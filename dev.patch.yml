@@ -1,0 +1,5 @@
+# 开发验证用:--patch 直接加载本地 TS 源文件(不走 npm 包解析)。
+# 用法:pnpm dsh web --patch <本文件绝对路径>
+- insert:
+    - id: dsh-sparrow
+      name: 'C:/Users/DJ028191/OneDrive/pyai/dsh-sparrow/src/host.ts'

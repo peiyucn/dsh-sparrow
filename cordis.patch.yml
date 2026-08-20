@@ -1,0 +1,5 @@
+# dsh-sparrow:麻雀虽小,五脏俱全 — 小插件集合。
+# 一行安装整个集合;某功能被官方支持后,从集合中退役并移除对应模块。
+- insert:
+    - id: dsh-sparrow
+      name: dsh-sparrow
