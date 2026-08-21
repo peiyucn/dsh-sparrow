@@ -19,7 +19,9 @@
 
 - [ ] 详见 research/02-fim-autocomplete.md 与 docs/modules/fim.md(待写)。
 
-## M3 · 一键压缩(dock 压缩按钮)
+## M3 · 一键压缩 —— 已取消
+
+官方加号菜单已提供 /compact 快捷入口(2026-08-20 实测),本模块不立项。调研记录见 docs/modules/compact.md。
 
 - [ ] 详见 docs/modules/compact.md;client 单半,remote.commands.execute('/compact')。
 

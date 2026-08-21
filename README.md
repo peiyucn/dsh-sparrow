@@ -10,7 +10,7 @@
 |---|---|---|
 | 归档会话管理 | 📋 计划(M1) | docs/modules/session-archive.md(待写) |
 | FIM 输入补全 | ✍️ 计划(M2) | research/02-fim-autocomplete.md |
-| 一键压缩 | 💡 计划(M3) | docs/modules/compact.md |
+| ~~一键压缩~~ | ✅ 官方已有 | 加号菜单里已有 /compact 快捷入口,不立项(见 docs/modules/compact.md) |
 
 路线图见 research/05-roadmap.md,研究底稿见 research/。
 
