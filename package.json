@@ -1,7 +1,7 @@
 {
-  "name": "dsh-sparrow",
+  "name": "dsh-fim",
   "version": "0.1.0",
-  "description": "麻雀虽小,五脏俱全 — a small DSH web-plugin collection (FIM completion, archived-session manager, …)",
+  "description": "DSH web 插件：聊天输入框 FIM 联想（DeepSeek FIM Beta 转发 + dock 建议条）",
   "type": "module",
   "main": "src/host.ts",
   "exports": {
@@ -9,14 +9,23 @@
     "./package.json": "./package.json"
   },
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" }
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
   },
-  "keywords": ["deepseek-harness", "dsh", "dsh-plugin", "fim", "session", "archive"],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "fim",
+    "autocomplete"
+  ],
   "license": "MIT",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --test",
-    "verify": "npm run typecheck && npm test"
+    "verify": "npm run typecheck && npm test",
+    "build": "tsc"
   },
   "devDependencies": {
     "typescript": "^5.5.0",
