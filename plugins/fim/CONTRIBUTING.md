@@ -12,7 +12,7 @@
 开发期用 --patch 直接加载本地 TS 源文件，无需构建：
 
     cd C:\Users\DJ028191\.dsh-launcher-panel\source
-    pnpm dsh web --port 3080 --no-open --patch C:\Users\DJ028191\pyai\dsh-fim\plugins\fim\dev.patch.yml
+    pnpm dsh web --port 3080 --no-open --patch C:\Users\DJ028191\pyai\dsh-sparrow\plugins\fim\dev.patch.yml
 
 启动后终端打印 [dsh-fim] host loaded 即验证通过。
 

@@ -4,4 +4,4 @@
 # 若用 npx 正式版：先 npm run build，再把下方 name 改成 dist/host.js。
 - insert:
     - id: dsh-fim
-      name: 'C:/Users/DJ028191/pyai/dsh-fim/plugins/fim/src/host.ts'
+      name: 'C:/Users/DJ028191/pyai/dsh-sparrow/plugins/fim/src/host.ts'
