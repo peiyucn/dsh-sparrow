@@ -8,8 +8,8 @@
 
 | 插件 | 状态 | 说明 | 文档 |
 |---|---|---|---|
-| [dsh-fim](plugins/fim/) | 🚧 M1 host half | 聊天输入框 FIM 联想（DeepSeek FIM Beta 转发 + dock 建议条） | [README](plugins/fim/README.md) · [spec](plugins/fim/docs/spec/) |
-| dsh-vision-subagent | 📋 计划中 | 纯文本主模型会话的图片视觉子代理（官方 vision 模型读图，主模型保持大脑） | [README](plugins/vision-subagent/README.md) |
+| [dsh-fim](plugins/fim/) | 📋 spec 评审中 | 聊天输入框 FIM 联想（DeepSeek FIM Beta 转发 + dock 建议条） | [README](plugins/fim/README.md) · [spec](plugins/fim/docs/spec/) |
+| dsh-vision-subagent | 📋 spec 评审中 | 纯文本主模型会话的图片视觉子代理（官方 vision 模型读图，主模型保持大脑） | [README](plugins/vision-subagent/README.md) · [spec](plugins/vision-subagent/docs/spec/) |
 
 ## 共享
 

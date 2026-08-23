@@ -1,54 +1,61 @@
 # 01 · 详细设计 — dsh-fim
 
+> 起点为零代码；seam 选择以本文件《seam 查证》为准，未查证项标注待查证，开工前补齐。
+
 ## 总体架构
 
-* **host half**（Node，`src/host.ts`）：webServer 路由 + 上游转发 + 凭据解析；
-* **client half**（浏览器，M2，`src/client/`，esbuild 单文件 bundle）：dock 建议条；
-* 通信只走 host 自有路由 `POST /api/fim/complete`（架构约束：client 不 import Node 模块，host 不 import 浏览器 API）。
+* **host half**（Node）：webServer 自有路由 + 上游转发 + 凭据解析；
+* **client half**（浏览器，M2）：dock 建议条，esbuild 单文件 bundle；
+* 通信只走 host 路由 `POST /api/fim/complete`（client 不 import Node 模块，host 不 import 浏览器 API）。
 
 ## 插件契约合规（dsh 规范）
 
-* 入口 export `name` / `inject` / `apply`；`inject` 只声明硬依赖（当前 `webServer`）；
+* 入口 export `name` / `inject` / `apply`；`inject` 只声明硬依赖（webServer）；
 * 副作用在 `apply` 内注册并配 `ctx.effect` 清理（路由注销）；
-* seam 只用公开契约：`ctx.webServer.register`（路由）、`ctx.get('sessions'|'credentials')`（软依赖、降级）；
-* 组合行 `cordis.patch.yml` 按官方 bundle patch 结构。
+* 只用公开 seam；确需包装时保持签名与 `this` 语义、可逆恢复、记录适配的 dsh 版本；
+* 不硬编码 dsh 内部目录布局；组合行 `cordis.patch.yml` 按官方 bundle patch 结构。
+
+## seam 查证（dsh ≥ 0.1.1-rc.2，本机 checkout 实测）
+
+| seam | 契约 | 证据 | 结论 |
+|---|---|---|---|
+| 路由注册 | `ctx.webServer.register(route: { kind: 'exact'|'prefix', path, handler(req,res): void|Promise<void> }): () => void`；重复 (kind,path) 抛错；返回注销函数 | packages/host/webserver/src/index.ts:108-115 | **公开 seam** ✓ |
+| 凭据 | `ctx.credentials.resolve(ref: CredentialRef): Promise<{ value, source } | undefined>`；ref 由 `credentialRef(name)` 构造（名称须匹配 /^[A-Za-z_][A-Za-z0-9_]*$/）；实时读勿缓存 | packages/credentials/credentials/src/index.ts:190、115-120、26-31 | **公开 seam** ✓，key 只经此解析 |
+| 会话校验 | `ctx.sessions.get(id): Session | undefined`（仅当前进程内存的 live 会话；持久化/历史回放另走 persistence 包） | packages/core/session/src/index.ts:1055-1057 | **公开 seam** ✓，注意内存表边界 |
+| 附件/输入 | 与 vision 插件共用 `ctx.attachments.readImage`（见 vision spec 01） | packages/attachment/attachment/src/index.ts:108 | 本插件 M2 若有图片需求再接入 |
 
 ## host half：转发路由
 
-### 现状（v1 骨架，已实现）
+### 请求语义
 
-* 注册 prefix 路由 `/api/fim`，只受理 `POST /api/fim/complete`，其余 404；
-* 请求校验：`sessionId` 必须命中 sessions 服务（否则 403/503）；`prompt` 非空且 ≤ `MAX_PROMPT_CHARS`（32k，否则 400）；
-* 请求体大小上限 `MAX_BODY_BYTES`（64 KB）；
-* 凭据：`ctx.credentials` 解析 `DEEPSEEK_API_KEY` 优先，环境变量兜底；缺失 401；
-* 上游转发：`POST {baseURL}/completions`，body `{ model, prompt, suffix?, max_tokens }`；
-* 生命周期：`REQUEST_TIMEOUT_MS`（30s）超时 + 客户端 `close` 即 `AbortController.abort()`；
-* 配置当前为内联 `DEFAULTS`（baseURL / model / maxTokens / apiKeyEnv）。
+* 只受理 `POST /api/fim/complete`，其余 404；
+* 校验：`sessionId` 命中 sessions 服务（否则 403/503）、`prompt` 非空且 ≤ `MAX_PROMPT_CHARS`（拟定 32k，否则 400）、请求体 ≤ `MAX_BODY_BYTES`（64 KB）；
+* 凭据：`ctx.credentials.resolve('DEEPSEEK_API_KEY')`，缺失 401；
+* 转发：`POST {baseURL}/completions`，body `{ model, prompt, suffix?, max_tokens }`；
+* 生命周期：超时（`REQUEST_TIMEOUT_MS` 30s）+ 客户端 `close` 即 `AbortController.abort()`。
 
-### M1 收尾待办
+### 配置
 
-* **配置化**：`DEFAULTS` 内联 → 插件设置分节（Config schema + settings），key 仍只经 credentials；
-* **错误映射表**（纯函数）：上游错误/超时/断连 → 用户可读提示；
-* **响应协议**：`{ suggestions: string[] }` 与 `{ error: { code, message } }` 定稿；
-* **单测**：请求校验、错误映射、请求体解析（AAA 风格，`test/*.test.mjs`）；
-* **本地验证**：`dev.patch.yml` + dsh source checkout（本机 `C:\Users\DJ028191\.dsh-launcher-panel\source`）；修复 tsconfig 类型路径（现指向已失效的 npx 缓存，需改为当前 `@deepseek-ai/cordis` 所在位置）。
+* 插件设置分节：`baseURL`（默认 https://api.deepseek.com/beta）/ `model` / `maxTokens` / `apiKeyEnv`；key 值仍只经 credentials，不进设置明文。
+
+### 错误映射（纯函数，可单测）
+
+* 上游错误/超时/断连 → 错误码表（`BAD_BODY` / `INVALID_PROMPT` / `UNKNOWN_SESSION` / `MISSING_CREDENTIAL` / `UPSTREAM_ERROR` / `TIMEOUT` 等）+ 用户可读提示。
 
 ## client half：dock 建议条（M2）
 
 ### 触发与作废（核心状态机，纯函数可单测）
 
 * **触发**：草稿变更后停顿 ≥ `TRIGGER_PAUSE_MS`（拟定 400ms，可配置）且草稿非空；
-* **不触发**：IME 组合态（`compositionstart` → `compositionend` 之间）、已在建议中、草稿被清空；
-* **作废**：继续输入、光标移动、发送消息、采用建议、超时未采用；
-* **防陈旧**：响应带回请求序号（或按草稿快照比对），过期响应直接丢弃。
+* **不触发**：IME 组合态（compositionstart/end 之间）、已有建议在飞、草稿为空；
+* **作废**：继续输入、光标移动、发送、采用、超时未采用；
+* **防陈旧**：响应带请求序号，过期响应丢弃；同一草稿只保留一个在飞请求。
 
 ### 展示与采用
 
-* 建议条 dock 在输入框附近，不遮挡输入；多条建议键盘（↑↓ Tab）可切换；
-* 采用 = 把建议文本追加进当前草稿（光标处），不发送；
-* 失败/超时静默降级为「无建议」，不打断输入。
+* dock 在输入框附近不遮挡；多条建议键盘（↑↓ Tab）切换；采用 = 追加进草稿（不发送）；失败静默降级为「无建议」。
 
-## 通信协议（host ↔ client）
+## 通信协议
 
 ```json
 POST /api/fim/complete
@@ -60,13 +67,12 @@ POST /api/fim/complete
 
 ## 安全与鲁棒性
 
-* API key 只在 host half 使用，不进浏览器、不进日志；日志不输出 prompt 全文（截断/脱敏）；
-* client 渲染建议一律转义（HTML 注入面）；
-* 上游请求全部带 AbortController；轮询/定时器在作废与卸载时清理；
+* API key 只在 host half，不进浏览器、不进日志；日志不输出 prompt 全文（截断/脱敏）；
+* client 渲染建议一律转义；上游请求全部带 AbortController；定时器/轮询在作废与卸载时清理；
 * 上游不可达/限流 → 按错误映射给可读提示，不悬挂。
 
 ## 风险与边界
 
-* **FIM Beta 接口稳定性**：接口字段/限额可能变化 → 转发层薄封装、错误映射兜底，随官方文档跟进；
-* **输入法组合态**：中文 IME 是触发误报高发区，必须用 composition 事件压制（列入 M2 验收）；
-* **多建议并发**：同一草稿只保留一个在飞请求（新请求取代旧请求）。
+* **FIM Beta 接口稳定性**：字段/限额可能变化 → 转发层薄封装 + 错误映射兜底，随官方文档跟进；
+* **输入法组合态**：中文 IME 是触发误报高发区，composition 压制列入 M2 验收；
+* **sessions 内存表边界**：`sessions.get(id)` 只覆盖当前进程 live 会话——宿主重启后旧 sessionId 校验会落空，需设计为「未命中即拒绝并提示刷新页面」，不做静默放行。
