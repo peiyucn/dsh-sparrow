@@ -1,33 +1,25 @@
-# dsh-fim
+# dsh-sparrow 🐦
 
-聊天输入框 FIM 联想 —— DeepSeek Harness（DSH）Web 插件。
+**麻雀虽小，五脏俱全** —— DeepSeek Harness（DSH）Web 插件小合集。
 
-打字停顿片刻，给出「接下来可能写的文字」建议，点击采用即追加进草稿。
-补全由 DeepSeek 官方 [FIM Beta](https://api-docs.deepseek.com/zh-cn/guides/fim_completion/) 接口生成。
+每个插件独立发布、独立安装（`dsh plugin --profile web add <包名>`）；某功能被官方原生支持后，对应插件从合集中退役。
 
-## 安装
+## 插件
 
-    dsh plugin --profile web add dsh-fim
+| 插件 | 状态 | 说明 | 文档 |
+|---|---|---|---|
+| [dsh-fim](plugins/fim/) | 🚧 M1 host half | 聊天输入框 FIM 联想（DeepSeek FIM Beta 转发 + dock 建议条） | [README](plugins/fim/README.md) · [spec](plugins/fim/docs/spec/) |
+| dsh-vision-subagent | 📋 计划中 | 纯文本主模型会话的图片视觉子代理（官方 vision 模型读图，主模型保持大脑） | [README](plugins/vision-subagent/README.md) |
 
-## 配置
+## 共享
 
-| 设置项 | 默认值 | 说明 |
-|---|---|---|
-| baseURL | https://api.deepseek.com/beta | FIM 端点 |
-| model | deepseek-v4-pro | 补全模型 |
-| maxTokens | 128 | 单条建议输出上限 |
-| apiKeyEnv | DEEPSEEK_API_KEY | 凭据引用，密钥存 DSH 凭据管理 |
+* [packages/shared](packages/shared/) —— 插件共用的 seam 适配层与测试基建（规划中）
 
-## 数据说明
+## 开发
 
-- 建议基于输入框当前草稿生成，草稿会发送到所配置的 FIM 端点；
-- 未点击「采用」的文本不会进入会话；
-- API key 只在 host half 使用，不进浏览器页面。
-
-## 文档
-
-- 设计：[docs/spec/](docs/spec/)
-- 贡献：[CONTRIBUTING.md](CONTRIBUTING.md)
+* 各插件独立目录开发与验证（如 `cd plugins/fim && npm run verify`）；
+* 新功能先写 spec（对应插件目录下 `docs/spec/NN-<主题>.md`）再开发；
+* 详细规范见 [AGENTS.md](AGENTS.md) 与 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## License
 

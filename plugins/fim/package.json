@@ -1,0 +1,34 @@
+{
+  "name": "dsh-fim",
+  "version": "0.1.0",
+  "description": "DSH web 插件：聊天输入框 FIM 联想（DeepSeek FIM Beta 转发 + dock 建议条）",
+  "type": "module",
+  "main": "src/host.ts",
+  "exports": {
+    ".": "./src/host.ts",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "fim",
+    "autocomplete"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test",
+    "verify": "npm run typecheck && npm test",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": "^20.14.0"
+  }
+}

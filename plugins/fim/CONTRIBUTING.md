@@ -4,15 +4,15 @@
 
 ## 开发环境
 
-- DSH rc.8 源码 checkout：C:\Users\DJ028191\deepseek-harness
-- Node 20+
+- DSH 源码 checkout：C:\Users\DJ028191\.dsh-launcher-panel\source（launcher 自管目录，dsh ≥ 0.1.1-rc.2）
+- Node 22.19+（22 系列）或 >= 24
 
 ## 本地验证（host half）
 
 开发期用 --patch 直接加载本地 TS 源文件，无需构建：
 
-    cd C:\Users\DJ028191\deepseek-harness
-    pnpm dsh web --patch C:\Users\DJ028191\OneDrive\pyai\dsh-fim\dev.patch.yml
+    cd C:\Users\DJ028191\.dsh-launcher-panel\source
+    pnpm dsh web --port 3080 --no-open --patch C:\Users\DJ028191\pyai\dsh-fim\plugins\fim\dev.patch.yml
 
 启动后终端打印 [dsh-fim] host loaded 即验证通过。
 
