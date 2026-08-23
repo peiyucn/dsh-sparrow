@@ -1,75 +1,72 @@
-# 01 · 详细设计
+# 01 · 详细设计 — dsh-fim
 
-## 1. 需求与验收标准
+## 总体架构
 
-### 需求
+* **host half**（Node，`src/host.ts`）：webServer 路由 + 上游转发 + 凭据解析；
+* **client half**（浏览器，M2，`src/client/`，esbuild 单文件 bundle）：dock 建议条；
+* 通信只走 host 自有路由 `POST /api/fim/complete`（架构约束：client 不 import Node 模块，host 不 import 浏览器 API）。
 
-* 用户打字停顿约 400ms 后，若草稿非空且以非空白结尾，展示一条续写建议；
-* 点击「采用」，建议文本追加进草稿；用户继续打字则建议自动作废；
-* 无建议、低置信、请求失败时静默降级，不打断输入。
+## 插件契约合规（dsh 规范）
 
-### 验收标准
+* 入口 export `name` / `inject` / `apply`；`inject` 只声明硬依赖（当前 `webServer`）；
+* 副作用在 `apply` 内注册并配 `ctx.effect` 清理（路由注销）；
+* seam 只用公开契约：`ctx.webServer.register`（路由）、`ctx.get('sessions'|'credentials')`（软依赖、降级）；
+* 组合行 `cordis.patch.yml` 按官方 bundle patch 结构。
 
-1. 仅 plain 相出建议；claimed / adjudicating / submitting 相不出；
-2. 采用后草稿 = 原草稿 + 建议文本，可正常发送；
-3. 建议出街后草稿继续变化（draftRev 推进）即作废；
-4. 无 key、限流、断网时不弹错误提示。
+## host half：转发路由
 
-## 2. FIM API 契约
+### 现状（v1 骨架，已实现）
 
-* 端点：POST https\://api.deepseek.com/beta/completions（OpenAI 兼容形状）
-* 请求：model（默认 deepseek-v4-pro）、prompt（已输入草稿全文）、suffix（可选）、max\_tokens（默认 128，官方上限 4K）
-* 响应：choices\[0].text
+* 注册 prefix 路由 `/api/fim`，只受理 `POST /api/fim/complete`，其余 404；
+* 请求校验：`sessionId` 必须命中 sessions 服务（否则 403/503）；`prompt` 非空且 ≤ `MAX_PROMPT_CHARS`（32k，否则 400）；
+* 请求体大小上限 `MAX_BODY_BYTES`（64 KB）；
+* 凭据：`ctx.credentials` 解析 `DEEPSEEK_API_KEY` 优先，环境变量兜底；缺失 401；
+* 上游转发：`POST {baseURL}/completions`，body `{ model, prompt, suffix?, max_tokens }`；
+* 生命周期：`REQUEST_TIMEOUT_MS`（30s）超时 + 客户端 `close` 即 `AbortController.abort()`；
+* 配置当前为内联 `DEFAULTS`（baseURL / model / maxTokens / apiKeyEnv）。
 
-## 3. client half设计
+### M1 收尾待办
 
-* 挂载：注册 conversation.input.dock 条目（list 插槽、会话 scope）
-* 数据源：owner 快照 input: InputState（draft / draftRev / phase）
-* 触发：phase 为 plain；draft 以非空白结尾；编辑发生在末尾（新 draft 以旧 draft 为前缀）；防抖 400ms
-* 请求：fetch POST /api/fim/complete，body { sessionId, prompt: draft }；AbortController 随 draftRev 变化或组件卸载取消
-* 渲染：单行建议条（建议文本 + 采用按钮），文案走 locale
-* 采用：inputActions.setDraft(draft + 建议文本)，前置校验 input.draft 仍等于建议基线
-* 作废：draftRev 变化、phase 离开 plain、组件卸载
+* **配置化**：`DEFAULTS` 内联 → 插件设置分节（Config schema + settings），key 仍只经 credentials；
+* **错误映射表**（纯函数）：上游错误/超时/断连 → 用户可读提示；
+* **响应协议**：`{ suggestions: string[] }` 与 `{ error: { code, message } }` 定稿；
+* **单测**：请求校验、错误映射、请求体解析（AAA 风格，`test/*.test.mjs`）；
+* **本地验证**：`dev.patch.yml` + dsh source checkout（本机 `C:\Users\DJ028191\.dsh-launcher-panel\source`）；修复 tsconfig 类型路径（现指向已失效的 npx 缓存，需改为当前 `@deepseek-ai/cordis` 所在位置）。
 
-## 4. host half设计
+## client half：dock 建议条（M2）
 
-### 配置（Config schema，同名 settings 分节）
+### 触发与作废（核心状态机，纯函数可单测）
 
-| 设置项 | 默认值 | 说明 |
-|---|---|---|
-| baseURL   | <https://api.deepseek.com/beta> | FIM 端点      |
-| model | deepseek-v4-pro | 补全模型 |
-| maxTokens | 128 | 单条建议输出上限 |
-| apiKeyEnv | DEEPSEEK\_API\_KEY              | 凭据引用（环境变量名） |
+* **触发**：草稿变更后停顿 ≥ `TRIGGER_PAUSE_MS`（拟定 400ms，可配置）且草稿非空；
+* **不触发**：IME 组合态（`compositionstart` → `compositionend` 之间）、已在建议中、草稿被清空；
+* **作废**：继续输入、光标移动、发送消息、采用建议、超时未采用；
+* **防陈旧**：响应带回请求序号（或按草稿快照比对），过期响应直接丢弃。
 
-### 路由
+### 展示与采用
 
-POST /api/fim/complete（经 ctx.webServer.register，kind: prefix，path: /api/fim）
+* 建议条 dock 在输入框附近，不遮挡输入；多条建议键盘（↑↓ Tab）可切换；
+* 采用 = 把建议文本追加进当前草稿（光标处），不发送；
+* 失败/超时静默降级为「无建议」，不打断输入。
 
-1. 校验 sessionId 为真实会话；
-2. 经 credentials seam 解析 API key；
-3. 转发 FIM 请求（透传请求取消信号）；
-4. 错误映射：401 → AUTH、429 → RATE\_LIMIT、网络失败 → TRANSPORT、超时 → TIMEOUT；
-5. 响应 { text }。
+## 通信协议（host ↔ client）
 
-## 5. 时序
+```json
+POST /api/fim/complete
+{ "sessionId": "...", "prompt": "草稿前缀", "suffix": "可选后缀" }
 
+200 { "suggestions": ["候选1", "候选2"] }
+4xx/5xx { "error": { "code": "...", "message": "..." } }
 ```
-打字 → 防抖 400ms → fetch /api/fim/complete → FIM Beta → 建议条渲染 → 点击采用 → setDraft
-```
 
-## 6. 边界与取舍
+## 安全与鲁棒性
 
-| 项 | 决定 | 理由 |
-|---|---|---|
-| 光标位置不可见 | 仅末尾输入时出建议 | InputState 不含 caret |
-| Tab 键不可用 | 点击采用 | 键盘仲裁是输入框私有面 |
-| 单条建议 | 不做候选列表 | 克制噪声 |
-| 采用后文本进入会话 | 作为普通草稿文本发送 | 符合用户预期 |
+* API key 只在 host half 使用，不进浏览器、不进日志；日志不输出 prompt 全文（截断/脱敏）；
+* client 渲染建议一律转义（HTML 注入面）；
+* 上游请求全部带 AbortController；轮询/定时器在作废与卸载时清理；
+* 上游不可达/限流 → 按错误映射给可读提示，不悬挂。
 
-## 7. 测试要点
+## 风险与边界
 
-* 触发条件与作废判定抽成纯函数，node:test 覆盖；
-* host 路由错误映射与取消传播用 mock fetch 覆盖；
-* 结构测试：bundle 声明与组合行（test/structure.test.mjs）。
-
+* **FIM Beta 接口稳定性**：接口字段/限额可能变化 → 转发层薄封装、错误映射兜底，随官方文档跟进；
+* **输入法组合态**：中文 IME 是触发误报高发区，必须用 composition 事件压制（列入 M2 验收）；
+* **多建议并发**：同一草稿只保留一个在飞请求（新请求取代旧请求）。

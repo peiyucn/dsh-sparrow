@@ -1,23 +1,31 @@
-# 02 · 路线图
+# 02 · 路线图 — dsh-fim
 
-仅记录未来计划。
+> 里程碑可独立验收；每完成一项单独 commit。
 
-## M1 · host half：FIM 转发路由
+## M1 · host half（进行中）
 
-- [ ] Config schema + settings 分节
-- [ ] POST /api/fim/complete：sessionId 校验、credentials 解析、错误映射、取消传播
-- [ ] 验证：curl / console fetch 拿到补全文本
+* [x] v1 骨架：webServer 路由 + 会话校验 + 凭据解析 + FIM 转发 + 超时/取消
+* [ ] 修 typecheck：tsconfig 类型路径指向当前 `@deepseek-ai/cordis` 实际位置
+* [ ] 配置化：DEFAULTS → 设置分节（baseURL / model / maxTokens / apiKeyEnv）
+* [ ] 错误映射表 + 响应协议定稿
+* [ ] 单测：请求校验 / 错误映射 / 请求体解析
+* [ ] `dev.patch.yml` 本地验证通过，`npm run verify` 全绿
 
-## M2 · client half：dock 建议条
+## M2 · client half（dost 建议条）
 
-- [ ] dsh.client 声明 + ./client 出口 + 组合行
-- [ ] dock 条目 + 触发 / 防抖 / 取消逻辑
-- [ ] 建议条 UI + 采用（setDraft）+ 作废
-- [ ] i18n（zh / en）
-- [ ] 真机手测清单逐项验收
+* [ ] esbuild 单文件 bundle 方案落地（src/client/，构建产物不入库）
+* [ ] 触发/作废状态机（含 IME 组合态压制，纯函数 + 单测）
+* [ ] dock 建议条 UI 与键盘交互
+* [ ] 采用追加草稿、防陈旧响应
+* [ ] 热更验证（dsh checkout 内 `pnpm run dev:web`）
 
-## M3 · 发布
+## M3 · 打磨（可选）
 
-- [ ] README 用户文档 + CHANGELOG
-- [ ] 版本号 + npm run verify
-- [ ] npm publish 或 tarball 交付
+* [ ] 多建议并发策略调优（同草稿单在飞请求）
+* [ ] 触发停顿阈值与 maxTokens 进设置
+* [ ] 性能：请求合并 / 结果缓存
+
+## 发布
+
+* 独立 npm 包 `dsh-fim`，按合集《发布》流程走 tag 或 `npm publish`；
+* 官方原生支持输入框 FIM 联想后退役。
