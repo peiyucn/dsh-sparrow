@@ -1,7 +1,0 @@
-# 开发验证用：source 模式 + --patch 直接加载本地 TS 源文件（无需构建）。
-# 用法（在 deepseek-harness checkout 内）：
-#   pnpm dsh web --port 3080 --no-open --patch <本文件绝对路径>
-# 若用 npx 正式版：先 npm run build，再把下方 name 改成 dist/host.js。
-- insert:
-    - id: dsh-fim
-      name: 'C:/Users/DJ028191/pyai/dsh-sparrow/plugins/fim/src/host.ts'

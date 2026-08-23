@@ -1,5 +1,0 @@
-# dsh-fim：聊天输入框 FIM 联想。
-# M1 host 行（FIM 转发路由）；M2 起增加 dsh.client 行（dock 建议条）。
-- insert:
-    - id: dsh-fim
-      name: dsh-fim
