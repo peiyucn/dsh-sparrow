@@ -49,7 +49,7 @@
 * **触发**：草稿变更后停顿 ≥ `TRIGGER_PAUSE_MS`（拟定 400ms，可配置）且草稿非空；
 * **不触发**：IME 组合态（compositionstart/end 之间）、已有建议在飞、草稿为空；
 * **作废**：继续输入、光标移动、发送、采用、超时未采用；
-* **防陈旧**：响应带请求序号，过期响应丢弃；同一草稿只保留一个在飞请求。
+* **防陈旧**：对齐 dsh 官方草稿修订号机制——请求时快照 `draftRev`，响应回来比对修订号，过期即丢弃（官方语义即 CAS：stale draftRev ⇒ 整个动作 no-op，见 packages/client/ui-input-trigger/src/types.ts:44-48）；同一草稿只保留一个在飞请求。
 
 ### 展示与采用
 
