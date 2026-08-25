@@ -12,8 +12,9 @@
 
 * 每个插件一个独立 npm 包、独立发布；合集 README 提供索引，某功能被官方原生支持后对应插件从合集中退役
 * 布局：
-  * `plugins/fim` — 聊天输入框 FIM 联想（DeepSeek FIM Beta 转发 + dock 建议条）
-  * `plugins/vision-subagent` — 纯文本会话的图片视觉子代理（官方 vision 模型读图，主模型保持大脑）
+  * `plugins/dsh-fim` — 聊天输入框 FIM 联想（DeepSeek FIM Beta 转发 + dock 建议条）
+  * `plugins/dsh-vision-subagent` — 纯文本会话的图片视觉子代理（官方 vision 模型读图，主模型保持大脑）
+  * `plugins/dsh-archive-session` — 归档会话管理：三档——轻量标题 / 备份 / 删除
   * `packages/shared` — 插件共用的 seam 适配层与测试基建（有真实共用代码时再落地）
 * 各插件本地验证 = 进入插件目录 `npm run verify`（typecheck + node:test）
 * 各插件专属约束见 `plugins/*/AGENTS.md`
@@ -26,7 +27,7 @@
 * **生命周期**：一切副作用在 `apply` 内注册，并配 `ctx.effect` 清理（卸载/更新时自动执行）；不泄漏定时器/watcher/事件监听
 * **组合行**：`cordis.patch.yml` 的 insert 结构按官方 bundle patch 规范（id + name + 依赖）
 * **seam 纪律**：只用公开 seam（`ctx.llm` / `ctx.webServer` / `ctx.tools` / slots / provide 等正路 API）；确需包装 seam 时保持原签名与 `this` 语义、可逆恢复，并记录所适配的 dsh 版本
-* **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直接读内部文件（附件/会话数据一律走官方服务）
+* **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直接读内部文件（附件/会话数据一律走官方服务）。**特例机制**：官方无能力、需求明确且必须直碰内部文件的场景，须在对应插件 `AGENTS.md` 显式记录特例（允许的操作、边界、风险），并经项目 owner 认可——如 dsh-archive-session 的「备份 / 删除」特例。
 * **查证原则**：引用 DSH 服务、事件、插槽、附件契约时，先 grep 源码（本机 checkout：`C:\Users\DJ028191\.dsh-launcher-panel\source`）或 cordis_inspect 查询确认，禁止凭记忆编造
 
 ***

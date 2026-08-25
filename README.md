@@ -8,8 +8,9 @@
 
 | 插件 | 状态 | 说明 | 文档 |
 |---|---|---|---|
-| [dsh-fim](plugins/fim/) | 📋 spec 评审中 | 聊天输入框 FIM 联想（DeepSeek FIM Beta 转发 + dock 建议条） | [README](plugins/fim/README.md) · [spec](plugins/fim/docs/spec/) |
-| dsh-vision-subagent | 📋 spec 评审中 | 纯文本主模型会话的图片视觉子代理（官方 vision 模型读图，主模型保持大脑） | [README](plugins/vision-subagent/README.md) · [spec](plugins/vision-subagent/docs/spec/) |
+| [dsh-fim](plugins/dsh-fim/) | 📋 spec 评审中 | 聊天输入框 FIM 联想（DeepSeek FIM Beta 转发 + dock 建议条） | [README](plugins/dsh-fim/README.md) · [spec](plugins/dsh-fim/docs/spec/) |
+| dsh-vision-subagent | 📋 spec 评审中 | 纯文本主模型会话的图片视觉子代理（官方 vision 模型读图，主模型保持大脑） | [README](plugins/dsh-vision-subagent/README.md) · [spec](plugins/dsh-vision-subagent/docs/spec/) |
+| [dsh-archive-session](plugins/dsh-archive-session/) | 📋 规划中 | 归档会话管理：三档——轻量标题 / 备份 / 删除 | [README](plugins/dsh-archive-session/README.md) · [spec](plugins/dsh-archive-session/docs/spec/) |
 
 ## 共享
 
@@ -17,7 +18,7 @@
 
 ## 开发
 
-* 各插件独立目录开发与验证（如 `cd plugins/fim && npm run verify`）；
+* 各插件独立目录开发与验证（如 `cd plugins/dsh-fim && npm run verify`）；
 * 新功能先写 spec（对应插件目录下 `docs/spec/NN-<主题>.md`）再开发；
 * 详细规范见 [AGENTS.md](AGENTS.md) 与 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
