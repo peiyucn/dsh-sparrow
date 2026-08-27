@@ -1,0 +1,13 @@
+# 本地开发补丁：dsh checkout 内 dev:web / --patch overlay 使用；name 是本机绝对路径。
+- insert:
+    - id: dsh-vision-subagent
+      name: C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-vision-subagent/src/index.ts
+      config:
+        subagentProvider: spawn
+        visionModel: deepseek-v4-flash-vision-exp
+        cacheMaxEntries: 64
+        textRoutes:
+          - provider: deepseek-official
+            model: deepseek-v4-pro
+          - provider: deepseek-official
+            model: deepseek-v4-flash

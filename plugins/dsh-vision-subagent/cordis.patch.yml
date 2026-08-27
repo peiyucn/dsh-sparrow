@@ -1,0 +1,13 @@
+# dsh-vision-subagent 组合补丁：门禁放行只对以下文本路由生效。
+- insert:
+    - id: dsh-vision-subagent
+      name: dsh-vision-subagent
+      config:
+        subagentProvider: spawn
+        visionModel: deepseek-v4-flash-vision-exp
+        cacheMaxEntries: 64
+        textRoutes:
+          - provider: deepseek-official
+            model: deepseek-v4-pro
+          - provider: deepseek-official
+            model: deepseek-v4-flash
