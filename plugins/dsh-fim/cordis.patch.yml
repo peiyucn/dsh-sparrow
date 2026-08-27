@@ -1,0 +1,14 @@
+# dsh-fim 组合补丁：`dsh plugin --profile web add dsh-fim` 安装后由 profile 自动挂载。
+# 配置值均为安全默认值；API key 只经 ctx.credentials 解析，绝不写在这里。
+- insert:
+    - id: dsh-fim
+      name: dsh-fim
+      config:
+        baseURL: https://api.deepseek.com/beta
+        model: deepseek-chat
+        maxTokens: 64
+        apiKeyEnv: DEEPSEEK_API_KEY
+        requestTimeoutMs: 30000
+        maxBodyBytes: 65536
+        maxPromptChars: 32768
+        triggerPauseMs: 400

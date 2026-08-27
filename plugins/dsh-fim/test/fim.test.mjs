@@ -1,0 +1,104 @@
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import {
+  DEFAULT_MAX_BODY_BYTES, extractSuggestions, isStaleResponse, normalizeConfig,
+  parseCompleteBody, summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
+} from '../lib/fim.js'
+
+describe('fim 纯逻辑', () => {
+  describe('normalizeConfig', () => {
+    it('空配置 应该 返回默认值', () => {
+      const config = normalizeConfig(undefined)
+      assert.equal(config.baseURL, 'https://api.deepseek.com/beta')
+      assert.equal(config.maxTokens, 64)
+      assert.equal(config.apiKeyEnv, 'DEEPSEEK_API_KEY')
+    })
+
+    it('非正整数限制 应该 抛错', () => {
+      assert.throws(() => normalizeConfig({ maxTokens: 0 }), /maxTokens/)
+    })
+
+    it('非 http 的 baseURL 应该 抛错', () => {
+      assert.throws(() => normalizeConfig({ baseURL: 'file:///tmp' }), /baseURL/)
+    })
+  })
+
+  describe('validateCompletePayload', () => {
+    it('合法请求 应该 返回 prompt 与 sessionId', () => {
+      const value = validateCompletePayload({ sessionId: 'session-1', prompt: '你好' })
+      assert.deepEqual(value, { sessionId: 'session-1', prompt: '你好' })
+    })
+
+    it('缺 prompt 应该 返回 INVALID_PROMPT', () => {
+      const value = validateCompletePayload({ sessionId: 'session-1', prompt: '' })
+      assert.equal(value.code, 'INVALID_PROMPT')
+    })
+
+    it('非字符串 suffix 应该 返回 BAD_BODY', () => {
+      const value = validateCompletePayload({ sessionId: 'session-1', prompt: 'a', suffix: 1 })
+      assert.equal(value.code, 'BAD_BODY')
+    })
+
+    it('超过 maxPromptChars 应该 返回 INVALID_PROMPT', () => {
+      const value = validateCompletePayload({ sessionId: 'session-1', prompt: 'abcd' }, 3)
+      assert.equal(value.code, 'INVALID_PROMPT')
+    })
+  })
+
+  describe('parseCompleteBody', () => {
+    it('超限请求体 应该 返回 BAD_BODY', () => {
+      const body = JSON.stringify({ sessionId: 's', prompt: 'x'.repeat(DEFAULT_MAX_BODY_BYTES) })
+      const value = parseCompleteBody(body, 1024)
+      assert.equal(value.code, 'BAD_BODY')
+    })
+
+    it('非法 JSON 应该 返回 BAD_BODY', () => {
+      const value = parseCompleteBody('{bad', 1024)
+      assert.equal(value.code, 'BAD_BODY')
+    })
+  })
+
+  describe('upstreamStatusToError', () => {
+    it('401 应该 映射为 MISSING_CREDENTIAL', () => {
+      assert.equal(upstreamStatusToError(401, '').code, 'MISSING_CREDENTIAL')
+    })
+
+    it('429 应该 映射为 RATE_LIMITED', () => {
+      assert.equal(upstreamStatusToError(429, '').code, 'RATE_LIMITED')
+    })
+
+    it('500 应该 映射为 UPSTREAM_ERROR 并保留短摘要', () => {
+      const error = upstreamStatusToError(500, JSON.stringify({ error: { message: 'boom' } }))
+      assert.equal(error.code, 'UPSTREAM_ERROR')
+      assert.match(error.message, /boom/u)
+    })
+  })
+
+  describe('extractSuggestions', () => {
+    it('合法 choices 应该 去重返回文本', () => {
+      assert.deepEqual(extractSuggestions({ choices: [{ text: 'a' }, { text: 'a' }, { text: 'b' }] }), ['a', 'b'])
+    })
+
+    it('无 choices 应该 返回空数组', () => {
+      assert.deepEqual(extractSuggestions({}), [])
+    })
+  })
+
+  describe('summarizeUpstreamBody', () => {
+    it('超长文本 应该 截断并带省略号', () => {
+      const value = summarizeUpstreamBody('x'.repeat(300), 10)
+      assert.equal(value.length, 11)
+      assert.match(value, /…$/u)
+    })
+  })
+
+  describe('isStaleResponse', () => {
+    it('draftRev 不一致 应该 判定陈旧', () => {
+      assert.equal(isStaleResponse(1, 2), true)
+    })
+
+    it('draftRev 一致 应该 判定新鲜', () => {
+      assert.equal(isStaleResponse(1, 1), false)
+    })
+  })
+})
