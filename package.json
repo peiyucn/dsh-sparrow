@@ -2,5 +2,7 @@
   "name": "dsh-sparrow",
   "private": true,
   "description": "麻雀虽小,五脏俱全 —— DeepSeek Harness Web 插件小合集",
-  "scripts": {}
+  "scripts": {
+    "verify:all": "node scripts/verify-all.mjs"
+  }
 }
