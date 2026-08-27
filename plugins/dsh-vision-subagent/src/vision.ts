@@ -27,7 +27,7 @@ export interface VisionConfig {
 export interface VisionReport {
   readonly summary: string
   readonly ocrText?: string
-  readonly tables: string[]
+  readonly tables?: string[]
   readonly layout?: string
 }
 
@@ -152,7 +152,7 @@ export function renderVisionReport(report: VisionReport): string {
   const lines = [`[vision_read]\nsummary: ${report.summary}`]
   if (report.ocrText !== undefined) lines.push(`ocr:\n${report.ocrText}`)
   if (report.layout !== undefined) lines.push(`layout: ${report.layout}`)
-  if (report.tables.length > 0) lines.push(`tables:\n${report.tables.map(table => `- ${table}`).join('\n')}`)
+  if (report.tables !== undefined && report.tables.length > 0) lines.push(`tables:\n${report.tables.map(table => `- ${table}`).join('\n')}`)
   return lines.join('\n')
 }
 

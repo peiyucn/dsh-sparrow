@@ -21,8 +21,20 @@ export type { VisionConfig, VisionReport }
 
 const TOOL_NAME = 'vision_read'
 
-/** 子代理结构化输出 schema；ObjectJsonSchema 由 dsh-tools 校验。 */
-const VISION_REPORT_SCHEMA = {
+/** defineTool 输出 schema（ValueSchemaSpec DSL）：工具回传主模型的契约。 */
+const VISION_REPORT_OUTPUT_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    summary: { type: 'string', required: true, description: '图片内容的中文一句话摘要' },
+    ocrText: { type: 'string', description: '图片中的逐字文本；没有文字时省略' },
+    tables: { type: 'array', items: { type: 'string' }, description: '图片中的表格，每表一个字符串；没有表格时省略' },
+    layout: { type: 'string', description: '版式分区描述；简单图片可省略' },
+  },
+} as const
+
+/** 子代理 structured output 的 ObjectJsonSchema（raw JSON Schema 子集）。 */
+const VISION_REPORT_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
@@ -73,7 +85,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       },
     },
     output: {
-      schema: VISION_REPORT_SCHEMA,
+      schema: VISION_REPORT_OUTPUT_SCHEMA,
       render: (_args, value: VisionReport) => [{
         type: 'text',
         text: renderVisionReport(value),
@@ -116,7 +128,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         parent: agent,
         signal: exec.signal,
         agentOptions: { model: settings.visionModel },
-        outputSchema: VISION_REPORT_SCHEMA,
+        outputSchema: VISION_REPORT_JSON_SCHEMA,
       })
       try {
         const result = await run.result
