@@ -4,16 +4,18 @@
 
 ## 项目概况
 
-DSH Web 插件：归档会话管理 —— 工作区工具栏一个入口按钮 + 弹窗列出轻归档会话；每行三档操作：轻量标题（`@` 仍可拉回，路线 A）、备份（`@` 不可达，可逆）、删除（`@` 不可达，不可逆）。
+DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入口按钮 + 弹窗列出轻归档会话。已实现：轻量标题（路线 A，短 TTL 缓存 `sessionQuery.readTitleSnapshots`）、备份（可逆）、删除（不可逆）、备份恢复。
+
+> 入口槽位查证结论（dsh ≥ 0.1.1-rc.2）：`ui-workspace` 没有可注入的工具栏 slot；采用 `ui-sidebar` 公开 slot `sidebar.footer.action`（`packages/client/ui-sidebar/src/client/index.ts:52`）。
 
 ## seam 特例（需项目 owner 认可，已定案）
 
-* **允许**：直接移动（备份档，可逆）或删除（删除档，不可逆）「会话日志目录」（`SessionPersistence.locate(meta)` 拿到的路径，`~/.dsh/sessions` 下）。理由：DSH 无公开「删除 / 移动会话日志」API。
+* **允许**：直接移动（备份档，可逆）或删除（删除档，不可逆）「会话日志目录」。当前只对 `SessionPersistence.locate(meta)` 返回 `kind: 'jsonl'` 且父目录明显为单会话目录的路径执行；其他后端返回 `BACKEND_UNSUPPORTED`。
 * **边界**：
-  * 备份档只移动（移入插件备份夹，默认 `~/.dsh/dsh-archive-session-backup/`）；删除档允许 `rm`，但须「不可逆」警示 + 更强确认（如输入会话标题）。
-  * 动作前二次确认；活动会话先停 + flush 再移 / 删，防 dispose 回写重建。
-  * 动作后必须同步清理 `workspace` 记账与归档集（经 `workspaceDomainSpec` + `ctx.storageDomain`），并广播 `host/archived-sessions-changed` 同步客户端；不留「未分组」脏行。
-  * 备份档支持移回恢复。
+  * 备份档只移动（移入插件备份夹，默认 `$DSH_HOME/dsh-archive-session-backup/`）；删除档允许 `rm`，并须输入完整会话标题强确认。
+  * 动作前二次确认；活动会话：`agent.cancel({kind:'hook'})` → `agent.whenIdle()` → `sessions.flush()` → `agent.ctx.fiber.dispose()`，确认会话已从 live store 卸载后再移 / 删。
+  * 动作后同步 `workspace` 记账：`WorkspaceEntity.detachSession()`；归档集经 `workspaceDomainSpec` + `ctx.storageDomain` 更新（`domain/changed` 会触发 api-proxy 广播 `host/archived-sessions-changed`，插件不手发帧）。
+  * 备份目录写 `dsh-archive-session.json` sidecar（原路径 / 标题 / workspaceIds），恢复时移回并 `WorkspaceEntity.attachSession()`。
 * **仍禁止**：monkey-patch 核心、读 / 改会话日志内容、动会话目录以外的内部文件（附件 / 存储域 / 凭据等一律走官方服务）。
 
 ## 架构约束

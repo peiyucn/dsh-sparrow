@@ -5,7 +5,7 @@
 ## DSH seam 查证结论（已 grep 源码确认）
 
 * 归档 API：`workspace` 公开 `archiveSession(sessionId)`（`packages/workspace/workspace/src/index.ts:244`），归档集持久化在 `~/.dsh/storages/workspace.json` 的 `archivedSessionIds`。
-* 未确认：`workspace` 是否公开「取消归档 / 列出已归档」方法（spec 注释提到 unarchive 应还原同一行，但 grep 未见公开方法；开工前补查）。
+* 已复核：`workspace` 无公开「取消归档 / 列出已归档」方法（spec 注释提到 unarchive，但 grep 未见公开方法）。
 * 会话删除：无官方「删除会话日志」API（客户端 workspace 接口无 deleteSession；`session.*` 接口无 delete；`SessionPersistence` 无 delete）。社区插件用删除链实现（dsh-plugin-session-delete / dsh-session-manager README 实证）：停会话 → 删日志目录 → 清理记账 → 同步帧。
 * 会话查询：`ctx.sessionQuery`（`listSessions` / `readTitleSnapshots` / `readSurface`）与 `ctx.sessionReferenceResolver`（`candidates`）为宿主平面服务。
 * Remote：客户端 `@` 源 `ui-reference` 经 `ctx.remote.sessionReferenceResolver` / `ctx.remote.fileReferences` 走宿主。
@@ -13,8 +13,8 @@
 
 ## UI 入口与摆放（定案）
 
-* **工作区工具栏加一个入口按钮**（与现有「搜索 / 排序 / 添加工作区」并排），点开弹窗列出轻归档会话。
-* 待查证：`ui-workspace` 工具栏是否有可注入按钮的 slot；具体 slot 契约开工前按「查证原则」grep 确认。
+* **侧边栏 footer 动作区加一个入口按钮**（公开 slot `sidebar.footer.action`），点开弹窗列出轻归档会话。
+* 已查证：`ui-workspace` 工具栏没有可注入 slot；本插件采用 `ui-sidebar` 的 `sidebar.footer.action`（`packages/client/ui-sidebar/src/client/index.ts:52`）。
 
 ## 三档操作的可行性
 
@@ -28,7 +28,7 @@
 备份 = 移动，删除 = `rm`。两者共用同一清理链，仅第 2 步动作与确认强度不同：
 
 1. **停 + dispose 运行中会话**（动作前 flush，防 dispose 阶段回写 / 重建日志目录）；
-2. **备份：移动会话目录** 到插件备份夹（默认 `~/.dsh/dsh-archive-session-backup/`）；**删除：`rm` 会话目录**；均需处理裸 UUID 与 `session-` 前缀两种 id 形式（`SessionPersistence.locate(meta)` 公开，可拿路径）；
+2. **备份：移动会话目录** 到插件备份夹（默认 `$DSH_HOME/dsh-archive-session-backup/`）；**删除：`rm` 会话目录**；只对 `SessionPersistence.locate(meta)` 返回 `kind: 'jsonl'` 的已知单会话目录执行；
 3. **清理记账**：经 `ctx.storageDomain.open(workspaceDomainSpec)` 从 `archivedSessionIds` 与 `workspaces` 表 `sessionIds` 移除该 id，内存 / 磁盘一致；
 4. **同步帧**：广播 `host/archived-sessions-changed` / workspace 变更帧同步客户端；备份移回时反向操作。
 
@@ -38,10 +38,10 @@
 
 ## 待查证 / 开放问题
 
-1. 工作区工具栏入口按钮：`ui-workspace` 有没有对应 slot？owner props / 注册方式？（需 grep 确认）
-2. `workspace` 有没有公开的 unarchive / 列归档方法？（需 grep 确认）
+1. ✅ 入口按钮：`ui-workspace` 无对应 slot，改用 `sidebar.footer.action`。
+2. ✅ `workspace` 无公开 unarchive；归档集读写经 `workspaceDomainSpec` + `ctx.storageDomain`，workspace 记账用 `WorkspaceEntity.detachSession/attachSession`。
 3. 三档已定：轻量标题 / 备份（可逆）/ 删除（不可逆），备份与删除的 seam 特例写入 `plugins/dsh-archive-session/AGENTS.md`（已定案）。
-4. 路线 A 用装配层替换还是包装 seam？装饰 `sessionReferenceResolver` 还是 `sessionQuery`？是否连带 `fileReferences`？
+4. ✅ 路线 A 包装 `sessionQuery.readTitleSnapshots`（短 TTL LRU + `session/title` 失效），不连带 `fileReferences`。
 
 ## 适配版本基线
 
