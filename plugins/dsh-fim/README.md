@@ -2,9 +2,9 @@
 
 聊天输入框 FIM 联想 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
 
-打字停顿片刻，给出「接下来可能写的文字」建议，点击采用即追加进草稿；补全由 DeepSeek 官方 [FIM Beta](https://api-docs.deepseek.com/zh-cn/guides/fim_completion/) 接口生成。
+打字停顿片刻，给出「接下来可能写的文字」建议，点击采用即追加进草稿；补全由 DeepSeek 官方 [对话前缀续写（Beta）](https://api-docs.deepseek.com/zh-cn/guides/chat_prefix_completion/) 接口生成：host 把最近对话历史和你正在输入的半句话作为 assistant prefix 发给模型。
 
-**状态：🚧 M1（host 转发路由）+ M2（dock 建议条）已实现** —— 适配 dsh ≥ 0.1.1-rc.2；设计文档见 [docs/spec/](docs/spec/)。
+**状态：🚧 M1+M2 已实现（对话前缀续写版）** —— 适配 dsh ≥ 0.1.1-rc.2；设计文档见 [docs/spec/](docs/spec/)。
 
 ## 本地验证
 

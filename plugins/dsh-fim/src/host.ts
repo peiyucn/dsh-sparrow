@@ -1,4 +1,4 @@
-/** dsh-fim host half：POST /api/fim/complete 转发路由。 */
+/** dsh-fim host half：POST /api/fim/complete，转发 DeepSeek 对话前缀续写（Beta）。 */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
@@ -8,8 +8,8 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
-  extractSuggestions, isAbortTimeout, normalizeConfig, parseCompleteBody, summarizeUpstreamBody,
-  upstreamStatusToError, type CompleteRequest, type FimConfig, type FimError,
+  buildChatPrefixMessages, extractSuggestions, isAbortTimeout, normalizeConfig, parseCompleteBody,
+  summarizeUpstreamBody, upstreamStatusToError, type CompleteRequest, type FimConfig, type FimError,
 } from './fim.js'
 
 export type { CompleteRequest } from './fim.js'
@@ -105,7 +105,8 @@ export function apply(ctx: Context, config: Readonly<Partial<FimConfig>> = {}): 
       }
 
       const sessionId = SessionId(parsed.sessionId)
-      if (ctx.sessions.get(sessionId) === undefined) {
+      const session = ctx.sessions.get(sessionId)
+      if (session === undefined) {
         sendError(res, 404, {
           code: 'UNKNOWN_SESSION',
           message: '会话不存在或已不在当前进程：请刷新页面后重试',
@@ -117,7 +118,7 @@ export function apply(ctx: Context, config: Readonly<Partial<FimConfig>> = {}): 
       try {
         credential = await ctx.credentials.resolve(credentialRef(settings.apiKeyEnv))
       } catch {
-        sendError(res, 500, { code: 'INVALID_CONFIG', message: 'FIM apiKeyEnv 配置不是合法的凭据引用' })
+        sendError(res, 500, { code: 'INVALID_CONFIG', message: '续写 apiKeyEnv 配置不是合法的凭据引用' })
         return
       }
       if (credential === undefined) {
@@ -125,15 +126,15 @@ export function apply(ctx: Context, config: Readonly<Partial<FimConfig>> = {}): 
         return
       }
 
+      const messages = buildChatPrefixMessages(session.deriveMessages() as readonly unknown[], parsed.prompt)
       const upstreamBody = {
         model: settings.model,
-        prompt: parsed.prompt,
-        ...parsed.suffix === undefined ? {} : { suffix: parsed.suffix },
+        messages,
         max_tokens: settings.maxTokens,
       }
       const signal = requestSignal(res, settings.requestTimeoutMs)
       try {
-        const upstream = await fetch(`${settings.baseURL.replace(/\/$/u, '')}/completions`, {
+        const upstream = await fetch(`${settings.baseURL.replace(/\/$/u, '')}/chat/completions`, {
           method: 'POST',
           headers: {
             authorization: `Bearer ${credential.value}`,
@@ -151,18 +152,18 @@ export function apply(ctx: Context, config: Readonly<Partial<FimConfig>> = {}): 
         try {
           data = JSON.parse(upstreamText)
         } catch {
-          sendError(res, 502, { code: 'UPSTREAM_ERROR', message: 'DeepSeek FIM 上游返回了非法 JSON' })
+          sendError(res, 502, { code: 'UPSTREAM_ERROR', message: 'DeepSeek 对话前缀续写上游返回了非法 JSON' })
           return
         }
         const suggestions = extractSuggestions(data)
         if (suggestions.length === 0) {
-          sendError(res, 502, { code: 'UPSTREAM_ERROR', message: 'DeepSeek FIM 上游没有返回可用候选' })
+          sendError(res, 502, { code: 'UPSTREAM_ERROR', message: 'DeepSeek 对话前缀续写上游没有返回可用候选' })
           return
         }
         sendJson(res, 200, { suggestions })
       } catch (error) {
         if (isAbortTimeout(signal.signal)) {
-          sendError(res, 504, { code: 'TIMEOUT', message: 'DeepSeek FIM 上游超时' })
+          sendError(res, 504, { code: 'TIMEOUT', message: 'DeepSeek 对话前缀续写上游超时' })
         } else if (signal.signal.aborted) {
           // 客户端已断开；响应写不写都无所谓，但要避免悬挂。
           if (!res.headersSent) res.destroy()
@@ -170,7 +171,7 @@ export function apply(ctx: Context, config: Readonly<Partial<FimConfig>> = {}): 
           const message = error instanceof Error ? error.message : String(error)
           sendError(res, 502, {
             code: 'UPSTREAM_ERROR',
-            message: `FIM 上游请求失败：${summarizeUpstreamBody(message)}`,
+            message: `对话前缀续写上游请求失败：${summarizeUpstreamBody(message)}`,
           })
         }
       } finally {
