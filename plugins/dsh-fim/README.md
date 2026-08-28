@@ -18,4 +18,12 @@ npm run verify
 * 客户端 dock 在停顿 400ms 后触发，IME 组合态压制，响应按 `draftRev` 防陈旧；
 * 采用通过 scoped `slash/input-insert-text` bail 事件写入草稿，不碰 DOM / 输入框内部实现。
 
+## 本机实测记录（2026-08-28）
+
+* 使用临时 `DSH_HOME` 执行 `dsh plugin --profile web add <本目录>`，再启动 web profile；
+* `POST /api/session.create` 创建 live session；
+* `POST /api/fim/complete` 返回 DeepSeek FIM Beta 真实建议（HTTP 200）；
+* `GET /plugins/dsh-fim/client.js` 返回 200，bundle 为 `window.__ModuleLoader__.load(...)` 工厂格式；
+* 浏览器端 dock 的点击交互仍需在页面里做一次人工确认。
+
 > 注：实现基于当前 dsh 版本（≥ 0.1.1-rc.2）的查证 seam 从零重做（seam 查证结论见 spec/01）。
