@@ -22,8 +22,10 @@ export interface ArchiveSidecar {
 }
 
 export function normalizeArchiveConfig(input: Readonly<Partial<ArchiveConfig>> | undefined): ArchiveConfig {
+  const fallbackHome = join(process.env.USERPROFILE || process.env.HOME || '.', '.dsh')
+  const defaultBackupRoot = join(process.env.DSH_HOME?.trim() || fallbackHome, 'dsh-archive-session-backup')
   const config: ArchiveConfig = {
-    backupRoot: input?.backupRoot?.trim() || join(process.env.DSH_HOME ?? join(process.env.USERPROFILE ?? process.env.HOME ?? '.', '.dsh'), 'dsh-archive-session-backup'),
+    backupRoot: input?.backupRoot?.trim() || defaultBackupRoot,
     titleCacheTtlMs: input?.titleCacheTtlMs ?? DEFAULT_TITLE_CACHE_TTL_MS,
     titleCacheMaxEntries: input?.titleCacheMaxEntries ?? DEFAULT_TITLE_CACHE_MAX_ENTRIES,
   }
