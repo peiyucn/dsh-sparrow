@@ -12,7 +12,7 @@ await build({
   target: 'es2022',
   sourcemap: true,
   legalComments: 'none',
-  banner: { js: `window.__ModuleLoader__.load({ id: ${JSON.stringify(id)}, factory: (require) => {` },
+  banner: { js: `window.__ModuleLoader__.load({ id: ${JSON.stringify(id)}, factory: (require) => {\nvar module = { exports: {} };` },
   footer: { js: 'return module.exports; } });' },
   external: ['react', 'react/jsx-runtime', '@deepseek-ai/cordis', '@deepseek-ai/dsh-client-ui-slots', '@deepseek-ai/dsh-client-ui-primitives', '@deepseek-ai/dsh-client-runtime/client'],
   define: {
