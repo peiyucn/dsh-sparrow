@@ -2,7 +2,7 @@
 # 注意：name 是本机绝对路径，不要提交到远端共享环境。
 - insert:
     - id: dsh-fim
-      name: C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-fim/src/index.ts
+      name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-fim/src/index.ts
       config:
         baseURL: https://api.deepseek.com/beta
         model: deepseek-chat
