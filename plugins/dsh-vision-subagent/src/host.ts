@@ -21,6 +21,11 @@ export type { VisionConfig, VisionReport }
 
 const TOOL_NAME = 'vision_read'
 
+/** 把超长的 sha256 附件 id 截短展示（错误消息里列候选用）。 */
+function shortId(id: string): string {
+  return id.length > 18 ? `${id.slice(0, 18)}…` : id
+}
+
 /** defineTool 输出 schema（ValueSchemaSpec DSL）：工具回传主模型的契约。 */
 const VISION_REPORT_OUTPUT_SCHEMA = {
   type: 'object',
@@ -77,7 +82,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       attachmentId: {
         type: 'string',
         required: true,
-        description: 'The opaque attachment id shown in the conversation image block placeholder.',
+        description: 'The opaque attachment id shown in the conversation image block placeholder. 会话图片的 attachmentId 形如 sha256:<64位哈希>；界面占位符里只露出短哈希时直接传短哈希即可，插件会按唯一前缀解析。',
       },
       question: {
         type: 'string',
@@ -99,10 +104,17 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         throw new Error('vision_read requires a calling agent (exec.agent was undefined)')
       }
       const attachmentId = args.attachmentId as string
-      const ref = findImageReference(agent.session.events, attachmentId)
-      if (ref === undefined) {
-        throw new Error(`vision_read: attachment "${attachmentId}" 不在当前会话中（附件可能已释放）`)
+      const lookup = findImageReference(agent.session.events, attachmentId)
+      if (!lookup.ok) {
+        const ids = lookup.matches.length > 0
+          ? lookup.matches.map(id => shortId(id)).join(', ')
+          : '（会话中没有任何图片附件）'
+        if (lookup.reason === 'ambiguous') {
+          throw new Error(`vision_read: attachment "${attachmentId}" 前缀匹配到多个图片，请提供更完整的 id：${ids}`)
+        }
+        throw new Error(`vision_read: attachment "${attachmentId}" 不在当前会话中（附件可能已释放）。会话中的图片 id：${ids}`)
       }
+      const ref = lookup.ref
 
       const cacheKey = String(ref.attachmentId)
       const cached = cache.get(cacheKey)

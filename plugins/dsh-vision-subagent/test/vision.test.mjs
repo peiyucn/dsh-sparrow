@@ -43,7 +43,9 @@ describe('vision-subagent 纯逻辑', () => {
         time: 0,
         data: { message: { role: 'user', content: [{ type: 'image', attachment: ref }] } },
       }]
-      assert.equal(findImageReference(events, 'att-1'), ref)
+      const result = findImageReference(events, 'att-1')
+      assert.equal(result.ok, true)
+      assert.equal(result.ref, ref)
     })
 
     it('tool-result 嵌套图片 应该 也能反查', () => {
@@ -54,11 +56,54 @@ describe('vision-subagent 纯逻辑', () => {
         time: 0,
         data: { content: [{ type: 'tool-result', content: [{ type: 'image', attachment: ref }] }] },
       }]
-      assert.equal(findImageReference(events, 'att-2'), ref)
+      const result = findImageReference(events, 'att-2')
+      assert.equal(result.ok, true)
+      assert.equal(result.ref, ref)
     })
 
-    it('未知 id 应该 返回 undefined', () => {
-      assert.equal(findImageReference([], 'nope'), undefined)
+    it('sha256: 前缀与裸哈希 应该 等价精确匹配', () => {
+      const ref = { attachmentId: 'sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890', mediaType: 'image/png' }
+      const events = [{ type: 'user/message', seq: 0, time: 0, data: { content: [{ type: 'image', attachment: ref }] } }]
+      const result = findImageReference(events, 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')
+      assert.equal(result.ok, true)
+      assert.equal(result.ref, ref)
+    })
+
+    it('截断哈希 应该 唯一前缀匹配', () => {
+      const ref = { attachmentId: 'sha256:1f336f80c1fec7c9c080d69e29b529f56c2d17af8bddc935c5aee3229d0e5263', mediaType: 'image/png' }
+      const events = [{ type: 'user/message', seq: 0, time: 0, data: { content: [{ type: 'image', attachment: ref }] } }]
+      const result = findImageReference(events, '1f336f80')
+      assert.equal(result.ok, true)
+      assert.equal(result.ref, ref)
+    })
+
+    it('前缀命中多个图片 应该 返回 ambiguous 与候选', () => {
+      const refs = [
+        { attachmentId: 'sha256:1f336f80c1fec7c9c080d69e29b529f56c2d17af8bddc935c5aee3229d0e5263', mediaType: 'image/png' },
+        { attachmentId: 'sha256:1f336f80c1fec7c9c080d69e29b529f56c2d17af8bddc935c5aee3229d0e5264', mediaType: 'image/png' },
+      ]
+      const events = [{ type: 'user/message', seq: 0, time: 0, data: { content: refs.map(ref => ({ type: 'image', attachment: ref })) } }]
+      const result = findImageReference(events, '1f336f80')
+      assert.equal(result.ok, false)
+      assert.equal(result.reason, 'ambiguous')
+      assert.equal(result.matches.length, 2)
+    })
+
+    it('过短 id 应该 只做精确匹配不做前缀匹配', () => {
+      const ref = { attachmentId: 'sha256:1f336f80c1fec7c9c080d69e29b529f56c2d17af8bddc935c5aee3229d0e5263', mediaType: 'image/png' }
+      const events = [{ type: 'user/message', seq: 0, time: 0, data: { content: [{ type: 'image', attachment: ref }] } }]
+      const result = findImageReference(events, '1f33')
+      assert.equal(result.ok, false)
+      assert.equal(result.reason, 'not-found')
+    })
+
+    it('未知 id 应该 返回 not-found 与现有图片 id', () => {
+      assert.equal(findImageReference([], 'nope').ok, false)
+      const ref = { attachmentId: 'att-x', mediaType: 'image/png' }
+      const events = [{ type: 'user/message', seq: 0, time: 0, data: { content: [{ type: 'image', attachment: ref }] } }]
+      const result = findImageReference(events, 'nope')
+      assert.equal(result.ok, false)
+      assert.deepEqual(result.matches, ['att-x'])
     })
   })
 

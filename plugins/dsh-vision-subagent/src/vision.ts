@@ -68,8 +68,25 @@ export function shouldClearInputModalities(
   return routes.some(route => route.provider === provider && route.model === model)
 }
 
-/** 从会话事件中反查首个匹配 attachmentId 的图片引用（仿 api-proxy.referencedImage 的纯逻辑版）。 */
-export function findImageReference(events: readonly SessionEvent[], attachmentId: string): ImageAttachmentRef | undefined {
+/** 唯一前缀匹配的最短查询长度；更短的 id 只做精确匹配，避免误命中。 */
+export const MIN_PREFIX_MATCH_CHARS = 8
+
+export type ImageLookupResult =
+  | { readonly ok: true; readonly ref: ImageAttachmentRef }
+  | { readonly ok: false; readonly reason: 'not-found' | 'ambiguous'; readonly matches: readonly string[] }
+
+/** 归一化附件 id：去空白、剥掉 `sha256:` 前缀、统一小写。 */
+export function normalizeAttachmentId(id: string): string {
+  const trimmed = id.trim().toLowerCase()
+  return trimmed.startsWith('sha256:') ? trimmed.slice('sha256:'.length) : trimmed
+}
+
+/**
+ * 从会话事件中反查图片引用（仿 api-proxy.referencedImage 的纯逻辑版）。
+ * 兼容占位符里只露出截断哈希的场景：先精确匹配，再唯一前缀匹配；歧义时返回全部候选。
+ */
+export function findImageReference(events: readonly SessionEvent[], attachmentId: string): ImageLookupResult {
+  const refs: ImageAttachmentRef[] = []
   for (const event of events) {
     const data = event.data as {
       content?: unknown
@@ -77,39 +94,49 @@ export function findImageReference(events: readonly SessionEvent[], attachmentId
       inserted?: Array<{ content?: unknown }>
       chunk?: { type?: unknown; block?: unknown }
     }
-    const direct = imageInContent(data.content, attachmentId)
-    if (direct !== undefined) return direct
-    const wrapped = data.message === undefined ? undefined : imageInContent(data.message.content, attachmentId)
-    if (wrapped !== undefined) return wrapped
+    collectImageRefs(data.content, refs)
+    if (data.message !== undefined) collectImageRefs(data.message.content, refs)
     if (data.inserted !== undefined) {
-      for (const message of data.inserted) {
-        const inserted = imageInContent(message.content, attachmentId)
-        if (inserted !== undefined) return inserted
-      }
+      for (const message of data.inserted) collectImageRefs(message.content, refs)
     }
     if (event.type === 'assistant/chunk' && data.chunk?.type === 'block-end') {
-      const chunked = imageInContent([data.chunk.block], attachmentId)
-      if (chunked !== undefined) return chunked
+      collectImageRefs([data.chunk.block], refs)
     }
   }
-  return undefined
+
+  const allIds = refs.map(ref => String(ref.attachmentId))
+  const query = normalizeAttachmentId(attachmentId)
+  if (query === '') return { ok: false, reason: 'not-found', matches: allIds }
+  for (const ref of refs) {
+    if (normalizeAttachmentId(String(ref.attachmentId)) === query) return { ok: true, ref }
+  }
+  if (query.length >= MIN_PREFIX_MATCH_CHARS) {
+    const prefixMatches = refs.filter(ref => normalizeAttachmentId(String(ref.attachmentId)).startsWith(query))
+    if (prefixMatches.length === 1 && prefixMatches[0] !== undefined) {
+      return { ok: true, ref: prefixMatches[0] }
+    }
+    if (prefixMatches.length > 1) {
+      return { ok: false, reason: 'ambiguous', matches: prefixMatches.map(ref => String(ref.attachmentId)) }
+    }
+  }
+  return { ok: false, reason: 'not-found', matches: allIds }
 }
 
-function imageInContent(content: unknown, attachmentId: string): ImageAttachmentRef | undefined {
-  if (!Array.isArray(content)) return undefined
+function collectImageRefs(content: unknown, refs: ImageAttachmentRef[]): void {
+  if (!Array.isArray(content)) return
   for (const value of content) {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
     const block = value as { type?: unknown; attachment?: unknown; content?: unknown }
     if (block.type === 'image' && typeof block.attachment === 'object' && block.attachment !== null) {
       const ref = block.attachment as ImageAttachmentRef
-      if (String(ref.attachmentId) === attachmentId) return ref
+      if (!refs.some(existing => String(existing.attachmentId) === String(ref.attachmentId))) {
+        refs.push(ref)
+      }
     }
     if (block.type === 'tool-result') {
-      const nested = imageInContent(block.content, attachmentId)
-      if (nested !== undefined) return nested
+      collectImageRefs(block.content, refs)
     }
   }
-  return undefined
 }
 
 /** 把子代理文本输出块拼成字符串（失败兜底报告用）。 */
