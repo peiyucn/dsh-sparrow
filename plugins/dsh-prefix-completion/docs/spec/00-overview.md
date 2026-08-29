@@ -4,7 +4,7 @@
 
 ## 定位
 
-给 DeepSeek Harness Web 的**聊天输入框**加「续写联想」：用户打字停顿片刻，插件给出「接下来可能写的文字」建议；点击采用即追加进草稿。补全由 DeepSeek 官方对话前缀续写（Chat Prefix Completion，Beta）接口生成：host 把最近对话历史和正在输入的半句话作为 assistant 前缀发给模型。
+给 DeepSeek Harness Web 的**聊天输入框**加「续写联想」：用户打字停顿片刻，插件给出「接下来可能写的文字」建议；点击采用即追加进草稿。补全由 DeepSeek 官方对话前缀续写（Chat Prefix Completion，Beta）接口生成：host 把最近对话历史、用户角度续写引导和正在输入的半句话发给模型，让补全内容站在用户角度续写草稿，而不是回应草稿。
 
 ## 需求范围（做什么 / 不做什么）
 

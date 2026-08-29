@@ -15,6 +15,7 @@ npm run verify
 ## 关键行为
 
 * host 路由 `POST /api/prefix-completion/complete`；会话未命中即拒、凭据只经 `ctx.credentials` 实时解析；
+* 补全请求带用户角度续写引导（官方契约要求 `prefix` 只加在最后一条 assistant 消息上，引导让续文内容站在用户角度，而不是回应草稿）；
 * 客户端 dock 在停顿 400ms 后触发，IME 组合态压制，响应按 `draftRev` 防陈旧；
 * 采用通过 scoped `slash/input-insert-text` bail 事件写入草稿，不碰 DOM / 输入框内部实现。
 

@@ -138,8 +138,15 @@ function textFromHistoryMessage(message: unknown): string {
 }
 
 /**
- * 构造「对话前缀续写」请求消息：带最近对话历史，并把用户正在输入的半句话
- * 作为最后一条 assistant 前缀（官方 Chat Prefix Completion 契约）。
+ * 用户角度续写引导：放在草稿前缀前。官方契约要求带 prefix 的最后一条消息必须是
+ * assistant 角色，因此把「站在用户角度续写」写进引导，让模型补全出的这段文本
+ * 内容上是用户草稿的续文，而不是对草稿的回复。
+ */
+export const DRAFT_CONTINUATION_GUIDANCE = '用户正在输入一条新消息，草稿如下。请站在用户的角度、以用户的口吻把草稿续写完整：只输出草稿的续写文本，不要解释、不要回复草稿内容、不要另起新话题。'
+
+/**
+ * 构造「对话前缀续写」请求消息：带最近对话历史 + 用户角度续写引导，并把用户正在
+ * 输入的半句话作为最后一条 assistant 前缀（官方 Chat Prefix Completion 契约）。
  */
 export function buildChatPrefixMessages(
   history: readonly unknown[],
@@ -158,12 +165,7 @@ export function buildChatPrefixMessages(
     chars += text.length
   }
 
-  if (recent.length === 0) {
-    recent.push({ role: 'user', content: '继续完成下面这条草稿：' })
-  } else if (recent.at(-1)?.role === 'assistant') {
-    recent.push({ role: 'user', content: '继续完成这条草稿：' })
-  }
-
+  recent.push({ role: 'user', content: DRAFT_CONTINUATION_GUIDANCE })
   recent.push({ role: 'assistant', content: draft, prefix: true })
   return recent
 }

@@ -81,15 +81,18 @@ describe('prefix-completion 纯逻辑', () => {
   })
 
   describe('buildChatPrefixMessages', () => {
-    it('空历史 应该 生成 user 引导 + assistant prefix', () => {
+    it('空历史 应该 生成用户角度引导 + assistant prefix', () => {
       const messages = buildChatPrefixMessages([], '我觉得这个功能')
+      assert.equal(messages.length, 2)
       assert.equal(messages[0].role, 'user')
+      assert.match(messages[0].content, /用户的角度/u)
+      assert.match(messages[0].content, /只输出草稿的续写文本/u)
       assert.equal(messages.at(-1).role, 'assistant')
       assert.equal(messages.at(-1).content, '我觉得这个功能')
       assert.equal(messages.at(-1).prefix, true)
     })
 
-    it('带最近对话历史 应该 保留文本并把草稿作为最后一条 assistant prefix', () => {
+    it('带最近对话历史 应该 保留文本，引导在前、草稿 prefix 在最后', () => {
       const history = [
         { role: 'user', content: [{ type: 'text', text: '帮我写周报' }] },
         { role: 'assistant', content: [{ type: 'text', text: '好的，本周完成了……' }] },
@@ -97,15 +100,18 @@ describe('prefix-completion 纯逻辑', () => {
       const messages = buildChatPrefixMessages(history, '下周计划是')
       assert.equal(messages[0].content, '帮我写周报')
       assert.equal(messages[1].content, '好的，本周完成了……')
+      assert.equal(messages[2].role, 'user')
+      assert.match(messages[2].content, /用户的口吻/u)
       assert.equal(messages.at(-1).content, '下周计划是')
       assert.equal(messages.at(-1).prefix, true)
     })
 
-    it('最后一条历史是 assistant 应该 插入一条 user 承接消息', () => {
+    it('官方契约 应该 满足：最后一条消息 assistant 且 prefix 为 true', () => {
       const history = [{ role: 'assistant', content: [{ type: 'text', text: '已经写好了。' }] }]
       const messages = buildChatPrefixMessages(history, '另外')
-      assert.equal(messages.at(-2).role, 'user')
       assert.equal(messages.at(-1).role, 'assistant')
+      assert.equal(messages.at(-1).prefix, true)
+      assert.equal(messages.at(-2).role, 'user')
     })
   })
 

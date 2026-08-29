@@ -31,7 +31,7 @@
 * 只受理 `POST /api/prefix-completion/complete`，其余 404；
 * 校验：`sessionId` 命中 sessions 服务（否则 403/503）、`prompt` 非空且 ≤ `MAX_PROMPT_CHARS`（拟定 32k，否则 400）、请求体 ≤ `MAX_BODY_BYTES`（64 KB）；
 * 凭据：`ctx.credentials.resolve('DEEPSEEK_API_KEY')`，缺失 401；
-* 转发：`POST {baseURL}/chat/completions`，body `{ model, messages, max_tokens }`；`messages` 由最近对话历史 + 最后一条 assistant 前缀（`prefix: true`）构造（见 `buildChatPrefixMessages`）；
+* 转发：`POST {baseURL}/chat/completions`，body `{ model, messages, max_tokens }`；`messages` 由最近对话历史 + 用户角度续写引导 + 最后一条 assistant 前缀（`prefix: true`，官方契约要求前缀必须是 assistant 角色）构造（见 `buildChatPrefixMessages`）；引导保证补全出的文本内容上是用户草稿的续文，而不是对草稿的回复；
 * 生命周期：超时（`REQUEST_TIMEOUT_MS` 30s）+ 客户端 `close` 即 `AbortController.abort()`。
 
 ### 配置
