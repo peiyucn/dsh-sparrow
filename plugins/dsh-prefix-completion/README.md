@@ -37,4 +37,9 @@ npm run verify
 * 注意：0.1.2-alpha.1 起 client bundle 走 `/plugins/??<id>/client.js&rev=...` 组合 URL，rc.2 时代的 `/plugins/<id>/client.js` 裸路径不再直接可用（旧记录第 4 条按当时版本为准）；
 * 真实 web profile 已用 `dsh plugin --profile web add` 装入三个插件（link: 指向合集源码目录），重启 web profile 后生效；输入框 dock 的点击交互仍需在页面里做一次人工确认。
 
+### 用户角度续写实测（2026-08-29，真实凭据直连上游）
+
+* 以插件同款消息构造（历史 + 用户角度引导 + 草稿 prefix）调用 `https://api.deepseek.com/beta/chat/completions`；
+* 草稿「下一个迭代我想」返回建议「把 `format` 的逻辑抽成一个纯函数，方便补单元测试。你怎么看？」——用户口吻续写且反问助手，符合预期。
+
 > 注：实现基于当前 dsh 版本（≥ 0.1.1-rc.2）的查证 seam 从零重做（seam 查证结论见 spec/01）。
