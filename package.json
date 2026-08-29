@@ -4,5 +4,8 @@
   "description": "麻雀虽小,五脏俱全 —— DeepSeek Harness Web 插件小合集",
   "scripts": {
     "verify:all": "node scripts/verify-all.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
   }
 }

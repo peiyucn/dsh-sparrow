@@ -1,3 +1,13 @@
 packages:
   - "plugins/*"
   - "packages/*"
+
+# esbuild 安装脚本需要落平台二进制；pnpm 11 默认拦截构建脚本，这里显式放行。
+allowBuilds:
+  esbuild: true
+
+# @deepseek-ai/cordis 是 dsh 内置 cordis 的 fork：npm 上只发布了 4.0.x，没有插件 peerDeps
+# 所写的 0.1.1-rc.2（dsh 包本体在 npm 有 0.1.1-rc.2）。实际运行环境（dsh ≥ 0.1.2-alpha.1）
+# 也用 4.0.1，因此整个 workspace 统一 override 到 npm 的 4.0.1。
+overrides:
+  "@deepseek-ai/cordis": "4.0.1"
