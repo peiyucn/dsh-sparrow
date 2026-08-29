@@ -28,4 +28,12 @@ npm run verify
 
 > **改名说明**：插件由 `dsh-fim` 更名 `dsh-prefix-completion`——实际实现走 DeepSeek [对话前缀续写（Beta）](https://api-docs.deepseek.com/zh-cn/guides/chat_prefix_completion/)，并非 FIM 补全，旧名与实现不符。路由同步改为 `POST /api/prefix-completion/complete`，bundle id 同步变更；上表实测是旧名下做的，改名后需重新 `add` 并复测。
 
+## 本机实测记录（2026-08-29，改名后，dsh 0.1.2-alpha.1）
+
+* 隔离冒烟：临时 `DSH_HOME` 下 `dsh plugin --profile web add` 装入三个 sparrow 插件（prefix-completion / vision-subagent / archive-session），再以当前 dsh 源码树 `--profile web --port 0` 启动，fail-loud 启动通过（三插件随 profile 装载成功）；
+* `POST /api/prefix-completion/complete` 携带假 sessionId 返回插件自身 `UNKNOWN_SESSION` JSON——路由注册与会话门禁生效；
+* 首页 boot 图包含 `dsh-prefix-completion` 与 `dsh-archive-session` 的 client bundle（combo 批次，HTTP 200，工厂以 `window.__ModuleLoader__.load({ id: ... })` 注入；vision-subagent 无 client half，按预期不出现）；
+* 注意：0.1.2-alpha.1 起 client bundle 走 `/plugins/??<id>/client.js&rev=...` 组合 URL，rc.2 时代的 `/plugins/<id>/client.js` 裸路径不再直接可用（旧记录第 4 条按当时版本为准）；
+* 真实 web profile 已用 `dsh plugin --profile web add` 装入三个插件（link: 指向合集源码目录），重启 web profile 后生效；输入框 dock 的点击交互仍需在页面里做一次人工确认。
+
 > 注：实现基于当前 dsh 版本（≥ 0.1.1-rc.2）的查证 seam 从零重做（seam 查证结论见 spec/01）。
