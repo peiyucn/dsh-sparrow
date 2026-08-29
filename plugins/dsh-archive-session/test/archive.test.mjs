@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  isDeleteConfirmationSufficient, normalizeArchiveConfig, parseBackupSidecar,
+  isDeleteConfirmationSufficient, legacyBackupItem, normalizeArchiveConfig, parseBackupSidecar,
   sanitizeSegment, TitleCache,
 } from '../lib/archive.js'
 
@@ -11,7 +11,7 @@ describe('archive-session 纯逻辑', () => {
       const config = normalizeArchiveConfig(undefined)
       assert.equal(config.titleCacheTtlMs, 60_000)
       assert.equal(config.titleCacheMaxEntries, 256)
-      assert.match(config.backupRoot, /dsh-archive-session-backup/u)
+      assert.match(config.backupRoot, /sessions-archived-backup/u)
     })
 
     it('非法 TTL 应该 抛错', () => {
@@ -69,6 +69,18 @@ describe('archive-session 纯逻辑', () => {
       assert.equal(cache.get('b'), undefined)
       assert.equal(cache.get('a'), 1)
       assert.equal(cache.get('c'), 3)
+    })
+  })
+
+  describe('legacyBackupItem', () => {
+    it('旧格式目录 应该 用目录名作 id 与标题并标记 legacy', () => {
+      const item = legacyBackupItem('0d21fc8b-56e9-4761-a59f-d972c095d2d8', 1788014172861)
+      assert.equal(item.backupId, '0d21fc8b-56e9-4761-a59f-d972c095d2d8')
+      assert.equal(item.sessionId, '0d21fc8b-56e9-4761-a59f-d972c095d2d8')
+      assert.equal(item.title, '0d21fc8b-56e9-4761-a59f-d972c095d2d8')
+      assert.equal(item.legacy, true)
+      assert.deepEqual(item.workspaceIds, [])
+      assert.match(item.archivedAt, /^\d{4}-\d{2}-\d{2}T/u)
     })
   })
 

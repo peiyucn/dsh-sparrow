@@ -5,6 +5,8 @@ import { join } from 'node:path'
 export const DEFAULT_TITLE_CACHE_TTL_MS = 60_000
 export const DEFAULT_TITLE_CACHE_MAX_ENTRIES = 256
 export const BACKUP_SIDECAR = 'dsh-archive-session.json'
+/** 备份目录名（沿用此前版本实际使用的目录，让旧备份直接可见）。 */
+export const DEFAULT_BACKUP_DIR = 'sessions-archived-backup'
 
 export interface ArchiveConfig {
   readonly backupRoot: string
@@ -23,7 +25,7 @@ export interface ArchiveSidecar {
 
 export function normalizeArchiveConfig(input: Readonly<Partial<ArchiveConfig>> | undefined): ArchiveConfig {
   const fallbackHome = join(process.env.USERPROFILE || process.env.HOME || '.', '.dsh')
-  const defaultBackupRoot = join(process.env.DSH_HOME?.trim() || fallbackHome, 'dsh-archive-session-backup')
+  const defaultBackupRoot = join(process.env.DSH_HOME?.trim() || fallbackHome, DEFAULT_BACKUP_DIR)
   const config: ArchiveConfig = {
     backupRoot: input?.backupRoot?.trim() || defaultBackupRoot,
     titleCacheTtlMs: input?.titleCacheTtlMs ?? DEFAULT_TITLE_CACHE_TTL_MS,
@@ -118,5 +120,31 @@ export function parseBackupSidecar(value: unknown): ArchiveSidecar | undefined {
     originalPath: sidecar.originalPath,
     archivedAt: sidecar.archivedAt,
     workspaceIds: sidecar.workspaceIds,
+  }
+}
+
+/** 旧格式备份条目（无 sidecar）：目录名即会话 id；只可列出/删除，不可恢复。 */
+export interface LegacyBackupItem {
+  readonly backupId: string
+  readonly sessionId: string
+  readonly title: string
+  readonly archivedAt: string
+  readonly workspaceIds: readonly []
+  readonly legacy: true
+}
+
+/**
+ * 从旧格式备份目录构造列表条目；时间取目录 mtime。
+ * @param name - 备份目录名（旧格式下即会话 id）。
+ * @param mtimeMs - 目录最后修改时间（毫秒时间戳）。
+ */
+export function legacyBackupItem(name: string, mtimeMs: number): LegacyBackupItem {
+  return {
+    backupId: name,
+    sessionId: name,
+    title: name,
+    archivedAt: new Date(mtimeMs).toISOString(),
+    workspaceIds: [],
+    legacy: true,
   }
 }

@@ -3,6 +3,6 @@
     - id: dsh-archive-session
       name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-archive-session/src/index.ts
       config:
-        backupRoot: C:/Users/DJ028191/.dsh/dsh-archive-session-backup
+        backupRoot: C:/Users/DJ028191/.dsh/sessions-archived-backup
         titleCacheTtlMs: 60000
         titleCacheMaxEntries: 256

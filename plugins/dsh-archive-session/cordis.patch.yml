@@ -4,6 +4,6 @@
     - id: dsh-archive-session
       name: dsh-archive-session
       config:
-        backupRoot: !!js dshHomePath('dsh-archive-session-backup')
+        backupRoot: !!js dshHomePath('sessions-archived-backup')
         titleCacheTtlMs: 60000
         titleCacheMaxEntries: 256

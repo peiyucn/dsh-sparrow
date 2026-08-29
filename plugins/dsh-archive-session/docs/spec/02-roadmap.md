@@ -5,7 +5,7 @@
 ## M1 · 查证与定案
 
 * [x] 补查：`workspace` 无公开 unarchive；`ui-workspace` 无工具栏 slot（改用 `sidebar.footer.action`）；`sessionQuery` 实例方法可包装。
-* [x] 定案：路线 A 包装 `sessionQuery.readTitleSnapshots`；备份夹 `$DSH_HOME/dsh-archive-session-backup/`。
+* [x] 定案：路线 A 包装 `sessionQuery.readTitleSnapshots`；备份夹 `$DSH_HOME/sessions-archived-backup/`（沿用旧版实际目录；无 sidecar 的旧目录按「仅列出/删除」收纳）。
 
 ## M2 · 按定案实现（路线 A + 归档查看 + 备份 / 删除 / 恢复）
 

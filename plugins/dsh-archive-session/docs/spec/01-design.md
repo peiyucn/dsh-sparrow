@@ -28,7 +28,7 @@
 备份 = 移动，删除 = `rm`。两者共用同一清理链，仅第 2 步动作与确认强度不同：
 
 1. **停 + dispose 运行中会话**（动作前 flush，防 dispose 阶段回写 / 重建日志目录）；
-2. **备份：移动会话目录** 到插件备份夹（默认 `$DSH_HOME/dsh-archive-session-backup/`）；**删除：`rm` 会话目录**；只对 `SessionPersistence.locate(meta)` 返回 `kind: 'jsonl'` 的已知单会话目录执行；
+2. **备份：移动会话目录** 到插件备份夹（默认 `$DSH_HOME/sessions-archived-backup/`）；**删除：`rm` 会话目录**；只对 `SessionPersistence.locate(meta)` 返回 `kind: 'jsonl'` 的已知单会话目录执行；
 3. **清理记账**：经 `ctx.storageDomain.open(workspaceDomainSpec)` 从 `archivedSessionIds` 与 `workspaces` 表 `sessionIds` 移除该 id，内存 / 磁盘一致；
 4. **同步帧**：广播 `host/archived-sessions-changed` / workspace 变更帧同步客户端；备份移回时反向操作。
 

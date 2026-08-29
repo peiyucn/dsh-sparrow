@@ -20,5 +20,6 @@ npm run verify
 
 ## 备份位置与恢复
 
-* 默认备份夹：`$DSH_HOME/dsh-archive-session-backup/`（`cordis.patch.yml` 使用 `dshHomePath(...)` 求值）；
-* 每个备份目录内写 `dsh-archive-session.json` sidecar（原路径 / 标题 / 工作区记账），恢复时按 sidecar 移回原处并回填工作区。
+* 默认备份夹：`$DSH_HOME/sessions-archived-backup/`（`cordis.patch.yml` 使用 `dshHomePath(...)` 求值；沿用此前版本实际使用的目录名，旧备份直接可见）；
+* 每个备份目录内写 `dsh-archive-session.json` sidecar（原路径 / 标题 / 工作区记账），恢复时按 sidecar 移回原处并回填工作区；
+* 无 sidecar 的目录按「旧格式」备份列出：可删除，不可恢复（原始位置无从得知），界面上标注并禁用恢复按钮。

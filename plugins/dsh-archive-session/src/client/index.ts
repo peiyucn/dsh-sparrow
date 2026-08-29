@@ -59,10 +59,12 @@ export function apply(ctx: ClientContext): void {
         sessionId: string
         title: string
         archivedAt: string
+        legacy: boolean
       }>('/api/archive-session/backups'),
       backupSession: (sessionId: string) => postApi('/api/archive-session/backup', { sessionId, confirm: true }),
       deleteSession: (sessionId: string, confirmTitle: string) => postApi('/api/archive-session/delete', { sessionId, confirmTitle }),
       restoreBackup: (backupId: string) => postApi('/api/archive-session/restore', { backupId }),
+      deleteBackup: (backupId: string) => postApi('/api/archive-session/backup-delete', { backupId, confirm: true }),
     }),
   }, ArchiveDock))
 }

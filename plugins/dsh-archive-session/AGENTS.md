@@ -12,10 +12,10 @@ DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入�
 
 * **允许**：直接移动（备份档，可逆）或删除（删除档，不可逆）「会话日志目录」。当前只对 `SessionPersistence.locate(meta)` 返回 `kind: 'jsonl'` 且父目录明显为单会话目录的路径执行；其他后端返回 `BACKEND_UNSUPPORTED`。
 * **边界**：
-  * 备份档只移动（移入插件备份夹，默认 `$DSH_HOME/dsh-archive-session-backup/`）；删除档允许 `rm`，并须输入完整会话标题强确认。
+  * 备份档只移动（移入插件备份夹，默认 `$DSH_HOME/sessions-archived-backup/`）；删除档允许 `rm`，并须输入完整会话标题强确认。
   * 动作前二次确认；活动会话：`agent.cancel({kind:'hook'})` → `agent.whenIdle()` → `sessions.flush()` → `agent.ctx.fiber.dispose()`，确认会话已从 live store 卸载后再移 / 删。
   * 动作后同步 `workspace` 记账：`WorkspaceEntity.detachSession()`；归档集经 `workspaceDomainSpec` + `ctx.storageDomain` 更新（`domain/changed` 会触发 api-proxy 广播 `host/archived-sessions-changed`，插件不手发帧）。
-  * 备份目录写 `dsh-archive-session.json` sidecar（原路径 / 标题 / workspaceIds），恢复时移回并 `WorkspaceEntity.attachSession()`。
+  * 备份目录写 `dsh-archive-session.json` sidecar（原路径 / 标题 / workspaceIds），恢复时移回并 `WorkspaceEntity.attachSession()`；无 sidecar 的旧格式目录按「仅列出/删除」收纳，不尝试恢复。
 * **仍禁止**：monkey-patch 核心、读 / 改会话日志内容、动会话目录以外的内部文件（附件 / 存储域 / 凭据等一律走官方服务）。
 
 ## 架构约束

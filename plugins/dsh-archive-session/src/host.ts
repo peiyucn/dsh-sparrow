@@ -1,7 +1,7 @@
 /** dsh-archive-session host half：标题缓存 + 归档会话 REST 路由。 */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
@@ -16,8 +16,8 @@ import { WorkspaceId, workspaceDomainSpec } from '@deepseek-ai/dsh-workspace'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
-  BACKUP_SIDECAR, isDeleteConfirmationSufficient, normalizeArchiveConfig, parseBackupSidecar,
-  sanitizeSegment, TitleCache, type ArchiveConfig,
+  BACKUP_SIDECAR, isDeleteConfirmationSufficient, legacyBackupItem, normalizeArchiveConfig,
+  parseBackupSidecar, sanitizeSegment, TitleCache, type ArchiveConfig,
 } from './archive.js'
 
 export const name = 'dsh-archive-session'
@@ -32,6 +32,7 @@ type ArchiveErrorCode =
   | 'BAD_BODY'
   | 'NOT_ARCHIVED'
   | 'UNKNOWN_SESSION'
+  | 'UNKNOWN_BACKUP'
   | 'SESSION_LIVE'
   | 'BACKEND_UNSUPPORTED'
   | 'CONFIRMATION_FAILED'
@@ -208,10 +209,17 @@ async function listBackups(backupRoot: string): Promise<unknown[]> {
           title: sidecar.title,
           archivedAt: sidecar.archivedAt,
           workspaceIds: sidecar.workspaceIds,
+          legacy: false,
         })
       }
     } catch {
-      // 备份目录里没有合法 sidecar 时跳过，不让列表挂死。
+      // 无合法 sidecar：按旧格式备份目录收纳（只列/删，不可恢复）。
+      try {
+        const info = await stat(dir)
+        if (info.isDirectory()) items.push(legacyBackupItem(name, info.mtimeMs))
+      } catch {
+        // 目录不存在或不可读：跳过，不让列表挂死。
+      }
     }
   }
   return items.sort((left, right) => String((right as { archivedAt?: string }).archivedAt ?? '').localeCompare(String((left as { archivedAt?: string }).archivedAt ?? '')))
@@ -374,14 +382,42 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
+        if (req.method === 'POST' && pathname === `${PREFIX}/backup-delete`) {
+          const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
+          if (typeof parsed.backupId !== 'string' || parsed.backupId.trim() === '') {
+            throw new ArchiveError('BAD_BODY', 'backupId 必须是非空字符串')
+          }
+          if (parsed.confirm !== true) {
+            throw new ArchiveError('CONFIRMATION_FAILED', '删除备份需要二次确认')
+          }
+          const backupDir = resolveBackupDir(settings.backupRoot, parsed.backupId)
+          let info
+          try {
+            info = await stat(backupDir)
+          } catch {
+            throw new ArchiveError('UNKNOWN_BACKUP', '备份不存在', 404)
+          }
+          if (!info.isDirectory()) {
+            throw new ArchiveError('UNKNOWN_BACKUP', '备份 id 不是目录', 404)
+          }
+          await rm(backupDir, { recursive: true, force: false })
+          sendJson(res, 200, { ok: true, backupId: parsed.backupId })
+          return
+        }
+
         if (req.method === 'POST' && pathname === `${PREFIX}/restore`) {
           const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
           if (typeof parsed.backupId !== 'string' || parsed.backupId.trim() === '') {
             throw new ArchiveError('BAD_BODY', 'backupId 必须是非空字符串')
           }
           const backupDir = resolveBackupDir(settings.backupRoot, parsed.backupId)
-          const raw = await readFile(join(backupDir, BACKUP_SIDECAR), 'utf8')
-          const sidecar = parseBackupSidecar(JSON.parse(raw))
+          let sidecar
+          try {
+            const raw = await readFile(join(backupDir, BACKUP_SIDECAR), 'utf8')
+            sidecar = parseBackupSidecar(JSON.parse(raw))
+          } catch {
+            throw new ArchiveError('UNKNOWN_BACKUP', '该备份是旧格式（缺少 sidecar），无法恢复；只能删除', 400)
+          }
           if (sidecar === undefined) {
             throw new ArchiveError('BAD_BODY', '备份 sidecar 无效', 404)
           }
