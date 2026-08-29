@@ -12,7 +12,7 @@
 
 * 每个插件一个独立 npm 包、独立发布；合集 README 提供索引，某功能被官方原生支持后对应插件从合集中退役
 * 布局：
-  * `plugins/dsh-fim` — 聊天输入框 FIM 联想（DeepSeek FIM Beta 转发 + dock 建议条）
+  * `plugins/dsh-prefix-completion` — 聊天输入框续写联想（DeepSeek 对话前缀续写 Beta 转发 + dock 建议条）
   * `plugins/dsh-vision-subagent` — 纯文本会话的图片视觉子代理（官方 vision 模型读图，主模型保持大脑）
   * `plugins/dsh-archive-session` — 归档会话管理：三档——轻量标题 / 备份 / 删除
   * `packages/shared` — 插件共用的 seam 适配层与测试基建（有真实共用代码时再落地）

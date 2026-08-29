@@ -1,4 +1,4 @@
-/** dsh-fim host half：POST /api/fim/complete，转发 DeepSeek 对话前缀续写（Beta）。 */
+/** dsh-prefix-completion host half：POST /api/prefix-completion/complete，转发 DeepSeek 对话前缀续写（Beta）。 */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
@@ -9,17 +9,17 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
   buildChatPrefixMessages, extractSuggestions, isAbortTimeout, normalizeConfig, parseCompleteBody,
-  summarizeUpstreamBody, upstreamStatusToError, type CompleteRequest, type FimConfig, type FimError,
-} from './fim.js'
+  summarizeUpstreamBody, upstreamStatusToError, type CompleteRequest, type PrefixCompletionConfig, type PrefixCompletionError,
+} from './prefix-completion.js'
 
-export type { CompleteRequest } from './fim.js'
+export type { CompleteRequest } from './prefix-completion.js'
 
-export const name = 'dsh-fim'
+export const name = 'dsh-prefix-completion'
 export const inject = ['webServer', 'sessions', 'credentials']
 
-export type { FimConfig, FimError }
+export type { PrefixCompletionConfig, PrefixCompletionError }
 
-const ROUTE_PATH = '/api/fim/complete'
+const ROUTE_PATH = '/api/prefix-completion/complete'
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   if (res.headersSent) return
@@ -30,11 +30,11 @@ function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   res.end(body)
 }
 
-function sendError(res: ServerResponse, status: number, error: FimError): void {
+function sendError(res: ServerResponse, status: number, error: PrefixCompletionError): void {
   sendJson(res, status, { error })
 }
 
-async function readRequestBody(req: IncomingMessage, maxBodyBytes: number): Promise<{ ok: true; body: string } | { ok: false; error: FimError }> {
+async function readRequestBody(req: IncomingMessage, maxBodyBytes: number): Promise<{ ok: true; body: string } | { ok: false; error: PrefixCompletionError }> {
   const chunks: Buffer[] = []
   let size = 0
   try {
@@ -63,7 +63,7 @@ function requestSignal(res: ServerResponse, timeoutMs: number): { signal: AbortS
   }
   res.once('close', onClose)
   const timer = setTimeout(() => {
-    abort(new DOMException('FIM request timed out', 'TimeoutError'))
+    abort(new DOMException('Prefix completion request timed out', 'TimeoutError'))
   }, timeoutMs)
   return {
     signal: controller.signal,
@@ -79,7 +79,7 @@ function requestSignal(res: ServerResponse, timeoutMs: number): { signal: AbortS
  * @param ctx - DSH 插件上下文。
  * @param config - 插件配置（cordis.patch.yml 注入）。
  */
-export function apply(ctx: Context, config: Readonly<Partial<FimConfig>> = {}): void {
+export function apply(ctx: Context, config: Readonly<Partial<PrefixCompletionConfig>> = {}): void {
   const settings = normalizeConfig(config)
 
   ctx.effect(() => ctx.webServer.register({
@@ -87,7 +87,7 @@ export function apply(ctx: Context, config: Readonly<Partial<FimConfig>> = {}): 
     path: ROUTE_PATH,
     handler: async (req, res) => {
       if (req.method !== 'POST') {
-        sendError(res, 405, { code: 'BAD_BODY', message: '只接受 POST /api/fim/complete' })
+        sendError(res, 405, { code: 'BAD_BODY', message: '只接受 POST /api/prefix-completion/complete' })
         return
       }
 
@@ -178,5 +178,5 @@ export function apply(ctx: Context, config: Readonly<Partial<FimConfig>> = {}): 
         signal.dispose()
       }
     },
-  }), 'dsh-fim: /api/fim/complete route')
+  }), 'dsh-prefix-completion: /api/prefix-completion/complete route')
 }

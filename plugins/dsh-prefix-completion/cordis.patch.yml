@@ -1,8 +1,8 @@
-# dsh-fim 组合补丁：`dsh plugin --profile web add dsh-fim` 安装后由 profile 自动挂载。
+# dsh-prefix-completion 组合补丁：`dsh plugin --profile web add dsh-prefix-completion` 安装后由 profile 自动挂载。
 # 配置值均为安全默认值；API key 只经 ctx.credentials 解析，绝不写在这里。
 - insert:
-    - id: dsh-fim
-      name: dsh-fim
+    - id: dsh-prefix-completion
+      name: dsh-prefix-completion
       config:
         baseURL: https://api.deepseek.com/beta
         model: deepseek-v4-pro

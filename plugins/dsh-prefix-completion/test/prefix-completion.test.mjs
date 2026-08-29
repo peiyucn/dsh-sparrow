@@ -3,9 +3,9 @@ import { describe, it } from 'node:test'
 import {
   buildChatPrefixMessages, DEFAULT_MAX_BODY_BYTES, extractSuggestions, isStaleResponse,
   normalizeConfig, parseCompleteBody, summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
-} from '../lib/fim.js'
+} from '../lib/prefix-completion.js'
 
-describe('fim 纯逻辑', () => {
+describe('prefix-completion 纯逻辑', () => {
   describe('normalizeConfig', () => {
     it('空配置 应该 返回默认值', () => {
       const config = normalizeConfig(undefined)
@@ -33,11 +33,6 @@ describe('fim 纯逻辑', () => {
     it('缺 prompt 应该 返回 INVALID_PROMPT', () => {
       const value = validateCompletePayload({ sessionId: 'session-1', prompt: '' })
       assert.equal(value.code, 'INVALID_PROMPT')
-    })
-
-    it('非字符串 suffix 应该 返回 BAD_BODY', () => {
-      const value = validateCompletePayload({ sessionId: 'session-1', prompt: 'a', suffix: 1 })
-      assert.equal(value.code, 'BAD_BODY')
     })
 
     it('超过 maxPromptChars 应该 返回 INVALID_PROMPT', () => {

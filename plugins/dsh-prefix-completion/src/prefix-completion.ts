@@ -1,4 +1,4 @@
-/** dsh-fim 纯逻辑：配置归一化、请求校验、错误映射、候选提取。 */
+/** dsh-prefix-completion 纯逻辑：配置归一化、请求校验、错误映射、候选提取。 */
 
 export const DEFAULT_BASE_URL = 'https://api.deepseek.com/beta'
 export const DEFAULT_MODEL = 'deepseek-v4-pro'
@@ -12,7 +12,7 @@ export const MAX_UPSTREAM_BODY_BYTES = 64 * 1024
 export const MAX_HISTORY_MESSAGES = 12
 export const MAX_HISTORY_CHARS = 6_000
 
-export type FimErrorCode =
+export type PrefixCompletionErrorCode =
   | 'BAD_BODY'
   | 'INVALID_PROMPT'
   | 'UNKNOWN_SESSION'
@@ -22,12 +22,12 @@ export type FimErrorCode =
   | 'RATE_LIMITED'
   | 'INVALID_CONFIG'
 
-export interface FimError {
-  readonly code: FimErrorCode
+export interface PrefixCompletionError {
+  readonly code: PrefixCompletionErrorCode
   readonly message: string
 }
 
-export interface FimConfig {
+export interface PrefixCompletionConfig {
   readonly baseURL: string
   readonly model: string
   readonly maxTokens: number
@@ -41,7 +41,6 @@ export interface FimConfig {
 export interface CompleteRequest {
   readonly sessionId: string
   readonly prompt: string
-  readonly suffix?: string
 }
 
 export interface CompleteResponse {
@@ -56,8 +55,8 @@ export interface ChatPrefixMessage {
 }
 
 /** 把外部配置补成完整内部配置；非法数字一律拒绝（插件加载期即失败，而不是请求期）。 */
-export function normalizeConfig(input: Readonly<Partial<FimConfig>> | undefined): FimConfig {
-  const config: FimConfig = {
+export function normalizeConfig(input: Readonly<Partial<PrefixCompletionConfig>> | undefined): PrefixCompletionConfig {
+  const config: PrefixCompletionConfig = {
     baseURL: input?.baseURL?.trim() || DEFAULT_BASE_URL,
     model: input?.model?.trim() || DEFAULT_MODEL,
     maxTokens: input?.maxTokens ?? DEFAULT_MAX_TOKENS,
@@ -68,7 +67,7 @@ export function normalizeConfig(input: Readonly<Partial<FimConfig>> | undefined)
     triggerPauseMs: input?.triggerPauseMs ?? DEFAULT_TRIGGER_PAUSE_MS,
   }
   if (config.baseURL === '' || config.model === '' || config.apiKeyEnv === '') {
-    throw new Error('dsh-fim: baseURL/model/apiKeyEnv 不能为空')
+    throw new Error('dsh-prefix-completion: baseURL/model/apiKeyEnv 不能为空')
   }
   for (const [name, value] of Object.entries({
     maxTokens: config.maxTokens,
@@ -78,17 +77,17 @@ export function normalizeConfig(input: Readonly<Partial<FimConfig>> | undefined)
     triggerPauseMs: config.triggerPauseMs,
   })) {
     if (!Number.isSafeInteger(value) || value <= 0) {
-      throw new Error(`dsh-fim: ${name} 必须是正整数`)
+      throw new Error(`dsh-prefix-completion: ${name} 必须是正整数`)
     }
   }
   if (!/^https?:\/\//u.test(config.baseURL)) {
-    throw new Error('dsh-fim: baseURL 必须是 http(s) URL')
+    throw new Error('dsh-prefix-completion: baseURL 必须是 http(s) URL')
   }
   return config
 }
 
 /** 安全解析请求体；超限 / 非法 JSON 返回 BAD_BODY。 */
-export function parseCompleteBody(body: string, maxBodyBytes: number, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | FimError {
+export function parseCompleteBody(body: string, maxBodyBytes: number, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | PrefixCompletionError {
   if (Buffer.byteLength(body, 'utf8') > maxBodyBytes) {
     return { code: 'BAD_BODY', message: `请求体超过 ${maxBodyBytes} 字节上限` }
   }
@@ -102,14 +101,13 @@ export function parseCompleteBody(body: string, maxBodyBytes: number, maxPromptC
 }
 
 /** 校验已解析请求。prompt 按字符数限制（上限为 MAX_SAFE_INTEGER 时表示不限制）。 */
-export function validateCompletePayload(value: unknown, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | FimError {
+export function validateCompletePayload(value: unknown, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | PrefixCompletionError {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return { code: 'BAD_BODY', message: '请求体必须是 JSON 对象' }
   }
   const body = value as Record<string, unknown>
   const sessionId = body.sessionId
   const prompt = body.prompt
-  const suffix = body.suffix
   if (typeof sessionId !== 'string' || sessionId.trim() === '') {
     return { code: 'BAD_BODY', message: 'sessionId 必须是非空字符串' }
   }
@@ -119,10 +117,7 @@ export function validateCompletePayload(value: unknown, maxPromptChars = Number.
   if (prompt.length > maxPromptChars) {
     return { code: 'INVALID_PROMPT', message: `prompt 超过 ${maxPromptChars} 字符上限` }
   }
-  if (suffix !== undefined && typeof suffix !== 'string') {
-    return { code: 'BAD_BODY', message: 'suffix 必须是字符串' }
-  }
-  return { sessionId, prompt, ...suffix === undefined ? {} : { suffix } }
+  return { sessionId, prompt }
 }
 
 /** 从一条 DSH 历史消息里提取可读文本；图片 / 工具结果等非续写块跳过。 */
@@ -179,7 +174,7 @@ function messageRole(message: unknown): 'user' | 'assistant' {
 }
 
 /** 把上游 HTTP 状态映射为插件错误码。 */
-export function upstreamStatusToError(status: number, bodyText: string): FimError {
+export function upstreamStatusToError(status: number, bodyText: string): PrefixCompletionError {
   if (status === 401 || status === 403) {
     return { code: 'MISSING_CREDENTIAL', message: 'DeepSeek API 凭据无效或无权访问对话前缀续写 Beta' }
   }
@@ -221,7 +216,7 @@ export function extractSuggestions(data: unknown): string[] {
   return suggestions
 }
 
-/** FIM 客户端建议作废判定：草稿修订号变了就是陈旧响应。 */
+/** 对话前缀续写建议作废判定：草稿修订号变了就是陈旧响应。 */
 export function isStaleResponse(requestDraftRev: number, currentDraftRev: number): boolean {
   return requestDraftRev !== currentDraftRev
 }

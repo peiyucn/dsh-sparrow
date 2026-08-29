@@ -1,4 +1,4 @@
-# 01 · 详细设计 — dsh-fim
+# 01 · 详细设计 — dsh-prefix-completion
 
 > 起点为零代码；seam 选择以本文件《seam 查证》为准，未查证项标注待查证，开工前补齐。
 
@@ -6,7 +6,7 @@
 
 * **host half**（Node）：webServer 自有路由 + 上游转发 + 凭据解析；
 * **client half**（浏览器，M2）：dock 建议条，esbuild 单文件 bundle；
-* 通信只走 host 路由 `POST /api/fim/complete`（client 不 import Node 模块，host 不 import 浏览器 API）。
+* 通信只走 host 路由 `POST /api/prefix-completion/complete`（client 不 import Node 模块，host 不 import 浏览器 API）。
 
 ## 插件契约合规（dsh 规范）
 
@@ -28,10 +28,10 @@
 
 ### 请求语义
 
-* 只受理 `POST /api/fim/complete`，其余 404；
+* 只受理 `POST /api/prefix-completion/complete`，其余 404；
 * 校验：`sessionId` 命中 sessions 服务（否则 403/503）、`prompt` 非空且 ≤ `MAX_PROMPT_CHARS`（拟定 32k，否则 400）、请求体 ≤ `MAX_BODY_BYTES`（64 KB）；
 * 凭据：`ctx.credentials.resolve('DEEPSEEK_API_KEY')`，缺失 401；
-* 转发：`POST {baseURL}/completions`，body `{ model, prompt, suffix?, max_tokens }`；
+* 转发：`POST {baseURL}/chat/completions`，body `{ model, messages, max_tokens }`；`messages` 由最近对话历史 + 最后一条 assistant 前缀（`prefix: true`）构造（见 `buildChatPrefixMessages`）；
 * 生命周期：超时（`REQUEST_TIMEOUT_MS` 30s）+ 客户端 `close` 即 `AbortController.abort()`。
 
 ### 配置
@@ -58,8 +58,8 @@
 ## 通信协议
 
 ```json
-POST /api/fim/complete
-{ "sessionId": "...", "prompt": "草稿前缀", "suffix": "可选后缀" }
+POST /api/prefix-completion/complete
+{ "sessionId": "...", "prompt": "草稿前缀" }
 
 200 { "suggestions": ["候选1", "候选2"] }
 4xx/5xx { "error": { "code": "...", "message": "..." } }
@@ -73,6 +73,6 @@ POST /api/fim/complete
 
 ## 风险与边界
 
-* **FIM Beta 接口稳定性**：字段/限额可能变化 → 转发层薄封装 + 错误映射兜底，随官方文档跟进；
+* **对话前缀续写 Beta 接口稳定性**：字段/限额可能变化 → 转发层薄封装 + 错误映射兜底，随官方文档跟进；
 * **输入法组合态**：中文 IME 是触发误报高发区，composition 压制列入 M2 验收；
 * **sessions 内存表边界**：`sessions.get(id)` 只覆盖当前进程 live 会话——宿主重启后旧 sessionId 校验会落空，需设计为「未命中即拒绝并提示刷新页面」，不做静默放行。

@@ -1,4 +1,4 @@
-/** FIM dock 建议条：触发、展示、作废、采用。 */
+/** 对话前缀续写 dock 建议条：触发、展示、作废、采用。 */
 
 import { useEffect, useRef, useState } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -6,7 +6,7 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 
-export interface FimDockInjected {
+export interface PrefixDockInjected {
   /** 发起一次 host 路由请求；由调用方负责陈旧响应判定。 */
   requestComplete: (
     sessionId: SessionId,
@@ -17,7 +17,7 @@ export interface FimDockInjected {
   adopt: (sessionId: SessionId, text: string, span: TokenSpan) => boolean
 }
 
-export type FimDockProps = PropsRuntime<'conversation.input.dock'> & FimDockInjected
+export type PrefixDockProps = PropsRuntime<'conversation.input.dock'> & PrefixDockInjected
 
 const PAUSE_MS = 400
 const MAX_SUGGESTIONS = 3
@@ -55,10 +55,10 @@ const styles = {
 } as const
 
 /**
- * FIM 建议条。只从 InputZone owner share 读快照；继续输入 / 发送 / 相位变化都会清空旧建议。
+ * 对话前缀续写建议条。只从 InputZone owner share 读快照；继续输入 / 发送 / 相位变化都会清空旧建议。
  * @param props - 槽位运行时 props + 注入动作。
  */
-export function FimDock(props: FimDockProps) {
+export function PrefixDock(props: PrefixDockProps) {
   const { session, input, requestComplete, adopt } = props
   const [suggestions, setSuggestions] = useState<readonly string[]>([])
   const [selected, setSelected] = useState(0)
@@ -113,7 +113,7 @@ export function FimDock(props: FimDockProps) {
           setSelected(0)
         })
         .catch(() => {
-          // 静默降级：FIM 失败不打扰输入。
+          // 静默降级：续写失败不打扰输入。
         })
         .finally(() => {
           if (flightRef.current === controller) flightRef.current = null
@@ -144,9 +144,9 @@ export function FimDock(props: FimDockProps) {
   return (
     <div
       style={styles.dock}
-      data-fim-dock=""
+      data-prefix-dock=""
       role="listbox"
-      aria-label="FIM 建议"
+      aria-label="续写建议"
       onKeyDown={(event) => {
         if (event.key === 'ArrowDown') {
           event.preventDefault()
