@@ -281,6 +281,7 @@ export function ensureFimBusyStyles(): void {
 .dsh-chat-fim-menu-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   width: 100%;
   min-height: 40px;
@@ -307,7 +308,7 @@ export function ensureFimBusyStyles(): void {
   overflow: hidden;
   min-width: 0;
 }
-/* 行尾键位提示：官方 @ 列表 drillHint 同款（caption 色文字 + 圆角键盘帽，右对齐）。 */
+/* 行尾键位提示：官方 @ 列表 drillHint 同款（caption 色文字 + 键盘帽，右对齐）。 */
 .dsh-chat-fim-menu-trailing {
   flex: none;
   display: inline-flex;
@@ -321,14 +322,19 @@ export function ensureFimBusyStyles(): void {
   line-height: 18px;
   white-space: nowrap;
 }
+/* 键盘帽做成「按钮」观感：实底 + 1px 边框 + 圆角（官方同款但底色更实，两主题都清晰）。 */
 .dsh-chat-fim-menu-kbd {
-  padding: 0 5px;
-  border-radius: 4px;
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-caption);
+  min-width: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
+  border-radius: 6px;
+  background: var(--dsw-alias-interactive-bg-hover-solid, rgba(0, 0, 0, 0.06));
+  color: var(--dsw-alias-label-secondary);
   font-family: inherit;
   font-size: 11px;
   line-height: 18px;
+  text-align: center;
+  box-shadow: inset 0 -1px 0 var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.08));
 }
 `
   document.head.appendChild(style)
