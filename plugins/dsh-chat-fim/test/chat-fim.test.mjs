@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, fimStopSequences, isDeepseekMainRoute,
-  isStaleResponse, mainRouteFromSession, normalizeConfig, parseCompleteBody, summarizeUpstreamBody,
-  upstreamStatusToError, validateCompletePayload,
+  isStaleResponse, mainRouteFromSession, normalizeConfig, parseCompleteBody, shouldTriggerFim,
+  summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
 } from '../lib/chat-fim.js'
 
 describe('chat-fim 纯逻辑', () => {
@@ -187,6 +187,44 @@ describe('chat-fim 纯逻辑', () => {
 
     it('未知路由 应该 默认放行', () => {
       assert.equal(isDeepseekMainRoute(undefined), true)
+    })
+  })
+
+  describe('shouldTriggerFim', () => {
+    it('空草稿 应该 不触发（empty）', () => {
+      assert.deepEqual(shouldTriggerFim('   '), { ok: false, reason: 'empty' })
+    })
+
+    it('过短草稿 应该 不触发（too-short）', () => {
+      assert.deepEqual(shouldTriggerFim('我觉得'), { ok: false, reason: 'too-short' })
+    })
+
+    it('句末问号 应该 不触发（sentence-end）', () => {
+      assert.deepEqual(shouldTriggerFim('还有个问题，fim接口是计费的么？'), { ok: false, reason: 'sentence-end' })
+    })
+
+    it('句末句号 应该 不触发（sentence-end）', () => {
+      assert.deepEqual(shouldTriggerFim('这个方案已经写完了。'), { ok: false, reason: 'sentence-end' })
+    })
+
+    it('英文句末句点 应该 不触发（sentence-end）', () => {
+      assert.deepEqual(shouldTriggerFim('Let me fix it.'), { ok: false, reason: 'sentence-end' })
+    })
+
+    it('尾随空格 应该 不触发（trailing-space）', () => {
+      assert.deepEqual(shouldTriggerFim('我觉得这个方案还 '), { ok: false, reason: 'trailing-space' })
+    })
+
+    it('停在英文单词中间 应该 不触发（mid-word）', () => {
+      assert.deepEqual(shouldTriggerFim('Let me fix the iss'), { ok: false, reason: 'mid-word' })
+    })
+
+    it('中文未完成句 应该 触发', () => {
+      assert.deepEqual(shouldTriggerFim('我觉得这个方案的'), { ok: true })
+    })
+
+    it('逗号结尾 应该 触发', () => {
+      assert.deepEqual(shouldTriggerFim('我们先看看数据，再'), { ok: true })
     })
   })
 })

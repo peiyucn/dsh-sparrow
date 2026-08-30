@@ -267,6 +267,34 @@ export function isStaleResponse(requestDraftRev: number, currentDraftRev: number
   return requestDraftRev !== currentDraftRev
 }
 
+/** 触发形态门控：草稿最短长度（trim 后）。 */
+export const MIN_TRIGGER_DRAFT_CHARS = 8
+
+/** 句末标点：草稿以这些字符结尾时句子已完整，FIM 会续出新一句而不是接话（实测质量差），不触发。 */
+export const SENTENCE_END_CHARS = '。！？.!?;；'
+
+export type FimTriggerDecision =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: 'empty' | 'too-short' | 'sentence-end' | 'mid-word' | 'trailing-space' }
+
+/**
+ * 依据草稿形态决定是否发起联想请求（2026-08-30 实测驱动）：
+ * 句末标点 / 尾随空白 / 单词中间都不触发，避免建议太频繁且续出「新一句话」。
+ */
+export function shouldTriggerFim(draft: string): FimTriggerDecision {
+  const trimmed = draft.trim()
+  if (trimmed === '') return { ok: false, reason: 'empty' }
+  if (trimmed.length < MIN_TRIGGER_DRAFT_CHARS) return { ok: false, reason: 'too-short' }
+  // 尾随空白必须查原文末尾（trim 后看不到）：用户刚敲完空格/换行，正在输入。
+  const rawLast = draft[draft.length - 1] ?? ''
+  if (rawLast.trim() === '') return { ok: false, reason: 'trailing-space' }
+  const last = trimmed[trimmed.length - 1] ?? ''
+  if (SENTENCE_END_CHARS.includes(last)) return { ok: false, reason: 'sentence-end' }
+  const prev = trimmed[trimmed.length - 2] ?? ''
+  if (/[A-Za-z0-9]/u.test(last) && /[A-Za-z0-9]/u.test(prev)) return { ok: false, reason: 'mid-word' }
+  return { ok: true }
+}
+
 /** 超时错误是否应映射为 TIMEOUT。 */
 export function isAbortTimeout(signal: AbortSignal): boolean {
   return signal.aborted && signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError'

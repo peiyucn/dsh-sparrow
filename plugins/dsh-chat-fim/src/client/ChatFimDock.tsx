@@ -8,6 +8,7 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
+import { shouldTriggerFim } from '../chat-fim.js'
 
 export interface ChatFimDockInjected {
   /** 查询当前会话主模型是否支持（deepseek 系列）；false 时整体隐藏。 */
@@ -425,7 +426,9 @@ export function ChatFimDock(props: ChatFimDockProps) {
     flightRef.current?.abort()
 
     const draft = input.draft
-    if (!supported || !enabled || draft.trim() === '' || composing || input.phase !== 'plain') return
+    // 形态门控：句末标点 / 尾随空白 / 单词中间 / 过短草稿不触发（避免建议太频繁、续出「新一句话」）。
+    if (!supported || !enabled || composing || input.phase !== 'plain') return
+    if (!shouldTriggerFim(draft).ok) return
 
     const rev = input.draftRev
     const timer = setTimeout(() => {
