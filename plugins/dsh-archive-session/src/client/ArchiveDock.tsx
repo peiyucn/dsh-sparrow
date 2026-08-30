@@ -131,6 +131,29 @@ export function ensureArchiveStyles(): void {
 .dsh-archive-close:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
+.dsh-archive-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  margin: 0 0 4px -12px;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  text-align: left;
+  cursor: pointer;
+}
+.dsh-archive-section:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
 `
   document.head.appendChild(style)
 }
@@ -144,6 +167,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     background: 'var(--dsw-alias-bg-mask-1, rgba(0, 0, 0, 0.28))',
+    backdropFilter: 'var(--dsw-mask-blur)',
   } satisfies CSSProperties,
   panel: {
     position: 'relative' as const,
@@ -163,7 +187,7 @@ const styles = {
     justifyContent: 'space-between',
     gap: 8,
     alignItems: 'center',
-    padding: '8px 4px',
+    padding: '8px 0',
     borderBottom: '1px solid var(--dsw-alias-border-l1, #e2e5ea)',
   } satisfies CSSProperties,
   actions: {
@@ -354,14 +378,14 @@ export function ArchiveDock(props: ArchiveDockProps) {
               </button>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
-            <p style={{ ...styles.secondarySmall, fontSize: 14, lineHeight: 22, margin: '0 0 8px' }}>
+            <p style={{ ...styles.secondarySmall, fontSize: 14, lineHeight: 22, margin: '0 0 12px' }}>
               {t('dialog.intro')}
             </p>
             {error !== null ? <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>{error}</p> : null}
 
             <button
               type="button"
-              style={{ border: 'none', outline: 'none', padding: '8px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              className="dsh-archive-section"
               aria-expanded={archivedOpen}
               onClick={() => { setArchivedOpen(value => !value) }}
             >
@@ -407,7 +431,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
 
             <button
               type="button"
-              style={{ border: 'none', outline: 'none', padding: '8px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              className="dsh-archive-section"
               aria-expanded={backupsOpen}
               onClick={() => { setBackupsOpen(value => !value) }}
             >
