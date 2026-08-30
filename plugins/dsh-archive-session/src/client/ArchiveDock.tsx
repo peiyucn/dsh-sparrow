@@ -297,6 +297,21 @@ const styles = {
     color: 'var(--dsw-alias-label-secondary, #6b7280)',
     fontSize: 12,
   } satisfies CSSProperties,
+  /** 子分组小标题（打开中）：官方面板分组标签同款（12px 次级色）。 */
+  groupHeading: {
+    margin: '10px 0 2px',
+    fontSize: 12,
+    lineHeight: '18px',
+    fontWeight: 500,
+    color: 'var(--dsw-alias-label-secondary, #6b7280)',
+  } satisfies CSSProperties,
+  /** 子分组说明（打开中会话只能下次启动后操作）。 */
+  groupHint: {
+    margin: '0 0 6px',
+    fontSize: 12,
+    lineHeight: '18px',
+    color: 'var(--dsw-alias-label-secondary, #6b7280)',
+  } satisfies CSSProperties,
 } as const
 
 /** 待确认动作（web 确认框状态）。 */
@@ -494,6 +509,47 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const restorableCount = backups.filter(item => !item.legacy).length
   const legacyCount = backups.length - restorableCount
 
+  // 打开中的会话单独分组：dsh 运行期间无法卸载，只能等下次启动后操作（2026-08-30）。
+  const liveItems = archived.filter(item => item.live)
+  const coldItems = archived.filter(item => !item.live)
+
+  /** 归档会话行：live 会话的备份/删除置灰并给提示（下次启动 dsh 后才能操作）。 */
+  const renderArchivedRow = (item: ArchivedSessionItem) => {
+    const locked = item.live
+    return (
+      <div key={item.sessionId} style={styles.row}>
+        <div style={{ minWidth: 0 }}>
+          <div style={styles.title} title={item.title}>{item.title}</div>
+          <div style={styles.secondarySmall}>
+            {item.sessionId}
+            {item.running ? ` · ${t('state.running')}` : item.live ? ` · ${t('state.live')}` : ''}
+            {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
+          </div>
+        </div>
+        <div style={styles.actions}>
+          <button
+            type="button"
+            className="dsh-archive-btn"
+            disabled={loading || !item.backendSupported || locked}
+            title={locked ? t('state.liveActionHint') : undefined}
+            onClick={() => { confirmBackup(item) }}
+          >
+            {t('action.backup')}
+          </button>
+          <button
+            type="button"
+            className="dsh-archive-btn dsh-archive-btn-danger"
+            disabled={loading || !item.backendSupported || locked}
+            title={locked ? t('state.liveActionHint') : undefined}
+            onClick={() => { confirmDelete(item) }}
+          >
+            {t('action.delete')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const confirmRestoreAll = (): void => {
     setPending({ kind: 'restoreAll', restorable: restorableCount, legacy: legacyCount })
   }
@@ -614,38 +670,14 @@ export function ArchiveDock(props: ArchiveDockProps) {
               <>
                 {loading ? loadingRow : null}
                 {!loading && archived.length === 0 ? <p style={styles.secondarySmall}>{t('empty.archived')}</p> : null}
-                {!loading && archived.map(item => (
-                  <div key={item.sessionId} style={styles.row}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={styles.title} title={item.title}>{item.title}</div>
-                      <div style={styles.secondarySmall}>
-                        {item.sessionId}
-                        {item.running ? ` · ${t('state.running')}` : item.live ? ` · ${t('state.live')}` : ''}
-                        {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
-                      </div>
-                    </div>
-                    <div style={styles.actions}>
-                      <button
-                        type="button"
-                        className="dsh-archive-btn"
-                        disabled={loading || !item.backendSupported}
-                        title={item.live ? t('state.liveActionHint') : undefined}
-                        onClick={() => { confirmBackup(item) }}
-                      >
-                        {t('action.backup')}
-                      </button>
-                      <button
-                        type="button"
-                        className="dsh-archive-btn dsh-archive-btn-danger"
-                        disabled={loading || !item.backendSupported}
-                        title={item.live ? t('state.liveActionHint') : undefined}
-                        onClick={() => { confirmDelete(item) }}
-                      >
-                        {t('action.delete')}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                {!loading && liveItems.length > 0 ? (
+                  <>
+                    <p style={styles.groupHeading}>{t('group.live', { count: liveItems.length })}</p>
+                    <p style={styles.groupHint}>{t('group.liveHint')}</p>
+                    {liveItems.map(renderArchivedRow)}
+                  </>
+                ) : null}
+                {!loading && coldItems.map(renderArchivedRow)}
               </>
             ) : null}
 

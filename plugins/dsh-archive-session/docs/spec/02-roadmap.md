@@ -13,7 +13,7 @@
 
 * [x] 侧边栏 footer 入口按钮 + 弹窗（列出轻归档会话 + live / running 状态），状态一致、可打断。
 * [x] 路线 A：`readTitleSnapshots` 短 TTL LRU 缓存 + 标题事件失效；纯逻辑单测；`npm run verify`。
-* [x] 备份 / 删除共用清理链：停会话 → flush → 移动（备份）/ `rm`（删除）→ `WorkspaceEntity.detachSession` + `workspaceDomainSpec` 归档集更新 → `domain/changed` 自动同步帧；备份二次确认、删除强确认；备份可移回。
+* [x] 备份 / 删除共用清理链：活动会话拒绝（dsh 运行期间无法卸载）→ 移动（备份）/ `rm`（删除）→ `WorkspaceEntity.detachSession` + `workspaceDomainSpec` 归档集更新 → `domain/changed` 自动同步帧；备份二次确认、删除强确认；备份可移回。
 * [x] 文档：seam 特例写入插件 AGENTS.md；备份夹位置与恢复方法写入 README。
 
 ## M3 · 验证与发布

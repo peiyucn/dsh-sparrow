@@ -27,14 +27,14 @@
 
 备份 = 移动，删除 = `rm`。两者共用同一清理链，仅第 2 步动作与确认强度不同：
 
-1. **停 + dispose 运行中会话**（动作前 flush，防 dispose 阶段回写 / 重建日志目录）；
+1. **活动会话防护**：本次 dsh 运行中打开过的会话无法被插件卸载（teardown 是官方持有且丢弃的能力、无公开结束 API），host 侧一律拒绝（生成中给「先停止生成」），面板把这类会话单独分组置灰并提示「下次启动 dsh 后才能操作」；
 2. **备份：移动会话目录** 到插件备份夹（默认 `$DSH_HOME/sessions-archived-backup/`）；**删除：`rm` 会话目录**；只对 `SessionPersistence.locate(meta)` 返回 `kind: 'jsonl'` 的已知单会话目录执行；
 3. **清理记账**：经 `ctx.storageDomain.open(workspaceDomainSpec)` 从 `archivedSessionIds` 与 `workspaces` 表 `sessionIds` 移除该 id，内存 / 磁盘一致；
 4. **同步帧**：广播 `host/archived-sessions-changed` / workspace 变更帧同步客户端；备份移回时反向操作。
 
 **确认强度**：备份 = 二次确认（标题 + 可逆说明）；删除 = 不可逆警示 + 更强确认（如输入会话标题）。
 
-**seam 特例（已定，写入插件 AGENTS.md）**：第 2 步直接移动 / 删除会话目录是唯一越过公开 API 的一步（DSH 无删除 API）。本插件只碰会话日志目录、不碰其它内部文件；边界 = 按档确认、先停活动会话、完整清理记账。
+**seam 特例（已定，写入插件 AGENTS.md）**：第 2 步直接移动 / 删除会话目录是唯一越过公开 API 的一步（DSH 无删除 API）。本插件只碰会话日志目录、不碰其它内部文件；边界 = 按档确认、拒绝打开中的会话、完整清理记账。
 
 ## 待查证 / 开放问题
 

@@ -117,43 +117,30 @@ function workspaceIdsFor(workspaces: readonly Workspace[], sessionId: SessionId)
     .map(workspace => String(workspace.id))
 }
 
-/** 等待会话离开 live store 的最长时间（卸载链可能异步完成）。 */
-const SESSION_UNLOAD_TIMEOUT_MS = 3_000
-
-/** 官方投影缓存域（session_projcache）：备份/删除移走目录后失效对应行，@ 列表不再读到。 */
-const PROJCACHE_DOMAIN_NAME = 'session_projcache'
-const PROJCACHE_SESSIONS_TABLE = 'sessions'
-
-async function stopAndFlushLiveSession(ctx: Context, sessionId: SessionId): Promise<void> {
+/**
+ * 活动会话防护：本次 dsh 运行中打开过的会话无法被插件卸载——AgentHandle.dispose
+ * 是官方 session-controller 持有且被丢弃的 teardown 能力，dsh 无公开「结束会话」
+ * API（查证 0.1.2-alpha.1 源码：session / agent 常驻 live store 至进程退出），
+ * 硬移目录会被后续回写重建幽灵目录。面板把这类会话单独分组置灰，host 侧兜底拒绝。
+ */
+function ensureSessionNotLive(ctx: Context, sessionId: SessionId): void {
   const agent = ctx.agents.get(sessionId)
   // 生成中的会话不静默取消用户回合：先让用户停止生成。
   if (agent !== undefined && agent.status === 'running') {
     throw new ArchiveError('SESSION_LIVE', '该会话正在生成回复：请先停止生成后再备份', 409)
   }
-  if (agent !== undefined) {
-    agent.cancel({ kind: 'hook', reason: 'dsh-archive-session' })
-    await agent.whenIdle()
-  }
-  const live = ctx.sessions.get(sessionId)
-  if (live !== undefined) {
-    await ctx.sessions.flush(live)
-  }
-  if (agent !== undefined) {
-    await agent.ctx.fiber.dispose()
-  }
-  // 卸载可能异步完成：轮询等待其离开 live store。
-  const deadline = Date.now() + SESSION_UNLOAD_TIMEOUT_MS
-  while (ctx.sessions.get(sessionId) !== undefined) {
-    if (Date.now() > deadline) {
-      throw new ArchiveError(
-        'SESSION_LIVE',
-        '该会话仍处于打开状态：请切换到其他会话、关闭它的窗口，或在侧边栏「进行中」列表结束该会话后重试（无需重启 dsh）',
-        409,
-      )
-    }
-    await new Promise(resolve => setTimeout(resolve, 100))
+  if (agent !== undefined || ctx.sessions.get(sessionId) !== undefined) {
+    throw new ArchiveError(
+      'SESSION_LIVE',
+      '该会话仍处于打开状态，dsh 运行期间无法安全卸载：请在下次启动 dsh 后重试',
+      409,
+    )
   }
 }
+
+/** 官方投影缓存域（session_projcache）：备份/删除移走目录后失效对应行，@ 列表不再读到。 */
+const PROJCACHE_DOMAIN_NAME = 'session_projcache'
+const PROJCACHE_SESSIONS_TABLE = 'sessions'
 
 async function readTitle(ctx: Context, sessionId: SessionId, fallback: string): Promise<string> {
   const observations = await ctx.sessionQuery.readTitleSnapshots([sessionId])
@@ -418,7 +405,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           }
 
           const workspaces = workspaceIdsFor(ctx.workspaceRegistry.list(), sessionId)
-          await stopAndFlushLiveSession(ctx, sessionId)
+          ensureSessionNotLive(ctx, sessionId)
           const location = ctx.sessionPersistence.locate(header)
           const sessionDir = location === undefined ? undefined : sessionDirectoryFor(location)
           if (sessionDir === undefined) {

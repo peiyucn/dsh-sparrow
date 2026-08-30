@@ -27,6 +27,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'state.live'
       | 'state.liveActionHint'
       | 'state.backendUnsupported'
+      | 'group.live'
+      | 'group.liveHint'
       | 'confirm.backup'
       | 'confirm.delete'
       | 'confirm.deleteMismatch'
