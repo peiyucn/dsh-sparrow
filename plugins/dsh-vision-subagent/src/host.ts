@@ -8,8 +8,8 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-tools'
 import {
-  extractJsonObject, findImageReference, normalizeVisionConfig, parseVisionReport,
-  renderVisionReport, shouldClearInputModalities, VisionCache, type VisionConfig, type VisionReport,
+  extractJsonObject, findImageReference, isDeepseekMainRoute, mainRouteFromSession, normalizeVisionConfig,
+  parseVisionReport, renderVisionReport, shouldClearInputModalities, VisionCache, type VisionConfig, type VisionReport,
 } from './vision.js'
 
 export const name = 'dsh-vision-subagent'
@@ -102,6 +102,12 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         throw new Error(`vision_read: attachment "${attachmentId}" 不在当前会话中（附件可能已释放）。会话中的图片 id：${ids}`)
       }
       const ref = lookup.ref
+
+      // 主模型不是 DeepSeek 系列时禁用（用户在非 deepseek 模型会话中无视觉功能）。
+      const main = mainRouteFromSession(agent.session.events)
+      if (!isDeepseekMainRoute(main)) {
+        throw new Error(`vision_read: 当前主模型 ${main?.provider ?? '?'}/${main?.model ?? '?'} 不是 DeepSeek 系列，视觉功能已禁用`)
+      }
 
       const cacheKey = String(ref.attachmentId)
       const cached = cache.get(cacheKey)

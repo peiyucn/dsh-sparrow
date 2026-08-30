@@ -78,6 +78,23 @@ export function shouldClearInputModalities(
   return routes.some(route => route.provider === provider && route.model === model)
 }
 
+/** 主模型路由：会话事件里最近一条 request/header 的 provider/model。 */
+export function mainRouteFromSession(events: readonly SessionEvent[]): { provider: string; model: string } | undefined {
+  for (const event of [...events].reverse()) {
+    if (event.type !== 'request/header') continue
+    const config = (event.data as { header?: { config?: { provider?: unknown; model?: unknown } } }).header?.config
+    if (typeof config?.provider === 'string' && typeof config.model === 'string') {
+      return { provider: config.provider, model: config.model }
+    }
+  }
+  return undefined
+}
+
+/** 主模型是否为 DeepSeek 系列（deepseek-official provider）；未知路由默认放行。 */
+export function isDeepseekMainRoute(route: { provider: string } | undefined): boolean {
+  return route === undefined || route.provider === 'deepseek-official'
+}
+
 /** 唯一前缀匹配的最短查询长度；更短的 id 只做精确匹配，避免误命中。 */
 export const MIN_PREFIX_MATCH_CHARS = 8
 
