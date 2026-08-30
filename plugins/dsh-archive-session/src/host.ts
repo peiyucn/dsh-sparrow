@@ -322,6 +322,12 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
+        if (req.method === 'GET' && pathname === `${PREFIX}/backup-dir`) {
+          // 面板提示信息用：明示备份实际存放位置（卸载影响可见化）。
+          sendJson(res, 200, { path: settings.backupRoot })
+          return
+        }
+
         if (req.method === 'POST' && (pathname === `${PREFIX}/backup` || pathname === `${PREFIX}/delete`)) {
           const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
           if (typeof parsed.sessionId !== 'string' || parsed.sessionId.trim() === '') {

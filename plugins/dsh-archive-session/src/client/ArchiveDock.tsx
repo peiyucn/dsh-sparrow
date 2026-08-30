@@ -27,6 +27,8 @@ export interface BackupItem {
 export interface ArchiveDockInjected {
   listArchived: () => Promise<ArchivedSessionItem[]>
   listBackups: () => Promise<BackupItem[]>
+  /** 备份实际存放目录（绝对路径），面板提示信息里明示卸载影响。 */
+  backupDirPath: () => Promise<string>
   backupSession: (sessionId: string) => Promise<unknown>
   deleteSession: (sessionId: string, confirmTitle: string) => Promise<unknown>
   restoreBackup: (backupId: string) => Promise<unknown>
@@ -395,10 +397,11 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
  * @param props - slot props + 注入动作。
  */
 export function ArchiveDock(props: ArchiveDockProps) {
-  const { wide, listArchived, listBackups, backupSession, deleteSession, restoreBackup, deleteBackup, restoreAllBackups, deleteAllBackups, t } = props
+  const { wide, listArchived, listBackups, backupDirPath, backupSession, deleteSession, restoreBackup, deleteBackup, restoreAllBackups, deleteAllBackups, t } = props
   const [open, setOpen] = useState(false)
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
   const [backups, setBackups] = useState<BackupItem[]>([])
+  const [backupDir, setBackupDir] = useState<string | null>(null)
   const [archivedOpen, setArchivedOpen] = useState(true)
   const [backupsOpen, setBackupsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -420,9 +423,14 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const refresh = async (): Promise<void> => {
     setLoading(true)
     try {
-      const [nextArchived, nextBackups] = await Promise.all([listArchived(), listBackups()])
+      const [nextArchived, nextBackups, nextBackupDir] = await Promise.all([
+        listArchived(),
+        listBackups(),
+        backupDirPath().catch(() => null),
+      ])
       setArchived(nextArchived)
       setBackups(nextBackups)
+      setBackupDir(nextBackupDir)
       setError(null)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
@@ -537,6 +545,14 @@ export function ArchiveDock(props: ArchiveDockProps) {
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
             <p style={{ ...styles.secondarySmall, fontSize: 14, lineHeight: '22px', margin: '0 0 12px' }}>
               {t('dialog.intro')}
+              {backupDir !== null && backupDir !== '' ? (
+                <>
+                  <br />
+                  {t('dialog.backupDir', { path: backupDir })}
+                </>
+              ) : null}
+              <br />
+              {t('dialog.uninstallHint')}
             </p>
             {error !== null ? <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>{error}</p> : null}
 

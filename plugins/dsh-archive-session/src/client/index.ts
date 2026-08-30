@@ -17,6 +17,8 @@ const LOCALE_DICTS = {
     'dialog.title': '归档会话管理',
     'dialog.close': '关闭',
     'dialog.intro': '备份可逆，删除不可逆；备份后 @ 列表将不再显示该会话。',
+    'dialog.backupDir': '备份存放位置：{path}',
+    'dialog.uninstallHint': '卸载本插件不会自动恢复已备份会话；如需卸载，请先在备份区「全部恢复」。',
     'loading': '加载中…',
     'section.archived': '已轻归档（{count}）',
     'section.backups': '备份区（{count}）',
@@ -54,6 +56,8 @@ const LOCALE_DICTS = {
     'dialog.title': 'Archived Sessions',
     'dialog.close': 'Close',
     'dialog.intro': 'Backup is reversible; delete is not. A backed-up session no longer appears in the @ list.',
+    'dialog.backupDir': 'Backups are stored at: {path}',
+    'dialog.uninstallHint': 'Uninstalling this plugin does not restore backed-up sessions. Restore all backups before uninstalling.',
     'loading': 'Loading…',
     'section.archived': 'Archived ({count})',
     'section.backups': 'Backups ({count})',
@@ -145,6 +149,14 @@ export function apply(ctx: ClientContext): void {
         archivedAt: string
         legacy: boolean
       }>('/api/archive-session/backups'),
+      backupDirPath: async () => {
+        const response = await fetch('/api/archive-session/backup-dir')
+        const payload = await response.json() as { path?: string; error?: { message?: string } }
+        if (!response.ok) {
+          throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
+        }
+        return payload.path ?? ''
+      },
       backupSession: (sessionId: string) => postApi('/api/archive-session/backup', { sessionId, confirm: true }),
       deleteSession: (sessionId: string, confirmTitle: string) => postApi('/api/archive-session/delete', { sessionId, confirmTitle }),
       restoreBackup: (backupId: string) => postApi('/api/archive-session/restore', { backupId }),
