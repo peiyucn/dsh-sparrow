@@ -17,7 +17,7 @@ export interface ChatFimDockInjected {
   adopt: (sessionId: SessionId, text: string, span: TokenSpan) => boolean
 }
 
-export type ChatFimDockProps = PropsRuntime<'conversation.input.dock'> & ChatFimDockInjected
+export type ChatFimDockProps = PropsRuntime<'conversation.composer.dock'> & ChatFimDockInjected
 
 const PAUSE_MS = 400
 const MAX_SUGGESTIONS = 3

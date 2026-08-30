@@ -1,6 +1,7 @@
 /**
- * dsh-chat-fim client half：注册到 `conversation.input.dock`，建议请求全部走 host 自有路由。
- * 不 import Node 模块；API key 不进浏览器。
+ * dsh-chat-fim client half：注册到 `conversation.composer.dock`（composer 卡片下方、
+ * 与输入框同宽，同槽还有官方统计行；input.dock 在卡片上方左对齐、单飞突兀），
+ * 建议请求全部走 host 自有路由。不 import Node 模块；API key 不进浏览器。
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -34,8 +35,8 @@ interface ClientAgentScope extends Context {
  */
 export function apply(ctx: ClientContext): void {
   const sessions = ctx.sessions as unknown as ClientSessionScope
-  ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
-    name: 'conversation.input.dock',
+  ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+    name: 'conversation.composer.dock',
     id: 'chat-fim',
     order: 30,
     inject: (sessionId: SessionId) => {
