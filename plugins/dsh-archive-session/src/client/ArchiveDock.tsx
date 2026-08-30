@@ -449,6 +449,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingConfirm | null>(null)
   const [copied, setCopied] = useState(false)
+  /** 单会话恢复进行中锁：连点会并发恢复同一 backupId（2026-08-30 审计）。 */
+  const [restoringId, setRestoringId] = useState<string | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
 
   // 官方弹窗行为：打开时聚焦关闭按钮，Esc 关闭。
@@ -462,7 +464,10 @@ export function ArchiveDock(props: ArchiveDockProps) {
     return () => { document.removeEventListener('keydown', onKeyDown) }
   }, [open])
 
+  // 刷新代际：快速开/关面板产生并发 refresh 时，只让最新一次的结果落地（陈旧列表竞态）。
+  const refreshSeqRef = useRef(0)
   const refresh = async (): Promise<void> => {
+    const seq = ++refreshSeqRef.current
     setLoading(true)
     try {
       const [nextArchived, nextBackups, nextBackupDir] = await Promise.all([
@@ -470,14 +475,16 @@ export function ArchiveDock(props: ArchiveDockProps) {
         listBackups(),
         backupDirPath().catch(() => null),
       ])
+      if (seq !== refreshSeqRef.current) return
       setArchived(nextArchived)
       setBackups(nextBackups)
       setBackupDir(nextBackupDir)
       setError(null)
     } catch (reason) {
+      if (seq !== refreshSeqRef.current) return
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
-      setLoading(false)
+      if (seq === refreshSeqRef.current) setLoading(false)
     }
   }
 
@@ -744,15 +751,19 @@ export function ArchiveDock(props: ArchiveDockProps) {
                         <button
                           type="button"
                           className="dsh-archive-btn"
-                          disabled={loading || item.legacy}
+                          disabled={loading || item.legacy || restoringId !== null}
                           title={item.legacy ? t('legacy.restoreTitle') : undefined}
                           onClick={() => {
+                            if (restoringId !== null) return
+                            setRestoringId(item.backupId)
                             void (async () => {
                               try {
                                 await restoreBackup(item.backupId)
                                 await refresh()
                               } catch (reason) {
                                 setError(reason instanceof Error ? reason.message : String(reason))
+                              } finally {
+                                setRestoringId(null)
                               }
                             })()
                           }}

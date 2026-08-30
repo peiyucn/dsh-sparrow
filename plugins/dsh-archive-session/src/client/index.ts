@@ -103,8 +103,11 @@ interface ApiEnvelope<T> {
   readonly error?: { readonly code?: string; readonly message?: string }
 }
 
+/** 面板请求超时：host 挂起时不让面板永久 loading（根 AGENTS 网络约定）。 */
+const REQUEST_TIMEOUT_MS = 15_000
+
 async function readApi<T>(path: string, init?: RequestInit): Promise<T[]> {
-  const response = await fetch(path, init)
+  const response = await fetch(path, { ...init, signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
   const payload = await response.json() as ApiEnvelope<T>
   if (!response.ok) {
     throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
@@ -117,6 +120,7 @@ async function postApi<T = { ok?: boolean }>(path: string, body: unknown): Promi
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   const payload = await response.json() as T & { error?: { message?: string } }
   if (!response.ok) {
