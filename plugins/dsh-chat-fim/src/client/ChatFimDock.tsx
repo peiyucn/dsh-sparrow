@@ -141,10 +141,25 @@ function endCaretPoint(): { x: number; y: number } | undefined {
     ghostDiagnostic = '定位失败：找不到输入区元素 [data-composer-input]'
     return undefined
   }
-  const endRange = document.createRange()
-  endRange.selectNodeContents(editor)
-  endRange.collapse(false)
-  const rect = endRange.getBoundingClientRect()
+  const range = document.createRange()
+  // Lexical 编辑器末尾常有尾随 <br>/零宽节点，selectNodeContents 折叠到最末尾的
+  // 矩形是 0×0；改为定位到最后一个文本节点的末尾（即草稿文字的光标处）。
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
+  let current = walker.nextNode()
+  let last: Text | null = null
+  while (current !== null) {
+    if (current.nodeType === Node.TEXT_NODE) last = current as Text
+    current = walker.nextNode()
+  }
+  if (last !== null && (last.nodeValue?.length ?? 0) > 0) {
+    const offset = last.nodeValue?.length ?? 0
+    range.setStart(last, offset)
+    range.setEnd(last, offset)
+  } else {
+    range.selectNodeContents(editor)
+    range.collapse(false)
+  }
+  const rect = range.getBoundingClientRect()
   if (rect.width === 0 && rect.height === 0) {
     ghostDiagnostic = '定位失败：文末矩形为空'
     return undefined
