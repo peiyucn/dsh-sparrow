@@ -20,6 +20,10 @@ dsh plugin --profile web add dsh-vision-access
 * **凭据**：视觉模型调用复用你在 dsh 中配置的 DeepSeek API key，图片只发给 DeepSeek 官方视觉模型、不出 DeepSeek 体系；不新增凭据
 * 同一张图 + 同一问题的报告在进程内缓存，重复询问秒回
 
+## 截图
+
+![工具行点亮图标（可跨模型读图）](docs/images/status-icon.png)
+
 ## 卸载与残留
 
 * **零残留**：不写任何文件、不改 `.dsh` 内部结构；报告缓存只在进程内存中，进程退出即消失。

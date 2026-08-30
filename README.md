@@ -32,6 +32,10 @@ dsh plugin --profile web add dsh-vision-access
 dsh plugin --profile web add dsh-archive-session
 ```
 
+## 截图
+
+![三插件一览](docs/images/overview.png)
+
 ## License
 
 MIT

@@ -20,6 +20,10 @@ dsh plugin --profile web add dsh-archive-session
 * **备份区**：单个 / 全部恢复、单个 / 全部删除；备份后的会话不再出现在 @ 列表
 * **备份位置**：面板顶部明示，点击即可复制完整路径
 
+## 截图
+
+![归档面板（归档区 / 备份区）](docs/images/panel.png)
+
 ## 备份位置与恢复
 
 * 默认备份夹：`$DSH_HOME/sessions-archived-backup/`；每个备份目录内含 `dsh-archive-session.json` 记录原始位置与工作区归属，恢复时按它移回
