@@ -16,6 +16,7 @@ dsh plugin --profile web add dsh-vision-access
 
 * **无需配置**：对话中贴图后，直接让主模型「看看这张图」即可，主模型会自动调用 `vision_read`
 * 当前主模型本身原生看图（如 deepseek-v4-flash-vision-exp）或不是 DeepSeek 系列时，该工具自动隐藏——图片本来就直达主模型，经文字转述反而有损
+* **凭据**：视觉模型调用复用你在 dsh 中配置的 DeepSeek API key，图片只发给 DeepSeek 官方视觉模型、不出 DeepSeek 体系；不新增凭据
 * 同一张图 + 同一问题的报告在进程内缓存，重复询问秒回
 
 ## 卸载与残留
