@@ -72,6 +72,12 @@ export function apply(ctx: ClientContext): void {
       throw new Error(`dsh-chat-fim: session "${String(sessionId)}" 没有浏览器 scope`)
     }
     return {
+      isSupported: async (id: SessionId): Promise<boolean> => {
+        const response = await fetch(`/api/chat-fim/complete?sessionId=${encodeURIComponent(String(id))}`)
+        if (!response.ok) return true
+        const payload = await response.json() as { supported?: boolean }
+        return payload.supported !== false
+      },
       requestComplete: async (id: SessionId, prompt: string, signal: AbortSignal) => {
         const response = await fetch('/api/chat-fim/complete', {
           method: 'POST',
@@ -109,5 +115,5 @@ export function apply(ctx: ClientContext): void {
 
 export { ChatFimDock, ChatFimSwitch, ensureFimBusyStyles } from './ChatFimDock.js'
 export type { ChatFimDockInjected, ChatFimDockProps, ChatFimSwitchProps } from './ChatFimDock.js'
-export { readEnabled, setFimBusy, setFimEnabled, setFimError, useFimBusy, useFimEnabled, useFimError } from './ChatFimDock.js'
+export { readEnabled, setFimBusy, setFimEnabled, setFimError, setFimSupported, useFimBusy, useFimEnabled, useFimError, useFimSupported } from './ChatFimDock.js'
 export { TRIGGER_PAUSE_MS }

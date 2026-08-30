@@ -87,6 +87,23 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
     kind: 'exact',
     path: ROUTE_PATH,
     handler: async (req, res) => {
+      if (req.method === 'GET') {
+        // 状态查询：主模型是否支持（deepseek 系列）。客户端据此整体隐藏开关。
+        const url = new URL(req.url ?? '/', 'http://localhost')
+        const sessionIdRaw = url.searchParams.get('sessionId') ?? ''
+        const session = ctx.sessions.get(SessionId(sessionIdRaw))
+        if (session === undefined) {
+          sendError(res, 404, {
+            code: 'UNKNOWN_SESSION',
+            message: '会话不存在或已不在当前进程：请刷新页面后重试',
+          })
+          return
+        }
+        const main = mainRouteFromSession(session.events)
+        sendJson(res, 200, { supported: isDeepseekMainRoute(main) })
+        return
+      }
+
       if (req.method !== 'POST') {
         sendError(res, 405, { code: 'BAD_BODY', message: '只接受 POST /api/chat-fim/complete' })
         return

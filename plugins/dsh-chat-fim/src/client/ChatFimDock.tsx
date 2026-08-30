@@ -9,6 +9,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 
 export interface ChatFimDockInjected {
+  /** 查询当前会话主模型是否支持（deepseek 系列）；false 时整体隐藏。 */
+  isSupported: (sessionId: SessionId) => Promise<boolean>
   /** 发起一次 host 路由请求；由调用方负责陈旧响应判定。 */
   requestComplete: (
     sessionId: SessionId,
@@ -97,6 +99,28 @@ export function setFimError(next: string | null): void {
   if (sharedError === next) return
   sharedError = next
   for (const listener of errorListeners) listener()
+}
+
+// 模块级共享「模型支持」状态：主模型非 deepseek 系列时整体隐藏（像没装插件）。
+let sharedSupported = true
+const supportedListeners = new Set<() => void>()
+
+/** 订阅共享模型支持状态；返回当前值。 */
+export function useFimSupported(): boolean {
+  const [value, setValue] = useState(sharedSupported)
+  useEffect(() => {
+    const listener = (): void => { setValue(sharedSupported) }
+    supportedListeners.add(listener)
+    return () => { supportedListeners.delete(listener) }
+  }, [])
+  return value
+}
+
+/** 设置共享模型支持状态。 */
+export function setFimSupported(next: boolean): void {
+  if (sharedSupported === next) return
+  sharedSupported = next
+  for (const listener of supportedListeners) listener()
 }
 
 /**
@@ -229,6 +253,8 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const enabled = useFimEnabled()
   const busy = useFimBusy()
   const error = useFimError()
+  const supported = useFimSupported()
+  if (!supported) return null
   const label = `${t('switch.label')} · ${enabled ? t('switch.on') : t('switch.off')}`
   return (
     <>
@@ -256,13 +282,26 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
  * @param props - 槽位运行时 props + 注入动作。
  */
 export function ChatFimDock(props: ChatFimDockProps) {
-  const { session, input, requestComplete, adopt } = props
+  const { session, input, requestComplete, adopt, isSupported } = props
   const [suggestion, setSuggestion] = useState<string | null>(null)
   const [composing, setComposing] = useState(false)
   const [point, setPoint] = useState<{ x: number; y: number } | null>(null)
   const [ring, setRing] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const enabled = useFimEnabled()
   const busy = useFimBusy()
+  const supported = useFimSupported()
+
+  // 会话切换时查询主模型支持状态；不支持则整体隐藏（像没装插件）。
+  useEffect(() => {
+    setFimSupported(true)
+    let alive = true
+    void isSupported(session.sessionId).then((next) => {
+      if (alive) setFimSupported(next)
+    }).catch(() => {
+      // 查询失败默认显示。
+    })
+    return () => { alive = false }
+  }, [isSupported, session.sessionId])
 
   const composingRef = useRef(false)
   const draftRevRef = useRef(input.draftRev)
@@ -297,7 +336,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
     flightRef.current?.abort()
 
     const draft = input.draft
-    if (!enabled || draft.trim() === '' || composing || input.phase !== 'plain') return
+    if (!supported || !enabled || draft.trim() === '' || composing || input.phase !== 'plain') return
 
     const rev = input.draftRev
     const timer = setTimeout(() => {
@@ -327,9 +366,9 @@ export function ChatFimDock(props: ChatFimDockProps) {
     return () => {
       clearTimeout(timer)
     }
-  }, [composing, enabled, input.draft, input.draftRev, input.phase, requestComplete, session.sessionId])
+  }, [composing, enabled, supported, input.draft, input.draftRev, input.phase, requestComplete, session.sessionId])
 
-  const ghost = !composing && input.phase === 'plain' && enabled ? suggestion : null
+  const ghost = !composing && input.phase === 'plain' && enabled && supported ? suggestion : null
 
   // 幽灵文本定位：草稿 / 建议变化后重测；滚动与窗口变化时跟随。
   useLayoutEffect(() => {
