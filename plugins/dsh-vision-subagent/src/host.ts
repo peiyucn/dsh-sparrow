@@ -122,6 +122,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         temperature: settings.temperature,
       }, exec.signal)
       let text = ''
+      let reasoning = ''
       for await (const chunk of prepared.stream({
         ...prepared.config,
         messages: [createUserMessage({
@@ -134,11 +135,14 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         signal: exec.signal,
       })) {
         if (chunk.type === 'text-delta') text += chunk.text
+        if (chunk.type === 'reasoning-delta') reasoning += chunk.text
       }
-      if (text.trim() === '') {
+      // 思考型模型可能把输出全部花在 reasoning 上、正文为空：用思考文本兜底。
+      const raw = text.trim() === '' ? reasoning.trim() : text.trim()
+      if (raw === '') {
         throw new Error('vision_read 上游没有返回文本')
       }
-      const report = parseVisionReport(extractJsonObject(text), text)
+      const report = parseVisionReport(extractJsonObject(raw), raw)
       cache.set(cacheKey, report)
       return report
     },

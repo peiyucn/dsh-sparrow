@@ -5,7 +5,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
 export const DEFAULT_VISION_PROVIDER = 'deepseek-official'
 export const DEFAULT_VISION_MODEL = 'deepseek-v4-flash-vision-exp'
-export const DEFAULT_MAX_TOKENS = 1024
+export const DEFAULT_MAX_TOKENS = 2048
 export const DEFAULT_TEMPERATURE = 0.2
 export const DEFAULT_CACHE_MAX_ENTRIES = 64
 export const DEFAULT_TEXT_ROUTES: readonly TextRoute[] = [

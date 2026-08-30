@@ -11,7 +11,7 @@ describe('vision-subagent 纯逻辑', () => {
       const config = normalizeVisionConfig(undefined)
       assert.equal(config.visionModel, 'deepseek-v4-flash-vision-exp')
       assert.equal(config.visionProvider, 'deepseek-official')
-      assert.equal(config.maxTokens, 1024)
+      assert.equal(config.maxTokens, 2048)
       assert.equal(config.temperature, 0.2)
       assert.equal(config.textRoutes.length, 2)
     })
