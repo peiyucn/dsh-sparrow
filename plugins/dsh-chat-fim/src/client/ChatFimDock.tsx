@@ -117,11 +117,6 @@ const ghostStyle = {
 } satisfies React.CSSProperties
 
 const styles = {
-  hint: {
-    color: 'var(--dsw-alias-label-secondary, #6b7280)',
-    fontSize: 12,
-    padding: '2px',
-  } satisfies React.CSSProperties,
   switch: {
     border: '1px solid var(--dsw-alias-border-l1, #d4d8e0)',
     borderRadius: 999,
@@ -136,29 +131,44 @@ const styles = {
     color: 'var(--dsw-alias-brand-primary, #4d6bfe)',
     borderColor: 'var(--dsw-alias-brand-primary, #4d6bfe)',
   } satisfies React.CSSProperties,
+  switchBusy: {
+    animation: 'dsh-chat-fim-pulse 1.1s ease-in-out infinite',
+  } satisfies React.CSSProperties,
 } as const
 
-/** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）；联想中时在旁显示省略号。 */
+/** 注入联想中边框脉冲的 keyframes（一次性，按 data 属性去重）。 */
+export function ensureFimBusyStyles(): void {
+  if (document.querySelector('style[data-dsh-chat-fim-busy]') !== null) return
+  const style = document.createElement('style')
+  style.dataset.dshChatFimBusy = ''
+  style.textContent = `@keyframes dsh-chat-fim-pulse {
+  0%, 100% { border-color: rgba(77, 107, 254, 0.9); box-shadow: 0 0 0 0 rgba(77, 107, 254, 0.30); }
+  50% { border-color: rgba(77, 107, 254, 0.45); box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.10); }
+}`
+  document.head.appendChild(style)
+}
+
+/** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）；联想中时边框呼吸提示。 */
 export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const { t } = props
   const enabled = useFimEnabled()
   const busy = useFimBusy()
   const label = `${t('switch.label')} · ${enabled ? t('switch.on') : t('switch.off')}`
   return (
-    <>
-      <button
-        type="button"
-        style={enabled ? { ...styles.switch, ...styles.switchOn } : styles.switch}
-        title={enabled ? t('switch.onHint') : t('switch.offHint')}
-        aria-pressed={enabled}
-        onClick={() => { setFimEnabled(!enabled) }}
-      >
-        {label}
-      </button>
-      {busy ? (
-        <span style={styles.hint} title={t('dock.busy')} aria-label={t('dock.busy')}>…</span>
-      ) : null}
-    </>
+    <button
+      type="button"
+      style={{
+        ...styles.switch,
+        ...enabled ? styles.switchOn : {},
+        ...busy ? styles.switchBusy : {},
+      }}
+      title={busy ? t('dock.busy') : enabled ? t('switch.onHint') : t('switch.offHint')}
+      aria-pressed={enabled}
+      aria-busy={busy}
+      onClick={() => { setFimEnabled(!enabled) }}
+    >
+      {label}
+    </button>
   )
 }
 

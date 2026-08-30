@@ -10,7 +10,7 @@ import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/c
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
-import { ChatFimDock, ChatFimSwitch } from './ChatFimDock.js'
+import { ChatFimDock, ChatFimSwitch, ensureFimBusyStyles } from './ChatFimDock.js'
 
 export const inject = ['slots', 'sessions', 'locale']
 
@@ -59,6 +59,7 @@ interface ClientAgentScope extends Context {
  */
 export function apply(ctx: ClientContext): void {
   const sessions = ctx.sessions as unknown as ClientSessionScope
+  ensureFimBusyStyles()
   const disposeDictionaries = ctx.locale.register('chat-fim', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
   ctx.effect(() => disposeDictionaries, 'dsh-chat-fim: locale dictionaries')
 
@@ -106,7 +107,7 @@ export function apply(ctx: ClientContext): void {
   }, ChatFimDock))
 }
 
-export { ChatFimDock, ChatFimSwitch } from './ChatFimDock.js'
+export { ChatFimDock, ChatFimSwitch, ensureFimBusyStyles } from './ChatFimDock.js'
 export type { ChatFimDockInjected, ChatFimDockProps, ChatFimSwitchProps } from './ChatFimDock.js'
 export { readEnabled, setFimBusy, setFimEnabled, useFimBusy, useFimEnabled } from './ChatFimDock.js'
 export { TRIGGER_PAUSE_MS }
