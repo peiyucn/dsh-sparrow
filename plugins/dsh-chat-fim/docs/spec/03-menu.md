@@ -12,7 +12,8 @@
 
 * 触发/作废状态机不变：停顿 ≥ `TRIGGER_PAUSE_MS`、IME 组合态压制、`draftRev` CAS 防陈旧、同一草稿单在飞请求、phase 非 plain 不展示；
 * 展示：建议到达且开关开启且主模型支持 → 菜单卡出现在输入框上方：
-  * 卡：官方 MenuDropdown 视觉 token（12px 圆角、`--dsw-specific-menu` 底、`--dsw-shadow-lv3`、内边距 4px；行 40px 高、10px 圆角、高亮 `--dsw-alias-interactive-bg-hover`；加载中骨架行样式）；
+  * 卡：官方 MenuDropdown 视觉 token（12px 圆角、`--dsw-specific-menu` 底、`--dsw-shadow-lv3`、内边距 4px；行 40px 高、10px 圆角、高亮 `--dsw-alias-interactive-bg-hover`）；**边框为开关 on 态同款紫色（`--dsw-alias-button-info-fill`）**，与官方 @ 列表做视觉区分（2026-08-30 用户要求）；
+  * 行尾键位提示：官方 drillHint 同款（caption 色文字 + 圆角键盘帽）——「采用 Tab · 丢弃 Esc」右对齐（2026-08-30 用户要求）；
   * 建议长句：行内 **2 行 line-clamp**（超出省略），悬停 `title` 给全文；
   * 高度：`useAnchoredMaxHeight` 钳在 composer 上方可用空间；
 * 采用：Tab（capture 监听，焦点保持在输入框）或 mousedown 点选（preventDefault 防焦点抢夺）→ `slash/input-insert-text` bail 事件追加草稿（span 取自共享快照的 draft/draftRev，CAS 判定）；Esc 丢弃；继续输入/发送/切会话清空；

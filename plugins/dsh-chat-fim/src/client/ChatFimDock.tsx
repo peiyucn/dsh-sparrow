@@ -227,7 +227,8 @@ export function ensureFimBusyStyles(): void {
   inset: 0 0 auto;
   height: 0;
 }
-/* 菜单卡：官方 MenuDropdown 视觉 token（见 ui-input-trigger/MenuView.module.css）。 */
+/* 菜单卡：官方 MenuDropdown 视觉 token（见 ui-input-trigger/MenuView.module.css）；
+   紫色边框与开关 on 态同款，与官方 @ 列表做视觉区分。 */
 .dsh-chat-fim-menu {
   position: absolute;
   bottom: calc(100% + 4px);
@@ -239,7 +240,7 @@ export function ensureFimBusyStyles(): void {
   padding: 4px;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--dsw-alias-border-inverted);
+  border: 1px solid var(--dsw-alias-button-info-fill, #4d6bfe);
   border-radius: 12px;
   background: var(--dsw-specific-menu);
   box-shadow: var(--dsw-shadow-lv3);
@@ -266,11 +267,35 @@ export function ensureFimBusyStyles(): void {
 }
 /* 建议长句 2 行截断（超出省略），全文经 title 提示。 */
 .dsh-chat-fim-menu-text {
+  flex: 1;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   min-width: 0;
+}
+/* 行尾键位提示：官方 @ 列表 drillHint 同款（caption 色文字 + 圆角键盘帽，右对齐）。 */
+.dsh-chat-fim-menu-trailing {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.dsh-chat-fim-menu-hint {
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.dsh-chat-fim-menu-kbd {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-caption);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 18px;
 }
 `
   document.head.appendChild(style)
@@ -518,6 +543,12 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
             }}
           >
             <span className="dsh-chat-fim-menu-text">{suggestion.text}</span>
+            <span className="dsh-chat-fim-menu-trailing" aria-hidden>
+              <span className="dsh-chat-fim-menu-hint">{t('menu.adopt')}</span>
+              <kbd className="dsh-chat-fim-menu-kbd">Tab</kbd>
+              <span className="dsh-chat-fim-menu-hint">{t('menu.dismiss')}</span>
+              <kbd className="dsh-chat-fim-menu-kbd">Esc</kbd>
+            </span>
           </button>
         </div>
       ) : null}

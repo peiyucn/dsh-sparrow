@@ -9,6 +9,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'switch.offHint'
       | 'dock.busy'
       | 'dock.aria'
+      | 'menu.adopt'
+      | 'menu.dismiss'
   }
 }
 

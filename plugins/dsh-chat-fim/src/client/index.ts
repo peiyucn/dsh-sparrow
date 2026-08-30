@@ -33,6 +33,8 @@ const LOCALE_DICTS = {
     'switch.offHint': '开启输入框续写联想',
     'dock.busy': '正在联想…',
     'dock.aria': '续写建议',
+    'menu.adopt': '采用',
+    'menu.dismiss': '丢弃',
   },
   en: {
     'switch.label': 'Suggest',
@@ -42,6 +44,8 @@ const LOCALE_DICTS = {
     'switch.offHint': 'Turn on input suggestions',
     'dock.busy': 'Suggesting…',
     'dock.aria': 'Suggestions',
+    'menu.adopt': 'Adopt',
+    'menu.dismiss': 'Dismiss',
   },
 } as const
 
