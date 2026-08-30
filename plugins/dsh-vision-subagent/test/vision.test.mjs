@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   extractJsonObject, findImageReference, normalizeVisionConfig, parseVisionReport,
-  renderVisionReport, shouldClearInputModalities, VisionCache,
+  renderVisionReport, resolveVisionOutput, shouldClearInputModalities, VisionCache,
 } from '../lib/vision.js'
 
 describe('vision-subagent 纯逻辑', () => {
@@ -11,13 +11,37 @@ describe('vision-subagent 纯逻辑', () => {
       const config = normalizeVisionConfig(undefined)
       assert.equal(config.visionModel, 'deepseek-v4-flash-vision-exp')
       assert.equal(config.visionProvider, 'deepseek-official')
-      assert.equal(config.maxTokens, 2048)
+      assert.equal(config.maxTokens, 8192)
       assert.equal(config.temperature, 0.2)
+      assert.equal(config.visionReasoningEffort, 'low')
       assert.equal(config.textRoutes.length, 2)
     })
 
     it('非法缓存上限 应该 抛错', () => {
       assert.throws(() => normalizeVisionConfig({ cacheMaxEntries: 0 }), /cacheMaxEntries/u)
+    })
+
+    it('合法思考力度 应该 保留配置值', () => {
+      const config = normalizeVisionConfig({ visionReasoningEffort: 'off' })
+      assert.equal(config.visionReasoningEffort, 'off')
+    })
+
+    it('非法思考力度 应该 抛错', () => {
+      assert.throws(() => normalizeVisionConfig({ visionReasoningEffort: 'ultra' }), /visionReasoningEffort/u)
+    })
+  })
+
+  describe('resolveVisionOutput', () => {
+    it('正文非空 应该 优先返回正文', () => {
+      assert.equal(resolveVisionOutput('  {"summary":"ok"}  ', '思考过程'), '{"summary":"ok"}')
+    })
+
+    it('只有思考文本 应该 抛截断错误', () => {
+      assert.throws(() => resolveVisionOutput('   ', '思考到一半'), /未给出正文/u)
+    })
+
+    it('正文与思考都为空 应该 抛上游无文本错误', () => {
+      assert.throws(() => resolveVisionOutput('', '  '), /没有返回文本/u)
     })
   })
 

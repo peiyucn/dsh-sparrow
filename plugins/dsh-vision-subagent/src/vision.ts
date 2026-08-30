@@ -5,9 +5,13 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
 export const DEFAULT_VISION_PROVIDER = 'deepseek-official'
 export const DEFAULT_VISION_MODEL = 'deepseek-v4-flash-vision-exp'
-export const DEFAULT_MAX_TOKENS = 2048
+export const DEFAULT_MAX_TOKENS = 8192
 export const DEFAULT_TEMPERATURE = 0.2
 export const DEFAULT_CACHE_MAX_ENTRIES = 64
+/** 视觉模型思考力度；low 足够结构化读图，避免把 maxTokens 全烧在思考上。 */
+export const DEFAULT_VISION_REASONING_EFFORT = 'low'
+export const VISION_REASONING_EFFORTS = ['off', 'low', 'high', 'max'] as const
+export type VisionReasoningEffort = (typeof VISION_REASONING_EFFORTS)[number]
 export const DEFAULT_TEXT_ROUTES: readonly TextRoute[] = [
   { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
   { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
@@ -23,6 +27,7 @@ export interface VisionConfig {
   readonly visionModel: string
   readonly maxTokens: number
   readonly temperature: number
+  readonly visionReasoningEffort: VisionReasoningEffort
   readonly cacheMaxEntries: number
   readonly textRoutes: readonly TextRoute[]
 }
@@ -36,11 +41,20 @@ export interface VisionReport {
 
 /** 规范化配置；文本路由为空时插件不做门禁放行（工具仍可用）。 */
 export function normalizeVisionConfig(input: Readonly<Partial<VisionConfig>> | undefined): VisionConfig {
+  let visionReasoningEffort: VisionReasoningEffort = DEFAULT_VISION_REASONING_EFFORT
+  if (input?.visionReasoningEffort !== undefined) {
+    const candidate = input.visionReasoningEffort.trim() as VisionReasoningEffort
+    if (!VISION_REASONING_EFFORTS.includes(candidate)) {
+      throw new Error(`dsh-vision-subagent: visionReasoningEffort 必须是 ${VISION_REASONING_EFFORTS.join('/')}`)
+    }
+    visionReasoningEffort = candidate
+  }
   const config: VisionConfig = {
     visionProvider: input?.visionProvider?.trim() || DEFAULT_VISION_PROVIDER,
     visionModel: input?.visionModel?.trim() || DEFAULT_VISION_MODEL,
     maxTokens: input?.maxTokens ?? DEFAULT_MAX_TOKENS,
     temperature: input?.temperature ?? DEFAULT_TEMPERATURE,
+    visionReasoningEffort,
     cacheMaxEntries: input?.cacheMaxEntries ?? DEFAULT_CACHE_MAX_ENTRIES,
     textRoutes: input?.textRoutes ?? DEFAULT_TEXT_ROUTES,
   }
@@ -186,6 +200,21 @@ export function extractJsonObject(text: string): unknown {
     }
     return undefined
   }
+}
+
+/**
+ * 选择模型输出正文：正文优先。只有思考文本、没有正文时，视为上游把 maxTokens
+ * 全烧在思考上（输出被截断）或模型异常——抛明确错误，而不是把「内心独白」
+ * 当报告回传（2026-08-30 实测：2048 上限 + 默认 high 思考 → 输出停在思考中途、
+ * 无 JSON，旧逻辑把整段思考文本兜底成了报告并缓存）。
+ */
+export function resolveVisionOutput(text: string, reasoning: string): string {
+  const trimmed = text.trim()
+  if (trimmed !== '') return trimmed
+  if (reasoning.trim() === '') {
+    throw new Error('vision_read 上游没有返回文本')
+  }
+  throw new Error('vision_read: 视觉模型只输出了思考过程、未给出正文（可能被 maxTokens 截断）')
 }
 
 /** 从子代理 structured/文本结果解析结构化报告；异常输入返回安全默认值。 */

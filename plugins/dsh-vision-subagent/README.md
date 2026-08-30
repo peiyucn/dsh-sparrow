@@ -13,7 +13,7 @@ npm run verify
 ## M1 行为
 
 * 仅对配置的文本路由抹除显式不含 image 的 `inputModalities`（放行贴图门禁），卸载时恢复；
-* 主模型调用 `vision_read` → 从会话事件反查图片引用（归一化 + 唯一前缀匹配，占位符里的截断哈希可直接传）→ `ctx.attachments.readImage` 校验 → **直连 `ctx.llm`** 指定官方 vision 模型读图（不再走子代理）；
+* 主模型调用 `vision_read` → 从会话事件反查图片引用（归一化 + 唯一前缀匹配，占位符里的截断哈希可直接传）→ `ctx.attachments.readImage` 校验 → **直连 `ctx.llm`** 指定官方 vision 模型读图（不再走子代理）；默认 `maxTokens: 8192` + `visionReasoningEffort: low`，避免思考把输出上限烧光导致正文截断；只有思考文本、没有正文时以明确错误返回，不再把思考过程当报告；
 * 报告按 attachmentId 进程内 LRU 缓存；失败以工具错误返回，不悬挂。
 
 ## 性能实测（2026-08-29）

@@ -4,12 +4,13 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-llm'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-tools'
 import {
   extractJsonObject, findImageReference, isDeepseekMainRoute, mainRouteFromSession, normalizeVisionConfig,
-  parseVisionReport, renderVisionReport, shouldClearInputModalities, VisionCache, type VisionConfig, type VisionReport,
+  parseVisionReport, renderVisionReport, resolveVisionOutput, shouldClearInputModalities, VisionCache,
+  type VisionConfig, type VisionReport,
 } from './vision.js'
 
 export const name = 'dsh-vision-subagent'
@@ -144,6 +145,8 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         model: settings.visionModel,
         maxTokens: settings.maxTokens,
         temperature: settings.temperature,
+        // 低思考力度：结构化读图不需要烧大量 reasoning，避免 maxTokens 截断。
+        reasoningEffort: ReasoningEffortId(settings.visionReasoningEffort),
       }, exec.signal)
       let text = ''
       let reasoning = ''
@@ -161,11 +164,8 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         if (chunk.type === 'text-delta') text += chunk.text
         if (chunk.type === 'reasoning-delta') reasoning += chunk.text
       }
-      // 思考型模型可能把输出全部花在 reasoning 上、正文为空：用思考文本兜底。
-      const raw = text.trim() === '' ? reasoning.trim() : text.trim()
-      if (raw === '') {
-        throw new Error('vision_read 上游没有返回文本')
-      }
+      // 正文优先；只有思考文本时视为截断/异常，抛明确错误而不是把思考当报告。
+      const raw = resolveVisionOutput(text, reasoning)
       const report = parseVisionReport(extractJsonObject(raw), raw)
       cache.set(cacheKey, report)
       return report

@@ -5,6 +5,8 @@
       config:
         subagentProvider: spawn
         visionModel: deepseek-v4-flash-vision-exp
+        maxTokens: 8192
+        visionReasoningEffort: low
         cacheMaxEntries: 64
         textRoutes:
           - provider: deepseek-official
