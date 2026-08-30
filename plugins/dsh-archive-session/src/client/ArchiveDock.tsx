@@ -75,6 +75,28 @@ export function ensureArchiveStyles(): void {
   padding: 0;
   border-radius: 50%;
 }
+.dsh-archive-btn {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dsh-archive-btn:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dsh-archive-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.dsh-archive-btn-danger {
+  color: var(--dsw-alias-state-error-primary, #c62828);
+}
 `
   document.head.appendChild(style)
 }
@@ -111,17 +133,6 @@ const styles = {
     display: 'flex',
     gap: 6,
     alignItems: 'center',
-  } satisfies CSSProperties,
-  small: {
-    border: '1px solid var(--dsw-alias-border-l1, #d4d8e0)',
-    borderRadius: 5,
-    background: 'transparent',
-    color: 'inherit',
-    padding: '3px 8px',
-    cursor: 'pointer',
-  } satisfies CSSProperties,
-  danger: {
-    color: 'var(--dsw-alias-state-error-primary, #c62828)',
   } satisfies CSSProperties,
   title: {
     overflow: 'hidden',
