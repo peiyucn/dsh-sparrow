@@ -3,8 +3,8 @@ import { describe, it } from 'node:test'
 import {
   buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, fimStopSequences, formatTokenCount,
   isDeepseekMainRoute, isStaleResponse, mainRouteFromSession, normalizeConfig, normalizeFimModelMode,
-  parseCompleteBody, resolveFimModel, shouldTriggerFim, summarizeUpstreamBody, upstreamStatusToError,
-  validateCompletePayload,
+  parseCompleteBody, resolveFimModel, shouldTriggerFim, stripSpeakerPrefix, summarizeUpstreamBody,
+  upstreamStatusToError, validateCompletePayload,
 } from '../lib/chat-fim.js'
 
 describe('chat-fim 纯逻辑', () => {
@@ -125,6 +125,40 @@ describe('chat-fim 纯逻辑', () => {
 
     it('en 应该 包含英文说话人标记', () => {
       assert.deepEqual(fimStopSequences('en'), ['\nUser: ', '\nAssistant: '])
+    })
+  })
+
+  describe('stripSpeakerPrefix', () => {
+    it('zh 助手：开头 应该 剥掉标记', () => {
+      assert.equal(stripSpeakerPrefix('助手：我来测试一下', 'zh'), '我来测试一下')
+    })
+
+    it('zh 换行 + 助手：开头 应该 剥掉换行与标记', () => {
+      assert.equal(stripSpeakerPrefix('\n助手：我来测试一下', 'zh'), '我来测试一下')
+    })
+
+    it('zh 用户：开头 应该 剥掉标记', () => {
+      assert.equal(stripSpeakerPrefix('用户：继续写', 'zh'), '继续写')
+    })
+
+    it('en Assistant: 开头 应该 剥掉标记与空格', () => {
+      assert.equal(stripSpeakerPrefix('Assistant: keep going', 'en'), 'keep going')
+    })
+
+    it('en User: 开头 应该 剥掉标记', () => {
+      assert.equal(stripSpeakerPrefix('User: draft', 'en'), 'draft')
+    })
+
+    it('无标记开头 应该 原样返回', () => {
+      assert.equal(stripSpeakerPrefix('我觉得可以', 'zh'), '我觉得可以')
+    })
+
+    it('仅标记 应该 返回空串', () => {
+      assert.equal(stripSpeakerPrefix('助手：', 'zh'), '')
+    })
+
+    it('标记在文本中间 应该 保留', () => {
+      assert.equal(stripSpeakerPrefix('好的助手：可以', 'zh'), '好的助手：可以')
     })
   })
 

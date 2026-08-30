@@ -179,6 +179,26 @@ export function setFimSuggestion(next: FimSuggestionRecord | null): void {
   for (const listener of suggestionListeners) listener()
 }
 
+// 模块级「最近一次采纳」标记：菜单 Tab/点选采纳前记录预期采纳（新草稿 = 旧草稿 + 建议文本），
+// dock 在草稿按此变化时跳过触发并消费标记——否则采纳后新草稿会立刻再次触发联想，
+// 建议马上复现（且上游常以「助手：」口吻续写）。采纳失败（bail CAS 拒绝）回滚清除。
+let lastAdoption: { sessionId: SessionId; draft: string; text: string } | null = null
+
+/** 菜单采纳前记录预期采纳。 */
+export function markFimAdoption(adoption: { sessionId: SessionId; draft: string; text: string }): void {
+  lastAdoption = adoption
+}
+
+/** 清除采纳标记（采纳失败回滚 / dock 消费后）。 */
+export function clearFimAdoption(): void {
+  lastAdoption = null
+}
+
+/** 只读当前采纳标记。 */
+export function peekFimAdoption(): { sessionId: SessionId; draft: string; text: string } | null {
+  return lastAdoption
+}
+
 /** 读取本地续写模型档位：auto/pro/flash，非法值回退 auto。 */
 export function readModelMode(storage: { getItem(key: string): string | null }, key = MODEL_MODE_STORAGE_KEY): FimModelMode {
   const value = storage.getItem(key)
@@ -663,6 +683,12 @@ export function ChatFimDock(props: ChatFimDockProps) {
     const draft = input.draft
     // 形态门控：句末标点 / 尾随空白 / 单词中间 / 过短草稿不触发（避免建议太频繁、续出「新一句话」）。
     if (!supported || !enabled || composing || input.phase !== 'plain') return
+    // Tab 采纳导致的草稿变化不再触发：采纳后建议会立刻复现（且上游常以「助手：」口吻续写）。
+    const adoption = peekFimAdoption()
+    if (adoption !== null && adoption.sessionId === session.sessionId && draft === adoption.draft + adoption.text) {
+      clearFimAdoption()
+      return
+    }
     if (!shouldTriggerFim(draft).ok) return
 
     const rev = input.draftRev
@@ -777,9 +803,13 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
       end: suggestion.draft.length,
       draftRev: suggestion.draftRev,
     }
+    // 先记采纳标记：dock 据此跳过「旧草稿 + 建议文本」这一次触发；bail 失败则回滚。
+    markFimAdoption({ sessionId: suggestion.sessionId, draft: suggestion.draft, text: suggestion.text })
     if (adopt(suggestion.sessionId, suggestion.text, span)) {
       setFimSuggestion(null)
       setFimBusy(false)
+    } else {
+      clearFimAdoption()
     }
   }, [adopt, suggestion])
 

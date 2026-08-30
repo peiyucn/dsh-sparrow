@@ -9,8 +9,8 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
   buildFimPrompt, extractSuggestions, extractUsage, fimStopSequences, isAbortTimeout, isDeepseekMainRoute,
-  mainRouteFromSession, normalizeConfig, parseCompleteBody, resolveFimModel, summarizeUpstreamBody,
-  upstreamStatusToError, type ChatFimConfig, type ChatFimError, type CompleteRequest,
+  mainRouteFromSession, normalizeConfig, parseCompleteBody, resolveFimModel, stripSpeakerPrefix,
+  summarizeUpstreamBody, upstreamStatusToError, type ChatFimConfig, type ChatFimError, type CompleteRequest,
 } from './chat-fim.js'
 
 export type { CompleteRequest } from './chat-fim.js'
@@ -207,10 +207,11 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
             totalPromptTokens += result.value.usage.promptTokens
             totalCompletionTokens += result.value.usage.completionTokens
             for (const suggestion of result.value.suggestions) {
-              if (!seen.has(suggestion)) {
-                seen.add(suggestion)
-                suggestions.push(suggestion)
-              }
+              // 剥离开头泄漏的说话人标记（「助手：…」），剥空或重复的候选丢弃。
+              const clean = stripSpeakerPrefix(suggestion, language)
+              if (clean === '' || seen.has(clean)) continue
+              seen.add(clean)
+              suggestions.push(clean)
             }
             continue
           }

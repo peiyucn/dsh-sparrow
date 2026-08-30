@@ -77,6 +77,22 @@ export function fimStopSequences(language: FimLanguage): readonly string[] {
   return ['user', 'assistant'].map(role => `\n${speakerText(language, role as 'user' | 'assistant')}`)
 }
 
+/**
+ * 剥离补全开头泄漏的说话人标记（「助手：/用户：」、「Assistant: /User: 」）与前置换行/空白。
+ * 上游 FIM 偶发不续写用户文本，而是复读历史转文本格式里的下一位说话人标记开头
+ * （2026-08-30 实测：补全输出「助手：…」，续写变成助手口吻）。剥后为空串返回空串，
+ * 由调用方丢弃该候选。标记出现在文本中间则不动（合法用户内容）。
+ */
+export function stripSpeakerPrefix(text: string, language: FimLanguage = 'zh'): string {
+  const withoutLeading = text.replace(/^[\s\uFEFF]+/u, '')
+  for (const role of ['assistant', 'user'] as const) {
+    const marker = speakerText(language, role)
+    if (!withoutLeading.startsWith(marker)) continue
+    return withoutLeading.slice(marker.length).replace(/^[\s\uFEFF]+/u, '')
+  }
+  return withoutLeading
+}
+
 /** 主模型路由：会话事件里最近一条 request/header 的 provider/model。 */
 export function mainRouteFromSession(events: readonly SessionEvent[]): { provider: string; model: string } | undefined {
   for (const event of [...events].reverse()) {
