@@ -1,0 +1,66 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - '*-v[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: '插件目录名（如 dsh-chat-fim）'
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve plugin and version from tag
+        id: resolve
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == 'push' ]]; then
+            TAG="${{ github.ref_name }}"
+            PLUGIN="${TAG%-v*}"
+            VERSION="${TAG##*-v}"
+            echo "plugin=${PLUGIN}" >> "$GITHUB_OUTPUT"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          else
+            echo "plugin=${{ inputs.plugin }}" >> "$GITHUB_OUTPUT"
+            echo "version=manual" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check tag version matches package.json
+        if: github.event_name == 'push'
+        shell: bash
+        working-directory: plugins/${{ steps.resolve.outputs.plugin }}
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [[ "${PKG_VERSION}" != "${{ steps.resolve.outputs.version }}" ]]; then
+            echo "tag 版本 ${{ steps.resolve.outputs.version }} 与 package.json 版本 ${PKG_VERSION} 不一致" >&2
+            exit 1
+          fi
+
+      - name: Verify plugin
+        working-directory: plugins/${{ steps.resolve.outputs.plugin }}
+        run: npm run verify
+
+      - name: Publish to npm
+        working-directory: plugins/${{ steps.resolve.outputs.plugin }}
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
