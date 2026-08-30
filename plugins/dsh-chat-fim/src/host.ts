@@ -8,8 +8,9 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
-  buildFimPrompt, extractSuggestions, fimStopSequences, isAbortTimeout, normalizeConfig, parseCompleteBody,
-  summarizeUpstreamBody, upstreamStatusToError, type ChatFimConfig, type ChatFimError, type CompleteRequest,
+  buildFimPrompt, extractSuggestions, fimStopSequences, isAbortTimeout, isDeepseekMainRoute,
+  mainRouteFromSession, normalizeConfig, parseCompleteBody, summarizeUpstreamBody, upstreamStatusToError,
+  type ChatFimConfig, type ChatFimError, type CompleteRequest,
 } from './chat-fim.js'
 
 export type { CompleteRequest } from './chat-fim.js'
@@ -110,6 +111,16 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
         sendError(res, 404, {
           code: 'UNKNOWN_SESSION',
           message: '会话不存在或已不在当前进程：请刷新页面后重试',
+        })
+        return
+      }
+
+      // 主模型不是 DeepSeek 系列时禁用（FIM 上游为 DeepSeek 官方能力）。
+      const main = mainRouteFromSession(session.events)
+      if (!isDeepseekMainRoute(main)) {
+        sendError(res, 403, {
+          code: 'MODEL_UNSUPPORTED',
+          message: `当前主模型 ${main?.provider ?? '?'}/${main?.model ?? '?'} 不是 DeepSeek 系列，续写功能已禁用`,
         })
         return
       }

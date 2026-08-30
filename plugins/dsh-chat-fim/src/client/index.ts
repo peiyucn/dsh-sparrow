@@ -109,5 +109,5 @@ export function apply(ctx: ClientContext): void {
 
 export { ChatFimDock, ChatFimSwitch, ensureFimBusyStyles } from './ChatFimDock.js'
 export type { ChatFimDockInjected, ChatFimDockProps, ChatFimSwitchProps } from './ChatFimDock.js'
-export { readEnabled, setFimBusy, setFimEnabled, useFimBusy, useFimEnabled } from './ChatFimDock.js'
+export { readEnabled, setFimBusy, setFimEnabled, setFimError, useFimBusy, useFimEnabled, useFimError } from './ChatFimDock.js'
 export { TRIGGER_PAUSE_MS }

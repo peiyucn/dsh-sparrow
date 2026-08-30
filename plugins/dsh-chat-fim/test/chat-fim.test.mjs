@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, fimStopSequences, isStaleResponse,
-  normalizeConfig, parseCompleteBody, summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
+  buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, fimStopSequences, isDeepseekMainRoute,
+  isStaleResponse, mainRouteFromSession, normalizeConfig, parseCompleteBody, summarizeUpstreamBody,
+  upstreamStatusToError, validateCompletePayload,
 } from '../lib/chat-fim.js'
 
 describe('chat-fim 纯逻辑', () => {
@@ -157,6 +158,35 @@ describe('chat-fim 纯逻辑', () => {
 
     it('draftRev 一致 应该 判定新鲜', () => {
       assert.equal(isStaleResponse(1, 1), false)
+    })
+  })
+
+  describe('mainRouteFromSession', () => {
+    it('最近一条 request/header 应该 取到 provider/model', () => {
+      const events = [
+        { type: 'user/message', seq: 1, time: 1, data: {} },
+        { type: 'request/header', seq: 2, time: 2, data: { header: { config: { provider: 'zai', model: 'glm-5.3-flash' } } } },
+        { type: 'request/header', seq: 3, time: 3, data: { header: { config: { provider: 'deepseek-official', model: 'deepseek-v4-pro' } } } },
+      ]
+      assert.deepEqual(mainRouteFromSession(events), { provider: 'deepseek-official', model: 'deepseek-v4-pro' })
+    })
+
+    it('无 request/header 应该 返回 undefined', () => {
+      assert.equal(mainRouteFromSession([{ type: 'user/message', seq: 1, time: 1, data: {} }]), undefined)
+    })
+  })
+
+  describe('isDeepseekMainRoute', () => {
+    it('deepseek-official 应该 放行', () => {
+      assert.equal(isDeepseekMainRoute({ provider: 'deepseek-official' }), true)
+    })
+
+    it('其它 provider 应该 禁用', () => {
+      assert.equal(isDeepseekMainRoute({ provider: 'zai' }), false)
+    })
+
+    it('未知路由 应该 默认放行', () => {
+      assert.equal(isDeepseekMainRoute(undefined), true)
     })
   })
 })

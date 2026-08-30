@@ -77,6 +77,28 @@ export function setFimBusy(next: boolean): void {
   for (const listener of busyListeners) listener()
 }
 
+// 模块级共享错误状态：禁用/凭据/上游错误让用户可见，而不是静默无建议。
+let sharedError: string | null = null
+const errorListeners = new Set<() => void>()
+
+/** 订阅共享错误状态；返回当前值。 */
+export function useFimError(): string | null {
+  const [value, setValue] = useState(sharedError)
+  useEffect(() => {
+    const listener = (): void => { setValue(sharedError) }
+    errorListeners.add(listener)
+    return () => { errorListeners.delete(listener) }
+  }, [])
+  return value
+}
+
+/** 设置共享错误状态。 */
+export function setFimError(next: string | null): void {
+  if (sharedError === next) return
+  sharedError = next
+  for (const listener of errorListeners) listener()
+}
+
 /**
  * 输入区只读几何测量（幽灵文本定位特例，见 AGENTS.md）：
  * 仅当光标位于内容可编辑区末尾时，返回文末光标所在视口坐标；
@@ -92,9 +114,6 @@ function endCaretPoint(): { x: number; y: number } | undefined {
   const endRange = document.createRange()
   endRange.selectNodeContents(editor)
   endRange.collapse(false)
-  const caretRange = selection.getRangeAt(0).cloneRange()
-  caretRange.collapse(false)
-  if (caretRange.compareBoundaryPoints(Range.END_TO_END, endRange) !== 0) return undefined
   const rect = endRange.getBoundingClientRect()
   if (rect.width === 0 && rect.height === 0) return undefined
   return { x: rect.right, y: rect.top }
@@ -209,18 +228,24 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const { t } = props
   const enabled = useFimEnabled()
   const busy = useFimBusy()
+  const error = useFimError()
   const label = `${t('switch.label')} · ${enabled ? t('switch.on') : t('switch.off')}`
   return (
-    <button
-      type="button"
-      className={enabled ? 'dsh-chat-fim-switch dsh-chat-fim-switch-on' : 'dsh-chat-fim-switch'}
-      title={busy ? t('dock.busy') : enabled ? t('switch.onHint') : t('switch.offHint')}
-      aria-pressed={enabled}
-      aria-busy={busy}
-      onClick={() => { setFimEnabled(!enabled) }}
-    >
-      {label}
-    </button>
+    <>
+      <button
+        type="button"
+        className={enabled ? 'dsh-chat-fim-switch dsh-chat-fim-switch-on' : 'dsh-chat-fim-switch'}
+        title={busy ? t('dock.busy') : error ?? (enabled ? t('switch.onHint') : t('switch.offHint'))}
+        aria-pressed={enabled}
+        aria-busy={busy}
+        onClick={() => { setFimEnabled(!enabled) }}
+      >
+        {label}
+      </button>
+      {error !== null ? (
+        <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)', fontSize: 12 }} title={error}>⚠</span>
+      ) : null}
+    </>
   )
 }
 
@@ -268,6 +293,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
   useEffect(() => {
     setSuggestion(null)
     setFimBusy(false)
+    setFimError(null)
     flightRef.current?.abort()
 
     const draft = input.draft
@@ -284,9 +310,13 @@ export function ChatFimDock(props: ChatFimDockProps) {
           if (controller.signal.aborted) return
           if (rev !== draftRevRef.current || draftRef.current !== draft) return
           setSuggestion(next[0] ?? null)
+          setFimError(null)
         })
-        .catch(() => {
-          // 静默降级：续写失败不打扰输入。
+        .catch((reason: unknown) => {
+          // 失败可见化：禁用/凭据/上游错误显示在开关旁，而不是静默无建议。
+          if (!controller.signal.aborted) {
+            setFimError(reason instanceof Error ? reason.message : String(reason))
+          }
         })
         .finally(() => {
           if (flightRef.current === controller) flightRef.current = null

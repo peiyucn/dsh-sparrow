@@ -1,5 +1,7 @@
 /** dsh-chat-fim 纯逻辑：配置归一化、请求校验、错误映射、候选提取。 */
 
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
+
 export const DEFAULT_BASE_URL = 'https://api.deepseek.com/beta'
 export const DEFAULT_MODEL = 'deepseek-v4-pro'
 export const DEFAULT_API_KEY_ENV = 'DEEPSEEK_API_KEY'
@@ -19,6 +21,7 @@ export type ChatFimErrorCode =
   | 'INVALID_PROMPT'
   | 'UNKNOWN_SESSION'
   | 'MISSING_CREDENTIAL'
+  | 'MODEL_UNSUPPORTED'
   | 'UPSTREAM_ERROR'
   | 'TIMEOUT'
   | 'RATE_LIMITED'
@@ -69,6 +72,23 @@ function speakerText(language: FimLanguage, role: 'user' | 'assistant'): string 
 /** FIM 停止序列：历史转文本用说话人标记，命中即停，防止模型续写下一位说话人。 */
 export function fimStopSequences(language: FimLanguage): readonly string[] {
   return ['user', 'assistant'].map(role => `\n${speakerText(language, role as 'user' | 'assistant')}`)
+}
+
+/** 主模型路由：会话事件里最近一条 request/header 的 provider/model。 */
+export function mainRouteFromSession(events: readonly SessionEvent[]): { provider: string; model: string } | undefined {
+  for (const event of [...events].reverse()) {
+    if (event.type !== 'request/header') continue
+    const config = (event.data as { header?: { config?: { provider?: unknown; model?: unknown } } }).header?.config
+    if (typeof config?.provider === 'string' && typeof config.model === 'string') {
+      return { provider: config.provider, model: config.model }
+    }
+  }
+  return undefined
+}
+
+/** 主模型是否为 DeepSeek 系列（deepseek-official provider）；未知路由默认放行。 */
+export function isDeepseekMainRoute(route: { provider: string } | undefined): boolean {
+  return route === undefined || route.provider === 'deepseek-official'
 }
 
 /** 把外部配置补成完整内部配置；非法数字一律拒绝（插件加载期即失败，而不是请求期）。 */
