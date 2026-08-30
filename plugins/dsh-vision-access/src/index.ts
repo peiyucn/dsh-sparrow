@@ -3,5 +3,5 @@ export { apply, inject, name } from './host.js'
 export type { VisionConfig, VisionReport } from './vision.js'
 export {
   extractJsonObject, findImageReference, normalizeVisionConfig, parseVisionReport,
-  renderVisionReport, shouldClearInputModalities, VisionCache,
+  renderVisionReport, shouldClearInputModalities, visionCacheKey, VisionCache,
 } from './vision.js'

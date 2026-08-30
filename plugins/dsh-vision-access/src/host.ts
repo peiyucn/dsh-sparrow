@@ -9,7 +9,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-tools'
 import {
   extractJsonObject, findImageReference, isDeepseekMainRoute, mainRouteFromSession, normalizeVisionConfig,
-  parseVisionReport, renderVisionReport, resolveVisionOutput, shouldClearInputModalities, VisionCache,
+  parseVisionReport, renderVisionReport, resolveVisionOutput, shouldClearInputModalities, visionCacheKey, VisionCache,
   type VisionConfig, type VisionReport,
 } from './vision.js'
 
@@ -128,16 +128,17 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         throw new Error(`vision_read: 当前主模型 ${main?.provider ?? '?'}/${main?.model ?? '?'} 不是 DeepSeek 系列，视觉功能已禁用`)
       }
 
-      const cacheKey = String(ref.attachmentId)
+      const question = typeof args.question === 'string' && args.question.trim() !== ''
+        ? args.question.trim()
+        : '请完整阅读这张图片并给出结构化报告。'
+
+      const cacheKey = visionCacheKey(String(ref.attachmentId), question)
       const cached = cache.get(cacheKey)
       if (cached !== undefined) return cached
 
       // 先走官方附件 seam 确认图片字节可读；只传 ref，不复制内部文件。
       await ctx.attachments.readImage(ref, exec.signal)
 
-      const question = typeof args.question === 'string' && args.question.trim() !== ''
-        ? args.question.trim()
-        : '请完整阅读这张图片并给出结构化报告。'
       const promptText = `${question}\n\n输出 JSON 对象：summary（一句话摘要）、ocrText（逐字文本，可选）、tables（表格，可选）、layout（版式，可选）。只输出 JSON 本体，不要输出解释或代码围栏。不要编造图中没有的内容。`
 
       const prepared = await ctx.llm.prepareCall({

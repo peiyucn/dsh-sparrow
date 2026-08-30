@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   extractJsonObject, findImageReference, normalizeVisionConfig, parseVisionReport,
-  renderVisionReport, resolveVisionOutput, shouldClearInputModalities, VisionCache,
+  renderVisionReport, resolveVisionOutput, shouldClearInputModalities, visionCacheKey, VisionCache,
 } from '../lib/vision.js'
 
 describe('vision-access 纯逻辑', () => {
@@ -42,6 +42,20 @@ describe('vision-access 纯逻辑', () => {
 
     it('正文与思考都为空 应该 抛上游无文本错误', () => {
       assert.throws(() => resolveVisionOutput('', '  '), /没有返回文本/u)
+    })
+  })
+
+  describe('visionCacheKey', () => {
+    it('同图同提问 应该 生成相同键', () => {
+      assert.equal(visionCacheKey('abc', 'q1'), visionCacheKey('abc', 'q1'))
+    })
+
+    it('同图不同提问 应该 生成不同键', () => {
+      assert.notEqual(visionCacheKey('abc', 'q1'), visionCacheKey('abc', 'q2'))
+    })
+
+    it('不同图同提问 应该 生成不同键', () => {
+      assert.notEqual(visionCacheKey('abc', 'q1'), visionCacheKey('xyz', 'q1'))
     })
   })
 

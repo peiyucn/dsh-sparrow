@@ -252,6 +252,11 @@ export function renderVisionReport(report: VisionReport): string {
   return lines.join('\n')
 }
 
+/** 缓存键：报告是提问相关的，同一图片换提问必须各自缓存（2026-08-30 实测：旧键只按图片 id，换提问命中旧报告）。 */
+export function visionCacheKey(attachmentId: string, question: string): string {
+  return `${attachmentId}\u0000${question}`
+}
+
 /** 进程内 LRU 缓存。 */
 export class VisionCache {
   private readonly entries = new Map<string, VisionReport>()
