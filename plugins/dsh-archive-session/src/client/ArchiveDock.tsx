@@ -274,6 +274,9 @@ const styles = {
   } satisfies CSSProperties,
 } as const
 
+/** 操作反馈提示自动消失时长。 */
+const NOTICE_AUTO_DISMISS_MS = 5_000
+
 /** 待确认动作（web 确认框状态）。 */
 type PendingConfirm =
   | { readonly kind: 'backup'; readonly item: ArchivedSessionItem }
@@ -371,7 +374,8 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
  * footer action 组件：窄栏显示图标，宽栏显示「归档管理」；弹窗列出轻归档会话与备份。
  * 打开后先显示加载态，数据就绪后再渲染列表。
  * @param props - slot props + 注入动作。
- */export function ArchiveDock(props: ArchiveDockProps) {
+ */
+export function ArchiveDock(props: ArchiveDockProps) {
   const { wide, listArchived, listBackups, backupSession, deleteSession, restoreBackup, deleteBackup, restoreAllBackups, deleteAllBackups, t } = props
   const [open, setOpen] = useState(false)
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
@@ -414,6 +418,13 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
     if (!open) return
     void refresh()
   }, [open])
+
+  // 操作反馈提示：展示几秒后自动消失（完成后的确认提示不需要常驻）。
+  useEffect(() => {
+    if (notice === null) return
+    const timer = setTimeout(() => { setNotice(null) }, NOTICE_AUTO_DISMISS_MS)
+    return () => { clearTimeout(timer) }
+  }, [notice])
 
   const run = async (key: string, action: () => Promise<unknown>): Promise<void> => {
     setBusy(key)
