@@ -19,7 +19,7 @@
 | 环节 | 契约 | 证据 | 结论 |
 |---|---|---|---|
 | 图片数据 | 消息 image block: `{ type:'image', attachment: ImageAttachmentRef }`；`readImage(ref, signal?) → { ref, data: Uint8Array }` 取字节 | packages/llm/llm/src/types.ts:71-75；packages/attachment/attachment/src/index.ts:108 | **公开 seam**，不硬编码 ~/.dsh/attachments 布局 |
-| 门禁放行 | RPC 层拒绝发生在 `resolveModelInfo` 返回的 `inputModalities` 显式不含 image 时；`resolveModelInfo` 是公开属性，可逆包装 | packages/host/apiproxy/src/api-proxy.ts:2382-2395；packages/llm/llm/src/index.ts:646-652 | 包装公开 seam（抹除文本路由的 inputModalities，可逆、只对配置的文本路由生效） |
+| 门禁放行 | RPC 层拒绝发生在 `resolveModelInfo` 返回的 `inputModalities` 显式不含 image 时；`resolveModelInfo` 是公开属性，可逆包装 | packages/api/session-controller/src/commands.ts:314；packages/llm/llm/src/index.ts:646-652 | 包装公开 seam（抹除文本路由的 inputModalities，可逆、只对配置的文本路由生效） |
 | 工具注册 | `ctx.tools.register(defineTool({ name, description, parameters, output:{ schema, render }, execute }))`；结果以 ContentBlock[] 回传 | packages/core/tools/src/index.ts:137-140、221-288、1037-1062；官方实例 packages/subagent/tool-subagent/src/index.ts:306-440 | **公开 seam**，委托是机制不是 prompt 软约束 |
 | 视觉模型直连 | `ctx.llm.prepareCall({ provider, model, maxTokens, temperature, reasoningEffort })` → `prepared.stream({ ...prepared.config, messages, signal })`（必须原样展开 `prepared.config`，否则 `INVALID_PREPARED_CALL`）；流块收 `text-delta` / `reasoning-delta` | packages/llm/llm/src/index.ts:889-919、call-config.ts:46-54 | **公开 seam**；实测直连 2.2s vs 子代理 46.3s，已弃子代理 |
 | 按 agent 屏蔽工具 | `agent/request` waterfall 里 `agent.ctx.tools.restrict({ deny: ['vision_read'] })`（返回解除器） | packages/subagent/tool-subagent 的官方先例 | **公开 seam**；主模型非 deepseek-official 时对该 agent 生效 |
@@ -38,7 +38,7 @@
 ### 2. 读取：`vision_read` 工具（机制化）
 
 * 工具定义：`vision_read`，parameters `{ attachmentId: string, question?: string }`，`isConcurrencySafe: true`，`timeoutMs: 120_000`；
-* `execute`：由 attachmentId 反查 ImageAttachmentRef（遍历会话事件里的 image block，仿 api-proxy 的 referencedImage，api-proxy.ts:2447）→ 主模型路由检查（非 deepseek-official 抛「视觉功能已禁用」）→ `ctx.attachments.readImage(ref)` 校验 → `ctx.llm.prepareCall`（默认 `maxTokens: 8192` + `visionReasoningEffort: low`，避免思考烧光输出上限）→ `prepared.stream` 收集 text/reasoning delta → `resolveVisionOutput`（正文优先；只有思考文本 = 截断/异常，抛明确错误，不把思考当报告）→ `parseVisionReport(extractJsonObject(raw), raw)`；
+* `execute`：由 attachmentId 反查 ImageAttachmentRef（遍历会话事件里的 image block，仿 api-session-controller 的 referencedImage，session-controller/src/commands.ts:572）→ 主模型路由检查（非 deepseek-official 抛「视觉功能已禁用」）→ `ctx.attachments.readImage(ref)` 校验 → `ctx.llm.prepareCall`（默认 `maxTokens: 8192` + `visionReasoningEffort: low`，避免思考烧光输出上限）→ `prepared.stream` 收集 text/reasoning delta → `resolveVisionOutput`（正文优先；只有思考文本 = 截断/异常，抛明确错误，不把思考当报告）→ `parseVisionReport(extractJsonObject(raw), raw)`；
 * 输出 schema：结构化报告 `{ summary: string, ocrText?: string, tables?: string[], layout?: string }`，render 转成带标记的文本块回传主模型；
 * 按 agent 屏蔽：主模型路由非 DeepSeek 系列时，`agent/request` waterfall 对该 agent `tools.restrict({ deny: ['vision_read'] })`（工具与 UI 都像没有）；切回 deepseek 路由时解除（Map 记录每个 agent 的解除器）；
 * **原生视觉主模型屏蔽**（2026-08-30）：主模型自身 `inputModalities` 含 image（如 deepseek-v4-flash-vision-exp）时同样隐藏工具——图片本来直达主模型，经 vision_read 转文字报告是有损的；`execute` 内二次防御：原生视觉主模型调用直接抛「无需视觉通道」；
