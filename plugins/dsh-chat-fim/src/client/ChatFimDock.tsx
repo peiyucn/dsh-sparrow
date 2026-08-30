@@ -18,6 +18,8 @@ export interface FimCompleteResult {
 }
 
 export interface ChatFimDockInjected {
+  /** 注入面所属会话（槽工厂按 sessionId 生成）；菜单据此校验建议归属，堵跨会话误采用。 */
+  readonly sessionId: SessionId
   /** 查询当前会话主模型是否支持（deepseek 系列）；false 时整体隐藏。 */
   isSupported: (sessionId: SessionId) => Promise<boolean>
   /** 发起一次 host 路由请求；由调用方负责陈旧响应判定。 */
@@ -73,7 +75,11 @@ export function useFimEnabled(): boolean {
 export function setFimEnabled(next: boolean): void {
   if (sharedEnabled === next) return
   sharedEnabled = next
-  window.localStorage.setItem(ENABLED_STORAGE_KEY, next ? '1' : '0')
+  try {
+    window.localStorage.setItem(ENABLED_STORAGE_KEY, next ? '1' : '0')
+  } catch {
+    // 隐私模式/配额满：内存态已生效，持久化静默失败（与读路径同防护）。
+  }
   for (const listener of enabledListeners) listener()
 }
 
@@ -229,7 +235,11 @@ export function useFimModelMode(): FimModelMode {
 export function setFimModelMode(next: FimModelMode): void {
   if (sharedModelMode === next) return
   sharedModelMode = next
-  window.localStorage.setItem(MODEL_MODE_STORAGE_KEY, next)
+  try {
+    window.localStorage.setItem(MODEL_MODE_STORAGE_KEY, next)
+  } catch {
+    // 隐私模式/配额满：内存态已生效，持久化静默失败（与读路径同防护）。
+  }
   for (const listener of modelModeListeners) listener()
 }
 
@@ -242,9 +252,10 @@ function composerCardRect(): { x: number; y: number; width: number; height: numb
   return { x: rect.left, y: rect.top, width: rect.width, height: rect.height }
 }
 
-/** 注入开关样式、联想中脉冲 keyframes 与候选菜单样式（一次性，按 data 属性去重）。 */
-export function ensureFimBusyStyles(): void {
-  if (document.querySelector('style[data-dsh-chat-fim-busy]') !== null) return
+/** 注入开关样式、联想中脉冲 keyframes 与候选菜单样式（按 data 属性去重）；返回 style 元素供卸载清理。 */
+export function ensureFimBusyStyles(): HTMLStyleElement {
+  const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-chat-fim-busy]')
+  if (existing !== null) return existing
   const style = document.createElement('style')
   style.dataset.dshChatFimBusy = ''
   style.textContent = `
@@ -477,6 +488,7 @@ export function ensureFimBusyStyles(): void {
 }
 `
   document.head.appendChild(style)
+  return style
 }
 
 /** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）：点击切换开关，右侧 ▾ 弹出模型三档。 */
@@ -773,7 +785,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
  * @param props - 槽位运行时 props + 注入动作。
  */
 export function ChatFimMenu(props: ChatFimMenuProps) {
-  const { adopt, t } = props
+  const { adopt, sessionId, t } = props
   const suggestion = useFimSuggestion()
   const enabled = useFimEnabled()
   const supported = useFimSupported()
@@ -792,10 +804,12 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
     return () => { observer.disconnect() }
   }, [])
 
-  const visible = suggestion !== null && enabled && supported && !triggerOpen
+  // 建议归属校验：共享建议按会话写入，切会话后到 dock 清空之前有一帧窗口，
+  // 渲染与采用都必须确认是本会话的建议，防止 Tab 把文本 bail 进旧会话草稿。
+  const visible = suggestion !== null && enabled && supported && !triggerOpen && suggestion.sessionId === sessionId
 
   const adoptSuggestion = useCallback((): void => {
-    if (suggestion === null) return
+    if (suggestion === null || suggestion.sessionId !== sessionId) return
     // 双保险：官方触发菜单打开时绝不采用（Tab 归官方菜单下钻）。
     if (document.querySelector('[data-trigger-menu]') !== null) return
     const span: TokenSpan = {
@@ -811,22 +825,35 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
     } else {
       clearFimAdoption()
     }
-  }, [adopt, suggestion])
+  }, [adopt, sessionId, suggestion])
 
-  // Tab 采用 / Esc 丢弃（capture 抢先于输入机；官方触发菜单打开时不响应）。
+  // Tab 采用（仅焦点在 composer 卡内）/ Esc 丢弃（capture 抢先于输入机）；
+  // 建议卡外 pointerdown 丢弃（官方触发菜单同款行为）。
   useEffect(() => {
     if (!visible) return
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
+        // 焦点不在输入区（例如刚点过聊天消息）时不劫持 Tab 走焦。
+        const active = document.activeElement
+        if (active instanceof HTMLElement && active.closest('[data-composer-card]') === null) return
         event.preventDefault()
         adoptSuggestion()
       } else if (event.key === 'Escape') {
         setFimSuggestion(null)
       }
     }
+    const onPointerDown = (event: PointerEvent): void => {
+      if (!(event.target instanceof Element)) return
+      if (event.target.closest('.dsh-chat-fim-menu') !== null) return
+      if (event.target.closest('.dsh-chat-fim-switch') !== null) return
+      if (event.target.closest('.dsh-chat-fim-model-popover') !== null) return
+      setFimSuggestion(null)
+    }
     document.addEventListener('keydown', onKeyDown, true)
+    document.addEventListener('pointerdown', onPointerDown, true)
     return () => {
       document.removeEventListener('keydown', onKeyDown, true)
+      document.removeEventListener('pointerdown', onPointerDown, true)
     }
   }, [visible, adoptSuggestion])
 

@@ -23,10 +23,7 @@ export interface ChatFimResponse {
   readonly error?: { readonly code?: string; readonly message?: string }
 }
 
-/** 客户端固定采用的停顿阈值；与 cordis.patch.yml 中 triggerPauseMs 保持一致。 */
-const TRIGGER_PAUSE_MS = 400
-
-/** 本插件的 locale 字典（未经 LocaleNamespaceMap 合并表，走非类型化注册）。 */
+/** 本插件的 locale 字典（经 locale.d.ts 的 LocaleNamespaceMap 扩充做类型化注册）。 */
 const LOCALE_DICTS = {
   zh: {
     'switch.label': '续写',
@@ -67,7 +64,8 @@ interface ClientAgentScope extends Context {
  */
 export function apply(ctx: ClientContext): void {
   const sessions = ctx.sessions as unknown as ClientSessionScope
-  ensureFimBusyStyles()
+  const busyStyles = ensureFimBusyStyles()
+  ctx.effect(() => () => { busyStyles.remove() }, 'dsh-chat-fim: busy styles')
   const disposeDictionaries = ctx.locale.register('chat-fim', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
   ctx.effect(() => disposeDictionaries, 'dsh-chat-fim: locale dictionaries')
 
@@ -80,6 +78,7 @@ export function apply(ctx: ClientContext): void {
       throw new Error(`dsh-chat-fim: session "${String(sessionId)}" 没有浏览器 scope`)
     }
     return {
+      sessionId,
       isSupported: async (id: SessionId): Promise<boolean> => {
         const response = await fetch(`/api/chat-fim/complete?sessionId=${encodeURIComponent(String(id))}`)
         if (!response.ok) return true
@@ -140,4 +139,3 @@ export function apply(ctx: ClientContext): void {
 export { ChatFimDock, ChatFimMenu, ChatFimSwitch, ensureFimBusyStyles } from './ChatFimDock.js'
 export type { ChatFimDockInjected, ChatFimDockProps, ChatFimMenuProps, ChatFimSwitchProps, FimSuggestionRecord } from './ChatFimDock.js'
 export { readEnabled, setFimBusy, setFimEnabled, setFimError, setFimSuggestion, setFimSupported, useFimBusy, useFimEnabled, useFimError, useFimSuggestion, useFimSupported } from './ChatFimDock.js'
-export { TRIGGER_PAUSE_MS }
