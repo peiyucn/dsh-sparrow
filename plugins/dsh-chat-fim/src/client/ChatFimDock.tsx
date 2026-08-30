@@ -125,21 +125,31 @@ export function setFimSupported(next: boolean): void {
 
 /**
  * 输入区只读几何测量（幽灵文本定位特例，见 AGENTS.md）：
- * 仅当光标位于内容可编辑区末尾时，返回文末光标所在视口坐标；
- * 不修改编辑器内容，写入仍走 slash/input-insert-text bail 事件。
+ * 返回文末光标所在视口坐标；不修改编辑器内容，写入仍走 slash/input-insert-text bail 事件。
+ * 失败原因记录在 ghostDiagnostic，供降级胶囊展示诊断。
  */
+let ghostDiagnostic: string | null = null
+
+/** 上次幽灵文本定位失败的原因；成功时清空。 */
+export function ghostDiagnosticText(): string | null {
+  return ghostDiagnostic
+}
+
 function endCaretPoint(): { x: number; y: number } | undefined {
   const editor = document.querySelector<HTMLElement>('[data-composer-input]')
-  if (editor === null) return undefined
-  const selection = window.getSelection()
-  if (selection === null || selection.rangeCount === 0) return undefined
-  const focusNode = selection.focusNode
-  if (focusNode === null || !editor.contains(focusNode)) return undefined
+  if (editor === null) {
+    ghostDiagnostic = '定位失败：找不到输入区元素 [data-composer-input]'
+    return undefined
+  }
   const endRange = document.createRange()
   endRange.selectNodeContents(editor)
   endRange.collapse(false)
   const rect = endRange.getBoundingClientRect()
-  if (rect.width === 0 && rect.height === 0) return undefined
+  if (rect.width === 0 && rect.height === 0) {
+    ghostDiagnostic = '定位失败：文末矩形为空'
+    return undefined
+  }
+  ghostDiagnostic = null
   return { x: rect.right, y: rect.top }
 }
 
@@ -286,6 +296,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
   const [suggestion, setSuggestion] = useState<string | null>(null)
   const [composing, setComposing] = useState(false)
   const [point, setPoint] = useState<{ x: number; y: number } | null>(null)
+  const [diagnostic, setDiagnostic] = useState<string | null>(null)
   const [ring, setRing] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const enabled = useFimEnabled()
   const busy = useFimBusy()
@@ -378,6 +389,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
     }
     const measure = (): void => {
       setPoint(endCaretPoint() ?? null)
+      setDiagnostic(ghostDiagnosticText())
     }
     measure()
     // 周期自愈：光标/滚动/焦点变化未触发事件时，每 300ms 重测一次。
@@ -477,6 +489,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
             <button type="button" className="dsh-chat-fim-fallback-chip" title={ghost} onClick={applyFallback}>
               {ghost}
             </button>
+            {diagnostic !== null ? <span style={{ color: 'var(--dsw-alias-label-tertiary, #9aa0a6)', fontSize: 12 }}>{diagnostic}</span> : null}
           </div>
         )
         : null}
