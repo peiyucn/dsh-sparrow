@@ -106,8 +106,19 @@ function workspaceIdsFor(workspaces: readonly Workspace[], sessionId: SessionId)
     .map(workspace => String(workspace.id))
 }
 
+/** 等待会话离开 live store 的最长时间（卸载链可能异步完成）。 */
+const SESSION_UNLOAD_TIMEOUT_MS = 3_000
+
+/** 官方投影缓存域（session_projcache）：备份/删除移走目录后失效对应行，@ 列表不再读到。 */
+const PROJCACHE_DOMAIN_NAME = 'session_projcache'
+const PROJCACHE_SESSIONS_TABLE = 'sessions'
+
 async function stopAndFlushLiveSession(ctx: Context, sessionId: SessionId): Promise<void> {
   const agent = ctx.agents.get(sessionId)
+  // 生成中的会话不静默取消用户回合：先让用户停止生成。
+  if (agent !== undefined && agent.status === 'running') {
+    throw new ArchiveError('SESSION_LIVE', '该会话正在生成回复，请先停止生成后再备份', 409)
+  }
   if (agent !== undefined) {
     agent.cancel({ kind: 'hook', reason: 'dsh-archive-session' })
     await agent.whenIdle()
@@ -119,8 +130,17 @@ async function stopAndFlushLiveSession(ctx: Context, sessionId: SessionId): Prom
   if (agent !== undefined) {
     await agent.ctx.fiber.dispose()
   }
-  if (ctx.sessions.get(sessionId) !== undefined) {
-    throw new ArchiveError('SESSION_LIVE', '会话仍在运行且无法安全卸载：请先切换到其他会话后重试')
+  // 卸载可能异步完成：轮询等待其离开 live store。
+  const deadline = Date.now() + SESSION_UNLOAD_TIMEOUT_MS
+  while (ctx.sessions.get(sessionId) !== undefined) {
+    if (Date.now() > deadline) {
+      throw new ArchiveError(
+        'SESSION_LIVE',
+        '该会话仍驻留在后台（可能处于「进行中」）：请停止其生成、或重启 dsh 后再备份',
+        409,
+      )
+    }
+    await new Promise(resolve => setTimeout(resolve, 100))
   }
 }
 
@@ -152,9 +172,28 @@ async function attachWorkspaceAccounting(ctx: Context, sessionId: SessionId, wor
   }
 }
 
+/** 归档集域句柄的最小面：global 读写 archivedSessionIds。 */
+interface ArchivedDomainHandle {
+  readonly global: {
+    get(): { readonly archivedSessionIds: readonly SessionId[] }
+    set(value: { readonly archivedSessionIds: readonly SessionId[] }): Promise<void>
+  }
+}
+
+/**
+ * 取归档集所在域（workspace 域由官方 WorkspaceRegistry 常驻打开，
+ * 直接 get；未打开时 open 兜底）。此前一律 open 会撞 already-open
+ * 被 catch 吞掉，归档集更新静默失败——@ 列表直到重启才消失的根因。
+ */
+async function openWorkspaceDomain(ctx: Context): Promise<ArchivedDomainHandle> {
+  const existing = ctx.storageDomain.get(workspaceDomainSpec.name)
+  if (existing !== undefined) return existing as unknown as ArchivedDomainHandle
+  return await ctx.storageDomain.open(workspaceDomainSpec) as unknown as ArchivedDomainHandle
+}
+
 /** 经公开 storageDomain 从归档集中移除会话；domain/changed 会自动广播 archived-sessions-changed。 */
 async function removeArchivedId(ctx: Context, sessionId: SessionId): Promise<void> {
-  const domain = await ctx.storageDomain.open(workspaceDomainSpec)
+  const domain = await openWorkspaceDomain(ctx)
   const state = domain.global.get()
   const archivedSessionIds = state.archivedSessionIds.filter(id => String(id) !== String(sessionId))
   if (archivedSessionIds.length === state.archivedSessionIds.length) return
@@ -163,12 +202,23 @@ async function removeArchivedId(ctx: Context, sessionId: SessionId): Promise<voi
 
 /** 恢复时把会话加回归档集，并让 WorkspaceRegistry 的内存态也回到一致。 */
 async function addArchivedId(ctx: Context, sessionId: SessionId): Promise<void> {
-  const domain = await ctx.storageDomain.open(workspaceDomainSpec)
+  const domain = await openWorkspaceDomain(ctx)
   const state = domain.global.get()
   if (!state.archivedSessionIds.some(id => String(id) === String(sessionId))) {
     await domain.global.set({ ...state, archivedSessionIds: [...state.archivedSessionIds, sessionId] })
   }
   await ctx.workspaceRegistry.archiveSession(sessionId)
+}
+
+/** 失效官方投影缓存行（派生数据，可安全删除；官方服务常驻打开该域，走 get）。 */
+async function invalidateProjectionCache(ctx: Context, sessionId: SessionId): Promise<void> {
+  try {
+    const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
+    if (domain === undefined) return
+    await domain.table(PROJCACHE_SESSIONS_TABLE).delete(String(sessionId))
+  } catch (error) {
+    ctx.logger.warn(`dsh-archive-session: 投影缓存失效失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 /** 只有已知的「单会话目录」后端（当前为 jsonl）才允许文件级移动 / 删除。 */
@@ -393,6 +443,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             } catch (cleanupError) {
               ctx.logger.warn(`dsh-archive-session: 归档集清理失败：${String(cleanupError)}`)
             }
+            await invalidateProjectionCache(ctx, sessionId)
             sendJson(res, 200, { ok: true, backupId, workspaceIds: workspaces })
             return
           }
@@ -404,6 +455,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           } catch (cleanupError) {
             ctx.logger.warn(`dsh-archive-session: 归档集清理失败：${String(cleanupError)}`)
           }
+          await invalidateProjectionCache(ctx, sessionId)
           sendJson(res, 200, { ok: true, deleted: true, workspaceIds: workspaces })
           return
         }
