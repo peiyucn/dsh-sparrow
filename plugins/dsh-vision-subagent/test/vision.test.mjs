@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  contentBlocksToText, findImageReference, normalizeVisionConfig, parseVisionReport,
+  extractJsonObject, findImageReference, normalizeVisionConfig, parseVisionReport,
   renderVisionReport, shouldClearInputModalities, VisionCache,
 } from '../lib/vision.js'
 
@@ -10,6 +10,9 @@ describe('vision-subagent 纯逻辑', () => {
     it('空配置 应该 使用官方文本路由默认值', () => {
       const config = normalizeVisionConfig(undefined)
       assert.equal(config.visionModel, 'deepseek-v4-flash-vision-exp')
+      assert.equal(config.visionProvider, 'deepseek-official')
+      assert.equal(config.maxTokens, 1024)
+      assert.equal(config.temperature, 0.2)
       assert.equal(config.textRoutes.length, 2)
     })
 
@@ -129,14 +132,21 @@ describe('vision-subagent 纯逻辑', () => {
     })
   })
 
-  describe('contentBlocksToText', () => {
-    it('混合内容块 应该 只拼接文本', () => {
-      const text = contentBlocksToText([
-        { type: 'text', text: 'a' },
-        { type: 'image', attachment: { attachmentId: 'x', mediaType: 'image/png' } },
-        { type: 'text', text: 'b' },
-      ])
-      assert.equal(text, 'a\nb')
+  describe('extractJsonObject', () => {
+    it('纯 JSON 应该 直接解析', () => {
+      assert.deepEqual(extractJsonObject('{"summary":"s"}'), { summary: 's' })
+    })
+
+    it('markdown 代码围栏 应该 剥掉围栏解析', () => {
+      assert.deepEqual(extractJsonObject('```json\n{"summary":"s"}\n```'), { summary: 's' })
+    })
+
+    it('前后杂文 应该 截取首个对象解析', () => {
+      assert.deepEqual(extractJsonObject('好的，结果如下：\n{"summary":"s"}\n以上就是。'), { summary: 's' })
+    })
+
+    it('非 JSON 应该 返回 undefined', () => {
+      assert.equal(extractJsonObject('完全不是 JSON'), undefined)
     })
   })
 

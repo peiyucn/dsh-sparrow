@@ -3,8 +3,10 @@
     - id: dsh-vision-subagent
       name: dsh-vision-subagent
       config:
-        subagentProvider: spawn
+        visionProvider: deepseek-official
         visionModel: deepseek-v4-flash-vision-exp
+        maxTokens: 1024
+        temperature: 0.2
         cacheMaxEntries: 64
         textRoutes:
           - provider: deepseek-official

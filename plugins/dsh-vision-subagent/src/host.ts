@@ -1,21 +1,19 @@
-/** dsh-vision-subagent host half：门禁放行 + vision_read 工具。 */
+/** dsh-vision-subagent host half：门禁放行 + vision_read 工具（直连 ctx.llm 视觉模型）。 */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-attachment'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-llm'
-import type {} from '@deepseek-ai/dsh-subagent'
-import type { ObjectJsonSchema } from '@deepseek-ai/dsh-tools'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-tools'
 import {
-  contentBlocksToText, findImageReference, normalizeVisionConfig, parseVisionReport,
+  extractJsonObject, findImageReference, normalizeVisionConfig, parseVisionReport,
   renderVisionReport, shouldClearInputModalities, VisionCache, type VisionConfig, type VisionReport,
 } from './vision.js'
 
 export const name = 'dsh-vision-subagent'
-export const inject = ['llm', 'tools', 'attachments', 'subagents']
+export const inject = ['llm', 'tools', 'attachments']
 
 export type { VisionConfig, VisionReport }
 
@@ -37,19 +35,6 @@ const VISION_REPORT_OUTPUT_SCHEMA = {
     layout: { type: 'string', description: '版式分区描述；简单图片可省略' },
   },
 } as const
-
-/** 子代理 structured output 的 ObjectJsonSchema（raw JSON Schema 子集）。 */
-const VISION_REPORT_JSON_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    summary: { type: 'string', description: '图片内容的中文一句话摘要' },
-    ocrText: { type: 'string', description: '图片中的逐字文本；没有文字时省略' },
-    tables: { type: 'array', items: { type: 'string' }, description: '图片中的表格，每表一个字符串；没有表格时省略' },
-    layout: { type: 'string', description: '版式分区描述；简单图片可省略' },
-  },
-  required: ['summary'],
-} as const satisfies ObjectJsonSchema
 
 /**
  * host half 入口：包装 resolveModelInfo 放行文本路由，并注册 vision_read。
@@ -74,7 +59,9 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
     llm.resolveModelInfo = originalResolveModelInfo
   }, 'dsh-vision-subagent: restore resolveModelInfo')
 
-  // 2. vision_read 工具：附件引用反查 → 读图校验 → 官方 vision 子代理 → 结构化报告缓存。
+  // 2. vision_read 工具：附件引用反查 → 读图校验 → 直连 ctx.llm 视觉模型 → 结构化报告缓存。
+  //    实测结论：走 subagents 时单次看图约 46s（子代理 agent 循环 + 系统提示 + 思考），
+  //    直连视觉模型约 2.2s，因此不再起子代理。
   ctx.effect(() => ctx.tools.register(defineTool({
     name: TOOL_NAME,
     description: 'Read an image already attached to this conversation with a vision subagent. Use this tool when the user asks about a pasted image and the main model cannot see images directly. The image stays inside the DeepSeek provider account and is never sent to a third party.',
@@ -126,38 +113,37 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       const question = typeof args.question === 'string' && args.question.trim() !== ''
         ? args.question.trim()
         : '请完整阅读这张图片并给出结构化报告。'
-      const prompt: ContentBlock[] = [
-        {
-          type: 'text',
-          text: `${question}\n\n输出 JSON 对象：summary（一句话摘要）、ocrText（逐字文本，可选）、tables（表格，可选）、layout（版式，可选）。不要编造图中没有的内容。`,
-        },
-        { type: 'image', attachment: ref },
-      ]
+      const promptText = `${question}\n\n输出 JSON 对象：summary（一句话摘要）、ocrText（逐字文本，可选）、tables（表格，可选）、layout（版式，可选）。只输出 JSON 本体，不要输出解释或代码围栏。不要编造图中没有的内容。`
 
-      const run = await ctx.subagents.start(settings.subagentProvider, {
-        label: TOOL_NAME,
-        prompt,
-        parent: agent,
+      const prepared = await ctx.llm.prepareCall({
+        provider: settings.visionProvider,
+        model: settings.visionModel,
+        maxTokens: settings.maxTokens,
+        temperature: settings.temperature,
+      }, exec.signal)
+      let text = ''
+      for await (const chunk of prepared.stream({
+        provider: settings.visionProvider,
+        model: settings.visionModel,
+        maxTokens: settings.maxTokens,
+        temperature: settings.temperature,
+        messages: [createUserMessage({
+          content: [
+            { type: 'text', text: promptText },
+            { type: 'image', attachment: ref },
+          ],
+          source: { kind: 'user' },
+        })],
         signal: exec.signal,
-        agentOptions: { model: settings.visionModel },
-        outputSchema: VISION_REPORT_JSON_SCHEMA,
-      })
-      try {
-        const result = await run.result
-        if (result.stopReason !== 'completed') {
-          const diagnostic = result.diagnostic === undefined ? result.stopReason : `${result.stopReason}: ${result.diagnostic}`
-          throw new Error(`vision_read 子代理未完成：${diagnostic}`)
-        }
-        const report = parseVisionReport(result.structured, contentBlocksToText(result.output))
-        cache.set(cacheKey, report)
-        return report
-      } finally {
-        try {
-          await run.dispose()
-        } catch {
-          // 结果已拿到；释放失败不覆盖工具结果。
-        }
+      })) {
+        if (chunk.type === 'text-delta') text += chunk.text
       }
+      if (text.trim() === '') {
+        throw new Error('vision_read 上游没有返回文本')
+      }
+      const report = parseVisionReport(extractJsonObject(text), text)
+      cache.set(cacheKey, report)
+      return report
     },
   })), 'dsh-vision-subagent: vision_read tool')
 }

@@ -1,11 +1,12 @@
 /** dsh-vision-subagent 纯逻辑：配置、门禁判定、图片反查、报告解析与缓存。 */
 
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
-export const DEFAULT_SUBAGENT_PROVIDER = 'spawn'
+export const DEFAULT_VISION_PROVIDER = 'deepseek-official'
 export const DEFAULT_VISION_MODEL = 'deepseek-v4-flash-vision-exp'
+export const DEFAULT_MAX_TOKENS = 1024
+export const DEFAULT_TEMPERATURE = 0.2
 export const DEFAULT_CACHE_MAX_ENTRIES = 64
 export const DEFAULT_TEXT_ROUTES: readonly TextRoute[] = [
   { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
@@ -18,8 +19,10 @@ export interface TextRoute {
 }
 
 export interface VisionConfig {
-  readonly subagentProvider: string
+  readonly visionProvider: string
   readonly visionModel: string
+  readonly maxTokens: number
+  readonly temperature: number
   readonly cacheMaxEntries: number
   readonly textRoutes: readonly TextRoute[]
 }
@@ -34,16 +37,23 @@ export interface VisionReport {
 /** 规范化配置；文本路由为空时插件不做门禁放行（工具仍可用）。 */
 export function normalizeVisionConfig(input: Readonly<Partial<VisionConfig>> | undefined): VisionConfig {
   const config: VisionConfig = {
-    subagentProvider: input?.subagentProvider?.trim() || DEFAULT_SUBAGENT_PROVIDER,
+    visionProvider: input?.visionProvider?.trim() || DEFAULT_VISION_PROVIDER,
     visionModel: input?.visionModel?.trim() || DEFAULT_VISION_MODEL,
+    maxTokens: input?.maxTokens ?? DEFAULT_MAX_TOKENS,
+    temperature: input?.temperature ?? DEFAULT_TEMPERATURE,
     cacheMaxEntries: input?.cacheMaxEntries ?? DEFAULT_CACHE_MAX_ENTRIES,
     textRoutes: input?.textRoutes ?? DEFAULT_TEXT_ROUTES,
   }
-  if (config.subagentProvider === '' || config.visionModel === '') {
-    throw new Error('dsh-vision-subagent: subagentProvider/visionModel 不能为空')
+  if (config.visionProvider === '' || config.visionModel === '') {
+    throw new Error('dsh-vision-subagent: visionProvider/visionModel 不能为空')
   }
-  if (!Number.isSafeInteger(config.cacheMaxEntries) || config.cacheMaxEntries <= 0) {
-    throw new Error('dsh-vision-subagent: cacheMaxEntries 必须是正整数')
+  for (const [name, value] of Object.entries({ maxTokens: config.maxTokens, cacheMaxEntries: config.cacheMaxEntries })) {
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new Error(`dsh-vision-subagent: ${name} 必须是正整数`)
+    }
+  }
+  if (typeof config.temperature !== 'number' || !Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 2) {
+    throw new Error('dsh-vision-subagent: temperature 必须是 0-2 之间的数字')
   }
   for (const route of config.textRoutes) {
     if (route.provider === '' || route.model === '') {
@@ -139,13 +149,26 @@ function collectImageRefs(content: unknown, refs: ImageAttachmentRef[]): void {
   }
 }
 
-/** 把子代理文本输出块拼成字符串（失败兜底报告用）。 */
-export function contentBlocksToText(blocks: readonly ContentBlock[]): string {
-  return blocks
-    .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
-    .map(block => block.text)
-    .join('\n')
-    .trim()
+/** 从模型文本输出里尽量提取 JSON 对象：容忍 markdown 代码围栏与前后杂文。 */
+export function extractJsonObject(text: string): unknown {
+  const trimmed = text.trim()
+  if (trimmed === '') return undefined
+  const fences = /^```(?:json)?\s*([\s\S]*?)\s*```$/u.exec(trimmed)
+  const candidate = fences?.[1] ?? trimmed
+  try {
+    return JSON.parse(candidate)
+  } catch {
+    const start = candidate.indexOf('{')
+    const end = candidate.lastIndexOf('}')
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(candidate.slice(start, end + 1))
+      } catch {
+        return undefined
+      }
+    }
+    return undefined
+  }
 }
 
 /** 从子代理 structured/文本结果解析结构化报告；异常输入返回安全默认值。 */
