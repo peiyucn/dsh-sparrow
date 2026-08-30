@@ -121,29 +121,29 @@ const styles = {
     border: '1px solid var(--dsw-alias-border-l1, #d4d8e0)',
     borderRadius: 999,
     background: 'transparent',
-    color: 'var(--dsw-alias-label-secondary, #6b7280)',
+    color: 'var(--dsw-alias-label-tertiary, #9aa0a6)',
     fontSize: 12,
     padding: '2px 8px',
     cursor: 'pointer',
     lineHeight: 1.5,
   } satisfies React.CSSProperties,
   switchOn: {
-    color: 'var(--dsw-alias-brand-primary, #4d6bfe)',
-    borderColor: 'var(--dsw-alias-brand-primary, #4d6bfe)',
+    color: 'var(--dsw-alias-button-info-fill, #4d6bfe)',
+    borderColor: 'var(--dsw-alias-button-info-fill, #4d6bfe)',
   } satisfies React.CSSProperties,
   switchBusy: {
     animation: 'dsh-chat-fim-pulse 1.1s ease-in-out infinite',
   } satisfies React.CSSProperties,
 } as const
 
-/** 注入联想中边框脉冲的 keyframes（一次性，按 data 属性去重）。 */
+/** 注入联想中边框脉冲的 keyframes（一次性，按 data 属性去重；颜色跟随发送按钮蓝紫）。 */
 export function ensureFimBusyStyles(): void {
   if (document.querySelector('style[data-dsh-chat-fim-busy]') !== null) return
   const style = document.createElement('style')
   style.dataset.dshChatFimBusy = ''
   style.textContent = `@keyframes dsh-chat-fim-pulse {
-  0%, 100% { border-color: rgba(77, 107, 254, 0.9); box-shadow: 0 0 0 0 rgba(77, 107, 254, 0.30); }
-  50% { border-color: rgba(77, 107, 254, 0.45); box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.10); }
+  0%, 100% { border-color: color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 90%, transparent); box-shadow: 0 0 0 0 color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 30%, transparent); }
+  50% { border-color: color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 45%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 10%, transparent); }
 }`
   document.head.appendChild(style)
 }
