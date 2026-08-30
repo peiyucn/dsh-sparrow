@@ -4,7 +4,7 @@
 
 ## 项目概况
 
-DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入口按钮 + 弹窗列出轻归档会话。已实现：备份（可逆）、删除（不可逆）、备份恢复（单个 / 全部）、备份删除（单个 / 全部）、旧格式备份收纳（仅列出 / 删除）。
+DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入口按钮 + 弹窗列出归档会话（归档区 / 备份区）。已实现：备份（可逆）、删除（不可逆）、备份恢复（单个 / 全部）、备份删除（单个 / 全部）、旧格式备份收纳（仅列出 / 删除）。
 
 > 路线 A（轻量标题 TTL 缓存）已退役：dsh 0.1.2-alpha.1 起官方 `sessionProjectionCache` 已覆盖 @ 候选标题读取的昂贵解码路径，插件再包一层 TTL 意义不大。
 
@@ -15,7 +15,7 @@ DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入�
 * **允许**：直接移动（备份档，可逆）或删除（删除档，不可逆）「会话日志目录」。当前只对 `SessionPersistence.locate(meta)` 返回 `kind: 'jsonl'` 且父目录明显为单会话目录的路径执行；其他后端返回 `BACKEND_UNSUPPORTED`。
 * **边界**：
   * 备份档只移动（移入插件备份夹，默认 `$DSH_HOME/sessions-archived-backup/`）；删除档允许 `rm`，并须输入完整会话标题强确认。
-  * 动作前二次确认；活动会话（本次 dsh 运行中打开过）**无法卸载**：`AgentHandle.dispose` 是官方 session-controller 持有且被丢弃的 teardown 能力，dsh 无公开「结束会话」API（查证 0.1.2-alpha.1 源码：session / agent 常驻 live store 至进程退出）。host 侧生成中直接拒绝、打开中一律 `SESSION_LIVE`；面板把打开中的会话单独分组（「打开中」+ 提示语）并置灰备份/删除，下次启动 dsh 后再操作（2026-08-30）。此前走 `fiber.dispose` + 轮询等待卸载的路线已废弃：dispose 只拆 agent 作用域、不解除 live store 登记，会留下僵尸 agent。
+  * 动作前二次确认；活动会话（本次 dsh 运行中驻留，**未释放**）**无法卸载**：`AgentHandle.dispose` 是官方 session-controller 持有且被丢弃的 teardown 能力，dsh 无公开「结束会话」API（查证 0.1.2-alpha.1 源码：session / agent 常驻 live store 至进程退出）。host 侧生成中直接拒绝、未释放的一律 `SESSION_LIVE`；面板在归档区内把这些会话分组前置（小标题「未释放（n）」、行内状态角标「未释放」用警示色），仅置灰备份/删除按钮（悬停提示），下次启动 dsh 后再操作（2026-08-30）。此前走 `fiber.dispose` + 轮询等待卸载的路线已废弃：dispose 只拆 agent 作用域、不解除 live store 登记，会留下僵尸 agent。
   * 动作后同步 `workspace` 记账：`WorkspaceEntity.detachSession()`；归档集经 `workspaceDomainSpec` + `ctx.storageDomain` 更新（`domain/changed` 会触发 api-proxy 广播 `host/archived-sessions-changed`，插件不手发帧）。**workspace 域由官方 WorkspaceRegistry 常驻打开，必须 `storageDomain.get(workspaceDomainSpec.name)` 取已开域（未打开才 `open` 兜底）**——2026-08-30 修复：此前一律 `open` 撞 `already-open` 被 catch 吞掉，归档集更新静默失败，@ 列表直到重启才消失。
   * 备份/删除后**失效官方投影缓存行**（`storageDomain.get('session_projcache').table('sessions').delete(id)`；派生数据可安全删除，官方服务常驻打开该域，未加载则跳过）。
   * 备份/删除成功后**补发官方公开事件 `api-session/removed`**（session-controller 的 cordis Events 公开声明、@mode emit）：会话目录已移走，客户端会话列表据此即时移除条目，避免侧边栏「未分组」残留（2026-08-30）。

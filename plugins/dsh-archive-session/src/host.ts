@@ -118,10 +118,10 @@ function workspaceIdsFor(workspaces: readonly Workspace[], sessionId: SessionId)
 }
 
 /**
- * 活动会话防护：本次 dsh 运行中打开过的会话无法被插件卸载——AgentHandle.dispose
+ * 活动会话防护：本次 dsh 运行中驻留（未释放）的会话无法被插件卸载——AgentHandle.dispose
  * 是官方 session-controller 持有且被丢弃的 teardown 能力，dsh 无公开「结束会话」
  * API（查证 0.1.2-alpha.1 源码：session / agent 常驻 live store 至进程退出），
- * 硬移目录会被后续回写重建幽灵目录。面板把这类会话单独分组置灰，host 侧兜底拒绝。
+ * 硬移目录会被后续回写重建幽灵目录。面板把这类会话在归档区内分组置灰，host 侧兜底拒绝。
  */
 function ensureSessionNotLive(ctx: Context, sessionId: SessionId): void {
   const agent = ctx.agents.get(sessionId)
@@ -132,7 +132,7 @@ function ensureSessionNotLive(ctx: Context, sessionId: SessionId): void {
   if (agent !== undefined || ctx.sessions.get(sessionId) !== undefined) {
     throw new ArchiveError(
       'SESSION_LIVE',
-      '该会话仍处于打开状态，dsh 运行期间无法安全卸载：请在下次启动 dsh 后重试',
+      '该会话仍被 dsh 进程占用（未释放），运行期间无法安全移动其文件：请在下次启动 dsh 后重试',
       409,
     )
   }
@@ -292,7 +292,7 @@ async function restoreBackupDir(ctx: Context, backupDir: string): Promise<Archiv
   }
   const sessionId = SessionId(sidecar.sessionId)
   if (ctx.sessions.get(sessionId) !== undefined || ctx.agents.get(sessionId) !== undefined) {
-    throw new ArchiveError('SESSION_LIVE', '该会话当前已打开，不能重复恢复')
+    throw new ArchiveError('SESSION_LIVE', '该会话仍被 dsh 进程占用（未释放），不能重复恢复')
   }
   try {
     await mkdir(dirname(sidecar.originalPath), { recursive: true })

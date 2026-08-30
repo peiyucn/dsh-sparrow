@@ -297,19 +297,12 @@ const styles = {
     color: 'var(--dsw-alias-label-secondary, #6b7280)',
     fontSize: 12,
   } satisfies CSSProperties,
-  /** 子分组小标题（打开中）：官方面板分组标签同款（12px 次级色）。 */
+  /** 子分组小标题（未释放）：官方面板分组标签同款（12px 次级色）。 */
   groupHeading: {
     margin: '10px 0 2px',
     fontSize: 12,
     lineHeight: '18px',
     fontWeight: 500,
-    color: 'var(--dsw-alias-label-secondary, #6b7280)',
-  } satisfies CSSProperties,
-  /** 子分组说明（打开中会话只能下次启动后操作）。 */
-  groupHint: {
-    margin: '0 0 6px',
-    fontSize: 12,
-    lineHeight: '18px',
     color: 'var(--dsw-alias-label-secondary, #6b7280)',
   } satisfies CSSProperties,
 } as const
@@ -509,11 +502,11 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const restorableCount = backups.filter(item => !item.legacy).length
   const legacyCount = backups.length - restorableCount
 
-  // 打开中的会话单独分组：dsh 运行期间无法卸载，只能等下次启动后操作（2026-08-30）。
+  // 未释放（本次 dsh 运行中驻留）的会话在归档区内分组前置：运行期间无法卸载，只能等下次启动后操作（2026-08-30）。
   const liveItems = archived.filter(item => item.live)
   const coldItems = archived.filter(item => !item.live)
 
-  /** 归档会话行：live 会话的备份/删除置灰并给提示（下次启动 dsh 后才能操作）。 */
+  /** 归档会话行：未释放（本次 dsh 运行中驻留）会话的备份/删除置灰并给提示。 */
   const renderArchivedRow = (item: ArchivedSessionItem) => {
     const locked = item.live
     return (
@@ -522,7 +515,12 @@ export function ArchiveDock(props: ArchiveDockProps) {
           <div style={styles.title} title={item.title}>{item.title}</div>
           <div style={styles.secondarySmall}>
             {item.sessionId}
-            {item.running ? ` · ${t('state.running')}` : item.live ? ` · ${t('state.live')}` : ''}
+            {item.running ? ` · ${t('state.running')}` : item.live ? (
+              <>
+                {' · '}
+                <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>{t('state.unreleased')}</span>
+              </>
+            ) : ''}
             {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
           </div>
         </div>
@@ -531,7 +529,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             type="button"
             className="dsh-archive-btn"
             disabled={loading || !item.backendSupported || locked}
-            title={locked ? t('state.liveActionHint') : undefined}
+            title={locked ? t('state.unreleasedActionHint') : undefined}
             onClick={() => { confirmBackup(item) }}
           >
             {t('action.backup')}
@@ -540,7 +538,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             type="button"
             className="dsh-archive-btn dsh-archive-btn-danger"
             disabled={loading || !item.backendSupported || locked}
-            title={locked ? t('state.liveActionHint') : undefined}
+            title={locked ? t('state.unreleasedActionHint') : undefined}
             onClick={() => { confirmDelete(item) }}
           >
             {t('action.delete')}
@@ -672,8 +670,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 {!loading && archived.length === 0 ? <p style={styles.secondarySmall}>{t('empty.archived')}</p> : null}
                 {!loading && liveItems.length > 0 ? (
                   <>
-                    <p style={styles.groupHeading}>{t('group.live', { count: liveItems.length })}</p>
-                    <p style={styles.groupHint}>{t('group.liveHint')}</p>
+                    <p style={styles.groupHeading}>{t('group.unreleased', { count: liveItems.length })}</p>
                     {liveItems.map(renderArchivedRow)}
                   </>
                 ) : null}
