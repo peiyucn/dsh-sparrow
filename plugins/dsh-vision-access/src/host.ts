@@ -8,9 +8,9 @@ import { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-tools'
 import {
-  extractJsonObject, findImageReference, isDeepseekMainRoute, mainRouteFromSession, normalizeVisionConfig,
-  parseVisionReport, renderVisionReport, resolveVisionOutput, shouldClearInputModalities, visionCacheKey, VisionCache,
-  type VisionConfig, type VisionReport,
+  extractJsonObject, findImageReference, isDeepseekMainRoute, mainRouteFromSession, modelSupportsImages,
+  normalizeVisionConfig, parseVisionReport, renderVisionReport, resolveVisionOutput, shouldClearInputModalities,
+  visionCacheKey, VisionCache, type VisionConfig, type VisionReport,
 } from './vision.js'
 
 export const name = 'dsh-vision-access'
@@ -60,20 +60,32 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
     llm.resolveModelInfo = originalResolveModelInfo
   }, 'dsh-vision-access: restore resolveModelInfo')
 
-  // 1.5 非 deepseek 主模型：对该 agent 作用域屏蔽 vision_read（像没有这个工具）。
+  // 1.5 按 agent 屏蔽 vision_read（像没有这个工具）：
+  //     非 deepseek 主模型；或主模型本身原生看图（图片直达主模型，转文字反而有损）。
   const restrictions = new Map<unknown, () => void>()
   ctx.on('agent/request', async (payload, next) => {
     const config = await next()
     const agent = payload.agent
+    let hide = config.provider !== 'deepseek-official'
     if (config.provider === 'deepseek-official') {
+      try {
+        const info = await ctx.llm.resolveModelInfo(config.provider, config.model)
+        hide = modelSupportsImages(info.inputModalities)
+      } catch {
+        hide = false // 能力解析失败：保守启用
+      }
+    }
+    if (hide) {
+      if (!restrictions.has(agent)) {
+        try {
+          restrictions.set(agent, agent.ctx.tools.restrict({ deny: [TOOL_NAME] }))
+        } catch {
+          // 工具尚未注册或已限制：忽略，下次请求再试。
+        }
+      }
+    } else {
       restrictions.get(agent)?.()
       restrictions.delete(agent)
-    } else if (!restrictions.has(agent)) {
-      try {
-        restrictions.set(agent, agent.ctx.tools.restrict({ deny: [TOOL_NAME] }))
-      } catch {
-        // 工具尚未注册或已限制：忽略，下次请求再试。
-      }
     }
     return config
   })
@@ -126,6 +138,18 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       const main = mainRouteFromSession(agent.session.events)
       if (!isDeepseekMainRoute(main)) {
         throw new Error(`vision_read: 当前主模型 ${main?.provider ?? '?'}/${main?.model ?? '?'} 不是 DeepSeek 系列，视觉功能已禁用`)
+      }
+      // 防御二次检查：主模型本身原生看图时，图片直达主模型，转文字反而有损。
+      if (main !== undefined) {
+        let info: { inputModalities?: readonly string[] } | undefined
+        try {
+          info = await ctx.llm.resolveModelInfo(main.provider, main.model)
+        } catch {
+          info = undefined // 能力解析失败：继续按文本模型处理
+        }
+        if (info !== undefined && modelSupportsImages(info.inputModalities)) {
+          throw new Error('vision_read: 当前主模型本身支持直接看图，无需视觉通道')
+        }
       }
 
       const question = typeof args.question === 'string' && args.question.trim() !== ''

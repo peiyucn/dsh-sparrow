@@ -14,6 +14,7 @@ npm run verify
 
 * 仅对配置的文本路由抹除显式不含 image 的 `inputModalities`（放行贴图门禁），卸载时恢复；
 * 主模型调用 `vision_read` → 从会话事件反查图片引用（归一化 + 唯一前缀匹配，占位符里的截断哈希可直接传）→ `ctx.attachments.readImage` 校验 → **直连 `ctx.llm`** 指定官方 vision 模型读图（不再走子代理）；默认 `maxTokens: 8192` + `visionReasoningEffort: low`，避免思考把输出上限烧光导致正文截断；只有思考文本、没有正文时以明确错误返回，不再把思考过程当报告；
+* **原生视觉主模型不启用**（2026-08-30）：主模型自身 `inputModalities` 含 image（如 deepseek-v4-flash-vision-exp）时，`vision_read` 对该 agent 隐藏——图片本来直达主模型，经工具转文字报告反而有损；
 * 报告按 attachmentId 进程内 LRU 缓存；失败以工具错误返回，不悬挂。
 
 ## 卸载与残留（诚实说明）

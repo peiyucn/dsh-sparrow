@@ -109,6 +109,11 @@ export function isDeepseekMainRoute(route: { provider: string } | undefined): bo
   return route === undefined || route.provider === 'deepseek-official'
 }
 
+/** 主模型本身能否直接看图：显式声明 image 能力即原生视觉（vision_read 反而有损，应隐藏）。 */
+export function modelSupportsImages(inputModalities: readonly string[] | undefined): boolean {
+  return inputModalities !== undefined && inputModalities.includes('image')
+}
+
 /** 唯一前缀匹配的最短查询长度；更短的 id 只做精确匹配，避免误命中。 */
 export const MIN_PREFIX_MATCH_CHARS = 8
 

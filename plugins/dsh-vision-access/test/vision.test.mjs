@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  extractJsonObject, findImageReference, normalizeVisionConfig, parseVisionReport,
+  extractJsonObject, findImageReference, modelSupportsImages, normalizeVisionConfig, parseVisionReport,
   renderVisionReport, resolveVisionOutput, shouldClearInputModalities, visionCacheKey, VisionCache,
 } from '../lib/vision.js'
 
@@ -56,6 +56,20 @@ describe('vision-access 纯逻辑', () => {
 
     it('不同图同提问 应该 生成不同键', () => {
       assert.notEqual(visionCacheKey('abc', 'q1'), visionCacheKey('xyz', 'q1'))
+    })
+  })
+
+  describe('modelSupportsImages', () => {
+    it('显式含 image 应该 判定原生视觉', () => {
+      assert.equal(modelSupportsImages(['text', 'image']), true)
+    })
+
+    it('undefined 应该 判定非原生视觉', () => {
+      assert.equal(modelSupportsImages(undefined), false)
+    })
+
+    it('仅 text 应该 判定非原生视觉', () => {
+      assert.equal(modelSupportsImages(['text']), false)
     })
   })
 
