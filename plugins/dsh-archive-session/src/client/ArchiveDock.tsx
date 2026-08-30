@@ -80,6 +80,7 @@ export function ensureArchiveStyles(): void {
   padding: 0 12px;
   border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
   border-radius: 999px;
+  outline: none;
   background: transparent;
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 13px;
@@ -100,11 +101,11 @@ export function ensureArchiveStyles(): void {
 .dsh-archive-panel-header {
   flex: none;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
   height: 54px;
-  padding: 14px 8px 8px 10px;
+  padding: 20px 14px 8px 10px;
   box-sizing: border-box;
 }
 .dsh-archive-panel-title {
@@ -122,6 +123,7 @@ export function ensureArchiveStyles(): void {
   padding: 0;
   border: none;
   border-radius: 28px;
+  outline: none;
   background: transparent;
   cursor: pointer;
   color: var(--dsw-alias-label-primary);
@@ -141,17 +143,20 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(0, 0, 0, 0.28)',
+    background: 'var(--dsw-alias-bg-mask-1, rgba(0, 0, 0, 0.28))',
   } satisfies CSSProperties,
   panel: {
-    width: 'min(720px, calc(100vw - 32px))',
-    maxHeight: '80vh',
-    overflow: 'auto',
-    padding: 16,
-    borderRadius: 12,
+    position: 'relative' as const,
+    display: 'flex',
+    flexDirection: 'column',
+    width: 'min(800px, calc(100vw - 48px))',
+    height: 'min(800px, calc(100vh - 48px))',
+    borderRadius: 24,
+    overflow: 'hidden',
+    padding: 0,
     background: 'var(--dsw-alias-bg-layer-2, #f6f7f9)',
     color: 'var(--dsw-alias-label-primary, #1f2329)',
-    boxShadow: '0 12px 40px rgba(0,0,0,0.22)',
+    boxShadow: 'var(--dsw-shadow-lv3, 0 12px 40px rgba(0,0,0,0.22))',
   } satisfies CSSProperties,
   row: {
     display: 'flex',
@@ -341,22 +346,22 @@ export function ArchiveDock(props: ArchiveDockProps) {
         <div style={styles.overlay} role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setOpen(false)
         }}>
-          <div style={{ ...styles.panel, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} role="dialog" aria-modal="true" aria-label={t('dialog.title')}>
+          <div style={styles.panel} role="dialog" aria-modal="true" aria-label={t('dialog.title')}>
             <div className="dsh-archive-panel-header">
               <h2 className="dsh-archive-panel-title" style={{ margin: 0 }}>{t('dialog.title')}</h2>
               <button ref={closeButtonRef} type="button" className="dsh-archive-close" aria-label={t('dialog.close')} onClick={() => { setOpen(false) }}>
                 <IconCloseOutline16 size={14} />
               </button>
             </div>
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 16px 16px' }}>
-            <p style={{ ...styles.secondarySmall, fontSize: 13 }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
+            <p style={{ ...styles.secondarySmall, fontSize: 14, lineHeight: 22, margin: '0 0 8px' }}>
               {t('dialog.intro')}
             </p>
             {error !== null ? <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>{error}</p> : null}
 
             <button
               type="button"
-              style={{ border: 'none', padding: '8px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              style={{ border: 'none', outline: 'none', padding: '8px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
               aria-expanded={archivedOpen}
               onClick={() => { setArchivedOpen(value => !value) }}
             >
@@ -402,7 +407,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
 
             <button
               type="button"
-              style={{ border: 'none', padding: '8px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              style={{ border: 'none', outline: 'none', padding: '8px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
               aria-expanded={backupsOpen}
               onClick={() => { setBackupsOpen(value => !value) }}
             >
