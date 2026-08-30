@@ -31,6 +31,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'confirm.deleteAll'
       | 'confirm.deleteAllPhrase'
       | 'confirm.deleteAllMismatch'
+      | 'confirm.cancel'
       | 'notice.restored'
       | 'notice.skippedLegacy'
       | 'notice.failed'
