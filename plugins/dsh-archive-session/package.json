@@ -1,6 +1,6 @@
 {
   "name": "dsh-archive-session",
-  "description": "DSH Web 插件：归档会话管理（轻量标题缓存 / 备份 / 删除）",
+  "description": "DSH Web 插件：归档会话管理（备份 / 删除 / 恢复）",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
@@ -31,6 +31,7 @@
       "platform": "web",
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-sidebar"
       ]
     }
@@ -51,6 +52,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "0.1.1-rc.2",
     "@deepseek-ai/dsh-agent": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-client-locale": "0.1.1-rc.2",
     "@deepseek-ai/dsh-client-runtime": "0.1.1-rc.2",
     "@deepseek-ai/dsh-client-ui-sidebar": "0.1.1-rc.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.1.1-rc.2",

@@ -1,8 +1,9 @@
-/** 归档会话管理入口：sidebar footer action + 弹窗。 */
+/** 归档会话管理入口：sidebar footer action + 弹窗（zh/en 双语 + loading 态）。 */
 
 import { useEffect, useState, type CSSProperties } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 
 export interface ArchivedSessionItem {
   readonly sessionId: string
@@ -33,7 +34,7 @@ export interface ArchiveDockInjected {
   deleteAllBackups: () => Promise<{ deleted?: number; failed?: string[] }>
 }
 
-export type ArchiveDockProps = PropsRuntime<'sidebar.footer.action'> & ArchiveDockInjected
+export type ArchiveDockProps = PropsRuntime<'sidebar.footer.action'> & ArchiveDockInjected & { t: TranslateNS<'archive-session'> }
 
 const styles = {
   button: {
@@ -95,23 +96,33 @@ const styles = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
   } satisfies CSSProperties,
+  secondary: {
+    color: 'var(--dsw-alias-label-secondary, #6b7280)',
+  } satisfies CSSProperties,
+  secondarySmall: {
+    color: 'var(--dsw-alias-label-secondary, #6b7280)',
+    fontSize: 12,
+  } satisfies CSSProperties,
 } as const
 
 /**
- * footer action 组件：窄栏显示图标，宽栏显示「归档」；弹窗列出轻归档会话与备份。
+ * footer action 组件：窄栏显示图标，宽栏显示「归档管理」；弹窗列出轻归档会话与备份。
+ * 打开后先显示加载态，数据就绪后再渲染列表。
  * @param props - slot props + 注入动作。
  */
 export function ArchiveDock(props: ArchiveDockProps) {
-  const { wide, listArchived, listBackups, backupSession, deleteSession, restoreBackup, deleteBackup, restoreAllBackups, deleteAllBackups } = props
+  const { wide, listArchived, listBackups, backupSession, deleteSession, restoreBackup, deleteBackup, restoreAllBackups, deleteAllBackups, t } = props
   const [open, setOpen] = useState(false)
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
   const [backups, setBackups] = useState<BackupItem[]>([])
   const [backupsOpen, setBackupsOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const refresh = async (): Promise<void> => {
+    setLoading(true)
     try {
       const [nextArchived, nextBackups] = await Promise.all([listArchived(), listBackups()])
       setArchived(nextArchived)
@@ -119,6 +130,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
       setError(null)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -141,31 +154,34 @@ export function ArchiveDock(props: ArchiveDockProps) {
   }
 
   const confirmBackup = (item: ArchivedSessionItem): void => {
-    const ok = window.confirm(`备份会话「${item.title}」？\n\n备份后 @ / 侧边栏不再出现；可随时从备份区恢复。`)
+    const ok = window.confirm(t('confirm.backup', { name: item.title }))
     if (!ok) return
     void run(`backup:${item.sessionId}`, () => backupSession(item.sessionId))
   }
 
   const confirmDelete = (item: ArchivedSessionItem): void => {
-    const typed = window.prompt(`此操作不可逆！\n\n请输入完整会话标题「${item.title}」以确认删除：`)
+    const typed = window.prompt(t('confirm.delete', { name: item.title }))
     if (typed === null) return
     if (typed.trim() !== item.title.trim()) {
-      setError('删除确认失败：输入的标题不一致')
+      setError(t('confirm.deleteMismatch'))
       return
     }
     void run(`delete:${item.sessionId}`, () => deleteSession(item.sessionId, typed))
   }
 
   const confirmDeleteBackup = (item: BackupItem): void => {
-    const ok = window.confirm(`删除备份「${item.title}」？\n\n此操作不可逆，备份内容将被移除。`)
+    const ok = window.confirm(t('confirm.deleteBackup', { name: item.title }))
     if (!ok) return
     void run(`backupDelete:${item.backupId}`, () => deleteBackup(item.backupId))
   }
 
   const restorableCount = backups.filter(item => !item.legacy).length
+  const legacyCount = backups.length - restorableCount
 
   const confirmRestoreAll = (): void => {
-    const ok = window.confirm(`恢复全部备份？\n\n将恢复 ${restorableCount} 个可恢复备份${backups.length - restorableCount > 0 ? `，跳过 ${backups.length - restorableCount} 个旧格式备份` : ''}。`)
+    const ok = window.confirm(legacyCount > 0
+      ? t('confirm.restoreAll.withLegacy', { count: restorableCount, legacy: legacyCount })
+      : t('confirm.restoreAll', { count: restorableCount }))
     if (!ok) return
     void (async () => {
       setBusy('restoreAll')
@@ -173,9 +189,12 @@ export function ArchiveDock(props: ArchiveDockProps) {
       setNotice(null)
       try {
         const result = await restoreAllBackups()
-        const failed = result.failed?.length ?? 0
+        const parts = [t('notice.restored', { count: result.restored?.length ?? 0 })]
         const skipped = result.skippedLegacy ?? 0
-        setNotice(`已恢复 ${result.restored?.length ?? 0} 个${skipped > 0 ? `，跳过旧格式 ${skipped} 个` : ''}${failed > 0 ? `，失败 ${failed} 个` : ''}`)
+        const failed = result.failed?.length ?? 0
+        if (skipped > 0) parts.push(t('notice.skippedLegacy', { count: skipped }))
+        if (failed > 0) parts.push(t('notice.failed', { count: failed }))
+        setNotice(parts.join(' · '))
         await refresh()
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
@@ -186,10 +205,11 @@ export function ArchiveDock(props: ArchiveDockProps) {
   }
 
   const confirmDeleteAll = (): void => {
-    const typed = window.prompt(`此操作不可逆！将删除备份区全部 ${backups.length} 个备份。\n\n请输入「删除全部备份」以确认：`)
+    const phrase = t('confirm.deleteAllPhrase')
+    const typed = window.prompt(t('confirm.deleteAll', { count: backups.length, phrase }))
     if (typed === null) return
-    if (typed.trim() !== '删除全部备份') {
-      setError('删除确认失败：请输入「删除全部备份」')
+    if (typed.trim() !== phrase) {
+      setError(t('confirm.deleteAllMismatch', { phrase }))
       return
     }
     void (async () => {
@@ -198,7 +218,10 @@ export function ArchiveDock(props: ArchiveDockProps) {
       setNotice(null)
       try {
         const result = await deleteAllBackups()
-        setNotice(`已删除 ${result.deleted ?? 0} 个备份${(result.failed?.length ?? 0) > 0 ? `，失败 ${result.failed?.length} 个` : ''}`)
+        const parts = [t('notice.deleted', { count: result.deleted ?? 0 })]
+        const failed = result.failed?.length ?? 0
+        if (failed > 0) parts.push(t('notice.failed', { count: failed }))
+        setNotice(parts.join(' · '))
         await refresh()
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
@@ -208,63 +231,68 @@ export function ArchiveDock(props: ArchiveDockProps) {
     })()
   }
 
+  const loadingRow = (
+    <p style={styles.secondarySmall}>{t('loading')}</p>
+  )
+
   return (
     <>
       <button
         type="button"
         style={styles.button}
-        title="归档会话管理"
+        title={t('dialog.title')}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => { setOpen(value => !value) }}
       >
         <span aria-hidden>📦</span>
-        {wide ? <span>归档</span> : null}
+        {wide ? <span>{t('button.label')}</span> : null}
       </button>
 
       {open ? (
         <div style={styles.overlay} role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setOpen(false)
         }}>
-          <div style={styles.panel} role="dialog" aria-modal="true" aria-label="归档会话管理">
+          <div style={styles.panel} role="dialog" aria-modal="true" aria-label={t('dialog.title')}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0, fontSize: 18 }}>归档会话管理</h2>
-              <button type="button" style={styles.small} aria-label="关闭" onClick={() => { setOpen(false) }}>关闭</button>
+              <h2 style={{ margin: 0, fontSize: 18 }}>{t('dialog.title')}</h2>
+              <button type="button" style={styles.small} aria-label={t('dialog.close')} onClick={() => { setOpen(false) }}>{t('dialog.close')}</button>
             </div>
 
-            <p style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)', fontSize: 13 }}>
-              轻量标题已默认启用；备份可逆，删除不可逆。
+            <p style={{ ...styles.secondarySmall, fontSize: 13 }}>
+              {t('dialog.intro')}
             </p>
             {error !== null ? <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>{error}</p> : null}
 
-            <h3 style={{ fontSize: 15 }}>已轻归档（{archived.length}）</h3>
-            {archived.length === 0 ? <p style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)' }}>暂无轻归档会话</p> : null}
-            {archived.map(item => (
+            <h3 style={{ fontSize: 15 }}>{t('section.archived', { count: loading ? '…' : archived.length })}</h3>
+            {loading ? loadingRow : null}
+            {!loading && archived.length === 0 ? <p style={styles.secondarySmall}>{t('empty.archived')}</p> : null}
+            {!loading && archived.map(item => (
               <div key={item.sessionId} style={styles.row}>
                 <div style={{ minWidth: 0 }}>
                   <div style={styles.title} title={item.title}>{item.title}</div>
-                  <div style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)', fontSize: 12 }}>
+                  <div style={styles.secondarySmall}>
                     {item.sessionId}
-                    {item.running ? ' · 运行中' : item.live ? ' · 已打开' : ''}
-                    {item.backendSupported ? '' : ' · 后端不支持文件级操作'}
+                    {item.running ? ` · ${t('state.running')}` : item.live ? ` · ${t('state.live')}` : ''}
+                    {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
                   </div>
                 </div>
                 <div style={styles.actions}>
                   <button
                     type="button"
                     style={styles.small}
-                    disabled={busy !== null || !item.backendSupported}
+                    disabled={busy !== null || loading || !item.backendSupported}
                     onClick={() => { confirmBackup(item) }}
                   >
-                    备份
+                    {t('action.backup')}
                   </button>
                   <button
                     type="button"
                     style={{ ...styles.small, ...styles.danger }}
-                    disabled={busy !== null || !item.backendSupported}
+                    disabled={busy !== null || loading || !item.backendSupported}
                     onClick={() => { confirmDelete(item) }}
                   >
-                    删除
+                    {t('action.delete')}
                   </button>
                 </div>
               </div>
@@ -272,17 +300,18 @@ export function ArchiveDock(props: ArchiveDockProps) {
 
             <button
               type="button"
-              style={{ ...styles.small, background: 'transparent', border: 'none', padding: '8px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              style={{ ...styles.small, border: 'none', padding: '8px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
               aria-expanded={backupsOpen}
               onClick={() => { setBackupsOpen(value => !value) }}
             >
               <span aria-hidden>{backupsOpen ? '▾' : '▸'}</span>
-              <span>备份区（{backups.length}）</span>
+              <span>{t('section.backups', { count: loading ? '…' : backups.length })}</span>
             </button>
-            {notice !== null ? <p style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)', fontSize: 12 }}>{notice}</p> : null}
+            {notice !== null ? <p style={styles.secondarySmall}>{notice}</p> : null}
             {backupsOpen ? (
               <>
-                {backups.length > 0 ? (
+                {loading ? loadingRow : null}
+                {!loading && backups.length > 0 ? (
                   <div style={{ ...styles.actions, padding: '4px 0 8px' }}>
                     <button
                       type="button"
@@ -290,7 +319,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       disabled={busy !== null || restorableCount === 0}
                       onClick={() => { confirmRestoreAll() }}
                     >
-                      全部恢复{restorableCount > 0 ? `（${restorableCount}）` : ''}
+                      {t('action.restoreAll', { count: restorableCount })}
                     </button>
                     <button
                       type="button"
@@ -298,22 +327,22 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       disabled={busy !== null || backups.length === 0}
                       onClick={() => { confirmDeleteAll() }}
                     >
-                      全部删除
+                      {t('action.deleteAll')}
                     </button>
                   </div>
                 ) : null}
-                {backups.length === 0 ? <p style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)' }}>暂无备份</p> : null}
-                {backups.some(item => item.legacy) ? (
-                  <p style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)', fontSize: 12 }}>
-                    标「旧格式」的备份来自更早版本，缺少恢复信息，仅可删除。
+                {!loading && backups.length === 0 ? <p style={styles.secondarySmall}>{t('empty.backups')}</p> : null}
+                {!loading && backups.some(item => item.legacy) ? (
+                  <p style={styles.secondarySmall}>
+                    {t('legacy.hint')}
                   </p>
                 ) : null}
-                {backups.map(item => (
+                {!loading && backups.map(item => (
                   <div key={item.backupId} style={styles.row}>
                     <div style={{ minWidth: 0 }}>
                       <div style={styles.title} title={item.title}>{item.title}</div>
-                      <div style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)', fontSize: 12 }}>
-                        {item.legacy ? '旧格式 · ' : ''}{item.archivedAt} · {item.sessionId}
+                      <div style={styles.secondarySmall}>
+                        {item.legacy ? `${t('legacy.badge')} · ` : ''}{item.archivedAt} · {item.sessionId}
                       </div>
                     </div>
                     <div style={styles.actions}>
@@ -321,10 +350,10 @@ export function ArchiveDock(props: ArchiveDockProps) {
                         type="button"
                         style={styles.small}
                         disabled={busy !== null || item.legacy}
-                        title={item.legacy ? '旧格式备份缺少恢复信息，无法恢复' : undefined}
+                        title={item.legacy ? t('legacy.restoreTitle') : undefined}
                         onClick={() => { void run(`restore:${item.backupId}`, () => restoreBackup(item.backupId)) }}
                       >
-                        恢复
+                        {t('action.restore')}
                       </button>
                       <button
                         type="button"
@@ -332,7 +361,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                         disabled={busy !== null}
                         onClick={() => { confirmDeleteBackup(item) }}
                       >
-                        删除
+                        {t('action.delete')}
                       </button>
                     </div>
                   </div>
