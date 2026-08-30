@@ -3,8 +3,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     'chat-fim':
       | 'switch.label'
-      | 'switch.on'
-      | 'switch.off'
       | 'switch.onHint'
       | 'switch.offHint'
       | 'dock.busy'

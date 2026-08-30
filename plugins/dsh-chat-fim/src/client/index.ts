@@ -27,8 +27,6 @@ const TRIGGER_PAUSE_MS = 400
 const LOCALE_DICTS = {
   zh: {
     'switch.label': '续写',
-    'switch.on': '开',
-    'switch.off': '关',
     'switch.onHint': '关闭输入框续写联想',
     'switch.offHint': '开启输入框续写联想',
     'dock.busy': '正在联想…',
@@ -38,8 +36,6 @@ const LOCALE_DICTS = {
   },
   en: {
     'switch.label': 'Suggest',
-    'switch.on': 'On',
-    'switch.off': 'Off',
     'switch.onHint': 'Turn off input suggestions',
     'switch.offHint': 'Turn on input suggestions',
     'dock.busy': 'Suggesting…',

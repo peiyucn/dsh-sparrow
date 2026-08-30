@@ -18,6 +18,7 @@ npm run verify
 * 补全走 FIM 接口：直接续写文本本身、没有角色语义，天然站在用户角度；`stop` 序列（`\n用户：` / `\n助手：`）防止模型续写下一位说话人；多建议 = 并行多次请求（FIM 无 `n` 参数），部分失败保留成功建议；
 * 客户端数据面挂 `conversation.composer.dock`，停顿 400ms 后触发，IME 组合态压制，响应按 `draftRev` 防陈旧；建议经共享 store 交给 `conversation.input.overlay` 菜单视图渲染（官方 MenuDropdown 视觉 token + `useAnchoredMaxHeight` 钳高，零定位 JS）；
 * 与官方触发菜单互斥：检测 `[data-trigger-menu]`（MutationObserver 观察 overlay 锚点），官方 @/斜杠列表打开期间本菜单不渲染、Tab 不采用；
+* 开关胶囊：火花图标 + 「Suggest」（关闭态删除线）；窄窗口按官方 `@container` 阈值（460px）折叠为纯图标；菜单卡紫色边框（同开关 on 态）+ 行尾「采用 Tab · 丢弃 Esc」键位提示；
 * 采用通过 scoped `slash/input-insert-text` bail 事件写入草稿，不碰 DOM / 输入框内部实现。
 
 ## 本机实测记录（2026-08-28，改名前 dsh-fim 名义）

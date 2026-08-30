@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { useAnchoredMaxHeight } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useAnchoredMaxHeight, IconSparkle16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -179,8 +179,12 @@ export function ensureFimBusyStyles(): void {
   style.dataset.dshChatFimBusy = ''
   style.textContent = `
 .dsh-chat-fim-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
   height: 28px;
-  padding: 0 12px;
+  padding: 0 12px 0 8px;
   border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
   border-radius: 999px;
   background: transparent;
@@ -193,9 +197,38 @@ export function ensureFimBusyStyles(): void {
 .dsh-chat-fim-switch:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
 }
+.dsh-chat-fim-switch-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-caption);
+}
+.dsh-chat-fim-switch-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .dsh-chat-fim-switch-on {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
   border-color: var(--dsw-alias-button-info-fill, #4d6bfe);
+}
+.dsh-chat-fim-switch-on .dsh-chat-fim-switch-icon {
+  color: var(--dsw-alias-button-info-fill, #4d6bfe);
+}
+/* 关闭态：Suggest 删除线 + 灰字（开启态正常紫色）。 */
+.dsh-chat-fim-switch-off .dsh-chat-fim-switch-label {
+  text-decoration: line-through;
+  color: var(--dsw-alias-label-tertiary, #9aa0a6);
+}
+/* 窄行折叠为纯图标：官方 PermissionSelect 同款匿名 @container 规则，
+   容器是 InputBar .row（container-type: inline-size），阈值同官方 460px。 */
+@container (max-width: 460px) {
+  .dsh-chat-fim-switch .dsh-chat-fim-switch-label {
+    display: none;
+  }
+  .dsh-chat-fim-switch {
+    padding: 0 8px;
+  }
 }
 @property --dsh-chat-fim-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
 .dsh-chat-fim-ring {
@@ -309,18 +342,18 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const error = useFimError()
   const supported = useFimSupported()
   if (!supported) return null
-  const label = `${t('switch.label')} · ${enabled ? t('switch.on') : t('switch.off')}`
   return (
     <>
       <button
         type="button"
-        className={enabled ? 'dsh-chat-fim-switch dsh-chat-fim-switch-on' : 'dsh-chat-fim-switch'}
+        className={enabled ? 'dsh-chat-fim-switch dsh-chat-fim-switch-on' : 'dsh-chat-fim-switch dsh-chat-fim-switch-off'}
         title={busy ? t('dock.busy') : error ?? (enabled ? t('switch.onHint') : t('switch.offHint'))}
         aria-pressed={enabled}
         aria-busy={busy}
         onClick={() => { setFimEnabled(!enabled) }}
       >
-        {label}
+        <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
+        <span className="dsh-chat-fim-switch-label">{t('switch.label')}</span>
       </button>
       {error !== null ? (
         <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)', fontSize: 12 }} title={error}>⚠</span>

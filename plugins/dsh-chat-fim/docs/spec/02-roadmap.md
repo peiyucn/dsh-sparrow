@@ -25,6 +25,7 @@
 * [x] overlay 槽菜单视图：MenuDropdown 视觉 token + 2 行 line-clamp + useAnchoredMaxHeight
 * [x] 与官方触发菜单互斥（`[data-trigger-menu]` 检测 + MutationObserver）；Tab/点选采用、Esc 丢弃
 * [x] 删除幽灵文本 portal / caret 测量 / fallback 胶囊；i18n 复用菜单文案；verify 全绿（实机验收待用户验证）
+* [x] 菜单紫色边框（同开关 on 态）+ 行尾 Tab/Esc 键位提示；开关改版（图标 + Suggest 删除线，@container 460px 折叠为纯图标）
 
 ## M4 · 打磨（可选）
 
