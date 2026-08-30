@@ -1,10 +1,10 @@
 /** 归档会话管理入口：sidebar footer action + 弹窗（zh/en 双语 + loading 态）。 */
 
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { IconArchiveOutline20 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconArchiveOutline20, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 
 export interface ArchivedSessionItem {
   readonly sessionId: string
@@ -97,6 +97,38 @@ export function ensureArchiveStyles(): void {
 .dsh-archive-btn-danger {
   color: var(--dsw-alias-state-error-primary, #c62828);
 }
+.dsh-archive-panel-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 54px;
+  padding: 14px 8px 8px 10px;
+  box-sizing: border-box;
+}
+.dsh-archive-panel-title {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  color: var(--dsw-alias-label-primary);
+}
+.dsh-archive-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 28px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--dsw-alias-label-primary);
+}
+.dsh-archive-close:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
 `
   document.head.appendChild(style)
 }
@@ -164,6 +196,18 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+
+  // 官方弹窗行为：打开时聚焦关闭按钮，Esc 关闭。
+  useEffect(() => {
+    if (!open) return
+    closeButtonRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => { document.removeEventListener('keydown', onKeyDown) }
+  }, [open])
 
   const refresh = async (): Promise<void> => {
     setLoading(true)
@@ -297,12 +341,14 @@ export function ArchiveDock(props: ArchiveDockProps) {
         <div style={styles.overlay} role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setOpen(false)
         }}>
-          <div style={styles.panel} role="dialog" aria-modal="true" aria-label={t('dialog.title')}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0, fontSize: 18 }}>{t('dialog.title')}</h2>
-              <button type="button" className="dsh-archive-btn" aria-label={t('dialog.close')} onClick={() => { setOpen(false) }}>{t('dialog.close')}</button>
+          <div style={{ ...styles.panel, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} role="dialog" aria-modal="true" aria-label={t('dialog.title')}>
+            <div className="dsh-archive-panel-header">
+              <h2 className="dsh-archive-panel-title" style={{ margin: 0 }}>{t('dialog.title')}</h2>
+              <button ref={closeButtonRef} type="button" className="dsh-archive-close" aria-label={t('dialog.close')} onClick={() => { setOpen(false) }}>
+                <IconCloseOutline16 size={14} />
+              </button>
             </div>
-
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 16px 16px' }}>
             <p style={{ ...styles.secondarySmall, fontSize: 13 }}>
               {t('dialog.intro')}
             </p>
@@ -424,6 +470,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 ))}
               </>
             ) : null}
+            </div>
           </div>
         </div>
       ) : null}
