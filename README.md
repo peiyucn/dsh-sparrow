@@ -32,9 +32,7 @@ dsh plugin --profile web add dsh-archive-session
 
 ## 开发
 
-* 各插件独立开发与验证：`cd plugins/<插件名> && npm run verify`；全量 `npm run verify:all`
-* 新功能先写 spec（对应插件目录下 `docs/spec/NN-<主题>.md`）再开发
-* 规范见 [AGENTS.md](AGENTS.md)（合集通用）与各插件目录下的 `AGENTS.md`（专属约束）
+规范与验证方式见 [AGENTS.md](AGENTS.md)（合集通用）与各插件目录下的 `AGENTS.md`。
 
 ## License
 
