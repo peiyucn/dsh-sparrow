@@ -16,7 +16,7 @@ npm run verify
 
 * host 路由 `POST /api/chat-fim/complete`；会话未命中即拒、凭据只经 `ctx.credentials` 实时解析；
 * 补全走 FIM 接口：直接续写文本本身、没有角色语义，天然站在用户角度；`stop` 序列（`\n用户：` / `\n助手：`）防止模型续写下一位说话人；多建议 = 并行多次请求（FIM 无 `n` 参数），部分失败保留成功建议；
-* **续写模型三档可选**（开关胶囊旁的 ▾ 下拉箭头，本地记忆）：`自动`（默认，跟随主模型：官方 pro/flash 用之，vision 回退 pro）/ `Pro` / `Flash`（快且省，输出单价为 pro 的 1/3）；建议菜单右下角显示本次续写的 token 数与实际使用模型；注：官方 API schema 只列 v4-pro，但实测 flash 可用（2026-08-30 直连实测）；
+* **续写模型三档可选**（开关胶囊旁的 ▾ 下拉箭头，本地记忆）：`自动`（默认，跟随主模型：官方 pro/flash 用之，vision 回退 pro）/ `Pro` / `Flash`（快且省，输出单价为 pro 的 1/3）；建议菜单右下角显示本次续写的 tok 数与实际模型、温度（如 `1,234 tok · deepseek-v4-flash · T0.4`）；注：官方 API schema 只列 v4-pro，但实测 flash 可用（2026-08-30 直连实测）；
 * 客户端数据面挂 `conversation.composer.dock`，停顿 400ms 后触发，IME 组合态压制，响应按 `draftRev` 防陈旧；建议经共享 store 交给 `conversation.input.overlay` 菜单视图渲染（官方 MenuDropdown 视觉 token + `useAnchoredMaxHeight` 钳高，零定位 JS）；
 * 与官方触发菜单互斥：检测 `[data-trigger-menu]`（MutationObserver 观察 overlay 锚点），官方 @/斜杠列表打开期间本菜单不渲染、Tab 不采用；
 * 开关胶囊：火花图标 + 「Suggest」（关闭态灰字）；窄窗口按官方 `@container` 阈值（460px）折叠为纯图标；菜单卡紫色边框（同开关 on 态）+ 行尾「采用 Tab · 丢弃 Esc」键位提示；

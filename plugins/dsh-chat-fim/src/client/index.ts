@@ -18,6 +18,7 @@ export const inject = ['slots', 'sessions', 'locale']
 export interface ChatFimResponse {
   readonly suggestions?: readonly string[]
   readonly model?: string
+  readonly temperature?: number
   readonly usage?: { readonly promptTokens?: number; readonly completionTokens?: number }
   readonly error?: { readonly code?: string; readonly message?: string }
 }
@@ -39,7 +40,7 @@ const LOCALE_DICTS = {
     'menu.model.auto': '自动',
     'menu.model.pro': 'Pro',
     'menu.model.flash': 'Flash',
-    'menu.tokens': '{tokens} tok · {model}',
+    'menu.tokens': '{tokens} tok · {model} · T{temperature}',
   },
   en: {
     'switch.label': 'Suggest',
@@ -53,7 +54,7 @@ const LOCALE_DICTS = {
     'menu.model.auto': 'Auto',
     'menu.model.pro': 'Pro',
     'menu.model.flash': 'Flash',
-    'menu.tokens': '{tokens} tok · {model}',
+    'menu.tokens': '{tokens} tok · {model} · T{temperature}',
   },
 } as const
 
@@ -105,6 +106,7 @@ export function apply(ctx: ClientContext): void {
         return {
           suggestions: payload.suggestions ?? [],
           model: payload.model ?? '',
+          temperature: payload.temperature ?? 0,
           usage: {
             promptTokens: payload.usage?.promptTokens ?? 0,
             completionTokens: payload.usage?.completionTokens ?? 0,

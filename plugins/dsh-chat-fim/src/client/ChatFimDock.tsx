@@ -13,6 +13,7 @@ import { shouldTriggerFim, formatTokenCount, type FimModelMode } from '../chat-f
 export interface FimCompleteResult {
   readonly suggestions: readonly string[]
   readonly model: string
+  readonly temperature: number
   readonly usage: { readonly promptTokens: number; readonly completionTokens: number }
 }
 
@@ -152,6 +153,8 @@ export interface FimSuggestionRecord {
   readonly model: string
   /** 本次续写总 token（prompt + completion，跨并行请求求和）。 */
   readonly totalTokens: number
+  /** 本次续写实际采样温度。 */
+  readonly temperature: number
 }
 
 // 模块级共享建议：dock（数据面）写入，overlay 菜单（视图）读取；随草稿/相位变化清空。
@@ -650,6 +653,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
               draftRev: rev,
               model: result.model,
               totalTokens: result.usage.promptTokens + result.usage.completionTokens,
+              temperature: result.temperature,
             })
           }
           setFimError(null)
@@ -799,7 +803,11 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
           </button>
           <div className="dsh-chat-fim-menu-footer">
             <span className="dsh-chat-fim-menu-usage">
-              {t('menu.tokens', { tokens: formatTokenCount(suggestion.totalTokens), model: suggestion.model })}
+              {t('menu.tokens', {
+                tokens: formatTokenCount(suggestion.totalTokens),
+                model: suggestion.model,
+                temperature: suggestion.temperature,
+              })}
             </span>
           </div>
         </div>

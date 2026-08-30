@@ -192,16 +192,18 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
             } catch {
               throw { code: 'UPSTREAM_ERROR', message: 'DeepSeek FIM 上游返回了非法 JSON' } satisfies ChatFimError
             }
-            return { suggestions: extractSuggestions(data), usage: extractUsage(data) }
+            return { suggestions: extractSuggestions(data), usage: extractUsage(data), temperature }
           }),
         )
         const seen = new Set<string>()
         const suggestions: string[] = []
         let totalPromptTokens = 0
         let totalCompletionTokens = 0
+        let firstTemperature = settings.temperature
         let firstError: ChatFimError | undefined
         for (const result of results) {
           if (result.status === 'fulfilled') {
+            if (suggestions.length === 0) firstTemperature = result.value.temperature
             totalPromptTokens += result.value.usage.promptTokens
             totalCompletionTokens += result.value.usage.completionTokens
             for (const suggestion of result.value.suggestions) {
@@ -225,6 +227,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
         sendJson(res, 200, {
           suggestions,
           model: fimModel,
+          temperature: firstTemperature,
           usage: { promptTokens: totalPromptTokens, completionTokens: totalCompletionTokens },
         })
       } catch (error) {
