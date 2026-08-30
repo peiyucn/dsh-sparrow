@@ -18,6 +18,7 @@ DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入�
   * 动作前二次确认；活动会话：`agent.cancel({kind:'hook'})` → `agent.whenIdle()` → `sessions.flush()` → `agent.ctx.fiber.dispose()`，确认会话已从 live store 卸载后再移 / 删。
   * 动作后同步 `workspace` 记账：`WorkspaceEntity.detachSession()`；归档集经 `workspaceDomainSpec` + `ctx.storageDomain` 更新（`domain/changed` 会触发 api-proxy 广播 `host/archived-sessions-changed`，插件不手发帧）。
   * 备份目录写 `dsh-archive-session.json` sidecar（原路径 / 标题 / workspaceIds），恢复时移回并 `WorkspaceEntity.attachSession()`；无 sidecar 的旧格式目录按「仅列出/删除」收纳，不尝试恢复。
+* **卸载透明**（2026-08-30 起）：备份位置与卸载影响在归档面板顶部提示中明示（`GET /api/archive-session/backup-dir`），README 含《卸载与残留》章节；卸载不自动恢复备份，恢复逻辑只经本插件。
 * **仍禁止**：monkey-patch 核心、读 / 改会话日志内容、动会话目录以外的内部文件（附件 / 存储域 / 凭据等一律走官方服务）。
 
 ## 架构约束

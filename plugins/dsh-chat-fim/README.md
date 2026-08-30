@@ -21,6 +21,12 @@ npm run verify
 * 开关胶囊：火花图标 + 「Suggest」（关闭态灰字）；窄窗口按官方 `@container` 阈值（460px）折叠为纯图标；菜单卡紫色边框（同开关 on 态）+ 行尾「采用 Tab · 丢弃 Esc」键位提示；
 * 采用通过 scoped `slash/input-insert-text` bail 事件写入草稿，不碰 DOM / 输入框内部实现。
 
+## 卸载与残留（诚实说明）
+
+* host half 不写任何文件、不改 `.dsh` 内部结构（只做网络转发）；
+* 唯一的持久状态是**浏览器 localStorage 键 `dsh-chat-fim:enabled`**（开关记忆，位于浏览器而非 `.dsh`）。卸载插件后该键会留在浏览器里，无害；介意的话可在 DevTools → Application → Local Storage 删除；
+* 卸载后无其他残留。
+
 ## 本机实测记录（2026-08-28，改名前 dsh-fim 名义）
 
 * 使用临时 `DSH_HOME` 执行 `dsh plugin --profile web add <本目录>`，再启动 web profile；

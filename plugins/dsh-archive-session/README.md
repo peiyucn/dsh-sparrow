@@ -26,6 +26,13 @@ npm run verify
 * 每个备份目录内写 `dsh-archive-session.json` sidecar（原路径 / 标题 / 工作区记账），恢复时按 sidecar 移回原处并回填工作区；
 * 无 sidecar 的目录按「旧格式」备份列出：可删除，不可恢复（原始位置无从得知），界面上标注并禁用恢复按钮。
 
+## 卸载与残留（诚实说明）
+
+* **本插件会移动会话目录**（备份 = 把会话目录移入备份夹），这是核心功能而非残留；备份位置已在归档面板顶部提示中明示；
+* **卸载不会自动恢复已备份会话**：备份夹 `$DSH_HOME/sessions-archived-backup/` 及其中的会话目录会保留。请**先在备份区「全部恢复」再卸载**；
+* 卸载后不产生其他文件残留：会话数据仍由官方持久化管理；归档集/工作区记账走官方 storageDomain（卸载时已是「已备份 = 已从工作区 detach」的一致状态），本插件不写官方目录之外的任何隐藏状态；
+* 若已卸载且仍有备份未恢复：重装本插件即可继续使用恢复功能，或按 sidecar 中的 `originalPath` 手动移回目录（工作区归属需重装后由插件回填）。
+
 ## 本机实测记录（2026-08-29）
 
 * 隔离冒烟（当前 dsh 0.1.2-alpha.1，备份夹经 config 覆盖指向真实 `sessions-archived-backup`）：`GET /api/archive-session/backups` 返回 88 条，全部为旧格式（legacy 标记）；`POST /api/archive-session/backup-delete` 对不存在 id 返回 404 `UNKNOWN_BACKUP`。
