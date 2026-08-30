@@ -105,7 +105,8 @@ export function ensureArchiveStyles(): void {
   justify-content: space-between;
   gap: 8px;
   height: 54px;
-  padding: 20px 14px 8px 10px;
+  /* 标题文字起点 24px：对齐官方 settings 面板 navTitle（rail 12px + title 12px）。 */
+  padding: 20px 14px 8px 24px;
   box-sizing: border-box;
 }
 .dsh-archive-panel-title {
@@ -137,7 +138,8 @@ export function ensureArchiveStyles(): void {
   gap: 8px;
   width: 100%;
   height: 40px;
-  padding: 0 12px;
+  /* 官方 settings 导航单元规格：pad (9,16,9,12)、字重 400。 */
+  padding: 9px 16px 9px 12px;
   margin: 0 0 4px -12px;
   box-sizing: border-box;
   border: none;
@@ -146,13 +148,13 @@ export function ensureArchiveStyles(): void {
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 22px;
   text-align: left;
   cursor: pointer;
 }
 .dsh-archive-section:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+  background: var(--dsw-specific-sidebar-nav-item-hover, var(--dsw-alias-interactive-bg-hover));
 }
 `
   document.head.appendChild(style)
@@ -174,7 +176,8 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     width: 'min(800px, calc(100vw - 48px))',
-    height: 'min(800px, calc(100vh - 48px))',
+    // 高度随内容自适应、上限钳到视口：列表短时不再留一大片空白底（官方 settings 固定高是因为有导航栏 + 长选项区，本面板是短列表）。
+    maxHeight: 'min(800px, calc(100vh - 48px))',
     borderRadius: 24,
     overflow: 'hidden',
     padding: 0,
