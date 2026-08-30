@@ -4,6 +4,7 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
     "strict": true,
     "noUncheckedIndexedAccess": false,
     "useUnknownInCatchVariables": true,
@@ -18,5 +19,5 @@
     "declarationDir": "lib/types",
     "types": ["node"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

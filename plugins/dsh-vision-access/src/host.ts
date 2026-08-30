@@ -1,10 +1,14 @@
-/** dsh-vision-access host half：门禁放行 + vision_read 工具（直连 ctx.llm 视觉模型）。 */
+/** dsh-vision-access host half：门禁放行 + vision_read 工具（直连 ctx.llm 视觉模型）+ 状态路由。 */
 
+import type { ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-attachment'
+import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-llm'
 import { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-tools'
 import {
@@ -14,11 +18,21 @@ import {
 } from './vision.js'
 
 export const name = 'dsh-vision-access'
-export const inject = ['llm', 'tools', 'attachments']
+export const inject = ['llm', 'tools', 'attachments', 'sessions', 'webServer']
 
 export type { VisionConfig, VisionReport }
 
 const TOOL_NAME = 'vision_read'
+const STATUS_ROUTE_PATH = '/api/vision-access/status'
+
+function sendJson(res: ServerResponse, status: number, payload: unknown): void {
+  if (res.headersSent) return
+  const body = JSON.stringify(payload)
+  res.statusCode = status
+  res.setHeader('content-type', 'application/json; charset=utf-8')
+  res.setHeader('content-length', Buffer.byteLength(body))
+  res.end(body)
+}
 
 /** 把超长的 sha256 附件 id 截短展示（错误消息里列候选用）。 */
 function shortId(id: string): string {
@@ -218,4 +232,38 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       return task
     },
   })), 'dsh-vision-access: vision_read tool')
+
+  // 3. 状态查询路由：客户端点亮图标据此判定（DeepSeek 文本模型 → vision_read 可用）。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: STATUS_ROUTE_PATH,
+    handler: async (req, res) => {
+      if (req.method !== 'GET') {
+        sendJson(res, 405, { available: false })
+        return
+      }
+      const url = new URL(req.url ?? '/', 'http://localhost')
+      const session = ctx.sessions.get(SessionId(url.searchParams.get('sessionId') ?? ''))
+      if (session === undefined) {
+        sendJson(res, 200, { available: false })
+        return
+      }
+      const main = mainRouteFromSession(session.events)
+      if (!isDeepseekMainRoute(main)) {
+        sendJson(res, 200, { available: false })
+        return
+      }
+      // 原生视觉主模型：图片直达主模型，无需视觉通道（与工具屏蔽逻辑一致）。
+      let nativeVision = false
+      if (main !== undefined) {
+        try {
+          const info = await ctx.llm.resolveModelInfo(main.provider, main.model)
+          nativeVision = modelSupportsImages(info.inputModalities)
+        } catch {
+          nativeVision = false // 能力解析失败：保守按文本模型处理（与工具执行侧一致）。
+        }
+      }
+      sendJson(res, 200, { available: !nativeVision })
+    },
+  }), 'dsh-vision-access: status route')
 }

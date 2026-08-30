@@ -4,14 +4,14 @@
 
 ## 项目概况
 
-DSH Web 插件：纯文本主模型会话的图片视觉通道 —— 主模型调用 `vision_read` 工具，host 直连官方视觉模型（默认 deepseek-v4-flash-vision-exp）读图并回传结构化文字报告，主模型保持对话大脑。host-only，无 client half、无可见 UI。
+DSH Web 插件：纯文本主模型会话的图片视觉通道 —— 主模型调用 `vision_read` 工具，host 直连官方视觉模型（默认 deepseek-v4-flash-vision-exp）读图并回传结构化文字报告，主模型保持对话大脑。host + 轻量 client half（输入框工具行一个纯指示的点亮图标，无交互、无持久状态）。
 
 * 2026-08-30 起不再走子代理：实测 subagents 单次读图 46.3s，直连 `ctx.llm` 2.2s。
 * 工具按 agent 条件隐藏：主模型非 DeepSeek 系列、或主模型本身原生看图时，该 agent 看不到 `vision_read`（像没有这个工具）。
 * 报告按「attachmentId + question」进程内 LRU 缓存（`visionCacheKey` 含 question，防止同图不同问题命中陈旧报告）；只有思考无正文时抛明确错误，不把思考当报告（maxTokens 8192 + `visionReasoningEffort: low`）。
 
-* TypeScript 实现；host half 源码在 src/，无 client half（不产出 client bundle）
-* 本地验证 = npm run verify（typecheck + node:test）
+* TypeScript 实现；host half 源码在 src/，client half 只有状态图标（client bundle 不入库，.gitignore）
+* 本地验证 = npm run verify（typecheck + client bundle + node:test）
 * 测试：Node 内置 test runner，用例在 test/*.test.mjs
 
 ***
@@ -33,9 +33,11 @@ DSH Web 插件：纯文本主模型会话的图片视觉通道 —— 主模型�
 
 ## 关键文件速查
 
-    src/host.ts   — host half 入口（resolveModelInfo 包装 + agent/request 屏蔽 + vision_read 工具）
+    src/host.ts   — host half 入口（resolveModelInfo 包装 + agent/request 屏蔽 + vision_read 工具 + 状态路由）
     src/vision.ts — 纯逻辑（缓存键 / 报告解析 / JSON 提取 / 附件引用匹配 / 能力判断）
     src/index.ts  — 入口契约 re-export
+    src/client/index.ts — client half 入口（locale + conversation.input.left 图标槽位）
+    src/client/VisionStatusIcon.tsx — 状态图标（GET /api/vision-access/status 查询，可用才点亮）
     test/vision.test.mjs — 纯逻辑单测
 
 ***
