@@ -27,15 +27,21 @@ export type ChatFimSwitchProps = PropsRuntime<'conversation.input.left'> & ChatF
 const PAUSE_MS = 400
 const ENABLED_STORAGE_KEY = 'dsh-chat-fim:enabled'
 
-/** 读取本地开关状态：默认开启，非法值回退默认。 */
+/** 读取本地开关状态：默认关闭，仅显式存过 '1' 才开启；非法值回退关闭。 */
 export function readEnabled(storage: { getItem(key: string): string | null }, key = ENABLED_STORAGE_KEY): boolean {
   const value = storage.getItem(key)
-  return value !== '0'
+  return value === '1'
 }
 
 // 模块级共享开关：开关（input.left）与建议条（composer.dock）是两个 React 树，
 // 用同一 bundle 内的可变状态 + 订阅器同步，避免靠 localStorage 事件（同页不触发）。
-let sharedEnabled = true
+// 启动时读取本地持久化值；默认关闭（见 readEnabled）。
+let sharedEnabled = false
+try {
+  sharedEnabled = readEnabled(window.localStorage)
+} catch {
+  sharedEnabled = false
+}
 const listeners = new Set<() => void>()
 
 /** 订阅共享开关状态；返回当前值。 */

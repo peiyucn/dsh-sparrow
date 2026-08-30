@@ -4,7 +4,7 @@
 
 ## 项目概况
 
-DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + 输入框内幽灵文本建议）。2026-08-29 从对话前缀续写切换为 FIM：实测提示词修视角不稳定（同构造两次采样一次用户口吻一次助手口吻），FIM 直接续写文本、无角色语义，天然站在用户角度。单候选（suggestionCount 默认 1），Tab 键入、Esc 丢弃；开关挂输入框工具行，文案随 dsh 语言 zh/en 切换。
+DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + 输入框内幽灵文本建议）。2026-08-29 从对话前缀续写切换为 FIM：实测提示词修视角不稳定（同构造两次采样一次用户口吻一次助手口吻），FIM 直接续写文本、无角色语义，天然站在用户角度。单候选（suggestionCount 默认 1），Tab 键入、Esc 丢弃；开关挂输入框工具行（**默认关闭**，选择本地持久化），文案随 dsh 语言 zh/en 切换。
 
 * TypeScript 实现；host half 源码在 src/，client half（M2 起）构建产物不入库（.gitignore）
 * 本地验证 = npm run verify（typecheck + node:test）
