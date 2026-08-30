@@ -41,6 +41,7 @@
 * `execute`：由 attachmentId 反查 ImageAttachmentRef（遍历会话事件里的 image block，仿 api-proxy 的 referencedImage，api-proxy.ts:2447）→ 主模型路由检查（非 deepseek-official 抛「视觉功能已禁用」）→ `ctx.attachments.readImage(ref)` 校验 → `ctx.llm.prepareCall`（默认 `maxTokens: 8192` + `visionReasoningEffort: low`，避免思考烧光输出上限）→ `prepared.stream` 收集 text/reasoning delta → `resolveVisionOutput`（正文优先；只有思考文本 = 截断/异常，抛明确错误，不把思考当报告）→ `parseVisionReport(extractJsonObject(raw), raw)`；
 * 输出 schema：结构化报告 `{ summary: string, ocrText?: string, tables?: string[], layout?: string }`，render 转成带标记的文本块回传主模型；
 * 按 agent 屏蔽：主模型路由非 DeepSeek 系列时，`agent/request` waterfall 对该 agent `tools.restrict({ deny: ['vision_read'] })`（工具与 UI 都像没有）；切回 deepseek 路由时解除（Map 记录每个 agent 的解除器）；
+* **原生视觉主模型屏蔽**（2026-08-30）：主模型自身 `inputModalities` 含 image（如 deepseek-v4-flash-vision-exp）时同样隐藏工具——图片本来直达主模型，经 vision_read 转文字报告是有损的；`execute` 内二次防御：原生视觉主模型调用直接抛「无需视觉通道」；
 * 主模型上下文中的占位文本只含 attachmentId + 「如需看图调用 vision_read」——旧方案的「复制文件补扩展名」体操全部删除。
 
 ### 3. 缓存与降级
