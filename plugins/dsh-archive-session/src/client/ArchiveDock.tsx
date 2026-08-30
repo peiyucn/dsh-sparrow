@@ -381,7 +381,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
               </button>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
-            <p style={{ ...styles.secondarySmall, fontSize: 14, lineHeight: 22, margin: '0 0 12px' }}>
+            <p style={{ ...styles.secondarySmall, fontSize: 14, lineHeight: '22px', margin: '0 0 12px' }}>
               {t('dialog.intro')}
             </p>
             {error !== null ? <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>{error}</p> : null}
