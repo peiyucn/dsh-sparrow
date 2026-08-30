@@ -117,7 +117,7 @@ async function stopAndFlushLiveSession(ctx: Context, sessionId: SessionId): Prom
   const agent = ctx.agents.get(sessionId)
   // 生成中的会话不静默取消用户回合：先让用户停止生成。
   if (agent !== undefined && agent.status === 'running') {
-    throw new ArchiveError('SESSION_LIVE', '该会话正在生成回复，请先停止生成后再备份', 409)
+    throw new ArchiveError('SESSION_LIVE', '该会话正在生成回复：请先停止生成后再备份', 409)
   }
   if (agent !== undefined) {
     agent.cancel({ kind: 'hook', reason: 'dsh-archive-session' })
@@ -136,7 +136,7 @@ async function stopAndFlushLiveSession(ctx: Context, sessionId: SessionId): Prom
     if (Date.now() > deadline) {
       throw new ArchiveError(
         'SESSION_LIVE',
-        '该会话仍驻留在后台（可能处于「进行中」）：请停止其生成、或重启 dsh 后再备份',
+        '该会话仍处于打开状态：请切换到其他会话、关闭它的窗口，或在侧边栏「进行中」列表结束该会话后重试（无需重启 dsh）',
         409,
       )
     }
