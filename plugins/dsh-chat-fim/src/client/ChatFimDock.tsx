@@ -393,24 +393,24 @@ export function ensureFimBusyStyles(): void {
   padding: 2px 4px 0;
   border-top: 1px solid var(--dsw-alias-border-inverted);
 }
-/* 开关旁的下拉箭头：点击弹出模型三档选择。 */
-.dsh-chat-fim-model-arrow {
+/* 胶囊内的模型下拉箭头：点击只开模型菜单（stopPropagation，不切换开关）。 */
+.dsh-chat-fim-switch-arrow {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: 999px;
-  background: transparent;
+  flex: none;
+  margin-left: 2px;
+  padding: 2px;
+  border-radius: 4px;
   color: var(--dsw-alias-label-caption);
   cursor: pointer;
 }
-.dsh-chat-fim-model-arrow:hover {
+.dsh-chat-fim-switch-arrow:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
-/* 模型三档弹层：官方 MenuDropdown 同款 token，锚定箭头按钮右下。 */
+.dsh-chat-fim-switch-on .dsh-chat-fim-switch-arrow {
+  color: var(--dsw-alias-button-info-fill, #4d6bfe);
+}
+/* 模型三档弹层：官方 MenuDropdown 同款 token，锚定胶囊右下，空间不足自动向上。 */
 .dsh-chat-fim-model-popover {
   position: fixed;
   z-index: 2100;
@@ -470,15 +470,23 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const supported = useFimSupported()
   const modelMode = useFimModelMode()
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [pickerPoint, setPickerPoint] = useState<{ x: number; y: number } | null>(null)
-  const arrowRef = useRef<HTMLButtonElement | null>(null)
+  const [pickerPoint, setPickerPoint] = useState<{ x: number; y: number; up: boolean } | null>(null)
+  const switchRef = useRef<HTMLButtonElement | null>(null)
 
   const modelModeLabel = (mode: FimModelMode): string =>
     mode === 'auto' ? t('menu.model.auto') : mode === 'pro' ? t('menu.model.pro') : t('menu.model.flash')
 
   const openPicker = (): void => {
-    const rect = arrowRef.current?.getBoundingClientRect()
-    setPickerPoint(rect === undefined ? null : { x: rect.right, y: rect.bottom + 4 })
+    const rect = switchRef.current?.getBoundingClientRect()
+    if (rect === undefined) {
+      setPickerPoint(null)
+      setPickerOpen(true)
+      return
+    }
+    // 空间不够时向上弹出（官方下拉惯例）：三选项弹层估算高度 112px + 8px 边距。
+    const estimate = 112 + 8
+    const up = rect.bottom + estimate > window.innerHeight
+    setPickerPoint({ x: rect.right, y: up ? rect.top - 4 : rect.bottom + 4, up })
     setPickerOpen(true)
   }
 
@@ -488,7 +496,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
     const onPointerDown = (event: PointerEvent): void => {
       if (!(event.target instanceof Element)) return
       if (event.target.closest('.dsh-chat-fim-model-popover') !== null) return
-      if (arrowRef.current !== null && arrowRef.current.contains(event.target)) return
+      if (switchRef.current !== null && switchRef.current.contains(event.target)) return
       setPickerOpen(false)
     }
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -509,6 +517,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
   return (
     <>
       <button
+        ref={switchRef}
         type="button"
         className={enabled ? 'dsh-chat-fim-switch dsh-chat-fim-switch-on' : 'dsh-chat-fim-switch dsh-chat-fim-switch-off'}
         title={busy ? t('dock.busy') : error ?? (enabled ? t('switch.onHint') : t('switch.offHint'))}
@@ -518,17 +527,21 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
       >
         <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
         <span className="dsh-chat-fim-switch-label">{t('switch.label')}</span>
-      </button>
-      <button
-        ref={arrowRef}
-        type="button"
-        className="dsh-chat-fim-model-arrow"
-        aria-haspopup="listbox"
-        aria-expanded={pickerOpen}
-        aria-label={t('menu.model.label', { mode: modelModeLabel(modelMode) })}
-        onClick={openPicker}
-      >
-        <IconChevronDownOutline14 size={12} />
+        <span
+          className="dsh-chat-fim-switch-arrow"
+          role="button"
+          aria-haspopup="listbox"
+          aria-expanded={pickerOpen}
+          aria-label={t('menu.model.label', { mode: modelModeLabel(modelMode) })}
+          title={t('menu.model.label', { mode: modelModeLabel(modelMode) })}
+          onClick={(event) => {
+            // 箭头点击只开模型菜单，不切换开关。
+            event.stopPropagation()
+            openPicker()
+          }}
+        >
+          <IconChevronDownOutline14 size={12} />
+        </span>
       </button>
       {error !== null ? (
         <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)', fontSize: 12 }} title={error}>⚠</span>
@@ -539,7 +552,11 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
             className="dsh-chat-fim-model-popover"
             role="listbox"
             aria-label={t('menu.model.label', { mode: '' })}
-            style={{ left: pickerPoint.x, top: pickerPoint.y, transform: 'translateX(-100%)' }}
+            style={{
+              left: pickerPoint.x,
+              top: pickerPoint.y,
+              transform: pickerPoint.up ? 'translateX(-100%) translateY(-100%)' : 'translateX(-100%)',
+            }}
             onMouseDown={(event) => {
               // 防止点按把焦点从输入框夺走（combobox 惯例）。
               event.preventDefault()
