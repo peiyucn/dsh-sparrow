@@ -55,6 +55,28 @@ export function setFimEnabled(next: boolean): void {
   for (const listener of listeners) listener()
 }
 
+// 模块级共享「联想中」状态：指示渲染在工具行开关旁，避免在输入框下方增减内容导致布局跳动。
+let sharedBusy = false
+const busyListeners = new Set<() => void>()
+
+/** 订阅共享联想中状态；返回当前值。 */
+export function useFimBusy(): boolean {
+  const [value, setValue] = useState(sharedBusy)
+  useEffect(() => {
+    const listener = (): void => { setValue(sharedBusy) }
+    busyListeners.add(listener)
+    return () => { busyListeners.delete(listener) }
+  }, [])
+  return value
+}
+
+/** 设置共享联想中状态。 */
+export function setFimBusy(next: boolean): void {
+  if (sharedBusy === next) return
+  sharedBusy = next
+  for (const listener of busyListeners) listener()
+}
+
 /**
  * 输入区只读几何测量（幽灵文本定位特例，见 AGENTS.md）：
  * 仅当光标位于内容可编辑区末尾时，返回文末光标所在视口坐标；
@@ -116,21 +138,27 @@ const styles = {
   } satisfies React.CSSProperties,
 } as const
 
-/** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）。 */
+/** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）；联想中时在旁显示省略号。 */
 export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const { t } = props
   const enabled = useFimEnabled()
+  const busy = useFimBusy()
   const label = `${t('switch.label')} · ${enabled ? t('switch.on') : t('switch.off')}`
   return (
-    <button
-      type="button"
-      style={enabled ? { ...styles.switch, ...styles.switchOn } : styles.switch}
-      title={enabled ? t('switch.onHint') : t('switch.offHint')}
-      aria-pressed={enabled}
-      onClick={() => { setFimEnabled(!enabled) }}
-    >
-      {label}
-    </button>
+    <>
+      <button
+        type="button"
+        style={enabled ? { ...styles.switch, ...styles.switchOn } : styles.switch}
+        title={enabled ? t('switch.onHint') : t('switch.offHint')}
+        aria-pressed={enabled}
+        onClick={() => { setFimEnabled(!enabled) }}
+      >
+        {label}
+      </button>
+      {busy ? (
+        <span style={styles.hint} title={t('dock.busy')} aria-label={t('dock.busy')}>…</span>
+      ) : null}
+    </>
   )
 }
 
@@ -141,9 +169,8 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
  * @param props - 槽位运行时 props + 注入动作。
  */
 export function ChatFimDock(props: ChatFimDockProps) {
-  const { session, input, requestComplete, adopt, t } = props
+  const { session, input, requestComplete, adopt } = props
   const [suggestion, setSuggestion] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
   const [composing, setComposing] = useState(false)
   const [point, setPoint] = useState<{ x: number; y: number } | null>(null)
   const enabled = useFimEnabled()
@@ -170,12 +197,13 @@ export function ChatFimDock(props: ChatFimDockProps) {
       document.removeEventListener('compositionstart', start)
       document.removeEventListener('compositionend', end)
       flightRef.current?.abort()
+      setFimBusy(false)
     }
   }, [])
 
   useEffect(() => {
     setSuggestion(null)
-    setBusy(false)
+    setFimBusy(false)
     flightRef.current?.abort()
 
     const draft = input.draft
@@ -186,7 +214,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
       if (composingRef.current || rev !== draftRevRef.current || draftRef.current !== draft) return
       const controller = new AbortController()
       flightRef.current = controller
-      setBusy(true)
+      setFimBusy(true)
       void requestComplete(session.sessionId, draft, controller.signal)
         .then((next) => {
           if (controller.signal.aborted) return
@@ -198,7 +226,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
         })
         .finally(() => {
           if (flightRef.current === controller) flightRef.current = null
-          if (!controller.signal.aborted) setBusy(false)
+          if (!controller.signal.aborted) setFimBusy(false)
         })
     }, PAUSE_MS)
 
@@ -240,7 +268,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
         }
         if (adopt(session.sessionId, ghost, span)) {
           setSuggestion(null)
-          setBusy(false)
+          setFimBusy(false)
         }
       } else if (event.key === 'Escape') {
         setSuggestion(null)
@@ -252,21 +280,16 @@ export function ChatFimDock(props: ChatFimDockProps) {
     }
   }, [adopt, ghost, input.draft, input.draftRev, session.sessionId])
 
-  return (
-    <>
-      {busy && ghost === null ? <div style={styles.hint}>{t('dock.busy')}</div> : null}
-      {ghost !== null && point !== null
-        ? createPortal(
-          <span
-            style={{ ...ghostStyle, left: point.x, top: point.y }}
-            data-chat-fim-ghost=""
-            aria-hidden
-          >
-            {ghost}
-          </span>,
-          document.body,
-        )
-        : null}
-    </>
-  )
+  return ghost !== null && point !== null
+    ? createPortal(
+      <span
+        style={{ ...ghostStyle, left: point.x, top: point.y }}
+        data-chat-fim-ghost=""
+        aria-hidden
+      >
+        {ghost}
+      </span>,
+      document.body,
+    )
+    : null
 }
