@@ -9,8 +9,8 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
   buildFimPrompt, extractSuggestions, fimStopSequences, isAbortTimeout, isDeepseekMainRoute,
-  mainRouteFromSession, normalizeConfig, parseCompleteBody, summarizeUpstreamBody, upstreamStatusToError,
-  type ChatFimConfig, type ChatFimError, type CompleteRequest,
+  mainRouteFromSession, normalizeConfig, parseCompleteBody, resolveFimModel, summarizeUpstreamBody,
+  upstreamStatusToError, type ChatFimConfig, type ChatFimError, type CompleteRequest,
 } from './chat-fim.js'
 
 export type { CompleteRequest } from './chat-fim.js'
@@ -157,6 +157,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
       const language = parsed.locale === 'en' ? 'en' : 'zh'
       const prompt = buildFimPrompt(session.deriveMessages() as readonly unknown[], parsed.prompt, language)
       const stop = fimStopSequences(language)
+      // 补全模型跟随主模型（pro/flash），vision 或未知主模型回退配置默认。
+      const fimModel = resolveFimModel(main, settings.model)
       const signal = requestSignal(res, settings.requestTimeoutMs)
       try {
         // FIM 接口没有 n 参数：多建议用并行请求 + 温度错开采样；部分失败保留成功建议。
@@ -172,7 +174,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
                 'content-type': 'application/json',
               },
               body: JSON.stringify({
-                model: settings.model,
+                model: fimModel,
                 prompt,
                 max_tokens: settings.maxTokens,
                 stop,

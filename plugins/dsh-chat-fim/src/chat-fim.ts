@@ -268,6 +268,21 @@ export function isStaleResponse(requestDraftRev: number, currentDraftRev: number
   return requestDraftRev !== currentDraftRev
 }
 
+/** FIM 端点实测可用的模型 id（2026-08-30 直连实测；官方文档 schema 只列 v4-pro，flash 实际可用）。 */
+export const FIM_MODEL_IDS = ['deepseek-v4-pro', 'deepseek-v4-flash'] as const
+
+/**
+ * 补全模型选择：主模型是官方 deepseek 且属于 FIM 可用 id 时**跟随主模型**
+ * （用户用什么模型对话就用什么模型补全，计费随之）；否则回退配置默认
+ * （如主模型是 vision-exp 或未知 id）。
+ */
+export function resolveFimModel(main: { provider: string; model: string } | undefined, configuredModel: string): string {
+  if (main !== undefined && main.provider === 'deepseek-official' && (FIM_MODEL_IDS as readonly string[]).includes(main.model)) {
+    return main.model
+  }
+  return configuredModel
+}
+
 /** 触发形态门控：草稿最短长度（trim 后）。 */
 export const MIN_TRIGGER_DRAFT_CHARS = 8
 

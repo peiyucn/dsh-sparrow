@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, fimStopSequences, isDeepseekMainRoute,
-  isStaleResponse, mainRouteFromSession, normalizeConfig, parseCompleteBody, shouldTriggerFim,
-  summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
+  isStaleResponse, mainRouteFromSession, normalizeConfig, parseCompleteBody, resolveFimModel,
+  shouldTriggerFim, summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
 } from '../lib/chat-fim.js'
 
 describe('chat-fim 纯逻辑', () => {
@@ -187,6 +187,28 @@ describe('chat-fim 纯逻辑', () => {
 
     it('未知路由 应该 默认放行', () => {
       assert.equal(isDeepseekMainRoute(undefined), true)
+    })
+  })
+
+  describe('resolveFimModel', () => {
+    it('主模型 v4-pro 应该 跟随主模型', () => {
+      assert.equal(resolveFimModel({ provider: 'deepseek-official', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+    })
+
+    it('主模型 v4-flash 应该 跟随主模型', () => {
+      assert.equal(resolveFimModel({ provider: 'deepseek-official', model: 'deepseek-v4-flash' }, 'deepseek-v4-pro'), 'deepseek-v4-flash')
+    })
+
+    it('主模型 vision-exp 应该 回退配置默认', () => {
+      assert.equal(resolveFimModel({ provider: 'deepseek-official', model: 'deepseek-v4-flash-vision-exp' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+    })
+
+    it('非官方 provider 应该 回退配置默认', () => {
+      assert.equal(resolveFimModel({ provider: 'zai', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+    })
+
+    it('未知主模型 应该 回退配置默认', () => {
+      assert.equal(resolveFimModel(undefined, 'deepseek-v4-pro'), 'deepseek-v4-pro')
     })
   })
 
