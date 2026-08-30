@@ -10,9 +10,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'menu.adopt'
       | 'menu.dismiss'
       | 'menu.model.label'
-      | 'menu.model.auto'
-      | 'menu.model.pro'
-      | 'menu.model.flash'
       | 'menu.tokens'
   }
 }

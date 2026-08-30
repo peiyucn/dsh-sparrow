@@ -37,9 +37,6 @@ const LOCALE_DICTS = {
     'menu.adopt': '采用',
     'menu.dismiss': '丢弃',
     'menu.model.label': '续写模型：{mode}',
-    'menu.model.auto': '自动',
-    'menu.model.pro': 'Pro',
-    'menu.model.flash': 'Flash',
     'menu.tokens': '{tokens} tok · {model} · T{temperature}',
   },
   en: {
@@ -51,9 +48,6 @@ const LOCALE_DICTS = {
     'menu.adopt': 'Adopt',
     'menu.dismiss': 'Dismiss',
     'menu.model.label': 'Model: {mode}',
-    'menu.model.auto': 'Auto',
-    'menu.model.pro': 'Pro',
-    'menu.model.flash': 'Flash',
     'menu.tokens': '{tokens} tok · {model} · T{temperature}',
   },
 } as const

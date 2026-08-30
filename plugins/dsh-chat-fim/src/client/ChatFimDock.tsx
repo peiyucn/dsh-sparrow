@@ -228,17 +228,18 @@ export function ensureFimBusyStyles(): void {
   const style = document.createElement('style')
   style.dataset.dshChatFimBusy = ''
   style.textContent = `
+/* 开关胶囊：官方下拉按钮同款（PermissionSelect trigger）——无边框、透明底、悬停亮底、省空间。 */
 .dsh-chat-fim-switch {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
   height: 28px;
-  padding: 0 12px 0 8px;
-  border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
-  border-radius: 999px;
+  padding: 0 4px 0 8px;
+  border: none;
+  border-radius: 24px;
   background: transparent;
-  color: var(--dsw-alias-label-primary, #1f2329);
+  color: var(--dsw-alias-label-secondary);
   font-size: 13px;
   line-height: 20px;
   white-space: nowrap;
@@ -260,7 +261,6 @@ export function ensureFimBusyStyles(): void {
 }
 .dsh-chat-fim-switch-on {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
-  border-color: var(--dsw-alias-button-info-fill, #4d6bfe);
 }
 .dsh-chat-fim-switch-on .dsh-chat-fim-switch-icon {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
@@ -269,6 +269,21 @@ export function ensureFimBusyStyles(): void {
 .dsh-chat-fim-switch-off .dsh-chat-fim-switch-label {
   color: var(--dsw-alias-label-tertiary, #9aa0a6);
 }
+/* 胶囊内的模型下拉箭头：点击只开模型菜单（stopPropagation，不切换开关）；打开时旋转 180°。 */
+.dsh-chat-fim-switch-arrow {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  margin-left: 2px;
+  color: var(--dsw-alias-label-caption);
+  transition: transform 120ms ease;
+}
+.dsh-chat-fim-switch-on .dsh-chat-fim-switch-arrow {
+  color: var(--dsw-alias-button-info-fill, #4d6bfe);
+}
+.dsh-chat-fim-switch-arrow-open {
+  transform: rotate(180deg);
+}
 /* 窄行折叠为纯图标：官方 PermissionSelect 同款匿名 @container 规则，
    容器是 InputBar .row（container-type: inline-size），阈值同官方 460px。 */
 @container (max-width: 460px) {
@@ -276,7 +291,7 @@ export function ensureFimBusyStyles(): void {
     display: none;
   }
   .dsh-chat-fim-switch {
-    padding: 0 8px;
+    padding: 0 6px;
   }
 }
 @property --dsh-chat-fim-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
@@ -393,23 +408,6 @@ export function ensureFimBusyStyles(): void {
   padding: 2px 4px 0;
   border-top: 1px solid var(--dsw-alias-border-inverted);
 }
-/* 胶囊内的模型下拉箭头：点击只开模型菜单（stopPropagation，不切换开关）。 */
-.dsh-chat-fim-switch-arrow {
-  display: inline-flex;
-  align-items: center;
-  flex: none;
-  margin-left: 2px;
-  padding: 2px;
-  border-radius: 4px;
-  color: var(--dsw-alias-label-caption);
-  cursor: pointer;
-}
-.dsh-chat-fim-switch-arrow:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.dsh-chat-fim-switch-on .dsh-chat-fim-switch-arrow {
-  color: var(--dsw-alias-button-info-fill, #4d6bfe);
-}
 /* 模型三档弹层：官方 MenuDropdown 同款 token，锚定胶囊右下，空间不足自动向上。 */
 .dsh-chat-fim-model-popover {
   position: fixed;
@@ -417,7 +415,7 @@ export function ensureFimBusyStyles(): void {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 148px;
+  min-width: 210px;
   padding: 4px;
   border: 1px solid var(--dsw-alias-border-inverted);
   border-radius: 12px;
@@ -473,8 +471,12 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const [pickerPoint, setPickerPoint] = useState<{ x: number; y: number; up: boolean } | null>(null)
   const switchRef = useRef<HTMLButtonElement | null>(null)
 
-  const modelModeLabel = (mode: FimModelMode): string =>
-    mode === 'auto' ? t('menu.model.auto') : mode === 'pro' ? t('menu.model.pro') : t('menu.model.flash')
+  // 选项写全名（用户要求：不做中英翻译）。
+  const MODEL_MODE_DISPLAY: Record<FimModelMode, string> = {
+    auto: 'auto',
+    pro: 'deepseek-v4-pro',
+    flash: 'deepseek-v4-flash',
+  }
 
   const openPicker = (): void => {
     const rect = switchRef.current?.getBoundingClientRect()
@@ -528,12 +530,12 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
         <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
         <span className="dsh-chat-fim-switch-label">{t('switch.label')}</span>
         <span
-          className="dsh-chat-fim-switch-arrow"
+          className={pickerOpen ? 'dsh-chat-fim-switch-arrow dsh-chat-fim-switch-arrow-open' : 'dsh-chat-fim-switch-arrow'}
           role="button"
           aria-haspopup="listbox"
           aria-expanded={pickerOpen}
-          aria-label={t('menu.model.label', { mode: modelModeLabel(modelMode) })}
-          title={t('menu.model.label', { mode: modelModeLabel(modelMode) })}
+          aria-label={t('menu.model.label', { mode: MODEL_MODE_DISPLAY[modelMode] })}
+          title={t('menu.model.label', { mode: MODEL_MODE_DISPLAY[modelMode] })}
           onClick={(event) => {
             // 箭头点击只开模型菜单，不切换开关。
             event.stopPropagation()
@@ -575,7 +577,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
                 }}
               >
                 <span className="dsh-chat-fim-model-option-check" aria-hidden>{mode === modelMode ? '✓' : ''}</span>
-                {modelModeLabel(mode)}
+                {MODEL_MODE_DISPLAY[mode]}
               </button>
             ))}
           </div>,
