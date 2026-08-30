@@ -59,6 +59,24 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
     llm.resolveModelInfo = originalResolveModelInfo
   }, 'dsh-vision-subagent: restore resolveModelInfo')
 
+  // 1.5 非 deepseek 主模型：对该 agent 作用域屏蔽 vision_read（像没有这个工具）。
+  const restrictions = new Map<unknown, () => void>()
+  ctx.on('agent/request', async (payload, next) => {
+    const config = await next()
+    const agent = payload.agent
+    if (config.provider === 'deepseek-official') {
+      restrictions.get(agent)?.()
+      restrictions.delete(agent)
+    } else if (!restrictions.has(agent)) {
+      try {
+        restrictions.set(agent, agent.ctx.tools.restrict({ deny: [TOOL_NAME] }))
+      } catch {
+        // 工具尚未注册或已限制：忽略，下次请求再试。
+      }
+    }
+    return config
+  })
+
   // 2. vision_read 工具：附件引用反查 → 读图校验 → 直连 ctx.llm 视觉模型 → 结构化报告缓存。
   //    实测结论：走 subagents 时单次看图约 46s（子代理 agent 循环 + 系统提示 + 思考），
   //    直连视觉模型约 2.2s，因此不再起子代理。
