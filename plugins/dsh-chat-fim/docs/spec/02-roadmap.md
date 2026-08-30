@@ -16,9 +16,17 @@
 * [x] esbuild 单文件 bundle（src/client/，构建产物不入库）
 * [x] 触发/作废状态机（IME 组合态压制，draftRev 防陈旧）
 * [x] dock UI 与键盘交互；采用追加草稿
+* [x] 开关胶囊（input.left）+ 幽灵文本 portal 初版（已随 M3 改版退役，见 03-menu.md）
 * [ ] 热更验证（dsh checkout 内 dev:web）
 
-## M3 · 打磨（可选）
+## M3 · 建议展示改版（@ 列表样式，见 03-menu.md）
+
+* [ ] 建议数据入共享 store；composer.dock 退为纯数据面（保留 busy 光环）
+* [ ] overlay 槽菜单视图：MenuDropdown 视觉 token + 2 行 line-clamp + useAnchoredMaxHeight
+* [ ] 与官方触发菜单互斥（`[data-trigger-menu]` 检测 + MutationObserver）；Tab/点选采用、Esc 丢弃
+* [ ] 删除幽灵文本 portal / caret 测量 / fallback 胶囊；i18n 补菜单文案；单测 + verify 全绿
+
+## M4 · 打磨（可选）
 
 * [ ] 多建议并发策略调优；触发阈值/maxTokens 进设置；请求合并/缓存
 

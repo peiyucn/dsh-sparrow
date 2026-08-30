@@ -54,7 +54,8 @@
 
 ### 展示与采用
 
-* dock 在输入框附近不遮挡；多条建议键盘（↑↓ Tab）切换；采用 = 追加进草稿（不发送）；失败静默降级为「无建议」。
+* 建议以官方 @ 候选菜单同款悬浮卡展示在输入框上方（`conversation.input.overlay` 槽 + MenuDropdown 视觉 token）；与官方触发菜单（`[data-trigger-menu]`）互斥，详见 03-menu.md；
+* 采用 = 追加进草稿（不发送）：Tab 或 mousedown 点选；Esc 丢弃；失败静默降级为「无建议」（错误提示挂在开关旁）。
 
 ## 通信协议
 
