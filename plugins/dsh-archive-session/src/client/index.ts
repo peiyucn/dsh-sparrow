@@ -13,7 +13,7 @@ export const inject = ['slots', 'locale']
 /** 本插件的 locale 字典（zh/en）。 */
 const LOCALE_DICTS = {
   zh: {
-    'button.label': '归档管理',
+    'button.label': '归档',
     'dialog.title': '归档会话管理',
     'dialog.close': '关闭',
     'dialog.intro': '备份可逆，删除不可逆；备份后 @ 列表将不再显示该会话。',
