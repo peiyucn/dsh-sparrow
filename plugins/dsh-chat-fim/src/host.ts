@@ -9,8 +9,9 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
   buildFimPrompt, extractSuggestions, extractUsage, fimStopSequences, isAbortTimeout, isDeepseekMainRoute,
-  mainRouteFromSession, normalizeConfig, parseCompleteBody, resolveFimModel, stripSpeakerPrefix,
-  summarizeUpstreamBody, upstreamStatusToError, type ChatFimConfig, type ChatFimError, type CompleteRequest,
+  mainRouteFromSession, MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, resolveFimModel,
+  stripSpeakerPrefix, summarizeUpstreamBody, upstreamStatusToError, type ChatFimConfig, type ChatFimError,
+  type CompleteRequest,
 } from './chat-fim.js'
 
 export type { CompleteRequest } from './chat-fim.js'
@@ -75,6 +76,29 @@ function requestSignal(res: ServerResponse, timeoutMs: number): { signal: AbortS
   }
 }
 
+/** 限量读取上游响应正文：超过 MAX_UPSTREAM_BODY_BYTES 即取消剩余流，防止异常上游超大 body 撑爆内存。 */
+async function readBoundedText(response: Response, maxBytes: number): Promise<string> {
+  const reader = response.body?.getReader()
+  if (reader === undefined) return ''
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(value)
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel()
+        break
+      }
+    }
+  } catch {
+    // 读取中断：按已读内容处理。
+  }
+  return Buffer.concat(chunks.map(chunk => Buffer.from(chunk))).toString('utf8').slice(0, maxBytes)
+}
+
 /**
  * host half 入口：注册路由，所有副作用都挂在 apply 的 effect 上。
  * @param ctx - DSH 插件上下文。
@@ -117,8 +141,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
 
       const parsed = parseCompleteBody(read.body, settings.maxBodyBytes, settings.maxPromptChars)
       if ('code' in parsed) {
-        const status = parsed.code === 'INVALID_PROMPT' ? 400 : 400
-        sendError(res, status, parsed)
+        sendError(res, 400, parsed)
         return
       }
 
@@ -182,7 +205,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
               }),
               signal: signal.signal,
             })
-            const upstreamText = await upstream.text()
+            const upstreamText = await readBoundedText(upstream, MAX_UPSTREAM_BODY_BYTES)
             if (!upstream.ok) {
               throw upstreamStatusToError(upstream.status, upstreamText)
             }

@@ -9,10 +9,10 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 export const DEFAULT_MAX_BODY_BYTES = 64 * 1024
 export const DEFAULT_MAX_PROMPT_CHARS = 32_768
 export const DEFAULT_MAX_TOKENS = 96
-export const DEFAULT_TRIGGER_PAUSE_MS = 400
 export const DEFAULT_SUGGESTION_COUNT = 1
 /** 默认采样温度：0.3（2026-08-30 A/B：temp=1 漂移明显、会复读历史消息，0.3 聚焦稳定）。 */
 export const DEFAULT_TEMPERATURE = 0.3
+/** 上游响应正文读取上限：防止异常上游超大 body 撑爆内存。 */
 export const MAX_UPSTREAM_BODY_BYTES = 64 * 1024
 export const MAX_HISTORY_MESSAGES = 12
 export const MAX_HISTORY_CHARS = 6_000
@@ -41,7 +41,6 @@ export interface ChatFimConfig {
   readonly requestTimeoutMs: number
   readonly maxBodyBytes: number
   readonly maxPromptChars: number
-  readonly triggerPauseMs: number
   readonly suggestionCount: number
   readonly temperature: number
 }
@@ -52,10 +51,6 @@ export interface CompleteRequest {
   readonly locale?: string
   /** 续写模型三档（客户端偏好）；非法值回退 auto。 */
   readonly fimModelMode: FimModelMode
-}
-
-export interface CompleteResponse {
-  readonly suggestions: readonly string[]
 }
 
 /** FIM 提示词使用的语言（说话人标签 / 停止序列随之切换）。 */
@@ -120,7 +115,6 @@ export function normalizeConfig(input: Readonly<Partial<ChatFimConfig>> | undefi
     requestTimeoutMs: input?.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
     maxBodyBytes: input?.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES,
     maxPromptChars: input?.maxPromptChars ?? DEFAULT_MAX_PROMPT_CHARS,
-    triggerPauseMs: input?.triggerPauseMs ?? DEFAULT_TRIGGER_PAUSE_MS,
     suggestionCount: input?.suggestionCount ?? DEFAULT_SUGGESTION_COUNT,
     temperature: input?.temperature ?? DEFAULT_TEMPERATURE,
   }
@@ -132,7 +126,6 @@ export function normalizeConfig(input: Readonly<Partial<ChatFimConfig>> | undefi
     requestTimeoutMs: config.requestTimeoutMs,
     maxBodyBytes: config.maxBodyBytes,
     maxPromptChars: config.maxPromptChars,
-    triggerPauseMs: config.triggerPauseMs,
     suggestionCount: config.suggestionCount,
   })) {
     if (!Number.isSafeInteger(value) || value <= 0) {
@@ -284,11 +277,6 @@ export function extractSuggestions(data: unknown): string[] {
     }
   }
   return suggestions
-}
-
-/** 对话前缀续写建议作废判定：草稿修订号变了就是陈旧响应。 */
-export function isStaleResponse(requestDraftRev: number, currentDraftRev: number): boolean {
-  return requestDraftRev !== currentDraftRev
 }
 
 /** FIM 端点实测可用的模型 id（2026-08-30 直连实测；官方文档 schema 只列 v4-pro，flash 实际可用）。 */
