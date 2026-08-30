@@ -45,6 +45,8 @@ const VISION_REPORT_OUTPUT_SCHEMA = {
 export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}): void {
   const settings = normalizeVisionConfig(config)
   const cache = new VisionCache(settings.cacheMaxEntries)
+  // 同 cacheKey 的 in-flight 视觉调用（isConcurrencySafe 下并发 execute 去重）。
+  const inflight = new Map<string, Promise<VisionReport>>()
 
   // 1. 门禁放行：可逆包装，只影响配置的文本路由。
   const llm = ctx.llm
@@ -63,6 +65,18 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   // 1.5 按 agent 屏蔽 vision_read（像没有这个工具）：
   //     非 deepseek 主模型；或主模型本身原生看图（图片直达主模型，转文字反而有损）。
   const restrictions = new Map<unknown, () => void>()
+  const releaseRestriction = (agent: unknown): void => {
+    restrictions.get(agent)?.()
+    restrictions.delete(agent)
+  }
+  ctx.on('agent/disposed', ({ agent }) => {
+    // agent 卸载时剪枝：否则 Map 无限增长并持有已死 agent 的引用。
+    releaseRestriction(agent)
+  })
+  ctx.effect(() => () => {
+    // 插件卸载时释放全部限制层；重装后才不会残留无法解除的旧 deny。
+    for (const agent of [...restrictions.keys()]) releaseRestriction(agent)
+  }, 'dsh-vision-access: release restrictions')
   ctx.on('agent/request', async (payload, next) => {
     const config = await next()
     const agent = payload.agent
@@ -84,8 +98,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         }
       }
     } else {
-      restrictions.get(agent)?.()
-      restrictions.delete(agent)
+      releaseRestriction(agent)
     }
     return config
   })
@@ -159,41 +172,50 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       const cacheKey = visionCacheKey(String(ref.attachmentId), question)
       const cached = cache.get(cacheKey)
       if (cached !== undefined) return cached
+      // isConcurrencySafe 下同 key 可能并发 execute：in-flight Promise 去重，避免重复视觉调用。
+      const pending = inflight.get(cacheKey)
+      if (pending !== undefined) return pending
 
-      // 先走官方附件 seam 确认图片字节可读；只传 ref，不复制内部文件。
-      await ctx.attachments.readImage(ref, exec.signal)
+      const task = (async (): Promise<VisionReport> => {
+        // 先走官方附件 seam 确认图片字节可读；只传 ref，不复制内部文件。
+        await ctx.attachments.readImage(ref, exec.signal)
 
-      const promptText = `${question}\n\n输出 JSON 对象：summary（一句话摘要）、ocrText（逐字文本，可选）、tables（表格，可选）、layout（版式，可选）。只输出 JSON 本体，不要输出解释或代码围栏。不要编造图中没有的内容。`
+        const promptText = `${question}\n\n输出 JSON 对象：summary（一句话摘要）、ocrText（逐字文本，可选）、tables（表格，可选）、layout（版式，可选）。只输出 JSON 本体，不要输出解释或代码围栏。不要编造图中没有的内容。`
 
-      const prepared = await ctx.llm.prepareCall({
-        provider: settings.visionProvider,
-        model: settings.visionModel,
-        maxTokens: settings.maxTokens,
-        temperature: settings.temperature,
-        // 低思考力度：结构化读图不需要烧大量 reasoning，避免 maxTokens 截断。
-        reasoningEffort: ReasoningEffortId(settings.visionReasoningEffort),
-      }, exec.signal)
-      let text = ''
-      let reasoning = ''
-      for await (const chunk of prepared.stream({
-        ...prepared.config,
-        messages: [createUserMessage({
-          content: [
-            { type: 'text', text: promptText },
-            { type: 'image', attachment: ref },
-          ],
-          source: { kind: 'user' },
-        })],
-        signal: exec.signal,
-      })) {
-        if (chunk.type === 'text-delta') text += chunk.text
-        if (chunk.type === 'reasoning-delta') reasoning += chunk.text
-      }
-      // 正文优先；只有思考文本时视为截断/异常，抛明确错误而不是把思考当报告。
-      const raw = resolveVisionOutput(text, reasoning)
-      const report = parseVisionReport(extractJsonObject(raw), raw)
-      cache.set(cacheKey, report)
-      return report
+        const prepared = await ctx.llm.prepareCall({
+          provider: settings.visionProvider,
+          model: settings.visionModel,
+          maxTokens: settings.maxTokens,
+          temperature: settings.temperature,
+          // 低思考力度：结构化读图不需要烧大量 reasoning，避免 maxTokens 截断。
+          reasoningEffort: ReasoningEffortId(settings.visionReasoningEffort),
+        }, exec.signal)
+        let text = ''
+        let reasoning = ''
+        for await (const chunk of prepared.stream({
+          ...prepared.config,
+          messages: [createUserMessage({
+            content: [
+              { type: 'text', text: promptText },
+              { type: 'image', attachment: ref },
+            ],
+            source: { kind: 'user' },
+          })],
+          signal: exec.signal,
+        })) {
+          if (chunk.type === 'text-delta') text += chunk.text
+          if (chunk.type === 'reasoning-delta') reasoning += chunk.text
+        }
+        // 正文优先；只有思考文本时视为截断/异常，抛明确错误而不是把思考当报告。
+        const raw = resolveVisionOutput(text, reasoning)
+        const report = parseVisionReport(extractJsonObject(raw), raw)
+        cache.set(cacheKey, report)
+        return report
+      })().finally(() => {
+        inflight.delete(cacheKey)
+      })
+      inflight.set(cacheKey, task)
+      return task
     },
   })), 'dsh-vision-access: vision_read tool')
 }
