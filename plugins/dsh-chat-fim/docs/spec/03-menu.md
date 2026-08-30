@@ -10,7 +10,7 @@
 
 ## 交互契约
 
-* 触发/作废状态机：停顿 ≥ `TRIGGER_PAUSE_MS`、IME 组合态压制、`draftRev` CAS 防陈旧、同一草稿单在飞请求、phase 非 plain 不展示；**草稿形态门控**（2026-08-30 新增，见 01-design：最短 8 字符、句末标点/尾随空白/单词中间不触发）；
+* 触发/作废状态机：停顿 ≥ 400ms（客户端常量 `PAUSE_MS`）、IME 组合态压制、`draftRev` CAS 防陈旧、同一草稿单在飞请求、phase 非 plain 不展示；**草稿形态门控**（2026-08-30 新增，见 01-design：最短 8 字符、句末标点/尾随空白/单词中间不触发）；
 * 展示：建议到达且开关开启且主模型支持 → 菜单卡出现在输入框上方：
   * 卡：官方 MenuDropdown 视觉 token（12px 圆角、`--dsw-specific-menu` 底、`--dsw-shadow-lv3`、内边距 4px；行 40px 高、10px 圆角、高亮 `--dsw-alias-interactive-bg-hover`）；**边框为开关 on 态同款紫色（`--dsw-alias-button-info-fill`）**，与官方 @ 列表做视觉区分（2026-08-30 用户要求）；
   * 行尾键位提示：官方 drillHint 同款布局与 token（caption 色文字 + 键盘帽，行尾右对齐）——「采用 Tab · 丢弃 Esc」；键盘帽与官方 @ 列表 Tab 键帽**逐项一致**（`--dsw-alias-interactive-bg-hover` 底、4px 圆角、`padding: 0 5px`、caption 字色，2026-08-30 用户对照官方后要求统一）；与建议文字保持 24px 间距；
