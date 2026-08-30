@@ -117,38 +117,43 @@ const ghostStyle = {
 } satisfies React.CSSProperties
 
 const styles = {
-  switch: {
-    border: '1px solid var(--dsw-alias-border-l1, #d4d8e0)',
-    borderRadius: 999,
-    background: 'transparent',
-    color: 'var(--dsw-alias-label-tertiary, #9aa0a6)',
-    fontSize: 12,
-    padding: '2px 8px',
-    cursor: 'pointer',
-    lineHeight: 1.5,
-  } satisfies React.CSSProperties,
-  switchOn: {
-    color: 'var(--dsw-alias-button-info-fill, #4d6bfe)',
-    borderColor: 'var(--dsw-alias-button-info-fill, #4d6bfe)',
-  } satisfies React.CSSProperties,
   switchBusy: {
     animation: 'dsh-chat-fim-pulse 1.1s ease-in-out infinite',
   } satisfies React.CSSProperties,
 } as const
 
-/** 注入联想中边框脉冲的 keyframes（一次性，按 data 属性去重；颜色跟随发送按钮蓝紫）。 */
+/** 注入开关样式与联想中脉冲 keyframes（一次性，按 data 属性去重；颜色跟随发送按钮蓝紫）。 */
 export function ensureFimBusyStyles(): void {
   if (document.querySelector('style[data-dsh-chat-fim-busy]') !== null) return
   const style = document.createElement('style')
   style.dataset.dshChatFimBusy = ''
-  style.textContent = `@keyframes dsh-chat-fim-pulse {
+  style.textContent = `
+.dsh-chat-fim-switch {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.dsh-chat-fim-switch:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dsh-chat-fim-switch-on {
+  color: var(--dsw-alias-button-info-fill, #4d6bfe);
+  border-color: var(--dsw-alias-button-info-fill, #4d6bfe);
+}
+@keyframes dsh-chat-fim-pulse {
   0%, 100% { border-color: color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 90%, transparent); box-shadow: 0 0 0 0 color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 30%, transparent); }
   50% { border-color: color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 45%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 10%, transparent); }
-}`
+}
+`
   document.head.appendChild(style)
 }
 
-/** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）；联想中时边框呼吸提示。 */
+/** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）；开启态蓝紫边框、联想中边框呼吸。 */
 export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const { t } = props
   const enabled = useFimEnabled()
@@ -157,11 +162,8 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
   return (
     <button
       type="button"
-      style={{
-        ...styles.switch,
-        ...enabled ? styles.switchOn : {},
-        ...busy ? styles.switchBusy : {},
-      }}
+      className={enabled ? 'dsh-chat-fim-switch dsh-chat-fim-switch-on' : 'dsh-chat-fim-switch'}
+      style={busy ? styles.switchBusy : undefined}
       title={busy ? t('dock.busy') : enabled ? t('switch.onHint') : t('switch.offHint')}
       aria-pressed={enabled}
       aria-busy={busy}
