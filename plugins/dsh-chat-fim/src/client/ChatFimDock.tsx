@@ -1,8 +1,9 @@
-/** FIM 续写：共享开关状态 + 输入框内开关（input.left）+ 幽灵文本续写（composer.dock）。 */
+/** FIM 续写：共享状态 + 开关（input.left）+ 数据面 dock（composer.dock）+ @ 列表样式候选菜单（input.overlay）。 */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { useAnchoredMaxHeight } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -23,9 +24,12 @@ export interface ChatFimDockInjected {
 
 export type ChatFimDockProps = PropsRuntime<'conversation.composer.dock'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
 export type ChatFimSwitchProps = PropsRuntime<'conversation.input.left'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
+export type ChatFimMenuProps = PropsRuntime<'conversation.input.overlay'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
 
 const PAUSE_MS = 400
 const ENABLED_STORAGE_KEY = 'dsh-chat-fim:enabled'
+/** 菜单高度设计上限（同官方 MenuDropdown）。 */
+const MENU_MAX_HEIGHT = 320
 
 /** 读取本地开关状态：默认关闭，仅显式存过 '1' 才开启；非法值回退关闭。 */
 export function readEnabled(storage: { getItem(key: string): string | null }, key = ENABLED_STORAGE_KEY): boolean {
@@ -42,15 +46,15 @@ try {
 } catch {
   sharedEnabled = false
 }
-const listeners = new Set<() => void>()
+const enabledListeners = new Set<() => void>()
 
 /** 订阅共享开关状态；返回当前值。 */
 export function useFimEnabled(): boolean {
   const [value, setValue] = useState(sharedEnabled)
   useEffect(() => {
     const listener = (): void => { setValue(sharedEnabled) }
-    listeners.add(listener)
-    return () => { listeners.delete(listener) }
+    enabledListeners.add(listener)
+    return () => { enabledListeners.delete(listener) }
   }, [])
   return value
 }
@@ -60,7 +64,7 @@ export function setFimEnabled(next: boolean): void {
   if (sharedEnabled === next) return
   sharedEnabled = next
   window.localStorage.setItem(ENABLED_STORAGE_KEY, next ? '1' : '0')
-  for (const listener of listeners) listener()
+  for (const listener of enabledListeners) listener()
 }
 
 // 模块级共享「联想中」状态：指示渲染在工具行开关旁，避免在输入框下方增减内容导致布局跳动。
@@ -129,66 +133,35 @@ export function setFimSupported(next: boolean): void {
   for (const listener of supportedListeners) listener()
 }
 
-/**
- * 输入区只读几何测量（幽灵文本定位特例，见 AGENTS.md）：
- * 返回文末光标所在视口坐标；不修改编辑器内容，写入仍走 slash/input-insert-text bail 事件。
- * 失败原因记录在 ghostDiagnostic，供降级胶囊展示诊断。
- */
-let ghostDiagnostic: string | null = null
-
-/** 上次幽灵文本定位失败的原因；成功时清空。 */
-export function ghostDiagnosticText(): string | null {
-  return ghostDiagnostic
+/** 一条「建议 + 生成它的草稿快照」：菜单视图据此渲染与采用（span CAS）。 */
+export interface FimSuggestionRecord {
+  readonly text: string
+  readonly sessionId: SessionId
+  readonly draft: string
+  readonly draftRev: number
 }
 
-function endCaretPoint(): { x: number; y: number } | undefined {
-  const editor = document.querySelector<HTMLElement>('[data-composer-input]')
-  if (editor === null) {
-    ghostDiagnostic = '定位失败：找不到输入区元素 [data-composer-input]'
-    return undefined
-  }
-  const range = document.createRange()
-  // Lexical 编辑器末尾常有尾随 <br>/零宽节点，selectNodeContents 折叠到最末尾的
-  // 矩形是 0×0；改为定位到最后一个文本节点的末尾（即草稿文字的光标处）。
-  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
-  let current = walker.nextNode()
-  let last: Text | null = null
-  while (current !== null) {
-    if (current.nodeType === Node.TEXT_NODE) last = current as Text
-    current = walker.nextNode()
-  }
-  if (last !== null && (last.nodeValue?.length ?? 0) > 0) {
-    const offset = last.nodeValue?.length ?? 0
-    range.setStart(last, offset)
-    range.setEnd(last, offset)
-  } else {
-    range.selectNodeContents(editor)
-    range.collapse(false)
-  }
-  const rect = range.getBoundingClientRect()
-  if (rect.width === 0 && rect.height === 0) {
-    ghostDiagnostic = '定位失败：文末矩形为空'
-    return undefined
-  }
-  ghostDiagnostic = null
-  return { x: rect.right, y: rect.top }
+// 模块级共享建议：dock（数据面）写入，overlay 菜单（视图）读取；随草稿/相位变化清空。
+let sharedSuggestion: FimSuggestionRecord | null = null
+const suggestionListeners = new Set<() => void>()
+
+/** 订阅共享建议；返回当前记录。 */
+export function useFimSuggestion(): FimSuggestionRecord | null {
+  const [value, setValue] = useState(sharedSuggestion)
+  useEffect(() => {
+    const listener = (): void => { setValue(sharedSuggestion) }
+    suggestionListeners.add(listener)
+    return () => { suggestionListeners.delete(listener) }
+  }, [])
+  return value
 }
 
-/** 幽灵文本样式：与编辑器文本同字体族/字号/行高，浅色 + 斜体。 */
-const ghostStyle = {
-  position: 'fixed' as const,
-  zIndex: 2000,
-  pointerEvents: 'none' as const,
-  whiteSpace: 'pre-wrap' as const,
-  maxWidth: '70vw',
-  overflow: 'hidden',
-  fontFamily: 'var(--dsw-font-family)',
-  fontSize: 'var(--dsh-content-font-size, 14px)',
-  lineHeight: 'calc(24px + var(--dsh-content-font-delta, 0px))',
-  fontStyle: 'italic' as const,
-  color: 'var(--dsw-alias-label-tertiary, #9aa0a6)',
-  opacity: 0.75,
-} satisfies React.CSSProperties
+/** 设置共享建议（null = 清空）。 */
+export function setFimSuggestion(next: FimSuggestionRecord | null): void {
+  if (sharedSuggestion === next) return
+  sharedSuggestion = next
+  for (const listener of suggestionListeners) listener()
+}
 
 /** composer 卡片视口矩形（旋转光环定位；只读测量）。 */
 function composerCardRect(): { x: number; y: number; width: number; height: number } | undefined {
@@ -199,9 +172,7 @@ function composerCardRect(): { x: number; y: number; width: number; height: numb
   return { x: rect.left, y: rect.top, width: rect.width, height: rect.height }
 }
 
-const styles = {} as const
-
-/** 注入开关样式与联想中脉冲 keyframes（一次性，按 data 属性去重；颜色跟随发送按钮蓝紫）。 */
+/** 注入开关样式、联想中脉冲 keyframes 与候选菜单样式（一次性，按 data 属性去重）。 */
 export function ensureFimBusyStyles(): void {
   if (document.querySelector('style[data-dsh-chat-fim-busy]') !== null) return
   const style = document.createElement('style')
@@ -250,29 +221,56 @@ export function ensureFimBusyStyles(): void {
 @keyframes dsh-chat-fim-ring-spin {
   to { --dsh-chat-fim-angle: 360deg; }
 }
-.dsh-chat-fim-fallback {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  padding: 2px;
-  font-size: 13px;
+/* 候选菜单锚点：镜像官方 overlayAnchor（绝对定位、零高、钉在 composer 卡片上沿）。 */
+.dsh-chat-fim-menu-anchor {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 0;
 }
-.dsh-chat-fim-fallback-chip {
-  max-width: 420px;
+/* 菜单卡：官方 MenuDropdown 视觉 token（见 ui-input-trigger/MenuView.module.css）。 */
+.dsh-chat-fim-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  max-height: 320px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-style: italic;
-  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--dsw-alias-border-inverted);
+  border-radius: 12px;
+  background: var(--dsw-specific-menu);
+  box-shadow: var(--dsw-shadow-lv3);
 }
-.dsh-chat-fim-fallback-chip:hover {
+.dsh-chat-fim-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+  text-align: left;
+}
+.dsh-chat-fim-menu-row:hover {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+/* 建议长句 2 行截断（超出省略），全文经 title 提示。 */
+.dsh-chat-fim-menu-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-width: 0;
 }
 `
   document.head.appendChild(style)
@@ -307,17 +305,14 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
 }
 
 /**
- * FIM 幽灵文本续写（挂在 conversation.composer.dock，视觉渲染进输入框光标处）。
- * 只从 InputZone owner share 读快照；继续输入 / 发送 / 相位变化都会清空旧建议。
- * 关闭时不渲染、不请求；Tab 采用、Esc 丢弃。
+ * 数据面（挂在 conversation.composer.dock）：读 InputZone 草稿快照 → 停顿后请求
+ * FIM → 把「建议 + 快照」写共享 store；可见 UI 由 overlay 菜单与开关渲染。
+ * 继续输入 / 发送 / 相位变化都会清空旧建议；联想中时渲染 composer 卡片外圈旋转紫光。
  * @param props - 槽位运行时 props + 注入动作。
  */
 export function ChatFimDock(props: ChatFimDockProps) {
-  const { session, input, requestComplete, adopt, isSupported } = props
-  const [suggestion, setSuggestion] = useState<string | null>(null)
+  const { session, input, requestComplete, isSupported } = props
   const [composing, setComposing] = useState(false)
-  const [point, setPoint] = useState<{ x: number; y: number } | null>(null)
-  const [diagnostic, setDiagnostic] = useState<string | null>(null)
   const [ring, setRing] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const enabled = useFimEnabled()
   const busy = useFimBusy()
@@ -358,11 +353,12 @@ export function ChatFimDock(props: ChatFimDockProps) {
       document.removeEventListener('compositionend', end)
       flightRef.current?.abort()
       setFimBusy(false)
+      setFimSuggestion(null)
     }
   }, [])
 
   useEffect(() => {
-    setSuggestion(null)
+    setFimSuggestion(null)
     setFimBusy(false)
     setFimError(null)
     flightRef.current?.abort()
@@ -380,7 +376,10 @@ export function ChatFimDock(props: ChatFimDockProps) {
         .then((next) => {
           if (controller.signal.aborted) return
           if (rev !== draftRevRef.current || draftRef.current !== draft) return
-          setSuggestion(next[0] ?? null)
+          const text = next[0]?.trim()
+          if (text !== undefined && text !== '') {
+            setFimSuggestion({ text, sessionId: session.sessionId, draft, draftRev: rev })
+          }
           setFimError(null)
         })
         .catch((reason: unknown) => {
@@ -400,55 +399,6 @@ export function ChatFimDock(props: ChatFimDockProps) {
     }
   }, [composing, enabled, supported, input.draft, input.draftRev, input.phase, requestComplete, session.sessionId])
 
-  const ghost = !composing && input.phase === 'plain' && enabled && supported ? suggestion : null
-
-  // 幽灵文本定位：草稿 / 建议变化后重测；滚动与窗口变化时跟随。
-  useLayoutEffect(() => {
-    if (ghost === null) {
-      setPoint(null)
-      return
-    }
-    const measure = (): void => {
-      setPoint(endCaretPoint() ?? null)
-      setDiagnostic(ghostDiagnosticText())
-    }
-    measure()
-    // 周期自愈：光标/滚动/焦点变化未触发事件时，每 300ms 重测一次。
-    const timer = window.setInterval(measure, 300)
-    window.addEventListener('resize', measure)
-    window.addEventListener('scroll', measure, true)
-    return () => {
-      window.clearInterval(timer)
-      window.removeEventListener('resize', measure)
-      window.removeEventListener('scroll', measure, true)
-    }
-  }, [ghost, input.draft])
-
-  // Tab 采用 / Esc 丢弃（capture 抢先于输入机）。
-  useEffect(() => {
-    if (ghost === null) return
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
-        event.preventDefault()
-        const span: TokenSpan = {
-          start: input.draft.length,
-          end: input.draft.length,
-          draftRev: input.draftRev,
-        }
-        if (adopt(session.sessionId, ghost, span)) {
-          setSuggestion(null)
-          setFimBusy(false)
-        }
-      } else if (event.key === 'Escape') {
-        setSuggestion(null)
-      }
-    }
-    document.addEventListener('keydown', onKeyDown, true)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown, true)
-    }
-  }, [adopt, ghost, input.draft, input.draftRev, session.sessionId])
-
   // 联想中：整个 composer 卡片外圈旋转紫光（跟随卡片矩形，周期自愈）。
   useLayoutEffect(() => {
     if (!busy) {
@@ -467,19 +417,6 @@ export function ChatFimDock(props: ChatFimDockProps) {
     }
   }, [busy])
 
-  const applyFallback = (): void => {
-    if (ghost === null) return
-    const span: TokenSpan = {
-      start: input.draft.length,
-      end: input.draft.length,
-      draftRev: input.draftRev,
-    }
-    if (adopt(session.sessionId, ghost, span)) {
-      setSuggestion(null)
-      setFimBusy(false)
-    }
-  }
-
   return (
     <>
       {busy && ring !== null
@@ -492,28 +429,98 @@ export function ChatFimDock(props: ChatFimDockProps) {
           document.body,
         )
         : null}
-      {ghost !== null && point !== null
-        ? createPortal(
-          <span
-            style={{ ...ghostStyle, left: point.x, top: point.y }}
-            data-chat-fim-ghost=""
-            aria-hidden
-          >
-            {ghost}
-          </span>,
-          document.body,
-        )
-        : null}
-      {ghost !== null && point === null
-        ? (
-          <div className="dsh-chat-fim-fallback" data-chat-fim-fallback="">
-            <button type="button" className="dsh-chat-fim-fallback-chip" title={ghost} onClick={applyFallback}>
-              {ghost}
-            </button>
-            {diagnostic !== null ? <span style={{ color: 'var(--dsw-alias-label-tertiary, #9aa0a6)', fontSize: 12 }}>{diagnostic}</span> : null}
-          </div>
-        )
-        : null}
     </>
+  )
+}
+
+/**
+ * 候选菜单视图（挂在 conversation.input.overlay）：官方 @ 候选菜单同款悬浮卡，
+ * 锚点由 shell 承载，零定位 JS。Tab / mousedown 点选采用，Esc 丢弃；
+ * 官方触发菜单（@/斜杠，`[data-trigger-menu]`）打开期间完全隐藏并让出按键。
+ * @param props - 槽位运行时 props + 注入动作。
+ */
+export function ChatFimMenu(props: ChatFimMenuProps) {
+  const { adopt, t } = props
+  const suggestion = useFimSuggestion()
+  const enabled = useFimEnabled()
+  const supported = useFimSupported()
+  const [triggerOpen, setTriggerOpen] = useState(() => document.querySelector('[data-trigger-menu]') !== null)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const cardRef = useRef<HTMLDivElement | null>(null)
+
+  // 与官方触发菜单互斥：观察 overlay 锚点子树，官方菜单增删时实时刷新。
+  useEffect(() => {
+    const anchor = rootRef.current?.parentElement ?? null
+    if (anchor === null) return
+    const check = (): void => { setTriggerOpen(document.querySelector('[data-trigger-menu]') !== null) }
+    check()
+    const observer = new MutationObserver(check)
+    observer.observe(anchor, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-trigger-menu'] })
+    return () => { observer.disconnect() }
+  }, [])
+
+  const visible = suggestion !== null && enabled && supported && !triggerOpen
+
+  const adoptSuggestion = useCallback((): void => {
+    if (suggestion === null) return
+    // 双保险：官方触发菜单打开时绝不采用（Tab 归官方菜单下钻）。
+    if (document.querySelector('[data-trigger-menu]') !== null) return
+    const span: TokenSpan = {
+      start: suggestion.draft.length,
+      end: suggestion.draft.length,
+      draftRev: suggestion.draftRev,
+    }
+    if (adopt(suggestion.sessionId, suggestion.text, span)) {
+      setFimSuggestion(null)
+      setFimBusy(false)
+    }
+  }, [adopt, suggestion])
+
+  // Tab 采用 / Esc 丢弃（capture 抢先于输入机；官方触发菜单打开时不响应）。
+  useEffect(() => {
+    if (!visible) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
+        event.preventDefault()
+        adoptSuggestion()
+      } else if (event.key === 'Escape') {
+        setFimSuggestion(null)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true)
+    }
+  }, [visible, adoptSuggestion])
+
+  const maxHeight = useAnchoredMaxHeight(cardRef, MENU_MAX_HEIGHT, visible ? suggestion : null)
+
+  return (
+    <div ref={rootRef} className="dsh-chat-fim-menu-anchor">
+      {visible && suggestion !== null ? (
+        <div
+          ref={cardRef}
+          className="dsh-chat-fim-menu"
+          style={{ maxHeight }}
+          role="listbox"
+          aria-label={t('dock.aria')}
+        >
+          <button
+            type="button"
+            role="option"
+            aria-selected="true"
+            className="dsh-chat-fim-menu-row"
+            title={suggestion.text}
+            // mousedown，不是 click：焦点保持在输入框（官方菜单同款 combobox 模式）。
+            onMouseDown={(event) => {
+              event.preventDefault()
+              adoptSuggestion()
+            }}
+          >
+            <span className="dsh-chat-fim-menu-text">{suggestion.text}</span>
+          </button>
+        </div>
+      ) : null}
+    </div>
   )
 }

@@ -2,9 +2,9 @@
 
 聊天输入框续写联想 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
 
-打字停顿片刻，给出「接下来可能写的文字」建议，点击采用即追加进草稿；补全由 DeepSeek 官方 [FIM 补全（Beta）](https://api-docs.deepseek.com/zh-cn/guides/fim_completion) 接口生成：host 把最近对话历史转成「用户：/助手：」说话人文本，加上你正在输入的半句话发给模型续写。
+打字停顿片刻，在输入框上方以**官方 @ 候选菜单同款悬浮卡**给出「接下来可能写的文字」建议，Tab / 点选采用即追加进草稿，Esc 丢弃；官方 @/斜杠候选菜单打开时本菜单自动隐藏让位。补全由 DeepSeek 官方 [FIM 补全（Beta）](https://api-docs.deepseek.com/zh-cn/guides/fim_completion) 接口生成：host 把最近对话历史转成「用户：/助手：」说话人文本，加上你正在输入的半句话发给模型续写。
 
-**状态：🚧 M1+M2 已实现（FIM 补全版）** —— 适配 dsh ≥ 0.1.1-rc.2；设计文档见 [docs/spec/](docs/spec/)。
+**状态：🚧 M1+M2+M3 已实现（FIM 补全 + @ 列表样式候选菜单）** —— 适配 dsh ≥ 0.1.1-rc.2；设计文档见 [docs/spec/](docs/spec/)。
 
 ## 本地验证
 
@@ -16,7 +16,8 @@ npm run verify
 
 * host 路由 `POST /api/chat-fim/complete`；会话未命中即拒、凭据只经 `ctx.credentials` 实时解析；
 * 补全走 FIM 接口：直接续写文本本身、没有角色语义，天然站在用户角度；`stop` 序列（`\n用户：` / `\n助手：`）防止模型续写下一位说话人；多建议 = 并行多次请求（FIM 无 `n` 参数），部分失败保留成功建议；
-* 客户端 dock 在停顿 400ms 后触发，IME 组合态压制，响应按 `draftRev` 防陈旧；
+* 客户端数据面挂 `conversation.composer.dock`，停顿 400ms 后触发，IME 组合态压制，响应按 `draftRev` 防陈旧；建议经共享 store 交给 `conversation.input.overlay` 菜单视图渲染（官方 MenuDropdown 视觉 token + `useAnchoredMaxHeight` 钳高，零定位 JS）；
+* 与官方触发菜单互斥：检测 `[data-trigger-menu]`（MutationObserver 观察 overlay 锚点），官方 @/斜杠列表打开期间本菜单不渲染、Tab 不采用；
 * 采用通过 scoped `slash/input-insert-text` bail 事件写入草稿，不碰 DOM / 输入框内部实现。
 
 ## 本机实测记录（2026-08-28，改名前 dsh-fim 名义）

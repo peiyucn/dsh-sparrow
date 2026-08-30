@@ -4,7 +4,7 @@
 
 ## 项目概况
 
-DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + 输入框内幽灵文本建议）。2026-08-29 从对话前缀续写切换为 FIM：实测提示词修视角不稳定（同构造两次采样一次用户口吻一次助手口吻），FIM 直接续写文本、无角色语义，天然站在用户角度。单候选（suggestionCount 默认 1），Tab 键入、Esc 丢弃；开关挂输入框工具行（**默认关闭**，选择本地持久化），文案随 dsh 语言 zh/en 切换。
+DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + 官方 @ 列表同款候选菜单）。2026-08-29 从对话前缀续写切换为 FIM：实测提示词修视角不稳定（同构造两次采样一次用户口吻一次助手口吻），FIM 直接续写文本、无角色语义，天然站在用户角度。2026-08-30 建议展示从 portal 幽灵文本改为 `conversation.input.overlay` 候选菜单（真·框内渲染受插件边界所限不可行，见 docs/spec/03-menu.md）。单候选（suggestionCount 默认 1），Tab 键入、Esc 丢弃；开关挂输入框工具行（**默认关闭**，选择本地持久化），文案随 dsh 语言 zh/en 切换。
 
 * TypeScript 实现；host half 源码在 src/，client half（M2 起）构建产物不入库（.gitignore）
 * 本地验证 = npm run verify（typecheck + node:test）
@@ -23,14 +23,16 @@ DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 +
 
 ## seam 特例（需项目 owner 认可，已定案）
 
-* **幽灵文本定位**：官方没有输入框内联建议 seam（`conversation.input.overlay` 是菜单弹层锚点且不带输入快照）。当前实现只对 `[data-composer-input]` 做**只读几何测量**（Range 取文末光标视口坐标），用 portal 把浅色斜体续文渲染在光标处；**不修改编辑器内容**，采用仍走 `slash/input-insert-text` bail 事件。边界：仅当光标在文末且 phase 为 plain 时显示；官方提供新 seam 后迁移。
+* **候选菜单（2026-08-30 起）**：官方没有输入框内联建议 seam（`conversation.input.overlay` 是菜单弹层锚点、不带输入快照）。当前实现：数据面挂 `conversation.composer.dock`（读 InputZone 草稿快照，**只读**；写入仍走 `slash/input-insert-text` bail 事件，span CAS），菜单视图挂 `conversation.input.overlay`（官方 MenuDropdown 视觉 token，锚点由 shell 承载，零定位 JS）。**不修改编辑器内容**；官方提供 inline-suggestion seam 后迁移。
+* **与官方触发菜单互斥**：对 `[data-trigger-menu]`（官方 @/斜杠触发菜单的公开 DOM 标记）做**只读存在性检测** + MutationObserver 观察 overlay 锚点子树；官方菜单打开期间本菜单不渲染、Tab 不采用。只读观察，不做任何写入。
+* **旋转光环定位**：只读测量 `[data-composer-card]` 视口矩形（portal 到 body），300ms 周期自愈。
 
 ***
 
 ## 关键文件速查
 
     src/host.ts              — host half 入口（webServer 路由 + settings 分节）
-    src/client/index.ts      — client half 入口（dock 建议条，M2）
+    src/client/index.ts      — client half 入口（开关 / 数据面 dock / overlay 候选菜单）
     test/structure.test.mjs  — 结构测试（bundle 声明与组合行）
     cordis.patch.yml         — 组合补丁（npm 安装路径）
     dev.patch.yml            — 开发补丁（--patch 加载本地 TS，内含本机绝对路径）

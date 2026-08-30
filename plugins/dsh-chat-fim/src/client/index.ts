@@ -1,6 +1,7 @@
 /**
  * dsh-chat-fim client half：开关挂 `conversation.input.left`（输入框工具行），
- * 建议条挂 `conversation.composer.dock`（卡片下方、与输入框同宽），
+ * 数据面挂 `conversation.composer.dock`（读 InputZone 草稿快照、无可见 UI），
+ * 候选菜单挂 `conversation.input.overlay`（官方 @ 列表同款悬浮卡），
  * 建议请求全部走 host 自有路由。文案经 dsh locale 服务（zh/en）。
  * 不 import Node 模块；API key 不进浏览器。
  */
@@ -10,7 +11,7 @@ import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/c
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
-import { ChatFimDock, ChatFimSwitch, ensureFimBusyStyles } from './ChatFimDock.js'
+import { ChatFimDock, ChatFimMenu, ChatFimSwitch, ensureFimBusyStyles } from './ChatFimDock.js'
 
 export const inject = ['slots', 'sessions', 'locale']
 
@@ -111,9 +112,17 @@ export function apply(ctx: ClientContext): void {
     locale: 'chat-fim',
     inject: injectedFace,
   }, ChatFimDock))
+
+  ctx.slots.inject('conversation.input.overlay', () => ctx.slots.register({
+    name: 'conversation.input.overlay',
+    id: 'chat-fim-menu',
+    order: 30,
+    locale: 'chat-fim',
+    inject: injectedFace,
+  }, ChatFimMenu))
 }
 
-export { ChatFimDock, ChatFimSwitch, ensureFimBusyStyles } from './ChatFimDock.js'
-export type { ChatFimDockInjected, ChatFimDockProps, ChatFimSwitchProps } from './ChatFimDock.js'
-export { readEnabled, setFimBusy, setFimEnabled, setFimError, setFimSupported, useFimBusy, useFimEnabled, useFimError, useFimSupported } from './ChatFimDock.js'
+export { ChatFimDock, ChatFimMenu, ChatFimSwitch, ensureFimBusyStyles } from './ChatFimDock.js'
+export type { ChatFimDockInjected, ChatFimDockProps, ChatFimMenuProps, ChatFimSwitchProps, FimSuggestionRecord } from './ChatFimDock.js'
+export { readEnabled, setFimBusy, setFimEnabled, setFimError, setFimSuggestion, setFimSupported, useFimBusy, useFimEnabled, useFimError, useFimSuggestion, useFimSupported } from './ChatFimDock.js'
 export { TRIGGER_PAUSE_MS }
