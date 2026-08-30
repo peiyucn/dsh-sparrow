@@ -19,6 +19,7 @@ dsh plugin --profile web add dsh-chat-fim
 * **建议**：Tab 采用、Esc 丢弃（也可直接点选）；官方 @/斜杠候选菜单打开时本建议自动让位
 * **续写模型**：胶囊右侧 ▾ 可选 `auto` / `deepseek-v4-pro` / `deepseek-v4-flash`，默认 `auto` 跟随主模型；建议卡右下角显示本次续写的 tok 数与实际模型、温度
 * 当前会话主模型不是 DeepSeek 系列时，开关整体隐藏
+* **凭据**：续写请求复用你在 dsh 中配置的 DeepSeek API key（FIM 补全 Beta），不新增凭据、key 不进浏览器；产生的 token 计入你的 DeepSeek 账户
 
 ## 卸载与残留
 
