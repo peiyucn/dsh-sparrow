@@ -9,7 +9,7 @@
 * 会话删除：无官方「删除会话日志」API（客户端 workspace 接口无 deleteSession；`session.*` 接口无 delete；`SessionPersistence` 无 delete）。社区插件用删除链实现（dsh-plugin-session-delete / dsh-session-manager README 实证）：停会话 → 删日志目录 → 清理记账 → 同步帧。
 * 会话查询：`ctx.sessionQuery`（`listSessions` / `readTitleSnapshots` / `readSurface`）与 `ctx.sessionReferenceResolver`（`candidates`）为宿主平面服务。
 * Remote：客户端 `@` 源 `ui-reference` 经 `ctx.remote.sessionReferenceResolver` / `ctx.remote.fileReferences` 走宿主。
-* 留档备用 seam：`workspaceDomainSpec`（已从 `@deepseek-ai/dsh-workspace/src/spec` 导出，可经 `ctx.storageDomain` 读写 `archivedSessionIds` / `workspaces` 记账）；`host/archived-sessions-changed` 帧（`host/apiproxy/src/api/events.ts:143`）；`SessionPersistence.locate(meta)`（公开，可拿日志路径）。
+* 留档备用 seam：`workspaceDomainSpec`（已从 `@deepseek-ai/dsh-workspace/src/spec` 导出，可经 `ctx.storageDomain` 读写 `archivedSessionIds` / `workspaces` 记账）；归档集变更的客户端同步帧为 workspace-controller 的 `{type:'archived'}` follow 帧（`packages/api/workspace-controller/src/feed.ts:112-115`，2026-08-30 复核；旧文档所记 `host/archived-sessions-changed` 帧不存在）；`SessionPersistence.locate(meta)`（公开，可拿日志路径）。
 
 ## UI 入口与摆放（定案）
 
@@ -18,7 +18,7 @@
 
 ## 三档操作的可行性
 
-### 轻量标题（`@` 仍可拉回，= 路线 A，公开 seam，默认档）
+### 轻量标题（`@` 仍可拉回，= 路线 A，公开 seam，已退役 2026-08-30）
 
 * 装配层替换 / 包装 `sessionReferenceResolver`（或 `sessionQuery`）：候选标题走短 TTL 缓存 / 轻量读取；保持原签名与 `this` 语义、可逆恢复；记录适配的 dsh 版本。
 * 生效后**所有**会话（含归档）`@` 都轻量且仍可拉回——天然是归档会话默认态，无需逐会话开关。
