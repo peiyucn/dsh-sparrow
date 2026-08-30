@@ -32,10 +32,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'confirm.deleteAllPhrase'
       | 'confirm.deleteAllMismatch'
       | 'confirm.cancel'
-      | 'notice.restored'
+      | 'confirm.deleting'
+      | 'confirm.backingUp'
+      | 'confirm.restoring'
       | 'notice.skippedLegacy'
       | 'notice.failed'
-      | 'notice.deleted'
   }
 }
 

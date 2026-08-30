@@ -43,10 +43,11 @@ const LOCALE_DICTS = {
     'confirm.deleteAllPhrase': '删除全部备份',
     'confirm.deleteAllMismatch': '删除确认失败：请输入「{phrase}」',
     'confirm.cancel': '取消',
-    'notice.restored': '已恢复 {count} 个',
+    'confirm.deleting': '正在删除…',
+    'confirm.backingUp': '正在备份…',
+    'confirm.restoring': '正在恢复…',
     'notice.skippedLegacy': '跳过旧格式 {count} 个',
     'notice.failed': '失败 {count} 个',
-    'notice.deleted': '已删除 {count} 个备份',
   },
   en: {
     'button.label': 'Archive',
@@ -79,10 +80,11 @@ const LOCALE_DICTS = {
     'confirm.deleteAllPhrase': 'DELETE ALL',
     'confirm.deleteAllMismatch': 'Delete failed: type "{phrase}"',
     'confirm.cancel': 'Cancel',
-    'notice.restored': 'Restored {count}',
+    'confirm.deleting': 'Deleting…',
+    'confirm.backingUp': 'Backing up…',
+    'confirm.restoring': 'Restoring…',
     'notice.skippedLegacy': 'skipped {count} legacy',
     'notice.failed': '{count} failed',
-    'notice.deleted': 'Deleted {count} backups',
   },
 } as const
 

@@ -213,6 +213,12 @@ export function ensureArchiveStyles(): void {
   line-height: 18px;
   color: var(--dsw-alias-state-error-primary, #c62828);
 }
+.dsh-archive-confirm-status {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
 .dsh-archive-confirm-actions {
   display: flex;
   justify-content: flex-end;
@@ -274,9 +280,6 @@ const styles = {
   } satisfies CSSProperties,
 } as const
 
-/** 操作反馈提示自动消失时长。 */
-const NOTICE_AUTO_DISMISS_MS = 5_000
-
 /** 待确认动作（web 确认框状态）。 */
 type PendingConfirm =
   | { readonly kind: 'backup'; readonly item: ArchivedSessionItem }
@@ -289,13 +292,16 @@ interface ArchiveConfirmProps {
   readonly pending: PendingConfirm
   readonly t: TranslateNS<'archive-session'>
   readonly onCancel: () => void
-  readonly onSubmit: (typed: string) => void
+  /** 执行动作；成功后父级关闭弹窗，失败 reject 并把错误显示在弹窗内。 */
+  readonly onSubmit: (typed: string) => Promise<void>
 }
 
-/** web 确认框：替代 window.confirm/prompt（webview 里原生 prompt 被禁用，删除按钮点不动）。 */
+/** web 确认框：替代 window.confirm/prompt；提交后在弹窗内展示处理中，成功后自动关闭。 */
 function ArchiveConfirm(props: ArchiveConfirmProps) {
   const { pending, t, onCancel, onSubmit } = props
   const [typed, setTyped] = useState('')
+  const [working, setWorking] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
   const needsTyping = pending.kind === 'delete' || pending.kind === 'deleteAll'
   const phrase = t('confirm.deleteAllPhrase')
   const expected = pending.kind === 'delete' ? pending.item.title.trim() : pending.kind === 'deleteAll' ? phrase : ''
@@ -311,21 +317,31 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
             ? t('confirm.restoreAll.withLegacy', { count: pending.restorable, legacy: pending.legacy })
             : t('confirm.restoreAll', { count: pending.restorable }))
           : t('confirm.deleteAll', { count: pending.count, phrase })
-  const ready = !needsTyping || typed.trim() === expected
-  const mismatch = needsTyping && typed.trim() !== '' && !ready
+  const workingText = pending.kind === 'backup' ? t('confirm.backingUp')
+    : pending.kind === 'restoreAll' ? t('confirm.restoring')
+      : t('confirm.deleting')
+  const ready = !working && (!needsTyping || typed.trim() === expected)
+  const mismatch = !working && needsTyping && typed.trim() !== '' && typed.trim() !== expected
 
   useEffect(() => {
     setTyped('')
+    setWorking(false)
+    setFailure(null)
   }, [pending])
 
   const submit = (): void => {
     if (!ready) return
-    onSubmit(typed)
+    setWorking(true)
+    setFailure(null)
+    void onSubmit(typed).catch((reason: unknown) => {
+      setWorking(false)
+      setFailure(reason instanceof Error ? reason.message : String(reason))
+    })
   }
 
   return (
     <div className="dsh-archive-confirm-overlay" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onCancel()
+      if (event.target === event.currentTarget && !working) onCancel()
     }}>
       <div
         className="dsh-archive-confirm-card"
@@ -333,7 +349,7 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
         aria-modal="true"
         aria-label={title}
         onKeyDown={(event) => {
-          if (event.key === 'Escape') {
+          if (event.key === 'Escape' && !working) {
             event.stopPropagation()
             onCancel()
           } else if (event.key === 'Enter' && ready) {
@@ -351,6 +367,7 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
               type="text"
               value={typed}
               placeholder={pending.kind === 'delete' ? pending.item.title : phrase}
+              disabled={working}
               autoFocus
               onChange={(event) => { setTyped(event.currentTarget.value) }}
             />
@@ -361,8 +378,10 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
             ) : null}
           </>
         ) : null}
+        {working ? <p className="dsh-archive-confirm-status">{workingText}</p> : null}
+        {failure !== null ? <p className="dsh-archive-confirm-hint" role="alert">{failure}</p> : null}
         <div className="dsh-archive-confirm-actions">
-          <button type="button" className="dsh-archive-btn" onClick={onCancel}>{t('confirm.cancel')}</button>
+          <button type="button" className="dsh-archive-btn" disabled={working} onClick={onCancel}>{t('confirm.cancel')}</button>
           <button type="button" className="dsh-archive-btn dsh-archive-btn-danger" disabled={!ready} onClick={submit}>{title}</button>
         </div>
       </div>
@@ -383,9 +402,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [archivedOpen, setArchivedOpen] = useState(true)
   const [backupsOpen, setBackupsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingConfirm | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
 
@@ -419,26 +436,6 @@ export function ArchiveDock(props: ArchiveDockProps) {
     void refresh()
   }, [open])
 
-  // 操作反馈提示：展示几秒后自动消失（完成后的确认提示不需要常驻）。
-  useEffect(() => {
-    if (notice === null) return
-    const timer = setTimeout(() => { setNotice(null) }, NOTICE_AUTO_DISMISS_MS)
-    return () => { clearTimeout(timer) }
-  }, [notice])
-
-  const run = async (key: string, action: () => Promise<unknown>): Promise<void> => {
-    setBusy(key)
-    setError(null)
-    try {
-      await action()
-      await refresh()
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
-    } finally {
-      setBusy(current => current === key ? null : current)
-    }
-  }
-
   const confirmBackup = (item: ArchivedSessionItem): void => {
     setPending({ kind: 'backup', item })
   }
@@ -462,62 +459,50 @@ export function ArchiveDock(props: ArchiveDockProps) {
     setPending({ kind: 'deleteAll', count: backups.length })
   }
 
-  /** 确认框提交：按类型分发到既有动作（备份/删除走 run，批量走各自流程）。 */
-  const submitConfirm = (typed: string): void => {
+  /**
+   * 确认框提交：动作全程在弹窗内展示处理中，成功后由这里关闭弹窗；
+   * 失败（含批量部分失败）reject 回弹窗展示错误。
+   */
+  const submitConfirm = async (typed: string): Promise<void> => {
     if (pending === null) return
     const kind = pending.kind
-    setPending(null)
     if (kind === 'backup') {
-      void run(`backup:${pending.item.sessionId}`, () => backupSession(pending.item.sessionId))
+      await backupSession(pending.item.sessionId)
+      await refresh()
+      setPending(null)
       return
     }
     if (kind === 'delete') {
-      void run(`delete:${pending.item.sessionId}`, () => deleteSession(pending.item.sessionId, typed))
+      await deleteSession(pending.item.sessionId, typed)
+      await refresh()
+      setPending(null)
       return
     }
     if (kind === 'deleteBackup') {
-      void run(`backupDelete:${pending.item.backupId}`, () => deleteBackup(pending.item.backupId))
+      await deleteBackup(pending.item.backupId)
+      await refresh()
+      setPending(null)
       return
     }
     if (kind === 'restoreAll') {
-      void (async () => {
-        setBusy('restoreAll')
-        setError(null)
-        setNotice(null)
-        try {
-          const result = await restoreAllBackups()
-          const parts = [t('notice.restored', { count: result.restored?.length ?? 0 })]
-          const skipped = result.skippedLegacy ?? 0
-          const failed = result.failed?.length ?? 0
-          if (skipped > 0) parts.push(t('notice.skippedLegacy', { count: skipped }))
-          if (failed > 0) parts.push(t('notice.failed', { count: failed }))
-          setNotice(parts.join(' · '))
-          await refresh()
-        } catch (reason) {
-          setError(reason instanceof Error ? reason.message : String(reason))
-        } finally {
-          setBusy(current => current === 'restoreAll' ? null : current)
-        }
-      })()
+      const result = await restoreAllBackups()
+      const problems: string[] = []
+      const skipped = result.skippedLegacy ?? 0
+      const failed = result.failed?.length ?? 0
+      if (skipped > 0) problems.push(t('notice.skippedLegacy', { count: skipped }))
+      if (failed > 0) problems.push(t('notice.failed', { count: failed }))
+      await refresh()
+      if (problems.length > 0) throw new Error(problems.join(' · '))
+      setPending(null)
       return
     }
-    void (async () => {
-      setBusy('deleteAll')
-      setError(null)
-      setNotice(null)
-      try {
-        const result = await deleteAllBackups()
-        const parts = [t('notice.deleted', { count: result.deleted ?? 0 })]
-        const failed = result.failed?.length ?? 0
-        if (failed > 0) parts.push(t('notice.failed', { count: failed }))
-        setNotice(parts.join(' · '))
-        await refresh()
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : String(reason))
-      } finally {
-        setBusy(current => current === 'deleteAll' ? null : current)
-      }
-    })()
+    const result = await deleteAllBackups()
+    const problems: string[] = []
+    const failed = result.failed?.length ?? 0
+    if (failed > 0) problems.push(t('notice.failed', { count: failed }))
+    await refresh()
+    if (problems.length > 0) throw new Error(problems.join(' · '))
+    setPending(null)
   }
 
   const loadingRow = (
@@ -582,7 +567,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       <button
                         type="button"
                         className="dsh-archive-btn"
-                        disabled={busy !== null || loading || !item.backendSupported}
+                        disabled={loading || !item.backendSupported}
                         onClick={() => { confirmBackup(item) }}
                       >
                         {t('action.backup')}
@@ -590,7 +575,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       <button
                         type="button"
                         className="dsh-archive-btn dsh-archive-btn-danger"
-                        disabled={busy !== null || loading || !item.backendSupported}
+                        disabled={loading || !item.backendSupported}
                         onClick={() => { confirmDelete(item) }}
                       >
                         {t('action.delete')}
@@ -610,7 +595,6 @@ export function ArchiveDock(props: ArchiveDockProps) {
               <span aria-hidden>{backupsOpen ? '▾' : '▸'}</span>
               <span>{t('section.backups', { count: loading ? '…' : backups.length })}</span>
             </button>
-            {notice !== null ? <p style={styles.secondarySmall}>{notice}</p> : null}
             {backupsOpen ? (
               <>
                 {loading ? loadingRow : null}
@@ -619,7 +603,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                     <button
                       type="button"
                       className="dsh-archive-btn"
-                      disabled={busy !== null || restorableCount === 0}
+                      disabled={loading || restorableCount === 0}
                       onClick={() => { confirmRestoreAll() }}
                     >
                       {t('action.restoreAll', { count: restorableCount })}
@@ -627,7 +611,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                     <button
                       type="button"
                       className="dsh-archive-btn dsh-archive-btn-danger"
-                      disabled={busy !== null || backups.length === 0}
+                      disabled={loading || backups.length === 0}
                       onClick={() => { confirmDeleteAll() }}
                     >
                       {t('action.deleteAll')}
@@ -652,16 +636,25 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       <button
                         type="button"
                         className="dsh-archive-btn"
-                        disabled={busy !== null || item.legacy}
+                        disabled={loading || item.legacy}
                         title={item.legacy ? t('legacy.restoreTitle') : undefined}
-                        onClick={() => { void run(`restore:${item.backupId}`, () => restoreBackup(item.backupId)) }}
+                        onClick={() => {
+                          void (async () => {
+                            try {
+                              await restoreBackup(item.backupId)
+                              await refresh()
+                            } catch (reason) {
+                              setError(reason instanceof Error ? reason.message : String(reason))
+                            }
+                          })()
+                        }}
                       >
                         {t('action.restore')}
                       </button>
                       <button
                         type="button"
                         className="dsh-archive-btn dsh-archive-btn-danger"
-                        disabled={busy !== null}
+                        disabled={loading}
                         onClick={() => { confirmDeleteBackup(item) }}
                       >
                         {t('action.delete')}
