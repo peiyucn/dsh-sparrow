@@ -1,28 +1,23 @@
 # dsh-vision-access
 
-纯文本主模型（如 deepseek-v4-pro）会话中，图片交给官方视觉模型（deepseek-v4-flash-vision-exp）处理，主模型保持对话大脑。
+纯文本主模型会话的图片视觉通道 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
 
-**状态：🚧 M1 已实现** —— 门禁放行（可逆包装 `resolveModelInfo`）+ `vision_read` 工具 + 结构化报告缓存；适配 dsh ≥ 0.1.1-rc.2。设计文档见 [docs/spec/](docs/spec/)。
+主模型本身看不到图片时，它会自动调用本插件提供的 `vision_read` 工具：host 直连官方视觉模型读图，把图片转成结构化文字报告（摘要 / OCR / 表格 / 版式），主模型保持对话大脑。全程无可见 UI。
 
-## 本地验证
+## 安装
 
 ```bash
-npm run verify
+dsh plugin --profile web add dsh-vision-access
 ```
 
-## M1 行为
+适配 dsh ≥ 0.1.1-rc.2。
 
-* 仅对配置的文本路由抹除显式不含 image 的 `inputModalities`（放行贴图门禁），卸载时恢复；
-* 主模型调用 `vision_read` → 从会话事件反查图片引用（归一化 + 唯一前缀匹配，占位符里的截断哈希可直接传）→ `ctx.attachments.readImage` 校验 → **直连 `ctx.llm`** 指定官方 vision 模型读图（不再走子代理）；默认 `maxTokens: 8192` + `visionReasoningEffort: low`，避免思考把输出上限烧光导致正文截断；只有思考文本、没有正文时以明确错误返回，不再把思考过程当报告；
-* **原生视觉主模型不启用**（2026-08-30）：主模型自身 `inputModalities` 含 image（如 deepseek-v4-flash-vision-exp）时，`vision_read` 对该 agent 隐藏——图片本来直达主模型，经工具转文字报告反而有损；
-* 报告按 attachmentId 进程内 LRU 缓存；失败以工具错误返回，不悬挂。
+## 使用
 
-## 卸载与残留（诚实说明）
+* **无需配置**：对话中贴图后，直接让主模型「看看这张图」即可，主模型会自动调用 `vision_read`
+* 当前主模型本身原生看图（如 deepseek-v4-flash-vision-exp）或不是 DeepSeek 系列时，该工具自动隐藏——图片本来就直达主模型，经文字转述反而有损
+* 同一张图 + 同一问题的报告在进程内缓存，重复询问秒回
 
-* **零残留**：本插件不写任何文件、不改 `.dsh` 内部结构——门禁放行是可逆包装（卸载即恢复原函数），报告缓存只在进程内存里（LRU，进程退出即消失）；
-* 卸载后无需任何清理。
+## 卸载与残留
 
-## 性能实测（2026-08-29）
-
-* 直连视觉模型：读图 + JSON 输出 **2.2s**（纯文本 0.8s）；
-* 旧实现走 `ctx.subagents`：**46.3s**（子代理 agent 循环 4 步 + 工具误用 + 系统提示 + 思考开销）——已弃用。
+* **零残留**：不写任何文件、不改 `.dsh` 内部结构；报告缓存只在进程内存中，进程退出即消失。
