@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, fimStopSequences, isDeepseekMainRoute,
-  isStaleResponse, mainRouteFromSession, normalizeConfig, parseCompleteBody, resolveFimModel,
+  buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, fimStopSequences, isDeepseekMainRoute,
+  isStaleResponse, mainRouteFromSession, normalizeConfig, normalizeFimModelMode, parseCompleteBody, resolveFimModel,
   shouldTriggerFim, summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
 } from '../lib/chat-fim.js'
 
@@ -29,7 +29,7 @@ describe('chat-fim 纯逻辑', () => {
   describe('validateCompletePayload', () => {
     it('合法请求 应该 返回 prompt 与 sessionId', () => {
       const value = validateCompletePayload({ sessionId: 'session-1', prompt: '你好' })
-      assert.deepEqual(value, { sessionId: 'session-1', prompt: '你好' })
+      assert.deepEqual(value, { sessionId: 'session-1', prompt: '你好', fimModelMode: 'auto' })
     })
 
     it('缺 prompt 应该 返回 INVALID_PROMPT', () => {
@@ -191,24 +191,60 @@ describe('chat-fim 纯逻辑', () => {
   })
 
   describe('resolveFimModel', () => {
-    it('主模型 v4-pro 应该 跟随主模型', () => {
-      assert.equal(resolveFimModel({ provider: 'deepseek-official', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+    it('mode=pro 应该 恒用 v4-pro', () => {
+      assert.equal(resolveFimModel('pro', { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
     })
 
-    it('主模型 v4-flash 应该 跟随主模型', () => {
-      assert.equal(resolveFimModel({ provider: 'deepseek-official', model: 'deepseek-v4-flash' }, 'deepseek-v4-pro'), 'deepseek-v4-flash')
+    it('mode=flash 应该 恒用 v4-flash', () => {
+      assert.equal(resolveFimModel('flash', { provider: 'deepseek-official', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-flash')
     })
 
-    it('主模型 vision-exp 应该 回退配置默认', () => {
-      assert.equal(resolveFimModel({ provider: 'deepseek-official', model: 'deepseek-v4-flash-vision-exp' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+    it('mode=auto 主模型 v4-pro 应该 跟随主模型', () => {
+      assert.equal(resolveFimModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
     })
 
-    it('非官方 provider 应该 回退配置默认', () => {
-      assert.equal(resolveFimModel({ provider: 'zai', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+    it('mode=auto 主模型 v4-flash 应该 跟随主模型', () => {
+      assert.equal(resolveFimModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, 'deepseek-v4-pro'), 'deepseek-v4-flash')
     })
 
-    it('未知主模型 应该 回退配置默认', () => {
-      assert.equal(resolveFimModel(undefined, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+    it('mode=auto 主模型 vision-exp 应该 回退配置默认', () => {
+      assert.equal(resolveFimModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-flash-vision-exp' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+    })
+
+    it('mode=auto 非官方 provider 应该 回退配置默认', () => {
+      assert.equal(resolveFimModel('auto', { provider: 'zai', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+    })
+
+    it('mode=auto 未知主模型 应该 回退配置默认', () => {
+      assert.equal(resolveFimModel('auto', undefined, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+    })
+  })
+
+  describe('normalizeFimModelMode', () => {
+    it('合法三档 应该 原样返回', () => {
+      assert.equal(normalizeFimModelMode('auto'), 'auto')
+      assert.equal(normalizeFimModelMode('pro'), 'pro')
+      assert.equal(normalizeFimModelMode('flash'), 'flash')
+    })
+
+    it('非法/缺省 应该 回退 auto', () => {
+      assert.equal(normalizeFimModelMode(undefined), 'auto')
+      assert.equal(normalizeFimModelMode('gpt'), 'auto')
+      assert.equal(normalizeFimModelMode(42), 'auto')
+    })
+  })
+
+  describe('extractUsage', () => {
+    it('合法 usage 应该 提取 prompt/completion', () => {
+      assert.deepEqual(extractUsage({ usage: { prompt_tokens: 12, completion_tokens: 34 } }), { promptTokens: 12, completionTokens: 34 })
+    })
+
+    it('缺失 usage 应该 回退 0', () => {
+      assert.deepEqual(extractUsage({ choices: [] }), { promptTokens: 0, completionTokens: 0 })
+    })
+
+    it('非法字段 应该 回退 0', () => {
+      assert.deepEqual(extractUsage({ usage: { prompt_tokens: 'x', completion_tokens: -1 } }), { promptTokens: 0, completionTokens: 0 })
     })
   })
 

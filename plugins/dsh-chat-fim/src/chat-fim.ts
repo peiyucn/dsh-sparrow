@@ -50,6 +50,8 @@ export interface CompleteRequest {
   readonly sessionId: string
   readonly prompt: string
   readonly locale?: string
+  /** 续写模型三档（客户端偏好）；非法值回退 auto。 */
+  readonly fimModelMode: FimModelMode
 }
 
 export interface CompleteResponse {
@@ -168,7 +170,12 @@ export function validateCompletePayload(value: unknown, maxPromptChars = Number.
   if (locale !== undefined && typeof locale !== 'string') {
     return { code: 'BAD_BODY', message: 'locale 必须是字符串' }
   }
-  return { sessionId, prompt, ...locale === undefined ? {} : { locale } }
+  return {
+    sessionId,
+    prompt,
+    fimModelMode: normalizeFimModelMode(body.fimModelMode),
+    ...locale === undefined ? {} : { locale },
+  }
 }
 
 /** 从一条 DSH 历史消息里提取可读文本；图片 / 工具结果等非续写块跳过。 */
@@ -271,16 +278,41 @@ export function isStaleResponse(requestDraftRev: number, currentDraftRev: number
 /** FIM 端点实测可用的模型 id（2026-08-30 直连实测；官方文档 schema 只列 v4-pro，flash 实际可用）。 */
 export const FIM_MODEL_IDS = ['deepseek-v4-pro', 'deepseek-v4-flash'] as const
 
+/** 续写模型三档选择（客户端偏好，随请求传给 host）。 */
+export type FimModelMode = 'auto' | 'pro' | 'flash'
+export const DEFAULT_FIM_MODEL_MODE: FimModelMode = 'auto'
+
+/** 请求体里的 fimModelMode 解析：非法/缺省回退 auto。 */
+export function normalizeFimModelMode(value: unknown): FimModelMode {
+  return value === 'auto' || value === 'pro' || value === 'flash' ? value : DEFAULT_FIM_MODEL_MODE
+}
+
 /**
- * 补全模型选择：主模型是官方 deepseek 且属于 FIM 可用 id 时**跟随主模型**
- * （用户用什么模型对话就用什么模型补全，计费随之）；否则回退配置默认
- * （如主模型是 vision-exp 或未知 id）。
+ * 补全模型解析（三档，见 docs/spec/04-model-choice.md）：
+ * pro/flash 恒用对应模型；auto 跟随官方主模型（pro/flash），vision / 未知回退配置默认。
  */
-export function resolveFimModel(main: { provider: string; model: string } | undefined, configuredModel: string): string {
+export function resolveFimModel(mode: FimModelMode, main: { provider: string; model: string } | undefined, configuredModel: string): string {
+  if (mode === 'pro') return 'deepseek-v4-pro'
+  if (mode === 'flash') return 'deepseek-v4-flash'
   if (main !== undefined && main.provider === 'deepseek-official' && (FIM_MODEL_IDS as readonly string[]).includes(main.model)) {
     return main.model
   }
   return configuredModel
+}
+
+/** 从 FIM 上游响应提取 usage；缺失 / 非法字段回退 0（安全默认值）。 */
+export function extractUsage(data: unknown): { promptTokens: number; completionTokens: number } {
+  const usage = typeof data === 'object' && data !== null
+    ? (data as { usage?: unknown }).usage
+    : undefined
+  const record = typeof usage === 'object' && usage !== null
+    ? usage as Record<string, unknown>
+    : undefined
+  const num = (value: unknown): number => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0
+  return {
+    promptTokens: num(record?.prompt_tokens),
+    completionTokens: num(record?.completion_tokens),
+  }
 }
 
 /** 触发形态门控：草稿最短长度（trim 后）。 */

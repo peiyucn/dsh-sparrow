@@ -17,6 +17,8 @@ export const inject = ['slots', 'sessions', 'locale']
 
 export interface ChatFimResponse {
   readonly suggestions?: readonly string[]
+  readonly model?: string
+  readonly usage?: { readonly promptTokens?: number; readonly completionTokens?: number }
   readonly error?: { readonly code?: string; readonly message?: string }
 }
 
@@ -33,6 +35,11 @@ const LOCALE_DICTS = {
     'dock.aria': '续写建议',
     'menu.adopt': '采用',
     'menu.dismiss': '丢弃',
+    'menu.model.label': '续写模型：{mode}',
+    'menu.model.auto': '自动',
+    'menu.model.pro': 'Pro',
+    'menu.model.flash': 'Flash',
+    'menu.tokens': '{tokens} tokens · {model}',
   },
   en: {
     'switch.label': 'Suggest',
@@ -42,6 +49,11 @@ const LOCALE_DICTS = {
     'dock.aria': 'Suggestions',
     'menu.adopt': 'Adopt',
     'menu.dismiss': 'Dismiss',
+    'menu.model.label': 'Model: {mode}',
+    'menu.model.auto': 'Auto',
+    'menu.model.pro': 'Pro',
+    'menu.model.flash': 'Flash',
+    'menu.tokens': '{tokens} tokens · {model}',
   },
 } as const
 
@@ -79,18 +91,25 @@ export function apply(ctx: ClientContext): void {
         const payload = await response.json() as { supported?: boolean }
         return payload.supported !== false
       },
-      requestComplete: async (id: SessionId, prompt: string, signal: AbortSignal) => {
+      requestComplete: async (id: SessionId, prompt: string, signal: AbortSignal, mode: 'auto' | 'pro' | 'flash') => {
         const response = await fetch('/api/chat-fim/complete', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionId: id, prompt, locale: requestLanguage() }),
+          body: JSON.stringify({ sessionId: id, prompt, locale: requestLanguage(), fimModelMode: mode }),
           signal,
         })
         const payload = await response.json() as ChatFimResponse
         if (!response.ok) {
           throw new Error(payload.error?.message ?? `续写请求失败（HTTP ${response.status}）`)
         }
-        return payload.suggestions ?? []
+        return {
+          suggestions: payload.suggestions ?? [],
+          model: payload.model ?? '',
+          usage: {
+            promptTokens: payload.usage?.promptTokens ?? 0,
+            completionTokens: payload.usage?.completionTokens ?? 0,
+          },
+        }
       },
       adopt: (id: SessionId, text: string, span: TokenSpan): boolean =>
         scope.bail(scope, 'slash/input-insert-text', { text, span }) === true,

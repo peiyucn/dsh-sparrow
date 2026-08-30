@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
-  buildFimPrompt, extractSuggestions, fimStopSequences, isAbortTimeout, isDeepseekMainRoute,
+  buildFimPrompt, extractSuggestions, extractUsage, fimStopSequences, isAbortTimeout, isDeepseekMainRoute,
   mainRouteFromSession, normalizeConfig, parseCompleteBody, resolveFimModel, summarizeUpstreamBody,
   upstreamStatusToError, type ChatFimConfig, type ChatFimError, type CompleteRequest,
 } from './chat-fim.js'
@@ -157,8 +157,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
       const language = parsed.locale === 'en' ? 'en' : 'zh'
       const prompt = buildFimPrompt(session.deriveMessages() as readonly unknown[], parsed.prompt, language)
       const stop = fimStopSequences(language)
-      // 补全模型跟随主模型（pro/flash），vision 或未知主模型回退配置默认。
-      const fimModel = resolveFimModel(main, settings.model)
+      // 补全模型三档解析：pro / flash / auto（跟随官方主模型，vision/未知回退配置默认）。
+      const fimModel = resolveFimModel(parsed.fimModelMode, main, settings.model)
       const signal = requestSignal(res, settings.requestTimeoutMs)
       try {
         // FIM 接口没有 n 参数：多建议用并行请求 + 温度错开采样；部分失败保留成功建议。
@@ -192,15 +192,19 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
             } catch {
               throw { code: 'UPSTREAM_ERROR', message: 'DeepSeek FIM 上游返回了非法 JSON' } satisfies ChatFimError
             }
-            return extractSuggestions(data)
+            return { suggestions: extractSuggestions(data), usage: extractUsage(data) }
           }),
         )
         const seen = new Set<string>()
         const suggestions: string[] = []
+        let totalPromptTokens = 0
+        let totalCompletionTokens = 0
         let firstError: ChatFimError | undefined
         for (const result of results) {
           if (result.status === 'fulfilled') {
-            for (const suggestion of result.value) {
+            totalPromptTokens += result.value.usage.promptTokens
+            totalCompletionTokens += result.value.usage.completionTokens
+            for (const suggestion of result.value.suggestions) {
               if (!seen.has(suggestion)) {
                 seen.add(suggestion)
                 suggestions.push(suggestion)
@@ -218,7 +222,11 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
           sendError(res, 502, firstError ?? { code: 'UPSTREAM_ERROR', message: 'DeepSeek FIM 上游没有返回可用候选' })
           return
         }
-        sendJson(res, 200, { suggestions })
+        sendJson(res, 200, {
+          suggestions,
+          model: fimModel,
+          usage: { promptTokens: totalPromptTokens, completionTokens: totalCompletionTokens },
+        })
       } catch (error) {
         if (isAbortTimeout(signal.signal)) {
           sendError(res, 504, { code: 'TIMEOUT', message: 'DeepSeek FIM 上游超时' })

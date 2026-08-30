@@ -8,7 +8,13 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { shouldTriggerFim } from '../chat-fim.js'
+import { shouldTriggerFim, type FimModelMode } from '../chat-fim.js'
+
+export interface FimCompleteResult {
+  readonly suggestions: readonly string[]
+  readonly model: string
+  readonly usage: { readonly promptTokens: number; readonly completionTokens: number }
+}
 
 export interface ChatFimDockInjected {
   /** 查询当前会话主模型是否支持（deepseek 系列）；false 时整体隐藏。 */
@@ -18,7 +24,8 @@ export interface ChatFimDockInjected {
     sessionId: SessionId,
     prompt: string,
     signal: AbortSignal,
-  ) => Promise<readonly string[]>
+    mode: FimModelMode,
+  ) => Promise<FimCompleteResult>
   /** 通过 scoped bail 事件把建议追加进草稿；返回是否被输入机接受。 */
   adopt: (sessionId: SessionId, text: string, span: TokenSpan) => boolean
 }
@@ -29,6 +36,7 @@ export type ChatFimMenuProps = PropsRuntime<'conversation.input.overlay'> & Chat
 
 const PAUSE_MS = 400
 const ENABLED_STORAGE_KEY = 'dsh-chat-fim:enabled'
+const MODEL_MODE_STORAGE_KEY = 'dsh-chat-fim:modelMode'
 /** 菜单高度设计上限（同官方 MenuDropdown）。 */
 const MENU_MAX_HEIGHT = 320
 
@@ -140,6 +148,10 @@ export interface FimSuggestionRecord {
   readonly sessionId: SessionId
   readonly draft: string
   readonly draftRev: number
+  /** host 解析出的实际补全模型 id。 */
+  readonly model: string
+  /** 本次续写总 token（prompt + completion，跨并行请求求和）。 */
+  readonly totalTokens: number
 }
 
 // 模块级共享建议：dock（数据面）写入，overlay 菜单（视图）读取；随草稿/相位变化清空。
@@ -162,6 +174,40 @@ export function setFimSuggestion(next: FimSuggestionRecord | null): void {
   if (sharedSuggestion === next) return
   sharedSuggestion = next
   for (const listener of suggestionListeners) listener()
+}
+
+/** 读取本地续写模型档位：auto/pro/flash，非法值回退 auto。 */
+export function readModelMode(storage: { getItem(key: string): string | null }, key = MODEL_MODE_STORAGE_KEY): FimModelMode {
+  const value = storage.getItem(key)
+  return value === 'pro' || value === 'flash' || value === 'auto' ? value : 'auto'
+}
+
+// 模块级共享续写模型档位（菜单选择器写入，dock 请求时读取）。
+let sharedModelMode: FimModelMode = 'auto'
+try {
+  sharedModelMode = readModelMode(window.localStorage)
+} catch {
+  sharedModelMode = 'auto'
+}
+const modelModeListeners = new Set<() => void>()
+
+/** 订阅共享续写模型档位。 */
+export function useFimModelMode(): FimModelMode {
+  const [value, setValue] = useState(sharedModelMode)
+  useEffect(() => {
+    const listener = (): void => { setValue(sharedModelMode) }
+    modelModeListeners.add(listener)
+    return () => { modelModeListeners.delete(listener) }
+  }, [])
+  return value
+}
+
+/** 设置共享续写模型档位并持久化。 */
+export function setFimModelMode(next: FimModelMode): void {
+  if (sharedModelMode === next) return
+  sharedModelMode = next
+  window.localStorage.setItem(MODEL_MODE_STORAGE_KEY, next)
+  for (const listener of modelModeListeners) listener()
 }
 
 /** composer 卡片视口矩形（旋转光环定位；只读测量）。 */
@@ -334,6 +380,72 @@ export function ensureFimBusyStyles(): void {
   font-size: 11px;
   line-height: 18px;
 }
+/* 菜单底部：左侧续写模型选择器，右侧 token 数与实际模型。 */
+.dsh-chat-fim-menu-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 2px 4px 0;
+  border-top: 1px solid var(--dsw-alias-border-inverted);
+}
+.dsh-chat-fim-model-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-caption);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 18px;
+  cursor: pointer;
+}
+.dsh-chat-fim-model-btn:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dsh-chat-fim-menu-usage {
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.dsh-chat-fim-model-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+.dsh-chat-fim-model-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+}
+.dsh-chat-fim-model-option:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dsh-chat-fim-model-option-on {
+  color: var(--dsw-alias-button-info-fill, #4d6bfe);
+}
+.dsh-chat-fim-model-option-check {
+  width: 14px;
+  flex: none;
+  font-size: 12px;
+}
 `
   document.head.appendChild(style)
 }
@@ -379,6 +491,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
   const enabled = useFimEnabled()
   const busy = useFimBusy()
   const supported = useFimSupported()
+  const modelMode = useFimModelMode()
 
   // 会话切换时查询主模型支持状态；不支持则整体隐藏（像没装插件）。
   useEffect(() => {
@@ -436,13 +549,20 @@ export function ChatFimDock(props: ChatFimDockProps) {
       const controller = new AbortController()
       flightRef.current = controller
       setFimBusy(true)
-      void requestComplete(session.sessionId, draft, controller.signal)
-        .then((next) => {
+      void requestComplete(session.sessionId, draft, controller.signal, modelMode)
+        .then((result) => {
           if (controller.signal.aborted) return
           if (rev !== draftRevRef.current || draftRef.current !== draft) return
-          const text = next[0]?.trim()
+          const text = result.suggestions[0]?.trim()
           if (text !== undefined && text !== '') {
-            setFimSuggestion({ text, sessionId: session.sessionId, draft, draftRev: rev })
+            setFimSuggestion({
+              text,
+              sessionId: session.sessionId,
+              draft,
+              draftRev: rev,
+              model: result.model,
+              totalTokens: result.usage.promptTokens + result.usage.completionTokens,
+            })
           }
           setFimError(null)
         })
@@ -461,7 +581,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
     return () => {
       clearTimeout(timer)
     }
-  }, [composing, enabled, supported, input.draft, input.draftRev, input.phase, requestComplete, session.sessionId])
+  }, [composing, enabled, supported, modelMode, input.draft, input.draftRev, input.phase, requestComplete, session.sessionId])
 
   // 联想中：整个 composer 卡片外圈旋转紫光（跟随卡片矩形，周期自愈）。
   useLayoutEffect(() => {
@@ -508,9 +628,14 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
   const suggestion = useFimSuggestion()
   const enabled = useFimEnabled()
   const supported = useFimSupported()
+  const modelMode = useFimModelMode()
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [triggerOpen, setTriggerOpen] = useState(() => document.querySelector('[data-trigger-menu]') !== null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const cardRef = useRef<HTMLDivElement | null>(null)
+
+  const modelModeLabel = (mode: FimModelMode): string =>
+    mode === 'auto' ? t('menu.model.auto') : mode === 'pro' ? t('menu.model.pro') : t('menu.model.flash')
 
   // 与官方触发菜单互斥：观察 overlay 锚点子树，官方菜单增删时实时刷新。
   useEffect(() => {
@@ -589,6 +714,41 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
               <kbd className="dsh-chat-fim-menu-kbd">Esc</kbd>
             </span>
           </button>
+          <div className="dsh-chat-fim-menu-footer">
+            <button
+              type="button"
+              className="dsh-chat-fim-model-btn"
+              aria-expanded={pickerOpen}
+              onClick={() => { setPickerOpen(value => !value) }}
+            >
+              {t('menu.model.label', { mode: modelModeLabel(modelMode) })}
+              <span aria-hidden>{pickerOpen ? '▴' : '▾'}</span>
+            </button>
+            <span className="dsh-chat-fim-menu-usage">
+              {t('menu.tokens', { tokens: suggestion.totalTokens, model: suggestion.model })}
+            </span>
+          </div>
+          {pickerOpen ? (
+            <div className="dsh-chat-fim-model-picker" role="listbox" aria-label={t('menu.model.label', { mode: '' })}>
+              {(['auto', 'pro', 'flash'] as const).map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="option"
+                  aria-selected={mode === modelMode}
+                  className={mode === modelMode ? 'dsh-chat-fim-model-option dsh-chat-fim-model-option-on' : 'dsh-chat-fim-model-option'}
+                  onMouseDown={(event) => {
+                    event.preventDefault()
+                    setFimModelMode(mode)
+                    setPickerOpen(false)
+                  }}
+                >
+                  <span className="dsh-chat-fim-model-option-check" aria-hidden>{mode === modelMode ? '✓' : ''}</span>
+                  {modelModeLabel(mode)}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
