@@ -1,5 +1,5 @@
 /**
- * dsh-prefix-completion client half：注册到 `conversation.input.dock`，建议请求全部走 host 自有路由。
+ * dsh-chat-fim client half：注册到 `conversation.input.dock`，建议请求全部走 host 自有路由。
  * 不 import Node 模块；API key 不进浏览器。
  */
 
@@ -7,11 +7,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
-import { PrefixDock } from './PrefixDock.js'
+import { ChatFimDock } from './ChatFimDock.js'
 
 export const inject = ['slots', 'sessions']
 
-export interface PrefixCompletionResponse {
+export interface ChatFimResponse {
   readonly suggestions?: readonly string[]
   readonly error?: { readonly code?: string; readonly message?: string }
 }
@@ -36,22 +36,22 @@ export function apply(ctx: ClientContext): void {
   const sessions = ctx.sessions as unknown as ClientSessionScope
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock',
-    id: 'prefix-completion',
+    id: 'chat-fim',
     order: 30,
     inject: (sessionId: SessionId) => {
       const scope = sessions.scope(sessionId)
       if (scope === undefined) {
-        throw new Error(`dsh-prefix-completion: session "${String(sessionId)}" 没有浏览器 scope`)
+        throw new Error(`dsh-chat-fim: session "${String(sessionId)}" 没有浏览器 scope`)
       }
       return {
         requestComplete: async (id: SessionId, prompt: string, signal: AbortSignal) => {
-          const response = await fetch('/api/prefix-completion/complete', {
+          const response = await fetch('/api/chat-fim/complete', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ sessionId: id, prompt }),
             signal,
           })
-          const payload = await response.json() as PrefixCompletionResponse
+          const payload = await response.json() as ChatFimResponse
           if (!response.ok) {
             throw new Error(payload.error?.message ?? `对话前缀续写请求失败（HTTP ${response.status}）`)
           }
@@ -61,9 +61,9 @@ export function apply(ctx: ClientContext): void {
           scope.bail(scope, 'slash/input-insert-text', { text, span }) === true,
       }
     },
-  }, PrefixDock))
+  }, ChatFimDock))
 }
 
-export { PrefixDock } from './PrefixDock.js'
-export type { PrefixDockInjected, PrefixDockProps } from './PrefixDock.js'
+export { ChatFimDock } from './ChatFimDock.js'
+export type { ChatFimDockInjected, ChatFimDockProps } from './ChatFimDock.js'
 export { TRIGGER_PAUSE_MS }

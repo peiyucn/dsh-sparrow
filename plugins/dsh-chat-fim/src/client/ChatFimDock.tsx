@@ -1,4 +1,4 @@
-/** 对话前缀续写 dock 建议条：触发、展示、作废、采用。 */
+/** FIM 续写 dock 建议条：触发、展示、作废、采用 + 开关。 */
 
 import { useEffect, useRef, useState } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -6,7 +6,7 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 
-export interface PrefixDockInjected {
+export interface ChatFimDockInjected {
   /** 发起一次 host 路由请求；由调用方负责陈旧响应判定。 */
   requestComplete: (
     sessionId: SessionId,
@@ -17,10 +17,17 @@ export interface PrefixDockInjected {
   adopt: (sessionId: SessionId, text: string, span: TokenSpan) => boolean
 }
 
-export type PrefixDockProps = PropsRuntime<'conversation.input.dock'> & PrefixDockInjected
+export type ChatFimDockProps = PropsRuntime<'conversation.input.dock'> & ChatFimDockInjected
 
 const PAUSE_MS = 400
 const MAX_SUGGESTIONS = 3
+const ENABLED_STORAGE_KEY = 'dsh-chat-fim:enabled'
+
+/** 读取本地开关状态：默认开启，非法值回退默认。 */
+export function readEnabled(storage: { getItem(key: string): string | null }, key = ENABLED_STORAGE_KEY): boolean {
+  const value = storage.getItem(key)
+  return value !== '0'
+}
 
 const styles = {
   dock: {
@@ -52,18 +59,34 @@ const styles = {
     color: 'var(--dsw-alias-label-secondary, #6b7280)',
     padding: '4px 2px',
   } satisfies React.CSSProperties,
+  switch: {
+    border: '1px solid var(--dsw-alias-border-l1, #d4d8e0)',
+    borderRadius: 999,
+    background: 'var(--dsw-alias-bg-layer-1, #ffffff)',
+    color: 'var(--dsw-alias-label-secondary, #6b7280)',
+    fontSize: 12,
+    padding: '2px 8px',
+    cursor: 'pointer',
+    lineHeight: 1.5,
+  } satisfies React.CSSProperties,
+  switchOn: {
+    color: 'var(--dsw-alias-brand-primary, #4d6bfe)',
+    borderColor: 'var(--dsw-alias-brand-primary, #4d6bfe)',
+  } satisfies React.CSSProperties,
 } as const
 
 /**
- * 对话前缀续写建议条。只从 InputZone owner share 读快照；继续输入 / 发送 / 相位变化都会清空旧建议。
+ * FIM 续写建议条。只从 InputZone owner share 读快照；继续输入 / 发送 / 相位变化都会清空旧建议。
+ * 开关状态持久化在 localStorage（默认开启）；关闭时不触发、不请求。
  * @param props - 槽位运行时 props + 注入动作。
  */
-export function PrefixDock(props: PrefixDockProps) {
+export function ChatFimDock(props: ChatFimDockProps) {
   const { session, input, requestComplete, adopt } = props
   const [suggestions, setSuggestions] = useState<readonly string[]>([])
   const [selected, setSelected] = useState(0)
   const [busy, setBusy] = useState(false)
   const [composing, setComposing] = useState(false)
+  const [enabled, setEnabled] = useState(() => readEnabled(window.localStorage))
 
   const composingRef = useRef(false)
   const draftRevRef = useRef(input.draftRev)
@@ -71,6 +94,19 @@ export function PrefixDock(props: PrefixDockProps) {
   const flightRef = useRef<AbortController | null>(null)
   draftRevRef.current = input.draftRev
   draftRef.current = input.draft
+
+  const toggleEnabled = (): void => {
+    setEnabled(current => {
+      const next = !current
+      window.localStorage.setItem(ENABLED_STORAGE_KEY, next ? '1' : '0')
+      if (!next) {
+        setSuggestions([])
+        setBusy(false)
+        flightRef.current?.abort()
+      }
+      return next
+    })
+  }
 
   useEffect(() => {
     const start = (): void => {
@@ -97,7 +133,7 @@ export function PrefixDock(props: PrefixDockProps) {
     flightRef.current?.abort()
 
     const draft = input.draft
-    if (draft.trim() === '' || composing || input.phase !== 'plain') return
+    if (!enabled || draft.trim() === '' || composing || input.phase !== 'plain') return
 
     const rev = input.draftRev
     const timer = setTimeout(() => {
@@ -124,9 +160,27 @@ export function PrefixDock(props: PrefixDockProps) {
     return () => {
       clearTimeout(timer)
     }
-  }, [composing, input.draft, input.draftRev, input.phase, requestComplete, session.sessionId])
+  }, [composing, enabled, input.draft, input.draftRev, input.phase, requestComplete, session.sessionId])
 
-  if (suggestions.length === 0) return null
+  if (!enabled) {
+    return (
+      <div style={styles.dock} data-chat-fim-dock="">
+        <button type="button" style={styles.switch} title="重新开启输入框续写联想" onClick={toggleEnabled}>
+          续写 · 关
+        </button>
+      </div>
+    )
+  }
+
+  if (suggestions.length === 0) {
+    return (
+      <div style={styles.dock} data-chat-fim-dock="">
+        <button type="button" style={{ ...styles.switch, ...styles.switchOn }} title="关闭输入框续写联想" onClick={toggleEnabled}>
+          续写 · 开
+        </button>
+      </div>
+    )
+  }
 
   const applySuggestion = (text: string): void => {
     const span: TokenSpan = {
@@ -144,7 +198,7 @@ export function PrefixDock(props: PrefixDockProps) {
   return (
     <div
       style={styles.dock}
-      data-prefix-dock=""
+      data-chat-fim-dock=""
       role="listbox"
       aria-label="续写建议"
       onKeyDown={(event) => {
@@ -161,6 +215,9 @@ export function PrefixDock(props: PrefixDockProps) {
         }
       }}
     >
+      <button type="button" style={{ ...styles.switch, ...styles.switchOn }} title="关闭输入框续写联想" onClick={toggleEnabled}>
+        续写 · 开
+      </button>
       {busy ? <span style={styles.hint}>正在联想…</span> : null}
       {suggestions.map((suggestion, index) => (
         <button

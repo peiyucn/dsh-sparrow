@@ -1,4 +1,4 @@
-/** dsh-prefix-completion 纯逻辑：配置归一化、请求校验、错误映射、候选提取。 */
+/** dsh-chat-fim 纯逻辑：配置归一化、请求校验、错误映射、候选提取。 */
 
 export const DEFAULT_BASE_URL = 'https://api.deepseek.com/beta'
 export const DEFAULT_MODEL = 'deepseek-v4-pro'
@@ -8,11 +8,13 @@ export const DEFAULT_MAX_BODY_BYTES = 64 * 1024
 export const DEFAULT_MAX_PROMPT_CHARS = 32_768
 export const DEFAULT_MAX_TOKENS = 96
 export const DEFAULT_TRIGGER_PAUSE_MS = 400
+export const DEFAULT_SUGGESTION_COUNT = 2
+export const DEFAULT_TEMPERATURE = 1
 export const MAX_UPSTREAM_BODY_BYTES = 64 * 1024
 export const MAX_HISTORY_MESSAGES = 12
 export const MAX_HISTORY_CHARS = 6_000
 
-export type PrefixCompletionErrorCode =
+export type ChatFimErrorCode =
   | 'BAD_BODY'
   | 'INVALID_PROMPT'
   | 'UNKNOWN_SESSION'
@@ -22,12 +24,12 @@ export type PrefixCompletionErrorCode =
   | 'RATE_LIMITED'
   | 'INVALID_CONFIG'
 
-export interface PrefixCompletionError {
-  readonly code: PrefixCompletionErrorCode
+export interface ChatFimError {
+  readonly code: ChatFimErrorCode
   readonly message: string
 }
 
-export interface PrefixCompletionConfig {
+export interface ChatFimConfig {
   readonly baseURL: string
   readonly model: string
   readonly maxTokens: number
@@ -36,6 +38,8 @@ export interface PrefixCompletionConfig {
   readonly maxBodyBytes: number
   readonly maxPromptChars: number
   readonly triggerPauseMs: number
+  readonly suggestionCount: number
+  readonly temperature: number
 }
 
 export interface CompleteRequest {
@@ -47,16 +51,12 @@ export interface CompleteResponse {
   readonly suggestions: readonly string[]
 }
 
-/** OpenAI Chat Completions 形状的一条消息；最后一条 assistant 消息带 prefix: true。 */
-export interface ChatPrefixMessage {
-  readonly role: 'system' | 'user' | 'assistant'
-  readonly content: string
-  readonly prefix?: true
-}
+/** FIM 补全的停止序列：历史转文本用「用户：/助手：」做说话人标记，命中即停，防止模型续写下一位说话人。 */
+export const FIM_STOP_SEQUENCES: readonly string[] = ['\n用户：', '\n助手：']
 
 /** 把外部配置补成完整内部配置；非法数字一律拒绝（插件加载期即失败，而不是请求期）。 */
-export function normalizeConfig(input: Readonly<Partial<PrefixCompletionConfig>> | undefined): PrefixCompletionConfig {
-  const config: PrefixCompletionConfig = {
+export function normalizeConfig(input: Readonly<Partial<ChatFimConfig>> | undefined): ChatFimConfig {
+  const config: ChatFimConfig = {
     baseURL: input?.baseURL?.trim() || DEFAULT_BASE_URL,
     model: input?.model?.trim() || DEFAULT_MODEL,
     maxTokens: input?.maxTokens ?? DEFAULT_MAX_TOKENS,
@@ -65,9 +65,11 @@ export function normalizeConfig(input: Readonly<Partial<PrefixCompletionConfig>>
     maxBodyBytes: input?.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES,
     maxPromptChars: input?.maxPromptChars ?? DEFAULT_MAX_PROMPT_CHARS,
     triggerPauseMs: input?.triggerPauseMs ?? DEFAULT_TRIGGER_PAUSE_MS,
+    suggestionCount: input?.suggestionCount ?? DEFAULT_SUGGESTION_COUNT,
+    temperature: input?.temperature ?? DEFAULT_TEMPERATURE,
   }
   if (config.baseURL === '' || config.model === '' || config.apiKeyEnv === '') {
-    throw new Error('dsh-prefix-completion: baseURL/model/apiKeyEnv 不能为空')
+    throw new Error('dsh-chat-fim: baseURL/model/apiKeyEnv 不能为空')
   }
   for (const [name, value] of Object.entries({
     maxTokens: config.maxTokens,
@@ -75,19 +77,26 @@ export function normalizeConfig(input: Readonly<Partial<PrefixCompletionConfig>>
     maxBodyBytes: config.maxBodyBytes,
     maxPromptChars: config.maxPromptChars,
     triggerPauseMs: config.triggerPauseMs,
+    suggestionCount: config.suggestionCount,
   })) {
     if (!Number.isSafeInteger(value) || value <= 0) {
-      throw new Error(`dsh-prefix-completion: ${name} 必须是正整数`)
+      throw new Error(`dsh-chat-fim: ${name} 必须是正整数`)
     }
   }
+  if (config.suggestionCount > 4) {
+    throw new Error('dsh-chat-fim: suggestionCount 不能超过 4')
+  }
+  if (typeof config.temperature !== 'number' || !Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 2) {
+    throw new Error('dsh-chat-fim: temperature 必须是 0-2 之间的数字')
+  }
   if (!/^https?:\/\//u.test(config.baseURL)) {
-    throw new Error('dsh-prefix-completion: baseURL 必须是 http(s) URL')
+    throw new Error('dsh-chat-fim: baseURL 必须是 http(s) URL')
   }
   return config
 }
 
 /** 安全解析请求体；超限 / 非法 JSON 返回 BAD_BODY。 */
-export function parseCompleteBody(body: string, maxBodyBytes: number, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | PrefixCompletionError {
+export function parseCompleteBody(body: string, maxBodyBytes: number, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | ChatFimError {
   if (Buffer.byteLength(body, 'utf8') > maxBodyBytes) {
     return { code: 'BAD_BODY', message: `请求体超过 ${maxBodyBytes} 字节上限` }
   }
@@ -101,7 +110,7 @@ export function parseCompleteBody(body: string, maxBodyBytes: number, maxPromptC
 }
 
 /** 校验已解析请求。prompt 按字符数限制（上限为 MAX_SAFE_INTEGER 时表示不限制）。 */
-export function validateCompletePayload(value: unknown, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | PrefixCompletionError {
+export function validateCompletePayload(value: unknown, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | ChatFimError {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return { code: 'BAD_BODY', message: '请求体必须是 JSON 对象' }
   }
@@ -138,36 +147,29 @@ function textFromHistoryMessage(message: unknown): string {
 }
 
 /**
- * 用户角度续写引导：放在草稿前缀前。官方契约要求带 prefix 的最后一条消息必须是
- * assistant 角色，因此把「站在用户角度续写」写进引导，让模型补全出的这段文本
- * 内容上是用户草稿的续文，而不是对草稿的回复。
+ * 构造 FIM 补全 prompt：最近对话历史转成「用户：/助手：」说话人文本，草稿作为
+ * 最后一个「用户：」开头。FIM 直接续写文本本身，没有角色语义，补全天然站在用户
+ * 角度；stop 序列防止模型接着写下一位说话人。
  */
-export const DRAFT_CONTINUATION_GUIDANCE = '用户正在输入一条新消息，草稿如下。请站在用户的角度、以用户的口吻把草稿续写完整：只输出草稿的续写文本，不要解释、不要回复草稿内容、不要另起新话题。'
-
-/**
- * 构造「对话前缀续写」请求消息：带最近对话历史 + 用户角度续写引导，并把用户正在
- * 输入的半句话作为最后一条 assistant 前缀（官方 Chat Prefix Completion 契约）。
- */
-export function buildChatPrefixMessages(
+export function buildFimPrompt(
   history: readonly unknown[],
   draft: string,
   maxMessages = MAX_HISTORY_MESSAGES,
   maxChars = MAX_HISTORY_CHARS,
-): ChatPrefixMessage[] {
-  const recent: ChatPrefixMessage[] = []
+): string {
+  const recent: Array<{ speaker: '用户' | '助手'; text: string }> = []
   let chars = 0
   for (const message of [...history].reverse()) {
     if (recent.length >= maxMessages) break
     const text = textFromHistoryMessage(message)
     if (text === '') continue
     if (chars + text.length > maxChars && recent.length > 0) break
-    recent.unshift({ role: messageRole(message), content: text })
+    recent.unshift({ speaker: messageRole(message) === 'assistant' ? '助手' : '用户', text })
     chars += text.length
   }
 
-  recent.push({ role: 'user', content: DRAFT_CONTINUATION_GUIDANCE })
-  recent.push({ role: 'assistant', content: draft, prefix: true })
-  return recent
+  const transcript = recent.map(entry => `${entry.speaker}：${entry.text}`).join('\n')
+  return `${transcript === '' ? '' : `${transcript}\n\n`}用户：${draft}`
 }
 
 function messageRole(message: unknown): 'user' | 'assistant' {
@@ -176,7 +178,7 @@ function messageRole(message: unknown): 'user' | 'assistant' {
 }
 
 /** 把上游 HTTP 状态映射为插件错误码。 */
-export function upstreamStatusToError(status: number, bodyText: string): PrefixCompletionError {
+export function upstreamStatusToError(status: number, bodyText: string): ChatFimError {
   if (status === 401 || status === 403) {
     return { code: 'MISSING_CREDENTIAL', message: 'DeepSeek API 凭据无效或无权访问对话前缀续写 Beta' }
   }

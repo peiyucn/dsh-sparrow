@@ -1,6 +1,6 @@
 {
-  "name": "dsh-prefix-completion",
-  "description": "DSH Web 插件：聊天输入框对话前缀续写（DeepSeek Chat Prefix Completion Beta）",
+  "name": "dsh-chat-fim",
+  "description": "DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + dock 建议条）",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",

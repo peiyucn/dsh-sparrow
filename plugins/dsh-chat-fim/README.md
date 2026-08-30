@@ -1,10 +1,10 @@
-# dsh-prefix-completion
+# dsh-chat-fim
 
 聊天输入框续写联想 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
 
-打字停顿片刻，给出「接下来可能写的文字」建议，点击采用即追加进草稿；补全由 DeepSeek 官方 [对话前缀续写（Beta）](https://api-docs.deepseek.com/zh-cn/guides/chat_prefix_completion/) 接口生成：host 把最近对话历史和你正在输入的半句话作为 assistant prefix 发给模型。
+打字停顿片刻，给出「接下来可能写的文字」建议，点击采用即追加进草稿；补全由 DeepSeek 官方 [FIM 补全（Beta）](https://api-docs.deepseek.com/zh-cn/guides/fim_completion) 接口生成：host 把最近对话历史转成「用户：/助手：」说话人文本，加上你正在输入的半句话发给模型续写。
 
-**状态：🚧 M1+M2 已实现（对话前缀续写版）** —— 适配 dsh ≥ 0.1.1-rc.2；设计文档见 [docs/spec/](docs/spec/)。
+**状态：🚧 M1+M2 已实现（FIM 补全版）** —— 适配 dsh ≥ 0.1.1-rc.2；设计文档见 [docs/spec/](docs/spec/)。
 
 ## 本地验证
 
@@ -14,8 +14,8 @@ npm run verify
 
 ## 关键行为
 
-* host 路由 `POST /api/prefix-completion/complete`；会话未命中即拒、凭据只经 `ctx.credentials` 实时解析；
-* 补全请求带用户角度续写引导（官方契约要求 `prefix` 只加在最后一条 assistant 消息上，引导让续文内容站在用户角度，而不是回应草稿）；
+* host 路由 `POST /api/chat-fim/complete`；会话未命中即拒、凭据只经 `ctx.credentials` 实时解析；
+* 补全走 FIM 接口：直接续写文本本身、没有角色语义，天然站在用户角度；`stop` 序列（`\n用户：` / `\n助手：`）防止模型续写下一位说话人；多建议 = 并行多次请求（FIM 无 `n` 参数），部分失败保留成功建议；
 * 客户端 dock 在停顿 400ms 后触发，IME 组合态压制，响应按 `draftRev` 防陈旧；
 * 采用通过 scoped `slash/input-insert-text` bail 事件写入草稿，不碰 DOM / 输入框内部实现。
 
@@ -27,9 +27,9 @@ npm run verify
 * `GET /plugins/dsh-fim/client.js` 返回 200，bundle 为 `window.__ModuleLoader__.load(...)` 工厂格式；
 * 浏览器端 dock 的点击交互仍需在页面里做一次人工确认。
 
-> **改名说明**：插件由 `dsh-fim` 更名 `dsh-prefix-completion`——实际实现走 DeepSeek [对话前缀续写（Beta）](https://api-docs.deepseek.com/zh-cn/guides/chat_prefix_completion/)，并非 FIM 补全，旧名与实现不符。路由同步改为 `POST /api/prefix-completion/complete`，bundle id 同步变更；上表实测是旧名下做的，改名后需重新 `add` 并复测。
+> **改名说明**：插件名演进 `dsh-fim` → `dsh-prefix-completion` → `dsh-chat-fim`。第一个名字用的是 FIM 补全、旧名与实现不符；第二个名字改用对话前缀续写但「用户角度」靠提示词硬掰、实测不稳定；现名切回 FIM 补全（A/B 实测见下），路由为 `POST /api/chat-fim/complete`。旧名下的实测记录保留并标注当时名义，改名后需重新 `add` 并复测。
 
-## 本机实测记录（2026-08-29，改名后，dsh 0.1.2-alpha.1）
+## 本机实测记录（2026-08-29，当时名 dsh-prefix-completion，dsh 0.1.2-alpha.1）
 
 * 隔离冒烟：临时 `DSH_HOME` 下 `dsh plugin --profile web add` 装入三个 sparrow 插件（prefix-completion / vision-subagent / archive-session），再以当前 dsh 源码树 `--profile web --port 0` 启动，fail-loud 启动通过（三插件随 profile 装载成功）；
 * `POST /api/prefix-completion/complete` 携带假 sessionId 返回插件自身 `UNKNOWN_SESSION` JSON——路由注册与会话门禁生效；

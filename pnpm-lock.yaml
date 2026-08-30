@@ -60,7 +60,7 @@ importers:
         specifier: ^18.2.0
         version: 18.3.1
 
-  plugins/dsh-prefix-completion:
+  plugins/dsh-chat-fim:
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.1
@@ -113,9 +113,6 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: 0.1.1-rc.2
         version: 0.1.1-rc.2(a4e4bb24a1f3580ac25e11cfa3c6b8cc)
-      '@deepseek-ai/dsh-subagent':
-        specifier: 0.1.1-rc.2
-        version: 0.1.1-rc.2(41d5ff529e06289e51a68d84fe32d51b)
       '@deepseek-ai/dsh-tools':
         specifier: 0.1.1-rc.2
         version: 0.1.1-rc.2(119bc70f73f8eddebfaa6b47561adeb3)

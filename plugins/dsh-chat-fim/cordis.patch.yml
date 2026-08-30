@@ -1,8 +1,8 @@
-# dsh-prefix-completion 组合补丁：`dsh plugin --profile web add dsh-prefix-completion` 安装后由 profile 自动挂载。
+# dsh-chat-fim 组合补丁：`dsh plugin --profile web add dsh-chat-fim` 安装后由 profile 自动挂载。
 # 配置值均为安全默认值；API key 只经 ctx.credentials 解析，绝不写在这里。
 - insert:
-    - id: dsh-prefix-completion
-      name: dsh-prefix-completion
+    - id: dsh-chat-fim
+      name: dsh-chat-fim
       config:
         baseURL: https://api.deepseek.com/beta
         model: deepseek-v4-pro
@@ -12,3 +12,5 @@
         maxBodyBytes: 65536
         maxPromptChars: 32768
         triggerPauseMs: 400
+        suggestionCount: 2
+        temperature: 1

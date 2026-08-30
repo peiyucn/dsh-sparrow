@@ -1,16 +1,16 @@
-# 00 · 插件概览 — dsh-prefix-completion
+# 00 · 插件概览 — dsh-chat-fim
 
 > dsh-sparrow 合集成员。本文是需求范围与验收边界；详细设计见 01-design.md，路线图见 02-roadmap.md。
 
 ## 定位
 
-给 DeepSeek Harness Web 的**聊天输入框**加「续写联想」：用户打字停顿片刻，插件给出「接下来可能写的文字」建议；点击采用即追加进草稿。补全由 DeepSeek 官方对话前缀续写（Chat Prefix Completion，Beta）接口生成：host 把最近对话历史、用户角度续写引导和正在输入的半句话发给模型，让补全内容站在用户角度续写草稿，而不是回应草稿。
+给 DeepSeek Harness Web 的**聊天输入框**加「续写联想」：用户打字停顿片刻，插件给出「接下来可能写的文字」建议；点击采用即追加进草稿。补全由 DeepSeek 官方 [FIM 补全（Beta）](https://api-docs.deepseek.com/zh-cn/guides/fim_completion) 接口生成：host 把最近对话历史转成「用户：/助手：」说话人文本，加上正在输入的半句话发给模型直接续写——FIM 没有角色语义，续文天然站在用户角度（实测提示词修视角不稳定，已弃用对话前缀续写方案）。
 
 ## 需求范围（做什么 / 不做什么）
 
 **做**：
 
-* host half：注册自有路由 `POST /api/prefix-completion/complete`，把（会话、最近对话历史、草稿前缀）转发到 DeepSeek 对话前缀续写（Beta），返回候选建议；
+* host half：注册自有路由 `POST /api/chat-fim/complete`，把（会话、最近对话历史转文本、草稿）转发到 DeepSeek FIM 补全（Beta），返回候选建议；
 * client half（M2）：输入框旁的 dock 建议条——触发、展示、作废、采用；
 * 触发/作废/采用的交互规则与错误降级。
 
@@ -25,7 +25,7 @@
 
 ### M1 · host half（转发路由）
 
-* `POST /api/prefix-completion/complete` 返回结构化的候选建议；非法请求按错误码拒绝（见 01 错误映射表）；
+* `POST /api/chat-fim/complete` 返回结构化的候选建议；非法请求按错误码拒绝（见 01 错误映射表）；
 * 上游超时/断连可取消，不悬挂、不泄漏 AbortController；
 * 配置（baseURL / model / maxTokens / apiKeyEnv）从插件设置分节读取，无明文 key；
 * `npm run verify` 全绿，纯逻辑（请求校验、错误映射）有单测。

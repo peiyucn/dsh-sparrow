@@ -1,4 +1,4 @@
-# 01 · 详细设计 — dsh-prefix-completion
+# 01 · 详细设计 — dsh-chat-fim
 
 > 起点为零代码；seam 选择以本文件《seam 查证》为准，未查证项标注待查证，开工前补齐。
 
@@ -6,7 +6,7 @@
 
 * **host half**（Node）：webServer 自有路由 + 上游转发 + 凭据解析；
 * **client half**（浏览器，M2）：dock 建议条，esbuild 单文件 bundle；
-* 通信只走 host 路由 `POST /api/prefix-completion/complete`（client 不 import Node 模块，host 不 import 浏览器 API）。
+* 通信只走 host 路由 `POST /api/chat-fim/complete`（client 不 import Node 模块，host 不 import 浏览器 API）。
 
 ## 插件契约合规（dsh 规范）
 
@@ -28,15 +28,16 @@
 
 ### 请求语义
 
-* 只受理 `POST /api/prefix-completion/complete`，其余 404；
+* 只受理 `POST /api/chat-fim/complete`，其余 404；
 * 校验：`sessionId` 命中 sessions 服务（否则 403/503）、`prompt` 非空且 ≤ `MAX_PROMPT_CHARS`（拟定 32k，否则 400）、请求体 ≤ `MAX_BODY_BYTES`（64 KB）；
 * 凭据：`ctx.credentials.resolve('DEEPSEEK_API_KEY')`，缺失 401；
-* 转发：`POST {baseURL}/chat/completions`，body `{ model, messages, max_tokens }`；`messages` 由最近对话历史 + 用户角度续写引导 + 最后一条 assistant 前缀（`prefix: true`，官方契约要求前缀必须是 assistant 角色）构造（见 `buildChatPrefixMessages`）；引导保证补全出的文本内容上是用户草稿的续文，而不是对草稿的回复；
+* 转发：`POST {baseURL}/completions`（FIM 补全 Beta），body `{ model, prompt, max_tokens, stop, temperature }`；`prompt` 由最近对话历史转成的「用户：/助手：」说话人文本 + 草稿（最后一个「用户：」开头）构造（见 `buildFimPrompt`）；FIM 直接续写文本本身、没有角色语义，天然站在用户角度；`stop` 序列 `\n用户：` / `\n助手：` 防止模型续写下一位说话人；
+* 多建议：FIM 接口无 `n` 参数，按 `suggestionCount`（默认 2）并行请求、温度错开采样；`allSettled` 部分失败保留成功建议；
 * 生命周期：超时（`REQUEST_TIMEOUT_MS` 30s）+ 客户端 `close` 即 `AbortController.abort()`。
 
 ### 配置
 
-* 插件设置分节：`baseURL`（默认 https://api.deepseek.com/beta）/ `model` / `maxTokens` / `apiKeyEnv`；key 值仍只经 credentials，不进设置明文。
+* 插件设置分节：`baseURL`（默认 https://api.deepseek.com/beta）/ `model` / `maxTokens` / `apiKeyEnv` / `suggestionCount` / `temperature`；key 值仍只经 credentials，不进设置明文。
 
 ### 错误映射（纯函数，可单测）
 
@@ -58,7 +59,7 @@
 ## 通信协议
 
 ```json
-POST /api/prefix-completion/complete
+POST /api/chat-fim/complete
 { "sessionId": "...", "prompt": "草稿前缀" }
 
 200 { "suggestions": ["候选1", "候选2"] }
