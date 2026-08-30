@@ -478,21 +478,22 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
     flash: 'deepseek-v4-flash',
   }
 
-  const openPicker = (): void => {
+  /** 依据开关胶囊矩形计算弹层锚点；空间不够时向上弹出（官方下拉惯例）。 */
+  const computePickerPoint = (): { x: number; y: number; up: boolean } | null => {
     const rect = switchRef.current?.getBoundingClientRect()
-    if (rect === undefined) {
-      setPickerPoint(null)
-      setPickerOpen(true)
-      return
-    }
-    // 空间不够时向上弹出（官方下拉惯例）：三选项弹层估算高度 112px + 8px 边距。
+    if (rect === undefined) return null
     const estimate = 112 + 8
     const up = rect.bottom + estimate > window.innerHeight
-    setPickerPoint({ x: rect.right, y: up ? rect.top - 4 : rect.bottom + 4, up })
+    return { x: rect.right, y: up ? rect.top - 4 : rect.bottom + 4, up }
+  }
+
+  const openPicker = (): void => {
+    setPickerPoint(computePickerPoint())
     setPickerOpen(true)
   }
 
-  // 弹层打开时：点外部关闭、Esc 关闭、滚动关闭（位置不再可靠）。
+  // 弹层打开时：点外部关闭、Esc 关闭；滚动/缩放**跟随重定位**（官方下拉行为，
+  // 不关闭——生成中的会话流式输出会带动聊天区滚动，关掉弹层就是这里的 bug）。
   useEffect(() => {
     if (!pickerOpen) return
     const onPointerDown = (event: PointerEvent): void => {
@@ -504,14 +505,20 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') setPickerOpen(false)
     }
-    const onScroll = (): void => { setPickerOpen(false) }
+    const reposition = (): void => {
+      const next = computePickerPoint()
+      if (next === null) setPickerOpen(false)
+      else setPickerPoint(next)
+    }
     document.addEventListener('pointerdown', onPointerDown, true)
     document.addEventListener('keydown', onKeyDown, true)
-    document.addEventListener('scroll', onScroll, true)
+    document.addEventListener('scroll', reposition, true)
+    window.addEventListener('resize', reposition)
     return () => {
       document.removeEventListener('pointerdown', onPointerDown, true)
       document.removeEventListener('keydown', onKeyDown, true)
-      document.removeEventListener('scroll', onScroll, true)
+      document.removeEventListener('scroll', reposition, true)
+      window.removeEventListener('resize', reposition)
     }
   }, [pickerOpen])
 
