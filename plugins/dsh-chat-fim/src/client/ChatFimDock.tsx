@@ -324,19 +324,15 @@ export function ensureFimBusyStyles(): void {
   line-height: 18px;
   white-space: nowrap;
 }
-/* 键盘帽做成「按钮」观感：实底 + 1px 边框 + 圆角（官方同款但底色更实，两主题都清晰）。 */
+/* 键盘帽与官方 @ 列表 drillHint 完全同款（token 逐项一致：底色/圆角/内边距/字色）。 */
 .dsh-chat-fim-menu-kbd {
-  min-width: 22px;
-  padding: 0 6px;
-  border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
-  border-radius: 6px;
-  background: var(--dsw-alias-interactive-bg-hover-solid, rgba(0, 0, 0, 0.06));
-  color: var(--dsw-alias-label-secondary);
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-caption);
   font-family: inherit;
   font-size: 11px;
   line-height: 18px;
-  text-align: center;
-  box-shadow: inset 0 -1px 0 var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.08));
 }
 `
   document.head.appendChild(style)
