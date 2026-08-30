@@ -25,6 +25,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'action.deleteAll'
       | 'state.running'
       | 'state.live'
+      | 'state.liveActionHint'
       | 'state.backendUnsupported'
       | 'confirm.backup'
       | 'confirm.delete'

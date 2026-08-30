@@ -629,6 +629,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                         type="button"
                         className="dsh-archive-btn"
                         disabled={loading || !item.backendSupported}
+                        title={item.live ? t('state.liveActionHint') : undefined}
                         onClick={() => { confirmBackup(item) }}
                       >
                         {t('action.backup')}
@@ -637,6 +638,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                         type="button"
                         className="dsh-archive-btn dsh-archive-btn-danger"
                         disabled={loading || !item.backendSupported}
+                        title={item.live ? t('state.liveActionHint') : undefined}
                         onClick={() => { confirmDelete(item) }}
                       >
                         {t('action.delete')}
