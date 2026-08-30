@@ -123,10 +123,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       }, exec.signal)
       let text = ''
       for await (const chunk of prepared.stream({
-        provider: settings.visionProvider,
-        model: settings.visionModel,
-        maxTokens: settings.maxTokens,
-        temperature: settings.temperature,
+        ...prepared.config,
         messages: [createUserMessage({
           content: [
             { type: 'text', text: promptText },
