@@ -40,6 +40,21 @@ export function sanitizeSegment(value: string): string {
   return /[A-Za-z0-9]/u.test(safe) ? safe : 'unknown'
 }
 
+/**
+ * 把 home 目录前缀掩码为 `~`（跨平台）：Windows 反斜杠与 POSIX 斜杠都处理；
+ * 先精确匹配，再回退大小写不敏感匹配（Windows 大小写不敏感的盘符路径）。
+ * 不在 home 下的路径原样返回。
+ */
+export function maskHomePath(path: string, homeDir: string): string {
+  const home = homeDir.replace(/[\\/]+$/u, '')
+  if (home === '') return path
+  const hasPrefix = (candidate: string, prefix: string): boolean =>
+    candidate === prefix || candidate.startsWith(`${prefix}\\`) || candidate.startsWith(`${prefix}/`)
+  if (hasPrefix(path, home)) return `~${path.slice(home.length)}`
+  if (hasPrefix(path.toLowerCase(), home.toLowerCase())) return `~${path.slice(home.length)}`
+  return path
+}
+
 /** 从备份 sidecar 解析出安全的恢复信息；非法输入返回 undefined。 */
 export function parseBackupSidecar(value: unknown): ArchiveSidecar | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined

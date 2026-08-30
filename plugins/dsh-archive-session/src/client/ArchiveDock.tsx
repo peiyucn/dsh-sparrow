@@ -27,8 +27,8 @@ export interface BackupItem {
 export interface ArchiveDockInjected {
   listArchived: () => Promise<ArchivedSessionItem[]>
   listBackups: () => Promise<BackupItem[]>
-  /** 备份实际存放目录（绝对路径），面板提示信息里明示卸载影响。 */
-  backupDirPath: () => Promise<string>
+  /** 备份实际存放目录（绝对路径 + 掩码后的展示路径），面板提示信息里明示卸载影响。 */
+  backupDirPath: () => Promise<{ path: string; displayPath: string }>
   backupSession: (sessionId: string) => Promise<unknown>
   deleteSession: (sessionId: string, confirmTitle: string) => Promise<unknown>
   restoreBackup: (backupId: string) => Promise<unknown>
@@ -214,6 +214,23 @@ export function ensureArchiveStyles(): void {
   font-size: 12px;
   line-height: 18px;
   color: var(--dsw-alias-state-error-primary, #c62828);
+}
+/* 备份路径按钮：掩码展示，点击复制完整路径（悬停 title 给全文）。 */
+.dsh-archive-backup-dir {
+  display: inline;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--dsw-alias-button-info-fill, #4d6bfe);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  cursor: pointer;
+  word-break: break-all;
+}
+.dsh-archive-backup-dir:hover {
+  text-decoration: underline;
 }
 .dsh-archive-confirm-status {
   margin: 0;
@@ -401,12 +418,13 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [open, setOpen] = useState(false)
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
   const [backups, setBackups] = useState<BackupItem[]>([])
-  const [backupDir, setBackupDir] = useState<string | null>(null)
+  const [backupDir, setBackupDir] = useState<{ path: string; displayPath: string } | null>(null)
   const [archivedOpen, setArchivedOpen] = useState(true)
   const [backupsOpen, setBackupsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingConfirm | null>(null)
+  const [copied, setCopied] = useState(false)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
 
   // 官方弹窗行为：打开时聚焦关闭按钮，Esc 关闭。
@@ -438,6 +456,23 @@ export function ArchiveDock(props: ArchiveDockProps) {
       setLoading(false)
     }
   }
+
+  // 复制完整备份路径到剪贴板；成功给 2 秒「已复制」反馈。
+  const copiedTimerRef = useRef<number | null>(null)
+  const copyBackupDir = async (): Promise<void> => {
+    if (backupDir === null) return
+    try {
+      await navigator.clipboard.writeText(backupDir.path)
+      setCopied(true)
+      if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current)
+      copiedTimerRef.current = window.setTimeout(() => { setCopied(false) }, 2_000)
+    } catch {
+      // 剪贴板不可用（非安全上下文等）：悬停 title 里始终有完整路径。
+    }
+  }
+  useEffect(() => () => {
+    if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current)
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -545,10 +580,20 @@ export function ArchiveDock(props: ArchiveDockProps) {
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
             <p style={{ ...styles.secondarySmall, fontSize: 14, lineHeight: '22px', margin: '0 0 12px' }}>
               {t('dialog.intro')}
-              {backupDir !== null && backupDir !== '' ? (
+              {backupDir !== null && backupDir.displayPath !== '' ? (
                 <>
                   <br />
-                  {t('dialog.backupDir', { path: backupDir })}
+                  {t('dialog.backupDir')}
+                  {' '}
+                  <button
+                    type="button"
+                    className="dsh-archive-backup-dir"
+                    title={`${backupDir.path}（${t('dialog.copyHint')}）`}
+                    onClick={() => { void copyBackupDir() }}
+                  >
+                    {backupDir.displayPath}
+                    {copied ? ` ✓${t('dialog.copied')}` : ''}
+                  </button>
                 </>
               ) : null}
               <br />

@@ -7,6 +7,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'dialog.close'
       | 'dialog.intro'
       | 'dialog.backupDir'
+      | 'dialog.copyHint'
+      | 'dialog.copied'
       | 'dialog.uninstallHint'
       | 'loading'
       | 'section.archived'

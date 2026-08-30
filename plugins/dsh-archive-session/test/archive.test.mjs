@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  isDeleteConfirmationSufficient, legacyBackupItem, normalizeArchiveConfig, parseBackupSidecar,
-  sanitizeSegment,
+  isDeleteConfirmationSufficient, legacyBackupItem, maskHomePath, normalizeArchiveConfig,
+  parseBackupSidecar, sanitizeSegment,
 } from '../lib/archive.js'
 
 describe('archive-session 纯逻辑', () => {
@@ -27,8 +27,35 @@ describe('archive-session 纯逻辑', () => {
     })
   })
 
-  describe('sanitizeSegment', () => {
-    it('危险字符 应该 替换为下划线', () => {
+  describe('maskHomePath', () => {
+    it('Windows home 前缀 应该 掩码为 ~', () => {
+      assert.equal(
+        maskHomePath('C:\\Users\\DJ028191\\.dsh\\sessions-archived-backup', 'C:\\Users\\DJ028191'),
+        '~\\.dsh\\sessions-archived-backup',
+      )
+    })
+
+    it('Windows 大小写不同 应该 也能掩码', () => {
+      assert.equal(
+        maskHomePath('c:\\users\\dj028191\\.dsh\\x', 'C:\\Users\\DJ028191'),
+        '~\\.dsh\\x',
+      )
+    })
+
+    it('POSIX home 前缀 应该 掩码为 ~', () => {
+      assert.equal(maskHomePath('/home/alice/.dsh/backups', '/home/alice'), '~/.dsh/backups')
+    })
+
+    it('路径等于 home 应该 掩码为 ~', () => {
+      assert.equal(maskHomePath('/home/alice', '/home/alice'), '~')
+    })
+
+    it('不在 home 下 应该 原样返回', () => {
+      assert.equal(maskHomePath('/opt/data/backups', '/home/alice'), '/opt/data/backups')
+    })
+  })
+
+  describe('sanitizeSegment', () => {    it('危险字符 应该 替换为下划线', () => {
       assert.equal(sanitizeSegment('../../a b'), '______a_b')
     })
 

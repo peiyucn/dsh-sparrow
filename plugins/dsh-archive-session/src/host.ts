@@ -2,6 +2,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
@@ -16,7 +17,7 @@ import { WorkspaceId, workspaceDomainSpec } from '@deepseek-ai/dsh-workspace'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
-  BACKUP_SIDECAR, isDeleteConfirmationSufficient, legacyBackupItem, normalizeArchiveConfig,
+  BACKUP_SIDECAR, isDeleteConfirmationSufficient, legacyBackupItem, maskHomePath, normalizeArchiveConfig,
   parseBackupSidecar, sanitizeSegment, type ArchiveConfig, type ArchiveSidecar,
 } from './archive.js'
 
@@ -323,8 +324,11 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
         }
 
         if (req.method === 'GET' && pathname === `${PREFIX}/backup-dir`) {
-          // 面板提示信息用：明示备份实际存放位置（卸载影响可见化）。
-          sendJson(res, 200, { path: settings.backupRoot })
+          // 面板提示信息用：明示备份实际存放位置（卸载影响可见化）；displayPath 掩码 home 前缀（~）。
+          sendJson(res, 200, {
+            path: settings.backupRoot,
+            displayPath: maskHomePath(settings.backupRoot, homedir()),
+          })
           return
         }
 
