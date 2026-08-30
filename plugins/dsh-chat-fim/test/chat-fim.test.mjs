@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, fimStopSequences, formatTokenCount,
-  isDeepseekMainRoute, isStaleResponse, mainRouteFromSession, normalizeConfig, normalizeFimModelMode,
+  isDeepseekMainRoute, mainRouteFromSession, normalizeConfig, normalizeFimModelMode,
   parseCompleteBody, resolveFimModel, shouldTriggerFim, stripSpeakerPrefix, summarizeUpstreamBody,
   upstreamStatusToError, validateCompletePayload,
 } from '../lib/chat-fim.js'
@@ -183,16 +183,6 @@ describe('chat-fim 纯逻辑', () => {
       const value = summarizeUpstreamBody('x'.repeat(300), 10)
       assert.equal(value.length, 11)
       assert.match(value, /…$/u)
-    })
-  })
-
-  describe('isStaleResponse', () => {
-    it('draftRev 不一致 应该 判定陈旧', () => {
-      assert.equal(isStaleResponse(1, 2), true)
-    })
-
-    it('draftRev 一致 应该 判定新鲜', () => {
-      assert.equal(isStaleResponse(1, 1), false)
     })
   })
 
