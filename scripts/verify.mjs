@@ -8,8 +8,16 @@ import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const cwd = process.cwd()
-const dshSource = resolve(process.env.DSH_SOURCE ?? 'C:/Users/DJ028191/.dsh-launcher-panel/source')
-const tsc = join(dshSource, 'node_modules', 'typescript', 'bin', 'tsc')
+const workspaceRoot = resolve(cwd, '..', '..')
+// 本机优先用 dsh checkout 的 tsc（与运行时源码一致）；CI / 无 checkout 时回退到
+// workspace 根安装的 typescript（root devDependencies 固定与本机同版本）。
+const checkoutTsc = join(process.env.DSH_SOURCE ?? 'C:/Users/DJ028191/.dsh-launcher-panel/source', 'node_modules', 'typescript', 'bin', 'tsc')
+const tsc = existsSync(checkoutTsc) ? checkoutTsc : resolve(workspaceRoot, 'node_modules', 'typescript', 'bin', 'tsc')
+
+if (!existsSync(tsc)) {
+  console.error(`verify: 找不到 typescript（已尝试 checkout ${checkoutTsc} 与 workspace ${workspaceRoot}）`)
+  process.exit(1)
+}
 
 if (!existsSync(join(cwd, 'tsconfig.json'))) {
   console.error(`verify: ${cwd} 缺少 tsconfig.json`)

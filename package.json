@@ -1,12 +1,13 @@
 {
   "name": "dsh-sparrow",
   "private": true,
-  "description": "麻雀虽小,五脏俱全 —— DeepSeek Harness Web 插件小合集",
+  "description": "DeepSeek Harness 插件小合集",
   "packageManager": "pnpm@11.22.0",
   "scripts": {
     "verify:all": "node scripts/verify-all.mjs"
   },
   "devDependencies": {
-    "esbuild": "^0.25.12"
+    "esbuild": "^0.25.12",
+    "typescript": "6.0.3"
   }
 }
