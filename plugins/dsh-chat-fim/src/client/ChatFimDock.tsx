@@ -315,6 +315,8 @@ export function ensureFimBusyStyles(): void {
   align-items: center;
   gap: 4px;
   margin-left: auto;
+  /* 与建议文字保持呼吸间距（文字 flex:1 顶满后 auto 边距为 0，靠这里拉开）。 */
+  padding-left: 24px;
 }
 .dsh-chat-fim-menu-hint {
   color: var(--dsw-alias-label-caption);
