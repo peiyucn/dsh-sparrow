@@ -4,6 +4,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
+import { IconArchiveOutline20 } from '@deepseek-ai/dsh-client-ui-primitives'
 
 export interface ArchivedSessionItem {
   readonly sessionId: string
@@ -42,9 +43,9 @@ const styles = {
     alignItems: 'center',
     gap: 6,
     padding: '6px 8px',
-    border: '1px solid var(--dsw-alias-border-l1, #d4d8e0)',
     borderRadius: 6,
-    background: 'var(--dsw-alias-bg-layer-1, #ffffff)',
+    background: 'transparent',
+    border: 'none',
     color: 'var(--dsw-alias-label-primary, #1f2329)',
     cursor: 'pointer',
   } satisfies CSSProperties,
@@ -115,6 +116,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [open, setOpen] = useState(false)
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
   const [backups, setBackups] = useState<BackupItem[]>([])
+  const [archivedOpen, setArchivedOpen] = useState(true)
   const [backupsOpen, setBackupsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
@@ -245,7 +247,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
         aria-expanded={open}
         onClick={() => { setOpen(value => !value) }}
       >
-        <span aria-hidden>📦</span>
+        <IconArchiveOutline20 />
         {wide ? <span>{t('button.label')}</span> : null}
       </button>
 
@@ -264,39 +266,51 @@ export function ArchiveDock(props: ArchiveDockProps) {
             </p>
             {error !== null ? <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>{error}</p> : null}
 
-            <h3 style={{ fontSize: 15 }}>{t('section.archived', { count: loading ? '…' : archived.length })}</h3>
-            {loading ? loadingRow : null}
-            {!loading && archived.length === 0 ? <p style={styles.secondarySmall}>{t('empty.archived')}</p> : null}
-            {!loading && archived.map(item => (
-              <div key={item.sessionId} style={styles.row}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={styles.title} title={item.title}>{item.title}</div>
-                  <div style={styles.secondarySmall}>
-                    {item.sessionId}
-                    {item.running ? ` · ${t('state.running')}` : item.live ? ` · ${t('state.live')}` : ''}
-                    {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
+            <button
+              type="button"
+              style={{ ...styles.small, border: 'none', padding: '8px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              aria-expanded={archivedOpen}
+              onClick={() => { setArchivedOpen(value => !value) }}
+            >
+              <span aria-hidden>{archivedOpen ? '▾' : '▸'}</span>
+              <span>{t('section.archived', { count: loading ? '…' : archived.length })}</span>
+            </button>
+            {archivedOpen ? (
+              <>
+                {loading ? loadingRow : null}
+                {!loading && archived.length === 0 ? <p style={styles.secondarySmall}>{t('empty.archived')}</p> : null}
+                {!loading && archived.map(item => (
+                  <div key={item.sessionId} style={styles.row}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={styles.title} title={item.title}>{item.title}</div>
+                      <div style={styles.secondarySmall}>
+                        {item.sessionId}
+                        {item.running ? ` · ${t('state.running')}` : item.live ? ` · ${t('state.live')}` : ''}
+                        {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
+                      </div>
+                    </div>
+                    <div style={styles.actions}>
+                      <button
+                        type="button"
+                        style={styles.small}
+                        disabled={busy !== null || loading || !item.backendSupported}
+                        onClick={() => { confirmBackup(item) }}
+                      >
+                        {t('action.backup')}
+                      </button>
+                      <button
+                        type="button"
+                        style={{ ...styles.small, ...styles.danger }}
+                        disabled={busy !== null || loading || !item.backendSupported}
+                        onClick={() => { confirmDelete(item) }}
+                      >
+                        {t('action.delete')}
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div style={styles.actions}>
-                  <button
-                    type="button"
-                    style={styles.small}
-                    disabled={busy !== null || loading || !item.backendSupported}
-                    onClick={() => { confirmBackup(item) }}
-                  >
-                    {t('action.backup')}
-                  </button>
-                  <button
-                    type="button"
-                    style={{ ...styles.small, ...styles.danger }}
-                    disabled={busy !== null || loading || !item.backendSupported}
-                    onClick={() => { confirmDelete(item) }}
-                  >
-                    {t('action.delete')}
-                  </button>
-                </div>
-              </div>
-            ))}
+                ))}
+              </>
+            ) : null}
 
             <button
               type="button"
