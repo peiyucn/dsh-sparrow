@@ -17,7 +17,7 @@
   * 建议长句：行内 **2 行 line-clamp**（超出省略），悬停 `title` 给全文；
   * 高度：`useAnchoredMaxHeight` 钳在 composer 上方可用空间；
 * 采用：Tab（capture 监听，焦点保持在输入框）或 mousedown 点选（preventDefault 防焦点抢夺）→ `slash/input-insert-text` bail 事件追加草稿（span 取自共享快照的 draft/draftRev，CAS 判定）；Esc 丢弃；继续输入/发送/切会话清空；
-* 开关（input.left）：火花图标 + 「Suggest/续写」标签，关闭态标签**删除线** + 灰字、开启态紫色；**窄行折叠为纯图标**——官方 PermissionSelect 同款匿名 `@container (max-width: 460px)` 规则（容器为 InputBar `.row`，查证见 InputBar.module.css:214 / PermissionSelect.module.css:68）（2026-08-30 用户要求）；
+* 开关（input.left）：火花图标 + 「Suggest/续写」标签，关闭态标签**灰字**（2026-08-30 起不用删除线，颜色区分已足够）、开启态紫色；**窄行折叠为纯图标**——官方 PermissionSelect 同款匿名 `@container (max-width: 460px)` 规则（容器为 InputBar `.row`，查证见 InputBar.module.css:214 / PermissionSelect.module.css:68）（2026-08-30 用户要求）；
 * 联想中指示：开关胶囊显示 busy；紫色旋转光环保留在 composer 卡片外圈（dock 组件渲染，portal 到 body）。
 
 ## @ 列表冲突规避（硬约束）

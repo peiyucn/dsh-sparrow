@@ -215,9 +215,8 @@ export function ensureFimBusyStyles(): void {
 .dsh-chat-fim-switch-on .dsh-chat-fim-switch-icon {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
 }
-/* 关闭态：Suggest 删除线 + 灰字（开启态正常紫色）。 */
+/* 关闭态：灰字区分（开启态紫色），不再用删除线。 */
 .dsh-chat-fim-switch-off .dsh-chat-fim-switch-label {
-  text-decoration: line-through;
   color: var(--dsw-alias-label-tertiary, #9aa0a6);
 }
 /* 窄行折叠为纯图标：官方 PermissionSelect 同款匿名 @container 规则，
