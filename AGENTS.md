@@ -10,13 +10,13 @@
 
 **dsh-sparrow**：DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全」。
 
-* 每个插件一个独立 npm 包、独立发布；合集 README 提供索引，某功能被官方原生支持后对应插件从合集中退役
+* 每个插件一个独立 npm 包、独立发布；某功能被官方原生支持后对应插件从合集中退役
 * 布局：
-  * `plugins/dsh-chat-fim` — 聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + dock 建议条）
+  * `plugins/dsh-chat-fim` — 聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + 官方 @ 列表同款候选菜单）
   * `plugins/dsh-vision-access` — 纯文本会话的图片视觉通道（官方 vision 模型读图，主模型保持大脑）
   * `plugins/dsh-archive-session` — 归档会话管理：备份 / 删除 / 恢复（轻量标题已随官方投影缓存退役）
-  * `packages/shared` — 插件共用的 seam 适配层与测试基建（有真实共用代码时再落地）
-* 各插件本地验证 = 进入插件目录 `npm run verify`（typecheck + node:test）
+* 各插件本地验证 = 进入插件目录 `npm run verify`（typecheck + node:test）；全量 = 仓库根 `npm run verify:all`
+* 文档分工：插件 README 面向用户（简介 / 安装 / 使用）；`AGENTS.md` 面向开发 agent（seam 特例 / 架构约束 / 测试约定），开发细节不进 README
 * 各插件专属约束见 `plugins/*/AGENTS.md`
 
 ***
@@ -42,7 +42,7 @@
 
 ### 分支
 
-* 日常开发一律在 `dev` 分支；`master` 只接受发布合并，不直接在上面开发
+* 日常开发一律在 `dev` 分支；`main` 只接受发布合并，不直接在上面开发
 
 ### Push
 
@@ -110,7 +110,7 @@
 1. 确认改动已提交并推送 `dev`
 2. 更新该插件 `package.json` 版本号，README / CHANGELOG 同步
 3. 再次验证：进入插件目录 `npm run verify`
-4. 合并 dev 到 master 并 push
+4. 合并 dev 到 main 并 push
 5. 打 tag（`<插件名>-vX.Y.Z`）触发发布，或 `npm publish` / tarball 交付
 6. 切回 dev 继续开发
 
@@ -123,6 +123,8 @@
 
 ***
 
-## CI 自动化（规划）
+## CI 与自动发布（已配置，远端 peiyucn/dsh-sparrow）
 
-* 仓库与远端尚未创建；创建后按插件维度配 GitHub Actions：`npm ci` + tsc 编译 + 测试 + 打包验证
+* `.github/workflows/ci.yml`：push dev/main 与 PR 时跑 `pnpm install --frozen-lockfile` + `npm run verify:all`
+* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish`
+* 发布前置：仓库 Secrets 里配 `NPM_TOKEN`（npmjs.org Automation token）；未配时 publish 步骤会失败，CI 不受影响
