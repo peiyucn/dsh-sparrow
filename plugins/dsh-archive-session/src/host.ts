@@ -72,8 +72,9 @@ function sendError(res: ServerResponse, error: unknown): void {
     sendJson(res, error.status, { error: { code: error.code, message: error.message } })
     return
   }
-  const message = error instanceof Error ? error.message : String(error)
-  sendJson(res, 500, { error: { code: 'IO_ERROR', message } })
+  // 原生 fs 错误消息可能含绝对路径：掩码 home 前缀，与 /backup-dir 的展示口径一致。
+  const raw = error instanceof Error ? error.message : String(error)
+  sendJson(res, 500, { error: { code: 'IO_ERROR', message: maskHomePath(raw, homedir()) } })
 }
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown | ArchiveError> {
@@ -189,23 +190,79 @@ async function openWorkspaceDomain(ctx: Context): Promise<ArchivedDomainHandle> 
   return await ctx.storageDomain.open(workspaceDomainSpec) as unknown as ArchivedDomainHandle
 }
 
-/** 经公开 storageDomain 从归档集中移除会话；domain/changed 会自动广播 archived-sessions-changed。 */
-async function removeArchivedId(ctx: Context, sessionId: SessionId): Promise<void> {
+/**
+ * 域写串行化：归档集的 get→set 是非原子读改写，并发备份/恢复会互相覆盖丢失更新
+ * （2026-08-30 审计）。串行后每次 set 都基于最新域状态。
+ */
+let domainWriteTail: Promise<unknown> = Promise.resolve()
+function serializeDomainWrite<T>(operation: () => Promise<T>): Promise<T> {
+  const next = domainWriteTail.then(operation, operation)
+  domainWriteTail = next.catch(() => undefined)
+  return next
+}
+
+/** 读归档集（以域为准：官方 WorkspaceRegistry 内存态不订阅域变更，直写后会陈旧）。 */
+async function readArchivedIds(ctx: Context): Promise<SessionId[]> {
   const domain = await openWorkspaceDomain(ctx)
-  const state = domain.global.get()
-  const archivedSessionIds = state.archivedSessionIds.filter(id => String(id) !== String(sessionId))
-  if (archivedSessionIds.length === state.archivedSessionIds.length) return
-  await domain.global.set({ ...state, archivedSessionIds })
+  return [...domain.global.get().archivedSessionIds]
+}
+
+/** 直写后一致性检查：registry 内存态与域不一致时告警（官方下一次写会把已移除 id 复活为幽灵条目）。 */
+function warnIfRegistryStale(ctx: Context, domain: ArchivedDomainHandle, label: string): void {
+  try {
+    const registry = ctx.workspaceRegistry.archivedSessionIds.map(String).sort()
+    const domainIds = domain.global.get().archivedSessionIds.map(String).sort()
+    if (registry.join(',') !== domainIds.join(',')) {
+      ctx.logger.warn(`dsh-archive-session: ${label} 后官方 workspace 内存态与域不一致；官方后续写操作可能把已移除会话 id 复活（重启后启动清扫恢复）`)
+    }
+  } catch {
+    // 一致性检查只作告警，不参与主流程。
+  }
+}
+
+/** 经公开 storageDomain 从归档集中移除会话；域变更经 workspace-controller 的 {type:'archived'} follow 帧同步客户端。 */
+async function removeArchivedId(ctx: Context, sessionId: SessionId): Promise<void> {
+  await serializeDomainWrite(async () => {
+    const domain = await openWorkspaceDomain(ctx)
+    const state = domain.global.get()
+    const archivedSessionIds = state.archivedSessionIds.filter(id => String(id) !== String(sessionId))
+    if (archivedSessionIds.length === state.archivedSessionIds.length) return
+    await domain.global.set({ ...state, archivedSessionIds })
+    warnIfRegistryStale(ctx, domain, 'removeArchivedId')
+  })
 }
 
 /** 恢复时把会话加回归档集，并让 WorkspaceRegistry 的内存态也回到一致。 */
 async function addArchivedId(ctx: Context, sessionId: SessionId): Promise<void> {
-  const domain = await openWorkspaceDomain(ctx)
-  const state = domain.global.get()
-  if (!state.archivedSessionIds.some(id => String(id) === String(sessionId))) {
-    await domain.global.set({ ...state, archivedSessionIds: [...state.archivedSessionIds, sessionId] })
-  }
+  await serializeDomainWrite(async () => {
+    const domain = await openWorkspaceDomain(ctx)
+    const state = domain.global.get()
+    if (!state.archivedSessionIds.some(id => String(id) === String(sessionId))) {
+      await domain.global.set({ ...state, archivedSessionIds: [...state.archivedSessionIds, sessionId] })
+    }
+  })
   await ctx.workspaceRegistry.archiveSession(sessionId)
+}
+
+/**
+ * 启动清扫：归档集里不在持久化中的幽灵 id（官方写操作复活产物）清理掉，
+ * 否则它们会永久驻留（2026-08-30 审计发现的 registry 缓存陈旧问题）。
+ */
+async function sweepGhostArchivedIds(ctx: Context): Promise<void> {
+  try {
+    const domain = await openWorkspaceDomain(ctx)
+    const headers = await ctx.sessionPersistence.list()
+    const known = new Set(headers.map(header => String(header.id)))
+    await serializeDomainWrite(async () => {
+      const latest = domain.global.get()
+      const cleaned = latest.archivedSessionIds.filter(id => known.has(String(id)))
+      if (cleaned.length === latest.archivedSessionIds.length) return
+      await domain.global.set({ ...latest, archivedSessionIds: cleaned })
+      ctx.logger.warn(`dsh-archive-session: 启动清扫移除 ${latest.archivedSessionIds.length - cleaned.length} 个幽灵归档 id`)
+    })
+  } catch (error) {
+    ctx.logger.warn(`dsh-archive-session: 启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 /** 失效官方投影缓存行（派生数据，可安全删除；官方服务常驻打开该域，走 get）。 */
@@ -220,7 +277,7 @@ async function invalidateProjectionCache(ctx: Context, sessionId: SessionId): Pr
 }
 
 /** 只有已知的「单会话目录」后端（当前为 jsonl）才允许文件级移动 / 删除。 */
-function sessionDirectoryFor(location: { kind: string; path: string }): string | undefined {
+export function sessionDirectoryFor(location: { kind: string; path: string }): string | undefined {
   if (location.kind !== 'jsonl') return undefined
   const dir = dirname(location.path)
   if (!isAbsolute(dir) || dirname(dir) === dir || basename(dir) === '') return undefined
@@ -228,7 +285,7 @@ function sessionDirectoryFor(location: { kind: string; path: string }): string |
 }
 
 /** 保证传入目录名只能落到 backupRoot 下。 */
-function resolveBackupDir(backupRoot: string, backupId: string): string {
+export function resolveBackupDir(backupRoot: string, backupId: string): string {
   const candidate = resolve(backupRoot, sanitizeSegment(backupId))
   const prefix = resolve(backupRoot)
   if (candidate !== prefix && !candidate.startsWith(`${prefix}${sep}`)) {
@@ -290,6 +347,12 @@ async function restoreBackupDir(ctx: Context, backupDir: string): Promise<Archiv
   if (sidecar === undefined) {
     throw new ArchiveError('BAD_BODY', '备份 sidecar 无效', 404)
   }
+  // sidecar 校验：originalPath 必须是「绝对路径 + 安全命名的单层目录」，防被篡改后把备份 rename 到任意位置。
+  if (!isAbsolute(sidecar.originalPath)
+    || dirname(sidecar.originalPath) === sidecar.originalPath
+    || !/^[A-Za-z0-9_-]+$/u.test(basename(sidecar.originalPath))) {
+    throw new ArchiveError('UNKNOWN_BACKUP', '该备份 sidecar 的原始路径不合法，拒绝恢复', 400)
+  }
   const sessionId = SessionId(sidecar.sessionId)
   if (ctx.sessions.get(sessionId) !== undefined || ctx.agents.get(sessionId) !== undefined) {
     throw new ArchiveError('SESSION_LIVE', '该会话仍被 dsh 进程占用（未释放），不能重复恢复')
@@ -303,7 +366,7 @@ async function restoreBackupDir(ctx: Context, backupDir: string): Promise<Archiv
   try {
     const entries = await readdir(sidecar.originalPath)
     if (entries.length > 0) {
-      throw new ArchiveError('TARGET_EXISTS', '原始会话位置已存在内容，拒绝覆盖恢复')
+      throw new ArchiveError('TARGET_EXISTS', '原始会话位置已存在内容（可能此前已恢复成功），拒绝覆盖恢复')
     }
     targetDirExists = true
   } catch (error) {
@@ -314,7 +377,12 @@ async function restoreBackupDir(ctx: Context, backupDir: string): Promise<Archiv
     await rm(sidecar.originalPath, { recursive: true, force: false })
   }
   await rename(backupDir, sidecar.originalPath)
-  await attachWorkspaceAccounting(ctx, sessionId, sidecar.workspaceIds)
+  try {
+    await attachWorkspaceAccounting(ctx, sessionId, sidecar.workspaceIds)
+  } catch (error) {
+    // 目录已移回，属「已恢复但记账失败」——明确提示，避免重试撞 TARGET_EXISTS。
+    throw new ArchiveError('IO_ERROR', `会话已恢复，但工作区记账失败（请勿重复恢复）：${error instanceof Error ? error.message : String(error)}`, 500)
+  }
   try {
     await addArchivedId(ctx, sessionId)
   } catch (cleanupError) {
@@ -331,6 +399,9 @@ async function restoreBackupDir(ctx: Context, backupDir: string): Promise<Archiv
 export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {}): void {
   const settings = normalizeArchiveConfig(config)
 
+  // 启动清扫归档集幽灵 id（官方写操作复活产物，2026-08-30 审计）：不影响加载。
+  void sweepGhostArchivedIds(ctx)
+
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: PREFIX,
@@ -340,7 +411,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
         if (req.method === 'GET' && pathname === `${PREFIX}/list`) {
           const headers = await ctx.sessionPersistence.list()
           const byId = new Map(headers.map(header => [String(header.id), header]))
-          const archivedIds = [...ctx.workspaceRegistry.archivedSessionIds]
+          // 以域为准读归档集：官方 registry 内存态不订阅域变更，直写后会陈旧。
+          const archivedIds = await readArchivedIds(ctx)
           const presentIds = archivedIds.filter(id => byId.has(String(id)))
           const observations = presentIds.length > 0
             ? await ctx.sessionQuery.readTitleSnapshots(presentIds.map(id => SessionId(String(id))))
@@ -386,7 +458,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             throw new ArchiveError('BAD_BODY', 'sessionId 必须是非空字符串')
           }
           const sessionId = SessionId(parsed.sessionId)
-          if (!ctx.workspaceRegistry.archivedSessionIds.includes(sessionId)) {
+          const archivedIds = await readArchivedIds(ctx)
+          if (!archivedIds.some(id => String(id) === String(sessionId))) {
             throw new ArchiveError('NOT_ARCHIVED', '只有已归档会话才能备份或删除')
           }
           const live = ctx.sessions.get(sessionId)
@@ -428,12 +501,19 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             try {
               await writeFile(join(backupDir, BACKUP_SIDECAR), JSON.stringify(sidecar, null, 2), 'utf8')
             } catch (error) {
+              let rolledBack = true
               try {
                 await rename(backupDir, sessionDir)
               } catch {
-                // 回滚失败也保留原始错误。
+                rolledBack = false
               }
-              throw new ArchiveError('IO_ERROR', `写入备份 sidecar 失败：${error instanceof Error ? error.message : String(error)}`, 500)
+              throw new ArchiveError(
+                'IO_ERROR',
+                rolledBack
+                  ? `写入备份 sidecar 失败（已回滚）：${error instanceof Error ? error.message : String(error)}`
+                  : '写入备份 sidecar 失败，且回滚未成功：会话目录已留在备份区（无 sidecar，仅可删除）',
+                500,
+              )
             }
             await detachWorkspaceAccounting(ctx, sessionId)
             try {
