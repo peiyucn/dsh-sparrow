@@ -20,7 +20,7 @@ DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入�
   * 备份/删除后**失效官方投影缓存行**（`storageDomain.get('session_projcache').table('sessions').delete(id)`；派生数据可安全删除，官方服务常驻打开该域，未加载则跳过）。
   * 备份/删除成功后**补发官方公开事件 `api-session/removed`**（session-controller 的 cordis Events 公开声明、@mode emit）：会话目录已移走，客户端会话列表据此即时移除条目，避免侧边栏「未分组」残留（2026-08-30）。
   * 备份目录写 `dsh-archive-session.json` sidecar（原路径 / 标题 / workspaceIds），恢复时移回并 `WorkspaceEntity.attachSession()`；无 sidecar 的旧格式目录按「仅列出/删除」收纳，不尝试恢复。
-* **卸载透明**（2026-08-30 起）：备份位置与卸载影响在归档面板顶部提示中明示（`GET /api/archive-session/backup-dir`），README 含《卸载与残留》章节；卸载不自动恢复备份，恢复逻辑只经本插件。
+* **卸载透明**（2026-08-30 起）：备份位置在归档面板顶部提示中明示（`GET /api/archive-session/backup-dir`，点击复制）；备份语义提示（不再出现在 @ 列表）放在备份区内；卸载影响与恢复指引只在 README《卸载与残留》章节；卸载不自动恢复备份，恢复逻辑只经本插件。
 * **仍禁止**：monkey-patch 核心、读 / 改会话日志内容、动会话目录以外的内部文件（附件 / 存储域 / 凭据等一律走官方服务）。
 
 ## 架构约束

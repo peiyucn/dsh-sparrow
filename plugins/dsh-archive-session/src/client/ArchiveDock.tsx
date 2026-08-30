@@ -649,10 +649,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
             </div>
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
             <p style={{ ...styles.secondarySmall, fontSize: 14, lineHeight: '22px', margin: '0 0 12px' }}>
-              {t('dialog.intro')}
               {backupDir !== null && backupDir.displayPath !== '' ? (
                 <>
-                  <br />
                   {t('dialog.backupDir')}
                   {' '}
                   <button
@@ -666,8 +664,6 @@ export function ArchiveDock(props: ArchiveDockProps) {
                   </button>
                 </>
               ) : null}
-              <br />
-              {t('dialog.uninstallHint')}
             </p>
             {error !== null ? <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>{error}</p> : null}
 
@@ -708,6 +704,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
               </button>
               {backupsOpen ? (
                 <>
+                  <p style={styles.secondarySmall}>{t('backups.hint')}</p>
                   {loading ? loadingRow : null}
                   {!loading && backups.length > 0 ? (
                     <div style={{ ...styles.actions, padding: '4px 0 8px' }}>
