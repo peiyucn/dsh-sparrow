@@ -300,7 +300,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
           <div style={styles.panel} role="dialog" aria-modal="true" aria-label={t('dialog.title')}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ margin: 0, fontSize: 18 }}>{t('dialog.title')}</h2>
-              <button type="button" style={styles.small} aria-label={t('dialog.close')} onClick={() => { setOpen(false) }}>{t('dialog.close')}</button>
+              <button type="button" className="dsh-archive-btn" aria-label={t('dialog.close')} onClick={() => { setOpen(false) }}>{t('dialog.close')}</button>
             </div>
 
             <p style={{ ...styles.secondarySmall, fontSize: 13 }}>
@@ -310,7 +310,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
 
             <button
               type="button"
-              style={{ ...styles.small, border: 'none', padding: '8px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              style={{ border: 'none', padding: '8px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
               aria-expanded={archivedOpen}
               onClick={() => { setArchivedOpen(value => !value) }}
             >
@@ -334,7 +334,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                     <div style={styles.actions}>
                       <button
                         type="button"
-                        style={styles.small}
+                        className="dsh-archive-btn"
                         disabled={busy !== null || loading || !item.backendSupported}
                         onClick={() => { confirmBackup(item) }}
                       >
@@ -342,7 +342,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       </button>
                       <button
                         type="button"
-                        style={{ ...styles.small, ...styles.danger }}
+                        className="dsh-archive-btn dsh-archive-btn-danger"
                         disabled={busy !== null || loading || !item.backendSupported}
                         onClick={() => { confirmDelete(item) }}
                       >
@@ -356,7 +356,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
 
             <button
               type="button"
-              style={{ ...styles.small, border: 'none', padding: '8px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              style={{ border: 'none', padding: '8px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
               aria-expanded={backupsOpen}
               onClick={() => { setBackupsOpen(value => !value) }}
             >
@@ -371,7 +371,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                   <div style={{ ...styles.actions, padding: '4px 0 8px' }}>
                     <button
                       type="button"
-                      style={styles.small}
+                      className="dsh-archive-btn"
                       disabled={busy !== null || restorableCount === 0}
                       onClick={() => { confirmRestoreAll() }}
                     >
@@ -379,7 +379,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                     </button>
                     <button
                       type="button"
-                      style={{ ...styles.small, ...styles.danger }}
+                      className="dsh-archive-btn dsh-archive-btn-danger"
                       disabled={busy !== null || backups.length === 0}
                       onClick={() => { confirmDeleteAll() }}
                     >
@@ -404,7 +404,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                     <div style={styles.actions}>
                       <button
                         type="button"
-                        style={styles.small}
+                        className="dsh-archive-btn"
                         disabled={busy !== null || item.legacy}
                         title={item.legacy ? t('legacy.restoreTitle') : undefined}
                         onClick={() => { void run(`restore:${item.backupId}`, () => restoreBackup(item.backupId)) }}
@@ -413,7 +413,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       </button>
                       <button
                         type="button"
-                        style={{ ...styles.small, ...styles.danger }}
+                        className="dsh-archive-btn dsh-archive-btn-danger"
                         disabled={busy !== null}
                         onClick={() => { confirmDeleteBackup(item) }}
                       >
