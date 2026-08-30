@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  extractJsonObject, findImageReference, modelSupportsImages, normalizeVisionConfig, parseVisionReport,
+  extractJsonObject, findImageReference, isDeepseekMainRoute, mainRouteFromSession, modelSupportsImages,
+  normalizeAttachmentId, normalizeVisionConfig, parseVisionReport,
   renderVisionReport, resolveVisionOutput, shouldClearInputModalities, visionCacheKey, VisionCache,
 } from '../lib/vision.js'
 
@@ -86,6 +87,60 @@ describe('vision-access 纯逻辑', () => {
 
     it('未命中配置路由 应该 不放行', () => {
       assert.equal(shouldClearInputModalities('deepseek-official', 'vision-model', ['text'], routes), false)
+    })
+
+    it('inputModalities 为 undefined 应该 不放行', () => {
+      assert.equal(shouldClearInputModalities('deepseek-official', 'deepseek-v4-pro', undefined, routes), false)
+    })
+  })
+
+  describe('mainRouteFromSession', () => {
+    it('最近一条 request/header 应该 取到 provider/model', () => {
+      const events = [
+        { type: 'user/message', seq: 0, time: 0, data: {} },
+        { type: 'request/header', seq: 1, time: 1, data: { header: { config: { provider: 'deepseek-official', model: 'deepseek-v4-pro' } } } },
+      ]
+      assert.deepEqual(mainRouteFromSession(events), { provider: 'deepseek-official', model: 'deepseek-v4-pro' })
+    })
+
+    it('多条 request/header 应该 取最近一条', () => {
+      const events = [
+        { type: 'request/header', seq: 0, time: 0, data: { header: { config: { provider: 'a', model: 'm1' } } } },
+        { type: 'request/header', seq: 1, time: 1, data: { header: { config: { provider: 'b', model: 'm2' } } } },
+      ]
+      assert.deepEqual(mainRouteFromSession(events), { provider: 'b', model: 'm2' })
+    })
+
+    it('无 request/header 应该 返回 undefined', () => {
+      assert.equal(mainRouteFromSession([{ type: 'user/message', seq: 0, time: 0, data: {} }]), undefined)
+    })
+  })
+
+  describe('isDeepseekMainRoute', () => {
+    it('deepseek-official 应该 放行', () => {
+      assert.equal(isDeepseekMainRoute({ provider: 'deepseek-official' }), true)
+    })
+
+    it('其它 provider 应该 禁用', () => {
+      assert.equal(isDeepseekMainRoute({ provider: 'openai' }), false)
+    })
+
+    it('未知路由 应该 默认放行', () => {
+      assert.equal(isDeepseekMainRoute(undefined), true)
+    })
+  })
+
+  describe('normalizeAttachmentId', () => {
+    it('sha256: 前缀 应该 剥离', () => {
+      assert.equal(normalizeAttachmentId('sha256:ABC'), 'abc')
+    })
+
+    it('大小写 应该 统一小写', () => {
+      assert.equal(normalizeAttachmentId('AbCdEf'), 'abcdef')
+    })
+
+    it('空白 应该 去除', () => {
+      assert.equal(normalizeAttachmentId('  abc  '), 'abc')
     })
   })
 
