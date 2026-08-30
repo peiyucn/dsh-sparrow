@@ -532,7 +532,11 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
         title={busy ? t('dock.busy') : error ?? (enabled ? t('switch.onHint') : t('switch.offHint'))}
         aria-pressed={enabled}
         aria-busy={busy}
-        onClick={() => { setFimEnabled(!enabled) }}
+        onClick={() => {
+          // 标签点击恒切换开关；弹层开着时一并收起（官方 PermissionSelect 触发器再点即合）。
+          if (pickerOpen) setPickerOpen(false)
+          setFimEnabled(!enabled)
+        }}
       >
         <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
         <span className="dsh-chat-fim-switch-label">{t('switch.label')}</span>
@@ -544,9 +548,10 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
           aria-label={t('menu.model.label', { mode: MODEL_MODE_DISPLAY[modelMode] })}
           title={t('menu.model.label', { mode: MODEL_MODE_DISPLAY[modelMode] })}
           onClick={(event) => {
-            // 箭头点击只开模型菜单，不切换开关。
+            // 箭头点击只开合模型菜单，不切换开关；再点收起（官方 PermissionSelect 同款 toggle）。
             event.stopPropagation()
-            openPicker()
+            if (pickerOpen) setPickerOpen(false)
+            else openPicker()
           }}
         >
           <IconChevronDownOutline14 size={12} />
