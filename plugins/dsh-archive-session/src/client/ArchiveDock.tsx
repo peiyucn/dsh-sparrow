@@ -158,6 +158,22 @@ export function ensureArchiveStyles(): void {
 .dsh-archive-section:hover {
   background: var(--dsw-specific-sidebar-nav-item-hover, var(--dsw-alias-interactive-bg-hover));
 }
+/* 区块卡：官方 settings 内容卡同款 token（ModelsSection .rowCard：border-l2 + r12），
+   归档区 / 备份区各包一块，视觉上分割两组列表；应用无全局 border-box，须显式声明。 */
+.dsh-archive-section-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 12px;
+  padding: 8px 12px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, #e2e5ea);
+  border-radius: 12px;
+}
+/* 分组头横贯卡内两侧、文字与行内容左对齐（卡内边距 12px）。 */
+.dsh-archive-section-card .dsh-archive-section {
+  width: calc(100% + 24px);
+  margin: 0 -12px 4px -12px;
+}
 /* web 确认框：替代 window.confirm/prompt（webview 里原生 prompt 被禁用，删除按钮点不动）。 */
 .dsh-archive-confirm-overlay {
   position: fixed;
@@ -655,107 +671,111 @@ export function ArchiveDock(props: ArchiveDockProps) {
             </p>
             {error !== null ? <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>{error}</p> : null}
 
-            <button
-              type="button"
-              className="dsh-archive-section"
-              aria-expanded={archivedOpen}
-              onClick={() => { setArchivedOpen(value => !value) }}
-            >
-              <span aria-hidden>{archivedOpen ? '▾' : '▸'}</span>
-              <span>{t('section.archived', { count: loading ? '…' : archived.length })}</span>
-            </button>
-            {archivedOpen ? (
-              <>
-                {loading ? loadingRow : null}
-                {!loading && archived.length === 0 ? <p style={styles.secondarySmall}>{t('empty.archived')}</p> : null}
-                {!loading && liveItems.length > 0 ? (
-                  <>
-                    <p style={styles.groupHeading}>{t('group.unreleased', { count: liveItems.length })}</p>
-                    {liveItems.map(renderArchivedRow)}
-                  </>
-                ) : null}
-                {!loading && coldItems.map(renderArchivedRow)}
-              </>
-            ) : null}
+            <div className="dsh-archive-section-card">
+              <button
+                type="button"
+                className="dsh-archive-section"
+                aria-expanded={archivedOpen}
+                onClick={() => { setArchivedOpen(value => !value) }}
+              >
+                <span aria-hidden>{archivedOpen ? '▾' : '▸'}</span>
+                <span>{t('section.archived', { count: loading ? '…' : archived.length })}</span>
+              </button>
+              {archivedOpen ? (
+                <>
+                  {loading ? loadingRow : null}
+                  {!loading && archived.length === 0 ? <p style={styles.secondarySmall}>{t('empty.archived')}</p> : null}
+                  {!loading && liveItems.length > 0 ? (
+                    <>
+                      <p style={styles.groupHeading}>{t('group.unreleased', { count: liveItems.length })}</p>
+                      {liveItems.map(renderArchivedRow)}
+                    </>
+                  ) : null}
+                  {!loading && coldItems.map(renderArchivedRow)}
+                </>
+              ) : null}
+            </div>
 
-            <button
-              type="button"
-              className="dsh-archive-section"
-              aria-expanded={backupsOpen}
-              onClick={() => { setBackupsOpen(value => !value) }}
-            >
-              <span aria-hidden>{backupsOpen ? '▾' : '▸'}</span>
-              <span>{t('section.backups', { count: loading ? '…' : backups.length })}</span>
-            </button>
-            {backupsOpen ? (
-              <>
-                {loading ? loadingRow : null}
-                {!loading && backups.length > 0 ? (
-                  <div style={{ ...styles.actions, padding: '4px 0 8px' }}>
-                    <button
-                      type="button"
-                      className="dsh-archive-btn"
-                      disabled={loading || restorableCount === 0}
-                      onClick={() => { confirmRestoreAll() }}
-                    >
-                      {t('action.restoreAll', { count: restorableCount })}
-                    </button>
-                    <button
-                      type="button"
-                      className="dsh-archive-btn dsh-archive-btn-danger"
-                      disabled={loading || backups.length === 0}
-                      onClick={() => { confirmDeleteAll() }}
-                    >
-                      {t('action.deleteAll')}
-                    </button>
-                  </div>
-                ) : null}
-                {!loading && backups.length === 0 ? <p style={styles.secondarySmall}>{t('empty.backups')}</p> : null}
-                {!loading && backups.some(item => item.legacy) ? (
-                  <p style={styles.secondarySmall}>
-                    {t('legacy.hint')}
-                  </p>
-                ) : null}
-                {!loading && backups.map(item => (
-                  <div key={item.backupId} style={styles.row}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={styles.title} title={item.title}>{item.title}</div>
-                      <div style={styles.secondarySmall}>
-                        {item.legacy ? `${t('legacy.badge')} · ` : ''}{item.archivedAt} · {item.sessionId}
-                      </div>
-                    </div>
-                    <div style={styles.actions}>
+            <div className="dsh-archive-section-card">
+              <button
+                type="button"
+                className="dsh-archive-section"
+                aria-expanded={backupsOpen}
+                onClick={() => { setBackupsOpen(value => !value) }}
+              >
+                <span aria-hidden>{backupsOpen ? '▾' : '▸'}</span>
+                <span>{t('section.backups', { count: loading ? '…' : backups.length })}</span>
+              </button>
+              {backupsOpen ? (
+                <>
+                  {loading ? loadingRow : null}
+                  {!loading && backups.length > 0 ? (
+                    <div style={{ ...styles.actions, padding: '4px 0 8px' }}>
                       <button
                         type="button"
                         className="dsh-archive-btn"
-                        disabled={loading || item.legacy}
-                        title={item.legacy ? t('legacy.restoreTitle') : undefined}
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              await restoreBackup(item.backupId)
-                              await refresh()
-                            } catch (reason) {
-                              setError(reason instanceof Error ? reason.message : String(reason))
-                            }
-                          })()
-                        }}
+                        disabled={loading || restorableCount === 0}
+                        onClick={() => { confirmRestoreAll() }}
                       >
-                        {t('action.restore')}
+                        {t('action.restoreAll', { count: restorableCount })}
                       </button>
                       <button
                         type="button"
                         className="dsh-archive-btn dsh-archive-btn-danger"
-                        disabled={loading}
-                        onClick={() => { confirmDeleteBackup(item) }}
+                        disabled={loading || backups.length === 0}
+                        onClick={() => { confirmDeleteAll() }}
                       >
-                        {t('action.delete')}
+                        {t('action.deleteAll')}
                       </button>
                     </div>
-                  </div>
-                ))}
-              </>
-            ) : null}
+                  ) : null}
+                  {!loading && backups.length === 0 ? <p style={styles.secondarySmall}>{t('empty.backups')}</p> : null}
+                  {!loading && backups.some(item => item.legacy) ? (
+                    <p style={styles.secondarySmall}>
+                      {t('legacy.hint')}
+                    </p>
+                  ) : null}
+                  {!loading && backups.map(item => (
+                    <div key={item.backupId} style={styles.row}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={styles.title} title={item.title}>{item.title}</div>
+                        <div style={styles.secondarySmall}>
+                          {item.legacy ? `${t('legacy.badge')} · ` : ''}{item.archivedAt} · {item.sessionId}
+                        </div>
+                      </div>
+                      <div style={styles.actions}>
+                        <button
+                          type="button"
+                          className="dsh-archive-btn"
+                          disabled={loading || item.legacy}
+                          title={item.legacy ? t('legacy.restoreTitle') : undefined}
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                await restoreBackup(item.backupId)
+                                await refresh()
+                              } catch (reason) {
+                                setError(reason instanceof Error ? reason.message : String(reason))
+                              }
+                            })()
+                          }}
+                        >
+                          {t('action.restore')}
+                        </button>
+                        <button
+                          type="button"
+                          className="dsh-archive-btn dsh-archive-btn-danger"
+                          disabled={loading}
+                          onClick={() => { confirmDeleteBackup(item) }}
+                        >
+                          {t('action.delete')}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : null}
+            </div>
             </div>
           </div>
         </div>
