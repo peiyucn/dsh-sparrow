@@ -1,4 +1,4 @@
-/** dsh-vision-subagent host half：门禁放行 + vision_read 工具（直连 ctx.llm 视觉模型）。 */
+/** dsh-vision-access host half：门禁放行 + vision_read 工具（直连 ctx.llm 视觉模型）。 */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
@@ -13,7 +13,7 @@ import {
   type VisionConfig, type VisionReport,
 } from './vision.js'
 
-export const name = 'dsh-vision-subagent'
+export const name = 'dsh-vision-access'
 export const inject = ['llm', 'tools', 'attachments']
 
 export type { VisionConfig, VisionReport }
@@ -58,7 +58,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   }) as typeof llm.resolveModelInfo
   ctx.effect(() => () => {
     llm.resolveModelInfo = originalResolveModelInfo
-  }, 'dsh-vision-subagent: restore resolveModelInfo')
+  }, 'dsh-vision-access: restore resolveModelInfo')
 
   // 1.5 非 deepseek 主模型：对该 agent 作用域屏蔽 vision_read（像没有这个工具）。
   const restrictions = new Map<unknown, () => void>()
@@ -170,5 +170,5 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       cache.set(cacheKey, report)
       return report
     },
-  })), 'dsh-vision-subagent: vision_read tool')
+  })), 'dsh-vision-access: vision_read tool')
 }

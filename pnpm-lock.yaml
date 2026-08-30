@@ -108,7 +108,7 @@ importers:
         specifier: ^18.2.0
         version: 18.3.1
 
-  plugins/dsh-vision-subagent:
+  plugins/dsh-vision-access:
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.1

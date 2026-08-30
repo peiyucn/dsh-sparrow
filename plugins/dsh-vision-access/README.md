@@ -1,4 +1,4 @@
-# dsh-vision-subagent
+# dsh-vision-access
 
 纯文本主模型（如 deepseek-v4-pro）会话中，图片交给官方视觉模型（deepseek-v4-flash-vision-exp）处理，主模型保持对话大脑。
 

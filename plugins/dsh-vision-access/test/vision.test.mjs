@@ -5,7 +5,7 @@ import {
   renderVisionReport, resolveVisionOutput, shouldClearInputModalities, VisionCache,
 } from '../lib/vision.js'
 
-describe('vision-subagent 纯逻辑', () => {
+describe('vision-access 纯逻辑', () => {
   describe('normalizeVisionConfig', () => {
     it('空配置 应该 使用官方文本路由默认值', () => {
       const config = normalizeVisionConfig(undefined)

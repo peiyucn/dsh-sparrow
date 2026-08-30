@@ -1,11 +1,12 @@
-# 本地开发补丁：dsh checkout 内 dev:web / --patch overlay 使用；name 是本机绝对路径。
+# dsh-vision-access 组合补丁：门禁放行只对以下文本路由生效。
 - insert:
-    - id: dsh-vision-subagent
-      name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-vision-subagent/src/index.ts
+    - id: dsh-vision-access
+      name: dsh-vision-access
       config:
-        subagentProvider: spawn
+        visionProvider: deepseek-official
         visionModel: deepseek-v4-flash-vision-exp
         maxTokens: 8192
+        temperature: 0.2
         visionReasoningEffort: low
         cacheMaxEntries: 64
         textRoutes:
