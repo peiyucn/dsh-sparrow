@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { useAnchoredMaxHeight, IconSparkle16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useAnchoredMaxHeight, IconSparkle16, IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -380,44 +380,52 @@ export function ensureFimBusyStyles(): void {
   font-size: 11px;
   line-height: 18px;
 }
-/* 菜单底部：左侧续写模型选择器，右侧 token 数与实际模型。 */
+/* 菜单底部：右下角展示 token 数与实际模型。 */
 .dsh-chat-fim-menu-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
   margin-top: 2px;
   padding: 2px 4px 0;
   border-top: 1px solid var(--dsw-alias-border-inverted);
 }
-.dsh-chat-fim-model-btn {
+/* 开关旁的下拉箭头：点击弹出模型三档选择。 */
+.dsh-chat-fim-model-arrow {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 999px;
   background: transparent;
   color: var(--dsw-alias-label-caption);
-  font-family: inherit;
-  font-size: 11px;
-  line-height: 18px;
   cursor: pointer;
 }
-.dsh-chat-fim-model-btn:hover {
+.dsh-chat-fim-model-arrow:hover {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+/* 模型三档弹层：官方 MenuDropdown 同款 token，锚定箭头按钮右下。 */
+.dsh-chat-fim-model-popover {
+  position: fixed;
+  z-index: 2100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 148px;
+  padding: 4px;
+  border: 1px solid var(--dsw-alias-border-inverted);
+  border-radius: 12px;
+  background: var(--dsw-specific-menu);
+  box-shadow: var(--dsw-shadow-lv3);
 }
 .dsh-chat-fim-menu-usage {
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
   line-height: 18px;
   white-space: nowrap;
-}
-.dsh-chat-fim-model-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 4px;
 }
 .dsh-chat-fim-model-option {
   display: flex;
@@ -450,13 +458,50 @@ export function ensureFimBusyStyles(): void {
   document.head.appendChild(style)
 }
 
-/** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）。 */
+/** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）：点击切换开关，右侧 ▾ 弹出模型三档。 */
 export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const { t } = props
   const enabled = useFimEnabled()
   const busy = useFimBusy()
   const error = useFimError()
   const supported = useFimSupported()
+  const modelMode = useFimModelMode()
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerPoint, setPickerPoint] = useState<{ x: number; y: number } | null>(null)
+  const arrowRef = useRef<HTMLButtonElement | null>(null)
+
+  const modelModeLabel = (mode: FimModelMode): string =>
+    mode === 'auto' ? t('menu.model.auto') : mode === 'pro' ? t('menu.model.pro') : t('menu.model.flash')
+
+  const openPicker = (): void => {
+    const rect = arrowRef.current?.getBoundingClientRect()
+    setPickerPoint(rect === undefined ? null : { x: rect.right, y: rect.bottom + 4 })
+    setPickerOpen(true)
+  }
+
+  // 弹层打开时：点外部关闭、Esc 关闭、滚动关闭（位置不再可靠）。
+  useEffect(() => {
+    if (!pickerOpen) return
+    const onPointerDown = (event: PointerEvent): void => {
+      if (!(event.target instanceof Element)) return
+      if (event.target.closest('.dsh-chat-fim-model-popover') !== null) return
+      if (arrowRef.current !== null && arrowRef.current.contains(event.target)) return
+      setPickerOpen(false)
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setPickerOpen(false)
+    }
+    const onScroll = (): void => { setPickerOpen(false) }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('keydown', onKeyDown, true)
+    document.addEventListener('scroll', onScroll, true)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true)
+      document.removeEventListener('keydown', onKeyDown, true)
+      document.removeEventListener('scroll', onScroll, true)
+    }
+  }, [pickerOpen])
+
   if (!supported) return null
   return (
     <>
@@ -471,9 +516,52 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
         <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
         <span className="dsh-chat-fim-switch-label">{t('switch.label')}</span>
       </button>
+      <button
+        ref={arrowRef}
+        type="button"
+        className="dsh-chat-fim-model-arrow"
+        aria-haspopup="listbox"
+        aria-expanded={pickerOpen}
+        aria-label={t('menu.model.label', { mode: modelModeLabel(modelMode) })}
+        onClick={openPicker}
+      >
+        <IconChevronDownOutline14 size={12} />
+      </button>
       {error !== null ? (
         <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)', fontSize: 12 }} title={error}>⚠</span>
       ) : null}
+      {pickerOpen && pickerPoint !== null
+        ? createPortal(
+          <div
+            className="dsh-chat-fim-model-popover"
+            role="listbox"
+            aria-label={t('menu.model.label', { mode: '' })}
+            style={{ left: pickerPoint.x, top: pickerPoint.y, transform: 'translateX(-100%)' }}
+            onMouseDown={(event) => {
+              // 防止点按把焦点从输入框夺走（combobox 惯例）。
+              event.preventDefault()
+            }}
+          >
+            {(['auto', 'pro', 'flash'] as const).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                role="option"
+                aria-selected={mode === modelMode}
+                className={mode === modelMode ? 'dsh-chat-fim-model-option dsh-chat-fim-model-option-on' : 'dsh-chat-fim-model-option'}
+                onClick={() => {
+                  setFimModelMode(mode)
+                  setPickerOpen(false)
+                }}
+              >
+                <span className="dsh-chat-fim-model-option-check" aria-hidden>{mode === modelMode ? '✓' : ''}</span>
+                {modelModeLabel(mode)}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )
+        : null}
     </>
   )
 }
@@ -628,14 +716,9 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
   const suggestion = useFimSuggestion()
   const enabled = useFimEnabled()
   const supported = useFimSupported()
-  const modelMode = useFimModelMode()
-  const [pickerOpen, setPickerOpen] = useState(false)
   const [triggerOpen, setTriggerOpen] = useState(() => document.querySelector('[data-trigger-menu]') !== null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const cardRef = useRef<HTMLDivElement | null>(null)
-
-  const modelModeLabel = (mode: FimModelMode): string =>
-    mode === 'auto' ? t('menu.model.auto') : mode === 'pro' ? t('menu.model.pro') : t('menu.model.flash')
 
   // 与官方触发菜单互斥：观察 overlay 锚点子树，官方菜单增删时实时刷新。
   useEffect(() => {
@@ -715,40 +798,10 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
             </span>
           </button>
           <div className="dsh-chat-fim-menu-footer">
-            <button
-              type="button"
-              className="dsh-chat-fim-model-btn"
-              aria-expanded={pickerOpen}
-              onClick={() => { setPickerOpen(value => !value) }}
-            >
-              {t('menu.model.label', { mode: modelModeLabel(modelMode) })}
-              <span aria-hidden>{pickerOpen ? '▴' : '▾'}</span>
-            </button>
             <span className="dsh-chat-fim-menu-usage">
               {t('menu.tokens', { tokens: suggestion.totalTokens, model: suggestion.model })}
             </span>
           </div>
-          {pickerOpen ? (
-            <div className="dsh-chat-fim-model-picker" role="listbox" aria-label={t('menu.model.label', { mode: '' })}>
-              {(['auto', 'pro', 'flash'] as const).map(mode => (
-                <button
-                  key={mode}
-                  type="button"
-                  role="option"
-                  aria-selected={mode === modelMode}
-                  className={mode === modelMode ? 'dsh-chat-fim-model-option dsh-chat-fim-model-option-on' : 'dsh-chat-fim-model-option'}
-                  onMouseDown={(event) => {
-                    event.preventDefault()
-                    setFimModelMode(mode)
-                    setPickerOpen(false)
-                  }}
-                >
-                  <span className="dsh-chat-fim-model-option-check" aria-hidden>{mode === modelMode ? '✓' : ''}</span>
-                  {modelModeLabel(mode)}
-                </button>
-              ))}
-            </div>
-          ) : null}
         </div>
       ) : null}
     </div>

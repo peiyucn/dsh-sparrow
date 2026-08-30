@@ -13,7 +13,8 @@
 
 ## 建议菜单展示
 
-* 菜单卡底部一行：左侧「续写模型：自动/Pro/Flash」选择器（点击在菜单内展开三选项，当前项打勾，选中即写 localStorage 并作用于下一次请求）；右侧「{tokens} tokens · {model}」（tokens = prompt + completion）；
+* **选择器位置在开关旁**（2026-08-30 用户要求）：开关胶囊右侧一个 ▾ 小箭头按钮，点击弹出三档菜单（官方 MenuDropdown 同款 token，锚定箭头右下，点外部 / Esc / 滚动关闭）；选中项打勾，写 localStorage 并作用于下一次请求；
+* 菜单卡底部右下角展示「{tokens} tokens · {model}」（tokens = prompt + completion）；
 * 文案 zh/en 随 dsh 语言；选择器与用量行沿用菜单的 caption 字号。
 
 ## 验收标准
