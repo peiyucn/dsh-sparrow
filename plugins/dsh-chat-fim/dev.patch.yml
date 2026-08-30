@@ -13,4 +13,4 @@
         maxPromptChars: 32768
         triggerPauseMs: 400
         suggestionCount: 1
-        temperature: 1
+        temperature: 0.3
