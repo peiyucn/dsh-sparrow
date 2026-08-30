@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, fimStopSequences, isDeepseekMainRoute,
-  isStaleResponse, mainRouteFromSession, normalizeConfig, normalizeFimModelMode, parseCompleteBody, resolveFimModel,
-  shouldTriggerFim, summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
+  buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, fimStopSequences, formatTokenCount,
+  isDeepseekMainRoute, isStaleResponse, mainRouteFromSession, normalizeConfig, normalizeFimModelMode,
+  parseCompleteBody, resolveFimModel, shouldTriggerFim, summarizeUpstreamBody, upstreamStatusToError,
+  validateCompletePayload,
 } from '../lib/chat-fim.js'
 
 describe('chat-fim 纯逻辑', () => {
@@ -245,6 +246,23 @@ describe('chat-fim 纯逻辑', () => {
 
     it('非法字段 应该 回退 0', () => {
       assert.deepEqual(extractUsage({ usage: { prompt_tokens: 'x', completion_tokens: -1 } }), { promptTokens: 0, completionTokens: 0 })
+    })
+  })
+
+  describe('formatTokenCount', () => {
+    it('千以内 应该 原样输出', () => {
+      assert.equal(formatTokenCount(0), '0')
+      assert.equal(formatTokenCount(999), '999')
+    })
+
+    it('千以上 应该 加千分位逗号', () => {
+      assert.equal(formatTokenCount(1000), '1,000')
+      assert.equal(formatTokenCount(1234567), '1,234,567')
+    })
+
+    it('非法输入 应该 回退 0', () => {
+      assert.equal(formatTokenCount(-5), '0')
+      assert.equal(formatTokenCount(Number.NaN), '0')
     })
   })
 

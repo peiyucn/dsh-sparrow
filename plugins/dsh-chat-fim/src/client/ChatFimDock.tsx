@@ -8,7 +8,7 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { shouldTriggerFim, type FimModelMode } from '../chat-fim.js'
+import { shouldTriggerFim, formatTokenCount, type FimModelMode } from '../chat-fim.js'
 
 export interface FimCompleteResult {
   readonly suggestions: readonly string[]
@@ -799,7 +799,7 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
           </button>
           <div className="dsh-chat-fim-menu-footer">
             <span className="dsh-chat-fim-menu-usage">
-              {t('menu.tokens', { tokens: suggestion.totalTokens, model: suggestion.model })}
+              {t('menu.tokens', { tokens: formatTokenCount(suggestion.totalTokens), model: suggestion.model })}
             </span>
           </div>
         </div>

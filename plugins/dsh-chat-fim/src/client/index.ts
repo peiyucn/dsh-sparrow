@@ -39,7 +39,7 @@ const LOCALE_DICTS = {
     'menu.model.auto': '自动',
     'menu.model.pro': 'Pro',
     'menu.model.flash': 'Flash',
-    'menu.tokens': '{tokens} tokens · {model}',
+    'menu.tokens': '{tokens} tok · {model}',
   },
   en: {
     'switch.label': 'Suggest',
@@ -53,7 +53,7 @@ const LOCALE_DICTS = {
     'menu.model.auto': 'Auto',
     'menu.model.pro': 'Pro',
     'menu.model.flash': 'Flash',
-    'menu.tokens': '{tokens} tokens · {model}',
+    'menu.tokens': '{tokens} tok · {model}',
   },
 } as const
 

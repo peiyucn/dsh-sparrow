@@ -315,6 +315,12 @@ export function extractUsage(data: unknown): { promptTokens: number; completionT
   }
 }
 
+/** token 数展示格式化：千分位逗号（1234 → 1,234）。 */
+export function formatTokenCount(count: number): string {
+  const safe = Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0
+  return String(safe).replace(/\B(?=(\d{3})+(?!\d))/gu, ',')
+}
+
 /** 触发形态门控：草稿最短长度（trim 后）。 */
 export const MIN_TRIGGER_DRAFT_CHARS = 8
 
