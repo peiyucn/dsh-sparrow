@@ -25,10 +25,12 @@ export interface BackupItem {
 export interface ArchiveDockInjected {
   listArchived: () => Promise<ArchivedSessionItem[]>
   listBackups: () => Promise<BackupItem[]>
-  backupSession: (sessionId: string) => Promise<void>
-  deleteSession: (sessionId: string, confirmTitle: string) => Promise<void>
-  restoreBackup: (backupId: string) => Promise<void>
-  deleteBackup: (backupId: string) => Promise<void>
+  backupSession: (sessionId: string) => Promise<unknown>
+  deleteSession: (sessionId: string, confirmTitle: string) => Promise<unknown>
+  restoreBackup: (backupId: string) => Promise<unknown>
+  deleteBackup: (backupId: string) => Promise<unknown>
+  restoreAllBackups: () => Promise<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ backupId: string; message: string }> }>
+  deleteAllBackups: () => Promise<{ deleted?: number; failed?: string[] }>
 }
 
 export type ArchiveDockProps = PropsRuntime<'sidebar.footer.action'> & ArchiveDockInjected
@@ -100,12 +102,14 @@ const styles = {
  * @param props - slot props + 注入动作。
  */
 export function ArchiveDock(props: ArchiveDockProps) {
-  const { wide, listArchived, listBackups, backupSession, deleteSession, restoreBackup, deleteBackup } = props
+  const { wide, listArchived, listBackups, backupSession, deleteSession, restoreBackup, deleteBackup, restoreAllBackups, deleteAllBackups } = props
   const [open, setOpen] = useState(false)
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
   const [backups, setBackups] = useState<BackupItem[]>([])
+  const [backupsOpen, setBackupsOpen] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const refresh = async (): Promise<void> => {
     try {
@@ -123,7 +127,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
     void refresh()
   }, [open])
 
-  const run = async (key: string, action: () => Promise<void>): Promise<void> => {
+  const run = async (key: string, action: () => Promise<unknown>): Promise<void> => {
     setBusy(key)
     setError(null)
     try {
@@ -156,6 +160,52 @@ export function ArchiveDock(props: ArchiveDockProps) {
     const ok = window.confirm(`删除备份「${item.title}」？\n\n此操作不可逆，备份内容将被移除。`)
     if (!ok) return
     void run(`backupDelete:${item.backupId}`, () => deleteBackup(item.backupId))
+  }
+
+  const restorableCount = backups.filter(item => !item.legacy).length
+
+  const confirmRestoreAll = (): void => {
+    const ok = window.confirm(`恢复全部备份？\n\n将恢复 ${restorableCount} 个可恢复备份${backups.length - restorableCount > 0 ? `，跳过 ${backups.length - restorableCount} 个旧格式备份` : ''}。`)
+    if (!ok) return
+    void (async () => {
+      setBusy('restoreAll')
+      setError(null)
+      setNotice(null)
+      try {
+        const result = await restoreAllBackups()
+        const failed = result.failed?.length ?? 0
+        const skipped = result.skippedLegacy ?? 0
+        setNotice(`已恢复 ${result.restored?.length ?? 0} 个${skipped > 0 ? `，跳过旧格式 ${skipped} 个` : ''}${failed > 0 ? `，失败 ${failed} 个` : ''}`)
+        await refresh()
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : String(reason))
+      } finally {
+        setBusy(current => current === 'restoreAll' ? null : current)
+      }
+    })()
+  }
+
+  const confirmDeleteAll = (): void => {
+    const typed = window.prompt(`此操作不可逆！将删除备份区全部 ${backups.length} 个备份。\n\n请输入「删除全部备份」以确认：`)
+    if (typed === null) return
+    if (typed.trim() !== '删除全部备份') {
+      setError('删除确认失败：请输入「删除全部备份」')
+      return
+    }
+    void (async () => {
+      setBusy('deleteAll')
+      setError(null)
+      setNotice(null)
+      try {
+        const result = await deleteAllBackups()
+        setNotice(`已删除 ${result.deleted ?? 0} 个备份${(result.failed?.length ?? 0) > 0 ? `，失败 ${result.failed?.length} 个` : ''}`)
+        await refresh()
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : String(reason))
+      } finally {
+        setBusy(current => current === 'deleteAll' ? null : current)
+      }
+    })()
   }
 
   return (
@@ -220,42 +270,75 @@ export function ArchiveDock(props: ArchiveDockProps) {
               </div>
             ))}
 
-            <h3 style={{ fontSize: 15 }}>备份区（{backups.length}）</h3>
-            {backups.length === 0 ? <p style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)' }}>暂无备份</p> : null}
-            {backups.some(item => item.legacy) ? (
-              <p style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)', fontSize: 12 }}>
-                标「旧格式」的备份来自更早版本，缺少恢复信息，仅可删除。
-              </p>
-            ) : null}
-            {backups.map(item => (
-              <div key={item.backupId} style={styles.row}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={styles.title} title={item.title}>{item.title}</div>
-                  <div style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)', fontSize: 12 }}>
-                    {item.legacy ? '旧格式 · ' : ''}{item.archivedAt} · {item.sessionId}
+            <button
+              type="button"
+              style={{ ...styles.small, background: 'transparent', border: 'none', padding: '8px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              aria-expanded={backupsOpen}
+              onClick={() => { setBackupsOpen(value => !value) }}
+            >
+              <span aria-hidden>{backupsOpen ? '▾' : '▸'}</span>
+              <span>备份区（{backups.length}）</span>
+            </button>
+            {notice !== null ? <p style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)', fontSize: 12 }}>{notice}</p> : null}
+            {backupsOpen ? (
+              <>
+                {backups.length > 0 ? (
+                  <div style={{ ...styles.actions, padding: '4px 0 8px' }}>
+                    <button
+                      type="button"
+                      style={styles.small}
+                      disabled={busy !== null || restorableCount === 0}
+                      onClick={() => { confirmRestoreAll() }}
+                    >
+                      全部恢复{restorableCount > 0 ? `（${restorableCount}）` : ''}
+                    </button>
+                    <button
+                      type="button"
+                      style={{ ...styles.small, ...styles.danger }}
+                      disabled={busy !== null || backups.length === 0}
+                      onClick={() => { confirmDeleteAll() }}
+                    >
+                      全部删除
+                    </button>
                   </div>
-                </div>
-                <div style={styles.actions}>
-                  <button
-                    type="button"
-                    style={styles.small}
-                    disabled={busy !== null || item.legacy}
-                    title={item.legacy ? '旧格式备份缺少恢复信息，无法恢复' : undefined}
-                    onClick={() => { void run(`restore:${item.backupId}`, () => restoreBackup(item.backupId)) }}
-                  >
-                    恢复
-                  </button>
-                  <button
-                    type="button"
-                    style={{ ...styles.small, ...styles.danger }}
-                    disabled={busy !== null}
-                    onClick={() => { confirmDeleteBackup(item) }}
-                  >
-                    删除
-                  </button>
-                </div>
-              </div>
-            ))}
+                ) : null}
+                {backups.length === 0 ? <p style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)' }}>暂无备份</p> : null}
+                {backups.some(item => item.legacy) ? (
+                  <p style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)', fontSize: 12 }}>
+                    标「旧格式」的备份来自更早版本，缺少恢复信息，仅可删除。
+                  </p>
+                ) : null}
+                {backups.map(item => (
+                  <div key={item.backupId} style={styles.row}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={styles.title} title={item.title}>{item.title}</div>
+                      <div style={{ color: 'var(--dsw-alias-label-secondary, #6b7280)', fontSize: 12 }}>
+                        {item.legacy ? '旧格式 · ' : ''}{item.archivedAt} · {item.sessionId}
+                      </div>
+                    </div>
+                    <div style={styles.actions}>
+                      <button
+                        type="button"
+                        style={styles.small}
+                        disabled={busy !== null || item.legacy}
+                        title={item.legacy ? '旧格式备份缺少恢复信息，无法恢复' : undefined}
+                        onClick={() => { void run(`restore:${item.backupId}`, () => restoreBackup(item.backupId)) }}
+                      >
+                        恢复
+                      </button>
+                      <button
+                        type="button"
+                        style={{ ...styles.small, ...styles.danger }}
+                        disabled={busy !== null}
+                        onClick={() => { confirmDeleteBackup(item) }}
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : null}
           </div>
         </div>
       ) : null}

@@ -1,17 +1,13 @@
-/** dsh-archive-session 纯逻辑：配置、标题缓存、确认强度、备份目录名。 */
+/** dsh-archive-session 纯逻辑：配置、确认强度、备份目录名、sidecar 解析。 */
 
 import { join } from 'node:path'
 
-export const DEFAULT_TITLE_CACHE_TTL_MS = 60_000
-export const DEFAULT_TITLE_CACHE_MAX_ENTRIES = 256
 export const BACKUP_SIDECAR = 'dsh-archive-session.json'
 /** 备份目录名（沿用此前版本实际使用的目录，让旧备份直接可见）。 */
 export const DEFAULT_BACKUP_DIR = 'sessions-archived-backup'
 
 export interface ArchiveConfig {
   readonly backupRoot: string
-  readonly titleCacheTtlMs: number
-  readonly titleCacheMaxEntries: number
 }
 
 export interface ArchiveSidecar {
@@ -28,16 +24,8 @@ export function normalizeArchiveConfig(input: Readonly<Partial<ArchiveConfig>> |
   const defaultBackupRoot = join(process.env.DSH_HOME?.trim() || fallbackHome, DEFAULT_BACKUP_DIR)
   const config: ArchiveConfig = {
     backupRoot: input?.backupRoot?.trim() || defaultBackupRoot,
-    titleCacheTtlMs: input?.titleCacheTtlMs ?? DEFAULT_TITLE_CACHE_TTL_MS,
-    titleCacheMaxEntries: input?.titleCacheMaxEntries ?? DEFAULT_TITLE_CACHE_MAX_ENTRIES,
   }
   if (config.backupRoot === '') throw new Error('dsh-archive-session: backupRoot 不能为空')
-  if (!Number.isSafeInteger(config.titleCacheTtlMs) || config.titleCacheTtlMs <= 0) {
-    throw new Error('dsh-archive-session: titleCacheTtlMs 必须是正整数')
-  }
-  if (!Number.isSafeInteger(config.titleCacheMaxEntries) || config.titleCacheMaxEntries <= 0) {
-    throw new Error('dsh-archive-session: titleCacheMaxEntries 必须是正整数')
-  }
   return config
 }
 
@@ -50,58 +38,6 @@ export function isDeleteConfirmationSufficient(expectedTitle: string, input: unk
 export function sanitizeSegment(value: string): string {
   const safe = value.replace(/[^A-Za-z0-9_-]/gu, '_')
   return /[A-Za-z0-9]/u.test(safe) ? safe : 'unknown'
-}
-
-/** 短 TTL 的标题观察缓存：只缓存 fulfilled 结果。 */
-export class TitleCache {
-  private readonly entries = new Map<string, { value: unknown; expiresAt: number }>()
-
-  /**
-   * @param ttlMs - 过期时间。
-   * @param maxEntries - 容量上限。
-   * @param now - 当前时间源（测试注入）。
-   */
-  constructor(
-    readonly ttlMs: number,
-    readonly maxEntries: number,
-    private readonly now: () => number = Date.now,
-  ) {
-  }
-
-  get(key: string): unknown | undefined {
-    const entry = this.entries.get(key)
-    if (entry === undefined) return undefined
-    if (entry.expiresAt <= this.now()) {
-      this.entries.delete(key)
-      return undefined
-    }
-    // 刷新为最近使用。
-    this.entries.delete(key)
-    this.entries.set(key, entry)
-    return entry.value
-  }
-
-  set(key: string, value: unknown): void {
-    this.entries.delete(key)
-    this.entries.set(key, { value, expiresAt: this.now() + this.ttlMs })
-    while (this.entries.size > this.maxEntries) {
-      const oldest = this.entries.keys().next().value as string | undefined
-      if (oldest === undefined) break
-      this.entries.delete(oldest)
-    }
-  }
-
-  delete(key: string): void {
-    this.entries.delete(key)
-  }
-
-  clear(): void {
-    this.entries.clear()
-  }
-
-  get size(): number {
-    return this.entries.size
-  }
 }
 
 /** 从备份 sidecar 解析出安全的恢复信息；非法输入返回 undefined。 */

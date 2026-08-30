@@ -23,16 +23,17 @@ async function readApi<T>(path: string, init?: RequestInit): Promise<T[]> {
   return payload.items ?? []
 }
 
-async function postApi(path: string, body: unknown): Promise<void> {
+async function postApi<T = { ok?: boolean }>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const payload = await response.json() as { ok?: boolean; error?: { message?: string } }
+  const payload = await response.json() as T & { error?: { message?: string } }
   if (!response.ok) {
     throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
   }
+  return payload
 }
 
 /**
@@ -65,6 +66,8 @@ export function apply(ctx: ClientContext): void {
       deleteSession: (sessionId: string, confirmTitle: string) => postApi('/api/archive-session/delete', { sessionId, confirmTitle }),
       restoreBackup: (backupId: string) => postApi('/api/archive-session/restore', { backupId }),
       deleteBackup: (backupId: string) => postApi('/api/archive-session/backup-delete', { backupId, confirm: true }),
+      restoreAllBackups: () => postApi<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ backupId: string; message: string }> }>('/api/archive-session/backup-restore-all', { confirm: true }),
+      deleteAllBackups: () => postApi<{ deleted?: number; failed?: string[] }>('/api/archive-session/backup-delete-all', { confirm: true }),
     }),
   }, ArchiveDock))
 }

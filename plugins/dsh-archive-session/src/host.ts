@@ -17,7 +17,7 @@ import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
   BACKUP_SIDECAR, isDeleteConfirmationSufficient, legacyBackupItem, normalizeArchiveConfig,
-  parseBackupSidecar, sanitizeSegment, TitleCache, type ArchiveConfig,
+  parseBackupSidecar, sanitizeSegment, type ArchiveConfig, type ArchiveSidecar,
 } from './archive.js'
 
 export const name = 'dsh-archive-session'
@@ -189,15 +189,9 @@ function resolveBackupDir(backupRoot: string, backupId: string): string {
 }
 
 async function listBackups(backupRoot: string): Promise<unknown[]> {
-  let names: string[] = []
-  try {
-    names = await readdir(backupRoot)
-  } catch {
-    return []
-  }
+  const names = await backupDirNames(backupRoot)
   const items: unknown[] = []
   for (const name of names) {
-    if (!/^[A-Za-z0-9_-]+$/u.test(name)) continue
     const dir = resolveBackupDir(backupRoot, name)
     try {
       const raw = await readFile(join(dir, BACKUP_SIDECAR), 'utf8')
@@ -225,46 +219,68 @@ async function listBackups(backupRoot: string): Promise<unknown[]> {
   return items.sort((left, right) => String((right as { archivedAt?: string }).archivedAt ?? '').localeCompare(String((left as { archivedAt?: string }).archivedAt ?? '')))
 }
 
+/** 列出备份根下符合安全命名的目录名。 */
+async function backupDirNames(backupRoot: string): Promise<string[]> {
+  try {
+    const names = await readdir(backupRoot)
+    return names.filter(name => /^[A-Za-z0-9_-]+$/u.test(name))
+  } catch {
+    return []
+  }
+}
+
+/** 按 sidecar 恢复单个备份目录（移动回原处 + 工作区记账 + 归档集回填）。 */
+async function restoreBackupDir(ctx: Context, backupDir: string): Promise<ArchiveSidecar> {
+  let sidecar: ArchiveSidecar | undefined
+  try {
+    const raw = await readFile(join(backupDir, BACKUP_SIDECAR), 'utf8')
+    sidecar = parseBackupSidecar(JSON.parse(raw))
+  } catch {
+    throw new ArchiveError('UNKNOWN_BACKUP', '该备份是旧格式（缺少 sidecar），无法恢复；只能删除', 400)
+  }
+  if (sidecar === undefined) {
+    throw new ArchiveError('BAD_BODY', '备份 sidecar 无效', 404)
+  }
+  const sessionId = SessionId(sidecar.sessionId)
+  if (ctx.sessions.get(sessionId) !== undefined || ctx.agents.get(sessionId) !== undefined) {
+    throw new ArchiveError('SESSION_LIVE', '该会话当前已打开，不能重复恢复')
+  }
+  try {
+    await mkdir(dirname(sidecar.originalPath), { recursive: true })
+  } catch (error) {
+    throw new ArchiveError('IO_ERROR', `无法创建恢复目录：${error instanceof Error ? error.message : String(error)}`, 500)
+  }
+  let targetDirExists = false
+  try {
+    const entries = await readdir(sidecar.originalPath)
+    if (entries.length > 0) {
+      throw new ArchiveError('TARGET_EXISTS', '原始会话位置已存在内容，拒绝覆盖恢复')
+    }
+    targetDirExists = true
+  } catch (error) {
+    if (error instanceof ArchiveError) throw error
+    // 目录不存在可继续；其他读取错误由后续 rename 报出。
+  }
+  if (targetDirExists) {
+    await rm(sidecar.originalPath, { recursive: true, force: false })
+  }
+  await rename(backupDir, sidecar.originalPath)
+  await attachWorkspaceAccounting(ctx, sessionId, sidecar.workspaceIds)
+  try {
+    await addArchivedId(ctx, sessionId)
+  } catch (cleanupError) {
+    ctx.logger.warn(`dsh-archive-session: 恢复后归档集同步失败：${String(cleanupError)}`)
+  }
+  return sidecar
+}
+
 /**
- * host half 入口：标题缓存 + 归档会话管理路由。
+ * host half 入口：归档会话管理路由。
  * @param ctx - DSH 插件上下文。
  * @param config - 插件配置（cordis.patch.yml 注入）。
  */
 export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {}): void {
   const settings = normalizeArchiveConfig(config)
-
-  // 路线 A：给 readTitleSnapshots 加短 TTL 缓存，避免 @ 候选逐会话全量解码。
-  const titleCache = new TitleCache(settings.titleCacheTtlMs, settings.titleCacheMaxEntries)
-  const sessionQuery = ctx.sessionQuery
-  const originalReadTitleSnapshots = sessionQuery.readTitleSnapshots.bind(sessionQuery) as typeof sessionQuery.readTitleSnapshots
-  sessionQuery.readTitleSnapshots = (async (sessionIds, signal) => {
-    const ids = sessionIds.map(id => String(id))
-    const cached = ids.map(id => titleCache.get(id) as SessionTitleObservationResult | undefined)
-    const missingIndexes = cached
-      .map((value, index) => value === undefined ? index : -1)
-      .filter(index => index >= 0)
-    if (missingIndexes.length === 0) {
-      return cached.map(value => value as SessionTitleObservationResult)
-    }
-    const missingIds = missingIndexes.map(index => sessionIds[index] as SessionId)
-    const fetched = await originalReadTitleSnapshots(missingIds, signal)
-    for (const [offset, index] of missingIndexes.entries()) {
-      const result = fetched[offset] as SessionTitleObservationResult | undefined
-      if (result?.status === 'fulfilled') titleCache.set(ids[index] as string, result)
-      cached[index] = result
-    }
-    return cached.map(value => value as SessionTitleObservationResult)
-  }) as typeof sessionQuery.readTitleSnapshots
-  ctx.effect(() => () => {
-    sessionQuery.readTitleSnapshots = originalReadTitleSnapshots
-  }, 'dsh-archive-session: restore readTitleSnapshots')
-
-  ctx.effect(() => {
-    const off = ctx.on('session/event', (session, event) => {
-      if (event.type === 'session/title') titleCache.delete(String(session.id))
-    })
-    return () => { off() }
-  }, 'dsh-archive-session: title cache invalidation')
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
@@ -411,47 +427,58 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             throw new ArchiveError('BAD_BODY', 'backupId 必须是非空字符串')
           }
           const backupDir = resolveBackupDir(settings.backupRoot, parsed.backupId)
-          let sidecar
-          try {
-            const raw = await readFile(join(backupDir, BACKUP_SIDECAR), 'utf8')
-            sidecar = parseBackupSidecar(JSON.parse(raw))
-          } catch {
-            throw new ArchiveError('UNKNOWN_BACKUP', '该备份是旧格式（缺少 sidecar），无法恢复；只能删除', 400)
-          }
-          if (sidecar === undefined) {
-            throw new ArchiveError('BAD_BODY', '备份 sidecar 无效', 404)
-          }
-          const sessionId = SessionId(sidecar.sessionId)
-          if (ctx.sessions.get(sessionId) !== undefined || ctx.agents.get(sessionId) !== undefined) {
-            throw new ArchiveError('SESSION_LIVE', '该会话当前已打开，不能重复恢复')
-          }
-          try {
-            await mkdir(dirname(sidecar.originalPath), { recursive: true })
-          } catch (error) {
-            throw new ArchiveError('IO_ERROR', `无法创建恢复目录：${error instanceof Error ? error.message : String(error)}`, 500)
-          }
-          let targetDirExists = false
-          try {
-            const entries = await readdir(sidecar.originalPath)
-            if (entries.length > 0) {
-              throw new ArchiveError('TARGET_EXISTS', '原始会话位置已存在内容，拒绝覆盖恢复')
-            }
-            targetDirExists = true
-          } catch (error) {
-            if (error instanceof ArchiveError) throw error
-            // 目录不存在可继续；其他读取错误由后续 rename 报出。
-          }
-          if (targetDirExists) {
-            await rm(sidecar.originalPath, { recursive: true, force: false })
-          }
-          await rename(backupDir, sidecar.originalPath)
-          await attachWorkspaceAccounting(ctx, sessionId, sidecar.workspaceIds)
-          try {
-            await addArchivedId(ctx, sessionId)
-          } catch (cleanupError) {
-            ctx.logger.warn(`dsh-archive-session: 恢复后归档集同步失败：${String(cleanupError)}`)
-          }
+          const sidecar = await restoreBackupDir(ctx, backupDir)
           sendJson(res, 200, { ok: true, sessionId: sidecar.sessionId, workspaceIds: sidecar.workspaceIds })
+          return
+        }
+
+        if (req.method === 'POST' && pathname === `${PREFIX}/backup-restore-all`) {
+          const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
+          if (parsed.confirm !== true) {
+            throw new ArchiveError('CONFIRMATION_FAILED', '恢复全部备份需要二次确认')
+          }
+          const names = await backupDirNames(settings.backupRoot)
+          const restored: string[] = []
+          const failed: Array<{ backupId: string; message: string }> = []
+          let skippedLegacy = 0
+          for (const name of names) {
+            const dir = resolveBackupDir(settings.backupRoot, name)
+            try {
+              const sidecar = await restoreBackupDir(ctx, dir)
+              restored.push(sidecar.sessionId)
+            } catch (error) {
+              if (error instanceof ArchiveError && error.code === 'UNKNOWN_BACKUP') {
+                skippedLegacy += 1
+                continue
+              }
+              failed.push({ backupId: name, message: error instanceof Error ? error.message : String(error) })
+            }
+          }
+          sendJson(res, 200, { ok: true, restored, skippedLegacy, failed })
+          return
+        }
+
+        if (req.method === 'POST' && pathname === `${PREFIX}/backup-delete-all`) {
+          const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
+          if (parsed.confirm !== true) {
+            throw new ArchiveError('CONFIRMATION_FAILED', '删除全部备份需要二次确认')
+          }
+          const names = await backupDirNames(settings.backupRoot)
+          const failed: string[] = []
+          let deleted = 0
+          for (const name of names) {
+            try {
+              const dir = resolveBackupDir(settings.backupRoot, name)
+              const info = await stat(dir)
+              if (info.isDirectory()) {
+                await rm(dir, { recursive: true, force: false })
+                deleted += 1
+              }
+            } catch {
+              failed.push(name)
+            }
+          }
+          sendJson(res, 200, { ok: true, deleted, failed })
           return
         }
 

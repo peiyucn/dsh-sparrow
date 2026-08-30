@@ -2,20 +2,14 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   isDeleteConfirmationSufficient, legacyBackupItem, normalizeArchiveConfig, parseBackupSidecar,
-  sanitizeSegment, TitleCache,
+  sanitizeSegment,
 } from '../lib/archive.js'
 
 describe('archive-session 纯逻辑', () => {
   describe('normalizeArchiveConfig', () => {
-    it('空配置 应该 提供默认 TTL 与容量', () => {
+    it('空配置 应该 提供默认备份目录', () => {
       const config = normalizeArchiveConfig(undefined)
-      assert.equal(config.titleCacheTtlMs, 60_000)
-      assert.equal(config.titleCacheMaxEntries, 256)
       assert.match(config.backupRoot, /sessions-archived-backup/u)
-    })
-
-    it('非法 TTL 应该 抛错', () => {
-      assert.throws(() => normalizeArchiveConfig({ titleCacheTtlMs: 0 }), /titleCacheTtlMs/u)
     })
   })
 
@@ -40,35 +34,6 @@ describe('archive-session 纯逻辑', () => {
 
     it('空串 应该 返回 unknown', () => {
       assert.equal(sanitizeSegment('///'), 'unknown')
-    })
-  })
-
-  describe('TitleCache', () => {
-    it('TTL 内 应该 命中', () => {
-      let now = 0
-      const cache = new TitleCache(100, 2, () => now)
-      cache.set('a', { status: 'fulfilled' })
-      now = 99
-      assert.deepEqual(cache.get('a'), { status: 'fulfilled' })
-    })
-
-    it('过期 应该 失效', () => {
-      let now = 0
-      const cache = new TitleCache(100, 2, () => now)
-      cache.set('a', { status: 'fulfilled' })
-      now = 100
-      assert.equal(cache.get('a'), undefined)
-    })
-
-    it('超过容量 应该 逐出最久未用项', () => {
-      const cache = new TitleCache(1000, 2, () => 0)
-      cache.set('a', 1)
-      cache.set('b', 2)
-      cache.get('a')
-      cache.set('c', 3)
-      assert.equal(cache.get('b'), undefined)
-      assert.equal(cache.get('a'), 1)
-      assert.equal(cache.get('c'), 3)
     })
   })
 

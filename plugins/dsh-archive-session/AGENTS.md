@@ -4,7 +4,9 @@
 
 ## 项目概况
 
-DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入口按钮 + 弹窗列出轻归档会话。已实现：轻量标题（路线 A，短 TTL 缓存 `sessionQuery.readTitleSnapshots`）、备份（可逆）、删除（不可逆）、备份恢复。
+DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入口按钮 + 弹窗列出轻归档会话。已实现：备份（可逆）、删除（不可逆）、备份恢复（单个 / 全部）、备份删除（单个 / 全部）、旧格式备份收纳（仅列出 / 删除）。
+
+> 路线 A（轻量标题 TTL 缓存）已退役：dsh 0.1.2-alpha.1 起官方 `sessionProjectionCache` 已覆盖 @ 候选标题读取的昂贵解码路径，插件再包一层 TTL 意义不大。
 
 > 入口槽位查证结论（dsh ≥ 0.1.1-rc.2）：`ui-workspace` 没有可注入的工具栏 slot；采用 `ui-sidebar` 公开 slot `sidebar.footer.action`（`packages/client/ui-sidebar/src/client/index.ts:52`）。
 
@@ -22,7 +24,6 @@ DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入�
 
 * host half 不 import 浏览器 API；client half 不 import Node 模块。
 * 一切副作用在 apply 内注册并配 `ctx.effect` 清理；不泄漏定时器 / watcher / AbortController。
-* 路线 A 包装 / 替换 `sessionReferenceResolver` / `sessionQuery` 时保持原签名与 `this` 语义、可逆恢复，并记录所适配 dsh 版本。
 
 ## 测试
 
