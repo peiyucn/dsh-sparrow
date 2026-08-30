@@ -29,6 +29,17 @@ export type { ArchiveConfig }
 const PREFIX = '/api/archive-session'
 const MAX_BODY_BYTES = 64 * 1024
 
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * 官方 session-controller 公开事件（@mode emit，见 dsh-api-session-controller types.ts）：
+     * 会话离开宿主时客户端会话列表据此即时移除条目。备份/删除成功后会话目录已移走，
+     * 补发此事件让侧边栏「未分组」等列表立即同步（2026-08-30 修复残留条目）。
+     */
+    'api-session/removed'(sessionId: SessionId): void
+  }
+}
+
 type ArchiveErrorCode =
   | 'BAD_BODY'
   | 'NOT_ARCHIVED'
@@ -444,6 +455,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               ctx.logger.warn(`dsh-archive-session: 归档集清理失败：${String(cleanupError)}`)
             }
             await invalidateProjectionCache(ctx, sessionId)
+            // 通知会话列表消费者移除条目（官方公开事件；会话目录已移走）。
+            ctx.emit('api-session/removed', sessionId)
             sendJson(res, 200, { ok: true, backupId, workspaceIds: workspaces })
             return
           }
@@ -456,6 +469,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             ctx.logger.warn(`dsh-archive-session: 归档集清理失败：${String(cleanupError)}`)
           }
           await invalidateProjectionCache(ctx, sessionId)
+          // 通知会话列表消费者移除条目（官方公开事件；会话目录已删除）。
+          ctx.emit('api-session/removed', sessionId)
           sendJson(res, 200, { ok: true, deleted: true, workspaceIds: workspaces })
           return
         }
