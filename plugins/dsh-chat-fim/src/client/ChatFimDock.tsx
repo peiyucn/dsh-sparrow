@@ -116,11 +116,16 @@ const ghostStyle = {
   opacity: 0.75,
 } satisfies React.CSSProperties
 
-const styles = {
-  switchBusy: {
-    animation: 'dsh-chat-fim-pulse 1.1s ease-in-out infinite',
-  } satisfies React.CSSProperties,
-} as const
+/** composer 卡片视口矩形（旋转光环定位；只读测量）。 */
+function composerCardRect(): { x: number; y: number; width: number; height: number } | undefined {
+  const card = document.querySelector<HTMLElement>('[data-composer-card]')
+  if (card === null) return undefined
+  const rect = card.getBoundingClientRect()
+  if (rect.width === 0 && rect.height === 0) return undefined
+  return { x: rect.left, y: rect.top, width: rect.width, height: rect.height }
+}
+
+const styles = {} as const
 
 /** 注入开关样式与联想中脉冲 keyframes（一次性，按 data 属性去重；颜色跟随发送按钮蓝紫）。 */
 export function ensureFimBusyStyles(): void {
@@ -130,38 +135,76 @@ export function ensureFimBusyStyles(): void {
   style.textContent = `
 .dsh-chat-fim-switch {
   height: 28px;
-  padding: 0 8px;
-  border: none;
-  border-radius: 8px;
-  background-color: transparent;
-  color: var(--dsw-alias-label-secondary, #6b7280);
+  padding: 0 12px;
+  border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 13px;
   line-height: 20px;
-  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
 }
 .dsh-chat-fim-switch:hover:not(:disabled) {
-  background-color: var(--dsw-alias-interactive-bg-hover);
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 .dsh-chat-fim-switch-on {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
+  border-color: var(--dsw-alias-button-info-fill, #4d6bfe);
 }
-@keyframes dsh-chat-fim-pulse {
-  0%, 100% {
-    background-color: transparent;
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 30%, transparent);
-  }
-  50% {
-    background-color: color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 14%, transparent);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 10%, transparent);
-  }
+@property --dsh-chat-fim-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.dsh-chat-fim-ring {
+  position: fixed;
+  z-index: 2000;
+  pointer-events: none;
+  padding: 2px;
+  border-radius: 24px;
+  background: conic-gradient(
+    from var(--dsh-chat-fim-angle),
+    transparent 0deg,
+    transparent 300deg,
+    color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 85%, transparent) 340deg,
+    color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 30%, transparent) 355deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: dsh-chat-fim-ring-spin 1.6s linear infinite;
+}
+@keyframes dsh-chat-fim-ring-spin {
+  to { --dsh-chat-fim-angle: 360deg; }
+}
+.dsh-chat-fim-fallback {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 2px;
+  font-size: 13px;
+}
+.dsh-chat-fim-fallback-chip {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font-style: italic;
+  cursor: pointer;
+}
+.dsh-chat-fim-fallback-chip:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 `
   document.head.appendChild(style)
 }
 
-/** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）；开启态蓝紫边框、联想中边框呼吸。 */
+/** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）。 */
 export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const { t } = props
   const enabled = useFimEnabled()
@@ -171,7 +214,6 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
     <button
       type="button"
       className={enabled ? 'dsh-chat-fim-switch dsh-chat-fim-switch-on' : 'dsh-chat-fim-switch'}
-      style={busy ? styles.switchBusy : undefined}
       title={busy ? t('dock.busy') : enabled ? t('switch.onHint') : t('switch.offHint')}
       aria-pressed={enabled}
       aria-busy={busy}
@@ -193,7 +235,9 @@ export function ChatFimDock(props: ChatFimDockProps) {
   const [suggestion, setSuggestion] = useState<string | null>(null)
   const [composing, setComposing] = useState(false)
   const [point, setPoint] = useState<{ x: number; y: number } | null>(null)
+  const [ring, setRing] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const enabled = useFimEnabled()
+  const busy = useFimBusy()
 
   const composingRef = useRef(false)
   const draftRevRef = useRef(input.draftRev)
@@ -303,16 +347,70 @@ export function ChatFimDock(props: ChatFimDockProps) {
     }
   }, [adopt, ghost, input.draft, input.draftRev, session.sessionId])
 
-  return ghost !== null && point !== null
-    ? createPortal(
-      <span
-        style={{ ...ghostStyle, left: point.x, top: point.y }}
-        data-chat-fim-ghost=""
-        aria-hidden
-      >
-        {ghost}
-      </span>,
-      document.body,
-    )
-    : null
+  // 联想中：整个 composer 卡片外圈旋转紫光（跟随卡片矩形，周期自愈）。
+  useLayoutEffect(() => {
+    if (!busy) {
+      setRing(null)
+      return
+    }
+    const measure = (): void => { setRing(composerCardRect() ?? null) }
+    measure()
+    const timer = window.setInterval(measure, 300)
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure, true)
+    }
+  }, [busy])
+
+  const applyFallback = (): void => {
+    if (ghost === null) return
+    const span: TokenSpan = {
+      start: input.draft.length,
+      end: input.draft.length,
+      draftRev: input.draftRev,
+    }
+    if (adopt(session.sessionId, ghost, span)) {
+      setSuggestion(null)
+      setFimBusy(false)
+    }
+  }
+
+  return (
+    <>
+      {busy && ring !== null
+        ? createPortal(
+          <div
+            className="dsh-chat-fim-ring"
+            style={{ left: ring.x - 2, top: ring.y - 2, width: ring.width + 4, height: ring.height + 4 }}
+            aria-hidden
+          />,
+          document.body,
+        )
+        : null}
+      {ghost !== null && point !== null
+        ? createPortal(
+          <span
+            style={{ ...ghostStyle, left: point.x, top: point.y }}
+            data-chat-fim-ghost=""
+            aria-hidden
+          >
+            {ghost}
+          </span>,
+          document.body,
+        )
+        : null}
+      {ghost !== null && point === null
+        ? (
+          <div className="dsh-chat-fim-fallback" data-chat-fim-fallback="">
+            <button type="button" className="dsh-chat-fim-fallback-chip" title={ghost} onClick={applyFallback}>
+              {ghost}
+            </button>
+          </div>
+        )
+        : null}
+    </>
+  )
 }
