@@ -37,18 +37,49 @@ export interface ArchiveDockInjected {
 
 export type ArchiveDockProps = PropsRuntime<'sidebar.footer.action'> & ArchiveDockInjected & { t: TranslateNS<'archive-session'> }
 
+/** 注入侧边栏 footer 触发键样式（对齐官方 settings 触发键：透明底、圆角、悬停亮底、rail 圆形）。 */
+export function ensureArchiveStyles(): void {
+  if (document.querySelector('style[data-dsh-archive-trigger]') !== null) return
+  const style = document.createElement('style')
+  style.dataset.dshArchiveTrigger = ''
+  style.textContent = `
+.dsh-archive-trigger {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% + 4px);
+  height: 42px;
+  margin: 4px -2px;
+  padding: 0 10px 0 8px;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 22px;
+}
+.dsh-archive-trigger:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dsh-archive-trigger-rail {
+  width: 36px;
+  height: 36px;
+  margin: 8px 0 10px;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  border-radius: 50%;
+}
+`
+  document.head.appendChild(style)
+}
+
 const styles = {
-  button: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '6px 8px',
-    borderRadius: 6,
-    background: 'transparent',
-    border: 'none',
-    color: 'var(--dsw-alias-label-primary, #1f2329)',
-    cursor: 'pointer',
-  } satisfies CSSProperties,
   overlay: {
     position: 'fixed' as const,
     inset: 0,
@@ -241,13 +272,13 @@ export function ArchiveDock(props: ArchiveDockProps) {
     <>
       <button
         type="button"
-        style={styles.button}
+        className={wide ? 'dsh-archive-trigger' : 'dsh-archive-trigger dsh-archive-trigger-rail'}
         title={t('dialog.title')}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => { setOpen(value => !value) }}
       >
-        <IconArchiveOutline20 />
+        <IconArchiveOutline20 size={wide ? 16 : 18} />
         {wide ? <span>{t('button.label')}</span> : null}
       </button>
 

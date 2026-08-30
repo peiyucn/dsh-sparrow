@@ -6,7 +6,7 @@
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import { ArchiveDock } from './ArchiveDock.js'
+import { ArchiveDock, ensureArchiveStyles } from './ArchiveDock.js'
 
 export const inject = ['slots', 'locale']
 
@@ -116,6 +116,7 @@ async function postApi<T = { ok?: boolean }>(path: string, body: unknown): Promi
  * @param ctx - 浏览器侧 Cordis 上下文。
  */
 export function apply(ctx: ClientContext): void {
+  ensureArchiveStyles()
   const disposeDictionaries = ctx.locale.register('archive-session', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
   ctx.effect(() => disposeDictionaries, 'dsh-archive-session: locale dictionaries')
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
@@ -150,5 +151,5 @@ export function apply(ctx: ClientContext): void {
   }, ArchiveDock))
 }
 
-export { ArchiveDock } from './ArchiveDock.js'
+export { ArchiveDock, ensureArchiveStyles } from './ArchiveDock.js'
 export type { ArchiveDockInjected, ArchiveDockProps, ArchivedSessionItem, BackupItem } from './ArchiveDock.js'
