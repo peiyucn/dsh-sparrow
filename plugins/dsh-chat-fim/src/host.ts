@@ -8,8 +8,8 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
-  buildFimPrompt, extractSuggestions, FIM_STOP_SEQUENCES, isAbortTimeout, normalizeConfig, parseCompleteBody,
-  summarizeUpstreamBody, upstreamStatusToError, type CompleteRequest, type ChatFimConfig, type ChatFimError,
+  buildFimPrompt, extractSuggestions, fimStopSequences, isAbortTimeout, normalizeConfig, parseCompleteBody,
+  summarizeUpstreamBody, upstreamStatusToError, type ChatFimConfig, type ChatFimError, type CompleteRequest,
 } from './chat-fim.js'
 
 export type { CompleteRequest } from './chat-fim.js'
@@ -126,7 +126,9 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
         return
       }
 
-      const prompt = buildFimPrompt(session.deriveMessages() as readonly unknown[], parsed.prompt)
+      const language = parsed.locale === 'en' ? 'en' : 'zh'
+      const prompt = buildFimPrompt(session.deriveMessages() as readonly unknown[], parsed.prompt, language)
+      const stop = fimStopSequences(language)
       const signal = requestSignal(res, settings.requestTimeoutMs)
       try {
         // FIM 接口没有 n 参数：多建议用并行请求 + 温度错开采样；部分失败保留成功建议。
@@ -145,7 +147,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
                 model: settings.model,
                 prompt,
                 max_tokens: settings.maxTokens,
-                stop: FIM_STOP_SEQUENCES,
+                stop,
                 temperature,
               }),
               signal: signal.signal,

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, FIM_STOP_SEQUENCES, isStaleResponse,
+  buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, fimStopSequences, isStaleResponse,
   normalizeConfig, parseCompleteBody, summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
 } from '../lib/chat-fim.js'
 
@@ -13,6 +13,7 @@ describe('chat-fim 纯逻辑', () => {
       assert.equal(config.model, 'deepseek-v4-pro')
         assert.equal(config.maxTokens, 96)
       assert.equal(config.apiKeyEnv, 'DEEPSEEK_API_KEY')
+      assert.equal(config.suggestionCount, 1)
     })
 
     it('非正整数限制 应该 抛错', () => {
@@ -94,19 +95,34 @@ describe('chat-fim 纯逻辑', () => {
       assert.match(prompt, /^用户：帮我写周报\n助手：好的，本周完成了……\n\n用户：下周计划是$/u)
     })
 
+    it('英文语言 应该 使用 User:/Assistant: 说话人标记', () => {
+      const history = [
+        { role: 'user', content: [{ type: 'text', text: 'Review this change' }] },
+        { role: 'assistant', content: [{ type: 'text', text: 'Looks good overall.' }] },
+      ]
+      const prompt = buildFimPrompt(history, 'Next iteration I want', 'en')
+      assert.equal(prompt, 'User: Review this change\nAssistant: Looks good overall.\n\nUser: Next iteration I want')
+    })
+
     it('历史裁剪 应该 受 maxMessages/maxChars 限制', () => {
       const history = [
         { role: 'user', content: [{ type: 'text', text: '第一条' }] },
         { role: 'user', content: [{ type: 'text', text: '第二条' }] },
         { role: 'user', content: [{ type: 'text', text: '第三条' }] },
       ]
-      const prompt = buildFimPrompt(history, '草稿', 2, 1000)
+      const prompt = buildFimPrompt(history, '草稿', 'zh', 2, 1000)
       assert.doesNotMatch(prompt, /第一条/u)
       assert.match(prompt, /用户：第二条\n用户：第三条\n\n用户：草稿$/u)
     })
+  })
 
-    it('stop 序列 应该 包含用户与助手说话人标记', () => {
-      assert.deepEqual(FIM_STOP_SEQUENCES, ['\n用户：', '\n助手：'])
+  describe('fimStopSequences', () => {
+    it('zh 应该 包含中文说话人标记', () => {
+      assert.deepEqual(fimStopSequences('zh'), ['\n用户：', '\n助手：'])
+    })
+
+    it('en 应该 包含英文说话人标记', () => {
+      assert.deepEqual(fimStopSequences('en'), ['\nUser: ', '\nAssistant: '])
     })
   })
 

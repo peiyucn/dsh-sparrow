@@ -12,5 +12,5 @@
         maxBodyBytes: 65536
         maxPromptChars: 32768
         triggerPauseMs: 400
-        suggestionCount: 2
+        suggestionCount: 1
         temperature: 1

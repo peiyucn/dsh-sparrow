@@ -4,7 +4,7 @@
 
 ## 项目概况
 
-DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + dock 建议条）。2026-08-29 从对话前缀续写切换为 FIM：实测提示词修视角不稳定（同构造两次采样一次用户口吻一次助手口吻），FIM 直接续写文本、无角色语义，天然站在用户角度。
+DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + 输入框内幽灵文本建议）。2026-08-29 从对话前缀续写切换为 FIM：实测提示词修视角不稳定（同构造两次采样一次用户口吻一次助手口吻），FIM 直接续写文本、无角色语义，天然站在用户角度。单候选（suggestionCount 默认 1），Tab 键入、Esc 丢弃；开关挂输入框工具行，文案随 dsh 语言 zh/en 切换。
 
 * TypeScript 实现；host half 源码在 src/，client half（M2 起）构建产物不入库（.gitignore）
 * 本地验证 = npm run verify（typecheck + node:test）
@@ -18,6 +18,12 @@ DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 +
 * client ↔ host 通信只走 ctx.webServer 自有路由（POST /api/chat-fim/complete）
 * API key 只经 ctx.credentials 解析，绝不落明文、绝不进浏览器
 * 一切副作用在 apply 内注册并配 ctx.effect 清理（DSH 插件生命周期要求）
+
+***
+
+## seam 特例（需项目 owner 认可，已定案）
+
+* **幽灵文本定位**：官方没有输入框内联建议 seam（`conversation.input.overlay` 是菜单弹层锚点且不带输入快照）。当前实现只对 `[data-composer-input]` 做**只读几何测量**（Range 取文末光标视口坐标），用 portal 把浅色斜体续文渲染在光标处；**不修改编辑器内容**，采用仍走 `slash/input-insert-text` bail 事件。边界：仅当光标在文末且 phase 为 plain 时显示；官方提供新 seam 后迁移。
 
 ***
 
