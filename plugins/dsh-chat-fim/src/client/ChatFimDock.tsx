@@ -103,7 +103,7 @@ function endCaretPoint(): { x: number; y: number } | undefined {
 /** 幽灵文本样式：与编辑器文本同字体族/字号/行高，浅色 + 斜体。 */
 const ghostStyle = {
   position: 'fixed' as const,
-  zIndex: 1000,
+  zIndex: 2000,
   pointerEvents: 'none' as const,
   whiteSpace: 'pre-wrap' as const,
   maxWidth: '70vw',
@@ -129,25 +129,33 @@ export function ensureFimBusyStyles(): void {
   style.dataset.dshChatFimBusy = ''
   style.textContent = `
 .dsh-chat-fim-switch {
-  border: 1px solid transparent;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
   border-radius: 8px;
-  background: transparent;
+  background-color: transparent;
   color: var(--dsw-alias-label-secondary, #6b7280);
-  font-size: 12px;
-  line-height: 1.5;
-  padding: 2px 8px;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
 }
-.dsh-chat-fim-switch:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+.dsh-chat-fim-switch:hover:not(:disabled) {
+  background-color: var(--dsw-alias-interactive-bg-hover);
 }
 .dsh-chat-fim-switch-on {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
-  border-color: var(--dsw-alias-button-info-fill, #4d6bfe);
 }
 @keyframes dsh-chat-fim-pulse {
-  0%, 100% { border-color: color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 90%, transparent); box-shadow: 0 0 0 0 color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 30%, transparent); }
-  50% { border-color: color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 45%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 10%, transparent); }
+  0%, 100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 30%, transparent);
+  }
+  50% {
+    background-color: color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 14%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 10%, transparent);
+  }
 }
 `
   document.head.appendChild(style)
@@ -259,9 +267,12 @@ export function ChatFimDock(props: ChatFimDockProps) {
       setPoint(endCaretPoint() ?? null)
     }
     measure()
+    // 周期自愈：光标/滚动/焦点变化未触发事件时，每 300ms 重测一次。
+    const timer = window.setInterval(measure, 300)
     window.addEventListener('resize', measure)
     window.addEventListener('scroll', measure, true)
     return () => {
+      window.clearInterval(timer)
       window.removeEventListener('resize', measure)
       window.removeEventListener('scroll', measure, true)
     }
