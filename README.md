@@ -30,10 +30,6 @@ dsh plugin --profile web add dsh-vision-access
 dsh plugin --profile web add dsh-archive-session
 ```
 
-## 开发
-
-规范与验证方式见 [AGENTS.md](AGENTS.md)（合集通用）与各插件目录下的 `AGENTS.md`。
-
 ## License
 
 MIT
