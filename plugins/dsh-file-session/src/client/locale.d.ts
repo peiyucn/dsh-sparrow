@@ -7,7 +7,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'dialog.close'
       | 'loading'
       | 'loadMore'
-      | 'summary'
+      | 'summary.count'
       | 'summary.loaded'
       | 'quota.used'
       | 'empty'

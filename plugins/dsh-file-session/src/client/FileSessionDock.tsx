@@ -192,10 +192,16 @@ export function ensureFileSessionStyles(): void {
   justify-content: flex-end;
   gap: 8px;
 }
-/* 用量/进度条固定区：面板头下方、不随列表滚动；左右 36px = 区块卡外边距 24 + 卡内边距 12，与卡内内容对齐。 */
+/* 用量/进度条固定区：面板头下方、不随列表滚动；左右 24px 与下方区块卡线框齐平。 */
 .dsh-file-session-summary {
   flex: none;
-  padding: 12px 36px 12px;
+  padding: 12px 24px 8px;
+}
+.dsh-file-session-count {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
 }
 /* 列表区块卡：存档页归档区/备份区同款 token（border-l2 + r12）。 */
 .dsh-file-session-card {
@@ -207,10 +213,12 @@ export function ensureFileSessionStyles(): void {
   border: 1px solid var(--dsw-alias-border-l2, #e2e5ea);
   border-radius: 12px;
 }
-/* 配额容量条：加厚 + 未使用区斜纹（repeating-linear-gradient），与分割线区分；填充盖住斜纹。 */
+/* 配额容量条：加厚 + 未使用区斜纹（repeating-linear-gradient），与分割线区分；填充盖住斜纹。
+   容量文字绝对定位居中叠加在条上。 */
 .dsh-file-session-quota-track {
-  height: 12px;
-  border-radius: 6px;
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
   background-color: var(--dsw-alias-interactive-bg-hover);
   background-image: repeating-linear-gradient(
     45deg,
@@ -220,6 +228,21 @@ export function ensureFileSessionStyles(): void {
     var(--dsw-alias-border-l1, #d4d8e0) 7px
   );
   overflow: hidden;
+}
+.dsh-file-session-quota-text {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 14px;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  /* 高用量时蓝填充垫底，加一圈底色光晕保证可读。 */
+  text-shadow: 0 0 4px var(--dsw-alias-bg-layer-2, #f6f7f9);
+  pointer-events: none;
 }
 .dsh-file-session-quota-fill {
   height: 100%;
@@ -412,20 +435,21 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
             </div>
             {summary !== null ? (
               <div className="dsh-file-session-summary">
-                <p style={{ ...styles.secondarySmall, margin: '0 0 6px' }}>
-                  {/* 列表翻页联动：未加载完时显示「已加载 X / 共 N」，加载完只显示总数。 */}
-                  {rows.length < summary.count
-                    ? t('summary.loaded', { loaded: rows.length, count: summary.count, size: `${summary.totalBytesLabel} / ${summary.quotaBytesLabel}` })
-                    : t('summary', { count: summary.count, size: `${summary.totalBytesLabel} / ${summary.quotaBytesLabel}` })}
-                  {' · '}
-                  {t('quota.used', { percent: formatUsagePercent(quotaRatio) })}
-                </p>
                 <div className="dsh-file-session-quota-track">
+                  <span className="dsh-file-session-quota-text">
+                    {`${summary.totalBytesLabel} / ${summary.quotaBytesLabel} · ${t('quota.used', { percent: formatUsagePercent(quotaRatio) })}`}
+                  </span>
                   {/* 零用量不渲染填充（min-width 银条只给「有使用」的状态）。 */}
                   {quotaRatio > 0
                     ? <div className="dsh-file-session-quota-fill" style={{ width: `${Math.round(quotaRatio * 100)}%` }} />
                     : null}
                 </div>
+                {/* 列表翻页联动：未加载完时显示「已加载 X / 共 N」，加载完只显示总数。 */}
+                <p className="dsh-file-session-count">
+                  {rows.length < summary.count
+                    ? t('summary.loaded', { loaded: rows.length, count: summary.count })
+                    : t('summary.count', { count: summary.count })}
+                </p>
               </div>
             ) : null}
             <div style={{ ...styles.body, padding: summary !== null ? '0 24px 24px' : '12px 24px 24px' }} className="dsh-file-session-body">
