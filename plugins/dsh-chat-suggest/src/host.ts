@@ -23,8 +23,8 @@ export const inject = ['webServer', 'sessions', 'credentials']
 export type { ChatSuggestConfig, ChatSuggestError }
 
 const ROUTE_PATH = '/api/chat-suggest/complete'
-/** 候选全被复读/回声护栏过滤时的重试温度：升温度更可能跳出采样循环（0.3 实测会整段复读）。 */
-const ECHO_RETRY_TEMPERATURE = 0.7
+/** 候选全被复读/回声护栏过滤时的重试温度：0.5——比 0.3 更易跳出复读循环，比 0.7 噪声小（0.7 实测相关性弱）。 */
+const ECHO_RETRY_TEMPERATURE = 0.5
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   if (res.headersSent) return
