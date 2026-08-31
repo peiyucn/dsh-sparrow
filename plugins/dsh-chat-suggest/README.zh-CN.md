@@ -12,7 +12,9 @@
 dsh plugin --profile web add @dsh-sparrow/dsh-chat-suggest
 ```
 
-适配 dsh ≥ 0.1.1-rc.2。
+适配 dsh ≥ 0.1.1-rc.2，并需要可用的 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
+
+> **不要**直接执行 `npm install @dsh-sparrow/dsh-chat-suggest`：那只会把包下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用上面的 `dsh plugin` 命令安装，并在安装后重启 DSH。
 
 ## 使用
 

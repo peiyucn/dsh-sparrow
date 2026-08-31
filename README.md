@@ -6,6 +6,12 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 Each plugin is published and installed independently; a plugin retires from the collection once DSH natively supports its feature.
 
+## Install
+
+Prerequisites: a working `dsh` CLI and `pnpm` (`dsh plugin` forwards installation to pnpm).
+
+> The packages are published on npm, but do **not** install them with `npm install @dsh-sparrow/...` directly — that only downloads them into a `node_modules` without registering them in the DSH web profile. Use the `dsh plugin` command below so each package lands in `$DSH_HOME/profiles/web` and its bundle layer is activated. Restart DSH after installing.
+
 ## dsh-chat-suggest
 
 Chat input suggestions. After a short typing pause, an official-@-menu-style card suggests what you may type next — Tab adopts, Esc dismisses; powered by DeepSeek FIM completion (Beta), with three trigger-sensitivity levels (high / medium / low); the completion model follows your selected main model.

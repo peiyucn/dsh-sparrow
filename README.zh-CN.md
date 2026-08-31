@@ -6,6 +6,12 @@
 
 每个插件独立发布、独立安装；某功能被官方原生支持后，对应插件从合集中退役。
 
+## 安装
+
+前置条件：可用的 `dsh` CLI 和 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
+
+> 这些包虽然发布在 npm，但**不要**直接用 `npm install @dsh-sparrow/...` 安装：那只会把它们下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用下面的 `dsh plugin` 命令，让包安装到 `$DSH_HOME/profiles/web` 并激活 bundle 层；安装后请重启 DSH。
+
 ## dsh-chat-suggest
 
 聊天输入框续写联想。打字停顿片刻，在输入框上方以官方 @ 候选菜单同款悬浮卡给出「接下来可能写的文字」，Tab 采用、Esc 丢弃；补全由 DeepSeek FIM 补全（Beta）驱动，触发灵敏度三档可调（高 / 中 / 低），续写模型跟随主模型。

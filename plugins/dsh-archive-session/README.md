@@ -12,7 +12,9 @@ Complements the built-in archive: DSH only hides archived sessions from the side
 dsh plugin --profile web add @dsh-sparrow/dsh-archive-session
 ```
 
-Requires dsh ≥ 0.1.1-rc.2.
+Requires dsh ≥ 0.1.1-rc.2 and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
+
+> Do **not** run `npm install @dsh-sparrow/dsh-archive-session` directly — that only downloads the package into a `node_modules` and does not register it in the DSH web profile. Install with the `dsh plugin` command above, then restart DSH.
 
 ## Usage
 
