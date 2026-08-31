@@ -39,9 +39,9 @@ const LOCALE_DICTS = {
     'sensitivity.eager': '高',
     'sensitivity.standard': '中',
     'sensitivity.conservative': '低',
-    'sensitivity.eager.rule': '250ms · 4/2 字 · 半词/句末也联想',
-    'sensitivity.standard.rule': '400ms · 8/6 字 · 半词/句末不联想',
-    'sensitivity.conservative.rule': '800ms · 12/8 字 · 半词/空格不联想',
+    'sensitivity.eager.rule': '250ms · 6/4 字 · 半词/句末也联想',
+    'sensitivity.standard.rule': '400ms · 10/6 字 · 半词/句末不联想',
+    'sensitivity.conservative.rule': '800ms · 14/10 字 · 半词/空格不联想',
   },
   en: {
     'switch.label': 'Suggest',
@@ -57,9 +57,9 @@ const LOCALE_DICTS = {
     'sensitivity.eager': 'High',
     'sensitivity.standard': 'Medium',
     'sensitivity.conservative': 'Low',
-    'sensitivity.eager.rule': '250ms · 4/2 chars · mid-word & sentence end',
-    'sensitivity.standard.rule': '400ms · 8/6 chars · no half-words/sentence end',
-    'sensitivity.conservative.rule': '800ms · 12/8 chars · no half-words/space',
+    'sensitivity.eager.rule': '250ms · 6/4 chars · mid-word & sentence end',
+    'sensitivity.standard.rule': '400ms · 10/6 chars · no half-words/sentence end',
+    'sensitivity.conservative.rule': '800ms · 14/10 chars · no half-words/space',
   },
 } as const
 

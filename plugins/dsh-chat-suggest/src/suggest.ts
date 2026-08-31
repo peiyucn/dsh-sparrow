@@ -431,8 +431,8 @@ export function formatTokenCount(count: number): string {
   return String(safe).replace(/\B(?=(\d{3})+(?!\d))/gu, ',')
 }
 
-/** 触发形态门控：草稿最短长度（trim 后）。标准档 CJK 草稿 8 字；纯拉丁草稿 6 字符（≈一个完整单词——2026-08-31 实测半词信号太弱、模型漂移，3→4→6）。 */
-export const MIN_TRIGGER_DRAFT_CHARS = 8
+/** 触发形态门控：草稿最短长度（trim 后）。标准档 CJK 草稿 10 字；纯拉丁草稿 6 字符（≈一个完整单词——2026-08-31 实测半词信号太弱、模型漂移，拉丁定格 6：好案例 please 恰好 6 字符）。 */
+export const MIN_TRIGGER_DRAFT_CHARS = 10
 export const MIN_TRIGGER_DRAFT_CHARS_LATIN = 6
 
 /** 句末标点：草稿以这些字符结尾时句子已完整，FIM 会续出新一句而不是接话（实测质量差），不触发。 */
@@ -463,8 +463,8 @@ export interface TriggerSensitivityParams {
 export const TRIGGER_SENSITIVITIES: Record<TriggerSensitivity, TriggerSensitivityParams> = {
   eager: {
     pauseMs: 250,
-    minCharsCjk: 4,
-    minCharsLatin: 2,
+    minCharsCjk: 6,
+    minCharsLatin: 4,
     allowLatinMidWord: true,
     allowTrailingSpace: true,
     allowSentenceEnd: true,
@@ -479,8 +479,8 @@ export const TRIGGER_SENSITIVITIES: Record<TriggerSensitivity, TriggerSensitivit
   },
   conservative: {
     pauseMs: 800,
-    minCharsCjk: 12,
-    minCharsLatin: 8,
+    minCharsCjk: 14,
+    minCharsLatin: 10,
     allowLatinMidWord: false,
     allowTrailingSpace: false,
     allowSentenceEnd: false,
