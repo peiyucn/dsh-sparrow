@@ -1,5 +1,5 @@
 /**
- * dsh-vision-access client half：输入框工具行状态图标（当前会话可跨模型读图时点亮）。
+ * dsh-vision-access client half：模型选择器旁的状态图标（当前会话可跨模型读图时点亮）。
  * 纯指示、无交互、无持久状态；可用性判定全在 host（GET /api/vision-access/status）。
  */
 
@@ -28,8 +28,8 @@ export function apply(ctx: ClientContext): void {
   const disposeDictionaries = ctx.locale.register('vision-access', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
   ctx.effect(() => disposeDictionaries, 'dsh-vision-access: locale dictionaries')
 
-  ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
-    name: 'conversation.input.left',
+  ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
+    name: 'conversation.input.right',
     id: 'vision-access-status',
     order: 20,
     locale: 'vision-access',

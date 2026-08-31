@@ -36,8 +36,8 @@ DSH Web 插件：纯文本主模型会话的图片视觉通道 —— 主模型�
     src/host.ts   — host half 入口（resolveModelInfo 包装 + agent/request 屏蔽 + vision_read 工具 + 状态路由）
     src/vision.ts — 纯逻辑（缓存键 / 报告解析 / JSON 提取 / 附件引用匹配 / 能力判断）
     src/index.ts  — 入口契约 re-export
-    src/client/index.ts — client half 入口（locale + conversation.input.left 图标槽位）
-    src/client/VisionStatusIcon.tsx — 状态图标（GET /api/vision-access/status 查询，可用才点亮）
+    src/client/index.ts — client half 入口（locale + conversation.input.right 图标槽位）
+    src/client/VisionStatusIcon.tsx — 状态图标（GET /api/vision-access/status 查询，非视觉模型才点亮）
     test/vision.test.mjs — 纯逻辑单测
 
 ***

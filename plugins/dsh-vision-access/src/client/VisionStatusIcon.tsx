@@ -1,4 +1,4 @@
-/** 状态图标：当前会话可跨模型读图时在输入框工具行点亮（纯指示，无交互、无持久状态）。 */
+/** 状态图标：当前会话可跨模型读图时在模型选择器旁点亮（纯指示，无交互、无持久状态）。 */
 
 import { useEffect, useState } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -10,7 +10,7 @@ export interface VisionStatusInjected {
   isAvailable: (sessionId: SessionId) => Promise<boolean>
 }
 
-export type VisionStatusProps = PropsRuntime<'conversation.input.left'> & VisionStatusInjected & { t: TranslateNS<'vision-access'> }
+export type VisionStatusProps = PropsRuntime<'conversation.input.right'> & VisionStatusInjected & { t: TranslateNS<'vision-access'> }
 
 /** 图片 glyph：官方 icon 集没有图片图标，内联 SVG + currentColor（同官方 PermissionSelect 自绘盾牌先例）。 */
 const IMAGE_GLYPH = (
