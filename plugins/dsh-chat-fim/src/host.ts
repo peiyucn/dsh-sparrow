@@ -22,6 +22,8 @@ export const inject = ['webServer', 'sessions', 'credentials']
 export type { ChatFimConfig, ChatFimError }
 
 const ROUTE_PATH = '/api/chat-fim/complete'
+/** 候选全被复读/回声护栏过滤时的重试温度：升温度更可能跳出采样循环（0.3 实测会整段复读）。 */
+const ECHO_RETRY_TEMPERATURE = 0.7
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   if (res.headersSent) return
@@ -180,47 +182,46 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
       const language = parsed.locale === 'en' ? 'en' : 'zh'
       const history = session.deriveMessages() as readonly unknown[]
       const prompt = buildFimPrompt(history, parsed.prompt, language)
-      // 回声判定的历史文本集（与 prompt 同一窗口）：模型复读/转述历史时丢弃候选。
-      const historyEchoTexts = recentHistoryTurns(history).map(turn => turn.text)
+      // 回声判定只用「用户」历史消息：模型复读用户刚说的话是退化（实测），
+      // 而续写里引用助手的措辞是正常对话，不判回声。
+      const historyEchoTexts = recentHistoryTurns(history)
+        .filter(turn => turn.role === 'user')
+        .map(turn => turn.text)
       const stop = fimStopSequences(language)
       // 补全模型三档解析：pro / flash / auto（跟随官方主模型，vision/未知回退配置默认）。
       const fimModel = resolveFimModel(parsed.fimModelMode, main, settings.model)
       const signal = requestSignal(res, settings.requestTimeoutMs)
       try {
-        // FIM 接口没有 n 参数：多建议用并行请求 + 温度错开采样；部分失败保留成功建议。
-        const results = await Promise.allSettled(
-          Array.from({ length: settings.suggestionCount }, async (_, index) => {
-            const temperature = settings.suggestionCount > 1
-              ? Math.min(2, settings.temperature + index * 0.4)
-              : settings.temperature
-            const upstream = await fetch(`${settings.baseURL.replace(/\/$/u, '')}/completions`, {
-              method: 'POST',
-              headers: {
-                authorization: `Bearer ${credential.value}`,
-                'content-type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: fimModel,
-                prompt,
-                max_tokens: settings.maxTokens,
-                stop,
-                temperature,
-              }),
-              signal: signal.signal,
-            })
-            const upstreamText = await readBoundedText(upstream, MAX_UPSTREAM_BODY_BYTES)
-            if (!upstream.ok) {
-              throw upstreamStatusToError(upstream.status, upstreamText)
-            }
-            let data: unknown
-            try {
-              data = JSON.parse(upstreamText)
-            } catch {
-              throw { code: 'UPSTREAM_ERROR', message: 'DeepSeek FIM 上游返回了非法 JSON' } satisfies ChatFimError
-            }
-            return { suggestions: extractSuggestions(data), usage: extractUsage(data), temperature }
-          }),
-        )
+        /** 单次上游补全请求；成功返回候选/用量，失败抛 ChatFimError。 */
+        const requestOnce = async (temperature: number) => {
+          const upstream = await fetch(`${settings.baseURL.replace(/\/$/u, '')}/completions`, {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${credential.value}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: fimModel,
+              prompt,
+              max_tokens: settings.maxTokens,
+              stop,
+              temperature,
+            }),
+            signal: signal.signal,
+          })
+          const upstreamText = await readBoundedText(upstream, MAX_UPSTREAM_BODY_BYTES)
+          if (!upstream.ok) {
+            throw upstreamStatusToError(upstream.status, upstreamText)
+          }
+          let data: unknown
+          try {
+            data = JSON.parse(upstreamText)
+          } catch {
+            throw { code: 'UPSTREAM_ERROR', message: 'DeepSeek FIM 上游返回了非法 JSON' } satisfies ChatFimError
+          }
+          return { suggestions: extractSuggestions(data), usage: extractUsage(data), temperature }
+        }
+
         const seen = new Set<string>()
         const suggestions: string[] = []
         let totalPromptTokens = 0
@@ -228,30 +229,46 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
         let firstTemperature = settings.temperature
         let firstError: ChatFimError | undefined
         let hadFulfilled = false
-        for (const result of results) {
-          if (result.status === 'fulfilled') {
-            hadFulfilled = true
-            if (suggestions.length === 0) firstTemperature = result.value.temperature
-            totalPromptTokens += result.value.usage.promptTokens
-            totalCompletionTokens += result.value.usage.completionTokens
-            for (const suggestion of result.value.suggestions) {
-              // 剥离开头泄漏的说话人标记（「助手：…」），剥空或重复的候选丢弃。
-              const clean = stripSpeakerPrefix(suggestion, language)
-              if (clean === '' || seen.has(clean)) continue
-              // 两道护栏：同一短语循环复读 / 复述历史原句（实测见 chat-fim.ts 注释）→ 丢弃。
-              if (hasDegenerateRepeat(clean) || isHistoryEcho(clean, historyEchoTexts)) continue
-              seen.add(clean)
-              suggestions.push(clean)
+
+        /** 把一批上游结果经护栏清洗进候选列表（说话人标记剥离、复读/回声丢弃、去重）。 */
+        const absorb = (results: Array<PromiseSettledResult<Awaited<ReturnType<typeof requestOnce>>>>): void => {
+          for (const result of results) {
+            if (result.status === 'fulfilled') {
+              hadFulfilled = true
+              if (suggestions.length === 0) firstTemperature = result.value.temperature
+              totalPromptTokens += result.value.usage.promptTokens
+              totalCompletionTokens += result.value.usage.completionTokens
+              for (const suggestion of result.value.suggestions) {
+                // 剥离开头泄漏的说话人标记（「助手：…」），剥空或重复的候选丢弃。
+                const clean = stripSpeakerPrefix(suggestion, language)
+                if (clean === '' || seen.has(clean)) continue
+                // 两道护栏：同一短语循环复读 / 复述用户历史消息（实测见 chat-fim.ts 注释）→ 丢弃。
+                if (hasDegenerateRepeat(clean) || isHistoryEcho(clean, historyEchoTexts)) continue
+                seen.add(clean)
+                suggestions.push(clean)
+              }
+              continue
             }
-            continue
+            const reason = result.reason
+            if (firstError !== undefined) continue
+            firstError = typeof reason === 'object' && reason !== null && 'code' in reason && 'message' in reason
+              ? reason as ChatFimError
+              : { code: 'UPSTREAM_ERROR', message: reason instanceof Error ? reason.message : String(reason) }
           }
-          const reason = result.reason
-          if (firstError !== undefined) continue
-          firstError = typeof reason === 'object' && reason !== null && 'code' in reason && 'message' in reason
-            ? reason as ChatFimError
-            : { code: 'UPSTREAM_ERROR', message: reason instanceof Error ? reason.message : String(reason) }
         }
-        // 候选全被护栏/空文本过滤：上游正常时静默返回空建议（客户端不显示错误、不打扰用户）；
+
+        // FIM 接口没有 n 参数：多建议用并行请求 + 温度错开采样；部分失败保留成功建议。
+        absorb(await Promise.allSettled(
+          Array.from({ length: settings.suggestionCount }, (_, index) => requestOnce(
+            settings.suggestionCount > 1 ? Math.min(2, settings.temperature + index * 0.4) : settings.temperature,
+          )),
+        ))
+
+        // 候选全被护栏过滤（复读/回声）：升温度重试一次，多数时候能跳出复读循环；
+        // 仍无候选则静默返回空建议（客户端不显示错误、不打扰用户）。
+        if (suggestions.length === 0 && hadFulfilled) {
+          absorb(await Promise.allSettled([requestOnce(ECHO_RETRY_TEMPERATURE)]))
+        }
         // 只有上游请求全部失败才报 502。
         if (suggestions.length === 0 && !hadFulfilled) {
           sendError(res, 502, firstError ?? { code: 'UPSTREAM_ERROR', message: 'DeepSeek FIM 上游没有返回可用候选' })

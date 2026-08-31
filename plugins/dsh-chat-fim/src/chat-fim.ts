@@ -284,8 +284,9 @@ function normalizeForEcho(text: string): string {
 }
 
 /**
- * 检测历史回声：建议开头（归一化后）的前 minOverlap 字连续出现在近期历史消息里，
- * 说明模型在复读/转述历史而非续写草稿（实测：输入 ple 复述聊天区历史原句），丢弃该候选。
+ * 检测历史回声：建议开头（归一化后）的前 minOverlap 字连续出现在给定的历史文本里，
+ * 说明模型在复读/转述历史而非续写草稿（实测：输入 ple 复述聊天区用户刚发过的句子）。
+ * host 侧只传「用户」消息做比对——引用助手措辞的正常续写不判回声，避免误杀。
  */
 export function isHistoryEcho(suggestion: string, historyTexts: readonly string[], minOverlap = 10): boolean {
   const text = normalizeForEcho(suggestion)
