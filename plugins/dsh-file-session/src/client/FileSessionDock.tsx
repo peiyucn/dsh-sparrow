@@ -216,9 +216,9 @@ export function ensureFileSessionStyles(): void {
 }
 .dsh-file-session-quota-fill {
   height: 100%;
-  /* 用量极小时（0.01% 量级）宽度趋近 0，兜底 3px 银条让「有使用」可见（网盘同款）。 */
+  /* 用量极小时（0.01% 量级）宽度趋近 0，兜底 3px 银条让「有使用」可见（网盘同款）。
+     不加自身圆角：最小宽度下 3px 圆角会长成圆点、视觉鼓出轨道左端，改由轨道 overflow:hidden + 圆角裁切两端。 */
   min-width: 3px;
-  border-radius: 3px;
   background: var(--dsw-alias-state-business-primary);
   transition: width 220ms ease-out;
 }
