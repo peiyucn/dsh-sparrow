@@ -325,7 +325,7 @@ export function formatTokenCount(count: number): string {
   return String(safe).replace(/\B(?=(\d{3})+(?!\d))/gu, ',')
 }
 
-/** 触发形态门控：草稿最短长度（trim 后）。CJK 草稿 8 字；纯拉丁草稿按词计，3 字符即可开补。 */
+/** 触发形态门控：草稿最短长度（trim 后）。标准档 CJK 草稿 8 字；纯拉丁草稿按词计，3 字符即可开补。 */
 export const MIN_TRIGGER_DRAFT_CHARS = 8
 export const MIN_TRIGGER_DRAFT_CHARS_LATIN = 3
 
@@ -335,30 +335,65 @@ export const SENTENCE_END_CHARS = '。！？.!?;；'
 /** CJK 字符检测：草稿含中日韩文字即按「中文语境」门控（2026-08-30 晚：不做 zh/en 硬切换，按内容自适应）。 */
 const CJK_CHARS = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/u
 
+/** 触发灵敏度三档（2026-08-30 晚）：用户习惯不同，敏锐/钝化自己调。 */
+export type FimSensitivity = 'eager' | 'standard' | 'conservative'
+export const DEFAULT_FIM_SENSITIVITY: FimSensitivity = 'standard'
+
+export interface FimSensitivityParams {
+  /** 停顿阈值（毫秒）。 */
+  readonly pauseMs: number
+  /** 含 CJK 草稿的最短长度。 */
+  readonly minCharsCjk: number
+  /** 纯拉丁草稿的最短长度。 */
+  readonly minCharsLatin: number
+  /** 是否放行「夹在中文里的英文单词停一半」。 */
+  readonly allowCjkMidWord: boolean
+  /** 是否放行尾随空格（词后预测下一个词 / 空格分词续写）。 */
+  readonly allowTrailingSpace: boolean
+}
+
+export const FIM_SENSITIVITIES: Record<FimSensitivity, FimSensitivityParams> = {
+  eager: { pauseMs: 250, minCharsCjk: 4, minCharsLatin: 2, allowCjkMidWord: true, allowTrailingSpace: true },
+  standard: {
+    pauseMs: 400,
+    minCharsCjk: MIN_TRIGGER_DRAFT_CHARS,
+    minCharsLatin: MIN_TRIGGER_DRAFT_CHARS_LATIN,
+    allowCjkMidWord: false,
+    allowTrailingSpace: true,
+  },
+  conservative: { pauseMs: 800, minCharsCjk: 12, minCharsLatin: 5, allowCjkMidWord: false, allowTrailingSpace: false },
+}
+
+/** 灵敏度解析：非法/缺省回退 standard。 */
+export function normalizeFimSensitivity(value: unknown): FimSensitivity {
+  return value === 'eager' || value === 'standard' || value === 'conservative' ? value : DEFAULT_FIM_SENSITIVITY
+}
+
 export type FimTriggerDecision =
   | { readonly ok: true }
-  | { readonly ok: false; readonly reason: 'empty' | 'too-short' | 'sentence-end' | 'mid-word' }
+  | { readonly ok: false; readonly reason: 'empty' | 'too-short' | 'sentence-end' | 'mid-word' | 'trailing-space' }
 
 /**
- * 依据草稿形态决定是否发起联想请求（2026-08-30 实测驱动，同日晚改为内容自适应通用规则）：
- * 句末标点不触发，避免建议续出「新一句话」。
- * 尾随空格一律放行——英文词后空格、不用标点用空格分词的中文，空格后正是预测下一段文字的位置；
- * 唯一按内容分化的规则：含 CJK 的草稿若正停在一半的夹入英文单词上（末尾两字符均为 ASCII 字母数字）
- * 不触发（续半词质量差），其余形态都触发。所有语言同一规则、按内容自适应。
+ * 依据草稿形态决定是否发起联想请求（2026-08-30 实测驱动，同日晚改为内容自适应 + 灵敏度可调）：
+ * 句末标点一律不触发，避免建议续出「新一句话」；其余规则按灵敏度参数伸缩
+ * （最短长度、夹入英文半词、尾随空格），停顿阈值由客户端按同一参数取值。所有语言同一规则。
  */
-export function shouldTriggerFim(draft: string): FimTriggerDecision {
+export function shouldTriggerFim(draft: string, sensitivity: FimSensitivity = DEFAULT_FIM_SENSITIVITY): FimTriggerDecision {
+  const params = FIM_SENSITIVITIES[sensitivity] ?? FIM_SENSITIVITIES[DEFAULT_FIM_SENSITIVITY]
   const trimmed = draft.trim()
   if (trimmed === '') return { ok: false, reason: 'empty' }
   const cjk = CJK_CHARS.test(trimmed)
-  const minChars = cjk ? MIN_TRIGGER_DRAFT_CHARS : MIN_TRIGGER_DRAFT_CHARS_LATIN
+  const minChars = cjk ? params.minCharsCjk : params.minCharsLatin
   if (trimmed.length < minChars) return { ok: false, reason: 'too-short' }
   const last = trimmed[trimmed.length - 1] ?? ''
   if (SENTENCE_END_CHARS.includes(last)) return { ok: false, reason: 'sentence-end' }
-  // 尾随空格（词后/句间）：放行，两种语境都是续写点。
+  // 尾随空格（词后/句间）：按灵敏度放行/抑制。
   const rawLast = draft[draft.length - 1] ?? ''
-  if (rawLast.trim() === '') return { ok: true }
-  // 正停在一个字符上：CJK 草稿里夹入的英文单词续一半质量差，不触发。
-  if (cjk) {
+  if (rawLast.trim() === '') {
+    return params.allowTrailingSpace ? { ok: true } : { ok: false, reason: 'trailing-space' }
+  }
+  // 正停在一个字符上：CJK 草稿里夹入的英文单词续一半质量差，按灵敏度决定是否抑制。
+  if (cjk && !params.allowCjkMidWord) {
     const prev = trimmed[trimmed.length - 2] ?? ''
     if (/[A-Za-z0-9]/u.test(last) && /[A-Za-z0-9]/u.test(prev)) return { ok: false, reason: 'mid-word' }
   }

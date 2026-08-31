@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, fimStopSequences, formatTokenCount,
-  isDeepseekMainRoute, mainRouteFromSession, normalizeConfig, normalizeFimModelMode,
+  isDeepseekMainRoute, mainRouteFromSession, normalizeConfig, normalizeFimModelMode, normalizeFimSensitivity,
   parseCompleteBody, resolveFimModel, shouldTriggerFim, stripSpeakerPrefix, summarizeUpstreamBody,
   upstreamStatusToError, validateCompletePayload,
 } from '../lib/chat-fim.js'
@@ -317,6 +317,39 @@ describe('chat-fim 纯逻辑', () => {
 
     it('中文句号后跟空格 应该 不触发（sentence-end）', () => {
       assert.deepEqual(shouldTriggerFim('这个方案已经写完了。 '), { ok: false, reason: 'sentence-end' })
+    })
+
+    it('高灵敏：4 字中文 应该 触发', () => {
+      assert.deepEqual(shouldTriggerFim('你好啊这', 'eager'), { ok: true })
+    })
+
+    it('高灵敏：夹入英文停半词 应该 触发', () => {
+      assert.deepEqual(shouldTriggerFim('这个 bug 出在 transf', 'eager'), { ok: true })
+    })
+
+    it('低灵敏：词后空格 应该 不触发（trailing-space）', () => {
+      assert.deepEqual(shouldTriggerFim('Let me fix the ', 'conservative'), { ok: false, reason: 'trailing-space' })
+    })
+
+    it('低灵敏：不足 12 字中文 应该 不触发（too-short）', () => {
+      assert.deepEqual(shouldTriggerFim('这个方案还差一点点', 'conservative'), { ok: false, reason: 'too-short' })
+    })
+
+    it('标准档（缺省）与显式 standard 应该 行为一致', () => {
+      assert.deepEqual(shouldTriggerFim('我觉得这个方案的'), shouldTriggerFim('我觉得这个方案的', 'standard'))
+    })
+
+    describe('normalizeFimSensitivity', () => {
+      it('合法三档 应该 原样返回', () => {
+        assert.equal(normalizeFimSensitivity('eager'), 'eager')
+        assert.equal(normalizeFimSensitivity('standard'), 'standard')
+        assert.equal(normalizeFimSensitivity('conservative'), 'conservative')
+      })
+
+      it('非法/缺省 应该 回退 standard', () => {
+        assert.equal(normalizeFimSensitivity('ultra'), 'standard')
+        assert.equal(normalizeFimSensitivity(undefined), 'standard')
+      })
     })
 
     it('中文夹英文单词停在一半 应该 不触发（mid-word）', () => {

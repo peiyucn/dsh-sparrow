@@ -8,7 +8,7 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { shouldTriggerFim, formatTokenCount, type FimModelMode } from '../chat-fim.js'
+import { FIM_SENSITIVITIES, formatTokenCount, shouldTriggerFim, type FimSensitivity } from '../chat-fim.js'
 
 export interface FimCompleteResult {
   readonly suggestions: readonly string[]
@@ -22,12 +22,11 @@ export interface ChatFimDockInjected {
   readonly sessionId: SessionId
   /** 查询当前会话主模型是否支持（deepseek 系列）；false 时整体隐藏。 */
   isSupported: (sessionId: SessionId) => Promise<boolean>
-  /** 发起一次 host 路由请求；由调用方负责陈旧响应判定。 */
+  /** 发起一次 host 路由请求；由调用方负责陈旧响应判定。续写模型固定 deepseek-v4-flash。 */
   requestComplete: (
     sessionId: SessionId,
     prompt: string,
     signal: AbortSignal,
-    mode: FimModelMode,
   ) => Promise<FimCompleteResult>
   /** 通过 scoped bail 事件把建议追加进草稿；返回是否被输入机接受。 */
   adopt: (sessionId: SessionId, text: string, span: TokenSpan) => boolean
@@ -37,9 +36,8 @@ export type ChatFimDockProps = PropsRuntime<'conversation.composer.dock'> & Chat
 export type ChatFimSwitchProps = PropsRuntime<'conversation.input.left'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
 export type ChatFimMenuProps = PropsRuntime<'conversation.input.overlay'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
 
-const PAUSE_MS = 400
 const ENABLED_STORAGE_KEY = 'dsh-chat-fim:enabled'
-const MODEL_MODE_STORAGE_KEY = 'dsh-chat-fim:modelMode'
+const SENSITIVITY_STORAGE_KEY = 'dsh-chat-fim:sensitivity'
 /** 菜单高度设计上限（同官方 MenuDropdown）。 */
 const MENU_MAX_HEIGHT = 320
 
@@ -205,42 +203,42 @@ export function peekFimAdoption(): { sessionId: SessionId; draft: string; text: 
   return lastAdoption
 }
 
-/** 读取本地续写模型档位：auto/pro/flash，非法值回退 auto。 */
-export function readModelMode(storage: { getItem(key: string): string | null }, key = MODEL_MODE_STORAGE_KEY): FimModelMode {
+/** 读取本地触发灵敏度：eager/standard/conservative，非法值回退 standard。 */
+export function readFimSensitivity(storage: { getItem(key: string): string | null }, key = SENSITIVITY_STORAGE_KEY): FimSensitivity {
   const value = storage.getItem(key)
-  return value === 'pro' || value === 'flash' || value === 'auto' ? value : 'auto'
+  return value === 'eager' || value === 'standard' || value === 'conservative' ? value : 'standard'
 }
 
-// 模块级共享续写模型档位（菜单选择器写入，dock 请求时读取）。
-let sharedModelMode: FimModelMode = 'auto'
+// 模块级共享触发灵敏度（开关胶囊 ▾ 选择器写入，dock 触发与请求时读取）。
+let sharedSensitivity: FimSensitivity = 'standard'
 try {
-  sharedModelMode = readModelMode(window.localStorage)
+  sharedSensitivity = readFimSensitivity(window.localStorage)
 } catch {
-  sharedModelMode = 'auto'
+  sharedSensitivity = 'standard'
 }
-const modelModeListeners = new Set<() => void>()
+const sensitivityListeners = new Set<() => void>()
 
-/** 订阅共享续写模型档位。 */
-export function useFimModelMode(): FimModelMode {
-  const [value, setValue] = useState(sharedModelMode)
+/** 订阅共享触发灵敏度。 */
+export function useFimSensitivity(): FimSensitivity {
+  const [value, setValue] = useState(sharedSensitivity)
   useEffect(() => {
-    const listener = (): void => { setValue(sharedModelMode) }
-    modelModeListeners.add(listener)
-    return () => { modelModeListeners.delete(listener) }
+    const listener = (): void => { setValue(sharedSensitivity) }
+    sensitivityListeners.add(listener)
+    return () => { sensitivityListeners.delete(listener) }
   }, [])
   return value
 }
 
-/** 设置共享续写模型档位并持久化。 */
-export function setFimModelMode(next: FimModelMode): void {
-  if (sharedModelMode === next) return
-  sharedModelMode = next
+/** 设置共享触发灵敏度并持久化。 */
+export function setFimSensitivity(next: FimSensitivity): void {
+  if (sharedSensitivity === next) return
+  sharedSensitivity = next
   try {
-    window.localStorage.setItem(MODEL_MODE_STORAGE_KEY, next)
+    window.localStorage.setItem(SENSITIVITY_STORAGE_KEY, next)
   } catch {
     // 隐私模式/配额满：内存态已生效，持久化静默失败（与读路径同防护）。
   }
-  for (const listener of modelModeListeners) listener()
+  for (const listener of sensitivityListeners) listener()
 }
 
 /** composer 卡片视口矩形（旋转光环定位；只读测量）。 */
@@ -439,14 +437,14 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   padding: 2px 4px 0;
   border-top: 1px solid var(--dsw-alias-border-inverted);
 }
-/* 模型三档弹层：官方 MenuDropdown 同款 token，锚定胶囊右下，空间不足自动向上。 */
-.dsh-chat-fim-model-popover {
+/* 触发灵敏度弹层：官方 MenuDropdown 同款 token，锚定胶囊右下，空间不足自动向上。 */
+.dsh-chat-fim-sensitivity-popover {
   position: fixed;
   z-index: 2100;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 210px;
+  min-width: 240px;
   padding: 4px;
   border: 1px solid var(--dsw-alias-border-inverted);
   border-radius: 12px;
@@ -459,12 +457,12 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   line-height: 18px;
   white-space: nowrap;
 }
-.dsh-chat-fim-model-option {
+.dsh-chat-fim-sensitivity-option {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   min-height: 32px;
-  padding: 4px 10px;
+  padding: 6px 10px;
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -475,46 +473,63 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   text-align: left;
   cursor: pointer;
 }
-.dsh-chat-fim-model-option:hover {
+.dsh-chat-fim-sensitivity-option:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
-.dsh-chat-fim-model-option-on {
+.dsh-chat-fim-sensitivity-option-on {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
 }
-.dsh-chat-fim-model-option-check {
+.dsh-chat-fim-sensitivity-option-check {
   width: 14px;
   flex: none;
   font-size: 12px;
+}
+.dsh-chat-fim-sensitivity-option-rule {
+  margin-left: auto;
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+/* 胶囊内的敏锐度小方块：高/中/低 = 3/2/1 个小方块。 */
+.dsh-chat-fim-squares {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.dsh-chat-fim-squares span {
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: currentColor;
 }
 `
   document.head.appendChild(style)
   return style
 }
 
-/** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）：点击切换开关，右侧 ▾ 弹出模型三档。 */
+/** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）：点击切换开关，右侧 ▾ 弹出触发灵敏度三档。 */
 export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const { t } = props
   const enabled = useFimEnabled()
   const busy = useFimBusy()
   const error = useFimError()
   const supported = useFimSupported()
-  const modelMode = useFimModelMode()
+  const sensitivity = useFimSensitivity()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerPoint, setPickerPoint] = useState<{ x: number; y: number; up: boolean } | null>(null)
   const switchRef = useRef<HTMLButtonElement | null>(null)
 
-  // 选项写全名（用户要求：不做中英翻译）。
-  const MODEL_MODE_DISPLAY: Record<FimModelMode, string> = {
-    auto: 'auto',
-    pro: 'deepseek-v4-pro',
-    flash: 'deepseek-v4-flash',
-  }
+  /** 高/中/低 → 方块数 3/2/1。 */
+  const SQUARES: Record<FimSensitivity, number> = { eager: 3, standard: 2, conservative: 1 }
+  /** 档位显示名（locale）。 */
+  const label = t(`sensitivity.${sensitivity}`)
 
   /** 依据开关胶囊矩形计算弹层锚点；空间不够时向上弹出（官方下拉惯例）。 */
   const computePickerPoint = (): { x: number; y: number; up: boolean } | null => {
     const rect = switchRef.current?.getBoundingClientRect()
     if (rect === undefined) return null
-    const estimate = 112 + 8
+    const estimate = 128 + 8
     const up = rect.bottom + estimate > window.innerHeight
     return { x: rect.right, y: up ? rect.top - 4 : rect.bottom + 4, up }
   }
@@ -530,7 +545,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
     if (!pickerOpen) return
     const onPointerDown = (event: PointerEvent): void => {
       if (!(event.target instanceof Element)) return
-      if (event.target.closest('.dsh-chat-fim-model-popover') !== null) return
+      if (event.target.closest('.dsh-chat-fim-sensitivity-popover') !== null) return
       if (switchRef.current !== null && switchRef.current.contains(event.target)) return
       setPickerOpen(false)
     }
@@ -561,7 +576,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
         ref={switchRef}
         type="button"
         className={enabled ? 'dsh-chat-fim-switch dsh-chat-fim-switch-on' : 'dsh-chat-fim-switch dsh-chat-fim-switch-off'}
-        title={busy ? t('dock.busy') : error ?? (enabled ? t('switch.onHint') : t('switch.offHint'))}
+        title={busy ? t('dock.busy') : error ?? (enabled ? t('sensitivity.hint', { label }) : t('switch.offHint'))}
         aria-pressed={enabled}
         aria-busy={busy}
         onClick={() => {
@@ -572,15 +587,18 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
       >
         <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
         <span className="dsh-chat-fim-switch-label">{t('switch.label')}</span>
+        <span className="dsh-chat-fim-squares" aria-hidden>
+          {Array.from({ length: SQUARES[sensitivity] }, (_, index) => <span key={index} />)}
+        </span>
         <span
           className={pickerOpen ? 'dsh-chat-fim-switch-arrow dsh-chat-fim-switch-arrow-open' : 'dsh-chat-fim-switch-arrow'}
           role="button"
           aria-haspopup="listbox"
           aria-expanded={pickerOpen}
-          aria-label={t('menu.model.label', { mode: MODEL_MODE_DISPLAY[modelMode] })}
-          title={t('menu.model.label', { mode: MODEL_MODE_DISPLAY[modelMode] })}
+          aria-label={t('sensitivity.aria', { label })}
+          title={t('sensitivity.aria', { label })}
           onClick={(event) => {
-            // 箭头点击只开合模型菜单，不切换开关；再点收起（官方 PermissionSelect 同款 toggle）。
+            // 箭头点击只开合灵敏度菜单，不切换开关；再点收起（官方 PermissionSelect 同款 toggle）。
             event.stopPropagation()
             if (pickerOpen) setPickerOpen(false)
             else openPicker()
@@ -595,9 +613,9 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
       {pickerOpen && pickerPoint !== null
         ? createPortal(
           <div
-            className="dsh-chat-fim-model-popover"
+            className="dsh-chat-fim-sensitivity-popover"
             role="listbox"
-            aria-label={t('menu.model.label', { mode: '' })}
+            aria-label={t('sensitivity.aria', { label: '' })}
             style={{
               left: pickerPoint.x,
               top: pickerPoint.y,
@@ -608,20 +626,21 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
               event.preventDefault()
             }}
           >
-            {(['auto', 'pro', 'flash'] as const).map(mode => (
+            {(['eager', 'standard', 'conservative'] as const).map(level => (
               <button
-                key={mode}
+                key={level}
                 type="button"
                 role="option"
-                aria-selected={mode === modelMode}
-                className={mode === modelMode ? 'dsh-chat-fim-model-option dsh-chat-fim-model-option-on' : 'dsh-chat-fim-model-option'}
+                aria-selected={level === sensitivity}
+                className={level === sensitivity ? 'dsh-chat-fim-sensitivity-option dsh-chat-fim-sensitivity-option-on' : 'dsh-chat-fim-sensitivity-option'}
                 onClick={() => {
-                  setFimModelMode(mode)
+                  setFimSensitivity(level)
                   setPickerOpen(false)
                 }}
               >
-                <span className="dsh-chat-fim-model-option-check" aria-hidden>{mode === modelMode ? '✓' : ''}</span>
-                {MODEL_MODE_DISPLAY[mode]}
+                <span className="dsh-chat-fim-sensitivity-option-check" aria-hidden>{level === sensitivity ? '✓' : ''}</span>
+                <span>{t(`sensitivity.${level}`)}</span>
+                <span className="dsh-chat-fim-sensitivity-option-rule">{t(`sensitivity.${level}.rule`)}</span>
               </button>
             ))}
           </div>,
@@ -645,7 +664,8 @@ export function ChatFimDock(props: ChatFimDockProps) {
   const enabled = useFimEnabled()
   const busy = useFimBusy()
   const supported = useFimSupported()
-  const modelMode = useFimModelMode()
+  const sensitivity = useFimSensitivity()
+  const sensitivityParams = FIM_SENSITIVITIES[sensitivity]
 
   // 会话切换时查询主模型支持状态；不支持则整体隐藏（像没装插件）。
   useEffect(() => {
@@ -693,7 +713,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
     flightRef.current?.abort()
 
     const draft = input.draft
-    // 形态门控：句末标点 / 尾随空白 / 单词中间 / 过短草稿不触发（避免建议太频繁、续出「新一句话」）。
+    // 形态门控：句末标点 / 尾随空白 / 单词中间 / 过短草稿按触发灵敏度三档伸缩。
     if (!supported || !enabled || composing || input.phase !== 'plain') return
     // Tab 采纳导致的草稿变化不再触发：采纳后建议会立刻复现（且上游常以「助手：」口吻续写）。
     const adoption = peekFimAdoption()
@@ -701,7 +721,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
       clearFimAdoption()
       return
     }
-    if (!shouldTriggerFim(draft).ok) return
+    if (!shouldTriggerFim(draft, sensitivity).ok) return
 
     const rev = input.draftRev
     const timer = setTimeout(() => {
@@ -709,7 +729,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
       const controller = new AbortController()
       flightRef.current = controller
       setFimBusy(true)
-      void requestComplete(session.sessionId, draft, controller.signal, modelMode)
+      void requestComplete(session.sessionId, draft, controller.signal)
         .then((result) => {
           if (controller.signal.aborted) return
           if (rev !== draftRevRef.current || draftRef.current !== draft) return
@@ -737,12 +757,12 @@ export function ChatFimDock(props: ChatFimDockProps) {
           if (flightRef.current === controller) flightRef.current = null
           if (!controller.signal.aborted) setFimBusy(false)
         })
-    }, PAUSE_MS)
+    }, sensitivityParams.pauseMs)
 
     return () => {
       clearTimeout(timer)
     }
-  }, [composing, enabled, supported, modelMode, input.draft, input.draftRev, input.phase, requestComplete, session.sessionId])
+  }, [composing, enabled, supported, sensitivity, sensitivityParams, input.draft, input.draftRev, input.phase, requestComplete, session.sessionId])
 
   // 联想中：整个 composer 卡片外圈旋转紫光（跟随卡片矩形，周期自愈）。
   useLayoutEffect(() => {
@@ -846,7 +866,7 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
       if (!(event.target instanceof Element)) return
       if (event.target.closest('.dsh-chat-fim-menu') !== null) return
       if (event.target.closest('.dsh-chat-fim-switch') !== null) return
-      if (event.target.closest('.dsh-chat-fim-model-popover') !== null) return
+      if (event.target.closest('.dsh-chat-fim-sensitivity-popover') !== null) return
       setFimSuggestion(null)
     }
     document.addEventListener('keydown', onKeyDown, true)

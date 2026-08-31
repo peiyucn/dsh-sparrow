@@ -9,8 +9,15 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'dock.aria'
       | 'menu.adopt'
       | 'menu.dismiss'
-      | 'menu.model.label'
       | 'menu.tokens'
+      | 'sensitivity.hint'
+      | 'sensitivity.aria'
+      | 'sensitivity.eager'
+      | 'sensitivity.standard'
+      | 'sensitivity.conservative'
+      | 'sensitivity.eager.rule'
+      | 'sensitivity.standard.rule'
+      | 'sensitivity.conservative.rule'
   }
 }
 

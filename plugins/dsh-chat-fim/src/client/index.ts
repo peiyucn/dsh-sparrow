@@ -33,8 +33,15 @@ const LOCALE_DICTS = {
     'dock.aria': '续写建议',
     'menu.adopt': '采用',
     'menu.dismiss': '丢弃',
-    'menu.model.label': '续写模型：{mode}',
     'menu.tokens': '{tokens} tok · {model} · T{temperature}',
+    'sensitivity.hint': '联想敏锐度：{label}',
+    'sensitivity.aria': '联想敏锐度：{label}',
+    'sensitivity.eager': '高',
+    'sensitivity.standard': '中',
+    'sensitivity.conservative': '低',
+    'sensitivity.eager.rule': '250ms · 4/2 字 · 单词中间也联想',
+    'sensitivity.standard.rule': '400ms · 8/3 字 · 夹入英文半词不联想',
+    'sensitivity.conservative.rule': '800ms · 12/5 字 · 词后空格不联想',
   },
   en: {
     'switch.label': 'Suggest',
@@ -44,8 +51,15 @@ const LOCALE_DICTS = {
     'dock.aria': 'Suggestions',
     'menu.adopt': 'Adopt',
     'menu.dismiss': 'Dismiss',
-    'menu.model.label': 'Model: {mode}',
     'menu.tokens': '{tokens} tok · {model} · T{temperature}',
+    'sensitivity.hint': 'Sensitivity: {label}',
+    'sensitivity.aria': 'Suggestion sensitivity: {label}',
+    'sensitivity.eager': 'High',
+    'sensitivity.standard': 'Medium',
+    'sensitivity.conservative': 'Low',
+    'sensitivity.eager.rule': '250ms · 4/2 chars · mid-word included',
+    'sensitivity.standard.rule': '400ms · 8/3 chars · no embedded half-words',
+    'sensitivity.conservative.rule': '800ms · 12/5 chars · no trailing space',
   },
 } as const
 
@@ -85,11 +99,12 @@ export function apply(ctx: ClientContext): void {
         const payload = await response.json() as { supported?: boolean }
         return payload.supported !== false
       },
-      requestComplete: async (id: SessionId, prompt: string, signal: AbortSignal, mode: 'auto' | 'pro' | 'flash') => {
+      requestComplete: async (id: SessionId, prompt: string, signal: AbortSignal) => {
         const response = await fetch('/api/chat-fim/complete', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionId: id, prompt, locale: requestLanguage(), fimModelMode: mode }),
+          // 续写模型固定 flash（足够快且便宜）：不再提供模型三档选择。
+          body: JSON.stringify({ sessionId: id, prompt, locale: requestLanguage(), fimModelMode: 'flash' }),
           signal,
         })
         const payload = await response.json() as ChatFimResponse
@@ -138,4 +153,4 @@ export function apply(ctx: ClientContext): void {
 
 export { ChatFimDock, ChatFimMenu, ChatFimSwitch, ensureFimBusyStyles } from './ChatFimDock.js'
 export type { ChatFimDockInjected, ChatFimDockProps, ChatFimMenuProps, ChatFimSwitchProps, FimSuggestionRecord } from './ChatFimDock.js'
-export { readEnabled, setFimBusy, setFimEnabled, setFimError, setFimSuggestion, setFimSupported, useFimBusy, useFimEnabled, useFimError, useFimSuggestion, useFimSupported } from './ChatFimDock.js'
+export { readEnabled, readFimSensitivity, setFimBusy, setFimEnabled, setFimError, setFimSensitivity, setFimSuggestion, setFimSupported, useFimBusy, useFimEnabled, useFimError, useFimSensitivity, useFimSuggestion, useFimSupported } from './ChatFimDock.js'
