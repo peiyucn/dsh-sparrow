@@ -14,8 +14,8 @@ export const inject = ['slots', 'locale']
 /** 本插件的 locale 字典（zh/en）。 */
 const LOCALE_DICTS = {
   zh: {
-    'button.label': '云端文件',
-    'dialog.title': '云端文件（DeepSeek Files API）',
+    'button.label': '文件',
+    'dialog.title': '文件（DeepSeek Files API）',
     'dialog.close': '关闭',
     'loading': '加载中…',
     'loadMore': '加载更多',
@@ -35,8 +35,8 @@ const LOCALE_DICTS = {
     'confirm.deleteDsh': '此文件由 DSH 自动上传，可能仍被会话引用。\n\n删除「{name}」？删除后再次引用时官方会自动重新上传。',
   },
   en: {
-    'button.label': 'Cloud Files',
-    'dialog.title': 'Cloud Files (DeepSeek Files API)',
+    'button.label': 'Files',
+    'dialog.title': 'Files (DeepSeek Files API)',
     'dialog.close': 'Close',
     'loading': 'Loading…',
     'loadMore': 'Load more',

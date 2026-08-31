@@ -66,7 +66,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin
 
 ## dsh-file-session
 
-DeepSeek Files API cloud file management. The "Cloud Files" entry in the sidebar lists every cloud file under your API key: cursor pagination, size / upload / expiry times, per-file deletion and one-click file_id copy. Reuses the official DeepSeekFilesClient — no extra credentials.
+DeepSeek Files API cloud file management. The "Files" entry in the sidebar lists every cloud file under your API key: cursor pagination, size / upload / expiry times, per-file deletion and one-click file_id copy. Reuses the official DeepSeekFilesClient — no extra credentials.
 
 > The official API has no batch-delete endpoint (no "delete all") and no download endpoint (no preview); the 10000-file / 25 GiB quota is an official limit.
 
