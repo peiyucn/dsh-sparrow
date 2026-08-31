@@ -1,6 +1,6 @@
 {
   "name": "dsh-archive-session",
-  "description": "DSH Web 插件：归档会话管理（备份 / 删除 / 恢复）",
+  "description": "DSH web plugin: archived-session management — backup, delete and restore archived sessions from the sidebar",
   "version": "0.1.0",
   "license": "MIT",
   "repository": {
@@ -27,7 +27,9 @@
     "lib/types/**/*.d.ts",
     "cordis.patch.yml",
     "docs/images/**",
-    "README.zh-CN.md"
+    "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md"
   ],
   "dsh": {
     "bundle": {
