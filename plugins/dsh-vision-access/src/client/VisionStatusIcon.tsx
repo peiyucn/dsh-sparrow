@@ -26,7 +26,7 @@ export type VisionStatusProps = PropsRuntime<'conversation.input.right'> & Visio
 
 /** 眼睛 glyph：官方 icon 集无眼睛图标，内联 SVG + currentColor（同官方 PermissionSelect 自绘盾牌先例）。 */
 const EYE_GLYPH = (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden>
     <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
     <circle cx="8" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.2" />
   </svg>
@@ -34,7 +34,7 @@ const EYE_GLYPH = (
 
 /** 带斜线的眼睛（无视觉能力降级态）。 */
 const EYE_OFF_GLYPH = (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden>
     <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" opacity="0.5" />
     <circle cx="8" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.2" opacity="0.5" />
     <line x1="3.4" y1="12.6" x2="12.6" y2="3.4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -52,11 +52,11 @@ export function ensureVisionStyles(): HTMLStyleElement {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: none;
-  border-radius: 24px;
+  border-radius: 20px;
   background: transparent;
   cursor: pointer;
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
