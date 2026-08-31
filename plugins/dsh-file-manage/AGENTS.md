@@ -4,7 +4,7 @@
 
 ## 项目概况
 
-DSH Web 插件：DeepSeek Files API 云端文件管理面板——侧边栏 footer 入口 + 弹窗列出本 API key 下全部云端文件（游标翻页、每页 20），支持单条删除与复制 file_id。复用官方 `@deepseek-ai/dsh-llm-deepseek` 导出的 `DeepSeekFilesClient`，不经手新凭据。无本地持久化（零 sidecar）、无配置项。
+DSH Web 插件：DeepSeek Files API 云端文件管理面板——侧边栏 footer 入口 + 弹窗列出本 API key 下全部云端文件（游标翻页、每页 20），支持单条删除与复制 file_id。复用官方 `@deepseek-ai/dsh-llm-deepseek` 导出的 `DeepSeekFilesClient`，不经手新凭据。无本地持久化（零 sidecar）、无配置项。2026-09-01 发布前包名由 `@dsh-sparrow/dsh-file-session` 更名为 `@dsh-sparrow/dsh-file-manage`（旧名从未发布）；改名只记内部文档，不进 README/CHANGELOG。
 
 * 范围（owner 拍板 2026-09-01）：只做清单 / 单条删除 / 复制 file_id；不做全部清理（官方无批量删除端点，逐条循环调用成本不可控）、不做会话归属、不做面板上传、不做预览下载（官方无下载端点）、不给 agent 加工具。
 * **官方删除安全性**：引用已删 file_id 的请求触发官方 adapter 失效重试（`adapter.ts` staleFile 分支：`providerRejectedFileId` → `invalidate` → 重试一次并重新上传）——删除安全，面板提示文案据此措辞。
