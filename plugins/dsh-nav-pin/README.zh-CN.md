@@ -12,9 +12,15 @@
 dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin
 ```
 
-适配 dsh ≥ 0.1.2-alpha.3（本机验证基线；更早版本未验证），并需要可用的 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
+完整功能适配 dsh ≥ 0.1.2-alpha.3（验证基线），并需要可用的 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）；更早版本的表现见下方「版本兼容性」。
 
 > **不要**直接执行 `npm install @dsh-sparrow/dsh-nav-pin`：那只会把包下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用上面的 `dsh plugin` 命令安装，并在安装后重启 DSH。
+
+## 版本兼容性
+
+* dsh ≥ 0.1.2-alpha.3：完整功能——断点覆盖 + 内容宽度钳制（验证基线）
+* dsh ≤ 0.1.1-rc.2：这些版本里还没有轮次导航、宽度拖拽轴和宽度相关 CSS 变量（已实测 0.1.1-rc.2 确认）——注入的样式表匹配不到任何目标，插件是无害空操作：不报错、无视觉变化
+* 两者之间的版本未逐一实测；同一机制保证最坏情况也只是部分生效或空操作，不会破坏界面
 
 ## 使用
 
