@@ -300,12 +300,35 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
 .dsh-chat-suggest-switch-off .dsh-chat-suggest-switch-label {
   color: var(--dsw-alias-label-tertiary, #9aa0a6);
 }
-/* 胶囊内的模型下拉箭头：点击只开模型菜单（stopPropagation，不切换开关）；打开时旋转 180°。 */
+/* 胶囊内灵敏度触发区（分割线右侧：三点 + ▾）：整区可点，只开合灵敏度菜单、不切换开关；悬停亮底。 */
+.dsh-chat-suggest-switch-picker {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  gap: 3px;
+  padding: 0 5px;
+  border-radius: 20px;
+  cursor: pointer;
+}
+.dsh-chat-suggest-switch-picker:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dsh-chat-suggest-switch-on .dsh-chat-suggest-switch-picker {
+  color: var(--dsw-alias-button-info-fill, #4d6bfe);
+}
+/* 开关主体与灵敏度触发区之间的 1px 分割线（split-button 形态）。 */
+.dsh-chat-suggest-switch-divider {
+  flex: none;
+  align-self: center;
+  width: 1px;
+  height: 12px;
+  background: var(--dsw-alias-border-l2);
+}
+/* ▾：打开时旋转 180°。 */
 .dsh-chat-suggest-switch-arrow {
   display: inline-flex;
   align-items: center;
   flex: none;
-  margin-left: 2px;
   color: var(--dsw-alias-label-caption);
   transition: transform 120ms ease;
 }
@@ -319,6 +342,9 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
    容器是 InputBar .row（container-type: inline-size），阈值同官方 460px。 */
 @container (max-width: 460px) {
   .dsh-chat-suggest-switch .dsh-chat-suggest-switch-label {
+    display: none;
+  }
+  .dsh-chat-suggest-switch-divider {
     display: none;
   }
   .dsh-chat-suggest-switch {
@@ -493,20 +519,18 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   line-height: 18px;
   white-space: nowrap;
 }
-/* 胶囊内的敏锐度竖点：恒显 3 个点，自下而上点亮 3/2/1 个 = 高/中/低；未点亮为淡色占位。
-   与左侧文字额外拉开间距（按钮 gap 4px + margin-left 6px），否则紧贴文字像残影；点 5px、圆角。 */
+/* 灵敏度竖点：恒显 3 个方点，自下而上点亮 3/2/1 个 = 高/中/低；未点亮为淡色占位。
+   与 ▾ 同在灵敏度触发区内（分割线左侧是开关主体）；点 4px、方角（owner 拍板：档位用方点）。 */
 .dsh-chat-suggest-dots {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  margin-left: 6px;
-  margin-right: 2px;
 }
 .dsh-chat-suggest-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 0;
   background: color-mix(in srgb, currentColor 45%, transparent);
 }
 .dsh-chat-suggest-dot-on {
@@ -596,29 +620,44 @@ export function ChatSuggestSwitch(props: ChatSuggestSwitchProps) {
       >
         <span className="dsh-chat-suggest-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
         <span className="dsh-chat-suggest-switch-label">{t('switch.label')}</span>
-        <span className="dsh-chat-suggest-dots" aria-hidden>
-          {(['eager', 'standard', 'conservative'] as const).map((level, index) => (
-            <span
-              key={level}
-              className={DOT_LIT_COUNT[sensitivity] > 2 - index ? 'dsh-chat-suggest-dot dsh-chat-suggest-dot-on' : 'dsh-chat-suggest-dot'}
-            />
-          ))}
-        </span>
+        <span className="dsh-chat-suggest-switch-divider" aria-hidden />
         <span
-          className={pickerOpen ? 'dsh-chat-suggest-switch-arrow dsh-chat-suggest-switch-arrow-open' : 'dsh-chat-suggest-switch-arrow'}
+          className="dsh-chat-suggest-switch-picker"
           role="button"
+          tabIndex={0}
           aria-haspopup="listbox"
           aria-expanded={pickerOpen}
           aria-label={t('sensitivity.aria', { label })}
           title={t('sensitivity.aria', { label })}
           onClick={(event) => {
-            // 箭头点击只开合灵敏度菜单，不切换开关；再点收起（官方 PermissionSelect 同款 toggle）。
+            // 灵敏度触发区（三点 + ▾）：只开合灵敏度菜单，不切换开关；再点收起（官方 PermissionSelect 同款 toggle）。
             event.stopPropagation()
             if (pickerOpen) setPickerOpen(false)
             else openPicker()
           }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              event.stopPropagation()
+              if (pickerOpen) setPickerOpen(false)
+              else openPicker()
+            }
+          }}
         >
-          <IconChevronDownOutline14 size={12} />
+          <span className="dsh-chat-suggest-dots" aria-hidden>
+            {(['eager', 'standard', 'conservative'] as const).map((level, index) => (
+              <span
+                key={level}
+                className={DOT_LIT_COUNT[sensitivity] > 2 - index ? 'dsh-chat-suggest-dot dsh-chat-suggest-dot-on' : 'dsh-chat-suggest-dot'}
+              />
+            ))}
+          </span>
+          <span
+            className={pickerOpen ? 'dsh-chat-suggest-switch-arrow dsh-chat-suggest-switch-arrow-open' : 'dsh-chat-suggest-switch-arrow'}
+            aria-hidden
+          >
+            <IconChevronDownOutline14 size={12} />
+          </span>
         </span>
       </button>
       {error !== null ? (
