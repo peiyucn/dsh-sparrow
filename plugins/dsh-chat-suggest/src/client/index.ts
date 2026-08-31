@@ -1,5 +1,5 @@
 /**
- * dsh-chat-fim client half：开关挂 `conversation.input.left`（输入框工具行），
+ * dsh-chat-suggest client half：开关挂 `conversation.input.left`（输入框工具行），
  * 数据面挂 `conversation.composer.dock`（读 InputZone 草稿快照、无可见 UI），
  * 候选菜单挂 `conversation.input.overlay`（官方 @ 列表同款悬浮卡），
  * 建议请求全部走 host 自有路由。文案经 dsh locale 服务（zh/en）。
@@ -11,11 +11,11 @@ import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/c
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
-import { ChatFimDock, ChatFimMenu, ChatFimSwitch, ensureFimBusyStyles } from './ChatFimDock.js'
+import { ChatSuggestDock, ChatSuggestMenu, ChatSuggestSwitch, ensureSuggestBusyStyles } from './ChatSuggestDock.js'
 
 export const inject = ['slots', 'sessions', 'locale']
 
-export interface ChatFimResponse {
+export interface ChatSuggestResponse {
   readonly suggestions?: readonly string[]
   readonly model?: string
   readonly temperature?: number
@@ -78,10 +78,10 @@ interface ClientAgentScope extends Context {
  */
 export function apply(ctx: ClientContext): void {
   const sessions = ctx.sessions as unknown as ClientSessionScope
-  const busyStyles = ensureFimBusyStyles()
-  ctx.effect(() => () => { busyStyles.remove() }, 'dsh-chat-fim: busy styles')
-  const disposeDictionaries = ctx.locale.register('chat-fim', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
-  ctx.effect(() => disposeDictionaries, 'dsh-chat-fim: locale dictionaries')
+  const busyStyles = ensureSuggestBusyStyles()
+  ctx.effect(() => () => { busyStyles.remove() }, 'dsh-chat-suggest: busy styles')
+  const disposeDictionaries = ctx.locale.register('chat-suggest', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
+  ctx.effect(() => disposeDictionaries, 'dsh-chat-suggest: locale dictionaries')
 
   /** 请求时读取当前语言：zh → zh，其余一律 en。 */
   const requestLanguage = (): 'zh' | 'en' => ctx.locale.getSnapshot().active === 'zh' ? 'zh' : 'en'
@@ -89,25 +89,25 @@ export function apply(ctx: ClientContext): void {
   const injectedFace = (sessionId: SessionId) => {
     const scope = sessions.scope(sessionId)
     if (scope === undefined) {
-      throw new Error(`dsh-chat-fim: session "${String(sessionId)}" 没有浏览器 scope`)
+      throw new Error(`dsh-chat-suggest: session "${String(sessionId)}" 没有浏览器 scope`)
     }
     return {
       sessionId,
       isSupported: async (id: SessionId): Promise<boolean> => {
-        const response = await fetch(`/api/chat-fim/complete?sessionId=${encodeURIComponent(String(id))}`)
+        const response = await fetch(`/api/chat-suggest/complete?sessionId=${encodeURIComponent(String(id))}`)
         if (!response.ok) return true
         const payload = await response.json() as { supported?: boolean }
         return payload.supported !== false
       },
       requestComplete: async (id: SessionId, prompt: string, signal: AbortSignal) => {
-        const response = await fetch('/api/chat-fim/complete', {
+        const response = await fetch('/api/chat-suggest/complete', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           // 续写模型固定 flash（足够快且便宜）：不再提供模型三档选择。
-          body: JSON.stringify({ sessionId: id, prompt, locale: requestLanguage(), fimModelMode: 'flash' }),
+          body: JSON.stringify({ sessionId: id, prompt, locale: requestLanguage(), suggestModelMode: 'flash' }),
           signal,
         })
-        const payload = await response.json() as ChatFimResponse
+        const payload = await response.json() as ChatSuggestResponse
         if (!response.ok) {
           throw new Error(payload.error?.message ?? `续写请求失败（HTTP ${response.status}）`)
         }
@@ -128,29 +128,29 @@ export function apply(ctx: ClientContext): void {
 
   ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
     name: 'conversation.input.left',
-    id: 'chat-fim-switch',
+    id: 'chat-suggest-switch',
     order: 30,
-    locale: 'chat-fim',
+    locale: 'chat-suggest',
     inject: injectedFace,
-  }, ChatFimSwitch))
+  }, ChatSuggestSwitch))
 
   ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
     name: 'conversation.composer.dock',
-    id: 'chat-fim',
+    id: 'chat-suggest',
     order: 30,
-    locale: 'chat-fim',
+    locale: 'chat-suggest',
     inject: injectedFace,
-  }, ChatFimDock))
+  }, ChatSuggestDock))
 
   ctx.slots.inject('conversation.input.overlay', () => ctx.slots.register({
     name: 'conversation.input.overlay',
-    id: 'chat-fim-menu',
+    id: 'chat-suggest-menu',
     order: 30,
-    locale: 'chat-fim',
+    locale: 'chat-suggest',
     inject: injectedFace,
-  }, ChatFimMenu))
+  }, ChatSuggestMenu))
 }
 
-export { ChatFimDock, ChatFimMenu, ChatFimSwitch, ensureFimBusyStyles } from './ChatFimDock.js'
-export type { ChatFimDockInjected, ChatFimDockProps, ChatFimMenuProps, ChatFimSwitchProps, FimSuggestionRecord } from './ChatFimDock.js'
-export { readEnabled, readFimSensitivity, setFimBusy, setFimEnabled, setFimError, setFimSensitivity, setFimSuggestion, setFimSupported, useFimBusy, useFimEnabled, useFimError, useFimSensitivity, useFimSuggestion, useFimSupported } from './ChatFimDock.js'
+export { ChatSuggestDock, ChatSuggestMenu, ChatSuggestSwitch, ensureSuggestBusyStyles } from './ChatSuggestDock.js'
+export type { ChatSuggestDockInjected, ChatSuggestDockProps, ChatSuggestMenuProps, ChatSuggestSwitchProps, SuggestionRecord } from './ChatSuggestDock.js'
+export { readEnabled, readTriggerSensitivity, setSuggestBusy, setSuggestEnabled, setSuggestError, setTriggerSensitivity, setSuggestion, setSuggestSupported, useSuggestBusy, useSuggestEnabled, useSuggestError, useTriggerSensitivity, useSuggestion, useSuggestSupported } from './ChatSuggestDock.js'

@@ -1,4 +1,4 @@
-/** dsh-chat-fim 纯逻辑：配置归一化、请求校验、错误映射、候选提取。 */
+/** dsh-chat-suggest 纯逻辑：配置归一化、请求校验、错误映射、候选提取。 */
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
@@ -17,7 +17,7 @@ export const MAX_UPSTREAM_BODY_BYTES = 64 * 1024
 export const MAX_HISTORY_MESSAGES = 12
 export const MAX_HISTORY_CHARS = 6_000
 
-export type ChatFimErrorCode =
+export type ChatSuggestErrorCode =
   | 'BAD_BODY'
   | 'INVALID_PROMPT'
   | 'UNKNOWN_SESSION'
@@ -28,12 +28,12 @@ export type ChatFimErrorCode =
   | 'RATE_LIMITED'
   | 'INVALID_CONFIG'
 
-export interface ChatFimError {
-  readonly code: ChatFimErrorCode
+export interface ChatSuggestError {
+  readonly code: ChatSuggestErrorCode
   readonly message: string
 }
 
-export interface ChatFimConfig {
+export interface ChatSuggestConfig {
   readonly baseURL: string
   readonly model: string
   readonly maxTokens: number
@@ -50,25 +50,25 @@ export interface CompleteRequest {
   readonly prompt: string
   readonly locale?: string
   /** 续写模型三档（客户端偏好）；非法值回退 auto。 */
-  readonly fimModelMode: FimModelMode
+  readonly suggestModelMode: SuggestModelMode
 }
 
 /** FIM 提示词使用的语言（说话人标签 / 停止序列随之切换）。 */
-export type FimLanguage = 'zh' | 'en'
+export type SuggestLanguage = 'zh' | 'en'
 
-const SPEAKER_LABELS: Record<FimLanguage, { user: string; assistant: string }> = {
+const SPEAKER_LABELS: Record<SuggestLanguage, { user: string; assistant: string }> = {
   zh: { user: '用户', assistant: '助手' },
   en: { user: 'User', assistant: 'Assistant' },
 }
 
 /** 说话人文本格式：zh 用全角冒号，en 用半角冒号 + 空格。 */
-function speakerText(language: FimLanguage, role: 'user' | 'assistant'): string {
+function speakerText(language: SuggestLanguage, role: 'user' | 'assistant'): string {
   const label = role === 'assistant' ? SPEAKER_LABELS[language].assistant : SPEAKER_LABELS[language].user
   return language === 'zh' ? `${label}：` : `${label}: `
 }
 
 /** FIM 停止序列：历史转文本用说话人标记，命中即停，防止模型续写下一位说话人。 */
-export function fimStopSequences(language: FimLanguage): readonly string[] {
+export function speakerStopSequences(language: SuggestLanguage): readonly string[] {
   return ['user', 'assistant'].map(role => `\n${speakerText(language, role as 'user' | 'assistant')}`)
 }
 
@@ -80,9 +80,9 @@ export function fimStopSequences(language: FimLanguage): readonly string[] {
  *    （实测：新会话草稿 plea → 输出「助手：看起来你的消息好像没发完整…」）。
  * 正常续写原样返回；无法使用返回 null，由调用方丢弃该候选。
  */
-export function cleanSuggestion(text: string, language: FimLanguage = 'zh'): string | null {
+export function cleanSuggestion(text: string, language: SuggestLanguage = 'zh'): string | null {
   let value = text
-  for (const marker of fimStopSequences(language)) {
+  for (const marker of speakerStopSequences(language)) {
     const at = value.indexOf(marker)
     if (at !== -1) value = value.slice(0, at)
   }
@@ -112,8 +112,8 @@ export function isDeepseekMainRoute(route: { provider: string } | undefined): bo
 }
 
 /** 把外部配置补成完整内部配置；非法数字一律拒绝（插件加载期即失败，而不是请求期）。 */
-export function normalizeConfig(input: Readonly<Partial<ChatFimConfig>> | undefined): ChatFimConfig {
-  const config: ChatFimConfig = {
+export function normalizeConfig(input: Readonly<Partial<ChatSuggestConfig>> | undefined): ChatSuggestConfig {
+  const config: ChatSuggestConfig = {
     baseURL: input?.baseURL?.trim() || DEFAULT_BASE_URL,
     model: input?.model?.trim() || DEFAULT_MODEL,
     maxTokens: input?.maxTokens ?? DEFAULT_MAX_TOKENS,
@@ -125,7 +125,7 @@ export function normalizeConfig(input: Readonly<Partial<ChatFimConfig>> | undefi
     temperature: input?.temperature ?? DEFAULT_TEMPERATURE,
   }
   if (config.baseURL === '' || config.model === '' || config.apiKeyEnv === '') {
-    throw new Error('dsh-chat-fim: baseURL/model/apiKeyEnv 不能为空')
+    throw new Error('dsh-chat-suggest: baseURL/model/apiKeyEnv 不能为空')
   }
   for (const [name, value] of Object.entries({
     maxTokens: config.maxTokens,
@@ -135,23 +135,23 @@ export function normalizeConfig(input: Readonly<Partial<ChatFimConfig>> | undefi
     suggestionCount: config.suggestionCount,
   })) {
     if (!Number.isSafeInteger(value) || value <= 0) {
-      throw new Error(`dsh-chat-fim: ${name} 必须是正整数`)
+      throw new Error(`dsh-chat-suggest: ${name} 必须是正整数`)
     }
   }
   if (config.suggestionCount > 4) {
-    throw new Error('dsh-chat-fim: suggestionCount 不能超过 4')
+    throw new Error('dsh-chat-suggest: suggestionCount 不能超过 4')
   }
   if (typeof config.temperature !== 'number' || !Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 2) {
-    throw new Error('dsh-chat-fim: temperature 必须是 0-2 之间的数字')
+    throw new Error('dsh-chat-suggest: temperature 必须是 0-2 之间的数字')
   }
   if (!/^https?:\/\//u.test(config.baseURL)) {
-    throw new Error('dsh-chat-fim: baseURL 必须是 http(s) URL')
+    throw new Error('dsh-chat-suggest: baseURL 必须是 http(s) URL')
   }
   return config
 }
 
 /** 安全解析请求体；超限 / 非法 JSON 返回 BAD_BODY。 */
-export function parseCompleteBody(body: string, maxBodyBytes: number, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | ChatFimError {
+export function parseCompleteBody(body: string, maxBodyBytes: number, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | ChatSuggestError {
   if (Buffer.byteLength(body, 'utf8') > maxBodyBytes) {
     return { code: 'BAD_BODY', message: `请求体超过 ${maxBodyBytes} 字节上限` }
   }
@@ -165,7 +165,7 @@ export function parseCompleteBody(body: string, maxBodyBytes: number, maxPromptC
 }
 
 /** 校验已解析请求。prompt 按字符数限制（上限为 MAX_SAFE_INTEGER 时表示不限制）。 */
-export function validateCompletePayload(value: unknown, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | ChatFimError {
+export function validateCompletePayload(value: unknown, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | ChatSuggestError {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return { code: 'BAD_BODY', message: '请求体必须是 JSON 对象' }
   }
@@ -188,7 +188,7 @@ export function validateCompletePayload(value: unknown, maxPromptChars = Number.
   return {
     sessionId,
     prompt,
-    fimModelMode: normalizeFimModelMode(body.fimModelMode),
+    suggestModelMode: normalizeSuggestModelMode(body.suggestModelMode),
     ...locale === undefined ? {} : { locale },
   }
 }
@@ -256,7 +256,7 @@ export interface PrefixMessage {
 export function buildPrefixMessages(
   history: readonly unknown[],
   draft: string,
-  language: FimLanguage = 'zh',
+  language: SuggestLanguage = 'zh',
   maxMessages = MAX_HISTORY_MESSAGES,
   maxChars = MAX_HISTORY_CHARS,
 ): PrefixMessage[] {
@@ -313,7 +313,7 @@ export function isHistoryEcho(suggestion: string, historyTexts: readonly string[
 }
 
 /** 把上游 HTTP 状态映射为插件错误码。 */
-export function upstreamStatusToError(status: number, bodyText: string): ChatFimError {
+export function upstreamStatusToError(status: number, bodyText: string): ChatSuggestError {
   if (status === 401 || status === 403) {
     return { code: 'MISSING_CREDENTIAL', message: 'DeepSeek API 凭据无效或无权访问续写接口（Beta）' }
   }
@@ -356,25 +356,25 @@ export function extractSuggestions(data: unknown): string[] {
 }
 
 /** FIM 端点实测可用的模型 id（2026-08-30 直连实测；官方文档 schema 只列 v4-pro，flash 实际可用）。 */
-export const FIM_MODEL_IDS = ['deepseek-v4-pro', 'deepseek-v4-flash'] as const
+export const SUGGEST_MODEL_IDS = ['deepseek-v4-pro', 'deepseek-v4-flash'] as const
 
 /** 续写模型三档选择（客户端偏好，随请求传给 host）。 */
-export type FimModelMode = 'auto' | 'pro' | 'flash'
-export const DEFAULT_FIM_MODEL_MODE: FimModelMode = 'auto'
+export type SuggestModelMode = 'auto' | 'pro' | 'flash'
+export const DEFAULT_SUGGEST_MODEL_MODE: SuggestModelMode = 'auto'
 
-/** 请求体里的 fimModelMode 解析：非法/缺省回退 auto。 */
-export function normalizeFimModelMode(value: unknown): FimModelMode {
-  return value === 'auto' || value === 'pro' || value === 'flash' ? value : DEFAULT_FIM_MODEL_MODE
+/** 请求体里的 suggestModelMode 解析：非法/缺省回退 auto。 */
+export function normalizeSuggestModelMode(value: unknown): SuggestModelMode {
+  return value === 'auto' || value === 'pro' || value === 'flash' ? value : DEFAULT_SUGGEST_MODEL_MODE
 }
 
 /**
  * 补全模型解析（三档，见 docs/spec/04-sensitivity.md）：
  * pro/flash 恒用对应模型；auto 跟随官方主模型（pro/flash），vision / 未知回退配置默认。
  */
-export function resolveFimModel(mode: FimModelMode, main: { provider: string; model: string } | undefined, configuredModel: string): string {
+export function resolveSuggestModel(mode: SuggestModelMode, main: { provider: string; model: string } | undefined, configuredModel: string): string {
   if (mode === 'pro') return 'deepseek-v4-pro'
   if (mode === 'flash') return 'deepseek-v4-flash'
-  if (main !== undefined && main.provider === 'deepseek-official' && (FIM_MODEL_IDS as readonly string[]).includes(main.model)) {
+  if (main !== undefined && main.provider === 'deepseek-official' && (SUGGEST_MODEL_IDS as readonly string[]).includes(main.model)) {
     return main.model
   }
   return configuredModel
@@ -412,10 +412,10 @@ export const SENTENCE_END_CHARS = '。！？.!?;；'
 const CJK_CHARS = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/u
 
 /** 触发灵敏度三档（2026-08-30 晚）：用户习惯不同，敏锐/钝化自己调。 */
-export type FimSensitivity = 'eager' | 'standard' | 'conservative'
-export const DEFAULT_FIM_SENSITIVITY: FimSensitivity = 'standard'
+export type TriggerSensitivity = 'eager' | 'standard' | 'conservative'
+export const DEFAULT_TRIGGER_SENSITIVITY: TriggerSensitivity = 'standard'
 
-export interface FimSensitivityParams {
+export interface TriggerSensitivityParams {
   /** 停顿阈值（毫秒）。 */
   readonly pauseMs: number
   /** 含 CJK 草稿的最短长度。 */
@@ -430,7 +430,7 @@ export interface FimSensitivityParams {
   readonly allowSentenceEnd: boolean
 }
 
-export const FIM_SENSITIVITIES: Record<FimSensitivity, FimSensitivityParams> = {
+export const TRIGGER_SENSITIVITIES: Record<TriggerSensitivity, TriggerSensitivityParams> = {
   eager: {
     pauseMs: 250,
     minCharsCjk: 4,
@@ -458,11 +458,11 @@ export const FIM_SENSITIVITIES: Record<FimSensitivity, FimSensitivityParams> = {
 }
 
 /** 灵敏度解析：非法/缺省回退 standard。 */
-export function normalizeFimSensitivity(value: unknown): FimSensitivity {
-  return value === 'eager' || value === 'standard' || value === 'conservative' ? value : DEFAULT_FIM_SENSITIVITY
+export function normalizeTriggerSensitivity(value: unknown): TriggerSensitivity {
+  return value === 'eager' || value === 'standard' || value === 'conservative' ? value : DEFAULT_TRIGGER_SENSITIVITY
 }
 
-export type FimTriggerDecision =
+export type SuggestTriggerDecision =
   | { readonly ok: true }
   | { readonly ok: false; readonly reason: 'empty' | 'too-short' | 'sentence-end' | 'mid-word' | 'trailing-space' }
 
@@ -471,8 +471,8 @@ export type FimTriggerDecision =
  * 句末标点 / 尾随空格 / 夹入英文半词 / 最短长度均按灵敏度参数伸缩，停顿阈值由客户端按同一参数取值。
  * 所有语言同一规则。
  */
-export function shouldTriggerFim(draft: string, sensitivity: FimSensitivity = DEFAULT_FIM_SENSITIVITY): FimTriggerDecision {
-  const params = FIM_SENSITIVITIES[sensitivity] ?? FIM_SENSITIVITIES[DEFAULT_FIM_SENSITIVITY]
+export function shouldTriggerSuggest(draft: string, sensitivity: TriggerSensitivity = DEFAULT_TRIGGER_SENSITIVITY): SuggestTriggerDecision {
+  const params = TRIGGER_SENSITIVITIES[sensitivity] ?? TRIGGER_SENSITIVITIES[DEFAULT_TRIGGER_SENSITIVITY]
   const trimmed = draft.trim()
   if (trimmed === '') return { ok: false, reason: 'empty' }
   const cjk = CJK_CHARS.test(trimmed)

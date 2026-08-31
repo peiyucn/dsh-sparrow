@@ -1,4 +1,4 @@
-# 00 · 插件概览 — dsh-chat-fim
+# 00 · 插件概览 — dsh-chat-suggest
 
 > dsh-sparrow 合集成员。本文是需求范围与验收边界；详细设计见 01-design.md，路线图见 02-roadmap.md。
 
@@ -10,7 +10,7 @@
 
 **做**：
 
-* host half：注册自有路由 `POST /api/chat-fim/complete`，把（会话、最近对话历史、草稿）转发到 DeepSeek 对话前缀续写（Beta），返回候选建议；
+* host half：注册自有路由 `POST /api/chat-suggest/complete`，把（会话、最近对话历史、草稿）转发到 DeepSeek 对话前缀续写（Beta），返回候选建议；
 * client half（M2）：输入框旁的 dock 建议条——触发、展示、作废、采用；
 * 触发/作废/采用的交互规则与错误降级。
 
@@ -25,7 +25,7 @@
 
 ### M1 · host half（转发路由）
 
-* `POST /api/chat-fim/complete` 返回结构化的候选建议；非法请求按错误码拒绝（见 01 错误映射表）；
+* `POST /api/chat-suggest/complete` 返回结构化的候选建议；非法请求按错误码拒绝（见 01 错误映射表）；
 * 上游超时/断连可取消，不悬挂、不泄漏 AbortController；
 * 配置（baseURL / model / maxTokens / apiKeyEnv）从插件设置分节读取，无明文 key；
 * `npm run verify` 全绿，纯逻辑（请求校验、错误映射）有单测。

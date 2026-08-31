@@ -25,7 +25,7 @@
 | 按 agent 屏蔽工具 | `agent/request` waterfall 里 `agent.ctx.tools.restrict({ deny: ['vision_read'] })`（返回解除器） | packages/subagent/tool-subagent 的官方先例 | **公开 seam**；主模型非 deepseek-official 时对该 agent 生效 |
 | 预设（可选增强） | `ctx.agentPresets`：list/resolve/mount/composeFrom/copy/remove/recompose；改模型应走 agentOptions 而非改 preset 文件 | packages/preset/agent-presets/src/index.ts:69-73、199-485 | 公开 seam；M1 不用，M2 可选 |
 | 流介入（可选增强） | `llm/stream` waterfall：读 options.messages 判定含图；deep-frozen 只读，必须构造新 messages 传给 next（语义需开工实测） | packages/llm/llm/src/index.ts:53-65；官方包装先例 packages/llm/llm/src/invariant.ts:88 | 公开 waterfall；M2 再启用 |
-| 会话/凭据（chat-fim 共用） | `sessions.get(id)`（仅 live 会话）；`credentials.resolve(credentialRef(name))` 实时读勿缓存 | packages/core/session/src/index.ts:1055-1057；packages/credentials/credentials/src/index.ts:190 | **公开 seam** |
+| 会话/凭据（chat-suggest 共用） | `sessions.get(id)`（仅 live 会话）；`credentials.resolve(credentialRef(name))` 实时读勿缓存 | packages/core/session/src/index.ts:1055-1057；packages/credentials/credentials/src/index.ts:190 | **公开 seam** |
 
 ## 核心设计
 

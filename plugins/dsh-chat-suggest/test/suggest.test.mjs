@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  buildPrefixMessages, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, fimStopSequences,
+  buildPrefixMessages, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, speakerStopSequences,
   formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
-  normalizeConfig, normalizeFimModelMode, normalizeFimSensitivity, parseCompleteBody, recentHistoryTurns,
-  resolveFimModel, shouldTriggerFim, cleanSuggestion, summarizeUpstreamBody, upstreamStatusToError,
+  normalizeConfig, normalizeSuggestModelMode, normalizeTriggerSensitivity, parseCompleteBody, recentHistoryTurns,
+  resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, summarizeUpstreamBody, upstreamStatusToError,
   validateCompletePayload,
-} from '../lib/chat-fim.js'
+} from '../lib/suggest.js'
 
-describe('chat-fim 纯逻辑', () => {
+describe('chat-suggest 纯逻辑', () => {
   describe('normalizeConfig', () => {
     it('空配置 应该 返回默认值', () => {
       const config = normalizeConfig(undefined)
@@ -31,7 +31,7 @@ describe('chat-fim 纯逻辑', () => {
   describe('validateCompletePayload', () => {
     it('合法请求 应该 返回 prompt 与 sessionId', () => {
       const value = validateCompletePayload({ sessionId: 'session-1', prompt: '你好' })
-      assert.deepEqual(value, { sessionId: 'session-1', prompt: '你好', fimModelMode: 'auto' })
+      assert.deepEqual(value, { sessionId: 'session-1', prompt: '你好', suggestModelMode: 'auto' })
     })
 
     it('缺 prompt 应该 返回 INVALID_PROMPT', () => {
@@ -127,13 +127,13 @@ describe('chat-fim 纯逻辑', () => {
     })
   })
 
-  describe('fimStopSequences', () => {
+  describe('speakerStopSequences', () => {
     it('zh 应该 包含中文说话人标记', () => {
-      assert.deepEqual(fimStopSequences('zh'), ['\n用户：', '\n助手：'])
+      assert.deepEqual(speakerStopSequences('zh'), ['\n用户：', '\n助手：'])
     })
 
     it('en 应该 包含英文说话人标记', () => {
-      assert.deepEqual(fimStopSequences('en'), ['\nUser: ', '\nAssistant: '])
+      assert.deepEqual(speakerStopSequences('en'), ['\nUser: ', '\nAssistant: '])
     })
   })
 
@@ -228,47 +228,47 @@ describe('chat-fim 纯逻辑', () => {
     })
   })
 
-  describe('resolveFimModel', () => {
+  describe('resolveSuggestModel', () => {
     it('mode=pro 应该 恒用 v4-pro', () => {
-      assert.equal(resolveFimModel('pro', { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+      assert.equal(resolveSuggestModel('pro', { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
     })
 
     it('mode=flash 应该 恒用 v4-flash', () => {
-      assert.equal(resolveFimModel('flash', { provider: 'deepseek-official', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-flash')
+      assert.equal(resolveSuggestModel('flash', { provider: 'deepseek-official', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-flash')
     })
 
     it('mode=auto 主模型 v4-pro 应该 跟随主模型', () => {
-      assert.equal(resolveFimModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+      assert.equal(resolveSuggestModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
     })
 
     it('mode=auto 主模型 v4-flash 应该 跟随主模型', () => {
-      assert.equal(resolveFimModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, 'deepseek-v4-pro'), 'deepseek-v4-flash')
+      assert.equal(resolveSuggestModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, 'deepseek-v4-pro'), 'deepseek-v4-flash')
     })
 
     it('mode=auto 主模型 vision-exp 应该 回退配置默认', () => {
-      assert.equal(resolveFimModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-flash-vision-exp' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+      assert.equal(resolveSuggestModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-flash-vision-exp' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
     })
 
     it('mode=auto 非官方 provider 应该 回退配置默认', () => {
-      assert.equal(resolveFimModel('auto', { provider: 'zai', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+      assert.equal(resolveSuggestModel('auto', { provider: 'zai', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
     })
 
     it('mode=auto 未知主模型 应该 回退配置默认', () => {
-      assert.equal(resolveFimModel('auto', undefined, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+      assert.equal(resolveSuggestModel('auto', undefined, 'deepseek-v4-pro'), 'deepseek-v4-pro')
     })
   })
 
-  describe('normalizeFimModelMode', () => {
+  describe('normalizeSuggestModelMode', () => {
     it('合法三档 应该 原样返回', () => {
-      assert.equal(normalizeFimModelMode('auto'), 'auto')
-      assert.equal(normalizeFimModelMode('pro'), 'pro')
-      assert.equal(normalizeFimModelMode('flash'), 'flash')
+      assert.equal(normalizeSuggestModelMode('auto'), 'auto')
+      assert.equal(normalizeSuggestModelMode('pro'), 'pro')
+      assert.equal(normalizeSuggestModelMode('flash'), 'flash')
     })
 
     it('非法/缺省 应该 回退 auto', () => {
-      assert.equal(normalizeFimModelMode(undefined), 'auto')
-      assert.equal(normalizeFimModelMode('gpt'), 'auto')
-      assert.equal(normalizeFimModelMode(42), 'auto')
+      assert.equal(normalizeSuggestModelMode(undefined), 'auto')
+      assert.equal(normalizeSuggestModelMode('gpt'), 'auto')
+      assert.equal(normalizeSuggestModelMode(42), 'auto')
     })
   })
 
@@ -303,122 +303,122 @@ describe('chat-fim 纯逻辑', () => {
     })
   })
 
-  describe('shouldTriggerFim', () => {
+  describe('shouldTriggerSuggest', () => {
     it('空草稿 应该 不触发（empty）', () => {
-      assert.deepEqual(shouldTriggerFim('   '), { ok: false, reason: 'empty' })
+      assert.deepEqual(shouldTriggerSuggest('   '), { ok: false, reason: 'empty' })
     })
 
     it('过短草稿 应该 不触发（too-short）', () => {
-      assert.deepEqual(shouldTriggerFim('我觉得'), { ok: false, reason: 'too-short' })
+      assert.deepEqual(shouldTriggerSuggest('我觉得'), { ok: false, reason: 'too-short' })
     })
 
     it('句末问号 应该 不触发（sentence-end）', () => {
-      assert.deepEqual(shouldTriggerFim('还有个问题，fim接口是计费的么？'), { ok: false, reason: 'sentence-end' })
+      assert.deepEqual(shouldTriggerSuggest('还有个问题，fim接口是计费的么？'), { ok: false, reason: 'sentence-end' })
     })
 
     it('句末句号 应该 不触发（sentence-end）', () => {
-      assert.deepEqual(shouldTriggerFim('这个方案已经写完了。'), { ok: false, reason: 'sentence-end' })
+      assert.deepEqual(shouldTriggerSuggest('这个方案已经写完了。'), { ok: false, reason: 'sentence-end' })
     })
 
     it('英文句末句点 应该 不触发（sentence-end）', () => {
-      assert.deepEqual(shouldTriggerFim('Let me fix it.'), { ok: false, reason: 'sentence-end' })
+      assert.deepEqual(shouldTriggerSuggest('Let me fix it.'), { ok: false, reason: 'sentence-end' })
     })
 
     it('中文尾随空格 应该 触发（空格分词续写）', () => {
-      assert.deepEqual(shouldTriggerFim('我觉得这个方案还 '), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('我觉得这个方案还 '), { ok: true })
     })
 
     it('中文句号后跟空格 应该 不触发（sentence-end）', () => {
-      assert.deepEqual(shouldTriggerFim('这个方案已经写完了。 '), { ok: false, reason: 'sentence-end' })
+      assert.deepEqual(shouldTriggerSuggest('这个方案已经写完了。 '), { ok: false, reason: 'sentence-end' })
     })
 
     it('高灵敏：句末问号 应该 触发', () => {
-      assert.deepEqual(shouldTriggerFim('还有个问题，fim接口是计费的么？', 'eager'), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('还有个问题，fim接口是计费的么？', 'eager'), { ok: true })
     })
 
     it('高灵敏：句末句号 应该 触发', () => {
-      assert.deepEqual(shouldTriggerFim('这个方案已经写完了。', 'eager'), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('这个方案已经写完了。', 'eager'), { ok: true })
     })
 
     it('高灵敏：英文句末句点 应该 触发', () => {
-      assert.deepEqual(shouldTriggerFim('Let me fix it.', 'eager'), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('Let me fix it.', 'eager'), { ok: true })
     })
 
     it('高灵敏：句号后跟空格 应该 触发', () => {
-      assert.deepEqual(shouldTriggerFim('这个方案已经写完了。 ', 'eager'), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('这个方案已经写完了。 ', 'eager'), { ok: true })
     })
 
     it('低灵敏：句末句号 应该 不触发（sentence-end）', () => {
-      assert.deepEqual(shouldTriggerFim('这个方案我们已经写完了。', 'conservative'), { ok: false, reason: 'sentence-end' })
+      assert.deepEqual(shouldTriggerSuggest('这个方案我们已经写完了。', 'conservative'), { ok: false, reason: 'sentence-end' })
     })
 
     it('高灵敏：4 字中文 应该 触发', () => {
-      assert.deepEqual(shouldTriggerFim('你好啊这', 'eager'), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('你好啊这', 'eager'), { ok: true })
     })
 
     it('高灵敏：夹入英文停半词 应该 触发', () => {
-      assert.deepEqual(shouldTriggerFim('这个 bug 出在 transf', 'eager'), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('这个 bug 出在 transf', 'eager'), { ok: true })
     })
 
     it('低灵敏：词后空格 应该 不触发（trailing-space）', () => {
-      assert.deepEqual(shouldTriggerFim('Let me fix the ', 'conservative'), { ok: false, reason: 'trailing-space' })
+      assert.deepEqual(shouldTriggerSuggest('Let me fix the ', 'conservative'), { ok: false, reason: 'trailing-space' })
     })
 
     it('低灵敏：不足 12 字中文 应该 不触发（too-short）', () => {
-      assert.deepEqual(shouldTriggerFim('这个方案还差一点点', 'conservative'), { ok: false, reason: 'too-short' })
+      assert.deepEqual(shouldTriggerSuggest('这个方案还差一点点', 'conservative'), { ok: false, reason: 'too-short' })
     })
 
     it('标准档（缺省）与显式 standard 应该 行为一致', () => {
-      assert.deepEqual(shouldTriggerFim('我觉得这个方案的'), shouldTriggerFim('我觉得这个方案的', 'standard'))
+      assert.deepEqual(shouldTriggerSuggest('我觉得这个方案的'), shouldTriggerSuggest('我觉得这个方案的', 'standard'))
     })
 
-    describe('normalizeFimSensitivity', () => {
+    describe('normalizeTriggerSensitivity', () => {
       it('合法三档 应该 原样返回', () => {
-        assert.equal(normalizeFimSensitivity('eager'), 'eager')
-        assert.equal(normalizeFimSensitivity('standard'), 'standard')
-        assert.equal(normalizeFimSensitivity('conservative'), 'conservative')
+        assert.equal(normalizeTriggerSensitivity('eager'), 'eager')
+        assert.equal(normalizeTriggerSensitivity('standard'), 'standard')
+        assert.equal(normalizeTriggerSensitivity('conservative'), 'conservative')
       })
 
       it('非法/缺省 应该 回退 standard', () => {
-        assert.equal(normalizeFimSensitivity('ultra'), 'standard')
-        assert.equal(normalizeFimSensitivity(undefined), 'standard')
+        assert.equal(normalizeTriggerSensitivity('ultra'), 'standard')
+        assert.equal(normalizeTriggerSensitivity(undefined), 'standard')
       })
     })
 
     it('中灵敏：夹入英文停半词 应该 触发', () => {
-      assert.deepEqual(shouldTriggerFim('这个 bug 出在 transf', 'standard'), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('这个 bug 出在 transf', 'standard'), { ok: true })
     })
 
     it('低灵敏：夹入英文停半词 应该 不触发（mid-word）', () => {
-      assert.deepEqual(shouldTriggerFim('这个 bug 出在 transf', 'conservative'), { ok: false, reason: 'mid-word' })
+      assert.deepEqual(shouldTriggerSuggest('这个 bug 出在 transf', 'conservative'), { ok: false, reason: 'mid-word' })
     })
 
     it('纯英文停在单词中间 应该 触发（补全当前单词）', () => {
-      assert.deepEqual(shouldTriggerFim('Let me fix the iss'), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('Let me fix the iss'), { ok: true })
     })
 
     it('纯英文 3 字符 应该 触发', () => {
-      assert.deepEqual(shouldTriggerFim('Hel'), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('Hel'), { ok: true })
     })
 
     it('纯英文 2 字符 应该 不触发（too-short）', () => {
-      assert.deepEqual(shouldTriggerFim('He'), { ok: false, reason: 'too-short' })
+      assert.deepEqual(shouldTriggerSuggest('He'), { ok: false, reason: 'too-short' })
     })
 
     it('纯英文尾随空格 应该 触发（预测下一个词）', () => {
-      assert.deepEqual(shouldTriggerFim('Let me fix the '), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('Let me fix the '), { ok: true })
     })
 
     it('纯英文句号后跟空格 应该 不触发（sentence-end）', () => {
-      assert.deepEqual(shouldTriggerFim('Let me fix it. '), { ok: false, reason: 'sentence-end' })
+      assert.deepEqual(shouldTriggerSuggest('Let me fix it. '), { ok: false, reason: 'sentence-end' })
     })
 
     it('中文未完成句 应该 触发', () => {
-      assert.deepEqual(shouldTriggerFim('我觉得这个方案的'), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('我觉得这个方案的'), { ok: true })
     })
 
     it('逗号结尾 应该 触发', () => {
-      assert.deepEqual(shouldTriggerFim('我们先看看数据，再'), { ok: true })
+      assert.deepEqual(shouldTriggerSuggest('我们先看看数据，再'), { ok: true })
     })
   })
 

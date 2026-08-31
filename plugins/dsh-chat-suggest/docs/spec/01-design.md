@@ -1,4 +1,4 @@
-# 01 · 详细设计 — dsh-chat-fim
+# 01 · 详细设计 — dsh-chat-suggest
 
 > 起点为零代码；seam 选择以本文件《seam 查证》为准，未查证项标注待查证，开工前补齐。
 
@@ -6,7 +6,7 @@
 
 * **host half**（Node）：webServer 自有路由 + 上游转发 + 凭据解析；
 * **client half**（浏览器，M2）：dock 建议条，esbuild 单文件 bundle；
-* 通信只走 host 路由 `POST /api/chat-fim/complete`（client 不 import Node 模块，host 不 import 浏览器 API）。
+* 通信只走 host 路由 `POST /api/chat-suggest/complete`（client 不 import Node 模块，host 不 import 浏览器 API）。
 
 ## 插件契约合规（dsh 规范）
 
@@ -28,11 +28,11 @@
 
 ### 请求语义
 
-* 只受理 `POST /api/chat-fim/complete`，其余 404；
+* 只受理 `POST /api/chat-suggest/complete`，其余 404；
 * 校验：`sessionId` 命中 sessions 服务（否则 403/503）、`prompt` 非空且 ≤ `MAX_PROMPT_CHARS`（拟定 32k，否则 400）、请求体 ≤ `MAX_BODY_BYTES`（64 KB）；
 * 凭据：`ctx.credentials.resolve('DEEPSEEK_API_KEY')`，缺失 401；
 * 转发：`POST {baseURL}/chat/completions`（对话前缀续写 Beta），body `{ model, messages, max_tokens, stop, temperature }`；`messages` 由最近对话历史（原生 user/assistant 角色）+ 最后一条以「用户：草稿」为前缀的 assistant 消息（`prefix: true`）构造（见 `buildPrefixMessages`）——官方 prefix 机制强制模型续写这条消息，实测用户口吻稳定（新会话 plea → ase）；`stop` 序列 `\n用户：` / `\n助手：` 兜底（实测 API stop 时灵时不灵，客户端另按标记截断 + 角色切换丢弃，见 `cleanSuggestion`）；
-* 补全模型（2026-08-30）：**跟随主模型**（`resolveFimModel`）——主模型为 deepseek-official 的 v4-pro/v4-flash 时用主模型补全（计费随之），vision-exp / 未知 / 非官方回退配置默认 `model`；依据：官方 API schema 只列 v4-pro，但直连实测 flash 亦可（见 README 实测记录）；
+* 补全模型（2026-08-30）：**跟随主模型**（`resolveSuggestModel`）——主模型为 deepseek-official 的 v4-pro/v4-flash 时用主模型补全（计费随之），vision-exp / 未知 / 非官方回退配置默认 `model`；依据：官方 API schema 只列 v4-pro，但直连实测 flash 亦可（见 README 实测记录）；
 * 多建议：FIM 接口无 `n` 参数，按 `suggestionCount`（默认 1）并行请求、温度错开采样（base + index×0.4，封顶 2）；`allSettled` 部分失败保留成功建议；
 * 采样：`temperature` 默认 **0.3**（2026-08-30 A/B 实测：1.0 漂移明显、会复读最近一条用户消息，0.3 聚焦稳定；上游已废弃 frequency/presence penalty，不可用）；
 * 生命周期：超时（`REQUEST_TIMEOUT_MS` 30s）+ 客户端 `close` 即 `AbortController.abort()`。
@@ -49,7 +49,7 @@
 
 ### 触发与作废（核心状态机，纯函数可单测）
 
-* **触发**：草稿变更后停顿 ≥ 400ms（客户端常量 `PAUSE_MS`，非插件配置），且**草稿形态门控通过**（`shouldTriggerFim`，2026-08-30 实测驱动，同日晚改为**按草稿内容自适应的通用规则**——不做 zh/en 硬切换，各语言体验一致）：
+* **触发**：草稿变更后停顿 ≥ 400ms（客户端常量 `PAUSE_MS`，非插件配置），且**草稿形态门控通过**（`shouldTriggerSuggest`，2026-08-30 实测驱动，同日晚改为**按草稿内容自适应的通用规则**——不做 zh/en 硬切换，各语言体验一致）：
   * trim 后达到最短长度：含 CJK 字符的草稿 ≥ `MIN_TRIGGER_DRAFT_CHARS`（8 字符）；纯拉丁草稿 ≥ `MIN_TRIGGER_DRAFT_CHARS_LATIN`（3 字符，按词计），上下文过短不触发；
   * 末尾非句末标点（`。！？.!?;；`）——句末已完整，模型会续出新一句而不是接话（实测：草稿「还有个问题，fim接口是计费的么？」被续成「claude code好像没有fim呢…」，衔接不上）；
   * 尾随空格一律放行：英文词后空格、中文空格分词习惯下，空格后正是预测下一段文字的位置；
@@ -66,7 +66,7 @@
 ## 通信协议
 
 ```json
-POST /api/chat-fim/complete
+POST /api/chat-suggest/complete
 { "sessionId": "...", "prompt": "草稿前缀" }
 
 200 { "suggestions": ["候选1", "候选2"] }

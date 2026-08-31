@@ -6,16 +6,16 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 Each plugin is published and installed independently; a plugin retires from the collection once DSH natively supports its feature.
 
-## dsh-chat-fim
+## dsh-chat-suggest
 
 Chat input suggestions. After a short typing pause, an official-@-menu-style card suggests what you may type next — Tab adopts, Esc dismisses; powered by DeepSeek FIM completion (Beta), with three trigger-sensitivity levels (high / medium / low) and a fixed flash completion model.
 
 > DeepSeek main models only (hidden otherwise); reuses the DeepSeek API key configured in dsh — no extra credentials.
 
-Docs: [dsh-chat-fim README](plugins/dsh-chat-fim/README.md)
+Docs: [dsh-chat-suggest README](plugins/dsh-chat-suggest/README.md)
 
 ```bash
-dsh plugin --profile web add dsh-chat-fim
+dsh plugin --profile web add dsh-chat-suggest
 ```
 
 ## dsh-vision-access

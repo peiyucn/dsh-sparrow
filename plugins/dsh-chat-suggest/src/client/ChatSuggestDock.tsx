@@ -8,16 +8,16 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { FIM_SENSITIVITIES, formatTokenCount, shouldTriggerFim, type FimSensitivity } from '../chat-fim.js'
+import { TRIGGER_SENSITIVITIES, formatTokenCount, shouldTriggerSuggest, type TriggerSensitivity } from '../suggest.js'
 
-export interface FimCompleteResult {
+export interface SuggestCompleteResult {
   readonly suggestions: readonly string[]
   readonly model: string
   readonly temperature: number
   readonly usage: { readonly promptTokens: number; readonly completionTokens: number }
 }
 
-export interface ChatFimDockInjected {
+export interface ChatSuggestDockInjected {
   /** 注入面所属会话（槽工厂按 sessionId 生成）；菜单据此校验建议归属，堵跨会话误采用。 */
   readonly sessionId: SessionId
   /** 查询当前会话主模型是否支持（deepseek 系列）；false 时整体隐藏。 */
@@ -27,17 +27,17 @@ export interface ChatFimDockInjected {
     sessionId: SessionId,
     prompt: string,
     signal: AbortSignal,
-  ) => Promise<FimCompleteResult>
+  ) => Promise<SuggestCompleteResult>
   /** 通过 scoped bail 事件把建议追加进草稿；返回是否被输入机接受。 */
   adopt: (sessionId: SessionId, text: string, span: TokenSpan) => boolean
 }
 
-export type ChatFimDockProps = PropsRuntime<'conversation.composer.dock'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
-export type ChatFimSwitchProps = PropsRuntime<'conversation.input.left'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
-export type ChatFimMenuProps = PropsRuntime<'conversation.input.overlay'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
+export type ChatSuggestDockProps = PropsRuntime<'conversation.composer.dock'> & ChatSuggestDockInjected & { t: TranslateNS<'chat-suggest'> }
+export type ChatSuggestSwitchProps = PropsRuntime<'conversation.input.left'> & ChatSuggestDockInjected & { t: TranslateNS<'chat-suggest'> }
+export type ChatSuggestMenuProps = PropsRuntime<'conversation.input.overlay'> & ChatSuggestDockInjected & { t: TranslateNS<'chat-suggest'> }
 
-const ENABLED_STORAGE_KEY = 'dsh-chat-fim:enabled'
-const SENSITIVITY_STORAGE_KEY = 'dsh-chat-fim:sensitivity'
+const ENABLED_STORAGE_KEY = 'dsh-chat-suggest:enabled'
+const SENSITIVITY_STORAGE_KEY = 'dsh-chat-suggest:sensitivity'
 /** 菜单高度设计上限（同官方 MenuDropdown）。 */
 const MENU_MAX_HEIGHT = 320
 
@@ -59,7 +59,7 @@ try {
 const enabledListeners = new Set<() => void>()
 
 /** 订阅共享开关状态；返回当前值。 */
-export function useFimEnabled(): boolean {
+export function useSuggestEnabled(): boolean {
   const [value, setValue] = useState(sharedEnabled)
   useEffect(() => {
     const listener = (): void => { setValue(sharedEnabled) }
@@ -70,7 +70,7 @@ export function useFimEnabled(): boolean {
 }
 
 /** 设置共享开关并持久化；返回新值。 */
-export function setFimEnabled(next: boolean): void {
+export function setSuggestEnabled(next: boolean): void {
   if (sharedEnabled === next) return
   sharedEnabled = next
   try {
@@ -86,7 +86,7 @@ let sharedBusy = false
 const busyListeners = new Set<() => void>()
 
 /** 订阅共享联想中状态；返回当前值。 */
-export function useFimBusy(): boolean {
+export function useSuggestBusy(): boolean {
   const [value, setValue] = useState(sharedBusy)
   useEffect(() => {
     const listener = (): void => { setValue(sharedBusy) }
@@ -97,7 +97,7 @@ export function useFimBusy(): boolean {
 }
 
 /** 设置共享联想中状态。 */
-export function setFimBusy(next: boolean): void {
+export function setSuggestBusy(next: boolean): void {
   if (sharedBusy === next) return
   sharedBusy = next
   for (const listener of busyListeners) listener()
@@ -108,7 +108,7 @@ let sharedError: string | null = null
 const errorListeners = new Set<() => void>()
 
 /** 订阅共享错误状态；返回当前值。 */
-export function useFimError(): string | null {
+export function useSuggestError(): string | null {
   const [value, setValue] = useState(sharedError)
   useEffect(() => {
     const listener = (): void => { setValue(sharedError) }
@@ -119,7 +119,7 @@ export function useFimError(): string | null {
 }
 
 /** 设置共享错误状态。 */
-export function setFimError(next: string | null): void {
+export function setSuggestError(next: string | null): void {
   if (sharedError === next) return
   sharedError = next
   for (const listener of errorListeners) listener()
@@ -130,7 +130,7 @@ let sharedSupported = true
 const supportedListeners = new Set<() => void>()
 
 /** 订阅共享模型支持状态；返回当前值。 */
-export function useFimSupported(): boolean {
+export function useSuggestSupported(): boolean {
   const [value, setValue] = useState(sharedSupported)
   useEffect(() => {
     const listener = (): void => { setValue(sharedSupported) }
@@ -141,14 +141,14 @@ export function useFimSupported(): boolean {
 }
 
 /** 设置共享模型支持状态。 */
-export function setFimSupported(next: boolean): void {
+export function setSuggestSupported(next: boolean): void {
   if (sharedSupported === next) return
   sharedSupported = next
   for (const listener of supportedListeners) listener()
 }
 
 /** 一条「建议 + 生成它的草稿快照」：菜单视图据此渲染与采用（span CAS）。 */
-export interface FimSuggestionRecord {
+export interface SuggestionRecord {
   readonly text: string
   readonly sessionId: SessionId
   readonly draft: string
@@ -162,11 +162,11 @@ export interface FimSuggestionRecord {
 }
 
 // 模块级共享建议：dock（数据面）写入，overlay 菜单（视图）读取；随草稿/相位变化清空。
-let sharedSuggestion: FimSuggestionRecord | null = null
+let sharedSuggestion: SuggestionRecord | null = null
 const suggestionListeners = new Set<() => void>()
 
 /** 订阅共享建议；返回当前记录。 */
-export function useFimSuggestion(): FimSuggestionRecord | null {
+export function useSuggestion(): SuggestionRecord | null {
   const [value, setValue] = useState(sharedSuggestion)
   useEffect(() => {
     const listener = (): void => { setValue(sharedSuggestion) }
@@ -177,7 +177,7 @@ export function useFimSuggestion(): FimSuggestionRecord | null {
 }
 
 /** 设置共享建议（null = 清空）。 */
-export function setFimSuggestion(next: FimSuggestionRecord | null): void {
+export function setSuggestion(next: SuggestionRecord | null): void {
   if (sharedSuggestion === next) return
   sharedSuggestion = next
   for (const listener of suggestionListeners) listener()
@@ -189,37 +189,37 @@ export function setFimSuggestion(next: FimSuggestionRecord | null): void {
 let lastAdoption: { sessionId: SessionId; draft: string; text: string } | null = null
 
 /** 菜单采纳前记录预期采纳。 */
-export function markFimAdoption(adoption: { sessionId: SessionId; draft: string; text: string }): void {
+export function markSuggestAdoption(adoption: { sessionId: SessionId; draft: string; text: string }): void {
   lastAdoption = adoption
 }
 
 /** 清除采纳标记（采纳失败回滚 / dock 消费后）。 */
-export function clearFimAdoption(): void {
+export function clearSuggestAdoption(): void {
   lastAdoption = null
 }
 
 /** 只读当前采纳标记。 */
-export function peekFimAdoption(): { sessionId: SessionId; draft: string; text: string } | null {
+export function peekSuggestAdoption(): { sessionId: SessionId; draft: string; text: string } | null {
   return lastAdoption
 }
 
 /** 读取本地触发灵敏度：eager/standard/conservative，非法值回退 standard。 */
-export function readFimSensitivity(storage: { getItem(key: string): string | null }, key = SENSITIVITY_STORAGE_KEY): FimSensitivity {
+export function readTriggerSensitivity(storage: { getItem(key: string): string | null }, key = SENSITIVITY_STORAGE_KEY): TriggerSensitivity {
   const value = storage.getItem(key)
   return value === 'eager' || value === 'standard' || value === 'conservative' ? value : 'standard'
 }
 
 // 模块级共享触发灵敏度（开关胶囊 ▾ 选择器写入，dock 触发与请求时读取）。
-let sharedSensitivity: FimSensitivity = 'standard'
+let sharedSensitivity: TriggerSensitivity = 'standard'
 try {
-  sharedSensitivity = readFimSensitivity(window.localStorage)
+  sharedSensitivity = readTriggerSensitivity(window.localStorage)
 } catch {
   sharedSensitivity = 'standard'
 }
 const sensitivityListeners = new Set<() => void>()
 
 /** 订阅共享触发灵敏度。 */
-export function useFimSensitivity(): FimSensitivity {
+export function useTriggerSensitivity(): TriggerSensitivity {
   const [value, setValue] = useState(sharedSensitivity)
   useEffect(() => {
     const listener = (): void => { setValue(sharedSensitivity) }
@@ -230,7 +230,7 @@ export function useFimSensitivity(): FimSensitivity {
 }
 
 /** 设置共享触发灵敏度并持久化。 */
-export function setFimSensitivity(next: FimSensitivity): void {
+export function setTriggerSensitivity(next: TriggerSensitivity): void {
   if (sharedSensitivity === next) return
   sharedSensitivity = next
   try {
@@ -251,14 +251,14 @@ function composerCardRect(): { x: number; y: number; width: number; height: numb
 }
 
 /** 注入开关样式、联想中脉冲 keyframes 与候选菜单样式（按 data 属性去重）；返回 style 元素供卸载清理。 */
-export function ensureFimBusyStyles(): HTMLStyleElement {
-  const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-chat-fim-busy]')
+export function ensureSuggestBusyStyles(): HTMLStyleElement {
+  const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-chat-suggest-busy]')
   if (existing !== null) return existing
   const style = document.createElement('style')
-  style.dataset.dshChatFimBusy = ''
+  style.dataset.dshChatSuggestBusy = ''
   style.textContent = `
 /* 开关胶囊：官方下拉按钮同款（PermissionSelect trigger）——无边框、透明底、悬停亮底、省空间。 */
-.dsh-chat-fim-switch {
+.dsh-chat-suggest-switch {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -274,32 +274,32 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   white-space: nowrap;
   cursor: pointer;
 }
-.dsh-chat-fim-switch:hover:not(:disabled) {
+.dsh-chat-suggest-switch:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
 }
-.dsh-chat-fim-switch-icon {
+.dsh-chat-suggest-switch-icon {
   display: inline-flex;
   flex: 0 0 auto;
   color: var(--dsw-alias-label-caption);
 }
-.dsh-chat-fim-switch-label {
+.dsh-chat-suggest-switch-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.dsh-chat-fim-switch-on {
+.dsh-chat-suggest-switch-on {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
 }
-.dsh-chat-fim-switch-on .dsh-chat-fim-switch-icon {
+.dsh-chat-suggest-switch-on .dsh-chat-suggest-switch-icon {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
 }
 /* 关闭态：灰字区分（开启态紫色），不再用删除线。 */
-.dsh-chat-fim-switch-off .dsh-chat-fim-switch-label {
+.dsh-chat-suggest-switch-off .dsh-chat-suggest-switch-label {
   color: var(--dsw-alias-label-tertiary, #9aa0a6);
 }
 /* 胶囊内的模型下拉箭头：点击只开模型菜单（stopPropagation，不切换开关）；打开时旋转 180°。 */
-.dsh-chat-fim-switch-arrow {
+.dsh-chat-suggest-switch-arrow {
   display: inline-flex;
   align-items: center;
   flex: none;
@@ -307,31 +307,31 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   color: var(--dsw-alias-label-caption);
   transition: transform 120ms ease;
 }
-.dsh-chat-fim-switch-on .dsh-chat-fim-switch-arrow {
+.dsh-chat-suggest-switch-on .dsh-chat-suggest-switch-arrow {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
 }
-.dsh-chat-fim-switch-arrow-open {
+.dsh-chat-suggest-switch-arrow-open {
   transform: rotate(180deg);
 }
 /* 窄行折叠为纯图标：官方 PermissionSelect 同款匿名 @container 规则，
    容器是 InputBar .row（container-type: inline-size），阈值同官方 460px。 */
 @container (max-width: 460px) {
-  .dsh-chat-fim-switch .dsh-chat-fim-switch-label {
+  .dsh-chat-suggest-switch .dsh-chat-suggest-switch-label {
     display: none;
   }
-  .dsh-chat-fim-switch {
+  .dsh-chat-suggest-switch {
     padding: 0 6px;
   }
 }
-@property --dsh-chat-fim-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
-.dsh-chat-fim-ring {
+@property --dsh-chat-suggest-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.dsh-chat-suggest-ring {
   position: fixed;
   z-index: 2000;
   pointer-events: none;
   padding: 2px;
   border-radius: 24px;
   background: conic-gradient(
-    from var(--dsh-chat-fim-angle),
+    from var(--dsh-chat-suggest-angle),
     transparent 0deg,
     transparent 300deg,
     color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 85%, transparent) 340deg,
@@ -342,20 +342,20 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
-  animation: dsh-chat-fim-ring-spin 1.6s linear infinite;
+  animation: dsh-chat-suggest-ring-spin 1.6s linear infinite;
 }
-@keyframes dsh-chat-fim-ring-spin {
-  to { --dsh-chat-fim-angle: 360deg; }
+@keyframes dsh-chat-suggest-ring-spin {
+  to { --dsh-chat-suggest-angle: 360deg; }
 }
 /* 候选菜单锚点：镜像官方 overlayAnchor（绝对定位、零高、钉在 composer 卡片上沿）。 */
-.dsh-chat-fim-menu-anchor {
+.dsh-chat-suggest-menu-anchor {
   position: absolute;
   inset: 0 0 auto;
   height: 0;
 }
 /* 菜单卡：官方 MenuDropdown 视觉 token（见 ui-input-trigger/MenuView.module.css）；
    紫色边框与开关 on 态同款，与官方 @ 列表做视觉区分。 */
-.dsh-chat-fim-menu {
+.dsh-chat-suggest-menu {
   position: absolute;
   bottom: calc(100% + 4px);
   left: 0;
@@ -371,7 +371,7 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   background: var(--dsw-specific-menu);
   box-shadow: var(--dsw-shadow-lv3);
 }
-.dsh-chat-fim-menu-row {
+.dsh-chat-suggest-menu-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -389,11 +389,11 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   color: var(--dsw-alias-label-primary);
   text-align: left;
 }
-.dsh-chat-fim-menu-row:hover {
+.dsh-chat-suggest-menu-row:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 /* 建议长句 2 行截断（超出省略），全文经 title 提示。 */
-.dsh-chat-fim-menu-text {
+.dsh-chat-suggest-menu-text {
   flex: 1;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -402,7 +402,7 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   min-width: 0;
 }
 /* 行尾键位提示：官方 @ 列表 drillHint 同款（caption 色文字 + 键盘帽，右对齐）。 */
-.dsh-chat-fim-menu-trailing {
+.dsh-chat-suggest-menu-trailing {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -411,14 +411,14 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   /* 与建议文字保持呼吸间距（文字 flex:1 顶满后 auto 边距为 0，靠这里拉开）。 */
   padding-left: 24px;
 }
-.dsh-chat-fim-menu-hint {
+.dsh-chat-suggest-menu-hint {
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
   line-height: 18px;
   white-space: nowrap;
 }
 /* 键盘帽与官方 @ 列表 drillHint 完全同款（token 逐项一致：底色/圆角/内边距/字色）。 */
-.dsh-chat-fim-menu-kbd {
+.dsh-chat-suggest-menu-kbd {
   padding: 0 5px;
   border-radius: 4px;
   background: var(--dsw-alias-interactive-bg-hover);
@@ -428,7 +428,7 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   line-height: 18px;
 }
 /* 菜单底部：右下角展示 token 数与实际模型。 */
-.dsh-chat-fim-menu-footer {
+.dsh-chat-suggest-menu-footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -438,7 +438,7 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   border-top: 1px solid var(--dsw-alias-border-inverted);
 }
 /* 触发灵敏度弹层：官方 MenuDropdown 同款 token，锚定胶囊右下，空间不足自动向上。 */
-.dsh-chat-fim-sensitivity-popover {
+.dsh-chat-suggest-sensitivity-popover {
   position: fixed;
   z-index: 2100;
   display: flex;
@@ -451,13 +451,13 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   background: var(--dsw-specific-menu);
   box-shadow: var(--dsw-shadow-lv3);
 }
-.dsh-chat-fim-menu-usage {
+.dsh-chat-suggest-menu-usage {
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
   line-height: 18px;
   white-space: nowrap;
 }
-.dsh-chat-fim-sensitivity-option {
+.dsh-chat-suggest-sensitivity-option {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -473,18 +473,18 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   text-align: left;
   cursor: pointer;
 }
-.dsh-chat-fim-sensitivity-option:hover {
+.dsh-chat-suggest-sensitivity-option:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
-.dsh-chat-fim-sensitivity-option-on {
+.dsh-chat-suggest-sensitivity-option-on {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
 }
-.dsh-chat-fim-sensitivity-option-check {
+.dsh-chat-suggest-sensitivity-option-check {
   width: 14px;
   flex: none;
   font-size: 12px;
 }
-.dsh-chat-fim-sensitivity-option-rule {
+.dsh-chat-suggest-sensitivity-option-rule {
   margin-left: auto;
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
@@ -493,7 +493,7 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
 }
 /* 胶囊内的敏锐度竖点：恒显 3 个点，自下而上点亮 3/2/1 个 = 高/中/低；未点亮为淡色占位。
    与左侧文字额外拉开间距（按钮 gap 4px + margin-left 6px），否则紧贴文字像残影；点 5px、圆角。 */
-.dsh-chat-fim-dots {
+.dsh-chat-suggest-dots {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -501,13 +501,13 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   margin-left: 6px;
   margin-right: 2px;
 }
-.dsh-chat-fim-dot {
+.dsh-chat-suggest-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: color-mix(in srgb, currentColor 45%, transparent);
 }
-.dsh-chat-fim-dot-on {
+.dsh-chat-suggest-dot-on {
   background: currentColor;
 }
 `
@@ -516,19 +516,19 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
 }
 
 /** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）：点击切换开关，右侧 ▾ 弹出触发灵敏度三档。 */
-export function ChatFimSwitch(props: ChatFimSwitchProps) {
+export function ChatSuggestSwitch(props: ChatSuggestSwitchProps) {
   const { t } = props
-  const enabled = useFimEnabled()
-  const busy = useFimBusy()
-  const error = useFimError()
-  const supported = useFimSupported()
-  const sensitivity = useFimSensitivity()
+  const enabled = useSuggestEnabled()
+  const busy = useSuggestBusy()
+  const error = useSuggestError()
+  const supported = useSuggestSupported()
+  const sensitivity = useTriggerSensitivity()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerPoint, setPickerPoint] = useState<{ x: number; y: number; up: boolean } | null>(null)
   const switchRef = useRef<HTMLButtonElement | null>(null)
 
   /** 高/中/低 → 自下而上点亮 3/2/1 个点（恒显 3 个占位点，档位只靠颜色区分）。 */
-  const DOT_LIT_COUNT: Record<FimSensitivity, number> = { eager: 3, standard: 2, conservative: 1 }
+  const DOT_LIT_COUNT: Record<TriggerSensitivity, number> = { eager: 3, standard: 2, conservative: 1 }
   /** 档位显示名（locale）。 */
   const label = t(`sensitivity.${sensitivity}`)
 
@@ -552,7 +552,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
     if (!pickerOpen) return
     const onPointerDown = (event: PointerEvent): void => {
       if (!(event.target instanceof Element)) return
-      if (event.target.closest('.dsh-chat-fim-sensitivity-popover') !== null) return
+      if (event.target.closest('.dsh-chat-suggest-sensitivity-popover') !== null) return
       if (switchRef.current !== null && switchRef.current.contains(event.target)) return
       setPickerOpen(false)
     }
@@ -582,28 +582,28 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
       <button
         ref={switchRef}
         type="button"
-        className={enabled ? 'dsh-chat-fim-switch dsh-chat-fim-switch-on' : 'dsh-chat-fim-switch dsh-chat-fim-switch-off'}
+        className={enabled ? 'dsh-chat-suggest-switch dsh-chat-suggest-switch-on' : 'dsh-chat-suggest-switch dsh-chat-suggest-switch-off'}
         title={busy ? t('dock.busy') : error ?? (enabled ? t('sensitivity.hint', { label }) : t('switch.offHint'))}
         aria-pressed={enabled}
         aria-busy={busy}
         onClick={() => {
           // 标签点击恒切换开关；弹层开着时一并收起（官方 PermissionSelect 触发器再点即合）。
           if (pickerOpen) setPickerOpen(false)
-          setFimEnabled(!enabled)
+          setSuggestEnabled(!enabled)
         }}
       >
-        <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
-        <span className="dsh-chat-fim-switch-label">{t('switch.label')}</span>
-        <span className="dsh-chat-fim-dots" aria-hidden>
+        <span className="dsh-chat-suggest-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
+        <span className="dsh-chat-suggest-switch-label">{t('switch.label')}</span>
+        <span className="dsh-chat-suggest-dots" aria-hidden>
           {(['eager', 'standard', 'conservative'] as const).map((level, index) => (
             <span
               key={level}
-              className={DOT_LIT_COUNT[sensitivity] > 2 - index ? 'dsh-chat-fim-dot dsh-chat-fim-dot-on' : 'dsh-chat-fim-dot'}
+              className={DOT_LIT_COUNT[sensitivity] > 2 - index ? 'dsh-chat-suggest-dot dsh-chat-suggest-dot-on' : 'dsh-chat-suggest-dot'}
             />
           ))}
         </span>
         <span
-          className={pickerOpen ? 'dsh-chat-fim-switch-arrow dsh-chat-fim-switch-arrow-open' : 'dsh-chat-fim-switch-arrow'}
+          className={pickerOpen ? 'dsh-chat-suggest-switch-arrow dsh-chat-suggest-switch-arrow-open' : 'dsh-chat-suggest-switch-arrow'}
           role="button"
           aria-haspopup="listbox"
           aria-expanded={pickerOpen}
@@ -625,7 +625,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
       {pickerOpen && pickerPoint !== null
         ? createPortal(
           <div
-            className="dsh-chat-fim-sensitivity-popover"
+            className="dsh-chat-suggest-sensitivity-popover"
             role="listbox"
             aria-label={t('sensitivity.aria', { label: '' })}
             style={{
@@ -644,15 +644,15 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
                 type="button"
                 role="option"
                 aria-selected={level === sensitivity}
-                className={level === sensitivity ? 'dsh-chat-fim-sensitivity-option dsh-chat-fim-sensitivity-option-on' : 'dsh-chat-fim-sensitivity-option'}
+                className={level === sensitivity ? 'dsh-chat-suggest-sensitivity-option dsh-chat-suggest-sensitivity-option-on' : 'dsh-chat-suggest-sensitivity-option'}
                 onClick={() => {
-                  setFimSensitivity(level)
+                  setTriggerSensitivity(level)
                   setPickerOpen(false)
                 }}
               >
-                <span className="dsh-chat-fim-sensitivity-option-check" aria-hidden>{level === sensitivity ? '✓' : ''}</span>
+                <span className="dsh-chat-suggest-sensitivity-option-check" aria-hidden>{level === sensitivity ? '✓' : ''}</span>
                 <span>{t(`sensitivity.${level}`)}</span>
-                <span className="dsh-chat-fim-sensitivity-option-rule">{t(`sensitivity.${level}.rule`)}</span>
+                <span className="dsh-chat-suggest-sensitivity-option-rule">{t(`sensitivity.${level}.rule`)}</span>
               </button>
             ))}
           </div>,
@@ -669,22 +669,22 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
  * 继续输入 / 发送 / 相位变化都会清空旧建议；联想中时渲染 composer 卡片外圈旋转紫光。
  * @param props - 槽位运行时 props + 注入动作。
  */
-export function ChatFimDock(props: ChatFimDockProps) {
+export function ChatSuggestDock(props: ChatSuggestDockProps) {
   const { session, input, requestComplete, isSupported } = props
   const [composing, setComposing] = useState(false)
   const [ring, setRing] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
-  const enabled = useFimEnabled()
-  const busy = useFimBusy()
-  const supported = useFimSupported()
-  const sensitivity = useFimSensitivity()
-  const sensitivityParams = FIM_SENSITIVITIES[sensitivity]
+  const enabled = useSuggestEnabled()
+  const busy = useSuggestBusy()
+  const supported = useSuggestSupported()
+  const sensitivity = useTriggerSensitivity()
+  const sensitivityParams = TRIGGER_SENSITIVITIES[sensitivity]
 
   // 会话切换时查询主模型支持状态；不支持则整体隐藏（像没装插件）。
   useEffect(() => {
-    setFimSupported(true)
+    setSuggestSupported(true)
     let alive = true
     void isSupported(session.sessionId).then((next) => {
-      if (alive) setFimSupported(next)
+      if (alive) setSuggestSupported(next)
     }).catch(() => {
       // 查询失败默认显示。
     })
@@ -713,41 +713,41 @@ export function ChatFimDock(props: ChatFimDockProps) {
       document.removeEventListener('compositionstart', start)
       document.removeEventListener('compositionend', end)
       flightRef.current?.abort()
-      setFimBusy(false)
-      setFimSuggestion(null)
+      setSuggestBusy(false)
+      setSuggestion(null)
     }
   }, [])
 
   useEffect(() => {
-    setFimSuggestion(null)
-    setFimBusy(false)
-    setFimError(null)
+    setSuggestion(null)
+    setSuggestBusy(false)
+    setSuggestError(null)
     flightRef.current?.abort()
 
     const draft = input.draft
     // 形态门控：句末标点 / 尾随空白 / 单词中间 / 过短草稿按触发灵敏度三档伸缩。
     if (!supported || !enabled || composing || input.phase !== 'plain') return
     // Tab 采纳导致的草稿变化不再触发：采纳后建议会立刻复现（且上游常以「助手：」口吻续写）。
-    const adoption = peekFimAdoption()
+    const adoption = peekSuggestAdoption()
     if (adoption !== null && adoption.sessionId === session.sessionId && draft === adoption.draft + adoption.text) {
-      clearFimAdoption()
+      clearSuggestAdoption()
       return
     }
-    if (!shouldTriggerFim(draft, sensitivity).ok) return
+    if (!shouldTriggerSuggest(draft, sensitivity).ok) return
 
     const rev = input.draftRev
     const timer = setTimeout(() => {
       if (composingRef.current || rev !== draftRevRef.current || draftRef.current !== draft) return
       const controller = new AbortController()
       flightRef.current = controller
-      setFimBusy(true)
+      setSuggestBusy(true)
       void requestComplete(session.sessionId, draft, controller.signal)
         .then((result) => {
           if (controller.signal.aborted) return
           if (rev !== draftRevRef.current || draftRef.current !== draft) return
           const text = result.suggestions[0]?.trim()
           if (text !== undefined && text !== '') {
-            setFimSuggestion({
+            setSuggestion({
               text,
               sessionId: session.sessionId,
               draft,
@@ -757,17 +757,17 @@ export function ChatFimDock(props: ChatFimDockProps) {
               temperature: result.temperature,
             })
           }
-          setFimError(null)
+          setSuggestError(null)
         })
         .catch((reason: unknown) => {
           // 失败可见化：禁用/凭据/上游错误显示在开关旁，而不是静默无建议。
           if (!controller.signal.aborted) {
-            setFimError(reason instanceof Error ? reason.message : String(reason))
+            setSuggestError(reason instanceof Error ? reason.message : String(reason))
           }
         })
         .finally(() => {
           if (flightRef.current === controller) flightRef.current = null
-          if (!controller.signal.aborted) setFimBusy(false)
+          if (!controller.signal.aborted) setSuggestBusy(false)
         })
     }, sensitivityParams.pauseMs)
 
@@ -799,7 +799,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
       {busy && ring !== null
         ? createPortal(
           <div
-            className="dsh-chat-fim-ring"
+            className="dsh-chat-suggest-ring"
             style={{ left: ring.x - 2, top: ring.y - 2, width: ring.width + 4, height: ring.height + 4 }}
             aria-hidden
           />,
@@ -816,11 +816,11 @@ export function ChatFimDock(props: ChatFimDockProps) {
  * 官方触发菜单（@/斜杠，`[data-trigger-menu]`）打开期间完全隐藏并让出按键。
  * @param props - 槽位运行时 props + 注入动作。
  */
-export function ChatFimMenu(props: ChatFimMenuProps) {
+export function ChatSuggestMenu(props: ChatSuggestMenuProps) {
   const { adopt, sessionId, t } = props
-  const suggestion = useFimSuggestion()
-  const enabled = useFimEnabled()
-  const supported = useFimSupported()
+  const suggestion = useSuggestion()
+  const enabled = useSuggestEnabled()
+  const supported = useSuggestSupported()
   const [triggerOpen, setTriggerOpen] = useState(() => document.querySelector('[data-trigger-menu]') !== null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const cardRef = useRef<HTMLDivElement | null>(null)
@@ -850,12 +850,12 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
       draftRev: suggestion.draftRev,
     }
     // 先记采纳标记：dock 据此跳过「旧草稿 + 建议文本」这一次触发；bail 失败则回滚。
-    markFimAdoption({ sessionId: suggestion.sessionId, draft: suggestion.draft, text: suggestion.text })
+    markSuggestAdoption({ sessionId: suggestion.sessionId, draft: suggestion.draft, text: suggestion.text })
     if (adopt(suggestion.sessionId, suggestion.text, span)) {
-      setFimSuggestion(null)
-      setFimBusy(false)
+      setSuggestion(null)
+      setSuggestBusy(false)
     } else {
-      clearFimAdoption()
+      clearSuggestAdoption()
     }
   }, [adopt, sessionId, suggestion])
 
@@ -871,15 +871,15 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
         event.preventDefault()
         adoptSuggestion()
       } else if (event.key === 'Escape') {
-        setFimSuggestion(null)
+        setSuggestion(null)
       }
     }
     const onPointerDown = (event: PointerEvent): void => {
       if (!(event.target instanceof Element)) return
-      if (event.target.closest('.dsh-chat-fim-menu') !== null) return
-      if (event.target.closest('.dsh-chat-fim-switch') !== null) return
-      if (event.target.closest('.dsh-chat-fim-sensitivity-popover') !== null) return
-      setFimSuggestion(null)
+      if (event.target.closest('.dsh-chat-suggest-menu') !== null) return
+      if (event.target.closest('.dsh-chat-suggest-switch') !== null) return
+      if (event.target.closest('.dsh-chat-suggest-sensitivity-popover') !== null) return
+      setSuggestion(null)
     }
     document.addEventListener('keydown', onKeyDown, true)
     document.addEventListener('pointerdown', onPointerDown, true)
@@ -892,11 +892,11 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
   const maxHeight = useAnchoredMaxHeight(cardRef, MENU_MAX_HEIGHT, visible ? suggestion : null)
 
   return (
-    <div ref={rootRef} className="dsh-chat-fim-menu-anchor">
+    <div ref={rootRef} className="dsh-chat-suggest-menu-anchor">
       {visible && suggestion !== null ? (
         <div
           ref={cardRef}
-          className="dsh-chat-fim-menu"
+          className="dsh-chat-suggest-menu"
           style={{ maxHeight }}
           role="listbox"
           aria-label={t('dock.aria')}
@@ -905,7 +905,7 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
             type="button"
             role="option"
             aria-selected="true"
-            className="dsh-chat-fim-menu-row"
+            className="dsh-chat-suggest-menu-row"
             title={suggestion.text}
             // mousedown，不是 click：焦点保持在输入框（官方菜单同款 combobox 模式）。
             onMouseDown={(event) => {
@@ -913,16 +913,16 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
               adoptSuggestion()
             }}
           >
-            <span className="dsh-chat-fim-menu-text">{suggestion.text}</span>
-            <span className="dsh-chat-fim-menu-trailing" aria-hidden>
-              <span className="dsh-chat-fim-menu-hint">{t('menu.adopt')}</span>
-              <kbd className="dsh-chat-fim-menu-kbd">Tab</kbd>
-              <span className="dsh-chat-fim-menu-hint">{t('menu.dismiss')}</span>
-              <kbd className="dsh-chat-fim-menu-kbd">Esc</kbd>
+            <span className="dsh-chat-suggest-menu-text">{suggestion.text}</span>
+            <span className="dsh-chat-suggest-menu-trailing" aria-hidden>
+              <span className="dsh-chat-suggest-menu-hint">{t('menu.adopt')}</span>
+              <kbd className="dsh-chat-suggest-menu-kbd">Tab</kbd>
+              <span className="dsh-chat-suggest-menu-hint">{t('menu.dismiss')}</span>
+              <kbd className="dsh-chat-suggest-menu-kbd">Esc</kbd>
             </span>
           </button>
-          <div className="dsh-chat-fim-menu-footer">
-            <span className="dsh-chat-fim-menu-usage">
+          <div className="dsh-chat-suggest-menu-footer">
+            <span className="dsh-chat-suggest-menu-usage">
               {t('menu.tokens', {
                 tokens: formatTokenCount(suggestion.totalTokens),
                 model: suggestion.model,

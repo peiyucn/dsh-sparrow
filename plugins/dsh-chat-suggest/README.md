@@ -1,4 +1,4 @@
-# dsh-chat-fim
+# dsh-chat-suggest
 
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
@@ -9,7 +9,7 @@ After a short typing pause, a suggestion card styled like the official @ menu ap
 ## Install
 
 ```bash
-dsh plugin --profile web add dsh-chat-fim
+dsh plugin --profile web add dsh-chat-suggest
 ```
 
 Requires dsh ≥ 0.1.1-rc.2.
@@ -39,4 +39,4 @@ Requires dsh ≥ 0.1.1-rc.2.
 ## Uninstall & Residue
 
 * The plugin writes no files and never touches the `.dsh` internals — it only forwards network requests.
-* The only persistent state is the browser localStorage keys `dsh-chat-fim:enabled` (switch) and `dsh-chat-fim:sensitivity` (trigger sensitivity). They remain in the browser after uninstall and are harmless; delete them in DevTools if you mind.
+* The only persistent state is the browser localStorage keys `dsh-chat-suggest:enabled` (switch) and `dsh-chat-suggest:sensitivity` (trigger sensitivity). They remain in the browser after uninstall and are harmless; delete them in DevTools if you mind.

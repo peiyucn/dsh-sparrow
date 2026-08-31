@@ -6,16 +6,16 @@
 
 每个插件独立发布、独立安装；某功能被官方原生支持后，对应插件从合集中退役。
 
-## dsh-chat-fim
+## dsh-chat-suggest
 
 聊天输入框续写联想。打字停顿片刻，在输入框上方以官方 @ 候选菜单同款悬浮卡给出「接下来可能写的文字」，Tab 采用、Esc 丢弃；补全由 DeepSeek FIM 补全（Beta）驱动，触发灵敏度三档可调（高 / 中 / 低），续写模型固定 flash。
 
 > 仅限 DeepSeek 系列主模型（其他主模型时自动隐藏），复用你在 dsh 中配置的 DeepSeek API key，不新增凭据。
 
-文档：[dsh-chat-fim README](plugins/dsh-chat-fim/README.zh-CN.md)
+文档：[dsh-chat-suggest README](plugins/dsh-chat-suggest/README.zh-CN.md)
 
 ```bash
-dsh plugin --profile web add dsh-chat-fim
+dsh plugin --profile web add dsh-chat-suggest
 ```
 
 ## dsh-vision-access
