@@ -1,0 +1,42 @@
+# 00 · 插件概览 — dsh-nav-pin
+
+> dsh-sparrow 合集成员。本文是需求范围与验收边界；详细设计见 01-design.md，路线图见 02-roadmap.md。
+
+## 定位
+
+让官方「轮次导航」（TurnNavigator，对话右侧翻轮次的刻度条）在窄对话列时不消失：官方断点 900px 提为 700px；≤700px 时默认隐藏，鼠标 hover 到右侧导航轨道即浮现为浮层（零高度锚点 + 绝对定位，不挤占对话布局）。无开关、无按钮、无设置项——纯注入样式表实现。
+
+## 痛点与根因（已查证）
+
+* **官方隐藏规则**：`packages/client/ui-chat/src/client/chat/TurnNavigator.module.css:215` 的 `@container (max-width: 900px) { .slot { display: none } }`；容器 = ChatView `.scroll`（`container-type: inline-size`，`ChatView.module.css:20`）。左边栏展开（280px）时窗口 <约 1180px，对话列即 <900px，导航消失——日常窗口宽度下经常不可见。
+* **导航本质就是浮层**：slot 是 `position: sticky; height: 0` 的零高度锚点 + 绝对定位 frame（`TurnNavigator.module.css`），浮在右缘 gutter、不占布局空间——窄屏隐藏并非空间所迫，右缘一直有余量（owner 实测）。
+* **官方无该行为的配置项**：config-catalog 无字段、「设置 → 常规」无相关行、无用户 CSS 机制（均已查证）。
+
+## 需求范围（做什么 / 不做什么）
+
+**做**：
+
+* 对话列 >700px：轮次导航恒显（覆盖官方 900px 隐藏，等效断点 700px）。
+* 对话列 ≤700px：默认隐藏（opacity 0，保留指针命中），hover 右侧导航轨道浮现为浮层；键盘 focus 进入（`:focus-within`）同样浮现；移出后隐藏。
+* 浮层形态：官方设计 token（`--dsw-alias-*`）的背景 / 边框 / 圆角面板。
+* 全部为注入样式表；无 JS 交互逻辑、无按钮、无设置、无持久化状态。
+
+**不做**：
+
+* 不做显示 / 隐藏开关（无关闭需求，owner 拍板）。
+* 不改左边栏「打开即最小宽度」（无公开 seam，另行跟进）。
+* 不改官方 DOM 结构、不碰 React 组件；只注入 CSS，卸载即恢复官方行为。
+
+## 验收标准（提案，待评审）
+
+* 对话列 700–900px：导航可见（官方此时默认隐藏）。
+* 对话列 ≤700px：导航默认不可见；鼠标进入右侧轨道 → 约 120ms 浮现为浮层面板；移出 → 隐藏。
+* 浮层显示期间对话内容布局不变（零高度锚点 + 绝对定位）。
+* 键盘 Tab 进入导航按钮时导航浮现（focus-within）。
+* `prefers-reduced-motion: reduce` 时无过渡动画。
+* zh / en 两套界面语言均生效（两套 aria-label 都覆盖）。
+* 卸载插件（移除样式表）后行为回到官方 900px 规则。
+
+## 退役条件
+
+官方把断点调小、或提供 hover 浮层 / 「始终显示」配置项后，本插件退役。
