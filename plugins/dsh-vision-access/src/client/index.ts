@@ -1,6 +1,7 @@
 /**
- * dsh-vision-access client half：模型选择器旁的状态图标（非视觉模型才显示，点击弹说明）。
- * 无持久状态；可用性判定与视觉模型 id 全在 host（GET /api/vision-access/status）。
+ * dsh-vision-access client half：模型选择器旁的状态图标（随模型能力三态，点击弹说明）。
+ * 无持久状态；可用性判定与视觉模型 id 全在 host（GET /api/vision-access/status）；
+ * 模型切换经会话 modelSelection 投影（官方 faceOf seam）订阅，实时跟随。
  */
 
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -8,7 +9,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { ensureVisionStyles, VisionStatusIcon, type VisionStatusResult } from './VisionStatusIcon.js'
 
-export const inject = ['slots', 'locale']
+export const inject = ['slots', 'locale', 'sessions']
 
 /** 本插件的 locale 字典（zh/en）。 */
 const LOCALE_DICTS = {
@@ -30,22 +31,31 @@ const LOCALE_DICTS = {
   },
 } as const
 
+/** 客户端 sessions 服务的最小面：按会话 id 拿 Session 的投影 face（官方 seam）。 */
+interface VisionClientSessions {
+  binding(id: SessionId): {
+    session: {
+      projections: {
+        faceOf(key: string): { subscribe(listener: () => void): () => void }
+      }
+    }
+  } | undefined
+}
+
 /**
  * client half 入口：注册 locale 字典 + 状态图标槽位。
  * @param ctx - 浏览器侧 Cordis 上下文。
  */
 export function apply(ctx: ClientContext): void {
+  const sessions = ctx.sessions as unknown as VisionClientSessions
   const styles = ensureVisionStyles()
   ctx.effect(() => () => { styles.remove() }, 'dsh-vision-access: styles')
   const disposeDictionaries = ctx.locale.register('vision-access', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
   ctx.effect(() => disposeDictionaries, 'dsh-vision-access: locale dictionaries')
 
-  ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
-    name: 'conversation.input.right',
-    id: 'vision-access-status',
-    order: 20,
-    locale: 'vision-access',
-    inject: () => ({
+  const injectedFace = (sessionId: SessionId) => {
+    const face = sessions.binding(sessionId)?.session.projections.faceOf('modelSelection')
+    return {
       queryStatus: async (id: SessionId): Promise<VisionStatusResult> => {
         const response = await fetch(`/api/vision-access/status?sessionId=${encodeURIComponent(String(id))}`)
         if (!response.ok) return { mode: 'none', visionModel: '' }
@@ -55,7 +65,19 @@ export function apply(ctx: ClientContext): void {
           : 'none'
         return { mode, visionModel: payload.visionModel ?? '' }
       },
-    }),
+      subscribeModelChange: (listener: () => void): (() => void) => {
+        if (face === undefined) return () => {}
+        return face.subscribe(listener)
+      },
+    }
+  }
+
+  ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
+    name: 'conversation.input.right',
+    id: 'vision-access-status',
+    order: 20,
+    locale: 'vision-access',
+    inject: injectedFace,
   }, VisionStatusIcon))
 }
 

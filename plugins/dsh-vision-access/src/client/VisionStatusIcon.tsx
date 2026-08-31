@@ -18,6 +18,8 @@ export interface VisionStatusResult {
 export interface VisionStatusInjected {
   /** host 状态查询：当前会话主模型的能力模式 + 实际视觉模型 id。 */
   queryStatus: (sessionId: SessionId) => Promise<VisionStatusResult>
+  /** 订阅会话 modelSelection 投影变化（切换模型即回调）；返回解除函数。 */
+  subscribeModelChange: (listener: () => void) => () => void
 }
 
 export type VisionStatusProps = PropsRuntime<'conversation.input.right'> & VisionStatusInjected & { t: TranslateNS<'vision-access'> }
@@ -103,24 +105,37 @@ export function ensureVisionStyles(): HTMLStyleElement {
   return style
 }
 
-export function VisionStatusIcon({ session, queryStatus, t }: VisionStatusProps) {
+export function VisionStatusIcon({ session, queryStatus, subscribeModelChange, t }: VisionStatusProps) {
   const [status, setStatus] = useState<VisionStatusResult | null>(null)
   const [open, setOpen] = useState(false)
   const [point, setPoint] = useState<{ x: number; y: number; up: boolean } | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
 
-  // 会话切换时查询 host 状态；查询失败默认隐藏（保守，不影响主流程）。
+  // 会话切换 / 模型切换（modelSelection 投影变化）时查询 host 状态；
+  // 查询失败默认隐藏（保守，不影响主流程）。
   useEffect(() => {
     setStatus(null)
     setOpen(false)
     let alive = true
-    void queryStatus(session.sessionId).then((next) => {
-      if (alive) setStatus(next)
-    }).catch(() => {
-      // 状态查询失败：不显示图标。
+    const refresh = (): void => {
+      void queryStatus(session.sessionId).then((next) => {
+        if (alive) setStatus(next)
+      }).catch(() => {
+        // 状态查询失败：不显示图标。
+      })
+    }
+    refresh()
+    const unsubscribe = subscribeModelChange(() => {
+      if (!alive) return
+      // 模型变了：弹窗文案已过时，收起并重新查询。
+      setOpen(false)
+      refresh()
     })
-    return () => { alive = false }
-  }, [queryStatus, session.sessionId])
+    return () => {
+      alive = false
+      unsubscribe()
+    }
+  }, [queryStatus, session.sessionId, subscribeModelChange])
 
   const computePoint = (): { x: number; y: number; up: boolean } | null => {
     const rect = buttonRef.current?.getBoundingClientRect()
