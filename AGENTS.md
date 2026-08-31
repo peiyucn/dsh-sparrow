@@ -16,7 +16,7 @@
   * `plugins/dsh-vision-access` — 纯文本会话的图片视觉通道（官方 vision 模型读图，主模型保持大脑）
   * `plugins/dsh-archive-session` — 归档会话管理：备份 / 删除 / 恢复（轻量标题已随官方投影缓存退役）
 * 各插件本地验证 = 进入插件目录 `npm run verify`（typecheck + node:test）；全量 = 仓库根 `npm run verify:all`
-* 文档分工：插件 README 面向用户（**README.md 中文 + README.en.md 英文**，两份同内容不同语言、顶部互链）；`AGENTS.md` 面向开发 agent（seam 特例 / 架构约束 / 测试约定），开发细节不进 README
+* 文档分工：插件 README 面向用户（**README.md 英文为 GitHub 默认 + README.zh-CN.md 简体中文**，顶部互链，写法对齐 dsh-launcher-panel）；`AGENTS.md` 面向开发 agent（seam 特例 / 架构约束 / 测试约定），开发细节不进 README
 * 各插件专属约束见 `plugins/*/AGENTS.md`
 
 ***

@@ -1,31 +1,31 @@
 # dsh-vision-access
 
-[English](README.en.md)
+[简体中文](README.zh-CN.md)
 
-纯文本主模型会话的图片视觉通道 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
+An image-vision channel for text-only main models — a DeepSeek Harness (DSH) Web plugin (part of the dsh-sparrow collection).
 
-主模型本身看不到图片时，它会自动调用本插件提供的 `vision_read` 工具：host 直连官方视觉模型读图，把图片转成结构化文字报告（摘要 / OCR / 表格 / 版式），主模型保持对话大脑。
+When the main model cannot see images, it automatically calls the provided `vision_read` tool: the host reads the image with the official vision model and returns a structured text report (summary / OCR / tables / layout) — the main model stays the brain of the conversation.
 
-## 安装
+## Install
 
 ```bash
 dsh plugin --profile web add dsh-vision-access
 ```
 
-适配 dsh ≥ 0.1.1-rc.2。
+Requires dsh ≥ 0.1.1-rc.2.
 
-## 使用
+## Usage
 
-* **无需配置**：对话中贴图后，直接让主模型「看看这张图」即可，主模型会自动调用 `vision_read`
-* **状态图标**：模型选择器旁的眼睛图标随当前模型能力**三态**变化——原生视觉模型（灰显）点击提示「该模型原生支持视觉」；DeepSeek 文本模型（蓝紫点亮）点击提示「可跨模型读图」（明示图片交给哪个视觉模型）；其它无视觉模型（灰显带斜线）点击提示「不支持看图」。切换模型时颜色与文案实时跟随，直观感知当前模型能力。
-* 当前主模型本身原生看图（如 deepseek-v4-flash-vision-exp）或不是 DeepSeek 系列时，该工具自动隐藏——图片本来就直达主模型，经文字转述反而有损
-* **凭据**：视觉模型调用复用你在 dsh 中配置的 DeepSeek API key，图片只发给 DeepSeek 官方视觉模型、不出 DeepSeek 体系；不新增凭据
-* 同一张图 + 同一问题的报告在进程内缓存，重复询问秒回
+* **Zero config**: Paste an image and just ask the main model to "look at it" — it calls `vision_read` on its own
+* **Status icon**: The eye glyph next to the model selector has **three states** following the current model's capability — native-vision models (grey) click to show "native vision"; DeepSeek text models (lit blue-purple) click to show "cross-model reading" (naming the vision model); other non-vision models (grey with a slash) click to show "no vision capability". Color and text follow the model instantly as you switch.
+* The tool hides itself when the main model sees images natively (e.g. deepseek-v4-flash-vision-exp) or is not a DeepSeek model — the image already reaches the model directly, so a text transcription would only degrade it
+* **Credentials**: Vision calls reuse the DeepSeek API key configured in dsh; images only go to DeepSeek's official vision model and never leave the DeepSeek ecosystem — no extra credentials
+* Reports are cached in-process per image + question, so repeated asks answer instantly
 
-## 截图
+## Screenshots
 
-![模型选择器旁的点亮图标（可跨模型读图）](docs/images/status-icon.png)
+![Status icon next to the model selector](docs/images/status-icon.png)
 
-## 卸载与残留
+## Uninstall & Residue
 
-* **零残留**：不写任何文件、不改 `.dsh` 内部结构；报告缓存只在进程内存中，进程退出即消失。
+* **Zero residue**: Writes no files and never touches the `.dsh` internals; the report cache lives only in process memory and vanishes on exit.

@@ -22,7 +22,7 @@
     "lib/types/**/*.d.ts",
     "cordis.patch.yml",
     "docs/images/**",
-    "README.en.md"
+    "README.zh-CN.md"
   ],
   "dsh": {
     "bundle": {
