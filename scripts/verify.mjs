@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * 单插件本地验证：typecheck（使用本机 dsh checkout 的 tsc）+ node:test。
+ * 单插件本地验证：typecheck（使用本机 dsh checkout 的 tsc）+ client bundle + node:test。
  * 在各插件目录通过 `npm run verify` 调用，工作目录必须是插件根目录。
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const cwd = process.cwd()
@@ -39,6 +39,22 @@ if (existsSync(bundleScript)) {
   console.log('verify: bundle client')
   const bundle = spawnSync(process.execPath, [bundleScript], { cwd, stdio: 'inherit', shell: false })
   if (bundle.status !== 0) process.exit(bundle.status ?? 1)
+
+  // 客户端 bundle 的 __ModuleLoader__ 注册 id 必须等于 npm 包名（scoped name）。
+  // 短名会导致 dsh 报 "loaded without registering" 并让整个客户端启动失败。
+  const clientPath = join(cwd, 'lib', 'client.js')
+  if (!existsSync(clientPath)) {
+    console.error(`verify: 缺少 client bundle 产物 ${clientPath}`)
+    process.exit(1)
+  }
+  const manifest = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'))
+  const firstLine = readFileSync(clientPath, 'utf8').split(/\r?\n/, 1)[0] ?? ''
+  const registeredId = /window\.__ModuleLoader__\.load\(\{\s*id:\s*["']([^"']+)["']/.exec(firstLine)?.[1]
+  if (registeredId !== manifest.name) {
+    console.error(`verify: client bundle 注册 id 应为 ${manifest.name}，实际为 ${registeredId ?? '(未找到)'}`)
+    process.exit(1)
+  }
+  console.log(`verify: client bundle id ${registeredId}`)
 }
 
 console.log('verify: node:test')

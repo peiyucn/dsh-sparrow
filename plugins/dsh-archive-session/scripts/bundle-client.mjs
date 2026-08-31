@@ -2,7 +2,7 @@
 import { build } from 'esbuild'
 import { resolve } from 'node:path'
 
-const id = 'dsh-archive-session'
+const id = '@dsh-sparrow/dsh-archive-session'
 await build({
   entryPoints: [resolve(process.cwd(), 'src/client/index.ts')],
   outfile: resolve(process.cwd(), 'lib/client.js'),
