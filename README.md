@@ -8,9 +8,11 @@ Each plugin is published and installed independently; a plugin retires from the 
 
 ## dsh-chat-suggest
 
-Chat input suggestions. After a short typing pause, an official-@-menu-style card suggests what you may type next — Tab adopts, Esc dismisses; powered by DeepSeek FIM completion (Beta), with three trigger-sensitivity levels (high / medium / low) and a fixed flash completion model.
+Chat input suggestions. After a short typing pause, an official-@-menu-style card suggests what you may type next — Tab adopts, Esc dismisses; powered by DeepSeek FIM completion (Beta), with three trigger-sensitivity levels (high / medium / low); the completion model follows your selected main model.
 
 > DeepSeek main models only (hidden otherwise); reuses the DeepSeek API key configured in dsh — no extra credentials.
+
+![Suggestion card](resources/dsh-chat-suggest.png)
 
 Docs: [dsh-chat-suggest README](plugins/dsh-chat-suggest/README.md)
 
@@ -24,6 +26,8 @@ An image-vision channel for text-only main models. The main model calls the `vis
 
 > DeepSeek main models only (hidden otherwise); reuses the DeepSeek API key configured in dsh — images never leave the DeepSeek ecosystem.
 
+![Status icon next to the model selector](resources/dsh-vision-access.png)
+
 Docs: [dsh-vision-access README](plugins/dsh-vision-access/README.md)
 
 ```bash
@@ -34,15 +38,13 @@ dsh plugin --profile web add dsh-vision-access
 
 Archived-session management. The "Archive" entry in the sidebar backs up / deletes archived sessions (backup moves the session folder out, reversible; deletion is irreversible), and the backups area restores or deletes backups individually or in bulk.
 
+![Archive panel](resources/dsh-archive-session.png)
+
 Docs: [dsh-archive-session README](plugins/dsh-archive-session/README.md)
 
 ```bash
 dsh plugin --profile web add dsh-archive-session
 ```
-
-## Screenshots
-
-![All three plugins](docs/images/overview.png)
 
 ## License
 

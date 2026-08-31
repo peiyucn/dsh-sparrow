@@ -21,6 +21,7 @@
     "lib/**/*.js",
     "lib/types/**/*.d.ts",
     "cordis.patch.yml",
+    "docs/images/**",
     "README.md",
     "README.zh-CN.md",
     "CHANGELOG.md"

@@ -30,6 +30,10 @@ dsh plugin --profile web add dsh-chat-suggest
 * 当前会话主模型不是 DeepSeek 系列时，开关整体隐藏
 * **凭据**：续写请求复用你在 dsh 中配置的 DeepSeek API key（FIM 补全 Beta），不新增凭据、key 不进浏览器；产生的 token 计入你的 DeepSeek 账户
 
+## 截图
+
+![续写建议候选菜单](docs/images/suggestion-menu.png)
+
 ## 卸载与残留
 
 * 插件不写任何文件、不改 `.dsh` 内部结构，只做网络转发；

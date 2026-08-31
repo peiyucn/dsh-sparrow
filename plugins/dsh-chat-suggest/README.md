@@ -30,6 +30,10 @@ Requires dsh ≥ 0.1.1-rc.2.
 * The whole switch is hidden when the current session's main model is not a DeepSeek model
 * **Credentials**: Requests reuse the DeepSeek API key configured in dsh (FIM completion Beta) — no extra credentials, the key never reaches the browser; token usage bills to your DeepSeek account
 
+## Screenshots
+
+![Suggestion card](docs/images/suggestion-menu.png)
+
 ## Uninstall & Residue
 
 * The plugin writes no files and never touches the `.dsh` internals — it only forwards network requests.
