@@ -72,14 +72,14 @@ jobs:
             npm unpublish "$spec" --force
           done
 
-        - name: Verify versions after unpublish
-          if: inputs.action == 'unpublish'
-          shell: bash
-          run: |
-            for spec in ${{ inputs.packages }}; do
-              if npm view "$spec" version --json >/dev/null 2>&1; then
-                echo "STILL EXISTS: $spec"
-                exit 1
-              fi
-              echo "GONE: $spec"
-            done
+      - name: Verify versions after unpublish
+        if: inputs.action == 'unpublish'
+        shell: bash
+        run: |
+          for spec in ${{ inputs.packages }}; do
+            if npm view "$spec" version --json >/dev/null 2>&1; then
+              echo "STILL EXISTS: $spec"
+              exit 1
+            fi
+            echo "GONE: $spec"
+          done
