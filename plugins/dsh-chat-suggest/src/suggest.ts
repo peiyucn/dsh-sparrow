@@ -72,9 +72,15 @@ export function speakerStopSequences(language: SuggestLanguage): readonly string
   return ['user', 'assistant'].map(role => `\n${speakerText(language, role as 'user' | 'assistant')}`)
 }
 
+/** 说话人标签前缀变体：大小写、半/全角冒号（实测模型会输出 assistant：/User: 这类变体）。 */
+const SPEAKER_START = /^(?:用户|助手|user|assistant)\s*[:：]\s*/iu
+/** 文本中部出现的说话人标签变体（前面带换行）：截断用（无 g 标志，exec 只取首个匹配）。 */
+const SPEAKER_TURN_BREAK = /(?:\n)(?:用户|助手|user|assistant)\s*[:：]\s*/iu
+
 /**
  * 清洗一条上游补全（2026-08-30 实测驱动）：
  * 1. 按说话人标记截断——API 的 stop 序列不可靠（同构造有时生效、有时带出「\n助手：…」整段回复）；
+ *    标签变体（大小写/全角冒号）同样截断（实测 assistant：）；
  * 2. 去前后空白；
  * 3. 以说话人标记开头视为「角色切换」——模型去回复而不是续写草稿，返回 null 丢弃
  *    （实测：新会话草稿 plea → 输出「助手：看起来你的消息好像没发完整…」）。
@@ -86,11 +92,11 @@ export function cleanSuggestion(text: string, language: SuggestLanguage = 'zh'):
     const at = value.indexOf(marker)
     if (at !== -1) value = value.slice(0, at)
   }
+  const loose = SPEAKER_TURN_BREAK.exec(value)
+  if (loose !== null && loose.index > 0) value = value.slice(0, loose.index)
   const trimmed = value.replace(/^[\s\uFEFF]+/u, '').replace(/[\s\uFEFF]+$/u, '')
   if (trimmed === '') return null
-  for (const role of ['assistant', 'user'] as const) {
-    if (trimmed.startsWith(speakerText(language, role))) return null
-  }
+  if (SPEAKER_START.test(trimmed)) return null
   return trimmed
 }
 

@@ -173,6 +173,18 @@ describe('chat-suggest 纯逻辑', () => {
     it('纯空白 应该 丢弃', () => {
       assert.equal(cleanSuggestion('  \n '), null)
     })
+
+    it('小写全角冒号变体 assistant：开头 应该 丢弃', () => {
+      assert.equal(cleanSuggestion('assistant：好的，我看了下', 'zh'), null)
+    })
+
+    it('小写半角冒号变体 user: 开头 应该 丢弃', () => {
+      assert.equal(cleanSuggestion('user: 我先说两句', 'zh'), null)
+    })
+
+    it('中部小写变体 应该 在标记处截断', () => {
+      assert.equal(cleanSuggestion('好的，我们继续\nassistant：我来补充', 'zh'), '好的，我们继续')
+    })
   })
 
   describe('truncateFirstSentence', () => {
