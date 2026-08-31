@@ -227,8 +227,10 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
         let totalCompletionTokens = 0
         let firstTemperature = settings.temperature
         let firstError: ChatFimError | undefined
+        let hadFulfilled = false
         for (const result of results) {
           if (result.status === 'fulfilled') {
+            hadFulfilled = true
             if (suggestions.length === 0) firstTemperature = result.value.temperature
             totalPromptTokens += result.value.usage.promptTokens
             totalCompletionTokens += result.value.usage.completionTokens
@@ -249,7 +251,9 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
             ? reason as ChatFimError
             : { code: 'UPSTREAM_ERROR', message: reason instanceof Error ? reason.message : String(reason) }
         }
-        if (suggestions.length === 0) {
+        // 候选全被护栏/空文本过滤：上游正常时静默返回空建议（客户端不显示错误、不打扰用户）；
+        // 只有上游请求全部失败才报 502。
+        if (suggestions.length === 0 && !hadFulfilled) {
           sendError(res, 502, firstError ?? { code: 'UPSTREAM_ERROR', message: 'DeepSeek FIM 上游没有返回可用候选' })
           return
         }
