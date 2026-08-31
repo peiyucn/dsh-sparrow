@@ -8,10 +8,10 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
-  buildFimPrompt, extractSuggestions, extractUsage, fimStopSequences, isAbortTimeout, isDeepseekMainRoute,
-  mainRouteFromSession, MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, resolveFimModel,
-  stripSpeakerPrefix, summarizeUpstreamBody, upstreamStatusToError, type ChatFimConfig, type ChatFimError,
-  type CompleteRequest,
+  buildFimPrompt, extractSuggestions, extractUsage, fimStopSequences, hasDegenerateRepeat, isAbortTimeout,
+  isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession, MAX_UPSTREAM_BODY_BYTES, normalizeConfig,
+  parseCompleteBody, recentHistoryTurns, resolveFimModel, stripSpeakerPrefix, summarizeUpstreamBody,
+  upstreamStatusToError, type ChatFimConfig, type ChatFimError, type CompleteRequest,
 } from './chat-fim.js'
 
 export type { CompleteRequest } from './chat-fim.js'
@@ -178,7 +178,10 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
       }
 
       const language = parsed.locale === 'en' ? 'en' : 'zh'
-      const prompt = buildFimPrompt(session.deriveMessages() as readonly unknown[], parsed.prompt, language)
+      const history = session.deriveMessages() as readonly unknown[]
+      const prompt = buildFimPrompt(history, parsed.prompt, language)
+      // 回声判定的历史文本集（与 prompt 同一窗口）：模型复读/转述历史时丢弃候选。
+      const historyEchoTexts = recentHistoryTurns(history).map(turn => turn.text)
       const stop = fimStopSequences(language)
       // 补全模型三档解析：pro / flash / auto（跟随官方主模型，vision/未知回退配置默认）。
       const fimModel = resolveFimModel(parsed.fimModelMode, main, settings.model)
@@ -233,6 +236,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
               // 剥离开头泄漏的说话人标记（「助手：…」），剥空或重复的候选丢弃。
               const clean = stripSpeakerPrefix(suggestion, language)
               if (clean === '' || seen.has(clean)) continue
+              // 两道护栏：同一短语循环复读 / 复述历史原句（实测见 chat-fim.ts 注释）→ 丢弃。
+              if (hasDegenerateRepeat(clean) || isHistoryEcho(clean, historyEchoTexts)) continue
               seen.add(clean)
               suggestions.push(clean)
             }

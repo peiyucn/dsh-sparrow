@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, fimStopSequences, formatTokenCount,
-  isDeepseekMainRoute, mainRouteFromSession, normalizeConfig, normalizeFimModelMode, normalizeFimSensitivity,
-  parseCompleteBody, resolveFimModel, shouldTriggerFim, stripSpeakerPrefix, summarizeUpstreamBody,
-  upstreamStatusToError, validateCompletePayload,
+  hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession, normalizeConfig,
+  normalizeFimModelMode, normalizeFimSensitivity, parseCompleteBody, recentHistoryTurns, resolveFimModel,
+  shouldTriggerFim, stripSpeakerPrefix, summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
 } from '../lib/chat-fim.js'
 
 describe('chat-fim 纯逻辑', () => {
@@ -406,6 +406,64 @@ describe('chat-fim 纯逻辑', () => {
 
     it('逗号结尾 应该 触发', () => {
       assert.deepEqual(shouldTriggerFim('我们先看看数据，再'), { ok: true })
+    })
+  })
+
+  describe('hasDegenerateRepeat', () => {
+    it('同句循环复读 应该 判定退化', () => {
+      assert.equal(hasDegenerateRepeat('请用中文回复。'.repeat(48)), true)
+    })
+
+    it('复读被截断（尾部不完整短语）应该 判定退化', () => {
+      assert.equal(hasDegenerateRepeat('请用中文回复。'.repeat(10) + '请用中文回'), true)
+    })
+
+    it('正常单句 应该 不算退化', () => {
+      assert.equal(hasDegenerateRepeat('请用中文回复。'), false)
+    })
+
+    it('自然短复读（好的好的好的）应该 不算退化', () => {
+      assert.equal(hasDegenerateRepeat('好的好的好的'), false)
+    })
+
+    it('空串 应该 不算退化', () => {
+      assert.equal(hasDegenerateRepeat(''), false)
+    })
+  })
+
+  describe('isHistoryEcho', () => {
+    it('建议开头复述历史消息 应该 判定回声', () => {
+      assert.equal(isHistoryEcho('你看，联想出来的文字内容。我输入的是ple', ['我是说，你看联想出来的文字内容。']), true)
+    })
+
+    it('建议是历史消息的截断前缀 应该 判定回声', () => {
+      assert.equal(isHistoryEcho('这是一段很长的历史消息开', ['这是一段很长的历史消息开头，后面还有内容']), true)
+    })
+
+    it('建议与历史无重叠 应该 不算回声', () => {
+      assert.equal(isHistoryEcho('请继续实现这个功能', ['今天天气不错']), false)
+    })
+
+    it('短建议（不足 10 字）应该 不算回声', () => {
+      assert.equal(isHistoryEcho('好的', ['好的，我们开始']), false)
+    })
+
+    it('历史为空 应该 不算回声', () => {
+      assert.equal(isHistoryEcho('你看，联想出来的文字内容', []), false)
+    })
+  })
+
+  describe('recentHistoryTurns', () => {
+    it('空历史 应该 返回空数组', () => {
+      assert.deepEqual(recentHistoryTurns([]), [])
+    })
+
+    it('非 user/assistant 消息 应该 跳过', () => {
+      const turns = recentHistoryTurns([
+        { role: 'system', content: [{ type: 'text', text: '你是助手' }] },
+        { role: 'user', content: [{ type: 'text', text: '你好' }] },
+      ])
+      assert.deepEqual(turns, [{ role: 'user', text: '你好' }])
     })
   })
 })

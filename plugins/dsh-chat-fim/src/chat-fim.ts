@@ -204,6 +204,36 @@ function textFromHistoryMessage(message: unknown): string {
   return parts.join('\n').trim()
 }
 
+function messageRole(message: unknown): 'user' | 'assistant' {
+  const role = (message as { role?: unknown }).role
+  return role === 'assistant' ? 'assistant' : 'user'
+}
+
+/** 近期历史里的一条说话人文本。 */
+export interface HistoryTurn {
+  readonly role: 'user' | 'assistant'
+  readonly text: string
+}
+
+/** 取最近对话历史文本（倒序遍历、非空才计数、按条数与字符数裁剪；与 buildFimPrompt 同一窗口规则）。 */
+export function recentHistoryTurns(
+  history: readonly unknown[],
+  maxMessages = MAX_HISTORY_MESSAGES,
+  maxChars = MAX_HISTORY_CHARS,
+): HistoryTurn[] {
+  const recent: HistoryTurn[] = []
+  let chars = 0
+  for (const message of [...history].reverse()) {
+    if (recent.length >= maxMessages) break
+    const text = textFromHistoryMessage(message)
+    if (text === '') continue
+    if (chars + text.length > maxChars && recent.length > 0) break
+    recent.unshift({ role: messageRole(message), text })
+    chars += text.length
+  }
+  return recent
+}
+
 /**
  * 构造 FIM 补全 prompt：最近对话历史转成说话人文本（zh「用户：/助手：」、en「User:/Assistant:」），
  * 草稿作为最后一个用户说话人的开头。FIM 直接续写文本本身，没有角色语义，补全天然站在
@@ -216,24 +246,55 @@ export function buildFimPrompt(
   maxMessages = MAX_HISTORY_MESSAGES,
   maxChars = MAX_HISTORY_CHARS,
 ): string {
-  const recent: Array<{ role: 'user' | 'assistant'; text: string }> = []
-  let chars = 0
-  for (const message of [...history].reverse()) {
-    if (recent.length >= maxMessages) break
-    const text = textFromHistoryMessage(message)
-    if (text === '') continue
-    if (chars + text.length > maxChars && recent.length > 0) break
-    recent.unshift({ role: messageRole(message), text })
-    chars += text.length
-  }
-
-  const transcript = recent.map(entry => `${speakerText(language, entry.role)}${entry.text}`).join('\n')
+  const transcript = recentHistoryTurns(history, maxMessages, maxChars)
+    .map(entry => `${speakerText(language, entry.role)}${entry.text}`)
+    .join('\n')
   return `${transcript === '' ? '' : `${transcript}\n\n`}${speakerText(language, 'user')}${draft}`
 }
 
-function messageRole(message: unknown): 'user' | 'assistant' {
-  const role = (message as { role?: unknown }).role
-  return role === 'assistant' ? 'assistant' : 'user'
+/**
+ * 检测退化复读：整段建议是同一短语（1..64 字）反复复制——≥ minRepeats 次完整重复、
+ * 覆盖 ≥ minCoverage 的文本（尾部允许是不完整短语，上游常被 max_tokens 截断）。
+ * 命中说明模型陷入循环复读（实测：历史含指令时输入 Please 复读「请用中文回复。」×N），建议不可用。
+ */
+export function hasDegenerateRepeat(text: string, minRepeats = 4, minCoverage = 0.85): boolean {
+  const value = text.trim()
+  if (value.length < minRepeats) return false
+  const maxUnit = Math.min(64, Math.floor(value.length / minRepeats))
+  for (let unitLen = 1; unitLen <= maxUnit; unitLen++) {
+    const unit = value.slice(0, unitLen)
+    let matched = 0
+    let repeats = 0
+    while (matched < value.length && repeats < 1000) {
+      if (value.slice(matched, matched + unitLen) !== unit) break
+      matched += unitLen
+      repeats++
+    }
+    if (repeats < minRepeats) continue
+    const rest = value.slice(matched)
+    if (rest !== '' && !unit.startsWith(rest)) continue
+    if (matched >= value.length * minCoverage) return true
+  }
+  return false
+}
+
+/** 归一化：去掉空白与标点符号，只留文字（回声判定用）。 */
+function normalizeForEcho(text: string): string {
+  return text.replace(/[\s\p{P}\p{S}]+/gu, '')
+}
+
+/**
+ * 检测历史回声：建议开头（归一化后）的前 minOverlap 字连续出现在近期历史消息里，
+ * 说明模型在复读/转述历史而非续写草稿（实测：输入 ple 复述聊天区历史原句），丢弃该候选。
+ */
+export function isHistoryEcho(suggestion: string, historyTexts: readonly string[], minOverlap = 10): boolean {
+  const text = normalizeForEcho(suggestion)
+  if (text.length < minOverlap) return false
+  const prefix = text.slice(0, minOverlap)
+  for (const entry of historyTexts) {
+    if (normalizeForEcho(entry).includes(prefix)) return true
+  }
+  return false
 }
 
 /** 把上游 HTTP 状态映射为插件错误码。 */
