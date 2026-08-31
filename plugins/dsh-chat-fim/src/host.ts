@@ -8,9 +8,9 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
-  buildFimPrompt, extractSuggestions, extractUsage, fimStopSequences, hasDegenerateRepeat, isAbortTimeout,
-  isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession, MAX_UPSTREAM_BODY_BYTES, normalizeConfig,
-  parseCompleteBody, recentHistoryTurns, resolveFimModel, stripSpeakerPrefix, summarizeUpstreamBody,
+  buildFimPrompt, cleanSuggestion, extractSuggestions, extractUsage, fimStopSequences, hasDegenerateRepeat,
+  isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession, MAX_UPSTREAM_BODY_BYTES,
+  normalizeConfig, parseCompleteBody, recentHistoryTurns, resolveFimModel, summarizeUpstreamBody,
   upstreamStatusToError, type ChatFimConfig, type ChatFimError, type CompleteRequest,
 } from './chat-fim.js'
 
@@ -239,9 +239,9 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
               totalPromptTokens += result.value.usage.promptTokens
               totalCompletionTokens += result.value.usage.completionTokens
               for (const suggestion of result.value.suggestions) {
-                // 剥离开头泄漏的说话人标记（「助手：…」），剥空或重复的候选丢弃。
-                const clean = stripSpeakerPrefix(suggestion, language)
-                if (clean === '' || seen.has(clean)) continue
+                // 按说话人标记截断 + 角色切换丢弃（API stop 实测不可靠，见 chat-fim.ts 注释）。
+                const clean = cleanSuggestion(suggestion, language)
+                if (clean === null || seen.has(clean)) continue
                 // 两道护栏：同一短语循环复读 / 复述用户历史消息（实测见 chat-fim.ts 注释）→ 丢弃。
                 if (hasDegenerateRepeat(clean) || isHistoryEcho(clean, historyEchoTexts)) continue
                 seen.add(clean)

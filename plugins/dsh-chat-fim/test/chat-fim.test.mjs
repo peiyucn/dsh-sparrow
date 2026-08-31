@@ -4,7 +4,7 @@ import {
   buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, fimStopSequences, formatTokenCount,
   hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession, normalizeConfig,
   normalizeFimModelMode, normalizeFimSensitivity, parseCompleteBody, recentHistoryTurns, resolveFimModel,
-  shouldTriggerFim, stripSpeakerPrefix, summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
+  shouldTriggerFim, cleanSuggestion, summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
 } from '../lib/chat-fim.js'
 
 describe('chat-fim 纯逻辑', () => {
@@ -128,37 +128,41 @@ describe('chat-fim 纯逻辑', () => {
     })
   })
 
-  describe('stripSpeakerPrefix', () => {
-    it('zh 助手：开头 应该 剥掉标记', () => {
-      assert.equal(stripSpeakerPrefix('助手：我来测试一下', 'zh'), '我来测试一下')
+  describe('cleanSuggestion', () => {
+    it('正常续写 应该 原样返回', () => {
+      assert.equal(cleanSuggestion('可行性不高'), '可行性不高')
     })
 
-    it('zh 换行 + 助手：开头 应该 剥掉换行与标记', () => {
-      assert.equal(stripSpeakerPrefix('\n助手：我来测试一下', 'zh'), '我来测试一下')
+    it('续写带出助手回合 应该 在说话人标记处截断', () => {
+      assert.equal(cleanSuggestion('可行性不高\n助手：嗯，我理解你的顾虑。'), '可行性不高')
     })
 
-    it('zh 用户：开头 应该 剥掉标记', () => {
-      assert.equal(stripSpeakerPrefix('用户：继续写', 'zh'), '继续写')
+    it('续写带出新用户回合 应该 在说话人标记处截断', () => {
+      assert.equal(cleanSuggestion(' tell me about the history\n用户：换一个话题'), 'tell me about the history')
     })
 
-    it('en Assistant: 开头 应该 剥掉标记与空格', () => {
-      assert.equal(stripSpeakerPrefix('Assistant: keep going', 'en'), 'keep going')
+    it('以助手标记开头 应该 丢弃（角色切换）', () => {
+      assert.equal(cleanSuggestion('助手：看起来你的消息好像没发完整呢'), null)
     })
 
-    it('en User: 开头 应该 剥掉标记', () => {
-      assert.equal(stripSpeakerPrefix('User: draft', 'en'), 'draft')
+    it('前置换行加助手标记 应该 丢弃', () => {
+      assert.equal(cleanSuggestion('\n助手：好的，请讲。\n\n用户：请帮我写一首诗'), null)
     })
 
-    it('无标记开头 应该 原样返回', () => {
-      assert.equal(stripSpeakerPrefix('我觉得可以', 'zh'), '我觉得可以')
+    it('以用户标记开头 应该 丢弃', () => {
+      assert.equal(cleanSuggestion('用户：我先说两句'), null)
     })
 
-    it('仅标记 应该 返回空串', () => {
-      assert.equal(stripSpeakerPrefix('助手：', 'zh'), '')
+    it('en 以 Assistant 开头 应该 丢弃', () => {
+      assert.equal(cleanSuggestion('Assistant: sure thing', 'en'), null)
     })
 
-    it('标记在文本中间 应该 保留', () => {
-      assert.equal(stripSpeakerPrefix('好的助手：可以', 'zh'), '好的助手：可以')
+    it('en 续写带出 Assistant 回合 应该 截断', () => {
+      assert.equal(cleanSuggestion(' tell me more\nAssistant: of course!', 'en'), 'tell me more')
+    })
+
+    it('纯空白 应该 丢弃', () => {
+      assert.equal(cleanSuggestion('  \n '), null)
     })
   })
 

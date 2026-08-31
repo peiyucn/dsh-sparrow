@@ -73,19 +73,25 @@ export function fimStopSequences(language: FimLanguage): readonly string[] {
 }
 
 /**
- * 剥离补全开头泄漏的说话人标记（「助手：/用户：」、「Assistant: /User: 」）与前置换行/空白。
- * 上游 FIM 偶发不续写用户文本，而是复读历史转文本格式里的下一位说话人标记开头
- * （2026-08-30 实测：补全输出「助手：…」，续写变成助手口吻）。剥后为空串返回空串，
- * 由调用方丢弃该候选。标记出现在文本中间则不动（合法用户内容）。
+ * 清洗一条上游补全（2026-08-30 实测驱动）：
+ * 1. 按说话人标记截断——API 的 stop 序列不可靠（同构造有时生效、有时带出「\n助手：…」整段回复）；
+ * 2. 去前后空白；
+ * 3. 以说话人标记开头视为「角色切换」——模型去回复而不是续写草稿，返回 null 丢弃
+ *    （实测：新会话草稿 plea → 输出「助手：看起来你的消息好像没发完整…」）。
+ * 正常续写原样返回；无法使用返回 null，由调用方丢弃该候选。
  */
-export function stripSpeakerPrefix(text: string, language: FimLanguage = 'zh'): string {
-  const withoutLeading = text.replace(/^[\s\uFEFF]+/u, '')
-  for (const role of ['assistant', 'user'] as const) {
-    const marker = speakerText(language, role)
-    if (!withoutLeading.startsWith(marker)) continue
-    return withoutLeading.slice(marker.length).replace(/^[\s\uFEFF]+/u, '')
+export function cleanSuggestion(text: string, language: FimLanguage = 'zh'): string | null {
+  let value = text
+  for (const marker of fimStopSequences(language)) {
+    const at = value.indexOf(marker)
+    if (at !== -1) value = value.slice(0, at)
   }
-  return withoutLeading
+  const trimmed = value.replace(/^[\s\uFEFF]+/u, '').replace(/[\s\uFEFF]+$/u, '')
+  if (trimmed === '') return null
+  for (const role of ['assistant', 'user'] as const) {
+    if (trimmed.startsWith(speakerText(language, role))) return null
+  }
+  return trimmed
 }
 
 /** 主模型路由：会话事件里最近一条 request/header 的 provider/model。 */
