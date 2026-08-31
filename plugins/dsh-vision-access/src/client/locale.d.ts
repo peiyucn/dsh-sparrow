@@ -2,7 +2,6 @@
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     'vision-access':
-      | 'icon.label'
       | 'popover.title'
       | 'popover.body'
   }

@@ -13,12 +13,10 @@ export const inject = ['slots', 'locale']
 /** 本插件的 locale 字典（zh/en）。 */
 const LOCALE_DICTS = {
   zh: {
-    'icon.label': '视觉',
     'popover.title': '可跨模型读图',
     'popover.body': '直接发送图片即可：dsh-vision-access 会自动把图片交给 {model} 处理，主模型保持对话大脑。',
   },
   en: {
-    'icon.label': 'Vision',
     'popover.title': 'Cross-model image reading',
     'popover.body': 'Just send an image: dsh-vision-access sends it to {model} automatically, while the main model stays the brain of the conversation.',
   },

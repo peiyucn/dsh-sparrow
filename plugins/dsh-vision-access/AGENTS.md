@@ -4,7 +4,7 @@
 
 ## 项目概况
 
-DSH Web 插件：纯文本主模型会话的图片视觉通道 —— 主模型调用 `vision_read` 工具，host 直连官方视觉模型（默认 deepseek-v4-flash-vision-exp）读图并回传结构化文字报告，主模型保持对话大脑。host + 轻量 client half（模型选择器旁的眼睛图标 +「视觉」标签，非视觉模型才显示，点击弹说明弹窗；无持久状态）。
+DSH Web 插件：纯文本主模型会话的图片视觉通道 —— 主模型调用 `vision_read` 工具，host 直连官方视觉模型（默认 deepseek-v4-flash-vision-exp）读图并回传结构化文字报告，主模型保持对话大脑。host + 轻量 client half（模型选择器旁的眼睛图标，非视觉模型才显示，点击弹说明弹窗；无持久状态）。
 
 * 2026-08-30 起不再走子代理：实测 subagents 单次读图 46.3s，直连 `ctx.llm` 2.2s。
 * 工具按 agent 条件隐藏：主模型非 DeepSeek 系列、或主模型本身原生看图时，该 agent 看不到 `vision_read`（像没有这个工具）。

@@ -37,9 +37,10 @@ export function ensureVisionStyles(): HTMLStyleElement {
 .dsh-vision-status {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  width: 28px;
   height: 28px;
-  padding: 0 8px;
+  padding: 0;
   border: none;
   border-radius: 24px;
   background: transparent;
@@ -51,9 +52,6 @@ export function ensureVisionStyles(): HTMLStyleElement {
 }
 .dsh-vision-status:hover {
   background: var(--dsw-alias-interactive-bg-hover);
-}
-.dsh-vision-status-label {
-  color: var(--dsw-alias-label-secondary);
 }
 .dsh-vision-popover {
   position: fixed;
@@ -150,6 +148,7 @@ export function VisionStatusIcon({ session, queryStatus, t }: VisionStatusProps)
         className="dsh-vision-status"
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-label={t('popover.title')}
         onClick={(event) => {
           event.stopPropagation()
           if (open) setOpen(false)
@@ -160,7 +159,6 @@ export function VisionStatusIcon({ session, queryStatus, t }: VisionStatusProps)
         }}
       >
         {EYE_GLYPH}
-        <span className="dsh-vision-status-label">{t('icon.label')}</span>
       </button>
       {open && point !== null
         ? createPortal(
