@@ -1,4 +1,4 @@
-/** dsh-file-session 纯逻辑：分页参数、行格式化、上游错误分类。 @module dsh-file-session/files */
+/** dsh-file-manage 纯逻辑：分页参数、行格式化、上游错误分类。 @module dsh-file-manage/files */
 
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { DeepSeekFileObject } from '@deepseek-ai/dsh-llm-deepseek'

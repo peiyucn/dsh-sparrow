@@ -1,4 +1,4 @@
-# dsh-file-session
+# dsh-file-manage
 
 简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
@@ -9,12 +9,12 @@ DSH 贴图的大图会自动上传到 DeepSeek Files API（云端文件库），
 ## 安装
 
 ```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-file-session
+dsh plugin --profile web add @dsh-sparrow/dsh-file-manage
 ```
 
 适配 dsh ≥ 0.1.2-alpha.3（本机验证基线；更早版本未验证），并需要可用的 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
 
-> **不要**直接执行 `npm install @dsh-sparrow/dsh-file-session`：那只会把包下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用上面的 `dsh plugin` 命令安装，并在安装后重启 DSH。
+> **不要**直接执行 `npm install @dsh-sparrow/dsh-file-manage`：那只会把包下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用上面的 `dsh plugin` 命令安装，并在安装后重启 DSH。
 
 ## 使用
 

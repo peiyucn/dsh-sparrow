@@ -1,4 +1,4 @@
-# 项目指令 — dsh-file-session（dsh-sparrow 合集成员）
+# 项目指令 — dsh-file-manage（dsh-sparrow 合集成员）
 
 合集级通用规则见根目录 AGENTS.md；本文件只记本插件专属约束与 seam 特例。
 
@@ -32,7 +32,7 @@ DSH Web 插件：DeepSeek Files API 云端文件管理面板——侧边栏 foot
     src/host.ts        — host half 入口（连接解析 + prefix 路由 list / 单条删除）
     src/files.ts       — 纯逻辑（分页归一化 / 行格式化 / 错误分类）
     src/client/index.ts — client half 入口（locale 字典 + API 封装 + sidebar slot 注册）
-    src/client/FileSessionDock.tsx — 云端文件面板（列表 / 翻页 / 删除确认 / 复制）
+    src/client/FileManageDock.tsx — 云端文件面板（列表 / 翻页 / 删除确认 / 复制）
     test/files.test.mjs    — 纯逻辑单测
     test/structure.test.mjs — 结构测试（bundle 声明与组合行）
     cordis.patch.yml   — 组合补丁（npm 安装路径）

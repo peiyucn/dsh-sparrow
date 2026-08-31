@@ -1,7 +1,7 @@
-/** file-session locale 命名空间扩充：值为字典键的字符串联合。 */
+/** file-manage locale 命名空间扩充：值为字典键的字符串联合。 */
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    'file-session':
+    'file-manage':
       | 'button.label'
       | 'dialog.title'
       | 'dialog.close'

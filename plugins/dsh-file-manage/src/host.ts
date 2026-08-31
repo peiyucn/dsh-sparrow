@@ -1,4 +1,4 @@
-/** dsh-file-session host half：DeepSeek Files API 云端文件清单 REST 路由（复用官方 DeepSeekFilesClient）。 */
+/** dsh-file-manage host half：DeepSeek Files API 云端文件清单 REST 路由（复用官方 DeepSeekFilesClient）。 */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
@@ -9,20 +9,20 @@ import type {} from '@deepseek-ai/dsh-settings'
 import { DeepSeekFileId, DeepSeekFilesClient, MAX_STORED_FILE_BYTES, MAX_STORED_FILE_COUNT } from '@deepseek-ai/dsh-llm-deepseek'
 import { classifyUpstreamError, COUNT_PAGE_LIMIT, COUNT_PAGE_TIMEOUT_MS, decodeFileIdParam, formatBytes, MAX_COUNT_PAGES, normalizePageQuery, toFileRow } from './files.js'
 
-export const name = 'dsh-file-session'
+export const name = 'dsh-file-manage'
 export const inject = ['webServer', 'credentials', 'settings']
 
-const PREFIX = '/api/file-session'
+const PREFIX = '/api/file-manage'
 /** 官方 adapter 同款回退：设置节缺省时依次回退环境变量与公共端点。 */
 const DEFAULT_BASE_URL = 'https://api.deepseek.com'
 const DEFAULT_API_KEY_ENV = 'DEEPSEEK_API_KEY'
 const LLM_DEEPSEEK_NS = 'llm-deepseek'
 
 /** 插件自身错误（面板可读的 code / message + HTTP 状态）。 */
-class FileSessionError extends Error {
+class FileManageError extends Error {
   constructor(readonly code: string, message: string, readonly status: number) {
     super(message)
-    this.name = 'FileSessionError'
+    this.name = 'FileManageError'
   }
 }
 
@@ -53,16 +53,16 @@ async function resolveConnection(ctx: Context): Promise<Connection> {
   try {
     credential = await ctx.credentials.resolve(credentialRef(apiKeyEnv))
   } catch {
-    throw new FileSessionError('INVALID_CONFIG', `apiKeyEnv 配置不是合法的凭据引用：${apiKeyEnv}`, 500)
+    throw new FileManageError('INVALID_CONFIG', `apiKeyEnv 配置不是合法的凭据引用：${apiKeyEnv}`, 500)
   }
   if (credential === undefined) {
-    throw new FileSessionError('MISSING_CREDENTIAL', `缺少凭据 ${apiKeyEnv}：请在 dsh 中配置 DeepSeek API key 后重试`, 401)
+    throw new FileManageError('MISSING_CREDENTIAL', `缺少凭据 ${apiKeyEnv}：请在 dsh 中配置 DeepSeek API key 后重试`, 401)
   }
   return { baseURL, apiKey: credential.value }
 }
 
-function isFileSessionError(error: unknown): error is FileSessionError {
-  return error instanceof FileSessionError
+function isFileManageError(error: unknown): error is FileManageError {
+  return error instanceof FileManageError
 }
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
@@ -74,7 +74,7 @@ function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   res.end(body)
 }
 
-function sendError(res: ServerResponse, error: FileSessionError): void {
+function sendError(res: ServerResponse, error: FileManageError): void {
   sendJson(res, error.status, { error: { code: error.code, message: error.message } })
 }
 
@@ -147,7 +147,7 @@ export function apply(ctx: Context): void {
         if (req.method === 'DELETE' && pathname === `${PREFIX}/files`) {
           const id = decodeFileIdParam(url.searchParams.get('id') ?? '')
           if (id === '') {
-            sendError(res, new FileSessionError('BAD_REQUEST', '缺少文件 id', 400))
+            sendError(res, new FileManageError('BAD_REQUEST', '缺少文件 id', 400))
             return
           }
           const connection = await resolveConnection(ctx)
@@ -156,9 +156,9 @@ export function apply(ctx: Context): void {
           sendJson(res, 200, { deleted: true, id })
           return
         }
-        sendError(res, new FileSessionError('NOT_FOUND', '未知路由', 404))
+        sendError(res, new FileManageError('NOT_FOUND', '未知路由', 404))
       } catch (error: unknown) {
-        if (isFileSessionError(error)) sendError(res, error)
+        if (isFileManageError(error)) sendError(res, error)
         else sendUpstreamError(res, error)
       }
     },

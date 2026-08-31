@@ -10,16 +10,16 @@ import type { FileCountSummary } from './api.js'
 import { formatUsagePercent, storageUsageRatio } from './quota.js'
 import { styles } from './styles.js'
 
-export interface FileSessionDockInjected {
+export interface FileManageDockInjected {
   listFiles: (after?: string) => Promise<{ rows: FileRow[]; hasMore: boolean; lastId?: string }>
   deleteFile: (id: string) => Promise<void>
   countFiles: () => Promise<FileCountSummary>
 }
 
-export type FileSessionDockProps = PropsRuntime<'sidebar.footer.action'> & FileSessionDockInjected & { t: TranslateNS<'file-session'> }
+export type FileManageDockProps = PropsRuntime<'sidebar.footer.action'> & FileManageDockInjected & { t: TranslateNS<'file-manage'> }
 
 /** 面板状态：首屏 loading / 错误横幅 / 列表 + 加载更多 / 删除确认框（web 确认框替代原生 confirm）。 */
-export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: FileSessionDockProps) {
+export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: FileManageDockProps) {
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState<readonly FileRow[]>([])
   const [hasMore, setHasMore] = useState(false)
@@ -134,63 +134,63 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
     <>
       <button
         type="button"
-        className={wide ? 'dsh-file-session-trigger' : 'dsh-file-session-trigger dsh-file-session-trigger-rail'}
+        className={wide ? 'dsh-file-manage-trigger' : 'dsh-file-manage-trigger dsh-file-manage-trigger-rail'}
         title={t('dialog.title')}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => { setOpen(value => !value) }}
       >
-        <IconFolderOpenOutline16 className="dsh-file-session-trigger-icon" size={wide ? 16 : 18} />
-        {wide ? <span className="dsh-file-session-trigger-label">{t('button.label')}</span> : null}
+        <IconFolderOpenOutline16 className="dsh-file-manage-trigger-icon" size={wide ? 16 : 18} />
+        {wide ? <span className="dsh-file-manage-trigger-label">{t('button.label')}</span> : null}
       </button>
       {open ? (
         <div style={styles.overlay} role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setOpen(false)
         }}>
           <div style={styles.panel} role="dialog" aria-modal="true" aria-label={t('dialog.title')}>
-            <div className="dsh-file-session-panel-header">
-              <h2 className="dsh-file-session-panel-title" style={{ margin: 0 }}>{t('dialog.title')}</h2>
-              <button ref={closeButtonRef} type="button" className="dsh-file-session-close" aria-label={t('dialog.close')} onClick={() => { setOpen(false) }}>
+            <div className="dsh-file-manage-panel-header">
+              <h2 className="dsh-file-manage-panel-title" style={{ margin: 0 }}>{t('dialog.title')}</h2>
+              <button ref={closeButtonRef} type="button" className="dsh-file-manage-close" aria-label={t('dialog.close')} onClick={() => { setOpen(false) }}>
                 <IconCloseOutline16 size={14} />
               </button>
             </div>
             {summary !== null ? (
-              <div className="dsh-file-session-summary">
-                <div className="dsh-file-session-quota-track">
-                  <span className="dsh-file-session-quota-text">
+              <div className="dsh-file-manage-summary">
+                <div className="dsh-file-manage-quota-track">
+                  <span className="dsh-file-manage-quota-text">
                     {`${summary.totalBytesLabel} / ${summary.quotaBytesLabel} · ${t('quota.used', { percent: formatUsagePercent(quotaRatio) })}`}
                   </span>
                   {/* 零用量不渲染填充（min-width 银条只给「有使用」的状态）。 */}
                   {quotaRatio > 0
-                    ? <div className="dsh-file-session-quota-fill" style={{ width: `${Math.round(quotaRatio * 100)}%` }} />
+                    ? <div className="dsh-file-manage-quota-fill" style={{ width: `${Math.round(quotaRatio * 100)}%` }} />
                     : null}
                 </div>
                 {/* 列表翻页联动：未加载完时显示「已加载 X / 共 N」，加载完只显示总数。 */}
-                <p className="dsh-file-session-count">
+                <p className="dsh-file-manage-count">
                   {rows.length < summary.count
                     ? t('summary.loaded', { loaded: rows.length, count: summary.count })
                     : t('summary.count', { count: summary.count })}
                 </p>
               </div>
             ) : null}
-            <div style={{ ...styles.body, padding: summary !== null ? '0 24px 24px' : '12px 24px 24px' }} className="dsh-file-session-body">
+            <div style={{ ...styles.body, padding: summary !== null ? '0 24px 24px' : '12px 24px 24px' }} className="dsh-file-manage-body">
               {error !== null ? (
                 <p role="alert" style={{ ...styles.secondarySmall, margin: '0 0 12px', color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>
                   {error}
                   {' '}
-                  <button type="button" className="dsh-file-session-btn" onClick={loadFirst}>{t('retry')}</button>
+                  <button type="button" className="dsh-file-manage-btn" onClick={loadFirst}>{t('retry')}</button>
                 </p>
               ) : null}
               {loading ? <p style={styles.secondarySmall}>{t('loading')}</p> : null}
               {!loading && error === null && rows.length === 0 ? <p style={styles.secondarySmall}>{t('empty')}</p> : null}
               {rows.length > 0 ? (
-                <div className="dsh-file-session-card">
+                <div className="dsh-file-manage-card">
                   {rows.map(row => (
                     <div key={row.id} style={styles.row}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                           <span style={styles.title} title={row.filename}>{row.filename}</span>
-                          {row.dshOwned ? <span className="dsh-file-session-badge">{t('dshBadge')}</span> : null}
+                          {row.dshOwned ? <span className="dsh-file-manage-badge">{t('dshBadge')}</span> : null}
                         </div>
                         <div style={styles.secondarySmall}>
                           {row.sizeLabel} · {row.createdAtLabel}
@@ -200,14 +200,14 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
                       <div style={styles.actions}>
                         <button
                           type="button"
-                          className="dsh-file-session-btn"
+                          className="dsh-file-manage-btn"
                           onClick={() => { void copyId(row) }}
                         >
                           {copied === row.id ? t('copied') : t('copy')}
                         </button>
                         <button
                           type="button"
-                          className="dsh-file-session-btn dsh-file-session-btn-danger"
+                          className="dsh-file-manage-btn dsh-file-manage-btn-danger"
                           onClick={() => { setConfirming(row) }}
                         >
                           {t('delete')}
@@ -222,7 +222,7 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
               <div style={styles.footerBar}>
                 <button
                   type="button"
-                  className="dsh-file-session-btn"
+                  className="dsh-file-manage-btn"
                   disabled={loadingMore}
                   onClick={() => { void loadMore() }}
                 >
@@ -234,11 +234,11 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
         </div>
       ) : null}
       {confirming !== null ? (
-        <div className="dsh-file-session-confirm-overlay" role="presentation" onMouseDown={(event) => {
+        <div className="dsh-file-manage-confirm-overlay" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget && !busyDelete) setConfirming(null)
         }}>
           <div
-            className="dsh-file-session-confirm-card"
+            className="dsh-file-manage-confirm-card"
             role="alertdialog"
             aria-modal="true"
             aria-label={t('delete')}
@@ -249,16 +249,16 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
               }
             }}
           >
-            <h3 className="dsh-file-session-confirm-title">{t('delete')}</h3>
-            <p className="dsh-file-session-confirm-desc">
+            <h3 className="dsh-file-manage-confirm-title">{t('delete')}</h3>
+            <p className="dsh-file-manage-confirm-desc">
               {confirming.dshOwned
                 ? t('confirm.deleteDsh', { name: confirming.filename })
                 : t('confirm.delete', { name: confirming.filename })}
             </p>
-            <div className="dsh-file-session-confirm-actions">
+            <div className="dsh-file-manage-confirm-actions">
               <button
                 type="button"
-                className="dsh-file-session-btn"
+                className="dsh-file-manage-btn"
                 disabled={busyDelete}
                 onClick={() => { setConfirming(null) }}
               >
@@ -266,7 +266,7 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
               </button>
               <button
                 type="button"
-                className="dsh-file-session-btn dsh-file-session-btn-danger"
+                className="dsh-file-manage-btn dsh-file-manage-btn-danger"
                 disabled={busyDelete}
                 onClick={() => { void submitDelete() }}
               >

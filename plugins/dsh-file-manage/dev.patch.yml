@@ -1,5 +1,5 @@
 # 本地开发补丁：dsh checkout 内 `dsh --patch <本文件>` 或 dev:web overlay 使用。
 # 注意：name 是本机绝对路径，不要提交到远端共享环境。
 - insert:
-    - id: dsh-file-session
-      name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-file-session/src/index.ts
+    - id: dsh-file-manage
+      name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-file-manage/src/index.ts

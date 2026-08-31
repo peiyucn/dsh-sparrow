@@ -1,12 +1,12 @@
 {
-  "name": "@dsh-sparrow/dsh-file-session",
+  "name": "@dsh-sparrow/dsh-file-manage",
   "description": "DSH web plugin: manage DeepSeek Files API cloud files from the sidebar — list with cursor pagination, delete, and copy file_id (reuses the official DeepSeekFilesClient, no extra credentials)",
   "version": "0.1.0-alpha.1",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/peiyucn/dsh-sparrow.git",
-    "directory": "plugins/dsh-file-session"
+    "directory": "plugins/dsh-file-manage"
   },
   "type": "module",
   "main": "lib/index.js",

@@ -1,4 +1,4 @@
-# 01 · 设计 — dsh-file-session
+# 01 · 设计 — dsh-file-manage
 
 > 本文是 seam 查证 + 架构提案；「待查证」条目未确认，开工前需补查。
 
@@ -13,8 +13,8 @@
 ## 架构（对齐 dsh-archive-session，完全无状态）
 
 * **host half**：REST 路由，内部用官方 `DeepSeekFilesClient`；插件零本地持久化（无 sidecar、无任务表）。
-  * `GET /api/file-session/list?after&limit&order` → 单页（转发官方 list，透传游标）
-  * `DELETE /api/file-session/:id` → 删除单条（转发官方 delete）
+  * `GET /api/file-manage/list?after&limit&order` → 单页（转发官方 list，透传游标）
+  * `DELETE /api/file-manage/:id` → 删除单条（转发官方 delete）
 * **client half**：`sidebar.footer.action` 入口按钮 + 弹窗面板（列表 / 翻页 / 删除 / 复制 file_id），样式注入；状态一致、可打断。
 * **纯逻辑抽 `src/files.ts`**：分页参数归一化、文件对象格式化（大小人读 / 时间显示 / 过期判定）、`dsh-` 判定、确认强度判定——全部可单测。
 

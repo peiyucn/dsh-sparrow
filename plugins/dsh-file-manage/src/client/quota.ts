@@ -1,4 +1,4 @@
-/** dsh-file-session 客户端纯逻辑：配额进度条计算（不 import Node 模块）。 @module dsh-file-session/client/quota */
+/** dsh-file-manage 客户端纯逻辑：配额进度条计算（不 import Node 模块）。 @module dsh-file-manage/client/quota */
 
 /** 存储用量比例：钳到 [0, 1]；used/quota 非正时返回 0（不除零）。 */
 export function storageUsageRatio(usedBytes: number, quotaBytes: number): number {

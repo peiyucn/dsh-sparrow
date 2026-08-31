@@ -6,7 +6,7 @@ import {
   normalizePageQuery, PAGE_SIZE, toFileRow,
 } from '../lib/files.js'
 
-describe('dsh-file-session 纯逻辑', () => {
+describe('dsh-file-manage 纯逻辑', () => {
   describe('normalizePageQuery', () => {
     it('空参数 应该 返回默认分页（20 条、最新在前）', () => {
       assert.deepEqual(normalizePageQuery({}), { limit: PAGE_SIZE, order: 'desc' })

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { formatUsagePercent, storageUsageRatio } from '../lib/client/quota.js'
 
-describe('dsh-file-session 配额纯逻辑', () => {
+describe('dsh-file-manage 配额纯逻辑', () => {
   describe('storageUsageRatio', () => {
     it('正常用量 应该 返回 used/quota 比例', () => {
       assert.equal(storageUsageRatio(50, 100), 0.5)

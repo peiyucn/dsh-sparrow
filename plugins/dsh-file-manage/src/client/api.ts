@@ -1,4 +1,4 @@
-/** dsh-file-session 客户端请求封装：host 路由的 fetch 层（超时 + 错误提取）。 @module dsh-file-session/client/api */
+/** dsh-file-manage 客户端请求封装：host 路由的 fetch 层（超时 + 错误提取）。 @module dsh-file-manage/client/api */
 
 import type { FileRow } from '../files.js'
 
@@ -28,7 +28,7 @@ export async function listApi(after?: string): Promise<{ rows: FileRow[]; hasMor
   // limit 不传：host 归一化缺省回退 PAGE_SIZE（页大小只活在一处，避免两端漂移）。
   const params = new URLSearchParams()
   if (after !== undefined) params.set('after', after)
-  const response = await fetch(`/api/file-session/list?${params.toString()}`, {
+  const response = await fetch(`/api/file-manage/list?${params.toString()}`, {
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   const payload = await response.json() as ListEnvelope
@@ -43,7 +43,7 @@ export async function listApi(after?: string): Promise<{ rows: FileRow[]; hasMor
 }
 
 export async function countApi(): Promise<FileCountSummary> {
-  const response = await fetch('/api/file-session/count', { signal: AbortSignal.timeout(COUNT_TIMEOUT_MS) })
+  const response = await fetch('/api/file-manage/count', { signal: AbortSignal.timeout(COUNT_TIMEOUT_MS) })
   const payload = await response.json() as Partial<FileCountSummary> & { error?: { message?: string } }
   if (!response.ok) {
     throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
@@ -60,7 +60,7 @@ export async function countApi(): Promise<FileCountSummary> {
 
 export async function deleteApi(id: string): Promise<void> {
   const params = new URLSearchParams({ id })
-  const response = await fetch(`/api/file-session/files?${params.toString()}`, {
+  const response = await fetch(`/api/file-manage/files?${params.toString()}`, {
     method: 'DELETE',
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 
-describe('dsh-file-session 结构', () => {
+describe('dsh-file-manage 结构', () => {
   it('package.json 应该 声明 dsh.bundle 与 dsh.client（侧边栏入口依赖）', async () => {
     const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
     assert.equal(pkg.dsh.bundle.patch, './cordis.patch.yml')
@@ -38,7 +38,7 @@ describe('dsh-file-session 结构', () => {
   it('cordis.patch.yml 应该 按 bundle patch 结构插入 host 行', async () => {
     const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
     assert.match(patch, /- insert:/u)
-    assert.match(patch, /id: dsh-file-session/u)
-    assert.match(patch, /name: '@dsh-sparrow\/dsh-file-session'/u)
+    assert.match(patch, /id: dsh-file-manage/u)
+    assert.match(patch, /name: '@dsh-sparrow\/dsh-file-manage'/u)
   })
 })

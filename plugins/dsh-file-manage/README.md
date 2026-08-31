@@ -1,4 +1,4 @@
-# dsh-file-session
+# dsh-file-manage
 
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
@@ -9,12 +9,12 @@ Large images pasted into DSH are auto-uploaded to the DeepSeek Files API, but th
 ## Install
 
 ```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-file-session
+dsh plugin --profile web add @dsh-sparrow/dsh-file-manage
 ```
 
 Requires dsh ≥ 0.1.2-alpha.3 (verified baseline; earlier versions unverified) and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
 
-> Do **not** run `npm install @dsh-sparrow/dsh-file-session` directly: that only downloads the package into some `node_modules` and does not register it with the DSH web profile. Use the `dsh plugin` command above, then restart DSH.
+> Do **not** run `npm install @dsh-sparrow/dsh-file-manage` directly: that only downloads the package into some `node_modules` and does not register it with the DSH web profile. Use the `dsh plugin` command above, then restart DSH.
 
 ## Usage
 

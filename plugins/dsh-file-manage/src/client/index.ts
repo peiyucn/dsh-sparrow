@@ -1,14 +1,14 @@
 /**
- * dsh-file-session client half：sidebar footer 入口 + 云端文件弹窗。
- * 请求封装见 api.ts、样式见 styles.ts、视图见 FileSessionDock.tsx；客户端不直接碰任何文件或凭据。
+ * dsh-file-manage client half：sidebar footer 入口 + 云端文件弹窗。
+ * 请求封装见 api.ts、样式见 styles.ts、视图见 FileManageDock.tsx；客户端不直接碰任何文件或凭据。
  */
 
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { countApi, deleteApi, listApi } from './api.js'
-import { FileSessionDock } from './FileSessionDock.js'
-import { ensureFileSessionStyles } from './styles.js'
+import { FileManageDock } from './FileManageDock.js'
+import { ensureFileManageStyles } from './styles.js'
 
 export const inject = ['slots', 'locale']
 
@@ -67,24 +67,24 @@ const LOCALE_DICTS = {
  * @param ctx - 浏览器侧 Cordis 上下文。
  */
 export function apply(ctx: ClientContext): void {
-  ensureFileSessionStyles()
-  const disposeDictionaries = ctx.locale.register('file-session', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
-  ctx.effect(() => disposeDictionaries, 'dsh-file-session: locale dictionaries')
+  ensureFileManageStyles()
+  const disposeDictionaries = ctx.locale.register('file-manage', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
+  ctx.effect(() => disposeDictionaries, 'dsh-file-manage: locale dictionaries')
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action',
-    locale: 'file-session',
-    id: 'file-session',
+    locale: 'file-manage',
+    id: 'file-manage',
     order: 21,
     inject: () => ({
       listFiles: listApi,
       deleteFile: deleteApi,
       countFiles: countApi,
     }),
-  }, FileSessionDock))
+  }, FileManageDock))
 }
 
-export { FileSessionDock } from './FileSessionDock.js'
-export type { FileSessionDockInjected, FileSessionDockProps } from './FileSessionDock.js'
-export { ensureFileSessionStyles } from './styles.js'
+export { FileManageDock } from './FileManageDock.js'
+export type { FileManageDockInjected, FileManageDockProps } from './FileManageDock.js'
+export { ensureFileManageStyles } from './styles.js'
 export { countApi, deleteApi, listApi } from './api.js'
 export type { FileCountSummary } from './api.js'

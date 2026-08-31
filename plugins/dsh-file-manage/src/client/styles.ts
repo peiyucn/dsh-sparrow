@@ -1,12 +1,12 @@
-/** dsh-file-session 客户端样式层：注入样式表 + 面板内联样式（官方设计 token；按 data 属性去重）。 @module dsh-file-session/client/styles */
+/** dsh-file-manage 客户端样式层：注入样式表 + 面板内联样式（官方设计 token；按 data 属性去重）。 @module dsh-file-manage/client/styles */
 
 import type { CSSProperties } from 'react'
 
 /** 注入触发键 / 面板 / 确认框样式；HMR / 重载按 data 属性去重不叠加。 */
-export function ensureFileSessionStyles(): void {
-  if (document.querySelector('style[data-dsh-file-session]') !== null) return
+export function ensureFileManageStyles(): void {
+  if (document.querySelector('style[data-dsh-file-manage]') !== null) return
   const style = document.createElement('style')
-  style.dataset.dshFileSession = ''
+  style.dataset.dshFileManage = ''
   style.textContent = `/* 官方 .footerActions 是横向 flex 行，slot 包裹层为行内 display:contents：
  * 多插件各自的全宽按钮会并排挤到右缘外（只剩一条边）。这里把包裹层改回真实盒子纵排，
  * Archive / 云端文件两个按钮上下堆叠、各自占满一行（!important 压过行内 contents）。 */
@@ -16,7 +16,7 @@ export function ensureFileSessionStyles(): void {
   /* 包裹层是 .footerActions 行容器里的 flex item，需显式撑满，否则两个全宽按钮按内容宽度收缩。 */
   width: 100%;
 }
-.dsh-file-session-trigger {
+.dsh-file-manage-trigger {
   flex: none;
   display: flex;
   align-items: center;
@@ -36,10 +36,10 @@ export function ensureFileSessionStyles(): void {
   font-size: 14px;
   line-height: 22px;
 }
-.dsh-file-session-trigger:hover {
+.dsh-file-manage-trigger:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
-.dsh-file-session-trigger-rail {
+.dsh-file-manage-trigger-rail {
   width: 36px;
   height: 36px;
   margin: 8px 0 10px;
@@ -48,21 +48,21 @@ export function ensureFileSessionStyles(): void {
   padding: 0;
   border-radius: 50%;
 }
-.dsh-file-session-trigger-icon {
+.dsh-file-manage-trigger-icon {
   flex: none;
 }
-.dsh-file-session-trigger-label {
+.dsh-file-manage-trigger-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 /* 面板滚动区：官方 settings 同款——elevated surface 重绑 l2 滚动条 token（base 默认 l1，浮层上对比度不对）。 */
-.dsh-file-session-body {
+.dsh-file-manage-body {
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 /* 面板头：官方 settings 面板同款（54px 高、标题起点 24px）。 */
-.dsh-file-session-panel-header {
+.dsh-file-manage-panel-header {
   flex: none;
   display: flex;
   align-items: flex-start;
@@ -72,13 +72,13 @@ export function ensureFileSessionStyles(): void {
   padding: 20px 14px 8px 24px;
   box-sizing: border-box;
 }
-.dsh-file-session-panel-title {
+.dsh-file-manage-panel-title {
   font-size: 16px;
   font-weight: 500;
   line-height: 24px;
   color: var(--dsw-alias-label-primary);
 }
-.dsh-file-session-close {
+.dsh-file-manage-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -92,10 +92,10 @@ export function ensureFileSessionStyles(): void {
   cursor: pointer;
   color: var(--dsw-alias-label-primary);
 }
-.dsh-file-session-close:hover {
+.dsh-file-manage-close:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
-.dsh-file-session-badge {
+.dsh-file-manage-badge {
   flex: none;
   padding: 1px 6px;
   border: 1px solid var(--dsw-alias-border-l2, #e2e5ea);
@@ -104,7 +104,7 @@ export function ensureFileSessionStyles(): void {
   font-size: 11px;
   line-height: 16px;
 }
-.dsh-file-session-btn {
+.dsh-file-manage-btn {
   height: 28px;
   padding: 0 12px;
   border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
@@ -117,18 +117,18 @@ export function ensureFileSessionStyles(): void {
   white-space: nowrap;
   cursor: pointer;
 }
-.dsh-file-session-btn:hover:not(:disabled) {
+.dsh-file-manage-btn:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
 }
-.dsh-file-session-btn:disabled {
+.dsh-file-manage-btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
-.dsh-file-session-btn-danger {
+.dsh-file-manage-btn-danger {
   color: var(--dsw-alias-state-error-primary, #c62828);
 }
 /* 删除确认框：官方 web 确认框同款（mask + 毛玻璃 + 480 卡片）。 */
-.dsh-file-session-confirm-overlay {
+.dsh-file-manage-confirm-overlay {
   position: fixed;
   inset: 0;
   z-index: 1100;
@@ -138,7 +138,7 @@ export function ensureFileSessionStyles(): void {
   background: var(--dsw-alias-bg-mask-1, rgba(0, 0, 0, 0.28));
   backdrop-filter: var(--dsw-mask-blur);
 }
-.dsh-file-session-confirm-card {
+.dsh-file-manage-confirm-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -149,38 +149,38 @@ export function ensureFileSessionStyles(): void {
   color: var(--dsw-alias-label-primary, #1f2329);
   box-shadow: var(--dsw-shadow-lv3, 0 12px 40px rgba(0,0,0,0.22));
 }
-.dsh-file-session-confirm-title {
+.dsh-file-manage-confirm-title {
   margin: 0;
   font-size: 16px;
   font-weight: 500;
   line-height: 24px;
 }
-.dsh-file-session-confirm-desc {
+.dsh-file-manage-confirm-desc {
   margin: 0;
   font-size: 14px;
   line-height: 22px;
   color: var(--dsw-alias-label-secondary, #6b7280);
   white-space: pre-line;
 }
-.dsh-file-session-confirm-actions {
+.dsh-file-manage-confirm-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
 /* 用量/进度条固定区：面板头下方、不随列表滚动；左侧 24px 与区块卡线框齐平，
    右侧额外让出滚动条宽度（列表区 scrollbar-gutter: stable 固定占位 8px）。 */
-.dsh-file-session-summary {
+.dsh-file-manage-summary {
   flex: none;
   padding: 12px calc(24px + var(--dsh-scrollbar-width, 8px)) 8px 24px;
 }
-.dsh-file-session-count {
+.dsh-file-manage-count {
   margin: 6px 0 0;
   font-size: 12px;
   line-height: 18px;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
 /* 列表区块卡：存档页归档区/备份区同款 token（border-l2 + r12）。 */
-.dsh-file-session-card {
+.dsh-file-manage-card {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -191,7 +191,7 @@ export function ensureFileSessionStyles(): void {
 }
 /* 配额容量条：加厚 + 未使用区斜纹（repeating-linear-gradient），与分割线区分；填充盖住斜纹。
    容量文字绝对定位居中叠加在条上。 */
-.dsh-file-session-quota-track {
+.dsh-file-manage-quota-track {
   position: relative;
   height: 16px;
   border-radius: 8px;
@@ -205,7 +205,7 @@ export function ensureFileSessionStyles(): void {
   );
   overflow: hidden;
 }
-.dsh-file-session-quota-text {
+.dsh-file-manage-quota-text {
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -220,7 +220,7 @@ export function ensureFileSessionStyles(): void {
   text-shadow: 0 0 4px var(--dsw-alias-bg-layer-2, #f6f7f9);
   pointer-events: none;
 }
-.dsh-file-session-quota-fill {
+.dsh-file-manage-quota-fill {
   height: 100%;
   /* 用量极小时（0.01% 量级）宽度趋近 0，兜底 4px 银条让「有使用」可见（网盘同款）。
      不加自身圆角：最小宽度下圆角会长成圆点、视觉鼓出轨道左端，改由轨道 overflow:hidden + 圆角裁切两端。 */
