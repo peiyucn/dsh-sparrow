@@ -1,9 +1,10 @@
-/** 云端文件管理入口：sidebar footer action + 弹窗（zh/en 双语 + loading / 错误 / 分页态）。 */
+/** 云端文件管理入口：sidebar footer action + 弹窗（zh/en 双语 + loading / 错误 / 分页态；面板样式对齐官方 Settings / Archive）。 */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
+import { IconCloseOutline16, IconFolderOpenOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FileRow } from '../files.js'
 
 export interface FileSessionDockInjected {
@@ -13,12 +14,19 @@ export interface FileSessionDockInjected {
 
 export type FileSessionDockProps = PropsRuntime<'sidebar.footer.action'> & FileSessionDockInjected & { t: TranslateNS<'file-session'> }
 
-/** 注入触发键与面板样式（官方设计 token；按 data 属性去重）。 */
+/** 注入触发键 / 面板 / 确认框样式（官方设计 token；按 data 属性去重）。 */
 export function ensureFileSessionStyles(): void {
   if (document.querySelector('style[data-dsh-file-session]') !== null) return
   const style = document.createElement('style')
   style.dataset.dshFileSession = ''
   style.textContent = `
+/* 官方 .footerActions 是横向 flex 行，slot 包裹层为行内 display:contents：
+ * 多插件各自的全宽按钮会并排挤到右缘外（只剩一条边）。这里把包裹层改回真实盒子纵排，
+ * Archive / 云端文件两个按钮上下堆叠、各自占满一行（!important 压过行内 contents）。 */
+[data-slot='sidebar.footer.action'] {
+  display: flex !important;
+  flex-direction: column;
+}
 .dsh-file-session-trigger {
   flex: none;
   display: flex;
@@ -59,133 +67,48 @@ export function ensureFileSessionStyles(): void {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.dsh-file-session-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 18, 25, 0.4);
-}
-.dsh-file-session-panel {
-  display: flex;
-  flex-direction: column;
-  width: min(520px, calc(100vw - 48px));
-  max-height: min(560px, calc(100vh - 96px));
-  box-sizing: border-box;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 14px;
-  background: var(--dsw-alias-bg-layer-1);
-  box-shadow: var(--dsw-shadow-lv2);
-  overflow: hidden;
-}
-.dsh-file-session-header {
+/* 面板头：官方 settings 面板同款（54px 高、标题起点 24px）。 */
+.dsh-file-session-panel-header {
   flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--dsw-alias-border-l2);
-}
-.dsh-file-session-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-primary);
-}
-.dsh-file-session-close {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-.dsh-file-session-close:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.dsh-file-session-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 12px 16px;
-}
-.dsh-file-session-footer {
-  flex: none;
-  display: flex;
-  justify-content: center;
-  padding: 10px 16px;
-  border-top: 1px solid var(--dsw-alias-border-l2);
-}
-.dsh-file-session-empty,
-.dsh-file-session-error {
-  padding: 24px 0;
-  text-align: center;
-  color: var(--dsw-alias-label-caption);
-  font-size: 13px;
-  line-height: 20px;
-}
-.dsh-file-session-error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-.dsh-file-session-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  height: 54px;
+  padding: 20px 14px 8px 24px;
+  box-sizing: border-box;
 }
-.dsh-file-session-row:last-child {
-  border-bottom: none;
-}
-.dsh-file-session-row-main {
-  min-width: 0;
-}
-.dsh-file-session-row-name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.dsh-file-session-row-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  line-height: 20px;
+.dsh-file-session-panel-title {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
   color: var(--dsw-alias-label-primary);
+}
+.dsh-file-session-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 28px;
+  outline: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--dsw-alias-label-primary);
+}
+.dsh-file-session-close:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 .dsh-file-session-badge {
   flex: none;
   padding: 1px 6px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 1px solid var(--dsw-alias-border-l2, #e2e5ea);
   border-radius: 999px;
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-caption, #8a919f);
   font-size: 11px;
   line-height: 16px;
-}
-.dsh-file-session-row-meta {
-  margin-top: 2px;
-  color: var(--dsw-alias-label-caption);
-  font-size: 12px;
-  line-height: 18px;
-}
-.dsh-file-session-row-actions {
-  flex: none;
-  display: flex;
-  gap: 6px;
 }
 .dsh-file-session-btn {
   height: 28px;
@@ -210,19 +133,40 @@ export function ensureFileSessionStyles(): void {
 .dsh-file-session-btn-danger {
   color: var(--dsw-alias-state-error-primary, #c62828);
 }
-.dsh-file-session-confirm {
-  margin-top: 8px;
-  padding: 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 10px;
-  background: var(--dsw-alias-bg-layer-1);
+/* 删除确认框：官方 web 确认框同款（mask + 毛玻璃 + 480 卡片）。 */
+.dsh-file-session-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dsw-alias-bg-mask-1, rgba(0, 0, 0, 0.28));
+  backdrop-filter: var(--dsw-mask-blur);
 }
-.dsh-file-session-confirm-text {
+.dsh-file-session-confirm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(480px, calc(100vw - 48px));
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--dsw-alias-bg-layer-2, #f6f7f9);
+  color: var(--dsw-alias-label-primary, #1f2329);
+  box-shadow: var(--dsw-shadow-lv3, 0 12px 40px rgba(0,0,0,0.22));
+}
+.dsh-file-session-confirm-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+.dsh-file-session-confirm-desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
   white-space: pre-line;
-  margin-bottom: 8px;
-  color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-  line-height: 20px;
 }
 .dsh-file-session-confirm-actions {
   display: flex;
@@ -233,7 +177,70 @@ export function ensureFileSessionStyles(): void {
   document.head.appendChild(style)
 }
 
-/** 面板状态：首屏 loading / 错误横幅 / 列表 + 加载更多 / 删除确认卡。 */
+const styles = {
+  overlay: {
+    position: 'fixed' as const,
+    inset: 0,
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'var(--dsw-alias-bg-mask-1, rgba(0, 0, 0, 0.28))',
+    backdropFilter: 'var(--dsw-mask-blur)',
+  } satisfies CSSProperties,
+  panel: {
+    position: 'relative' as const,
+    display: 'flex',
+    flexDirection: 'column',
+    width: 'min(800px, calc(100vw - 48px))',
+    // 高度随内容自适应、上限钳到视口（官方 settings 同款上限）。
+    maxHeight: 'min(800px, calc(100vh - 48px))',
+    borderRadius: 24,
+    overflow: 'hidden',
+    padding: 0,
+    background: 'var(--dsw-alias-bg-layer-2, #f6f7f9)',
+    color: 'var(--dsw-alias-label-primary, #1f2329)',
+    boxShadow: 'var(--dsw-shadow-lv3, 0 12px 40px rgba(0,0,0,0.22))',
+  } satisfies CSSProperties,
+  body: {
+    flex: 1,
+    minHeight: 0,
+    overflow: 'auto',
+    padding: '0 24px 24px',
+  } satisfies CSSProperties,
+  row: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 8,
+    alignItems: 'center',
+    padding: '8px 0',
+    borderBottom: '1px solid var(--dsw-alias-border-l1, #e2e5ea)',
+  } satisfies CSSProperties,
+  actions: {
+    display: 'flex',
+    gap: 6,
+    alignItems: 'center',
+  } satisfies CSSProperties,
+  title: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+  } satisfies CSSProperties,
+  secondarySmall: {
+    color: 'var(--dsw-alias-label-secondary, #6b7280)',
+    fontSize: 12,
+    lineHeight: '18px',
+  } satisfies CSSProperties,
+  footerBar: {
+    flex: 'none',
+    display: 'flex',
+    justifyContent: 'center',
+    padding: '10px 24px 14px',
+    borderTop: '1px solid var(--dsw-alias-border-l2, #e2e5ea)',
+  } satisfies CSSProperties,
+} as const
+
+/** 面板状态：首屏 loading / 错误横幅 / 列表 + 加载更多 / 删除确认框（web 确认框替代原生 confirm）。 */
 export function FileSessionDock({ wide, listFiles, deleteFile, t }: FileSessionDockProps) {
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState<readonly FileRow[]>([])
@@ -245,6 +252,7 @@ export function FileSessionDock({ wide, listFiles, deleteFile, t }: FileSessionD
   const [confirming, setConfirming] = useState<FileRow | null>(null)
   const [busyDelete, setBusyDelete] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
 
   const loadFirst = useCallback(() => {
     setLoading(true)
@@ -258,6 +266,17 @@ export function FileSessionDock({ wide, listFiles, deleteFile, t }: FileSessionD
       .catch(reason => { setError(reason instanceof Error ? reason.message : String(reason)) })
       .finally(() => { setLoading(false) })
   }, [listFiles])
+
+  // 官方弹窗行为：打开时聚焦关闭按钮，Esc 关闭。
+  useEffect(() => {
+    if (!open) return
+    closeButtonRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => { document.removeEventListener('keydown', onKeyDown) }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -280,7 +299,6 @@ export function FileSessionDock({ wide, listFiles, deleteFile, t }: FileSessionD
 
   const copyId = useCallback(async (row: FileRow) => {
     try {
-      if (navigator.clipboard === undefined) throw new Error('clipboard unavailable')
       await navigator.clipboard.writeText(row.id)
       setCopied(row.id)
     } catch {
@@ -289,7 +307,7 @@ export function FileSessionDock({ wide, listFiles, deleteFile, t }: FileSessionD
     }
   }, [t])
 
-  const confirmDelete = useCallback(() => {
+  const submitDelete = useCallback(() => {
     if (confirming === null || busyDelete) return
     setBusyDelete(true)
     deleteFile(confirming.id)
@@ -309,110 +327,68 @@ export function FileSessionDock({ wide, listFiles, deleteFile, t }: FileSessionD
       <button
         type="button"
         className={wide ? 'dsh-file-session-trigger' : 'dsh-file-session-trigger dsh-file-session-trigger-rail'}
-        aria-label={t('button.label')}
-        onClick={() => { setOpen(true) }}
+        title={t('dialog.title')}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => { setOpen(value => !value) }}
       >
-        <svg className="dsh-file-session-trigger-icon" viewBox="0 0 20 20" width="20" height="20" fill="none" aria-hidden>
-          <path d="M11 3H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7l-5-4Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-          <path d="M11 3v4h4" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-        </svg>
-        {wide && <span className="dsh-file-session-trigger-label">{t('button.label')}</span>}
+        <IconFolderOpenOutline16 className="dsh-file-session-trigger-icon" size={wide ? 16 : 18} />
+        {wide ? <span className="dsh-file-session-trigger-label">{t('button.label')}</span> : null}
       </button>
-      {open && (
-        <div className="dsh-file-session-overlay" onClick={() => { setOpen(false) }}>
-          <div
-            className="dsh-file-session-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('dialog.title')}
-            onClick={event => { event.stopPropagation() }}
-          >
-            <div className="dsh-file-session-header">
-              <div className="dsh-file-session-title">{t('dialog.title')}</div>
-              <button
-                type="button"
-                className="dsh-file-session-close"
-                aria-label={t('dialog.close')}
-                onClick={() => { setOpen(false) }}
-              >
-                ×
+      {open ? (
+        <div style={styles.overlay} role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setOpen(false)
+        }}>
+          <div style={styles.panel} role="dialog" aria-modal="true" aria-label={t('dialog.title')}>
+            <div className="dsh-file-session-panel-header">
+              <h2 className="dsh-file-session-panel-title" style={{ margin: 0 }}>{t('dialog.title')}</h2>
+              <button ref={closeButtonRef} type="button" className="dsh-file-session-close" aria-label={t('dialog.close')} onClick={() => { setOpen(false) }}>
+                <IconCloseOutline16 size={14} />
               </button>
             </div>
-            <div className="dsh-file-session-body">
-              {loading && <div className="dsh-file-session-empty">{t('loading')}</div>}
-              {!loading && error !== null && (
-                <div className="dsh-file-session-error">
-                  <span>{error}</span>
+            <div style={styles.body}>
+              {error !== null ? (
+                <p role="alert" style={{ ...styles.secondarySmall, margin: '0 0 12px', color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>
+                  {error}
+                  {' '}
                   <button type="button" className="dsh-file-session-btn" onClick={loadFirst}>{t('retry')}</button>
-                </div>
-              )}
-              {!loading && error === null && rows.length === 0 && (
-                <div className="dsh-file-session-empty">{t('empty')}</div>
-              )}
-              {rows.length > 0 && (
-                <div className="dsh-file-session-list">
-                  {rows.map(row => (
-                    <div key={row.id} className="dsh-file-session-row">
-                      <div className="dsh-file-session-row-main">
-                        <div className="dsh-file-session-row-name">
-                          <span className="dsh-file-session-row-title" title={row.filename}>{row.filename}</span>
-                          {row.dshOwned && <span className="dsh-file-session-badge">{t('dshBadge')}</span>}
-                        </div>
-                        <div className="dsh-file-session-row-meta">
-                          {row.sizeLabel} · {row.createdAtLabel}
-                          {row.expiresAtLabel !== undefined ? ` · ${t('expires', { time: row.expiresAtLabel })}` : ''}
-                        </div>
-                      </div>
-                      <div className="dsh-file-session-row-actions">
-                        <button
-                          type="button"
-                          className="dsh-file-session-btn"
-                          onClick={() => { void copyId(row) }}
-                        >
-                          {copied === row.id ? t('copied') : t('copy')}
-                        </button>
-                        <button
-                          type="button"
-                          className="dsh-file-session-btn dsh-file-session-btn-danger"
-                          onClick={() => { setConfirming(row) }}
-                        >
-                          {t('delete')}
-                        </button>
-                      </div>
+                </p>
+              ) : null}
+              {loading ? <p style={styles.secondarySmall}>{t('loading')}</p> : null}
+              {!loading && error === null && rows.length === 0 ? <p style={styles.secondarySmall}>{t('empty')}</p> : null}
+              {rows.map(row => (
+                <div key={row.id} style={styles.row}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <span style={styles.title} title={row.filename}>{row.filename}</span>
+                      {row.dshOwned ? <span className="dsh-file-session-badge">{t('dshBadge')}</span> : null}
                     </div>
-                  ))}
-                </div>
-              )}
-              {confirming !== null && (
-                <div className="dsh-file-session-confirm">
-                  <div className="dsh-file-session-confirm-text">
-                    {confirming.dshOwned
-                      ? t('confirm.deleteDsh', { name: confirming.filename })
-                      : t('confirm.delete', { name: confirming.filename })}
+                    <div style={styles.secondarySmall}>
+                      {row.sizeLabel} · {row.createdAtLabel}
+                      {row.expiresAtLabel !== undefined ? ` · ${t('expires', { time: row.expiresAtLabel })}` : ''}
+                    </div>
                   </div>
-                  <div className="dsh-file-session-confirm-actions">
+                  <div style={styles.actions}>
                     <button
                       type="button"
                       className="dsh-file-session-btn"
-                      disabled={busyDelete}
-                      onClick={() => { setConfirming(null) }}
+                      onClick={() => { void copyId(row) }}
                     >
-                      {t('confirm.cancel')}
+                      {copied === row.id ? t('copied') : t('copy')}
                     </button>
                     <button
                       type="button"
                       className="dsh-file-session-btn dsh-file-session-btn-danger"
-                      disabled={busyDelete}
-                      onClick={() => { void confirmDelete() }}
+                      onClick={() => { setConfirming(row) }}
                     >
-                      {busyDelete ? t('confirm.deleting') : t('confirm.confirm')}
+                      {t('delete')}
                     </button>
                   </div>
                 </div>
-              )}
+              ))}
             </div>
-            {hasMore && !loading && (
-              <div className="dsh-file-session-footer">
+            {hasMore && !loading ? (
+              <div style={styles.footerBar}>
                 <button
                   type="button"
                   className="dsh-file-session-btn"
@@ -422,10 +398,53 @@ export function FileSessionDock({ wide, listFiles, deleteFile, t }: FileSessionD
                   {loadingMore ? t('loading') : t('loadMore')}
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
+      {confirming !== null ? (
+        <div className="dsh-file-session-confirm-overlay" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !busyDelete) setConfirming(null)
+        }}>
+          <div
+            className="dsh-file-session-confirm-card"
+            role="alertdialog"
+            aria-modal="true"
+            aria-label={t('delete')}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && !busyDelete) {
+                event.stopPropagation()
+                setConfirming(null)
+              }
+            }}
+          >
+            <h3 className="dsh-file-session-confirm-title">{t('delete')}</h3>
+            <p className="dsh-file-session-confirm-desc">
+              {confirming.dshOwned
+                ? t('confirm.deleteDsh', { name: confirming.filename })
+                : t('confirm.delete', { name: confirming.filename })}
+            </p>
+            <div className="dsh-file-session-confirm-actions">
+              <button
+                type="button"
+                className="dsh-file-session-btn"
+                disabled={busyDelete}
+                onClick={() => { setConfirming(null) }}
+              >
+                {t('confirm.cancel')}
+              </button>
+              <button
+                type="button"
+                className="dsh-file-session-btn dsh-file-session-btn-danger"
+                disabled={busyDelete}
+                onClick={() => { void submitDelete() }}
+              >
+                {busyDelete ? t('confirm.deleting') : t('confirm.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }
