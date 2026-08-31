@@ -1,0 +1,11 @@
+# Dependabot 版本更新（pnpm workspace：根目录一条覆盖全部插件）
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
