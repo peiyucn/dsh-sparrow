@@ -23,7 +23,7 @@
 
 ## UI
 
-* 开关胶囊（`conversation.input.left`）内置：**竖排三点指示**（恒显 3 个 4px 圆点、自下而上点亮 3/2/1 个 = 高/中/低，点亮用 currentColor、未点亮淡色占位）+ **▾ 弹层**选档（选项行 = 档位名 + 规则摘要，官方 MenuDropdown 同款 token，点外部/Esc 关闭、滚动跟随重定位）；
+* 开关胶囊（`conversation.input.left`）内置：**竖排三点指示**（恒显 3 个 5px 圆点、自下而上点亮 3/2/1 个 = 高/中/低，点亮用 currentColor、未点亮淡色占位，与文字间额外留 6px 间距防视觉粘连）+ **▾ 弹层**选档（选项行 = 档位名 + 规则摘要，官方 MenuDropdown 同款 token，点外部/Esc 关闭、滚动跟随重定位）；
 * **按钮 tooltip 随档位变化**（`sensitivity.hint`：联想敏锐度：{高/中/低}）；
 * 选择持久化在 localStorage `dsh-chat-fim:sensitivity`（非法回退 standard）；旧 `dsh-chat-fim:modelMode` 键不再读写（无害残留）。
 

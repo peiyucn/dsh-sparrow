@@ -491,18 +491,21 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   line-height: 18px;
   white-space: nowrap;
 }
-/* 胶囊内的敏锐度竖点：恒显 3 个点，自下而上点亮 3/2/1 个 = 高/中/低；未点亮为淡色占位。 */
+/* 胶囊内的敏锐度竖点：恒显 3 个点，自下而上点亮 3/2/1 个 = 高/中/低；未点亮为淡色占位。
+   与左侧文字额外拉开间距（按钮 gap 4px + margin-left 6px），否则紧贴文字像残影；点 5px、圆角。 */
 .dsh-chat-fim-dots {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  margin-left: 6px;
+  margin-right: 2px;
 }
 .dsh-chat-fim-dot {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: color-mix(in srgb, currentColor 35%, transparent);
+  background: color-mix(in srgb, currentColor 45%, transparent);
 }
 .dsh-chat-fim-dot-on {
   background: currentColor;
