@@ -24,13 +24,24 @@ export interface BackupItem {
   readonly legacy: boolean
 }
 
+export interface StraySessionItem {
+  readonly sessionId: string
+  readonly title: string
+  readonly createdAt: number
+  readonly blank: boolean
+  readonly live: boolean
+  readonly running: boolean
+  readonly backendSupported: boolean
+}
+
 export interface ArchiveDockInjected {
   listArchived: () => Promise<ArchivedSessionItem[]>
+  listStrays: () => Promise<StraySessionItem[]>
   listBackups: () => Promise<BackupItem[]>
   /** 备份实际存放目录（绝对路径 + 掩码后的展示路径），面板提示信息里明示卸载影响。 */
   backupDirPath: () => Promise<{ path: string; displayPath: string }>
   backupSession: (sessionId: string) => Promise<unknown>
-  deleteSession: (sessionId: string, confirmTitle: string) => Promise<unknown>
+  deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => Promise<unknown>
   restoreBackup: (backupId: string) => Promise<unknown>
   deleteBackup: (backupId: string) => Promise<unknown>
   restoreAllBackups: () => Promise<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ backupId: string; message: string }> }>
@@ -327,6 +338,8 @@ const styles = {
 type PendingConfirm =
   | { readonly kind: 'backup'; readonly item: ArchivedSessionItem }
   | { readonly kind: 'delete'; readonly item: ArchivedSessionItem }
+  | { readonly kind: 'backupStray'; readonly item: StraySessionItem }
+  | { readonly kind: 'deleteStray'; readonly item: StraySessionItem }
   | { readonly kind: 'deleteBackup'; readonly item: BackupItem }
   | { readonly kind: 'restoreAll'; readonly restorable: number; readonly legacy: number }
   | { readonly kind: 'deleteAll'; readonly count: number }
@@ -345,22 +358,26 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
   const [typed, setTyped] = useState('')
   const [working, setWorking] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
-  const needsTyping = pending.kind === 'delete' || pending.kind === 'deleteAll'
+  const needsTyping = pending.kind === 'delete' || (pending.kind === 'deleteStray' && !pending.item.blank) || pending.kind === 'deleteAll'
   const phrase = t('confirm.deleteAllPhrase')
-  const expected = pending.kind === 'delete' ? pending.item.title.trim() : pending.kind === 'deleteAll' ? phrase : ''
-  const title = pending.kind === 'backup' ? t('action.backup')
-    : pending.kind === 'delete' || pending.kind === 'deleteBackup' ? t('action.delete')
+  const expected = pending.kind === 'delete' || pending.kind === 'deleteStray' ? pending.item.title.trim() : pending.kind === 'deleteAll' ? phrase : ''
+  const title = pending.kind === 'backup' || pending.kind === 'backupStray' ? t('action.backup')
+    : pending.kind === 'delete' || pending.kind === 'deleteStray' || pending.kind === 'deleteBackup' ? t('action.delete')
       : pending.kind === 'restoreAll' ? t('action.restoreAll', { count: pending.restorable })
         : t('action.deleteAll')
-  const description = pending.kind === 'backup' ? t('confirm.backup', { name: pending.item.title })
+  const description = pending.kind === 'backup' || pending.kind === 'backupStray' ? t('confirm.backup', { name: pending.item.title })
     : pending.kind === 'delete' ? t('confirm.delete', { name: pending.item.title })
-      : pending.kind === 'deleteBackup' ? t('confirm.deleteBackup', { name: pending.item.title })
-        : pending.kind === 'restoreAll'
-          ? (pending.legacy > 0
-            ? t('confirm.restoreAll.withLegacy', { count: pending.restorable, legacy: pending.legacy })
-            : t('confirm.restoreAll', { count: pending.restorable }))
-          : t('confirm.deleteAll', { count: pending.count, phrase })
-  const workingText = pending.kind === 'backup' ? t('confirm.backingUp')
+      : pending.kind === 'deleteStray'
+        ? (pending.item.blank
+          ? t('confirm.deleteStrayBlank', { name: pending.item.title })
+          : t('confirm.delete', { name: pending.item.title }))
+        : pending.kind === 'deleteBackup' ? t('confirm.deleteBackup', { name: pending.item.title })
+          : pending.kind === 'restoreAll'
+            ? (pending.legacy > 0
+              ? t('confirm.restoreAll.withLegacy', { count: pending.restorable, legacy: pending.legacy })
+              : t('confirm.restoreAll', { count: pending.restorable }))
+            : t('confirm.deleteAll', { count: pending.count, phrase })
+  const workingText = pending.kind === 'backup' || pending.kind === 'backupStray' ? t('confirm.backingUp')
     : pending.kind === 'restoreAll' ? t('confirm.restoring')
       : t('confirm.deleting')
   const ready = !working && (!needsTyping || typed.trim() === expected)
@@ -409,14 +426,14 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
               className="dsh-archive-confirm-input"
               type="text"
               value={typed}
-              placeholder={pending.kind === 'delete' ? pending.item.title : phrase}
+              placeholder={pending.kind === 'delete' || pending.kind === 'deleteStray' ? pending.item.title : phrase}
               disabled={working}
               autoFocus
               onChange={(event) => { setTyped(event.currentTarget.value) }}
             />
             {mismatch ? (
               <p className="dsh-archive-confirm-hint" role="alert">
-                {pending.kind === 'delete' ? t('confirm.deleteMismatch') : t('confirm.deleteAllMismatch', { phrase })}
+                {pending.kind === 'delete' || pending.kind === 'deleteStray' ? t('confirm.deleteMismatch') : t('confirm.deleteAllMismatch', { phrase })}
               </p>
             ) : null}
           </>
@@ -438,12 +455,14 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
  * @param props - slot props + 注入动作。
  */
 export function ArchiveDock(props: ArchiveDockProps) {
-  const { wide, listArchived, listBackups, backupDirPath, backupSession, deleteSession, restoreBackup, deleteBackup, restoreAllBackups, deleteAllBackups, t } = props
+  const { wide, listArchived, listStrays, listBackups, backupDirPath, backupSession, deleteSession, restoreBackup, deleteBackup, restoreAllBackups, deleteAllBackups, t } = props
   const [open, setOpen] = useState(false)
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
+  const [strays, setStrays] = useState<StraySessionItem[]>([])
   const [backups, setBackups] = useState<BackupItem[]>([])
   const [backupDir, setBackupDir] = useState<{ path: string; displayPath: string } | null>(null)
   const [archivedOpen, setArchivedOpen] = useState(true)
+  const [straysOpen, setStraysOpen] = useState(true)
   const [backupsOpen, setBackupsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -470,13 +489,15 @@ export function ArchiveDock(props: ArchiveDockProps) {
     const seq = ++refreshSeqRef.current
     setLoading(true)
     try {
-      const [nextArchived, nextBackups, nextBackupDir] = await Promise.all([
+      const [nextArchived, nextStrays, nextBackups, nextBackupDir] = await Promise.all([
         listArchived(),
+        listStrays(),
         listBackups(),
         backupDirPath().catch(() => null),
       ])
       if (seq !== refreshSeqRef.current) return
       setArchived(nextArchived)
+      setStrays(nextStrays)
       setBackups(nextBackups)
       setBackupDir(nextBackupDir)
       setError(null)
@@ -516,6 +537,64 @@ export function ArchiveDock(props: ArchiveDockProps) {
 
   const confirmDelete = (item: ArchivedSessionItem): void => {
     setPending({ kind: 'delete', item })
+  }
+
+  const confirmBackupStray = (item: StraySessionItem): void => {
+    setPending({ kind: 'backupStray', item })
+  }
+
+  const confirmDeleteStray = (item: StraySessionItem): void => {
+    setPending({ kind: 'deleteStray', item })
+  }
+
+  /** 创建龄文案：今天 / N 天前。 */
+  const strayAge = (createdAt: number): string => {
+    const days = Math.floor((Date.now() - createdAt) / 86_400_000)
+    return days <= 0 ? t('stray.ageToday') : t('stray.ageDays', { n: days })
+  }
+
+  /** 游离会话行：与归档行同构；空白会话带角标、删除走简化确认。 */
+  const renderStrayRow = (item: StraySessionItem) => {
+    const locked = item.live
+    return (
+      <div key={item.sessionId} style={styles.row}>
+        <div style={{ minWidth: 0 }}>
+          <div style={styles.title} title={item.title}>{item.title}</div>
+          <div style={styles.secondarySmall}>
+            {item.sessionId}
+            {' · '}{strayAge(item.createdAt)}
+            {item.blank ? ` · ${t('stray.blankBadge')}` : ''}
+            {item.running ? ` · ${t('state.running')}` : item.live ? (
+              <>
+                {' · '}
+                <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>{t('state.unreleased')}</span>
+              </>
+            ) : ''}
+            {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
+          </div>
+        </div>
+        <div style={styles.actions}>
+          <button
+            type="button"
+            className="dsh-archive-btn"
+            disabled={loading || !item.backendSupported || locked}
+            title={locked ? t('state.unreleasedActionHint') : undefined}
+            onClick={() => { confirmBackupStray(item) }}
+          >
+            {t('action.backup')}
+          </button>
+          <button
+            type="button"
+            className="dsh-archive-btn dsh-archive-btn-danger"
+            disabled={loading || !item.backendSupported || locked}
+            title={locked ? t('state.unreleasedActionHint') : undefined}
+            onClick={() => { confirmDeleteStray(item) }}
+          >
+            {t('action.delete')}
+          </button>
+        </div>
+      </div>
+    )
   }
 
   const confirmDeleteBackup = (item: BackupItem): void => {
@@ -586,14 +665,20 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const submitConfirm = async (typed: string): Promise<void> => {
     if (pending === null) return
     const kind = pending.kind
-    if (kind === 'backup') {
+    if (kind === 'backup' || kind === 'backupStray') {
       await backupSession(pending.item.sessionId)
       await refresh()
       setPending(null)
       return
     }
     if (kind === 'delete') {
-      await deleteSession(pending.item.sessionId, typed)
+      await deleteSession(pending.item.sessionId, typed, false)
+      await refresh()
+      setPending(null)
+      return
+    }
+    if (kind === 'deleteStray') {
+      await deleteSession(pending.item.sessionId, pending.item.blank ? '' : typed, pending.item.blank)
       await refresh()
       setPending(null)
       return
@@ -698,6 +783,26 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 </>
               ) : null}
             </div>
+
+            {!loading && strays.length > 0 ? (
+              <div className="dsh-archive-section-card">
+                <button
+                  type="button"
+                  className="dsh-archive-section"
+                  aria-expanded={straysOpen}
+                  onClick={() => { setStraysOpen(value => !value) }}
+                >
+                  <span aria-hidden>{straysOpen ? '▾' : '▸'}</span>
+                  <span>{t('section.strays', { count: strays.length })}</span>
+                </button>
+                {straysOpen ? (
+                  <>
+                    <p style={styles.secondarySmall}>{t('stray.hint')}</p>
+                    {strays.map(renderStrayRow)}
+                  </>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="dsh-archive-section-card">
               <button

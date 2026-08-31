@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   isDeleteConfirmationSufficient, legacyBackupItem, maskHomePath, normalizeArchiveConfig,
-  parseBackupSidecar, sanitizeSegment,
+  parseBackupSidecar, parseBlankProjection, sanitizeSegment, straySessionIds,
 } from '../lib/archive.js'
 
 describe('archive-session 纯逻辑', () => {
@@ -74,6 +74,54 @@ describe('archive-session 纯逻辑', () => {
       assert.equal(item.legacy, true)
       assert.deepEqual(item.workspaceIds, [])
       assert.match(item.archivedAt, /^\d{4}-\d{2}-\d{2}T/u)
+    })
+  })
+
+  describe('straySessionIds', () => {
+    it('持久化有且未归档且未挂工作区 应该 判定游离', () => {
+      assert.deepEqual(straySessionIds(['a', 'b'], [], []), ['a', 'b'])
+    })
+
+    it('已归档 应该 排除', () => {
+      assert.deepEqual(straySessionIds(['a', 'b'], ['a'], []), ['b'])
+    })
+
+    it('挂工作区 应该 排除', () => {
+      assert.deepEqual(straySessionIds(['a', 'b'], [], ['b']), ['a'])
+    })
+
+    it('归档与挂工作区叠加 应该 都排除且保持输入顺序', () => {
+      assert.deepEqual(straySessionIds(['a', 'b', 'c', 'd'], ['b'], ['c']), ['a', 'd'])
+    })
+
+    it('清单为空 应该 返回空数组', () => {
+      assert.deepEqual(straySessionIds([], ['x'], ['y']), [])
+    })
+  })
+
+  describe('parseBlankProjection', () => {
+    it('blank 标记为真 应该 判定空白', () => {
+      const row = { version: 4, record: { identity: {}, rows: { sessionListMetadata: { val: { blank: true, lastPromptAt: null } } } } }
+      assert.deepEqual(parseBlankProjection(row), { blank: true })
+    })
+
+    it('仅 turns 为 0 应该 判定空白', () => {
+      const row = { record: { rows: { sessionStats: { val: { turns: 0 } } } } }
+      assert.deepEqual(parseBlankProjection(row), { blank: true })
+    })
+
+    it('有轮次且无 blank 标记 应该 返回 undefined', () => {
+      const row = { record: { rows: { sessionStats: { val: { turns: 3 } } } } }
+      assert.equal(parseBlankProjection(row), undefined)
+    })
+
+    it('行缺失 rows 应该 返回 undefined', () => {
+      assert.equal(parseBlankProjection({ record: { identity: {} } }), undefined)
+    })
+
+    it('非对象输入 应该 返回 undefined', () => {
+      assert.equal(parseBlankProjection(null), undefined)
+      assert.equal(parseBlankProjection('x'), undefined)
     })
   })
 

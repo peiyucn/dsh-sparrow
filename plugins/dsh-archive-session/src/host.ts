@@ -18,7 +18,8 @@ import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
   BACKUP_SIDECAR, isDeleteConfirmationSufficient, legacyBackupItem, maskHomePath, normalizeArchiveConfig,
-  parseBackupSidecar, sanitizeSegment, type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar,
+  parseBackupSidecar, parseBlankProjection, sanitizeSegment, straySessionIds,
+  type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar,
 } from './archive.js'
 
 export const name = 'dsh-archive-session'
@@ -287,6 +288,18 @@ async function invalidateProjectionCacheGuarded(ctx: Context, sessionId: Session
       return
     }
     if (attempt === 1) ctx.logger.warn(`dsh-archive-session: 备份/删除后投影缓存仍残留 ${String(sessionId)}，重启后启动清扫会再次清理`)
+  }
+}
+
+/** 游离会话的「空白」判定：只读官方投影行（与失效投影行同域，见 AGENTS seam 特例）；读失败按非空白保守处理。 */
+async function readStrayBlankness(ctx: Context, sessionId: SessionId): Promise<boolean> {
+  try {
+    const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
+    if (domain === undefined) return false
+    const row = domain.table(PROJCACHE_SESSIONS_TABLE).get(String(sessionId))
+    return parseBlankProjection(row)?.blank === true
+  } catch {
+    return false
   }
 }
 
@@ -582,6 +595,30 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
+        if (req.method === 'GET' && pathname === `${PREFIX}/strays`) {
+          const headers = await ctx.sessionPersistence.list()
+          const archivedIds = await readArchivedIds(ctx)
+          const attachedIds = ctx.workspaceRegistry.list().flatMap(workspace => workspace.sessionIds.map(id => String(id)))
+          const strayIds = straySessionIds(headers.map(header => String(header.id)), archivedIds.map(id => String(id)), attachedIds)
+          const items = []
+          for (const header of headers) {
+            if (!strayIds.includes(String(header.id))) continue
+            const sessionId = SessionId(String(header.id))
+            const location = ctx.sessionPersistence.locate(header)
+            items.push({
+              sessionId: String(header.id),
+              title: await readTitle(ctx, sessionId, header.id),
+              createdAt: header.createdAt,
+              blank: await readStrayBlankness(ctx, sessionId),
+              live: ctx.sessions.get(sessionId) !== undefined,
+              running: ctx.agents.get(sessionId)?.status === 'running',
+              backendSupported: location !== undefined && sessionDirectoryFor(location) !== undefined,
+            })
+          }
+          sendJson(res, 200, { items })
+          return
+        }
+
         if (req.method === 'GET' && pathname === `${PREFIX}/backups`) {
           sendJson(res, 200, { items: await listBackups(settings.backupRoot) })
           return
@@ -603,18 +640,27 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           }
           const sessionId = SessionId(parsed.sessionId)
           const archivedIds = await readArchivedIds(ctx)
-          if (!archivedIds.some(id => String(id) === String(sessionId))) {
-            throw new ArchiveError('NOT_ARCHIVED', '只有已归档会话才能备份或删除')
+          const headers = await ctx.sessionPersistence.list()
+          const attachedIds = ctx.workspaceRegistry.list().flatMap(workspace => workspace.sessionIds.map(id => String(id)))
+          const strayIds = straySessionIds(headers.map(header => String(header.id)), archivedIds.map(id => String(id)), attachedIds)
+          const isArchived = archivedIds.some(id => String(id) === String(sessionId))
+          const isStray = strayIds.includes(String(sessionId))
+          if (!isArchived && !isStray) {
+            throw new ArchiveError('NOT_ARCHIVED', '只有已归档或游离会话才能备份或删除')
           }
           const live = ctx.sessions.get(sessionId)
-          const headers = await ctx.sessionPersistence.list()
           const header = live?.header ?? headers.find(candidate => String(candidate.id) === String(sessionId))
           if (header === undefined) {
             throw new ArchiveError('UNKNOWN_SESSION', '会话持久化中没有这个会话', 404)
           }
           const title = await readTitle(ctx, sessionId, header.id)
+          const strayBlank = isStray && await readStrayBlankness(ctx, sessionId)
           if (pathname.endsWith('/delete')) {
-            if (!isDeleteConfirmationSufficient(title, parsed.confirmTitle)) {
+            if (strayBlank) {
+              if (parsed.confirm !== true) {
+                throw new ArchiveError('CONFIRMATION_FAILED', '删除空白游离会话需要确认')
+              }
+            } else if (!isDeleteConfirmationSufficient(title, parsed.confirmTitle)) {
               throw new ArchiveError('CONFIRMATION_FAILED', '删除确认失败：请输入完整会话标题')
             }
           } else if (parsed.confirm !== true) {

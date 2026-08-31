@@ -127,3 +127,43 @@ export function legacyBackupItem(name: string, mtimeMs: number): LegacyBackupIte
     legacy: true,
   }
 }
+
+/**
+ * 游离会话识别（三差集，见 docs/spec/05-stray-sessions.md）：
+ * 持久化清单里有 ∧ 不在归档集 ∧ 不挂任何工作区。保持输入顺序。
+ * @param persistedIds - sessionPersistence.list() 的会话 id。
+ * @param archivedIds - workspace 域 archivedSessionIds。
+ * @param attachedIds - 所有 workspace.sessionIds 的并集。
+ */
+export function straySessionIds(
+  persistedIds: readonly string[],
+  archivedIds: readonly string[],
+  attachedIds: readonly string[],
+): string[] {
+  const archived = new Set(archivedIds)
+  const attached = new Set(attachedIds)
+  return persistedIds.filter(id => !archived.has(id) && !attached.has(id))
+}
+
+/**
+ * 从官方投影行解析「空白会话」信号（session_projcache 行形状：{ version, record: { identity, rows } }）：
+ * blank = sessionListMetadata.blank === true 或 sessionStats.turns === 0。
+ * 行缺失 / 形状异常 / 明确非空白一律返回 undefined（调用方按非空白保守对待）。
+ */
+export function parseBlankProjection(row: unknown): { blank: true } | undefined {
+  if (typeof row !== 'object' || row === null || Array.isArray(row)) return undefined
+  const outer = row as Record<string, unknown>
+  const recordCandidate = outer.record
+  const record = (typeof recordCandidate === 'object' && recordCandidate !== null && !Array.isArray(recordCandidate)
+    ? recordCandidate
+    : outer) as Record<string, unknown>
+  const rowsCandidate = record.rows
+  if (typeof rowsCandidate !== 'object' || rowsCandidate === null || Array.isArray(rowsCandidate)) return undefined
+  const rows = rowsCandidate as Record<string, unknown>
+  const metaVal = (rows.sessionListMetadata as Record<string, unknown> | undefined)?.val
+  const statsVal = (rows.sessionStats as Record<string, unknown> | undefined)?.val
+  const metaBlank = (metaVal as Record<string, unknown> | undefined)?.blank
+  const statsTurns = (statsVal as Record<string, unknown> | undefined)?.turns
+  if (metaBlank === true || statsTurns === 0) return { blank: true }
+  return undefined
+}

@@ -23,6 +23,11 @@ const LOCALE_DICTS = {
     'loading': '加载中…',
     'section.archived': '归档区（{count}）',
     'section.backups': '备份区（{count}）',
+    'section.strays': '游离会话（{count}）',
+    'stray.hint': '游离会话：不在任何工作区、也未归档，官方界面无法清理，@ 列表会一直显示。',
+    'stray.blankBadge': '空白会话',
+    'stray.ageDays': '{n} 天前',
+    'stray.ageToday': '今天',
     'empty.archived': '暂无归档会话',
     'empty.backups': '暂无备份',
     'legacy.hint': '标「旧格式」的备份来自更早版本，缺少恢复信息，仅可删除。',
@@ -40,6 +45,7 @@ const LOCALE_DICTS = {
     'group.unreleased': '未释放（{count}）',
     'confirm.backup': '备份会话「{name}」？\n\n备份后 @ / 侧边栏不再出现；可随时从备份区恢复。',
     'confirm.delete': '此操作不可逆！\n\n请输入完整会话标题「{name}」以确认删除：',
+    'confirm.deleteStrayBlank': '删除空白会话「{name}」？\n\n此操作不可逆。该会话 0 轮、没有任何内容。',
     'confirm.deleteMismatch': '删除确认失败：输入的标题不一致',
     'confirm.deleteBackup': '删除备份「{name}」？\n\n此操作不可逆，备份内容将被移除。',
     'confirm.restoreAll': '恢复全部备份？\n\n将恢复 {count} 个可恢复备份。',
@@ -65,6 +71,11 @@ const LOCALE_DICTS = {
     'loading': 'Loading…',
     'section.archived': 'Archive ({count})',
     'section.backups': 'Backups ({count})',
+    'section.strays': 'Stray sessions ({count})',
+    'stray.hint': 'Stray sessions: not in any workspace and not archived; the official UI cannot clean them, and @ keeps showing them.',
+    'stray.blankBadge': 'blank',
+    'stray.ageDays': '{n} days ago',
+    'stray.ageToday': 'today',
     'empty.archived': 'No archived sessions',
     'empty.backups': 'No backups',
     'legacy.hint': 'Legacy backups from an earlier version cannot be restored; they can only be deleted.',
@@ -82,6 +93,7 @@ const LOCALE_DICTS = {
     'group.unreleased': 'Held by dsh ({count})',
     'confirm.backup': 'Back up "{name}"?\n\nIt disappears from @ / the sidebar; restore anytime from Backups.',
     'confirm.delete': 'This cannot be undone!\n\nType the full session title "{name}" to confirm:',
+    'confirm.deleteStrayBlank': 'Delete blank session "{name}"?\n\nThis cannot be undone. The session has 0 turns and no content.',
     'confirm.deleteMismatch': 'Delete failed: the title does not match',
     'confirm.deleteBackup': 'Delete backup "{name}"?\n\nThis cannot be undone.',
     'confirm.restoreAll': 'Restore all backups?\n\nWill restore {count} restorable backups.',
@@ -152,6 +164,15 @@ export function apply(ctx: ClientContext): void {
         backendSupported: boolean
         workspaceIds: readonly string[]
       }>('/api/archive-session/list'),
+      listStrays: () => readApi<{
+        sessionId: string
+        title: string
+        createdAt: number
+        blank: boolean
+        live: boolean
+        running: boolean
+        backendSupported: boolean
+      }>('/api/archive-session/strays'),
       listBackups: () => readApi<{
         backupId: string
         sessionId: string
@@ -168,7 +189,7 @@ export function apply(ctx: ClientContext): void {
         return { path: payload.path ?? '', displayPath: payload.displayPath ?? payload.path ?? '' }
       },
       backupSession: (sessionId: string) => postApi('/api/archive-session/backup', { sessionId, confirm: true }),
-      deleteSession: (sessionId: string, confirmTitle: string) => postApi('/api/archive-session/delete', { sessionId, confirmTitle }),
+      deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => postApi('/api/archive-session/delete', simple ? { sessionId, confirm: true } : { sessionId, confirmTitle }),
       restoreBackup: (backupId: string) => postApi('/api/archive-session/restore', { backupId }),
       deleteBackup: (backupId: string) => postApi('/api/archive-session/backup-delete', { backupId, confirm: true }),
       restoreAllBackups: () => postApi<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ backupId: string; message: string }> }>('/api/archive-session/backup-restore-all', { confirm: true }),
