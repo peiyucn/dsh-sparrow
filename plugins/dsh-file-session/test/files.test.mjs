@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import {
-  classifyUpstreamError, DSH_OWNED_FILE_PREFIX, formatBytes, formatTimestamp,
+  classifyUpstreamError, decodeFileIdParam, DSH_OWNED_FILE_PREFIX, formatBytes, formatTimestamp,
   normalizePageQuery, PAGE_SIZE, toFileRow,
 } from '../lib/files.js'
 
@@ -87,6 +87,18 @@ describe('dsh-file-session 纯逻辑', () => {
     it('带到期时间的文件 应该 输出到期标签', () => {
       const row = toFileRow({ id: 'file-api-y', bytes: 1, createdAt: 1, filename: 'a.png', purpose: 'user_data', expiresAt: 1700000000 })
       assert.match(row.expiresAtLabel ?? '', /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+    })
+  })
+
+  describe('decodeFileIdParam', () => {
+    it('合法编码 应该 原样解码', () => {
+      assert.equal(decodeFileIdParam('file-api-one'), 'file-api-one')
+      assert.equal(decodeFileIdParam('file-api%2Done'), 'file-api-one')
+    })
+
+    it('畸形百分号编码 应该 返回空串（不抛 URIError）', () => {
+      assert.equal(decodeFileIdParam('%zz'), '')
+      assert.equal(decodeFileIdParam('%E0%A4%A'), '')
     })
   })
 

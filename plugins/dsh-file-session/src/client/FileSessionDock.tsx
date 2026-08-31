@@ -334,20 +334,31 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
   const [confirming, setConfirming] = useState<FileRow | null>(null)
   const [busyDelete, setBusyDelete] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
+  /** 「已复制」反馈 2s 复位（archive 同款）。 */
+  const copiedTimerRef = useRef<number | null>(null)
   const [summary, setSummary] = useState<FileCountSummary | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  /** 刷新代际：快速关/开面板产生并发请求时，只让最新一次的结果落地（陈旧响应竞态，archive 同款）。 */
+  const refreshSeqRef = useRef(0)
 
   const loadFirst = useCallback(() => {
+    const seq = ++refreshSeqRef.current
     setLoading(true)
     setError(null)
     listFiles()
       .then(page => {
+        if (seq !== refreshSeqRef.current) return
         setRows(page.rows)
         setHasMore(page.hasMore)
         setLastId(page.lastId)
       })
-      .catch(reason => { setError(reason instanceof Error ? reason.message : String(reason)) })
-      .finally(() => { setLoading(false) })
+      .catch(reason => {
+        if (seq !== refreshSeqRef.current) return
+        setError(reason instanceof Error ? reason.message : String(reason))
+      })
+      .finally(() => {
+        if (seq === refreshSeqRef.current) setLoading(false)
+      })
   }, [listFiles])
 
   // 官方弹窗行为：打开时聚焦关闭按钮，Esc 关闭。
@@ -366,8 +377,13 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
     setConfirming(null)
     setSummary(null)
     loadFirst()
-    // 总数统计为 best-effort：接口失败只隐藏统计行，不影响列表。
-    void countFiles().then(setSummary).catch(() => {})
+    // 总数统计为 best-effort：接口失败只隐藏统计行，不影响列表；同样受刷新代际约束。
+    const seq = refreshSeqRef.current
+    void countFiles()
+      .then(next => {
+        if (seq === refreshSeqRef.current) setSummary(next)
+      })
+      .catch(() => {})
   }, [open, loadFirst, countFiles])
 
   const loadMore = useCallback(() => {
@@ -387,11 +403,17 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
     try {
       await navigator.clipboard.writeText(row.id)
       setCopied(row.id)
+      if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current)
+      copiedTimerRef.current = window.setTimeout(() => { setCopied(null) }, 2_000)
     } catch {
       setCopied(null)
       setError(t('copyFailed'))
     }
   }, [t])
+
+  useEffect(() => () => {
+    if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current)
+  }, [])
 
   const quotaRatio = summary === null ? 0 : storageUsageRatio(summary.totalBytes, summary.quotaBytes)
 

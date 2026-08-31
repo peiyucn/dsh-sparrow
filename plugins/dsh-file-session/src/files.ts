@@ -9,6 +9,9 @@ export const DSH_OWNED_FILE_PREFIX = 'dsh-'
 /** 列表页大小（owner 拍板 2026-09-01；官方上限 1000）。 */
 export const PAGE_SIZE = 20
 
+/** 总数统计每页拉取上限（官方 list 上限 1000）。 */
+export const COUNT_PAGE_LIMIT = 1000
+
 /** 总数统计最多翻页数：官方配额 10000 个文件 ÷ 每页 1000 = 10 页，12 页兜底防配额口径变化。 */
 export const MAX_COUNT_PAGES = 12
 
@@ -78,6 +81,15 @@ export function toFileRow(file: DeepSeekFileObject): FileRow {
     createdAtLabel: formatTimestamp(file.createdAt),
     ...file.expiresAt === undefined ? {} : { expiresAtLabel: formatTimestamp(file.expiresAt) },
     dshOwned: file.filename.startsWith(DSH_OWNED_FILE_PREFIX),
+  }
+}
+
+/** 解码 DELETE 的文件 id 参数：畸形百分号编码返回空串（交由 400 分支），不抛 URIError。 */
+export function decodeFileIdParam(raw: string): string {
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return ''
   }
 }
 

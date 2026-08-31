@@ -75,7 +75,8 @@ const REQUEST_TIMEOUT_MS = 15_000
 const COUNT_TIMEOUT_MS = 60_000
 
 async function listApi(after?: string): Promise<{ rows: FileRow[]; hasMore: boolean; lastId?: string }> {
-  const params = new URLSearchParams({ limit: '20' })
+  // limit 不传：host 归一化缺省回退 PAGE_SIZE（页大小只活在一处，避免两端漂移）。
+  const params = new URLSearchParams()
   if (after !== undefined) params.set('after', after)
   const response = await fetch(`/api/file-session/list?${params.toString()}`, {
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

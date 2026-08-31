@@ -7,7 +7,7 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-settings'
 import { DeepSeekFileId, DeepSeekFilesClient, MAX_STORED_FILE_BYTES, MAX_STORED_FILE_COUNT } from '@deepseek-ai/dsh-llm-deepseek'
-import { classifyUpstreamError, COUNT_PAGE_TIMEOUT_MS, formatBytes, MAX_COUNT_PAGES, normalizePageQuery, toFileRow } from './files.js'
+import { classifyUpstreamError, COUNT_PAGE_LIMIT, COUNT_PAGE_TIMEOUT_MS, decodeFileIdParam, formatBytes, MAX_COUNT_PAGES, normalizePageQuery, toFileRow } from './files.js'
 
 export const name = 'dsh-file-session'
 export const inject = ['webServer', 'credentials', 'settings']
@@ -125,7 +125,7 @@ export function apply(ctx: Context): void {
           for (let page = 0; page < MAX_COUNT_PAGES; page++) {
             const result = await client.list({
               ...after === undefined ? {} : { after },
-              limit: 1000,
+              limit: COUNT_PAGE_LIMIT,
               order: 'desc',
               signal: AbortSignal.timeout(COUNT_PAGE_TIMEOUT_MS),
             })
@@ -145,7 +145,7 @@ export function apply(ctx: Context): void {
           return
         }
         if (req.method === 'DELETE' && pathname === `${PREFIX}/files`) {
-          const id = decodeURIComponent(url.searchParams.get('id') ?? '')
+          const id = decodeFileIdParam(url.searchParams.get('id') ?? '')
           if (id === '') {
             sendError(res, new FileSessionError('BAD_REQUEST', '缺少文件 id', 400))
             return
