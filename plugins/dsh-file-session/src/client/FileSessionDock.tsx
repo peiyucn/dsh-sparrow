@@ -401,7 +401,7 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
                   <p style={{ ...styles.secondarySmall, margin: '0 0 6px' }}>
                     {t('summary', { count: summary.count, size: `${summary.totalBytesLabel} / ${summary.quotaBytesLabel}` })}
                     {' · '}
-                    {formatUsagePercent(quotaRatio)}
+                    {t('quota.used', { percent: formatUsagePercent(quotaRatio) })}
                   </p>
                   <div className="dsh-file-session-quota-track">
                     {/* 零用量不渲染填充（min-width 银条只给「有使用」的状态）。 */}
