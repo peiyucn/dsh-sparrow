@@ -431,8 +431,12 @@ describe('chat-suggest 纯逻辑', () => {
       assert.deepEqual(shouldTriggerSuggest('Let me fix the iss'), { ok: true })
     })
 
-    it('纯英文 3 字符 应该 触发', () => {
-      assert.deepEqual(shouldTriggerSuggest('Hel'), { ok: true })
+    it('纯英文 4 字符 应该 触发', () => {
+      assert.deepEqual(shouldTriggerSuggest('Hell'), { ok: true })
+    })
+
+    it('纯英文 3 字符 应该 不触发（too-short）', () => {
+      assert.deepEqual(shouldTriggerSuggest('Hel'), { ok: false, reason: 'too-short' })
     })
 
     it('纯英文 2 字符 应该 不触发（too-short）', () => {
@@ -485,6 +489,14 @@ describe('chat-suggest 纯逻辑', () => {
 
     it('建议是历史消息的截断前缀 应该 判定回声', () => {
       assert.equal(isHistoryEcho('这是一段很长的历史消息开', ['这是一段很长的历史消息开头，后面还有内容']), true)
+    })
+
+    it('建议中段含助手消息片段 应该 判定回声（转述实现细节）', () => {
+      assert.equal(isHistoryEcho('先想想 cleanSuggestion 按说话人标记处理', ['cleanSuggestion按说话人标记截断，角色切换丢弃']), true)
+    })
+
+    it('建议与历史仅共词不共段 应该 不算回声', () => {
+      assert.equal(isHistoryEcho('这个方案还需要再想想', ['这个方案可以再细化']), false)
     })
 
     it('建议与历史无重叠 应该 不算回声', () => {

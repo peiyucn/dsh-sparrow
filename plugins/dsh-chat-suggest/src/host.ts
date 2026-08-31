@@ -184,11 +184,9 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
       const history = session.deriveMessages() as readonly unknown[]
       // 对话前缀续写请求体：原生历史消息 + 以「用户：草稿」为前缀的 assistant 消息（prefix: true）。
       const messages = buildPrefixMessages(history, parsed.prompt, language)
-      // 回声判定只用「用户」历史消息：模型复读用户刚说的话是退化（实测），
-      // 而续写里引用助手的措辞是正常对话，不判回声。
-      const historyEchoTexts = recentHistoryTurns(history)
-        .filter(turn => turn.role === 'user')
-        .map(turn => turn.text)
+      // 回声判定的历史文本集（与 prompt 同一窗口，用户与助手消息都比对）：
+      // 模型复读/转述任一角色的话语都是退化（实测转述插件讨论内容时仅比用户消息拦不住）。
+      const historyEchoTexts = recentHistoryTurns(history).map(turn => turn.text)
       const stop = speakerStopSequences(language)
       // 补全模型三档解析：pro / flash / auto（跟随官方主模型，vision/未知回退配置默认）。
       const suggestModel = resolveSuggestModel(parsed.suggestModelMode, main, settings.model)

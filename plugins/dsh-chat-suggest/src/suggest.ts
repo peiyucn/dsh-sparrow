@@ -319,16 +319,19 @@ function normalizeForEcho(text: string): string {
 }
 
 /**
- * 检测历史回声：建议开头（归一化后）的前 minOverlap 字连续出现在给定的历史文本里，
- * 说明模型在复读/转述历史而非续写草稿（实测：输入 ple 复述聊天区用户刚发过的句子）。
- * host 侧只传「用户」消息做比对——引用助手措辞的正常续写不判回声，避免误杀。
+ * 检测历史回声：建议（归一化后）任一 minOverlap 字窗口连续出现在给定历史文本里，
+ * 说明模型在复读/转述历史而非续写草稿（实测：输入 ple 复述聊天区用户刚发过的句子；
+ * 输入 ple 转述正在讨论的插件实现细节——「cleanSuggestion 按说话人标记处理」）。
+ * 窗口匹配而非前缀锚定：模型常把原句改写后再复读，前缀对不上但片段仍在。
+ * host 侧传近期用户 + 助手消息文本（含助手——2026-08-31 实测仅比用户消息拦不住转述）。
  */
 export function isHistoryEcho(suggestion: string, historyTexts: readonly string[], minOverlap = 10): boolean {
   const text = normalizeForEcho(suggestion)
   if (text.length < minOverlap) return false
-  const prefix = text.slice(0, minOverlap)
-  for (const entry of historyTexts) {
-    if (normalizeForEcho(entry).includes(prefix)) return true
+  const normalizedHistory = historyTexts.map(entry => normalizeForEcho(entry))
+  for (let start = 0; start <= text.length - minOverlap; start++) {
+    const windowText = text.slice(start, start + minOverlap)
+    if (normalizedHistory.some(entry => entry.includes(windowText))) return true
   }
   return false
 }
@@ -422,9 +425,9 @@ export function formatTokenCount(count: number): string {
   return String(safe).replace(/\B(?=(\d{3})+(?!\d))/gu, ',')
 }
 
-/** 触发形态门控：草稿最短长度（trim 后）。标准档 CJK 草稿 8 字；纯拉丁草稿按词计，3 字符即可开补。 */
+/** 触发形态门控：草稿最短长度（trim 后）。标准档 CJK 草稿 8 字；纯拉丁草稿按词计，4 字符才开补（3 字符片段信号太弱，实测联想质量差）。 */
 export const MIN_TRIGGER_DRAFT_CHARS = 8
-export const MIN_TRIGGER_DRAFT_CHARS_LATIN = 3
+export const MIN_TRIGGER_DRAFT_CHARS_LATIN = 4
 
 /** 句末标点：草稿以这些字符结尾时句子已完整，FIM 会续出新一句而不是接话（实测质量差），不触发。 */
 export const SENTENCE_END_CHARS = '。！？.!?;；'
