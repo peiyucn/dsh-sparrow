@@ -325,31 +325,41 @@ export function formatTokenCount(count: number): string {
   return String(safe).replace(/\B(?=(\d{3})+(?!\d))/gu, ',')
 }
 
-/** 触发形态门控：草稿最短长度（trim 后）。 */
+/** 触发形态门控：草稿最短长度（trim 后）。CJK 草稿 8 字；纯拉丁草稿按词计，3 字符即可开补。 */
 export const MIN_TRIGGER_DRAFT_CHARS = 8
+export const MIN_TRIGGER_DRAFT_CHARS_LATIN = 3
 
 /** 句末标点：草稿以这些字符结尾时句子已完整，FIM 会续出新一句而不是接话（实测质量差），不触发。 */
 export const SENTENCE_END_CHARS = '。！？.!?;；'
+
+/** CJK 字符检测：草稿含中日韩文字即按「中文语境」门控（2026-08-30 晚：不做 zh/en 硬切换，按内容自适应）。 */
+const CJK_CHARS = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/u
 
 export type FimTriggerDecision =
   | { readonly ok: true }
   | { readonly ok: false; readonly reason: 'empty' | 'too-short' | 'sentence-end' | 'mid-word' | 'trailing-space' }
 
 /**
- * 依据草稿形态决定是否发起联想请求（2026-08-30 实测驱动）：
- * 句末标点 / 尾随空白 / 单词中间都不触发，避免建议太频繁且续出「新一句话」。
+ * 依据草稿形态决定是否发起联想请求（2026-08-30 实测驱动，同日晚改为内容自适应通用规则）：
+ * 句末标点 / 尾随空白都不触发，避免建议太频繁且续出「新一句话」。
+ * 「停在英文单词中间」仅对含 CJK 的草稿生效：中文里夹英文单词，续一半词质量差；
+ * 纯拉丁草稿（英文等）打字停顿几乎总在单词中间，恰是最该补全的位置，放行——所有语言同一规则、按内容自适应。
  */
 export function shouldTriggerFim(draft: string): FimTriggerDecision {
   const trimmed = draft.trim()
   if (trimmed === '') return { ok: false, reason: 'empty' }
-  if (trimmed.length < MIN_TRIGGER_DRAFT_CHARS) return { ok: false, reason: 'too-short' }
+  const cjk = CJK_CHARS.test(trimmed)
+  const minChars = cjk ? MIN_TRIGGER_DRAFT_CHARS : MIN_TRIGGER_DRAFT_CHARS_LATIN
+  if (trimmed.length < minChars) return { ok: false, reason: 'too-short' }
   // 尾随空白必须查原文末尾（trim 后看不到）：用户刚敲完空格/换行，正在输入。
   const rawLast = draft[draft.length - 1] ?? ''
   if (rawLast.trim() === '') return { ok: false, reason: 'trailing-space' }
   const last = trimmed[trimmed.length - 1] ?? ''
   if (SENTENCE_END_CHARS.includes(last)) return { ok: false, reason: 'sentence-end' }
-  const prev = trimmed[trimmed.length - 2] ?? ''
-  if (/[A-Za-z0-9]/u.test(last) && /[A-Za-z0-9]/u.test(prev)) return { ok: false, reason: 'mid-word' }
+  if (cjk) {
+    const prev = trimmed[trimmed.length - 2] ?? ''
+    if (/[A-Za-z0-9]/u.test(last) && /[A-Za-z0-9]/u.test(prev)) return { ok: false, reason: 'mid-word' }
+  }
   return { ok: true }
 }
 

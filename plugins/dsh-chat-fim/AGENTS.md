@@ -7,6 +7,7 @@
 DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + 官方 @ 列表同款候选菜单）。2026-08-29 从对话前缀续写切换为 FIM：实测提示词修视角不稳定（同构造两次采样一次用户口吻一次助手口吻），FIM 直接续写文本、无角色语义，天然站在用户角度。2026-08-30 建议展示从 portal 幽灵文本改为 `conversation.input.overlay` 候选菜单（真·框内渲染受插件边界所限不可行，见 docs/spec/03-menu.md）。单候选（suggestionCount 默认 1），Tab 键入、Esc 丢弃；开关挂输入框工具行（**默认关闭**，选择本地持久化），文案随 dsh 语言 zh/en 切换。
 
 * 2026-08-30 两个实测修正：上游偶发以「助手：」开头复读说话人标记（续写变助手口吻）——host 侧 `stripSpeakerPrefix` 剥离后再下发；Tab 采纳后 dock 会立刻对新草稿再触发联想（建议马上复现）——菜单采纳前记 `markFimAdoption`，dock 对「旧草稿 + 建议文本」这次草稿变化跳过触发，bail 失败回滚标记。
+* 2026-08-30 晚触发门控改**内容自适应通用规则**（`shouldTriggerFim` 无语言参数）：草稿含 CJK → 8 字符门槛 + 抑制夹在中文里的英文单词续一半；纯拉丁草稿 → 3 字符门槛 + 放行单词中间（英文停顿几乎总在词中）。不做 zh/en 硬切换，各语言体验一致。
 
 * TypeScript 实现；host half 源码在 src/，client half（M2 起）构建产物不入库（.gitignore）
 * 本地验证 = npm run verify（typecheck + node:test）

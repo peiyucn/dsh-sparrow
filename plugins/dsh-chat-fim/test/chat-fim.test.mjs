@@ -315,8 +315,20 @@ describe('chat-fim 纯逻辑', () => {
       assert.deepEqual(shouldTriggerFim('我觉得这个方案还 '), { ok: false, reason: 'trailing-space' })
     })
 
-    it('停在英文单词中间 应该 不触发（mid-word）', () => {
-      assert.deepEqual(shouldTriggerFim('Let me fix the iss'), { ok: false, reason: 'mid-word' })
+    it('中文夹英文单词停在一半 应该 不触发（mid-word）', () => {
+      assert.deepEqual(shouldTriggerFim('这个 bug 出在 transf'), { ok: false, reason: 'mid-word' })
+    })
+
+    it('纯英文停在单词中间 应该 触发（补全当前单词）', () => {
+      assert.deepEqual(shouldTriggerFim('Let me fix the iss'), { ok: true })
+    })
+
+    it('纯英文 3 字符 应该 触发', () => {
+      assert.deepEqual(shouldTriggerFim('Hel'), { ok: true })
+    })
+
+    it('纯英文 2 字符 应该 不触发（too-short）', () => {
+      assert.deepEqual(shouldTriggerFim('He'), { ok: false, reason: 'too-short' })
     })
 
     it('中文未完成句 应该 触发', () => {
