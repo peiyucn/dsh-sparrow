@@ -23,8 +23,10 @@ describe('dsh-file-session 配额纯逻辑', () => {
   })
 
   describe('formatUsagePercent', () => {
-    it('低于 10% 应该 保留一位小数（网盘风格）', () => {
-      assert.equal(formatUsagePercent(0), '0.0%')
+    it('百分比 应该 按量级自适应小数位（25GiB 配额下常见 0.01% 量级）', () => {
+      assert.equal(formatUsagePercent(0), '0.0000%')
+      assert.equal(formatUsagePercent(0.000195), '0.0195%')
+      assert.equal(formatUsagePercent(0.0053), '0.53%')
       assert.equal(formatUsagePercent(0.05), '5.0%')
       assert.equal(formatUsagePercent(0.092), '9.2%')
     })
@@ -36,7 +38,7 @@ describe('dsh-file-session 配额纯逻辑', () => {
     })
 
     it('越界输入 应该 钳到 [0%, 100%]', () => {
-      assert.equal(formatUsagePercent(-0.3), '0.0%')
+      assert.equal(formatUsagePercent(-0.3), '0.0000%')
       assert.equal(formatUsagePercent(1.7), '100%')
     })
   })
