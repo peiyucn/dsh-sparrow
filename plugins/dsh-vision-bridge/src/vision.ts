@@ -1,4 +1,4 @@
-/** dsh-vision-access 纯逻辑：配置、门禁判定、图片反查、报告解析与缓存。 */
+/** dsh-vision-bridge 纯逻辑：配置、门禁判定、图片反查、报告解析与缓存。 */
 
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -45,7 +45,7 @@ export function normalizeVisionConfig(input: Readonly<Partial<VisionConfig>> | u
   if (input?.visionReasoningEffort !== undefined) {
     const candidate = input.visionReasoningEffort.trim() as VisionReasoningEffort
     if (!VISION_REASONING_EFFORTS.includes(candidate)) {
-      throw new Error(`dsh-vision-access: visionReasoningEffort 必须是 ${VISION_REASONING_EFFORTS.join('/')}`)
+      throw new Error(`dsh-vision-bridge: visionReasoningEffort 必须是 ${VISION_REASONING_EFFORTS.join('/')}`)
     }
     visionReasoningEffort = candidate
   }
@@ -59,19 +59,19 @@ export function normalizeVisionConfig(input: Readonly<Partial<VisionConfig>> | u
     textRoutes: input?.textRoutes ?? DEFAULT_TEXT_ROUTES,
   }
   if (config.visionProvider === '' || config.visionModel === '') {
-    throw new Error('dsh-vision-access: visionProvider/visionModel 不能为空')
+    throw new Error('dsh-vision-bridge: visionProvider/visionModel 不能为空')
   }
   for (const [name, value] of Object.entries({ maxTokens: config.maxTokens, cacheMaxEntries: config.cacheMaxEntries })) {
     if (!Number.isSafeInteger(value) || value <= 0) {
-      throw new Error(`dsh-vision-access: ${name} 必须是正整数`)
+      throw new Error(`dsh-vision-bridge: ${name} 必须是正整数`)
     }
   }
   if (typeof config.temperature !== 'number' || !Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 2) {
-    throw new Error('dsh-vision-access: temperature 必须是 0-2 之间的数字')
+    throw new Error('dsh-vision-bridge: temperature 必须是 0-2 之间的数字')
   }
   for (const route of config.textRoutes) {
     if (route.provider === '' || route.model === '') {
-      throw new Error('dsh-vision-access: textRoutes 中 provider/model 不能为空')
+      throw new Error('dsh-vision-bridge: textRoutes 中 provider/model 不能为空')
     }
   }
   return config

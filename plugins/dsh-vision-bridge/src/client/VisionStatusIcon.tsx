@@ -22,7 +22,7 @@ export interface VisionStatusInjected {
   subscribeModelChange: (listener: () => void) => () => void
 }
 
-export type VisionStatusProps = PropsRuntime<'conversation.input.right'> & VisionStatusInjected & { t: TranslateNS<'vision-access'> }
+export type VisionStatusProps = PropsRuntime<'conversation.input.right'> & VisionStatusInjected & { t: TranslateNS<'vision-bridge'> }
 
 /** 眼睛 glyph：官方 icon 集无眼睛图标，内联 SVG + currentColor（同官方 PermissionSelect 自绘盾牌先例）。 */
 const EYE_GLYPH = (
@@ -43,10 +43,10 @@ const EYE_OFF_GLYPH = (
 
 /** 注入图标与说明弹窗样式（按 data 属性去重）；返回 style 元素供卸载清理。 */
 export function ensureVisionStyles(): HTMLStyleElement {
-  const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-vision-access]')
+  const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-vision-bridge]')
   if (existing !== null) return existing
   const style = document.createElement('style')
-  style.dataset.dshVisionAccess = ''
+  style.dataset.dshVisionBridge = ''
   style.textContent = `
 .dsh-vision-status {
   display: inline-flex;

@@ -1,7 +1,7 @@
 # 本地开发补丁：dsh checkout 内 dev:web / --patch overlay 使用；name 是本机绝对路径。
 - insert:
-    - id: dsh-vision-access
-      name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-vision-access/src/index.ts
+    - id: dsh-vision-bridge
+      name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-vision-bridge/src/index.ts
       config:
         visionModel: deepseek-v4-flash-vision-exp
         maxTokens: 8192

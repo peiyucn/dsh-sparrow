@@ -1,4 +1,4 @@
-/** dsh-vision-access host half：门禁放行 + vision_read 工具（直连 ctx.llm 视觉模型）+ 状态路由。 */
+/** dsh-vision-bridge host half：门禁放行 + vision_read 工具（直连 ctx.llm 视觉模型）+ 状态路由。 */
 
 import type { ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
@@ -17,13 +17,13 @@ import {
   visionCacheKey, VisionCache, type VisionConfig, type VisionReport,
 } from './vision.js'
 
-export const name = 'dsh-vision-access'
+export const name = 'dsh-vision-bridge'
 export const inject = ['llm', 'tools', 'attachments', 'sessions', 'webServer']
 
 export type { VisionConfig, VisionReport }
 
 const TOOL_NAME = 'vision_read'
-const STATUS_ROUTE_PATH = '/api/vision-access/status'
+const STATUS_ROUTE_PATH = '/api/vision-bridge/status'
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   if (res.headersSent) return
@@ -109,7 +109,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   }) as typeof llm.resolveModelInfo
   ctx.effect(() => () => {
     llm.resolveModelInfo = originalResolveModelInfo
-  }, 'dsh-vision-access: restore resolveModelInfo')
+  }, 'dsh-vision-bridge: restore resolveModelInfo')
 
   // 1.5 按 agent 屏蔽 vision_read（像没有这个工具）：
   //     非 deepseek 主模型；或主模型本身原生看图（图片直达主模型，转文字反而有损）。
@@ -125,7 +125,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   ctx.effect(() => () => {
     // 插件卸载时释放全部限制层；重装后才不会残留无法解除的旧 deny。
     for (const agent of [...restrictions.keys()]) releaseRestriction(agent)
-  }, 'dsh-vision-access: release restrictions')
+  }, 'dsh-vision-bridge: release restrictions')
   ctx.on('agent/request', async (payload, next) => {
     const config = await next()
     const agent = payload.agent
@@ -266,7 +266,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       inflight.set(cacheKey, task)
       return task
     },
-  })), 'dsh-vision-access: vision_read tool')
+  })), 'dsh-vision-bridge: vision_read tool')
 
   // 3. 状态查询路由：客户端点亮图标据此判定（DeepSeek 文本模型 → vision_read 可用）。
   ctx.effect(() => ctx.webServer.register({
@@ -307,5 +307,5 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
           : 'no-vision'
       sendJson(res, 200, { mode, visionModel: settings.visionModel })
     },
-  }), 'dsh-vision-access: status route')
+  }), 'dsh-vision-bridge: status route')
 }

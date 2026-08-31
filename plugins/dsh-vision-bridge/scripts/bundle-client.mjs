@@ -2,7 +2,7 @@
 import { build } from 'esbuild'
 import { resolve } from 'node:path'
 
-const id = '@dsh-sparrow/dsh-vision-access'
+const id = '@dsh-sparrow/dsh-vision-bridge'
 await build({
   entryPoints: [resolve(process.cwd(), 'src/client/index.ts')],
   outfile: resolve(process.cwd(), 'lib/client.js'),

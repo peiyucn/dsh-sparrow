@@ -1,4 +1,4 @@
-# 项目指令 — dsh-vision-access（dsh-sparrow 合集成员）
+# 项目指令 — dsh-vision-bridge（dsh-sparrow 合集成员）
 
 合集级通用规则见根目录 AGENTS.md；本文件只记本插件专属约束与 seam 特例。
 

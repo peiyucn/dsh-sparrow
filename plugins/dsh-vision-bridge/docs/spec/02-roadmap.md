@@ -1,4 +1,4 @@
-# 02 · 路线图 — dsh-vision-access
+# 02 · 路线图 — dsh-vision-bridge
 
 > 里程碑可独立验收；每完成一项单独 commit。
 
@@ -24,4 +24,4 @@
 
 ## 发布
 
-* 独立 npm 包 `dsh-vision-access`，按合集《发布》流程走 tag 或 `npm publish`；官方在纯文本路由上原生支持视觉读图后退役。
+* 独立 npm 包 `dsh-vision-bridge`，按合集《发布》流程走 tag 或 `npm publish`；官方在纯文本路由上原生支持视觉读图后退役。

@@ -1,4 +1,4 @@
-# 00 · 插件概览 — dsh-vision-access
+# 00 · 插件概览 — dsh-vision-bridge
 
 > dsh-sparrow 合集成员。详细设计见 01-design.md（seam 选择以 dsh 源码查证为准），路线图见 02-roadmap.md。
 
