@@ -69,5 +69,5 @@ jobs:
         shell: bash
         run: |
           for spec in ${{ inputs.packages }}; do
-            npm unpublish "$spec"
+            npm unpublish "$spec" --force
           done
