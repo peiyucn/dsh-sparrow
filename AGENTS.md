@@ -119,6 +119,7 @@
   * `repository` 必填（`git+https://github.com/peiyucn/dsh-sparrow.git` + `directory` 指到插件目录）——npm `--provenance` 校验 repository.url 与来源仓库匹配，缺失直接 E422
   * `files` 清单齐备：`lib/**/*.js`、`lib/types/**/*.d.ts`、`cordis.patch.yml`、`docs/images/**`、`README.md`、`README.zh-CN.md`、`CHANGELOG.md`
 * README：README.md 英文为 GitHub / npm 默认 + README.zh-CN.md 中文，顶部互链
+* CHANGELOG：英文（面向发布受众，与 README.md 一致；版本条目覆盖本版全部用户可感知改动）
 * 截图放 `plugins/<插件>/docs/images/`（与 README 引用一致）；同一张主截图也放仓库根 `resources/dsh-<插件>.png` 供总 README 使用
 
 #### 版本策略
