@@ -9,7 +9,7 @@ After a short typing pause, a suggestion card styled like the official @ menu ap
 ## Install
 
 ```bash
-dsh plugin --profile web add dsh-chat-suggest
+dsh plugin --profile web add @dsh-sparrow/dsh-chat-suggest
 ```
 
 Requires dsh ≥ 0.1.1-rc.2.

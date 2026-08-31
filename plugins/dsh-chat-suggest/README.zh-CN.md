@@ -9,7 +9,7 @@
 ## 安装
 
 ```bash
-dsh plugin --profile web add dsh-chat-suggest
+dsh plugin --profile web add @dsh-sparrow/dsh-chat-suggest
 ```
 
 适配 dsh ≥ 0.1.1-rc.2。

@@ -27,7 +27,7 @@ describe('dsh-chat-suggest 结构', () => {
     const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
     assert.match(patch, /- insert:/u)
     assert.match(patch, /id: dsh-chat-suggest/u)
-    assert.match(patch, /name: dsh-chat-suggest/u)
+    assert.match(patch, /name: '@dsh-sparrow\/dsh-chat-suggest'/u)
     assert.match(patch, /apiKeyEnv: DEEPSEEK_API_KEY/u)
   })
 })

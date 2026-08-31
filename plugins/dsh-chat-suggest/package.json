@@ -1,7 +1,7 @@
 {
-  "name": "dsh-chat-suggest",
+  "name": "@dsh-sparrow/dsh-chat-suggest",
   "description": "DSH web plugin: chat input suggestions via DeepSeek FIM completion (Beta) — a card suggests what you may type next, Tab adopts, Esc dismisses; trigger sensitivity adjustable (high/medium/low)",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "license": "MIT",
   "repository": {
     "type": "git",
