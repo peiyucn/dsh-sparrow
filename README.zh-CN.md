@@ -17,7 +17,7 @@
 文档：[dsh-chat-suggest README](plugins/dsh-chat-suggest/README.zh-CN.md)
 
 ```bash
-dsh plugin --profile web add dsh-chat-suggest
+dsh plugin --profile web add @dsh-sparrow/dsh-chat-suggest
 ```
 
 ## dsh-vision-access
@@ -31,7 +31,7 @@ dsh plugin --profile web add dsh-chat-suggest
 文档：[dsh-vision-access README](plugins/dsh-vision-access/README.zh-CN.md)
 
 ```bash
-dsh plugin --profile web add dsh-vision-access
+dsh plugin --profile web add @dsh-sparrow/dsh-vision-access
 ```
 
 ## dsh-archive-session
@@ -43,7 +43,7 @@ dsh plugin --profile web add dsh-vision-access
 文档：[dsh-archive-session README](plugins/dsh-archive-session/README.zh-CN.md)
 
 ```bash
-dsh plugin --profile web add dsh-archive-session
+dsh plugin --profile web add @dsh-sparrow/dsh-archive-session
 ```
 
 ## License

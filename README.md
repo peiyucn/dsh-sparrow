@@ -17,7 +17,7 @@ Chat input suggestions. After a short typing pause, an official-@-menu-style car
 Docs: [dsh-chat-suggest README](plugins/dsh-chat-suggest/README.md)
 
 ```bash
-dsh plugin --profile web add dsh-chat-suggest
+dsh plugin --profile web add @dsh-sparrow/dsh-chat-suggest
 ```
 
 ## dsh-vision-access
@@ -31,7 +31,7 @@ An image-vision channel for text-only main models. The main model calls the `vis
 Docs: [dsh-vision-access README](plugins/dsh-vision-access/README.md)
 
 ```bash
-dsh plugin --profile web add dsh-vision-access
+dsh plugin --profile web add @dsh-sparrow/dsh-vision-access
 ```
 
 ## dsh-archive-session
@@ -43,7 +43,7 @@ Archived-session management. The "Archive" entry in the sidebar backs up / delet
 Docs: [dsh-archive-session README](plugins/dsh-archive-session/README.md)
 
 ```bash
-dsh plugin --profile web add dsh-archive-session
+dsh plugin --profile web add @dsh-sparrow/dsh-archive-session
 ```
 
 ## License
