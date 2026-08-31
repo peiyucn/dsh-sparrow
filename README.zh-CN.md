@@ -66,7 +66,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin
 
 ## dsh-file-session
 
-DeepSeek Files API 云端文件管理。侧边栏「文件」入口列出你 API key 下的全部云端文件：游标翻页、大小 / 上传 / 到期时间、单条删除与一键复制 file_id。复用官方 DeepSeekFilesClient，不新增凭据。
+DeepSeek Files API 云端文件管理。侧边栏「云端文件」入口列出你 API key 下的全部云端文件：游标翻页、大小 / 上传 / 到期时间、单条删除与一键复制 file_id。复用官方 DeepSeekFilesClient，不新增凭据。
 
 > 官方无批量删除端点（不做「全部清理」）、无下载端点（不预览内容）；配额 10000 个 / 25 GiB 为官方限制。
 

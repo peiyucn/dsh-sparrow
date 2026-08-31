@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-settings'
-import { DeepSeekFileId, DeepSeekFilesClient } from '@deepseek-ai/dsh-llm-deepseek'
+import { DeepSeekFileId, DeepSeekFilesClient, MAX_STORED_FILE_BYTES, MAX_STORED_FILE_COUNT } from '@deepseek-ai/dsh-llm-deepseek'
 import { classifyUpstreamError, COUNT_PAGE_TIMEOUT_MS, formatBytes, MAX_COUNT_PAGES, normalizePageQuery, toFileRow } from './files.js'
 
 export const name = 'dsh-file-session'
@@ -134,7 +134,14 @@ export function apply(ctx: Context): void {
             if (!result.hasMore || result.lastId === undefined) break
             after = result.lastId
           }
-          sendJson(res, 200, { count, totalBytesLabel: formatBytes(totalBytes) })
+          sendJson(res, 200, {
+            count,
+            totalBytes,
+            totalBytesLabel: formatBytes(totalBytes),
+            quotaBytes: MAX_STORED_FILE_BYTES,
+            quotaBytesLabel: formatBytes(MAX_STORED_FILE_BYTES),
+            quotaCount: MAX_STORED_FILE_COUNT,
+          })
           return
         }
         if (req.method === 'DELETE' && pathname === `${PREFIX}/files`) {

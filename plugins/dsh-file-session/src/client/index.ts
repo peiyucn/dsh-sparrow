@@ -7,6 +7,7 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { FileSessionDock, ensureFileSessionStyles } from './FileSessionDock.js'
+import type { FileCountSummary } from './FileSessionDock.js'
 import type { FileRow } from '../files.js'
 
 export const inject = ['slots', 'locale']
@@ -14,8 +15,8 @@ export const inject = ['slots', 'locale']
 /** 本插件的 locale 字典（zh/en）。 */
 const LOCALE_DICTS = {
   zh: {
-    'button.label': '文件',
-    'dialog.title': '文件（DeepSeek Files API）',
+    'button.label': '云端文件',
+    'dialog.title': '云端文件（DeepSeek Files API）',
     'dialog.close': '关闭',
     'loading': '加载中…',
     'loadMore': '加载更多',
@@ -35,8 +36,8 @@ const LOCALE_DICTS = {
     'confirm.deleteDsh': '此文件由 DSH 自动上传，可能仍被会话引用。\n\n删除「{name}」？删除后再次引用时官方会自动重新上传。',
   },
   en: {
-    'button.label': 'Files',
-    'dialog.title': 'Files (DeepSeek Files API)',
+    'button.label': 'Cloud Files',
+    'dialog.title': 'Cloud Files (DeepSeek Files API)',
     'dialog.close': 'Close',
     'loading': 'Loading…',
     'loadMore': 'Load more',
@@ -86,13 +87,20 @@ async function listApi(after?: string): Promise<{ rows: FileRow[]; hasMore: bool
   }
 }
 
-async function countApi(): Promise<{ count: number; totalBytesLabel: string }> {
+async function countApi(): Promise<FileCountSummary> {
   const response = await fetch('/api/file-session/count', { signal: AbortSignal.timeout(COUNT_TIMEOUT_MS) })
-  const payload = await response.json() as { count?: number; totalBytesLabel?: string; error?: { message?: string } }
+  const payload = await response.json() as Partial<FileCountSummary> & { error?: { message?: string } }
   if (!response.ok) {
     throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
   }
-  return { count: payload.count ?? 0, totalBytesLabel: payload.totalBytesLabel ?? '0 B' }
+  return {
+    count: payload.count ?? 0,
+    totalBytes: payload.totalBytes ?? 0,
+    totalBytesLabel: payload.totalBytesLabel ?? '0 B',
+    quotaBytes: payload.quotaBytes ?? 0,
+    quotaBytesLabel: payload.quotaBytesLabel ?? '0 B',
+    quotaCount: payload.quotaCount ?? 0,
+  }
 }
 
 async function deleteApi(id: string): Promise<void> {

@@ -6,11 +6,22 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { IconCloseOutline16, IconFolderOpenOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FileRow } from '../files.js'
+import { formatUsagePercent, storageUsageRatio } from './quota.js'
+
+/** 总数统计（含配额，供网盘式进度条）。 */
+export interface FileCountSummary {
+  count: number
+  totalBytes: number
+  totalBytesLabel: string
+  quotaBytes: number
+  quotaBytesLabel: string
+  quotaCount: number
+}
 
 export interface FileSessionDockInjected {
   listFiles: (after?: string) => Promise<{ rows: FileRow[]; hasMore: boolean; lastId?: string }>
   deleteFile: (id: string) => Promise<void>
-  countFiles: () => Promise<{ count: number; totalBytesLabel: string }>
+  countFiles: () => Promise<FileCountSummary>
 }
 
 export type FileSessionDockProps = PropsRuntime<'sidebar.footer.action'> & FileSessionDockInjected & { t: TranslateNS<'file-session'> }
@@ -181,6 +192,32 @@ export function ensureFileSessionStyles(): void {
   justify-content: flex-end;
   gap: 8px;
 }
+/* 配额进度条：网盘风格细条（track 悬停底色 + 业务蓝填充）。 */
+.dsh-file-session-quota {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.dsh-file-session-quota-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  overflow: hidden;
+}
+.dsh-file-session-quota-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--dsw-alias-state-business-primary);
+  transition: width 220ms ease-out;
+}
+.dsh-file-session-quota-label {
+  flex: none;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
 `
   document.head.appendChild(style)
 }
@@ -260,7 +297,7 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
   const [confirming, setConfirming] = useState<FileRow | null>(null)
   const [busyDelete, setBusyDelete] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
-  const [summary, setSummary] = useState<{ count: number; totalBytesLabel: string } | null>(null)
+  const [summary, setSummary] = useState<FileCountSummary | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
 
   const loadFirst = useCallback(() => {
@@ -319,6 +356,8 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
     }
   }, [t])
 
+  const quotaRatio = summary === null ? 0 : storageUsageRatio(summary.totalBytes, summary.quotaBytes)
+
   const submitDelete = useCallback(() => {
     if (confirming === null || busyDelete) return
     setBusyDelete(true)
@@ -369,9 +408,17 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
                 </p>
               ) : null}
               {summary !== null ? (
-                <p style={{ ...styles.secondarySmall, margin: '0 0 12px' }}>
-                  {t('summary', { count: summary.count, size: summary.totalBytesLabel })}
-                </p>
+                <div style={{ margin: '0 0 12px' }}>
+                  <p style={{ ...styles.secondarySmall, margin: 0 }}>
+                    {t('summary', { count: summary.count, size: `${summary.totalBytesLabel} / ${summary.quotaBytesLabel}` })}
+                  </p>
+                  <div className="dsh-file-session-quota">
+                    <div className="dsh-file-session-quota-track">
+                      <div className="dsh-file-session-quota-fill" style={{ width: `${Math.round(quotaRatio * 100)}%` }} />
+                    </div>
+                    <span className="dsh-file-session-quota-label">{formatUsagePercent(quotaRatio)}</span>
+                  </div>
+                </div>
               ) : null}
               {loading ? <p style={styles.secondarySmall}>{t('loading')}</p> : null}
               {!loading && error === null && rows.length === 0 ? <p style={styles.secondarySmall}>{t('empty')}</p> : null}
