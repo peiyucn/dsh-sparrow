@@ -6,7 +6,8 @@
 
 * 输入框是 shell 私有 Lexical 编辑器，插件边界外拿不到编辑器实例（`ComposerKeyboard.editor` 源码标注 package-internal，永不跨插件边界）。往文档插真实文本会污染草稿/undo/发送序列化，往 contentEditable 塞裸 DOM 会被 Lexical reconcile 清掉——真·框内渲染需要官方新 seam，当前不可行（详查证见 `dsh-sparrow` 会话记录与 ui-conversation 源码）。
 * 官方 @ 候选菜单 = 渲染进 `conversation.input.overlay` 槽的卡片（ui-input-trigger/MenuView）；shell 用 `.overlayAnchor`（`position:absolute; inset:0 0 auto; height:0`，钉在 composer 卡片上沿、与卡片同宽）承载，菜单自身 `position:absolute; bottom:calc(100%+4px); left:0; right:0`，高度经公开原语 `useAnchoredMaxHeight` 钳制——**零定位 JS、零 portal、零 caret 测量**，窄宽度兼容由「菜单钉满卡片宽 + 行内省略号」按构造保证。
-* 决定：FIM 建议以同款菜单卡展示；`composer.dock` 组件退为纯数据面（拿草稿快照 → 请求 → 写共享 store），`conversation.input.overlay` 槽新注册菜单视图组件（overlay 槽无 InputZone 分享，靠共享 store 桥接，模式同开关 ↔ dock）。
+* 决定：FIM 建议以同款菜单卡展示；数据面组件退为纯数据面（拿草稿快照 → 请求 → 写共享 store），`conversation.input.overlay` 槽新注册菜单视图组件（overlay 槽无 InputZone 分享，靠共享 store 桥接，模式同开关 ↔ dock）。
+* 数据面挂载槽 2026-08-31 由 `conversation.composer.dock` 改为 **`conversation.input.dock`**：dsh shell（ConversationRoot）只在非 hero 状态渲染 composer.dock，而新会话页（空白会话）是 hero 状态（「Preview/预览版」徽标即 EmptyHero 的 `hero.preview`）——挂在 composer.dock 时新会话第一条草稿永远不触发联想（实测 0 请求）。input.dock 无 hero 门控、owner 同为 InputZone（slots 契约查证 ui-conversation/src/client/skeleton/ConversationRoot.tsx:344-355 与 contract/slots.ts），hero/active 两种状态下都挂载。
 
 ## 交互契约
 

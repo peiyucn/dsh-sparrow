@@ -1,4 +1,4 @@
-/** FIM 续写：共享状态 + 开关（input.left）+ 数据面 dock（composer.dock）+ @ 列表样式候选菜单（input.overlay）。 */
+/** FIM 续写：共享状态 + 开关（input.left）+ 数据面 dock（input.dock）+ @ 列表样式候选菜单（input.overlay）。 */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -32,7 +32,7 @@ export interface ChatSuggestDockInjected {
   adopt: (sessionId: SessionId, text: string, span: TokenSpan) => boolean
 }
 
-export type ChatSuggestDockProps = PropsRuntime<'conversation.composer.dock'> & ChatSuggestDockInjected & { t: TranslateNS<'chat-suggest'> }
+export type ChatSuggestDockProps = PropsRuntime<'conversation.input.dock'> & ChatSuggestDockInjected & { t: TranslateNS<'chat-suggest'> }
 export type ChatSuggestSwitchProps = PropsRuntime<'conversation.input.left'> & ChatSuggestDockInjected & { t: TranslateNS<'chat-suggest'> }
 export type ChatSuggestMenuProps = PropsRuntime<'conversation.input.overlay'> & ChatSuggestDockInjected & { t: TranslateNS<'chat-suggest'> }
 
@@ -49,7 +49,7 @@ export function readEnabled(storage: { getItem(key: string): string | null }, ke
   return value === '1'
 }
 
-// 模块级共享开关：开关（input.left）与建议条（composer.dock）是两个 React 树，
+// 模块级共享开关：开关（input.left）与建议条（input.dock）是两个 React 树，
 // 用同一 bundle 内的可变状态 + 订阅器同步，避免靠 localStorage 事件（同页不触发）。
 // 启动时读取本地持久化值；默认关闭（见 readEnabled）。
 let sharedEnabled = false
@@ -666,7 +666,7 @@ export function ChatSuggestSwitch(props: ChatSuggestSwitchProps) {
 }
 
 /**
- * 数据面（挂在 conversation.composer.dock）：读 InputZone 草稿快照 → 停顿后请求
+ * 数据面（挂在 conversation.input.dock）：读 InputZone 草稿快照 → 停顿后请求
  * FIM → 把「建议 + 快照」写共享 store；可见 UI 由 overlay 菜单与开关渲染。
  * 继续输入 / 发送 / 相位变化都会清空旧建议；联想中时渲染 composer 卡片外圈旋转紫光。
  * @param props - 槽位运行时 props + 注入动作。

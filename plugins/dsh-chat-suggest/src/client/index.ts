@@ -1,6 +1,8 @@
 /**
  * dsh-chat-suggest client half：开关挂 `conversation.input.left`（输入框工具行），
- * 数据面挂 `conversation.composer.dock`（读 InputZone 草稿快照、无可见 UI），
+ * 数据面挂 `conversation.input.dock`（读 InputZone 草稿快照、无可见 UI；
+ * 不挂 `conversation.composer.dock`——dsh shell 在 hero 状态（新会话页）不渲染它，
+ * 而 input.dock 在 hero 下同样挂载，否则新会话第一条草稿永远没有联想），
  * 候选菜单挂 `conversation.input.overlay`（官方 @ 列表同款悬浮卡），
  * 建议请求全部走 host 自有路由。文案经 dsh locale 服务（zh/en）。
  * 不 import Node 模块；API key 不进浏览器。
@@ -133,8 +135,8 @@ export function apply(ctx: ClientContext): void {
     inject: injectedFace,
   }, ChatSuggestSwitch))
 
-  ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
-    name: 'conversation.composer.dock',
+  ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
+    name: 'conversation.input.dock',
     id: 'chat-suggest',
     order: 30,
     locale: 'chat-suggest',

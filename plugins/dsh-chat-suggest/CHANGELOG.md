@@ -9,4 +9,5 @@
 - 建议**单句截断**（续写到句末标点即止）；**Tab 链式续写**（高档可连续 Tab）
 - 质量护栏：角色切换丢弃（含说话人标签大小写/全角变体）、退化复读、历史回声（用户前缀 / 助手窗口）、语言一致性；候选全被过滤时升温度 0.5 重试一次，仍无候选静默不显示
 - 开关默认关闭、状态本地记忆；主模型非 DeepSeek 系列时开关整体隐藏；复用 dsh 配置的 DeepSeek API key（不进浏览器）
+- **新会话页联想可用**：数据面自 `conversation.composer.dock` 迁至 `conversation.input.dock`（dsh shell 在 hero 状态（新会话页）不渲染 composer.dock，旧实现新会话第一条草稿 0 联想；input.dock 两种状态都挂载）
 - 插件自 dsh-chat-fim 更名而来（上游实现与「FIM 命名」语义分离）；npm 首发
