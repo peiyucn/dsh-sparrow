@@ -105,14 +105,56 @@
 
 * 对应插件的 `npm run verify` 通过；`git diff --check` 无空白错误
 
-### 发布（按插件独立发布）
+### 发布（npm 包，GitHub + npm 全套流程）
 
-1. 确认改动已提交并推送 `dev`
-2. 更新该插件 `package.json` 版本号，README / CHANGELOG 同步
-3. 再次验证：进入插件目录 `npm run verify`
-4. 合并 dev 到 main 并 push
-5. 打 tag（`<插件名>-vX.Y.Z`）触发发布，或 `npm publish` / tarball 交付
-6. 切回 dev 继续开发
+> 2026-08-31 首次 npm 发布时定案（与 VS Code 插件发布不同：**发布即永久**——同版本不可覆盖、整体 unpublish 会锁包名 24 小时）。发布前必须把版本、描述、CHANGELOG、tag 说明全部核对到位。
+
+#### 发布范围
+
+* 每次发布先**检查全部三个插件**（dsh-chat-suggest / dsh-vision-access / dsh-archive-session）的版本状态：对比 `npm view <包名> version` 与 `plugins/<插件>/package.json` 的 version、以及自上次 tag 以来的 git log
+* **只要有修改更新的插件，就走完整发布流程**（GitHub tag + npm publish）；没有改动的插件不动
+* 各插件独立版本号、独立发布、独立 tag（`<插件名>-vX.Y.Z`）
+
+#### 元数据规范（「介绍内容」）
+
+* `package.json`：
+  * `description` 必须**英文**（npm 搜索页与包页首行显示它）
+  * `repository` 必填（`git+https://github.com/peiyucn/dsh-sparrow.git` + `directory` 指到插件目录）——npm `--provenance` 校验 repository.url 与来源仓库匹配，缺失直接 E422
+  * `files` 清单齐备：`lib/**/*.js`、`lib/types/**/*.d.ts`、`cordis.patch.yml`、`docs/images/**`、`README.md`、`README.zh-CN.md`、`CHANGELOG.md`
+* README：README.md 英文为 GitHub / npm 默认 + README.zh-CN.md 中文，顶部互链
+* 截图放 `plugins/<插件>/docs/images/`（与 README 引用一致）；同一张主截图也放仓库根 `resources/dsh-<插件>.png` 供总 README 使用
+
+#### 版本策略
+
+* semver：修复升 patch（0.0.x）、功能升 minor（0.x.0）、破坏性升 major（x.0.0）
+* **npm 同版本不可覆盖已发布内容**——已发布版本的元数据错误（描述 / README）只能升补丁版修正，并在 CHANGELOG 诚实记录（如「描述改英文，功能与上版一致」）
+* **禁止**对已发布包 `npm unpublish` 整个包（锁包名 24 小时）；仅「发布后几分钟内 + 零安装 + owner 确认」才考虑撤销单版本重发
+
+#### 发布流程（按插件逐个走）
+
+1. 改动提交并推送 `dev`；对应插件 `npm run verify` 通过
+2. 更新该插件 `package.json` version；CHANGELOG 新增版本条目（覆盖本版全部用户可感知改动）；README 如有变化同步
+3. 再次 `npm run verify` + `git diff --check`
+4. 合并 dev → main（fast-forward）并 push
+5. 打 **annotated tag**：`git tag -a <插件名>-vX.Y.Z -m "<一句话中文发布说明>"`（轻量 tag 在 GitHub tag 页显示的是 commit message，必须 `-a` 带说明）
+6. push tag → 自动触发 Publish 工作流（解析插件目录、校验 tag 版本 == package.json version、verify 后 `npm publish --access public --provenance`）
+7. `gh run watch` 盯到 success；`npm view <包名> version description` 复核版本与英文描述
+8. `gh release create <tag> --notes "<本版 CHANGELOG 要点>"` 补 GitHub Release 说明（推荐；已发布 tag 补说明用同命令，**不要重推 tag**）
+9. 切回 `dev` 继续开发
+
+#### 首发踩坑实录（2026-08-31）
+
+* npm 403：账号开 2FA 后直接发布要求 **Automation 类型且勾选「绕过 2FA」**的 granular token，否则报 "bypass 2fa enabled is required"
+* npm E422：`--provenance` 要求 package.json `repository.url` 与来源仓库匹配
+* GitHub Actions：`secrets` 上下文不能出现在 step 的 `if`（整条工作流解析失败、0s 空跑无 job），必须经 job 级 `env` 中转
+* 轻量 tag 的「介绍」是 commit message——发布 tag 一律 annotated + 明确说明
+* tag 挪动需先删远端旧 tag 再推新的；tag push 会再次触发发布工作流，同版本重复发布会 E403 失败
+* 网络抖动：git push 失败就换代理（127.0.0.1:7897）或直连重试；gh api 直连 api.github.com
+
+#### 发布后收尾
+
+* npm 包页配置 **Trusted Publishing（OIDC）**：Settings → Access → Trusted publishers，owner `peiyucn` + repo `dsh-sparrow` + workflow 路径 `.github/workflows/publish.yml`
+* OIDC 配好并验证后：撤销用过的 token（聊天里贴过的 token 一律视为已暴露）、删除仓库 `NPM_TOKEN` secret——后续发布零密钥
 
 ***
 
@@ -126,5 +168,6 @@
 ## CI 与自动发布（已配置，远端 peiyucn/dsh-sparrow）
 
 * `.github/workflows/ci.yml`：push dev/main 与 PR 时跑 `pnpm install --frozen-lockfile` + `npm run verify:all`
-* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --provenance`
+* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`
+* 工作流实现细节（勿回退）：`NPM_TOKEN` 经 job 级 `env` 中转再进 step 的 `if`（`secrets` 上下文不允许出现在 `if` 里，直接写会让整条工作流 0s 解析失败）；`--provenance` 要求各插件 package.json 声明 `repository` 字段
 * 发布鉴权**双模式**（2026-08-31 为 npm 收紧准备）：有 `NPM_TOKEN` secret 走 Automation token（**首发必需**——npm trusted publisher 配置要求包已存在）；无 secret 自动走 **npm Trusted Publishing（OIDC）**（工作流 `permissions: id-token: write`；npm 包页 Access → Trusted publishers 配置 owner/peiyucn + repo + workflow 路径）。npm 官方 2027-01 起收紧「绕过 2FA 的令牌」直接发布，长期方向即 OIDC。CI 不受 NPM_TOKEN 影响
