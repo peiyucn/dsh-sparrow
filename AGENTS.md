@@ -39,6 +39,7 @@
 ### 分支
 
 * 日常开发一律在 `dev` 分支；`main` 只接受发布合并，不直接在上面开发
+* 分支保护：main 有 required CI 门禁 + 禁强推/删/重建，dev 有 rulesets 轻保护；外部 PR 需 CI 绿 + owner 审核合并（Squash-only）；统一安全基线（本仓库 **A 级**）见 pyai-meta-repo AGENTS.md
 
 ### Push
 
