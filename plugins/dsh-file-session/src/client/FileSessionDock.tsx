@@ -207,18 +207,25 @@ export function ensureFileSessionStyles(): void {
   border: 1px solid var(--dsw-alias-border-l2, #e2e5ea);
   border-radius: 12px;
 }
-/* 配额进度条：网盘风格细条（track 悬停底色 + 业务蓝填充）；百分比并入上方统计行，避免与细条左右分离。 */
+/* 配额容量条：加厚 + 未使用区斜纹（repeating-linear-gradient），与分割线区分；填充盖住斜纹。 */
 .dsh-file-session-quota-track {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--dsw-alias-interactive-bg-hover);
+  height: 12px;
+  border-radius: 6px;
+  background-color: var(--dsw-alias-interactive-bg-hover);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0px,
+    transparent 5px,
+    var(--dsw-alias-border-l1, #d4d8e0) 5px,
+    var(--dsw-alias-border-l1, #d4d8e0) 7px
+  );
   overflow: hidden;
 }
 .dsh-file-session-quota-fill {
   height: 100%;
   /* 用量极小时（0.01% 量级）宽度趋近 0，兜底 3px 银条让「有使用」可见（网盘同款）。
      不加自身圆角：最小宽度下 3px 圆角会长成圆点、视觉鼓出轨道左端，改由轨道 overflow:hidden + 圆角裁切两端。 */
-  min-width: 3px;
+  min-width: 4px;
   background: var(--dsw-alias-state-business-primary);
   transition: width 220ms ease-out;
 }
