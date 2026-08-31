@@ -4,13 +4,13 @@
 
 **dsh-sparrow**：DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全」。
 
-* 每个插件一个独立 npm 包、独立发布，统一挂在 npm 组织 **`@dsh-sparrow`** 下（`@dsh-sparrow/dsh-chat-suggest` 等，对齐官方 `@deepseek-ai/*` 惯例）；某功能被官方原生支持后对应插件从合集中退役
+* 每个插件一个独立 npm 包、独立发布，统一挂在 npm 组织 **`@dsh-sparrow`** 下（`@dsh-sparrow/dsh-chat-fim` 等，对齐官方 `@deepseek-ai/*` 惯例）；某功能被官方原生支持后对应插件从合集中退役
 * 布局：
-  * `plugins/dsh-chat-suggest` — 聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + 官方 @ 列表同款候选菜单）
-  * `plugins/dsh-vision-access` — 纯文本会话的图片视觉通道（官方 vision 模型读图，主模型保持大脑）
-  * `plugins/dsh-archive-session` — 归档会话管理：备份 / 删除 / 恢复（轻量标题已随官方投影缓存退役）
+  * `plugins/dsh-chat-fim` — 聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + 官方 @ 列表同款候选菜单）
+  * `plugins/dsh-vision-bridge` — 纯文本会话的图片视觉通道（官方 vision 模型读图，主模型保持大脑）
+  * `plugins/dsh-archive-manage` — 归档会话管理：备份 / 删除 / 恢复（轻量标题已随官方投影缓存退役）
   * `plugins/dsh-nav-pin` — 轮次导航窄屏不消失：官方 900px 断点提到 700px，更窄时 hover 右缘浮现为浮层（纯样式注入）
-  * `plugins/dsh-file-session` — DeepSeek Files API 云端文件管理：侧边栏清单 / 单条删除 / 复制 file_id（复用官方 DeepSeekFilesClient，无本地持久化）
+  * `plugins/dsh-file-manage` — DeepSeek Files API 云端文件管理：侧边栏清单 / 单条删除 / 复制 file_id（复用官方 DeepSeekFilesClient，无本地持久化）
 * 各插件本地验证 = 进入插件目录 `npm run verify`（typecheck + node:test）；全量 = 仓库根 `npm run verify:all`
 * 文档分工：插件 README 面向用户（**README.md 英文为 GitHub 默认 + README.zh-CN.md 简体中文**，顶部互链，写法对齐 dsh-launcher-panel）；`AGENTS.md` 面向开发 agent（seam 特例 / 架构约束 / 测试约定），开发细节不进 README
 * 各插件专属约束见 `plugins/*/AGENTS.md`
@@ -21,9 +21,9 @@
 
 * **入口契约**：插件模块 export `name` / `inject` / `apply`；`inject` 只声明硬依赖服务，缺失时插件不启动
 * **生命周期**：一切副作用在 `apply` 内注册，并配 `ctx.effect` 清理（卸载/更新时自动执行）；不泄漏定时器/watcher/事件监听
-* **组合行**：`cordis.patch.yml` 的 insert 结构按官方 bundle patch 规范——`id` 用**短名**（如 `dsh-chat-suggest`，稳定供后续 patch 定位）、`name` 用 **scoped 包名**（`@dsh-sparrow/dsh-chat-suggest`，loader 按包名解析模块；官方先例 `packages/bundle/sdk-app/tests/sdk-app.spec.ts`：`id: sdk-app-startup` + `name: '@deepseek-ai/dsh-sdk-app'`）
+* **组合行**：`cordis.patch.yml` 的 insert 结构按官方 bundle patch 规范——`id` 用**短名**（如 `dsh-chat-fim`，稳定供后续 patch 定位）、`name` 用 **scoped 包名**（`@dsh-sparrow/dsh-chat-fim`，loader 按包名解析模块；官方先例 `packages/bundle/sdk-app/tests/sdk-app.spec.ts`：`id: sdk-app-startup` + `name: '@deepseek-ai/dsh-sdk-app'`）
 * **seam 纪律**：只用公开 seam（`ctx.llm` / `ctx.webServer` / `ctx.tools` / slots / provide 等正路 API）；确需包装 seam 时保持原签名与 `this` 语义、可逆恢复，并记录所适配的 dsh 版本
-* **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直接读内部文件（附件/会话数据一律走官方服务）。**特例机制**：官方无能力、需求明确且必须直碰内部文件的场景，须在对应插件 `AGENTS.md` 显式记录特例（允许的操作、边界、风险），并经项目 owner 认可——如 dsh-archive-session 的「备份 / 删除」特例。
+* **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直接读内部文件（附件/会话数据一律走官方服务）。**特例机制**：官方无能力、需求明确且必须直碰内部文件的场景，须在对应插件 `AGENTS.md` 显式记录特例（允许的操作、边界、风险），并经项目 owner 认可——如 dsh-archive-manage 的「备份 / 删除」特例。
 * **查证原则**：引用 DSH 服务、事件、插槽、附件契约时，先 grep 源码（本机 checkout：`C:\Users\DJ028191\.dsh-launcher-panel\source`）或 cordis_inspect 查询确认，禁止凭记忆编造
 
 ***
@@ -107,7 +107,7 @@
 
 #### 发布范围
 
-* 每次发布先**检查全部插件**（dsh-chat-suggest / dsh-vision-access / dsh-archive-session / dsh-nav-pin / dsh-file-session）的版本状态：对比 `npm view <包名> version` 与 `plugins/<插件>/package.json` 的 version、以及自上次 tag 以来的 git log
+* 每次发布先**检查全部插件**（dsh-chat-fim / dsh-vision-bridge / dsh-archive-manage / dsh-nav-pin / dsh-file-manage）的版本状态：对比 `npm view <包名> version` 与 `plugins/<插件>/package.json` 的 version、以及自上次 tag 以来的 git log
 * **只要有修改更新的插件，就走完整发布流程**（GitHub tag + npm publish）；没有改动的插件不动
 * 各插件独立版本号、独立发布、独立 tag（`<插件名>-vX.Y.Z`）
 

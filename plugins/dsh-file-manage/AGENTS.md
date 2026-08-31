@@ -23,7 +23,7 @@ DSH Web 插件：DeepSeek Files API 云端文件管理面板——侧边栏 foot
 
 * **复用官方客户端**：直接 import 官方导出 `DeepSeekFilesClient`（peer 依赖 `@deepseek-ai/dsh-llm-deepseek`）；官方改导出需插件升级。
 * **只读官方 llm-deepseek 设置节**：`ctx.settings.describe()` 找 `ns === 'llm-deepseek'` 的已解析值（schema 默认 + 组合 base + 用户层），只取 `baseURL` / `apiKeyEnv` 两字段；官方改节名 / 字段需插件升级。
-* **连接事实解析（与官方 adapter 同路径）**：baseURL 回退 `$DEEPSEEK_BASE_URL` → `https://api.deepseek.com`；key 经 `ctx.credentials.resolve(credentialRef(apiKeyEnv))`（apiKeyEnv 缺省 `DEEPSEEK_API_KEY`），chat-suggest 同款模式。
+* **连接事实解析（与官方 adapter 同路径）**：baseURL 回退 `$DEEPSEEK_BASE_URL` → `https://api.deepseek.com`；key 经 `ctx.credentials.resolve(credentialRef(apiKeyEnv))`（apiKeyEnv 缺省 `DEEPSEEK_API_KEY`），chat-fim 同款模式。
 * **dsh- 前缀警示**：官方自动上传文件（`dsh-` 前缀文件名）删除时给更强确认文案；不读官方上传索引文件。
 * **仍禁止**：monkey-patch 核心、绕过官方 client 直连 api.deepseek.com、写官方上传索引、动其它内部文件。
 

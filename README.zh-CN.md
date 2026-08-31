@@ -12,44 +12,44 @@
 
 > 这些包虽然发布在 npm，但**不要**直接用 `npm install @dsh-sparrow/...` 安装：那只会把它们下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用下面的 `dsh plugin` 命令，让包安装到 `$DSH_HOME/profiles/web` 并激活 bundle 层；安装后请重启 DSH。
 
-## dsh-chat-suggest
+## dsh-chat-fim
 
 聊天输入框续写联想。打字停顿片刻，在输入框上方以官方 @ 候选菜单同款悬浮卡给出「接下来可能写的文字」，Tab 采用、Esc 丢弃；补全由 DeepSeek FIM 补全（Beta）驱动，触发灵敏度三档可调（高 / 中 / 低），续写模型跟随主模型。
 
 > 仅限 DeepSeek 系列主模型（其他主模型时自动隐藏），复用你在 dsh 中配置的 DeepSeek API key，不新增凭据。
 
-![续写建议候选菜单](resources/dsh-chat-suggest.png)
+![续写建议候选菜单](resources/dsh-chat-fim.png)
 
-文档：[dsh-chat-suggest README](plugins/dsh-chat-suggest/README.zh-CN.md)
+文档：[dsh-chat-fim README](plugins/dsh-chat-fim/README.zh-CN.md)
 
 ```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-chat-suggest
+dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim
 ```
 
-## dsh-vision-access
+## dsh-vision-bridge
 
 纯文本主模型会话的官方视觉通道——只用 DeepSeek 官方视觉模型，不引入任何第三方模型或凭据。主模型调用 `vision_read` 工具，host 直连官方视觉模型读图并回传结构化文字报告，主模型保持对话大脑；主模型本身原生看图时该工具自动隐藏。
 
 > 仅限 DeepSeek 系列主模型（其他主模型时自动隐藏），复用你在 dsh 中配置的 DeepSeek API key，图片不出 DeepSeek 体系。
 
-![模型选择器旁的眼睛图标](resources/dsh-vision-access.png)
+![模型选择器旁的眼睛图标](resources/dsh-vision-bridge.png)
 
-文档：[dsh-vision-access README](plugins/dsh-vision-access/README.zh-CN.md)
+文档：[dsh-vision-bridge README](plugins/dsh-vision-bridge/README.zh-CN.md)
 
 ```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-vision-access
+dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge
 ```
 
-## dsh-archive-session
+## dsh-archive-manage
 
 归档会话管理。侧边栏「归档」入口：归档区备份 / 删除会话（备份 = 移出会话目录、可逆；删除不可逆），备份区支持单个 / 全部恢复与删除。
 
-![归档面板](resources/dsh-archive-session.png)
+![归档面板](resources/dsh-archive-manage.png)
 
-文档：[dsh-archive-session README](plugins/dsh-archive-session/README.zh-CN.md)
+文档：[dsh-archive-manage README](plugins/dsh-archive-manage/README.zh-CN.md)
 
 ```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-archive-session
+dsh plugin --profile web add @dsh-sparrow/dsh-archive-manage
 ```
 
 ## dsh-nav-pin
@@ -66,18 +66,18 @@ dsh plugin --profile web add @dsh-sparrow/dsh-archive-session
 dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin
 ```
 
-## dsh-file-session
+## dsh-file-manage
 
 DeepSeek Files API 云端文件管理。侧边栏「云端文件」入口列出你 API key 下的全部云端文件：游标翻页、大小 / 上传 / 到期时间、单条删除与一键复制 file_id。复用官方 DeepSeekFilesClient，不新增凭据。
 
 > 官方无批量删除端点（不做「全部清理」）、无下载端点（不预览内容）；配额 10000 个 / 25 GiB 为官方限制。
 
-![云端文件面板](resources/dsh-file-session.png)
+![云端文件面板](resources/dsh-file-manage.png)
 
-文档：[dsh-file-session README](plugins/dsh-file-session/README.zh-CN.md)
+文档：[dsh-file-manage README](plugins/dsh-file-manage/README.zh-CN.md)
 
 ```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-file-session
+dsh plugin --profile web add @dsh-sparrow/dsh-file-manage
 ```
 
 ## License

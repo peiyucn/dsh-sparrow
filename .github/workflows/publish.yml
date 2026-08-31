@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       plugin:
-        description: '插件目录名（如 dsh-chat-suggest）'
+        description: '插件目录名（如 dsh-chat-fim）'
         required: true
         type: string
 

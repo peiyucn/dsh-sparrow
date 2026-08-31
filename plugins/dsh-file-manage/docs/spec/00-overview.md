@@ -4,7 +4,7 @@
 
 ## 定位
 
-DeepSeek Files API 云端文件的**可视化管理面板**：侧边栏 footer 一个入口按钮（与 dsh-archive-session 同模式），弹窗列出本 API key 下的全部云端文件，支持单条删除与复制 file_id。只做「看得见 + 删得掉」，不动官方上传与去重逻辑（owner 拍板：不破坏官方初衷）。
+DeepSeek Files API 云端文件的**可视化管理面板**：侧边栏 footer 一个入口按钮（与 dsh-archive-manage 同模式），弹窗列出本 API key 下的全部云端文件，支持单条删除与复制 file_id。只做「看得见 + 删得掉」，不动官方上传与去重逻辑（owner 拍板：不破坏官方初衷）。
 
 ## 痛点与根因（已查证）
 
@@ -17,7 +17,7 @@ DeepSeek Files API 云端文件的**可视化管理面板**：侧边栏 footer �
 
 **做**：
 
-* 侧边栏 footer 入口按钮 + 弹窗（同 archive-session 模式）。
+* 侧边栏 footer 入口按钮 + 弹窗（同 archive-manage 模式）。
 * 列表：游标翻页（after / limit / order，默认 desc 最新在前）；行内展示文件名、大小（人读）、上传时间（created_at）、到期时间（expires_at，有则显）、file_id（一键复制）；`dsh-` 前缀文件标注「DSH 自动上传」。
 * 删除单条：二次确认；`dsh-` 前缀额外说明「删除后再次引用时官方会自动重新上传」。
 * 复制 file_id。
