@@ -2,7 +2,7 @@
 
 简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
-纯文本主模型会话的图片视觉通道 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
+纯文本主模型会话的官方视觉通道——只用 DeepSeek 官方视觉模型，不引入任何第三方模型或凭据。DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
 
 主模型本身看不到图片时，它会自动调用本插件提供的 `vision_read` 工具：host 直连官方视觉模型读图，把图片转成结构化文字报告（摘要 / OCR / 表格 / 版式），主模型保持对话大脑。
 

@@ -28,7 +28,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-chat-suggest
 
 ## dsh-vision-access
 
-纯文本主模型会话的图片视觉通道。主模型调用 `vision_read` 工具，host 直连官方视觉模型读图并回传结构化文字报告，主模型保持对话大脑；主模型本身原生看图时该工具自动隐藏。
+纯文本主模型会话的官方视觉通道——只用 DeepSeek 官方视觉模型，不引入任何第三方模型或凭据。主模型调用 `vision_read` 工具，host 直连官方视觉模型读图并回传结构化文字报告，主模型保持对话大脑；主模型本身原生看图时该工具自动隐藏。
 
 > 仅限 DeepSeek 系列主模型（其他主模型时自动隐藏），复用你在 dsh 中配置的 DeepSeek API key，图片不出 DeepSeek 体系。
 

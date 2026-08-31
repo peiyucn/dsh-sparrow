@@ -28,7 +28,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-chat-suggest
 
 ## dsh-vision-access
 
-An image-vision channel for text-only main models. The main model calls the `vision_read` tool, the host reads the image with the official vision model and returns a structured text report — the main model stays the brain; the tool hides itself when the main model already sees images.
+The official DeepSeek vision channel for text-only main models — official vision model only, no third-party models or credentials. The main model calls the `vision_read` tool, the host reads the image with the official vision model and returns a structured text report — the main model stays the brain; the tool hides itself when the main model already sees images.
 
 > DeepSeek main models only (hidden otherwise); reuses the DeepSeek API key configured in dsh — images never leave the DeepSeek ecosystem.
 

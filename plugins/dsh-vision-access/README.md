@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
-An image-vision channel for text-only main models — a DeepSeek Harness (DSH) Web plugin (part of the dsh-sparrow collection).
+The official DeepSeek vision channel for text-only main models — official vision model only, no third-party models or credentials. A DeepSeek Harness (DSH) Web plugin (part of the dsh-sparrow collection).
 
 When the main model cannot see images, it automatically calls the provided `vision_read` tool: the host reads the image with the official vision model and returns a structured text report (summary / OCR / tables / layout) — the main model stays the brain of the conversation.
 
