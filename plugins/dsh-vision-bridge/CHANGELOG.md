@@ -1,18 +1,17 @@
 # Changelog
 
-## 0.1.0-alpha.1（2026-08-31 · 预发布）
+## 0.1.0-alpha.1 (2026-08-31 · pre-release)
 
-- 包名由 `@dsh-sparrow/dsh-vision-access` 更名为 `@dsh-sparrow/dsh-vision-bridge`（2026-09-01 改定，locale namespace 等内部标识同步对齐；旧名从未发布，无迁移成本）
-- 首个预发布版本，先走 `next` 通道验证；功能同计划中的 `0.1.0` 首发
+- Renamed package from `@dsh-sparrow/dsh-vision-access` to `@dsh-sparrow/dsh-vision-bridge` (decided 2026-09-01; locale namespace and other internal identifiers aligned; the old name was never published, no migration cost)
+- First pre-release, published to the `next` channel for validation; features match the planned `0.1.0` first release
 
+## 0.1.0 (2026-08-31 · stable)
 
-## 0.1.0（2026-08-31 · 正式发布）
-
-- 迁移至 npm 组织作用域 `@dsh-sparrow`，以 0.1.0 作为首个正式发布版本
-- 修复 `scripts/bundle-client.mjs` 的 `__ModuleLoader__.load` 注册 id 使用 scoped 包名，避免 dsh 客户端加载失败
-- `npm run verify` 增加 client bundle 注册 id 与 package name 一致性校验
-- `vision_read` 工具：对话贴图后主模型自动调用，host 直连官方视觉模型（默认 deepseek-v4-flash-vision-exp）读图，回传结构化文字报告（摘要 / OCR / 表格 / 版式）；直连 `ctx.llm` 而非子代理（实测 2.2s vs 46.3s）
-- 按 agent 条件隐藏：主模型非 DeepSeek 系列、或本身原生看图时，该 agent 看不到 `vision_read`（像没有这个工具）
-- 状态图标：模型选择器旁的眼睛三态（原生视觉灰显 / DeepSeek 文本点亮 / 其它无视觉带斜线），点击弹对应说明，切换模型实时跟随；新会话无模型信息时按共享默认模型判定
-- 报告进程内缓存（按「attachmentId + question」），同一张图重复询问秒回
-- 凭据复用 dsh 配置的 DeepSeek API key，图片只发 DeepSeek 官方视觉模型、不出 DeepSeek 体系；零残留（不写文件、缓存仅进程内存）
+- Moved to the `@dsh-sparrow` npm org scope, with 0.1.0 as the first stable version
+- Fixed `scripts/bundle-client.mjs` to register the client bundle under the scoped package name in `__ModuleLoader__.load`, avoiding dsh client load failures
+- `npm run verify` now checks that the client bundle registration id matches the package name
+- `vision_read` tool: the main model calls it automatically after an image is pasted; the host reads the image directly with the official vision model (default deepseek-v4-flash-vision-exp) and returns a structured text report (summary / OCR / tables / layout); goes through `ctx.llm` instead of a subagent (measured 2.2s vs 46.3s)
+- Hidden per agent conditionally: when the main model is not a DeepSeek model, or natively understands images, that agent cannot see `vision_read` (as if the tool did not exist)
+- Status icon: a three-state eye beside the model selector (native vision greyed out / DeepSeek text lit / no-vision slashed); clicking shows the matching explanation, and it follows model switches live; with no model info on a new session it falls back to the shared default model
+- In-process report cache (keyed by "attachmentId + question"); repeat questions about the same image answer instantly
+- Reuses the DeepSeek API key configured in dsh; images are only sent to the official DeepSeek vision model and never leave the DeepSeek ecosystem; zero residue (no files written, cache is process memory only)

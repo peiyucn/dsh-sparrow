@@ -1,21 +1,20 @@
 # Changelog
 
-## 0.1.0-alpha.1（2026-08-31 · 预发布）
+## 0.1.0-alpha.1 (2026-08-31 · pre-release)
 
-- 包名由 `@dsh-sparrow/dsh-chat-suggest` 更名为 `@dsh-sparrow/dsh-chat-fim`（2026-09-01 改定，路由 / locale namespace / 存储键等内部标识同步对齐；旧名已 unpublish，无迁移成本）
-- 开关文案中英统一为 **FIM**（原 zh「续写」/ en「Suggest」，2026-09-01 用户拍板：行业通用词 + 省按钮宽度）
-- 首个预发布版本，先走 `next` 通道验证；功能同计划中的 `0.1.0` 首发
+- Renamed package from `@dsh-sparrow/dsh-chat-suggest` to `@dsh-sparrow/dsh-chat-fim` (decided 2026-09-01; route / locale namespace / storage keys and other internal identifiers aligned; the old name was unpublished, no migration cost)
+- Switch label unified to **FIM** in both zh and en (was 续写 (zh, "continuation") / Suggest (en); decided 2026-09-01: industry-standard term + narrower button)
+- First pre-release, published to the `next` channel for validation; features match the planned `0.1.0` first release
 
+## 0.1.0 (2026-08-31 · stable)
 
-## 0.1.0（2026-08-31 · 正式发布）
-
-- 迁移至 npm 组织作用域 `@dsh-sparrow`，以 0.1.0 作为首个正式发布版本
-- 修复 `scripts/bundle-client.mjs` 的 `__ModuleLoader__.load` 注册 id 使用 scoped 包名，避免 dsh 客户端加载失败
-- `npm run verify` 增加 client bundle 注册 id 与 package name 一致性校验
-- 输入框续写联想：打字停顿触发，官方 @ 候选菜单同款悬浮卡展示；**Tab** 采用、**Esc** 丢弃（也可点选），与官方 @/斜杠触发菜单互斥让位
-- 上游：DeepSeek **FIM 补全（Beta）**（`/beta/completions` + 说话人转写体）；续写模型**跟随主模型**（auto：v4-pro / v4-flash，vision 等回退 pro），卡片右下角展示实际模型与温度
-- **触发灵敏度三档**（高/中/低）：停顿时长 250/400/800ms、最短草稿（中文 4/8/12 字、英文 2/6/8 字符）、夹入英文半词、词后空格、句末标点分别伸缩；胶囊右侧「方点 + ▾」为独立灵敏度触发区（与开关主体邻接，整区点击只开菜单不切换开关），tooltip 随档位变化，选择本地持久化
-- 内容自适应：续写语言**跟随草稿**；建议**单句截断**（句末标点即止）；**Tab 链式续写**（高档可连续 Tab）
-- 质量护栏：角色切换丢弃、退化复读、历史回声（用户前缀 / 助手窗口）、语言一致性；候选全被过滤时升温度 0.5 重试一次，仍无候选静默不显示
-- 开关默认关闭、状态本地记忆；主模型非 DeepSeek 系列时整体隐藏；复用 dsh 配置的 DeepSeek API key（不进浏览器）
-- **新会话页联想可用**：数据面挂 `conversation.input.dock`（dsh shell 在 hero 状态不渲染 composer.dock，input.dock 两种状态都挂载）
+- Moved to the `@dsh-sparrow` npm org scope, with 0.1.0 as the first stable version
+- Fixed `scripts/bundle-client.mjs` to register the client bundle under the scoped package name in `__ModuleLoader__.load`, avoiding dsh client load failures
+- `npm run verify` now checks that the client bundle registration id matches the package name
+- Chat input suggestions: fired after a typing pause, shown in a floating card styled like the official @ candidate menu; **Tab** adopts, **Esc** dismisses (clicking works too); yields while the official @/slash trigger menu is open
+- Upstream: DeepSeek **FIM completion (Beta)** (`/beta/completions` + speaker-transcribed prompt); the completion model **follows the main model** (auto: v4-pro / v4-flash, falls back to pro for vision etc.), the actual model and temperature are shown in the card corner
+- **Three trigger sensitivity levels** (high / medium / low): pause 250/400/800ms, minimum draft (Chinese 4/8/12 chars, English 2/6/8 chars), embedded English half-word, trailing space, and sentence-end punctuation scale per level; the "dots + ▾" zone beside the pill is a separate sensitivity trigger area (clicking the whole zone opens the level menu without toggling the switch), the tooltip follows the level, and the choice persists locally
+- Content-adaptive: the completion language **follows the draft**; suggestions are **truncated to one sentence** (stop at sentence-end punctuation); **Tab chaining** (High allows continuous Tab)
+- Quality guards: role-switch discard, degenerate repetition, history echo (user prefix / assistant window), language consistency; when all candidates are filtered out, one retry at temperature 0.5, then silent empty if still none
+- Switch off by default with local persistence; hidden entirely when the session's main model is not a DeepSeek model; reuses the DeepSeek API key configured in dsh (never enters the browser)
+- **Works on the new-session page**: the data side mounts `conversation.input.dock` (the dsh shell does not render composer.dock in hero state; input.dock mounts in both states)

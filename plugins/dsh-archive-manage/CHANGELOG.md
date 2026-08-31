@@ -1,20 +1,19 @@
 # Changelog
 
-## 0.1.0-alpha.1（2026-08-31 · 预发布）
+## 0.1.0-alpha.1 (2026-08-31 · pre-release)
 
-- 包名由 `@dsh-sparrow/dsh-archive-session` 更名为 `@dsh-sparrow/dsh-archive-manage`（2026-09-01 改定，路由 / locale namespace / sidecar 文件名等内部标识同步对齐；旧名从未发布，无迁移成本）
-- 首个预发布版本，先走 `next` 通道验证；功能同计划中的 `0.1.0` 首发
+- Renamed package from `@dsh-sparrow/dsh-archive-session` to `@dsh-sparrow/dsh-archive-manage` (decided 2026-09-01; route / locale namespace / sidecar filename and other internal identifiers aligned; the old name was never published, no migration cost)
+- First pre-release, published to the `next` channel for validation; features match the planned `0.1.0` first release
 
+## 0.1.0 (2026-08-31 · stable)
 
-## 0.1.0（2026-08-31 · 正式发布）
-
-- 迁移至 npm 组织作用域 `@dsh-sparrow`，以 0.1.0 作为首个正式发布版本
-- 修复 `scripts/bundle-client.mjs` 的 `__ModuleLoader__.load` 注册 id 使用 scoped 包名，避免 dsh 客户端加载失败
-- `npm run verify` 增加 client bundle 注册 id 与 package name 一致性校验
-- 侧边栏底部「归档」入口，弹窗分「归档区 / 备份区」两个区块
-- 归档区：备份（移出磁盘、可逆）或删除（不可逆，需输入完整会话标题强确认）；本次 dsh 运行中打开过的未释放会话分组置灰，下次启动后可操作
-- 备份区：单个 / 全部恢复、单个 / 全部删除；备份位置在面板顶部明示、点击复制
-- 备份目录写 sidecar（原路径 / 工作区归属），恢复按它移回；无记录的旧格式目录仅列出 / 删除
-- 备份 / 删除连带处理父会话的全部 subagent 会话（备份时随父目录一并移入备份，恢复时一并移回；孤儿 subagent 由启动清扫清理）
-- 备份后即时从 @ 列表移除：同步官方 workspace 域记账、失效投影缓存行、补发 `api-session/removed` 事件
-- README 定位：官方归档标记不过滤 @ 候选（三层链路源码查证），文件级备份才是让会话离开 @ 的可逆手段
+- Moved to the `@dsh-sparrow` npm org scope, with 0.1.0 as the first stable version
+- Fixed `scripts/bundle-client.mjs` to register the client bundle under the scoped package name in `__ModuleLoader__.load`, avoiding dsh client load failures
+- `npm run verify` now checks that the client bundle registration id matches the package name
+- Sidebar footer "Archive" entry with a panel split into two sections: archived / backup
+- Archived section: backup (moves the session off disk, reversible) or delete (irreversible, requires typing the full session title to confirm); sessions still held open in this dsh run are grouped and greyed out, actionable after the next dsh restart
+- Backup section: restore or delete individually / in bulk; the backup location is shown at the top of the panel and copyable
+- Backups write a sidecar (original path / workspace membership) used for restore; legacy directories without a sidecar are list/delete only
+- Backup / delete also handles all subagent sessions of the parent session (moved into the backup together, restored together; orphan subagents are cleaned by the startup sweep)
+- Removed from the @ list immediately after backup: updates the official workspace domain bookkeeping, invalidates projection-cache rows, and re-emits the `api-session/removed` event
+- README positioning: the official archive flag does not filter @ candidates (verified through all three layers of the source); file-level backup is the only reversible way to take a session out of @
