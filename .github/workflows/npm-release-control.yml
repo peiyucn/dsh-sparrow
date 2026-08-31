@@ -67,10 +67,51 @@ jobs:
       - name: Unpublish versions
         if: inputs.action == 'unpublish'
         shell: bash
+        env:
+          SPECS: ${{ inputs.packages }}
         run: |
-          for spec in ${{ inputs.packages }}; do
-            npm unpublish "$spec" --force --loglevel=verbose
-          done
+          node --input-type=module <<'NODE'
+          const token = process.env.NPM_TOKEN
+          const registry = 'https://registry.npmjs.org'
+          for (const spec of process.env.SPECS.split(/\s+/).filter(Boolean)) {
+            const at = spec.lastIndexOf('@')
+            const name = spec.slice(0, at)
+            const version = spec.slice(at + 1)
+            const escaped = name.replace('/', '%2F')
+            const base = `${registry}/${escaped}`
+            const get = async () => {
+              const res = await fetch(`${base}?write=true`, { headers: { authorization: `Bearer ${token}` } })
+              if (!res.ok) throw new Error(`GET ${res.status}: ${await res.text()}`)
+              return res.json()
+            }
+            let pkg = await get()
+            if (!pkg.versions?.[version]) {
+              console.log(`GONE: ${spec}`)
+              continue
+            }
+            delete pkg.versions[version]
+            for (const [tag, value] of Object.entries(pkg['dist-tags'] ?? {})) {
+              if (value === version) delete pkg['dist-tags'][tag]
+            }
+            delete pkg._revisions
+            delete pkg._attachments
+            for (let attempt = 0; attempt < 3; attempt++) {
+              const put = await fetch(`${base}/-rev/${pkg._rev}`, {
+                method: 'PUT',
+                headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+                body: JSON.stringify(pkg),
+              })
+              const body = await put.text()
+              console.log(`PUT ${spec} attempt=${attempt + 1} status=${put.status} ${body}`)
+              if (put.ok) {
+                console.log(`UNPUBLISHED: ${spec}`)
+                break
+              }
+              if (attempt === 2) process.exitCode = 1
+              pkg = await get()
+            }
+          }
+          NODE
 
       - name: Verify versions after unpublish
         if: inputs.action == 'unpublish'
