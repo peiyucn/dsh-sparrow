@@ -192,10 +192,10 @@ export function ensureFileSessionStyles(): void {
   justify-content: flex-end;
   gap: 8px;
 }
-/* 用量/进度条固定区：面板头下方、不随列表滚动。 */
+/* 用量/进度条固定区：面板头下方、不随列表滚动；左右 36px = 区块卡外边距 24 + 卡内边距 12，与卡内内容对齐。 */
 .dsh-file-session-summary {
   flex: none;
-  padding: 12px 24px 12px;
+  padding: 12px 36px 12px;
 }
 /* 列表区块卡：存档页归档区/备份区同款 token（border-l2 + r12）。 */
 .dsh-file-session-card {
