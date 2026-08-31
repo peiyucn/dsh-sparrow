@@ -54,7 +54,7 @@
 实测结论（owner 拍板）：浮层不做面板框——只 opacity 淡入，无底色 / 边框 / 圆角 / 阴影，与官方宽屏轨道形态一致；高度过渡与官方 `.frame` 并列声明（复刻 `height 220ms`）。
 
 ```css
-/* 3) 会话内容最大宽度钳制（每侧留白 88 → 140px） */
+/* 3) 会话内容最大宽度钳制（每侧留白 88 → 160px） */
 [data-phase] {
   --dsh-nav-pin-official-width: var(--dsh-chat-content-width);
 }
@@ -62,7 +62,7 @@
 [data-width-handle] {
   --dsh-chat-content-width: min(
     var(--dsh-nav-pin-official-width),
-    max(680px, calc(var(--dsh-conversation-column-width) - 280px))
+    max(680px, calc(var(--dsh-conversation-column-width) - 320px))
   );
 }
 [data-conversation-scroll] {
