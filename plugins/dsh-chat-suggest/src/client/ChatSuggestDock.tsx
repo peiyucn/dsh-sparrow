@@ -300,29 +300,21 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
 .dsh-chat-suggest-switch-off .dsh-chat-suggest-switch-label {
   color: var(--dsw-alias-label-tertiary, #9aa0a6);
 }
-/* 胶囊内灵敏度触发区（分割线右侧：三点 + ▾）：整区可点，只开合灵敏度菜单、不切换开关。
+/* 胶囊内灵敏度触发区（开关主体右侧：三点 + ▾）：整区可点，只开合灵敏度菜单、不切换开关。
    不单独做悬停底色——按钮主体已有悬停底色，叠加会成嵌套椭圆。
-   命中区铺满：负 margin 顶掉按钮右侧 padding 与分割线左侧 gap，视觉间距由 padding 补回
-   （左 4px 与分割线左侧 gap 一致，右侧 9px 保持按钮右缘观感）。 */
+   命中区铺满：负 margin 顶掉按钮右侧 padding 与标签左侧 gap，视觉间距由 padding 补回
+   （左 6px 呼吸间距，右侧 9px 保持按钮右缘观感）。 */
 .dsh-chat-suggest-switch-picker {
   display: inline-flex;
   align-items: center;
   align-self: stretch;
   gap: 3px;
   margin: 0 -4px 0 -4px;
-  padding: 0 9px 0 4px;
+  padding: 0 9px 0 6px;
   cursor: pointer;
 }
 .dsh-chat-suggest-switch-on .dsh-chat-suggest-switch-picker {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
-}
-/* 开关主体与灵敏度触发区之间的 1px 分割线（split-button 形态）。 */
-.dsh-chat-suggest-switch-divider {
-  flex: none;
-  align-self: center;
-  width: 1px;
-  height: 12px;
-  background: var(--dsw-alias-border-l2);
 }
 /* ▾：打开时旋转 180°。 */
 .dsh-chat-suggest-switch-arrow {
@@ -342,9 +334,6 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
    容器是 InputBar .row（container-type: inline-size），阈值同官方 460px。 */
 @container (max-width: 460px) {
   .dsh-chat-suggest-switch .dsh-chat-suggest-switch-label {
-    display: none;
-  }
-  .dsh-chat-suggest-switch-divider {
     display: none;
   }
   .dsh-chat-suggest-switch {
@@ -624,7 +613,6 @@ export function ChatSuggestSwitch(props: ChatSuggestSwitchProps) {
       >
         <span className="dsh-chat-suggest-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
         <span className="dsh-chat-suggest-switch-label">{t('switch.label')}</span>
-        <span className="dsh-chat-suggest-switch-divider" aria-hidden />
         <span
           className="dsh-chat-suggest-switch-picker"
           role="button"
