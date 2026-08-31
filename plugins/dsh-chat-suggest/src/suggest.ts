@@ -449,9 +449,9 @@ export function formatTokenCount(count: number): string {
   return String(safe).replace(/\B(?=(\d{3})+(?!\d))/gu, ',')
 }
 
-/** 触发形态门控：草稿最短长度（trim 后）。标准档 CJK 草稿 8 字（FIM 时代实测好值）；纯拉丁草稿 4 字符（Hell 即触发，FIM 半词补全稳定）。 */
+/** 触发形态门控：草稿最短长度（trim 后）。标准档 CJK 草稿 8 字（FIM 时代实测好值）；纯拉丁草稿 6 字符——完整单词才触发，半词建议已按用户拍板去掉（plea×4 实测全错为 es、ple→as，字母级补全不可靠）。 */
 export const MIN_TRIGGER_DRAFT_CHARS = 8
-export const MIN_TRIGGER_DRAFT_CHARS_LATIN = 4
+export const MIN_TRIGGER_DRAFT_CHARS_LATIN = 6
 
 /** 句末标点：草稿以这些字符结尾时句子已完整，FIM 会续出新一句而不是接话（实测质量差），不触发。 */
 export const SENTENCE_END_CHARS = '。！？.!?;；'
