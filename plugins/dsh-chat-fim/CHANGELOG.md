@@ -2,8 +2,7 @@
 
 ## 0.1.0-alpha.1 (2026-09-01 · pre-release)
 
-- Renamed package from `@dsh-sparrow/dsh-chat-suggest` to `@dsh-sparrow/dsh-chat-fim` (route / locale namespace / storage keys and other internal identifiers aligned; the old name was published as 0.1.0 on 2026-08-31 and then unpublished, no migration cost)
-- First published version of the renamed package, released to the `next` channel for owner validation before the stable `0.1.0`
+- First published version, released to the `next` channel for owner validation before the stable `0.1.0`
 - Chat input suggestions: fired after a typing pause, shown in a floating card styled like the official @ candidate menu; **Tab** adopts, **Esc** dismisses (clicking works too); yields while the official @/slash trigger menu is open
 - Upstream: DeepSeek **FIM completion (Beta)** (`/beta/completions` + speaker-transcribed prompt); the completion model **follows the main model** (auto: v4-pro / v4-flash, falls back to pro for vision etc.), the actual model and temperature are shown in the card corner
 - Switch label **FIM** in both zh and en (decided 2026-09-01: industry-standard term + narrower button)

@@ -2,7 +2,6 @@
 
 ## 0.1.0-alpha.1 (2026-09-01 · pre-release)
 
-- Renamed package from `@dsh-sparrow/dsh-archive-session` to `@dsh-sparrow/dsh-archive-manage` (route / locale namespace / sidecar filename and other internal identifiers aligned; the old name was never published, no migration cost)
 - First published version, released to the `next` channel for owner validation before the stable `0.1.0`
 - Sidebar footer "Archive" entry with a panel split into two sections: archived / backup
 - Archived section: backup (moves the session off disk, reversible) or delete (irreversible, requires typing the full session title to confirm); sessions still held open in this dsh run are grouped and greyed out, actionable after the next dsh restart
