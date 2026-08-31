@@ -67,7 +67,7 @@ describe('dsh-nav-pin 纯逻辑', () => {
       assert.ok(css.includes('--dsh-nav-pin-official-width: var(--dsh-chat-content-width)'))
       assert.ok(css.includes('--dsh-chat-content-width: min('))
       assert.ok(css.includes(`calc(var(--dsh-conversation-column-width) - ${CONTENT_MAX_SIDE_CLEARANCE_PX * 2}px)`))
-      assert.ok(css.includes('max(680px'))
+      assert.ok(css.includes('max(640px'))
     })
 
     it('宽度钳制 应该 覆盖滚动体与两侧拖拽条', () => {

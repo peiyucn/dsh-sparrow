@@ -62,7 +62,7 @@
 [data-width-handle] {
   --dsh-chat-content-width: min(
     var(--dsh-nav-pin-official-width),
-    max(680px, calc(var(--dsh-conversation-column-width) - 320px))
+    max(640px, calc(var(--dsh-conversation-column-width) - 320px))
   );
 }
 [data-conversation-scroll] {
@@ -73,7 +73,7 @@
 ## seam 特例（写入插件 AGENTS.md）
 
 * 只读依赖两个公开 DOM 标记（`[data-conversation-scroll]` + nav aria-label 两套文案）；官方改文案 / 结构需插件升级，AGENTS.md 记录所适配 dsh 版本。
-* 宽度钳制依赖 `[data-phase]` / `[data-width-handle]` 公开属性；官方宽度值经 `[data-phase]` 上的 `--dsh-nav-pin-official-width` 捕获中转（自定义属性自引用会成环失效，不能直接 `min(var(--dsh-chat-content-width), …)`）；官方改宽度轴公式或消费点需插件升级。
+* 宽度钳制依赖 `[data-phase]` / `[data-width-handle]` 公开属性；官方宽度值经 `[data-phase]` 上的 `--dsh-nav-pin-official-width` 捕获中转（自定义属性自引用会成环失效，不能直接 `min(var(--dsh-chat-content-width), …)`）；钳制地板为官方最小内容宽度 640px（窄列下默认内容 680→640，owner 拍板）；官方改宽度轴公式或消费点需插件升级。
 * 样式表在 apply 内注入、`ctx.effect` 清理；卸载即恢复官方 900px 行为。
 
 ## 开放问题
