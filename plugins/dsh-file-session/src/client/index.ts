@@ -1,14 +1,14 @@
 /**
  * dsh-file-session client half：sidebar footer 入口 + 云端文件弹窗。
- * 列表与删除都走 host 自有路由；客户端不直接碰任何文件或凭据。
+ * 请求封装见 api.ts、样式见 styles.ts、视图见 FileSessionDock.tsx；客户端不直接碰任何文件或凭据。
  */
 
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import { FileSessionDock, ensureFileSessionStyles } from './FileSessionDock.js'
-import type { FileCountSummary } from './FileSessionDock.js'
-import type { FileRow } from '../files.js'
+import { countApi, deleteApi, listApi } from './api.js'
+import { FileSessionDock } from './FileSessionDock.js'
+import { ensureFileSessionStyles } from './styles.js'
 
 export const inject = ['slots', 'locale']
 
@@ -62,64 +62,6 @@ const LOCALE_DICTS = {
   },
 } as const
 
-interface ListEnvelope {
-  readonly items?: FileRow[]
-  readonly hasMore?: boolean
-  readonly lastId?: string
-  readonly error?: { readonly code?: string; readonly message?: string }
-}
-
-/** 面板请求超时：host 挂起时不让面板永久 loading（根 AGENTS 网络约定）。 */
-const REQUEST_TIMEOUT_MS = 15_000
-/** 总数统计超时：host 侧要游标翻到底（配额内最多 10 页），放宽到 60s。 */
-const COUNT_TIMEOUT_MS = 60_000
-
-async function listApi(after?: string): Promise<{ rows: FileRow[]; hasMore: boolean; lastId?: string }> {
-  // limit 不传：host 归一化缺省回退 PAGE_SIZE（页大小只活在一处，避免两端漂移）。
-  const params = new URLSearchParams()
-  if (after !== undefined) params.set('after', after)
-  const response = await fetch(`/api/file-session/list?${params.toString()}`, {
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  const payload = await response.json() as ListEnvelope
-  if (!response.ok) {
-    throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
-  }
-  return {
-    rows: payload.items ?? [],
-    hasMore: payload.hasMore ?? false,
-    ...payload.lastId === undefined ? {} : { lastId: payload.lastId },
-  }
-}
-
-async function countApi(): Promise<FileCountSummary> {
-  const response = await fetch('/api/file-session/count', { signal: AbortSignal.timeout(COUNT_TIMEOUT_MS) })
-  const payload = await response.json() as Partial<FileCountSummary> & { error?: { message?: string } }
-  if (!response.ok) {
-    throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
-  }
-  return {
-    count: payload.count ?? 0,
-    totalBytes: payload.totalBytes ?? 0,
-    totalBytesLabel: payload.totalBytesLabel ?? '0 B',
-    quotaBytes: payload.quotaBytes ?? 0,
-    quotaBytesLabel: payload.quotaBytesLabel ?? '0 B',
-    quotaCount: payload.quotaCount ?? 0,
-  }
-}
-
-async function deleteApi(id: string): Promise<void> {
-  const params = new URLSearchParams({ id })
-  const response = await fetch(`/api/file-session/files?${params.toString()}`, {
-    method: 'DELETE',
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  const payload = await response.json() as { error?: { message?: string } }
-  if (!response.ok) {
-    throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
-  }
-}
-
 /**
  * client half 入口：注册 locale 字典 + sidebar footer action。
  * @param ctx - 浏览器侧 Cordis 上下文。
@@ -141,5 +83,8 @@ export function apply(ctx: ClientContext): void {
   }, FileSessionDock))
 }
 
-export { FileSessionDock, ensureFileSessionStyles } from './FileSessionDock.js'
+export { FileSessionDock } from './FileSessionDock.js'
 export type { FileSessionDockInjected, FileSessionDockProps } from './FileSessionDock.js'
+export { ensureFileSessionStyles } from './styles.js'
+export { countApi, deleteApi, listApi } from './api.js'
+export type { FileCountSummary } from './api.js'
