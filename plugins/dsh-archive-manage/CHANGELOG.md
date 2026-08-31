@@ -1,15 +1,9 @@
 # Changelog
 
-## 0.1.0-alpha.1 (2026-08-31 · pre-release)
+## 0.1.0-alpha.1 (2026-09-01 · pre-release)
 
-- Renamed package from `@dsh-sparrow/dsh-archive-session` to `@dsh-sparrow/dsh-archive-manage` (decided 2026-09-01; route / locale namespace / sidecar filename and other internal identifiers aligned; the old name was never published, no migration cost)
-- First pre-release, published to the `next` channel for validation; features match the planned `0.1.0` first release
-
-## 0.1.0 (2026-08-31 · stable)
-
-- Moved to the `@dsh-sparrow` npm org scope, with 0.1.0 as the first stable version
-- Fixed `scripts/bundle-client.mjs` to register the client bundle under the scoped package name in `__ModuleLoader__.load`, avoiding dsh client load failures
-- `npm run verify` now checks that the client bundle registration id matches the package name
+- Renamed package from `@dsh-sparrow/dsh-archive-session` to `@dsh-sparrow/dsh-archive-manage` (route / locale namespace / sidecar filename and other internal identifiers aligned; the old name was never published, no migration cost)
+- First published version, released to the `next` channel for owner validation before the stable `0.1.0`
 - Sidebar footer "Archive" entry with a panel split into two sections: archived / backup
 - Archived section: backup (moves the session off disk, reversible) or delete (irreversible, requires typing the full session title to confirm); sessions still held open in this dsh run are grouped and greyed out, actionable after the next dsh restart
 - Backup section: restore or delete individually / in bulk; the backup location is shown at the top of the panel and copyable
