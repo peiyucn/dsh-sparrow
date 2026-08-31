@@ -270,6 +270,11 @@ export function ensureArchiveStyles(): void {
   justify-content: flex-end;
   gap: 8px;
 }
+/* 面板滚动区：elevated surface 重绑 l2 滚动条 token（base 默认 l1，浮层上对比度不对）。 */
+.dsh-archive-panel-body {
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
 `
   document.head.appendChild(style)
 }
@@ -739,7 +744,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 <IconCloseOutline16 size={14} />
               </button>
             </div>
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
+            <div className="dsh-archive-panel-body" style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
             <p style={{ ...styles.secondarySmall, fontSize: 14, lineHeight: '22px', margin: '0 0 12px' }}>
               {backupDir !== null && backupDir.displayPath !== '' ? (
                 <>
