@@ -111,7 +111,9 @@ export function cleanSuggestion(text: string, language: SuggestLanguage = 'zh'):
   }
   const loose = SPEAKER_TURN_BREAK.exec(value)
   if (loose !== null && loose.index > 0) value = value.slice(0, loose.index)
-  const trimmed = value.replace(/^[\s\uFEFF]+/u, '').replace(/[\s\uFEFF]+$/u, '')
+  // 原生 trim：同时覆盖 \s 与 \uFEFF（BOM），且为线性实现——原「尾部 \s+$ 替换」
+  // 属多项式回溯正则（CodeQL js/polynomial-redos 告警），已改用 trim。
+  const trimmed = value.trim()
   if (trimmed === '') return null
   if (SPEAKER_START.test(trimmed)) return null
   return trimmed

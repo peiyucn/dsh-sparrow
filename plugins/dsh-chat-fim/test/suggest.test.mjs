@@ -168,6 +168,14 @@ describe('chat-fim 纯逻辑', () => {
       assert.equal(cleanSuggestion('可行性不高'), '可行性不高')
     })
 
+    it('含 BOM 与首尾空白 应该 按 trim 语义截断', () => {
+      assert.equal(cleanSuggestion('\uFEFF  可行性不高 \t\n'), '可行性不高')
+    })
+
+    it('超长空白草稿 应该 快速判空返回 null', () => {
+      assert.equal(cleanSuggestion('\t'.repeat(10000)), null)
+    })
+
     it('续写带出助手回合 应该 在说话人标记处截断', () => {
       assert.equal(cleanSuggestion('可行性不高\n助手：嗯，我理解你的顾虑。'), '可行性不高')
     })
