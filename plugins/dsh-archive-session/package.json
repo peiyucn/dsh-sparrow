@@ -3,6 +3,11 @@
   "description": "DSH Web 插件：归档会话管理（备份 / 删除 / 恢复）",
   "version": "0.1.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peiyucn/dsh-sparrow.git",
+    "directory": "plugins/dsh-archive-session"
+  },
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

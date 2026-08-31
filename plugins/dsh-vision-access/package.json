@@ -3,6 +3,11 @@
   "description": "DSH Web 插件：纯文本主模型的图片视觉通道（官方 vision 模型读图，主模型保持大脑）",
   "version": "0.1.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peiyucn/dsh-sparrow.git",
+    "directory": "plugins/dsh-vision-access"
+  },
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
