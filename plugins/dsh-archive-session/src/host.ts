@@ -276,6 +276,25 @@ async function invalidateProjectionCache(ctx: Context, sessionId: SessionId): Pr
   }
 }
 
+/** 启动清扫：投影缓存中不在 sessionPersistence.list() 里的会话行删除，@ 列表与真实持久化保持一致。 */
+async function sweepStaleProjectionCache(ctx: Context): Promise<void> {
+  try {
+    const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
+    if (domain === undefined) return
+    const headers = await ctx.sessionPersistence.list()
+    const known = new Set(headers.map(header => String(header.id)))
+    const table = domain.table(PROJCACHE_SESSIONS_TABLE)
+    let removed = 0
+    for (const key of [...table.keys()]) {
+      if (known.has(String(key))) continue
+      await table.delete(String(key))
+      removed++
+    }
+    if (removed > 0) ctx.logger.warn(`dsh-archive-session: 启动清扫投影缓存移除 ${removed} 个陈旧会话`)
+  } catch (error) {
+    ctx.logger.warn(`dsh-archive-session: 投影缓存启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
+  }
+}
 /** 只有已知的「单会话目录」后端（当前为 jsonl）才允许文件级移动 / 删除。 */
 export function sessionDirectoryFor(location: { kind: string; path: string }): string | undefined {
   if (location.kind !== 'jsonl') return undefined
@@ -401,6 +420,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
 
   // 启动清扫归档集幽灵 id（官方写操作复活产物，2026-08-30 审计）：不影响加载。
   void sweepGhostArchivedIds(ctx)
+    // 启动清扫投影缓存：@ 列表与真实持久化一致。
+    void sweepStaleProjectionCache(ctx)
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
