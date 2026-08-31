@@ -108,8 +108,8 @@ importers:
         specifier: ~18.3.1
         version: 18.3.31
       '@types/react-dom':
-        specifier: ~18.3.1
-        version: 18.3.7(@types/react@18.3.31)
+        specifier: ~19.2.5
+        version: 19.2.5(@types/react@18.3.31)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -156,8 +156,8 @@ importers:
         specifier: ~18.3.1
         version: 18.3.31
       '@types/react-dom':
-        specifier: ~18.3.1
-        version: 18.3.7(@types/react@18.3.31)
+        specifier: ~19.2.5
+        version: 19.2.5(@types/react@18.3.31)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -1095,10 +1095,10 @@ packages:
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
 
-  '@types/react-dom@18.3.7':
-    resolution: {integrity: sha512-MEe3UeoENYVFXzoXEWsvcpg6ZvlrFNlOQ7EOsvhI3CfAXwzPfO8Qwuxd40nepsYKqyyVQnTdEfv68q91yLcKrQ==}
+  '@types/react-dom@19.2.5':
+    resolution: {integrity: sha512-fMPwH9v7r/pp43yUd2/Mbiex5KouJwwR3dzHkhLREUC6764VyDsqxhAxv6OFEYR1RhjOyD1naqba8ECDBe7ZQg==}
     peerDependencies:
-      '@types/react': ^18.0.0
+      '@types/react': ^19.2.0
 
   '@types/react@18.3.31':
     resolution: {integrity: sha512-vfEqpXTvwT91yhmwdfouStN2hSKwTvyRs8qpLfADyrq/kxDw0hZM7Wk9Ug1FELj8hIby+S/+kQCSRFF32nv2Qw==}
@@ -2345,7 +2345,7 @@ snapshots:
 
   '@types/prop-types@15.7.15': {}
 
-  '@types/react-dom@18.3.7(@types/react@18.3.31)':
+  '@types/react-dom@19.2.5(@types/react@18.3.31)':
     dependencies:
       '@types/react': 18.3.31
 
