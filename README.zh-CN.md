@@ -52,6 +52,30 @@ dsh plugin --profile web add @dsh-sparrow/dsh-vision-access
 dsh plugin --profile web add @dsh-sparrow/dsh-archive-session
 ```
 
+## dsh-nav-pin
+
+轮次导航窄屏不消失。官方「轮次导航」在对话列窄于 900px 时会整体隐藏；本插件把断点提到 700px，700px 以下默认隐身、鼠标移到右侧轨道即淡入浮现为浮层（无框无底色，与宽屏形态一致），并把会话内容最大宽度钳到每侧 120px 留白（640px 官方最小宽度地板），右侧拖拽条不再挤占导航。
+
+> 纯样式注入：无开关、无按钮、无设置、无持久化状态；卸载即恢复官方行为。
+
+文档：[dsh-nav-pin README](plugins/dsh-nav-pin/README.zh-CN.md)
+
+```bash
+dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin
+```
+
+## dsh-file-session
+
+DeepSeek Files API 云端文件管理。侧边栏「云端文件」入口列出你 API key 下的全部云端文件：游标翻页、大小 / 上传 / 到期时间、单条删除与一键复制 file_id。复用官方 DeepSeekFilesClient，不新增凭据。
+
+> 官方无批量删除端点（不做「全部清理」）、无下载端点（不预览内容）；配额 10000 个 / 25 GiB 为官方限制。
+
+文档：[dsh-file-session README](plugins/dsh-file-session/README.zh-CN.md)
+
+```bash
+dsh plugin --profile web add @dsh-sparrow/dsh-file-session
+```
+
 ## License
 
 MIT

@@ -10,7 +10,7 @@
   * `plugins/dsh-vision-access` — 纯文本会话的图片视觉通道（官方 vision 模型读图，主模型保持大脑）
   * `plugins/dsh-archive-session` — 归档会话管理：备份 / 删除 / 恢复（轻量标题已随官方投影缓存退役）
   * `plugins/dsh-nav-pin` — 轮次导航窄屏不消失：官方 900px 断点提到 700px，更窄时 hover 右缘浮现为浮层（纯样式注入）
-  * `plugins/dsh-file-session` — DeepSeek Files API 云端文件清单管理（spec 阶段，未实现）
+  * `plugins/dsh-file-session` — DeepSeek Files API 云端文件管理：侧边栏清单 / 单条删除 / 复制 file_id（复用官方 DeepSeekFilesClient，无本地持久化）
 * 各插件本地验证 = 进入插件目录 `npm run verify`（typecheck + node:test）；全量 = 仓库根 `npm run verify:all`
 * 文档分工：插件 README 面向用户（**README.md 英文为 GitHub 默认 + README.zh-CN.md 简体中文**，顶部互链，写法对齐 dsh-launcher-panel）；`AGENTS.md` 面向开发 agent（seam 特例 / 架构约束 / 测试约定），开发细节不进 README
 * 各插件专属约束见 `plugins/*/AGENTS.md`
@@ -107,7 +107,7 @@
 
 #### 发布范围
 
-* 每次发布先**检查全部插件**（dsh-chat-suggest / dsh-vision-access / dsh-archive-session / dsh-nav-pin，spec 阶段的插件除外）的版本状态：对比 `npm view <包名> version` 与 `plugins/<插件>/package.json` 的 version、以及自上次 tag 以来的 git log
+* 每次发布先**检查全部插件**（dsh-chat-suggest / dsh-vision-access / dsh-archive-session / dsh-nav-pin / dsh-file-session）的版本状态：对比 `npm view <包名> version` 与 `plugins/<插件>/package.json` 的 version、以及自上次 tag 以来的 git log
 * **只要有修改更新的插件，就走完整发布流程**（GitHub tag + npm publish）；没有改动的插件不动
 * 各插件独立版本号、独立发布、独立 tag（`<插件名>-vX.Y.Z`）
 

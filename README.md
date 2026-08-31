@@ -52,6 +52,30 @@ Docs: [dsh-archive-session README](plugins/dsh-archive-session/README.md)
 dsh plugin --profile web add @dsh-sparrow/dsh-archive-session
 ```
 
+## dsh-nav-pin
+
+Turn navigation that stays on narrow conversations. The official turn rail hides below a 900px conversation column; this plugin moves the breakpoint to 700px, fades the rail in as a floating overlay on hover below it (no frame, no background — same look as the wide layout), and caps the conversation content width to 120px clearance per side (640px official minimum floor) so the right drag handle no longer crowds the rail.
+
+> Pure stylesheet injection: no toggle, no button, no settings, no persisted state; uninstalling restores the official behavior.
+
+Docs: [dsh-nav-pin README](plugins/dsh-nav-pin/README.md)
+
+```bash
+dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin
+```
+
+## dsh-file-session
+
+DeepSeek Files API cloud file management. The "Cloud Files" entry in the sidebar lists every cloud file under your API key: cursor pagination, size / upload / expiry times, per-file deletion and one-click file_id copy. Reuses the official DeepSeekFilesClient — no extra credentials.
+
+> The official API has no batch-delete endpoint (no "delete all") and no download endpoint (no preview); the 10000-file / 25 GiB quota is an official limit.
+
+Docs: [dsh-file-session README](plugins/dsh-file-session/README.md)
+
+```bash
+dsh plugin --profile web add @dsh-sparrow/dsh-file-session
+```
+
 ## License
 
 MIT
