@@ -61,8 +61,8 @@ export function ensureVisionStyles(): HTMLStyleElement {
   cursor: pointer;
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
   font-family: inherit;
-  /* 拉近与右侧模型选择框的距离（紧贴模型选择器）。 */
-  margin-right: -6px;
+  /* 拉近与右侧模型选择框的距离（紧贴模型选择器，owner 拍板再贴近）。 */
+  margin-right: -9px;
 }
 .dsh-vision-status:hover {
   background: var(--dsw-alias-interactive-bg-hover);
