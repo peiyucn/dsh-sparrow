@@ -189,8 +189,17 @@ function collectImageRefs(content: unknown, refs: ImageAttachmentRef[]): void {
 export function extractJsonObject(text: string): unknown {
   const trimmed = text.trim()
   if (trimmed === '') return undefined
-  const fences = /^```(?:json)?\s*([\s\S]*?)\s*```$/u.exec(trimmed)
-  const candidate = fences?.[1] ?? trimmed
+  // 围栏剥离用 indexOf 切片（线性）——原 /^```(?:json)?\s*([\s\S]*?)\s*```$/u
+  // 属多项式回溯正则（CodeQL js/polynomial-redos 告警）；首行无换行（围栏与 JSON 同行）
+  // 时不剥离，交给下方花括号回退解析。
+  let candidate = trimmed
+  if (trimmed.startsWith('```') && trimmed.endsWith('```')) {
+    const firstLineEnd = trimmed.indexOf('\n')
+    if (firstLineEnd !== -1) {
+      const inner = trimmed.slice(firstLineEnd + 1, trimmed.length - 3)
+      if (inner !== '') candidate = inner
+    }
+  }
   try {
     return JSON.parse(candidate)
   } catch {

@@ -255,6 +255,14 @@ describe('vision-bridge 纯逻辑', () => {
     it('非 JSON 应该 返回 undefined', () => {
       assert.equal(extractJsonObject('完全不是 JSON'), undefined)
     })
+
+    it('围栏与 JSON 同行 应该 经花括号回退解析', () => {
+      assert.deepEqual(extractJsonObject('```{"summary":"s"}```'), { summary: 's' })
+    })
+
+    it('超长栅栏占位（大量制表符）应该 快速判为非法返回 undefined', () => {
+      assert.equal(extractJsonObject('```' + '\t'.repeat(10000) + '```'), undefined)
+    })
   })
 
   describe('VisionCache', () => {
