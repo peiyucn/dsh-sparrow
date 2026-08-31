@@ -406,7 +406,10 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
             {summary !== null ? (
               <div className="dsh-file-session-summary">
                 <p style={{ ...styles.secondarySmall, margin: '0 0 6px' }}>
-                  {t('summary', { count: summary.count, size: `${summary.totalBytesLabel} / ${summary.quotaBytesLabel}` })}
+                  {/* 列表翻页联动：未加载完时显示「已加载 X / 共 N」，加载完只显示总数。 */}
+                  {rows.length < summary.count
+                    ? t('summary.loaded', { loaded: rows.length, count: summary.count, size: `${summary.totalBytesLabel} / ${summary.quotaBytesLabel}` })
+                    : t('summary', { count: summary.count, size: `${summary.totalBytesLabel} / ${summary.quotaBytesLabel}` })}
                   {' · '}
                   {t('quota.used', { percent: formatUsagePercent(quotaRatio) })}
                 </p>

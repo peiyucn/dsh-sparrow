@@ -8,6 +8,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'loading'
       | 'loadMore'
       | 'summary'
+      | 'summary.loaded'
       | 'quota.used'
       | 'empty'
       | 'dshBadge'
