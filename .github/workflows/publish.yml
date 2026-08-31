@@ -20,6 +20,10 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # secrets 上下文不能出现在 step 的 if 里（GitHub 会拒绝解析整个工作流，
+    # 表现为 0s 失败且无 job），必须先经 job 级 env 中转。
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -68,13 +72,13 @@ jobs:
       # 双模式鉴权：有 NPM_TOKEN 用 Automation token（首发必需——npm 的
       # trusted publisher 配置需要包已存在）；没有则走 OIDC 信任发布。
       - name: Publish to npm (token)
-        if: ${{ secrets.NPM_TOKEN != '' }}
+        if: env.NPM_TOKEN != ''
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
         run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm (OIDC trusted publishing)
-        if: ${{ secrets.NPM_TOKEN == '' }}
+        if: env.NPM_TOKEN == ''
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
         run: npm publish --access public --provenance
