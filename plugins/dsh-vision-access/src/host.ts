@@ -259,32 +259,39 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
     kind: 'exact',
     path: STATUS_ROUTE_PATH,
     handler: async (req, res) => {
+      const none = (): void => sendJson(res, 200, { mode: 'none', visionModel: settings.visionModel })
       if (req.method !== 'GET') {
-        sendJson(res, 405, { available: false })
+        sendJson(res, 405, { mode: 'none', visionModel: settings.visionModel })
         return
       }
       const url = new URL(req.url ?? '/', 'http://localhost')
       const session = ctx.sessions.get(SessionId(url.searchParams.get('sessionId') ?? ''))
       if (session === undefined) {
-        sendJson(res, 200, { available: false, visionModel: settings.visionModel })
+        none()
         return
       }
       const main = currentMainModel(ctx, session)
-      if (!isDeepseekMainRoute(main)) {
-        sendJson(res, 200, { available: false, visionModel: settings.visionModel })
+      // 无模型信息（新会话未选择）：不显示。
+      if (main === undefined) {
+        none()
         return
       }
-      // 原生视觉主模型：图片直达主模型，无需视觉通道（与工具屏蔽逻辑一致）。
-      let nativeVision = false
-      if (main !== undefined) {
-        try {
-          const info = await ctx.llm.resolveModelInfo(main.provider, main.model)
-          nativeVision = modelSupportsImages(info.inputModalities)
-        } catch {
-          nativeVision = false // 能力解析失败：保守按文本模型处理（与工具执行侧一致）。
-        }
+      // 能力模式判定（全靠模型自身 inputModalities 属性，不靠名字）：
+      //   具备视觉能力 → native-vision（灰显）；DeepSeek 文本模型 → cross-model（点亮）；
+      //   其它无视觉能力 → no-vision（带斜线，降级提示）。
+      let supportsImages = false
+      try {
+        const info = await ctx.llm.resolveModelInfo(main.provider, main.model)
+        supportsImages = modelSupportsImages(info.inputModalities)
+      } catch {
+        supportsImages = false // 能力解析失败：按无视觉能力处理。
       }
-      sendJson(res, 200, { available: !nativeVision, visionModel: settings.visionModel })
+      const mode = supportsImages
+        ? 'native-vision'
+        : isDeepseekMainRoute(main)
+          ? 'cross-model'
+          : 'no-vision'
+      sendJson(res, 200, { mode, visionModel: settings.visionModel })
     },
   }), 'dsh-vision-access: status route')
 }

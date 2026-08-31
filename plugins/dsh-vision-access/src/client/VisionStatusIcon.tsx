@@ -1,4 +1,4 @@
-/** 状态图标：当前会话可跨模型读图时在模型选择器旁点亮；点击弹说明（非视觉模型才显示）。 */
+/** 状态图标：模型选择器旁的眼睛，随当前模型能力变化颜色与文案（DeepSeek 模型都显示）。 */
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -6,14 +6,17 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 
+/** 图标状态：cross-model=可跨模型读图（蓝紫点亮）；native-vision=原生视觉（灰显）；no-vision=无视觉能力（带斜线）；none=无信息（隐藏）。 */
+export type VisionStatusMode = 'none' | 'cross-model' | 'native-vision' | 'no-vision'
+
 export interface VisionStatusResult {
-  readonly available: boolean
-  /** host 实际配置的视觉模型 id（弹窗里明示发往哪个模型）。 */
+  readonly mode: VisionStatusMode
+  /** host 实际配置的视觉模型 id（cross-model 弹窗里明示发往哪个模型）。 */
   readonly visionModel: string
 }
 
 export interface VisionStatusInjected {
-  /** host 状态查询：当前会话主模型是否为「DeepSeek 文本模型」+ 实际视觉模型。 */
+  /** host 状态查询：当前会话主模型的能力模式 + 实际视觉模型 id。 */
   queryStatus: (sessionId: SessionId) => Promise<VisionStatusResult>
 }
 
@@ -24,6 +27,15 @@ const EYE_GLYPH = (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
     <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
     <circle cx="8" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.2" />
+  </svg>
+)
+
+/** 带斜线的眼睛（无视觉能力降级态）。 */
+const EYE_OFF_GLYPH = (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+    <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" opacity="0.5" />
+    <circle cx="8" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.2" opacity="0.5" />
+    <line x1="3.4" y1="12.6" x2="12.6" y2="3.4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
   </svg>
 )
 
@@ -38,8 +50,8 @@ export function ensureVisionStyles(): HTMLStyleElement {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: none;
   border-radius: 24px;
@@ -47,11 +59,19 @@ export function ensureVisionStyles(): HTMLStyleElement {
   cursor: pointer;
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
   font-family: inherit;
-  font-size: 13px;
-  line-height: 20px;
+  /* 拉近与右侧模型选择框的距离（紧贴模型选择器）。 */
+  margin-right: -6px;
 }
 .dsh-vision-status:hover {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+/* 原生视觉模型：灰显，与官方其它控件文字同色。 */
+.dsh-vision-status-native {
+  color: var(--dsw-alias-label-secondary);
+}
+/* 无视觉能力（降级）：更暗 + 斜线。 */
+.dsh-vision-status-none {
+  color: var(--dsw-alias-label-tertiary);
 }
 .dsh-vision-popover {
   position: fixed;
@@ -139,16 +159,23 @@ export function VisionStatusIcon({ session, queryStatus, t }: VisionStatusProps)
     }
   }, [open])
 
-  if (status === null || !status.available) return null
+  const native = status?.mode === 'native-vision'
+  const none = status?.mode === 'no-vision'
+  if (status === null || status.mode === 'none') return null
+  const aria = native ? t('popover.nativeVision.title') : none ? t('popover.noVision.title') : t('popover.crossModel.title')
   return (
     <>
       <button
         ref={buttonRef}
         type="button"
-        className="dsh-vision-status"
+        className={native
+          ? 'dsh-vision-status dsh-vision-status-native'
+          : none
+            ? 'dsh-vision-status dsh-vision-status-none'
+            : 'dsh-vision-status'}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={t('popover.title')}
+        aria-label={aria}
         onClick={(event) => {
           event.stopPropagation()
           if (open) setOpen(false)
@@ -158,22 +185,28 @@ export function VisionStatusIcon({ session, queryStatus, t }: VisionStatusProps)
           }
         }}
       >
-        {EYE_GLYPH}
+        {none ? EYE_OFF_GLYPH : EYE_GLYPH}
       </button>
       {open && point !== null
         ? createPortal(
           <div
             className="dsh-vision-popover"
             role="dialog"
-            aria-label={t('popover.title')}
+            aria-label={aria}
             style={{
               left: point.x,
               top: point.y,
               transform: point.up ? 'translateX(-100%) translateY(-100%)' : 'translateX(-100%)',
             }}
           >
-            <div className="dsh-vision-popover-title">{t('popover.title')}</div>
-            <div className="dsh-vision-popover-body">{t('popover.body', { model: status.visionModel })}</div>
+            <div className="dsh-vision-popover-title">{native ? t('popover.nativeVision.title') : none ? t('popover.noVision.title') : t('popover.crossModel.title')}</div>
+            <div className="dsh-vision-popover-body">
+              {native
+                ? t('popover.nativeVision.body')
+                : none
+                  ? t('popover.noVision.body')
+                  : t('popover.crossModel.body', { model: status.visionModel })}
+            </div>
           </div>,
           document.body,
         )

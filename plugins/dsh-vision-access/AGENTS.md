@@ -4,7 +4,7 @@
 
 ## 项目概况
 
-DSH Web 插件：纯文本主模型会话的图片视觉通道 —— 主模型调用 `vision_read` 工具，host 直连官方视觉模型（默认 deepseek-v4-flash-vision-exp）读图并回传结构化文字报告，主模型保持对话大脑。host + 轻量 client half（模型选择器旁的眼睛图标，非视觉模型才显示，点击弹说明弹窗；无持久状态）。
+DSH Web 插件：纯文本主模型会话的图片视觉通道 —— 主模型调用 `vision_read` 工具，host 直连官方视觉模型（默认 deepseek-v4-flash-vision-exp）读图并回传结构化文字报告，主模型保持对话大脑。host + 轻量 client half（模型选择器旁的眼睛图标，按模型能力三态——原生视觉灰显 / DeepSeek 文本点亮 / 其它无视觉带斜线，点击弹对应说明；无持久状态）。
 
 * 2026-08-30 起不再走子代理：实测 subagents 单次读图 46.3s，直连 `ctx.llm` 2.2s。
 * 工具按 agent 条件隐藏：主模型非 DeepSeek 系列、或主模型本身原生看图时，该 agent 看不到 `vision_read`（像没有这个工具）。
@@ -37,7 +37,7 @@ DSH Web 插件：纯文本主模型会话的图片视觉通道 —— 主模型�
     src/vision.ts — 纯逻辑（缓存键 / 报告解析 / JSON 提取 / 附件引用匹配 / 能力判断）
     src/index.ts  — 入口契约 re-export
     src/client/index.ts — client half 入口（locale + conversation.input.right 图标槽位）
-    src/client/VisionStatusIcon.tsx — 眼睛图标 + 说明弹窗（点击弹出、非视觉模型才显示，弹窗内明示实际视觉模型）
+    src/client/VisionStatusIcon.tsx — 眼睛图标 + 说明弹窗（三态：原生视觉灰显 / DeepSeek 文本点亮 / 其它无视觉带斜线；点击按状态弹对应文案）
     test/vision.test.mjs — 纯逻辑单测
 
 ***

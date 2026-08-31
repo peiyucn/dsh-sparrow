@@ -2,8 +2,12 @@
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     'vision-access':
-      | 'popover.title'
-      | 'popover.body'
+      | 'popover.crossModel.title'
+      | 'popover.crossModel.body'
+      | 'popover.nativeVision.title'
+      | 'popover.nativeVision.body'
+      | 'popover.noVision.title'
+      | 'popover.noVision.body'
   }
 }
 
