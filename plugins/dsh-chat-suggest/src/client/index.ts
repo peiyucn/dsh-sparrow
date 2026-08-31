@@ -83,9 +83,6 @@ export function apply(ctx: ClientContext): void {
   const disposeDictionaries = ctx.locale.register('chat-suggest', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
   ctx.effect(() => disposeDictionaries, 'dsh-chat-suggest: locale dictionaries')
 
-  /** 请求时读取当前语言：zh → zh，其余一律 en。 */
-  const requestLanguage = (): 'zh' | 'en' => ctx.locale.getSnapshot().active === 'zh' ? 'zh' : 'en'
-
   const injectedFace = (sessionId: SessionId) => {
     const scope = sessions.scope(sessionId)
     if (scope === undefined) {
@@ -104,7 +101,8 @@ export function apply(ctx: ClientContext): void {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           // 续写模型固定 flash（足够快且便宜）：不再提供模型三档选择。
-          body: JSON.stringify({ sessionId: id, prompt, locale: requestLanguage(), suggestModelMode: 'flash' }),
+          // 语言由 host 按草稿内容自适应（detectDraftLanguage），客户端不再传 locale。
+          body: JSON.stringify({ sessionId: id, prompt, suggestModelMode: 'flash' }),
           signal,
         })
         const payload = await response.json() as ChatSuggestResponse

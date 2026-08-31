@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, speakerStopSequences,
+  buildFimPrompt, detectDraftLanguage, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, speakerStopSequences,
   formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
   normalizeConfig, normalizeSuggestModelMode, normalizeTriggerSensitivity, parseCompleteBody, recentHistoryTurns,
   resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence,
@@ -81,6 +81,20 @@ describe('chat-suggest 纯逻辑', () => {
 
     it('无 choices 应该 返回空数组', () => {
       assert.deepEqual(extractSuggestions({}), [])
+    })
+  })
+
+  describe('detectDraftLanguage', () => {
+    it('含中文 应该 判定 zh', () => {
+      assert.equal(detectDraftLanguage('我觉得这个方案'), 'zh')
+    })
+
+    it('纯英文 应该 判定 en', () => {
+      assert.equal(detectDraftLanguage('please'), 'en')
+    })
+
+    it('英文夹杂中文 应该 判定 zh', () => {
+      assert.equal(detectDraftLanguage('hello 你好'), 'zh')
     })
   })
 

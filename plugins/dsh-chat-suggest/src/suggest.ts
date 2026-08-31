@@ -48,13 +48,20 @@ export interface ChatSuggestConfig {
 export interface CompleteRequest {
   readonly sessionId: string
   readonly prompt: string
-  readonly locale?: string
   /** 续写模型三档（客户端偏好）；非法值回退 auto。 */
   readonly suggestModelMode: SuggestModelMode
 }
 
 /** FIM 提示词使用的语言（说话人标签 / 停止序列随之切换）。 */
 export type SuggestLanguage = 'zh' | 'en'
+
+/**
+ * 续写语言跟随草稿内容（2026-08-31 实测：界面语言 en、草稿英文，历史以中文为主时模型仍续中文，
+ * 语言框架必须与草稿一致——草稿含 CJK 用中文说话人标签，否则英文标签）。
+ */
+export function detectDraftLanguage(draft: string): SuggestLanguage {
+  return CJK_CHARS.test(draft) ? 'zh' : 'en'
+}
 
 const SPEAKER_LABELS: Record<SuggestLanguage, { user: string; assistant: string }> = {
   zh: { user: '用户', assistant: '助手' },
@@ -199,7 +206,6 @@ export function validateCompletePayload(value: unknown, maxPromptChars = Number.
   const body = value as Record<string, unknown>
   const sessionId = body.sessionId
   const prompt = body.prompt
-  const locale = body.locale
   if (typeof sessionId !== 'string' || sessionId.trim() === '') {
     return { code: 'BAD_BODY', message: 'sessionId 必须是非空字符串' }
   }
@@ -209,14 +215,10 @@ export function validateCompletePayload(value: unknown, maxPromptChars = Number.
   if (prompt.length > maxPromptChars) {
     return { code: 'INVALID_PROMPT', message: `prompt 超过 ${maxPromptChars} 字符上限` }
   }
-  if (locale !== undefined && typeof locale !== 'string') {
-    return { code: 'BAD_BODY', message: 'locale 必须是字符串' }
-  }
   return {
     sessionId,
     prompt,
     suggestModelMode: normalizeSuggestModelMode(body.suggestModelMode),
-    ...locale === undefined ? {} : { locale },
   }
 }
 

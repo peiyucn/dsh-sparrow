@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
-  buildFimPrompt, cleanSuggestion, extractSuggestions, extractUsage, speakerStopSequences,
+  buildFimPrompt, cleanSuggestion, detectDraftLanguage, extractSuggestions, extractUsage, speakerStopSequences,
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
   MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns, resolveSuggestModel,
   startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence, upstreamStatusToError,
@@ -216,7 +216,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
         return
       }
 
-      const language = parsed.locale === 'en' ? 'en' : 'zh'
+      // 续写语言跟随草稿内容（草稿英文→英文标签续写，中文→中文），不跟随界面语言（见 suggest.ts detectDraftLanguage）。
+      const language = detectDraftLanguage(parsed.prompt)
       const history = session.deriveMessages() as readonly unknown[]
       // FIM 转写体 prompt：最近历史转说话人文本 + 「用户：草稿」结尾（见 suggest.ts buildFimPrompt）。
       const prompt = buildFimPrompt(history, parsed.prompt, language)
