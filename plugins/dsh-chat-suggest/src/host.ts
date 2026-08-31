@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
-  buildPrefixMessages, cleanSuggestion, extractSuggestions, extractUsage, speakerStopSequences,
+  buildFimPrompt, cleanSuggestion, extractSuggestions, extractUsage, speakerStopSequences,
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
   MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns, resolveSuggestModel,
   startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence, upstreamStatusToError,
@@ -218,8 +218,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
 
       const language = parsed.locale === 'en' ? 'en' : 'zh'
       const history = session.deriveMessages() as readonly unknown[]
-      // 对话前缀续写请求体：原生历史消息 + 以「用户：草稿」为前缀的 assistant 消息（prefix: true）。
-      const messages = buildPrefixMessages(history, parsed.prompt, language)
+      // FIM 转写体 prompt：最近历史转说话人文本 + 「用户：草稿」结尾（见 suggest.ts buildFimPrompt）。
+      const prompt = buildFimPrompt(history, parsed.prompt, language)
       // 回声判定的历史文本集（与 prompt 同一窗口）：
       // 用户消息按「开头 10 字前缀」比对（整段复读用户原话时开头即重叠；中段复用措辞不误杀），
       // 助手消息按「15 字窗口」比对（转述讨论内容如 cleanSuggestion 仍拦得住，正常措辞复用放行）。
@@ -233,7 +233,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
       try {
         /** 单次上游补全请求；成功返回候选/用量，失败抛 ChatSuggestError。 */
         const requestOnce = async (temperature: number) => {
-          const upstream = await fetch(`${settings.baseURL.replace(/\/$/u, '')}/chat/completions`, {
+          const upstream = await fetch(`${settings.baseURL.replace(/\/$/u, '')}/completions`, {
             method: 'POST',
             headers: {
               authorization: `Bearer ${credential.value}`,
@@ -241,7 +241,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
             },
             body: JSON.stringify({
               model: suggestModel,
-              messages,
+              prompt,
               max_tokens: settings.maxTokens,
               stop,
               temperature,

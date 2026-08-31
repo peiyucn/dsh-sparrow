@@ -11,6 +11,7 @@
 * [x] `npm run verify` 全绿（`dev.patch.yml` 热更验证待做）
 * [x] 切换 FIM 补全：`/completions` + 说话人文本 prompt + stop 序列 + 并行多建议（A/B 实测见 README）
 * [x] 切回对话前缀续写：`/chat/completions` + 原生历史消息 + prefix: true（A/B 实测：短拉丁草稿 plea 在 FIM 下被「助手：」口吻回复，前缀机制下补成 please）
+* [x] 再切回 FIM 补全：三方案 A/B（FIM 转写体 / 伪前缀 / 官方语义前缀）8/8 样本 FIM 全胜——prefix 的官方语义（续写 assistant 消息）与「续用户的话」结构性冲突，用户拍板切回（详情见 AGENTS.md）
 
 ## M2 · client half（dock 建议条）
 

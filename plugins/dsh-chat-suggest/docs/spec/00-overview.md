@@ -4,13 +4,13 @@
 
 ## 定位
 
-给 DeepSeek Harness Web 的**聊天输入框**加「续写联想」：用户打字停顿片刻，插件给出「接下来可能写的文字」建议；点击采用即追加进草稿。补全由 DeepSeek 官方 [对话前缀续写（Beta）](https://api-docs.deepseek.com/zh-cn/guides/chat_prefix_completion) 接口生成：host 把最近对话历史按原生角色发给模型，最后一条 assistant 消息以「用户：草稿」为前缀（`prefix: true`）强制模型续写这条消息——实测用户口吻稳定（新会话草稿 plea → ase 补成 please）。曾用的 FIM 纯文本续写（`/completions`）无角色约束、短拉丁草稿被模型以「助手：」口吻回复，已弃用。
+给 DeepSeek Harness Web 的**聊天输入框**加「续写联想」：用户打字停顿片刻，插件给出「接下来可能写的文字」建议；点击采用即追加进草稿。补全由 DeepSeek 官方 [FIM 补全（Beta）](https://api-docs.deepseek.com/zh-cn/guides/fim_completion) 接口生成：host 把最近对话历史转成「用户：/助手：」说话人文本、草稿作为最后一个用户说话人的开头，纯文本续写天然站在用户角度——2026-08-31 三方案直连 A/B（FIM 转写体 / 「用户：」伪前缀 / 官方语义前缀）8/8 样本 FIM 全胜（见 AGENTS.md）；曾短暂使用对话前缀续写（`prefix: true`），因「续写 assistant 自己的消息」的官方语义与「续写用户的话」冲突（结构性角色漂移）而弃用。
 
 ## 需求范围（做什么 / 不做什么）
 
 **做**：
 
-* host half：注册自有路由 `POST /api/chat-suggest/complete`，把（会话、最近对话历史、草稿）转发到 DeepSeek 对话前缀续写（Beta），返回候选建议；
+* host half：注册自有路由 `POST /api/chat-suggest/complete`，把（会话、最近对话历史转说话人文本、草稿）转发到 DeepSeek FIM 补全（Beta），返回候选建议；
 * client half（M2）：输入框旁的 dock 建议条——触发、展示、作废、采用；
 * 触发/作废/采用的交互规则与错误降级。
 

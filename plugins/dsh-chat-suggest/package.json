@@ -1,6 +1,6 @@
 {
   "name": "dsh-chat-suggest",
-  "description": "DSH Web 插件：聊天输入框续写联想（DeepSeek 对话前缀续写 Beta 转发 + 官方 @ 列表同款候选菜单）",
+  "description": "DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + 官方 @ 列表同款候选菜单）",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
