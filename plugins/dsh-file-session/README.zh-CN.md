@@ -29,6 +29,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-file-session
 * 官方 Files API **没有批量删除端点**——不做「全部清理」，只能逐条删
 * 官方**没有下载端点**——不能预览 / 下载文件内容
 * 配额：单 key 最多 10000 个文件 / 25 GiB（官方限制）
+* **文件来源**：云端文件只在 **DeepSeek 系列模型**路径下由 DSH 自动上传（上传发生在 llm-deepseek 适配器层）；使用其它模型时列表主要为你手动 / 外部工具上传的文件
 
 ## 卸载与残留
 
