@@ -9,9 +9,9 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
   buildFimPrompt, cleanSuggestion, detectDraftLanguage, extractSuggestions, extractUsage, speakerStopSequences,
-  hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
-  MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns, resolveSuggestModel,
-  startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence, upstreamStatusToError,
+  hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, isLanguageConsistent,
+  mainRouteFromSession, MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns,
+  resolveSuggestModel, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence, upstreamStatusToError,
   type ChatSuggestConfig, type ChatSuggestError, type CompleteRequest,
 } from './suggest.js'
 
@@ -26,7 +26,7 @@ const ROUTE_PATH = '/api/chat-suggest/complete'
 /** 候选全被复读/回声护栏过滤时的重试温度：0.5——比 0.3 更易跳出复读循环，比 0.7 噪声小（0.7 实测相关性弱）。 */
 const ECHO_RETRY_TEMPERATURE = 0.5
 
-type DiagnosticKey = 'requests' | 'fulfilled' | 'retries' | 'shown' | 'empty' | 'filteredSpeaker' | 'filteredRepeat' | 'filteredEcho'
+type DiagnosticKey = 'requests' | 'fulfilled' | 'retries' | 'shown' | 'empty' | 'filteredSpeaker' | 'filteredRepeat' | 'filteredEcho' | 'filteredLanguage'
 
 /**
  * 进程级诊断计数（status 路由带 ?diagnostics=1 时返回；不持久化、不含任何用户内容，
@@ -41,6 +41,7 @@ const diagnostics: Record<DiagnosticKey, number> & { bySession: Record<string, R
   filteredSpeaker: 0,
   filteredRepeat: 0,
   filteredEcho: 0,
+  filteredLanguage: 0,
   bySession: {},
 }
 
@@ -49,7 +50,7 @@ function bumpDiagnostics(key: DiagnosticKey, sessionId: string): void {
   diagnostics[key]++
   let stats = diagnostics.bySession[sessionId]
   if (stats === undefined) {
-    stats = { requests: 0, fulfilled: 0, retries: 0, shown: 0, empty: 0, filteredSpeaker: 0, filteredRepeat: 0, filteredEcho: 0 }
+    stats = { requests: 0, fulfilled: 0, retries: 0, shown: 0, empty: 0, filteredSpeaker: 0, filteredRepeat: 0, filteredEcho: 0, filteredLanguage: 0 }
     diagnostics.bySession[sessionId] = stats
   }
   stats[key]++
@@ -287,6 +288,11 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
                   continue
                 }
                 if (seen.has(clean)) continue
+                // 语言一致性：草稿纯拉丁时建议不得含中文（实测 please 后空格模型续中文，见 suggest.ts）。
+                if (!isLanguageConsistent(parsed.prompt, clean)) {
+                  bumpDiagnostics('filteredLanguage', sessionKey)
+                  continue
+                }
                 // 护栏：同一短语循环复读 → 丢弃；开头复述用户消息（10 字前缀）或
                 // 窗口转述助手消息（15 字）→ 丢弃。
                 if (hasDegenerateRepeat(clean)) {

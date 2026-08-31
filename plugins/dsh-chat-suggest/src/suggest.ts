@@ -63,6 +63,16 @@ export function detectDraftLanguage(draft: string): SuggestLanguage {
   return CJK_CHARS.test(draft) ? 'zh' : 'en'
 }
 
+/**
+ * 语言一致性护栏（2026-08-31 实测：please 后跟空格，模型续出全新中文句且不被回声护栏命中）：
+ * 草稿纯拉丁时建议不得含 CJK——英文草稿必须英文续写；
+ * 反向不拦：中文草稿常夹英文术语，建议含英文是正常的。
+ */
+export function isLanguageConsistent(draft: string, suggestion: string): boolean {
+  if (CJK_CHARS.test(draft)) return true
+  return !CJK_CHARS.test(suggestion)
+}
+
 const SPEAKER_LABELS: Record<SuggestLanguage, { user: string; assistant: string }> = {
   zh: { user: '用户', assistant: '助手' },
   en: { user: 'User', assistant: 'Assistant' },

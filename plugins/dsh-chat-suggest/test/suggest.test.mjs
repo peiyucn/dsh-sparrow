@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  buildFimPrompt, detectDraftLanguage, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, speakerStopSequences,
+  buildFimPrompt, detectDraftLanguage, isLanguageConsistent, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, speakerStopSequences,
   formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
   normalizeConfig, normalizeSuggestModelMode, normalizeTriggerSensitivity, parseCompleteBody, recentHistoryTurns,
   resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence,
@@ -95,6 +95,28 @@ describe('chat-suggest 纯逻辑', () => {
 
     it('英文夹杂中文 应该 判定 zh', () => {
       assert.equal(detectDraftLanguage('hello 你好'), 'zh')
+    })
+  })
+
+  describe('isLanguageConsistent', () => {
+    it('英文草稿 + 英文建议 应该 一致', () => {
+      assert.equal(isLanguageConsistent('please', ' fix it'), true)
+    })
+
+    it('英文草稿 + 中文建议 应该 不一致', () => {
+      assert.equal(isLanguageConsistent('please', '用中文回复'), false)
+    })
+
+    it('英文草稿带尾随空格 + 中文建议 应该 不一致', () => {
+      assert.equal(isLanguageConsistent('please ', '先看看这个'), false)
+    })
+
+    it('中文草稿 + 英文建议 应该 放行（中文草稿常夹英文）', () => {
+      assert.equal(isLanguageConsistent('我觉得', 'ok fine'), true)
+    })
+
+    it('中文草稿 + 中文建议 应该 一致', () => {
+      assert.equal(isLanguageConsistent('我觉得', '可以'), true)
     })
   })
 
