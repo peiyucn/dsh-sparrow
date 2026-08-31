@@ -69,7 +69,7 @@ jobs:
         shell: bash
         run: |
           for spec in ${{ inputs.packages }}; do
-            npm unpublish "$spec" --force
+            npm unpublish "$spec" --force --loglevel=verbose
           done
 
       - name: Verify versions after unpublish
