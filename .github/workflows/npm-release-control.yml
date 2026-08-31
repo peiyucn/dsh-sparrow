@@ -10,12 +10,13 @@ on:
         options:
           - promote
           - deprecate
+          - unpublish
       packages:
         description: 'npm 包 spec 列表（空格分隔，如 @scope/pkg@version）'
         required: true
         type: string
       version:
-        description: 'promote 时的版本号（如 1.0.1-alpha.1）'
+        description: 'promote 时的版本号'
         required: false
         type: string
       message:
@@ -40,7 +41,7 @@ jobs:
       - name: Fail if NPM_TOKEN is missing
         if: env.NPM_TOKEN == ''
         run: |
-          echo "NPM_TOKEN secret is required for dist-tag / deprecate operations" >&2
+          echo "NPM_TOKEN secret is required for npm release-control operations" >&2
           exit 1
 
       - name: Authenticate with npm registry
@@ -61,4 +62,12 @@ jobs:
         run: |
           for spec in ${{ inputs.packages }}; do
             npm deprecate "$spec" "${{ inputs.message }}"
+          done
+
+      - name: Unpublish versions
+        if: inputs.action == 'unpublish'
+        shell: bash
+        run: |
+          for spec in ${{ inputs.packages }}; do
+            npm unpublish "$spec"
           done
