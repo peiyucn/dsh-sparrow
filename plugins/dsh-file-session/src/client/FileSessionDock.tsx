@@ -208,6 +208,8 @@ export function ensureFileSessionStyles(): void {
 }
 .dsh-file-session-quota-fill {
   height: 100%;
+  /* 用量极小时（0.01% 量级）宽度趋近 0，兜底 3px 银条让「有使用」可见（网盘同款）。 */
+  min-width: 3px;
   border-radius: 3px;
   background: var(--dsw-alias-state-business-primary);
   transition: width 220ms ease-out;
@@ -414,7 +416,10 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
                   </p>
                   <div className="dsh-file-session-quota">
                     <div className="dsh-file-session-quota-track">
-                      <div className="dsh-file-session-quota-fill" style={{ width: `${Math.round(quotaRatio * 100)}%` }} />
+                      {/* 零用量不渲染填充（min-width 银条只给「有使用」的状态）。 */}
+                      {quotaRatio > 0
+                        ? <div className="dsh-file-session-quota-fill" style={{ width: `${Math.round(quotaRatio * 100)}%` }} />
+                        : null}
                     </div>
                     <span className="dsh-file-session-quota-label">{formatUsagePercent(quotaRatio)}</span>
                   </div>
