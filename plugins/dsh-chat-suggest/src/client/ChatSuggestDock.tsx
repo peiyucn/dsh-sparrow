@@ -300,18 +300,15 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
 .dsh-chat-suggest-switch-off .dsh-chat-suggest-switch-label {
   color: var(--dsw-alias-label-tertiary, #9aa0a6);
 }
-/* 胶囊内灵敏度触发区（分割线右侧：三点 + ▾）：整区可点，只开合灵敏度菜单、不切换开关；悬停亮底。 */
+/* 胶囊内灵敏度触发区（分割线右侧：三点 + ▾）：整区可点，只开合灵敏度菜单、不切换开关。
+   不单独做悬停底色——按钮主体已有悬停底色，叠加会成嵌套椭圆。 */
 .dsh-chat-suggest-switch-picker {
   display: inline-flex;
   align-items: center;
   align-self: stretch;
   gap: 3px;
   padding: 0 5px;
-  border-radius: 20px;
   cursor: pointer;
-}
-.dsh-chat-suggest-switch-picker:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
 }
 .dsh-chat-suggest-switch-on .dsh-chat-suggest-switch-picker {
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
