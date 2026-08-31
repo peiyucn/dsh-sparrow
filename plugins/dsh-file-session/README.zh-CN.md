@@ -31,6 +31,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-file-session
 * 官方**没有下载端点**——不能预览 / 下载文件内容
 * 配额：单 key 最多 10000 个文件 / 25 GiB（官方限制）
 * **文件来源**：云端文件只在 **DeepSeek 系列模型**路径下由 DSH 自动上传（上传发生在 llm-deepseek 适配器层）；使用其它模型时列表主要为你手动 / 外部工具上传的文件
+* **有效期**：DSH 自动上传的文件默认 **7 天**有效期（官方无「永久」选项）；到期后再次引用会自动重新上传，可在 `llm-deepseek` 设置节的 `fileExpiresAfterSeconds`（1 小时–30 天）调整
 
 ## 卸载与残留
 

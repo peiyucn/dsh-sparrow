@@ -31,6 +31,7 @@ Requires dsh ≥ 0.1.2-alpha.3 (verified baseline; earlier versions unverified) 
 * The official API has **no download endpoint** — content cannot be previewed or downloaded
 * Quota: at most 10000 files / 25 GiB per key (official limits)
 * **Where files come from**: DSH auto-uploads to the Files API only on the **DeepSeek model path** (the upload lives in the llm-deepseek adapter layer); with other models the list mostly shows files you or external tools uploaded
+* **Expiry**: DSH auto-uploads files with a default **7-day** expiry (the official API has no permanent option); expired files are transparently re-uploaded on next use — tune `fileExpiresAfterSeconds` (1h–30d) in the `llm-deepseek` settings section
 
 ## Uninstall & leftovers
 
