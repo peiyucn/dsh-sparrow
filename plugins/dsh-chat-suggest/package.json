@@ -21,8 +21,9 @@
     "lib/**/*.js",
     "lib/types/**/*.d.ts",
     "cordis.patch.yml",
-    "docs/images/**",
-    "README.zh-CN.md"
+    "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md"
   ],
   "dsh": {
     "bundle": {

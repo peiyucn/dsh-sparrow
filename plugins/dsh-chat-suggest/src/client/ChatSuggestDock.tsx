@@ -40,6 +40,8 @@ const ENABLED_STORAGE_KEY = 'dsh-chat-suggest:enabled'
 const SENSITIVITY_STORAGE_KEY = 'dsh-chat-suggest:sensitivity'
 /** 菜单高度设计上限（同官方 MenuDropdown）。 */
 const MENU_MAX_HEIGHT = 320
+/** 旋转光环的卡片矩形自愈测量周期。 */
+const RING_MEASURE_INTERVAL_MS = 300
 
 /** 读取本地开关状态：默认关闭，仅显式存过 '1' 才开启；非法值回退关闭。 */
 export function readEnabled(storage: { getItem(key: string): string | null }, key = ENABLED_STORAGE_KEY): boolean {
@@ -785,7 +787,7 @@ export function ChatSuggestDock(props: ChatSuggestDockProps) {
     }
     const measure = (): void => { setRing(composerCardRect() ?? null) }
     measure()
-    const timer = window.setInterval(measure, 300)
+    const timer = window.setInterval(measure, RING_MEASURE_INTERVAL_MS)
     window.addEventListener('resize', measure)
     window.addEventListener('scroll', measure, true)
     return () => {
