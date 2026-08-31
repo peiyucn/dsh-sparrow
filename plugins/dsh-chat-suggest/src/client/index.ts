@@ -100,9 +100,9 @@ export function apply(ctx: ClientContext): void {
         const response = await fetch('/api/chat-suggest/complete', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          // 续写模型固定 flash（足够快且便宜）：不再提供模型三档选择。
+          // 续写模型暂切 pro（2026-08-31 用户拍板实测对比 flash：质量上限更高，单价约 3 倍、延迟更高）。
           // 语言由 host 按草稿内容自适应（detectDraftLanguage），客户端不再传 locale。
-          body: JSON.stringify({ sessionId: id, prompt, suggestModelMode: 'flash' }),
+          body: JSON.stringify({ sessionId: id, prompt, suggestModelMode: 'pro' }),
           signal,
         })
         const payload = await response.json() as ChatSuggestResponse

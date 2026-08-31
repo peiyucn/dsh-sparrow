@@ -1,12 +1,13 @@
-# 04 · 触发灵敏度三档（模型固定 flash）
+# 04 · 触发灵敏度三档（模型暂切 pro 实测）
 
 > 决策记录（2026-08-30 晚，用户拍板）：模型三档切换退役——续写场景 flash 足够（快且省，输出单价为 pro 的 1/3），改由「触发灵敏度」三档承载个性化。用户习惯不同：有人要更敏锐、有人要更钝化，自己调。
+> 2026-08-31 用户拍板**暂切 pro 实测对比**：`suggestModelMode: 'pro'`（质量上限更高，单价约 3 倍、延迟更高）；对比结论出来后定档。
 
-## 模型固定
+## 模型暂切 pro
 
-* 客户端请求固定 `suggestModelMode: 'flash'` → host `resolveSuggestModel` 恒解析为 `deepseek-v4-flash`；
-* host 侧 `pro/auto` 分支保留（兼容直接 API 调用方），客户端不再提供模型选择 UI；
-* 建议菜单右下角仍展示实际模型与温度（现在恒为 flash）。
+* 客户端请求暂用 `suggestModelMode: 'pro'` → host `resolveSuggestModel` 恒解析为 `deepseek-v4-pro`；
+* host 侧 `flash/auto` 分支保留（兼容直接 API 调用方），客户端不再提供模型选择 UI；
+* 建议菜单右下角仍展示实际模型与温度（现在恒为 pro）。
 
 ## 灵敏度三档（高 / 中 / 低）
 
