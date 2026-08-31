@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2（2026-08-31 · 正式发布）
+
+- `0.1.2-alpha.1` 验证通过，转正发布；修复内容同 `0.1.2-alpha.1`
+
 ## 0.1.2-alpha.1（2026-08-31 · 修复客户端 bundle 注册 id）
 
 - 修复 `scripts/bundle-client.mjs` 的 `__ModuleLoader__.load` 注册 id 未随 scoped 包名更新，导致 dsh 0.1.2 启动报 `loaded without registering "@dsh-sparrow/dsh-chat-suggest"` 的问题
