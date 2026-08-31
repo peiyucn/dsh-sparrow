@@ -1,7 +1,7 @@
 /** dsh-archive-session host half：标题缓存 + 归档会话 REST 路由。 */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -18,7 +18,7 @@ import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
   BACKUP_SIDECAR, isDeleteConfirmationSufficient, legacyBackupItem, maskHomePath, normalizeArchiveConfig,
-  parseBackupSidecar, sanitizeSegment, type ArchiveConfig, type ArchiveSidecar,
+  parseBackupSidecar, sanitizeSegment, type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar,
 } from './archive.js'
 
 export const name = 'dsh-archive-session'
@@ -278,7 +278,7 @@ async function invalidateProjectionCache(ctx: Context, sessionId: SessionId): Pr
 /** 备份/删除后校验投影缓存是否已删除；未删除时重试一次并告警，供启动清扫兜底。 */
 async function invalidateProjectionCacheGuarded(ctx: Context, sessionId: SessionId): Promise<void> {
   for (let attempt = 0; attempt < 2; attempt++) {
-    await invalidateProjectionCacheGuarded(ctx, sessionId)
+    await invalidateProjectionCache(ctx, sessionId)
     try {
       const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
       if (domain === undefined || domain.table(PROJCACHE_SESSIONS_TABLE).get(String(sessionId)) === undefined) return
@@ -309,12 +309,87 @@ async function sweepStaleProjectionCache(ctx: Context): Promise<void> {
     ctx.logger.warn(`dsh-archive-session: 投影缓存启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
   }
 }
+
+/**
+ * 启动清扫：父会话已不在持久化中的孤儿 subagent 会话（origin === 'subagent'）——删除其目录、
+ * 失效投影行、清理工作区记账，@ 列表不再出现。目录级删除与「删除档」同属 seam 特例；
+ * 父/子任一侧仍被 dsh 进程占用时跳过本次清扫，后端不支持文件级处理时只留日志。
+ */
+async function sweepOrphanSubagents(ctx: Context): Promise<void> {
+  try {
+    const headers = await ctx.sessionPersistence.list()
+    const persistedIds = new Set(headers.map(header => String(header.id)))
+    let removed = 0
+    for (const header of headers) {
+      if (header.origin !== 'subagent' || header.parentSession === undefined) continue
+      if (persistedIds.has(String(header.parentSession))) continue
+      const childId = SessionId(String(header.id))
+      if (ctx.sessions.get(childId) !== undefined || ctx.agents.get(childId) !== undefined) continue
+      if (ctx.sessions.get(SessionId(String(header.parentSession))) !== undefined) continue
+      const location = ctx.sessionPersistence.locate(header)
+      const dir = location === undefined ? undefined : sessionDirectoryFor(location)
+      if (dir === undefined) {
+        ctx.logger.warn(`dsh-archive-session: 孤儿 subagent 会话 ${String(childId)} 的后端不支持文件级处理，跳过`)
+        continue
+      }
+      try {
+        await rm(dir, { recursive: true, force: false })
+      } catch (error) {
+        ctx.logger.warn(`dsh-archive-session: 孤儿 subagent 目录删除失败（${String(childId)}）：${error instanceof Error ? error.message : String(error)}`)
+        continue
+      }
+      try {
+        await detachWorkspaceAccounting(ctx, childId)
+      } catch (accountingError) {
+        ctx.logger.warn(`dsh-archive-session: 孤儿 subagent 工作区记账清理失败（${String(childId)}）：${String(accountingError)}`)
+      }
+      await invalidateProjectionCacheGuarded(ctx, childId)
+      removed++
+    }
+    if (removed > 0) ctx.logger.warn(`dsh-archive-session: 启动清扫删除 ${removed} 个孤儿 subagent 会话`)
+  } catch (error) {
+    ctx.logger.warn(`dsh-archive-session: 孤儿 subagent 启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
 /** 只有已知的「单会话目录」后端（当前为 jsonl）才允许文件级移动 / 删除。 */
 export function sessionDirectoryFor(location: { kind: string; path: string }): string | undefined {
   if (location.kind !== 'jsonl') return undefined
   const dir = dirname(location.path)
   if (!isAbsolute(dir) || dirname(dir) === dir || basename(dir) === '') return undefined
   return dir
+}
+interface SubagentTarget {
+  readonly sessionId: SessionId
+  readonly header: SessionHeader
+  readonly dir: string
+}
+
+/** 找出某个父会话下的全部 subagent 会话；任一会话仍被占用时不处理任何文件。 */
+async function listSubagentTargets(ctx: Context, parentSessionId: SessionId): Promise<SubagentTarget[]> {
+  const headers = await ctx.sessionPersistence.list()
+  const targets: SubagentTarget[] = []
+  for (const header of headers) {
+    if (header.origin !== 'subagent' || header.parentSession === undefined) continue
+    if (String(header.parentSession) !== String(parentSessionId)) continue
+    const sessionId = SessionId(String(header.id))
+    if (ctx.sessions.get(sessionId) !== undefined || ctx.agents.get(sessionId) !== undefined) {
+      throw new ArchiveError('SESSION_LIVE', `subagent 会话 ${String(sessionId)} 仍被 dsh 进程占用，不能与父会话一起处理`, 409)
+    }
+    const location = ctx.sessionPersistence.locate(header)
+    const dir = location === undefined ? undefined : sessionDirectoryFor(location)
+    if (dir === undefined) {
+      throw new ArchiveError('BACKEND_UNSUPPORTED', `subagent 会话 ${String(sessionId)} 的持久化后端不支持文件级处理`, 501)
+    }
+    targets.push({ sessionId, header, dir })
+  }
+  return targets
+}
+
+/** 备份目录内 subagent 子目录名必须安全，防 sidecar 篡改后路径穿越。 */
+function safeDirName(value: string): string {
+  if (!/^[A-Za-z0-9_-]+$/u.test(value)) throw new ArchiveError('BAD_BODY', `非法会话目录名：${value}`)
+  return value
 }
 
 /** 保证传入目录名只能落到 backupRoot 下。 */
@@ -390,6 +465,19 @@ async function restoreBackupDir(ctx: Context, backupDir: string): Promise<Archiv
   if (ctx.sessions.get(sessionId) !== undefined || ctx.agents.get(sessionId) !== undefined) {
     throw new ArchiveError('SESSION_LIVE', '该会话仍被 dsh 进程占用（未释放），不能重复恢复')
   }
+
+  const subagentTargets = (sidecar.subagents ?? []).map(child => {
+    const childId = SessionId(child.sessionId)
+    if (!isAbsolute(child.originalPath)
+      || dirname(child.originalPath) === child.originalPath
+      || !/^[A-Za-z0-9_-]+$/u.test(basename(child.originalPath))) {
+      throw new ArchiveError('UNKNOWN_BACKUP', `subagent 会话 ${String(childId)} 的原始路径不合法，拒绝恢复`, 400)
+    }
+    if (ctx.sessions.get(childId) !== undefined || ctx.agents.get(childId) !== undefined) {
+      throw new ArchiveError('SESSION_LIVE', `subagent 会话 ${String(childId)} 仍被 dsh 进程占用（未释放），不能重复恢复`)
+    }
+    return { childId, originalPath: child.originalPath, workspaceIds: child.workspaceIds }
+  })
   try {
     await mkdir(dirname(sidecar.originalPath), { recursive: true })
   } catch (error) {
@@ -410,8 +498,29 @@ async function restoreBackupDir(ctx: Context, backupDir: string): Promise<Archiv
     await rm(sidecar.originalPath, { recursive: true, force: false })
   }
   await rename(backupDir, sidecar.originalPath)
+  for (const target of subagentTargets) {
+    try {
+      await mkdir(dirname(target.originalPath), { recursive: true })
+      await rename(join(sidecar.originalPath, 'subagents', safeDirName(basename(target.originalPath))), target.originalPath)
+    } catch (error) {
+      // 父目录已移回，属「已恢复但 subagent 未移回」——明确提示，避免重试撞 TARGET_EXISTS。
+      throw new ArchiveError('IO_ERROR', `父会话已恢复，但 subagent 会话目录移回失败（${String(target.childId)}，请勿重复恢复）：${error instanceof Error ? error.message : String(error)}`, 500)
+    }
+  }
+  try {
+    await rm(join(sidecar.originalPath, 'subagents'), { recursive: true, force: false })
+  } catch {
+    // subagents 目录不存在时忽略。
+  }
   try {
     await attachWorkspaceAccounting(ctx, sessionId, sidecar.workspaceIds)
+    for (const target of subagentTargets) {
+      try {
+        await attachWorkspaceAccounting(ctx, target.childId, target.workspaceIds)
+      } catch (childError) {
+        ctx.logger.warn(`dsh-archive-session: 恢复后 subagent 工作区记账失败（${String(target.childId)}）：${String(childError)}`)
+      }
+    }
   } catch (error) {
     // 目录已移回，属「已恢复但记账失败」——明确提示，避免重试撞 TARGET_EXISTS。
     throw new ArchiveError('IO_ERROR', `会话已恢复，但工作区记账失败（请勿重复恢复）：${error instanceof Error ? error.message : String(error)}`, 500)
@@ -432,10 +541,10 @@ async function restoreBackupDir(ctx: Context, backupDir: string): Promise<Archiv
 export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {}): void {
   const settings = normalizeArchiveConfig(config)
 
-  // 启动清扫归档集幽灵 id（官方写操作复活产物，2026-08-30 审计）：不影响加载。
+  // 启动清扫（均不影响加载）：归档集幽灵 id（官方写操作复活产物）、投影缓存陈旧行、孤儿 subagent 会话。
   void sweepGhostArchivedIds(ctx)
-    // 启动清扫投影缓存：@ 列表与真实持久化一致。
-    void sweepStaleProjectionCache(ctx)
+  void sweepStaleProjectionCache(ctx)
+  void sweepOrphanSubagents(ctx)
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
@@ -520,60 +629,130 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             throw new ArchiveError('BACKEND_UNSUPPORTED', '当前会话持久化后端不提供已知的单会话目录，无法备份/删除', 501)
           }
 
+          const subagents = await listSubagentTargets(ctx, sessionId)
+
           if (pathname.endsWith('/backup')) {
             await ensureBackupRoot(settings.backupRoot)
             const backupId = `${sanitizeSegment(String(sessionId))}-${Date.now()}`
             const backupDir = resolveBackupDir(settings.backupRoot, backupId)
-            await rename(sessionDir, backupDir)
+            const moved: Array<{ from: string; to: string }> = []
+            const rollbackMoves = async (): Promise<void> => {
+              for (const move of [...moved].reverse()) {
+                try {
+                  await rename(move.to, move.from)
+                } catch (rollbackError) {
+                  ctx.logger.warn(`dsh-archive-session: 回滚失败（${move.to} → ${move.from}）：${String(rollbackError)}`)
+                }
+              }
+            }
+            try {
+              await rename(sessionDir, backupDir)
+              moved.push({ from: sessionDir, to: backupDir })
+            } catch (error) {
+              throw new ArchiveError('IO_ERROR', `移动父会话目录失败：${error instanceof Error ? error.message : String(error)}`, 500)
+            }
+            const subagentSidecars: ArchiveSubagentSidecar[] = []
+            if (subagents.length > 0) {
+              const subagentsDir = join(backupDir, 'subagents')
+              try {
+                await mkdir(subagentsDir, { recursive: true })
+                for (const child of subagents) {
+                  const childDirName = safeDirName(basename(child.dir))
+                  const to = join(subagentsDir, childDirName)
+                  await rename(child.dir, to)
+                  moved.push({ from: child.dir, to })
+                  subagentSidecars.push({
+                    sessionId: String(child.sessionId),
+                    title: await readTitle(ctx, child.sessionId, child.header.id),
+                    originalPath: child.dir,
+                    workspaceIds: workspaceIdsFor(ctx.workspaceRegistry.list(), child.sessionId),
+                  })
+                }
+              } catch (error) {
+                await rollbackMoves()
+                // 回滚成功后 backupDir 已移回原处，清掉残留的空 subagents/ 子目录（非空时保留，避免误删未移回的会话）。
+                await rmdir(join(sessionDir, 'subagents')).catch(() => undefined)
+                throw new ArchiveError('IO_ERROR', `移动 subagent 会话目录失败（已回滚）：${error instanceof Error ? error.message : String(error)}`, 500)
+              }
+            }
             const sidecar = {
-              version: 1,
+              version: 2,
               sessionId: String(sessionId),
               title,
               originalPath: sessionDir,
               archivedAt: new Date().toISOString(),
               workspaceIds: workspaces,
+              subagents: subagentSidecars.length > 0 ? subagentSidecars : undefined,
             }
             try {
               await writeFile(join(backupDir, BACKUP_SIDECAR), JSON.stringify(sidecar, null, 2), 'utf8')
             } catch (error) {
-              let rolledBack = true
-              try {
-                await rename(backupDir, sessionDir)
-              } catch {
-                rolledBack = false
-              }
-              throw new ArchiveError(
-                'IO_ERROR',
-                rolledBack
-                  ? `写入备份 sidecar 失败（已回滚）：${error instanceof Error ? error.message : String(error)}`
-                  : '写入备份 sidecar 失败，且回滚未成功：会话目录已留在备份区（无 sidecar，仅可删除）',
-                500,
-              )
+              await rollbackMoves()
+              await rmdir(join(sessionDir, 'subagents')).catch(() => undefined)
+              throw new ArchiveError('IO_ERROR', `写入备份 sidecar 失败（已回滚）：${error instanceof Error ? error.message : String(error)}`, 500)
             }
             await detachWorkspaceAccounting(ctx, sessionId)
+            for (const child of subagents) {
+              try {
+                await detachWorkspaceAccounting(ctx, child.sessionId)
+              } catch (cleanupError) {
+                ctx.logger.warn(`dsh-archive-session: subagent 工作区记账清理失败（${String(child.sessionId)}）：${String(cleanupError)}`)
+              }
+            }
             try {
               await removeArchivedId(ctx, sessionId)
             } catch (cleanupError) {
               ctx.logger.warn(`dsh-archive-session: 归档集清理失败：${String(cleanupError)}`)
             }
             await invalidateProjectionCacheGuarded(ctx, sessionId)
+            for (const child of subagents) {
+              await invalidateProjectionCacheGuarded(ctx, child.sessionId)
+            }
             // 通知会话列表消费者移除条目（官方公开事件；会话目录已移走）。
             ctx.emit('api-session/removed', sessionId)
-            sendJson(res, 200, { ok: true, backupId, workspaceIds: workspaces })
+            for (const child of subagents) {
+              ctx.emit('api-session/removed', child.sessionId)
+            }
+            sendJson(res, 200, {
+              ok: true,
+              backupId,
+              workspaceIds: workspaces,
+              subagentIds: subagents.map(child => String(child.sessionId)),
+            })
             return
           }
 
           await rm(sessionDir, { recursive: true, force: false })
+          for (const child of subagents) {
+            try {
+              await rm(child.dir, { recursive: true, force: false })
+            } catch (error) {
+              ctx.logger.warn(`dsh-archive-session: 删除 subagent 会话目录失败（${String(child.sessionId)}），启动清扫会兜底：${error instanceof Error ? error.message : String(error)}`)
+            }
+          }
           await detachWorkspaceAccounting(ctx, sessionId)
+          for (const child of subagents) {
+            try {
+              await detachWorkspaceAccounting(ctx, child.sessionId)
+            } catch (cleanupError) {
+              ctx.logger.warn(`dsh-archive-session: subagent 工作区记账清理失败（${String(child.sessionId)}）：${String(cleanupError)}`)
+            }
+          }
           try {
             await removeArchivedId(ctx, sessionId)
           } catch (cleanupError) {
             ctx.logger.warn(`dsh-archive-session: 归档集清理失败：${String(cleanupError)}`)
           }
           await invalidateProjectionCacheGuarded(ctx, sessionId)
+          for (const child of subagents) {
+            await invalidateProjectionCacheGuarded(ctx, child.sessionId)
+          }
           // 通知会话列表消费者移除条目（官方公开事件；会话目录已删除）。
           ctx.emit('api-session/removed', sessionId)
-          sendJson(res, 200, { ok: true, deleted: true, workspaceIds: workspaces })
+          for (const child of subagents) {
+            ctx.emit('api-session/removed', child.sessionId)
+          }
+          sendJson(res, 200, { ok: true, deleted: true, workspaceIds: workspaces, subagentIds: subagents.map(child => String(child.sessionId)) })
           return
         }
 

@@ -55,7 +55,8 @@ describe('archive-session 纯逻辑', () => {
     })
   })
 
-  describe('sanitizeSegment', () => {    it('危险字符 应该 替换为下划线', () => {
+  describe('sanitizeSegment', () => {
+    it('危险字符 应该 替换为下划线', () => {
       assert.equal(sanitizeSegment('../../a b'), '______a_b')
     })
 
@@ -92,6 +93,49 @@ describe('archive-session 纯逻辑', () => {
 
     it('缺少 originalPath 应该 返回 undefined', () => {
       assert.equal(parseBackupSidecar({ version: 1, sessionId: 's', archivedAt: 'now', workspaceIds: [] }), undefined)
+    })
+
+    it('version 2 带合法 subagents 应该 解析出子会话清单', () => {
+      const sidecar = parseBackupSidecar({
+        version: 2,
+        sessionId: 'p',
+        title: 'parent',
+        originalPath: 'C:/tmp/p',
+        archivedAt: 'now',
+        workspaceIds: ['w'],
+        subagents: [
+          { sessionId: 'c1', title: 'child1', originalPath: 'C:/tmp/c1', workspaceIds: ['w'] },
+          { sessionId: 'c2', originalPath: 'C:/tmp/c2', workspaceIds: [] },
+        ],
+      })
+      assert.equal(sidecar?.version, 2)
+      assert.equal(sidecar?.subagents?.length, 2)
+      assert.equal(sidecar?.subagents?.[1].title, 'c2')
+      assert.deepEqual(sidecar?.subagents?.[0].workspaceIds, ['w'])
+    })
+
+    it('version 2 subagents 含非法条目 应该 返回 undefined', () => {
+      const sidecar = parseBackupSidecar({
+        version: 2,
+        sessionId: 'p',
+        originalPath: 'C:/tmp/p',
+        archivedAt: 'now',
+        workspaceIds: [],
+        subagents: [{ sessionId: 'c1', originalPath: 'C:/tmp/c1', workspaceIds: ['w'] }, { title: 'bad' }],
+      })
+      assert.equal(sidecar, undefined)
+    })
+
+    it('version 1 无 subagents 应该 正常解析', () => {
+      const sidecar = parseBackupSidecar({
+        version: 1,
+        sessionId: 'p',
+        originalPath: 'C:/tmp/p',
+        archivedAt: 'now',
+        workspaceIds: [],
+      })
+      assert.equal(sidecar?.version, 1)
+      assert.equal(sidecar?.subagents, undefined)
     })
   })
 })

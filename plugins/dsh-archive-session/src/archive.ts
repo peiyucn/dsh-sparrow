@@ -10,13 +10,22 @@ export interface ArchiveConfig {
   readonly backupRoot: string
 }
 
+export interface ArchiveSubagentSidecar {
+  readonly sessionId: string
+  readonly title: string
+  readonly originalPath: string
+  readonly workspaceIds: readonly string[]
+}
+
 export interface ArchiveSidecar {
-  readonly version: 1
+  readonly version: 1 | 2
   readonly sessionId: string
   readonly title: string
   readonly originalPath: string
   readonly archivedAt: string
   readonly workspaceIds: readonly string[]
+  /** version 2：备份时随父会话一起移动的 subagent 会话。 */
+  readonly subagents?: readonly ArchiveSubagentSidecar[]
 }
 
 export function normalizeArchiveConfig(input: Readonly<Partial<ArchiveConfig>> | undefined): ArchiveConfig {
@@ -59,18 +68,37 @@ export function maskHomePath(path: string, homeDir: string): string {
 export function parseBackupSidecar(value: unknown): ArchiveSidecar | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
   const sidecar = value as Record<string, unknown>
-  if (sidecar.version !== 1) return undefined
+  if (sidecar.version !== 1 && sidecar.version !== 2) return undefined
   if (typeof sidecar.sessionId !== 'string' || sidecar.sessionId.trim() === '') return undefined
   if (typeof sidecar.originalPath !== 'string' || sidecar.originalPath.trim() === '') return undefined
   if (typeof sidecar.archivedAt !== 'string') return undefined
   if (!Array.isArray(sidecar.workspaceIds) || !sidecar.workspaceIds.every(id => typeof id === 'string')) return undefined
+  let subagents: ArchiveSubagentSidecar[] | undefined
+  if (sidecar.version === 2 && sidecar.subagents !== undefined) {
+    if (!Array.isArray(sidecar.subagents)) return undefined
+    subagents = sidecar.subagents.map((item): ArchiveSubagentSidecar | undefined => {
+      if (typeof item !== 'object' || item === null || Array.isArray(item)) return undefined
+      const child = item as Record<string, unknown>
+      if (typeof child.sessionId !== 'string' || child.sessionId.trim() === '') return undefined
+      if (typeof child.originalPath !== 'string' || child.originalPath.trim() === '') return undefined
+      if (!Array.isArray(child.workspaceIds) || !child.workspaceIds.every(id => typeof id === 'string')) return undefined
+      return {
+        sessionId: child.sessionId,
+        title: typeof child.title === 'string' ? child.title : child.sessionId,
+        originalPath: child.originalPath,
+        workspaceIds: child.workspaceIds,
+      }
+    }).filter((item): item is ArchiveSubagentSidecar => item !== undefined)
+    if (subagents.length !== (sidecar.subagents as unknown[]).length) return undefined
+  }
   return {
-    version: 1,
+    version: sidecar.version,
     sessionId: sidecar.sessionId,
     title: typeof sidecar.title === 'string' ? sidecar.title : sidecar.sessionId,
     originalPath: sidecar.originalPath,
     archivedAt: sidecar.archivedAt,
     workspaceIds: sidecar.workspaceIds,
+    subagents,
   }
 }
 
