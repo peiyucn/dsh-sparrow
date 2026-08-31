@@ -284,8 +284,8 @@ const styles = {
     flex: 'none',
     display: 'flex',
     justifyContent: 'center',
+    // 列表已包区块卡，不再加顶部分隔线（避免与卡片叠加显乱）。
     padding: '10px 24px 14px',
-    borderTop: '1px solid var(--dsw-alias-border-l2, #e2e5ea)',
   } satisfies CSSProperties,
 } as const
 
