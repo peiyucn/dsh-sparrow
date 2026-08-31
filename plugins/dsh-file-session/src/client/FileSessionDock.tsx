@@ -192,6 +192,21 @@ export function ensureFileSessionStyles(): void {
   justify-content: flex-end;
   gap: 8px;
 }
+/* 用量/进度条固定区：面板头下方、不随列表滚动。 */
+.dsh-file-session-summary {
+  flex: none;
+  padding: 12px 24px 12px;
+}
+/* 列表区块卡：存档页归档区/备份区同款 token（border-l2 + r12）。 */
+.dsh-file-session-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 12px;
+  padding: 8px 12px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, #e2e5ea);
+  border-radius: 12px;
+}
 /* 配额进度条：网盘风格细条（track 悬停底色 + 业务蓝填充）；百分比并入上方统计行，避免与细条左右分离。 */
 .dsh-file-session-quota-track {
   height: 6px;
@@ -388,7 +403,22 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
                 <IconCloseOutline16 size={14} />
               </button>
             </div>
-            <div style={styles.body} className="dsh-file-session-body">
+            {summary !== null ? (
+              <div className="dsh-file-session-summary">
+                <p style={{ ...styles.secondarySmall, margin: '0 0 6px' }}>
+                  {t('summary', { count: summary.count, size: `${summary.totalBytesLabel} / ${summary.quotaBytesLabel}` })}
+                  {' · '}
+                  {t('quota.used', { percent: formatUsagePercent(quotaRatio) })}
+                </p>
+                <div className="dsh-file-session-quota-track">
+                  {/* 零用量不渲染填充（min-width 银条只给「有使用」的状态）。 */}
+                  {quotaRatio > 0
+                    ? <div className="dsh-file-session-quota-fill" style={{ width: `${Math.round(quotaRatio * 100)}%` }} />
+                    : null}
+                </div>
+              </div>
+            ) : null}
+            <div style={{ ...styles.body, padding: summary !== null ? '0 24px 24px' : '12px 24px 24px' }} className="dsh-file-session-body">
               {error !== null ? (
                 <p role="alert" style={{ ...styles.secondarySmall, margin: '0 0 12px', color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>
                   {error}
@@ -396,53 +426,42 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
                   <button type="button" className="dsh-file-session-btn" onClick={loadFirst}>{t('retry')}</button>
                 </p>
               ) : null}
-              {summary !== null ? (
-                <div style={{ margin: '0 0 12px' }}>
-                  <p style={{ ...styles.secondarySmall, margin: '0 0 6px' }}>
-                    {t('summary', { count: summary.count, size: `${summary.totalBytesLabel} / ${summary.quotaBytesLabel}` })}
-                    {' · '}
-                    {t('quota.used', { percent: formatUsagePercent(quotaRatio) })}
-                  </p>
-                  <div className="dsh-file-session-quota-track">
-                    {/* 零用量不渲染填充（min-width 银条只给「有使用」的状态）。 */}
-                    {quotaRatio > 0
-                      ? <div className="dsh-file-session-quota-fill" style={{ width: `${Math.round(quotaRatio * 100)}%` }} />
-                      : null}
-                  </div>
-                </div>
-              ) : null}
               {loading ? <p style={styles.secondarySmall}>{t('loading')}</p> : null}
               {!loading && error === null && rows.length === 0 ? <p style={styles.secondarySmall}>{t('empty')}</p> : null}
-              {rows.map(row => (
-                <div key={row.id} style={styles.row}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                      <span style={styles.title} title={row.filename}>{row.filename}</span>
-                      {row.dshOwned ? <span className="dsh-file-session-badge">{t('dshBadge')}</span> : null}
+              {rows.length > 0 ? (
+                <div className="dsh-file-session-card">
+                  {rows.map(row => (
+                    <div key={row.id} style={styles.row}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                          <span style={styles.title} title={row.filename}>{row.filename}</span>
+                          {row.dshOwned ? <span className="dsh-file-session-badge">{t('dshBadge')}</span> : null}
+                        </div>
+                        <div style={styles.secondarySmall}>
+                          {row.sizeLabel} · {row.createdAtLabel}
+                          {row.expiresAtLabel !== undefined ? ` · ${t('expires', { time: row.expiresAtLabel })}` : ''}
+                        </div>
+                      </div>
+                      <div style={styles.actions}>
+                        <button
+                          type="button"
+                          className="dsh-file-session-btn"
+                          onClick={() => { void copyId(row) }}
+                        >
+                          {copied === row.id ? t('copied') : t('copy')}
+                        </button>
+                        <button
+                          type="button"
+                          className="dsh-file-session-btn dsh-file-session-btn-danger"
+                          onClick={() => { setConfirming(row) }}
+                        >
+                          {t('delete')}
+                        </button>
+                      </div>
                     </div>
-                    <div style={styles.secondarySmall}>
-                      {row.sizeLabel} · {row.createdAtLabel}
-                      {row.expiresAtLabel !== undefined ? ` · ${t('expires', { time: row.expiresAtLabel })}` : ''}
-                    </div>
-                  </div>
-                  <div style={styles.actions}>
-                    <button
-                      type="button"
-                      className="dsh-file-session-btn"
-                      onClick={() => { void copyId(row) }}
-                    >
-                      {copied === row.id ? t('copied') : t('copy')}
-                    </button>
-                    <button
-                      type="button"
-                      className="dsh-file-session-btn dsh-file-session-btn-danger"
-                      onClick={() => { setConfirming(row) }}
-                    >
-                      {t('delete')}
-                    </button>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              ) : null}
             </div>
             {hasMore && !loading ? (
               <div style={styles.footerBar}>
