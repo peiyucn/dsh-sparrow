@@ -18,7 +18,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
-  plugins/dsh-archive-session:
+  plugins/dsh-archive-manage:
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.1
@@ -69,7 +69,7 @@ importers:
         specifier: ^18.2.0
         version: 18.3.1
 
-  plugins/dsh-chat-suggest:
+  plugins/dsh-chat-fim:
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.1
@@ -114,7 +114,7 @@ importers:
         specifier: ^18.2.0
         version: 18.3.1
 
-  plugins/dsh-file-session:
+  plugins/dsh-file-manage:
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.1
@@ -171,7 +171,7 @@ importers:
         specifier: ^22.20.0
         version: 22.20.1
 
-  plugins/dsh-vision-access:
+  plugins/dsh-vision-bridge:
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.1
