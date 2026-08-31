@@ -1,6 +1,6 @@
 # 本地开发补丁：dsh checkout 内 dev:web / --patch overlay 使用；name 是本机绝对路径。
 - insert:
-    - id: dsh-archive-session
-      name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-archive-session/src/index.ts
+    - id: dsh-archive-manage
+      name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-archive-manage/src/index.ts
       config:
         backupRoot: C:/Users/DJ028191/.dsh/sessions-archived-backup

@@ -1,4 +1,4 @@
-/** dsh-archive-session host half：标题缓存 + 归档会话 REST 路由。 */
+/** dsh-archive-manage host half：标题缓存 + 归档会话 REST 路由。 */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
@@ -22,12 +22,12 @@ import {
   type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar,
 } from './archive.js'
 
-export const name = 'dsh-archive-session'
+export const name = 'dsh-archive-manage'
 export const inject = ['webServer', 'sessions', 'agents', 'workspaceRegistry', 'sessionPersistence', 'sessionQuery', 'storageDomain']
 
 export type { ArchiveConfig }
 
-const PREFIX = '/api/archive-session'
+const PREFIX = '/api/archive-manage'
 const MAX_BODY_BYTES = 64 * 1024
 
 declare module '@deepseek-ai/cordis' {
@@ -214,7 +214,7 @@ function warnIfRegistryStale(ctx: Context, domain: ArchivedDomainHandle, label: 
     const registry = ctx.workspaceRegistry.archivedSessionIds.map(String).sort()
     const domainIds = domain.global.get().archivedSessionIds.map(String).sort()
     if (registry.join(',') !== domainIds.join(',')) {
-      ctx.logger.warn(`dsh-archive-session: ${label} 后官方 workspace 内存态与域不一致；官方后续写操作可能把已移除会话 id 复活（重启后启动清扫恢复）`)
+      ctx.logger.warn(`dsh-archive-manage: ${label} 后官方 workspace 内存态与域不一致；官方后续写操作可能把已移除会话 id 复活（重启后启动清扫恢复）`)
     }
   } catch {
     // 一致性检查只作告警，不参与主流程。
@@ -259,10 +259,10 @@ async function sweepGhostArchivedIds(ctx: Context): Promise<void> {
       const cleaned = latest.archivedSessionIds.filter(id => known.has(String(id)))
       if (cleaned.length === latest.archivedSessionIds.length) return
       await domain.global.set({ ...latest, archivedSessionIds: cleaned })
-      ctx.logger.warn(`dsh-archive-session: 启动清扫移除 ${latest.archivedSessionIds.length - cleaned.length} 个幽灵归档 id`)
+      ctx.logger.warn(`dsh-archive-manage: 启动清扫移除 ${latest.archivedSessionIds.length - cleaned.length} 个幽灵归档 id`)
     })
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-session: 启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`dsh-archive-manage: 启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -273,7 +273,7 @@ async function invalidateProjectionCache(ctx: Context, sessionId: SessionId): Pr
     if (domain === undefined) return
     await domain.table(PROJCACHE_SESSIONS_TABLE).delete(String(sessionId))
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-session: 投影缓存失效失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`dsh-archive-manage: 投影缓存失效失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
   }
 }
 /** 备份/删除后校验投影缓存是否已删除；未删除时重试一次并告警，供启动清扫兜底。 */
@@ -284,10 +284,10 @@ async function invalidateProjectionCacheGuarded(ctx: Context, sessionId: Session
       const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
       if (domain === undefined || domain.table(PROJCACHE_SESSIONS_TABLE).get(String(sessionId)) === undefined) return
     } catch (error) {
-      ctx.logger.warn(`dsh-archive-session: 投影缓存校验失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+      ctx.logger.warn(`dsh-archive-manage: 投影缓存校验失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
       return
     }
-    if (attempt === 1) ctx.logger.warn(`dsh-archive-session: 备份/删除后投影缓存仍残留 ${String(sessionId)}，重启后启动清扫会再次清理`)
+    if (attempt === 1) ctx.logger.warn(`dsh-archive-manage: 备份/删除后投影缓存仍残留 ${String(sessionId)}，重启后启动清扫会再次清理`)
   }
 }
 
@@ -317,9 +317,9 @@ async function sweepStaleProjectionCache(ctx: Context): Promise<void> {
       await table.delete(String(key))
       removed++
     }
-    if (removed > 0) ctx.logger.warn(`dsh-archive-session: 启动清扫投影缓存移除 ${removed} 个陈旧会话`)
+    if (removed > 0) ctx.logger.warn(`dsh-archive-manage: 启动清扫投影缓存移除 ${removed} 个陈旧会话`)
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-session: 投影缓存启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`dsh-archive-manage: 投影缓存启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -342,26 +342,26 @@ async function sweepOrphanSubagents(ctx: Context): Promise<void> {
       const location = ctx.sessionPersistence.locate(header)
       const dir = location === undefined ? undefined : sessionDirectoryFor(location)
       if (dir === undefined) {
-        ctx.logger.warn(`dsh-archive-session: 孤儿 subagent 会话 ${String(childId)} 的后端不支持文件级处理，跳过`)
+        ctx.logger.warn(`dsh-archive-manage: 孤儿 subagent 会话 ${String(childId)} 的后端不支持文件级处理，跳过`)
         continue
       }
       try {
         await rm(dir, { recursive: true, force: false })
       } catch (error) {
-        ctx.logger.warn(`dsh-archive-session: 孤儿 subagent 目录删除失败（${String(childId)}）：${error instanceof Error ? error.message : String(error)}`)
+        ctx.logger.warn(`dsh-archive-manage: 孤儿 subagent 目录删除失败（${String(childId)}）：${error instanceof Error ? error.message : String(error)}`)
         continue
       }
       try {
         await detachWorkspaceAccounting(ctx, childId)
       } catch (accountingError) {
-        ctx.logger.warn(`dsh-archive-session: 孤儿 subagent 工作区记账清理失败（${String(childId)}）：${String(accountingError)}`)
+        ctx.logger.warn(`dsh-archive-manage: 孤儿 subagent 工作区记账清理失败（${String(childId)}）：${String(accountingError)}`)
       }
       await invalidateProjectionCacheGuarded(ctx, childId)
       removed++
     }
-    if (removed > 0) ctx.logger.warn(`dsh-archive-session: 启动清扫删除 ${removed} 个孤儿 subagent 会话`)
+    if (removed > 0) ctx.logger.warn(`dsh-archive-manage: 启动清扫删除 ${removed} 个孤儿 subagent 会话`)
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-session: 孤儿 subagent 启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`dsh-archive-manage: 孤儿 subagent 启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -531,7 +531,7 @@ async function restoreBackupDir(ctx: Context, backupDir: string): Promise<Archiv
       try {
         await attachWorkspaceAccounting(ctx, target.childId, target.workspaceIds)
       } catch (childError) {
-        ctx.logger.warn(`dsh-archive-session: 恢复后 subagent 工作区记账失败（${String(target.childId)}）：${String(childError)}`)
+        ctx.logger.warn(`dsh-archive-manage: 恢复后 subagent 工作区记账失败（${String(target.childId)}）：${String(childError)}`)
       }
     }
   } catch (error) {
@@ -541,7 +541,7 @@ async function restoreBackupDir(ctx: Context, backupDir: string): Promise<Archiv
   try {
     await addArchivedId(ctx, sessionId)
   } catch (cleanupError) {
-    ctx.logger.warn(`dsh-archive-session: 恢复后归档集同步失败：${String(cleanupError)}`)
+    ctx.logger.warn(`dsh-archive-manage: 恢复后归档集同步失败：${String(cleanupError)}`)
   }
   return sidecar
 }
@@ -687,7 +687,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
                 try {
                   await rename(move.to, move.from)
                 } catch (rollbackError) {
-                  ctx.logger.warn(`dsh-archive-session: 回滚失败（${move.to} → ${move.from}）：${String(rollbackError)}`)
+                  ctx.logger.warn(`dsh-archive-manage: 回滚失败（${move.to} → ${move.from}）：${String(rollbackError)}`)
                 }
               }
             }
@@ -742,13 +742,13 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               try {
                 await detachWorkspaceAccounting(ctx, child.sessionId)
               } catch (cleanupError) {
-                ctx.logger.warn(`dsh-archive-session: subagent 工作区记账清理失败（${String(child.sessionId)}）：${String(cleanupError)}`)
+                ctx.logger.warn(`dsh-archive-manage: subagent 工作区记账清理失败（${String(child.sessionId)}）：${String(cleanupError)}`)
               }
             }
             try {
               await removeArchivedId(ctx, sessionId)
             } catch (cleanupError) {
-              ctx.logger.warn(`dsh-archive-session: 归档集清理失败：${String(cleanupError)}`)
+              ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
             }
             await invalidateProjectionCacheGuarded(ctx, sessionId)
             for (const child of subagents) {
@@ -773,7 +773,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             try {
               await rm(child.dir, { recursive: true, force: false })
             } catch (error) {
-              ctx.logger.warn(`dsh-archive-session: 删除 subagent 会话目录失败（${String(child.sessionId)}），启动清扫会兜底：${error instanceof Error ? error.message : String(error)}`)
+              ctx.logger.warn(`dsh-archive-manage: 删除 subagent 会话目录失败（${String(child.sessionId)}），启动清扫会兜底：${error instanceof Error ? error.message : String(error)}`)
             }
           }
           await detachWorkspaceAccounting(ctx, sessionId)
@@ -781,13 +781,13 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             try {
               await detachWorkspaceAccounting(ctx, child.sessionId)
             } catch (cleanupError) {
-              ctx.logger.warn(`dsh-archive-session: subagent 工作区记账清理失败（${String(child.sessionId)}）：${String(cleanupError)}`)
+              ctx.logger.warn(`dsh-archive-manage: subagent 工作区记账清理失败（${String(child.sessionId)}）：${String(cleanupError)}`)
             }
           }
           try {
             await removeArchivedId(ctx, sessionId)
           } catch (cleanupError) {
-            ctx.logger.warn(`dsh-archive-session: 归档集清理失败：${String(cleanupError)}`)
+            ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
           }
           await invalidateProjectionCacheGuarded(ctx, sessionId)
           for (const child of subagents) {
@@ -886,10 +886,10 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
-        sendJson(res, 404, { error: { code: 'BAD_BODY', message: `未知的 archive-session 路由：${pathname}` } })
+        sendJson(res, 404, { error: { code: 'BAD_BODY', message: `未知的 archive-manage 路由：${pathname}` } })
       } catch (error) {
         sendError(res, error)
       }
     },
-  }), 'dsh-archive-session: REST routes')
+  }), 'dsh-archive-manage: REST routes')
 }

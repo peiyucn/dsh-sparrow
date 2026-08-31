@@ -1,8 +1,8 @@
-/** dsh-archive-session 纯逻辑：配置、确认强度、备份目录名、sidecar 解析。 */
+/** dsh-archive-manage 纯逻辑：配置、确认强度、备份目录名、sidecar 解析。 */
 
 import { join } from 'node:path'
 
-export const BACKUP_SIDECAR = 'dsh-archive-session.json'
+export const BACKUP_SIDECAR = 'dsh-archive-manage.json'
 /** 备份目录名（沿用此前版本实际使用的目录，让旧备份直接可见）。 */
 export const DEFAULT_BACKUP_DIR = 'sessions-archived-backup'
 
@@ -34,7 +34,7 @@ export function normalizeArchiveConfig(input: Readonly<Partial<ArchiveConfig>> |
   const config: ArchiveConfig = {
     backupRoot: input?.backupRoot?.trim() || defaultBackupRoot,
   }
-  if (config.backupRoot === '') throw new Error('dsh-archive-session: backupRoot 不能为空')
+  if (config.backupRoot === '') throw new Error('dsh-archive-manage: backupRoot 不能为空')
   return config
 }
 

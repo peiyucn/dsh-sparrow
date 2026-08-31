@@ -48,7 +48,7 @@ export interface ArchiveDockInjected {
   deleteAllBackups: () => Promise<{ deleted?: number; failed?: string[] }>
 }
 
-export type ArchiveDockProps = PropsRuntime<'sidebar.footer.action'> & ArchiveDockInjected & { t: TranslateNS<'archive-session'> }
+export type ArchiveDockProps = PropsRuntime<'sidebar.footer.action'> & ArchiveDockInjected & { t: TranslateNS<'archive-manage'> }
 
 /** 注入侧边栏 footer 触发键样式（对齐官方 settings 触发键：透明底、圆角、悬停亮底、rail 圆形）。 */
 export function ensureArchiveStyles(): void {
@@ -351,7 +351,7 @@ type PendingConfirm =
 
 interface ArchiveConfirmProps {
   readonly pending: PendingConfirm
-  readonly t: TranslateNS<'archive-session'>
+  readonly t: TranslateNS<'archive-manage'>
   readonly onCancel: () => void
   /** 执行动作；成功后父级关闭弹窗，失败 reject 并把错误显示在弹窗内。 */
   readonly onSubmit: (typed: string) => Promise<void>

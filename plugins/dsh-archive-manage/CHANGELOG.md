@@ -2,6 +2,7 @@
 
 ## 0.1.0-alpha.1（2026-08-31 · 预发布）
 
+- 包名由 `@dsh-sparrow/dsh-archive-session` 更名为 `@dsh-sparrow/dsh-archive-manage`（2026-09-01 改定，路由 / locale namespace / sidecar 文件名等内部标识同步对齐；旧名从未发布，无迁移成本）
 - 首个预发布版本，先走 `next` 通道验证；功能同计划中的 `0.1.0` 首发
 
 

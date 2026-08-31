@@ -1,4 +1,4 @@
-# 01 · 设计 —— dsh-archive-session
+# 01 · 设计 —— dsh-archive-manage
 
 > 本文是 seam 查证 + 架构提案；「待查证」条目未确认，开工前需补查。
 
@@ -40,7 +40,7 @@
 
 1. ✅ 入口按钮：`ui-workspace` 无对应 slot，改用 `sidebar.footer.action`。
 2. ✅ `workspace` 无公开 unarchive；归档集读写经 `workspaceDomainSpec` + `ctx.storageDomain`，workspace 记账用 `WorkspaceEntity.detachSession/attachSession`。
-3. 三档已定：轻量标题 / 备份（可逆）/ 删除（不可逆），备份与删除的 seam 特例写入 `plugins/dsh-archive-session/AGENTS.md`（已定案）。
+3. 三档已定：轻量标题 / 备份（可逆）/ 删除（不可逆），备份与删除的 seam 特例写入 `plugins/dsh-archive-manage/AGENTS.md`（已定案）。
 4. ✅ 路线 A 包装 `sessionQuery.readTitleSnapshots`（短 TTL LRU + `session/title` 失效），不连带 `fileReferences`。
 
 ## 适配版本基线

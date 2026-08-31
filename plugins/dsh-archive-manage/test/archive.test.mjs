@@ -5,7 +5,7 @@ import {
   parseBackupSidecar, parseBlankProjection, sanitizeSegment, straySessionIds,
 } from '../lib/archive.js'
 
-describe('archive-session 纯逻辑', () => {
+describe('archive-manage 纯逻辑', () => {
   describe('normalizeArchiveConfig', () => {
     it('空配置 应该 提供默认备份目录', () => {
       const config = normalizeArchiveConfig(undefined)

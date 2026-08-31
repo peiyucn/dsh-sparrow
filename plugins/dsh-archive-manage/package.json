@@ -1,12 +1,12 @@
 {
-  "name": "@dsh-sparrow/dsh-archive-session",
+  "name": "@dsh-sparrow/dsh-archive-manage",
   "description": "DSH web plugin: archived-session management — backup, delete and restore archived sessions from the sidebar",
   "version": "0.1.0-alpha.1",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/peiyucn/dsh-sparrow.git",
-    "directory": "plugins/dsh-archive-session"
+    "directory": "plugins/dsh-archive-manage"
   },
   "type": "module",
   "main": "lib/index.js",

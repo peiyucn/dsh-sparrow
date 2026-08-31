@@ -23,7 +23,7 @@
 
 ## 动作复用
 
-- 备份 / 删除直接复用现有链路（`POST /api/archive-session/backup|delete`）：仅把入口校验从「必须已归档」放宽为「已归档 ∨ 游离」。链路其余部分对游离会话天然兼容：
+- 备份 / 删除直接复用现有链路（`POST /api/archive-manage/backup|delete`）：仅把入口校验从「必须已归档」放宽为「已归档 ∨ 游离」。链路其余部分对游离会话天然兼容：
   - `removeArchivedId`（不在归档集，no-op）、`detachWorkspaceAccounting`（不挂工作区，no-op）；
   - subagent 连带处理、投影失效、`api-session/removed` 事件照常执行。
 - 备份后恢复：会话回到「游离」态，重新出现在游离区（行为自洽）。

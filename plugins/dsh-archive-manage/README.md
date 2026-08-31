@@ -1,4 +1,4 @@
-# dsh-archive-session
+# dsh-archive-manage
 
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
@@ -9,12 +9,12 @@ Complements the built-in archive. DSH's archive marker only hides a session from
 ## Install
 
 ```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-archive-session
+dsh plugin --profile web add @dsh-sparrow/dsh-archive-manage
 ```
 
 Requires dsh ≥ 0.1.1-rc.2 and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
 
-> Do **not** run `npm install @dsh-sparrow/dsh-archive-session` directly — that only downloads the package into a `node_modules` and does not register it in the DSH web profile. Install with the `dsh plugin` command above, then restart DSH.
+> Do **not** run `npm install @dsh-sparrow/dsh-archive-manage` directly — that only downloads the package into a `node_modules` and does not register it in the DSH web profile. Install with the `dsh plugin` command above, then restart DSH.
 
 ## Usage
 
@@ -30,7 +30,7 @@ Requires dsh ≥ 0.1.1-rc.2 and a working `pnpm` (`dsh plugin` forwards installa
 
 ## Backup Location & Restore
 
-* Default backup folder: `$DSH_HOME/sessions-archived-backup/`; each backup folder contains a `dsh-archive-session.json` recording its original location and workspace ownership, which restore uses to move it back
+* Default backup folder: `$DSH_HOME/sessions-archived-backup/`; each backup folder contains a `dsh-archive-manage.json` recording its original location and workspace ownership, which restore uses to move it back
 * Folders without a sidecar file are listed as "legacy": they can only be deleted, not restored
 
 ## Uninstall & Residue

@@ -1,4 +1,4 @@
-# 02 · 路线图 —— dsh-archive-session
+# 02 · 路线图 —— dsh-archive-manage
 
 > M1/M2 已实现，剩余热更验证与发布检查。
 

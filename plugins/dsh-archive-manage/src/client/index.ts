@@ -1,5 +1,5 @@
 /**
- * dsh-archive-session client half：sidebar footer 入口 + 归档弹窗。
+ * dsh-archive-manage client half：sidebar footer 入口 + 归档弹窗。
  * 所有写操作都走 host 自有路由；客户端不直接碰文件。
  */
 
@@ -147,12 +147,12 @@ async function postApi<T = { ok?: boolean }>(path: string, body: unknown): Promi
  */
 export function apply(ctx: ClientContext): void {
   ensureArchiveStyles()
-  const disposeDictionaries = ctx.locale.register('archive-session', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
-  ctx.effect(() => disposeDictionaries, 'dsh-archive-session: locale dictionaries')
+  const disposeDictionaries = ctx.locale.register('archive-manage', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
+  ctx.effect(() => disposeDictionaries, 'dsh-archive-manage: locale dictionaries')
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action',
-    locale: 'archive-session',
-    id: 'archive-session',
+    locale: 'archive-manage',
+    id: 'archive-manage',
     order: 20,
     inject: () => ({
       listArchived: () => readApi<{
@@ -163,7 +163,7 @@ export function apply(ctx: ClientContext): void {
         running: boolean
         backendSupported: boolean
         workspaceIds: readonly string[]
-      }>('/api/archive-session/list'),
+      }>('/api/archive-manage/list'),
       listStrays: () => readApi<{
         sessionId: string
         title: string
@@ -172,28 +172,28 @@ export function apply(ctx: ClientContext): void {
         live: boolean
         running: boolean
         backendSupported: boolean
-      }>('/api/archive-session/strays'),
+      }>('/api/archive-manage/strays'),
       listBackups: () => readApi<{
         backupId: string
         sessionId: string
         title: string
         archivedAt: string
         legacy: boolean
-      }>('/api/archive-session/backups'),
+      }>('/api/archive-manage/backups'),
       backupDirPath: async () => {
-        const response = await fetch('/api/archive-session/backup-dir')
+        const response = await fetch('/api/archive-manage/backup-dir')
         const payload = await response.json() as { path?: string; displayPath?: string; error?: { message?: string } }
         if (!response.ok) {
           throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
         }
         return { path: payload.path ?? '', displayPath: payload.displayPath ?? payload.path ?? '' }
       },
-      backupSession: (sessionId: string) => postApi('/api/archive-session/backup', { sessionId, confirm: true }),
-      deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => postApi('/api/archive-session/delete', simple ? { sessionId, confirm: true } : { sessionId, confirmTitle }),
-      restoreBackup: (backupId: string) => postApi('/api/archive-session/restore', { backupId }),
-      deleteBackup: (backupId: string) => postApi('/api/archive-session/backup-delete', { backupId, confirm: true }),
-      restoreAllBackups: () => postApi<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ backupId: string; message: string }> }>('/api/archive-session/backup-restore-all', { confirm: true }),
-      deleteAllBackups: () => postApi<{ deleted?: number; failed?: string[] }>('/api/archive-session/backup-delete-all', { confirm: true }),
+      backupSession: (sessionId: string) => postApi('/api/archive-manage/backup', { sessionId, confirm: true }),
+      deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => postApi('/api/archive-manage/delete', simple ? { sessionId, confirm: true } : { sessionId, confirmTitle }),
+      restoreBackup: (backupId: string) => postApi('/api/archive-manage/restore', { backupId }),
+      deleteBackup: (backupId: string) => postApi('/api/archive-manage/backup-delete', { backupId, confirm: true }),
+      restoreAllBackups: () => postApi<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ backupId: string; message: string }> }>('/api/archive-manage/backup-restore-all', { confirm: true }),
+      deleteAllBackups: () => postApi<{ deleted?: number; failed?: string[] }>('/api/archive-manage/backup-delete-all', { confirm: true }),
     }),
   }, ArchiveDock))
 }

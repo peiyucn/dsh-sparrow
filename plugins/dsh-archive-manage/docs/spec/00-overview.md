@@ -1,4 +1,4 @@
-# 00 · 插件概览 — dsh-archive-session
+# 00 · 插件概览 — dsh-archive-manage
 
 > dsh-sparrow 合集成员。本文是需求范围与验收边界；详细设计见 01-design.md，路线图见 02-roadmap.md。
 

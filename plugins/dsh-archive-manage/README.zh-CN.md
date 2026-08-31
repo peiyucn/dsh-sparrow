@@ -1,4 +1,4 @@
-# dsh-archive-session
+# dsh-archive-manage
 
 简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
@@ -9,12 +9,12 @@
 ## 安装
 
 ```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-archive-session
+dsh plugin --profile web add @dsh-sparrow/dsh-archive-manage
 ```
 
 适配 dsh ≥ 0.1.1-rc.2，并需要可用的 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
 
-> **不要**直接执行 `npm install @dsh-sparrow/dsh-archive-session`：那只会把包下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用上面的 `dsh plugin` 命令安装，并在安装后重启 DSH。
+> **不要**直接执行 `npm install @dsh-sparrow/dsh-archive-manage`：那只会把包下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用上面的 `dsh plugin` 命令安装，并在安装后重启 DSH。
 
 ## 使用
 
@@ -30,7 +30,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-archive-session
 
 ## 备份位置与恢复
 
-* 默认备份夹：`$DSH_HOME/sessions-archived-backup/`；每个备份目录内含 `dsh-archive-session.json` 记录原始位置与工作区归属，恢复时按它移回
+* 默认备份夹：`$DSH_HOME/sessions-archived-backup/`；每个备份目录内含 `dsh-archive-manage.json` 记录原始位置与工作区归属，恢复时按它移回
 * 无记录文件的旧格式目录按「旧格式」列出：只能删除、不能恢复
 
 ## 卸载与残留

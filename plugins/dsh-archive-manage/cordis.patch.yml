@@ -1,7 +1,7 @@
-# dsh-archive-session 组合补丁。
+# dsh-archive-manage 组合补丁。
 # backupRoot 是插件自己的备份夹，不动 dsh 会话根目录。
 - insert:
-    - id: dsh-archive-session
-      name: '@dsh-sparrow/dsh-archive-session'
+    - id: dsh-archive-manage
+      name: '@dsh-sparrow/dsh-archive-manage'
       config:
         backupRoot: !!js dshHomePath('sessions-archived-backup')

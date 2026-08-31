@@ -12,7 +12,7 @@ const sessionPath = win ? 'C:\\dsh\\sessions\\session-1\\session.jsonl' : '/dsh/
 const sessionDir = win ? 'C:\\dsh\\sessions\\session-1' : '/dsh/sessions/session-1'
 const rootLevelSession = win ? 'C:\\session.jsonl' : '/session.jsonl'
 
-describe('archive-session host 纯逻辑', () => {
+describe('archive-manage host 纯逻辑', () => {
   describe('resolveBackupDir', () => {
     it('合法备份 id 应该 解析到 backupRoot 下', () => {
       const dir = resolveBackupDir(root, 'abc-123')
