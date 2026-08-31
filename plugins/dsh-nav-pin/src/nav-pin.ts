@@ -21,44 +21,38 @@ export const CONTENT_MIN_FLOOR_PX = 640
 /** 官方输入卡片比内容宽的固定增量（--dsh-composer-card-max-width = 内容宽 + 32px）。 */
 const CARD_EXTRA_WIDTH_PX = 32
 
-/**
- * 轮次导航 slot 定位选择器：对话滚动体（公开 DOM 标记）内、轮次导航 nav 的直接父元素。
- * slot 是官方隐藏规则（display: none）作用的目标，本规则以更高特异性压过它。
- * @param label - 官方 nav 的 aria-label 文案。
- * @returns slot 元素的 CSS 选择器。
- */
-export function slotSelector(label: string): string {
-  return `[data-conversation-scroll] div:has(> nav[aria-label="${label}"])`
+/** CSS 双引号属性选择器内的转义：反斜杠与双引号前置反斜杠，防标签内容破坏 / 注入选择器。 */
+function escapeCssString(value: string): string {
+  return value.replace(/[\\"]/gu, character => '\\' + character)
 }
 
 /**
- * 生成注入样式表：恒显规则 + ≤断点宽度的 hover 浮层规则 + reduced-motion 分支。
- * @param labels - 官方 nav 标签集合（默认 NAV_ARIA_LABELS）。
- * @param breakpointPx - 隐藏断点（默认 HOVER_HIDE_BREAKPOINT_PX）。
- * @returns 完整样式表文本。
+ * 轮次导航 slot 定位选择器：对话滚动体（公开 DOM 标记）内、轮次导航 nav 的直接父元素。
+ * slot 是官方隐藏规则（display: none）作用的目标，本规则以更高特异性压过它。
+ * @param label - 官方 nav 的 aria-label 文案（自动做 CSS 转义）。
+ * @returns slot 元素的 CSS 选择器。
  */
-export function buildNavPinCss(
-  labels: readonly string[] = NAV_ARIA_LABELS,
-  breakpointPx: number = HOVER_HIDE_BREAKPOINT_PX,
-): string {
+export function slotSelector(label: string): string {
+  return `[data-conversation-scroll] div:has(> nav[aria-label="${escapeCssString(label)}"])`
+}
+
+/** 恒显规则：压过官方 @container (max-width: 900px) 的 display: none（特异性更高，无需 !important）。 */
+function alwaysVisibleRule(labels: readonly string[]): string {
   const slots = labels.map(slotSelector).join(',\n')
+  return `${slots} {
+  display: block;
+}`
+}
+
+/** ≤断点：默认隐身（保留指针命中），hover / 键盘 focus 淡入浮现；不加载框 / 底色 / 阴影（owner 实测拍板）。 */
+function hoverRevealBlock(labels: readonly string[], breakpointPx: number): string {
   const navs = labels.map(label => `${slotSelector(label)} > nav`).join(',\n')
   const hitAreas = labels.map(label => `${slotSelector(label)} > nav::before`).join(',\n')
   const reveals = labels.flatMap(label => [
     `${slotSelector(label)} > nav:hover`,
     `${slotSelector(label)} > nav:focus-within`,
   ]).join(',\n')
-
-  return `/* dsh-nav-pin：轮次导航窄屏不消失（官方 900px 断点提到 ${breakpointPx}px；更窄时 hover 右缘浮现为浮层）。 */
-
-/* 1) 恒显：压过官方 @container (max-width: 900px) 的 display: none（特异性更高，无需 !important）。 */
-${slots} {
-  display: block;
-}
-
-/* 2) ≤${breakpointPx}px：默认隐身（保留指针命中），hover / 键盘 focus 淡入浮现。
- *    只做 opacity，不加载框 / 底色 / 阴影——与官方宽屏轨道形态一致（owner 实测拍板）。 */
-@container (max-width: ${breakpointPx}px) {
+  return `@container (max-width: ${breakpointPx}px) {
   ${navs} {
     opacity: 0;
     box-sizing: border-box;
@@ -76,14 +70,12 @@ ${slots} {
   ${reveals} {
     opacity: 1;
   }
+}`
 }
 
-/* 3) 会话内容最大宽度钳制：官方拖宽上限每侧留 88px（CONTENT_EDGE_BUDGET 176 / 2），
- *    右侧拖拽条（z-index 8）会压到轮次导航命中区（轨道 28px + 本插件 ::before 16px ≈ 右缘 56px）。
- *    每侧留白收紧到 120px：宽列下拖拽条外缘停在导航命中区之外；窄列下地板为官方最小内容宽度 640px（默认内容 680→640 换导航余量）。
- *    官方宽度值先捕获到 [data-phase] 根上的 --dsh-nav-pin-official-width（自定义属性自引用会成环失效），
- *    再在滚动体 / 拖拽条上 min() 钳制；卡片宽度公式（内容宽 + 32px，InputBar 消费）同步重算。 */
-[data-phase] {
+/** 会话内容最大宽度钳制：宽列拖宽上限收紧（官方 88px → 插件 120px / 侧）、窄列地板 640 让出导航余量。 */
+function widthCapBlock(): string {
+  return `[data-phase] {
   --dsh-nav-pin-official-width: var(--dsh-chat-content-width);
 }
 [data-conversation-scroll],
@@ -95,14 +87,50 @@ ${slots} {
 }
 [data-conversation-scroll] {
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + ${CARD_EXTRA_WIDTH_PX}px);
+}`
 }
 
-@media (prefers-reduced-motion: reduce) {
+/** reduced-motion：关闭 opacity 过渡。 */
+function reducedMotionBlock(labels: readonly string[], breakpointPx: number): string {
+  const navs = labels.map(label => `${slotSelector(label)} > nav`).join(',\n')
+  return `@media (prefers-reduced-motion: reduce) {
   @container (max-width: ${breakpointPx}px) {
     ${navs} {
       transition: none;
     }
   }
+}`
 }
+
+/**
+ * 生成注入样式表：恒显 + hover 浮层 + 宽度钳制 + reduced-motion 四段拼接。
+ * 异常输入返回安全默认值：空标签集 → 空串（无目标不注入任何规则）；非正断点 → 回退默认断点。
+ * @param labels - 官方 nav 标签集合（默认 NAV_ARIA_LABELS）。
+ * @param breakpointPx - 隐藏断点（默认 HOVER_HIDE_BREAKPOINT_PX）。
+ * @returns 完整样式表文本。
+ */
+export function buildNavPinCss(
+  labels: readonly string[] = NAV_ARIA_LABELS,
+  breakpointPx: number = HOVER_HIDE_BREAKPOINT_PX,
+): string {
+  if (labels.length === 0) return ''
+  const breakpoint = Number.isFinite(breakpointPx) && breakpointPx > 0 ? breakpointPx : HOVER_HIDE_BREAKPOINT_PX
+  return `/* dsh-nav-pin：轮次导航窄屏不消失（官方 900px 断点提到 ${breakpoint}px；更窄时 hover 右缘浮现为浮层）。 */
+
+/* 1) 恒显：压过官方 @container (max-width: 900px) 的 display: none（特异性更高，无需 !important）。 */
+${alwaysVisibleRule(labels)}
+
+/* 2) ≤${breakpoint}px：默认隐身（保留指针命中），hover / 键盘 focus 淡入浮现。
+ *    只做 opacity，不加载框 / 底色 / 阴影——与官方宽屏轨道形态一致（owner 实测拍板）。 */
+${hoverRevealBlock(labels, breakpoint)}
+
+/* 3) 会话内容最大宽度钳制：官方拖宽上限每侧留 88px（CONTENT_EDGE_BUDGET 176 / 2），
+ *    右侧拖拽条（z-index 8）会压到轮次导航命中区（轨道 28px + 本插件 ::before 16px ≈ 右缘 56px）。
+ *    每侧留白收紧到 120px：宽列下拖拽条外缘停在导航命中区之外；窄列下地板为官方最小内容宽度 640px（默认内容 680→640 换导航余量）。
+ *    官方宽度值先捕获到 [data-phase] 根上的 --dsh-nav-pin-official-width（自定义属性自引用会成环失效），
+ *    再在滚动体 / 拖拽条上 min() 钳制；卡片宽度公式（内容宽 + 32px，InputBar 消费）同步重算。 */
+${widthCapBlock()}
+
+${reducedMotionBlock(labels, breakpoint)}
 `
 }

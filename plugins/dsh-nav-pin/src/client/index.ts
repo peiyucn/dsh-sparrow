@@ -13,11 +13,16 @@ export const inject: string[] = []
 
 /** 注入样式表（按 data 属性去重，HMR / 重载不叠加）；返回 style 元素供卸载清理。 */
 function ensureNavPinStyles(): HTMLStyleElement {
+  const css = buildNavPinCss()
   const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-nav-pin]')
-  if (existing !== null) return existing
+  if (existing !== null) {
+    // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之。
+    if (existing.textContent !== css) existing.textContent = css
+    return existing
+  }
   const style = document.createElement('style')
   style.dataset.dshNavPin = ''
-  style.textContent = buildNavPinCss()
+  style.textContent = css
   document.head.appendChild(style)
   return style
 }

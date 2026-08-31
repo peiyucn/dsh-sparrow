@@ -82,5 +82,40 @@ describe('dsh-nav-pin 纯逻辑', () => {
     it('留白常量 应该 大于官方 88px', () => {
       assert.ok(CONTENT_MAX_SIDE_CLEARANCE_PX > 88)
     })
+
+    it('空标签集 应该 返回空串（不注入无选择器规则）', () => {
+      assert.equal(buildNavPinCss([]), '')
+    })
+
+    it('非法断点（0 / 负数 / NaN / Infinity）应该 回退默认 700px', () => {
+      for (const bad of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
+        const css = buildNavPinCss(NAV_ARIA_LABELS, bad)
+        assert.ok(css.includes('@container (max-width: 700px)'), `断点 ${bad} 未回退`)
+        assert.ok(!css.includes(`(max-width: ${bad}px)`), `断点 ${bad} 未回退`)
+      }
+    })
+
+    it('生成样式 应该 花括号配对（规则结构完整）', () => {
+      const open = (css.match(/\{/gu) ?? []).length
+      const close = (css.match(/\}/gu) ?? []).length
+      assert.equal(open, close)
+      assert.ok(open > 0)
+    })
+  })
+
+  describe('slotSelector 转义', () => {
+    it('标签含双引号 应该 转义为选择器安全的字符串', () => {
+      assert.equal(
+        slotSelector('say "hi"'),
+        '[data-conversation-scroll] div:has(> nav[aria-label="say \\"hi\\""])',
+      )
+    })
+
+    it('标签含反斜杠 应该 转义为选择器安全的字符串', () => {
+      assert.equal(
+        slotSelector('a\\b'),
+        '[data-conversation-scroll] div:has(> nav[aria-label="a\\\\b"])',
+      )
+    })
   })
 })
