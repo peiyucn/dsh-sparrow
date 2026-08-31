@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1-alpha.1（2026-08-31 · 修复客户端 bundle 注册 id）
+
+- 修复 `scripts/bundle-client.mjs` 的 `__ModuleLoader__.load` 注册 id 未随 scoped 包名更新，导致 dsh 0.1.2 启动报 `loaded without registering "@dsh-sparrow/dsh-vision-access"` 的问题
+- 根 `scripts/verify.mjs` 增加校验：client bundle 注册 id 必须等于 `package.json` 的 `name`
+
 ## 1.0.0（2026-08-31 · 正式首发）
 
 - 迁移至 npm 组织作用域 `@dsh-sparrow` 正式发布 1.0.0（此前无作用域的 0.1.x 为试验发布线，已废弃并从 npm / GitHub 清理）

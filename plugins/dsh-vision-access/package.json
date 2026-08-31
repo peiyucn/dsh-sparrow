@@ -1,7 +1,7 @@
 {
   "name": "@dsh-sparrow/dsh-vision-access",
   "description": "DSH web plugin: an image-vision channel for text-only main models — the main model calls vision_read, the host reads images with the official vision model and returns a structured text report",
-  "version": "1.0.0",
+  "version": "1.0.1-alpha.1",
   "license": "MIT",
   "repository": {
     "type": "git",
