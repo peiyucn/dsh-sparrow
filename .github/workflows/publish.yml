@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve plugin and version from tag
+      - name: Resolve plugin, version, and npm dist-tag
         id: resolve
         shell: bash
         run: |
@@ -35,12 +35,19 @@ jobs:
             TAG="${{ github.ref_name }}"
             PLUGIN="${TAG%-v*}"
             VERSION="${TAG##*-v}"
-            echo "plugin=${PLUGIN}" >> "$GITHUB_OUTPUT"
-            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           else
-            echo "plugin=${{ inputs.plugin }}" >> "$GITHUB_OUTPUT"
-            echo "version=manual" >> "$GITHUB_OUTPUT"
+            PLUGIN="${{ inputs.plugin }}"
+            VERSION="$(node -p "require('./plugins/${PLUGIN}/package.json').version")"
           fi
+          # 预发布版本走 next；正式版本走 latest，避免未稳定的包顶掉 latest。
+          if [[ "${VERSION}" == *-* ]]; then
+            NPM_TAG="next"
+          else
+            NPM_TAG="latest"
+          fi
+          echo "plugin=${PLUGIN}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "npm-tag=${NPM_TAG}" >> "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v4
         with:
@@ -74,11 +81,11 @@ jobs:
       - name: Publish to npm (token)
         if: env.NPM_TOKEN != ''
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
-        run: npm publish --access public --provenance
+        run: npm publish --access public --provenance --tag ${{ steps.resolve.outputs.npm-tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm (OIDC trusted publishing)
         if: env.NPM_TOKEN == ''
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
-        run: npm publish --access public --provenance
+        run: npm publish --access public --provenance --tag ${{ steps.resolve.outputs.npm-tag }}

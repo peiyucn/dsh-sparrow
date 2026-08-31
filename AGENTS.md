@@ -101,7 +101,7 @@
 
 ### 发布（npm 包，GitHub + npm 全套流程）
 
-> 2026-08-31 首次 npm 发布时定案（与 VS Code 插件发布不同：**发布即永久**——同版本不可覆盖、整体 unpublish 会锁包名 24 小时）。发布前必须把版本、描述、CHANGELOG、tag 说明全部核对到位。
+> npm 发布与 VS Code 插件发布不同：**发布即永久**——同版本不可覆盖、整体 unpublish 会锁包名 24 小时。发布前必须把版本、描述、CHANGELOG、tag 说明全部核对到位。
 
 #### 发布范围
 
@@ -122,8 +122,9 @@
 #### 版本策略
 
 * semver：修复升 patch（0.0.x）、功能升 minor（0.x.0）、破坏性升 major（x.0.0）
-* **首发阶段三个插件版本线保持一致**：一个插件升版本（如元数据修正）时，其余插件同步升同号版本对齐；对齐类发版在 CHANGELOG 诚实记录「版本对齐合集 X.Y.Z（功能与上版一致）」
+* **三个插件版本线保持一致**：一个插件升版本（如元数据修正）时，其余插件同步升同号版本对齐；对齐类发版在 CHANGELOG 诚实记录「版本对齐合集 X.Y.Z（功能与上版一致）」
 * **npm 同版本不可覆盖已发布内容**——已发布版本的元数据错误（描述 / README）只能升补丁版修正，并在 CHANGELOG 诚实记录（如「描述改英文，功能与上版一致」）
+* **新版本一律先发 `next`（alpha 预发布）**：版本号用 `X.Y.Z-alpha.N`；工作流按版本是否含 `-` 自动选 `next` / `latest`。owner 通过 `next` 通道安装验证并确认后，再用 `npm dist-tag add <包名>@<版本> latest` 转正；转正后 deprecate 被替代的坏版本（优先 deprecate，不 unpublish）
 * **禁止**对已发布包 `npm unpublish` 整个包（锁包名 24 小时）；仅「发布后几分钟内 + 零安装 + owner 确认」才考虑撤销单版本重发
 
 #### 发布流程（按插件逐个走）
@@ -133,19 +134,18 @@
 3. 再次 `npm run verify` + `git diff --check`
 4. 合并 dev → main（fast-forward）并 push
 5. 打 **annotated tag**：`git tag -a <插件名>-vX.Y.Z -m "<一句话中文发布说明>"`（轻量 tag 在 GitHub tag 页显示的是 commit message，必须 `-a` 带说明）
-6. push tag → 自动触发 Publish 工作流（解析插件目录、校验 tag 版本 == package.json version、verify 后 `npm publish --access public --provenance`）
-7. `gh run watch` 盯到 success；`npm view <包名> version description` 复核版本与英文描述
-8. `gh release create <tag> --notes "<本版 CHANGELOG 要点>"` 补 GitHub Release 说明（推荐；已发布 tag 补说明用同命令，**不要重推 tag**）
-9. 切回 `dev` 继续开发
+6. push tag → 自动触发 Publish 工作流（解析插件目录与 npm dist-tag：版本含 `-` 发 `next`，正式版发 `latest`；校验 tag 版本 == package.json version、verify 后 `npm publish --access public --provenance --tag <next|latest>`）
+7. `gh run watch` 盯到 success；`npm view <包名> version dist-tags` 复核版本与 dist-tag
+8. **预发布待验证**：`next` 已指向新版本且 `latest` 未变；owner 通过 `next` 通道安装验证，未确认前不得动 `latest`
+9. **转正**：owner 确认后 `npm dist-tag add <包名>@<版本> latest`，然后 `npm deprecate <被替代的坏版本> "..."`（不 unpublish）
+10. `gh release create <tag> --notes "<本版 CHANGELOG 要点>"` 补 GitHub Release 说明（推荐；已发布 tag 补说明用同命令，**不要重推 tag**）
+11. 切回 `dev` 继续开发
 
-#### 首发踩坑实录（2026-08-31）
+#### 发布红线
 
-* npm 403：账号开 2FA 后直接发布要求 **Automation 类型且勾选「绕过 2FA」**的 granular token，否则报 "bypass 2fa enabled is required"
-* npm E422：`--provenance` 要求 package.json `repository.url` 与来源仓库匹配
-* GitHub Actions：`secrets` 上下文不能出现在 step 的 `if`（整条工作流解析失败、0s 空跑无 job），必须经 job 级 `env` 中转
-* 轻量 tag 的「介绍」是 commit message——发布 tag 一律 annotated + 明确说明
-* tag 挪动需先删远端旧 tag 再推新的；tag push 会再次触发发布工作流，同版本重复发布会 E403 失败
-* 网络抖动：git push 失败就换代理（127.0.0.1:7897）或直连重试；gh api 直连 api.github.com
+* 已发布版本 / tag 不可覆盖、不可挪动；同版本重复发布会 E403。错误只能发新版本修正，并 deprecate 被替代的坏版本（不 unpublish）
+* tag 一律 annotated；push 前 `npm run verify` + `git diff --check` 必须通过，tag 版本必须等于 `package.json` version
+* GitHub Actions：`secrets` 不能出现在 step 的 `if`，必须经 job 级 `env` 中转；`--provenance` 要求各插件 `package.json` 声明 `repository`（均已固化在 workflow 与元数据规范，勿回退）
 
 #### 发布后收尾
 
@@ -161,9 +161,9 @@
 
 ***
 
-## CI 与自动发布（已配置，远端 peiyucn/dsh-sparrow）
+## CI 与自动发布
 
 * `.github/workflows/ci.yml`：push dev/main 与 PR 时跑 `pnpm install --frozen-lockfile` + `npm run verify:all`
-* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`
+* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`；dist-tag 自动选择：版本含 `-` → `next`，正式版 → `latest`
 * 工作流实现细节（勿回退）：`NPM_TOKEN` 经 job 级 `env` 中转再进 step 的 `if`（`secrets` 上下文不允许出现在 `if` 里，直接写会让整条工作流 0s 解析失败）；`--provenance` 要求各插件 package.json 声明 `repository` 字段
-* 发布鉴权**双模式**（2026-08-31 为 npm 收紧准备）：有 `NPM_TOKEN` secret 走 Automation token（**首发必需**——npm trusted publisher 配置要求包已存在）；无 secret 自动走 **npm Trusted Publishing（OIDC）**（工作流 `permissions: id-token: write`；npm 包页 Access → Trusted publishers 配置 owner/peiyucn + repo + workflow 路径）。npm 官方 2027-01 起收紧「绕过 2FA 的令牌」直接发布，长期方向即 OIDC。CI 不受 NPM_TOKEN 影响
+* 发布鉴权**双模式**：有 `NPM_TOKEN` secret 走 Automation token；无 secret 走 npm Trusted Publishing（OIDC）。包尚不存在（无法预配 OIDC）时必须有 `NPM_TOKEN`；长期方向是无 token 的 OIDC
