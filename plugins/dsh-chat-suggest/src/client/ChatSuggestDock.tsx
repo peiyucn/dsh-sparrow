@@ -302,14 +302,15 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
 }
 /* 胶囊内灵敏度触发区（分割线右侧：三点 + ▾）：整区可点，只开合灵敏度菜单、不切换开关。
    不单独做悬停底色——按钮主体已有悬停底色，叠加会成嵌套椭圆。
-   命中区铺满：负 margin 顶掉按钮右侧 padding 与分割线左侧 gap，视觉间距由 padding 原样补回。 */
+   命中区铺满：负 margin 顶掉按钮右侧 padding 与分割线左侧 gap，视觉间距由 padding 补回
+   （左 4px 与分割线左侧 gap 一致，右侧 9px 保持按钮右缘观感）。 */
 .dsh-chat-suggest-switch-picker {
   display: inline-flex;
   align-items: center;
   align-self: stretch;
   gap: 3px;
   margin: 0 -4px 0 -4px;
-  padding: 0 9px;
+  padding: 0 9px 0 4px;
   cursor: pointer;
 }
 .dsh-chat-suggest-switch-on .dsh-chat-suggest-switch-picker {
