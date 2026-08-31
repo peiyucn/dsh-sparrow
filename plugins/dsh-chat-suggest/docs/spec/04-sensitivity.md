@@ -10,7 +10,7 @@
 
 ## 灵敏度三档（高 / 中 / 低）
 
-* 纯逻辑在 `chat-suggest.ts`：`TRIGGER_SENSITIVITIES`（参数表）+ `normalizeTriggerSensitivity`（非法回退 standard）+ `shouldTriggerSuggest(draft, sensitivity)`；
+* 纯逻辑在 `suggest.ts`：`TRIGGER_SENSITIVITIES`（参数表）+ `normalizeTriggerSensitivity`（非法回退 standard）+ `shouldTriggerSuggest(draft, sensitivity)`；
 * 三档规则（写进 README 明示，用户可见）：
 
 | 档位 | 停顿 | 最短草稿 | 夹入英文半词 | 词后空格 | 句末标点 |
@@ -19,7 +19,7 @@
 | standard（中，默认） | 400ms | CJK 8 / Latin 3 | 放行 | 放行 | 抑制 |
 | conservative（低） | 800ms | CJK 12 / Latin 5 | 抑制 | 抑制 | 抑制 |
 
-* 不随灵敏度变化的部分：IME 组合态一律不触发；Tab 采纳导致的草稿变化不触发；非 DeepSeek 主模型整体隐藏。
+* 不随灵敏度变化的部分：IME 组合态一律不触发；非 DeepSeek 主模型整体隐藏。（Tab 采纳后的草稿变化**会**重新触发——链式续写，2026-08-31 变更：采纳文本以句末标点结尾时中/低档仍由门控抑制，高档可一直 Tab。）
 
 ## UI
 

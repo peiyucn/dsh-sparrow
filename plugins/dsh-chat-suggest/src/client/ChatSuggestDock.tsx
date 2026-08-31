@@ -727,11 +727,12 @@ export function ChatSuggestDock(props: ChatSuggestDockProps) {
     const draft = input.draft
     // 形态门控：句末标点 / 尾随空白 / 单词中间 / 过短草稿按触发灵敏度三档伸缩。
     if (!supported || !enabled || composing || input.phase !== 'plain') return
-    // Tab 采纳导致的草稿变化不再触发：采纳后建议会立刻复现（且上游常以「助手：」口吻续写）。
+    // Tab 采纳后的草稿变化：消费采纳标记后继续走触发流程——前缀机制从草稿尾部续写，
+    // 不会复现旧建议（FIM 时代「建议马上复现」的问题已随上游切换失效），Tab 链式续写由此成立；
+    // 采纳文本以句末标点结尾时，中/低档门控自然抑制链式触发，高档（句末标点也触发）可一直 Tab。
     const adoption = peekSuggestAdoption()
     if (adoption !== null && adoption.sessionId === session.sessionId && draft === adoption.draft + adoption.text) {
       clearSuggestAdoption()
-      return
     }
     if (!shouldTriggerSuggest(draft, sensitivity).ok) return
 

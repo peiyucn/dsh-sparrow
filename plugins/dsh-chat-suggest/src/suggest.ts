@@ -94,6 +94,27 @@ export function cleanSuggestion(text: string, language: SuggestLanguage = 'zh'):
   return trimmed
 }
 
+/** 中文句末标点（截断用）；分号不算——分号后面仍是同一句。 */
+const TRUNCATE_END_CJK = '。！？'
+
+/**
+ * 建议只保留第一句（2026-08-31 用户拍板「续写不要太长」，连续续写靠 Tab 链）：
+ * 在首个句末标点处截断（含标点）。中文 。！？ 直接截；英文 .!? 须后随空白/结尾、
+ * 且前面 ≥ minLatinChars 字，避免把 e.g. / approx. 这类缩写当句末。无句末标点原样返回。
+ */
+export function truncateFirstSentence(text: string, minLatinChars = 8): string {
+  const value = text.trim()
+  for (let index = 0; index < value.length; index++) {
+    const char = value[index] ?? ''
+    if (TRUNCATE_END_CJK.includes(char)) return value.slice(0, index + 1)
+    if ('.!?'.includes(char)) {
+      const next = value[index + 1]
+      if ((next === undefined || /\s/u.test(next)) && index >= minLatinChars) return value.slice(0, index + 1)
+    }
+  }
+  return value
+}
+
 /** 主模型路由：会话事件里最近一条 request/header 的 provider/model。 */
 export function mainRouteFromSession(events: readonly SessionEvent[]): { provider: string; model: string } | undefined {
   for (const event of [...events].reverse()) {

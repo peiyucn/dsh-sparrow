@@ -11,7 +11,8 @@ import {
   buildPrefixMessages, cleanSuggestion, extractSuggestions, extractUsage, speakerStopSequences,
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
   MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns, resolveSuggestModel,
-  summarizeUpstreamBody, upstreamStatusToError, type ChatSuggestConfig, type ChatSuggestError, type CompleteRequest,
+  summarizeUpstreamBody, truncateFirstSentence, upstreamStatusToError, type ChatSuggestConfig,
+  type ChatSuggestError, type CompleteRequest,
 } from './suggest.js'
 
 export type { CompleteRequest } from './suggest.js'
@@ -240,13 +241,16 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
               totalPromptTokens += result.value.usage.promptTokens
               totalCompletionTokens += result.value.usage.completionTokens
               for (const suggestion of result.value.suggestions) {
-                // 按说话人标记截断 + 角色切换丢弃（API stop 实测不可靠，见 chat-suggest.ts 注释）。
+                // 按说话人标记截断 + 角色切换丢弃（API stop 实测不可靠，见 suggest.ts 注释）。
                 const clean = cleanSuggestion(suggestion, language)
                 if (clean === null || seen.has(clean)) continue
-                // 两道护栏：同一短语循环复读 / 复述用户历史消息（实测见 chat-suggest.ts 注释）→ 丢弃。
+                // 两道护栏：同一短语循环复读 / 复述用户历史消息（实测见 suggest.ts 注释）→ 丢弃。
                 if (hasDegenerateRepeat(clean) || isHistoryEcho(clean, historyEchoTexts)) continue
-                seen.add(clean)
-                suggestions.push(clean)
+                // 单句截断：续写只给一句，连续续写靠 Tab 链（见 suggest.ts truncateFirstSentence）。
+                const short = truncateFirstSentence(clean)
+                if (short === '' || seen.has(short)) continue
+                seen.add(short)
+                suggestions.push(short)
               }
               continue
             }

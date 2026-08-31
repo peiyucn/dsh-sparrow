@@ -6,11 +6,12 @@
 
 DSH Web 插件：聊天输入框续写联想（DeepSeek 对话前缀续写 Beta 转发 + 官方 @ 列表同款候选菜单）。2026-08-29 曾从无 prefix 的提示词方案切换为 FIM（实测提示词修视角不稳定：同构造两次采样一次用户口吻一次助手口吻）；2026-08-30 深夜实测发现 FIM 纯文本续写无角色约束——短拉丁草稿在聊天转写体里被模型以「助手：」口吻回复（新会话 plea 必现），遂切回官方**对话前缀续写（prefix: true）**。2026-08-30 建议展示从 portal 幽灵文本改为 `conversation.input.overlay` 候选菜单（真·框内渲染受插件边界所限不可行，见 docs/spec/03-menu.md）。单候选（suggestionCount 默认 1），Tab 键入、Esc 丢弃；开关挂输入框工具行（**默认关闭**，选择本地持久化），文案随 dsh 语言 zh/en 切换。
 
-* 2026-08-30 两个实测修正：上游偶发以「助手：」开头复读说话人标记（续写变助手口吻）——此前 strip 后下发，后改 `cleanSuggestion`：按说话人标记截断 + 以标记开头视为角色切换整条丢弃；Tab 采纳后 dock 会立刻对新草稿再触发联想（建议马上复现）——菜单采纳前记 `markSuggestAdoption`，dock 对「旧草稿 + 建议文本」这次草稿变化跳过触发，bail 失败回滚标记。
+* 2026-08-30 两个实测修正：上游偶发以「助手：」开头复读说话人标记（续写变助手口吻）——此前 strip 后下发，后改 `cleanSuggestion`：按说话人标记截断 + 以标记开头视为角色切换整条丢弃；Tab 采纳后 dock 会立刻对新草稿再触发联想（建议马上复现）——菜单采纳前记 `markSuggestAdoption`（2026-08-31 起采纳后改为继续触发以支持 Tab 链式续写，见下），bail 失败回滚标记。
 * 2026-08-30 晚触发门控改**内容自适应通用规则**（`shouldTriggerSuggest` 无语言参数）：草稿含 CJK → 8 字符门槛；纯拉丁草稿 → 3 字符门槛 + 放行单词中间（英文停顿几乎总在词中）。尾随空格两种语境都放行（英文词后预测下一个词、中文空格分词续写）；句末标点、夹入英文半词是否触发随灵敏度伸缩（见下条）。不做 zh/en 硬切换，各语言体验一致。
 * 2026-08-30 晚模型三档退役、引入**触发灵敏度三档**（高/中/低，= eager/standard/conservative）：flash 足够，▾ 弹层改为灵敏度选择（按钮内竖排三点指示：恒显 3 点、自下而上点亮 3/2/1 个、tooltip 随档位变化），参数表 `TRIGGER_SENSITIVITIES`（停顿时长/最短草稿/夹入英文半词/词后空格/句末标点），持久化键 `dsh-chat-suggest:sensitivity`；规则全量明示在 README 与 docs/spec/04-sensitivity.md。
 * 2026-08-30 晚（续）两个上游退化护栏：历史含指令/元话语时 FIM 偶发**循环复读同一短语**（实测输入 Please 复读「请用中文回复。」×N 直到 max_tokens）或**转述历史原句**（实测输入 ple 复述聊天区刚发过的句子）——host 侧丢弃这两种候选：`hasDegenerateRepeat`（同一短语 ≥4 次循环、覆盖 ≥85% 文本即退化）+ `isHistoryEcho`（建议开头与历史 ≥10 字连续重叠即回声，**只与用户消息比对**——引用助手措辞的正常续写不误杀；历史窗口经 `recentHistoryTurns` 与 buildPrefixMessages 同源）。候选全被过滤时：**升温度 0.7 重试一次**（跳出复读循环），仍无候选且上游正常即静默返回空建议（客户端不显示错误），只有上游请求全部失败才报 502。
 * 2026-08-30 深夜上游切回**对话前缀续写（prefix: true）**（官方 `/beta/chat/completions`，文档 api-docs.deepseek.com/zh-cn/guides/chat_prefix_completion）：直连 A/B 实测——FIM `/completions` 聊天转写体（原格式）plea → 「助手：看起来你的消息好像没发完整…」（与新会话截图一致）；草稿不加说话人 → 元问答体；顶部指令 → 仍助手回复；纯草稿无历史 → 词典体；**前缀接口 + 原生历史 + 前缀消息「用户：草稿」→ plea → ase（补成 please）、CJK → 「可行性很高，咱们可以再细化…」**。实现 `buildPrefixMessages`：最近历史按原生 user/assistant 角色进 messages + 最后一条 assistant 消息（`prefix: true`）以「用户：草稿」开头；stop 序列照发但实测时灵时不灵，`cleanSuggestion` 客户端按标记截断兜底。
+* 2026-08-31 建议**单句截断** + **Tab 链式续写**（用户拍板「续写不要太长，一直续就高档一直 Tab」）：`truncateFirstSentence`（中文 。！？ 直接截、英文 .!? 须后随空白且前 ≥8 字防缩写误截）在护栏之后截出第一句；dock 采纳后不再跳过触发——前缀机制从草稿尾部续写、不复现旧建议（FIM 时代「建议马上复现」随上游切换失效）。采纳文本以句末标点结尾时中/低档门控自然抑制链式触发，高档（句末标点也触发）可一直 Tab。
 
 * TypeScript 实现；host half 源码在 src/，client half（M2 起）构建产物不入库（.gitignore）
 * 本地验证 = npm run verify（typecheck + node:test）

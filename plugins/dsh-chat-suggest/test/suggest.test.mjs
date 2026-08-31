@@ -4,8 +4,8 @@ import {
   buildPrefixMessages, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, speakerStopSequences,
   formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
   normalizeConfig, normalizeSuggestModelMode, normalizeTriggerSensitivity, parseCompleteBody, recentHistoryTurns,
-  resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, summarizeUpstreamBody, upstreamStatusToError,
-  validateCompletePayload,
+  resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, summarizeUpstreamBody, truncateFirstSentence,
+  upstreamStatusToError, validateCompletePayload,
 } from '../lib/suggest.js'
 
 describe('chat-suggest 纯逻辑', () => {
@@ -172,6 +172,40 @@ describe('chat-suggest 纯逻辑', () => {
 
     it('纯空白 应该 丢弃', () => {
       assert.equal(cleanSuggestion('  \n '), null)
+    })
+  })
+
+  describe('truncateFirstSentence', () => {
+    it('中文句号 应该 截断到第一句', () => {
+      assert.equal(truncateFirstSentence('可行性不高，我们再看看。接下来'), '可行性不高，我们再看看。')
+    })
+
+    it('感叹号 应该 截断', () => {
+      assert.equal(truncateFirstSentence('听起来不错！然后我们继续'), '听起来不错！')
+    })
+
+    it('问号 应该 截断', () => {
+      assert.equal(truncateFirstSentence('什么？真的吗'), '什么？')
+    })
+
+    it('英文句点后随空格 应该 截断', () => {
+      assert.equal(truncateFirstSentence('se note: this is ChatGPT. Our system'), 'se note: this is ChatGPT.')
+    })
+
+    it('无句末标点 应该 原样返回', () => {
+      assert.equal(truncateFirstSentence('Let me think'), 'Let me think')
+    })
+
+    it('缩写（e.g.）应该 不截断', () => {
+      assert.equal(truncateFirstSentence('e.g. consider this'), 'e.g. consider this')
+    })
+
+    it('分号 应该 不截断', () => {
+      assert.equal(truncateFirstSentence('好的；然后我们继续'), '好的；然后我们继续')
+    })
+
+    it('空串 应该 原样返回', () => {
+      assert.equal(truncateFirstSentence(''), '')
     })
   })
 
