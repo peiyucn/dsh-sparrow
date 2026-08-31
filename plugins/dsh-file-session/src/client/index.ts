@@ -66,6 +66,8 @@ interface ListEnvelope {
 
 /** 面板请求超时：host 挂起时不让面板永久 loading（根 AGENTS 网络约定）。 */
 const REQUEST_TIMEOUT_MS = 15_000
+/** 总数统计超时：host 侧要游标翻到底（配额内最多 10 页），放宽到 60s。 */
+const COUNT_TIMEOUT_MS = 60_000
 
 async function listApi(after?: string): Promise<{ rows: FileRow[]; hasMore: boolean; lastId?: string }> {
   const params = new URLSearchParams({ limit: '20' })
@@ -85,7 +87,7 @@ async function listApi(after?: string): Promise<{ rows: FileRow[]; hasMore: bool
 }
 
 async function countApi(): Promise<{ count: number; totalBytesLabel: string }> {
-  const response = await fetch('/api/file-session/count', { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+  const response = await fetch('/api/file-session/count', { signal: AbortSignal.timeout(COUNT_TIMEOUT_MS) })
   const payload = await response.json() as { count?: number; totalBytesLabel?: string; error?: { message?: string } }
   if (!response.ok) {
     throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
