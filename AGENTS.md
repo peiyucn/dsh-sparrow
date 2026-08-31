@@ -122,9 +122,9 @@
 #### 版本策略
 
 * semver：修复升 patch（0.0.x）、功能升 minor（0.x.0）、破坏性升 major（x.0.0）
-* **三个插件版本线保持一致**：一个插件升版本（如元数据修正）时，其余插件同步升同号版本对齐；对齐类发版在 CHANGELOG 诚实记录「版本对齐合集 X.Y.Z（功能与上版一致）」
+* **三个插件版本线保持一致**：一个插件升版本（如元数据修正）时，其余插件同步升同号版本对齐；对齐类发版在 CHANGELOG 诚实记录「版本对齐合集 X.Y.Z（功能与上版一致）」。**版本线（0.x / 1.x）由 owner 决定；未另行决定前沿用上一正式版的版本线**
 * **npm 同版本不可覆盖已发布内容**——已发布版本的元数据错误（描述 / README）只能升补丁版修正，并在 CHANGELOG 诚实记录（如「描述改英文，功能与上版一致」）
-* **新版本一律先发 `next`（alpha 预发布）**：版本号用 `X.Y.Z-alpha.N`；工作流按版本是否含 `-` 自动选 `next` / `latest`。owner 通过 `next` 通道安装验证并确认后，再用 `npm dist-tag add <包名>@<版本> latest` 转正；转正后 deprecate 被替代的坏版本（优先 deprecate，不 unpublish）
+* **新版本一律先发 `next`（alpha 预发布）**：版本号用 `X.Y.Z-alpha.N`；工作流按版本是否含 `-` 自动选 `next` / `latest`。owner 通过 `dsh plugin --profile web add <包名>@next` 安装验证；验证通过后发布同号稳定版 `X.Y.Z` 并自动上 `latest`，**不把 `latest` 直接指向 alpha**。转正后 deprecate 被替代的坏版本（优先 deprecate，不 unpublish）
 * **禁止**对已发布包 `npm unpublish` 整个包（锁包名 24 小时）；仅「发布后几分钟内 + 零安装 + owner 确认」才考虑撤销单版本重发
 
 #### 发布流程（按插件逐个走）
@@ -136,8 +136,8 @@
 5. 打 **annotated tag**：`git tag -a <插件名>-vX.Y.Z -m "<一句话中文发布说明>"`（轻量 tag 在 GitHub tag 页显示的是 commit message，必须 `-a` 带说明）
 6. push tag → 自动触发 Publish 工作流（解析插件目录与 npm dist-tag：版本含 `-` 发 `next`，正式版发 `latest`；校验 tag 版本 == package.json version、verify 后 `npm publish --access public --provenance --tag <next|latest>`）
 7. `gh run watch` 盯到 success；`npm view <包名> version dist-tags` 复核版本与 dist-tag
-8. **预发布待验证**：`next` 已指向新版本且 `latest` 未变；owner 通过 `next` 通道安装验证，未确认前不得动 `latest`
-9. **转正**：owner 确认后 `npm dist-tag add <包名>@<版本> latest`，然后 `npm deprecate <被替代的坏版本> "..."`（不 unpublish）
+8. **预发布待验证**：`next` 已指向新版本且 `latest` 未变；owner 通过 `dsh plugin --profile web add <包名>@next` 安装验证，未确认前不发布稳定版
+9. **转正**：owner 确认后把 `package.json` 版本改为稳定版 `X.Y.Z`（去掉 `-alpha.N`），CHANGELOG 记转正，按本流程发布该稳定版（工作流自动上 `latest`）；然后 deprecate 被替代的坏版本（不 unpublish）
 10. `gh release create <tag> --notes "<本版 CHANGELOG 要点>"` 补 GitHub Release 说明（推荐；已发布 tag 补说明用同命令，**不要重推 tag**）
 11. 切回 `dev` 继续开发
 
