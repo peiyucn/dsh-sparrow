@@ -9,7 +9,7 @@
 ## 安装
 
 ```bash
-dsh plugin --profile web add dsh-vision-access
+dsh plugin --profile web add @dsh-sparrow/dsh-vision-access
 ```
 
 适配 dsh ≥ 0.1.1-rc.2。

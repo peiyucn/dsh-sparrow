@@ -9,7 +9,7 @@ When the main model cannot see images, it automatically calls the provided `visi
 ## Install
 
 ```bash
-dsh plugin --profile web add dsh-vision-access
+dsh plugin --profile web add @dsh-sparrow/dsh-vision-access
 ```
 
 Requires dsh ≥ 0.1.1-rc.2.
