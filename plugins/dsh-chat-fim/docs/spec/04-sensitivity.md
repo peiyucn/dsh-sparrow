@@ -23,13 +23,13 @@
 
 ## UI
 
-* 开关胶囊（`conversation.input.left`）内置：**小方块指示**（高/中/低 = 3/2/1 个 4px 方块，currentColor）+ **▾ 弹层**选档（选项行 = 档位名 + 规则摘要，官方 MenuDropdown 同款 token，点外部/Esc 关闭、滚动跟随重定位）；
+* 开关胶囊（`conversation.input.left`）内置：**竖排三点指示**（恒显 3 个 4px 圆点、自下而上点亮 3/2/1 个 = 高/中/低，点亮用 currentColor、未点亮淡色占位）+ **▾ 弹层**选档（选项行 = 档位名 + 规则摘要，官方 MenuDropdown 同款 token，点外部/Esc 关闭、滚动跟随重定位）；
 * **按钮 tooltip 随档位变化**（`sensitivity.hint`：联想敏锐度：{高/中/低}）；
 * 选择持久化在 localStorage `dsh-chat-fim:sensitivity`（非法回退 standard）；旧 `dsh-chat-fim:modelMode` 键不再读写（无害残留）。
 
 ## 验收标准
 
 * [ ] 三档切换立即影响停顿时长与形态门控（纯函数有单测：eager 4 字触发/半词/句末放行、conservative 空格抑制与 12 字门槛）；
-* [ ] 按钮内 3/2/1 方块随档位变化，tooltip 文案随档位变化；请求模型恒为 flash；
+* [ ] 按钮内竖排三点随档位点亮 3/2/1 个（恒显 3 点），tooltip 文案随档位变化；请求模型恒为 flash；
 * [ ] 旧行为不回归：中/低档句末标点不触发、IME 抑制、非 deepseek 主模型隐藏、@ 触发菜单互斥、温度 0.3；
 * [ ] `npm run verify` 全绿。

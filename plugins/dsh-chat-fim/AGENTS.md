@@ -8,7 +8,7 @@ DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 +
 
 * 2026-08-30 两个实测修正：上游偶发以「助手：」开头复读说话人标记（续写变助手口吻）——host 侧 `stripSpeakerPrefix` 剥离后再下发；Tab 采纳后 dock 会立刻对新草稿再触发联想（建议马上复现）——菜单采纳前记 `markFimAdoption`，dock 对「旧草稿 + 建议文本」这次草稿变化跳过触发，bail 失败回滚标记。
 * 2026-08-30 晚触发门控改**内容自适应通用规则**（`shouldTriggerFim` 无语言参数）：草稿含 CJK → 8 字符门槛；纯拉丁草稿 → 3 字符门槛 + 放行单词中间（英文停顿几乎总在词中）。尾随空格两种语境都放行（英文词后预测下一个词、中文空格分词续写）；句末标点、夹入英文半词是否触发随灵敏度伸缩（见下条）。不做 zh/en 硬切换，各语言体验一致。
-* 2026-08-30 晚模型三档退役、引入**触发灵敏度三档**（高/中/低，= eager/standard/conservative）：flash 足够，▾ 弹层改为灵敏度选择（按钮内 3/2/1 小方块指示、tooltip 随档位变化），参数表 `FIM_SENSITIVITIES`（停顿时长/最短草稿/夹入英文半词/词后空格/句末标点），持久化键 `dsh-chat-fim:sensitivity`；规则全量明示在 README 与 docs/spec/04-sensitivity.md。
+* 2026-08-30 晚模型三档退役、引入**触发灵敏度三档**（高/中/低，= eager/standard/conservative）：flash 足够，▾ 弹层改为灵敏度选择（按钮内竖排三点指示：恒显 3 点、自下而上点亮 3/2/1 个、tooltip 随档位变化），参数表 `FIM_SENSITIVITIES`（停顿时长/最短草稿/夹入英文半词/词后空格/句末标点），持久化键 `dsh-chat-fim:sensitivity`；规则全量明示在 README 与 docs/spec/04-sensitivity.md。
 
 * TypeScript 实现；host half 源码在 src/，client half（M2 起）构建产物不入库（.gitignore）
 * 本地验证 = npm run verify（typecheck + node:test）

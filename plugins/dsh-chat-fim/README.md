@@ -19,7 +19,7 @@ Requires dsh ≥ 0.1.1-rc.2.
 * **Switch**: A "✦ Suggest" pill in the input tool row toggles it; **off by default**, your choice is remembered locally
 * **Trigger**: Suggestions fire after a typing pause; **a sentence-ending punctuation (`。！？.!?;；`) triggers only at High** (Medium/Low suppress it), and IME composition suppresses triggers; all other rules (pause length, min draft, embedded half-word, trailing space) scale with the sensitivity levels below
 * **Suggestion**: Tab adopts, Esc dismisses (clicking works too); the card yields while the official @/slash menu is open
-* **Sensitivity**: the ▾ next to the pill picks **High / Medium / Low** (3/2/1 small squares in the pill show the current level, with a hover hint); the completion model is fixed at `deepseek-v4-flash`. The rules:
+* **Sensitivity**: the ▾ next to the pill picks **High / Medium / Low** (a vertical row of 3 dots in the pill shows the level — always 3 dots, 3/2/1 lit from the bottom, with a hover hint); the completion model is fixed at `deepseek-v4-flash`. The rules:
 
   | Level | Pause | Min draft | Embedded half-word | Trailing space | Sentence end |
   |---|---|---|---|---|---|

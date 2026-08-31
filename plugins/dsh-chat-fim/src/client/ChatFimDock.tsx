@@ -491,16 +491,20 @@ export function ensureFimBusyStyles(): HTMLStyleElement {
   line-height: 18px;
   white-space: nowrap;
 }
-/* 胶囊内的敏锐度小方块：高/中/低 = 3/2/1 个小方块。 */
-.dsh-chat-fim-squares {
+/* 胶囊内的敏锐度竖点：恒显 3 个点，自下而上点亮 3/2/1 个 = 高/中/低；未点亮为淡色占位。 */
+.dsh-chat-fim-dots {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   gap: 2px;
 }
-.dsh-chat-fim-squares span {
+.dsh-chat-fim-dot {
   width: 4px;
   height: 4px;
-  border-radius: 1px;
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 35%, transparent);
+}
+.dsh-chat-fim-dot-on {
   background: currentColor;
 }
 `
@@ -520,8 +524,8 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const [pickerPoint, setPickerPoint] = useState<{ x: number; y: number; up: boolean } | null>(null)
   const switchRef = useRef<HTMLButtonElement | null>(null)
 
-  /** 高/中/低 → 方块数 3/2/1。 */
-  const SQUARES: Record<FimSensitivity, number> = { eager: 3, standard: 2, conservative: 1 }
+  /** 高/中/低 → 自下而上点亮 3/2/1 个点（恒显 3 个占位点，档位只靠颜色区分）。 */
+  const DOT_LIT_COUNT: Record<FimSensitivity, number> = { eager: 3, standard: 2, conservative: 1 }
   /** 档位显示名（locale）。 */
   const label = t(`sensitivity.${sensitivity}`)
 
@@ -587,8 +591,13 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
       >
         <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
         <span className="dsh-chat-fim-switch-label">{t('switch.label')}</span>
-        <span className="dsh-chat-fim-squares" aria-hidden>
-          {Array.from({ length: SQUARES[sensitivity] }, (_, index) => <span key={index} />)}
+        <span className="dsh-chat-fim-dots" aria-hidden>
+          {(['eager', 'standard', 'conservative'] as const).map((level, index) => (
+            <span
+              key={level}
+              className={DOT_LIT_COUNT[sensitivity] > 2 - index ? 'dsh-chat-fim-dot dsh-chat-fim-dot-on' : 'dsh-chat-fim-dot'}
+            />
+          ))}
         </span>
         <span
           className={pickerOpen ? 'dsh-chat-fim-switch-arrow dsh-chat-fim-switch-arrow-open' : 'dsh-chat-fim-switch-arrow'}
