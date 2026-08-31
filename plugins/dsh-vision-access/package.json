@@ -1,6 +1,6 @@
 {
   "name": "dsh-vision-access",
-  "description": "DSH Web 插件：纯文本主模型的图片视觉通道（官方 vision 模型读图，主模型保持大脑）",
+  "description": "DSH web plugin: an image-vision channel for text-only main models — the main model calls vision_read, the host reads images with the official vision model and returns a structured text report",
   "version": "0.1.0",
   "license": "MIT",
   "repository": {
@@ -27,7 +27,9 @@
     "lib/types/**/*.d.ts",
     "cordis.patch.yml",
     "docs/images/**",
-    "README.zh-CN.md"
+    "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md"
   ],
   "dsh": {
     "bundle": {
