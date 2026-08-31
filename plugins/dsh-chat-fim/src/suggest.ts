@@ -1,4 +1,4 @@
-/** dsh-chat-suggest 纯逻辑：配置归一化、请求校验、错误映射、候选提取。 */
+/** dsh-chat-fim 纯逻辑：配置归一化、请求校验、错误映射、候选提取。 */
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
@@ -17,7 +17,7 @@ export const MAX_UPSTREAM_BODY_BYTES = 64 * 1024
 export const MAX_HISTORY_MESSAGES = 12
 export const MAX_HISTORY_CHARS = 6_000
 
-export type ChatSuggestErrorCode =
+export type ChatFimErrorCode =
   | 'BAD_BODY'
   | 'INVALID_PROMPT'
   | 'UNKNOWN_SESSION'
@@ -28,12 +28,12 @@ export type ChatSuggestErrorCode =
   | 'RATE_LIMITED'
   | 'INVALID_CONFIG'
 
-export interface ChatSuggestError {
-  readonly code: ChatSuggestErrorCode
+export interface ChatFimError {
+  readonly code: ChatFimErrorCode
   readonly message: string
 }
 
-export interface ChatSuggestConfig {
+export interface ChatFimConfig {
   readonly baseURL: string
   readonly model: string
   readonly maxTokens: number
@@ -156,8 +156,8 @@ export function isDeepseekMainRoute(route: { provider: string } | undefined): bo
 }
 
 /** 把外部配置补成完整内部配置；非法数字一律拒绝（插件加载期即失败，而不是请求期）。 */
-export function normalizeConfig(input: Readonly<Partial<ChatSuggestConfig>> | undefined): ChatSuggestConfig {
-  const config: ChatSuggestConfig = {
+export function normalizeConfig(input: Readonly<Partial<ChatFimConfig>> | undefined): ChatFimConfig {
+  const config: ChatFimConfig = {
     baseURL: input?.baseURL?.trim() || DEFAULT_BASE_URL,
     model: input?.model?.trim() || DEFAULT_MODEL,
     maxTokens: input?.maxTokens ?? DEFAULT_MAX_TOKENS,
@@ -169,7 +169,7 @@ export function normalizeConfig(input: Readonly<Partial<ChatSuggestConfig>> | un
     temperature: input?.temperature ?? DEFAULT_TEMPERATURE,
   }
   if (config.baseURL === '' || config.model === '' || config.apiKeyEnv === '') {
-    throw new Error('dsh-chat-suggest: baseURL/model/apiKeyEnv 不能为空')
+    throw new Error('dsh-chat-fim: baseURL/model/apiKeyEnv 不能为空')
   }
   for (const [name, value] of Object.entries({
     maxTokens: config.maxTokens,
@@ -179,23 +179,23 @@ export function normalizeConfig(input: Readonly<Partial<ChatSuggestConfig>> | un
     suggestionCount: config.suggestionCount,
   })) {
     if (!Number.isSafeInteger(value) || value <= 0) {
-      throw new Error(`dsh-chat-suggest: ${name} 必须是正整数`)
+      throw new Error(`dsh-chat-fim: ${name} 必须是正整数`)
     }
   }
   if (config.suggestionCount > 4) {
-    throw new Error('dsh-chat-suggest: suggestionCount 不能超过 4')
+    throw new Error('dsh-chat-fim: suggestionCount 不能超过 4')
   }
   if (typeof config.temperature !== 'number' || !Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 2) {
-    throw new Error('dsh-chat-suggest: temperature 必须是 0-2 之间的数字')
+    throw new Error('dsh-chat-fim: temperature 必须是 0-2 之间的数字')
   }
   if (!/^https?:\/\//u.test(config.baseURL)) {
-    throw new Error('dsh-chat-suggest: baseURL 必须是 http(s) URL')
+    throw new Error('dsh-chat-fim: baseURL 必须是 http(s) URL')
   }
   return config
 }
 
 /** 安全解析请求体；超限 / 非法 JSON 返回 BAD_BODY。 */
-export function parseCompleteBody(body: string, maxBodyBytes: number, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | ChatSuggestError {
+export function parseCompleteBody(body: string, maxBodyBytes: number, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | ChatFimError {
   if (Buffer.byteLength(body, 'utf8') > maxBodyBytes) {
     return { code: 'BAD_BODY', message: `请求体超过 ${maxBodyBytes} 字节上限` }
   }
@@ -209,7 +209,7 @@ export function parseCompleteBody(body: string, maxBodyBytes: number, maxPromptC
 }
 
 /** 校验已解析请求。prompt 按字符数限制（上限为 MAX_SAFE_INTEGER 时表示不限制）。 */
-export function validateCompletePayload(value: unknown, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | ChatSuggestError {
+export function validateCompletePayload(value: unknown, maxPromptChars = Number.MAX_SAFE_INTEGER): CompleteRequest | ChatFimError {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return { code: 'BAD_BODY', message: '请求体必须是 JSON 对象' }
   }
@@ -361,7 +361,7 @@ export function startsWithHistoryEcho(suggestion: string, historyTexts: readonly
 }
 
 /** 把上游 HTTP 状态映射为插件错误码。 */
-export function upstreamStatusToError(status: number, bodyText: string): ChatSuggestError {
+export function upstreamStatusToError(status: number, bodyText: string): ChatFimError {
   if (status === 401 || status === 403) {
     return { code: 'MISSING_CREDENTIAL', message: 'DeepSeek API 凭据无效或无权访问续写接口（Beta）' }
   }

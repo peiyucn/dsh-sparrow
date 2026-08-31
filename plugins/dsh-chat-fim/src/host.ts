@@ -1,4 +1,4 @@
-/** dsh-chat-suggest host half：POST /api/chat-suggest/complete，转发 DeepSeek 对话前缀续写（Beta）。 */
+/** dsh-chat-fim host half：POST /api/chat-fim/complete，转发 DeepSeek 对话前缀续写（Beta）。 */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
@@ -12,17 +12,17 @@ import {
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, isLanguageConsistent,
   mainRouteFromSession, MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns,
   resolveSuggestModel, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence, upstreamStatusToError,
-  type ChatSuggestConfig, type ChatSuggestError, type CompleteRequest,
+  type ChatFimConfig, type ChatFimError, type CompleteRequest,
 } from './suggest.js'
 
 export type { CompleteRequest } from './suggest.js'
 
-export const name = 'dsh-chat-suggest'
+export const name = 'dsh-chat-fim'
 export const inject = ['webServer', 'sessions', 'credentials']
 
-export type { ChatSuggestConfig, ChatSuggestError }
+export type { ChatFimConfig, ChatFimError }
 
-const ROUTE_PATH = '/api/chat-suggest/complete'
+const ROUTE_PATH = '/api/chat-fim/complete'
 /** 候选全被复读/回声护栏过滤时的重试温度：0.5——比 0.3 更易跳出复读循环，比 0.7 噪声小（0.7 实测相关性弱）。 */
 const ECHO_RETRY_TEMPERATURE = 0.5
 
@@ -65,11 +65,11 @@ function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   res.end(body)
 }
 
-function sendError(res: ServerResponse, status: number, error: ChatSuggestError): void {
+function sendError(res: ServerResponse, status: number, error: ChatFimError): void {
   sendJson(res, status, { error })
 }
 
-async function readRequestBody(req: IncomingMessage, maxBodyBytes: number): Promise<{ ok: true; body: string } | { ok: false; error: ChatSuggestError }> {
+async function readRequestBody(req: IncomingMessage, maxBodyBytes: number): Promise<{ ok: true; body: string } | { ok: false; error: ChatFimError }> {
   const chunks: Buffer[] = []
   let size = 0
   try {
@@ -137,7 +137,7 @@ async function readBoundedText(response: Response, maxBytes: number): Promise<st
  * @param ctx - DSH 插件上下文。
  * @param config - 插件配置（cordis.patch.yml 注入）。
  */
-export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>> = {}): void {
+export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {}): void {
   const settings = normalizeConfig(config)
 
   ctx.effect(() => ctx.webServer.register({
@@ -167,7 +167,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
       }
 
       if (req.method !== 'POST') {
-        sendError(res, 405, { code: 'BAD_BODY', message: '只接受 POST /api/chat-suggest/complete' })
+        sendError(res, 405, { code: 'BAD_BODY', message: '只接受 POST /api/chat-fim/complete' })
         return
       }
 
@@ -233,7 +233,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
       const suggestModel = resolveSuggestModel(parsed.suggestModelMode, main, settings.model)
       const signal = requestSignal(res, settings.requestTimeoutMs)
       try {
-        /** 单次上游补全请求；成功返回候选/用量，失败抛 ChatSuggestError。 */
+        /** 单次上游补全请求；成功返回候选/用量，失败抛 ChatFimError。 */
         const requestOnce = async (temperature: number) => {
           const upstream = await fetch(`${settings.baseURL.replace(/\/$/u, '')}/completions`, {
             method: 'POST',
@@ -258,7 +258,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
           try {
             data = JSON.parse(upstreamText)
           } catch {
-            throw { code: 'UPSTREAM_ERROR', message: 'DeepSeek 续写上游返回了非法 JSON' } satisfies ChatSuggestError
+            throw { code: 'UPSTREAM_ERROR', message: 'DeepSeek 续写上游返回了非法 JSON' } satisfies ChatFimError
           }
           return { suggestions: extractSuggestions(data), usage: extractUsage(data), temperature }
         }
@@ -268,7 +268,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
         let totalPromptTokens = 0
         let totalCompletionTokens = 0
         let firstTemperature = settings.temperature
-        let firstError: ChatSuggestError | undefined
+        let firstError: ChatFimError | undefined
         let hadFulfilled = false
 
         /** 把一批上游结果经护栏清洗进候选列表（说话人标记剥离、复读/回声丢弃、去重）。 */
@@ -314,7 +314,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
             const reason = result.reason
             if (firstError !== undefined) continue
             firstError = typeof reason === 'object' && reason !== null && 'code' in reason && 'message' in reason
-              ? reason as ChatSuggestError
+              ? reason as ChatFimError
               : { code: 'UPSTREAM_ERROR', message: reason instanceof Error ? reason.message : String(reason) }
           }
         }
@@ -352,7 +352,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
           // 客户端已断开；响应写不写都无所谓，但要避免悬挂。
           if (!res.headersSent) res.destroy()
         } else if (typeof error === 'object' && error !== null && 'code' in error && 'message' in error) {
-          sendError(res, 502, error as ChatSuggestError)
+          sendError(res, 502, error as ChatFimError)
         } else {
           const message = error instanceof Error ? error.message : String(error)
           sendError(res, 502, {
@@ -364,5 +364,5 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
         signal.dispose()
       }
     },
-  }), 'dsh-chat-suggest: /api/chat-suggest/complete route')
+  }), 'dsh-chat-fim: /api/chat-fim/complete route')
 }

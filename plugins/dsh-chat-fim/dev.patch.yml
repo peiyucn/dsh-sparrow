@@ -1,8 +1,8 @@
 # 本地开发补丁：dsh checkout 内 `dsh --patch <本文件>` 或 dev:web overlay 使用。
 # 注意：name 是本机绝对路径，不要提交到远端共享环境。
 - insert:
-    - id: dsh-chat-suggest
-      name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-chat-suggest/src/index.ts
+    - id: dsh-chat-fim
+      name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-chat-fim/src/index.ts
       config:
         baseURL: https://api.deepseek.com/beta
         model: deepseek-v4-pro

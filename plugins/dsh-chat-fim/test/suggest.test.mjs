@@ -8,7 +8,7 @@ import {
   upstreamStatusToError, validateCompletePayload,
 } from '../lib/suggest.js'
 
-describe('chat-suggest 纯逻辑', () => {
+describe('chat-fim 纯逻辑', () => {
   describe('normalizeConfig', () => {
     it('空配置 应该 返回默认值', () => {
       const config = normalizeConfig(undefined)

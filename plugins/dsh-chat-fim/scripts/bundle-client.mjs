@@ -2,7 +2,7 @@
 import { build } from 'esbuild'
 import { resolve } from 'node:path'
 
-const id = '@dsh-sparrow/dsh-chat-suggest'
+const id = '@dsh-sparrow/dsh-chat-fim'
 await build({
   entryPoints: [resolve(process.cwd(), 'src/client/index.ts')],
   outfile: resolve(process.cwd(), 'lib/client.js'),

@@ -1,4 +1,4 @@
-# 01 · 详细设计 — dsh-chat-suggest
+# 01 · 详细设计 — dsh-chat-fim
 
 > 起点为零代码；seam 选择以本文件《seam 查证》为准，未查证项标注待查证，开工前补齐。
 
@@ -6,7 +6,7 @@
 
 * **host half**（Node）：webServer 自有路由 + 上游转发 + 凭据解析；
 * **client half**（浏览器，M2）：dock 建议条，esbuild 单文件 bundle；
-* 通信只走 host 路由 `POST /api/chat-suggest/complete`（client 不 import Node 模块，host 不 import 浏览器 API）。
+* 通信只走 host 路由 `POST /api/chat-fim/complete`（client 不 import Node 模块，host 不 import 浏览器 API）。
 
 ## 插件契约合规（dsh 规范）
 
@@ -28,7 +28,7 @@
 
 ### 请求语义
 
-* 只受理 `POST /api/chat-suggest/complete`，其余 404；
+* 只受理 `POST /api/chat-fim/complete`，其余 404；
 * 校验：`sessionId` 命中 sessions 服务（否则 403/503）、`prompt` 非空且 ≤ `MAX_PROMPT_CHARS`（拟定 32k，否则 400）、请求体 ≤ `MAX_BODY_BYTES`（64 KB）；
 * 凭据：`ctx.credentials.resolve('DEEPSEEK_API_KEY')`，缺失 401；
 * 转发：`POST {baseURL}/completions`（FIM 补全 Beta），body `{ model, prompt, max_tokens, stop, temperature }`；`prompt` 由最近对话历史转成的「用户：/助手：」说话人文本 + 草稿（最后一个「用户：」开头）构造（见 `buildFimPrompt`，2026-08-31 三方案 A/B 定稿——纯文本续写天然站在用户角度）；`stop` 序列 `\n用户：` / `\n助手：` 兜底（实测 API stop 时灵时不灵，客户端另按标记截断 + 角色切换丢弃，见 `cleanSuggestion`）；
@@ -66,7 +66,7 @@
 ## 通信协议
 
 ```json
-POST /api/chat-suggest/complete
+POST /api/chat-fim/complete
 { "sessionId": "...", "prompt": "草稿前缀" }
 
 200 { "suggestions": ["候选1", "候选2"] }

@@ -1,4 +1,4 @@
-# dsh-chat-suggest
+# dsh-chat-fim
 
 简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
@@ -9,12 +9,12 @@
 ## 安装
 
 ```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-chat-suggest
+dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim
 ```
 
 适配 dsh ≥ 0.1.1-rc.2，并需要可用的 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
 
-> **不要**直接执行 `npm install @dsh-sparrow/dsh-chat-suggest`：那只会把包下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用上面的 `dsh plugin` 命令安装，并在安装后重启 DSH。
+> **不要**直接执行 `npm install @dsh-sparrow/dsh-chat-fim`：那只会把包下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用上面的 `dsh plugin` 命令安装，并在安装后重启 DSH。
 
 ## 使用
 
@@ -39,4 +39,4 @@ dsh plugin --profile web add @dsh-sparrow/dsh-chat-suggest
 ## 卸载与残留
 
 * 插件不写任何文件、不改 `.dsh` 内部结构，只做网络转发；
-* 唯一的持久状态是浏览器 localStorage 键 `dsh-chat-suggest:enabled`（开关）与 `dsh-chat-suggest:sensitivity`（触发灵敏度）。卸载后这两个键留在浏览器里、无害，介意可在 DevTools 中删除。
+* 唯一的持久状态是浏览器 localStorage 键 `dsh-chat-fim:enabled`（开关）与 `dsh-chat-fim:sensitivity`（触发灵敏度）。卸载后这两个键留在浏览器里、无害，介意可在 DevTools 中删除。

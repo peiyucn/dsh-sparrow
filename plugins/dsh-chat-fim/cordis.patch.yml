@@ -1,8 +1,8 @@
-# dsh-chat-suggest 组合补丁：`dsh plugin --profile web add @dsh-sparrow/dsh-chat-suggest` 安装后由 profile 自动挂载。
+# dsh-chat-fim 组合补丁：`dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim` 安装后由 profile 自动挂载。
 # 配置值均为安全默认值；API key 只经 ctx.credentials 解析，绝不写在这里。
 - insert:
-    - id: dsh-chat-suggest
-      name: '@dsh-sparrow/dsh-chat-suggest'
+    - id: dsh-chat-fim
+      name: '@dsh-sparrow/dsh-chat-fim'
       config:
         baseURL: https://api.deepseek.com/beta
         model: deepseek-v4-pro
