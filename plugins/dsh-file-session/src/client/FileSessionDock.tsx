@@ -192,15 +192,8 @@ export function ensureFileSessionStyles(): void {
   justify-content: flex-end;
   gap: 8px;
 }
-/* 配额进度条：网盘风格细条（track 悬停底色 + 业务蓝填充）。 */
-.dsh-file-session-quota {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-}
+/* 配额进度条：网盘风格细条（track 悬停底色 + 业务蓝填充）；百分比并入上方统计行，避免与细条左右分离。 */
 .dsh-file-session-quota-track {
-  flex: 1;
   height: 6px;
   border-radius: 3px;
   background: var(--dsw-alias-interactive-bg-hover);
@@ -213,12 +206,6 @@ export function ensureFileSessionStyles(): void {
   border-radius: 3px;
   background: var(--dsw-alias-state-business-primary);
   transition: width 220ms ease-out;
-}
-.dsh-file-session-quota-label {
-  flex: none;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
 }
 `
   document.head.appendChild(style)
@@ -411,17 +398,16 @@ export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: 
               ) : null}
               {summary !== null ? (
                 <div style={{ margin: '0 0 12px' }}>
-                  <p style={{ ...styles.secondarySmall, margin: 0 }}>
+                  <p style={{ ...styles.secondarySmall, margin: '0 0 6px' }}>
                     {t('summary', { count: summary.count, size: `${summary.totalBytesLabel} / ${summary.quotaBytesLabel}` })}
+                    {' · '}
+                    {formatUsagePercent(quotaRatio)}
                   </p>
-                  <div className="dsh-file-session-quota">
-                    <div className="dsh-file-session-quota-track">
-                      {/* 零用量不渲染填充（min-width 银条只给「有使用」的状态）。 */}
-                      {quotaRatio > 0
-                        ? <div className="dsh-file-session-quota-fill" style={{ width: `${Math.round(quotaRatio * 100)}%` }} />
-                        : null}
-                    </div>
-                    <span className="dsh-file-session-quota-label">{formatUsagePercent(quotaRatio)}</span>
+                  <div className="dsh-file-session-quota-track">
+                    {/* 零用量不渲染填充（min-width 银条只给「有使用」的状态）。 */}
+                    {quotaRatio > 0
+                      ? <div className="dsh-file-session-quota-fill" style={{ width: `${Math.round(quotaRatio * 100)}%` }} />
+                      : null}
                   </div>
                 </div>
               ) : null}
