@@ -18,7 +18,7 @@ Requires dsh ≥ 0.1.1-rc.2 and a working `pnpm` (`dsh plugin` forwards installa
 
 ## Usage
 
-* **Switch**: A "✦ Suggest" pill in the input tool row toggles it; **off by default**, your choice is remembered locally
+* **Switch**: A "✦ FIM" pill in the input tool row toggles it; **off by default**, your choice is remembered locally
 * **Trigger**: Suggestions fire after a typing pause; **a sentence-ending punctuation (`。！？.!?;；`) triggers only at High** (Medium/Low suppress it), and IME composition suppresses triggers; all other rules (pause length, min draft, embedded half-word, trailing space) scale with the sensitivity levels below
 * **Suggestion**: Tab adopts, Esc dismisses (clicking works too); the card yields while the official @/slash menu is open; **each suggestion is one sentence** — keep pressing Tab to chain continuations (switch to High for more eager triggering)
 * **Sensitivity**: the "dots + ▾" zone on the right side of the pill picks **High / Medium / Low** (clicking the whole zone opens the level menu without toggling the switch — 3 square dots always shown, 3/2/1 lit from the bottom, with a hover hint); the completion model **follows your selected main model** (v4-pro / v4-flash; falls back to pro for vision etc.). The rules:

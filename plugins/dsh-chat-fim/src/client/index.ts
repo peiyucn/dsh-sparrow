@@ -28,7 +28,7 @@ export interface ChatFimResponse {
 /** 本插件的 locale 字典（经 locale.d.ts 的 LocaleNamespaceMap 扩充做类型化注册）。 */
 const LOCALE_DICTS = {
   zh: {
-    'switch.label': '续写',
+    'switch.label': 'FIM',
     'switch.onHint': '关闭输入框续写联想',
     'switch.offHint': '开启输入框续写联想',
     'dock.busy': '正在联想…',
@@ -46,7 +46,7 @@ const LOCALE_DICTS = {
     'sensitivity.conservative.rule': '800ms · 12/8 字 · 半词/空格不联想',
   },
   en: {
-    'switch.label': 'Suggest',
+    'switch.label': 'FIM',
     'switch.onHint': 'Turn off input suggestions',
     'switch.offHint': 'Turn on input suggestions',
     'dock.busy': 'Suggesting…',
