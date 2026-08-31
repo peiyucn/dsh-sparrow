@@ -11,8 +11,8 @@ import {
   buildPrefixMessages, cleanSuggestion, extractSuggestions, extractUsage, speakerStopSequences,
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
   MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns, resolveSuggestModel,
-  summarizeUpstreamBody, truncateFirstSentence, upstreamStatusToError, type ChatSuggestConfig,
-  type ChatSuggestError, type CompleteRequest,
+  startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence, upstreamStatusToError,
+  type ChatSuggestConfig, type ChatSuggestError, type CompleteRequest,
 } from './suggest.js'
 
 export type { CompleteRequest } from './suggest.js'
@@ -26,11 +26,13 @@ const ROUTE_PATH = '/api/chat-suggest/complete'
 /** 候选全被复读/回声护栏过滤时的重试温度：0.5——比 0.3 更易跳出复读循环，比 0.7 噪声小（0.7 实测相关性弱）。 */
 const ECHO_RETRY_TEMPERATURE = 0.5
 
+type DiagnosticKey = 'requests' | 'fulfilled' | 'retries' | 'shown' | 'empty' | 'filteredSpeaker' | 'filteredRepeat' | 'filteredEcho'
+
 /**
- * 进程级诊断计数（status 路由带 ?diagnostics=1 时返回；不持久化、不含任何用户内容）。
- * 「转完圈没出卡片」时先查这里，看候选被哪道护栏拦了，别盲调参数。
+ * 进程级诊断计数（status 路由带 ?diagnostics=1 时返回；不持久化、不含任何用户内容，
+ * bySession 只记会话 id 不记内容）。「转完圈没出卡片」时先查这里，别盲调参数。
  */
-const diagnostics = {
+const diagnostics: Record<DiagnosticKey, number> & { bySession: Record<string, Record<DiagnosticKey, number>> } = {
   requests: 0,
   fulfilled: 0,
   retries: 0,
@@ -39,6 +41,18 @@ const diagnostics = {
   filteredSpeaker: 0,
   filteredRepeat: 0,
   filteredEcho: 0,
+  bySession: {},
+}
+
+/** 累加一个诊断计数（全局 + 按会话分组）。 */
+function bumpDiagnostics(key: DiagnosticKey, sessionId: string): void {
+  diagnostics[key]++
+  let stats = diagnostics.bySession[sessionId]
+  if (stats === undefined) {
+    stats = { requests: 0, fulfilled: 0, retries: 0, shown: 0, empty: 0, filteredSpeaker: 0, filteredRepeat: 0, filteredEcho: 0 }
+    diagnostics.bySession[sessionId] = stats
+  }
+  stats[key]++
 }
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
@@ -155,7 +169,6 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
         sendError(res, 405, { code: 'BAD_BODY', message: '只接受 POST /api/chat-suggest/complete' })
         return
       }
-      diagnostics.requests++
 
       const read = await readRequestBody(req, settings.maxBodyBytes)
       if (!read.ok) {
@@ -170,6 +183,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
       }
 
       const sessionId = SessionId(parsed.sessionId)
+      const sessionKey = String(sessionId)
+      bumpDiagnostics('requests', sessionKey)
       const session = ctx.sessions.get(sessionId)
       if (session === undefined) {
         sendError(res, 404, {
@@ -206,9 +221,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
       // 对话前缀续写请求体：原生历史消息 + 以「用户：草稿」为前缀的 assistant 消息（prefix: true）。
       const messages = buildPrefixMessages(history, parsed.prompt, language)
       // 回声判定的历史文本集（与 prompt 同一窗口）：
-      // 用户消息 10 字窗口、助手消息 15 字窗口——模型复读用户刚说的话是退化（实测），
-      // 转述助手讨论内容（cleanSuggestion 等 15 字片段）也是；但助手措辞的正常复用
-      // （常见 <15 字）不再误杀（2026-08-31 实测 10 字全比对导致正常会话频繁空建议）。
+      // 用户消息按「开头 10 字前缀」比对（整段复读用户原话时开头即重叠；中段复用措辞不误杀），
+      // 助手消息按「15 字窗口」比对（转述讨论内容如 cleanSuggestion 仍拦得住，正常措辞复用放行）。
       const historyTurns = recentHistoryTurns(history)
       const userEchoTexts = historyTurns.filter(turn => turn.role === 'user').map(turn => turn.text)
       const assistantEchoTexts = historyTurns.filter(turn => turn.role === 'assistant').map(turn => turn.text)
@@ -260,7 +274,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
           for (const result of results) {
             if (result.status === 'fulfilled') {
               hadFulfilled = true
-              diagnostics.fulfilled++
+              bumpDiagnostics('fulfilled', sessionKey)
               if (suggestions.length === 0) firstTemperature = result.value.temperature
               totalPromptTokens += result.value.usage.promptTokens
               totalCompletionTokens += result.value.usage.completionTokens
@@ -268,17 +282,18 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
                 // 按说话人标记截断 + 角色切换丢弃（API stop 实测不可靠，见 suggest.ts 注释）。
                 const clean = cleanSuggestion(suggestion, language)
                 if (clean === null) {
-                  diagnostics.filteredSpeaker++
+                  bumpDiagnostics('filteredSpeaker', sessionKey)
                   continue
                 }
                 if (seen.has(clean)) continue
-                // 护栏：同一短语循环复读 → 丢弃；复述用户消息（10 字窗口）或助手消息（15 字窗口）→ 丢弃。
+                // 护栏：同一短语循环复读 → 丢弃；开头复述用户消息（10 字前缀）或
+                // 窗口转述助手消息（15 字）→ 丢弃。
                 if (hasDegenerateRepeat(clean)) {
-                  diagnostics.filteredRepeat++
+                  bumpDiagnostics('filteredRepeat', sessionKey)
                   continue
                 }
-                if (isHistoryEcho(clean, userEchoTexts, 10) || isHistoryEcho(clean, assistantEchoTexts, 15)) {
-                  diagnostics.filteredEcho++
+                if (startsWithHistoryEcho(clean, userEchoTexts, 10) || isHistoryEcho(clean, assistantEchoTexts, 15)) {
+                  bumpDiagnostics('filteredEcho', sessionKey)
                   continue
                 }
                 // 单句截断：续写只给一句，连续续写靠 Tab 链（见 suggest.ts truncateFirstSentence）。
@@ -307,7 +322,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
         // 候选全被护栏过滤（复读/回声）：升温度重试一次，多数时候能跳出复读循环；
         // 仍无候选则静默返回空建议（客户端不显示错误、不打扰用户）。
         if (suggestions.length === 0 && hadFulfilled) {
-          diagnostics.retries++
+          bumpDiagnostics('retries', sessionKey)
           absorb(await Promise.allSettled([requestOnce(ECHO_RETRY_TEMPERATURE)]))
         }
         // 只有上游请求全部失败才报 502。
@@ -315,8 +330,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
           sendError(res, 502, firstError ?? { code: 'UPSTREAM_ERROR', message: 'DeepSeek 续写上游没有返回可用候选' })
           return
         }
-        if (suggestions.length === 0) diagnostics.empty++
-        else diagnostics.shown++
+        if (suggestions.length === 0) bumpDiagnostics('empty', sessionKey)
+        else bumpDiagnostics('shown', sessionKey)
         sendJson(res, 200, {
           suggestions,
           model: suggestModel,

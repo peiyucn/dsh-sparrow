@@ -4,7 +4,7 @@ import {
   buildPrefixMessages, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, speakerStopSequences,
   formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
   normalizeConfig, normalizeSuggestModelMode, normalizeTriggerSensitivity, parseCompleteBody, recentHistoryTurns,
-  resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, summarizeUpstreamBody, truncateFirstSentence,
+  resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence,
   upstreamStatusToError, validateCompletePayload,
 } from '../lib/suggest.js'
 
@@ -549,6 +549,24 @@ describe('chat-suggest 纯逻辑', () => {
 
     it('历史为空 应该 不算回声', () => {
       assert.equal(isHistoryEcho('你看，联想出来的文字内容', []), false)
+    })
+  })
+
+  describe('startsWithHistoryEcho', () => {
+    it('开头复述用户原话 应该 判定回声', () => {
+      assert.equal(startsWithHistoryEcho('你看，联想出来的文字内容。我输入的是ple', ['我是说，你看联想出来的文字内容。']), true)
+    })
+
+    it('中段才重叠 应该 不算回声', () => {
+      assert.equal(startsWithHistoryEcho('先想想 cleanSuggestion 按说话人标记处理', ['cleanSuggestion按说话人标记截断，角色切换丢弃']), false)
+    })
+
+    it('短建议（不足 10 字）应该 不算回声', () => {
+      assert.equal(startsWithHistoryEcho('好的', ['好的，我们开始']), false)
+    })
+
+    it('历史为空 应该 不算回声', () => {
+      assert.equal(startsWithHistoryEcho('你看，联想出来的文字内容', []), false)
     })
   })
 

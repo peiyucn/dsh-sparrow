@@ -325,11 +325,10 @@ function normalizeForEcho(text: string): string {
 }
 
 /**
- * 检测历史回声：建议（归一化后）任一 minOverlap 字窗口连续出现在给定历史文本里，
- * 说明模型在复读/转述历史而非续写草稿（实测：输入 ple 复述聊天区用户刚发过的句子；
- * 输入 ple 转述正在讨论的插件实现细节——「cleanSuggestion 按说话人标记处理」）。
- * 窗口匹配而非前缀锚定：模型常把原句改写后再复读，前缀对不上但片段仍在。
- * host 侧传近期用户 + 助手消息文本（含助手——2026-08-31 实测仅比用户消息拦不住转述）。
+ * 检测历史回声（窗口模式）：建议（归一化后）任一 minOverlap 字窗口连续出现在给定历史文本里，
+ * 说明模型在复读/转述历史而非续写草稿（实测：输入 ple 转述正在讨论的插件实现细节——
+ * 「cleanSuggestion 按说话人标记处理」）。窗口匹配覆盖改写后复读。
+ * host 侧用于助手消息比对（阈值 15——10 字窗口误杀正常措辞复用，见 AGENTS.md）。
  */
 export function isHistoryEcho(suggestion: string, historyTexts: readonly string[], minOverlap = 10): boolean {
   const text = normalizeForEcho(suggestion)
@@ -340,6 +339,19 @@ export function isHistoryEcho(suggestion: string, historyTexts: readonly string[
     if (normalizedHistory.some(entry => entry.includes(windowText))) return true
   }
   return false
+}
+
+/**
+ * 检测「开头回声」（前缀锚定）：建议开头（归一化后）的前 minOverlap 字连续出现在给定历史文本里。
+ * host 侧用于用户消息比对（阈值 10）——模型整段复读用户刚说过的话时开头即重叠
+ * （实测 ple 复述聊天区原句）；只锚定开头：正常续写中段复用用户措辞不误杀
+ * （2026-08-31 实测窗口比对导致频繁空建议，改回前缀）。
+ */
+export function startsWithHistoryEcho(suggestion: string, historyTexts: readonly string[], minOverlap = 10): boolean {
+  const text = normalizeForEcho(suggestion)
+  if (text.length < minOverlap) return false
+  const prefix = text.slice(0, minOverlap)
+  return historyTexts.some(entry => normalizeForEcho(entry).includes(prefix))
 }
 
 /** 把上游 HTTP 状态映射为插件错误码。 */
