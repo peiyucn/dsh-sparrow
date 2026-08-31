@@ -4,22 +4,22 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: '要执行的操作'
+        description: 'Action to perform'
         required: true
         type: choice
         options:
           - promote
           - deprecate
       packages:
-        description: 'npm 包 spec 列表（空格分隔，如 @scope/pkg@version）'
+        description: 'npm package specs, space separated (e.g. @scope/pkg@version)'
         required: true
         type: string
       version:
-        description: 'promote 时的版本号'
+        description: 'Version to promote'
         required: false
         type: string
       message:
-        description: 'deprecate 时的提示文案'
+        description: 'Deprecation message'
         required: false
         type: string
 

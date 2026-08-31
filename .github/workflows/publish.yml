@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       plugin:
-        description: '插件目录名（如 dsh-chat-fim）'
+        description: 'Plugin directory name (e.g. dsh-chat-fim)'
         required: true
         type: string
 
@@ -68,7 +68,7 @@ jobs:
         run: |
           PKG_VERSION="$(node -p "require('./package.json').version")"
           if [[ "${PKG_VERSION}" != "${{ steps.resolve.outputs.version }}" ]]; then
-            echo "tag 版本 ${{ steps.resolve.outputs.version }} 与 package.json 版本 ${PKG_VERSION} 不一致" >&2
+            echo "tag version ${{ steps.resolve.outputs.version }} does not match package.json version ${PKG_VERSION}" >&2
             exit 1
           fi
 
