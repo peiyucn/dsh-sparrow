@@ -71,6 +71,7 @@ describe('dsh-file-session 纯逻辑', () => {
       const row = toFileRow({ id: 'file-api-one', bytes: 1024, createdAt: 1700000000, filename: 'photo.png', purpose: 'user_data' })
       assert.equal(row.id, 'file-api-one')
       assert.equal(row.filename, 'photo.png')
+      assert.equal(row.bytes, 1024)
       assert.equal(row.sizeLabel, '1.0 KiB')
       assert.match(row.createdAtLabel, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
       assert.equal(row.expiresAtLabel, undefined)
@@ -80,6 +81,7 @@ describe('dsh-file-session 纯逻辑', () => {
     it('dsh- 前缀文件 应该 标自动上传角标', () => {
       const row = toFileRow({ id: 'file-api-x', bytes: 1, createdAt: 1, filename: DSH_OWNED_FILE_PREFIX + 'abc.png', purpose: 'user_data' })
       assert.equal(row.dshOwned, true)
+      assert.equal(row.bytes, 1)
     })
 
     it('带到期时间的文件 应该 输出到期标签', () => {

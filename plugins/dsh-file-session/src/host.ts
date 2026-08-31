@@ -7,7 +7,7 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-settings'
 import { DeepSeekFileId, DeepSeekFilesClient } from '@deepseek-ai/dsh-llm-deepseek'
-import { classifyUpstreamError, normalizePageQuery, toFileRow } from './files.js'
+import { classifyUpstreamError, COUNT_PAGE_TIMEOUT_MS, formatBytes, MAX_COUNT_PAGES, normalizePageQuery, toFileRow } from './files.js'
 
 export const name = 'dsh-file-session'
 export const inject = ['webServer', 'credentials', 'settings']
@@ -113,6 +113,28 @@ export function apply(ctx: Context): void {
             hasMore: page.hasMore,
             ...page.lastId === undefined ? {} : { lastId: page.lastId },
           })
+          return
+        }
+        if (req.method === 'GET' && pathname === `${PREFIX}/count`) {
+          // 官方 list 无总数字段：翻到底累计（每页 1000，配额内最多 10 页，MAX_COUNT_PAGES 兜底）。
+          const connection = await resolveConnection(ctx)
+          const client = new DeepSeekFilesClient({ baseURL: connection.baseURL, apiKey: connection.apiKey })
+          let count = 0
+          let totalBytes = 0
+          let after: DeepSeekFileId | undefined
+          for (let page = 0; page < MAX_COUNT_PAGES; page++) {
+            const result = await client.list({
+              ...after === undefined ? {} : { after },
+              limit: 1000,
+              order: 'desc',
+              signal: AbortSignal.timeout(COUNT_PAGE_TIMEOUT_MS),
+            })
+            count += result.data.length
+            for (const file of result.data) totalBytes += file.bytes
+            if (!result.hasMore || result.lastId === undefined) break
+            after = result.lastId
+          }
+          sendJson(res, 200, { count, totalBytesLabel: formatBytes(totalBytes) })
           return
         }
         if (req.method === 'DELETE' && pathname === `${PREFIX}/files`) {

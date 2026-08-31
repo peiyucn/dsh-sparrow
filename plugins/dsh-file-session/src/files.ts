@@ -9,6 +9,12 @@ export const DSH_OWNED_FILE_PREFIX = 'dsh-'
 /** 列表页大小（owner 拍板 2026-09-01；官方上限 1000）。 */
 export const PAGE_SIZE = 20
 
+/** 总数统计最多翻页数：官方配额 10000 个文件 ÷ 每页 1000 = 10 页，12 页兜底防配额口径变化。 */
+export const MAX_COUNT_PAGES = 12
+
+/** 总数统计每页请求超时。 */
+export const COUNT_PAGE_TIMEOUT_MS = 15_000
+
 /** 归一化后的分页参数。 */
 export interface PageQuery {
   after?: string
@@ -51,10 +57,11 @@ export function formatTimestamp(unixSeconds: number): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-/** 面板文件行。 */
+/** 面板文件行（bytes 为原始字节数，供面板删除后本地校正）。 */
 export interface FileRow {
   id: string
   filename: string
+  bytes: number
   sizeLabel: string
   createdAtLabel: string
   expiresAtLabel?: string
@@ -66,6 +73,7 @@ export function toFileRow(file: DeepSeekFileObject): FileRow {
   return {
     id: file.id,
     filename: file.filename,
+    bytes: file.bytes,
     sizeLabel: formatBytes(file.bytes),
     createdAtLabel: formatTimestamp(file.createdAt),
     ...file.expiresAt === undefined ? {} : { expiresAtLabel: formatTimestamp(file.expiresAt) },

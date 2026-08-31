@@ -10,6 +10,7 @@ import type { FileRow } from '../files.js'
 export interface FileSessionDockInjected {
   listFiles: (after?: string) => Promise<{ rows: FileRow[]; hasMore: boolean; lastId?: string }>
   deleteFile: (id: string) => Promise<void>
+  countFiles: () => Promise<{ count: number; totalBytesLabel: string }>
 }
 
 export type FileSessionDockProps = PropsRuntime<'sidebar.footer.action'> & FileSessionDockInjected & { t: TranslateNS<'file-session'> }
@@ -26,6 +27,8 @@ export function ensureFileSessionStyles(): void {
 [data-slot='sidebar.footer.action'] {
   display: flex !important;
   flex-direction: column;
+  /* 包裹层是 .footerActions 行容器里的 flex item，需显式撑满，否则两个全宽按钮按内容宽度收缩。 */
+  width: 100%;
 }
 .dsh-file-session-trigger {
   flex: none;
@@ -66,6 +69,11 @@ export function ensureFileSessionStyles(): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 面板滚动区：官方 settings 同款——elevated surface 重绑 l2 滚动条 token（base 默认 l1，浮层上对比度不对）。 */
+.dsh-file-session-body {
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 /* 面板头：官方 settings 面板同款（54px 高、标题起点 24px）。 */
 .dsh-file-session-panel-header {
@@ -241,7 +249,7 @@ const styles = {
 } as const
 
 /** 面板状态：首屏 loading / 错误横幅 / 列表 + 加载更多 / 删除确认框（web 确认框替代原生 confirm）。 */
-export function FileSessionDock({ wide, listFiles, deleteFile, t }: FileSessionDockProps) {
+export function FileSessionDock({ wide, listFiles, deleteFile, countFiles, t }: FileSessionDockProps) {
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState<readonly FileRow[]>([])
   const [hasMore, setHasMore] = useState(false)
@@ -252,6 +260,7 @@ export function FileSessionDock({ wide, listFiles, deleteFile, t }: FileSessionD
   const [confirming, setConfirming] = useState<FileRow | null>(null)
   const [busyDelete, setBusyDelete] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
+  const [summary, setSummary] = useState<{ count: number; totalBytesLabel: string } | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
 
   const loadFirst = useCallback(() => {
@@ -281,8 +290,11 @@ export function FileSessionDock({ wide, listFiles, deleteFile, t }: FileSessionD
   useEffect(() => {
     if (!open) return
     setConfirming(null)
+    setSummary(null)
     loadFirst()
-  }, [open, loadFirst])
+    // 总数统计为 best-effort：接口失败只隐藏统计行，不影响列表。
+    void countFiles().then(setSummary).catch(() => {})
+  }, [open, loadFirst, countFiles])
 
   const loadMore = useCallback(() => {
     if (lastId === undefined || loadingMore) return
@@ -314,6 +326,8 @@ export function FileSessionDock({ wide, listFiles, deleteFile, t }: FileSessionD
       .then(() => {
         setRows(current => current.filter(row => row.id !== confirming.id))
         setConfirming(null)
+        // 删除后刷新总数（best-effort）。
+        void countFiles().then(setSummary).catch(() => {})
       })
       .catch(reason => {
         setError(reason instanceof Error ? reason.message : String(reason))
@@ -346,12 +360,17 @@ export function FileSessionDock({ wide, listFiles, deleteFile, t }: FileSessionD
                 <IconCloseOutline16 size={14} />
               </button>
             </div>
-            <div style={styles.body}>
+            <div style={styles.body} className="dsh-file-session-body">
               {error !== null ? (
                 <p role="alert" style={{ ...styles.secondarySmall, margin: '0 0 12px', color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>
                   {error}
                   {' '}
                   <button type="button" className="dsh-file-session-btn" onClick={loadFirst}>{t('retry')}</button>
+                </p>
+              ) : null}
+              {summary !== null ? (
+                <p style={{ ...styles.secondarySmall, margin: '0 0 12px' }}>
+                  {t('summary', { count: summary.count, size: summary.totalBytesLabel })}
                 </p>
               ) : null}
               {loading ? <p style={styles.secondarySmall}>{t('loading')}</p> : null}

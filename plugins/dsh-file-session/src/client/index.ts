@@ -19,6 +19,7 @@ const LOCALE_DICTS = {
     'dialog.close': '关闭',
     'loading': '加载中…',
     'loadMore': '加载更多',
+    'summary': '共 {count} 个文件 · {size}',
     'empty': '暂无云端文件',
     'dshBadge': 'DSH 自动上传',
     'expires': '到期 {time}',
@@ -39,6 +40,7 @@ const LOCALE_DICTS = {
     'dialog.close': 'Close',
     'loading': 'Loading…',
     'loadMore': 'Load more',
+    'summary': '{count} files · {size}',
     'empty': 'No cloud files',
     'dshBadge': 'DSH auto-uploaded',
     'expires': 'expires {time}',
@@ -82,6 +84,15 @@ async function listApi(after?: string): Promise<{ rows: FileRow[]; hasMore: bool
   }
 }
 
+async function countApi(): Promise<{ count: number; totalBytesLabel: string }> {
+  const response = await fetch('/api/file-session/count', { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+  const payload = await response.json() as { count?: number; totalBytesLabel?: string; error?: { message?: string } }
+  if (!response.ok) {
+    throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
+  }
+  return { count: payload.count ?? 0, totalBytesLabel: payload.totalBytesLabel ?? '0 B' }
+}
+
 async function deleteApi(id: string): Promise<void> {
   const params = new URLSearchParams({ id })
   const response = await fetch(`/api/file-session/files?${params.toString()}`, {
@@ -110,6 +121,7 @@ export function apply(ctx: ClientContext): void {
     inject: () => ({
       listFiles: listApi,
       deleteFile: deleteApi,
+      countFiles: countApi,
     }),
   }, FileSessionDock))
 }
