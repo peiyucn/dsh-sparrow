@@ -275,6 +275,20 @@ async function invalidateProjectionCache(ctx: Context, sessionId: SessionId): Pr
     ctx.logger.warn(`dsh-archive-session: 投影缓存失效失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
   }
 }
+/** 备份/删除后校验投影缓存是否已删除；未删除时重试一次并告警，供启动清扫兜底。 */
+async function invalidateProjectionCacheGuarded(ctx: Context, sessionId: SessionId): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await invalidateProjectionCacheGuarded(ctx, sessionId)
+    try {
+      const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
+      if (domain === undefined || domain.table(PROJCACHE_SESSIONS_TABLE).get(String(sessionId)) === undefined) return
+    } catch (error) {
+      ctx.logger.warn(`dsh-archive-session: 投影缓存校验失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+      return
+    }
+    if (attempt === 1) ctx.logger.warn(`dsh-archive-session: 备份/删除后投影缓存仍残留 ${String(sessionId)}，重启后启动清扫会再次清理`)
+  }
+}
 
 /** 启动清扫：投影缓存中不在 sessionPersistence.list() 里的会话行删除，@ 列表与真实持久化保持一致。 */
 async function sweepStaleProjectionCache(ctx: Context): Promise<void> {
@@ -542,7 +556,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             } catch (cleanupError) {
               ctx.logger.warn(`dsh-archive-session: 归档集清理失败：${String(cleanupError)}`)
             }
-            await invalidateProjectionCache(ctx, sessionId)
+            await invalidateProjectionCacheGuarded(ctx, sessionId)
             // 通知会话列表消费者移除条目（官方公开事件；会话目录已移走）。
             ctx.emit('api-session/removed', sessionId)
             sendJson(res, 200, { ok: true, backupId, workspaceIds: workspaces })
@@ -556,7 +570,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           } catch (cleanupError) {
             ctx.logger.warn(`dsh-archive-session: 归档集清理失败：${String(cleanupError)}`)
           }
-          await invalidateProjectionCache(ctx, sessionId)
+          await invalidateProjectionCacheGuarded(ctx, sessionId)
           // 通知会话列表消费者移除条目（官方公开事件；会话目录已删除）。
           ctx.emit('api-session/removed', sessionId)
           sendJson(res, 200, { ok: true, deleted: true, workspaceIds: workspaces })
