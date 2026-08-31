@@ -350,18 +350,35 @@ export interface FimSensitivityParams {
   readonly allowCjkMidWord: boolean
   /** 是否放行尾随空格（词后预测下一个词 / 空格分词续写）。 */
   readonly allowTrailingSpace: boolean
+  /** 是否放行句末标点结尾（高档「什么都想续」；中低档续新一句质量差，抑制）。 */
+  readonly allowSentenceEnd: boolean
 }
 
 export const FIM_SENSITIVITIES: Record<FimSensitivity, FimSensitivityParams> = {
-  eager: { pauseMs: 250, minCharsCjk: 4, minCharsLatin: 2, allowCjkMidWord: true, allowTrailingSpace: true },
+  eager: {
+    pauseMs: 250,
+    minCharsCjk: 4,
+    minCharsLatin: 2,
+    allowCjkMidWord: true,
+    allowTrailingSpace: true,
+    allowSentenceEnd: true,
+  },
   standard: {
     pauseMs: 400,
     minCharsCjk: MIN_TRIGGER_DRAFT_CHARS,
     minCharsLatin: MIN_TRIGGER_DRAFT_CHARS_LATIN,
     allowCjkMidWord: false,
     allowTrailingSpace: true,
+    allowSentenceEnd: false,
   },
-  conservative: { pauseMs: 800, minCharsCjk: 12, minCharsLatin: 5, allowCjkMidWord: false, allowTrailingSpace: false },
+  conservative: {
+    pauseMs: 800,
+    minCharsCjk: 12,
+    minCharsLatin: 5,
+    allowCjkMidWord: false,
+    allowTrailingSpace: false,
+    allowSentenceEnd: false,
+  },
 }
 
 /** 灵敏度解析：非法/缺省回退 standard。 */
@@ -375,8 +392,8 @@ export type FimTriggerDecision =
 
 /**
  * 依据草稿形态决定是否发起联想请求（2026-08-30 实测驱动，同日晚改为内容自适应 + 灵敏度可调）：
- * 句末标点一律不触发，避免建议续出「新一句话」；其余规则按灵敏度参数伸缩
- * （最短长度、夹入英文半词、尾随空格），停顿阈值由客户端按同一参数取值。所有语言同一规则。
+ * 句末标点 / 尾随空格 / 夹入英文半词 / 最短长度均按灵敏度参数伸缩，停顿阈值由客户端按同一参数取值。
+ * 所有语言同一规则。
  */
 export function shouldTriggerFim(draft: string, sensitivity: FimSensitivity = DEFAULT_FIM_SENSITIVITY): FimTriggerDecision {
   const params = FIM_SENSITIVITIES[sensitivity] ?? FIM_SENSITIVITIES[DEFAULT_FIM_SENSITIVITY]
@@ -386,7 +403,9 @@ export function shouldTriggerFim(draft: string, sensitivity: FimSensitivity = DE
   const minChars = cjk ? params.minCharsCjk : params.minCharsLatin
   if (trimmed.length < minChars) return { ok: false, reason: 'too-short' }
   const last = trimmed[trimmed.length - 1] ?? ''
-  if (SENTENCE_END_CHARS.includes(last)) return { ok: false, reason: 'sentence-end' }
+  if (SENTENCE_END_CHARS.includes(last) && !params.allowSentenceEnd) {
+    return { ok: false, reason: 'sentence-end' }
+  }
   // 尾随空格（词后/句间）：按灵敏度放行/抑制。
   const rawLast = draft[draft.length - 1] ?? ''
   if (rawLast.trim() === '') {

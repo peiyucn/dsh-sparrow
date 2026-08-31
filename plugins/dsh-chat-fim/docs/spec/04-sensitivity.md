@@ -13,13 +13,13 @@
 * 纯逻辑在 `chat-fim.ts`：`FIM_SENSITIVITIES`（参数表）+ `normalizeFimSensitivity`（非法回退 standard）+ `shouldTriggerFim(draft, sensitivity)`；
 * 三档规则（写进 README 明示，用户可见）：
 
-| 档位 | 停顿 | 最短草稿 | 夹入英文半词 | 词后空格 |
-|---|---|---|---|---|
-| eager（高） | 250ms | CJK 4 / Latin 2 | 放行 | 放行 |
-| standard（中，默认） | 400ms | CJK 8 / Latin 3 | 抑制 | 放行 |
-| conservative（低） | 800ms | CJK 12 / Latin 5 | 抑制 | 抑制 |
+| 档位 | 停顿 | 最短草稿 | 夹入英文半词 | 词后空格 | 句末标点 |
+|---|---|---|---|---|---|
+| eager（高） | 250ms | CJK 4 / Latin 2 | 放行 | 放行 | 放行 |
+| standard（中，默认） | 400ms | CJK 8 / Latin 3 | 抑制 | 放行 | 抑制 |
+| conservative（低） | 800ms | CJK 12 / Latin 5 | 抑制 | 抑制 | 抑制 |
 
-* 不随灵敏度变化的部分：句末标点（`。！？.!?;；`）结尾一律不触发；IME 组合态一律不触发；Tab 采纳导致的草稿变化不触发；非 DeepSeek 主模型整体隐藏。
+* 不随灵敏度变化的部分：IME 组合态一律不触发；Tab 采纳导致的草稿变化不触发；非 DeepSeek 主模型整体隐藏。
 
 ## UI
 
@@ -29,7 +29,7 @@
 
 ## 验收标准
 
-* [ ] 三档切换立即影响停顿时长与形态门控（纯函数有单测：eager 4 字触发/半词放行、conservative 空格抑制与 12 字门槛）；
+* [ ] 三档切换立即影响停顿时长与形态门控（纯函数有单测：eager 4 字触发/半词/句末放行、conservative 空格抑制与 12 字门槛）；
 * [ ] 按钮内 3/2/1 方块随档位变化，tooltip 文案随档位变化；请求模型恒为 flash；
-* [ ] 旧行为不回归：句末标点不触发、IME 抑制、非 deepseek 主模型隐藏、@ 触发菜单互斥、温度 0.3；
+* [ ] 旧行为不回归：中/低档句末标点不触发、IME 抑制、非 deepseek 主模型隐藏、@ 触发菜单互斥、温度 0.3；
 * [ ] `npm run verify` 全绿。

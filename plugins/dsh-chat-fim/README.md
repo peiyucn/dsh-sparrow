@@ -17,15 +17,15 @@ Requires dsh ≥ 0.1.1-rc.2.
 ## Usage
 
 * **Switch**: A "✦ Suggest" pill in the input tool row toggles it; **off by default**, your choice is remembered locally
-* **Trigger**: Suggestions fire after a typing pause; **a sentence-ending punctuation (`。！？.!?;；`) never triggers**, and IME composition suppresses triggers; all other rules (pause length, min draft, embedded half-word, trailing space) scale with the sensitivity levels below
+* **Trigger**: Suggestions fire after a typing pause; **a sentence-ending punctuation (`。！？.!?;；`) triggers only at High** (Medium/Low suppress it), and IME composition suppresses triggers; all other rules (pause length, min draft, embedded half-word, trailing space) scale with the sensitivity levels below
 * **Suggestion**: Tab adopts, Esc dismisses (clicking works too); the card yields while the official @/slash menu is open
 * **Sensitivity**: the ▾ next to the pill picks **High / Medium / Low** (3/2/1 small squares in the pill show the current level, with a hover hint); the completion model is fixed at `deepseek-v4-flash`. The rules:
 
-  | Level | Pause | Min draft | Embedded half-word | Trailing space |
-  |---|---|---|---|---|
-  | High | 250ms | CJK 4 / Latin 2 chars | suggests | suggests |
-  | Medium (default) | 400ms | CJK 8 / Latin 3 chars | no | suggests |
-  | Low | 800ms | CJK 12 / Latin 5 chars | no | no |
+  | Level | Pause | Min draft | Embedded half-word | Trailing space | Sentence end |
+  |---|---|---|---|---|---|
+  | High | 250ms | CJK 4 / Latin 2 chars | suggests | suggests | suggests |
+  | Medium (default) | 400ms | CJK 8 / Latin 3 chars | no | suggests | no |
+  | Low | 800ms | CJK 12 / Latin 5 chars | no | no | no |
 
 * The whole switch is hidden when the current session's main model is not a DeepSeek model
 * **Credentials**: Requests reuse the DeepSeek API key configured in dsh (FIM completion Beta) — no extra credentials, the key never reaches the browser; token usage bills to your DeepSeek account

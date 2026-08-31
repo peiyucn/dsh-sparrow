@@ -319,6 +319,26 @@ describe('chat-fim 纯逻辑', () => {
       assert.deepEqual(shouldTriggerFim('这个方案已经写完了。 '), { ok: false, reason: 'sentence-end' })
     })
 
+    it('高灵敏：句末问号 应该 触发', () => {
+      assert.deepEqual(shouldTriggerFim('还有个问题，fim接口是计费的么？', 'eager'), { ok: true })
+    })
+
+    it('高灵敏：句末句号 应该 触发', () => {
+      assert.deepEqual(shouldTriggerFim('这个方案已经写完了。', 'eager'), { ok: true })
+    })
+
+    it('高灵敏：英文句末句点 应该 触发', () => {
+      assert.deepEqual(shouldTriggerFim('Let me fix it.', 'eager'), { ok: true })
+    })
+
+    it('高灵敏：句号后跟空格 应该 触发', () => {
+      assert.deepEqual(shouldTriggerFim('这个方案已经写完了。 ', 'eager'), { ok: true })
+    })
+
+    it('低灵敏：句末句号 应该 不触发（sentence-end）', () => {
+      assert.deepEqual(shouldTriggerFim('这个方案我们已经写完了。', 'conservative'), { ok: false, reason: 'sentence-end' })
+    })
+
     it('高灵敏：4 字中文 应该 触发', () => {
       assert.deepEqual(shouldTriggerFim('你好啊这', 'eager'), { ok: true })
     })
