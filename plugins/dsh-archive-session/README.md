@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 Archived-session management — a DeepSeek Harness (DSH) Web plugin (part of the dsh-sparrow collection).
 
-Complements the built-in archive: DSH only hides archived sessions from the sidebar, while this plugin adds an "Archive" entry at the bottom of the sidebar to truly **back up** archived sessions (moved off disk, reversible) or **delete** them (irreversible), and **restore** them anytime.
+Complements the built-in archive. DSH's archive marker only hides a session from the sidebar — the **@ mention list does not filter by the archive marker**, so archived sessions keep crowding @ candidates. This plugin adds an "Archive" entry at the bottom of the sidebar to truly **back up** archived sessions (the session directory is moved out of persistence, reversible) or **delete** them (irreversible), and **restore** backups anytime — backed-up or deleted sessions really leave the @ list.
 
 ## Install
 
