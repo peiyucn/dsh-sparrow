@@ -26,6 +26,21 @@ const ROUTE_PATH = '/api/chat-suggest/complete'
 /** 候选全被复读/回声护栏过滤时的重试温度：0.5——比 0.3 更易跳出复读循环，比 0.7 噪声小（0.7 实测相关性弱）。 */
 const ECHO_RETRY_TEMPERATURE = 0.5
 
+/**
+ * 进程级诊断计数（status 路由带 ?diagnostics=1 时返回；不持久化、不含任何用户内容）。
+ * 「转完圈没出卡片」时先查这里，看候选被哪道护栏拦了，别盲调参数。
+ */
+const diagnostics = {
+  requests: 0,
+  fulfilled: 0,
+  retries: 0,
+  shown: 0,
+  empty: 0,
+  filteredSpeaker: 0,
+  filteredRepeat: 0,
+  filteredEcho: 0,
+}
+
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   if (res.headersSent) return
   const body = JSON.stringify(payload)
@@ -117,6 +132,11 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
       if (req.method === 'GET') {
         // 状态查询：主模型是否支持（deepseek 系列）。客户端据此整体隐藏开关。
         const url = new URL(req.url ?? '/', 'http://localhost')
+        // 诊断查询：返回护栏丢弃计数（无用户内容），用于「转完圈没出卡片」排查。
+        if (url.searchParams.get('diagnostics') === '1') {
+          sendJson(res, 200, diagnostics)
+          return
+        }
         const sessionIdRaw = url.searchParams.get('sessionId') ?? ''
         const session = ctx.sessions.get(SessionId(sessionIdRaw))
         if (session === undefined) {
@@ -135,6 +155,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
         sendError(res, 405, { code: 'BAD_BODY', message: '只接受 POST /api/chat-suggest/complete' })
         return
       }
+      diagnostics.requests++
 
       const read = await readRequestBody(req, settings.maxBodyBytes)
       if (!read.ok) {
@@ -184,9 +205,13 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
       const history = session.deriveMessages() as readonly unknown[]
       // 对话前缀续写请求体：原生历史消息 + 以「用户：草稿」为前缀的 assistant 消息（prefix: true）。
       const messages = buildPrefixMessages(history, parsed.prompt, language)
-      // 回声判定的历史文本集（与 prompt 同一窗口，用户与助手消息都比对）：
-      // 模型复读/转述任一角色的话语都是退化（实测转述插件讨论内容时仅比用户消息拦不住）。
-      const historyEchoTexts = recentHistoryTurns(history).map(turn => turn.text)
+      // 回声判定的历史文本集（与 prompt 同一窗口）：
+      // 用户消息 10 字窗口、助手消息 15 字窗口——模型复读用户刚说的话是退化（实测），
+      // 转述助手讨论内容（cleanSuggestion 等 15 字片段）也是；但助手措辞的正常复用
+      // （常见 <15 字）不再误杀（2026-08-31 实测 10 字全比对导致正常会话频繁空建议）。
+      const historyTurns = recentHistoryTurns(history)
+      const userEchoTexts = historyTurns.filter(turn => turn.role === 'user').map(turn => turn.text)
+      const assistantEchoTexts = historyTurns.filter(turn => turn.role === 'assistant').map(turn => turn.text)
       const stop = speakerStopSequences(language)
       // 补全模型三档解析：pro / flash / auto（跟随官方主模型，vision/未知回退配置默认）。
       const suggestModel = resolveSuggestModel(parsed.suggestModelMode, main, settings.model)
@@ -235,15 +260,27 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
           for (const result of results) {
             if (result.status === 'fulfilled') {
               hadFulfilled = true
+              diagnostics.fulfilled++
               if (suggestions.length === 0) firstTemperature = result.value.temperature
               totalPromptTokens += result.value.usage.promptTokens
               totalCompletionTokens += result.value.usage.completionTokens
               for (const suggestion of result.value.suggestions) {
                 // 按说话人标记截断 + 角色切换丢弃（API stop 实测不可靠，见 suggest.ts 注释）。
                 const clean = cleanSuggestion(suggestion, language)
-                if (clean === null || seen.has(clean)) continue
-                // 两道护栏：同一短语循环复读 / 复述用户历史消息（实测见 suggest.ts 注释）→ 丢弃。
-                if (hasDegenerateRepeat(clean) || isHistoryEcho(clean, historyEchoTexts)) continue
+                if (clean === null) {
+                  diagnostics.filteredSpeaker++
+                  continue
+                }
+                if (seen.has(clean)) continue
+                // 护栏：同一短语循环复读 → 丢弃；复述用户消息（10 字窗口）或助手消息（15 字窗口）→ 丢弃。
+                if (hasDegenerateRepeat(clean)) {
+                  diagnostics.filteredRepeat++
+                  continue
+                }
+                if (isHistoryEcho(clean, userEchoTexts, 10) || isHistoryEcho(clean, assistantEchoTexts, 15)) {
+                  diagnostics.filteredEcho++
+                  continue
+                }
                 // 单句截断：续写只给一句，连续续写靠 Tab 链（见 suggest.ts truncateFirstSentence）。
                 const short = truncateFirstSentence(clean)
                 if (short === '' || seen.has(short)) continue
@@ -260,7 +297,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
           }
         }
 
-        // FIM 接口没有 n 参数：多建议用并行请求 + 温度错开采样；部分失败保留成功建议。
+        // 前缀续写接口没有 n 参数：多建议用并行请求 + 温度错开采样；部分失败保留成功建议。
         absorb(await Promise.allSettled(
           Array.from({ length: settings.suggestionCount }, (_, index) => requestOnce(
             settings.suggestionCount > 1 ? Math.min(2, settings.temperature + index * 0.4) : settings.temperature,
@@ -270,6 +307,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
         // 候选全被护栏过滤（复读/回声）：升温度重试一次，多数时候能跳出复读循环；
         // 仍无候选则静默返回空建议（客户端不显示错误、不打扰用户）。
         if (suggestions.length === 0 && hadFulfilled) {
+          diagnostics.retries++
           absorb(await Promise.allSettled([requestOnce(ECHO_RETRY_TEMPERATURE)]))
         }
         // 只有上游请求全部失败才报 502。
@@ -277,6 +315,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
           sendError(res, 502, firstError ?? { code: 'UPSTREAM_ERROR', message: 'DeepSeek 续写上游没有返回可用候选' })
           return
         }
+        if (suggestions.length === 0) diagnostics.empty++
+        else diagnostics.shown++
         sendJson(res, 200, {
           suggestions,
           model: suggestModel,
@@ -285,7 +325,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatSuggestConfig>>
         })
       } catch (error) {
         if (isAbortTimeout(signal.signal)) {
-          sendError(res, 504, { code: 'TIMEOUT', message: 'DeepSeek FIM 上游超时' })
+          sendError(res, 504, { code: 'TIMEOUT', message: 'DeepSeek 续写上游超时' })
         } else if (signal.signal.aborted) {
           // 客户端已断开；响应写不写都无所谓，但要避免悬挂。
           if (!res.headersSent) res.destroy()

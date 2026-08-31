@@ -527,6 +527,14 @@ describe('chat-suggest 纯逻辑', () => {
       assert.equal(isHistoryEcho('先想想 cleanSuggestion 按说话人标记处理', ['cleanSuggestion按说话人标记截断，角色切换丢弃']), true)
     })
 
+    it('助手消息 15 字窗口 应该 判定回声（调用方阈值）', () => {
+      assert.equal(isHistoryEcho('先想想 cleanSuggestion 按说话人标记处理', ['cleanSuggestion按说话人标记截断，角色切换丢弃'], 15), true)
+    })
+
+    it('短于阈值的片段 应该 不算回声', () => {
+      assert.equal(isHistoryEcho('这个功能我们先做一版试试', ['这个功能我们先做一版试试效果'], 15), false)
+    })
+
     it('建议与历史仅共词不共段 应该 不算回声', () => {
       assert.equal(isHistoryEcho('这个方案还需要再想想', ['这个方案可以再细化']), false)
     })
