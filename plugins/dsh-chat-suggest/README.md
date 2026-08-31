@@ -23,9 +23,9 @@ Requires dsh ≥ 0.1.1-rc.2.
 
   | Level | Pause | Min draft | Embedded half-word | Trailing space | Sentence end |
   |---|---|---|---|---|---|
-  | High | 250ms | CJK 6 / Latin 4 chars | suggests | suggests | suggests |
-  | Medium (default) | 400ms | CJK 10 / Latin 6 chars | no | suggests | no |
-  | Low | 800ms | CJK 14 / Latin 10 chars | no | no | no |
+  | High | 250ms | CJK 4 / Latin 2 chars | suggests | suggests | suggests |
+  | Medium (default) | 400ms | CJK 8 / Latin 4 chars | no | suggests | no |
+  | Low | 800ms | CJK 12 / Latin 8 chars | no | no | no |
 
 * The whole switch is hidden when the current session's main model is not a DeepSeek model
 * **Credentials**: Requests reuse the DeepSeek API key configured in dsh (FIM completion Beta) — no extra credentials, the key never reaches the browser; token usage bills to your DeepSeek account

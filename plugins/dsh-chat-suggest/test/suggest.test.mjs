@@ -402,12 +402,12 @@ describe('chat-suggest 纯逻辑', () => {
       assert.deepEqual(shouldTriggerSuggest('这个方案我们昨天已经写完了。', 'conservative'), { ok: false, reason: 'sentence-end' })
     })
 
-    it('高灵敏：6 字中文 应该 触发', () => {
-      assert.deepEqual(shouldTriggerSuggest('你好啊这是测', 'eager'), { ok: true })
+    it('高灵敏：4 字中文 应该 触发', () => {
+      assert.deepEqual(shouldTriggerSuggest('你好啊这', 'eager'), { ok: true })
     })
 
-    it('高灵敏：5 字中文 应该 不触发（too-short）', () => {
-      assert.deepEqual(shouldTriggerSuggest('你好啊这是', 'eager'), { ok: false, reason: 'too-short' })
+    it('高灵敏：3 字中文 应该 不触发（too-short）', () => {
+      assert.deepEqual(shouldTriggerSuggest('你好啊', 'eager'), { ok: false, reason: 'too-short' })
     })
 
     it('高灵敏：夹入英文停半词 应该 触发', () => {
@@ -451,12 +451,12 @@ describe('chat-suggest 纯逻辑', () => {
       assert.deepEqual(shouldTriggerSuggest('Let me fix the iss'), { ok: true })
     })
 
-    it('纯英文 6 字符（完整单词）应该 触发', () => {
-      assert.deepEqual(shouldTriggerSuggest('please'), { ok: true })
+    it('纯英文 4 字符 应该 触发', () => {
+      assert.deepEqual(shouldTriggerSuggest('Hell'), { ok: true })
     })
 
-    it('纯英文 5 字符 应该 不触发（too-short）', () => {
-      assert.deepEqual(shouldTriggerSuggest('pleas'), { ok: false, reason: 'too-short' })
+    it('纯英文 3 字符 应该 不触发（too-short）', () => {
+      assert.deepEqual(shouldTriggerSuggest('Hel'), { ok: false, reason: 'too-short' })
     })
 
     it('低灵敏：纯英文 7 字符 应该 不触发（too-short）', () => {
@@ -467,12 +467,12 @@ describe('chat-suggest 纯逻辑', () => {
       assert.deepEqual(shouldTriggerSuggest('He'), { ok: false, reason: 'too-short' })
     })
 
-    it('高灵敏：纯英文 4 字符 应该 触发', () => {
-      assert.deepEqual(shouldTriggerSuggest('Hell', 'eager'), { ok: true })
+    it('高灵敏：纯英文 2 字符 应该 触发', () => {
+      assert.deepEqual(shouldTriggerSuggest('He', 'eager'), { ok: true })
     })
 
-    it('高灵敏：纯英文 3 字符 应该 不触发（too-short）', () => {
-      assert.deepEqual(shouldTriggerSuggest('Hel', 'eager'), { ok: false, reason: 'too-short' })
+    it('高灵敏：纯英文 1 字符 应该 不触发（too-short）', () => {
+      assert.deepEqual(shouldTriggerSuggest('H', 'eager'), { ok: false, reason: 'too-short' })
     })
 
     it('纯英文尾随空格 应该 触发（预测下一个词）', () => {
@@ -491,8 +491,8 @@ describe('chat-suggest 纯逻辑', () => {
       assert.deepEqual(shouldTriggerSuggest('我们先看看数据，再看'), { ok: true })
     })
 
-    it('中灵敏：9 字中文 应该 不触发（too-short）', () => {
-      assert.deepEqual(shouldTriggerSuggest('我觉得这个方案可', 'standard'), { ok: false, reason: 'too-short' })
+    it('中灵敏：7 字中文 应该 不触发（too-short）', () => {
+      assert.deepEqual(shouldTriggerSuggest('我觉得这个方案', 'standard'), { ok: false, reason: 'too-short' })
     })
   })
 
