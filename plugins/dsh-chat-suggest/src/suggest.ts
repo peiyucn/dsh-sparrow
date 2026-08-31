@@ -431,9 +431,9 @@ export function formatTokenCount(count: number): string {
   return String(safe).replace(/\B(?=(\d{3})+(?!\d))/gu, ',')
 }
 
-/** 触发形态门控：草稿最短长度（trim 后）。标准档 CJK 草稿 8 字；纯拉丁草稿按词计，4 字符才开补（3 字符片段信号太弱，实测联想质量差）。 */
+/** 触发形态门控：草稿最短长度（trim 后）。标准档 CJK 草稿 8 字；纯拉丁草稿 6 字符（≈一个完整单词——2026-08-31 实测半词信号太弱、模型漂移，3→4→6）。 */
 export const MIN_TRIGGER_DRAFT_CHARS = 8
-export const MIN_TRIGGER_DRAFT_CHARS_LATIN = 4
+export const MIN_TRIGGER_DRAFT_CHARS_LATIN = 6
 
 /** 句末标点：草稿以这些字符结尾时句子已完整，FIM 会续出新一句而不是接话（实测质量差），不触发。 */
 export const SENTENCE_END_CHARS = '。！？.!?;；'
@@ -473,14 +473,14 @@ export const TRIGGER_SENSITIVITIES: Record<TriggerSensitivity, TriggerSensitivit
     pauseMs: 400,
     minCharsCjk: MIN_TRIGGER_DRAFT_CHARS,
     minCharsLatin: MIN_TRIGGER_DRAFT_CHARS_LATIN,
-    allowLatinMidWord: true,
+    allowLatinMidWord: false,
     allowTrailingSpace: true,
     allowSentenceEnd: false,
   },
   conservative: {
     pauseMs: 800,
     minCharsCjk: 12,
-    minCharsLatin: 5,
+    minCharsLatin: 8,
     allowLatinMidWord: false,
     allowTrailingSpace: false,
     allowSentenceEnd: false,
