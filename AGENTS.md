@@ -12,7 +12,7 @@
 
 * 每个插件一个独立 npm 包、独立发布；某功能被官方原生支持后对应插件从合集中退役
 * 布局：
-  * `plugins/dsh-chat-suggest` — 聊天输入框续写联想（DeepSeek 对话前缀续写 Beta 转发 + 官方 @ 列表同款候选菜单）
+  * `plugins/dsh-chat-suggest` — 聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + 官方 @ 列表同款候选菜单）
   * `plugins/dsh-vision-access` — 纯文本会话的图片视觉通道（官方 vision 模型读图，主模型保持大脑）
   * `plugins/dsh-archive-session` — 归档会话管理：备份 / 删除 / 恢复（轻量标题已随官方投影缓存退役）
 * 各插件本地验证 = 进入插件目录 `npm run verify`（typecheck + node:test）；全量 = 仓库根 `npm run verify:all`
@@ -126,5 +126,5 @@
 ## CI 与自动发布（已配置，远端 peiyucn/dsh-sparrow）
 
 * `.github/workflows/ci.yml`：push dev/main 与 PR 时跑 `pnpm install --frozen-lockfile` + `npm run verify:all`
-* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish`
-* 发布前置：仓库 Secrets 里配 `NPM_TOKEN`（npmjs.org Automation token）；未配时 publish 步骤会失败，CI 不受影响
+* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --provenance`
+* 发布鉴权**双模式**（2026-08-31 为 npm 收紧准备）：有 `NPM_TOKEN` secret 走 Automation token（**首发必需**——npm trusted publisher 配置要求包已存在）；无 secret 自动走 **npm Trusted Publishing（OIDC）**（工作流 `permissions: id-token: write`；npm 包页 Access → Trusted publishers 配置 owner/peiyucn + repo + workflow 路径）。npm 官方 2027-01 起收紧「绕过 2FA 的令牌」直接发布，长期方向即 OIDC。CI 不受 NPM_TOKEN 影响

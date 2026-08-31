@@ -11,6 +11,12 @@ on:
         required: true
         type: string
 
+# id-token: write 用于 npm Trusted Publishing（OIDC）——npm 2027-01 起收紧
+# 绕过 2FA 的令牌直接发布，官方方向是 OIDC / staged publishing。
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -59,8 +65,16 @@ jobs:
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
         run: npm run verify
 
-      - name: Publish to npm
+      # 双模式鉴权：有 NPM_TOKEN 用 Automation token（首发必需——npm 的
+      # trusted publisher 配置需要包已存在）；没有则走 OIDC 信任发布。
+      - name: Publish to npm (token)
+        if: ${{ secrets.NPM_TOKEN != '' }}
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
-        run: npm publish --access public
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish to npm (OIDC trusted publishing)
+        if: ${{ secrets.NPM_TOKEN == '' }}
+        working-directory: plugins/${{ steps.resolve.outputs.plugin }}
+        run: npm publish --access public --provenance
