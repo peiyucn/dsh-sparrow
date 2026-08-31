@@ -1,6 +1,6 @@
 {
   "name": "dsh-chat-suggest",
-  "description": "DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 + 官方 @ 列表同款候选菜单）",
+  "description": "DSH web plugin: chat input suggestions via DeepSeek FIM completion (Beta) — a card suggests what you may type next, Tab adopts, Esc dismisses; trigger sensitivity adjustable (high/medium/low)",
   "version": "0.1.0",
   "license": "MIT",
   "repository": {
