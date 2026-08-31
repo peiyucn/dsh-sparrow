@@ -7,7 +7,7 @@ import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-llm'
 import { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId, type Session } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-tools'
@@ -50,6 +50,27 @@ const VISION_REPORT_OUTPUT_SCHEMA = {
     layout: { type: 'string', description: '版式分区描述；简单图片可省略' },
   },
 } as const
+
+/**
+ * 读「当前选择的模型」：优先会话投影的 modelSelection（选择器一切换就写入 model/selection，
+ * 未发送也能拿到），回退最近一次 request/header。判定图标显示用——不能只看最后请求，
+ * 否则切换选择器后、发送前会读到旧模型（2026-08-30 实测反馈）。
+ */
+function currentMainModel(ctx: Context, session: Session): { provider: string; model: string } | undefined {
+  const projections = ctx.get('sessionProjections') as {
+    stateOf(session: Session, key: string): { pending?: { provider: string; model: string } | null; lastUsed?: { provider: string; model: string } | null } | undefined
+  } | undefined
+  try {
+    const state = projections?.stateOf(session, 'modelSelection')
+    const selected = state?.pending ?? state?.lastUsed
+    if (selected !== null && selected !== undefined && typeof selected.provider === 'string' && typeof selected.model === 'string') {
+      return { provider: selected.provider, model: selected.model }
+    }
+  } catch {
+    // 投影未注册 / 读取失败：回退请求头。
+  }
+  return mainRouteFromSession(session.events)
+}
 
 /**
  * host half 入口：包装 resolveModelInfo 放行文本路由，并注册 vision_read。
@@ -248,7 +269,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         sendJson(res, 200, { available: false, visionModel: settings.visionModel })
         return
       }
-      const main = mainRouteFromSession(session.events)
+      const main = currentMainModel(ctx, session)
       if (!isDeepseekMainRoute(main)) {
         sendJson(res, 200, { available: false, visionModel: settings.visionModel })
         return
