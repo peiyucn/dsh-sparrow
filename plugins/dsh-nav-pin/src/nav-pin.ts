@@ -7,13 +7,19 @@ export const NAV_ARIA_LABELS: readonly string[] = ['Turn navigation', '轮次导
 export const HOVER_HIDE_BREAKPOINT_PX = 700
 
 /** 浮现 / 隐藏的透明度过渡时长。 */
-export const OPACITY_TRANSITION_MS = 120
+const OPACITY_TRANSITION_MS = 120
 
 /** 官方 .frame 的高度过渡（复刻：覆盖 transition 简写会吃掉官方的高度动画）。 */
 const NATIVE_HEIGHT_TRANSITION = 'height 220ms cubic-bezier(0.2, 0.8, 0.2, 1)'
 
 /** 会话内容每侧最小留白（官方为 88px）：钳制拖宽上限，右侧拖拽条不再挤占轮次导航命中区。 */
 export const CONTENT_MAX_SIDE_CLEARANCE_PX = 120
+
+/** 钳制地板 = 官方最小内容宽度（CONTENT_MIN 640）：窄列下内容不压过 640px。 */
+export const CONTENT_MIN_FLOOR_PX = 640
+
+/** 官方输入卡片比内容宽的固定增量（--dsh-composer-card-max-width = 内容宽 + 32px）。 */
+const CARD_EXTRA_WIDTH_PX = 32
 
 /**
  * 轮次导航 slot 定位选择器：对话滚动体（公开 DOM 标记）内、轮次导航 nav 的直接父元素。
@@ -84,11 +90,11 @@ ${slots} {
 [data-width-handle] {
   --dsh-chat-content-width: min(
     var(--dsh-nav-pin-official-width),
-    max(640px, calc(var(--dsh-conversation-column-width) - ${CONTENT_MAX_SIDE_CLEARANCE_PX * 2}px))
+    max(${CONTENT_MIN_FLOOR_PX}px, calc(var(--dsh-conversation-column-width) - ${CONTENT_MAX_SIDE_CLEARANCE_PX * 2}px))
   );
 }
 [data-conversation-scroll] {
-  --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
+  --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + ${CARD_EXTRA_WIDTH_PX}px);
 }
 
 @media (prefers-reduced-motion: reduce) {

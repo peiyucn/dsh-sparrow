@@ -12,7 +12,7 @@ import { buildNavPinCss } from '../nav-pin.js'
 export const inject: string[] = []
 
 /** 注入样式表（按 data 属性去重，HMR / 重载不叠加）；返回 style 元素供卸载清理。 */
-export function ensureNavPinStyles(): HTMLStyleElement {
+function ensureNavPinStyles(): HTMLStyleElement {
   const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-nav-pin]')
   if (existing !== null) return existing
   const style = document.createElement('style')
