@@ -1,0 +1,5 @@
+# dsh-file-session 组合补丁：`dsh plugin --profile web add @dsh-sparrow/dsh-file-session` 安装后由 profile 自动挂载。
+# 复用官方 DeepSeekFilesClient，无配置项；凭据只经 ctx.credentials 解析。
+- insert:
+    - id: dsh-file-session
+      name: '@dsh-sparrow/dsh-file-session'
