@@ -11,6 +11,7 @@
 * **`:has()` 先例**：官方样式已大量使用（如 `ConversationRoot.module.css:275`），浏览器支持无虞。
 * **容器查询**：插件样式表里的 `@container (max-width: 700px)` 与官方一样解析到 ChatView `.scroll`（最近的 inline-size 容器），断点语义与官方同源。
 * **渲染门槛**：官方 rail 在 `items.length < 2` 时不渲染（`TurnNavigator.tsx:129`，items 含已翻页的旧轮次标记）——单轮会话没有导航可显，插件不改变该门槛。
+* **宽度轴（钳制用）**：`--dsh-chat-content-width` 定义在 ConversationRoot 根（`.root`，公开属性 `data-phase`）——`var(--dsh-chat-user-width, clamp(680px, calc(var(--dsh-conversation-column-width, 0px) * 0.64), 920px))`，用户拖宽经内联 `--dsh-chat-user-width` 整体替换；消费点：消息列 `.column`、拖拽条 `.widthHandle`（公开属性 `data-width-handle`，定位 `50% ± W/2 + 24px`、宽 `min(40px, (100% - W)/2 - 48px)`）、输入卡片（`--dsh-composer-card-max-width = W + 32px`，`InputBar.module.css:22/41` 消费）。官方拖宽上限 = 每侧 88px（`CONTENT_EDGE_BUDGET 176`），拖拽条 z-index 8 高于导航 z-index 6，拉到最宽时二者命中区重叠（owner 实测）。
 
 ## CSS 骨架（提案）
 
@@ -52,9 +53,27 @@
 
 实测结论（owner 拍板）：浮层不做面板框——只 opacity 淡入，无底色 / 边框 / 圆角 / 阴影，与官方宽屏轨道形态一致；高度过渡与官方 `.frame` 并列声明（复刻 `height 220ms`）。
 
+```css
+/* 3) 会话内容最大宽度钳制（每侧留白 88 → 124px） */
+[data-phase] {
+  --dsh-nav-pin-official-width: var(--dsh-chat-content-width);
+}
+[data-conversation-scroll],
+[data-width-handle] {
+  --dsh-chat-content-width: min(
+    var(--dsh-nav-pin-official-width),
+    max(680px, calc(var(--dsh-conversation-column-width) - 248px))
+  );
+}
+[data-conversation-scroll] {
+  --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
+}
+```
+
 ## seam 特例（写入插件 AGENTS.md）
 
 * 只读依赖两个公开 DOM 标记（`[data-conversation-scroll]` + nav aria-label 两套文案）；官方改文案 / 结构需插件升级，AGENTS.md 记录所适配 dsh 版本。
+* 宽度钳制依赖 `[data-phase]` / `[data-width-handle]` 公开属性；官方宽度值经 `[data-phase]` 上的 `--dsh-nav-pin-official-width` 捕获中转（自定义属性自引用会成环失效，不能直接 `min(var(--dsh-chat-content-width), …)`）；官方改宽度轴公式或消费点需插件升级。
 * 样式表在 apply 内注入、`ctx.effect` 清理；卸载即恢复官方 900px 行为。
 
 ## 开放问题

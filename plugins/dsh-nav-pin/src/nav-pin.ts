@@ -12,6 +12,9 @@ export const OPACITY_TRANSITION_MS = 120
 /** 官方 .frame 的高度过渡（复刻：覆盖 transition 简写会吃掉官方的高度动画）。 */
 const NATIVE_HEIGHT_TRANSITION = 'height 220ms cubic-bezier(0.2, 0.8, 0.2, 1)'
 
+/** 会话内容每侧最小留白（官方为 88px）：钳制拖宽上限，右侧拖拽条不再挤占轮次导航命中区。 */
+export const CONTENT_MAX_SIDE_CLEARANCE_PX = 124
+
 /**
  * 轮次导航 slot 定位选择器：对话滚动体（公开 DOM 标记）内、轮次导航 nav 的直接父元素。
  * slot 是官方隐藏规则（display: none）作用的目标，本规则以更高特异性压过它。
@@ -67,6 +70,25 @@ ${slots} {
   ${reveals} {
     opacity: 1;
   }
+}
+
+/* 3) 会话内容最大宽度钳制：官方拖宽上限每侧留 88px（CONTENT_EDGE_BUDGET 176 / 2），
+ *    右侧拖拽条（z-index 8）会压到轮次导航命中区（轨道 28px + 本插件 ::before 16px ≈ 右缘 56px）。
+ *    每侧留白收紧到 124px：拖拽条外缘停在导航命中区之外；窄列（cap 低于 680px 地板）与官方行为一致。
+ *    官方宽度值先捕获到 [data-phase] 根上的 --dsh-nav-pin-official-width（自定义属性自引用会成环失效），
+ *    再在滚动体 / 拖拽条上 min() 钳制；卡片宽度公式（内容宽 + 32px，InputBar 消费）同步重算。 */
+[data-phase] {
+  --dsh-nav-pin-official-width: var(--dsh-chat-content-width);
+}
+[data-conversation-scroll],
+[data-width-handle] {
+  --dsh-chat-content-width: min(
+    var(--dsh-nav-pin-official-width),
+    max(680px, calc(var(--dsh-conversation-column-width) - ${CONTENT_MAX_SIDE_CLEARANCE_PX * 2}px))
+  );
+}
+[data-conversation-scroll] {
+  --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
 }
 
 @media (prefers-reduced-motion: reduce) {

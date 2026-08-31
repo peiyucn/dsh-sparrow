@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { buildNavPinCss, NAV_ARIA_LABELS, slotSelector } from '../lib/nav-pin.js'
+import { buildNavPinCss, CONTENT_MAX_SIDE_CLEARANCE_PX, NAV_ARIA_LABELS, slotSelector } from '../lib/nav-pin.js'
 
 describe('dsh-nav-pin 纯逻辑', () => {
   describe('slotSelector', () => {
@@ -61,6 +61,26 @@ describe('dsh-nav-pin 纯逻辑', () => {
     it('自定义断点 应该 反映在容器查询与说明注释中', () => {
       const custom = buildNavPinCss(NAV_ARIA_LABELS, 640)
       assert.ok(custom.includes('@container (max-width: 640px)'))
+    })
+
+    it('宽度钳制 应该 捕获官方宽度值并钳到对话列减两倍留白', () => {
+      assert.ok(css.includes('--dsh-nav-pin-official-width: var(--dsh-chat-content-width)'))
+      assert.ok(css.includes('--dsh-chat-content-width: min('))
+      assert.ok(css.includes(`calc(var(--dsh-conversation-column-width) - ${CONTENT_MAX_SIDE_CLEARANCE_PX * 2}px)`))
+      assert.ok(css.includes('max(680px'))
+    })
+
+    it('宽度钳制 应该 覆盖滚动体与两侧拖拽条', () => {
+      assert.ok(css.includes('[data-conversation-scroll],\n[data-width-handle]'))
+      assert.ok(css.includes('[data-width-handle]'))
+    })
+
+    it('宽度钳制 应该 同步重算输入卡片最大宽度', () => {
+      assert.ok(css.includes('--dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px)'))
+    })
+
+    it('留白常量 应该 大于官方 88px', () => {
+      assert.ok(CONTENT_MAX_SIDE_CLEARANCE_PX > 88)
     })
   })
 })

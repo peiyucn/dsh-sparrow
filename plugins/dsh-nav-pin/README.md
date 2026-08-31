@@ -21,6 +21,7 @@ Requires dsh ≥ 0.1.2-alpha.3 (verified baseline; earlier versions unverified) 
 * No settings, no toggle: active as soon as it is installed
 * Conversation column > 700px: the rail is always visible (the official 900px hide is overridden)
 * Conversation column ≤ 700px: the rail is hidden by default; hover the right edge of the conversation (or Tab into the rail) and it fades in (~120ms) with no frame or background; moving away hides it again
+* The conversation content width is capped: even dragged to the widest, it keeps at least 124px clearance per side (official: 88px), so the right drag handle no longer crowds the turn rail
 * **Note**: the official rail only renders from the second turn on — a single-turn session has no rail to pin, and this plugin does not change that threshold
 * Uninstalling restores the official 900px behavior; no persisted state, no leftovers
 
