@@ -25,7 +25,8 @@ describe('dsh-file-session 配额纯逻辑', () => {
   describe('formatUsagePercent', () => {
     it('百分比 应该 按量级自适应小数位（25GiB 配额下常见 0.01% 量级）', () => {
       assert.equal(formatUsagePercent(0), '0.0000%')
-      assert.equal(formatUsagePercent(0.000195), '0.0195%')
+      assert.equal(formatUsagePercent(0.00005), '0.0050%')
+      assert.equal(formatUsagePercent(0.000195), '0.020%')
       assert.equal(formatUsagePercent(0.0053), '0.53%')
       assert.equal(formatUsagePercent(0.05), '5.0%')
       assert.equal(formatUsagePercent(0.092), '9.2%')
