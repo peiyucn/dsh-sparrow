@@ -1,17 +1,10 @@
 # Changelog
 
-## 0.1.2（2026-08-31 · 正式发布）
+## 0.1.0（2026-08-31 · 正式发布）
 
-- `0.1.2-alpha.1` 验证通过，转正发布；修复内容同 `0.1.2-alpha.1`
-
-## 0.1.2-alpha.1（2026-08-31 · 修复客户端 bundle 注册 id）
-
-- 修复 `scripts/bundle-client.mjs` 的 `__ModuleLoader__.load` 注册 id 未随 scoped 包名更新，导致 dsh 0.1.2 启动报 `loaded without registering "@dsh-sparrow/dsh-chat-suggest"` 的问题
-- 根 `scripts/verify.mjs` 增加校验：client bundle 注册 id 必须等于 `package.json` 的 `name`
-
-## 1.0.0（2026-08-31 · 正式首发）
-
-- 迁移至 npm 组织作用域 `@dsh-sparrow` 正式发布 1.0.0（此前无作用域的 0.1.x 为试验发布线，已废弃并从 npm / GitHub 清理）
+- 迁移至 npm 组织作用域 `@dsh-sparrow`，以 0.1.0 作为首个正式发布版本
+- 修复 `scripts/bundle-client.mjs` 的 `__ModuleLoader__.load` 注册 id 使用 scoped 包名，避免 dsh 客户端加载失败
+- `npm run verify` 增加 client bundle 注册 id 与 package name 一致性校验
 - 输入框续写联想：打字停顿触发，官方 @ 候选菜单同款悬浮卡展示；**Tab** 采用、**Esc** 丢弃（也可点选），与官方 @/斜杠触发菜单互斥让位
 - 上游：DeepSeek **FIM 补全（Beta）**（`/beta/completions` + 说话人转写体）；续写模型**跟随主模型**（auto：v4-pro / v4-flash，vision 等回退 pro），卡片右下角展示实际模型与温度
 - **触发灵敏度三档**（高/中/低）：停顿时长 250/400/800ms、最短草稿（中文 4/8/12 字、英文 2/6/8 字符）、夹入英文半词、词后空格、句末标点分别伸缩；胶囊内竖排三点指示 + tooltip 随档位变化，选择本地持久化
