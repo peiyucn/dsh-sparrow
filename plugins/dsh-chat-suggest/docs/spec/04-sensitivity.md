@@ -24,7 +24,7 @@
 
 ## UI
 
-* 开关胶囊（`conversation.input.left`）内置：右侧为**灵敏度触发区**（1px 分割线与开关主体隔开：**竖排三点指示** + ▾，恒显 3 个 4px 方点、自下而上点亮 3/2/1 个 = 高/中/低，点亮用 currentColor、未点亮淡色占位）；**点击整区只开合选档弹层、不切换开关**（区域整高，Enter/Space 键盘可触发；不做单独悬停底色，避免与按钮主体悬停底色叠加成嵌套椭圆）；**▾ 弹层**选档（选项行 = 档位名 + 规则摘要，官方 MenuDropdown 同款 token，点外部/Esc 关闭、滚动跟随重定位）；
+* 开关胶囊（`conversation.input.left`）内置：右侧为**灵敏度触发区**（1px 分割线与开关主体隔开：**竖排三点指示** + ▾，恒显 3 个 3px 方点、自下而上点亮 3/2/1 个 = 高/中/低，点亮用 currentColor、未点亮用 30% 透明度混色淡色占位）；**点击整区只开合选档弹层、不切换开关**（区域整高且经负 margin 铺满按钮右缘——按钮右侧 padding 与分割线左侧 gap 都计入命中区，右缘缝隙点击不再落回开关；Enter/Space 键盘可触发；不做单独悬停底色，避免与按钮主体悬停底色叠加成嵌套椭圆）；**▾ 弹层**选档（选项行 = 档位名 + 规则摘要，官方 MenuDropdown 同款 token，点外部/Esc 关闭、滚动跟随重定位）；
 * **按钮 tooltip 随档位变化**（`sensitivity.hint`：联想敏锐度：{高/中/低}）；
 * 选择持久化在 localStorage `dsh-chat-suggest:sensitivity`（非法回退 standard）；旧 `dsh-chat-suggest:modelMode` 键不再读写（无害残留）。
 

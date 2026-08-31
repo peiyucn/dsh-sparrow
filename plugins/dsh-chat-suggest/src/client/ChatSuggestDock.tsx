@@ -301,13 +301,15 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   color: var(--dsw-alias-label-tertiary, #9aa0a6);
 }
 /* 胶囊内灵敏度触发区（分割线右侧：三点 + ▾）：整区可点，只开合灵敏度菜单、不切换开关。
-   不单独做悬停底色——按钮主体已有悬停底色，叠加会成嵌套椭圆。 */
+   不单独做悬停底色——按钮主体已有悬停底色，叠加会成嵌套椭圆。
+   命中区铺满：负 margin 顶掉按钮右侧 padding 与分割线左侧 gap，视觉间距由 padding 原样补回。 */
 .dsh-chat-suggest-switch-picker {
   display: inline-flex;
   align-items: center;
   align-self: stretch;
   gap: 3px;
-  padding: 0 5px;
+  margin: 0 -4px 0 -4px;
+  padding: 0 9px;
   cursor: pointer;
 }
 .dsh-chat-suggest-switch-on .dsh-chat-suggest-switch-picker {
@@ -346,6 +348,10 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   }
   .dsh-chat-suggest-switch {
     padding: 0 6px;
+  }
+  .dsh-chat-suggest-switch-picker {
+    margin: 0 -6px 0 -4px;
+    padding: 0 11px 0 9px;
   }
 }
 @property --dsh-chat-suggest-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
@@ -516,8 +522,8 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   line-height: 18px;
   white-space: nowrap;
 }
-/* 灵敏度竖点：恒显 3 个方点，自下而上点亮 3/2/1 个 = 高/中/低；未点亮为淡色占位。
-   与 ▾ 同在灵敏度触发区内（分割线左侧是开关主体）；点 4px、方角（owner 拍板：档位用方点）。 */
+/* 灵敏度竖点：恒显 3 个方点，自下而上点亮 3/2/1 个 = 高/中/低；未点亮为更浅的淡色占位。
+   与 ▾ 同在灵敏度触发区内（分割线左侧是开关主体）；点 3px、方角（owner 拍板：档位用方点）。 */
 .dsh-chat-suggest-dots {
   display: inline-flex;
   flex-direction: column;
@@ -525,10 +531,10 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   gap: 2px;
 }
 .dsh-chat-suggest-dot {
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
   border-radius: 0;
-  background: color-mix(in srgb, currentColor 45%, transparent);
+  background: color-mix(in srgb, currentColor 30%, transparent);
 }
 .dsh-chat-suggest-dot-on {
   background: currentColor;
