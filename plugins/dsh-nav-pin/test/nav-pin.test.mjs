@@ -37,6 +37,13 @@ describe('dsh-nav-pin 纯逻辑', () => {
       assert.ok(css.includes('opacity: 1'))
     })
 
+    it('浮层 应该 不带边框底色阴影（与官方宽屏轨道形态一致）', () => {
+      assert.ok(!css.includes('background:'))
+      assert.ok(!css.includes('border:'))
+      assert.ok(!css.includes('border-radius'))
+      assert.ok(!css.includes('box-shadow'))
+    })
+
     it('应该 提供 ::before 命中区扩展', () => {
       assert.ok(css.includes('nav::before'))
       assert.ok(css.includes('inset: -8px 0 -8px 16px'))

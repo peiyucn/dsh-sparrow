@@ -26,11 +26,7 @@
   [data-conversation-scroll] div:has(> nav[aria-label="Turn navigation"]) > nav,
   [data-conversation-scroll] div:has(> nav[aria-label="轮次导航"]) > nav {
     opacity: 0;
-    background: var(--dsw-alias-bg-layer-1);
-    border: 1px solid var(--dsw-alias-border-l2);
-    border-radius: 8px;
-    box-shadow: var(--dsw-shadow-lv2);
-    transition: opacity 120ms ease-out;
+    transition: opacity 120ms ease-out, height 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   /* 命中区：frame 自身（28px 轨道）+ ::before 向左扩 16px */
@@ -54,7 +50,7 @@
 }
 ```
 
-细节（命中区大小、浮层视觉 token）在 M2 实测后微调。
+实测结论（owner 拍板）：浮层不做面板框——只 opacity 淡入，无底色 / 边框 / 圆角 / 阴影，与官方宽屏轨道形态一致；高度过渡与官方 `.frame` 并列声明（复刻 `height 220ms`）。
 
 ## seam 特例（写入插件 AGENTS.md）
 

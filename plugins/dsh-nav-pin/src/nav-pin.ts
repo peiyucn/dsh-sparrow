@@ -47,15 +47,12 @@ ${slots} {
   display: block;
 }
 
-/* 2) ≤${breakpointPx}px：默认隐身（保留指针命中），hover / 键盘 focus 浮现为浮层面板。 */
+/* 2) ≤${breakpointPx}px：默认隐身（保留指针命中），hover / 键盘 focus 淡入浮现。
+ *    只做 opacity，不加载框 / 底色 / 阴影——与官方宽屏轨道形态一致（owner 实测拍板）。 */
 @container (max-width: ${breakpointPx}px) {
   ${navs} {
     opacity: 0;
     box-sizing: border-box;
-    background: var(--dsw-alias-bg-layer-1);
-    border: 1px solid var(--dsw-alias-border-l2);
-    border-radius: 8px;
-    box-shadow: var(--dsw-shadow-lv2);
     /* 与官方 .frame 的高度过渡并列：覆盖 transition 简写会吃掉官方的高度动画。 */
     transition: opacity ${OPACITY_TRANSITION_MS}ms ease-out, ${NATIVE_HEIGHT_TRANSITION};
   }
