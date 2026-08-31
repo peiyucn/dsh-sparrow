@@ -245,12 +245,12 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       const url = new URL(req.url ?? '/', 'http://localhost')
       const session = ctx.sessions.get(SessionId(url.searchParams.get('sessionId') ?? ''))
       if (session === undefined) {
-        sendJson(res, 200, { available: false })
+        sendJson(res, 200, { available: false, visionModel: settings.visionModel })
         return
       }
       const main = mainRouteFromSession(session.events)
       if (!isDeepseekMainRoute(main)) {
-        sendJson(res, 200, { available: false })
+        sendJson(res, 200, { available: false, visionModel: settings.visionModel })
         return
       }
       // 原生视觉主模型：图片直达主模型，无需视觉通道（与工具屏蔽逻辑一致）。
@@ -263,7 +263,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
           nativeVision = false // 能力解析失败：保守按文本模型处理（与工具执行侧一致）。
         }
       }
-      sendJson(res, 200, { available: !nativeVision })
+      sendJson(res, 200, { available: !nativeVision, visionModel: settings.visionModel })
     },
   }), 'dsh-vision-access: status route')
 }

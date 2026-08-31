@@ -1,22 +1,26 @@
 /**
- * dsh-vision-access client half：模型选择器旁的状态图标（当前会话可跨模型读图时点亮）。
- * 纯指示、无交互、无持久状态；可用性判定全在 host（GET /api/vision-access/status）。
+ * dsh-vision-access client half：模型选择器旁的状态图标（非视觉模型才显示，点击弹说明）。
+ * 无持久状态；可用性判定与视觉模型 id 全在 host（GET /api/vision-access/status）。
  */
 
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import { VisionStatusIcon } from './VisionStatusIcon.js'
+import { ensureVisionStyles, VisionStatusIcon } from './VisionStatusIcon.js'
 
 export const inject = ['slots', 'locale']
 
 /** 本插件的 locale 字典（zh/en）。 */
 const LOCALE_DICTS = {
   zh: {
-    'icon.hint': '当前模型不支持看图：贴图后直接询问，自动经视觉模型读图',
+    'icon.label': '视觉',
+    'popover.title': '可跨模型读图',
+    'popover.body': '直接发送图片即可：dsh-vision-access 会自动把图片交给 {model} 处理，主模型保持对话大脑。',
   },
   en: {
-    'icon.hint': 'This model cannot see images: paste one and ask — it is read by the vision model automatically',
+    'icon.label': 'Vision',
+    'popover.title': 'Cross-model image reading',
+    'popover.body': 'Just send an image: dsh-vision-access sends it to {model} automatically, while the main model stays the brain of the conversation.',
   },
 } as const
 
@@ -25,6 +29,8 @@ const LOCALE_DICTS = {
  * @param ctx - 浏览器侧 Cordis 上下文。
  */
 export function apply(ctx: ClientContext): void {
+  const styles = ensureVisionStyles()
+  ctx.effect(() => () => { styles.remove() }, 'dsh-vision-access: styles')
   const disposeDictionaries = ctx.locale.register('vision-access', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
   ctx.effect(() => disposeDictionaries, 'dsh-vision-access: locale dictionaries')
 
@@ -34,15 +40,15 @@ export function apply(ctx: ClientContext): void {
     order: 20,
     locale: 'vision-access',
     inject: () => ({
-      isAvailable: async (id: SessionId): Promise<boolean> => {
+      queryStatus: async (id: SessionId): Promise<{ available: boolean; visionModel: string }> => {
         const response = await fetch(`/api/vision-access/status?sessionId=${encodeURIComponent(String(id))}`)
-        if (!response.ok) return false
-        const payload = await response.json() as { available?: boolean }
-        return payload.available === true
+        if (!response.ok) return { available: false, visionModel: '' }
+        const payload = await response.json() as { available?: boolean; visionModel?: string }
+        return { available: payload.available === true, visionModel: payload.visionModel ?? '' }
       },
     }),
   }, VisionStatusIcon))
 }
 
-export { VisionStatusIcon } from './VisionStatusIcon.js'
-export type { VisionStatusInjected, VisionStatusProps } from './VisionStatusIcon.js'
+export { ensureVisionStyles, VisionStatusIcon } from './VisionStatusIcon.js'
+export type { VisionStatusInjected, VisionStatusProps, VisionStatusResult } from './VisionStatusIcon.js'
