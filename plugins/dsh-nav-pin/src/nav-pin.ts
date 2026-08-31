@@ -13,7 +13,7 @@ export const OPACITY_TRANSITION_MS = 120
 const NATIVE_HEIGHT_TRANSITION = 'height 220ms cubic-bezier(0.2, 0.8, 0.2, 1)'
 
 /** 会话内容每侧最小留白（官方为 88px）：钳制拖宽上限，右侧拖拽条不再挤占轮次导航命中区。 */
-export const CONTENT_MAX_SIDE_CLEARANCE_PX = 130
+export const CONTENT_MAX_SIDE_CLEARANCE_PX = 140
 
 /**
  * 轮次导航 slot 定位选择器：对话滚动体（公开 DOM 标记）内、轮次导航 nav 的直接父元素。
@@ -74,7 +74,7 @@ ${slots} {
 
 /* 3) 会话内容最大宽度钳制：官方拖宽上限每侧留 88px（CONTENT_EDGE_BUDGET 176 / 2），
  *    右侧拖拽条（z-index 8）会压到轮次导航命中区（轨道 28px + 本插件 ::before 16px ≈ 右缘 56px）。
- *    每侧留白收紧到 130px：拖拽条外缘停在导航命中区之外；窄列（cap 低于 680px 地板）与官方行为一致。
+ *    每侧留白收紧到 140px：拖拽条外缘停在导航命中区之外；窄列（cap 低于 680px 地板）与官方行为一致。
  *    官方宽度值先捕获到 [data-phase] 根上的 --dsh-nav-pin-official-width（自定义属性自引用会成环失效），
  *    再在滚动体 / 拖拽条上 min() 钳制；卡片宽度公式（内容宽 + 32px，InputBar 消费）同步重算。 */
 [data-phase] {
