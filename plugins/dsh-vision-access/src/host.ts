@@ -53,8 +53,9 @@ const VISION_REPORT_OUTPUT_SCHEMA = {
 
 /**
  * 读「当前选择的模型」：优先会话投影的 modelSelection（选择器一切换就写入 model/selection，
- * 未发送也能拿到），回退最近一次 request/header。判定图标显示用——不能只看最后请求，
- * 否则切换选择器后、发送前会读到旧模型（2026-08-30 实测反馈）。
+ * 未发送也能拿到），回退最近一次 request/header，再回退共享默认模型
+ * （`agentDefaultModel.currentSelection()`，与 composer 模型座位同源——新会话尚无任何
+ * 选择/请求记录时座位显示的就是它，图标判定必须一致，否则新会话页眼睛图标会消失）。
  */
 function currentMainModel(ctx: Context, session: Session): { provider: string; model: string } | undefined {
   const projections = ctx.get('sessionProjections') as {
@@ -69,7 +70,20 @@ function currentMainModel(ctx: Context, session: Session): { provider: string; m
   } catch {
     // 投影未注册 / 读取失败：回退请求头。
   }
-  return mainRouteFromSession(session.events)
+  const fromEvents = mainRouteFromSession(session.events)
+  if (fromEvents !== undefined) return fromEvents
+  try {
+    const defaultModel = ctx.get('agentDefaultModel') as {
+      currentSelection?: () => { provider: string; model: string } | undefined
+    } | undefined
+    const selected = defaultModel?.currentSelection?.()
+    if (selected !== undefined && typeof selected.provider === 'string' && typeof selected.model === 'string') {
+      return { provider: selected.provider, model: selected.model }
+    }
+  } catch {
+    // 服务缺失（旧版 dsh）：保持无信息，图标隐藏。
+  }
+  return undefined
 }
 
 /**
@@ -271,7 +285,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         return
       }
       const main = currentMainModel(ctx, session)
-      // 无模型信息（新会话未选择）：不显示。
+      // 无模型信息且无共享默认模型（新会话、部署未配默认）：不显示。
       if (main === undefined) {
         none()
         return
