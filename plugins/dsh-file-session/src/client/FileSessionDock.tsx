@@ -192,10 +192,11 @@ export function ensureFileSessionStyles(): void {
   justify-content: flex-end;
   gap: 8px;
 }
-/* 用量/进度条固定区：面板头下方、不随列表滚动；左右 24px 与下方区块卡线框齐平。 */
+/* 用量/进度条固定区：面板头下方、不随列表滚动；左侧 24px 与区块卡线框齐平，
+   右侧额外让出滚动条宽度（列表区 scrollbar-gutter: stable 固定占位 8px）。 */
 .dsh-file-session-summary {
   flex: none;
-  padding: 12px 24px 8px;
+  padding: 12px calc(24px + var(--dsh-scrollbar-width, 8px)) 8px 24px;
 }
 .dsh-file-session-count {
   margin: 6px 0 0;
@@ -217,8 +218,8 @@ export function ensureFileSessionStyles(): void {
    容量文字绝对定位居中叠加在条上。 */
 .dsh-file-session-quota-track {
   position: relative;
-  height: 14px;
-  border-radius: 7px;
+  height: 16px;
+  border-radius: 8px;
   background-color: var(--dsw-alias-interactive-bg-hover);
   background-image: repeating-linear-gradient(
     45deg,
@@ -237,7 +238,7 @@ export function ensureFileSessionStyles(): void {
   align-items: center;
   justify-content: center;
   font-size: 11px;
-  line-height: 14px;
+  line-height: 16px;
   white-space: nowrap;
   color: var(--dsw-alias-label-primary, #1f2329);
   /* 高用量时蓝填充垫底，加一圈底色光晕保证可读。 */
@@ -285,6 +286,8 @@ const styles = {
     flex: 1,
     minHeight: 0,
     overflow: 'auto',
+    // 滚动条固定占位：卡片右缘不因滚动条出现/消失而左右漂移（与顶部进度条对齐）。
+    scrollbarGutter: 'stable',
     padding: '0 24px 24px',
   } satisfies CSSProperties,
   row: {
