@@ -33,6 +33,10 @@ Requires dsh ≥ 0.1.2-alpha.3 (verified baseline; earlier versions unverified) 
 * **Where files come from**: DSH auto-uploads to the Files API only on the **DeepSeek model path** (the upload lives in the llm-deepseek adapter layer); with other models the list mostly shows files you or external tools uploaded
 * **Expiry**: DSH auto-uploads files with a default **7-day** expiry (the official API has no permanent option); expired files are transparently re-uploaded on next use — tune `fileExpiresAfterSeconds` (1h–30d) in the `llm-deepseek` settings section
 
+## Screenshot
+
+![Cloud Files panel](docs/images/panel.png)
+
 ## Uninstall & leftovers
 
 * The plugin keeps no local state; uninstalling leaves the cloud files untouched and DSH behavior unchanged

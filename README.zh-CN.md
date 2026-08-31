@@ -58,6 +58,8 @@ dsh plugin --profile web add @dsh-sparrow/dsh-archive-session
 
 > 纯样式注入：无开关、无按钮、无设置、无持久化状态；卸载即恢复官方行为。
 
+![轮次导航 hover 浮层](resources/dsh-nav-pin.png)
+
 文档：[dsh-nav-pin README](plugins/dsh-nav-pin/README.zh-CN.md)
 
 ```bash
@@ -69,6 +71,8 @@ dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin
 DeepSeek Files API 云端文件管理。侧边栏「云端文件」入口列出你 API key 下的全部云端文件：游标翻页、大小 / 上传 / 到期时间、单条删除与一键复制 file_id。复用官方 DeepSeekFilesClient，不新增凭据。
 
 > 官方无批量删除端点（不做「全部清理」）、无下载端点（不预览内容）；配额 10000 个 / 25 GiB 为官方限制。
+
+![云端文件面板](resources/dsh-file-session.png)
 
 文档：[dsh-file-session README](plugins/dsh-file-session/README.zh-CN.md)
 

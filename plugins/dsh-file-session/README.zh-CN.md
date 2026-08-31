@@ -33,6 +33,10 @@ dsh plugin --profile web add @dsh-sparrow/dsh-file-session
 * **文件来源**：云端文件只在 **DeepSeek 系列模型**路径下由 DSH 自动上传（上传发生在 llm-deepseek 适配器层）；使用其它模型时列表主要为你手动 / 外部工具上传的文件
 * **有效期**：DSH 自动上传的文件默认 **7 天**有效期（官方无「永久」选项）；到期后再次引用会自动重新上传，可在 `llm-deepseek` 设置节的 `fileExpiresAfterSeconds`（1 小时–30 天）调整
 
+## 截图
+
+![云端文件面板](docs/images/panel.png)
+
 ## 卸载与残留
 
 * 插件无任何本地持久化状态；卸载后云端文件原样保留，DSH 行为不受影响

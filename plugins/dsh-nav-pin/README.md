@@ -25,6 +25,10 @@ Requires dsh ≥ 0.1.2-alpha.3 (verified baseline; earlier versions unverified) 
 * **Note**: the official rail only renders from the second turn on — a single-turn session has no rail to pin, and this plugin does not change that threshold
 * Uninstalling restores the official 900px behavior; no persisted state, no leftovers
 
+## Screenshot
+
+![Turn rail hover reveal](docs/images/rail.png)
+
 ## Uninstall & leftovers
 
 * The plugin writes no files and touches no `.dsh` internals; its only action is injecting one stylesheet, removed together with the plugin lifecycle
