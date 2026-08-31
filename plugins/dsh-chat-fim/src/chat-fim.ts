@@ -221,7 +221,7 @@ export interface HistoryTurn {
   readonly text: string
 }
 
-/** 取最近对话历史文本（倒序遍历、非空才计数、按条数与字符数裁剪；与 buildFimPrompt 同一窗口规则）。 */
+/** 取最近对话历史文本（倒序遍历、非空才计数、按条数与字符数裁剪；与 buildPrefixMessages 同一窗口规则）。 */
 export function recentHistoryTurns(
   history: readonly unknown[],
   maxMessages = MAX_HISTORY_MESSAGES,
@@ -240,22 +240,30 @@ export function recentHistoryTurns(
   return recent
 }
 
+/** 对话前缀续写请求里的一条消息；prefix 只允许出现在最后一条 assistant 消息。 */
+export interface PrefixMessage {
+  readonly role: 'user' | 'assistant'
+  readonly content: string
+  readonly prefix?: true
+}
+
 /**
- * 构造 FIM 补全 prompt：最近对话历史转成说话人文本（zh「用户：/助手：」、en「User:/Assistant:」），
- * 草稿作为最后一个用户说话人的开头。FIM 直接续写文本本身，没有角色语义，补全天然站在
- * 用户角度；stop 序列（见 fimStopSequences）防止模型接着写下一位说话人。
+ * 构造「对话前缀续写（Beta）」请求的 messages（2026-08-30 深夜从 FIM 切回，实测依据见 AGENTS.md）：
+ * 最近对话历史按原生角色进 messages，最后一条 assistant 消息以「用户：草稿」为前缀并标 prefix: true。
+ * 官方 prefix 机制强制模型续写这条消息，前缀写成用户说话人开头即可拿到用户口吻——
+ * 实测新会话草稿 plea → 输出 ase（补成 please）；而 FIM 纯文本续写无角色语义，同构造被模型以「助手：」口吻回复。
  */
-export function buildFimPrompt(
+export function buildPrefixMessages(
   history: readonly unknown[],
   draft: string,
   language: FimLanguage = 'zh',
   maxMessages = MAX_HISTORY_MESSAGES,
   maxChars = MAX_HISTORY_CHARS,
-): string {
-  const transcript = recentHistoryTurns(history, maxMessages, maxChars)
-    .map(entry => `${speakerText(language, entry.role)}${entry.text}`)
-    .join('\n')
-  return `${transcript === '' ? '' : `${transcript}\n\n`}${speakerText(language, 'user')}${draft}`
+): PrefixMessage[] {
+  const messages: PrefixMessage[] = recentHistoryTurns(history, maxMessages, maxChars)
+    .map(turn => ({ role: turn.role, content: turn.text }))
+  messages.push({ role: 'assistant', content: `${speakerText(language, 'user')}${draft}`, prefix: true })
+  return messages
 }
 
 /**
@@ -307,18 +315,18 @@ export function isHistoryEcho(suggestion: string, historyTexts: readonly string[
 /** 把上游 HTTP 状态映射为插件错误码。 */
 export function upstreamStatusToError(status: number, bodyText: string): ChatFimError {
   if (status === 401 || status === 403) {
-    return { code: 'MISSING_CREDENTIAL', message: 'DeepSeek API 凭据无效或无权访问 FIM 补全 Beta' }
+    return { code: 'MISSING_CREDENTIAL', message: 'DeepSeek API 凭据无效或无权访问续写接口（Beta）' }
   }
   if (status === 408 || status === 504) {
-    return { code: 'TIMEOUT', message: 'DeepSeek FIM 补全上游超时' }
+    return { code: 'TIMEOUT', message: 'DeepSeek 续写上游超时' }
   }
   if (status === 429) {
-    return { code: 'RATE_LIMITED', message: 'DeepSeek FIM 补全上游限流，请稍后重试' }
+    return { code: 'RATE_LIMITED', message: 'DeepSeek 续写上游限流，请稍后重试' }
   }
   const detail = summarizeUpstreamBody(bodyText)
   return {
     code: 'UPSTREAM_ERROR',
-    message: detail === '' ? `DeepSeek FIM 补全上游返回 HTTP ${status}` : `DeepSeek FIM 补全上游错误：${detail}`,
+    message: detail === '' ? `DeepSeek 续写上游返回 HTTP ${status}` : `DeepSeek 续写上游错误：${detail}`,
   }
 }
 
@@ -360,7 +368,7 @@ export function normalizeFimModelMode(value: unknown): FimModelMode {
 }
 
 /**
- * 补全模型解析（三档，见 docs/spec/04-model-choice.md）：
+ * 补全模型解析（三档，见 docs/spec/04-sensitivity.md）：
  * pro/flash 恒用对应模型；auto 跟随官方主模型（pro/flash），vision / 未知回退配置默认。
  */
 export function resolveFimModel(mode: FimModelMode, main: { provider: string; model: string } | undefined, configuredModel: string): string {

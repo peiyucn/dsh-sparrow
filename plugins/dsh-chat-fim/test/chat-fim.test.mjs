@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  buildFimPrompt, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, fimStopSequences, formatTokenCount,
-  hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession, normalizeConfig,
-  normalizeFimModelMode, normalizeFimSensitivity, parseCompleteBody, recentHistoryTurns, resolveFimModel,
-  shouldTriggerFim, cleanSuggestion, summarizeUpstreamBody, upstreamStatusToError, validateCompletePayload,
+  buildPrefixMessages, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, fimStopSequences,
+  formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
+  normalizeConfig, normalizeFimModelMode, normalizeFimSensitivity, parseCompleteBody, recentHistoryTurns,
+  resolveFimModel, shouldTriggerFim, cleanSuggestion, summarizeUpstreamBody, upstreamStatusToError,
+  validateCompletePayload,
 } from '../lib/chat-fim.js'
 
 describe('chat-fim 纯逻辑', () => {
@@ -83,27 +84,32 @@ describe('chat-fim 纯逻辑', () => {
     })
   })
 
-  describe('buildFimPrompt', () => {
-    it('空历史 应该 只输出「用户：草稿」', () => {
-      assert.equal(buildFimPrompt([], '我觉得这个功能'), '用户：我觉得这个功能')
+  describe('buildPrefixMessages', () => {
+    it('空历史 应该 只有一条以「用户：草稿」为前缀的 assistant 消息', () => {
+      assert.deepEqual(buildPrefixMessages([], '我觉得这个功能'), [
+        { role: 'assistant', content: '用户：我觉得这个功能', prefix: true },
+      ])
     })
 
-    it('带最近对话历史 应该 转成说话人文本，草稿在最后', () => {
+    it('带最近对话历史 应该 原生角色进 messages、前缀消息在最后', () => {
       const history = [
         { role: 'user', content: [{ type: 'text', text: '帮我写周报' }] },
         { role: 'assistant', content: [{ type: 'text', text: '好的，本周完成了……' }] },
       ]
-      const prompt = buildFimPrompt(history, '下周计划是')
-      assert.match(prompt, /^用户：帮我写周报\n助手：好的，本周完成了……\n\n用户：下周计划是$/u)
+      assert.deepEqual(buildPrefixMessages(history, '下周计划是'), [
+        { role: 'user', content: '帮我写周报' },
+        { role: 'assistant', content: '好的，本周完成了……' },
+        { role: 'assistant', content: '用户：下周计划是', prefix: true },
+      ])
     })
 
-    it('英文语言 应该 使用 User:/Assistant: 说话人标记', () => {
+    it('英文语言 应该 使用 User: 前缀', () => {
       const history = [
         { role: 'user', content: [{ type: 'text', text: 'Review this change' }] },
         { role: 'assistant', content: [{ type: 'text', text: 'Looks good overall.' }] },
       ]
-      const prompt = buildFimPrompt(history, 'Next iteration I want', 'en')
-      assert.equal(prompt, 'User: Review this change\nAssistant: Looks good overall.\n\nUser: Next iteration I want')
+      const messages = buildPrefixMessages(history, 'Next iteration I want', 'en')
+      assert.deepEqual(messages[messages.length - 1], { role: 'assistant', content: 'User: Next iteration I want', prefix: true })
     })
 
     it('历史裁剪 应该 受 maxMessages/maxChars 限制', () => {
@@ -112,9 +118,12 @@ describe('chat-fim 纯逻辑', () => {
         { role: 'user', content: [{ type: 'text', text: '第二条' }] },
         { role: 'user', content: [{ type: 'text', text: '第三条' }] },
       ]
-      const prompt = buildFimPrompt(history, '草稿', 'zh', 2, 1000)
-      assert.doesNotMatch(prompt, /第一条/u)
-      assert.match(prompt, /用户：第二条\n用户：第三条\n\n用户：草稿$/u)
+      const messages = buildPrefixMessages(history, '草稿', 'zh', 2, 1000)
+      assert.deepEqual(messages, [
+        { role: 'user', content: '第二条' },
+        { role: 'user', content: '第三条' },
+        { role: 'assistant', content: '用户：草稿', prefix: true },
+      ])
     })
   })
 

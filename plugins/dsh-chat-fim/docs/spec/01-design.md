@@ -31,7 +31,7 @@
 * 只受理 `POST /api/chat-fim/complete`，其余 404；
 * 校验：`sessionId` 命中 sessions 服务（否则 403/503）、`prompt` 非空且 ≤ `MAX_PROMPT_CHARS`（拟定 32k，否则 400）、请求体 ≤ `MAX_BODY_BYTES`（64 KB）；
 * 凭据：`ctx.credentials.resolve('DEEPSEEK_API_KEY')`，缺失 401；
-* 转发：`POST {baseURL}/completions`（FIM 补全 Beta），body `{ model, prompt, max_tokens, stop, temperature }`；`prompt` 由最近对话历史转成的「用户：/助手：」说话人文本 + 草稿（最后一个「用户：」开头）构造（见 `buildFimPrompt`）；FIM 直接续写文本本身、没有角色语义，天然站在用户角度；`stop` 序列 `\n用户：` / `\n助手：` 防止模型续写下一位说话人；
+* 转发：`POST {baseURL}/chat/completions`（对话前缀续写 Beta），body `{ model, messages, max_tokens, stop, temperature }`；`messages` 由最近对话历史（原生 user/assistant 角色）+ 最后一条以「用户：草稿」为前缀的 assistant 消息（`prefix: true`）构造（见 `buildPrefixMessages`）——官方 prefix 机制强制模型续写这条消息，实测用户口吻稳定（新会话 plea → ase）；`stop` 序列 `\n用户：` / `\n助手：` 兜底（实测 API stop 时灵时不灵，客户端另按标记截断 + 角色切换丢弃，见 `cleanSuggestion`）；
 * 补全模型（2026-08-30）：**跟随主模型**（`resolveFimModel`）——主模型为 deepseek-official 的 v4-pro/v4-flash 时用主模型补全（计费随之），vision-exp / 未知 / 非官方回退配置默认 `model`；依据：官方 API schema 只列 v4-pro，但直连实测 flash 亦可（见 README 实测记录）；
 * 多建议：FIM 接口无 `n` 参数，按 `suggestionCount`（默认 1）并行请求、温度错开采样（base + index×0.4，封顶 2）；`allSettled` 部分失败保留成功建议；
 * 采样：`temperature` 默认 **0.3**（2026-08-30 A/B 实测：1.0 漂移明显、会复读最近一条用户消息，0.3 聚焦稳定；上游已废弃 frequency/presence penalty，不可用）；
@@ -51,7 +51,7 @@
 
 * **触发**：草稿变更后停顿 ≥ 400ms（客户端常量 `PAUSE_MS`，非插件配置），且**草稿形态门控通过**（`shouldTriggerFim`，2026-08-30 实测驱动，同日晚改为**按草稿内容自适应的通用规则**——不做 zh/en 硬切换，各语言体验一致）：
   * trim 后达到最短长度：含 CJK 字符的草稿 ≥ `MIN_TRIGGER_DRAFT_CHARS`（8 字符）；纯拉丁草稿 ≥ `MIN_TRIGGER_DRAFT_CHARS_LATIN`（3 字符，按词计），上下文过短不触发；
-  * 末尾非句末标点（`。！？.!?;；`）——句末已完整，FIM 会续出新一句而不是接话（实测：草稿「还有个问题，fim接口是计费的么？」被续成「claude code好像没有fim呢…」，衔接不上）；
+  * 末尾非句末标点（`。！？.!?;；`）——句末已完整，模型会续出新一句而不是接话（实测：草稿「还有个问题，fim接口是计费的么？」被续成「claude code好像没有fim呢…」，衔接不上）；
   * 尾随空格一律放行：英文词后空格、中文空格分词习惯下，空格后正是预测下一段文字的位置；
   * 含 CJK 的草稿若正停在夹入的英文单词中间（末尾两字符都是 `[A-Za-z0-9]`）不触发（续半词质量差）；其余形态——含纯拉丁单词中间——都触发；
 * **不触发**：IME 组合态（compositionstart/end 之间）、已有建议在飞、形态门控未过；

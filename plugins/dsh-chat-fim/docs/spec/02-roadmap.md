@@ -10,6 +10,7 @@
 * [x] 单测：请求校验 / 错误映射 / 请求体解析
 * [x] `npm run verify` 全绿（`dev.patch.yml` 热更验证待做）
 * [x] 切换 FIM 补全：`/completions` + 说话人文本 prompt + stop 序列 + 并行多建议（A/B 实测见 README）
+* [x] 切回对话前缀续写：`/chat/completions` + 原生历史消息 + prefix: true（A/B 实测：短拉丁草稿 plea 在 FIM 下被「助手：」口吻回复，前缀机制下补成 please）
 
 ## M2 · client half（dock 建议条）
 
@@ -27,7 +28,7 @@
 * [x] 删除幽灵文本 portal / caret 测量 / fallback 胶囊；i18n 复用菜单文案；verify 全绿（实机验收待用户验证）
 * [x] 菜单紫色边框（同开关 on 态）+ 行尾 Tab/Esc 键位提示；开关改版（图标 + Suggest 删除线，@container 460px 折叠为纯图标）
 * [x] 触发形态门控 `shouldTriggerFim`（句末/单词中间/尾随空白/过短不触发）
-* [x] 续写模型三档可选（自动/Pro/Flash，见 04-model-choice.md）+ 菜单用量展示（token 数 + 实际模型）
+* [x] 续写模型三档可选（自动/Pro/Flash，见 04-sensitivity.md）+ 菜单用量展示（token 数 + 实际模型）
 
 ## M4 · 打磨（可选）
 

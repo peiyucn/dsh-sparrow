@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 Chat input suggestions — a DeepSeek Harness (DSH) Web plugin (part of the dsh-sparrow collection).
 
-After a short typing pause, a suggestion card styled like the official @ menu appears above the input — **Tab** adopts the text, **Esc** dismisses it. Powered by DeepSeek FIM completion (Beta); the continuation picks up in your own voice.
+After a short typing pause, a suggestion card styled like the official @ menu appears above the input — **Tab** adopts the text, **Esc** dismisses it. Powered by DeepSeek Chat Prefix Completion (Beta); the continuation picks up in your own voice.
 
 ## Install
 
@@ -28,7 +28,7 @@ Requires dsh ≥ 0.1.1-rc.2.
   | Low | 800ms | CJK 12 / Latin 5 chars | no | no | no |
 
 * The whole switch is hidden when the current session's main model is not a DeepSeek model
-* **Credentials**: Requests reuse the DeepSeek API key configured in dsh (FIM completion Beta) — no extra credentials, the key never reaches the browser; token usage bills to your DeepSeek account
+* **Credentials**: Requests reuse the DeepSeek API key configured in dsh (Chat Prefix Completion Beta) — no extra credentials, the key never reaches the browser; token usage bills to your DeepSeek account
 
 ## Screenshots
 

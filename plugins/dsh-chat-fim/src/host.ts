@@ -1,4 +1,4 @@
-/** dsh-chat-fim host half：POST /api/chat-fim/complete，转发 DeepSeek FIM 补全（Beta）。 */
+/** dsh-chat-fim host half：POST /api/chat-fim/complete，转发 DeepSeek 对话前缀续写（Beta）。 */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
@@ -8,10 +8,10 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
-  buildFimPrompt, cleanSuggestion, extractSuggestions, extractUsage, fimStopSequences, hasDegenerateRepeat,
-  isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession, MAX_UPSTREAM_BODY_BYTES,
-  normalizeConfig, parseCompleteBody, recentHistoryTurns, resolveFimModel, summarizeUpstreamBody,
-  upstreamStatusToError, type ChatFimConfig, type ChatFimError, type CompleteRequest,
+  buildPrefixMessages, cleanSuggestion, extractSuggestions, extractUsage, fimStopSequences,
+  hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
+  MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns, resolveFimModel,
+  summarizeUpstreamBody, upstreamStatusToError, type ChatFimConfig, type ChatFimError, type CompleteRequest,
 } from './chat-fim.js'
 
 export type { CompleteRequest } from './chat-fim.js'
@@ -181,7 +181,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
 
       const language = parsed.locale === 'en' ? 'en' : 'zh'
       const history = session.deriveMessages() as readonly unknown[]
-      const prompt = buildFimPrompt(history, parsed.prompt, language)
+      // 对话前缀续写请求体：原生历史消息 + 以「用户：草稿」为前缀的 assistant 消息（prefix: true）。
+      const messages = buildPrefixMessages(history, parsed.prompt, language)
       // 回声判定只用「用户」历史消息：模型复读用户刚说的话是退化（实测），
       // 而续写里引用助手的措辞是正常对话，不判回声。
       const historyEchoTexts = recentHistoryTurns(history)
@@ -194,7 +195,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
       try {
         /** 单次上游补全请求；成功返回候选/用量，失败抛 ChatFimError。 */
         const requestOnce = async (temperature: number) => {
-          const upstream = await fetch(`${settings.baseURL.replace(/\/$/u, '')}/completions`, {
+          const upstream = await fetch(`${settings.baseURL.replace(/\/$/u, '')}/chat/completions`, {
             method: 'POST',
             headers: {
               authorization: `Bearer ${credential.value}`,
@@ -202,7 +203,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
             },
             body: JSON.stringify({
               model: fimModel,
-              prompt,
+              messages,
               max_tokens: settings.maxTokens,
               stop,
               temperature,
@@ -217,7 +218,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
           try {
             data = JSON.parse(upstreamText)
           } catch {
-            throw { code: 'UPSTREAM_ERROR', message: 'DeepSeek FIM 上游返回了非法 JSON' } satisfies ChatFimError
+            throw { code: 'UPSTREAM_ERROR', message: 'DeepSeek 续写上游返回了非法 JSON' } satisfies ChatFimError
           }
           return { suggestions: extractSuggestions(data), usage: extractUsage(data), temperature }
         }

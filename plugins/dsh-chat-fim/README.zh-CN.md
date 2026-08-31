@@ -4,7 +4,7 @@
 
 聊天输入框续写联想 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
 
-打字停顿片刻，输入框上方会以官方 @ 候选菜单同款悬浮卡给出「接下来可能写的文字」建议：**Tab** 采用进草稿，**Esc** 丢弃。补全由 DeepSeek 官方 FIM 补全（Beta）驱动，续写直接站在你的角度接话。
+打字停顿片刻，输入框上方会以官方 @ 候选菜单同款悬浮卡给出「接下来可能写的文字」建议：**Tab** 采用进草稿，**Esc** 丢弃。补全由 DeepSeek 官方对话前缀续写（Beta）驱动，续写直接站在你的角度接话。
 
 ## 安装
 
@@ -28,7 +28,7 @@ dsh plugin --profile web add dsh-chat-fim
   | 低 | 800ms | 中文 12 字 / 英文 5 字符 | 不联想 | 不联想 | 不联想 |
 
 * 当前会话主模型不是 DeepSeek 系列时，开关整体隐藏
-* **凭据**：续写请求复用你在 dsh 中配置的 DeepSeek API key（FIM 补全 Beta），不新增凭据、key 不进浏览器；产生的 token 计入你的 DeepSeek 账户
+* **凭据**：续写请求复用你在 dsh 中配置的 DeepSeek API key（对话前缀续写 Beta），不新增凭据、key 不进浏览器；产生的 token 计入你的 DeepSeek 账户
 
 ## 截图
 
