@@ -311,8 +311,12 @@ describe('chat-fim 纯逻辑', () => {
       assert.deepEqual(shouldTriggerFim('Let me fix it.'), { ok: false, reason: 'sentence-end' })
     })
 
-    it('尾随空格 应该 不触发（trailing-space）', () => {
-      assert.deepEqual(shouldTriggerFim('我觉得这个方案还 '), { ok: false, reason: 'trailing-space' })
+    it('中文尾随空格 应该 触发（空格分词续写）', () => {
+      assert.deepEqual(shouldTriggerFim('我觉得这个方案还 '), { ok: true })
+    })
+
+    it('中文句号后跟空格 应该 不触发（sentence-end）', () => {
+      assert.deepEqual(shouldTriggerFim('这个方案已经写完了。 '), { ok: false, reason: 'sentence-end' })
     })
 
     it('中文夹英文单词停在一半 应该 不触发（mid-word）', () => {
@@ -329,6 +333,14 @@ describe('chat-fim 纯逻辑', () => {
 
     it('纯英文 2 字符 应该 不触发（too-short）', () => {
       assert.deepEqual(shouldTriggerFim('He'), { ok: false, reason: 'too-short' })
+    })
+
+    it('纯英文尾随空格 应该 触发（预测下一个词）', () => {
+      assert.deepEqual(shouldTriggerFim('Let me fix the '), { ok: true })
+    })
+
+    it('纯英文句号后跟空格 应该 不触发（sentence-end）', () => {
+      assert.deepEqual(shouldTriggerFim('Let me fix it. '), { ok: false, reason: 'sentence-end' })
     })
 
     it('中文未完成句 应该 触发', () => {

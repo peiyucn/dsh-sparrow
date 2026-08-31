@@ -337,13 +337,14 @@ const CJK_CHARS = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/u
 
 export type FimTriggerDecision =
   | { readonly ok: true }
-  | { readonly ok: false; readonly reason: 'empty' | 'too-short' | 'sentence-end' | 'mid-word' | 'trailing-space' }
+  | { readonly ok: false; readonly reason: 'empty' | 'too-short' | 'sentence-end' | 'mid-word' }
 
 /**
  * 依据草稿形态决定是否发起联想请求（2026-08-30 实测驱动，同日晚改为内容自适应通用规则）：
- * 句末标点 / 尾随空白都不触发，避免建议太频繁且续出「新一句话」。
- * 「停在英文单词中间」仅对含 CJK 的草稿生效：中文里夹英文单词，续一半词质量差；
- * 纯拉丁草稿（英文等）打字停顿几乎总在单词中间，恰是最该补全的位置，放行——所有语言同一规则、按内容自适应。
+ * 句末标点不触发，避免建议续出「新一句话」。
+ * 尾随空格一律放行——英文词后空格、不用标点用空格分词的中文，空格后正是预测下一段文字的位置；
+ * 唯一按内容分化的规则：含 CJK 的草稿若正停在一半的夹入英文单词上（末尾两字符均为 ASCII 字母数字）
+ * 不触发（续半词质量差），其余形态都触发。所有语言同一规则、按内容自适应。
  */
 export function shouldTriggerFim(draft: string): FimTriggerDecision {
   const trimmed = draft.trim()
@@ -351,11 +352,12 @@ export function shouldTriggerFim(draft: string): FimTriggerDecision {
   const cjk = CJK_CHARS.test(trimmed)
   const minChars = cjk ? MIN_TRIGGER_DRAFT_CHARS : MIN_TRIGGER_DRAFT_CHARS_LATIN
   if (trimmed.length < minChars) return { ok: false, reason: 'too-short' }
-  // 尾随空白必须查原文末尾（trim 后看不到）：用户刚敲完空格/换行，正在输入。
-  const rawLast = draft[draft.length - 1] ?? ''
-  if (rawLast.trim() === '') return { ok: false, reason: 'trailing-space' }
   const last = trimmed[trimmed.length - 1] ?? ''
   if (SENTENCE_END_CHARS.includes(last)) return { ok: false, reason: 'sentence-end' }
+  // 尾随空格（词后/句间）：放行，两种语境都是续写点。
+  const rawLast = draft[draft.length - 1] ?? ''
+  if (rawLast.trim() === '') return { ok: true }
+  // 正停在一个字符上：CJK 草稿里夹入的英文单词续一半质量差，不触发。
   if (cjk) {
     const prev = trimmed[trimmed.length - 2] ?? ''
     if (/[A-Za-z0-9]/u.test(last) && /[A-Za-z0-9]/u.test(prev)) return { ok: false, reason: 'mid-word' }

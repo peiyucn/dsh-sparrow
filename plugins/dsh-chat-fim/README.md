@@ -17,7 +17,7 @@ Requires dsh ≥ 0.1.1-rc.2.
 ## Usage
 
 * **Switch**: A "✦ Suggest" pill in the input tool row toggles it; **off by default**, your choice is remembered locally
-* **Trigger**: Suggestions fire after ~0.4s of typing pause, with content-adaptive rules: for CJK drafts — not when shorter than 8 characters, ending with sentence punctuation (`。！？.!?;；`), ending with a space/newline, or stopping mid-way through an embedded English word; for pure Latin drafts — not when shorter than 3 characters, and mid-word pauses DO complete the current word; IME composition suppresses triggers regardless
+* **Trigger**: Suggestions fire after ~0.4s of typing pause, with content-adaptive rules: no trigger when the draft is shorter than 8 characters (3 for pure Latin) or ends with sentence punctuation (`。！？.!?;；`); CJK drafts also skip when stopping mid-way through an embedded English word; **a trailing space always triggers** (next-word prediction for English, and for space-separated Chinese); IME composition suppresses triggers regardless
 * **Suggestion**: Tab adopts, Esc dismisses (clicking works too); the card yields while the official @/slash menu is open
 * **Model**: The ▾ next to the pill picks `auto` / `deepseek-v4-pro` / `deepseek-v4-flash` (default `auto` follows the main model); the card footer shows the token count, the model used, and the temperature
 * The whole switch is hidden when the current session's main model is not a DeepSeek model
