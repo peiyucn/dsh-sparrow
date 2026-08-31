@@ -24,7 +24,7 @@ Requires dsh ≥ 0.1.1-rc.2.
   | Level | Pause | Min draft | Embedded half-word | Trailing space | Sentence end |
   |---|---|---|---|---|---|
   | High | 250ms | CJK 4 / Latin 2 chars | suggests | suggests | suggests |
-  | Medium (default) | 400ms | CJK 8 / Latin 3 chars | no | suggests | no |
+  | Medium (default) | 400ms | CJK 8 / Latin 3 chars | suggests | suggests | no |
   | Low | 800ms | CJK 12 / Latin 5 chars | no | no | no |
 
 * The whole switch is hidden when the current session's main model is not a DeepSeek model

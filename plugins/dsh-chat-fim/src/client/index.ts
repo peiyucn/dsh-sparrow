@@ -40,8 +40,8 @@ const LOCALE_DICTS = {
     'sensitivity.standard': '中',
     'sensitivity.conservative': '低',
     'sensitivity.eager.rule': '250ms · 4/2 字 · 半词/句末也联想',
-    'sensitivity.standard.rule': '400ms · 8/3 字 · 夹入英文半词不联想',
-    'sensitivity.conservative.rule': '800ms · 12/5 字 · 词后空格不联想',
+    'sensitivity.standard.rule': '400ms · 8/3 字 · 句末标点不联想',
+    'sensitivity.conservative.rule': '800ms · 12/5 字 · 半词/空格不联想',
   },
   en: {
     'switch.label': 'Suggest',
@@ -58,8 +58,8 @@ const LOCALE_DICTS = {
     'sensitivity.standard': 'Medium',
     'sensitivity.conservative': 'Low',
     'sensitivity.eager.rule': '250ms · 4/2 chars · mid-word & sentence end',
-    'sensitivity.standard.rule': '400ms · 8/3 chars · no embedded half-words',
-    'sensitivity.conservative.rule': '800ms · 12/5 chars · no trailing space',
+    'sensitivity.standard.rule': '400ms · 8/3 chars · no sentence end',
+    'sensitivity.conservative.rule': '800ms · 12/5 chars · no half-words/space',
   },
 } as const
 

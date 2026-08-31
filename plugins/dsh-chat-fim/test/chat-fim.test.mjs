@@ -372,8 +372,12 @@ describe('chat-fim 纯逻辑', () => {
       })
     })
 
-    it('中文夹英文单词停在一半 应该 不触发（mid-word）', () => {
-      assert.deepEqual(shouldTriggerFim('这个 bug 出在 transf'), { ok: false, reason: 'mid-word' })
+    it('中灵敏：夹入英文停半词 应该 触发', () => {
+      assert.deepEqual(shouldTriggerFim('这个 bug 出在 transf', 'standard'), { ok: true })
+    })
+
+    it('低灵敏：夹入英文停半词 应该 不触发（mid-word）', () => {
+      assert.deepEqual(shouldTriggerFim('这个 bug 出在 transf', 'conservative'), { ok: false, reason: 'mid-word' })
     })
 
     it('纯英文停在单词中间 应该 触发（补全当前单词）', () => {

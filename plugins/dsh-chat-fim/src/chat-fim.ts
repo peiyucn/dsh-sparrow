@@ -346,8 +346,8 @@ export interface FimSensitivityParams {
   readonly minCharsCjk: number
   /** 纯拉丁草稿的最短长度。 */
   readonly minCharsLatin: number
-  /** 是否放行「夹在中文里的英文单词停一半」。 */
-  readonly allowCjkMidWord: boolean
+  /** 是否放行「停在一个拉丁单词中间」（仅 CJK 草稿中夹入的英文词受此约束；纯拉丁草稿始终放行）。 */
+  readonly allowLatinMidWord: boolean
   /** 是否放行尾随空格（词后预测下一个词 / 空格分词续写）。 */
   readonly allowTrailingSpace: boolean
   /** 是否放行句末标点结尾（高档「什么都想续」；中低档续新一句质量差，抑制）。 */
@@ -359,7 +359,7 @@ export const FIM_SENSITIVITIES: Record<FimSensitivity, FimSensitivityParams> = {
     pauseMs: 250,
     minCharsCjk: 4,
     minCharsLatin: 2,
-    allowCjkMidWord: true,
+    allowLatinMidWord: true,
     allowTrailingSpace: true,
     allowSentenceEnd: true,
   },
@@ -367,7 +367,7 @@ export const FIM_SENSITIVITIES: Record<FimSensitivity, FimSensitivityParams> = {
     pauseMs: 400,
     minCharsCjk: MIN_TRIGGER_DRAFT_CHARS,
     minCharsLatin: MIN_TRIGGER_DRAFT_CHARS_LATIN,
-    allowCjkMidWord: false,
+    allowLatinMidWord: true,
     allowTrailingSpace: true,
     allowSentenceEnd: false,
   },
@@ -375,7 +375,7 @@ export const FIM_SENSITIVITIES: Record<FimSensitivity, FimSensitivityParams> = {
     pauseMs: 800,
     minCharsCjk: 12,
     minCharsLatin: 5,
-    allowCjkMidWord: false,
+    allowLatinMidWord: false,
     allowTrailingSpace: false,
     allowSentenceEnd: false,
   },
@@ -411,8 +411,8 @@ export function shouldTriggerFim(draft: string, sensitivity: FimSensitivity = DE
   if (rawLast.trim() === '') {
     return params.allowTrailingSpace ? { ok: true } : { ok: false, reason: 'trailing-space' }
   }
-  // 正停在一个字符上：CJK 草稿里夹入的英文单词续一半质量差，按灵敏度决定是否抑制。
-  if (cjk && !params.allowCjkMidWord) {
+  // 正停在一个字符上：CJK 草稿里夹入的英文单词续一半质量差，仅低档抑制（高/中档放行）。
+  if (cjk && !params.allowLatinMidWord) {
     const prev = trimmed[trimmed.length - 2] ?? ''
     if (/[A-Za-z0-9]/u.test(last) && /[A-Za-z0-9]/u.test(prev)) return { ok: false, reason: 'mid-word' }
   }
