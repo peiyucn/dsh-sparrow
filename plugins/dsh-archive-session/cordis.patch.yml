@@ -2,6 +2,6 @@
 # backupRoot 是插件自己的备份夹，不动 dsh 会话根目录。
 - insert:
     - id: dsh-archive-session
-      name: dsh-archive-session
+      name: '@dsh-sparrow/dsh-archive-session'
       config:
         backupRoot: !!js dshHomePath('sessions-archived-backup')

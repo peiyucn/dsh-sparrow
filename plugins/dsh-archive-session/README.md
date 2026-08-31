@@ -9,7 +9,7 @@ Complements the built-in archive: DSH only hides archived sessions from the side
 ## Install
 
 ```bash
-dsh plugin --profile web add dsh-archive-session
+dsh plugin --profile web add @dsh-sparrow/dsh-archive-session
 ```
 
 Requires dsh ≥ 0.1.1-rc.2.
