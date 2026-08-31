@@ -1,6 +1,6 @@
 # dsh-vision-access
 
-[English](README.md)
+简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 纯文本主模型会话的图片视觉通道 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
 

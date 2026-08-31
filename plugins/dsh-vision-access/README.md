@@ -1,6 +1,6 @@
 # dsh-vision-access
 
-[简体中文](README.zh-CN.md)
+English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 An image-vision channel for text-only main models — a DeepSeek Harness (DSH) Web plugin (part of the dsh-sparrow collection).
 

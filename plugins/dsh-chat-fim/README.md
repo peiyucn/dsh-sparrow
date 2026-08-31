@@ -1,6 +1,6 @@
 # dsh-chat-fim
 
-[简体中文](README.zh-CN.md)
+English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 Chat input suggestions — a DeepSeek Harness (DSH) Web plugin (part of the dsh-sparrow collection).
 

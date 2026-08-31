@@ -1,6 +1,6 @@
 # dsh-archive-session
 
-[English](README.md)
+简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 归档会话管理 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
 

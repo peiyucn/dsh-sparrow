@@ -1,6 +1,6 @@
 # dsh-archive-session
 
-[简体中文](README.zh-CN.md)
+English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 Archived-session management — a DeepSeek Harness (DSH) Web plugin (part of the dsh-sparrow collection).
 

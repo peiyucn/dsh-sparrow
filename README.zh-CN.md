@@ -1,6 +1,6 @@
 # dsh-sparrow 🐦
 
-[English](README.md)
+简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 **DeepSeek Harness（DSH）Web 插件小合集。**
 
@@ -12,6 +12,8 @@
 
 > 仅限 DeepSeek 系列主模型（其他主模型时自动隐藏），复用你在 dsh 中配置的 DeepSeek API key，不新增凭据。
 
+文档：[dsh-chat-fim README](plugins/dsh-chat-fim/README.zh-CN.md)
+
 ```bash
 dsh plugin --profile web add dsh-chat-fim
 ```
@@ -22,6 +24,8 @@ dsh plugin --profile web add dsh-chat-fim
 
 > 仅限 DeepSeek 系列主模型（其他主模型时自动隐藏），复用你在 dsh 中配置的 DeepSeek API key，图片不出 DeepSeek 体系。
 
+文档：[dsh-vision-access README](plugins/dsh-vision-access/README.zh-CN.md)
+
 ```bash
 dsh plugin --profile web add dsh-vision-access
 ```
@@ -29,6 +33,8 @@ dsh plugin --profile web add dsh-vision-access
 ## dsh-archive-session
 
 归档会话管理。侧边栏「归档」入口：归档区备份 / 删除会话（备份 = 移出会话目录、可逆；删除不可逆），备份区支持单个 / 全部恢复与删除。
+
+文档：[dsh-archive-session README](plugins/dsh-archive-session/README.zh-CN.md)
 
 ```bash
 dsh plugin --profile web add dsh-archive-session

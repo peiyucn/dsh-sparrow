@@ -1,6 +1,6 @@
 # dsh-chat-fim
 
-[English](README.md)
+简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 聊天输入框续写联想 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
 

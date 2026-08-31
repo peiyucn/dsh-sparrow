@@ -1,6 +1,6 @@
 # dsh-sparrow 🐦
 
-[简体中文](README.zh-CN.md)
+English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 **A collection of small DeepSeek Harness (DSH) Web plugins.**
 
@@ -12,6 +12,8 @@ Chat input suggestions. After a short typing pause, an official-@-menu-style car
 
 > DeepSeek main models only (hidden otherwise); reuses the DeepSeek API key configured in dsh — no extra credentials.
 
+Docs: [dsh-chat-fim README](plugins/dsh-chat-fim/README.md)
+
 ```bash
 dsh plugin --profile web add dsh-chat-fim
 ```
@@ -22,6 +24,8 @@ An image-vision channel for text-only main models. The main model calls the `vis
 
 > DeepSeek main models only (hidden otherwise); reuses the DeepSeek API key configured in dsh — images never leave the DeepSeek ecosystem.
 
+Docs: [dsh-vision-access README](plugins/dsh-vision-access/README.md)
+
 ```bash
 dsh plugin --profile web add dsh-vision-access
 ```
@@ -29,6 +33,8 @@ dsh plugin --profile web add dsh-vision-access
 ## dsh-archive-session
 
 Archived-session management. The "Archive" entry in the sidebar backs up / deletes archived sessions (backup moves the session folder out, reversible; deletion is irreversible), and the backups area restores or deletes backups individually or in bulk.
+
+Docs: [dsh-archive-session README](plugins/dsh-archive-session/README.md)
 
 ```bash
 dsh plugin --profile web add dsh-archive-session
