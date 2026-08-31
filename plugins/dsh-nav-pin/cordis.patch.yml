@@ -1,0 +1,5 @@
+# dsh-nav-pin 组合补丁：`dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin` 安装后由 profile 自动挂载。
+# 纯客户端样式注入，无配置项。
+- insert:
+    - id: dsh-nav-pin
+      name: '@dsh-sparrow/dsh-nav-pin'
