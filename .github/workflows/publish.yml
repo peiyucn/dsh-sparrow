@@ -6,19 +6,40 @@ on:
       - '*-v[0-9]+.[0-9]+.[0-9]+*'
   workflow_dispatch:
     inputs:
-      plugin:
-        description: 'Plugin directory name (e.g. dsh-chat-fim)'
+      action:
+        description: 'Action to perform'
         required: true
+        type: choice
+        options:
+          - publish
+          - promote
+          - deprecate
+      plugin:
+        description: 'Plugin directory name (e.g. dsh-chat-fim) — publish only'
+        required: false
+        type: string
+      packages:
+        description: 'npm package specs, space separated (e.g. @scope/pkg@version) — promote/deprecate'
+        required: false
+        type: string
+      version:
+        description: 'Version to promote (promote only)'
+        required: false
+        type: string
+      message:
+        description: 'Deprecation message (deprecate only)'
+        required: false
         type: string
 
-# id-token: write 用于 npm Trusted Publishing（OIDC）——npm 2027-01 起收紧
-# 绕过 2FA 的令牌直接发布，官方方向是 OIDC / staged publishing。
+# id-token: write 用于 npm Trusted Publishing（OIDC）；contents: write 用于自动建 GitHub Release
 permissions:
   contents: write
   id-token: write
 
 jobs:
   publish:
+    name: publish
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'publish')
     runs-on: ubuntu-latest
     # secrets 上下文不能出现在 step 的 if 里（GitHub 会拒绝解析整个工作流，
     # 表现为 0s 失败且无 job），必须先经 job 级 env 中转。
@@ -90,9 +111,63 @@ jobs:
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
         run: npm publish --access public --provenance --tag ${{ steps.resolve.outputs.npm-tag }}
 
-      # GitHub Release 是 publish 的内部步骤：发布成功后自动建发布页（--generate-notes）
+      # GitHub Release 是 publish 的内部步骤：说明取自该插件 CHANGELOG 对应版本条目
+      # （无条目回退 --generate-notes）；预发布版本标 prerelease；不附产物
+      # （npm 用户一律走 registry 安装，对齐官方 DSH 惯例）
       - name: Create GitHub Release
         if: github.event_name == 'push'
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" --generate-notes
+        run: |
+          CHANGELOG="plugins/${{ steps.resolve.outputs.plugin }}/CHANGELOG.md"
+          VERSION="${{ steps.resolve.outputs.version }}"
+          awk -v ver="${VERSION}" '/^## / { if (started) exit; if ($0 ~ "^## " ver " ") started = 1; next } started' "$CHANGELOG" > release-notes.md
+          FLAGS=""
+          if [[ "${{ steps.resolve.outputs.npm-tag }}" == "next" ]]; then
+            FLAGS="--prerelease"
+          fi
+          if [[ -s release-notes.md ]]; then
+            gh release create "${{ github.ref_name }}" --notes-file release-notes.md ${FLAGS}
+          else
+            echo "::warning::CHANGELOG entry for ${VERSION} not found, falling back to --generate-notes"
+            gh release create "${{ github.ref_name }}" --generate-notes ${FLAGS}
+          fi
+
+  release-control:
+    name: release-control
+    if: github.event_name == 'workflow_dispatch' && inputs.action != 'publish'
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Fail if NPM_TOKEN is missing
+        if: env.NPM_TOKEN == ''
+        run: |
+          echo "NPM_TOKEN secret is required for npm release-control operations" >&2
+          exit 1
+
+      - name: Authenticate with npm registry
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+
+      - name: Promote versions to latest
+        if: inputs.action == 'promote'
+        shell: bash
+        run: |
+          for spec in ${{ inputs.packages }}; do
+            npm dist-tag add "${spec}@${{ inputs.version }}" latest
+          done
+
+      - name: Deprecate versions
+        if: inputs.action == 'deprecate'
+        shell: bash
+        run: |
+          for spec in ${{ inputs.packages }}; do
+            npm deprecate "$spec" "${{ inputs.message }}"
+          done
