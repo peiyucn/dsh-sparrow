@@ -22,7 +22,10 @@
 * **入口契约**：插件模块 export `name` / `inject` / `apply`；`inject` 只声明硬依赖服务，缺失时插件不启动
 * **生命周期**：一切副作用在 `apply` 内注册，并配 `ctx.effect` 清理（卸载/更新时自动执行）；不泄漏定时器/watcher/事件监听
 * **组合行**：`cordis.patch.yml` 的 insert 结构按官方 bundle patch 规范——`id` 用**短名**（如 `dsh-chat-fim`，稳定供后续 patch 定位）、`name` 用 **scoped 包名**（`@dsh-sparrow/dsh-chat-fim`，loader 按包名解析模块；官方先例 `packages/bundle/sdk-app/tests/sdk-app.spec.ts`：`id: sdk-app-startup` + `name: '@deepseek-ai/dsh-sdk-app'`）
-* **seam 纪律**：只用公开 seam（`ctx.llm` / `ctx.webServer` / `ctx.tools` / slots / provide 等正路 API）；确需包装 seam 时保持原签名与 `this` 语义、可逆恢复，并记录所适配的 dsh 版本
+* **seam 纪律（三档）**：
+  1. **正路（默认）**：只用公开 seam（`ctx.llm` / `ctx.webServer` / `ctx.tools` / slots / provide 等）
+  2. **包装（特例）**：公开 seam 存在但不满足需求时包装它——保持原签名与 `this` 语义、可逆恢复，并记录所适配的 dsh 版本
+  3. **私有 seam 依赖（特例，2026-09-01 起）**：官方无公开能力、需求成立时，允许调用官方服务的 private 方法 / 读写 private 状态（JS 运行时无真 private）。**护栏**：不替换 / 不包装 / 不覆写任何官方函数（碰了即 monkey-patch，仍禁止）；优先复用官方自己的写入路径（如 workspace 的 `enqueueOperation` + `setState`），不自造平行机制；启动时能力检查——surface 变化即 fail-fast 报「不支持的 dsh 版本」（已查证：cordis 对插件启动错误逐插件捕获并 logger.error，插件失败不影响 dsh 本体启动）；owner 批准 + 插件 AGENTS 记录特例（理由、边界、适配版本）
 * **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直接读内部文件（附件/会话数据一律走官方服务）。**特例机制**：官方无能力、需求明确且必须直碰内部文件的场景，须在对应插件 `AGENTS.md` 显式记录特例（允许的操作、边界、风险），并经项目 owner 认可——如 dsh-archive-manage 的「备份 / 删除」特例。
 * **查证原则**：引用 DSH 服务、事件、插槽、附件契约时，先 grep 源码（本机 checkout：`C:\Users\DJ028191\.dsh-launcher-panel\source`）或 cordis_inspect 查询确认，禁止凭记忆编造
 
