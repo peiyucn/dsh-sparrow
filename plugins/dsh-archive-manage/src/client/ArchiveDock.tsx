@@ -41,6 +41,7 @@ export interface ArchiveDockInjected {
   /** 回收站实际存放目录（绝对路径 + 掩码后的展示路径），面板提示信息里明示卸载影响。 */
   trashDirPath: () => Promise<{ path: string; displayPath: string; warning?: string }>
   moveToTrash: (sessionId: string) => Promise<unknown>
+  unarchiveSession: (sessionId: string) => Promise<unknown>
   deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => Promise<unknown>
   restoreTrashItem: (trashId: string) => Promise<unknown>
   deleteTrashItem: (trashId: string) => Promise<unknown>
@@ -367,6 +368,7 @@ const styles = {
 
 /** 待确认动作（web 确认框状态）。 */
 type PendingConfirm =
+  | { readonly kind: 'unarchive'; readonly item: ArchivedSessionItem }
   | { readonly kind: 'trash'; readonly item: ArchivedSessionItem }
   | { readonly kind: 'delete'; readonly item: ArchivedSessionItem }
   | { readonly kind: 'trashStray'; readonly item: StraySessionItem }
@@ -392,11 +394,13 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
   const needsTyping = pending.kind === 'delete' || (pending.kind === 'deleteStray' && !pending.item.blank) || pending.kind === 'deleteAll'
   const phrase = t('confirm.deleteAllPhrase')
   const expected = pending.kind === 'delete' || pending.kind === 'deleteStray' ? pending.item.title.trim() : pending.kind === 'deleteAll' ? phrase : ''
-  const title = pending.kind === 'trash' || pending.kind === 'trashStray' ? t('action.trash')
+  const title = pending.kind === 'unarchive' ? t('action.unarchive')
+    : pending.kind === 'trash' || pending.kind === 'trashStray' ? t('action.trash')
     : pending.kind === 'delete' || pending.kind === 'deleteStray' || pending.kind === 'deleteTrashItem' ? t('action.deletePermanently')
       : pending.kind === 'restoreAll' ? t('action.restoreAll', { count: pending.restorable })
         : t('action.deleteAll')
-  const description = pending.kind === 'trash' || pending.kind === 'trashStray' ? t('confirm.trash', { name: pending.item.title })
+  const description = pending.kind === 'unarchive' ? t('confirm.unarchive', { name: pending.item.title })
+    : pending.kind === 'trash' || pending.kind === 'trashStray' ? t('confirm.trash', { name: pending.item.title })
     : pending.kind === 'delete' ? t('confirm.delete', { name: pending.item.title })
       : pending.kind === 'deleteStray'
         ? (pending.item.blank
@@ -408,7 +412,8 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
               ? t('confirm.restoreAll.withLegacy', { count: pending.restorable, legacy: pending.legacy })
               : t('confirm.restoreAll', { count: pending.restorable }))
             : t('confirm.deleteAll', { count: pending.count, phrase })
-  const workingText = pending.kind === 'trash' || pending.kind === 'trashStray' ? t('confirm.movingToTrash')
+  const workingText = pending.kind === 'unarchive' ? t('confirm.unarchiving')
+    : pending.kind === 'trash' || pending.kind === 'trashStray' ? t('confirm.movingToTrash')
     : pending.kind === 'restoreAll' ? t('confirm.restoring')
       : t('confirm.deleting')
   const ready = !working && (!needsTyping || typed.trim() === expected)
@@ -486,7 +491,7 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
  * @param props - slot props + 注入动作。
  */
 export function ArchiveDock(props: ArchiveDockProps) {
-  const { wide, listArchived, listStrays, listTrashItems, trashDirPath, moveToTrash, deleteSession, restoreTrashItem, deleteTrashItem, restoreAllTrash, deleteAllTrash, t } = props
+  const { wide, listArchived, listStrays, listTrashItems, trashDirPath, moveToTrash, unarchiveSession, deleteSession, restoreTrashItem, deleteTrashItem, restoreAllTrash, deleteAllTrash, t } = props
   const [open, setOpen] = useState(false)
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
   const [strays, setStrays] = useState<StraySessionItem[]>([])
@@ -564,6 +569,10 @@ export function ArchiveDock(props: ArchiveDockProps) {
 
   const confirmTrash = (item: ArchivedSessionItem): void => {
     setPending({ kind: 'trash', item })
+  }
+
+  const confirmUnarchive = (item: ArchivedSessionItem): void => {
+    setPending({ kind: 'unarchive', item })
   }
 
   const confirmDelete = (item: ArchivedSessionItem): void => {
@@ -661,6 +670,14 @@ export function ArchiveDock(props: ArchiveDockProps) {
           <button
             type="button"
             className="dsh-archive-btn"
+            disabled={loading}
+            onClick={() => { confirmUnarchive(item) }}
+          >
+            {t('action.unarchive')}
+          </button>
+          <button
+            type="button"
+            className="dsh-archive-btn"
             disabled={loading || !item.backendSupported || locked}
             title={locked ? t('state.unreleasedActionHint') : undefined}
             onClick={() => { confirmTrash(item) }}
@@ -696,6 +713,12 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const submitConfirm = async (typed: string): Promise<void> => {
     if (pending === null) return
     const kind = pending.kind
+    if (kind === 'unarchive') {
+      await unarchiveSession(pending.item.sessionId)
+      await refresh()
+      setPending(null)
+      return
+    }
     if (kind === 'trash' || kind === 'trashStray') {
       await moveToTrash(pending.item.sessionId)
       await refresh()
@@ -880,6 +903,11 @@ export function ArchiveDock(props: ArchiveDockProps) {
                         {t('action.deleteAll')}
                       </button>
                     </div>
+                  ) : null}
+                  {trashItems.length > 0 ? (
+                    <p role="note" style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)', fontSize: 12, lineHeight: '18px', margin: '0 0 4px' }}>
+                      {t('trash.uninstallHint')}
+                    </p>
                   ) : null}
                   {trashItems.length === 0 ? <p style={styles.secondarySmall}>{t('empty.trash')}</p> : null}
                   {trashItems.some(item => item.legacy) ? (
