@@ -42,7 +42,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge
 
 ## dsh-archive-manage
 
-归档会话管理。侧边栏「归档」入口：归档区备份 / 删除会话（备份 = 移出会话目录、可逆；删除不可逆），备份区支持单个 / 全部恢复与删除。
+归档会话管理。侧边栏「归档」入口：归档会话可取消归档（回到会话列表）、移入回收站（移出会话目录、可逆）或彻底删除；回收站支持单个 / 全部还原与彻底删除。
 
 ![归档面板](resources/dsh-archive-manage.png)
 

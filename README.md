@@ -42,7 +42,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge
 
 ## dsh-archive-manage
 
-Archived-session management. The "Archive" entry in the sidebar backs up / deletes archived sessions (backup moves the session folder out, reversible; deletion is irreversible), and the backups area restores or deletes backups individually or in bulk.
+Archived-session management. The "Archive" entry in the sidebar lets you unarchive sessions (back to the session list), move them to trash (the session folder is moved out, reversible), or delete them permanently; the trash restores or deletes entries individually or in bulk.
 
 ![Archive panel](resources/dsh-archive-manage.png)
 
