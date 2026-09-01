@@ -128,7 +128,7 @@
 * semver：修复升 patch（0.0.x）、功能升 minor（0.x.0）、破坏性升 major（x.0.0）
 * **各插件版本线保持一致**：一个插件升版本（如元数据修正）时，其余已发布插件同步升同号版本对齐；对齐类发版在 CHANGELOG 诚实记录「版本对齐合集 X.Y.Z（功能与上版一致）」。**版本线（0.x / 1.x）由 owner 决定；未另行决定前沿用上一正式版的版本线**
 * **npm 同版本不可覆盖已发布内容**——已发布版本的元数据错误（描述 / README）只能升补丁版修正，并在 CHANGELOG 诚实记录（如「描述改英文，功能与上版一致」）
-* **新版本一律先发 `next`（alpha 预发布）**：版本号用 `X.Y.Z-alpha.N`；工作流按版本是否含 `-` 自动选 `next` / `latest`。owner 通过 `dsh plugin --profile web add <包名>@next` 安装验证；验证通过后发布同号稳定版 `X.Y.Z` 并自动上 `latest`，**不把 `latest` 直接指向 alpha**。转正后 deprecate 被替代的坏版本（优先 deprecate，不 unpublish）
+* **新版本一律先发 `next`（alpha 预发布）**：版本号用 `X.Y.Z-alpha.N`；工作流按版本是否含 `-` 自动选 `next` / `latest`。owner 通过 `dsh plugin --profile web add <包名>@next` 安装验证；验证通过后发布同号稳定版 `X.Y.Z` 并自动上 `latest`。注意：**npm 首发布会自动把 `latest` 指向该版本，且 npm 不允许移除 `latest` 标签（dist-tag rm 会 E403）**——预发布阶段 latest=alpha 是平台硬性行为，正式版发布后 latest 自动转到稳定版。转正后 deprecate 被替代的坏版本（优先 deprecate，不 unpublish）
 * **禁止**对已发布包 `npm unpublish` 整个包（锁包名 24 小时）；仅「发布后几分钟内 + 零安装 + owner 确认」才考虑撤销单版本重发
 
 #### 发布流程（按插件逐个走）
@@ -168,6 +168,6 @@
 ## CI 与自动发布
 
 * `.github/workflows/ci.yml`：push dev/main 与 PR 时跑四过程 `typecheck`（tsc --noEmit）→ `build`（tsc 产出 lib/ + client bundle）→ `test`（node:test，CI 下产 JUnit artifact；测试依赖 lib/ 故 build 在前）→ `package`（npm pack --dry-run 校验 files 清单）
-* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`；dist-tag 自动选择：版本含 `-` → `next`，正式版 → `latest`；发布成功后自动建 GitHub Release（说明由 publish.yml 拼接该插件两份 CHANGELOG 对应版本条目，两份均缺条目回退 `--generate-notes`；一律标 prerelease——宿主 dsh 仍处预发布阶段；不附产物）；另含 `release-control` job：workflow_dispatch 手动选 `promote`（dist-tag 升 latest）、`deprecate`（废弃坏版本）或 `untag-latest`（移除误置的 latest 标签，如 npm 首发布默认把 latest 指向 alpha 时）
+* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`；dist-tag 自动选择：版本含 `-` → `next`，正式版 → `latest`；发布成功后自动建 GitHub Release（说明由 publish.yml 拼接该插件两份 CHANGELOG 对应版本条目，两份均缺条目回退 `--generate-notes`；一律标 prerelease——宿主 dsh 仍处预发布阶段；不附产物）；另含 `release-control` job：workflow_dispatch 手动选 `promote`（dist-tag 升 latest）或 `deprecate`（废弃坏版本）
 * 工作流实现细节（勿回退）：`NPM_TOKEN` 经 job 级 `env` 中转再进 step 的 `if`（`secrets` 上下文不允许出现在 `if` 里，直接写会让整条工作流 0s 解析失败）；`--provenance` 要求各插件 package.json 声明 `repository` 字段
 * 发布鉴权**双模式**：有 `NPM_TOKEN` secret 走 Automation token；无 secret 走 npm Trusted Publishing（OIDC）。包尚不存在（无法预配 OIDC）时必须有 `NPM_TOKEN`；长期方向是无 token 的 OIDC
