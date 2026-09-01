@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-session'
 import {
   buildFimPrompt, cleanSuggestion, detectDraftLanguage, extractSuggestions, extractUsage, speakerStopSequences,
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, isLanguageConsistent,
-  mainRouteFromSession, MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, readSessionEvents, recentHistoryTurns,
+  mainRouteFromSession, MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns,
   resolveSuggestModel, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence, upstreamStatusToError,
   type ChatFimConfig, type ChatFimError, type CompleteRequest,
 } from './suggest.js'
@@ -161,7 +161,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
           })
           return
         }
-        const main = mainRouteFromSession(readSessionEvents(session))
+        const main = mainRouteFromSession(session.snapshotEvents())
         sendJson(res, 200, { supported: isDeepseekMainRoute(main) })
         return
       }
@@ -196,7 +196,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
       }
 
       // 主模型不是 DeepSeek 系列时禁用（FIM 上游为 DeepSeek 官方能力）。
-      const main = mainRouteFromSession(readSessionEvents(session))
+      const main = mainRouteFromSession(session.snapshotEvents())
       if (!isDeepseekMainRoute(main)) {
         sendError(res, 403, {
           code: 'MODEL_UNSUPPORTED',
