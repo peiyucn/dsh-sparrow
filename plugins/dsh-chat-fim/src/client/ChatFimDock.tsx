@@ -390,7 +390,7 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   border: 1px solid var(--dsw-alias-button-info-fill, #4d6bfe);
   border-radius: 12px;
   background: var(--dsw-specific-menu);
-  box-shadow: var(--dsw-shadow-lv3);
+  box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
 }
 .dsh-chat-fim-menu-row {
   display: flex;
@@ -470,7 +470,7 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   border: 1px solid var(--dsw-alias-border-inverted);
   border-radius: 12px;
   background: var(--dsw-specific-menu);
-  box-shadow: var(--dsw-shadow-lv3);
+  box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
 }
 .dsh-chat-fim-menu-usage {
   color: var(--dsw-alias-label-caption);
