@@ -57,6 +57,7 @@ export function ensureVisionStyles(): HTMLStyleElement {
   padding: 0;
   border: none;
   border-radius: 20px;
+  corner-shape: round;
   background: transparent;
   cursor: pointer;
   color: var(--dsw-alias-button-info-fill, #4d6bfe);
@@ -87,7 +88,7 @@ export function ensureVisionStyles(): HTMLStyleElement {
   border: 1px solid var(--dsw-alias-border-inverted);
   border-radius: 12px;
   background: var(--dsw-specific-menu);
-  box-shadow: var(--dsw-shadow-lv3);
+  box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
 }
 .dsh-vision-popover-title {
   font-size: 14px;
