@@ -138,7 +138,7 @@
 3. 再次 `npm run verify` + `git diff --check`
 4. 合并 dev → main（fast-forward）并 push
 5. 打 **annotated tag**：`git tag -a <插件名>-vX.Y.Z -m "<一句话中文发布说明>"`（轻量 tag 在 GitHub tag 页显示的是 commit message，必须 `-a` 带说明）
-6. push tag → 自动触发 Publish 工作流（解析插件目录与 npm dist-tag：版本含 `-` 发 `next`，正式版发 `latest`；校验 tag 版本 == package.json version、verify 后 `npm publish --access public --provenance --tag <next|latest>`）。**tag 触发兜底**：推 tag 前确认无其他会话并发推送 dev/main；推 tag 后 30 秒内若没有对应 Publish run（2026-09-01 实测：与 dev/main 并发推送的窗口期 tag 触发会被丢失），改用 `gh workflow run publish.yml -f action=publish -f plugin=<插件名>` 手动派发（发布内容一致，仅跳过自动建 GitHub Release——Release 用 `gh release create <tag> --prerelease --notes-file <CHANGELOG 拼好的说明>` 补建）
+6. push tag → 自动触发 Publish 工作流（解析插件目录与 npm dist-tag：版本含 `-` 发 `next`，正式版发 `latest`；校验 tag 版本 == package.json version、verify 后 `npm publish --access public --provenance --tag <next|latest>`）。**tag 触发兜底**：推 tag 后 30 秒内若没有对应 Publish run（2026-09-01 实测出现过未触发，原因待查），改用 `gh workflow run publish.yml -f action=publish -f plugin=<插件名>` 手动派发（发布内容一致，仅跳过自动建 GitHub Release——Release 用 `gh release create <tag> --prerelease --notes-file <CHANGELOG 拼好的说明>` 补建）
 7. `gh run watch` 盯到 success；`npm view <包名> version dist-tags` 复核版本与 dist-tag
 8. **预发布待验证**：`next` 已指向新版本且 `latest` 未变；owner 通过 `dsh plugin --profile web add <包名>@next` 安装验证，未确认前不发布稳定版
 9. **转正**：owner 确认后把 `package.json` 版本改为稳定版 `X.Y.Z`（去掉 `-alpha.N`），CHANGELOG 记转正，按本流程发布该稳定版（工作流自动上 `latest`）；如需，用 publish.yml 手动触发 `deprecate` 标记被替代的坏版本（不 unpublish）
