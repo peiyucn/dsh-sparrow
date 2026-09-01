@@ -275,6 +275,32 @@ export function ensureArchiveStyles(): void {
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
+/* 整页 loading：四个初始请求（归档/游离/备份/备份目录）都落定前占满内容区，
+   避免「打开后加载闪动」（2026-09-01）。 */
+.dsh-archive-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 240px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 14px;
+  line-height: 22px;
+}
+.dsh-archive-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--dsw-alias-border-l1, #d4d8e0);
+  border-top-color: var(--dsw-alias-button-info-fill, #4d6bfe);
+  border-radius: 50%;
+  animation: dsh-archive-spin 0.8s linear infinite;
+}
+@keyframes dsh-archive-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dsh-archive-spinner { animation: none; }
+}
 `
   document.head.appendChild(style)
 }
@@ -715,10 +741,6 @@ export function ArchiveDock(props: ArchiveDockProps) {
     setPending(null)
   }
 
-  const loadingRow = (
-    <p style={styles.secondarySmall}>{t('loading')}</p>
-  )
-
   return (
     <>
       <button
@@ -745,6 +767,13 @@ export function ArchiveDock(props: ArchiveDockProps) {
               </button>
             </div>
             <div className="dsh-archive-panel-body" style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
+            {loading ? (
+              <div className="dsh-archive-loading" role="status">
+                <span className="dsh-archive-spinner" aria-hidden />
+                <span>{t('loading')}</span>
+              </div>
+            ) : (
+            <>
             <p style={{ ...styles.secondarySmall, fontSize: 14, lineHeight: '22px', margin: '0 0 12px' }}>
               {backupDir !== null && backupDir.displayPath !== '' ? (
                 <>
@@ -762,7 +791,13 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 </>
               ) : null}
             </p>
-            {error !== null ? <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>{error}</p> : null}
+            {error !== null ? (
+              <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)', margin: '0 0 12px' }}>
+                {error}
+                {' '}
+                <button type="button" className="dsh-archive-btn" onClick={() => { void refresh() }}>{t('retry')}</button>
+              </p>
+            ) : null}
 
             <div className="dsh-archive-section-card">
               <button
@@ -772,24 +807,23 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 onClick={() => { setArchivedOpen(value => !value) }}
               >
                 <span aria-hidden>{archivedOpen ? '▾' : '▸'}</span>
-                <span>{t('section.archived', { count: loading ? '…' : archived.length })}</span>
+                <span>{t('section.archived', { count: archived.length })}</span>
               </button>
               {archivedOpen ? (
                 <>
-                  {loading ? loadingRow : null}
-                  {!loading && archived.length === 0 ? <p style={styles.secondarySmall}>{t('empty.archived')}</p> : null}
-                  {!loading && liveItems.length > 0 ? (
+                  {archived.length === 0 ? <p style={styles.secondarySmall}>{t('empty.archived')}</p> : null}
+                  {liveItems.length > 0 ? (
                     <>
                       <p style={styles.groupHeading}>{t('group.unreleased', { count: liveItems.length })}</p>
                       {liveItems.map(renderArchivedRow)}
                     </>
                   ) : null}
-                  {!loading && coldItems.map(renderArchivedRow)}
+                  {coldItems.map(renderArchivedRow)}
                 </>
               ) : null}
             </div>
 
-            {!loading && strays.length > 0 ? (
+            {strays.length > 0 ? (
               <div className="dsh-archive-section-card">
                 <button
                   type="button"
@@ -817,13 +851,12 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 onClick={() => { setBackupsOpen(value => !value) }}
               >
                 <span aria-hidden>{backupsOpen ? '▾' : '▸'}</span>
-                <span>{t('section.backups', { count: loading ? '…' : backups.length })}</span>
+                <span>{t('section.backups', { count: backups.length })}</span>
               </button>
               {backupsOpen ? (
                 <>
                   <p style={styles.secondarySmall}>{t('backups.hint')}</p>
-                  {loading ? loadingRow : null}
-                  {!loading && backups.length > 0 ? (
+                  {backups.length > 0 ? (
                     <div style={{ ...styles.actions, padding: '4px 0 8px' }}>
                       <button
                         type="button"
@@ -843,13 +876,13 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       </button>
                     </div>
                   ) : null}
-                  {!loading && backups.length === 0 ? <p style={styles.secondarySmall}>{t('empty.backups')}</p> : null}
-                  {!loading && backups.some(item => item.legacy) ? (
+                  {backups.length === 0 ? <p style={styles.secondarySmall}>{t('empty.backups')}</p> : null}
+                  {backups.some(item => item.legacy) ? (
                     <p style={styles.secondarySmall}>
                       {t('legacy.hint')}
                     </p>
                   ) : null}
-                  {!loading && backups.map(item => (
+                  {backups.map(item => (
                     <div key={item.backupId} style={styles.row}>
                       <div style={{ minWidth: 0 }}>
                         <div style={styles.title} title={item.title}>{item.title}</div>
@@ -894,6 +927,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 </>
               ) : null}
             </div>
+            </>
+            )}
             </div>
           </div>
         </div>

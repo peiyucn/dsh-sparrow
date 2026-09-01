@@ -10,6 +10,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'dialog.copied'
       | 'backups.hint'
       | 'loading'
+      | 'retry'
       | 'section.archived'
       | 'section.backups'
       | 'section.strays'
