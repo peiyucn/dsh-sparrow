@@ -111,24 +111,30 @@ jobs:
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
         run: npm publish --access public --provenance --tag ${{ steps.resolve.outputs.npm-tag }}
 
-      # GitHub Release 是 publish 的内部步骤：说明取自该插件 CHANGELOG 对应版本条目
-      # （无条目回退 --generate-notes）；一律标 prerelease（宿主 dsh 仍处预发布阶段，
-      # 宿主转正后移除该标记）；不附产物（npm 用户一律走 registry 安装，对齐官方 DSH 惯例）
+      # GitHub Release 是 publish 的内部步骤：说明由两份 CHANGELOG 当前版本条目拼成
+      # （英文在上、中文在下；两份都缺条目时回退 --generate-notes）；一律标 prerelease
+      # （宿主 dsh 仍处预发布阶段，宿主转正后移除该标记）；不附产物
+      # （npm 用户一律走 registry 安装，对齐官方 DSH 惯例）
       - name: Create GitHub Release
         if: github.event_name == 'push'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          CHANGELOG="plugins/${{ steps.resolve.outputs.plugin }}/CHANGELOG.md"
+          PLUGIN="plugins/${{ steps.resolve.outputs.plugin }}"
           VERSION="${{ steps.resolve.outputs.version }}"
-          awk -v ver="${VERSION}" '/^## / { if (started) exit; if ($0 ~ "^## " ver " ") started = 1; next } started' "$CHANGELOG" > release-notes.md
-          if [[ -s release-notes.md ]]; then
-            gh release create "${{ github.ref_name }}" --prerelease --notes-file release-notes.md
-          else
+          awk -v ver="${VERSION}" '/^## / { if (started) exit; if ($0 ~ "^## " ver " ") started = 1; next } started' "$PLUGIN/CHANGELOG.md" > release-notes-en.md
+          awk -v ver="${VERSION}" '/^## / { if (started) exit; if ($0 ~ "^## " ver " ") started = 1; next } started' "$PLUGIN/CHANGELOG.zh-CN.md" > release-notes-zh.md
+          if [[ ! -s release-notes-en.md && ! -s release-notes-zh.md ]]; then
             echo "::warning::CHANGELOG entry for ${VERSION} not found, falling back to --generate-notes"
             gh release create "${{ github.ref_name }}" --prerelease --generate-notes
+            exit 0
           fi
+          {
+            if [[ -s release-notes-en.md ]]; then printf '### English\n\n'; cat release-notes-en.md; fi
+            if [[ -s release-notes-zh.md ]]; then printf '\n### 中文\n\n'; cat release-notes-zh.md; fi
+          } > release-notes.md
+          gh release create "${{ github.ref_name }}" --prerelease --notes-file release-notes.md
 
   release-control:
     name: release-control
