@@ -6,7 +6,7 @@
 
 1. 归档集变更（加 / 去 id）全部迁移到官方私有写通道，退役自建补偿体系；
 2. 新增「取消归档（unarchive）」：官方归档标记的会话回到会话列表原位置；
-3. 「备份区」语义统一为「回收站」（UI 文案 + 目录名 + 内部命名），一次性迁移旧目录；
+3. 「备份区」语义统一为「回收站」（UI 文案 + 目录名 + 内部命名）；
 4. 保持既有能力不回归：文件级回收（移出/还原/彻底删除）、subagent 父子原子处理、@ 列表即时移除、live 会话保守拒绝；
 5. 卸载语义口径固化：明确「卸载不自动恢复」的技术根因、三种已操作会话的卸载后状态、卸载前收尾步骤，写入 README 与面板提示。
 
@@ -18,7 +18,7 @@
 * unarchive 路由 + 客户端「取消归档」按钮（全部归档区行，含 live 与非 live）
 * 回收站语义统一（文案 / 目录名 / 路由 / locale / 内部变量；sidecar 文件名保留）
 * 幽灵补偿退役（见清单）
-* 旧备份目录一次性迁移
+* 旧备份目录迁移：不做（owner 拍板 2026-09-01：插件无存量安装，旧目录由用户自行清理）
 * 卸载语义口径固化（spec 本节 + README《卸载与残留》重写 + 面板卸载提示）
 
 **不做**（范围控制，后续按需）：
@@ -54,7 +54,7 @@
 
 ## 回收站语义统一（改名）
 
-* 目录：sessions-archived-backup → .sessions-recycle-bin（默认 $DSH_HOME 下）；启动/首次使用时检测旧目录存在 → 一次性 rename 迁移；rename 失败继续用旧目录 + 面板提示
+* 目录：sessions-archived-backup → .sessions-recycle-bin（默认 $DSH_HOME 下）。**不做旧目录迁移**——无存量安装（owner 拍板 2026-09-01），旧目录与旧配置键 backupRoot 均不保留兼容
 * 路由：/api/archive-manage/backup-dir → /api/archive-manage/trash-dir（同包客户端同步）
 * locale / 内部变量 / 函数名：backup* → trash* 对齐（zh/en 全量）
 * UI 文案：
@@ -81,7 +81,7 @@
 
 ## 兼容性
 
-* 已发布 alpha.2 用户的旧回收目录：自动迁移（如上），sidecar 格式不变，零数据丢失；
+* 不做旧目录迁移：alpha.2 无存量安装（owner 确认 2026-09-01），旧目录 sessions-archived-backup 与旧配置键 backupRoot 不做兼容处理；sidecar 格式不变。
 * unarchive 为纯新增能力，无历史兼容负担；
 * 私有 seam 依赖 dsh 版本：能力检查 fail-fast + AGENTS 记录适配版本（>= 0.1.2-alpha.x，待实现时实测确认）。
 
@@ -90,14 +90,14 @@
 1. 归档区任一会话（live 与非 live）点「取消归档」→ 侧边栏立即重现（原工作区位置），无需重启；
 2. 重复取消归档幂等；
 3. 归档 / 取消归档 / 移入回收站 / 还原 / 彻底删除五条链全部走官方串行通道，域与 registry 内存态无分歧；
-4. 旧目录 sessions-archived-backup 存在时：首次启动自动迁移为 .sessions-recycle-bin，数据完整、面板路径显示新目录；
+4. 启动即使用新目录 .sessions-recycle-bin（不做旧目录迁移——owner 拍板无存量用户），面板路径显示新目录；
 5. 启动能力检查：故意用缺方法的 mock registry 时，插件明确报「不支持的 DSH workspace registry」；
 6. 回归：@ 列表移除、subagent 原子、live 置灰、投影缓存失效、api-session/removed 全部保持；
-7. npm run verify 通过（新增单测：集合变更纯函数、unarchive 幂等、迁移决策函数、能力检查）；
+7. npm run verify 通过（新增单测：集合变更纯函数、unarchive 幂等、能力检查）；
 8. README《卸载与残留》与本节口径一致（卸载前收尾 + 重装自愈 + 取消归档零残留 + 删除不可逆），面板回收站非空时显示卸载提示。
 
 ## 测试
 
-* 纯函数导出：mutateArchivedSet 的新集合计算（追加/过滤/幂等）、迁移目录决策（旧在/新在/双在）、能力检查（缺方法清单）；
+* 纯函数导出：mutateArchivedSet 的新集合计算（追加/过滤/幂等）、能力检查（缺方法清单）；
 * host 测试：仿现有 host.test.mjs 模式，mock registry 的私有方法验证串行链调用次序；
 * 结构测试不新增断言。

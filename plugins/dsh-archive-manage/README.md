@@ -31,7 +31,6 @@ Requires dsh ≥ 0.1.1-rc.2 and a working `pnpm` (`dsh plugin` forwards installa
 ## Trash Location & Restore
 
 * Default trash folder: `$DSH_HOME/.sessions-recycle-bin/`; each entry folder contains a `dsh-archive-manage.json` recording its original location and workspace ownership, which restore uses to move it back
-* The `sessions-archived-backup` folder used by earlier versions is migrated to the new folder automatically on first use; if the rename fails, the old folder keeps being used and the panel shows a warning
 * Folders without a sidecar file are listed as "legacy": they can only be deleted permanently, not restored
 
 ## Uninstall & Residue

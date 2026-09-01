@@ -31,7 +31,6 @@ dsh plugin --profile web add @dsh-sparrow/dsh-archive-manage
 ## 回收站位置与还原
 
 * 默认回收站：`$DSH_HOME/.sessions-recycle-bin/`；每个条目目录内含 `dsh-archive-manage.json` 记录原始位置与工作区归属，还原时按它移回
-* 旧版本使用的 `sessions-archived-backup` 目录会在首次使用时自动迁移为新目录；迁移失败则继续使用旧目录并在面板提示
 * 无记录文件的旧格式目录按「旧格式」列出：只能彻底删除、不能还原
 
 ## 卸载与残留
