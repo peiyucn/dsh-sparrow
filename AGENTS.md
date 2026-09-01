@@ -120,7 +120,7 @@
   * `repository` 必填（`git+https://github.com/peiyucn/dsh-sparrow.git` + `directory` 指到插件目录）——npm `--provenance` 校验 repository.url 与来源仓库匹配，缺失直接 E422
   * `files` 清单齐备：`lib/**/*.js`、`lib/types/**/*.d.ts`、`cordis.patch.yml`、`docs/images/**`、`README.md`、`README.zh-CN.md`、`CHANGELOG.md`
 * README：README.md 英文为 GitHub / npm 默认 + README.zh-CN.md 中文，顶部互链
-* CHANGELOG：英文（面向发布受众，与 README.md 一致；版本条目覆盖本版全部用户可感知改动）；条目按**发布顺序从上到下**排列——预发布 `-alpha.N` 条目在前，转正的稳定版条目加在其下，且稳定版条目覆盖 alpha 全部用户可感知改动（与 alpha 一致时写「与 X.Y.Z-alpha.N 一致」）；只记录该包名下真实发布过的版本——发布前的改名、已撤销的旧名发布等内部历史不进 README/CHANGELOG（首次发布即纯介绍，对用户是无效信息），需要备查时记在插件 AGENTS.md 或 docs/spec
+* CHANGELOG：单一文件、每个版本条目**英文在上、中文在下**（GitHub Release 说明直接取本条目，勿另写一份；版本条目覆盖本版全部用户可感知改动）；条目按**发布顺序从上到下**排列——预发布 `-alpha.N` 条目在前，转正的稳定版条目加在其下，且稳定版条目覆盖 alpha 全部用户可感知改动（与 alpha 一致时写「与 X.Y.Z-alpha.N 一致」）；只记录该包名下真实发布过的版本——发布前的改名、已撤销的旧名发布等内部历史不进 README/CHANGELOG（首次发布即纯介绍，对用户是无效信息），需要备查时记在插件 AGENTS.md 或 docs/spec
 * 截图放 `plugins/<插件>/docs/images/`（与 README 引用一致）；同一张主截图也放仓库根 `resources/dsh-<插件>.png` 供总 README 使用
 
 #### 版本策略
@@ -142,7 +142,7 @@
 7. `gh run watch` 盯到 success；`npm view <包名> version dist-tags` 复核版本与 dist-tag
 8. **预发布待验证**：`next` 已指向新版本且 `latest` 未变；owner 通过 `dsh plugin --profile web add <包名>@next` 安装验证，未确认前不发布稳定版
 9. **转正**：owner 确认后把 `package.json` 版本改为稳定版 `X.Y.Z`（去掉 `-alpha.N`），CHANGELOG 记转正，按本流程发布该稳定版（工作流自动上 `latest`）；如需，用 publish.yml 手动触发 `deprecate` 标记被替代的坏版本（不 unpublish）
-10. GitHub Release 已由 publish.yml 在发布后自动创建：说明取自该插件 CHANGELOG 对应版本条目，预发布版本标 prerelease，不附产物（npm 安装一律走 registry，对齐官方 DSH 惯例）；如需补充说明用 `gh release edit <tag> --notes "..."`（**不要重推 tag**）
+10. GitHub Release 已由 publish.yml 在发布后自动创建：说明取自该插件 CHANGELOG 对应版本条目，**一律标 prerelease**（宿主 dsh 仍处预发布阶段；宿主转正后移除该标记），不附产物（npm 安装一律走 registry，对齐官方 DSH 惯例）；如需补充说明用 `gh release edit <tag> --notes "..."`（**不要重推 tag**）
 11. 切回 `dev` 继续开发
 
 #### 发布红线
@@ -168,6 +168,6 @@
 ## CI 与自动发布
 
 * `.github/workflows/ci.yml`：push dev/main 与 PR 时跑四过程 `typecheck`（tsc --noEmit）→ `build`（tsc 产出 lib/ + client bundle）→ `test`（node:test，CI 下产 JUnit artifact；测试依赖 lib/ 故 build 在前）→ `package`（npm pack --dry-run 校验 files 清单）
-* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`；dist-tag 自动选择：版本含 `-` → `next`，正式版 → `latest`；发布成功后自动建 GitHub Release（说明取自该插件 CHANGELOG 对应版本条目，缺条目回退 `--generate-notes`；预发布版本标 prerelease；不附产物）；另含 `release-control` job：workflow_dispatch 手动选 `promote`（dist-tag 升 latest）或 `deprecate`（废弃坏版本）
+* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`；dist-tag 自动选择：版本含 `-` → `next`，正式版 → `latest`；发布成功后自动建 GitHub Release（说明取自该插件 CHANGELOG 对应版本条目，缺条目回退 `--generate-notes`；一律标 prerelease——宿主 dsh 仍处预发布阶段；不附产物）；另含 `release-control` job：workflow_dispatch 手动选 `promote`（dist-tag 升 latest）或 `deprecate`（废弃坏版本）
 * 工作流实现细节（勿回退）：`NPM_TOKEN` 经 job 级 `env` 中转再进 step 的 `if`（`secrets` 上下文不允许出现在 `if` 里，直接写会让整条工作流 0s 解析失败）；`--provenance` 要求各插件 package.json 声明 `repository` 字段
 * 发布鉴权**双模式**：有 `NPM_TOKEN` secret 走 Automation token；无 secret 走 npm Trusted Publishing（OIDC）。包尚不存在（无法预配 OIDC）时必须有 `NPM_TOKEN`；长期方向是无 token 的 OIDC
