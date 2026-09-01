@@ -12,4 +12,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Backup / delete also handles all subagent sessions of the parent session (moved into the backup together, restored together; orphan subagents are cleaned by the startup sweep)
 - Removed from the @ list immediately after backup: updates the official workspace domain bookkeeping, invalidates projection-cache rows, and re-emits the `api-session/removed` event
 - README positioning: the official archive flag does not filter @ candidates (verified through all three layers of the source); file-level backup is the only reversible way to take a session out of @
+
+## 0.1.0-alpha.2 (2026-09-01 · pre-release)
+
 - Panel opens with a full-panel loading state: content is revealed only after all four initial requests settle, eliminating the loading flicker; the initial error banner now has a retry button
