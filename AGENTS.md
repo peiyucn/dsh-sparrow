@@ -167,7 +167,7 @@
 
 ## CI 与自动发布
 
-* `.github/workflows/ci.yml`：push dev/main 与 PR 时跑七过程 job——`typecheck`（typecheck:all，含 client bundle 校验）与 `test`（test:all）有实质内容，`build`/`package`/`publish`/`deploy`/`sync` 空跑占位（publish 实质在 publish.yml，tag 触发）
+* `.github/workflows/ci.yml`：push dev/main 与 PR 时跑七过程 job **全串行链**——`typecheck`（typecheck:all，含 client bundle 校验）与 `test`（test:all，CI 下产 JUnit 报告 artifact）有实质内容，`build`/`package`/`publish`/`deploy`/`sync` 空跑占位（publish 实质在 publish.yml，tag 触发）
 * `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`；dist-tag 自动选择：版本含 `-` → `next`，正式版 → `latest`
 * `.github/workflows/npm-release-control.yml`：workflow_dispatch 执行 `promote`（`dist-tag add ... latest`）或 `deprecate`；需要 `NPM_TOKEN`
 * 工作流实现细节（勿回退）：`NPM_TOKEN` 经 job 级 `env` 中转再进 step 的 `if`（`secrets` 上下文不允许出现在 `if` 里，直接写会让整条工作流 0s 解析失败）；`--provenance` 要求各插件 package.json 声明 `repository` 字段

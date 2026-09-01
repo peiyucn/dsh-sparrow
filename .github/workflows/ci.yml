@@ -43,8 +43,15 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Typecheck all plugins (produce lib/ for tests)
         run: pnpm run typecheck:all
-      - name: Test all plugins
+      - name: Test all plugins (JUnit reports)
         run: pnpm run test:all
+      - name: Upload test reports
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-reports
+          path: plugins/*/junit.xml
+          retention-days: 7
 
   build:
     name: build
@@ -56,7 +63,7 @@ jobs:
 
   package:
     name: package
-    needs: test
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: No-op
@@ -64,7 +71,7 @@ jobs:
 
   publish:
     name: publish
-    needs: test
+    needs: package
     runs-on: ubuntu-latest
     steps:
       - name: No-op
@@ -72,7 +79,7 @@ jobs:
 
   deploy:
     name: deploy
-    needs: test
+    needs: publish
     runs-on: ubuntu-latest
     steps:
       - name: No-op
@@ -80,7 +87,7 @@ jobs:
 
   sync:
     name: sync
-    needs: test
+    needs: deploy
     runs-on: ubuntu-latest
     steps:
       - name: No-op

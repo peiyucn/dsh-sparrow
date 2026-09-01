@@ -63,7 +63,12 @@ if (runTypecheck) {
 
 if (runTest) {
   console.log('verify: node:test')
-  const test = spawnSync(process.execPath, ['--test', 'test/*.test.mjs'], {
+  const testArgs = ['--test', 'test/*.test.mjs']
+  if (process.env.CI) {
+    // CI 里产出 JUnit 报告（由 ci.yml 的 test job 统一上传 artifact）
+    testArgs.push('--test-reporter=junit', '--test-reporter-destination=junit.xml')
+  }
+  const test = spawnSync(process.execPath, testArgs, {
     cwd,
     stdio: 'inherit',
     shell: false,
