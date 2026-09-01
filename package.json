@@ -5,7 +5,9 @@
   "packageManager": "pnpm@11.22.0",
   "scripts": {
     "verify": "pnpm run verify:all",
-    "verify:all": "node scripts/verify-all.mjs"
+    "verify:all": "node scripts/verify-all.mjs",
+    "typecheck:all": "node scripts/verify-all.mjs --typecheck",
+    "test:all": "node scripts/verify-all.mjs --test"
   },
   "devDependencies": {
     "esbuild": "^0.25.12",

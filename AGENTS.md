@@ -11,7 +11,7 @@
   * `plugins/dsh-archive-manage` — 归档会话管理：备份 / 删除 / 恢复（轻量标题已随官方投影缓存退役）
   * `plugins/dsh-nav-pin` — 轮次导航窄屏不消失：官方 900px 断点提到 700px，更窄时 hover 右缘浮现为浮层（纯样式注入）
   * `plugins/dsh-file-manage` — DeepSeek Files API 云端文件管理：侧边栏清单 / 单条删除 / 复制 file_id（复用官方 DeepSeekFilesClient，无本地持久化）
-* 各插件本地验证 = 进入插件目录 `npm run verify`（typecheck + node:test）；全量 = 仓库根 `npm run verify`（即 verify:all）
+* 各插件本地验证 = 进入插件目录 `npm run verify`（typecheck + node:test）；全量 = 仓库根 `npm run verify`（即 verify:all）；分项 = 根 `pnpm run typecheck:all` / `pnpm run test:all`
 * 文档分工：插件 README 面向用户（**README.md 英文为 GitHub 默认 + README.zh-CN.md 简体中文**，顶部互链，写法对齐 dsh-launcher-panel）；`AGENTS.md` 面向开发 agent（seam 特例 / 架构约束 / 测试约定），开发细节不进 README
 * 各插件专属约束见 `plugins/*/AGENTS.md`
 
@@ -167,7 +167,7 @@
 
 ## CI 与自动发布
 
-* `.github/workflows/ci.yml`：push dev/main 与 PR 时跑 `pnpm install --frozen-lockfile` + `npm run verify`
+* `.github/workflows/ci.yml`：push dev/main 与 PR 时跑两个标准过程 job——`typecheck`（typecheck:all，含 client bundle 校验）与 `test`（test:all，node:test）
 * `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`；dist-tag 自动选择：版本含 `-` → `next`，正式版 → `latest`
 * `.github/workflows/npm-release-control.yml`：workflow_dispatch 执行 `promote`（`dist-tag add ... latest`）或 `deprecate`；需要 `NPM_TOKEN`
 * 工作流实现细节（勿回退）：`NPM_TOKEN` 经 job 级 `env` 中转再进 step 的 `if`（`secrets` 上下文不允许出现在 `if` 里，直接写会让整条工作流 0s 解析失败）；`--provenance` 要求各插件 package.json 声明 `repository` 字段
