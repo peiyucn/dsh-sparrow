@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-/** 逐个插件运行验证：默认 typecheck + test；`--typecheck` / `--test` 只跑单项。 */
+/** 逐个插件运行验证：默认 typecheck + build + test；`--typecheck` / `--build` / `--test` 只跑单项。 */
 import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-const mode = process.argv[2] // undefined | '--typecheck' | '--test'
+const mode = process.argv[2] // undefined | '--typecheck' | '--build' | '--test'
 
 const root = resolve(import.meta.dirname, '..')
 // 只验证已脚手架化的插件（有 package.json）；纯文档目录（如 spec 阶段的插件）跳过。

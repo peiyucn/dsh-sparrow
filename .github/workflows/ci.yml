@@ -26,8 +26,8 @@ jobs:
       - name: Typecheck all plugins
         run: pnpm run typecheck:all
 
-  test:
-    name: test
+  build:
+    name: build
     needs: typecheck
     runs-on: ubuntu-latest
     steps:
@@ -41,8 +41,26 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Typecheck all plugins (produce lib/ for tests)
-        run: pnpm run typecheck:all
+      - name: Build all plugins (tsc → lib/ + client bundle)
+        run: pnpm run build:all
+
+  test:
+    name: test
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build all plugins (produce lib/ for tests)
+        run: pnpm run build:all
       - name: Test all plugins (JUnit reports)
         run: pnpm run test:all
       - name: Upload test reports
@@ -52,3 +70,23 @@ jobs:
           name: test-reports
           path: plugins/*/junit.xml
           retention-days: 7
+
+  package:
+    name: package
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build all plugins (produce lib/ for pack)
+        run: pnpm run build:all
+      - name: Pack check all plugins (npm pack --dry-run)
+        run: pnpm run package:all

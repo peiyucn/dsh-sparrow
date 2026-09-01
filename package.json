@@ -7,6 +7,8 @@
     "verify": "pnpm run verify:all",
     "verify:all": "node scripts/verify-all.mjs",
     "typecheck:all": "node scripts/verify-all.mjs --typecheck",
+    "build:all": "node scripts/verify-all.mjs --build",
+    "package:all": "node scripts/verify-all.mjs --package",
     "test:all": "node scripts/verify-all.mjs --test"
   },
   "devDependencies": {
