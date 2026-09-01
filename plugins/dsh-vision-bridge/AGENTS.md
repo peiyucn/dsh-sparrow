@@ -26,10 +26,10 @@ DSH Web 插件：纯文本主模型会话的图片视觉通道 —— 主模型�
 
 ## seam 特例（需项目 owner 认可，已定案）
 
-* **门禁放行（可逆包装 `ctx.llm.resolveModelInfo`）**：仅对配置的文本路由抹除「显式不含 image」的 `inputModalities`（放行贴图门禁），保持原签名与 `this` 语义，卸载时恢复原函数；记录所适配 dsh 版本（≥ 0.1.1-rc.2）。
+* **门禁放行（可逆包装 `ctx.llm.resolveModelInfo`）**：仅对配置的文本路由抹除「显式不含 image」的 `inputModalities`（放行贴图门禁），保持原签名与 `this` 语义，卸载时恢复原函数。
 * **按 agent 隐藏工具**：`agent/request` 拦截后，主模型非 deepseek-official 或原生视觉模型时用 `agent.ctx.tools.restrict({ deny: ['vision_read'] })` 对该 agent 屏蔽（Map 记 disposer，转回可解除）；工具执行时再做一次防御二次检查（会话事件里最近 request/header 解析主模型 + `resolveModelInfo` 能力判断）。
 * **附件反查**：只从会话事件里归一化 + 唯一前缀匹配图片引用（占位符截断哈希可直接传），图片字节经官方 `ctx.attachments.readImage` 校验；不读内部文件路径。
-* **会话事件读取**：`readSessionEvents`（vision.ts）运行时 feature-detect——新版 dsh 用 `snapshotEvents()`、旧版回退 `events` 属性；host 三处读取（currentMainModel 主路由、vision_read 的附件反查与主路由防御检查）均经此助手，不直读字段。
+* **会话事件读取**：host 三处读取（currentMainModel 主路由、vision_read 的附件反查与主路由防御检查）直读官方 `snapshotEvents()`（仅支持 dsh 0.1.2-alpha.4 起，无旧版回退）。
 * **仍禁止**：monkey-patch 核心、直读附件存储、向第三方发送图片。
 
 ## 关键文件速查
