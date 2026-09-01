@@ -54,7 +54,7 @@
 
 ## 回收站语义统一（改名）
 
-* 目录：sessions-archived-backup → .sessions-recycle-bin（默认 $DSH_HOME 下）。**不做旧目录迁移**——无存量安装（owner 拍板 2026-09-01），旧目录与旧配置键 backupRoot 均不保留兼容
+* 目录：sessions-archived-backup → .sessions-trash（默认 $DSH_HOME 下）。**不做旧目录迁移**——无存量安装（owner 拍板 2026-09-01），旧目录与旧配置键 backupRoot 均不保留兼容
 * 路由：/api/archive-manage/backup-dir → /api/archive-manage/trash-dir（同包客户端同步）
 * locale / 内部变量 / 函数名：backup* → trash* 对齐（zh/en 全量）
 * UI 文案：
@@ -90,7 +90,7 @@
 1. 归档区任一会话（live 与非 live）点「取消归档」→ 侧边栏立即重现（原工作区位置），无需重启；
 2. 重复取消归档幂等；
 3. 归档 / 取消归档 / 移入回收站 / 还原 / 彻底删除五条链全部走官方串行通道，域与 registry 内存态无分歧；
-4. 启动即使用新目录 .sessions-recycle-bin（不做旧目录迁移——owner 拍板无存量用户），面板路径显示新目录；
+4. 启动即使用新目录 .sessions-trash（不做旧目录迁移——owner 拍板无存量用户），面板路径显示新目录；
 5. 启动能力检查：故意用缺方法的 mock registry 时，插件明确报「不支持的 DSH workspace registry」；
 6. 回归：@ 列表移除、subagent 原子、live 置灰、投影缓存失效、api-session/removed 全部保持；
 7. npm run verify 通过（新增单测：集合变更纯函数、unarchive 幂等、能力检查）；

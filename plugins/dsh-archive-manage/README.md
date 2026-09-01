@@ -30,7 +30,7 @@ Requires dsh ≥ 0.1.2-alpha.4 and a working `pnpm` (`dsh plugin` forwards insta
 
 ## Trash Location & Restore
 
-* Default trash folder: `$DSH_HOME/.sessions-recycle-bin/`; each entry folder contains a `dsh-archive-manage.json` recording its original location and workspace ownership, which restore uses to move it back
+* Default trash folder: `$DSH_HOME/.sessions-trash/`; each entry folder contains a `dsh-archive-manage.json` recording its original location and workspace ownership, which restore uses to move it back
 * Folders without a sidecar file are listed as "legacy": they can only be deleted permanently, not restored
 
 ## Uninstall & Residue

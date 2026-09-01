@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 export const TRASH_SIDECAR = 'dsh-archive-manage.json'
 /** 回收站目录名（. 前缀与 DSH 官方目录区分）。 */
-export const DEFAULT_TRASH_DIR = '.sessions-recycle-bin'
+export const DEFAULT_TRASH_DIR = '.sessions-trash'
 
 export interface ArchiveConfig {
   readonly trashRoot: string

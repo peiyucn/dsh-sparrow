@@ -4,4 +4,4 @@
     - id: dsh-archive-manage
       name: '@dsh-sparrow/dsh-archive-manage'
       config:
-        trashRoot: !!js dshHomePath('.sessions-recycle-bin')
+        trashRoot: !!js dshHomePath('.sessions-trash')

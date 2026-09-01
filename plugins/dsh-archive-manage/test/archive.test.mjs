@@ -9,7 +9,7 @@ describe('archive-manage 纯逻辑', () => {
   describe('normalizeArchiveConfig', () => {
     it('空配置 应该 提供默认回收站目录', () => {
       const config = normalizeArchiveConfig(undefined)
-      assert.match(config.trashRoot, /\.sessions-recycle-bin/u)
+      assert.match(config.trashRoot, /\.sessions-trash/u)
     })
 
     it('trashRoot 配置 应该 优先采用', () => {
@@ -39,8 +39,8 @@ describe('archive-manage 纯逻辑', () => {
   describe('maskHomePath', () => {
     it('Windows home 前缀 应该 掩码为 ~', () => {
       assert.equal(
-        maskHomePath('C:\\Users\\DJ028191\\.dsh\\.sessions-recycle-bin', 'C:\\Users\\DJ028191'),
-        '~\\.dsh\\.sessions-recycle-bin',
+        maskHomePath('C:\\Users\\DJ028191\\.dsh\\.sessions-trash', 'C:\\Users\\DJ028191'),
+        '~\\.dsh\\.sessions-trash',
       )
     })
 
