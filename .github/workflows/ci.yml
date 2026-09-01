@@ -41,5 +41,7 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Typecheck all plugins (produce lib/ for tests)
+        run: pnpm run typecheck:all
       - name: Test all plugins
         run: pnpm run test:all
