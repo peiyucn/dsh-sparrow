@@ -14,12 +14,13 @@ on:
           - publish
           - promote
           - deprecate
+          - untag-latest
       plugin:
         description: 'Plugin directory name (e.g. dsh-chat-fim) — publish only'
         required: false
         type: string
       packages:
-        description: 'npm package specs, space separated (e.g. @scope/pkg@version) — promote/deprecate'
+        description: 'npm package specs, space separated (e.g. @scope/pkg@version) — promote/deprecate/untag-latest'
         required: false
         type: string
       version:
@@ -172,4 +173,12 @@ jobs:
         run: |
           for spec in ${{ inputs.packages }}; do
             npm deprecate "$spec" "${{ inputs.message }}"
+          done
+
+      - name: Remove misplaced latest tag
+        if: inputs.action == 'untag-latest'
+        shell: bash
+        run: |
+          for spec in ${{ inputs.packages }}; do
+            npm dist-tag rm "$spec" latest
           done
