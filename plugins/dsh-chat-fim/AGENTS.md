@@ -36,6 +36,7 @@ DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 +
 * **候选菜单（2026-08-30 起）**：官方没有输入框内联建议 seam（`conversation.input.overlay` 是菜单弹层锚点、不带输入快照）。当前实现：数据面挂 `conversation.input.dock`（读 InputZone 草稿快照，**只读**；写入仍走 `slash/input-insert-text` bail 事件，span CAS），菜单视图挂 `conversation.input.overlay`（官方 MenuDropdown 视觉 token，锚点由 shell 承载，零定位 JS）。**不修改编辑器内容**；官方提供 inline-suggestion seam 后迁移。2026-08-31 数据面自 `conversation.composer.dock` 迁至 `conversation.input.dock`：composer.dock 在 hero 状态（新会话页）不被 shell 渲染，导致新会话第一条草稿 0 联想；input.dock 在 hero/active 两种状态都渲染（查证与决策见 docs/spec/03-menu.md）。
 * **与官方触发菜单互斥**：对 `[data-trigger-menu]`（官方 @/斜杠触发菜单的公开 DOM 标记）做**只读存在性检测** + MutationObserver 观察 overlay 锚点子树；官方菜单打开期间本菜单不渲染、Tab 不采用。只读观察，不做任何写入。
 * **旋转光环定位**：只读测量 `[data-composer-card]` 视口矩形（portal 到 body），300ms 周期自愈。
+* **会话事件读取（2026-09-01 适配）**：dsh 0.1.2-alpha.4 移除 `Session.events`，官方改为按需读取 API（`seq` / `eventAt()` / `snapshotEvents()`）。`readSessionEvents`（suggest.ts）运行时 feature-detect：有 `snapshotEvents()` 用之（alpha.4），否则回退旧 `events` 属性（≤ 0.1.2-alpha.3）；host 两处主路由读取（GET 状态 / POST complete）均经此助手，不再直读字段。已对 alpha.4 源码复核：`SessionId` 导出与 `request/header` 事件形状不变。适配版本：dsh ≥ 0.1.2-alpha.4（0.1.1-rc.2 起回退兼容）。
 
 ***
 
