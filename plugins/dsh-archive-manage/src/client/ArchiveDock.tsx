@@ -88,12 +88,15 @@ export function ensureArchiveStyles(): void {
   gap: 0;
   padding: 0;
   border-radius: 50%;
+  corner-shape: round;
 }
 .dsh-archive-btn {
   height: 28px;
   padding: 0 12px;
   border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
   border-radius: 999px;
+  /* 官方 alpha.4 约定：全圆形状退出全局 superellipse 角（胶囊两端不被压方）。 */
+  corner-shape: round;
   outline: none;
   background: transparent;
   color: var(--dsw-alias-label-primary, #1f2329);
@@ -138,6 +141,7 @@ export function ensureArchiveStyles(): void {
   padding: 0;
   border: none;
   border-radius: 28px;
+  corner-shape: round;
   outline: none;
   background: transparent;
   cursor: pointer;
@@ -206,7 +210,7 @@ export function ensureArchiveStyles(): void {
   border-radius: 16px;
   background: var(--dsw-alias-bg-layer-2, #f6f7f9);
   color: var(--dsw-alias-label-primary, #1f2329);
-  box-shadow: var(--dsw-shadow-lv3, 0 12px 40px rgba(0,0,0,0.22));
+  box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
 }
 .dsh-archive-confirm-title {
   margin: 0;
@@ -294,6 +298,7 @@ export function ensureArchiveStyles(): void {
   border: 2px solid var(--dsw-alias-border-l1, #d4d8e0);
   border-top-color: var(--dsw-alias-button-info-fill, #4d6bfe);
   border-radius: 50%;
+  corner-shape: round;
   animation: dsh-archive-spin 0.8s linear infinite;
 }
 @keyframes dsh-archive-spin {
@@ -329,7 +334,7 @@ const styles = {
     padding: 0,
     background: 'var(--dsw-alias-bg-layer-2, #f6f7f9)',
     color: 'var(--dsw-alias-label-primary, #1f2329)',
-    boxShadow: 'var(--dsw-shadow-lv3, 0 12px 40px rgba(0,0,0,0.22))',
+    boxShadow: 'var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22))',
   } satisfies CSSProperties,
   row: {
     display: 'flex',
