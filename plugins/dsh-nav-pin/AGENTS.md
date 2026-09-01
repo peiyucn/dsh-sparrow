@@ -20,7 +20,7 @@ DSH Web 插件：让官方「轮次导航」（TurnNavigator，对话右侧跳�
 
 ## seam 特例（需项目 owner 认可，已定案）
 
-* **只读依赖官方 DOM 标记与文案**：`[data-conversation-scroll]`（公开标记，ui-conversation ConversationRoot）+ 轮次导航 nav 的 aria-label 两套文案（`Turn navigation` / `轮次导航`，`ui-chat/src/client/locale.ts:32/149`）；官方改文案需插件升级。已确认滚动体内另一 nav（会话层级面包屑，`会话层级` / `Session hierarchy`）标签不同不会误伤。
+* **只读依赖官方 DOM 标记与文案**：`[data-conversation-scroll]`（公开标记，ui-conversation ConversationRoot）+ 轮次导航 nav 的 aria-label 两套文案（`Turn navigation` / `轮次导航`，`ui-chat/src/client/locale.ts:32/149`）；官方改文案需插件升级。已确认滚动体内另一 nav（会话层级面包屑，`会话层级` / `Session hierarchy`）标签不同不会误伤。（2026-09-01 复核 alpha.4：locale.ts:32/149 文案、TurnNavigator.module.css 的 `@container (max-width: 900px)` 规则、`[data-conversation-scroll]` / `[data-phase]` / `[data-width-handle]`、`--dsh-composer-card-max-width` 消费点全部健在；alpha.4 只改圆角/描边/投影样式值，断点与命中区不受影响。）
 * **特异性压制官方隐藏规则**：官方 `@container (max-width: 900px) { .slot { display: none } }`（`TurnNavigator.module.css:215`）特异性 (0,1,0)；插件规则 (0,2,3)，无需 !important。
 * **transition 复刻**：≤700px 的 opacity 过渡与官方 `.frame` 的 `height 220ms` 过渡并列声明（覆盖 transition 简写会吃掉官方的高度动画）；官方改时长仅影响动画观感，不破坏功能。
 * **浮层不做面板框**（owner 实测拍板）：≤700px 只做 opacity 淡入，不加载底色 / 边框 / 圆角 / 阴影——轨道自身无视觉容器，与官方宽屏形态一致；命中区仍由 frame 28px + ::before 扩展承担。
