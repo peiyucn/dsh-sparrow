@@ -41,6 +41,8 @@ jobs:
     name: publish
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'publish')
     runs-on: ubuntu-latest
+    # npm 发布环境：Deployments 页留下发布记录，NPM_TOKEN 作用域收窄到环境级（pi 仓库同款做法）
+    environment: npm-publish
     # secrets 上下文不能出现在 step 的 if 里（GitHub 会拒绝解析整个工作流，
     # 表现为 0s 失败且无 job），必须先经 job 级 env 中转。
     env:
@@ -140,6 +142,7 @@ jobs:
     name: release-control
     if: github.event_name == 'workflow_dispatch' && inputs.action != 'publish'
     runs-on: ubuntu-latest
+    environment: npm-publish
     env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
