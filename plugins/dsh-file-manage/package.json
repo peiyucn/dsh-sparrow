@@ -29,7 +29,7 @@
     "docs/images/**",
     "README.md",
     "README.zh-CN.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md", "CHANGELOG.zh-CN.md"
   ],
   "dsh": {
     "bundle": {
