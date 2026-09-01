@@ -155,13 +155,12 @@ jobs:
           echo "NPM_TOKEN secret is required for npm release-control operations" >&2
           exit 1
 
-      - name: Authenticate with npm registry
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-
       - name: Promote versions to latest
         if: inputs.action == 'promote'
         shell: bash
+        env:
+          # 鉴权走 NODE_AUTH_TOKEN（npm 会忽略 ~/.npmrc，因为 Actions 把 userconfig 指向临时文件）
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for spec in ${{ inputs.packages }}; do
             npm dist-tag add "${spec}@${{ inputs.version }}" latest
@@ -170,6 +169,8 @@ jobs:
       - name: Deprecate versions
         if: inputs.action == 'deprecate'
         shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for spec in ${{ inputs.packages }}; do
             npm deprecate "$spec" "${{ inputs.message }}"
@@ -178,6 +179,8 @@ jobs:
       - name: Remove misplaced latest tag
         if: inputs.action == 'untag-latest'
         shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for spec in ${{ inputs.packages }}; do
             npm dist-tag rm "$spec" latest
