@@ -141,10 +141,10 @@
 3. 再次 `npm run verify` + `git diff --check`
 4. 合并 dev → main（fast-forward）并 push
 5. 打 **annotated tag**：`git tag -a <插件名>-vX.Y.Z -m "<一句话中文发布说明>"`（轻量 tag 在 GitHub tag 页显示的是 commit message，必须 `-a` 带说明）
-6. push tag → 自动触发 Publish 工作流（解析插件目录与 npm dist-tag：版本含 `-` 发 `next`，正式版发 `latest`；校验 tag 版本 == package.json version、verify 后 `npm publish --access public --provenance --tag <next|latest>`）。**tag 触发兜底**：推 tag 后 30 秒内若没有对应 Publish run（2026-09-01 实测出现过未触发，原因待查），改用 `gh workflow run publish.yml -f action=publish -f plugin=<插件名>` 手动派发（发布内容一致，仅跳过自动建 GitHub Release——Release 用 `gh release create <tag> --prerelease --notes-file <CHANGELOG 拼好的说明>` 补建）
+6. push tag → 自动触发 Publish 工作流（解析插件目录与 npm dist-tag：版本含 `-` 发 `next`，正式版发 `latest`；校验 tag 版本 == package.json version、verify 后 `npm publish --access public --provenance --tag <next|latest>`）。**tag 触发兜底**：推 tag 后 30 秒内若没有对应 Publish run（2026-09-01 实测出现过未触发，原因待查），改用 `gh workflow run publish.yml -f plugin=<插件名>` 手动派发（发布内容一致，仅跳过自动建 GitHub Release——Release 用 `gh release create <tag> --prerelease --notes-file <CHANGELOG 拼好的说明>` 补建）
 7. `gh run watch` 盯到 success；`npm view <包名> version dist-tags` 复核版本与 dist-tag
 8. **预发布待验证**：`next` 已指向新版本且 `latest` 未变；owner 通过 `dsh plugin --profile web add <包名>@next` 安装验证，未确认前不发布稳定版
-9. **转正**：owner 确认后把 `package.json` 版本改为稳定版 `X.Y.Z`（去掉 `-alpha.N`），CHANGELOG 记转正，按本流程发布该稳定版（工作流自动上 `latest`）；如需，用 publish.yml 手动触发 `deprecate` 标记被替代的坏版本（不 unpublish）
+9. **转正**：owner 确认后把 `package.json` 版本改为稳定版 `X.Y.Z`（去掉 `-alpha.N`），CHANGELOG 记转正，按本流程发布该稳定版（工作流自动上 `latest`）；如需标记坏版本，owner 本机 `npm login` 后 `npm deprecate <包>@<版本> "<原因>"`（不 unpublish）
 10. GitHub Release 已由 publish.yml 在发布后自动创建：说明由 publish.yml 拼接该插件两份 CHANGELOG 对应版本条目（英文在上、中文在下），**一律标 prerelease**（宿主 dsh 仍处预发布阶段；宿主转正后移除该标记），不附产物（npm 安装一律走 registry，对齐官方 DSH 惯例）；如需补充说明用 `gh release edit <tag> --notes "..."`（**不要重推 tag**）
 11. 切回 `dev` 继续开发
 
@@ -157,7 +157,7 @@
 #### 发布后收尾
 
 * npm 包页配置 **Trusted Publishing（OIDC）**：Settings → Access → Trusted publishers，owner `peiyucn` + repo `dsh-sparrow` + workflow 路径 `.github/workflows/publish.yml`
-* OIDC 配好并验证后：撤销用过的 token（聊天里贴过的 token 一律视为已暴露）、删除仓库 `NPM_TOKEN` secret——后续发布零密钥
+* OIDC 配好并验证后：撤销用过的 token（聊天里贴过的 token 一律视为已暴露）、删除仓库 `NPM_TOKEN` secret——后续发布零密钥（release-control 已移除，发布链路无 token 依赖）
 
 ***
 
@@ -171,6 +171,6 @@
 ## CI 与自动发布
 
 * `.github/workflows/ci.yml`：push dev/main 与 PR 时跑四过程 `typecheck`（tsc --noEmit）→ `build`（tsc 产出 lib/ + client bundle）→ `test`（node:test，CI 下产 JUnit artifact；测试依赖 lib/ 故 build 在前）→ `package`（npm pack --dry-run 校验 files 清单）
-* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`；dist-tag 自动选择：版本含 `-` → `next`，正式版 → `latest`；发布成功后自动建 GitHub Release（说明由 publish.yml 拼接该插件两份 CHANGELOG 对应版本条目，两份均缺条目回退 `--generate-notes`；一律标 prerelease——宿主 dsh 仍处预发布阶段；不附产物）；另含 `release-control` job：workflow_dispatch 手动选 `promote`（dist-tag 升 latest）或 `deprecate`（废弃坏版本）。publish 与 release-control 两个 job 均挂 `environment: npm-publish`（2026-09-01 起，pi 仓库同款做法）：Deployments 页留下每次发布记录，NPM_TOKEN 收窄到环境级作用域
+* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`；dist-tag 自动选择：版本含 `-` → `next`，正式版 → `latest`；发布成功后自动建 GitHub Release（说明由 publish.yml 拼接该插件两份 CHANGELOG 对应版本条目，两份均缺条目回退 `--generate-notes`；一律标 prerelease——宿主 dsh 仍处预发布阶段；不附产物）；publish job 挂 `environment: npm-publish`（2026-09-01 起，pi 仓库同款做法）：Deployments 页留下每次发布记录。**无 release-control**（2026-09-01 拍板移除）：通道变更一律走「发新版本号」（转正发同号稳定版自动上 `latest`），不直接改 dist-tag；deprecate 需要时由 owner 本机 `npm login` 后 `npm deprecate` 手动执行
 * 工作流实现细节（勿回退）：`NPM_TOKEN` 经 job 级 `env` 中转再进 step 的 `if`（`secrets` 上下文不允许出现在 `if` 里，直接写会让整条工作流 0s 解析失败）；`--provenance` 要求各插件 package.json 声明 `repository` 字段
 * 发布鉴权**双模式**：有 `NPM_TOKEN` secret 走 Automation token；无 secret 走 npm Trusted Publishing（OIDC）。包尚不存在（无法预配 OIDC）时必须有 `NPM_TOKEN`；长期方向是无 token 的 OIDC
