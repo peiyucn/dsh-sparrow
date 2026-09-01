@@ -192,11 +192,11 @@ export function apply(ctx: ClientContext): void {
       }>('/api/archive-manage/trash'),
       trashDirPath: async () => {
         const response = await fetch('/api/archive-manage/trash-dir')
-        const payload = await response.json() as { path?: string; displayPath?: string; warning?: string; error?: { message?: string } }
+        const payload = await response.json() as { path?: string; displayPath?: string; error?: { message?: string } }
         if (!response.ok) {
           throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
         }
-        return { path: payload.path ?? '', displayPath: payload.displayPath ?? payload.path ?? '', warning: payload.warning }
+        return { path: payload.path ?? '', displayPath: payload.displayPath ?? payload.path ?? '' }
       },
       moveToTrash: (sessionId: string) => postApi('/api/archive-manage/trash', { sessionId, confirm: true }),
       unarchiveSession: (sessionId: string) => postApi('/api/archive-manage/unarchive', { sessionId }),

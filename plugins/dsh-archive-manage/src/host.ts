@@ -17,9 +17,9 @@ import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import type { Workspace, WorkspaceDomainState } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
-  TRASH_SIDECAR, decideTrashMigration, defaultTrashDir, isDeleteConfirmationSufficient, legacyDefaultBackupDir,
-  legacyTrashItem, maskHomePath, normalizeArchiveConfig, parseBlankProjection, parseTrashSidecar,
-  sanitizeSegment, straySessionIds, type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar,
+  TRASH_SIDECAR, isDeleteConfirmationSufficient, legacyTrashItem, maskHomePath, normalizeArchiveConfig,
+  parseBlankProjection, parseTrashSidecar, sanitizeSegment, straySessionIds,
+  type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar,
 } from './archive.js'
 
 export const name = 'dsh-archive-manage'
@@ -525,48 +525,6 @@ async function restoreTrashDir(ctx: Context, surface: RegistryMutationSurface, t
   return sidecar
 }
 
-/** 目录存在性检查（迁移决策输入）。 */
-async function isDirectory(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isDirectory()
-  } catch {
-    return false
-  }
-}
-
-/**
- * 一次性迁移旧版备份目录 → 新版回收站目录（决策见 archive.ts decideTrashMigration）；
- * rename 失败继续用旧目录并在面板提示；意外错误回退为原配置目录，不让路由挂死。
- */
-async function migrateLegacyTrashDir(ctx: Context, settings: ArchiveConfig): Promise<{ trashRoot: string; warning?: string }> {
-  try {
-    const legacyDir = legacyDefaultBackupDir()
-    const targetDir = defaultTrashDir()
-    const decision = decideTrashMigration(
-      settings.trashRoot,
-      legacyDir,
-      targetDir,
-      await isDirectory(legacyDir),
-      await isDirectory(targetDir),
-    )
-    if (decision.kind !== 'migrate') {
-      return { trashRoot: decision.trashRoot, warning: decision.warning }
-    }
-    try {
-      await rename(decision.legacyDir, decision.targetDir)
-      ctx.logger.info(`dsh-archive-manage: 旧版备份目录已迁移为 ${decision.targetDir}`)
-      return { trashRoot: decision.targetDir }
-    } catch (error) {
-      const message = maskHomePath(error instanceof Error ? error.message : String(error), homedir())
-      ctx.logger.warn(`dsh-archive-manage: 旧版备份目录迁移失败，继续使用原目录：${message}`)
-      return { trashRoot: decision.legacyDir, warning: `旧版备份目录迁移失败（继续使用原目录）：${message}` }
-    }
-  } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: 回收站目录解析失败：${error instanceof Error ? error.message : String(error)}`)
-    return { trashRoot: settings.trashRoot }
-  }
-}
-
 /**
  * host half 入口：归档会话管理路由。
  * @param ctx - DSH 插件上下文。
@@ -576,12 +534,6 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
   const settings = normalizeArchiveConfig(config)
   // 私有 seam 依赖：官方 WorkspaceRegistry 的 enqueueOperation/requireState/setState（AGENTS 三档特例，2026-09-01）。
   const surface = assertRegistryMutationApi(ctx.workspaceRegistry)
-  // 回收站根目录懒解析（一次性迁移旧目录，见 archive.ts decideTrashMigration）；路由共享同一 promise。
-  let trashRootReady: Promise<{ trashRoot: string; warning?: string }> | undefined
-  const resolveTrashRoot = (): Promise<{ trashRoot: string; warning?: string }> => {
-    trashRootReady ??= migrateLegacyTrashDir(ctx, settings)
-    return trashRootReady
-  }
 
   // 启动清扫（均不影响加载）：归档集幽灵 id（历史遗留）、投影缓存陈旧行、孤儿 subagent 会话。
   void sweepGhostArchivedIds(ctx, surface)
@@ -594,7 +546,6 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
     handler: async (req, res) => {
       const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
       try {
-        const { trashRoot, warning } = await resolveTrashRoot()
         if (req.method === 'GET' && pathname === `${PREFIX}/list`) {
           const headers = await ctx.sessionPersistence.list()
           const byId = new Map(headers.map(header => [String(header.id), header]))
@@ -650,16 +601,15 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
         }
 
         if (req.method === 'GET' && pathname === `${PREFIX}/trash`) {
-          sendJson(res, 200, { items: await listTrashItems(trashRoot) })
+          sendJson(res, 200, { items: await listTrashItems(settings.trashRoot) })
           return
         }
 
         if (req.method === 'GET' && pathname === `${PREFIX}/trash-dir`) {
           // 面板提示信息用：明示回收站实际存放位置（卸载影响可见化）；displayPath 掩码 home 前缀（~）。
           sendJson(res, 200, {
-            path: trashRoot,
-            displayPath: maskHomePath(trashRoot, homedir()),
-            ...(warning !== undefined ? { warning } : {}),
+            path: settings.trashRoot,
+            displayPath: maskHomePath(settings.trashRoot, homedir()),
           })
           return
         }
@@ -721,9 +671,9 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           const subagents = await listSubagentTargets(ctx, sessionId)
 
           if (pathname.endsWith('/trash')) {
-            await ensureTrashRoot(trashRoot)
+            await ensureTrashRoot(settings.trashRoot)
             const trashId = `${sanitizeSegment(String(sessionId))}-${Date.now()}`
-            const trashDir = resolveTrashDir(trashRoot, trashId)
+            const trashDir = resolveTrashDir(settings.trashRoot, trashId)
             const moved: Array<{ from: string; to: string }> = []
             const rollbackMoves = async (): Promise<void> => {
               for (const move of [...moved].reverse()) {
@@ -853,7 +803,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           if (parsed.confirm !== true) {
             throw new ArchiveError('CONFIRMATION_FAILED', '彻底删除回收站条目需要二次确认')
           }
-          const trashDir = resolveTrashDir(trashRoot, parsed.trashId)
+          const trashDir = resolveTrashDir(settings.trashRoot, parsed.trashId)
           let info
           try {
             info = await stat(trashDir)
@@ -873,7 +823,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           if (typeof parsed.trashId !== 'string' || parsed.trashId.trim() === '') {
             throw new ArchiveError('BAD_BODY', 'trashId 必须是非空字符串')
           }
-          const trashDir = resolveTrashDir(trashRoot, parsed.trashId)
+          const trashDir = resolveTrashDir(settings.trashRoot, parsed.trashId)
           const sidecar = await restoreTrashDir(ctx, surface, trashDir)
           sendJson(res, 200, { ok: true, sessionId: sidecar.sessionId, workspaceIds: sidecar.workspaceIds })
           return
@@ -884,12 +834,12 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           if (parsed.confirm !== true) {
             throw new ArchiveError('CONFIRMATION_FAILED', '还原全部回收站条目需要二次确认')
           }
-          const names = await trashDirNames(trashRoot)
+          const names = await trashDirNames(settings.trashRoot)
           const restored: string[] = []
           const failed: Array<{ trashId: string; message: string }> = []
           let skippedLegacy = 0
           for (const name of names) {
-            const dir = resolveTrashDir(trashRoot, name)
+            const dir = resolveTrashDir(settings.trashRoot, name)
             try {
               const sidecar = await restoreTrashDir(ctx, surface, dir)
               restored.push(sidecar.sessionId)
@@ -910,12 +860,12 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           if (parsed.confirm !== true) {
             throw new ArchiveError('CONFIRMATION_FAILED', '彻底删除全部回收站条目需要二次确认')
           }
-          const names = await trashDirNames(trashRoot)
+          const names = await trashDirNames(settings.trashRoot)
           const failed: string[] = []
           let deleted = 0
           for (const name of names) {
             try {
-              const dir = resolveTrashDir(trashRoot, name)
+              const dir = resolveTrashDir(settings.trashRoot, name)
               const info = await stat(dir)
               if (info.isDirectory()) {
                 await rm(dir, { recursive: true, force: false })

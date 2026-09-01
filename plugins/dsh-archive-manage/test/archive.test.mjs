@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  decideTrashMigration, isDeleteConfirmationSufficient, legacyTrashItem, maskHomePath, normalizeArchiveConfig,
+  isDeleteConfirmationSufficient, legacyTrashItem, maskHomePath, normalizeArchiveConfig,
   parseTrashSidecar, parseBlankProjection, sanitizeSegment, straySessionIds,
 } from '../lib/archive.js'
 
@@ -17,14 +17,8 @@ describe('archive-manage 纯逻辑', () => {
       assert.equal(config.trashRoot, 'D:/trash')
     })
 
-    it('仅旧键 backupRoot 应该 回退读取', () => {
-      const config = normalizeArchiveConfig({ backupRoot: 'D:/old' })
-      assert.equal(config.trashRoot, 'D:/old')
-    })
-
-    it('trashRoot 与 backupRoot 同给 应该 优先 trashRoot', () => {
-      const config = normalizeArchiveConfig({ trashRoot: 'D:/new', backupRoot: 'D:/old' })
-      assert.equal(config.trashRoot, 'D:/new')
+    it('trashRoot 空串 应该 抛明确错误', () => {
+      assert.throws(() => normalizeArchiveConfig({ trashRoot: '  ' }), /trashRoot/u)
     })
   })
 
@@ -89,58 +83,6 @@ describe('archive-manage 纯逻辑', () => {
       assert.equal(item.legacy, true)
       assert.deepEqual(item.workspaceIds, [])
       assert.match(item.archivedAt, /^\d{4}-\d{2}-\d{2}T/u)
-    })
-  })
-
-  describe('decideTrashMigration', () => {
-    const legacy = 'C:/Users/u/.dsh/sessions-archived-backup'
-    const target = 'C:/Users/u/.dsh/.sessions-recycle-bin'
-
-    it('配置指向旧默认目录且旧在、新缺 应该 决定迁移', () => {
-      const decision = decideTrashMigration(legacy, legacy, target, true, false)
-      assert.equal(decision.kind, 'migrate')
-      if (decision.kind === 'migrate') {
-        assert.equal(decision.legacyDir, legacy)
-        assert.equal(decision.targetDir, target)
-      }
-    })
-
-    it('配置指向旧默认目录但旧缺 应该 直接用新目录不迁移', () => {
-      const decision = decideTrashMigration(legacy, legacy, target, false, false)
-      assert.equal(decision.kind, 'none')
-      if (decision.kind === 'none') assert.equal(decision.trashRoot, target)
-    })
-
-    it('旧新双在 应该 用新目录并提示旧目录残留', () => {
-      const decision = decideTrashMigration(legacy, legacy, target, true, true)
-      assert.equal(decision.kind, 'none')
-      if (decision.kind === 'none') {
-        assert.equal(decision.trashRoot, target)
-        assert.ok(decision.warning !== undefined)
-      }
-    })
-
-    it('自定义目录且旧默认目录仍在 应该 不迁移并提示', () => {
-      const decision = decideTrashMigration('D:/custom', legacy, target, true, false)
-      assert.equal(decision.kind, 'none')
-      if (decision.kind === 'none') {
-        assert.equal(decision.trashRoot, 'D:/custom')
-        assert.ok(decision.warning !== undefined)
-      }
-    })
-
-    it('自定义目录且旧默认目录不在 应该 无提示', () => {
-      const decision = decideTrashMigration('D:/custom', legacy, target, false, false)
-      assert.equal(decision.kind, 'none')
-      if (decision.kind === 'none') {
-        assert.equal(decision.trashRoot, 'D:/custom')
-        assert.equal(decision.warning, undefined)
-      }
-    })
-
-    it('大小写不同的同一路径 应该 视为旧默认位置', () => {
-      const decision = decideTrashMigration('C:/Users/U/.dsh/SESSIONS-ARCHIVED-BACKUP', legacy, target, true, false)
-      assert.equal(decision.kind, 'migrate')
     })
   })
 

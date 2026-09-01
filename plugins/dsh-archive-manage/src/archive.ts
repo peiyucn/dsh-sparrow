@@ -1,17 +1,13 @@
-/** dsh-archive-manage 纯逻辑：配置、确认强度、回收站目录与迁移决策、sidecar 解析。 */
+/** dsh-archive-manage 纯逻辑：配置、确认强度、回收站目录、sidecar 解析。 */
 
 import { join } from 'node:path'
 
 export const TRASH_SIDECAR = 'dsh-archive-manage.json'
-/** 回收站目录名（2026-09-01 改名：. 前缀与 DSH 官方目录区分；旧名见 LEGACY_BACKUP_DIR）。 */
+/** 回收站目录名（. 前缀与 DSH 官方目录区分）。 */
 export const DEFAULT_TRASH_DIR = '.sessions-recycle-bin'
-/** 0.1.0-alpha.x 时期使用的备份目录名（一次性迁移检测用）。 */
-export const LEGACY_BACKUP_DIR = 'sessions-archived-backup'
 
 export interface ArchiveConfig {
   readonly trashRoot: string
-  /** 旧配置键（0.1.0-alpha.x 的 backupRoot）：trashRoot 未配置时回退读取，改名后保留兼容。 */
-  readonly backupRoot?: string
 }
 
 export interface ArchiveSubagentSidecar {
@@ -38,22 +34,15 @@ function dshHomeBase(): string {
   return process.env.DSH_HOME?.trim() || fallbackHome
 }
 
-/** 新版默认回收站目录的绝对路径。 */
+/** 默认回收站目录的绝对路径。 */
 export function defaultTrashDir(): string {
   return join(dshHomeBase(), DEFAULT_TRASH_DIR)
 }
 
-/** 旧版默认备份目录的绝对路径（迁移检测用）。 */
-export function legacyDefaultBackupDir(): string {
-  return join(dshHomeBase(), LEGACY_BACKUP_DIR)
-}
-
 export function normalizeArchiveConfig(input: Readonly<Partial<ArchiveConfig>> | undefined): ArchiveConfig {
-  const legacy = input?.backupRoot?.trim()
   const trash = input?.trashRoot?.trim()
   if (trash !== undefined && trash === '') throw new Error('dsh-archive-manage: trashRoot 不能为空')
-  const trashRoot = trash || legacy || defaultTrashDir()
-  return { trashRoot, ...(legacy !== undefined && legacy !== '' ? { backupRoot: legacy } : {}) }
+  return { trashRoot: trash || defaultTrashDir() }
 }
 
 /** 彻底删除强确认：用户输入必须与会话当前标题逐字一致（trim 后比较）。 */
@@ -144,35 +133,6 @@ export function legacyTrashItem(name: string, mtimeMs: number): LegacyTrashItem 
     workspaceIds: [],
     legacy: true,
   }
-}
-
-export type TrashMigrationDecision =
-  | { readonly kind: 'migrate'; readonly legacyDir: string; readonly targetDir: string }
-  | { readonly kind: 'none'; readonly trashRoot: string; readonly warning?: string }
-
-/**
- * 一次性目录迁移决策（旧在 / 新在 / 双在 / 自定义配置）：
- * - 配置指向旧默认目录：旧在且新缺 → migrate（调用方 rename 旧目录到新目录）；
- *   旧缺 → 直接用新目录；双在 → 用新目录 + 提示旧目录残留未迁移
- * - 配置指向自定义目录：不动它；旧默认目录仍存在时提示残留
- * 路径相等比较不区分大小写（Windows 盘符路径大小写不稳定）。
- */
-export function decideTrashMigration(
-  trashRoot: string,
-  legacyDir: string,
-  targetDir: string,
-  legacyExists: boolean,
-  targetExists: boolean,
-): TrashMigrationDecision {
-  const atLegacy = trashRoot.toLowerCase() === legacyDir.toLowerCase()
-  if (!atLegacy) {
-    return legacyExists
-      ? { kind: 'none', trashRoot, warning: `检测到旧版备份目录仍存在（${legacyDir}），内容未迁移：请自行处理，或把回收站目录配置指向它` }
-      : { kind: 'none', trashRoot }
-  }
-  if (!legacyExists) return { kind: 'none', trashRoot: targetDir }
-  if (!targetExists) return { kind: 'migrate', legacyDir, targetDir }
-  return { kind: 'none', trashRoot: targetDir, warning: `新旧回收站目录并存：旧目录（${legacyDir}）的内容未迁移，请自行处理` }
 }
 
 /**

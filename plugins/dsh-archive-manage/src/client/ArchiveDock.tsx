@@ -39,7 +39,7 @@ export interface ArchiveDockInjected {
   listStrays: () => Promise<StraySessionItem[]>
   listTrashItems: () => Promise<TrashItem[]>
   /** 回收站实际存放目录（绝对路径 + 掩码后的展示路径），面板提示信息里明示卸载影响。 */
-  trashDirPath: () => Promise<{ path: string; displayPath: string; warning?: string }>
+  trashDirPath: () => Promise<{ path: string; displayPath: string }>
   moveToTrash: (sessionId: string) => Promise<unknown>
   unarchiveSession: (sessionId: string) => Promise<unknown>
   deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => Promise<unknown>
@@ -496,7 +496,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
   const [strays, setStrays] = useState<StraySessionItem[]>([])
   const [trashItems, setTrashItems] = useState<TrashItem[]>([])
-  const [trashDir, setTrashDir] = useState<{ path: string; displayPath: string; warning?: string } | null>(null)
+  const [trashDir, setTrashDir] = useState<{ path: string; displayPath: string } | null>(null)
   const [archivedOpen, setArchivedOpen] = useState(true)
   const [straysOpen, setStraysOpen] = useState(true)
   const [trashOpen, setTrashOpen] = useState(false)
@@ -814,11 +814,6 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 </>
               ) : null}
             </p>
-            {trashDir !== null && trashDir.warning !== undefined && trashDir.warning !== '' ? (
-              <p role="status" style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)', fontSize: 13, lineHeight: '20px', margin: '0 0 12px' }}>
-                {trashDir.warning}
-              </p>
-            ) : null}
             {error !== null ? (
               <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)', margin: '0 0 12px' }}>
                 {error}
