@@ -56,6 +56,31 @@ export function ensureFileManageStyles(): void {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 整页 loading：首屏数据（列表 + 总数）落定前占满内容区，避免「打开后加载闪动」（2026-09-01）。 */
+.dsh-file-manage-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 240px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 14px;
+  line-height: 22px;
+}
+.dsh-file-manage-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--dsw-alias-border-l1, #d4d8e0);
+  border-top-color: var(--dsw-alias-button-info-fill, #4d6bfe);
+  border-radius: 50%;
+  animation: dsh-file-manage-spin 0.8s linear infinite;
+}
+@keyframes dsh-file-manage-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dsh-file-manage-spinner { animation: none; }
+}
 /* 面板滚动区：官方 settings 同款——elevated surface 重绑 l2 滚动条 token（base 默认 l1，浮层上对比度不对）。 */
 .dsh-file-manage-body {
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);

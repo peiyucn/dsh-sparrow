@@ -31,15 +31,20 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
   const [busyDelete, setBusyDelete] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [summary, setSummary] = useState<FileCountSummary | null>(null)
+  /** 总数统计请求尚未落定：与 loading 一起构成首屏 ready 门（2026-09-01 整页 loading）。 */
+  const [summaryPending, setSummaryPending] = useState(false)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   /** 刷新代际：快速关/开面板产生并发请求时，只让最新一次的结果落地（陈旧响应竞态，archive 同款）。 */
   const refreshSeqRef = useRef(0)
   /** 「已复制」反馈 2s 复位（archive 同款）。 */
   const copiedTimerRef = useRef<number | null>(null)
 
-  const loadFirst = useCallback(() => {
+  /** 首屏 / 重试共用：列表与总数统计并发拉取，两者都落定才揭开内容（整页 loading 防闪动，2026-09-01）。 */
+  const reload = useCallback(() => {
     const seq = ++refreshSeqRef.current
     setLoading(true)
+    setSummaryPending(true)
+    setSummary(null)
     setError(null)
     listFiles()
       .then(page => {
@@ -55,7 +60,16 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
       .finally(() => {
         if (seq === refreshSeqRef.current) setLoading(false)
       })
-  }, [listFiles])
+    // 总数统计为 best-effort：接口失败只隐藏统计行，不影响列表；同样受刷新代际约束。
+    void countFiles()
+      .then(next => {
+        if (seq === refreshSeqRef.current) setSummary(next)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (seq === refreshSeqRef.current) setSummaryPending(false)
+      })
+  }, [listFiles, countFiles])
 
   // 官方弹窗行为：打开时聚焦关闭按钮，Esc 关闭。
   useEffect(() => {
@@ -72,15 +86,11 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
     if (!open) return
     setConfirming(null)
     setSummary(null)
-    loadFirst()
-    // 总数统计为 best-effort：接口失败只隐藏统计行，不影响列表；同样受刷新代际约束。
-    const seq = refreshSeqRef.current
-    void countFiles()
-      .then(next => {
-        if (seq === refreshSeqRef.current) setSummary(next)
-      })
-      .catch(() => {})
-  }, [open, loadFirst, countFiles])
+    setRows([])
+    setHasMore(false)
+    setLastId(undefined)
+    reload()
+  }, [open, reload])
 
   useEffect(() => () => {
     if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current)
@@ -110,6 +120,9 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
       setError(t('copyFailed'))
     }
   }, [t])
+
+  /** 首屏 ready 门：列表 + 总数都落定前展示整页 loading（2026-09-01）。 */
+  const initialLoading = loading || summaryPending
 
   const quotaRatio = summary === null ? 0 : storageUsageRatio(summary.totalBytes, summary.quotaBytes)
 
@@ -174,15 +187,21 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
               </div>
             ) : null}
             <div style={{ ...styles.body, padding: summary !== null ? '0 24px 24px' : '12px 24px 24px' }} className="dsh-file-manage-body">
+              {initialLoading ? (
+                <div className="dsh-file-manage-loading" role="status">
+                  <span className="dsh-file-manage-spinner" aria-hidden />
+                  <span>{t('loading')}</span>
+                </div>
+              ) : (
+                <>
               {error !== null ? (
                 <p role="alert" style={{ ...styles.secondarySmall, margin: '0 0 12px', color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>
                   {error}
                   {' '}
-                  <button type="button" className="dsh-file-manage-btn" onClick={loadFirst}>{t('retry')}</button>
+                  <button type="button" className="dsh-file-manage-btn" onClick={() => { reload() }}>{t('retry')}</button>
                 </p>
               ) : null}
-              {loading ? <p style={styles.secondarySmall}>{t('loading')}</p> : null}
-              {!loading && error === null && rows.length === 0 ? <p style={styles.secondarySmall}>{t('empty')}</p> : null}
+              {error === null && rows.length === 0 ? <p style={styles.secondarySmall}>{t('empty')}</p> : null}
               {rows.length > 0 ? (
                 <div className="dsh-file-manage-card">
                   {rows.map(row => (
@@ -217,8 +236,10 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
                   ))}
                 </div>
               ) : null}
+                </>
+              )}
             </div>
-            {hasMore && !loading ? (
+            {hasMore && !initialLoading ? (
               <div style={styles.footerBar}>
                 <button
                   type="button"
