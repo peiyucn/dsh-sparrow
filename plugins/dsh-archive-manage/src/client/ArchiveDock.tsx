@@ -91,17 +91,16 @@ export function ensureArchiveStyles(): void {
   corner-shape: round;
 }
 .dsh-archive-btn {
+  /* 官方 Button.sm 同款几何：h28 + r14 胶囊（超椭圆角随官方全局规则自动生效）。 */
   height: 28px;
-  padding: 0 12px;
-  border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
-  border-radius: 999px;
-  /* 官方 alpha.4 约定：全圆形状退出全局 superellipse 角（胶囊两端不被压方）。 */
-  corner-shape: round;
+  padding: 0 10px;
+  border: 0.5px solid var(--dsw-alias-border-l3, #d4d8e0);
+  border-radius: 14px;
   outline: none;
   background: transparent;
   color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 12px;
+  line-height: 18px;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -140,8 +139,7 @@ export function ensureArchiveStyles(): void {
   height: 28px;
   padding: 0;
   border: none;
-  border-radius: 28px;
-  corner-shape: round;
+  border-radius: 8px;
   outline: none;
   background: transparent;
   cursor: pointer;
