@@ -35,4 +35,11 @@ Requires dsh ≥ 0.1.1-rc.2 and a working `pnpm` (`dsh plugin` forwards installa
 
 ## Uninstall & Residue
 
-* **Uninstalling does not restore backups**: the backup folder and the session folders inside it stay. Restore all backups before uninstalling; if already uninstalled, reinstall the plugin to restore them.
+Uninstalling does **not** restore anything automatically: once the plugin is removed from DSH, its code is no longer loaded, so there is no moment for it to run — an inherent constraint of DSH's plugin mechanism. Decide the fate of your data before uninstalling:
+
+* **Backed-up sessions**: their folders and sidecar files stay in the backup folder; reinstalling the plugin lets you restore or delete them again
+* **Deleted sessions**: irreversible, whether or not you uninstall
+* **Unarchived sessions**: files were never moved — they stay in the official session list, no residue
+
+* Before uninstalling: settle the backups area in one step ("Restore all" or "Delete all"), then uninstall
+* Already uninstalled? Reinstall the plugin to keep managing the backup folder (as long as sidecar files exist, restore works)

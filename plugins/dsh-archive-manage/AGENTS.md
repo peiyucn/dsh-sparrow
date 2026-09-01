@@ -23,7 +23,7 @@ DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入�
   * 备份/删除成功后**补发官方公开事件 `api-session/removed`**（session-controller 的 cordis Events 公开声明、@mode emit）：会话目录已移走，客户端会话列表据此即时移除条目，避免侧边栏「未分组」残留（2026-08-30）。
   * **启动清扫删除孤儿 subagent 会话**（`origin === 'subagent'` 且父会话已不在持久化中）：目录 `rm` + 投影行失效 + 工作区记账清理；父/子任一侧仍被进程占用时跳过。与删除档同属目录级 `rm` 特例；jsonl 后端 `list()` 按目录枚举，删目录即从持久化清单消失（2026-08-31 查证 `packages/session/session-persistence-jsonl/src/index.ts`）。
   * 备份目录写 `dsh-archive-manage.json` sidecar（原路径 / 标题 / workspaceIds，version 2 另含 subagents 清单：各自原路径 / 标题 / workspaceIds），恢复时父目录与子目录一并移回并 `WorkspaceEntity.attachSession()`；无 sidecar 的旧格式目录按「仅列出/删除」收纳，不尝试恢复；version 1 sidecar 照常恢复（视为无 subagents）。
-* **卸载透明**（2026-08-30 起）：备份位置在归档面板顶部提示中明示（`GET /api/archive-manage/backup-dir`，点击复制）；备份语义提示（不再出现在 @ 列表）放在备份区内；卸载影响与恢复指引只在 README《卸载与残留》章节；卸载不自动恢复备份，恢复逻辑只经本插件。
+* **卸载透明**（2026-08-30 起；卸载语义 2026-09-01 口径固化）：备份位置在归档面板顶部提示中明示（`GET /api/archive-manage/backup-dir`，点击复制）；备份语义提示（不再出现在 @ 列表）放在备份区内；卸载影响与恢复指引只在 README《卸载与残留》章节。**卸载语义（2026-09-01）**：插件从 profile 移除后代码不再加载，卸载没有执行时机，「卸载时自动恢复」技术上不存在——卸载 = 卸载前显式收尾（面板「全部恢复」/「全部删除」一步处理）+ 卸载后诚实残留（备份夹 + sidecar 保留，重装即恢复能力；取消归档零残留；彻底删除不可逆）；恢复逻辑只经本插件，不做假的「卸载清理」承诺。
 * **仍禁止**：monkey-patch 核心、读 / 改会话日志内容、动会话目录以外的内部文件（附件 / 存储域 / 凭据等一律走官方服务）。
 
 ## 架构约束
