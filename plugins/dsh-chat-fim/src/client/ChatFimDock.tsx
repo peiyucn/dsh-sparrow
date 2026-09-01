@@ -273,6 +273,7 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   color: var(--dsw-alias-label-secondary);
   font-size: 13px;
   line-height: 20px;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
 }
