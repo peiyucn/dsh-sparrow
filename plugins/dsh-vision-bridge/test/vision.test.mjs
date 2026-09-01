@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   extractJsonObject, findImageReference, isDeepseekMainRoute, mainRouteFromSession, modelSupportsImages,
-  normalizeAttachmentId, normalizeVisionConfig, parseVisionReport, readSessionEvents,
+  normalizeAttachmentId, normalizeVisionConfig, parseVisionReport,
   renderVisionReport, resolveVisionOutput, shouldClearInputModalities, visionCacheKey, VisionCache,
 } from '../lib/vision.js'
 
@@ -285,20 +285,4 @@ describe('vision-bridge 纯逻辑', () => {
     })
   })
 
-  describe('readSessionEvents', () => {
-    it('snapshotEvents 存在 应该 用之（alpha.4 语义）', () => {
-      const snapshot = [{ type: 'request/header' }]
-      const session = { snapshotEvents: () => snapshot, events: [] }
-      assert.equal(readSessionEvents(session), snapshot)
-    })
-
-    it('仅有旧 events 属性 应该 回退读取（alpha.3 兼容）', () => {
-      const events = [{ type: 'request/header' }]
-      assert.deepEqual(readSessionEvents({ events }), events)
-    })
-
-    it('两者都缺 应该 返回空数组', () => {
-      assert.deepEqual(readSessionEvents({}), [])
-    })
-  })
 })

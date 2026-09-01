@@ -13,7 +13,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-tools'
 import {
   extractJsonObject, findImageReference, isDeepseekMainRoute, mainRouteFromSession, modelSupportsImages,
-  normalizeVisionConfig, parseVisionReport, readSessionEvents, renderVisionReport, resolveVisionOutput, shouldClearInputModalities,
+  normalizeVisionConfig, parseVisionReport, renderVisionReport, resolveVisionOutput, shouldClearInputModalities,
   visionCacheKey, VisionCache, type VisionConfig, type VisionReport,
 } from './vision.js'
 
@@ -70,7 +70,7 @@ function currentMainModel(ctx: Context, session: Session): { provider: string; m
   } catch {
     // 投影未注册 / 读取失败：回退请求头。
   }
-  const fromEvents = mainRouteFromSession(readSessionEvents(session))
+  const fromEvents = mainRouteFromSession(session.snapshotEvents())
   if (fromEvents !== undefined) return fromEvents
   try {
     const defaultModel = ctx.get('agentDefaultModel') as {
@@ -184,7 +184,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         throw new Error('vision_read requires a calling agent (exec.agent was undefined)')
       }
       const attachmentId = args.attachmentId as string
-      const lookup = findImageReference(readSessionEvents(agent.session), attachmentId)
+      const lookup = findImageReference(agent.session.snapshotEvents(), attachmentId)
       if (!lookup.ok) {
         const ids = lookup.matches.length > 0
           ? lookup.matches.map(id => shortId(id)).join(', ')
@@ -197,7 +197,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       const ref = lookup.ref
 
       // 主模型不是 DeepSeek 系列时禁用（用户在非 deepseek 模型会话中无视觉功能）。
-      const main = mainRouteFromSession(readSessionEvents(agent.session))
+      const main = mainRouteFromSession(agent.session.snapshotEvents())
       if (!isDeepseekMainRoute(main)) {
         throw new Error(`vision_read: 当前主模型 ${main?.provider ?? '?'}/${main?.model ?? '?'} 不是 DeepSeek 系列，视觉功能已禁用`)
       }
