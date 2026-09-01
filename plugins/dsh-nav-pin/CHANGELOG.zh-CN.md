@@ -1,6 +1,6 @@
 # 更新日志
 
-> English version: [CHANGELOG.md](CHANGELOG.md)。
+简体中文 | [English](CHANGELOG.md)
 
 ## 0.1.0-alpha.1 (2026-09-01 · pre-release)
 

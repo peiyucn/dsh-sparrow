@@ -1,6 +1,6 @@
 # Changelog
 
-> 中文版本见 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)。
+English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## 0.1.0-alpha.1 (2026-09-01 · pre-release)
 
