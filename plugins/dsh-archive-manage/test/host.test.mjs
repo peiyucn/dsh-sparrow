@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { resolve, sep } from 'node:path'
-import { assertRegistryMutationApi, mutateArchivedSet, resolveBackupDir, sessionDirectoryFor } from '../lib/host.js'
+import { assertRegistryMutationApi, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor } from '../lib/host.js'
 
 // 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
 // 测试夹具按当前平台构造——CI 跑 Ubuntu、本机跑 Windows，两边都必须绿。
@@ -13,21 +13,21 @@ const sessionDir = win ? 'C:\\dsh\\sessions\\session-1' : '/dsh/sessions/session
 const rootLevelSession = win ? 'C:\\session.jsonl' : '/session.jsonl'
 
 describe('archive-manage host 纯逻辑', () => {
-  describe('resolveBackupDir', () => {
-    it('合法备份 id 应该 解析到 backupRoot 下', () => {
-      const dir = resolveBackupDir(root, 'abc-123')
+  describe('resolveTrashDir', () => {
+    it('合法回收站 id 应该 解析到 trashRoot 下', () => {
+      const dir = resolveTrashDir(root, 'abc-123')
       assert.equal(dir, resolve(root, 'abc-123'))
     })
 
-    it('绝对路径风格的备份 id 应该 被消毒后仍落在 backupRoot 下', () => {
-      const dir = resolveBackupDir(root, evilId)
+    it('绝对路径风格的回收站 id 应该 被消毒后仍落在 trashRoot 下', () => {
+      const dir = resolveTrashDir(root, evilId)
       const prefix = resolve(root)
       assert.ok(dir === prefix || dir.startsWith(`${prefix}${sep}`))
       assert.ok(!dir.startsWith(win ? 'C:\\evil' : '/evil'))
     })
 
-    it('空备份 id 应该 落到 unknown 目录', () => {
-      const dir = resolveBackupDir(root, '')
+    it('空回收站 id 应该 落到 unknown 目录', () => {
+      const dir = resolveTrashDir(root, '')
       assert.equal(dir, resolve(root, 'unknown'))
     })
   })

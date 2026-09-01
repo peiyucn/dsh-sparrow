@@ -16,8 +16,8 @@ export interface ArchivedSessionItem {
   readonly workspaceIds: readonly string[]
 }
 
-export interface BackupItem {
-  readonly backupId: string
+export interface TrashItem {
+  readonly trashId: string
   readonly sessionId: string
   readonly title: string
   readonly archivedAt: string
@@ -37,15 +37,15 @@ export interface StraySessionItem {
 export interface ArchiveDockInjected {
   listArchived: () => Promise<ArchivedSessionItem[]>
   listStrays: () => Promise<StraySessionItem[]>
-  listBackups: () => Promise<BackupItem[]>
-  /** 备份实际存放目录（绝对路径 + 掩码后的展示路径），面板提示信息里明示卸载影响。 */
-  backupDirPath: () => Promise<{ path: string; displayPath: string }>
-  backupSession: (sessionId: string) => Promise<unknown>
+  listTrashItems: () => Promise<TrashItem[]>
+  /** 回收站实际存放目录（绝对路径 + 掩码后的展示路径），面板提示信息里明示卸载影响。 */
+  trashDirPath: () => Promise<{ path: string; displayPath: string; warning?: string }>
+  moveToTrash: (sessionId: string) => Promise<unknown>
   deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => Promise<unknown>
-  restoreBackup: (backupId: string) => Promise<unknown>
-  deleteBackup: (backupId: string) => Promise<unknown>
-  restoreAllBackups: () => Promise<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ backupId: string; message: string }> }>
-  deleteAllBackups: () => Promise<{ deleted?: number; failed?: string[] }>
+  restoreTrashItem: (trashId: string) => Promise<unknown>
+  deleteTrashItem: (trashId: string) => Promise<unknown>
+  restoreAllTrash: () => Promise<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ trashId: string; message: string }> }>
+  deleteAllTrash: () => Promise<{ deleted?: number; failed?: string[] }>
 }
 
 export type ArchiveDockProps = PropsRuntime<'sidebar.footer.action'> & ArchiveDockInjected & { t: TranslateNS<'archive-manage'> }
@@ -170,7 +170,7 @@ export function ensureArchiveStyles(): void {
   background: var(--dsw-specific-sidebar-nav-item-hover, var(--dsw-alias-interactive-bg-hover));
 }
 /* 区块卡：官方 settings 内容卡同款 token（ModelsSection .rowCard：border-l2 + r12），
-   归档区 / 备份区各包一块，视觉上分割两组列表；应用无全局 border-box，须显式声明。 */
+   归档区 / 回收站各包一块，视觉上分割两组列表；应用无全局 border-box，须显式声明。 */
 .dsh-archive-section-card {
   box-sizing: border-box;
   display: flex;
@@ -242,8 +242,8 @@ export function ensureArchiveStyles(): void {
   line-height: 18px;
   color: var(--dsw-alias-state-error-primary, #c62828);
 }
-/* 备份路径按钮：掩码展示，点击复制完整路径（悬停 title 给全文）。 */
-.dsh-archive-backup-dir {
+/* 回收站路径按钮：掩码展示，点击复制完整路径（悬停 title 给全文）。 */
+.dsh-archive-trash-dir {
   display: inline;
   padding: 0;
   border: none;
@@ -256,7 +256,7 @@ export function ensureArchiveStyles(): void {
   cursor: pointer;
   word-break: break-all;
 }
-.dsh-archive-backup-dir:hover {
+.dsh-archive-trash-dir:hover {
   text-decoration: underline;
 }
 .dsh-archive-confirm-status {
@@ -275,7 +275,7 @@ export function ensureArchiveStyles(): void {
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
-/* 整页 loading：四个初始请求（归档/游离/备份/备份目录）都落定前占满内容区，
+/* 整页 loading：四个初始请求（归档/游离/回收站/回收站目录）都落定前占满内容区，
    避免「打开后加载闪动」（2026-09-01）。 */
 .dsh-archive-loading {
   display: flex;
@@ -367,11 +367,11 @@ const styles = {
 
 /** 待确认动作（web 确认框状态）。 */
 type PendingConfirm =
-  | { readonly kind: 'backup'; readonly item: ArchivedSessionItem }
+  | { readonly kind: 'trash'; readonly item: ArchivedSessionItem }
   | { readonly kind: 'delete'; readonly item: ArchivedSessionItem }
-  | { readonly kind: 'backupStray'; readonly item: StraySessionItem }
+  | { readonly kind: 'trashStray'; readonly item: StraySessionItem }
   | { readonly kind: 'deleteStray'; readonly item: StraySessionItem }
-  | { readonly kind: 'deleteBackup'; readonly item: BackupItem }
+  | { readonly kind: 'deleteTrashItem'; readonly item: TrashItem }
   | { readonly kind: 'restoreAll'; readonly restorable: number; readonly legacy: number }
   | { readonly kind: 'deleteAll'; readonly count: number }
 
@@ -392,23 +392,23 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
   const needsTyping = pending.kind === 'delete' || (pending.kind === 'deleteStray' && !pending.item.blank) || pending.kind === 'deleteAll'
   const phrase = t('confirm.deleteAllPhrase')
   const expected = pending.kind === 'delete' || pending.kind === 'deleteStray' ? pending.item.title.trim() : pending.kind === 'deleteAll' ? phrase : ''
-  const title = pending.kind === 'backup' || pending.kind === 'backupStray' ? t('action.backup')
-    : pending.kind === 'delete' || pending.kind === 'deleteStray' || pending.kind === 'deleteBackup' ? t('action.delete')
+  const title = pending.kind === 'trash' || pending.kind === 'trashStray' ? t('action.trash')
+    : pending.kind === 'delete' || pending.kind === 'deleteStray' || pending.kind === 'deleteTrashItem' ? t('action.deletePermanently')
       : pending.kind === 'restoreAll' ? t('action.restoreAll', { count: pending.restorable })
         : t('action.deleteAll')
-  const description = pending.kind === 'backup' || pending.kind === 'backupStray' ? t('confirm.backup', { name: pending.item.title })
+  const description = pending.kind === 'trash' || pending.kind === 'trashStray' ? t('confirm.trash', { name: pending.item.title })
     : pending.kind === 'delete' ? t('confirm.delete', { name: pending.item.title })
       : pending.kind === 'deleteStray'
         ? (pending.item.blank
           ? t('confirm.deleteStrayBlank', { name: pending.item.title })
           : t('confirm.delete', { name: pending.item.title }))
-        : pending.kind === 'deleteBackup' ? t('confirm.deleteBackup', { name: pending.item.title })
+        : pending.kind === 'deleteTrashItem' ? t('confirm.deleteTrashItem', { name: pending.item.title })
           : pending.kind === 'restoreAll'
             ? (pending.legacy > 0
               ? t('confirm.restoreAll.withLegacy', { count: pending.restorable, legacy: pending.legacy })
               : t('confirm.restoreAll', { count: pending.restorable }))
             : t('confirm.deleteAll', { count: pending.count, phrase })
-  const workingText = pending.kind === 'backup' || pending.kind === 'backupStray' ? t('confirm.backingUp')
+  const workingText = pending.kind === 'trash' || pending.kind === 'trashStray' ? t('confirm.movingToTrash')
     : pending.kind === 'restoreAll' ? t('confirm.restoring')
       : t('confirm.deleting')
   const ready = !working && (!needsTyping || typed.trim() === expected)
@@ -481,25 +481,25 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
 }
 
 /**
- * footer action 组件：窄栏显示图标，宽栏显示「归档管理」；弹窗列出轻归档会话与备份。
+ * footer action 组件：窄栏显示图标，宽栏显示「归档管理」；弹窗列出轻归档会话与回收站。
  * 打开后先显示加载态，数据就绪后再渲染列表。
  * @param props - slot props + 注入动作。
  */
 export function ArchiveDock(props: ArchiveDockProps) {
-  const { wide, listArchived, listStrays, listBackups, backupDirPath, backupSession, deleteSession, restoreBackup, deleteBackup, restoreAllBackups, deleteAllBackups, t } = props
+  const { wide, listArchived, listStrays, listTrashItems, trashDirPath, moveToTrash, deleteSession, restoreTrashItem, deleteTrashItem, restoreAllTrash, deleteAllTrash, t } = props
   const [open, setOpen] = useState(false)
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
   const [strays, setStrays] = useState<StraySessionItem[]>([])
-  const [backups, setBackups] = useState<BackupItem[]>([])
-  const [backupDir, setBackupDir] = useState<{ path: string; displayPath: string } | null>(null)
+  const [trashItems, setTrashItems] = useState<TrashItem[]>([])
+  const [trashDir, setTrashDir] = useState<{ path: string; displayPath: string; warning?: string } | null>(null)
   const [archivedOpen, setArchivedOpen] = useState(true)
   const [straysOpen, setStraysOpen] = useState(true)
-  const [backupsOpen, setBackupsOpen] = useState(false)
+  const [trashOpen, setTrashOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingConfirm | null>(null)
   const [copied, setCopied] = useState(false)
-  /** 单会话恢复进行中锁：连点会并发恢复同一 backupId（2026-08-30 审计）。 */
+  /** 单会话还原进行中锁：连点会并发还原同一 trashId（2026-08-30 审计）。 */
   const [restoringId, setRestoringId] = useState<string | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
 
@@ -520,17 +520,17 @@ export function ArchiveDock(props: ArchiveDockProps) {
     const seq = ++refreshSeqRef.current
     setLoading(true)
     try {
-      const [nextArchived, nextStrays, nextBackups, nextBackupDir] = await Promise.all([
+      const [nextArchived, nextStrays, nextTrashItems, nextTrashDir] = await Promise.all([
         listArchived(),
         listStrays(),
-        listBackups(),
-        backupDirPath().catch(() => null),
+        listTrashItems(),
+        trashDirPath().catch(() => null),
       ])
       if (seq !== refreshSeqRef.current) return
       setArchived(nextArchived)
       setStrays(nextStrays)
-      setBackups(nextBackups)
-      setBackupDir(nextBackupDir)
+      setTrashItems(nextTrashItems)
+      setTrashDir(nextTrashDir)
       setError(null)
     } catch (reason) {
       if (seq !== refreshSeqRef.current) return
@@ -540,12 +540,12 @@ export function ArchiveDock(props: ArchiveDockProps) {
     }
   }
 
-  // 复制完整备份路径到剪贴板；成功给 2 秒「已复制」反馈。
+  // 复制完整回收站路径到剪贴板；成功给 2 秒「已复制」反馈。
   const copiedTimerRef = useRef<number | null>(null)
-  const copyBackupDir = async (): Promise<void> => {
-    if (backupDir === null) return
+  const copyTrashDir = async (): Promise<void> => {
+    if (trashDir === null) return
     try {
-      await navigator.clipboard.writeText(backupDir.path)
+      await navigator.clipboard.writeText(trashDir.path)
       setCopied(true)
       if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current)
       copiedTimerRef.current = window.setTimeout(() => { setCopied(false) }, 2_000)
@@ -562,16 +562,16 @@ export function ArchiveDock(props: ArchiveDockProps) {
     void refresh()
   }, [open])
 
-  const confirmBackup = (item: ArchivedSessionItem): void => {
-    setPending({ kind: 'backup', item })
+  const confirmTrash = (item: ArchivedSessionItem): void => {
+    setPending({ kind: 'trash', item })
   }
 
   const confirmDelete = (item: ArchivedSessionItem): void => {
     setPending({ kind: 'delete', item })
   }
 
-  const confirmBackupStray = (item: StraySessionItem): void => {
-    setPending({ kind: 'backupStray', item })
+  const confirmTrashStray = (item: StraySessionItem): void => {
+    setPending({ kind: 'trashStray', item })
   }
 
   const confirmDeleteStray = (item: StraySessionItem): void => {
@@ -610,9 +610,9 @@ export function ArchiveDock(props: ArchiveDockProps) {
             className="dsh-archive-btn"
             disabled={loading || !item.backendSupported || locked}
             title={locked ? t('state.unreleasedActionHint') : undefined}
-            onClick={() => { confirmBackupStray(item) }}
+            onClick={() => { confirmTrashStray(item) }}
           >
-            {t('action.backup')}
+            {t('action.trash')}
           </button>
           <button
             type="button"
@@ -621,25 +621,25 @@ export function ArchiveDock(props: ArchiveDockProps) {
             title={locked ? t('state.unreleasedActionHint') : undefined}
             onClick={() => { confirmDeleteStray(item) }}
           >
-            {t('action.delete')}
+            {t('action.deletePermanently')}
           </button>
         </div>
       </div>
     )
   }
 
-  const confirmDeleteBackup = (item: BackupItem): void => {
-    setPending({ kind: 'deleteBackup', item })
+  const confirmDeleteTrashItem = (item: TrashItem): void => {
+    setPending({ kind: 'deleteTrashItem', item })
   }
 
-  const restorableCount = backups.filter(item => !item.legacy).length
-  const legacyCount = backups.length - restorableCount
+  const restorableCount = trashItems.filter(item => !item.legacy).length
+  const legacyCount = trashItems.length - restorableCount
 
   // 未释放（本次 dsh 运行中驻留）的会话在归档区内分组前置：运行期间无法卸载，只能等下次启动后操作（2026-08-30）。
   const liveItems = archived.filter(item => item.live)
   const coldItems = archived.filter(item => !item.live)
 
-  /** 归档会话行：未释放（本次 dsh 运行中驻留）会话的备份/删除置灰并给提示。 */
+  /** 归档会话行：未释放（本次 dsh 运行中驻留）会话的移入回收站/彻底删除置灰并给提示。 */
   const renderArchivedRow = (item: ArchivedSessionItem) => {
     const locked = item.live
     return (
@@ -663,9 +663,9 @@ export function ArchiveDock(props: ArchiveDockProps) {
             className="dsh-archive-btn"
             disabled={loading || !item.backendSupported || locked}
             title={locked ? t('state.unreleasedActionHint') : undefined}
-            onClick={() => { confirmBackup(item) }}
+            onClick={() => { confirmTrash(item) }}
           >
-            {t('action.backup')}
+            {t('action.trash')}
           </button>
           <button
             type="button"
@@ -674,7 +674,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             title={locked ? t('state.unreleasedActionHint') : undefined}
             onClick={() => { confirmDelete(item) }}
           >
-            {t('action.delete')}
+            {t('action.deletePermanently')}
           </button>
         </div>
       </div>
@@ -686,7 +686,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
   }
 
   const confirmDeleteAll = (): void => {
-    setPending({ kind: 'deleteAll', count: backups.length })
+    setPending({ kind: 'deleteAll', count: trashItems.length })
   }
 
   /**
@@ -696,8 +696,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const submitConfirm = async (typed: string): Promise<void> => {
     if (pending === null) return
     const kind = pending.kind
-    if (kind === 'backup' || kind === 'backupStray') {
-      await backupSession(pending.item.sessionId)
+    if (kind === 'trash' || kind === 'trashStray') {
+      await moveToTrash(pending.item.sessionId)
       await refresh()
       setPending(null)
       return
@@ -714,14 +714,14 @@ export function ArchiveDock(props: ArchiveDockProps) {
       setPending(null)
       return
     }
-    if (kind === 'deleteBackup') {
-      await deleteBackup(pending.item.backupId)
+    if (kind === 'deleteTrashItem') {
+      await deleteTrashItem(pending.item.trashId)
       await refresh()
       setPending(null)
       return
     }
     if (kind === 'restoreAll') {
-      const result = await restoreAllBackups()
+      const result = await restoreAllTrash()
       const problems: string[] = []
       const skipped = result.skippedLegacy ?? 0
       const failed = result.failed?.length ?? 0
@@ -732,7 +732,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
       setPending(null)
       return
     }
-    const result = await deleteAllBackups()
+    const result = await deleteAllTrash()
     const problems: string[] = []
     const failed = result.failed?.length ?? 0
     if (failed > 0) problems.push(t('notice.failed', { count: failed }))
@@ -775,22 +775,27 @@ export function ArchiveDock(props: ArchiveDockProps) {
             ) : (
             <>
             <p style={{ ...styles.secondarySmall, fontSize: 14, lineHeight: '22px', margin: '0 0 12px' }}>
-              {backupDir !== null && backupDir.displayPath !== '' ? (
+              {trashDir !== null && trashDir.displayPath !== '' ? (
                 <>
-                  {t('dialog.backupDir')}
+                  {t('dialog.trashDir')}
                   {' '}
                   <button
                     type="button"
-                    className="dsh-archive-backup-dir"
-                    title={`${backupDir.path}（${t('dialog.copyHint')}）`}
-                    onClick={() => { void copyBackupDir() }}
+                    className="dsh-archive-trash-dir"
+                    title={`${trashDir.path}（${t('dialog.copyHint')}）`}
+                    onClick={() => { void copyTrashDir() }}
                   >
-                    {backupDir.displayPath}
+                    {trashDir.displayPath}
                     {copied ? ` ✓${t('dialog.copied')}` : ''}
                   </button>
                 </>
               ) : null}
             </p>
+            {trashDir !== null && trashDir.warning !== undefined && trashDir.warning !== '' ? (
+              <p role="status" style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)', fontSize: 13, lineHeight: '20px', margin: '0 0 12px' }}>
+                {trashDir.warning}
+              </p>
+            ) : null}
             {error !== null ? (
               <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)', margin: '0 0 12px' }}>
                 {error}
@@ -847,16 +852,16 @@ export function ArchiveDock(props: ArchiveDockProps) {
               <button
                 type="button"
                 className="dsh-archive-section"
-                aria-expanded={backupsOpen}
-                onClick={() => { setBackupsOpen(value => !value) }}
+                aria-expanded={trashOpen}
+                onClick={() => { setTrashOpen(value => !value) }}
               >
-                <span aria-hidden>{backupsOpen ? '▾' : '▸'}</span>
-                <span>{t('section.backups', { count: backups.length })}</span>
+                <span aria-hidden>{trashOpen ? '▾' : '▸'}</span>
+                <span>{t('section.trash', { count: trashItems.length })}</span>
               </button>
-              {backupsOpen ? (
+              {trashOpen ? (
                 <>
-                  <p style={styles.secondarySmall}>{t('backups.hint')}</p>
-                  {backups.length > 0 ? (
+                  <p style={styles.secondarySmall}>{t('trash.hint')}</p>
+                  {trashItems.length > 0 ? (
                     <div style={{ ...styles.actions, padding: '4px 0 8px' }}>
                       <button
                         type="button"
@@ -869,21 +874,21 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       <button
                         type="button"
                         className="dsh-archive-btn dsh-archive-btn-danger"
-                        disabled={loading || backups.length === 0}
+                        disabled={loading || trashItems.length === 0}
                         onClick={() => { confirmDeleteAll() }}
                       >
                         {t('action.deleteAll')}
                       </button>
                     </div>
                   ) : null}
-                  {backups.length === 0 ? <p style={styles.secondarySmall}>{t('empty.backups')}</p> : null}
-                  {backups.some(item => item.legacy) ? (
+                  {trashItems.length === 0 ? <p style={styles.secondarySmall}>{t('empty.trash')}</p> : null}
+                  {trashItems.some(item => item.legacy) ? (
                     <p style={styles.secondarySmall}>
                       {t('legacy.hint')}
                     </p>
                   ) : null}
-                  {backups.map(item => (
-                    <div key={item.backupId} style={styles.row}>
+                  {trashItems.map(item => (
+                    <div key={item.trashId} style={styles.row}>
                       <div style={{ minWidth: 0 }}>
                         <div style={styles.title} title={item.title}>{item.title}</div>
                         <div style={styles.secondarySmall}>
@@ -898,10 +903,10 @@ export function ArchiveDock(props: ArchiveDockProps) {
                           title={item.legacy ? t('legacy.restoreTitle') : undefined}
                           onClick={() => {
                             if (restoringId !== null) return
-                            setRestoringId(item.backupId)
+                            setRestoringId(item.trashId)
                             void (async () => {
                               try {
-                                await restoreBackup(item.backupId)
+                                await restoreTrashItem(item.trashId)
                                 await refresh()
                               } catch (reason) {
                                 setError(reason instanceof Error ? reason.message : String(reason))
@@ -917,9 +922,9 @@ export function ArchiveDock(props: ArchiveDockProps) {
                           type="button"
                           className="dsh-archive-btn dsh-archive-btn-danger"
                           disabled={loading}
-                          onClick={() => { confirmDeleteBackup(item) }}
+                          onClick={() => { confirmDeleteTrashItem(item) }}
                         >
-                          {t('action.delete')}
+                          {t('action.deletePermanently')}
                         </button>
                       </div>
                     </div>

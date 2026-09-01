@@ -1,13 +1,17 @@
-/** dsh-archive-manage 纯逻辑：配置、确认强度、备份目录名、sidecar 解析。 */
+/** dsh-archive-manage 纯逻辑：配置、确认强度、回收站目录与迁移决策、sidecar 解析。 */
 
 import { join } from 'node:path'
 
-export const BACKUP_SIDECAR = 'dsh-archive-manage.json'
-/** 备份目录名（沿用此前版本实际使用的目录，让旧备份直接可见）。 */
-export const DEFAULT_BACKUP_DIR = 'sessions-archived-backup'
+export const TRASH_SIDECAR = 'dsh-archive-manage.json'
+/** 回收站目录名（2026-09-01 改名：. 前缀与 DSH 官方目录区分；旧名见 LEGACY_BACKUP_DIR）。 */
+export const DEFAULT_TRASH_DIR = '.sessions-recycle-bin'
+/** 0.1.0-alpha.x 时期使用的备份目录名（一次性迁移检测用）。 */
+export const LEGACY_BACKUP_DIR = 'sessions-archived-backup'
 
 export interface ArchiveConfig {
-  readonly backupRoot: string
+  readonly trashRoot: string
+  /** 旧配置键（0.1.0-alpha.x 的 backupRoot）：trashRoot 未配置时回退读取，改名后保留兼容。 */
+  readonly backupRoot?: string
 }
 
 export interface ArchiveSubagentSidecar {
@@ -24,26 +28,40 @@ export interface ArchiveSidecar {
   readonly originalPath: string
   readonly archivedAt: string
   readonly workspaceIds: readonly string[]
-  /** version 2：备份时随父会话一起移动的 subagent 会话。 */
+  /** version 2：移入回收站时随父会话一起移动的 subagent 会话。 */
   readonly subagents?: readonly ArchiveSubagentSidecar[]
 }
 
-export function normalizeArchiveConfig(input: Readonly<Partial<ArchiveConfig>> | undefined): ArchiveConfig {
+/** DSH 数据主目录（$DSH_HOME 优先，缺省 ~/.dsh）。 */
+function dshHomeBase(): string {
   const fallbackHome = join(process.env.USERPROFILE || process.env.HOME || '.', '.dsh')
-  const defaultBackupRoot = join(process.env.DSH_HOME?.trim() || fallbackHome, DEFAULT_BACKUP_DIR)
-  const config: ArchiveConfig = {
-    backupRoot: input?.backupRoot?.trim() || defaultBackupRoot,
-  }
-  if (config.backupRoot === '') throw new Error('dsh-archive-manage: backupRoot 不能为空')
-  return config
+  return process.env.DSH_HOME?.trim() || fallbackHome
 }
 
-/** 删除档强确认：用户输入必须与会话当前标题逐字一致（trim 后比较）。 */
+/** 新版默认回收站目录的绝对路径。 */
+export function defaultTrashDir(): string {
+  return join(dshHomeBase(), DEFAULT_TRASH_DIR)
+}
+
+/** 旧版默认备份目录的绝对路径（迁移检测用）。 */
+export function legacyDefaultBackupDir(): string {
+  return join(dshHomeBase(), LEGACY_BACKUP_DIR)
+}
+
+export function normalizeArchiveConfig(input: Readonly<Partial<ArchiveConfig>> | undefined): ArchiveConfig {
+  const legacy = input?.backupRoot?.trim()
+  const trash = input?.trashRoot?.trim()
+  if (trash !== undefined && trash === '') throw new Error('dsh-archive-manage: trashRoot 不能为空')
+  const trashRoot = trash || legacy || defaultTrashDir()
+  return { trashRoot, ...(legacy !== undefined && legacy !== '' ? { backupRoot: legacy } : {}) }
+}
+
+/** 彻底删除强确认：用户输入必须与会话当前标题逐字一致（trim 后比较）。 */
 export function isDeleteConfirmationSufficient(expectedTitle: string, input: unknown): boolean {
   return typeof input === 'string' && input.trim() === expectedTitle.trim() && expectedTitle.trim() !== ''
 }
 
-/** 备份目录 / 备份 id 只允许大小写字母、数字、- 和 _，避免路径穿越。 */
+/** 回收站目录 / 回收站 id 只允许大小写字母、数字、- 和 _，避免路径穿越。 */
 export function sanitizeSegment(value: string): string {
   const safe = value.replace(/[^A-Za-z0-9_-]/gu, '_')
   return /[A-Za-z0-9]/u.test(safe) ? safe : 'unknown'
@@ -64,8 +82,8 @@ export function maskHomePath(path: string, homeDir: string): string {
   return path
 }
 
-/** 从备份 sidecar 解析出安全的恢复信息；非法输入返回 undefined。 */
-export function parseBackupSidecar(value: unknown): ArchiveSidecar | undefined {
+/** 从回收站 sidecar 解析出安全的还原信息；非法输入返回 undefined。 */
+export function parseTrashSidecar(value: unknown): ArchiveSidecar | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
   const sidecar = value as Record<string, unknown>
   if (sidecar.version !== 1 && sidecar.version !== 2) return undefined
@@ -102,9 +120,9 @@ export function parseBackupSidecar(value: unknown): ArchiveSidecar | undefined {
   }
 }
 
-/** 旧格式备份条目（无 sidecar）：目录名即会话 id；只可列出/删除，不可恢复。 */
-export interface LegacyBackupItem {
-  readonly backupId: string
+/** 旧格式条目（无 sidecar）：目录名即会话 id；只可列出/彻底删除，不可还原。 */
+export interface LegacyTrashItem {
+  readonly trashId: string
   readonly sessionId: string
   readonly title: string
   readonly archivedAt: string
@@ -113,19 +131,48 @@ export interface LegacyBackupItem {
 }
 
 /**
- * 从旧格式备份目录构造列表条目；时间取目录 mtime。
- * @param name - 备份目录名（旧格式下即会话 id）。
+ * 从旧格式目录构造列表条目；时间取目录 mtime。
+ * @param name - 回收站目录名（旧格式下即会话 id）。
  * @param mtimeMs - 目录最后修改时间（毫秒时间戳）。
  */
-export function legacyBackupItem(name: string, mtimeMs: number): LegacyBackupItem {
+export function legacyTrashItem(name: string, mtimeMs: number): LegacyTrashItem {
   return {
-    backupId: name,
+    trashId: name,
     sessionId: name,
     title: name,
     archivedAt: new Date(mtimeMs).toISOString(),
     workspaceIds: [],
     legacy: true,
   }
+}
+
+export type TrashMigrationDecision =
+  | { readonly kind: 'migrate'; readonly legacyDir: string; readonly targetDir: string }
+  | { readonly kind: 'none'; readonly trashRoot: string; readonly warning?: string }
+
+/**
+ * 一次性目录迁移决策（旧在 / 新在 / 双在 / 自定义配置）：
+ * - 配置指向旧默认目录：旧在且新缺 → migrate（调用方 rename 旧目录到新目录）；
+ *   旧缺 → 直接用新目录；双在 → 用新目录 + 提示旧目录残留未迁移
+ * - 配置指向自定义目录：不动它；旧默认目录仍存在时提示残留
+ * 路径相等比较不区分大小写（Windows 盘符路径大小写不稳定）。
+ */
+export function decideTrashMigration(
+  trashRoot: string,
+  legacyDir: string,
+  targetDir: string,
+  legacyExists: boolean,
+  targetExists: boolean,
+): TrashMigrationDecision {
+  const atLegacy = trashRoot.toLowerCase() === legacyDir.toLowerCase()
+  if (!atLegacy) {
+    return legacyExists
+      ? { kind: 'none', trashRoot, warning: `检测到旧版备份目录仍存在（${legacyDir}），内容未迁移：请自行处理，或把回收站目录配置指向它` }
+      : { kind: 'none', trashRoot }
+  }
+  if (!legacyExists) return { kind: 'none', trashRoot: targetDir }
+  if (!targetExists) return { kind: 'migrate', legacyDir, targetDir }
+  return { kind: 'none', trashRoot: targetDir, warning: `新旧回收站目录并存：旧目录（${legacyDir}）的内容未迁移，请自行处理` }
 }
 
 /**

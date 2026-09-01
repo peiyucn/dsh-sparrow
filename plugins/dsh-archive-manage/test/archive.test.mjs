@@ -1,15 +1,30 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  isDeleteConfirmationSufficient, legacyBackupItem, maskHomePath, normalizeArchiveConfig,
-  parseBackupSidecar, parseBlankProjection, sanitizeSegment, straySessionIds,
+  decideTrashMigration, isDeleteConfirmationSufficient, legacyTrashItem, maskHomePath, normalizeArchiveConfig,
+  parseTrashSidecar, parseBlankProjection, sanitizeSegment, straySessionIds,
 } from '../lib/archive.js'
 
 describe('archive-manage 纯逻辑', () => {
   describe('normalizeArchiveConfig', () => {
-    it('空配置 应该 提供默认备份目录', () => {
+    it('空配置 应该 提供默认回收站目录', () => {
       const config = normalizeArchiveConfig(undefined)
-      assert.match(config.backupRoot, /sessions-archived-backup/u)
+      assert.match(config.trashRoot, /\.sessions-recycle-bin/u)
+    })
+
+    it('trashRoot 配置 应该 优先采用', () => {
+      const config = normalizeArchiveConfig({ trashRoot: 'D:/trash' })
+      assert.equal(config.trashRoot, 'D:/trash')
+    })
+
+    it('仅旧键 backupRoot 应该 回退读取', () => {
+      const config = normalizeArchiveConfig({ backupRoot: 'D:/old' })
+      assert.equal(config.trashRoot, 'D:/old')
+    })
+
+    it('trashRoot 与 backupRoot 同给 应该 优先 trashRoot', () => {
+      const config = normalizeArchiveConfig({ trashRoot: 'D:/new', backupRoot: 'D:/old' })
+      assert.equal(config.trashRoot, 'D:/new')
     })
   })
 
@@ -30,8 +45,8 @@ describe('archive-manage 纯逻辑', () => {
   describe('maskHomePath', () => {
     it('Windows home 前缀 应该 掩码为 ~', () => {
       assert.equal(
-        maskHomePath('C:\\Users\\DJ028191\\.dsh\\sessions-archived-backup', 'C:\\Users\\DJ028191'),
-        '~\\.dsh\\sessions-archived-backup',
+        maskHomePath('C:\\Users\\DJ028191\\.dsh\\.sessions-recycle-bin', 'C:\\Users\\DJ028191'),
+        '~\\.dsh\\.sessions-recycle-bin',
       )
     })
 
@@ -43,7 +58,7 @@ describe('archive-manage 纯逻辑', () => {
     })
 
     it('POSIX home 前缀 应该 掩码为 ~', () => {
-      assert.equal(maskHomePath('/home/alice/.dsh/backups', '/home/alice'), '~/.dsh/backups')
+      assert.equal(maskHomePath('/home/alice/.dsh/trash', '/home/alice'), '~/.dsh/trash')
     })
 
     it('路径等于 home 应该 掩码为 ~', () => {
@@ -51,7 +66,7 @@ describe('archive-manage 纯逻辑', () => {
     })
 
     it('不在 home 下 应该 原样返回', () => {
-      assert.equal(maskHomePath('/opt/data/backups', '/home/alice'), '/opt/data/backups')
+      assert.equal(maskHomePath('/opt/data/trash', '/home/alice'), '/opt/data/trash')
     })
   })
 
@@ -65,15 +80,67 @@ describe('archive-manage 纯逻辑', () => {
     })
   })
 
-  describe('legacyBackupItem', () => {
+  describe('legacyTrashItem', () => {
     it('旧格式目录 应该 用目录名作 id 与标题并标记 legacy', () => {
-      const item = legacyBackupItem('0d21fc8b-56e9-4761-a59f-d972c095d2d8', 1788014172861)
-      assert.equal(item.backupId, '0d21fc8b-56e9-4761-a59f-d972c095d2d8')
+      const item = legacyTrashItem('0d21fc8b-56e9-4761-a59f-d972c095d2d8', 1788014172861)
+      assert.equal(item.trashId, '0d21fc8b-56e9-4761-a59f-d972c095d2d8')
       assert.equal(item.sessionId, '0d21fc8b-56e9-4761-a59f-d972c095d2d8')
       assert.equal(item.title, '0d21fc8b-56e9-4761-a59f-d972c095d2d8')
       assert.equal(item.legacy, true)
       assert.deepEqual(item.workspaceIds, [])
       assert.match(item.archivedAt, /^\d{4}-\d{2}-\d{2}T/u)
+    })
+  })
+
+  describe('decideTrashMigration', () => {
+    const legacy = 'C:/Users/u/.dsh/sessions-archived-backup'
+    const target = 'C:/Users/u/.dsh/.sessions-recycle-bin'
+
+    it('配置指向旧默认目录且旧在、新缺 应该 决定迁移', () => {
+      const decision = decideTrashMigration(legacy, legacy, target, true, false)
+      assert.equal(decision.kind, 'migrate')
+      if (decision.kind === 'migrate') {
+        assert.equal(decision.legacyDir, legacy)
+        assert.equal(decision.targetDir, target)
+      }
+    })
+
+    it('配置指向旧默认目录但旧缺 应该 直接用新目录不迁移', () => {
+      const decision = decideTrashMigration(legacy, legacy, target, false, false)
+      assert.equal(decision.kind, 'none')
+      if (decision.kind === 'none') assert.equal(decision.trashRoot, target)
+    })
+
+    it('旧新双在 应该 用新目录并提示旧目录残留', () => {
+      const decision = decideTrashMigration(legacy, legacy, target, true, true)
+      assert.equal(decision.kind, 'none')
+      if (decision.kind === 'none') {
+        assert.equal(decision.trashRoot, target)
+        assert.ok(decision.warning !== undefined)
+      }
+    })
+
+    it('自定义目录且旧默认目录仍在 应该 不迁移并提示', () => {
+      const decision = decideTrashMigration('D:/custom', legacy, target, true, false)
+      assert.equal(decision.kind, 'none')
+      if (decision.kind === 'none') {
+        assert.equal(decision.trashRoot, 'D:/custom')
+        assert.ok(decision.warning !== undefined)
+      }
+    })
+
+    it('自定义目录且旧默认目录不在 应该 无提示', () => {
+      const decision = decideTrashMigration('D:/custom', legacy, target, false, false)
+      assert.equal(decision.kind, 'none')
+      if (decision.kind === 'none') {
+        assert.equal(decision.trashRoot, 'D:/custom')
+        assert.equal(decision.warning, undefined)
+      }
+    })
+
+    it('大小写不同的同一路径 应该 视为旧默认位置', () => {
+      const decision = decideTrashMigration('C:/Users/U/.dsh/SESSIONS-ARCHIVED-BACKUP', legacy, target, true, false)
+      assert.equal(decision.kind, 'migrate')
     })
   })
 
@@ -125,9 +192,9 @@ describe('archive-manage 纯逻辑', () => {
     })
   })
 
-  describe('parseBackupSidecar', () => {
+  describe('parseTrashSidecar', () => {
     it('合法 sidecar 应该 返回结构化信息', () => {
-      const sidecar = parseBackupSidecar({
+      const sidecar = parseTrashSidecar({
         version: 1,
         sessionId: 's',
         title: 't',
@@ -140,11 +207,11 @@ describe('archive-manage 纯逻辑', () => {
     })
 
     it('缺少 originalPath 应该 返回 undefined', () => {
-      assert.equal(parseBackupSidecar({ version: 1, sessionId: 's', archivedAt: 'now', workspaceIds: [] }), undefined)
+      assert.equal(parseTrashSidecar({ version: 1, sessionId: 's', archivedAt: 'now', workspaceIds: [] }), undefined)
     })
 
     it('version 2 带合法 subagents 应该 解析出子会话清单', () => {
-      const sidecar = parseBackupSidecar({
+      const sidecar = parseTrashSidecar({
         version: 2,
         sessionId: 'p',
         title: 'parent',
@@ -163,7 +230,7 @@ describe('archive-manage 纯逻辑', () => {
     })
 
     it('version 2 subagents 含非法条目 应该 返回 undefined', () => {
-      const sidecar = parseBackupSidecar({
+      const sidecar = parseTrashSidecar({
         version: 2,
         sessionId: 'p',
         originalPath: 'C:/tmp/p',
@@ -175,7 +242,7 @@ describe('archive-manage 纯逻辑', () => {
     })
 
     it('version 1 无 subagents 应该 正常解析', () => {
-      const sidecar = parseBackupSidecar({
+      const sidecar = parseTrashSidecar({
         version: 1,
         sessionId: 'p',
         originalPath: 'C:/tmp/p',

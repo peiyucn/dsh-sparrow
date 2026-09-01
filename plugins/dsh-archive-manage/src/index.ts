@@ -2,6 +2,6 @@
 export { apply, inject, name } from './host.js'
 export type { ArchiveConfig } from './archive.js'
 export {
-  BACKUP_SIDECAR, isDeleteConfirmationSufficient, legacyBackupItem, normalizeArchiveConfig,
-  parseBackupSidecar, sanitizeSegment,
+  TRASH_SIDECAR, isDeleteConfirmationSufficient, legacyTrashItem, normalizeArchiveConfig,
+  parseTrashSidecar, sanitizeSegment,
 } from './archive.js'

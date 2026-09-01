@@ -3,4 +3,4 @@
     - id: dsh-archive-manage
       name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-archive-manage/src/index.ts
       config:
-        backupRoot: C:/Users/DJ028191/.dsh/sessions-archived-backup
+        trashRoot: C:/Users/DJ028191/.dsh/.sessions-recycle-bin
