@@ -112,8 +112,8 @@ jobs:
         run: npm publish --access public --provenance --tag ${{ steps.resolve.outputs.npm-tag }}
 
       # GitHub Release 是 publish 的内部步骤：说明取自该插件 CHANGELOG 对应版本条目
-      # （无条目回退 --generate-notes）；预发布版本标 prerelease；不附产物
-      # （npm 用户一律走 registry 安装，对齐官方 DSH 惯例）
+      # （无条目回退 --generate-notes）；一律标 prerelease（宿主 dsh 仍处预发布阶段，
+      # 宿主转正后移除该标记）；不附产物（npm 用户一律走 registry 安装，对齐官方 DSH 惯例）
       - name: Create GitHub Release
         if: github.event_name == 'push'
         shell: bash
@@ -123,15 +123,11 @@ jobs:
           CHANGELOG="plugins/${{ steps.resolve.outputs.plugin }}/CHANGELOG.md"
           VERSION="${{ steps.resolve.outputs.version }}"
           awk -v ver="${VERSION}" '/^## / { if (started) exit; if ($0 ~ "^## " ver " ") started = 1; next } started' "$CHANGELOG" > release-notes.md
-          FLAGS=""
-          if [[ "${{ steps.resolve.outputs.npm-tag }}" == "next" ]]; then
-            FLAGS="--prerelease"
-          fi
           if [[ -s release-notes.md ]]; then
-            gh release create "${{ github.ref_name }}" --notes-file release-notes.md ${FLAGS}
+            gh release create "${{ github.ref_name }}" --prerelease --notes-file release-notes.md
           else
             echo "::warning::CHANGELOG entry for ${VERSION} not found, falling back to --generate-notes"
-            gh release create "${{ github.ref_name }}" --generate-notes ${FLAGS}
+            gh release create "${{ github.ref_name }}" --prerelease --generate-notes
           fi
 
   release-control:
