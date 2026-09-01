@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import {
   buildFimPrompt, detectDraftLanguage, isLanguageConsistent, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, speakerStopSequences,
   formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
-  normalizeConfig, normalizeSuggestModelMode, normalizeTriggerSensitivity, parseCompleteBody, recentHistoryTurns,
+  normalizeConfig, normalizeSuggestModelMode, normalizeTriggerSensitivity, parseCompleteBody, readSessionEvents, recentHistoryTurns,
   resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence,
   upstreamStatusToError, validateCompletePayload,
 } from '../lib/suggest.js'
@@ -615,6 +615,23 @@ describe('chat-fim 纯逻辑', () => {
         { role: 'user', content: [{ type: 'text', text: '你好' }] },
       ])
       assert.deepEqual(turns, [{ role: 'user', text: '你好' }])
+    })
+  })
+
+  describe('readSessionEvents', () => {
+    it('snapshotEvents 存在 应该 用之（alpha.4 语义）', () => {
+      const snapshot = [{ type: 'request/header' }]
+      const session = { snapshotEvents: () => snapshot, events: [] }
+      assert.equal(readSessionEvents(session), snapshot)
+    })
+
+    it('仅有旧 events 属性 应该 回退读取（alpha.3 兼容）', () => {
+      const events = [{ type: 'request/header' }]
+      assert.deepEqual(readSessionEvents({ events }), events)
+    })
+
+    it('两者都缺 应该 返回空数组', () => {
+      assert.deepEqual(readSessionEvents({}), [])
     })
   })
 })

@@ -152,6 +152,17 @@ export function mainRouteFromSession(events: readonly SessionEvent[]): { provide
   return undefined
 }
 
+/**
+ * 读会话事件快照：dsh 0.1.2-alpha.4 起 Session.events 移除，改为按需读取
+ * snapshotEvents()；保留更早版本的 events 属性兼容（适配版本见 AGENTS）。
+ */
+export function readSessionEvents(session: {
+  snapshotEvents?: () => readonly SessionEvent[]
+  events?: readonly SessionEvent[]
+}): readonly SessionEvent[] {
+  return typeof session.snapshotEvents === 'function' ? session.snapshotEvents() : session.events ?? []
+}
+
 /** 主模型是否为 DeepSeek 系列（deepseek-official provider）；未知路由默认放行。 */
 export function isDeepseekMainRoute(route: { provider: string } | undefined): boolean {
   return route === undefined || route.provider === 'deepseek-official'
