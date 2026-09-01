@@ -22,5 +22,5 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Verify all plugins
-        run: npm run verify:all
+      - name: Verify
+        run: npm run verify

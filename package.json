@@ -4,6 +4,7 @@
   "description": "A collection of small DeepSeek Harness (DSH) web plugins",
   "packageManager": "pnpm@11.22.0",
   "scripts": {
+    "verify": "pnpm run verify:all",
     "verify:all": "node scripts/verify-all.mjs"
   },
   "devDependencies": {
