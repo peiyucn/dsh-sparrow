@@ -11,7 +11,7 @@
   * `plugins/dsh-archive-manage` — 归档会话管理：备份 / 删除 / 恢复（轻量标题已随官方投影缓存退役）
   * `plugins/dsh-nav-pin` — 轮次导航窄屏不消失：官方 900px 断点提到 700px，更窄时 hover 右缘浮现为浮层（纯样式注入）
   * `plugins/dsh-file-manage` — DeepSeek Files API 云端文件管理：侧边栏清单 / 单条删除 / 复制 file_id（复用官方 DeepSeekFilesClient，无本地持久化）
-* 各插件本地验证 = 进入插件目录 `npm run verify`（typecheck + node:test）；全量 = 仓库根 `npm run verify`（即 verify:all）；分项 = 根 `pnpm run typecheck:all` / `pnpm run test:all`
+* 各插件本地验证 = 进入插件目录 `npm run verify`（typecheck + build + node:test + pack 校验）；全量 = 仓库根 `npm run verify`（即 verify:all）；分项 = 根 `pnpm run typecheck:all` / `pnpm run build:all` / `pnpm run test:all` / `pnpm run package:all`
 * 文档分工：插件 README 面向用户（**README.md 英文为 GitHub 默认 + README.zh-CN.md 简体中文**，顶部互链，写法对齐 dsh-launcher-panel）；`AGENTS.md` 面向开发 agent（seam 特例 / 架构约束 / 测试约定），开发细节不进 README
 * 各插件专属约束见 `plugins/*/AGENTS.md`
 
@@ -141,8 +141,8 @@
 6. push tag → 自动触发 Publish 工作流（解析插件目录与 npm dist-tag：版本含 `-` 发 `next`，正式版发 `latest`；校验 tag 版本 == package.json version、verify 后 `npm publish --access public --provenance --tag <next|latest>`）
 7. `gh run watch` 盯到 success；`npm view <包名> version dist-tags` 复核版本与 dist-tag
 8. **预发布待验证**：`next` 已指向新版本且 `latest` 未变；owner 通过 `dsh plugin --profile web add <包名>@next` 安装验证，未确认前不发布稳定版
-9. **转正**：owner 确认后把 `package.json` 版本改为稳定版 `X.Y.Z`（去掉 `-alpha.N`），CHANGELOG 记转正，按本流程发布该稳定版（工作流自动上 `latest`）；然后 deprecate 被替代的坏版本（不 unpublish）
-10. GitHub Release 已由 publish.yml 在发布后自动创建（`--generate-notes`）；如需补充说明用 `gh release edit <tag> --notes "..."`（**不要重推 tag**）
+9. **转正**：owner 确认后把 `package.json` 版本改为稳定版 `X.Y.Z`（去掉 `-alpha.N`），CHANGELOG 记转正，按本流程发布该稳定版（工作流自动上 `latest`）；如需，用 publish.yml 手动触发 `deprecate` 标记被替代的坏版本（不 unpublish）
+10. GitHub Release 已由 publish.yml 在发布后自动创建：说明取自该插件 CHANGELOG 对应版本条目，预发布版本标 prerelease，不附产物（npm 安装一律走 registry，对齐官方 DSH 惯例）；如需补充说明用 `gh release edit <tag> --notes "..."`（**不要重推 tag**）
 11. 切回 `dev` 继续开发
 
 #### 发布红线
@@ -167,8 +167,7 @@
 
 ## CI 与自动发布
 
-* `.github/workflows/ci.yml`：push dev/main 与 PR 时跑真实过程 `typecheck`（typecheck:all，含 client bundle 校验）→ `test`（test:all，CI 下产 JUnit 报告 artifact）；publish 在 publish.yml（tag 触发）
-* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`；dist-tag 自动选择：版本含 `-` → `next`，正式版 → `latest`
-* `.github/workflows/npm-release-control.yml`：workflow_dispatch 执行 `promote`（`dist-tag add ... latest`）或 `deprecate`；需要 `NPM_TOKEN`
+* `.github/workflows/ci.yml`：push dev/main 与 PR 时跑四过程 `typecheck`（tsc --noEmit）→ `build`（tsc 产出 lib/ + client bundle）→ `test`（node:test，CI 下产 JUnit artifact；测试依赖 lib/ 故 build 在前）→ `package`（npm pack --dry-run 校验 files 清单）
+* `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`；dist-tag 自动选择：版本含 `-` → `next`，正式版 → `latest`；发布成功后自动建 GitHub Release（说明取自该插件 CHANGELOG 对应版本条目，缺条目回退 `--generate-notes`；预发布版本标 prerelease；不附产物）；另含 `release-control` job：workflow_dispatch 手动选 `promote`（dist-tag 升 latest）或 `deprecate`（废弃坏版本）
 * 工作流实现细节（勿回退）：`NPM_TOKEN` 经 job 级 `env` 中转再进 step 的 `if`（`secrets` 上下文不允许出现在 `if` 里，直接写会让整条工作流 0s 解析失败）；`--provenance` 要求各插件 package.json 声明 `repository` 字段
 * 发布鉴权**双模式**：有 `NPM_TOKEN` secret 走 Automation token；无 secret 走 npm Trusted Publishing（OIDC）。包尚不存在（无法预配 OIDC）时必须有 `NPM_TOKEN`；长期方向是无 token 的 OIDC
