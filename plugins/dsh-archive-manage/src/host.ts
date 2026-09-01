@@ -13,8 +13,8 @@ import type {} from '@deepseek-ai/dsh-session-persistence'
 import type { SessionTitleObservationResult } from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-storage-domain'
-import { WorkspaceId, workspaceDomainSpec } from '@deepseek-ai/dsh-workspace'
-import type { Workspace } from '@deepseek-ai/dsh-workspace'
+import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
+import type { Workspace, WorkspaceDomainState } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
   BACKUP_SIDECAR, isDeleteConfirmationSufficient, legacyBackupItem, maskHomePath, normalizeArchiveConfig,
@@ -172,95 +172,74 @@ async function attachWorkspaceAccounting(ctx: Context, sessionId: SessionId, wor
   }
 }
 
-/** 归档集域句柄的最小面：global 读写 archivedSessionIds。 */
-interface ArchivedDomainHandle {
-  readonly global: {
-    get(): { readonly archivedSessionIds: readonly SessionId[] }
-    set(value: { readonly archivedSessionIds: readonly SessionId[] }): Promise<void>
+/**
+ * 官方 WorkspaceRegistry 的私有写入面（私有 seam 依赖，AGENTS 三档特例已批，2026-09-01）：
+ * TS private 只是编译期约束，JS 运行时成员真实存在；社区插件（huahai0202/dsh-better-archive）
+ * 同款通道。通道价值：enqueueOperation（官方写串行链，与官方一切写操作互斥，无需自建队列）+
+ * requireState/setState（官方持久化写——域与内存态一步同步，从机制上消除直写域的幽灵问题）。
+ */
+interface RegistryMutationSurface {
+  readonly enqueueOperation: <T>(operation: () => Promise<T>) => Promise<T>
+  readonly requireState: () => WorkspaceDomainState
+  readonly setState: (state: WorkspaceDomainState) => Promise<void>
+}
+
+const REGISTRY_MUTATION_METHODS = ['enqueueOperation', 'requireState', 'setState'] as const
+
+/**
+ * 启动能力检查（私有 seam 护栏）：官方升级改动 private surface 时 fail-fast。
+ * 抛错只让本插件不可用——cordis 对插件启动错误逐插件捕获并 logger.error，
+ * 不影响 dsh 本体与其余插件（已查证 cordis lib/index.js）。
+ */
+export function assertRegistryMutationApi(registry: unknown): RegistryMutationSurface {
+  const missing = REGISTRY_MUTATION_METHODS.filter(method => typeof (registry as Record<string, unknown>)?.[method] !== 'function')
+  if (missing.length > 0) {
+    throw new Error(`不支持的 DSH workspace registry：缺少私有写入方法 ${missing.join('、')}；请升级插件以匹配当前 dsh 版本`)
   }
+  return registry as unknown as RegistryMutationSurface
 }
 
-/**
- * 取归档集所在域（workspace 域由官方 WorkspaceRegistry 常驻打开，
- * 直接 get；未打开时 open 兜底）。此前一律 open 会撞 already-open
- * 被 catch 吞掉，归档集更新静默失败——@ 列表直到重启才消失的根因。
- */
-async function openWorkspaceDomain(ctx: Context): Promise<ArchivedDomainHandle> {
-  const existing = ctx.storageDomain.get(workspaceDomainSpec.name)
-  if (existing !== undefined) return existing as unknown as ArchivedDomainHandle
-  return await ctx.storageDomain.open(workspaceDomainSpec) as unknown as ArchivedDomainHandle
-}
-
-/**
- * 域写串行化：归档集的 get→set 是非原子读改写，并发备份/恢复会互相覆盖丢失更新
- * （2026-08-30 审计）。串行后每次 set 都基于最新域状态。
- */
-let domainWriteTail: Promise<unknown> = Promise.resolve()
-function serializeDomainWrite<T>(operation: () => Promise<T>): Promise<T> {
-  const next = domainWriteTail.then(operation, operation)
-  domainWriteTail = next.catch(() => undefined)
-  return next
-}
-
-/** 读归档集（以域为准：官方 WorkspaceRegistry 内存态不订阅域变更，直写后会陈旧）。 */
+/** 读归档集：官方公开 getter（通道迁移后内存态与域恒同步，无需再直读域）。 */
 async function readArchivedIds(ctx: Context): Promise<SessionId[]> {
-  const domain = await openWorkspaceDomain(ctx)
-  return [...domain.global.get().archivedSessionIds]
-}
-
-/** 直写后一致性检查：registry 内存态与域不一致时告警（官方下一次写会把已移除 id 复活为幽灵条目）。 */
-function warnIfRegistryStale(ctx: Context, domain: ArchivedDomainHandle, label: string): void {
-  try {
-    const registry = ctx.workspaceRegistry.archivedSessionIds.map(String).sort()
-    const domainIds = domain.global.get().archivedSessionIds.map(String).sort()
-    if (registry.join(',') !== domainIds.join(',')) {
-      ctx.logger.warn(`dsh-archive-manage: ${label} 后官方 workspace 内存态与域不一致；官方后续写操作可能把已移除会话 id 复活（重启后启动清扫恢复）`)
-    }
-  } catch {
-    // 一致性检查只作告警，不参与主流程。
-  }
-}
-
-/** 经公开 storageDomain 从归档集中移除会话；域变更经 workspace-controller 的 {type:'archived'} follow 帧同步客户端。 */
-async function removeArchivedId(ctx: Context, sessionId: SessionId): Promise<void> {
-  await serializeDomainWrite(async () => {
-    const domain = await openWorkspaceDomain(ctx)
-    const state = domain.global.get()
-    const archivedSessionIds = state.archivedSessionIds.filter(id => String(id) !== String(sessionId))
-    if (archivedSessionIds.length === state.archivedSessionIds.length) return
-    await domain.global.set({ ...state, archivedSessionIds })
-    warnIfRegistryStale(ctx, domain, 'removeArchivedId')
-  })
-}
-
-/** 恢复时把会话加回归档集，并让 WorkspaceRegistry 的内存态也回到一致。 */
-async function addArchivedId(ctx: Context, sessionId: SessionId): Promise<void> {
-  await serializeDomainWrite(async () => {
-    const domain = await openWorkspaceDomain(ctx)
-    const state = domain.global.get()
-    if (!state.archivedSessionIds.some(id => String(id) === String(sessionId))) {
-      await domain.global.set({ ...state, archivedSessionIds: [...state.archivedSessionIds, sessionId] })
-    }
-  })
-  await ctx.workspaceRegistry.archiveSession(sessionId)
+  return [...ctx.workspaceRegistry.archivedSessionIds]
 }
 
 /**
- * 启动清扫：归档集里不在持久化中的幽灵 id（官方写操作复活产物）清理掉，
- * 否则它们会永久驻留（2026-08-30 审计发现的 registry 缓存陈旧问题）。
+ * 归档集读改写：挂官方 enqueueOperation 串行链，链内 requireState → 计算新集合 →
+ * setState（官方持久化写：域 + 内存态一步同步）。update 返回同一引用视为无变化。
  */
-async function sweepGhostArchivedIds(ctx: Context): Promise<void> {
+export function mutateArchivedSet(surface: RegistryMutationSurface, update: (ids: readonly SessionId[]) => readonly SessionId[]): Promise<void> {
+  return surface.enqueueOperation(async () => {
+    const state = surface.requireState()
+    const next = update(state.archivedSessionIds)
+    if (next === state.archivedSessionIds) return
+    await surface.setState({ ...state, archivedSessionIds: [...next] })
+  })
+}
+
+/** 从归档集移除会话（取消归档 / 移入回收站 / 彻底删除共用）；不在集合内幂等无操作。 */
+async function removeArchivedId(surface: RegistryMutationSurface, sessionId: SessionId): Promise<void> {
+  await mutateArchivedSet(surface, ids => ids.filter(id => String(id) !== String(sessionId)))
+}
+
+/** 把会话加回归档集（回收站还原后恢复隐藏态）；已在集合内幂等无操作。 */
+async function addArchivedId(surface: RegistryMutationSurface, sessionId: SessionId): Promise<void> {
+  await mutateArchivedSet(surface, ids => ids.some(id => String(id) === String(sessionId)) ? ids : [...ids, sessionId])
+}
+
+/**
+ * 启动清扫：归档集里不在持久化中的幽灵 id 清理掉（历史遗留防御——旧版本直写时代可能已
+ * 产生幽灵条目；通道迁移后不再产生新幽灵，保留一次性防御）。
+ */
+async function sweepGhostArchivedIds(ctx: Context, surface: RegistryMutationSurface): Promise<void> {
   try {
-    const domain = await openWorkspaceDomain(ctx)
     const headers = await ctx.sessionPersistence.list()
     const known = new Set(headers.map(header => String(header.id)))
-    await serializeDomainWrite(async () => {
-      const latest = domain.global.get()
-      const cleaned = latest.archivedSessionIds.filter(id => known.has(String(id)))
-      if (cleaned.length === latest.archivedSessionIds.length) return
-      await domain.global.set({ ...latest, archivedSessionIds: cleaned })
-      ctx.logger.warn(`dsh-archive-manage: 启动清扫移除 ${latest.archivedSessionIds.length - cleaned.length} 个幽灵归档 id`)
-    })
+    const current = await readArchivedIds(ctx)
+    const cleaned = current.filter(id => known.has(String(id)))
+    if (cleaned.length === current.length) return
+    await mutateArchivedSet(surface, () => cleaned)
+    ctx.logger.warn(`dsh-archive-manage: 启动清扫移除 ${current.length - cleaned.length} 个幽灵归档 id`)
   } catch (error) {
     ctx.logger.warn(`dsh-archive-manage: 启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
   }
@@ -457,7 +436,7 @@ async function backupDirNames(backupRoot: string): Promise<string[]> {
 }
 
 /** 按 sidecar 恢复单个备份目录（移动回原处 + 工作区记账 + 归档集回填）。 */
-async function restoreBackupDir(ctx: Context, backupDir: string): Promise<ArchiveSidecar> {
+async function restoreBackupDir(ctx: Context, surface: RegistryMutationSurface, backupDir: string): Promise<ArchiveSidecar> {
   let sidecar: ArchiveSidecar | undefined
   try {
     const raw = await readFile(join(backupDir, BACKUP_SIDECAR), 'utf8')
@@ -539,7 +518,7 @@ async function restoreBackupDir(ctx: Context, backupDir: string): Promise<Archiv
     throw new ArchiveError('IO_ERROR', `会话已恢复，但工作区记账失败（请勿重复恢复）：${error instanceof Error ? error.message : String(error)}`, 500)
   }
   try {
-    await addArchivedId(ctx, sessionId)
+    await addArchivedId(surface, sessionId)
   } catch (cleanupError) {
     ctx.logger.warn(`dsh-archive-manage: 恢复后归档集同步失败：${String(cleanupError)}`)
   }
@@ -553,9 +532,11 @@ async function restoreBackupDir(ctx: Context, backupDir: string): Promise<Archiv
  */
 export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {}): void {
   const settings = normalizeArchiveConfig(config)
+  // 私有 seam 依赖：官方 WorkspaceRegistry 的 enqueueOperation/requireState/setState（AGENTS 三档特例，2026-09-01）。
+  const surface = assertRegistryMutationApi(ctx.workspaceRegistry)
 
-  // 启动清扫（均不影响加载）：归档集幽灵 id（官方写操作复活产物）、投影缓存陈旧行、孤儿 subagent 会话。
-  void sweepGhostArchivedIds(ctx)
+  // 启动清扫（均不影响加载）：归档集幽灵 id（历史遗留）、投影缓存陈旧行、孤儿 subagent 会话。
+  void sweepGhostArchivedIds(ctx, surface)
   void sweepStaleProjectionCache(ctx)
   void sweepOrphanSubagents(ctx)
 
@@ -630,6 +611,18 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             path: settings.backupRoot,
             displayPath: maskHomePath(settings.backupRoot, homedir()),
           })
+          return
+        }
+
+        if (req.method === 'POST' && pathname === `${PREFIX}/unarchive`) {
+          // 取消归档：官方归档标记的会话回到会话列表原位置（2026-09-01 新增）。
+          // 只动归档集、不碰文件——live 会话（被 dsh hold）同样可恢复；幂等。
+          const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
+          if (typeof parsed.sessionId !== 'string' || parsed.sessionId.trim() === '') {
+            throw new ArchiveError('BAD_BODY', 'sessionId 必须是非空字符串')
+          }
+          await removeArchivedId(surface, SessionId(parsed.sessionId))
+          sendJson(res, 200, { ok: true })
           return
         }
 
@@ -746,7 +739,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               }
             }
             try {
-              await removeArchivedId(ctx, sessionId)
+              await removeArchivedId(surface, sessionId)
             } catch (cleanupError) {
               ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
             }
@@ -785,7 +778,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             }
           }
           try {
-            await removeArchivedId(ctx, sessionId)
+            await removeArchivedId(surface, sessionId)
           } catch (cleanupError) {
             ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
           }
@@ -831,7 +824,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             throw new ArchiveError('BAD_BODY', 'backupId 必须是非空字符串')
           }
           const backupDir = resolveBackupDir(settings.backupRoot, parsed.backupId)
-          const sidecar = await restoreBackupDir(ctx, backupDir)
+          const sidecar = await restoreBackupDir(ctx, surface, backupDir)
           sendJson(res, 200, { ok: true, sessionId: sidecar.sessionId, workspaceIds: sidecar.workspaceIds })
           return
         }
@@ -848,7 +841,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           for (const name of names) {
             const dir = resolveBackupDir(settings.backupRoot, name)
             try {
-              const sidecar = await restoreBackupDir(ctx, dir)
+              const sidecar = await restoreBackupDir(ctx, surface, dir)
               restored.push(sidecar.sessionId)
             } catch (error) {
               if (error instanceof ArchiveError && error.code === 'UNKNOWN_BACKUP') {
