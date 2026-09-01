@@ -1,6 +1,6 @@
 # 项目指令 — dsh-archive-manage（dsh-sparrow 合集成员）
 
-合集级通用规则见根目录 AGENTS.md；本文件只记本插件专属约束与 seam 特例。
+合集级通用规则（DSH 插件契约 / Git / 发布 / 代码审计 / 语言规范）见根目录 AGENTS.md；本文件只记本插件专属约束与 seam 特例。
 
 ## 项目概况
 
@@ -9,6 +9,29 @@ DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入�
 > 路线 A（轻量标题 TTL 缓存）已退役：dsh 0.1.2-alpha.1 起官方 `sessionProjectionCache` 已覆盖 @ 候选标题读取的昂贵解码路径，插件再包一层 TTL 意义不大。
 
 > 入口槽位查证结论：`ui-workspace` 没有可注入的工具栏 slot；采用 `ui-sidebar` 公开 slot `sidebar.footer.action`（`packages/client/ui-sidebar`）。
+
+## 开发 / 构建
+
+### 架构约束
+
+* 通用契约（入口 / 生命周期 / 副作用清理不泄漏 / host-client 边界）按根 AGENTS.md，本插件无额外架构约束
+
+### 关键文件速查
+
+    src/host.ts              — host half 入口（REST 路由 + 清理链 + 官方写通道 + 记账/事件同步）
+    src/archive.ts           — 纯逻辑（配置归一化 / sidecar 解析 / 路径掩码 / 确认强度）
+    src/client/index.ts      — client half 入口（locale 字典 + API 封装 + sidebar slot 注册）
+    src/client/ArchiveDock.tsx — 归档面板（归档区/回收站区块卡、确认弹窗、样式注入）
+    test/archive.test.mjs    — 纯逻辑单测
+    test/host.test.mjs       — host 纯函数单测（路径守卫 / 单会话目录判定）
+    cordis.patch.yml         — 组合补丁（npm 安装路径）
+    dev.patch.yml            — 开发补丁（--patch 加载本地 TS，内含本机绝对路径）
+    docs/spec/               — 设计文档
+
+### 测试
+
+* Node 内置 test runner，用例在 `test/*.test.mjs`；命名 `<模块名>.test.mjs`，AAA 结构，it 描述「输入条件 应该 期望结果」。
+* 清理链纯逻辑（活动会话拒绝判定、移动 / 彻底删除、记账清理、同步帧、确认强度判定）必须可单测。
 
 ## seam 特例（需项目 owner 认可，已定案）
 
@@ -25,25 +48,3 @@ DSH Web 插件：归档会话管理 —— 侧边栏 footer 动作区一个入�
   * 回收站条目目录写 `dsh-archive-manage.json` sidecar（原路径 / 标题 / workspaceIds，version 2 另含 subagents 清单：各自原路径 / 标题 / workspaceIds），还原时父目录与子目录一并移回并 `WorkspaceEntity.attachSession()`；无 sidecar 的旧格式目录按「仅列出/彻底删除」收纳，不尝试还原；version 1 sidecar 照常还原（视为无 subagents）。
 * **卸载透明**：回收站位置在归档面板顶部提示中明示（`GET /api/archive-manage/trash-dir`，点击复制）；回收站语义提示（不再出现在 @ 列表）放在回收站内；卸载影响与恢复指引只在 README《卸载与残留》章节。**卸载语义**：插件从 profile 移除后代码不再加载，卸载没有执行时机，「卸载时自动恢复」技术上不存在——卸载 = 卸载前显式收尾（面板「全部还原」/「全部彻底删除」一步处理，回收站非空时面板内有提示）+ 卸载后诚实残留（回收站目录 + sidecar 保留，重装即可继续还原/彻底删除；取消归档零残留；彻底删除不可逆）；还原逻辑只经本插件，不做假的「卸载清理」承诺。
 * **仍禁止**：monkey-patch 核心、读 / 改会话日志内容、动会话目录以外的内部文件（附件 / 存储域 / 凭据等一律走官方服务）。
-
-## 架构约束
-
-* host half 不 import 浏览器 API；client half 不 import Node 模块。
-* 一切副作用在 apply 内注册并配 `ctx.effect` 清理；不泄漏定时器 / watcher / AbortController。
-
-## 关键文件速查
-
-    src/host.ts              — host half 入口（REST 路由 + 清理链 + 官方写通道 + 记账/事件同步）
-    src/archive.ts           — 纯逻辑（配置归一化 / sidecar 解析 / 路径掩码 / 确认强度）
-    src/client/index.ts      — client half 入口（locale 字典 + API 封装 + sidebar slot 注册）
-    src/client/ArchiveDock.tsx — 归档面板（归档区/回收站区块卡、确认弹窗、样式注入）
-    test/archive.test.mjs    — 纯逻辑单测
-    test/host.test.mjs       — host 纯函数单测（路径守卫 / 单会话目录判定）
-    cordis.patch.yml         — 组合补丁（npm 安装路径）
-    dev.patch.yml            — 开发补丁（--patch 加载本地 TS，内含本机绝对路径）
-    docs/spec/               — 设计文档
-
-## 测试
-
-* Node 内置 test runner，用例在 `test/*.test.mjs`；命名 `<模块名>.test.mjs`，AAA 结构，it 描述「输入条件 应该 期望结果」。
-* 清理链纯逻辑（活动会话拒绝判定、移动 / 彻底删除、记账清理、同步帧、确认强度判定）必须可单测。

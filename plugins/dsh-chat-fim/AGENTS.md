@@ -1,6 +1,6 @@
 # 项目指令 — dsh-chat-fim（dsh-sparrow 合集成员）
 
-合集级通用规则见根目录 AGENTS.md；本文件只记 chat-fim 专属约束。
+合集级通用规则（DSH 插件契约 / Git / 发布 / 代码审计 / 语言规范）见根目录 AGENTS.md；本文件只记 chat-fim 专属约束与 seam 特例。
 
 ## 项目概况
 
@@ -16,31 +16,18 @@ DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 +
 * 2026-08-31 建议**单句截断** + **Tab 链式续写**（用户拍板「续写不要太长，一直续就高档一直 Tab」）：`truncateFirstSentence`（中文 。！？ 直接截、英文 .!? 须后随空白且前 ≥8 字防缩写误截）在护栏之后截出第一句；dock 采纳后不再跳过触发——FIM 转写体下续写从新草稿尾部出发，「建议马上复现」的旧风险由单句截断 + 退化护栏兜底（若复发可只在高档放开链式）。采纳文本以句末标点结尾时中/低档门控自然抑制链式触发，高档（句末标点也触发）可一直 Tab。
 * 2026-08-31「有锚再抛」触发收紧（直连 A/B 实测驱动）：中档**夹入英文半词由放行改回抑制**（实测 transf 半词补全质量差——prefix 接口下补成 transfigure 且漂移，该门控与接口无关）、拉丁最短草稿中 3→6 / 低 5→8（半词信号太弱；同日稍后再整体调钝，见上条）。「根据上下文猜用户下一句」超出两个官方 Beta 接口的能力定位——FIM 转写体是实测最优的借用（见 2026-08-31 切回条目），插件仍以官方原生支持续写为退役条件。
 
-* TypeScript 实现；host half 源码在 src/，client half（M2 起）构建产物不入库（.gitignore）
-* 本地验证 = npm run verify（typecheck + node:test）
-* 测试：Node 内置 test runner，用例在 test/*.test.mjs
+* TypeScript 实现；host half 源码在 src/，client half（M2 起）构建产物不入库（.gitignore）；本地验证 = npm run verify（typecheck + node:test）
 
-***
+## 开发 / 构建
 
-## 架构约束
+### 架构约束
 
-* host half 不 import 浏览器 API；client half 不 import Node 模块
-* client ↔ host 通信只走 ctx.webServer 自有路由（POST /api/chat-fim/complete）
-* API key 只经 ctx.credentials 解析，绝不落明文、绝不进浏览器
-* 一切副作用在 apply 内注册并配 ctx.effect 清理（DSH 插件生命周期要求）
+* 通用契约（入口 / 生命周期 / seam 三档 / 禁止）按根 AGENTS.md；本插件专属：
+  * host half 不 import 浏览器 API；client half 不 import Node 模块
+  * client ↔ host 通信只走 ctx.webServer 自有路由（POST /api/chat-fim/complete）
+  * API key 只经 ctx.credentials 解析，绝不落明文、绝不进浏览器
 
-***
-
-## seam 特例（需项目 owner 认可，已定案）
-
-* **候选菜单（2026-08-30 起）**：官方没有输入框内联建议 seam（`conversation.input.overlay` 是菜单弹层锚点、不带输入快照）。当前实现：数据面挂 `conversation.input.dock`（读 InputZone 草稿快照，**只读**；写入仍走 `slash/input-insert-text` bail 事件，span CAS），菜单视图挂 `conversation.input.overlay`（官方 MenuDropdown 视觉 token，锚点由 shell 承载，零定位 JS）。**不修改编辑器内容**；官方提供 inline-suggestion seam 后迁移。2026-08-31 数据面自 `conversation.composer.dock` 迁至 `conversation.input.dock`：composer.dock 在 hero 状态（新会话页）不被 shell 渲染，导致新会话第一条草稿 0 联想；input.dock 在 hero/active 两种状态都渲染（查证与决策见 docs/spec/03-menu.md）。
-* **与官方触发菜单互斥**：对 `[data-trigger-menu]`（官方 @/斜杠触发菜单的公开 DOM 标记）做**只读存在性检测** + MutationObserver 观察 overlay 锚点子树；官方菜单打开期间本菜单不渲染、Tab 不采用。只读观察，不做任何写入。
-* **旋转光环定位**：只读测量 `[data-composer-card]` 视口矩形（portal 到 body），300ms 周期自愈。
-* **会话事件读取**：host 两处主路由读取（GET 状态 / POST complete）直读官方 `session.snapshotEvents()`（官方读取 API；仅支持 dsh 0.1.2-alpha.4 起，无旧版回退）。
-
-***
-
-## 关键文件速查
+### 关键文件速查
 
     src/host.ts              — host half 入口（webServer 路由 + settings 分节）
     src/client/index.ts      — client half 入口（开关 / 数据面 dock / overlay 候选菜单）
@@ -49,11 +36,14 @@ DSH Web 插件：聊天输入框续写联想（DeepSeek FIM 补全 Beta 转发 +
     dev.patch.yml            — 开发补丁（--patch 加载本地 TS，内含本机绝对路径）
     docs/spec/               — 设计文档
 
-***
+### 测试
 
-## 测试
-
-* 测试文件命名：<模块名>.test.mjs，与被测模块同名
-* 结构遵循 AAA 原则（Arrange / Act / Assert），describe → it 两层
-* it 描述格式：「输入条件 应该 期望结果」（中文）
+* Node 内置 test runner，用例在 `test/*.test.mjs`；命名 `<模块名>.test.mjs`，AAA 结构（describe → it），it 描述「输入条件 应该 期望结果」（中文）
 * 纯逻辑必须可单测：触发条件、建议作废判定、错误映射等抽成纯函数并导出
+
+## seam 特例（需项目 owner 认可，已定案）
+
+* **候选菜单（2026-08-30 起）**：官方没有输入框内联建议 seam（`conversation.input.overlay` 是菜单弹层锚点、不带输入快照）。当前实现：数据面挂 `conversation.input.dock`（读 InputZone 草稿快照，**只读**；写入仍走 `slash/input-insert-text` bail 事件，span CAS），菜单视图挂 `conversation.input.overlay`（官方 MenuDropdown 视觉 token，锚点由 shell 承载，零定位 JS）。**不修改编辑器内容**；官方提供 inline-suggestion seam 后迁移。2026-08-31 数据面自 `conversation.composer.dock` 迁至 `conversation.input.dock`：composer.dock 在 hero 状态（新会话页）不被 shell 渲染，导致新会话第一条草稿 0 联想；input.dock 在 hero/active 两种状态都渲染（查证与决策见 docs/spec/03-menu.md）。
+* **与官方触发菜单互斥**：对 `[data-trigger-menu]`（官方 @/斜杠触发菜单的公开 DOM 标记）做**只读存在性检测** + MutationObserver 观察 overlay 锚点子树；官方菜单打开期间本菜单不渲染、Tab 不采用。只读观察，不做任何写入。
+* **旋转光环定位**：只读测量 `[data-composer-card]` 视口矩形（portal 到 body），300ms 周期自愈。
+* **会话事件读取**：host 两处主路由读取（GET 状态 / POST complete）直读官方 `session.snapshotEvents()`（官方读取 API；仅支持 dsh 0.1.2-alpha.4 起，无旧版回退）。
