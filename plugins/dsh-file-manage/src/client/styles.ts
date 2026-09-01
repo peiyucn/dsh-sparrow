@@ -215,8 +215,8 @@ export function ensureFileManageStyles(): void {
   flex-direction: column;
   margin: 0 0 12px;
   padding: 8px 12px 12px;
-  border: 1px solid var(--dsw-alias-border-l2, #e2e5ea);
-  border-radius: 12px;
+  border: 0.5px solid var(--dsw-alias-border-l4, #e2e5ea);
+  border-radius: 16px;
 }
 /* 配额容量条：加厚 + 未使用区斜纹（repeating-linear-gradient），与分割线区分；填充盖住斜纹。
    容量文字绝对定位居中叠加在条上。 */
