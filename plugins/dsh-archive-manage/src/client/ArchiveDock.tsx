@@ -180,8 +180,8 @@ export function ensureArchiveStyles(): void {
   flex-direction: column;
   margin: 0 0 12px;
   padding: 8px 12px 12px;
-  border: 1px solid var(--dsw-alias-border-l2, #e2e5ea);
-  border-radius: 12px;
+  border: 0.5px solid var(--dsw-alias-border-l4, #e2e5ea);
+  border-radius: 16px;
 }
 /* 分组头横贯卡内两侧、文字与行内容左对齐（卡内边距 12px）。 */
 .dsh-archive-section-card .dsh-archive-section {
