@@ -47,6 +47,7 @@ export function ensureFileManageStyles(): void {
   gap: 0;
   padding: 0;
   border-radius: 50%;
+  corner-shape: round;
 }
 .dsh-file-manage-trigger-icon {
   flex: none;
@@ -73,6 +74,7 @@ export function ensureFileManageStyles(): void {
   border: 2px solid var(--dsw-alias-border-l1, #d4d8e0);
   border-top-color: var(--dsw-alias-button-info-fill, #4d6bfe);
   border-radius: 50%;
+  corner-shape: round;
   animation: dsh-file-manage-spin 0.8s linear infinite;
 }
 @keyframes dsh-file-manage-spin {
@@ -112,6 +114,7 @@ export function ensureFileManageStyles(): void {
   padding: 0;
   border: none;
   border-radius: 28px;
+  corner-shape: round;
   outline: none;
   background: transparent;
   cursor: pointer;
@@ -125,6 +128,7 @@ export function ensureFileManageStyles(): void {
   padding: 1px 6px;
   border: 1px solid var(--dsw-alias-border-l2, #e2e5ea);
   border-radius: 999px;
+  corner-shape: round;
   color: var(--dsw-alias-label-caption, #8a919f);
   font-size: 11px;
   line-height: 16px;
@@ -134,6 +138,7 @@ export function ensureFileManageStyles(): void {
   padding: 0 12px;
   border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
   border-radius: 999px;
+  corner-shape: round;
   outline: none;
   background: transparent;
   color: var(--dsw-alias-label-primary, #1f2329);
@@ -172,7 +177,7 @@ export function ensureFileManageStyles(): void {
   border-radius: 16px;
   background: var(--dsw-alias-bg-layer-2, #f6f7f9);
   color: var(--dsw-alias-label-primary, #1f2329);
-  box-shadow: var(--dsw-shadow-lv3, 0 12px 40px rgba(0,0,0,0.22));
+  box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
 }
 .dsh-file-manage-confirm-title {
   margin: 0;
@@ -281,7 +286,7 @@ export const styles = {
     padding: 0,
     background: 'var(--dsw-alias-bg-layer-2, #f6f7f9)',
     color: 'var(--dsw-alias-label-primary, #1f2329)',
-    boxShadow: 'var(--dsw-shadow-lv3, 0 12px 40px rgba(0,0,0,0.22))',
+    boxShadow: 'var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22))',
   } satisfies CSSProperties,
   body: {
     flex: 1,
