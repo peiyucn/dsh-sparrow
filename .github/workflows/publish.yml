@@ -14,7 +14,7 @@ on:
 # id-token: write 用于 npm Trusted Publishing（OIDC）——npm 2027-01 起收紧
 # 绕过 2FA 的令牌直接发布，官方方向是 OIDC / staged publishing。
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -89,3 +89,10 @@ jobs:
         if: env.NPM_TOKEN == ''
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
         run: npm publish --access public --provenance --tag ${{ steps.resolve.outputs.npm-tag }}
+
+      # GitHub Release 是 publish 的内部步骤：发布成功后自动建发布页（--generate-notes）
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" --generate-notes

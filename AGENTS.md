@@ -142,7 +142,7 @@
 7. `gh run watch` 盯到 success；`npm view <包名> version dist-tags` 复核版本与 dist-tag
 8. **预发布待验证**：`next` 已指向新版本且 `latest` 未变；owner 通过 `dsh plugin --profile web add <包名>@next` 安装验证，未确认前不发布稳定版
 9. **转正**：owner 确认后把 `package.json` 版本改为稳定版 `X.Y.Z`（去掉 `-alpha.N`），CHANGELOG 记转正，按本流程发布该稳定版（工作流自动上 `latest`）；然后 deprecate 被替代的坏版本（不 unpublish）
-10. `gh release create <tag> --notes "<本版 CHANGELOG 要点>"` 补 GitHub Release 说明（推荐；已发布 tag 补说明用同命令，**不要重推 tag**）
+10. GitHub Release 已由 publish.yml 在发布后自动创建（`--generate-notes`）；如需补充说明用 `gh release edit <tag> --notes "..."`（**不要重推 tag**）
 11. 切回 `dev` 继续开发
 
 #### 发布红线
@@ -167,7 +167,7 @@
 
 ## CI 与自动发布
 
-* `.github/workflows/ci.yml`：push dev/main 与 PR 时跑两个标准过程 job——`typecheck`（typecheck:all，含 client bundle 校验）与 `test`（test:all，node:test）
+* `.github/workflows/ci.yml`：push dev/main 与 PR 时跑七过程 job——`typecheck`（typecheck:all，含 client bundle 校验）与 `test`（test:all）有实质内容，`build`/`package`/`publish`/`deploy`/`sync` 空跑占位（publish 实质在 publish.yml，tag 触发）
 * `.github/workflows/publish.yml`：push `<插件名>-vX.Y.Z` tag 触发，或 workflow_dispatch 指定插件；从 tag 解析插件名、校验 tag 版本与 `package.json` version 一致，跑该插件 verify 后 `npm publish --access public --provenance`；dist-tag 自动选择：版本含 `-` → `next`，正式版 → `latest`
 * `.github/workflows/npm-release-control.yml`：workflow_dispatch 执行 `promote`（`dist-tag add ... latest`）或 `deprecate`；需要 `NPM_TOKEN`
 * 工作流实现细节（勿回退）：`NPM_TOKEN` 经 job 级 `env` 中转再进 step 的 `if`（`secrets` 上下文不允许出现在 `if` 里，直接写会让整条工作流 0s 解析失败）；`--provenance` 要求各插件 package.json 声明 `repository` 字段

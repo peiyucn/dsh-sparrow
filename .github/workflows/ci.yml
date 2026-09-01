@@ -45,3 +45,43 @@ jobs:
         run: pnpm run typecheck:all
       - name: Test all plugins
         run: pnpm run test:all
+
+  build:
+    name: build
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: No-op
+        run: echo "build 空跑（lib/ 由 tsc 在 typecheck 过程产出）"
+
+  package:
+    name: package
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: No-op
+        run: echo "package 空跑（打包内置于 npm publish）"
+
+  publish:
+    name: publish
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: No-op
+        run: echo "publish 实质由 publish.yml 在 tag 触发时执行，此处空跑占位"
+
+  deploy:
+    name: deploy
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: No-op
+        run: echo "deploy 空跑（本仓库无部署目标）"
+
+  sync:
+    name: sync
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: No-op
+        run: echo "sync 空跑（本仓库无数据同步）"
