@@ -279,7 +279,8 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         return
       }
       const url = new URL(req.url ?? '/', 'http://localhost')
-      const session = ctx.sessions.get(SessionId(url.searchParams.get('sessionId') ?? ''))
+      const sessionIdRaw = url.searchParams.get('sessionId') ?? ''
+      const session = ctx.sessions.get(SessionId(sessionIdRaw))
       if (session === undefined) {
         none()
         return

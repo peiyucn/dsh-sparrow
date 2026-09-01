@@ -22,7 +22,7 @@ export interface VisionStatusInjected {
   subscribeModelChange: (listener: () => void) => () => void
 }
 
-export type VisionStatusProps = PropsRuntime<'conversation.input.right'> & VisionStatusInjected & { t: TranslateNS<'vision-bridge'> }
+export type VisionStatusProps = PropsRuntime<'conversation.input.right'> & VisionStatusInjected & { t: TranslateNS<'vision-bridge'>; sessionId?: SessionId }
 
 /** 眼睛 glyph：官方 icon 集无眼睛图标，内联 SVG + currentColor（同官方 PermissionSelect 自绘盾牌先例）。 */
 const EYE_GLYPH = (
@@ -106,7 +106,7 @@ export function ensureVisionStyles(): HTMLStyleElement {
   return style
 }
 
-export function VisionStatusIcon({ session, queryStatus, subscribeModelChange, t }: VisionStatusProps) {
+export function VisionStatusIcon({ sessionId, queryStatus, subscribeModelChange, t }: VisionStatusProps) {
   const [status, setStatus] = useState<VisionStatusResult | null>(null)
   const [open, setOpen] = useState(false)
   const [point, setPoint] = useState<{ x: number; y: number; up: boolean } | null>(null)
@@ -117,9 +117,10 @@ export function VisionStatusIcon({ session, queryStatus, subscribeModelChange, t
   useEffect(() => {
     setStatus(null)
     setOpen(false)
+    if (sessionId === undefined) return
     let alive = true
     const refresh = (): void => {
-      void queryStatus(session.sessionId).then((next) => {
+      void queryStatus(sessionId).then((next) => {
         if (alive) setStatus(next)
       }).catch(() => {
         // 状态查询失败：不显示图标。
@@ -136,7 +137,7 @@ export function VisionStatusIcon({ session, queryStatus, subscribeModelChange, t
       alive = false
       unsubscribe()
     }
-  }, [queryStatus, session.sessionId, subscribeModelChange])
+  }, [queryStatus, sessionId, subscribeModelChange])
 
   const computePoint = (): { x: number; y: number; up: boolean } | null => {
     const rect = buttonRef.current?.getBoundingClientRect()
