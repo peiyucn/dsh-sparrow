@@ -13,3 +13,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Quality guards: role-switch discard, degenerate repetition, history echo (user prefix / assistant window), language consistency; when all candidates are filtered out, one retry at temperature 0.5, then silent empty if still none
 - Switch off by default with local persistence; hidden entirely when the session's main model is not a DeepSeek model; reuses the DeepSeek API key configured in dsh (never enters the browser)
 - **Works on the new-session page**: the data side mounts `conversation.input.dock` (the dsh shell does not render composer.dock in hero state; input.dock mounts in both states)
+
+## 0.1.0-alpha.2 (2026-09-01 · pre-release)
+
+- Version alignment with the collection release 0.1.0-alpha.2 (no functional changes since 0.1.0-alpha.1)

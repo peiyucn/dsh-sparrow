@@ -10,3 +10,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Status icon: a three-state eye beside the model selector (native vision greyed out / DeepSeek text lit / no-vision slashed); clicking shows the matching explanation, and it follows model switches live; with no model info on a new session it falls back to the shared default model
 - In-process report cache (keyed by "attachmentId + question"); repeat questions about the same image answer instantly
 - Reuses the DeepSeek API key configured in dsh; images are only sent to the official DeepSeek vision model and never leave the DeepSeek ecosystem; zero residue (no files written, cache is process memory only)
+
+## 0.1.0-alpha.2 (2026-09-01 · pre-release)
+
+- Version alignment with the collection release 0.1.0-alpha.2 (no functional changes since 0.1.0-alpha.1)
