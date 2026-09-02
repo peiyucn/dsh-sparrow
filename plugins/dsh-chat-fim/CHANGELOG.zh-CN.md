@@ -23,6 +23,3 @@
 - 默认关闭并本地持久化；会话主模型非 DeepSeek 时整体隐藏；复用 dsh 里配置的 DeepSeek API key（绝不进浏览器）
 - **新会话页可用**：数据面挂 `conversation.input.dock`（dsh shell 在 hero 状态不渲染 composer.dock；input.dock 两种状态都渲染）
 
-## 0.1.0-alpha.2 (2026-09-01 · pre-release)
-
-- 版本对齐合集 0.1.0-alpha.2（功能与上版一致）

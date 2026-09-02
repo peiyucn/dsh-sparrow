@@ -19,6 +19,3 @@
 - 进程内报告缓存（键为「attachmentId + question」）；同一图片的重复提问秒回
 - 复用 dsh 里配置的 DeepSeek API key；图片只发给官方 DeepSeek 视觉模型、不离开 DeepSeek 生态；零残留（不写文件，缓存仅在进程内存）
 
-## 0.1.0-alpha.2 (2026-09-01 · pre-release)
-
-- 版本对齐合集 0.1.0-alpha.2（功能与上版一致）

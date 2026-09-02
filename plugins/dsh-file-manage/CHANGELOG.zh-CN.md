@@ -17,6 +17,3 @@
 - 总数 + 网盘式配额条：已用 / 25 GiB、自适应精度百分比、条纹空白区、「已加载 X / N」随翻页同步
 - 复用官方 DeepSeekFilesClient（连接事实取自 llm-deepseek 设置节 + ctx.credentials）；无本地持久化
 
-## 0.1.0-alpha.2 (2026-09-01 · pre-release)
-
-- 面板打开改为整页 loading：文件列表与总数统计都就绪后才展示内容，消除加载闪动
