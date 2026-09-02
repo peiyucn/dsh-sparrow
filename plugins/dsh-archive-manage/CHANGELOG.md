@@ -2,6 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.1-alpha.1 (2026-09-02 · pre-release)
+
+- Compat with dsh master after the 0.1.2-alpha.5 publish: `sessionPersistence.list()` now returns snapshots on master (dual-shape mapping keeps older dsh versions working), and `locate` moved from the public contract to a backend-private method (startup capability check added, failing fast with a clear message).
+
 ## 0.1.0 (2026-09-02)
 
 - Promoted 0.1.0 (identical to 0.1.0-alpha.3).

@@ -2,6 +2,10 @@
 
 简体中文 | [English](CHANGELOG.md)
 
+## 0.1.1-alpha.1 (2026-09-02 · pre-release)
+
+- 适配 alpha.5 发布后的 dsh master：`sessionPersistence.list()` 在 master 上改为返回快照（双形状兼容，旧版 dsh 不受影响）；`locate` 从公开契约降为后端私有方法，改为启动能力检查，缺失即 fail-fast 报明确错误。
+
 ## 0.1.0 (2026-09-02)
 
 - 转正 0.1.0（与 0.1.0-alpha.3 一致）。
