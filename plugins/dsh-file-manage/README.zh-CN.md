@@ -35,7 +35,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-file-manage
 
 ## 截图
 
-![云端文件面板](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/plugins/dsh-file-manage/docs/images/dsh-file-manage.png)
+![云端文件面板](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-dsh-file-manage.png)
 
 ## 卸载与残留
 
