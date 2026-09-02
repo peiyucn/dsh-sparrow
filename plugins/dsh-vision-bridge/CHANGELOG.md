@@ -2,6 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.0 (2026-09-02)
+
+- Promoted 0.1.0 (identical to 0.1.0-alpha.3).
+
 ## 0.1.0-alpha.3 (2026-09-02 · pre-release)
 
 - README screenshots now use absolute URLs and are no longer packed into the npm package (functionally identical to the previous release).
