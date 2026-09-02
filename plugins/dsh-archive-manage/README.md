@@ -26,7 +26,7 @@ Requires dsh ≥ 0.1.2-alpha.4 and a working `pnpm` (`dsh plugin` forwards insta
 
 ## Screenshots
 
-![Archive panel (archive & trash areas)](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-dsh-archive-manage.png)
+![Archive panel (archive & trash areas)](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-archive-manage.png)
 
 ## Trash Location & Restore
 

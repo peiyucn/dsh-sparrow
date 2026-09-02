@@ -26,7 +26,7 @@ Requires dsh ≥ 0.1.2-alpha.4 and a working `pnpm` (`dsh plugin` forwards insta
 
 ## Screenshots
 
-![Status icon next to the model selector](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-dsh-vision-bridge.png)
+![Status icon next to the model selector](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-vision-bridge.png)
 
 ## Uninstall & Residue
 
