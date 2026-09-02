@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - '*-v[0-9]*.[0-9]*.[0-9]*'
+      # 预发布后缀（-alpha.N 等）：稳定版模式全串匹配不到带连字符的 tag
+      - '*-v[0-9]*.[0-9]*.[0-9]*-*'
   workflow_dispatch:
     inputs:
       plugin:
