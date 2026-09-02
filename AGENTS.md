@@ -11,8 +11,7 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 * `plugins/dsh-file-manage` — DeepSeek Files API 云端文件管理（无本地持久化）
 
 * 验证：插件目录 `npm run verify`；全量 = 根 `npm run verify`；分项 = 根 `pnpm run <step>:all`
-* 文档分工：插件 README 面向用户（中英双份、顶部互链）；AGENTS 面向 agent（seam 特例/架构约束/测试约定），开发细节不进 README
-* 各插件专属约束见 `plugins/*/AGENTS.md`
+* 文档分工：AGENTS.md 是唯一 agent 指令文件（不保留 CLAUDE.md 等其它厂商指令文件）；插件 README 面向用户（中英双份、顶部互链）；插件私有 seam 特例只在根 AGENTS 记概括（见下文），实现细节以代码注释与 docs/spec 为准，开发细节不进 README
 
 ## DSH 插件契约（硬约束）
 
@@ -22,18 +21,34 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 * **seam 纪律（三档）**：
   1. **正路（默认）**：只用公开 seam（`ctx.llm`/`ctx.webServer`/`ctx.tools`/slots/provide 等）
   2. **包装（特例）**：公开 seam 不满足需求时包装它——保持原签名与 `this` 语义、可逆恢复，并记录适配的 dsh 版本
-  3. **私有 seam 依赖（特例，2026-09-01 起）**：官方无公开能力、需求成立时，允许调用官方服务 private 方法/读写 private 状态。护栏：不替换/不包装/不覆写官方函数；优先复用官方自身写入路径（如 enqueueOperation + setState），不自造平行机制；启动时能力检查，surface 变化即 fail-fast 报「不支持的 dsh 版本」；owner 批准 + 插件 AGENTS 记录特例
-* **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直读内部文件；确需直碰内部文件的特例须插件 AGENTS 显式记录（允许的操作/边界/风险）+ owner 认可
+  3. **私有 seam 依赖（特例，2026-09-01 起）**：官方无公开能力、需求成立时，允许调用官方服务 private 方法/读写 private 状态。护栏：不替换/不包装/不覆写官方函数；优先复用官方自身写入路径（如 enqueueOperation + setState），不自造平行机制；启动时能力检查，surface 变化即 fail-fast 报「不支持的 dsh 版本」；owner 批准 + 在本文件「插件私有 seam 特例（概括）」小节记录
+* **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直读内部文件；确需直碰内部文件的特例须在本文件「插件私有 seam 特例（概括）」小节记录 + owner 认可
 * **查证原则**：引用 DSH 服务/事件/插槽契约前，先 grep 官方源码（本机 checkout：`C:\Users\DJ028191\.dsh-launcher-panel\source`）确认，禁止凭记忆编造
 
-## Git 规范
+## 插件私有 seam 特例（概括）
 
-* **逐项提交**：中文描述 + 英文类型前缀（feat:/fix:/refactor:/chore:/docs:）
-* **分支**：日常开发在 `dev`；`main` 只接受发布合并；main 禁强推/删/重建，dev rulesets 轻保护；外部 PR 由 owner 审核合并（Squash-only，合并前确认 CI 绿）
-* **Push**：push 前对应插件 `npm run verify` 通过；日常推送目标 `dev`
-* **诚实原则**：不确定的事直接说"不确定"，禁止编造事实性信息
-* 统一开发流程 / 安全基线 / 文档语言规范按 pyai-meta-repo AGENTS.md
-* 网络：`git push/fetch` 需要代理 127.0.0.1:7897；`gh api` 直连
+> dsh 迭代快，特例不写死细节：开发时以临场查证官方源码为准；新增/变更特例须 owner 认可，实现细节以代码注释与各插件 docs/spec 为准。
+
+* `dsh-chat-fim`：候选菜单挂 `conversation.input.dock`（只读草稿快照，写入走官方 `slash/input-insert-text` 事件）+ `conversation.input.overlay`（官方菜单视觉 token）；与官方触发菜单互斥（只读检测 `[data-trigger-menu]`）；host 直读 `session.snapshotEvents()` 取主路由（仅 dsh ≥ 0.1.2-alpha.4）
+* `dsh-vision-bridge`：可逆包装 `ctx.llm.resolveModelInfo` 抹除文本路由的 image 门禁；`agent/request` 拦截按主模型能力屏蔽 `vision_read` 工具；图片字节只经官方 `ctx.attachments.readImage`；直读 `snapshotEvents()`
+* `dsh-archive-manage`：允许移动/删除会话日志目录（仅 jsonl 单会话目录，其余 `BACKEND_UNSUPPORTED`）；归档集变更走官方 WorkspaceRegistry 私有写通道（`enqueueOperation`/`requireState`/`setState`，启动能力检查缺方法即 fail-fast）；live 会话拒绝处理；回收站目录写 sidecar 记账
+* `dsh-file-manage`：直接 import 官方导出 `DeepSeekFilesClient`；只读官方 `llm-deepseek` 设置节取 `baseURL`/`apiKeyEnv`
+* `dsh-nav-pin`：只读依赖官方 DOM 标记与 aria-label 文案；CSS 特异性压制官方窄屏隐藏规则；宽度轴经官方公开 data 属性钳制
+
+## 工程管线（本仓库自含）
+
+* **开发**：日常改动在 `dev`；`main` 只接受发布合并
+* **验证**：插件目录 `npm run verify`；全量 = 根 `npm run verify`；push 前对应插件 verify 必须通过
+* **提交**：逐项提交，中文描述 + 英文类型前缀（feat:/fix:/refactor:/chore:/docs:）；不确定的事直接说"不确定"，禁止编造事实性信息
+* **推送**：日常目标 `dev`；`git push/fetch` 需要代理 127.0.0.1:7897，`gh api` 直连
+* **合并**：dev → main（fast-forward）
+* **运维**：依赖升级统一手动（security updates 与 dependabot.yml 关闭）；收到警报 → 判断影响面（运行时/产物依赖才影响用户）→ 手动升级 → 影响用户的按发布流程发版
+
+## 安全基线（本仓库自含要点）
+
+* 已开启：Dependabot alerts（仅报警）、CodeQL default setup、secret scanning + push protection、Private vulnerability reporting、根 `SECURITY.md`；检查命令 `gh api repos/peiyucn/dsh-sparrow --jq .security_and_analysis`
+* 分支保护：main 禁强推/删/重建、Squash-only、owner 保留 fast-forward 直推；dev rulesets 轻保护（禁强推+禁删+禁重建）；**CI 会跑但不设硬门禁**——合并外部 PR 前 owner 自己确认 CI 绿
+* 外部 PR / Issue 一律开放、不设交互限制，owner 审核合并（Squash-only），不想收的直接关闭
 
 ## 代码审计（发布前 / 全面检查时，按要发布的插件逐项）
 
@@ -52,7 +67,7 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 > npm 发布**永久**：同版本不可覆盖、整体 unpublish 锁包名 24 小时；发布前把版本/描述/CHANGELOG/tag 说明核对到位。
 
 * **范围**：发布前对比 `npm view <包名> version`、插件 package.json version、自上次 tag 的 git log——有改动的插件走完整发布流程，没改动的不动；各插件独立版本号、独立 tag（`<插件名>-vX.Y.Z`）
-* **元数据**：name 必须 `@dsh-sparrow/<插件名>`；description 英文；`repository` 必填（npm `--provenance` 校验）；`files` 清单齐备；README/CHANGELOG 中英双份顶部互链；CHANGELOG 条目按发布顺序从上到下、稳定版覆盖 alpha 全部用户可感知改动、只记真实发布过的版本（发布前的改名等内部历史记插件 AGENTS 或 docs/spec）；截图放 `plugins/<插件>/docs/images/`（主截图同放仓库根 resources/）
+* **元数据**：name 必须 `@dsh-sparrow/<插件名>`；description 英文；`repository` 必填（npm `--provenance` 校验）；`files` 清单齐备；README/CHANGELOG 中英双份顶部互链；CHANGELOG 条目按发布顺序从上到下、稳定版覆盖 alpha 全部用户可感知改动、只记真实发布过的版本（发布前的改名等内部历史记 docs/spec）；截图放 `plugins/<插件>/docs/images/`（主截图同放仓库根 resources/）
 * **版本策略**：修复 patch / 功能 minor / 破坏性 major；各插件版本线保持一致（对齐类发版 CHANGELOG 记「版本对齐合集」）；**新版本一律先发 next（`X.Y.Z-alpha.N`）**，owner 用 `dsh plugin --profile web add <包名>@next` 验证后发同号稳定版（自动上 latest）；npm 首发的 latest 指向该版本且不可移除 dist-tag（平台硬性行为）；坏版本 deprecate（不 unpublish）；版本线由 owner 决定；已发布版本元数据错误只能升补丁版修正并诚实记录
 * **流程**：改动 push dev + 插件 verify → 版本号 + CHANGELOG 双份 → 再 verify + `git diff --check` → 合并 dev→main（fast-forward）并 push → `git tag -a <插件名>-vX.Y.Z -m "<一句话中文说明>"`（必须 -a）→ push tag 自动发布（解析插件、校验 tag==package.json version、verify、`npm publish --access public --provenance --tag next|latest`、自动建 GitHub Release：说明拼两份 CHANGELOG、一律 prerelease、不附产物）→ `gh run watch` 盯 success + `npm view` 复核版本与 dist-tag → 切回 dev
 * **tag 兜底**：push tag 后 30 秒内无对应 Publish run，改 `gh workflow run publish.yml -f plugin=<插件名>` 手动派发（内容一致，仅跳过 Release——用 `gh release create <tag> --prerelease --notes-file <说明>` 补建）
