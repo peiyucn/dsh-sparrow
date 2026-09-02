@@ -124,6 +124,21 @@ describe('archive-manage 纯逻辑', () => {
       assert.equal(parseBlankProjection(row), undefined)
     })
 
+    it('v6 行形状（顶层 identity + rows）blank 为真 应该 判定空白', () => {
+      const row = { identity: { createdAt: 1 }, rows: { sessionListMetadata: { ver: 1, seq: 2, val: { blank: true } } } }
+      assert.deepEqual(parseBlankProjection(row), { blank: true })
+    })
+
+    it('v6 行形状 turns 为 0 应该 判定空白', () => {
+      const row = { identity: {}, rows: { sessionStats: { ver: 1, seq: 0, val: { turns: 0 } } } }
+      assert.deepEqual(parseBlankProjection(row), { blank: true })
+    })
+
+    it('v6 行形状有轮次且无 blank 应该 返回 undefined', () => {
+      const row = { identity: {}, rows: { sessionStats: { ver: 1, seq: 3, val: { turns: 3 } } } }
+      assert.equal(parseBlankProjection(row), undefined)
+    })
+
     it('行缺失 rows 应该 返回 undefined', () => {
       assert.equal(parseBlankProjection({ record: { identity: {} } }), undefined)
     })

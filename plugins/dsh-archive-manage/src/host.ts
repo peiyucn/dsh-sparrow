@@ -199,6 +199,36 @@ export function assertRegistryMutationApi(registry: unknown): RegistryMutationSu
   return registry as unknown as RegistryMutationSurface
 }
 
+/**
+ * sessionPersistence.list() 双形状兼容读取：
+ * - npm 0.1.2-alpha.5 及更早：直接返回 SessionHeader[]；
+ * - alpha.5 发布后的 master（2026-09-02 会话持久化重构）：返回 Snapshot[]（{ header, revision, ... }）。
+ * 按元素是否携带 header 字段分流，统一返回 SessionHeader[]（见 AGENTS 插件私有 seam 特例）。
+ */
+export async function storedHeaders(ctx: Context): Promise<SessionHeader[]> {
+  const entries = await ctx.sessionPersistence.list() as readonly unknown[]
+  return entries.map((entry): SessionHeader => {
+    const record = entry as Record<string, unknown> | null | undefined
+    const header = record?.header
+    if (typeof header === 'object' && header !== null && typeof (header as Record<string, unknown>).id === 'string') {
+      return header as SessionHeader
+    }
+    return entry as SessionHeader
+  })
+}
+
+/**
+ * 私有 seam 依赖：sessionPersistence.locate。alpha.5 发布后的 master 把它从公开服务契约
+ * 降为 jsonl 后端私有方法——运行时成员仍在（插件只读使用，不替换不覆写），但必须启动
+ * 能力检查，缺失即 fail-fast（与 registry 写通道同款护栏）。
+ */
+export function assertSessionLocationApi(persistence: unknown): void {
+  const locate = (persistence as Record<string, unknown> | null | undefined)?.locate
+  if (typeof locate !== 'function') {
+    throw new Error('不支持的 DSH session persistence：缺少私有 locate 方法；请升级插件以匹配当前 dsh 版本')
+  }
+}
+
 /** 读归档集：官方公开 getter（通道迁移后内存态与域恒同步，无需再直读域）。 */
 async function readArchivedIds(ctx: Context): Promise<SessionId[]> {
   return [...ctx.workspaceRegistry.archivedSessionIds]
@@ -233,7 +263,7 @@ async function addArchivedId(surface: RegistryMutationSurface, sessionId: Sessio
  */
 async function sweepGhostArchivedIds(ctx: Context, surface: RegistryMutationSurface): Promise<void> {
   try {
-    const headers = await ctx.sessionPersistence.list()
+    const headers = await storedHeaders(ctx)
     const known = new Set(headers.map(header => String(header.id)))
     const current = await readArchivedIds(ctx)
     const cleaned = current.filter(id => known.has(String(id)))
@@ -287,7 +317,7 @@ async function sweepStaleProjectionCache(ctx: Context): Promise<void> {
   try {
     const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
     if (domain === undefined) return
-    const headers = await ctx.sessionPersistence.list()
+    const headers = await storedHeaders(ctx)
     const known = new Set(headers.map(header => String(header.id)))
     const table = domain.table(PROJCACHE_SESSIONS_TABLE)
     let removed = 0
@@ -309,7 +339,7 @@ async function sweepStaleProjectionCache(ctx: Context): Promise<void> {
  */
 async function sweepOrphanSubagents(ctx: Context): Promise<void> {
   try {
-    const headers = await ctx.sessionPersistence.list()
+    const headers = await storedHeaders(ctx)
     const persistedIds = new Set(headers.map(header => String(header.id)))
     let removed = 0
     for (const header of headers) {
@@ -359,7 +389,7 @@ interface SubagentTarget {
 
 /** 找出某个父会话下的全部 subagent 会话；任一会话仍被占用时不处理任何文件。 */
 async function listSubagentTargets(ctx: Context, parentSessionId: SessionId): Promise<SubagentTarget[]> {
-  const headers = await ctx.sessionPersistence.list()
+  const headers = await storedHeaders(ctx)
   const targets: SubagentTarget[] = []
   for (const header of headers) {
     if (header.origin !== 'subagent' || header.parentSession === undefined) continue
@@ -534,6 +564,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
   const settings = normalizeArchiveConfig(config)
   // 私有 seam 依赖：官方 WorkspaceRegistry 的 enqueueOperation/requireState/setState（AGENTS 三档特例，2026-09-01）。
   const surface = assertRegistryMutationApi(ctx.workspaceRegistry)
+  // 私有 seam 依赖：sessionPersistence.locate（2026-09-02 起公开契约降为后端私有方法，运行时仍在）。
+  assertSessionLocationApi(ctx.sessionPersistence)
 
   // 启动清扫（均不影响加载）：归档集幽灵 id（历史遗留）、投影缓存陈旧行、孤儿 subagent 会话。
   void sweepGhostArchivedIds(ctx, surface)
@@ -547,7 +579,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
       const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
       try {
         if (req.method === 'GET' && pathname === `${PREFIX}/list`) {
-          const headers = await ctx.sessionPersistence.list()
+          const headers = await storedHeaders(ctx)
           const byId = new Map(headers.map(header => [String(header.id), header]))
           // 归档集读官方 registry getter（通道迁移后内存态与域恒同步）。
           const archivedIds = await readArchivedIds(ctx)
@@ -577,7 +609,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
         }
 
         if (req.method === 'GET' && pathname === `${PREFIX}/strays`) {
-          const headers = await ctx.sessionPersistence.list()
+          const headers = await storedHeaders(ctx)
           const archivedIds = await readArchivedIds(ctx)
           const attachedIds = ctx.workspaceRegistry.list().flatMap(workspace => workspace.sessionIds.map(id => String(id)))
           const strayIds = straySessionIds(headers.map(header => String(header.id)), archivedIds.map(id => String(id)), attachedIds)
@@ -633,7 +665,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           }
           const sessionId = SessionId(parsed.sessionId)
           const archivedIds = await readArchivedIds(ctx)
-          const headers = await ctx.sessionPersistence.list()
+          const headers = await storedHeaders(ctx)
           const attachedIds = ctx.workspaceRegistry.list().flatMap(workspace => workspace.sessionIds.map(id => String(id)))
           const strayIds = straySessionIds(headers.map(header => String(header.id)), archivedIds.map(id => String(id)), attachedIds)
           const isArchived = archivedIds.some(id => String(id) === String(sessionId))

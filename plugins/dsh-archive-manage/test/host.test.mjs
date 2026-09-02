@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { resolve, sep } from 'node:path'
-import { assertRegistryMutationApi, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor } from '../lib/host.js'
+import { assertRegistryMutationApi, assertSessionLocationApi, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor, storedHeaders } from '../lib/host.js'
 
 // 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
 // 测试夹具按当前平台构造——CI 跑 Ubuntu、本机跑 Windows，两边都必须绿。
@@ -82,6 +82,39 @@ describe('archive-manage host 纯逻辑', () => {
       assert.equal(typeof surface.enqueueOperation, 'function')
       assert.equal(typeof surface.requireState, 'function')
       assert.equal(typeof surface.setState, 'function')
+    })
+  })
+
+  describe('assertSessionLocationApi', () => {
+    it('缺 locate 应该 抛含 locate 的明确错误', () => {
+      assert.throws(() => assertSessionLocationApi({}), /locate/)
+    })
+
+    it('locate 非函数 应该 抛错', () => {
+      assert.throws(() => assertSessionLocationApi({ locate: 'x' }), /locate/)
+    })
+
+    it('locate 存在 应该 不抛', () => {
+      assert.doesNotThrow(() => assertSessionLocationApi({ locate: () => ({ kind: 'jsonl', path: '/x/session.jsonl' }) }))
+    })
+  })
+
+  describe('storedHeaders', () => {
+    const ctxWithList = (list) => ({ sessionPersistence: { list } })
+
+    it('master 快照形状 应该 映射为 header', async () => {
+      const ctx = ctxWithList(async () => [
+        { header: { id: 'a', createdAt: 1, isSeeded: false }, revision: 'r1' },
+        { header: { id: 'b', createdAt: 2, isSeeded: false }, revision: 'r2' },
+      ])
+      const headers = await storedHeaders(ctx)
+      assert.deepEqual(headers.map(h => String(h.id)), ['a', 'b'])
+    })
+
+    it('旧 header 形状 应该 原样通过', async () => {
+      const ctx = ctxWithList(async () => [{ id: 'c', createdAt: 3, isSeeded: false }])
+      const headers = await storedHeaders(ctx)
+      assert.deepEqual(headers.map(h => String(h.id)), ['c'])
     })
   })
 
