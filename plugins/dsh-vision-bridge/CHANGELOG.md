@@ -2,6 +2,14 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.0-alpha.3 (2026-09-02 · pre-release)
+
+- README screenshots now use absolute URLs and are no longer packed into the npm package (functionally identical to the previous release).
+
+## 0.1.0-alpha.2 (2026-09-01 · pre-release)
+
+- Version-line alignment 0.1.0-alpha.2 (functionally identical to the previous release).
+
 ## 0.1.0-alpha.1 (2026-09-01 · pre-release)
 
 - First published version, released to the `next` channel for owner validation before the stable `0.1.0`
