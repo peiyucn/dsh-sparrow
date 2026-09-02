@@ -93,28 +93,6 @@ jobs:
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
         run: npm publish --access public --provenance --tag ${{ steps.resolve.outputs.npm-tag }}
 
-      # GitHub Release 是 publish 的内部步骤（多包单仓库）：说明由两份 CHANGELOG
-      # 当前版本条目拼成（英文在上、中文在下；两份都缺条目时回退 --generate-notes）；
-      # 预发布版本（版本号含 -）标 prerelease；所有版本一律不设 Latest
-      # （每包的权威指针是 npm dist-tag）；不附产物。
-      - name: Create GitHub Release
-        if: github.event_name == 'push'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          PLUGIN="plugins/${{ steps.resolve.outputs.plugin }}"
-          VERSION="${{ steps.resolve.outputs.version }}"
-          if [[ "${VERSION}" == *-* ]]; then PRERELEASE_FLAG="--prerelease"; else PRERELEASE_FLAG=""; fi
-          awk -v ver="${VERSION}" '/^## / { if (started) exit; if ($0 ~ "^## " ver " ") started = 1; next } started' "$PLUGIN/CHANGELOG.md" > release-notes-en.md
-          awk -v ver="${VERSION}" '/^## / { if (started) exit; if ($0 ~ "^## " ver " ") started = 1; next } started' "$PLUGIN/CHANGELOG.zh-CN.md" > release-notes-zh.md
-          if [[ ! -s release-notes-en.md && ! -s release-notes-zh.md ]]; then
-            echo "::warning::CHANGELOG entry for ${VERSION} not found, falling back to --generate-notes"
-            gh release create "${{ github.ref_name }}" ${PRERELEASE_FLAG} --latest=false --generate-notes
-            exit 0
-          fi
-          {
-            if [[ -s release-notes-en.md ]]; then printf '### English\n\n'; cat release-notes-en.md; fi
-            if [[ -s release-notes-zh.md ]]; then printf '\n### 中文\n\n'; cat release-notes-zh.md; fi
-          } > release-notes.md
-          gh release create "${{ github.ref_name }}" ${PRERELEASE_FLAG} --latest=false --notes-file release-notes.md
+      # 不建 GitHub Release：多包单仓库下 Release/Latest 语义混乱；发布记录 =
+      # npm dist-tag（latest/next）+ annotated tag（tag 页自带说明）；
+      # CHANGELOG 看仓库文件与各插件 README 的 Changelog 链接。
