@@ -2,6 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.0 (2026-09-02)
+
+- Promoted 0.1.0 (identical to 0.1.0-alpha.3).
+
 ## 0.1.0-alpha.3 (2026-09-02 · pre-release)
 
 - Fixed the suggestion halo leaving a gap around the composer card (the ring element was missing box-sizing).
