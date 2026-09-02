@@ -5,9 +5,45 @@ packages:
 allowBuilds:
   esbuild: true
 
-# alpha.4 当天发布（2026-09-01），pnpm 供应链策略对 24h 内的新版本要求显式白名单；
+# alpha.5 当天发布（2026-09-02），pnpm 供应链策略对 24h 内的新版本要求显式白名单；
 # 24h 后本段可整体删除（pnpm 会自动维护——它曾在首次安装时自动追加过 12 条）。
 minimumReleaseAgeExclude:
+  - '@deepseek-ai/dsh-agent@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-anonymous-user-id@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-atomic-write@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-attachment@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-brand@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-code-runtime@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-credentials@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-deepseek-llm-api-extensions@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-fs@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-home-paths@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-host-webserver@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-invariants@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-launch-environment@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-llm@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-llm-deepseek@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-sandbox@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-scope@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-session@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-session-persistence@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-session-projection@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-session-projection-cache@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-session-query@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-session-title@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-settings@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-storage@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-storage-domain@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-system-prompt@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-timeout@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-tool-todo@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-tools@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-typert-protocol@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-user-approval@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-util-crypto@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-util-values@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-workspace@0.1.2-alpha.5'
+# 临时：锁文件尚未迁走 alpha.4 条目，白名单保留至 pnpm install 完成后删除（2026-09-02）。
   - '@deepseek-ai/dsh-agent@0.1.2-alpha.4'
   - '@deepseek-ai/dsh-anonymous-user-id@0.1.2-alpha.4'
   - '@deepseek-ai/dsh-atomic-write@0.1.2-alpha.4'
@@ -48,45 +84,45 @@ minimumReleaseAgeExclude:
 # 所写的 0.1.1-rc.2（dsh 包本体在 npm 有 0.1.1-rc.2）。实际运行环境（dsh ≥ 0.1.2-alpha.1）
 # 也用 4.0.1，因此整个 workspace 统一 override 到 npm 的 4.0.1。
 #
-# dsh 0.1.2-alpha.4 的包间依赖经 workspace:^ 发布重写为 ">=0.1.2 <0.2.0-0"，该范围按 semver
-# 匹配不到任何已发布版本（0.1.2-alpha.4 是预发布版，排序低于 0.1.2）——官方 monorepo 内靠
+# dsh 0.1.2-alpha.5 的包间依赖经 workspace:^ 发布重写为 ">=0.1.2 <0.2.0-0"，该范围按 semver
+# 匹配不到任何已发布版本（0.1.2-alpha.5 是预发布版，排序低于 0.1.2）——官方 monorepo 内靠
 # workspace 互链不踩此坑，npm 消费者全踩。下面把五个插件 host 依赖的完整闭包逐个 override
-# 到 0.1.2-alpha.4 以恢复解析（2026-09-01，闭包按 checkout manifests 计算）；
+# 到 0.1.2-alpha.5 以恢复解析（2026-09-01，闭包按 checkout manifests 计算）；
 # 官方发布稳定 0.1.2 或修正发布范围后移除。
 overrides:
   "@deepseek-ai/cordis": "4.0.1"
-  "@deepseek-ai/dsh-agent": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-anonymous-user-id": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-atomic-write": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-attachment": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-brand": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-code-runtime": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-credentials": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-deepseek-llm-api-extensions": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-fs": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-home-paths": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-host-webserver": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-invariants": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-launch-environment": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-llm": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-llm-deepseek": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-sandbox": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-scope": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-session": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-session-persistence": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-session-projection": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-session-projection-cache": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-session-query": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-session-title": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-settings": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-storage": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-storage-domain": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-system-prompt": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-timeout": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-tool-todo": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-tools": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-typert-protocol": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-user-approval": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-util-crypto": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-util-values": "0.1.2-alpha.4"
-  "@deepseek-ai/dsh-workspace": "0.1.2-alpha.4"
+  "@deepseek-ai/dsh-agent": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-anonymous-user-id": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-atomic-write": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-attachment": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-brand": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-code-runtime": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-credentials": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-deepseek-llm-api-extensions": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-fs": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-home-paths": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-host-webserver": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-invariants": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-launch-environment": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-llm": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-llm-deepseek": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-sandbox": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-scope": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-session": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-session-persistence": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-session-projection": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-session-projection-cache": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-session-query": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-session-title": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-settings": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-storage": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-storage-domain": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-system-prompt": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-timeout": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-tool-todo": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-tools": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-typert-protocol": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-user-approval": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-util-crypto": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-util-values": "0.1.2-alpha.5"
+  "@deepseek-ai/dsh-workspace": "0.1.2-alpha.5"
