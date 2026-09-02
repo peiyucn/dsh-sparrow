@@ -2,6 +2,14 @@
 
 简体中文 | [English](CHANGELOG.md)
 
+## 0.1.0-alpha.3 (2026-09-02 · pre-release)
+
+- README 截图改为绝对 URL 引用，图片不再打包进 npm 包（功能与上版一致）。
+
+## 0.1.0-alpha.2 (2026-09-01 · pre-release)
+
+- 面板整页 loading + 错误横幅重试按钮（消除打开闪动）。
+
 ## 0.1.0-alpha.1 (2026-09-01 · pre-release)
 
 - 首个发布版本，先发 `next` 渠道供 owner 验证，稳定版 `0.1.0` 待转正
