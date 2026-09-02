@@ -72,7 +72,7 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 * **流程**：改动 push dev + 插件 verify → 版本号 + CHANGELOG 双份 → 再 verify + `git diff --check` → 合并 dev→main（fast-forward）并 push → `git tag -a <插件名>-vX.Y.Z -m "<一句话中文说明>"`（必须 -a）→ push tag 自动发布（解析插件、校验 tag==package.json version、verify、`npm publish --access public --provenance --tag next|latest`、自动建 GitHub Release：说明拼两份 CHANGELOG、一律 prerelease、不附产物）→ `gh run watch` 盯 success + `npm view` 复核版本与 dist-tag → 切回 dev
 * **tag 兜底**：push tag 后 30 秒内无对应 Publish run，改 `gh workflow run publish.yml -f plugin=<插件名>` 手动派发（内容一致，仅跳过 Release——用 `gh release create <tag> --prerelease --notes-file <说明>` 补建）
 * **红线**：已发布版本/tag 不可覆盖、不可挪动，同版本重发 E403；错误只能发新版本 + deprecate 坏版本；tag 版本必须等于 package.json version；`secrets` 不能出现在 step 的 `if`（经 job 级 env 中转）；`--provenance` 要求各插件 package.json 声明 repository
-* **发布后收尾**：npm 包页配 Trusted Publishing（OIDC：owner peiyucn + repo + workflow 路径）；OIDC 验证后撤销用过的 token（聊天贴过的一律视为已暴露）、删 `NPM_TOKEN` secret——后续发布零密钥
+* **发布后收尾（OIDC 配置，五个包各配一次）**：包 Settings → Access → Trusted Publishing → Add Trusted Publisher → GitHub Actions，填四项——Organization `peiyucn`、Repository `dsh-sparrow`、Workflow `publish.yml`（**只填文件名**）、Environment `npm-publish`（**必须**与 publish job 的 environment 一致，不填/填错 OIDC 校验失败）；Allowed actions 勾 `Allow npm publish`（不勾 stage publish）。配置完成后删 `NPM_TOKEN` secret，并在 npmjs Access Tokens 页 revoke 旧 token（聊天贴过的一律视为已暴露）——后续发布零密钥
 
 ## 需求
 
