@@ -1,7 +1,7 @@
 {
   "name": "@dsh-sparrow/dsh-nav-pin",
   "description": "DSH web plugin: keeps the turn navigation visible on narrow conversations (official 900px hide breakpoint moves to 700px, hover-reveal overlay below it) and caps the conversation content width so the rail stays clear of the drag handles",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "license": "MIT",
   "repository": {
     "type": "git",
