@@ -350,6 +350,7 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   position: fixed;
   z-index: 2000;
   pointer-events: none;
+  box-sizing: border-box;
   padding: 2px;
   border-radius: 24px;
   background: conic-gradient(
