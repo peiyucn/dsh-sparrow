@@ -18,7 +18,7 @@ Chat input suggestions. After a short typing pause, an official-@-menu-style car
 
 > DeepSeek main models only (hidden otherwise); reuses the DeepSeek API key configured in dsh — no extra credentials.
 
-![Suggestion card](resources/dsh-chat-fim.png)
+![Suggestion card](plugins/dsh-chat-fim/docs/images/suggestion-menu.png)
 
 Docs: [dsh-chat-fim README](plugins/dsh-chat-fim/README.md)
 
@@ -32,7 +32,7 @@ The official DeepSeek vision channel for text-only main models — official visi
 
 > DeepSeek main models only (hidden otherwise); reuses the DeepSeek API key configured in dsh — images never leave the DeepSeek ecosystem.
 
-![Status icon next to the model selector](resources/dsh-vision-bridge.png)
+![Status icon next to the model selector](plugins/dsh-vision-bridge/docs/images/status-icon.png)
 
 Docs: [dsh-vision-bridge README](plugins/dsh-vision-bridge/README.md)
 
@@ -44,7 +44,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge
 
 Archived-session management. The "Archive" entry in the sidebar lets you unarchive sessions (back to the session list), move them to trash (the session folder is moved out, reversible), or delete them permanently; the trash restores or deletes entries individually or in bulk.
 
-![Archive panel](resources/dsh-archive-manage.png)
+![Archive panel](plugins/dsh-archive-manage/docs/images/panel.png)
 
 Docs: [dsh-archive-manage README](plugins/dsh-archive-manage/README.md)
 
@@ -58,7 +58,7 @@ Turn navigation that stays on narrow conversations. The official turn rail hides
 
 > Pure stylesheet injection: no toggle, no button, no settings, no persisted state; uninstalling restores the official behavior.
 
-![Turn rail hover reveal](resources/dsh-nav-pin.png)
+![Turn rail hover reveal](plugins/dsh-nav-pin/docs/images/rail.png)
 
 Docs: [dsh-nav-pin README](plugins/dsh-nav-pin/README.md)
 
@@ -72,7 +72,7 @@ DeepSeek Files API cloud file management. The "Cloud Files" entry in the sidebar
 
 > The official API has no batch-delete endpoint (no "delete all") and no download endpoint (no preview); the 10000-file / 25 GiB quota is an official limit.
 
-![Cloud Files panel](resources/dsh-file-manage.png)
+![Cloud Files panel](plugins/dsh-file-manage/docs/images/panel.png)
 
 Docs: [dsh-file-manage README](plugins/dsh-file-manage/README.md)
 
