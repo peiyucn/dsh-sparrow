@@ -31,3 +31,5 @@ dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge
 ## 卸载与残留
 
 * **零残留**：不写任何文件、不改 `.dsh` 内部结构；报告缓存只在进程内存中，进程退出即消失。
+
+**更新日志**：[CHANGELOG.zh-CN.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-vision-bridge/CHANGELOG.zh-CN.md)

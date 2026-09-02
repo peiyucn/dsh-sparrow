@@ -37,3 +37,5 @@ Requires dsh ≥ 0.1.2-alpha.4 and a working `pnpm` (`dsh plugin` forwards insta
 
 * The plugin writes no files and touches no `.dsh` internals; its only action is injecting one stylesheet, removed together with the plugin lifecycle
 * No localStorage keys, no config residue
+
+**Changelog**: [CHANGELOG.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-nav-pin/CHANGELOG.md)

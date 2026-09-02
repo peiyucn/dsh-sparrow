@@ -43,3 +43,4 @@ dsh plugin --profile web add @dsh-sparrow/dsh-archive-manage
 
 * 卸载前收尾：在回收站「全部还原」或「全部彻底删除」一步处理完，再卸载插件（回收站非空时面板内也有提示）
 * 已卸载后才想起：重新安装本插件即可继续操作回收站（记录文件在，还原能力就在）
+**更新日志**：[CHANGELOG.zh-CN.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-archive-manage/CHANGELOG.zh-CN.md)

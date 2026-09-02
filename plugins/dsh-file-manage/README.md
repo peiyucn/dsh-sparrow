@@ -40,3 +40,5 @@ Requires dsh ≥ 0.1.2-alpha.4 and a working `pnpm` (`dsh plugin` forwards insta
 ## Uninstall & leftovers
 
 * The plugin keeps no local state; uninstalling leaves the cloud files untouched and DSH behavior unchanged
+
+**Changelog**: [CHANGELOG.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-file-manage/CHANGELOG.md)

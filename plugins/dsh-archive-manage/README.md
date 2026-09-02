@@ -43,3 +43,4 @@ Uninstalling does **not** restore anything automatically: once the plugin is rem
 
 * Before uninstalling: settle the trash in one step ("Restore all" or "Delete all permanently"), then uninstall (the panel shows a reminder while the trash is not empty)
 * Already uninstalled? Reinstall the plugin to keep managing the trash (as long as sidecar files exist, restore works)
+**Changelog**: [CHANGELOG.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-archive-manage/CHANGELOG.md)

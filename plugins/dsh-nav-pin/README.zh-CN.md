@@ -37,3 +37,5 @@ dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin
 
 * 插件不写任何文件、不改 `.dsh` 内部结构；唯一动作是页面里注入一张样式表，随插件生命周期移除
 * 无 localStorage / 无配置残留
+
+**更新日志**：[CHANGELOG.zh-CN.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-nav-pin/CHANGELOG.zh-CN.md)

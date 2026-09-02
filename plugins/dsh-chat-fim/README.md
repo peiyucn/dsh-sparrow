@@ -40,3 +40,5 @@ Requires dsh ≥ 0.1.2-alpha.4 and a working `pnpm` (`dsh plugin` forwards insta
 
 * The plugin writes no files and never touches the `.dsh` internals — it only forwards network requests.
 * The only persistent state is the browser localStorage keys `dsh-chat-fim:enabled` (switch) and `dsh-chat-fim:sensitivity` (trigger sensitivity). They remain in the browser after uninstall and are harmless; delete them in DevTools if you mind.
+
+**Changelog**: [CHANGELOG.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-chat-fim/CHANGELOG.md)

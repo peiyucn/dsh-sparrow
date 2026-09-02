@@ -40,3 +40,5 @@ dsh plugin --profile web add @dsh-sparrow/dsh-file-manage
 ## 卸载与残留
 
 * 插件无任何本地持久化状态；卸载后云端文件原样保留，DSH 行为不受影响
+
+**更新日志**：[CHANGELOG.zh-CN.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-file-manage/CHANGELOG.zh-CN.md)

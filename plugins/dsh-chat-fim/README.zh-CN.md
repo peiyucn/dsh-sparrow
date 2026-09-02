@@ -40,3 +40,5 @@ dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim
 
 * 插件不写任何文件、不改 `.dsh` 内部结构，只做网络转发；
 * 唯一的持久状态是浏览器 localStorage 键 `dsh-chat-fim:enabled`（开关）与 `dsh-chat-fim:sensitivity`（触发灵敏度）。卸载后这两个键留在浏览器里、无害，介意可在 DevTools 中删除。
+
+**更新日志**：[CHANGELOG.zh-CN.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-chat-fim/CHANGELOG.zh-CN.md)
