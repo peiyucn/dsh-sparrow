@@ -31,7 +31,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin
 
 ## 截图
 
-![轮次导航 hover 浮层](docs/images/rail.png)
+![轮次导航 hover 浮层](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/plugins/dsh-nav-pin/docs/images/dsh-nav-pin.png)
 
 ## 卸载与残留
 

@@ -18,7 +18,7 @@
 
 > 仅限 DeepSeek 系列主模型（其他主模型时自动隐藏），复用你在 dsh 中配置的 DeepSeek API key，不新增凭据。
 
-![续写建议候选菜单](plugins/dsh-chat-fim/docs/images/suggestion-menu.png)
+![续写建议候选菜单](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/plugins/dsh-chat-fim/docs/images/dsh-chat-fim.png)
 
 文档：[dsh-chat-fim README](plugins/dsh-chat-fim/README.zh-CN.md)
 
@@ -32,7 +32,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim
 
 > 仅限 DeepSeek 系列主模型（其他主模型时自动隐藏），复用你在 dsh 中配置的 DeepSeek API key，图片不出 DeepSeek 体系。
 
-![模型选择器旁的眼睛图标](plugins/dsh-vision-bridge/docs/images/status-icon.png)
+![模型选择器旁的眼睛图标](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/plugins/dsh-vision-bridge/docs/images/dsh-vision-bridge.png)
 
 文档：[dsh-vision-bridge README](plugins/dsh-vision-bridge/README.zh-CN.md)
 
@@ -44,7 +44,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge
 
 归档会话管理。侧边栏「归档」入口：归档会话可取消归档（回到会话列表）、移入回收站（移出会话目录、可逆）或彻底删除；回收站支持单个 / 全部还原与彻底删除。
 
-![归档面板](plugins/dsh-archive-manage/docs/images/panel.png)
+![归档面板](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/plugins/dsh-archive-manage/docs/images/dsh-archive-manage.png)
 
 文档：[dsh-archive-manage README](plugins/dsh-archive-manage/README.zh-CN.md)
 
@@ -58,7 +58,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-archive-manage
 
 > 纯样式注入：无开关、无按钮、无设置、无持久化状态；卸载即恢复官方行为。
 
-![轮次导航 hover 浮层](plugins/dsh-nav-pin/docs/images/rail.png)
+![轮次导航 hover 浮层](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/plugins/dsh-nav-pin/docs/images/dsh-nav-pin.png)
 
 文档：[dsh-nav-pin README](plugins/dsh-nav-pin/README.zh-CN.md)
 
@@ -72,7 +72,7 @@ DeepSeek Files API 云端文件管理。侧边栏「云端文件」入口列出�
 
 > 官方无批量删除端点（不做「全部清理」）、无下载端点（不预览内容）；配额 10000 个 / 25 GiB 为官方限制。
 
-![云端文件面板](plugins/dsh-file-manage/docs/images/panel.png)
+![云端文件面板](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/plugins/dsh-file-manage/docs/images/dsh-file-manage.png)
 
 文档：[dsh-file-manage README](plugins/dsh-file-manage/README.zh-CN.md)
 

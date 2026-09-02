@@ -34,7 +34,7 @@ Requires dsh ≥ 0.1.2-alpha.4 and a working `pnpm` (`dsh plugin` forwards insta
 
 ## Screenshots
 
-![Suggestion card](docs/images/suggestion-menu.png)
+![Suggestion card](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/plugins/dsh-chat-fim/docs/images/dsh-chat-fim.png)
 
 ## Uninstall & Residue
 

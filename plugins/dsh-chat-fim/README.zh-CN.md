@@ -34,7 +34,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim
 
 ## 截图
 
-![续写建议候选菜单](docs/images/suggestion-menu.png)
+![续写建议候选菜单](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/plugins/dsh-chat-fim/docs/images/dsh-chat-fim.png)
 
 ## 卸载与残留
 

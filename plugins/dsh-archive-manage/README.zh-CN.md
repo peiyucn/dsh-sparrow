@@ -26,7 +26,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-archive-manage
 
 ## 截图
 
-![归档面板（归档区 / 回收站）](docs/images/panel.png)
+![归档面板（归档区 / 回收站）](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/plugins/dsh-archive-manage/docs/images/dsh-archive-manage.png)
 
 ## 回收站位置与还原
 
