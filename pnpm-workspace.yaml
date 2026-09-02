@@ -3,7 +3,10 @@ packages:
 
 # esbuild 安装脚本需要落平台二进制；pnpm 11 默认拦截构建脚本，这里显式放行。
 allowBuilds:
+  # 经 @deepseek-ai/dsh-llm-pi-ai 传入的传递依赖，不跑安装脚本
+  '@google/genai': false
   esbuild: true
+  protobufjs: false
 
 # alpha.5 当天发布（2026-09-02），pnpm 供应链策略对 24h 内的新版本要求显式白名单；
 # 24h 后本段可整体删除（pnpm 会自动维护——它曾在首次安装时自动追加过 12 条）。
@@ -43,6 +46,8 @@ minimumReleaseAgeExclude:
   - '@deepseek-ai/dsh-util-crypto@0.1.2-alpha.5'
   - '@deepseek-ai/dsh-util-values@0.1.2-alpha.5'
   - '@deepseek-ai/dsh-workspace@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-authorization@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-llm-pi-ai@0.1.2-alpha.5'
 
 # @deepseek-ai/cordis 是 dsh 内置 cordis 的 fork：npm 上只发布了 4.0.x，没有插件 peerDeps
 # 所写的 0.1.1-rc.2（dsh 包本体在 npm 有 0.1.1-rc.2）。实际运行环境（dsh ≥ 0.1.2-alpha.1）

@@ -1,0 +1,5 @@
+# dsh-codebuddy-credits 组合补丁：`dsh plugin --profile web add dsh-codebuddy-credits` 安装后由 profile 自动挂载。
+# 配置值均为安全默认值；API key 只经 ctx.credentials 解析，绝不写在这里。
+- insert:
+    - id: llm-codebuddy-credits
+      name: '@dsh-sparrow/dsh-codebuddy-credits'
