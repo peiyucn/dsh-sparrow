@@ -9,6 +9,7 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 * `plugins/dsh-archive-manage` — 归档会话管理（备份/删除/恢复）
 * `plugins/dsh-nav-pin` — 轮次导航窄屏不消失（纯样式注入）
 * `plugins/dsh-file-manage` — DeepSeek Files API 云端文件管理（无本地持久化）
+* `plugins/dsh-codebuddy-credits` — CodeBuddy 额度 LLM provider（官方 API Key 直连，纯模型推理）
 
 * 验证：插件目录 `npm run verify`；全量 = 根 `npm run verify`；分项 = 根 `pnpm run <step>:all`
 * 文档分工：AGENTS.md 是唯一 agent 指令文件（不保留 CLAUDE.md 等其它厂商指令文件）；插件 README 面向用户（中英双份、顶部互链）；插件私有 seam 特例只在根 AGENTS 记概括（见下文），实现细节以代码注释与 docs/spec 为准，开发细节不进 README
@@ -34,6 +35,7 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 * `dsh-archive-manage`：允许移动/删除会话日志目录（仅 jsonl 单会话目录，其余 `BACKEND_UNSUPPORTED`）；归档集变更走官方 WorkspaceRegistry 私有写通道（`enqueueOperation`/`requireState`/`setState`，启动能力检查缺方法即 fail-fast）；`sessionPersistence.list()` 双形状兼容（master 返回快照、旧版返回裸 header）；`sessionPersistence.locate` 为后端私有方法（alpha.5 发布后从公开契约降级，启动能力检查缺方法即 fail-fast）；live 会话拒绝处理；回收站目录写 sidecar 记账
 * `dsh-file-manage`：直接 import 官方导出 `DeepSeekFilesClient`；只读官方 `llm-deepseek` 设置节取 `baseURL`/`apiKeyEnv`
 * `dsh-nav-pin`：只读依赖官方 DOM 标记与 aria-label 文案；CSS 特异性压制官方窄屏隐藏规则；宽度轴经官方公开 data 属性钳制
+* `dsh-codebuddy-credits`：包装 provider 的 `stream`/`streamSimple` 注入官方 CLI `user-agent`（user-agent 是 DSH attribution 保留名、profile.headers 覆盖不了，而 CodeBuddy 服务端校验官方请求标识——社区插件公开记录为 500 no body）；自建 pi-ai 认证桥接（官方 llm-pi-ai 的 `credentialStoreFrom`/`authContextFrom` 未导出，按官方实现复刻，凭据记录作用域 = 插件 NS）
 
 ## 工程管线（本仓库自含）
 
@@ -68,7 +70,7 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 
 * **范围**：发布前对比 `npm view <包名> version`、插件 package.json version、自上次 tag 的 git log——有改动的插件走完整发布流程，没改动的不动；各插件独立版本号、独立 tag（`<插件名>-vX.Y.Z`）
 * **元数据**：name 必须 `@dsh-sparrow/<插件名>`；description 英文；`repository` 必填（npm `--provenance` 校验）；`files` 清单齐备；README/CHANGELOG 中英双份顶部互链；CHANGELOG 条目按发布顺序从上到下、稳定版覆盖 alpha 全部用户可感知改动、只记真实发布过的版本（发布前的改名等内部历史记 docs/spec）；插件截图统一放仓库根 `resources/dsh-<插件名>.png`（单一来源）；README 一律用**绝对 URL**引用（`https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-<插件名>.png`，GitHub 与 npm 页双端可用，URL 绑定 main 分支）；**图片不打包进 npm 包**（插件 `files` 不含 resources）
-* **版本策略**：修复 patch / 功能 minor / 破坏性 major；各插件版本线保持一致（对齐类发版 CHANGELOG 记「版本对齐合集」）；**新版本一律先发 next（`X.Y.Z-alpha.N`）**，owner 经本地 web profile 验证后发同号稳定版（自动上 latest）；owner 的 web profile 固定 `link:` 直连本仓库插件目录（开发改动即时生效，日常不切 registry；`dsh plugin --profile web add <包名>@next` 供外部用户/换机安装）；npm 首发的 latest 指向该版本且不可移除 dist-tag（平台硬性行为）；坏版本 deprecate（不 unpublish）；版本线由 owner 决定；已发布版本元数据错误只能升补丁版修正并诚实记录
+* **版本策略**：修复 patch / 功能 minor / 破坏性 major；各插件版本线保持一致（对齐类发版 CHANGELOG 记「版本对齐合集」）；**新版本一律先发 next（`X.Y.Z-alpha.N`）**，owner 经本地 web profile 验证后发同号稳定版（自动上 latest）；owner 的 web profile 固定 `link:` 直连本仓库插件目录（开发改动即时生效，日常不切 registry；`dsh plugin --profile web add <包名>@next` 供外部用户/换机安装）；**profile 级 cordis.patch.yml 保持 `[]`**——插件经 package.json `dsh.profile.bundles` 装载（`dsh plugin add` 会写 bundles），各插件 bundle 自带 cordis.patch.yml 自动生效；往 profile 级 patch 写 insert 会与 bundle 层重复 → `duplicate loader entry id` 启动失败（2026-09-02 实踩）；npm 首发的 latest 指向该版本且不可移除 dist-tag（平台硬性行为）；坏版本 deprecate（不 unpublish）；版本线由 owner 决定；已发布版本元数据错误只能升补丁版修正并诚实记录
 * **官方版本跟随（2026-09-02 定）**：日常跟随官方 alpha 线（dev 即 alpha 轨，发布一律走 next）；**不回头适配 rc.2**（官方已断代弃线）；官方 0.1.2-rc / 稳定版落地后做一次对齐 sprint——届时 main 对齐 rc 走 latest、dev 继续 alpha 走 next；**dsh 升级 = 正式适配任务**（先看官方 release note 与社区迁移地图 → 影响清单 → bump 依赖 → typecheck → 修 → verify → 发新版），launcher 的 Update dsh 不随手点、checkout 不随手 pull
 * **流程**：改动 push dev + 插件 verify → 版本号 + CHANGELOG 双份 → 再 verify + `git diff --check` → 合并 dev→main（fast-forward）并 push → `git tag -a <插件名>-vX.Y.Z -F <说明文件>`（必须 -a；说明用 `node scripts/tag-notes.mjs <插件名> <版本号>` 生成——拼接两份 CHANGELOG 当前版本条目，英文在上、中文在下，GitHub tag 页完整展示；Windows 先输出到文件再 `-F`）→ push tag 自动发布（解析插件、校验 tag==package.json version、verify、`npm publish --access public --provenance --tag next|latest`）→ `gh run watch` 盯 success + `npm view` 复核版本与 dist-tag → 切回 dev
 * **tag 兜底**：push tag 后 30 秒内无对应 Publish run，改 `gh workflow run publish.yml -f plugin=<插件名>` 手动派发（发布内容与 tag 触发完全一致；本仓库不建 GitHub Release，版本说明看 tag 页与 CHANGELOG）
