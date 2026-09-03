@@ -21,9 +21,9 @@ const MAX_BODY_BYTES = 16 * 1024
 export interface AccountView {
   enterpriseName?: string
   accountType?: string
-  /** 企业内姓名（如 裴昱）。 */
+  /** 企业内姓名（/v2/accounts 的 enterpriseUserName）。 */
   enterpriseUserName?: string
-  /** 账号昵称（如 DJ028191）。 */
+  /** 账号昵称（/v2/accounts 的 nickname）。 */
   nickname?: string
 }
 

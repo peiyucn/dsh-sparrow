@@ -46,9 +46,9 @@ export interface CodeBuddyAccount {
   enterpriseId?: string
   enterpriseName?: string
   accountType?: string
-  /** 账号昵称（如 DJ028191）。 */
+  /** 账号昵称（/v2/accounts 的 nickname）。 */
   nickname?: string
-  /** 企业内姓名（如 裴昱）。 */
+  /** 企业内姓名（/v2/accounts 的 enterpriseUserName）。 */
   enterpriseUserName?: string
 }
 
