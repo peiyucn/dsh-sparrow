@@ -44,12 +44,10 @@ jobs:
             PLUGIN="${{ inputs.plugin }}"
             VERSION="$(node -p "require('./plugins/${PLUGIN}/package.json').version")"
           fi
-          # 预发布版本走 next；正式版本走 latest，避免未稳定的包顶掉 latest。
-          if [[ "${VERSION}" == *-* ]]; then
-            NPM_TAG="next"
-          else
-            NPM_TAG="latest"
-          fi
+          # 临时（2026-09-03 定）：官方 0.1.2-rc.1 落地前，alpha 版本也直发 latest
+          # （当前无稳定轨可服务，next 空转无意义）。rc.1 落地后恢复双通道：
+          # 版本含 `-` 发 next、正式版发 latest。
+          NPM_TAG="latest"
           echo "plugin=${PLUGIN}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "npm-tag=${NPM_TAG}" >> "$GITHUB_OUTPUT"
