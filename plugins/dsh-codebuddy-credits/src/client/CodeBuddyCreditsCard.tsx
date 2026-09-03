@@ -136,26 +136,6 @@ const dangerButtonStyle: CSSProperties = {
   color: 'var(--dsw-alias-state-error-primary)',
 }
 
-/** 折叠态：一行状态 + 小号「更换 Key」（不渲染成第二个编辑器卡）。 */
-const collapsedRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '10px',
-  padding: '8px 12px',
-  borderRadius: '12px',
-  background: 'var(--dsw-alias-bg-module-platform)',
-  width: '100%',
-  boxSizing: 'border-box',
-}
-
-const collapsedTextStyle: CSSProperties = {
-  margin: 0,
-  fontSize: '12px',
-  lineHeight: '18px',
-  color: 'var(--dsw-alias-label-secondary)',
-}
-
 /** 官方 apiKeyFailure 的轻量镜像：可打印 ASCII（空格除外）。 */
 const LEGAL_API_KEY = /^[\x21-\x7E]+$/
 
@@ -302,20 +282,10 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
 
   // 状态未知时渲染 0×0 隐藏锚点（不渲染 null）：拦截监听与 :has 锚点从首帧
   // 起就位——否则这个窗口期点官方「编辑」会把官方编辑器打开，造成双标题。
-  if (pending) {
+  // 折叠态同样只渲染隐藏锚点：行下不显示任何内容（与 DeepSeek 行一致，
+  // 只有名称 + 圆点 + 编辑按钮），企业信息等点开编辑后在编辑器里看。
+  if (pending || !showEditor) {
     return <div ref={rootRef} className="ccb-card-root" style={{ display: 'none' }} />
-  }
-
-  if (!showEditor) {
-    return (
-      <div ref={rootRef} className="ccb-card-root" style={collapsedRowStyle}>
-        <p style={collapsedTextStyle}>
-          {accountParts.length > 0
-            ? t('state.configured', { account: accountParts.join(' · ') })
-            : t('state.configuredShort')}
-        </p>
-      </div>
-    )
   }
 
   return (

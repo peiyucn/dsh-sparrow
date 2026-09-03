@@ -241,6 +241,14 @@ export function apply(ctx: Context, config: Config): void {
         await credentials.unset?.(credentialRef(LEGACY_API_KEY_ENV)).catch(() => {})
       }
     }
+    // 官方行头圆点按 profile.apiKeyEnv join 凭据：Key 已存在但 profile 缺该
+    // 字段时补写（否则行头永远没有圆点）。旧版本存的 profile 只有 models。
+    const settingsBoot = ctx.get('settings')
+    if (settingsBoot !== undefined && current()?.providers?.[PROVIDER]?.apiKeyEnv === undefined) {
+      await settingsBoot.mutate(NS, [
+        { op: 'set', path: ['providers', PROVIDER, 'apiKeyEnv'], value: API_KEY_ENV },
+      ]).catch(() => {})
+    }
     await refreshAccountWithKey(key)
     ensureRoutes(true)
     void kickModelRefresh()

@@ -246,11 +246,11 @@ export function CodeBuddyCreditsIndicator({
     account?.enterpriseName,
   ].filter((part): part is string => part !== undefined).join(' · ') || undefined
 
-  // 右上角用户徽章：企业内姓名-账号昵称（如 裴昱-DJ028191）；无企业姓名时只显示昵称。
+  // 右上角用户徽章：企业内姓名 · 账号昵称（如 裴昱 · DJ028191）；无企业姓名时只显示昵称。
   const userBadge = account?.enterpriseUserName !== undefined
     ? account.enterpriseUserName
       + (account.nickname !== undefined && account.nickname !== account.enterpriseUserName
-        ? '-' + account.nickname
+        ? ' · ' + account.nickname
         : '')
     : account?.nickname
 
