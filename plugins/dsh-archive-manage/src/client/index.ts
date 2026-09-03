@@ -7,8 +7,10 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { ArchiveDock, ensureArchiveStyles } from './ArchiveDock.js'
+import type { ArchivedSessionItem, StraySessionItem } from './ArchiveDock.js'
 
-export const inject = ['slots', 'locale']
+// remote：官方 Remote 事件载体（api-session/* 桥接，spec 08 §2.5）；硬依赖，缺失时本插件客户端不启动。
+export const inject = ['slots', 'locale', 'remote']
 
 /** 本插件的 locale 字典（zh/en）。 */
 const LOCALE_DICTS = {
@@ -28,6 +30,9 @@ const LOCALE_DICTS = {
     'section.strays': '游离会话（{count}）',
     'stray.hint': '游离会话：不在任何工作区、也未归档，官方界面无法清理，@ 列表会一直显示。',
     'stray.blankBadge': '空白会话',
+    'stray.orphanBadge': '孤儿子会话',
+    'tree.childCount': '{n} 个子会话',
+    'fact.turns': '{n} 轮',
     'stray.ageDays': '{n} 天前',
     'stray.ageToday': '今天',
     'empty.archived': '暂无归档会话',
@@ -37,13 +42,14 @@ const LOCALE_DICTS = {
     'legacy.restoreTitle': '旧格式条目缺少还原信息，无法还原',
     'action.trash': '移入回收站',
     'action.unarchive': '取消归档',
+    'action.archive': '归档',
     'action.deletePermanently': '彻底删除',
     'action.restore': '还原',
     'action.restoreAll': '全部还原（{count}）',
     'action.deleteAll': '全部彻底删除',
     'state.running': '运行中',
     'state.unreleased': '未释放',
-    'state.unreleasedActionHint': '该会话未被 dsh 进程释放，运行期间无法安全移动其文件：只能在下次启动 dsh 后移入回收站/彻底删除',
+    'state.unreleasedActionHint': '该会话仍被 dsh 进程占用（未释放）：请先关闭该会话（或停止生成）再重试；仍被占用可重启 dsh 后操作',
     'state.backendUnsupported': '后端不支持文件级操作',
     'group.unreleased': '未释放（{count}）',
     'confirm.trash': '将会话「{name}」移入回收站？\n\n移入后 @ / 侧边栏不再出现；可随时从回收站还原。',
@@ -61,6 +67,7 @@ const LOCALE_DICTS = {
     'confirm.deleting': '正在彻底删除…',
     'confirm.movingToTrash': '正在移入回收站…',
     'confirm.unarchiving': '正在取消归档…',
+    'confirm.archiving': '正在归档…',
     'confirm.restoring': '正在还原…',
     'notice.skippedLegacy': '跳过旧格式 {count} 个',
     'notice.failed': '失败 {count} 个',
@@ -81,6 +88,9 @@ const LOCALE_DICTS = {
     'section.strays': 'Stray sessions ({count})',
     'stray.hint': 'Stray sessions: not in any workspace and not archived; the official UI cannot clean them, and @ keeps showing them.',
     'stray.blankBadge': 'blank',
+    'stray.orphanBadge': 'orphan subagent',
+    'tree.childCount': '{n} subagents',
+    'fact.turns': '{n} turns',
     'stray.ageDays': '{n} days ago',
     'stray.ageToday': 'today',
     'empty.archived': 'No archived sessions',
@@ -90,13 +100,14 @@ const LOCALE_DICTS = {
     'legacy.restoreTitle': 'Legacy entry has no restore info',
     'action.trash': 'Move to trash',
     'action.unarchive': 'Unarchive',
+    'action.archive': 'Archive',
     'action.deletePermanently': 'Delete permanently',
     'action.restore': 'Restore',
     'action.restoreAll': 'Restore all ({count})',
     'action.deleteAll': 'Delete all permanently',
     'state.running': 'Running',
     'state.unreleased': 'Held by dsh',
-    'state.unreleasedActionHint': 'This session is still held by the dsh process and its files cannot be moved safely during this run: move it to trash or delete it after the next dsh startup',
+    'state.unreleasedActionHint': 'This session is still held by the dsh process: close the conversation (or stop generation) and retry; if still held, restart dsh',
     'state.backendUnsupported': 'Backend does not support file operations',
     'group.unreleased': 'Held by dsh ({count})',
     'confirm.trash': 'Move "{name}" to trash?\n\nIt disappears from @ / the sidebar; restore anytime from Trash.',
@@ -114,6 +125,7 @@ const LOCALE_DICTS = {
     'confirm.deleting': 'Deleting permanently…',
     'confirm.movingToTrash': 'Moving to trash…',
     'confirm.unarchiving': 'Unarchiving…',
+    'confirm.archiving': 'Archiving…',
     'confirm.restoring': 'Restoring…',
     'notice.skippedLegacy': 'skipped {count} legacy',
     'notice.failed': '{count} failed',
@@ -125,8 +137,9 @@ interface ApiEnvelope<T> {
   readonly error?: { readonly code?: string; readonly message?: string }
 }
 
-/** 面板请求超时：host 挂起时不让面板永久 loading（根 AGENTS 网络约定）。 */
-const REQUEST_TIMEOUT_MS = 15_000
+/** 面板请求超时：host 挂起时不让面板永久 loading（根 AGENTS 网络约定）。
+ * 30s：/list 首开要串行做对齐 + 全量扫描 + 冷观察 + 标签梯子，重启后冷启动曾误触 15s（2026-09-03）。 */
+const REQUEST_TIMEOUT_MS = 30_000
 
 async function readApi<T>(path: string, init?: RequestInit): Promise<T[]> {
   const response = await fetch(path, { ...init, signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
@@ -135,6 +148,16 @@ async function readApi<T>(path: string, init?: RequestInit): Promise<T[]> {
     throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
   }
   return payload.items ?? []
+}
+
+/** 树形载荷读取（spec 08：/list 返回 tree）。 */
+async function readTree<T>(path: string, init?: RequestInit): Promise<T[]> {
+  const response = await fetch(path, { ...init, signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+  const payload = await response.json() as { tree?: T[]; error?: { readonly code?: string; readonly message?: string } }
+  if (!response.ok) {
+    throw new Error(payload.error?.message ?? '请求失败（HTTP ' + response.status + '）')
+  }
+  return payload.tree ?? []
 }
 
 async function postApi<T = { ok?: boolean }>(path: string, body: unknown): Promise<T> {
@@ -159,30 +182,23 @@ export function apply(ctx: ClientContext): void {
   ensureArchiveStyles()
   const disposeDictionaries = ctx.locale.register('archive-manage', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
   ctx.effect(() => disposeDictionaries, 'dsh-archive-manage: locale dictionaries')
+  // 官方「会话离开 live store」（fiber 销毁，session-controller 转发的 api-session/removed）
+  // → 广播窗口事件，面板打开时据此实时刷新 hold 标记（spec 08 §2.5）。
+  // 事件名在 cordis Events 与 TypertRemoteEventSelection 均已声明，但 npm 中间态包的
+  // Remote 签名推导拼不出该事件（运行时桥接按名称转发，与类型无关），此处做局部结构断言。
+  const remote = ctx.remote as unknown as { $on(event: string, handler: () => void): () => void }
+  const disposeRemoved = remote.$on('api-session/removed', () => {
+    window.dispatchEvent(new CustomEvent('dsh-archive-sessions-changed'))
+  })
+  ctx.effect(() => disposeRemoved, 'dsh-archive-manage: live 状态实时刷新')
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action',
     locale: 'archive-manage',
     id: 'archive-manage',
     order: 20,
     inject: () => ({
-      listArchived: () => readApi<{
-        sessionId: string
-        title: string
-        updatedAt: number
-        live: boolean
-        running: boolean
-        backendSupported: boolean
-        workspaceIds: readonly string[]
-      }>('/api/archive-manage/list'),
-      listStrays: () => readApi<{
-        sessionId: string
-        title: string
-        createdAt: number
-        blank: boolean
-        live: boolean
-        running: boolean
-        backendSupported: boolean
-      }>('/api/archive-manage/strays'),
+      listArchived: () => readTree<ArchivedSessionItem>('/api/archive-manage/list'),
+      listStrays: () => readApi<StraySessionItem>('/api/archive-manage/strays'),
       listTrashItems: () => readApi<{
         trashId: string
         sessionId: string
@@ -200,6 +216,7 @@ export function apply(ctx: ClientContext): void {
       },
       moveToTrash: (sessionId: string) => postApi('/api/archive-manage/trash', { sessionId, confirm: true }),
       unarchiveSession: (sessionId: string) => postApi('/api/archive-manage/unarchive', { sessionId }),
+      archiveSession: (sessionId: string) => postApi('/api/archive-manage/archive', { sessionId }),
       deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => postApi('/api/archive-manage/delete', simple ? { sessionId, confirm: true } : { sessionId, confirmTitle }),
       restoreTrashItem: (trashId: string) => postApi('/api/archive-manage/restore', { trashId }),
       deleteTrashItem: (trashId: string) => postApi('/api/archive-manage/trash-delete', { trashId, confirm: true }),

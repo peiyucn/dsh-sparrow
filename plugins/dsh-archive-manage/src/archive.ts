@@ -174,3 +174,133 @@ export function parseBlankProjection(row: unknown): { blank: true } | undefined 
   if (metaBlank === true || statsTurns === 0) return { blank: true }
   return undefined
 }
+
+/** 会话统计与列表元数据（展示用；v5/v6 双形状，与 parseBlankProjection 同款 record ?? outer 回退）。 */
+export interface SessionFacts {
+  readonly turns?: number
+  readonly decodeTokens?: number
+  readonly lastPromptAt?: number
+}
+
+export function parseSessionFacts(row: unknown): SessionFacts | undefined {
+  if (typeof row !== 'object' || row === null || Array.isArray(row)) return undefined
+  const outer = row as Record<string, unknown>
+  const recordCandidate = outer.record
+  const record = (typeof recordCandidate === 'object' && recordCandidate !== null && !Array.isArray(recordCandidate)
+    ? recordCandidate
+    : outer) as Record<string, unknown>
+  const rowsCandidate = record.rows
+  if (typeof rowsCandidate !== 'object' || rowsCandidate === null || Array.isArray(rowsCandidate)) return undefined
+  const rows = rowsCandidate as Record<string, unknown>
+  const statsVal = (rows.sessionStats as Record<string, unknown> | undefined)?.val as Record<string, unknown> | undefined
+  const metaVal = (rows.sessionListMetadata as Record<string, unknown> | undefined)?.val as Record<string, unknown> | undefined
+  const turns = typeof statsVal?.turns === 'number' ? statsVal.turns : undefined
+  const decodeTokens = typeof statsVal?.decodeTokens === 'number' ? statsVal.decodeTokens : undefined
+  const lastPromptAt = typeof metaVal?.lastPromptAt === 'number' ? metaVal.lastPromptAt : undefined
+  if (turns === undefined && decodeTokens === undefined && lastPromptAt === undefined) return undefined
+  const facts: SessionFacts = {
+    ...(turns === undefined ? {} : { turns }),
+    ...(decodeTokens === undefined ? {} : { decodeTokens }),
+    ...(lastPromptAt === undefined ? {} : { lastPromptAt }),
+  }
+  return facts
+}
+
+/** 树构建所需的 SessionHeader 结构子集（纯模块零依赖，host 侧传入真实 header）。 */
+export interface SessionTreeHeader {
+  readonly id: string
+  readonly createdAt: number
+  readonly parentSession?: string
+  readonly origin?: 'subagent'
+}
+
+export interface SessionTreeNode {
+  readonly header: SessionTreeHeader
+  readonly children: SessionTreeNode[]
+}
+
+/**
+ * 由全量会话 header 构建父子树：
+ * - 子会话（origin === 'subagent' 且父在清单内）挂到父节点下，同级按 createdAt 升序；
+ * - 顶层会话与孤儿子会话（父不在清单内）为根节点，按 createdAt 降序；
+ * - 孤儿按顶层会话对待（无父可随，面板手动操作；spec 08）。
+ */
+export function buildSessionTree(headers: readonly SessionTreeHeader[]): SessionTreeNode[] {
+  const byId = new Map(headers.map(header => [header.id, header]))
+  const childrenOf = new Map<string, SessionTreeHeader[]>()
+  const claimed = new Set<string>()
+  for (const header of headers) {
+    if (header.origin !== 'subagent' || header.parentSession === undefined) continue
+    if (!byId.has(header.parentSession)) continue
+    claimed.add(header.id)
+    const list = childrenOf.get(header.parentSession) ?? []
+    list.push(header)
+    childrenOf.set(header.parentSession, list)
+  }
+  const build = (header: SessionTreeHeader): SessionTreeNode => {
+    const childHeaders = (childrenOf.get(header.id) ?? []).sort((a, b) => a.createdAt - b.createdAt)
+    return { header, children: childHeaders.map(build) }
+  }
+  return headers
+    .filter(header => !claimed.has(header.id))
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map(build)
+}
+
+export interface ArchiveAlignment {
+  readonly add: string[]
+  readonly remove: string[]
+}
+
+/**
+ * 计算父子归档对齐差异（spec 08 状态不变量：子镜像父）：
+ * - 父已归档而子未归档 → 加入 add；
+ * - 父未归档而子已归档 → 加入 remove；
+ * - 孤儿子会话（父不在清单）与顶层会话不参与。
+ */
+export function archiveAlignmentForChildren(
+  headers: readonly SessionTreeHeader[],
+  archivedIds: readonly string[],
+): ArchiveAlignment {
+  const byId = new Map(headers.map(header => [header.id, header]))
+  const archived = new Set(archivedIds)
+  const add: string[] = []
+  const remove: string[] = []
+  for (const header of headers) {
+    if (header.origin !== 'subagent' || header.parentSession === undefined) continue
+    if (!byId.has(header.parentSession)) continue
+    const parentArchived = archived.has(header.parentSession)
+    const childArchived = archived.has(header.id)
+    if (parentArchived && !childArchived) add.push(header.id)
+    else if (!parentArchived && childArchived) remove.push(header.id)
+  }
+  return { add, remove }
+}
+
+/** 有父（父在清单内）的子会话 id 集合——这些子会话跟随父，不单独出现在游离区（spec 08）。 */
+export function livingChildIds(headers: readonly SessionTreeHeader[]): Set<string> {
+  const byId = new Set(headers.map(header => header.id))
+  const out = new Set<string>()
+  for (const header of headers) {
+    if (header.origin !== 'subagent' || header.parentSession === undefined) continue
+    if (byId.has(header.parentSession)) out.add(header.id)
+  }
+  return out
+}
+
+/** 根会话及其全部后代 id（按父为单位归档/取消归档时使用；BFS 保序）。 */
+export function collectSubtreeIds(headers: readonly SessionTreeHeader[], rootId: string): string[] {
+  const childrenOf = new Map<string, string[]>()
+  const byId = new Set(headers.map(header => header.id))
+  for (const header of headers) {
+    if (header.origin !== 'subagent' || header.parentSession === undefined) continue
+    if (!byId.has(header.parentSession)) continue
+    const list = childrenOf.get(header.parentSession) ?? []
+    list.push(header.id)
+    childrenOf.set(header.parentSession, list)
+  }
+  const out: string[] = [rootId]
+  for (let i = 0; i < out.length; i++) out.push(...(childrenOf.get(out[i]) ?? []))
+  return out
+}
+

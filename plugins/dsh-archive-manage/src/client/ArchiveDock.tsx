@@ -1,19 +1,30 @@
 /** 归档会话管理入口：sidebar footer action + 弹窗（zh/en 双语 + loading 态）。 */
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { IconArchiveOutline20, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 
+/** 归档树节点：顶层为归档会话根，children 为随父归档的子会话（spec 08，只操作父）。 */
 export interface ArchivedSessionItem {
   readonly sessionId: string
   readonly title: string
   readonly updatedAt: number
+  readonly createdAt: number
   readonly live: boolean
   readonly running: boolean
   readonly backendSupported: boolean
   readonly workspaceIds: readonly string[]
+  /** 父会话已不存在的孤儿子会话（按顶层对待，可手动归档/删除）。 */
+  readonly orphan: boolean
+  readonly children: readonly ArchivedSessionItem[]
+  /** 展示用事实（官方投影/快照；缺失时隐藏对应项）。 */
+  readonly project?: string
+  readonly turns?: number
+  readonly tokens?: number
+  readonly lastActiveAt?: number
+  readonly sizeBytes?: number
 }
 
 export interface TrashItem {
@@ -29,9 +40,16 @@ export interface StraySessionItem {
   readonly title: string
   readonly createdAt: number
   readonly blank: boolean
+  /** 父会话已不存在的孤儿子会话（spec 08：按顶层对待）。 */
+  readonly orphan: boolean
   readonly live: boolean
   readonly running: boolean
   readonly backendSupported: boolean
+  readonly project?: string
+  readonly turns?: number
+  readonly tokens?: number
+  readonly lastActiveAt?: number
+  readonly sizeBytes?: number
 }
 
 export interface ArchiveDockInjected {
@@ -42,6 +60,7 @@ export interface ArchiveDockInjected {
   trashDirPath: () => Promise<{ path: string; displayPath: string }>
   moveToTrash: (sessionId: string) => Promise<unknown>
   unarchiveSession: (sessionId: string) => Promise<unknown>
+  archiveSession: (sessionId: string) => Promise<unknown>
   deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => Promise<unknown>
   restoreTrashItem: (trashId: string) => Promise<unknown>
   deleteTrashItem: (trashId: string) => Promise<unknown>
@@ -57,6 +76,64 @@ export function ensureArchiveStyles(): void {
   const style = document.createElement('style')
   style.dataset.dshArchiveTrigger = ''
   style.textContent = `
+/* spec 08 归档树：父行折叠按钮 + 树状连接线。 */
+.dsh-archive-tree-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font-size: 12px;
+  line-height: 1;
+}
+.dsh-archive-tree-toggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+}
+.dsh-archive-tree-toggle-spacer {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+/* 分组线：父会话与其全部子会话视为一个整体块，分割线画在整块底部（父行自身不再画线）。
+   组内用 L 形连接线：竖线 = 子区容器 border-left（落点 = 父行折叠按钮中心 10px），
+   每个子节点一根 14px 横连钉在标题行中线（子行 padding-top 4px + 行高 22px → 15px），
+   末子节点用 ::after 盖掉竖线过肘残段（面板底色实色，覆盖安全）。 */
+.dsh-archive-tree-children {
+  margin-left: 10px;
+  padding-left: 14px;
+  border-left: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+}
+.dsh-archive-tree-group {
+  border-bottom: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+}
+.dsh-archive-tree-node {
+  position: relative;
+}
+.dsh-archive-tree-node::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 15px;
+  width: 14px;
+  height: 0;
+  border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+}
+.dsh-archive-tree-node-last::after {
+  content: '';
+  position: absolute;
+  left: -15px;
+  top: 16px;
+  bottom: 0;
+  width: 2px;
+  background: var(--dsw-alias-bg-layer-2, #f6f7f9);
+}
 .dsh-archive-trigger {
   flex: none;
   display: flex;
@@ -494,7 +571,7 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
  * @param props - slot props + 注入动作。
  */
 export function ArchiveDock(props: ArchiveDockProps) {
-  const { wide, listArchived, listStrays, listTrashItems, trashDirPath, moveToTrash, unarchiveSession, deleteSession, restoreTrashItem, deleteTrashItem, restoreAllTrash, deleteAllTrash, t } = props
+  const { wide, listArchived, listStrays, listTrashItems, trashDirPath, moveToTrash, unarchiveSession, archiveSession, deleteSession, restoreTrashItem, deleteTrashItem, restoreAllTrash, deleteAllTrash, t } = props
   const [open, setOpen] = useState(false)
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
   const [strays, setStrays] = useState<StraySessionItem[]>([])
@@ -509,6 +586,10 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [copied, setCopied] = useState(false)
   /** 单会话还原进行中锁：连点会并发还原同一 trashId（2026-08-30 审计）。 */
   const [restoringId, setRestoringId] = useState<string | null>(null)
+  /** 游离/孤儿会话归档进行中锁（spec 08）。 */
+  const [archivingId, setArchivingId] = useState<string | null>(null)
+  /** 归档树折叠的父节点 id 集合（spec 08）。 */
+  const [collapsedIds, setCollapsedIds] = useState<ReadonlySet<string>>(new Set())
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
 
   // 官方弹窗行为：打开时聚焦关闭按钮，Esc 关闭。
@@ -570,6 +651,14 @@ export function ArchiveDock(props: ArchiveDockProps) {
     void refresh()
   }, [open])
 
+  // 官方会话释放（fiber 销毁）→ 面板打开时实时刷新，hold 标记即时清除（spec 08 §2.5）。
+  useEffect(() => {
+    if (!open) return
+    const onSessionsChanged = (): void => { void refresh() }
+    window.addEventListener('dsh-archive-sessions-changed', onSessionsChanged)
+    return () => { window.removeEventListener('dsh-archive-sessions-changed', onSessionsChanged) }
+  }, [open])
+
   const confirmTrash = (item: ArchivedSessionItem): void => {
     setPending({ kind: 'trash', item })
   }
@@ -590,23 +679,65 @@ export function ArchiveDock(props: ArchiveDockProps) {
     setPending({ kind: 'deleteStray', item })
   }
 
+  /** 游离/孤儿会话归档：父+子树一并归档（可逆操作，无二次确认；spec 08）。 */
+  const archiveStray = async (item: StraySessionItem): Promise<void> => {
+    if (loading || archivingId !== null) return
+    setArchivingId(item.sessionId)
+    try {
+      await archiveSession(item.sessionId)
+      await refresh()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setArchivingId(null)
+    }
+  }
+
   /** 创建龄文案：今天 / N 天前。 */
-  const strayAge = (createdAt: number): string => {
+  const strayAge = (createdAt: number | undefined): string => {
+    if (typeof createdAt !== 'number' || !Number.isFinite(createdAt)) return ''
     const days = Math.floor((Date.now() - createdAt) / 86_400_000)
     return days <= 0 ? t('stray.ageToday') : t('stray.ageDays', { n: days })
   }
 
-  /** 游离会话行：与归档行同构；空白会话带角标、删除走简化确认。 */
+  /** 输出 token 数人类可读（1.2M / 30.8K / 512）。 */
+  const formatTokens = (n: number): string => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+    return String(n)
+  }
+
+  /** 文件大小人类可读。 */
+  const formatBytes = (n: number): string => {
+    if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`
+    if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`
+    return `${n} B`
+  }
+
+  /** 会话事实行：项目 · 轮数 · tok · 大小 · 时间（缺失项自动跳过）。 */
+  const sessionFactLine = (item: { project?: string; turns?: number; tokens?: number; lastActiveAt?: number; sizeBytes?: number; createdAt: number }): string => {
+    const parts = [
+      item.project,
+      item.turns !== undefined ? t('fact.turns', { n: item.turns }) : null,
+      item.tokens !== undefined ? `${formatTokens(item.tokens)} tok` : null,
+      item.sizeBytes !== undefined ? formatBytes(item.sizeBytes) : null,
+      strayAge(item.lastActiveAt ?? item.createdAt),
+    ].filter((part): part is string => typeof part === 'string' && part !== '')
+    return parts.join(' · ')
+  }
+
+  /** 游离会话行：与归档行同构；空白会话带角标、删除走简化确认；孤儿打标；「归档」以父为单位（spec 08）。 */
   const renderStrayRow = (item: StraySessionItem) => {
     const locked = item.live
+    const busy = archivingId === item.sessionId
     return (
       <div key={item.sessionId} style={styles.row}>
         <div style={{ minWidth: 0 }}>
           <div style={styles.title} title={item.title}>{item.title}</div>
-          <div style={styles.secondarySmall}>
-            {item.sessionId}
-            {' · '}{strayAge(item.createdAt)}
+          <div style={styles.secondarySmall} title={item.sessionId}>
+            {sessionFactLine(item)}
             {item.blank ? ` · ${t('stray.blankBadge')}` : ''}
+            {item.orphan ? ` · ${t('stray.orphanBadge')}` : ''}
             {item.running ? ` · ${t('state.running')}` : item.live ? (
               <>
                 {' · '}
@@ -620,7 +751,15 @@ export function ArchiveDock(props: ArchiveDockProps) {
           <button
             type="button"
             className="dsh-archive-btn"
-            disabled={loading || !item.backendSupported || locked}
+            disabled={loading || busy}
+            onClick={() => { void archiveStray(item) }}
+          >
+            {busy ? t('confirm.archiving') : t('action.archive')}
+          </button>
+          <button
+            type="button"
+            className="dsh-archive-btn"
+            disabled={loading || busy || !item.backendSupported || locked}
             title={locked ? t('state.unreleasedActionHint') : undefined}
             onClick={() => { confirmTrashStray(item) }}
           >
@@ -629,7 +768,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
           <button
             type="button"
             className="dsh-archive-btn dsh-archive-btn-danger"
-            disabled={loading || !item.backendSupported || locked}
+            disabled={loading || busy || !item.backendSupported || locked}
             title={locked ? t('state.unreleasedActionHint') : undefined}
             onClick={() => { confirmDeleteStray(item) }}
           >
@@ -647,56 +786,110 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const restorableCount = trashItems.filter(item => !item.legacy).length
   const legacyCount = trashItems.length - restorableCount
 
-  // 未释放（本次 dsh 运行中驻留）的会话在归档区内分组前置：运行期间无法卸载，只能等下次启动后操作（2026-08-30）。
-  const liveItems = archived.filter(item => item.live)
-  const coldItems = archived.filter(item => !item.live)
+  /** 子树内是否存在未释放会话（父级操作锁定依据；host 侧同样整单拒绝，spec 08）。 */
+  const subtreeLive = (item: ArchivedSessionItem): boolean => {
+    return item.live || item.children.some(child => subtreeLive(child))
+  }
 
-  /** 归档会话行：未释放（本次 dsh 运行中驻留）会话的移入回收站/彻底删除置灰并给提示。 */
-  const renderArchivedRow = (item: ArchivedSessionItem) => {
-    const locked = item.live
+  // 未释放（本次 dsh 运行中驻留）的会话在归档区内分组前置；父级锁定看整棵子树。
+  const liveItems = archived.filter(item => subtreeLive(item))
+  const coldItems = archived.filter(item => !subtreeLive(item))
+
+  /** 展开/收起某父节点的子树（spec 08）。 */
+  const toggleCollapsed = (sessionId: string): void => {
+    setCollapsedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(sessionId)) next.delete(sessionId)
+      else next.add(sessionId)
+      return next
+    })
+  }
+
+  /** 归档树行：父行（深度 0）带操作按钮与折叠切换；子行缩进只读并带树状连接线（spec 08）。 */
+  const renderArchivedRow = (item: ArchivedSessionItem, depth = 0): ReactElement => {
+    const locked = depth === 0 && subtreeLive(item)
+    const hasChildren = item.children.length > 0
+    const collapsed = collapsedIds.has(item.sessionId)
     return (
-      <div key={item.sessionId} style={styles.row}>
-        <div style={{ minWidth: 0 }}>
-          <div style={styles.title} title={item.title}>{item.title}</div>
-          <div style={styles.secondarySmall}>
-            {item.sessionId}
-            {item.running ? ` · ${t('state.running')}` : item.live ? (
-              <>
-                {' · '}
-                <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>{t('state.unreleased')}</span>
-              </>
-            ) : ''}
-            {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
+      <div key={item.sessionId} className={hasChildren ? 'dsh-archive-tree-group' : undefined}>
+        <div style={{
+          ...styles.row,
+          ...(depth > 0 || hasChildren ? { borderBottom: 'none', padding: '4px 0' } : {}),
+        }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              {hasChildren ? (
+                <button
+                  type="button"
+                  className="dsh-archive-tree-toggle"
+                  aria-expanded={!collapsed}
+                  onClick={() => { toggleCollapsed(item.sessionId) }}
+                >
+                  <span aria-hidden>{collapsed ? '▸' : '▾'}</span>
+                </button>
+              ) : (
+                <span className="dsh-archive-tree-toggle-spacer" aria-hidden />
+              )}
+              <div style={{ ...styles.title, minWidth: 0 }} title={item.title}>{item.title}</div>
+            </div>
+            <div style={{ ...styles.secondarySmall, paddingLeft: 20, marginTop: 2 }} title={item.sessionId}>
+              {sessionFactLine(item)}
+              {hasChildren ? ` · ${t('tree.childCount', { n: item.children.length })}` : ''}
+              {item.orphan ? ` · ${t('stray.orphanBadge')}` : ''}
+              {item.running ? ` · ${t('state.running')}` : item.live ? (
+                <>
+                  {' · '}
+                  <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>{t('state.unreleased')}</span>
+                </>
+              ) : ''}
+              {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
+            </div>
           </div>
+          {depth === 0 ? (
+            <div style={styles.actions}>
+              <button
+                type="button"
+                className="dsh-archive-btn"
+                disabled={loading}
+                onClick={() => { confirmUnarchive(item) }}
+              >
+                {t('action.unarchive')}
+              </button>
+              <button
+                type="button"
+                className="dsh-archive-btn"
+                disabled={loading || !item.backendSupported || locked}
+                title={locked ? t('state.unreleasedActionHint') : undefined}
+                onClick={() => { confirmTrash(item) }}
+              >
+                {t('action.trash')}
+              </button>
+              <button
+                type="button"
+                className="dsh-archive-btn dsh-archive-btn-danger"
+                disabled={loading || !item.backendSupported || locked}
+                title={locked ? t('state.unreleasedActionHint') : undefined}
+                onClick={() => { confirmDelete(item) }}
+              >
+                {t('action.deletePermanently')}
+              </button>
+            </div>
+          ) : null}
         </div>
-        <div style={styles.actions}>
-          <button
-            type="button"
-            className="dsh-archive-btn"
-            disabled={loading}
-            onClick={() => { confirmUnarchive(item) }}
-          >
-            {t('action.unarchive')}
-          </button>
-          <button
-            type="button"
-            className="dsh-archive-btn"
-            disabled={loading || !item.backendSupported || locked}
-            title={locked ? t('state.unreleasedActionHint') : undefined}
-            onClick={() => { confirmTrash(item) }}
-          >
-            {t('action.trash')}
-          </button>
-          <button
-            type="button"
-            className="dsh-archive-btn dsh-archive-btn-danger"
-            disabled={loading || !item.backendSupported || locked}
-            title={locked ? t('state.unreleasedActionHint') : undefined}
-            onClick={() => { confirmDelete(item) }}
-          >
-            {t('action.deletePermanently')}
-          </button>
-        </div>
+        {hasChildren && !collapsed ? (
+          <div className="dsh-archive-tree-children">
+            {item.children.map((child, index) => (
+              <div
+                key={child.sessionId}
+                className={index === item.children.length - 1
+                  ? 'dsh-archive-tree-node dsh-archive-tree-node-last'
+                  : 'dsh-archive-tree-node'}
+              >
+                {renderArchivedRow(child, depth + 1)}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -841,10 +1034,10 @@ export function ArchiveDock(props: ArchiveDockProps) {
                   {liveItems.length > 0 ? (
                     <>
                       <p style={styles.groupHeading}>{t('group.unreleased', { count: liveItems.length })}</p>
-                      {liveItems.map(renderArchivedRow)}
+                      {liveItems.map(item => renderArchivedRow(item))}
                     </>
                   ) : null}
-                  {coldItems.map(renderArchivedRow)}
+                  {coldItems.map(item => renderArchivedRow(item))}
                 </>
               ) : null}
             </div>
@@ -917,8 +1110,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
                     <div key={item.trashId} style={styles.row}>
                       <div style={{ minWidth: 0 }}>
                         <div style={styles.title} title={item.title}>{item.title}</div>
-                        <div style={styles.secondarySmall}>
-                          {item.legacy ? `${t('legacy.badge')} · ` : ''}{item.archivedAt} · {item.sessionId}
+                        <div style={styles.secondarySmall} title={item.sessionId}>
+                          {item.legacy ? `${t('legacy.badge')} · ` : ''}{item.archivedAt}
                         </div>
                       </div>
                       <div style={styles.actions}>

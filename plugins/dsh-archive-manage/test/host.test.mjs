@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { resolve, sep } from 'node:path'
-import { assertRegistryMutationApi, assertSessionLocationApi, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor, storedHeaders } from '../lib/host.js'
+import { addedSummaryFor, assertRegistryMutationApi, assertSessionLocationApi, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor, storedHeaders } from '../lib/host.js'
 
 // 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
 // 测试夹具按当前平台构造——CI 跑 Ubuntu、本机跑 Windows，两边都必须绿。
@@ -96,6 +96,21 @@ describe('archive-manage host 纯逻辑', () => {
 
     it('locate 存在 应该 不抛', () => {
       assert.doesNotThrow(() => assertSessionLocationApi({ locate: () => ({ kind: 'jsonl', path: '/x/session.jsonl' }) }))
+    })
+  })
+
+  describe('addedSummaryFor', () => {
+    it('普通 header 应该 只含必填字段', () => {
+      const summary = addedSummaryFor({ id: 'a', createdAt: 42, isSeeded: false }, true)
+      assert.deepEqual(summary, { sessionId: 'a', updatedAt: 42, running: false, blank: true })
+    })
+
+    it('subagent header 应该 透出 parent 与 origin 与 cwd', () => {
+      const summary = addedSummaryFor({ id: 'b', createdAt: 1, isSeeded: false, parentSession: 'p', origin: 'subagent', cwd: '/w' }, false)
+      assert.equal(summary.parentSessionId, 'p')
+      assert.equal(summary.origin, 'subagent')
+      assert.equal(summary.cwd, '/w')
+      assert.equal(summary.blank, false)
     })
   })
 

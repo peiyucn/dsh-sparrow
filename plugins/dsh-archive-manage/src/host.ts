@@ -17,9 +17,11 @@ import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import type { Workspace, WorkspaceDomainState } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
-  TRASH_SIDECAR, isDeleteConfirmationSufficient, legacyTrashItem, maskHomePath, normalizeArchiveConfig,
-  parseBlankProjection, parseTrashSidecar, sanitizeSegment, straySessionIds,
-  type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar,
+  TRASH_SIDECAR, archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, isDeleteConfirmationSufficient,
+  legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig, parseBlankProjection, parseSessionFacts,
+  parseTrashSidecar, sanitizeSegment, straySessionIds,
+  type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar, type SessionFacts, type SessionTreeHeader,
+  type SessionTreeNode,
 } from './archive.js'
 
 export const name = 'dsh-archive-manage'
@@ -38,6 +40,8 @@ declare module '@deepseek-ai/cordis' {
      * 补发此事件让侧边栏「未分组」等列表立即同步（2026-08-30 修复残留条目）。
      */
     'api-session/removed'(sessionId: SessionId): void
+    /** 官方公开事件：会话回到列表（载荷形状对齐官方 SessionSummary 的插件可用子集，见 dsh-api-session-controller types.ts）。 */
+    'api-session/added'(summary: { sessionId: SessionId; updatedAt: number; running: boolean; blank: boolean; parentSessionId?: SessionId; origin?: 'subagent'; cwd?: string }): void
   }
 }
 
@@ -134,7 +138,7 @@ function ensureSessionNotLive(ctx: Context, sessionId: SessionId): void {
   if (agent !== undefined || ctx.sessions.get(sessionId) !== undefined) {
     throw new ArchiveError(
       'SESSION_LIVE',
-      '该会话仍被 dsh 进程占用（未释放），运行期间无法安全移动其文件：请在下次启动 dsh 后重试',
+      '该会话仍被 dsh 进程占用（未释放），无法安全移动其文件：请先关闭该会话（或停止生成）再重试；仍被占用可重启 dsh 后操作',
       409,
     )
   }
@@ -206,15 +210,37 @@ export function assertRegistryMutationApi(registry: unknown): RegistryMutationSu
  * 按元素是否携带 header 字段分流，统一返回 SessionHeader[]（见 AGENTS 插件私有 seam 特例）。
  */
 export async function storedHeaders(ctx: Context): Promise<SessionHeader[]> {
+  return (await storedHeaderFacts(ctx)).headers
+}
+
+/** list() 双形状兼容读取 + 快照附加信息（sizeBytes，仅 master 快照形状有）。 */
+export async function storedHeaderFacts(ctx: Context): Promise<{ headers: SessionHeader[]; sizes: Map<string, number> }> {
   const entries = await ctx.sessionPersistence.list() as readonly unknown[]
-  return entries.map((entry): SessionHeader => {
+  const headers: SessionHeader[] = []
+  const sizes = new Map<string, number>()
+  for (const entry of entries) {
     const record = entry as Record<string, unknown> | null | undefined
     const header = record?.header
     if (typeof header === 'object' && header !== null && typeof (header as Record<string, unknown>).id === 'string') {
-      return header as SessionHeader
+      headers.push(header as SessionHeader)
+      const sizeBytes = record?.sizeBytes
+      if (typeof sizeBytes === 'number') sizes.set(String((header as SessionHeader).id), sizeBytes)
+    } else {
+      headers.push(entry as SessionHeader)
     }
-    return entry as SessionHeader
-  })
+  }
+  return { headers, sizes }
+}
+
+/** 会话统计/列表元数据（projcache 行，缺失返回 undefined）。 */
+function sessionFacts(ctx: Context, sessionId: string): SessionFacts | undefined {
+  try {
+    const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
+    if (domain === undefined) return undefined
+    return parseSessionFacts(domain.table(PROJCACHE_SESSIONS_TABLE).get(sessionId))
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -226,6 +252,141 @@ export function assertSessionLocationApi(persistence: unknown): void {
   const locate = (persistence as Record<string, unknown> | null | undefined)?.locate
   if (typeof locate !== 'function') {
     throw new Error('不支持的 DSH session persistence：缺少私有 locate 方法；请升级插件以匹配当前 dsh 版本')
+  }
+}
+
+/**
+ * 构造官方 api-session/added 的载荷（SessionSummary 结构化子集）：仅 sessionId/updatedAt/
+ * running/blank 必填，其余字段按 header 可选透出。非驻留会话没有活跃事件时间，
+ * updatedAt 用 header.createdAt（与 /list 列表口径一致）。
+ */
+export function addedSummaryFor(header: SessionHeader, blank: boolean): {
+  sessionId: SessionId
+  updatedAt: number
+  running: boolean
+  blank: boolean
+  parentSessionId?: SessionId
+  origin?: 'subagent'
+  cwd?: string
+} {
+  return {
+    sessionId: header.id,
+    updatedAt: header.createdAt,
+    running: false,
+    blank,
+    ...header.parentSession === undefined ? {} : { parentSessionId: header.parentSession },
+    ...header.origin === 'subagent' ? { origin: 'subagent' as const } : {},
+    ...header.cwd === undefined ? {} : { cwd: header.cwd },
+  }
+}
+
+/**
+ * unarchive 后补发官方 api-session/added：客户端 handleSessionAdded 即时并入会话列表，
+ * 用户无需刷新页面。不发出则用户必须刷新——刷新会触发 dsh 把会话加载进 live store，
+ * 之后「再归档 → 进回收站」会被 hold 守卫（ensureSessionNotLive）拦下。
+ */
+async function emitSessionAdded(ctx: Context, sessionId: SessionId): Promise<void> {
+  try {
+    const headers = await storedHeaders(ctx)
+    const header = headers.find(candidate => String(candidate.id) === String(sessionId))
+    if (header === undefined) return
+    ctx.emit('api-session/added', addedSummaryFor(header, await readStrayBlankness(ctx, sessionId)))
+  } catch (error) {
+    ctx.logger.warn(`dsh-archive-manage: api-session/added 通知失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+/** SessionHeader → 纯逻辑树结构（spec 08）。 */
+function treeHeaderOf(header: SessionHeader): SessionTreeHeader {
+  return {
+    id: String(header.id),
+    createdAt: header.createdAt,
+    ...header.parentSession === undefined ? {} : { parentSession: String(header.parentSession) },
+    ...header.origin === 'subagent' ? { origin: 'subagent' as const } : {},
+  }
+}
+
+/** 树内全部节点 id（前序遍历，供批量标题读取）。 */
+function treeIds(nodes: readonly SessionTreeNode[]): string[] {
+  const out: string[] = []
+  for (const node of nodes) {
+    out.push(node.header.id)
+    out.push(...treeIds(node.children))
+  }
+  return out
+}
+
+/**
+ * 子会话标签：官方 subagent 投影单元 label（父会话给子会话的任务描述，不受父消息污染）。
+ * 安全两档，绝不走 observeSession——对 live 会话它会悬挂（官方 list-children 对 live 只走
+ * 注册表快照），对种子冷会话它会连带读取父会话前缀（大日志 OOM，2026-09-03 实测 dsh 进程
+ * 堆打满崩溃）：
+ *   1. live 子会话 → 投影注册表快照（内存、同步）；
+ *   2. 冷会话 → 投影缓存行（展示级；行自带身份校验，读不到就回退标题）。
+ * 均做能力检查 + 结构断言，失败返回 undefined，调用方回退标题单元结果。
+ */
+async function subagentLabel(ctx: Context, header: SessionHeader): Promise<string | undefined> {
+  const sessionId = SessionId(String(header.id))
+  const live = ctx.sessions.get(sessionId)
+  if (live !== undefined) {
+    const registry = ctx.get('sessionProjections') as unknown as {
+      snapshot?: (session: unknown, units: readonly string[]) => { values: Record<string, { label?: string } | null | undefined> }
+    } | undefined
+    if (registry !== undefined && typeof registry.snapshot === 'function') {
+      try {
+        const label = registry.snapshot(live, ['subagent']).values.subagent?.label
+        if (typeof label === 'string' && label.trim() !== '') return label
+      } catch (error) {
+        ctx.logger.warn(`dsh-archive-manage: subagent 投影快照失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    return undefined
+  }
+  const cache = ctx.get('sessionProjectionCache') as unknown as {
+    cachedSnapshot?: (header: unknown, cut: unknown, units: readonly string[]) => { values: Record<string, { label?: string } | null | undefined> } | undefined
+  } | undefined
+  if (cache !== undefined && typeof cache.cachedSnapshot === 'function') {
+    try {
+      const row = cache.cachedSnapshot(header, 0, ['subagent'])
+      const label = row?.values?.subagent?.label
+      if (typeof label === 'string' && label.trim() !== '') return label
+    } catch (error) {
+      ctx.logger.warn(`dsh-archive-manage: subagent 投影缓存读取失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  return undefined
+}
+
+/** 批量子会话标签（header.id → label；取不到的 id 不在映射中，调用方回退标题）。 */
+async function subagentLabels(ctx: Context, headers: readonly SessionHeader[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  for (const header of headers) {
+    const label = await subagentLabel(ctx, header)
+    if (label !== undefined) out.set(String(header.id), label)
+  }
+  return out
+}
+
+/**
+ * 父子归档对齐（spec 08 状态不变量：子镜像父）：
+ * - 「父已归档而子未归档」→ 子补进归档集；「父未归档而子已归档」→ 子移出。
+ * - 触发：启动 + 官方 workspace 域写入事件（domain/changed）+ 面板打开惰性兜底；幂等。
+ */
+async function alignChildArchives(ctx: Context, surface: RegistryMutationSurface): Promise<void> {
+  try {
+    const headers = await storedHeaders(ctx)
+    const archived = await readArchivedIds(ctx)
+    const { add, remove } = archiveAlignmentForChildren(headers.map(treeHeaderOf), archived.map(String))
+    if (add.length === 0 && remove.length === 0) return
+    await mutateArchivedSet(surface, ids => {
+      const next = new Set(ids.map(String))
+      for (const id of add) next.add(id)
+      for (const id of remove) next.delete(id)
+      return [...next].map(id => SessionId(id))
+    })
+    ctx.logger.info(`dsh-archive-manage: 父子归档对齐 +${add.length} / -${remove.length}`)
+  } catch (error) {
+    ctx.logger.warn(`dsh-archive-manage: 父子归档对齐失败：${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -329,48 +490,6 @@ async function sweepStaleProjectionCache(ctx: Context): Promise<void> {
     if (removed > 0) ctx.logger.warn(`dsh-archive-manage: 启动清扫投影缓存移除 ${removed} 个陈旧会话`)
   } catch (error) {
     ctx.logger.warn(`dsh-archive-manage: 投影缓存启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
-  }
-}
-
-/**
- * 启动清扫：父会话已不在持久化中的孤儿 subagent 会话（origin === 'subagent'）——删除其目录、
- * 失效投影行、清理工作区记账，@ 列表不再出现。目录级删除与「删除档」同属 seam 特例；
- * 父/子任一侧仍被 dsh 进程占用时跳过本次清扫，后端不支持文件级处理时只留日志。
- */
-async function sweepOrphanSubagents(ctx: Context): Promise<void> {
-  try {
-    const headers = await storedHeaders(ctx)
-    const persistedIds = new Set(headers.map(header => String(header.id)))
-    let removed = 0
-    for (const header of headers) {
-      if (header.origin !== 'subagent' || header.parentSession === undefined) continue
-      if (persistedIds.has(String(header.parentSession))) continue
-      const childId = SessionId(String(header.id))
-      if (ctx.sessions.get(childId) !== undefined || ctx.agents.get(childId) !== undefined) continue
-      if (ctx.sessions.get(SessionId(String(header.parentSession))) !== undefined) continue
-      const location = ctx.sessionPersistence.locate(header)
-      const dir = location === undefined ? undefined : sessionDirectoryFor(location)
-      if (dir === undefined) {
-        ctx.logger.warn(`dsh-archive-manage: 孤儿 subagent 会话 ${String(childId)} 的后端不支持文件级处理，跳过`)
-        continue
-      }
-      try {
-        await rm(dir, { recursive: true, force: false })
-      } catch (error) {
-        ctx.logger.warn(`dsh-archive-manage: 孤儿 subagent 目录删除失败（${String(childId)}）：${error instanceof Error ? error.message : String(error)}`)
-        continue
-      }
-      try {
-        await detachWorkspaceAccounting(ctx, childId)
-      } catch (accountingError) {
-        ctx.logger.warn(`dsh-archive-manage: 孤儿 subagent 工作区记账清理失败（${String(childId)}）：${String(accountingError)}`)
-      }
-      await invalidateProjectionCacheGuarded(ctx, childId)
-      removed++
-    }
-    if (removed > 0) ctx.logger.warn(`dsh-archive-manage: 启动清扫删除 ${removed} 个孤儿 subagent 会话`)
-  } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: 孤儿 subagent 启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -567,10 +686,16 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
   // 私有 seam 依赖：sessionPersistence.locate（2026-09-02 起公开契约降为后端私有方法，运行时仍在）。
   assertSessionLocationApi(ctx.sessionPersistence)
 
-  // 启动清扫（均不影响加载）：归档集幽灵 id（历史遗留）、投影缓存陈旧行、孤儿 subagent 会话。
+  // 启动清扫（均不影响加载）：归档集幽灵 id（历史遗留）、投影缓存陈旧行。
   void sweepGhostArchivedIds(ctx, surface)
   void sweepStaleProjectionCache(ctx)
-  void sweepOrphanSubagents(ctx)
+
+  // spec 08 父子联动：启动对齐 + 官方 workspace 域写入事件驱动实时对齐（幂等，官方 feed 同款监听）。
+  void alignChildArchives(ctx, surface)
+  ctx.effect(() => ctx.on('domain/changed', (change) => {
+    if (change.domain !== 'workspace' || change.operation !== 'put') return
+    void alignChildArchives(ctx, surface)
+  }), 'dsh-archive-manage: 父子归档对齐')
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
@@ -579,50 +704,85 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
       const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
       try {
         if (req.method === 'GET' && pathname === `${PREFIX}/list`) {
-          const headers = await storedHeaders(ctx)
+          // spec 08：归档区 = 已归档会话的父子树；先惰性对齐再构建（事件驱动之外的兜底）。
+          await alignChildArchives(ctx, surface)
+          const { headers, sizes } = await storedHeaderFacts(ctx)
           const byId = new Map(headers.map(header => [String(header.id), header]))
-          // 归档集读官方 registry getter（通道迁移后内存态与域恒同步）。
-          const archivedIds = await readArchivedIds(ctx)
-          const presentIds = archivedIds.filter(id => byId.has(String(id)))
-          const observations = presentIds.length > 0
-            ? await ctx.sessionQuery.readTitleSnapshots(presentIds.map(id => SessionId(String(id))))
+          const archivedIds = new Set((await readArchivedIds(ctx)).map(String))
+          const archivedHeaders = headers.filter(header => archivedIds.has(String(header.id)))
+          const tree = buildSessionTree(archivedHeaders.map(treeHeaderOf))
+          const ids = treeIds(tree)
+          const observations = ids.length > 0
+            ? await ctx.sessionQuery.readTitleSnapshots(ids.map(id => SessionId(id)))
             : []
+          const observationByIndex = new Map(ids.map((id, index) => [id, observations[index]]))
           const workspaces = ctx.workspaceRegistry.list()
-          const items = presentIds.map((id, index) => {
-            const header = byId.get(String(id)) as SessionHeader
-            const sessionId = SessionId(String(id))
+          // 子会话标签走官方 subagent 投影（标题单元对种子会话取到父消息，2026-09-02 实测）。
+          const childHeaders = ids
+            .map(id => byId.get(id))
+            .filter((header): header is SessionHeader => header !== undefined && header.origin === 'subagent')
+          const childLabels = childHeaders.length > 0
+            ? await subagentLabels(ctx, childHeaders)
+            : new Map<string, string>()
+          const nodeOf = (node: SessionTreeNode): Record<string, unknown> => {
+            const header = byId.get(node.header.id)
+            const sessionId = SessionId(node.header.id)
             const liveSession = ctx.sessions.get(sessionId)
             const agent = ctx.agents.get(sessionId)
-            const location = ctx.sessionPersistence.locate(header)
+            const location = header === undefined ? undefined : ctx.sessionPersistence.locate(header)
+            const facts = header === undefined ? undefined : sessionFacts(ctx, node.header.id)
             return {
-              sessionId: String(id),
-              title: titleFromObservation(observations[index], header.id),
-              updatedAt: header.createdAt,
+              sessionId: node.header.id,
+              title: childLabels.get(node.header.id) ?? titleFromObservation(observationByIndex.get(node.header.id), sessionId),
+              updatedAt: header?.createdAt ?? node.header.createdAt,
+              createdAt: header?.createdAt ?? node.header.createdAt,
+              project: header?.cwd === undefined ? undefined : basename(header.cwd),
+              turns: facts?.turns,
+              tokens: facts?.decodeTokens,
+              lastActiveAt: facts?.lastPromptAt,
+              sizeBytes: sizes.get(node.header.id),
               live: liveSession !== undefined,
               running: agent?.status === 'running',
               backendSupported: location !== undefined && sessionDirectoryFor(location) !== undefined,
-              workspaceIds: workspaceIdsFor(workspaces, sessionId),
+              workspaceIds: header === undefined ? [] : workspaceIdsFor(workspaces, sessionId),
+              orphan: header !== undefined && header.origin === 'subagent'
+                && header.parentSession !== undefined && !byId.has(String(header.parentSession)),
+              children: node.children.map(nodeOf),
             }
-          })
-          sendJson(res, 200, { items })
+          }
+          sendJson(res, 200, { tree: tree.map(nodeOf) })
           return
         }
 
         if (req.method === 'GET' && pathname === `${PREFIX}/strays`) {
-          const headers = await storedHeaders(ctx)
+          const { headers, sizes } = await storedHeaderFacts(ctx)
           const archivedIds = await readArchivedIds(ctx)
           const attachedIds = ctx.workspaceRegistry.list().flatMap(workspace => workspace.sessionIds.map(id => String(id)))
-          const strayIds = straySessionIds(headers.map(header => String(header.id)), archivedIds.map(id => String(id)), attachedIds)
+          // spec 08：有父的子会话跟随父、不单独出现在游离区；孤儿子会话（父不在）按顶层对待并打 orphan 标。
+          const children = livingChildIds(headers.map(treeHeaderOf))
+          const strayIds = straySessionIds(
+            headers.map(header => String(header.id)),
+            archivedIds.map(id => String(id)),
+            attachedIds,
+          ).filter(id => !children.has(id))
           const items = []
           for (const header of headers) {
             if (!strayIds.includes(String(header.id))) continue
             const sessionId = SessionId(String(header.id))
             const location = ctx.sessionPersistence.locate(header)
+            const childLabel = header.origin === 'subagent' ? await subagentLabel(ctx, header) : undefined
+            const facts = sessionFacts(ctx, String(header.id))
             items.push({
               sessionId: String(header.id),
-              title: await readTitle(ctx, sessionId, header.id),
+              title: childLabel ?? await readTitle(ctx, sessionId, header.id),
               createdAt: header.createdAt,
+              project: header.cwd === undefined ? undefined : basename(header.cwd),
+              turns: facts?.turns,
+              tokens: facts?.decodeTokens,
+              lastActiveAt: facts?.lastPromptAt,
+              sizeBytes: sizes.get(String(header.id)),
               blank: await readStrayBlankness(ctx, sessionId),
+              orphan: header.origin === 'subagent',
               live: ctx.sessions.get(sessionId) !== undefined,
               running: ctx.agents.get(sessionId)?.status === 'running',
               backendSupported: location !== undefined && sessionDirectoryFor(location) !== undefined,
@@ -653,8 +813,33 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           if (typeof parsed.sessionId !== 'string' || parsed.sessionId.trim() === '') {
             throw new ArchiveError('BAD_BODY', 'sessionId 必须是非空字符串')
           }
-          await removeArchivedId(surface, SessionId(parsed.sessionId))
+          const sessionId = SessionId(parsed.sessionId)
+          await removeArchivedId(surface, sessionId)
+          // 补发官方「回到列表」通知（不发则用户刷新页面 → 会话被加载 → hold 守卫拦下后续回收站操作）。
+          await emitSessionAdded(ctx, sessionId)
           sendJson(res, 200, { ok: true })
+          return
+        }
+
+        if (req.method === 'POST' && pathname === `${PREFIX}/archive`) {
+          // spec 08：归档以父为单位——父 + 全部有父的子会话一并进归档集（单写链原子）。
+          // 只服务游离/孤儿子会话（官方菜单覆盖不到）；官方归档的父由 domain/changed 对齐补子。
+          const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
+          if (typeof parsed.sessionId !== 'string' || parsed.sessionId.trim() === '') {
+            throw new ArchiveError('BAD_BODY', 'sessionId 必须是非空字符串')
+          }
+          const rootId = parsed.sessionId.trim()
+          const headers = await storedHeaders(ctx)
+          if (!headers.some(header => String(header.id) === rootId)) {
+            throw new ArchiveError('UNKNOWN_SESSION', '会话持久化中没有这个会话', 404)
+          }
+          const subtree = collectSubtreeIds(headers.map(treeHeaderOf), rootId)
+          await mutateArchivedSet(surface, ids => {
+            const next = new Set(ids.map(String))
+            for (const id of subtree) next.add(id)
+            return [...next].map(id => SessionId(id))
+          })
+          sendJson(res, 200, { ok: true, archivedIds: subtree })
           return
         }
 
@@ -775,10 +960,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             } catch (cleanupError) {
               ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
             }
-            await invalidateProjectionCacheGuarded(ctx, sessionId)
-            for (const child of subagents) {
-              await invalidateProjectionCacheGuarded(ctx, child.sessionId)
-            }
+            // 移入回收站不失效投影行：会话身份未变，还原后标题投影依然有效（否则子会话标题退化为
+            // 冷读首条用户消息 = 委派指令文本；2026-09-02 实测，spec 08 §2.6）。
             // 通知会话列表消费者移除条目（官方公开事件；会话目录已移走）。
             ctx.emit('api-session/removed', sessionId)
             for (const child of subagents) {

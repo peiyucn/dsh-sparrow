@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  isDeleteConfirmationSufficient, legacyTrashItem, maskHomePath, normalizeArchiveConfig,
-  parseTrashSidecar, parseBlankProjection, sanitizeSegment, straySessionIds,
+  archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, isDeleteConfirmationSufficient,
+  legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig, parseTrashSidecar, parseBlankProjection,
+  parseSessionFacts, sanitizeSegment, straySessionIds,
 } from '../lib/archive.js'
 
 describe('archive-manage 纯逻辑', () => {
@@ -146,6 +147,122 @@ describe('archive-manage 纯逻辑', () => {
     it('非对象输入 应该 返回 undefined', () => {
       assert.equal(parseBlankProjection(null), undefined)
       assert.equal(parseBlankProjection('x'), undefined)
+    })
+  })
+
+  describe('buildSessionTree', () => {
+    const h = (id, createdAt, extra = {}) => ({ id, createdAt, ...extra })
+
+    it('父与两个子 应该 挂成一层树，子按 createdAt 升序', () => {
+      const tree = buildSessionTree([
+        h('p', 100),
+        h('c2', 40, { parentSession: 'p', origin: 'subagent' }),
+        h('c1', 10, { parentSession: 'p', origin: 'subagent' }),
+      ])
+      assert.equal(tree.length, 1)
+      assert.equal(tree[0].header.id, 'p')
+      assert.deepEqual(tree[0].children.map(c => c.header.id), ['c1', 'c2'])
+    })
+
+    it('孤儿子会话（父不在清单）应该 成为根节点', () => {
+      const tree = buildSessionTree([
+        h('p', 100),
+        h('orphan', 50, { parentSession: 'gone', origin: 'subagent' }),
+      ])
+      assert.deepEqual(tree.map(t => t.header.id).sort(), ['orphan', 'p'])
+    })
+
+    it('多层嵌套 应该 递归展开', () => {
+      const tree = buildSessionTree([
+        h('p', 100),
+        h('c', 50, { parentSession: 'p', origin: 'subagent' }),
+        h('gc', 10, { parentSession: 'c', origin: 'subagent' }),
+      ])
+      assert.equal(tree[0].children[0].children[0].header.id, 'gc')
+    })
+
+    it('根节点 应该 按 createdAt 降序', () => {
+      const tree = buildSessionTree([h('old', 1), h('new', 9)])
+      assert.deepEqual(tree.map(t => t.header.id), ['new', 'old'])
+    })
+  })
+
+  describe('archiveAlignmentForChildren', () => {
+    const h = (id, extra = {}) => ({ id, createdAt: 1, ...extra })
+    const child = (id, parent) => h(id, { parentSession: parent, origin: 'subagent' })
+
+    it('父已归档而子未归档 应该 子进 add', () => {
+      const r = archiveAlignmentForChildren([h('p'), child('c', 'p')], ['p'])
+      assert.deepEqual(r, { add: ['c'], remove: [] })
+    })
+
+    it('父未归档而子已归档 应该 子进 remove', () => {
+      const r = archiveAlignmentForChildren([h('p'), child('c', 'p')], ['c'])
+      assert.deepEqual(r, { add: [], remove: ['c'] })
+    })
+
+    it('父子状态一致 应该 全空', () => {
+      const r = archiveAlignmentForChildren([h('p'), child('c', 'p')], ['p', 'c'])
+      assert.deepEqual(r, { add: [], remove: [] })
+    })
+
+    it('孤儿与顶层会话 应该 不参与', () => {
+      const r = archiveAlignmentForChildren([h('top'), child('orphan', 'gone')], ['orphan'])
+      assert.deepEqual(r, { add: [], remove: [] })
+    })
+  })
+
+  describe('livingChildIds', () => {
+    const h = (id, extra = {}) => ({ id, createdAt: 1, ...extra })
+
+    it('有父的子会话 应该 入选', () => {
+      const ids = livingChildIds([h('p'), h('c', { parentSession: 'p', origin: 'subagent' })])
+      assert.deepEqual([...ids], ['c'])
+    })
+
+    it('孤儿子会话与顶层会话 应该 不入选', () => {
+      const ids = livingChildIds([h('top'), h('orphan', { parentSession: 'gone', origin: 'subagent' })])
+      assert.deepEqual([...ids], [])
+    })
+  })
+
+  describe('collectSubtreeIds', () => {
+    const h = (id, extra = {}) => ({ id, createdAt: 1, ...extra })
+
+    it('父与多层子孙 应该 全部收集且根在前', () => {
+      const ids = collectSubtreeIds([
+        h('p'), h('c', { parentSession: 'p', origin: 'subagent' }),
+        h('gc', { parentSession: 'c', origin: 'subagent' }),
+        h('other', { parentSession: 'x', origin: 'subagent' }),
+      ], 'p')
+      assert.deepEqual(ids, ['p', 'c', 'gc'])
+    })
+
+    it('无子会话 应该 只有根自身', () => {
+      assert.deepEqual(collectSubtreeIds([h('p')], 'p'), ['p'])
+    })
+  })
+
+  describe('parseSessionFacts', () => {
+    it('v6 形状 应该 解析轮数/token/最后活跃时间', () => {
+      const row = {
+        identity: {},
+        rows: {
+          sessionStats: { ver: 1, seq: 3, val: { turns: 12, decodeTokens: 1200000 } },
+          sessionListMetadata: { ver: 1, seq: 3, val: { lastPromptAt: 1788 } },
+        },
+      }
+      assert.deepEqual(parseSessionFacts(row), { turns: 12, decodeTokens: 1200000, lastPromptAt: 1788 })
+    })
+
+    it('v5 形状（record 包装）应该 解析', () => {
+      const row = { record: { rows: { sessionStats: { val: { turns: 3 } } } } }
+      assert.deepEqual(parseSessionFacts(row), { turns: 3 })
+    })
+
+    it('无有效字段 应该 返回 undefined', () => {
+      assert.equal(parseSessionFacts({ rows: { sessionStats: { val: {} } } }), undefined)
+      assert.equal(parseSessionFacts(null), undefined)
     })
   })
 
