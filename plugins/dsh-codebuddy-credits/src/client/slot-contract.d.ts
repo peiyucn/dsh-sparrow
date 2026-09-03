@@ -54,6 +54,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'indicator.title'
       | 'indicator.loading'
       | 'indicator.loadFailed'
+      | 'indicator.user'
       | 'indicator.quotaTitle'
       | 'indicator.used'
       | 'indicator.remainingLabel'

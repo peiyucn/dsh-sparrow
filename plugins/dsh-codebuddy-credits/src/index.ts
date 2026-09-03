@@ -46,6 +46,10 @@ export interface CodeBuddyAccount {
   enterpriseId?: string
   enterpriseName?: string
   accountType?: string
+  /** 账号昵称（如 DJ028191）。 */
+  nickname?: string
+  /** 企业内姓名（如 裴昱）。 */
+  enterpriseUserName?: string
 }
 
 export function apply(ctx: Context, config: Config): void {
@@ -127,7 +131,7 @@ export function apply(ctx: Context, config: Config): void {
         },
       })
       if (!res.ok) return
-      const body = await res.json() as { data?: { accounts?: Array<{ uid?: string; enterpriseId?: string; enterpriseName?: string; type?: string }> } }
+      const body = await res.json() as { data?: { accounts?: Array<{ uid?: string; enterpriseId?: string; enterpriseName?: string; type?: string; nickname?: string; enterpriseUserName?: string }> } }
       const first = body.data?.accounts?.[0]
       if (first === undefined) return
       account = {
@@ -135,6 +139,8 @@ export function apply(ctx: Context, config: Config): void {
         ...(first.enterpriseId === undefined ? {} : { enterpriseId: first.enterpriseId }),
         ...(first.enterpriseName === undefined ? {} : { enterpriseName: first.enterpriseName }),
         ...(first.type === undefined ? {} : { accountType: first.type }),
+        ...(first.nickname === undefined ? {} : { nickname: first.nickname }),
+        ...(first.enterpriseUserName === undefined ? {} : { enterpriseUserName: first.enterpriseUserName }),
       }
     } catch {
       // 账号信息缺失只影响企业上下文头，不阻塞功能。
@@ -285,10 +291,15 @@ export function apply(ctx: Context, config: Config): void {
     async quota() {
       return fetchQuota(await resolveApiKey(), account)
     },
-    account: () => ({
-      ...(account?.enterpriseName === undefined ? {} : { enterpriseName: account.enterpriseName }),
-      ...(account?.accountType === undefined ? {} : { accountType: account.accountType }),
-    }),
+    account: () => {
+      const userName = account?.enterpriseUserName ?? account?.nickname
+      return {
+        ...(account?.enterpriseName === undefined ? {} : { enterpriseName: account.enterpriseName }),
+        ...(account?.accountType === undefined ? {} : { accountType: account.accountType }),
+        // 用户名：企业内姓名优先，回退账号昵称（/v2/accounts 实测字段）。
+        ...(userName === undefined ? {} : { userName }),
+      }
+    },
     async ensureAccount() {
       // 启动期补拉失败的兜底：状态接口触发一次（成功即缓存进内存）。
       if (account !== undefined) return

@@ -45,7 +45,7 @@ interface ModelFactView {
 
 interface StatusPayload {
   keyConfigured: boolean
-  account?: { enterpriseName?: string; accountType?: string }
+  account?: { enterpriseName?: string; accountType?: string; userName?: string }
   quota?: QuotaView
   quotaError?: string
   models: ModelFactView[]
@@ -283,6 +283,9 @@ export function CodeBuddyCreditsIndicator({
                 <>
                   {accountText !== undefined
                     ? <div style={captionStyle}>{accountText}</div>
+                    : null}
+                  {status.account?.userName !== undefined
+                    ? <div style={captionStyle}>{t('indicator.user', { user: status.account.userName })}</div>
                     : null}
                   {quota !== undefined
                     ? (
