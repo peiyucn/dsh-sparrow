@@ -22,6 +22,10 @@
 * [ ] 可选：第三方 VLM 降级配置（默认关闭，明示隐私）
 * [ ] 可选：agentPresets 预设集成（视觉模型预置/校验）
 
+## M3 · 自动看图（spec 03）
+
+* [ ] 评审通过后开工：`system-prompt/assemble` 注入 + 门控（deepseek 文本路由）+ 缓存复用 + 预算（N 图/超时）+ `autoDescribe` 开关 + 单测
+
 ## 发布
 
 * 独立 npm 包 `dsh-vision-bridge`，按合集《发布》流程走 tag 或 `npm publish`；官方在纯文本路由上原生支持视觉读图后退役。
