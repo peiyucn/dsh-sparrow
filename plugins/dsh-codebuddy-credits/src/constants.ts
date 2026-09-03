@@ -32,6 +32,8 @@ export const PRODUCT_HEADER = 'SaaS'
 export const STREAM_IDLE_TIMEOUT_MS = 300_000
 /** /v3/config 模型目录拉取的超时（保存 Key 与后台刷新共用）。 */
 export const MODEL_DISCOVERY_TIMEOUT_MS = 15_000
+/** /v2/accounts 账号补拉的超时（/status 触发时不能把接口挂住）。 */
+export const ACCOUNT_FETCH_TIMEOUT_MS = 5_000
 /**
  * 后台模型刷新节流：宿主重建模型目录（模型选择器打开后的首次建目录、
  * 适配器/凭据/设置变化事件）会触发刷新，两次尝试之间的最小间隔。

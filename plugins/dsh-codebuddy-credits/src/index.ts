@@ -24,6 +24,7 @@ import { discoverCodeBuddyModels, factsFromEntries, fetchCodeBuddyModels } from 
 import type { CodeBuddyModelFacts } from './catalog.js'
 import { Config } from './config.js'
 import {
+  ACCOUNT_FETCH_TIMEOUT_MS,
   API_KEY_ENV,
   DISPLAY_NAME,
   LEGACY_API_KEY_ENV,
@@ -131,6 +132,8 @@ export function apply(ctx: Context, config: Config): void {
           'user-agent': 'CLI/unknown CodeBuddy/2.137.1',
           'x-product': 'SaaS',
         },
+        // /status 会触发补拉：加超时避免把状态接口挂住。
+        signal: AbortSignal.timeout(ACCOUNT_FETCH_TIMEOUT_MS),
       })
       if (!res.ok) return
       const body = await res.json() as { data?: { accounts?: Array<{ uid?: string; enterpriseId?: string; enterpriseName?: string; type?: string; nickname?: string; enterpriseUserName?: string }> } }

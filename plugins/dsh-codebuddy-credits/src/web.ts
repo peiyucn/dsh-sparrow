@@ -114,29 +114,30 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
             sendJson(res, 403, { error: '只允许从本机 DSH 页面访问' })
             return
           }
+          // 状态接口保持「本地毫秒级」：不夹带配额网络请求（额度卡图标
+          // 的出现依赖它，慢查询会让图标迟迟不出现）。配额走 /quota。
           if (req.method === 'GET' && pathname === PREFIX + '/status') {
             const keyConfigured = await shared.keyConfigured()
-            let quota: QuotaStatus | undefined
-            let quotaError: string | undefined
             if (keyConfigured) {
               // 账号信息在启动补拉失败（网络抖动）时会缺失：状态读取时补一次。
               await shared.ensureAccount().catch(() => {})
               // 模型目录为空时同样补拉：配置卡/额度卡读取即自愈。
               await shared.ensureModels().catch(() => {})
-              try {
-                quota = await shared.quota()
-              } catch (error) {
-                quotaError = error instanceof Error ? error.message : '配额查询失败'
-              }
             }
             sendJson(res, 200, {
               keyConfigured,
               active: shared.active(),
               account: shared.account(),
               models: shared.models().map(model => toModelFactView(model)),
-              ...(quota === undefined ? {} : { quota }),
-              ...(quotaError === undefined ? {} : { quotaError }),
             })
+            return
+          }
+          if (req.method === 'POST' && pathname === PREFIX + '/quota') {
+            if (!await shared.keyConfigured()) {
+              sendJson(res, 400, { error: '未配置 Key' })
+              return
+            }
+            sendJson(res, 200, await shared.quota())
             return
           }
           if (req.method === 'POST' && pathname === PREFIX + '/key') {

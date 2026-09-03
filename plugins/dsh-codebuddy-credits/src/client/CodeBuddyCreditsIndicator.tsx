@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { CSSProperties } from 'react'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
+const QUOTA_URL = '/api/codebuddy-credits/quota'
 
 /** 面板标题用的方形渐变图标（Combine 里取出的 Color 单块，独立渐变 id）。 */
 const SQUARE_LOGO_SVG = '<svg height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>CodeBuddy</title><defs><radialGradient cx="0" cy="0" gradientTransform="matrix(-9.00009 -16 16 -9.00009 21 24.5)" gradientUnits="userSpaceOnUse" id="ccb-logo-square-gradient" r="1"><stop stop-color="#2EA99D"></stop><stop offset="1" stop-color="#6C4DFF"></stop></radialGradient></defs><path d="M18.821 0H5.18A5.179 5.179 0 000 5.179V18.82A5.179 5.179 0 005.179 24H18.82A5.179 5.179 0 0024 18.821V5.18A5.179 5.179 0 0018.821 0z" fill="url(#ccb-logo-square-gradient)"></path><path d="M18.777 1.647c.28-.02.536.114.972.51 1.018.926 2.437 2.828 3.318 4.452l.34.631.482.24.11.06v3.638a5.206 5.206 0 00-5.32-1.23c-.491.166-1.021.471-2.08 1.082l-6.09 3.516c-1.057.61-1.586.916-1.975 1.259a5.208 5.208 0 00-1.493 5.572c.165.49.471 1.02 1.082 2.08l.315.543h-3.26c-.685 0-1.34-.135-1.939-.377-.169-.956-.009-1.789.469-2.335.158-.18.164-.189.13-.493a11.846 11.846 0 01-.057-1.711l.02-.444-.667-1.18C2.1 15.622 1.445 14.078 1.192 12.9c-.133-.647-.125-.934.04-1.146.1-.128.427-.261.822-.334.994-.175 3.162-.017 5.575.41l.25.043.551-.487c.915-.81 1.522-1.264 2.641-1.962 1.167-.73 2.484-1.331 3.967-1.807l.476-.152.261-.688c.937-2.471 1.896-4.293 2.58-4.9.235-.21.25-.22.422-.23z" fill="#fff"></path><path d="M12.139 18.2a1.203 1.203 0 011.642.44l1.296 2.243a1.204 1.204 0 01-2.083 1.203l-1.296-2.243a1.203 1.203 0 01.44-1.644zM18.629 14.452a1.203 1.203 0 011.642.44l1.295 2.244a1.203 1.203 0 11-2.083 1.203l-1.295-2.243a1.203 1.203 0 01.44-1.644z" fill="#fff"></path></svg>'
@@ -170,6 +171,10 @@ export function CodeBuddyCreditsIndicator({
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<StatusPayload | undefined>(() => cachedStatus)
   const [loadError, setLoadError] = useState<string | undefined>(undefined)
+  // 配额独立于状态接口：/status 保持毫秒级（图标出现不等待配额网络请求），
+  // 展开面板时才拉 /quota。
+  const [quota, setQuota] = useState<QuotaView | undefined>(undefined)
+  const [quotaError, setQuotaError] = useState<string | undefined>(undefined)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const requestSeq = useRef(0)
 
@@ -209,6 +214,25 @@ export function CodeBuddyCreditsIndicator({
     } catch {
       if (seq !== requestSeq.current) return
       setLoadError(t('indicator.loadFailed'))
+    }
+  }, [t])
+
+  /** 展开面板时拉取配额（独立于 /status，不阻塞图标出现）。 */
+  const loadQuota = useCallback(async () => {
+    const seq = ++requestSeq.current
+    setQuotaError(undefined)
+    try {
+      const response = await fetch(QUOTA_URL, { method: 'POST', cache: 'no-store' })
+      if (seq !== requestSeq.current) return
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({})) as { error?: string }
+        setQuotaError(payload.error ?? t('indicator.loadFailed'))
+        return
+      }
+      setQuota(await response.json() as QuotaView)
+    } catch {
+      if (seq !== requestSeq.current) return
+      setQuotaError(t('indicator.loadFailed'))
     }
   }, [t])
 
@@ -269,7 +293,6 @@ export function CodeBuddyCreditsIndicator({
         : '')
     : account?.nickname
 
-  const quota = status?.quota
   const ratio = quota !== undefined && quota.limit > 0
     ? Math.min(1, Math.max(0, quota.used / quota.limit))
     : 0
@@ -405,8 +428,8 @@ export function CodeBuddyCreditsIndicator({
                       </>
                     )
                     : null}
-                  {status.quotaError !== undefined
-                    ? <div style={dangerStyle}>{status.quotaError}</div>
+                  {quotaError !== undefined
+                    ? <div style={dangerStyle}>{quotaError}</div>
                     : null}
                 </>
               )
