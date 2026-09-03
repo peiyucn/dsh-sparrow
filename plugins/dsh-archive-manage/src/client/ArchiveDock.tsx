@@ -98,8 +98,15 @@ export function ensureArchiveStyles(): void {
 }
 .dsh-archive-tree-toggle-spacer {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 20px;
   height: 20px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 12px;
+  line-height: 1;
+  user-select: none;
 }
 /* 分组线：父会话与其全部子会话视为一个整体块，分割线画在整块底部（父行自身不再画线）。
    组内用 L 形连接线：竖线 = 子区容器 border-left（落点 = 父行折叠按钮中心 10px），
@@ -828,13 +835,20 @@ export function ArchiveDock(props: ArchiveDockProps) {
                   <span aria-hidden>{collapsed ? '▸' : '▾'}</span>
                 </button>
               ) : (
-                <span className="dsh-archive-tree-toggle-spacer" aria-hidden />
+                <span className="dsh-archive-tree-toggle-spacer" aria-hidden>·</span>
               )}
               <div style={{ ...styles.title, minWidth: 0 }} title={item.title}>{item.title}</div>
             </div>
             <div style={{ ...styles.secondarySmall, paddingLeft: 20, marginTop: 2 }} title={item.sessionId}>
               {sessionFactLine(item)}
-              {hasChildren ? ` · ${t('tree.childCount', { n: item.children.length })}` : ''}
+              {hasChildren ? (
+                <>
+                  {' · '}
+                  <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>
+                    {t('tree.childCount', { n: item.children.length })}
+                  </span>
+                </>
+              ) : ''}
               {item.orphan ? ` · ${t('stray.orphanBadge')}` : ''}
               {item.running ? ` · ${t('state.running')}` : item.live ? (
                 <>
