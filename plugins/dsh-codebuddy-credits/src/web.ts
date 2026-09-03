@@ -145,8 +145,11 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
           if (req.method === 'POST' && pathname === PREFIX + '/key') {
             const body = await readBody(req)
             const key = typeof body.key === 'string' ? body.key.trim() : ''
+            // 空 Key = 幂等重配：用已存 Key 重拉模型目录与账号信息（已配置时
+            // 直接点应用、不输新 Key 的路径）。
             if (key.length === 0) {
-              sendJson(res, 400, { error: '请输入 API Key' })
+              await shared.reapply()
+              sendJson(res, 200, { ok: true })
               return
             }
             if (key.length > 16 * 1024) {
