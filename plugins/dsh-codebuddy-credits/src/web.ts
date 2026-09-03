@@ -1,6 +1,8 @@
 /**
  * dsh-codebuddy-credits 的 host HTTP 路由：给 client 的设置卡片提供
- * 状态读取、Key 保存与移除。Key 只经 ctx.credentials，不进日志、不进响应。
+ * 状态读取、Key 保存/移除、配额查询与模型目录刷新。
+ * Key 只经 ctx.credentials，不进日志、不进响应；所有云端请求仅在用户
+ * 给 Key 后发生（无 Key 零网络行为）。
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -8,22 +10,38 @@ import type { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { API_KEY_ENV } from './constants.js'
+import type { QuotaStatus } from './quota.js'
 
 export const KEY_REF = credentialRef(API_KEY_ENV)
 const PREFIX = '/api/codebuddy-credits'
 const MAX_BODY_BYTES = 16 * 1024
 
+/** 模型目录刷新结果。 */
+export interface ModelRefreshResult {
+  /** 本次新出现的模型 id（企业管理员新放开的）。 */
+  added: string[]
+  /** 刷新后的模型总数。 */
+  total: number
+}
+
+/** 账号快照（展示用）。 */
+export interface AccountView {
+  enterpriseName?: string
+  accountType?: string
+}
+
 /** web.ts 与 index.ts 共享的最小操作面。 */
 export interface CodeBuddyCreditsShared {
-  /** 凭据（凭据库或环境）当前是否可用。 */
   keyConfigured(): Promise<boolean>
-  /** 保存 Key 到 DSH 凭据库并立即重评估 route 注册。 */
   saveKey(key: string): Promise<void>
-  /** 从 DSH 凭据库移除 Key 并立即重评估 route 注册。 */
   removeKey(): Promise<void>
-  /** route 是否已注册（模型选择器可见）。 */
+  /** 拉取模型目录并对比已存，返回新增模型（用户主动刷新时调用）。 */
+  refreshModels(): Promise<ModelRefreshResult>
+  /** 查询企业周期配额。 */
+  quota(): Promise<QuotaStatus>
+  /** 账号快照（来自 /v2/accounts）。 */
+  account(): AccountView
   active(): boolean
-  /** 当前生效的模型 id 列表。 */
   modelIds(): readonly string[]
 }
 
@@ -67,15 +85,27 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
             sendJson(res, 403, { error: '只允许从本机 DSH 页面访问' })
             return
           }
-          if (req.method === 'GET' && pathname === `${PREFIX}/status`) {
+          if (req.method === 'GET' && pathname === PREFIX + '/status') {
+            let quota: QuotaStatus | undefined
+            let quotaError: string | undefined
+            if (await shared.keyConfigured()) {
+              try {
+                quota = await shared.quota()
+              } catch (error) {
+                quotaError = error instanceof Error ? error.message : '配额查询失败'
+              }
+            }
             sendJson(res, 200, {
               keyConfigured: await shared.keyConfigured(),
               active: shared.active(),
               models: shared.modelIds(),
+              account: shared.account(),
+              ...(quota === undefined ? {} : { quota }),
+              ...(quotaError === undefined ? {} : { quotaError }),
             })
             return
           }
-          if (req.method === 'POST' && pathname === `${PREFIX}/key`) {
+          if (req.method === 'POST' && pathname === PREFIX + '/key') {
             const body = await readBody(req)
             const key = typeof body.key === 'string' ? body.key.trim() : ''
             if (key.length === 0) {
@@ -90,9 +120,19 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
             sendJson(res, 200, { ok: true })
             return
           }
-          if (req.method === 'POST' && pathname === `${PREFIX}/remove-key`) {
+          if (req.method === 'POST' && pathname === PREFIX + '/remove-key') {
             await shared.removeKey()
             sendJson(res, 200, { ok: true })
+            return
+          }
+          if (req.method === 'POST' && pathname === PREFIX + '/refresh-models') {
+            const result = await shared.refreshModels()
+            sendJson(res, 200, result)
+            return
+          }
+          if (req.method === 'POST' && pathname === PREFIX + '/quota') {
+            const quota = await shared.quota()
+            sendJson(res, 200, quota)
             return
           }
           sendJson(res, 404, { error: '未知路径' })

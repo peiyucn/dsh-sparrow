@@ -23,6 +23,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'key.placeholder'
       | 'key.save'
       | 'key.remove'
+      | 'models.refresh'
+      | 'models.added'
+      | 'models.unchanged'
+      | 'quota.line'
       | 'state.configured'
       | 'state.missing'
       | 'state.active'
@@ -30,6 +34,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'error.empty'
       | 'error.saveFailed'
       | 'error.removeFailed'
+      | 'error.refreshFailed'
   }
 }
 

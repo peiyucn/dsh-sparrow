@@ -35,7 +35,7 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 * `dsh-archive-manage`：允许移动/删除会话日志目录（仅 jsonl 单会话目录，其余 `BACKEND_UNSUPPORTED`）；归档集变更走官方 WorkspaceRegistry 私有写通道（`enqueueOperation`/`requireState`/`setState`，启动能力检查缺方法即 fail-fast）；`sessionPersistence.list()` 双形状兼容（master 返回快照、旧版返回裸 header）；`sessionPersistence.locate` 为后端私有方法（alpha.5 发布后从公开契约降级，启动能力检查缺方法即 fail-fast）；live 会话拒绝处理；回收站目录写 sidecar 记账
 * `dsh-file-manage`：直接 import 官方导出 `DeepSeekFilesClient`；只读官方 `llm-deepseek` 设置节取 `baseURL`/`apiKeyEnv`
 * `dsh-nav-pin`：只读依赖官方 DOM 标记与 aria-label 文案；CSS 特异性压制官方窄屏隐藏规则；宽度轴经官方公开 data 属性钳制
-* `dsh-codebuddy-credits`：包装 provider 的 `stream`/`streamSimple` 注入官方 CLI `user-agent`（user-agent 是 DSH attribution 保留名、profile.headers 覆盖不了，而 CodeBuddy 服务端校验官方请求标识——社区插件公开记录为 500 no body）；自建 pi-ai 认证桥接（官方 llm-pi-ai 的 `credentialStoreFrom`/`authContextFrom` 未导出，按官方实现复刻，凭据记录作用域 = 插件 NS）
+* `dsh-codebuddy-credits`：无私有 seam——协议层自建（`CodeBuddyAdapter extends LlmAdapter`，不依赖 pi-ai）：请求构造、SSE 解析、usage.credit 提取、企业策略错误透传全部显式实现；官方请求标识（user-agent/x-product/企业上下文头）直接进请求头
 
 ## 工程管线（本仓库自含）
 
