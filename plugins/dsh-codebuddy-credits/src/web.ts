@@ -40,9 +40,10 @@ export interface ModelFactView {
 export interface CodeBuddyCreditsShared {
   keyConfigured(): Promise<boolean>
   saveKey(key: string): Promise<void>
-  removeKey(): Promise<void>
   /** 查询企业周期配额。 */
   quota(): Promise<QuotaStatus>
+  /** route 是否注册（状态接口诊断用）。 */
+  active(): boolean
   /** 账号快照（来自 /v2/accounts）。 */
   account(): AccountView
   /** 账号缺失时补拉 /v2/accounts（best-effort，状态接口在给 Key 后调用）。 */
@@ -143,11 +144,6 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
               return
             }
             await shared.saveKey(key)
-            sendJson(res, 200, { ok: true })
-            return
-          }
-          if (req.method === 'POST' && pathname === PREFIX + '/remove-key') {
-            await shared.removeKey()
             sendJson(res, 200, { ok: true })
             return
           }

@@ -26,6 +26,7 @@ import { Config } from './config.js'
 import {
   API_KEY_ENV,
   DISPLAY_NAME,
+  LEGACY_API_KEY_ENV,
   MODEL_REFRESH_COOLDOWN_MS,
   NS,
   PROVIDER,
@@ -60,13 +61,19 @@ export function apply(ctx: Context, config: Config): void {
   /** 账号上下文缓存（保存 Key 时从 /v2/accounts 拉取；重启后异步恢复）。 */
   let account: CodeBuddyAccount | undefined
 
-  /** 每请求解析凭据：credentials 缝优先，无缝时整个凭据平面就是进程环境。 */
+  /**
+   * 每请求解析凭据：credentials 缝优先，无缝时整个凭据平面就是进程环境。
+   * 新引用（CODEBUDDY_CREDITS_API_KEY，对齐官方页面派生名）优先，
+   * 旧引用（CODEBUDDY_API_KEY）兜底——旧版存过的 Key 不用重配。
+   */
   const resolveApiKey = async (): Promise<string> => {
     const credentials = ctx.get('credentials')
-    const hit = credentials !== undefined
-      ? (await credentials.resolve(credentialRef(API_KEY_ENV)))?.value
-      : launchEnvironmentOf(ctx).get(credentialRef(API_KEY_ENV))?.value
-    if (hit !== undefined && hit.length > 0) return assertUsableApiKey(hit, name, credentialRef(API_KEY_ENV))
+    for (const ref of [API_KEY_ENV, LEGACY_API_KEY_ENV]) {
+      const hit = credentials !== undefined
+        ? (await credentials.resolve(credentialRef(ref)))?.value
+        : launchEnvironmentOf(ctx).get(credentialRef(ref))?.value
+      if (hit !== undefined && hit.length > 0) return assertUsableApiKey(hit, name, credentialRef(ref))
+    }
     throw new LlmError(
       `${name}: 没有可用的 API Key（${API_KEY_ENV}）；请在设置页的 CodeBuddy Credits 卡片里保存 Key`,
       'MISSING_CREDENTIAL',
@@ -217,6 +224,17 @@ export function apply(ctx: Context, config: Config): void {
     } catch {
       return
     }
+    // 旧引用 → 新引用迁移（boot 兜底；saveKey 也会做）：官方页面按新引用
+    // join 凭据，迁移后行头圆点即亮绿。
+    const credentials = ctx.get('credentials')
+    if (credentials !== undefined) {
+      const fresh = await credentials.resolve(credentialRef(API_KEY_ENV)).catch(() => undefined)
+      const legacy = await credentials.resolve(credentialRef(LEGACY_API_KEY_ENV)).catch(() => undefined)
+      if (fresh?.value === undefined && legacy?.value !== undefined) {
+        await credentials.set(credentialRef(API_KEY_ENV), legacy.value).catch(() => {})
+        await credentials.unset?.(credentialRef(LEGACY_API_KEY_ENV)).catch(() => {})
+      }
+    }
     await refreshAccountWithKey(key)
     ensureRoutes(true)
     void kickModelRefresh()
@@ -233,7 +251,8 @@ export function apply(ctx: Context, config: Config): void {
     return discoverCodeBuddyModels(apiKey, account, signal)
   })
 
-  // 设置卡片路由：Key 的保存/移除、配额查询、状态。
+  // 设置卡片路由：Key 的保存、配额查询、状态。删除走官方行头「移除」
+  // （引用对齐后官方流程会连带清凭据与 profile，installSection onChange 收尾）。
   installCodeBuddyWeb(ctx, {
     async keyConfigured() {
       return hasKey()
@@ -248,14 +267,20 @@ export function apply(ctx: Context, config: Config): void {
       await refreshAccountWithKey(key)
       facts = factsFromEntries(entries)
       await credentials.set(credentialRef(API_KEY_ENV), key)
+      // 旧引用迁移：老版本存在 CODEBUDDY_API_KEY 下的 Key 挪到新引用并清掉旧值。
+      const legacy = await credentials.resolve(credentialRef(LEGACY_API_KEY_ENV)).catch(() => undefined)
+      if (legacy?.value !== undefined) await credentials.unset?.(credentialRef(LEGACY_API_KEY_ENV))
+      const settings = ctx.get('settings')
+      if (settings === undefined) {
+        throw new LlmError(`${name}: 本组合没有设置服务，无法记录凭据引用`, 'NO_SETTINGS_STORE')
+      }
+      // 官方页面的凭据 join 读 profile.apiKeyEnv：物化到用户层，行头圆点才会
+      // 亮绿；顺带清掉旧版遗留的 models 键（模型列表已不落设置节）。
+      await settings.mutate(NS, [
+        { op: 'set', path: ['providers', PROVIDER, 'apiKeyEnv'], value: API_KEY_ENV },
+        { op: 'unset', path: ['providers', PROVIDER, 'models'] },
+      ])
       ensureRoutes(true)
-    },
-    async removeKey() {
-      const credentials = ctx.get('credentials')
-      if (credentials === undefined) return
-      await credentials.unset?.(credentialRef(API_KEY_ENV))
-      facts = []
-      ensureRoutes(ambientKey())
     },
     async quota() {
       return fetchQuota(await resolveApiKey(), account)
@@ -277,6 +302,7 @@ export function apply(ctx: Context, config: Config): void {
       // 目录为空（启动拉取失败）时状态读取触发补拉：配置卡/额度卡是自愈入口。
       if (models().length === 0) kickModelRefresh()
     },
+    active: () => registered,
     models: () => models(),
   })
 
@@ -286,7 +312,13 @@ export function apply(ctx: Context, config: Config): void {
         current = source
       },
       onChange: () => {
-        // 本插件无注册期捕获的易变事实（retry policy 恒定），无需重注册。
+        // 官方行头「移除」删除 profile 后（删除配置的正路）：清空模型事实、
+        // 撤回 route。凭据由官方流程一并清理（引用对齐后）。
+        const raw = current()
+        if (raw?.providers?.[PROVIDER] === undefined) {
+          facts = []
+          ensureRoutes(ambientKey())
+        }
       },
     })
   })

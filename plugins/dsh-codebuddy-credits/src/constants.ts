@@ -6,8 +6,15 @@ export const NS = 'llm-codebuddy-credits'
 export const PROVIDER = 'codebuddy-credits'
 /** 模型选择器与设置页显示的 provider 名（内部 ID 保持小写连字符，仅展示名品牌化）。 */
 export const DISPLAY_NAME = 'CodeBuddy Credits'
-/** 凭据环境变量名；API key 只经 ctx.credentials 解析，绝不落盘到设置文件。 */
-export const API_KEY_ENV = 'CODEBUDDY_API_KEY'
+/**
+ * 凭据环境变量名；API key 只经 ctx.credentials 解析，绝不落盘到设置文件。
+ * 命名对齐官方设置页的派生规则 deriveKeyRef('codebuddy-credits') =
+ * CODEBUDDY_CREDITS_API_KEY：行头凭据圆点、官方「移除」流程的凭据清理都按
+ * 该引用 join，用同名引用才能让官方 UI 原生生效（绿色圆点/删除配置）。
+ */
+export const API_KEY_ENV = 'CODEBUDDY_CREDITS_API_KEY'
+/** 旧版引用（早期版本用 CODEBUDDY_API_KEY 存 Key）：解析时兼容并迁移。 */
+export const LEGACY_API_KEY_ENV = 'CODEBUDDY_API_KEY'
 /** CodeBuddy 推理端点（OpenAI Chat Completions 方言，仅支持流式）。 */
 export const BASE_URL = 'https://copilot.tencent.com/v2'
 /** 模型目录端点：按当前 API key 的账号权限返回可用模型。 */

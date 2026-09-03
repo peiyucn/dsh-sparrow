@@ -350,12 +350,14 @@ export function ensureCardStyles(): void {
     '.ccb-card-input::placeholder { color: var(--dsw-alias-label-dimmed); }',
     '.ccb-card-input:disabled { opacity: 0.6; cursor: default; }',
     '.ccb-card-edit:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }',
-    // 官方行头「编辑」按钮对本插件命名空间只会展开占位提示卡：以 CSS 隐藏
-    // （只隐藏编辑按钮、保留「移除」；:has 依赖本卡根节点 ccb-card-root，
-    // 官方类名为 CSS Modules 哈希，按类名片段匹配——nav-pin 同款读 DOM 层级）。
-    'li:has(> .ccb-card-root) [class*="rowActions"] [class*="secondaryButton"] { display: none; }',
-    // 首装 setup 姿态下官方渲染的占位编辑器同样隐藏，只留我们的卡。
-    'li[class*="setupCard"] > [class*="editor"] { display: none; }',
+    // 官方行头「编辑」按钮对本插件命名空间只会展开占位提示卡：以 CSS 隐藏，
+    // 只隐藏编辑按钮、保留「移除」。官方类名是纯哈希（生产构建不带可读
+    // 片段，类名匹配无效），按 DOM 结构定位：li(rowCard) > div(rowHead) >
+    // span(rowActions) > 第一个 button（编辑）。:has 锚点 = 本卡根节点。
+    'li:has(.ccb-card-root) > div:first-child > span:last-child > button:first-child { display: none; }',
+    // 首装 setup 姿态：官方占位编辑器是 li 的第一个 div 且内部无 rowActions
+    // 结构（无「span:last-child」直系子元素），同样隐藏，只留我们的卡。
+    'li:has(.ccb-card-root) > div:first-child:not(:has(> span:last-child)) { display: none; }',
   ].join('\n')
   document.head.append(style)
 }

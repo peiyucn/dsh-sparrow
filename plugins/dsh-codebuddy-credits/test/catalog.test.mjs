@@ -26,6 +26,11 @@ describe('factsFromEntries', () => {
     assert.equal(model.reasoning, true)
     assert.deepEqual(model.thinkingLevelMap, { off: null, high: 'high' })
   })
+  it('档位表透传 declaredEfforts 结论，不强行塞 off（hy4 不可关思考/固定档位只有一档）', () => {
+    const [model] = factsFromEntries([{ id: 'hy4', name: 'Hy4', reasoningEfforts: { high: 'high' }, defaultEffort: 'high' }])
+    assert.deepEqual(model.thinkingLevelMap, { high: 'high' })
+    assert.equal(model.defaultEffort, 'high')
+  })
   it('服务端默认档位透传（仅推理模型携带）', () => {
     const [model] = factsFromEntries([{ id: 'x', name: 'X', reasoningEfforts: { high: 'high' }, defaultEffort: 'high' }])
     assert.equal(model.defaultEffort, 'high')

@@ -178,6 +178,11 @@ export function CodeBuddyCreditsIndicator({
     }
   }, [t])
 
+  // 挂载即读取状态：未配置 Key 时不显示图标（无配置时对话页不该有标）。
+  useEffect(() => {
+    void loadStatus()
+  }, [loadStatus])
+
   useEffect(() => {
     if (!open) return
     void loadStatus()
@@ -216,6 +221,10 @@ export function CodeBuddyCreditsIndicator({
   const percent = Math.round(ratio * 100)
   const resetAt = formatReset(quota?.resetAt)
 
+  // 未配置 Key（或状态未加载完成）时不渲染图标：对话页只在有 CodeBuddy
+  // 配置时才出现这个标；加载完成后配置态自动亮出。
+  if (status?.keyConfigured !== true) return null
+
   return (
     <div ref={rootRef} style={{ position: 'relative', display: 'inline-flex' }}>
       <button
@@ -239,9 +248,6 @@ export function CodeBuddyCreditsIndicator({
             </div>
             {status === undefined && loadError === undefined
               ? <div style={captionStyle}>{t('indicator.loading')}</div>
-              : null}
-            {status?.keyConfigured === false
-              ? <div style={captionStyle}>{t('indicator.noKey')}</div>
               : null}
             {status?.keyConfigured === true
               ? (

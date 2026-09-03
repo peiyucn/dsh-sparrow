@@ -96,8 +96,10 @@ export function factsFromEntries(entries: readonly CodeBuddyModelEntry[]): CodeB
   return entries.map(entry => {
     const declared = entry.reasoningEfforts
     const reasoning = declared !== undefined && declared !== false
+    // off 是否可用由 declaredEfforts 依据 canDisableThinking 决定，
+    // 这里只透传（不再无条件塞 off——hy4-preview 不可关思考、固定档位模型只有一档）。
     const thinkingLevelMap = declared !== undefined && declared !== false
-      ? { off: null, ...declared }
+      ? { ...declared }
       : undefined
     return {
       id: entry.id,
