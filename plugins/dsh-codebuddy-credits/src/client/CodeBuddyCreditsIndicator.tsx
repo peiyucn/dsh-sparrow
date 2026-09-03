@@ -158,6 +158,9 @@ const panelStyle: CSSProperties = {
   gap: '6px',
 } as CSSProperties
 
+/** 模块级状态缓存：槽位重挂载（切会话/视图）时以它初始化，避免「空 → 出现」闪烁。 */
+let cachedStatus: StatusPayload | undefined
+
 export function CodeBuddyCreditsIndicator({
   t,
   sessionId,
@@ -165,7 +168,7 @@ export function CodeBuddyCreditsIndicator({
   directoryFor,
 }: CodeBuddyCreditsIndicatorProps) {
   const [open, setOpen] = useState(false)
-  const [status, setStatus] = useState<StatusPayload | undefined>(undefined)
+  const [status, setStatus] = useState<StatusPayload | undefined>(() => cachedStatus)
   const [loadError, setLoadError] = useState<string | undefined>(undefined)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const requestSeq = useRef(0)
@@ -200,7 +203,9 @@ export function CodeBuddyCreditsIndicator({
         setLoadError(t('indicator.loadFailed'))
         return
       }
-      setStatus(await response.json() as StatusPayload)
+      const payload = await response.json() as StatusPayload
+      cachedStatus = payload
+      setStatus(payload)
     } catch {
       if (seq !== requestSeq.current) return
       setLoadError(t('indicator.loadFailed'))
