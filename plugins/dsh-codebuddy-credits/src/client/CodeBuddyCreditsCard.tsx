@@ -132,19 +132,6 @@ const dangerButtonStyle: CSSProperties = {
   color: 'var(--dsw-alias-state-error-primary)',
 }
 
-/** 官方 savedNotice 同款：绿色保存提示（12px/18px）。 */
-const savedNoticeStyle: CSSProperties = {
-  margin: '0',
-  fontSize: '12px',
-  lineHeight: '18px',
-  color: 'var(--dsw-alias-state-success-primary)',
-}
-
-/** 折叠态包装：默认 0×0 隐藏锚点；有保存提示时展开为纯文本行。 */
-const noticeWrapStyle: CSSProperties = {
-  display: 'block',
-}
-
 /** 官方 apiKeyFailure 的轻量镜像：可打印 ASCII（空格除外）。 */
 const LEGAL_API_KEY = /^[\x21-\x7E]+$/
 
@@ -218,6 +205,27 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
   useEffect(() => {
     if (editing) setSavedNotice(false)
   }, [editing])
+
+  // 绿色保存提示插到 section 顶部（官方 savedProvider 位置）：位于 intro 与
+  // 列表之间；savedNotice 清除时卸载。DOM 插入（无对应公开槽位）——已记 seam。
+  useEffect(() => {
+    if (!savedNotice) return
+    const li = rootRef.current?.closest('li')
+    if (li === null || li === undefined) return
+    const rows = li.parentElement
+    const section = rows?.parentElement
+    if (rows === null || rows === undefined || section === null || section === undefined) return
+    const notice = document.createElement('p')
+    notice.textContent = t('saved.provider')
+    notice.setAttribute('role', 'status')
+    notice.setAttribute('aria-live', 'polite')
+    notice.style.margin = '0'
+    notice.style.fontSize = '12px'
+    notice.style.lineHeight = '18px'
+    notice.style.color = 'var(--dsw-alias-state-success-primary)'
+    section.insertBefore(notice, rows)
+    return () => { notice.remove() }
+  }, [savedNotice, t])
 
   // 首装 setup 姿态没有行头「编辑」按钮（官方占位编辑器是 li 的首个子 div 且
   // 无 span 子元素）：折叠会让卡片完全空掉，此姿态下自动展开一次。
@@ -320,17 +328,11 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
 
   // 状态未知时渲染 0×0 隐藏锚点（不渲染 null）：拦截监听与 :has 锚点从首帧
   // 起就位——否则这个窗口期点官方「编辑」会把官方编辑器打开，造成双标题。
-  // 折叠态同样只渲染隐藏锚点：行下不显示任何内容（与 DeepSeek 行一致，
-  // 只有名称 + 圆点 + 编辑按钮）；应用成功后的绿色保存提示例外（官方
-  // savedProvider 同款，持续到下一次编辑/取消）。
+  // 折叠态只渲染隐藏锚点：行下不显示任何内容（与 DeepSeek 行一致，只有名称
+  // + 圆点 + 编辑按钮）。应用成功后的绿色保存提示经 DOM 插到 section 顶部
+  // （官方 savedProvider 位置），不落在行内。
   if (pending || !showEditor) {
-    return (
-      <div ref={rootRef} className="ccb-card-root" style={savedNotice ? noticeWrapStyle : { display: 'none' }}>
-        {savedNotice
-          ? <p style={savedNoticeStyle} role="status" aria-live="polite">{t('saved.provider')}</p>
-          : null}
-      </div>
-    )
+    return <div ref={rootRef} className="ccb-card-root" style={{ display: 'none' }} />
   }
 
   return (
