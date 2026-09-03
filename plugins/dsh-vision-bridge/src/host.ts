@@ -73,6 +73,23 @@ async function supportsImagesCached(ctx: Context, provider: string, model: strin
   return supports
 }
 
+/** 读共享默认模型（agentDefaultModel.currentSelection，与 composer 座位兜底同源）；
+ *  服务缺失 / 读取失败返回 undefined。 */
+function readDefaultModel(ctx: Context): { provider: string; model: string } | undefined {
+  try {
+    const service = ctx.get('agentDefaultModel') as {
+      currentSelection?: () => { provider: string; model: string } | undefined
+    } | undefined
+    const selected = service?.currentSelection?.()
+    if (selected !== undefined && typeof selected.provider === 'string' && typeof selected.model === 'string') {
+      return { provider: selected.provider, model: selected.model }
+    }
+  } catch {
+    // 服务缺失（旧版 dsh）：返回 undefined。
+  }
+  return undefined
+}
+
 /**
  * 读一张图并返回结构化报告（vision_read 工具与自动档共用）：
  * 缓存/在途去重 → 附件 seam 校验 → 直连官方视觉模型 → 结构化报告落缓存。
@@ -147,19 +164,12 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   // 同 cacheKey 的 in-flight 视觉调用（isConcurrencySafe 下并发 execute 去重）。
   const inflight = new Map<string, Promise<VisionReport>>()
 
-  // 预热共享默认模型的能力：新会话首帧座位显示默认模型，图标的能力查询命中缓存、
+  // 预热共享默认模型的能力：会话历史未装载时图标按默认模型显示，能力查询命中缓存、
   // 毫秒级返回，不把冷 resolveModelInfo 摊到页面首帧关键路径上。
   void (async () => {
-    try {
-      const defaultModel = ctx.get('agentDefaultModel') as {
-        currentSelection?: () => { provider: string; model: string } | undefined
-      } | undefined
-      const selected = defaultModel?.currentSelection?.()
-      if (selected !== undefined && typeof selected.provider === 'string' && typeof selected.model === 'string') {
-        await supportsImagesCached(ctx, selected.provider, selected.model)
-      }
-    } catch {
-      // 服务缺失 / 读取失败：首次能力查询再按需解析。
+    const selected = readDefaultModel(ctx)
+    if (selected !== undefined) {
+      await supportsImagesCached(ctx, selected.provider, selected.model)
     }
   })()
 
@@ -288,8 +298,10 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   })), 'dsh-vision-bridge: vision_read tool')
 
   // 3. 能力路由：客户端状态图标据此判定。与 session 无关——当前选中模型在客户端
-  //    走官方 modelDirectories 共享目录（与模型座位同 store、首帧同步），这里只回答
-  //    「这个 provider/model 能不能看图」。DeepSeek 文本模型 → cross-model（vision_read 可用）。
+  //    走官方 modelDirectories 共享目录（与模型座位同 store），这里只回答
+  //    「这个 provider/model 能不能看图」。未指定模型（会话历史未装载、座位目录
+  //    尚未解析）时按共享默认模型回答——该窗口内 composer 实际生效的就是默认模型。
+  //    DeepSeek 文本模型 → cross-model（vision_read 可用）。
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
     path: CAPABILITY_ROUTE_PATH,
@@ -299,11 +311,16 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         return
       }
       const url = new URL(req.url ?? '/', 'http://localhost')
-      const provider = url.searchParams.get('provider') ?? ''
-      const model = url.searchParams.get('model') ?? ''
+      let provider = url.searchParams.get('provider') ?? ''
+      let model = url.searchParams.get('model') ?? ''
       if (provider === '' || model === '') {
-        sendJson(res, 400, { mode: 'no-vision', visionModel: settings.visionModel })
-        return
+        const selected = readDefaultModel(ctx)
+        if (selected === undefined) {
+          sendJson(res, 400, { mode: 'no-vision', visionModel: settings.visionModel })
+          return
+        }
+        provider = selected.provider
+        model = selected.model
       }
       const supportsImages = await supportsImagesCached(ctx, provider, model)
       // 能力模式判定（全靠模型自身 inputModalities 属性，不靠名字）：
