@@ -20,6 +20,7 @@
 | 占位文本生成于请求准备层（`textOnlyImageText`），插件不可达 | packages/llm/llm/src/content.ts:73-76、203 |
 | **正路**：`system-prompt/assemble` 瀑布——官方给模型可见内容的扩展渠道 | packages/extensions/tool-cordis/src/api-catalog.ts:3270-3274 |
 | `ctx.systemPrompt` 服务可注册有序 prompt 段落 | api-catalog:2311 |
+| 官方多图准备即并行（`Promise.all` over `readImageRequest`），全部图进同一次推理请求（默认上限 600 张/请求） | packages/llm/llm-deepseek/src/adapter.ts:219-228、request-pricing.ts:22 |
 
 ## 边界（硬约束）
 
