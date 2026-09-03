@@ -238,6 +238,8 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
       setMessageKind('info')
       setMessage(t('saved'))
       await load()
+      // 通知对话页的额度卡联动刷新（出现/消失），无需刷新页面。
+      window.dispatchEvent(new Event(STATUS_CHANGED_EVENT))
     } catch {
       setMessageKind('error')
       setMessage(t('error.saveFailed'))
