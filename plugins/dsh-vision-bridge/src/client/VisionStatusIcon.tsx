@@ -68,10 +68,6 @@ export function ensureVisionStyles(): HTMLStyleElement {
 .dsh-vision-status:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
-/* 原生视觉模型：灰显，与官方其它控件文字同色。 */
-.dsh-vision-status-native {
-  color: var(--dsw-alias-label-secondary);
-}
 /* 无视觉能力（降级）：更暗 + 斜线。 */
 .dsh-vision-status-none {
   color: var(--dsw-alias-label-tertiary);
@@ -176,20 +172,16 @@ export function VisionStatusIcon({ sessionId, queryStatus, subscribeModelChange,
     }
   }, [open])
 
-  const native = status?.mode === 'native-vision'
-  const none = status?.mode === 'no-vision'
-  if (status === null || status.mode === 'none') return null
-  const aria = native ? t('popover.nativeVision.title') : none ? t('popover.noVision.title') : t('popover.crossModel.title')
+  const noVision = status?.mode === 'no-vision'
+  // 原生视觉主模型：插件零存在感——图片直达模型，图标与弹窗都不渲染。
+  if (status === null || status.mode === 'none' || status.mode === 'native-vision') return null
+  const aria = noVision ? t('popover.noVision.title') : t('popover.crossModel.title')
   return (
     <>
       <button
         ref={buttonRef}
         type="button"
-        className={native
-          ? 'dsh-vision-status dsh-vision-status-native'
-          : none
-            ? 'dsh-vision-status dsh-vision-status-none'
-            : 'dsh-vision-status'}
+        className={noVision ? 'dsh-vision-status dsh-vision-status-none' : 'dsh-vision-status'}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={aria}
@@ -202,7 +194,7 @@ export function VisionStatusIcon({ sessionId, queryStatus, subscribeModelChange,
           }
         }}
       >
-        {none ? EYE_OFF_GLYPH : EYE_GLYPH}
+        {noVision ? EYE_OFF_GLYPH : EYE_GLYPH}
       </button>
       {open && point !== null
         ? createPortal(
@@ -216,13 +208,11 @@ export function VisionStatusIcon({ sessionId, queryStatus, subscribeModelChange,
               transform: point.up ? 'translateX(-100%) translateY(-100%)' : 'translateX(-100%)',
             }}
           >
-            <div className="dsh-vision-popover-title">{native ? t('popover.nativeVision.title') : none ? t('popover.noVision.title') : t('popover.crossModel.title')}</div>
+            <div className="dsh-vision-popover-title">{noVision ? t('popover.noVision.title') : t('popover.crossModel.title')}</div>
             <div className="dsh-vision-popover-body">
-              {native
-                ? t('popover.nativeVision.body')
-                : none
-                  ? t('popover.noVision.body')
-                  : t('popover.crossModel.body', { model: status.visionModel })}
+              {noVision
+                ? t('popover.noVision.body')
+                : t('popover.crossModel.body', { model: status.visionModel })}
             </div>
           </div>,
           document.body,
