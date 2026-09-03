@@ -203,12 +203,23 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     return () => document.removeEventListener('click', onClickCapture, true)
   }, [])
 
+  // 首装 setup 姿态没有行头「编辑」按钮（官方占位编辑器是 li 的首个子 div 且
+  // 无 span 子元素）：折叠会让卡片完全空掉，此姿态下自动展开一次。
+  useEffect(() => {
+    const li = rootRef.current?.closest('li')
+    if (li === null || li === undefined) return
+    const head = li.querySelector(':scope > div:first-child')
+    if (head === null) return
+    if (head.querySelector(':scope > span:last-child') === null) setEditing(true)
+  }, [])
+
   // 任一信号（页面 join / 状态接口）确认已配置即折叠。
   const configured = status?.keyConfigured === true || ownerKeyConfigured === true
   // 状态未知（页面 join 尚未就绪、状态接口未返回）时不渲染任何内容——
-  // 避免「先闪出输入区再折叠」：配置态直接折叠、未配置态等状态落地后自然展开。
+  // 避免「先闪出输入区再折叠」。
   const pending = status === undefined && ownerKeyConfigured !== true
-  const showEditor = !configured || editing
+  // 与官方一致：默认折叠（有无 Key 都一样），「编辑」展开、取消收起。
+  const showEditor = editing
   const illegal = keyFailure(draft)
 
   const save = async () => {
@@ -251,7 +262,8 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
   const cancel = () => {
     setDraft('')
     setMessage(undefined)
-    if (configured) setEditing(false)
+    // 官方语义：取消即收起编辑器（无论是否已配置）。
+    setEditing(false)
   }
 
   /** 清空已保存的 Key（凭据与模型目录一起清掉；profile 保留，行头圆点转红）。 */
