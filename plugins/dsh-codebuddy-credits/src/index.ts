@@ -231,27 +231,47 @@ export function apply(ctx: Context, config: Config): void {
       return
     }
     // 旧引用 → 新引用迁移（boot 兜底；saveKey 也会做）：官方页面按新引用
-    // join 凭据，迁移后行头圆点即亮绿。
-    const credentials = ctx.get('credentials')
-    if (credentials !== undefined) {
-      const fresh = await credentials.resolve(credentialRef(API_KEY_ENV)).catch(() => undefined)
-      const legacy = await credentials.resolve(credentialRef(LEGACY_API_KEY_ENV)).catch(() => undefined)
-      if (fresh?.value === undefined && legacy?.value !== undefined) {
-        await credentials.set(credentialRef(API_KEY_ENV), legacy.value).catch(() => {})
-        await credentials.unset?.(credentialRef(LEGACY_API_KEY_ENV)).catch(() => {})
+    // join 凭据，迁移后行头圆点即亮绿。每步独立容错——任何一步失败都不能
+    // 挡掉后面的 route 注册（此前 unset 可选链/服务解析异常会整体打断）。
+    try {
+      const credentials = ctx.get('credentials')
+      if (credentials !== undefined) {
+        const fresh = await credentials.resolve(credentialRef(API_KEY_ENV)).catch(() => undefined)
+        const legacy = await credentials.resolve(credentialRef(LEGACY_API_KEY_ENV)).catch(() => undefined)
+        if (fresh?.value === undefined && legacy?.value !== undefined) {
+          await credentials.set(credentialRef(API_KEY_ENV), legacy.value).catch(() => {})
+          const unset = credentials.unset
+          if (typeof unset === 'function') {
+            await unset.call(credentials, credentialRef(LEGACY_API_KEY_ENV)).catch(() => {})
+          }
+        }
       }
+    } catch (error) {
+      ctx.logger.warn(`${name}: boot 凭据迁移失败（不阻塞注册）`)
+      ctx.logger.warn(error)
     }
     // 官方行头圆点读整节根部 apiKeyEnv：Key 已存在时补写（旧版本存的
     // profile 是 providers 子树，一并清掉——整节型 schema 已不再有该层）。
-    const settingsBoot = ctx.get('settings')
-    if (settingsBoot !== undefined) {
-      await settingsBoot.mutate(NS, [
-        { op: 'set', path: ['apiKeyEnv'], value: API_KEY_ENV },
-        { op: 'unset', path: ['providers'] },
-      ]).catch(() => {})
+    try {
+      const settingsBoot = ctx.get('settings')
+      if (settingsBoot !== undefined) {
+        await settingsBoot.mutate(NS, [
+          { op: 'set', path: ['apiKeyEnv'], value: API_KEY_ENV },
+          { op: 'unset', path: ['providers'] },
+        ]).catch(() => {})
+      }
+    } catch (error) {
+      ctx.logger.warn(`${name}: boot 设置补写失败（不阻塞注册）`)
+      ctx.logger.warn(error)
     }
     await refreshAccountWithKey(key)
-    ensureRoutes(true)
+    // Key 可用即注册 route——模型目录可后补（选择器建目录/状态读取会补拉）。
+    try {
+      ensureRoutes(true)
+    } catch (error) {
+      ctx.logger.warn(`${name}: route 注册失败`)
+      ctx.logger.warn(error)
+    }
     void kickModelRefresh()
   })()
 
@@ -302,10 +322,11 @@ export function apply(ctx: Context, config: Config): void {
       // （官方行头圆点转红 = 未配置凭据的官方语义）。被环境遮蔽的引用 unset
       // 会抛错（官方语义：环境提供者优先），逐引用容错。
       const credentials = ctx.get('credentials')
-      if (credentials !== undefined) {
+      const unset = credentials?.unset
+      if (credentials !== undefined && typeof unset === 'function') {
         for (const ref of [API_KEY_ENV, LEGACY_API_KEY_ENV]) {
           try {
-            await credentials.unset?.(credentialRef(ref))
+            await unset.call(credentials, credentialRef(ref))
           } catch {
             // 环境遮蔽等拒绝：静默（环境里的 Key 仍生效，清空不覆盖环境）。
           }
@@ -334,8 +355,17 @@ export function apply(ctx: Context, config: Config): void {
       }
     },
     async ensureModels() {
-      // 目录为空（启动拉取失败）时状态读取触发补拉：配置卡/额度卡是自愈入口。
+      // 状态读取是自愈入口：目录为空补拉；route 未注册（boot 异常被打断过）
+      // 则补注册——此处只在 keyConfigured 时被调用，注册安全。
       if (models().length === 0) kickModelRefresh()
+      if (!registered) {
+        try {
+          ensureRoutes(true)
+        } catch (error) {
+          ctx.logger.warn(`${name}: 状态读取兜底注册失败`)
+          ctx.logger.warn(error)
+        }
+      }
     },
     active: () => registered,
     models: () => models(),
