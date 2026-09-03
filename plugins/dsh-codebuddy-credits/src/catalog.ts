@@ -37,18 +37,21 @@ export interface CodeBuddyModelEntry {
   maxTokens?: number
   input?: ('text' | 'image')[]
   reasoningEfforts?: ReasoningEfforts
+  /** 服务端声明的默认思考档位（fixed-effort 形态取 effort 值本身）。 */
+  defaultEffort?: string
 }
 
 /** 解析后的模型事实（adapter 与状态接口共用）。 */
 export interface CodeBuddyModelFacts {
   id: string
-  /** 展示名：原始名 + 系数/视觉标记（模型选择器可见的唯一文本位）。 */
+  /** 展示名：原始名 + 系数（模型选择器可见的唯一文本位）。 */
   name: string
   contextWindow: number
   maxTokens: number
   input: readonly ('text' | 'image')[]
   reasoning: boolean
   thinkingLevelMap?: Record<string, string | null>
+  defaultEffort?: string
 }
 
 /** "x0.79 credits" → 短系数 "x0.79"；数值为 0（如 "x0.00"）→ "free"；非字符串 → undefined。 */
@@ -61,19 +64,31 @@ export function creditLabel(raw: unknown): string | undefined {
 }
 
 /**
- * 展示名组装：原始名 + 两空格 + 标签（系数 · 视觉标记）。
- * 官方模型选择器只渲染 model.name，右对齐不可行，空格分隔是已接受的兜底。
+ * 展示名组装：原始名 + 两空格 + 积分系数（free/x0.79）。
+ * 视觉能力不进名字（列表里不挂 👁 标记）——能力走 inputModalities 声明，
+ * 视觉提示只在聊天头部额度卡展示；两空格是自建选择器拆分左右列的锚点。
  */
 export function displayName(entry: {
   name: string
   credits?: string
   input?: readonly ('text' | 'image')[]
 }): string {
-  const tags: string[] = []
   const credits = creditLabel(entry.credits)
-  if (credits !== undefined) tags.push(credits)
-  if (entry.input?.includes('image') === true) tags.push('👁')
-  return tags.length === 0 ? entry.name : entry.name + '  ' + tags.join(' · ')
+  return credits === undefined ? entry.name : entry.name + '  ' + credits
+}
+
+/** 思考档位 id → 展示名（选择器推理等级面板用；未知 id 原样）。 */
+export function effortName(id: string): string {
+  switch (id) {
+    case 'off': return 'Off'
+    case 'minimal': return 'Minimal'
+    case 'low': return 'Low'
+    case 'medium': return 'Medium'
+    case 'high': return 'High'
+    case 'xhigh': return 'Extra high'
+    case 'max': return 'Max'
+    default: return id
+  }
 }
 
 /** 完整条目 → 模型事实（推理三态：false/dict/缺省；未声明容量用兜底常量）。 */
@@ -92,6 +107,7 @@ export function factsFromEntries(entries: readonly CodeBuddyModelEntry[]): CodeB
       input: [...(entry.input ?? ['text'])],
       reasoning,
       ...(reasoning && thinkingLevelMap !== undefined ? { thinkingLevelMap } : {}),
+      ...(reasoning && entry.defaultEffort !== undefined ? { defaultEffort: entry.defaultEffort } : {}),
     }
   })
 }
@@ -136,18 +152,49 @@ function shortCredits(raw: unknown): string | undefined {
 }
 
 /**
- * 官方思考档位集合里挑出服务端声明的支持档位；canDisableThinking=false 时
- * 不声明 off（模型不允许关思考，如 hy4-preview）。
+ * 实测 reasoning 有两种形态：
+ * - 可选档位：supportedEfforts 数组 + canDisableThinking + defaultEffort
+ *   （如 glm-5.3-flash / hy4-preview）；
+ * - 固定档位：只有 effort 单字符串（如 deepseek-v4-pro=high、
+ *   minimax-m3-pay=medium）——只有这一档、不可关。
  */
 function declaredEfforts(raw: Record<string, unknown>): ReasoningEfforts {
   const supported = Array.isArray(raw.supportedEfforts) ? raw.supportedEfforts as unknown[] : undefined
-  if (supported === undefined || supported.length === 0) return { off: null }
-  const map: Record<string, string | null> = {}
-  if (raw.canDisableThinking !== false) map.off = null
-  for (const level of supported) {
-    if (typeof level === 'string' && level.length > 0) map[level] = level
+  if (supported !== undefined && supported.length > 0) {
+    const map: Record<string, string | null> = {}
+    if (raw.canDisableThinking !== false) map.off = null
+    for (const level of supported) {
+      if (typeof level === 'string' && level.length > 0) map[level] = level
+    }
+    return map
   }
-  return map
+  if (typeof raw.effort === 'string' && raw.effort.length > 0) {
+    return { [raw.effort]: raw.effort }
+  }
+  return { off: null }
+}
+
+/** 服务端声明的默认档位（可选档位形态取 defaultEffort，固定档位形态取 effort）。 */
+function declaredDefaultEffort(raw: Record<string, unknown>): string | undefined {
+  const declared = raw.defaultEffort
+  if (typeof declared === 'string' && declared.length > 0) return declared
+  const fixed = raw.effort
+  return typeof fixed === 'string' && fixed.length > 0 ? fixed : undefined
+}
+
+/** 实测的视觉判定（2026-09）：supportsImages 对 deepseek-v4-pro/flash 也返回
+ * true，但它们是纯文本模型（官方 DSH 目录里视觉是单独的 flash-vision-exp
+ * 变体）。可信信号 = supportsImages 且（服务端显式 enabledMultimodal
+ * （disabledMultimodal === false）或 描述/名字声明多模态）。 */
+const MULTIMODAL_HINT = /多模态|multimodal|vision/i
+
+function supportsNativeVision(raw: Record<string, unknown>): boolean {
+  if (raw.supportsImages !== true) return false
+  if (raw.disabledMultimodal === false) return true
+  const hints = [raw.descriptionZh, raw.descriptionEn, raw.name]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+  return MULTIMODAL_HINT.test(hints)
 }
 
 /**
@@ -179,9 +226,14 @@ export function parseModelConfig(body: unknown): readonly CodeBuddyModelEntry[] 
       ...(credits === undefined ? {} : { credits }),
       ...(contextWindow === undefined ? {} : { contextWindow }),
       ...(maxTokens === undefined ? {} : { maxTokens }),
-      input: raw.supportsImages === true ? ['text', 'image'] : ['text'],
+      input: supportsNativeVision(raw) ? ['text', 'image'] : ['text'],
       ...(reasoning !== undefined && raw.supportsReasoning === true
-        ? { reasoningEfforts: declaredEfforts(reasoning) }
+        ? {
+          reasoningEfforts: declaredEfforts(reasoning),
+          ...(declaredDefaultEffort(reasoning) === undefined
+            ? {}
+            : { defaultEffort: declaredDefaultEffort(reasoning) }),
+        }
         : {}),
     }
     return [entry]

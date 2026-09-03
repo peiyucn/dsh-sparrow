@@ -22,7 +22,7 @@ import type {
   ToolCallBlock,
   ToolResultMessage,
 } from '@deepseek-ai/dsh-llm'
-import { BASE_URL, requestHeaders } from './catalog.js'
+import { BASE_URL, effortName, requestHeaders } from './catalog.js'
 import { DISPLAY_NAME } from './constants.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
 
@@ -241,7 +241,10 @@ export class CodeBuddyAdapter extends LlmAdapter {
     if (facts?.reasoning === true && facts.thinkingLevelMap !== undefined) {
       const levels = Object.keys(facts.thinkingLevelMap)
       info.reasoning = {
-        efforts: levels.map(level => ({ id: level as never, name: level })),
+        efforts: levels.map(level => ({ id: level as never, name: effortName(level) })),
+        ...(facts.defaultEffort !== undefined && levels.includes(facts.defaultEffort)
+          ? { defaultEffort: facts.defaultEffort as never }
+          : {}),
       }
     }
     return Promise.resolve(info)
