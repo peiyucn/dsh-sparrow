@@ -165,6 +165,25 @@ export function mapUsage(raw: Record<string, unknown>): { tokens: TokenUsage; cr
   }
 }
 
+/**
+ * SSE 数据行 → 可解析帧（纯函数，供单测）。非 data: 行、[DONE] 与无效 JSON
+ * 一律返回 undefined（流解析时跳过，不中断）。
+ */
+export function parseSseLine(line: string): Record<string, unknown> | undefined {
+  const trimmed = line.trim()
+  if (!trimmed.startsWith('data:')) return undefined
+  const data = trimmed.slice(5).trim()
+  if (data.length === 0 || data === '[DONE]') return undefined
+  try {
+    const parsed = JSON.parse(data) as unknown
+    return parsed !== null && typeof parsed === 'object'
+      ? parsed as Record<string, unknown>
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** 非 2xx 响应 → LlmError（服务端 code/msg 原样透传，如 10081 ip whitelist）。 */
 async function providerError(response: Response): Promise<never> {
   let detail = ''
@@ -321,17 +340,10 @@ export class CodeBuddyAdapter extends LlmAdapter {
         buffer += decoder.decode(value, { stream: true })
         let lineEnd
         while ((lineEnd = buffer.indexOf('\n')) >= 0) {
-          const line = buffer.slice(0, lineEnd).trim()
+          const line = buffer.slice(0, lineEnd)
           buffer = buffer.slice(lineEnd + 1)
-          if (!line.startsWith('data:')) continue
-          const data = line.slice(5).trim()
-          if (data.length === 0 || data === '[DONE]') continue
-          let frame: Record<string, unknown>
-          try {
-            frame = JSON.parse(data) as Record<string, unknown>
-          } catch {
-            continue
-          }
+          const frame = parseSseLine(line)
+          if (frame === undefined) continue
           const choices = Array.isArray(frame.choices) ? frame.choices as Array<Record<string, unknown>> : []
           const choice = choices[0]
           const delta = choice !== undefined && typeof choice.delta === 'object' && choice.delta !== null

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { codeBuddyModel, discoveredToProfile, parseModelConfig, resolveModels } from '../lib/catalog.js'
-import { mapFinish, mapUsage, toWireMessages } from '../lib/adapter.js'
+import { mapFinish, mapUsage, parseSseLine, toWireMessages } from '../lib/adapter.js'
 
 describe('resolveModels', () => {
   it('空配置返回空模型集（无预置目录）', () => {
@@ -145,6 +145,27 @@ describe('mapFinish', () => {
     assert.deepEqual(mapFinish('length'), { kind: 'max-tokens' })
     assert.deepEqual(mapFinish('tool_calls'), { kind: 'tool-calls' })
     assert.equal(mapFinish('unknown-reason'), undefined)
+  })
+})
+
+describe('parseSseLine', () => {
+  it('有效 data 帧解析为对象', () => {
+    const frame = parseSseLine('data: {"id":"x","choices":[]}')
+    assert.deepEqual(frame, { id: 'x', choices: [] })
+  })
+  it('[DONE] 与空帧返回 undefined', () => {
+    assert.equal(parseSseLine('data: [DONE]'), undefined)
+    assert.equal(parseSseLine('data:'), undefined)
+  })
+  it('非 data 行与无效 JSON 返回 undefined', () => {
+    assert.equal(parseSseLine(''), undefined)
+    assert.equal(parseSseLine('event: message'), undefined)
+    assert.equal(parseSseLine('data: {broken'), undefined)
+    assert.equal(parseSseLine('data: 123'), undefined)
+  })
+  it('前缀空白容忍', () => {
+    const frame = parseSseLine('  data: {"a":1}')
+    assert.deepEqual(frame, { a: 1 })
   })
 })
 
