@@ -246,7 +246,8 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
         return
       }
       setDraft('')
-      setEditing(false)
+      // 应用成功后保持展开：让用户看到加载出来的账号信息与「已保存」提示，
+      // 关闭交给用户（编辑 toggle / 取消）。
       setMessageKind('info')
       setMessage(t('saved'))
       await load()
