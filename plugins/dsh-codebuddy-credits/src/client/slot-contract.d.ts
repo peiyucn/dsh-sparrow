@@ -1,8 +1,11 @@
 /**
- * 类型扩充：官方 master 的 Models 设置页扩展槽位（settings.models.provider-card，
- * keyed by owning settings namespace）。client 包发布停在 0.1.1-rc.2，该槽位的
- * 类型声明尚未随包发布；运行时由官方 web 端声明并提供，这里只补类型层。
- * 组件不读 owner props（数据经本机 host 路由），故按最小形状声明。
+ * 类型扩充：client 包发布停在 0.1.1-rc.2，下列槽位与词典命名空间的类型
+ * 声明尚未随包发布；运行时由官方 web 端声明并提供，这里只补类型层。
+ * - settings.models.provider-card：官方设置 → 模型页扩展槽位（keyed by
+ *   owning settings namespace），挂 Key 配置卡。
+ * - conversation.session.header.actions：会话头部操作区（kind=list，
+ *   scope=session），挂 CodeBuddy 额度小卡；occupant 拿框架注入的
+ *   SessionStandardProps（sessionId/useProjection 等，ui-session 声明）。
  */
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -16,6 +19,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         keyConfigured: boolean
       }
     }
+    'conversation.session.header.actions': {
+      kind: 'list'
+      scope: 'session'
+      owner: { children?: never }
+    }
   }
 
   interface LocaleNamespaceMap {
@@ -23,18 +31,25 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'key.placeholder'
       | 'key.save'
       | 'key.remove'
-      | 'models.refresh'
-      | 'models.added'
-      | 'models.unchanged'
-      | 'quota.line'
       | 'state.configured'
       | 'state.missing'
-      | 'state.active'
       | 'saved'
       | 'error.empty'
       | 'error.saveFailed'
       | 'error.removeFailed'
-      | 'error.refreshFailed'
+      | 'account.enterprise'
+      | 'account.personal'
+      | 'indicator.open'
+      | 'indicator.title'
+      | 'indicator.loading'
+      | 'indicator.loadFailed'
+      | 'indicator.noKey'
+      | 'indicator.balance'
+      | 'indicator.reset'
+      | 'indicator.model.title'
+      | 'indicator.model.context'
+      | 'indicator.model.vision'
+      | 'indicator.model.efforts'
   }
 }
 

@@ -1,8 +1,10 @@
 /**
  * CodeBuddy Credits 设置卡片：挂在官方 settings.models.provider-card 槽位
  * （key = 本插件命名空间），渲染在设置 → 模型页的 CodeBuddy Credits 行上。
- * Key 只发给本机 host 路由存入 DSH 凭据库；配额与模型目录在给 Key 后才查询；
- * 企业策略错误（如 ip whitelist）原样透传展示。
+ * 交互对齐 DeepSeek 官方行的极简姿态：只有 Key 输入 + 保存/移除，配置后
+ * 显示账号信息一行（企业/个人账号信息只在配置页展示）。配额与模型列表
+ * 不进这里（配额在聊天头部额度卡，模型列表随 Key 自动刷新）。
+ * Key 只发给本机 host 路由存入 DSH 凭据库；企业策略错误原样透传展示。
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -11,29 +13,14 @@ import type { CSSProperties } from 'react'
 const STATUS_URL = '/api/codebuddy-credits/status'
 const KEY_URL = '/api/codebuddy-credits/key'
 const REMOVE_URL = '/api/codebuddy-credits/remove-key'
-const REFRESH_URL = '/api/codebuddy-credits/refresh-models'
-
-interface CardQuota {
-  used: number
-  limit: number
-  remaining: number
-  cycleStart?: string
-  cycleEnd?: string
-  resetAt?: string
-}
 
 interface CardStatus {
   keyConfigured: boolean
-  active: boolean
-  models: string[]
   account?: { enterpriseName?: string; accountType?: string }
-  quota?: CardQuota
-  quotaError?: string
 }
 
 interface CardProps {
   t: (key: string, vars?: Record<string, string>) => string
-  errorText?: (message: string) => string
 }
 
 const inputStyle: CSSProperties = {
@@ -64,7 +51,15 @@ const buttonStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
-export function CodeBuddyCreditsCard({ t, errorText }: CardProps) {
+/** 账号类型文案（/v2/accounts 的 type 字段；未知值原样展示）。 */
+function accountTypeLabel(t: CardProps['t'], raw: string | undefined): string | undefined {
+  if (raw === undefined) return undefined
+  if (raw === 'enterprise') return t('account.enterprise')
+  if (raw === 'personal') return t('account.personal')
+  return raw
+}
+
+export function CodeBuddyCreditsCard({ t }: CardProps) {
   const [status, setStatus] = useState<CardStatus | undefined>(undefined)
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
@@ -92,7 +87,7 @@ export function CodeBuddyCreditsCard({ t, errorText }: CardProps) {
   const save = async () => {
     const key = draft.trim()
     if (key.length === 0) {
-      fail(errorText?.(t('error.empty')) ?? t('error.empty'))
+      fail(t('error.empty'))
       return
     }
     setBusy(true)
@@ -134,33 +129,7 @@ export function CodeBuddyCreditsCard({ t, errorText }: CardProps) {
     }
   }
 
-  const refreshModels = async () => {
-    setBusy(true)
-    setMessage(undefined)
-    try {
-      const response = await fetch(REFRESH_URL, { method: 'POST' })
-      const payload = await response.json().catch(() => ({})) as { error?: string; added?: string[]; total?: number }
-      if (!response.ok) {
-        fail(payload.error ?? t('error.refreshFailed'))
-        return
-      }
-      if ((payload.added?.length ?? 0) > 0) {
-        setMessageKind('info')
-        setMessage(t('models.added', { names: payload.added!.join('、') }))
-      } else {
-        setMessageKind('info')
-        setMessage(t('models.unchanged', { count: String(payload.total ?? status?.models.length ?? 0) }))
-      }
-      await load()
-    } catch {
-      fail(t('error.refreshFailed'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const quota = status?.quota
-  const modelCount = status?.models.length ?? 0
+  const account = status?.account
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', padding: '10px 12px', boxSizing: 'border-box' }}>
@@ -175,29 +144,26 @@ export function CodeBuddyCreditsCard({ t, errorText }: CardProps) {
           autoComplete="new-password"
           style={inputStyle}
         />
-        <button type="button" onClick={() => void save()} disabled={busy} style={buttonStyle}>
-          {t('key.save')}
-        </button>
         {status?.keyConfigured === true
           ? (
             <button type="button" onClick={() => void remove()} disabled={busy} style={buttonStyle}>
               {t('key.remove')}
             </button>
           )
-          : null}
-        {status?.keyConfigured === true
-          ? (
-            <button type="button" onClick={() => void refreshModels()} disabled={busy} style={buttonStyle}>
-              {t('models.refresh')}
+          : (
+            <button type="button" onClick={() => void save()} disabled={busy} style={buttonStyle}>
+              {t('key.save')}
             </button>
-          )
-          : null}
+          )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', lineHeight: '18px', color: 'var(--dsw-text-secondary, #667085)' }}>
         {status?.keyConfigured === true
           ? (
             <span>
-              {t('state.configured', { count: String(modelCount), enterprise: status.account?.enterpriseName ?? '—' })}
+              {t('state.configured', {
+                enterprise: account?.enterpriseName ?? '—',
+                type: accountTypeLabel(t, account?.accountType) ?? '—',
+              })}
             </span>
           )
           : (
@@ -205,22 +171,6 @@ export function CodeBuddyCreditsCard({ t, errorText }: CardProps) {
               {t('state.missing')}
             </span>
           )}
-        {quota !== undefined
-          ? (
-            <span>
-              {t('quota.line', {
-                used: quota.used.toFixed(2),
-                limit: quota.limit.toFixed(2),
-                remaining: quota.remaining.toFixed(2),
-                reset: quota.resetAt ?? '—',
-              })}
-            </span>
-          )
-          : null}
-        {status?.quotaError !== undefined
-          ? <span style={{ color: 'var(--dsw-text-danger, #c62828)' }}>{status.quotaError}</span>
-          : null}
-        {status?.active === true ? <span>{t('state.active')}</span> : null}
         {message !== undefined
           ? <span style={{ color: messageKind === 'error' ? 'var(--dsw-text-danger, #c62828)' : undefined }}>{message}</span>
           : null}
