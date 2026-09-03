@@ -116,11 +116,11 @@ function percentText(ratio: number): string {
   return percent < 1 ? percent.toFixed(3) : String(Math.round(percent))
 }
 
-/** 面板正文：与对话正文同字号（--dsh-content-font-size，随用户字体设置），
+/** 面板正文：统一 12px（与进度条内文字同号），
  * label-secondary（caption 在深浅两主题下都偏淡，不可读）。 */
 const captionStyle: CSSProperties = {
-  fontSize: 'var(--dsh-content-font-size, 14px)',
-  lineHeight: 'calc(24px + var(--dsh-content-font-delta, 0px))',
+  fontSize: '12px',
+  lineHeight: '18px',
   color: 'var(--dsw-alias-label-secondary)',
 }
 
@@ -279,13 +279,17 @@ export function CodeBuddyCreditsIndicator({
       {open
         ? (
           <div role="dialog" aria-label={t('indicator.title')} style={panelStyle}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--dsh-content-font-size, 14px)', fontWeight: 600, lineHeight: 'calc(24px + var(--dsh-content-font-delta, 0px))', marginBottom: '6px' }}>
-              <span style={{ display: 'inline-flex', fontSize: 16, lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: SQUARE_LOGO_SVG }} />
-              {t('indicator.title')}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, lineHeight: '18px', marginBottom: '6px' }}>
+              <span style={{ display: 'inline-flex', flex: '0 0 auto', fontSize: 16, lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: SQUARE_LOGO_SVG }} />
+              {/* 标题不换行：放不下时省略号截断，把空间让给徽章。 */}
+              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {t('indicator.title')}
+              </span>
               {userBadge !== undefined
                 ? (
                   <span style={{
                     marginLeft: 'auto',
+                    flex: '0 0 auto',
                     padding: '0 6px',
                     borderRadius: '4px',
                     background: 'var(--dsw-alias-interactive-bg-hover)',
@@ -314,7 +318,7 @@ export function CodeBuddyCreditsIndicator({
                       <>
                         {/* 容量条对齐 dsh-file-manage 配额条：加厚 16px、未使用区
                             45° 斜纹、文字居中叠加、business 蓝填充。 */}
-                        <div style={{ marginTop: '4px', fontSize: 'var(--dsh-content-font-size, 14px)', lineHeight: 'calc(24px + var(--dsh-content-font-delta, 0px))', fontWeight: 500, color: 'var(--dsw-alias-label-secondary)' }}>
+                        <div style={{ marginTop: '4px', fontSize: '12px', lineHeight: '18px', fontWeight: 500, color: 'var(--dsw-alias-label-secondary)' }}>
                           {t('indicator.quotaTitle')}
                         </div>
                         <div
@@ -395,7 +399,7 @@ export function CodeBuddyCreditsIndicator({
                 <>
                   <div style={dividerStyle} />
                   <div style={{ ...captionStyle, marginBottom: '2px' }}>{t('indicator.model.title')}</div>
-                  <div style={{ fontSize: 'var(--dsh-content-font-size, 14px)', lineHeight: 'calc(24px + var(--dsh-content-font-delta, 0px))', fontWeight: 500 }}>{model.name}</div>
+                  <div style={{ fontSize: '12px', lineHeight: '18px', fontWeight: 500 }}>{model.name}</div>
                   <div style={captionStyle}>{t('indicator.model.context', { context: formatTokens(model.contextWindow) })}</div>
                   {model.vision
                     ? <div style={captionStyle}>👁 {t('indicator.model.vision')}</div>
