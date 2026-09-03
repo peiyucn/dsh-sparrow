@@ -1,9 +1,10 @@
 /**
  * CodeBuddy Credits 设置卡片：挂在官方 settings.models.provider-card 槽位
  * （key = 本插件命名空间），渲染在设置 → 模型页的 CodeBuddy Credits 行上。
- * 交互对齐 DeepSeek 官方行的极简姿态：只有 Key 输入 + 保存/移除，配置后
- * 显示账号信息一行（企业/个人账号信息只在配置页展示）。配额与模型列表
- * 不进这里（配额在聊天头部额度卡，模型列表随 Key 自动刷新）。
+ * 交互对齐 DeepSeek 官方编辑器卡（ui-settings-models ProviderEditor）：
+ * 标题行（显示名 + 路由 id）→ 「API Key」标签 + 密码输入（placeholder 随
+ * 配置状态切换）→ 账号信息一行（企业/个人只在配置页展示）→ 取消/应用
+ * footer。视觉 token 与官方一致（--dsw-alias-*，随 DSH 深浅主题自动切换）。
  * Key 只发给本机 host 路由存入 DSH 凭据库；企业策略错误原样透传展示。
  */
 
@@ -12,7 +13,6 @@ import type { CSSProperties } from 'react'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const KEY_URL = '/api/codebuddy-credits/key'
-const REMOVE_URL = '/api/codebuddy-credits/remove-key'
 
 interface CardStatus {
   keyConfigured: boolean
@@ -23,38 +23,130 @@ interface CardProps {
   t: (key: string, vars?: Record<string, string>) => string
 }
 
-const inputStyle: CSSProperties = {
-  flex: '1 1 200px',
-  minWidth: 0,
-  minHeight: '32px',
+/** 官方 editor 容器：填充模块面，圆角 12，内边距 14/16。 */
+const editorStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '14px',
+  padding: '14px 16px',
+  borderRadius: '12px',
+  background: 'var(--dsw-alias-bg-module-platform)',
+  width: '100%',
   boxSizing: 'border-box',
-  padding: '0 10px',
-  border: '1px solid var(--dsw-border-subtle, #d0d5dd)',
-  borderRadius: '8px',
-  background: 'var(--dsw-surface-subtle, transparent)',
-  color: 'inherit',
-  font: 'inherit',
-  fontSize: '13px',
 }
 
-const buttonStyle: CSSProperties = {
-  minHeight: '28px',
-  padding: '0 12px',
-  border: '1px solid var(--dsw-border-subtle, #d0d5dd)',
-  borderRadius: '14px',
-  background: 'var(--dsw-surface-subtle, transparent)',
-  color: 'inherit',
-  cursor: 'pointer',
-  font: 'inherit',
-  fontSize: '13px',
+const headerStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: '8px',
+}
+
+const titleStyle: CSSProperties = {
+  fontSize: '14px',
+  lineHeight: '22px',
   fontWeight: 500,
-  whiteSpace: 'nowrap',
+  color: 'var(--dsw-alias-label-primary)',
 }
 
-/** 账号类型文案（/v2/accounts 的 type 字段；未知值原样展示）。 */
+const routeStyle: CSSProperties = {
+  fontSize: '12px',
+  lineHeight: '18px',
+  color: 'var(--dsw-alias-label-tertiary)',
+}
+
+const fieldStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '6px',
+}
+
+const labelStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '10px',
+  fontSize: '12px',
+  lineHeight: '18px',
+  fontWeight: 500,
+  color: 'var(--dsw-alias-label-secondary)',
+}
+
+const inputStyle: CSSProperties = {
+  boxSizing: 'border-box',
+  width: '100%',
+  minHeight: '36px',
+  padding: '0 12px',
+  border: '1px solid var(--dsw-alias-border-l3)',
+  borderRadius: '8px',
+  background: 'transparent',
+  color: 'var(--dsw-alias-label-primary)',
+  font: 'inherit',
+  fontSize: '13px',
+}
+
+const errorStyle: CSSProperties = {
+  margin: 0,
+  fontSize: '12px',
+  lineHeight: '18px',
+  color: 'var(--dsw-alias-state-error-primary)',
+}
+
+const hintStyle: CSSProperties = {
+  margin: 0,
+  fontSize: '12px',
+  lineHeight: '18px',
+  color: 'var(--dsw-alias-label-tertiary)',
+}
+
+const actionsStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: '8px',
+}
+
+/** 官方 footer 按钮：36px 胶囊。 */
+const buttonBase: CSSProperties = {
+  boxSizing: 'border-box',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '4px',
+  height: '36px',
+  padding: '0 14px',
+  border: 'none',
+  borderRadius: '18px',
+  font: 'inherit',
+  fontSize: '14px',
+  lineHeight: '22px',
+  cursor: 'pointer',
+}
+
+const primaryButtonStyle: CSSProperties = {
+  ...buttonBase,
+  background: 'var(--dsw-alias-button-primary-fill)',
+  color: 'var(--dsw-alias-label-primary-foreground)',
+}
+
+const secondaryButtonStyle: CSSProperties = {
+  ...buttonBase,
+  border: '0.5px solid var(--dsw-alias-border-l3)',
+  background: 'transparent',
+  color: 'var(--dsw-alias-label-primary)',
+}
+
+/** 官方 apiKeyFailure 的轻量镜像：可打印 ASCII（空格除外）。 */
+const LEGAL_API_KEY = /^[\x21-\x7E]+$/
+
+function keyFailure(draft: string): boolean {
+  if (draft.length === 0) return false
+  const value = draft.trim()
+  if (value.length === 0) return true
+  return !LEGAL_API_KEY.test(value)
+}
+
+/** 账号类型文案（/v2/accounts 的 type 字段实测为 ultimate/personal；未知值原样展示）。 */
 function accountTypeLabel(t: CardProps['t'], raw: string | undefined): string | undefined {
   if (raw === undefined) return undefined
-  if (raw === 'enterprise') return t('account.enterprise')
+  if (raw === 'enterprise' || raw === 'ultimate') return t('account.enterprise')
   if (raw === 'personal') return t('account.personal')
   return raw
 }
@@ -79,15 +171,14 @@ export function CodeBuddyCreditsCard({ t }: CardProps) {
     void load()
   }, [load])
 
-  const fail = (text: string) => {
-    setMessageKind('error')
-    setMessage(text)
-  }
+  const configured = status?.keyConfigured === true
+  const illegal = keyFailure(draft)
 
   const save = async () => {
     const key = draft.trim()
     if (key.length === 0) {
-      fail(t('error.empty'))
+      setMessageKind('error')
+      setMessage(t('error.empty'))
       return
     }
     setBusy(true)
@@ -101,7 +192,8 @@ export function CodeBuddyCreditsCard({ t }: CardProps) {
       const payload = await response.json().catch(() => ({})) as { error?: string }
       if (!response.ok) {
         // 企业策略错误等原样透传（如 ip not in whitelist）
-        fail(payload.error ?? t('error.saveFailed'))
+        setMessageKind('error')
+        setMessage(payload.error ?? t('error.saveFailed'))
         return
       }
       setDraft('')
@@ -109,21 +201,8 @@ export function CodeBuddyCreditsCard({ t }: CardProps) {
       setMessage(t('saved'))
       await load()
     } catch {
-      fail(t('error.saveFailed'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const remove = async () => {
-    setBusy(true)
-    setMessage(undefined)
-    try {
-      await fetch(REMOVE_URL, { method: 'POST' })
-      setDraft('')
-      await load()
-    } catch {
-      fail(t('error.removeFailed'))
+      setMessageKind('error')
+      setMessage(t('error.saveFailed'))
     } finally {
       setBusy(false)
     }
@@ -132,48 +211,62 @@ export function CodeBuddyCreditsCard({ t }: CardProps) {
   const account = status?.account
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', padding: '10px 12px', boxSizing: 'border-box' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', width: '100%' }}>
+    <div style={editorStyle}>
+      <div style={headerStyle}>
+        <span style={titleStyle}>CodeBuddy Credits</span>
+        <span style={routeStyle}>codebuddy-credits</span>
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>{t('key.label')}</span>
         <input
           aria-label="CodeBuddy API Key"
           type="password"
-          placeholder={t('key.placeholder')}
+          placeholder={configured ? t('key.stored') : t('key.placeholder')}
           value={draft}
           onChange={event => setDraft(event.target.value)}
           disabled={busy}
           autoComplete="new-password"
+          aria-invalid={illegal}
           style={inputStyle}
         />
-        {status?.keyConfigured === true
-          ? (
-            <button type="button" onClick={() => void remove()} disabled={busy} style={buttonStyle}>
-              {t('key.remove')}
-            </button>
-          )
-          : (
-            <button type="button" onClick={() => void save()} disabled={busy} style={buttonStyle}>
-              {t('key.save')}
-            </button>
-          )}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', lineHeight: '18px', color: 'var(--dsw-text-secondary, #667085)' }}>
-        {status?.keyConfigured === true
-          ? (
-            <span>
-              {t('state.configured', {
-                enterprise: account?.enterpriseName ?? '—',
-                type: accountTypeLabel(t, account?.accountType) ?? '—',
-              })}
-            </span>
-          )
-          : (
-            <span>
-              {t('state.missing')}
-            </span>
-          )}
-        {message !== undefined
-          ? <span style={{ color: messageKind === 'error' ? 'var(--dsw-text-danger, #c62828)' : undefined }}>{message}</span>
+        {illegal
+          ? <p style={errorStyle}>{t('key.illegal')}</p>
           : null}
+      </div>
+      {configured
+        ? (
+          <p style={hintStyle}>
+            {t('state.configured', {
+              enterprise: account?.enterpriseName ?? '—',
+              type: accountTypeLabel(t, account?.accountType) ?? '—',
+            })}
+          </p>
+        )
+        : null}
+      {message !== undefined
+        ? (
+          <p style={messageKind === 'error' ? errorStyle : hintStyle}>
+            {message}
+          </p>
+        )
+        : null}
+      <div style={actionsStyle}>
+        <button
+          type="button"
+          onClick={() => { setDraft(''); setMessage(undefined) }}
+          disabled={busy}
+          style={secondaryButtonStyle}
+        >
+          {t('action.cancel')}
+        </button>
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={busy || illegal}
+          style={primaryButtonStyle}
+        >
+          {busy ? t('action.applying') : t('action.apply')}
+        </button>
       </div>
     </div>
   )
