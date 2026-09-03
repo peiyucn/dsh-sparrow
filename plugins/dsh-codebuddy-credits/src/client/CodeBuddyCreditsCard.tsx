@@ -196,7 +196,8 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
       if (button === target || button.contains(target)) {
         event.preventDefault()
         event.stopPropagation()
-        setEditing(true)
+        // 双向开关：编辑态点击即收起（官方编辑按钮的 toggle 语义）。
+        setEditing(value => !value)
       }
     }
     document.addEventListener('click', onClickCapture, true)
