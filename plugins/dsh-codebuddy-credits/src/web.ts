@@ -131,6 +131,7 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
             }
             sendJson(res, 200, {
               keyConfigured,
+              active: shared.active(),
               account: shared.account(),
               models: shared.models().map(model => toModelFactView(model)),
               ...(quota === undefined ? {} : { quota }),
@@ -150,6 +151,11 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
               return
             }
             await shared.saveKey(key)
+            sendJson(res, 200, { ok: true })
+            return
+          }
+          if (req.method === 'POST' && pathname === PREFIX + '/remove-key') {
+            await shared.removeKey()
             sendJson(res, 200, { ok: true })
             return
           }

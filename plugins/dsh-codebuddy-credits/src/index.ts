@@ -290,11 +290,17 @@ export function apply(ctx: Context, config: Config): void {
     },
     async removeKey() {
       // 清空 Key：两个引用都清掉，模型事实与 route 一并撤回；profile 保留
-      // （官方行头圆点转红 = 未配置凭据的官方语义）。
+      // （官方行头圆点转红 = 未配置凭据的官方语义）。被环境遮蔽的引用 unset
+      // 会抛错（官方语义：环境提供者优先），逐引用容错。
       const credentials = ctx.get('credentials')
       if (credentials !== undefined) {
-        await credentials.unset?.(credentialRef(API_KEY_ENV))
-        await credentials.unset?.(credentialRef(LEGACY_API_KEY_ENV))
+        for (const ref of [API_KEY_ENV, LEGACY_API_KEY_ENV]) {
+          try {
+            await credentials.unset?.(credentialRef(ref))
+          } catch {
+            // 环境遮蔽等拒绝：静默（环境里的 Key 仍生效，清空不覆盖环境）。
+          }
+        }
       }
       account = undefined
       facts = []

@@ -300,7 +300,11 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     account?.enterpriseName,
   ].filter((part): part is string => part !== undefined)
 
-  if (pending) return null
+  // 状态未知时渲染 0×0 隐藏锚点（不渲染 null）：拦截监听与 :has 锚点从首帧
+  // 起就位——否则这个窗口期点官方「编辑」会把官方编辑器打开，造成双标题。
+  if (pending) {
+    return <div ref={rootRef} className="ccb-card-root" style={{ display: 'none' }} />
+  }
 
   if (!showEditor) {
     return (
