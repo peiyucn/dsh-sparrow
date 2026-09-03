@@ -44,6 +44,8 @@ export interface ModelFactView {
 export interface CodeBuddyCreditsShared {
   keyConfigured(): Promise<boolean>
   saveKey(key: string): Promise<void>
+  /** 清空已保存的 Key（凭据 + 模型目录；profile 保留）。 */
+  removeKey(): Promise<void>
   /** 查询企业周期配额。 */
   quota(): Promise<QuotaStatus>
   /** route 是否注册（状态接口诊断用）。 */

@@ -288,6 +288,18 @@ export function apply(ctx: Context, config: Config): void {
       ])
       ensureRoutes(true)
     },
+    async removeKey() {
+      // 清空 Key：两个引用都清掉，模型事实与 route 一并撤回；profile 保留
+      // （官方行头圆点转红 = 未配置凭据的官方语义）。
+      const credentials = ctx.get('credentials')
+      if (credentials !== undefined) {
+        await credentials.unset?.(credentialRef(API_KEY_ENV))
+        await credentials.unset?.(credentialRef(LEGACY_API_KEY_ENV))
+      }
+      account = undefined
+      facts = []
+      ensureRoutes(ambientKey())
+    },
     async quota() {
       return fetchQuota(await resolveApiKey(), account)
     },

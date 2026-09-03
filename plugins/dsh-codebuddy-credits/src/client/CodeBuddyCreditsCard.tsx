@@ -12,11 +12,12 @@
  * Key 只发给本机 host 路由存入 DSH 凭据库；企业策略错误原样透传展示。
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const KEY_URL = '/api/codebuddy-credits/key'
+const REMOVE_URL = '/api/codebuddy-credits/remove-key'
 
 interface CardStatus {
   keyConfigured: boolean
@@ -127,6 +128,13 @@ const secondaryButtonStyle: CSSProperties = {
   color: 'var(--dsw-alias-label-primary)',
 }
 
+/** 官方 dangerButton 同款：透明底、错误色文字。 */
+const dangerButtonStyle: CSSProperties = {
+  ...buttonBase,
+  background: 'transparent',
+  color: 'var(--dsw-alias-state-error-primary)',
+}
+
 /** 折叠态：一行状态 + 小号「更换 Key」（不渲染成第二个编辑器卡）。 */
 const collapsedRowStyle: CSSProperties = {
   display: 'flex',
@@ -145,24 +153,6 @@ const collapsedTextStyle: CSSProperties = {
   fontSize: '12px',
   lineHeight: '18px',
   color: 'var(--dsw-alias-label-secondary)',
-}
-
-/** 官方 rowActions 同款「编辑」小胶囊（28px、描边、hover 交互底）。 */
-const editSmallStyle: CSSProperties = {
-  boxSizing: 'border-box',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  height: '28px',
-  padding: '0 10px',
-  border: '0.5px solid var(--dsw-alias-border-l3)',
-  borderRadius: '14px',
-  background: 'transparent',
-  color: 'var(--dsw-alias-label-primary)',
-  font: 'inherit',
-  fontSize: '12px',
-  lineHeight: '18px',
-  cursor: 'pointer',
 }
 
 /** 官方 apiKeyFailure 的轻量镜像：可打印 ASCII（空格除外）。 */
@@ -190,6 +180,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | undefined>(undefined)
   const [messageKind, setMessageKind] = useState<'error' | 'info'>('info')
+  const rootRef = useRef<HTMLDivElement | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -204,8 +195,36 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     void load()
   }, [load])
 
-  // 任一信号（页面 join / 状态接口）确认已配置即折叠；两者都未知才展开输入区。
+  // 官方行头「编辑」按钮保持在官方原位：捕获阶段拦截其点击，改为展开我们
+  // 自己的编辑器（stopPropagation 阻断官方编辑器打开）。按钮位置/样式都是
+  // 官方的，行为归我们。setup 姿态没有行头，此监听自然不命中。
+  useEffect(() => {
+    const onClickCapture = (event: MouseEvent): void => {
+      const target = event.target
+      if (target === null || !(target instanceof Node) || rootRef.current === null) return
+      const li = rootRef.current.closest('li')
+      if (li === null) return
+      const head = li.querySelector(':scope > div:first-child')
+      if (head === null) return
+      const actions = head.querySelector(':scope > span:last-child')
+      if (actions === null) return
+      const button = actions.querySelector('button:first-of-type')
+      if (button === null) return
+      if (button === target || button.contains(target)) {
+        event.preventDefault()
+        event.stopPropagation()
+        setEditing(true)
+      }
+    }
+    document.addEventListener('click', onClickCapture, true)
+    return () => document.removeEventListener('click', onClickCapture, true)
+  }, [])
+
+  // 任一信号（页面 join / 状态接口）确认已配置即折叠。
   const configured = status?.keyConfigured === true || ownerKeyConfigured === true
+  // 状态未知（页面 join 尚未就绪、状态接口未返回）时不渲染任何内容——
+  // 避免「先闪出输入区再折叠」：配置态直接折叠、未配置态等状态落地后自然展开。
+  const pending = status === undefined && ownerKeyConfigured !== true
   const showEditor = !configured || editing
   const illegal = keyFailure(draft)
 
@@ -250,31 +269,52 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     if (configured) setEditing(false)
   }
 
+  /** 清空已保存的 Key（凭据与模型目录一起清掉；profile 保留，行头圆点转红）。 */
+  const clearKey = async () => {
+    setBusy(true)
+    setMessage(undefined)
+    try {
+      const response = await fetch(REMOVE_URL, { method: 'POST' })
+      if (!response.ok) {
+        setMessageKind('error')
+        setMessage(t('error.clearFailed'))
+        return
+      }
+      setDraft('')
+      setEditing(false)
+      setMessageKind('info')
+      setMessage(t('cleared'))
+      await load()
+    } catch {
+      setMessageKind('error')
+      setMessage(t('error.clearFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const account = status?.account
   const accountParts = [
     accountTypeLabel(t, account?.accountType),
     account?.enterpriseName,
   ].filter((part): part is string => part !== undefined)
-  const modelCount = status?.models?.length ?? 0
+
+  if (pending) return null
 
   if (!showEditor) {
     return (
-      <div className="ccb-card-root" style={collapsedRowStyle}>
+      <div ref={rootRef} className="ccb-card-root" style={collapsedRowStyle}>
         <p style={collapsedTextStyle}>
           {accountParts.length > 0
             ? t('state.configured', { account: accountParts.join(' · ') })
             : t('state.configuredShort')}
         </p>
-        {/* 官方行头同款「编辑」按钮：展开我们自己的编辑器卡。 */}
-        <button type="button" onClick={() => setEditing(true)} className="ccb-card-edit" style={editSmallStyle}>
-          {t('action.edit')}
-        </button>
       </div>
     )
   }
 
   return (
-    <div className="ccb-card-root" style={editorStyle}>
+    <div ref={rootRef} className="ccb-card-root" style={editorStyle}>
       <div style={headerStyle}>
         <span style={titleStyle}>CodeBuddy Credits</span>
         <span style={routeStyle}>codebuddy-credits</span>
@@ -311,6 +351,18 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
         )
         : null}
       <div style={actionsStyle}>
+        {configured
+          ? (
+            <button
+              type="button"
+              onClick={() => void clearKey()}
+              disabled={busy}
+              style={{ ...dangerButtonStyle, marginRight: 'auto' }}
+            >
+              {t('action.clearKey')}
+            </button>
+          )
+          : null}
         <button
           type="button"
           onClick={cancel}
@@ -349,14 +401,9 @@ export function ensureCardStyles(): void {
     '.ccb-card-input:focus { outline: none; border-color: var(--dsw-alias-brand-primary); }',
     '.ccb-card-input::placeholder { color: var(--dsw-alias-label-dimmed); }',
     '.ccb-card-input:disabled { opacity: 0.6; cursor: default; }',
-    '.ccb-card-edit:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }',
-    // 官方行头「编辑」按钮对本插件命名空间只会展开占位提示卡：以 CSS 隐藏，
-    // 只隐藏编辑按钮、保留「移除」。官方类名是纯哈希（生产构建不带可读
-    // 片段，类名匹配无效），按 DOM 结构定位：li(rowCard) > div(rowHead) >
-    // span(rowActions) > 第一个 button（编辑）。:has 锚点 = 本卡根节点。
-    'li:has(.ccb-card-root) > div:first-child > span:last-child > button:first-child { display: none; }',
-    // 首装 setup 姿态：官方占位编辑器是 li 的第一个 div 且内部无 rowActions
-    // 结构（无「span:last-child」直系子元素），同样隐藏，只留我们的卡。
+    // 官方行头「编辑」按钮保留在官方原位（点击由本卡捕获阶段拦截，展开我们
+    // 自己的编辑器），不再 CSS 隐藏。首装 setup 姿态下官方渲染的占位编辑器
+    // 仍然隐藏：它是 li 的第一个 div 且无 rowActions 结构（span:last-child）。
     'li:has(.ccb-card-root) > div:first-child:not(:has(> span:last-child)) { display: none; }',
   ].join('\n')
   document.head.append(style)
