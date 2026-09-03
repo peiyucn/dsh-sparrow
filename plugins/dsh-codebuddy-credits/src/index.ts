@@ -291,15 +291,12 @@ export function apply(ctx: Context, config: Config): void {
     async quota() {
       return fetchQuota(await resolveApiKey(), account)
     },
-    account: () => {
-      const userName = account?.enterpriseUserName ?? account?.nickname
-      return {
-        ...(account?.enterpriseName === undefined ? {} : { enterpriseName: account.enterpriseName }),
-        ...(account?.accountType === undefined ? {} : { accountType: account.accountType }),
-        // 用户名：企业内姓名优先，回退账号昵称（/v2/accounts 实测字段）。
-        ...(userName === undefined ? {} : { userName }),
-      }
-    },
+    account: () => ({
+      ...(account?.enterpriseName === undefined ? {} : { enterpriseName: account.enterpriseName }),
+      ...(account?.accountType === undefined ? {} : { accountType: account.accountType }),
+      ...(account?.enterpriseUserName === undefined ? {} : { enterpriseUserName: account.enterpriseUserName }),
+      ...(account?.nickname === undefined ? {} : { nickname: account.nickname }),
+    }),
     async ensureAccount() {
       // 启动期补拉失败的兜底：状态接口触发一次（成功即缓存进内存）。
       if (account !== undefined) return

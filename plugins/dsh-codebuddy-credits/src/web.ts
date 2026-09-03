@@ -21,8 +21,10 @@ const MAX_BODY_BYTES = 16 * 1024
 export interface AccountView {
   enterpriseName?: string
   accountType?: string
-  /** 用户名（企业内姓名优先，回退账号昵称）。 */
-  userName?: string
+  /** 企业内姓名（如 裴昱）。 */
+  enterpriseUserName?: string
+  /** 账号昵称（如 DJ028191）。 */
+  nickname?: string
 }
 
 /** 状态接口里的模型事实视图（client 头部卡片据此展示当前模型信息）。 */

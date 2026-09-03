@@ -45,7 +45,7 @@ interface ModelFactView {
 
 interface StatusPayload {
   keyConfigured: boolean
-  account?: { enterpriseName?: string; accountType?: string; userName?: string }
+  account?: { enterpriseName?: string; accountType?: string; enterpriseUserName?: string; nickname?: string }
   quota?: QuotaView
   quotaError?: string
   models: ModelFactView[]
@@ -240,6 +240,14 @@ export function CodeBuddyCreditsIndicator({
         ? t('account.personal')
         : undefined)
 
+  // 右上角用户徽章：裴昱（DJ028191）；无企业姓名时只显示昵称。
+  const userBadge = account?.enterpriseUserName !== undefined
+    ? account.enterpriseUserName
+      + (account.nickname !== undefined && account.nickname !== account.enterpriseUserName
+        ? '（' + account.nickname + '）'
+        : '')
+    : account?.nickname
+
   const quota = status?.quota
   const ratio = quota !== undefined && quota.limit > 0
     ? Math.min(1, Math.max(0, quota.used / quota.limit))
@@ -274,6 +282,23 @@ export function CodeBuddyCreditsIndicator({
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--dsh-content-font-size, 14px)', fontWeight: 600, lineHeight: 'calc(24px + var(--dsh-content-font-delta, 0px))', marginBottom: '6px' }}>
               <span style={{ display: 'inline-flex', fontSize: 16, lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: SQUARE_LOGO_SVG }} />
               {t('indicator.title')}
+              {userBadge !== undefined
+                ? (
+                  <span style={{
+                    marginLeft: 'auto',
+                    padding: '0 6px',
+                    borderRadius: '4px',
+                    background: 'var(--dsw-alias-interactive-bg-hover)',
+                    color: 'var(--dsw-alias-label-secondary)',
+                    fontSize: '12px',
+                    lineHeight: '18px',
+                    fontWeight: 500,
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {userBadge}
+                  </span>
+                )
+                : null}
             </div>
             {status === undefined && loadError === undefined
               ? <div style={captionStyle}>{t('indicator.loading')}</div>
@@ -283,9 +308,6 @@ export function CodeBuddyCreditsIndicator({
                 <>
                   {accountText !== undefined
                     ? <div style={captionStyle}>{accountText}</div>
-                    : null}
-                  {status.account?.userName !== undefined
-                    ? <div style={captionStyle}>{t('indicator.user', { user: status.account.userName })}</div>
                     : null}
                   {quota !== undefined
                     ? (
