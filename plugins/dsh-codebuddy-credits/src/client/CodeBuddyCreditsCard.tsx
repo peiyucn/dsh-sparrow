@@ -58,12 +58,6 @@ const titleStyle: CSSProperties = {
   color: 'var(--dsw-alias-label-primary)',
 }
 
-const routeStyle: CSSProperties = {
-  fontSize: '12px',
-  lineHeight: '18px',
-  color: 'var(--dsw-alias-label-tertiary)',
-}
-
 const fieldStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
@@ -138,6 +132,19 @@ const dangerButtonStyle: CSSProperties = {
   color: 'var(--dsw-alias-state-error-primary)',
 }
 
+/** 官方 savedNotice 同款：绿色保存提示（12px/18px）。 */
+const savedNoticeStyle: CSSProperties = {
+  margin: '0',
+  fontSize: '12px',
+  lineHeight: '18px',
+  color: 'var(--dsw-alias-state-success-primary)',
+}
+
+/** 折叠态包装：默认 0×0 隐藏锚点；有保存提示时展开为纯文本行。 */
+const noticeWrapStyle: CSSProperties = {
+  display: 'block',
+}
+
 /** 官方 apiKeyFailure 的轻量镜像：可打印 ASCII（空格除外）。 */
 const LEGAL_API_KEY = /^[\x21-\x7E]+$/
 
@@ -163,6 +170,9 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | undefined>(undefined)
   const [messageKind, setMessageKind] = useState<'error' | 'info'>('info')
+  // 官方 savedProvider 同款：应用成功后关闭编辑器，行下显示绿色保存提示，
+  // 直到下一次编辑/取消。
+  const [savedNotice, setSavedNotice] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
 
   const load = useCallback(async () => {
@@ -204,6 +214,11 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     return () => document.removeEventListener('click', onClickCapture, true)
   }, [])
 
+  // 编辑器打开即清掉绿色保存提示（官方语义：提示持续到下一次编辑）。
+  useEffect(() => {
+    if (editing) setSavedNotice(false)
+  }, [editing])
+
   // 首装 setup 姿态没有行头「编辑」按钮（官方占位编辑器是 li 的首个子 div 且
   // 无 span 子元素）：折叠会让卡片完全空掉，此姿态下自动展开一次。
   useEffect(() => {
@@ -225,7 +240,9 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
 
   const save = async () => {
     const key = draft.trim()
-    if (key.length === 0) {
+    // 已配置且未输入新 Key：幂等重配——服务端用已存 Key 重拉模型目录与
+    // 账号信息（key 传空串，服务端走 reapply）。
+    if (key.length === 0 && !configured) {
       setMessageKind('error')
       setMessage(t('error.empty'))
       return
@@ -246,10 +263,10 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
         return
       }
       setDraft('')
-      // 应用成功后保持展开：让用户看到加载出来的账号信息与「已保存」提示，
-      // 关闭交给用户（编辑 toggle / 取消）。
-      setMessageKind('info')
-      setMessage(t('saved'))
+      // 官方语义：应用成功即关闭编辑器，行下显示绿色保存提示（持续到下次编辑）。
+      setMessage(undefined)
+      setSavedNotice(true)
+      setEditing(false)
       await load()
       // 通知对话页的额度卡联动刷新（出现/消失），无需刷新页面。
       window.dispatchEvent(new Event(STATUS_CHANGED_EVENT))
@@ -264,6 +281,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
   const cancel = () => {
     setDraft('')
     setMessage(undefined)
+    setSavedNotice(false)
     // 官方语义：取消即收起编辑器（无论是否已配置）。
     setEditing(false)
   }
@@ -281,8 +299,8 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
       }
       setDraft('')
       setEditing(false)
-      setMessageKind('info')
-      setMessage(t('cleared'))
+      setSavedNotice(false)
+      setMessage(undefined)
       await load()
       // 通知对话页的额度卡联动刷新（消失/出现），无需刷新页面。
       window.dispatchEvent(new Event(STATUS_CHANGED_EVENT))
@@ -303,16 +321,22 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
   // 状态未知时渲染 0×0 隐藏锚点（不渲染 null）：拦截监听与 :has 锚点从首帧
   // 起就位——否则这个窗口期点官方「编辑」会把官方编辑器打开，造成双标题。
   // 折叠态同样只渲染隐藏锚点：行下不显示任何内容（与 DeepSeek 行一致，
-  // 只有名称 + 圆点 + 编辑按钮），企业信息等点开编辑后在编辑器里看。
+  // 只有名称 + 圆点 + 编辑按钮）；应用成功后的绿色保存提示例外（官方
+  // savedProvider 同款，持续到下一次编辑/取消）。
   if (pending || !showEditor) {
-    return <div ref={rootRef} className="ccb-card-root" style={{ display: 'none' }} />
+    return (
+      <div ref={rootRef} className="ccb-card-root" style={savedNotice ? noticeWrapStyle : { display: 'none' }}>
+        {savedNotice
+          ? <p style={savedNoticeStyle} role="status" aria-live="polite">{t('saved.provider')}</p>
+          : null}
+      </div>
+    )
   }
 
   return (
     <div ref={rootRef} className="ccb-card-root" style={editorStyle}>
       <div style={headerStyle}>
         <span style={titleStyle}>CodeBuddy Credits</span>
-        <span style={routeStyle}>codebuddy-credits</span>
       </div>
       <div style={fieldStyle}>
         <span style={labelStyle}>{t('key.label')}</span>

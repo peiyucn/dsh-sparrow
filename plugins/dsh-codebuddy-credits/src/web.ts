@@ -44,6 +44,8 @@ export interface ModelFactView {
 export interface CodeBuddyCreditsShared {
   keyConfigured(): Promise<boolean>
   saveKey(key: string): Promise<void>
+  /** 用已存 Key 幂等重配：重拉模型目录与账号信息（应用时不输新 Key 的路径）。 */
+  reapply(): Promise<void>
   /** 清空已保存的 Key（凭据 + 模型目录；profile 保留）。 */
   removeKey(): Promise<void>
   /** 查询企业周期配额。 */

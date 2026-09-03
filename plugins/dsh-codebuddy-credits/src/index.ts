@@ -322,6 +322,14 @@ export function apply(ctx: Context, config: Config): void {
       ])
       ensureRoutes(true)
     },
+    async reapply() {
+      // 幂等重配：用已存 Key 重拉模型目录与账号信息（不写凭据、不写设置）。
+      const key = await resolveApiKey()
+      const entries = await fetchCodeBuddyModels(key, account)
+      await refreshAccountWithKey(key)
+      facts = factsFromEntries(entries)
+      ensureRoutes(true)
+    },
     async removeKey() {
       // 清空 Key：两个引用都清掉，模型事实与 route 一并撤回；profile 保留
       // （官方行头圆点转红 = 未配置凭据的官方语义）。被环境遮蔽的引用 unset
