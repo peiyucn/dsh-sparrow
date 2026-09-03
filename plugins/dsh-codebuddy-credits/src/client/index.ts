@@ -170,18 +170,25 @@ export function apply(ctx: ClientContext): void {
   }, CodeBuddyCreditsIndicator as unknown as (props: object) => ReactNode))
 
   // 模型选择器遮蔽：priority -1（官方条目为默认 0，最低者渲染）。
-  // 能力检查失败（组合里没有 modelDirectories / sessions 服务）时保留官方选择器。
-  // 与官方 ui-model-selection 相同的声明式注入：等 modelDirectories/sessions
-  // 服务就绪后再注册遮蔽（此前 eager ctx.get 受启动时序影响，偶发拿不到
-  // 服务 → 遮蔽静默失败 → 回退官方样式，系数不再置右）。服务缺失/迟到即
-  // 不注册，保留官方选择器（fail-soft）。
-  ctx.inject(['modelDirectories', 'sessions'], (scope) => {
-    const resolver = scope.get('modelDirectories') as unknown as {
-      directoryFor(id: string): ModelDirectoryLike | undefined
+  // 双保险注册：(1) 声明式注入等 modelDirectories/sessions 就绪（官方同款
+  // 姿势）；(2) 延迟重试兜底——若注入因任何原因未触发（时序/组合差异），
+  // 服务可用后补注册。pickerRegistered 防重复；始终注册不上则保留官方
+  // 选择器（fail-soft）。
+  let pickerRegistered = false
+  const registerPicker = (scopeCtx: ClientContext): void => {
+    if (pickerRegistered) return
+    let resolver: { directoryFor(id: string): ModelDirectoryLike | undefined }
+    let sessions: { subagentAddress(id: string): unknown } | undefined
+    try {
+      resolver = scopeCtx.get('modelDirectories') as never
+    } catch {
+      return
     }
-    const sessions = scope.get('sessions') as unknown as {
-      subagentAddress(id: string): unknown
-    } | undefined
+    try {
+      sessions = scopeCtx.get('sessions') as never
+    } catch {
+      // sessions 可选：缺失时按可用处理。
+    }
     // 未知会话（目录解析失败）时给一个空目录 + 禁用态，避免渲染抛错。
     const emptyDirectory = (): ModelDirectoryLike => {
       const snapshot = { current: null, routable: null, groups: [], failures: [], status: 'idle', error: null }
@@ -194,7 +201,7 @@ export function apply(ctx: ClientContext): void {
         select: async () => {},
       }
     }
-    scope.slots.inject('conversation.input.model', () => scope.slots.register({
+    scopeCtx.slots.inject('conversation.input.model', () => scopeCtx.slots.register({
       name: 'conversation.input.model',
       locale: 'codebuddy-credits',
       priority: -1,
@@ -214,5 +221,12 @@ export function apply(ctx: ClientContext): void {
         }
       },
     }, CodeBuddyModelSelect as unknown as (props: object) => ReactNode))
-  })
+    pickerRegistered = true
+  }
+  ctx.inject(['modelDirectories', 'sessions'], registerPicker)
+  const retryDelays = [1_000, 3_000, 8_000]
+  for (let i = 0; i < retryDelays.length; i++) {
+    const timer = setTimeout(() => { registerPicker(ctx) }, retryDelays[i])
+    ctx.effect(() => () => { clearTimeout(timer) }, 'llm-codebuddy-credits: picker retry ' + String(i))
+  }
 }
