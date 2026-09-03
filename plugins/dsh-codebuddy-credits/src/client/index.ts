@@ -173,20 +173,17 @@ export function apply(ctx: ClientContext): void {
 
   // 模型选择器遮蔽：priority -1（官方条目为默认 0，最低者渲染）。
   // 能力检查失败（组合里没有 modelDirectories / sessions 服务）时保留官方选择器。
-  try {
-    const resolver = ctx.get('modelDirectories') as unknown as {
+  // 与官方 ui-model-selection 相同的声明式注入：等 modelDirectories/sessions
+  // 服务就绪后再注册遮蔽（此前 eager ctx.get 受启动时序影响，偶发拿不到
+  // 服务 → 遮蔽静默失败 → 回退官方样式，系数不再置右）。服务缺失/迟到即
+  // 不注册，保留官方选择器（fail-soft）。
+  ctx.inject(['modelDirectories', 'sessions'], (scope) => {
+    const resolver = scope.get('modelDirectories') as unknown as {
       directoryFor(id: string): ModelDirectoryLike | undefined
+    }
+    const sessions = scope.get('sessions') as unknown as {
+      subagentAddress(id: string): unknown
     } | undefined
-    if (resolver === undefined) return
-    const sessions = (() => {
-      try {
-        return ctx.get('sessions') as unknown as {
-          subagentAddress(id: string): unknown
-        } | undefined
-      } catch {
-        return undefined
-      }
-    })()
     // 未知会话（目录解析失败）时给一个空目录 + 禁用态，避免渲染抛错。
     const emptyDirectory = (): ModelDirectoryLike => {
       const snapshot = { current: null, routable: null, groups: [], failures: [], status: 'idle', error: null }
@@ -199,7 +196,7 @@ export function apply(ctx: ClientContext): void {
         select: async () => {},
       }
     }
-    ctx.slots.inject('conversation.input.model', () => ctx.slots.register({
+    scope.slots.inject('conversation.input.model', () => scope.slots.register({
       name: 'conversation.input.model',
       locale: 'codebuddy-credits',
       priority: -1,
@@ -219,7 +216,5 @@ export function apply(ctx: ClientContext): void {
         }
       },
     }, CodeBuddyModelSelect as unknown as (props: object) => ReactNode))
-  } catch {
-    // 缺服务：保留官方选择器（fail-soft，无遮蔽）。
-  }
+  })
 }
