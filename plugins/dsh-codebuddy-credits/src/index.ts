@@ -241,12 +241,13 @@ export function apply(ctx: Context, config: Config): void {
         await credentials.unset?.(credentialRef(LEGACY_API_KEY_ENV)).catch(() => {})
       }
     }
-    // 官方行头圆点按 profile.apiKeyEnv join 凭据：Key 已存在但 profile 缺该
-    // 字段时补写（否则行头永远没有圆点）。旧版本存的 profile 只有 models。
+    // 官方行头圆点读整节根部 apiKeyEnv：Key 已存在时补写（旧版本存的
+    // profile 是 providers 子树，一并清掉——整节型 schema 已不再有该层）。
     const settingsBoot = ctx.get('settings')
-    if (settingsBoot !== undefined && current()?.providers?.[PROVIDER]?.apiKeyEnv === undefined) {
+    if (settingsBoot !== undefined) {
       await settingsBoot.mutate(NS, [
-        { op: 'set', path: ['providers', PROVIDER, 'apiKeyEnv'], value: API_KEY_ENV },
+        { op: 'set', path: ['apiKeyEnv'], value: API_KEY_ENV },
+        { op: 'unset', path: ['providers'] },
       ]).catch(() => {})
     }
     await refreshAccountWithKey(key)
@@ -291,8 +292,8 @@ export function apply(ctx: Context, config: Config): void {
       // 官方页面的凭据 join 读 profile.apiKeyEnv：物化到用户层，行头圆点才会
       // 亮绿；顺带清掉旧版遗留的 models 键（模型列表已不落设置节）。
       await settings.mutate(NS, [
-        { op: 'set', path: ['providers', PROVIDER, 'apiKeyEnv'], value: API_KEY_ENV },
-        { op: 'unset', path: ['providers', PROVIDER, 'models'] },
+        { op: 'set', path: ['apiKeyEnv'], value: API_KEY_ENV },
+        { op: 'unset', path: ['providers'] },
       ])
       ensureRoutes(true)
     },
@@ -346,13 +347,8 @@ export function apply(ctx: Context, config: Config): void {
         current = source
       },
       onChange: () => {
-        // 官方行头「移除」删除 profile 后（删除配置的正路）：清空模型事实、
-        // 撤回 route。凭据由官方流程一并清理（引用对齐后）。
-        const raw = current()
-        if (raw?.providers?.[PROVIDER] === undefined) {
-          facts = []
-          ensureRoutes(ambientKey())
-        }
+        // 整节型 provider（settingsPath 为空）官方页面不提供「移除」，凭据
+        // 清理由我们的「清空 Key」承担（/remove-key）；设置变化无需收尾。
       },
     })
   })
