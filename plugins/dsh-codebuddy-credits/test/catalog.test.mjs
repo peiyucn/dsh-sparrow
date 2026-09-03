@@ -1,50 +1,23 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { BUILTIN_MODELS, codeBuddyModel, parseModelConfig, resolveModels } from '../lib/catalog.js'
-
-describe('BUILTIN_MODELS', () => {
-  it('内置目录非空且 id 唯一', () => {
-    assert.ok(BUILTIN_MODELS.length > 0)
-    const ids = new Set(BUILTIN_MODELS.map(model => model.id))
-    assert.equal(ids.size, BUILTIN_MODELS.length)
-  })
-  it('内置条目均有正数容量与推理声明', () => {
-    for (const model of BUILTIN_MODELS) {
-      assert.ok(model.contextWindow > 0)
-      assert.ok(model.maxTokens > 0)
-      assert.ok(model.reasoningEfforts !== false)
-    }
-  })
-})
+import { codeBuddyModel, discoveredToProfile, parseModelConfig, resolveModels } from '../lib/catalog.js'
 
 describe('resolveModels', () => {
-  it('空配置返回内置目录', () => {
-    const models = resolveModels([])
-    assert.equal(models.length, BUILTIN_MODELS.length)
-    for (const model of models) {
-      assert.equal(model.provider, 'codebuddy-credits')
-      assert.equal(model.api, 'openai-completions')
-    }
+  it('空配置返回空模型集（无预置目录）', () => {
+    assert.deepEqual(resolveModels([]), [])
   })
-  it('配置条目继承内置同名模型的未声明字段', () => {
-    const [builtin] = BUILTIN_MODELS
-    const models = resolveModels([{ id: builtin.id, name: '自定义名' }])
-    assert.equal(models.length, 1)
-    const [model] = models
-    assert.equal(model.name, '自定义名')
-    assert.equal(model.contextWindow, builtin.contextWindow)
-    assert.equal(model.maxTokens, builtin.maxTokens)
+  it('配置条目解析为 codebuddy-credits 路由的 openai-completions 模型', () => {
+    const [model] = resolveModels([{ id: 'hy3', name: 'Hy3', contextWindow: 192000, maxTokens: 64000 }])
+    assert.equal(model.provider, 'codebuddy-credits')
+    assert.equal(model.api, 'openai-completions')
+    assert.equal(model.contextWindow, 192000)
+    assert.equal(model.maxTokens, 64000)
   })
-  it('reasoningEfforts: false 禁用推理', () => {
-    const [builtin] = BUILTIN_MODELS
-    const [model] = resolveModels([{ id: builtin.id, reasoningEfforts: false }])
-    assert.equal(model.reasoning, false)
-    assert.equal(model.thinkingLevelMap, undefined)
-  })
-  it('未知 id 的条目以兜底常量补齐容量', () => {
+  it('容量缺失的条目以兜底常量补齐', () => {
     const [model] = resolveModels([{ id: 'brand-new-model' }])
     assert.equal(model.contextWindow, 262_144)
     assert.equal(model.maxTokens, 32_768)
+    assert.equal(model.name, 'brand-new-model')
   })
 })
 
@@ -53,6 +26,16 @@ describe('codeBuddyModel', () => {
     const model = codeBuddyModel({ id: 'x', reasoningEfforts: { off: null, high: 'high' } })
     assert.equal(model.reasoning, true)
     assert.deepEqual(model.thinkingLevelMap, { off: null, high: 'high' })
+  })
+  it('reasoningEfforts: false 禁用推理', () => {
+    const model = codeBuddyModel({ id: 'x', reasoningEfforts: false })
+    assert.equal(model.reasoning, false)
+    assert.equal(model.thinkingLevelMap, undefined)
+  })
+  it('未声明 reasoningEfforts 时不声明推理能力（不发思考参数）', () => {
+    const model = codeBuddyModel({ id: 'x' })
+    assert.equal(model.reasoning, false)
+    assert.equal(model.thinkingLevelMap, undefined)
   })
 })
 
@@ -95,5 +78,22 @@ describe('parseModelConfig', () => {
   it('非数组输入返回空', () => {
     assert.deepEqual(parseModelConfig(undefined), [])
     assert.deepEqual(parseModelConfig({ data: null }), [])
+  })
+})
+
+describe('discoveredToProfile', () => {
+  it('发现结果转为设置节条目，带默认思考声明', () => {
+    const profiles = discoveredToProfile([{ id: 'hy3', name: 'Hy3', contextWindow: 192000, maxTokens: 64000 }])
+    assert.deepEqual(profiles, [{
+      id: 'hy3',
+      name: 'Hy3',
+      contextWindow: 192000,
+      maxTokens: 64000,
+      reasoningEfforts: { off: null },
+    }])
+  })
+  it('缺失字段不写进条目', () => {
+    const profiles = discoveredToProfile([{ id: 'ghost' }])
+    assert.deepEqual(profiles, [{ id: 'ghost', reasoningEfforts: { off: null } }])
   })
 })

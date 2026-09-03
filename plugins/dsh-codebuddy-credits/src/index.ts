@@ -5,6 +5,9 @@
  *
  * 结构对齐官方 llm-deepseek / llm-pi-ai 的正路写法：
  * registerConfigurableProviders + registerAdapter + registerModelDiscovery + installSection。
+ *
+ * route 注册条件化：Key 已配置（设置页保存的凭据库值或环境变量）才注册 adapter，
+ * 模型选择器才出现本 provider；Key 移除后 route 随即撤回。
  * @module dsh-codebuddy-credits
  */
 
@@ -13,13 +16,15 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { assertUsableApiKey, LlmError, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
+import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import type {} from '@deepseek-ai/dsh-settings'
 import { authInjectionFor } from './auth.js'
-import { discoverCodeBuddyModels, resolveModels } from './catalog.js'
+import { discoverCodeBuddyModels, discoveredToProfile, resolveModels } from './catalog.js'
 import { Config } from './config.js'
 import {
+  API_KEY_ENV,
   DISPLAY_NAME,
   MAX_REQUEST_IMAGE_BYTES,
   NS,
@@ -30,6 +35,7 @@ import {
   STREAM_IDLE_TIMEOUT_MS,
 } from './constants.js'
 import { buildCodeBuddyProvider } from './provider.js'
+import { installCodeBuddyWeb } from './web.js'
 
 export const name = 'llm-codebuddy-credits'
 export const inject = ['llm']
@@ -103,10 +109,52 @@ export function apply(ctx: Context, config: Config): void {
     resolveAttachments: () => ctx.get('attachments'),
   })
 
+  // 目录条目始终注册：设置页 provider 行是 Key 的配置入口（client 在行上挂输入卡）。
   ctx.llm.registerConfigurableProviders([
     { provider: PROVIDER, displayName: DISPLAY_NAME, settingsNs: NS, settingsPath: [] },
   ])
-  ctx.llm.registerAdapter([PROVIDER], adapter)
+
+  // route 条件注册：Key 可用且模型目录已就位才进模型选择器；Key 移除即撤回。
+  // want 由调用方显式给出（凭据库是异步面，由保存/移除接口驱动）。
+  let registration: AdapterRegistrationHandle | undefined
+  let registered = false
+  const ensureRoutes = (want: boolean): void => {
+    if (want === registered) return
+    if (want) {
+      if (registration === undefined) registration = ctx.llm.registerAdapter([PROVIDER], adapter)
+      else registration.replace([PROVIDER])
+      registered = true
+    } else {
+      if (registration !== undefined) {
+        registration.replace([])
+        registered = false
+      }
+    }
+  }
+
+  /** 模型目录是否已就位（用户给 Key 时拉取并写入设置节）。 */
+  function hasModels(): boolean {
+    return (current().models ?? []).length > 0
+  }
+
+  /** 启动环境里的 Key（同步判定，凭据库另走异步检查）。 */
+  function ambientKey(): boolean {
+    const ref = profile().apiKeyEnv
+    if (ref === undefined) return false
+    const value = launchEnvironmentOf(ctx).get(ref)?.value
+    return value !== undefined && value.length > 0
+  }
+
+  // 启动：环境变量可见且目录已存则立即注册；凭据库的 Key 在异步检查命中后注册。
+  ensureRoutes(ambientKey() && hasModels())
+  void (async () => {
+    try {
+      await resolveApiKey(PROVIDER, profile())
+      ensureRoutes(hasModels())
+    } catch {
+      // 无凭据属预期姿态（用户还没配 Key），保持未注册即可。
+    }
+  })()
 
   // 模型发现：draft 请求自带凭据时直接用；否则回退到已配置的凭据。
   ctx.llm.registerModelDiscovery(NS, async (request, signal) => {
@@ -115,11 +163,47 @@ export function apply(ctx: Context, config: Config): void {
       : await resolveApiKey(PROVIDER, profile())
     if (apiKey === undefined || apiKey.length === 0) {
       throw new LlmError(
-        `${name}: 模型发现需要 API Key（CODEBUDDY_API_KEY）`,
+        `${name}: 模型发现需要 API Key（${API_KEY_ENV}）`,
         'MISSING_CREDENTIAL',
       )
     }
     return discoverCodeBuddyModels(apiKey, signal)
+  })
+
+  // 设置卡片路由：Key 的保存/移除/状态。
+  installCodeBuddyWeb(ctx, {
+    async keyConfigured() {
+      try {
+        await resolveApiKey(PROVIDER, profile())
+        return true
+      } catch {
+        return false
+      }
+    },
+    async saveKey(key) {
+      const credentials = ctx.get('credentials')
+      if (credentials === undefined) {
+        throw new LlmError(`${name}: 本组合没有凭据服务，无法保存 Key`, 'NO_CREDENTIAL_STORE')
+      }
+      // 用户给 Key 的行为 = 对这次模型目录拉取的授权：保存 Key 后用该 Key
+      // 拉 /v3/config（按该 Key 的账号权限返回模型），成功才写入设置节并注册 route。
+      const models = await discoverCodeBuddyModels(key)
+      const settings = ctx.get('settings')
+      if (settings === undefined) {
+        throw new LlmError(`${name}: 本组合没有设置服务，无法保存模型目录`, 'NO_SETTINGS_STORE')
+      }
+      await settings.mutate(NS, [{ op: 'set', path: ['models'], value: discoveredToProfile(models) }])
+      await credentials.set(credentialRef(API_KEY_ENV), key)
+      ensureRoutes(true)
+    },
+    async removeKey() {
+      const credentials = ctx.get('credentials')
+      if (credentials === undefined) return
+      await credentials.unset?.(credentialRef(API_KEY_ENV))
+      ensureRoutes(ambientKey())
+    },
+    active: () => registered,
+    modelIds: () => resolveModels(current().models ?? []).map(model => model.id),
   })
 
   ctx.inject(['settings'], (settingsCtx) => {

@@ -4,8 +4,8 @@
 export const NS = 'llm-codebuddy-credits'
 /** DSH provider 路由 key，也是模型条目与凭据配置的锚点。 */
 export const PROVIDER = 'codebuddy-credits'
-/** 模型选择器与设置页显示的 provider 名（跟随官方全小写风格）。 */
-export const DISPLAY_NAME = 'codebuddy-credits'
+/** 模型选择器与设置页显示的 provider 名（内部 ID 保持小写连字符，仅展示名品牌化）。 */
+export const DISPLAY_NAME = 'CodeBuddy Credits'
 /** 凭据环境变量名；API key 只经 ctx.credentials 解析，绝不落盘到设置文件。 */
 export const API_KEY_ENV = 'CODEBUDDY_API_KEY'
 /** CodeBuddy 推理端点（OpenAI Chat Completions 方言，仅支持流式）。 */

@@ -1,6 +1,7 @@
 /**
- * CodeBuddy 模型目录：内置兜底目录（按企业账号实测）+ 远程 /v3/config 发现。
- * 远程目录按 API key 的账号权限返回；内置目录保证插件在断网/接口变动时仍可用。
+ * CodeBuddy 模型目录解析：不预置任何模型信息。模型列表完全依赖用户给 Key
+ * 的行为——保存 Key 时（或「获取可用模型」）才调 /v3/config 拉取，结果经
+ * 设置节持久化。无 Key 时本插件不发任何网络请求。
  */
 
 import { LlmError } from '@deepseek-ai/dsh-llm'
@@ -36,62 +37,35 @@ const COMPAT = {
 }
 
 /**
- * 内置兜底目录（2026-09-02 按企业账号实测 /v3/config 快照）。
- * reasoningEfforts 声明 { off: null }：支持推理，off 档不发参数；其余档位
- * 的 wire 拼写与档位名一致，交给 pi-ai 的默认档位表。
+ * 一条模型配置 → pi-ai Model。未声明容量时用兜底常量；
+ * 推理能力：false 禁用、dict 显式声明（off 恒支持）、缺省不声明
+ * （不发思考参数，交给服务端默认档位）。
  */
-export const BUILTIN_MODELS: readonly PiAiModelProfile[] = [
-  { id: 'hy4-preview', name: 'Hy4 preview', contextWindow: 1_000_000, maxTokens: 64_000, input: ['text', 'image'], reasoningEfforts: { off: null } },
-  { id: 'hy3', name: 'Hy3', contextWindow: 192_000, maxTokens: 64_000, input: ['text', 'image'], reasoningEfforts: { off: null } },
-  { id: 'hy3-x', name: 'Hy3', contextWindow: 192_000, maxTokens: 64_000, input: ['text', 'image'], reasoningEfforts: { off: null } },
-  { id: 'glm-5.3-flash', name: 'GLM-5.3-Flash', contextWindow: 1_000_000, maxTokens: 32_000, input: ['text', 'image'], reasoningEfforts: { off: null } },
-  { id: 'minimax-m3-pay', name: 'MiniMax-M3', contextWindow: 512_000, maxTokens: 128_000, input: ['text', 'image'], reasoningEfforts: { off: null } },
-  { id: 'deepseek-v4-flash', name: 'Deepseek-V4-Flash', contextWindow: 1_000_000, maxTokens: 50_000, input: ['text', 'image'], reasoningEfforts: { off: null } },
-]
-
-/**
- * 一条模型配置 → pi-ai Model。未声明的字段继承内置同名模型（fallback），
- * 再退到兜底常量；推理能力三态：false 禁用、dict 显式声明（off 恒支持）、
- * 缺省继承 fallback 的推理能力。
- */
-export function codeBuddyModel(entry: PiAiModelProfile, fallback?: Model<Api>): Model<Api> {
+export function codeBuddyModel(entry: PiAiModelProfile): Model<Api> {
   const declared = entry.reasoningEfforts
-  let reasoning: boolean
-  let thinkingLevelMap: Model<Api>['thinkingLevelMap']
-  if (declared === false) {
-    reasoning = false
-    thinkingLevelMap = undefined
-  } else if (declared === undefined) {
-    reasoning = fallback?.reasoning ?? false
-    thinkingLevelMap = fallback?.thinkingLevelMap
-  } else {
-    reasoning = true
-    thinkingLevelMap = { off: null, ...declared }
-  }
+  const reasoning = declared !== undefined && declared !== false
+  const thinkingLevelMap = declared !== undefined && declared !== false
+    ? { off: null, ...declared }
+    : undefined
   return {
     id: entry.id,
-    name: entry.name ?? fallback?.name ?? entry.id,
+    name: entry.name ?? entry.id,
     api: 'openai-completions',
     provider: PROVIDER,
     baseUrl: BASE_URL,
     reasoning,
     ...(reasoning && thinkingLevelMap !== undefined ? { thinkingLevelMap } : {}),
-    input: [...(entry.input ?? fallback?.input ?? ['text'])],
+    input: [...(entry.input ?? ['text'])],
     cost: { ...NO_COST },
-    contextWindow: entry.contextWindow ?? fallback?.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
-    maxTokens: entry.maxTokens ?? fallback?.maxTokens ?? DEFAULT_MAX_TOKENS,
+    contextWindow: entry.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
+    maxTokens: entry.maxTokens ?? DEFAULT_MAX_TOKENS,
     compat: { ...COMPAT },
   }
 }
 
-/**
- * 配置 → 最终模型集。settings 里的 models 为空时用内置目录；非空时逐条
- * 解析，每条继承内置同名模型未声明的字段。
- */
+/** 配置 → 最终模型集。 */
 export function resolveModels(configured: readonly PiAiModelProfile[]): Model<Api>[] {
-  const builtins = new Map(BUILTIN_MODELS.map(entry => [entry.id, codeBuddyModel(entry)]))
-  if (configured.length === 0) return [...builtins.values()]
-  return configured.map(entry => codeBuddyModel(entry, builtins.get(entry.id)))
+  return configured.map(entry => codeBuddyModel(entry))
 }
 
 /** 模型目录请求的三件套请求头。 */
@@ -146,7 +120,21 @@ export function parseModelConfig(body: unknown): readonly LlmDiscoveredModel[] {
   })
 }
 
-/** 拉取 CodeBuddy 模型目录（settings 的「获取可用模型」）。 */
+/**
+ * 发现结果 → 设置节模型条目。CodeBuddy 的 CLI 模型均支持思考档位，
+ * 声明 { off: null }（支持推理、off 不发参数，其余档位按 pi-ai 默认表）。
+ */
+export function discoveredToProfile(models: readonly LlmDiscoveredModel[]): PiAiModelProfile[] {
+  return models.map(model => ({
+    id: model.id,
+    ...(model.name === undefined ? {} : { name: model.name }),
+    ...(model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow }),
+    ...(model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens }),
+    reasoningEfforts: { off: null },
+  }))
+}
+
+/** 拉取 CodeBuddy 模型目录（只在用户给 Key 后调用）。 */
 export async function discoverCodeBuddyModels(
   apiKey: string,
   signal?: AbortSignal,

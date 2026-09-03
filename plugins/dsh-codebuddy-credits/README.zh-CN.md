@@ -6,9 +6,9 @@
 企业发放的 WorkBuddy/CodeBuddy 积分，在 DSH 里直接用。官方 API Key 直连，
 只用模型推理，**不用它的 agent harness，不做令牌/登录态逆向**。
 
-插件在 DSH 模型选择器里注册一个 `codebuddy-credits` provider。DSH 自己跑
-agent 循环（工具、权限、上下文），CodeBuddy 只负责推理，额度记在 CodeBuddy
-账号上。
+插件在 DSH 模型选择器里注册一个 `CodeBuddy Credits` provider（内部路由
+`codebuddy-credits`）。DSH 自己跑 agent 循环（工具、权限、上下文），CodeBuddy
+只负责推理，额度记在 CodeBuddy 账号上。
 
 ## 为什么做这个
 
@@ -35,17 +35,18 @@ dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits@latest
    API 管理 → 访问密钥；国际版 <https://www.codebuddy.ai/profile/keys>）。
 2. 创建密钥。企业密钥按账号签发，模型可用范围跟随账号权限。
 
-## 配置
+## 配置（界面内完成）
 
-插件默认从环境变量 `CODEBUDDY_API_KEY` 解析密钥，也可以存在 DSH 凭据服务里：
+打开 **设置 → 模型**，在 **CodeBuddy Credits** 行上直接粘贴 Key 并保存：
 
-- **设置 → 模型 → codebuddy-credits**：apiKeyEnv 是凭据引用字段——把 Key 粘贴
-  进去即存入 DSH 凭据库（不会写进 settings.yaml），或者留空并在启动环境里
-  导出 `CODEBUDDY_API_KEY`。
+- 保存 Key 时，插件用这把 Key 查询 CodeBuddy 模型目录（按该 Key 的账号权限
+  返回，企业管理员配置的可用模型），写入设置并启用 provider；
+- 之后模型选择器里即可选择这些模型；
+- 未配置 Key 时，插件不发起任何网络请求，模型选择器也不出现本 provider；
+- 移除 Key 后 provider 随即停用。
 
-插件自带模型目录（hy4-preview、hy3、hy3-x、glm-5.3-flash、minimax-m3-pay、
-deepseek-v4-flash）。想同步账号真实可用模型：**设置 → 模型 → codebuddy-credits
-→ 获取可用模型**，插件会用你的 Key 查 CodeBuddy 目录并把结果供你采纳。
+环境变量 `CODEBUDDY_API_KEY` 仍然兼容（启动时读取），但界面保存是推荐方式；
+Key 只存入 DSH 凭据库，不进 settings.yaml。
 
 ## 如实说明
 

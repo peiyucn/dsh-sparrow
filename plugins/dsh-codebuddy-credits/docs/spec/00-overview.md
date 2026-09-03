@@ -8,11 +8,12 @@
 
 ## 形态
 
-- DSH provider 路由 `codebuddy-credits`，模型选择器显示同名条目（小写随官方风格）
-- 模型 = 内置兜底目录（企业账号实测 6 模型）+ 设置页「获取可用模型」远程发现
+- DSH provider 路由 `codebuddy-credits`，模型选择器显示名 `CodeBuddy Credits`
+- 模型目录：**不预置**，完全依赖用户给 Key 的行为——保存 Key 时按该 Key 的
+  账号权限拉 /v3/config（企业管理员配置的可用模型），写入设置节并激活 provider
 - 推理 `POST https://copilot.tencent.com/v2/chat/completions`（仅流式，OpenAI SSE 方言）
-- 模型目录 `GET https://copilot.tencent.com/v3/config`（按 Key 的账号权限返回）
-- 凭据 `CODEBUDDY_API_KEY` 环境变量或 DSH 凭据库（credential-ref 设置字段）
+- 凭据：界面保存（DSH 凭据库）为主，`CODEBUDDY_API_KEY` 环境变量兼容
+- 无 Key 时插件不发任何网络请求，模型选择器不出现本 provider
 
 ## 架构
 

@@ -7,9 +7,10 @@ enterprise-issued CodeBuddy quota, used directly inside DSH. Official API key
 only: models as a provider, **no agent harness, no login/token reverse
 engineering**.
 
-The plugin registers a `codebuddy-credits` provider in the DSH model picker.
-DSH runs its own agent loop (tools, permissions, context); CodeBuddy only
-serves inference, billed to your CodeBuddy account.
+The plugin registers a `CodeBuddy Credits` provider (route
+`codebuddy-credits`) in the DSH model picker. DSH runs its own agent loop
+(tools, permissions, context); CodeBuddy only serves inference, billed to your
+CodeBuddy account.
 
 ## Why
 
@@ -39,21 +40,21 @@ Restart DSH afterwards. For headless use, repeat with `--profile headless`.
 2. Create a key. Enterprise keys are issued per account; model availability
    follows your account's permissions.
 
-## Configure
+## Configure (in the UI)
 
-The plugin resolves the key from the `CODEBUDDY_API_KEY` environment variable
-by default, or from the key stored in DSH's credential service:
+Open **Settings → Models** and paste your key on the **CodeBuddy Credits** row:
 
-- **Settings → Models → codebuddy-credits**: the apiKeyEnv field is a
-  credential reference — paste the key there to store it in the DSH credential
-  vault (never written to settings.yaml), or leave it and export
-  `CODEBUDDY_API_KEY` in your launching environment.
+- Saving the key queries the CodeBuddy model catalog with that key (models
+  follow the key's account permissions — e.g. the set your enterprise admin
+  granted), writes the result to settings, and activates the provider;
+- the models then appear in the model picker;
+- without a key the plugin makes no network requests at all and the provider
+  does not appear in the model picker;
+- removing the key deactivates the provider.
 
-The provider ships a built-in model catalog (hy4-preview, hy3, hy3-x,
-glm-5.3-flash, minimax-m3-pay, deepseek-v4-flash). To sync with what your
-account can actually use, open **Settings → Models → codebuddy-credits →
-Get available models** — the plugin queries the CodeBuddy catalog endpoint
-with your key and offers the result for adoption.
+The `CODEBUDDY_API_KEY` environment variable still works (read at startup),
+but saving in the UI is the recommended path; the key lives only in the DSH
+credential vault, never in settings.yaml.
 
 ## Honest limitations
 
