@@ -208,8 +208,18 @@ export function CodeBuddyCreditsIndicator({
   }, [t])
 
   // 挂载即读取状态：未配置 Key 时不显示图标（无配置时对话页不该有标）。
+  // 配置卡保存/清空 Key 会广播窗口事件，此处联动刷新（无需刷新页面）；
+  // 窗口重新获得焦点时也刷一次（兜底外部变更）。
   useEffect(() => {
     void loadStatus()
+    const onStatusChanged = () => { void loadStatus() }
+    const onFocus = () => { void loadStatus() }
+    window.addEventListener('codebuddy-credits-status-changed', onStatusChanged)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.removeEventListener('codebuddy-credits-status-changed', onStatusChanged)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [loadStatus])
 
   useEffect(() => {

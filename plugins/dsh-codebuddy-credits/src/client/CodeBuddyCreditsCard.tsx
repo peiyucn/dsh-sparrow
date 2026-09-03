@@ -18,6 +18,8 @@ import type { CSSProperties } from 'react'
 const STATUS_URL = '/api/codebuddy-credits/status'
 const KEY_URL = '/api/codebuddy-credits/key'
 const REMOVE_URL = '/api/codebuddy-credits/remove-key'
+/** 保存/清空 Key 后广播的窗口事件（对话页额度卡据此联动刷新）。 */
+const STATUS_CHANGED_EVENT = 'codebuddy-credits-status-changed'
 
 interface CardStatus {
   keyConfigured: boolean
@@ -266,6 +268,8 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
       setMessageKind('info')
       setMessage(t('cleared'))
       await load()
+      // 通知对话页的额度卡联动刷新（消失/出现），无需刷新页面。
+      window.dispatchEvent(new Event(STATUS_CHANGED_EVENT))
     } catch {
       setMessageKind('error')
       setMessage(t('error.clearFailed'))
