@@ -61,6 +61,8 @@ export function apply(ctx: Context, config: Config): void {
    */
   let facts: readonly CodeBuddyModelFacts[] = []
   const models = (): readonly CodeBuddyModelFacts[] => facts
+  /** 兜底注册失败日志只记一次（每进程）；成功后重置。 */
+  let registrationFailureLogged = false
 
   /** 账号上下文缓存（保存 Key 时从 /v2/accounts 拉取；重启后异步恢复）。 */
   let account: CodeBuddyAccount | undefined
@@ -361,9 +363,15 @@ export function apply(ctx: Context, config: Config): void {
       if (!registered) {
         try {
           ensureRoutes(true)
+          registrationFailureLogged = false
         } catch (error) {
-          ctx.logger.warn(`${name}: 状态读取兜底注册失败`)
-          ctx.logger.warn(error)
+          // 日志防刷：同一失败只记一次（每进程），后续静默；状态接口的
+          // active 字段供诊断。成功后再失败会重新记。
+          if (!registrationFailureLogged) {
+            registrationFailureLogged = true
+            ctx.logger.warn(`${name}: 状态读取兜底注册失败（本进程只记一次）`)
+            ctx.logger.warn(error)
+          }
         }
       }
     },
