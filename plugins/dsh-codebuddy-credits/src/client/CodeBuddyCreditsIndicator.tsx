@@ -131,11 +131,11 @@ const dangerStyle: CSSProperties = {
 
 const dividerStyle: CSSProperties = {
   height: '1px',
-  margin: '8px 0',
   background: 'var(--dsw-alias-border-l1)',
 }
 
-/** 面板材质对齐官方 Menu 卡片（--dsw-specific-menu + elevation token）。 */
+/** 面板材质对齐官方 Menu 卡片（--dsw-specific-menu + elevation token）。
+ * flex 列 + 统一 gap 6px：所有行间距一致，子元素不再各自设 margin。 */
 const panelStyle: CSSProperties = {
   position: 'absolute',
   top: 'calc(100% + 6px)',
@@ -153,6 +153,9 @@ const panelStyle: CSSProperties = {
   zIndex: 1000,
   textAlign: 'left',
   fontFamily: 'inherit',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '6px',
 } as CSSProperties
 
 export function CodeBuddyCreditsIndicator({
@@ -318,7 +321,7 @@ export function CodeBuddyCreditsIndicator({
                       <>
                         {/* 容量条对齐 dsh-file-manage 配额条：加厚 16px、未使用区
                             45° 斜纹、文字居中叠加、business 蓝填充。 */}
-                        <div style={{ marginTop: '4px', fontSize: '12px', lineHeight: '18px', fontWeight: 500, color: 'var(--dsw-alias-label-secondary)' }}>
+                        <div style={{ fontSize: '12px', lineHeight: '18px', fontWeight: 500, color: 'var(--dsw-alias-label-secondary)' }}>
                           {t('indicator.quotaTitle')}
                         </div>
                         <div
@@ -329,7 +332,6 @@ export function CodeBuddyCreditsIndicator({
                           style={{
                             position: 'relative',
                             height: '16px',
-                            marginTop: '6px',
                             borderRadius: '8px',
                             backgroundColor: 'var(--dsw-alias-interactive-bg-hover)',
                             backgroundImage: 'repeating-linear-gradient(45deg, transparent 0px, transparent 5px, var(--dsw-alias-border-l1) 5px, var(--dsw-alias-border-l1) 7px)',
@@ -368,7 +370,7 @@ export function CodeBuddyCreditsIndicator({
                             })}
                           </span>
                         </div>
-                        <div style={{ ...captionStyle, marginTop: '6px' }}>
+                        <div style={captionStyle}>
                           {t('indicator.remainingLabel')}{' '}
                           <span style={{ color: CREDIT_ORANGE, fontWeight: 600 }}>{formatCredits(quota.remaining)}</span>
                         </div>
@@ -398,7 +400,7 @@ export function CodeBuddyCreditsIndicator({
               ? (
                 <>
                   <div style={dividerStyle} />
-                  <div style={{ ...captionStyle, marginBottom: '2px' }}>{t('indicator.model.title')}</div>
+                  <div style={captionStyle}>{t('indicator.model.title')}</div>
                   <div style={{ fontSize: '12px', lineHeight: '18px', fontWeight: 500 }}>{model.name}</div>
                   <div style={captionStyle}>{t('indicator.model.context', { context: formatTokens(model.contextWindow) })}</div>
                   {model.vision
