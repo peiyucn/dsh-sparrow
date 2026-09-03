@@ -47,8 +47,6 @@ interface ModelFactView {
 interface StatusPayload {
   keyConfigured: boolean
   account?: { enterpriseName?: string; accountType?: string; enterpriseUserName?: string; nickname?: string }
-  quota?: QuotaView
-  quotaError?: string
   models: ModelFactView[]
 }
 
@@ -254,6 +252,7 @@ export function CodeBuddyCreditsIndicator({
   useEffect(() => {
     if (!open) return
     void loadStatus()
+    void loadQuota()
     const onMouseDown = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
     }
@@ -266,7 +265,7 @@ export function CodeBuddyCreditsIndicator({
       document.removeEventListener('mousedown', onMouseDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [open, loadStatus])
+  }, [open, loadStatus, loadQuota])
 
   const selected = selection?.provider === 'codebuddy-credits' ? selection : undefined
   const model = selected === undefined
@@ -356,6 +355,9 @@ export function CodeBuddyCreditsIndicator({
                 <>
                   {accountText !== undefined
                     ? <div style={captionStyle}>{accountText}</div>
+                    : null}
+                  {quota === undefined && quotaError === undefined
+                    ? <div style={captionStyle}>{t('indicator.loading')}</div>
                     : null}
                   {quota !== undefined
                     ? (
