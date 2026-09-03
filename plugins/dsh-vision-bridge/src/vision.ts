@@ -153,43 +153,6 @@ export function imageRefsInEvents(events: readonly SessionEvent[]): ImageAttachm
   return refs
 }
 
-/**
- * 自动档门控：主模型已识别为 DeepSeek 系列文本路由（图片不走直达、需要文字报告）时才注入。
- * 未识别路由不注入（spec 03）——全新会话首轮尚无 request/header 可判，注入可能污染
- * 原生视觉主模型的提示。
- */
-export function shouldAutoDescribe(
-  mainRoute: { provider: string } | undefined,
-  inputModalities: readonly string[] | undefined,
-): boolean {
-  if (mainRoute === undefined) return false
-  if (!isDeepseekMainRoute(mainRoute)) return false
-  return !modelSupportsImages(inputModalities)
-}
-
-/** 自动档注入段落：每图一段渲染报告；有未读到的图时注明（下一轮组装自动补）。 */
-export function autoVisionSectionText(
-  entries: readonly { attachmentId: string; report: VisionReport }[],
-  missedCount: number,
-): string {
-  if (entries.length === 0) return ''
-  const lines = [
-    '[vision_read 自动描述] 会话中的图片已由视觉模型自动读取，内容如下。',
-    '这些图片的内容已在上面给出：直接基于它作答即可，不要再调用 vision_read 重复查看。',
-    '仅当需要针对性二次提取（如把表格转成 CSV、只识别某段文字）时，才调用 vision_read 并附对应 attachmentId。',
-    '',
-  ]
-  for (const entry of entries) {
-    lines.push('attachmentId=sha256:' + entry.attachmentId)
-    lines.push(renderVisionReport(entry.report))
-    lines.push('')
-  }
-  if (missedCount > 0) {
-    lines.push('（另有 ' + missedCount + ' 张图本轮未读到，将在后续轮次自动补读）')
-  }
-  return lines.join('\n').trimEnd()
-}
-
 export function findImageReference(events: readonly SessionEvent[], attachmentId: string): ImageLookupResult {
   const refs = imageRefsInEvents(events)
   const allIds = refs.map(ref => String(ref.attachmentId))

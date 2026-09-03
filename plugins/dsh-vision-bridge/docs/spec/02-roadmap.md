@@ -22,9 +22,9 @@
 * [ ] 可选：第三方 VLM 降级配置（默认关闭，明示隐私）
 * [ ] 可选：agentPresets 预设集成（视觉模型预置/校验）
 
-## M3 · 自动看图（spec 03）
+## M3 · 自动看图（spec 03）— 已撤销（2026-09-04）
 
-* [ ] 评审通过后开工：`system-prompt/assemble` 注入 + 门控（deepseek 文本路由）+ 缓存复用 + 预算（N 图/超时）+ `autoDescribe` 开关 + 单测
+* [x] ~~`system-prompt/assemble` 注入~~ 已撤销：评审后决定回到纯工具通道，不做自动注入
 
 ## 发布
 

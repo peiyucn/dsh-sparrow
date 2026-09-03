@@ -6,18 +6,16 @@ import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-llm'
-import type {} from '@deepseek-ai/dsh-system-prompt'
 import { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
-import { SessionId, type Session, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionId, type Session } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-tools'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import {
-  autoVisionSectionText, extractJsonObject, findImageReference, imageRefsInEvents, isDeepseekMainRoute,
-  mainRouteFromSession, modelSupportsImages, normalizeVisionConfig, parseVisionReport, renderVisionReport,
-  resolveVisionOutput, shouldAutoDescribe, shouldClearInputModalities, visionCacheKey, VisionCache,
-  type VisionConfig, type VisionReport,
+  extractJsonObject, findImageReference, isDeepseekMainRoute, mainRouteFromSession, modelSupportsImages,
+  normalizeVisionConfig, parseVisionReport, renderVisionReport, resolveVisionOutput, shouldClearInputModalities,
+  visionCacheKey, VisionCache, type VisionConfig, type VisionReport,
 } from './vision.js'
 
 export const name = 'dsh-vision-bridge'
@@ -27,12 +25,8 @@ export type { VisionConfig, VisionReport }
 
 const TOOL_NAME = 'vision_read'
 const STATUS_ROUTE_PATH = '/api/vision-bridge/status'
-/** 自动档与工具默认提问共用同一条（共享缓存键，避免同一张图读两次）。 */
+/** vision_read 工具默认提问。 */
 const DEFAULT_VISION_QUESTION = '请完整阅读这张图片并给出结构化报告。'
-/** 自动档注入段落的唯一名（组装不变量：段名唯一且非空）。 */
-const AUTO_SECTION_NAME = 'vision-bridge:auto-describe'
-/** 单次组装的读图总预算；超时中止并行读图，未读到的图下一轮组装自动补。 */
-const AUTO_DESCRIBE_BUDGET_MS = 15_000
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   if (res.headersSent) return
@@ -229,7 +223,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   //    直连视觉模型约 2.2s，因此不再起子代理。
   ctx.effect(() => ctx.tools.register(defineTool({
     name: TOOL_NAME,
-    description: 'Read an image already attached to this conversation with a vision subagent. Use this tool only when the image content is NOT already summarized in your system prompt (as a "[vision_read 自动描述]" block), or when the user asks for a targeted extraction (e.g. transcribe a table, read one region). The image stays inside the DeepSeek provider account and is never sent to a third party.',
+    description: 'Read an image already attached to this conversation with a vision subagent. Use this tool when the user asks about a pasted image and the main model cannot see images directly. The image stays inside the DeepSeek provider account and is never sent to a third party.',
     parameters: {
       attachmentId: {
         type: 'string',
@@ -292,54 +286,6 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       return describeImage(ctx, settings, cache, inflight, ref, question, exec.signal)
     },
   })), 'dsh-vision-bridge: vision_read tool')
-
-  // 2.5 自动看图（spec 03）：system-prompt/assemble 注入——贴图后主模型稳定拿到报告，
-  //     不依赖自觉调用 vision_read。只增不改：本钩子是现有行为之外的新增注入点，
-  //     任何失败静默跳过，绝不阻塞请求。
-  ctx.effect(() => ctx.on('system-prompt/assemble', async (assembly, context, next) => {
-    const result = await next()
-    try {
-      const agent = (context as { agent?: { session?: Session } }).agent
-      if (agent === undefined || agent.session === undefined) return result
-      const session = agent.session
-      const events = session.snapshotEvents()
-      // 按「当前选中的模型」判定（选择器一写就有，新会话首轮也能拿到），
-      // 而非 request/header（首轮尚无）。
-      const main = currentMainModel(ctx, session)
-      // 新图判定前置（最便宜）：会话无图、或全部已缓存 → 不动组装。
-      const fresh = imageRefsInEvents(events).filter(ref =>
-        cache.get(visionCacheKey(String(ref.attachmentId), DEFAULT_VISION_QUESTION)) === undefined)
-      if (fresh.length === 0) return result
-      // 门控：未识别 / 非 deepseek / 原生视觉主模型（图片直达）→ 不注入。
-      let inputModalities: readonly string[] | undefined
-      if (main !== undefined) {
-        try {
-          inputModalities = (await ctx.llm.resolveModelInfo(main.provider, main.model)).inputModalities
-        } catch {
-          inputModalities = undefined // 能力解析失败：已识别 deepseek 路由时仍按文本模型处理（与工具档口径一致）
-        }
-      }
-      if (!shouldAutoDescribe(main, inputModalities)) return result
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), AUTO_DESCRIBE_BUDGET_MS)
-      const outcomes = await Promise.allSettled(fresh.map(ref =>
-        describeImage(ctx, settings, cache, inflight, ref, DEFAULT_VISION_QUESTION, controller.signal)))
-      clearTimeout(timer)
-      const described: { attachmentId: string; report: VisionReport }[] = []
-      let missed = 0
-      outcomes.forEach((outcome, index) => {
-        const ref = fresh[index]
-        if (ref === undefined) return
-        if (outcome.status === 'fulfilled') described.push({ attachmentId: String(ref.attachmentId), report: outcome.value })
-        else missed += 1
-      })
-      if (described.length === 0) return result
-      result.sections.push({ name: AUTO_SECTION_NAME, text: autoVisionSectionText(described, missed) })
-    } catch {
-      // 注入失败绝不阻塞请求：回退到纯现有行为（模型可自行调用 vision_read）。
-    }
-    return result
-  }), 'dsh-vision-bridge: auto describe')
 
   // 3. 状态查询路由：客户端点亮图标据此判定（DeepSeek 文本模型 → vision_read 可用）。
   ctx.effect(() => ctx.webServer.register({

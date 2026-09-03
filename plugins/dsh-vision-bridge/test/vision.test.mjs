@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  autoVisionSectionText, extractJsonObject, findImageReference, imageRefsInEvents, isDeepseekMainRoute,
+  extractJsonObject, findImageReference, imageRefsInEvents, isDeepseekMainRoute,
   mainRouteFromSession, modelSupportsImages, normalizeAttachmentId, normalizeVisionConfig, parseVisionReport,
-  renderVisionReport, resolveVisionOutput, shouldAutoDescribe, shouldClearInputModalities, visionCacheKey, VisionCache,
+  renderVisionReport, resolveVisionOutput, shouldClearInputModalities, visionCacheKey, VisionCache,
 } from '../lib/vision.js'
 
 describe('vision-bridge 纯逻辑', () => {
@@ -299,42 +299,6 @@ describe('vision-bridge 纯逻辑', () => {
 
     it('无图事件 应该 返回空数组', () => {
       assert.deepEqual(imageRefsInEvents([{ type: 'user/message', data: { content: [{ type: 'text', text: 'hi' }] } }]), [])
-    })
-  })
-
-  describe('shouldAutoDescribe', () => {
-    it('deepseek 文本路由 应该 注入', () => {
-      assert.equal(shouldAutoDescribe({ provider: 'deepseek-official' }, ['text']), true)
-    })
-
-    it('未识别路由 应该 不注入（全新会话首轮防污染）', () => {
-      assert.equal(shouldAutoDescribe(undefined, undefined), false)
-    })
-
-    it('非 deepseek 主模型 应该 不注入', () => {
-      assert.equal(shouldAutoDescribe({ provider: 'openai' }, ['text']), false)
-    })
-
-    it('原生视觉主模型 应该 不注入', () => {
-      assert.equal(shouldAutoDescribe({ provider: 'deepseek-official' }, ['text', 'image']), false)
-    })
-  })
-
-  describe('autoVisionSectionText', () => {
-    it('有报告 应该 含标记、attachmentId 与摘要', () => {
-      const text = autoVisionSectionText([{ attachmentId: 'abc', report: { summary: '一张猫图', tables: [] } }], 0)
-      assert.match(text, /vision_read 自动描述/u)
-      assert.match(text, /attachmentId=sha256:abc/u)
-      assert.match(text, /summary: 一张猫图/u)
-    })
-
-    it('有未读到的图 应该 注明数量', () => {
-      const text = autoVisionSectionText([{ attachmentId: 'abc', report: { summary: 's', tables: [] } }], 2)
-      assert.match(text, /另有 2 张图本轮未读到/u)
-    })
-
-    it('无报告 应该 返回空串', () => {
-      assert.equal(autoVisionSectionText([], 3), '')
     })
   })
 
