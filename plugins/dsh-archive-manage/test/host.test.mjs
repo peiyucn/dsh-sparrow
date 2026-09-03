@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { resolve, sep } from 'node:path'
-import { addedSummaryFor, assertRegistryMutationApi, assertSessionLocationApi, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor, storedHeaders } from '../lib/host.js'
+import { addedSummaryFor, assertRegistryMutationApi, assertSessionLocationApi, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor, storedHeaders, subagentLabel } from '../lib/host.js'
 
 // 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
 // 测试夹具按当前平台构造——CI 跑 Ubuntu、本机跑 Windows，两边都必须绿。
@@ -163,6 +163,105 @@ describe('archive-manage host 纯逻辑', () => {
       const { surface, get } = fakeRegistry(['a'])
       await mutateArchivedSet(surface, ids => ids.includes('a') ? ids : [...ids, 'a'])
       assert.deepEqual(get().archivedSessionIds, ['a'])
+    })
+  })
+
+  describe('subagentLabel 三档读链', () => {
+    const labelHeader = (id, extra = {}) => ({ id, createdAt: 1, isSeeded: false, origin: 'subagent', ...extra })
+    const labelCtx = ({ live, cacheRow, cacheThrows = false, observe, observeThrows = false }) => ({
+      sessions: { get: () => live },
+      get: (name) => {
+        if (name === 'sessionProjections') {
+          return live === undefined ? undefined : { snapshot: () => ({ values: { subagent: { label: 'live-label' } } }) }
+        }
+        if (name === 'sessionProjectionCache') {
+          return { cachedSnapshot: cacheThrows ? () => { throw new Error('cache boom') } : () => cacheRow }
+        }
+        if (name === 'sessionQuery') {
+          return { observeSession: observeThrows ? async () => { throw new Error('fold boom') } : observe }
+        }
+        return undefined
+      },
+      logger: { warn: () => {} },
+    })
+
+    it('live 子会话 应该 走注册表快照', async () => {
+      const ctx = labelCtx({ live: { live: true } })
+      assert.equal(await subagentLabel(ctx, labelHeader('live-1')), 'live-label')
+    })
+
+    it('冷会话 + 缓存命中 应该 用缓存行标签', async () => {
+      const ctx = labelCtx({ cacheRow: { values: { subagent: { label: 'cached-label' } } } })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-cache-1')), 'cached-label')
+    })
+
+    it('缓存落空 + 未种子 应该 从日志折叠并释放租约', async () => {
+      let disposed = 0
+      const ctx = labelCtx({
+        cacheRow: undefined,
+        observe: async () => ({
+          header: { createdAt: 1 },
+          projections: { values: { subagent: { label: 'folded-label' } } },
+          dispose: () => { disposed += 1 },
+        }),
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-1')), 'folded-label')
+      assert.equal(disposed, 1)
+    })
+
+    it('缓存读取抛错 应该 继续走日志折叠档', async () => {
+      const ctx = labelCtx({
+        cacheThrows: true,
+        observe: async () => ({
+          header: { createdAt: 1 },
+          projections: { values: { subagent: { label: 'folded-after-cache-boom' } } },
+          dispose: () => {},
+        }),
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-2')), 'folded-after-cache-boom')
+    })
+
+    it('种子冷会话 应该 不走日志折叠档（OOM 场景门）', async () => {
+      let observed = 0
+      const ctx = labelCtx({
+        cacheRow: undefined,
+        observe: async () => { observed += 1; return undefined },
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('seeded-1', { isSeeded: true })), undefined)
+      assert.equal(observed, 0)
+    })
+
+    it('日志折叠抛错 应该 回退 undefined', async () => {
+      const ctx = labelCtx({ cacheRow: undefined, observeThrows: true })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-3')), undefined)
+    })
+
+    it('折叠成功结果 应该 按 sessionId 记忆（二次调用不再折叠）', async () => {
+      let observed = 0
+      const ctx = labelCtx({
+        cacheRow: undefined,
+        observe: async () => {
+          observed += 1
+          return { header: { createdAt: 1 }, projections: { values: { subagent: { label: 'memo-label' } } }, dispose: () => {} }
+        },
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-4')), 'memo-label')
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-4')), 'memo-label')
+      assert.equal(observed, 1)
+    })
+
+    it('观察生命周期与 header 不一致 应该 拒绝并释放租约', async () => {
+      let disposed = 0
+      const ctx = labelCtx({
+        cacheRow: undefined,
+        observe: async () => ({
+          header: { createdAt: 99 },
+          projections: { values: { subagent: { label: 'stale-label' } } },
+          dispose: () => { disposed += 1 },
+        }),
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-5')), undefined)
+      assert.equal(disposed, 1)
     })
   })
 })

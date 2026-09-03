@@ -316,16 +316,33 @@ function treeIds(nodes: readonly SessionTreeNode[]): string[] {
   return out
 }
 
+/** 第三档（冷、未种子）从日志重新折叠投影的单次观察超时。 */
+const LABEL_FOLD_TIMEOUT_MS = 15_000
+
+/**
+ * 折叠成功的 subagent 标签记忆：描述符事件一旦写入即不可变（官方注释 "a descriptor is
+ * immutable once appended"），归档会话日志静止，按 sessionId 记忆安全。只写成功值。
+ */
+const foldedSubagentLabels = new Map<string, string>()
+
+/** observeSession 观察结果（租约，用后必须 dispose）的最小结构。 */
+interface FoldObservation {
+  header?: { createdAt?: number }
+  projections?: { values?: Record<string, { label?: string } | null | undefined> }
+  dispose?: () => void
+}
+
 /**
  * 子会话标签：官方 subagent 投影单元 label（父会话给子会话的任务描述，不受父消息污染）。
- * 安全两档，绝不走 observeSession——对 live 会话它会悬挂（官方 list-children 对 live 只走
- * 注册表快照），对种子冷会话它会连带读取父会话前缀（大日志 OOM，2026-09-03 实测 dsh 进程
- * 堆打满崩溃）：
- *   1. live 子会话 → 投影注册表快照（内存、同步）；
- *   2. 冷会话 → 投影缓存行（展示级；行自带身份校验，读不到就回退标题）。
+ * 三档读链，与官方 list-children 同构——缓存只是捷径，日志才是权威，缓存坏掉只变慢、不变错：
+ *   1. live 子会话 → 投影注册表快照（内存、同步；官方对 live 只走这一档，observeSession 会悬挂）；
+ *   2. 冷会话 → 投影缓存行（展示级；行自带身份校验）；
+ *   3. 冷 + 未种子 + 缓存不可用 → observeSession 从日志重新折叠（官方同款权威兜底）。
+ *      9-03 的 OOM 是「种子冷会话连带读父会话前缀」——isSeeded 门把该场景挡在档外，
+ *      而不是禁用整条正路；观察是租约，用后 dispose，15s 超时防悬挂。
  * 均做能力检查 + 结构断言，失败返回 undefined，调用方回退标题单元结果。
  */
-async function subagentLabel(ctx: Context, header: SessionHeader): Promise<string | undefined> {
+export async function subagentLabel(ctx: Context, header: SessionHeader): Promise<string | undefined> {
   const sessionId = SessionId(String(header.id))
   const live = ctx.sessions.get(sessionId)
   if (live !== undefined) {
@@ -352,6 +369,36 @@ async function subagentLabel(ctx: Context, header: SessionHeader): Promise<strin
       if (typeof label === 'string' && label.trim() !== '') return label
     } catch (error) {
       ctx.logger.warn(`dsh-archive-manage: subagent 投影缓存读取失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  if (!header.isSeeded) {
+    const memoized = foldedSubagentLabels.get(String(sessionId))
+    if (memoized !== undefined) return memoized
+    const query = ctx.get('sessionQuery') as unknown as {
+      observeSession?: (id: unknown, options: { signal?: AbortSignal }) => Promise<FoldObservation>
+    } | undefined
+    if (query !== undefined && typeof query.observeSession === 'function') {
+      let observation: FoldObservation | undefined
+      try {
+        observation = await query.observeSession(sessionId, { signal: AbortSignal.timeout(LABEL_FOLD_TIMEOUT_MS) })
+        // 生命周期见证：同 id 槽位被删后重建（createdAt 变化）不得串用旧观察。
+        if (observation !== undefined
+          && (observation.header?.createdAt === undefined || observation.header.createdAt === header.createdAt)) {
+          const label = observation.projections?.values?.subagent?.label
+          if (typeof label === 'string' && label.trim() !== '') {
+            foldedSubagentLabels.set(String(sessionId), label)
+            return label
+          }
+        }
+      } catch (error) {
+        ctx.logger.warn(`dsh-archive-manage: subagent 标签日志折叠失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+      } finally {
+        try {
+          observation?.dispose?.()
+        } catch {
+          // 租约释放 best-effort：失败不影响回退。
+        }
+      }
     }
   }
   return undefined
