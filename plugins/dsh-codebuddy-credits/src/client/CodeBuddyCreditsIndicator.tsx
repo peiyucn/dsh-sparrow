@@ -236,12 +236,15 @@ export function CodeBuddyCreditsIndicator({
 
   const account = status?.account
   // /v2/accounts 实测 type 为 ultimate（企业）/personal；enterprise 兼容旧形状。
-  const accountText = account?.enterpriseName
-    ?? (account?.accountType === 'enterprise' || account?.accountType === 'ultimate'
+  // 企业行与配置页同格式：企业版 · 大家保险集团有限责任公司。
+  const accountText = [
+    account?.accountType === 'enterprise' || account?.accountType === 'ultimate'
       ? t('account.enterprise')
       : account?.accountType === 'personal'
         ? t('account.personal')
-        : undefined)
+        : undefined,
+    account?.enterpriseName,
+  ].filter((part): part is string => part !== undefined).join(' · ') || undefined
 
   // 右上角用户徽章：企业内姓名（账号昵称）；无企业姓名时只显示昵称。
   const userBadge = account?.enterpriseUserName !== undefined
