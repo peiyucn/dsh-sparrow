@@ -307,15 +307,16 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       const fresh = imageRefsInEvents(events).filter(ref =>
         cache.get(visionCacheKey(String(ref.attachmentId), DEFAULT_VISION_QUESTION)) === undefined)
       if (fresh.length === 0) return result
-      // 门控：非 deepseek 主模型、或原生视觉主模型（图片直达）→ 不注入。
+      // 门控：未识别路由 / 非 deepseek 主模型 / 原生视觉主模型（图片直达）→ 不注入。
+      let inputModalities: readonly string[] | undefined
       if (main !== undefined) {
         try {
-          const info = await ctx.llm.resolveModelInfo(main.provider, main.model)
-          if (!shouldAutoDescribe(main, info.inputModalities)) return result
+          inputModalities = (await ctx.llm.resolveModelInfo(main.provider, main.model)).inputModalities
         } catch {
-          // 能力解析失败：继续按文本模型处理（与工具档口径一致）。
+          inputModalities = undefined // 能力解析失败：已识别 deepseek 路由时仍按文本模型处理（与工具档口径一致）
         }
       }
+      if (!shouldAutoDescribe(main, inputModalities)) return result
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), AUTO_DESCRIBE_BUDGET_MS)
       const outcomes = await Promise.allSettled(fresh.map(ref =>

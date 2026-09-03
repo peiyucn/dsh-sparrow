@@ -305,7 +305,10 @@ describe('vision-bridge 纯逻辑', () => {
   describe('shouldAutoDescribe', () => {
     it('deepseek 文本路由 应该 注入', () => {
       assert.equal(shouldAutoDescribe({ provider: 'deepseek-official' }, ['text']), true)
-      assert.equal(shouldAutoDescribe(undefined, undefined), true)
+    })
+
+    it('未识别路由 应该 不注入（全新会话首轮防污染）', () => {
+      assert.equal(shouldAutoDescribe(undefined, undefined), false)
     })
 
     it('非 deepseek 主模型 应该 不注入', () => {

@@ -154,13 +154,15 @@ export function imageRefsInEvents(events: readonly SessionEvent[]): ImageAttachm
 }
 
 /**
- * 自动档门控：主模型为 DeepSeek 系列且非原生视觉（图片不走直达、需要文字报告）时注入。
- * 未识别路由按 deepseek 处理（与 vision_read 工具的按 agent 屏蔽口径一致）。
+ * 自动档门控：主模型已识别为 DeepSeek 系列文本路由（图片不走直达、需要文字报告）时才注入。
+ * 未识别路由不注入（spec 03）——全新会话首轮尚无 request/header 可判，注入可能污染
+ * 原生视觉主模型的提示。
  */
 export function shouldAutoDescribe(
   mainRoute: { provider: string } | undefined,
   inputModalities: readonly string[] | undefined,
 ): boolean {
+  if (mainRoute === undefined) return false
   if (!isDeepseekMainRoute(mainRoute)) return false
   return !modelSupportsImages(inputModalities)
 }
