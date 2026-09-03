@@ -16,12 +16,16 @@ const LOCALE_DICTS = {
   zh: {
     'popover.crossModel.title': '可跨模型读图',
     'popover.crossModel.body': '直接发送图片即可：dsh-vision-bridge 会自动把图片交给 {model} 处理，主模型保持对话大脑。',
+    'popover.nativeVision.title': '该模型原生支持视觉',
+    'popover.nativeVision.body': '当前模型本身就支持看图：图片直达主模型，无需经视觉通道转述。',
     'popover.noVision.title': '该模型不支持看图',
     'popover.noVision.body': '当前模型不具备视觉能力，也不在此插件支持的跨模型读图范围内（仅 DeepSeek 文本模型）。请切换模型后再试。',
   },
   en: {
     'popover.crossModel.title': 'Cross-model image reading',
     'popover.crossModel.body': 'Just send an image: dsh-vision-bridge sends it to {model} automatically, while the main model stays the brain of the conversation.',
+    'popover.nativeVision.title': 'Native vision model',
+    'popover.nativeVision.body': 'This model sees images natively: images go straight to the main model, with no transcription channel needed.',
     'popover.noVision.title': 'No vision capability',
     'popover.noVision.body': 'This model cannot see images and is outside the cross-model channel (DeepSeek text models only). Switch models to continue.',
   },

@@ -4,6 +4,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'vision-bridge':
       | 'popover.crossModel.title'
       | 'popover.crossModel.body'
+      | 'popover.nativeVision.title'
+      | 'popover.nativeVision.body'
       | 'popover.noVision.title'
       | 'popover.noVision.body'
   }
