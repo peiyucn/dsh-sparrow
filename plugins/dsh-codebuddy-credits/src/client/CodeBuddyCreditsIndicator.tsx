@@ -91,6 +91,19 @@ function formatReset(raw: string | undefined): string | undefined {
   return match === null ? raw : match[1]
 }
 
+/** 距重置日期的天数（不足一天按 1 天计；无效/已过返回 null）。 */
+function daysUntil(date: string): number | null {
+  const time = Date.parse(date.replace(' ', 'T'))
+  if (Number.isNaN(time)) return null
+  const days = Math.ceil((time - Date.now()) / 86_400_000)
+  return days >= 1 ? days : null
+}
+
+/** 积分数字：整数不挂小数位（2000），非整数保留两位（0.41/1999.59）。 */
+function formatCredits(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2)
+}
+
 /** 面板正文：label-secondary（caption 在深浅两主题下都偏淡，不可读）。 */
 const captionStyle: CSSProperties = {
   fontSize: '12px',
@@ -207,12 +220,13 @@ export function CodeBuddyCreditsIndicator({
 
   const account = status?.account
   // /v2/accounts 实测 type 为 ultimate（企业）/personal；enterprise 兼容旧形状。
-  const accountText = account?.enterpriseName
-    ?? (account?.accountType === 'enterprise' || account?.accountType === 'ultimate'
+  const accountLine = account?.enterpriseName !== undefined
+    ? t('indicator.account', { enterprise: account.enterpriseName })
+    : (account?.accountType === 'enterprise' || account?.accountType === 'ultimate')
       ? t('account.enterprise')
       : account?.accountType === 'personal'
         ? t('account.personal')
-        : undefined)
+        : undefined
 
   const quota = status?.quota
   const ratio = quota !== undefined && quota.limit > 0
@@ -220,6 +234,7 @@ export function CodeBuddyCreditsIndicator({
     : 0
   const percent = Math.round(ratio * 100)
   const resetAt = formatReset(quota?.resetAt)
+  const resetDays = resetAt === undefined ? null : daysUntil(resetAt)
 
   // 未配置 Key（或状态未加载完成）时不渲染图标：对话页只在有 CodeBuddy
   // 配置时才出现这个标；加载完成后配置态自动亮出。
@@ -252,17 +267,17 @@ export function CodeBuddyCreditsIndicator({
             {status?.keyConfigured === true
               ? (
                 <>
-                  {accountText !== undefined
-                    ? <div style={captionStyle}>{accountText}</div>
+                  {accountLine !== undefined
+                    ? <div style={{ ...captionStyle, marginBottom: '4px' }}>{accountLine}</div>
                     : null}
                   {quota !== undefined
                     ? (
                       <>
+                        <div style={{ fontSize: '12px', lineHeight: '18px', color: 'var(--dsw-alias-label-secondary)' }}>
+                          {t('indicator.quotaLine', { limit: formatCredits(quota.limit) })}
+                        </div>
                         {/* 容量条对齐 dsh-file-manage 配额条：加厚 16px、未使用区
                             45° 斜纹、文字居中叠加、business 蓝填充。 */}
-                        <div style={{ marginTop: '4px', fontSize: '12px', lineHeight: '18px', fontWeight: 500, color: 'var(--dsw-alias-label-secondary)' }}>
-                          {t('indicator.quotaTitle')}
-                        </div>
                         <div
                           role="progressbar"
                           aria-valuemin={0}
@@ -304,17 +319,20 @@ export function CodeBuddyCreditsIndicator({
                             pointerEvents: 'none',
                           }}>
                             {t('indicator.used', {
-                              used: quota.used.toFixed(2),
-                              limit: quota.limit.toFixed(2),
-                              percent: String(percent),
+                              used: formatCredits(quota.used),
+                              remaining: formatCredits(quota.remaining),
                             })}
                           </span>
                         </div>
-                        <div style={{ ...captionStyle, marginTop: '6px' }}>
-                          {t('indicator.remaining', { remaining: quota.remaining.toFixed(2) })}
-                        </div>
                         {resetAt !== undefined
-                          ? <div style={captionStyle}>{t('indicator.reset', { reset: resetAt })}</div>
+                          ? (
+                            <div style={{ ...captionStyle, marginTop: '6px' }}>
+                              {t('indicator.reset', { reset: resetAt })}
+                              {resetDays !== null
+                                ? ' ' + t('indicator.resetDays', { days: String(resetDays) })
+                                : ''}
+                            </div>
+                          )
                           : null}
                       </>
                     )
