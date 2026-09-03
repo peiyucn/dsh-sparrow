@@ -1,11 +1,13 @@
 /**
  * CodeBuddy 模型目录解析：不预置任何模型信息。模型列表完全依赖用户给 Key
- * 的行为——保存 Key 时（或「获取可用模型」）才调 /v3/config 拉取，结果经
- * 设置节持久化。无 Key 时本插件不发任何网络请求。
+ * 的行为——保存 Key 后（及宿主重建模型目录时）才调 /v3/config 拉取，模型
+ * 事实只存进程内、不落设置节（设置页不自建模型列表，模型列表随 Key 走）。
+ * 无 Key 时本插件不发任何网络请求。
  *
- * /v3/config 的模型条目带积分消耗系数（credits，如 "x0.79 credits"）与精确
- * 思考档位声明（reasoning.supportedEfforts / canDisableThinking）。系数附加进
- * 展示名（模型选择器可见），档位转成 reasoningEfforts 声明。
+ * /v3/config 的模型条目带积分消耗系数（credits，如 "x0.79 credits"）、多模态
+ * 声明（supportsImages）与精确思考档位声明（reasoning.supportedEfforts /
+ * canDisableThinking）。系数与视觉标记附加进展示名（模型选择器只渲染
+ * model.name，官方 UI 没有独立字段位），档位转成 reasoningEfforts 声明。
  */
 
 import { LlmError } from '@deepseek-ai/dsh-llm'
@@ -15,24 +17,32 @@ import {
   CONFIG_URL,
   DEFAULT_CONTEXT_WINDOW,
   DEFAULT_MAX_TOKENS,
+  MODEL_DISCOVERY_TIMEOUT_MS,
   OFFICIAL_USER_AGENT,
   PRODUCT_HEADER,
   PROVIDER,
 } from './constants.js'
 
-/** 设置节里一条模型配置（插件自有类型，不依赖 pi-ai）。 */
-export interface CodeBuddyModelProfile {
+/** 思考档位声明：false 禁用；dict 显式声明（key 为档位 id，value 为 wire 拼写，null 表示不发参数）。 */
+export type ReasoningEfforts = false | Record<string, string | null>
+
+/** 完整解析的远端模型条目（比 DSH 的 LlmDiscoveredModel 多计费、多模态与档位事实）。 */
+export interface CodeBuddyModelEntry {
   id: string
-  name?: string
+  /** 服务端原始模型名（不含任何插件附加标记）。 */
+  name: string
+  /** 积分消耗系数短串（"x0.79"），缺省表示服务端未声明。 */
+  credits?: string
   contextWindow?: number
   maxTokens?: number
   input?: ('text' | 'image')[]
-  reasoningEfforts?: false | Record<string, string | null>
+  reasoningEfforts?: ReasoningEfforts
 }
 
-/** 解析后的模型事实（adapter 与目录展示共用）。 */
+/** 解析后的模型事实（adapter 与状态接口共用）。 */
 export interface CodeBuddyModelFacts {
   id: string
+  /** 展示名：原始名 + 系数/视觉标记（模型选择器可见的唯一文本位）。 */
   name: string
   contextWindow: number
   maxTokens: number
@@ -41,38 +51,49 @@ export interface CodeBuddyModelFacts {
   thinkingLevelMap?: Record<string, string | null>
 }
 
-/** 完整解析的远端模型条目（比 DSH 的 LlmDiscoveredModel 多计费与档位事实）。 */
-export interface CodeBuddyModelEntry {
-  id: string
+/** "x0.79 credits" → 短系数 "x0.79"；数值为 0（如 "x0.00"）→ "free"；非字符串 → undefined。 */
+export function creditLabel(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined
+  const match = /x([\d.]+)/i.exec(raw)
+  if (match === null) return undefined
+  const value = Number(match[1])
+  return Number.isFinite(value) && value === 0 ? 'free' : 'x' + match[1]
+}
+
+/**
+ * 展示名组装：原始名 + 两空格 + 标签（系数 · 视觉标记）。
+ * 官方模型选择器只渲染 model.name，右对齐不可行，空格分隔是已接受的兜底。
+ */
+export function displayName(entry: {
   name: string
   credits?: string
-  contextWindow?: number
-  maxTokens?: number
-  input?: CodeBuddyModelProfile['input']
-  reasoningEfforts?: CodeBuddyModelProfile['reasoningEfforts']
+  input?: readonly ('text' | 'image')[]
+}): string {
+  const tags: string[] = []
+  const credits = creditLabel(entry.credits)
+  if (credits !== undefined) tags.push(credits)
+  if (entry.input?.includes('image') === true) tags.push('👁')
+  return tags.length === 0 ? entry.name : entry.name + '  ' + tags.join(' · ')
 }
 
-/** 一条模型配置 → 模型事实。未声明容量用兜底常量；推理三态（false/dict/缺省）。 */
-export function codeBuddyModel(entry: CodeBuddyModelProfile): CodeBuddyModelFacts {
-  const declared = entry.reasoningEfforts
-  const reasoning = declared !== undefined && declared !== false
-  const thinkingLevelMap = declared !== undefined && declared !== false
-    ? { off: null, ...declared }
-    : undefined
-  return {
-    id: entry.id,
-    name: entry.name ?? entry.id,
-    contextWindow: entry.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
-    maxTokens: entry.maxTokens ?? DEFAULT_MAX_TOKENS,
-    input: [...(entry.input ?? ['text'])],
-    reasoning,
-    ...(reasoning && thinkingLevelMap !== undefined ? { thinkingLevelMap } : {}),
-  }
-}
-
-/** 配置 → 最终模型事实集。 */
-export function resolveModels(configured: readonly CodeBuddyModelProfile[]): CodeBuddyModelFacts[] {
-  return configured.map(entry => codeBuddyModel(entry))
+/** 完整条目 → 模型事实（推理三态：false/dict/缺省；未声明容量用兜底常量）。 */
+export function factsFromEntries(entries: readonly CodeBuddyModelEntry[]): CodeBuddyModelFacts[] {
+  return entries.map(entry => {
+    const declared = entry.reasoningEfforts
+    const reasoning = declared !== undefined && declared !== false
+    const thinkingLevelMap = declared !== undefined && declared !== false
+      ? { off: null, ...declared }
+      : undefined
+    return {
+      id: entry.id,
+      name: displayName(entry),
+      contextWindow: entry.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
+      maxTokens: entry.maxTokens ?? DEFAULT_MAX_TOKENS,
+      input: [...(entry.input ?? ['text'])],
+      reasoning,
+      ...(reasoning && thinkingLevelMap !== undefined ? { thinkingLevelMap } : {}),
+    }
+  })
 }
 
 /** 请求头：官方请求标识 + 企业上下文（值与官方 CLI 一致；uid/enterpriseId 来自 /v2/accounts）。 */
@@ -118,7 +139,7 @@ function shortCredits(raw: unknown): string | undefined {
  * 官方思考档位集合里挑出服务端声明的支持档位；canDisableThinking=false 时
  * 不声明 off（模型不允许关思考，如 hy4-preview）。
  */
-function declaredEfforts(raw: Record<string, unknown>): CodeBuddyModelProfile['reasoningEfforts'] {
+function declaredEfforts(raw: Record<string, unknown>): ReasoningEfforts {
   const supported = Array.isArray(raw.supportedEfforts) ? raw.supportedEfforts as unknown[] : undefined
   if (supported === undefined || supported.length === 0) return { off: null }
   const map: Record<string, string | null> = {}
@@ -154,8 +175,7 @@ export function parseModelConfig(body: unknown): readonly CodeBuddyModelEntry[] 
       : undefined
     const entry: CodeBuddyModelEntry = {
       id,
-      // 积分消耗系数附加进展示名：模型选择器一眼可见（免费模型显示 x0.00）
-      name: credits === undefined ? baseName : baseName + ' · ' + credits,
+      name: baseName,
       ...(credits === undefined ? {} : { credits }),
       ...(contextWindow === undefined ? {} : { contextWindow }),
       ...(maxTokens === undefined ? {} : { maxTokens }),
@@ -168,39 +188,33 @@ export function parseModelConfig(body: unknown): readonly CodeBuddyModelEntry[] 
   })
 }
 
-/** 完整条目 → DSH 发现结果（官方「获取可用模型」契约的四字段，name 已带系数）。 */
+/** 完整条目 → DSH 发现结果（官方「获取可用模型」契约的四字段，name 带系数/视觉标记）。 */
 export function toDiscovered(entries: readonly CodeBuddyModelEntry[]): LlmDiscoveredModel[] {
-  return entries.map(entry => ({
-    id: entry.id,
-    ...(entry.name === entry.id ? {} : { name: entry.name }),
-    ...(entry.contextWindow === undefined ? {} : { contextWindow: entry.contextWindow }),
-    ...(entry.maxTokens === undefined ? {} : { maxTokens: entry.maxTokens }),
-  }))
+  return entries.map(entry => {
+    const name = displayName(entry)
+    return {
+      id: entry.id,
+      ...(name === entry.id ? {} : { name }),
+      ...(entry.contextWindow === undefined ? {} : { contextWindow: entry.contextWindow }),
+      ...(entry.maxTokens === undefined ? {} : { maxTokens: entry.maxTokens }),
+    }
+  })
 }
 
-/** 完整条目 → 设置节模型条目（保留系数名与精确思考档位）。 */
-export function discoveredToProfile(entries: readonly CodeBuddyModelEntry[]): CodeBuddyModelProfile[] {
-  return entries.map(entry => ({
-    id: entry.id,
-    name: entry.name,
-    ...(entry.contextWindow === undefined ? {} : { contextWindow: entry.contextWindow }),
-    ...(entry.maxTokens === undefined ? {} : { maxTokens: entry.maxTokens }),
-    ...(entry.input === undefined ? {} : { input: entry.input }),
-    ...(entry.reasoningEfforts === undefined ? {} : { reasoningEfforts: entry.reasoningEfforts }),
-  }))
-}
-
-/** 拉取并解析 CodeBuddy 模型目录（只在用户给 Key 后调用）。 */
+/** 拉取并解析 CodeBuddy 模型目录（只在用户给 Key 后调用），带超时。 */
 export async function fetchCodeBuddyModels(
   apiKey: string,
   account?: { userId?: string; enterpriseId?: string },
   signal?: AbortSignal,
 ): Promise<readonly CodeBuddyModelEntry[]> {
+  const timeout = AbortSignal.timeout(MODEL_DISCOVERY_TIMEOUT_MS)
+  const upstream = signal === undefined || signal.aborted ? timeout : AbortSignal.any([signal, timeout])
   let response: Response
   try {
-    response = await fetch(CONFIG_URL, { headers: requestHeaders(apiKey, account), signal })
+    response = await fetch(CONFIG_URL, { headers: requestHeaders(apiKey, account), signal: upstream })
   } catch (error) {
     if (signal?.aborted) throw new LlmError('CodeBuddy 模型发现已取消', 'ABORTED', { cause: error })
+    if (timeout.aborted) throw new LlmError('CodeBuddy 模型配置接口超时', 'DISCOVERY_FAILED', { cause: error })
     throw new LlmError('无法连接 CodeBuddy 模型配置接口', 'DISCOVERY_FAILED', { cause: error })
   }
   if (!response.ok) throw new LlmError('CodeBuddy 模型配置接口返回 ' + String(response.status), 'DISCOVERY_FAILED')

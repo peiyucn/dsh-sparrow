@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { codeBuddyModel, discoveredToProfile, parseModelConfig, resolveModels } from '../lib/catalog.js'
+import { creditLabel, displayName, factsFromEntries, parseModelConfig } from '../lib/catalog.js'
 import { mapFinish, mapUsage, parseSseLine, toWireMessages } from '../lib/adapter.js'
 
-describe('resolveModels', () => {
-  it('空配置返回空模型集（无预置目录）', () => {
-    assert.deepEqual(resolveModels([]), [])
+describe('factsFromEntries', () => {
+  it('空目录返回空模型集（无预置目录）', () => {
+    assert.deepEqual(factsFromEntries([]), [])
   })
-  it('配置条目解析为模型事实（自带输入模态与推理声明）', () => {
-    const [model] = resolveModels([{ id: 'hy3', name: 'Hy3', contextWindow: 192000, maxTokens: 64000 }])
+  it('远端条目解析为模型事实（容量/输入模态/展示名）', () => {
+    const [model] = factsFromEntries([{ id: 'hy3', name: 'Hy3', contextWindow: 192000, maxTokens: 64000 }])
     assert.equal(model.id, 'hy3')
     assert.equal(model.name, 'Hy3')
     assert.equal(model.contextWindow, 192000)
@@ -17,32 +17,56 @@ describe('resolveModels', () => {
     assert.equal(model.reasoning, false)
   })
   it('容量缺失的条目以兜底常量补齐', () => {
-    const [model] = resolveModels([{ id: 'brand-new-model' }])
+    const [model] = factsFromEntries([{ id: 'brand-new-model', name: 'Brand New Model' }])
     assert.equal(model.contextWindow, 262_144)
     assert.equal(model.maxTokens, 32_768)
   })
-})
-
-describe('codeBuddyModel', () => {
   it('显式 reasoningEfforts 展开 thinkingLevelMap 且 off 恒支持', () => {
-    const model = codeBuddyModel({ id: 'x', reasoningEfforts: { off: null, high: 'high' } })
+    const [model] = factsFromEntries([{ id: 'x', name: 'X', reasoningEfforts: { off: null, high: 'high' } }])
     assert.equal(model.reasoning, true)
     assert.deepEqual(model.thinkingLevelMap, { off: null, high: 'high' })
   })
   it('reasoningEfforts: false 禁用推理', () => {
-    const model = codeBuddyModel({ id: 'x', reasoningEfforts: false })
+    const [model] = factsFromEntries([{ id: 'x', name: 'X', reasoningEfforts: false }])
     assert.equal(model.reasoning, false)
     assert.equal(model.thinkingLevelMap, undefined)
   })
   it('未声明 reasoningEfforts 时不声明推理能力（不发思考参数）', () => {
-    const model = codeBuddyModel({ id: 'x' })
+    const [model] = factsFromEntries([{ id: 'x', name: 'X' }])
     assert.equal(model.reasoning, false)
     assert.equal(model.thinkingLevelMap, undefined)
   })
 })
 
+describe('creditLabel', () => {
+  it('普通系数取短串', () => {
+    assert.equal(creditLabel('x0.79 credits'), 'x0.79')
+    assert.equal(creditLabel('x1.62'), 'x1.62')
+  })
+  it('零系数显示 free（x0.00 → free）', () => {
+    assert.equal(creditLabel('x0.00 credits'), 'free')
+    assert.equal(creditLabel('x0'), 'free')
+  })
+  it('非字符串与无系数返回 undefined', () => {
+    assert.equal(creditLabel(undefined), undefined)
+    assert.equal(creditLabel('free credits'), undefined)
+    assert.equal(creditLabel(0.79), undefined)
+  })
+})
+
+describe('displayName', () => {
+  it('系数 + 视觉标记以空格分隔附加（官方选择器只渲染 name）', () => {
+    assert.equal(displayName({ name: 'GLM-5.3', credits: 'x0.79', input: ['text', 'image'] }), 'GLM-5.3  x0.79 · 👁')
+    assert.equal(displayName({ name: 'Hy3', credits: 'x0.00', input: ['text', 'image'] }), 'Hy3  free · 👁')
+    assert.equal(displayName({ name: 'GLM-5.3', credits: 'x0.79' }), 'GLM-5.3  x0.79')
+  })
+  it('无系数无视觉时保持原始名', () => {
+    assert.equal(displayName({ name: 'Kimi K2' }), 'Kimi K2')
+  })
+})
+
 describe('parseModelConfig', () => {
-  it('解析实测形状的 /v3/config 响应（系数进名字）', () => {
+  it('解析实测形状的 /v3/config 响应（系数/视觉不写进原始名，单独成字段）', () => {
     const body = {
       code: 0,
       data: {
@@ -57,14 +81,21 @@ describe('parseModelConfig', () => {
     assert.equal(models.length, 2)
     assert.deepEqual(models[0], {
       id: 'hy3',
-      name: 'Hy3 · x0.00',
+      name: 'Hy3',
       credits: 'x0.00',
       contextWindow: 192000,
       maxTokens: 64000,
       input: ['text', 'image'],
       reasoningEfforts: { off: null, high: 'high' },
     })
-    assert.equal(models[1].name, 'GLM-5.3-Flash · x0.06')
+    assert.deepEqual(models[1], {
+      id: 'glm-5.3-flash',
+      name: 'GLM-5.3-Flash',
+      credits: 'x0.06',
+      contextWindow: 1000000,
+      maxTokens: 32000,
+      input: ['text'],
+    })
   })
   it('agents 包裹在 data.agent 下时同样解析', () => {
     const body = {
@@ -89,24 +120,6 @@ describe('parseModelConfig', () => {
   it('非数组输入返回空', () => {
     assert.deepEqual(parseModelConfig(undefined), [])
     assert.deepEqual(parseModelConfig({ data: null }), [])
-  })
-})
-
-describe('discoveredToProfile', () => {
-  it('发现结果转为设置节条目（缺省字段不写入）', () => {
-    const profiles = discoveredToProfile([{ id: 'hy3', name: 'Hy3 · x0.00', contextWindow: 192000, maxTokens: 64000, credits: 'x0.00', input: ['text', 'image'], reasoningEfforts: { off: null, high: 'high' } }])
-    assert.deepEqual(profiles, [{
-      id: 'hy3',
-      name: 'Hy3 · x0.00',
-      contextWindow: 192000,
-      maxTokens: 64000,
-      input: ['text', 'image'],
-      reasoningEfforts: { off: null, high: 'high' },
-    }])
-  })
-  it('缺失字段不写进条目', () => {
-    const profiles = discoveredToProfile([{ id: 'ghost', name: 'ghost' }])
-    assert.deepEqual(profiles, [{ id: 'ghost', name: 'ghost' }])
   })
 })
 

@@ -23,6 +23,15 @@ export const PRODUCT_HEADER = 'SaaS'
 
 /** Provider 流式读取的空闲超时（默认 5 分钟，与官方 llm-pi-ai 一致）。 */
 export const STREAM_IDLE_TIMEOUT_MS = 300_000
+/** /v3/config 模型目录拉取的超时（保存 Key 与后台刷新共用）。 */
+export const MODEL_DISCOVERY_TIMEOUT_MS = 15_000
+/**
+ * 后台模型刷新节流：宿主重建模型目录（模型选择器打开后的首次建目录、
+ * 适配器/凭据/设置变化事件）会触发刷新，两次尝试之间的最小间隔。
+ * 官方目录在 ready 后缓存，选择器每次打开不再产生可感知事件，本间隔
+ * 保证目录重建密集时不会连环打服务端。
+ */
+export const MODEL_REFRESH_COOLDOWN_MS = 60_000
 /** 未声明容量的模型的上下文窗口兜底值。 */
 export const DEFAULT_CONTEXT_WINDOW = 262_144
 /** 未声明容量的模型的最大输出兜底值。 */
@@ -33,6 +42,3 @@ export const MAX_REQUEST_IMAGE_BYTES = 20 * 1024 * 1024
 export const REQUEST_IMAGE_PIXEL_BUDGET = 2048 * 2048
 /** 内联图片原始字节目标（与官方默认一致）。 */
 export const REQUEST_IMAGE_MAX_BYTES = 1024 * 1024
-
-/** CodeBuddy 官方思考档位集合，按官方升级顺序排列。 */
-export const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const

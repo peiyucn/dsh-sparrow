@@ -44,6 +44,11 @@ export interface CodeBuddyAdapterOptions {
   streamIdleTimeoutMs: number
   /** 每次调用的用量/积分回调（会话统计用）。 */
   onUsage?: (usage: CodeBuddyUsage) => void
+  /**
+   * 宿主读取本适配器模型目录时的回调（模型选择器建目录触发）。
+   * 插件侧在此做节流后台刷新；目录读取本身同步返回当前事实。
+   */
+  onCatalogRead?: () => void
 }
 
 interface WireToolCall {
@@ -214,11 +219,13 @@ export class CodeBuddyAdapter extends LlmAdapter {
   }
 
   override listModels(provider: string): Promise<readonly LlmModelInfo[]> {
+    this.config.onCatalogRead?.()
     return Promise.resolve(this.config.models().map(model => ({
       provider,
       id: model.id,
       name: model.name,
-      ...(model.input.includes('image') ? { inputModalities: model.input } : {}),
+      // 显式声明输入模态：text-only 是「明确的负能力」，视觉模型带上 image。
+      inputModalities: model.input,
     })))
   }
 
@@ -229,6 +236,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
       id: model,
       name: facts?.name ?? model,
       context: { contextWindow: facts?.contextWindow ?? 262_144 },
+      ...(facts === undefined ? {} : { inputModalities: facts.input }),
     }
     if (facts?.reasoning === true && facts.thinkingLevelMap !== undefined) {
       const levels = Object.keys(facts.thinkingLevelMap)
