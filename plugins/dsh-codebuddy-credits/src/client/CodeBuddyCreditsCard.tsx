@@ -128,9 +128,10 @@ const secondaryButtonStyle: CSSProperties = {
   color: 'var(--dsw-alias-label-primary)',
 }
 
-/** 官方 dangerButton 同款：透明底、错误色文字。 */
+/** 与取消/应用同款胶囊（描边 36px），文字用错误红。 */
 const dangerButtonStyle: CSSProperties = {
   ...buttonBase,
+  border: '0.5px solid var(--dsw-alias-border-l3)',
   background: 'transparent',
   color: 'var(--dsw-alias-state-error-primary)',
 }
