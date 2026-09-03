@@ -1,7 +1,8 @@
 /**
- * 插件设置节：llm-codebuddy-credits。apiKeyEnv 是凭据引用（设置页以凭据控件呈现，
- * 密钥值只经 ctx.credentials，不进设置文件）；models 覆盖内置目录（模型发现的
- * 采纳结果写在这里）。
+ * 插件设置节：llm-codebuddy-credits。形状对齐官方 llm-pi-ai 的 providers dict：
+ * settings 里 providers.codebuddy-credits 存在 = 用户主动添加了这个 provider（route
+ * 生效）；删除 = route 消失（dormant）。apiKeyEnv 是凭据引用（密钥只经
+ * ctx.credentials，不进设置文件）；models 覆盖内置目录（模型发现的采纳结果写这里）。
  */
 
 import z from '@deepseek-ai/schemastery'
@@ -27,15 +28,22 @@ const modelProfile = z.object({
   reasoningEfforts: z.union([z.const(false), reasoningEfforts]),
 }) as unknown as z<PiAiModelProfile>
 
-/** 插件配置；同名 schema 兼作 llm-codebuddy-credits 设置节形状。 */
-export interface Config {
+/** 一条 provider 路由配置（settings 里 providers.<provider> 的值）。 */
+export interface ProviderConfig {
   /** 凭据引用（环境变量名），默认 CODEBUDDY_API_KEY。 */
   apiKeyEnv?: string
   /** 模型列表；空（缺省）时使用内置目录。 */
   models?: PiAiModelProfile[]
 }
 
+/** 插件配置；同名 schema 兼作 llm-codebuddy-credits 设置节形状。 */
+export interface Config {
+  providers?: Record<string, ProviderConfig>
+}
+
 export const Config: z<Config> = z.object({
-  apiKeyEnv: z.string().role('credential-ref').default(API_KEY_ENV),
-  models: z.array(modelProfile).default([]),
+  providers: z.dict(z.object({
+    apiKeyEnv: z.string().role('credential-ref').default(API_KEY_ENV),
+    models: z.array(modelProfile).default([]),
+  })).default({}),
 })
