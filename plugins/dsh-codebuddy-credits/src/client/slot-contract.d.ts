@@ -44,7 +44,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'action.applying'
       | 'state.configured'
       | 'state.configuredShort'
-      | 'key.replace'
+      | 'action.edit'
       | 'customized'
       | 'baseUrl'
       | 'models.auto'

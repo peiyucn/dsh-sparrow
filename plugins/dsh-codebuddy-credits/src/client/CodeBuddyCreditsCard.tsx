@@ -150,16 +150,18 @@ const collapsedTextStyle: CSSProperties = {
   color: 'var(--dsw-alias-label-secondary)',
 }
 
-const linkButtonStyle: CSSProperties = {
+/** 官方 rowActions 同款「编辑」小胶囊（28px、描边、hover 交互底）。 */
+const editSmallStyle: CSSProperties = {
   boxSizing: 'border-box',
   display: 'inline-flex',
   alignItems: 'center',
+  justifyContent: 'center',
   height: '28px',
   padding: '0 10px',
-  border: 'none',
+  border: '0.5px solid var(--dsw-alias-border-l3)',
   borderRadius: '14px',
   background: 'transparent',
-  color: 'var(--dsw-alias-label-tertiary)',
+  color: 'var(--dsw-alias-label-primary)',
   font: 'inherit',
   fontSize: '12px',
   lineHeight: '18px',
@@ -260,21 +262,22 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
 
   if (!showEditor) {
     return (
-      <div style={collapsedRowStyle}>
+      <div className="ccb-card-root" style={collapsedRowStyle}>
         <p style={collapsedTextStyle}>
           {accountParts.length > 0
             ? t('state.configured', { account: accountParts.join(' · ') })
             : t('state.configuredShort')}
         </p>
-        <button type="button" onClick={() => setEditing(true)} className="ccb-card-link" style={linkButtonStyle}>
-          {t('key.replace')}
+        {/* 官方行头同款「编辑」按钮：展开我们自己的编辑器卡。 */}
+        <button type="button" onClick={() => setEditing(true)} className="ccb-card-edit" style={editSmallStyle}>
+          {t('action.edit')}
         </button>
       </div>
     )
   }
 
   return (
-    <div style={editorStyle}>
+    <div className="ccb-card-root" style={editorStyle}>
       <div style={headerStyle}>
         <span style={titleStyle}>CodeBuddy Credits</span>
         <span style={routeStyle}>codebuddy-credits</span>
@@ -369,7 +372,7 @@ export function ensureCardStyles(): void {
     '.ccb-card-input:focus { outline: none; border-color: var(--dsw-alias-brand-primary); }',
     '.ccb-card-input::placeholder { color: var(--dsw-alias-label-dimmed); }',
     '.ccb-card-input:disabled { opacity: 0.6; cursor: default; }',
-    '.ccb-card-link:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); }',
+    '.ccb-card-edit:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }',
     '.ccb-card-customized { border-top: 0.5px solid var(--dsw-alias-border-l2); padding-top: 10px; }',
     '.ccb-card-customized > summary {',
     '  display: flex; align-items: center; gap: 6px; width: fit-content;',
@@ -386,6 +389,12 @@ export function ensureCardStyles(): void {
     '.ccb-card-customized[open] > summary::before { transform: rotate(45deg) translate(-1px, -1px); }',
     '.ccb-card-customized > summary:hover { color: var(--dsw-alias-label-primary); }',
     '.ccb-card-customizedBody { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }',
+    // 官方行头「编辑」按钮对本插件命名空间只会展开占位提示卡：以 CSS 隐藏
+    // （只隐藏编辑按钮、保留「移除」；:has 依赖本卡根节点 ccb-card-root，
+    // 官方类名为 CSS Modules 哈希，按类名片段匹配——nav-pin 同款读 DOM 层级）。
+    'li:has(> .ccb-card-root) [class*="rowActions"] [class*="secondaryButton"] { display: none; }',
+    // 首装 setup 姿态下官方渲染的占位编辑器同样隐藏，只留我们的卡。
+    'li[class*="setupCard"] > [class*="editor"] { display: none; }',
   ].join('\n')
   document.head.append(style)
 }
