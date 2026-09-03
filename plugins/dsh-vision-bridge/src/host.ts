@@ -1,4 +1,4 @@
-/** dsh-vision-bridge host half：门禁放行 + vision_read 工具（直连 ctx.llm 视觉模型）+ 状态路由。 */
+/** dsh-vision-bridge host half：门禁放行 + vision_read 工具（直连 ctx.llm 视觉模型）+ 能力路由（无会话依赖）。 */
 
 import type { ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
@@ -7,7 +7,6 @@ import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-llm'
 import { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
-import { SessionId, type Session } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-tools'
@@ -15,16 +14,16 @@ import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import {
   extractJsonObject, findImageReference, isDeepseekMainRoute, mainRouteFromSession, modelSupportsImages,
   normalizeVisionConfig, parseVisionReport, renderVisionReport, resolveVisionOutput, shouldClearInputModalities,
-  visionCacheKey, VisionCache, type VisionConfig, type VisionReport,
+  visionCacheKey, visionModeForRoute, VisionCache, type VisionConfig, type VisionReport,
 } from './vision.js'
 
 export const name = 'dsh-vision-bridge'
-export const inject = ['llm', 'tools', 'attachments', 'sessions', 'webServer']
+export const inject = ['llm', 'tools', 'attachments', 'webServer']
 
 export type { VisionConfig, VisionReport }
 
 const TOOL_NAME = 'vision_read'
-const STATUS_ROUTE_PATH = '/api/vision-bridge/status'
+const CAPABILITY_ROUTE_PATH = '/api/vision-bridge/capability'
 /** vision_read 工具默认提问。 */
 const DEFAULT_VISION_QUESTION = '请完整阅读这张图片并给出结构化报告。'
 
@@ -54,44 +53,24 @@ const VISION_REPORT_OUTPUT_SCHEMA = {
   },
 } as const
 
-/**
- * 读「当前选择的模型」：优先会话投影的 modelSelection（选择器一切换就写入 model/selection，
- * 未发送也能拿到），回退最近一次 request/header，再回退共享默认模型
- * （`agentDefaultModel.currentSelection()`，与 composer 模型座位同源——新会话尚无任何
- * 选择/请求记录时座位显示的就是它，图标判定必须一致，否则新会话页眼睛图标会消失）。
- * session 允许 undefined：页面刚打开、会话历史尚未装载时宿主查不到 session，
- * 此时跳过投影/事件、直接回退默认模型——与模型座位首帧一致；历史装载后 client
- * 订阅 modelSelection 投影变化重查状态路由，会自动纠正为会话真实模型。
- */
-export function currentMainModel(ctx: Context, session: Session | undefined): { provider: string; model: string } | undefined {
-  if (session !== undefined) {
-    const projections = ctx.get('sessionProjections') as {
-      stateOf(session: Session, key: string): { pending?: { provider: string; model: string } | null; lastUsed?: { provider: string; model: string } | null } | undefined
-    } | undefined
-    try {
-      const state = projections?.stateOf(session, 'modelSelection')
-      const selected = state?.pending ?? state?.lastUsed
-      if (selected !== null && selected !== undefined && typeof selected.provider === 'string' && typeof selected.model === 'string') {
-        return { provider: selected.provider, model: selected.model }
-      }
-    } catch {
-      // 投影未注册 / 读取失败：回退请求头。
-    }
-    const fromEvents = mainRouteFromSession(session.snapshotEvents())
-    if (fromEvents !== undefined) return fromEvents
-  }
+/** 模型能力缓存：provider:model → 是否支持图片。能力与 session 无关，
+ *  进程内解析一次即可；图标高频查询（切模型/重挂载即查）不再重复解析。 */
+const capabilityCache = new Map<string, boolean>()
+
+/** 解析（或读缓存）一个模型是否支持图片；解析失败按无视觉能力处理（保守）。 */
+async function supportsImagesCached(ctx: Context, provider: string, model: string): Promise<boolean> {
+  const key = `${provider}:${model}`
+  const hit = capabilityCache.get(key)
+  if (hit !== undefined) return hit
+  let supports = false
   try {
-    const defaultModel = ctx.get('agentDefaultModel') as {
-      currentSelection?: () => { provider: string; model: string } | undefined
-    } | undefined
-    const selected = defaultModel?.currentSelection?.()
-    if (selected !== undefined && typeof selected.provider === 'string' && typeof selected.model === 'string') {
-      return { provider: selected.provider, model: selected.model }
-    }
+    const info = await ctx.llm.resolveModelInfo(provider, model)
+    supports = modelSupportsImages(info.inputModalities)
   } catch {
-    // 服务缺失（旧版 dsh）：保持无信息，图标隐藏。
+    supports = false // 能力解析失败：按无视觉能力处理。
   }
-  return undefined
+  capabilityCache.set(key, supports)
+  return supports
 }
 
 /**
@@ -167,6 +146,22 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   const cache = new VisionCache(settings.cacheMaxEntries)
   // 同 cacheKey 的 in-flight 视觉调用（isConcurrencySafe 下并发 execute 去重）。
   const inflight = new Map<string, Promise<VisionReport>>()
+
+  // 预热共享默认模型的能力：新会话首帧座位显示默认模型，图标的能力查询命中缓存、
+  // 毫秒级返回，不把冷 resolveModelInfo 摊到页面首帧关键路径上。
+  void (async () => {
+    try {
+      const defaultModel = ctx.get('agentDefaultModel') as {
+        currentSelection?: () => { provider: string; model: string } | undefined
+      } | undefined
+      const selected = defaultModel?.currentSelection?.()
+      if (selected !== undefined && typeof selected.provider === 'string' && typeof selected.model === 'string') {
+        await supportsImagesCached(ctx, selected.provider, selected.model)
+      }
+    } catch {
+      // 服务缺失 / 读取失败：首次能力查询再按需解析。
+    }
+  })()
 
   // 1. 门禁放行：可逆包装，只影响配置的文本路由。
   const llm = ctx.llm
@@ -292,44 +287,29 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
     },
   })), 'dsh-vision-bridge: vision_read tool')
 
-  // 3. 状态查询路由：客户端点亮图标据此判定（DeepSeek 文本模型 → vision_read 可用）。
+  // 3. 能力路由：客户端状态图标据此判定。与 session 无关——当前选中模型在客户端
+  //    走官方 modelDirectories 共享目录（与模型座位同 store、首帧同步），这里只回答
+  //    「这个 provider/model 能不能看图」。DeepSeek 文本模型 → cross-model（vision_read 可用）。
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
-    path: STATUS_ROUTE_PATH,
+    path: CAPABILITY_ROUTE_PATH,
     handler: async (req, res) => {
-      const none = (): void => sendJson(res, 200, { mode: 'none', visionModel: settings.visionModel })
       if (req.method !== 'GET') {
-        sendJson(res, 405, { mode: 'none', visionModel: settings.visionModel })
+        sendJson(res, 405, { mode: 'no-vision', visionModel: settings.visionModel })
         return
       }
       const url = new URL(req.url ?? '/', 'http://localhost')
-      const sessionIdRaw = url.searchParams.get('sessionId') ?? ''
-      const session = ctx.sessions.get(SessionId(sessionIdRaw))
-      // 会话未装载（页面刚打开、历史未加载）时 session 为 undefined：不直接回 none，
-      // 走 currentMainModel 的默认模型回退（座位首帧同源）——图标随页面立即出现，
-      // 不必等会话历史装载；装载后 client 重查会纠正为会话真实模型。
-      const main = currentMainModel(ctx, session)
-      // 无模型信息且无共享默认模型（新会话、部署未配默认）：不显示。
-      if (main === undefined) {
-        none()
+      const provider = url.searchParams.get('provider') ?? ''
+      const model = url.searchParams.get('model') ?? ''
+      if (provider === '' || model === '') {
+        sendJson(res, 400, { mode: 'no-vision', visionModel: settings.visionModel })
         return
       }
+      const supportsImages = await supportsImagesCached(ctx, provider, model)
       // 能力模式判定（全靠模型自身 inputModalities 属性，不靠名字）：
       //   具备视觉能力 → native-vision（灰显）；DeepSeek 文本模型 → cross-model（点亮）；
       //   其它无视觉能力 → no-vision（带斜线，降级提示）。
-      let supportsImages = false
-      try {
-        const info = await ctx.llm.resolveModelInfo(main.provider, main.model)
-        supportsImages = modelSupportsImages(info.inputModalities)
-      } catch {
-        supportsImages = false // 能力解析失败：按无视觉能力处理。
-      }
-      const mode = supportsImages
-        ? 'native-vision'
-        : isDeepseekMainRoute(main)
-          ? 'cross-model'
-          : 'no-vision'
-      sendJson(res, 200, { mode, visionModel: settings.visionModel })
+      sendJson(res, 200, { mode: visionModeForRoute(provider, supportsImages), visionModel: settings.visionModel })
     },
-  }), 'dsh-vision-bridge: status route')
+  }), 'dsh-vision-bridge: capability route')
 }

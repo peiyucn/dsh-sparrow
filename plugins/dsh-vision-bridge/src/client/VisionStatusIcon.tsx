@@ -1,13 +1,13 @@
 /** 状态图标：模型选择器旁的眼睛，随当前模型能力变化颜色与文案（DeepSeek 模型都显示）。 */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 
-/** 图标状态：cross-model=可跨模型读图（蓝紫点亮）；native-vision=原生视觉（灰显）；no-vision=无视觉能力（带斜线）；none=无信息（隐藏）。status 查询未返回时以灰显中性态常驻（同 FIM，不随会话历史装载才出现）。 */
-export type VisionStatusMode = 'none' | 'cross-model' | 'native-vision' | 'no-vision'
+/** 图标状态：cross-model=可跨模型读图（蓝紫点亮）；native-vision=原生视觉（灰显）；no-vision=无视觉能力（带斜线）。 */
+export type VisionStatusMode = 'cross-model' | 'native-vision' | 'no-vision'
 
 export interface VisionStatusResult {
   readonly mode: VisionStatusMode
@@ -15,11 +15,17 @@ export interface VisionStatusResult {
   readonly visionModel: string
 }
 
+/** 官方共享模型目录 store 的最小面（与模型座位同 store：快照 + 订阅）。 */
+export interface DirectoryStore {
+  getSnapshot(): { current: { provider: string; model: string } | null }
+  subscribe(listener: () => void): () => void
+}
+
 export interface VisionStatusInjected {
-  /** host 状态查询：当前会话主模型的能力模式 + 实际视觉模型 id。 */
-  queryStatus: (sessionId: SessionId) => Promise<VisionStatusResult>
-  /** 订阅会话 modelSelection 投影变化（切换模型即回调）；返回解除函数。 */
-  subscribeModelChange: (listener: () => void) => () => void
+  /** 官方共享模型目录 store（ctx.modelDirectories）：当前选中模型与座位同源；目录不可用时 undefined。 */
+  directoryFor: (sessionId: SessionId) => DirectoryStore | undefined
+  /** host 能力查询：按 provider/model 取模式 + 视觉模型 id（client 进程内缓存）。 */
+  queryCapability: (provider: string, model: string) => Promise<VisionStatusResult>
 }
 
 export type VisionStatusProps = PropsRuntime<'conversation.input.right'> & VisionStatusInjected & { t: TranslateNS<'vision-bridge'>; sessionId?: SessionId }
@@ -106,40 +112,48 @@ export function ensureVisionStyles(): HTMLStyleElement {
   return style
 }
 
-export function VisionStatusIcon({ sessionId, queryStatus, subscribeModelChange, t }: VisionStatusProps) {
+export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, t }: VisionStatusProps) {
   const [status, setStatus] = useState<VisionStatusResult | null>(null)
   const [open, setOpen] = useState(false)
   const [point, setPoint] = useState<{ x: number; y: number; up: boolean } | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
 
-  // 会话切换 / 模型切换（modelSelection 投影变化）时查询 host 状态；
-  // 查询期间 status 保持 null → 灰显中性态常驻（同 FIM，不等会话历史装载）；
-  // 查询失败隐藏（保守，不影响主流程）。
+  // 当前选中模型：官方共享模型目录（与模型座位同 store，含「会话投影 ?? 全局默认」兜底）。
+  // 座位显示什么模型，图标就显示什么模型的能力——首帧即同步，没有自己的异步判定窗口。
+  const directory = useMemo(() => {
+    if (sessionId === undefined) return undefined
+    try {
+      return directoryFor(sessionId)
+    } catch {
+      return undefined
+    }
+  }, [directoryFor, sessionId])
+  const subscribe = useCallback((listener: () => void): (() => void) => {
+    if (directory === undefined) return () => {}
+    return directory.subscribe(listener)
+  }, [directory])
+  const current = useSyncExternalStore(
+    subscribe,
+    () => directory?.getSnapshot().current ?? null,
+  )
+  const selectionKey = current === null ? null : `${current.provider}:${current.model}`
+
+  // 模型变化 / 会话切换时查能力：缓存命中立即上色；未命中先隐藏（不显示占位色），
+  // 返回后以正确模式出现。查询失败隐藏（保守，不影响主流程）。
   useEffect(() => {
     setStatus(null)
     setOpen(false)
-    if (sessionId === undefined) return
+    if (current === null || selectionKey === null) return
     let alive = true
-    const refresh = (): void => {
-      void queryStatus(sessionId).then((next) => {
-        if (alive) setStatus(next)
-      }).catch(() => {
-        // 状态查询失败：隐藏图标（保守，不影响主流程）。
-        if (alive) setStatus({ mode: 'none', visionModel: '' })
-      })
-    }
-    refresh()
-    const unsubscribe = subscribeModelChange(() => {
-      if (!alive) return
-      // 模型变了：弹窗文案已过时，收起并重新查询。
-      setOpen(false)
-      refresh()
+    void queryCapability(current.provider, current.model).then((next) => {
+      if (alive) setStatus(next)
+    }).catch(() => {
+      // 状态查询失败：隐藏图标。
     })
     return () => {
       alive = false
-      unsubscribe()
     }
-  }, [queryStatus, sessionId, subscribeModelChange])
+  }, [current, queryCapability, selectionKey])
 
   const computePoint = (): { x: number; y: number; up: boolean } | null => {
     const rect = buttonRef.current?.getBoundingClientRect()
@@ -180,17 +194,15 @@ export function VisionStatusIcon({ sessionId, queryStatus, subscribeModelChange,
 
   const native = status?.mode === 'native-vision'
   const noVision = status?.mode === 'no-vision'
-  // none = 确实无信息 → 隐藏；status === null（查询中）→ 灰显中性态常驻。
-  if (status !== null && status.mode === 'none') return null
-  const aria = status === null
-    ? t('popover.unknown.title')
-    : native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')
+  // 无选中模型 / 能力查询未返回 / 查询失败 → 隐藏（不显示占位色）。
+  if (status === null) return null
+  const aria = native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')
   return (
     <>
       <button
         ref={buttonRef}
         type="button"
-        className={status === null || native
+        className={native
           ? 'dsh-vision-status dsh-vision-status-native'
           : noVision
             ? 'dsh-vision-status dsh-vision-status-none'
@@ -221,15 +233,13 @@ export function VisionStatusIcon({ sessionId, queryStatus, subscribeModelChange,
               transform: point.up ? 'translateX(-100%) translateY(-100%)' : 'translateX(-100%)',
             }}
           >
-            <div className="dsh-vision-popover-title">{status === null ? t('popover.unknown.title') : native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')}</div>
+            <div className="dsh-vision-popover-title">{native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')}</div>
             <div className="dsh-vision-popover-body">
-              {status === null
-                ? t('popover.unknown.body')
-                : native
-                  ? t('popover.nativeVision.body')
-                  : noVision
-                    ? t('popover.noVision.body')
-                    : t('popover.crossModel.body', { model: status.visionModel })}
+              {native
+                ? t('popover.nativeVision.body')
+                : noVision
+                  ? t('popover.noVision.body')
+                  : t('popover.crossModel.body', { model: status.visionModel })}
             </div>
           </div>,
           document.body,

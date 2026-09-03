@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import {
   extractJsonObject, findImageReference, imageRefsInEvents, isDeepseekMainRoute,
   mainRouteFromSession, modelSupportsImages, normalizeAttachmentId, normalizeVisionConfig, parseVisionReport,
-  renderVisionReport, resolveVisionOutput, shouldClearInputModalities, visionCacheKey, VisionCache,
+  renderVisionReport, resolveVisionOutput, shouldClearInputModalities, visionCacheKey, visionModeForRoute, VisionCache,
 } from '../lib/vision.js'
 
 describe('vision-bridge 纯逻辑', () => {
@@ -302,4 +302,19 @@ describe('vision-bridge 纯逻辑', () => {
     })
   })
 
+})
+
+describe('visionModeForRoute', () => {
+  it('支持看图 应该 判定 native-vision（任何 provider）', () => {
+    assert.equal(visionModeForRoute('deepseek-official', true), 'native-vision')
+    assert.equal(visionModeForRoute('other-provider', true), 'native-vision')
+  })
+
+  it('DeepSeek 文本模型 应该 判定 cross-model（vision_read 可用）', () => {
+    assert.equal(visionModeForRoute('deepseek-official', false), 'cross-model')
+  })
+
+  it('其它 provider 无视觉能力 应该 判定 no-vision', () => {
+    assert.equal(visionModeForRoute('other-provider', false), 'no-vision')
+  })
 })

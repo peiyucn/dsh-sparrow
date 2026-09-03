@@ -114,6 +114,15 @@ export function modelSupportsImages(inputModalities: readonly string[] | undefin
   return inputModalities !== undefined && inputModalities.includes('image')
 }
 
+/** 视觉状态模式：原生看图 → native-vision（灰显）；DeepSeek 文本 → cross-model（点亮）；其它 → no-vision（带斜线）。 */
+export type VisionMode = 'native-vision' | 'cross-model' | 'no-vision'
+
+/** 按 provider + 看图能力判定状态图标模式（host 能力路由据此回答，不依赖会话）。 */
+export function visionModeForRoute(provider: string, supportsImages: boolean): VisionMode {
+  if (supportsImages) return 'native-vision'
+  return isDeepseekMainRoute({ provider }) ? 'cross-model' : 'no-vision'
+}
+
 /** 唯一前缀匹配的最短查询长度；更短的 id 只做精确匹配，避免误命中。 */
 export const MIN_PREFIX_MATCH_CHARS = 8
 
