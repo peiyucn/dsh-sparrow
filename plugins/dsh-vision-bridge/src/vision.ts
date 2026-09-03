@@ -175,7 +175,8 @@ export function autoVisionSectionText(
   if (entries.length === 0) return ''
   const lines = [
     '[vision_read 自动描述] 会话中的图片已由视觉模型自动读取，内容如下。',
-    '如需对某张图进一步提问，可调用 vision_read 工具并附对应 attachmentId。',
+    '这些图片的内容已在上面给出：直接基于它作答即可，不要再调用 vision_read 重复查看。',
+    '仅当需要针对性二次提取（如把表格转成 CSV、只识别某段文字）时，才调用 vision_read 并附对应 attachmentId。',
     '',
   ]
   for (const entry of entries) {

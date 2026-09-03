@@ -229,7 +229,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   //    直连视觉模型约 2.2s，因此不再起子代理。
   ctx.effect(() => ctx.tools.register(defineTool({
     name: TOOL_NAME,
-    description: 'Read an image already attached to this conversation with a vision subagent. Use this tool when the user asks about a pasted image and the main model cannot see images directly. The image stays inside the DeepSeek provider account and is never sent to a third party.',
+    description: 'Read an image already attached to this conversation with a vision subagent. Use this tool only when the image content is NOT already summarized in your system prompt (as a "[vision_read 自动描述]" block), or when the user asks for a targeted extraction (e.g. transcribe a table, read one region). The image stays inside the DeepSeek provider account and is never sent to a third party.',
     parameters: {
       attachmentId: {
         type: 'string',
@@ -299,15 +299,18 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   ctx.effect(() => ctx.on('system-prompt/assemble', async (assembly, context, next) => {
     const result = await next()
     try {
-      const agent = (context as { agent?: { session?: { snapshotEvents?: () => readonly SessionEvent[] } } }).agent
-      if (agent === undefined || typeof agent.session?.snapshotEvents !== 'function') return result
-      const events = agent.session.snapshotEvents()
-      const main = mainRouteFromSession(events)
+      const agent = (context as { agent?: { session?: Session } }).agent
+      if (agent === undefined || agent.session === undefined) return result
+      const session = agent.session
+      const events = session.snapshotEvents()
+      // 按「当前选中的模型」判定（选择器一写就有，新会话首轮也能拿到），
+      // 而非 request/header（首轮尚无）。
+      const main = currentMainModel(ctx, session)
       // 新图判定前置（最便宜）：会话无图、或全部已缓存 → 不动组装。
       const fresh = imageRefsInEvents(events).filter(ref =>
         cache.get(visionCacheKey(String(ref.attachmentId), DEFAULT_VISION_QUESTION)) === undefined)
       if (fresh.length === 0) return result
-      // 门控：未识别路由 / 非 deepseek 主模型 / 原生视觉主模型（图片直达）→ 不注入。
+      // 门控：未识别 / 非 deepseek / 原生视觉主模型（图片直达）→ 不注入。
       let inputModalities: readonly string[] | undefined
       if (main !== undefined) {
         try {
