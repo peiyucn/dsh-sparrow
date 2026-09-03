@@ -174,14 +174,23 @@ export function apply(ctx: ClientContext): void {
   // 姿势）；(2) 延迟重试兜底——若注入因任何原因未触发（时序/组合差异），
   // 服务可用后补注册。pickerRegistered 防重复；始终注册不上则保留官方
   // 选择器（fail-soft）。
+  // 诊断：注册尝试与结果（刷新后仍回退官方样式时，请用户复制
+  // JSON.stringify(window.__ccbDiag) 发回排查）。
+  const diag: { attempts: number; serviceError?: string; injectError?: string; registered: boolean; registerError?: string } = {
+    attempts: 0,
+    registered: false,
+  }
+  ;(window as unknown as Record<string, unknown>).__ccbDiag = diag
   let pickerRegistered = false
   const registerPicker = (scopeCtx: ClientContext): void => {
     if (pickerRegistered) return
+    diag.attempts += 1
     let resolver: { directoryFor(id: string): ModelDirectoryLike | undefined }
     let sessions: { subagentAddress(id: string): unknown } | undefined
     try {
       resolver = scopeCtx.get('modelDirectories') as never
-    } catch {
+    } catch (error) {
+      diag.serviceError = error instanceof Error ? error.message : String(error)
       return
     }
     try {
@@ -201,27 +210,40 @@ export function apply(ctx: ClientContext): void {
         select: async () => {},
       }
     }
-    scopeCtx.slots.inject('conversation.input.model', () => scopeCtx.slots.register({
-      name: 'conversation.input.model',
-      locale: 'codebuddy-credits',
-      priority: -1,
-      inject: (sessionId: string) => {
-        const directory = resolver.directoryFor(sessionId) ?? emptyDirectory()
-        const available = directory !== undefined
-          && (sessions === undefined || sessions.subagentAddress(sessionId) === undefined)
-        return {
-          available,
-          directory: directory.store,
-          load: () => {
-            if (available) directory.load().catch(() => { /* 错误落在 store 上 */ })
-          },
-          select: (selection: unknown) => available
-            ? directory.select(selection).then(() => true, () => false)
-            : Promise.resolve(false),
+    try {
+      scopeCtx.slots.inject('conversation.input.model', () => {
+        try {
+          const dispose = scopeCtx.slots.register({
+            name: 'conversation.input.model',
+            locale: 'codebuddy-credits',
+            priority: -1,
+            inject: (sessionId: string) => {
+              const directory = resolver.directoryFor(sessionId) ?? emptyDirectory()
+              const available = directory !== undefined
+                && (sessions === undefined || sessions.subagentAddress(sessionId) === undefined)
+              return {
+                available,
+                directory: directory.store,
+                load: () => {
+                  if (available) directory.load().catch(() => { /* 错误落在 store 上 */ })
+                },
+                select: (selection: unknown) => available
+                  ? directory.select(selection).then(() => true, () => false)
+                  : Promise.resolve(false),
+              }
+            },
+          }, CodeBuddyModelSelect as unknown as (props: object) => ReactNode)
+          diag.registered = true
+          return dispose
+        } catch (error) {
+          diag.registerError = error instanceof Error ? error.message : String(error)
+          return () => {}
         }
-      },
-    }, CodeBuddyModelSelect as unknown as (props: object) => ReactNode))
-    pickerRegistered = true
+      })
+      pickerRegistered = true
+    } catch (error) {
+      diag.injectError = error instanceof Error ? error.message : String(error)
+    }
   }
   ctx.inject(['modelDirectories', 'sessions'], registerPicker)
   const retryDelays = [1_000, 3_000, 8_000]
