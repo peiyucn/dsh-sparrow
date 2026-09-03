@@ -110,10 +110,10 @@ function formatCredits(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2)
 }
 
-/** 百分比文案：占比不足 1% 时保留两位小数（0.02%），否则取整。 */
+/** 百分比文案：占比不足 1% 时保留三位小数（0.020%），否则取整。 */
 function percentText(ratio: number): string {
   const percent = ratio * 100
-  return percent < 1 ? percent.toFixed(2) : String(Math.round(percent))
+  return percent < 1 ? percent.toFixed(3) : String(Math.round(percent))
 }
 
 /** 面板正文：label-secondary（caption 在深浅两主题下都偏淡，不可读）。 */
