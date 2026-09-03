@@ -3,12 +3,12 @@
  * （key = 本插件命名空间），渲染在设置 → 模型页的 CodeBuddy Credits 行上。
  * 结构与视觉 1:1 复刻官方 ProviderEditor（ui-settings-models）：标题行
  * （显示名 + 路由 id）→「API Key」标签 + 密码输入 → 账号信息一行 →
- * 「自定义设置」折叠区（Base URL 只读 + 模型目录说明）→ 取消/应用 footer。
- * 样式全部照抄官方 ModelsSection.module.css（--dsw-alias-* token）。
+ * 取消/应用 footer。端点固定、模型目录随 Key 自动获取，无可自定义项，
+ * 故不渲染官方那格「自定义设置」折叠区。样式照抄官方 ModelsSection.module.css。
  *
- * 无法接管的是官方行头「编辑」按钮展开的那张官方卡（页面内组件、非槽位，
- * 对本命名空间只渲染占位提示）；本卡常驻在行内、与官方编辑器同款，Key
- * 已配置时折叠成一行（账号信息 + 更换 Key），点按钮才展开输入区。
+ * 官方行头「编辑」按钮对本命名空间只弹占位提示，已被 CSS 隐藏（保留「移除」）；
+ * 编辑入口完全由本卡承担：Key 已配置时折叠成一行（账号信息 + 编辑按钮），
+ * 点按钮才展开输入区。
  * Key 只发给本机 host 路由存入 DSH 凭据库；企业策略错误原样透传展示。
  */
 
@@ -17,9 +17,6 @@ import type { CSSProperties } from 'react'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const KEY_URL = '/api/codebuddy-credits/key'
-
-/** 官方端点固定（协议层自建，不开放自定义 Base URL）。 */
-const FIXED_BASE_URL = 'https://copilot.tencent.com/v2'
 
 interface CardStatus {
   keyConfigured: boolean
@@ -306,26 +303,6 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
           </p>
         )
         : null}
-      {/* 官方编辑器的「自定义设置」折叠区（同款旋转箭头、同款分隔线）。 */}
-      <details className="ccb-card-customized">
-        <summary>{t('customized')}</summary>
-        <div className="ccb-card-customizedBody">
-          <div style={fieldStyle}>
-            <span style={labelStyle}>{t('baseUrl')}</span>
-            <input
-              className="ccb-card-input"
-              type="text"
-              value={FIXED_BASE_URL}
-              disabled
-              readOnly
-              aria-label={t('baseUrl')}
-            />
-          </div>
-          <p style={hintStyle}>
-            {t('models.auto', { count: String(modelCount) })}
-          </p>
-        </div>
-      </details>
       {message !== undefined
         ? (
           <p style={messageKind === 'error' ? errorStyle : hintStyle}>
@@ -373,22 +350,6 @@ export function ensureCardStyles(): void {
     '.ccb-card-input::placeholder { color: var(--dsw-alias-label-dimmed); }',
     '.ccb-card-input:disabled { opacity: 0.6; cursor: default; }',
     '.ccb-card-edit:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }',
-    '.ccb-card-customized { border-top: 0.5px solid var(--dsw-alias-border-l2); padding-top: 10px; }',
-    '.ccb-card-customized > summary {',
-    '  display: flex; align-items: center; gap: 6px; width: fit-content;',
-    '  padding: 2px 4px; margin-left: -4px; border-radius: 6px;',
-    '  cursor: pointer; font-size: 12px; line-height: 18px; font-weight: 500;',
-    '  color: var(--dsw-alias-label-secondary); list-style: none;',
-    '}',
-    '.ccb-card-customized > summary::-webkit-details-marker { display: none; }',
-    '.ccb-card-customized > summary::before {',
-    "  content: ''; width: 5px; height: 5px;",
-    '  border-right: 1.5px solid currentcolor; border-bottom: 1.5px solid currentcolor;',
-    '  transform: rotate(-45deg) translate(-1px, -1px); transition: transform 120ms ease;',
-    '}',
-    '.ccb-card-customized[open] > summary::before { transform: rotate(45deg) translate(-1px, -1px); }',
-    '.ccb-card-customized > summary:hover { color: var(--dsw-alias-label-primary); }',
-    '.ccb-card-customizedBody { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }',
     // 官方行头「编辑」按钮对本插件命名空间只会展开占位提示卡：以 CSS 隐藏
     // （只隐藏编辑按钮、保留「移除」；:has 依赖本卡根节点 ccb-card-root，
     // 官方类名为 CSS Modules 哈希，按类名片段匹配——nav-pin 同款读 DOM 层级）。
