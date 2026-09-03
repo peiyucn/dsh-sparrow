@@ -59,22 +59,27 @@ const VISION_REPORT_OUTPUT_SCHEMA = {
  * 未发送也能拿到），回退最近一次 request/header，再回退共享默认模型
  * （`agentDefaultModel.currentSelection()`，与 composer 模型座位同源——新会话尚无任何
  * 选择/请求记录时座位显示的就是它，图标判定必须一致，否则新会话页眼睛图标会消失）。
+ * session 允许 undefined：页面刚打开、会话历史尚未装载时宿主查不到 session，
+ * 此时跳过投影/事件、直接回退默认模型——与模型座位首帧一致；历史装载后 client
+ * 订阅 modelSelection 投影变化重查状态路由，会自动纠正为会话真实模型。
  */
-function currentMainModel(ctx: Context, session: Session): { provider: string; model: string } | undefined {
-  const projections = ctx.get('sessionProjections') as {
-    stateOf(session: Session, key: string): { pending?: { provider: string; model: string } | null; lastUsed?: { provider: string; model: string } | null } | undefined
-  } | undefined
-  try {
-    const state = projections?.stateOf(session, 'modelSelection')
-    const selected = state?.pending ?? state?.lastUsed
-    if (selected !== null && selected !== undefined && typeof selected.provider === 'string' && typeof selected.model === 'string') {
-      return { provider: selected.provider, model: selected.model }
+export function currentMainModel(ctx: Context, session: Session | undefined): { provider: string; model: string } | undefined {
+  if (session !== undefined) {
+    const projections = ctx.get('sessionProjections') as {
+      stateOf(session: Session, key: string): { pending?: { provider: string; model: string } | null; lastUsed?: { provider: string; model: string } | null } | undefined
+    } | undefined
+    try {
+      const state = projections?.stateOf(session, 'modelSelection')
+      const selected = state?.pending ?? state?.lastUsed
+      if (selected !== null && selected !== undefined && typeof selected.provider === 'string' && typeof selected.model === 'string') {
+        return { provider: selected.provider, model: selected.model }
+      }
+    } catch {
+      // 投影未注册 / 读取失败：回退请求头。
     }
-  } catch {
-    // 投影未注册 / 读取失败：回退请求头。
+    const fromEvents = mainRouteFromSession(session.snapshotEvents())
+    if (fromEvents !== undefined) return fromEvents
   }
-  const fromEvents = mainRouteFromSession(session.snapshotEvents())
-  if (fromEvents !== undefined) return fromEvents
   try {
     const defaultModel = ctx.get('agentDefaultModel') as {
       currentSelection?: () => { provider: string; model: string } | undefined
@@ -300,10 +305,9 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       const url = new URL(req.url ?? '/', 'http://localhost')
       const sessionIdRaw = url.searchParams.get('sessionId') ?? ''
       const session = ctx.sessions.get(SessionId(sessionIdRaw))
-      if (session === undefined) {
-        none()
-        return
-      }
+      // 会话未装载（页面刚打开、历史未加载）时 session 为 undefined：不直接回 none，
+      // 走 currentMainModel 的默认模型回退（座位首帧同源）——图标随页面立即出现，
+      // 不必等会话历史装载；装载后 client 重查会纠正为会话真实模型。
       const main = currentMainModel(ctx, session)
       // 无模型信息且无共享默认模型（新会话、部署未配默认）：不显示。
       if (main === undefined) {

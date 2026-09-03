@@ -6,7 +6,7 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 
-/** 图标状态：cross-model=可跨模型读图（蓝紫点亮）；native-vision=原生视觉（灰显）；no-vision=无视觉能力（带斜线）；none=无信息（隐藏）。 */
+/** 图标状态：cross-model=可跨模型读图（蓝紫点亮）；native-vision=原生视觉（灰显）；no-vision=无视觉能力（带斜线）；none=无信息（隐藏）。status 查询未返回时以灰显中性态常驻（同 FIM，不随会话历史装载才出现）。 */
 export type VisionStatusMode = 'none' | 'cross-model' | 'native-vision' | 'no-vision'
 
 export interface VisionStatusResult {
@@ -113,7 +113,8 @@ export function VisionStatusIcon({ sessionId, queryStatus, subscribeModelChange,
   const buttonRef = useRef<HTMLButtonElement | null>(null)
 
   // 会话切换 / 模型切换（modelSelection 投影变化）时查询 host 状态；
-  // 查询失败默认隐藏（保守，不影响主流程）。
+  // 查询期间 status 保持 null → 灰显中性态常驻（同 FIM，不等会话历史装载）；
+  // 查询失败隐藏（保守，不影响主流程）。
   useEffect(() => {
     setStatus(null)
     setOpen(false)
@@ -123,7 +124,8 @@ export function VisionStatusIcon({ sessionId, queryStatus, subscribeModelChange,
       void queryStatus(sessionId).then((next) => {
         if (alive) setStatus(next)
       }).catch(() => {
-        // 状态查询失败：不显示图标。
+        // 状态查询失败：隐藏图标（保守，不影响主流程）。
+        if (alive) setStatus({ mode: 'none', visionModel: '' })
       })
     }
     refresh()
@@ -178,14 +180,17 @@ export function VisionStatusIcon({ sessionId, queryStatus, subscribeModelChange,
 
   const native = status?.mode === 'native-vision'
   const noVision = status?.mode === 'no-vision'
-  if (status === null || status.mode === 'none') return null
-  const aria = native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')
+  // none = 确实无信息 → 隐藏；status === null（查询中）→ 灰显中性态常驻。
+  if (status !== null && status.mode === 'none') return null
+  const aria = status === null
+    ? t('popover.unknown.title')
+    : native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')
   return (
     <>
       <button
         ref={buttonRef}
         type="button"
-        className={native
+        className={status === null || native
           ? 'dsh-vision-status dsh-vision-status-native'
           : noVision
             ? 'dsh-vision-status dsh-vision-status-none'
@@ -216,13 +221,15 @@ export function VisionStatusIcon({ sessionId, queryStatus, subscribeModelChange,
               transform: point.up ? 'translateX(-100%) translateY(-100%)' : 'translateX(-100%)',
             }}
           >
-            <div className="dsh-vision-popover-title">{native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')}</div>
+            <div className="dsh-vision-popover-title">{status === null ? t('popover.unknown.title') : native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')}</div>
             <div className="dsh-vision-popover-body">
-              {native
-                ? t('popover.nativeVision.body')
-                : noVision
-                  ? t('popover.noVision.body')
-                  : t('popover.crossModel.body', { model: status.visionModel })}
+              {status === null
+                ? t('popover.unknown.body')
+                : native
+                  ? t('popover.nativeVision.body')
+                  : noVision
+                    ? t('popover.noVision.body')
+                    : t('popover.crossModel.body', { model: status.visionModel })}
             </div>
           </div>,
           document.body,

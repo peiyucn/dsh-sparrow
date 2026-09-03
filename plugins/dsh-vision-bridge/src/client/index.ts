@@ -20,6 +20,8 @@ const LOCALE_DICTS = {
     'popover.nativeVision.body': '当前模型本身就支持看图：图片直达主模型，无需经视觉通道转述。',
     'popover.noVision.title': '该模型不支持看图',
     'popover.noVision.body': '当前模型不具备视觉能力，也不在此插件支持的跨模型读图范围内（仅 DeepSeek 文本模型）。请切换模型后再试。',
+    'popover.unknown.title': '视觉状态读取中',
+    'popover.unknown.body': '正在识别当前模型的看图能力…',
   },
   en: {
     'popover.crossModel.title': 'Cross-model image reading',
@@ -28,6 +30,8 @@ const LOCALE_DICTS = {
     'popover.nativeVision.body': 'This model sees images natively: images go straight to the main model, with no transcription channel needed.',
     'popover.noVision.title': 'No vision capability',
     'popover.noVision.body': 'This model cannot see images and is outside the cross-model channel (DeepSeek text models only). Switch models to continue.',
+    'popover.unknown.title': 'Reading vision status',
+    'popover.unknown.body': 'Detecting the current model\'s vision capability…',
   },
 } as const
 

@@ -8,6 +8,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'popover.nativeVision.body'
       | 'popover.noVision.title'
       | 'popover.noVision.body'
+      | 'popover.unknown.title'
+      | 'popover.unknown.body'
   }
 }
 
