@@ -912,9 +912,20 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
     }
     const onPointerDown = (event: PointerEvent): void => {
       if (!(event.target instanceof Element)) return
-      if (event.target.closest('.dsh-chat-fim-menu') !== null) return
-      if (event.target.closest('.dsh-chat-fim-switch') !== null) return
-      if (event.target.closest('.dsh-chat-fim-sensitivity-popover') !== null) return
+      // 卡内任意位置（含底栏/空白）与开关/灵敏度弹层的 mousedown 都阻止默认焦点转移：
+      // 否则点一下输入框就失焦到 body，后续 Tab 的焦点检查失败表现为「Tab 失灵」（2026-09-03）。
+      if (event.target.closest('.dsh-chat-fim-menu') !== null) {
+        event.preventDefault()
+        return
+      }
+      if (event.target.closest('.dsh-chat-fim-switch') !== null) {
+        event.preventDefault()
+        return
+      }
+      if (event.target.closest('.dsh-chat-fim-sensitivity-popover') !== null) {
+        event.preventDefault()
+        return
+      }
       setSuggestion(null)
     }
     document.addEventListener('keydown', onKeyDown, true)
