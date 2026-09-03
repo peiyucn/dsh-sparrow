@@ -264,6 +264,15 @@ export function apply(ctx: Context, config: Config): void {
       ...(account?.enterpriseName === undefined ? {} : { enterpriseName: account.enterpriseName }),
       ...(account?.accountType === undefined ? {} : { accountType: account.accountType }),
     }),
+    async ensureAccount() {
+      // 启动期补拉失败的兜底：状态接口触发一次（成功即缓存进内存）。
+      if (account !== undefined) return
+      try {
+        await refreshAccountWithKey(await resolveApiKey())
+      } catch {
+        // best-effort：账号信息缺失不阻塞状态接口。
+      }
+    },
     models: () => models(),
   })
 

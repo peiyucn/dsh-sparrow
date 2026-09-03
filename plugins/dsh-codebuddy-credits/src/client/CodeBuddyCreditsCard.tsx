@@ -5,6 +5,11 @@
  * 标题行（显示名 + 路由 id）→ 「API Key」标签 + 密码输入（placeholder 随
  * 配置状态切换）→ 账号信息一行（企业/个人只在配置页展示）→ 取消/应用
  * footer。视觉 token 与官方一致（--dsw-alias-*，随 DSH 深浅主题自动切换）。
+ *
+ * 避免与官方「编辑」展开的编辑器卡重复：Key 已配置时折叠成一行状态
+ * （账号信息 + 「更换 Key」按钮），点按钮才展开输入区；未配置时直接显示
+ * 输入区。官方行头的「编辑」展开的是官方编辑器，对本插件命名空间只能
+ * 渲染占位提示——那是由官方页面控制的，本卡不做重复编辑器。
  * Key 只发给本机 host 路由存入 DSH 凭据库；企业策略错误原样透传展示。
  */
 
@@ -21,6 +26,8 @@ interface CardStatus {
 
 interface CardProps {
   t: (key: string, vars?: Record<string, string>) => string
+  /** 官方页面 owner 共享：行头凭据 join 结果（初始渲染即可用，无需等状态接口）。 */
+  keyConfigured?: boolean
 }
 
 /** 官方 editor 容器：填充模块面，圆角 12，内边距 14/16。 */
@@ -133,6 +140,42 @@ const secondaryButtonStyle: CSSProperties = {
   color: 'var(--dsw-alias-label-primary)',
 }
 
+/** 折叠态：一行状态 + 小号「更换 Key」（不渲染成第二个编辑器卡）。 */
+const collapsedRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '10px',
+  padding: '8px 12px',
+  borderRadius: '12px',
+  background: 'var(--dsw-alias-bg-module-platform)',
+  width: '100%',
+  boxSizing: 'border-box',
+}
+
+const collapsedTextStyle: CSSProperties = {
+  margin: 0,
+  fontSize: '12px',
+  lineHeight: '18px',
+  color: 'var(--dsw-alias-label-secondary)',
+}
+
+const linkButtonStyle: CSSProperties = {
+  boxSizing: 'border-box',
+  display: 'inline-flex',
+  alignItems: 'center',
+  height: '28px',
+  padding: '0 10px',
+  border: 'none',
+  borderRadius: '14px',
+  background: 'transparent',
+  color: 'var(--dsw-alias-label-tertiary)',
+  font: 'inherit',
+  fontSize: '12px',
+  lineHeight: '18px',
+  cursor: 'pointer',
+}
+
 /** 官方 apiKeyFailure 的轻量镜像：可打印 ASCII（空格除外）。 */
 const LEGAL_API_KEY = /^[\x21-\x7E]+$/
 
@@ -151,9 +194,10 @@ function accountTypeLabel(t: CardProps['t'], raw: string | undefined): string | 
   return raw
 }
 
-export function CodeBuddyCreditsCard({ t }: CardProps) {
+export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: CardProps) {
   const [status, setStatus] = useState<CardStatus | undefined>(undefined)
   const [draft, setDraft] = useState('')
+  const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | undefined>(undefined)
   const [messageKind, setMessageKind] = useState<'error' | 'info'>('info')
@@ -171,7 +215,9 @@ export function CodeBuddyCreditsCard({ t }: CardProps) {
     void load()
   }, [load])
 
-  const configured = status?.keyConfigured === true
+  // 任一信号（页面 join / 状态接口）确认已配置即折叠；两者都未知才展开输入区。
+  const configured = status?.keyConfigured === true || ownerKeyConfigured === true
+  const showEditor = !configured || editing
   const illegal = keyFailure(draft)
 
   const save = async () => {
@@ -197,6 +243,7 @@ export function CodeBuddyCreditsCard({ t }: CardProps) {
         return
       }
       setDraft('')
+      setEditing(false)
       setMessageKind('info')
       setMessage(t('saved'))
       await load()
@@ -208,7 +255,32 @@ export function CodeBuddyCreditsCard({ t }: CardProps) {
     }
   }
 
+  const cancel = () => {
+    setDraft('')
+    setMessage(undefined)
+    if (configured) setEditing(false)
+  }
+
   const account = status?.account
+  const accountParts = [
+    accountTypeLabel(t, account?.accountType),
+    account?.enterpriseName,
+  ].filter((part): part is string => part !== undefined)
+
+  if (!showEditor) {
+    return (
+      <div style={collapsedRowStyle}>
+        <p style={collapsedTextStyle}>
+          {accountParts.length > 0
+            ? t('state.configured', { account: accountParts.join(' · ') })
+            : t('state.configuredShort')}
+        </p>
+        <button type="button" onClick={() => setEditing(true)} className="ccb-card-replace" style={linkButtonStyle}>
+          {t('key.replace')}
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div style={editorStyle}>
@@ -233,13 +305,10 @@ export function CodeBuddyCreditsCard({ t }: CardProps) {
           ? <p style={errorStyle}>{t('key.illegal')}</p>
           : null}
       </div>
-      {configured
+      {configured && accountParts.length > 0
         ? (
           <p style={hintStyle}>
-            {t('state.configured', {
-              enterprise: account?.enterpriseName ?? '—',
-              type: accountTypeLabel(t, account?.accountType) ?? '—',
-            })}
+            {t('state.configured', { account: accountParts.join(' · ') })}
           </p>
         )
         : null}
@@ -253,7 +322,7 @@ export function CodeBuddyCreditsCard({ t }: CardProps) {
       <div style={actionsStyle}>
         <button
           type="button"
-          onClick={() => { setDraft(''); setMessage(undefined) }}
+          onClick={cancel}
           disabled={busy}
           style={secondaryButtonStyle}
         >

@@ -45,6 +45,8 @@ export interface CodeBuddyCreditsShared {
   quota(): Promise<QuotaStatus>
   /** 账号快照（来自 /v2/accounts）。 */
   account(): AccountView
+  /** 账号缺失时补拉 /v2/accounts（best-effort，状态接口在给 Key 后调用）。 */
+  ensureAccount(): Promise<void>
   /** 当前生效模型事实（进程内，Key 驱动的目录）。 */
   models(): readonly CodeBuddyModelFacts[]
 }
@@ -108,6 +110,8 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
             let quota: QuotaStatus | undefined
             let quotaError: string | undefined
             if (keyConfigured) {
+              // 账号信息在启动补拉失败（网络抖动）时会缺失：状态读取时补一次。
+              await shared.ensureAccount().catch(() => {})
               try {
                 quota = await shared.quota()
               } catch (error) {
