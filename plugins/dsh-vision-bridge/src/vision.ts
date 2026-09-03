@@ -131,7 +131,8 @@ export function normalizeAttachmentId(id: string): string {
  * 从会话事件中反查图片引用（仿 api-proxy.referencedImage 的纯逻辑版）。
  * 兼容占位符里只露出截断哈希的场景：先精确匹配，再唯一前缀匹配；歧义时返回全部候选。
  */
-export function findImageReference(events: readonly SessionEvent[], attachmentId: string): ImageLookupResult {
+/** 会话事件里出现过的全部图片引用（按首次出现顺序去重）。 */
+export function imageRefsInEvents(events: readonly SessionEvent[]): ImageAttachmentRef[] {
   const refs: ImageAttachmentRef[] = []
   for (const event of events) {
     const data = event.data as {
@@ -149,7 +150,45 @@ export function findImageReference(events: readonly SessionEvent[], attachmentId
       collectImageRefs([data.chunk.block], refs)
     }
   }
+  return refs
+}
 
+/**
+ * 自动档门控：主模型为 DeepSeek 系列且非原生视觉（图片不走直达、需要文字报告）时注入。
+ * 未识别路由按 deepseek 处理（与 vision_read 工具的按 agent 屏蔽口径一致）。
+ */
+export function shouldAutoDescribe(
+  mainRoute: { provider: string } | undefined,
+  inputModalities: readonly string[] | undefined,
+): boolean {
+  if (!isDeepseekMainRoute(mainRoute)) return false
+  return !modelSupportsImages(inputModalities)
+}
+
+/** 自动档注入段落：每图一段渲染报告；有未读到的图时注明（下一轮组装自动补）。 */
+export function autoVisionSectionText(
+  entries: readonly { attachmentId: string; report: VisionReport }[],
+  missedCount: number,
+): string {
+  if (entries.length === 0) return ''
+  const lines = [
+    '[vision_read 自动描述] 会话中的图片已由视觉模型自动读取，内容如下。',
+    '如需对某张图进一步提问，可调用 vision_read 工具并附对应 attachmentId。',
+    '',
+  ]
+  for (const entry of entries) {
+    lines.push('attachmentId=sha256:' + entry.attachmentId)
+    lines.push(renderVisionReport(entry.report))
+    lines.push('')
+  }
+  if (missedCount > 0) {
+    lines.push('（另有 ' + missedCount + ' 张图本轮未读到，将在后续轮次自动补读）')
+  }
+  return lines.join('\n').trimEnd()
+}
+
+export function findImageReference(events: readonly SessionEvent[], attachmentId: string): ImageLookupResult {
+  const refs = imageRefsInEvents(events)
   const allIds = refs.map(ref => String(ref.attachmentId))
   const query = normalizeAttachmentId(attachmentId)
   if (query === '') return { ok: false, reason: 'not-found', matches: allIds }

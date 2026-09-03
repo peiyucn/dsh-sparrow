@@ -6,15 +6,18 @@ import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-system-prompt'
 import { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
-import { SessionId, type Session } from '@deepseek-ai/dsh-session'
+import { SessionId, type Session, type SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-tools'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import {
-  extractJsonObject, findImageReference, isDeepseekMainRoute, mainRouteFromSession, modelSupportsImages,
-  normalizeVisionConfig, parseVisionReport, renderVisionReport, resolveVisionOutput, shouldClearInputModalities,
-  visionCacheKey, VisionCache, type VisionConfig, type VisionReport,
+  autoVisionSectionText, extractJsonObject, findImageReference, imageRefsInEvents, isDeepseekMainRoute,
+  mainRouteFromSession, modelSupportsImages, normalizeVisionConfig, parseVisionReport, renderVisionReport,
+  resolveVisionOutput, shouldAutoDescribe, shouldClearInputModalities, visionCacheKey, VisionCache,
+  type VisionConfig, type VisionReport,
 } from './vision.js'
 
 export const name = 'dsh-vision-bridge'
@@ -24,6 +27,12 @@ export type { VisionConfig, VisionReport }
 
 const TOOL_NAME = 'vision_read'
 const STATUS_ROUTE_PATH = '/api/vision-bridge/status'
+/** 自动档与工具默认提问共用同一条（共享缓存键，避免同一张图读两次）。 */
+const DEFAULT_VISION_QUESTION = '请完整阅读这张图片并给出结构化报告。'
+/** 自动档注入段落的唯一名（组装不变量：段名唯一且非空）。 */
+const AUTO_SECTION_NAME = 'vision-bridge:auto-describe'
+/** 单次组装的读图总预算；超时中止并行读图，未读到的图下一轮组装自动补。 */
+const AUTO_DESCRIBE_BUDGET_MS = 15_000
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   if (res.headersSent) return
@@ -84,6 +93,69 @@ function currentMainModel(ctx: Context, session: Session): { provider: string; m
     // 服务缺失（旧版 dsh）：保持无信息，图标隐藏。
   }
   return undefined
+}
+
+/**
+ * 读一张图并返回结构化报告（vision_read 工具与自动档共用）：
+ * 缓存/在途去重 → 附件 seam 校验 → 直连官方视觉模型 → 结构化报告落缓存。
+ */
+async function describeImage(
+  ctx: Context,
+  settings: VisionConfig,
+  cache: VisionCache,
+  inflight: Map<string, Promise<VisionReport>>,
+  ref: ImageAttachmentRef,
+  question: string,
+  signal: AbortSignal | undefined,
+): Promise<VisionReport> {
+  const cacheKey = visionCacheKey(String(ref.attachmentId), question)
+  const cached = cache.get(cacheKey)
+  if (cached !== undefined) return cached
+  // isConcurrencySafe 下同 key 可能并发：in-flight Promise 去重，避免重复视觉调用。
+  const pending = inflight.get(cacheKey)
+  if (pending !== undefined) return pending
+  const task = (async (): Promise<VisionReport> => {
+    // 先走官方附件 seam 确认图片字节可读；只传 ref，不复制内部文件。
+    await ctx.attachments.readImage(ref, signal)
+
+    const promptText = `${question}
+
+输出 JSON 对象：summary（一句话摘要）、ocrText（逐字文本，可选）、tables（表格，可选）、layout（版式，可选）。只输出 JSON 本体，不要输出解释或代码围栏。不要编造图中没有的内容。`
+
+    const prepared = await ctx.llm.prepareCall({
+      provider: settings.visionProvider,
+      model: settings.visionModel,
+      maxTokens: settings.maxTokens,
+      temperature: settings.temperature,
+      // 低思考力度：结构化读图不需要烧大量 reasoning，避免 maxTokens 截断。
+      reasoningEffort: ReasoningEffortId(settings.visionReasoningEffort),
+    }, signal)
+    let text = ''
+    let reasoning = ''
+    for await (const chunk of prepared.stream({
+      ...prepared.config,
+      messages: [createUserMessage({
+        content: [
+          { type: 'text', text: promptText },
+          { type: 'image', attachment: ref },
+        ],
+        source: { kind: 'user' },
+      })],
+      signal,
+    })) {
+      if (chunk.type === 'text-delta') text += chunk.text
+      if (chunk.type === 'reasoning-delta') reasoning += chunk.text
+    }
+    // 正文优先；只有思考文本时视为截断/异常，抛明确错误而不是把思考当报告。
+    const raw = resolveVisionOutput(text, reasoning)
+    const report = parseVisionReport(extractJsonObject(raw), raw)
+    cache.set(cacheKey, report)
+    return report
+  })().finally(() => {
+    inflight.delete(cacheKey)
+  })
+  inflight.set(cacheKey, task)
+  return task
 }
 
 /**
@@ -216,57 +288,54 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
 
       const question = typeof args.question === 'string' && args.question.trim() !== ''
         ? args.question.trim()
-        : '请完整阅读这张图片并给出结构化报告。'
-
-      const cacheKey = visionCacheKey(String(ref.attachmentId), question)
-      const cached = cache.get(cacheKey)
-      if (cached !== undefined) return cached
-      // isConcurrencySafe 下同 key 可能并发 execute：in-flight Promise 去重，避免重复视觉调用。
-      const pending = inflight.get(cacheKey)
-      if (pending !== undefined) return pending
-
-      const task = (async (): Promise<VisionReport> => {
-        // 先走官方附件 seam 确认图片字节可读；只传 ref，不复制内部文件。
-        await ctx.attachments.readImage(ref, exec.signal)
-
-        const promptText = `${question}\n\n输出 JSON 对象：summary（一句话摘要）、ocrText（逐字文本，可选）、tables（表格，可选）、layout（版式，可选）。只输出 JSON 本体，不要输出解释或代码围栏。不要编造图中没有的内容。`
-
-        const prepared = await ctx.llm.prepareCall({
-          provider: settings.visionProvider,
-          model: settings.visionModel,
-          maxTokens: settings.maxTokens,
-          temperature: settings.temperature,
-          // 低思考力度：结构化读图不需要烧大量 reasoning，避免 maxTokens 截断。
-          reasoningEffort: ReasoningEffortId(settings.visionReasoningEffort),
-        }, exec.signal)
-        let text = ''
-        let reasoning = ''
-        for await (const chunk of prepared.stream({
-          ...prepared.config,
-          messages: [createUserMessage({
-            content: [
-              { type: 'text', text: promptText },
-              { type: 'image', attachment: ref },
-            ],
-            source: { kind: 'user' },
-          })],
-          signal: exec.signal,
-        })) {
-          if (chunk.type === 'text-delta') text += chunk.text
-          if (chunk.type === 'reasoning-delta') reasoning += chunk.text
-        }
-        // 正文优先；只有思考文本时视为截断/异常，抛明确错误而不是把思考当报告。
-        const raw = resolveVisionOutput(text, reasoning)
-        const report = parseVisionReport(extractJsonObject(raw), raw)
-        cache.set(cacheKey, report)
-        return report
-      })().finally(() => {
-        inflight.delete(cacheKey)
-      })
-      inflight.set(cacheKey, task)
-      return task
+        : DEFAULT_VISION_QUESTION
+      return describeImage(ctx, settings, cache, inflight, ref, question, exec.signal)
     },
   })), 'dsh-vision-bridge: vision_read tool')
+
+  // 2.5 自动看图（spec 03）：system-prompt/assemble 注入——贴图后主模型稳定拿到报告，
+  //     不依赖自觉调用 vision_read。只增不改：本钩子是现有行为之外的新增注入点，
+  //     任何失败静默跳过，绝不阻塞请求。
+  ctx.effect(() => ctx.on('system-prompt/assemble', async (assembly, context, next) => {
+    const result = await next()
+    try {
+      const agent = (context as { agent?: { session?: { snapshotEvents?: () => readonly SessionEvent[] } } }).agent
+      if (agent === undefined || typeof agent.session?.snapshotEvents !== 'function') return result
+      const events = agent.session.snapshotEvents()
+      const main = mainRouteFromSession(events)
+      // 新图判定前置（最便宜）：会话无图、或全部已缓存 → 不动组装。
+      const fresh = imageRefsInEvents(events).filter(ref =>
+        cache.get(visionCacheKey(String(ref.attachmentId), DEFAULT_VISION_QUESTION)) === undefined)
+      if (fresh.length === 0) return result
+      // 门控：非 deepseek 主模型、或原生视觉主模型（图片直达）→ 不注入。
+      if (main !== undefined) {
+        try {
+          const info = await ctx.llm.resolveModelInfo(main.provider, main.model)
+          if (!shouldAutoDescribe(main, info.inputModalities)) return result
+        } catch {
+          // 能力解析失败：继续按文本模型处理（与工具档口径一致）。
+        }
+      }
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), AUTO_DESCRIBE_BUDGET_MS)
+      const outcomes = await Promise.allSettled(fresh.map(ref =>
+        describeImage(ctx, settings, cache, inflight, ref, DEFAULT_VISION_QUESTION, controller.signal)))
+      clearTimeout(timer)
+      const described: { attachmentId: string; report: VisionReport }[] = []
+      let missed = 0
+      outcomes.forEach((outcome, index) => {
+        const ref = fresh[index]
+        if (ref === undefined) return
+        if (outcome.status === 'fulfilled') described.push({ attachmentId: String(ref.attachmentId), report: outcome.value })
+        else missed += 1
+      })
+      if (described.length === 0) return result
+      result.sections.push({ name: AUTO_SECTION_NAME, text: autoVisionSectionText(described, missed) })
+    } catch {
+      // 注入失败绝不阻塞请求：回退到纯现有行为（模型可自行调用 vision_read）。
+    }
+    return result
+  }), 'dsh-vision-bridge: auto describe')
 
   // 3. 状态查询路由：客户端点亮图标据此判定（DeepSeek 文本模型 → vision_read 可用）。
   ctx.effect(() => ctx.webServer.register({
