@@ -45,7 +45,7 @@ jobs:
             VERSION="$(node -p "require('./plugins/${PLUGIN}/package.json').version")"
           fi
           # 临时（2026-09-03 定）：官方 0.1.2-rc.1 落地前，alpha 版本也直发 latest
-          # （当前无稳定轨可服务，next 空转无意义）。rc.1 落地后恢复双通道：
+          # （当前无稳定轨可服务，next 空转无意义）。0.1.2-rc.1 落地后恢复双通道：
           # 版本含 `-` 发 next、正式版发 latest。
           NPM_TAG="latest"
           echo "plugin=${PLUGIN}" >> "$GITHUB_OUTPUT"
