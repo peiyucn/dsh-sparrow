@@ -1,6 +1,6 @@
 /**
- * dsh-codebuddy-credits 的 host HTTP 路由：给 client 的设置卡片提供
- * 状态读取、Key 保存/移除、配额查询与模型目录刷新。
+ * dsh-codebuddy-credits 的 host HTTP 路由：给 client 的设置卡片与聊天头部
+ * 额度卡提供状态读取、Key 保存/移除、配额查询。
  * Key 只经 ctx.credentials，不进日志、不进响应；所有云端请求仅在用户
  * 给 Key 后发生（无 Key 零网络行为）。
  */
@@ -9,6 +9,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-host-webserver'
+import type { CodeBuddyModelFacts } from './catalog.js'
 import { API_KEY_ENV } from './constants.js'
 import type { QuotaStatus } from './quota.js'
 
@@ -16,18 +17,23 @@ export const KEY_REF = credentialRef(API_KEY_ENV)
 const PREFIX = '/api/codebuddy-credits'
 const MAX_BODY_BYTES = 16 * 1024
 
-/** 模型目录刷新结果。 */
-export interface ModelRefreshResult {
-  /** 本次新出现的模型 id（企业管理员新放开的）。 */
-  added: string[]
-  /** 刷新后的模型总数。 */
-  total: number
-}
-
 /** 账号快照（展示用）。 */
 export interface AccountView {
   enterpriseName?: string
   accountType?: string
+}
+
+/** 状态接口里的模型事实视图（client 头部卡片据此展示当前模型信息）。 */
+export interface ModelFactView {
+  id: string
+  /** 展示名（已含系数/视觉标记）。 */
+  name: string
+  /** 原生视觉（supportsImages）。 */
+  vision: boolean
+  contextWindow: number
+  maxTokens: number
+  /** 思考档位 id（含 off），无推理能力时缺省。 */
+  efforts?: string[]
 }
 
 /** web.ts 与 index.ts 共享的最小操作面。 */
@@ -35,14 +41,26 @@ export interface CodeBuddyCreditsShared {
   keyConfigured(): Promise<boolean>
   saveKey(key: string): Promise<void>
   removeKey(): Promise<void>
-  /** 拉取模型目录并对比已存，返回新增模型（用户主动刷新时调用）。 */
-  refreshModels(): Promise<ModelRefreshResult>
   /** 查询企业周期配额。 */
   quota(): Promise<QuotaStatus>
   /** 账号快照（来自 /v2/accounts）。 */
   account(): AccountView
-  active(): boolean
-  modelIds(): readonly string[]
+  /** 当前生效模型事实（进程内，Key 驱动的目录）。 */
+  models(): readonly CodeBuddyModelFacts[]
+}
+
+/** 模型事实 → 状态接口视图。 */
+export function toModelFactView(model: CodeBuddyModelFacts): ModelFactView {
+  return {
+    id: model.id,
+    name: model.name,
+    vision: model.input.includes('image'),
+    contextWindow: model.contextWindow,
+    maxTokens: model.maxTokens,
+    ...(model.reasoning && model.thinkingLevelMap !== undefined
+      ? { efforts: Object.keys(model.thinkingLevelMap) }
+      : {}),
+  }
 }
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
@@ -86,9 +104,10 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
             return
           }
           if (req.method === 'GET' && pathname === PREFIX + '/status') {
+            const keyConfigured = await shared.keyConfigured()
             let quota: QuotaStatus | undefined
             let quotaError: string | undefined
-            if (await shared.keyConfigured()) {
+            if (keyConfigured) {
               try {
                 quota = await shared.quota()
               } catch (error) {
@@ -96,10 +115,9 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
               }
             }
             sendJson(res, 200, {
-              keyConfigured: await shared.keyConfigured(),
-              active: shared.active(),
-              models: shared.modelIds(),
+              keyConfigured,
               account: shared.account(),
+              models: shared.models().map(model => toModelFactView(model)),
               ...(quota === undefined ? {} : { quota }),
               ...(quotaError === undefined ? {} : { quotaError }),
             })
@@ -123,16 +141,6 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
           if (req.method === 'POST' && pathname === PREFIX + '/remove-key') {
             await shared.removeKey()
             sendJson(res, 200, { ok: true })
-            return
-          }
-          if (req.method === 'POST' && pathname === PREFIX + '/refresh-models') {
-            const result = await shared.refreshModels()
-            sendJson(res, 200, result)
-            return
-          }
-          if (req.method === 'POST' && pathname === PREFIX + '/quota') {
-            const quota = await shared.quota()
-            sendJson(res, 200, quota)
             return
           }
           sendJson(res, 404, { error: '未知路径' })
