@@ -91,10 +91,11 @@ function formatReset(raw: string | undefined): string | undefined {
   return match === null ? raw : match[1]
 }
 
+/** 面板正文：label-secondary（caption 在深浅两主题下都偏淡，不可读）。 */
 const captionStyle: CSSProperties = {
   fontSize: '12px',
   lineHeight: '18px',
-  color: 'var(--dsw-alias-label-caption)',
+  color: 'var(--dsw-alias-label-secondary)',
 }
 
 const dangerStyle: CSSProperties = {
@@ -251,19 +252,10 @@ export function CodeBuddyCreditsIndicator({
                   {quota !== undefined
                     ? (
                       <>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'baseline',
-                          justifyContent: 'space-between',
-                          gap: '8px',
-                          marginTop: '4px',
-                        }}>
-                          <span style={{ fontSize: '12px', lineHeight: '18px', fontWeight: 500, color: 'var(--dsw-alias-label-secondary)' }}>
-                            {t('indicator.quotaTitle')}
-                          </span>
-                          <span style={{ fontSize: '12px', lineHeight: '18px', color: 'var(--dsw-alias-label-caption)', fontVariantNumeric: 'tabular-nums' }}>
-                            {percent}%
-                          </span>
+                        {/* 容量条对齐 dsh-file-manage 配额条：加厚 16px、未使用区
+                            45° 斜纹、文字居中叠加、business 蓝填充。 */}
+                        <div style={{ marginTop: '4px', fontSize: '12px', lineHeight: '18px', fontWeight: 500, color: 'var(--dsw-alias-label-secondary)' }}>
+                          {t('indicator.quotaTitle')}
                         </div>
                         <div
                           role="progressbar"
@@ -271,25 +263,48 @@ export function CodeBuddyCreditsIndicator({
                           aria-valuemax={100}
                           aria-valuenow={percent}
                           style={{
-                            height: '6px',
+                            position: 'relative',
+                            height: '16px',
                             marginTop: '6px',
-                            borderRadius: '3px',
-                            background: 'var(--dsw-alias-interactive-bg-hover)',
+                            borderRadius: '8px',
+                            backgroundColor: 'var(--dsw-alias-interactive-bg-hover)',
+                            backgroundImage: 'repeating-linear-gradient(45deg, transparent 0px, transparent 5px, var(--dsw-alias-border-l1) 5px, var(--dsw-alias-border-l1) 7px)',
                             overflow: 'hidden',
                           }}
                         >
-                          <div style={{
-                            width: percent + '%',
-                            height: '100%',
-                            borderRadius: '3px',
-                            background: 'var(--dsw-alias-button-info-fill)',
-                            transition: 'width 200ms ease',
-                          }} />
+                          {quota.used > 0
+                            ? (
+                              <div style={{
+                                height: '100%',
+                                minWidth: '4px',
+                                background: 'var(--dsw-alias-state-business-primary)',
+                                transition: 'width 220ms ease-out',
+                                width: percent + '%',
+                              }} />
+                            )
+                            : null}
+                          <span style={{
+                            position: 'absolute',
+                            inset: 0,
+                            zIndex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '11px',
+                            lineHeight: '16px',
+                            whiteSpace: 'nowrap',
+                            color: 'var(--dsw-alias-label-primary)',
+                            textShadow: '0 0 4px var(--dsw-alias-bg-layer-2)',
+                            pointerEvents: 'none',
+                          }}>
+                            {t('indicator.used', {
+                              used: quota.used.toFixed(2),
+                              limit: quota.limit.toFixed(2),
+                              percent: String(percent),
+                            })}
+                          </span>
                         </div>
                         <div style={{ ...captionStyle, marginTop: '6px' }}>
-                          {t('indicator.used', { used: quota.used.toFixed(2), limit: quota.limit.toFixed(2) })}
-                        </div>
-                        <div style={captionStyle}>
                           {t('indicator.remaining', { remaining: quota.remaining.toFixed(2) })}
                         </div>
                         {resetAt !== undefined

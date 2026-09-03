@@ -273,6 +273,10 @@ export function apply(ctx: Context, config: Config): void {
         // best-effort：账号信息缺失不阻塞状态接口。
       }
     },
+    async ensureModels() {
+      // 目录为空（启动拉取失败）时状态读取触发补拉：配置卡/额度卡是自愈入口。
+      if (models().length === 0) kickModelRefresh()
+    },
     models: () => models(),
   })
 
