@@ -1,15 +1,14 @@
 /**
  * CodeBuddy Credits 设置卡片：挂在官方 settings.models.provider-card 槽位
  * （key = 本插件命名空间），渲染在设置 → 模型页的 CodeBuddy Credits 行上。
- * 交互对齐 DeepSeek 官方编辑器卡（ui-settings-models ProviderEditor）：
- * 标题行（显示名 + 路由 id）→ 「API Key」标签 + 密码输入（placeholder 随
- * 配置状态切换）→ 账号信息一行（企业/个人只在配置页展示）→ 取消/应用
- * footer。视觉 token 与官方一致（--dsw-alias-*，随 DSH 深浅主题自动切换）。
+ * 结构与视觉 1:1 复刻官方 ProviderEditor（ui-settings-models）：标题行
+ * （显示名 + 路由 id）→「API Key」标签 + 密码输入 → 账号信息一行 →
+ * 「自定义设置」折叠区（Base URL 只读 + 模型目录说明）→ 取消/应用 footer。
+ * 样式全部照抄官方 ModelsSection.module.css（--dsw-alias-* token）。
  *
- * 避免与官方「编辑」展开的编辑器卡重复：Key 已配置时折叠成一行状态
- * （账号信息 + 「更换 Key」按钮），点按钮才展开输入区；未配置时直接显示
- * 输入区。官方行头的「编辑」展开的是官方编辑器，对本插件命名空间只能
- * 渲染占位提示——那是由官方页面控制的，本卡不做重复编辑器。
+ * 无法接管的是官方行头「编辑」按钮展开的那张官方卡（页面内组件、非槽位，
+ * 对本命名空间只渲染占位提示）；本卡常驻在行内、与官方编辑器同款，Key
+ * 已配置时折叠成一行（账号信息 + 更换 Key），点按钮才展开输入区。
  * Key 只发给本机 host 路由存入 DSH 凭据库；企业策略错误原样透传展示。
  */
 
@@ -19,9 +18,13 @@ import type { CSSProperties } from 'react'
 const STATUS_URL = '/api/codebuddy-credits/status'
 const KEY_URL = '/api/codebuddy-credits/key'
 
+/** 官方端点固定（协议层自建，不开放自定义 Base URL）。 */
+const FIXED_BASE_URL = 'https://copilot.tencent.com/v2'
+
 interface CardStatus {
   keyConfigured: boolean
   account?: { enterpriseName?: string; accountType?: string }
+  models?: unknown[]
 }
 
 interface CardProps {
@@ -75,19 +78,6 @@ const labelStyle: CSSProperties = {
   lineHeight: '18px',
   fontWeight: 500,
   color: 'var(--dsw-alias-label-secondary)',
-}
-
-const inputStyle: CSSProperties = {
-  boxSizing: 'border-box',
-  width: '100%',
-  minHeight: '36px',
-  padding: '0 12px',
-  border: '1px solid var(--dsw-alias-border-l3)',
-  borderRadius: '8px',
-  background: 'transparent',
-  color: 'var(--dsw-alias-label-primary)',
-  font: 'inherit',
-  fontSize: '13px',
 }
 
 const errorStyle: CSSProperties = {
@@ -266,6 +256,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     accountTypeLabel(t, account?.accountType),
     account?.enterpriseName,
   ].filter((part): part is string => part !== undefined)
+  const modelCount = status?.models?.length ?? 0
 
   if (!showEditor) {
     return (
@@ -275,7 +266,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
             ? t('state.configured', { account: accountParts.join(' · ') })
             : t('state.configuredShort')}
         </p>
-        <button type="button" onClick={() => setEditing(true)} className="ccb-card-replace" style={linkButtonStyle}>
+        <button type="button" onClick={() => setEditing(true)} className="ccb-card-link" style={linkButtonStyle}>
           {t('key.replace')}
         </button>
       </div>
@@ -292,6 +283,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
         <span style={labelStyle}>{t('key.label')}</span>
         <input
           aria-label="CodeBuddy API Key"
+          className="ccb-card-input"
           type="password"
           placeholder={configured ? t('key.stored') : t('key.placeholder')}
           value={draft}
@@ -299,7 +291,6 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
           disabled={busy}
           autoComplete="new-password"
           aria-invalid={illegal}
-          style={inputStyle}
         />
         {illegal
           ? <p style={errorStyle}>{t('key.illegal')}</p>
@@ -312,6 +303,26 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
           </p>
         )
         : null}
+      {/* 官方编辑器的「自定义设置」折叠区（同款旋转箭头、同款分隔线）。 */}
+      <details className="ccb-card-customized">
+        <summary>{t('customized')}</summary>
+        <div className="ccb-card-customizedBody">
+          <div style={fieldStyle}>
+            <span style={labelStyle}>{t('baseUrl')}</span>
+            <input
+              className="ccb-card-input"
+              type="text"
+              value={FIXED_BASE_URL}
+              disabled
+              readOnly
+              aria-label={t('baseUrl')}
+            />
+          </div>
+          <p style={hintStyle}>
+            {t('models.auto', { count: String(modelCount) })}
+          </p>
+        </div>
+      </details>
       {message !== undefined
         ? (
           <p style={messageKind === 'error' ? errorStyle : hintStyle}>
@@ -339,4 +350,42 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
       </div>
     </div>
   )
+}
+
+let cardStylesInstalled = false
+
+/** 官方 ModelsSection.module.css 的 input/customized/linkButton 照抄（:focus 等伪类只能走样式表）。 */
+export function ensureCardStyles(): void {
+  if (cardStylesInstalled || typeof document === 'undefined') return
+  cardStylesInstalled = true
+  const style = document.createElement('style')
+  style.textContent = [
+    '.ccb-card-input {',
+    '  box-sizing: border-box; width: 100%; height: 32px; padding: 0 10px;',
+    '  border: 0.5px solid var(--dsw-alias-border-l4); border-radius: 8px;',
+    '  font: inherit; font-size: 14px; line-height: 22px;',
+    '  background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary);',
+    '}',
+    '.ccb-card-input:focus { outline: none; border-color: var(--dsw-alias-brand-primary); }',
+    '.ccb-card-input::placeholder { color: var(--dsw-alias-label-dimmed); }',
+    '.ccb-card-input:disabled { opacity: 0.6; cursor: default; }',
+    '.ccb-card-link:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); }',
+    '.ccb-card-customized { border-top: 0.5px solid var(--dsw-alias-border-l2); padding-top: 10px; }',
+    '.ccb-card-customized > summary {',
+    '  display: flex; align-items: center; gap: 6px; width: fit-content;',
+    '  padding: 2px 4px; margin-left: -4px; border-radius: 6px;',
+    '  cursor: pointer; font-size: 12px; line-height: 18px; font-weight: 500;',
+    '  color: var(--dsw-alias-label-secondary); list-style: none;',
+    '}',
+    '.ccb-card-customized > summary::-webkit-details-marker { display: none; }',
+    '.ccb-card-customized > summary::before {',
+    "  content: ''; width: 5px; height: 5px;",
+    '  border-right: 1.5px solid currentcolor; border-bottom: 1.5px solid currentcolor;',
+    '  transform: rotate(-45deg) translate(-1px, -1px); transition: transform 120ms ease;',
+    '}',
+    '.ccb-card-customized[open] > summary::before { transform: rotate(45deg) translate(-1px, -1px); }',
+    '.ccb-card-customized > summary:hover { color: var(--dsw-alias-label-primary); }',
+    '.ccb-card-customizedBody { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }',
+  ].join('\n')
+  document.head.append(style)
 }

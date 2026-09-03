@@ -14,7 +14,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import { CodeBuddyCreditsCard } from './CodeBuddyCreditsCard.js'
+import { CodeBuddyCreditsCard, ensureCardStyles } from './CodeBuddyCreditsCard.js'
 import { CodeBuddyCreditsIndicator, ensureIndicatorStyles } from './CodeBuddyCreditsIndicator.js'
 import { CodeBuddyModelSelect, ensurePickerStyles } from './CodeBuddyModelSelect.js'
 
@@ -32,6 +32,9 @@ const LOCALE_DICTS = {
     'state.configured': '已配置 · {account}',
     'state.configuredShort': '已配置',
     'key.replace': '更换 Key',
+    'customized': '自定义设置',
+    'baseUrl': 'Base URL',
+    'models.auto': '模型目录随 Key 自动获取（当前 {count} 个）',
     'saved': '已保存 API Key，模型目录已更新',
     'error.empty': '请输入 API Key',
     'error.saveFailed': '保存失败：请确认 Key 有效（保存时已尝试获取模型目录）',
@@ -77,6 +80,9 @@ const LOCALE_DICTS = {
     'state.configured': 'Configured · {account}',
     'state.configuredShort': 'Configured',
     'key.replace': 'Replace key',
+    'customized': 'Customized settings',
+    'baseUrl': 'Base URL',
+    'models.auto': 'Model catalog auto-fetched with the key ({count} models)',
     'saved': 'API key saved, model catalog updated',
     'error.empty': 'Enter an API key',
     'error.saveFailed': 'Save failed: check the key (catalog fetch runs on save)',
@@ -131,6 +137,7 @@ interface DirectoryStoreLike {
 export function apply(ctx: ClientContext): void {
   ensureIndicatorStyles()
   ensurePickerStyles()
+  ensureCardStyles()
   const disposeDictionaries = ctx.locale.register('codebuddy-credits', {
     zh: LOCALE_DICTS.zh,
     en: LOCALE_DICTS.en,
