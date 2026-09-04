@@ -279,19 +279,29 @@ export function CodeBuddyCreditsIndicator({
   }, [t])
 
   /** 计算面板位置：header 变体右缘对齐按钮、左缘钳制在会话区（空间不足允许
-   *  收缩，绝不越过会话区左缘）；sidebar 变体从按钮右上方展开（贴近对话框），
-   *  左缘钳制在会话区左缘、右缘不越视口。 */
+   *  收缩，绝不越过会话区左缘）；sidebar 变体——宽栏时面板落在侧栏宽度范围内、
+   *  紧贴按钮上方（侧栏宽 = 会话区左缘），rail 时侧栏窄、面板右移进会话区。 */
   const position = useCallback(() => {
     const rect = rootRef.current?.getBoundingClientRect()
     if (rect === undefined) return
     const conversationLeft = document.querySelector('[data-conversation-scroll]')?.getBoundingClientRect().left ?? 0
     if (variant === 'sidebar') {
-      const left = Math.max(conversationLeft + PANEL_EDGE_GAP, rect.right + 6)
-      setPoint({
-        left,
-        bottom: window.innerHeight - rect.top + 8,
-        width: Math.min(PANEL_MAX_WIDTH, window.innerWidth - left - PANEL_EDGE_GAP),
-      })
+      if (wide) {
+        // 侧栏展开宽 = 会话区左缘；面板在侧栏内居中、贴按钮上方。
+        const sidebarWidth = conversationLeft
+        setPoint({
+          left: PANEL_EDGE_GAP,
+          bottom: window.innerHeight - rect.top + 8,
+          width: Math.min(PANEL_MAX_WIDTH, sidebarWidth - PANEL_EDGE_GAP * 2),
+        })
+      } else {
+        const left = Math.max(conversationLeft + PANEL_EDGE_GAP, rect.right + 6)
+        setPoint({
+          left,
+          bottom: window.innerHeight - rect.top + 8,
+          width: Math.min(PANEL_MAX_WIDTH, window.innerWidth - left - PANEL_EDGE_GAP),
+        })
+      }
       return
     }
     const width = Math.min(PANEL_MAX_WIDTH, Math.max(0, rect.right - conversationLeft - PANEL_EDGE_GAP))
@@ -300,7 +310,7 @@ export function CodeBuddyCreditsIndicator({
       right: window.innerWidth - rect.right,
       width,
     })
-  }, [variant])
+  }, [variant, wide])
 
   // 挂载即读取状态：未配置 Key 时不显示图标（无配置时对话页不该有标）。
   // 配置卡保存/清空 Key 会广播窗口事件，此处联动刷新（无需刷新页面）；
