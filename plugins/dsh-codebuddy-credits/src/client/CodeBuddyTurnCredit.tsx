@@ -111,8 +111,11 @@ export function ensureTurnCreditStyles(): void {
   const style = document.createElement('style')
   style.textContent = [
     // 官方 .trigger 配方：28px 高、圆角胶囊、tertiary 文案（非交互，不挂 hover）。
+    // box-sizing 显式 border-box：span 默认 content-box，height+padding 会撑到
+    // 40px、比同排按钮高；border-box 下才是 28px（官方 button 的口径）。
     '.ccb-turn-credit-trigger {',
-    '  display: inline-flex; align-items: center; gap: 4px; min-width: 0;',
+    '  display: inline-flex; align-items: center; gap: 6px; min-width: 0;',
+    '  box-sizing: border-box;',
     '  height: calc(28px + var(--dsh-content-font-delta, 0px));',
     '  padding: 6px 8px; border-radius: 28px;',
     '  background: transparent; color: var(--dsw-alias-label-tertiary);',
