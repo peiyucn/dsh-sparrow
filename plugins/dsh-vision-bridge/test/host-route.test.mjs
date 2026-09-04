@@ -11,7 +11,7 @@ import { apply } from '../lib/host.js'
 /** 记录 resolveModelInfo 调用次数的 mock llm。
  *  注意：cordis ctx.effect 的语义是同步执行回调注册副作用，mock 必须复现——
  *  否则 webServer.register 不会发生，路由测试就是空转（这正是第一次跑挂的原因）。 */
-function buildHarness({ resolveModelInfo, defaultModel, missingDefaultModel } = {}) {
+function buildHarness({ resolveModelInfo, defaultModel, missingDefaultModel, config } = {}) {
   const calls = []
   let handler = null
   const ctx = {
@@ -35,7 +35,7 @@ function buildHarness({ resolveModelInfo, defaultModel, missingDefaultModel } = 
         : { currentSelection: () => defaultModel ?? { provider: 'deepseek-official', model: 'deepseek-v4-pro' } })
       : undefined),
   }
-  apply(ctx, {})
+  apply(ctx, config ?? {})
   return { ctx, calls, get handler() { return handler } }
 }
 
@@ -81,13 +81,35 @@ describe('dsh-vision-bridge 能力路由链路', () => {
   })
 
   it('缺少 provider/model 应该 回退共享默认模型（空白会话/历史未装载窗口）', async () => {
-    // 独特默认模型名隔离模块级缓存：回退后必然解析过它（预热或路由任一路径）。
-    const model = 'fallback-test-model'
-    const { handler, calls } = buildHarness({ defaultModel: { provider: 'deepseek-official', model } })
+    // 默认模型取路由内的 deepseek-v4-pro：回退后必然解析过它（预热或路由任一路径）。
+    const { handler, calls } = buildHarness({ defaultModel: { provider: 'deepseek-official', model: 'deepseek-v4-pro' } })
     const result = await request(handler, '/api/vision-bridge/capability')
     assert.equal(result.statusCode, 200)
     assert.equal(result.body.mode, 'cross-model')
-    assert.ok(calls.some(([provider, hit]) => provider === 'deepseek-official' && hit === model))
+    assert.ok(calls.some(([provider, hit]) => provider === 'deepseek-official' && hit === 'deepseek-v4-pro'))
+  })
+
+  it('默认模型未命中文本路由 应该 回答 no-vision（门禁未放行，不承诺跨模型读图）', async () => {
+    const model = 'unrouted-default-model'
+    const { handler } = buildHarness({ defaultModel: { provider: 'deepseek-official', model } })
+    const result = await request(handler, '/api/vision-bridge/capability')
+    assert.equal(result.statusCode, 200)
+    assert.equal(result.body.mode, 'no-vision')
+  })
+
+  it('自定义 textRoutes 命中的 DeepSeek 文本模型 应该 返回 cross-model', async () => {
+    const model = 'custom-routed-model'
+    const { handler } = buildHarness({
+      config: { textRoutes: [{ provider: 'deepseek-official', model }] },
+    })
+    const result = await request(handler, `/api/vision-bridge/capability?provider=deepseek-official&model=${model}`)
+    assert.equal(result.body.mode, 'cross-model')
+  })
+
+  it('未命中 textRoutes 的 DeepSeek 文本模型 应该 返回 no-vision', async () => {
+    const { handler } = buildHarness()
+    const result = await request(handler, '/api/vision-bridge/capability?provider=deepseek-official&model=unlisted-text-model')
+    assert.equal(result.body.mode, 'no-vision')
   })
 
   it('缺少 provider/model 且默认模型服务缺失（旧版 dsh）应该 400', async () => {
@@ -136,7 +158,7 @@ describe('dsh-vision-bridge 能力路由链路', () => {
     assert.equal(calls.length, afterFirst + 1)
   })
 
-  it('能力解析失败 应该 按无视觉能力处理（不抛 500）', async () => {
+  it('能力解析失败 应该 按无视觉能力处理（不抛 500；未列路由 → no-vision）', async () => {
     const { handler } = buildHarness({
       resolveModelInfo: async (provider, model) => {
         if (model === 'broken') throw new Error('no catalog')
@@ -145,7 +167,7 @@ describe('dsh-vision-bridge 能力路由链路', () => {
     })
     const result = await request(handler, '/api/vision-bridge/capability?provider=deepseek-official&model=broken')
     assert.equal(result.statusCode, 200)
-    assert.equal(result.body.mode, 'cross-model')
+    assert.equal(result.body.mode, 'no-vision')
     assert.equal(result.body.declared, false)
   })
 

@@ -39,27 +39,65 @@ export interface VisionReport {
   readonly layout?: string
 }
 
-/** 规范化配置；文本路由为空时插件不做门禁放行（工具仍可用）。 */
+/** 规范化配置；文本路由为空时插件不做门禁放行（工具仍可用）。
+ *  配置来自 yml（未校验的运行时数据）：字段逐一做类型/取值校验，异常配置
+ *  报可读错误，不让「类型错误 TypeError」之类把启动失败原因藏起来。 */
 export function normalizeVisionConfig(input: Readonly<Partial<VisionConfig>> | undefined): VisionConfig {
+  // 思考力度：先校验类型再 trim，非字符串（yml 里的数字等）给出可读错误。
   let visionReasoningEffort: VisionReasoningEffort = DEFAULT_VISION_REASONING_EFFORT
-  if (input?.visionReasoningEffort !== undefined) {
-    const candidate = input.visionReasoningEffort.trim() as VisionReasoningEffort
+  const rawEffort: unknown = input?.visionReasoningEffort
+  if (rawEffort !== undefined) {
+    if (typeof rawEffort !== 'string') {
+      throw new Error(`dsh-vision-bridge: visionReasoningEffort 必须是 ${VISION_REASONING_EFFORTS.join('/')}`)
+    }
+    const candidate = rawEffort.trim() as VisionReasoningEffort
     if (!VISION_REASONING_EFFORTS.includes(candidate)) {
       throw new Error(`dsh-vision-bridge: visionReasoningEffort 必须是 ${VISION_REASONING_EFFORTS.join('/')}`)
     }
     visionReasoningEffort = candidate
   }
+  // provider/model：非字符串视为无效（统一报「不能为空」类错误），不做 .trim 直接调用。
+  const rawProvider: unknown = input?.visionProvider
+  const rawModel: unknown = input?.visionModel
+  const visionProvider = typeof rawProvider === 'string'
+    ? rawProvider.trim()
+    : rawProvider === undefined ? DEFAULT_VISION_PROVIDER : ''
+  const visionModel = typeof rawModel === 'string'
+    ? rawModel.trim()
+    : rawModel === undefined ? DEFAULT_VISION_MODEL : ''
+  // textRoutes：逐项校验形状并归一化 trim（yml 里可能混入非对象项）。
+  const rawRoutes: unknown = input?.textRoutes
+  let textRoutes: readonly TextRoute[]
+  if (rawRoutes === undefined) {
+    textRoutes = DEFAULT_TEXT_ROUTES
+  } else if (!Array.isArray(rawRoutes)) {
+    throw new Error('dsh-vision-bridge: textRoutes 必须是数组')
+  } else {
+    textRoutes = rawRoutes.map((route: unknown) => {
+      if (typeof route !== 'object' || route === null
+        || typeof (route as TextRoute).provider !== 'string'
+        || typeof (route as TextRoute).model !== 'string') {
+        throw new Error('dsh-vision-bridge: textRoutes 每项必须是 { provider, model } 字符串对象')
+      }
+      const provider = (route as TextRoute).provider.trim()
+      const model = (route as TextRoute).model.trim()
+      if (provider === '' || model === '') {
+        throw new Error('dsh-vision-bridge: textRoutes 中 provider/model 不能为空')
+      }
+      return { provider, model }
+    })
+  }
   const config: VisionConfig = {
-    visionProvider: input?.visionProvider?.trim() || DEFAULT_VISION_PROVIDER,
-    visionModel: input?.visionModel?.trim() || DEFAULT_VISION_MODEL,
+    visionProvider,
+    visionModel,
     maxTokens: input?.maxTokens ?? DEFAULT_MAX_TOKENS,
     temperature: input?.temperature ?? DEFAULT_TEMPERATURE,
     visionReasoningEffort,
     cacheMaxEntries: input?.cacheMaxEntries ?? DEFAULT_CACHE_MAX_ENTRIES,
-    textRoutes: input?.textRoutes ?? DEFAULT_TEXT_ROUTES,
+    textRoutes,
   }
   if (config.visionProvider === '' || config.visionModel === '') {
-    throw new Error('dsh-vision-bridge: visionProvider/visionModel 不能为空')
+    throw new Error('dsh-vision-bridge: visionProvider/visionModel 必须是字符串且不能为空')
   }
   for (const [name, value] of Object.entries({ maxTokens: config.maxTokens, cacheMaxEntries: config.cacheMaxEntries })) {
     if (!Number.isSafeInteger(value) || value <= 0) {
@@ -68,11 +106,6 @@ export function normalizeVisionConfig(input: Readonly<Partial<VisionConfig>> | u
   }
   if (typeof config.temperature !== 'number' || !Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 2) {
     throw new Error('dsh-vision-bridge: temperature 必须是 0-2 之间的数字')
-  }
-  for (const route of config.textRoutes) {
-    if (route.provider === '' || route.model === '') {
-      throw new Error('dsh-vision-bridge: textRoutes 中 provider/model 不能为空')
-    }
   }
   return config
 }
@@ -114,13 +147,23 @@ export function modelSupportsImages(inputModalities: readonly string[] | undefin
   return inputModalities !== undefined && inputModalities.includes('image')
 }
 
-/** 视觉状态模式：原生看图 → native-vision（灰显）；DeepSeek 文本 → cross-model（点亮）；其它 → no-vision（带斜线）。 */
+/** 视觉状态模式：原生看图 → native-vision（灰显）；命中文本路由的 DeepSeek 文本模型 → cross-model（点亮）；其它 → no-vision（带斜线）。 */
 export type VisionMode = 'native-vision' | 'cross-model' | 'no-vision'
 
-/** 按 provider + 看图能力判定状态图标模式（host 能力路由据此回答，不依赖会话）。 */
-export function visionModeForRoute(provider: string, supportsImages: boolean): VisionMode {
+/** 按 provider + model + 看图能力判定状态图标模式（host 能力路由据此回答，不依赖会话）。
+ *  cross-model 只在「上传门禁确实对该路由放行」（命中配置的文本路由）时点亮：
+ *  门禁只对 textRoutes 里的路由抹除 inputModalities，未列出的 DeepSeek 文本模型
+ *  贴图仍会被官方 session/attachment-invalid 拒绝——图标不能替它承诺跨模型读图。 */
+export function visionModeForRoute(
+  provider: string,
+  model: string,
+  supportsImages: boolean,
+  routes: readonly TextRoute[],
+): VisionMode {
   if (supportsImages) return 'native-vision'
-  return isDeepseekMainRoute({ provider }) ? 'cross-model' : 'no-vision'
+  const routeCleared = isDeepseekMainRoute({ provider })
+    && routes.some(route => route.provider === provider && route.model === model)
+  return routeCleared ? 'cross-model' : 'no-vision'
 }
 
 /** 唯一前缀匹配的最短查询长度；更短的 id 只做精确匹配，避免误命中。 */

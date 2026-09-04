@@ -27,6 +27,10 @@ const TOOL_NAME = 'vision_read'
 const CAPABILITY_ROUTE_PATH = '/api/vision-bridge/capability'
 /** vision_read 工具默认提问。 */
 const DEFAULT_VISION_QUESTION = '请完整阅读这张图片并给出结构化报告。'
+/** vision_read 工具超时上限（官方工具运行器据此 abort 调用信号）。 */
+const VISION_READ_TIMEOUT_MS = 120_000
+/** 错误消息里展示的附件 id 截断长度（超长 sha256 只露头部）。 */
+const MAX_DISPLAY_ID_CHARS = 18
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   if (res.headersSent) return
@@ -39,7 +43,7 @@ function sendJson(res: ServerResponse, status: number, payload: unknown): void {
 
 /** 把超长的 sha256 附件 id 截短展示（错误消息里列候选用）。 */
 function shortId(id: string): string {
-  return id.length > 18 ? `${id.slice(0, 18)}…` : id
+  return id.length > MAX_DISPLAY_ID_CHARS ? `${id.slice(0, MAX_DISPLAY_ID_CHARS)}…` : id
 }
 
 /** defineTool 输出 schema（ValueSchemaSpec DSL）：工具回传主模型的契约。 */
@@ -123,6 +127,8 @@ async function describeImage(
   const pending = inflight.get(cacheKey)
   if (pending !== undefined) return pending
   const task = (async (): Promise<VisionReport> => {
+    // 已中止的信号（工具超时/回合取消）立即失败：不给已作废的调用开视觉请求。
+    signal?.throwIfAborted()
     // 先走官方附件 seam 确认图片字节可读；只传 ref，不复制内部文件。
     await ctx.attachments.readImage(ref, signal)
 
@@ -249,7 +255,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   //    直连视觉模型约 2.2s，因此不再起子代理。
   ctx.effect(() => ctx.tools.register(defineTool({
     name: TOOL_NAME,
-    description: 'Read an image already attached to this conversation with a vision subagent. Use this tool when the user asks about a pasted image and the main model cannot see images directly. The image stays inside the DeepSeek provider account and is never sent to a third party.',
+    description: 'Read an image already attached to this conversation with a vision model. Use this tool when the user asks about a pasted image and the main model cannot see images directly. The image stays inside the DeepSeek provider account and is never sent to a third party.',
     parameters: {
       attachmentId: {
         type: 'string',
@@ -269,7 +275,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       }],
     },
     isConcurrencySafe: () => true,
-    timeoutMs: 120_000,
+    timeoutMs: VISION_READ_TIMEOUT_MS,
     async execute(args, exec) {
       const agent = exec.agent
       if (agent === undefined) {
@@ -318,7 +324,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   //    「这个 provider/model 能不能看图」。未指定模型（空白会话/历史未装载窗口）时
   //    按共享默认模型回答——该窗口内 composer 实际生效的就是默认模型（与座位兜底
   //    同源）；默认模型都读不到（旧版 dsh 缺服务）才 400。
-  //    DeepSeek 文本模型 → cross-model（vision_read 可用）。
+  //    命中门禁放行文本路由的 DeepSeek 文本模型 → cross-model（vision_read 可用）。
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
     path: CAPABILITY_ROUTE_PATH,
@@ -340,11 +346,11 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         model = selected.model
       }
       const { supports: supportsImages, declared } = await resolveSupportsImages(originalResolveModelInfo, provider, model)
-      // 能力模式判定（全靠模型自身 inputModalities 属性，不靠名字）：
-      //   具备视觉能力 → native-vision（灰显）；DeepSeek 文本模型 → cross-model（点亮）；
-      //   其它无视觉能力 → no-vision（带斜线，降级提示）。
+      // 能力模式判定（全靠模型自身 inputModalities 属性 + 门禁放行的文本路由，不靠名字）：
+      //   具备视觉能力 → native-vision（灰显）；命中文本路由的 DeepSeek 文本模型 → cross-model（点亮）；
+      //   其它无视觉能力（含未配置门禁放行的 DeepSeek 文本模型）→ no-vision（带斜线，降级提示）。
       // declared 告知客户端答案是否为定论：目录未就绪时客户端据它有限补查自愈。
-      sendJson(res, 200, { mode: visionModeForRoute(provider, supportsImages), visionModel: settings.visionModel, declared })
+      sendJson(res, 200, { mode: visionModeForRoute(provider, model, supportsImages, settings.textRoutes), visionModel: settings.visionModel, declared })
     },
   }), 'dsh-vision-bridge: capability route')
 

@@ -24,6 +24,10 @@ export interface VisionStatusResult {
 export const CAPABILITY_UNKNOWN_RETRY_MS = 2_500
 export const CAPABILITY_UNKNOWN_RETRIES = 4
 
+/** host 能力查询的超时上限：路由走本地回环、正常毫秒级；超时按查询失败
+ *  （图标隐藏，fail-soft）处理，不把图标悬挂在永不 settle 的请求上。 */
+export const CAPABILITY_QUERY_TIMEOUT_MS = 10_000
+
 /** 解析目标：provider:model；两者皆空 = host 共享默认模型兜底。 */
 export interface CapabilityTarget {
   readonly provider: string

@@ -8,6 +8,7 @@
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import { CAPABILITY_QUERY_TIMEOUT_MS } from './capability-machine.js'
 import { ensureVisionStyles, VisionStatusIcon, type DirectoryStore, type VisionStatusResult } from './VisionStatusIcon.js'
 
 export const inject = ['slots', 'locale']
@@ -38,12 +39,15 @@ const LOCALE_DICTS = {
 const capabilityCache = new Map<string, VisionStatusResult>()
 const capabilityInflight = new Map<string, Promise<VisionStatusResult>>()
 
-/** 裸查询：发能力请求并校验响应（不做缓存）。 */
+/** 裸查询：发能力请求并校验响应（不做缓存）。带超时（AbortSignal.timeout）：
+ *  路由是本地回环、正常毫秒级；超时按查询失败处理，图标隐藏而不是悬挂。 */
 function requestCapability(provider: string, model: string): Promise<VisionStatusResult> {
   const query = provider === '' || model === ''
     ? ''
     : `?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}`
-  return fetch(`/api/vision-bridge/capability${query}`).then(async (response) => {
+  return fetch(`/api/vision-bridge/capability${query}`, {
+    signal: AbortSignal.timeout(CAPABILITY_QUERY_TIMEOUT_MS),
+  }).then(async (response) => {
     if (!response.ok) throw new Error(`vision-bridge capability request failed (HTTP ${response.status})`)
     const payload = await response.json() as { mode?: unknown; visionModel?: unknown; declared?: unknown }
     if (payload.mode !== 'native-vision' && payload.mode !== 'cross-model' && payload.mode !== 'no-vision') {
@@ -110,6 +114,27 @@ export function apply(ctx: ClientContext): void {
     locale: 'vision-bridge',
     inject: () => ({ directoryFor, queryCapability }),
   }, VisionStatusIcon))
+
+  // host 适配器重注册 / 凭据更新 → 清 client 能力缓存（与 host 侧清缓存对称）：
+  // 模型事实刷新后旧的 declared 定论不能再把图标锁在错误状态。remote 服务
+  // 缺失（旧版 dsh）时 fail-soft 跳过——无失效通知，退化为切换模型时的现查。
+  const clearClientCapabilityCache = (): void => { capabilityCache.clear() }
+  let remote: { $on(event: string, listener: () => void): () => void } | undefined
+  try {
+    remote = ctx.root.get('remote') as { $on(event: string, listener: () => void): () => void } | undefined
+  } catch {
+    remote = undefined
+  }
+  if (remote !== undefined) {
+    ctx.effect(() => {
+      const offAdapters = remote.$on('llm/adapters-updated', clearClientCapabilityCache)
+      const offCredentials = remote.$on('credentials/reference-updated', clearClientCapabilityCache)
+      return () => {
+        offAdapters()
+        offCredentials()
+      }
+    }, 'dsh-vision-bridge: client capability cache invalidation')
+  }
 }
 
 export { ensureVisionStyles, VisionStatusIcon } from './VisionStatusIcon.js'

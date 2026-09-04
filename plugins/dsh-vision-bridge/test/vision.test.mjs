@@ -30,6 +30,42 @@ describe('vision-bridge 纯逻辑', () => {
     it('非法思考力度 应该 抛错', () => {
       assert.throws(() => normalizeVisionConfig({ visionReasoningEffort: 'ultra' }), /visionReasoningEffort/u)
     })
+
+    it('非字符串思考力度（yml 数字）应该 抛可读错误而不是 TypeError', () => {
+      assert.throws(() => normalizeVisionConfig({ visionReasoningEffort: 3 }), /visionReasoningEffort/u)
+    })
+
+    it('非字符串 visionProvider/visionModel 应该 抛可读错误', () => {
+      assert.throws(() => normalizeVisionConfig({ visionProvider: 123 }), /visionProvider/u)
+      assert.throws(() => normalizeVisionConfig({ visionModel: { id: 'x' } }), /visionProvider/u)
+    })
+
+    it('textRoutes 非数组 应该 抛错', () => {
+      assert.throws(() => normalizeVisionConfig({ textRoutes: 'deepseek-v4-pro' }), /textRoutes/u)
+    })
+
+    it('textRoutes 混入非对象项 应该 抛错', () => {
+      assert.throws(() => normalizeVisionConfig({ textRoutes: ['deepseek-v4-pro'] }), /textRoutes/u)
+    })
+
+    it('textRoutes 空字符串字段 应该 抛错', () => {
+      assert.throws(
+        () => normalizeVisionConfig({ textRoutes: [{ provider: 'deepseek-official', model: '  ' }] }),
+        /textRoutes/u,
+      )
+    })
+
+    it('textRoutes 字段带空白 应该 归一化 trim', () => {
+      const config = normalizeVisionConfig({
+        textRoutes: [{ provider: ' deepseek-official ', model: ' deepseek-v4-pro ' }],
+      })
+      assert.deepEqual(config.textRoutes, [{ provider: 'deepseek-official', model: 'deepseek-v4-pro' }])
+    })
+
+    it('textRoutes 空数组 应该 保留（不做门禁放行但工具可用）', () => {
+      const config = normalizeVisionConfig({ textRoutes: [] })
+      assert.deepEqual(config.textRoutes, [])
+    })
   })
 
   describe('resolveVisionOutput', () => {
@@ -305,16 +341,30 @@ describe('vision-bridge 纯逻辑', () => {
 })
 
 describe('visionModeForRoute', () => {
+  const routes = [
+    { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
+    { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+  ]
+
   it('支持看图 应该 判定 native-vision（任何 provider）', () => {
-    assert.equal(visionModeForRoute('deepseek-official', true), 'native-vision')
-    assert.equal(visionModeForRoute('other-provider', true), 'native-vision')
+    assert.equal(visionModeForRoute('deepseek-official', 'deepseek-v4-pro', true, routes), 'native-vision')
+    assert.equal(visionModeForRoute('other-provider', 'm', true, routes), 'native-vision')
   })
 
-  it('DeepSeek 文本模型 应该 判定 cross-model（vision_read 可用）', () => {
-    assert.equal(visionModeForRoute('deepseek-official', false), 'cross-model')
+  it('命中文本路由的 DeepSeek 文本模型 应该 判定 cross-model（vision_read 可用）', () => {
+    assert.equal(visionModeForRoute('deepseek-official', 'deepseek-v4-pro', false, routes), 'cross-model')
+    assert.equal(visionModeForRoute('deepseek-official', 'deepseek-v4-flash', false, routes), 'cross-model')
+  })
+
+  it('未命中文本路由的 DeepSeek 文本模型 应该 判定 no-vision（门禁未放行）', () => {
+    assert.equal(visionModeForRoute('deepseek-official', 'some-unlisted-text-model', false, routes), 'no-vision')
   })
 
   it('其它 provider 无视觉能力 应该 判定 no-vision', () => {
-    assert.equal(visionModeForRoute('other-provider', false), 'no-vision')
+    assert.equal(visionModeForRoute('other-provider', 'm', false, routes), 'no-vision')
+  })
+
+  it('textRoutes 为空 应该 全部文本模型判定 no-vision（不做门禁放行）', () => {
+    assert.equal(visionModeForRoute('deepseek-official', 'deepseek-v4-pro', false, []), 'no-vision')
   })
 })
