@@ -279,10 +279,21 @@ export function apply(ctx: ClientContext): void {
                   }
                 },
                 select: (selection: unknown) => {
-                  const hit = ensure()
-                  return hit !== undefined
-                    ? (hit as unknown as { select(sel: unknown): Promise<unknown> }).select(selection).then(() => true, () => false)
-                    : Promise.resolve(false)
+                  // select 是目录（ModelDirectory）的方法，store 没有——这里直接解析目录；
+                  // 成功后把 current 乐观回写进共享 store：空白会话投影不下发，官方 select
+                  // 末尾 syncInputs 读不到 current，座位/眼睛/信息卡就都看不到选择（点击"没反应"）。
+                  let directory: ModelDirectoryLike | undefined
+                  try {
+                    directory = resolver.directoryFor(sessionId) as unknown as ModelDirectoryLike | undefined
+                  } catch {
+                    return Promise.resolve(false)
+                  }
+                  if (directory === undefined) return Promise.resolve(false)
+                  return directory.select(selection).then(() => {
+                    ;(directory!.store as unknown as { update(fn: (s: { current: unknown }) => void): void })
+                      .update(s => { s.current = selection })
+                    return true
+                  }, () => false)
                 },
               }
             },
