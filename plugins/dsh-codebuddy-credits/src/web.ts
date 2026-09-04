@@ -54,16 +54,10 @@ export interface CodeBuddyCreditsShared {
   removeKey(): Promise<void>
   /** 查询企业周期配额。 */
   quota(): Promise<QuotaStatus>
-  /** 会话累计积分与调用次数（进程内 usage 记账）。 */
-  sessionUsage(sessionId: string): {
-    credit: number
-    calls: number
-  }
-  /** 单轮积分与调用次数（每轮积分胶囊用）。 */
-  turnUsage(sessionId: string, turn: number): {
-    credit: number
-    calls: number
-  }
+  /** 会话累计积分与调用次数（进程内 usage 记账），附按模型聚合的调用明细。 */
+  sessionUsage(sessionId: string): TurnUsageView
+  /** 单轮积分与调用次数（每轮积分胶囊弹窗用）。 */
+  turnUsage(sessionId: string, turn: number): TurnUsageView
   /** route 是否注册（状态接口诊断用）。 */
   active(): boolean
   /** 账号快照（来自 /v2/accounts）。 */
@@ -81,25 +75,47 @@ export interface UsageEntryLike {
   sessionId?: string
   turn?: number
   credit?: number
+  model?: string
+}
+
+/** 积分聚合视图：合计 + 调用次数 + 按模型聚合的明细（供轮次/会话面板）。 */
+export interface TurnUsageView {
+  credit: number
+  calls: number
+  /** 按模型聚合：每模型合计积分 + 调用次数（顺序 = 首次出现）。 */
+  byModel: ReadonlyArray<{ model: string; credit: number; calls: number }>
 }
 
 /**
- * usage 记账聚合（纯函数）：按会话（+可选轮次）合计积分与调用次数。
+ * usage 记账聚合（纯函数）：按会话（+可选轮次）合计积分与调用次数，
+ * 并按模型聚合明细（同一模型多次调用合并成一行，避免重复条目刷屏）。
  */
 export function turnUsageOf(
   entries: readonly UsageEntryLike[],
   sessionId: string,
   turn: number | undefined,
-): { credit: number; calls: number } {
+): TurnUsageView {
   let credit = 0
   let calls = 0
+  const byModel: { model: string; credit: number; calls: number }[] = []
+  const index = new Map<string, number>()
   for (const usage of entries) {
     if (usage.sessionId !== sessionId) continue
     if (turn !== undefined && usage.turn !== turn) continue
     calls += 1
     if (usage.credit !== undefined) credit += usage.credit
+    const model = usage.model ?? ''
+    let slot = index.get(model)
+    if (slot === undefined) {
+      slot = byModel.length
+      index.set(model, slot)
+      byModel.push({ model, credit: 0, calls: 0 })
+    }
+    const bucket = byModel[slot]
+    bucket.calls += 1
+    if (usage.credit !== undefined) bucket.credit += usage.credit
   }
-  return { credit, calls }
+  return { credit, calls, byModel }
 }
 
 /** 模型事实 → 状态接口视图。 */

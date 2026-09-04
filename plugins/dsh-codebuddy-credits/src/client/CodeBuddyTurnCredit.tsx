@@ -1,18 +1,21 @@
 /**
- * 每轮积分胶囊：挂官方 conversation.chat.assistant-actions 槽位——与官方
- * Usage 胶囊（TurnUsagePanel）同排（官方渲染顺序：复制 → 本槽位 → 分支 →
- * Usage → 时间），材质与官方胶囊一致（transparent + 28px 圆角 + tertiary
- * 文案）。只显示该轮 CodeBuddy 积分合计——对齐 CodeBuddy 官方 app 的胶囊
- * （无点击弹窗、无调用明细）。数据走 host /turn-usage 路由（按 sessionId+
- * turn 记账；host 端经 agent/request 载荷的 signal 与 usage 帧精确关联
- * 轮次）。该轮没有 CodeBuddy 调用（calls=0）时不渲染，官方行动作行保持
- * 原样。
+ * 每轮积分胶囊：挂官方 conversation.chat.assistant-actions 槽位——该槽位渲染
+ * 在复制与分支之间（官方顺序：复制 → 本槽位 → 分支 → Usage → 时间），我们
+ * DOM 级把本插件自有节点移动到行动作行末尾（时间之后，真正的行尾），只移动
+ * 自有节点，不包装/替换官方组件。材质与官方胶囊一致（transparent + 28px 圆角
+ * + tertiary 文案，hover 提亮）；点击展开官方 Turn usage 弹窗同款材质的面板，
+ * 内容精简为：本轮总积分、调用次数、每次调用（按模型聚合）的积分。
+ * 数据走 host /turn-usage 路由（按 sessionId+turn 记账；host 端经 agent/request
+ * 载荷的 signal 与 usage 帧精确关联轮次）。该轮没有 CodeBuddy 调用（calls=0）
+ * 时不渲染，官方行动作行保持原样。
  *
  * 图标：lobehub/lobe-icons 的 codebuddy.svg（黑白，fill=currentColor，
  * 随主题着色，MIT），来源 https://lobehub.com/icons/codebuddy。
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import type { CSSProperties } from 'react'
 
 const TURN_USAGE_URL = '/api/codebuddy-credits/turn-usage'
 
@@ -28,6 +31,8 @@ const CODEBUDDY_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="no
 export interface TurnUsageView {
   credit: number
   calls: number
+  /** 按模型聚合的调用明细（同模型多次调用合并一行）。 */
+  byModel: ReadonlyArray<{ model: string; credit: number; calls: number }>
 }
 
 /** 官方 ChatSnapshot 的最小面（turn-tail 节点的 closing 记录 messageId）。 */
@@ -51,21 +56,41 @@ export interface CodeBuddyTurnCreditProps {
   useChat: <T>(selector: (snapshot: SnapshotLike) => T) => T
 }
 
+/** 官方 Turn usage 弹窗同款面板材质。 */
+const panelBase: CSSProperties = {
+  position: 'fixed',
+  zIndex: 1100,
+  boxSizing: 'border-box',
+  width: 'max-content',
+  minWidth: 'min(300px, calc(100vw - 24px))',
+  maxWidth: 'min(440px, calc(100vw - 24px))',
+  padding: '16px',
+  border: '0',
+  borderRadius: '12px',
+  background: 'var(--dsw-specific-menu)',
+  '--dsw-elevation-stroke-color': 'var(--dsw-alias-border-l1)',
+  boxShadow: 'var(--dsw-elevation-prominent)',
+  fontSize: '12px',
+  lineHeight: '18px',
+  color: 'var(--dsw-alias-label-secondary)',
+} as CSSProperties
+
 export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBuddyTurnCreditProps) {
   const [usage, setUsage] = useState<TurnUsageView | undefined>(undefined)
-  const pillRef = useRef<HTMLSpanElement | null>(null)
+  const [open, setOpen] = useState(false)
+  const [point, setPoint] = useState<{ left: number; bottom: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
 
-  // 槽位固定渲染在复制与分支之间（官方顺序）；用户要求胶囊放到行尾时间之前——
-  // DOM 级移动本插件自有节点：assistant 消息的行动作行末尾就是时间元素，
-  // 把胶囊插到行内最后一个元素之前（时间缺失时兜底落到 Usage 胶囊之后，
-  // 仍在行尾）。只移动自有节点，不包装/替换官方组件。
+  // 槽位固定渲染在复制与分支之间（官方顺序）；用户要求胶囊放到行动作行末尾
+  // （时间之后）——DOM 级移动本插件自有节点到行尾（appendChild）。每次渲染后
+  // 重试（官方行可能因任何信号重渲染把我们移回原位），只移动自有节点、幂等。
   useEffect(() => {
-    const pill = pillRef.current
+    const pill = buttonRef.current
     if (pill === null) return
     const row = pill.parentElement
-    if (row === null || row.lastElementChild === null || row.lastElementChild === pill) return
-    row.insertBefore(pill, row.lastElementChild)
-  }, [usage !== undefined && usage.calls > 0])
+    if (row === null || row.lastElementChild === pill) return
+    row.appendChild(pill)
+  })
 
   // messageId → turn：扫描快照里的 turn-tail 节点（官方同款关联：closing.
   // finalNode.messageId）。找不到（历史未装载/非完成态）返回 null → 不渲染。
@@ -91,41 +116,138 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
     return () => { alive = false }
   }, [sessionId, turn])
 
+  const computePoint = useCallback((): { left: number; bottom: number } | null => {
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (rect === undefined) return null
+    // 面板左缘对齐胶囊；靠右时钳制，避免面板溢出视口右缘（面板自带
+    // max-width: min(440px, 100vw-24px)，钳制只保右缘 12px 边距）。
+    const left = Math.max(12, Math.min(rect.left, window.innerWidth - 12 - 440))
+    return { left, bottom: window.innerHeight - rect.top + 8 }
+  }, [])
+
+  // 弹层打开时：点外部关闭、Esc 关闭、滚动/缩放跟随重定位（官方下拉同款）。
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: PointerEvent): void => {
+      if (!(event.target instanceof Element)) return
+      if (event.target.closest('.ccb-turn-credit-panel') !== null) return
+      if (buttonRef.current !== null && buttonRef.current.contains(event.target)) return
+      setOpen(false)
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    const reposition = (): void => {
+      const next = computePoint()
+      if (next === null) setOpen(false)
+      else setPoint(next)
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('keydown', onKeyDown, true)
+    document.addEventListener('scroll', reposition, true)
+    window.addEventListener('resize', reposition)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true)
+      document.removeEventListener('keydown', onKeyDown, true)
+      document.removeEventListener('scroll', reposition, true)
+      window.removeEventListener('resize', reposition)
+    }
+  }, [open, computePoint])
+
   // 该轮没有 CodeBuddy 调用：不渲染，官方行动作行保持原样。
   if (usage === undefined || usage.calls === 0) return null
 
   return (
-    <span ref={pillRef} className="ccb-turn-credit-trigger">
-      <span style={{ display: 'inline-flex', flex: 'none' }} dangerouslySetInnerHTML={{ __html: CODEBUDDY_ICON }} />
-      <span className="ccb-turn-credit-label">{t('turnCredit.label', { credit: formatCredits(usage.credit) })}</span>
-    </span>
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        className="ccb-turn-credit-trigger"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={t('turnCredit.aria', { credit: formatCredits(usage.credit) })}
+        onClick={() => {
+          if (open) setOpen(false)
+          else {
+            setPoint(computePoint())
+            setOpen(true)
+          }
+        }}
+      >
+        <span style={{ display: 'inline-flex', flex: 'none' }} dangerouslySetInnerHTML={{ __html: CODEBUDDY_ICON }} />
+        <span className="ccb-turn-credit-label">{t('turnCredit.label', { credit: formatCredits(usage.credit) })}</span>
+      </button>
+      {open && point !== null
+        ? createPortal(
+          <div
+            className="ccb-turn-credit-panel"
+            role="dialog"
+            aria-label={t('turnCredit.title')}
+            style={{ ...panelBase, left: point.left, bottom: point.bottom }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', marginBottom: '8px', color: 'var(--dsw-alias-label-primary)', fontWeight: 500 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                <span style={{ display: 'inline-flex', flex: 'none' }} dangerouslySetInnerHTML={{ __html: CODEBUDDY_ICON }} />
+                {t('turnCredit.title')}
+              </span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCredits(usage.credit)}</span>
+            </div>
+            <div style={{ marginBottom: '10px', borderTop: '0.5px solid var(--dsw-alias-border-l2)' }} aria-hidden />
+            <dl style={{ display: 'grid', gridTemplateColumns: 'minmax(76px, auto) minmax(0, 1fr)', gap: '6px 16px', margin: 0, color: 'var(--dsw-alias-label-tertiary)' }}>
+              <dt style={{ margin: 0, minWidth: 0 }}>{t('turnCredit.calls')}</dt>
+              <dd style={{ margin: 0, minWidth: 0, color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>
+                {String(usage.calls)}
+              </dd>
+              {usage.byModel.length > 0
+                ? (
+                  <>
+                    <dt style={{ margin: 0, minWidth: 0, gridColumn: '1 / -1', paddingTop: '4px' }}>{t('turnCredit.perCall')}</dt>
+                    {usage.byModel.map((call, index) => (
+                      <Fragment key={index}>
+                        <dt style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>
+                          {call.model}{call.calls > 1 ? ` ×${call.calls}` : ''}
+                        </dt>
+                        <dd style={{ margin: 0, minWidth: 0, color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>
+                          {formatCredits(call.credit)}
+                        </dd>
+                      </Fragment>
+                    ))}
+                  </>
+                )
+                : null}
+            </dl>
+          </div>,
+          document.body,
+        )
+        : null}
+    </>
   )
 }
 
 let stylesInstalled = false
 
-/** 胶囊样式（对齐官方 TurnUsagePanel 的 trigger 材质配方）。 */
+/** 胶囊与弹层的样式（对齐官方 TurnUsagePanel.module.css 的材质配方）。 */
 export function ensureTurnCreditStyles(): void {
   if (stylesInstalled || typeof document === 'undefined') return
   stylesInstalled = true
   const style = document.createElement('style')
   style.textContent = [
-    // 官方 .trigger 配方：28px 高、圆角胶囊、tertiary 文案（非交互，不挂 hover）。
-    // box-sizing 显式 border-box：span 默认 content-box，height+padding 会撑到
-    // 40px、比同排按钮高；border-box 下才是 28px（官方 button 的口径）。
+    // 官方 .trigger 配方：28px 高、圆角胶囊、tertiary 文案、hover 提亮。
     '.ccb-turn-credit-trigger {',
     '  display: inline-flex; align-items: center; gap: 6px; min-width: 0;',
-    '  box-sizing: border-box;',
     '  height: calc(28px + var(--dsh-content-font-delta, 0px));',
-    '  padding: 6px 8px; border-radius: 28px;',
+    '  padding: 6px 8px; border: none; border-radius: 28px;',
     '  background: transparent; color: var(--dsw-alias-label-tertiary);',
     '  font-size: var(--dsh-content-font-size-secondary, 13px);',
     '  font-variant-numeric: tabular-nums;',
     '  line-height: calc(24px + var(--dsh-content-font-delta, 0px));',
-    '  white-space: nowrap;',
+    '  white-space: nowrap; cursor: pointer;',
     '}',
     '.ccb-turn-credit-trigger svg {',
     '  width: calc(15px + var(--dsh-content-font-delta, 0px)); height: calc(15px + var(--dsh-content-font-delta, 0px)); flex: none;',
+    '}',
+    '.ccb-turn-credit-trigger:hover, .ccb-turn-credit-trigger[aria-expanded="true"] {',
+    '  background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary);',
     '}',
     '.ccb-turn-credit-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }',
     '@media (max-width: 480px) {',
