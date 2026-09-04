@@ -16,7 +16,6 @@ interface ListEnvelope {
   readonly items?: FileRow[]
   readonly hasMore?: boolean
   readonly lastId?: string
-  readonly error?: { readonly code?: string; readonly message?: string }
 }
 
 /** 面板请求超时：host 挂起时不让面板永久 loading（根 AGENTS 网络约定）。 */
@@ -24,17 +23,40 @@ const REQUEST_TIMEOUT_MS = 15_000
 /** 总数统计超时：host 侧要游标翻到底（配额内最多 10 页），放宽到 60s。 */
 const COUNT_TIMEOUT_MS = 60_000
 
+/** 带超时的 fetch：超时中止转换为用户可读文案（浏览器原生 AbortError 文案不友好）。 */
+async function fetchWithTimeout(path: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  try {
+    return await fetch(path, { ...init, signal: AbortSignal.timeout(timeoutMs) })
+  } catch (error) {
+    if (error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+      throw new Error(`请求超时（${Math.round(timeoutMs / 1000)}s），请重试`)
+    }
+    throw error
+  }
+}
+
+/** 解析 JSON 响应体：非 JSON 回退空对象（代理错误页等异常输入返回安全默认值，不抛）。 */
+async function readJson<T>(response: Response): Promise<T> {
+  try {
+    return await response.json() as T
+  } catch {
+    return {} as T
+  }
+}
+
+/** 非 2xx 的用户可读错误：优先 payload.error.message，回退 HTTP 状态文案。 */
+async function readErrorMessage(response: Response): Promise<string> {
+  const payload = await readJson<{ error?: { message?: string } }>(response)
+  return payload.error?.message ?? `请求失败（HTTP ${response.status}）`
+}
+
 export async function listApi(after?: string): Promise<{ rows: FileRow[]; hasMore: boolean; lastId?: string }> {
   // limit 不传：host 归一化缺省回退 PAGE_SIZE（页大小只活在一处，避免两端漂移）。
   const params = new URLSearchParams()
   if (after !== undefined) params.set('after', after)
-  const response = await fetch(`/api/file-manage/list?${params.toString()}`, {
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  const payload = await response.json() as ListEnvelope
-  if (!response.ok) {
-    throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
-  }
+  const response = await fetchWithTimeout(`/api/file-manage/list?${params.toString()}`, {}, REQUEST_TIMEOUT_MS)
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  const payload = await readJson<ListEnvelope>(response)
   return {
     rows: payload.items ?? [],
     hasMore: payload.hasMore ?? false,
@@ -43,11 +65,9 @@ export async function listApi(after?: string): Promise<{ rows: FileRow[]; hasMor
 }
 
 export async function countApi(): Promise<FileCountSummary> {
-  const response = await fetch('/api/file-manage/count', { signal: AbortSignal.timeout(COUNT_TIMEOUT_MS) })
-  const payload = await response.json() as Partial<FileCountSummary> & { error?: { message?: string } }
-  if (!response.ok) {
-    throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
-  }
+  const response = await fetchWithTimeout('/api/file-manage/count', {}, COUNT_TIMEOUT_MS)
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  const payload = await readJson<Partial<FileCountSummary>>(response)
   return {
     count: payload.count ?? 0,
     totalBytes: payload.totalBytes ?? 0,
@@ -60,12 +80,6 @@ export async function countApi(): Promise<FileCountSummary> {
 
 export async function deleteApi(id: string): Promise<void> {
   const params = new URLSearchParams({ id })
-  const response = await fetch(`/api/file-manage/files?${params.toString()}`, {
-    method: 'DELETE',
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  const payload = await response.json() as { error?: { message?: string } }
-  if (!response.ok) {
-    throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
-  }
+  const response = await fetchWithTimeout(`/api/file-manage/files?${params.toString()}`, { method: 'DELETE' }, REQUEST_TIMEOUT_MS)
+  if (!response.ok) throw new Error(await readErrorMessage(response))
 }

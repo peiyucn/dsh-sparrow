@@ -17,6 +17,11 @@ const PREFIX = '/api/file-manage'
 const DEFAULT_BASE_URL = 'https://api.deepseek.com'
 const DEFAULT_API_KEY_ENV = 'DEEPSEEK_API_KEY'
 const LLM_DEEPSEEK_NS = 'llm-deepseek'
+/**
+ * 单页 list / 单条 delete 的上游超时：官方 client 的 fetch 本身无默认超时，客户端断开
+ * （关面板 / 15s 超时）后残留的上游请求必须自限，否则会无限挂起并占用官方 API 配额。
+ */
+const UPSTREAM_TIMEOUT_MS = 15_000
 
 /** 插件自身错误（面板可读的 code / message + HTTP 状态）。 */
 class FileManageError extends Error {
@@ -107,6 +112,7 @@ export function apply(ctx: Context): void {
             ...query.after === undefined ? {} : { after: DeepSeekFileId(query.after) },
             limit: query.limit,
             order: query.order,
+            signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
           })
           sendJson(res, 200, {
             items: page.data.map(toFileRow),
@@ -123,6 +129,8 @@ export function apply(ctx: Context): void {
           let totalBytes = 0
           let after: DeepSeekFileId | undefined
           for (let page = 0; page < MAX_COUNT_PAGES; page++) {
+            // 客户端已断开（超时 / 关面板）时停止翻页：剩余页数没有接收方，白烧官方 API 配额。
+            if (res.destroyed) break
             const result = await client.list({
               ...after === undefined ? {} : { after },
               limit: COUNT_PAGE_LIMIT,
@@ -152,7 +160,7 @@ export function apply(ctx: Context): void {
           }
           const connection = await resolveConnection(ctx)
           const client = new DeepSeekFilesClient({ baseURL: connection.baseURL, apiKey: connection.apiKey })
-          await client.delete(DeepSeekFileId(id))
+          await client.delete(DeepSeekFileId(id), AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
           sendJson(res, 200, { deleted: true, id })
           return
         }

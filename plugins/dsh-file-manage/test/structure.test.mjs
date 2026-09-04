@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 
@@ -40,5 +41,11 @@ describe('dsh-file-manage 结构', () => {
     assert.match(patch, /- insert:/u)
     assert.match(patch, /id: dsh-file-manage/u)
     assert.match(patch, /name: '@dsh-sparrow\/dsh-file-manage'/u)
+  })
+
+  it('lib/ 应该 不残留 src 已删除组件的编译产物（防改名后过期产物随包发布）', () => {
+    // FileSessionDock 曾随 0.1.0 发布（src 已改名 FileManageDock，tsc 不清 lib/）。
+    assert.equal(existsSync(new URL('../lib/client/FileSessionDock.js', import.meta.url)), false)
+    assert.equal(existsSync(new URL('../lib/types/client/FileSessionDock.d.ts', import.meta.url)), false)
   })
 })

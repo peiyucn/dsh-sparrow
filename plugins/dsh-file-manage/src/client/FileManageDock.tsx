@@ -10,6 +10,9 @@ import type { FileCountSummary } from './api.js'
 import { formatUsagePercent, storageUsageRatio } from './quota.js'
 import { styles } from './styles.js'
 
+/** 「已复制」反馈复位时长（archive 同款）。 */
+const COPIED_RESET_MS = 2_000
+
 export interface FileManageDockInjected {
   listFiles: (after?: string) => Promise<{ rows: FileRow[]; hasMore: boolean; lastId?: string }>
   deleteFile: (id: string) => Promise<void>
@@ -46,6 +49,11 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
     setSummaryPending(true)
     setSummary(null)
     setError(null)
+    // 新代际开始：上一代际被丢弃的 loadMore 不再归还 loadingMore，否则「加载更多」会卡死在禁用态。
+    setLoadingMore(false)
+    // 同理复位删除锁：删除飞行期间换代时，陈旧 delete 的 finally 被代际守卫吞掉，
+    // 不复位会把新代际的删除按钮卡死在禁用态；这里由刷新代际统一复位。
+    setBusyDelete(false)
     listFiles()
       .then(page => {
         if (seq !== refreshSeqRef.current) return
@@ -98,15 +106,23 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
 
   const loadMore = useCallback(() => {
     if (lastId === undefined || loadingMore) return
+    // 刷新代际守卫：翻页期间发生重试 / 关开面板（reload 换代）时，陈旧页结果不得混入新列表。
+    const seq = refreshSeqRef.current
     setLoadingMore(true)
     listFiles(lastId)
       .then(page => {
+        if (seq !== refreshSeqRef.current) return
         setRows(current => [...current, ...page.rows])
         setHasMore(page.hasMore)
         setLastId(page.lastId)
       })
-      .catch(reason => { setError(reason instanceof Error ? reason.message : String(reason)) })
-      .finally(() => { setLoadingMore(false) })
+      .catch(reason => {
+        if (seq !== refreshSeqRef.current) return
+        setError(reason instanceof Error ? reason.message : String(reason))
+      })
+      .finally(() => {
+        if (seq === refreshSeqRef.current) setLoadingMore(false)
+      })
   }, [lastId, loadingMore, listFiles])
 
   const copyId = useCallback(async (row: FileRow) => {
@@ -114,7 +130,7 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
       await navigator.clipboard.writeText(row.id)
       setCopied(row.id)
       if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current)
-      copiedTimerRef.current = window.setTimeout(() => { setCopied(null) }, 2_000)
+      copiedTimerRef.current = window.setTimeout(() => { setCopied(null) }, COPIED_RESET_MS)
     } catch {
       setCopied(null)
       setError(t('copyFailed'))
@@ -128,19 +144,27 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
 
   const submitDelete = useCallback(() => {
     if (confirming === null || busyDelete) return
+    const seq = refreshSeqRef.current
+    const deleteId = confirming.id
     setBusyDelete(true)
-    deleteFile(confirming.id)
+    deleteFile(deleteId)
       .then(() => {
-        setRows(current => current.filter(row => row.id !== confirming.id))
-        setConfirming(null)
-        // 删除后刷新总数（best-effort）。
-        void countFiles().then(setSummary).catch(() => {})
+        setRows(current => current.filter(row => row.id !== deleteId))
+        // 只关闭本代际的确认框：删除飞行期间关开面板并点开新确认框时，陈旧回调不得误关新框。
+        setConfirming(current => current !== null && current.id === deleteId ? null : current)
+        // 删除后刷新总数（best-effort）；面板已换代（关闭重开）时陈旧总数不落地。
+        void countFiles().then(next => {
+          if (seq === refreshSeqRef.current) setSummary(next)
+        }).catch(() => {})
       })
       .catch(reason => {
         setError(reason instanceof Error ? reason.message : String(reason))
-        setConfirming(null)
+        setConfirming(current => current !== null && current.id === deleteId ? null : current)
       })
-      .finally(() => { setBusyDelete(false) })
+      .finally(() => {
+        // 陈旧代际的 finally 不得复位新代际的删除锁（新删除飞行中被误放行会连点双删）。
+        if (seq === refreshSeqRef.current) setBusyDelete(false)
+      })
   }, [busyDelete, confirming, deleteFile, countFiles])
 
   return (
