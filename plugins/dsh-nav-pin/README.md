@@ -12,13 +12,13 @@ The official turn navigation (the tick rail on the right side of a conversation 
 dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin
 ```
 
-Requires dsh ≥ 0.1.2-alpha.4 and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
+Requires dsh ≥ 0.1.2-rc.1 and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
 
 > Do **not** run `npm install @dsh-sparrow/dsh-nav-pin` directly: that only downloads the package into some `node_modules` and does not register it with the DSH web profile. Use the `dsh plugin` command above, then restart DSH.
 
 ## Compatibility
 
-* Targets dsh ≥ 0.1.2-alpha.4; earlier versions are not promised — the injected stylesheet at worst matches nothing (a no-op) and never breaks the UI
+* Targets dsh ≥ 0.1.2-rc.1; earlier versions are not promised — the injected stylesheet at worst matches nothing (a no-op) and never breaks the UI
 
 ## Usage
 

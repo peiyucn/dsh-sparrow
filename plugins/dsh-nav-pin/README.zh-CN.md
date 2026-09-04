@@ -12,13 +12,13 @@
 dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin
 ```
 
-适配 dsh ≥ 0.1.2-alpha.4，并需要可用的 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
+适配 dsh ≥ 0.1.2-rc.1，并需要可用的 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
 
 > **不要**直接执行 `npm install @dsh-sparrow/dsh-nav-pin`：那只会把包下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用上面的 `dsh plugin` 命令安装，并在安装后重启 DSH。
 
 ## 版本兼容性
 
-* 适配 dsh ≥ 0.1.2-alpha.4；更早版本不承诺——注入样式在最坏情况下只是匹配不到目标（空操作），不会破坏界面
+* 适配 dsh ≥ 0.1.2-rc.1；更早版本不承诺——注入样式在最坏情况下只是匹配不到目标（空操作），不会破坏界面
 
 ## 使用
 
