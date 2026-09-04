@@ -85,8 +85,8 @@ export interface CodeBuddyCreditsIndicatorProps {
   sessionId?: string
   /** header 变体：框架注入的会话投影 hook；sidebar 变体无此件。 */
   useProjection?: <K extends string>(key: K) => ModelSelectionProjection | undefined
-  /** sidebar 变体：框架注入的 GlobalStandardProps（当前会话 id）。 */
-  useSessions?: <T>(selector: (list: { current?: string | null }) => T) => T
+  /** sidebar 变体：框架注入的 GlobalStandardProps（当前会话列表快照选择器）。 */
+  useSessions?: <S>(selector: (list: { current?: string | null }) => S) => S
   /** sidebar 变体：owner 传侧栏宽窄（宽=展开、窄=rail）。 */
   wide?: boolean
   /** 插件注入：当前会话的共享模型目录 store（官方 ctx.modelDirectories）。 */
@@ -190,7 +190,10 @@ export function CodeBuddyCreditsIndicator({
   directoryFor,
 }: CodeBuddyCreditsIndicatorProps) {
   // sidebar 变体挂在 root 作用域：当前会话 id 走 GlobalStandardProps（useSessions）。
-  const currentSessionId = useSessions === undefined ? undefined : useSessions(list => list.current ?? undefined)
+  // 选择器经 useCallback 稳定身份：无论运行时 hook 是 uSES 绑定还是按渲染
+  // 直调选择器，都不会引起订阅抖动。
+  const selectCurrentSession = useCallback((list: { current?: string | null }): string | undefined => list.current ?? undefined, [])
+  const currentSessionId = useSessions === undefined ? undefined : useSessions(selectCurrentSession)
   const sessionId = (variant === 'sidebar' ? currentSessionId : headerSessionId) ?? ''
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<StatusPayload | undefined>(() => cachedStatus)
@@ -217,7 +220,13 @@ export function CodeBuddyCreditsIndicator({
     width: number
   } | null>(null)
   const rootRef = useRef<HTMLElement | null>(null)
-  const requestSeq = useRef(0)
+  // 三个加载器各自独立的请求序号：共享一个序号会让并发请求互相作废——展开
+  // 面板时 status/quota/sessionUsage 同时发出，先发者的响应会被后发者的序号
+  // 增长丢弃，面板一直停在「读取中」（实测）。各自维护序号，只作废自己这条
+  // 流里被更新的旧响应。
+  const statusSeq = useRef(0)
+  const quotaSeq = useRef(0)
+  const usageSeq = useRef(0)
 
   // 当前选中模型：共享模型目录优先（与选择器同一 store，含目录默认兜底）；
   // 目录不可用（组合里没有 modelDirectories 服务）时退回 session 投影。
@@ -242,11 +251,11 @@ export function CodeBuddyCreditsIndicator({
   const selection: ModelSelection | null = directoryCurrent ?? projection?.next ?? null
 
   const loadStatus = useCallback(async () => {
-    const seq = ++requestSeq.current
+    const seq = ++statusSeq.current
     setLoadError(undefined)
     try {
       const response = await fetch(STATUS_URL, { cache: 'no-store' })
-      if (seq !== requestSeq.current) return
+      if (seq !== statusSeq.current) return
       if (!response.ok) {
         setLoadError(t('indicator.loadFailed'))
         return
@@ -255,18 +264,18 @@ export function CodeBuddyCreditsIndicator({
       cachedStatus = payload
       setStatus(payload)
     } catch {
-      if (seq !== requestSeq.current) return
+      if (seq !== statusSeq.current) return
       setLoadError(t('indicator.loadFailed'))
     }
   }, [t])
 
   /** 展开面板时拉取配额（独立于 /status，不阻塞图标出现）。 */
   const loadQuota = useCallback(async () => {
-    const seq = ++requestSeq.current
+    const seq = ++quotaSeq.current
     setQuotaError(undefined)
     try {
       const response = await fetch(QUOTA_URL, { method: 'POST', cache: 'no-store' })
-      if (seq !== requestSeq.current) return
+      if (seq !== quotaSeq.current) return
       if (!response.ok) {
         const payload = await response.json().catch(() => ({})) as { error?: string }
         setQuotaError(payload.error ?? t('indicator.loadFailed'))
@@ -274,18 +283,20 @@ export function CodeBuddyCreditsIndicator({
       }
       setQuota(await response.json() as QuotaView)
     } catch {
-      if (seq !== requestSeq.current) return
+      if (seq !== quotaSeq.current) return
       setQuotaError(t('indicator.loadFailed'))
     }
   }, [t])
 
   /** 展开面板时拉取本会话累计积分（按 sessionId 记账）。 */
   const loadSessionUsage = useCallback(async () => {
-    const seq = ++requestSeq.current
+    // 无当前会话（新会话纯视图）时没有可记的账：跳过，不显示本会话消耗行。
+    if (sessionId === '') return
+    const seq = ++usageSeq.current
     setUsageError(undefined)
     try {
       const response = await fetch(`${SESSION_USAGE_URL}?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' })
-      if (seq !== requestSeq.current) return
+      if (seq !== usageSeq.current) return
       if (!response.ok) {
         setUsageError(t('indicator.loadFailed'))
         return
@@ -296,7 +307,7 @@ export function CodeBuddyCreditsIndicator({
         recent: ReadonlyArray<{ model: string; credit?: number }>
       })
     } catch {
-      if (seq !== requestSeq.current) return
+      if (seq !== usageSeq.current) return
       setUsageError(t('indicator.loadFailed'))
     }
   }, [sessionId, t])
