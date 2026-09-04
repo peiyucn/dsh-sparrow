@@ -18,6 +18,7 @@ import { CodeBuddyCreditsCard, ensureCardStyles } from './CodeBuddyCreditsCard.j
 import { CodeBuddyCreditsIndicator, ensureIndicatorStyles } from './CodeBuddyCreditsIndicator.js'
 import { CodeBuddyModelSelect, ensurePickerStyles } from './CodeBuddyModelSelect.js'
 import { CodeBuddyTurnCredit, ensureTurnCreditStyles } from './CodeBuddyTurnCredit.js'
+import { CodeBuddyCreditsStats, ensureStatsStyles } from './CodeBuddyCreditsStats.js'
 
 export const inject = ['slots', 'locale']
 
@@ -58,6 +59,7 @@ const LOCALE_DICTS = {
     'turnCredit.total': '本轮合计',
     'turnCredit.calls': '调用次数',
     'turnCredit.recent': '每次调用',
+    'stats.sessionCredits': 'CodeBuddy 积分 {credit} · {calls} 次调用',
     'indicator.model.title': '当前模型',
     'indicator.model.context': '上下文 {context}',
     'indicator.model.vision': '原生视觉',
@@ -114,6 +116,7 @@ const LOCALE_DICTS = {
     'turnCredit.total': 'Turn total',
     'turnCredit.calls': 'Calls',
     'turnCredit.recent': 'Per call',
+    'stats.sessionCredits': 'CodeBuddy credits {credit} · {calls} calls',
     'indicator.model.title': 'Current model',
     'indicator.model.context': 'Context {context}',
     'indicator.model.vision': 'Native vision',
@@ -156,6 +159,7 @@ export function apply(ctx: ClientContext): void {
   ensurePickerStyles()
   ensureCardStyles()
   ensureTurnCreditStyles()
+  ensureStatsStyles()
   const disposeDictionaries = ctx.locale.register('codebuddy-credits', {
     zh: LOCALE_DICTS.zh,
     en: LOCALE_DICTS.en,
@@ -197,6 +201,15 @@ export function apply(ctx: ClientContext): void {
     id: 'codebuddy-credits-turn-credit',
     locale: 'codebuddy-credits',
   }, CodeBuddyTurnCredit as unknown as (props: object) => ReactNode))
+
+  // 会话积分统计行：官方 StatsLine 同槽位（composer.dock，公开 seam），
+  // order 1 渲染在官方统计行之后。无 CodeBuddy 调用时返回 null。
+  ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+    name: 'conversation.composer.dock',
+    id: 'codebuddy-credits-stats',
+    order: 1,
+    locale: 'codebuddy-credits',
+  }, CodeBuddyCreditsStats as unknown as (props: object) => ReactNode))
 
   // 模型选择器遮蔽：priority -1（官方条目为默认 0，最低者渲染）。
   // 双保险注册：(1) 声明式注入等 modelDirectories/sessions 就绪（官方同款

@@ -41,6 +41,16 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       scope: 'session'
       owner: { messageId: string }
     }
+    /**
+     * composer 底部扩展槽位（ui-conversation 声明；kind=list，scope=session）。
+     * 官方 StatsLine 挂在这里（order 0）——本插件以 order 1 挂会话积分统计行，
+     * 渲染在官方统计行之后。
+     */
+    'conversation.composer.dock': {
+      kind: 'list'
+      scope: 'session'
+      owner: { children?: never }
+    }
   }
 
   interface LocaleNamespaceMap {
@@ -84,6 +94,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'turnCredit.total'
       | 'turnCredit.calls'
       | 'turnCredit.recent'
+      | 'stats.sessionCredits'
       | 'picker.trigger.fallback'
       | 'picker.trigger.loading'
       | 'picker.trigger.selectAria'
