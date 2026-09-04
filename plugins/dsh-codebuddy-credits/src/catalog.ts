@@ -48,6 +48,8 @@ export interface CodeBuddyModelFacts {
   id: string
   /** 展示名：原始名 + 系数（模型选择器可见的唯一文本位）。 */
   name: string
+  /** 积分系数短串（"x0.79"），服务端未声明时缺省——额度卡消耗速度行用。 */
+  credits?: string
   contextWindow: number
   maxTokens: number
   input: readonly ('text' | 'image')[]
@@ -107,6 +109,7 @@ export function factsFromEntries(entries: readonly CodeBuddyModelEntry[]): CodeB
     return {
       id: entry.id,
       name: displayName(entry),
+      ...(entry.credits === undefined ? {} : { credits: entry.credits }),
       contextWindow: entry.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
       maxTokens: entry.maxTokens ?? DEFAULT_MAX_TOKENS,
       input: [...(entry.input ?? ['text'])],

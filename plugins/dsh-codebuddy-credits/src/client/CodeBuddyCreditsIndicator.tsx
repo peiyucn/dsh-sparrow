@@ -42,6 +42,8 @@ interface QuotaView {
 interface ModelFactView {
   id: string
   name: string
+  /** 积分系数短串（"x0.79"），服务端未声明时缺省——消耗速度行用。 */
+  credits?: string
   vision: boolean
   contextWindow: number
   maxTokens: number
@@ -89,19 +91,6 @@ export interface CodeBuddyCreditsIndicatorProps {
   wide?: boolean
   /** 插件注入：当前会话的共享模型目录 store（官方 ctx.modelDirectories）。 */
   directoryFor: (sessionId: string) => DirectoryStore | undefined
-}
-
-/** 上下文 token 数的人类可读缩写（192000 → 192K，1000000 → 1M）。 */
-function formatTokens(value: number): string {
-  if (value >= 1_000_000) {
-    const millions = value / 1_000_000
-    return (Number.isInteger(millions) ? String(millions) : millions.toFixed(1)) + 'M'
-  }
-  if (value >= 1000) {
-    const thousands = value / 1000
-    return (Number.isInteger(thousands) ? String(thousands) : thousands.toFixed(0)) + 'K'
-  }
-  return String(value)
 }
 
 /** 重置时间只展示到日：2026-09-26 00:00:00 → 2026-09-26（非零点整保留原样）。 */
@@ -356,6 +345,15 @@ export function CodeBuddyCreditsIndicator({
     ? undefined
     : status?.models.find(entry => entry.id === selected.model)
 
+  // 消耗速度（积分倍率）：x0.51 → 0.51x 倍率；x0 → 免费；无声明 → –。
+  const rateText = (() => {
+    if (model === undefined || model.credits === undefined) return '–'
+    const match = /^x([\d.]+)$/i.exec(model.credits)
+    if (match === null) return model.credits
+    const value = Number(match[1])
+    return value === 0 ? t('indicator.model.free') : t('indicator.model.rateValue', { rate: String(value) })
+  })()
+
   const account = status?.account
   // /v2/accounts 实测 type 为 ultimate（企业）/personal；enterprise 兼容旧形状。
   // 企业行与配置页同格式：企业版 · 大家保险集团有限责任公司。
@@ -584,18 +582,27 @@ export function CodeBuddyCreditsIndicator({
               ? (
                 <>
                   <div style={dividerStyle} />
-                  <div style={captionStyle}>{t('indicator.model.title')}</div>
-                  <div style={{ fontSize: '12px', lineHeight: '18px', fontWeight: 500 }}>{model.name}</div>
+                  {/* 模型卡（参考官方模型展示）：加粗名 → 描述 → 可用功能 → 分隔 → 消耗速度。 */}
+                  <div style={{ fontSize: '13px', lineHeight: '20px', fontWeight: 600, color: 'var(--dsw-alias-label-primary)' }}>
+                    {model.name.split('  ')[0]}
+                  </div>
                   {model.description !== undefined
                     ? <div style={captionStyle}>{model.description}</div>
                     : null}
-                  <div style={captionStyle}>{t('indicator.model.context', { context: formatTokens(model.contextWindow) })}</div>
-                  {model.vision
-                    ? <div style={captionStyle}>👁 {t('indicator.model.vision')}</div>
-                    : null}
-                  {model.efforts !== undefined && model.efforts.length > 0
-                    ? <div style={captionStyle}>{t('indicator.model.efforts', { efforts: model.efforts.join(' / ') })}</div>
-                    : null}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                    <span style={captionStyle}>{t('indicator.model.features')}</span>
+                    <span style={{ fontSize: '12px', lineHeight: '18px', color: 'var(--dsw-alias-label-secondary)' }}>
+                      {[
+                        model.vision ? t('indicator.model.visionFeature') : null,
+                        model.efforts !== undefined && model.efforts.length > 0 ? t('indicator.model.reasoningFeature') : null,
+                      ].filter((item): item is string => item !== null).join('、')}
+                    </span>
+                  </div>
+                  <div style={dividerStyle} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                    <span style={captionStyle}>{t('indicator.model.rate')}</span>
+                    <span style={{ fontSize: '12px', lineHeight: '18px', color: 'var(--dsw-alias-label-secondary)' }}>{rateText}</span>
+                  </div>
                 </>
               )
               : null}
