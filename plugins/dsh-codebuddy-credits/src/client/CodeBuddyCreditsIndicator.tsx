@@ -279,20 +279,18 @@ export function CodeBuddyCreditsIndicator({
   }, [t])
 
   /** 计算面板位置：header 变体右缘对齐按钮、左缘钳制在会话区（空间不足允许
-   *  收缩，绝不越过会话区左缘）；sidebar 变体——宽栏时面板落在侧栏宽度范围内、
-   *  紧贴按钮上方（侧栏宽 = 会话区左缘），rail 时侧栏窄、面板右移进会话区。 */
+   *  收缩，绝不越过会话区左缘）；sidebar 变体——固定宽度、位置偏左，宽栏时
+   *  面板左缘贴侧栏、紧贴按钮上方（可向右溢进会话区），rail 时侧栏窄仍右移。 */
   const position = useCallback(() => {
     const rect = rootRef.current?.getBoundingClientRect()
     if (rect === undefined) return
     const conversationLeft = document.querySelector('[data-conversation-scroll]')?.getBoundingClientRect().left ?? 0
     if (variant === 'sidebar') {
       if (wide) {
-        // 侧栏展开宽 = 会话区左缘；面板在侧栏内居中、贴按钮上方。
-        const sidebarWidth = conversationLeft
         setPoint({
           left: PANEL_EDGE_GAP,
           bottom: window.innerHeight - rect.top + 8,
-          width: Math.min(PANEL_MAX_WIDTH, sidebarWidth - PANEL_EDGE_GAP * 2),
+          width: Math.min(PANEL_MAX_WIDTH, window.innerWidth - PANEL_EDGE_GAP * 2),
         })
       } else {
         const left = Math.max(conversationLeft + PANEL_EDGE_GAP, rect.right + 6)
