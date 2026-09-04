@@ -187,14 +187,15 @@ export function apply(ctx: ClientContext): void {
     }
   }
 
-  ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
-    name: 'conversation.session.header.actions',
-    id: 'llm-codebuddy-credits',
-    // 排到头部操作区最右：官方条目 agent-preset=-10 / schedule=10 / job-list=20，
-    // 30 使额度卡成为行尾最后一项（owner 拍板置右）。
-    order: 30,
+  // 左侧栏 footer 额度入口：官方 Settings 的堆叠区（sidebar.footer.action
+  // 槽位，公开 seam；Archive/Cloud Files 同款）。宽栏以 CSS 方案落在 Settings
+  // 行右侧共用该行（官方 Settings 单槽不可加项）；rail 为常规圆形图标行。
+  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
+    name: 'sidebar.footer.action',
+    id: 'codebuddy-credits',
+    order: 40,
     locale: 'codebuddy-credits',
-    inject: () => ({ directoryFor }),
+    inject: () => ({ directoryFor, variant: 'sidebar' as const }),
   }, CodeBuddyCreditsIndicator as unknown as (props: object) => ReactNode))
 
   // 每轮积分胶囊：官方 Usage 胶囊同排（assistant-actions 槽位，公开 seam）。
