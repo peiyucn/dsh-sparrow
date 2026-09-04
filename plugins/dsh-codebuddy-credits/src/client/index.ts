@@ -152,7 +152,8 @@ export function apply(ctx: ClientContext): void {
   // 器同一 store）。组合缺该服务（旧版 dsh）时捕获并退回 useProjection 兜底。
   const directoryFor = (sessionId: string): DirectoryStoreLike | undefined => {
     try {
-      const resolver = ctx.get('modelDirectories') as unknown as {
+      // 根上下文取官方服务实例（子上下文 get 会实例化出注入不全的副本）。
+      const resolver = ctx.root.get('modelDirectories') as unknown as {
         directoryFor(id: string): { store: DirectoryStoreLike } | undefined
       } | undefined
       // store 原样传递（快照/订阅方法可能依赖内部状态闭包，不做解构）。
@@ -176,39 +177,40 @@ export function apply(ctx: ClientContext): void {
   // 选择器（fail-soft）。
   // 诊断：注册尝试与结果（刷新后仍回退官方样式时，请用户复制
   // JSON.stringify(window.__ccbDiag) 发回排查）。
-  const diag: { attempts: number; serviceError?: string; injectError?: string; registered: boolean; registerError?: string } = {
+  const diag: {
+    attempts: number
+    serviceError?: string
+    injectError?: string
+    registered: boolean
+    registerError?: string
+    sessionId?: string
+    ensureFails: number
+    ensureError?: string
+  } = {
     attempts: 0,
     registered: false,
+    ensureFails: 0,
   }
   ;(window as unknown as Record<string, unknown>).__ccbDiag = diag
   let pickerRegistered = false
   const registerPicker = (scopeCtx: ClientContext): void => {
     if (pickerRegistered) return
     diag.attempts += 1
-    let resolver: { directoryFor(id: string): ModelDirectoryLike | undefined }
+    let resolver: { directoryFor(id: string): { store: DirectoryStoreLike } | undefined }
     let sessions: { subagentAddress(id: string): unknown } | undefined
+    // 必须从根上下文取：官方 ui-model-selection 在根上下文注册该服务；
+    // 在子上下文 get 会另行实例化，其 remote.session 等注入无法装配
+    // （"cannot get property without inject"）——这正是目录空/弃权的根因。
     try {
-      resolver = scopeCtx.get('modelDirectories') as never
+      resolver = scopeCtx.root.get('modelDirectories') as unknown as typeof resolver
     } catch (error) {
       diag.serviceError = error instanceof Error ? error.message : String(error)
       return
     }
     try {
-      sessions = scopeCtx.get('sessions') as never
+      sessions = scopeCtx.root.get('sessions') as unknown as typeof sessions
     } catch {
       // sessions 可选：缺失时按可用处理。
-    }
-    // 未知会话（目录解析失败）时给一个空目录 + 禁用态，避免渲染抛错。
-    const emptyDirectory = (): ModelDirectoryLike => {
-      const snapshot = { current: null, routable: null, groups: [], failures: [], status: 'idle', error: null }
-      return {
-        store: {
-          getSnapshot: () => snapshot,
-          subscribe: () => () => {},
-        },
-        load: async () => {},
-        select: async () => {},
-      }
     }
     try {
       scopeCtx.slots.inject('conversation.input.model', () => {
@@ -218,18 +220,70 @@ export function apply(ctx: ClientContext): void {
             locale: 'codebuddy-credits',
             priority: -1,
             inject: (sessionId: string) => {
-              const directory = resolver.directoryFor(sessionId) ?? emptyDirectory()
-              const available = directory !== undefined
-                && (sessions === undefined || sessions.subagentAddress(sessionId) === undefined)
+              diag.sessionId = String(sessionId)
+              // 惰性解析目录 store：首次 dispatch 时会话 scope 可能尚未就绪，
+              // directoryFor 会抛错（抛错一次 = 槽位弃权，官方条目顶上）。
+              // 这里绝不抛：解析失败保持未决，getSnapshot/load 后续重试，
+              // 解析成功后通知等待中的订阅者（重挂载前自愈，不弃权）。
+              let resolvedStore: DirectoryStoreLike | undefined
+              const pending = new Set<() => void>()
+              // 注意：必须是稳定引用（uSES 的 getSnapshot 每次返回新对象会
+              // 触发无限重渲染，React #185「Maximum update depth exceeded」
+              // → 槽位弃权回退官方——这正是刷新后样式回退的根因之一）。
+              const emptySnapshot = { current: null, routable: null, groups: [], failures: [], status: 'idle', error: null }
+              const ensure = (): DirectoryStoreLike | undefined => {
+                if (resolvedStore !== undefined) return resolvedStore
+                try {
+                  const hit: DirectoryStoreLike | undefined = resolver.directoryFor(sessionId)?.store
+                  if (hit !== undefined) {
+                    resolvedStore = hit
+                    for (const fn of pending) fn()
+                    pending.clear()
+                  }
+                } catch (error) {
+                  // 会话 scope 未就绪：保持未决，下一次读取重试。
+                  diag.ensureFails += 1
+                  diag.ensureError = error instanceof Error ? error.message : String(error)
+                }
+                return resolvedStore
+              }
+              const available = sessions === undefined
+                || (() => {
+                  try {
+                    return sessions.subagentAddress(sessionId) === undefined
+                  } catch {
+                    return true
+                  }
+                })()
               return {
                 available,
-                directory: directory.store,
+                directory: {
+                  getSnapshot: () => {
+                    const hit = ensure()
+                    return hit !== undefined ? hit.getSnapshot() : emptySnapshot
+                  },
+                  subscribe: (fn: () => void): (() => void) => {
+                    const hit = ensure()
+                    if (hit !== undefined) return hit.subscribe(fn)
+                    pending.add(fn)
+                    return () => { pending.delete(fn) }
+                  },
+                } as unknown as DirectoryStoreLike,
                 load: () => {
-                  if (available) directory.load().catch(() => { /* 错误落在 store 上 */ })
+                  const hit = ensure()
+                  if (hit !== undefined) {
+                    ;(hit as unknown as { load(): Promise<unknown> }).load().catch(() => { /* 错误落在 store 上 */ })
+                  } else if (available) {
+                    // 未解析：挂一个待命回调，解析成功后补一次 load。
+                    pending.add(() => { ensure() !== undefined && (ensure() as unknown as { load(): Promise<unknown> }).load().catch(() => {}) })
+                  }
                 },
-                select: (selection: unknown) => available
-                  ? directory.select(selection).then(() => true, () => false)
-                  : Promise.resolve(false),
+                select: (selection: unknown) => {
+                  const hit = ensure()
+                  return hit !== undefined
+                    ? (hit as unknown as { select(sel: unknown): Promise<unknown> }).select(selection).then(() => true, () => false)
+                    : Promise.resolve(false)
+                },
               }
             },
           }, CodeBuddyModelSelect as unknown as (props: object) => ReactNode)
