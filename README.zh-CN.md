@@ -80,6 +80,24 @@ DeepSeek Files API 云端文件管理。侧边栏「云端文件」入口列出�
 dsh plugin --profile web add @dsh-sparrow/dsh-file-manage
 ```
 
+## dsh-codebuddy-credits
+
+公司 CodeBuddy 额度接成 DSH 的 LLM provider——企业发的 WorkBuddy/CodeBuddy
+积分，在 DSH 里直接花。仅官方 API Key（不逆向令牌、不用 CodeBuddy 的 agent
+harness）：在**设置 → 模型**的 **CodeBuddy Credits** 行保存 Key，之后模型
+选择器即可选 CodeBuddy 模型，每行右侧显示积分系数（`x0.79`、`free`）。侧栏
+入口展开额度面板（账号、已用 / 额度 / 剩余、重置日期、当前模型信息）；输入
+框下方统计行累计本会话积分，每轮末尾有积分胶囊并可按调用拆分明细。
+
+> 仅流式接口；Key 与用量记录留在你的 CodeBuddy 账号上——如实限制见插件
+> README。
+
+文档：[dsh-codebuddy-credits README](plugins/dsh-codebuddy-credits/README.zh-CN.md)
+
+```bash
+dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits
+```
+
 ## License
 
 MIT

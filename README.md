@@ -80,6 +80,26 @@ Docs: [dsh-file-manage README](plugins/dsh-file-manage/README.md)
 dsh plugin --profile web add @dsh-sparrow/dsh-file-manage
 ```
 
+## dsh-codebuddy-credits
+
+Company CodeBuddy credits as a DSH LLM provider — your enterprise-issued
+WorkBuddy/CodeBuddy quota, spent inside DSH. Official API key only (no token
+reverse engineering, no CodeBuddy agent harness): save the key on the
+**CodeBuddy Credits** row under Settings → Models, then pick CodeBuddy models
+in the composer, each showing its credit rate (`x0.79`, `free`). A sidebar
+entry opens the quota panel (account, used / limit / remaining, reset date,
+selected model info); the composer stats line accumulates the session's
+credits, and each turn carries a credit pill with the per-call breakdown.
+
+> Streaming endpoint only; keys and usage records stay on your CodeBuddy
+> account — see the plugin README for the honest limitations.
+
+Docs: [dsh-codebuddy-credits README](plugins/dsh-codebuddy-credits/README.md)
+
+```bash
+dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits
+```
+
 ## License
 
 MIT
