@@ -38,6 +38,14 @@ describe('archive-manage host 纯逻辑', () => {
       assert.equal(dir, sessionDir)
     })
 
+    it('rc.1 zstd 压缩产物（session.jsonl.zstd）应该 返回其父目录', () => {
+      const dir = sessionDirectoryFor({
+        kind: 'jsonl',
+        path: win ? 'C:\\dsh\\sessions\\session-1\\session.jsonl.zstd' : '/dsh/sessions/session-1/session.jsonl.zstd',
+      })
+      assert.equal(dir, sessionDir)
+    })
+
     it('非 jsonl 后端 应该 返回 undefined', () => {
       assert.equal(sessionDirectoryFor({ kind: 'memory', path: 'session-1' }), undefined)
     })
@@ -159,6 +167,13 @@ describe('archive-manage host 纯逻辑', () => {
       assert.deepEqual(get().archivedSessionIds, ['a'])
     })
 
+    it('update 返回内容一致的新数组 应该 不触发 setState（零写入）', async () => {
+      const { surface, calls, get } = fakeRegistry(['a', 'b'])
+      await mutateArchivedSet(surface, ids => ids.filter(id => id !== 'x'))
+      assert.deepEqual(calls, ['enqueue'])
+      assert.deepEqual(get().archivedSessionIds, ['a', 'b'])
+    })
+
     it('追加已存在的 id 应该 不重复（幂等）', async () => {
       const { surface, get } = fakeRegistry(['a'])
       await mutateArchivedSet(surface, ids => ids.includes('a') ? ids : [...ids, 'a'])
@@ -206,6 +221,20 @@ describe('archive-manage host 纯逻辑', () => {
         }),
       })
       assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-1')), 'folded-label')
+      assert.equal(disposed, 1)
+    })
+
+    it('rc.1 Disposable 租约（仅 Symbol.dispose）应该 正确释放', async () => {
+      let disposed = 0
+      const ctx = labelCtx({
+        cacheRow: undefined,
+        observe: async () => ({
+          header: { createdAt: 1 },
+          projections: { values: { subagent: { label: 'rc1-label' } } },
+          [Symbol.dispose]: () => { disposed += 1 },
+        }),
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-rc1')), 'rc1-label')
       assert.equal(disposed, 1)
     })
 

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, isDeleteConfirmationSufficient,
-  legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig, parseTrashSidecar, parseBlankProjection,
-  parseSessionFacts, sanitizeSegment, straySessionIds, trashItemView,
+  isSafeSessionDirName, legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig,
+  parseTrashSidecar, parseBlankProjection, parseSessionFacts, sanitizeSegment, straySessionIds, trashItemView,
 } from '../lib/archive.js'
 
 describe('archive-manage 纯逻辑', () => {
@@ -72,6 +72,30 @@ describe('archive-manage 纯逻辑', () => {
 
     it('空串 应该 返回 unknown', () => {
       assert.equal(sanitizeSegment('///'), 'unknown')
+    })
+  })
+
+  describe('isSafeSessionDirName', () => {
+    it('官方生成的 UUID 形目录名 应该 通过', () => {
+      assert.equal(isSafeSessionDirName('0d21fc8b-56e9-4761-a59f-d972c095d2d8'), true)
+      assert.equal(isSafeSessionDirName('session-0d21fc8b-56e9-4761-a59f-d972c095d2d8'), true)
+    })
+
+    it('官方 encodeSegment 转义形式（任意 id）应该 通过', () => {
+      assert.equal(isSafeSessionDirName('foo~002Fbar'), true)
+      assert.equal(isSafeSessionDirName('~002E'), true)
+      assert.equal(isSafeSessionDirName('a.b_c-d'), true)
+    })
+
+    it('路径穿越与分隔符 应该 拒绝', () => {
+      assert.equal(isSafeSessionDirName('..'), false)
+      assert.equal(isSafeSessionDirName('.'), false)
+      assert.equal(isSafeSessionDirName(''), false)
+      assert.equal(isSafeSessionDirName('../x'), false)
+      assert.equal(isSafeSessionDirName('C:'), false)
+      assert.equal(isSafeSessionDirName('a\\b'), false)
+      assert.equal(isSafeSessionDirName('a/b'), false)
+      assert.equal(isSafeSessionDirName('~002G'), false)
     })
   })
 

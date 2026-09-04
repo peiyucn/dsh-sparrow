@@ -580,6 +580,11 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
   )
 }
 
+/** 创建龄文案的「一天」毫秒数。 */
+const DAY_MS = 86_400_000
+/** 复制成功反馈的展示时长。 */
+const COPIED_FEEDBACK_MS = 2_000
+
 /**
  * footer action 组件：窄栏显示图标，宽栏显示「归档管理」；弹窗列出轻归档会话与回收站。
  * 打开后先显示加载态，数据就绪后再渲染列表。
@@ -654,7 +659,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
       await navigator.clipboard.writeText(trashDir.path)
       setCopied(true)
       if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current)
-      copiedTimerRef.current = window.setTimeout(() => { setCopied(false) }, 2_000)
+      copiedTimerRef.current = window.setTimeout(() => { setCopied(false) }, COPIED_FEEDBACK_MS)
     } catch {
       // 剪贴板不可用（非安全上下文等）：悬停 title 里始终有完整路径。
     }
@@ -713,7 +718,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
   /** 创建龄文案：今天 / N 天前。 */
   const strayAge = (createdAt: number | undefined): string => {
     if (typeof createdAt !== 'number' || !Number.isFinite(createdAt)) return ''
-    const days = Math.floor((Date.now() - createdAt) / 86_400_000)
+    const days = Math.floor((Date.now() - createdAt) / DAY_MS)
     return days <= 0 ? t('stray.ageToday') : t('stray.ageDays', { n: days })
   }
 
@@ -991,7 +996,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             <button
               type="button"
               className="dsh-archive-btn dsh-archive-btn-danger"
-              disabled={loading}
+              disabled={loading || restoringId !== null}
               onClick={() => { confirmDeleteTrashItem(item) }}
             >
               {t('action.deletePermanently')}
@@ -1210,7 +1215,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       <button
                         type="button"
                         className="dsh-archive-btn"
-                        disabled={loading || restorableCount === 0}
+                        disabled={loading || restorableCount === 0 || restoringId !== null}
                         onClick={() => { confirmRestoreAll() }}
                       >
                         {t('action.restoreAll', { count: restorableCount })}
@@ -1218,7 +1223,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       <button
                         type="button"
                         className="dsh-archive-btn dsh-archive-btn-danger"
-                        disabled={loading || trashItems.length === 0}
+                        disabled={loading || trashItems.length === 0 || restoringId !== null}
                         onClick={() => { confirmDeleteAll() }}
                       >
                         {t('action.deleteAll')}

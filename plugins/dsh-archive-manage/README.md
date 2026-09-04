@@ -20,6 +20,8 @@ Requires dsh ≥ 0.1.2-alpha.4 and a working `pnpm` (`dsh plugin` forwards insta
 
 * **Entry**: The "Archive" button at the bottom of the sidebar opens a panel with an Archive area and a Trash area
 * **Archive area**: Unarchive, move to trash, or delete permanently; permanent deletion requires typing the full session title as a strong confirmation
+* **Subagent tree**: Subagent sessions are shown indented under their parent (read-only rows); archive / unarchive / move to trash / delete / restore always treat a parent and its subagents as one unit
+* **Stray sessions**: Sessions that belong to no workspace and are not archived — the official UI cannot clean them, and they keep crowding @ candidates. The panel lists them separately with archive / move-to-trash / delete actions; blank sessions (0 turns) are badged and use a simplified confirmation
 * **Held sessions**: Sessions opened during the current dsh run cannot have their files moved — they are grouped and greyed out in the archive area and become operable after the next dsh startup; unarchiving does not move files and works immediately
 * **Trash**: Restore or delete entries individually or in bulk; sessions in the trash no longer appear in the @ list
 * **Trash location**: The trash location is shown at the top of the panel; click to copy the full path
@@ -31,6 +33,7 @@ Requires dsh ≥ 0.1.2-alpha.4 and a working `pnpm` (`dsh plugin` forwards insta
 ## Trash Location & Restore
 
 * Default trash folder: `$DSH_HOME/.sessions-trash/`; each entry folder contains a `dsh-archive-manage.json` recording its original location and workspace ownership, which restore uses to move it back
+* The sidecar also records the parent's subagent sessions: restoring moves the whole family back together
 * Folders without a sidecar file are listed as "legacy": they can only be deleted permanently, not restored
 
 ## Uninstall & Residue

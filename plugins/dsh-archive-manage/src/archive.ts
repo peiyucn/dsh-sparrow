@@ -57,6 +57,18 @@ export function sanitizeSegment(value: string): string {
 }
 
 /**
+ * 官方 jsonl 后端单会话目录名的安全判定（rc.1 布局 `<root>/<project>/<encodeSegment(id)>/`）：
+ * - 普通形式：大小写字母、数字、-、_（官方生成的会话 id 为 UUID / session-<uuid> / webhook-<uuid>，直接落盘）；
+ * - 官方 encodeSegment 转义形式：`~XXXX`（4 位大写十六进制）穿插在 `[A-Za-z0-9._-]` 之间
+ *   （外部注入的任意会话 id——如 ACP——会被官方转义成该形式）。
+ * 两种形式都不含路径分隔符与盘符冒号；`.`、`..`、空串一律拒绝（`.` 会命中转义形式字符集，须显式排除）。
+ */
+export function isSafeSessionDirName(name: string): boolean {
+  if (name === '' || name === '.' || name === '..') return false
+  return /^(?:[A-Za-z0-9._-]|~[0-9A-F]{4})+$/u.test(name)
+}
+
+/**
  * 把 home 目录前缀掩码为 `~`（跨平台）：Windows 反斜杠与 POSIX 斜杠都处理；
  * 先精确匹配，再回退大小写不敏感匹配（Windows 大小写不敏感的盘符路径）。
  * 不在 home 下的路径原样返回。

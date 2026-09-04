@@ -18,8 +18,8 @@ import type { Workspace, WorkspaceDomainState } from '@deepseek-ai/dsh-workspace
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
   TRASH_SIDECAR, archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, isDeleteConfirmationSufficient,
-  legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig, parseBlankProjection, parseSessionFacts,
-  parseTrashSidecar, sanitizeSegment, straySessionIds, trashItemView,
+  isSafeSessionDirName, legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig, parseBlankProjection,
+  parseSessionFacts, parseTrashSidecar, sanitizeSegment, straySessionIds, trashItemView,
   type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar, type SessionFacts, type SessionTreeHeader,
   type SessionTreeNode,
 } from './archive.js'
@@ -330,6 +330,8 @@ interface FoldObservation {
   header?: { createdAt?: number }
   projections?: { values?: Record<string, { label?: string } | null | undefined> }
   dispose?: () => void
+  /** rc.1 起官方观察租约是 Disposable 契约（[Symbol.dispose]），旧中间版是 dispose() 方法；两者都探测。 */
+  [Symbol.dispose]?: () => void
 }
 
 /**
@@ -394,7 +396,11 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
         ctx.logger.warn(`dsh-archive-manage: subagent 标签日志折叠失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
       } finally {
         try {
-          observation?.dispose?.()
+          // rc.1 租约走 [Symbol.dispose]，旧中间版走 dispose()；释放失败不影响回退。
+          if (observation !== undefined) {
+            if (typeof observation.dispose === 'function') observation.dispose()
+            else observation[Symbol.dispose]?.()
+          }
         } catch {
           // 租约释放 best-effort：失败不影响回退。
         }
@@ -444,13 +450,17 @@ async function readArchivedIds(ctx: Context): Promise<SessionId[]> {
 
 /**
  * 归档集读改写：挂官方 enqueueOperation 串行链，链内 requireState → 计算新集合 →
- * setState（官方持久化写：域 + 内存态一步同步）。update 返回同一引用视为无变化。
+ * setState（官方持久化写：域 + 内存态一步同步）。update 返回同一引用或内容逐项一致视为无变化
+ * （removeArchivedId 的 filter 恒返回新数组，内容比较才能让「不在集合内」真正零写入、零事件噪音）。
  */
 export function mutateArchivedSet(surface: RegistryMutationSurface, update: (ids: readonly SessionId[]) => readonly SessionId[]): Promise<void> {
   return surface.enqueueOperation(async () => {
     const state = surface.requireState()
     const next = update(state.archivedSessionIds)
     if (next === state.archivedSessionIds) return
+    const unchanged = next.length === state.archivedSessionIds.length
+      && next.every((id, index) => String(id) === String(state.archivedSessionIds[index]))
+    if (unchanged) return
     await surface.setState({ ...state, archivedSessionIds: [...next] })
   })
 }
@@ -574,9 +584,9 @@ async function listSubagentTargets(ctx: Context, parentSessionId: SessionId): Pr
   return targets
 }
 
-/** 回收站目录内 subagent 子目录名必须安全，防 sidecar 篡改后路径穿越。 */
+/** 回收站目录内 subagent 子目录名必须安全（兼容官方 encodeSegment 转义形式），防 sidecar 篡改后路径穿越。 */
 function safeDirName(value: string): string {
-  if (!/^[A-Za-z0-9_-]+$/u.test(value)) throw new ArchiveError('BAD_BODY', `非法会话目录名：${value}`)
+  if (!isSafeSessionDirName(value)) throw new ArchiveError('BAD_BODY', `非法会话目录名：${value}`)
   return value
 }
 
@@ -636,10 +646,11 @@ async function restoreTrashDir(ctx: Context, surface: RegistryMutationSurface, t
   if (sidecar === undefined) {
     throw new ArchiveError('BAD_BODY', '回收站条目 sidecar 无效', 404)
   }
-  // sidecar 校验：originalPath 必须是「绝对路径 + 安全命名的单层目录」，防被篡改后把回收站条目 rename 到任意位置。
+  // sidecar 校验：originalPath 必须是「绝对路径 + 安全命名的单层目录」（兼容官方 encodeSegment 转义形式），
+  // 防被篡改后把回收站条目 rename 到任意位置。
   if (!isAbsolute(sidecar.originalPath)
     || dirname(sidecar.originalPath) === sidecar.originalPath
-    || !/^[A-Za-z0-9_-]+$/u.test(basename(sidecar.originalPath))) {
+    || !isSafeSessionDirName(basename(sidecar.originalPath))) {
     throw new ArchiveError('UNKNOWN_TRASH', '该条目 sidecar 的原始路径不合法，拒绝还原', 400)
   }
   const sessionId = SessionId(sidecar.sessionId)
@@ -651,7 +662,7 @@ async function restoreTrashDir(ctx: Context, surface: RegistryMutationSurface, t
     const childId = SessionId(child.sessionId)
     if (!isAbsolute(child.originalPath)
       || dirname(child.originalPath) === child.originalPath
-      || !/^[A-Za-z0-9_-]+$/u.test(basename(child.originalPath))) {
+      || !isSafeSessionDirName(basename(child.originalPath))) {
       throw new ArchiveError('UNKNOWN_TRASH', `subagent 会话 ${String(childId)} 的原始路径不合法，拒绝还原`, 400)
     }
     if (ctx.sessions.get(childId) !== undefined || ctx.agents.get(childId) !== undefined) {
@@ -987,7 +998,13 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               await rmdir(join(sessionDir, 'subagents')).catch(() => undefined)
               throw new ArchiveError('IO_ERROR', `写入回收站 sidecar 失败（已回滚）：${error instanceof Error ? error.message : String(error)}`, 500)
             }
-            await detachWorkspaceAccounting(ctx, sessionId)
+            // 工作区记账 detach 是 best-effort：会话目录已移走，官方 workspace 投影对缺失 header 的
+            // 候选自动过滤、下次工作区变更时 durable 修剪（rc.1 Workspace.sessionIds 契约），失败可自愈。
+            try {
+              await detachWorkspaceAccounting(ctx, sessionId)
+            } catch (cleanupError) {
+              ctx.logger.warn(`dsh-archive-manage: 工作区记账清理失败（${String(sessionId)}）：${String(cleanupError)}`)
+            }
             for (const child of subagents) {
               try {
                 await detachWorkspaceAccounting(ctx, child.sessionId)
@@ -1024,7 +1041,12 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               ctx.logger.warn(`dsh-archive-manage: 删除 subagent 会话目录失败（${String(child.sessionId)}），启动清扫会兜底：${error instanceof Error ? error.message : String(error)}`)
             }
           }
-          await detachWorkspaceAccounting(ctx, sessionId)
+          // 工作区记账 detach 是 best-effort（同移入回收站：官方过滤投影 + 下次变更修剪自愈）。
+          try {
+            await detachWorkspaceAccounting(ctx, sessionId)
+          } catch (cleanupError) {
+            ctx.logger.warn(`dsh-archive-manage: 工作区记账清理失败（${String(sessionId)}）：${String(cleanupError)}`)
+          }
           for (const child of subagents) {
             try {
               await detachWorkspaceAccounting(ctx, child.sessionId)

@@ -208,7 +208,7 @@ export function apply(ctx: ClientContext): void {
         subagents?: Array<{ sessionId: string; title: string }>
       }>('/api/archive-manage/trash'),
       trashDirPath: async () => {
-        const response = await fetch('/api/archive-manage/trash-dir')
+        const response = await fetch('/api/archive-manage/trash-dir', { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
         const payload = await response.json() as { path?: string; displayPath?: string; error?: { message?: string } }
         if (!response.ok) {
           throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
