@@ -33,6 +33,8 @@ export interface CodeBuddyUsage {
   tokens: TokenUsage
   credit?: number
   model: string
+  /** 会话 id（GenerateOptions.sessionId 透传；无会话的调用缺省）。 */
+  sessionId?: string
 }
 
 /** 图片字节读取回调（附件 seam）：返回媒体类型与原始字节，供 data URL 序列化。 */
@@ -481,7 +483,12 @@ export class CodeBuddyAdapter extends LlmAdapter {
                 chunks.push({ type: 'usage', usage: tokens })
                 usageSent = true
               }
-              this.config.onUsage?.({ tokens, ...(credit === undefined ? {} : { credit }), model: options.model })
+              this.config.onUsage?.({
+                tokens,
+                ...(credit === undefined ? {} : { credit }),
+                model: options.model,
+                ...(typeof options.sessionId === 'string' ? { sessionId: options.sessionId } : {}),
+              })
             }
             const finish = mapFinish(reason)
             if (finish === undefined) {
@@ -500,7 +507,12 @@ export class CodeBuddyAdapter extends LlmAdapter {
               chunks.push({ type: 'usage', usage: tokens })
               usageSent = true
             }
-            this.config.onUsage?.({ tokens, ...(credit === undefined ? {} : { credit }), model: options.model })
+            this.config.onUsage?.({
+              tokens,
+              ...(credit === undefined ? {} : { credit }),
+              model: options.model,
+              ...(typeof options.sessionId === 'string' ? { sessionId: options.sessionId } : {}),
+            })
           }
           for (const chunk of chunks.splice(0)) yield chunk
         }

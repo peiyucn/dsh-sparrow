@@ -12,10 +12,12 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const QUOTA_URL = '/api/codebuddy-credits/quota'
+const SESSION_USAGE_URL = '/api/codebuddy-credits/session-usage'
 
 /** 面板标题用的方形渐变图标（Combine 里取出的 Color 单块，独立渐变 id）。 */
 const SQUARE_LOGO_SVG = '<svg height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>CodeBuddy</title><defs><radialGradient cx="0" cy="0" gradientTransform="matrix(-9.00009 -16 16 -9.00009 21 24.5)" gradientUnits="userSpaceOnUse" id="ccb-logo-square-gradient" r="1"><stop stop-color="#2EA99D"></stop><stop offset="1" stop-color="#6C4DFF"></stop></radialGradient></defs><path d="M18.821 0H5.18A5.179 5.179 0 000 5.179V18.82A5.179 5.179 0 005.179 24H18.82A5.179 5.179 0 0024 18.821V5.18A5.179 5.179 0 0018.821 0z" fill="url(#ccb-logo-square-gradient)"></path><path d="M18.777 1.647c.28-.02.536.114.972.51 1.018.926 2.437 2.828 3.318 4.452l.34.631.482.24.11.06v3.638a5.206 5.206 0 00-5.32-1.23c-.491.166-1.021.471-2.08 1.082l-6.09 3.516c-1.057.61-1.586.916-1.975 1.259a5.208 5.208 0 00-1.493 5.572c.165.49.471 1.02 1.082 2.08l.315.543h-3.26c-.685 0-1.34-.135-1.939-.377-.169-.956-.009-1.789.469-2.335.158-.18.164-.189.13-.493a11.846 11.846 0 01-.057-1.711l.02-.444-.667-1.18C2.1 15.622 1.445 14.078 1.192 12.9c-.133-.647-.125-.934.04-1.146.1-.128.427-.261.822-.334.994-.175 3.162-.017 5.575.41l.25.043.551-.487c.915-.81 1.522-1.264 2.641-1.962 1.167-.73 2.484-1.331 3.967-1.807l.476-.152.261-.688c.937-2.471 1.896-4.293 2.58-4.9.235-.21.25-.22.422-.23z" fill="#fff"></path><path d="M12.139 18.2a1.203 1.203 0 011.642.44l1.296 2.243a1.204 1.204 0 01-2.083 1.203l-1.296-2.243a1.203 1.203 0 01.44-1.644zM18.629 14.452a1.203 1.203 0 011.642.44l1.295 2.244a1.203 1.203 0 11-2.083 1.203l-1.295-2.243a1.203 1.203 0 01.44-1.644z" fill="#fff"></path></svg>'
@@ -135,13 +137,11 @@ const dividerStyle: CSSProperties = {
 }
 
 /** 面板材质对齐官方 Menu 卡片（--dsw-specific-menu + elevation token）。
- * flex 列 + 统一 gap 6px：所有行间距一致，子元素不再各自设 margin。 */
+ * flex 列 + 统一 gap 6px：所有行间距一致，子元素不再各自设 margin。
+ * 定位在打开时计算（portal + fixed）：右缘对齐按钮、左缘钳制在会话区内，
+ * 避免面板伸进左侧边栏被压住。 */
 const panelStyle: CSSProperties = {
-  position: 'absolute',
-  top: 'calc(100% + 6px)',
-  right: 0,
-  minWidth: '280px',
-  maxWidth: '360px',
+  position: 'fixed',
   boxSizing: 'border-box',
   padding: '12px 14px',
   border: '0',
@@ -157,6 +157,11 @@ const panelStyle: CSSProperties = {
   flexDirection: 'column',
   gap: '6px',
 } as CSSProperties
+
+/** 面板最大宽度：会话区足够宽时的上限。 */
+const PANEL_MAX_WIDTH = 360
+/** 面板与会话区左缘的最小间距。 */
+const PANEL_EDGE_GAP = 8
 
 /** 模块级状态缓存：槽位重挂载（切会话/视图）时以它初始化，避免「空 → 出现」闪烁。 */
 let cachedStatus: StatusPayload | undefined
@@ -174,6 +179,11 @@ export function CodeBuddyCreditsIndicator({
   // 展开面板时才拉 /quota。
   const [quota, setQuota] = useState<QuotaView | undefined>(undefined)
   const [quotaError, setQuotaError] = useState<string | undefined>(undefined)
+  // 本会话累计积分（进程内 usage 记账，展开面板时查询）。
+  const [sessionUsage, setSessionUsage] = useState<{ credit: number; calls: number } | undefined>(undefined)
+  const [usageError, setUsageError] = useState<string | undefined>(undefined)
+  // 面板定位（打开时计算，滚动/缩放跟随重定位）：右缘对齐按钮、左缘钳制在会话区。
+  const [point, setPoint] = useState<{ top: number; right: number; width: number } | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const requestSeq = useRef(0)
 
@@ -235,6 +245,38 @@ export function CodeBuddyCreditsIndicator({
     }
   }, [t])
 
+  /** 展开面板时拉取本会话累计积分（按 sessionId 记账）。 */
+  const loadSessionUsage = useCallback(async () => {
+    const seq = ++requestSeq.current
+    setUsageError(undefined)
+    try {
+      const response = await fetch(`${SESSION_USAGE_URL}?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' })
+      if (seq !== requestSeq.current) return
+      if (!response.ok) {
+        setUsageError(t('indicator.loadFailed'))
+        return
+      }
+      setSessionUsage(await response.json() as { credit: number; calls: number })
+    } catch {
+      if (seq !== requestSeq.current) return
+      setUsageError(t('indicator.loadFailed'))
+    }
+  }, [sessionId, t])
+
+  /** 计算面板位置：右缘对齐按钮、左缘钳制在会话区（[data-conversation-scroll]）。
+   *  空间不足时允许收缩（面板内容可换行），绝不越过会话区左缘。 */
+  const position = useCallback(() => {
+    const rect = rootRef.current?.getBoundingClientRect()
+    if (rect === undefined) return
+    const conversationLeft = document.querySelector('[data-conversation-scroll]')?.getBoundingClientRect().left ?? 0
+    const width = Math.min(PANEL_MAX_WIDTH, Math.max(0, rect.right - conversationLeft - PANEL_EDGE_GAP))
+    setPoint({
+      top: rect.bottom + 6,
+      right: window.innerWidth - rect.right,
+      width,
+    })
+  }, [])
+
   // 挂载即读取状态：未配置 Key 时不显示图标（无配置时对话页不该有标）。
   // 配置卡保存/清空 Key 会广播窗口事件，此处联动刷新（无需刷新页面）；
   // 窗口重新获得焦点时也刷一次（兜底外部变更）。
@@ -252,21 +294,30 @@ export function CodeBuddyCreditsIndicator({
 
   useEffect(() => {
     if (!open) return
+    position()
     void loadStatus()
     void loadQuota()
+    void loadSessionUsage()
     const onMouseDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+      // portal 面板不在 rootRef 内：按面板类名豁免，其余点击关闭。
+      const target = event.target
+      if (target instanceof Element && target.closest('.ccb-indicator-panel') !== null) return
+      if (!rootRef.current?.contains(target as Node)) setOpen(false)
     }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false)
     }
     document.addEventListener('mousedown', onMouseDown)
     document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('scroll', position, true)
+    window.addEventListener('resize', position)
     return () => {
       document.removeEventListener('mousedown', onMouseDown)
       document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('scroll', position, true)
+      window.removeEventListener('resize', position)
     }
-  }, [open, loadStatus, loadQuota])
+  }, [open, position, loadStatus, loadQuota, loadSessionUsage])
 
   const selected = selection?.provider === 'codebuddy-credits' ? selection : undefined
   const model = selected === undefined
@@ -320,9 +371,14 @@ export function CodeBuddyCreditsIndicator({
           dangerouslySetInnerHTML={{ __html: LOGO_SVG }}
         />
       </button>
-      {open
-        ? (
-          <div role="dialog" aria-label={t('indicator.title')} style={panelStyle}>
+      {open && point !== null
+        ? createPortal(
+          <div
+            className="ccb-indicator-panel"
+            role="dialog"
+            aria-label={t('indicator.title')}
+            style={{ ...panelStyle, top: point.top, right: point.right, width: point.width }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, lineHeight: '18px', marginBottom: '6px' }}>
               <span style={{ display: 'inline-flex', flex: '0 0 auto', fontSize: 16, lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: SQUARE_LOGO_SVG }} />
               {/* 标题不换行：放不下时省略号截断，把空间让给徽章。 */}
@@ -434,6 +490,19 @@ export function CodeBuddyCreditsIndicator({
                   {quotaError !== undefined
                     ? <div style={dangerStyle}>{quotaError}</div>
                     : null}
+                  {sessionUsage !== undefined
+                    ? (
+                      <div style={captionStyle}>
+                        {t('indicator.sessionUsage', {
+                          credit: formatCredits(sessionUsage.credit),
+                          calls: String(sessionUsage.calls),
+                        })}
+                      </div>
+                    )
+                    : null}
+                  {usageError !== undefined
+                    ? <div style={dangerStyle}>{usageError}</div>
+                    : null}
                 </>
               )
               : null}
@@ -459,7 +528,8 @@ export function CodeBuddyCreditsIndicator({
                 </>
               )
               : null}
-          </div>
+          </div>,
+          document.body,
         )
         : null}
     </div>

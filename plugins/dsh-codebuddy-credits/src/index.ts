@@ -366,6 +366,17 @@ export function apply(ctx: Context, config: Config): void {
     async quota() {
       return fetchQuota(await resolveApiKey(), account)
     },
+    /** 会话累计积分：usage 回调按 sessionId 记账（进程内，重启清零）。 */
+    sessionUsage(sessionId) {
+      let credit = 0
+      let calls = 0
+      for (const usage of usageLog) {
+        if (usage.sessionId !== sessionId) continue
+        calls += 1
+        if (usage.credit !== undefined) credit += usage.credit
+      }
+      return { credit, calls }
+    },
     account: () => ({
       ...(account?.enterpriseName === undefined ? {} : { enterpriseName: account.enterpriseName }),
       ...(account?.accountType === undefined ? {} : { accountType: account.accountType }),

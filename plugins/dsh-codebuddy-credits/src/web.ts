@@ -52,6 +52,8 @@ export interface CodeBuddyCreditsShared {
   removeKey(): Promise<void>
   /** 查询企业周期配额。 */
   quota(): Promise<QuotaStatus>
+  /** 会话累计积分与调用次数（进程内 usage 记账）。 */
+  sessionUsage(sessionId: string): { credit: number; calls: number }
   /** route 是否注册（状态接口诊断用）。 */
   active(): boolean
   /** 账号快照（来自 /v2/accounts）。 */
@@ -143,6 +145,15 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
               return
             }
             sendJson(res, 200, await shared.quota())
+            return
+          }
+          if (req.method === 'GET' && pathname === PREFIX + '/session-usage') {
+            const sessionId = new URL(req.url ?? '/', 'http://localhost').searchParams.get('sessionId')
+            if (sessionId === null || sessionId === '') {
+              sendJson(res, 400, { error: '缺少 sessionId' })
+              return
+            }
+            sendJson(res, 200, shared.sessionUsage(sessionId))
             return
           }
           if (req.method === 'POST' && pathname === PREFIX + '/key') {
