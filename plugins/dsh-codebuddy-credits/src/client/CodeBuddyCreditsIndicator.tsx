@@ -627,7 +627,9 @@ export function ensureIndicatorStyles(): void {
     '.ccb-sidebar-anchor {',
     '  position: relative; height: 0; width: 100%; align-self: flex-end;',
     '}',
+    // 官方 Settings trigger 是 flex:1 撑满行：先关掉 flex 伸展，宽度才生效。
     'body:has(.ccb-sidebar-anchor) [data-slot="sidebar.settings"] button {',
+    '  flex: none;',
     '  width: calc(100% - 96px);',
     '}',
     '.ccb-sidebar-trigger {',
