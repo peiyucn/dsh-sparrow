@@ -17,7 +17,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
-import { CODEBUDDY_ICON } from './CodeBuddyTurnCredit.js'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const QUOTA_URL = '/api/codebuddy-credits/quota'
@@ -434,7 +433,8 @@ export function CodeBuddyCreditsIndicator({
               onClick={() => setOpen(value => !value)}
               className="ccb-sidebar-trigger ccb-sidebar-trigger-wide"
             >
-              <span style={{ display: 'inline-flex', fontSize: 16, lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: CODEBUDDY_ICON }} />
+              {/* 宽栏用品牌长条 logo（header 版同款视觉）；黑白小标留给每轮积分胶囊。 */}
+              <span style={{ display: 'inline-flex', fontSize: 18, lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: LOGO_SVG }} />
             </button>
           </span>
         )
@@ -448,7 +448,8 @@ export function CodeBuddyCreditsIndicator({
             onClick={() => setOpen(value => !value)}
             className="ccb-sidebar-trigger ccb-sidebar-trigger-rail"
           >
-            <span style={{ display: 'inline-flex', fontSize: 16, lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: CODEBUDDY_ICON }} />
+            {/* rail 放不下长条：用同源品牌的渐变方块。 */}
+            <span style={{ display: 'inline-flex', fontSize: 16, lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: SQUARE_LOGO_SVG }} />
           </button>
         )
     )
@@ -683,9 +684,10 @@ export function ensureIndicatorStyles(): void {
     '.ccb-indicator-button:focus-visible {',
     '  outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);',
     '}',
-    // 侧栏 footer 触发键：宽栏 = 零占位锚点 + 绝对定位紧凑图标，落在 Settings
-    // 行右侧（官方 Settings 单槽不可加项，CSS 方案共用该行、只占自有点击区）；
-    // rail = 常规圆形图标行（对齐 archive/file-manage 同款触发键配方）。
+    // 侧栏 footer 触发键：宽栏 = 零占位锚点 + 绝对定位品牌 logo 按钮，落在
+    // Settings 行右侧（官方 Settings 单槽不可加项，CSS 方案共用该行、只占
+    // 自有点击区）；rail = 常规圆形图标行（对齐 archive/file-manage 同款
+    // 触发键配方）。
     '.ccb-sidebar-anchor {',
     '  position: relative; height: 0; width: 100%; align-self: flex-end;',
     '}',
@@ -698,9 +700,12 @@ export function ensureIndicatorStyles(): void {
     '  background: var(--dsw-alias-interactive-bg-hover);',
     '  color: var(--dsw-alias-label-primary);',
     '}',
+    // 宽栏按钮背景 = 侧栏底色（不透明）：压在 Settings 按钮上，遮挡其 hover
+    // 亮色在本图标区域透出——Settings 与额度的 hover 互不干扰。
     '.ccb-sidebar-trigger-wide {',
     '  position: absolute; right: 0; top: 4px; z-index: 1;',
-    '  width: 36px; height: 42px; border-radius: 12px;',
+    '  height: 42px; padding: 0 10px; border-radius: 12px;',
+    '  background: var(--dsw-specific-sidebar-fill);',
     '}',
     '.ccb-sidebar-trigger-rail {',
     '  width: 36px; height: 36px; margin: 8px 0 10px; border-radius: 50%;',
