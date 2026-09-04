@@ -299,10 +299,7 @@ export function apply(ctx: ClientContext): void {
       diag.injectError = error instanceof Error ? error.message : String(error)
     }
   }
+  // 单一确定性路径：声明式注入等两个服务就绪后注册。根因修复后不再需要
+  // 定时重试（服务解析从根上下文走，注入回调必然触发）。
   ctx.inject(['modelDirectories', 'sessions'], registerPicker)
-  const retryDelays = [1_000, 3_000, 8_000]
-  for (let i = 0; i < retryDelays.length; i++) {
-    const timer = setTimeout(() => { registerPicker(ctx) }, retryDelays[i])
-    ctx.effect(() => () => { clearTimeout(timer) }, 'llm-codebuddy-credits: picker retry ' + String(i))
-  }
 }
