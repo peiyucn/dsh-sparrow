@@ -154,6 +154,40 @@ describe('CodeBuddyAdapter.stream', () => {
     const finish = chunks.find(c => c.type === 'finish')
     assert.deepEqual(finish.reason, { kind: 'tool-calls' })
   })
+
+  it('usage 帧先于终帧单独到达、终帧重复携带 usage 时，usage 块与记账回调都只发一次', async () => {
+    const frames = [
+      { choices: [{ delta: { content: 'ok' } }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, credit: 0.01 } },
+      { choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, credit: 0.01 } },
+    ]
+    const sse = frames.map(frame => 'data: ' + JSON.stringify(frame) + '\n\n').join('') + 'data: [DONE]\n\n'
+    const usages = []
+    globalThis.fetch = async () => new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    const adapter = new CodeBuddyAdapter({
+      models: () => [],
+      resolveApiKey: async () => 'test-key',
+      account: () => undefined,
+      streamIdleTimeoutMs: 10_000,
+      onUsage: usage => { usages.push(usage) },
+    })
+    const chunks = []
+    try {
+      for await (const chunk of adapter.stream({
+        provider: 'codebuddy-credits',
+        model: 'hy4-preview',
+        messages: [],
+        sessionId: 's1',
+      })) {
+        chunks.push(chunk)
+      }
+    } finally {
+      globalThis.fetch = undefined
+    }
+    assert.equal(usages.length, 1)
+    assert.equal(usages[0].credit, 0.01)
+    assert.equal(usages[0].sessionId, 's1')
+    assert.equal(chunks.filter(c => c.type === 'usage').length, 1)
+  })
 })
 
 describe('parseSseLine / mapFinish / mapUsage', () => {

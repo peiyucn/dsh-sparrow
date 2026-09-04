@@ -387,6 +387,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
     const toolNameByIndex = new Map<number, string>()
     const toolArgsByIndex = new Map<number, string>()
     let usageSent = false
+    let usageReported = false
     let finishSent = false
 
     const openBlock = (index: number, blockType: 'reasoning' | 'text' | 'tool-call'): void => {
@@ -485,13 +486,18 @@ export class CodeBuddyAdapter extends LlmAdapter {
                 chunks.push({ type: 'usage', usage: tokens })
                 usageSent = true
               }
-              this.config.onUsage?.({
-                tokens,
-                ...(credit === undefined ? {} : { credit }),
-                model: options.model,
-                ...(typeof options.sessionId === 'string' ? { sessionId: options.sessionId } : {}),
-                ...(options.signal === undefined ? {} : { signal: options.signal }),
-              })
+              // usage 帧可能先于终帧单独到达（终帧又带一份 usage）：
+              // 记账回调只发一次，避免同一调用重复计入积分。
+              if (!usageReported) {
+                usageReported = true
+                this.config.onUsage?.({
+                  tokens,
+                  ...(credit === undefined ? {} : { credit }),
+                  model: options.model,
+                  ...(typeof options.sessionId === 'string' ? { sessionId: options.sessionId } : {}),
+                  ...(options.signal === undefined ? {} : { signal: options.signal }),
+                })
+              }
             }
             const finish = mapFinish(reason)
             if (finish === undefined) {
@@ -510,13 +516,16 @@ export class CodeBuddyAdapter extends LlmAdapter {
               chunks.push({ type: 'usage', usage: tokens })
               usageSent = true
             }
-            this.config.onUsage?.({
-              tokens,
-              ...(credit === undefined ? {} : { credit }),
-              model: options.model,
-              ...(typeof options.sessionId === 'string' ? { sessionId: options.sessionId } : {}),
-              ...(options.signal === undefined ? {} : { signal: options.signal }),
-            })
+            if (!usageReported) {
+              usageReported = true
+              this.config.onUsage?.({
+                tokens,
+                ...(credit === undefined ? {} : { credit }),
+                model: options.model,
+                ...(typeof options.sessionId === 'string' ? { sessionId: options.sessionId } : {}),
+                ...(options.signal === undefined ? {} : { signal: options.signal }),
+              })
+            }
           }
           for (const chunk of chunks.splice(0)) yield chunk
         }
