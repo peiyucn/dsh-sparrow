@@ -26,6 +26,30 @@ export type { ChatFimConfig, ChatFimError }
 const ROUTE_PATH = '/api/chat-fim/complete'
 /** 候选全被复读/回声护栏过滤时的重试温度：0.5——比 0.3 更易跳出复读循环，比 0.7 噪声小（0.7 实测相关性弱）。 */
 const ECHO_RETRY_TEMPERATURE = 0.5
+/** 并行请求温度错开步长（suggestionCount > 1 时生效，步长 0.4 实测多样性足够）。 */
+const TEMPERATURE_SPREAD_STEP = 0.4
+/** 采样温度上限（DeepSeek API 允许范围 0-2）。 */
+const MAX_TEMPERATURE = 2
+
+/**
+ * 与官方 connection 信任栅栏同口径的浏览器标记检查（packages/client/connection/src/api-request-trust.ts）：
+ * webServer 的 exact 路由不走官方 /api 前缀栅栏（前缀匹配被精确路由抢先），而本路由的 POST
+ * 会以服务端 API key 执行计费上游请求——跨站页面可盲发 no-cors 请求。口径：带 Origin 必须与
+ * Host 同源；sec-fetch-site 跨站直接拒绝；origin "null"（沙箱 iframe）与非法值拒绝；
+ * 非浏览器客户端（curl 等，无浏览器标记）放行。
+ */
+export function isTrustedBrowserRequest(headers: { host?: string; origin?: string; 'sec-fetch-site'?: string }): boolean {
+  const host = headers.host
+  if (host === undefined || host === '') return false
+  if (headers['sec-fetch-site'] === 'cross-site') return false
+  const origin = headers.origin
+  if (origin === undefined) return true
+  try {
+    return new URL(origin).host === host
+  } catch {
+    return false
+  }
+}
 
 type DiagnosticKey = 'requests' | 'fulfilled' | 'retries' | 'shown' | 'empty' | 'filteredSpeaker' | 'filteredRepeat' | 'filteredEcho' | 'filteredLanguage'
 
@@ -202,6 +226,12 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
         return
       }
 
+      // POST 会执行计费上游请求：按官方 /api 栅栏同口径拒绝跨站浏览器请求（GET 只读，不设防）。
+      if (!isTrustedBrowserRequest(req.headers)) {
+        sendError(res, 403, { code: 'FORBIDDEN', message: '拒绝跨站请求' })
+        return
+      }
+
       const read = await readRequestBody(req, settings.maxBodyBytes)
       if (!read.ok) {
         sendError(res, 400, read.error)
@@ -353,7 +383,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
         // 前缀续写接口没有 n 参数：多建议用并行请求 + 温度错开采样；部分失败保留成功建议。
         absorb(await Promise.allSettled(
           Array.from({ length: settings.suggestionCount }, (_, index) => requestOnce(
-            settings.suggestionCount > 1 ? Math.min(2, settings.temperature + index * 0.4) : settings.temperature,
+            settings.suggestionCount > 1 ? Math.min(MAX_TEMPERATURE, settings.temperature + index * TEMPERATURE_SPREAD_STEP) : settings.temperature,
           )),
         ))
 

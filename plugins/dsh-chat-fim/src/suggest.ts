@@ -23,6 +23,7 @@ export type ChatFimErrorCode =
   | 'UNKNOWN_SESSION'
   | 'MISSING_CREDENTIAL'
   | 'MODEL_UNSUPPORTED'
+  | 'FORBIDDEN'
   | 'UPSTREAM_ERROR'
   | 'TIMEOUT'
   | 'RATE_LIMITED'

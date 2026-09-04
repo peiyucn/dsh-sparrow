@@ -14,8 +14,12 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { ChatFimDock, ChatFimMenu, ChatFimSwitch, ensureSuggestBusyStyles, type FimDirectoryStore } from './ChatFimDock.js'
+import { parseJsonOrNull } from './parse.js'
 
 export const inject = ['slots', 'sessions', 'locale']
+
+/** 支持性查询超时（毫秒）：离线/挂死时按「支持」兜底显示（fail-open），不留悬挂 Promise。 */
+const SUPPORT_CHECK_TIMEOUT_MS = 5_000
 
 export interface ChatFimResponse {
   readonly suggestions?: readonly string[]
@@ -105,9 +109,13 @@ export function apply(ctx: ClientContext): void {
         }
       },
       isSupported: async (id: SessionId): Promise<boolean> => {
-        const response = await fetch(`/api/chat-fim/complete?sessionId=${encodeURIComponent(String(id))}`)
+        const response = await fetch(`/api/chat-fim/complete?sessionId=${encodeURIComponent(String(id))}`, {
+          signal: AbortSignal.timeout(SUPPORT_CHECK_TIMEOUT_MS),
+        })
         if (!response.ok) return true
-        const payload = await response.json() as { supported?: boolean }
+        // 响应不是 JSON（反向代理错误页等）按支持显示（fail-open），与查询失败同口径。
+        const payload = parseJsonOrNull(await response.text()) as { supported?: boolean } | null
+        if (payload === null) return true
         return payload.supported !== false
       },
       requestComplete: async (id: SessionId, prompt: string, signal: AbortSignal) => {
@@ -120,7 +128,10 @@ export function apply(ctx: ClientContext): void {
           body: JSON.stringify({ sessionId: id, prompt, suggestModelMode: 'auto' }),
           signal,
         })
-        const payload = await response.json() as ChatFimResponse
+        const payload = parseJsonOrNull(await response.text()) as ChatFimResponse | null
+        if (payload === null) {
+          throw new Error(`续写响应不是合法 JSON（HTTP ${response.status}）`)
+        }
         if (!response.ok) {
           throw new Error(payload.error?.message ?? `续写请求失败（HTTP ${response.status}）`)
         }
