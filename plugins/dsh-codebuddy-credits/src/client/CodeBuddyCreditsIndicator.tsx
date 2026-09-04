@@ -699,7 +699,7 @@ export function ensureIndicatorStyles(): void {
     '  color: var(--dsw-alias-label-primary);',
     '}',
     '.ccb-sidebar-trigger-wide {',
-    '  position: absolute; right: 0; top: 0; z-index: 1;',
+    '  position: absolute; right: 0; top: 4px; z-index: 1;',
     '  width: 36px; height: 42px; border-radius: 12px;',
     '}',
     '.ccb-sidebar-trigger-rail {',
