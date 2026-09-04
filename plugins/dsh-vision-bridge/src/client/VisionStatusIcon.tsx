@@ -139,16 +139,14 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, t }
 
   // 模型变化 / 会话切换时查能力：缓存命中立即上色；未命中先隐藏（不显示占位色），
   // 返回后以正确模式出现。查询失败隐藏（保守，不影响主流程）。
-  // 座位目录尚未解析（会话历史未装载）时 current 为 null：改查共享默认模型
-  // （host 兜底同源）——图标首帧即在位，历史装载后 current 就位自动纠正为会话真实模型。
+  // current 为 null = 座位尚未解析出模型（新会话页未选、或历史未装载）——
+  // 与 credits 信息卡一致：不显示，绝不用默认模型顶替。
   useEffect(() => {
     setStatus(null)
     setOpen(false)
+    if (current === null) return
     let alive = true
-    const request = current === null
-      ? queryCapability('', '')
-      : queryCapability(current.provider, current.model)
-    void request.then((next) => {
+    void queryCapability(current.provider, current.model).then((next) => {
       if (alive) setStatus(next)
     }).catch(() => {
       // 状态查询失败：隐藏图标。

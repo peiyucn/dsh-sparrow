@@ -35,8 +35,7 @@ const LOCALE_DICTS = {
 const capabilityCache = new Map<string, VisionStatusResult>()
 const capabilityInflight = new Map<string, Promise<VisionStatusResult>>()
 
-/** host 能力查询：按 provider/model 取模式 + 视觉模型 id；provider 为空时查共享默认模型
- *  （会话历史未装载、座位目录尚未解析的窗口）；失败抛错（调用方隐藏图标）。 */
+/** host 能力查询：按 provider/model 取模式 + 视觉模型 id；失败抛错（调用方隐藏图标）。 */
 function queryCapability(provider: string, model: string): Promise<VisionStatusResult> {
   const key = `${provider}:${model}`
   const hit = capabilityCache.get(key)
@@ -44,10 +43,7 @@ function queryCapability(provider: string, model: string): Promise<VisionStatusR
   const inflight = capabilityInflight.get(key)
   if (inflight !== undefined) return inflight
   const task = (async (): Promise<VisionStatusResult> => {
-    const url = provider === '' || model === ''
-      ? '/api/vision-bridge/capability'
-      : `/api/vision-bridge/capability?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}`
-    const response = await fetch(url)
+    const response = await fetch(`/api/vision-bridge/capability?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}`)
     if (!response.ok) throw new Error(`vision-bridge capability request failed (HTTP ${response.status})`)
     const payload = await response.json() as { mode?: unknown; visionModel?: unknown }
     if (payload.mode !== 'native-vision' && payload.mode !== 'cross-model' && payload.mode !== 'no-vision') {

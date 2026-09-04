@@ -30,9 +30,7 @@ function buildHarness({ resolveModelInfo, defaultModel } = {}) {
     },
     on: () => {},
     get: (key) => (key === 'agentDefaultModel'
-      ? (defaultModel === null
-        ? undefined
-        : { currentSelection: () => defaultModel ?? { provider: 'deepseek-official', model: 'deepseek-v4-pro' } })
+      ? { currentSelection: () => defaultModel ?? { provider: 'deepseek-official', model: 'deepseek-v4-pro' } }
       : undefined),
   }
   apply(ctx, {})
@@ -79,23 +77,9 @@ describe('dsh-vision-bridge 能力路由链路', () => {
     assert.equal(result.body.mode, 'no-vision')
   })
 
-  it('参数不完整（只给 provider） 应该 回退默认模型', async () => {
-    const { handler } = buildHarness({ defaultModel: { provider: 'deepseek-official', model: 'default-window-model' } })
+  it('缺少 provider/model 应该 400', async () => {
+    const { handler } = buildHarness()
     const result = await request(handler, '/api/vision-bridge/capability?provider=deepseek-official')
-    assert.equal(result.statusCode, 200)
-    assert.equal(result.body.mode, 'cross-model')
-  })
-
-  it('无 provider/model 应该 按共享默认模型回答（历史未装载窗口）', async () => {
-    const { handler } = buildHarness({ defaultModel: { provider: 'deepseek-official', model: 'default-window-model' } })
-    const result = await request(handler, '/api/vision-bridge/capability')
-    assert.equal(result.statusCode, 200)
-    assert.equal(result.body.mode, 'cross-model')
-  })
-
-  it('无 provider/model 且无默认模型服务 应该 400', async () => {
-    const { handler } = buildHarness({ defaultModel: null })
-    const result = await request(handler, '/api/vision-bridge/capability')
     assert.equal(result.statusCode, 400)
   })
 
