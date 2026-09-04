@@ -46,15 +46,38 @@ Open **Settings → Models** and paste your key on the **CodeBuddy Credits** row
 
 - Saving the key queries the CodeBuddy model catalog with that key (models
   follow the key's account permissions — e.g. the set your enterprise admin
-  granted), writes the result to settings, and activates the provider;
-- the models then appear in the model picker;
-- without a key the plugin makes no network requests at all and the provider
-  does not appear in the model picker;
-- removing the key deactivates the provider.
+  granted) and activates the provider. The catalog is held in memory and
+  refreshed on demand; it is never written to settings.
+- The models then appear in the model picker. The picker is a
+  CodeBuddy-aware variant of the official one: each model row shows its credit
+  rate (`x0.79`, `free`) on the right, and reasoning-effort choices follow
+  what the server declares per model.
+- Without a key the plugin makes no network requests at all and the provider
+  does not appear in the model picker.
+- Removing the key deactivates the provider.
 
-The `CODEBUDDY_API_KEY` environment variable still works (read at startup),
-but saving in the UI is the recommended path; the key lives only in the DSH
-credential vault, never in settings.yaml.
+The key lives only in the DSH credential vault, never in settings.yaml. The
+`CODEBUDDY_CREDITS_API_KEY` environment variable is also read at startup; the
+earlier `CODEBUDDY_API_KEY` spelling still resolves and is migrated
+automatically. Saving in the UI is the recommended path.
+
+## Credit visibility
+
+Once a key is configured, the plugin surfaces your CodeBuddy usage in the
+conversation UI:
+
+- **Sidebar entry** (bottom of the left rail, beside Settings when the
+  sidebar is wide): opens a panel with your account/enterprise, current-cycle
+  quota (used / limit / remaining, progress bar, reset date) and the selected
+  CodeBuddy model's description, capabilities, and spend rate.
+- **Session stats**: accumulated credits and call count for the current
+  conversation, appended to the official stats line under the composer.
+- **Per-turn credit pill**: credits spent for one assistant turn (at the end
+  of its action row), with a popup breaking the total down per call and per
+  model.
+
+Session and per-turn figures are accumulated in memory and reset when DSH
+restarts; the quota panel always reads the authoritative server-side number.
 
 ## Honest limitations
 
