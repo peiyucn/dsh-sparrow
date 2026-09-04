@@ -23,6 +23,7 @@ import type {
   ToolResultMessage,
   ToolSchema,
 } from '@deepseek-ai/dsh-llm'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { BASE_URL, effortName, requestHeaders } from './catalog.js'
 import { DISPLAY_NAME } from './constants.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
@@ -33,6 +34,12 @@ export interface CodeBuddyUsage {
   credit?: number
   model: string
 }
+
+/** 图片字节读取回调（附件 seam）：返回媒体类型与原始字节，供 data URL 序列化。 */
+export type CodeBuddyReadImage = (
+  ref: ImageAttachmentRef,
+  signal?: AbortSignal,
+) => Promise<{ mediaType: string; data: Uint8Array }>
 
 export interface CodeBuddyAdapterOptions {
   /** 当前生效的模型事实（设置节驱动，每次调用现读）。 */
@@ -50,6 +57,8 @@ export interface CodeBuddyAdapterOptions {
    * 插件侧在此做节流后台刷新；目录读取本身同步返回当前事实。
    */
   onCatalogRead?: () => void
+  /** 图片字节读取（官方附件 seam）；未配置时带图请求以明确错误失败。 */
+  readImage?: CodeBuddyReadImage
 }
 
 interface WireToolCall {
@@ -80,8 +89,19 @@ function textOf(blocks: readonly ContentBlock[]): string {
   return text
 }
 
-/** DSH Message → CodeBuddy 线格式（OpenAI 方言）。reasoning 块不进历史。 */
-export function toWireMessages(options: GenerateOptions): WireMessage[] {
+/** 图片附件 → OpenAI 方言 image_url data URL（附件字节经官方 seam 读取；
+ *  媒体类型以读取回调返回为准——请求版本可能被重编码为 JPEG）。 */
+async function imageDataUrl(ref: ImageAttachmentRef, readImage: CodeBuddyReadImage, signal?: AbortSignal): Promise<string> {
+  const stored = await readImage(ref, signal)
+  return `data:${stored.mediaType};base64,${Buffer.from(stored.data).toString('base64')}`
+}
+
+/** DSH Message → CodeBuddy 线格式（OpenAI 方言）。reasoning 块不进历史；
+ *  图片块经附件 seam 序列化为 image_url data URL。 */
+export async function toWireMessages(
+  options: GenerateOptions,
+  readImage?: CodeBuddyReadImage,
+): Promise<WireMessage[]> {
   const messages: WireMessage[] = []
   if (options.system !== undefined && options.system.length > 0) {
     messages.push({ role: 'system', content: options.system })
@@ -101,13 +121,25 @@ export function toWireMessages(options: GenerateOptions): WireMessage[] {
       continue
     }
     if (message.role === 'user') {
-      // 文本优先；图片块目前原样透传 DSH 附件引用（CodeBuddy 侧图片载荷
-      // 序列化尚未实现——视觉模型请求里带图会被服务端拒绝，属已知缺口）。
+      // 文本优先；图片块经附件 seam 读字节，转 OpenAI 方言 image_url data URL。
       const parts: unknown[] = []
       let text = ''
       for (const block of message.content) {
-        if (block.type === 'text') text += block.text
-        else if (block.type === 'image') parts.push({ type: 'image', attachment: block.attachment })
+        if (block.type === 'text') {
+          text += block.text
+        } else if (block.type === 'image') {
+          if (readImage === undefined) {
+            throw new LlmError('CodeBuddy 适配器未接入附件服务，无法发送图片', 'UNSUPPORTED_CONTENT')
+          }
+          let url: string
+          try {
+            url = await imageDataUrl(block.attachment, readImage, options.signal)
+          } catch (error) {
+            if (options.signal?.aborted) throw error
+            throw new LlmError('CodeBuddy 图片读取失败', 'TRANSPORT', { cause: error })
+          }
+          parts.push({ type: 'image_url', image_url: { url } })
+        }
       }
       if (parts.length === 0) {
         messages.push({ role: 'user', content: text })
@@ -311,7 +343,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
     const account = this.config.account()
     const body: Record<string, unknown> = {
       model: options.model,
-      messages: toWireMessages(options),
+      messages: await toWireMessages(options, this.config.readImage),
       stream: true,
     }
     if (options.tools !== undefined && options.tools.length > 0) body.tools = toWireTools(options.tools)

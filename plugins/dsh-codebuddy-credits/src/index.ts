@@ -14,6 +14,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
+import type {} from '@deepseek-ai/dsh-attachment'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm'
@@ -27,6 +28,7 @@ import {
   ACCOUNT_FETCH_TIMEOUT_MS,
   API_KEY_ENV,
   DISPLAY_NAME,
+  IMAGE_REQUEST_POLICY,
   LEGACY_API_KEY_ENV,
   MODEL_REFRESH_COOLDOWN_MS,
   NS,
@@ -37,7 +39,7 @@ import { fetchQuota } from './quota.js'
 import { installCodeBuddyWeb } from './web.js'
 
 export const name = 'llm-codebuddy-credits'
-export const inject = ['llm']
+export const inject = ['llm', 'attachments']
 
 export { Config } from './config.js'
 
@@ -163,6 +165,18 @@ export function apply(ctx: Context, config: Config): void {
     },
     onCatalogRead: () => {
       kickModelRefresh()
+    },
+    // 图片字节只经官方附件 seam：按官方 CLI 压缩档派生请求版本（最长边
+    // 2000px + 字节目标，JPEG 质量阶梯由附件服务实现），后端不支持投影时
+    // 退回规范化存储字节（协议仍成立，只是跳过缩放）。
+    readImage: async (ref, signal) => {
+      try {
+        const request = await ctx.attachments.readImageRequest(ref, IMAGE_REQUEST_POLICY, signal)
+        return { mediaType: request.mediaType, data: request.data }
+      } catch {
+        const stored = await ctx.attachments.readImage(ref, signal)
+        return { mediaType: ref.mediaType, data: stored.data }
+      }
     },
   })
 

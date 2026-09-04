@@ -265,8 +265,8 @@ describe('parseSseLine', () => {
 })
 
 describe('toWireMessages', () => {
-  it('system/user/assistant 基础转换', () => {
-    const messages = toWireMessages({
+  it('system/user/assistant 基础转换', async () => {
+    const messages = await toWireMessages({
       provider: 'codebuddy-credits',
       model: 'hy3',
       system: '你是助手',
@@ -280,8 +280,8 @@ describe('toWireMessages', () => {
     assert.deepEqual(messages[1], { role: 'user', content: '你好' })
     assert.deepEqual(messages[2], { role: 'assistant', content: '你好！', tool_calls: undefined })
   })
-  it('assistant 的 tool-call 块转 wire tool_calls，reasoning 块不进历史', () => {
-    const messages = toWireMessages({
+  it('assistant 的 tool-call 块转 wire tool_calls，reasoning 块不进历史', async () => {
+    const messages = await toWireMessages({
       provider: 'codebuddy-credits',
       model: 'hy3',
       messages: [
@@ -303,8 +303,8 @@ describe('toWireMessages', () => {
       tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'Bash', arguments: '{"cmd":"ls"}' } }],
     })
   })
-  it('tool-result 消息转 role=tool', () => {
-    const messages = toWireMessages({
+  it('tool-result 消息转 role=tool', async () => {
+    const messages = await toWireMessages({
       provider: 'codebuddy-credits',
       model: 'hy3',
       messages: [

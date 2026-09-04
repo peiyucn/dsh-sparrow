@@ -25,8 +25,8 @@ describe('toWireTools', () => {
 })
 
 describe('toWireMessages', () => {
-  it('assistant 工具调用回放保留 name 与 arguments', () => {
-    const wire = toWireMessages({
+  it('assistant 工具调用回放保留 name 与 arguments', async () => {
+    const wire = await toWireMessages({
       provider: 'codebuddy-credits',
       model: 'hy4-preview',
       messages: [{
@@ -41,6 +41,49 @@ describe('toWireMessages', () => {
       content: '',
       tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'read_file', arguments: '{"path":"a.txt"}' } }],
     }])
+  })
+
+  it('用户图片块经附件 seam 序列化为 image_url data URL', async () => {
+    const ref = { attachmentId: 'sha256:abc', mediaType: 'image/png', bytes: 4, width: 2, height: 2 }
+    const wire = await toWireMessages({
+      provider: 'codebuddy-credits',
+      model: 'glm-5.3-flash',
+      messages: [{
+        id: 'm1',
+        role: 'user',
+        source: { kind: 'user' },
+        content: [
+          { type: 'text', text: '看这张图' },
+          { type: 'image', attachment: ref },
+        ],
+      }],
+    }, async (got) => {
+      assert.equal(got.attachmentId, 'sha256:abc')
+      return { mediaType: 'image/png', data: new Uint8Array([1, 2, 3, 4]) }
+    })
+    assert.deepEqual(wire, [{
+      role: 'user',
+      content: [
+        { type: 'text', text: '看这张图' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,AQIDBA==' } },
+      ],
+    }])
+  })
+
+  it('未接入附件服务时带图请求以明确错误失败', async () => {
+    await assert.rejects(
+      toWireMessages({
+        provider: 'codebuddy-credits',
+        model: 'glm-5.3-flash',
+        messages: [{
+          id: 'm1',
+          role: 'user',
+          source: { kind: 'user' },
+          content: [{ type: 'image', attachment: { attachmentId: 'sha256:abc', mediaType: 'image/png', bytes: 1, width: 1, height: 1 } }],
+        }],
+      }),
+      /未接入附件服务/,
+    )
   })
 })
 

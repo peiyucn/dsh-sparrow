@@ -45,9 +45,14 @@ export const MODEL_REFRESH_COOLDOWN_MS = 60_000
 export const DEFAULT_CONTEXT_WINDOW = 262_144
 /** 未声明容量的模型的最大输出兜底值。 */
 export const DEFAULT_MAX_TOKENS = 32_768
-/** 请求级 base64 图片载荷上限（与官方默认一致）。 */
-export const MAX_REQUEST_IMAGE_BYTES = 20 * 1024 * 1024
-/** 请求版本的总像素预算（与官方默认一致）。 */
-export const REQUEST_IMAGE_PIXEL_BUDGET = 2048 * 2048
-/** 内联图片原始字节目标（与官方默认一致）。 */
-export const REQUEST_IMAGE_MAX_BYTES = 1024 * 1024
+/**
+ * 图片请求预算：照搬官方 CLI 的默认压缩档（2000 档，源码实测）——
+ * 默认最长边 2000px（CODEBUDDY_CODE_IMAGE_COMPRESSION_MAX_DIMENSION 可调，
+ * 我们跟随默认档，不引入该环境变量）、JPEG 质量阶梯 [80,60,40,20]、
+ * 原始字节目标 3_932_160（base64 上限 5_242_880）。DSH 附件策略只有
+ * maxPixels（宽×高）没有单边上限，取 2000×2000 近似官方档。
+ */
+export const IMAGE_REQUEST_POLICY = {
+  maxPixels: 2000 * 2000,
+  maxBytes: 3_932_160,
+} as const
