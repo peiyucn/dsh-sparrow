@@ -190,6 +190,9 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
     name: 'conversation.session.header.actions',
     id: 'llm-codebuddy-credits',
+    // 排到头部操作区最右：官方条目 agent-preset=-10 / schedule=10 / job-list=20，
+    // 30 使额度卡成为行尾最后一项（owner 拍板置右）。
+    order: 30,
     locale: 'codebuddy-credits',
     inject: () => ({ directoryFor }),
   }, CodeBuddyCreditsIndicator as unknown as (props: object) => ReactNode))
