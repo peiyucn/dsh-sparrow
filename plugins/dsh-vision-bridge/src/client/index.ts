@@ -31,7 +31,9 @@ const LOCALE_DICTS = {
   },
 } as const
 
-/** 能力结果缓存：进程内按 provider:model 记忆（切模型即查，避免重复往返）。 */
+/** 能力结果缓存：进程内按 provider:model 记忆（切模型即查，避免重复往返）。
+ *  只缓存 host 给出定论（declared）的答案——目录未就绪的「未知」答案
+ *  会被短时补查纠正，缓存它会把图标锁在错误状态（hy4 假阴性实测）。 */
 const capabilityCache = new Map<string, VisionStatusResult>()
 const capabilityInflight = new Map<string, Promise<VisionStatusResult>>()
 
@@ -42,11 +44,16 @@ function requestCapability(provider: string, model: string): Promise<VisionStatu
     : `?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}`
   return fetch(`/api/vision-bridge/capability${query}`).then(async (response) => {
     if (!response.ok) throw new Error(`vision-bridge capability request failed (HTTP ${response.status})`)
-    const payload = await response.json() as { mode?: unknown; visionModel?: unknown }
+    const payload = await response.json() as { mode?: unknown; visionModel?: unknown; declared?: unknown }
     if (payload.mode !== 'native-vision' && payload.mode !== 'cross-model' && payload.mode !== 'no-vision') {
       throw new Error(`vision-bridge capability: unexpected mode ${String(payload.mode)}`)
     }
-    return { mode: payload.mode, visionModel: typeof payload.visionModel === 'string' ? payload.visionModel : '' }
+    return {
+      mode: payload.mode,
+      visionModel: typeof payload.visionModel === 'string' ? payload.visionModel : '',
+      // 旧版 host 无 declared 字段：按「未知」处理（有限补查自愈，不缓存）。
+      declared: payload.declared === true,
+    }
   })
 }
 
@@ -61,7 +68,9 @@ function queryCapability(provider: string, model: string): Promise<VisionStatusR
   const inflight = capabilityInflight.get(key)
   if (inflight !== undefined) return inflight
   const task = requestCapability(provider, model)
-  task.then((result) => { capabilityCache.set(key, result) }, () => {})
+  task.then((result) => {
+    if (result.declared) capabilityCache.set(key, result)
+  }, () => {})
   capabilityInflight.set(key, task)
   void task.finally(() => {
     if (capabilityInflight.get(key) === task) capabilityInflight.delete(key)

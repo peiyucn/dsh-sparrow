@@ -13,7 +13,14 @@ export interface VisionStatusResult {
   readonly mode: VisionStatusMode
   /** host 实际配置的视觉模型 id（cross-model 弹窗里明示发往哪个模型）。 */
   readonly visionModel: string
+  /** host 是否给出定论（模型事实已装载）；false = 能力未知，会短时补查自愈。 */
+  readonly declared: boolean
 }
+
+/** 能力未知（declared:false）时的补查间隔与次数上限——provider 目录启动期
+ *  未就绪的假阴性会在几秒内被纠正，不把图标锁在错误状态。 */
+const CAPABILITY_UNKNOWN_RETRY_MS = 2_500
+const CAPABILITY_UNKNOWN_RETRIES = 4
 
 /** 官方共享模型目录 store 的最小面（与模型座位同 store：快照 + 订阅）。 */
 export interface DirectoryStore {
@@ -179,20 +186,33 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
   // （避免闪烁），失败隐藏（保守，不影响主流程）。目录/投影都未解析（空白会话、
   // 历史未装载窗口）时按共享默认模型兜底——该窗口内 composer 实际生效的就是
   // 默认模型；目录/投影就位后自动纠正为会话真实模型，图标首帧即在位。
+  // host 报 declared:false（模型事实未装载）时有限次补查自愈：启动期目录未就绪
+  // 的假阴性（如默认模型 hy4 先答 no-vision）几秒内纠正，不锁死在错误状态。
   useEffect(() => {
     setOpen(false)
     let alive = true
-    const request = effective === null
-      ? queryCapability('', '')
-      : queryCapability(effective.provider, effective.model)
-    void request.then((next) => {
-      if (alive) setStatus(next)
-    }).catch(() => {
-      // 状态查询失败：隐藏图标。
-      if (alive) setStatus(null)
-    })
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let attempts = 0
+    const query = (): void => {
+      const request = effective === null
+        ? queryCapability('', '')
+        : queryCapability(effective.provider, effective.model)
+      void request.then((next) => {
+        if (!alive) return
+        setStatus(next)
+        if (!next.declared && attempts < CAPABILITY_UNKNOWN_RETRIES) {
+          attempts += 1
+          timer = setTimeout(query, CAPABILITY_UNKNOWN_RETRY_MS)
+        }
+      }).catch(() => {
+        // 状态查询失败：隐藏图标。
+        if (alive) setStatus(null)
+      })
+    }
+    query()
     return () => {
       alive = false
+      if (timer !== undefined) clearTimeout(timer)
     }
   }, [effectiveKey, queryCapability])
 

@@ -60,20 +60,30 @@ const VISION_REPORT_OUTPUT_SCHEMA = {
  *  目录刷新）的假阴性，缓存会把图标永久锁在错误状态。 */
 const capabilityCache = new Map<string, boolean>()
 
-/** 解析（或读缓存）一个模型是否支持图片；解析失败按无视觉能力处理（保守）。 */
-async function supportsImagesCached(ctx: Context, provider: string, model: string): Promise<boolean> {
+/** 解析（或读缓存）一个模型是否支持图片；解析失败按无视觉能力处理（保守）。
+ *  必须用「未包装」的 resolveModelInfo：门禁包装会把文本路由的 inputModalities
+ *  抹成 undefined，能力路由需要模型事实的原生声明。
+ *  declared=false 表示 inputModalities 未显式声明（模型事实尚未装载，如启动
+ *  预热期 provider 目录未就绪）——调用方不得当定论，客户端据 declared 补查自愈。 */
+async function resolveSupportsImages(
+  resolver: (provider: string, model: string, signal?: AbortSignal) => Promise<{ inputModalities?: readonly string[] }>,
+  provider: string,
+  model: string,
+): Promise<{ supports: boolean; declared: boolean }> {
   const key = `${provider}:${model}`
   const hit = capabilityCache.get(key)
-  if (hit !== undefined) return hit
+  if (hit !== undefined) return { supports: hit, declared: true }
   let supports = false
+  let declared = false
   try {
-    const info = await ctx.llm.resolveModelInfo(provider, model)
+    const info = await resolver(provider, model)
+    declared = info.inputModalities !== undefined
     supports = modelSupportsImages(info.inputModalities)
   } catch {
-    supports = false // 能力解析失败：按无视觉能力处理。
+    // 能力解析失败：按无视觉能力处理（保守），不缓存。
   }
   if (supports) capabilityCache.set(key, true)
-  return supports
+  return { supports, declared }
 }
 
 /** 读共享默认模型（agentDefaultModel.currentSelection，与 composer 座位兜底同源）；
@@ -167,18 +177,21 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   // 同 cacheKey 的 in-flight 视觉调用（isConcurrencySafe 下并发 execute 去重）。
   const inflight = new Map<string, Promise<VisionReport>>()
 
+  // 先取原始解析器再包装：能力路由与预热要读模型事实的原生声明，
+  // 不能经过文本路由抹除 inputModalities 的包装。
+  const llm = ctx.llm
+  const originalResolveModelInfo = llm.resolveModelInfo.bind(llm) as typeof llm.resolveModelInfo
+
   // 预热共享默认模型的能力：会话历史未装载时图标按默认模型显示，能力查询命中缓存、
   // 毫秒级返回，不把冷 resolveModelInfo 摊到页面首帧关键路径上。
   void (async () => {
     const selected = readDefaultModel(ctx)
     if (selected !== undefined) {
-      await supportsImagesCached(ctx, selected.provider, selected.model)
+      await resolveSupportsImages(originalResolveModelInfo, selected.provider, selected.model)
     }
   })()
 
   // 1. 门禁放行：可逆包装，只影响配置的文本路由。
-  const llm = ctx.llm
-  const originalResolveModelInfo = llm.resolveModelInfo.bind(llm) as typeof llm.resolveModelInfo
   llm.resolveModelInfo = (async (provider, model, signal) => {
     const info = await originalResolveModelInfo(provider, model, signal)
     if (shouldClearInputModalities(info.provider, info.id, info.inputModalities, settings.textRoutes)) {
@@ -326,11 +339,12 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         provider = selected.provider
         model = selected.model
       }
-      const supportsImages = await supportsImagesCached(ctx, provider, model)
+      const { supports: supportsImages, declared } = await resolveSupportsImages(originalResolveModelInfo, provider, model)
       // 能力模式判定（全靠模型自身 inputModalities 属性，不靠名字）：
       //   具备视觉能力 → native-vision（灰显）；DeepSeek 文本模型 → cross-model（点亮）；
       //   其它无视觉能力 → no-vision（带斜线，降级提示）。
-      sendJson(res, 200, { mode: visionModeForRoute(provider, supportsImages), visionModel: settings.visionModel })
+      // declared 告知客户端答案是否为定论：目录未就绪时客户端据它有限补查自愈。
+      sendJson(res, 200, { mode: visionModeForRoute(provider, supportsImages), visionModel: settings.visionModel, declared })
     },
   }), 'dsh-vision-bridge: capability route')
 
@@ -341,3 +355,4 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
   ctx.on('llm/adapters-updated', clearCapabilityCache)
   ctx.on('credentials/reference-updated', clearCapabilityCache)
 }
+

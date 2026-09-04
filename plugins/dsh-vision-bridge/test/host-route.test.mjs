@@ -59,11 +59,12 @@ async function request(handler, url, method = 'GET') {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 describe('dsh-vision-bridge 能力路由链路', () => {
-  it('DeepSeek 文本模型 应该 返回 cross-model', async () => {
+  it('DeepSeek 文本模型 应该 返回 cross-model（显式声明 → declared:true）', async () => {
     const { handler } = buildHarness()
     const result = await request(handler, '/api/vision-bridge/capability?provider=deepseek-official&model=deepseek-v4-pro')
     assert.equal(result.statusCode, 200)
     assert.equal(result.body.mode, 'cross-model')
+    assert.equal(result.body.declared, true)
     assert.equal(typeof result.body.visionModel, 'string')
   })
 
@@ -145,5 +146,33 @@ describe('dsh-vision-bridge 能力路由链路', () => {
     const result = await request(handler, '/api/vision-bridge/capability?provider=deepseek-official&model=broken')
     assert.equal(result.statusCode, 200)
     assert.equal(result.body.mode, 'cross-model')
+    assert.equal(result.body.declared, false)
+  })
+
+  it('目录未就绪（无 inputModalities 声明）应该 declared:false 且不缓存——重查自愈', async () => {
+    // 首查模拟 provider 目录尚未装载：resolveModel 不给 inputModalities（未知）；
+    // 第二次目录就绪、显式声明 image。若假阴性被缓存，第二次仍会是 no-vision。
+    const model = 'lazy-catalog-model'
+    let resolved = 0
+    const { handler } = buildHarness({
+      defaultModel: { provider: 'deepseek-official', model: 'other-preheat-model' },
+      resolveModelInfo: async (provider, hit) => {
+        if (hit !== model) return { provider, id: hit, inputModalities: ['text'] }
+        resolved += 1
+        return resolved === 1
+          ? { provider, id: hit }
+          : { provider, id: hit, inputModalities: ['text', 'image'] }
+      },
+    })
+    const first = await request(handler, `/api/vision-bridge/capability?provider=other&model=${model}`)
+    assert.equal(first.statusCode, 200)
+    assert.equal(first.body.mode, 'no-vision')
+    assert.equal(first.body.declared, false)
+    assert.equal(resolved, 1)
+    const second = await request(handler, `/api/vision-bridge/capability?provider=other&model=${model}`)
+    assert.equal(second.body.mode, 'native-vision')
+    assert.equal(second.body.declared, true)
+    // 未知答案没有被缓存：第二次真的重新解析了（自愈）。
+    assert.equal(resolved, 2)
   })
 })
