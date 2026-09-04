@@ -21,6 +21,7 @@ import type {
   TokenUsage,
   ToolCallBlock,
   ToolResultMessage,
+  ToolSchema,
 } from '@deepseek-ai/dsh-llm'
 import { BASE_URL, effortName, requestHeaders } from './catalog.js'
 import { DISPLAY_NAME } from './constants.js'
@@ -55,6 +56,11 @@ interface WireToolCall {
   id: string
   type: 'function'
   function: { name: string; arguments: string }
+}
+
+interface WireTool {
+  type: 'function'
+  function: { name: string; description: string; parameters: Record<string, unknown> }
 }
 
 interface WireMessage {
@@ -95,7 +101,8 @@ export function toWireMessages(options: GenerateOptions): WireMessage[] {
       continue
     }
     if (message.role === 'user') {
-      // 文本优先；图片块转 OpenAI data URL（附件字节经附件服务读取）。
+      // 文本优先；图片块目前原样透传 DSH 附件引用（CodeBuddy 侧图片载荷
+      // 序列化尚未实现——视觉模型请求里带图会被服务端拒绝，属已知缺口）。
       const parts: unknown[] = []
       let text = ''
       for (const block of message.content) {
@@ -307,7 +314,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
       messages: toWireMessages(options),
       stream: true,
     }
-    if (options.tools !== undefined && options.tools.length > 0) body.tools = options.tools
+    if (options.tools !== undefined && options.tools.length > 0) body.tools = toWireTools(options.tools)
     if (options.temperature !== undefined) body.temperature = options.temperature
     if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens
     if (options.stop !== undefined && options.stop.length > 0) body.stop = options.stop
@@ -331,10 +338,18 @@ export class CodeBuddyAdapter extends LlmAdapter {
     let buffer = ''
     // 块索引：reasoning=0、text=1、tool 调用从 2 起
     const TOOL_BASE = 2
+    /** wire 工具 index（0 起）→ 块索引（≥TOOL_BASE）映射。 */
+    const toolIndexByWire = new Map<number, number>()
+    /** 无 wire index 方言：工具 id → 块索引。 */
     const toolIndexById = new Map<string, number>()
     let nextToolIndex = TOOL_BASE
     const opened = new Set<number>()
     const finished = new Set<number>()
+    // 已开块的累计内容：终块必须带全量（DSH 以终块组装最终消息）。
+    const textByIndex = new Map<number, string>()
+    const toolIdByIndex = new Map<number, string>()
+    const toolNameByIndex = new Map<number, string>()
+    const toolArgsByIndex = new Map<number, string>()
     let usageSent = false
     let finishSent = false
 
@@ -365,46 +380,76 @@ export class CodeBuddyAdapter extends LlmAdapter {
           if (delta !== undefined) {
             if (typeof delta.reasoning_content === 'string' && delta.reasoning_content.length > 0) {
               openBlock(0, 'reasoning')
+              textByIndex.set(0, (textByIndex.get(0) ?? '') + delta.reasoning_content)
               chunks.push({ type: 'reasoning-delta', index: 0, text: delta.reasoning_content })
             }
             if (typeof delta.content === 'string' && delta.content.length > 0) {
               openBlock(1, 'text')
+              textByIndex.set(1, (textByIndex.get(1) ?? '') + delta.content)
               chunks.push({ type: 'text-delta', index: 1, text: delta.content })
             }
             const calls = Array.isArray(delta.tool_calls) ? delta.tool_calls as Array<Record<string, unknown>> : []
             for (const call of calls) {
-              const callId = typeof call.id === 'string' ? call.id : 'call-' + String(call.index ?? '')
-              let index = toolIndexById.get(callId)
-              if (index === undefined) {
-                index = nextToolIndex
-                nextToolIndex += 1
-                toolIndexById.set(callId, index)
+              // wire 的工具 index 是 0 起（OpenAI 口径、同消息内编号），与我们的
+              // 块索引空间（0=reasoning、1=text、工具 ≥2）不同——必须映射，不能直用。
+              const wireIndex = typeof call.index === 'number' ? call.index : undefined
+              let index: number | undefined
+              if (wireIndex !== undefined) {
+                index = toolIndexByWire.get(wireIndex)
+                if (index === undefined) {
+                  index = nextToolIndex
+                  nextToolIndex += 1
+                  toolIndexByWire.set(wireIndex, index)
+                }
+              } else {
+                // 无 index 的方言：按 id 兜底映射。
+                let callId = typeof call.id === 'string' ? call.id : ''
+                if (callId === '') callId = 'call-unknown'
+                index = toolIndexById.get(callId)
+                if (index === undefined) {
+                  index = nextToolIndex
+                  nextToolIndex += 1
+                  toolIndexById.set(callId, index)
+                }
               }
+              const callId = typeof call.id === 'string' ? call.id : ''
+              if (callId !== '') toolIdByIndex.set(index, callId)
+              else if (!toolIdByIndex.has(index)) toolIdByIndex.set(index, 'call-' + String(index))
               openBlock(index, 'tool-call')
               const fn = call.function as Record<string, unknown> | undefined
+              const name = typeof fn?.name === 'string' ? fn.name : ''
+              const args = typeof fn?.arguments === 'string' ? fn.arguments : ''
+              const firstNamed = name.length > 0 && !toolNameByIndex.has(index)
+              if (firstNamed) toolNameByIndex.set(index, name)
+              toolArgsByIndex.set(index, (toolArgsByIndex.get(index) ?? '') + args)
               chunks.push({
                 type: 'tool-call-delta',
                 index,
-                id: callId as never,
-                ...(typeof fn?.name === 'string' && fn.name.length > 0 ? { name: fn.name } : {}),
-                argumentsDelta: typeof fn?.arguments === 'string' ? fn.arguments : '',
+                id: (toolIdByIndex.get(index) ?? '') as never,
+                ...(firstNamed ? { name } : {}),
+                argumentsDelta: args,
               })
             }
           }
-          if (frame.usage !== null && typeof frame.usage === 'object' && frame.usage !== undefined) {
-            const { tokens, credit } = mapUsage(frame.usage as Record<string, unknown>)
-            if (!usageSent) {
-              chunks.push({ type: 'usage', usage: tokens })
-              usageSent = true
-            }
-            this.config.onUsage?.({ tokens, ...(credit === undefined ? {} : { credit }), model: options.model })
-          }
           const reason = choice !== undefined && typeof choice.finish_reason === 'string' ? choice.finish_reason : ''
           if (reason.length > 0 && !finishSent) {
-            // 终帧：收尾所有已开块
+            // 终帧：先收尾所有已开块（携带累计全量内容），再发 usage、finish
+            // （官方顺序：block-end* → usage → finish）。
             for (const index of [...opened].filter(i => !finished.has(i))) {
               finished.add(index)
-              chunks.push({ type: 'block-end', index, block: blockFor(index, toolIndexById) })
+              chunks.push({
+                type: 'block-end',
+                index,
+                block: blockFor(index, textByIndex, toolIdByIndex, toolNameByIndex, toolArgsByIndex),
+              })
+            }
+            if (frame.usage !== null && typeof frame.usage === 'object' && frame.usage !== undefined) {
+              const { tokens, credit } = mapUsage(frame.usage as Record<string, unknown>)
+              if (!usageSent) {
+                chunks.push({ type: 'usage', usage: tokens })
+                usageSent = true
+              }
+              this.config.onUsage?.({ tokens, ...(credit === undefined ? {} : { credit }), model: options.model })
             }
             const finish = mapFinish(reason)
             if (finish === undefined) {
@@ -416,6 +461,14 @@ export class CodeBuddyAdapter extends LlmAdapter {
               replayState: { response: { model: options.model, usage: frame.usage ?? null } },
             })
             finishSent = true
+          } else if (frame.usage !== null && typeof frame.usage === 'object' && frame.usage !== undefined && !finishSent) {
+            // 尾随 usage 帧（终帧之后单独到达）：块已收尾，直接补发 usage。
+            const { tokens, credit } = mapUsage(frame.usage as Record<string, unknown>)
+            if (!usageSent) {
+              chunks.push({ type: 'usage', usage: tokens })
+              usageSent = true
+            }
+            this.config.onUsage?.({ tokens, ...(credit === undefined ? {} : { credit }), model: options.model })
           }
           for (const chunk of chunks.splice(0)) yield chunk
         }
@@ -429,12 +482,36 @@ export class CodeBuddyAdapter extends LlmAdapter {
   }
 }
 
-/** 已开块的最终 ContentBlock 组装（block-end 携带）。 */
-function blockFor(index: number, toolIndexById: Map<string, number>): ContentBlock {
-  if (index === 0) return { type: 'reasoning', text: '' }
-  if (index === 1) return { type: 'text', text: '' }
-  for (const [id, idx] of toolIndexById) {
-    if (idx === index) return { type: 'tool-call', id: id as never, name: '', arguments: '' }
+/** DSH 工具 schema → CodeBuddy（OpenAI 方言）tools 数组。官方映射口径：
+ *  DSH 条目是 { name, description, parameters }，wire 上必须包 function 信封；
+ *  原样直发会被服务端以「Invalid request parameters」拒绝。 */
+export function toWireTools(tools: readonly ToolSchema[]): WireTool[] {
+  return tools.map(tool => ({
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+    },
+  }))
+}
+
+/** 已开块的最终 ContentBlock 组装（block-end 携带）——必须带累计的完整内容：
+ *  DSH 以终块组装最终消息（正文/工具名/参数都从终块取），空内容终块会导致
+ *  流式过程可见、结果消失，工具调用会变成「unknown tool ""」。 */
+function blockFor(
+  index: number,
+  textByIndex: ReadonlyMap<number, string>,
+  toolIdByIndex: ReadonlyMap<number, string>,
+  toolNameByIndex: ReadonlyMap<number, string>,
+  toolArgsByIndex: ReadonlyMap<number, string>,
+): ContentBlock {
+  if (index === 0) return { type: 'reasoning', text: textByIndex.get(0) ?? '' }
+  if (index === 1) return { type: 'text', text: textByIndex.get(1) ?? '' }
+  return {
+    type: 'tool-call',
+    id: (toolIdByIndex.get(index) ?? '') as never,
+    name: toolNameByIndex.get(index) ?? '',
+    arguments: toolArgsByIndex.get(index) ?? '',
   }
-  return { type: 'text', text: '' }
 }
