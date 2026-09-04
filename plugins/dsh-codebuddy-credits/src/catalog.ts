@@ -191,19 +191,16 @@ function declaredDefaultEffort(raw: Record<string, unknown>): string | undefined
   return typeof fixed === 'string' && fixed.length > 0 ? fixed : undefined
 }
 
-/** 实测的视觉判定（2026-09）：supportsImages 对 deepseek-v4-pro/flash 也返回
- * true，但它们是纯文本模型（官方 DSH 目录里视觉是单独的 flash-vision-exp
- * 变体）。可信信号 = supportsImages 且（服务端显式 enabledMultimodal
- * （disabledMultimodal === false）或 描述/名字声明多模态）。 */
-const MULTIMODAL_HINT = /多模态|multimodal|vision/i
-
+/**
+ * 视觉判定（2026-09-04 修订）：/v3/config 的 supportsImages 就是权威声明——
+ * CodeBuddy app 里 deepseek-v4-pro/flash 明确支持图片输入，supportsImages 也
+ * 返回 true。早前「supportsImages=true 但可能是纯文本」的假设不成立（那是
+ * 官方 DSH 目录的文本/视觉拆分，不适用于 CodeBuddy 自己托管的模型）。实测
+ * disabledMultimodal 只作为冗余标注出现：true 只在 supportsImages=false 上、
+ * false 只在 true 上，不改变结论，故直接以 supportsImages 为准。
+ */
 function supportsNativeVision(raw: Record<string, unknown>): boolean {
-  if (raw.supportsImages !== true) return false
-  if (raw.disabledMultimodal === false) return true
-  const hints = [raw.descriptionZh, raw.descriptionEn, raw.name]
-    .filter((value): value is string => typeof value === 'string')
-    .join(' ')
-  return MULTIMODAL_HINT.test(hints)
+  return raw.supportsImages === true
 }
 
 /**

@@ -142,7 +142,7 @@ describe('parseModelConfig', () => {
     }
     const models = parseModelConfig(body)
     assert.equal(models.length, 3)
-    // 纯文本：supportsImages=true 但无多模态声明（实测 deepseek-v4-pro/flash 就是这种）
+    // 视觉：supportsImages=true 即视为支持图片输入（deepseek-v4-pro/flash 实测如此）
     assert.deepEqual(models[0], {
       id: 'deepseek-v4-pro',
       name: 'Deepseek-V4-Pro',
@@ -150,11 +150,11 @@ describe('parseModelConfig', () => {
       credits: 'x0.51',
       contextWindow: 1000000,
       maxTokens: 50000,
-      input: ['text'],
+      input: ['text', 'image'],
       reasoningEfforts: { high: 'high' },
       defaultEffort: 'high',
     })
-    // 原生多模态：描述声明
+    // 原生多模态
     assert.deepEqual(models[1], {
       id: 'glm-5.3-flash',
       name: 'GLM-5.3-Flash',
@@ -166,7 +166,7 @@ describe('parseModelConfig', () => {
       reasoningEfforts: { off: null, low: 'low', high: 'high', max: 'max' },
       defaultEffort: 'high',
     })
-    // disabledMultimodal=false 且不可关思考（无描述字段 → 不携带）
+    // 视觉 + 不可关思考（无描述字段 → 不携带）
     assert.deepEqual(models[2], {
       id: 'hy4-preview',
       name: 'Hy4 preview',

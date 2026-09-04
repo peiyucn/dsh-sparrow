@@ -47,12 +47,12 @@
 
 * CLI 允许 7 个模型：hy4-preview、hy3、hy3-x、glm-5.3-flash、
   minimax-m3-pay、deepseek-v4-pro、deepseek-v4-flash。
-* **视觉**：supportsImages 对 deepseek-v4-pro/flash 也返回 true（服务端
-  平台口径），但它们是纯文本（官方 DSH 目录里视觉是单独的
-  flash-vision-exp 变体）。修正判定 = supportsImages 且
-  （disabledMultimodal === false 或 描述/名字含 多模态/multimodal/vision）：
-  结果 glm-5.3-flash/minimax-m3（描述声明原生多模态）与 hy3/hy3-x/hy4
-  （disabledMultimodal=false）为视觉，deepseek pro/flash 为纯文本。
+* **视觉（2026-09-04 修订）**：supportsImages 就是权威声明——CodeBuddy app
+  里 deepseek-v4-pro/flash 明确支持图片输入。早前「supportsImages=true 但
+  是纯文本（官方 DSH 目录里视觉是独立 flash-vision-exp 变体）」的判定被
+  推翻：那是官方 DSH 的文本/视觉拆分，不适用于 CodeBuddy 自己托管的模型。
+  实测 disabledMultimodal 只是冗余标注（true 只在 supportsImages=false 上、
+  false 只在 true 上），故直接以 supportsImages 为准。
 * **reasoning 两种实测形态**：可选档位（supportedEfforts 数组 +
   canDisableThinking + defaultEffort，如 glm-5.3-flash/hy4-preview）与
   固定档位（effort 单字符串，如 deepseek-v4-pro=high、
