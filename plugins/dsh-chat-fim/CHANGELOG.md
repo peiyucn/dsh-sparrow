@@ -2,6 +2,13 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.2-rc.1 (2026-09-04)
+
+- Version-line alignment with official dsh 0.1.2-rc.1 (stability line).
+- The FIM switch now tracks the selected model immediately: switching models updates the support state right away, and switching between two unsupported models no longer flashes the card.
+- Clicking the suggestion card outside a button no longer steals focus from the composer (Tab adoption keeps working).
+- Cross-site requests to the completion endpoint are now refused (the route executes billed upstream calls with the server-side API key).
+
 ## 0.1.0 (2026-09-02)
 
 - Promoted 0.1.0 (identical to 0.1.0-alpha.3).
