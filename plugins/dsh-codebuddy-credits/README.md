@@ -21,7 +21,7 @@ mechanism, without borrowing browser logins or the CodeBuddy CLI.
 
 ## Requirements
 
-- DSH >= 0.1.2-alpha.4
+- DSH >= 0.1.2-rc.1
 - Node.js >= 22.19.0
 
 ## Install

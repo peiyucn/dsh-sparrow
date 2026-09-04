@@ -1,7 +1,7 @@
 {
   "name": "@dsh-sparrow/dsh-codebuddy-credits",
   "description": "Company CodeBuddy credits as a DeepSeek Harness LLM provider — official API key, models only, no agent harness",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.2-rc.1",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -61,12 +61,12 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^0.1.1-rc.2 || ^4.0.1",
-    "@deepseek-ai/dsh-attachment": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-credentials": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-host-webserver": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-launch-environment": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-llm": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-settings": "^0.1.2-alpha.4"
+    "@deepseek-ai/dsh-attachment": "^0.1.2-rc.1",
+    "@deepseek-ai/dsh-credentials": "^0.1.2-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "^0.1.2-rc.1",
+    "@deepseek-ai/dsh-launch-environment": "^0.1.2-rc.1",
+    "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
+    "@deepseek-ai/dsh-settings": "^0.1.2-rc.1"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.2"
