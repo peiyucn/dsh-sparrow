@@ -12,7 +12,7 @@ Large images pasted into DSH are auto-uploaded to the DeepSeek Files API, but th
 dsh plugin --profile web add @dsh-sparrow/dsh-file-manage
 ```
 
-Requires dsh ≥ 0.1.2-alpha.4 and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
+Requires dsh ≥ 0.1.2-rc.1 and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
 
 > Do **not** run `npm install @dsh-sparrow/dsh-file-manage` directly: that only downloads the package into some `node_modules` and does not register it with the DSH web profile. Use the `dsh plugin` command above, then restart DSH.
 

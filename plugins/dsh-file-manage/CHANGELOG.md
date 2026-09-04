@@ -2,6 +2,13 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.2-rc.1 (2026-09-04)
+
+- Version-line alignment with official dsh 0.1.2-rc.1 (stability line).
+- Pagination and delete race fixes: after quickly reopening the panel or hitting Retry, stale pages no longer merge into the fresh list, "Load more" no longer sticks disabled, and a late delete callback no longer dismisses a newly opened confirmation dialog.
+- Requests that outlive the panel now stop by themselves (15s cap) instead of hanging, and the count pass stops as soon as the panel disconnects, so a closed panel no longer keeps burning API quota.
+- The sidebar "Cloud Files" button now aligns its width with Settings (same as the Archive entry).
+
 ## 0.1.0 (2026-09-02)
 
 - Promoted 0.1.0 (identical to 0.1.0-alpha.3).
