@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import {
   archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, isDeleteConfirmationSufficient,
   legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig, parseTrashSidecar, parseBlankProjection,
-  parseSessionFacts, sanitizeSegment, straySessionIds,
+  parseSessionFacts, sanitizeSegment, straySessionIds, trashItemView,
 } from '../lib/archive.js'
 
 describe('archive-manage 纯逻辑', () => {
@@ -325,6 +325,40 @@ describe('archive-manage 纯逻辑', () => {
       })
       assert.equal(sidecar?.version, 1)
       assert.equal(sidecar?.subagents, undefined)
+    })
+  })
+
+  describe('trashItemView', () => {
+    it('version 2 sidecar 应该 透出子会话展示清单（父子联动数据）', () => {
+      const view = trashItemView('trash-1', {
+        version: 2,
+        sessionId: 'p',
+        title: 'parent',
+        originalPath: 'C:/tmp/p',
+        archivedAt: '2026-09-04T10:00:00.000Z',
+        workspaceIds: ['w'],
+        subagents: [
+          { sessionId: 'c1', title: 'child1', originalPath: 'C:/tmp/c1', workspaceIds: ['w'] },
+          { sessionId: 'c2', title: 'child2', originalPath: 'C:/tmp/c2', workspaceIds: [] },
+        ],
+      })
+      assert.equal(view.trashId, 'trash-1')
+      assert.equal(view.sessionId, 'p')
+      assert.equal(view.title, 'parent')
+      assert.equal(view.legacy, false)
+      assert.deepEqual(view.subagents, [{ sessionId: 'c1', title: 'child1' }, { sessionId: 'c2', title: 'child2' }])
+    })
+
+    it('version 1 sidecar 无子会话 应该 返回空数组（不破坏列表渲染）', () => {
+      const view = trashItemView('trash-2', {
+        version: 1,
+        sessionId: 'p',
+        title: 'parent',
+        originalPath: 'C:/tmp/p',
+        archivedAt: '2026-09-04T10:00:00.000Z',
+        workspaceIds: [],
+      })
+      assert.deepEqual(view.subagents, [])
     })
   })
 })

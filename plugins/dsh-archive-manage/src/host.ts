@@ -19,7 +19,7 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import {
   TRASH_SIDECAR, archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, isDeleteConfirmationSufficient,
   legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig, parseBlankProjection, parseSessionFacts,
-  parseTrashSidecar, sanitizeSegment, straySessionIds,
+  parseTrashSidecar, sanitizeSegment, straySessionIds, trashItemView,
   type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar, type SessionFacts, type SessionTreeHeader,
   type SessionTreeNode,
 } from './archive.js'
@@ -599,14 +599,7 @@ async function listTrashItems(trashRoot: string): Promise<unknown[]> {
       const raw = await readFile(join(dir, TRASH_SIDECAR), 'utf8')
       const sidecar = parseTrashSidecar(JSON.parse(raw))
       if (sidecar !== undefined) {
-        items.push({
-          trashId: name,
-          sessionId: sidecar.sessionId,
-          title: sidecar.title,
-          archivedAt: sidecar.archivedAt,
-          workspaceIds: sidecar.workspaceIds,
-          legacy: false,
-        })
+        items.push(trashItemView(name, sidecar))
       }
     } catch {
       // 无合法 sidecar：按旧格式目录收纳（只列/删，不可还原）。

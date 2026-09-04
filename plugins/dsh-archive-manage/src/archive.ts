@@ -119,6 +119,31 @@ export interface LegacyTrashItem {
   readonly legacy: true
 }
 
+/** 回收站条目视图（列表接口返回形状）：子会话仅展示用（父子联动），
+ *  还原/删除整棵走 sidecar 原样。 */
+export interface TrashItemView {
+  readonly trashId: string
+  readonly sessionId: string
+  readonly title: string
+  readonly archivedAt: string
+  readonly workspaceIds: readonly string[]
+  readonly legacy: false
+  readonly subagents: ReadonlyArray<{ sessionId: string; title: string }>
+}
+
+/** sidecar → 列表条目视图；v1 无子会话记录时 subagents 为空数组。 */
+export function trashItemView(trashId: string, sidecar: ArchiveSidecar): TrashItemView {
+  return {
+    trashId,
+    sessionId: sidecar.sessionId,
+    title: sidecar.title,
+    archivedAt: sidecar.archivedAt,
+    workspaceIds: sidecar.workspaceIds,
+    legacy: false,
+    subagents: (sidecar.subagents ?? []).map(child => ({ sessionId: child.sessionId, title: child.title })),
+  }
+}
+
 /**
  * 从旧格式目录构造列表条目；时间取目录 mtime。
  * @param name - 回收站目录名（旧格式下即会话 id）。

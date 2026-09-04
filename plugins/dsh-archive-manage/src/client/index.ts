@@ -205,6 +205,7 @@ export function apply(ctx: ClientContext): void {
         title: string
         archivedAt: string
         legacy: boolean
+        subagents?: Array<{ sessionId: string; title: string }>
       }>('/api/archive-manage/trash'),
       trashDirPath: async () => {
         const response = await fetch('/api/archive-manage/trash-dir')

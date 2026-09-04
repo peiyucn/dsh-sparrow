@@ -33,6 +33,8 @@ export interface TrashItem {
   readonly title: string
   readonly archivedAt: string
   readonly legacy: boolean
+  /** 随父一起进回收站的子会话（sidecar v2 记账，展示用父子联动；还原/删除整棵走父条目）。 */
+  readonly subagents?: ReadonlyArray<{ sessionId: string; title: string }>
 }
 
 export interface StraySessionItem {
@@ -603,6 +605,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [archivingId, setArchivingId] = useState<string | null>(null)
   /** 归档树折叠的父节点 id 集合（spec 08）。 */
   const [collapsedIds, setCollapsedIds] = useState<ReadonlySet<string>>(new Set())
+  /** 回收站树折叠的父条目集合（键 = trashId，与归档树分开：两区互不干扰）。 */
+  const [collapsedTrashIds, setCollapsedTrashIds] = useState<ReadonlySet<string>>(new Set())
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
 
   // 官方弹窗行为：打开时聚焦关闭按钮，Esc 关闭。
@@ -818,6 +822,16 @@ export function ArchiveDock(props: ArchiveDockProps) {
     })
   }
 
+  /** 展开/收起回收站父条目的子树（与归档树同一交互语义）。 */
+  const toggleTrashCollapsed = (trashId: string): void => {
+    setCollapsedTrashIds(prev => {
+      const next = new Set(prev)
+      if (next.has(trashId)) next.delete(trashId)
+      else next.add(trashId)
+      return next
+    })
+  }
+
   /** 归档树行：父行（深度 0）带操作按钮与折叠切换；子行缩进只读并带树状连接线（spec 08）。 */
   const renderArchivedRow = (item: ArchivedSessionItem, depth = 0): ReactElement => {
     const locked = depth === 0 && subtreeLive(item)
@@ -906,6 +920,102 @@ export function ArchiveDock(props: ArchiveDockProps) {
                   : 'dsh-archive-tree-node'}
               >
                 {renderArchivedRow(child, depth + 1)}
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
+  /** 回收站树行：父行带恢复/彻底删除与折叠切换，子行缩进只读
+   *  （与归档树同款交互；还原/删除整棵走父条目的 sidecar）。 */
+  const renderTrashRow = (item: TrashItem): ReactElement => {
+    const children = item.subagents ?? []
+    const hasChildren = children.length > 0
+    const collapsed = collapsedTrashIds.has(item.trashId)
+    return (
+      <div key={item.trashId} className={hasChildren ? 'dsh-archive-tree-group' : undefined}>
+        <div style={{ ...styles.row, ...(hasChildren ? { borderBottom: 'none', padding: '4px 0' } : {}) }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              {hasChildren ? (
+                <button
+                  type="button"
+                  className="dsh-archive-tree-toggle"
+                  aria-expanded={!collapsed}
+                  onClick={() => { toggleTrashCollapsed(item.trashId) }}
+                >
+                  <span aria-hidden>{collapsed ? '▸' : '▾'}</span>
+                </button>
+              ) : (
+                <span className="dsh-archive-tree-toggle-spacer" aria-hidden>·</span>
+              )}
+              <div style={{ ...styles.title, minWidth: 0 }} title={item.title}>{item.title}</div>
+            </div>
+            <div style={styles.secondarySmall} title={item.sessionId}>
+              {item.legacy ? `${t('legacy.badge')} · ` : ''}{item.archivedAt}
+              {hasChildren ? (
+                <>
+                  {' · '}
+                  <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>
+                    {t('tree.childCount', { n: children.length })}
+                  </span>
+                </>
+              ) : ''}
+            </div>
+          </div>
+          <div style={styles.actions}>
+            <button
+              type="button"
+              className="dsh-archive-btn"
+              disabled={loading || item.legacy || restoringId !== null}
+              title={item.legacy ? t('legacy.restoreTitle') : undefined}
+              onClick={() => {
+                if (restoringId !== null) return
+                setRestoringId(item.trashId)
+                void (async () => {
+                  try {
+                    await restoreTrashItem(item.trashId)
+                    await refresh()
+                  } catch (reason) {
+                    setError(reason instanceof Error ? reason.message : String(reason))
+                  } finally {
+                    setRestoringId(null)
+                  }
+                })()
+              }}
+            >
+              {t('action.restore')}
+            </button>
+            <button
+              type="button"
+              className="dsh-archive-btn dsh-archive-btn-danger"
+              disabled={loading}
+              onClick={() => { confirmDeleteTrashItem(item) }}
+            >
+              {t('action.deletePermanently')}
+            </button>
+          </div>
+        </div>
+        {hasChildren && !collapsed ? (
+          <div className="dsh-archive-tree-children">
+            {children.map((child, index) => (
+              <div
+                key={child.sessionId}
+                className={index === children.length - 1
+                  ? 'dsh-archive-tree-node dsh-archive-tree-node-last'
+                  : 'dsh-archive-tree-node'}
+              >
+                <div style={{ ...styles.row, borderBottom: 'none', padding: '4px 0' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <span className="dsh-archive-tree-toggle-spacer" aria-hidden>·</span>
+                      <div style={{ ...styles.title, minWidth: 0 }} title={child.title}>{child.title}</div>
+                    </div>
+                    <div style={{ ...styles.secondarySmall, paddingLeft: 20, marginTop: 2 }} title={child.sessionId}>{child.sessionId}</div>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -1126,48 +1236,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       {t('legacy.hint')}
                     </p>
                   ) : null}
-                  {trashItems.map(item => (
-                    <div key={item.trashId} style={styles.row}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={styles.title} title={item.title}>{item.title}</div>
-                        <div style={styles.secondarySmall} title={item.sessionId}>
-                          {item.legacy ? `${t('legacy.badge')} · ` : ''}{item.archivedAt}
-                        </div>
-                      </div>
-                      <div style={styles.actions}>
-                        <button
-                          type="button"
-                          className="dsh-archive-btn"
-                          disabled={loading || item.legacy || restoringId !== null}
-                          title={item.legacy ? t('legacy.restoreTitle') : undefined}
-                          onClick={() => {
-                            if (restoringId !== null) return
-                            setRestoringId(item.trashId)
-                            void (async () => {
-                              try {
-                                await restoreTrashItem(item.trashId)
-                                await refresh()
-                              } catch (reason) {
-                                setError(reason instanceof Error ? reason.message : String(reason))
-                              } finally {
-                                setRestoringId(null)
-                              }
-                            })()
-                          }}
-                        >
-                          {t('action.restore')}
-                        </button>
-                        <button
-                          type="button"
-                          className="dsh-archive-btn dsh-archive-btn-danger"
-                          disabled={loading}
-                          onClick={() => { confirmDeleteTrashItem(item) }}
-                        >
-                          {t('action.deletePermanently')}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                  {trashItems.map(renderTrashRow)}
                 </>
               ) : null}
             </div>
