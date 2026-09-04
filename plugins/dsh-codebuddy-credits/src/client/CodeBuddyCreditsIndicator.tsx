@@ -411,11 +411,11 @@ export function CodeBuddyCreditsIndicator({
   const resetAt = formatReset(quota?.resetAt)
   const resetDays = resetAt === undefined ? null : daysUntil(resetAt)
 
+  const setRoot = useCallback((el: HTMLElement | null) => { rootRef.current = el }, [])
+
   // 未配置 Key（或状态未加载完成）时不渲染图标：对话页只在有 CodeBuddy
   // 配置时才出现这个标；加载完成后配置态自动亮出。
   if (status?.keyConfigured !== true) return null
-
-  const setRoot = useCallback((el: HTMLElement | null) => { rootRef.current = el }, [])
 
   // sidebar 变体：宽栏 = 零占位锚点 + 绝对定位紧凑图标（落在 Settings 行右侧，
   // 官方 Settings 单槽不可加项，CSS 方案共用该行）；rail = 常规圆形图标行。

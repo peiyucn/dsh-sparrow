@@ -5,9 +5,9 @@
  *   owner 传 locked）。本插件以 priority -1 注册遮蔽官方 ModelSelect。
  * - settings.models.provider-card：官方设置 → 模型页扩展槽位（keyed by
  *   owning settings namespace），挂 Key 配置卡。
- * - conversation.session.header.actions：会话头部操作区（kind=list，
- *   scope=session），挂 CodeBuddy 额度小卡；occupant 拿框架注入的
- *   SessionStandardProps（sessionId/useProjection 等，ui-session 声明）。
+ * - sidebar.footer.action：左侧栏 footer 槽位（kind=list，scope=root，
+ *   owner 传 wide）——官方 Settings 上方的堆叠区；本插件挂 CodeBuddy 额度
+ *   入口，宽栏以 CSS 落在 Settings 行右侧。
  */
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -26,10 +26,14 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         keyConfigured: boolean
       }
     }
-    'conversation.session.header.actions': {
+    /**
+     * 左侧栏 footer 扩展槽位（ui-sidebar 声明；kind=list，scope=root，
+     * owner 传 wide=宽栏）。Archive/Cloud Files 同款；本插件挂额度入口。
+     */
+    'sidebar.footer.action': {
       kind: 'list'
-      scope: 'session'
-      owner: { children?: never }
+      scope: 'root'
+      owner: { wide: boolean }
     }
     /**
      * 官方聊天视图的完成态 assistant 行动作槽位（ui-chat 声明；kind=list，
