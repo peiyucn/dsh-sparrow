@@ -1,26 +1,16 @@
 /** 状态图标：模型选择器旁的眼睛，随当前模型能力变化颜色与文案（DeepSeek 模型都显示）。 */
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
+import {
+  capabilityReducer, capabilityShown, CAPABILITY_UNKNOWN_RETRY_MS, initialCapabilityState,
+  type CapabilityTarget, type VisionStatusResult,
+} from './capability-machine.js'
 
-/** 图标状态：cross-model=可跨模型读图（蓝紫点亮）；native-vision=原生视觉（灰显）；no-vision=无视觉能力（带斜线）。 */
-export type VisionStatusMode = 'cross-model' | 'native-vision' | 'no-vision'
-
-export interface VisionStatusResult {
-  readonly mode: VisionStatusMode
-  /** host 实际配置的视觉模型 id（cross-model 弹窗里明示发往哪个模型）。 */
-  readonly visionModel: string
-  /** host 是否给出定论（模型事实已装载）；false = 能力未知，会短时补查自愈。 */
-  readonly declared: boolean
-}
-
-/** 能力未知（declared:false）时的补查间隔与次数上限——provider 目录启动期
- *  未就绪的假阴性会在几秒内被纠正，不把图标锁在错误状态。 */
-const CAPABILITY_UNKNOWN_RETRY_MS = 2_500
-const CAPABILITY_UNKNOWN_RETRIES = 4
+export type { VisionStatusMode, VisionStatusResult } from './capability-machine.js'
 
 /** 弹层定位常量：高度估算 96px（264px 宽说明卡）、翻转判定余量 8px、
  *  离按钮间距 4px。 */
@@ -175,7 +165,10 @@ export function ensureVisionStyles(): HTMLStyleElement {
 }
 
 export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, useProjection, t }: VisionStatusProps) {
-  const [status, setStatus] = useState<VisionStatusResult | null>(null)
+  // 能力解析状态机：所有「查哪个模型 / 查没查到 / 要不要补查」的状态与
+  // 竞态判定都收在 capabilityReducer 里，这里只做三件事——换模型时发
+  // model-changed、resolving 时发查询、retrying 时按间隔发补查 tick。
+  const [capability, dispatch] = useReducer(capabilityReducer, initialCapabilityState)
   const [open, setOpen] = useState(false)
   const [point, setPoint] = useState<{ x: number; y: number; up: boolean } | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
@@ -198,40 +191,38 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
 
   // 生效模型：目录（座位同源，含乐观回写）→ 会话投影（持久化选择）→ null（默认兜底）。
   const effective = directoryCurrent ?? projection?.next ?? null
-  const effectiveKey = effective === null ? '' : `${effective.provider}:${effective.model}`
 
-  // 模型变化 / 会话切换时查能力：缓存命中立即上色；未命中保持上一状态直到新结果
-  // （避免闪烁），失败隐藏（保守）。目录/投影都未解析（空白会话、历史未装载窗口）
-  // 时按共享默认模型兜底——该窗口内 composer 实际生效的就是默认模型，就位后自动
-  // 纠正为会话真实模型。host 报 declared:false（模型事实未装载）时有限次补查自愈
-  // （启动期假阴性如 hy4 先答 no-vision，几秒内纠正）。
+  // 状态机解析目标：''/'' = host 共享默认模型兜底。
+  const target: CapabilityTarget = effective === null
+    ? { provider: '', model: '' }
+    : { provider: effective.provider, model: effective.model }
+
+  // 模型/会话切换：重开一轮解析（携带上一答案防闪烁由状态机负责）。
   useEffect(() => {
     setOpen(false)
-    let alive = true
-    let timer: ReturnType<typeof setTimeout> | undefined
-    let attempts = 0
-    const query = (): void => {
-      const request = effective === null
-        ? queryCapability('', '')
-        : queryCapability(effective.provider, effective.model)
-      void request.then((next) => {
-        if (!alive) return
-        setStatus(next)
-        if (!next.declared && attempts < CAPABILITY_UNKNOWN_RETRIES) {
-          attempts += 1
-          timer = setTimeout(query, CAPABILITY_UNKNOWN_RETRY_MS)
-        }
-      }).catch(() => {
-        // 状态查询失败：隐藏图标。
-        if (alive) setStatus(null)
-      })
-    }
-    query()
-    return () => {
-      alive = false
-      if (timer !== undefined) clearTimeout(timer)
-    }
-  }, [effectiveKey, queryCapability])
+    dispatch({ type: 'model-changed', target })
+  }, [target.provider, target.model])
+
+  // resolving：按当前目标发起一次查询。旧目标的响应回来时状态机按地址作废
+  // （不需要 alive 标志）；retrying → resolving 由 attempts 推进触发重查。
+  useEffect(() => {
+    if (capability.phase !== 'resolving') return
+    const requestTarget = capability.target
+    void queryCapability(requestTarget.provider, requestTarget.model).then(
+      (result) => dispatch({ type: 'answered', target: requestTarget, result }),
+      () => dispatch({ type: 'query-failed', target: requestTarget }),
+    )
+  }, [capability.phase, capability.target.provider, capability.target.model, capability.attempts, queryCapability])
+
+  // retrying：等补查间隔后发 tick 重查；阶段/目标不符的 tick 由状态机作废。
+  useEffect(() => {
+    if (capability.phase !== 'retrying') return
+    const tickTarget = capability.target
+    const timer = setTimeout(() => {
+      dispatch({ type: 'retry-tick', target: tickTarget })
+    }, CAPABILITY_UNKNOWN_RETRY_MS)
+    return () => { clearTimeout(timer) }
+  }, [capability.phase, capability.target.provider, capability.target.model, capability.attempts])
 
   const computePoint = (): { x: number; y: number; up: boolean } | null => {
     const rect = buttonRef.current?.getBoundingClientRect()
@@ -269,9 +260,11 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
     }
   }, [open])
 
+  // 当前应显示的答案：idle/failed 隐藏；其余显示已携带/最新答案。
+  const status = capabilityShown(capability)
   const native = status?.mode === 'native-vision'
   const noVision = status?.mode === 'no-vision'
-  // 能力查询未返回 / 查询失败 → 隐藏（不显示占位色）。
+  // 无答案 / 查询失败 → 隐藏（不显示占位色）。
   if (status === null) return null
   const title = native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')
   const buttonClass = native
