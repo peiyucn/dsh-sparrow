@@ -36,6 +36,8 @@ export interface ModelFactView {
   vision: boolean
   contextWindow: number
   maxTokens: number
+  /** 服务端模型描述（descriptionZh ?? descriptionEn）。 */
+  description?: string
   /** 思考档位 id（含 off），无推理能力时缺省。 */
   efforts?: string[]
 }
@@ -70,6 +72,7 @@ export function toModelFactView(model: CodeBuddyModelFacts): ModelFactView {
     vision: model.input.includes('image'),
     contextWindow: model.contextWindow,
     maxTokens: model.maxTokens,
+    ...(model.description === undefined ? {} : { description: model.description }),
     ...(model.reasoning && model.thinkingLevelMap !== undefined
       ? { efforts: Object.keys(model.thinkingLevelMap) }
       : {}),

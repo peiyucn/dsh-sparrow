@@ -39,6 +39,8 @@ export interface CodeBuddyModelEntry {
   reasoningEfforts?: ReasoningEfforts
   /** 服务端声明的默认思考档位（fixed-effort 形态取 effort 值本身）。 */
   defaultEffort?: string
+  /** 服务端模型描述（descriptionZh ?? descriptionEn），缺省表示未声明。 */
+  description?: string
 }
 
 /** 解析后的模型事实（adapter 与状态接口共用）。 */
@@ -52,6 +54,7 @@ export interface CodeBuddyModelFacts {
   reasoning: boolean
   thinkingLevelMap?: Record<string, string | null>
   defaultEffort?: string
+  description?: string
 }
 
 /** "x0.79 credits" → 短系数 "x0.79"；数值为 0（如 "x0.00"）→ "free"；非字符串 → undefined。 */
@@ -110,6 +113,7 @@ export function factsFromEntries(entries: readonly CodeBuddyModelEntry[]): CodeB
       reasoning,
       ...(reasoning && thinkingLevelMap !== undefined ? { thinkingLevelMap } : {}),
       ...(reasoning && entry.defaultEffort !== undefined ? { defaultEffort: entry.defaultEffort } : {}),
+      ...(entry.description === undefined ? {} : { description: entry.description }),
     }
   })
 }
@@ -219,12 +223,14 @@ export function parseModelConfig(body: unknown): readonly CodeBuddyModelEntry[] 
     if (contextWindow === undefined && maxTokens === undefined) return []
     const credits = shortCredits(raw.credits)
     const baseName = text(raw.name) ?? id
+    const description = text(raw.descriptionZh) ?? text(raw.descriptionEn)
     const reasoning = raw.reasoning !== null && typeof raw.reasoning === 'object'
       ? raw.reasoning as Record<string, unknown>
       : undefined
     const entry: CodeBuddyModelEntry = {
       id,
       name: baseName,
+      ...(description === undefined ? {} : { description }),
       ...(credits === undefined ? {} : { credits }),
       ...(contextWindow === undefined ? {} : { contextWindow }),
       ...(maxTokens === undefined ? {} : { maxTokens }),

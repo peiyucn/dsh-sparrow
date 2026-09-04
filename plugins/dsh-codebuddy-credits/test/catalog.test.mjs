@@ -16,6 +16,12 @@ describe('factsFromEntries', () => {
     assert.deepEqual(model.input, ['text'])
     assert.equal(model.reasoning, false)
   })
+  it('服务端描述透传（缺省时不携带该字段）', () => {
+    const [withDesc] = factsFromEntries([{ id: 'hy3', name: 'Hy3', description: '旗舰模型' }])
+    assert.equal(withDesc.description, '旗舰模型')
+    const [without] = factsFromEntries([{ id: 'hy3', name: 'Hy3' }])
+    assert.equal(without.description, undefined)
+  })
   it('容量缺失的条目以兜底常量补齐', () => {
     const [model] = factsFromEntries([{ id: 'brand-new-model', name: 'Brand New Model' }])
     assert.equal(model.contextWindow, 262_144)
@@ -140,6 +146,7 @@ describe('parseModelConfig', () => {
     assert.deepEqual(models[0], {
       id: 'deepseek-v4-pro',
       name: 'Deepseek-V4-Pro',
+      description: 'DeepSeek 旗舰模型，支持 1M 上下文窗口',
       credits: 'x0.51',
       contextWindow: 1000000,
       maxTokens: 50000,
@@ -151,6 +158,7 @@ describe('parseModelConfig', () => {
     assert.deepEqual(models[1], {
       id: 'glm-5.3-flash',
       name: 'GLM-5.3-Flash',
+      description: '原生多模态，擅长处理复杂的长程自主任务。',
       credits: 'x0.06',
       contextWindow: 1000000,
       maxTokens: 32000,
@@ -158,7 +166,7 @@ describe('parseModelConfig', () => {
       reasoningEfforts: { off: null, low: 'low', high: 'high', max: 'max' },
       defaultEffort: 'high',
     })
-    // disabledMultimodal=false 且不可关思考
+    // disabledMultimodal=false 且不可关思考（无描述字段 → 不携带）
     assert.deepEqual(models[2], {
       id: 'hy4-preview',
       name: 'Hy4 preview',
@@ -170,16 +178,17 @@ describe('parseModelConfig', () => {
       defaultEffort: 'high',
     })
   })
-  it('agents 包裹在 data.agent 下时同样解析', () => {
+  it('agents 包裹在 data.agent 下时同样解析（descriptionEn 兜底）', () => {
     const body = {
       data: {
         agent: { agents: [{ name: 'cli', models: ['hy3'] }] },
-        models: [{ id: 'hy3', maxInputTokens: 192000, maxOutputTokens: 64000 }],
+        models: [{ id: 'hy3', descriptionEn: 'Model description fallback', maxInputTokens: 192000, maxOutputTokens: 64000 }],
       },
     }
     const models = parseModelConfig(body)
     assert.equal(models.length, 1)
     assert.equal(models[0].id, 'hy3')
+    assert.equal(models[0].description, 'Model description fallback')
   })
   it('容量缺失的模型被丢弃，id 不在目录的模型被丢弃', () => {
     const body = {

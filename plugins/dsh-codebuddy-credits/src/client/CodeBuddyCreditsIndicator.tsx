@@ -41,6 +41,7 @@ interface ModelFactView {
   vision: boolean
   contextWindow: number
   maxTokens: number
+  description?: string
   efforts?: string[]
 }
 
@@ -445,6 +446,9 @@ export function CodeBuddyCreditsIndicator({
                   <div style={dividerStyle} />
                   <div style={captionStyle}>{t('indicator.model.title')}</div>
                   <div style={{ fontSize: '12px', lineHeight: '18px', fontWeight: 500 }}>{model.name}</div>
+                  {model.description !== undefined
+                    ? <div style={captionStyle}>{model.description}</div>
+                    : null}
                   <div style={captionStyle}>{t('indicator.model.context', { context: formatTokens(model.contextWindow) })}</div>
                   {model.vision
                     ? <div style={captionStyle}>👁 {t('indicator.model.vision')}</div>

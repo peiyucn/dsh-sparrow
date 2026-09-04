@@ -226,6 +226,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
       name: model.name,
       // 显式声明输入模态：text-only 是「明确的负能力」，视觉模型带上 image。
       inputModalities: model.input,
+      ...(model.description === undefined ? {} : { description: model.description }),
     })))
   }
 
@@ -237,6 +238,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
       name: facts?.name ?? model,
       context: { contextWindow: facts?.contextWindow ?? 262_144 },
       ...(facts === undefined ? {} : { inputModalities: facts.input }),
+      ...(facts?.description === undefined ? {} : { description: facts.description }),
     }
     if (facts?.reasoning === true && facts.thinkingLevelMap !== undefined) {
       const levels = Object.keys(facts.thinkingLevelMap)
