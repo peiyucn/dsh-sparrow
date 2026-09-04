@@ -1,7 +1,8 @@
 /**
  * dsh-vision-bridge client half：模型选择器旁的状态图标（随模型能力三态，点击弹说明）。
- * 当前选中模型读官方共享模型目录（ctx.modelDirectories，与模型座位同 store、首帧同步）；
- * 能力模式查 host 能力路由（GET /api/vision-bridge/capability，无会话依赖，client 进程内缓存）。
+ * 当前选中模型读官方共享模型目录（ctx.modelDirectories，与模型座位同 store）+ 会话
+ * modelSelection 投影，未解析时走共享默认模型兜底；能力模式查 host 能力路由
+ * （GET /api/vision-bridge/capability，无会话依赖；client 只缓存 host 给定论的答案）。
  */
 
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -88,11 +89,9 @@ export function apply(ctx: ClientContext): void {
   const disposeDictionaries = ctx.locale.register('vision-bridge', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
   ctx.effect(() => disposeDictionaries, 'dsh-vision-bridge: locale dictionaries')
 
-  // 官方共享模型目录（与模型座位同 store、首帧同步）；组合缺该服务（旧版 dsh）
-  // 时 fail-soft：目录取不到 → 图标隐藏，不影响主流程。
-  // 与 credits 遮蔽选择器一致从根上下文取（防御性对齐：实测本机运行时 ctx.get
-  // 与 ctx.root.get 为同一实例；真正的失败场景是会话 scope 首帧未就绪时
-  // directoryFor 抛错，由组件内惰性重试适配器消化——见 VisionStatusIcon）。
+  // 官方共享模型目录（与模型座位同 store）；组合缺该服务（旧版 dsh）时
+  // fail-soft：目录取不到 → 走投影/默认兜底。从根上下文取（与 credits 遮蔽
+  // 选择器一致）；首帧 scope 未就绪时 directoryFor 抛错由组件惰性重试消化。
   const directoryFor = (sessionId: SessionId): DirectoryStore | undefined => {
     try {
       const resolver = ctx.root.get('modelDirectories') as unknown as {

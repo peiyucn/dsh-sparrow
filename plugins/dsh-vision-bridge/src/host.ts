@@ -324,7 +324,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
     path: CAPABILITY_ROUTE_PATH,
     handler: async (req, res) => {
       if (req.method !== 'GET') {
-        sendJson(res, 405, { mode: 'no-vision', visionModel: settings.visionModel })
+        sendJson(res, 405, { mode: 'no-vision', visionModel: settings.visionModel, declared: false })
         return
       }
       const url = new URL(req.url ?? '/', 'http://localhost')
@@ -333,7 +333,7 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       if (provider === '' || model === '') {
         const selected = readDefaultModel(ctx)
         if (selected === undefined) {
-          sendJson(res, 400, { mode: 'no-vision', visionModel: settings.visionModel })
+          sendJson(res, 400, { mode: 'no-vision', visionModel: settings.visionModel, declared: false })
           return
         }
         provider = selected.provider

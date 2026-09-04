@@ -22,6 +22,12 @@ export interface VisionStatusResult {
 const CAPABILITY_UNKNOWN_RETRY_MS = 2_500
 const CAPABILITY_UNKNOWN_RETRIES = 4
 
+/** 弹层定位常量：高度估算 96px（264px 宽说明卡）、翻转判定余量 8px、
+ *  离按钮间距 4px。 */
+const POPOVER_HEIGHT_ESTIMATE = 96
+const POPOVER_FLIP_MARGIN = 8
+const POPOVER_GAP = 4
+
 /** 官方共享模型目录 store 的最小面（与模型座位同 store：快照 + 订阅）。 */
 export interface DirectoryStore {
   getSnapshot(): { current: { provider: string; model: string } | null }
@@ -46,6 +52,44 @@ export type VisionStatusProps = PropsRuntime<'conversation.input.right'> & Visio
   sessionId?: SessionId
   /** 会话标准 hook（ui-session 提供）；旧版 dsh 缺该 prop 时为 undefined。 */
   useProjection?: (key: string) => unknown
+}
+
+/**
+ * 官方共享模型目录的惰性读取面（与模型座位同 store、含模型选择乐观回写）。
+ * 首次渲染时会话 scope 可能尚未就绪、directoryFor 会抛错——一次失败不弃权：
+ * getSnapshot/subscribe 每次读取重试（credits 遮蔽选择器同款惰性解析），
+ * 解析成功后通知等待中的订阅者。
+ */
+function createLazyDirectoryStore(
+  directoryFor: VisionStatusInjected['directoryFor'],
+  sessionId: SessionId | undefined,
+): { getSnapshot: () => { provider: string; model: string } | null; subscribe: (listener: () => void) => () => void } {
+  let resolved: DirectoryStore | undefined
+  const pending = new Set<() => void>()
+  const ensure = (): DirectoryStore | undefined => {
+    if (resolved !== undefined) return resolved
+    if (sessionId === undefined) return undefined
+    try {
+      const hit = directoryFor(sessionId)
+      if (hit !== undefined) {
+        resolved = hit
+        for (const listener of pending) listener()
+        pending.clear()
+      }
+    } catch {
+      // 会话 scope 尚未就绪：保持未决，下一次读取重试。
+    }
+    return resolved
+  }
+  return {
+    getSnapshot: () => ensure()?.getSnapshot().current ?? null,
+    subscribe: (listener) => {
+      const hit = ensure()
+      if (hit !== undefined) return hit.subscribe(listener)
+      pending.add(listener)
+      return () => { pending.delete(listener) }
+    },
+  }
 }
 
 /** 眼睛 glyph：官方 icon 集无眼睛图标，内联 SVG + currentColor（同官方 PermissionSelect 自绘盾牌先例）。 */
@@ -142,52 +186,25 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
     ? undefined
     : useProjection('modelSelection') as ModelSelectionProjectionLike | undefined
 
-  // 官方共享模型目录（与模型座位同 store、含模型选择乐观回写）。首次渲染时会话
-  // scope 可能尚未就绪、directoryFor 会抛错——一次失败不弃权：getSnapshot/subscribe
-  // 每次读取重试（credits 遮蔽选择器同款惰性解析），解析成功后通知等待中的订阅者。
-  const directoryAdapter = useMemo(() => {
-    let resolved: DirectoryStore | undefined
-    const pending = new Set<() => void>()
-    const ensure = (): DirectoryStore | undefined => {
-      if (resolved !== undefined) return resolved
-      if (sessionId === undefined) return undefined
-      try {
-        const hit = directoryFor(sessionId)
-        if (hit !== undefined) {
-          resolved = hit
-          for (const listener of pending) listener()
-          pending.clear()
-        }
-      } catch {
-        // 会话 scope 尚未就绪：保持未决，下一次读取重试。
-      }
-      return resolved
-    }
-    return {
-      getSnapshot: (): { provider: string; model: string } | null => ensure()?.getSnapshot().current ?? null,
-      subscribe: (listener: () => void): (() => void) => {
-        const hit = ensure()
-        if (hit !== undefined) return hit.subscribe(listener)
-        pending.add(listener)
-        return () => { pending.delete(listener) }
-      },
-    }
-  }, [directoryFor, sessionId])
+  // 官方共享模型目录（与模型座位同 store、含模型选择乐观回写）；惰性重试解析。
+  const directoryAdapter = useMemo(
+    () => createLazyDirectoryStore(directoryFor, sessionId),
+    [directoryFor, sessionId],
+  )
   const directoryCurrent = useSyncExternalStore(
     directoryAdapter.subscribe,
     directoryAdapter.getSnapshot,
   )
 
-  // 生效模型：目录（座位同源）→ 会话投影（持久化选择）→ null（走 host 默认模型兜底）。
+  // 生效模型：目录（座位同源，含乐观回写）→ 会话投影（持久化选择）→ null（默认兜底）。
   const effective = directoryCurrent ?? projection?.next ?? null
   const effectiveKey = effective === null ? '' : `${effective.provider}:${effective.model}`
 
   // 模型变化 / 会话切换时查能力：缓存命中立即上色；未命中保持上一状态直到新结果
-  // （避免闪烁），失败隐藏（保守，不影响主流程）。目录/投影都未解析（空白会话、
-  // 历史未装载窗口）时按共享默认模型兜底——该窗口内 composer 实际生效的就是
-  // 默认模型；目录/投影就位后自动纠正为会话真实模型，图标首帧即在位。
-  // host 报 declared:false（模型事实未装载）时有限次补查自愈：启动期目录未就绪
-  // 的假阴性（如默认模型 hy4 先答 no-vision）几秒内纠正，不锁死在错误状态。
+  // （避免闪烁），失败隐藏（保守）。目录/投影都未解析（空白会话、历史未装载窗口）
+  // 时按共享默认模型兜底——该窗口内 composer 实际生效的就是默认模型，就位后自动
+  // 纠正为会话真实模型。host 报 declared:false（模型事实未装载）时有限次补查自愈
+  // （启动期假阴性如 hy4 先答 no-vision，几秒内纠正）。
   useEffect(() => {
     setOpen(false)
     let alive = true
@@ -219,9 +236,8 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
   const computePoint = (): { x: number; y: number; up: boolean } | null => {
     const rect = buttonRef.current?.getBoundingClientRect()
     if (rect === undefined) return null
-    const estimate = 96 + 8
-    const up = rect.bottom + estimate > window.innerHeight
-    return { x: rect.right, y: up ? rect.top - 4 : rect.bottom + 4, up }
+    const up = rect.bottom + POPOVER_HEIGHT_ESTIMATE + POPOVER_FLIP_MARGIN > window.innerHeight
+    return { x: rect.right, y: up ? rect.top - POPOVER_GAP : rect.bottom + POPOVER_GAP, up }
   }
 
   // 弹层打开时：点外部关闭、Esc 关闭、滚动/缩放跟随重定位（官方下拉同款行为）。
@@ -257,20 +273,21 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
   const noVision = status?.mode === 'no-vision'
   // 能力查询未返回 / 查询失败 → 隐藏（不显示占位色）。
   if (status === null) return null
-  const aria = native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')
+  const title = native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')
+  const buttonClass = native
+    ? 'dsh-vision-status dsh-vision-status-native'
+    : noVision
+      ? 'dsh-vision-status dsh-vision-status-none'
+      : 'dsh-vision-status'
   return (
     <>
       <button
         ref={buttonRef}
         type="button"
-        className={native
-          ? 'dsh-vision-status dsh-vision-status-native'
-          : noVision
-            ? 'dsh-vision-status dsh-vision-status-none'
-            : 'dsh-vision-status'}
+        className={buttonClass}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={aria}
+        aria-label={title}
         onClick={(event) => {
           event.stopPropagation()
           if (open) setOpen(false)
@@ -287,14 +304,14 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
           <div
             className="dsh-vision-popover"
             role="dialog"
-            aria-label={aria}
+            aria-label={title}
             style={{
               left: point.x,
               top: point.y,
               transform: point.up ? 'translateX(-100%) translateY(-100%)' : 'translateX(-100%)',
             }}
           >
-            <div className="dsh-vision-popover-title">{native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')}</div>
+            <div className="dsh-vision-popover-title">{title}</div>
             <div className="dsh-vision-popover-body">
               {native
                 ? t('popover.nativeVision.body')
