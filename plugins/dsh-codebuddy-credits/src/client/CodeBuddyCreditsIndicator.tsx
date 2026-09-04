@@ -20,7 +20,6 @@ import type { CSSProperties } from 'react'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const QUOTA_URL = '/api/codebuddy-credits/quota'
-const SESSION_USAGE_URL = '/api/codebuddy-credits/session-usage'
 
 /** 面板标题用的方形渐变图标（Combine 里取出的 Color 单块，独立渐变 id）。 */
 const SQUARE_LOGO_SVG = '<svg height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>CodeBuddy</title><defs><radialGradient cx="0" cy="0" gradientTransform="matrix(-9.00009 -16 16 -9.00009 21 24.5)" gradientUnits="userSpaceOnUse" id="ccb-logo-square-gradient" r="1"><stop stop-color="#2EA99D"></stop><stop offset="1" stop-color="#6C4DFF"></stop></radialGradient></defs><path d="M18.821 0H5.18A5.179 5.179 0 000 5.179V18.82A5.179 5.179 0 005.179 24H18.82A5.179 5.179 0 0024 18.821V5.18A5.179 5.179 0 0018.821 0z" fill="url(#ccb-logo-square-gradient)"></path><path d="M18.777 1.647c.28-.02.536.114.972.51 1.018.926 2.437 2.828 3.318 4.452l.34.631.482.24.11.06v3.638a5.206 5.206 0 00-5.32-1.23c-.491.166-1.021.471-2.08 1.082l-6.09 3.516c-1.057.61-1.586.916-1.975 1.259a5.208 5.208 0 00-1.493 5.572c.165.49.471 1.02 1.082 2.08l.315.543h-3.26c-.685 0-1.34-.135-1.939-.377-.169-.956-.009-1.789.469-2.335.158-.18.164-.189.13-.493a11.846 11.846 0 01-.057-1.711l.02-.444-.667-1.18C2.1 15.622 1.445 14.078 1.192 12.9c-.133-.647-.125-.934.04-1.146.1-.128.427-.261.822-.334.994-.175 3.162-.017 5.575.41l.25.043.551-.487c.915-.81 1.522-1.264 2.641-1.962 1.167-.73 2.484-1.331 3.967-1.807l.476-.152.261-.688c.937-2.471 1.896-4.293 2.58-4.9.235-.21.25-.22.422-.23z" fill="#fff"></path><path d="M12.139 18.2a1.203 1.203 0 011.642.44l1.296 2.243a1.204 1.204 0 01-2.083 1.203l-1.296-2.243a1.203 1.203 0 01.44-1.644zM18.629 14.452a1.203 1.203 0 011.642.44l1.295 2.244a1.203 1.203 0 11-2.083 1.203l-1.295-2.243a1.203 1.203 0 01.44-1.644z" fill="#fff"></path></svg>'
@@ -201,13 +200,6 @@ export function CodeBuddyCreditsIndicator({
   // 展开面板时才拉 /quota。
   const [quota, setQuota] = useState<QuotaView | undefined>(undefined)
   const [quotaError, setQuotaError] = useState<string | undefined>(undefined)
-  // 本会话累计积分（进程内 usage 记账，展开面板时查询）。
-  const [sessionUsage, setSessionUsage] = useState<{
-    credit: number
-    calls: number
-    recent: ReadonlyArray<{ model: string; credit?: number }>
-  } | undefined>(undefined)
-  const [usageError, setUsageError] = useState<string | undefined>(undefined)
   // 面板定位（打开时计算，滚动/缩放跟随重定位）：
   // header 变体右缘对齐按钮、左缘钳制在会话区；sidebar 变体从按钮右上展开、
   // 左缘钳制在会话区左缘（侧栏按钮在会话区之外，右对齐公式不适用）。
@@ -219,13 +211,12 @@ export function CodeBuddyCreditsIndicator({
     width: number
   } | null>(null)
   const rootRef = useRef<HTMLElement | null>(null)
-  // 三个加载器各自独立的请求序号：共享一个序号会让并发请求互相作废——展开
-  // 面板时 status/quota/sessionUsage 同时发出，先发者的响应会被后发者的序号
-  // 增长丢弃，面板一直停在「读取中」（实测）。各自维护序号，只作废自己这条
-  // 流里被更新的旧响应。
+  // 两个加载器各自独立的请求序号：共享一个序号会让并发请求互相作废——展开
+  // 面板时 status/quota 同时发出，先发者的响应会被后发者的序号增长丢弃，
+  // 面板一直停在「读取中」（实测）。各自维护序号，只作废自己这条流里被
+  // 更新的旧响应。
   const statusSeq = useRef(0)
   const quotaSeq = useRef(0)
-  const usageSeq = useRef(0)
 
   // 当前选中模型：共享模型目录优先（与选择器同一 store，含目录默认兜底）；
   // 目录不可用（组合里没有 modelDirectories 服务）时退回 session 投影。
@@ -287,30 +278,6 @@ export function CodeBuddyCreditsIndicator({
     }
   }, [t])
 
-  /** 展开面板时拉取本会话累计积分（按 sessionId 记账）。 */
-  const loadSessionUsage = useCallback(async () => {
-    // 无当前会话（新会话纯视图）时没有可记的账：跳过，不显示本会话消耗行。
-    if (sessionId === '') return
-    const seq = ++usageSeq.current
-    setUsageError(undefined)
-    try {
-      const response = await fetch(`${SESSION_USAGE_URL}?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' })
-      if (seq !== usageSeq.current) return
-      if (!response.ok) {
-        setUsageError(t('indicator.loadFailed'))
-        return
-      }
-      setSessionUsage(await response.json() as {
-        credit: number
-        calls: number
-        recent: ReadonlyArray<{ model: string; credit?: number }>
-      })
-    } catch {
-      if (seq !== usageSeq.current) return
-      setUsageError(t('indicator.loadFailed'))
-    }
-  }, [sessionId, t])
-
   /** 计算面板位置：header 变体右缘对齐按钮、左缘钳制在会话区（空间不足允许
    *  收缩，绝不越过会话区左缘）；sidebar 变体从按钮右上方展开（贴近对话框），
    *  左缘钳制在会话区左缘、右缘不越视口。 */
@@ -355,7 +322,6 @@ export function CodeBuddyCreditsIndicator({
     position()
     void loadStatus()
     void loadQuota()
-    void loadSessionUsage()
     const onMouseDown = (event: MouseEvent) => {
       // portal 面板不在 rootRef 内：按面板类名豁免，其余点击关闭。
       const target = event.target
@@ -375,7 +341,7 @@ export function CodeBuddyCreditsIndicator({
       document.removeEventListener('scroll', position, true)
       window.removeEventListener('resize', position)
     }
-  }, [open, position, loadStatus, loadQuota, loadSessionUsage])
+  }, [open, position, loadStatus, loadQuota])
 
   const selected = selection?.provider === 'codebuddy-credits' ? selection : undefined
   const model = selected === undefined
@@ -600,36 +566,6 @@ export function CodeBuddyCreditsIndicator({
                   {quotaError !== undefined
                     ? <div style={dangerStyle}>{quotaError}</div>
                     : null}
-                  {sessionUsage !== undefined
-                    ? (
-                      <>
-                        <div style={captionStyle}>
-                          {t('indicator.sessionUsage', {
-                            credit: formatCredits(sessionUsage.credit),
-                            calls: String(sessionUsage.calls),
-                          })}
-                        </div>
-                        {sessionUsage.recent.length > 0
-                          ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <div style={captionStyle}>{t('indicator.recentCalls')}</div>
-                              {sessionUsage.recent.map((call, index) => (
-                                <div key={index} style={captionStyle}>
-                                  {t('indicator.callRow', {
-                                    model: call.model,
-                                    credit: call.credit === undefined ? '–' : formatCredits(call.credit),
-                                  })}
-                                </div>
-                              ))}
-                            </div>
-                          )
-                          : null}
-                      </>
-                    )
-                    : null}
-                  {usageError !== undefined
-                    ? <div style={dangerStyle}>{usageError}</div>
-                    : null}
                 </>
               )
               : null}
@@ -685,11 +621,14 @@ export function ensureIndicatorStyles(): void {
     '  outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);',
     '}',
     // 侧栏 footer 触发键：宽栏 = 零占位锚点 + 绝对定位品牌 logo 按钮，落在
-    // Settings 行右侧（官方 Settings 单槽不可加项，CSS 方案共用该行、只占
-    // 自有点击区）；rail = 常规圆形图标行（对齐 archive/file-manage 同款
-    // 触发键配方）。
+    // Settings 行右侧。官方 Settings 是 single 槽位、按钮占满整行——经官方
+    // 锚点契约（data-slot 可寻址 seam）把 Settings 按钮收缩让出右侧 96px，
+    // 两个按钮同行不重叠（仅在本插件宽栏锚点存在时生效，rail 不收缩）。
     '.ccb-sidebar-anchor {',
     '  position: relative; height: 0; width: 100%; align-self: flex-end;',
+    '}',
+    'body:has(.ccb-sidebar-anchor) [data-slot="sidebar.settings"] button {',
+    '  width: calc(100% - 96px);',
     '}',
     '.ccb-sidebar-trigger {',
     '  display: flex; align-items: center; justify-content: center;',
@@ -700,12 +639,9 @@ export function ensureIndicatorStyles(): void {
     '  background: var(--dsw-alias-interactive-bg-hover);',
     '  color: var(--dsw-alias-label-primary);',
     '}',
-    // 宽栏按钮背景 = 侧栏底色（不透明）：压在 Settings 按钮上，遮挡其 hover
-    // 亮色在本图标区域透出——Settings 与额度的 hover 互不干扰。
     '.ccb-sidebar-trigger-wide {',
-    '  position: absolute; right: 0; top: 4px; z-index: 1;',
+    '  position: absolute; right: 0; top: 4px;',
     '  height: 42px; padding: 0 10px; border-radius: 12px;',
-    '  background: var(--dsw-specific-sidebar-fill);',
     '}',
     '.ccb-sidebar-trigger-rail {',
     '  width: 36px; height: 36px; margin: 8px 0 10px; border-radius: 50%;',

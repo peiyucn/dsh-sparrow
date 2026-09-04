@@ -193,10 +193,6 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
             </div>
             <div style={{ marginBottom: '10px', borderTop: '0.5px solid var(--dsw-alias-border-l2)' }} aria-hidden />
             <dl style={{ display: 'grid', gridTemplateColumns: 'minmax(76px, auto) minmax(0, 1fr)', gap: '6px 16px', margin: 0, color: 'var(--dsw-alias-label-tertiary)' }}>
-              <dt style={{ margin: 0, minWidth: 0 }}>{t('turnCredit.total')}</dt>
-              <dd style={{ margin: 0, minWidth: 0, color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>
-                {formatCredits(usage.credit)}
-              </dd>
               <dt style={{ margin: 0, minWidth: 0 }}>{t('turnCredit.calls')}</dt>
               <dd style={{ margin: 0, minWidth: 0, color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>
                 {String(usage.calls)}
