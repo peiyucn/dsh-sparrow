@@ -12,7 +12,7 @@ Complements the built-in archive. DSH's archive marker only hides a session from
 dsh plugin --profile web add @dsh-sparrow/dsh-archive-manage
 ```
 
-Requires dsh ≥ 0.1.2-alpha.4 and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
+Requires dsh ≥ 0.1.2-rc.1 and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
 
 > Do **not** run `npm install @dsh-sparrow/dsh-archive-manage` directly — that only downloads the package into a `node_modules` and does not register it in the DSH web profile. Install with the `dsh plugin` command above, then restart DSH.
 
