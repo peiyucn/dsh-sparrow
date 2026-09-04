@@ -54,17 +54,15 @@ export interface CodeBuddyCreditsShared {
   removeKey(): Promise<void>
   /** 查询企业周期配额。 */
   quota(): Promise<QuotaStatus>
-  /** 会话累计积分与调用次数（进程内 usage 记账），附最近调用明细。 */
+  /** 会话累计积分与调用次数（进程内 usage 记账）。 */
   sessionUsage(sessionId: string): {
     credit: number
     calls: number
-    recent: ReadonlyArray<{ model: string; credit?: number }>
   }
-  /** 单轮积分与调用明细（每轮积分胶囊用）。 */
+  /** 单轮积分与调用次数（每轮积分胶囊用）。 */
   turnUsage(sessionId: string, turn: number): {
     credit: number
     calls: number
-    recent: ReadonlyArray<{ model: string; credit?: number }>
   }
   /** route 是否注册（状态接口诊断用）。 */
   active(): boolean
@@ -83,38 +81,26 @@ export interface UsageEntryLike {
   sessionId?: string
   turn?: number
   credit?: number
-  model: string
 }
 
 /**
- * usage 记账聚合（纯函数）：按会话（+可选轮次）合计积分与调用次数，
- * 附最近调用明细（模型 + 积分，最多 RECENT_CALLS 条）。
+ * usage 记账聚合（纯函数）：按会话（+可选轮次）合计积分与调用次数。
  */
 export function turnUsageOf(
   entries: readonly UsageEntryLike[],
   sessionId: string,
   turn: number | undefined,
-): { credit: number; calls: number; recent: ReadonlyArray<{ model: string; credit?: number }> } {
+): { credit: number; calls: number } {
   let credit = 0
   let calls = 0
-  const recent: { model: string; credit?: number }[] = []
   for (const usage of entries) {
     if (usage.sessionId !== sessionId) continue
     if (turn !== undefined && usage.turn !== turn) continue
     calls += 1
     if (usage.credit !== undefined) credit += usage.credit
-    recent.push({
-      model: usage.model,
-      ...(usage.credit === undefined ? {} : { credit: usage.credit }),
-    })
-    // 只保留最近几次调用（面板明细；合计不受截断影响）。
-    if (recent.length > RECENT_CALLS) recent.shift()
   }
-  return { credit, calls, recent }
+  return { credit, calls }
 }
-
-/** 明细保留的最近调用条数。 */
-export const RECENT_CALLS = 5
 
 /** 模型事实 → 状态接口视图。 */
 export function toModelFactView(model: CodeBuddyModelFacts): ModelFactView {
