@@ -643,7 +643,10 @@ export function ensureIndicatorStyles(): void {
     '  position: relative; height: 0; width: 100%; align-self: flex-end;',
     '}',
     // 官方 Settings trigger 是 flex:1 撑满行：先关掉 flex 伸展，宽度才生效。
-    'body:has(.ccb-sidebar-anchor) [data-slot="sidebar.settings"] button {',
+    // 选择器必须收窄到触发键（aria-haspopup="dialog"）：sidebar.settings 这个
+    // 槽位承载的是整个 SettingsRoot（触发键 + 全屏设置面板），裸 `button`
+    // 会把设置页的导航/关闭/下拉按钮一并压窄（"General" 被截成 "G.."）。
+    'body:has(.ccb-sidebar-anchor) [data-slot="sidebar.settings"] button[aria-haspopup="dialog"] {',
     '  flex: none;',
     '  width: calc(100% - 96px);',
     '}',
