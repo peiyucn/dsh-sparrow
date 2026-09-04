@@ -79,6 +79,18 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
   const [point, setPoint] = useState<{ left: number; bottom: number } | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
 
+  // 槽位固定渲染在复制与分支之间（官方顺序）；用户要求胶囊放到行尾时间之前——
+  // DOM 级移动本插件自有节点：assistant 消息的行动作行末尾就是时间元素，
+  // 把胶囊插到行内最后一个元素之前（时间缺失时兜底落到 Usage 胶囊之后，
+  // 仍在行尾）。只移动自有节点，不包装/替换官方组件。
+  useEffect(() => {
+    const pill = buttonRef.current
+    if (pill === null) return
+    const row = pill.parentElement
+    if (row === null || row.lastElementChild === null || row.lastElementChild === pill) return
+    row.insertBefore(pill, row.lastElementChild)
+  }, [usage !== undefined && usage.calls > 0])
+
   // messageId → turn：扫描快照里的 turn-tail 节点（官方同款关联：closing.
   // finalNode.messageId）。找不到（历史未装载/非完成态）返回 null → 不渲染。
   const turn = useChat((snapshot) => {
