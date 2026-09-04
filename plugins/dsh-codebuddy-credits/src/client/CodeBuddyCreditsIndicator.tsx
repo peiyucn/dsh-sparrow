@@ -160,7 +160,7 @@ const panelStyle: CSSProperties = {
 } as CSSProperties
 
 /** 面板最大宽度：会话区足够宽时的上限。 */
-const PANEL_MAX_WIDTH = 360
+const PANEL_MAX_WIDTH = 300
 /** 面板与会话区左缘的最小间距。 */
 const PANEL_EDGE_GAP = 8
 
@@ -595,7 +595,7 @@ export function CodeBuddyCreditsIndicator({
                       {[
                         model.vision ? t('indicator.model.visionFeature') : null,
                         model.efforts !== undefined && model.efforts.length > 0 ? t('indicator.model.reasoningFeature') : null,
-                      ].filter((item): item is string => item !== null).join('、')}
+                      ].filter((item): item is string => item !== null).join(' · ')}
                     </span>
                   </div>
                   <div style={dividerStyle} />
