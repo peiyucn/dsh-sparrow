@@ -16,6 +16,17 @@
 - 凭据：界面保存（DSH 凭据库）为主，`CODEBUDDY_API_KEY` 环境变量兼容
 - 无 Key 时插件不发任何网络请求，模型选择器不出现本 provider
 
+## 信息分级（总纲，2026-09-04 定）
+
+积分/用量信息按四档各归其位，改动一律按档位归位：
+
+| 档位 | 信息 | 位置 | 数据源 |
+| :--- | :--- | :--- | :--- |
+| 用户级 | 账号/企业、周期额度、重置时间、当前模型 | 侧栏额度卡（`sidebar.footer.action`，与 Settings 同行右置） | `/status` + `/quota` |
+| 会话级 | 本会话累计积分 · 调用次数 | 输入框下方统计行（`conversation.composer.dock`，官方 StatsLine 同槽位 order 1） | `/session-usage` |
+| 轮次级 | 该轮积分合计 + 每次调用明细 | 每轮「积分」胶囊（`conversation.chat.assistant-actions`，DOM 移到行尾时间前） | `/turn-usage`（agent/request signal 关联轮次） |
+| 对话级 | token 消耗、缓存命中、耗时 | 官方每轮 Usage/时间统计（不改动） | 官方 token-meter（数据来自本适配器 usage 帧） |
+
 ## 架构（2026-09-03 重写：协议层自建，不依赖 pi-ai）
 
 把 CodeBuddy 积分当成一个**非标准协议的推理 API** 来适配——OpenAI Chat Completions
