@@ -15,6 +15,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-attachment'
+import type {} from '@deepseek-ai/dsh-agent'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm'
@@ -36,7 +37,7 @@ import {
   STREAM_IDLE_TIMEOUT_MS,
 } from './constants.js'
 import { fetchQuota } from './quota.js'
-import { installCodeBuddyWeb } from './web.js'
+import { installCodeBuddyWeb, turnUsageOf } from './web.js'
 
 export const name = 'llm-codebuddy-credits'
 export const inject = ['llm', 'attachments']
@@ -89,8 +90,26 @@ export function apply(ctx: Context, config: Config): void {
     )
   }
 
-  /** 会话/今日积分统计（进程内累计，展示走状态接口）。 */
-  const usageLog: CodeBuddyUsage[] = []
+  /** 会话/积分统计（进程内累计，展示走状态接口）。 */
+  /** usage 条目附带轮次（agent/request 载荷透出，供每轮积分展示）。 */
+  interface TaggedUsage extends CodeBuddyUsage {
+    turn?: number
+  }
+  const usageLog: TaggedUsage[] = []
+
+  /**
+   * 请求信号 → turn 关联：agent/request 载荷的 signal 与适配器
+   * options.signal 是同一实例（官方 loop prepareCall 透传，已查证），
+   * WeakMap 按信号精确关联；请求被中断时条目随信号回收、无残留错位。
+   */
+  const requestTurns = new WeakMap<AbortSignal, { turn: number }>()
+  ctx.on('agent/request', async (payload, next) => {
+    const config = await next()
+    if (config.provider === PROVIDER) {
+      requestTurns.set(payload.signal, { turn: payload.turn })
+    }
+    return config
+  })
 
   // route 条件注册：Key 可用即注册（模型目录可能还是空的——首次打开选择器时
   // 建目录会触发后台刷新补上）；Key 移除即撤回。
@@ -160,7 +179,11 @@ export function apply(ctx: Context, config: Config): void {
     account: () => account,
     streamIdleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,
     onUsage: (usage) => {
-      usageLog.push(usage)
+      const tagged = usage.signal === undefined ? undefined : requestTurns.get(usage.signal)
+      usageLog.push({
+        ...usage,
+        ...(tagged === undefined ? {} : { turn: tagged.turn }),
+      })
       if (usageLog.length > 1000) usageLog.splice(0, usageLog.length - 1000)
     },
     onCatalogRead: () => {
@@ -368,21 +391,11 @@ export function apply(ctx: Context, config: Config): void {
     },
     /** 会话累计积分：usage 回调按 sessionId 记账（进程内，重启清零）。 */
     sessionUsage(sessionId) {
-      let credit = 0
-      let calls = 0
-      const recent: { model: string; credit?: number }[] = []
-      for (const usage of usageLog) {
-        if (usage.sessionId !== sessionId) continue
-        calls += 1
-        if (usage.credit !== undefined) credit += usage.credit
-        recent.push({
-          model: usage.model,
-          ...(usage.credit === undefined ? {} : { credit: usage.credit }),
-        })
-        // 只保留最近几次调用（面板明细；合计不受截断影响）。
-        if (recent.length > 5) recent.shift()
-      }
-      return { credit, calls, recent }
+      return turnUsageOf(usageLog, sessionId, undefined)
+    },
+    /** 单轮积分：按 sessionId + turn 记账（每轮积分胶囊用）。 */
+    turnUsage(sessionId, turn) {
+      return turnUsageOf(usageLog, sessionId, turn)
     },
     account: () => ({
       ...(account?.enterpriseName === undefined ? {} : { enterpriseName: account.enterpriseName }),

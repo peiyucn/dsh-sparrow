@@ -17,6 +17,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { CodeBuddyCreditsCard, ensureCardStyles } from './CodeBuddyCreditsCard.js'
 import { CodeBuddyCreditsIndicator, ensureIndicatorStyles } from './CodeBuddyCreditsIndicator.js'
 import { CodeBuddyModelSelect, ensurePickerStyles } from './CodeBuddyModelSelect.js'
+import { CodeBuddyTurnCredit, ensureTurnCreditStyles } from './CodeBuddyTurnCredit.js'
 
 export const inject = ['slots', 'locale']
 
@@ -51,6 +52,12 @@ const LOCALE_DICTS = {
     'indicator.sessionUsage': '本会话消耗：{credit} 积分 · {calls} 次调用',
     'indicator.recentCalls': '最近调用：',
     'indicator.callRow': '{model} · {credit} 积分',
+    'turnCredit.aria': '本轮积分消耗 {credit}',
+    'turnCredit.label': '积分 {credit}',
+    'turnCredit.title': '本轮积分消耗',
+    'turnCredit.total': '本轮合计',
+    'turnCredit.calls': '调用次数',
+    'turnCredit.recent': '每次调用',
     'indicator.model.title': '当前模型',
     'indicator.model.context': '上下文 {context}',
     'indicator.model.vision': '原生视觉',
@@ -101,6 +108,12 @@ const LOCALE_DICTS = {
     'indicator.sessionUsage': 'This session: {credit} credits · {calls} calls',
     'indicator.recentCalls': 'Recent calls:',
     'indicator.callRow': '{model} · {credit} credits',
+    'turnCredit.aria': 'Turn credits {credit}',
+    'turnCredit.label': 'Credits {credit}',
+    'turnCredit.title': 'Turn credits',
+    'turnCredit.total': 'Turn total',
+    'turnCredit.calls': 'Calls',
+    'turnCredit.recent': 'Per call',
     'indicator.model.title': 'Current model',
     'indicator.model.context': 'Context {context}',
     'indicator.model.vision': 'Native vision',
@@ -142,6 +155,7 @@ export function apply(ctx: ClientContext): void {
   ensureIndicatorStyles()
   ensurePickerStyles()
   ensureCardStyles()
+  ensureTurnCreditStyles()
   const disposeDictionaries = ctx.locale.register('codebuddy-credits', {
     zh: LOCALE_DICTS.zh,
     en: LOCALE_DICTS.en,
@@ -175,6 +189,14 @@ export function apply(ctx: ClientContext): void {
     locale: 'codebuddy-credits',
     inject: () => ({ directoryFor }),
   }, CodeBuddyCreditsIndicator as unknown as (props: object) => ReactNode))
+
+  // 每轮积分胶囊：官方 Usage 胶囊同排（assistant-actions 槽位，公开 seam）。
+  // 该轮无 CodeBuddy 调用时组件返回 null，官方行动作行保持原样。
+  ctx.slots.inject('conversation.chat.assistant-actions', () => ctx.slots.register({
+    name: 'conversation.chat.assistant-actions',
+    id: 'codebuddy-credits-turn-credit',
+    locale: 'codebuddy-credits',
+  }, CodeBuddyTurnCredit as unknown as (props: object) => ReactNode))
 
   // 模型选择器遮蔽：priority -1（官方条目为默认 0，最低者渲染）。
   // 双保险注册：(1) 声明式注入等 modelDirectories/sessions 就绪（官方同款

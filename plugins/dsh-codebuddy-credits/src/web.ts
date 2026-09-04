@@ -58,6 +58,12 @@ export interface CodeBuddyCreditsShared {
     calls: number
     recent: ReadonlyArray<{ model: string; credit?: number }>
   }
+  /** 单轮积分与调用明细（每轮积分胶囊用）。 */
+  turnUsage(sessionId: string, turn: number): {
+    credit: number
+    calls: number
+    recent: ReadonlyArray<{ model: string; credit?: number }>
+  }
   /** route 是否注册（状态接口诊断用）。 */
   active(): boolean
   /** 账号快照（来自 /v2/accounts）。 */
@@ -69,6 +75,44 @@ export interface CodeBuddyCreditsShared {
   /** 当前生效模型事实（进程内，Key 驱动的目录）。 */
   models(): readonly CodeBuddyModelFacts[]
 }
+
+/** usage 记账条目的最小面（turnUsageOf 的输入）。 */
+export interface UsageEntryLike {
+  sessionId?: string
+  turn?: number
+  credit?: number
+  model: string
+}
+
+/**
+ * usage 记账聚合（纯函数）：按会话（+可选轮次）合计积分与调用次数，
+ * 附最近调用明细（模型 + 积分，最多 RECENT_CALLS 条）。
+ */
+export function turnUsageOf(
+  entries: readonly UsageEntryLike[],
+  sessionId: string,
+  turn: number | undefined,
+): { credit: number; calls: number; recent: ReadonlyArray<{ model: string; credit?: number }> } {
+  let credit = 0
+  let calls = 0
+  const recent: { model: string; credit?: number }[] = []
+  for (const usage of entries) {
+    if (usage.sessionId !== sessionId) continue
+    if (turn !== undefined && usage.turn !== turn) continue
+    calls += 1
+    if (usage.credit !== undefined) credit += usage.credit
+    recent.push({
+      model: usage.model,
+      ...(usage.credit === undefined ? {} : { credit: usage.credit }),
+    })
+    // 只保留最近几次调用（面板明细；合计不受截断影响）。
+    if (recent.length > RECENT_CALLS) recent.shift()
+  }
+  return { credit, calls, recent }
+}
+
+/** 明细保留的最近调用条数。 */
+export const RECENT_CALLS = 5
 
 /** 模型事实 → 状态接口视图。 */
 export function toModelFactView(model: CodeBuddyModelFacts): ModelFactView {
@@ -158,6 +202,22 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
               return
             }
             sendJson(res, 200, shared.sessionUsage(sessionId))
+            return
+          }
+          if (req.method === 'GET' && pathname === PREFIX + '/turn-usage') {
+            const params = new URL(req.url ?? '/', 'http://localhost').searchParams
+            const sessionId = params.get('sessionId')
+            const rawTurn = params.get('turn')
+            if (sessionId === null || sessionId === '' || rawTurn === null || rawTurn === '') {
+              sendJson(res, 400, { error: '缺少 sessionId 或 turn' })
+              return
+            }
+            const turn = Number(rawTurn)
+            if (!Number.isSafeInteger(turn) || turn < 0) {
+              sendJson(res, 400, { error: 'turn 必须是非负整数' })
+              return
+            }
+            sendJson(res, 200, shared.turnUsage(sessionId, turn))
             return
           }
           if (req.method === 'POST' && pathname === PREFIX + '/key') {

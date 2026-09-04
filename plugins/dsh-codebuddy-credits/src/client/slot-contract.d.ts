@@ -31,6 +31,16 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       scope: 'session'
       owner: { children?: never }
     }
+    /**
+     * 官方聊天视图的完成态 assistant 行动作槽位（ui-chat 声明；kind=list，
+     * scope=session，owner 传 durable messageId）——官方渲染顺序：复制 →
+     * 本槽位 → 分支 → Usage 胶囊 → 时间。本插件挂每轮积分胶囊。
+     */
+    'conversation.chat.assistant-actions': {
+      kind: 'list'
+      scope: 'session'
+      owner: { messageId: string }
+    }
   }
 
   interface LocaleNamespaceMap {
@@ -65,6 +75,15 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'indicator.model.context'
       | 'indicator.model.vision'
       | 'indicator.model.efforts'
+      | 'indicator.sessionUsage'
+      | 'indicator.recentCalls'
+      | 'indicator.callRow'
+      | 'turnCredit.aria'
+      | 'turnCredit.label'
+      | 'turnCredit.title'
+      | 'turnCredit.total'
+      | 'turnCredit.calls'
+      | 'turnCredit.recent'
       | 'picker.trigger.fallback'
       | 'picker.trigger.loading'
       | 'picker.trigger.selectAria'

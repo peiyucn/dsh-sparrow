@@ -35,6 +35,8 @@ export interface CodeBuddyUsage {
   model: string
   /** 会话 id（GenerateOptions.sessionId 透传；无会话的调用缺省）。 */
   sessionId?: string
+  /** 本次请求的取消信号（与 agent/request 载荷同一实例，插件据此关联 turn）。 */
+  signal?: AbortSignal
 }
 
 /** 图片字节读取回调（附件 seam）：返回媒体类型与原始字节，供 data URL 序列化。 */
@@ -488,6 +490,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
                 ...(credit === undefined ? {} : { credit }),
                 model: options.model,
                 ...(typeof options.sessionId === 'string' ? { sessionId: options.sessionId } : {}),
+                ...(options.signal === undefined ? {} : { signal: options.signal }),
               })
             }
             const finish = mapFinish(reason)
@@ -512,6 +515,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
               ...(credit === undefined ? {} : { credit }),
               model: options.model,
               ...(typeof options.sessionId === 'string' ? { sessionId: options.sessionId } : {}),
+              ...(options.signal === undefined ? {} : { signal: options.signal }),
             })
           }
           for (const chunk of chunks.splice(0)) yield chunk
