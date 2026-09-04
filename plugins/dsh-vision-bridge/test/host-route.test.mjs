@@ -11,7 +11,7 @@ import { apply } from '../lib/host.js'
 /** 记录 resolveModelInfo 调用次数的 mock llm。
  *  注意：cordis ctx.effect 的语义是同步执行回调注册副作用，mock 必须复现——
  *  否则 webServer.register 不会发生，路由测试就是空转（这正是第一次跑挂的原因）。 */
-function buildHarness({ resolveModelInfo, defaultModel } = {}) {
+function buildHarness({ resolveModelInfo, defaultModel, missingDefaultModel } = {}) {
   const calls = []
   let handler = null
   const ctx = {
@@ -30,7 +30,9 @@ function buildHarness({ resolveModelInfo, defaultModel } = {}) {
     },
     on: () => {},
     get: (key) => (key === 'agentDefaultModel'
-      ? { currentSelection: () => defaultModel ?? { provider: 'deepseek-official', model: 'deepseek-v4-pro' } }
+      ? (missingDefaultModel === true
+        ? undefined
+        : { currentSelection: () => defaultModel ?? { provider: 'deepseek-official', model: 'deepseek-v4-pro' } })
       : undefined),
   }
   apply(ctx, {})
@@ -77,9 +79,19 @@ describe('dsh-vision-bridge 能力路由链路', () => {
     assert.equal(result.body.mode, 'no-vision')
   })
 
-  it('缺少 provider/model 应该 400', async () => {
-    const { handler } = buildHarness()
-    const result = await request(handler, '/api/vision-bridge/capability?provider=deepseek-official')
+  it('缺少 provider/model 应该 回退共享默认模型（空白会话/历史未装载窗口）', async () => {
+    // 独特默认模型名隔离模块级缓存：回退后必然解析过它（预热或路由任一路径）。
+    const model = 'fallback-test-model'
+    const { handler, calls } = buildHarness({ defaultModel: { provider: 'deepseek-official', model } })
+    const result = await request(handler, '/api/vision-bridge/capability')
+    assert.equal(result.statusCode, 200)
+    assert.equal(result.body.mode, 'cross-model')
+    assert.ok(calls.some(([provider, hit]) => provider === 'deepseek-official' && hit === model))
+  })
+
+  it('缺少 provider/model 且默认模型服务缺失（旧版 dsh）应该 400', async () => {
+    const { handler } = buildHarness({ missingDefaultModel: true })
+    const result = await request(handler, '/api/vision-bridge/capability')
     assert.equal(result.statusCode, 400)
   })
 

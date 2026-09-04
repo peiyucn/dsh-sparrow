@@ -1,6 +1,6 @@
 /** 状态图标：模型选择器旁的眼睛，随当前模型能力变化颜色与文案（DeepSeek 模型都显示）。 */
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -24,11 +24,22 @@ export interface DirectoryStore {
 export interface VisionStatusInjected {
   /** 官方共享模型目录 store（ctx.modelDirectories）：当前选中模型与座位同源；目录不可用时 undefined。 */
   directoryFor: (sessionId: SessionId) => DirectoryStore | undefined
-  /** host 能力查询：按 provider/model 取模式 + 视觉模型 id（client 进程内缓存）。 */
+  /** host 能力查询：按 provider/model 取模式 + 视觉模型 id（client 进程内缓存；空参=host 默认模型兜底）。 */
   queryCapability: (provider: string, model: string) => Promise<VisionStatusResult>
 }
 
-export type VisionStatusProps = PropsRuntime<'conversation.input.right'> & VisionStatusInjected & { t: TranslateNS<'vision-bridge'>; sessionId?: SessionId }
+/** 官方 session 标准 hook useProjection 的最小面（旧版 dsh 未提供该 prop 时为 undefined）。 */
+export interface ModelSelectionProjectionLike {
+  /** 持久化选择：pending ?? lastUsed；空白会话为 null。 */
+  readonly next?: { provider: string; model: string } | null
+}
+
+export type VisionStatusProps = PropsRuntime<'conversation.input.right'> & VisionStatusInjected & {
+  t: TranslateNS<'vision-bridge'>
+  sessionId?: SessionId
+  /** 会话标准 hook（ui-session 提供）；旧版 dsh 缺该 prop 时为 undefined。 */
+  useProjection?: (key: string) => unknown
+}
 
 /** 眼睛 glyph：官方 icon 集无眼睛图标，内联 SVG + currentColor（同官方 PermissionSelect 自绘盾牌先例）。 */
 const EYE_GLYPH = (
@@ -112,49 +123,94 @@ export function ensureVisionStyles(): HTMLStyleElement {
   return style
 }
 
-export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, t }: VisionStatusProps) {
+export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, useProjection, t }: VisionStatusProps) {
   const [status, setStatus] = useState<VisionStatusResult | null>(null)
   const [open, setOpen] = useState(false)
   const [point, setPoint] = useState<{ x: number; y: number; up: boolean } | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
 
-  // 当前选中模型：官方共享模型目录（与模型座位同 store，含「会话投影 ?? 全局默认」兜底）。
-  // 座位显示什么模型，图标就显示什么模型的能力——首帧即同步，没有自己的异步判定窗口。
-  const directory = useMemo(() => {
-    if (sessionId === undefined) return undefined
-    try {
-      return directoryFor(sessionId)
-    } catch {
-      return undefined
+  // 会话持久化模型选择投影（官方会话标准 hook；旧版 dsh 未提供时为 undefined）。
+  // next = pending ?? lastUsed——与座位展示的当前模型同一来源。
+  const projection = useProjection === undefined
+    ? undefined
+    : useProjection('modelSelection') as ModelSelectionProjectionLike | undefined
+
+  // 官方共享模型目录（与模型座位同 store、含模型选择乐观回写）。首次渲染时会话
+  // scope 可能尚未就绪、directoryFor 会抛错——一次失败不弃权：getSnapshot/subscribe
+  // 每次读取重试（credits 遮蔽选择器同款惰性解析），解析成功后通知等待中的订阅者。
+  const directoryAdapter = useMemo(() => {
+    let resolved: DirectoryStore | undefined
+    const pending = new Set<() => void>()
+    const ensure = (): DirectoryStore | undefined => {
+      if (resolved !== undefined) return resolved
+      if (sessionId === undefined) return undefined
+      try {
+        const hit = directoryFor(sessionId)
+        if (hit !== undefined) {
+          resolved = hit
+          for (const listener of pending) listener()
+          pending.clear()
+        }
+      } catch {
+        // 会话 scope 尚未就绪：保持未决，下一次读取重试。
+      }
+      return resolved
+    }
+    return {
+      isResolved: () => resolved !== undefined,
+      getSnapshot: (): { provider: string; model: string } | null => ensure()?.getSnapshot().current ?? null,
+      subscribe: (listener: () => void): (() => void) => {
+        const hit = ensure()
+        if (hit !== undefined) return hit.subscribe(listener)
+        pending.add(listener)
+        return () => { pending.delete(listener) }
+      },
     }
   }, [directoryFor, sessionId])
-  const subscribe = useCallback((listener: () => void): (() => void) => {
-    if (directory === undefined) return () => {}
-    return directory.subscribe(listener)
-  }, [directory])
-  const current = useSyncExternalStore(
-    subscribe,
-    () => directory?.getSnapshot().current ?? null,
+  const directoryCurrent = useSyncExternalStore(
+    directoryAdapter.subscribe,
+    directoryAdapter.getSnapshot,
   )
 
-  // 模型变化 / 会话切换时查能力：缓存命中立即上色；未命中先隐藏（不显示占位色），
-  // 返回后以正确模式出现。查询失败隐藏（保守，不影响主流程）。
-  // current 为 null = 座位尚未解析出模型（新会话页未选、或历史未装载）——
-  // 与 credits 信息卡一致：不显示，绝不用默认模型顶替。
+  // 生效模型：目录（座位同源）→ 会话投影（持久化选择）→ null（走 host 默认模型兜底）。
+  const effective = directoryCurrent ?? projection?.next ?? null
+  const effectiveKey = effective === null ? '' : `${effective.provider}:${effective.model}`
+  const fallback = effective === null
+
+  // 临时诊断（排查小眼睛显示问题）：把目录解析与状态透出到 window，供现场排查。
   useEffect(() => {
-    setStatus(null)
+    const diag = window as unknown as Record<string, unknown>
+    diag.__vbDiag = {
+      sessionId: sessionId ?? null,
+      directoryResolved: directoryAdapter.isResolved(),
+      directoryCurrent: directoryCurrent === null ? null : { provider: directoryCurrent.provider, model: directoryCurrent.model },
+      projection: projection?.next === undefined ? null : projection.next,
+      effective: effective === null ? null : { provider: effective.provider, model: effective.model },
+      fallback,
+      status: status === null ? null : { mode: status.mode },
+    }
+  })
+
+  // 模型变化 / 会话切换时查能力：缓存命中立即上色；未命中保持上一状态直到新结果
+  // （避免闪烁），失败隐藏（保守，不影响主流程）。目录/投影都未解析（空白会话、
+  // 历史未装载窗口）时按共享默认模型兜底——该窗口内 composer 实际生效的就是
+  // 默认模型；目录/投影就位后自动纠正为会话真实模型，图标首帧即在位。
+  useEffect(() => {
     setOpen(false)
-    if (current === null) return
     let alive = true
-    void queryCapability(current.provider, current.model).then((next) => {
+    const request = effective === null
+      ? queryCapability('', '')
+      : queryCapability(effective.provider, effective.model)
+    void request.then((next) => {
       if (alive) setStatus(next)
     }).catch(() => {
       // 状态查询失败：隐藏图标。
+      if (alive) setStatus(null)
     })
     return () => {
       alive = false
     }
-  }, [current, queryCapability])
+  }, [effectiveKey, queryCapability])
 
   const computePoint = (): { x: number; y: number; up: boolean } | null => {
     const rect = buttonRef.current?.getBoundingClientRect()
@@ -195,7 +251,7 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, t }
 
   const native = status?.mode === 'native-vision'
   const noVision = status?.mode === 'no-vision'
-  // 无选中模型 / 能力查询未返回 / 查询失败 → 隐藏（不显示占位色）。
+  // 能力查询未返回 / 查询失败 → 隐藏（不显示占位色）。
   if (status === null) return null
   const aria = native ? t('popover.nativeVision.title') : noVision ? t('popover.noVision.title') : t('popover.crossModel.title')
   return (

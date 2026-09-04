@@ -299,7 +299,9 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
 
   // 3. 能力路由：客户端状态图标据此判定。与 session 无关——当前选中模型在客户端
   //    走官方 modelDirectories 共享目录（与模型座位同 store），这里只回答
-  //    「这个 provider/model 能不能看图」。缺参按 400（客户端只在拿到模型后才查询）。
+  //    「这个 provider/model 能不能看图」。未指定模型（空白会话/历史未装载窗口）时
+  //    按共享默认模型回答——该窗口内 composer 实际生效的就是默认模型（与座位兜底
+  //    同源）；默认模型都读不到（旧版 dsh 缺服务）才 400。
   //    DeepSeek 文本模型 → cross-model（vision_read 可用）。
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
@@ -310,11 +312,16 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
         return
       }
       const url = new URL(req.url ?? '/', 'http://localhost')
-      const provider = url.searchParams.get('provider') ?? ''
-      const model = url.searchParams.get('model') ?? ''
+      let provider = url.searchParams.get('provider') ?? ''
+      let model = url.searchParams.get('model') ?? ''
       if (provider === '' || model === '') {
-        sendJson(res, 400, { mode: 'no-vision', visionModel: settings.visionModel })
-        return
+        const selected = readDefaultModel(ctx)
+        if (selected === undefined) {
+          sendJson(res, 400, { mode: 'no-vision', visionModel: settings.visionModel })
+          return
+        }
+        provider = selected.provider
+        model = selected.model
       }
       const supportsImages = await supportsImagesCached(ctx, provider, model)
       // 能力模式判定（全靠模型自身 inputModalities 属性，不靠名字）：
