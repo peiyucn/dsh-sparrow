@@ -39,6 +39,12 @@ export function ensureFileManageStyles(): void {
 .dsh-file-manage-trigger:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
+/* 与 dsh-codebuddy-credits 额度入口同行对齐：官方 Settings 让位收缩后，
+   本按钮同宽收缩（仅额度入口宽栏锚点存在时生效；rail 不渲染锚点，不受影响）。
+   92px = 96px 让位 - 4px 容器出血补偿，右缘与 Settings 按钮严格对齐。 */
+body:has(.ccb-sidebar-anchor) .dsh-file-manage-trigger {
+  width: calc(100% - 92px);
+}
 .dsh-file-manage-trigger-rail {
   width: 36px;
   height: 36px;
