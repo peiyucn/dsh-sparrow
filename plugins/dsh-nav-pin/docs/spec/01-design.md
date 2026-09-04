@@ -30,12 +30,12 @@
     transition: opacity 120ms ease-out, height 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
-  /* 命中区：frame 自身（28px 轨道）+ ::before 向左扩 16px */
+  /* 命中区：frame 自身（28px 轨道）+ ::before 向左扩 16px（left 负值越出左缘） */
   [data-conversation-scroll] div:has(> nav[aria-label="Turn navigation"]) > nav::before,
   [data-conversation-scroll] div:has(> nav[aria-label="轮次导航"]) > nav::before {
     content: '';
     position: absolute;
-    inset: -8px 0 -8px 16px;
+    inset: -8px 0 -8px -16px;
   }
 
   [data-conversation-scroll] div:has(> nav[aria-label="Turn navigation"]) > nav:hover,

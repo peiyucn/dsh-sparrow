@@ -60,11 +60,12 @@ function hoverRevealBlock(labels: readonly string[], breakpointPx: number): stri
     transition: opacity ${OPACITY_TRANSITION_MS}ms ease-out, ${NATIVE_HEIGHT_TRANSITION};
   }
 
-  /* 命中区：frame 自身（28px 轨道）+ ::before 向左扩 16px、上下各 8px。 */
+  /* 命中区：frame 自身（28px 轨道）+ ::before 向左扩 16px、上下各 8px。
+   *  left 取负值向左越出 frame 左缘（正值会落在 frame 内部，变成 12px 窄条）。 */
   ${hitAreas} {
     content: '';
     position: absolute;
-    inset: -8px 0 -8px 16px;
+    inset: -8px 0 -8px -16px;
   }
 
   ${reveals} {

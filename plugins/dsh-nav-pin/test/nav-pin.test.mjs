@@ -44,9 +44,9 @@ describe('dsh-nav-pin 纯逻辑', () => {
       assert.ok(!css.includes('box-shadow'))
     })
 
-    it('应该 提供 ::before 命中区扩展', () => {
+    it('应该 提供 ::before 命中区扩展（左缘 -16px 向左扩出 frame，上下各 8px）', () => {
       assert.ok(css.includes('nav::before'))
-      assert.ok(css.includes('inset: -8px 0 -8px 16px'))
+      assert.ok(css.includes('inset: -8px 0 -8px -16px'))
     })
 
     it('应该 为 reduced-motion 关闭过渡', () => {
