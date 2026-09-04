@@ -157,7 +157,6 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
       return resolved
     }
     return {
-      isResolved: () => resolved !== undefined,
       getSnapshot: (): { provider: string; model: string } | null => ensure()?.getSnapshot().current ?? null,
       subscribe: (listener: () => void): (() => void) => {
         const hit = ensure()
@@ -175,21 +174,6 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
   // 生效模型：目录（座位同源）→ 会话投影（持久化选择）→ null（走 host 默认模型兜底）。
   const effective = directoryCurrent ?? projection?.next ?? null
   const effectiveKey = effective === null ? '' : `${effective.provider}:${effective.model}`
-  const fallback = effective === null
-
-  // 临时诊断（排查小眼睛显示问题）：把目录解析与状态透出到 window，供现场排查。
-  useEffect(() => {
-    const diag = window as unknown as Record<string, unknown>
-    diag.__vbDiag = {
-      sessionId: sessionId ?? null,
-      directoryResolved: directoryAdapter.isResolved(),
-      directoryCurrent: directoryCurrent === null ? null : { provider: directoryCurrent.provider, model: directoryCurrent.model },
-      projection: projection?.next === undefined ? null : projection.next,
-      effective: effective === null ? null : { provider: effective.provider, model: effective.model },
-      fallback,
-      status: status === null ? null : { mode: status.mode },
-    }
-  })
 
   // 模型变化 / 会话切换时查能力：缓存命中立即上色；未命中保持上一状态直到新结果
   // （避免闪烁），失败隐藏（保守，不影响主流程）。目录/投影都未解析（空白会话、
