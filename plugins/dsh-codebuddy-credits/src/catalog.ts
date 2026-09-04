@@ -267,8 +267,9 @@ export async function fetchCodeBuddyModels(
   account?: { userId?: string; enterpriseId?: string },
   signal?: AbortSignal,
 ): Promise<readonly CodeBuddyModelEntry[]> {
+  signal?.throwIfAborted()
   const timeout = AbortSignal.timeout(MODEL_DISCOVERY_TIMEOUT_MS)
-  const upstream = signal === undefined || signal.aborted ? timeout : AbortSignal.any([signal, timeout])
+  const upstream = signal === undefined ? timeout : AbortSignal.any([signal, timeout])
   let response: Response
   try {
     response = await fetch(CONFIG_URL, { headers: requestHeaders(apiKey, account), signal: upstream })

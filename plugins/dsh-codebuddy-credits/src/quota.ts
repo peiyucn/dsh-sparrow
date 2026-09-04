@@ -6,6 +6,7 @@
 
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import { requestHeaders } from './catalog.js'
+import { QUOTA_FETCH_TIMEOUT_MS } from './constants.js'
 
 /** 配额快照（展示用）。 */
 export interface QuotaStatus {
@@ -33,12 +34,15 @@ function textOr(raw: unknown): string | undefined {
   return typeof raw === 'string' && raw.length > 0 ? raw : undefined
 }
 
-/** 查询企业周期配额（用户给 Key 后才允许调用）。 */
+/** 查询企业周期配额（用户给 Key 后才允许调用），带超时。 */
 export async function fetchQuota(
   apiKey: string,
   account?: { userId?: string; enterpriseId?: string },
   signal?: AbortSignal,
 ): Promise<QuotaStatus> {
+  signal?.throwIfAborted()
+  const timeout = AbortSignal.timeout(QUOTA_FETCH_TIMEOUT_MS)
+  const upstream = signal === undefined ? timeout : AbortSignal.any([signal, timeout])
   let response: Response
   try {
     response = await fetch(QUOTA_URL, {
@@ -48,10 +52,11 @@ export async function fetchQuota(
         'content-type': 'application/json',
       },
       body: '{}',
-      signal,
+      signal: upstream,
     })
   } catch (error) {
     if (signal?.aborted) throw new LlmError('配额查询已取消', 'ABORTED', { cause: error })
+    if (timeout.aborted) throw new LlmError('CodeBuddy 配额接口超时', 'TRANSPORT', { cause: error })
     throw new LlmError('无法连接 CodeBuddy 配额接口', 'TRANSPORT', { cause: error })
   }
   if (!response.ok) throw new LlmError('CodeBuddy 配额接口返回 HTTP ' + String(response.status), 'PROVIDER', { status: response.status })
