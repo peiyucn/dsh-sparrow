@@ -180,7 +180,11 @@ export function CodeBuddyCreditsIndicator({
   const [quota, setQuota] = useState<QuotaView | undefined>(undefined)
   const [quotaError, setQuotaError] = useState<string | undefined>(undefined)
   // 本会话累计积分（进程内 usage 记账，展开面板时查询）。
-  const [sessionUsage, setSessionUsage] = useState<{ credit: number; calls: number } | undefined>(undefined)
+  const [sessionUsage, setSessionUsage] = useState<{
+    credit: number
+    calls: number
+    recent: ReadonlyArray<{ model: string; credit?: number }>
+  } | undefined>(undefined)
   const [usageError, setUsageError] = useState<string | undefined>(undefined)
   // 面板定位（打开时计算，滚动/缩放跟随重定位）：右缘对齐按钮、左缘钳制在会话区。
   const [point, setPoint] = useState<{ top: number; right: number; width: number } | null>(null)
@@ -256,7 +260,11 @@ export function CodeBuddyCreditsIndicator({
         setUsageError(t('indicator.loadFailed'))
         return
       }
-      setSessionUsage(await response.json() as { credit: number; calls: number })
+      setSessionUsage(await response.json() as {
+        credit: number
+        calls: number
+        recent: ReadonlyArray<{ model: string; credit?: number }>
+      })
     } catch {
       if (seq !== requestSeq.current) return
       setUsageError(t('indicator.loadFailed'))
@@ -492,12 +500,29 @@ export function CodeBuddyCreditsIndicator({
                     : null}
                   {sessionUsage !== undefined
                     ? (
-                      <div style={captionStyle}>
-                        {t('indicator.sessionUsage', {
-                          credit: formatCredits(sessionUsage.credit),
-                          calls: String(sessionUsage.calls),
-                        })}
-                      </div>
+                      <>
+                        <div style={captionStyle}>
+                          {t('indicator.sessionUsage', {
+                            credit: formatCredits(sessionUsage.credit),
+                            calls: String(sessionUsage.calls),
+                          })}
+                        </div>
+                        {sessionUsage.recent.length > 0
+                          ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div style={captionStyle}>{t('indicator.recentCalls')}</div>
+                              {sessionUsage.recent.map((call, index) => (
+                                <div key={index} style={captionStyle}>
+                                  {t('indicator.callRow', {
+                                    model: call.model,
+                                    credit: call.credit === undefined ? '–' : formatCredits(call.credit),
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+                          )
+                          : null}
+                      </>
                     )
                     : null}
                   {usageError !== undefined

@@ -370,12 +370,19 @@ export function apply(ctx: Context, config: Config): void {
     sessionUsage(sessionId) {
       let credit = 0
       let calls = 0
+      const recent: { model: string; credit?: number }[] = []
       for (const usage of usageLog) {
         if (usage.sessionId !== sessionId) continue
         calls += 1
         if (usage.credit !== undefined) credit += usage.credit
+        recent.push({
+          model: usage.model,
+          ...(usage.credit === undefined ? {} : { credit: usage.credit }),
+        })
+        // 只保留最近几次调用（面板明细；合计不受截断影响）。
+        if (recent.length > 5) recent.shift()
       }
-      return { credit, calls }
+      return { credit, calls, recent }
     },
     account: () => ({
       ...(account?.enterpriseName === undefined ? {} : { enterpriseName: account.enterpriseName }),

@@ -52,8 +52,12 @@ export interface CodeBuddyCreditsShared {
   removeKey(): Promise<void>
   /** 查询企业周期配额。 */
   quota(): Promise<QuotaStatus>
-  /** 会话累计积分与调用次数（进程内 usage 记账）。 */
-  sessionUsage(sessionId: string): { credit: number; calls: number }
+  /** 会话累计积分与调用次数（进程内 usage 记账），附最近调用明细。 */
+  sessionUsage(sessionId: string): {
+    credit: number
+    calls: number
+    recent: ReadonlyArray<{ model: string; credit?: number }>
+  }
   /** route 是否注册（状态接口诊断用）。 */
   active(): boolean
   /** 账号快照（来自 /v2/accounts）。 */
