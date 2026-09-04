@@ -157,6 +157,16 @@ export function isDeepseekMainRoute(route: { provider: string } | undefined): bo
   return route === undefined || route.provider === 'deepseek-official'
 }
 
+/** 会话当前主模型：选中投影（pending ?? lastUsed，模型选择即生效、不依赖历史事件）→
+ *  最近请求事件 → 共享默认模型；全都没有返回 undefined（调用方按「未知 = 放行」处理）。 */
+export function currentMainRoute(
+  selection: { pending?: { provider: string; model: string } | null; lastUsed?: { provider: string; model: string } | null } | undefined,
+  eventsRoute: { provider: string; model: string } | undefined,
+  defaultModel: { provider: string; model: string } | undefined,
+): { provider: string; model: string } | undefined {
+  return selection?.pending ?? selection?.lastUsed ?? eventsRoute ?? defaultModel
+}
+
 /** 把外部配置补成完整内部配置；非法数字一律拒绝（插件加载期即失败，而不是请求期）。 */
 export function normalizeConfig(input: Readonly<Partial<ChatFimConfig>> | undefined): ChatFimConfig {
   const config: ChatFimConfig = {

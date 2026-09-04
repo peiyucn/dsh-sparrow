@@ -13,7 +13,7 @@ import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/c
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
-import { ChatFimDock, ChatFimMenu, ChatFimSwitch, ensureSuggestBusyStyles } from './ChatFimDock.js'
+import { ChatFimDock, ChatFimMenu, ChatFimSwitch, ensureSuggestBusyStyles, type FimDirectoryStore } from './ChatFimDock.js'
 
 export const inject = ['slots', 'sessions', 'locale']
 
@@ -92,6 +92,18 @@ export function apply(ctx: ClientContext): void {
     }
     return {
       sessionId,
+      // 官方共享模型目录（与模型座位同 store）：开关随选中模型即时追平，
+      // 不再只等切会话。目录服务缺失（旧版 dsh）时 fail-soft。
+      directoryFor: (id: SessionId): FimDirectoryStore | undefined => {
+        try {
+          const resolver = ctx.root.get('modelDirectories') as unknown as {
+            directoryFor(sessionId: SessionId): { store: FimDirectoryStore } | undefined
+          } | undefined
+          return resolver?.directoryFor(id)?.store
+        } catch {
+          return undefined
+        }
+      },
       isSupported: async (id: SessionId): Promise<boolean> => {
         const response = await fetch(`/api/chat-fim/complete?sessionId=${encodeURIComponent(String(id))}`)
         if (!response.ok) return true
@@ -154,4 +166,6 @@ export function apply(ctx: ClientContext): void {
 
 export { ChatFimDock, ChatFimMenu, ChatFimSwitch, ensureSuggestBusyStyles } from './ChatFimDock.js'
 export type { ChatFimDockInjected, ChatFimDockProps, ChatFimMenuProps, ChatFimSwitchProps, SuggestionRecord } from './ChatFimDock.js'
-export { readEnabled, readTriggerSensitivity, setSuggestBusy, setSuggestEnabled, setSuggestError, setTriggerSensitivity, setSuggestion, setSuggestSupported, useSuggestBusy, useSuggestEnabled, useSuggestError, useTriggerSensitivity, useSuggestion, useSuggestSupported } from './ChatFimDock.js'
+export { readEnabled, readTriggerSensitivity, setSuggestBusy, setSuggestEnabled, setSuggestError, setTriggerSensitivity, setSuggestion, dispatchSupportEvent, useSuggestBusy, useSuggestEnabled, useSuggestError, useTriggerSensitivity, useSuggestion, useSuggestSupported, useSuggestSupportState } from './ChatFimDock.js'
+export { fimSupportReducer, fimSupportShown, initialFimSupportState } from './fim-support-machine.js'
+export type { FimSupportAddress, FimSupportEvent, FimSupportPhase, FimSupportState } from './fim-support-machine.js'

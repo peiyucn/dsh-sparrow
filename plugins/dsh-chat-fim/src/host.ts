@@ -6,9 +6,10 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import {
-  buildFimPrompt, cleanSuggestion, detectDraftLanguage, extractSuggestions, extractUsage, speakerStopSequences,
+  buildFimPrompt, cleanSuggestion, currentMainRoute, detectDraftLanguage, extractSuggestions, extractUsage, speakerStopSequences,
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, isLanguageConsistent,
   mainRouteFromSession, MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns,
   resolveSuggestModel, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence, upstreamStatusToError,
@@ -132,6 +133,36 @@ async function readBoundedText(response: Response, maxBytes: number): Promise<st
   return Buffer.concat(chunks.map(chunk => Buffer.from(chunk))).toString('utf8').slice(0, maxBytes)
 }
 
+/** 会话当前主模型：modelSelection 投影（选中即生效，不依赖历史事件）→ 最近请求事件
+ *  → 共享默认模型；服务缺失（旧版 dsh）逐档 fail-soft。模型一换，开关状态立刻追平。 */
+function currentSessionModel(
+  ctx: Context,
+  session: { snapshotEvents(): readonly SessionEvent[] },
+): { provider: string; model: string } | undefined {
+  let selection: { lastUsed?: { provider: string; model: string } | null; pending?: { provider: string; model: string } | null } | undefined
+  try {
+    const projections = ctx.get('sessionProjections') as unknown as {
+      stateOf(session: unknown, key: string): { lastUsed?: { provider: string; model: string } | null; pending?: { provider: string; model: string } | null } | undefined
+    } | undefined
+    selection = projections?.stateOf(session, 'modelSelection')
+  } catch {
+    // 投影注册表缺失（旧版 dsh）：走事件档。
+  }
+  let defaultModel: { provider: string; model: string } | undefined
+  try {
+    const service = ctx.get('agentDefaultModel') as {
+      currentSelection?: () => { provider: string; model: string } | undefined
+    } | undefined
+    const selected = service?.currentSelection?.()
+    if (selected !== undefined && typeof selected.provider === 'string' && typeof selected.model === 'string') {
+      defaultModel = { provider: selected.provider, model: selected.model }
+    }
+  } catch {
+    // 缺服务：跳过默认档。
+  }
+  return currentMainRoute(selection, mainRouteFromSession(session.snapshotEvents()), defaultModel)
+}
+
 /**
  * host half 入口：注册路由，所有副作用都挂在 apply 的 effect 上。
  * @param ctx - DSH 插件上下文。
@@ -161,7 +192,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
           })
           return
         }
-        const main = mainRouteFromSession(session.snapshotEvents())
+        const main = currentSessionModel(ctx, session)
         sendJson(res, 200, { supported: isDeepseekMainRoute(main) })
         return
       }
@@ -196,7 +227,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
       }
 
       // 主模型不是 DeepSeek 系列时禁用（FIM 上游为 DeepSeek 官方能力）。
-      const main = mainRouteFromSession(session.snapshotEvents())
+      const main = currentSessionModel(ctx, session)
       if (!isDeepseekMainRoute(main)) {
         sendError(res, 403, {
           code: 'MODEL_UNSUPPORTED',

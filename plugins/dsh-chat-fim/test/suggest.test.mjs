@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   buildFimPrompt, detectDraftLanguage, isLanguageConsistent, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, speakerStopSequences,
-  formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession,
+  formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession, currentMainRoute,
   normalizeConfig, normalizeSuggestModelMode, normalizeTriggerSensitivity, parseCompleteBody, recentHistoryTurns,
   resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence,
   upstreamStatusToError, validateCompletePayload,
@@ -305,6 +305,43 @@ describe('chat-fim 纯逻辑', () => {
 
     it('未知路由 应该 默认放行', () => {
       assert.equal(isDeepseekMainRoute(undefined), true)
+    })
+  })
+
+  describe('currentMainRoute', () => {
+    const eventsRoute = { provider: 'deepseek-official', model: 'deepseek-v4-pro' }
+    const defaultModel = { provider: 'codebuddy-credits', model: 'hy4-preview' }
+
+    it('选中投影 pending 应该 最优先（模型刚切换、未发消息也生效）', () => {
+      const route = currentMainRoute(
+        { pending: { provider: 'zai', model: 'glm-5.3-flash' }, lastUsed: { provider: 'deepseek-official', model: 'deepseek-v4-pro' } },
+        eventsRoute,
+        defaultModel,
+      )
+      assert.deepEqual(route, { provider: 'zai', model: 'glm-5.3-flash' })
+    })
+
+    it('无 pending 应该 回退 lastUsed', () => {
+      const route = currentMainRoute(
+        { pending: null, lastUsed: { provider: 'zai', model: 'glm-5.3-flash' } },
+        eventsRoute,
+        defaultModel,
+      )
+      assert.deepEqual(route, { provider: 'zai', model: 'glm-5.3-flash' })
+    })
+
+    it('投影为空 应该 回退最近请求事件', () => {
+      const route = currentMainRoute({ pending: null, lastUsed: null }, eventsRoute, defaultModel)
+      assert.deepEqual(route, eventsRoute)
+    })
+
+    it('投影与事件都无 应该 回退共享默认模型（空白会话显示的是默认模型）', () => {
+      const route = currentMainRoute({ pending: null, lastUsed: null }, undefined, defaultModel)
+      assert.deepEqual(route, defaultModel)
+    })
+
+    it('全部未知 应该 返回 undefined（调用方按默认放行）', () => {
+      assert.equal(currentMainRoute(undefined, undefined, undefined), undefined)
     })
   })
 

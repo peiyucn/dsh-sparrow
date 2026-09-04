@@ -1,6 +1,6 @@
 /** FIM 续写：共享状态 + 开关（input.left）+ 数据面 dock（input.dock）+ @ 列表样式候选菜单（input.overlay）。 */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { useAnchoredMaxHeight, IconSparkle16, IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -9,6 +9,10 @@ import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { TRIGGER_SENSITIVITIES, formatTokenCount, shouldTriggerSuggest, type TriggerSensitivity } from '../suggest.js'
+import {
+  fimSupportReducer, fimSupportShown, initialFimSupportState,
+  type FimSupportEvent, type FimSupportState,
+} from './fim-support-machine.js'
 
 export interface SuggestCompleteResult {
   readonly suggestions: readonly string[]
@@ -17,9 +21,51 @@ export interface SuggestCompleteResult {
   readonly usage: { readonly promptTokens: number; readonly completionTokens: number }
 }
 
+/** 官方共享模型目录 store 的最小面（与模型座位同 store：快照 + 订阅）。 */
+export interface FimDirectoryStore {
+  getSnapshot(): { current: { provider: string; model: string } | null }
+  subscribe(listener: () => void): () => void
+}
+
+/** 目录 store 惰性读取面：首帧会话 scope 未就绪时 directoryFor 会抛错——
+ *  不弃权，getSnapshot/subscribe 每次读取重试，解析成功后通知等待中的订阅者。 */
+function createLazyDirectoryStore(
+  directoryFor: (sessionId: SessionId) => FimDirectoryStore | undefined,
+  sessionId: SessionId | undefined,
+): { getSnapshot: () => { provider: string; model: string } | null; subscribe: (listener: () => void) => () => void } {
+  let resolved: FimDirectoryStore | undefined
+  const pending = new Set<() => void>()
+  const ensure = (): FimDirectoryStore | undefined => {
+    if (resolved !== undefined) return resolved
+    if (sessionId === undefined) return undefined
+    try {
+      const hit = directoryFor(sessionId)
+      if (hit !== undefined) {
+        resolved = hit
+        for (const listener of pending) listener()
+        pending.clear()
+      }
+    } catch {
+      // 会话 scope 尚未就绪：保持未决，下一次读取重试。
+    }
+    return resolved
+  }
+  return {
+    getSnapshot: () => ensure()?.getSnapshot().current ?? null,
+    subscribe: (listener) => {
+      const hit = ensure()
+      if (hit !== undefined) return hit.subscribe(listener)
+      pending.add(listener)
+      return () => { pending.delete(listener) }
+    },
+  }
+}
+
 export interface ChatFimDockInjected {
   /** 注入面所属会话（槽工厂按 sessionId 生成）；菜单据此校验建议归属，堵跨会话误采用。 */
   readonly sessionId: SessionId
+  /** 官方共享模型目录 store（ctx.modelDirectories）：选中模型与座位同源；目录不可用时 undefined。 */
+  readonly directoryFor: (sessionId: SessionId) => FimDirectoryStore | undefined
   /** 查询当前会话主模型是否支持（deepseek 系列）；false 时整体隐藏。 */
   isSupported: (sessionId: SessionId) => Promise<boolean>
   /** 发起一次 host 路由请求；由调用方负责陈旧响应判定。续写模型固定 deepseek-v4-flash。 */
@@ -32,7 +78,11 @@ export interface ChatFimDockInjected {
   adopt: (sessionId: SessionId, text: string, span: TokenSpan) => boolean
 }
 
-export type ChatFimDockProps = PropsRuntime<'conversation.input.dock'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
+export type ChatFimDockProps = PropsRuntime<'conversation.input.dock'> & ChatFimDockInjected & {
+  t: TranslateNS<'chat-fim'>
+  /** 会话标准 hook（ui-session 提供）；旧版 dsh 缺该 prop 时为 undefined。 */
+  useProjection?: (key: string) => unknown
+}
 export type ChatFimSwitchProps = PropsRuntime<'conversation.input.left'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
 export type ChatFimMenuProps = PropsRuntime<'conversation.input.overlay'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
 
@@ -127,26 +177,34 @@ export function setSuggestError(next: string | null): void {
   for (const listener of errorListeners) listener()
 }
 
-// 模块级共享「模型支持」状态：主模型非 deepseek 系列时整体隐藏（像没装插件）。
-let sharedSupported = true
-const supportedListeners = new Set<() => void>()
+// 模块级共享「模型支持」状态机：主模型非 deepseek 系列时整体隐藏（像没装插件）。
+// 判定管线（idle → checking → supported/unsupported/failed）由 fim-support-machine
+// 的纯 reducer 驱动，事件带会话+模型地址，旧响应在状态机里被结构性作废。
+let sharedSupport = initialFimSupportState
+const supportListeners = new Set<() => void>()
 
-/** 订阅共享模型支持状态；返回当前值。 */
-export function useSuggestSupported(): boolean {
-  const [value, setValue] = useState(sharedSupported)
+/** 订阅共享模型支持状态机全量状态（dock 据此驱动查询）。 */
+export function useSuggestSupportState(): FimSupportState {
+  const [value, setValue] = useState(sharedSupport)
   useEffect(() => {
-    const listener = (): void => { setValue(sharedSupported) }
-    supportedListeners.add(listener)
-    return () => { supportedListeners.delete(listener) }
+    const listener = (): void => { setValue(sharedSupport) }
+    supportListeners.add(listener)
+    return () => { supportListeners.delete(listener) }
   }, [])
   return value
 }
 
-/** 设置共享模型支持状态。 */
-export function setSuggestSupported(next: boolean): void {
-  if (sharedSupported === next) return
-  sharedSupported = next
-  for (const listener of supportedListeners) listener()
+/** 订阅共享模型支持布尔态（开关/菜单只关心显隐）。 */
+export function useSuggestSupported(): boolean {
+  return fimSupportShown(useSuggestSupportState())
+}
+
+/** 派发支持状态机事件；reducer 判定无效事件（旧地址/阶段不符）并原样忽略。 */
+export function dispatchSupportEvent(event: FimSupportEvent): void {
+  const next = fimSupportReducer(sharedSupport, event)
+  if (next === sharedSupport) return
+  sharedSupport = next
+  for (const listener of supportListeners) listener()
 }
 
 /** 一条「建议 + 生成它的草稿快照」：菜单视图据此渲染与采用（span CAS）。 */
@@ -705,26 +763,48 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
  * @param props - 槽位运行时 props + 注入动作。
  */
 export function ChatFimDock(props: ChatFimDockProps) {
-  const { session, input, requestComplete, isSupported } = props
+  const { session, input, requestComplete, isSupported, directoryFor, useProjection } = props
   const [composing, setComposing] = useState(false)
   const [ring, setRing] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const enabled = useSuggestEnabled()
   const busy = useSuggestBusy()
   const supported = useSuggestSupported()
+  const supportState = useSuggestSupportState()
   const sensitivity = useTriggerSensitivity()
   const sensitivityParams = TRIGGER_SENSITIVITIES[sensitivity]
 
-  // 会话切换时查询主模型支持状态；不支持则整体隐藏（像没装插件）。
+  // 当前选中模型（与座位同源）：目录 store 惰性解析 + 会话投影兜底。
+  // 模型一换，currentKey 就变 → 支持状态立即重查，开关随模型追平，
+  // 不再只等切会话（旧实现只在 sessionId 变化时查）。
+  const directoryAdapter = useMemo(
+    () => createLazyDirectoryStore(directoryFor, session.sessionId),
+    [directoryFor, session.sessionId],
+  )
+  const directoryCurrent = useSyncExternalStore(directoryAdapter.subscribe, directoryAdapter.getSnapshot)
+  const projection = useProjection === undefined
+    ? undefined
+    : useProjection('modelSelection') as { next?: { provider: string; model: string } | null } | undefined
+  const currentModel = directoryCurrent ?? projection?.next ?? null
+  const currentKey = currentModel === null ? '' : `${currentModel.provider}:${currentModel.model}`
+
+  // 会话/模型切换：支持状态机进入 checking（先按支持显示，查完追平）。
   useEffect(() => {
-    setSuggestSupported(true)
-    let alive = true
-    void isSupported(session.sessionId).then((next) => {
-      if (alive) setSuggestSupported(next)
-    }).catch(() => {
-      // 查询失败默认显示。
+    dispatchSupportEvent({
+      type: 'context-changed',
+      address: { sessionId: session.sessionId, modelKey: currentKey },
     })
-    return () => { alive = false }
-  }, [isSupported, session.sessionId])
+  }, [session.sessionId, currentKey])
+
+  // checking：按状态机地址发起一次支持查询；旧上下文的响应回来时
+  // 状态机按地址作废（不需要 alive 标志）。
+  useEffect(() => {
+    if (supportState.phase !== 'checking') return
+    const address = supportState.address
+    void isSupported(address.sessionId as SessionId).then(
+      (next) => dispatchSupportEvent({ type: 'checked', address, supported: next }),
+      () => dispatchSupportEvent({ type: 'check-failed', address }),
+    )
+  }, [supportState.phase, supportState.address.sessionId, supportState.address.modelKey, isSupported])
 
   const composingRef = useRef(false)
   const draftRevRef = useRef(input.draftRev)
