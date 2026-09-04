@@ -7,13 +7,10 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
-import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { CodeBuddyModelFacts } from './catalog.js'
-import { API_KEY_ENV } from './constants.js'
 import type { QuotaStatus } from './quota.js'
 
-export const KEY_REF = credentialRef(API_KEY_ENV)
 const PREFIX = '/api/codebuddy-credits'
 const MAX_BODY_BYTES = 16 * 1024
 

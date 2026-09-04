@@ -24,13 +24,11 @@ import { CodeBuddyAdapter } from './adapter.js'
 import type { CodeBuddyUsage } from './adapter.js'
 import { discoverCodeBuddyModels, factsFromEntries, fetchCodeBuddyModels } from './catalog.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
-import { Config } from './config.js'
+import { Config, keyRefs } from './config.js'
 import {
   ACCOUNT_FETCH_TIMEOUT_MS,
-  API_KEY_ENV,
   DISPLAY_NAME,
   IMAGE_REQUEST_POLICY,
-  LEGACY_API_KEY_ENV,
   MODEL_REFRESH_COOLDOWN_MS,
   NS,
   PROVIDER,
@@ -73,19 +71,21 @@ export function apply(ctx: Context, config: Config): void {
 
   /**
    * 每请求解析凭据：credentials 缝优先，无缝时整个凭据平面就是进程环境。
-   * 新引用（CODEBUDDY_CREDITS_API_KEY，对齐官方页面派生名）优先，
-   * 旧引用（CODEBUDDY_API_KEY）兜底——旧版存过的 Key 不用重配。
+   * 引用列表由配置节的 apiKeyEnv 决定（默认对齐官方页面派生名
+   * CODEBUDDY_CREDITS_API_KEY），旧引用（CODEBUDDY_API_KEY）兜底——旧版
+   * 存过的 Key 不用重配。
    */
   const resolveApiKey = async (): Promise<string> => {
     const credentials = ctx.get('credentials')
-    for (const ref of [API_KEY_ENV, LEGACY_API_KEY_ENV]) {
+    const refs = keyRefs(current())
+    for (const ref of refs) {
       const hit = credentials !== undefined
         ? (await credentials.resolve(credentialRef(ref)))?.value
         : launchEnvironmentOf(ctx).get(credentialRef(ref))?.value
       if (hit !== undefined && hit.length > 0) return assertUsableApiKey(hit, name, credentialRef(ref))
     }
     throw new LlmError(
-      `${name}: 没有可用的 API Key（${API_KEY_ENV}）；请在设置页的 CodeBuddy Credits 卡片里保存 Key`,
+      `${name}: 没有可用的 API Key（${refs.join(' / ')}）；请在设置页的 CodeBuddy Credits 卡片里保存 Key`,
       'MISSING_CREDENTIAL',
     )
   }
@@ -130,8 +130,12 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   function ambientKey(): boolean {
-    const value = launchEnvironmentOf(ctx).get(credentialRef(API_KEY_ENV))?.value
-    return value !== undefined && value.length > 0
+    const environment = launchEnvironmentOf(ctx)
+    for (const ref of keyRefs(current())) {
+      const value = environment.get(credentialRef(ref))?.value
+      if (value !== undefined && value.length > 0) return true
+    }
+    return false
   }
 
   async function hasKey(): Promise<boolean> {
@@ -272,19 +276,21 @@ export function apply(ctx: Context, config: Config): void {
     } catch {
       return
     }
-    // 旧引用 → 新引用迁移（boot 兜底；saveKey 也会做）：官方页面按新引用
-    // join 凭据，迁移后行头圆点即亮绿。每步独立容错——任何一步失败都不能
-    // 挡掉后面的 route 注册（此前 unset 可选链/服务解析异常会整体打断）。
+    // 旧引用 → 主引用迁移（boot 兜底；saveKey 也会做）：官方页面按节根
+    // apiKeyEnv join 凭据，迁移后行头圆点即亮绿。每步独立容错——任何一步
+    // 失败都不能挡掉后面的 route 注册（此前 unset 可选链/服务解析异常会
+    // 整体打断）。
     try {
       const credentials = ctx.get('credentials')
-      if (credentials !== undefined) {
-        const fresh = await credentials.resolve(credentialRef(API_KEY_ENV)).catch(() => undefined)
-        const legacy = await credentials.resolve(credentialRef(LEGACY_API_KEY_ENV)).catch(() => undefined)
-        if (fresh?.value === undefined && legacy?.value !== undefined) {
-          await credentials.set(credentialRef(API_KEY_ENV), legacy.value).catch(() => {})
+      const [primary, legacyRef] = keyRefs(current())
+      if (credentials !== undefined && legacyRef !== undefined && legacyRef !== primary) {
+        const fresh = await credentials.resolve(credentialRef(primary)).catch(() => undefined)
+        const storedLegacy = await credentials.resolve(credentialRef(legacyRef)).catch(() => undefined)
+        if (fresh?.value === undefined && storedLegacy?.value !== undefined) {
+          await credentials.set(credentialRef(primary), storedLegacy.value).catch(() => {})
           const unset = credentials.unset
           if (typeof unset === 'function') {
-            await unset.call(credentials, credentialRef(LEGACY_API_KEY_ENV)).catch(() => {})
+            await unset.call(credentials, credentialRef(legacyRef)).catch(() => {})
           }
         }
       }
@@ -292,14 +298,18 @@ export function apply(ctx: Context, config: Config): void {
       ctx.logger.warn(`${name}: boot 凭据迁移失败（不阻塞注册）`)
       ctx.logger.warn(error)
     }
-    // 官方行头圆点读整节根部 apiKeyEnv：Key 已存在时补写（旧版本存的
-    // profile 是 providers 子树，一并清掉——整节型 schema 已不再有该层）。
+    // 官方行头圆点读整节根部 apiKeyEnv：节根未写时补写（写配置引用的值，
+    // 不覆盖用户已有自定义）；旧版本存的 providers 子树一并清掉——整节型
+    // schema 已不再有该层。
     try {
       const settingsBoot = ctx.get('settings')
       if (settingsBoot !== undefined) {
+        const section = settingsBoot.get(NS) as { apiKeyEnv?: unknown } | undefined
+        const primary = keyRefs(current())[0]
+        const hasApiKeyEnv = typeof section?.apiKeyEnv === 'string' && section.apiKeyEnv.length > 0
         await settingsBoot.mutate(NS, [
-          { op: 'set', path: ['apiKeyEnv'], value: API_KEY_ENV },
-          { op: 'unset', path: ['providers'] },
+          ...(hasApiKeyEnv ? [] : [{ op: 'set' as const, path: ['apiKeyEnv'], value: primary }]),
+          { op: 'unset' as const, path: ['providers'] },
         ]).catch(() => {})
       }
     } catch (error) {
@@ -322,9 +332,6 @@ export function apply(ctx: Context, config: Config): void {
     const apiKey = typeof request.apiKey === 'string' && request.apiKey.length > 0
       ? request.apiKey
       : await resolveApiKey()
-    if (apiKey === undefined || apiKey.length === 0) {
-      throw new LlmError(`${name}: 模型发现需要 API Key（${API_KEY_ENV}）`, 'MISSING_CREDENTIAL')
-    }
     return discoverCodeBuddyModels(apiKey, account, signal)
   })
 
@@ -335,26 +342,30 @@ export function apply(ctx: Context, config: Config): void {
       return hasKey()
     },
     async saveKey(key) {
+      // 预检两个服务（先于任何写入）：避免 Key 已落库后才因缺服务报错的部分失败。
       const credentials = ctx.get('credentials')
       if (credentials === undefined) {
         throw new LlmError(`${name}: 本组合没有凭据服务，无法保存 Key`, 'NO_CREDENTIAL_STORE')
+      }
+      const settings = ctx.get('settings')
+      if (settings === undefined) {
+        throw new LlmError(`${name}: 本组合没有设置服务，无法记录凭据引用`, 'NO_SETTINGS_STORE')
       }
       // 用户给 Key 的行为 = 对模型目录与账号信息拉取的授权；先验证再落库。
       const entries = await fetchCodeBuddyModels(key, account)
       await refreshAccountWithKey(key)
       facts = factsFromEntries(entries)
-      await credentials.set(credentialRef(API_KEY_ENV), key)
-      // 旧引用迁移：老版本存在 CODEBUDDY_API_KEY 下的 Key 挪到新引用并清掉旧值。
-      const legacy = await credentials.resolve(credentialRef(LEGACY_API_KEY_ENV)).catch(() => undefined)
-      if (legacy?.value !== undefined) await credentials.unset?.(credentialRef(LEGACY_API_KEY_ENV))
-      const settings = ctx.get('settings')
-      if (settings === undefined) {
-        throw new LlmError(`${name}: 本组合没有设置服务，无法记录凭据引用`, 'NO_SETTINGS_STORE')
+      const [primary, legacyRef] = keyRefs(current())
+      await credentials.set(credentialRef(primary), key)
+      // 旧引用迁移：老版本存在 CODEBUDDY_API_KEY 下的 Key 挪到主引用并清掉旧值。
+      if (legacyRef !== undefined && legacyRef !== primary) {
+        const legacy = await credentials.resolve(credentialRef(legacyRef)).catch(() => undefined)
+        if (legacy?.value !== undefined) await credentials.unset?.(credentialRef(legacyRef))
       }
       // 官方页面的凭据 join 读 profile.apiKeyEnv：物化到用户层，行头圆点才会
-      // 亮绿；顺带清掉旧版遗留的 models 键（模型列表已不落设置节）。
+      // 亮绿；顺带清掉旧版遗留的 providers 子树（整节型 schema 已无该层）。
       await settings.mutate(NS, [
-        { op: 'set', path: ['apiKeyEnv'], value: API_KEY_ENV },
+        { op: 'set', path: ['apiKeyEnv'], value: primary },
         { op: 'unset', path: ['providers'] },
       ])
       ensureRoutes(true)
@@ -368,13 +379,13 @@ export function apply(ctx: Context, config: Config): void {
       ensureRoutes(true)
     },
     async removeKey() {
-      // 清空 Key：两个引用都清掉，模型事实与 route 一并撤回；profile 保留
+      // 清空 Key：所有引用都清掉，模型事实与 route 一并撤回；profile 保留
       // （官方行头圆点转红 = 未配置凭据的官方语义）。被环境遮蔽的引用 unset
       // 会抛错（官方语义：环境提供者优先），逐引用容错。
       const credentials = ctx.get('credentials')
       const unset = credentials?.unset
       if (credentials !== undefined && typeof unset === 'function') {
-        for (const ref of [API_KEY_ENV, LEGACY_API_KEY_ENV]) {
+        for (const ref of keyRefs(current())) {
           try {
             await unset.call(credentials, credentialRef(ref))
           } catch {

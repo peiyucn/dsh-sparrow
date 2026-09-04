@@ -8,7 +8,7 @@
  */
 
 import z from '@deepseek-ai/schemastery'
-import { API_KEY_ENV } from './constants.js'
+import { API_KEY_ENV, LEGACY_API_KEY_ENV } from './constants.js'
 
 /** 插件配置；同名 schema 兼作 llm-codebuddy-credits 设置节形状。 */
 export interface Config {
@@ -19,3 +19,14 @@ export interface Config {
 export const Config: z<Config> = z.object({
   apiKeyEnv: z.string().role('credential-ref').default(API_KEY_ENV),
 })
+
+/**
+ * 解析 Key 时依次尝试的凭据引用（纯函数，供单测）：
+ * 用户配置的 apiKeyEnv 优先（默认对齐官方派生名 CODEBUDDY_CREDITS_API_KEY），
+ * 旧引用 CODEBUDDY_API_KEY 兜底（旧版存过的 Key 不用重配）；两者同名时去重。
+ */
+export function keyRefs(config: Config): readonly string[] {
+  const primary = config.apiKeyEnv ?? API_KEY_ENV
+  const refs = [primary, LEGACY_API_KEY_ENV]
+  return refs.filter((ref, index) => refs.indexOf(ref) === index)
+}
