@@ -67,4 +67,26 @@ describe('fim-support-machine FIM 支持状态机', () => {
     state = fimSupportReducer(state, { type: 'checked', address: A('s1', 'zai:glm-5.3-flash'), supported: false })
     assert.equal(state.phase, 'unsupported')
   })
+
+  it('均不支持模型间切换不闪出——checking 携带上一隐藏态，直到新判定到达', () => {
+    let state = fimSupportReducer(initialFimSupportState, { type: 'context-changed', address: A('s1', 'zai:glm-5.3-flash') })
+    state = fimSupportReducer(state, { type: 'checked', address: A('s1', 'zai:glm-5.3-flash'), supported: false })
+    assert.equal(fimSupportShown(state), false)
+    // 切到另一个同样不支持的模型：查询窗口内仍保持隐藏，不闪出。
+    state = fimSupportReducer(state, { type: 'context-changed', address: A('s1', 'codebuddy-credits:hy4-preview') })
+    assert.equal(state.phase, 'checking')
+    assert.equal(fimSupportShown(state), false)
+    state = fimSupportReducer(state, { type: 'checked', address: A('s1', 'codebuddy-credits:hy4-preview'), supported: false })
+    assert.equal(fimSupportShown(state), false)
+  })
+
+  it('支持→不支持切换：checking 携带上一「显示」态，查完才隐藏（不提前闪没）', () => {
+    let state = fimSupportReducer(initialFimSupportState, { type: 'context-changed', address: A('s1') })
+    state = fimSupportReducer(state, { type: 'checked', address: A('s1'), supported: true })
+    assert.equal(fimSupportShown(state), true)
+    state = fimSupportReducer(state, { type: 'context-changed', address: A('s1', 'zai:glm-5.3-flash') })
+    assert.equal(fimSupportShown(state), true) // 查询中仍显示
+    state = fimSupportReducer(state, { type: 'checked', address: A('s1', 'zai:glm-5.3-flash'), supported: false })
+    assert.equal(fimSupportShown(state), false)
+  })
 })
