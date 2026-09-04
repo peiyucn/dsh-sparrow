@@ -35,6 +35,7 @@
   "files": [
     "lib/index.js",
     "lib/**/*.js",
+    "!lib/client/**",
     "lib/types/**/*.d.ts",
     "cordis.patch.yml",
     "README.md",
@@ -49,7 +50,6 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-settings-models"
