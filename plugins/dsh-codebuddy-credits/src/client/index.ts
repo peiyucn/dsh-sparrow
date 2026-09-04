@@ -270,12 +270,27 @@ export function apply(ctx: ClientContext): void {
                   },
                 } as unknown as DirectoryStoreLike,
                 load: () => {
-                  const hit = ensure()
-                  if (hit !== undefined) {
-                    ;(hit as unknown as { load(): Promise<unknown> }).load().catch(() => { /* 错误落在 store 上 */ })
-                  } else if (available) {
-                    // 未解析：挂一个待命回调，解析成功后补一次 load。
-                    pending.add(() => { ensure() !== undefined && (ensure() as unknown as { load(): Promise<unknown> }).load().catch(() => {}) })
+                  // load 与 select 一样是目录（ModelDirectory）的方法，store 没有——
+                  // 必须解析目录本身；解析失败挂待命回调（解析成功后补一次 load），
+                  // 每次开菜单还会重试。
+                  let directory: ModelDirectoryLike | undefined
+                  try {
+                    directory = resolver.directoryFor(sessionId) as unknown as ModelDirectoryLike | undefined
+                  } catch {
+                    if (available) {
+                      pending.add(() => {
+                        try {
+                          ;(resolver.directoryFor(sessionId) as unknown as ModelDirectoryLike | undefined)
+                            ?.load().catch(() => { /* 错误落在 store 上 */ })
+                        } catch {
+                          // 会话 scope 仍未就绪：保持待命。
+                        }
+                      })
+                    }
+                    return
+                  }
+                  if (directory !== undefined) {
+                    directory.load().catch(() => { /* 错误落在 store 上 */ })
                   }
                 },
                 select: (selection: unknown) => {
