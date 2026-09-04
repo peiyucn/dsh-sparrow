@@ -81,8 +81,9 @@ export function apply(ctx: ClientContext): void {
 
   // 官方共享模型目录（与模型座位同 store、首帧同步）；组合缺该服务（旧版 dsh）
   // 时 fail-soft：目录取不到 → 图标隐藏，不影响主流程。
-  // 根因修复（对齐 credits 遮蔽选择器）：必须从根上下文取服务实例——子上下文
-  // get 拿到的实例注入不全，directoryFor 永远解析不出目录（座位同 session 正常）。
+  // 与 credits 遮蔽选择器一致从根上下文取（防御性对齐：实测本机运行时 ctx.get
+  // 与 ctx.root.get 为同一实例；真正的失败场景是会话 scope 首帧未就绪时
+  // directoryFor 抛错，由组件内惰性重试适配器消化——见 VisionStatusIcon）。
   const directoryFor = (sessionId: SessionId): DirectoryStore | undefined => {
     try {
       const resolver = ctx.root.get('modelDirectories') as unknown as {
@@ -92,14 +93,6 @@ export function apply(ctx: ClientContext): void {
     } catch {
       return undefined
     }
-  }
-
-  // 临时诊断（排查小眼睛显示问题）：对比根上下文与本地 get 的实例是否同一。
-  {
-    const w = window as unknown as Record<string, unknown>
-    const local = (() => { try { return ctx.get('modelDirectories') } catch { return null } })()
-    const root = (() => { try { return ctx.root.get('modelDirectories') } catch { return null } })()
-    w.__vbGetDiag = { sameInstance: local !== null && local === root }
   }
 
   ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
