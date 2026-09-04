@@ -103,7 +103,8 @@ describe('dsh-vision-bridge 能力路由链路', () => {
 
   it('同模型重复查询 应该 命中缓存不再解析', async () => {
     // 能力缓存是模块级的（进程内共享），用独特模型名隔离本用例。
-    const model = 'cache-test-model'
+    // 只缓存正结果：命中缓存的前提是视觉模型（名字含 vision）。
+    const model = 'cache-vision-test-model'
     const { handler, calls } = buildHarness({ defaultModel: { provider: 'deepseek-official', model: 'other-preheat-model' } })
     await request(handler, `/api/vision-bridge/capability?provider=deepseek-official&model=${model}`)
     const afterFirst = calls.length
@@ -112,7 +113,8 @@ describe('dsh-vision-bridge 能力路由链路', () => {
   })
 
   it('启动预热 应该 提前解析默认模型（首查毫秒级）', async () => {
-    const preheatModel = 'preheat-test-model'
+    // 只缓存正结果：预热命中缓存的场景必须是视觉模型（名字含 vision → mock 返回 image 能力）。
+    const preheatModel = 'preheat-vision-test-model'
     const { handler, calls } = buildHarness({ defaultModel: { provider: 'deepseek-official', model: preheatModel } })
     await sleep(10)
     const warmed = calls.some(([provider, model]) => provider === 'deepseek-official' && model === preheatModel)
@@ -120,6 +122,17 @@ describe('dsh-vision-bridge 能力路由链路', () => {
     const before = calls.length
     await request(handler, `/api/vision-bridge/capability?provider=deepseek-official&model=${preheatModel}`)
     assert.equal(calls.length, before)
+  })
+
+  it('无视觉能力的解析结果 应该 不入缓存（启动期假阴性不锁死图标）', async () => {
+    // 文本模型解析结果为 false：不再缓存——provider 目录未就绪时的假阴性
+    // 不能把图标永久锁在错误状态，每次查询现解（registry 查找，代价可忽略）。
+    const model = 'no-negative-cache-test-model'
+    const { handler, calls } = buildHarness({ defaultModel: { provider: 'deepseek-official', model: 'other-model' } })
+    await request(handler, `/api/vision-bridge/capability?provider=deepseek-official&model=${model}`)
+    const afterFirst = calls.length
+    await request(handler, `/api/vision-bridge/capability?provider=deepseek-official&model=${model}`)
+    assert.equal(calls.length, afterFirst + 1)
   })
 
   it('能力解析失败 应该 按无视觉能力处理（不抛 500）', async () => {

@@ -4,6 +4,7 @@ import type { ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-attachment'
+import type {} from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-llm'
 import { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
@@ -54,7 +55,9 @@ const VISION_REPORT_OUTPUT_SCHEMA = {
 } as const
 
 /** 模型能力缓存：provider:model → 是否支持图片。能力与 session 无关，
- *  进程内解析一次即可；图标高频查询（切模型/重挂载即查）不再重复解析。 */
+ *  进程内解析一次即可；图标高频查询（切模型/重挂载即查）不再重复解析。
+ *  只缓存正结果：负结果可能是模型事实尚未装载（如启动预热早于 provider
+ *  目录刷新）的假阴性，缓存会把图标永久锁在错误状态。 */
 const capabilityCache = new Map<string, boolean>()
 
 /** 解析（或读缓存）一个模型是否支持图片；解析失败按无视觉能力处理（保守）。 */
@@ -69,7 +72,7 @@ async function supportsImagesCached(ctx: Context, provider: string, model: strin
   } catch {
     supports = false // 能力解析失败：按无视觉能力处理。
   }
-  capabilityCache.set(key, supports)
+  if (supports) capabilityCache.set(key, true)
   return supports
 }
 
@@ -330,4 +333,11 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       sendJson(res, 200, { mode: visionModeForRoute(provider, supportsImages), visionModel: settings.visionModel })
     },
   }), 'dsh-vision-bridge: capability route')
+
+  // 适配器重注册 / 凭据更新 → 清能力缓存：模型事实刷新后（如 codebuddy 目录
+  // 就绪），旧的解析结果（尤其启动预热期按无视觉处理的假阴性）不能再误导图标。
+  // 负结果本来就不入缓存，这里只负责清掉已缓存的正结果与可能的旧事实。
+  const clearCapabilityCache = (): void => { capabilityCache.clear() }
+  ctx.on('llm/adapters-updated', clearCapabilityCache)
+  ctx.on('credentials/reference-updated', clearCapabilityCache)
 }
