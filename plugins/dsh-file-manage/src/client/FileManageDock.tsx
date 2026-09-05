@@ -124,6 +124,8 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
       return
     }
     // 窗口已盖满已加载行且服务端还有更多：拉下一页数据并同步延伸窗口。
+    // 官方契约 hasMore=true 与 lastId 同现；缺 lastId 时放弃本次点击
+    // （不空转请求：after 缺省会重新拉第一页）。
     if (lastId === undefined) return
     // 刷新代际守卫：翻页期间发生重试 / 关开面板（reload 换代）时，陈旧页结果不得混入新列表。
     const seq = refreshSeqRef.current
