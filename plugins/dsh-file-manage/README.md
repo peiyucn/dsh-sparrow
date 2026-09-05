@@ -19,7 +19,7 @@ Requires dsh ≥ 0.1.2-rc.1 and a working `pnpm` (`dsh plugin` forwards installa
 ## Usage
 
 * **Entry**: the "Cloud Files" button at the sidebar footer
-* **List**: 20 files per page with "Load more" pagination (official after cursor, newest first); each row shows filename / size / upload time / expiry time (when present)
+* **List**: newest first with "Load more" at the bottom (100 more files per click, official after cursor); each row shows filename / size / upload time / expiry time (when present)
 * **Quota**: the panel header shows the total count and a netdisk-style quota bar (used storage / the official 25 GiB limit)
 * **Delete**: per-row delete with confirmation; "DSH auto-uploaded" files (`dsh-` prefix) get an extra note — sessions referencing them will transparently re-upload on next use (may be slower)
 * **Copy file_id**: one-click copy per row

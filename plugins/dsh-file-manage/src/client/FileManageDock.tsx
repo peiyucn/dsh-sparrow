@@ -7,6 +7,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { IconCloseOutline16, IconFolderOpenOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FileRow } from '../files.js'
 import type { FileCountSummary } from './api.js'
+import { hasLoadMore, renderedRowCount, RENDER_PAGE_SIZE } from './paging.js'
 import { formatUsagePercent, storageUsageRatio } from './quota.js'
 import { styles } from './styles.js'
 
@@ -45,6 +46,8 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
   const scrollPendingRef = useRef(false)
   /** 「已复制」反馈 2s 复位（archive 同款）。 */
   const copiedTimerRef = useRef<number | null>(null)
+  /** 渲染窗口上限：行数随「加载更多」递增，超出窗口的行不进 DOM（archive spec 09 同款，配额 10000 下 DOM 有界）。 */
+  const [renderLimit, setRenderLimit] = useState(RENDER_PAGE_SIZE)
 
   /** 首屏 / 重试共用：列表与总数统计并发拉取，两者都落定才揭开内容（整页 loading 防闪动，2026-09-01）。 */
   const reload = useCallback(() => {
@@ -60,6 +63,8 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
     setBusyDelete(false)
     // 换代清掉待滚底标记：陈旧翻页的滚动不得落在新列表上。
     scrollPendingRef.current = false
+    // 换代复位渲染窗口：新列表从头渲染首窗，不带旧代际的窗口位。
+    setRenderLimit(RENDER_PAGE_SIZE)
     listFiles()
       .then(page => {
         if (seq !== refreshSeqRef.current) return
@@ -111,11 +116,19 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
   }, [])
 
   const loadMore = useCallback(() => {
-    if (lastId === undefined || loadingMore) return
+    if (loadingMore) return
+    // 窗口还没盖满已加载行：只延伸渲染窗口（不发请求）；滚底 = 滚到新窗口末尾。
+    if (renderLimit < rows.length) {
+      setRenderLimit(limit => limit + RENDER_PAGE_SIZE)
+      scrollPendingRef.current = true
+      return
+    }
+    // 窗口已盖满已加载行且服务端还有更多：拉下一页数据并同步延伸窗口。
+    if (lastId === undefined) return
     // 刷新代际守卫：翻页期间发生重试 / 关开面板（reload 换代）时，陈旧页结果不得混入新列表。
     const seq = refreshSeqRef.current
     setLoadingMore(true)
-    // 新行渲染提交后滚到列表底部（滚动发生在 rows 变化的 effect 里，一次性）。
+    // 新行渲染提交后滚到列表底部（滚动发生在 rows/renderLimit 变化的 effect 里，一次性）。
     scrollPendingRef.current = true
     listFiles(lastId)
       .then(page => {
@@ -123,6 +136,7 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
         setRows(current => [...current, ...page.rows])
         setHasMore(page.hasMore)
         setLastId(page.lastId)
+        setRenderLimit(limit => limit + RENDER_PAGE_SIZE)
       })
       .catch(reason => {
         if (seq !== refreshSeqRef.current) return
@@ -131,7 +145,7 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
       .finally(() => {
         if (seq === refreshSeqRef.current) setLoadingMore(false)
       })
-  }, [lastId, loadingMore, listFiles])
+  }, [renderLimit, rows.length, lastId, loadingMore, listFiles])
 
   const copyId = useCallback(async (row: FileRow) => {
     try {
@@ -145,18 +159,20 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
     }
   }, [t])
 
-  // 加载更多成功 → rows 增长 → 滚到列表底部（标记只在 loadMore 发起时置位，一次消费）。
+  // 加载更多成功 → rows 增长 / 窗口延伸 → 滚到窗口末尾（标记只在 loadMore 发起时置位，一次消费）。
   useEffect(() => {
     if (!scrollPendingRef.current) return
     scrollPendingRef.current = false
     const el = bodyRef.current
     if (el !== null) el.scrollTop = el.scrollHeight
-  }, [rows])
+  }, [rows, renderLimit])
 
   /** 首屏 ready 门：列表 + 总数都落定前展示整页 loading（2026-09-01）。 */
   const initialLoading = loading || summaryPending
 
   const quotaRatio = summary === null ? 0 : storageUsageRatio(summary.totalBytes, summary.quotaBytes)
+  /** 窗口内可见行数：「已加载 X / 共 N」按渲染窗口显示，不按已拉取的数据行数虚报。 */
+  const visibleCount = renderedRowCount(rows.length, renderLimit)
 
   const submitDelete = useCallback(() => {
     if (confirming === null || busyDelete) return
@@ -165,6 +181,7 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
     setBusyDelete(true)
     deleteFile(deleteId)
       .then(() => {
+        // 行移除不设代际守卫：删除已落定，文件确已消失，任何代际的列表移除该行都是真实结果。
         setRows(current => current.filter(row => row.id !== deleteId))
         // 只关闭本代际的确认框：删除飞行期间关开面板并点开新确认框时，陈旧回调不得误关新框。
         setConfirming(current => current !== null && current.id === deleteId ? null : current)
@@ -174,6 +191,9 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
         }).catch(() => {})
       })
       .catch(reason => {
+        // 代际守卫闭环：陈旧删除的失败既不得污染新代际的错误横幅，
+        // 也不得误关新代际的确认框（同一文件重新确认删除时，旧失败的迟到回调不得打断新尝试）。
+        if (seq !== refreshSeqRef.current) return
         setError(reason instanceof Error ? reason.message : String(reason))
         setConfirming(current => current !== null && current.id === deleteId ? null : current)
       })
@@ -220,8 +240,8 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
                 </div>
                 {/* 列表翻页联动：未加载完时显示「已加载 X / 共 N」，加载完只显示总数。 */}
                 <p className="dsh-file-manage-count">
-                  {rows.length < summary.count
-                    ? t('summary.loaded', { loaded: rows.length, count: summary.count })
+                  {visibleCount < summary.count
+                    ? t('summary.loaded', { loaded: visibleCount, count: summary.count })
                     : t('summary.count', { count: summary.count })}
                 </p>
               </div>
@@ -244,7 +264,8 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
               {error === null && rows.length === 0 ? <p style={styles.secondarySmall}>{t('empty')}</p> : null}
               {rows.length > 0 ? (
                 <div className="dsh-file-manage-card">
-                  {rows.map(row => (
+                  {/* 只渲染窗口内行：预算裁剪 DOM（超出窗口靠「加载更多」延伸，配额 10000 不无界进 DOM）。 */}
+                  {rows.slice(0, renderLimit).map(row => (
                     <div key={row.id} style={styles.row}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
@@ -277,7 +298,7 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
                 </div>
               ) : null}
               {/* 加载更多随列表滚动：放在当前列表最下面（不再固定在面板底部）。 */}
-              {hasMore && !initialLoading ? (
+              {hasLoadMore(rows.length, renderLimit, hasMore) && !initialLoading ? (
                 <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12 }}>
                   <button
                     type="button"

@@ -39,7 +39,7 @@ DeepSeek Files API 云端文件的**可视化管理面板**：侧边栏 footer �
 
 ### 列表
 
-* 游标翻页与官方一致（after / limit / order）；「加载更多」按 has_more 驱动。
+* 游标翻页与官方一致（after / limit / order）；「加载更多」延伸渲染窗口、窗口盖满已加载行时再按 has_more 拉下一页。
 * 行信息完整（文件名 / 大小人读 / 上传与到期时间 / file_id 复制）；`dsh-` 角标正确。
 
 ### 删除
