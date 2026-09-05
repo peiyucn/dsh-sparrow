@@ -292,6 +292,26 @@ describe('chat-fim 纯逻辑', () => {
     it('无 request/header 应该 返回 undefined', () => {
       assert.equal(mainRouteFromSession([{ type: 'user/message', seq: 1, time: 1, data: {} }]), undefined)
     })
+
+    it('长事件列表 应该 倒序取到末尾最近的 header（不依赖数组拷贝）', () => {
+      const events = Array.from({ length: 50 }, (_, index) => ({
+        type: 'request/header',
+        seq: index,
+        time: index,
+        data: { header: { config: { provider: `p${index}`, model: `m${index}` } } },
+      }))
+      assert.deepEqual(mainRouteFromSession(events), { provider: 'p49', model: 'm49' })
+    })
+
+    it('遍历 不应该 改写输入事件数组', () => {
+      const events = [
+        { type: 'user/message', seq: 1, time: 1, data: {} },
+        { type: 'request/header', seq: 2, time: 2, data: { header: { config: { provider: 'zai', model: 'glm-5.3-flash' } } } },
+      ]
+      const snapshot = JSON.parse(JSON.stringify(events))
+      mainRouteFromSession(events)
+      assert.deepEqual(events, snapshot)
+    })
   })
 
   describe('isDeepseekMainRoute', () => {
@@ -652,6 +672,29 @@ describe('chat-fim 纯逻辑', () => {
         { role: 'user', content: [{ type: 'text', text: '你好' }] },
       ])
       assert.deepEqual(turns, [{ role: 'user', text: '你好' }])
+    })
+
+    it('超过 maxMessages 应该 只取最近的窗口且保持正序（倒序遍历不复制）', () => {
+      const history = Array.from({ length: 20 }, (_, index) => ({
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        content: [{ type: 'text', text: `t${index}` }],
+      }))
+      const turns = recentHistoryTurns(history, 3)
+      assert.deepEqual(turns, [
+        { role: 'assistant', text: 't17' },
+        { role: 'user', text: 't18' },
+        { role: 'assistant', text: 't19' },
+      ])
+    })
+
+    it('超过 maxChars 应该 在已有条目后截断', () => {
+      const history = [
+        { role: 'user', content: [{ type: 'text', text: 'aaaa' }] },
+        { role: 'assistant', content: [{ type: 'text', text: 'bbbb' }] },
+        { role: 'user', content: [{ type: 'text', text: 'cccc' }] },
+      ]
+      const turns = recentHistoryTurns(history, 10, 6)
+      assert.deepEqual(turns, [{ role: 'user', text: 'cccc' }])
     })
   })
 

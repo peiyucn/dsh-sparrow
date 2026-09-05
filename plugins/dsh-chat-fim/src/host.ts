@@ -51,7 +51,10 @@ export function isTrustedBrowserRequest(headers: { host?: string; origin?: strin
   }
 }
 
-type DiagnosticKey = 'requests' | 'fulfilled' | 'retries' | 'shown' | 'empty' | 'filteredSpeaker' | 'filteredRepeat' | 'filteredEcho' | 'filteredLanguage'
+export type DiagnosticKey = 'requests' | 'fulfilled' | 'retries' | 'shown' | 'empty' | 'filteredSpeaker' | 'filteredRepeat' | 'filteredEcho' | 'filteredLanguage'
+
+/** 按会话诊断条目上限：host 进程长期存活，bySession 表必须随会话数有界——超限淘汰最早写入条目（FIFO）。 */
+export const MAX_DIAGNOSTIC_SESSIONS = 256
 
 /**
  * 进程级诊断计数（status 路由带 ?diagnostics=1 时返回；不持久化、不含任何用户内容，
@@ -70,15 +73,30 @@ const diagnostics: Record<DiagnosticKey, number> & { bySession: Record<string, R
   bySession: {},
 }
 
+/** 在按会话诊断表里累加一次计数；新会话条目使表超上限时先淘汰最早写入的会话（对象键插入序 = FIFO）。 */
+export function bumpSessionDiagnostics(
+  bySession: Record<string, Record<DiagnosticKey, number>>,
+  sessionId: string,
+  key: DiagnosticKey,
+  maxSessions = MAX_DIAGNOSTIC_SESSIONS,
+): void {
+  let stats = bySession[sessionId]
+  if (stats === undefined) {
+    while (Object.keys(bySession).length >= maxSessions) {
+      const oldest = Object.keys(bySession)[0]
+      if (oldest === undefined) break
+      delete bySession[oldest]
+    }
+    stats = { requests: 0, fulfilled: 0, retries: 0, shown: 0, empty: 0, filteredSpeaker: 0, filteredRepeat: 0, filteredEcho: 0, filteredLanguage: 0 }
+    bySession[sessionId] = stats
+  }
+  stats[key]++
+}
+
 /** 累加一个诊断计数（全局 + 按会话分组）。 */
 function bumpDiagnostics(key: DiagnosticKey, sessionId: string): void {
   diagnostics[key]++
-  let stats = diagnostics.bySession[sessionId]
-  if (stats === undefined) {
-    stats = { requests: 0, fulfilled: 0, retries: 0, shown: 0, empty: 0, filteredSpeaker: 0, filteredRepeat: 0, filteredEcho: 0, filteredLanguage: 0 }
-    diagnostics.bySession[sessionId] = stats
-  }
-  stats[key]++
+  bumpSessionDiagnostics(diagnostics.bySession, sessionId, key)
 }
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {

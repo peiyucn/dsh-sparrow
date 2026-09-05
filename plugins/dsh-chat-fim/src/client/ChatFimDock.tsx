@@ -9,6 +9,8 @@ import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { TRIGGER_SENSITIVITIES, detectEndOfDraft, formatTokenCount, shouldTriggerSuggest, type TriggerSensitivity } from '../suggest.js'
+import { anchorPointsEqual, rectsEqual } from './geometry.js'
+import { createLazyDirectoryStore } from './lazy-directory-store.js'
 import {
   fimSupportReducer, fimSupportShown, initialFimSupportState,
   type FimSupportEvent, type FimSupportState,
@@ -25,40 +27,6 @@ export interface SuggestCompleteResult {
 export interface FimDirectoryStore {
   getSnapshot(): { current: { provider: string; model: string } | null }
   subscribe(listener: () => void): () => void
-}
-
-/** 目录 store 惰性读取面：首帧会话 scope 未就绪时 directoryFor 会抛错——
- *  不弃权，getSnapshot/subscribe 每次读取重试，解析成功后通知等待中的订阅者。 */
-function createLazyDirectoryStore(
-  directoryFor: (sessionId: SessionId) => FimDirectoryStore | undefined,
-  sessionId: SessionId | undefined,
-): { getSnapshot: () => { provider: string; model: string } | null; subscribe: (listener: () => void) => () => void } {
-  let resolved: FimDirectoryStore | undefined
-  const pending = new Set<() => void>()
-  const ensure = (): FimDirectoryStore | undefined => {
-    if (resolved !== undefined) return resolved
-    if (sessionId === undefined) return undefined
-    try {
-      const hit = directoryFor(sessionId)
-      if (hit !== undefined) {
-        resolved = hit
-        for (const listener of pending) listener()
-        pending.clear()
-      }
-    } catch {
-      // 会话 scope 尚未就绪：保持未决，下一次读取重试。
-    }
-    return resolved
-  }
-  return {
-    getSnapshot: () => ensure()?.getSnapshot().current ?? null,
-    subscribe: (listener) => {
-      const hit = ensure()
-      if (hit !== undefined) return hit.subscribe(listener)
-      pending.add(listener)
-      return () => { pending.delete(listener) }
-    },
-  }
 }
 
 export interface ChatFimDockInjected {
@@ -649,7 +617,8 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
     const reposition = (): void => {
       const next = computePickerPoint()
       if (next === null) setPickerOpen(false)
-      else setPickerPoint(next)
+      // 滚动事件高频（逐帧）：锚点数值无变化时不写状态，避免逐事件重渲染。
+      else setPickerPoint(prev => (anchorPointsEqual(prev, next) ? prev : next))
     }
     document.addEventListener('pointerdown', onPointerDown, true)
     document.addEventListener('keydown', onKeyDown, true)
@@ -902,12 +871,17 @@ export function ChatFimDock(props: ChatFimDockProps) {
   }, [composing, enabled, supported, sensitivity, sensitivityParams, input.draft, input.draftRev, input.phase, requestComplete, session.sessionId])
 
   // 联想中：整个 composer 卡片外圈旋转紫光（跟随卡片矩形，周期自愈）。
+  // 矩形无变化时不写状态：300ms 周期 + resize/scroll（capture）回调会高频触发，
+  // 逐拍写入新对象等于逐拍无意义重渲染（geometry.rectsEqual 去重）。
   useLayoutEffect(() => {
     if (!busy) {
       setRing(null)
       return
     }
-    const measure = (): void => { setRing(composerCardRect() ?? null) }
+    const measure = (): void => {
+      const next = composerCardRect() ?? null
+      setRing(prev => (rectsEqual(prev, next) ? prev : next))
+    }
     measure()
     const timer = window.setInterval(measure, RING_MEASURE_INTERVAL_MS)
     window.addEventListener('resize', measure)

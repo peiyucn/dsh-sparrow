@@ -141,10 +141,13 @@ export function truncateFirstSentence(text: string, minLatinChars = 8): string {
   return value
 }
 
-/** 主模型路由：会话事件里最近一条 request/header 的 provider/model。 */
+/** 主模型路由：会话事件里最近一条 request/header 的 provider/model。
+ *  倒序遍历、不复制整段事件数组——每次建议请求都会调 snapshotEvents()（全量快照），
+ *  这里再 `[...events].reverse()` 会多一次 O(n) 拷贝（长会话可上万条）。 */
 export function mainRouteFromSession(events: readonly SessionEvent[]): { provider: string; model: string } | undefined {
-  for (const event of [...events].reverse()) {
-    if (event.type !== 'request/header') continue
+  for (let index = events.length - 1; index >= 0; index--) {
+    const event = events[index] as SessionEvent | undefined
+    if (event === undefined || event.type !== 'request/header') continue
     const config = (event.data as { header?: { config?: { provider?: unknown; model?: unknown } } }).header?.config
     if (typeof config?.provider === 'string' && typeof config.model === 'string') {
       return { provider: config.provider, model: config.model }
@@ -273,7 +276,8 @@ export interface HistoryTurn {
   readonly text: string
 }
 
-/** 取最近对话历史文本（倒序遍历、非空才计数、按条数与字符数裁剪；与 buildFimPrompt 同一窗口规则）。 */
+/** 取最近对话历史文本（倒序遍历、非空才计数、按条数与字符数裁剪；与 buildFimPrompt 同一窗口规则）。
+ *  倒序走索引、不复制整段历史——deriveMessages() 本身已是全量数组，`[...history].reverse()` 是第二次 O(n) 拷贝。 */
 export function recentHistoryTurns(
   history: readonly unknown[],
   maxMessages = MAX_HISTORY_MESSAGES,
@@ -281,8 +285,9 @@ export function recentHistoryTurns(
 ): HistoryTurn[] {
   const recent: HistoryTurn[] = []
   let chars = 0
-  for (const message of [...history].reverse()) {
+  for (let index = history.length - 1; index >= 0; index--) {
     if (recent.length >= maxMessages) break
+    const message = history[index]
     const text = textFromHistoryMessage(message)
     if (text === '') continue
     if (chars + text.length > maxChars && recent.length > 0) break
