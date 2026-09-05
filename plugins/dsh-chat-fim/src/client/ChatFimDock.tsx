@@ -508,15 +508,20 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   font-size: 11px;
   line-height: 18px;
 }
-/* 菜单底部：右下角展示 token 数与实际模型。 */
+/* 菜单底部：左下角品牌行（🐦 dsh-sparrow），右下角展示 token 数与实际模型。 */
 .dsh-chat-fim-menu-footer {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 8px;
   margin-top: 2px;
   padding: 2px 4px 0;
   border-top: 1px solid var(--dsw-alias-border-inverted);
+}
+.dsh-chat-fim-menu-brand {
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
 }
 /* 触发灵敏度弹层：官方 MenuDropdown 同款 token，锚定胶囊右下，空间不足自动向上。 */
 .dsh-chat-fim-sensitivity-popover {
@@ -1049,6 +1054,7 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
             </span>
           </button>
           <div className="dsh-chat-fim-menu-footer">
+            <span className="dsh-chat-fim-menu-brand">🐦 dsh-sparrow</span>
             <span className="dsh-chat-fim-menu-usage">
               {t('menu.tokens', {
                 tokens: formatTokenCount(suggestion.totalTokens),

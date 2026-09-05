@@ -1336,6 +1336,10 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 </>
               ) : null}
             </div>
+            {/* 合集品牌行：面板 footer 居中（只展示，不交互）。 */}
+            <p style={{ textAlign: 'center', fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary, #8a919f)', margin: '12px 0 0' }}>
+              🐦 dsh-sparrow
+            </p>
             </>
             )}
             </div>

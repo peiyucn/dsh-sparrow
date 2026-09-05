@@ -312,6 +312,10 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
                   ? t('popover.noVision.body')
                   : t('popover.crossModel.body', { model: status.visionModel })}
             </div>
+            {/* 合集品牌行：弹窗 footer 居中（只展示，不交互）。 */}
+            <div style={{ textAlign: 'center', fontSize: 11, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary, #8a919f)', marginTop: 8 }}>
+              🐦 dsh-sparrow
+            </div>
           </div>,
           document.body,
         )

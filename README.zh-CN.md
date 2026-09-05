@@ -1,4 +1,4 @@
-# dsh-sparrow 🐦
+# 🐦 dsh-sparrow
 
 简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
