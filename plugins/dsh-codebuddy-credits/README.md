@@ -80,6 +80,12 @@ conversation UI:
 Session and per-turn figures are accumulated in memory and reset when DSH
 restarts; the quota panel always reads the authoritative server-side number.
 
+## Screenshots
+
+![Credits entry and quota panel on the session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-codebuddy-credits.png)
+
+![CodeBuddy Credits configuration card in Settings → Models](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-codebuddy-credits-settings.png)
+
 ## Honest limitations
 
 - The inference endpoint is the one the official CodeBuddy CLI uses. The key

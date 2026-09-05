@@ -65,6 +65,12 @@ Key 只存入 DSH 凭据库，不进 settings.yaml。环境变量
 会话与单轮统计在本进程内累计，重启 DSH 后清零；额度面板始终读服务端权威
 数字。
 
+## 截图
+
+![会话页额度入口与面板](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-codebuddy-credits.png)
+
+![设置 → 模型页的 CodeBuddy Credits 配置卡](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-codebuddy-credits-settings.png)
+
 ## 如实说明
 
 - 推理端点就是官方 CodeBuddy CLI 用的那套。Key 是官方签发、认证方式是官方
