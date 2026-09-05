@@ -325,15 +325,15 @@ export const styles = {
     // 列表已包区块卡，不再加顶部分隔线（避免与卡片叠加显乱）。
     padding: '10px 24px 14px',
   } satisfies CSSProperties,
-  /** 合集品牌 footer：固定面板底部（滚动区之外），顶部分割线与内容区隔开。 */
+  /** 合集品牌 footer：固定面板底部（滚动区之外），顶部分割线与内容区隔开；紧凑规格。 */
   footer: {
     flex: 'none',
     boxSizing: 'border-box',
-    padding: '10px 24px 14px',
+    padding: '6px 24px 8px',
     borderTop: '1px solid var(--dsw-alias-border-l1, #e2e5ea)',
     textAlign: 'center' as const,
-    fontSize: 12,
-    lineHeight: '18px',
+    fontSize: 11,
+    lineHeight: '16px',
     color: 'var(--dsw-alias-label-tertiary, #8a919f)',
   } satisfies CSSProperties,
 } as const

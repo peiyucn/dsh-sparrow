@@ -370,15 +370,15 @@ export function ensureArchiveStyles(): void {
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
-/* 合集品牌 footer：固定面板底部（滚动区之外），顶部分割线与内容区隔开。 */
+/* 合集品牌 footer：固定面板底部（滚动区之外），顶部分割线与内容区隔开；紧凑规格。 */
 .dsh-archive-panel-footer {
   flex: none;
   box-sizing: border-box;
-  padding: 10px 24px 14px;
+  padding: 6px 24px 8px;
   border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
   text-align: center;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 11px;
+  line-height: 16px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
 /* 整页 loading：四个初始请求（归档/游离/回收站/回收站目录）都落定前占满内容区，
