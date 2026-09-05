@@ -12,6 +12,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Startup sweep: ghost archive ids and stale projection rows are cleaned automatically.
 - Subagent labels read from the authoritative log tier, with in-memory fallbacks.
 - The Archive button now aligns its width with Settings; any-session ids (externally injected) archive and restore correctly.
+- Large archives open fast: session headers are cached in memory (invalidated on every change), titles come from the projection cache instead of re-reading each log, and lists are paginated (100 rows + Load more).
 
 ## 0.1.1-alpha.1 (2026-09-02 · pre-release)
 
