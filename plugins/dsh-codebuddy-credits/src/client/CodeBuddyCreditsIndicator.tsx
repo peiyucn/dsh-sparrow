@@ -212,13 +212,10 @@ export function CodeBuddyCreditsIndicator({
   const [quota, setQuota] = useState<QuotaView | undefined>(undefined)
   const [quotaError, setQuotaError] = useState<string | undefined>(undefined)
   // 面板定位（打开时计算，滚动/缩放跟随重定位）：
-  // header 变体右缘对齐按钮、左缘钳制在会话区；sidebar 变体从按钮右上展开、
-  // 左缘钳制在会话区左缘（侧栏按钮在会话区之外，右对齐公式不适用）。
+  // header 与 hero 变体同公式：右缘对齐按钮、左缘钳制在会话区。
   const [point, setPoint] = useState<{
-    top?: number
-    right?: number
-    left?: number
-    bottom?: number
+    top: number
+    right: number
     width: number
   } | null>(null)
   const rootRef = useRef<HTMLElement | null>(null)
@@ -453,10 +450,8 @@ export function CodeBuddyCreditsIndicator({
             aria-label={t('indicator.title')}
             style={{
               ...panelStyle,
-              ...(point.top === undefined ? {} : { top: point.top }),
-              ...(point.right === undefined ? {} : { right: point.right }),
-              ...(point.left === undefined ? {} : { left: point.left }),
-              ...(point.bottom === undefined ? {} : { bottom: point.bottom }),
+              top: point.top,
+              right: point.right,
               width: point.width,
             }}
           >
