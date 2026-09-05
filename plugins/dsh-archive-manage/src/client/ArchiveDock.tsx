@@ -5,6 +5,12 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { IconArchiveOutline20, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { countVisibleRows } from './paging.js'
+
+/** 分页窗口大小（spec 09）：每区每次渲染的行数上限，「加载更多」按此递增。 */
+const ARCHIVE_PAGE_SIZE = 100
+/** 会话进出事件的刷新防抖（spec 09）：多个会话释放事件合并成一次全量刷新。 */
+const SESSIONS_CHANGED_DEBOUNCE_MS = 300
 
 /** 归档树节点：顶层为归档会话根，children 为随父归档的子会话（spec 08，只操作父）。 */
 export interface ArchivedSessionItem {
@@ -612,6 +618,10 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [collapsedIds, setCollapsedIds] = useState<ReadonlySet<string>>(new Set())
   /** 回收站树折叠的父条目集合（键 = trashId，与归档树分开：两区互不干扰）。 */
   const [collapsedTrashIds, setCollapsedTrashIds] = useState<ReadonlySet<string>>(new Set())
+  /** 三区分页窗口（spec 09）：数据刷新时复位，加载更多按页递增。 */
+  const [archivedLimit, setArchivedLimit] = useState(ARCHIVE_PAGE_SIZE)
+  const [straysLimit, setStraysLimit] = useState(ARCHIVE_PAGE_SIZE)
+  const [trashLimit, setTrashLimit] = useState(ARCHIVE_PAGE_SIZE)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
 
   // 官方弹窗行为：打开时聚焦关闭按钮，Esc 关闭。
@@ -642,6 +652,10 @@ export function ArchiveDock(props: ArchiveDockProps) {
       setStrays(nextStrays)
       setTrashItems(nextTrashItems)
       setTrashDir(nextTrashDir)
+      // spec 09：新数据重置分页窗口（避免刷新后停在深层分页位）。
+      setArchivedLimit(ARCHIVE_PAGE_SIZE)
+      setStraysLimit(ARCHIVE_PAGE_SIZE)
+      setTrashLimit(ARCHIVE_PAGE_SIZE)
       setError(null)
     } catch (reason) {
       if (seq !== refreshSeqRef.current) return
@@ -674,11 +688,19 @@ export function ArchiveDock(props: ArchiveDockProps) {
   }, [open])
 
   // 官方会话释放（fiber 销毁）→ 面板打开时实时刷新，hold 标记即时清除（spec 08 §2.5）。
+  // spec 09：300ms 防抖——批量释放会话时合并成一次全量刷新。
   useEffect(() => {
     if (!open) return
-    const onSessionsChanged = (): void => { void refresh() }
+    let timer: number | null = null
+    const onSessionsChanged = (): void => {
+      if (timer !== null) window.clearTimeout(timer)
+      timer = window.setTimeout(() => { void refresh() }, SESSIONS_CHANGED_DEBOUNCE_MS)
+    }
     window.addEventListener('dsh-archive-sessions-changed', onSessionsChanged)
-    return () => { window.removeEventListener('dsh-archive-sessions-changed', onSessionsChanged) }
+    return () => {
+      window.removeEventListener('dsh-archive-sessions-changed', onSessionsChanged)
+      if (timer !== null) window.clearTimeout(timer)
+    }
   }, [open])
 
   const confirmTrash = (item: ArchivedSessionItem): void => {
@@ -837,11 +859,40 @@ export function ArchiveDock(props: ArchiveDockProps) {
     })
   }
 
-  /** 归档树行：父行（深度 0）带操作按钮与折叠切换；子行缩进只读并带树状连接线（spec 08）。 */
-  const renderArchivedRow = (item: ArchivedSessionItem, depth = 0): ReactElement => {
+  /** 归档树行：父行（深度 0）带操作按钮与折叠切换；子行缩进只读并带树状连接线（spec 08）。
+   *  spec 09 分页预算：超出窗口的行返回 null，由父层 children 容器跳过空行渲染。 */
+  const renderArchivedRow = (item: ArchivedSessionItem, depth = 0): ReactElement | null => {
+    if (archivedRowsRendered >= archivedLimit) return null
+    archivedRowsRendered += 1
     const locked = depth === 0 && subtreeLive(item)
     const hasChildren = item.children.length > 0
     const collapsed = collapsedIds.has(item.sessionId)
+    const childrenBlock = hasChildren && !collapsed
+      ? (() => {
+        const emitted: ReactElement[] = []
+        for (const child of item.children) {
+          if (archivedRowsRendered >= archivedLimit) break
+          const row = renderArchivedRow(child, depth + 1)
+          if (row === null) continue
+          emitted.push(row)
+        }
+        if (emitted.length === 0) return null
+        return (
+          <div className="dsh-archive-tree-children">
+            {emitted.map((row, index) => (
+              <div
+                key={row.key}
+                className={index === emitted.length - 1
+                  ? 'dsh-archive-tree-node dsh-archive-tree-node-last'
+                  : 'dsh-archive-tree-node'}
+              >
+                {row}
+              </div>
+            ))}
+          </div>
+        )
+      })()
+      : null
     return (
       <div key={item.sessionId} className={hasChildren ? 'dsh-archive-tree-group' : undefined}>
         <div style={{
@@ -915,30 +966,57 @@ export function ArchiveDock(props: ArchiveDockProps) {
             </div>
           ) : null}
         </div>
-        {hasChildren && !collapsed ? (
-          <div className="dsh-archive-tree-children">
-            {item.children.map((child, index) => (
-              <div
-                key={child.sessionId}
-                className={index === item.children.length - 1
-                  ? 'dsh-archive-tree-node dsh-archive-tree-node-last'
-                  : 'dsh-archive-tree-node'}
-              >
-                {renderArchivedRow(child, depth + 1)}
-              </div>
-            ))}
-          </div>
-        ) : null}
+        {childrenBlock}
       </div>
     )
   }
 
   /** 回收站树行：父行带恢复/彻底删除与折叠切换，子行缩进只读
-   *  （与归档树同款交互；还原/删除整棵走父条目的 sidecar）。 */
-  const renderTrashRow = (item: TrashItem): ReactElement => {
+   *  （与归档树同款交互；还原/删除整棵走父条目的 sidecar）。
+   *  spec 09 分页预算：超出窗口的行返回 null。 */
+  const renderTrashRow = (item: TrashItem): ReactElement | null => {
+    if (trashRowsRendered >= trashLimit) return null
+    trashRowsRendered += 1
     const children = item.subagents ?? []
     const hasChildren = children.length > 0
     const collapsed = collapsedTrashIds.has(item.trashId)
+    const childrenBlock = hasChildren && !collapsed
+      ? (() => {
+        const emitted: ReactElement[] = []
+        for (const child of children) {
+          if (trashRowsRendered >= trashLimit) break
+          trashRowsRendered += 1
+          emitted.push(
+            <div key={child.sessionId}>
+              <div style={{ ...styles.row, borderBottom: 'none', padding: '4px 0' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <span className="dsh-archive-tree-toggle-spacer" aria-hidden>·</span>
+                    <div style={{ ...styles.title, minWidth: 0 }} title={child.title}>{child.title}</div>
+                  </div>
+                  <div style={{ ...styles.secondarySmall, paddingLeft: 20, marginTop: 2 }} title={child.sessionId}>{child.sessionId}</div>
+                </div>
+              </div>
+            </div>,
+          )
+        }
+        if (emitted.length === 0) return null
+        return (
+          <div className="dsh-archive-tree-children">
+            {emitted.map((row, index) => (
+              <div
+                key={row.key}
+                className={index === emitted.length - 1
+                  ? 'dsh-archive-tree-node dsh-archive-tree-node-last'
+                  : 'dsh-archive-tree-node'}
+              >
+                {row}
+              </div>
+            ))}
+          </div>
+        )
+      })()
+      : null
     return (
       <div key={item.trashId} className={hasChildren ? 'dsh-archive-tree-group' : undefined}>
         <div style={{ ...styles.row, ...(hasChildren ? { borderBottom: 'none', padding: '4px 0' } : {}) }}>
@@ -1003,28 +1081,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             </button>
           </div>
         </div>
-        {hasChildren && !collapsed ? (
-          <div className="dsh-archive-tree-children">
-            {children.map((child, index) => (
-              <div
-                key={child.sessionId}
-                className={index === children.length - 1
-                  ? 'dsh-archive-tree-node dsh-archive-tree-node-last'
-                  : 'dsh-archive-tree-node'}
-              >
-                <div style={{ ...styles.row, borderBottom: 'none', padding: '4px 0' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                      <span className="dsh-archive-tree-toggle-spacer" aria-hidden>·</span>
-                      <div style={{ ...styles.title, minWidth: 0 }} title={child.title}>{child.title}</div>
-                    </div>
-                    <div style={{ ...styles.secondarySmall, paddingLeft: 20, marginTop: 2 }} title={child.sessionId}>{child.sessionId}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
+        {childrenBlock}
       </div>
     )
   }
@@ -1094,6 +1151,17 @@ export function ArchiveDock(props: ArchiveDockProps) {
     if (problems.length > 0) throw new Error(problems.join(' · '))
     setPending(null)
   }
+
+  // spec 09 分页预算：每次渲染复位（renderArchivedRow/renderTrashRow 超出窗口返回 null）；
+  // 总数用于「加载更多」显隐。树结构不变，分页只裁剪渲染窗口。
+  let archivedRowsRendered = 0
+  let trashRowsRendered = 0
+  const archivedTotal = countVisibleRows(liveItems, item => item.children, item => collapsedIds.has(item.sessionId))
+    + countVisibleRows(coldItems, item => item.children, item => collapsedIds.has(item.sessionId))
+  const trashTotal = trashItems.reduce((total, item) => {
+    const children = item.subagents?.length ?? 0
+    return total + 1 + (collapsedTrashIds.has(item.trashId) ? 0 : children)
+  }, 0)
 
   return (
     <>
@@ -1173,6 +1241,16 @@ export function ArchiveDock(props: ArchiveDockProps) {
                     </>
                   ) : null}
                   {coldItems.map(item => renderArchivedRow(item))}
+                  {archivedTotal > archivedLimit ? (
+                    <button
+                      type="button"
+                      className="dsh-archive-btn"
+                      style={{ marginTop: 8 }}
+                      onClick={() => { setArchivedLimit(limit => limit + ARCHIVE_PAGE_SIZE) }}
+                    >
+                      {t('pager.loadMore', { remaining: archivedTotal - archivedLimit })}
+                    </button>
+                  ) : null}
                 </>
               ) : null}
             </div>
@@ -1191,7 +1269,17 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 {straysOpen ? (
                   <>
                     <p style={styles.secondarySmall}>{t('stray.hint')}</p>
-                    {strays.map(renderStrayRow)}
+                    {strays.slice(0, straysLimit).map(renderStrayRow)}
+                    {strays.length > straysLimit ? (
+                      <button
+                        type="button"
+                        className="dsh-archive-btn"
+                        style={{ marginTop: 8 }}
+                        onClick={() => { setStraysLimit(limit => limit + ARCHIVE_PAGE_SIZE) }}
+                      >
+                        {t('pager.loadMore', { remaining: strays.length - straysLimit })}
+                      </button>
+                    ) : null}
                   </>
                 ) : null}
               </div>
@@ -1242,6 +1330,16 @@ export function ArchiveDock(props: ArchiveDockProps) {
                     </p>
                   ) : null}
                   {trashItems.map(renderTrashRow)}
+                  {trashTotal > trashLimit ? (
+                    <button
+                      type="button"
+                      className="dsh-archive-btn"
+                      style={{ marginTop: 8 }}
+                      onClick={() => { setTrashLimit(limit => limit + ARCHIVE_PAGE_SIZE) }}
+                    >
+                      {t('pager.loadMore', { remaining: trashTotal - trashLimit })}
+                    </button>
+                  ) : null}
                 </>
               ) : null}
             </div>

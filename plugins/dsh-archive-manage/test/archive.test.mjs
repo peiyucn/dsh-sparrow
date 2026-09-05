@@ -1,12 +1,91 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, isDeleteConfirmationSufficient,
+  archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, createHeaderFactsStore, isDeleteConfirmationSufficient,
   isSafeSessionDirName, legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig,
-  parseTrashSidecar, parseBlankProjection, parseSessionFacts, sanitizeSegment, straySessionIds, trashItemView,
+  parseTrashSidecar, parseBlankProjection, parseSessionFacts, runBounded, sanitizeSegment, straySessionIds, trashItemView,
 } from '../lib/archive.js'
 
 describe('archive-manage 纯逻辑', () => {
+  describe('createHeaderFactsStore（spec 09）', () => {
+    it('TTL 内命中缓存，不重复 load', async () => {
+      let loads = 0
+      let now = 1000
+      const store = createHeaderFactsStore(async () => { loads += 1; return loads }, 30_000, () => now)
+      assert.equal(await store.get(), 1)
+      assert.equal(await store.get(), 1)
+      assert.equal(loads, 1)
+    })
+
+    it('TTL 过期后重新 load', async () => {
+      let loads = 0
+      let now = 1000
+      const store = createHeaderFactsStore(async () => { loads += 1; return loads }, 30_000, () => now)
+      await store.get()
+      now = 1000 + 30_000
+      assert.equal(await store.get(), 2)
+      assert.equal(loads, 2)
+    })
+
+    it('并发 get 共享单飞（只 load 一次）', async () => {
+      let loads = 0
+      const store = createHeaderFactsStore(async () => { loads += 1; return loads }, 30_000, () => 0)
+      const [a, b] = await Promise.all([store.get(), store.get()])
+      assert.equal(a, 1)
+      assert.equal(b, 1)
+      assert.equal(loads, 1)
+    })
+
+    it('invalidate 后下一次 get 重扫', async () => {
+      let loads = 0
+      let now = 1000
+      const store = createHeaderFactsStore(async () => { loads += 1; return loads }, 30_000, () => now)
+      await store.get()
+      store.invalidate()
+      assert.equal(await store.get(), 2)
+      assert.equal(loads, 2)
+    })
+
+    it('load 失败不缓存，下一次重试', async () => {
+      let loads = 0
+      const store = createHeaderFactsStore(async () => {
+        loads += 1
+        if (loads === 1) throw new Error('boom')
+        return loads
+      }, 30_000, () => 0)
+      await assert.rejects(store.get(), /boom/u)
+      assert.equal(await store.get(), 2)
+    })
+  })
+
+  describe('runBounded（spec 09）', () => {
+    it('结果与输入对齐，单任务失败只在该位置 undefined', async () => {
+      const results = await runBounded([1, 2, 3, 4], 2, async n => {
+        if (n === 2) throw new Error('boom')
+        return n * 10
+      })
+      assert.deepEqual(results, [10, undefined, 30, 40])
+    })
+
+    it('空输入返回空数组', async () => {
+      assert.deepEqual(await runBounded([], 2, async n => n), [])
+    })
+
+    it('同时进行中的任务不超过 limit', async () => {
+      let active = 0
+      let peak = 0
+      const results = await runBounded([1, 2, 3, 4, 5, 6], 2, async n => {
+        active += 1
+        peak = Math.max(peak, active)
+        await new Promise(resolve => setTimeout(resolve, 10))
+        active -= 1
+        return n
+      })
+      assert.equal(peak, 2)
+      assert.deepEqual(results, [1, 2, 3, 4, 5, 6])
+    })
+  })
+
   describe('normalizeArchiveConfig', () => {
     it('空配置 应该 提供默认回收站目录', () => {
       const config = normalizeArchiveConfig(undefined)

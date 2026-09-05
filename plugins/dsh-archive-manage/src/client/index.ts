@@ -71,6 +71,7 @@ const LOCALE_DICTS = {
     'confirm.restoring': '正在还原…',
     'notice.skippedLegacy': '跳过旧格式 {count} 个',
     'notice.failed': '失败 {count} 个',
+    'pager.loadMore': '加载更多（还有 {remaining} 条）',
   },
   en: {
     'button.label': 'Archive',
@@ -129,6 +130,7 @@ const LOCALE_DICTS = {
     'confirm.restoring': 'Restoring…',
     'notice.skippedLegacy': 'skipped {count} legacy',
     'notice.failed': '{count} failed',
+    'pager.loadMore': 'Load more ({remaining} more)',
   },
 } as const
 

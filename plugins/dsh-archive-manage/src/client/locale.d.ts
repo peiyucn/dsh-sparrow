@@ -58,6 +58,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'confirm.restoring'
       | 'notice.skippedLegacy'
       | 'notice.failed'
+      | 'pager.loadMore'
   }
 }
 

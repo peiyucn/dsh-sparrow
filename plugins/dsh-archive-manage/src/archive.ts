@@ -341,3 +341,69 @@ export function collectSubtreeIds(headers: readonly SessionTreeHeader[], rootId:
   return out
 }
 
+/**
+ * header 事实缓存存储（spec 09，纯逻辑供单测）：TTL 内直接返回缓存；过期后
+ * 单飞填充（并发调用共享同一 promise）；invalidate 清缓存让下一次 get 重扫。
+ * 安全依据：jsonl header 物化后不可变，按 id 缓存只需处理成员增减（写穿失效）。
+ */
+export interface HeaderFactsStore<F> {
+  get(): Promise<F>
+  invalidate(): void
+}
+
+export function createHeaderFactsStore<F>(
+  load: () => Promise<F>,
+  ttlMs: number,
+  now: () => number = Date.now,
+): HeaderFactsStore<F> {
+  let cached: F | undefined
+  let fetchedAt = -Infinity
+  let inflight: Promise<F> | undefined
+  return {
+    async get(): Promise<F> {
+      if (cached !== undefined && now() - fetchedAt < ttlMs) return cached
+      inflight ??= load().then(value => {
+        cached = value
+        fetchedAt = now()
+        return value
+      }).finally(() => {
+        inflight = undefined
+      })
+      return inflight
+    },
+    invalidate(): void {
+      cached = undefined
+      fetchedAt = -Infinity
+    },
+  }
+}
+
+/**
+ * 有界并发执行（spec 09，纯逻辑供单测）：至多 limit 个 worker 顺序取任务；
+ * 单任务失败只在该位置记 undefined，不中断其余任务；结果与输入对齐。
+ */
+export async function runBounded<T, R>(
+  items: readonly T[],
+  limit: number,
+  work: (item: T) => Promise<R>,
+): Promise<Array<R | undefined>> {
+  const results: Array<R | undefined> = new Array<R | undefined>(items.length)
+  if (items.length === 0) return results
+  let next = 0
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+    while (true) {
+      const index = next
+      next += 1
+      if (index >= items.length) return
+      const item = items[index] as T
+      try {
+        results[index] = await work(item)
+      } catch {
+        results[index] = undefined
+      }
+    }
+  })
+  await Promise.all(workers)
+  return results
+}
+

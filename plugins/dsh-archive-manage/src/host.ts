@@ -17,9 +17,10 @@ import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import type { Workspace, WorkspaceDomainState } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
-  TRASH_SIDECAR, archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, isDeleteConfirmationSufficient,
-  isSafeSessionDirName, legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig, parseBlankProjection,
-  parseSessionFacts, parseTrashSidecar, sanitizeSegment, straySessionIds, trashItemView,
+  TRASH_SIDECAR, archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, createHeaderFactsStore,
+  isDeleteConfirmationSufficient, isSafeSessionDirName, legacyTrashItem, livingChildIds, maskHomePath,
+  normalizeArchiveConfig, parseBlankProjection, parseSessionFacts, parseTrashSidecar, runBounded, sanitizeSegment,
+  straySessionIds, trashItemView,
   type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar, type SessionFacts, type SessionTreeHeader,
   type SessionTreeNode,
 } from './archive.js'
@@ -31,6 +32,12 @@ export type { ArchiveConfig }
 
 const PREFIX = '/api/archive-manage'
 const MAX_BODY_BYTES = 64 * 1024
+/** header 事实缓存 TTL（spec 09）：写穿失效之外的兜底，防没有事件的边界路径留陈旧成员表。 */
+const HEADER_CACHE_TTL_MS = 30_000
+/** 标题折叠兜底的有界并发（spec 09）：同一时间至多 N 个冷会话在做全日志折叠。 */
+const TITLE_FOLD_CONCURRENCY = 4
+/** 标题折叠兜底的整体预算（spec 09）：超时后未完成的折叠按失败处理、回退会话 id。 */
+const TITLE_FOLD_BUDGET_MS = 8_000
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -148,9 +155,82 @@ function ensureSessionNotLive(ctx: Context, sessionId: SessionId): void {
 const PROJCACHE_DOMAIN_NAME = 'session_projcache'
 const PROJCACHE_SESSIONS_TABLE = 'sessions'
 
-async function readTitle(ctx: Context, sessionId: SessionId, fallback: string): Promise<string> {
-  const observations = await ctx.sessionQuery.readTitleSnapshots([sessionId])
-  return titleFromObservation(observations[0], fallback)
+/**
+ * 标题投影缓存读取（spec 09，官方 title 单元 stateSchema = string|null、latest-wins）：
+ * live 会话走投影注册表快照；冷会话走 sessionProjectionCache 行（官方 @ 列表同款，
+ * list.ts:335 口径）。行值防御性解析（直接字符串或 {title} 对象都接受），无/空返回 undefined。
+ */
+function cachedTitle(ctx: Context, header: SessionHeader, live: unknown): string | undefined {
+  const read = (values: Record<string, unknown> | null | undefined): string | undefined => {
+    const raw: unknown = values?.title
+    if (typeof raw === 'string') return raw.trim() === '' ? undefined : raw
+    const wrapped = (raw as { title?: unknown } | null | undefined)?.title
+    if (typeof wrapped === 'string') return wrapped.trim() === '' ? undefined : wrapped
+    return undefined
+  }
+  if (live !== undefined) {
+    const registry = ctx.get('sessionProjections') as unknown as {
+      snapshot?: (session: unknown, units: readonly string[]) => { values: Record<string, unknown> } | undefined
+    } | undefined
+    if (registry !== undefined && typeof registry.snapshot === 'function') {
+      try {
+        const hit = read(registry.snapshot(live, ['title'])?.values)
+        if (hit !== undefined) return hit
+      } catch (error) {
+        ctx.logger.warn(`dsh-archive-manage: 标题投影快照失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    return undefined
+  }
+  const cache = ctx.get('sessionProjectionCache') as unknown as {
+    cachedSnapshot?: (header: unknown, cut: unknown, units: readonly string[]) => { values: Record<string, unknown> } | undefined
+  } | undefined
+  if (cache !== undefined && typeof cache.cachedSnapshot === 'function') {
+    try {
+      const hit = read(cache.cachedSnapshot(header, 0, ['title'])?.values)
+      if (hit !== undefined) return hit
+    } catch (error) {
+      ctx.logger.warn(`dsh-archive-manage: 标题投影缓存读取失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  return undefined
+}
+
+/**
+ * 批量标题三档（spec 09）：live 投影 → 冷缓存 → 有界折叠兜底。
+ * 折叠共享一个整体预算信号（超时后未完成项按失败处理），并发上限 TITLE_FOLD_CONCURRENCY；
+ * 最终取不到的 id 落 fallback（默认会话 id）。返回值包含全部输入 id 的键。
+ */
+async function titlesFor(
+  ctx: Context,
+  headers: readonly SessionHeader[],
+  fallback: (header: SessionHeader) => string,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  const misses: SessionHeader[] = []
+  for (const header of headers) {
+    const hit = cachedTitle(ctx, header, ctx.sessions.get(SessionId(String(header.id))))
+    if (hit !== undefined) {
+      out.set(String(header.id), hit)
+      continue
+    }
+    misses.push(header)
+  }
+  if (misses.length === 0) return out
+  const budget = AbortSignal.timeout(TITLE_FOLD_BUDGET_MS)
+  const folded = await runBounded(misses, TITLE_FOLD_CONCURRENCY, async (header) => {
+    const observations = await ctx.sessionQuery.readTitleSnapshots([SessionId(String(header.id))], budget)
+    return titleFromObservation(observations[0], fallback(header))
+  })
+  misses.forEach((header, index) => {
+    out.set(String(header.id), folded[index] ?? fallback(header))
+  })
+  return out
+}
+
+/** 单会话标题（三档 + 兜底折叠；fallback 默认会话 id）。 */
+async function readTitle(ctx: Context, header: SessionHeader, fallback: string): Promise<string> {
+  return titlesFor(ctx, [header], () => fallback).then(map => map.get(String(header.id)) ?? fallback)
 }
 
 async function ensureTrashRoot(trashRoot: string): Promise<void> {
@@ -410,13 +490,14 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
   return undefined
 }
 
-/** 批量子会话标签（header.id → label；取不到的 id 不在映射中，调用方回退标题）。 */
+/** 批量子会话标签（spec 09：有界并发折叠，与标题兜底同一并发上限；header.id → label，取不到的 id 不在映射中）。 */
 async function subagentLabels(ctx: Context, headers: readonly SessionHeader[]): Promise<Map<string, string>> {
   const out = new Map<string, string>()
-  for (const header of headers) {
-    const label = await subagentLabel(ctx, header)
+  const results = await runBounded(headers, TITLE_FOLD_CONCURRENCY, header => subagentLabel(ctx, header))
+  headers.forEach((header, index) => {
+    const label = results[index]
     if (label !== undefined) out.set(String(header.id), label)
-  }
+  })
   return out
 }
 
@@ -737,16 +818,26 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
   // 私有 seam 依赖：sessionPersistence.locate（2026-09-02 起公开契约降为后端私有方法，运行时仍在）。
   assertSessionLocationApi(ctx.sessionPersistence)
 
+  // spec 09：header 事实缓存（单飞 + TTL）。写穿失效见下方事件监听与写路由；
+  // jsonl header 物化后不可变，按 id 缓存安全，成员增减由事件与自身写操作失效。
+  const headerFacts = createHeaderFactsStore(() => storedHeaderFacts(ctx), HEADER_CACHE_TTL_MS)
+
   // 启动清扫（均不影响加载）：归档集幽灵 id（历史遗留）、投影缓存陈旧行。
   void sweepGhostArchivedIds(ctx, surface)
   void sweepStaleProjectionCache(ctx)
 
   // spec 08 父子联动：启动对齐 + 官方 workspace 域写入事件驱动实时对齐（幂等，官方 feed 同款监听）。
+  // spec 09：同事件写穿失效 header 缓存（官方菜单归档等外部写不经过本插件路由）。
   void alignChildArchives(ctx, surface)
   ctx.effect(() => ctx.on('domain/changed', (change) => {
     if (change.domain !== 'workspace' || change.operation !== 'put') return
+    headerFacts.invalidate()
     void alignChildArchives(ctx, surface)
   }), 'dsh-archive-manage: 父子归档对齐')
+
+  // spec 09：会话进出事件写穿失效 header 缓存（自身写操作补发的 removed/added 亦经此路径）。
+  ctx.effect(() => ctx.on('api-session/added', () => headerFacts.invalidate()), 'dsh-archive-manage: header 缓存失效（added）')
+  ctx.effect(() => ctx.on('api-session/removed', () => headerFacts.invalidate()), 'dsh-archive-manage: header 缓存失效（removed）')
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
@@ -757,21 +848,20 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
         if (req.method === 'GET' && pathname === `${PREFIX}/list`) {
           // spec 08：归档区 = 已归档会话的父子树；先惰性对齐再构建（事件驱动之外的兜底）。
           await alignChildArchives(ctx, surface)
-          const { headers, sizes } = await storedHeaderFacts(ctx)
+          const { headers, sizes } = await headerFacts.get()
           const byId = new Map(headers.map(header => [String(header.id), header]))
           const archivedIds = new Set((await readArchivedIds(ctx)).map(String))
           const archivedHeaders = headers.filter(header => archivedIds.has(String(header.id)))
           const tree = buildSessionTree(archivedHeaders.map(treeHeaderOf))
           const ids = treeIds(tree)
-          const observations = ids.length > 0
-            ? await ctx.sessionQuery.readTitleSnapshots(ids.map(id => SessionId(id)))
-            : []
-          const observationByIndex = new Map(ids.map((id, index) => [id, observations[index]]))
           const workspaces = ctx.workspaceRegistry.list()
-          // 子会话标签走官方 subagent 投影（标题单元对种子会话取到父消息，2026-09-02 实测）。
-          const childHeaders = ids
+          // spec 09：标题三档（live 投影 → 冷缓存 → 有界折叠兜底），不再整树全日志折叠。
+          const treeHeaders = ids
             .map(id => byId.get(id))
-            .filter((header): header is SessionHeader => header !== undefined && header.origin === 'subagent')
+            .filter((header): header is SessionHeader => header !== undefined)
+          const titles = await titlesFor(ctx, treeHeaders, header => header.id)
+          // 子会话标签走官方 subagent 投影（标题单元对种子会话取到父消息，2026-09-02 实测）。
+          const childHeaders = treeHeaders.filter(header => header.origin === 'subagent')
           const childLabels = childHeaders.length > 0
             ? await subagentLabels(ctx, childHeaders)
             : new Map<string, string>()
@@ -784,7 +874,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             const facts = header === undefined ? undefined : sessionFacts(ctx, node.header.id)
             return {
               sessionId: node.header.id,
-              title: childLabels.get(node.header.id) ?? titleFromObservation(observationByIndex.get(node.header.id), sessionId),
+              title: childLabels.get(node.header.id) ?? titles.get(node.header.id) ?? sessionId,
               updatedAt: header?.createdAt ?? node.header.createdAt,
               createdAt: header?.createdAt ?? node.header.createdAt,
               project: header?.cwd === undefined ? undefined : basename(header.cwd),
@@ -806,7 +896,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
         }
 
         if (req.method === 'GET' && pathname === `${PREFIX}/strays`) {
-          const { headers, sizes } = await storedHeaderFacts(ctx)
+          const { headers, sizes } = await headerFacts.get()
           const archivedIds = await readArchivedIds(ctx)
           const attachedIds = ctx.workspaceRegistry.list().flatMap(workspace => workspace.sessionIds.map(id => String(id)))
           // spec 08：有父的子会话跟随父、不单独出现在游离区；孤儿子会话（父不在）按顶层对待并打 orphan 标。
@@ -816,16 +906,21 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             archivedIds.map(id => String(id)),
             attachedIds,
           ).filter(id => !children.has(id))
+          // spec 09：先取游离 header 集，标题/子标签批量三档（缓存优先 + 有界折叠），不再逐会话串行全日志折叠。
+          const strayHeaders = headers.filter(header => strayIds.includes(String(header.id)))
+          const titles = await titlesFor(ctx, strayHeaders, header => header.id)
+          const labelHeaders = strayHeaders.filter(header => header.origin === 'subagent')
+          const childLabels = labelHeaders.length > 0
+            ? await subagentLabels(ctx, labelHeaders)
+            : new Map<string, string>()
           const items = []
-          for (const header of headers) {
-            if (!strayIds.includes(String(header.id))) continue
+          for (const header of strayHeaders) {
             const sessionId = SessionId(String(header.id))
             const location = ctx.sessionPersistence.locate(header)
-            const childLabel = header.origin === 'subagent' ? await subagentLabel(ctx, header) : undefined
             const facts = sessionFacts(ctx, String(header.id))
             items.push({
               sessionId: String(header.id),
-              title: childLabel ?? await readTitle(ctx, sessionId, header.id),
+              title: childLabels.get(String(header.id)) ?? titles.get(String(header.id)) ?? String(sessionId),
               createdAt: header.createdAt,
               project: header.cwd === undefined ? undefined : basename(header.cwd),
               turns: facts?.turns,
@@ -880,7 +975,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             throw new ArchiveError('BAD_BODY', 'sessionId 必须是非空字符串')
           }
           const rootId = parsed.sessionId.trim()
-          const headers = await storedHeaders(ctx)
+          const headers = (await headerFacts.get()).headers
           if (!headers.some(header => String(header.id) === rootId)) {
             throw new ArchiveError('UNKNOWN_SESSION', '会话持久化中没有这个会话', 404)
           }
@@ -901,7 +996,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           }
           const sessionId = SessionId(parsed.sessionId)
           const archivedIds = await readArchivedIds(ctx)
-          const headers = await storedHeaders(ctx)
+          const headers = (await headerFacts.get()).headers
           const attachedIds = ctx.workspaceRegistry.list().flatMap(workspace => workspace.sessionIds.map(id => String(id)))
           const strayIds = straySessionIds(headers.map(header => String(header.id)), archivedIds.map(id => String(id)), attachedIds)
           const isArchived = archivedIds.some(id => String(id) === String(sessionId))
@@ -914,7 +1009,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           if (header === undefined) {
             throw new ArchiveError('UNKNOWN_SESSION', '会话持久化中没有这个会话', 404)
           }
-          const title = await readTitle(ctx, sessionId, header.id)
+          const title = await readTitle(ctx, header, header.id)
           const strayBlank = isStray && await readStrayBlankness(ctx, sessionId)
           if (pathname.endsWith('/delete')) {
             if (strayBlank) {
@@ -970,7 +1065,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
                   moved.push({ from: child.dir, to })
                   subagentSidecars.push({
                     sessionId: String(child.sessionId),
-                    title: await readTitle(ctx, child.sessionId, child.header.id),
+                    title: await readTitle(ctx, child.header, child.header.id),
                     originalPath: child.dir,
                     workspaceIds: workspaceIdsFor(ctx.workspaceRegistry.list(), child.sessionId),
                   })
@@ -1102,6 +1197,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           }
           const trashDir = resolveTrashDir(settings.trashRoot, parsed.trashId)
           const sidecar = await restoreTrashDir(ctx, surface, trashDir)
+          // 还原把会话目录移回持久化：立即失效 header 缓存（restore 不发 added 事件，写穿靠这里）。
+          headerFacts.invalidate()
           sendJson(res, 200, { ok: true, sessionId: sidecar.sessionId, workspaceIds: sidecar.workspaceIds })
           return
         }
@@ -1128,6 +1225,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               failed.push({ trashId: name, message: error instanceof Error ? error.message : String(error) })
             }
           }
+          headerFacts.invalidate()
           sendJson(res, 200, { ok: true, restored, skippedLegacy, failed })
           return
         }
