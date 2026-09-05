@@ -1196,23 +1196,6 @@ export function ArchiveDock(props: ArchiveDockProps) {
               </div>
             ) : (
             <>
-            <p style={{ ...styles.secondarySmall, fontSize: 14, lineHeight: '22px', margin: '0 0 12px' }}>
-              {trashDir !== null && trashDir.displayPath !== '' ? (
-                <>
-                  {t('dialog.trashDir')}
-                  {' '}
-                  <button
-                    type="button"
-                    className="dsh-archive-trash-dir"
-                    title={`${trashDir.path}（${t('dialog.copyHint')}）`}
-                    onClick={() => { void copyTrashDir() }}
-                  >
-                    {trashDir.displayPath}
-                    {copied ? ` ✓${t('dialog.copied')}` : ''}
-                  </button>
-                </>
-              ) : null}
-            </p>
             {error !== null ? (
               <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)', margin: '0 0 12px' }}>
                 {error}
@@ -1297,6 +1280,22 @@ export function ArchiveDock(props: ArchiveDockProps) {
               </button>
               {trashOpen ? (
                 <>
+                  {/* 回收站位置归回收站区（面板顶部不放全局行）；点击复制完整路径。 */}
+                  {trashDir !== null && trashDir.displayPath !== '' ? (
+                    <p style={styles.secondarySmall}>
+                      {t('dialog.trashDir')}
+                      {' '}
+                      <button
+                        type="button"
+                        className="dsh-archive-trash-dir"
+                        title={`${trashDir.path}（${t('dialog.copyHint')}）`}
+                        onClick={() => { void copyTrashDir() }}
+                      >
+                        {trashDir.displayPath}
+                        {copied ? ` ✓${t('dialog.copied')}` : ''}
+                      </button>
+                    </p>
+                  ) : null}
                   <p style={styles.secondarySmall}>{t('trash.hint')}</p>
                   {trashItems.length > 0 ? (
                     <div style={{ ...styles.actions, padding: '4px 0 8px' }}>
