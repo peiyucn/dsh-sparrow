@@ -8,7 +8,8 @@
  * header 行几何：top 14 / right 28），active 相位返回 null 让位 header 常驻
  * 入口。点击展开面板：账号、本期额度（进度条 + 已用/剩余 + 重置日期）、
  * 当前选中 CodeBuddy 模型的信息。全部颜色走 --dsw-* 官方 token（进度条
- * 填充取 business 蓝下一深档的 static deepseek 档），深浅主题自动。
+ * 填充对齐官方发送按钮 hover 色 --dsw-alias-button-info-hover），深浅
+ * 主题自动。
  *
  * 当前选中模型读官方共享模型目录（ctx.modelDirectories，与模型选择器
  * 同一 store，含目录默认值兜底），目录不可用时退回 session 投影
@@ -500,8 +501,8 @@ export function CodeBuddyCreditsIndicator({
                     ? (
                       <>
                         {/* 容量条对齐 dsh-file-manage 配额条：加厚 16px、未使用区
-                            45° 斜纹、文字居中叠加、business 蓝下一深档填充
-                            （浅色 deepseek-600 / 深色 deepseek-500，见注入样式）。 */}
+                            45° 斜纹、文字居中叠加、填充对齐官方发送按钮
+                            hover 色（--dsw-alias-button-info-hover）。 */}
                         <div style={{ fontSize: '12px', lineHeight: '18px', fontWeight: 500, color: 'var(--dsw-alias-label-secondary)' }}>
                           {t('indicator.quotaTitle')}
                         </div>
@@ -680,11 +681,10 @@ export function ensureIndicatorStyles(): void {
     '.ccb-indicator-button:focus-visible {',
     '  outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);',
     '}',
-    // 进度条填充：business 蓝下一深档——浅色主题 business-primary=deepseek-500
-    // → 600；深色主题 business-primary=deepseek-400 → 500（跟随官方深色
-    // 主题标记 body[data-ds-dark-theme]）。
-    '.ccb-quota-fill { background: var(--dsw-static-deepseek-600); }',
-    'body[data-ds-dark-theme] .ccb-quota-fill { background: var(--dsw-static-deepseek-500); }',
+    // 进度条填充：官方发送按钮 hover 色（--dsw-alias-button-info-hover——
+    // 浅色 deepseek-400 #679EFE / 深色 deepseek-500 #4176E6，官方 alias
+    // 随主题自动切换，无需自写深色标记覆盖）。
+    '.ccb-quota-fill { background: var(--dsw-alias-button-info-hover); }',
   ].join('\n')
   document.head.append(style)
 }
