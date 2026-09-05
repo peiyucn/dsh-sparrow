@@ -12,45 +12,26 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 * `plugins/dsh-codebuddy-credits` — CodeBuddy 额度 LLM provider（官方 API Key 直连，纯模型推理）
 
 * 验证：插件目录 `npm run verify`；全量 = 根 `npm run verify`；分项 = 根 `pnpm run <step>:all`
-* 文档分工：AGENTS.md 是唯一 agent 指令文件（不保留 CLAUDE.md 等其它厂商指令文件）；插件 README 面向用户（中英双份、顶部互链，只写用法与行为，开发细节不进 README）；CHANGELOG 双份面向用户——每条一条用户可感知变化（一句话、行为级），不写实现细节/内部机制（归 commit 与 docs/spec）；插件私有 seam 特例只在根 AGENTS 记概括（见下文），实现细节以代码注释与 docs/spec 为准
 
-## DSH 插件契约（硬约束）
+## 文档规范
 
-* **入口契约**：模块 export `name`/`inject`/`apply`；`inject` 只声明硬依赖服务，缺失时插件不启动
-* **生命周期**：一切副作用在 `apply` 内注册并配 `ctx.effect` 清理；不泄漏定时器/watcher/监听
-* **组合行**：`cordis.patch.yml` insert 按官方 bundle patch 规范——`id` 用短名（稳定供后续 patch 定位），`name` 用 scoped 包名（loader 按包名解析）
-* **seam 纪律（三档）**：
-  1. **正路（默认）**：只用公开 seam（`ctx.llm`/`ctx.webServer`/`ctx.tools`/slots/provide 等）
-  2. **包装（特例）**：公开 seam 不满足需求时包装它——保持原签名与 `this` 语义、可逆恢复，并记录适配的 dsh 版本
-  3. **私有 seam 依赖（特例，2026-09-01 起）**：官方无公开能力、需求成立时，允许调用官方服务 private 方法/读写 private 状态。护栏：不替换/不包装/不覆写官方函数；优先复用官方自身写入路径（如 enqueueOperation + setState），不自造平行机制；启动时能力检查，surface 变化即 fail-fast 报「不支持的 dsh 版本」；owner 批准 + 在本文件「插件私有 seam 特例（概括）」小节记录
-* **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直读内部文件；确需直碰内部文件的特例须在本文件「插件私有 seam 特例（概括）」小节记录 + owner 认可
-* **查证原则**：引用 DSH 服务/事件/插槽契约前，先 grep 官方源码（本机 checkout：`C:\Users\DJ028191\.dsh-launcher-panel\source`）确认，禁止凭记忆编造
+> 三份文档各司其职、各有读者：AGENTS 给开发 agent、README 给用户、CHANGELOG 给用户——写错读者是文档事故。
 
-## 插件私有 seam 特例（概括）
-
-> dsh 迭代快，特例不写死细节：开发时以临场查证官方源码为准；新增/变更特例须 owner 认可，实现细节以代码注释与各插件 docs/spec 为准。
-
-* `dsh-chat-fim`：候选菜单挂 `conversation.input.dock`（只读草稿快照，写入走官方 `slash/input-insert-text` 事件）+ `conversation.input.overlay`（官方菜单视觉 token）；与官方触发菜单互斥（只读检测 `[data-trigger-menu]`）；host 直读 `session.snapshotEvents()` 取主路由（仅 dsh ≥ 0.1.2-alpha.4）
-* `dsh-vision-bridge`：可逆包装 `ctx.llm.resolveModelInfo` 抹除文本路由的 image 门禁；`agent/request` 拦截按主模型能力屏蔽 `vision_read` 工具；图片字节只经官方 `ctx.attachments.readImage`；直读 `snapshotEvents()`；状态图标与模型座位共享官方 `ctx.modelDirectories` 目录 store，能力判定走无会话依赖的 `/api/vision-bridge/capability` 路由
-* `dsh-archive-manage`：允许移动/删除会话日志目录（仅 jsonl 单会话目录，其余 `BACKEND_UNSUPPORTED`）；归档集变更走官方 WorkspaceRegistry 私有写通道（`enqueueOperation`/`requireState`/`setState`，启动能力检查缺方法即 fail-fast）；`sessionPersistence.list()` 双形状兼容（master 返回快照、旧版返回裸 header）；`sessionPersistence.locate` 为后端私有方法（alpha.5 发布后从公开契约降级，启动能力检查缺方法即 fail-fast）；live 会话拒绝处理；回收站目录写 sidecar 记账
-* `dsh-file-manage`：直接 import 官方导出 `DeepSeekFilesClient`；只读官方 `llm-deepseek` 设置节取 `baseURL`/`apiKeyEnv`
-* `dsh-nav-pin`：只读依赖官方 DOM 标记与 aria-label 文案；CSS 特异性压制官方窄屏隐藏规则；宽度轴经官方公开 data 属性钳制
-* `dsh-codebuddy-credits`：无私有 seam——协议层自建（`CodeBuddyAdapter extends LlmAdapter`，不依赖 pi-ai）：请求构造、SSE 解析、usage.credit 提取、企业策略错误透传全部显式实现；官方请求标识（user-agent/x-product/企业上下文头）直接进请求头；`conversation.input.model` 槽位以 priority -1 遮蔽官方 ModelSelect（官方注册表语义：同 cell 最低 priority 渲染，非 monkey-patch）——vendored 选择器（MIT 署名，源码 ui-model-selection）只为积分系数右对齐列，启动能力检查缺 `modelDirectories`/`sessions` 服务即保留官方选择器；只读依赖官方 DOM 标记 `[data-composer-card]`（Toast 锚定）；捕获阶段点击拦截官方行头「编辑」按钮（按钮保留官方原位与样式，`stopPropagation` 阻断官方编辑器打开，行为改为展开本插件自建编辑器——官方编辑器对本命名空间只渲染占位提示）；首装 setup 占位编辑器以 CSS 隐藏（`:has(.ccb-card-root)` 锚点 + DOM 结构定位——官方类名是纯哈希、片段匹配无效）；凭据引用对齐官方派生名 `CODEBUDDY_CREDITS_API_KEY`（deriveKeyRef 口径，旧引用 `CODEBUDDY_API_KEY` 兼容迁移），使官方行头凭据圆点原生生效；每轮积分胶囊挂官方 `conversation.chat.assistant-actions` 槽位（公开 seam），DOM 级移动到该行动作行末尾时间之前（只移动本插件自有节点，不包装/替换官方组件）；轮次关联经 `agent/request` 载荷 signal 与适配器 options.signal 同实例（WeakMap，中断零残留）；会话积分统计段挂官方 `conversation.composer.dock` 槽位，DOM 级把自有分段追加到官方 StatsLine 行末尾（官方行每步重渲染清注入节点，组件以同 nodes 信号重建，无可见断档）；额度卡挂官方 `sidebar.footer.action` 槽位（公开 seam，owner 传 `wide`），宽栏以零占位锚点 + 绝对定位品牌 logo 与官方 Settings 同行右置、不重叠——经官方锚点契约的 `[data-slot="sidebar.settings"]` 可寻址 seam 以 CSS 收缩官方 Settings 按钮让出右侧空间（`body:has` 限定仅宽栏生效；rail 常规圆形图标行）
+* `AGENTS.md`：**中文一份**（面向开发 agent；**唯一 agent 指令文件**，不保留 CLAUDE.md 等其它厂商指令文件）
+* 插件 `README`：面向用户（中英双份、顶部互链，只写用法与行为，开发细节不进 README）
+* `CHANGELOG`：双份面向用户——每条一条用户可感知变化（一句话、行为级），不写实现细节/内部机制（归 commit 与 docs/spec）
+* 插件私有 seam 特例只在根 AGENTS 记概括（见「项目专属章节」），实现细节以代码注释与 docs/spec 为准
 
 ## 工程管线（本仓库自含）
 
-* **开发**：日常改动在 `dev`；`main` 只接受发布合并
+* **开发**：日常改动在 `dev`；`main` 只接受发布合并；新功能先写 spec（`plugins/<插件>/docs/spec/NN-<主题>.md`），评审后才开工
 * **验证**：插件目录 `npm run verify`；全量 = 根 `npm run verify`；push 前对应插件 verify 必须通过
 * **提交**：逐项提交，中文描述 + 英文类型前缀（feat:/fix:/refactor:/chore:/docs:）；不确定的事直接说"不确定"，禁止编造事实性信息
 * **推送**：日常目标 `dev`；`git push/fetch` 需要代理 127.0.0.1:7897，`gh api` 直连
 * **合并**：dev → main（fast-forward）
+* **发布**：npm 发布流程见「项目专属章节 · 发布（npm 包）」
 * **运维**：依赖升级统一手动（security updates 与 dependabot.yml 关闭）；收到警报 → 判断影响面（运行时/产物依赖才影响用户）→ 手动升级 → 影响用户的按发布流程发版
-
-## 安全基线（本仓库自含要点）
-
-* 已开启：Dependabot alerts（仅报警）、CodeQL default setup、secret scanning + push protection、Private vulnerability reporting、根 `SECURITY.md`；检查命令 `gh api repos/peiyucn/dsh-sparrow --jq .security_and_analysis`
-* 分支保护：main 禁强推/删/重建、Squash-only、owner 保留 fast-forward 直推；dev rulesets 轻保护（禁强推+禁删+禁重建）；**CI 会跑但不设硬门禁**——合并外部 PR 前 owner 自己确认 CI 绿
-* 外部 PR / Issue 一律开放、不设交互限制，owner 审核合并（Squash-only），不想收的直接关闭
+* **收尾**：发布后切回 `dev`
 
 ## 代码审计（发布前 / 全面检查时，按要发布的插件逐项）
 
@@ -65,7 +46,49 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 * **并发与防御**：UI 入口连点防护（锁/debounce/disabled/幂等）；请求可被打断且状态一致
 * **测试与验证**：纯逻辑改动补 `test/*.test.mjs`；对应插件 `npm run verify` 通过 + `git diff --check` 干净
 
-## 发布（npm 包）
+## 安全基线（本仓库自含要点）
+
+* 已开启：Dependabot alerts（仅报警）、CodeQL default setup、secret scanning + push protection、Private vulnerability reporting、根 `SECURITY.md`；检查命令 `gh api repos/peiyucn/dsh-sparrow --jq .security_and_analysis`
+* 分支保护：main 禁强推/删/重建、Squash-only、owner 保留 fast-forward 直推；dev rulesets 轻保护（禁强推+禁删+禁重建）；**CI 会跑但不设硬门禁**——合并外部 PR 前 owner 自己确认 CI 绿
+* 外部 PR / Issue 一律开放、不设交互限制，owner 审核合并（Squash-only），不想收的直接关闭
+
+## CI 与自动发布
+
+* `ci.yml`：push dev/main 与 PR → `typecheck` → `build` → `test`（JUnit artifact；测试依赖 lib/ 故 build 在前）→ `package`（npm pack --dry-run 校验 files 清单）
+* `publish.yml`：push `<插件名>-vX.Y.Z` tag 或 workflow_dispatch 指定插件；解析插件/校验版本/verify 后 npm publish（alpha/beta 预发布发 next、rc 与纯数字稳定版发 latest）；同文件含 promote 手动任务（workflow_dispatch 填 plugin/version/tag → `npm dist-tag add` 移动通道，deprecate 仍归 owner 本机）；publish job 挂 `environment: npm-publish`（Deployments 留发布记录）；**无 release-control**（通道变更一律发新版本号；deprecate 由 owner 本机手动执行）
+* 鉴权双模式：有 `NPM_TOKEN` 走 Automation token（首发必需——trusted publisher 需包已存在）；无则走 npm Trusted Publishing（OIDC）
+
+## GitHub 与网络
+
+* GitHub 操作一律走 `gh` CLI（已登录 peiyucn）；`gh api` 直连 api.github.com，`git push/fetch` 需要代理 127.0.0.1:7897
+* 仓库：https://github.com/peiyucn/dsh-sparrow
+
+## 项目专属章节
+
+### DSH 插件契约（硬约束）
+
+* **入口契约**：模块 export `name`/`inject`/`apply`；`inject` 只声明硬依赖服务，缺失时插件不启动
+* **生命周期**：一切副作用在 `apply` 内注册并配 `ctx.effect` 清理；不泄漏定时器/watcher/监听
+* **组合行**：`cordis.patch.yml` insert 按官方 bundle patch 规范——`id` 用短名（稳定供后续 patch 定位），`name` 用 scoped 包名（loader 按包名解析）
+* **seam 纪律（三档）**：
+  1. **正路（默认）**：只用公开 seam（`ctx.llm`/`ctx.webServer`/`ctx.tools`/slots/provide 等）
+  2. **包装（特例）**：公开 seam 不满足需求时包装它——保持原签名与 `this` 语义、可逆恢复，并记录适配的 dsh 版本
+  3. **私有 seam 依赖（特例，2026-09-01 起）**：官方无公开能力、需求成立时，允许调用官方服务 private 方法/读写 private 状态。护栏：不替换/不包装/不覆写官方函数；优先复用官方自身写入路径（如 enqueueOperation + setState），不自造平行机制；启动时能力检查，surface 变化即 fail-fast 报「不支持的 dsh 版本」；owner 批准 + 在本文件「插件私有 seam 特例（概括）」小节记录
+* **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直读内部文件；确需直碰内部文件的特例须在本文件「插件私有 seam 特例（概括）」小节记录 + owner 认可
+* **查证原则**：引用 DSH 服务/事件/插槽契约前，先 grep 官方源码（本机 checkout：`C:\Users\DJ028191\.dsh-launcher-panel\source`）确认，禁止凭记忆编造
+
+### 插件私有 seam 特例（概括）
+
+> dsh 迭代快，特例不写死细节：开发时以临场查证官方源码为准；新增/变更特例须 owner 认可，实现细节以代码注释与各插件 docs/spec 为准。
+
+* `dsh-chat-fim`：候选菜单挂 `conversation.input.dock`（只读草稿快照，写入走官方 `slash/input-insert-text` 事件）+ `conversation.input.overlay`（官方菜单视觉 token）；与官方触发菜单互斥（只读检测 `[data-trigger-menu]`）；host 直读 `session.snapshotEvents()` 取主路由（仅 dsh ≥ 0.1.2-alpha.4）
+* `dsh-vision-bridge`：可逆包装 `ctx.llm.resolveModelInfo` 抹除文本路由的 image 门禁；`agent/request` 拦截按主模型能力屏蔽 `vision_read` 工具；图片字节只经官方 `ctx.attachments.readImage`；直读 `snapshotEvents()`；状态图标与模型座位共享官方 `ctx.modelDirectories` 目录 store，能力判定走无会话依赖的 `/api/vision-bridge/capability` 路由
+* `dsh-archive-manage`：允许移动/删除会话日志目录（仅 jsonl 单会话目录，其余 `BACKEND_UNSUPPORTED`）；归档集变更走官方 WorkspaceRegistry 私有写通道（`enqueueOperation`/`requireState`/`setState`，启动能力检查缺方法即 fail-fast）；`sessionPersistence.list()` 双形状兼容（master 返回快照、旧版返回裸 header）；`sessionPersistence.locate` 为后端私有方法（alpha.5 发布后从公开契约降级，启动能力检查缺方法即 fail-fast）；live 会话拒绝处理；回收站目录写 sidecar 记账
+* `dsh-file-manage`：直接 import 官方导出 `DeepSeekFilesClient`；只读官方 `llm-deepseek` 设置节取 `baseURL`/`apiKeyEnv`
+* `dsh-nav-pin`：只读依赖官方 DOM 标记与 aria-label 文案；CSS 特异性压制官方窄屏隐藏规则；宽度轴经官方公开 data 属性钳制
+* `dsh-codebuddy-credits`：无私有 seam——协议层自建（`CodeBuddyAdapter extends LlmAdapter`，不依赖 pi-ai）：请求构造、SSE 解析、usage.credit 提取、企业策略错误透传全部显式实现；官方请求标识（user-agent/x-product/企业上下文头）直接进请求头；`conversation.input.model` 槽位以 priority -1 遮蔽官方 ModelSelect（官方注册表语义：同 cell 最低 priority 渲染，非 monkey-patch）——vendored 选择器（MIT 署名，源码 ui-model-selection）只为积分系数右对齐列，启动能力检查缺 `modelDirectories`/`sessions` 服务即保留官方选择器；只读依赖官方 DOM 标记 `[data-composer-card]`（Toast 锚定）；捕获阶段点击拦截官方行头「编辑」按钮（按钮保留官方原位与样式，`stopPropagation` 阻断官方编辑器打开，行为改为展开本插件自建编辑器——官方编辑器对本命名空间只渲染占位提示）；首装 setup 占位编辑器以 CSS 隐藏（`:has(.ccb-card-root)` 锚点 + DOM 结构定位——官方类名是纯哈希、片段匹配无效）；凭据引用对齐官方派生名 `CODEBUDDY_CREDITS_API_KEY`（deriveKeyRef 口径，旧引用 `CODEBUDDY_API_KEY` 兼容迁移），使官方行头凭据圆点原生生效；每轮积分胶囊挂官方 `conversation.chat.assistant-actions` 槽位（公开 seam），DOM 级移动到该行动作行末尾时间之前（只移动本插件自有节点，不包装/替换官方组件）；轮次关联经 `agent/request` 载荷 signal 与适配器 options.signal 同实例（WeakMap，中断零残留）；会话积分统计段挂官方 `conversation.composer.dock` 槽位，DOM 级把自有分段追加到官方 StatsLine 行末尾（官方行每步重渲染清注入节点，组件以同 nodes 信号重建，无可见断档）；额度卡挂官方 `sidebar.footer.action` 槽位（公开 seam，owner 传 `wide`），宽栏以零占位锚点 + 绝对定位品牌 logo 与官方 Settings 同行右置、不重叠——经官方锚点契约的 `[data-slot="sidebar.settings"]` 可寻址 seam 以 CSS 收缩官方 Settings 按钮让出右侧空间（`body:has` 限定仅宽栏生效；rail 常规圆形图标行）
+
+### 发布（npm 包）
 
 > npm 发布**永久**：同版本不可覆盖、整体 unpublish 锁包名 24 小时；发布前把版本/描述/CHANGELOG/tag 说明核对到位。
 
@@ -77,13 +100,3 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 * **tag 兜底**：push tag 后 30 秒内无对应 Publish run，改 `gh workflow run publish.yml -f plugin=<插件名>` 手动派发（发布内容与 tag 触发完全一致；本仓库不建 GitHub Release，版本说明看 tag 页与 CHANGELOG）
 * **红线**：已发布版本/tag 不可覆盖、不可挪动，同版本重发 E403；错误只能发新版本 + deprecate 坏版本；tag 版本必须等于 package.json version；`secrets` 不能出现在 step 的 `if`（经 job 级 env 中转）；`--provenance` 要求各插件 package.json 声明 repository
 * **发布后收尾（OIDC 配置，每个包各配一次）**：包 Settings → Access → Trusted Publishing → Add Trusted Publisher → GitHub Actions，填四项——Organization `peiyucn`、Repository `dsh-sparrow`、Workflow `publish.yml`（**只填文件名**）、Environment `npm-publish`（**必须**与 publish job 的 environment 一致，不填/填错 OIDC 校验失败）；Allowed actions 勾 `Allow npm publish`（不勾 stage publish）。配置完成后删 `NPM_TOKEN` secret，并在 npmjs Access Tokens 页 revoke 旧 token（聊天贴过的一律视为已暴露）——后续发布零密钥。**新包首发例外**：包尚不存在时 OIDC 无法预配——首发走 Automation token（临时放 `npm-publish` 环境 secret，发完即配 OIDC 并删 token），或由 owner 本机首发后立即补配
-
-## 需求
-
-* 新功能先写 spec（`plugins/<插件>/docs/spec/NN-<主题>.md`），评审后才开工
-
-## CI 与自动发布
-
-* `ci.yml`：push dev/main 与 PR → `typecheck` → `build` → `test`（JUnit artifact；测试依赖 lib/ 故 build 在前）→ `package`（npm pack --dry-run 校验 files 清单）
-* `publish.yml`：push `<插件名>-vX.Y.Z` tag 或 workflow_dispatch 指定插件；解析插件/校验版本/verify 后 npm publish（alpha/beta 预发布发 next、rc 与纯数字稳定版发 latest）；同文件含 promote 手动任务（workflow_dispatch 填 plugin/version/tag → `npm dist-tag add` 移动通道，deprecate 仍归 owner 本机）；publish job 挂 `environment: npm-publish`（Deployments 留发布记录）；**无 release-control**（通道变更一律发新版本号；deprecate 由 owner 本机手动执行）
-* 鉴权双模式：有 `NPM_TOKEN` 走 Automation token（首发必需——trusted publisher 需包已存在）；无则走 npm Trusted Publishing（OIDC）
