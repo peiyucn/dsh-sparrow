@@ -370,6 +370,17 @@ export function ensureArchiveStyles(): void {
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
+/* 合集品牌 footer：固定面板底部（滚动区之外），顶部分割线与内容区隔开。 */
+.dsh-archive-panel-footer {
+  flex: none;
+  box-sizing: border-box;
+  padding: 10px 24px 14px;
+  border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  text-align: center;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
 /* 整页 loading：四个初始请求（归档/游离/回收站/回收站目录）都落定前占满内容区，
    避免「打开后加载闪动」（2026-09-01）。 */
 .dsh-archive-loading {
@@ -1336,13 +1347,11 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 </>
               ) : null}
             </div>
-            {/* 合集品牌行：面板 footer 居中（只展示，不交互）。 */}
-            <p style={{ textAlign: 'center', fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary, #8a919f)', margin: '12px 0 0' }}>
-              🐦 dsh-sparrow
-            </p>
             </>
             )}
             </div>
+            {/* 合集品牌 footer：固定面板底部、不随内容滚动，顶部分割线与内容区隔开。 */}
+            <div className="dsh-archive-panel-footer">🐦 dsh-sparrow</div>
           </div>
         </div>
       ) : null}

@@ -531,8 +531,9 @@ export function CodeBuddyCreditsIndicator({
                 </>
               )
               : null}
-            {/* 合集品牌行：面板 footer 居中（只展示，不交互）。 */}
-            <div style={{ textAlign: 'center', fontSize: 11, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)', marginTop: 4 }}>
+            {/* 合集品牌行：面板 footer 居中，上方分割线与内容隔开。 */}
+            <div style={{ height: '1px', background: 'var(--dsw-alias-border-l1)', margin: '2px 0' }} />
+            <div style={{ textAlign: 'center', fontSize: 11, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)' }}>
               🐦 dsh-sparrow
             </div>
           </div>,
