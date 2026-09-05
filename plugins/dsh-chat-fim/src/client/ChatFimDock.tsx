@@ -8,7 +8,7 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { TRIGGER_SENSITIVITIES, formatTokenCount, shouldTriggerSuggest, type TriggerSensitivity } from '../suggest.js'
+import { TRIGGER_SENSITIVITIES, detectEndOfDraft, formatTokenCount, shouldTriggerSuggest, type TriggerSensitivity } from '../suggest.js'
 import {
   fimSupportReducer, fimSupportShown, initialFimSupportState,
   type FimSupportEvent, type FimSupportState,
@@ -213,6 +213,9 @@ export interface SuggestionRecord {
   readonly sessionId: SessionId
   readonly draft: string
   readonly draftRev: number
+  /** 草稿末端在 detect 坐标（TokenSpan 平面）的偏移：@ 元素每个只占 1 字符，
+   *  clipboard 展开长度必须扣除（detectEndOfDraft 口径）。 */
+  readonly detectEnd: number
   /** host 解析出的实际补全模型 id。 */
   readonly model: string
   /** 本次续写总 token（prompt + completion，跨并行请求求和）。 */
@@ -873,6 +876,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
               sessionId: session.sessionId,
               draft,
               draftRev: rev,
+              detectEnd: detectEndOfDraft(draft, input.occurrences),
               model: result.model,
               totalTokens: result.usage.promptTokens + result.usage.completionTokens,
               temperature: result.temperature,
@@ -965,9 +969,12 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
     if (suggestion === null || suggestion.sessionId !== sessionId) return
     // 双保险：官方触发菜单打开时绝不采用（Tab 归官方菜单下钻）。
     if (document.querySelector('[data-trigger-menu]') !== null) return
+    // span 用 detect 坐标（TokenSpan 平面）：@ 元素每个只占 1 字符，draft.length
+    // 是 clipboard 坐标，含 @ 时会被官方 span 映射越界拒绝（Tab 失灵）；detectEnd
+    // 在建议生成时按草稿快照扣除了 chip 的展开长度。
     const span: TokenSpan = {
-      start: suggestion.draft.length,
-      end: suggestion.draft.length,
+      start: suggestion.detectEnd,
+      end: suggestion.detectEnd,
       draftRev: suggestion.draftRev,
     }
     // 先记采纳标记：dock 据此跳过「旧草稿 + 建议文本」这一次触发；bail 失败则回滚。

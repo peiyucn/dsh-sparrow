@@ -560,3 +560,24 @@ export function shouldTriggerSuggest(draft: string, sensitivity: TriggerSensitiv
 export function isAbortTimeout(signal: AbortSignal): boolean {
   return signal.aborted && signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError'
 }
+
+/** Occurrence 最小面（clipboard 坐标；InputState.occurrences 的子集）。 */
+export interface DraftOccurrenceLike {
+  readonly offset: number
+  readonly length: number
+}
+
+/**
+ * clipboard 坐标的草稿末端 → detect 坐标（TokenSpan 平面）：
+ * 官方投影里每个 chip 在 detect 文本中只占 1 个字符（U+FFFC，ui-conversation
+ * input/editor/projection.ts 的 ATOMIC_CHAR 口径），其 clipboard 展开多出的
+ * length-1 个字符全部扣掉。无 chip 时两者相等，返回 draft.length。
+ * 建议只在草稿末端采纳，全部 occurrence 都位于末端之前，按总和扣除即正确。
+ */
+export function detectEndOfDraft(draft: string, occurrences: readonly DraftOccurrenceLike[]): number {
+  let detect = draft.length
+  for (const occurrence of occurrences) {
+    detect -= occurrence.length - 1
+  }
+  return detect
+}

@@ -5,7 +5,7 @@ import {
   formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession, currentMainRoute,
   normalizeConfig, normalizeSuggestModelMode, normalizeTriggerSensitivity, parseCompleteBody, recentHistoryTurns,
   resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence,
-  upstreamStatusToError, validateCompletePayload,
+  upstreamStatusToError, validateCompletePayload, detectEndOfDraft,
 } from '../lib/suggest.js'
 
 describe('chat-fim 纯逻辑', () => {
@@ -652,6 +652,32 @@ describe('chat-fim 纯逻辑', () => {
         { role: 'user', content: [{ type: 'text', text: '你好' }] },
       ])
       assert.deepEqual(turns, [{ role: 'user', text: '你好' }])
+    })
+  })
+
+  describe('detectEndOfDraft（@ 元素下的 TokenSpan 坐标）', () => {
+    it('无 chip 时 detect 末端 = 草稿长度', () => {
+      assert.equal(detectEndOfDraft('你好，世界', []), 5)
+    })
+
+    it('每个 chip 只占 1 字符，clipboard 展开长度扣除', () => {
+      // 草稿「看下 @报告.md 的第 3 行」中 chip 的 clipboard 展开为 @报告.md（长度 6），
+      // detect 平面里它只占 1 个字符。
+      const draft = '看下 @报告.md 的第 3 行'
+      assert.equal(detectEndOfDraft(draft, [{ offset: 3, length: 6 }]), draft.length - 5)
+    })
+
+    it('多个 chip 各自扣除（@ 元素在草稿中部也不影响末端换算）', () => {
+      const draft = '@甲文件 和 @乙文件 一起看'
+      const occurrences = [
+        { offset: 0, length: 4 },
+        { offset: 7, length: 4 },
+      ]
+      assert.equal(detectEndOfDraft(draft, occurrences), draft.length - 6)
+    })
+
+    it('异常输入安全：length 为 1 的 chip 不改变坐标', () => {
+      assert.equal(detectEndOfDraft('abc', [{ offset: 0, length: 1 }]), 3)
     })
   })
 
