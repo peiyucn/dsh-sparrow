@@ -34,7 +34,7 @@ Requires dsh ≥ 0.1.2-rc.1 and a working `pnpm` (`dsh plugin` forwards installa
 
 ## Screenshots
 
-![Suggestion card](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-chat-fim.png)
+![Fill-in-the-middle (FIM) suggestion card](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-chat-fim.png)
 
 ## Uninstall & Residue
 

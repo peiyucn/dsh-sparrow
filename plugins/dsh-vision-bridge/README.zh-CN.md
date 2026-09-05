@@ -26,7 +26,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge
 
 ## 截图
 
-![模型选择器旁的眼睛图标](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-vision-bridge.png)
+![模型选择器旁的眼睛图标与说明弹层](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-vision-bridge.png)
 
 ## 卸载与残留
 

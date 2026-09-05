@@ -26,7 +26,7 @@ Requires dsh ≥ 0.1.2-rc.1 and a working `pnpm` (`dsh plugin` forwards installa
 
 ## Screenshots
 
-![Status icon next to the model selector](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-vision-bridge.png)
+![Vision status icon and its tooltip next to the model selector](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-vision-bridge.png)
 
 ## Uninstall & Residue
 
