@@ -17,7 +17,7 @@ Prerequisites: a working `dsh` CLI and `pnpm` (`dsh plugin` forwards installatio
 ## Plugins
 
 | Plugin | What it does | Install |
-| :--- | :--- | :--- | :--- |
+| :--- | :--- | :--- |
 | [dsh-chat-fim](plugins/dsh-chat-fim/README.md) | Chat input suggestions powered by DeepSeek FIM (Beta): pause to get an official-@-menu-style card, Tab adopts; three trigger-sensitivity levels; the completion model follows the main model. | `dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim` |
 | [dsh-vision-bridge](plugins/dsh-vision-bridge/README.md) | A vision channel for text-only main models: the `vision_read` tool reads pasted images with the official DeepSeek vision model and returns a structured text report. | `dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge` |
 | [dsh-archive-manage](plugins/dsh-archive-manage/README.md) | Manage archived sessions: unarchive, move to trash, delete permanently, restore from trash — a parent session and its subagents always move as one. | `dsh plugin --profile web add @dsh-sparrow/dsh-archive-manage` |

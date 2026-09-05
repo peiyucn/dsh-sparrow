@@ -17,7 +17,7 @@
 ## 插件目录
 
 | 插件 | 是什么 | 安装 |
-| :--- | :--- | :--- | :--- |
+| :--- | :--- | :--- |
 | [dsh-chat-fim](plugins/dsh-chat-fim/README.zh-CN.md) | 输入框续写联想：停顿后出官方同款候选卡、Tab 采纳；DeepSeek FIM（Beta）驱动，触发灵敏度三档，续写模型跟随主模型。 | `dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim` |
 | [dsh-vision-bridge](plugins/dsh-vision-bridge/README.zh-CN.md) | 纯文本主模型的视觉通道：`vision_read` 工具用官方 DeepSeek 视觉模型读图并回传结构化文字报告。 | `dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge` |
 | [dsh-archive-manage](plugins/dsh-archive-manage/README.zh-CN.md) | 归档会话管理：取消归档 / 移入回收站 / 彻底删除 / 回收站还原，父会话与子会话整体操作。 | `dsh plugin --profile web add @dsh-sparrow/dsh-archive-manage` |
