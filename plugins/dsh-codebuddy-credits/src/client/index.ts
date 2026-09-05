@@ -5,8 +5,9 @@
  *   积分系数右对齐（官方选择器只渲染 model.name）。行为/材质对齐官方。
  * - settings.models.provider-card 槽位（key = 本插件命名空间）：设置 → 模型页
  *   的 CodeBuddy Credits 行挂 Key 配置卡（对齐 DeepSeek 官方编辑器交互）。
- * - conversation.session.header.actions 槽位：会话头部右上角挂 CodeBuddy 额度
- *   小卡（文字 logo 展开：账号/额度进度条/重置日期/当前模型信息）。
+ * - conversation.session.header.utilities 槽位：会话头部右上角挂 CodeBuddy
+ *   额度小卡（order -10，渲染在官方 session log 下载按钮左边；文字 logo
+ *   展开：账号/额度进度条/重置日期/当前模型信息）。
  * Key 只经本机 host 路由存入 DSH 凭据库；文案经 dsh locale。
  */
 
@@ -183,15 +184,15 @@ export function apply(ctx: ClientContext): void {
     }
   }
 
-  // 左侧栏 footer 额度入口：官方 Settings 的堆叠区（sidebar.footer.action
-  // 槽位，公开 seam；Archive/Cloud Files 同款）。宽栏以 CSS 方案落在 Settings
-  // 行右侧共用该行（官方 Settings 单槽不可加项）；rail 为常规圆形图标行。
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-    name: 'sidebar.footer.action',
+  // 会话头部额度入口：官方 utilities 槽位（公开 seam；session log 下载按钮
+  // 同槽位，order 0）——order -10 渲染在其左边。原 sidebar.footer.action 位置
+  // 会遮挡官方连接状态提示语（2026-09-05 实测），故整体迁到右上角头部。
+  ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
+    name: 'conversation.session.header.utilities',
     id: 'codebuddy-credits',
-    order: 40,
+    order: -10,
     locale: 'codebuddy-credits',
-    inject: () => ({ directoryFor, variant: 'sidebar' as const }),
+    inject: () => ({ directoryFor }),
   }, CodeBuddyCreditsIndicator as unknown as (props: object) => ReactNode))
 
   // 每轮积分胶囊：官方 Usage 胶囊同排（assistant-actions 槽位，公开 seam）。

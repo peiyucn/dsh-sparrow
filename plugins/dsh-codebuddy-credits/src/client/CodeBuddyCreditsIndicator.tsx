@@ -1,17 +1,13 @@
 /**
- * CodeBuddy 额度入口：挂在官方 sidebar.footer.action 槽位（kind=list，
- * scope=root；Archive/Cloud Files 同款堆叠区）——宽栏以 CSS 方案落在
- * Settings 行右侧共用该行（官方 Settings 单槽不可加项），rail 为常规圆形
- * 图标行；header 变体保留会话头部挂载能力。点击展开面板：账号、本期额度
- * （进度条 + 已用/剩余 + 重置日期）、本会话消耗与最近调用、当前选中
- * CodeBuddy 模型的信息。全部颜色走 --dsw-alias-* / --dsw-elevation-*
- * 官方 token，深浅主题自动。
+ * CodeBuddy 额度入口：挂在官方 conversation.session.header.utilities 槽位
+ * （kind=list，scope=session；session log 下载按钮同槽位，本插件 order -10
+ * 渲染在其左边）。点击展开面板：账号、本期额度（进度条 + 已用/剩余 +
+ * 重置日期）、当前选中 CodeBuddy 模型的信息。全部颜色走 --dsw-alias-* /
+ * --dsw-elevation-* 官方 token，深浅主题自动。
  *
  * 当前选中模型读官方共享模型目录（ctx.modelDirectories，与模型选择器
  * 同一 store，含目录默认值兜底），目录不可用时退回 session 投影
- * （useProjection('modelSelection')，header 变体）——都是框架公开 seam，
- * 不读私有状态。sidebar 变体挂在 root 作用域：当前会话 id 走
- * GlobalStandardProps（useSessions），本会话消耗按该 id 记账。
+ * （useProjection('modelSelection')）——都是框架公开 seam，不读私有状态。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
@@ -76,19 +72,10 @@ interface DirectoryStore {
 
 export interface CodeBuddyCreditsIndicatorProps {
   t: (key: string, vars?: Record<string, string>) => string
-  /**
-   * header（默认）：会话头部槽位（session 作用域，框架注入 SessionStandardProps）。
-   * sidebar：左侧栏 footer 槽位（root 作用域，框架注入 GlobalStandardProps）。
-   */
-  variant?: 'header' | 'sidebar'
-  /** header 变体：框架注入的 SessionStandardProps。 */
+  /** 会话头部 utilities 槽位（session 作用域，框架注入 SessionStandardProps）。 */
   sessionId?: string
-  /** header 变体：框架注入的会话投影 hook；sidebar 变体无此件。 */
+  /** 框架注入的会话投影 hook（目录缺失时兜底当前选中模型）。 */
   useProjection?: <K extends string>(key: K) => ModelSelectionProjection | undefined
-  /** sidebar 变体：框架注入的 GlobalStandardProps（当前会话列表快照选择器）。 */
-  useSessions?: <S>(selector: (list: { current?: string | null }) => S) => S
-  /** sidebar 变体：owner 传侧栏宽窄（宽=展开、窄=rail）。 */
-  wide?: boolean
   /** 插件注入：当前会话的共享模型目录 store（官方 ctx.modelDirectories）。 */
   directoryFor: (sessionId: string) => DirectoryStore | undefined
 }
@@ -171,17 +158,9 @@ export function CodeBuddyCreditsIndicator({
   t,
   sessionId: headerSessionId,
   useProjection,
-  useSessions,
-  variant = 'header',
-  wide = true,
   directoryFor,
 }: CodeBuddyCreditsIndicatorProps) {
-  // sidebar 变体挂在 root 作用域：当前会话 id 走 GlobalStandardProps（useSessions）。
-  // 选择器经 useCallback 稳定身份：无论运行时 hook 是 uSES 绑定还是按渲染
-  // 直调选择器，都不会引起订阅抖动。
-  const selectCurrentSession = useCallback((list: { current?: string | null }): string | undefined => list.current ?? undefined, [])
-  const currentSessionId = useSessions === undefined ? undefined : useSessions(selectCurrentSession)
-  const sessionId = (variant === 'sidebar' ? currentSessionId : headerSessionId) ?? ''
+  const sessionId = headerSessionId ?? ''
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<StatusPayload | undefined>(() => cachedStatus)
   const [loadError, setLoadError] = useState<string | undefined>(undefined)
@@ -267,37 +246,19 @@ export function CodeBuddyCreditsIndicator({
     }
   }, [t])
 
-  /** 计算面板位置：header 变体右缘对齐按钮、左缘钳制在会话区（空间不足允许
-   *  收缩，绝不越过会话区左缘）；sidebar 变体——固定宽度、位置偏左，宽栏时
-   *  面板左缘贴侧栏、紧贴按钮上方（可向右溢进会话区），rail 时侧栏窄仍右移。 */
+  /** 计算面板位置：右缘对齐按钮、左缘钳制在会话区（空间不足允许
+   *  收缩，绝不越过会话区左缘）。 */
   const position = useCallback(() => {
     const rect = rootRef.current?.getBoundingClientRect()
     if (rect === undefined) return
     const conversationLeft = document.querySelector('[data-conversation-scroll]')?.getBoundingClientRect().left ?? 0
-    if (variant === 'sidebar') {
-      if (wide) {
-        setPoint({
-          left: PANEL_EDGE_GAP,
-          bottom: window.innerHeight - rect.top + 8,
-          width: Math.min(PANEL_MAX_WIDTH, window.innerWidth - PANEL_EDGE_GAP * 2),
-        })
-      } else {
-        const left = Math.max(conversationLeft + PANEL_EDGE_GAP, rect.right + 6)
-        setPoint({
-          left,
-          bottom: window.innerHeight - rect.top + 8,
-          width: Math.min(PANEL_MAX_WIDTH, window.innerWidth - left - PANEL_EDGE_GAP),
-        })
-      }
-      return
-    }
     const width = Math.min(PANEL_MAX_WIDTH, Math.max(0, rect.right - conversationLeft - PANEL_EDGE_GAP))
     setPoint({
       top: rect.bottom + 6,
       right: window.innerWidth - rect.right,
       width,
     })
-  }, [variant, wide])
+  }, [])
 
   // 挂载即读取状态：未配置 Key 时不显示图标（无配置时对话页不该有标）。
   // 配置卡保存/清空 Key 会广播窗口事件，此处联动刷新（无需刷新页面）；
@@ -388,60 +349,24 @@ export function CodeBuddyCreditsIndicator({
   // 配置时才出现这个标；加载完成后配置态自动亮出。
   if (status?.keyConfigured !== true) return null
 
-  // sidebar 变体：宽栏 = 零占位锚点 + 绝对定位紧凑图标（落在 Settings 行右侧，
-  // 官方 Settings 单槽不可加项，CSS 方案共用该行）；rail = 常规圆形图标行。
-  // header 变体：会话头部 logo 胶囊。
-  const trigger = variant === 'sidebar'
-    ? (
-      wide
-        ? (
-          <span className="ccb-sidebar-anchor">
-            <button
-              ref={setRoot}
-              type="button"
-              aria-label={t('indicator.open')}
-              aria-expanded={open}
-              title={t('indicator.open')}
-              onClick={() => setOpen(value => !value)}
-              className="ccb-sidebar-trigger ccb-sidebar-trigger-wide"
-            >
-              {/* 宽栏用品牌长条 logo（header 版同款视觉）；黑白小标留给每轮积分胶囊。 */}
-              <span style={{ display: 'inline-flex', fontSize: 18, lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: LOGO_SVG }} />
-            </button>
-          </span>
-        )
-        : (
-          <button
-            ref={setRoot}
-            type="button"
-            aria-label={t('indicator.open')}
-            aria-expanded={open}
-            title={t('indicator.open')}
-            onClick={() => setOpen(value => !value)}
-            className="ccb-sidebar-trigger ccb-sidebar-trigger-rail"
-          >
-            {/* rail 放不下长条：用同源品牌的渐变方块。 */}
-            <span style={{ display: 'inline-flex', fontSize: 16, lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: SQUARE_LOGO_SVG }} />
-          </button>
-        )
-    )
-    : (
-      <div ref={setRoot} style={{ position: 'relative', display: 'inline-flex' }}>
-        <button
-          type="button"
-          aria-label={t('indicator.open')}
-          aria-expanded={open}
-          title={t('indicator.open')}
-          onClick={() => setOpen(value => !value)}
-          className="ccb-indicator-button"
-        >
-          <span
-            style={{ display: 'inline-flex', fontSize: 18, lineHeight: 1 }}
-            dangerouslySetInnerHTML={{ __html: LOGO_SVG }}
-          />
-        </button>
-      </div>
-    )
+  // 会话头部 logo 胶囊：挂在官方 header.utilities 槽位（session log 按钮左边）。
+  const trigger = (
+    <div ref={setRoot} style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        type="button"
+        aria-label={t('indicator.open')}
+        aria-expanded={open}
+        title={t('indicator.open')}
+        onClick={() => setOpen(value => !value)}
+        className="ccb-indicator-button"
+      >
+        <span
+          style={{ display: 'inline-flex', fontSize: 18, lineHeight: 1 }}
+          dangerouslySetInnerHTML={{ __html: LOGO_SVG }}
+        />
+      </button>
+    </div>
+  )
 
   return (
     <>
@@ -634,38 +559,6 @@ export function ensureIndicatorStyles(): void {
     '}',
     '.ccb-indicator-button:focus-visible {',
     '  outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);',
-    '}',
-    // 侧栏 footer 触发键：宽栏 = 零占位锚点 + 绝对定位品牌 logo 按钮，落在
-    // Settings 行右侧。官方 Settings 是 single 槽位、按钮占满整行——经官方
-    // 锚点契约（data-slot 可寻址 seam）把 Settings 按钮收缩让出右侧 96px，
-    // 两个按钮同行不重叠（仅在本插件宽栏锚点存在时生效，rail 不收缩）。
-    '.ccb-sidebar-anchor {',
-    '  position: relative; height: 0; width: 100%; align-self: flex-end;',
-    '}',
-    // 官方 Settings trigger 是 flex:1 撑满行：先关掉 flex 伸展，宽度才生效。
-    // 选择器必须收窄到触发键（aria-haspopup="dialog"）：sidebar.settings 这个
-    // 槽位承载的是整个 SettingsRoot（触发键 + 全屏设置面板），裸 `button`
-    // 会把设置页的导航/关闭/下拉按钮一并压窄（"General" 被截成 "G.."）。
-    'body:has(.ccb-sidebar-anchor) [data-slot="sidebar.settings"] button[aria-haspopup="dialog"] {',
-    '  flex: none;',
-    '  width: calc(100% - 96px);',
-    '}',
-    '.ccb-sidebar-trigger {',
-    '  display: flex; align-items: center; justify-content: center;',
-    '  border: none; background: transparent; cursor: pointer;',
-    '  color: var(--dsw-alias-label-secondary); font-family: inherit;',
-    '}',
-    '.ccb-sidebar-trigger:hover {',
-    '  background: var(--dsw-alias-interactive-bg-hover);',
-    '  color: var(--dsw-alias-label-primary);',
-    '}',
-    '.ccb-sidebar-trigger-wide {',
-    '  position: absolute; right: 0; top: 4px;',
-    '  height: 42px; padding: 0 10px; border-radius: 12px;',
-    '}',
-    '.ccb-sidebar-trigger-rail {',
-    '  width: 36px; height: 36px; margin: 8px 0 10px; border-radius: 50%;',
-    '  corner-shape: round;',
     '}',
   ].join('\n')
   document.head.append(style)
