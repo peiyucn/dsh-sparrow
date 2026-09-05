@@ -531,8 +531,9 @@ export function CodeBuddyCreditsIndicator({
                 </>
               )
               : null}
-            {/* 合集品牌行：分割线与文字合并一行（border-top + 紧凑字距），最小占位。 */}
-            <div style={{ borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: '2px', textAlign: 'center', fontSize: 11, lineHeight: '14px', color: 'var(--dsw-alias-label-tertiary)' }}>
+            {/* 合集品牌行：分割线与文字合并一行；-6px 底距抵消面板 12px 内边距，
+                使「分割线上方 gap 6px」与「文字下方 6px」对称（上下边距一致）。 */}
+            <div style={{ borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: '2px', marginBottom: '-6px', textAlign: 'center', fontSize: 11, lineHeight: '14px', color: 'var(--dsw-alias-label-tertiary)' }}>
               🐦 dsh-sparrow
             </div>
           </div>,
