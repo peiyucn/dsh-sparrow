@@ -312,9 +312,8 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
                   ? t('popover.noVision.body')
                   : t('popover.crossModel.body', { model: status.visionModel })}
             </div>
-            {/* 合集品牌行：弹窗 footer 居中，上方分割线与内容隔开；紧凑规格。 */}
-            <div style={{ height: '1px', background: 'var(--dsw-alias-border-l1)', margin: '1px 0' }} />
-            <div style={{ textAlign: 'center', fontSize: 11, lineHeight: '16px', color: 'var(--dsw-alias-label-tertiary, #8a919f)' }}>
+            {/* 合集品牌行：分割线与文字合并一行（border-top + 紧凑字距），最小占位。 */}
+            <div style={{ borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: '2px', textAlign: 'center', fontSize: 11, lineHeight: '14px', color: 'var(--dsw-alias-label-tertiary, #8a919f)' }}>
               🐦 dsh-sparrow
             </div>
           </div>,
