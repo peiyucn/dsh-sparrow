@@ -345,6 +345,10 @@ export function collectSubtreeIds(headers: readonly SessionTreeHeader[], rootId:
  * header 事实缓存存储（spec 09，纯逻辑供单测）：TTL 内直接返回缓存；过期后
  * 单飞填充（并发调用共享同一 promise）；invalidate 清缓存让下一次 get 重扫。
  * 安全依据：jsonl header 物化后不可变，按 id 缓存只需处理成员增减（写穿失效）。
+ *
+ * 失效代际（spec 09 审计）：invalidate 作废进行中的 load——失效前启动的扫描
+ * 结果不许写回缓存，否则写穿失效会被「旧成员表重新填满缓存」抵消（TTL 内持续
+ * 陈旧）；作废的 promise 仍会正常落定给当时在等的调用方（快照语义），只是不缓存。
  */
 export interface HeaderFactsStore<F> {
   get(): Promise<F>
@@ -359,21 +363,86 @@ export function createHeaderFactsStore<F>(
   let cached: F | undefined
   let fetchedAt = -Infinity
   let inflight: Promise<F> | undefined
+  let generation = 0
   return {
     async get(): Promise<F> {
       if (cached !== undefined && now() - fetchedAt < ttlMs) return cached
-      inflight ??= load().then(value => {
-        cached = value
-        fetchedAt = now()
-        return value
-      }).finally(() => {
-        inflight = undefined
-      })
+      if (inflight === undefined) {
+        const startedAt = generation
+        const attempt = load().then(value => {
+          if (generation === startedAt) {
+            cached = value
+            fetchedAt = now()
+          }
+          return value
+        }).finally(() => {
+          // 只清理自己这一代：invalidate 后新 load 已顶替 inflight，旧 load 落定不得误清新代。
+          if (inflight === attempt) inflight = undefined
+        })
+        inflight = attempt
+      }
       return inflight
     },
     invalidate(): void {
+      generation += 1
       cached = undefined
       fetchedAt = -Infinity
+      inflight = undefined
+    },
+  }
+}
+
+/**
+ * 有上限的 LRU 缓存（spec 09 审计，纯逻辑供单测）：Map 插入序即访问序，
+ * get 命中删后重插 = 移到最新；set 超上限淘汰最久未使用条目。
+ * 值域不含 undefined（本插件记忆的都是非空字符串），缺键与「值为 undefined」不可区分，
+ * 调用方需保证不存 undefined 值。
+ */
+export interface LruCache<K, V> {
+  get(key: K): V | undefined
+  set(key: K, value: V): void
+  readonly size: number
+}
+
+export function createLruCache<K, V>(maxEntries: number): LruCache<K, V> {
+  const entries = new Map<K, V>()
+  return {
+    get(key) {
+      const value = entries.get(key)
+      if (value !== undefined) {
+        entries.delete(key)
+        entries.set(key, value)
+      }
+      return value
+    },
+    set(key, value) {
+      entries.delete(key)
+      entries.set(key, value)
+      if (entries.size > maxEntries) {
+        const oldest = entries.keys().next().value as K | undefined
+        if (oldest !== undefined) entries.delete(oldest)
+      }
+    },
+    get size() {
+      return entries.size
+    },
+  }
+}
+
+/**
+ * 可提前释放的预算信号（spec 09 审计，纯逻辑供单测）：AbortSignal.timeout 的
+ * 定时器在批结束后仍活到死线（成功路径不释放）；这里改为自建 AbortController +
+ * 定时器，release() 在成功与失败路径都清 timer，句柄不滞留。
+ */
+export function createBudgetSignal(timeoutMs: number): { signal: AbortSignal; release: () => void } {
+  const controller = new AbortController()
+  const timer = setTimeout(() => {
+    controller.abort(new Error(`预算超时（${timeoutMs}ms）`))
+  }, timeoutMs)
+  return {
+    signal: controller.signal,
+    release: () => {
+      clearTimeout(timer)
     },
   }
 }

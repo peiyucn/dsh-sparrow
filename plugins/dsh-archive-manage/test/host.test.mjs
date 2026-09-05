@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { resolve, sep } from 'node:path'
-import { addedSummaryFor, assertRegistryMutationApi, assertSessionLocationApi, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor, storedHeaders, subagentLabel } from '../lib/host.js'
+import { createHeaderFactsStore } from '../lib/archive.js'
+import { addedSummaryFor, alignChildArchives, assertRegistryMutationApi, assertSessionLocationApi, FOLDED_LABEL_CACHE_MAX_ENTRIES, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor, storedHeaders, subagentLabel } from '../lib/host.js'
 
 // 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
 // 测试夹具按当前平台构造——CI 跑 Ubuntu、本机跑 Windows，两边都必须绿。
@@ -181,6 +182,47 @@ describe('archive-manage host 纯逻辑', () => {
     })
   })
 
+  describe('alignChildArchives（spec 09 审计）', () => {
+    const headerOf = (id, extra = {}) => ({ id, createdAt: 1, isSeeded: false, ...extra })
+    const alignCtx = (archivedIds) => ({
+      workspaceRegistry: { archivedSessionIds: archivedIds },
+      logger: { info: () => {}, warn: () => {} },
+    })
+    const alignSurface = () => {
+      let state = { archivedSessionIds: ['p'] }
+      return {
+        surface: {
+          enqueueOperation: async (op) => op(),
+          requireState: () => state,
+          setState: async (next) => { state = next },
+        },
+        get: () => state,
+      }
+    }
+
+    it('headers 应该 经 header 事实缓存取（暖缓存不重复扫盘）', async () => {
+      let loads = 0
+      const store = createHeaderFactsStore(async () => {
+        loads += 1
+        return { headers: [], sizes: new Map() }
+      }, 30_000, () => 0)
+      const { surface } = alignSurface()
+      await alignChildArchives(alignCtx([]), surface, store)
+      await alignChildArchives(alignCtx([]), surface, store)
+      assert.equal(loads, 1)
+    })
+
+    it('父已归档而子未归档 应该 把子补进归档集', async () => {
+      const store = createHeaderFactsStore(async () => ({
+        headers: [headerOf('p'), headerOf('c', { parentSession: 'p', origin: 'subagent' })],
+        sizes: new Map(),
+      }), 30_000, () => 0)
+      const { surface, get } = alignSurface()
+      await alignChildArchives(alignCtx(['p']), surface, store)
+      assert.deepEqual(get().archivedSessionIds.map(String).sort(), ['c', 'p'])
+    })
+  })
+
   describe('subagentLabel 三档读链', () => {
     const labelHeader = (id, extra = {}) => ({ id, createdAt: 1, isSeeded: false, origin: 'subagent', ...extra })
     const labelCtx = ({ live, cacheRow, cacheThrows = false, observe, observeThrows = false }) => ({
@@ -277,6 +319,32 @@ describe('archive-manage host 纯逻辑', () => {
       assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-4')), 'memo-label')
       assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-4')), 'memo-label')
       assert.equal(observed, 1)
+    })
+
+    it('折叠记忆超过 LRU 上限 应该 淘汰最旧条目（有界不无限累积）', async () => {
+      const observed = new Map()
+      const ctx = {
+        sessions: { get: () => undefined },
+        get: (name) => {
+          if (name === 'sessionQuery') {
+            return {
+              observeSession: async (id) => {
+                const key = String(id)
+                observed.set(key, (observed.get(key) ?? 0) + 1)
+                return { header: { createdAt: 1 }, projections: { values: { subagent: { label: `label-${key}` } } }, dispose: () => {} }
+              },
+            }
+          }
+          return undefined
+        },
+        logger: { warn: () => {} },
+      }
+      for (let i = 0; i <= FOLDED_LABEL_CACHE_MAX_ENTRIES; i++) {
+        assert.equal(await subagentLabel(ctx, labelHeader(`evict-${i}`)), `label-evict-${i}`)
+      }
+      // 最旧的 evict-0 已被 LRU 淘汰：再查一次会重新折叠，而不是无限记忆。
+      assert.equal(await subagentLabel(ctx, labelHeader('evict-0')), 'label-evict-0')
+      assert.equal(observed.get('evict-0'), 2)
     })
 
     it('观察生命周期与 header 不一致 应该 拒绝并释放租约', async () => {

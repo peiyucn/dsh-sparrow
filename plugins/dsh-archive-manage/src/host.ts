@@ -17,12 +17,12 @@ import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import type { Workspace, WorkspaceDomainState } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
-  TRASH_SIDECAR, archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, createHeaderFactsStore,
-  isDeleteConfirmationSufficient, isSafeSessionDirName, legacyTrashItem, livingChildIds, maskHomePath,
-  normalizeArchiveConfig, parseBlankProjection, parseSessionFacts, parseTrashSidecar, runBounded, sanitizeSegment,
-  straySessionIds, trashItemView,
-  type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar, type SessionFacts, type SessionTreeHeader,
-  type SessionTreeNode,
+  TRASH_SIDECAR, archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, createBudgetSignal,
+  createHeaderFactsStore, createLruCache, isDeleteConfirmationSufficient, isSafeSessionDirName, legacyTrashItem,
+  livingChildIds, maskHomePath, normalizeArchiveConfig, parseBlankProjection, parseSessionFacts, parseTrashSidecar,
+  runBounded, sanitizeSegment, straySessionIds, trashItemView,
+  type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar, type HeaderFactsStore, type SessionFacts,
+  type SessionTreeHeader, type SessionTreeNode,
 } from './archive.js'
 
 export const name = 'dsh-archive-manage'
@@ -217,15 +217,20 @@ async function titlesFor(
     misses.push(header)
   }
   if (misses.length === 0) return out
-  const budget = AbortSignal.timeout(TITLE_FOLD_BUDGET_MS)
-  const folded = await runBounded(misses, TITLE_FOLD_CONCURRENCY, async (header) => {
-    const observations = await ctx.sessionQuery.readTitleSnapshots([SessionId(String(header.id))], budget)
-    return titleFromObservation(observations[0], fallback(header))
-  })
-  misses.forEach((header, index) => {
-    out.set(String(header.id), folded[index] ?? fallback(header))
-  })
-  return out
+  // 预算信号自建（spec 09 审计）：批结束（成功或失败）即 release，定时器不滞留到死线。
+  const budget = createBudgetSignal(TITLE_FOLD_BUDGET_MS)
+  try {
+    const folded = await runBounded(misses, TITLE_FOLD_CONCURRENCY, async (header) => {
+      const observations = await ctx.sessionQuery.readTitleSnapshots([SessionId(String(header.id))], budget.signal)
+      return titleFromObservation(observations[0], fallback(header))
+    })
+    misses.forEach((header, index) => {
+      out.set(String(header.id), folded[index] ?? fallback(header))
+    })
+    return out
+  } finally {
+    budget.release()
+  }
 }
 
 /** 单会话标题（三档 + 兜底折叠；fallback 默认会话 id）。 */
@@ -293,8 +298,11 @@ export async function storedHeaders(ctx: Context): Promise<SessionHeader[]> {
   return (await storedHeaderFacts(ctx)).headers
 }
 
+/** header 事实缓存承载类型（spec 09）：全量 header + 快照 size 映射。 */
+type HeaderFacts = { headers: SessionHeader[]; sizes: Map<string, number> }
+
 /** list() 双形状兼容读取 + 快照附加信息（sizeBytes，仅 master 快照形状有）。 */
-export async function storedHeaderFacts(ctx: Context): Promise<{ headers: SessionHeader[]; sizes: Map<string, number> }> {
+export async function storedHeaderFacts(ctx: Context): Promise<HeaderFacts> {
   const entries = await ctx.sessionPersistence.list() as readonly unknown[]
   const headers: SessionHeader[] = []
   const sizes = new Map<string, number>()
@@ -364,10 +372,11 @@ export function addedSummaryFor(header: SessionHeader, blank: boolean): {
  * unarchive 后补发官方 api-session/added：客户端 handleSessionAdded 即时并入会话列表，
  * 用户无需刷新页面。不发出则用户必须刷新——刷新会触发 dsh 把会话加载进 live store，
  * 之后「再归档 → 进回收站」会被 hold 守卫（ensureSessionNotLive）拦下。
+ * spec 09 审计：headers 经 header 事实缓存取，与 /list /strays 共享单飞，不单独扫盘。
  */
-async function emitSessionAdded(ctx: Context, sessionId: SessionId): Promise<void> {
+async function emitSessionAdded(ctx: Context, sessionId: SessionId, headerFacts: HeaderFactsStore<HeaderFacts>): Promise<void> {
   try {
-    const headers = await storedHeaders(ctx)
+    const { headers } = await headerFacts.get()
     const header = headers.find(candidate => String(candidate.id) === String(sessionId))
     if (header === undefined) return
     ctx.emit('api-session/added', addedSummaryFor(header, await readStrayBlankness(ctx, sessionId)))
@@ -399,11 +408,15 @@ function treeIds(nodes: readonly SessionTreeNode[]): string[] {
 /** 第三档（冷、未种子）从日志重新折叠投影的单次观察超时。 */
 const LABEL_FOLD_TIMEOUT_MS = 15_000
 
+/** 折叠标签记忆上限（spec 09 审计）：记忆随观察过的会话数增长，设 LRU 上限防无界累积。 */
+export const FOLDED_LABEL_CACHE_MAX_ENTRIES = 256
+
 /**
  * 折叠成功的 subagent 标签记忆：描述符事件一旦写入即不可变（官方注释 "a descriptor is
- * immutable once appended"），归档会话日志静止，按 sessionId 记忆安全。只写成功值。
+ * immutable once appended"），归档会话日志静止，按 sessionId 记忆安全。只写成功值；
+ * LRU 上限淘汰最久未用条目（sessionId 为 UUID，删除后重建同 id 的可能性忽略不计）。
  */
-const foldedSubagentLabels = new Map<string, string>()
+const foldedSubagentLabels = createLruCache<string, string>(FOLDED_LABEL_CACHE_MAX_ENTRIES)
 
 /** observeSession 观察结果（租约，用后必须 dispose）的最小结构。 */
 interface FoldObservation {
@@ -461,8 +474,10 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
     } | undefined
     if (query !== undefined && typeof query.observeSession === 'function') {
       let observation: FoldObservation | undefined
+      // 预算信号自建（spec 09 审计）：成功与失败路径都 release，定时器不滞留到死线。
+      const budget = createBudgetSignal(LABEL_FOLD_TIMEOUT_MS)
       try {
-        observation = await query.observeSession(sessionId, { signal: AbortSignal.timeout(LABEL_FOLD_TIMEOUT_MS) })
+        observation = await query.observeSession(sessionId, { signal: budget.signal })
         // 生命周期见证：同 id 槽位被删后重建（createdAt 变化）不得串用旧观察。
         if (observation !== undefined
           && (observation.header?.createdAt === undefined || observation.header.createdAt === header.createdAt)) {
@@ -475,6 +490,7 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
       } catch (error) {
         ctx.logger.warn(`dsh-archive-manage: subagent 标签日志折叠失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
       } finally {
+        budget.release()
         try {
           // rc.1 租约走 [Symbol.dispose]，旧中间版走 dispose()；释放失败不影响回退。
           if (observation !== undefined) {
@@ -505,10 +521,16 @@ async function subagentLabels(ctx: Context, headers: readonly SessionHeader[]): 
  * 父子归档对齐（spec 08 状态不变量：子镜像父）：
  * - 「父已归档而子未归档」→ 子补进归档集；「父未归档而子已归档」→ 子移出。
  * - 触发：启动 + 官方 workspace 域写入事件（domain/changed）+ 面板打开惰性兜底；幂等。
+ * - spec 09 审计：headers 经 header 事实缓存取（缓存层单飞/TTL/写穿失效），
+ *   面板打开不再为对齐做全量扫盘（此前每次 /list 都直接 list() 一次）。
  */
-async function alignChildArchives(ctx: Context, surface: RegistryMutationSurface): Promise<void> {
+export async function alignChildArchives(
+  ctx: Context,
+  surface: RegistryMutationSurface,
+  headerFacts: HeaderFactsStore<HeaderFacts>,
+): Promise<void> {
   try {
-    const headers = await storedHeaders(ctx)
+    const { headers } = await headerFacts.get()
     const archived = await readArchivedIds(ctx)
     const { add, remove } = archiveAlignmentForChildren(headers.map(treeHeaderOf), archived.map(String))
     if (add.length === 0 && remove.length === 0) return
@@ -559,10 +581,15 @@ async function addArchivedId(surface: RegistryMutationSurface, sessionId: Sessio
 /**
  * 启动清扫：归档集里不在持久化中的幽灵 id 清理掉（历史遗留防御——旧版本直写时代可能已
  * 产生幽灵条目；通道迁移后不再产生新幽灵，保留一次性防御）。
+ * spec 09 审计：headers 经 header 事实缓存取，与其余启动读取共享同一次扫盘。
  */
-async function sweepGhostArchivedIds(ctx: Context, surface: RegistryMutationSurface): Promise<void> {
+async function sweepGhostArchivedIds(
+  ctx: Context,
+  surface: RegistryMutationSurface,
+  headerFacts: HeaderFactsStore<HeaderFacts>,
+): Promise<void> {
   try {
-    const headers = await storedHeaders(ctx)
+    const { headers } = await headerFacts.get()
     const known = new Set(headers.map(header => String(header.id)))
     const current = await readArchivedIds(ctx)
     const cleaned = current.filter(id => known.has(String(id)))
@@ -612,11 +639,11 @@ async function readStrayBlankness(ctx: Context, sessionId: SessionId): Promise<b
 }
 
 /** 启动清扫：投影缓存中不在 sessionPersistence.list() 里的会话行删除，@ 列表与真实持久化保持一致。 */
-async function sweepStaleProjectionCache(ctx: Context): Promise<void> {
+async function sweepStaleProjectionCache(ctx: Context, headerFacts: HeaderFactsStore<HeaderFacts>): Promise<void> {
   try {
     const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
     if (domain === undefined) return
-    const headers = await storedHeaders(ctx)
+    const { headers } = await headerFacts.get()
     const known = new Set(headers.map(header => String(header.id)))
     const table = domain.table(PROJCACHE_SESSIONS_TABLE)
     let removed = 0
@@ -644,9 +671,14 @@ interface SubagentTarget {
   readonly dir: string
 }
 
-/** 找出某个父会话下的全部 subagent 会话；任一会话仍被占用时不处理任何文件。 */
-async function listSubagentTargets(ctx: Context, parentSessionId: SessionId): Promise<SubagentTarget[]> {
-  const headers = await storedHeaders(ctx)
+/** 找出某个父会话下的全部 subagent 会话；任一会话仍被占用时不处理任何文件。
+ *  spec 09 审计：headers 经 header 事实缓存取，与同请求的主 header 查表口径一致。 */
+async function listSubagentTargets(
+  ctx: Context,
+  parentSessionId: SessionId,
+  headerFacts: HeaderFactsStore<HeaderFacts>,
+): Promise<SubagentTarget[]> {
+  const { headers } = await headerFacts.get()
   const targets: SubagentTarget[] = []
   for (const header of headers) {
     if (header.origin !== 'subagent' || header.parentSession === undefined) continue
@@ -823,16 +855,17 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
   const headerFacts = createHeaderFactsStore(() => storedHeaderFacts(ctx), HEADER_CACHE_TTL_MS)
 
   // 启动清扫（均不影响加载）：归档集幽灵 id（历史遗留）、投影缓存陈旧行。
-  void sweepGhostArchivedIds(ctx, surface)
-  void sweepStaleProjectionCache(ctx)
+  // spec 09 审计：三项启动读取（清扫 ×2 + 对齐）共享 header 事实缓存单飞，启动只扫一次盘。
+  void sweepGhostArchivedIds(ctx, surface, headerFacts)
+  void sweepStaleProjectionCache(ctx, headerFacts)
 
   // spec 08 父子联动：启动对齐 + 官方 workspace 域写入事件驱动实时对齐（幂等，官方 feed 同款监听）。
   // spec 09：同事件写穿失效 header 缓存（官方菜单归档等外部写不经过本插件路由）。
-  void alignChildArchives(ctx, surface)
+  void alignChildArchives(ctx, surface, headerFacts)
   ctx.effect(() => ctx.on('domain/changed', (change) => {
     if (change.domain !== 'workspace' || change.operation !== 'put') return
     headerFacts.invalidate()
-    void alignChildArchives(ctx, surface)
+    void alignChildArchives(ctx, surface, headerFacts)
   }), 'dsh-archive-manage: 父子归档对齐')
 
   // spec 09：会话进出事件写穿失效 header 缓存（自身写操作补发的 removed/added 亦经此路径）。
@@ -847,7 +880,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
       try {
         if (req.method === 'GET' && pathname === `${PREFIX}/list`) {
           // spec 08：归档区 = 已归档会话的父子树；先惰性对齐再构建（事件驱动之外的兜底）。
-          await alignChildArchives(ctx, surface)
+          await alignChildArchives(ctx, surface, headerFacts)
           const { headers, sizes } = await headerFacts.get()
           const byId = new Map(headers.map(header => [String(header.id), header]))
           const archivedIds = new Set((await readArchivedIds(ctx)).map(String))
@@ -962,7 +995,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           const sessionId = SessionId(parsed.sessionId)
           await removeArchivedId(surface, sessionId)
           // 补发官方「回到列表」通知（不发则用户刷新页面 → 会话被加载 → hold 守卫拦下后续回收站操作）。
-          await emitSessionAdded(ctx, sessionId)
+          await emitSessionAdded(ctx, sessionId, headerFacts)
           sendJson(res, 200, { ok: true })
           return
         }
@@ -1031,7 +1064,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             throw new ArchiveError('BACKEND_UNSUPPORTED', '当前会话持久化后端不提供已知的单会话目录，无法移入回收站/删除', 501)
           }
 
-          const subagents = await listSubagentTargets(ctx, sessionId)
+          const subagents = await listSubagentTargets(ctx, sessionId, headerFacts)
 
           if (pathname.endsWith('/trash')) {
             await ensureTrashRoot(settings.trashRoot)

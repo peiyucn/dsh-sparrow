@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, createHeaderFactsStore, isDeleteConfirmationSufficient,
-  isSafeSessionDirName, legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig,
-  parseTrashSidecar, parseBlankProjection, parseSessionFacts, runBounded, sanitizeSegment, straySessionIds, trashItemView,
+  archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, createBudgetSignal, createHeaderFactsStore,
+  createLruCache, isDeleteConfirmationSufficient, isSafeSessionDirName, legacyTrashItem, livingChildIds, maskHomePath,
+  normalizeArchiveConfig, parseTrashSidecar, parseBlankProjection, parseSessionFacts, runBounded, sanitizeSegment,
+  straySessionIds, trashItemView,
 } from '../lib/archive.js'
 
 describe('archive-manage 纯逻辑', () => {
@@ -55,6 +56,80 @@ describe('archive-manage 纯逻辑', () => {
       }, 30_000, () => 0)
       await assert.rejects(store.get(), /boom/u)
       assert.equal(await store.get(), 2)
+    })
+
+    it('invalidate 打断进行中的 load 应该 丢弃过期结果（不写回缓存）', async () => {
+      let loads = 0
+      const resolvers = []
+      const store = createHeaderFactsStore(async () => {
+        loads += 1
+        const value = loads
+        await new Promise(resolve => resolvers.push(() => resolve(value)))
+        return value
+      }, 30_000, () => 0)
+      const first = store.get()
+      store.invalidate() // 扫描期间发生写操作（写穿失效）
+      resolvers[0]()
+      assert.equal(await first, 1) // 发起时在等的调用方仍拿到自己的快照
+      assert.equal(loads, 1)
+      const second = store.get() // 失效后的读取必须重扫
+      assert.equal(loads, 2)
+      resolvers[1]()
+      assert.equal(await second, 2)
+      assert.equal(await store.get(), 2) // 新结果已缓存，不再扫
+      assert.equal(loads, 2)
+    })
+
+    it('invalidate 后并发 get 共享新 load（单飞仍成立）', async () => {
+      let loads = 0
+      const store = createHeaderFactsStore(async () => { loads += 1; return loads }, 30_000, () => 0)
+      await store.get()
+      store.invalidate()
+      const [a, b] = await Promise.all([store.get(), store.get()])
+      assert.equal(a, 2)
+      assert.equal(b, 2)
+      assert.equal(loads, 2)
+    })
+  })
+
+  describe('createLruCache（spec 09 审计）', () => {
+    it('超过上限 应该 淘汰最久未使用条目', () => {
+      const cache = createLruCache(3)
+      cache.set('a', 1)
+      cache.set('b', 2)
+      cache.set('c', 3)
+      cache.get('a') // 命中 a → 移到最新
+      cache.set('d', 4) // 淘汰最久未用的 b
+      assert.equal(cache.get('b'), undefined)
+      assert.equal(cache.get('a'), 1)
+      assert.equal(cache.get('c'), 3)
+      assert.equal(cache.get('d'), 4)
+      assert.equal(cache.size, 3)
+    })
+
+    it('重复 set 同键 应该 更新值且不重复占位', () => {
+      const cache = createLruCache(2)
+      cache.set('a', 1)
+      cache.set('a', 2)
+      cache.set('b', 3)
+      assert.equal(cache.size, 2)
+      assert.equal(cache.get('a'), 2)
+      assert.equal(cache.get('b'), 3)
+    })
+  })
+
+  describe('createBudgetSignal（spec 09 审计）', () => {
+    it('未 release 应该 到点中止', async () => {
+      const budget = createBudgetSignal(20)
+      await new Promise(resolve => setTimeout(resolve, 70))
+      assert.equal(budget.signal.aborted, true)
+    })
+
+    it('release 后 应该 解除定时器不再中止', async () => {
+      const budget = createBudgetSignal(20)
+      budget.release()
+      await new Promise(resolve => setTimeout(resolve, 70))
+      assert.equal(budget.signal.aborted, false)
     })
   })
 

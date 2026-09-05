@@ -97,6 +97,21 @@
 - `npm run verify` 全绿 + `git diff --check`。
 - owner 在真实大归档 profile 下开关面板实测（一次打开含失效后的首开）。
 
+## 审计修正（AGENTS 代码审计①资源/内存泄漏 + ⑧性能）
+
+- **header 事实缓存补失效代际**：`invalidate` 作废进行中的 load——失效前启动的扫描
+  结果不再写回缓存（原实现会被「失效前的旧成员表」重新填满缓存，写穿失效在 TTL 内
+  形同虚设）；作废的 promise 仍正常落定给当时在等的调用方（快照语义），失败路径
+  inflight 清理与重试语义不变。
+- **折叠预算信号改为自建 AbortController + 定时器**：批结束（成功与失败路径）即
+  release，定时器不滞留到死线（标题 8s 预算与 subagent 15s 观察同改，纯逻辑
+  `createBudgetSignal`）。
+- **foldedSubagentLabels 记忆加 LRU 上限**（256 条，`FOLDED_LABEL_CACHE_MAX_ENTRIES`）：
+  防随观察过的会话数无界增长；最久未用条目被淘汰后重新折叠即可。
+- **启动清扫 ×2 + 父子对齐经 header 事实缓存取 headers**：启动只扫一次盘；面板打开
+  不再为对齐做全量扫盘（此前 `/list` 每次打开都直接 `list()` 一次），
+  落实「稳态打开零磁盘扫描」。
+
 ## 风险与后续
 
 - 缓存一致性靠「header 不可变 + 三重失效」；如官方改 header 回写语义，
