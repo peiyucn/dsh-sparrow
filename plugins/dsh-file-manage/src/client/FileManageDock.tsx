@@ -39,6 +39,10 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   /** 刷新代际：快速关/开面板产生并发请求时，只让最新一次的结果落地（陈旧响应竞态，archive 同款）。 */
   const refreshSeqRef = useRef(0)
+  /** 滚动区容器（列表翻页后滚到底部用）。 */
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+  /** 加载更多成功后待滚底的标记：新行渲染提交后执行一次。 */
+  const scrollPendingRef = useRef(false)
   /** 「已复制」反馈 2s 复位（archive 同款）。 */
   const copiedTimerRef = useRef<number | null>(null)
 
@@ -54,6 +58,8 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
     // 同理复位删除锁：删除飞行期间换代时，陈旧 delete 的 finally 被代际守卫吞掉，
     // 不复位会把新代际的删除按钮卡死在禁用态；这里由刷新代际统一复位。
     setBusyDelete(false)
+    // 换代清掉待滚底标记：陈旧翻页的滚动不得落在新列表上。
+    scrollPendingRef.current = false
     listFiles()
       .then(page => {
         if (seq !== refreshSeqRef.current) return
@@ -109,6 +115,8 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
     // 刷新代际守卫：翻页期间发生重试 / 关开面板（reload 换代）时，陈旧页结果不得混入新列表。
     const seq = refreshSeqRef.current
     setLoadingMore(true)
+    // 新行渲染提交后滚到列表底部（滚动发生在 rows 变化的 effect 里，一次性）。
+    scrollPendingRef.current = true
     listFiles(lastId)
       .then(page => {
         if (seq !== refreshSeqRef.current) return
@@ -136,6 +144,14 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
       setError(t('copyFailed'))
     }
   }, [t])
+
+  // 加载更多成功 → rows 增长 → 滚到列表底部（标记只在 loadMore 发起时置位，一次消费）。
+  useEffect(() => {
+    if (!scrollPendingRef.current) return
+    scrollPendingRef.current = false
+    const el = bodyRef.current
+    if (el !== null) el.scrollTop = el.scrollHeight
+  }, [rows])
 
   /** 首屏 ready 门：列表 + 总数都落定前展示整页 loading（2026-09-01）。 */
   const initialLoading = loading || summaryPending
@@ -210,7 +226,7 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
                 </p>
               </div>
             ) : null}
-            <div style={{ ...styles.body, padding: summary !== null ? '0 24px 24px' : '12px 24px 24px' }} className="dsh-file-manage-body">
+            <div ref={bodyRef} style={{ ...styles.body, padding: summary !== null ? '0 24px 24px' : '12px 24px 24px' }} className="dsh-file-manage-body">
               {initialLoading ? (
                 <div className="dsh-file-manage-loading" role="status">
                   <span className="dsh-file-manage-spinner" aria-hidden />
@@ -260,21 +276,22 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
                   ))}
                 </div>
               ) : null}
+              {/* 加载更多随列表滚动：放在当前列表最下面（不再固定在面板底部）。 */}
+              {hasMore && !initialLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12 }}>
+                  <button
+                    type="button"
+                    className="dsh-file-manage-btn"
+                    disabled={loadingMore}
+                    onClick={() => { void loadMore() }}
+                  >
+                    {loadingMore ? t('loading') : t('loadMore')}
+                  </button>
+                </div>
+              ) : null}
                 </>
               )}
             </div>
-            {hasMore && !initialLoading ? (
-              <div style={styles.footerBar}>
-                <button
-                  type="button"
-                  className="dsh-file-manage-btn"
-                  disabled={loadingMore}
-                  onClick={() => { void loadMore() }}
-                >
-                  {loadingMore ? t('loading') : t('loadMore')}
-                </button>
-              </div>
-            ) : null}
             {/* 合集品牌 footer：固定底部不随内容滚动（只展示，不交互）。 */}
             <div style={styles.footer}>🐦 dsh-sparrow</div>
           </div>

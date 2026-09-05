@@ -318,13 +318,6 @@ export const styles = {
     fontSize: 12,
     lineHeight: '18px',
   } satisfies CSSProperties,
-  footerBar: {
-    flex: 'none',
-    display: 'flex',
-    justifyContent: 'center',
-    // 列表已包区块卡，不再加顶部分隔线（避免与卡片叠加显乱）。
-    padding: '10px 24px 14px',
-  } satisfies CSSProperties,
   /** 合集品牌 footer：固定面板底部（滚动区之外），顶部分割线与内容区隔开；紧凑规格。 */
   footer: {
     flex: 'none',
