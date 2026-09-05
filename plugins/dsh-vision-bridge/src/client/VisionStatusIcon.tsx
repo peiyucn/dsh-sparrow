@@ -9,6 +9,7 @@ import {
   capabilityReducer, capabilityShown, CAPABILITY_UNKNOWN_RETRY_MS, initialCapabilityState,
   type CapabilityTarget, type VisionStatusResult,
 } from './capability-machine.js'
+import { repositionDecision, type PopoverPoint } from './popover-position.js'
 
 export type { VisionStatusMode, VisionStatusResult } from './capability-machine.js'
 
@@ -170,8 +171,11 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
   // model-changed、resolving 时发查询、retrying 时按间隔发补查 tick。
   const [capability, dispatch] = useReducer(capabilityReducer, initialCapabilityState)
   const [open, setOpen] = useState(false)
-  const [point, setPoint] = useState<{ x: number; y: number; up: boolean } | null>(null)
+  const [point, setPoint] = useState<PopoverPoint | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
+  // 最近一次已生效的定位（state 的镜像）：滚动重定位据此判断位置是否真的变了，
+  // 未变则跳过 setState，避免高频 scroll 事件每次都触发重渲染。
+  const pointRef = useRef<PopoverPoint | null>(null)
 
   // 会话持久化模型选择投影（官方会话标准 hook；旧版 dsh 未提供时为 undefined）。
   // next = pending ?? lastUsed——与座位展示的当前模型同一来源。
@@ -224,16 +228,23 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
     return () => { clearTimeout(timer) }
   }, [capability.phase, capability.target.provider, capability.target.model, capability.attempts])
 
-  const computePoint = (): { x: number; y: number; up: boolean } | null => {
+  const computePoint = (): PopoverPoint | null => {
     const rect = buttonRef.current?.getBoundingClientRect()
     if (rect === undefined) return null
     const up = rect.bottom + POPOVER_HEIGHT_ESTIMATE + POPOVER_FLIP_MARGIN > window.innerHeight
     return { x: rect.right, y: up ? rect.top - POPOVER_GAP : rect.bottom + POPOVER_GAP, up }
   }
 
+  // 当前应显示的答案：idle/failed 隐藏；其余显示已携带/最新答案。
+  const status = capabilityShown(capability)
+  // 图标隐藏（无答案/查询失败）时弹层必须同步视为关闭：否则 document 监听
+  // 在弹层已卸载后仍滞留，要等下一次点击/滚动才被摘除。
+  const openEffective = open && status !== null
+
   // 弹层打开时：点外部关闭、Esc 关闭、滚动/缩放跟随重定位（官方下拉同款行为）。
   useEffect(() => {
-    if (!open) return
+    if (!openEffective) return
+    let frame: number | null = null
     const onPointerDown = (event: PointerEvent): void => {
       if (!(event.target instanceof Element)) return
       if (event.target.closest('.dsh-vision-popover') !== null) return
@@ -243,25 +254,36 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') setOpen(false)
     }
+    // 滚动/缩放是高频事件：rAF 节流（一帧最多重定位一次）+ 位置未变跳过
+    // setState——避免每个 scroll 事件都 getBoundingClientRect 读布局并触发重渲染。
     const reposition = (): void => {
-      const next = computePoint()
-      if (next === null) setOpen(false)
-      else setPoint(next)
+      if (frame !== null) return
+      frame = requestAnimationFrame(() => {
+        frame = null
+        const next = computePoint()
+        const decision = repositionDecision(pointRef.current, next)
+        if (decision === 'close') {
+          setOpen(false)
+        } else if (decision === 'apply' && next !== null) {
+          pointRef.current = next
+          setPoint(next)
+        }
+      })
     }
     document.addEventListener('pointerdown', onPointerDown, true)
     document.addEventListener('keydown', onKeyDown, true)
     document.addEventListener('scroll', reposition, true)
     window.addEventListener('resize', reposition)
     return () => {
+      if (frame !== null) cancelAnimationFrame(frame)
+      pointRef.current = null
       document.removeEventListener('pointerdown', onPointerDown, true)
       document.removeEventListener('keydown', onKeyDown, true)
       document.removeEventListener('scroll', reposition, true)
       window.removeEventListener('resize', reposition)
     }
-  }, [open])
+  }, [openEffective])
 
-  // 当前应显示的答案：idle/failed 隐藏；其余显示已携带/最新答案。
-  const status = capabilityShown(capability)
   const native = status?.mode === 'native-vision'
   const noVision = status?.mode === 'no-vision'
   // 无答案 / 查询失败 → 隐藏（不显示占位色）。
@@ -285,14 +307,16 @@ export function VisionStatusIcon({ sessionId, directoryFor, queryCapability, use
           event.stopPropagation()
           if (open) setOpen(false)
           else {
-            setPoint(computePoint())
+            const initial = computePoint()
+            pointRef.current = initial
+            setPoint(initial)
             setOpen(true)
           }
         }}
       >
         {noVision ? EYE_OFF_GLYPH : EYE_GLYPH}
       </button>
-      {open && point !== null
+      {openEffective && point !== null
         ? createPortal(
           <div
             className="dsh-vision-popover"
