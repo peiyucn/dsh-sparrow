@@ -582,7 +582,9 @@ export interface DraftOccurrenceLike {
 export function detectEndOfDraft(draft: string, occurrences: readonly DraftOccurrenceLike[]): number {
   let detect = draft.length
   for (const occurrence of occurrences) {
-    detect -= occurrence.length - 1
+    // 异常输入钳制：length=0 的 occurrence 按 1 字符计（chip 在 detect 平面
+    // 恒占 1 字符，不因坏数据反向加长末端）。
+    detect -= Math.max(1, occurrence.length) - 1
   }
   return detect
 }

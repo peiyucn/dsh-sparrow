@@ -722,6 +722,10 @@ describe('chat-fim 纯逻辑', () => {
     it('异常输入安全：length 为 1 的 chip 不改变坐标', () => {
       assert.equal(detectEndOfDraft('abc', [{ offset: 0, length: 1 }]), 3)
     })
+
+    it('异常输入安全：length 为 0 的 occurrence 按 1 字符计（不反向加长末端）', () => {
+      assert.equal(detectEndOfDraft('abc', [{ offset: 1, length: 0 }]), 3)
+    })
   })
 
 })
