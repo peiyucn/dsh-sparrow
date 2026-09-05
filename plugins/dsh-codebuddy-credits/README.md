@@ -66,8 +66,9 @@ automatically. Saving in the UI is the recommended path.
 Once a key is configured, the plugin surfaces your CodeBuddy usage in the
 conversation UI:
 
-- **Sidebar entry** (bottom of the left rail, beside Settings when the
-  sidebar is wide): opens a panel with your account/enterprise, current-cycle
+- **Header entry** (top-right of the conversation column, next to the
+  Session log button — shown on conversation pages and on the new-session
+  page alike): opens a panel with your account/enterprise, current-cycle
   quota (used / limit / remaining, progress bar, reset date) and the selected
   CodeBuddy model's description, capabilities, and spend rate.
 - **Session stats**: accumulated credits and call count for the current

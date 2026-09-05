@@ -2,17 +2,19 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.1.2-rc.1 (2026-09-04)
+## 0.1.2-rc.1 (2026-09-05)
 
 - Version-line alignment with official dsh 0.1.2-rc.1 (stability line).
 - Parent-child tree panel: archived sessions show their subagent children nested beneath the parent (orange child count), and operations act on the parent with its children.
 - Stray-session section: sessions that reference a missing parent (blank/orphan tags) are listed for archiving or deletion.
 - Trash: restore or permanently delete entries individually or in bulk, with old-format entries (no sidecar) recognized.
+- The trash location row now sits inside the Trash area (no longer a global row above the panel content).
 - Sessions released mid-use unlock in the panel immediately (live-status refresh), and moves roll back cleanly if the sidecar write fails.
 - Startup sweep: ghost archive ids and stale projection rows are cleaned automatically.
 - Subagent labels read from the authoritative log tier, with in-memory fallbacks.
 - The Archive button now aligns its width with Settings; any-session ids (externally injected) archive and restore correctly.
 - Large archives open fast: session headers are cached in memory (invalidated on every change), titles come from the projection cache instead of re-reading each log, and lists are paginated (100 rows + Load more).
+- A subtle 🐦 dsh-sparrow brand line closes the panel.
 
 ## 0.1.1-alpha.1 (2026-09-02 · pre-release)
 

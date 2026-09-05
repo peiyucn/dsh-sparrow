@@ -2,7 +2,7 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.1.2-rc.1 (2026-09-04)
+## 0.1.2-rc.1 (2026-09-05)
 
 - Version-line alignment with official dsh 0.1.2-rc.1 (stability line).
 - Fix the hover hit area on narrow conversations: the rail's extended hit zone now actually extends 16px to the left (previously it landed inside the rail), so hover reveal triggers across the intended area.

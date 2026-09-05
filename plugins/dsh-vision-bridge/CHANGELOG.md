@@ -2,12 +2,13 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.1.2-rc.1 (2026-09-04)
+## 0.1.2-rc.1 (2026-09-05)
 
 - Version-line alignment with official dsh 0.1.2-rc.1 (stability line).
 - The vision status icon now shares the model seat's directory: it appears as soon as the page loads and no longer waits for the session history to load.
 - Native-vision main models have zero presence: the icon and its popover stay hidden entirely instead of showing a grayed-out state.
 - The icon state now matches actual availability: DeepSeek text models that are not configured for the vision bridge show "no vision" instead of promising a read that would be rejected, and the state re-checks itself after the model directory or credentials change.
+- A subtle 🐦 dsh-sparrow brand line closes the popover.
 
 ## 0.1.0 (2026-09-02)
 
