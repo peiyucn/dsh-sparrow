@@ -8,9 +8,13 @@
 
 每个插件独立发布、独立安装；某功能被官方原生支持后，对应插件从合集中退役。上方版本徽章跟踪合集对齐版本线（镜像官方 dsh），点击进入 npm org 页可看各包自己的版本。
 
-## 安装
+## 环境要求
 
-前置条件：可用的 `dsh` CLI 和 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
+- DSH >= 0.1.2-rc.1（[deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)——每次发版跟随官方 dsh 版本线，见顶部版本徽章）
+- Node.js >= 22.19.0
+- 可用的 `dsh` CLI 和 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）
+
+## 安装
 
 > 这些包虽然发布在 npm，但**不要**直接用 `npm install @dsh-sparrow/...` 安装：那只会把它们下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用下面的 `dsh plugin` 命令，让包安装到 `$DSH_HOME/profiles/web` 并激活 bundle 层；安装后请重启 DSH。
 

@@ -8,9 +8,13 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 Each plugin is published and installed independently; a plugin retires from the collection once DSH natively supports its feature. The version badge above tracks the collection's aligned release line (mirrored from official dsh) and links to the npm org page, where each package's own version is listed.
 
-## Install
+## Requirements
 
-Prerequisites: a working `dsh` CLI and `pnpm` (`dsh plugin` forwards installation to pnpm).
+- DSH >= 0.1.2-rc.1 ([deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) — each release tracks the official dsh version line, see the version badge)
+- Node.js >= 22.19.0
+- A working `dsh` CLI and `pnpm` (`dsh plugin` forwards installation to pnpm)
+
+## Install
 
 > The packages are published on npm, but do **not** install them with `npm install @dsh-sparrow/...` directly — that only downloads them into a `node_modules` without registering them in the DSH web profile. Use the `dsh plugin` command below so each package lands in `$DSH_HOME/profiles/web` and its bundle layer is activated. Restart DSH after installing.
 
