@@ -1,8 +1,13 @@
 /**
- * CodeBuddy 额度入口：挂在官方 conversation.session.header.utilities 槽位
- * （kind=list，scope=session；session log 下载按钮同槽位，本插件 order -10
- * 渲染在其左边）。点击展开面板：账号、本期额度（进度条 + 已用/剩余 +
- * 重置日期）、当前选中 CodeBuddy 模型的信息。全部颜色走 --dsw-alias-* /
+ * CodeBuddy 额度入口：会话页挂官方 conversation.session.header.utilities
+ * 槽位（kind=list，scope=session；session log 下载按钮同槽位，本插件
+ * order -10 渲染在其左边）。blank 会话 hero 态官方 header 整体隐藏
+ * （hideChrome），utilities 不渲染——改经 conversation.input.dock 槽位的
+ * hero 锚点（CodeBuddyCreditsHeroAnchor）挂同一入口：读官方根元素
+ * data-phase 公开标记，相位为 hero 时 portal 到会话根右上角（absolute 对齐
+ * header 行几何：top 14 / right 28），active 相位返回 null 让位 header 常驻
+ * 入口。点击展开面板：账号、本期额度（进度条 + 已用/剩余 + 重置日期）、
+ * 当前选中 CodeBuddy 模型的信息。全部颜色走 --dsw-alias-* /
  * --dsw-elevation-* 官方 token，深浅主题自动。
  *
  * 当前选中模型读官方共享模型目录（ctx.modelDirectories，与模型选择器
@@ -78,6 +83,8 @@ export interface CodeBuddyCreditsIndicatorProps {
   useProjection?: <K extends string>(key: K) => ModelSelectionProjection | undefined
   /** 插件注入：当前会话的共享模型目录 store（官方 ctx.modelDirectories）。 */
   directoryFor: (sessionId: string) => DirectoryStore | undefined
+  /** header 常驻入口（默认）或 blank 会话 hero 锚点（portal 到会话根右上角）。 */
+  variant?: 'header' | 'hero'
 }
 
 /** 重置时间只展示到日：2026-09-26 00:00:00 → 2026-09-26（非零点整保留原样）。 */
@@ -154,13 +161,48 @@ const PANEL_EDGE_GAP = 8
 /** 模块级状态缓存：槽位重挂载（切会话/视图）时以它初始化，避免「空 → 出现」闪烁。 */
 let cachedStatus: StatusPayload | undefined
 
+/**
+ * blank 会话 hero 锚点的落点解析：从 dock 内隐藏锚 span 向上找官方会话根
+ * 元素（[data-phase] 公开 DOM 标记，ConversationRoot 每相位重渲染时改写
+ * hero/settling/active），相位为 hero 时入口可见——官方 header 只在 hero 态
+ * 整体隐藏（hideChrome），active 相位 header 常驻入口已就位，hero 锚点
+ * 必须让位（settling 也不显示：延续会话可能 header 已可见，避免双份）。
+ */
+function useHeroRoot(): {
+  anchorRef: (el: HTMLSpanElement | null) => void
+  rootEl: Element | null
+  visible: boolean
+} {
+  const anchorRef = useRef<HTMLSpanElement | null>(null)
+  const [rootEl, setRootEl] = useState<Element | null>(null)
+  const [phase, setPhase] = useState<string | null>(null)
+  // 回调 ref：锚 span 挂载后解析会话根（portal 容器 + 观察目标）。
+  const setAnchor = useCallback((el: HTMLSpanElement | null): void => {
+    anchorRef.current = el
+    setRootEl(el?.closest('[data-phase]') ?? null)
+  }, [])
+  useEffect(() => {
+    if (rootEl === null) return
+    const read = (): void => { setPhase(rootEl.getAttribute('data-phase')) }
+    read()
+    const observer = new MutationObserver(read)
+    observer.observe(rootEl, { attributes: true, attributeFilter: ['data-phase'] })
+    return () => { observer.disconnect() }
+  }, [rootEl])
+  return { anchorRef: setAnchor, rootEl, visible: phase === 'hero' }
+}
+
 export function CodeBuddyCreditsIndicator({
   t,
   sessionId: headerSessionId,
   useProjection,
   directoryFor,
+  variant = 'header',
 }: CodeBuddyCreditsIndicatorProps) {
   const sessionId = headerSessionId ?? ''
+  // hero 变体的会话根解析（header 变体不使用结果，但 hook 无条件调用；
+  // 锚 span 只在 hero 变体渲染，header 变体零观察零开销）。
+  const hero = useHeroRoot()
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<StatusPayload | undefined>(() => cachedStatus)
   const [loadError, setLoadError] = useState<string | undefined>(undefined)
@@ -301,6 +343,12 @@ export function CodeBuddyCreditsIndicator({
     }
   }, [open, position, loadStatus, loadQuota])
 
+  // hero 变体：相位离开 hero（发首条消息 → engaging/active，header 常驻
+  // 入口接管）时收起已展开面板——否则面板停在旧锚点坐标上与新入口并存。
+  useEffect(() => {
+    if (variant === 'hero' && !hero.visible && open) setOpen(false)
+  }, [variant, hero.visible, open])
+
   const selected = selection?.provider === 'codebuddy-credits' ? selection : undefined
   const model = selected === undefined
     ? undefined
@@ -349,28 +397,53 @@ export function CodeBuddyCreditsIndicator({
   // 配置时才出现这个标；加载完成后配置态自动亮出。
   if (status?.keyConfigured !== true) return null
 
-  // 会话头部 logo 胶囊：挂在官方 header.utilities 槽位（session log 按钮左边）。
+  // 会话头部 logo 胶囊：header 变体挂在官方 header.utilities 槽位（session
+  // log 按钮左边）；hero 变体 portal 到会话根右上角，absolute 几何对齐
+  // header 行（padding-top 12 + 32px 行内 28px 按钮居中 = top 14，
+  // right 28 同 header padding-right）。
+  const triggerButton = (
+    <button
+      type="button"
+      aria-label={t('indicator.open')}
+      aria-expanded={open}
+      title={t('indicator.open')}
+      onClick={() => setOpen(value => !value)}
+      className="ccb-indicator-button"
+    >
+      <span
+        style={{ display: 'inline-flex', fontSize: 18, lineHeight: 1 }}
+        dangerouslySetInnerHTML={{ __html: LOGO_SVG }}
+      />
+    </button>
+  )
+
   const trigger = (
-    <div ref={setRoot} style={{ position: 'relative', display: 'inline-flex' }}>
-      <button
-        type="button"
-        aria-label={t('indicator.open')}
-        aria-expanded={open}
-        title={t('indicator.open')}
-        onClick={() => setOpen(value => !value)}
-        className="ccb-indicator-button"
-      >
-        <span
-          style={{ display: 'inline-flex', fontSize: 18, lineHeight: 1 }}
-          dangerouslySetInnerHTML={{ __html: LOGO_SVG }}
-        />
-      </button>
+    <div
+      ref={setRoot}
+      style={variant === 'hero'
+        ? { position: 'absolute', top: 14, right: 28, display: 'inline-flex', zIndex: 7 }
+        : { position: 'relative', display: 'inline-flex' }}
+    >
+      {triggerButton}
     </div>
   )
 
+  // hero 变体：相位不是 hero（active 时 header 常驻入口已就位）或会话根
+  // 尚未解析（锚 span 刚挂载、回调 ref 未回填）时不渲染入口。
+  const heroHidden = variant === 'hero' && (!hero.visible || hero.rootEl === null)
+
   return (
     <>
-      {trigger}
+      {/* hero 锚 span：display:none 占位，closest 解析会话根仍有效；不渲染
+          时回调 ref 收不到元素，故必须在入口可见性判定之外常驻。 */}
+      {variant === 'hero'
+        ? <span ref={hero.anchorRef} style={{ display: 'none' }} aria-hidden="true" />
+        : null}
+      {heroHidden
+        ? null
+        : variant === 'hero' && hero.rootEl !== null
+          ? createPortal(trigger, hero.rootEl)
+          : trigger}
       {open && point !== null
         ? createPortal(
           <div
@@ -541,6 +614,45 @@ export function CodeBuddyCreditsIndicator({
         )
         : null}
     </>
+  )
+}
+
+export interface CodeBuddyCreditsHeroAnchorProps {
+  t: (key: string, vars?: Record<string, string>) => string
+  /** 框架 SessionStandardProps：槽位所属会话 id（header 槽位同款注入）。 */
+  sessionId?: string
+  /** conversation.input.dock 的 InputZone owner 份额（兜底会话 id 来源）。 */
+  session?: { sessionId?: unknown }
+  /** 框架注入的会话投影 hook（透传给额度入口）。 */
+  useProjection?: <K extends string>(key: K) => ModelSelectionProjection | undefined
+  /** 插件注入：当前会话的共享模型目录 store（官方 ctx.modelDirectories）。 */
+  directoryFor: (sessionId: string) => DirectoryStore | undefined
+}
+
+/**
+ * blank 会话 hero 锚点：官方 header 在 hero 态整体隐藏（hideChrome，
+ * header.utilities 不渲染），额度入口改经 conversation.input.dock 槽位挂载
+ * （公开 seam，hero/active 两态都渲染；输入区草稿槽位，本组件零可见输出）。
+ * 入口组件读官方根元素 data-phase 公开标记，hero 相位 portal 到会话根
+ * 右上角（与 header 行同位），active 相位返回 null 让位 header 常驻入口。
+ */
+export function CodeBuddyCreditsHeroAnchor({
+  t,
+  sessionId,
+  session,
+  useProjection,
+  directoryFor,
+}: CodeBuddyCreditsHeroAnchorProps) {
+  const zoneSessionId = typeof session?.sessionId === 'string' ? session.sessionId : undefined
+  const resolved = typeof sessionId === 'string' ? sessionId : zoneSessionId ?? ''
+  return (
+    <CodeBuddyCreditsIndicator
+      variant="hero"
+      t={t}
+      sessionId={resolved}
+      useProjection={useProjection}
+      directoryFor={directoryFor}
+    />
   )
 }
 

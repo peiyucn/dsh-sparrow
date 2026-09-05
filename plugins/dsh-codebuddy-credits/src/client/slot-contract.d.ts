@@ -37,6 +37,17 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       owner: { children?: never }
     }
     /**
+     * composer 上方全宽扩展槽位（ui-conversation 声明；kind=list，
+     * scope=session，owner 传 InputZone={session,input}）。本插件挂 blank
+     * 会话 hero 额度入口锚点（官方 header 在 hero 态整体隐藏，utilities
+     * 不渲染；锚点读官方根元素 data-phase 标记，hero 相位才显示）。
+     */
+    'conversation.input.dock': {
+      kind: 'list'
+      scope: 'session'
+      owner: { session: { sessionId: unknown }; input: unknown }
+    }
+    /**
      * 官方聊天视图的完成态 assistant 行动作槽位（ui-chat 声明；kind=list，
      * scope=session，owner 传 durable messageId）——官方渲染顺序：复制 →
      * 本槽位 → 分支 → Usage 胶囊 → 时间。本插件挂每轮积分胶囊。

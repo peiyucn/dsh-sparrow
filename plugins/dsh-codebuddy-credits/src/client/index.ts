@@ -16,7 +16,11 @@ import type { ReactNode } from 'react'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { CodeBuddyCreditsCard, ensureCardStyles } from './CodeBuddyCreditsCard.js'
-import { CodeBuddyCreditsIndicator, ensureIndicatorStyles } from './CodeBuddyCreditsIndicator.js'
+import {
+  CodeBuddyCreditsHeroAnchor,
+  CodeBuddyCreditsIndicator,
+  ensureIndicatorStyles,
+} from './CodeBuddyCreditsIndicator.js'
 import { CodeBuddyModelSelect, ensurePickerStyles } from './CodeBuddyModelSelect.js'
 import { CodeBuddyTurnCredit, ensureTurnCreditStyles } from './CodeBuddyTurnCredit.js'
 import { CodeBuddyCreditsStats, ensureStatsStyles } from './CodeBuddyCreditsStats.js'
@@ -194,6 +198,18 @@ export function apply(ctx: ClientContext): void {
     locale: 'codebuddy-credits',
     inject: () => ({ directoryFor }),
   }, CodeBuddyCreditsIndicator as unknown as (props: object) => ReactNode))
+
+  // blank 会话 hero 锚点：官方 header 在 hero 态整体隐藏（hideChrome，
+  // utilities 槽位不渲染）——额度入口经 conversation.input.dock 槽位（公开
+  // seam，hero/active 两态都渲染）兜底挂载，读官方根元素 data-phase 标记，
+  // hero 相位 portal 到会话根右上角，active 相位让位 header 常驻入口。
+  ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
+    name: 'conversation.input.dock',
+    id: 'codebuddy-credits-hero',
+    order: 30,
+    locale: 'codebuddy-credits',
+    inject: () => ({ directoryFor }),
+  }, CodeBuddyCreditsHeroAnchor as unknown as (props: object) => ReactNode))
 
   // 每轮积分胶囊：官方 Usage 胶囊同排（assistant-actions 槽位，公开 seam）。
   // 该轮无 CodeBuddy 调用时组件返回 null，官方行动作行保持原样。
