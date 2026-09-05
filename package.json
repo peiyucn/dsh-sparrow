@@ -1,6 +1,7 @@
 {
   "name": "dsh-sparrow",
   "private": true,
+  "version": "0.1.2-rc.1",
   "description": "A collection of small DeepSeek Harness (DSH) web plugins",
   "packageManager": "pnpm@11.22.0",
   "scripts": {
