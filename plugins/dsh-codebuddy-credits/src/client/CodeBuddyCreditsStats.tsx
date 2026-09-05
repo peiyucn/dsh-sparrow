@@ -26,6 +26,19 @@ interface SessionUsageView {
 
 /** 会话级缓存：槽位重挂载（切会话/视图）时以它初始化，避免「空 → 出现」闪烁。 */
 const usageCache = new Map<string, SessionUsageView>()
+/** 缓存条目上限：切过的会话数可无限增长，按 FIFO 淘汰最老条目（有界，审计「按会话累积状态」条目）。 */
+const USAGE_CACHE_MAX = 200
+
+/** 有界缓存写入（FIFO 淘汰最老条目；重复写入的键先删后插 = 刷新到最新位置）。导出供测试。 */
+export function boundedSet<K, V>(map: Map<K, V>, key: K, value: V, max: number): void {
+  map.delete(key)
+  map.set(key, value)
+  while (map.size > max) {
+    const oldest = map.keys().next().value as K | undefined
+    if (oldest === undefined) break
+    map.delete(oldest)
+  }
+}
 
 export interface CodeBuddyCreditsStatsProps {
   t: (key: string, vars?: Record<string, string>) => string
@@ -44,7 +57,7 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
     void fetch(`${SESSION_USAGE_URL}?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' })
       .then(response => response.ok ? response.json() as Promise<SessionUsageView> : Promise.reject(new Error(`HTTP ${response.status}`)))
       .then(value => {
-        usageCache.set(sessionId, value)
+        boundedSet(usageCache, sessionId, value, USAGE_CACHE_MAX)
         setUsage(value)
       })
       .catch(() => {

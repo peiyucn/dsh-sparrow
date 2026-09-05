@@ -184,8 +184,13 @@ export function apply(ctx: Context, config: Config): void {
     streamIdleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,
     onUsage: (usage) => {
       const tagged = usage.signal === undefined ? undefined : requestTurns.get(usage.signal)
+      // signal 只在关联轮次时用一次：不随条目滞留（AbortSignal 引用会钉住请求的
+      // 取消监听，纯属无用保留），条目只存统计需要的字段。
       usageLog.push({
-        ...usage,
+        tokens: usage.tokens,
+        model: usage.model,
+        ...(usage.credit === undefined ? {} : { credit: usage.credit }),
+        ...(usage.sessionId === undefined ? {} : { sessionId: usage.sessionId }),
         ...(tagged === undefined ? {} : { turn: tagged.turn }),
       })
       if (usageLog.length > 1000) usageLog.splice(0, usageLog.length - 1000)
