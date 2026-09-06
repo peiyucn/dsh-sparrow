@@ -100,9 +100,6 @@ restarts; the quota panel always reads the authoritative server-side number.
 
 ## Relationship to other projects
 
-- [dsh-llm-codebuddy](https://github.com/Axiaohungry/dsh-llm-codebuddy):
-  token-reverse-engineering + API-key dual mode. This plugin deliberately
-  keeps only the official API-key path.
 - Official CodeBuddy Agent SDK / HTTP API: agent-level integrations (CodeBuddy
   runs its own loop). This plugin is the opposite shape — DSH runs the loop.
 

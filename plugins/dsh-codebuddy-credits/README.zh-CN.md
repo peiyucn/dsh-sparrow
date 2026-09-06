@@ -83,8 +83,6 @@ Key 只存入 DSH 凭据库，不进 settings.yaml。环境变量
 
 ## 与同类项目的区别
 
-- [dsh-llm-codebuddy](https://github.com/Axiaohungry/dsh-llm-codebuddy)：
-  令牌逆向 + API Key 双模式；本插件刻意只保留官方 API Key 一路。
 - 官方 CodeBuddy Agent SDK / HTTP API：agent 级集成（CodeBuddy 自己跑循环）；
   本插件形态相反——DSH 跑循环。
 
