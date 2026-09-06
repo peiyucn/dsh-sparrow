@@ -4,8 +4,8 @@
 
 Company CodeBuddy credits as a DeepSeek Harness (DSH) LLM provider — your
 enterprise-issued CodeBuddy quota, used directly inside DSH. Official API key
-only: models as a provider, **no agent harness, no login/token reverse
-engineering**.
+only: CodeBuddy contributes just the model inference your credits pay for; the
+agent harness (tools, permissions, context) is entirely DSH's.
 
 The plugin registers a `CodeBuddy Credits` provider (route
 `codebuddy-credits`) in the DSH model picker. DSH runs its own agent loop

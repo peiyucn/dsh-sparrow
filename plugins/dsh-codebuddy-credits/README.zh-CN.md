@@ -3,8 +3,9 @@
 [English](./README.md)
 
 把**公司发的 CodeBuddy 额度**接成 DeepSeek Harness（DSH）的 LLM provider——
-企业发放的 WorkBuddy/CodeBuddy 积分，在 DSH 里直接用。官方 API Key 直连，
-只用模型推理，**不用它的 agent harness，不做令牌/登录态逆向**。
+企业发放的 WorkBuddy/CodeBuddy 积分，在 DSH 里直接用。官方 API Key 直连：
+CodeBuddy 只提供积分对应的模型推理，agent 循环（工具、权限、上下文）完全
+由 DSH 承担。
 
 插件在 DSH 模型选择器里注册一个 `CodeBuddy Credits` provider（内部路由
 `codebuddy-credits`）。DSH 自己跑 agent 循环（工具、权限、上下文），CodeBuddy
