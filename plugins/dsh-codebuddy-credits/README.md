@@ -98,11 +98,6 @@ restarts; the quota panel always reads the authoritative server-side number.
 - Requests made through your key appear in your account's usage records
   (including prompt text in the enterprise usage console).
 
-## Relationship to other projects
-
-- Official CodeBuddy Agent SDK / HTTP API: agent-level integrations (CodeBuddy
-  runs its own loop). This plugin is the opposite shape — DSH runs the loop.
-
 ## License
 
 [MIT](./LICENSE)

@@ -81,11 +81,6 @@ Key 只存入 DSH 凭据库，不进 settings.yaml。环境变量
   随时可能变。
 - 通过 Key 发起的请求会进入账号用量记录（企业用量控制台连提示词文本都可见）。
 
-## 与同类项目的区别
-
-- 官方 CodeBuddy Agent SDK / HTTP API：agent 级集成（CodeBuddy 自己跑循环）；
-  本插件形态相反——DSH 跑循环。
-
 ## License
 
 [MIT](./LICENSE)
