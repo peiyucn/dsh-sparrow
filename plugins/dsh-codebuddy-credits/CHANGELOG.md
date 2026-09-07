@@ -3,6 +3,11 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
+## 0.1.2-rc.1.1 (2026-09-07)
+
+- **Max mode** (reasoning-effort lock, same idea as the CodeBuddy client's toggle): a switch in the credits panel (above the model card) — once on, every reasoning model in this provider sends the Max effort level; the model picker's effort list shows Max pinned on top with the other levels greyed out until the lock is released
+- Models outside this provider (the official DeepSeek route and others) are never affected by the lock
+
 ## 0.1.2-rc.1 (2026-09-05)
 
 - Initial release: company CodeBuddy credits as a DSH LLM provider — official API key only, streaming only

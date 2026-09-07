@@ -10,7 +10,6 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 * `plugins/dsh-nav-pin` — 轮次导航窄屏不消失（纯样式注入）
 * `plugins/dsh-file-manage` — DeepSeek Files API 云端文件管理（无本地持久化）
 * `plugins/dsh-codebuddy-credits` — CodeBuddy 额度 LLM provider（官方 API Key 直连，纯模型推理）
-
 * 验证：插件目录 `npm run verify`；全量 = 根 `npm run verify`；分项 = 根 `pnpm run <step>:all`
 
 ## 文档规范
@@ -61,20 +60,26 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 ## GitHub 与网络
 
 * GitHub 操作一律走 `gh` CLI（已登录 peiyucn）；`gh api` 直连 api.github.com，`git push/fetch` 需要代理 127.0.0.1:7897
-* 仓库：https://github.com/peiyucn/dsh-sparrow
+* 仓库：<https://github.com/peiyucn/dsh-sparrow>
 
 ## 项目专属章节
 
 ### DSH 插件契约（硬约束）
 
 * **入口契约**：模块 export `name`/`inject`/`apply`；`inject` 只声明硬依赖服务，缺失时插件不启动
+
 * **生命周期**：一切副作用在 `apply` 内注册并配 `ctx.effect` 清理；不泄漏定时器/watcher/监听
+
 * **组合行**：`cordis.patch.yml` insert 按官方 bundle patch 规范——`id` 用短名（稳定供后续 patch 定位），`name` 用 scoped 包名（loader 按包名解析）
+
 * **seam 纪律（三档）**：
+
   1. **正路（默认）**：只用公开 seam（`ctx.llm`/`ctx.webServer`/`ctx.tools`/slots/provide 等）
   2. **包装（特例）**：公开 seam 不满足需求时包装它——保持原签名与 `this` 语义、可逆恢复，并记录适配的 dsh 版本
   3. **私有 seam 依赖（特例，2026-09-01 起）**：官方无公开能力、需求成立时，允许调用官方服务 private 方法/读写 private 状态。护栏：不替换/不包装/不覆写官方函数；优先复用官方自身写入路径（如 enqueueOperation + setState），不自造平行机制；启动时能力检查，surface 变化即 fail-fast 报「不支持的 dsh 版本」；owner 批准 + 在本文件「插件私有 seam 特例（概括）」小节记录
+
 * **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直读内部文件；确需直碰内部文件的特例须在本文件「插件私有 seam 特例（概括）」小节记录 + owner 认可
+
 * **查证原则**：引用 DSH 服务/事件/插槽契约前，先 grep 官方源码（本机 checkout：`C:\Users\DJ028191\.dsh-launcher-panel\source`）确认，禁止凭记忆编造
 
 ### 插件私有 seam 特例（概括）
@@ -94,9 +99,9 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 
 * **范围**：发布前对比 `npm view <包名> version`、插件 package.json version、自上次 tag 的 git log——有改动的插件走完整发布流程，没改动的不动；各插件独立版本号、独立 tag（`<插件名>-vX.Y.Z`）
 * **元数据**：name 必须 `@dsh-sparrow/<插件名>`；description 英文；`repository` 必填（npm `--provenance` 校验）；`files` 清单齐备；README/CHANGELOG 中英双份顶部互链；CHANGELOG 条目按发布顺序从上到下、稳定版覆盖 alpha 全部用户可感知改动、只记真实发布过的版本（发布前的改名等内部历史记 docs/spec）；插件截图统一放仓库根 `resources/dsh-<插件名>.png`（单一来源）；README 一律用**绝对 URL**引用（`https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-<插件名>.png`，GitHub 与 npm 页双端可用，URL 绑定 main 分支）；**图片不打包进 npm 包**（插件 `files` 不含 resources）
-* **版本策略**：**版本线镜像官方 dsh（2026-09-03 定）**——官方什么版本、我们同形版本（alpha 对 alpha、rc 对 rc，稳定版也带 rc 标记）：版本号即 dsh 兼容目标，用户一眼可辨、无需解释；官方同一版本内的多次发布用 rc/补丁位递增（届时按需细化）；各插件版本线保持一致（对齐类发版 CHANGELOG 记「版本对齐合集」）；**发布通道**：alpha/beta 预发布发 next，rc 与纯数字稳定版发 latest（稳定版带 rc 标记）；next 上的版本经 owner 本地 web profile 验证后，可用 publish.yml 的 promote 手动任务把**同一版本号**移上 latest（只移 dist-tag、不重发包）；owner 的 web profile 固定 `link:` 直连本仓库插件目录（开发改动即时生效，日常不切 registry；`dsh plugin --profile web add <包名>@next` 供外部用户/换机安装）；**profile 级 cordis.patch.yml 保持 `[]`**——插件经 package.json `dsh.profile.bundles` 装载（`dsh plugin add` 会写 bundles），各插件 bundle 自带 cordis.patch.yml 自动生效；往 profile 级 patch 写 insert 会与 bundle 层重复 → `duplicate loader entry id` 启动失败（2026-09-02 实踩）；npm 首发的 latest 指向该版本且不可移除 dist-tag（平台硬性行为）；坏版本 deprecate（不 unpublish）；版本线由 owner 决定；已发布版本元数据错误只能升补丁版修正并诚实记录
+* **版本策略**：**版本线镜像官方 dsh（2026-09-03 定）**——官方什么版本、我们同形版本（alpha 对 alpha、rc 对 rc，稳定版也带 rc 标记）：版本号即 dsh 兼容目标，用户一眼可辨、无需解释；**官方未发新版时的自发版（2026-09-07 定）**：同一官方基线上的自家迭代用预发布尾段递增（`0.1.2-rc.1.1`、`0.1.2-rc.1.2`…；alpha 基线则 `0.1.3-alpha.1.1`…）——前段仍是 dsh 兼容目标，末段是自家序号，semver 排序天然正确（`0.1.2-rc.1 < 0.1.2-rc.1.1 < 0.1.2-rc.2`），publish.yml 的 tag glob 与通道判定（含 alpha/beta → next、否则 latest）对四段号天然兼容；**各插件版本线各自独立、不再强对齐**（2026-09-07 起：哪个插件有改动发哪个，其余不动；根 package.json `version` 跟随最新发布的插件版本，作为合集徽章源）；**发布通道**：alpha/beta 预发布发 next，rc 与纯数字稳定版发 latest（稳定版带 rc 标记）；next 上的版本经 owner 本地 web profile 验证后，可用 publish.yml 的 promote 手动任务把**同一版本号**移上 latest（只移 dist-tag、不重发包）；owner 的 web profile 固定 `link:` 直连本仓库插件目录（开发改动即时生效，日常不切 registry；`dsh plugin --profile web add <包名>@next` 供外部用户/换机安装）；**profile 级 cordis.patch.yml 保持 `[]`**——插件经 package.json `dsh.profile.bundles` 装载（`dsh plugin add` 会写 bundles），各插件 bundle 自带 cordis.patch.yml 自动生效；往 profile 级 patch 写 insert 会与 bundle 层重复 → `duplicate loader entry id` 启动失败（2026-09-02 实踩）；npm 首发的 latest 指向该版本且不可移除 dist-tag（平台硬性行为）；坏版本 deprecate（不 unpublish）；版本线由 owner 决定；已发布版本元数据错误只能升补丁版修正并诚实记录
 * **官方版本跟随（2026-09-02 定）**：日常跟随官方 alpha 线（dev 即 alpha 轨；alpha/beta 走 next、rc/稳定走 latest）；**不回头适配 rc.2**（官方已断代弃线）；官方每发新版本做一次对齐/适配，版本级影响预判记 `docs/upstream/`（当前：0.1.3 SessionHandle 变更，见该目录）；**dsh 升级 = 正式适配任务**（先看官方 release note 与社区迁移地图 → 影响清单 → bump 依赖 → typecheck → 修 → verify → 发新版），launcher 的 Update dsh 不随手点、checkout 不随手 pull
-* **流程**：改动 push dev + 插件 verify → 版本号 + CHANGELOG 双份 → 再 verify + `git diff --check` → 合并 dev→main（fast-forward）并 push → `git tag -a <插件名>-vX.Y.Z -F <说明文件>`（必须 -a；说明用 `node scripts/tag-notes.mjs <插件名> <版本号>` 生成——拼接两份 CHANGELOG 当前版本条目，英文在上、中文在下，GitHub tag 页完整展示；Windows 先输出到文件再 `-F`）→ push tag 自动发布（解析插件、校验 tag==package.json version、verify、`npm publish --access public --provenance --tag next|latest`）→ `gh run watch` 盯 success + `npm view` 复核版本与 dist-tag → 切回 dev。**版本号编辑含根 package.json `version` 同步**（合集对齐版本线，README 版本徽章 `github/package-json/v` 的源；各插件 package.json 各自对齐官方版本线；根 README 环境要求的 DSH 版本行同步）
+* **流程**：改动 push dev + 插件 verify → 版本号 + CHANGELOG 双份 → 再 verify + `git diff --check` → 合并 dev→main（fast-forward）并 push → `git tag -a <插件名>-vX.Y.Z -F <说明文件>`（必须 -a；说明用 `node scripts/tag-notes.mjs <插件名> <版本号>` 生成——拼接两份 CHANGELOG 当前版本条目，英文在上、中文在下，GitHub tag 页完整展示；Windows 先输出到文件再 `-F`）→ push tag 自动发布（解析插件、校验 tag==package.json version、verify、`npm publish --access public --provenance --tag next|latest`）→ `gh run watch` 盯 success + `npm view` 复核版本与 dist-tag → 切回 dev。**版本号编辑含根 package.json `version` 同步**（README 版本徽章 `github/package-json/v` 的源——跟随最新发布的插件版本，见「版本策略」；各插件 package.json 各自对齐官方版本线；根 README 环境要求的 DSH 版本行同步）
 * **tag 兜底**：push tag 后 30 秒内无对应 Publish run，改 `gh workflow run publish.yml -f plugin=<插件名>` 手动派发（发布内容与 tag 触发完全一致；本仓库不建 GitHub Release，版本说明看 tag 页与 CHANGELOG）。**时序经验（2026-09-05 实测）**：main 快进合并后约 90 秒内推的 6 个 tag 全部未触发（runs API 零注册；同一批模式 9/2 alpha 与当日稍后测试 tag 均正常触发，机制本身无碍——疑 GitHub 在默认分支刚更新的窗口内丢弃 tag 事件）→ 发布时先等 main 的 CI run 注册（约 2-5 分钟）再推 tag；版本不匹配的 tag 会触发 run 但在版本校验步骤失败退出，零误发风险（`dsh-nav-pin-v0.0.0` 测试 tag 已验证，测毕已删）
 * **红线**：已发布版本/tag 不可覆盖、不可挪动，同版本重发 E403；错误只能发新版本 + deprecate 坏版本；tag 版本必须等于 package.json version；`secrets` 不能出现在 step 的 `if`（经 job 级 env 中转）；`--provenance` 要求各插件 package.json 声明 repository
 * **发布后收尾（OIDC 配置，每个包各配一次）**：包 Settings → Access → Trusted Publishing → Add Trusted Publisher → GitHub Actions，填四项——Organization `peiyucn`、Repository `dsh-sparrow`、Workflow `publish.yml`（**只填文件名**）、Environment `npm-publish`（**必须**与 publish job 的 environment 一致，不填/填错 OIDC 校验失败）；Allowed actions 勾 `Allow npm publish`（不勾 stage publish）。配置完成后删 `NPM_TOKEN` secret，并在 npmjs Access Tokens 页 revoke 旧 token（聊天贴过的一律视为已暴露）——后续发布零密钥。**新包首发例外**：包尚不存在时 OIDC 无法预配——首发走 Automation token（临时放 `npm-publish` 环境 secret，发完即配 OIDC 并删 token），或由 owner 本机首发后立即补配

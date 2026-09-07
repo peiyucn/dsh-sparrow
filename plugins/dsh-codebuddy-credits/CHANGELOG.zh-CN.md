@@ -3,6 +3,11 @@
 所有用户可感知的改动都记录在此。
 See [English](./CHANGELOG.md).
 
+## 0.1.2-rc.1.1（2026-09-07）
+
+- **Max 模式**（推理档位锁，CodeBuddy 客户端同款开关）：额度卡面板内（模型卡上方）新增开关——开启后本 provider 的所有推理模型强制走 Max 档位；模型选择器的档位列表 Max 置顶高亮、其余档位在锁定期间置灰不可调，关闭后恢复
+- 本 provider 之外的模型（官方 DeepSeek 等）不受锁定影响
+
 ## 0.1.2-rc.1（2026-09-05）
 
 - 首发：公司 CodeBuddy 额度接成 DSH 的 LLM provider——仅官方 API Key、仅流式
