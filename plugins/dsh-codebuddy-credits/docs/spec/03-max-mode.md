@@ -22,8 +22,12 @@ CodeBuddy 客户端把「Max 模式」做成模型列表顶部的全局开关，
 
 Max 模式**不是新增档位**，是对整个推理档位面板的锁定态：
 
+- **作用域 = codebuddy-credits 域内**：锁只对本插件 provider 的 reasoning
+  模型生效；其他 provider（官方 DeepSeek 等）的请求不走本插件适配器，
+  选择器面板与请求一律不呈现/不施加锁定态（自建选择器遮蔽的是全
+  provider 槽位，必须显式判 provider，否则 UI 与实际行为脱节）
 - 目录保持诚实：不改 `declaredEfforts` 的映射，不给模型编造 max 档
-- 锁是请求层 + UI 层的覆盖：锁定期所有 reasoning 模型请求强制发
+- 锁是请求层 + UI 层的覆盖：锁定期域内所有 reasoning 模型请求强制发
   `reasoning_effort:"max"`；选择器档位面板呈现锁定态
 - **用户的逐模型档位偏好保留不覆盖**：锁只是暂时忽略，解锁后原样恢复
   （不出现「锁一次 max 把所有档位记忆洗成 max」）
@@ -35,9 +39,10 @@ maxMode = off（默认）
   → 一切照旧：每模型按其声明档位 + 用户记忆的档位偏好发请求
 
 maxMode = on
-  → 请求层：所有 supportsReasoning 模型强制 reasoning_effort="max"
+  → 请求层：域内所有 supportsReasoning 模型强制 reasoning_effort="max"
     （无白名单、无豁免——hy4-preview 实测接受 max，见上）
-  → 非 reasoning 模型：天然不受影响（本来就不发该参数）
+  → 域内非 reasoning 模型：天然不受影响（本来就不发该参数）
+  → 域外 provider：完全不受影响（请求与面板都不碰）
   → 选择器档位面板：Max 置顶高亮为当前生效档，其余档位（含 Off）全部
     置灰不可选；面板内提示「已被 Max 模式锁定，在额度卡关闭后可调」
   → 逐模型档位记忆：忽略但不清除

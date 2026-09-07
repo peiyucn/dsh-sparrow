@@ -176,8 +176,12 @@ export function CodeBuddyModelSelect(
     : choices.findIndex(c => c.selection.provider === state.current?.provider && c.selection.model === state.current.model)
   const currentChoice = choices[selectedIndex]
   const reasoning = currentChoice?.model.reasoning
-  // 锁定期当前选中模型是否被锁接管：只对 reasoning 模型生效。
-  const lockedByMax = maxMode && reasoning !== undefined
+  // 锁定期当前选中模型是否被锁接管：只对 codebuddy-credits 域内的 reasoning
+  // 模型生效——选择器遮蔽的是全 provider 槽位，其他 provider（官方 DeepSeek
+  // 等）的请求不走本插件适配器，绝不能呈现锁定态（UI 与实际行为脱节）。
+  const lockedByMax = maxMode
+    && state.current?.provider === 'codebuddy-credits'
+    && reasoning !== undefined
   const effectiveEffort = lockedByMax ? 'max' : state.current?.reasoningEffort ?? reasoning?.defaultEffort
   const effortChoices: EffortChoice[] = reasoning === undefined
     ? []
