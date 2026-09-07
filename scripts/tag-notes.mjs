@@ -21,7 +21,10 @@ const read = (file) => readFileSync(join(root, 'plugins', plugin, file), 'utf8')
 
 const section = (text) => {
   const lines = text.split(/\r?\n/)
-  const i = lines.findIndex((l) => l.startsWith('## ' + version + ' '))
+  // 版本标题的日期分隔符中英文不一致（英文 "(2026-09-07)"、中文 "（2026-09-07）"），
+  // 按「## <version> 后任意空白 + 任意括号包裹的日期」匹配，两种括号都认。
+  const heading = new RegExp('^## ' + version.replaceAll('.', '\\.') + '\\s+[（(].*[）)]\\s*$')
+  const i = lines.findIndex((l) => heading.test(l))
   if (i < 0) return ''
   const out = []
   for (let j = i + 1; j < lines.length; j++) {
