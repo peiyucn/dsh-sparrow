@@ -19,6 +19,7 @@ import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
   IconWarningOutline16, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { getMaxMode, subscribeMaxMode } from './maxMode.js'
 
 /**
  * 展示名拆分：与 host 侧 catalog.splitDisplayName 同规则（两空格是系数
@@ -158,6 +159,11 @@ export function CodeBuddyModelSelect(
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
 
+  // Max 模式（推理档位锁）：锁开时档位面板呈现锁定态（Max 置顶、其余置灰），
+  // 触发器档位显示 Max。锁只影响展示与请求（host 侧强制 max），用户逐模型
+  // 档位偏好保留不覆盖，解锁后原样恢复。
+  const maxMode = useSyncExternalStore(subscribeMaxMode, getMaxMode)
+
   const choices = useMemo(() => state.groups.flatMap(group =>
     group.models.map(model => ({
       group,
@@ -170,7 +176,9 @@ export function CodeBuddyModelSelect(
     : choices.findIndex(c => c.selection.provider === state.current?.provider && c.selection.model === state.current.model)
   const currentChoice = choices[selectedIndex]
   const reasoning = currentChoice?.model.reasoning
-  const effectiveEffort = state.current?.reasoningEffort ?? reasoning?.defaultEffort
+  // 锁定期当前选中模型是否被锁接管：只对 reasoning 模型生效。
+  const lockedByMax = maxMode && reasoning !== undefined
+  const effectiveEffort = lockedByMax ? 'max' : state.current?.reasoningEffort ?? reasoning?.defaultEffort
   const effortChoices: EffortChoice[] = reasoning === undefined
     ? []
     : [
@@ -283,11 +291,13 @@ export function CodeBuddyModelSelect(
       ?? (state.current === null ? t('picker.trigger.fallback') : state.current.provider + '/' + state.current.model)
   const effortLabel = reasoning === undefined
     ? undefined
-    : effectiveEffort === undefined
-      ? undefined
-      : effortChoices.find(level => level.effort === effectiveEffort)?.label
-        ?? reasoning.efforts.find(level => level.id === effectiveEffort)?.name
-        ?? effectiveEffort
+    : lockedByMax
+      ? t('picker.effort.max')
+      : effectiveEffort === undefined
+        ? undefined
+        : effortChoices.find(level => level.effort === effectiveEffort)?.label
+          ?? reasoning.efforts.find(level => level.id === effectiveEffort)?.name
+          ?? effectiveEffort
   const triggerLabel = effortLabel === undefined ? modelLabel : modelLabel + ' · ' + effortLabel
   const triggerAria = waiting
     ? t('picker.trigger.loading')
@@ -423,27 +433,60 @@ export function CodeBuddyModelSelect(
                   <button type="button" className="ccb-model-retry" onClick={reload}>{t('picker.action.reload')}</button>
                 </div>
               )}
-              {effortChoices.length === 0
-                ? <div className="ccb-model-empty">{t('picker.empty.efforts')}</div>
-                : effortChoices.map(level => (
-                  <button
-                    ref={itemRef()}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={effectiveEffort === level.effort}
-                    className={clsx('ccb-model-option', effectiveEffort === level.effort && 'ccb-model-selected')}
-                    key={level.key}
-                    disabled={busy}
-                    onClick={() => { chooseEffort(level.effort) }}
-                  >
-                    <span className="ccb-model-optionCopy">
-                      <span className="ccb-model-name">{level.label}</span>
-                    </span>
-                    <span className="ccb-model-check">
-                      {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
-                    </span>
-                  </button>
-                ))}
+              {lockedByMax
+                ? (
+                  <>
+                    {/* Max 锁定态：Max 置顶高亮（声明了 max 的模型与原列表去重），
+                        其余档位全部置灰；底部提示解锁入口在额度卡。 */}
+                    {[
+                      { key: 'effort:max', label: t('picker.effort.max') },
+                      ...effortChoices.filter(level => level.key !== 'effort:max'),
+                    ].map(level => {
+                      const isMax = level.key === 'effort:max'
+                      return (
+                        <button
+                          ref={itemRef()}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={isMax}
+                          className={clsx('ccb-model-option', isMax && 'ccb-model-selected')}
+                          key={level.key}
+                          disabled
+                          title={isMax ? undefined : t('picker.max.lockedHint')}
+                        >
+                          <span className="ccb-model-optionCopy">
+                            <span className="ccb-model-name">{level.label}</span>
+                          </span>
+                          <span className="ccb-model-check">
+                            {isMax ? <IconCheckOutline16 /> : null}
+                          </span>
+                        </button>
+                      )
+                    })}
+                    <div className="ccb-model-empty">{t('picker.max.locked')}</div>
+                  </>
+                )
+                : effortChoices.length === 0
+                  ? <div className="ccb-model-empty">{t('picker.empty.efforts')}</div>
+                  : effortChoices.map(level => (
+                    <button
+                      ref={itemRef()}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={effectiveEffort === level.effort}
+                      className={clsx('ccb-model-option', effectiveEffort === level.effort && 'ccb-model-selected')}
+                      key={level.key}
+                      disabled={busy}
+                      onClick={() => { chooseEffort(level.effort) }}
+                    >
+                      <span className="ccb-model-optionCopy">
+                        <span className="ccb-model-name">{level.label}</span>
+                      </span>
+                      <span className="ccb-model-check">
+                        {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
+                      </span>
+                    </button>
+                  ))}
             </>
           )}
         </div>

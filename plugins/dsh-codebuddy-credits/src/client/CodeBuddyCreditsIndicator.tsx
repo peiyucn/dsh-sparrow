@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
+import { setMaxMode, subscribeMaxMode, getMaxMode, syncMaxMode } from './maxMode.js'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const QUOTA_URL = '/api/codebuddy-credits/quota'
@@ -57,6 +58,8 @@ interface StatusPayload {
   keyConfigured: boolean
   account?: { enterpriseName?: string; accountType?: string; enterpriseUserName?: string; nickname?: string }
   models: ModelFactView[]
+  /** Max 模式（推理档位锁）状态（2026-09-07 起随状态接口下发）。 */
+  maxMode?: boolean
 }
 
 interface ModelSelection {
@@ -261,6 +264,8 @@ export function CodeBuddyCreditsIndicator({
       const payload = await response.json() as StatusPayload
       cachedStatus = payload
       setStatus(payload)
+      // Max 模式状态随 /status 同步进共享 store（选择器档位面板同源读取）。
+      if (payload.maxMode !== undefined) syncMaxMode(payload.maxMode)
     } catch {
       if (seq !== statusSeq.current) return
       setLoadError(t('indicator.loadFailed'))
@@ -380,6 +385,20 @@ export function CodeBuddyCreditsIndicator({
         ? ' · ' + account.nickname
         : '')
     : account?.nickname
+
+  // Max 模式（推理档位锁）开关：共享 store 同源（选择器锁定态即时联动）；
+  // 写入乐观更新，失败回滚并短暂提示。
+  const maxMode = useSyncExternalStore(subscribeMaxMode, getMaxMode)
+  const [maxBusy, setMaxBusy] = useState(false)
+  const [maxError, setMaxError] = useState<string | undefined>(undefined)
+  const toggleMaxMode = useCallback(() => {
+    if (maxBusy) return
+    setMaxBusy(true)
+    setMaxError(undefined)
+    void setMaxMode(!maxMode)
+      .catch(() => { setMaxError(t('indicator.max.failed')) })
+      .finally(() => { setMaxBusy(false) })
+  }, [maxBusy, maxMode, t])
 
   const ratio = quota !== undefined && quota.limit > 0
     ? Math.min(1, Math.max(0, quota.used / quota.limit))
@@ -575,6 +594,35 @@ export function CodeBuddyCreditsIndicator({
             {loadError !== undefined
               ? <div style={dangerStyle}>{loadError}</div>
               : null}
+            {/* Max 模式（推理档位锁）：模型卡上方、分割线下独立一行——
+                标签 + 档位开关；锁开后所有推理模型请求强制 max 档。 */}
+            {status?.keyConfigured === true
+              ? (
+                <>
+                  <div style={dividerStyle} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                    <span style={{ fontSize: '12px', lineHeight: '18px', fontWeight: 500, color: 'var(--dsw-alias-label-primary)' }}>
+                      {t('indicator.max.title')}
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={maxMode}
+                      aria-label={t('indicator.max.title')}
+                      title={t('indicator.max.hint')}
+                      disabled={maxBusy}
+                      onClick={toggleMaxMode}
+                      className={maxMode ? 'ccb-max-switch ccb-max-switch-on' : 'ccb-max-switch'}
+                    >
+                      <span className="ccb-max-knob" />
+                    </button>
+                  </div>
+                  {maxError !== undefined
+                    ? <div style={dangerStyle}>{maxError}</div>
+                    : null}
+                </>
+              )
+              : null}
             {model !== undefined
               ? (
                 <>
@@ -680,6 +728,13 @@ export function ensureIndicatorStyles(): void {
     // 浅色 deepseek-400 #679EFE / 深色 deepseek-500 #4176E6，官方 alias
     // 随主题自动切换，无需自写深色标记覆盖）。
     '.ccb-quota-fill { background: var(--dsw-alias-button-info-hover); }',
+    // Max 模式档位开关：轨道 28×16 + 12px 圆钮；开启色同进度条填充。
+    '.ccb-max-switch { position: relative; flex: 0 0 auto; width: 28px; height: 16px; padding: 0; border: none; border-radius: 8px; background: var(--dsw-alias-interactive-bg-hover); cursor: pointer; transition: background 120ms ease; }',
+    '.ccb-max-switch:disabled { cursor: default; opacity: 0.6; }',
+    '.ccb-max-switch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-border-l3); }',
+    '.ccb-max-switch-on { background: var(--dsw-alias-button-info-hover); }',
+    '.ccb-max-knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--dsw-alias-label-primary, #fff); transition: transform 120ms ease; }',
+    '.ccb-max-switch-on .ccb-max-knob { transform: translateX(12px); }',
   ].join('\n')
   document.head.append(style)
 }

@@ -82,6 +82,12 @@ const LOCALE_DICTS = {
     'picker.warning.groupLoad': '{name} 加载失败：{message}',
     'picker.empty.models': '没有可用的模型。',
     'picker.empty.efforts': '当前模型未提供推理等级。',
+    'picker.effort.max': 'Max',
+    'picker.max.locked': '已被 Max 模式锁定 — 在额度卡关闭后可调',
+    'picker.max.lockedHint': 'Max 模式锁定中',
+    'indicator.max.title': 'Max 模式',
+    'indicator.max.hint': '开启后所有推理模型强制使用 Max 档位（CodeBuddy 客户端同款）',
+    'indicator.max.failed': 'Max 模式切换失败，请重试',
   },
   en: {
     'key.label': 'API key',
@@ -137,6 +143,12 @@ const LOCALE_DICTS = {
     'picker.warning.groupLoad': '{name} failed to load: {message}',
     'picker.empty.models': 'No models available.',
     'picker.empty.efforts': 'This model provides no reasoning effort levels.',
+    'picker.effort.max': 'Max',
+    'picker.max.locked': 'Locked by Max mode — turn it off in the credits card to adjust',
+    'picker.max.lockedHint': 'Locked by Max mode',
+    'indicator.max.title': 'Max mode',
+    'indicator.max.hint': 'Force all reasoning models to the Max effort level (same as the CodeBuddy client)',
+    'indicator.max.failed': 'Failed to toggle Max mode, please retry',
   },
 } as const
 
