@@ -182,6 +182,7 @@ export function apply(ctx: Context, config: Config): void {
     resolveApiKey,
     account: () => account,
     streamIdleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,
+    maxMode: () => current().maxMode === true,
     onUsage: (usage) => {
       const tagged = usage.signal === undefined ? undefined : requestTurns.get(usage.signal)
       // signal 只在关联轮次时用一次：不随条目滞留（AbortSignal 引用会钉住请求的
@@ -449,6 +450,14 @@ export function apply(ctx: Context, config: Config): void {
     },
     active: () => registered,
     models: () => models(),
+    maxMode: () => current().maxMode === true,
+    async setMaxMode(enabled) {
+      const settings = ctx.get('settings')
+      if (settings === undefined) {
+        throw new LlmError(`${name}: 本组合没有设置服务，无法保存 Max 模式`, 'NO_SETTINGS_STORE')
+      }
+      await settings.mutate(NS, [{ op: 'set', path: ['maxMode'], value: enabled }])
+    },
   })
 
   ctx.inject(['settings'], (settingsCtx) => {

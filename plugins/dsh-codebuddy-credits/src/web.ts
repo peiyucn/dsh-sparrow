@@ -65,6 +65,10 @@ export interface CodeBuddyCreditsShared {
   ensureModels(): Promise<void>
   /** 当前生效模型事实（进程内，Key 驱动的目录）。 */
   models(): readonly CodeBuddyModelFacts[]
+  /** Max 模式（推理档位锁）当前状态（设置节）。 */
+  maxMode(): boolean
+  /** 设置 Max 模式（写设置节；client 额度卡开关用）。 */
+  setMaxMode(enabled: boolean): Promise<void>
 }
 
 /** usage 记账条目的最小面（turnUsageOf 的输入）。 */
@@ -186,7 +190,18 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
               active: shared.active(),
               account: shared.account(),
               models: shared.models().map(model => toModelFactView(model)),
+              maxMode: shared.maxMode(),
             })
+            return
+          }
+          if (req.method === 'POST' && pathname === PREFIX + '/max-mode') {
+            const body = await readBody(req)
+            if (typeof body.enabled !== 'boolean') {
+              sendJson(res, 400, { error: 'enabled 必须是布尔值' })
+              return
+            }
+            await shared.setMaxMode(body.enabled)
+            sendJson(res, 200, { ok: true, maxMode: shared.maxMode() })
             return
           }
           if (req.method === 'POST' && pathname === PREFIX + '/quota') {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { CodeBuddyAdapter, mapFinish, mapUsage, parseSseLine, toWireMessages, toWireTools } from '../lib/adapter.js'
+import { CodeBuddyAdapter, effectiveReasoningEffort, mapFinish, mapUsage, parseSseLine, toWireMessages, toWireTools } from '../lib/adapter.js'
 
 describe('toWireTools', () => {
   it('DSH 工具 schema 包成 OpenAI function 信封（name/description/parameters 原位）', () => {
@@ -187,6 +187,82 @@ describe('CodeBuddyAdapter.stream', () => {
     assert.equal(usages[0].credit, 0.01)
     assert.equal(usages[0].sessionId, 's1')
     assert.equal(chunks.filter(c => c.type === 'usage').length, 1)
+  })
+})
+
+describe('effectiveReasoningEffort（Max 模式档位锁）', () => {
+  it('锁开 + 推理模型 → 强制 max（覆盖调用方档位）', () => {
+    assert.equal(effectiveReasoningEffort(true, true, 'low'), 'max')
+    assert.equal(effectiveReasoningEffort(true, true, undefined), 'max')
+    assert.equal(effectiveReasoningEffort(true, true, 'high'), 'max')
+  })
+
+  it('锁开 + 非推理模型 → 不发参数（锁对无推理能力模型无影响）', () => {
+    assert.equal(effectiveReasoningEffort(true, false, 'low'), 'low')
+    assert.equal(effectiveReasoningEffort(true, false, undefined), undefined)
+  })
+
+  it('锁关 → 透传调用方档位', () => {
+    assert.equal(effectiveReasoningEffort(false, true, 'low'), 'low')
+    assert.equal(effectiveReasoningEffort(false, true, 'high'), 'high')
+    assert.equal(effectiveReasoningEffort(false, true, undefined), undefined)
+    assert.equal(effectiveReasoningEffort(false, false, undefined), undefined)
+  })
+})
+
+describe('CodeBuddyAdapter Max 模式请求构造', () => {
+  const sse = [
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: 'ok' } }] }) + '\n\n',
+    'data: ' + JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1 } }) + '\n\n',
+    'data: [DONE]\n\n',
+  ].join('')
+
+  async function captureBody({ maxMode, modelReasoning, effort }) {
+    let requestBody
+    globalThis.fetch = async (url, init) => {
+      requestBody = JSON.parse(init.body)
+      return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    }
+    const adapter = new CodeBuddyAdapter({
+      models: () => [{
+        id: 'm1', name: 'M1', contextWindow: 1000, maxTokens: 100,
+        input: ['text'], reasoning: modelReasoning,
+      }],
+      resolveApiKey: async () => 'test-key',
+      account: () => undefined,
+      streamIdleTimeoutMs: 10_000,
+      maxMode: () => maxMode,
+    })
+    try {
+      for await (const chunk of adapter.stream({
+        provider: 'codebuddy-credits',
+        model: 'm1',
+        messages: [],
+        ...(effort === undefined ? {} : { reasoningEffort: effort }),
+      })) {
+        void chunk
+      }
+    } finally {
+      globalThis.fetch = undefined
+    }
+    return requestBody
+  }
+
+  it('锁开 + 推理模型：请求体 reasoning_effort 强制 max（覆盖 low）', async () => {
+    const body = await captureBody({ maxMode: true, modelReasoning: true, effort: 'low' })
+    assert.equal(body.reasoning_effort, 'max')
+  })
+
+  it('锁开 + 非推理模型：不带 reasoning_effort', async () => {
+    const body = await captureBody({ maxMode: true, modelReasoning: false, effort: undefined })
+    assert.equal('reasoning_effort' in body, false)
+  })
+
+  it('锁关：透传调用方档位；未给档位不带参数', async () => {
+    const body = await captureBody({ maxMode: false, modelReasoning: true, effort: 'high' })
+    assert.equal(body.reasoning_effort, 'high')
+    const bare = await captureBody({ maxMode: false, modelReasoning: true, effort: undefined })
+    assert.equal('reasoning_effort' in bare, false)
   })
 })
 

@@ -14,10 +14,18 @@ import { API_KEY_ENV, LEGACY_API_KEY_ENV } from './constants.js'
 export interface Config {
   /** 凭据引用（环境变量名），默认 CODEBUDDY_CREDITS_API_KEY。 */
   apiKeyEnv?: string
+  /**
+   * Max 模式（推理档位锁）：开启后所有 reasoning 模型的请求强制发
+   * reasoning_effort:"max"（CodeBuddy 服务端宽容接受未声明的 max，已实测
+   * v4-flash / glm-5.3-flash / hy4-preview 全部 200 生效）；选择器档位面板
+   * 呈现锁定态。逐模型档位偏好保留不覆盖，关闭后原样恢复。
+   */
+  maxMode?: boolean
 }
 
 export const Config: z<Config> = z.object({
   apiKeyEnv: z.string().role('credential-ref').default(API_KEY_ENV),
+  maxMode: z.boolean().default(false),
 })
 
 /**

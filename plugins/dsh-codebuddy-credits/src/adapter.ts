@@ -63,6 +63,8 @@ export interface CodeBuddyAdapterOptions {
   onCatalogRead?: () => void
   /** 图片字节读取（官方附件 seam）；未配置时带图请求以明确错误失败。 */
   readImage?: CodeBuddyReadImage
+  /** Max 模式（推理档位锁）开关读取（设置节驱动，每次调用现读）。 */
+  maxMode?: () => boolean
 }
 
 interface WireToolCall {
@@ -177,6 +179,21 @@ export async function toWireMessages(
 /** 思考档位 → 线格式。wire 拼写按档位名直发（待公司网络实测确认）。 */
 function wireReasoningEffort(effort: GenerateOptions['reasoningEffort']): string | undefined {
   return effort === undefined ? undefined : String(effort)
+}
+
+/**
+ * Max 模式（推理档位锁）的最终生效档位（纯函数，供单测）：
+ * 锁开且模型有推理能力 → 强制 "max"（服务端宽容接受未声明的 max，2026-09-07
+ * 实测 v4-flash / glm-5.3-flash / hy4-preview 全部 200 且思考预算真实变大）；
+ * 锁关或模型无推理能力 → 走调用方档位（undefined = 不发参数，服务端按默认档）。
+ */
+export function effectiveReasoningEffort(
+  maxMode: boolean,
+  modelReasoning: boolean,
+  effort: GenerateOptions['reasoningEffort'],
+): string | undefined {
+  if (maxMode && modelReasoning) return 'max'
+  return wireReasoningEffort(effort)
 }
 
 /** 服务端 finish_reason → DSH 契约。 */
@@ -354,7 +371,13 @@ export class CodeBuddyAdapter extends LlmAdapter {
     if (options.temperature !== undefined) body.temperature = options.temperature
     if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens
     if (options.stop !== undefined && options.stop.length > 0) body.stop = options.stop
-    const effort = wireReasoningEffort(options.reasoningEffort)
+    // Max 模式（档位锁）：锁开且模型有推理能力时强制 max，覆盖调用方档位。
+    const facts = this.config.models().find(entry => entry.id === options.model)
+    const effort = effectiveReasoningEffort(
+      this.config.maxMode?.() ?? false,
+      facts?.reasoning === true,
+      options.reasoningEffort,
+    )
     if (effort !== undefined) body.reasoning_effort = effort
 
     const response = await fetch(BASE_URL + '/chat/completions', {
