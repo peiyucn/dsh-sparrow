@@ -24,6 +24,7 @@ import {
   type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar, type HeaderFactsStore, type SessionFacts,
   type SessionTreeHeader, type SessionTreeNode, type SubagentIdentityValue,
 } from './archive.js'
+import { assertHostCompatible } from './compat.js'
 
 export const name = 'dsh-archive-manage'
 export const inject = ['webServer', 'sessions', 'agents', 'workspaceRegistry', 'sessionPersistence', 'sessionQuery', 'storageDomain']
@@ -885,6 +886,9 @@ async function restoreTrashDir(ctx: Context, surface: RegistryMutationSurface, t
  * @param config - 插件配置（cordis.patch.yml 注入）。
  */
 export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {}): void {
+  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》，先于一切注册）：会话格式不认识就整个停用。
+  // 本插件按目录移动/删除会话文件——宁可停用，也不要在不认识的格式上执行不可逆操作。
+  assertHostCompatible(ctx, name)
   const settings = normalizeArchiveConfig(config)
   // 私有 seam 依赖：官方 WorkspaceRegistry 的 enqueueOperation/requireState/setState（AGENTS 三档特例，2026-09-01）。
   const surface = assertRegistryMutationApi(ctx.workspaceRegistry)
