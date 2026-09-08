@@ -16,6 +16,11 @@ import * as dshSessionSurface from '@deepseek-ai/dsh-session'
  */
 export const SUPPORTED_SESSION_FORMAT_VERSIONS: readonly number[] = [0]
 
+/** 面向日志/错误的统一停用前缀。 */
+function disabledLine(pluginName: string, reason: string): string {
+  return `${pluginName}: ${reason}；已停用插件以免影响 dsh（升级本插件或运行环境后自动恢复）`
+}
+
 /**
  * 宿主会话格式是否可安全处理；不可时返回可直接进日志的原因。
  * @param version - 宿主上报的 `SESSION_FORMAT_VERSION`（非数字等未知形状一律按不支持处理）。
@@ -29,17 +34,6 @@ export function unsupportedSessionFormatReason(
   if (typeof version === 'number' && supported.includes(version)) return undefined
   const shown = typeof version === 'number' ? `v${version}` : `未知（${String(version)}）`
   return `当前 dsh 的会话格式为 ${shown}，本插件仅支持 ${supported.map(value => `v${value}`).join(' / ')}`
-}
-
-/**
- * 宿主上报的会话格式版本。
- *
- * 用**命名空间访问**而非具名导入：官方若删除/改名该导出，这里只得到 `undefined`
- * （判定为「未知 → 不支持 → 自停用」），而不是 ESM 链接期失败——链接期失败发生在
- * 模块加载阶段，不在插件容器对 `apply` 的异常保护范围内。
- */
-export function hostSessionFormatVersion(): unknown {
-  return (dshSessionSurface as { readonly SESSION_FORMAT_VERSION?: unknown }).SESSION_FORMAT_VERSION
 }
 
 /**
@@ -77,6 +71,50 @@ export function assertStoredFormatSupported(pluginName: string, ...headers: read
 }
 
 /**
+ * 宿主上报的会话格式版本。
+ *
+ * 用**命名空间访问**而非具名导入：官方若删除/改名该导出，这里只得到 `undefined`
+ * （判定为「未知 → 不支持 → 自停用」），而不是 ESM 链接期失败——链接期失败发生在
+ * 模块加载阶段，不在插件容器对 `apply` 的异常保护范围内。
+ */
+export function hostSessionFormatVersion(): unknown {
+  return (dshSessionSurface as { readonly SESSION_FORMAT_VERSION?: unknown }).SESSION_FORMAT_VERSION
+}
+
+/** 一项宿主能力：`name` 进日志，`ok` 由调用方探测（服务/方法/导出是否存在）。 */
+export interface HostCapability {
+  readonly name: string
+  readonly ok: boolean
+}
+
+/**
+ * 缺失的能力名（纯逻辑，供单测）。
+ * @param capabilities - 本插件声明的宿主能力。
+ * @returns 未满足的能力名，按声明顺序。
+ */
+export function missingCapabilities(capabilities: readonly HostCapability[]): string[] {
+  return capabilities.filter(capability => !capability.ok).map(capability => capability.name)
+}
+
+/**
+ * 能力门：宿主缺少任一必需能力即抛错（自停用）。
+ * @param ctx - 插件上下文（只用到 logger）。
+ * @param pluginName - 插件名（日志与错误前缀）。
+ * @param capabilities - 本插件声明的宿主能力。
+ */
+export function assertCapabilities(
+  ctx: { logger: { warn(message: string): void } },
+  pluginName: string,
+  capabilities: readonly HostCapability[],
+): void {
+  const missing = missingCapabilities(capabilities)
+  if (missing.length === 0) return
+  const reason = `缺少本插件依赖的 ${missing.join('、')}`
+  ctx.logger.warn(disabledLine(pluginName, reason))
+  throw new Error(`${pluginName}: ${reason}`)
+}
+
+/**
  * 启动自检：宿主不兼容即停用本插件（抛错）。
  *
  * cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响
@@ -93,6 +131,6 @@ export function assertHostCompatible(
 ): void {
   const reason = unsupportedSessionFormatReason(version)
   if (reason === undefined) return
-  ctx.logger.warn(`${pluginName}: ${reason}；已停用插件以免影响 dsh（升级本插件后自动恢复）`)
+  ctx.logger.warn(disabledLine(pluginName, reason))
   throw new Error(`${pluginName}: ${reason}`)
 }

@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  assertHostCompatible, assertStoredFormatSupported, hostSessionFormatVersion,
-  SUPPORTED_SESSION_FORMAT_VERSIONS, unsupportedSessionFormatReason, unsupportedStoredFormatReason,
+  assertCapabilities, assertHostCompatible, assertStoredFormatSupported, hostSessionFormatVersion,
+  missingCapabilities, SUPPORTED_SESSION_FORMAT_VERSIONS, unsupportedSessionFormatReason, unsupportedStoredFormatReason,
 } from '../lib/compat.js'
 
 // 根 AGENTS《插件与宿主兼容》：宿主契约不认识时插件必须自停用（抛错 → cordis 标 inactive），
 // 而不是带病运行。本文件覆盖纯判定与接线；容器行为由 cordis 保证（lib/index.js:1350-1362）。
-describe('compat 宿主兼容自检', () => {
+describe('compat 宿主兼容自检（会话版）', () => {
   const fakeCtx = () => {
     const warns = []
     return { ctx: { logger: { warn: (message) => { warns.push(message) } } }, warns }
@@ -79,6 +79,27 @@ describe('compat 宿主兼容自检', () => {
       assert.doesNotThrow(() => { assertStoredFormatSupported('dsh-x') })
       assert.doesNotThrow(() => { assertStoredFormatSupported('dsh-x', { version: 0 }) })
       assert.throws(() => { assertStoredFormatSupported('dsh-x', { version: 3 }) }, /已拒绝本次操作/u)
+    })
+  })
+
+  describe('能力门（宿主能力面）', () => {
+    it('missingCapabilities 应该 按声明顺序返回未满足项', () => {
+      assert.deepEqual(missingCapabilities([
+        { name: 'a', ok: true }, { name: 'b', ok: false }, { name: 'c', ok: false },
+      ]), ['b', 'c'])
+    })
+
+    it('能力齐备 应该 不抛不告警', () => {
+      const { ctx, warns } = fakeCtx()
+      assert.doesNotThrow(() => { assertCapabilities(ctx, 'dsh-x', [{ name: 'llm', ok: true }]) })
+      assert.equal(warns.length, 0)
+    })
+
+    it('能力缺失 应该 告警并抛错（停用）', () => {
+      const { ctx, warns } = fakeCtx()
+      assert.throws(() => { assertCapabilities(ctx, 'dsh-x', [{ name: 'llm.registerAdapter', ok: false }]) }, /llm\.registerAdapter/u)
+      assert.equal(warns.length, 1)
+      assert.match(warns[0], /已停用插件以免影响 dsh/u)
     })
   })
 })
