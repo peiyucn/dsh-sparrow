@@ -612,6 +612,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [straysOpen, setStraysOpen] = useState(true)
   const [trashOpen, setTrashOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  /** 已有数据时的后台刷新（写操作后 / 实时刷新事件）：列表保持挂载，只静默更新（防闪烁）。 */
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingConfirm | null>(null)
   const [copied, setCopied] = useState(false)
@@ -642,9 +644,14 @@ export function ArchiveDock(props: ArchiveDockProps) {
 
   // 刷新代际：快速开/关面板产生并发 refresh 时，只让最新一次的结果落地（陈旧列表竞态）。
   const refreshSeqRef = useRef(0)
+  /** 首屏是否已成功落过数据：决定刷新走「整页 loading」还是「静默更新」。 */
+  const loadedRef = useRef(false)
   const refresh = async (): Promise<void> => {
     const seq = ++refreshSeqRef.current
-    setLoading(true)
+    // 只有首屏（还没有任何数据）才占满内容区。写操作后的刷新改走 refreshing：
+    // 此前每次刷新都把 loading 置真 → 内容区被 loading 替换 → 卸载再挂载，看起来就是「闪一下」。
+    if (loadedRef.current) setRefreshing(true)
+    else setLoading(true)
     try {
       const [nextArchived, nextStrays, nextTrashItems, nextTrashDir] = await Promise.all([
         listArchived(),
@@ -661,12 +668,16 @@ export function ArchiveDock(props: ArchiveDockProps) {
       setArchivedLimit(ARCHIVE_PAGE_SIZE)
       setStraysLimit(ARCHIVE_PAGE_SIZE)
       setTrashLimit(ARCHIVE_PAGE_SIZE)
+      loadedRef.current = true
       setError(null)
     } catch (reason) {
       if (seq !== refreshSeqRef.current) return
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
-      if (seq === refreshSeqRef.current) setLoading(false)
+      if (seq === refreshSeqRef.current) {
+        setLoading(false)
+        setRefreshing(false)
+      }
     }
   }
 
@@ -730,7 +741,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
 
   /** 游离/孤儿会话归档：父+子树一并归档（可逆操作，无二次确认；spec 08）。 */
   const archiveStray = async (item: StraySessionItem): Promise<void> => {
-    if (loading || archivingId !== null) return
+    if (loading || refreshing || archivingId !== null) return
     setArchivingId(item.sessionId)
     try {
       await archiveSession(item.sessionId)
@@ -800,7 +811,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
           <button
             type="button"
             className="dsh-archive-btn"
-            disabled={loading || busy}
+            disabled={loading || refreshing || busy}
             onClick={() => { void archiveStray(item) }}
           >
             {busy ? t('confirm.archiving') : t('action.archive')}
@@ -808,7 +819,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
           <button
             type="button"
             className="dsh-archive-btn"
-            disabled={loading || busy || !item.backendSupported || locked}
+            disabled={loading || refreshing || busy || !item.backendSupported || locked}
             title={locked ? t('state.unreleasedActionHint') : undefined}
             onClick={() => { confirmTrashStray(item) }}
           >
@@ -817,7 +828,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
           <button
             type="button"
             className="dsh-archive-btn dsh-archive-btn-danger"
-            disabled={loading || busy || !item.backendSupported || locked}
+            disabled={loading || refreshing || busy || !item.backendSupported || locked}
             title={locked ? t('state.unreleasedActionHint') : undefined}
             onClick={() => { confirmDeleteStray(item) }}
           >
@@ -945,7 +956,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
               <button
                 type="button"
                 className="dsh-archive-btn"
-                disabled={loading}
+                disabled={loading || refreshing}
                 onClick={() => { confirmUnarchive(item) }}
               >
                 {t('action.unarchive')}
@@ -953,7 +964,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
               <button
                 type="button"
                 className="dsh-archive-btn"
-                disabled={loading || !item.backendSupported || locked}
+                disabled={loading || refreshing || !item.backendSupported || locked}
                 title={locked ? t('state.unreleasedActionHint') : undefined}
                 onClick={() => { confirmTrash(item) }}
               >
@@ -962,7 +973,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
               <button
                 type="button"
                 className="dsh-archive-btn dsh-archive-btn-danger"
-                disabled={loading || !item.backendSupported || locked}
+                disabled={loading || refreshing || !item.backendSupported || locked}
                 title={locked ? t('state.unreleasedActionHint') : undefined}
                 onClick={() => { confirmDelete(item) }}
               >
@@ -1057,7 +1068,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             <button
               type="button"
               className="dsh-archive-btn"
-              disabled={loading || item.legacy || restoringId !== null}
+              disabled={loading || refreshing || item.legacy || restoringId !== null}
               title={item.legacy ? t('legacy.restoreTitle') : undefined}
               onClick={() => {
                 if (restoringId !== null) return
@@ -1079,7 +1090,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             <button
               type="button"
               className="dsh-archive-btn dsh-archive-btn-danger"
-              disabled={loading || restoringId !== null}
+              disabled={loading || refreshing || restoringId !== null}
               onClick={() => { confirmDeleteTrashItem(item) }}
             >
               {t('action.deletePermanently')}
@@ -1193,7 +1204,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 <IconCloseOutline16 size={14} />
               </button>
             </div>
-            <div className="dsh-archive-panel-body" style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
+            <div className="dsh-archive-panel-body" aria-busy={refreshing} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
             {loading ? (
               <div className="dsh-archive-loading" role="status">
                 <span className="dsh-archive-spinner" aria-hidden />
@@ -1307,7 +1318,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       <button
                         type="button"
                         className="dsh-archive-btn"
-                        disabled={loading || restorableCount === 0 || restoringId !== null}
+                        disabled={loading || refreshing || restorableCount === 0 || restoringId !== null}
                         onClick={() => { confirmRestoreAll() }}
                       >
                         {t('action.restoreAll', { count: restorableCount })}
@@ -1315,7 +1326,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       <button
                         type="button"
                         className="dsh-archive-btn dsh-archive-btn-danger"
-                        disabled={loading || trashItems.length === 0 || restoringId !== null}
+                        disabled={loading || refreshing || trashItems.length === 0 || restoringId !== null}
                         onClick={() => { confirmDeleteAll() }}
                       >
                         {t('action.deleteAll')}
