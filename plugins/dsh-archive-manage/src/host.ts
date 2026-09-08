@@ -24,7 +24,7 @@ import {
   type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar, type HeaderFactsStore, type SessionFacts,
   type SessionTreeHeader, type SessionTreeNode, type SubagentIdentityValue,
 } from './archive.js'
-import { assertHostCompatible } from './compat.js'
+import { assertHostCompatible, unsupportedStoredFormatReason } from './compat.js'
 
 export const name = 'dsh-archive-manage'
 export const inject = ['webServer', 'sessions', 'agents', 'workspaceRegistry', 'sessionPersistence', 'sessionQuery', 'storageDomain']
@@ -713,6 +713,14 @@ interface SubagentTarget {
   readonly dir: string
 }
 
+/** 宿主真值格式门（请求期）：header 由宿主给出，不受「插件解析到旧版官方包」影响。
+ *  不支持即拒绝——本插件的操作会移动/删除会话目录，认错格式的代价是丢数据。 */
+function assertHeaderFormatSupported(header: SessionHeader): void {
+  const reason = unsupportedStoredFormatReason([header])
+  if (reason === undefined) return
+  throw new ArchiveError('BACKEND_UNSUPPORTED', `${reason}；已拒绝本次操作（升级本插件后自动恢复）`, 501)
+}
+
 /** 找出某个父会话下的全部 subagent 会话；任一会话仍被占用时不处理任何文件。
  *  spec 09 审计：headers 经 header 事实缓存取，与同请求的主 header 查表口径一致。 */
 async function listSubagentTargets(
@@ -725,6 +733,7 @@ async function listSubagentTargets(
   for (const header of headers) {
     if (header.origin !== 'subagent' || header.parentSession === undefined) continue
     if (String(header.parentSession) !== String(parentSessionId)) continue
+    assertHeaderFormatSupported(header)
     const sessionId = SessionId(String(header.id))
     if (ctx.sessions.get(sessionId) !== undefined || ctx.agents.get(sessionId) !== undefined) {
       throw new ArchiveError('SESSION_LIVE', `subagent 会话 ${String(sessionId)} 仍被 dsh 进程占用，不能与父会话一起处理`, 409)
@@ -1087,6 +1096,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           if (header === undefined) {
             throw new ArchiveError('UNKNOWN_SESSION', '会话持久化中没有这个会话', 404)
           }
+          // 宿主真值格式门（请求期，先于任何文件操作）。
+          assertHeaderFormatSupported(header)
           const title = await readTitle(ctx, header, header.id)
           const strayBlank = isStray && await readStrayBlankness(ctx, sessionId)
           if (pathname.endsWith('/delete')) {
