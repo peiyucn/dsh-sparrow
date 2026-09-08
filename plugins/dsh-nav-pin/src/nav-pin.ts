@@ -3,6 +3,16 @@
 /** 官方轮次导航 nav 的 aria-label 文案（zh / en 两套；官方改文案需同步更新，见插件 AGENTS.md）。 */
 export const NAV_ARIA_LABELS: readonly string[] = ['Turn navigation', '轮次导航']
 
+/**
+ * 本插件样式依赖的浏览器特性（宿主兼容自检用，见根 AGENTS《插件与宿主兼容》）：
+ * `:has()` 承载槽位定位选择器，container query 承载窄列浮现规则。
+ * 缺任一即注入无效规则——不如不注入并记一条日志。
+ */
+export const REQUIRED_CSS_FEATURES: readonly { readonly name: string; readonly probe: string }[] = [
+  { name: 'selector(:has())', probe: 'selector(div:has(> nav))' },
+  { name: 'container-type: inline-size', probe: 'container-type: inline-size' },
+]
+
 /** 「自动」档隐藏断点：对话列窄到多少 px 才默认隐藏轮次导航（官方为 900px，本插件提到 700px）。 */
 export const HOVER_HIDE_BREAKPOINT_PX = 700
 

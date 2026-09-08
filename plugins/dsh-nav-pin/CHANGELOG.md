@@ -2,6 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.2-rc.1.1 (2026-09-09)
+
+- If dsh is upgraded to a version this plugin does not support yet, the plugin now disables itself instead of running against an unknown contract (dsh and other plugins are unaffected).
+
 ## 0.1.2-rc.1 (2026-09-05)
 
 - Version-line alignment with official dsh 0.1.2-rc.1 (stability line).

@@ -6,7 +6,9 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { buildNavPinCss } from '../nav-pin.js'
+import { buildNavPinCss, REQUIRED_CSS_FEATURES } from '../nav-pin.js'
+import { assertCapabilities } from '../compat.js'
+import { name } from '../host.js'
 
 /** 客户端不依赖任何 cordis 服务（纯 DOM 样式注入）。 */
 export const inject: string[] = []
@@ -32,6 +34,18 @@ function ensureNavPinStyles(): HTMLStyleElement {
  * @param ctx - 浏览器侧 Cordis 上下文。
  */
 export function apply(ctx: Context): void {
+  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》）：样式依赖的浏览器特性缺失时
+  // 注入的是无效规则——按统一能力门自停用，而不是假装在工作。
+  assertCapabilities(ctx, name, REQUIRED_CSS_FEATURES.map(feature => ({
+    name: feature.name,
+    ok: typeof CSS !== 'undefined' && (() => {
+      try {
+        return CSS.supports(feature.probe)
+      } catch {
+        return false
+      }
+    })(),
+  })))
   const style = ensureNavPinStyles()
   ctx.effect(() => () => { style.remove() }, 'dsh-nav-pin: styles')
 }
