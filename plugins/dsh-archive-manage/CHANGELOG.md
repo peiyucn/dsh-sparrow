@@ -2,9 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.1.2-rc.1.1 (2026-09-05)
+## 0.1.2-rc.1.1 (2026-09-08)
 
 - The archive panel opens noticeably faster: subagent labels no longer re-read a session's whole log when the official projection cache has already settled them (previously every open re-folded the log for each subagent).
+- Subagent labels are no longer taken from an inherited ancestor descriptor (a forked child briefly showed the parent's label before writing its own).
 
 ## 0.1.2-rc.1 (2026-09-05)
 
