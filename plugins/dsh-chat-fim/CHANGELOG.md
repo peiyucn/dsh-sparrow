@@ -2,6 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.2-rc.1.1 (2026-09-08)
+
+- The suggestion ring now blurs together with the background when a dialog opens (it used to float above the mask).
+
 ## 0.1.2-rc.1 (2026-09-05)
 
 - Version-line alignment with official dsh 0.1.2-rc.1 (stability line).

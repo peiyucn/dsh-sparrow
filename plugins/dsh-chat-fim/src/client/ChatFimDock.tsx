@@ -375,9 +375,14 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   }
 }
 @property --dsh-chat-fim-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+/* 转动环：钉在 composer 上沿的装饰层。
+   z-index 必须**低于**遮罩层（官方 Modal/Settings 1000、归档面板与确认框 1000/1100）——
+   否则弹窗打开时环会浮在遮罩之上，不随背景一起虚化（2026-09-08 修）。
+   取值 900：仍高于普通内容与菜单层（官方 MenuView/PopupSelect 100、本插件菜单 100），
+   又低于一切遮罩，因此弹窗一出环即被 backdrop-filter 模糊。 */
 .dsh-chat-fim-ring {
   position: fixed;
-  z-index: 2000;
+  z-index: 900;
   pointer-events: none;
   box-sizing: border-box;
   padding: 2px;
