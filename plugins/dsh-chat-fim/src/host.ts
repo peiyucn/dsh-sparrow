@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
-import { assertHostCompatible } from './compat.js'
+import { assertHostCompatible, unsupportedStoredFormatReason } from './compat.js'
 import {
   buildFimPrompt, cleanSuggestion, currentMainRoute, detectDraftLanguage, extractSuggestions, extractUsage, speakerStopSequences,
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, isLanguageConsistent,
@@ -176,6 +176,12 @@ async function readBoundedText(response: Response, maxBytes: number): Promise<st
   return Buffer.concat(chunks.map(chunk => Buffer.from(chunk))).toString('utf8').slice(0, maxBytes)
 }
 
+/** 宿主真值格式门（请求期）：header 由宿主给出，不受「插件解析到旧版官方包」影响
+ *  （常量探针在 link:/peer 副本场景会读到旧值，故以宿主数据为准）。 */
+function hostFormatSupported(header: { readonly version?: unknown } | undefined): boolean {
+  return header !== undefined && unsupportedStoredFormatReason([header]) === undefined
+}
+
 /** 会话当前主模型：modelSelection 投影（选中即生效，不依赖历史事件）→ 最近请求事件
  *  → 共享默认模型；服务缺失（旧版 dsh）逐档 fail-soft。模型一换，开关状态立刻追平。 */
 function currentSessionModel(
@@ -237,6 +243,11 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
           })
           return
         }
+        // 宿主真值格式门（请求期）：header 由宿主给出，不受插件依赖副本影响。
+        if (!hostFormatSupported(session.header)) {
+          sendJson(res, 200, { supported: false })
+          return
+        }
         const main = currentSessionModel(ctx, session)
         sendJson(res, 200, { supported: isDeepseekMainRoute(main) })
         return
@@ -273,6 +284,14 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
         sendError(res, 404, {
           code: 'UNKNOWN_SESSION',
           message: '会话不存在或已不在当前进程：请刷新页面后重试',
+        })
+        return
+      }
+      // 宿主真值格式门（请求期）：事件语义不认识就不发上游请求。
+      if (!hostFormatSupported(session.header)) {
+        sendError(res, 501, {
+          code: 'UNSUPPORTED_HOST_FORMAT',
+          message: '当前 dsh 的会话格式与本插件不兼容，续写功能已停用（升级插件后自动恢复）',
         })
         return
       }

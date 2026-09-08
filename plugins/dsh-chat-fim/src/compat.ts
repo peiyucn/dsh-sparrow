@@ -43,6 +43,40 @@ export function hostSessionFormatVersion(): unknown {
 }
 
 /**
+ * 宿主**真值**格式门：宿主给出的会话 header 自带 `version`（由宿主的持久化层翻译后
+ * 给出），与「插件解析到哪份官方包」无关。
+ *
+ * 为什么需要它：插件里的 `import '@deepseek-ai/dsh-session'` 可能解析到**插件自己的**
+ * peer/开发依赖副本（`link:` 形态、或 npm 按 `^旧范围` 为插件补装的 peer），此时
+ * {@link hostSessionFormatVersion} 读到的是旧值，常量探针会误判为兼容。header 由宿主
+ * 产生，是唯一不受该问题影响的信号。
+ * @param headers - 宿主给出的会话 header（`sessionPersistence.list()` 结果或 live `session.header`）。
+ * @param supported - 本插件支持的版本集合（默认 {@link SUPPORTED_SESSION_FORMAT_VERSIONS}）。
+ * @returns 任一 header 版本不受支持时返回原因；全部支持（或列表为空）时 `undefined`。
+ */
+export function unsupportedStoredFormatReason(
+  headers: readonly { readonly version?: unknown }[],
+  supported: readonly number[] = SUPPORTED_SESSION_FORMAT_VERSIONS,
+): string | undefined {
+  for (const header of headers) {
+    const reason = unsupportedSessionFormatReason(header.version, supported)
+    if (reason !== undefined) return `${reason}（宿主会话 header）`
+  }
+  return undefined
+}
+
+/**
+ * 请求期宿主真值校验：宿主给出的 header 版本不受支持即抛错（拒绝本次操作，不静默继续）。
+ * @param pluginName - 错误前缀。
+ * @param headers - 本次操作涉及的会话 header。
+ */
+export function assertStoredFormatSupported(pluginName: string, ...headers: readonly { readonly version?: unknown }[]): void {
+  const reason = unsupportedStoredFormatReason(headers)
+  if (reason === undefined) return
+  throw new Error(`${pluginName}: ${reason}；已拒绝本次操作（升级本插件后自动恢复）`)
+}
+
+/**
  * 启动自检：宿主不兼容即停用本插件（抛错）。
  *
  * cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响
