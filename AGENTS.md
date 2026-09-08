@@ -70,7 +70,10 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 
 * **生命周期**：一切副作用在 `apply` 内注册并配 `ctx.effect` 清理；不泄漏定时器/watcher/监听
 
-* **宿主兼容自检（硬约束）**：`apply` 开头先跑 `assertHostCompatible(ctx, name)`（各插件 `src/compat.ts`）——能力探测 + 会话格式门（官方 `SESSION_FORMAT_VERSION` 必须落在插件声明的支持集合内），不通过即**抛错自停用**：cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响（已查证 cordis `lib/index.js:1350-1362`）。**用户只升级 dsh、不升级插件时，插件必须自己让位**（根 AGENTS《扩展与宿主兼容（fail-safe）》）。探针用**命名空间访问**读官方导出（导出消失/改名只得到 `undefined` → 判定不支持 → 自停用，不产生链接期失败）；判定逻辑纯函数化并补单测（含「不兼容 → 告警 + 抛错」接线用例）
+* **宿主兼容自检（硬约束，六个插件全有）**：`apply` 开头先跑本插件 `src/compat.ts` 的门，不通过即**抛错自停用**——cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响（已查证 cordis `lib/index.js:1350-1362`）。**用户只升级 dsh、不升级插件时，插件必须自己让位**（根 AGENTS《扩展与宿主兼容（fail-safe）》）。两档门：
+  1. **能力门**（全部插件）：`assertCapabilities(ctx, name, [{ name, ok }])`——宿主服务/方法/导出、以及运行环境特性（如 nav-pin 依赖的 `:has()` 与 container query）缺任一即停用；探针用**命名空间访问或惰性 import**（导出消失/改名只得到 `undefined` → 判不支持，不产生链接期失败）。
+  2. **会话格式门**（读会话数据的三个插件：archive / chat-fim / vision-bridge）：常量探针 `assertHostCompatible(ctx, name)`（官方 `SESSION_FORMAT_VERSION` 须在支持集合内）+ **宿主真值** `unsupportedStoredFormatReason(headers)`——常量探针在 `link:`/peer 副本场景会读到插件自己的旧版官方包，故以宿主给出的会话 `header.version` 为准（archive 在移动/删除前逐 header 校验，chat-fim/vision-bridge 在读取前校验）。
+  判定逻辑纯函数化并补单测（含「不兼容 → 告警 + 抛错」接线用例）；停用文案统一为「已停用插件以免影响 dsh（升级本插件或运行环境后自动恢复）」
 
 * **组合行**：`cordis.patch.yml` insert 按官方 bundle patch 规范——`id` 用短名（稳定供后续 patch 定位），`name` 用 scoped 包名（loader 按包名解析）
 
