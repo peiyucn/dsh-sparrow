@@ -24,6 +24,7 @@ import { CodeBuddyAdapter } from './adapter.js'
 import type { CodeBuddyUsage } from './adapter.js'
 import { discoverCodeBuddyModels, factsFromEntries, fetchCodeBuddyModels } from './catalog.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
+import { assertCapabilities } from './compat.js'
 import { Config, keyRefs } from './config.js'
 import {
   ACCOUNT_FETCH_TIMEOUT_MS,
@@ -55,6 +56,12 @@ export interface CodeBuddyAccount {
 }
 
 export function apply(ctx: Context, config: Config): void {
+  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》，先于一切注册）：本插件向 llm 注册
+  // 适配器路由并接管模型目录，宿主缺这些面即自停用，而不是带病注册半个 provider。
+  assertCapabilities(ctx, name, [
+    { name: 'llm.registerAdapter', ok: typeof (ctx.llm as { registerAdapter?: unknown } | undefined)?.registerAdapter === 'function' },
+    { name: 'llm.resolveModelInfo', ok: typeof (ctx.llm as { resolveModelInfo?: unknown } | undefined)?.resolveModelInfo === 'function' },
+  ])
   let current: () => Config = () => config
 
   /**
