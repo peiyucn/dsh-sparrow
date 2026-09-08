@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-settings'
-import { DeepSeekFileId, DeepSeekFilesClient, MAX_STORED_FILE_BYTES, MAX_STORED_FILE_COUNT } from '@deepseek-ai/dsh-llm-deepseek'
+import type { DeepSeekFileId, DeepSeekFilePage } from '@deepseek-ai/dsh-llm-deepseek'
 import { classifyUpstreamError, COUNT_PAGE_LIMIT, COUNT_PAGE_TIMEOUT_MS, decodeFileIdParam, formatBytes, MAX_COUNT_PAGES, normalizePageQuery, toFileRow } from './files.js'
 
 export const name = 'dsh-file-manage'
@@ -89,10 +89,48 @@ function sendUpstreamError(res: ServerResponse, error: unknown): void {
 }
 
 /**
+ * 官方 dsh-llm-deepseek 的运行时面（惰性 import）。
+ *
+ * 不用模块顶层具名导入：官方一旦删除/改名这些导出，具名导入会在**模块加载阶段**链接期失败，
+ * 而链接期失败不在插件容器对 `apply` 的异常保护范围内（根 AGENTS《扩展与宿主兼容》）。
+ * 惰性 + 能力检查把同一情形变成一次可读的启动自停用。
+ */
+interface DeepSeekSurface {
+  readonly DeepSeekFileId: (value: string) => DeepSeekFileId
+  readonly DeepSeekFilesClient: new (options: { baseURL: string; apiKey: string }) => {
+    list(options?: { after?: DeepSeekFileId; limit?: number; order?: 'asc' | 'desc'; signal?: AbortSignal }): Promise<DeepSeekFilePage>
+    delete(fileId: DeepSeekFileId, signal?: AbortSignal): Promise<void>
+  }
+  readonly MAX_STORED_FILE_BYTES: number
+  readonly MAX_STORED_FILE_COUNT: number
+}
+
+let officialSurface: DeepSeekSurface | undefined
+
+/** 读取（并缓存）官方导出面；缺任何一项即抛可读错误（启动期抛错 = 自停用）。 */
+async function deepSeekSurface(): Promise<DeepSeekSurface> {
+  if (officialSurface !== undefined) return officialSurface
+  const module = await import('@deepseek-ai/dsh-llm-deepseek') as unknown as Record<string, unknown>
+  const missing = (['DeepSeekFileId', 'DeepSeekFilesClient', 'MAX_STORED_FILE_BYTES', 'MAX_STORED_FILE_COUNT'] as const)
+    .filter(key => module[key] === undefined)
+  if (missing.length > 0) {
+    throw new FileManageError(
+      'UNSUPPORTED_HOST',
+      `当前 dsh 的 dsh-llm-deepseek 不再导出 ${missing.join('、')}；本插件已停用（升级本插件后自动恢复）`,
+      501,
+    )
+  }
+  officialSurface = module as unknown as DeepSeekSurface
+  return officialSurface
+}
+
+/**
  * host half 入口：注册 prefix 路由（list / 单条删除），全部副作用挂在 apply 的 effect 上。
  * @param ctx - DSH 插件上下文。
  */
-export function apply(ctx: Context): void {
+export async function apply(ctx: Context): Promise<void> {
+  // 宿主兼容自检（根 AGENTS《扩展与宿主兼容》，先于一切注册）：官方面缺失即自停用。
+  await deepSeekSurface()
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: PREFIX,
@@ -100,6 +138,7 @@ export function apply(ctx: Context): void {
       const url = new URL(req.url ?? '/', 'http://localhost')
       const pathname = url.pathname
       try {
+        const surface = await deepSeekSurface()
         if (req.method === 'GET' && pathname === `${PREFIX}/list`) {
           const query = normalizePageQuery({
             after: url.searchParams.get('after') ?? undefined,
@@ -107,9 +146,9 @@ export function apply(ctx: Context): void {
             order: url.searchParams.get('order') ?? undefined,
           })
           const connection = await resolveConnection(ctx)
-          const client = new DeepSeekFilesClient({ baseURL: connection.baseURL, apiKey: connection.apiKey })
+          const client = new surface.DeepSeekFilesClient({ baseURL: connection.baseURL, apiKey: connection.apiKey })
           const page = await client.list({
-            ...query.after === undefined ? {} : { after: DeepSeekFileId(query.after) },
+            ...query.after === undefined ? {} : { after: surface.DeepSeekFileId(query.after) },
             limit: query.limit,
             order: query.order,
             signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
@@ -124,7 +163,7 @@ export function apply(ctx: Context): void {
         if (req.method === 'GET' && pathname === `${PREFIX}/count`) {
           // 官方 list 无总数字段：翻到底累计（每页 1000，配额内最多 10 页，MAX_COUNT_PAGES 兜底）。
           const connection = await resolveConnection(ctx)
-          const client = new DeepSeekFilesClient({ baseURL: connection.baseURL, apiKey: connection.apiKey })
+          const client = new surface.DeepSeekFilesClient({ baseURL: connection.baseURL, apiKey: connection.apiKey })
           let count = 0
           let totalBytes = 0
           let after: DeepSeekFileId | undefined
@@ -146,9 +185,9 @@ export function apply(ctx: Context): void {
             count,
             totalBytes,
             totalBytesLabel: formatBytes(totalBytes),
-            quotaBytes: MAX_STORED_FILE_BYTES,
-            quotaBytesLabel: formatBytes(MAX_STORED_FILE_BYTES),
-            quotaCount: MAX_STORED_FILE_COUNT,
+            quotaBytes: surface.MAX_STORED_FILE_BYTES,
+            quotaBytesLabel: formatBytes(surface.MAX_STORED_FILE_BYTES),
+            quotaCount: surface.MAX_STORED_FILE_COUNT,
           })
           return
         }
@@ -159,8 +198,8 @@ export function apply(ctx: Context): void {
             return
           }
           const connection = await resolveConnection(ctx)
-          const client = new DeepSeekFilesClient({ baseURL: connection.baseURL, apiKey: connection.apiKey })
-          await client.delete(DeepSeekFileId(id), AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
+          const client = new surface.DeepSeekFilesClient({ baseURL: connection.baseURL, apiKey: connection.apiKey })
+          await client.delete(surface.DeepSeekFileId(id), AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
           sendJson(res, 200, { deleted: true, id })
           return
         }
