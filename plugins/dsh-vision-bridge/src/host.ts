@@ -17,7 +17,7 @@ import {
   normalizeVisionConfig, parseVisionReport, renderVisionReport, resolveVisionOutput, shouldClearInputModalities,
   visionCacheKey, visionModeForRoute, VisionCache, type VisionConfig, type VisionReport,
 } from './vision.js'
-import { assertHostCompatible } from './compat.js'
+import { assertHostCompatible, unsupportedStoredFormatReason } from './compat.js'
 
 export const name = 'dsh-vision-bridge'
 export const inject = ['llm', 'tools', 'attachments', 'webServer']
@@ -285,6 +285,11 @@ export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}
       const agent = exec.agent
       if (agent === undefined) {
         throw new Error('vision_read requires a calling agent (exec.agent was undefined)')
+      }
+      // 宿主真值格式门（请求期）：header 由宿主给出，不受插件依赖副本影响。
+      const storedReason = unsupportedStoredFormatReason([agent.session.header])
+      if (storedReason !== undefined) {
+        throw new Error(`vision_read: ${storedReason}；已拒绝本次读取（升级本插件后自动恢复）`)
       }
       const attachmentId = args.attachmentId as string
       const lookup = findImageReference(agent.session.snapshotEvents(), attachmentId)

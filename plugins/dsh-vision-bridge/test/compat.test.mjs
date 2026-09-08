@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { assertHostCompatible, hostSessionFormatVersion, SUPPORTED_SESSION_FORMAT_VERSIONS, unsupportedSessionFormatReason } from '../lib/compat.js'
+import {
+  assertHostCompatible, assertStoredFormatSupported, hostSessionFormatVersion,
+  SUPPORTED_SESSION_FORMAT_VERSIONS, unsupportedSessionFormatReason, unsupportedStoredFormatReason,
+} from '../lib/compat.js'
 
 // 根 AGENTS《插件与宿主兼容》：宿主契约不认识时插件必须自停用（抛错 → cordis 标 inactive），
 // 而不是带病运行。本文件覆盖纯判定与接线；容器行为由 cordis 保证（lib/index.js:1350-1362）。
@@ -49,5 +52,33 @@ describe('compat 宿主兼容自检', () => {
     assert.throws(() => { assertHostCompatible(ctx, 'dsh-x', 3) }, /dsh-x: .*v3/u)
     assert.equal(warns.length, 1)
     assert.match(warns[0], /已停用插件以免影响 dsh/u)
+  })
+
+  // 宿主真值门：header 由宿主给出，不受「插件解析到旧版官方包」影响。
+  describe('宿主真值格式门（会话 header）', () => {
+    it('空列表 应该 返回 undefined（没有会话可判定）', () => {
+      assert.equal(unsupportedStoredFormatReason([]), undefined)
+    })
+
+    it('全部 header 支持 应该 返回 undefined', () => {
+      assert.equal(unsupportedStoredFormatReason([{ version: 0 }, { version: 0 }]), undefined)
+    })
+
+    it('任一 header 不支持 应该 返回带来源标注的原因', () => {
+      const reason = unsupportedStoredFormatReason([{ version: 0 }, { version: 3 }])
+      assert.ok(reason !== undefined)
+      assert.match(reason, /v3/u)
+      assert.match(reason, /宿主会话 header/u)
+    })
+
+    it('header 版本缺失 应该 按不支持处理（保守）', () => {
+      assert.ok(unsupportedStoredFormatReason([{}]) !== undefined)
+    })
+
+    it('assertStoredFormatSupported：支持不抛、不支持抛错', () => {
+      assert.doesNotThrow(() => { assertStoredFormatSupported('dsh-x') })
+      assert.doesNotThrow(() => { assertStoredFormatSupported('dsh-x', { version: 0 }) })
+      assert.throws(() => { assertStoredFormatSupported('dsh-x', { version: 3 }) }, /已拒绝本次操作/u)
+    })
   })
 })
