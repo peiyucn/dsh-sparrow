@@ -7,6 +7,7 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-settings'
 import type { DeepSeekFileId, DeepSeekFilePage } from '@deepseek-ai/dsh-llm-deepseek'
+import { assertCapabilities } from './compat.js'
 import { classifyUpstreamError, COUNT_PAGE_LIMIT, COUNT_PAGE_TIMEOUT_MS, decodeFileIdParam, formatBytes, MAX_COUNT_PAGES, normalizePageQuery, toFileRow } from './files.js'
 
 export const name = 'dsh-file-manage'
@@ -129,7 +130,11 @@ async function deepSeekSurface(): Promise<DeepSeekSurface> {
  * @param ctx - DSH 插件上下文。
  */
 export async function apply(ctx: Context): Promise<void> {
-  // 宿主兼容自检（根 AGENTS《扩展与宿主兼容》，先于一切注册）：官方面缺失即自停用。
+  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》，先于一切注册）：能力面或官方面缺失即自停用。
+  assertCapabilities(ctx, name, [
+    { name: 'webServer.register', ok: typeof (ctx.webServer as { register?: unknown } | undefined)?.register === 'function' },
+    { name: 'credentials.resolve', ok: typeof (ctx.credentials as { resolve?: unknown } | undefined)?.resolve === 'function' },
+  ])
   await deepSeekSurface()
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
