@@ -101,26 +101,39 @@ export function setSuggestEnabled(next: boolean): void {
   for (const listener of enabledListeners) listener()
 }
 
-// 模块级共享「联想中」状态：指示渲染在工具行开关旁，避免在输入框下方增减内容导致布局跳动。
-let sharedBusy = false
+// 模块级共享「联想中」状态：记录**哪个会话**在联想——环只由该会话的 dock 渲染，
+// 后台会话的在途请求不会把环画到当前会话上（会话隔离，见 spec 06）。
+let sharedBusySessionId: string | null = null
 const busyListeners = new Set<() => void>()
 
-/** 订阅共享联想中状态；返回当前值。 */
-export function useSuggestBusy(): boolean {
-  const [value, setValue] = useState(sharedBusy)
+/**
+ * 订阅共享联想中状态。
+ * @param sessionId - 指定时只反映该会话是否在联想；省略时反映「任意会话在联想」（开关胶囊用）。
+ * @returns 该会话（或任意会话）是否正在联想。
+ */
+export function useSuggestBusy(sessionId?: string): boolean {
+  const read = (): boolean => sessionId === undefined ? sharedBusySessionId !== null : sharedBusySessionId === sessionId
+  const [value, setValue] = useState(read)
   useEffect(() => {
-    const listener = (): void => { setValue(sharedBusy) }
+    const listener = (): void => { setValue(read()) }
     busyListeners.add(listener)
     return () => { busyListeners.delete(listener) }
-  }, [])
+    // read 随 sessionId 闭包变化：sessionId 变更时重挂监听（并立即以新会话重算）。
+  }, [sessionId])
   return value
 }
 
-/** 设置共享联想中状态。 */
-export function setSuggestBusy(next: boolean): void {
-  if (sharedBusy === next) return
-  sharedBusy = next
+/** 设置共享联想中会话（null = 无）。 */
+export function setSuggestBusy(sessionId: string | null): void {
+  if (sharedBusySessionId === sessionId) return
+  sharedBusySessionId = sessionId
   for (const listener of busyListeners) listener()
+}
+
+/** 只在「当前在联想的正是这个会话」时清除——后台会话迟到的结束回调不得清掉当前会话的环。 */
+export function clearSuggestBusy(sessionId: string): void {
+  if (sharedBusySessionId !== sessionId) return
+  setSuggestBusy(null)
 }
 
 // 模块级共享错误状态：禁用/凭据/上游错误让用户可见，而不是静默无建议。
@@ -272,9 +285,18 @@ export function setTriggerSensitivity(next: TriggerSensitivity): void {
   for (const listener of sensitivityListeners) listener()
 }
 
-/** composer 卡片视口矩形（旋转光环定位；只读测量）。 */
-function composerCardRect(): { x: number; y: number; width: number; height: number } | undefined {
-  const card = document.querySelector<HTMLElement>('[data-composer-card]')
+/**
+ * 本 dock 所属会话的 composer 卡片视口矩形（旋转光环定位；只读测量）。
+ *
+ * 从**本会话根**（`[data-phase]`，官方公开 DOM 标记）里取卡片，而不是全局
+ * `document.querySelector`——多会话并存时全局查询会取到别的会话的卡片，
+ * 把环画到当前会话上（spec 06 修）。后台会话的卡片不可见时矩形为 0 → 不画环。
+ * @param anchor - 本 dock 渲染的隐藏锚点（用于定位自己所在的会话根）。
+ * @returns 视口矩形；取不到或不可见时 undefined。
+ */
+function composerCardRect(anchor: HTMLElement | null): { x: number; y: number; width: number; height: number } | undefined {
+  const root = anchor?.closest('[data-phase]') ?? document
+  const card = root.querySelector<HTMLElement>('[data-composer-card]')
   if (card === null) return undefined
   const rect = card.getBoundingClientRect()
   if (rect.width === 0 && rect.height === 0) return undefined
@@ -749,11 +771,13 @@ export function ChatFimDock(props: ChatFimDockProps) {
   const [composing, setComposing] = useState(false)
   const [ring, setRing] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const enabled = useSuggestEnabled()
-  const busy = useSuggestBusy()
+  const busy = useSuggestBusy(session.sessionId)
   const supported = useSuggestSupported()
   const supportState = useSuggestSupportState()
   const sensitivity = useTriggerSensitivity()
   const sensitivityParams = TRIGGER_SENSITIVITIES[sensitivity]
+  /** 隐藏锚点：把环的测量范围限定在本会话（见 composerCardRect）。 */
+  const anchorRef = useRef<HTMLSpanElement | null>(null)
 
   // 当前选中模型（与座位同源）：目录 store 惰性解析 + 会话投影兜底。
   // 模型一换，currentKey 就变 → 支持状态立即重查，开关随模型追平，
@@ -810,14 +834,14 @@ export function ChatFimDock(props: ChatFimDockProps) {
       document.removeEventListener('compositionstart', start)
       document.removeEventListener('compositionend', end)
       flightRef.current?.abort()
-      setSuggestBusy(false)
+      clearSuggestBusy(session.sessionId)
       setSuggestion(null)
     }
   }, [])
 
   useEffect(() => {
     setSuggestion(null)
-    setSuggestBusy(false)
+    clearSuggestBusy(session.sessionId)
     setSuggestError(null)
     flightRef.current?.abort()
 
@@ -838,7 +862,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
       if (composingRef.current || rev !== draftRevRef.current || draftRef.current !== draft) return
       const controller = new AbortController()
       flightRef.current = controller
-      setSuggestBusy(true)
+      setSuggestBusy(session.sessionId)
       void requestComplete(session.sessionId, draft, controller.signal)
         .then((result) => {
           if (controller.signal.aborted) return
@@ -866,7 +890,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
         })
         .finally(() => {
           if (flightRef.current === controller) flightRef.current = null
-          if (!controller.signal.aborted) setSuggestBusy(false)
+          if (!controller.signal.aborted) clearSuggestBusy(session.sessionId)
         })
     }, sensitivityParams.pauseMs)
 
@@ -884,7 +908,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
       return
     }
     const measure = (): void => {
-      const next = composerCardRect() ?? null
+      const next = composerCardRect(anchorRef.current) ?? null
       setRing(prev => (rectsEqual(prev, next) ? prev : next))
     }
     measure()
@@ -900,6 +924,8 @@ export function ChatFimDock(props: ChatFimDockProps) {
 
   return (
     <>
+      {/* 隐藏锚点：把环的测量范围限定在本会话（composerCardRect 从它向上找会话根）。 */}
+      <span ref={anchorRef} style={{ display: 'none' }} aria-hidden />
       {busy && ring !== null
         ? createPortal(
           <div
@@ -960,7 +986,7 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
     markSuggestAdoption({ sessionId: suggestion.sessionId, draft: suggestion.draft, text: suggestion.text })
     if (adopt(suggestion.sessionId, suggestion.text, span)) {
       setSuggestion(null)
-      setSuggestBusy(false)
+      clearSuggestBusy(suggestion.sessionId)
     } else {
       clearSuggestAdoption()
     }

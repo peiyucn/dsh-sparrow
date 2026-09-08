@@ -52,31 +52,47 @@ export function isTrustedBrowserRequest(headers: { host?: string; origin?: strin
   }
 }
 
-export type DiagnosticKey = 'requests' | 'fulfilled' | 'retries' | 'shown' | 'empty' | 'filteredSpeaker' | 'filteredRepeat' | 'filteredEcho' | 'filteredLanguage'
+export type DiagnosticKey = 'requests' | 'fulfilled' | 'retries' | 'shown' | 'empty' | 'filteredSpeaker' | 'filteredRepeat' | 'filteredEcho' | 'filteredLanguage' | 'aborted' | 'timeout' | 'upstreamError'
 
 /** 按会话诊断条目上限：host 进程长期存活，bySession 表必须随会话数有界——超限淘汰最早写入条目（FIFO）。 */
 export const MAX_DIAGNOSTIC_SESSIONS = 256
 
+/** 一个会话（或全局）的诊断计数行；`elapsed*` 只在全局行维护。 */
+type DiagnosticCounts = Record<DiagnosticKey, number>
+
+function emptyCounts(): DiagnosticCounts {
+  return {
+    requests: 0,
+    fulfilled: 0,
+    retries: 0,
+    shown: 0,
+    empty: 0,
+    filteredSpeaker: 0,
+    filteredRepeat: 0,
+    filteredEcho: 0,
+    filteredLanguage: 0,
+    aborted: 0,
+    timeout: 0,
+    upstreamError: 0,
+  }
+}
+
 /**
  * 进程级诊断计数（status 路由带 ?diagnostics=1 时返回；不持久化、不含任何用户内容，
- * bySession 只记会话 id 不记内容）。「转完圈没出卡片」时先查这里，别盲调参数。
+ * bySession 只记会话 id 不记内容）。「转完圈没出卡片」时先查这里，别盲调参数：
+ * `aborted` = 客户端作废（还在打字/切会话），`timeout` = 上游超时，`upstreamError` = 上游报错，
+ * `elapsedTotalMs / requests` = 平均耗时，`elapsedMaxMs` = 最慢一次。
  */
-const diagnostics: Record<DiagnosticKey, number> & { bySession: Record<string, Record<DiagnosticKey, number>> } = {
-  requests: 0,
-  fulfilled: 0,
-  retries: 0,
-  shown: 0,
-  empty: 0,
-  filteredSpeaker: 0,
-  filteredRepeat: 0,
-  filteredEcho: 0,
-  filteredLanguage: 0,
+const diagnostics: DiagnosticCounts & { bySession: Record<string, DiagnosticCounts>; elapsedTotalMs: number; elapsedMaxMs: number } = {
+  ...emptyCounts(),
   bySession: {},
+  elapsedTotalMs: 0,
+  elapsedMaxMs: 0,
 }
 
 /** 在按会话诊断表里累加一次计数；新会话条目使表超上限时先淘汰最早写入的会话（对象键插入序 = FIFO）。 */
 export function bumpSessionDiagnostics(
-  bySession: Record<string, Record<DiagnosticKey, number>>,
+  bySession: Record<string, DiagnosticCounts>,
   sessionId: string,
   key: DiagnosticKey,
   maxSessions = MAX_DIAGNOSTIC_SESSIONS,
@@ -88,7 +104,7 @@ export function bumpSessionDiagnostics(
       if (oldest === undefined) break
       delete bySession[oldest]
     }
-    stats = { requests: 0, fulfilled: 0, retries: 0, shown: 0, empty: 0, filteredSpeaker: 0, filteredRepeat: 0, filteredEcho: 0, filteredLanguage: 0 }
+    stats = emptyCounts()
     bySession[sessionId] = stats
   }
   stats[key]++
@@ -278,6 +294,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
 
       const sessionId = SessionId(parsed.sessionId)
       const sessionKey = String(sessionId)
+      /** 本次请求起点（诊断耗时用）。 */
+      const startedAt = Date.now()
       bumpDiagnostics('requests', sessionKey)
       const session = ctx.sessions.get(sessionId)
       if (session === undefined) {
@@ -448,13 +466,17 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
         })
       } catch (error) {
         if (isAbortTimeout(signal.signal)) {
+          bumpDiagnostics('timeout', sessionKey)
           sendError(res, 504, { code: 'TIMEOUT', message: 'DeepSeek 续写上游超时' })
         } else if (signal.signal.aborted) {
-          // 客户端已断开；响应写不写都无所谓，但要避免悬挂。
+          // 客户端已断开（多为「还在打字 / 切会话」作废了这次联想）；响应写不写都无所谓，但要避免悬挂。
+          bumpDiagnostics('aborted', sessionKey)
           if (!res.headersSent) res.destroy()
         } else if (typeof error === 'object' && error !== null && 'code' in error && 'message' in error) {
+          bumpDiagnostics('upstreamError', sessionKey)
           sendError(res, 502, error as ChatFimError)
         } else {
+          bumpDiagnostics('upstreamError', sessionKey)
           const message = error instanceof Error ? error.message : String(error)
           sendError(res, 502, {
             code: 'UPSTREAM_ERROR',
@@ -462,6 +484,10 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
           })
         }
       } finally {
+        // 单次请求耗时（含被作废的）：慢上游是「转完圈没出卡片」的常见原因，记下来别盲调参数。
+        const elapsed = Date.now() - startedAt
+        diagnostics.elapsedTotalMs += elapsed
+        if (elapsed > diagnostics.elapsedMaxMs) diagnostics.elapsedMaxMs = elapsed
         signal.dispose()
       }
     },

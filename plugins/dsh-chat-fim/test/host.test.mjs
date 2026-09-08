@@ -50,6 +50,7 @@ describe('bumpSessionDiagnostics 有界按会话诊断表', () => {
     assert.deepEqual(bySession.s1, {
       requests: 2, fulfilled: 0, retries: 0, shown: 1, empty: 0,
       filteredSpeaker: 0, filteredRepeat: 0, filteredEcho: 0, filteredLanguage: 0,
+      aborted: 0, timeout: 0, upstreamError: 0,
     })
   })
 
@@ -76,6 +77,7 @@ describe('bumpSessionDiagnostics 有界按会话诊断表', () => {
     assert.deepEqual(bySession.old, {
       requests: 1, fulfilled: 0, retries: 0, shown: 0, empty: 0,
       filteredSpeaker: 0, filteredRepeat: 0, filteredEcho: 0, filteredLanguage: 0,
+      aborted: 0, timeout: 0, upstreamError: 0,
     })
   })
 })
