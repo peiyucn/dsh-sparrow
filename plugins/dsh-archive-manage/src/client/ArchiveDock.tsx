@@ -811,7 +811,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
           <button
             type="button"
             className="dsh-archive-btn"
-            disabled={loading || refreshing || busy}
+            disabled={loading || busy}
             onClick={() => { void archiveStray(item) }}
           >
             {busy ? t('confirm.archiving') : t('action.archive')}
@@ -819,7 +819,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
           <button
             type="button"
             className="dsh-archive-btn"
-            disabled={loading || refreshing || busy || !item.backendSupported || locked}
+            disabled={loading || busy || !item.backendSupported || locked}
             title={locked ? t('state.unreleasedActionHint') : undefined}
             onClick={() => { confirmTrashStray(item) }}
           >
@@ -828,7 +828,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
           <button
             type="button"
             className="dsh-archive-btn dsh-archive-btn-danger"
-            disabled={loading || refreshing || busy || !item.backendSupported || locked}
+            disabled={loading || busy || !item.backendSupported || locked}
             title={locked ? t('state.unreleasedActionHint') : undefined}
             onClick={() => { confirmDeleteStray(item) }}
           >
@@ -956,7 +956,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
               <button
                 type="button"
                 className="dsh-archive-btn"
-                disabled={loading || refreshing}
+                disabled={loading}
                 onClick={() => { confirmUnarchive(item) }}
               >
                 {t('action.unarchive')}
@@ -964,7 +964,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
               <button
                 type="button"
                 className="dsh-archive-btn"
-                disabled={loading || refreshing || !item.backendSupported || locked}
+                disabled={loading || !item.backendSupported || locked}
                 title={locked ? t('state.unreleasedActionHint') : undefined}
                 onClick={() => { confirmTrash(item) }}
               >
@@ -973,7 +973,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
               <button
                 type="button"
                 className="dsh-archive-btn dsh-archive-btn-danger"
-                disabled={loading || refreshing || !item.backendSupported || locked}
+                disabled={loading || !item.backendSupported || locked}
                 title={locked ? t('state.unreleasedActionHint') : undefined}
                 onClick={() => { confirmDelete(item) }}
               >
@@ -1068,7 +1068,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             <button
               type="button"
               className="dsh-archive-btn"
-              disabled={loading || refreshing || item.legacy || restoringId !== null}
+              disabled={loading || item.legacy || restoringId !== null}
               title={item.legacy ? t('legacy.restoreTitle') : undefined}
               onClick={() => {
                 if (restoringId !== null) return
@@ -1090,7 +1090,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             <button
               type="button"
               className="dsh-archive-btn dsh-archive-btn-danger"
-              disabled={loading || refreshing || restoringId !== null}
+              disabled={loading || restoringId !== null}
               onClick={() => { confirmDeleteTrashItem(item) }}
             >
               {t('action.deletePermanently')}
@@ -1318,7 +1318,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       <button
                         type="button"
                         className="dsh-archive-btn"
-                        disabled={loading || refreshing || restorableCount === 0 || restoringId !== null}
+                        disabled={loading || restorableCount === 0 || restoringId !== null}
                         onClick={() => { confirmRestoreAll() }}
                       >
                         {t('action.restoreAll', { count: restorableCount })}
@@ -1326,7 +1326,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                       <button
                         type="button"
                         className="dsh-archive-btn dsh-archive-btn-danger"
-                        disabled={loading || refreshing || trashItems.length === 0 || restoringId !== null}
+                        disabled={loading || trashItems.length === 0 || restoringId !== null}
                         onClick={() => { confirmDeleteAll() }}
                       >
                         {t('action.deleteAll')}

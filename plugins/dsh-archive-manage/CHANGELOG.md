@@ -6,7 +6,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 - The archive panel opens noticeably faster: subagent labels no longer re-read a session's whole log when the official projection cache has already settled them (previously every open re-folded the log for each subagent).
 - Subagent labels are no longer taken from an inherited ancestor descriptor (a forked child briefly showed the parent's label before writing its own).
-- The panel no longer flickers after an action: the list stays on screen and updates in place instead of being replaced by a loading spinner.
+- The panel no longer flickers after an action: the list and its buttons stay as they are and update in place, instead of being replaced by a loading spinner or briefly greying out.
 
 ## 0.1.2-rc.1 (2026-09-05)
 

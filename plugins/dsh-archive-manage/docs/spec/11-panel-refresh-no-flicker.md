@@ -39,21 +39,37 @@ const refresh = async () => {
 - 判定依据 `loadedRef`（首屏是否成功落过数据）：成功一次后所有刷新都走 `refreshing`；
   首屏失败（如 host 未就绪）仍走整页 loading，重试语义不变。
 - 面板关掉再打开同样不再转圈：数据已在，先显示旧内容再静默更新（感知更快）。
-- **连点防护不变**：所有操作按钮的 `disabled` 与入口锁都从 `loading` 扩为
-  `loading || refreshing`，刷新在途期间仍然禁点（AGENTS 审计⑨）。
 - 无障碍：内容区加 `aria-busy={refreshing}`，屏幕阅读器仍能感知刷新在途。
 - 不额外加可视指示器：确认框自身在操作期间显示「正在移入回收站…」等文案，
   刷新紧随其后完成，再加转圈反而制造第二个闪烁源。
 
+## 审计修正：刷新期间不得改按钮外观
+
+第一版把 `refreshing` 并进了所有按钮的 `disabled` 判据（`loading || refreshing`），
+owner 实测反馈「列表不闪了，但按钮在闪」——根因是 `.dsh-archive-btn:disabled { opacity: .5 }`：
+每次后台刷新（写操作后 / 实时事件）都会让全部按钮变灰再恢复，一次刷新一次闪。
+
+修正：**`refreshing` 只做无障碍与入口锁，不再进任何 `disabled` 属性**——
+按钮外观在刷新期间保持原样；并发保护由既有锁承担，语义不变：
+
+| 入口 | 保护 |
+| :--- | :--- |
+| 归档游离会话 | `archiveStray` 入口守卫（`loading \|\| refreshing \|\| archivingId !== null`）+ 行级 `archivingId` |
+| 还原单条 | 行级 `restoringId` 锁（点击瞬间置位，按钮随之禁用） |
+| 其余操作 | 均先开确认框，提交由确认框自身的 `working` 锁串行化（幂等 + 单飞） |
+
+刷新窗口约百毫秒，期间点击行按钮只是打开确认框、由 host 重新校验后执行，
+不会基于陈旧数据直接落盘（host 侧对状态有权威校验）。
+
 ## 涉及文件
 
 - `src/client/ArchiveDock.tsx`：新增 `refreshing` 状态与 `loadedRef`；`refresh()` 分流；
-  按钮禁用判据并入 `refreshing`。
+  `refreshing` 仅用于 `aria-busy` 与 `archiveStray` 入口守卫。
 
 ## 验证
 
 - `npm run verify` 全绿（122 tests）；客户端产物重新打包。
-- 行为：写操作后列表不卸载（无闪烁），计数与行内容静默更新。
+- 行为：写操作后列表不卸载（无闪烁），按钮外观不随刷新变化，计数与行内容静默更新。
 
 ## 风险
 
