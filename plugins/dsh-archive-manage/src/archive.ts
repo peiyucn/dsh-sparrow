@@ -399,6 +399,12 @@ export function createHeaderFactsStore<F>(
  */
 export interface SubagentIdentityValue {
   readonly label?: string
+  /**
+   * 折叠出该 identity 的 `subagent/descriptor` 事件位置。官方用它证明描述符来自子会话
+   * **自有**后缀（`Session.isOwnSeq`，官方 list-children.ts:224-225 的自有后缀门），
+   * 而非 fork seed 里继承的祖先描述符。缺失/畸形时无法验证自有性。
+   */
+  readonly seq?: number
 }
 
 /**

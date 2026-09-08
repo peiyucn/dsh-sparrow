@@ -51,9 +51,9 @@ if (typeof label === 'string' && label.trim() !== '') return label
 | `null` / 缺失 / ver 不匹配 | 未定 | 继续走折叠档（保守，不变） |
 
 行的可靠性由官方保证，可放心当权威用：`cachedSnapshot` 先过 `identityMatches`
-（createdAt / cwd / isSeeded / inheritedEventCount）确认「这份缓存属于这条生命周期」，
-`viewCheckpoint` 再丢弃 `ver` 与 live unit 不一致的行
-（`session-projection-cache/src/index.ts:116`、`session-projection/src/index.ts:448`）。
+（createdAt / cwd / isSeeded / inheritedEventCount，`session-projection-cache/src/index.ts:377`，
+由 `recordFor:116` 调用）、`viewCheckpoint` 再丢弃 `ver` 与 live unit 不一致的行
+（`session-projection/src/index.ts:448`）。
 
 **不拿正确性换速度**：只有官方明确给出 identity 才停止折叠；identity 为 null
 （可能是快照早于描述符写入）仍走原路。
@@ -64,15 +64,39 @@ if (typeof label === 'string' && label.trim() !== '') return label
 记住，否则折叠档仍会为每个无标签会话反复解日志。非权威结果（折叠抛错、生命周期
 不匹配）**不记**，下次仍可重试（保持原有容错）。LRU 上限与淘汰语义不变。
 
+## 审计修正（live 档自有后缀门）
+
+第二档（缓存行）与折叠档都只处理**冷**会话，语义正确性已由官方校验覆盖；但**live 档**
+漏了官方 `list-children.ts:224-225` 的自有后缀门：
+
+```ts
+if (identity === undefined || identity === null
+  || !candidate.live.isOwnSeq(identity.seq)) return   // 官方：不出行
+```
+
+`Session.isOwnSeq(seq)`（`session/src/index.ts:624`）= `seq >= inheritedEventCount && seq < this.seq`，
+即「描述符必须落在子会话**自有**事件里」。fork 子会话在**自己的描述符写入前**的创建窗口里，
+快照折叠出的 identity 来自 seed 继承的**祖先**描述符（官方注释：the creation window before
+the establishing provider appends its descriptor）——不挡就会把祖先标签显示成这个子会话的标签。
+
+本次一并修掉（旧代码同样有此问题，非本次引入）：
+
+- live 档拿 identity 后先过 `live.isOwnSeq(identity.seq)`，非自有即返回 undefined（回退标题）；
+- `identity.seq` 经 `ownSeqOf` 安全品牌化——官方 `SessionSeq()` 对非法输入抛 TypeError，
+  畸形/缺失一律当「无法验证自有性」保守不出行，不让异常冒泡；
+- 缓存档与折叠档**不需要**这道门：官方对冷会话的同类语义由 `!header.isSeeded` 门 +
+  缓存行身份校验保证（`resolveColdIdentity` 只在 `!header.isSeeded` 时用缓存，官方注释
+  "An unseeded child's descriptor is owned at every valid seq"），插件与之一致。
+
 ## 涉及文件
 
-- `src/archive.ts`：`labelFromSubagentIdentity`（纯函数，`SubagentIdentityValue` 类型）。
-- `src/host.ts`：`subagentLabel` 三档改走新判据；记忆值域放宽。
-- `test/host.test.mjs`：新判据矩阵 + 记忆/重试语义。
+- `src/archive.ts`：`labelFromSubagentIdentity`（纯函数，`SubagentIdentityValue` 类型含 `seq`）。
+- `src/host.ts`：`subagentLabel` 三档改走新判据；live 档补自有后缀门（`ownSeqOf`）；记忆值域放宽。
+- `test/host.test.mjs`：新判据矩阵 + 记忆/重试语义 + live 自有后缀门。
 
 ## 验证
 
-- `npm run verify` 全绿（116 tests）。
+- `npm run verify` 全绿（122 tests）。
 - 对照实测（本机真实 projcache，10 个子会话）：需折叠数 **10/10 → 0/10**。
 - owner 重启 dsh 后实测 `/list` 打开耗时（预期从 ~1s 降到 ~100ms 级）。
 

@@ -275,7 +275,7 @@ describe('archive-manage host 纯逻辑', () => {
       sessions: { get: () => live },
       get: (name) => {
         if (name === 'sessionProjections') {
-          return live === undefined ? undefined : { snapshot: () => ({ values: { subagent: { label: 'live-label' } } }) }
+          return live === undefined ? undefined : { snapshot: () => ({ values: { subagent: { label: 'live-label', seq: 7 } } }) }
         }
         if (name === 'sessionProjectionCache') {
           return { cachedSnapshot: cacheThrows ? () => { throw new Error('cache boom') } : () => cacheRow }
@@ -289,8 +289,53 @@ describe('archive-manage host 纯逻辑', () => {
     })
 
     it('live 子会话 应该 走注册表快照', async () => {
-      const ctx = labelCtx({ live: { live: true } })
+      const ctx = labelCtx({ live: { live: true, isOwnSeq: () => true } })
       assert.equal(await subagentLabel(ctx, labelHeader('live-1')), 'live-label')
+    })
+
+    // spec 10 审计：对齐官方 list-children.ts:224-225 的自有后缀门。
+    it('live 快照 identity 非自有（fork seed 祖先描述符）应该 不出标签', async () => {
+      const ctx = {
+        sessions: { get: () => ({ isOwnSeq: () => false }) },
+        get: (name) => {
+          if (name === 'sessionProjections') {
+            return { snapshot: () => ({ values: { subagent: { mode: 'one-shot', label: '祖先标签', seq: 7 } } }) }
+          }
+          return undefined
+        },
+        logger: { warn: () => {} },
+      }
+      assert.equal(await subagentLabel(ctx, labelHeader('live-seed-window-1')), undefined)
+    })
+
+    it('live 快照 identity seq 畸形 应该 保守不出标签（不抛 SessionSeq TypeError）', async () => {
+      const ctx = {
+        sessions: { get: () => ({ isOwnSeq: () => true }) },
+        get: (name) => {
+          if (name === 'sessionProjections') {
+            return { snapshot: () => ({ values: { subagent: { mode: 'one-shot', label: 'x', seq: -1 } } }) }
+          }
+          return undefined
+        },
+        logger: { warn: () => {} },
+      }
+      assert.equal(await subagentLabel(ctx, labelHeader('live-badseq-1')), undefined)
+    })
+
+    it('live 缺 isOwnSeq 能力 应该 静默保守不出标签（不抛不告警）', async () => {
+      let warned = 0
+      const ctx = {
+        sessions: { get: () => ({ live: true }) },
+        get: (name) => {
+          if (name === 'sessionProjections') {
+            return { snapshot: () => ({ values: { subagent: { mode: 'one-shot', label: 'x', seq: 7 } } }) }
+          }
+          return undefined
+        },
+        logger: { warn: () => { warned += 1 } },
+      }
+      assert.equal(await subagentLabel(ctx, labelHeader('live-nocap-1')), undefined)
+      assert.equal(warned, 0)
     })
 
     it('冷会话 + 缓存命中 应该 用缓存行标签', async () => {

@@ -7,7 +7,7 @@ import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { SessionId, type SessionHeader } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionSeq, type SessionHeader } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type { SessionTitleObservationResult } from '@deepseek-ai/dsh-session-query'
@@ -442,6 +442,15 @@ interface FoldObservation {
 }
 
 /**
+ * identity.seq → 官方 SessionSeq 品牌值；畸形值（缺失 / 负数 / 非安全整数 / -0）返回 undefined。
+ * 官方 `SessionSeq()` 对非法输入抛 TypeError，本插件把它当「无法验证自有性」处理，不抛给调用方。
+ */
+function ownSeqOf(value: number | undefined): SessionSeq | undefined {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || Object.is(value, -0)) return undefined
+  return SessionSeq(value)
+}
+
+/**
  * 子会话标签：官方 subagent 投影单元 label（父会话给子会话的任务描述，不受父消息污染）。
  * 三档读链，与官方 list-children 同构——缓存只是捷径，日志才是权威，缓存坏掉只变慢、不变错：
  *   1. live 子会话 → 投影注册表快照（内存、同步；官方对 live 只走这一档，observeSession 会悬挂）；
@@ -465,7 +474,15 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
     } | undefined
     if (registry !== undefined && typeof registry.snapshot === 'function') {
       try {
-        return labelFromSubagentIdentity(registry.snapshot(live, ['subagent']).values.subagent) ?? undefined
+        const identity = registry.snapshot(live, ['subagent']).values.subagent
+        if (identity === null || typeof identity !== 'object') return undefined
+        // 自有后缀门（spec 10 审计，对齐官方 list-children.ts:224-225）：identity 必须折自
+        // 子会话**自有**事件。fork 子会话在「自己的描述符写入前」的创建窗口里，快照带的是
+        // seed 继承的祖先描述符——不挡就会把祖先标签显示成这个子会话的标签（官方此时不出行）。
+        // seq 畸形 / 缺官方 isOwnSeq（不支持的 dsh）一律按「无法验证自有性」保守不出行。
+        const seq = ownSeqOf(identity.seq)
+        if (seq === undefined || typeof live.isOwnSeq !== 'function' || !live.isOwnSeq(seq)) return undefined
+        return labelFromSubagentIdentity(identity) ?? undefined
       } catch (error) {
         ctx.logger.warn(`dsh-archive-manage: subagent 投影快照失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
       }
@@ -478,9 +495,10 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
   if (cache !== undefined && typeof cache.cachedSnapshot === 'function') {
     try {
       // 行的可靠性由官方保证：cachedSnapshot 先过 identityMatches（createdAt/cwd/isSeeded/
-      // inheritedEventCount）验「这份缓存属于这条生命周期」，viewCheckpoint 再丢弃 ver 与
-      // live unit 不一致的行（projection-cache index.ts:116/448）。所以拿到的 identity
-      // 是这份日志的有效折叠结果，可以直接当权威结论用。
+      // inheritedEventCount，session-projection-cache/src/index.ts:377，由 recordFor:116 调用）
+      // 验「这份缓存属于这条生命周期」，viewCheckpoint 再丢弃 ver 与 live unit 不一致的行
+      // （session-projection/src/index.ts:448）。所以拿到的 identity 是这份日志的有效折叠
+      // 结果，可以直接当权威结论用。
       const settled = labelFromSubagentIdentity(cache.cachedSnapshot(header, 0, ['subagent'])?.values?.subagent)
       if (settled !== undefined) return settled ?? undefined // 有标签返回标签；权威无标签直接结束（不再折叠）
     } catch (error) {
