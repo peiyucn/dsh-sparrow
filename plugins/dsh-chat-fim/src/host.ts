@@ -8,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
+import { assertHostCompatible } from './compat.js'
 import {
   buildFimPrompt, cleanSuggestion, currentMainRoute, detectDraftLanguage, extractSuggestions, extractUsage, speakerStopSequences,
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, isLanguageConsistent,
@@ -211,6 +212,8 @@ function currentSessionModel(
  * @param config - 插件配置（cordis.patch.yml 注入）。
  */
 export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {}): void {
+  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》，先于一切注册）：会话格式不认识就整个停用。
+  assertHostCompatible(ctx, name)
   const settings = normalizeConfig(config)
 
   ctx.effect(() => ctx.webServer.register({
