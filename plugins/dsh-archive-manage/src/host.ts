@@ -123,11 +123,23 @@ function titleFromObservation(result: SessionTitleObservationResult | undefined,
   return result.value.title?.title ?? fallback
 }
 
-/** 找出仍持该会话的工作区，供回收站 sidecar / 还原时反向记账。 */
-function workspaceIdsFor(workspaces: readonly Workspace[], sessionId: SessionId): string[] {
-  return workspaces
-    .filter(workspace => workspace.sessionIds.includes(sessionId))
-    .map(workspace => String(workspace.id))
+/**
+ * 预建「会话 id → 持它的工作区 id 列表」索引（性能审计：热路径无 O(n²)）。
+ * /list 组装按节点调用时，旧实现每节点全量扫「工作区 × 会话」；改为一次建索引、全树复用。
+ * 输出顺序 = 工作区列表顺序；同一工作区内重复的 sessionId 条目只记一次（对齐旧实现 includes 语义）。
+ */
+export function workspaceIndexFor(workspaces: readonly Workspace[]): Map<string, readonly string[]> {
+  const index = new Map<string, string[]>()
+  for (const workspace of workspaces) {
+    const workspaceId = String(workspace.id)
+    for (const sessionId of workspace.sessionIds) {
+      const key = String(sessionId)
+      const holders = index.get(key)
+      if (holders === undefined) index.set(key, [workspaceId])
+      else if (!holders.includes(workspaceId)) holders.push(workspaceId)
+    }
+  }
+  return index
 }
 
 /**
@@ -898,7 +910,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           const archivedHeaders = headers.filter(header => archivedIds.has(String(header.id)))
           const tree = buildSessionTree(archivedHeaders.map(treeHeaderOf))
           const ids = treeIds(tree)
-          const workspaces = ctx.workspaceRegistry.list()
+          const workspaceIds = workspaceIndexFor(ctx.workspaceRegistry.list())
           // spec 09：标题三档（live 投影 → 冷缓存 → 有界折叠兜底），不再整树全日志折叠。
           const treeHeaders = ids
             .map(id => byId.get(id))
@@ -929,7 +941,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               live: liveSession !== undefined,
               running: agent?.status === 'running',
               backendSupported: location !== undefined && sessionDirectoryFor(location) !== undefined,
-              workspaceIds: header === undefined ? [] : workspaceIdsFor(workspaces, sessionId),
+              workspaceIds: header === undefined ? [] : workspaceIds.get(String(sessionId)) ?? [],
               orphan: header !== undefined && header.origin === 'subagent'
                 && header.parentSession !== undefined && !byId.has(String(header.parentSession)),
               children: node.children.map(nodeOf),
@@ -1067,7 +1079,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             throw new ArchiveError('CONFIRMATION_FAILED', '移入回收站需要二次确认')
           }
 
-          const workspaces = workspaceIdsFor(ctx.workspaceRegistry.list(), sessionId)
+          const workspaces = workspaceIndexFor(ctx.workspaceRegistry.list()).get(String(sessionId)) ?? []
           ensureSessionNotLive(ctx, sessionId)
           const location = ctx.sessionPersistence.locate(header)
           const sessionDir = location === undefined ? undefined : sessionDirectoryFor(location)
@@ -1100,6 +1112,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             const subagentSidecars: ArchiveSubagentSidecar[] = []
             if (subagents.length > 0) {
               const subagentsDir = join(trashDir, 'subagents')
+              const workspaceIds = workspaceIndexFor(ctx.workspaceRegistry.list())
               try {
                 await mkdir(subagentsDir, { recursive: true })
                 for (const child of subagents) {
@@ -1111,7 +1124,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
                     sessionId: String(child.sessionId),
                     title: await readTitle(ctx, child.header, child.header.id),
                     originalPath: child.dir,
-                    workspaceIds: workspaceIdsFor(ctx.workspaceRegistry.list(), child.sessionId),
+                    workspaceIds: workspaceIds.get(String(child.sessionId)) ?? [],
                   })
                 }
               } catch (error) {

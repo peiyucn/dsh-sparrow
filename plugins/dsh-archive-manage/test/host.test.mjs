@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { resolve, sep } from 'node:path'
 import { createHeaderFactsStore, labelFromSubagentIdentity } from '../lib/archive.js'
-import { addedSummaryFor, alignChildArchives, assertRegistryMutationApi, assertSessionLocationApi, FOLDED_LABEL_CACHE_MAX_ENTRIES, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor, storedHeaders, subagentLabel } from '../lib/host.js'
+import { addedSummaryFor, alignChildArchives, assertRegistryMutationApi, assertSessionLocationApi, FOLDED_LABEL_CACHE_MAX_ENTRIES, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor, storedHeaders, subagentLabel, workspaceIndexFor } from '../lib/host.js'
 
 // 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
 // 测试夹具按当前平台构造——CI 跑 Ubuntu、本机跑 Windows，两边都必须绿。
@@ -243,6 +243,29 @@ describe('archive-manage host 纯逻辑', () => {
 
     it('label 为空白串 应该 按无标签处理（返回 null）', () => {
       assert.equal(labelFromSubagentIdentity({ mode: 'one-shot', label: '   ', seq: 1 }), null)
+    })
+  })
+
+  describe('workspaceIndexFor（工作区归属预建索引）', () => {
+    it('按会话 id 汇总持有工作区，顺序与工作区列表一致', () => {
+      const index = workspaceIndexFor([
+        { id: 'w1', sessionIds: ['s1', 's2'] },
+        { id: 'w2', sessionIds: ['s2', 's3'] },
+      ])
+      assert.deepEqual(index.get('s1'), ['w1'])
+      assert.deepEqual(index.get('s2'), ['w1', 'w2'])
+      assert.deepEqual(index.get('s3'), ['w2'])
+      assert.equal(index.get('s4'), undefined)
+    })
+
+    it('同一工作区内重复的 sessionId 条目应该 只记一次', () => {
+      const index = workspaceIndexFor([{ id: 'w1', sessionIds: ['s1', 's1', 's2'] }])
+      assert.deepEqual(index.get('s1'), ['w1'])
+      assert.deepEqual(index.get('s2'), ['w1'])
+    })
+
+    it('无工作区输入应该 返回空索引', () => {
+      assert.equal(workspaceIndexFor([]).size, 0)
     })
   })
 
