@@ -17,6 +17,7 @@ import {
   normalizeVisionConfig, parseVisionReport, renderVisionReport, resolveVisionOutput, shouldClearInputModalities,
   visionCacheKey, visionModeForRoute, VisionCache, type VisionConfig, type VisionReport,
 } from './vision.js'
+import { assertHostCompatible } from './compat.js'
 
 export const name = 'dsh-vision-bridge'
 export const inject = ['llm', 'tools', 'attachments', 'webServer']
@@ -178,6 +179,10 @@ async function describeImage(
  * @param config - 插件配置（cordis.patch.yml 注入）。
  */
 export function apply(ctx: Context, config: Readonly<Partial<VisionConfig>> = {}): void {
+  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》，先于一切注册）：会话格式不认识就整个停用。
+  // 本插件要包装 llm.resolveModelInfo 与拦截 agent/request——宁可停用，
+  // 也不要在不认识的契约上改动宿主行为。
+  assertHostCompatible(ctx, name)
   const settings = normalizeVisionConfig(config)
   const cache = new VisionCache(settings.cacheMaxEntries)
   // 同 cacheKey 的 in-flight 视觉调用（isConcurrencySafe 下并发 execute 去重）。
