@@ -18,11 +18,11 @@ import type { Workspace, WorkspaceDomainState } from '@deepseek-ai/dsh-workspace
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
   TRASH_SIDECAR, archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, createBudgetSignal,
-  createHeaderFactsStore, createLruCache, isDeleteConfirmationSufficient, isSafeSessionDirName, legacyTrashItem,
-  livingChildIds, maskHomePath, normalizeArchiveConfig, parseBlankProjection, parseSessionFacts, parseTrashSidecar,
-  runBounded, sanitizeSegment, straySessionIds, trashItemView,
+  createHeaderFactsStore, createLruCache, isDeleteConfirmationSufficient, isSafeSessionDirName, labelFromSubagentIdentity,
+  legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig, parseBlankProjection, parseSessionFacts,
+  parseTrashSidecar, runBounded, sanitizeSegment, straySessionIds, trashItemView,
   type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar, type HeaderFactsStore, type SessionFacts,
-  type SessionTreeHeader, type SessionTreeNode,
+  type SessionTreeHeader, type SessionTreeNode, type SubagentIdentityValue,
 } from './archive.js'
 
 export const name = 'dsh-archive-manage'
@@ -412,16 +412,18 @@ const LABEL_FOLD_TIMEOUT_MS = 15_000
 export const FOLDED_LABEL_CACHE_MAX_ENTRIES = 256
 
 /**
- * 折叠成功的 subagent 标签记忆：描述符事件一旦写入即不可变（官方注释 "a descriptor is
- * immutable once appended"），归档会话日志静止，按 sessionId 记忆安全。只写成功值；
+ * 日志折叠的 subagent 标签结论记忆：描述符事件一旦写入即不可变（官方注释 "a descriptor is
+ * immutable once appended"），归档会话日志静止，按 sessionId 记忆安全。
+ * 值 = 折叠出的标签；`null` = 权威判定「该会话没有标签」（同样值得记——否则每次打开面板
+ * 都要为它重折一遍整份日志）。非权威结果（折叠失败、生命周期不匹配）不记。
  * LRU 上限淘汰最久未用条目（sessionId 为 UUID，删除后重建同 id 的可能性忽略不计）。
  */
-const foldedSubagentLabels = createLruCache<string, string>(FOLDED_LABEL_CACHE_MAX_ENTRIES)
+const foldedSubagentLabels = createLruCache<string, string | null>(FOLDED_LABEL_CACHE_MAX_ENTRIES)
 
 /** observeSession 观察结果（租约，用后必须 dispose）的最小结构。 */
 interface FoldObservation {
   header?: { createdAt?: number }
-  projections?: { values?: Record<string, { label?: string } | null | undefined> }
+  projections?: { values?: Record<string, SubagentIdentityValue | null | undefined> }
   dispose?: () => void
   /** rc.1 起官方观察租约是 Disposable 契约（[Symbol.dispose]），旧中间版是 dispose() 方法；两者都探测。 */
   [Symbol.dispose]?: () => void
@@ -431,23 +433,27 @@ interface FoldObservation {
  * 子会话标签：官方 subagent 投影单元 label（父会话给子会话的任务描述，不受父消息污染）。
  * 三档读链，与官方 list-children 同构——缓存只是捷径，日志才是权威，缓存坏掉只变慢、不变错：
  *   1. live 子会话 → 投影注册表快照（内存、同步；官方对 live 只走这一档，observeSession 会悬挂）；
- *   2. 冷会话 → 投影缓存行（展示级；行自带身份校验）；
- *   3. 冷 + 未种子 + 缓存不可用 → observeSession 从日志重新折叠（官方同款权威兜底）。
+ *   2. 冷会话 → 投影缓存行（展示级；行自带 identity + ver 校验，见下）；
+ *   3. 冷 + 未种子 + 缓存行未给出权威结论 → observeSession 从日志重新折叠（官方同款权威兜底）。
  *      9-03 的 OOM 是「种子冷会话连带读父会话前缀」——isSeeded 门把该场景挡在档外，
  *      而不是禁用整条正路；观察是租约，用后 dispose，15s 超时防悬挂。
  * 均做能力检查 + 结构断言，失败返回 undefined，调用方回退标题单元结果。
+ *
+ * spec 10：第二档的判定从「取到 label 才算命中」改为「identity 非 null 即权威」——
+ * one-shot 子会话的 label 官方定义为可选（projection-types.ts:30-33），此前这类会话
+ * 每个都掉进第三档，把整份 zstd 日志解出来重折一遍（本机 10 个子会话 ≈ 8MB 压缩日志
+ * ≈ 1s/次打开，且因折不出 label 永不进记忆 → 每次打开都重来）。
  */
 export async function subagentLabel(ctx: Context, header: SessionHeader): Promise<string | undefined> {
   const sessionId = SessionId(String(header.id))
   const live = ctx.sessions.get(sessionId)
   if (live !== undefined) {
     const registry = ctx.get('sessionProjections') as unknown as {
-      snapshot?: (session: unknown, units: readonly string[]) => { values: Record<string, { label?: string } | null | undefined> }
+      snapshot?: (session: unknown, units: readonly string[]) => { values: Record<string, SubagentIdentityValue | null | undefined> }
     } | undefined
     if (registry !== undefined && typeof registry.snapshot === 'function') {
       try {
-        const label = registry.snapshot(live, ['subagent']).values.subagent?.label
-        if (typeof label === 'string' && label.trim() !== '') return label
+        return labelFromSubagentIdentity(registry.snapshot(live, ['subagent']).values.subagent) ?? undefined
       } catch (error) {
         ctx.logger.warn(`dsh-archive-manage: subagent 投影快照失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
       }
@@ -455,20 +461,24 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
     return undefined
   }
   const cache = ctx.get('sessionProjectionCache') as unknown as {
-    cachedSnapshot?: (header: unknown, cut: unknown, units: readonly string[]) => { values: Record<string, { label?: string } | null | undefined> } | undefined
+    cachedSnapshot?: (header: unknown, cut: unknown, units: readonly string[]) => { values: Record<string, SubagentIdentityValue | null | undefined> } | undefined
   } | undefined
   if (cache !== undefined && typeof cache.cachedSnapshot === 'function') {
     try {
-      const row = cache.cachedSnapshot(header, 0, ['subagent'])
-      const label = row?.values?.subagent?.label
-      if (typeof label === 'string' && label.trim() !== '') return label
+      // 行的可靠性由官方保证：cachedSnapshot 先过 identityMatches（createdAt/cwd/isSeeded/
+      // inheritedEventCount）验「这份缓存属于这条生命周期」，viewCheckpoint 再丢弃 ver 与
+      // live unit 不一致的行（projection-cache index.ts:116/448）。所以拿到的 identity
+      // 是这份日志的有效折叠结果，可以直接当权威结论用。
+      const settled = labelFromSubagentIdentity(cache.cachedSnapshot(header, 0, ['subagent'])?.values?.subagent)
+      if (settled !== undefined) return settled ?? undefined // 有标签返回标签；权威无标签直接结束（不再折叠）
     } catch (error) {
       ctx.logger.warn(`dsh-archive-manage: subagent 投影缓存读取失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
     }
   }
   if (!header.isSeeded) {
     const memoized = foldedSubagentLabels.get(String(sessionId))
-    if (memoized !== undefined) return memoized
+    // null 亦为结论（该会话确实没有标签）：命中就不必再折一次整份日志。
+    if (memoized !== undefined) return memoized ?? undefined
     const query = ctx.get('sessionQuery') as unknown as {
       observeSession?: (id: unknown, options: { signal?: AbortSignal }) => Promise<FoldObservation>
     } | undefined
@@ -481,10 +491,11 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
         // 生命周期见证：同 id 槽位被删后重建（createdAt 变化）不得串用旧观察。
         if (observation !== undefined
           && (observation.header?.createdAt === undefined || observation.header.createdAt === header.createdAt)) {
-          const label = observation.projections?.values?.subagent?.label
-          if (typeof label === 'string' && label.trim() !== '') {
-            foldedSubagentLabels.set(String(sessionId), label)
-            return label
+          const settled = labelFromSubagentIdentity(observation.projections?.values?.subagent)
+          // 只记权威结论：折叠失败 / identity 缺失不记，下次仍可重试。
+          if (settled !== undefined) {
+            foldedSubagentLabels.set(String(sessionId), settled)
+            return settled ?? undefined
           }
         }
       } catch (error) {

@@ -393,10 +393,38 @@ export function createHeaderFactsStore<F>(
 }
 
 /**
+ * 官方 subagent 投影单元的值（`SubagentIdentityProjection` 的最小结构，
+ * 官方 projection-types.ts:28）：判别联合（mode one-shot / continuable）+ 可选 label。
+ * 本插件只关心 label 是否存在，故按最小结构断言，不复制官方的 mode 判别。
+ */
+export interface SubagentIdentityValue {
+  readonly label?: string
+}
+
+/**
+ * 权威 identity → 标签结论（spec 10）。
+ *
+ * `identity` 非 null 表示官方已在这份日志上折到 subagent 描述符（官方
+ * `subagent` 单元的 view = `state.identity ?? null`，projection.ts:178）；描述符
+ * 一经追加即不可变（官方注释 "a descriptor is immutable once appended"）且位于子会话
+ * 日志开头，因此折到一次即永久成立。label 对 one-shot 子会话是**可选**的
+ * （projection-types.ts:30-33），所以「有 identity 而无 label」的正确解读是
+ * 「该会话确实没有标签」，而非「还没折出来」——不该再为它重折整份日志。
+ *
+ * @param identity - 官方 subagent 投影单元的值（live 快照 / 缓存行 / 日志折叠三处同形）。
+ * @returns 有标签 = 标签字符串；权威无标签 = `null`；无法判定（identity 缺失或为 null）= `undefined`。
+ */
+export function labelFromSubagentIdentity(identity: SubagentIdentityValue | null | undefined): string | null | undefined {
+  if (identity === null || typeof identity !== 'object') return undefined
+  const label: unknown = identity.label
+  return typeof label === 'string' && label.trim() !== '' ? label : null
+}
+
+/**
  * 有上限的 LRU 缓存（spec 09 审计，纯逻辑供单测）：Map 插入序即访问序，
  * get 命中删后重插 = 移到最新；set 超上限淘汰最久未使用条目。
- * 值域不含 undefined（本插件记忆的都是非空字符串），缺键与「值为 undefined」不可区分，
- * 调用方需保证不存 undefined 值。
+ * 值域不含 undefined（缺键与「值为 undefined」不可区分）；可存 null（「权威无标签」这类
+ * 结论同样要被记住，否则每次都要重折日志），调用方需保证不存 undefined 值。
  */
 export interface LruCache<K, V> {
   get(key: K): V | undefined

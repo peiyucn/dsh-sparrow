@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { resolve, sep } from 'node:path'
-import { createHeaderFactsStore } from '../lib/archive.js'
+import { createHeaderFactsStore, labelFromSubagentIdentity } from '../lib/archive.js'
 import { addedSummaryFor, alignChildArchives, assertRegistryMutationApi, assertSessionLocationApi, FOLDED_LABEL_CACHE_MAX_ENTRIES, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor, storedHeaders, subagentLabel } from '../lib/host.js'
 
 // 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
@@ -223,6 +223,29 @@ describe('archive-manage host 纯逻辑', () => {
     })
   })
 
+  describe('labelFromSubagentIdentity（spec 10 权威判定）', () => {
+    it('identity 带 label 应该 返回该标签', () => {
+      assert.equal(labelFromSubagentIdentity({ mode: 'continuable', label: '审查卸载残留', seq: 7 }), '审查卸载残留')
+    })
+
+    it('identity 存在但无 label（one-shot 可选）应该 返回 null（权威无标签，非「未定」）', () => {
+      assert.equal(labelFromSubagentIdentity({ mode: 'one-shot', seq: 7 }), null)
+    })
+
+    it('identity 为 null（未折到描述符）应该 返回 undefined（仍需折叠）', () => {
+      assert.equal(labelFromSubagentIdentity(null), undefined)
+    })
+
+    it('identity 缺失 / 形状异常 应该 返回 undefined（仍需折叠）', () => {
+      assert.equal(labelFromSubagentIdentity(undefined), undefined)
+      assert.equal(labelFromSubagentIdentity('not-an-object'), undefined)
+    })
+
+    it('label 为空白串 应该 按无标签处理（返回 null）', () => {
+      assert.equal(labelFromSubagentIdentity({ mode: 'one-shot', label: '   ', seq: 1 }), null)
+    })
+  })
+
   describe('subagentLabel 三档读链', () => {
     const labelHeader = (id, extra = {}) => ({ id, createdAt: 1, isSeeded: false, origin: 'subagent', ...extra })
     const labelCtx = ({ live, cacheRow, cacheThrows = false, observe, observeThrows = false }) => ({
@@ -359,6 +382,70 @@ describe('archive-manage host 纯逻辑', () => {
       })
       assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-5')), undefined)
       assert.equal(disposed, 1)
+    })
+
+    // spec 10：one-shot 子会话的 label 官方定义为可选，此前「取不到 label 就重折整份日志」，
+    // 导致每次打开面板都为这批会话解一遍 zstd 日志。缓存行给出 identity 即为权威结论。
+    it('缓存行 identity 存在但无 label 应该 直接结束（不再折叠日志）', async () => {
+      let observed = 0
+      const ctx = labelCtx({
+        cacheRow: { values: { subagent: { mode: 'one-shot', seq: 7 } } },
+        observe: async () => { observed += 1; return undefined },
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-nolabel-1')), undefined)
+      assert.equal(observed, 0)
+    })
+
+    it('缓存行 identity 为 null（未折到描述符）应该 继续走折叠档', async () => {
+      const ctx = labelCtx({
+        cacheRow: { values: { subagent: null } },
+        observe: async () => ({
+          header: { createdAt: 1 },
+          projections: { values: { subagent: { mode: 'continuable', label: 'folded-after-null' } } },
+          dispose: () => {},
+        }),
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-null-1')), 'folded-after-null')
+    })
+
+    it('权威无标签结论 应该 被记忆（二次调用不再折叠）', async () => {
+      let observed = 0
+      const ctx = labelCtx({
+        cacheRow: undefined,
+        observe: async () => {
+          observed += 1
+          return {
+            header: { createdAt: 1 },
+            projections: { values: { subagent: { mode: 'one-shot', seq: 3 } } },
+            dispose: () => {},
+          }
+        },
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-memo-null')), undefined)
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-memo-null')), undefined)
+      assert.equal(observed, 1)
+    })
+
+    it('折叠抛错（非权威）应该 不记忆，下次仍可重试', async () => {
+      let observed = 0
+      const ctx = {
+        sessions: { get: () => undefined },
+        get: (name) => {
+          if (name === 'sessionQuery') {
+            return {
+              observeSession: async () => {
+                observed += 1
+                throw new Error('fold boom')
+              },
+            }
+          }
+          return undefined
+        },
+        logger: { warn: () => {} },
+      }
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-retry-1')), undefined)
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-retry-1')), undefined)
+      assert.equal(observed, 2)
     })
   })
 })
