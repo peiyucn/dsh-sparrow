@@ -103,7 +103,8 @@ async function imageDataUrl(ref: ImageAttachmentRef, readImage: CodeBuddyReadIma
 }
 
 /** DSH Message → CodeBuddy 线格式（OpenAI 方言）。reasoning 块不进历史；
- *  图片块经附件 seam 序列化为 image_url data URL。 */
+ *  图片块经附件 seam 序列化为 image_url data URL；连续 user 消息合并为一条
+ *  （上游只认最后一条 user 消息里的图片，见下方注释与 spec 04）。 */
 export async function toWireMessages(
   options: GenerateOptions,
   readImage?: CodeBuddyReadImage,
@@ -146,6 +147,20 @@ export async function toWireMessages(
           }
           parts.push({ type: 'image_url', image_url: { url } })
         }
+      }
+      // 连续 user 消息合并（spec 04，2026-09-08 实测）：上游网关**只认最后一条 user
+      // 消息里的图片**，更早消息中的图片会被静默丢弃并注入「当前模型不支持图片」的提醒。
+      // 而 DSH 会把 system-reminder / 技能目录 / 运行时上下文等以 user 消息追加在真实
+      // 用户消息之后——不合并的话带图消息永远不是最后一条，图片必然被丢弃。
+      const previous = messages.at(-1)
+      if (previous !== undefined && previous.role === 'user') {
+        const merged: unknown[] = typeof previous.content === 'string'
+          ? (previous.content === '' ? [] : [{ type: 'text', text: previous.content }])
+          : [...(previous.content ?? []) as unknown[]]
+        if (text !== '') merged.push({ type: 'text', text })
+        merged.push(...parts)
+        previous.content = merged.length === 0 ? '' : merged
+        continue
       }
       if (parts.length === 0) {
         messages.push({ role: 'user', content: text })

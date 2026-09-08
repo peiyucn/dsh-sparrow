@@ -85,6 +85,91 @@ describe('toWireMessages', () => {
       /未接入附件服务/,
     )
   })
+
+  // spec 04（2026-09-08 实测）：上游只认最后一条 user 消息里的图片，
+  // DSH 又把 system-reminder 等作为 user 消息追加在真实用户消息之后。
+  it('连续 user 消息应该 合并为一条（文本顺序保持）', async () => {
+    const wire = await toWireMessages({
+      provider: 'codebuddy-credits',
+      model: 'deepseek-v4-flash',
+      messages: [
+        { id: 'm1', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '这是啥？' }] },
+        { id: 'm2', role: 'user', source: { kind: 'plugin' }, content: [{ type: 'text', text: '<system-reminder>工作区规范</system-reminder>' }] },
+      ],
+    })
+    assert.deepEqual(wire, [{
+      role: 'user',
+      content: [
+        { type: 'text', text: '这是啥？' },
+        { type: 'text', text: '<system-reminder>工作区规范</system-reminder>' },
+      ],
+    }])
+  })
+
+  it('图片后跟其它 user 消息 应该 合并后图片落在最后一条消息里', async () => {
+    const wire = await toWireMessages({
+      provider: 'codebuddy-credits',
+      model: 'deepseek-v4-flash',
+      messages: [
+        {
+          id: 'm1',
+          role: 'user',
+          source: { kind: 'user' },
+          content: [
+            { type: 'image', attachment: { attachmentId: 'sha256:abc', mediaType: 'image/png', bytes: 4, width: 2, height: 2 } },
+            { type: 'text', text: '这是啥？' },
+          ],
+        },
+        { id: 'm2', role: 'user', source: { kind: 'skill-catalog' }, content: [{ type: 'text', text: '技能目录' }] },
+      ],
+    }, async () => ({ mediaType: 'image/png', data: new Uint8Array([1, 2, 3, 4]) }))
+    assert.equal(wire.length, 1)
+    assert.equal(wire[0].role, 'user')
+    assert.deepEqual(wire[0].content, [
+      { type: 'text', text: '这是啥？' },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,AQIDBA==' } },
+      { type: 'text', text: '技能目录' },
+    ])
+  })
+
+  it('工具结果消息 应该 不参与合并（user/tool 交替保持）', async () => {
+    const wire = await toWireMessages({
+      provider: 'codebuddy-credits',
+      model: 'deepseek-v4-flash',
+      messages: [
+        { id: 'm1', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '跑一下' }] },
+        {
+          id: 'm2',
+          role: 'user',
+          source: { kind: 'tool', callId: 'call_1' },
+          content: [{ type: 'tool-result', content: [{ type: 'text', text: '结果' }] }],
+        },
+        { id: 'm3', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '继续' }] },
+      ],
+    })
+    assert.deepEqual(wire, [
+      { role: 'user', content: '跑一下' },
+      { role: 'tool', tool_call_id: 'call_1', content: '结果' },
+      { role: 'user', content: '继续' },
+    ])
+  })
+
+  it('被 assistant 隔开的 user 消息 应该 不合并', async () => {
+    const wire = await toWireMessages({
+      provider: 'codebuddy-credits',
+      model: 'deepseek-v4-flash',
+      messages: [
+        { id: 'm1', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '第一问' }] },
+        { id: 'm2', role: 'assistant', source: { kind: 'model', model: 'deepseek-v4-flash' }, content: [{ type: 'text', text: '第一答' }] },
+        { id: 'm3', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '第二问' }] },
+      ],
+    })
+    assert.deepEqual(wire, [
+      { role: 'user', content: '第一问' },
+      { role: 'assistant', content: '第一答', tool_calls: undefined },
+      { role: 'user', content: '第二问' },
+    ])
+  })
 })
 
 describe('CodeBuddyAdapter.stream', () => {
