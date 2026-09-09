@@ -60,17 +60,6 @@ export function unsupportedStoredFormatReason(
 }
 
 /**
- * 请求期宿主真值校验：宿主给出的 header 版本不受支持即抛错（拒绝本次操作，不静默继续）。
- * @param pluginName - 错误前缀。
- * @param headers - 本次操作涉及的会话 header。
- */
-export function assertStoredFormatSupported(pluginName: string, ...headers: readonly { readonly version?: unknown }[]): void {
-  const reason = unsupportedStoredFormatReason(headers)
-  if (reason === undefined) return
-  throw new Error(`${pluginName}: ${reason}；已拒绝本次操作（升级本插件后自动恢复）`)
-}
-
-/**
  * 宿主上报的会话格式版本。
  *
  * 用**命名空间访问**而非具名导入：官方若删除/改名该导出，这里只得到 `undefined`

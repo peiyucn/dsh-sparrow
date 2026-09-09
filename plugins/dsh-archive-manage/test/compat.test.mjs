@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  assertCapabilities, assertHostCompatible, assertStoredFormatSupported, hostSessionFormatVersion,
+  assertCapabilities, assertHostCompatible, hostSessionFormatVersion,
   missingCapabilities, SUPPORTED_SESSION_FORMAT_VERSIONS, unsupportedSessionFormatReason, unsupportedStoredFormatReason,
 } from '../lib/compat.js'
 
@@ -73,12 +73,6 @@ describe('compat 宿主兼容自检（会话版）', () => {
 
     it('header 版本缺失 应该 按不支持处理（保守）', () => {
       assert.ok(unsupportedStoredFormatReason([{}]) !== undefined)
-    })
-
-    it('assertStoredFormatSupported：支持不抛、不支持抛错', () => {
-      assert.doesNotThrow(() => { assertStoredFormatSupported('dsh-x') })
-      assert.doesNotThrow(() => { assertStoredFormatSupported('dsh-x', { version: 0 }) })
-      assert.throws(() => { assertStoredFormatSupported('dsh-x', { version: 3 }) }, /已拒绝本次操作/u)
     })
   })
 
