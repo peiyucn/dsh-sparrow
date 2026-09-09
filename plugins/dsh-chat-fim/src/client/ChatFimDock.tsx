@@ -840,8 +840,11 @@ export function ChatFimDock(props: ChatFimDockProps) {
   }, [])
 
   useEffect(() => {
+    // 本会话 id 在此定格：会话切换时旧的 effect 清理要用**旧** id 撤销归属，
+    // 否则环会一直挂在已离开的会话上（开关胶囊的 aria-busy 也跟着卡住）。
+    const sessionId = session.sessionId
     setSuggestion(null)
-    clearSuggestBusy(session.sessionId)
+    clearSuggestBusy(sessionId)
     setSuggestError(null)
     flightRef.current?.abort()
 
@@ -852,7 +855,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
     // 不会复现旧建议（FIM 时代「建议马上复现」的问题已随上游切换失效），Tab 链式续写由此成立；
     // 采纳文本以句末标点结尾时，中/低档门控自然抑制链式触发，高档（句末标点也触发）可一直 Tab。
     const adoption = peekSuggestAdoption()
-    if (adoption !== null && adoption.sessionId === session.sessionId && draft === adoption.draft + adoption.text) {
+    if (adoption !== null && adoption.sessionId === sessionId && draft === adoption.draft + adoption.text) {
       clearSuggestAdoption()
     }
     if (!shouldTriggerSuggest(draft, sensitivity).ok) return
@@ -862,7 +865,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
       if (composingRef.current || rev !== draftRevRef.current || draftRef.current !== draft) return
       const controller = new AbortController()
       flightRef.current = controller
-      setSuggestBusy(session.sessionId)
+      setSuggestBusy(sessionId)
       void requestComplete(session.sessionId, draft, controller.signal)
         .then((result) => {
           if (controller.signal.aborted) return
@@ -871,7 +874,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
           if (text !== undefined && text !== '') {
             setSuggestion({
               text,
-              sessionId: session.sessionId,
+              sessionId,
               draft,
               draftRev: rev,
               detectEnd: detectEndOfDraft(draft, input.occurrences),
@@ -890,12 +893,16 @@ export function ChatFimDock(props: ChatFimDockProps) {
         })
         .finally(() => {
           if (flightRef.current === controller) flightRef.current = null
-          if (!controller.signal.aborted) clearSuggestBusy(session.sessionId)
+          if (!controller.signal.aborted) clearSuggestBusy(sessionId)
         })
     }, sensitivityParams.pauseMs)
 
     return () => {
       clearTimeout(timer)
+      // 会话切换/卸载：本会话在途请求作废，环的归属一并按**本会话**撤销
+      // （abort 后 .finally 因 signal.aborted 不再清，故这里显式清）。
+      flightRef.current?.abort()
+      clearSuggestBusy(sessionId)
     }
   }, [composing, enabled, supported, sensitivity, sensitivityParams, input.draft, input.draftRev, input.phase, requestComplete, session.sessionId])
 
