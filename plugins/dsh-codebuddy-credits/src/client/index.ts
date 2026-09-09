@@ -11,7 +11,6 @@
  * Key 只经本机 host 路由存入 DSH 凭据库；文案经 dsh locale。
  */
 
-import type { Context } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
