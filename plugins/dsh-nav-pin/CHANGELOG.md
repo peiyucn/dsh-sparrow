@@ -4,7 +4,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## 0.1.2-rc.1.1 (2026-09-09)
 
-- If dsh is upgraded to a version this plugin does not support yet, the plugin now disables itself instead of running against an unknown contract (dsh and other plugins are unaffected).
+- If the browser running dsh lacks a CSS feature this plugin needs, the plugin now disables itself instead of injecting rules that cannot work (dsh and other plugins are unaffected).
 
 ## 0.1.2-rc.1 (2026-09-05)
 

@@ -2,12 +2,13 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.1.2-rc.1.1 (2026-09-08)
+## 0.1.2-rc.1.1 (2026-09-09)
 
 - If dsh is upgraded to a version this plugin does not support yet, the plugin now disables itself instead of running against an unknown contract (dsh and other plugins are unaffected).
 - The archive panel opens noticeably faster: subagent labels no longer re-read a session's whole log when the official projection cache has already settled them (previously every open re-folded the log for each subagent).
 - Subagent labels are no longer taken from an inherited ancestor descriptor (a forked child briefly showed the parent's label before writing its own).
 - The panel no longer flickers after an action: the list and its buttons stay as they are and update in place, instead of being replaced by a loading spinner or briefly greying out.
+- Sessions stored in a format this plugin does not recognize are no longer moved or deleted: the action is refused instead of guessed at.
 
 ## 0.1.2-rc.1 (2026-09-05)
 

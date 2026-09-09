@@ -3,7 +3,7 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
-## 0.1.2-rc.1.2 (2026-09-08)
+## 0.1.2-rc.1.2 (2026-09-09)
 
 - If dsh is upgraded to a version this plugin does not support yet, the plugin now disables itself instead of running against an unknown contract (dsh and other plugins are unaffected).
 - Images now reach vision-capable models reliably: previously the model replied that it could not see images even though the model supports them.
