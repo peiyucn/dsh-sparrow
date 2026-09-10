@@ -192,13 +192,25 @@ export function imageRefsInEvents(events: readonly SessionEvent[]): ImageAttachm
       message?: { content?: unknown }
       inserted?: Array<{ content?: unknown }>
       chunk?: { type?: unknown; block?: unknown }
+      stream?: Array<{ type?: unknown; chunk?: { type?: unknown; block?: unknown } }>
     }
     collectImageRefs(data.content, refs)
     if (data.message !== undefined) collectImageRefs(data.message.content, refs)
     if (data.inserted !== undefined) {
       for (const message of data.inserted) collectImageRefs(message.content, refs)
     }
-    if (event.type === 'assistant/chunk' && data.chunk?.type === 'block-end') {
+    // V3（dsh ≥ 0.1.5）：assistant 流按 attempt 聚合进 assistant/attempt（及 assistant/message）
+    // 的 data.stream[]，原始 chunk 记录带 type: 'chunk' + chunk.block。
+    if (Array.isArray(data.stream)) {
+      for (const record of data.stream) {
+        if (record?.type === 'chunk' && record.chunk?.type === 'block-end') {
+          collectImageRefs([record.chunk.block], refs)
+        }
+      }
+    }
+    // V2（dsh < 0.1.5）：assistant/chunk 是独立事件类型；0.1.5 的类型里已不存在，
+    // 故经 string 拓宽比较，保留对旧宿主的读取能力（会话格式门同样接受 v0）。
+    if ((event.type as string) === 'assistant/chunk' && data.chunk?.type === 'block-end') {
       collectImageRefs([data.chunk.block], refs)
     }
   }

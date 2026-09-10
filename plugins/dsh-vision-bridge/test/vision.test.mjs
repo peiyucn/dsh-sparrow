@@ -336,6 +336,33 @@ describe('vision-bridge 纯逻辑', () => {
     it('无图事件 应该 返回空数组', () => {
       assert.deepEqual(imageRefsInEvents([{ type: 'user/message', data: { content: [{ type: 'text', text: 'hi' }] } }]), [])
     })
+
+    it('V3 assistant/attempt 的 stream 块 应该 也能反查到图片（0.1.5 起）', () => {
+      const image = { type: 'image', attachment: { attachmentId: 'sha256:cccccccccccccccc' } }
+      const events = [{
+        type: 'assistant/attempt',
+        data: {
+          turn: 0,
+          step: 0,
+          stream: [
+            { type: 'text-chunks', time0: 0, index: 0, dt: [], texts: ['x'] },
+            { type: 'chunk', time: 1, chunk: { type: 'block-end', block: image } },
+          ],
+        },
+      }]
+      assert.deepEqual(imageRefsInEvents(events).map(ref => String(ref.attachmentId)), ['sha256:cccccccccccccccc'])
+    })
+
+    it('V2 assistant/chunk 事件 应该 保持兼容读取（旧宿主）', () => {
+      const image = { type: 'image', attachment: { attachmentId: 'sha256:dddddddddddddddd' } }
+      const events = [{ type: 'assistant/chunk', data: { chunk: { type: 'block-end', block: image } } }]
+      assert.deepEqual(imageRefsInEvents(events).map(ref => String(ref.attachmentId)), ['sha256:dddddddddddddddd'])
+    })
+
+    it('stream 里的非 block-end chunk 应该 不采集', () => {
+      const events = [{ type: 'assistant/attempt', data: { stream: [{ type: 'chunk', chunk: { type: 'text-delta', text: 'x' } }] } }]
+      assert.deepEqual(imageRefsInEvents(events), [])
+    })
   })
 
 })
