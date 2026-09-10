@@ -12,7 +12,7 @@ After a short typing pause, a suggestion card styled like the official @ menu ap
 dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim
 ```
 
-Requires dsh 0.1.2-rc.1 — the exact official version line this release is built and verified against (newer lines, pre-releases in particular, are not covered) — and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
+Requires dsh 0.1.5-rc.1 — the exact official version line this release is built and verified against (newer lines, pre-releases in particular, are not covered) — and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
 
 > Do **not** run `npm install @dsh-sparrow/dsh-chat-fim` directly — that only downloads the package into a `node_modules` and does not register it in the DSH web profile. Install with the `dsh plugin` command above, then restart DSH.
 

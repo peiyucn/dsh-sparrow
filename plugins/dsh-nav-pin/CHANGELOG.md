@@ -2,6 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.5-rc.1 (2026-09-10)
+
+- Version-line alignment with official dsh 0.1.5-rc.1.
+
 ## 0.1.2-rc.1.1 (2026-09-09)
 
 - If the browser running dsh lacks a CSS feature this plugin needs, the plugin now disables itself instead of injecting rules that cannot work (dsh and other plugins are unaffected).
