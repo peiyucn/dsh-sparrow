@@ -2,12 +2,16 @@
 
 /**
  * 容量（token 数）→ 短串：百万级用 M（至多一位小数、整数不带 .0），千级用 K，其它原样；
- * 非法值返回 undefined（渲染侧按缺省处理）。口径对齐官方 DeepSeek 编辑器的容量显示（`1M` / `256K`）。
+ * 非法值返回 undefined（渲染侧按缺省处理）；999_500 以上收成 M，不出现 1000K。
  */
 export function formatCapacity(value: unknown): string | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return undefined
   if (value >= 1_000_000) return `${Math.round(value / 100_000) / 10}M`
-  if (value >= 1_000) return `${Math.round(value / 1_000)}K`
+  if (value >= 1_000) {
+    // 999_500+ 四舍五入到 1000K 时收成 1M，避免出现「1000K」这种边界串。
+    const thousands = Math.round(value / 1_000)
+    return thousands >= 1_000 ? `${Math.round(value / 100_000) / 10}M` : `${thousands}K`
+  }
   return String(Math.round(value))
 }
 

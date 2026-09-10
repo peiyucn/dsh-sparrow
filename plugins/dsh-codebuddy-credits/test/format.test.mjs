@@ -14,6 +14,11 @@ describe('formatCapacity（只读清单的容量短串）', () => {
     assert.equal(formatCapacity(1_000), '1K')
   })
 
+  it('接近百万的边界 应该 进位到 1M（不出现 1000K）', () => {
+    assert.equal(formatCapacity(999_999), '1M')
+    assert.equal(formatCapacity(999_499), '999K')
+  })
+
   it('千以下 应该 原样（取整）', () => {
     assert.equal(formatCapacity(999), '999')
     assert.equal(formatCapacity(12.6), '13')
