@@ -12,6 +12,36 @@ const ARCHIVE_PAGE_SIZE = 100
 /** 会话进出事件的刷新防抖（spec 09）：多个会话释放事件合并成一次全量刷新。 */
 const SESSIONS_CHANGED_DEBOUNCE_MS = 300
 
+/** dsh 官方 ongoing 点阵几何（ui-primitives StateDot 的 matrix 分支）：10px 网格上的
+ *  外圈 8 个 2px 方块、从左上起顺时针；每格负延时 125ms = 一圈 1s。 */
+const MATRIX_CELLS: readonly (readonly [number, number])[] = [
+  [0, 0], [4, 0], [8, 0], [8, 4], [8, 8], [4, 8], [0, 8], [0, 4],
+]
+/** 点阵相位步长（毫秒）：与官方 StateDot 一致。 */
+const MATRIX_PHASE_STEP_MS = 125
+
+/**
+ * dsh 官方点阵 loading：几何与节奏照搬 ui-primitives StateDot 的 ongoing 分支
+ * （10×10 viewBox、crispEdges、逐格负延时相位）；配色与 keyframes 见注入的样式表。
+ */
+function MatrixLoading(): ReactElement {
+  return (
+    <svg className="dsh-archive-matrix" width="16" height="16" viewBox="0 0 10 10" shapeRendering="crispEdges" aria-hidden="true">
+      {MATRIX_CELLS.map(([x, y], index) => (
+        <rect
+          key={`${x}-${y}`}
+          className="dsh-archive-matrix-cell"
+          x={x}
+          y={y}
+          width="2"
+          height="2"
+          style={{ animationDelay: `${(index - MATRIX_CELLS.length) * MATRIX_PHASE_STEP_MS}ms` }}
+        />
+      ))}
+    </svg>
+  )
+}
+
 /** 归档树节点：顶层为归档会话根，children 为随父归档的子会话（spec 08，只操作父）。 */
 export interface ArchivedSessionItem {
   readonly sessionId: string
@@ -393,20 +423,25 @@ export function ensureArchiveStyles(): void {
   font-size: 14px;
   line-height: 22px;
 }
-.dsh-archive-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--dsw-alias-border-l1, #d4d8e0);
-  border-top-color: var(--dsw-alias-button-info-fill, #4d6bfe);
-  border-radius: 50%;
-  corner-shape: round;
-  animation: dsh-archive-spin 0.8s linear infinite;
+/* dsh 官方 ongoing 点阵（ui-primitives StateDot matrix）：10×10 网格上 8 个 2px 方块
+   顺时针追逐，每格负延时 125ms（一圈 1s），透明度按 1 → .6 → .35 → .15 平键帧跳变。 */
+.dsh-archive-matrix {
+  flex: none;
+  color: var(--dsw-static-deepseek-450, #5686fe);
 }
-@keyframes dsh-archive-spin {
-  to { transform: rotate(360deg); }
+.dsh-archive-matrix .dsh-archive-matrix-cell {
+  fill: currentColor;
+  opacity: 0.15;
+  animation: dsh-archive-dot-chase 1s infinite;
+}
+@keyframes dsh-archive-dot-chase {
+  0%, 12.4% { opacity: 1; }
+  12.5%, 24.9% { opacity: 0.6; }
+  25%, 37.4% { opacity: 0.35; }
+  37.5%, 100% { opacity: 0.15; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .dsh-archive-spinner { animation: none; }
+  .dsh-archive-matrix .dsh-archive-matrix-cell { animation: none; opacity: 0.7; }
 }
 `
   document.head.appendChild(style)
@@ -1207,7 +1242,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             <div className="dsh-archive-panel-body" aria-busy={refreshing} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
             {loading ? (
               <div className="dsh-archive-loading" role="status">
-                <span className="dsh-archive-spinner" aria-hidden />
+                <MatrixLoading />
                 <span>{t('loading')}</span>
               </div>
             ) : (

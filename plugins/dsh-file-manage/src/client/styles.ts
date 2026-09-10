@@ -68,20 +68,25 @@ export function ensureFileManageStyles(): void {
   font-size: 14px;
   line-height: 22px;
 }
-.dsh-file-manage-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--dsw-alias-border-l1, #d4d8e0);
-  border-top-color: var(--dsw-alias-button-info-fill, #4d6bfe);
-  border-radius: 50%;
-  corner-shape: round;
-  animation: dsh-file-manage-spin 0.8s linear infinite;
+/* dsh 官方 ongoing 点阵（ui-primitives StateDot matrix）：10×10 网格上 8 个 2px 方块
+   顺时针追逐，每格负延时 125ms（一圈 1s），透明度按 1 → .6 → .35 → .15 平键帧跳变。 */
+.dsh-file-manage-matrix {
+  flex: none;
+  color: var(--dsw-static-deepseek-450, #5686fe);
 }
-@keyframes dsh-file-manage-spin {
-  to { transform: rotate(360deg); }
+.dsh-file-manage-matrix .dsh-file-manage-matrix-cell {
+  fill: currentColor;
+  opacity: 0.15;
+  animation: dsh-file-manage-dot-chase 1s infinite;
+}
+@keyframes dsh-file-manage-dot-chase {
+  0%, 12.4% { opacity: 1; }
+  12.5%, 24.9% { opacity: 0.6; }
+  25%, 37.4% { opacity: 0.35; }
+  37.5%, 100% { opacity: 0.15; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .dsh-file-manage-spinner { animation: none; }
+  .dsh-file-manage-matrix .dsh-file-manage-matrix-cell { animation: none; opacity: 0.7; }
 }
 /* 面板滚动区：官方 settings 同款——elevated surface 重绑 l2 滚动条 token（base 默认 l1，浮层上对比度不对）。 */
 .dsh-file-manage-body {

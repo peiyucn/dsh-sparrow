@@ -5,6 +5,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 ## 0.1.5-rc.1 (2026-09-10)
 
 - Version-line alignment with official dsh 0.1.5-rc.1.
+- The panel's loading indicator now uses dsh's own dot-matrix chase animation, matching the rest of the UI.
 
 ## 0.1.2-rc.1.1 (2026-09-09)
 

@@ -1,6 +1,6 @@
 /** 云端文件面板视图：入口按钮 + 弹窗（列表 / 翻页 / 删除确认 / 复制 / 配额条）；样式与请求分别在 styles.ts / api.ts。 */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
@@ -21,6 +21,36 @@ export interface FileManageDockInjected {
 }
 
 export type FileManageDockProps = PropsRuntime<'sidebar.footer.action'> & FileManageDockInjected & { t: TranslateNS<'file-manage'> }
+
+/** dsh 官方 ongoing 点阵几何（ui-primitives StateDot 的 matrix 分支）：10px 网格上的
+ *  外圈 8 个 2px 方块、从左上起顺时针；每格负延时 125ms = 一圈 1s。 */
+const MATRIX_CELLS: readonly (readonly [number, number])[] = [
+  [0, 0], [4, 0], [8, 0], [8, 4], [8, 8], [4, 8], [0, 8], [0, 4],
+]
+/** 点阵相位步长（毫秒）：与官方 StateDot 一致。 */
+const MATRIX_PHASE_STEP_MS = 125
+
+/**
+ * dsh 官方点阵 loading：几何与节奏照搬 ui-primitives StateDot 的 ongoing 分支
+ * （10×10 viewBox、crispEdges、逐格负延时相位）；配色与 keyframes 见注入的样式表。
+ */
+function MatrixLoading(): ReactElement {
+  return (
+    <svg className="dsh-file-manage-matrix" width="16" height="16" viewBox="0 0 10 10" shapeRendering="crispEdges" aria-hidden="true">
+      {MATRIX_CELLS.map(([x, y], index) => (
+        <rect
+          key={`${x}-${y}`}
+          className="dsh-file-manage-matrix-cell"
+          x={x}
+          y={y}
+          width="2"
+          height="2"
+          style={{ animationDelay: `${(index - MATRIX_CELLS.length) * MATRIX_PHASE_STEP_MS}ms` }}
+        />
+      ))}
+    </svg>
+  )
+}
 
 /** 面板状态：首屏 loading / 错误横幅 / 列表 + 加载更多 / 删除确认框（web 确认框替代原生 confirm）。 */
 export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: FileManageDockProps) {
@@ -251,7 +281,7 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
             <div ref={bodyRef} style={{ ...styles.body, padding: summary !== null ? '0 24px 24px' : '12px 24px 24px' }} className="dsh-file-manage-body">
               {initialLoading ? (
                 <div className="dsh-file-manage-loading" role="status">
-                  <span className="dsh-file-manage-spinner" aria-hidden />
+                  <MatrixLoading />
                   <span>{t('loading')}</span>
                 </div>
               ) : (
