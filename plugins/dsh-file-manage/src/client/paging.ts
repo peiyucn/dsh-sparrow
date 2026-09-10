@@ -1,11 +1,11 @@
 /** 文件面板渲染窗口纯逻辑（对齐 archive-manage spec 09）：数据分页与 DOM 渲染窗口分离。 @module dsh-file-manage/client/paging */
 
-/** 渲染窗口大小：每次渲染的行数上限，「加载更多」按此递增（archive 同款 100）。 */
-export const RENDER_PAGE_SIZE = 100
+/** 渲染窗口大小：每次「加载更多」多显示的行数（owner 定案 2026-09-01：每页 20 条）。 */
+export const RENDER_PAGE_SIZE = 20
 
 /**
- * 数据分页大小：每次 list 拉取的行数。必须大于渲染窗口（200 > 100），
- * 窗口才会真正裁剪 DOM——否则窗口永远跑在数据前面，退化回全量渲染。
+ * 数据分页大小：每次 list 拉取的行数。大于渲染窗口（200 > 20），
+ * 一次游标请求覆盖多次「加载更多」点击，窗口之外的数据不渲染（DOM 有界）。
  */
 export const FILE_PAGE_SIZE = 200
 
