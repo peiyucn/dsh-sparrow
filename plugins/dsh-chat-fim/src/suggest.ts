@@ -1,6 +1,6 @@
 /** dsh-chat-fim 纯逻辑：配置归一化、请求校验、错误映射、候选提取。 */
 
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { EpochHeader } from '@deepseek-ai/dsh-session'
 
 export const DEFAULT_BASE_URL = 'https://api.deepseek.com/beta'
 export const DEFAULT_MODEL = 'deepseek-v4-pro'
@@ -142,17 +142,19 @@ export function truncateFirstSentence(text: string, minLatinChars = 8): string {
   return value
 }
 
-/** 主模型路由：会话事件里最近一条 request/header 的 provider/model。
- *  倒序遍历、不复制整段事件数组——每次建议请求都会调 snapshotEvents()（全量快照），
- *  这里再 `[...events].reverse()` 会多一次 O(n) 拷贝（长会话可上万条）。 */
-export function mainRouteFromSession(events: readonly SessionEvent[]): { provider: string; model: string } | undefined {
-  for (let index = events.length - 1; index >= 0; index--) {
-    const event = events[index] as SessionEvent | undefined
-    if (event === undefined || event.type !== 'request/header') continue
-    const config = (event.data as { header?: { config?: { provider?: unknown; model?: unknown } } }).header?.config
-    if (typeof config?.provider === 'string' && typeof config.model === 'string') {
-      return { provider: config.provider, model: config.model }
-    }
+/** 主模型路由：宿主折叠出的最近一次请求 header 的 provider/model。
+ *
+ * 改用官方 `session.requestHeader()`（增量折叠、无 TTL）替代原先遍历 `snapshotEvents()`：
+ * 官方 agent-loop 每次 dispatch 前写入 header 后立即用它组装请求，故「日志最后一条
+ * request/header 之后生效的 header」与事件遍历在 provider/model 上等价，但省掉每次建议请求
+ * 的 O(总事件数) 全量快照拷贝（V3 日志更长，这一点更明显）。
+ *
+ * 守卫必须保留：live 追加只校验 header 是对象，provider/model 仅 seed 路径校验，
+ * 折叠出的 config 可能缺字段。 */
+export function mainRouteFromHeader(header: EpochHeader | undefined): { provider: string; model: string } | undefined {
+  const config = header?.config
+  if (typeof config?.provider === 'string' && typeof config.model === 'string') {
+    return { provider: config.provider, model: config.model }
   }
   return undefined
 }

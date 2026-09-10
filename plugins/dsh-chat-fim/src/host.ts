@@ -6,13 +6,13 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { EpochHeader } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import { assertHostCompatible, unsupportedStoredFormatReason } from './compat.js'
 import {
   buildFimPrompt, cleanSuggestion, currentMainRoute, detectDraftLanguage, extractSuggestions, extractUsage, speakerStopSequences,
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, isLanguageConsistent,
-  mainRouteFromSession, MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns,
+  mainRouteFromHeader, MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns,
   resolveSuggestModel, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence, upstreamStatusToError,
   type ChatFimConfig, type ChatFimError, type CompleteRequest,
 } from './suggest.js'
@@ -198,11 +198,12 @@ function hostFormatSupported(header: { readonly version?: unknown } | undefined)
   return header !== undefined && unsupportedStoredFormatReason([header]) === undefined
 }
 
-/** 会话当前主模型：modelSelection 投影（选中即生效，不依赖历史事件）→ 最近请求事件
- *  → 共享默认模型；服务缺失（旧版 dsh）逐档 fail-soft。模型一换，开关状态立刻追平。 */
+/** 会话当前主模型：modelSelection 投影（选中即生效，不依赖历史事件）→ 官方折叠出的
+ *  最近请求 header（`session.requestHeader()`，增量折叠）→ 共享默认模型；服务缺失（旧版 dsh）
+ *  逐档 fail-soft。模型一换，开关状态立刻追平。 */
 function currentSessionModel(
   ctx: Context,
-  session: { snapshotEvents(): readonly SessionEvent[] },
+  session: { requestHeader(): EpochHeader | undefined },
 ): { provider: string; model: string } | undefined {
   let selection: { lastUsed?: { provider: string; model: string } | null; pending?: { provider: string; model: string } | null } | undefined
   try {
@@ -225,7 +226,7 @@ function currentSessionModel(
   } catch {
     // 缺服务：跳过默认档。
   }
-  return currentMainRoute(selection, mainRouteFromSession(session.snapshotEvents()), defaultModel)
+  return currentMainRoute(selection, mainRouteFromHeader(session.requestHeader()), defaultModel)
 }
 
 /**

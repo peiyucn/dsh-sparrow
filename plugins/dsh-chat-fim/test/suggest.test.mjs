@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   buildFimPrompt, detectDraftLanguage, isLanguageConsistent, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, speakerStopSequences,
-  formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromSession, currentMainRoute,
+  formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromHeader, currentMainRoute,
   normalizeConfig, normalizeSuggestModelMode, normalizeTriggerSensitivity, parseCompleteBody, recentHistoryTurns,
   resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence,
   upstreamStatusToError, validateCompletePayload, detectEndOfDraft,
@@ -279,38 +279,23 @@ describe('chat-fim 纯逻辑', () => {
     })
   })
 
-  describe('mainRouteFromSession', () => {
-    it('最近一条 request/header 应该 取到 provider/model', () => {
-      const events = [
-        { type: 'user/message', seq: 1, time: 1, data: {} },
-        { type: 'request/header', seq: 2, time: 2, data: { header: { config: { provider: 'zai', model: 'glm-5.3-flash' } } } },
-        { type: 'request/header', seq: 3, time: 3, data: { header: { config: { provider: 'deepseek-official', model: 'deepseek-v4-pro' } } } },
-      ]
-      assert.deepEqual(mainRouteFromSession(events), { provider: 'deepseek-official', model: 'deepseek-v4-pro' })
+  describe('mainRouteFromHeader', () => {
+    it('header 的 config 应该 取到 provider/model', () => {
+      assert.deepEqual(
+        mainRouteFromHeader({ config: { provider: 'deepseek-official', model: 'deepseek-v4-pro' } }),
+        { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
+      )
     })
 
-    it('无 request/header 应该 返回 undefined', () => {
-      assert.equal(mainRouteFromSession([{ type: 'user/message', seq: 1, time: 1, data: {} }]), undefined)
+    it('无 header 应该 返回 undefined', () => {
+      assert.equal(mainRouteFromHeader(undefined), undefined)
     })
 
-    it('长事件列表 应该 倒序取到末尾最近的 header（不依赖数组拷贝）', () => {
-      const events = Array.from({ length: 50 }, (_, index) => ({
-        type: 'request/header',
-        seq: index,
-        time: index,
-        data: { header: { config: { provider: `p${index}`, model: `m${index}` } } },
-      }))
-      assert.deepEqual(mainRouteFromSession(events), { provider: 'p49', model: 'm49' })
-    })
-
-    it('遍历 不应该 改写输入事件数组', () => {
-      const events = [
-        { type: 'user/message', seq: 1, time: 1, data: {} },
-        { type: 'request/header', seq: 2, time: 2, data: { header: { config: { provider: 'zai', model: 'glm-5.3-flash' } } } },
-      ]
-      const snapshot = JSON.parse(JSON.stringify(events))
-      mainRouteFromSession(events)
-      assert.deepEqual(events, snapshot)
+    it('缺 provider/model 的畸形 header 应该 返回 undefined（守卫）', () => {
+      assert.equal(mainRouteFromHeader({ config: {} }), undefined)
+      assert.equal(mainRouteFromHeader({ config: { provider: 'zai' } }), undefined)
+      assert.equal(mainRouteFromHeader({ config: { model: 'glm-5.3' } }), undefined)
+      assert.equal(mainRouteFromHeader({}), undefined)
     })
   })
 
