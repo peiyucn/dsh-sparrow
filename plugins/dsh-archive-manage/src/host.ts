@@ -345,15 +345,31 @@ function sessionFacts(ctx: Context, sessionId: string): SessionFacts | undefined
 }
 
 /**
- * 私有 seam 依赖：sessionPersistence.locate。alpha.5 发布后的 master 把它从公开服务契约
- * 降为 jsonl 后端私有方法——运行时成员仍在（插件只读使用，不替换不覆写），但必须启动
- * 能力检查，缺失即 fail-fast（与 registry 写通道同款护栏）。
+ * 私有 locate 方法的返回形状：本插件只用到 kind 与 path（见 sessionDirectoryFor）。
+ * 0.1.5-rc.1 起官方不再把它放在公开 SessionPersistence 类型上，故不能直接用该类型。
  */
-export function assertSessionLocationApi(persistence: unknown): void {
+export interface SessionLocationLike {
+  readonly kind: string
+  readonly path: string
+}
+
+/** 受检后的私有 locate 访问器。 */
+export interface SessionLocationApi {
+  locate(header: SessionHeader): SessionLocationLike | undefined
+}
+
+/**
+ * 私有 seam 依赖：sessionPersistence.locate。alpha.5 发布后的 master 把它从公开服务契约
+ * 降为 jsonl 后端私有方法，0.1.5-rc.1 已从公开类型 `SessionPersistence` 上消失（运行时成员仍在，
+ * 插件只读使用、不替换不覆写）。缺失即 fail-fast，并返回结构化访问器供各调用点使用
+ * （与 registry 写通道同款护栏）。
+ */
+export function assertSessionLocationApi(persistence: unknown): SessionLocationApi {
   const locate = (persistence as Record<string, unknown> | null | undefined)?.locate
   if (typeof locate !== 'function') {
     throw new Error('不支持的 DSH session persistence：缺少私有 locate 方法；请升级插件以匹配当前 dsh 版本')
   }
+  return persistence as unknown as SessionLocationApi
 }
 
 /**
@@ -738,7 +754,7 @@ async function listSubagentTargets(
     if (ctx.sessions.get(sessionId) !== undefined || ctx.agents.get(sessionId) !== undefined) {
       throw new ArchiveError('SESSION_LIVE', `subagent 会话 ${String(sessionId)} 仍被 dsh 进程占用，不能与父会话一起处理`, 409)
     }
-    const location = ctx.sessionPersistence.locate(header)
+    const location = assertSessionLocationApi(ctx.sessionPersistence).locate(header)
     const dir = location === undefined ? undefined : sessionDirectoryFor(location)
     if (dir === undefined) {
       throw new ArchiveError('BACKEND_UNSUPPORTED', `subagent 会话 ${String(sessionId)} 的持久化后端不支持文件级处理`, 501)
@@ -957,7 +973,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             const sessionId = SessionId(node.header.id)
             const liveSession = ctx.sessions.get(sessionId)
             const agent = ctx.agents.get(sessionId)
-            const location = header === undefined ? undefined : ctx.sessionPersistence.locate(header)
+            const location = header === undefined ? undefined : assertSessionLocationApi(ctx.sessionPersistence).locate(header)
             const facts = header === undefined ? undefined : sessionFacts(ctx, node.header.id)
             return {
               sessionId: node.header.id,
@@ -1003,7 +1019,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           const items = []
           for (const header of strayHeaders) {
             const sessionId = SessionId(String(header.id))
-            const location = ctx.sessionPersistence.locate(header)
+            const location = assertSessionLocationApi(ctx.sessionPersistence).locate(header)
             const facts = sessionFacts(ctx, String(header.id))
             items.push({
               sessionId: String(header.id),
@@ -1114,7 +1130,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
 
           const workspaces = workspaceIndexFor(ctx.workspaceRegistry.list()).get(String(sessionId)) ?? []
           ensureSessionNotLive(ctx, sessionId)
-          const location = ctx.sessionPersistence.locate(header)
+          const location = assertSessionLocationApi(ctx.sessionPersistence).locate(header)
           const sessionDir = location === undefined ? undefined : sessionDirectoryFor(location)
           if (sessionDir === undefined) {
             throw new ArchiveError('BACKEND_UNSUPPORTED', '当前会话持久化后端不提供已知的单会话目录，无法移入回收站/删除', 501)
