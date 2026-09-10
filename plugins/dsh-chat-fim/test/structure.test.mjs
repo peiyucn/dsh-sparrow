@@ -32,9 +32,11 @@ describe('dsh-chat-fim 结构', () => {
     assert.match(patch, /apiKeyEnv: DEEPSEEK_API_KEY/u)
   })
 
-  it('cordis.patch.yml 的补全模型 应该 与 DEFAULT_MODEL 一致（防配置漂移）', async () => {
-    const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
-    const match = /^\s*model:\s*(\S+)\s*$/mu.exec(patch)
-    assert.equal(match?.[1], DEFAULT_MODEL)
+  it('两个 patch 文件的补全模型 应该 都与 DEFAULT_MODEL 一致（防配置漂移）', async () => {
+    for (const file of ['../cordis.patch.yml', '../dev.patch.yml']) {
+      const patch = await readFile(new URL(file, import.meta.url), 'utf8')
+      const match = /^\s*model:\s*(\S+)\s*$/mu.exec(patch)
+      assert.equal(match?.[1], DEFAULT_MODEL, `${file} 的 model 与 DEFAULT_MODEL 不一致`)
+    }
   })
 })

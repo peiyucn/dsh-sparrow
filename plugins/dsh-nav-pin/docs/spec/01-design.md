@@ -58,14 +58,14 @@
 [data-phase] {
   --dsh-nav-pin-official-width: var(--dsh-chat-content-width);
 }
-[data-conversation-scroll],
-[data-width-handle] {
+[data-phase] [data-conversation-scroll],
+[data-phase] [data-width-handle] {
   --dsh-chat-content-width: min(
     var(--dsh-nav-pin-official-width),
     max(640px, calc(var(--dsh-conversation-column-width) - 240px))
   );
 }
-[data-conversation-scroll] {
+[data-phase] [data-conversation-scroll] {
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
 }
 ```

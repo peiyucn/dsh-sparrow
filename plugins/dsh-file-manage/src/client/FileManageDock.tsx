@@ -132,7 +132,9 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
     if (!open) return
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
-      if (confirming !== null && !busyDelete) {
+      // 删除进行中：Esc 既不关确认框也不关面板（避免请求未落定时把确认框留在屏上）。
+      if (busyDelete) return
+      if (confirming !== null) {
         setConfirming(null)
         return
       }

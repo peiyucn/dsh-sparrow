@@ -549,8 +549,8 @@ export class CodeBuddyAdapter extends LlmAdapter {
             finishSent = true
           } else if (frame.usage !== null && typeof frame.usage === 'object' && frame.usage !== undefined) {
             // 尾随 usage 帧（终帧之后单独到达）：块已收尾——只补记账，不再向流里补发 usage 块
-            // （finish 之后再推块违反消费端契约）。此前条件里的 !finishSent 让这一段永远不可达，
-            // 终帧后到达的 usage/credit 被静默丢弃（审计 S3，2026-09-10）。
+            // （finish 之后再推块违反消费端契约）。此前条件里的 !finishSent 只挡住「终帧之后」
+            // 到达的 usage 帧，那些 usage/credit 会被静默丢弃（审计 S3，2026-09-10）。
             const { tokens, credit } = mapUsage(frame.usage as Record<string, unknown>)
             if (!usageSent && !finishSent) {
               chunks.push({ type: 'usage', usage: tokens })

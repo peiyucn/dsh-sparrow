@@ -58,6 +58,12 @@ describe('archive-manage host 纯逻辑', () => {
     it('根目录路径 应该 返回 undefined', () => {
       assert.equal(sessionDirectoryFor({ kind: 'jsonl', path: rootLevelSession }), undefined)
     })
+
+    it('path 字段漂移（非字符串 / 空串）应该 返回 undefined 而不是抛错', () => {
+      assert.equal(sessionDirectoryFor({ kind: 'jsonl', path: undefined }), undefined)
+      assert.equal(sessionDirectoryFor({ kind: 'jsonl', path: '' }), undefined)
+      assert.equal(sessionDirectoryFor({ kind: 'jsonl', path: null }), undefined)
+    })
   })
 
   describe('assertRegistryMutationApi', () => {
