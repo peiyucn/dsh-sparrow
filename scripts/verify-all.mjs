@@ -7,10 +7,14 @@ import { join, resolve } from 'node:path'
 const mode = process.argv[2] // undefined | '--typecheck' | '--build' | '--test'
 
 const root = resolve(import.meta.dirname, '..')
+// 已退役插件不参与全量验证（代码原地保留作历史，见 AGENTS「项目概况」）：
+// 它们不再跟随官方 dsh 版本线升级，留在流水线里只会制造与发布无关的红灯。
+const RETIRED_PLUGINS = new Set(['dsh-vision-bridge'])
 // 只验证已脚手架化的插件（有 package.json）；纯文档目录（如 spec 阶段的插件）跳过。
 const plugins = readdirSync(join(root, 'plugins'), { withFileTypes: true })
   .filter(entry => entry.isDirectory())
   .map(entry => entry.name)
+  .filter(name => !RETIRED_PLUGINS.has(name))
   .filter(name => existsSync(join(root, 'plugins', name, 'package.json')))
   .sort()
 
