@@ -719,6 +719,9 @@ async function sweepStaleProjectionCache(ctx: Context, headerFacts: HeaderFactsS
 /** 只有已知的「单会话目录」后端（当前为 jsonl）才允许文件级移动 / 删除。 */
 export function sessionDirectoryFor(location: { kind: string; path: string }): string | undefined {
   if (location.kind !== 'jsonl') return undefined
+  // 宿主字段漂移防御（审计 B1，2026-09-10）：path 非字符串/为空时返回 undefined，让调用方走
+  // 既有的 BACKEND_UNSUPPORTED 降级（backendSupported:false / 501），而不是 dirname(undefined) 抛穿整条路由。
+  if (typeof location.path !== 'string' || location.path === '') return undefined
   const dir = dirname(location.path)
   if (!isAbsolute(dir) || dirname(dir) === dir || basename(dir) === '') return undefined
   return dir
@@ -1239,7 +1242,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             try {
               await rm(child.dir, { recursive: true, force: false })
             } catch (error) {
-              ctx.logger.warn(`dsh-archive-manage: 删除 subagent 会话目录失败（${String(child.sessionId)}），启动清扫会兜底：${error instanceof Error ? error.message : String(error)}`)
+              ctx.logger.warn(`dsh-archive-manage: 删除 subagent 会话目录失败（${String(child.sessionId)}），属 best-effort 清理、已跳过：${error instanceof Error ? error.message : String(error)}`)
             }
           }
           // 工作区记账 detach 是 best-effort（同移入回收站：官方过滤投影 + 下次变更修剪自愈）。

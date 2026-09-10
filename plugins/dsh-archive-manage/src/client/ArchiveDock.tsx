@@ -110,10 +110,7 @@ export type ArchiveDockProps = PropsRuntime<'sidebar.footer.action'> & ArchiveDo
 
 /** 注入侧边栏 footer 触发键样式（对齐官方 settings 触发键：透明底、圆角、悬停亮底、rail 圆形）。 */
 export function ensureArchiveStyles(): void {
-  if (document.querySelector('style[data-dsh-archive-trigger]') !== null) return
-  const style = document.createElement('style')
-  style.dataset.dshArchiveTrigger = ''
-  style.textContent = `
+  const css = `
 /* spec 08 归档树：父行折叠按钮 + 树状连接线。 */
 .dsh-archive-tree-toggle {
   flex: none;
@@ -444,6 +441,15 @@ export function ensureArchiveStyles(): void {
   .dsh-archive-matrix .dsh-archive-matrix-cell { animation: none; opacity: 0.7; }
 }
 `
+  const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-archive-trigger]')
+  if (existing !== null) {
+    // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之（与 nav-pin 同款，审计建议）。
+    if (existing.textContent !== css) existing.textContent = css
+    return
+  }
+  const style = document.createElement('style')
+  style.dataset.dshArchiveTrigger = ''
+  style.textContent = css
   document.head.appendChild(style)
 }
 
@@ -489,9 +495,6 @@ const styles = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
-  } satisfies CSSProperties,
-  secondary: {
-    color: 'var(--dsw-alias-label-secondary, #6b7280)',
   } satisfies CSSProperties,
   secondarySmall: {
     color: 'var(--dsw-alias-label-secondary, #6b7280)',

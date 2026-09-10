@@ -71,8 +71,14 @@ describe('dsh-nav-pin 纯逻辑', () => {
     })
 
     it('宽度钳制 应该 覆盖滚动体与两侧拖拽条', () => {
-      assert.ok(css.includes('[data-conversation-scroll],\n[data-width-handle]'))
-      assert.ok(css.includes('[data-width-handle]'))
+      assert.ok(css.includes('[data-phase] [data-conversation-scroll],\n[data-phase] [data-width-handle]'))
+      assert.ok(css.includes('[data-phase] [data-width-handle]'))
+    })
+
+    it('宽度钳制 应该 全部由官方 [data-phase] 标记守卫（标记消失即整体不生效，不反噬官方宽度轴）', () => {
+      assert.ok(css.includes('[data-phase] {\n  --dsh-nav-pin-official-width: var(--dsh-chat-content-width);\n}'))
+      assert.ok(css.includes('[data-phase] [data-conversation-scroll] {'))
+      assert.ok(css.includes('--dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px)'))
     })
 
     it('宽度钳制 应该 同步重算输入卡片最大宽度', () => {
