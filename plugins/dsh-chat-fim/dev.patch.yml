@@ -5,7 +5,7 @@
       name: file:///C:/Users/DJ028191/pyai-meta-repo/dsh-sparrow/plugins/dsh-chat-fim/src/index.ts
       config:
         baseURL: https://api.deepseek.com/beta
-        model: deepseek-v4-pro
+        model: deepseek-flash
         maxTokens: 96
         apiKeyEnv: DEEPSEEK_API_KEY
         requestTimeoutMs: 30000

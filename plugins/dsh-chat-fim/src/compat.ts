@@ -11,7 +11,7 @@ import * as dshSessionSurface from '@deepseek-ai/dsh-session'
  * 本插件构建时对齐的 dsh 会话格式版本。
  *
  * 官方会话格式是单调整数（0.1.2-rc.1 为 `0`，0.1.5-rc.1 为 `3`），每次升级都
- * 可能改变日志布局、事件语义与落盘文件名。本插件直读宿主会话事件推断主路由，认错格式会静默读不出主路由，因此只声明已知可安全
+ * 可能改变日志布局、事件语义与落盘文件名。本插件经官方 `session.requestHeader()` 取主路由，认错格式会静默读不出主路由，因此只声明已知可安全
  * 处理的版本。
  *
  * 注意（0.1.5 起）：`sessionPersistence.list()/stat()` 返回的 header 已被持久化层

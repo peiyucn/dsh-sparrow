@@ -23,6 +23,7 @@ export type ChatFimErrorCode =
   | 'UNKNOWN_SESSION'
   | 'MISSING_CREDENTIAL'
   | 'MODEL_UNSUPPORTED'
+  | 'UNSUPPORTED_HOST'
   | 'UNSUPPORTED_HOST_FORMAT'
   | 'FORBIDDEN'
   | 'UPSTREAM_ERROR'
@@ -420,9 +421,8 @@ export function extractSuggestions(data: unknown): string[] {
 
 /** FIM 端点实测可用的模型 id：2026-08-30 直连实测 v4-pro / v4-flash 可用（官方 schema 只列 v4-pro）；
  *  2026-09-10 复测 deepseek-flash（V4.1 Flash）同样 200，且旧的 deepseek-v4-flash 已被服务端路由到
- *  deepseek-flash。auto 跟随只认在此集合内的主模型。 */
+ *  deepseek-flash。跟随解析只认在此集合内的主模型。 */
 export const SUGGEST_MODEL_IDS = ['deepseek-flash', 'deepseek-v4-pro', 'deepseek-v4-flash'] as const
-
 
 /**
  * 补全模型解析（见 docs/spec/04-sensitivity.md）：跟随官方主模型（在 SUGGEST_MODEL_IDS 内），

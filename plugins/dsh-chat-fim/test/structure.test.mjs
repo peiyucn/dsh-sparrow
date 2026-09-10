@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
+import { DEFAULT_MODEL } from '../lib/suggest.js'
 
 describe('dsh-chat-fim 结构', () => {
   it('package.json 应该 声明 dsh.bundle 与 dsh.client', async () => {
@@ -29,5 +30,11 @@ describe('dsh-chat-fim 结构', () => {
     assert.match(patch, /id: dsh-chat-fim/u)
     assert.match(patch, /name: '@dsh-sparrow\/dsh-chat-fim'/u)
     assert.match(patch, /apiKeyEnv: DEEPSEEK_API_KEY/u)
+  })
+
+  it('cordis.patch.yml 的补全模型 应该 与 DEFAULT_MODEL 一致（防配置漂移）', async () => {
+    const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+    const match = /^\s*model:\s*(\S+)\s*$/mu.exec(patch)
+    assert.equal(match?.[1], DEFAULT_MODEL)
   })
 })

@@ -32,7 +32,7 @@
 * 校验：`sessionId` 命中 sessions 服务（否则 403/503）、`prompt` 非空且 ≤ `MAX_PROMPT_CHARS`（拟定 32k，否则 400）、请求体 ≤ `MAX_BODY_BYTES`（64 KB）；
 * 凭据：`ctx.credentials.resolve('DEEPSEEK_API_KEY')`，缺失 401；
 * 转发：`POST {baseURL}/completions`（FIM 补全 Beta），body `{ model, prompt, max_tokens, stop, temperature }`；`prompt` 由最近对话历史转成的「用户：/助手：」说话人文本 + 草稿（最后一个「用户：」开头）构造（见 `buildFimPrompt`，2026-08-31 三方案 A/B 定稿——纯文本续写天然站在用户角度）；`stop` 序列 `\n用户：` / `\n助手：` 兜底（实测 API stop 时灵时不灵，客户端另按标记截断 + 角色切换丢弃，见 `cleanSuggestion`）；
-* 补全模型（2026-08-30）：**跟随主模型**（`resolveSuggestModel`）——主模型为 deepseek-official 的 v4-pro/v4-flash 时用主模型补全（计费随之），vision-exp / 未知 / 非官方回退配置默认 `model`；依据：官方 API schema 只列 v4-pro，但直连实测 flash 亦可（见 README 实测记录）；
+* 补全模型（2026-08-30 定，2026-09-10 更新）：**跟随主模型**（`resolveSuggestModel`）——主模型为 deepseek-official 的 `deepseek-flash` / v4-pro / v4-flash 时用主模型补全（计费随之），vision-exp / 未知 / 非官方回退配置默认 `model`（现为 `deepseek-flash`）；依据：官方 API schema 只列 v4-pro，但直连实测 flash 与 deepseek-flash 均可（见 README 实测记录）；
 * 多建议：FIM 接口无 `n` 参数，按 `suggestionCount`（默认 1）并行请求、温度错开采样（base + index×0.4，封顶 2）；`allSettled` 部分失败保留成功建议；
 * 采样：`temperature` 默认 **0.3**（2026-08-30 A/B 实测：1.0 漂移明显、会复读最近一条用户消息，0.3 聚焦稳定；上游已废弃 frequency/presence penalty，不可用）；
 * 生命周期：超时（`REQUEST_TIMEOUT_MS` 30s）+ 客户端 `close` 即 `AbortController.abort()`。

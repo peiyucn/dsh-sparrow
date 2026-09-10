@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
-import { assertHostCompatible, unsupportedStoredFormatReason } from './compat.js'
+import { assertCapabilities, assertHostCompatible, unsupportedStoredFormatReason } from './compat.js'
 import {
   buildFimPrompt, cleanSuggestion, currentMainRoute, detectDraftLanguage, extractSuggestions, extractUsage, speakerStopSequences,
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, isLanguageConsistent,
@@ -198,6 +198,17 @@ function hostFormatSupported(header: { readonly version?: unknown } | undefined)
   return header !== undefined && unsupportedStoredFormatReason([header]) === undefined
 }
 
+/**
+ * 会话实例级能力探测（根 AGENTS 能力门）：`requestHeader` / `deriveMessages` 是 Session 实例方法，
+ * 启动期拿不到实例，只能在请求入口按**宿主真实对象**探测——插件自带的官方包副本在这里不可信
+ * （link:/peer 副本场景会自证兼容，见 compat.ts 的同类说明）。缺失即视为不支持的 dsh 版本：
+ * GET 隐藏功能、POST 明确报错，不在未知契约上带病运行。
+ */
+function sessionSurfaceSupported(session: unknown): boolean {
+  const candidate = session as { requestHeader?: unknown; deriveMessages?: unknown } | null | undefined
+  return typeof candidate?.requestHeader === 'function' && typeof candidate.deriveMessages === 'function'
+}
+
 /** 会话当前主模型：modelSelection 投影（选中即生效，不依赖历史事件）→ 官方折叠出的
  *  最近请求 header（`session.requestHeader()`，增量折叠）→ 共享默认模型；服务缺失（旧版 dsh）
  *  逐档 fail-soft。模型一换，开关状态立刻追平。 */
@@ -235,8 +246,13 @@ function currentSessionModel(
  * @param config - 插件配置（cordis.patch.yml 注入）。
  */
 export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {}): void {
-  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》，先于一切注册）：会话格式不认识就整个停用。
+  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》，先于一切注册）：能力面与会话格式缺任一即整个停用。
   assertHostCompatible(ctx, name)
+  assertCapabilities(ctx, name, [
+    { name: 'webServer.register', ok: typeof ctx.webServer?.register === 'function' },
+    { name: 'sessions.get', ok: typeof ctx.sessions?.get === 'function' },
+    { name: 'credentials.resolve', ok: typeof ctx.credentials?.resolve === 'function' },
+  ])
   const settings = normalizeConfig(config)
 
   ctx.effect(() => ctx.webServer.register({
@@ -262,6 +278,10 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
         }
         // 宿主真值格式门（请求期）：header 由宿主给出，不受插件依赖副本影响。
         if (!hostFormatSupported(session.header)) {
+          sendJson(res, 200, { supported: false })
+          return
+        }
+        if (!sessionSurfaceSupported(session)) {
           sendJson(res, 200, { supported: false })
           return
         }
@@ -311,6 +331,15 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
         sendError(res, 501, {
           code: 'UNSUPPORTED_HOST_FORMAT',
           message: '当前 dsh 的会话格式与本插件不兼容，续写功能已停用（升级插件后自动恢复）',
+        })
+        return
+      }
+
+      // 会话实例能力门：缺 requestHeader/deriveMessages 即不支持的 dsh 版本（见 sessionSurfaceSupported）。
+      if (!sessionSurfaceSupported(session)) {
+        sendError(res, 501, {
+          code: 'UNSUPPORTED_HOST',
+          message: '当前 dsh 版本缺少续写所需的会话接口，续写功能已停用（升级插件后自动恢复）',
         })
         return
       }
