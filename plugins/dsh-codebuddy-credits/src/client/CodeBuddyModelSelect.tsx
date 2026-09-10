@@ -6,7 +6,7 @@
  * 与官方的差异只有一处：模型行是「模型名 + 右侧只读事实」两列（事实 =
  * 积分系数 · 上下文长度，如 `x0.00 · 1M`；官方选择器只渲染 model.name，
  * 没有描述列）。事实不在模型名里——名字保持服务端原始名，事实按模型 id 查
- * 共享事实表（与额度卡同源，见 CodeBuddyCreditsIndicator 的模型事实表）；
+ * 共享事实表（与额度卡同源，见 model-facts.ts）；
  * 查不到事实的模型只显示名字。其余行为——两层面板（模型/推理等级）、
  * 键盘导航、外点关闭、Toast 锚定、目录共享（同一个 ctx.modelDirectories
  * store）——与官方一致。
@@ -28,7 +28,7 @@ import { formatModelFacts } from './format.js'
 // 选择器只订阅读取，不自己发请求（额度卡未挂载时由 ensureModelFacts 补一次）。
 import {
   PROVIDER_ID, ensureModelFacts, getModelFacts, subscribeModelFacts,
-} from './CodeBuddyCreditsIndicator.js'
+} from './model-facts.js'
 
 /** 与官方 ModelDirectoryState 对齐的最小形状（runtime 由官方 web 提供）。 */
 export interface DirectoryState {

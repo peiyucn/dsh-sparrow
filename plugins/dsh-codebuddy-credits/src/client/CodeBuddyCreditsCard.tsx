@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { formatModelFacts } from './format.js'
 import { CLIENT_ACTION_TIMEOUT_MS, fetchLocal } from './fetch-timeout.js'
+import { syncModelFacts, type ModelFactView } from './model-facts.js'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const KEY_URL = '/api/codebuddy-credits/key'
@@ -23,16 +24,6 @@ const REMOVE_URL = '/api/codebuddy-credits/remove-key'
 const REFRESH_URL = '/api/codebuddy-credits/refresh-models'
 /** 保存/清空 Key 后广播的窗口事件（对话页额度卡据此联动刷新）。 */
 const STATUS_CHANGED_EVENT = 'codebuddy-credits-status-changed'
-
-// 只读模型清单：一行一个模型（照官方 DeepSeek 编辑器的行布局，去掉全部编辑控件）。
-interface ModelFactView {
-  id: string
-  name: string
-  credits?: string
-  contextWindow?: number
-  maxTokens?: number
-  vision?: boolean
-}
 
 interface CardStatus {
   keyConfigured: boolean
@@ -229,7 +220,10 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     try {
       const response = await fetchLocal(STATUS_URL, { cache: 'no-store' })
       if (!response.ok) return
-      setStatus(await response.json() as CardStatus)
+      const payload = await response.json() as CardStatus
+      setStatus(payload)
+      // 设置卡读到的模型事实同样回写共享表（与额度卡/选择器同源）。
+      syncModelFacts(payload.models ?? [])
     } catch {
       // 状态读取失败保持原状（离线/服务未就绪时卡片静默降级）。
     }
@@ -256,6 +250,8 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
         return
       }
       const list = Array.isArray(payload?.models) ? payload.models : []
+      // 手动刷新结果同步进共享事实表：选择器/额度卡不必等下一次 /status（审计 S4）。
+      syncModelFacts(list)
       setStatus(previous => previous === undefined ? previous : { ...previous, models: list })
       setRefreshNote(payload?.changed === true
         ? t('models.updated', { count: String(list.length) })
@@ -478,9 +474,11 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
                 {refreshing ? t('models.fetching') : t('models.fetch')}
               </button>
             </div>
-            {models.length === 0
-              ? <p style={hintStyle}>{t('models.empty')}</p>
-              : models.map(model => (
+            {status === undefined
+              ? <p style={hintStyle}>{t('picker.trigger.loading')}</p>
+              : models.length === 0
+                ? <p style={hintStyle}>{t('models.empty')}</p>
+                : models.map(model => (
                 // 名字 = 服务端原始名（不带系数/free）；右侧 = 只读事实（系数 · 上下文长度）。
                 <div key={model.id} style={modelRowStyle}>
                   <span style={modelNameStyle} title={model.id}>{model.name}</span>
