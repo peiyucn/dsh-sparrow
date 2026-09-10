@@ -22,9 +22,8 @@ import {
 import { getMaxMode, subscribeMaxMode } from './maxMode.js'
 
 /**
- * 展示名拆分：与 host 侧 catalog.splitDisplayName 同规则（两空格是系数
- * 列的锚点）。client 包不能 import host 侧 catalog（会拖进 dsh-llm），
- * 此处局部镜像并保持同步。
+ * 展示名拆分：与 host 侧目录的展示名构造同规则（两空格是系数列的锚点）。
+ * client 包不能 import host 侧 catalog（会拖进 dsh-llm），此处局部镜像并保持同步。
  */
 function splitDisplayName(name: string): { left: string; right?: string } {
   const index = name.lastIndexOf('  ')

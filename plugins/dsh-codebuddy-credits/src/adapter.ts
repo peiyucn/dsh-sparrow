@@ -547,10 +547,12 @@ export class CodeBuddyAdapter extends LlmAdapter {
               replayState: { response: { model: options.model, usage: frame.usage ?? null } },
             })
             finishSent = true
-          } else if (frame.usage !== null && typeof frame.usage === 'object' && frame.usage !== undefined && !finishSent) {
-            // 尾随 usage 帧（终帧之后单独到达）：块已收尾，直接补发 usage。
+          } else if (frame.usage !== null && typeof frame.usage === 'object' && frame.usage !== undefined) {
+            // 尾随 usage 帧（终帧之后单独到达）：块已收尾——只补记账，不再向流里补发 usage 块
+            // （finish 之后再推块违反消费端契约）。此前条件里的 !finishSent 让这一段永远不可达，
+            // 终帧后到达的 usage/credit 被静默丢弃（审计 S3，2026-09-10）。
             const { tokens, credit } = mapUsage(frame.usage as Record<string, unknown>)
-            if (!usageSent) {
+            if (!usageSent && !finishSent) {
               chunks.push({ type: 'usage', usage: tokens })
               usageSent = true
             }

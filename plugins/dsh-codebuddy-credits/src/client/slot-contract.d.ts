@@ -124,6 +124,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'picker.warning.groupLoad'
       | 'picker.empty.models'
       | 'picker.empty.efforts'
+      | 'picker.effort.max'
+      | 'picker.max.locked'
+      | 'picker.max.lockedHint'
+      | 'indicator.max.title'
+      | 'indicator.max.hint'
+      | 'indicator.max.failed'
   }
 }
 

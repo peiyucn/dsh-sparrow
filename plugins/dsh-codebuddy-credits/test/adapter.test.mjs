@@ -273,6 +273,42 @@ describe('CodeBuddyAdapter.stream', () => {
     assert.equal(usages[0].sessionId, 's1')
     assert.equal(chunks.filter(c => c.type === 'usage').length, 1)
   })
+
+  it('终帧之后到达的尾随 usage 帧 应该 只补记账、不再补发 usage 块', async () => {
+    const frames = [
+      { choices: [{ delta: { content: 'ok' } }] },
+      { choices: [{ delta: {}, finish_reason: 'stop' }] },
+      { choices: [], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, credit: 0.02 } },
+    ]
+    const sse = frames.map(frame => 'data: ' + JSON.stringify(frame) + '\n\n').join('') + 'data: [DONE]\n\n'
+    const usages = []
+    globalThis.fetch = async () => new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    const adapter = new CodeBuddyAdapter({
+      models: () => [],
+      resolveApiKey: async () => 'test-key',
+      account: () => undefined,
+      streamIdleTimeoutMs: 10_000,
+      onUsage: usage => { usages.push(usage) },
+    })
+    const chunks = []
+    try {
+      for await (const chunk of adapter.stream({
+        provider: 'codebuddy-credits',
+        model: 'hy4-preview',
+        messages: [],
+        sessionId: 's1',
+      })) {
+        chunks.push(chunk)
+      }
+    } finally {
+      globalThis.fetch = undefined
+    }
+    assert.equal(usages.length, 1)
+    assert.equal(usages[0].credit, 0.02)
+    // finish 之后不允许再向流里推块（消费端契约）。
+    assert.equal(chunks.filter(c => c.type === 'usage').length, 0)
+    assert.equal(chunks.findIndex(c => c.type === 'finish'), chunks.length - 1)
+  })
 })
 
 describe('effectiveReasoningEffort（Max 模式档位锁）', () => {

@@ -6,6 +6,7 @@ See [简体中文](./CHANGELOG.zh-CN.md).
 ## 0.1.5-rc.1 (2026-09-10)
 
 - Version-line alignment with official dsh 0.1.5-rc.1.
+- A usage frame that arrives after the stream's final frame is now accounted for instead of being dropped, so session credit totals stay accurate.
 
 ## 0.1.2-rc.1.2 (2026-09-09)
 

@@ -6,6 +6,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 - Version-line alignment with official dsh 0.1.5-rc.1.
 - The panel's loading indicator now uses dsh's own dot-matrix chase animation, matching the rest of the UI.
+- Escape now closes the delete confirmation first instead of leaving it stranded on screen after the panel closes.
 
 ## 0.1.2-rc.1.1 (2026-09-09)
 

@@ -120,16 +120,27 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
       })
   }, [listFiles, countFiles])
 
-  // 官方弹窗行为：打开时聚焦关闭按钮，Esc 关闭。
+  // 官方弹窗行为：打开时聚焦关闭按钮。
   useEffect(() => {
     if (!open) return
     closeButtonRef.current?.focus()
+  }, [open])
+
+  // Esc 逐级退出：确认框在场时先关确认框，否则才关面板——此前文档级 Esc 只关面板，
+  // 会把确认框孤儿化留在屏上（审计 S1，2026-09-10）。
+  useEffect(() => {
+    if (!open) return
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key !== 'Escape') return
+      if (confirming !== null && !busyDelete) {
+        setConfirming(null)
+        return
+      }
+      setOpen(false)
     }
     document.addEventListener('keydown', onKeyDown)
     return () => { document.removeEventListener('keydown', onKeyDown) }
-  }, [open])
+  }, [open, confirming, busyDelete])
 
   useEffect(() => {
     if (!open) return
@@ -359,12 +370,6 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
             role="alertdialog"
             aria-modal="true"
             aria-label={t('delete')}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape' && !busyDelete) {
-                event.stopPropagation()
-                setConfirming(null)
-              }
-            }}
           >
             <h3 className="dsh-file-manage-confirm-title">{t('delete')}</h3>
             <p className="dsh-file-manage-confirm-desc">
