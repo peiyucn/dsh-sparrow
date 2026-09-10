@@ -50,8 +50,6 @@ export interface ChatFimConfig {
 export interface CompleteRequest {
   readonly sessionId: string
   readonly prompt: string
-  /** 续写模型三档（客户端偏好）；非法值回退 auto。 */
-  readonly suggestModelMode: SuggestModelMode
 }
 
 /** FIM 提示词使用的语言（说话人标签 / 停止序列随之切换）。 */
@@ -244,11 +242,7 @@ export function validateCompletePayload(value: unknown, maxPromptChars = Number.
   if (prompt.length > maxPromptChars) {
     return { code: 'INVALID_PROMPT', message: `prompt 超过 ${maxPromptChars} 字符上限` }
   }
-  return {
-    sessionId,
-    prompt,
-    suggestModelMode: normalizeSuggestModelMode(body.suggestModelMode),
-  }
+  return { sessionId, prompt }
 }
 
 /** 从一条 DSH 历史消息里提取可读文本；图片 / 工具结果等非续写块跳过。 */
@@ -429,22 +423,13 @@ export function extractSuggestions(data: unknown): string[] {
  *  deepseek-flash。auto 跟随只认在此集合内的主模型。 */
 export const SUGGEST_MODEL_IDS = ['deepseek-flash', 'deepseek-v4-pro', 'deepseek-v4-flash'] as const
 
-/** 续写模型三档选择（客户端偏好，随请求传给 host）。 */
-export type SuggestModelMode = 'auto' | 'pro' | 'flash'
-export const DEFAULT_SUGGEST_MODEL_MODE: SuggestModelMode = 'auto'
-
-/** 请求体里的 suggestModelMode 解析：非法/缺省回退 auto。 */
-export function normalizeSuggestModelMode(value: unknown): SuggestModelMode {
-  return value === 'auto' || value === 'pro' || value === 'flash' ? value : DEFAULT_SUGGEST_MODEL_MODE
-}
 
 /**
- * 补全模型解析（三档，见 docs/spec/04-sensitivity.md）：
- * pro/flash 恒用对应模型；auto 跟随官方主模型（pro/flash），vision / 未知回退配置默认。
+ * 补全模型解析（见 docs/spec/04-sensitivity.md）：跟随官方主模型（在 SUGGEST_MODEL_IDS 内），
+ * vision / 未知 / 非官方 provider 回退插件配置默认。
+ * 2026-09-10：pro / flash 两档退役——客户端恒发 auto，两档早已不可达，且 V4 Pro 将于 09-14 下线。
  */
-export function resolveSuggestModel(mode: SuggestModelMode, main: { provider: string; model: string } | undefined, configuredModel: string): string {
-  if (mode === 'pro') return 'deepseek-v4-pro'
-  if (mode === 'flash') return 'deepseek-v4-flash'
+export function resolveSuggestModel(main: { provider: string; model: string } | undefined, configuredModel: string): string {
   if (main !== undefined && main.provider === 'deepseek-official' && (SUGGEST_MODEL_IDS as readonly string[]).includes(main.model)) {
     return main.model
   }

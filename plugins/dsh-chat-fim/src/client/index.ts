@@ -124,8 +124,9 @@ export function apply(ctx: ClientContext): void {
           headers: { 'content-type': 'application/json' },
           // 续写模型跟随主模型（2026-08-31 用户拍板：用户选什么模型，suggest 就用什么模型；
           // host 侧 resolveSuggestModel 按会话事件现读主路由，vision/未知回退配置默认）。
+          // 2026-09-10：pro/flash 两档退役，客户端不再传模型档位。
           // 语言由 host 按草稿内容自适应（detectDraftLanguage），客户端不再传 locale。
-          body: JSON.stringify({ sessionId: id, prompt, suggestModelMode: 'auto' }),
+          body: JSON.stringify({ sessionId: id, prompt }),
           signal,
         })
         const payload = parseJsonOrNull(await response.text()) as ChatFimResponse | null

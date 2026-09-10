@@ -5,7 +5,7 @@
 
 ## 模型跟随主模型
 
-* 客户端请求 `suggestModelMode: 'auto'` → host `resolveSuggestModel` 按会话事件现读主路由：主模型为 deepseek-official 的 `deepseek-flash`（V4.1 Flash，2026-09-10 加入——V4 Pro 将于 2026-09-14 下线并路由到它）/v4-pro/v4-flash 时跟随；vision-exp / 未知 / 非官方回退配置默认 `model`（`deepseek-flash`）；
+* 客户端不传模型档位（2026-09-10 起 `pro`/`flash` 两档退役——客户端恒发 auto 早已不可达）→ host `resolveSuggestModel` 按会话事件现读主路由：主模型为 deepseek-official 的 `deepseek-flash`（V4.1 Flash，2026-09-10 加入——V4 Pro 将于 2026-09-14 下线并路由到它）/v4-pro/v4-flash 时跟随；vision-exp / 未知 / 非官方回退配置默认 `model`（`deepseek-flash`）；
 * 切换主模型后下一次联想请求立即生效（每次请求现读，无缓存）；客户端不提供模型选择 UI；
 * 建议菜单右下角仍展示实际模型与温度（跟随结果实时可见）。
 

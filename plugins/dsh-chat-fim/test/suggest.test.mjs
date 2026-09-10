@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import {
   buildFimPrompt, detectDraftLanguage, isLanguageConsistent, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, speakerStopSequences,
   formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromHeader, currentMainRoute,
-  normalizeConfig, normalizeSuggestModelMode, normalizeTriggerSensitivity, parseCompleteBody, recentHistoryTurns,
+  normalizeConfig, normalizeTriggerSensitivity, parseCompleteBody, recentHistoryTurns,
   resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence,
   upstreamStatusToError, validateCompletePayload, detectEndOfDraft,
 } from '../lib/suggest.js'
@@ -31,7 +31,7 @@ describe('chat-fim 纯逻辑', () => {
   describe('validateCompletePayload', () => {
     it('合法请求 应该 返回 prompt 与 sessionId', () => {
       const value = validateCompletePayload({ sessionId: 'session-1', prompt: '你好' })
-      assert.deepEqual(value, { sessionId: 'session-1', prompt: '你好', suggestModelMode: 'auto' })
+      assert.deepEqual(value, { sessionId: 'session-1', prompt: '你好' })
     })
 
     it('缺 prompt 应该 返回 INVALID_PROMPT', () => {
@@ -351,50 +351,28 @@ describe('chat-fim 纯逻辑', () => {
   })
 
   describe('resolveSuggestModel', () => {
-    it('mode=pro 应该 恒用 v4-pro', () => {
-      assert.equal(resolveSuggestModel('pro', { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+    it('主模型 v4-pro 应该 跟随主模型', () => {
+      assert.equal(resolveSuggestModel({ provider: 'deepseek-official', model: 'deepseek-v4-pro' }, 'deepseek-flash'), 'deepseek-v4-pro')
     })
 
-    it('mode=flash 应该 恒用 v4-flash', () => {
-      assert.equal(resolveSuggestModel('flash', { provider: 'deepseek-official', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-flash')
+    it('主模型 v4-flash 应该 跟随主模型', () => {
+      assert.equal(resolveSuggestModel({ provider: 'deepseek-official', model: 'deepseek-v4-flash' }, 'deepseek-flash'), 'deepseek-v4-flash')
     })
 
-    it('mode=auto 主模型 v4-pro 应该 跟随主模型', () => {
-      assert.equal(resolveSuggestModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
+    it('主模型 deepseek-flash 应该 跟随主模型', () => {
+      assert.equal(resolveSuggestModel({ provider: 'deepseek-official', model: 'deepseek-flash' }, 'deepseek-v4-pro'), 'deepseek-flash')
     })
 
-    it('mode=auto 主模型 v4-flash 应该 跟随主模型', () => {
-      assert.equal(resolveSuggestModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, 'deepseek-v4-pro'), 'deepseek-v4-flash')
+    it('主模型 vision-exp 应该 回退配置默认', () => {
+      assert.equal(resolveSuggestModel({ provider: 'deepseek-official', model: 'deepseek-v4-flash-vision-exp' }, 'deepseek-flash'), 'deepseek-flash')
     })
 
-    it('mode=auto 主模型 deepseek-flash 应该 跟随主模型', () => {
-      assert.equal(resolveSuggestModel('auto', { provider: 'deepseek-official', model: 'deepseek-flash' }, 'deepseek-v4-pro'), 'deepseek-flash')
+    it('非官方 provider 应该 回退配置默认', () => {
+      assert.equal(resolveSuggestModel({ provider: 'zai', model: 'deepseek-v4-pro' }, 'deepseek-flash'), 'deepseek-flash')
     })
 
-    it('mode=auto 主模型 vision-exp 应该 回退配置默认', () => {
-      assert.equal(resolveSuggestModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-flash-vision-exp' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
-    })
-
-    it('mode=auto 非官方 provider 应该 回退配置默认', () => {
-      assert.equal(resolveSuggestModel('auto', { provider: 'zai', model: 'deepseek-v4-pro' }, 'deepseek-v4-pro'), 'deepseek-v4-pro')
-    })
-
-    it('mode=auto 未知主模型 应该 回退配置默认', () => {
-      assert.equal(resolveSuggestModel('auto', undefined, 'deepseek-v4-pro'), 'deepseek-v4-pro')
-    })
-  })
-
-  describe('normalizeSuggestModelMode', () => {
-    it('合法三档 应该 原样返回', () => {
-      assert.equal(normalizeSuggestModelMode('auto'), 'auto')
-      assert.equal(normalizeSuggestModelMode('pro'), 'pro')
-      assert.equal(normalizeSuggestModelMode('flash'), 'flash')
-    })
-
-    it('非法/缺省 应该 回退 auto', () => {
-      assert.equal(normalizeSuggestModelMode(undefined), 'auto')
-      assert.equal(normalizeSuggestModelMode('gpt'), 'auto')
-      assert.equal(normalizeSuggestModelMode(42), 'auto')
+    it('未知主模型 应该 回退配置默认', () => {
+      assert.equal(resolveSuggestModel(undefined, 'deepseek-flash'), 'deepseek-flash')
     })
   })
 

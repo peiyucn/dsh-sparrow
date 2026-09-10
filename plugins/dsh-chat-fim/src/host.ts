@@ -349,8 +349,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
       const userEchoTexts = historyTurns.filter(turn => turn.role === 'user').map(turn => turn.text)
       const assistantEchoTexts = historyTurns.filter(turn => turn.role === 'assistant').map(turn => turn.text)
       const stop = speakerStopSequences(language)
-      // 补全模型三档解析：pro / flash / auto（跟随官方主模型，vision/未知回退配置默认）。
-      const suggestModel = resolveSuggestModel(parsed.suggestModelMode, main, settings.model)
+      // 补全模型解析：跟随官方主模型，vision / 未知 / 非官方回退配置默认。
+      const suggestModel = resolveSuggestModel(main, settings.model)
       const signal = requestSignal(res, settings.requestTimeoutMs)
       try {
         /** 单次上游补全请求；成功返回候选/用量，失败抛 ChatFimError。 */
