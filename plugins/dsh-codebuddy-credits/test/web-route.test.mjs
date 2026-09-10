@@ -54,7 +54,7 @@ async function request(handler, url, { method = 'POST', address = '127.0.0.1' } 
 
 const PREVIEW = {
   id: 'hy4-preview',
-  name: 'hy4-preview (x0.79)',
+  name: 'hy4-preview',
   credits: 'x0.79',
   input: ['text', 'image'],
   contextWindow: 1_000_000,

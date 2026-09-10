@@ -94,7 +94,7 @@
   （只保留现有 Key 输入区）。
 - **布局**：照官方 DeepSeek 编辑器的行布局——**一个模型一行**，左侧模型名、右侧只读事实（积分系数；
   有容量事实也同排展示），**无编辑控件、无添加 / 删除行、无折叠**。
-- **刷新**：一个刷新按钮 + 上次刷新时间；点击调 P1 的 host 路由。
+- **刷新**：一个刷新按钮；点击调 P1 的 host 路由。（设计稿里的「上次刷新时间」**未实现**，见实施记录。）
 - 文案**照抄官方** `settings.models` 的 `fetchModels`「获取可用模型」/ `fetching`「正在询问提供方…」/ `retry`「重试」
   （official `ui-settings-models/src/client/locales.ts:67-77,174-184`）——按仓库既有做法**同词抄进本插件词典**，
   不引官方组件（官方 client 入口不导出组件）。
@@ -145,12 +145,17 @@
   词典中英各加 7 键、`slot-contract.d.ts` 的 `LocaleNamespaceMap` 同步。
 - 按评审结论落定：**不新增**「打开设置即扫」（列表在首次配置成功后就有，之后手动刷新）；
   不在卡里重复展示账号/企业名；401 文案用通用指引（未实测响应体，无法区分 Key 失效与无 CLI 权限）。
-- 未覆盖：路由本身无单测（本插件测试面里 `web.test.mjs` 只测纯函数，无 http 桩）——待后续补一个
-  路由级测试（可参考 vision-bridge 的 `test/host-route.test.mjs`）。
+- **未实现**：刷新按钮旁的「上次刷新时间」（设计稿有、实现省略；刷新结果改用状态行
+  「已是最新 / 已更新 N 个模型」反馈）。
+- **路由级测试已补**（0a70f9d，2026-09-10）：`test/web-route.test.mjs` 用最小 mock ctx 走真实
+  `installCodeBuddyWeb`，覆盖成功有变化 / 成功无变化 / 未配 Key 400 / 非回环 403 / 上游失败 400 五条路径。
 
 ## 测试与验证
 
-- 纯逻辑：`refreshModels` 的响应组装、`sameFacts` 比较、错误映射 → 单测；
-- 路由：未配 Key / 上游失败 / 成功无变化 / 成功有变化 四条路径（沿用 `host-route` 类测试）；
-- 手动绕过冷却但复用单飞：并发两次请求只发一次上游；
-- `pnpm run verify` 全绿 + `git diff --check` 干净。
+- 纯逻辑：`format.ts`（容量短串 / 只读事实串）、`catalog.ts`（事实映射 / SSE 解析 / 请求构造）
+  等有单测（`test/format.test.mjs`、`test/catalog.test.mjs`）；
+- 路由：**已覆盖**（`test/web-route.test.mjs`，5 条路径：成功有变化 / 成功无变化 / 未配 Key 400 /
+  非回环 403 / 上游失败 400）；
+- **未覆盖**：手动绕过冷却但复用单飞——`loadFactsOnce` 与 `sameFacts` 是 `apply` 内闭包，路由测试
+  只 mock 了 `shared.refreshModels`（第四轮审计 S2，留作后续欠账）；
+- 插件 `npm run verify` 全绿 + 根 `pnpm run verify:all` 全绿 + `git diff --check` 干净。
