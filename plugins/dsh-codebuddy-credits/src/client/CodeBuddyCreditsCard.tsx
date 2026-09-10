@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { formatModelFacts } from './format.js'
+import { CLIENT_ACTION_TIMEOUT_MS, fetchLocal } from './fetch-timeout.js'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const KEY_URL = '/api/codebuddy-credits/key'
@@ -226,7 +227,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch(STATUS_URL, { cache: 'no-store' })
+      const response = await fetchLocal(STATUS_URL, { cache: 'no-store' })
       if (!response.ok) return
       setStatus(await response.json() as CardStatus)
     } catch {
@@ -247,7 +248,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     setRefreshError(undefined)
     setRefreshNote(undefined)
     try {
-      const response = await fetch(REFRESH_URL, { method: 'POST' })
+      const response = await fetchLocal(REFRESH_URL, { method: 'POST' }, CLIENT_ACTION_TIMEOUT_MS)
       const payload = await response.json().catch(() => null) as
         { error?: string; changed?: boolean; models?: ModelFactView[] } | null
       if (!response.ok) {
@@ -349,11 +350,11 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     setBusy(true)
     setMessage(undefined)
     try {
-      const response = await fetch(KEY_URL, {
+      const response = await fetchLocal(KEY_URL, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ key }),
-      })
+      }, CLIENT_ACTION_TIMEOUT_MS)
       const payload = await response.json().catch(() => ({})) as { error?: string }
       if (!response.ok) {
         // 企业策略错误等原样透传（如 ip not in whitelist）
@@ -390,7 +391,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     setBusy(true)
     setMessage(undefined)
     try {
-      const response = await fetch(REMOVE_URL, { method: 'POST' })
+      const response = await fetchLocal(REMOVE_URL, { method: 'POST' })
       if (!response.ok) {
         setMessageKind('error')
         setMessage(t('error.clearFailed'))

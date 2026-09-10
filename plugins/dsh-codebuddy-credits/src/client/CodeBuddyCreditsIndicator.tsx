@@ -26,6 +26,7 @@ import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import { setMaxMode, subscribeMaxMode, getMaxMode, syncMaxMode } from './maxMode.js'
 import { formatModelFacts } from './format.js'
+import { fetchLocal } from './fetch-timeout.js'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const QUOTA_URL = '/api/codebuddy-credits/quota'
@@ -205,7 +206,7 @@ export function syncModelFacts(models: readonly ModelFactView[]): void {
  */
 export function ensureModelFacts(): void {
   if (modelFacts.size > 0 || modelFactsRequest !== undefined) return
-  modelFactsRequest = fetch(STATUS_URL, { cache: 'no-store' })
+  modelFactsRequest = fetchLocal(STATUS_URL, { cache: 'no-store' })
     .then(response => response.ok ? response.json() as Promise<StatusPayload> : undefined)
     .then(payload => {
       if (payload === undefined) return
@@ -306,7 +307,7 @@ export function CodeBuddyCreditsIndicator({
     const seq = ++statusSeq.current
     setLoadError(undefined)
     try {
-      const response = await fetch(STATUS_URL, { cache: 'no-store' })
+      const response = await fetchLocal(STATUS_URL, { cache: 'no-store' })
       if (seq !== statusSeq.current) return
       if (!response.ok) {
         setLoadError(t('indicator.loadFailed'))
@@ -330,7 +331,7 @@ export function CodeBuddyCreditsIndicator({
     const seq = ++quotaSeq.current
     setQuotaError(undefined)
     try {
-      const response = await fetch(QUOTA_URL, { method: 'POST', cache: 'no-store' })
+      const response = await fetchLocal(QUOTA_URL, { method: 'POST', cache: 'no-store' })
       if (seq !== quotaSeq.current) return
       if (!response.ok) {
         const payload = await response.json().catch(() => ({})) as { error?: string }

@@ -7,6 +7,7 @@
  *   窗口事件（配置卡/本 store 都会广播）即可拿到新值。
  */
 
+import { fetchLocal } from './fetch-timeout.js'
 const MAX_MODE_URL = '/api/codebuddy-credits/max-mode'
 /** Max 模式变化窗口事件（配置卡状态广播之外的专用通道：选择器跨组件联动）。 */
 export const MAX_MODE_CHANGED_EVENT = 'codebuddy-credits-max-mode-changed'
@@ -50,7 +51,7 @@ export async function setMaxMode(enabled: boolean): Promise<void> {
   const prev = current
   syncMaxMode(enabled)
   try {
-    const response = await fetch(MAX_MODE_URL, {
+    const response = await fetchLocal(MAX_MODE_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ enabled }),

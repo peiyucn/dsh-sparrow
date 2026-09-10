@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { fetchLocal } from './fetch-timeout.js'
 
 const SESSION_USAGE_URL = '/api/codebuddy-credits/session-usage'
 /** 节点推进后的刷新去抖（流式每步都变，800ms 合并成一次本地查询）。 */
@@ -54,7 +55,7 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = useCallback(() => {
-    void fetch(`${SESSION_USAGE_URL}?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' })
+    void fetchLocal(`${SESSION_USAGE_URL}?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' })
       .then(response => response.ok ? response.json() as Promise<SessionUsageView> : Promise.reject(new Error(`HTTP ${response.status}`)))
       .then(value => {
         boundedSet(usageCache, sessionId, value, USAGE_CACHE_MAX)

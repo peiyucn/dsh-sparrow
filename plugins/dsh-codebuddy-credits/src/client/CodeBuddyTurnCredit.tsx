@@ -16,6 +16,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
+import { fetchLocal } from './fetch-timeout.js'
 
 const TURN_USAGE_URL = '/api/codebuddy-credits/turn-usage'
 
@@ -109,7 +110,7 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
   useEffect(() => {
     if (turn === null || turn === undefined) return
     let alive = true
-    void fetch(`${TURN_USAGE_URL}?sessionId=${encodeURIComponent(sessionId)}&turn=${turn}`, { cache: 'no-store' })
+    void fetchLocal(`${TURN_USAGE_URL}?sessionId=${encodeURIComponent(sessionId)}&turn=${turn}`, { cache: 'no-store' })
       .then(response => response.ok ? response.json() as Promise<TurnUsageView> : Promise.reject(new Error(`HTTP ${response.status}`)))
       .then(value => { if (alive) setUsage(value) })
       .catch(() => { if (alive) setUsage(undefined) })
