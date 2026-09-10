@@ -35,7 +35,8 @@ const PREFIX = '/api/archive-manage'
 const MAX_BODY_BYTES = 64 * 1024
 /** header 事实缓存 TTL（spec 09）：写穿失效之外的兜底，防没有事件的边界路径留陈旧成员表。 */
 const HEADER_CACHE_TTL_MS = 30_000
-/** 标题折叠兜底的有界并发（spec 09）：同一时间至多 N 个冷会话在做全日志折叠。 */
+/** 冷会话整份日志折叠的有界并发（spec 09）：同一时间至多 N 个冷会话在做折叠。
+ *  现由子会话标签折叠使用；标题折叠整批交给官方 readTitleSnapshots（其内部并发同为 4）。 */
 const TITLE_FOLD_CONCURRENCY = 4
 /** 标题折叠兜底的整体预算（spec 09）：超时后未完成的折叠按失败处理、回退会话 id。 */
 const TITLE_FOLD_BUDGET_MS = 8_000
@@ -210,11 +211,19 @@ function cachedTitle(ctx: Context, header: SessionHeader, live: unknown): string
 }
 
 /**
- * 批量标题三档（spec 09）：live 投影 → 冷缓存 → 有界折叠兜底。
- * 折叠共享一个整体预算信号（超时后未完成项按失败处理），并发上限 TITLE_FOLD_CONCURRENCY；
- * 最终取不到的 id 落 fallback（默认会话 id）。返回值包含全部输入 id 的键。
+ * 批量标题三档（spec 09）：live 投影 → 冷缓存 → 折叠兜底。
+ * 折叠共享一个整体预算信号（超时后未完成项按失败处理），最终取不到的 id 落 fallback（默认会话 id）。
+ * 返回值包含全部输入 id 的键。
+ *
+ * 标题批量化（诊断结论 O(m·K) → O(K + m·L)）：全部 miss **整批一次** readTitleSnapshots——
+ * 官方 projectMany 每次调用都要先跑一遍全量 listPersisted（corpus.ts:161），逐 id 单条调用是 O(m·K)
+ * （m 个 miss = m 次全盘扫描 + m 次全日志折叠，只被 runBounded 的并发压成 ceil(m/4) 轮）；
+ * 整批一次即 O(K + m·L)，且官方 projectMany 内部本就是 4 路并发读
+ * （config.ts:9，与本插件 TITLE_FOLD_CONCURRENCY 同值）。返回**每个唯一 id 一条**、按首次出现顺序
+ * 落定（官方 corpus.ts:137/249），故此处先按 id 去重再回填——输入重复 id 也不会错位。
+ * 单条失败只影响该条（取不到 → fallback）；整批抛错（预算已超时等）同样退化为全部 fallback。
  */
-async function titlesFor(
+export async function titlesFor(
   ctx: Context,
   headers: readonly SessionHeader[],
   fallback: (header: SessionHeader) => string,
@@ -233,13 +242,17 @@ async function titlesFor(
   // 预算信号自建（spec 09 审计）：批结束（成功或失败）即 release，定时器不滞留到死线。
   const budget = createBudgetSignal(TITLE_FOLD_BUDGET_MS)
   try {
-    const folded = await runBounded(misses, TITLE_FOLD_CONCURRENCY, async (header) => {
-      const observations = await ctx.sessionQuery.readTitleSnapshots([SessionId(String(header.id))], budget.signal)
-      return titleFromObservation(observations[0], fallback(header))
-    })
-    misses.forEach((header, index) => {
-      out.set(String(header.id), folded[index] ?? fallback(header))
-    })
+    const missingIds = [...new Set(misses.map(header => String(header.id)))]
+    const observations = await ctx.sessionQuery.readTitleSnapshots(missingIds.map(id => SessionId(id)), budget.signal)
+    const folded = new Map(missingIds.map((id, index) => [id, observations[index]]))
+    for (const header of misses) {
+      out.set(String(header.id), titleFromObservation(folded.get(String(header.id)), fallback(header)))
+    }
+    return out
+  } catch (error) {
+    // 整批失败（含预算超时）：标题退化为 fallback，列表照常返回，不让路由 500。
+    ctx.logger.warn(`dsh-archive-manage: 标题折叠失败（${misses.length} 个会话）：${error instanceof Error ? error.message : String(error)}`)
+    for (const header of misses) out.set(String(header.id), fallback(header))
     return out
   } finally {
     budget.release()
@@ -631,6 +644,22 @@ async function removeArchivedId(surface: RegistryMutationSurface, sessionId: Ses
   await mutateArchivedSet(surface, ids => ids.filter(id => String(id) !== String(sessionId)))
 }
 
+/**
+ * 移入回收站 / 彻底删除后的归档集清理：父会话 + 其**全部后代**一次摘除（一次判定、一次写链）。
+ * 复用 /archive 用的同一套子树计算（collectSubtreeIds，spec 08「子镜像父」）：只摘父会把随父一起
+ * 离开持久化的子会话 id 留成幽灵——它们已不在 headers 里，父子对齐再也看不到它们，只能等下次启动清扫；
+ * 期间归档集随操作单调膨胀（域每次 setState 全量重写，/list 每轮还要 filter 掉它们）。
+ * 嵌套后代同理：其父已随根一起离开持久化，留在归档集里只会变成「官方列表看不见、归档区里挂着」的孤儿。
+ */
+export async function removeArchivedSubtree(
+  surface: RegistryMutationSurface,
+  headers: readonly SessionHeader[],
+  rootId: string,
+): Promise<void> {
+  const subtree = new Set(collectSubtreeIds(headers.map(treeHeaderOf), rootId))
+  await mutateArchivedSet(surface, ids => ids.filter(id => !subtree.has(String(id))))
+}
+
 /** 把会话加回归档集（回收站还原后回归隐藏态）；已在集合内幂等无操作。 */
 async function addArchivedId(surface: RegistryMutationSurface, sessionId: SessionId): Promise<void> {
   await mutateArchivedSet(surface, ids => ids.some(id => String(id) === String(sessionId)) ? ids : [...ids, sessionId])
@@ -1013,7 +1042,9 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             attachedIds,
           ).filter(id => !children.has(id))
           // spec 09：先取游离 header 集，标题/子标签批量三档（缓存优先 + 有界折叠），不再逐会话串行全日志折叠。
-          const strayHeaders = headers.filter(header => strayIds.includes(String(header.id)))
+          // 审计（host.ts 旧 :1013 的 O(K·S)）：成员判定先建一次 Set，避免逐 header 对 strayIds 做线性 includes。
+          const strayIdSet = new Set(strayIds)
+          const strayHeaders = headers.filter(header => strayIdSet.has(String(header.id)))
           const titles = await titlesFor(ctx, strayHeaders, header => header.id)
           const labelHeaders = strayHeaders.filter(header => header.origin === 'subagent')
           const childLabels = labelHeaders.length > 0
@@ -1217,7 +1248,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               }
             }
             try {
-              await removeArchivedId(surface, sessionId)
+              await removeArchivedSubtree(surface, headers, String(sessionId))
             } catch (cleanupError) {
               ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
             }
@@ -1259,7 +1290,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             }
           }
           try {
-            await removeArchivedId(surface, sessionId)
+            await removeArchivedSubtree(surface, headers, String(sessionId))
           } catch (cleanupError) {
             ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
           }

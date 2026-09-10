@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { resolve, sep } from 'node:path'
 import { createHeaderFactsStore, labelFromSubagentIdentity } from '../lib/archive.js'
-import { addedSummaryFor, alignChildArchives, assertRegistryMutationApi, assertSessionLocationApi, FOLDED_LABEL_CACHE_MAX_ENTRIES, mutateArchivedSet, resolveTrashDir, sessionDirectoryFor, storedHeaders, subagentLabel, workspaceIndexFor } from '../lib/host.js'
+import { addedSummaryFor, alignChildArchives, assertRegistryMutationApi, assertSessionLocationApi, FOLDED_LABEL_CACHE_MAX_ENTRIES, mutateArchivedSet, removeArchivedSubtree, resolveTrashDir, sessionDirectoryFor, storedHeaders, subagentLabel, titlesFor, workspaceIndexFor } from '../lib/host.js'
 
 // 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
 // 测试夹具按当前平台构造——CI 跑 Ubuntu、本机跑 Windows，两边都必须绿。
@@ -190,6 +190,57 @@ describe('archive-manage host 纯逻辑', () => {
     })
   })
 
+  // 幽灵 id 清理：trash/delete 只摘父会让随父一起离开持久化的子会话 id 永远留在
+  // 归档集里（父子对齐再也看不到它们），归档集随操作单调膨胀。
+  describe('removeArchivedSubtree（幽灵 id 清理）', () => {
+    const headerOf = (id, extra = {}) => ({ id, createdAt: 1, isSeeded: false, ...extra })
+    const subtreeSurface = (initialIds) => {
+      const calls = []
+      let state = { archivedSessionIds: [...initialIds], initialized: true, workspaceIds: [] }
+      return {
+        calls,
+        surface: {
+          enqueueOperation: async (op) => { calls.push('enqueue'); return op() },
+          requireState: () => state,
+          setState: async (next) => { calls.push('set'); state = next },
+        },
+        get: () => state,
+      }
+    }
+
+    it('父 + 子 + 孙 应该 一次全部移出归档集（不留幽灵）', async () => {
+      const headers = [
+        headerOf('p'),
+        headerOf('c', { parentSession: 'p', origin: 'subagent' }),
+        headerOf('g', { parentSession: 'c', origin: 'subagent' }),
+        headerOf('other'),
+      ]
+      const { surface, calls, get } = subtreeSurface(['p', 'c', 'g', 'other'])
+      await removeArchivedSubtree(surface, headers, 'p')
+      assert.deepEqual(calls, ['enqueue', 'set'])
+      assert.deepEqual(get().archivedSessionIds.map(String), ['other'])
+    })
+
+    it('子树 id 都不在归档集时 应该 零写入（幂等无事件噪音）', async () => {
+      const headers = [headerOf('p'), headerOf('c', { parentSession: 'p', origin: 'subagent' })]
+      const { surface, calls, get } = subtreeSurface(['other'])
+      await removeArchivedSubtree(surface, headers, 'p')
+      assert.deepEqual(calls, ['enqueue'])
+      assert.deepEqual(get().archivedSessionIds.map(String), ['other'])
+    })
+
+    it('无父的子会话（孤儿）不在兄弟子树内 应该 不被误摘', async () => {
+      const headers = [
+        headerOf('p'),
+        headerOf('c', { parentSession: 'p', origin: 'subagent' }),
+        headerOf('orphan', { parentSession: 'missing', origin: 'subagent' }),
+      ]
+      const { surface, get } = subtreeSurface(['p', 'c', 'orphan'])
+      await removeArchivedSubtree(surface, headers, 'p')
+      assert.deepEqual(get().archivedSessionIds.map(String), ['orphan'])
+    })
+  })
+
   describe('alignChildArchives（spec 09 审计）', () => {
     const headerOf = (id, extra = {}) => ({ id, createdAt: 1, isSeeded: false, ...extra })
     const alignCtx = (archivedIds) => ({
@@ -228,6 +279,86 @@ describe('archive-manage host 纯逻辑', () => {
       const { surface, get } = alignSurface()
       await alignChildArchives(alignCtx(['p']), surface, store)
       assert.deepEqual(get().archivedSessionIds.map(String).sort(), ['c', 'p'])
+    })
+  })
+
+  // 标题兜底从「每个 miss 一次 readTitleSnapshots」改为「整批一次」——
+  // 官方 projectMany 每次调用都要重跑一遍全量 listPersisted，逐 id 单条调用是 O(m·K)。
+  describe('titlesFor 批量折叠', () => {
+    const titleHeader = (id) => ({ id, createdAt: 1, isSeeded: false })
+    const titlesCtx = ({ readTitleSnapshots, cacheRow }) => ({
+      sessions: { get: () => undefined },
+      sessionQuery: { readTitleSnapshots },
+      get: (name) => (name === 'sessionProjectionCache' ? { cachedSnapshot: () => cacheRow } : undefined),
+      logger: { warn: () => {} },
+    })
+    const fulfilled = (id, title) => ({ sessionId: id, status: 'fulfilled', value: { title: { title } } })
+
+    it('多个 miss 应该 只调用一次 readTitleSnapshots，且整批传入全部 id', async () => {
+      const calls = []
+      const ctx = titlesCtx({
+        readTitleSnapshots: async (ids) => {
+          calls.push(ids.map(String))
+          return ids.map(id => fulfilled(String(id), `title-${String(id)}`))
+        },
+      })
+      const titles = await titlesFor(ctx, ['a', 'b', 'c', 'd', 'e'].map(titleHeader), header => header.id)
+      assert.equal(calls.length, 1)
+      assert.deepEqual(calls[0], ['a', 'b', 'c', 'd', 'e'])
+      assert.equal(titles.size, 5)
+      assert.equal(titles.get('a'), 'title-a')
+      assert.equal(titles.get('e'), 'title-e')
+    })
+
+    it('重复 id 应该 去重成一次请求，且每条都拿到同一个标题（不错位）', async () => {
+      const calls = []
+      const ctx = titlesCtx({
+        // 官方契约：每个唯一 id 一条结果、按首次出现顺序（corpus.ts:137/249）。
+        readTitleSnapshots: async (ids) => { calls.push(ids.map(String)); return ids.map(id => fulfilled(String(id), `title-${String(id)}`)) },
+      })
+      const titles = await titlesFor(ctx, [titleHeader('dup'), titleHeader('dup'), titleHeader('other')], header => `id:${header.id}`)
+      assert.deepEqual(calls, [['dup', 'other']])
+      assert.equal(titles.get('dup'), 'title-dup')
+      assert.equal(titles.get('other'), 'title-other')
+      assert.equal(titles.size, 2)
+    })
+
+    it('缓存命中 应该 不进折叠批（一次都不调用）', async () => {
+      const calls = []
+      const ctx = titlesCtx({
+        cacheRow: { values: { title: 'cached-title' } },
+        readTitleSnapshots: async (ids) => { calls.push(ids.map(String)); return ids.map(id => fulfilled(String(id), 'folded')) },
+      })
+      const titles = await titlesFor(ctx, [titleHeader('a')], header => header.id)
+      assert.equal(titles.get('a'), 'cached-title')
+      assert.deepEqual(calls, [])
+    })
+
+    it('单条 rejected（会话已被移走）应该 只退化为该条的 fallback', async () => {
+      const ctx = titlesCtx({
+        readTitleSnapshots: async (ids) => ids.map(id => String(id) === 'gone'
+          ? { sessionId: id, status: 'rejected', reason: new Error('not found') }
+          : fulfilled(String(id), `title-${String(id)}`)),
+      })
+      const titles = await titlesFor(ctx, ['kept', 'gone'].map(titleHeader), header => `id:${header.id}`)
+      assert.equal(titles.get('kept'), 'title-kept')
+      assert.equal(titles.get('gone'), 'id:gone')
+    })
+
+    it('整批抛错（预算超时）应该 全部退化为 fallback 且不抛给调用方', async () => {
+      const ctx = titlesCtx({
+        readTitleSnapshots: async () => { throw new Error('budget abort') },
+      })
+      const titles = await titlesFor(ctx, ['x', 'y'].map(titleHeader), header => `id:${header.id}`)
+      assert.deepEqual([...titles], [['x', 'id:x'], ['y', 'id:y']])
+    })
+
+    it('空输入 应该 不调用 readTitleSnapshots', async () => {
+      let calls = 0
+      const ctx = titlesCtx({ readTitleSnapshots: async () => { calls += 1; return [] } })
+      const titles = await titlesFor(ctx, [], header => header.id)
+      assert.equal(titles.size, 0)
+      assert.equal(calls, 0)
     })
   })
 

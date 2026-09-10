@@ -7,7 +7,7 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { ArchiveDock, ensureArchiveStyles } from './ArchiveDock.js'
-import type { ArchivedSessionItem, StraySessionItem } from './ArchiveDock.js'
+import type { ArchivedSessionItem, DeleteMutationResult, StraySessionItem, TrashDeleteResult, TrashMutationResult } from './ArchiveDock.js'
 
 // remote：官方 Remote 事件载体（api-session/* 桥接，spec 08 §2.5）；硬依赖，缺失时本插件客户端不启动。
 export const inject = ['slots', 'locale', 'remote']
@@ -217,12 +217,12 @@ export function apply(ctx: ClientContext): void {
         }
         return { path: payload.path ?? '', displayPath: payload.displayPath ?? payload.path ?? '' }
       },
-      moveToTrash: (sessionId: string) => postApi('/api/archive-manage/trash', { sessionId, confirm: true }),
+      moveToTrash: (sessionId: string) => postApi<TrashMutationResult>('/api/archive-manage/trash', { sessionId, confirm: true }),
       unarchiveSession: (sessionId: string) => postApi('/api/archive-manage/unarchive', { sessionId }),
       archiveSession: (sessionId: string) => postApi('/api/archive-manage/archive', { sessionId }),
-      deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => postApi('/api/archive-manage/delete', simple ? { sessionId, confirm: true } : { sessionId, confirmTitle }),
+      deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => postApi<DeleteMutationResult>('/api/archive-manage/delete', simple ? { sessionId, confirm: true } : { sessionId, confirmTitle }),
       restoreTrashItem: (trashId: string) => postApi('/api/archive-manage/restore', { trashId }),
-      deleteTrashItem: (trashId: string) => postApi('/api/archive-manage/trash-delete', { trashId, confirm: true }),
+      deleteTrashItem: (trashId: string) => postApi<TrashDeleteResult>('/api/archive-manage/trash-delete', { trashId, confirm: true }),
       restoreAllTrash: () => postApi<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ trashId: string; message: string }> }>('/api/archive-manage/trash-restore-all', { confirm: true }),
       deleteAllTrash: () => postApi<{ deleted?: number; failed?: string[] }>('/api/archive-manage/trash-delete-all', { confirm: true }),
     }),

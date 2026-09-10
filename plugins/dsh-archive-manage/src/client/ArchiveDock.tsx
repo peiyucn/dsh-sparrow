@@ -90,18 +90,42 @@ export interface StraySessionItem {
   readonly sizeBytes?: number
 }
 
+/**
+ * 写路由响应形状（与 host.ts 的路由契约一一对应）：
+ * 变更成功后客户端靠响应里的 id 立刻本地摘掉受影响的行，不再等整页刷新落定。
+ */
+export interface TrashMutationResult {
+  readonly ok?: boolean
+  /** 本次回收站条目 id（回收站列表重载前用于对账）。 */
+  readonly trashId?: string
+  /** 随父会话一起进回收站的子会话 id（本地移除必须连带它们的行）。 */
+  readonly subagentIds?: readonly string[]
+}
+
+export interface DeleteMutationResult {
+  readonly ok?: boolean
+  readonly deleted?: boolean
+  /** 随父会话一起删除的子会话 id（本地移除必须连带它们的行）。 */
+  readonly subagentIds?: readonly string[]
+}
+
+export interface TrashDeleteResult {
+  readonly ok?: boolean
+  readonly trashId?: string
+}
+
 export interface ArchiveDockInjected {
   listArchived: () => Promise<ArchivedSessionItem[]>
   listStrays: () => Promise<StraySessionItem[]>
   listTrashItems: () => Promise<TrashItem[]>
   /** 回收站实际存放目录（绝对路径 + 掩码后的展示路径），面板提示信息里明示卸载影响。 */
   trashDirPath: () => Promise<{ path: string; displayPath: string }>
-  moveToTrash: (sessionId: string) => Promise<unknown>
+  moveToTrash: (sessionId: string) => Promise<TrashMutationResult>
   unarchiveSession: (sessionId: string) => Promise<unknown>
   archiveSession: (sessionId: string) => Promise<unknown>
-  deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => Promise<unknown>
+  deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => Promise<DeleteMutationResult>
   restoreTrashItem: (trashId: string) => Promise<unknown>
-  deleteTrashItem: (trashId: string) => Promise<unknown>
+  deleteTrashItem: (trashId: string) => Promise<TrashDeleteResult>
   restoreAllTrash: () => Promise<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ trashId: string; message: string }> }>
   deleteAllTrash: () => Promise<{ deleted?: number; failed?: string[] }>
 }
@@ -634,6 +658,18 @@ const DAY_MS = 86_400_000
 /** 复制成功反馈的展示时长。 */
 const COPIED_FEEDBACK_MS = 2_000
 
+/** 归档树某节点的子树 id（本地已知的父子关系；与 host 的 collectSubtreeIds 同语义，用于即时移除）。 */
+function subtreeIdsOf(item: ArchivedSessionItem): string[] {
+  return [item.sessionId, ...item.children.flatMap(subtreeIdsOf)]
+}
+
+/** 从归档树摘掉若干会话 id：命中节点的整棵子树一并消失（父行没了，子行没有留的理由）。 */
+function dropArchivedIds(items: readonly ArchivedSessionItem[], ids: ReadonlySet<string>): ArchivedSessionItem[] {
+  return items
+    .filter(item => !ids.has(item.sessionId))
+    .map(item => ({ ...item, children: dropArchivedIds(item.children, ids) }))
+}
+
 /**
  * footer action 组件：窄栏显示图标，宽栏显示「归档管理」；弹窗列出轻归档会话与回收站。
  * 打开后先显示加载态，数据就绪后再渲染列表。
@@ -1151,38 +1187,62 @@ export function ArchiveDock(props: ArchiveDockProps) {
   /**
    * 确认框提交：动作全程在弹窗内展示处理中，成功后由这里关闭弹窗；
    * 失败（含批量部分失败）reject 回弹窗展示错误。
+   *
+   * 单条分支不等整页刷新：写操作必然打穿 host 的 header 缓存，紧随其后的刷新要走冷扫描
+   * （列表越大越慢），此前条目与弹窗都干等它落定。改为变更成功后立即按响应里的 id 本地摘掉
+   * 受影响的行（含子会话行）并关闭弹窗，refresh() 退到后台对账。
+   * 失败路径语义不变：变更 reject 时本地状态一律不动，错误仍回弹窗展示。
    */
   const submitConfirm = async (typed: string): Promise<void> => {
     if (pending === null) return
     const kind = pending.kind
     if (kind === 'unarchive') {
-      await unarchiveSession(pending.item.sessionId)
-      await refresh()
+      const item = pending.item
+      await unarchiveSession(item.sessionId)
+      // 子会话由 host 的父子对齐异步移出归档集；本地先按已知子树摘，收敛结果一致。
+      const removed = new Set(subtreeIdsOf(item))
+      setArchived(prev => dropArchivedIds(prev, removed))
       setPending(null)
+      void refresh()
       return
     }
     if (kind === 'trash' || kind === 'trashStray') {
-      await moveToTrash(pending.item.sessionId)
-      await refresh()
+      const sessionId = pending.item.sessionId
+      const result = await moveToTrash(sessionId)
+      const removed = new Set([sessionId, ...result.subagentIds ?? []])
+      setArchived(prev => dropArchivedIds(prev, removed))
+      setStrays(prev => prev.filter(stray => !removed.has(stray.sessionId)))
       setPending(null)
+      void refresh()
       return
     }
     if (kind === 'delete') {
-      await deleteSession(pending.item.sessionId, typed, false)
-      await refresh()
+      const sessionId = pending.item.sessionId
+      const result = await deleteSession(sessionId, typed, false)
+      const removed = new Set([sessionId, ...result.subagentIds ?? []])
+      setArchived(prev => dropArchivedIds(prev, removed))
+      setStrays(prev => prev.filter(stray => !removed.has(stray.sessionId)))
       setPending(null)
+      void refresh()
       return
     }
     if (kind === 'deleteStray') {
-      await deleteSession(pending.item.sessionId, pending.item.blank ? '' : typed, pending.item.blank)
-      await refresh()
+      const item = pending.item
+      const result = await deleteSession(item.sessionId, item.blank ? '' : typed, item.blank)
+      const removed = new Set([item.sessionId, ...result.subagentIds ?? []])
+      setArchived(prev => dropArchivedIds(prev, removed))
+      setStrays(prev => prev.filter(stray => !removed.has(stray.sessionId)))
       setPending(null)
+      void refresh()
       return
     }
     if (kind === 'deleteTrashItem') {
-      await deleteTrashItem(pending.item.trashId)
-      await refresh()
+      const trashId = pending.item.trashId
+      const result = await deleteTrashItem(trashId)
+      const removedTrashId = result.trashId ?? trashId
+      setTrashItems(prev => prev.filter(item => item.trashId !== removedTrashId))
       setPending(null)
+      void refresh()
       return
     }
     if (kind === 'restoreAll') {
