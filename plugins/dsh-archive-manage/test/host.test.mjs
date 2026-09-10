@@ -103,8 +103,10 @@ describe('archive-manage host 纯逻辑', () => {
       assert.throws(() => assertSessionLocationApi({ locate: 'x' }), /locate/)
     })
 
-    it('locate 存在 应该 不抛', () => {
-      assert.doesNotThrow(() => assertSessionLocationApi({ locate: () => ({ kind: 'jsonl', path: '/x/session.jsonl' }) }))
+    it('locate 存在 应该 返回可转发调用的访问器', () => {
+      const location = { kind: 'jsonl', path: '/x/session.jsonl' }
+      const api = assertSessionLocationApi({ locate: () => location })
+      assert.deepEqual(api.locate({}), location)
     })
   })
 
