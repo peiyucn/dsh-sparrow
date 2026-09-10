@@ -13,8 +13,8 @@ describe('chat-fim 纯逻辑', () => {
     it('空配置 应该 返回默认值', () => {
       const config = normalizeConfig(undefined)
       assert.equal(config.baseURL, 'https://api.deepseek.com/beta')
-      assert.equal(config.model, 'deepseek-v4-pro')
-        assert.equal(config.maxTokens, 96)
+      assert.equal(config.model, 'deepseek-flash')
+      assert.equal(config.maxTokens, 96)
       assert.equal(config.apiKeyEnv, 'DEEPSEEK_API_KEY')
       assert.equal(config.suggestionCount, 1)
     })
@@ -365,6 +365,10 @@ describe('chat-fim 纯逻辑', () => {
 
     it('mode=auto 主模型 v4-flash 应该 跟随主模型', () => {
       assert.equal(resolveSuggestModel('auto', { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, 'deepseek-v4-pro'), 'deepseek-v4-flash')
+    })
+
+    it('mode=auto 主模型 deepseek-flash 应该 跟随主模型', () => {
+      assert.equal(resolveSuggestModel('auto', { provider: 'deepseek-official', model: 'deepseek-flash' }, 'deepseek-v4-pro'), 'deepseek-flash')
     })
 
     it('mode=auto 主模型 vision-exp 应该 回退配置默认', () => {

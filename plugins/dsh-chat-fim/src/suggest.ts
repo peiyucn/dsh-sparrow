@@ -3,7 +3,7 @@
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
 
 export const DEFAULT_BASE_URL = 'https://api.deepseek.com/beta'
-export const DEFAULT_MODEL = 'deepseek-v4-pro'
+export const DEFAULT_MODEL = 'deepseek-flash'
 export const DEFAULT_API_KEY_ENV = 'DEEPSEEK_API_KEY'
 export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 export const DEFAULT_MAX_BODY_BYTES = 64 * 1024
@@ -424,8 +424,10 @@ export function extractSuggestions(data: unknown): string[] {
   return suggestions
 }
 
-/** FIM 端点实测可用的模型 id（2026-08-30 直连实测；官方文档 schema 只列 v4-pro，flash 实际可用）。 */
-export const SUGGEST_MODEL_IDS = ['deepseek-v4-pro', 'deepseek-v4-flash'] as const
+/** FIM 端点实测可用的模型 id：2026-08-30 直连实测 v4-pro / v4-flash 可用（官方 schema 只列 v4-pro）；
+ *  2026-09-10 复测 deepseek-flash（V4.1 Flash）同样 200，且旧的 deepseek-v4-flash 已被服务端路由到
+ *  deepseek-flash。auto 跟随只认在此集合内的主模型。 */
+export const SUGGEST_MODEL_IDS = ['deepseek-flash', 'deepseek-v4-pro', 'deepseek-v4-flash'] as const
 
 /** 续写模型三档选择（客户端偏好，随请求传给 host）。 */
 export type SuggestModelMode = 'auto' | 'pro' | 'flash'

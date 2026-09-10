@@ -7,6 +7,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Version-line alignment with official dsh 0.1.5-rc.1.
 - The suggestion switch and the candidate menu are shown again on dsh 0.1.5: the previous release hid them entirely because it did not recognize the new session format.
 - Suggestions no longer copy the whole session log on every request, so they stay responsive in very long sessions.
+- Suggestions now follow the new deepseek-flash main model (an unrecognized main model used to fall back to deepseek-v4-pro), and the fallback default is deepseek-flash too.
 
 ## 0.1.2-rc.1.1 (2026-09-09)
 

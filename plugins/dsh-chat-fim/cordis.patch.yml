@@ -5,7 +5,7 @@
       name: '@dsh-sparrow/dsh-chat-fim'
       config:
         baseURL: https://api.deepseek.com/beta
-        model: deepseek-v4-pro
+        model: deepseek-flash
         maxTokens: 96
         apiKeyEnv: DEEPSEEK_API_KEY
         requestTimeoutMs: 30000

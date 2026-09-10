@@ -36,7 +36,7 @@ export interface ChatFimDockInjected {
   readonly directoryFor: (sessionId: SessionId) => FimDirectoryStore | undefined
   /** 查询当前会话主模型是否支持（deepseek 系列）；false 时整体隐藏。 */
   isSupported: (sessionId: SessionId) => Promise<boolean>
-  /** 发起一次 host 路由请求；由调用方负责陈旧响应判定。续写模型固定 deepseek-v4-flash。 */
+  /** 发起一次 host 路由请求；由调用方负责陈旧响应判定。续写模型由 host 按主模型解析（auto 跟随）。 */
   requestComplete: (
     sessionId: SessionId,
     prompt: string,
