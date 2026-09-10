@@ -2,7 +2,7 @@
 
 /** Settings 命名空间（小写连字符标识，installSection 契约要求）。 */
 export const NS = 'llm-codebuddy-credits'
-/** DSH provider 路由 key，也是模型条目与凭据配置的锚点。 */
+/** DSH provider 路由 key，也是模型条目与凭据配置的锚点（client 端 model-facts.ts 的 PROVIDER_ID 必须与此一致）。 */
 export const PROVIDER = 'codebuddy-credits'
 /** 模型选择器与设置页显示的 provider 名（内部 ID 保持小写连字符，仅展示名品牌化）。 */
 export const DISPLAY_NAME = 'CodeBuddy Credits'
