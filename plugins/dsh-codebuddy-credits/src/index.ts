@@ -70,6 +70,11 @@ export function apply(ctx: Context, config: Config): void {
    */
   let facts: readonly CodeBuddyModelFacts[] = []
   const models = (): readonly CodeBuddyModelFacts[] => facts
+  /**
+   * 凭据/授权代际：saveKey / reapply / removeKey 落定前自增；异步目录刷新在发起时捕获，
+   * 落定前不一致即丢弃——防止旧 Key 的在飞结果回写新状态（审计 S2/S3）。
+   */
+  let factsGeneration = 0
   /** 兜底注册失败日志只记一次（每进程）；成功后重置。 */
   let registrationFailureLogged = false
 
@@ -156,6 +161,7 @@ export function apply(ctx: Context, config: Config): void {
 
   /** 拉取账号上下文（企业头用），best-effort：失败不阻塞注册。 */
   async function refreshAccountWithKey(key: string): Promise<void> {
+    const generation = factsGeneration
     try {
       const res = await fetch('https://copilot.tencent.com/v2/accounts', {
         headers: {
@@ -171,6 +177,8 @@ export function apply(ctx: Context, config: Config): void {
       const body = await res.json() as { data?: { accounts?: Array<{ uid?: string; enterpriseId?: string; enterpriseName?: string; type?: string; nickname?: string; enterpriseUserName?: string }> } }
       const first = body.data?.accounts?.[0]
       if (first === undefined) return
+      // 凭据代际已变化（换/清 Key）：旧账号快照不覆盖新状态（审计 S2）。
+      if (generation !== factsGeneration) return
       account = {
         ...(first.uid === undefined ? {} : { userId: first.uid }),
         ...(first.enterpriseId === undefined ? {} : { enterpriseId: first.enterpriseId }),
@@ -252,6 +260,7 @@ export function apply(ctx: Context, config: Config): void {
 
   /** 节流后台刷新：失败保持现状（下次建目录再试），成功且有变化即通知选择器。 */
   async function refreshFactsInBackground(): Promise<void> {
+    const generation = factsGeneration
     let key: string
     try {
       key = await resolveApiKey()
@@ -260,6 +269,8 @@ export function apply(ctx: Context, config: Config): void {
     }
     try {
       const next = await loadFactsOnce(key)
+      // 凭据/授权已变化：这次结果属于旧状态，直接丢弃（审计 S2）。
+      if (generation !== factsGeneration) return
       const changed = !sameFacts(facts, next)
       facts = next
       if (changed && registered && registration !== undefined) {
@@ -279,12 +290,17 @@ export function apply(ctx: Context, config: Config): void {
    * 由 registerAdapter([PROVIDER]) 创建、replace 只动该 handle 的 owned 集合，不触碰其他 provider。
    */
   async function refreshModelsManually(): Promise<{ changed: boolean; models: readonly CodeBuddyModelFacts[] }> {
+    const generation = factsGeneration
     const key = await resolveApiKey()
     const next = await loadFactsOnce(key)
+    // 刷新期间凭据被换掉/清空：结果已过期，既不能用它覆盖新状态，也不能据此注册 route（审计 S2/S3）。
+    if (generation !== factsGeneration) {
+      throw new LlmError(`${name}: 凭据在刷新期间发生变化，请稍后重试`, 'REFRESH_SUPERSEDED')
+    }
     const changed = !sameFacts(facts, next)
     facts = next
     lastRefreshAttemptAt = Date.now()
-    if (changed && registration !== undefined) registration.replace([PROVIDER])
+    if (changed && registered && registration !== undefined) registration.replace([PROVIDER])
     if (!registered) ensureRoutes(true)
     return { changed, models: next }
   }
@@ -390,8 +406,11 @@ export function apply(ctx: Context, config: Config): void {
         throw new LlmError(`${name}: 本组合没有设置服务，无法记录凭据引用`, 'NO_SETTINGS_STORE')
       }
       // 用户给 Key 的行为 = 对模型目录与账号信息拉取的授权；先验证再落库。
-      const entries = await fetchCodeBuddyModels(key, account)
+      // 先取账号上下文（best-effort）再拉目录：请求才带对当前 Key 的企业头（审计 S8）。
       await refreshAccountWithKey(key)
+      const entries = await fetchCodeBuddyModels(key, account)
+      // 作废所有仍用旧 Key 的在飞刷新（审计 S2）。
+      factsGeneration += 1
       facts = factsFromEntries(entries)
       const [primary, legacyRef] = keyRefs(current())
       await credentials.set(credentialRef(primary), key)
@@ -411,8 +430,9 @@ export function apply(ctx: Context, config: Config): void {
     async reapply() {
       // 幂等重配：用已存 Key 重拉模型目录与账号信息（不写凭据、不写设置）。
       const key = await resolveApiKey()
-      const entries = await fetchCodeBuddyModels(key, account)
       await refreshAccountWithKey(key)
+      const entries = await fetchCodeBuddyModels(key, account)
+      factsGeneration += 1
       facts = factsFromEntries(entries)
       ensureRoutes(true)
     },
@@ -431,6 +451,8 @@ export function apply(ctx: Context, config: Config): void {
           }
         }
       }
+      // 作废所有在飞刷新/账号补拉，防止旧结果回写（审计 S2/S3）。
+      factsGeneration += 1
       account = undefined
       facts = []
       ensureRoutes(ambientKey())
