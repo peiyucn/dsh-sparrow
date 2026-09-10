@@ -1,5 +1,7 @@
 # dsh-vision-bridge
 
+> **⚠️ 已退役（2026-09-10）** —— 本插件不再需要：DeepSeek 主模型已原生多模态，请直接用 **`deepseek-flash`** 替代。**不要**再新装。以下正文保留作历史记录。
+
 简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 纯文本主模型会话的官方视觉通道——只用 DeepSeek 官方视觉模型，不引入任何第三方模型或凭据。DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。

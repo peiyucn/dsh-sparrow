@@ -4,7 +4,11 @@
 
 | 插件 / Plugin | 支持 / Supported |
 | :--- | :--- |
-| `plugins/*` 全部插件（dsh-chat-fim、dsh-vision-bridge、dsh-archive-manage、dsh-nav-pin、dsh-file-manage） | 仅最新发布版 / Latest release only |
+| `plugins/*` 全部插件（dsh-chat-fim、dsh-archive-manage、dsh-nav-pin、dsh-file-manage） | 仅最新发布版 / Latest release only |
+
+> `dsh-vision-bridge` 已于 2026-09-10 退役（DeepSeek 主模型已原生多模态），不再提供支持。
+>
+> `dsh-vision-bridge` was retired on 2026-09-10 (DeepSeek main models are natively multimodal); it is no longer supported.
 
 ## 报告漏洞 / Reporting a Vulnerability
 

@@ -1,5 +1,7 @@
 # dsh-vision-bridge
 
+> **⚠️ Retired (2026-09-10)** — this plugin is no longer needed: DeepSeek main models are natively multimodal now, so use **`deepseek-flash`** instead. Do **not** install it on new setups. The rest of this document is kept for historical reference.
+
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 The official DeepSeek vision channel for text-only main models — official vision model only, no third-party models or credentials. A DeepSeek Harness (DSH) Web plugin (part of the dsh-sparrow collection).

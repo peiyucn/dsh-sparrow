@@ -5,11 +5,12 @@
 DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全」。每个插件一个独立 npm 包、独立发布，统一挂在 `@dsh-sparrow` 组织下；功能被官方原生支持后对应插件退役。
 
 * `plugins/dsh-chat-fim` — 输入框续写联想（FIM Beta 转发 + 官方同款候选菜单）
-* `plugins/dsh-vision-bridge` — 纯文本会话的图片视觉通道
+* `plugins/dsh-vision-bridge` — **已退役（2026-09-10）**：原为纯文本会话的图片视觉通道；DeepSeek 主模型已原生多模态（`deepseek-flash`），插件退役，代码原地保留不删不移
 * `plugins/dsh-archive-manage` — 归档会话管理（备份/删除/恢复）
 * `plugins/dsh-nav-pin` — 轮次导航窄屏不消失（纯样式注入）
 * `plugins/dsh-file-manage` — DeepSeek Files API 云端文件管理（无本地持久化）
 * `plugins/dsh-codebuddy-credits` — CodeBuddy 额度 LLM provider（官方 API Key 直连，纯模型推理）
+* **插件总数口径：五个活跃插件 + 一个已退役插件**（`dsh-vision-bridge` 于 2026-09-10 退役，代码原地保留）
 * 验证：插件目录 `npm run verify`；全量 = 根 `npm run verify`；分项 = 根 `pnpm run <step>:all`
 
 ## 文档规范
@@ -70,9 +71,9 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 
 * **生命周期**：一切副作用在 `apply` 内注册并配 `ctx.effect` 清理；不泄漏定时器/watcher/监听
 
-* **宿主兼容自检（硬约束，六个插件全有）**：`apply` 开头先跑本插件 `src/compat.ts` 的门，不通过即**抛错自停用**——cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响（已查证 cordis `lib/index.js:1350-1362`）。**用户只升级 dsh、不升级插件时，插件必须自己让位**（根 AGENTS《扩展与宿主兼容（fail-safe）》）。两档门：
+* **宿主兼容自检（硬约束，五个活跃插件全有；已退役的 dsh-vision-bridge 代码原地保留）**：`apply` 开头先跑本插件 `src/compat.ts` 的门，不通过即**抛错自停用**——cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响（已查证 cordis `lib/index.js:1350-1362`）。**用户只升级 dsh、不升级插件时，插件必须自己让位**（根 AGENTS《扩展与宿主兼容（fail-safe）》）。两档门：
   1. **能力门**（全部插件）：`assertCapabilities(ctx, name, [{ name, ok }])`——宿主服务/方法/导出、以及运行环境特性（如 nav-pin 依赖的 `:has()` 与 container query）缺任一即停用；探针用**命名空间访问或惰性 import**（导出消失/改名只得到 `undefined` → 判不支持，不产生链接期失败）。
-  2. **会话格式门**（读会话数据的三个插件：archive / chat-fim / vision-bridge）：常量探针 `assertHostCompatible(ctx, name)`（官方 `SESSION_FORMAT_VERSION` 须在支持集合内）+ **宿主真值** `unsupportedStoredFormatReason(headers)`——常量探针在 `link:`/peer 副本场景会读到插件自己的旧版官方包，故以宿主给出的会话 `header.version` 为准（archive 在移动/删除前逐 header 校验，chat-fim/vision-bridge 在读取前校验）。
+  2. **会话格式门**（读会话数据的两个插件：archive / chat-fim）：常量探针 `assertHostCompatible(ctx, name)`（官方 `SESSION_FORMAT_VERSION` 须在支持集合内）+ **宿主真值** `unsupportedStoredFormatReason(headers)`——常量探针在 `link:`/peer 副本场景会读到插件自己的旧版官方包，故以宿主给出的会话 `header.version` 为准（archive 在移动/删除前逐 header 校验，chat-fim 在读取前校验）。
   判定逻辑纯函数化并补单测（含「不兼容 → 告警 + 抛错」接线用例）；停用文案统一为「已停用插件以免影响 dsh（升级本插件或运行环境后自动恢复）」
 
 * **组合行**：`cordis.patch.yml` insert 按官方 bundle patch 规范——`id` 用短名（稳定供后续 patch 定位），`name` 用 scoped 包名（loader 按包名解析）
@@ -92,7 +93,7 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 > dsh 迭代快，特例不写死细节：开发时以临场查证官方源码为准；新增/变更特例须 owner 认可，实现细节以代码注释与各插件 docs/spec 为准。
 
 * `dsh-chat-fim`：候选菜单挂 `conversation.input.dock`（只读草稿快照，写入走官方 `slash/input-insert-text` 事件）+ `conversation.input.overlay`（官方菜单视觉 token）；与官方触发菜单互斥（只读检测 `[data-trigger-menu]`）；host 直读 `session.snapshotEvents()` 取主路由（仅 dsh ≥ 0.1.2-alpha.4）
-* `dsh-vision-bridge`：可逆包装 `ctx.llm.resolveModelInfo` 抹除文本路由的 image 门禁；`agent/request` 拦截按主模型能力屏蔽 `vision_read` 工具；图片字节只经官方 `ctx.attachments.readImage`；直读 `snapshotEvents()`；状态图标与模型座位共享官方 `ctx.modelDirectories` 目录 store，能力判定走无会话依赖的 `/api/vision-bridge/capability` 路由
+* `dsh-vision-bridge`（已退役，2026-09-10；以下记录仅作历史）：可逆包装 `ctx.llm.resolveModelInfo` 抹除文本路由的 image 门禁；`agent/request` 拦截按主模型能力屏蔽 `vision_read` 工具；图片字节只经官方 `ctx.attachments.readImage`；直读 `snapshotEvents()`；状态图标与模型座位共享官方 `ctx.modelDirectories` 目录 store，能力判定走无会话依赖的 `/api/vision-bridge/capability` 路由
 * `dsh-archive-manage`：允许移动/删除会话日志目录（仅 jsonl 单会话目录，其余 `BACKEND_UNSUPPORTED`）；归档集变更走官方 WorkspaceRegistry 私有写通道（`enqueueOperation`/`requireState`/`setState`，启动能力检查缺方法即 fail-fast）；`sessionPersistence.list()` 双形状兼容（master 返回快照、旧版返回裸 header）；`sessionPersistence.locate` 为后端私有方法（alpha.5 发布后从公开契约降级，启动能力检查缺方法即 fail-fast）；live 会话拒绝处理；回收站目录写 sidecar 记账
 * `dsh-file-manage`：直接 import 官方导出 `DeepSeekFilesClient`；只读官方 `llm-deepseek` 设置节取 `baseURL`/`apiKeyEnv`
 * `dsh-nav-pin`：只读依赖官方 DOM 标记与 aria-label 文案；CSS 特异性压制官方窄屏隐藏规则；宽度轴经官方公开 data 属性钳制
