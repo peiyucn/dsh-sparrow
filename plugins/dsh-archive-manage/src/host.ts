@@ -1268,13 +1268,18 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           }
 
           await rm(sessionDir, { recursive: true, force: false })
+          // 只有真正删掉的直接子会话才算 removed：rm 失败者仍在磁盘上，保留其归档标记
+          // 与工作区记账，让它在归档面板以孤儿根继续可操作（审计 S7）。
+          const deletedSubagentIds: string[] = []
           for (const child of subagents) {
             try {
               await rm(child.dir, { recursive: true, force: false })
+              deletedSubagentIds.push(String(child.sessionId))
             } catch (error) {
-              ctx.logger.warn(`dsh-archive-manage: 删除 subagent 会话目录失败（${String(child.sessionId)}），属 best-effort 清理、已跳过：${error instanceof Error ? error.message : String(error)}`)
+              ctx.logger.warn(`dsh-archive-manage: 删除 subagent 会话目录失败（${String(child.sessionId)}），属 best-effort 清理、已跳过并保留归档标记：${error instanceof Error ? error.message : String(error)}`)
             }
           }
+          const deletedSubagentIdSet = new Set(deletedSubagentIds)
           // 工作区记账 detach 是 best-effort（同移入回收站：官方过滤投影 + 下次变更修剪自愈）。
           try {
             await detachWorkspaceAccounting(ctx, sessionId)
@@ -1282,6 +1287,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             ctx.logger.warn(`dsh-archive-manage: 工作区记账清理失败（${String(sessionId)}）：${String(cleanupError)}`)
           }
           for (const child of subagents) {
+            if (!deletedSubagentIdSet.has(String(child.sessionId))) continue
             try {
               await detachWorkspaceAccounting(ctx, child.sessionId)
             } catch (cleanupError) {
@@ -1289,20 +1295,22 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             }
           }
           try {
-            await removeArchivedIds(surface, archivedIdsToRemove(String(sessionId), subagentIds))
+            await removeArchivedIds(surface, archivedIdsToRemove(String(sessionId), deletedSubagentIds))
           } catch (cleanupError) {
             ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
           }
           await invalidateProjectionCacheGuarded(ctx, sessionId)
           for (const child of subagents) {
+            if (!deletedSubagentIdSet.has(String(child.sessionId))) continue
             await invalidateProjectionCacheGuarded(ctx, child.sessionId)
           }
           // 通知会话列表消费者移除条目（官方公开事件；会话目录已删除）。
           ctx.emit('api-session/removed', sessionId)
           for (const child of subagents) {
+            if (!deletedSubagentIdSet.has(String(child.sessionId))) continue
             ctx.emit('api-session/removed', child.sessionId)
           }
-          sendJson(res, 200, { ok: true, deleted: true, workspaceIds: workspaces, subagentIds })
+          sendJson(res, 200, { ok: true, deleted: true, workspaceIds: workspaces, subagentIds: deletedSubagentIds })
           return
         }
 
