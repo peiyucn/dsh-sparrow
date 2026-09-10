@@ -10,7 +10,7 @@ Each plugin is published and installed independently; a plugin retires from the 
 
 ## Requirements
 
-- DSH 0.1.5-rc.1 — the exact official version line each release is built and verified against ([deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)); newer version lines, pre-releases in particular, are **not** covered. When a plugin meets an unsupported DSH it disables itself (with one log line) instead of breaking DSH.
+- DSH 0.1.5-rc.2 — the exact official version line each release is built and verified against ([deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)); newer version lines, pre-releases in particular, are **not** covered. When a plugin meets an unsupported DSH it disables itself (with one log line) instead of breaking DSH.
 - Node.js >= 22.19.0
 - A working `dsh` CLI and `pnpm` (`dsh plugin` forwards installation to pnpm)
 

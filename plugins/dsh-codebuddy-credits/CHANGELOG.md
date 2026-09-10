@@ -3,9 +3,9 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
-## 0.1.5-rc.1 (2026-09-10)
+## 0.1.5-rc.2 (2026-09-10)
 
-- Version-line alignment with official dsh 0.1.5-rc.1.
+- Version-line alignment with official dsh 0.1.5-rc.2.
 - A usage frame that arrives after the stream's final frame is now accounted for instead of being dropped, so session credit totals stay accurate.
 - The settings card now lists the models your CodeBuddy key can use, with a "Fetch available models" button to re-scan on the spot after an administrator changes them (read-only; no other provider is touched).
 - Model names no longer carry a credit-rate suffix (a zero rate no longer reads `free`); the settings list, the model picker and the credits panel now all show the plain model name with its read-only facts (`x0.00 · 1M` — credit rate · context window) on the right.

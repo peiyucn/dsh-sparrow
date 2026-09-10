@@ -2,9 +2,9 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.1.5-rc.1 (2026-09-10)
+## 0.1.5-rc.2 (2026-09-10)
 
-- Version-line alignment with official dsh 0.1.5-rc.1.
+- Version-line alignment with official dsh 0.1.5-rc.2.
 - Moving a session to trash or deleting it permanently works again on dsh 0.1.5: the previous release refused both because it did not recognize the new session format.
 - The panel's loading indicator now uses dsh's own dot-matrix chase animation, matching the rest of the UI.
 - Entries disappear as soon as an action succeeds: moving a session to trash, deleting it, unarchiving it or deleting a trash entry no longer leaves the panel waiting for the whole list to reload.

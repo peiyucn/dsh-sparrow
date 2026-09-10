@@ -2,9 +2,9 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.1.5-rc.1 (2026-09-10)
+## 0.1.5-rc.2 (2026-09-10)
 
-- Version-line alignment with official dsh 0.1.5-rc.1.
+- Version-line alignment with official dsh 0.1.5-rc.2.
 
 ## 0.1.2-rc.1.1 (2026-09-09)
 
