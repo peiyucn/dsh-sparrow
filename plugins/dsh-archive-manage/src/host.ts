@@ -17,7 +17,7 @@ import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import type { Workspace, WorkspaceDomainState } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
-  TRASH_SIDECAR, archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, createBudgetSignal,
+  TRASH_SIDECAR, archiveAlignmentForChildren, archivedIdsToRemove, buildSessionTree, collectSubtreeIds, createBudgetSignal,
   createHeaderFactsStore, createLruCache, isDeleteConfirmationSufficient, isSafeSessionDirName, labelFromSubagentIdentity,
   legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig, parseBlankProjection, parseSessionFacts,
   parseTrashSidecar, runBounded, sanitizeSegment, straySessionIds, trashItemView,
@@ -645,19 +645,16 @@ async function removeArchivedId(surface: RegistryMutationSurface, sessionId: Ses
 }
 
 /**
- * 移入回收站 / 彻底删除后的归档集清理：父会话 + 其**全部后代**一次摘除（一次判定、一次写链）。
- * 复用 /archive 用的同一套子树计算（collectSubtreeIds，spec 08「子镜像父」）：只摘父会把随父一起
- * 离开持久化的子会话 id 留成幽灵——它们已不在 headers 里，父子对齐再也看不到它们，只能等下次启动清扫；
- * 期间归档集随操作单调膨胀（域每次 setState 全量重写，/list 每轮还要 filter 掉它们）。
- * 嵌套后代同理：其父已随根一起离开持久化，留在归档集里只会变成「官方列表看不见、归档区里挂着」的孤儿。
+ * 移入回收站 / 彻底删除后的归档集清理：只摘「根 + 实际被搬走/删掉的直接子会话」一次写链（审计 B1）。
+ * 官方持久化是扁平同级布局（sessionDir = projectDir/encodeSegment(id)，子会话继承父 cwd），trash/delete
+ * 只逐个搬运**直接**子会话目录；深度 ≥2 的后代目录仍留在磁盘上，必须保留归档标记——按全子树摘会把
+ * 它们永久变成「未归档」（父已不在 headers，父子对齐对孤儿不参与，补不回来）。
+ * 待摘 id 由调用方用 archivedIdsToRemove(根, 直接子会话 id) 给出；/archive 那种 collectSubtreeIds
+ * 全子树口径只适用于「归档集里成树」的语义。
  */
-export async function removeArchivedSubtree(
-  surface: RegistryMutationSurface,
-  headers: readonly SessionHeader[],
-  rootId: string,
-): Promise<void> {
-  const subtree = new Set(collectSubtreeIds(headers.map(treeHeaderOf), rootId))
-  await mutateArchivedSet(surface, ids => ids.filter(id => !subtree.has(String(id))))
+export async function removeArchivedIds(surface: RegistryMutationSurface, ids: readonly string[]): Promise<void> {
+  const remove = new Set(ids)
+  await mutateArchivedSet(surface, current => current.filter(id => !remove.has(String(id))))
 }
 
 /** 把会话加回归档集（回收站还原后回归隐藏态）；已在集合内幂等无操作。 */
@@ -1171,6 +1168,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           }
 
           const subagents = await listSubagentTargets(ctx, sessionId, headerFacts)
+          // 随父一起搬走/删掉的**直接**子会话 id（归档集清理与响应契约共用；深度 ≥2 的后代不在此列，审计 B1）。
+          const subagentIds = subagents.map(child => String(child.sessionId))
 
           if (pathname.endsWith('/trash')) {
             await ensureTrashRoot(settings.trashRoot)
@@ -1248,7 +1247,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               }
             }
             try {
-              await removeArchivedSubtree(surface, headers, String(sessionId))
+              await removeArchivedIds(surface, archivedIdsToRemove(String(sessionId), subagentIds))
             } catch (cleanupError) {
               ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
             }
@@ -1263,7 +1262,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               ok: true,
               trashId,
               workspaceIds: workspaces,
-              subagentIds: subagents.map(child => String(child.sessionId)),
+              subagentIds,
             })
             return
           }
@@ -1290,7 +1289,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             }
           }
           try {
-            await removeArchivedSubtree(surface, headers, String(sessionId))
+            await removeArchivedIds(surface, archivedIdsToRemove(String(sessionId), subagentIds))
           } catch (cleanupError) {
             ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
           }
@@ -1303,7 +1302,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           for (const child of subagents) {
             ctx.emit('api-session/removed', child.sessionId)
           }
-          sendJson(res, 200, { ok: true, deleted: true, workspaceIds: workspaces, subagentIds: subagents.map(child => String(child.sessionId)) })
+          sendJson(res, 200, { ok: true, deleted: true, workspaceIds: workspaces, subagentIds })
           return
         }
 

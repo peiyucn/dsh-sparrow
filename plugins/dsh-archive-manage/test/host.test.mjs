@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { resolve, sep } from 'node:path'
-import { createHeaderFactsStore, labelFromSubagentIdentity } from '../lib/archive.js'
-import { addedSummaryFor, alignChildArchives, assertRegistryMutationApi, assertSessionLocationApi, FOLDED_LABEL_CACHE_MAX_ENTRIES, mutateArchivedSet, removeArchivedSubtree, resolveTrashDir, sessionDirectoryFor, storedHeaders, subagentLabel, titlesFor, workspaceIndexFor } from '../lib/host.js'
+import { archivedIdsToRemove, createHeaderFactsStore, labelFromSubagentIdentity } from '../lib/archive.js'
+import { addedSummaryFor, alignChildArchives, assertRegistryMutationApi, assertSessionLocationApi, FOLDED_LABEL_CACHE_MAX_ENTRIES, mutateArchivedSet, removeArchivedIds, resolveTrashDir, sessionDirectoryFor, storedHeaders, subagentLabel, titlesFor, workspaceIndexFor } from '../lib/host.js'
 
 // 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
 // 测试夹具按当前平台构造——CI 跑 Ubuntu、本机跑 Windows，两边都必须绿。
@@ -190,11 +190,11 @@ describe('archive-manage host 纯逻辑', () => {
     })
   })
 
-  // 幽灵 id 清理：trash/delete 只摘父会让随父一起离开持久化的子会话 id 永远留在
-  // 归档集里（父子对齐再也看不到它们），归档集随操作单调膨胀。
-  describe('removeArchivedSubtree（幽灵 id 清理）', () => {
-    const headerOf = (id, extra = {}) => ({ id, createdAt: 1, isSeeded: false, ...extra })
-    const subtreeSurface = (initialIds) => {
+  // trash/delete 的归档集清理（audit B1）：待摘 id = 根 + **实际被搬走的直接子会话**
+  // （archivedIdsToRemove）。深度 ≥2 的后代目录仍在磁盘上（官方扁平同级布局），必须留在归档集里；
+  // 旧实现按 collectSubtreeIds 摘全子树，会让这些会话永久失去归档标记。
+  describe('removeArchivedIds + archivedIdsToRemove（audit B1）', () => {
+    const removeSurface = (initialIds) => {
       const calls = []
       let state = { archivedSessionIds: [...initialIds], initialized: true, workspaceIds: [] }
       return {
@@ -208,36 +208,24 @@ describe('archive-manage host 纯逻辑', () => {
       }
     }
 
-    it('父 + 子 + 孙 应该 一次全部移出归档集（不留幽灵）', async () => {
-      const headers = [
-        headerOf('p'),
-        headerOf('c', { parentSession: 'p', origin: 'subagent' }),
-        headerOf('g', { parentSession: 'c', origin: 'subagent' }),
-        headerOf('other'),
-      ]
-      const { surface, calls, get } = subtreeSurface(['p', 'c', 'g', 'other'])
-      await removeArchivedSubtree(surface, headers, 'p')
+    it('只摘根 + 直接子会话 应该 让深度 ≥2 的后代留在归档集', async () => {
+      const { surface, calls, get } = removeSurface(['p', 'c', 'gc', 'other'])
+      await removeArchivedIds(surface, archivedIdsToRemove('p', ['c']))
       assert.deepEqual(calls, ['enqueue', 'set'])
+      assert.deepEqual(get().archivedSessionIds.map(String), ['gc', 'other'])
+    })
+
+    it('无子会话的根 应该 只摘根自身', async () => {
+      const { surface, get } = removeSurface(['p', 'other'])
+      await removeArchivedIds(surface, archivedIdsToRemove('p', []))
       assert.deepEqual(get().archivedSessionIds.map(String), ['other'])
     })
 
-    it('子树 id 都不在归档集时 应该 零写入（幂等无事件噪音）', async () => {
-      const headers = [headerOf('p'), headerOf('c', { parentSession: 'p', origin: 'subagent' })]
-      const { surface, calls, get } = subtreeSurface(['other'])
-      await removeArchivedSubtree(surface, headers, 'p')
+    it('待摘 id 都不在归档集 应该 零写入（幂等无事件噪音）', async () => {
+      const { surface, calls, get } = removeSurface(['other'])
+      await removeArchivedIds(surface, archivedIdsToRemove('p', ['c', 'gc']))
       assert.deepEqual(calls, ['enqueue'])
       assert.deepEqual(get().archivedSessionIds.map(String), ['other'])
-    })
-
-    it('无父的子会话（孤儿）不在兄弟子树内 应该 不被误摘', async () => {
-      const headers = [
-        headerOf('p'),
-        headerOf('c', { parentSession: 'p', origin: 'subagent' }),
-        headerOf('orphan', { parentSession: 'missing', origin: 'subagent' }),
-      ]
-      const { surface, get } = subtreeSurface(['p', 'c', 'orphan'])
-      await removeArchivedSubtree(surface, headers, 'p')
-      assert.deepEqual(get().archivedSessionIds.map(String), ['orphan'])
     })
   })
 

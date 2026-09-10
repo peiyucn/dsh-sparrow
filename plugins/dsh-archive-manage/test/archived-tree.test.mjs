@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import { dropArchivedIds, subtreeIdsOf } from '../lib/client/archivedTree.js'
+
+/** 最小归档树节点（真实条目形状见 ArchivedSessionItem；纯逻辑只读 sessionId / orphan / children）。 */
+const node = (sessionId, children = [], orphan = false) => ({ sessionId, orphan, children })
+/** p → c → gc，p 另有直接子会话 c2；顶层还有 other。 */
+const tree = () => [
+  node('p', [node('c', [node('gc')]), node('c2')]),
+  node('other'),
+]
+const ids = (...values) => new Set(values)
+
+describe('dropArchivedIds（audit B1：与 host 的移除集合口径一致）', () => {
+  it('只摘根 + 直接子会话 应该 保留深度 ≥2 的后代（上提为孤儿根）', () => {
+    const next = dropArchivedIds(tree(), ids('p', 'c'))
+    assert.deepEqual(next.map(item => item.sessionId), ['gc', 'c2', 'other'])
+    assert.equal(next[0].orphan, true)
+    assert.equal(next[1].orphan, true)
+  })
+
+  it('未命中的节点 应该 原样留在原位（含其子树）', () => {
+    const next = dropArchivedIds(tree(), ids('other'))
+    assert.deepEqual(next.map(item => item.sessionId), ['p'])
+    assert.deepEqual(next[0].children.map(item => item.sessionId), ['c', 'c2'])
+    assert.deepEqual(next[0].children[0].children.map(item => item.sessionId), ['gc'])
+  })
+
+  it('只命中中间子会话 应该 摘它、其父与后代都保留', () => {
+    const next = dropArchivedIds(tree(), ids('c'))
+    assert.deepEqual(next.map(item => item.sessionId), ['p', 'other'])
+    assert.deepEqual(next[0].children.map(item => item.sessionId), ['gc', 'c2'])
+    assert.equal(next[0].children[0].orphan, true)
+    assert.equal(next[0].children[1].orphan, false)
+  })
+
+  it('未命中任何 id 应该 结构不变且不新增 orphan 标', () => {
+    const next = dropArchivedIds(tree(), ids())
+    assert.deepEqual(next.map(item => item.sessionId), ['p', 'other'])
+    assert.equal(next[0].orphan, false)
+  })
+})
+
+describe('subtreeIdsOf（取消归档时即时摘除整棵子树）', () => {
+  it('根 + 多层子孙 应该 全部收集且根在前', () => {
+    assert.deepEqual(subtreeIdsOf(tree()[0]), ['p', 'c', 'gc', 'c2'])
+  })
+
+  it('叶子节点 应该 只有自身', () => {
+    assert.deepEqual(subtreeIdsOf(node('leaf')), ['leaf'])
+  })
+})

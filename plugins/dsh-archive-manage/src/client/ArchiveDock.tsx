@@ -5,6 +5,7 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { IconArchiveOutline20, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { dropArchivedIds, subtreeIdsOf, type ArchivedSessionItem } from './archivedTree.js'
 import { countVisibleRows } from './paging.js'
 
 /** 分页窗口大小（spec 09）：每区每次渲染的行数上限，「加载更多」按此递增。 */
@@ -42,26 +43,8 @@ function MatrixLoading(): ReactElement {
   )
 }
 
-/** 归档树节点：顶层为归档会话根，children 为随父归档的子会话（spec 08，只操作父）。 */
-export interface ArchivedSessionItem {
-  readonly sessionId: string
-  readonly title: string
-  readonly updatedAt: number
-  readonly createdAt: number
-  readonly live: boolean
-  readonly running: boolean
-  readonly backendSupported: boolean
-  readonly workspaceIds: readonly string[]
-  /** 父会话已不存在的孤儿子会话（按顶层对待，可手动归档/删除）。 */
-  readonly orphan: boolean
-  readonly children: readonly ArchivedSessionItem[]
-  /** 展示用事实（官方投影/快照；缺失时隐藏对应项）。 */
-  readonly project?: string
-  readonly turns?: number
-  readonly tokens?: number
-  readonly lastActiveAt?: number
-  readonly sizeBytes?: number
-}
+/** 归档树节点与本地变更纯逻辑：见 archivedTree.ts（零依赖纯模块，node:test 可直接导入）。 */
+export type { ArchivedSessionItem } from './archivedTree.js'
 
 export interface TrashItem {
   readonly trashId: string
@@ -658,18 +641,6 @@ const DAY_MS = 86_400_000
 /** 复制成功反馈的展示时长。 */
 const COPIED_FEEDBACK_MS = 2_000
 
-/** 归档树某节点的子树 id（本地已知的父子关系；与 host 的 collectSubtreeIds 同语义，用于即时移除）。 */
-function subtreeIdsOf(item: ArchivedSessionItem): string[] {
-  return [item.sessionId, ...item.children.flatMap(subtreeIdsOf)]
-}
-
-/** 从归档树摘掉若干会话 id：命中节点的整棵子树一并消失（父行没了，子行没有留的理由）。 */
-function dropArchivedIds(items: readonly ArchivedSessionItem[], ids: ReadonlySet<string>): ArchivedSessionItem[] {
-  return items
-    .filter(item => !ids.has(item.sessionId))
-    .map(item => ({ ...item, children: dropArchivedIds(item.children, ids) }))
-}
-
 /**
  * footer action 组件：窄栏显示图标，宽栏显示「归档管理」；弹窗列出轻归档会话与回收站。
  * 打开后先显示加载态，数据就绪后再渲染列表。
@@ -1190,7 +1161,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
    *
    * 单条分支不等整页刷新：写操作必然打穿 host 的 header 缓存，紧随其后的刷新要走冷扫描
    * （列表越大越慢），此前条目与弹窗都干等它落定。改为变更成功后立即按响应里的 id 本地摘掉
-   * 受影响的行（含子会话行）并关闭弹窗，refresh() 退到后台对账。
+   * 受影响的行并关闭弹窗，refresh() 退到后台对账。摘除集合与 host 完全一致（trash/delete = 根 +
+   * 直接子会话；深度 ≥2 的后代仍在磁盘上、保持归档，见审计 B1），由 refresh 落定。
    * 失败路径语义不变：变更 reject 时本地状态一律不动，错误仍回弹窗展示。
    */
   const submitConfirm = async (typed: string): Promise<void> => {

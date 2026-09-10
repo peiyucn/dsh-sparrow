@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  archiveAlignmentForChildren, buildSessionTree, collectSubtreeIds, createBudgetSignal, createHeaderFactsStore,
+  archiveAlignmentForChildren, archivedIdsToRemove, buildSessionTree, collectSubtreeIds, createBudgetSignal, createHeaderFactsStore,
   createLruCache, isDeleteConfirmationSufficient, isSafeSessionDirName, legacyTrashItem, livingChildIds, maskHomePath,
   normalizeArchiveConfig, parseTrashSidecar, parseBlankProjection, parseSessionFacts, runBounded, sanitizeSegment,
   straySessionIds, trashItemView,
@@ -418,6 +418,20 @@ describe('archive-manage 纯逻辑', () => {
 
     it('无子会话 应该 只有根自身', () => {
       assert.deepEqual(collectSubtreeIds([h('p')], 'p'), ['p'])
+    })
+  })
+
+  describe('archivedIdsToRemove（audit B1：trash/delete 只摘根 + 直接子会话）', () => {
+    it('根 + 直接子会话 应该 根在前且去重保序', () => {
+      assert.deepEqual(archivedIdsToRemove('p', ['c', 'c2', 'c']), ['p', 'c', 'c2'])
+    })
+
+    it('子会话清单里混入根自身 应该 只出现一次', () => {
+      assert.deepEqual(archivedIdsToRemove('p', ['p', 'c']), ['p', 'c'])
+    })
+
+    it('无子会话 应该 只有根自身', () => {
+      assert.deepEqual(archivedIdsToRemove('p', []), ['p'])
     })
   })
 

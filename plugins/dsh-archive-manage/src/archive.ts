@@ -342,6 +342,23 @@ export function collectSubtreeIds(headers: readonly SessionTreeHeader[], rootId:
 }
 
 /**
+ * 移入回收站 / 彻底删除后要从归档集摘除的 id：根 + **实际被搬走/删掉的直接子会话**（去重、根在前）。
+ * 不能复用 collectSubtreeIds 摘全子树：官方持久化是扁平同级布局（`sessionDir = projectDir/encodeSegment(id)`，
+ * 子会话继承父 cwd），trash/delete 只逐个搬运直接子会话目录，深度 ≥2 的后代目录仍留在磁盘上——
+ * 把它们移出归档集会让这些会话永久变成「未归档」（父已不在持久化，父子对齐也看不到它们）。审计 B1。
+ */
+export function archivedIdsToRemove(rootId: string, subagentIds: readonly string[]): string[] {
+  const out: string[] = [rootId]
+  const seen = new Set(out)
+  for (const id of subagentIds) {
+    if (seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
+/**
  * header 事实缓存存储（spec 09，纯逻辑供单测）：TTL 内直接返回缓存；过期后
  * 单飞填充（并发调用共享同一 promise）；invalidate 清缓存让下一次 get 重扫。
  * 安全依据：jsonl header 物化后不可变，按 id 缓存只需处理成员增减（写穿失效）。
