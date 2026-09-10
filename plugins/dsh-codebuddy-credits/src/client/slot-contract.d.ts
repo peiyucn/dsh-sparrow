@@ -130,6 +130,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'indicator.max.title'
       | 'indicator.max.hint'
       | 'indicator.max.failed'
+      | 'models.title'
+      | 'models.fetch'
+      | 'models.fetching'
+      | 'models.updated'
+      | 'models.latest'
+      | 'models.empty'
+      | 'models.failed'
   }
 }
 

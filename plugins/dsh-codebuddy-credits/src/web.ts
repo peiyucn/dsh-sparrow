@@ -63,6 +63,8 @@ export interface CodeBuddyCreditsShared {
   ensureAccount(): Promise<void>
   /** 模型目录为空时触发节流后台补拉（状态接口在给 Key 后调用）。 */
   ensureModels(): Promise<void>
+  /** 手动重扫模型目录（设置卡刷新按钮）：绕过自动冷却、复用上游单飞，只动本 provider。 */
+  refreshModels(): Promise<{ changed: boolean; models: readonly CodeBuddyModelFacts[] }>
   /** 当前生效模型事实（进程内，Key 驱动的目录）。 */
   models(): readonly CodeBuddyModelFacts[]
   /** Max 模式（推理档位锁）当前状态（设置节）。 */
@@ -253,6 +255,21 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
             }
             await shared.saveKey(key)
             sendJson(res, 200, { ok: true })
+            return
+          }
+          if (req.method === 'POST' && pathname === PREFIX + '/refresh-models') {
+            if (!await shared.keyConfigured()) {
+              sendJson(res, 400, { error: '未配置 Key' })
+              return
+            }
+            // 手动重扫：只重拉本 provider 的模型目录并重提自己的 route（不触碰其他 provider）。
+            const result = await shared.refreshModels()
+            sendJson(res, 200, {
+              ok: true,
+              changed: result.changed,
+              models: result.models.map(model => toModelFactView(model)),
+              account: shared.account(),
+            })
             return
           }
           if (req.method === 'POST' && pathname === PREFIX + '/remove-key') {

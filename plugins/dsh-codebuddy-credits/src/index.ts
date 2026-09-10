@@ -241,6 +241,15 @@ export function apply(ctx: Context, config: Config): void {
     return factsFromEntries(await fetchCodeBuddyModels(key, account))
   }
 
+  /** 上游拉取的单飞：自动与手动两条路径共用，避免并发重复拉 /v3/config。 */
+  let factsInFlight: Promise<readonly CodeBuddyModelFacts[]> | undefined
+  function loadFactsOnce(key: string): Promise<readonly CodeBuddyModelFacts[]> {
+    if (factsInFlight === undefined) {
+      factsInFlight = refreshFactsWithKey(key).finally(() => { factsInFlight = undefined })
+    }
+    return factsInFlight
+  }
+
   /** 节流后台刷新：失败保持现状（下次建目录再试），成功且有变化即通知选择器。 */
   async function refreshFactsInBackground(): Promise<void> {
     let key: string
@@ -250,7 +259,7 @@ export function apply(ctx: Context, config: Config): void {
       return
     }
     try {
-      const next = await refreshFactsWithKey(key)
+      const next = await loadFactsOnce(key)
       const changed = !sameFacts(facts, next)
       facts = next
       if (changed && registered && registration !== undefined) {
@@ -262,6 +271,22 @@ export function apply(ctx: Context, config: Config): void {
       ctx.logger.warn(`${name}: 后台模型目录刷新失败`)
       ctx.logger.warn(error)
     }
+  }
+
+  /**
+   * 设置卡「获取可用模型」：手动重扫模型目录。与自动路径**共用上游单飞**，但不受冷却
+   * 限制（手动点了就该真的去拉）。只重拉本 provider 的目录并重提自己的 route——registration
+   * 由 registerAdapter([PROVIDER]) 创建、replace 只动该 handle 的 owned 集合，不触碰其他 provider。
+   */
+  async function refreshModelsManually(): Promise<{ changed: boolean; models: readonly CodeBuddyModelFacts[] }> {
+    const key = await resolveApiKey()
+    const next = await loadFactsOnce(key)
+    const changed = !sameFacts(facts, next)
+    facts = next
+    lastRefreshAttemptAt = Date.now()
+    if (changed && registration !== undefined) registration.replace([PROVIDER])
+    if (!registered) ensureRoutes(true)
+    return { changed, models: next }
   }
 
   function kickModelRefresh(): void {
@@ -412,6 +437,9 @@ export function apply(ctx: Context, config: Config): void {
     },
     async quota() {
       return fetchQuota(await resolveApiKey(), account)
+    },
+    async refreshModels() {
+      return refreshModelsManually()
     },
     /** 会话累计积分：usage 回调按 sessionId 记账（进程内，重启清零）。 */
     sessionUsage(sessionId) {

@@ -7,6 +7,7 @@ See [简体中文](./CHANGELOG.zh-CN.md).
 
 - Version-line alignment with official dsh 0.1.5-rc.1.
 - A usage frame that arrives after the stream's final frame is now accounted for instead of being dropped, so session credit totals stay accurate.
+- The settings card now lists the models your CodeBuddy key can use, with a "Fetch available models" button to re-scan on the spot after an administrator changes them (read-only; no other provider is touched).
 
 ## 0.1.2-rc.1.2 (2026-09-09)
 

@@ -1,4 +1,4 @@
-# 06 · 模型目录手动重新扫描（2026-09-10 提出，**待评审**）
+# 06 · 模型目录手动重新扫描（2026-09-10 提出；同日评审通过并实施）
 
 > 需求由 owner 提出；本文件是开工前的 spec，评审通过后才动代码。所有官方契约均按 checkout
 > `dsh-v0.1.5-rc.1` 逐条核验（行号即当时核验位置），核验记录见 `_poc/TEMP/recon-model-refresh.md`。
@@ -134,6 +134,19 @@
 2. 刷新成功后是否一并显示**账号 / 企业名**？倾向**不做**：额度卡里已有，卡里再放一份属信息重复。
 3. 401 文案：目前**无法区分**「Key 失效」与「无 CLI 权限」（响应体未实测），是否接受一句通用指引
    （如「请在 CodeBuddy 侧确认该 Key 具备 CLI 模型权限」）？
+
+## 实施记录（2026-09-10）
+
+- host：`POST /api/codebuddy-credits/refresh-models`（`src/web.ts`，沿用 prefix + localOnly；未配 Key → 400）；
+  逻辑在 `src/index.ts` 的 `refreshModelsManually()`：**绕过 60s 冷却**、与自动路径**共用上游单飞**
+  （新增 `loadFactsOnce()`，两条路径都走它），落 facts 后有变化才 `registration.replace([PROVIDER])`。
+- client：卡里新增只读清单 + 「获取可用模型」按钮（`CodeBuddyCreditsCard.tsx`）；新增纯逻辑
+  `src/client/format.ts`（容量短串，口径对齐官方编辑器）并补单测 `test/format.test.mjs`；
+  词典中英各加 7 键、`slot-contract.d.ts` 的 `LocaleNamespaceMap` 同步。
+- 按评审结论落定：**不新增**「打开设置即扫」（列表在首次配置成功后就有，之后手动刷新）；
+  不在卡里重复展示账号/企业名；401 文案用通用指引（未实测响应体，无法区分 Key 失效与无 CLI 权限）。
+- 未覆盖：路由本身无单测（本插件测试面里 `web.test.mjs` 只测纯函数，无 http 桩）——待后续补一个
+  路由级测试（可参考 vision-bridge 的 `test/host-route.test.mjs`）。
 
 ## 测试与验证
 

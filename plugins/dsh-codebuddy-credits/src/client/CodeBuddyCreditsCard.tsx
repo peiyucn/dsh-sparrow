@@ -14,17 +14,29 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { formatCapacity } from './format.js'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const KEY_URL = '/api/codebuddy-credits/key'
 const REMOVE_URL = '/api/codebuddy-credits/remove-key'
+const REFRESH_URL = '/api/codebuddy-credits/refresh-models'
 /** 保存/清空 Key 后广播的窗口事件（对话页额度卡据此联动刷新）。 */
 const STATUS_CHANGED_EVENT = 'codebuddy-credits-status-changed'
+
+// 只读模型清单：一行一个模型（照官方 DeepSeek 编辑器的行布局，去掉全部编辑控件）。
+interface ModelFactView {
+  id: string
+  name: string
+  credits?: string
+  contextWindow?: number
+  maxTokens?: number
+  vision?: boolean
+}
 
 interface CardStatus {
   keyConfigured: boolean
   account?: { enterpriseName?: string; accountType?: string }
-  models?: unknown[]
+  models?: ModelFactView[]
 }
 
 interface CardProps {
@@ -88,6 +100,41 @@ const hintStyle: CSSProperties = {
   color: 'var(--dsw-alias-label-tertiary)',
 }
 
+/** 只读模型清单：一行一个模型（名称左、只读事实右）。 */
+const modelsBlockStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '6px',
+}
+
+const modelsHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '8px',
+}
+
+const modelRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'baseline',
+  justifyContent: 'space-between',
+  gap: '12px',
+  fontSize: '12px',
+  lineHeight: '18px',
+}
+
+const modelNameStyle: CSSProperties = {
+  color: 'var(--dsw-alias-label-primary)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+}
+
+const modelFactStyle: CSSProperties = {
+  flex: 'none',
+  color: 'var(--dsw-alias-label-tertiary)',
+}
+
 const actionsStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'flex-end',
@@ -132,6 +179,18 @@ const dangerButtonStyle: CSSProperties = {
   color: 'var(--dsw-alias-state-error-primary)',
 }
 
+/** 只读清单右上角的「获取可用模型」按钮：官方同款紧凑行内（28px）。 */
+const refreshButtonStyle: CSSProperties = {
+  ...buttonBase,
+  height: '28px',
+  padding: '0 10px',
+  fontSize: '12px',
+  lineHeight: '18px',
+  border: '0.5px solid var(--dsw-alias-border-l3)',
+  background: 'transparent',
+  color: 'var(--dsw-alias-label-primary)',
+}
+
 /** 官方 apiKeyFailure 的轻量镜像：可打印 ASCII（空格除外）。 */
 const LEGAL_API_KEY = /^[\x21-\x7E]+$/
 
@@ -154,6 +213,9 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
   const [status, setStatus] = useState<CardStatus | undefined>(undefined)
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshNote, setRefreshNote] = useState<string | undefined>(undefined)
+  const [refreshError, setRefreshError] = useState<string | undefined>(undefined)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | undefined>(undefined)
   const [messageKind, setMessageKind] = useState<'error' | 'info'>('info')
@@ -174,6 +236,35 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
   useEffect(() => {
     void load()
   }, [load])
+
+  /**
+   * 手动重新扫描可用模型（「获取可用模型」）：只走本插件 host 路由——host 只重拉本 provider 的
+   * 目录并重提自己的 route，不触碰其他 provider；结果就地更新只读清单。
+   */
+  const refreshModels = useCallback(async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    setRefreshError(undefined)
+    setRefreshNote(undefined)
+    try {
+      const response = await fetch(REFRESH_URL, { method: 'POST' })
+      const payload = await response.json().catch(() => null) as
+        { error?: string; changed?: boolean; models?: ModelFactView[] } | null
+      if (!response.ok) {
+        setRefreshError(payload?.error ?? t('models.failed'))
+        return
+      }
+      const list = Array.isArray(payload?.models) ? payload.models : []
+      setStatus(previous => previous === undefined ? previous : { ...previous, models: list })
+      setRefreshNote(payload?.changed === true
+        ? t('models.updated', { count: String(list.length) })
+        : t('models.latest'))
+    } catch {
+      setRefreshError(t('models.failed'))
+    } finally {
+      setRefreshing(false)
+    }
+  }, [refreshing, t])
 
   // 官方行头「编辑」按钮保持在官方原位：捕获阶段拦截其点击，改为展开我们
   // 自己的编辑器（stopPropagation 阻断官方编辑器打开）。按钮位置/样式都是
@@ -321,6 +412,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
   }
 
   const account = status?.account
+  const models = status?.models ?? []
   const accountParts = [
     accountTypeLabel(t, account?.accountType),
     account?.enterpriseName,
@@ -369,6 +461,37 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
           <p style={messageKind === 'error' ? errorStyle : hintStyle}>
             {message}
           </p>
+        )
+        : null}
+      {configured
+        ? (
+          <div style={modelsBlockStyle}>
+            <div style={modelsHeaderStyle}>
+              <span style={labelStyle}>{t('models.title')}</span>
+              <button
+                type="button"
+                onClick={() => void refreshModels()}
+                disabled={refreshing}
+                style={refreshButtonStyle}
+              >
+                {refreshing ? t('models.fetching') : t('models.fetch')}
+              </button>
+            </div>
+            {models.length === 0
+              ? <p style={hintStyle}>{t('models.empty')}</p>
+              : models.map(model => {
+                const facts = [model.credits, formatCapacity(model.contextWindow)]
+                  .filter((part): part is string => part !== undefined)
+                return (
+                  <div key={model.id} style={modelRowStyle}>
+                    <span style={modelNameStyle} title={model.id}>{model.name}</span>
+                    <span style={modelFactStyle}>{facts.join(' · ')}</span>
+                  </div>
+                )
+              })}
+            {refreshNote === undefined ? null : <p style={hintStyle}>{refreshNote}</p>}
+            {refreshError === undefined ? null : <p style={errorStyle}>{refreshError}</p>}
+          </div>
         )
         : null}
       <div style={actionsStyle}>
