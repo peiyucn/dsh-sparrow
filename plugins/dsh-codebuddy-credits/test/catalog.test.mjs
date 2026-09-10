@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { creditLabel, displayName, effortName, factsFromEntries, parseModelConfig } from '../lib/catalog.js'
+import { effortName, factsFromEntries, parseModelConfig, toDiscovered } from '../lib/catalog.js'
 import { mapFinish, mapUsage, parseSseLine, toWireMessages } from '../lib/adapter.js'
 
 describe('factsFromEntries', () => {
@@ -15,6 +15,12 @@ describe('factsFromEntries', () => {
     assert.equal(model.maxTokens, 64000)
     assert.deepEqual(model.input, ['text'])
     assert.equal(model.reasoning, false)
+  })
+  it('展示名保持原始名：系数与容量只作为事实字段随行，不进名字', () => {
+    const [model] = factsFromEntries([{ id: 'hy3', name: 'Hy3', credits: 'x0.00', contextWindow: 1_000_000 }])
+    assert.equal(model.name, 'Hy3')
+    assert.equal(model.credits, 'x0.00')
+    assert.equal(model.contextWindow, 1_000_000)
   })
   it('服务端描述透传（缺省时不携带该字段）', () => {
     const [withDesc] = factsFromEntries([{ id: 'hy3', name: 'Hy3', description: '旗舰模型' }])
@@ -55,30 +61,15 @@ describe('factsFromEntries', () => {
   })
 })
 
-describe('creditLabel', () => {
-  it('普通系数取短串', () => {
-    assert.equal(creditLabel('x0.79 credits'), 'x0.79')
-    assert.equal(creditLabel('x1.62'), 'x1.62')
+describe('toDiscovered', () => {
+  it('发现结果的名字是服务端原始名（不带系数/free 后缀）', () => {
+    assert.deepEqual(
+      toDiscovered([{ id: 'glm-5.3', name: 'GLM-5.3', credits: 'x0.79', contextWindow: 1_000_000, maxTokens: 32_000 }]),
+      [{ id: 'glm-5.3', name: 'GLM-5.3', contextWindow: 1_000_000, maxTokens: 32_000 }],
+    )
   })
-  it('零系数显示 free（x0.00 → free）', () => {
-    assert.equal(creditLabel('x0.00 credits'), 'free')
-    assert.equal(creditLabel('x0'), 'free')
-  })
-  it('非字符串与无系数返回 undefined', () => {
-    assert.equal(creditLabel(undefined), undefined)
-    assert.equal(creditLabel('free credits'), undefined)
-    assert.equal(creditLabel(0.79), undefined)
-  })
-})
-
-describe('displayName', () => {
-  it('系数以两空格附加，视觉标记不进名字（能力走 inputModalities + 卡片）', () => {
-    assert.equal(displayName({ name: 'GLM-5.3', credits: 'x0.79', input: ['text', 'image'] }), 'GLM-5.3  x0.79')
-    assert.equal(displayName({ name: 'Hy3', credits: 'x0.00', input: ['text', 'image'] }), 'Hy3  free')
-    assert.equal(displayName({ name: 'GLM-5.3', credits: 'x0.79' }), 'GLM-5.3  x0.79')
-  })
-  it('无系数时保持原始名', () => {
-    assert.equal(displayName({ name: 'Kimi K2' }), 'Kimi K2')
+  it('名字与 id 相同时不携带 name 字段（官方四字段契约）', () => {
+    assert.deepEqual(toDiscovered([{ id: 'hy3', name: 'hy3', contextWindow: 192_000 }]), [{ id: 'hy3', contextWindow: 192_000 }])
   })
 })
 

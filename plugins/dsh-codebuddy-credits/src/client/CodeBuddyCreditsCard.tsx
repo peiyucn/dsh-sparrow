@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { formatCapacity } from './format.js'
+import { formatModelFacts } from './format.js'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const KEY_URL = '/api/codebuddy-credits/key'
@@ -479,16 +479,13 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
             </div>
             {models.length === 0
               ? <p style={hintStyle}>{t('models.empty')}</p>
-              : models.map(model => {
-                const facts = [model.credits, formatCapacity(model.contextWindow)]
-                  .filter((part): part is string => part !== undefined)
-                return (
-                  <div key={model.id} style={modelRowStyle}>
-                    <span style={modelNameStyle} title={model.id}>{model.name}</span>
-                    <span style={modelFactStyle}>{facts.join(' · ')}</span>
-                  </div>
-                )
-              })}
+              : models.map(model => (
+                // 名字 = 服务端原始名（不带系数/free）；右侧 = 只读事实（系数 · 上下文长度）。
+                <div key={model.id} style={modelRowStyle}>
+                  <span style={modelNameStyle} title={model.id}>{model.name}</span>
+                  <span style={modelFactStyle}>{formatModelFacts(model)}</span>
+                </div>
+              ))}
             {refreshNote === undefined ? null : <p style={hintStyle}>{refreshNote}</p>}
             {refreshError === undefined ? null : <p style={errorStyle}>{refreshError}</p>}
           </div>

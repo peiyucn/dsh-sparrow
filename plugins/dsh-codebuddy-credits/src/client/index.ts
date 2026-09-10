@@ -1,8 +1,9 @@
 /**
  * dsh-codebuddy-credits client half：
  * - conversation.input.model 槽位（priority -1 遮蔽官方 ModelSelect，官方
- *   注册表语义：同 cell 最低 priority 渲染）：自建模型选择器，模型行把
- *   积分系数右对齐（官方选择器只渲染 model.name）。行为/材质对齐官方。
+ *   注册表语义：同 cell 最低 priority 渲染）：自建模型选择器，模型行把只读
+ *   事实（积分系数 · 上下文长度）右对齐（官方选择器只渲染 model.name）。
+ *   行为/材质对齐官方。
  * - settings.models.provider-card 槽位（key = 本插件命名空间）：设置 → 模型页
  *   的 CodeBuddy Credits 行挂 Key 配置卡（对齐 DeepSeek 官方编辑器交互）。
  * - conversation.session.header.utilities 槽位：会话头部右上角挂 CodeBuddy
@@ -70,9 +71,6 @@ const LOCALE_DICTS = {
     'indicator.model.features': '可用功能',
     'indicator.model.visionFeature': '图片输入',
     'indicator.model.reasoningFeature': '推理',
-    'indicator.model.rate': '消耗速度',
-    'indicator.model.rateValue': '{rate}x 倍率',
-    'indicator.model.free': '免费',
     'picker.trigger.fallback': '选择模型',
     'picker.trigger.loading': '正在加载模型…',
     'picker.trigger.selectAria': '选择模型',
@@ -138,9 +136,6 @@ const LOCALE_DICTS = {
     'indicator.model.features': 'Features',
     'indicator.model.visionFeature': 'Image input',
     'indicator.model.reasoningFeature': 'Reasoning',
-    'indicator.model.rate': 'Spend rate',
-    'indicator.model.rateValue': '{rate}x rate',
-    'indicator.model.free': 'Free',
     'picker.trigger.fallback': 'Select model',
     'picker.trigger.loading': 'Loading models…',
     'picker.trigger.selectAria': 'Select model',

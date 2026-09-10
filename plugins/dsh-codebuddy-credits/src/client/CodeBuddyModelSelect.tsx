@@ -3,10 +3,13 @@
  * 实现（源码自官方 ui-model-selection 的 ModelSelect.tsx / ModelSelect.module.css，
  * MIT License，© 2026 DeepSeek；本仓库仅做插件化适配）。
  *
- * 与官方的差异只有一处：模型行把展示名拆成「模型名 | 积分系数」两列，
- * 系数右对齐（官方选择器只渲染 model.name，没有描述列）。其余行为——
- * 两层面板（模型/推理等级）、键盘导航、外点关闭、Toast 锚定、目录共享
- * （同一个 ctx.modelDirectories store）——与官方一致。
+ * 与官方的差异只有一处：模型行是「模型名 + 右侧只读事实」两列（事实 =
+ * 积分系数 · 上下文长度，如 `x0.00 · 1M`；官方选择器只渲染 model.name，
+ * 没有描述列）。事实不在模型名里——名字保持服务端原始名，事实按模型 id 查
+ * 共享事实表（与额度卡同源，见 CodeBuddyCreditsIndicator 的模型事实表）；
+ * 查不到事实的模型只显示名字。其余行为——两层面板（模型/推理等级）、
+ * 键盘导航、外点关闭、Toast 锚定、目录共享（同一个 ctx.modelDirectories
+ * store）——与官方一致。
  * 槽位遮蔽靠官方注册表语义：同 cell 不同 priority 共存、最低者渲染，
  * 本插件以 priority: -1 注册（默认 0 即官方条目）。
  */
@@ -20,16 +23,12 @@ import {
   IconWarningOutline16, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getMaxMode, subscribeMaxMode } from './maxMode.js'
-
-/**
- * 展示名拆分：与 host 侧目录的展示名构造同规则（两空格是系数列的锚点）。
- * client 包不能 import host 侧 catalog（会拖进 dsh-llm），此处局部镜像并保持同步。
- */
-function splitDisplayName(name: string): { left: string; right?: string } {
-  const index = name.lastIndexOf('  ')
-  if (index < 0) return { left: name }
-  return { left: name.slice(0, index), right: name.slice(index + 2) }
-}
+import { formatModelFacts } from './format.js'
+// 模型事实表与额度卡同源（host /api/codebuddy-credits/status 的 models 列表）：
+// 选择器只订阅读取，不自己发请求（额度卡未挂载时由 ensureModelFacts 补一次）。
+import {
+  PROVIDER_ID, ensureModelFacts, getModelFacts, subscribeModelFacts,
+} from './CodeBuddyCreditsIndicator.js'
 
 /** 与官方 ModelDirectoryState 对齐的最小形状（runtime 由官方 web 提供）。 */
 export interface DirectoryState {
@@ -124,7 +123,7 @@ export function ensurePickerStyles(): void {
     '.ccb-model-optionCopy { display: flex; flex: 1; flex-direction: column; min-width: 0; }',
     '.ccb-model-row { display: flex; align-items: baseline; gap: 10px; min-width: 0; }',
     '.ccb-model-name { flex: 1 1 auto; min-width: 0; overflow: hidden; color: inherit; font-size: 14px; line-height: 20px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }',
-    '.ccb-model-coef { flex: 0 0 auto; color: var(--dsw-alias-label-caption); font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums; }',
+    '.ccb-model-facts { flex: 0 0 auto; color: var(--dsw-alias-label-caption); font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums; }',
     '.ccb-model-check { display: grid; place-items: center; flex: 0 0 18px; color: var(--dsw-alias-label-primary); }',
     '.ccb-model-cell { box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: auto; min-width: 100%; height: 40px; padding: 0 10px; border: none; border-radius: 10px; background: transparent; color: var(--dsw-alias-label-primary); font-size: 14px; line-height: 22px; cursor: pointer; text-align: left; }',
     '.ccb-model-cell:hover { background: var(--dsw-alias-interactive-bg-hover); }',
@@ -162,6 +161,9 @@ export function CodeBuddyModelSelect(
   // 触发器档位显示 Max。锁只影响展示与请求（host 侧强制 max），用户逐模型
   // 档位偏好保留不覆盖，解锁后原样恢复。
   const maxMode = useSyncExternalStore(subscribeMaxMode, getMaxMode)
+
+  // 模型只读事实表（按模型 id）：与额度卡同源，查不到事实的行只显示模型名。
+  const modelFactTable = useSyncExternalStore(subscribeModelFacts, getModelFacts)
 
   const choices = useMemo(() => state.groups.flatMap(group =>
     group.models.map(model => ({
@@ -216,6 +218,8 @@ export function CodeBuddyModelSelect(
     setPane('root')
     setOpen(true)
     reload()
+    // 事实表尚空时补一次 /status（额度卡未挂载/未回包时才真正发请求，单飞）。
+    ensureModelFacts()
   }
 
   const close = (restoreFocus = false): void => {
@@ -391,7 +395,11 @@ export function CodeBuddyModelSelect(
                       <div className="ccb-model-groupTitle" id={headingId}>{group.name}</div>
                       {group.models.map((model) => {
                         const selected = state.current?.provider === group.id && state.current.model === model.id
-                        const split = splitDisplayName(model.name)
+                        // 只读事实只对本 provider 的行套用（其他 provider 的目录条目
+                        // 即使 id 相同也不查表）。
+                        const facts = group.id === PROVIDER_ID
+                          ? formatModelFacts(modelFactTable.get(model.id))
+                          : undefined
                         return (
                           <button
                             ref={itemRef()}
@@ -406,10 +414,10 @@ export function CodeBuddyModelSelect(
                           >
                             <span className="ccb-model-optionCopy">
                               <span className="ccb-model-row">
-                                <span className="ccb-model-name">{split.left}</span>
-                                {split.right !== undefined
-                                  ? <span className="ccb-model-coef">{split.right}</span>
-                                  : null}
+                                <span className="ccb-model-name">{model.name}</span>
+                                {facts === undefined
+                                  ? null
+                                  : <span className="ccb-model-facts">{facts}</span>}
                               </span>
                             </span>
                             <span className="ccb-model-check">

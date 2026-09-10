@@ -6,8 +6,9 @@
  *
  * /v3/config 的模型条目带积分消耗系数（credits，如 "x0.79 credits"）、多模态
  * 声明（supportsImages）与精确思考档位声明（reasoning.supportedEfforts /
- * canDisableThinking）。系数与视觉标记附加进展示名（模型选择器只渲染
- * model.name，官方 UI 没有独立字段位），档位转成 reasoningEfforts 声明。
+ * canDisableThinking）。展示名一律是服务端原始模型名——系数/容量等事实由
+ * 本插件 UI 自行渲染（选择器与额度卡同读 /status 的 models 事实表），不再
+ * 往名字里附加任何标记；档位转成 reasoningEfforts 声明。
  */
 
 import { LlmError } from '@deepseek-ai/dsh-llm'
@@ -46,9 +47,9 @@ export interface CodeBuddyModelEntry {
 /** 解析后的模型事实（adapter 与状态接口共用）。 */
 export interface CodeBuddyModelFacts {
   id: string
-  /** 展示名：原始名 + 系数（模型选择器可见的唯一文本位）。 */
+  /** 服务端原始模型名（不含任何插件附加标记）。 */
   name: string
-  /** 积分系数短串（"x0.79"），服务端未声明时缺省——额度卡消耗速度行用。 */
+  /** 积分系数短串（"x0.79"），服务端未声明时缺省——额度卡与选择器的只读事实行用。 */
   credits?: string
   contextWindow: number
   maxTokens: number
@@ -57,29 +58,6 @@ export interface CodeBuddyModelFacts {
   thinkingLevelMap?: Record<string, string | null>
   defaultEffort?: string
   description?: string
-}
-
-/** "x0.79 credits" → 短系数 "x0.79"；数值为 0（如 "x0.00"）→ "free"；非字符串 → undefined。 */
-export function creditLabel(raw: unknown): string | undefined {
-  if (typeof raw !== 'string') return undefined
-  const match = /x([\d.]+)/i.exec(raw)
-  if (match === null) return undefined
-  const value = Number(match[1])
-  return Number.isFinite(value) && value === 0 ? 'free' : 'x' + match[1]
-}
-
-/**
- * 展示名组装：原始名 + 两空格 + 积分系数（free/x0.79）。
- * 视觉能力不进名字（列表里不挂 👁 标记）——能力走 inputModalities 声明，
- * 视觉提示只在聊天头部额度卡展示；两空格是自建选择器拆分左右列的锚点。
- */
-export function displayName(entry: {
-  name: string
-  credits?: string
-  input?: readonly ('text' | 'image')[]
-}): string {
-  const credits = creditLabel(entry.credits)
-  return credits === undefined ? entry.name : entry.name + '  ' + credits
 }
 
 /** 思考档位 id → 展示名（选择器推理等级面板用；未知 id 原样）。 */
@@ -108,7 +86,7 @@ export function factsFromEntries(entries: readonly CodeBuddyModelEntry[]): CodeB
       : undefined
     return {
       id: entry.id,
-      name: displayName(entry),
+      name: entry.name,
       ...(entry.credits === undefined ? {} : { credits: entry.credits }),
       contextWindow: entry.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
       maxTokens: entry.maxTokens ?? DEFAULT_MAX_TOKENS,
@@ -248,17 +226,14 @@ export function parseModelConfig(body: unknown): readonly CodeBuddyModelEntry[] 
   })
 }
 
-/** 完整条目 → DSH 发现结果（官方「获取可用模型」契约的四字段，name 带系数/视觉标记）。 */
+/** 完整条目 → DSH 发现结果（官方「获取可用模型」契约的四字段，name 为服务端原始模型名）。 */
 export function toDiscovered(entries: readonly CodeBuddyModelEntry[]): LlmDiscoveredModel[] {
-  return entries.map(entry => {
-    const name = displayName(entry)
-    return {
-      id: entry.id,
-      ...(name === entry.id ? {} : { name }),
-      ...(entry.contextWindow === undefined ? {} : { contextWindow: entry.contextWindow }),
-      ...(entry.maxTokens === undefined ? {} : { maxTokens: entry.maxTokens }),
-    }
-  })
+  return entries.map(entry => ({
+    id: entry.id,
+    ...(entry.name === entry.id ? {} : { name: entry.name }),
+    ...(entry.contextWindow === undefined ? {} : { contextWindow: entry.contextWindow }),
+    ...(entry.maxTokens === undefined ? {} : { maxTokens: entry.maxTokens }),
+  }))
 }
 
 /** 拉取并解析 CodeBuddy 模型目录（只在用户给 Key 后调用），带超时。 */

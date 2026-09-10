@@ -14,15 +14,23 @@
  * 当前选中模型读官方共享模型目录（ctx.modelDirectories，与模型选择器
  * 同一 store，含目录默认值兜底），目录不可用时退回 session 投影
  * （useProjection('modelSelection')）——都是框架公开 seam，不读私有状态。
+ *
+ * 本模块同时导出模型事实表（module 级，见 ModelFactView）：事实只来自本插件
+ * /api/codebuddy-credits/status 的 models 列表，额度卡与自建模型选择器共用这
+ * 一份缓存（选择器不再从展示名里解析系数）；选择器打开菜单时若事实表尚空，
+ * 补一次同路由 GET（单飞），失败静默——该模型只显示名字。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import { setMaxMode, subscribeMaxMode, getMaxMode, syncMaxMode } from './maxMode.js'
+import { formatModelFacts } from './format.js'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
 const QUOTA_URL = '/api/codebuddy-credits/quota'
+/** 本插件 provider id（模型选择器只对本 provider 的行套用事实表）。 */
+export const PROVIDER_ID = 'codebuddy-credits'
 
 /** 面板标题用的方形渐变图标（Combine 里取出的 Color 单块，独立渐变 id）。 */
 const SQUARE_LOGO_SVG = '<svg height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>CodeBuddy</title><defs><radialGradient cx="0" cy="0" gradientTransform="matrix(-9.00009 -16 16 -9.00009 21 24.5)" gradientUnits="userSpaceOnUse" id="ccb-logo-square-gradient" r="1"><stop stop-color="#2EA99D"></stop><stop offset="1" stop-color="#6C4DFF"></stop></radialGradient></defs><path d="M18.821 0H5.18A5.179 5.179 0 000 5.179V18.82A5.179 5.179 0 005.179 24H18.82A5.179 5.179 0 0024 18.821V5.18A5.179 5.179 0 0018.821 0z" fill="url(#ccb-logo-square-gradient)"></path><path d="M18.777 1.647c.28-.02.536.114.972.51 1.018.926 2.437 2.828 3.318 4.452l.34.631.482.24.11.06v3.638a5.206 5.206 0 00-5.32-1.23c-.491.166-1.021.471-2.08 1.082l-6.09 3.516c-1.057.61-1.586.916-1.975 1.259a5.208 5.208 0 00-1.493 5.572c.165.49.471 1.02 1.082 2.08l.315.543h-3.26c-.685 0-1.34-.135-1.939-.377-.169-.956-.009-1.789.469-2.335.158-.18.164-.189.13-.493a11.846 11.846 0 01-.057-1.711l.02-.444-.667-1.18C2.1 15.622 1.445 14.078 1.192 12.9c-.133-.647-.125-.934.04-1.146.1-.128.427-.261.822-.334.994-.175 3.162-.017 5.575.41l.25.043.551-.487c.915-.81 1.522-1.264 2.641-1.962 1.167-.73 2.484-1.331 3.967-1.807l.476-.152.261-.688c.937-2.471 1.896-4.293 2.58-4.9.235-.21.25-.22.422-.23z" fill="#fff"></path><path d="M12.139 18.2a1.203 1.203 0 011.642.44l1.296 2.243a1.204 1.204 0 01-2.083 1.203l-1.296-2.243a1.203 1.203 0 01.44-1.644zM18.629 14.452a1.203 1.203 0 011.642.44l1.295 2.244a1.203 1.203 0 11-2.083 1.203l-1.295-2.243a1.203 1.203 0 01.44-1.644z" fill="#fff"></path></svg>'
@@ -45,7 +53,7 @@ interface QuotaView {
 interface ModelFactView {
   id: string
   name: string
-  /** 积分系数短串（"x0.79"），服务端未声明时缺省——消耗速度行用。 */
+  /** 积分系数短串（"x0.79"），服务端未声明时缺省——只读事实行用。 */
   credits?: string
   vision: boolean
   contextWindow: number
@@ -165,6 +173,49 @@ const PANEL_EDGE_GAP = 8
 /** 模块级状态缓存：槽位重挂载（切会话/视图）时以它初始化，避免「空 → 出现」闪烁。 */
 let cachedStatus: StatusPayload | undefined
 
+// ---- 模型事实表（client 侧单一来源）----------------------------------------
+// 事实只来自 host 的 /api/codebuddy-credits/status（models 列表）——额度卡读到
+// 状态时刷入，模型选择器的模型行按 id 查表渲染右侧只读事实。快照引用只在事实
+// 变化时更新（useSyncExternalStore 契约）。
+let modelFacts: ReadonlyMap<string, ModelFactView> = new Map()
+const modelFactListeners = new Set<() => void>()
+/** 单飞：选择器打开菜单而事实表尚空（额度卡未挂载 / 尚未回包）时的补拉。 */
+let modelFactsRequest: Promise<void> | undefined
+
+/** 订阅模型事实变化（useSyncExternalStore 契约）。 */
+export function subscribeModelFacts(fn: () => void): () => void {
+  modelFactListeners.add(fn)
+  return () => { modelFactListeners.delete(fn) }
+}
+
+/** 当前模型事实快照（按模型 id 建表）。 */
+export function getModelFacts(): ReadonlyMap<string, ModelFactView> {
+  return modelFacts
+}
+
+/** /status 读到模型清单时刷入事实表（额度卡与选择器同源）。 */
+export function syncModelFacts(models: readonly ModelFactView[]): void {
+  modelFacts = new Map(models.map(model => [model.id, model]))
+  for (const fn of modelFactListeners) fn()
+}
+
+/**
+ * 事实表为空时补一次 /status（与额度卡同一路由、单飞）；失败静默——
+ * 没有事实的模型只显示名字，不报错、不显示占位符。
+ */
+export function ensureModelFacts(): void {
+  if (modelFacts.size > 0 || modelFactsRequest !== undefined) return
+  modelFactsRequest = fetch(STATUS_URL, { cache: 'no-store' })
+    .then(response => response.ok ? response.json() as Promise<StatusPayload> : undefined)
+    .then(payload => {
+      if (payload === undefined) return
+      syncModelFacts(payload.models ?? [])
+      if (payload.maxMode !== undefined) syncMaxMode(payload.maxMode)
+    })
+    .catch(() => { /* 事实缺失：选择器只显示模型名 */ })
+    .finally(() => { modelFactsRequest = undefined })
+}
+
 /**
  * blank 会话 hero 锚点的落点解析：从 dock 内隐藏锚 span 向上找官方会话根
  * 元素（[data-phase] 公开 DOM 标记，ConversationRoot 每相位重渲染时改写
@@ -264,6 +315,8 @@ export function CodeBuddyCreditsIndicator({
       const payload = await response.json() as StatusPayload
       cachedStatus = payload
       setStatus(payload)
+      // 模型事实随 /status 刷入共享事实表（选择器模型行同源读取）。
+      syncModelFacts(payload.models ?? [])
       // Max 模式状态随 /status 同步进共享 store（选择器档位面板同源读取）。
       if (payload.maxMode !== undefined) syncMaxMode(payload.maxMode)
     } catch {
@@ -352,19 +405,14 @@ export function CodeBuddyCreditsIndicator({
     if (variant === 'hero' && !hero.visible && open) setOpen(false)
   }, [variant, hero.visible, open])
 
-  const selected = selection?.provider === 'codebuddy-credits' ? selection : undefined
+  const selected = selection?.provider === PROVIDER_ID ? selection : undefined
   const model = selected === undefined
     ? undefined
     : status?.models.find(entry => entry.id === selected.model)
 
-  // 消耗速度（积分倍率）：x0.51 → 0.51x 倍率；x0 → 免费；无声明 → –。
-  const rateText = (() => {
-    if (model === undefined || model.credits === undefined) return '–'
-    const match = /^x([\d.]+)$/i.exec(model.credits)
-    if (match === null) return model.credits
-    const value = Number(match[1])
-    return value === 0 ? t('indicator.model.free') : t('indicator.model.rateValue', { rate: String(value) })
-  })()
+  // 模型只读事实（系数 · 上下文长度，如 `x0.00 · 1M`）：与设置清单、模型选择器
+  // 同一口径（formatModelFacts）；无事实时 undefined（只显示模型名）。
+  const modelFactsText = formatModelFacts(model)
 
   const account = status?.account
   // /v2/accounts 实测 type 为 ultimate（企业）/personal；enterprise 兼容旧形状。
@@ -627,9 +675,19 @@ export function CodeBuddyCreditsIndicator({
               ? (
                 <>
                   <div style={dividerStyle} />
-                  {/* 模型卡（参考官方模型展示）：加粗名 → 描述 → 可用功能 → 分隔 → 消耗速度。 */}
-                  <div style={{ fontSize: '13px', lineHeight: '20px', fontWeight: 600, color: 'var(--dsw-alias-label-primary)' }}>
-                    {model.name.split('  ')[0]}
+                  {/* 模型卡（参考官方模型展示）：加粗名 + 右侧只读事实（系数 · 上下文
+                      长度）→ 描述 → 可用功能。名字与事实两列，事实缺失时只显示名字。 */}
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px' }}>
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '13px', lineHeight: '20px', fontWeight: 600, color: 'var(--dsw-alias-label-primary)' }}>
+                      {model.name}
+                    </span>
+                    {modelFactsText === undefined
+                      ? null
+                      : (
+                        <span style={{ flex: '0 0 auto', fontSize: '12px', lineHeight: '18px', color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                          {modelFactsText}
+                        </span>
+                      )}
                   </div>
                   {model.description !== undefined
                     ? <div style={captionStyle}>{model.description}</div>
@@ -642,11 +700,6 @@ export function CodeBuddyCreditsIndicator({
                         model.efforts !== undefined && model.efforts.length > 0 ? t('indicator.model.reasoningFeature') : null,
                       ].filter((item): item is string => item !== null).join(' · ')}
                     </span>
-                  </div>
-                  <div style={dividerStyle} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                    <span style={captionStyle}>{t('indicator.model.rate')}</span>
-                    <span style={{ fontSize: '12px', lineHeight: '18px', color: 'var(--dsw-alias-label-secondary)' }}>{rateText}</span>
                   </div>
                 </>
               )

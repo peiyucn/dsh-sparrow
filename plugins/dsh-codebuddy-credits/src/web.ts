@@ -27,9 +27,9 @@ export interface AccountView {
 /** 状态接口里的模型事实视图（client 头部卡片据此展示当前模型信息）。 */
 export interface ModelFactView {
   id: string
-  /** 展示名（已含系数）。 */
+  /** 服务端原始模型名（不含任何插件附加标记）。 */
   name: string
-  /** 积分系数短串（"x0.79"），服务端未声明时缺省——消耗速度行用。 */
+  /** 积分系数短串（"x0.79"），服务端未声明时缺省——额度卡与选择器的只读事实行用。 */
   credits?: string
   /** 原生视觉（supportsImages）。 */
   vision: boolean

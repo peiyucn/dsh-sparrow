@@ -49,9 +49,10 @@ Open **Settings → Models** and paste your key on the **CodeBuddy Credits** row
   granted) and activates the provider. The catalog is held in memory and
   refreshed on demand; it is never written to settings.
 - The models then appear in the model picker. The picker is a
-  CodeBuddy-aware variant of the official one: each model row shows its credit
-  rate (`x0.79`, `free`) on the right, and reasoning-effort choices follow
-  what the server declares per model.
+  CodeBuddy-aware variant of the official one: each model row shows the plain
+  model name with its read-only facts on the right (`x0.00 · 1M` — credit rate
+  · context window), and reasoning-effort choices follow what the server
+  declares per model.
 - Without a key the plugin makes no network requests at all and the provider
   does not appear in the model picker.
 - Removing the key deactivates the provider.
@@ -70,7 +71,8 @@ conversation UI:
   Session log button — shown on conversation pages and on the new-session
   page alike): opens a panel with your account/enterprise, current-cycle
   quota (used / limit / remaining, progress bar, reset date) and the selected
-  CodeBuddy model's description, capabilities, and spend rate.
+  CodeBuddy model's read-only facts (credit rate · context window), description,
+  and capabilities.
 - **Session stats**: accumulated credits and call count for the current
   conversation, appended to the official stats line under the composer.
 - **Per-turn credit pill**: credits spent for one assistant turn (at the end

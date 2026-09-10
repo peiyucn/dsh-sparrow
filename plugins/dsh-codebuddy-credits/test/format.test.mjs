@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { formatCapacity } from '../lib/client/format.js'
+import { formatCapacity, formatModelFacts } from '../lib/client/format.js'
 
 describe('formatCapacity（只读清单的容量短串）', () => {
   it('百万级 应该 用 M（整数不带小数、非整保留一位）', () => {
@@ -26,5 +26,27 @@ describe('formatCapacity（只读清单的容量短串）', () => {
     assert.equal(formatCapacity(-1), undefined)
     assert.equal(formatCapacity(Number.NaN), undefined)
     assert.equal(formatCapacity('1000'), undefined)
+  })
+})
+
+describe('formatModelFacts（模型右侧只读事实：系数 · 上下文长度）', () => {
+  it('系数与容量 应该 用 · 分隔', () => {
+    assert.equal(formatModelFacts({ credits: 'x0.79', contextWindow: 1_000_000 }), 'x0.79 · 1M')
+  })
+
+  it('零系数 应该 原样显示 x0.00（不再映射 free/免费）', () => {
+    assert.equal(formatModelFacts({ credits: 'x0.00', contextWindow: 1_000_000 }), 'x0.00 · 1M')
+  })
+
+  it('缺一 应该 只显示另一项', () => {
+    assert.equal(formatModelFacts({ contextWindow: 131_072 }), '131K')
+    assert.equal(formatModelFacts({ credits: 'x1.62' }), 'x1.62')
+  })
+
+  it('无事实 应该 返回 undefined（渲染侧只显示模型名，无占位符）', () => {
+    assert.equal(formatModelFacts(undefined), undefined)
+    assert.equal(formatModelFacts({}), undefined)
+    assert.equal(formatModelFacts({ credits: '' }), undefined)
+    assert.equal(formatModelFacts({ credits: 'x0.00', contextWindow: 0 }), 'x0.00')
   })
 })
