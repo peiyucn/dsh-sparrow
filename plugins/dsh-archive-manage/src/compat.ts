@@ -10,11 +10,15 @@ import * as dshSessionSurface from '@deepseek-ai/dsh-session'
 /**
  * 本插件构建时对齐的 dsh 会话格式版本。
  *
- * 官方会话格式是单调整数（0.1.2-rc.1 为 `0`，0.1.5-alpha.1 为 `3`），每次
- * 升级都可能改变日志布局与事件语义。本插件按**目录**移动/删除会话文件，
- * 认错格式的代价是丢数据，因此只声明已知可安全处理的版本。
+ * 官方会话格式是单调整数（0.1.2-rc.1 为 `0`，0.1.5-rc.1 为 `3`），每次升级都
+ * 可能改变日志布局、事件语义与落盘文件名。本插件按**目录**移动/删除会话文件，认错格式的代价是丢数据，因此只声明已知可安全
+ * 处理的版本。
+ *
+ * 注意（0.1.5 起）：`sessionPersistence.list()/stat()` 返回的 header 已被持久化层
+ * **翻译成当前逻辑版本**（恒等于宿主的 `SESSION_FORMAT_VERSION`），不再反映磁盘上的
+ * 物理代——本门判的是「宿主契约代」。同一目录内旧代与 V3 文件可以并存（迁移保留源文件）。
  */
-export const SUPPORTED_SESSION_FORMAT_VERSIONS: readonly number[] = [0]
+export const SUPPORTED_SESSION_FORMAT_VERSIONS: readonly number[] = [0, 3]
 
 /** 面向日志/错误的统一停用前缀。 */
 function disabledLine(pluginName: string, reason: string): string {

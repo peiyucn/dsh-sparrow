@@ -19,10 +19,10 @@ describe('compat 宿主兼容自检（会话版）', () => {
     }
   })
 
-  it('更高的会话格式版本（如 0.1.5 的 3）应该 返回原因', () => {
-    const reason = unsupportedSessionFormatReason(3)
+  it('未来更高的会话格式版本（如 4）应该 返回原因', () => {
+    const reason = unsupportedSessionFormatReason(4)
     assert.ok(reason !== undefined)
-    assert.match(reason, /v3/u)
+    assert.match(reason, /v4/u)
     assert.match(reason, /v0/u)
   })
 
@@ -49,7 +49,7 @@ describe('compat 宿主兼容自检（会话版）', () => {
 
   it('不兼容时 应该 告警并抛错（停用）', () => {
     const { ctx, warns } = fakeCtx()
-    assert.throws(() => { assertHostCompatible(ctx, 'dsh-x', 3) }, /dsh-x: .*v3/u)
+    assert.throws(() => { assertHostCompatible(ctx, 'dsh-x', 4) }, /dsh-x: .*v4/u)
     assert.equal(warns.length, 1)
     assert.match(warns[0], /已停用插件以免影响 dsh/u)
   })
@@ -61,13 +61,13 @@ describe('compat 宿主兼容自检（会话版）', () => {
     })
 
     it('全部 header 支持 应该 返回 undefined', () => {
-      assert.equal(unsupportedStoredFormatReason([{ version: 0 }, { version: 0 }]), undefined)
+      assert.equal(unsupportedStoredFormatReason([{ version: 0 }, { version: 3 }]), undefined)
     })
 
     it('任一 header 不支持 应该 返回带来源标注的原因', () => {
-      const reason = unsupportedStoredFormatReason([{ version: 0 }, { version: 3 }])
+      const reason = unsupportedStoredFormatReason([{ version: 0 }, { version: 4 }])
       assert.ok(reason !== undefined)
-      assert.match(reason, /v3/u)
+      assert.match(reason, /v4/u)
       assert.match(reason, /宿主会话 header/u)
     })
 
