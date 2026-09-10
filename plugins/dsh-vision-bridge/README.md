@@ -1,6 +1,14 @@
 # dsh-vision-bridge
 
-> **⚠️ Retired (2026-09-10)** — this plugin is no longer needed: DeepSeek main models are natively multimodal now, so use **`deepseek-flash`** instead. Do **not** install it on new setups. The rest of this document is kept for historical reference.
+> **⚠️ Retired (2026-09-10)** — this plugin is no longer needed: DeepSeek main models are natively multimodal now, so use **`deepseek-flash`** instead. Do **not** install it on new setups.
+>
+> **Already installed it? Remove it.** Once you upgrade dsh to 0.1.5 this plugin disables itself (it does not recognize the new session format) and logs a "plugin disabled" warning — harmless, but pure noise:
+>
+> ```bash
+> dsh plugin --profile web remove @dsh-sparrow/dsh-vision-bridge
+> ```
+>
+> The rest of this document is kept for historical reference.
 
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
@@ -8,15 +16,15 @@ The official DeepSeek vision channel for text-only main models — official visi
 
 When the main model cannot see images, it automatically calls the provided `vision_read` tool: the host reads the image with the official vision model and returns a structured text report (summary / OCR / tables / layout) — the main model stays the brain of the conversation.
 
-## Install
+## Install (retired)
+
+**Do not install.** This plugin is retired — see the notice above. If you already have it:
 
 ```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge
+dsh plugin --profile web remove @dsh-sparrow/dsh-vision-bridge
 ```
 
-Requires dsh 0.1.2-rc.1 — the exact official version line this release is built and verified against (newer lines, pre-releases in particular, are not covered) — and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
-
-> Do **not** run `npm install @dsh-sparrow/dsh-vision-bridge` directly — that only downloads the package into a `node_modules` and does not register it in the DSH web profile. Install with the `dsh plugin` command above, then restart DSH.
+The retired release targeted dsh 0.1.2-rc.1 and was installed with `dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge` — kept here for historical reference only.
 
 ## Usage
 
@@ -31,6 +39,12 @@ Requires dsh 0.1.2-rc.1 — the exact official version line this release is buil
 ![Vision status icon and its tooltip next to the model selector](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-vision-bridge.png)
 
 ## Uninstall & Residue
+
+```bash
+dsh plugin --profile web remove @dsh-sparrow/dsh-vision-bridge
+```
+
+Restart dsh afterwards so the profile reloads without it.
 
 * **Zero residue**: Writes no files and never touches the `.dsh` internals; the report cache lives only in process memory and vanishes on exit.
 

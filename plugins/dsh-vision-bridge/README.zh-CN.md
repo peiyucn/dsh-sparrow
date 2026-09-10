@@ -1,6 +1,14 @@
 # dsh-vision-bridge
 
-> **⚠️ 已退役（2026-09-10）** —— 本插件不再需要：DeepSeek 主模型已原生多模态，请直接用 **`deepseek-flash`** 替代。**不要**再新装。以下正文保留作历史记录。
+> **⚠️ 已退役（2026-09-10）** —— 本插件不再需要：DeepSeek 主模型已原生多模态，请直接用 **`deepseek-flash`** 替代。**不要**再新装。
+>
+> **已经装了？请自行卸载。** dsh 升到 0.1.5 后本插件会自停用（不认识新的会话格式），启动日志里留一条「已停用插件」告警——不影响 dsh，但纯属噪声：
+>
+> ```bash
+> dsh plugin --profile web remove @dsh-sparrow/dsh-vision-bridge
+> ```
+>
+> 以下正文保留作历史记录。
 
 简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
@@ -8,15 +16,15 @@
 
 主模型本身看不到图片时，它会自动调用本插件提供的 `vision_read` 工具：host 直连官方视觉模型读图，把图片转成结构化文字报告（摘要 / OCR / 表格 / 版式），主模型保持对话大脑。
 
-## 安装
+## 安装（已退役）
+
+**不要安装。** 本插件已退役——见上方横幅。已经装了的话：
 
 ```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge
+dsh plugin --profile web remove @dsh-sparrow/dsh-vision-bridge
 ```
 
-适配 dsh 0.1.2-rc.1（本版构建与验证所对齐的确切官方版本线；更新的版本线、尤其是预发布版本不在承诺范围内），并需要可用的 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
-
-> **不要**直接执行 `npm install @dsh-sparrow/dsh-vision-bridge`：那只会把包下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用上面的 `dsh plugin` 命令安装，并在安装后重启 DSH。
+退役版本适配 dsh 0.1.2-rc.1，安装命令为 `dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge`——以上仅作历史记录保留。
 
 ## 使用
 
@@ -31,6 +39,12 @@ dsh plugin --profile web add @dsh-sparrow/dsh-vision-bridge
 ![模型选择器旁的眼睛图标与说明弹层](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-vision-bridge.png)
 
 ## 卸载与残留
+
+```bash
+dsh plugin --profile web remove @dsh-sparrow/dsh-vision-bridge
+```
+
+卸载后重启 dsh，让 profile 在不含本插件的情况下重新加载。
 
 * **零残留**：不写任何文件、不改 `.dsh` 内部结构；报告缓存只在进程内存中，进程退出即消失。
 
