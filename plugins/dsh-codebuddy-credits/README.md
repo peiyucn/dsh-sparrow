@@ -48,6 +48,10 @@ Open **Settings → Models** and paste your key on the **CodeBuddy Credits** row
   follow the key's account permissions — e.g. the set your enterprise admin
   granted) and activates the provider. The catalog is held in memory and
   refreshed on demand; it is never written to settings.
+- Once configured, the card also lists the models the key can use (read-only:
+  plain name + `x0.00 · 1M` credit rate · context window) with a **Fetch
+  available models** button to re-scan after an administrator changes the
+  list. The refresh only touches this provider.
 - The models then appear in the model picker. The picker is a
   CodeBuddy-aware variant of the official one: each model row shows the plain
   model name with its read-only facts on the right (`x0.00 · 1M` — credit rate
