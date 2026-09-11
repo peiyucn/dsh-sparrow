@@ -105,6 +105,17 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
     setRow(current => (current === next ? current : next))
   })
 
+  // 官方两颗胶囊按自身条件渲染，可能在我们注入之后才补上第二颗——React 新增末位
+  // 子节点用 appendChild，我们的节点就会停在中间而非行尾。每次渲染后重挂到行尾
+  // （与每轮积分胶囊同款自愈；只移动自有节点、幂等）。
+  useEffect(() => {
+    const pill = buttonRef.current
+    if (pill === null) return
+    const host = pill.parentElement
+    if (host === null || host.lastElementChild === pill) return
+    host.appendChild(pill)
+  })
+
   // 没有 CodeBuddy 调用：不注入，官方统计行保持原样。
   const active = row !== null && usage !== undefined && usage.calls > 0
 
