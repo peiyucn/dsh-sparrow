@@ -77,8 +77,9 @@ conversation UI:
   quota (used / limit / remaining, progress bar, reset date) and the selected
   CodeBuddy model's read-only facts (credit rate · context window), description,
   and capabilities.
-- **Session stats**: accumulated credits and call count for the current
-  conversation, appended to the official stats line under the composer.
+- **Session credit pill**: one more pill of the same kind in the official stats
+  row under the composer — accumulated credits and call count for the current
+  conversation; clicking it opens the call count and the per-model breakdown.
 - **Per-turn credit pill**: credits spent for one assistant turn (at the end
   of its action row), with a popup breaking the total down per call and per
   model.
