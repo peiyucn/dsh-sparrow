@@ -296,9 +296,13 @@ export interface ArchiveAlignment {
  * - 孤儿子会话（父不在清单）与顶层会话不参与。
  *
  * 子代理自身也能再派子代理，故「子镜像父」要沿父子链传到**全部后代**：从每个顶层节点 BFS
- * 逐层把祖先的归档态传播下去（每个节点只访问一次，O(n)）。单趟只看一层的旧实现在多层树上
+ * 逐层把祖先的归档态传播下去（id 唯一时每个节点只访问一次，O(n)）。单趟只看一层的旧实现在多层树上
  * 只对齐一层，要靠「自己那次写又触发一轮 domain/changed」迭代收敛——把正确性押在事件链上，
  * 且面板惰性对齐每打开一次也只能推进一层。无根节点（父子成环）时无人可传播，不做任何对齐。
+ *
+ * `seen` 守卫（同一批给 `collectSubtreeIds` 补的同款）：id 唯一时环必然不可达；但畸形数据里
+ * 同一 id 出现两条 header 就能造出**从根可达**的环（一条挂在链尾指回祖先），没有守卫会让
+ * 这个函数在宿主的 `domain/changed` 监听与 `/list` 路由里同步转不出来（2026-09-12 审计 S1）。
  */
 export function archiveAlignmentForChildren(
   headers: readonly SessionTreeHeader[],
@@ -317,13 +321,18 @@ export function archiveAlignmentForChildren(
   const add: string[] = []
   const remove: string[] = []
   const queue: string[] = []
+  const seen = new Set<string>()
   for (const header of headers) {
     const hasParent = header.origin === 'subagent' && header.parentSession !== undefined && byId.has(header.parentSession)
-    if (!hasParent) queue.push(header.id)
+    if (hasParent || seen.has(header.id)) continue
+    seen.add(header.id)
+    queue.push(header.id)
   }
   for (let i = 0; i < queue.length; i++) {
     const ancestorArchived = archived.has(queue[i])
     for (const childId of childrenOf.get(queue[i]) ?? []) {
+      if (seen.has(childId)) continue
+      seen.add(childId)
       if (ancestorArchived !== archived.has(childId)) {
         if (ancestorArchived) {
           archived.add(childId)

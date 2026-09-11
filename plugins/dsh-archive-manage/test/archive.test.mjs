@@ -424,6 +424,15 @@ describe('archive-manage 纯逻辑', () => {
       ], ['a'])
       assert.deepEqual(r, { add: [], remove: [] })
     })
+
+    // 审计 S1：同一 id 出现两条 header 能造出**从根可达**的环（一条挂在链尾指回祖先）——
+    // 无守卫时 BFS 队列无界增长、在 domain/changed 监听里同步挂死（不是抛错）。
+    it('重复 id 造出的可达环 应该 终止、每个节点只传播一次', () => {
+      const r = archiveAlignmentForChildren([
+        h('r'), child('a', 'r'), child('b', 'a'), { id: 'a', createdAt: 1, parentSession: 'b', origin: 'subagent' },
+      ], ['r'])
+      assert.deepEqual(r, { add: ['a', 'b'], remove: [] })
+    })
   })
 
   describe('livingChildIds', () => {
