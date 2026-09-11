@@ -1204,6 +1204,12 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               await rename(sessionDir, trashDir)
               moved.push({ from: sessionDir, to: trashDir })
             } catch (error) {
+              // 根目录缺失（陈旧 header 缓存 / 已被别的操作搬走或手工删过）：没有东西可搬进回收站。
+              // 有意**不**像后代那样静默跳过——回收站条目一旦只有 sidecar 没有日志，还原就会造出一个
+              // 空会话目录，比直接报错更糟。给一条人能看懂的提示，用户可改用「彻底删除」（它宽容 ENOENT）。
+              if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+                throw new ArchiveError('UNKNOWN_SESSION', '会话目录不在磁盘上（可能已被移走或删除）：没有可移入回收站的内容，请刷新面板', 404)
+              }
               throw new ArchiveError('IO_ERROR', `移动父会话目录失败：${error instanceof Error ? error.message : String(error)}`, 500)
             }
             const subagentSidecars: ArchiveSubagentSidecar[] = []
@@ -1294,7 +1300,9 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
             return
           }
 
-          await rm(sessionDir, { recursive: true, force: false })
+          // force:true 只吞 ENOENT：根目录本就不在磁盘上同样算「已消失」（与子会话同一条道理，
+          // 见下方注释），否则幽灵会话会永久留在归档面板、面板里再也清不掉（审计 S4）。
+          await rm(sessionDir, { recursive: true, force: true })
           // 只有真正从磁盘上消失的子会话（含全部后代）才算 removed：rm 失败者仍在磁盘上，保留其归档标记
           // 与工作区记账，让它在归档面板以孤儿根继续可操作（审计 S7）。
           const deletedSubagentIds: string[] = []
