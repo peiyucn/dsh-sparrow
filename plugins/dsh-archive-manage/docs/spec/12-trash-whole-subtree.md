@@ -63,16 +63,35 @@ if (String(header.parentSession) !== String(parentSessionId)) continue
   不含根、别的父下的子会话不入选；`archivedIdsToRemove` / `removeArchivedIds` 整棵子树出归档集；
   客户端 `dropArchivedIds` 摘整棵子树只留未命中的顶层节点；`archiveAlignmentForChildren` 多层树
   一次算全 + 无根成环不误对齐。
-- 路由级实测（临时脚本驱动真实 REST handler + 临时目录造**五层链** `p → c（子）→ gc（孙）→
-  ggc（重孙）→ gggc（玄孙）`，`ggc` 另有一个兄弟、且 `ggc`/`gggc` 落在**另一个 project 目录**，
-  另有无关会话 `unrelated → other-child`）：
-  - trash：`subagentIds = ['c','gc','ggc','ggc2','gggc']`，回收站内 `subagents/{c,gc,ggc,ggc2,gggc}/`，
-    两个 project 目录都只剩无关会话，归档集清空整棵子树，`api-session/removed` 发全六条；
-  - delete：同上，全部目录删除，无关会话不动；
-  - trash → restore：五个后代（含跨 project 的两个）全部回到各自**原路径**，回收站条目消失，
-    父会话回归归档集；
-  - 玄孙 live 占用：整单 409 `SESSION_LIVE`，一个目录都没动、回收站目录都没创建（不半搬）。
+- 路由级实测（临时脚本驱动真实 REST handler + 临时目录造树，逐维度打卡）：
+
+  | 维度 | 用例 | 实测结果 |
+  |---|---|---|
+  | 深度 | 五层链 `p → c（子）→ gc（孙）→ ggc（重孙）→ gggc（玄孙）` | trash/delete `subagentIds = ['c','gc','ggc','ggc2','gggc']`，全部搬走/删除 |
+  | 宽度（姊妹） | `ggc` 的姊妹 `ggc2` | 同为后代，一起走；回收站 `subagents/` 下逐个目录 |
+  | 跨 project | `ggc`/`gggc` 在另一个 project 目录（cwd 不同） | 按各自 header 的 `locate` 取目录，两个 project 都清空；restore 各回**原路径** |
+  | 越界（移中间节点） | trash 中间节点 `c1`（父 `p`、姊妹 `c2` 都在） | 只带 `['g1','g2']`；`p`、`c2` 目录与归档标记**原地不动**，`removed` 只发三条 |
+  | 越界（删姊妹） | delete `c2` | 只删 `c2`；`p` 与 `c1` 整棵树不动 |
+  | 孤儿根 | 父不在清单的子会话 `o`（自带孩子 `og`） | 走同一条链路，`og` 一起走；别的树不动 |
+  | 拒绝 | 玄孙 live 占用 | 整单 409 `SESSION_LIVE`；一个目录没动、回收站目录都没创建（不半搬） |
+  | 幽灵目录 | 某个后代目录已不在盘上 | 该条跳过并告警，其余照搬完成（见下节），不再整单回滚 |
+  | 归档对齐 | 官方菜单只归档父 `p` | 一趟到全子树（pass 1 全含），pass 2 零写 |
+
+- trash → restore 全链：五个后代（含跨 project 的两个）全部回到各自原路径，回收站条目消失，
+  父会话回归归档集，会话目录里不留记账文件（spec 13）。
 - `npm run verify` 全绿（166 tests）。
+
+## 附带修：后代会话目录缺失不再整单回滚（与 delete 的 ENOENT 口径对齐）
+
+trash 分支对每个后代 `rename` 时，旧代码把整个循环包在一个 try 里：任一目录不在盘上
+（陈旧 header 缓存 / 手工删过）就 `ENOENT` → 整单回滚 + 500，于是**这棵会话树永远移不进回收站**
+（只能走「彻底删除」，而那是不可逆的）。delete 分支早前已按审计 F2 把 ENOENT 视为「已消失」
+（`a0652ac`），trash 与它不对称。
+
+现改为逐条 try：`ENOENT` → 告警 + 跳过该条（磁盘上本就没有东西可搬），其余错误照旧整单回滚。
+被跳过的会话**仍留在响应 `subagentIds` 与归档集清理清单**里——磁盘上已无此会话，标记不该留
+（启动的幽灵 id 清扫也会兜底）。实测：手工删掉重孙 `ggc` 目录后 trash 返回 200，
+`c/gc/ggc2/gggc` 正常进回收站，`ggc` 只出现一条告警。
 
 ## 附带修：归档对齐也走整棵子树（同一次定位的姊妹缺口）
 

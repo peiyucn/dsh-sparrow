@@ -1213,7 +1213,19 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
                 for (const child of subagents) {
                   const childDirName = safeDirName(basename(child.dir))
                   const to = join(subagentsDir, childDirName)
-                  await rename(child.dir, to)
+                  try {
+                    await rename(child.dir, to)
+                  } catch (error) {
+                    // ENOENT = 目录本就不在磁盘上（陈旧 header 缓存 / 手工删过）：没有东西可搬，
+                    // 跳过并继续——与 delete 分支的 ENOENT 口径一致（审计 F2），不让一个幽灵条目把
+                    // 整单拖回滚、把用户永久卡在「这个树移不进回收站」。它仍留在响应/归档集清理清单里
+                    // （磁盘上已无该会话，标记不该留）。其余错误照旧整单回滚。
+                    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+                      ctx.logger.warn(`dsh-archive-manage: subagent 会话目录不在磁盘上（${String(child.sessionId)}），已跳过搬运：${error instanceof Error ? error.message : String(error)}`)
+                      continue
+                    }
+                    throw error
+                  }
                   moved.push({ from: child.dir, to })
                   subagentSidecars.push({
                     sessionId: String(child.sessionId),
