@@ -30,9 +30,10 @@ export function subtreeIdsOf(item: ArchivedSessionItem): string[] {
 }
 
 /**
- * 从归档树按给定 id 集合摘除节点：**只移除命中 id 的节点**（与 host 的移除集合口径一致，审计 B1）——
- * 命中节点的未命中后代上提到该节点位置并标 orphan（host 侧对「父已不在持久化」的子会话同样按孤儿根
- * 渲染，见 host.ts /list 的 orphan 字段），不像旧实现那样连带整棵子树一起消失。
+ * 从归档树按给定 id 集合摘除节点：**只移除命中 id 的节点**（集合由 host 的 trash/delete 响应给出，
+ * 现为「根 + 全部后代」整棵子树，见 spec 12）——命中节点的未命中后代上提到该节点位置并标 orphan
+ * （host 侧对「父已不在持久化」的子会话同样按孤儿根渲染，见 host.ts /list 的 orphan 字段），
+ * 不像旧实现那样连带整棵子树一起消失。
  */
 export function dropArchivedIds(items: readonly ArchivedSessionItem[], ids: ReadonlySet<string>): ArchivedSessionItem[] {
   const kept: ArchivedSessionItem[] = []

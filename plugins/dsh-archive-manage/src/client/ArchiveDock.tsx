@@ -1161,8 +1161,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
    *
    * 单条分支不等整页刷新：写操作必然打穿 host 的 header 缓存，紧随其后的刷新要走冷扫描
    * （列表越大越慢），此前条目与弹窗都干等它落定。改为变更成功后立即按响应里的 id 本地摘掉
-   * 受影响的行并关闭弹窗，refresh() 退到后台对账。摘除集合与 host 完全一致（trash/delete = 根 +
-   * 响应给出 subagentIds，即随父一起搬走/删掉的**全部后代**子会话，任意深度），由 refresh 落定。
+   * 受影响的行并关闭弹窗，refresh() 退到后台对账。摘除集合与 host 完全一致——响应里的 subagentIds
+   * 就是随父一起搬走/删掉的**全部后代**子会话（任意深度，见 spec 12），由 refresh 落定。
    * 失败路径语义不变：变更 reject 时本地状态一律不动，错误仍回弹窗展示。
    */
   const submitConfirm = async (typed: string): Promise<void> => {

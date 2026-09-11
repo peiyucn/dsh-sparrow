@@ -13,7 +13,7 @@ subagent 条目」，与父会话的条目彼此失去关联。
 | 时间 | 操作 | 结果 |
 |---|---|---|
 | 02:12:22 | trash 祖父会话 `session-95fd23b7`（带子代理树） | sidecar 只记了两个**直接**子会话 `20ffb1a3` / `3d2191db` |
-| 02:12:36 | trash 两个孙会话 `52afb238` / `fee8d1f0`（各成一条回收站条目） | 用户手动补齐，14 秒后 |
+| 02:12:34 / 02:12:36 | 用户先后 trash 两个孙会话 `fee8d1f0` / `52afb238`（各成一条回收站条目） | 手动补齐，12–14 秒后 |
 
 两个孙会话的 header 实测为 `origin: 'subagent'`、`parentSession: 20ffb1a3`（即**已入回收站的直接子会话**）
 ——即父子链深度为 2，不是插件以为的 1。
@@ -79,7 +79,7 @@ if (String(header.parentSession) !== String(parentSessionId)) continue
 
 - trash → restore 全链：五个后代（含跨 project 的两个）全部回到各自原路径，回收站条目消失，
   父会话回归归档集，会话目录里不留记账文件（spec 13）。
-- `npm run verify` 全绿（166 tests）。
+- `npm run verify` 全绿（167 tests；发布前审计独立复核 166 → 补可达环断言后 167）。
 
 ## 附带修：后代会话目录缺失不再整单回滚（与 delete 的 ENOENT 口径对齐）
 
@@ -103,11 +103,42 @@ const parentArchived = archived.has(header.parentSession)   // 只看直接父
 
 多层树上它一次只对齐一层，靠「这次写又触发一轮 `domain/changed`」迭代收敛——实测四层树需要
 4 轮（`["p","c"] → ["p","c","gc"] → […,ggc,ggc2] → […,gggc]`）。正确性押在事件链上、面板惰性对齐
-每打开一次也只推进一层。改为从顶层节点 BFS 逐层传播祖先归档态（每节点访问一次，O(n)）：
+每打开一次也只推进一层。改为从顶层节点 BFS 逐层传播祖先归档态（id 唯一时每节点访问一次，O(n)）：
 一趟即全子树（实测 pass 1 就到位），无根成环时无人可传播、不做任何对齐。
+
+**发布前审计 S1（已修）**：BFS 版漏了 `seen` 守卫，而 `id` 唯一这个前提并不由本函数保证——畸形数据里
+同一 id 出现两条 header 就能造出**从根可达**的环（一条挂在链尾指回祖先），队列无界增长 =
+在 `domain/changed` 监听与 `/list` 路由里**同步挂死**（审计实测 15s 未返回）。同批给
+`collectSubtreeIds` 补守卫时漏了这一处，现已补上并加了「可达环」回归断言（原有的「无根 2-环」
+用例不可达、挂不住这个 bug）。可达性：受支持版本线的官方 jsonl 后端**主动拒绝**重复 id
+（`session-persistence-jsonl/src/index.ts` `listArtifacts()` 抛 duplicate），故线上不可达；
+非 jsonl / 将来后端口径未知，守卫仍按「不能挂死」处理。
 
 > 归档文件搬运本身不依赖这条对齐（trash/delete 直接按 header 父子链取全后代）；
 > 这条只影响归档集标记与面板展示的一致性。
+
+## 附带修：后代会话目录缺失不再整单回滚（与 delete 的 ENOENT 口径对齐）
+
+trash 分支对每个后代 `rename` 时，旧代码把整个循环包在一个 try 里：任一目录不在盘上
+（陈旧 header 缓存 / 手工删过）就 `ENOENT` → 整单回滚 + 500，于是**这棵会话树永远移不进回收站**
+（只能走「彻底删除」，而那是不可逆的）。delete 分支早前已按审计 F2 把 ENOENT 视为「已消失」
+（`a0652ac`），trash 与它不对称。
+
+现改为逐条 try：`ENOENT` → 告警 + 跳过该条（磁盘上本就没有东西可搬），其余错误照旧整单回滚。
+被跳过的会话**仍留在响应 `subagentIds` 与归档集清理清单**里——磁盘上已无此会话，标记不该留
+（启动的幽灵 id 清扫也会兜底）。实测：手工删掉重孙 `ggc` 目录后 trash 返回 200，
+`c/gc/ggc2/gggc` 正常进回收站，`ggc` 只出现一条告警。
+
+**根会话的 ENOENT 口径（有意不对称，审计 S4）**：后代宽容、根从严——
+
+| 场景 | 后代目录缺失 | 根目录缺失 |
+|---|---|---|
+| trash | 跳过该条，其余照搬（200） | **拒绝**：404「会话目录不在磁盘上……没有可移入回收站的内容」（不伪造条目） |
+| delete | `rm force:true`，视为已删除并摘标记 | `rm force:true`，视为已删除并摘标记（`a0652ac` 同一条道理） |
+
+trash 的根为什么不也「跳过」：回收站条目的可还原性建立在「目录里有会话日志」上；只有 sidecar 的
+空条目还原后会在用户数据目录里造出一个空会话目录，比直接报错更糟。delete 侧的宽容则让幽灵会话
+（盘上已无、归档标记还在）在面板里可被清掉，不必等下次启动的幽灵 id 清扫。
 
 ## 附带发现（同次验证暴露，另修）
 
@@ -115,10 +146,22 @@ const parentArchived = archived.has(header.parentSession)   // 只看直接父
 `dsh-archive-manage.json` 会**跟着落回用户会话目录**（`subagents/` 子目录有清理，sidecar 没有）。
 见 spec 13。
 
-## 风险
+## 风险与已知项
 
-- 深度变大后单次操作的文件数变多：一次 trash 现在可能搬 N 个目录（本机历史最大子树 18 个子会话）。
-  路径长度与 rename 次数线性增长，但仍是一次请求内的串行 rename（本机毫秒级）；失败路径沿用原有
-  「反向 rename 回滚 + 归档集清理」，回滚集合就是本次实际 `moved` 的目录，语义未变。
+- 深度变大后单次操作的文件数变多：一次 trash 现在可能搬 N 个目录（本机回收站 sidecar 里记录过的
+  最大子会话清单为 18 条——`session-889f769c`、`session-a5db9699`；旧口径只记直接子会话，故真实
+  后代数只会更多）。路径长度与 rename 次数线性增长，但仍是一次请求内的串行 rename（本机毫秒级）；
+  失败路径沿用原有「反向 rename 回滚 + 归档集清理」，回滚集合就是本次实际 `moved` 的目录，语义未变。
 - 归档集清理范围变大：只在「目录确实被搬走/删掉」时摘（delete 分支仍只摘 `rm` 成功的那些），
   失败者保留标记、留在归档面板可重试（沿用审计 S7 口径）。
+- **测试覆盖缺口（审计 S3，列为技术债）**：本批的两条「静默降级」路径——trash 跳过 ENOENT 的后代、
+  还原后清理 sidecar——目前只有路由级临时脚本（未入库）作为证据，`test/*.test.mjs` 全是纯逻辑层用例，
+  下次回归 `verify` 拦不住这两条。收口方向：把 trash 循环 / `restoreTrashDir` 里可纯化的部分抽成
+  注入 fs 的纯逻辑（照 `archivedTree.ts` / `paging.ts` 先例），或补 temp-dir 级路由测试
+  （官方依赖都在 devDependencies 里，成本不高）。
+- **既有设计，本批只是放大了触发面**（审计 nit 10/11）：① `rollbackMoves` 某条回滚失败时只 warn，
+  未回滚的子会话目录会嵌在还原后的 `<父会话目录>/subagents/` 里；② trash 在「父目录已 rename、
+  sidecar 未写」之间存在崩溃窗口（无两阶段提交），进程被杀会留下一个不可还原的旧格式条目。
+- **畸形输入类**（重复 id 的 header）：`collectSubtreeIds` / `archiveAlignmentForChildren` 已由 `seen`
+  守卫保证终止；但 `buildSessionTree` 在同一输入下仍会栈溢出（RangeError，审计复现）——该畸形输入类
+  官方 jsonl 后端本就拒绝（`listArtifacts()` 抛 duplicate），故按「不挂死即可」处理，未一并加固。
