@@ -11,7 +11,14 @@ const tree = () => [
 ]
 const ids = (...values) => new Set(values)
 
-describe('dropArchivedIds（audit B1：与 host 的移除集合口径一致）', () => {
+describe('dropArchivedIds（按 host 传回的 id 集合本地摘行）', () => {
+  // host 的 trash/delete 现在传回「根 + 全部后代」，故正常路径整棵子树一次摘净。
+  it('摘整棵子树 应该 只留未命中的顶层节点', () => {
+    const next = dropArchivedIds(tree(), ids('p', 'c', 'gc', 'c2'))
+    assert.deepEqual(next.map(item => item.sessionId), ['other'])
+  })
+
+  // 纯函数契约：未命中的后代按现状保留并上提为孤儿根（防御 host 传回的集合不完整）。
   it('只摘根 + 直接子会话 应该 保留深度 ≥2 的后代（上提为孤儿根）', () => {
     const next = dropArchivedIds(tree(), ids('p', 'c'))
     assert.deepEqual(next.map(item => item.sessionId), ['gc', 'c2', 'other'])

@@ -20,7 +20,7 @@ import {
   TRASH_SIDECAR, archiveAlignmentForChildren, archivedIdsToRemove, buildSessionTree, collectSubtreeIds, createBudgetSignal,
   createHeaderFactsStore, createLruCache, isDeleteConfirmationSufficient, isSafeSessionDirName, labelFromSubagentIdentity,
   legacyTrashItem, livingChildIds, maskHomePath, normalizeArchiveConfig, parseBlankProjection, parseSessionFacts,
-  parseTrashSidecar, runBounded, sanitizeSegment, straySessionIds, trashItemView,
+  parseTrashSidecar, runBounded, sanitizeSegment, straySessionIds, subagentDescendantIds, trashItemView,
   type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar, type HeaderFactsStore, type SessionFacts,
   type SessionTreeHeader, type SessionTreeNode, type SubagentIdentityValue,
 } from './archive.js'
@@ -645,12 +645,11 @@ async function removeArchivedId(surface: RegistryMutationSurface, sessionId: Ses
 }
 
 /**
- * 移入回收站 / 彻底删除后的归档集清理：只摘「根 + 实际被搬走/删掉的直接子会话」一次写链（审计 B1）。
- * 官方持久化是扁平同级布局（sessionDir = projectDir/encodeSegment(id)，子会话继承父 cwd），trash/delete
- * 只逐个搬运**直接**子会话目录；深度 ≥2 的后代目录仍留在磁盘上，必须保留归档标记——按全子树摘会把
- * 它们永久变成「未归档」（父已不在 headers，父子对齐对孤儿不参与，补不回来）。
- * 待摘 id 由调用方用 archivedIdsToRemove(根, 直接子会话 id) 给出；/archive 那种 collectSubtreeIds
- * 全子树口径只适用于「归档集里成树」的语义。
+ * 移入回收站 / 彻底删除后的归档集清理：摘「根 + 实际被搬走/删掉的**全部后代**子会话」一次写链。
+ * 官方持久化是扁平同级布局（sessionDir = projectDir/encodeSegment(id)，子会话继承父 cwd），
+ * trash/delete 逐个搬运/删除整棵子树的目录，故整棵子树都要出归档集——只摘直接子会话会把
+ * 深度 ≥2 的后代永久留成孤儿根（父已不在 headers，父子对齐对孤儿不参与，摘不回来）。
+ * 待摘 id 由调用方用 archivedIdsToRemove(根, 全部后代 id) 给出。
  */
 export async function removeArchivedIds(surface: RegistryMutationSurface, ids: readonly string[]): Promise<void> {
   const remove = new Set(ids)
@@ -766,7 +765,10 @@ function assertHeaderFormatSupported(header: SessionHeader): void {
   throw new ArchiveError('BACKEND_UNSUPPORTED', `${reason}；已拒绝本次操作（升级本插件后自动恢复）`, 501)
 }
 
-/** 找出某个父会话下的全部 subagent 会话；任一会话仍被占用时不处理任何文件。
+/** 找出某个父会话下的**全部后代** subagent 会话（任意深度）；任一会话仍被占用时不处理任何文件。
+ *  子代理自身也能再派子代理（官方 header 有 `delegationDepth`，subagent 工具可嵌套），故不能只取
+ *  直接子会话：深度 ≥2 的后代目录留在磁盘上，父已缺位后它们要么以孤儿根浮现在归档区根级、
+ *  要么落进游离区（2026-09-12 实测：两个孙会话在其祖父会话入回收站后掉出来，用户只能逐个再操作）。
  *  spec 09 审计：headers 经 header 事实缓存取，与同请求的主 header 查表口径一致。 */
 async function listSubagentTargets(
   ctx: Context,
@@ -774,10 +776,13 @@ async function listSubagentTargets(
   headerFacts: HeaderFactsStore<HeaderFacts>,
 ): Promise<SubagentTarget[]> {
   const { headers } = await headerFacts.get()
+  const byId = new Map(headers.map(header => [String(header.id), header]))
+  // 全后代（BFS，父在子前）；subagentDescendantIds 只遍历清单内有父的 header，故 id 必定查得到。
+  const descendantIds = subagentDescendantIds(headers.map(treeHeaderOf), String(parentSessionId))
   const targets: SubagentTarget[] = []
-  for (const header of headers) {
-    if (header.origin !== 'subagent' || header.parentSession === undefined) continue
-    if (String(header.parentSession) !== String(parentSessionId)) continue
+  for (const id of descendantIds) {
+    const header = byId.get(id)
+    if (header === undefined) continue
     assertHeaderFormatSupported(header)
     const sessionId = SessionId(String(header.id))
     if (ctx.sessions.get(sessionId) !== undefined || ctx.agents.get(sessionId) !== undefined) {
@@ -1168,7 +1173,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           }
 
           const subagents = await listSubagentTargets(ctx, sessionId, headerFacts)
-          // 随父一起搬走/删掉的**直接**子会话 id（归档集清理与响应契约共用；深度 ≥2 的后代不在此列，审计 B1）。
+          // 随父一起搬走/删掉的**全部后代**子会话 id（归档集清理与响应契约共用）。
           const subagentIds = subagents.map(child => String(child.sessionId))
 
           if (pathname.endsWith('/trash')) {
@@ -1268,7 +1273,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           }
 
           await rm(sessionDir, { recursive: true, force: false })
-          // 只有真正从磁盘上消失的直接子会话才算 removed：rm 失败者仍在磁盘上，保留其归档标记
+          // 只有真正从磁盘上消失的子会话（含全部后代）才算 removed：rm 失败者仍在磁盘上，保留其归档标记
           // 与工作区记账，让它在归档面板以孤儿根继续可操作（审计 S7）。
           const deletedSubagentIds: string[] = []
           for (const child of subagents) {

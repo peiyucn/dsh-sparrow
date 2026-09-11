@@ -190,10 +190,10 @@ describe('archive-manage host 纯逻辑', () => {
     })
   })
 
-  // trash/delete 的归档集清理（audit B1）：待摘 id = 根 + **实际被搬走的直接子会话**
-  // （archivedIdsToRemove）。深度 ≥2 的后代目录仍在磁盘上（官方扁平同级布局），必须留在归档集里；
-  // 旧实现按 collectSubtreeIds 摘全子树，会让这些会话永久失去归档标记。
-  describe('removeArchivedIds + archivedIdsToRemove（audit B1）', () => {
+  // trash/delete 的归档集清理：待摘 id = 根 + host 实际搬走/删掉的**全部后代**子会话
+  // （archivedIdsToRemove）。子代理能再派子代理，故后代深度不固定——整棵子树都随父走、
+  // 都出归档集；只摘直接子会话会让更深的后代变成孤儿根（2026-09-12 实测）。
+  describe('removeArchivedIds + archivedIdsToRemove（整棵子树）', () => {
     const removeSurface = (initialIds) => {
       const calls = []
       let state = { archivedSessionIds: [...initialIds], initialized: true, workspaceIds: [] }
@@ -208,11 +208,11 @@ describe('archive-manage host 纯逻辑', () => {
       }
     }
 
-    it('只摘根 + 直接子会话 应该 让深度 ≥2 的后代留在归档集', async () => {
+    it('摘根 + 全部后代 应该 把整棵子树移出归档集', async () => {
       const { surface, calls, get } = removeSurface(['p', 'c', 'gc', 'other'])
-      await removeArchivedIds(surface, archivedIdsToRemove('p', ['c']))
+      await removeArchivedIds(surface, archivedIdsToRemove('p', ['c', 'gc']))
       assert.deepEqual(calls, ['enqueue', 'set'])
-      assert.deepEqual(get().archivedSessionIds.map(String), ['gc', 'other'])
+      assert.deepEqual(get().archivedSessionIds.map(String), ['other'])
     })
 
     it('无子会话的根 应该 只摘根自身', async () => {

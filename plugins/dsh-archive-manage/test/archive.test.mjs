@@ -4,7 +4,7 @@ import {
   archiveAlignmentForChildren, archivedIdsToRemove, buildSessionTree, collectSubtreeIds, createBudgetSignal, createHeaderFactsStore,
   createLruCache, isDeleteConfirmationSufficient, isSafeSessionDirName, legacyTrashItem, livingChildIds, maskHomePath,
   normalizeArchiveConfig, parseTrashSidecar, parseBlankProjection, parseSessionFacts, runBounded, sanitizeSegment,
-  straySessionIds, trashItemView,
+  straySessionIds, subagentDescendantIds, trashItemView,
 } from '../lib/archive.js'
 
 describe('archive-manage 纯逻辑', () => {
@@ -419,11 +419,61 @@ describe('archive-manage 纯逻辑', () => {
     it('无子会话 应该 只有根自身', () => {
       assert.deepEqual(collectSubtreeIds([h('p')], 'p'), ['p'])
     })
+
+    // 子代理能再派子代理：深度不固定，链再长也要收全。
+    it('四层链 应该 逐层收全（不截断在直接子会话）', () => {
+      const chain = [
+        h('p'),
+        h('c', { parentSession: 'p', origin: 'subagent' }),
+        h('gc', { parentSession: 'c', origin: 'subagent' }),
+        h('ggc', { parentSession: 'gc', origin: 'subagent' }),
+      ]
+      assert.deepEqual(collectSubtreeIds(chain, 'p'), ['p', 'c', 'gc', 'ggc'])
+    })
+
+    // 磁盘 header 由官方写入，理论上无环；万一出现环也不能让 BFS 转不出来（调用方要动文件）。
+    // 环只能由「同一 id 出现两条 header」（一条挂在链尾指回祖先）造出来。
+    it('父子成环（异常数据）应该 终止并只返回环上节点一次', () => {
+      const ids = collectSubtreeIds([
+        h('p'),
+        h('a', { parentSession: 'p', origin: 'subagent' }),
+        h('b', { parentSession: 'a', origin: 'subagent' }),
+        h('b', { parentSession: 'b', origin: 'subagent' }),
+      ], 'p')
+      assert.deepEqual(ids, ['p', 'a', 'b'])
+    })
   })
 
-  describe('archivedIdsToRemove（audit B1：trash/delete 只摘根 + 直接子会话）', () => {
-    it('根 + 直接子会话 应该 根在前且去重保序', () => {
-      assert.deepEqual(archivedIdsToRemove('p', ['c', 'c2', 'c']), ['p', 'c', 'c2'])
+  // trash/delete 传给 host 的待处理集合：根 + 全部后代（任意深度）。
+  describe('subagentDescendantIds（trash/delete 一起搬走的后代集合）', () => {
+    const h = (id, extra = {}) => ({ id, createdAt: 1, ...extra })
+
+    it('多层后代 应该 全部返回且不含根', () => {
+      const ids = subagentDescendantIds([
+        h('p'),
+        h('c', { parentSession: 'p', origin: 'subagent' }),
+        h('gc', { parentSession: 'c', origin: 'subagent' }),
+      ], 'p')
+      assert.deepEqual(ids, ['c', 'gc'])
+    })
+
+    it('无子会话 应该 返回空数组', () => {
+      assert.deepEqual(subagentDescendantIds([h('p')], 'p'), [])
+    })
+
+    it('别的父下的子会话 应该 不入选', () => {
+      const ids = subagentDescendantIds([
+        h('p'),
+        h('c', { parentSession: 'p', origin: 'subagent' }),
+        h('other-child', { parentSession: 'other', origin: 'subagent' }),
+      ], 'p')
+      assert.deepEqual(ids, ['c'])
+    })
+  })
+
+  describe('archivedIdsToRemove（根 + host 实际搬走/删掉的全部后代）', () => {
+    it('根 + 后代清单 应该 根在前且去重保序', () => {
+      assert.deepEqual(archivedIdsToRemove('p', ['c', 'gc', 'c']), ['p', 'c', 'gc'])
     })
 
     it('子会话清单里混入根自身 应该 只出现一次', () => {

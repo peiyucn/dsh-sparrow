@@ -325,7 +325,7 @@ export function livingChildIds(headers: readonly SessionTreeHeader[]): Set<strin
   return out
 }
 
-/** 根会话及其全部后代 id（按父为单位归档/取消归档时使用；BFS 保序）。 */
+/** 根会话及其全部后代 id（任意深度，BFS 保序、根在前；按父为单位归档 / trash / delete 时使用）。 */
 export function collectSubtreeIds(headers: readonly SessionTreeHeader[], rootId: string): string[] {
   const childrenOf = new Map<string, string[]>()
   const byId = new Set(headers.map(header => header.id))
@@ -337,15 +337,32 @@ export function collectSubtreeIds(headers: readonly SessionTreeHeader[], rootId:
     childrenOf.set(header.parentSession, list)
   }
   const out: string[] = [rootId]
-  for (let i = 0; i < out.length; i++) out.push(...(childrenOf.get(out[i]) ?? []))
+  // seen 守卫：父子链由磁盘 header 决定，理论上无环；万一出现环（手工改盘 / 上游写入异常）
+  // 也不能让 BFS 转不出来——调用方是文件级移动 / 删除，卡死比少搬更糟。
+  const seen = new Set(out)
+  for (let i = 0; i < out.length; i++) {
+    for (const child of childrenOf.get(out[i]) ?? []) {
+      if (seen.has(child)) continue
+      seen.add(child)
+      out.push(child)
+    }
+  }
   return out
 }
 
 /**
- * 移入回收站 / 彻底删除后要从归档集摘除的 id：根 + **实际被搬走/删掉的直接子会话**（去重、根在前）。
- * 不能复用 collectSubtreeIds 摘全子树：官方持久化是扁平同级布局（`sessionDir = projectDir/encodeSegment(id)`，
- * 子会话继承父 cwd），trash/delete 只逐个搬运直接子会话目录，深度 ≥2 的后代目录仍留在磁盘上——
- * 把它们移出归档集会让这些会话永久变成「未归档」（父已不在持久化，父子对齐也看不到它们）。审计 B1。
+ * 要与根会话一起搬走 / 删掉的 subagent 会话 id：根的**全部后代**（任意深度，BFS 父在子前，不含根）。
+ * 子代理自身也能再派子代理，故深度不是固定一层——只取直接子会话会漏掉更深的后代。
+ */
+export function subagentDescendantIds(headers: readonly SessionTreeHeader[], rootId: string): string[] {
+  return collectSubtreeIds(headers, rootId).slice(1)
+}
+
+/**
+ * 移入回收站 / 彻底删除后要从归档集摘除的 id：根 + **实际被搬走/删掉的子会话**（去重、根在前）。
+ * 调用方传的是 `listSubagentTargets` 查到的**全部后代**（任意深度）——trash/delete 逐个搬运/删除
+ * 整棵子树，故整棵子树都要出归档集；只摘直接子会话会把深度 ≥2 的后代永久留成孤儿根
+ * （父已不在持久化，父子对齐也看不到它们；2026-09-12 实测）。
  */
 export function archivedIdsToRemove(rootId: string, subagentIds: readonly string[]): string[] {
   const out: string[] = [rootId]
