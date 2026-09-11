@@ -777,11 +777,12 @@ async function listSubagentTargets(
 ): Promise<SubagentTarget[]> {
   const { headers } = await headerFacts.get()
   const byId = new Map(headers.map(header => [String(header.id), header]))
-  // 全后代（BFS，父在子前）；subagentDescendantIds 只遍历清单内有父的 header，故 id 必定查得到。
+  // 全后代（BFS，父在子前）；id 由 subagentDescendantIds 从同一份 headers 产出，故查表不会落空。
   const descendantIds = subagentDescendantIds(headers.map(treeHeaderOf), String(parentSessionId))
   const targets: SubagentTarget[] = []
   for (const id of descendantIds) {
     const header = byId.get(id)
+    // 防御分支：上游 header 形状变化时宁可少搬一个目录，也不要在 undefined 上取字段抛穿整条路由。
     if (header === undefined) continue
     assertHeaderFormatSupported(header)
     const sessionId = SessionId(String(header.id))
@@ -904,6 +905,15 @@ async function restoreTrashDir(ctx: Context, surface: RegistryMutationSurface, t
     await rm(sidecar.originalPath, { recursive: true, force: false })
   }
   await rename(trashDir, sidecar.originalPath)
+  // 记账 sidecar 在回收站目录里，上面这次 rename 会把它一起带回会话目录（spec 13）：它是回收站元数据
+  // （含标题与原工作区记账 id），留在用户数据目录里只会被官方日志导出/打包捎带。**紧跟 rename 清理**：
+  // 排在 subagent 移回之前，因为那条路径失败会直接抛出，放在末尾的清理就再也不会执行（审计 S2）；
+  // 此刻条目已被 rename 走，删它不会把回收站条目退化成「无 sidecar 的旧格式条目」。删不掉只告警。
+  try {
+    await rm(join(sidecar.originalPath, TRASH_SIDECAR), { force: true })
+  } catch (error) {
+    ctx.logger.warn(`dsh-archive-manage: 还原后回收站记账文件清理失败（${sidecar.originalPath}）：${error instanceof Error ? error.message : String(error)}`)
+  }
   for (const target of subagentTargets) {
     try {
       await mkdir(dirname(target.originalPath), { recursive: true })
@@ -917,14 +927,6 @@ async function restoreTrashDir(ctx: Context, surface: RegistryMutationSurface, t
     await rm(join(sidecar.originalPath, 'subagents'), { recursive: true, force: false })
   } catch {
     // subagents 目录不存在时忽略。
-  }
-  // 记账 sidecar 在回收站目录里，rename 会把它一起带回会话目录（spec 13）：它是回收站元数据
-  // （含标题与原工作区记账 id），留在用户数据目录里只会被官方日志导出/打包捎带。移回成功后
-  // best-effort 清掉；删不掉只告警——文件仍在，不影响会话可用。
-  try {
-    await rm(join(sidecar.originalPath, TRASH_SIDECAR), { force: true })
-  } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: 还原后回收站记账文件清理失败（${sidecar.originalPath}）：${error instanceof Error ? error.message : String(error)}`)
   }
   try {
     await attachWorkspaceAccounting(ctx, sessionId, sidecar.workspaceIds)
