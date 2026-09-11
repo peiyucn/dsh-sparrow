@@ -1,7 +1,7 @@
 {
   "name": "@dsh-sparrow/dsh-codebuddy-credits",
   "description": "Company CodeBuddy credits as a DeepSeek Harness LLM provider — official API key, models only, no agent harness",
-  "version": "0.1.5-rc.2",
+  "version": "0.1.5-rc.2.1",
   "license": "MIT",
   "repository": {
     "type": "git",

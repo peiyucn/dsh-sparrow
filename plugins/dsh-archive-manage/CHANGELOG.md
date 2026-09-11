@@ -2,6 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.5-rc.2.1 (2026-09-11)
+
+- Permanently deleting a session now clears the archived mark only from the subagent sessions that were really deleted: a subagent whose deletion failed keeps its mark and stays operable in the panel, so the deletion can be retried instead of leaving an unaccounted-for entry behind.
+
 ## 0.1.5-rc.2 (2026-09-10)
 
 - Version-line alignment with official dsh 0.1.5-rc.2.

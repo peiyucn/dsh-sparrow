@@ -3,6 +3,15 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
+## 0.1.5-rc.2.1 (2026-09-11)
+
+- The session credit summary now sits in the composer's stats row as a pill of the same kind as the official ones (brand mark + `Credits N · M calls`) — same size, colours and hover — and clicking it opens the call count with the per-model breakdown. A conversation with no CodeBuddy calls still gets nothing added.
+- The settings card, the credits panel and the model picker now read one shared model catalog, so **Fetch available models** updates all three at once.
+- Saving a key now reads the account context before the model catalog, so the first catalog request already carries the right enterprise headers.
+- A credit rate just below a million no longer reads `1000K` — it shows `1M`.
+- Provider requests can no longer hang: status, save, re-scan, quota and turn-usage calls all give up after a timeout instead of waiting forever.
+- Replacing or clearing the API key no longer lets a refresh that was already in flight write the old account or the old model list back.
+
 ## 0.1.5-rc.2 (2026-09-10)
 
 - Version-line alignment with official dsh 0.1.5-rc.2.
