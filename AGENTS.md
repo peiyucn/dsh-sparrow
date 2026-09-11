@@ -27,7 +27,7 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 * **开发**：日常改动在 `dev`；`main` 只接受发布合并；新功能先写 spec（`plugins/<插件>/docs/spec/NN-<主题>.md`），评审后才开工
 * **验证**：插件目录 `npm run verify`；全量 = 根 `npm run verify`；push 前对应插件 verify 必须通过
 * **提交**：逐项提交，中文描述 + 英文类型前缀（feat:/fix:/refactor:/chore:/docs:）；不确定的事直接说"不确定"，禁止编造事实性信息
-* **推送**：日常目标 `dev`；`git push/fetch` 需要代理 127.0.0.1:7897，`gh api` 直连
+* **推送**：日常目标 `dev`
 * **合并**：dev → main（fast-forward）
 * **发布**：npm 发布流程见「项目专属章节 · 发布（npm 包）」——**push tag 前须 owner 当次点头**（硬门禁，见该节；总规范《工程管线 · ⑦发布》第 5 步）
 * **运维**：依赖升级统一手动（security updates 与 dependabot.yml 关闭）；收到警报 → 判断影响面（运行时/产物依赖才影响用户）→ 手动升级 → 影响用户的按发布流程发版
@@ -60,7 +60,7 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 
 ## GitHub 与网络
 
-* GitHub 操作一律走 `gh` CLI（已登录 peiyucn）；`gh api` 直连 api.github.com，`git push/fetch` 需要代理 127.0.0.1:7897
+* GitHub 操作一律走 `gh` CLI（已登录 peiyucn）
 * 仓库：<https://github.com/peiyucn/dsh-sparrow>
 
 ## 项目专属章节
