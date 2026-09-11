@@ -1,6 +1,24 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { formatCapacity, formatModelFacts } from '../lib/client/format.js'
+import { formatCapacity, formatCredits, formatModelFacts } from '../lib/client/format.js'
+
+describe('formatCredits（积分数字：会话胶囊 / 每轮胶囊 / 两者弹层标题共用口径）', () => {
+  it('整数 应该 不挂小数位', () => {
+    assert.equal(formatCredits(2000), '2000')
+    assert.equal(formatCredits(0), '0')
+  })
+
+  it('非整数 应该 保留两位', () => {
+    assert.equal(formatCredits(0.41), '0.41')
+    assert.equal(formatCredits(1999.59), '1999.59')
+    assert.equal(formatCredits(1.005), '1.00')
+  })
+
+  it('负数 应该 原样按同一口径（不吞号、不留 -0）', () => {
+    assert.equal(formatCredits(-3), '-3')
+    assert.equal(formatCredits(-0.5), '-0.50')
+  })
+})
 
 describe('formatCapacity（只读清单的容量短串）', () => {
   it('百万级 应该 用 M（整数不带小数、非整保留一位）', () => {

@@ -1,4 +1,12 @@
-/** dsh-codebuddy-credits 客户端纯逻辑：只读模型清单的展示格式化。 */
+/** dsh-codebuddy-credits 客户端纯逻辑：只读模型清单与积分的展示格式化。 */
+
+/**
+ * 积分数字：整数不挂小数位（2000），非整数保留两位（0.41/1999.59）。
+ * 会话胶囊、每轮胶囊与两者的弹层标题共用这一个口径。
+ */
+export function formatCredits(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2)
+}
 
 /**
  * 容量（token 数）→ 短串：百万级用 M（至多一位小数、整数不带 .0），千级用 K，其它原样；

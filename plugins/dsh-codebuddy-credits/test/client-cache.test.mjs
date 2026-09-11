@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { boundedSet } from '../lib/client/CodeBuddyCreditsStats.js'
+import { boundedSet } from '../lib/client/boundedCache.js'
 
 describe('boundedSet（会话级缓存有界，审计「按会话累积状态」条目）', () => {
   it('上限内正常写入', () => {

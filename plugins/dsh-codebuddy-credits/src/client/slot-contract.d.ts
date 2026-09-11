@@ -59,8 +59,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     }
     /**
      * composer 底部扩展槽位（ui-conversation 声明；kind=list，scope=session）。
-     * 官方 StatsLine 挂在这里（order 0）——本插件以 order 1 挂会话积分统计行，
-     * 渲染在官方统计行之后。
+     * 官方统计胶囊行挂在这里（order 0，ui-chat StatsPills）——本插件以 order 1
+     * 挂会话积分胶囊，并 DOM 级把自有节点追加进官方行（官方行的 [data-composer-stats]
+     * 标记可寻址），形状与官方 `.pill` 一致。
      */
     'conversation.composer.dock': {
       kind: 'list'
@@ -106,6 +107,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'turnCredit.calls'
       | 'turnCredit.perCall'
       | 'stats.sessionCredits'
+      | 'stats.sessionCreditsAria'
+      | 'stats.sessionCreditsTitle'
       | 'picker.trigger.fallback'
       | 'picker.trigger.loading'
       | 'picker.trigger.selectAria'
