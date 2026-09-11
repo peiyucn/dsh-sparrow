@@ -1,11 +1,11 @@
 /** 归档会话管理入口：sidebar footer action + 弹窗（zh/en 双语 + loading 态）。 */
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { IconArchiveOutline20, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { dropArchivedIds, subtreeIdsOf, type ArchivedSessionItem } from './archivedTree.js'
+import { dropArchivedIds, subtreeIdsOf, trashSubagentTree, type ArchivedSessionItem, type TrashSubagentNode } from './archivedTree.js'
 import { countVisibleRows } from './paging.js'
 
 /** 分页窗口大小（spec 09）：每区每次渲染的行数上限，「加载更多」按此递增。 */
@@ -52,8 +52,9 @@ export interface TrashItem {
   readonly title: string
   readonly archivedAt: string
   readonly legacy: boolean
-  /** 随父一起进回收站的子会话（sidecar v2 记账，展示用父子联动；还原/删除整棵走父条目）。 */
-  readonly subagents?: ReadonlyArray<{ sessionId: string; title: string }>
+  /** 随父一起进回收站的子会话（sidecar v2 记账，展示用父子联动；还原/删除整棵走父条目）。
+   *  parentSessionId 用于还原层级（spec 14）；旧条目没有该字段时按顶层平铺。 */
+  readonly subagents?: ReadonlyArray<{ sessionId: string; title: string; parentSessionId?: string }>
 }
 
 export interface StraySessionItem {
@@ -891,6 +892,12 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const restorableCount = trashItems.filter(item => !item.legacy).length
   const legacyCount = trashItems.length - restorableCount
 
+  /** 回收站区父子层级（spec 14）：sidecar 的扁平清单 → 嵌套树，一次构建供全部行复用。 */
+  const trashTrees = useMemo(
+    () => new Map(trashItems.map(item => [item.trashId, trashSubagentTree(item.subagents ?? [])])),
+    [trashItems],
+  )
+
   /** 子树内是否存在未释放会话（父级操作锁定依据；host 侧同样整单拒绝，spec 08）。 */
   const subtreeLive = (item: ArchivedSessionItem): boolean => {
     return item.live || item.children.some(child => subtreeLive(child))
@@ -1032,34 +1039,68 @@ export function ArchiveDock(props: ArchiveDockProps) {
     )
   }
 
-  /** 回收站树行：父行带恢复/彻底删除与折叠切换，子行缩进只读
+  /** 回收站子行：任意深度缩进（父行由 sidecar 的 parentSessionId 还原，spec 14）。
+   *  spec 09 分页预算：超出窗口的行返回 null。 */
+  const renderTrashChildRow = (node: TrashSubagentNode): ReactElement | null => {
+    if (trashRowsRendered >= trashLimit) return null
+    trashRowsRendered += 1
+    const nested = node.children.length > 0
+      ? (() => {
+        const emitted: ReactElement[] = []
+        for (const child of node.children) {
+          const row = renderTrashChildRow(child)
+          if (row === null) continue
+          emitted.push(row)
+        }
+        if (emitted.length === 0) return null
+        return (
+          <div className="dsh-archive-tree-children">
+            {emitted.map((row, index) => (
+              <div
+                key={row.key}
+                className={index === emitted.length - 1
+                  ? 'dsh-archive-tree-node dsh-archive-tree-node-last'
+                  : 'dsh-archive-tree-node'}
+              >
+                {row}
+              </div>
+            ))}
+          </div>
+        )
+      })()
+      : null
+    return (
+      <div key={node.item.sessionId}>
+        <div style={{ ...styles.row, borderBottom: 'none', padding: '4px 0' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <span className="dsh-archive-tree-toggle-spacer" aria-hidden>·</span>
+              <div style={{ ...styles.title, minWidth: 0 }} title={node.item.title}>{node.item.title}</div>
+            </div>
+            <div style={{ ...styles.secondarySmall, paddingLeft: 20, marginTop: 2 }} title={node.item.sessionId}>{node.item.sessionId}</div>
+          </div>
+        </div>
+        {nested}
+      </div>
+    )
+  }
+
+  /** 回收站树行：父行带恢复/彻底删除与折叠切换，子行缩进只读（任意深度）
    *  （与归档树同款交互；还原/删除整棵走父条目的 sidecar）。
    *  spec 09 分页预算：超出窗口的行返回 null。 */
   const renderTrashRow = (item: TrashItem): ReactElement | null => {
     if (trashRowsRendered >= trashLimit) return null
     trashRowsRendered += 1
-    const children = item.subagents ?? []
+    const children = trashTrees.get(item.trashId) ?? []
     const hasChildren = children.length > 0
     const collapsed = collapsedTrashIds.has(item.trashId)
     const childrenBlock = hasChildren && !collapsed
       ? (() => {
         const emitted: ReactElement[] = []
         for (const child of children) {
-          if (trashRowsRendered >= trashLimit) break
-          trashRowsRendered += 1
-          emitted.push(
-            <div key={child.sessionId}>
-              <div style={{ ...styles.row, borderBottom: 'none', padding: '4px 0' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                    <span className="dsh-archive-tree-toggle-spacer" aria-hidden>·</span>
-                    <div style={{ ...styles.title, minWidth: 0 }} title={child.title}>{child.title}</div>
-                  </div>
-                  <div style={{ ...styles.secondarySmall, paddingLeft: 20, marginTop: 2 }} title={child.sessionId}>{child.sessionId}</div>
-                </div>
-              </div>
-            </div>,
-          )
+          const row = renderTrashChildRow(child)
+          if (row === null) continue
+          emitted.push(row)
         }
         if (emitted.length === 0) return null
         return (

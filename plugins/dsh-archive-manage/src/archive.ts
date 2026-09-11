@@ -15,6 +15,8 @@ export interface ArchiveSubagentSidecar {
   readonly title: string
   readonly originalPath: string
   readonly workspaceIds: readonly string[]
+  /** 该子会话的父会话 id（回收站区据此还原父子层级，spec 14）；旧条目无此字段 → 平铺展示。 */
+  readonly parentSessionId?: string
 }
 
 export interface ArchiveSidecar {
@@ -106,6 +108,11 @@ export function parseTrashSidecar(value: unknown): ArchiveSidecar | undefined {
         title: typeof child.title === 'string' ? child.title : child.sessionId,
         originalPath: child.originalPath,
         workspaceIds: child.workspaceIds,
+        // 层级字段只影响展示：形状不对就丢掉该字段（回落平铺），不让一个畸形字段把整条
+        // 回收站条目判成不可还原（§还原只依赖 originalPath）。
+        ...typeof child.parentSessionId === 'string' && child.parentSessionId.trim() !== ''
+          ? { parentSessionId: child.parentSessionId }
+          : {},
       }
     }).filter((item): item is ArchiveSubagentSidecar => item !== undefined)
     if (subagents.length !== (sidecar.subagents as unknown[]).length) return undefined
@@ -132,7 +139,7 @@ export interface LegacyTrashItem {
 }
 
 /** 回收站条目视图（列表接口返回形状）：子会话仅展示用（父子联动），
- *  还原/删除整棵走 sidecar 原样。 */
+ *  还原/删除整棵走 sidecar 原样。parentSessionId 供回收站区还原层级（spec 14）。 */
 export interface TrashItemView {
   readonly trashId: string
   readonly sessionId: string
@@ -140,7 +147,7 @@ export interface TrashItemView {
   readonly archivedAt: string
   readonly workspaceIds: readonly string[]
   readonly legacy: false
-  readonly subagents: ReadonlyArray<{ sessionId: string; title: string }>
+  readonly subagents: ReadonlyArray<{ sessionId: string; title: string; parentSessionId?: string }>
 }
 
 /** sidecar → 列表条目视图；v1 无子会话记录时 subagents 为空数组。 */
@@ -152,7 +159,11 @@ export function trashItemView(trashId: string, sidecar: ArchiveSidecar): TrashIt
     archivedAt: sidecar.archivedAt,
     workspaceIds: sidecar.workspaceIds,
     legacy: false,
-    subagents: (sidecar.subagents ?? []).map(child => ({ sessionId: child.sessionId, title: child.title })),
+    subagents: (sidecar.subagents ?? []).map(child => ({
+      sessionId: child.sessionId,
+      title: child.title,
+      ...child.parentSessionId === undefined ? {} : { parentSessionId: child.parentSessionId },
+    })),
   }
 }
 

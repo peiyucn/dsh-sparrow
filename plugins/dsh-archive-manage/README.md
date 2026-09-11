@@ -23,7 +23,7 @@ Requires dsh 0.1.5-rc.2 — the exact official version line this release is buil
 * **Subagent tree**: Subagent sessions are shown indented under their parent (read-only rows); archive / unarchive / move to trash / delete / restore always treat a parent and its subagents as one unit
 * **Stray sessions**: Sessions that belong to no workspace and are not archived — the official UI cannot clean them, and they keep crowding @ candidates. The panel lists them separately with archive / move-to-trash / delete actions; blank sessions (0 turns) are badged and use a simplified confirmation
 * **Held sessions**: Sessions opened during the current dsh run cannot have their files moved — they are grouped and greyed out in the archive area and become operable after the next dsh startup; unarchiving does not move files and works immediately
-* **Trash**: Restore or delete entries individually or in bulk; sessions in the trash no longer appear in the @ list
+* **Trash**: Restore or delete entries individually or in bulk; entries expand as a parent/child tree (indented like the archive area, so multi-level subagents are not flattened); sessions in the trash no longer appear in the @ list
 * **Trash location**: The trash location is shown inside the Trash area; click to copy the full path
 
 ## Screenshots

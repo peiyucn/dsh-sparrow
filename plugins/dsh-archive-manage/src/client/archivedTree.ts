@@ -47,3 +47,60 @@ export function dropArchivedIds(items: readonly ArchivedSessionItem[], ids: Read
   }
   return kept
 }
+
+/** 回收站条目的子会话条目（host /trash 视图形状）。 */
+export interface TrashSubagentItem {
+  readonly sessionId: string
+  readonly title: string
+  /** 父会话 id；旧 sidecar 无此字段（或父不在本条目内）→ 该条按顶层展示。 */
+  readonly parentSessionId?: string
+}
+
+export interface TrashSubagentNode {
+  readonly item: TrashSubagentItem
+  readonly children: readonly TrashSubagentNode[]
+}
+
+/**
+ * 回收站条目的**扁平**子会话清单 → 嵌套树（spec 14）：层级由 sidecar 记的 `parentSessionId` 还原，
+ * 任意深度都按归档区同款缩进展示（此前只有一层，深度 ≥2 的后代被平铺成同级行）。
+ * 健壮性：重复 id 只收一次；父不在清单内、或父子链成环（畸形数据）的条目按顶层挂——**不丢行**，
+ * 也不让渲染转不出来。
+ */
+export function trashSubagentTree(items: readonly TrashSubagentItem[]): TrashSubagentNode[] {
+  const byId = new Map<string, TrashSubagentItem>()
+  const ordered: TrashSubagentItem[] = []
+  for (const item of items) {
+    if (byId.has(item.sessionId)) continue
+    byId.set(item.sessionId, item)
+    ordered.push(item)
+  }
+  /** 沿 parentSessionId 上溯；父不在清单内即为顶，遇环返回 false（该条按顶层挂）。 */
+  const reachesTop = (item: TrashSubagentItem): boolean => {
+    const seen = new Set([item.sessionId])
+    let parent = item.parentSessionId
+    while (parent !== undefined && byId.has(parent)) {
+      if (seen.has(parent)) return false
+      seen.add(parent)
+      parent = byId.get(parent)?.parentSessionId
+    }
+    return true
+  }
+  const childrenOf = new Map<string, TrashSubagentItem[]>()
+  const roots: TrashSubagentItem[] = []
+  for (const item of ordered) {
+    const parent = item.parentSessionId
+    if (parent !== undefined && parent !== item.sessionId && byId.has(parent) && reachesTop(item)) {
+      const list = childrenOf.get(parent) ?? []
+      list.push(item)
+      childrenOf.set(parent, list)
+      continue
+    }
+    roots.push(item)
+  }
+  const build = (item: TrashSubagentItem): TrashSubagentNode => ({
+    item,
+    children: (childrenOf.get(item.sessionId) ?? []).map(build),
+  })
+  return roots.map(build)
+}

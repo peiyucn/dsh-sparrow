@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { dropArchivedIds, subtreeIdsOf } from '../lib/client/archivedTree.js'
+import { dropArchivedIds, subtreeIdsOf, trashSubagentTree } from '../lib/client/archivedTree.js'
 
 /** 最小归档树节点（真实条目形状见 ArchivedSessionItem；纯逻辑只读 sessionId / orphan / children）。 */
 const node = (sessionId, children = [], orphan = false) => ({ sessionId, orphan, children })
@@ -55,5 +55,50 @@ describe('subtreeIdsOf（取消归档时即时摘除整棵子树）', () => {
 
   it('叶子节点 应该 只有自身', () => {
     assert.deepEqual(subtreeIdsOf(node('leaf')), ['leaf'])
+  })
+})
+
+describe('trashSubagentTree（spec 14：回收站条目按 sidecar 父子链还原层级）', () => {
+  const sub = (sessionId, parentSessionId) => ({ sessionId, title: sessionId, ...parentSessionId === undefined ? {} : { parentSessionId } })
+  const shape = nodes => nodes.map(node => ({ id: node.item.sessionId, children: shape(node.children) }))
+
+  it('四层链 应该 逐层嵌套（此前只有一层可画）', () => {
+    const tree2 = trashSubagentTree([
+      sub('c', 'root'), sub('gc', 'c'), sub('ggc', 'gc'), sub('gggc', 'ggc'),
+    ])
+    assert.deepEqual(shape(tree2), [{ id: 'c', children: [{ id: 'gc', children: [{ id: 'ggc', children: [{ id: 'gggc', children: [] }] }] }] }])
+  })
+
+  it('姊妹会话 应该 挂同一父下且保持清单顺序', () => {
+    const tree2 = trashSubagentTree([sub('a', 'root'), sub('b', 'root'), sub('a1', 'a'), sub('a2', 'a')])
+    assert.deepEqual(shape(tree2), [{
+      id: 'a',
+      children: [{ id: 'a1', children: [] }, { id: 'a2', children: [] }],
+    }, { id: 'b', children: [] }])
+  })
+
+  // 旧 sidecar（本版之前落的盘）没有 parentSessionId：全部按顶层平铺，不丢任何一行。
+  it('旧 sidecar（无 parentSessionId）应该 全部按顶层平铺', () => {
+    const tree2 = trashSubagentTree([sub('c'), sub('gc'), sub('other')])
+    assert.deepEqual(shape(tree2), [{ id: 'c', children: [] }, { id: 'gc', children: [] }, { id: 'other', children: [] }])
+  })
+
+  it('父不在本条目内 应该 按顶层挂（不丢行）', () => {
+    const tree2 = trashSubagentTree([sub('orphan', 'gone'), sub('kid', 'orphan')])
+    assert.deepEqual(shape(tree2), [{ id: 'orphan', children: [{ id: 'kid', children: [] }] }])
+  })
+
+  it('重复 id 应该 只收一次', () => {
+    const tree2 = trashSubagentTree([sub('c', 'root'), sub('c', 'root')])
+    assert.deepEqual(shape(tree2), [{ id: 'c', children: [] }])
+  })
+
+  it('父子成环（畸形数据）应该 按顶层挂且终止（不丢行、不转死）', () => {
+    const tree2 = trashSubagentTree([sub('a', 'b'), sub('b', 'a')])
+    assert.deepEqual(shape(tree2), [{ id: 'a', children: [] }, { id: 'b', children: [] }])
+  })
+
+  it('空清单 应该 返回空数组', () => {
+    assert.deepEqual(trashSubagentTree([]), [])
   })
 })

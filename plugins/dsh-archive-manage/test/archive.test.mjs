@@ -588,6 +588,42 @@ describe('archive-manage 纯逻辑', () => {
       assert.equal(sidecar?.subagents?.length, 2)
       assert.equal(sidecar?.subagents?.[1].title, 'c2')
       assert.deepEqual(sidecar?.subagents?.[0].workspaceIds, ['w'])
+      // 旧条目没有 parentSessionId（spec 14 之前落的盘）→ 字段缺失，展示层回落平铺。
+      assert.equal(sidecar?.subagents?.[0].parentSessionId, undefined)
+    })
+
+    // spec 14：parentSessionId 只服务展示层级，形状不对就丢该字段，不把整条判成不可还原。
+    it('subagent 的 parentSessionId 应该 透出；畸形值只丢字段不废条目', () => {
+      const withParent = parseTrashSidecar({
+        version: 2,
+        sessionId: 'p',
+        title: 'parent',
+        originalPath: 'C:/tmp/p',
+        archivedAt: 'now',
+        workspaceIds: [],
+        subagents: [
+          { sessionId: 'c1', originalPath: 'C:/tmp/c1', workspaceIds: [], parentSessionId: 'p' },
+          { sessionId: 'gc1', originalPath: 'C:/tmp/gc1', workspaceIds: [], parentSessionId: 'c1' },
+        ],
+      })
+      assert.equal(withParent?.subagents?.[0].parentSessionId, 'p')
+      assert.equal(withParent?.subagents?.[1].parentSessionId, 'c1')
+
+      const badParent = parseTrashSidecar({
+        version: 2,
+        sessionId: 'p',
+        title: 'parent',
+        originalPath: 'C:/tmp/p',
+        archivedAt: 'now',
+        workspaceIds: [],
+        subagents: [
+          { sessionId: 'c1', originalPath: 'C:/tmp/c1', workspaceIds: [], parentSessionId: 42 },
+          { sessionId: 'c2', originalPath: 'C:/tmp/c2', workspaceIds: [], parentSessionId: '   ' },
+        ],
+      })
+      assert.equal(badParent?.subagents?.length, 2)
+      assert.equal(badParent?.subagents?.[0].parentSessionId, undefined)
+      assert.equal(badParent?.subagents?.[1].parentSessionId, undefined)
     })
 
     it('version 2 subagents 含非法条目 应该 返回 undefined', () => {
@@ -634,6 +670,28 @@ describe('archive-manage 纯逻辑', () => {
       assert.equal(view.title, 'parent')
       assert.equal(view.legacy, false)
       assert.deepEqual(view.subagents, [{ sessionId: 'c1', title: 'child1' }, { sessionId: 'c2', title: 'child2' }])
+    })
+
+    // spec 14：视图要带出 parentSessionId，回收站区才能画出 >2 层的树；旧条目没有该字段。
+    it('带 parentSessionId 的 sidecar 应该 逐条透出层级字段', () => {
+      const view = trashItemView('trash-3', {
+        version: 2,
+        sessionId: 'p',
+        title: 'parent',
+        originalPath: 'C:/tmp/p',
+        archivedAt: '2026-09-04T10:00:00.000Z',
+        workspaceIds: [],
+        subagents: [
+          { sessionId: 'c1', title: 'child1', originalPath: 'C:/tmp/c1', workspaceIds: [], parentSessionId: 'p' },
+          { sessionId: 'gc1', title: 'grandchild1', originalPath: 'C:/tmp/gc1', workspaceIds: [], parentSessionId: 'c1' },
+          { sessionId: 'legacy-row', title: 'no-parent', originalPath: 'C:/tmp/legacy', workspaceIds: [] },
+        ],
+      })
+      assert.deepEqual(view.subagents, [
+        { sessionId: 'c1', title: 'child1', parentSessionId: 'p' },
+        { sessionId: 'gc1', title: 'grandchild1', parentSessionId: 'c1' },
+        { sessionId: 'legacy-row', title: 'no-parent' },
+      ])
     })
 
     it('version 1 sidecar 无子会话 应该 返回空数组（不破坏列表渲染）', () => {

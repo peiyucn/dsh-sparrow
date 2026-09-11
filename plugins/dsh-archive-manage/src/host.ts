@@ -1240,6 +1240,9 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
                     title: await readTitle(ctx, child.header, child.header.id),
                     originalPath: child.dir,
                     workspaceIds: workspaceIds.get(String(child.sessionId)) ?? [],
+                    // 记父子链：回收站区据此还原任意深度的层级（spec 14）。深度 ≥2 的后代父是
+                    // 中间层子会话，不记就只能平铺展示（2026-09-12 owner 实测「回收站里显示不了 >2 的树」）。
+                    ...child.header.parentSession === undefined ? {} : { parentSessionId: String(child.header.parentSession) },
                   })
                 }
               } catch (error) {
