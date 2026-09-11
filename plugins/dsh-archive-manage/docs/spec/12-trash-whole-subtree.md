@@ -61,13 +61,34 @@ if (String(header.parentSession) !== String(parentSessionId)) continue
 
 - 单测：`collectSubtreeIds` 四层链逐层收全 + 成环终止；`subagentDescendantIds` 多层后代全返回、
   不含根、别的父下的子会话不入选；`archivedIdsToRemove` / `removeArchivedIds` 整棵子树出归档集；
-  客户端 `dropArchivedIds` 摘整棵子树只留未命中的顶层节点。
-- 路由级实测（临时脚本驱动真实 REST handler + 临时目录造树 `p → c → gc`，另有无关会话）：
-  - trash：`subagentIds = ['c','gc']`，回收站内 `subagents/{c,gc}/`，磁盘上只剩无关会话，
-    归档集清空子树，`api-session/removed` 发全三条；
-  - delete：`subagentIds = ['c','gc']`，三个目录全删，无关会话不动；
-  - trash → restore：`p`/`c`/`gc` 全部回到各自原路径，回收站条目消失，父会话回归归档集。
-- `npm run verify` 全绿（161 tests）。
+  客户端 `dropArchivedIds` 摘整棵子树只留未命中的顶层节点；`archiveAlignmentForChildren` 多层树
+  一次算全 + 无根成环不误对齐。
+- 路由级实测（临时脚本驱动真实 REST handler + 临时目录造**五层链** `p → c（子）→ gc（孙）→
+  ggc（重孙）→ gggc（玄孙）`，`ggc` 另有一个兄弟、且 `ggc`/`gggc` 落在**另一个 project 目录**，
+  另有无关会话 `unrelated → other-child`）：
+  - trash：`subagentIds = ['c','gc','ggc','ggc2','gggc']`，回收站内 `subagents/{c,gc,ggc,ggc2,gggc}/`，
+    两个 project 目录都只剩无关会话，归档集清空整棵子树，`api-session/removed` 发全六条；
+  - delete：同上，全部目录删除，无关会话不动；
+  - trash → restore：五个后代（含跨 project 的两个）全部回到各自**原路径**，回收站条目消失，
+    父会话回归归档集；
+  - 玄孙 live 占用：整单 409 `SESSION_LIVE`，一个目录都没动、回收站目录都没创建（不半搬）。
+- `npm run verify` 全绿（166 tests）。
+
+## 附带修：归档对齐也走整棵子树（同一次定位的姊妹缺口）
+
+`archiveAlignmentForChildren`（官方菜单归档/取消归档父会话后的父子对齐）旧实现是**单趟只看一层**：
+
+```ts
+const parentArchived = archived.has(header.parentSession)   // 只看直接父
+```
+
+多层树上它一次只对齐一层，靠「这次写又触发一轮 `domain/changed`」迭代收敛——实测四层树需要
+4 轮（`["p","c"] → ["p","c","gc"] → […,ggc,ggc2] → […,gggc]`）。正确性押在事件链上、面板惰性对齐
+每打开一次也只推进一层。改为从顶层节点 BFS 逐层传播祖先归档态（每节点访问一次，O(n)）：
+一趟即全子树（实测 pass 1 就到位），无根成环时无人可传播、不做任何对齐。
+
+> 归档文件搬运本身不依赖这条对齐（trash/delete 直接按 header 父子链取全后代）；
+> 这条只影响归档集标记与面板展示的一致性。
 
 ## 附带发现（同次验证暴露，另修）
 

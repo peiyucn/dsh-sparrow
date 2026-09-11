@@ -294,22 +294,47 @@ export interface ArchiveAlignment {
  * - 父已归档而子未归档 → 加入 add；
  * - 父未归档而子已归档 → 加入 remove；
  * - 孤儿子会话（父不在清单）与顶层会话不参与。
+ *
+ * 子代理自身也能再派子代理，故「子镜像父」要沿父子链传到**全部后代**：从每个顶层节点 BFS
+ * 逐层把祖先的归档态传播下去（每个节点只访问一次，O(n)）。单趟只看一层的旧实现在多层树上
+ * 只对齐一层，要靠「自己那次写又触发一轮 domain/changed」迭代收敛——把正确性押在事件链上，
+ * 且面板惰性对齐每打开一次也只能推进一层。无根节点（父子成环）时无人可传播，不做任何对齐。
  */
 export function archiveAlignmentForChildren(
   headers: readonly SessionTreeHeader[],
   archivedIds: readonly string[],
 ): ArchiveAlignment {
   const byId = new Map(headers.map(header => [header.id, header]))
-  const archived = new Set(archivedIds)
-  const add: string[] = []
-  const remove: string[] = []
+  const childrenOf = new Map<string, string[]>()
   for (const header of headers) {
     if (header.origin !== 'subagent' || header.parentSession === undefined) continue
     if (!byId.has(header.parentSession)) continue
-    const parentArchived = archived.has(header.parentSession)
-    const childArchived = archived.has(header.id)
-    if (parentArchived && !childArchived) add.push(header.id)
-    else if (!parentArchived && childArchived) remove.push(header.id)
+    const list = childrenOf.get(header.parentSession) ?? []
+    list.push(header.id)
+    childrenOf.set(header.parentSession, list)
+  }
+  const archived = new Set(archivedIds)
+  const add: string[] = []
+  const remove: string[] = []
+  const queue: string[] = []
+  for (const header of headers) {
+    const hasParent = header.origin === 'subagent' && header.parentSession !== undefined && byId.has(header.parentSession)
+    if (!hasParent) queue.push(header.id)
+  }
+  for (let i = 0; i < queue.length; i++) {
+    const ancestorArchived = archived.has(queue[i])
+    for (const childId of childrenOf.get(queue[i]) ?? []) {
+      if (ancestorArchived !== archived.has(childId)) {
+        if (ancestorArchived) {
+          archived.add(childId)
+          add.push(childId)
+        } else {
+          archived.delete(childId)
+          remove.push(childId)
+        }
+      }
+      queue.push(childId)
+    }
   }
   return { add, remove }
 }

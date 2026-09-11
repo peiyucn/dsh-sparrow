@@ -388,6 +388,42 @@ describe('archive-manage 纯逻辑', () => {
       const r = archiveAlignmentForChildren([h('top'), child('orphan', 'gone')], ['orphan'])
       assert.deepEqual(r, { add: [], remove: [] })
     })
+
+    // 子代理能再派子代理：多层树要一次算到全部后代，不能只对齐一层、靠写事件迭代收敛。
+    it('父已归档 应该 把多层后代一次全部补进 add', () => {
+      const r = archiveAlignmentForChildren([
+        h('p'), child('c', 'p'), child('gc', 'c'), child('ggc', 'gc'),
+      ], ['p'])
+      assert.deepEqual(r, { add: ['c', 'gc', 'ggc'], remove: [] })
+    })
+
+    it('父未归档 应该 把多层后代一次全部移进 remove', () => {
+      const r = archiveAlignmentForChildren([
+        h('p'), child('c', 'p'), child('gc', 'c'),
+      ], ['c', 'gc', 'other'])
+      assert.deepEqual(r, { add: [], remove: ['c', 'gc'] })
+    })
+
+    it('多层树里状态混杂 应该 按祖先统一（深度不再决定顺序）', () => {
+      const r = archiveAlignmentForChildren([
+        h('p'), child('c', 'p'), child('gc', 'c'), child('ggc', 'gc'),
+      ], ['p', 'gc'])
+      assert.deepEqual(r, { add: ['c', 'ggc'], remove: [] })
+    })
+
+    it('另一棵树的顶层未归档 应该 只影响它自己的后代', () => {
+      const r = archiveAlignmentForChildren([
+        h('p'), child('c', 'p'), h('q'), child('qc', 'q'), child('qgc', 'qc'),
+      ], ['p', 'c', 'qgc'])
+      assert.deepEqual(r, { add: [], remove: ['qgc'] })
+    })
+
+    it('父子成环（无根）应该 不产生任何差异（不误对齐、不转死）', () => {
+      const r = archiveAlignmentForChildren([
+        child('a', 'b'), child('b', 'a'),
+      ], ['a'])
+      assert.deepEqual(r, { add: [], remove: [] })
+    })
   })
 
   describe('livingChildIds', () => {

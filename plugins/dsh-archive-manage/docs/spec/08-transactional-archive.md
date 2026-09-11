@@ -45,7 +45,7 @@
 
 ### 2.5 事件驱动一致性（对齐 + hold 实时化）
 
-- **父子归档对齐**：监听官方 `domain/changed`（workspace 域 put）→ 比对归档集与全量 header 的父子关系 → 经官方写通道（现有 enqueueOperation/setState 特例）把子会话对齐进/出归档集（幂等）。官方 feed 层同款监听（workspace-controller/feed.ts，已查证）。兜底：启动清扫 + 面板打开惰性对齐。
+- **父子归档对齐**：监听官方 `domain/changed`（workspace 域 put）→ 比对归档集与全量 header 的父子关系 → 经官方写通道（现有 enqueueOperation/setState 特例）把子会话对齐进/出归档集（幂等）。官方 feed 层同款监听（workspace-controller/feed.ts，已查证）。兜底：启动清扫 + 面板打开惰性对齐。**对齐一趟算到全部后代**（子代理可再派子代理；spec 12），不依赖「本次写再触发下一轮事件」逐层收敛。
 - **hold 实时化（通知侧）**：监听官方 `session/created` / `session/disposed`（会话进入/离开 live store 时发出，core/session，已查证）→ 实时刷新面板条目 live 标记；用户关闭会话后「进回收站」即时解锁，无需刷新或重启。**主动释放仍无公开 API**（SessionStore 无 remove/close，卸载只有 fiber 销毁私有路径）——守卫保留，仅把报错文案从「请下次启动 dsh 后重试」改为「请先关闭该会话（或停止生成）再重试」。
 - 两个监听均为公开事件，不新增私有 seam。
 
