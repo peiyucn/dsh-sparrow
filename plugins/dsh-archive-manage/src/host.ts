@@ -918,6 +918,14 @@ async function restoreTrashDir(ctx: Context, surface: RegistryMutationSurface, t
   } catch {
     // subagents 目录不存在时忽略。
   }
+  // 记账 sidecar 在回收站目录里，rename 会把它一起带回会话目录（spec 13）：它是回收站元数据
+  // （含标题与原工作区记账 id），留在用户数据目录里只会被官方日志导出/打包捎带。移回成功后
+  // best-effort 清掉；删不掉只告警——文件仍在，不影响会话可用。
+  try {
+    await rm(join(sidecar.originalPath, TRASH_SIDECAR), { force: true })
+  } catch (error) {
+    ctx.logger.warn(`dsh-archive-manage: 还原后回收站记账文件清理失败（${sidecar.originalPath}）：${error instanceof Error ? error.message : String(error)}`)
+  }
   try {
     await attachWorkspaceAccounting(ctx, sessionId, sidecar.workspaceIds)
     for (const target of subagentTargets) {
