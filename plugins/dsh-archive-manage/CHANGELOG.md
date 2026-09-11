@@ -2,6 +2,13 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.5-rc.2.2 (2026-09-12)
+
+- Moving a session to trash or deleting it permanently now takes along **every** subagent in its tree: subagents that spawned their own subagents (grandchildren and deeper, any depth) are no longer left behind as separate entries you had to clean up one by one.
+- Archiving or unarchiving a parent session now settles the archive state of its whole subagent tree in one go (deeper subagents previously caught up only on a later refresh or panel reopen).
+- Restoring a session no longer leaves the plugin's bookkeeping file inside the session folder, where exported session logs used to carry it along.
+- A session folder that is already missing from disk no longer fails hard: subagents are skipped while the rest moves as usual, permanent deletion treats it as already gone, and moving it to trash reports a clear message instead of a raw filesystem error.
+
 ## 0.1.5-rc.2.1 (2026-09-11)
 
 - Permanently deleting a session now clears the archived mark only from the subagent sessions that were really deleted: a subagent whose deletion failed keeps its mark and stays operable in the panel, so the deletion can be retried instead of leaving an unaccounted-for entry behind.
