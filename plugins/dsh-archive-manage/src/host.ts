@@ -1268,12 +1268,15 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           }
 
           await rm(sessionDir, { recursive: true, force: false })
-          // 只有真正删掉的直接子会话才算 removed：rm 失败者仍在磁盘上，保留其归档标记
+          // 只有真正从磁盘上消失的直接子会话才算 removed：rm 失败者仍在磁盘上，保留其归档标记
           // 与工作区记账，让它在归档面板以孤儿根继续可操作（审计 S7）。
           const deletedSubagentIds: string[] = []
           for (const child of subagents) {
             try {
-              await rm(child.dir, { recursive: true, force: false })
+              // force:true 只吞 ENOENT——目录本就不在磁盘上同样算「已消失」，否则它会被
+              // 当成「失败、仍在磁盘上」而永久保留归档标记，成为再也删不掉的孤儿根
+              // （父目录已删，再点删除会在上面那行 rm 上整单失败）。其余错误照旧抛出、保留标记。
+              await rm(child.dir, { recursive: true, force: true })
               deletedSubagentIds.push(String(child.sessionId))
             } catch (error) {
               ctx.logger.warn(`dsh-archive-manage: 删除 subagent 会话目录失败（${String(child.sessionId)}），属 best-effort 清理、已跳过并保留归档标记：${error instanceof Error ? error.message : String(error)}`)
