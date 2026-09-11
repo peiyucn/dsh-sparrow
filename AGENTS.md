@@ -49,9 +49,8 @@ DeepSeek Harness（DSH）Web 插件小合集——「麻雀虽小，五脏俱全
 ## 安全基线（本仓库自含要点）
 
 * 已开启（2026-09 逐项核验）：Dependabot alerts（仅报警）、CodeQL default setup（weekly，JS/TS + actions）、secret scanning + push protection、Private vulnerability reporting、根 `SECURITY.md`
-* 分支保护三层（2026-09 逐项核验）：① 经典保护 ✓（main：要求对话解决 + 不允许绕过；不设 required checks）② ruleset 轻保护 ✓（默认分支 + dev 各一条：禁删/禁强推/禁建）③ 仓库合并设置 **Squash-only** ✓；owner 保留 fast-forward 直推——**CI 会跑但不设硬门禁**，合并外部 PR 前 owner 自己确认 CI 绿
-* 外部 PR / Issue 一律开放、不设交互限制，owner 审核合并（Squash-only），不想收的直接关闭
-* **核验别只跑 `.security_and_analysis`**（它只含 secret scanning 项）——逐项命令见根规范《统一安全基线 · 逐项检查命令》
+* 分支保护三层（2026-09 逐项核验）：① 经典保护 ✓（main：要求对话解决 + 不允许绕过）② ruleset 轻保护 ✓（默认分支 + dev 各一条）③ 合并设置 **Squash-only** ✓；owner 保留 fast-forward 直推，**CI 会跑但不设硬门禁**
+* 外部 PR / Issue 一律开放，owner 审核合并（Squash-only），不想收的直接关闭；核验按根规范《统一安全基线 · 逐项检查命令》逐项跑（**别只跑 `.security_and_analysis`**）
 
 ## CI 与自动发布
 
