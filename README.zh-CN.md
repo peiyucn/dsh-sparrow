@@ -27,7 +27,10 @@
 | [dsh-nav-pin](plugins/dsh-nav-pin/README.zh-CN.md) [![npm downloads](https://img.shields.io/npm/dm/@dsh-sparrow/dsh-nav-pin)](https://www.npmjs.com/package/@dsh-sparrow/dsh-nav-pin)                                         | ![轮次导航 hover 浮层](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-nav-pin.png "ratio:0.13")<br>轮次导航窄屏不消失——纯样式注入。                                                   | `dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin`           |
 | [dsh-file-manage](plugins/dsh-file-manage/README.zh-CN.md) [![npm downloads](https://img.shields.io/npm/dm/@dsh-sparrow/dsh-file-manage)](https://www.npmjs.com/package/@dsh-sparrow/dsh-file-manage)                         | ![云端文件面板](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-file-manage.png "ratio:0.15")<br>DeepSeek Files API 云端文件：游标翻页列表、配额条、单条删除、一键复制 file_id。                  | `dsh plugin --profile web add @dsh-sparrow/dsh-file-manage`       |
 | [dsh-codebuddy-credits](plugins/dsh-codebuddy-credits/README.zh-CN.md) [![npm downloads](https://img.shields.io/npm/dm/@dsh-sparrow/dsh-codebuddy-credits)](https://www.npmjs.com/package/@dsh-sparrow/dsh-codebuddy-credits) | ![会话页额度入口与面板](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-codebuddy-credits.png "ratio:0.25")<br>公司 CodeBuddy 额度接成 DSH LLM provider：选择器显示模型名 + 只读事实（`x0.00 · 1M`）、头部额度面板、每轮积分胶囊。  | `dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits` |
-| ~~**[dsh-vision-bridge](plugins/dsh-vision-bridge/README.zh-CN.md)**~~ — 已退役 | ![模型选择器旁的眼睛图标与说明弹层](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-vision-bridge.png)<br>纯文本主模型的视觉通道：`vision_read` 工具用官方 DeepSeek 视觉模型读图并回传结构化文字报告。DeepSeek 主模型已原生多模态，请直接用 `deepseek-flash`。 | ✗ 已退役——卸载：`dsh plugin --profile web remove @dsh-sparrow/dsh-vision-bridge`             |
+
+## 已退役
+
+* ~~**[dsh-vision-bridge](plugins/dsh-vision-bridge/README.zh-CN.md)**~~——纯文本主模型的视觉通道：`vision_read` 工具用官方 DeepSeek 视觉模型读图并回传结构化文字报告。DeepSeek 主模型已原生多模态，请直接用 `deepseek-flash`；卸载：`dsh plugin --profile web remove @dsh-sparrow/dsh-vision-bridge`。
 
 ## License
 
