@@ -2,6 +2,11 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.5-rc.2.3 (2026-09-13)
+
+- Subagent trees in the archive area and the trash are now **collapsed by default**: a parent row still shows its subagent count, and a click on ▸ reveals the children — previously the panel unfolded every subagent at once, so a session with many subagents pushed the entries below it out of sight.
+- When a parent session cannot be moved only because one of its **subagents** is still held by dsh, the row now says so ("subagent held by dsh"); previously just the greyed-out buttons and a tooltip hinted at it, hiding which level held the lock.
+
 ## 0.1.5-rc.2.2 (2026-09-12)
 
 - Moving a session to trash or deleting it permanently now takes along **every** subagent in its tree: subagents that spawned their own subagents (grandchildren and deeper, any depth) are no longer left behind as separate entries you had to clean up one by one.
