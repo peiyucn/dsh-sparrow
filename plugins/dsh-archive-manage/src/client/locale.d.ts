@@ -36,6 +36,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'action.deleteAll'
       | 'state.running'
       | 'state.unreleased'
+      | 'state.subagentUnreleased'
       | 'state.unreleasedActionHint'
       | 'state.backendUnsupported'
       | 'group.unreleased'

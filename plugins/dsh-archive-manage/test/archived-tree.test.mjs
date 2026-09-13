@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { dropArchivedIds, subtreeIdsOf, trashSubagentTree } from '../lib/client/archivedTree.js'
+import { descendantLive, dropArchivedIds, isCollapsed, subtreeIdsOf, subtreeLive, trashSubagentTree } from '../lib/client/archivedTree.js'
 
 /** 最小归档树节点（真实条目形状见 ArchivedSessionItem；纯逻辑只读 sessionId / orphan / children）。 */
 const node = (sessionId, children = [], orphan = false) => ({ sessionId, orphan, children })
@@ -55,6 +55,64 @@ describe('subtreeIdsOf（取消归档时即时摘除整棵子树）', () => {
 
   it('叶子节点 应该 只有自身', () => {
     assert.deepEqual(subtreeIdsOf(node('leaf')), ['leaf'])
+  })
+})
+
+describe('subtreeLive（spec 08：父级操作锁定看整棵子树）', () => {
+  /** 自身 live 的节点（纯逻辑只读 sessionId / live / children）。 */
+  const live = (sessionId, children = []) => ({ sessionId, live: true, children })
+
+  it('自身 live 应该 命中', () => {
+    assert.equal(subtreeLive(live('p')), true)
+  })
+
+  it('自身冷、孙会话 live 应该 命中（任意深度）', () => {
+    assert.equal(subtreeLive(node('p', [node('c', [live('gc')])])), true)
+  })
+
+  it('全冷 应该 不命中', () => {
+    assert.equal(subtreeLive(node('p', [node('c', [node('gc')]), node('c2')])), false)
+  })
+
+  it('冷叶子 应该 不命中', () => {
+    assert.equal(subtreeLive(node('leaf')), false)
+  })
+})
+
+describe('descendantLive（spec 15：锁定来源是不是后代）', () => {
+  const live = (sessionId, children = []) => ({ sessionId, live: true, children })
+
+  // 自身 live 的行已显示「未释放」，不再重复提示——这个判据只认后代。
+  it('自身 live、后代全冷 应该 不命中', () => {
+    assert.equal(descendantLive(live('p', [node('c')])), false)
+  })
+
+  it('自身冷、直接子会话 live 应该 命中', () => {
+    assert.equal(descendantLive(node('p', [live('c'), node('c2')])), true)
+  })
+
+  it('自身冷、孙会话 live 应该 命中（中间层同样提示）', () => {
+    assert.equal(descendantLive(node('p', [node('c', [live('gc')])])), true)
+  })
+
+  it('全冷 应该 不命中', () => {
+    assert.equal(descendantLive(node('p', [node('c')])), false)
+  })
+})
+
+describe('isCollapsed（spec 15：默认收起）', () => {
+  it('空集（面板刚打开）应该 判为收起', () => {
+    assert.equal(isCollapsed(ids(), 'p'), true)
+  })
+
+  it('显式展开过的节点 应该 判为展开', () => {
+    assert.equal(isCollapsed(ids('p'), 'p'), false)
+  })
+
+  // 展开状态按 id 记，别的父节点不受影响；重开面板沿用同一份状态（组件不重置）。
+  it('只展开过一个节点 应该 不影响其它节点', () => {
+    const expanded = ids('p')
+    assert.equal(isCollapsed(expanded, 'other'), true)
   })
 })
 

@@ -5,7 +5,7 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { IconArchiveOutline20, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { dropArchivedIds, subtreeIdsOf, trashSubagentTree, type ArchivedSessionItem, type TrashSubagentNode } from './archivedTree.js'
+import { descendantLive, dropArchivedIds, isCollapsed, subtreeIdsOf, subtreeLive, trashSubagentTree, type ArchivedSessionItem, type TrashSubagentNode } from './archivedTree.js'
 import { countVisibleRows } from './paging.js'
 
 /** 分页窗口大小（spec 09）：每区每次渲染的行数上限，「加载更多」按此递增。 */
@@ -667,10 +667,11 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [restoringId, setRestoringId] = useState<string | null>(null)
   /** 游离/孤儿会话归档进行中锁（spec 08）。 */
   const [archivingId, setArchivingId] = useState<string | null>(null)
-  /** 归档树折叠的父节点 id 集合（spec 08）。 */
-  const [collapsedIds, setCollapsedIds] = useState<ReadonlySet<string>>(new Set())
-  /** 回收站树折叠的父条目集合（键 = trashId，与归档树分开：两区互不干扰）。 */
-  const [collapsedTrashIds, setCollapsedTrashIds] = useState<ReadonlySet<string>>(new Set())
+  /** 归档树里被用户**显式展开**的父节点 id（spec 15：默认收起——空集即全部收起，
+   *  与「跟踪折叠集合」相比默认值由数据结构表达，不靠初值预置）。 */
+  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set())
+  /** 回收站树被显式展开的父条目集合（键 = trashId，与归档树分开：两区互不干扰）。 */
+  const [expandedTrashIds, setExpandedTrashIds] = useState<ReadonlySet<string>>(new Set())
   /** 三区分页窗口（spec 09）：数据刷新时复位，加载更多按页递增。 */
   const [archivedLimit, setArchivedLimit] = useState(ARCHIVE_PAGE_SIZE)
   const [straysLimit, setStraysLimit] = useState(ARCHIVE_PAGE_SIZE)
@@ -898,18 +899,14 @@ export function ArchiveDock(props: ArchiveDockProps) {
     [trashItems],
   )
 
-  /** 子树内是否存在未释放会话（父级操作锁定依据；host 侧同样整单拒绝，spec 08）。 */
-  const subtreeLive = (item: ArchivedSessionItem): boolean => {
-    return item.live || item.children.some(child => subtreeLive(child))
-  }
-
-  // 未释放（本次 dsh 运行中驻留）的会话在归档区内分组前置；父级锁定看整棵子树。
+  // 未释放（本次 dsh 运行中驻留）的会话在归档区内分组前置；父级锁定看整棵子树
+  // （subtreeLive 已下沉到 archivedTree.ts，判定有单测覆盖，spec 15）。
   const liveItems = archived.filter(item => subtreeLive(item))
   const coldItems = archived.filter(item => !subtreeLive(item))
 
-  /** 展开/收起某父节点的子树（spec 08）。 */
-  const toggleCollapsed = (sessionId: string): void => {
-    setCollapsedIds(prev => {
+  /** 展开/收起某父节点的子树（spec 15：集合里存的是「显式展开过」的 id）。 */
+  const toggleExpanded = (sessionId: string): void => {
+    setExpandedIds(prev => {
       const next = new Set(prev)
       if (next.has(sessionId)) next.delete(sessionId)
       else next.add(sessionId)
@@ -918,8 +915,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
   }
 
   /** 展开/收起回收站父条目的子树（与归档树同一交互语义）。 */
-  const toggleTrashCollapsed = (trashId: string): void => {
-    setCollapsedTrashIds(prev => {
+  const toggleTrashExpanded = (trashId: string): void => {
+    setExpandedTrashIds(prev => {
       const next = new Set(prev)
       if (next.has(trashId)) next.delete(trashId)
       else next.add(trashId)
@@ -934,7 +931,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
     archivedRowsRendered += 1
     const locked = depth === 0 && subtreeLive(item)
     const hasChildren = item.children.length > 0
-    const collapsed = collapsedIds.has(item.sessionId)
+    const collapsed = isCollapsed(expandedIds, item.sessionId)
     const childrenBlock = hasChildren && !collapsed
       ? (() => {
         const emitted: ReactElement[] = []
@@ -974,7 +971,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                   type="button"
                   className="dsh-archive-tree-toggle"
                   aria-expanded={!collapsed}
-                  onClick={() => { toggleCollapsed(item.sessionId) }}
+                  onClick={() => { toggleExpanded(item.sessionId) }}
                 >
                   <span aria-hidden>{collapsed ? '▸' : '▾'}</span>
                 </button>
@@ -998,6 +995,11 @@ export function ArchiveDock(props: ArchiveDockProps) {
                 <>
                   {' · '}
                   <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>{t('state.unreleased')}</span>
+                </>
+              ) : descendantLive(item) ? (
+                <>
+                  {' · '}
+                  <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>{t('state.subagentUnreleased')}</span>
                 </>
               ) : ''}
               {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
@@ -1093,7 +1095,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
     trashRowsRendered += 1
     const children = trashTrees.get(item.trashId) ?? []
     const hasChildren = children.length > 0
-    const collapsed = collapsedTrashIds.has(item.trashId)
+    const collapsed = isCollapsed(expandedTrashIds, item.trashId)
     const childrenBlock = hasChildren && !collapsed
       ? (() => {
         const emitted: ReactElement[] = []
@@ -1129,7 +1131,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                   type="button"
                   className="dsh-archive-tree-toggle"
                   aria-expanded={!collapsed}
-                  onClick={() => { toggleTrashCollapsed(item.trashId) }}
+                  onClick={() => { toggleTrashExpanded(item.trashId) }}
                 >
                   <span aria-hidden>{collapsed ? '▸' : '▾'}</span>
                 </button>
@@ -1281,13 +1283,14 @@ export function ArchiveDock(props: ArchiveDockProps) {
 
   // spec 09 分页预算：每次渲染复位（renderArchivedRow/renderTrashRow 超出窗口返回 null）；
   // 总数用于「加载更多」显隐。树结构不变，分页只裁剪渲染窗口。
+  // spec 15：默认可视行只剩父行，窗口预算不再被未展开的子行吃掉。
   let archivedRowsRendered = 0
   let trashRowsRendered = 0
-  const archivedTotal = countVisibleRows(liveItems, item => item.children, item => collapsedIds.has(item.sessionId))
-    + countVisibleRows(coldItems, item => item.children, item => collapsedIds.has(item.sessionId))
+  const archivedTotal = countVisibleRows(liveItems, item => item.children, item => isCollapsed(expandedIds, item.sessionId))
+    + countVisibleRows(coldItems, item => item.children, item => isCollapsed(expandedIds, item.sessionId))
   const trashTotal = trashItems.reduce((total, item) => {
     const children = item.subagents?.length ?? 0
-    return total + 1 + (collapsedTrashIds.has(item.trashId) ? 0 : children)
+    return total + 1 + (isCollapsed(expandedTrashIds, item.trashId) ? 0 : children)
   }, 0)
 
   return (

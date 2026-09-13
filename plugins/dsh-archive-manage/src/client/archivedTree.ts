@@ -1,6 +1,7 @@
 /**
  * 归档树本地变更纯逻辑（spec 08）：host 写路由成功后，面板按响应里的 id 立即本地摘行，
- * 不等整页刷新落定。零依赖纯模块（照 paging.ts 先例），便于 node:test 直接导入。
+ * 不等整页刷新落定。另承载归档树展示判定（spec 15：默认收起、锁定来源）。
+ * 零依赖纯模块（照 paging.ts 先例），便于 node:test 直接导入。
  */
 
 /** 归档树节点：顶层为归档会话根，children 为随父归档的子会话（host /list 契约）。 */
@@ -46,6 +47,31 @@ export function dropArchivedIds(items: readonly ArchivedSessionItem[], ids: Read
     for (const child of children) kept.push(child.orphan ? child : { ...child, orphan: true })
   }
   return kept
+}
+
+/**
+ * 子树内是否存在未释放（本次 dsh 运行中驻留）的会话：父级操作因它整单锁定（spec 08）。
+ * 任意深度——子代理可再派子代理。
+ */
+export function subtreeLive(item: ArchivedSessionItem): boolean {
+  return item.live || item.children.some(subtreeLive)
+}
+
+/**
+ * 锁定是否来自**后代**（自身不 live、后代里有人 live）：spec 15 的「子会话未释放」判据。
+ * 与 `subtreeLive` 的分工：那个答「这行能不能操作」，这个答「锁是不是后代造成的」——
+ * 自身 live 已在行内显示「未释放」，不再重复提示。
+ */
+export function descendantLive(item: ArchivedSessionItem): boolean {
+  return item.children.some(subtreeLive)
+}
+
+/**
+ * 默认收起（spec 15）：只有被用户显式展开过的节点才展开——空集即全部收起。
+ * 判据收在这里，免得折叠态散落成各处的 `Set.has()` 取反（默认值靠初值预置，容易漏配）。
+ */
+export function isCollapsed(expandedIds: ReadonlySet<string>, sessionId: string): boolean {
+  return !expandedIds.has(sessionId)
 }
 
 /** 回收站条目的子会话条目（host /trash 视图形状）。 */
