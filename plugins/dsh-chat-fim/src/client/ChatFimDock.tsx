@@ -12,7 +12,7 @@ import { TRIGGER_SENSITIVITIES, detectEndOfDraft, formatTokenCount, shouldTrigge
 import { anchorPointsEqual, rectsEqual } from './geometry.js'
 import { createLazyDirectoryStore } from './lazy-directory-store.js'
 import {
-  fimSupportReducer, fimSupportShown, initialFimSupportState,
+  fimSupportReducer, fimSupportRetryDelayMs, fimSupportShown, initialFimSupportState,
   type FimSupportEvent, type FimSupportState,
 } from './fim-support-machine.js'
 
@@ -34,8 +34,8 @@ export interface ChatFimDockInjected {
   readonly sessionId: SessionId
   /** 官方共享模型目录 store（ctx.modelDirectories）：选中模型与座位同源；目录不可用时 undefined。 */
   readonly directoryFor: (sessionId: SessionId) => FimDirectoryStore | undefined
-  /** 查询当前会话主模型是否支持（deepseek 系列）；false 时整体隐藏。 */
-  isSupported: (sessionId: SessionId) => Promise<boolean>
+  /** 查询当前会话主模型是否支持（deepseek 系列）；`null` = 宿主现在判不了（冷启动会话未激活等）。 */
+  checkSupport: (sessionId: SessionId) => Promise<boolean | null>
   /** 发起一次 host 路由请求；由调用方负责陈旧响应判定。续写模型由 host 按主模型解析（auto 跟随）。 */
   requestComplete: (
     sessionId: SessionId,
@@ -159,8 +159,10 @@ export function setSuggestError(next: string | null): void {
 }
 
 // 模块级共享「模型支持」状态机：主模型非 deepseek 系列时整体隐藏（像没装插件）。
-// 判定管线（idle → checking → supported/unsupported/failed）由 fim-support-machine
-// 的纯 reducer 驱动，事件带会话+模型地址，旧响应在状态机里被结构性作废。
+// 判定管线（idle → checking ⇄ retrying → supported/unsupported/failed）由
+// fim-support-machine 的纯 reducer 驱动，事件带会话+模型地址，旧响应在状态机里被
+// 结构性作废。「宿主判不了」（冷启动会话未激活）单独成相并做有界补查——不与
+// 「判为不支持」混同，见 fim-support-machine 顶部注释。
 let sharedSupport = initialFimSupportState
 const supportListeners = new Set<() => void>()
 
@@ -767,7 +769,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
  * @param props - 槽位运行时 props + 注入动作。
  */
 export function ChatFimDock(props: ChatFimDockProps) {
-  const { session, input, requestComplete, isSupported, directoryFor, useProjection } = props
+  const { session, input, requestComplete, checkSupport, directoryFor, useProjection } = props
   const [composing, setComposing] = useState(false)
   const [ring, setRing] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const enabled = useSuggestEnabled()
@@ -793,7 +795,7 @@ export function ChatFimDock(props: ChatFimDockProps) {
   const currentModel = directoryCurrent ?? projection?.next ?? null
   const currentKey = currentModel === null ? '' : `${currentModel.provider}:${currentModel.model}`
 
-  // 会话/模型切换：支持状态机进入 checking（先按支持显示，查完追平）。
+  // 会话/模型切换：支持状态机进入 checking（未定论前不显示，查完追平）。
   useEffect(() => {
     dispatchSupportEvent({
       type: 'context-changed',
@@ -806,11 +808,28 @@ export function ChatFimDock(props: ChatFimDockProps) {
   useEffect(() => {
     if (supportState.phase !== 'checking') return
     const address = supportState.address
-    void isSupported(address.sessionId as SessionId).then(
-      (next) => dispatchSupportEvent({ type: 'checked', address, supported: next }),
-      () => dispatchSupportEvent({ type: 'check-failed', address }),
+    void checkSupport(address.sessionId as SessionId).then(
+      (next) => dispatchSupportEvent(
+        next === null
+          ? { type: 'unknown', address }
+          : { type: 'checked', address, supported: next },
+      ),
+      () => { dispatchSupportEvent({ type: 'unknown', address }) },
     )
-  }, [supportState.phase, supportState.address.sessionId, supportState.address.modelKey, isSupported])
+  }, [supportState.phase, supportState.address.sessionId, supportState.address.modelKey, checkSupport])
+
+  // retrying：宿主判不了（冷启动时会话尚未激活 → 404），等待后补查。
+  // 退避 + 次数有界（fim-support-machine 的常量）：会话激活后补查即拿定论，
+  // 开关随所选模型追平；耗尽才落 failed 并 fail-open 显示。定时器随状态/地址重排，
+  // 组件卸载与上下文切换都由清理函数撤销，不滞留。
+  useEffect(() => {
+    if (supportState.phase !== 'retrying') return
+    const address = supportState.address
+    const timer = setTimeout(() => {
+      dispatchSupportEvent({ type: 'retry-tick', address })
+    }, fimSupportRetryDelayMs(supportState.attempts))
+    return () => { clearTimeout(timer) }
+  }, [supportState.phase, supportState.address.sessionId, supportState.address.modelKey, supportState.attempts])
 
   const composingRef = useRef(false)
   const draftRevRef = useRef(input.draftRev)

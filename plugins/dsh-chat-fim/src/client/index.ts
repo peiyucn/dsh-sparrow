@@ -18,7 +18,10 @@ import { parseJsonOrNull } from './parse.js'
 
 export const inject = ['slots', 'sessions', 'locale']
 
-/** 支持性查询超时（毫秒）：离线/挂死时按「支持」兜底显示（fail-open），不留悬挂 Promise。 */
+/**
+ * 单次支持性查询超时（毫秒）：到点按「判不了」处理（状态机据此补查），不留悬挂 Promise。
+ * 走本地回环、正常毫秒级，5s 只兜住挂死的宿主。
+ */
 const SUPPORT_CHECK_TIMEOUT_MS = 5_000
 
 export interface ChatFimResponse {
@@ -108,15 +111,28 @@ export function apply(ctx: ClientContext): void {
           return undefined
         }
       },
-      isSupported: async (id: SessionId): Promise<boolean> => {
-        const response = await fetch(`/api/chat-fim/complete?sessionId=${encodeURIComponent(String(id))}`, {
-          signal: AbortSignal.timeout(SUPPORT_CHECK_TIMEOUT_MS),
-        })
-        if (!response.ok) return true
-        // 响应不是 JSON（反向代理错误页等）按支持显示（fail-open），与查询失败同口径。
-        const payload = parseJsonOrNull(await response.text()) as { supported?: boolean } | null
-        if (payload === null) return true
-        return payload.supported !== false
+      /**
+       * 查询当前会话主模型是否支持（deepseek 系列）。
+       * 返回 `true` / `false` = 宿主给出定论；`null` = 宿主**现在判不了**
+       * （冷启动尚未激活该会话 → 404 UNKNOWN_SESSION、路由不可达、响应不是 JSON）。
+       * 「判不了」绝不能与「判为不支持」混为一谈：旧实现把两者都当支持（fail-open），
+       * 于是冷启动那一发 404 会把开关钉在常显状态——调用方按 null 做有界补查。
+       */
+      checkSupport: async (id: SessionId): Promise<boolean | null> => {
+        let response: Response
+        try {
+          response = await fetch(`/api/chat-fim/complete?sessionId=${encodeURIComponent(String(id))}`, {
+            signal: AbortSignal.timeout(SUPPORT_CHECK_TIMEOUT_MS),
+          })
+        } catch {
+          return null // 网络/超时：判不了（补查自愈），不是「不支持」。
+        }
+        // 路由不可达（宿主尚无该路由）或宿主明确说会话不可用：都属「现在判不了」。
+        if (!response.ok) return null
+        // 响应不是 JSON（反向代理错误页等）同样判不了。
+        const payload = parseJsonOrNull(await response.text()) as { supported?: unknown } | null
+        if (payload === null || typeof payload.supported !== 'boolean') return null
+        return payload.supported
       },
       requestComplete: async (id: SessionId, prompt: string, signal: AbortSignal) => {
         const response = await fetch('/api/chat-fim/complete', {
