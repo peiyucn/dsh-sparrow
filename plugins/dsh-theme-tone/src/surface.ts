@@ -25,7 +25,7 @@
  * **为什么不把图层塞进 token**：官方把同一个 `--dsw-specific-menu` 也用在
  * `ModelSelect` 的 `.groupTitle` 这类 `position: sticky` 小条上，而百分比渐变按元素
  * 自身盒子缩放 —— 一条 24px 的横条会把 `ellipse 120% 42%` 压成一道硬边金带，
- * 与菜单主体对不上。详见 `POPUP_TOKENS` 的注释与 05-surfaces §8.5。
+ * 与菜单主体对不上。详见 `POPUP_TOKENS` 的注释与 05-surfaces §8.2。
  *
  * ## 浮层是「面板」，不是地面
  *

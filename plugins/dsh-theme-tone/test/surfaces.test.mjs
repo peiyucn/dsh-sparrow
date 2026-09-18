@@ -373,7 +373,7 @@ describe('抬升面：不变量', () => {
 
   it('浮层的配方应该 三层齐备（颗粒 / 顶光 / 底光）—— 但画在选择器那层，不进 token', () => {
     // 曾经这条测的是 `--dsw-specific-menu` 的值，现在配方归 `surfaceLayers()`：
-    // token 只装颜色（否则 sticky 分组标题会把百分比渐变压成硬边金带，见 05-surfaces §8.5）。
+    // token 只装颜色（否则 sticky 分组标题会把百分比渐变压成硬边金带，见 05-surfaces §8.2）。
     const layers = surfaceLayers().split(',\n    ')
     assert.equal(layers.length, 3, '颗粒 + 顶光 + 底光')
     assert.equal(layers[0], `var(${GRAIN_TILE_VARIABLE}, none)`, '颗粒压在最上面才像砂面')

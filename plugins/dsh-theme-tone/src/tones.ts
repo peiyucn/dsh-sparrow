@@ -324,7 +324,7 @@ export const SURFACE_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRun
  *
  * 结论：**token 只给颜色**（消费方共享同一个不透明色，小条天然与主体同色），
  * **图层交给 `surface.ts` 的选择器表**（按 role 命中真正的浮层）。代价是那个无 role 的
- * `<ul>` 只拿到颜色、拿不到颗粒与光 —— 已知且记账（见 05-surfaces §8.5）。
+ * `<ul>` 只拿到颜色、拿不到颗粒与光 —— 已知且记账（见 05-surfaces §8.2）。
  */
 export const POPUP_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRung }>[] = Object.freeze([
   Object.freeze({ token: '--dsw-specific-menu', rung: 'layer3' as const }),
