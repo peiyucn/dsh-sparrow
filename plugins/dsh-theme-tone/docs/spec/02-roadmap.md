@@ -80,7 +80,8 @@ profile 级 `cordis.patch.yml` **保持 `[]`**（插件经 bundle 装载，往 p
 * [x] 四张卡恒排一行；切明暗行内容立即刷新。
 * [x] 持久化：重启 dsh 后选择保留，`settings.yaml` 出现 `ui-theme-tone`。
 * [x] 卸载还原：停用插件后 token / 层 / 样式表 / 设置行全部回收。
+* [x] 截图存仓库根 `resources/dsh-theme-tone.png`（按 AGENTS「发布（npm 包）」：单一来源、不进 npm 包），
+  README 双份以绝对 URL 引用。
 * [ ] 零布局影响：开关前后 `document.body.scrollHeight` 不变。
 * [ ] 交互不受影响复核：菜单、tooltip、拖拽条、输入框、弹窗；层级切分符合定案。
-* [ ] 截图（8 款）存 `resources/dsh-theme-tone-*.png`。
-* [ ] 对发布执行《代码审计》；README / CHANGELOG 与实现对齐；按根 AGENTS「发布（npm 包）」流程发布。
+* [ ] 对发布执行《代码审计》；按根 AGENTS「发布（npm 包）」流程首次发布（首发须 owner 当次确认）。
