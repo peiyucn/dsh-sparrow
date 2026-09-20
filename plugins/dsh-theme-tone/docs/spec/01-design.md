@@ -1,6 +1,6 @@
 # 01 · 设计 — dsh-theme-tone
 
-> 本文是 seam 查证 + 架构提案。「开放问题」未定案，开工前需与 owner 拍板。
+> 本文是 seam 查证结论 + 架构，与实现一一对应。
 >
 > **查证基线**：本机 dsh checkout `C:\Users\DJ028191\.dsh-launcher-panel\source`，`0.1.5-rc.2`，HEAD `fb2c4b9e698e30edb738bca4cf0618587db7d203`（tag `dsh-v0.1.5-rc.2`）。
 
@@ -204,9 +204,7 @@ ctx.slots.inject('settings.general.item', () => ctx.slots.register({
    → 最终取「锚视口左上角」的椭圆，零 JS、左栏任何宽度下都成立。
 10. **色调卡复用整屏染色几何 / 原始 alpha** —— 两个都不行：`ellipse 80% 45% at 50% -10%` 在 ~135×83 的卡上把染色整个落在盒外；即便换成卡片尺度几何，环境级 alpha（`.16`–`.30`）在小卡上仍读不太出来，卡面照样是纯色。→ 改为同源色值 + `PREVIEW_*` 几何 + `PREVIEW_ALPHA_SCALE` 放大 alpha（实层不动）。
 
-## 9) 开放问题
-
-**已定案**：
+## 9) 设计定案
 
 1. 设置行位置 → **同区紧邻的自有行**（`id: 'theme-tone'`、`order: 10.5` 插在官方外观 10 与字号 11 之间、带自己的标题）。不 shadow 官方外观行。
 2. 层级切分 → **`z-index: 80`**（应用底 + 左右栏 + 对话区着色；菜单 / tooltip / 弹窗 / toast 保持官方中性面）。见 4.3。
@@ -216,11 +214,8 @@ ctx.slots.inject('settings.general.item', () => ctx.slots.register({
 6. 默认值 → **深色默认 `violet`（蓝紫，装上就见效）、浅色默认 `official`**；两轴都提供「官方默认」档，用户随时可切回官方。
 7. 落地范围 → **8 款全部可选**（深色 4 / 浅色 4）。
 8. 浅色轴要不要颗粒 → **要**：白底上用 `multiply` + `.16`（`screen` 在白底饱和失效）。见 03-palette。
-
-**仍待定**：
-
-* **`preference: 'system'` 下色调归属**：按解析出的 `colorScheme` 取该轴的色调（已如此设计），待真机确认符合预期。
+9. **`preference: 'system'` 下色调归属** → 按宿主解析出的 `colorScheme` 取该轴的色调（`system` 由官方 ui-theme 解析，本插件只读解析结果）。
 
 ## 10) 适配版本基线
 
-本机 dsh checkout `C:\Users\DJ028191\.dsh-launcher-panel\source`（`0.1.5-rc.2`）。开工时复核：`design-platform.css` 的 `--dsw-alias-bg-base` / `--dsw-specific-sidebar-fill` 行号与值、`ThemeRuntime.overrideTokens` 与 `getTheme` 签名、`settings.general.item` 槽位声明、`PLATFORM_MODULES` 清单、`packages/client/**` 的 z-index 分布。
+本机 dsh checkout `C:\Users\DJ028191\.dsh-launcher-panel\source`（`0.1.5-rc.2`）。本文引用的官方事实出自：`design-platform.css` 的 `--dsw-alias-bg-base` / `--dsw-specific-sidebar-fill` 行号与值、`ThemeRuntime.overrideTokens` 与 `getTheme` 签名、`settings.general.item` 槽位声明、`PLATFORM_MODULES` 清单、`packages/client/**` 的 z-index 分布。
