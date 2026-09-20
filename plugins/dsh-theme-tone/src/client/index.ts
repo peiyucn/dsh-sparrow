@@ -219,13 +219,22 @@ export function apply(ctx: Context): void {
     else target.removeAttribute(WORKSTART_ATTR)
   }
 
-  /** 同一帧内合并多次 DOM 变动，避免连续写属性触发无谓重排。 */
+  /**
+   * 同一帧内合并多次 DOM 变动，避免连续写属性触发无谓重排。
+   *
+   * ⚠️ rAF 句柄**必须存下来并在卸载时取消**：`ctx.effect` 只管它收集到的 disposer，
+   * 不会替你取消已入队的动画帧。否则「变动入队 → 卸载 → 帧才到」这条时序里，
+   * 回调会在清理**之后**跑，把刚摘掉的 {@link WORKSTART_ATTR} 重新写回 body
+   * （官方那条虚线仍在，判定仍为真）—— 属性就永久残留了。
+   */
   let probeScheduled = false
+  let probeFrame = 0
   const scheduleProbe = (): void => {
     if (probeScheduled) return
     probeScheduled = true
-    requestAnimationFrame(() => {
+    probeFrame = requestAnimationFrame(() => {
       probeScheduled = false
+      probeFrame = 0
       probeWorkstart()
     })
   }
@@ -240,7 +249,13 @@ export function apply(ctx: Context): void {
     const root = document.body ?? document.documentElement
     const observer = new MutationObserver(scheduleProbe)
     observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
-    return () => { observer.disconnect() }
+    return () => {
+      observer.disconnect()
+      // 取消尚未触发的探测，见 scheduleProbe 的 ⚠️。
+      if (probeFrame !== 0) cancelAnimationFrame(probeFrame)
+      probeFrame = 0
+      probeScheduled = false
+    }
   }, 'dsh-theme-tone: workstart probe')
 
   // 明暗轴切换：token 层已按模式给全，presenter 会自己取用，故只需重算层与行。

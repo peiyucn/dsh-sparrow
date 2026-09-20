@@ -62,4 +62,19 @@ describe('workstart：未选工作区待启动态的判定（纯函数）', () =
     const css = await readFile(new URL('../src/glass.ts', import.meta.url), 'utf8')
     assert.ok(!/border[^;]*dashed/u.test(css), '本插件自己不该画虚线边框（边界让回官方）')
   })
+
+  it('⛔ 卸载必须取消尚未触发的探测帧（否则属性会被写回、永久残留）', async () => {
+    // 回归守卫：`ctx.effect` 只跑它收集到的 disposer，**不会**替你取消已入队的 rAF。
+    // 少了 cancelAnimationFrame 就会出现「变动入队 → 卸载 → 帧才到 → 把刚摘掉的
+    // WORKSTART_ATTR 重新写回」——卸载后属性永久残留在 body 上。
+    const { readFile } = await import('node:fs/promises')
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(src, /let probeFrame = 0/u, 'rAF 句柄必须存下来')
+    assert.match(src, /probeFrame = requestAnimationFrame\(/u, 'rAF 返回值必须赋给 probeFrame')
+    assert.match(src, /cancelAnimationFrame\(probeFrame\)/u, '清理时必须取消该帧')
+    // 取消与 observer.disconnect() 必须在**同一个** effect 的清理里
+    const cleanup = src.slice(src.indexOf('dsh-theme-tone: workstart probe') - 700, src.indexOf('dsh-theme-tone: workstart probe'))
+    assert.ok(cleanup.includes('observer.disconnect()'), '清理里要断开 observer')
+    assert.ok(cleanup.includes('cancelAnimationFrame'), '同一个清理里要取消 rAF')
+  })
 })
