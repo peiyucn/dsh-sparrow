@@ -44,6 +44,24 @@ import {
 import { buildGlassCss, GLASS_SPECULAR_RING } from '../lib/glass.js'
 
 /**
+ * 取**某一条规则**的规则体（花括号内的声明串）。
+ *
+ * 为什么要这个 helper：全表 `css.includes(x)` 这种非局部断言会被**别处的巧合**喂饱
+ * —— 同一个图层串可能被多条规则使用（例如 `menuSurfaceLayers()` 同时被三条停靠卡规则用），
+ * 于是「本规则必须用它」这条断言即使本规则改坏了也照样为真。
+ * 断言「某条规则的内容」时必须先把作用域收进那条规则。
+ * @param css - 整张样式表文本。
+ * @param selectorWithBrace - 选择器片段，**含结尾的 ` {`**（避免与前缀相同的另一条撞名）。
+ * @returns 该规则的规则体。
+ */
+function bodyOfRule(css, selectorWithBrace) {
+  const at = css.indexOf(selectorWithBrace)
+  assert.ok(at >= 0, `缺规则：${selectorWithBrace}`)
+  const open = css.indexOf('{', at)
+  return css.slice(open + 1, css.indexOf('}', open))
+}
+
+/**
  * 官方抬升面 rung 的**数值真值** —— 从官方调色板逐字抄下来的一份契约快照
  * （`ui-theme/src/styles/design-platform.css:53-71` 的 light 静态块、`:129-147` 的 dark 静态块，
  * alias 绑定在 `:156-247` / `:249-340`）。这里抄数值是为了能在测试里算「混合后还亮不亮」，
@@ -800,7 +818,12 @@ describe('抬升面：表面绘制', () => {
     assert.ok(layers.includes(POPUP_BOTTOM_SHAPE), '底光要留（锚盒子底部，与吸顶标题不相遇）')
     assert.ok(!layers.includes(POPUP_TOP_SHAPE), '**顶光必须去掉** —— 它是横带的唯一来源')
     assert.ok(!layers.includes(TOP_VARIABLE), '顶光变量也不该出现在这条里')
-    assert.ok(css.includes(layers), '去顶光的图层串必须在表里')
+    // ⚠️ 必须断言**在这一条规则的规则体里**，不能用全表 `css.includes(layers)` ——
+    // 那个串同时被三条停靠卡规则使用，`includes` 会被别处喂饱：
+    // 即使本规则改回含顶光的 `surfaceLayers()`，全表断言照样为真（守卫形同虚设）。
+    const gatedBody = bodyOfRule(css, `${gated} {`)
+    assert.ok(gatedBody.includes(layers), '去顶光的图层串必须在**这条规则**里')
+    assert.ok(!gatedBody.includes(TOP_VARIABLE), '本条规则不得含顶光变量')
 
     // 标题条本身也要拿回颗粒，否则标题上没颗粒、菜单上有 → 一层极淡的接缝
     const titleRule = `${gated} ${GROUPED_MENU_TITLE_SELECTOR}`
@@ -1083,10 +1106,23 @@ describe('抬升面：表面绘制', () => {
     assert.ok(!/hover/u.test(body), '不该自己重写 hover（官方那条规则天然保留）')
     // ⚠️ 不许写到 body 上：这 token 语义通用（现在只有 .uV2eYG_add 一个消费方，
     // 官方将来若接上别的组件，写 body 会误伤）。范围收在卡片里。
-    assert.ok(
-      !/^body:not\(\[[^\]]*\]\) \{\s*--dsw-specific-selector/u.test(css),
-      '不得把该 token 覆盖写到 body 上（会外溢到别的组件）',
-    )
+    //
+    // ⚠️ 这里的 `m` 标志**不能省**：`buildSurfaceCss()` 的产物以注释 `/* … */` 开头，
+    // 没有 `m` 时 `^` 只锚定整个字符串的起点 → 永远匹配不到 → `!test(...)` 恒为真，
+    // 这条断言对任何输入都不动（实测：构造一份真的把该 token 写到 body 上的产物，
+    // 无 `m` 时为 false、加 `m` 后为 true）。故断言改写为「逐规则找是否有 body 级声明」，
+    // 比正则更直白且不受锚点影响。
+    for (const rule of css.matchAll(/(^|\n)([^{}\n]+)\{([^{}]*)\}/gu)) {
+      const selector = rule[2].trim()
+      const bodyText = rule[3]
+      if (!/^body[^ ]*$\s*/u.test(selector) && selector !== 'body') continue
+      assert.ok(
+        !bodyText.includes('--dsw-specific-selector'),
+        `不得把该 token 覆盖写到 body 上（会外溢到别的组件）：${selector}`,
+      )
+    }
+    // 正向确认：该 token 确实写在图标按钮那条规则里（否则上面那条循环会「空过」）
+    assert.ok(body.includes('--dsw-specific-selector'), '该 token 应写在图标按钮规则里')
   })
 
   it('不应该 依赖官方 hashed 类名，也不应该 限定相位', () => {
