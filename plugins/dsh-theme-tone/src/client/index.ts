@@ -34,6 +34,7 @@ import {
   ROW_SLOT,
   SETTINGS_NAMESPACE,
   TOP_VARIABLE,
+  WORKSTART_ATTR,
   name,
 } from '../constants.js'
 import {
@@ -46,6 +47,7 @@ import {
 import { buildGlassCss, buildSeamCss } from '../glass.js'
 import { buildSurfaceCss } from '../surface.js'
 import { buildSweepCss } from '../sweep.js'
+import { isWorkstartProbe } from '../workstart.js'
 import {
   DEFAULT_SETTINGS,
   toneFieldFor,
@@ -187,8 +189,59 @@ export function apply(ctx: Context): void {
     paintLayer(ctx.theme.getTheme())
   }
 
+  /**
+   * 「未选工作区」待启动态的观测 —— 给 body 打 {@link WORKSTART_ATTR}，让玻璃把边界让回官方。
+   *
+   * 为什么需要观测：官方那个状态只体现为一个 **CSS-module 哈希类名**（不能写，仓库红线），
+   * 它同时写入的语义属性又全被本插件与官方其它控件污染（三选一全误命中，见 constants.ts）。
+   * 唯一可靠的判据是**那条虚线伪元素自己的签名** —— 所以只能读 `::after` 的计算样式。
+   *
+   * 代价与边界：
+   * * 每次只读**一个**元素（`[data-composer-card]`）的两个计算值，不做子树遍历；
+   * * `getComputedStyle` 会强制样式解析，故**同一帧内合并**（rAF 去抖），
+   *   且只在 DOM 变动时跑 —— hero 页与对话页都很安静，不会成为热路径；
+   * * observer 挂在 `document.body`（官方卡片进出都在其下），随 `ctx.effect` 卸载断开。
+   */
+  const probeWorkstart = (): void => {
+    const target = document.body ?? document.documentElement
+    const card = document.querySelector('[data-composer-card]')
+    let active = false
+    if (card !== null) {
+      // 传 null 取伪元素自身；`::after` 在部分引擎上要用 webkit 版取 mask。
+      const after = getComputedStyle(card, '::after')
+      active = isWorkstartProbe({
+        content: after.content,
+        maskImage: after.maskImage,
+        webkitMaskImage: after.getPropertyValue('-webkit-mask-image'),
+      })
+    }
+    if (active) target.setAttribute(WORKSTART_ATTR, '')
+    else target.removeAttribute(WORKSTART_ATTR)
+  }
+
+  /** 同一帧内合并多次 DOM 变动，避免连续写属性触发无谓重排。 */
+  let probeScheduled = false
+  const scheduleProbe = (): void => {
+    if (probeScheduled) return
+    probeScheduled = true
+    requestAnimationFrame(() => {
+      probeScheduled = false
+      probeWorkstart()
+    })
+  }
+
   repaint()
   ctx.effect(() => scope.subscribe(() => { repaint() }), 'dsh-theme-tone: settings scope')
+
+  // 待启动态观测：初跑一次，随后只在 DOM 变动时重算（同帧合并，见 scheduleProbe）。
+  // `attributes` 必须过滤到 class —— 否则官方每次改任意属性都会触发全量回调节流。
+  probeWorkstart()
+  ctx.effect(() => {
+    const root = document.body ?? document.documentElement
+    const observer = new MutationObserver(scheduleProbe)
+    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+    return () => { observer.disconnect() }
+  }, 'dsh-theme-tone: workstart probe')
 
   // 明暗轴切换：token 层已按模式给全，presenter 会自己取用，故只需重算层与行。
   // `ctx.on` 的监听器本身就以 effect 记在当前 fiber 上，卸载自动摘除，无需再包一层。
@@ -200,8 +253,9 @@ export function apply(ctx: Context): void {
     style.remove()
     disposeTokens?.()
     // 门也要摘掉：留着它，卸载后玻璃与抬升面两张表的规则会继续被挡（表本身也随 style 没了，
-    // 但属性不该残留在 body 上）。
+    // 但属性不该残留在 body 上）。待启动态标记同理 —— 它是本插件加的，卸载必须收干净。
     paintPlain(false)
+    ;(document.body ?? document.documentElement).removeAttribute(WORKSTART_ATTR)
   }, 'dsh-theme-tone: backdrop + token overrides')
 
   ctx.slots.inject(ROW_SLOT, () => ctx.slots.register({

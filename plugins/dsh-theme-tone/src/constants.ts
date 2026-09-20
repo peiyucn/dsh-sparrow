@@ -201,6 +201,36 @@ export const MARKER_ATTR = 'data-dsh-theme-tone'
  */
 export const PLAIN_ATTR = 'data-dsh-theme-tone-plain'
 
+/**
+ * 「输入框卡片此刻是**未选工作区**的待启动态」的 body 标记属性。
+ *
+ * 那个状态下官方会在卡片上加 `.…_cardWorkspaceTrigger`，靠 `::after` 画一圈**虚线圆角框**，
+ * 并**同时把 `--dsw-elevation-stroke-color` 设成 `transparent`** —— 即官方刻意让虚线框
+ * 成为那唯一的边界（`InputBar.module.css`：`cardWorkspaceTrigger` 规则组）。
+ *
+ * 而本插件的玻璃给卡片**无条件**加了悬浮投影 + 内嵌边光，于是**两套边缘语言叠在一起**
+ * （owner：「描边就有点不和谐了」）。方案：这个状态下撤掉我们的边光与悬浮投影，
+ * 把边界让回官方那条虚线（owner 定案 2026-09-20）。
+ *
+ * ## 为什么必须是行为探针，而不是 CSS 选择器
+ *
+ * 官方那条类名是 CSS-module 哈希（形如 `uV2eYG_cardWorkspaceTrigger`，每次构建都变），
+ * 仓库红线禁止写哈希类名。而它同时写入的语义属性**都不可用** —— 实测普通态下这三个
+ * 选择器**全部误命中**（被本插件的模型触发器 / 附件按钮 / 输入框污染）：
+ *
+ * | 候选 | 普通态 | 被谁污染 |
+ * | :--- | :--- | :--- |
+ * | `:has([aria-haspopup='menu'])` | true | 本插件的 `ccb-model-trigger` |
+ * | `:has([aria-haspopup])` | true | 附件按钮（listbox）/ 权限按钮（dialog） |
+ * | `:has([contenteditable])` | true | 输入框本身 |
+ *
+ * 所以改由 client 在 JS 里读卡片 `::after` 的计算值 —— 那条虚线的两个签名
+ * （`content` 非 `none` **且** `mask-image` 含 `stroke-dasharray`）在任何主题下都成立，
+ * 且与类名无关。判定逻辑是纯函数（见 `src/workstart.ts`），有单测。
+ */
+export const WORKSTART_ATTR = 'data-dsh-theme-tone-workstart'
+
+
 /** 背景层元素的类名。 */
 export const BACKDROP_CLASS = 'dsh-theme-tone'
 

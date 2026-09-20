@@ -20,7 +20,7 @@ import {
 } from '../lib/glass.js'
 /** 浅色轴暗边用的官方最深静态色 token。 */
 const SHADE_TOKEN = '--dsw-static-neutral-bluish-1000'
-import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_TILE_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, SIDE_ATTR, WIDTH_HANDLE_ATTR } from '../lib/constants.js'
+import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_TILE_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, SIDE_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
 import { BACKDROP_GRADIENTS, dimmedBackdropGradients } from '../lib/backdrop.js'
 
 const css = buildGlassCss()
@@ -271,6 +271,35 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // 早先底座上还压着一层 40% 填充，故当时按「合成不透明度」设上限；
     // 夹层撤掉后，**卡片这一层就是最终不透明度**，判据随之简化。
     assert.ok(GLASS_CARD_ALPHA <= 0.82, `卡片不透明度 ${(GLASS_CARD_ALPHA * 100).toFixed(0)}% 太高，玻璃看不出来`)
+  })
+
+  it('未选工作区（待启动态）应该 撤掉我们的边光，把边界让回官方虚线框', () => {
+    // owner 2026-09-20：「点击选择工作区的页面，改成玻璃输入框后，它这个描边就有点不和谐了」
+    //   → 定案 (a)：这个状态下撤我们的边光，官方的虚线框成为唯一边界。
+    // 官方在那个状态**自己**把 --dsw-elevation-stroke-color 设成 transparent，
+    // 即刻意让虚线成为唯一那道边；我们再叠镜面 + 暗壁就是两套边缘语言。
+    const rule = new RegExp(
+      `body:not\\(\\[${PLAIN_ATTR}\\]\\)\\[${WORKSTART_ATTR}\\][^{]*\\[data-composer-card\\]\\s*\\{([^}]*)\\}`,
+      'u',
+    ).exec(css)
+    assert.ok(rule !== null, `缺待启动态的卡片规则（应带 [${WORKSTART_ATTR}] 标记）`)
+    const body = rule[1]
+    // 必须保留官方自己的抬升投影 —— 那是官方语义，不归我们撤。
+    assert.match(body, /box-shadow:\s*var\(--dsw-elevation-soft\)/u, '应保留官方 --dsw-elevation-soft')
+    // ⛔ 不得含我们的悬浮投影，也不得含任何 inset 边光（镜面 / 暗壁一律撤）。
+    for (const line of GLASS_CARD_LIFT.split(',')) {
+      assert.ok(!body.includes(line.trim()), `待启动态不得含我们的悬浮投影：${line.trim()}`)
+    }
+    assert.ok(!/inset/u.test(body), '待启动态不得含 inset 边光 —— 与官方虚线框并存就是两条边')
+    // 玻璃本体（填充 / 模糊）**保留**：卡片仍是玻璃，只是边缘交给官方。
+    assert.ok(!/backdrop-filter/u.test(body), '这条规则不该重复声明 backdrop-filter（上面那条已给）')
+  })
+
+  it('⛔ 待启动态规则必须**排在**卡片玻璃规则之后（同特异性靠后者胜出）', () => {
+    const normal = css.indexOf('[data-composer-seat] [data-composer-card]')
+    const workstart = css.indexOf(`[${WORKSTART_ATTR}]`)
+    assert.ok(normal >= 0 && workstart >= 0, '两条规则都应存在')
+    assert.ok(workstart > normal, '待启动态规则必须在卡片玻璃规则之后，否则覆盖不生效')
   })
 
   it('卡片应该 带**一圈镜面高光**（液态玻璃的「玻璃厚度」），且分主光方向', () => {
@@ -554,9 +583,11 @@ describe('glass：边界与纪律', () => {
     for (const phase of GLASS_CARD_PHASES) {
       assert.match(css, new RegExp(`\\[data-phase='${phase}'\\]`, 'u'), `卡片规则应覆盖 ${phase} 相位`)
     }
-    // 两条卡片规则（深 / 浅轴）都得带相位门
+    // 三条卡片规则（深轴 / 浅轴 / 未选工作区）都得带相位门。
+    // ⚠️ 第三条（待启动态）**也必须覆盖 hero** —— 「未选工作区」就发生在 hero 页
+    // （`InputBar` 的 workspaceTrigger 条件：inert && !removed && onRequestWorkspace）。
     const cardBlocks = rules.split('}').filter(b => b.includes('[data-composer-card]'))
-    assert.equal(cardBlocks.length, 2, '卡片应有深 / 浅轴两条规则')
+    assert.equal(cardBlocks.length, 3, '卡片应有深轴 / 浅轴 / 待启动态三条规则')
     for (const block of cardBlocks) {
       const selector = block.slice(0, block.indexOf('{')).trim()
       for (const phase of GLASS_CARD_PHASES) {

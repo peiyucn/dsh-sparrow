@@ -457,6 +457,48 @@ const phase = settling ? 'settling' : hero ? 'hero' : 'active'
 > 半透明与边光都照常生效（那是主要观感来源）。真机上若觉得首页卡片偏「薄」，
 > 该调的是**填充 α 或边光**，而不是加模糊（加模糊在无内容背景上照样看不出来）。
 
+### 5.6 「未选工作区」待启动态：**把边界让回官方那条虚线框**
+
+首页在「还没选工作区」时，官方给输入框卡片画一圈**虚线圆角框**，并**同时**把
+`--dsw-elevation-stroke-color` 设成 `transparent` —— 即它刻意让那条虚线成为**唯一**的边界。
+
+本插件的玻璃给卡片**无条件**加了悬浮投影 + 内嵌边光，于是两套边缘语言叠在一起
+（owner 2026-09-20：「点击选择工作区的页面，改成玻璃输入框后，它这个描边就有点不和谐了」）。
+**定案：撤我们的、留官方的。**
+
+| 撤掉 | 保留 |
+| :--- | :--- |
+| 悬浮投影 `GLASS_CARD_LIFT`（虚线框已承担「立形」） | 官方自己的 `--dsw-elevation-soft`（官方抬升语义，不归我们管） |
+| `inset` 边光 `rimFor()`（与虚线并存就是两条边） | 玻璃**填充**与 `backdrop-filter`（卡片本体仍是玻璃，只是边缘交给官方） |
+
+#### 为什么判定必须靠**行为探针**，而不是 CSS 选择器
+
+官方那个状态只体现为一个 **CSS-module 哈希类名**（形如 `uV2eYG_cardWorkspaceTrigger`，每次构建都变）
+—— 仓库红线禁止写哈希类名。而它同时写入的**语义属性全部不可用**，实测普通态下三个候选
+**都误命中**：
+
+| 候选选择器 | 普通态 | 被谁污染 |
+| :--- | :--- | :--- |
+| `:has([aria-haspopup='menu'])` | **true** | 本插件的 `ccb-model-trigger`（模型选择器） |
+| `:has([aria-haspopup])` | **true** | 附件按钮（`listbox`）/ 权限按钮（`dialog`） |
+| `:has([contenteditable])` | **true** | 输入框本身 |
+
+唯一可靠的判据是**那条虚线伪元素自己的签名**：官方用「实色块 + 虚线遮罩」画那圈框，
+所以页面上**查不到任何 `border-style: dashed`**（`border` 全是 `none`）。签名是两条同时成立：
+
+1. `::after` 的 `content` 不是 `none` / `normal` / 空串（**是**在渲染）；
+2. 它的 `mask-image`（或 `-webkit-mask-image`）里含 `stroke-dasharray`
+   （官方那段内联 SVG 圆角矩形的 `stroke-dasharray='4 4'`）。
+
+判定做成纯函数 `src/workstart.ts`（`isWorkstartProbe`），client 侧用 `MutationObserver`
+观察 `class` 变动、同帧合并后读一次 `getComputedStyle(card, '::after')` 并打 / 摘
+`WORKSTART_ATTR`；卸载时一并摘掉。真机实测三段闭环：普通态无属性 → 虚线出现即打上
+（投影与 inset 都撤掉、模糊保留）→ 虚线消失即复原。
+
+守卫在 `test/workstart.test.mjs`（判定纯函数）与 `test/glass.test.mjs`
+（CSS 形状：那条规则只能剩 `var(--dsw-elevation-soft)`、不得含 `inset`、且必须排在卡片玻璃规则**之后** ——
+同特异性靠后者胜出）。
+
 ### 5.5 右边栏：**被抬到 82 之后，得自己画一遍**光与颗粒
 
 **根因是抬升的代价**（与顶栏「金光没了」同一类，见 [03-palette](03-palette.md) 的不变式）：

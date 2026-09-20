@@ -35,7 +35,7 @@
  * 属性由 client 按 `backdropPlan(...).hidden` 打上 / 摘掉（见 constants.ts 的 `PLAIN_ATTR`）。
  */
 
-import { ABOVE_CONTENT_Z_INDEX, GRAIN_TILE_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WIDTH_HANDLE_ATTR } from './constants.js'
+import { ABOVE_CONTENT_Z_INDEX, GRAIN_TILE_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from './constants.js'
 import { BACKDROP_GRADIENTS, dimmedBackdropGradients } from './backdrop.js'
 
 /** 顶栏高度（px）。官方把它钉在这个值上，与左栏 38+38 对齐（`ConversationRoot.module.css:37-41`）。 */
@@ -757,6 +757,26 @@ body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) ${phaseGate(GLASS_CARD_PHASE
   box-shadow: var(--dsw-elevation-soft),
     ${GLASS_CARD_LIFT},
     ${rimFor('light')};
+}
+
+/* --- 未选工作区（待启动态）：**把边界让回官方那条虚线框** ---
+   官方在「还没选工作区」时给卡片画一圈虚线圆角框（::after + 内联 SVG 虚线遮罩），
+   并**同时**把 --dsw-elevation-stroke-color 设成 transparent —— 即它刻意让虚线成为
+   **唯一**的边界。而本插件的玻璃给卡片无条件加了悬浮投影 + 内嵌边光，
+   两套边缘语言叠加后「不和谐」（owner 2026-09-20 报，定案：撤我们的、留官方的）。
+
+   撤掉的是**两条与边缘有关**的：
+   * 悬浮投影 GLASS_CARD_LIFT（我们加的那段外投影）—— 虚线框已经承担了「立形」；
+   * inset 边光 rimFor（镜面 + 暗壁）—— 与虚线并存就是两条边。
+
+   **保留**：官方自己的 --dsw-elevation-soft（那是官方的抬升语义，不归我们管）、
+   玻璃填充与 backdrop-filter（卡片本体仍是玻璃，只是边缘交给官方）。
+
+   ⚠️ 判定属性由 client 的**行为探针**打上（见 constants.ts 的 WORKSTART_ATTR：
+   那条类名是哈希、语义属性又全被污染，只有读 ::after 的 mask 才认得出）。
+   这两条必须放在上面两条**之后** —— 同特异性下靠后者胜出。 */
+body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card] {
+  box-shadow: var(--dsw-elevation-soft);
 }
 
 /* ===== 右边栏：自己画一遍背景层的光与颗粒 =====
