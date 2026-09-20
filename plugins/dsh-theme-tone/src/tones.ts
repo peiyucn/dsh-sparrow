@@ -389,7 +389,7 @@ export const INSET_TINT: Readonly<Record<ColorScheme, number>> = Object.freeze({
  * **浅灰内嵌面**的 token 表 —— 底色取**官方自己那一档**（逐条写，因为两轴不同档）。
  *
  * 引用官方 `--dsw-static-*` 原始色阶而非 alias：alias 正是我们要覆盖的东西，引用会成自引用环。
- * 「默认」轴走 {@link OFFICIAL_INSET}（官方逐条绑定），保证完全不介入。
+ * 「默认」轴走每条自带的 `official` 字段（逐条回官方绑定），保证完全不介入。
  */
 export const INSET_TOKENS: readonly Readonly<{
   token: string

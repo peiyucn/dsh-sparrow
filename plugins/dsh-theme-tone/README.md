@@ -29,11 +29,13 @@ Open **Settings → General**. A **Tone** row sits directly under the official *
 | Dark | Default, Space (blue-violet), Ember (red), Glade (green) |
 | Light | Default, Frost (blue), Sakura (pink), Moss (green) |
 
-* **Default** changes nothing at all — no tokens are overridden and no background layer is painted, so you always have an untouched official look to compare against
+* **Default** overrides no tokens and paints no background layer, so you always have an untouched official look to compare against
 * Each card previews the tone it applies, so what you pick is what you get
 * Picking a tone takes effect immediately; no page reload
 
-Because both axes are available, the plugin never forces you onto a tone — uninstalling it (or selecting Default on both axes) restores the official appearance exactly.
+Because both axes are available, the plugin never forces you onto a tone — uninstalling it (or selecting Default on both axes) restores the official appearance.
+
+The one deliberate exception: the official **hover preview card** hard-codes its own background and text colours, which would stay a fixed dark grey under any tone. The plugin re-tints that one card so it follows the theme like everything else.
 
 ## What the tone drives
 
@@ -48,8 +50,8 @@ The dark axis keeps the deep-space palette from [pyai.site](https://pyai.site) �
 ## Compatibility
 
 * Targets dsh 0.1.5-rc.2 — the exact official version line this release is built and verified against (other lines are not covered)
-* If the host is missing a capability this plugin depends on (`ctx.theme.overrideTokens`, `ctx.settingsScope`, `ctx.slots` or `ctx.locale`), the plugin disables itself with a user-facing warning instead of running against an unknown contract — dsh and your other plugins are unaffected
-* If the browser lacks a CSS feature the glass effect needs, the plugin similarly disables itself rather than injecting rules that cannot work
+* If the host is missing a capability this plugin depends on (`ctx.theme.overrideTokens`, `ctx.settingsScope`, `ctx.slots` or `ctx.locale`), the plugin does not start
+* If the browser lacks the CSS features the background layer needs (`mix-blend-mode: screen`, `radial-gradient()`), the plugin disables itself with a user-facing warning rather than injecting rules that cannot work. The glass effect needs `backdrop-filter` too, but that one does **not** disable the plugin — without it the glass simply becomes a translucent panel, and the rest of the plugin keeps working
 * The plugin never touches official DOM structure, official React components, or hashed CSS-module class names
 
 ## Screenshot
