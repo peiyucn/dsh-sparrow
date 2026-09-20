@@ -14,6 +14,7 @@ import {
   PREVIEW_ALPHA_SCALE,
   PREVIEW_STOP,
   PREVIEW_TOP_SHAPE,
+  REQUIRED_CSS_FEATURES,
   tonePreview,
 } from '../lib/backdrop.js'
 import {
@@ -431,5 +432,27 @@ describe('DOM 选择器', () => {
     // 层选择器带 div 限定，才不会在 document.querySelector 时先命中 <head> 里的 <style>
     assert.ok(LAYER_SELECTOR.startsWith('div['))
     assert.ok(STYLE_SELECTOR.startsWith('style['))
+  })
+})
+
+describe('浏览器特性门', () => {
+  it('该门的三个特性应该 都在，且 backdrop-filter / :has() 有意不在', () => {
+    const names = REQUIRED_CSS_FEATURES.map(f => f.name)
+    // 三条「缺了插件就不成立」的：screen 合成（降级会压暗内容）、径向渐变（色调的载体）、
+    // color-mix（**22/38 个 token 的染色值全靠它**，缺了等于插件没生效却还占着设置行）。
+    for (const must of ['mix-blend-mode: screen', 'radial-gradient()', 'color-mix()']) {
+      assert.ok(names.includes(must), `特性门缺 ${must}`)
+    }
+    // 有意**不**门的：缺了只是「少覆盖几个面 / 退化成半透明」，为它停用整个插件不划算。
+    for (const mustNot of ['backdrop-filter', ':has()']) {
+      assert.ok(
+        !names.some(n => n.includes(mustNot)),
+        `${mustNot} 不该进特性门（缺它只是观感退化，见 backdrop.ts 的表）`,
+      )
+    }
+    // 探针必须非空（会交给 CSS.supports）
+    for (const feature of REQUIRED_CSS_FEATURES) {
+      assert.ok(feature.probe.length > 0, `${feature.name} 缺探针`)
+    }
   })
 })

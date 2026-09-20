@@ -203,10 +203,29 @@ export function boostAlpha(color: string, scale: number): string {
   return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${alpha.toFixed(3)})`
 }
 
-/** 深色轴配方依赖的浏览器特性；任一缺失即自停用（不降级成正片叠底，那会真压暗内容）。 */
+/**
+ * 浏览器特性门 —— 任一缺失即自停用（**不降级**）。
+ *
+ * 三条都是「缺了整个插件就不成立」，而不是「缺了只是少点质感」：
+ *
+ * | 特性 | 缺了会怎样 | 为什么不能降级 |
+ * | :--- | :--- | :--- |
+ * | `mix-blend-mode: screen` | 深色轴的颗粒与光会改用正常合成 | 正常合成是**压暗**，会把内容一起压黑（不是「少一点效果」） |
+ * | `radial-gradient()` | 背景层的光晕整个没了 | 色调的存在感主要靠它 |
+ * | `color-mix()` | **22 / 38 个 token 的值直接失效** | 这些 token 是**染色本身**（抬升面 / 交互态 / 内嵌面的色值全靠它算），失效后多数面回落到官方原色 —— 等于插件基本没生效，却还占着设置行 |
+ *
+ * **`backdrop-filter` 有意不在门里**（判据见 04-glass §6）：缺它只是玻璃退化成半透明面板，
+ * 色调那部分照常工作 —— 为它停用整个插件不划算。
+ *
+ * **`:has()` 也有意不门**：它只用在几条**锚点**规则上（surface 表 4 处 / 缝挡板 6 处），
+ * 缺失时那几条规则不命中、那些面退化回官方外观，但 token 层与背景层照常工作 ——
+ * 属于「少覆盖几个面」而非「插件失效」。旧引擎多半正是缺 `:has()` 的那一类，
+ * 为它停用会让本可正常工作的色调一起没了。
+ */
 export const REQUIRED_CSS_FEATURES: readonly { name: string; probe: string }[] = Object.freeze([
   Object.freeze({ name: 'mix-blend-mode: screen', probe: 'mix-blend-mode: screen' }),
   Object.freeze({ name: 'radial-gradient()', probe: 'background: radial-gradient(red, blue)' }),
+  Object.freeze({ name: 'color-mix()', probe: 'color: color-mix(in srgb, red 50%, blue)' }),
 ])
 
 /**
