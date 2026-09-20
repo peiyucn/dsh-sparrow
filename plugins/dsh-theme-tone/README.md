@@ -54,7 +54,7 @@ The dark axis keeps the deep-space palette from [pyai.site](https://pyai.site) â
 
 ## Screenshot
 
-![Tone row in Settings â†’ General](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone.png)
+![Dark axis on the new-session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone.png)
 
 ## Uninstall & leftovers
 

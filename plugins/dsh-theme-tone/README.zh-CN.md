@@ -54,7 +54,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone
 
 ## 截图
 
-![设置 → 常规里的色调行](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone.png)
+![新建会话页上的深色轴](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone.png)
 
 ## 卸载与残留
 
