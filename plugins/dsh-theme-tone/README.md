@@ -40,8 +40,8 @@ Because both axes are available, the plugin never forces you onto a tone — uni
 * The app background and the sidebar fill
 * A soft glow across the screen (upper light, lower depth, and a halo over the left sidebar)
 * A fine grain texture
-* Raised surfaces — menus, dialogs, toasts and elevated cards — inherit the tone's hue
-* Interactive states (hover, pressed, selected), separators and scrollbars are tinted to match
+* Raised surfaces — menus, dialogs and elevated cards — inherit the tone's hue; interactive states, separators and scrollbars are tinted to match
+* Inset grey surfaces — code blocks and the three cards above the composer (todo, goal, queued messages) — sit one step heavier than the page background, so their edges read at a glance
 
 The dark axis keeps the deep-space palette from [pyai.site](https://pyai.site) — a near-black ground with a single warm-gold light source. The light axis mirrors that structure with an official white ground lit by the tone's own colour.
 
