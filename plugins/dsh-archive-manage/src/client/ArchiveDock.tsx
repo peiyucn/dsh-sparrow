@@ -152,13 +152,20 @@ export function ensureArchiveStyles(): void {
   user-select: none;
 }
 /* 分组线：父会话与其全部子会话视为一个整体块，分割线画在整块底部（父行自身不再画线）。
-   组内用 L 形连接线：竖线 = 子区容器 border-left（落点 = 父行折叠按钮中心 10px），
-   每个子节点一根 14px 横连钉在标题行中线（子行 padding-top 4px + 行高 22px → 15px），
-   末子节点用 ::after 盖掉竖线过肘残段（面板底色实色，覆盖安全）。 */
+   组内用 L 形连接线：竖线**由每个子节点自己画一段**（见 .dsh-archive-tree-node::after），
+   每个子节点一根 14px 横连钉在标题行中线（子行 padding-top 4px + 行高 22px → 15px）。
+
+   ⚠️ 竖线**不能**画成子区容器的 border-left：那样它在**末节点底部**仍会往下拖出一截，
+   于是需要一个「用面板底色盖掉残段」的补丁（.dsh-archive-tree-node-last::after）。
+   那个补丁只在「与父面**逐像素**同色」时成立 —— 而 dsh-theme-tone 会给抬升面
+   （本面板是 role='dialog'，被它的浮层锚点命中）叠一层**颗粒与光**，父面从此不再是纯色：
+   一条纯色的遮盖带盖在带颗粒的面上，就露成**一条白线**（owner 2026-09-20 报「看见蓝框里
+   那个白线了么…官方纯白色调因为同色所以看不见」）。
+   改成每节点自画竖段后，**没有任何一处依赖「与父面同色」**，色调插件怎么给质感都不会破。
+   （本段在模板字符串里，注释中不能出现反引号。） */
 .dsh-archive-tree-children {
   margin-left: 10px;
   padding-left: 14px;
-  border-left: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
 }
 .dsh-archive-tree-group {
   border-bottom: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
@@ -166,6 +173,7 @@ export function ensureArchiveStyles(): void {
 .dsh-archive-tree-node {
   position: relative;
 }
+/* 横连：从竖线右侧 14px，钉在标题行中线。 */
 .dsh-archive-tree-node::before {
   content: '';
   position: absolute;
@@ -175,14 +183,23 @@ export function ensureArchiveStyles(): void {
   height: 0;
   border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
 }
-.dsh-archive-tree-node-last::after {
+/* 竖段：每个节点自己画一段，从节点顶接续到**下一个**节点的肘部。
+   非末节点 ⇒ 贯通整行（bottom: 0），线才能接到下一个孩子；
+   末节点 ⇒ 只画到自己的肘部（见下一条），于是竖线在此**自然收口**，无需任何遮盖。
+   横坐标 left: -15px 与原先子区容器 border-left 的位置逐像素一致。 */
+.dsh-archive-tree-node::after {
   content: '';
   position: absolute;
   left: -15px;
-  top: 16px;
+  top: 0;
   bottom: 0;
-  width: 2px;
-  background: var(--dsw-alias-bg-layer-2, #f6f7f9);
+  width: 1px;
+  background: var(--dsw-alias-border-l1, #e2e5ea);
+}
+/* 末节点：竖线止于肘部（横连在 top:15px，故画到 16px 正好接上）。 */
+.dsh-archive-tree-node-last::after {
+  bottom: auto;
+  height: 16px;
 }
 .dsh-archive-trigger {
   flex: none;
