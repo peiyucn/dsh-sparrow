@@ -4,7 +4,7 @@
  *   两个模式一次给全，故明暗轴切换无需重写）。
  * - 两个径向染色 + 颗粒纹理由插件自有的固定背景层承载（token 装不下渐变与纹理），
  *   深色轴走 `mix-blend-mode: screen`、浅色轴走正常合成，见 src/backdrop.ts。
- * - 「设置 → 常规」外观区挂一条「色调」行（order 12，紧随官方外观 10 / 字号 11）。
+ * - 「设置 → 常规」外观区挂一条「色调」行（`ROW_ORDER`，紧随官方外观与字号之间）。
  *
  * 无 slots 之外的服务写操作、不碰官方 DOM 结构、不 import Node 模块；
  * 卸载即回收 token / 背景层 / 样式表 / 设置行。
@@ -149,7 +149,8 @@ export function apply(ctx: Context): void {
 
   resources.style = ensureStyles()
   resources.layer = ensureLayer()
-  const style = resources.style
+  // 只留 layer 的局部别名（渲染计划要写它的 style 属性）；
+  // style 仅由清理 effect 经 holder 回收，无其它读取点，故不取名。
   const layer = resources.layer
   const scope: SettingsScope<ThemeToneSettings> = ctx.settingsScope.bind<ThemeToneSettings>({
     namespace: SETTINGS_NAMESPACE,

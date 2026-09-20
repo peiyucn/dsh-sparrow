@@ -156,10 +156,13 @@ export interface GlassRing {
  *
  * | 边 | 相对光源 | 角色 | 实现 |
  * | :--- | :--- | :--- | :--- |
- * | 上缘 | 正对 | **高光**（最强、最锐） | 亮色 inset，lur 0 |
- * | 左缘 | 斜射 | **高光**（次强，带柔） | 亮色 inset，lur 1px |
- * | **右缘** | **背对** | **阴影**（不是光！） | **暗色** inset —— 见 {@link GLASS_SHADE_RING} |
- * | 下缘 | 穿过玻璃体 | **焦散**（弱光、最柔） | 亮色 inset，lur 2px |
+ * | 上缘 | 正对 | **高光**（最强、最锐） | {@link GLASS_EDGE_TOP}（主光） |
+ * | 左缘 | 斜射 | **高光**（次强，带柔） | {@link GLASS_EDGE_LEFT}（主光） |
+ * | **右缘** | **背对** | **阴影**（不是光！） | **暗色** —— 见 {@link GLASS_SHADE_RING} |
+ * | 下缘 | 穿过玻璃体 | **焦散**（弱光、最柔） | {@link GLASS_SPECULAR_RING} 的 `bottom`（`blur` 最大） |
+ *
+ * ⚠️ **主光是 `background-image` 的两条细长椭圆**（`GLASS_EDGE_TOP` / `GLASS_EDGE_LEFT`），
+ * 不是 `inset` 阴影；{@link GLASS_SPECULAR_RING} 里的 `top` / `bottom` 只是**底光**。
  *
  * ## 为什么「右边是阴影」是关键
  *

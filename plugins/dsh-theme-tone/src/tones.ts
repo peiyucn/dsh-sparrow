@@ -14,10 +14,7 @@ import {
   GRAIN_TILE_VARIABLE,
   LEFT_VARIABLE,
   PANEL_VARIABLE,
-  POPUP_BOTTOM_SHAPE,
   POPUP_GRAIN_DATA_URI,
-  POPUP_STOP,
-  POPUP_TOP_SHAPE,
   TOP_STOP_VARIABLE,
   TOP_VARIABLE,
 } from './constants.js'
@@ -507,7 +504,7 @@ function surfaceFill(tint: string, scheme: ColorScheme, rung: SurfaceRung): stri
   if (tint === '') return `var(${OFFICIAL_RUNGS[scheme][rung]})`
   // ⚠️ 面板用**专用**的 {@link PANEL_TINT}（2026-09-18 从 SURFACE_TINT 拆出）——
   // 地面已回官方无色，面板太艳会与地面「两张皮」。交互态 / 滚动条仍用 SURFACE_TINT。
-  return rungFill(tint, scheme, SURFACE_RUNGS[scheme][rung], PANEL_TINT[scheme])
+  return rungFill(tint, SURFACE_RUNGS[scheme][rung], PANEL_TINT[scheme])
 }
 
 /**
@@ -516,13 +513,15 @@ function surfaceFill(tint: string, scheme: ColorScheme, rung: SurfaceRung): stri
  * 引用 static 而**不是** alias：alias 正是我们要覆盖的东西，引用它会形成自引用环。
  * 传色阶的**完整变量名**（如 `--dsw-static-neutral-bluish-800` / `--dsw-static-deepseek-100`），
  * 与 {@link SURFACE_RUNGS} 同一个口径 —— 抬升面与交互态共用这一条。
+ *
+ * 比例由调用方按轴给出（`PANEL_TINT` / `SURFACE_TINT` / `INSET_TINT` 都按轴取值），
+ * 本函数**不感知明暗轴** —— 同一档色阶在两个轴上怎么混是调用方的事。
  * @param tint - 本色通道值（`'R, G, B'`）；`''` → 直通官方色阶（等于官方原值）。
- * @param scheme - 明暗轴（决定混合比例）。
  * @param rung - 官方原始色阶的完整变量名。
  * @param scale - 混合比例 0–1。
  * @returns CSS 颜色字面量。
  */
-function rungFill(tint: string, scheme: ColorScheme, rung: string, scale: number): string {
+function rungFill(tint: string, rung: string, scale: number): string {
   const reference = `var(${rung})`
   // 比例为 0 时直通官方引用 —— 不产出 `color-mix(… 0%, …)` 那种恒等包装，
   // 「官方底色不动」在产物里逐字符可见（浅色轴的面板就是走这条路，见 {@link PANEL_TINT}）。
@@ -1022,8 +1021,8 @@ export function tokenOverrides(settings: ThemeToneSettings): TokenOverrides {
   // 浅灰内嵌面（代码块 / 三张停靠卡）：**独立通道、独立比例**，取官方自己那一档。
   for (const { token, official } of INSET_TOKENS) {
     overrides[token] = {
-      light: rungFill(light.tint, 'light', official.light, INSET_TINT.light),
-      dark: rungFill(dark.tint, 'dark', official.dark, INSET_TINT.dark),
+      light: rungFill(light.tint, official.light, INSET_TINT.light),
+      dark: rungFill(dark.tint, official.dark, INSET_TINT.dark),
     }
   }
   // 浮层面板底色：单独发一份，给「自带硬编码底色」的弹层兜底（surface.ts 的选择器读它）。
@@ -1043,8 +1042,8 @@ export function tokenOverrides(settings: ThemeToneSettings): TokenOverrides {
   // 交互态：无 alpha 的面走 color-mix，低 alpha 的洗染只换 RGB、保住 alpha。
   for (const entry of STATE_TOKENS) {
     overrides[entry.token] = {
-      light: rungFill(light.tint, 'light', entry.light, SURFACE_TINT.light),
-      dark: rungFill(dark.tint, 'dark', entry.dark, SURFACE_TINT.dark),
+      light: rungFill(light.tint, entry.light, SURFACE_TINT.light),
+      dark: rungFill(dark.tint, entry.dark, SURFACE_TINT.dark),
     }
   }
   for (const { token, official } of [...WASH_TOKENS, ...BORDER_TOKENS]) {
@@ -1056,8 +1055,8 @@ export function tokenOverrides(settings: ThemeToneSettings): TokenOverrides {
   // 滚动条：实心变量引用，走 color-mix（与抬升面同一个比例）。
   for (const { token, light: lightRung, dark: darkRung } of SCROLLBAR_TOKENS) {
     overrides[token] = {
-      light: rungFill(light.tint, 'light', lightRung, SURFACE_TINT.light),
-      dark: rungFill(dark.tint, 'dark', darkRung, SURFACE_TINT.dark),
+      light: rungFill(light.tint, lightRung, SURFACE_TINT.light),
+      dark: rungFill(dark.tint, darkRung, SURFACE_TINT.dark),
     }
   }
   return overrides
