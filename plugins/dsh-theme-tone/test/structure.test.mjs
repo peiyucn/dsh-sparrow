@@ -70,4 +70,48 @@ describe('dsh-theme-tone 结构', () => {
       assert.ok(!imported.test(source), `${rel} 不得 import schemastery（会进客户端 bundle）`)
     }
   })
+
+  it('⛔ 设置「未就绪」时不得用默认值上色（否则每次冷加载都闪一下默认配色）', async () => {
+    // 回归守卫：`status === 'loading'` 时 `value` 也是 undefined，若写成
+    // `value ?? DEFAULT_SETTINGS` 就会先按默认画一遍（浅 official / 深 violet），
+    // 等宿主回值再纠正 —— 改过色调的用户每次冷加载都看到一次可见跳变。
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.ok(
+      !/\.value \?\? DEFAULT_SETTINGS/u.test(src),
+      '不得用 `value ?? DEFAULT_SETTINGS` —— 未就绪时会画默认值',
+    )
+    assert.match(src, /status !== 'loading'/u, '必须有「loading 不上色」的门')
+    assert.match(src, /shouldPaint/u, 'repaint 要经过 shouldPaint 门')
+  })
+
+  it('⛔ 宿主不可写时必须落到进程内兜底并告警（不得静默空操作）', async () => {
+    // 回归守卫：官方 `SettingsScopeController.enqueue()` 在 memory 模式直接 return，
+    // `subscribe` 也永不触发。若 setTone 只调 scope.set，用户点色调会毫无反应且无日志。
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(src, /localSettings/u, '要有进程内兜底值')
+    assert.match(src, /snapshot\.writable/u, 'setTone 要检查 writable')
+    assert.match(src, /ctx\.logger\?\.warn/u, '不可持久化时要记一条面向用户的告警')
+    // setTone 的分支里必须真的写兜底值 + 立刻重绘
+    const i = src.indexOf('setTone:')
+    const seg = src.slice(i, i + 800)
+    assert.ok(seg.includes('localSettings'), 'setTone 不可写分支要写 localSettings')
+    assert.ok(seg.includes('repaint()'), 'setTone 不可写分支要立刻重绘')
+  })
+
+  it('⛔ 资源必须先武装清理、再创建（中途抛错不得留下无生命周期的 style / 层）', async () => {
+    // 回归守卫：cordis 只跑**已注册**的 disposer。若先 ensureStyles/ensureLayer 再注册清理，
+    // 两者之间任一环节抛错（bind / overrideTokens 校验 / locale 重名）都会让 <style> 与背景层
+    // 永久残留，且 PLAIN_ATTR 从未置上 → 三张表的 body:not([PLAIN_ATTR]) 规则全部 fail-open。
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    const iCleanup = src.indexOf('dsh-theme-tone: backdrop + token overrides')
+    const iStyles = src.indexOf('resources.style = ensureStyles()')
+    const iLayer = src.indexOf('resources.layer = ensureLayer()')
+    assert.ok(iCleanup > 0 && iStyles > 0 && iLayer > 0, '锚点缺失（实现改过？）')
+    assert.ok(iCleanup < iStyles, '清理 effect 必须注册在 ensureStyles() **之前**')
+    assert.ok(iCleanup < iLayer, '清理 effect 必须注册在 ensureLayer() **之前**')
+    // 清理里不得再直接引用 style/layer 常量 —— 要用 holder，否则 ensureLayer 抛错时
+    // style 已创建却无人回收（const 绑定尚未完成）。
+    assert.match(src, /resources\.style\?\.remove\(\)/u, '清理要从 holder 取 style')
+    assert.match(src, /resources\.layer\?\.remove\(\)/u, '清理要从 holder 取 layer')
+  })
 })

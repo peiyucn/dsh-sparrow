@@ -121,8 +121,36 @@ export function apply(ctx: Context): void {
     })),
   ])
 
-  const style = ensureStyles()
-  const layer = ensureLayer()
+  /**
+   * 先武装清理，再创建资源。
+   *
+   * ⚠️ **顺序不能反**：cordis 只跑**已注册**的 disposer。若先 `ensureStyles()` /
+   * `ensureLayer()` 再注册清理，那么两者之间任一环节抛错（`settingsScope.bind`、
+   * 首次 `repaint` 里的 `overrideTokens` 校验、`locale.register` 重名…）都会让
+   * `<style>` 与背景层**永久留在 DOM 里**，而 `PLAIN_ATTR` 从未置上 →
+   * 三张表的 `body:not([PLAIN_ATTR])` 规则全部 fail-open 命中，
+   * 得到一个「样式生效、无背景层、无生命周期」的半应用态。
+   *
+   * 用一个可变 holder 装资源：`ensureStyles` 自身抛错时 holder 仍为空，清理是空操作；
+   * 它成功而 `ensureLayer` 抛错时，holder 里已有 style，清理照样收得掉。
+   * 注册顺序也顺带正确 —— cordis 按注册的**逆序**跑 disposer，先注册者最后运行，
+   * 正好让资源在所有其它 effect 之后回收。
+   */
+  const resources: { style?: HTMLStyleElement; layer?: HTMLDivElement } = {}
+  ctx.effect(() => () => {
+    resources.layer?.remove()
+    resources.style?.remove()
+    disposeTokens?.()
+    // 门也要摘掉：留着它，卸载后玻璃与抬升面两张表的规则会继续被挡（表本身也随 style 没了，
+    // 但属性不该残留在 body 上）。待启动态标记同理 —— 它是本插件加的，卸载必须收干净。
+    paintPlain(false)
+    ;(document.body ?? document.documentElement).removeAttribute(WORKSTART_ATTR)
+  }, 'dsh-theme-tone: backdrop + token overrides')
+
+  resources.style = ensureStyles()
+  resources.layer = ensureLayer()
+  const style = resources.style
+  const layer = resources.layer
   const scope: SettingsScope<ThemeToneSettings> = ctx.settingsScope.bind<ThemeToneSettings>({
     namespace: SETTINGS_NAMESPACE,
   })
@@ -133,7 +161,60 @@ export function apply(ctx: Context): void {
   let lastTokenKey = ''
   let revision = 0
 
-  const readSettings = (): ThemeToneSettings => scope.getSnapshot().value ?? DEFAULT_SETTINGS
+  /**
+   * 进程内兜底值 —— 宿主侧设置**不可用**时（非 loopback 的 memory 模式，或命名空间未暴露）
+   * 用它承载本次会话的选择。
+   *
+   * 为什么必须有：官方契约 `mode: 'memory'` 时 `writable` 恒为 false，
+   * 且 `SettingsScopeController.enqueue()` 在 memory 下**直接 return**
+   * （官方 `ui-settings/lib/client.js`：`if (this.persistence === "memory" || this.disposed)
+   * return Promise.resolve()`）。也就是说此时 `set()` 是**静默空操作**、`subscribe` 永不触发
+   * （只有 `persistence === "host"` 才订阅 mirror）。
+   *
+   * 若不做兜底：用户点色调**屏幕毫无反应、也无任何日志** —— 既违反本插件 spec
+   * （01-design §6「按 ui-theme 对非 loopback 的口径降级为进程内状态，并在日志里说明」），
+   * 也违反根规范《鲁棒性·失败路径用户可见》与《扩展与宿主兼容·不得带病运行》。
+   */
+  let localSettings: ThemeToneSettings = DEFAULT_SETTINGS
+  let warnedNoPersistence = false
+
+  /**
+   * 当前该用哪份设置。
+   *
+   * ⚠️ 这里**不能**写成 `value ?? DEFAULT_SETTINGS`：`status === 'loading'` 时
+   * `value` 也是 `undefined`，那样会在宿主回第一帧之前**先按默认值上色**，
+   * 等真值到达再纠正 —— 改过色调的用户每次冷加载都会看到一次可见跳变
+   * （浅色轴默认 `official`、深色轴默认 `violet`，与多数人的实际选择不同）。
+   * 就绪前一律用**进程内兜底值**（初值 = 默认，且此时没人改过它），
+   * 并由 {@link shouldPaint} 决定先不上色。
+   */
+  const readSettings = (): ThemeToneSettings => {
+    const snapshot = scope.getSnapshot()
+    if (snapshot.status === 'ready' && snapshot.value !== undefined) return snapshot.value
+    return localSettings
+  }
+
+  /**
+   * 现在能不能上色。
+   *
+   * `loading`（宿主还没回第一帧）→ **不上色**：此刻没有任何权威值，
+   * 按默认值画一遍再纠正就是可避免的闪变（见 {@link readSettings}）。
+   * `ready` → 正常上色。`unavailable` → 用进程内兜底值上色（选择仍应生效，只是不持久化）。
+   */
+  const shouldPaint = (): boolean => scope.getSnapshot().status !== 'loading'
+
+  /** 宿主不可写时记**一条**告警（不重复刷）。 */
+  const warnIfNotPersistable = (): void => {
+    if (warnedNoPersistence) return
+    const snapshot = scope.getSnapshot()
+    if (snapshot.status === 'ready' && snapshot.writable) return
+    if (snapshot.status === 'loading') return
+    warnedNoPersistence = true
+    ctx.logger?.warn(
+      `${name}: 本次会话的设置无法写入宿主（${snapshot.mode === 'memory' ? '页面非本机回环地址' : '该设置项对当前客户端不可用'}）；`
+      + '色调仍会在本次会话内生效，但不会持久化。从本机回环地址访问 dsh 即可保存。',
+    )
+  }
 
   /**
    * 把「这一轴是官方默认」挂到 body 上 / 摘掉。
@@ -184,6 +265,10 @@ export function apply(ctx: Context): void {
 
   /** 设置变更：token、层、行全都要重算。 */
   const repaint = (): void => {
+    // 宿主还没回第一帧（`loading`）就不上色 —— 此刻没有权威值，按默认画一遍再纠正
+    // 就是一次可避免的闪变（见 readSettings 的 ⚠️）。
+    if (!shouldPaint()) return
+    warnIfNotPersistable()
     const settings = readSettings()
     paintTokens(settings)
     paintLayer(ctx.theme.getTheme())
@@ -263,15 +348,6 @@ export function apply(ctx: Context): void {
   ctx.on('theme/change', snapshot => { paintLayer(snapshot) })
 
   ctx.effect(() => ctx.locale.register(LOCALE_NAMESPACE, { zh, en }), 'dsh-theme-tone: locale dictionaries')
-  ctx.effect(() => () => {
-    layer.remove()
-    style.remove()
-    disposeTokens?.()
-    // 门也要摘掉：留着它，卸载后玻璃与抬升面两张表的规则会继续被挡（表本身也随 style 没了，
-    // 但属性不该残留在 body 上）。待启动态标记同理 —— 它是本插件加的，卸载必须收干净。
-    paintPlain(false)
-    ;(document.body ?? document.documentElement).removeAttribute(WORKSTART_ATTR)
-  }, 'dsh-theme-tone: backdrop + token overrides')
 
   ctx.slots.inject(ROW_SLOT, () => ctx.slots.register({
     name: ROW_SLOT,
@@ -282,10 +358,23 @@ export function apply(ctx: Context): void {
     inject: (actions: BoundActions<typeof rowStore>): ThemeToneRowInjected => {
       boundRow = actions
       // 注册后立刻补一次同步，避免丢掉「注册」与「首次事件」之间的变化。
-      paintLayer(ctx.theme.getTheme())
+      // 仍走 repaint 那道「未就绪不上色」的门 —— 注册早于宿主回值时不画默认色。
+      repaint()
       return {
         setTone: (id: ToneId) => {
-          void scope.set(toneFieldFor(ctx.theme.getTheme().active.colorScheme), id)
+          const scheme = ctx.theme.getTheme().active.colorScheme
+          const field = toneFieldFor(scheme)
+          const snapshot = scope.getSnapshot()
+          // 宿主不可写（memory 模式 / 命名空间未暴露）时 `scope.set` 是**静默空操作**，
+          // 点下去屏幕不会有任何反应。此时写进程内兜底值并立刻重绘，
+          // 让选择在**本次会话内**照常生效（只是不持久化），并记一条告警说明原因。
+          if (snapshot.status !== 'ready' || !snapshot.writable) {
+            localSettings = { ...localSettings, [field]: id }
+            warnIfNotPersistable()
+            repaint()
+            return
+          }
+          void scope.set(field, id)
         },
       }
     },
