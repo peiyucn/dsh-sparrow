@@ -18,8 +18,15 @@
 | `--dsw-alias-bg-layer-3` | 菜单族（`ui-primitives/Menu.module.css:18` 经 `--dsw-specific-menu`）、`PopupSelectView`、`ModelSelect`、`InputTrigger/MenuView`、`stat-dialog`、`JobListAction`、`ScheduleCatalogAction`、`SubagentHeaderLineage`、`ContextMeter` | `bluish-800` `rgb(53,54,56)` | `bluish-00` `#fff` |
 | `--dsw-alias-bg-layer-2` | 模态对话框（`ui-primitives/Modal.module.css:33`）、`DirectoryBrowser`、`SettingsRoot` | `bluish-850` `rgb(44,44,46)` | `bluish-00` `#fff` |
 | `--dsw-alias-bg-layer-1` | `OnboardingSurface`、`FeedbackDialog`、`Input`、`JsonTree`、各类抬升卡片 | `bluish-875` `rgb(35,35,36)` | `bluish-00` `#fff` |
-| `--dsw-specific-tip` | 浮动提示条：`TodoPanel`、`QueueDock`、`GoalBar` | `bluish-800` `rgb(53,54,56)` | `bluish-60` `rgb(245,246,247)` |
 | `--dsw-specific-menu` | 菜单专用别名，官方绑定在 `var(--dsw-alias-bg-layer-3)`（`design-platform.css:240/333`） | 同上 | 同上 |
+
+**另有一族「浅灰内嵌面」走独立通道**（见 §4.2，比例与抬升面**不同**）：
+
+| 官方 token | 谁在用 | 暗轴官方值 | 亮轴官方值 |
+| :--- | :--- | :--- | :--- |
+| `--dsw-alias-markdown-code-block` | 代码块、`ioCard`、`payload`、`instructionsCard`、Trajectory 各块（15+ 处） | `bluish-900` | `bluish-50` `#f9fafb` |
+| `--dsw-alias-markdown-code-block-banner` | 代码块顶栏 | `bluish-850` | `bluish-50` `#f9fafb` |
+| `--dsw-specific-tip` | **三张停靠卡**：`TodoPanel`、`GoalBar`、`QueueDock` | `bluish-800` | `bluish-60` `rgb(245,246,247)` |
 
 **为什么走 token 而不是写 CSS 选择器**：这些组件用的都是官方 hashed 类名（`._8HJdBW_cube` 之类），
 写选择器会直接违反「不碰 hashed 类名」这条红线；而 token 是官方**公开的 alias 层**，
@@ -54,8 +61,9 @@
   引用它会形成自引用环。
 * **「官方默认」直通**：`tint === ''` 时输出 `var(--dsw-static-neutral-bluish-800)`，
   逐字符等于官方自己的绑定 → 「官方默认」仍然与停用插件逐像素一致。
-* **整族收敛成一档**（`SURFACE_RUNGS`）：暗轴 `875`、浅轴 `60`，`layer-1/2/3 + 菜单 + 提示条` 同色。
+* **整族收敛成一档**（`SURFACE_RUNGS`）：暗轴 `875`、浅轴 `00`，`layer-1/2/3 + 菜单` 同色。
   官方的三档只差 4–6/255，肉眼分不出，是 owner 说的「不统一」的来源之一 —— 见 §8.1。
+  （`tip` **不在**这一族：它已归浅灰内嵌面通道，见 §4.0.2 —— 它要「比地面重」而本族要「与地面同深」。）
 * **「默认」这一轴走另一张表**（`OFFICIAL_RUNGS`）：官方默认必须逐条回到官方绑定，
   **不能**发我们选的档（否则 `layer-3` 会从 `800` 被改深，破「官方默认完全不动」）。
 
@@ -83,21 +91,89 @@
 浅色轴是**官方底色 + 主色打光**（地面是官方 `#fff`），此时面板若仍带本色就
 「**其他元素也得跟着适配**」—— 地面已经无色，而面板还带 14% 本色：
 
-| | 改前 | 改后 |
+| | 改前 | 现在 |
 | :--- | :--- | :--- |
 | 地面 | `#fff`（官方） | 不变 |
-| **面板填充**（菜单 / 对话框 / 卡片） | `#f4fbf5`（green，带本色） | **`#f9fdfa`**（`PANEL_TINT.light = .07`） |
+| **面板填充**（菜单 / 对话框 / 卡片） | `#f4fbf5`（green，带本色） | **纯官方引用**（`PANEL_TINT.light = 0`） |
 | 交互态面 / 滚动条 | `.14` | **不变**（仍走 `SURFACE_TINT`） |
 
 **为什么不一起降**：两者的**并列对象**不同 ——
 
-* 面板要与**无色的地面**同屏并列 ⇒ 太艳就成「地面无色、浮层有色」两张皮，故降到 `.07`（保留同族感）；
+* 面板要与**无色的地面**同屏并列 ⇒ 太艳就成「地面无色、浮层有色」两张皮，故收到 `0`；
 * 交互态面 / 滚动条**永远出现在已染色的面板之内**，不与地面直接并列 ⇒ 保持 `.14`。
+
+##### 浅色轴为什么收到 `0`（而不是 `.07`）
+
+`.07` 的实测值是 `#f9fdfa`（green），而官方「面」色是
+`--dsw-static-neutral-bluish-50` = **`#f9fafb`**（代码块、左侧栏都用它）—— **两者只差 1–3 阶**。
+后果是**任何用官方面色当背景的元素都不再可辨**。落点：Trajectory 视图的画布取
+`--dsw-alias-bg-layer-1`（`dsh-client-ui-trajectory` 的 `qBU-ya_root` / `Y0dWHa_split` / `Y0dWHa_table`），
+官方面是 `#fff`、代码块 `#f9fafb`（差 6 阶，灰底读得出来）；被染成 `#f9fdfa` 后与代码块同色 →
+**代码块的底色被吃掉**（owner 2026-09-20 报）。
+
+浅色口径是「**官方底色配置 + 打光用主色**」：既然打光已经给了色调，再往**面**上染色就是重复叠色，
+且必然改动官方底色。收到 `0` 后浅色轴的抬升面与官方**逐字符相同**，分层改由描边与阴影承担
+（与官方浅轴同法）。`rungFill` 对比例 `0` 直接短路成官方引用，不产出 `color-mix(… 0%, …)` 那种恒等包装。
 
 深色轴**不动**（两者仍同为 `.14`）：它的地面是本色染过的近黑、本就与面板同源，没有这个冲突。
 
 `PANEL_TINT` 只由 `surfaceFill()` 消费（面板填充）；`SURFACE_TINT` 仍由 `STATE_TOKENS` /
 `SCROLLBAR_TOKENS` 消费。两者**浅色轴已分离**，有测试钉住（`surfaces.test.mjs`）。
+
+#### 4.0.2) 浅灰内嵌面：**第三条通道**（`INSET_TOKENS` / `INSET_TINT`）
+
+官方浅色轴另有一族「**比背景略暗的浅灰面**」，用来在白色地面上圈出内容块：
+
+| 官方 token | 谁在用 | 官方浅色 | 官方深色 |
+| :--- | :--- | :--- | :--- |
+| `--dsw-alias-markdown-code-block` | 代码块、`ioCard`、`payload`、`instructionsCard`、Trajectory 各块（15+ 处） | `bluish-50` `#f9fafb` | `bluish-900` |
+| `--dsw-alias-markdown-code-block-banner` | 代码块顶栏 | `bluish-50` | `bluish-850` |
+| `--dsw-specific-tip` | **三张停靠卡**：`TodoPanel` / `GoalBar` / `QueueDock` | `bluish-60` `#f5f6f7` | `bluish-800` |
+
+**它与抬升面的目标相反，所以必须分开**：
+
+| 通道 | 语义位置 | 目标 | 比例 |
+| :--- | :--- | :--- | :--- |
+| 抬升面（`PANEL_TINT`） | 浮在地面**之上** | 要**浅**（别显脏） | 浅 `0` |
+| **内嵌面（`INSET_TINT`）** | 嵌在地面**之内** | 要**比地面重**才读得出 | 浅 `.12` |
+
+owner 的判断：「我看了下官方白色主题，这几个卡，包括代码块，都是浅灰色，所以我考虑要不我们用我们的
+主色来做这个事，这样就会比背景颜色重一些，正好就区分开了。」
+
+实测印证必要性：官方这两档与白背景分别只差 **5.1 / 9.1** 阶；而浅色轴抬升面回纯白后
+`--dsw-specific-tip` 一度等于 `#fff` —— **与背景同色**，三张停靠卡的面直接消失（只剩 4% 描边在撑）。
+染色后（本色 12% 混进官方灰）：
+
+| 色调 | 代码块 | 比背景 | 停靠卡 | 比背景 |
+| :--- | :--- | :--- | :--- | :--- |
+| 苔青 | `#f0f7f3` | −9.8 | `#edf4f0` | −12.8 |
+| 霜蓝 | `#edf6f9` | −10.7 | `#e9f2f6` | −14.6 |
+| 樱花 | `#f9f4f7` | −9.7 | `#f5f0f3` | −13.7 |
+
+即「比官方灰更重、但远不到彩色块」。**「默认」轴走 {@link OFFICIAL_INSET} 逐条回官方**（不含 `color-mix`）。
+
+**代码块比停靠卡浅 2–3 阶是刻意的**：两族官方基数本来就不同（代码块 `bluish-50` `#f9fafb`、
+停靠卡 `bluish-60` `#f5f6f7`），我们**沿用各自基数**，只是按同一比例混本色 ——
+所以官方「代码块更白、提示卡更深」的既有层级关系被保留，没有被我们抹平。
+（实测：苔青下代码块 `rgb(240,247,243)` L=245.2、停靠卡 `rgb(237,244,240)` L=241.9。）
+
+**比例是从 `.18` 收到 `.12` 的**：`.18` 在真机上 owner 觉得「还是有点重」，
+收到 `.12` 后代码块比白背景 −9.8、停靠卡 −12.8，仍远高于官方的 −5.1 / −9.1（读得出边界），
+但不再像灰板。若要再调，一次挪一格（`.10` / `.14`），下界参考官方的 −5.1。
+
+#### ⛔ 停靠卡的选择器规则**不得**再写 `background-color`
+
+三张停靠卡（`COMPOSER_CARD_ANCHORS`）既走 token 通道拿底色，又有一条选择器规则补图层。
+那条规则曾经写 `background-color: var(<面板变量>) !important` —— 在浅色轴面板比例还是 `.07` 时
+两者观感接近，看不出问题；**等抬升面收到 `0`（面板变量在浅色轴 = 纯白）之后**，
+这条 `!important` 就把三张卡的面**盖成了纯白**，token 层的染色完全失效
+（owner 随即反馈「goal、todo、排队对话好像都没改」）。
+
+**正解：底色归 token 层**（本节这条通道），选择器规则**只写 `background-image`**（它拿不到的颗粒 + 光）。
+有守卫钉住（`test/surfaces.test.mjs`：三条锚点的规则块里**不得出现 `background-color`**）。
+
+教训与「实色遮盖」同源：**同一块面只能有一个颜色来源**。两处都写、且其中一处是 `!important` 覆盖时，
+任何一边调整（这里是把面板比例收到 0）都会让另一边静默失效。
 
 ### 4.1) 不变量（token 层，测试逐条钉住，`test/surfaces.test.mjs`）
 
@@ -108,8 +184,11 @@
 | 两轴 `bottom` 那一层都**比底色亮** | 辉光的语义是「加亮」，有测试钉住 |
 | `DEPTH_ALPHA` 深 `.18` / 浅 `.54` | 浅色 `.54` = 色卡等效值（与卡面对齐）；深色是 owner 定过的数 |
 | 每个 rung 引用 `--dsw-static-*`，不引用 `--dsw-alias-*` | 防自引用环 |
-| 整族（layer-1/2/3 + 菜单 + 提示条）**同色** | 「不统一」的来源之一就是官方那三档只差 4–6/255 |
+| 整族（layer-1/2/3 + 菜单）**同色** | 「不统一」的来源之一就是官方那三档只差 4–6/255 |
 | 浮层填充**不得**再走 layer-* 那档浅灰、也不得是 color-mix | layer 族是行内面的档位；浮层走它就会再次变成「比地面亮的灰板」 |
+| 浅色轴**面板**比例恒为 `0`（抬升面逐字符等于官方） | 浅色口径是「官方底色 + 主色打光」；`.07` 实测 `#f9fdfa` 会压住官方面色 `#f9fafb` |
+| 浅灰内嵌面与抬升面**比例必须不同** | 两者目标相反：抬升面要浅、内嵌面要比地面重（§4.0.2） |
+| 浅灰内嵌面「官方默认」直通官方绑定、不含 `color-mix` | 同「完全不介入」底线 |
 | 暗轴阶梯单调（layer1 < layer2 < layer3） | 中性 rung 的次序不能被染色打乱 |
 | 暗轴三款在每个 rung 上仍可分辨 | 本色没被中性 rung 冲平 |
 | 不染工具提示 / 轻提示 / 遮罩 | 反色与遮罩语义不能被染 |
@@ -127,7 +206,7 @@
 这是**有意**的：这族 token 就是「抬升面」这一个语义，拆开覆盖会让同一个界面里
 （设置页里卡片与菜单同屏）出现一半带色、一半不带的斑驳。代价是改动面比字面需求大 ——
 若真机上认为行内卡片不该跟着变，**去掉 `SURFACE_TOKENS` 里的 `--dsw-alias-bg-layer-1` 一行**即可，
-菜单族（layer-2/3 / specific-menu / specific-tip）不受影响。
+菜单族（layer-2/3 / specific-menu）不受影响。
 
 **浮层的填充与图层不会波及行内面**：那两条走的是 `SURFACE_ANCHORS` 选择器（只命中浮层元素），
 不是「改一档 token 全体跟随」。`--dsw-alias-bg-layer-1/2/3` 的消费者（输入框 / JsonTree 头 / 设置卡片 / 表格行）
@@ -468,7 +547,10 @@ owner 圈出输入框左下那两个圆按钮（`+` 命令面板 / 附件）：
 | `--dsw-alias-state-success-*` / `-error-*` / `-warn-*` | 语义色在任何主题下都必须是它自己 |
 | `--dsw-alias-bg-mask-*` | 遮罩是黑色半透明，不是面 |
 | `--dsw-alias-border-inverted` / `-inverted2` | 两轴都是 `rgba(0, 0, 0, 0)`；染了等于凭空画出一条线 |
-| `--dsw-alias-markdown-code-block*` | 代码块（早期范围决定里明确排除的） |
+
+> 代码块 `--dsw-alias-markdown-code-block*` **不在此列**（要染）—— 它走 §4.0.2 的
+> 内嵌面通道（`INSET_TOKENS`），与停靠卡同一族。早期曾按「行内元素」排除，owner 2026-09-20
+> 指出它和停靠卡一样是「白色主题下的浅灰面」，染了才读得出边界。
 
 ### 7.3 一处判断题：`--dsw-specific-sidebar-nav-item-active-accent`
 
@@ -567,10 +649,11 @@ CSS 仍静态注入（可测、不重解析），只是选择器不命中。三�
 
 ## 10) 范围边界（染什么 / 不染什么）
 
-* **不染**：**代码块**（`--dsw-alias-markdown-code-block*`）、**输入框**（`--dsw-specific-input-major`，
-  它归玻璃那套，见 04-glass）、反色面（工具提示 / 轻提示）、零宽度描边（`border-inverted*`）、
+* **不染**：**输入框**（`--dsw-specific-input-major`，它归玻璃那套，见 04-glass）、
+  反色面（工具提示 / 轻提示）、零宽度描边（`border-inverted*`）、
   **语义色**（危险 / 品牌主按钮 / 成功错误警告，见 §7.2）。
-* **染**：`--dsw-alias-bg-layer-1/2/3`、`--dsw-specific-menu`、`--dsw-specific-tip`（**只给颜色**，见 §8.2）、
+* **染**：`--dsw-alias-bg-layer-1/2/3`、`--dsw-specific-menu`（**只给颜色**，见 §8.2）、
+  **浅灰内嵌面**（`--dsw-specific-tip` + `--dsw-alias-markdown-code-block*`，独立通道见 §4.0.2）、
   **交互态**（导航选中 / hover / 模块面板 / 按钮面 / 低 alpha 洗染）、**框内元素**
   （描边五档 / 滚动条四条，§7.5），以及**悬停卡**（`body > [role='button']`，§6.3.2）。
 * **「官方默认」下以上全部让路**：token 走 `OFFICIAL_RUNGS`，两张 CSS 表走 `PLAIN_ATTR` 门（§8.3）。

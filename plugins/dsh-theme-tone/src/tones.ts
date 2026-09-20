@@ -183,17 +183,25 @@ export const DEPTH_ALPHA: Readonly<Record<ColorScheme, number>> = Object.freeze(
  * | **面板填充**（本常量） | **`.07`** | 它要与**无色的地面**并列出现 —— 太艳就「地面无色的、浮层有色的」两张皮 |
  * | 交互态面 / 滚动条（{@link SURFACE_TINT}） | `.14` | 它们**永远出现在已染色的面板之内**，是「面板上的面」，与地面不同屏并列，保持原浓度即可 |
  *
- * ## 实测（本色混官方白，弹层候选）
+ * ## 浅色轴收到 `0`（2026-09-20）—— 染色会撞掉官方面
  *
- * | 比例 | green | blue | 说明 |
- * | :--- | :--- | :--- | :--- |
- * | `.14`（旧） | `#f4fbf5` | `#f0f9fc` | 与白地面并列时色偏明显 |
- * | **`.07`（本值）** | **`#f9fdfa`** | **`#f7fcfe`** | 保留同族感，又读得出「官方底色的浮起面」 |
- * | `0` | `#ffffff` | `#ffffff` | 与地面完全同色，只能靠描边 / 阴影分层 |
+ * 浅色轴原先取 `.07`，实测值 `#f9fdfa`（green）**恰好落在官方面色 `#f9fafb` 上**
+ * （`--dsw-alias-markdown-code-block` / `--dsw-static-neutral-bluish-50`，二者只差 1–3 阶）。
+ * 后果是**任何用官方面色当背景的元素都不再可辨**：Trajectory 视图的画布取
+ * `--dsw-alias-bg-layer-1`（`dsh-client-ui-trajectory` 的 `qBU-ya_root` / `Y0dWHa_split`），
+ * 官方面是 `#fff`、代码块是 `#f9fafb`，差 6 阶 → 灰底读得出来；
+ * 我们把它染成 `#f9fdfa` → 差 1–3 阶 → **代码块的底色被吃掉**。
+ *
+ * ## 为什么浅色轴应当是 `0`
+ *
+ * 浅色定的口径是「**官方底色配置 + 打光用主色**」——底色保持官方原值，色调由**打光层**
+ * （背景层 + 抬升面的颗粒 / 顶光 / 底光）承担。既然打光已经给了色调，
+ * 再往**面**上染色就是重复叠色，且必然改动官方底色 —— 与口径相悖。
+ * 收到 `0` 后浅色轴的抬升面与官方**逐字符相同**，分层改由描边与阴影承担（与官方浅轴同法）。
  *
  * 深色轴**不动**（`.14`）：它的地面是本色染过的近黑、面板本就同源，没有这个冲突。
  */
-export const PANEL_TINT: Readonly<Record<ColorScheme, number>> = Object.freeze({ light: 0.07, dark: 0.14 })
+export const PANEL_TINT: Readonly<Record<ColorScheme, number>> = Object.freeze({ light: 0, dark: 0.14 })
 
 /**
  * 交互态面 / 滚动条的染色比例：两轴各一档，全部色调共用。
@@ -328,7 +336,80 @@ export const SURFACE_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRun
  */
 export const POPUP_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRung }>[] = Object.freeze([
   Object.freeze({ token: '--dsw-specific-menu', rung: 'layer3' as const }),
-  Object.freeze({ token: '--dsw-specific-tip', rung: 'tip' as const }),
+])
+// ⚠️ `--dsw-specific-tip` **曾在此表**（当它是「菜单族」），现已移出：
+// 它的三个消费方是**三张停靠卡**（TodoPanel / GoalBar / QueueDock），不是菜单；
+// 且它需要的是「比地面重」而菜单族要的是「比地面浅」，目标相反。
+// 现归 {@link INSET_TOKENS}，走独立的 {@link INSET_TINT}。
+
+/**
+ * **浅灰内嵌面**（inset surface）的染色比例 —— 从抬升面那套里**独立出来**的新通道。
+ *
+ * ## 这些面是什么、为什么要单独一档（owner 2026-09-20 的想法）
+ *
+ * 官方浅色轴里有一族「比背景略暗的浅灰面」，用来在**白色地面上**圈出内容块：
+ *
+ * | token | 官方浅色 | 官方深色 | 谁在吃 |
+ * | :--- | :--- | :--- | :--- |
+ * | `--dsw-alias-markdown-code-block` | `bluish-50` `#f9fafb` | `bluish-900` | 代码块、`ioCard`、`payload`、`instructionsCard`、Trajectory 各块（15+ 处） |
+ * | `--dsw-alias-markdown-code-block-banner` | `bluish-50` | `bluish-850` | 代码块顶栏 |
+ * | `--dsw-specific-tip` | `bluish-60` `#f5f6f7` | `bluish-800` | **三张停靠卡**：`TodoPanel` / `GoalBar` / `QueueDock` |
+ *
+ * owner 的判断：「我看了下官方白色主题，这几个卡，包括代码块，都是浅灰色，所以我考虑要不我们
+ * 用我们的主色来做这个事，这样就会比背景颜色重一些，正好就区分开了。」
+ *
+ * 实测印证：官方这两档与白背景分别只差 **5.1 / 9.1** 阶亮度；而浅色轴的抬升面已回到**纯白**
+ * （`PANEL_TINT.light = 0`），于是 `--dsw-specific-tip` 一度等于 `#fff` —— **与背景同色**，
+ * 三张停靠卡的面直接「消失」（只剩 4% 的描边在撑）。代码块也只差 5 阶，几乎读不出边界。
+ *
+ * 染色后（本色 12% 混进官方灰）实测：
+ *
+ * | 色调 | 代码块 | 比背景 | 停靠卡 | 比背景 |
+ * | :--- | :--- | :--- | :--- | :--- |
+ * | 苔青 | `#f0f7f3` | −9.8 | `#edf4f0` | −12.8 |
+ * | 霜蓝 | `#edf6f9` | −10.7 | `#e9f2f6` | −14.6 |
+ * | 樱花 | `#f9f4f7` | −9.7 | `#f5f0f3` | −13.7 |
+ *
+ * 即「比官方灰更重、但远不到彩色块」——正是 owner 要的「区分开」。
+ *
+ * **代码块比停靠卡浅 2–3 阶是刻意的**：两族官方基数不同（代码块 `bluish-50` =
+ * `#f9fafb`，停靠卡 `bluish-60` = `#f5f6f7`），我们沿用各自基数、只按同一比例混本色，
+ * 于是官方「代码块更白、提示卡更深」的既有层级被保留，没有被抹平。
+ *
+ * **比例从 `.18` 收到 `.12`**：`.18` 在真机上 owner 觉得「还是有点重」。
+ * `.12` 仍显著高于官方的 −5.1 / −9.1（读得出边界），但不再像灰板。
+ * 再调一次挪一格（`.10` / `.14`）；下界参考官方的 −5.1。
+ *
+ * ## 为什么不复用 PANEL_TINT
+ *
+ * 抬升面（菜单 / 弹窗）是**浮在地面之上的面板**，浅色轴上 owner 明确要它「浅、别显脏」
+ * （第 12 轮），所以收到 0。而这族是**嵌在地面之内的内容块**，语义相反：它需要**比地面重**
+ * 才读得出来。两者目标冲突，必须分开。
+ */
+export const INSET_TINT: Readonly<Record<ColorScheme, number>> = Object.freeze({ light: 0.12, dark: 0.14 })
+
+/**
+ * **浅灰内嵌面**的 token 表 —— 底色取**官方自己那一档**（逐条写，因为两轴不同档）。
+ *
+ * 引用官方 `--dsw-static-*` 原始色阶而非 alias：alias 正是我们要覆盖的东西，引用会成自引用环。
+ * 「默认」轴走 {@link OFFICIAL_INSET}（官方逐条绑定），保证完全不介入。
+ */
+export const INSET_TOKENS: readonly Readonly<{
+  token: string
+  official: Readonly<Record<ColorScheme, string>>
+}>[] = Object.freeze([
+  Object.freeze({
+    token: '--dsw-alias-markdown-code-block',
+    official: Object.freeze({ light: '--dsw-static-neutral-bluish-50', dark: '--dsw-static-neutral-bluish-900' }),
+  }),
+  Object.freeze({
+    token: '--dsw-alias-markdown-code-block-banner',
+    official: Object.freeze({ light: '--dsw-static-neutral-bluish-50', dark: '--dsw-static-neutral-bluish-850' }),
+  }),
+  Object.freeze({
+    token: '--dsw-specific-tip',
+    official: Object.freeze({ light: '--dsw-static-neutral-bluish-60', dark: '--dsw-static-neutral-bluish-800' }),
+  }),
 ])
 
 /**
@@ -443,7 +524,9 @@ function surfaceFill(tint: string, scheme: ColorScheme, rung: SurfaceRung): stri
  */
 function rungFill(tint: string, scheme: ColorScheme, rung: string, scale: number): string {
   const reference = `var(${rung})`
-  if (tint === '') return reference
+  // 比例为 0 时直通官方引用 —— 不产出 `color-mix(… 0%, …)` 那种恒等包装，
+  // 「官方底色不动」在产物里逐字符可见（浅色轴的面板就是走这条路，见 {@link PANEL_TINT}）。
+  if (tint === '' || scale === 0) return reference
   return `color-mix(in srgb, rgb(${tint}) ${Math.round(scale * 100)}%, ${reference})`
 }
 
@@ -934,6 +1017,13 @@ export function tokenOverrides(settings: ThemeToneSettings): TokenOverrides {
     overrides[token] = {
       light: surfaceFill(light.tint, 'light', rung),
       dark: surfaceFill(dark.tint, 'dark', rung),
+    }
+  }
+  // 浅灰内嵌面（代码块 / 三张停靠卡）：**独立通道、独立比例**，取官方自己那一档。
+  for (const { token, official } of INSET_TOKENS) {
+    overrides[token] = {
+      light: rungFill(light.tint, 'light', official.light, INSET_TINT.light),
+      dark: rungFill(dark.tint, 'dark', official.dark, INSET_TINT.dark),
     }
   }
   // 浮层面板底色：单独发一份，给「自带硬编码底色」的弹层兜底（surface.ts 的选择器读它）。

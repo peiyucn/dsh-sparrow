@@ -5,6 +5,8 @@ import {
   DARK_TONES,
   DEFAULT_SETTINGS,
   DEPTH_ALPHA,
+  INSET_TINT,
+  INSET_TOKENS,
   LIGHT_GLOW_ALPHA,
   LIGHT_TOKENS,
   LIGHT_TONES,
@@ -226,9 +228,12 @@ describe('抬升面：谁被染', () => {
   })
 
   it('菜单族应该 单独成组，但只装颜色（图层归 surface.ts，见 POPUP_TOKENS）', () => {
-    // 菜单 / 提示条走 POPUP_TOKENS：**只给颜色**。曾经塞过整份图层配方，但官方把这个
+    // 菜单走 POPUP_TOKENS：**只给颜色**。曾经塞过整份图层配方，但官方把这个
     // token 也用在 sticky 分组标题上，百分比渐变按元素盒子缩放会把小条压成硬边金带。
-    assert.deepEqual(POPUP_TOKENS.map(entry => entry.token), ['--dsw-specific-menu', '--dsw-specific-tip'])
+    // ⚠️ 2026-09-20：`--dsw-specific-tip` **已移出本表** —— 它的消费方是三张停靠卡
+    // （TodoPanel / GoalBar / QueueDock），不是菜单；且它要「比地面重」而菜单族要「比地面浅」，
+    // 目标相反。现归 INSET_TOKENS（见下一条）。
+    assert.deepEqual(POPUP_TOKENS.map(entry => entry.token), ['--dsw-specific-menu'])
     for (const token of tokens) {
       assert.ok(!['--dsw-specific-menu', '--dsw-specific-tip'].includes(token), `${token} 不该同时在两张表里`)
     }
@@ -239,6 +244,33 @@ describe('抬升面：谁被染', () => {
         assert.ok(!value.includes('gradient'), `${token}.${scheme} 不该带渐变`)
         assert.ok(!value.includes('url('), `${token}.${scheme} 不该带贴图`)
       }
+    }
+  })
+
+  it('浅灰内嵌面应该 走**独立比例**，且比背景更重（代码块 / 三张停靠卡）', () => {
+    // owner 2026-09-20：「官方白色主题这几个卡，包括代码块，都是浅灰色，所以我考虑要不我们
+    // 用我们的主色来做这个事，这样就会比背景颜色重一些，正好就区分开了。」
+    // 回归意义：这三条一度**与背景同色**（浅色轴抬升面回纯白后，tip 变 #fff）——
+    // 卡片的面整个消失，只剩 4% 描边在撑。
+    assert.deepEqual(
+      INSET_TOKENS.map(e => e.token),
+      ['--dsw-alias-markdown-code-block', '--dsw-alias-markdown-code-block-banner', '--dsw-specific-tip'],
+    )
+    // 三张停靠卡 + 代码块都在这张表里（缺一条就会有面重新变白）
+    assert.ok(INSET_TOKENS.some(e => e.token === '--dsw-specific-tip'), '停靠卡必须被染色')
+    // 不得与抬升面 / 菜单族重叠
+    for (const { token } of INSET_TOKENS) {
+      assert.ok(!tokens.includes(token), `${token} 不该同时在抬升面表里`)
+      assert.ok(!POPUP_TOKENS.some(e => e.token === token), `${token} 不该同时在菜单族里`)
+    }
+    // 独立比例：必须与面板比例分开（目标相反）
+    assert.notEqual(INSET_TINT.light, PANEL_TINT.light, '内嵌面比例必须与面板比例分开')
+    // 比背景更重：混进本色后的亮度必须**低于**同轴的官方基色（否则还是「看不见」）
+    const overrides = tokenOverrides({ lightTone: 'green', darkTone: 'violet' })
+    for (const { token, official } of INSET_TOKENS) {
+      const value = overrides[token].light
+      assert.ok(value.includes('color-mix'), `${token} 浅色轴应被染色（实测 ${value}）`)
+      assert.ok(value.includes(`var(${official.light})`), `${token} 应混进官方那一档 ${official.light}`)
     }
   })
 
@@ -278,6 +310,26 @@ describe('抬升面：谁被染', () => {
         assert.equal(identity[token][scheme], `var(${RUNG_VARIABLE[scheme][rung]})`, `${token}.${scheme}`)
       }
       assert.equal(identity[PANEL_VARIABLE][scheme], `var(${RUNG_VARIABLE[scheme].layer3})`, `panel.${scheme}`)
+      // 浅灰内嵌面同样要**逐条回官方**：代码块与三张停靠卡在「默认」轴必须与官方逐字符相同。
+      for (const { token, official } of INSET_TOKENS) {
+        assert.equal(
+          identity[token][scheme],
+          `var(${official[scheme]})`,
+          `${token}.${scheme} 官方默认必须直通官方绑定（实测 ${identity[token][scheme]}）`,
+        )
+      }
+    }
+  })
+
+  it('⛔ 浅灰内嵌面在「默认」轴不得产生 color-mix（否则官方默认就被染色了）', () => {
+    const identity = tokenOverrides({ lightTone: 'official', darkTone: 'official' })
+    for (const { token } of INSET_TOKENS) {
+      for (const scheme of SCHEMES) {
+        assert.ok(
+          !identity[token][scheme].includes('color-mix'),
+          `${token}.${scheme} 官方默认下不该有 color-mix：${identity[token][scheme]}`,
+        )
+      }
     }
   })
 
@@ -300,25 +352,44 @@ describe('抬升面：覆盖层取值', () => {
     }
   })
 
-  it('非官方色调应该 按**面板专用**比例把本色混进官方 rung', () => {
-    // ⚠️ 2026-09-18：面板填充的比例**已从 SURFACE_TINT 拆到 PANEL_TINT**。
-    // 原因：地面改回官方无色后，面板若仍带 14% 本色就与地面「两张皮」；
-    // 而 SURFACE_TINT 还被**交互态面 / 滚动条**共用（那些永远出现在已染色的面板之内，
-    // 与地面不同屏并列，故保持 .14）。浅色面板收到 `.07`。
+  it('非官方色调应该 按**面板专用**比例把本色混进官方 rung（浅色轴 0 → 直通官方）', () => {
+    // ⚠️ 2026-09-20：浅色轴的面板比例收到 `0` —— 面板底色必须**逐字符等于官方**。
+    // 原因见下一条回归守卫（`.07` 的实测值 `#f9fdfa` 会压住官方面色 `#f9fafb`）。
+    // 深色轴仍是 `.14`：它的地面是本色染过的近黑、面板本就同源，没有这个冲突。
     const overrides = tokenOverrides({ lightTone: 'blue', darkTone: 'violet' })
     for (const scheme of SCHEMES) {
       const tint = TONES[scheme][scheme === 'dark' ? 'violet' : 'blue'].tint
       const pct = Math.round(PANEL_TINT[scheme] * 100)
       for (const { token, rung } of SURFACE_TOKENS) {
-        const expected = `color-mix(in srgb, rgb(${tint}) ${pct}%, var(${SURFACE_RUNGS[scheme][rung]}))`
+        const reference = `var(${SURFACE_RUNGS[scheme][rung]})`
+        const expected = pct === 0 ? reference : `color-mix(in srgb, rgb(${tint}) ${pct}%, ${reference})`
         assert.equal(overrides[token][scheme], expected, `${token}.${scheme}`)
       }
     }
-    // 拆分的要点：浅色面板变淡、交互态保持原浓度
-    assert.equal(PANEL_TINT.light, 0.07, '浅色面板比例应为 .07')
-    assert.equal(SURFACE_TINT.light, 0.14, '交互态 / 滚动条比例保持 .14（不跟着面板降）')
+    assert.equal(PANEL_TINT.light, 0, '浅色面板比例应为 0（底色保持官方原值）')
+    assert.equal(SURFACE_TINT.light, 0.14, '交互态 / 滚动条保持 .14（它们只出现在已染色的面之内）')
     assert.notEqual(PANEL_TINT.light, SURFACE_TINT.light, '浅色轴两者应已分离')
     assert.equal(PANEL_TINT.dark, SURFACE_TINT.dark, '深色轴两者仍同值（地面同源，无冲突）')
+  })
+
+  it('浅色轴 抬升面底色不得染色 —— 否则会与官方「面」色撞车', () => {
+    // 回归守卫（2026-09-20，owner 报「代码块等对话内元素的背景被吃掉」的根因）：
+    // 官方面色 `--dsw-static-neutral-bluish-50` = `#f9fafb`（代码块、左侧栏都用它）；
+    // 浅色轴若按 `.07` 染本色，实测值 `#f9fdfa` 与它只差 1–3 阶 —— 于是
+    // **用官方面色当背景的元素全部失去可辨性**。
+    // 具体落点：Trajectory 视图画布取 `--dsw-alias-bg-layer-1`
+    // （`dsh-client-ui-trajectory` 的 `qBU-ya_root` / `Y0dWHa_split` / `Y0dWHa_table`），
+    // 官方面是 `#fff`、代码块 `#f9fafb`（差 6 阶，读得出灰底）；
+    // 被我们染成 `#f9fdfa` 后与代码块同色 → 灰底消失。
+    // 浅色口径是「官方底色配置 + 打光用主色」：底色不染，色调由打光层承担。
+    const overrides = tokenOverrides({ lightTone: 'green', darkTone: 'violet' })
+    for (const { token, rung } of [...SURFACE_TOKENS, ...POPUP_TOKENS]) {
+      assert.equal(
+        overrides[token].light,
+        `var(${SURFACE_RUNGS.light[rung]})`,
+        `${token} 的浅色轴必须是纯官方引用`,
+      )
+    }
   })
 
   it('官方默认应该 直通**官方** rung（逐字符等于官方原值，不产生 color-mix）', () => {
@@ -849,7 +920,16 @@ describe('抬升面：表面绘制', () => {
       const at = css.indexOf(`${gated} {`)
       assert.ok(at >= 0, `缺规则 ${gated}`)
       const body = css.slice(at, css.indexOf('}', at))
-      assert.ok(body.includes(`background-color: var(${PANEL_VARIABLE}) !important`), `${anchor} 要锚面板底色`)
+      // ⚠️ 2026-09-20：这里**不许**再写 background-color。
+      // 曾经写 `background-color: var(<面板变量>) !important` —— 那时浅色轴面板比例 .07、
+      // 与卡自己的 `--dsw-specific-tip` 观感接近，看不出问题。等抬升面收到 `0`
+      // （面板变量浅色轴 = 纯白 #fff）后，这条 !important 把三张卡的面**盖成纯白**，
+      // token 层的内嵌面染色完全失效（owner：「goal、todo、排队对话好像都没改」）。
+      // 正解：**底色交给 token 层**（05-surfaces §4.0.2 的内嵌面通道），本表只补颗粒 + 光。
+      assert.ok(
+        !/background-color/u.test(body),
+        `${anchor} 不得写 background-color —— 写死面板变量会盖掉 --dsw-specific-tip 的染色`,
+      )
       assert.ok(body.includes(menuSurfaceLayers()), `${anchor} 要画「颗粒 + 底光」`)
       assert.ok(!body.includes('backdrop-filter'), `${anchor} 是内容面，不做玻璃`)
     }

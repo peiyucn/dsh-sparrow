@@ -345,9 +345,19 @@ ${gatedAnchor(GROUPED_MENU_SELECTOR)} ${GROUPED_MENU_TITLE_SELECTOR} {
 }
 /* --- 输入框上方那三张**停靠卡**（排队 / 目标 / 待办）---
    owner：「**输入框上面那个区域也没适配**，刚才我记得让改了，但是没改。」
-   锚点与「为什么画在子元素上」见 COMPOSER_CARD_ANCHORS。 */
+   锚点与「为什么画在子元素上」见 COMPOSER_CARD_ANCHORS。
+
+   ⚠️ **底色必须用卡片自己的 token（--dsw-specific-tip），不能用面板变量 PANEL_VARIABLE**。
+   这两者语义不同：面板变量是**抬升面**（浮在地面之上的浮层）的面板色，
+   而这三张卡是**内嵌面**（嵌在地面之内的内容块），官方给它们的底色是 --dsw-specific-tip
+   （浅色轴 bluish-60、深色轴 bluish-800），走的是独立染色通道（见 05-surfaces §4.0.2）。
+
+   曾经这里写 background-color: var(面板变量)：那时浅色轴面板比例 .07、两者观感接近，
+   看不出问题。等抬升面收到 0（面板变量在浅色轴变成纯白）之后，
+   这条 !important 就把三张卡的面**盖成了纯白**，--dsw-specific-tip 的染色完全失效 ——
+   owner 随即反馈「goal、todo、排队对话好像都没改」。**只写图层、不写底色**即根治：
+   底色交给 token 层（§4.0.2 那条通道），这里只负责它拿不到的那部分（颗粒 + 光）。 */
 ${COMPOSER_CARD_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
-  background-color: var(${PANEL_VARIABLE}) !important;
   background-image: ${menuSurfaceLayers()} !important;
 }`).join('\n')}
 /* --- 为什么**不**改这三张卡的几何（owner：「官方处理方式不一样？」—— 是的，确实不一样）---
