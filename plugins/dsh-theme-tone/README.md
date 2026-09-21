@@ -20,8 +20,8 @@ Open **Settings → General** — a **Tone** row sits directly under the officia
 
 | Axis | Tones |
 | :--- | :--- |
-| Dark | Default (the official dark), Space, Ember, Glade |
-| Light | Default (the official light), Frost, Sakura, Moss |
+| Dark | Default (official black), Space, Ember, Glade |
+| Light | Default (official white), Frost, Sakura, Moss |
 
 ## Compatibility
 
