@@ -97,6 +97,9 @@ function ensureLayer(): HTMLDivElement {
   layer.className = BACKDROP_CLASS
   layer.hidden = true
   // 固定定位层挂 body 即可；极端早期（body 未就绪）退到 documentElement。
+  // ⚠️ 这一处**可以**退到 documentElement（与标记属性不同）：它是 `position: fixed` 的
+  // 纯装饰层，样式表按 `.dsh-theme-tone` **类名**命中、不依赖任何 `body` 锚定选择器，
+  // 挂在 `<html>` 上照常显示。标记属性则必须挂 body —— 消费侧写的是 `body:not([…])`。
   ;(document.body ?? document.documentElement).appendChild(layer)
   return layer
 }
@@ -122,6 +125,19 @@ export function apply(ctx: Context): void {
   ])
 
   /**
+   * 标记属性的**唯一宿主** —— 所有 `PLAIN_ATTR` / `WORKSTART_ATTR` 的读写都用它。
+   *
+   * ⚠️ **不能退到 `documentElement`**：消费侧的选择器全是 `body:not([PLAIN_ATTR])`
+   * 与 `body:not([PLAIN_ATTR])[WORKSTART_ATTR]` —— 属性若挂在 `<html>` 上，
+   * `body:not([...])` 恒真，三张表的门全部 **fail-open**，官方默认档下玻璃与抬升面照样命中。
+   *
+   * `body` 为 null 时（理论上不会：模块在 boot 之后才执行，`index.html` 自带 `<body>`）
+   * 就**不打标记** —— 宁可这次不画，也不要打一个消费侧读不到的标记。
+   * 同一个 `target` 被读/写/清理共用，避免 set 与 remove 目标漂移把属性残留下来。
+   */
+  const markerHost = document.body
+
+  /**
    * 先武装清理，再创建资源。
    *
    * ⚠️ **顺序不能反**：cordis 只跑**已注册**的 disposer。若先 `ensureStyles()` /
@@ -144,7 +160,7 @@ export function apply(ctx: Context): void {
     // 门也要摘掉：留着它，卸载后玻璃与抬升面两张表的规则会继续被挡（表本身也随 style 没了，
     // 但属性不该残留在 body 上）。待启动态标记同理 —— 它是本插件加的，卸载必须收干净。
     paintPlain(false)
-    ;(document.body ?? document.documentElement).removeAttribute(WORKSTART_ATTR)
+    markerHost?.removeAttribute(WORKSTART_ATTR)
   }, 'dsh-theme-tone: backdrop + token overrides')
 
   resources.style = ensureStyles()
@@ -226,7 +242,8 @@ export function apply(ctx: Context): void {
    * @param plain - 当前轴是否为官方默认（= 整层隐藏）。
    */
   const paintPlain = (plain: boolean): void => {
-    const target = document.body ?? document.documentElement
+    const target = markerHost
+    if (target === null) return
     if (plain) target.setAttribute(PLAIN_ATTR, '')
     else target.removeAttribute(PLAIN_ATTR)
   }
@@ -235,12 +252,18 @@ export function apply(ctx: Context): void {
    * 写 token 覆盖层。色值与明暗轴无关（两个模式一次给全），故只在设置真的变了才重写 ——
    * `overrideTokens` 会 emit `theme/change`，条件跳过同时也是防自激环的闸门。
    * 同一 source 再调即整层替换并重排到顶，旧 disposer 随之变 no-op，故只留最新一个。
+   *
+   * ⚠️ `lastTokenKey` **必须在成功后**才前进：先置 key 再调用的话，万一 `overrideTokens`
+   * 抛错（官方会校验入参形状），key 已经前进了 —— 下次同样的设置会被判为「没变」而**永不重试**，
+   * 色调就永久停在旧值上。写在后面则失败不前进，下一次 repaint 会自然重试。
    */
   const paintTokens = (settings: ThemeToneSettings): void => {
     const key = `${settings.lightTone}|${settings.darkTone}`
     if (key === lastTokenKey) return
+    const dispose = ctx.theme.overrideTokens(PACKAGE_NAME, tokenOverrides(settings))
+    // 成功之后才认账
     lastTokenKey = key
-    disposeTokens = ctx.theme.overrideTokens(PACKAGE_NAME, tokenOverrides(settings))
+    disposeTokens = dispose
   }
 
   /** 写背景层与行状态：依赖当前解析出的明暗轴。 */
@@ -289,7 +312,9 @@ export function apply(ctx: Context): void {
    * * observer 挂在 `document.body`（官方卡片进出都在其下），随 `ctx.effect` 卸载断开。
    */
   const probeWorkstart = (): void => {
-    const target = document.body ?? document.documentElement
+    const target = markerHost
+    // body 缺失（理论上不会）就不打标记 —— 消费侧只认 body 上的属性。
+    if (target === null) return
     const card = document.querySelector('[data-composer-card]')
     let active = false
     if (card !== null) {
@@ -332,7 +357,9 @@ export function apply(ctx: Context): void {
   // `attributes` 必须过滤到 class —— 否则官方每次改任意属性都会触发全量回调节流。
   probeWorkstart()
   ctx.effect(() => {
-    const root = document.body ?? document.documentElement
+    const root = markerHost
+    // body 缺失时没有可观察的宿主 —— 直接不装（probeWorkstart 也不会打标记）。
+    if (root === null) return () => {}
     const observer = new MutationObserver(scheduleProbe)
     observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
     return () => {
