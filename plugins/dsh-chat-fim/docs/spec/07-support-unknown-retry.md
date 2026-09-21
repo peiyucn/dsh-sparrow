@@ -31,8 +31,10 @@
   `retry-tick` 事件。`unknown` **不再是定案**——留出有界补查预算，会话激活后补查即拿定论；
   预算耗尽（`FIM_SUPPORT_UNKNOWN_RETRIES` = 5，退避 500/1000/2000/4000/8000ms，合计 15.5s）
   才落 `failed` 并 fail-open 显示——不因探测不可靠而永久隐藏功能。
-* **未定论前不显示**：`context-changed` 时 `shown` 取 `initialFimSupportState.shown`（= `false`）。
-  显示只是「已有定论」，不是「猜测兜底」；与 vision-bridge 能力机同口径。
+* **未定论前不显示**：`initialFimSupportState.shown` = **`false`**（首帧/首次查询期间没有任何答案）。
+  `context-changed` 时**沿用上一相的 `shown`**，不是重置成 `false` —— 切模型时新查询在途期间
+  保持上一模型的显示态，避免「本来支持、一换模型先闪没了再出现」；只有首次 `context-changed`
+  （上一相是 `initial`）才恰好为 `false`。显示只是「已有定论」，不是「猜测兜底」。
 * **补查定时器**（`ChatFimDock.tsx`）：`retrying` 相排一个 `setTimeout`，按 `attempts` 退避；
   随相位/地址重排，卸载与上下文切换都由清理函数撤销，不滞留。
 
