@@ -3,6 +3,12 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
+## 0.1.5-rc.2.2 (2026-09-21)
+
+- Session and per-turn credit figures **no longer reset after a DSH restart**, and reopening an older session still shows the full total.
+- The credit dialog is narrower.
+- The user badge in the credit dialog opens the CodeBuddy profile page when clicked.
+
 ## 0.1.5-rc.2.1 (2026-09-11)
 
 - The session credit summary now sits in the composer's stats row as a pill of the same kind as the official ones (brand mark + `Credits N · M calls`) — same size, colours and hover — and clicking it opens the call count with the per-model breakdown. A conversation with no CodeBuddy calls still gets nothing added.
