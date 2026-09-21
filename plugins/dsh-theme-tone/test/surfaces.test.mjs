@@ -1041,6 +1041,29 @@ describe('抬升面：表面绘制', () => {
     }
   })
 
+  it('⛔ **所有**会被 gatedAnchor 处理的常量都必须带 body 前缀（不只是一张表）', () => {
+    // 为什么单独钉这三条：`gatedAnchor()` 用 `anchor.replace(/^body\b/, …)` —— 锚点一旦
+    // 丢了 `body ` 前缀，`replace` **静默不替换**，产物里就是一条**完全不带门**的规则，
+    // 而「复算期望值」式的断言会与产物一起错（自己同意自己）。上面那条循环只走了
+    // SURFACE_ANCHORS，另外两处（输入框图标按钮 / 分组菜单）**当时无人守**。
+    // 实测（审计 M30/M31）：这两处去掉 `body ` 前缀后，产物里出现裸 `[data-composer-card]`
+    // 与裸 `[role='menu']:has([role='group'])`，而 225 个用例**全绿**。
+    for (const [label, constant] of [
+      ['COMPOSER_ICON_BUTTON_SCOPE', COMPOSER_ICON_BUTTON_SCOPE],
+      ['GROUPED_MENU_SELECTOR', GROUPED_MENU_SELECTOR],
+    ]) {
+      assert.match(constant, /^body /u, `${label} 要有 body 前缀，否则 gatedAnchor 静默失门：${constant}`)
+    }
+    // GROUPED_MENU_TITLE_SELECTOR **故意不带** body 前缀：它永远作为上面那条的**后代**
+    // 拼在后面（`gatedAnchor(GROUPED_MENU_SELECTOR) ${GROUPED_MENU_TITLE_SELECTOR}`），
+    // 自己不是规则起点，加了反而会拼出非法选择器。
+    assert.doesNotMatch(
+      GROUPED_MENU_TITLE_SELECTOR,
+      /^body\b/u,
+      'GROUPED_MENU_TITLE_SELECTOR 是后代片段，不该自带 body 前缀',
+    )
+  })
+
   it('图层顺序应该 是「颗粒 / 顶光 / 底光」（颗粒压在最上面才像砂面）', () => {
     const order = [GRAIN_TILE_VARIABLE, TOP_VARIABLE, BOTTOM_VARIABLE]
     const at = order.map(name => layers.indexOf(`var(${name}`))
@@ -1130,6 +1153,3 @@ describe('抬升面：表面绘制', () => {
     assert.ok(!css.includes('data-phase'), 'hero 相位下侧栏菜单照样要弹')
   })
 })
-
-
-

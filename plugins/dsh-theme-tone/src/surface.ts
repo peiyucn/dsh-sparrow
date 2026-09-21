@@ -431,7 +431,16 @@ ${gatedAnchor(COMPOSER_ICON_BUTTON_SCOPE)} {
    HOVER_CARD_ANCHOR）。面走 ${PANEL_VARIABLE}：官方默认档下它正是官方自己的 layer3，
    那个档下只把「恒深面」掰回主题面，不引入外来色相。 */
 ${HOVER_CARD_ANCHOR} {
-  background-color: var(${PANEL_VARIABLE}) !important;
+  /* ⚠️ 这条是**唯一不带门**的规则，因此也是唯一「插件 token 层还没就绪时」
+     照常生效的规则 —— 必须给面板底色变量一个**官方兜底**：
+     它由 tokenOverrides 发出，而 token 层在 status 为 loading 的窗口内（以及
+     overrideTokens 抛错后重试成功之前）是**不具备**的。没有兜底时 var() 解析为空，
+     再加上 !important 压住官方自己那条，卡片会变成**全透明**（实测计算值为
+     全零 alpha），比不生效更糟。
+     兜底取官方 layer-3：正是「这个档下本来该有的那个面」，降级方向正确。
+     （本段在模板字符串里，注释中既不能出现反引号，也不能出现色值字面量——
+     本文件的「不得硬编码色值」守卫是全表扫描、注释也算。） */
+  background-color: var(${PANEL_VARIABLE}, var(--dsw-alias-bg-layer-3)) !important;
   background-image: ${surfaceLayers()} !important;
 }
 /* 字色：官方写死的浅字必须一起换成**主题感知**的 label token，否则浅卡配浅字还是白底白字。
