@@ -123,7 +123,7 @@ body:not([data-ds-dark-theme]) .dsh-theme-tone::after { display: none; }
 ```
 
 * **色调参数走 CSS 变量，不走改样式表**：`apply` 时在层元素上 `style.setProperty('--dsh-theme-tone-top' | '-bottom' | '-left', …)`；换色调只改变量，样式表只注入一次。左侧金晕是可选层：色调不给就 `removeProperty`，样式表里的 `transparent` 兜底。
-* **左侧金晕为什么锚视口左上角、而不是按接缝定位**：官方没把左栏宽度暴露成 CSS 变量 —— 宽度是 `SidebarRoot` 的 inline style（`SidebarRoot.tsx:173`），列轨道是 AppFrame 的 inline `grid-template-columns`（`AppFrame.tsx:207`），元素本身只有 hashed 类名、没有 `data-*` 钩子（已 grep 确认）。按接缝定位就得 JS 观测元素宽度 + ResizeObserver，破「零常驻开销」且多一处泄漏面。锚左上角的椭圆在左栏 264–420px（`columns.ts:13-17`）之间变化时观感都成立，且左栏右缘一带自然收束成金色渐变。
+* **左侧金晕为什么锚视口左上角、而不是按接缝定位**：官方没把左栏宽度暴露成 CSS 变量 —— 宽度是 `SidebarRoot` 的 inline style（`SidebarRoot.tsx:173`），列轨道是 AppFrame 的 inline `grid-template-columns`（`AppFrame.tsx:207`），元素本身只有 hashed 类名、没有 `data-*` 钩子（已 grep 确认）。按接缝定位就得 JS 观测元素宽度 + ResizeObserver，破「低常驻开销」且多一处泄漏面。锚左上角的椭圆在左栏 264–420px（`columns.ts:13-17`）之间变化时观感都成立，且左栏右缘一带自然收束成金色渐变。
 * **`data:` URI 纹理可行**：应用外壳未设 CSP——`packages/**` 全树 grep `Content-Security-Policy` 只命中 `api/session-controller/src/media-references.ts:19`（媒体响应自己的 `sandbox; default-src 'none'`，与应用 index 无关）；且 `dsh-nav-pin` 已有在 `apply` 内注入 `<style>` 的先例。
 * **整层叠在内容之上**：因为底色面各自不透明且分散在 4 处（见 00「痛点与根因」3），垫底下会被盖住；改透明有实证代价（见「已否决方案」1）。深色轴靠 screen 保证不遮内容；浅色轴靠低 alpha 保证不碍阅读。
 * **层的显隐由 JS 决定**：当前轴的色调是 `official`（`top`/`bottom` 为空）→ 给层加 `hidden`，不画任何东西；`grain: false` 时给层加 `data-grain="off"`（CSS 里 `[data-grain="off"]::after { display: none }`）。两者都靠「订阅 `theme/change` + settings 变更 → 重算 → 写 DOM」驱动；不用 CSS 表达式，因为 `display` 无法由自定义属性决定。

@@ -116,13 +116,12 @@
   选「默认」时逐字符回官方。
 * **零布局影响**：开关插件前后 `document.body.scrollHeight` 不变，不新增滚动条。
 * **卸载即还原**：停用插件后 token 回收、背景层与样式表移除、设置行消失，外观与官方一致。
-* **零常驻开销**：无 `requestAnimationFrame`、无定时器；只在 `theme/change`、settings 变更、点选时做同步 DOM/样式写入。
+* **低常驻开销**：无常驻定时器；只在 `theme/change`、settings 变更、点选时做同步 DOM/样式写入。
+  另有一个 `MutationObserver`（只观察 `class` 变动）服务于「未选工作区」待启动态的行为探针，
+  经**同一帧内合并**（`requestAnimationFrame` 去抖）后只读一个元素的两个计算值（见 04-glass §5）。
 * **语言无关性**：行文案走 `ctx.locale.register` 的 zh / en 双份字典，两套界面语言都正确。
 * **兼容自检**：宿主缺 `ctx.theme.overrideTokens` / `ctx.settingsScope` / `ctx.slots` / `ctx.locale` 任一时，插件**抛错自停用**并记一条面向用户的告警，不带上不认识的契约。
 
 ## 退役条件
 
 官方在「设置 → 外观」提供色调 / 用户自定义 CSS 后，本插件退役。
-
-
-

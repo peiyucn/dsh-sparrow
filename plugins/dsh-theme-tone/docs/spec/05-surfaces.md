@@ -253,17 +253,26 @@
 ### 6.1 兜底通道：填充 + 三个图层
 
 ```css
+/* 带门的五条锚点（[role='dialog'] 那条见下方注）*/
 body:not([data-dsh-theme-tone-plain]) [role='menu'],
 body:not([data-dsh-theme-tone-plain]) [data-trigger-menu],
 body:not([data-dsh-theme-tone-plain]) :has(> [role='listbox']),
 body:not([data-dsh-theme-tone-plain]) [role='listbox']:not([data-trigger-menu] *),
-body:not([data-dsh-theme-tone-plain]) [role='dialog']:not(:has(> img)),
-body:not([data-dsh-theme-tone-plain]) > [role='button'] {
+body:not([data-dsh-theme-tone-plain]) [role='dialog']:not(:has(> img)) {
   background-color: var(--dsh-theme-tone-panel) !important;
   background-image:
     var(--dsh-theme-tone-grain-tile, none),
     radial-gradient(ellipse 120% 42% at 50% -12%, var(--dsh-theme-tone-top, transparent), transparent 76%),
     radial-gradient(ellipse 110% 52% at 50% 112%, var(--dsh-theme-tone-bottom, transparent), transparent 76%) !important;
+}
+
+/* ⚠️ 悬停卡是**唯一不带门**的一条（见 §8.4）：官方把它的面与字写死成组件内字面量，
+   「先把官方默认修了，然后再适配咱们的」，所以两个档都要修。
+   底色带**官方 layer-3 兜底** —— 它是唯一「token 层未就绪时也照常生效」的规则，
+   没有兜底而 var() 解析为空时，!important 会把卡片压成全透明（比不生效更糟）。 */
+body > [role='button'] {
+  background-color: var(--dsh-theme-tone-panel, var(--dsw-alias-bg-layer-3)) !important;
+  background-image: … !important;
 }
 ```
 

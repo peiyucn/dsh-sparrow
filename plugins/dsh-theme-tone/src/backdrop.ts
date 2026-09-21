@@ -444,4 +444,3 @@ export const LAYER_SELECTOR = `div[${MARKER_ATTR}]`
 
 /** 背景层样式表的选择器。 */
 export const STYLE_SELECTOR = `style[${MARKER_ATTR}]`
-
