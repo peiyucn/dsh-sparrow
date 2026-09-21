@@ -54,9 +54,13 @@ The dark axis keeps the deep-space palette from [pyai.site](https://pyai.site) �
 * If the browser lacks the CSS features the background layer needs (`mix-blend-mode: screen`, `radial-gradient()`), the plugin disables itself with a user-facing warning rather than injecting rules that cannot work. The glass effect needs `backdrop-filter` too, but that one does **not** disable the plugin — without it the glass simply becomes a translucent panel, and the rest of the plugin keeps working
 * The plugin never touches official DOM structure, official React components, or hashed CSS-module class names
 
-## Screenshot
+## Screenshots
 
-![Dark axis on the new-session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone.png)
+The new-session page on each axis — dark, then light:
+
+![Dark axis on the new-session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png)
+
+![Light axis on the new-session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png)
 
 ## Uninstall & leftovers
 
