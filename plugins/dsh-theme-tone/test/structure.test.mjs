@@ -114,4 +114,40 @@ describe('dsh-theme-tone 结构', () => {
     assert.match(src, /resources\.style\?\.remove\(\)/u, '清理要从 holder 取 style')
     assert.match(src, /resources\.layer\?\.remove\(\)/u, '清理要从 holder 取 layer')
   })
+
+  it('⛔ 门属性必须先关成「官方默认」再注入样式表（loading 窗口不得 fail-open）', async () => {
+    // 回归守卫：门属性是 `body:not([PLAIN_ATTR])` 的唯一开关，此前只在 paintLayer 里写。
+    // 而样式表无条件注入、首次 repaint() 又被 shouldPaint()（status==='loading'）挡住 ——
+    // 于是「注入」到「宿主回值」之间存在窗口：门属性不存在 ⇒ 38 条带门规则里 11 条当场命中。
+    // 真机实测该窗口内顶栏 backdrop-filter=blur(12px)、输入框卡 blur(10px)：选了「官方默认」
+    // 的用户会先看到玻璃再被抹掉，正是「完全不介入」最不该有的闪变。
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    const iClose = src.indexOf('paintPlain(true)')
+    const iStyles = src.indexOf('resources.style = ensureStyles()')
+    const iLayer = src.indexOf('resources.layer = ensureLayer()')
+    assert.ok(iClose > 0, '注入样式表前必须先把门关成官方默认（缺 paintPlain(true)）')
+    assert.ok(iClose < iStyles, 'paintPlain(true) 必须在 ensureStyles() **之前**')
+    assert.ok(iClose < iLayer, 'paintPlain(true) 必须在 ensureLayer() **之前**')
+    // 声明必须早于清理 effect（清理体要调它，否则该窗口内跑清理会撞 TDZ，
+    // 抛 ReferenceError 把真正的失败原因盖掉）。
+    const iDecl = src.indexOf('const paintPlain = ')
+    const iCleanup = src.indexOf('dsh-theme-tone: backdrop + token overrides')
+    assert.ok(iDecl > 0 && iCleanup > 0, '锚点缺失（实现改过？）')
+    assert.ok(iDecl < iCleanup, 'paintPlain 必须声明在清理 effect 之前（否则清理会撞 TDZ）')
+  })
+
+  it('⛔ theme/change 那条直达 paintLayer 的路径也要过 shouldPaint 门', async () => {
+    // theme/change 由 ui-theme 自己的 settings scope 驱动，与本插件 settings 就绪没有先后
+    // 保证；若它绕过 shouldPaint()，就会用进程内兜底值（默认 violet）算出 hidden=false
+    // 而把门打开 —— 与上一条要堵的是同一个洞的另一个入口。
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    const i = src.indexOf('const paintLayer = ')
+    assert.ok(i > 0, '缺 paintLayer 定义')
+    const seg = src.slice(i, i + 900)
+    assert.ok(seg.includes('shouldPaint()'), 'paintLayer 必须先过 shouldPaint 门')
+    assert.ok(
+      seg.indexOf('shouldPaint()') < seg.indexOf('paintPlain('),
+      'shouldPaint 门必须在 paintPlain 之前',
+    )
+  })
 })

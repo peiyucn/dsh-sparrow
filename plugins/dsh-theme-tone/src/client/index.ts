@@ -138,6 +138,25 @@ export function apply(ctx: Context): void {
   const markerHost = document.body
 
   /**
+   * 把「这一轴是官方默认」挂到 body 上 / 摘掉。
+   *
+   * 玻璃与抬升面两张表的 CSS 仍然静态注入（可测、不重解析），靠 `body:not([PLAIN_ATTR])`
+   * 这个门决定命不命中 —— 官方默认下两张表整表让路，外观与没装插件逐像素一致。
+   * 挂在 `document.body` 上而不是 `documentElement`：presenter 的 token 也写在 body 上，同一处好回收。
+   *
+   * ⚠️ **本函数必须声明在清理 effect 之前**：清理体要调它，若声明在 effect 之后，
+   * 那么「effect 注册」与「声明」之间任一环节抛错时，cordis 跑清理会撞上 TDZ，
+   * 抛 `ReferenceError` 把真正的失败原因盖掉（见下面清理 effect 的 ⚠️）。
+   * @param plain - 当前轴是否为官方默认（= 整层隐藏）。
+   */
+  const paintPlain = (plain: boolean): void => {
+    const target = markerHost
+    if (target === null) return
+    if (plain) target.setAttribute(PLAIN_ATTR, '')
+    else target.removeAttribute(PLAIN_ATTR)
+  }
+
+  /**
    * 先武装清理，再创建资源。
    *
    * ⚠️ **顺序不能反**：cordis 只跑**已注册**的 disposer。若先 `ensureStyles()` /
@@ -163,6 +182,25 @@ export function apply(ctx: Context): void {
     markerHost?.removeAttribute(WORKSTART_ATTR)
   }, 'dsh-theme-tone: backdrop + token overrides')
 
+  /**
+   * ⚠️ **先把门关成「官方默认」，再注入样式表。**
+   *
+   * 门属性是 `body:not([PLAIN_ATTR])` 的**唯一开关**，而它此前只在 `paintLayer` 里写
+   * （即 `paintPlain(plan.hidden)`）。可样式表是在本函数下面**无条件**注入的，而首次
+   * `repaint()` 又要过 `shouldPaint()` 那道门 —— `status === 'loading'`（宿主还没回第一帧，
+   * 官方 `SettingsScopeController` 的初值恒为 `'loading'`，见 `ui-settings/.../settings-scope.ts:71`）
+   * 时它**直接 return，从不调用 `paintLayer`**。于是从「样式表注入」到「宿主回值」之间
+   * 存在一个窗口：门属性**不存在** → 38 条带门的规则里**有 11 条当场命中**。
+   *
+   * 实测（真机 dsh）：该窗口内顶栏拿到 `backdrop-filter: blur(12px)`、输入框卡拿到
+   * `blur(10px) saturate(1.45)` 且底色变成 58% 半透明 —— 一个选了「官方默认」的用户
+   * 会先看到玻璃与染色，等宿主回值再被抹掉，正是本插件承诺「**完全不介入**」时最不该有的闪变。
+   *
+   * 修法：初值取**最保守**的一侧（`plain = true` = 整层让路）。宿主回值后 `paintLayer`
+   * 会按真实色调把它翻成正确的值；期间宁可少画（官方外观），也绝不先画错。
+   * 与 `shouldPaint()`「未就绪不上色」的既有口径完全一致 —— 原来只是漏在门属性这一条上。
+   */
+  paintPlain(true)
   resources.style = ensureStyles()
   resources.layer = ensureLayer()
   // 只留 layer 的局部别名（渲染计划要写它的 style 属性）；
@@ -234,21 +272,6 @@ export function apply(ctx: Context): void {
   }
 
   /**
-   * 把「这一轴是官方默认」挂到 body 上 / 摘掉。
-   *
-   * 玻璃与抬升面两张表的 CSS 仍然静态注入（可测、不重解析），靠 `body:not([PLAIN_ATTR])`
-   * 这个门决定命不命中 —— 官方默认下两张表整表让路，外观与没装插件逐像素一致。
-   * 挂在 `document.body` 上而不是 `documentElement`：presenter 的 token 也写在 body 上，同一处好回收。
-   * @param plain - 当前轴是否为官方默认（= 整层隐藏）。
-   */
-  const paintPlain = (plain: boolean): void => {
-    const target = markerHost
-    if (target === null) return
-    if (plain) target.setAttribute(PLAIN_ATTR, '')
-    else target.removeAttribute(PLAIN_ATTR)
-  }
-
-  /**
    * 写 token 覆盖层。色值与明暗轴无关（两个模式一次给全），故只在设置真的变了才重写 ——
    * `overrideTokens` 会 emit `theme/change`，条件跳过同时也是防自激环的闸门。
    * 同一 source 再调即整层替换并重排到顶，旧 disposer 随之变 no-op，故只留最新一个。
@@ -266,8 +289,21 @@ export function apply(ctx: Context): void {
     disposeTokens = dispose
   }
 
-  /** 写背景层与行状态：依赖当前解析出的明暗轴。 */
+  /**
+   * 写背景层与行状态：依赖当前解析出的明暗轴。
+   *
+   * ⚠️ **这里也要过 `shouldPaint()` 那道门**（不能只靠 `repaint()` 里的那份）。
+   * `theme/change` 是**另一条**直达本函数的路径，它**不经过 `repaint()`** —— 而官方的
+   * `theme/change` 由 ui-theme 自己的 settings scope 驱动，与本插件的 settings 就绪
+   * **没有先后保证**。于是「ui-theme 先就绪、本插件还在 `loading`」时，本函数会用
+   * `readSettings()` 的进程内兜底值（= 默认值，深色轴 `violet`）算出 `hidden = false`
+   * → `paintPlain(false)` **把门打开** → 一个实际选了「官方默认」的用户照样吃到玻璃与染色，
+   * 直到本插件自己回值再纠正。这与上面 `paintPlain(true)` 要堵的是**同一个洞**，只是另一个入口。
+   *
+   * 未就绪一律不画：层保持 `hidden`、门保持关，等本插件拿到权威值再一次性画对。
+   */
   const paintLayer = (snapshot: ThemeSnapshot): void => {
+    if (!shouldPaint()) return
     const settings = readSettings()
     const scheme: ColorScheme = snapshot.active.colorScheme
     const plan = backdropPlan(scheme, settings)
@@ -408,4 +444,3 @@ export function apply(ctx: Context): void {
     },
   }, ThemeToneRow as unknown as (props: object) => ReactNode))
 }
-
