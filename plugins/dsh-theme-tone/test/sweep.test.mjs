@@ -14,7 +14,38 @@ const css = buildSweepCss()
 // 注释里会引用官方那条 `width: 300px` 做反面说明，结构断言必须先剥注释（踩过一次）。
 const rules = css.replace(/\/\*[\s\S]*?\*\//gu, '')
 
+/**
+ * 解析**产物**里的选择器（剥注释后，取每条规则 `{` 之前那段）。
+ *
+ * ⚠️ 为什么必须从产物解析，而不是拿 `SWEEP_ANCHORS` 再算一遍期望值：
+ * `gated()` 用的是 `anchor.replace(/^body\b/, …)` —— 锚点一旦丢了 `body ` 前缀，
+ * `replace` **静默不替换**，于是「算出来的期望值」与「实际产物」是同一个无门选择器，
+ * 断言自己同意自己（on both sides of the same bug）。实测：把 `sweep.ts` 的锚点
+ * 改成不带 `body ` 的裸属性选择器，重建后 224 个用例**全绿**，而产物里那条规则
+ * **完全不带官方默认门** —— 正是 owner 最在意的「官方默认不要动」被破。
+ * 所以守卫必须独立地检查产物「带没带门」，不能复算期望值。
+ * @param text - 已剥注释的样式表文本。
+ * @returns 每条规则的选择器。
+ */
+function emittedSelectors(text) {
+  return text.split('}').map(block => {
+    const at = block.indexOf('{')
+    return at < 0 ? '' : block.slice(0, at).trim()
+  }).filter(sel => sel !== '')
+}
+
 describe('官方运行扫光带：照我们自己的背景画（A 方案）', () => {
+  it('⛔ 产物里**每一条**选择器都必须真的带官方默认门（不得靠复算期望值自证）', () => {
+    const selectors = emittedSelectors(rules)
+    assert.ok(selectors.length > 0, '没解析到任何规则（产物结构变了？）')
+    for (const sel of selectors) {
+      assert.ok(
+        sel.includes(`body:not([${PLAIN_ATTR}])`),
+        `产物里的选择器缺少官方默认门：${sel}`,
+      )
+    }
+  })
+
   it('锚点必须**收窄**到官方那 5 处 —— 泛匹配曾误伤无关伪元素盖住对话区底部', () => {
     // 上一版锚点是 `[data-state='running']::after` + `... [class*='_row']::after`：
     // data-state 是通用属性、_row 是通用后缀 → 官方给元素写 ::after 的理由五花八门
