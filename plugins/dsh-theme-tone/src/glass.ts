@@ -36,7 +36,7 @@
  */
 
 import { ABOVE_CONTENT_Z_INDEX, GRAIN_TILE_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from './constants.js'
-import { BACKDROP_GRADIENTS, dimmedBackdropGradients } from './backdrop.js'
+import { BACKDROP_GRADIENTS, dimmedBackdropGradients, grainOverGradients } from './backdrop.js'
 
 /** 顶栏高度（px）。官方把它钉在这个值上，与左栏 38+38 对齐（`ConversationRoot.module.css:37-41`）。 */
 export const HEADER_HEIGHT_PX = 76
@@ -601,8 +601,7 @@ function pct(alpha: number): string {
  */
 function backingPaint(): string {
   return `background-color: var(--dsw-alias-bg-base);
-  background-image: var(${GRAIN_TILE_VARIABLE}, none),
-    ${BACKDROP_GRADIENTS};
+  background-image: ${grainOverGradients()};
   background-attachment: fixed;`
 }
 
@@ -837,8 +836,7 @@ body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [da
    第 1、3 段渐变退回按元素盒解析）。**不许再退回任何一个 per-layer 属性只给一两个值。**
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}] {
-  background-image: var(${GRAIN_TILE_VARIABLE}, none),
-    ${BACKDROP_GRADIENTS};
+  background-image: ${grainOverGradients()};
   background-attachment: scroll;
   background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;
   background-position: calc(100% - 100vw) top, right top, right top, right top;

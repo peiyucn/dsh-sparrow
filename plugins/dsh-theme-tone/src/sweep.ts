@@ -48,7 +48,7 @@
  */
 
 import { GRAIN_TILE_VARIABLE, PLAIN_ATTR } from './constants.js'
-import { BACKDROP_GRADIENTS } from './backdrop.js'
+import { grainOverGradients } from './backdrop.js'
 
 /**
  * 扫光带的锚点 —— 覆盖官方那 5 处实现，**且只覆盖它们**（理由见文件头）。
@@ -87,8 +87,7 @@ export const SWEEP_PEAK_STOP = '55%'
  *
  * 底色不在图层里（它走 `background-color`）。整块一起被 {@link SWEEP_SHAPE_MASK} 乘 0.6。
  */
-export const SWEEP_PLATE_LAYERS =
-  `var(${GRAIN_TILE_VARIABLE}, none),\n    ${BACKDROP_GRADIENTS}`
+export const SWEEP_PLATE_LAYERS = grainOverGradients()
 
 /**
  * 带子的**形状 + 强度**（`mask`）—— 一块 mask 干两件事：

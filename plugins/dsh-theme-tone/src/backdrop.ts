@@ -16,6 +16,7 @@ import {
   CONTENT_Z_INDEX,
   DOCKKIT_MENU_ATTR,
   GRAIN_ATTR,
+  GRAIN_TILE_VARIABLE,
   LEFT_VARIABLE,
   MARKER_ATTR,
   PLAIN_ATTR,
@@ -244,6 +245,29 @@ export const REQUIRED_CSS_FEATURES: readonly { name: string; probe: string }[] =
 export const BACKDROP_GRADIENTS = `radial-gradient(${DARK_RADIAL_SHAPE}, var(${TOP_VARIABLE}, transparent), transparent var(${TOP_STOP_VARIABLE}, ${RADIAL_STOP})),
     radial-gradient(${BOTTOM_RADIAL_SHAPE}, var(${BOTTOM_VARIABLE}, transparent), ${BOTTOM_RADIAL_STOP}),
     radial-gradient(${LEFT_RADIAL_SHAPE}, var(${LEFT_VARIABLE}, transparent), ${LEFT_RADIAL_STOP})`
+
+/**
+ * 「**颗粒 + 背景层那串光**」两行 —— 凡是**把背景原样重画一遍**的地方都用它。
+ *
+ * ## 为什么值得抽出来（三处同源，但各自的下文不同）
+ *
+ * 被抬到背景层**之上**的面吃不到那层光与颗粒（顶栏、右边栏、输入框底座、扫光带都是这个处境），
+ * 所以要把地面**原样重画一遍**。重画的那两行字面量三处完全一样 ——
+ * 但**三处的外围不同，不能合并规则**：
+ *
+ * | 用处 | 外围差异 |
+ * | :--- | :--- |
+ * | 座底不透带 / 缝挡板（`glass.ts` 的 `backingPaint()`） | 还带 `background-color` 与**单个** `fixed`（要逐像素等于地面） |
+ * | 右边栏（`glass.ts`） | **不能**用 `fixed`（面板有 `transform` 动画，`fixed` 会静默改判）→ 用显式 `100vw/100vh` 盒 + `background-position` 对齐 |
+ * | 扫光带（`sweep.ts` 的 `SWEEP_PLATE_LAYERS`） | 再被一块 `mask` 乘 0.6 |
+ *
+ * 所以共用的是**这两行**，不是整条规则 —— 抽它只为「颗粒与光必须同源」这一条不被漏抄
+ * （`BACKDROP_GRADIENTS` 是直引，不复制数值；颗粒走 `GRAIN_TILE_VARIABLE`）。
+ * @returns 可写进 `background-image` 的两行图层串（不含结尾分号）。
+ */
+export function grainOverGradients(): string {
+  return `var(${GRAIN_TILE_VARIABLE}, none),\n    ${BACKDROP_GRADIENTS}`
+}
 
 /*
  * `dimmedBackdropGradients(scale)` —— 把上面这串渐变**按比例压强度**（形状与几何一字不改）。
