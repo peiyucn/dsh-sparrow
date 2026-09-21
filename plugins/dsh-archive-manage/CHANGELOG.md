@@ -2,6 +2,9 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.1.5-rc.2.4 (2026-09-21)
+
+- Fixed a stray white line next to the last child in a session tree: the connector is now drawn per node instead of being patched by a solid strip in the panel colour, so it no longer shows up once a theme plugin gives the panel a texture.
 ## 0.1.5-rc.2.3 (2026-09-13)
 
 - Subagent trees in the archive area and the trash are now **collapsed by default**: a parent row still shows its subagent count, and a click on ▸ reveals the children — previously the panel unfolded every subagent at once, so a session with many subagents pushed the entries below it out of sight.
