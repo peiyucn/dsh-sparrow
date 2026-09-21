@@ -4,7 +4,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## 0.1.5-rc.2.1 (2026-09-21)
 
-- Fixed the suggestion toggle ignoring the selected model right after DSH starts (it only respected it after a page refresh): when the host cannot answer yet, the plugin now waits for a verdict instead of assuming the feature is supported. The toggle appears only once the model is known to be supported, or after the retries give up — never on the first guess.
+- Fixed the suggestion toggle ignoring the selected model right after DSH starts.
 ## 0.1.5-rc.2 (2026-09-10)
 
 - Version-line alignment with official dsh 0.1.5-rc.2.
