@@ -1,6 +1,6 @@
 {
   "name": "@dsh-sparrow/dsh-theme-tone",
-  "description": "DSH web plugin: a background-tone layer under the official light/dark theme — pick a background tone per axis in Settings",
+  "description": "DSH web plugin: tone skins for the official light and dark themes — pick one per theme in Settings",
   "version": "0.1.5-rc.2",
   "license": "MIT",
   "repository": {

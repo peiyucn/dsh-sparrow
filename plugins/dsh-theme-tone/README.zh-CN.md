@@ -2,7 +2,7 @@
 
 简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
-明暗主题之下的色调层 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
+给 DSH 加上深浅两套主题各自的色调皮肤 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
 
 ## 安装
 
@@ -16,9 +16,9 @@ dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone
 
 ## 用法
 
-打开**设置 → 常规**，**色调**行就在官方**外观**行正下方。每轴四款色调 + 一款**默认**：
+打开**设置 → 常规**，**色调**行就在官方**外观**行正下方 —— 浅色、深色各有四款皮肤，外加一款**默认**：
 
-| 轴 | 色调 |
+| 外观 | 皮肤 |
 | :--- | :--- |
 | 深色 | 默认（官方黑）、深空、余烬、幽林 |
 | 浅色 | 默认（官方白）、霜蓝、樱花、苔青 |
@@ -26,14 +26,14 @@ dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone
 ## 版本兼容性
 
 * 适配 dsh 0.1.5-rc.2（本版构建与验证所对齐的确切官方版本线，其它版本线不在承诺范围内）
-* **纯外观**：不会让界面卡住，也不改任何东西的行为
+* 只改外观：不会让界面卡住，也不改任何功能
 * 宿主或浏览器缺少它需要的东西时，它会**自停用**并记一条面向用户的告警
 
 ## 截图
 
-![新建会话页上的深色轴](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png)
+![新建会话页的深色主题](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png)
 
-![新建会话页上的浅色轴](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png)
+![新建会话页的浅色主题](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png)
 
 ## 卸载与残留
 

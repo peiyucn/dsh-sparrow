@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
-A background-tone layer under the official light/dark theme — a DeepSeek Harness (DSH) web plugin (dsh-sparrow collection member).
+Tone skins for the official light and dark themes — a DeepSeek Harness (DSH) web plugin (dsh-sparrow collection member).
 
 ## Install
 
@@ -16,9 +16,9 @@ Requires dsh 0.1.5-rc.2 — the exact official version line this release is buil
 
 ## Usage
 
-Open **Settings → General** — a **Tone** row sits directly under the official **Appearance** row. Four tones per axis, plus **Default**:
+Open **Settings → General** — a **Tone** row sits directly under the official **Appearance** row. Light and dark each get four skins, plus a **Default**:
 
-| Axis | Tones |
+| Appearance | Skins |
 | :--- | :--- |
 | Dark | Default (official black), Space, Ember, Glade |
 | Light | Default (official white), Frost, Sakura, Moss |
@@ -26,14 +26,14 @@ Open **Settings → General** — a **Tone** row sits directly under the officia
 ## Compatibility
 
 * Targets dsh 0.1.5-rc.2 — the exact official version line this release is built and verified against (other lines are not covered)
-* Purely visual: it never blocks the UI or changes how anything works
+* Appearance only: it never blocks the UI or changes how anything works
 * If the host or the browser is missing something it needs, it disables itself with a user-facing warning
 
 ## Screenshots
 
-![Dark axis on the new-session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png)
+![Dark theme on the new-session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png)
 
-![Light axis on the new-session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png)
+![Light theme on the new-session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png)
 
 ## Uninstall & leftovers
 
