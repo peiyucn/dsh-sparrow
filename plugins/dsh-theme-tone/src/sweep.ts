@@ -47,7 +47,7 @@
  * 五处都带 `data-variant` 或 `data-tool` —— 这就是收窄的判据（测试里钉死）。
  */
 
-import { GRAIN_TILE_VARIABLE, PLAIN_ATTR } from './constants.js'
+import { PLAIN_ATTR } from './constants.js'
 import { grainOverGradients } from './backdrop.js'
 
 /**
