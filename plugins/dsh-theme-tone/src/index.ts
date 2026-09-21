@@ -87,6 +87,7 @@ export {
 } from './surface.js'
 export {
   SWEEP_ANCHORS,
+  SWEEP_PEAK_STOP,
   SWEEP_PLATE_ALPHA,
   SWEEP_PLATE_LAYERS,
   SWEEP_SHAPE_MASK,

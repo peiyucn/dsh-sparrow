@@ -72,6 +72,14 @@ export const SWEEP_ANCHORS: readonly string[] = Object.freeze([
 export const SWEEP_PLATE_ALPHA = 0.6
 
 /**
+ * 官方那条横向渐变的**峰位**（`transparent 0% → 55% → transparent 100%`）。
+ *
+ * 与 {@link SWEEP_PLATE_ALPHA} 一样是**必须与官方一致**的契约，故同样命名 ——
+ * 改了它，扫光的节奏与位置手感就变了（`sweep.test.mjs` 钉住这个字面量）。
+ */
+export const SWEEP_PEAK_STOP = '55%'
+
+/**
  * 背景板要画的图层（**从上到下**）—— 与「我们自己那块地面」逐项对应：
  *
  * 1. **颗粒瓦片**（`GRAIN_TILE_VARIABLE`）—— 漏了它带子就成了唯一「干净」的一条；
@@ -88,11 +96,11 @@ export const SWEEP_PLATE_LAYERS =
  * * **形状**：与官方那条横向渐变的 alpha 剖面一致（`transparent 0% → 55% → transparent 100%`）；
  * * **强度**：峰值 `rgb(0 0 0 / 60%)`，把整块背景板乘 `0.6`（与官方那支颜色的 60% 对齐）。
  *
- * **停点必须与官方一致**，否则扫光的节奏与位置手感就变了；
+ * **停点必须与官方一致**（{@link SWEEP_PEAK_STOP}），否则扫光的节奏与位置手感就变了；
  * **峰值必须保持 60%**，否则「压在背景上＝背景」这条等式不成立（大了显形、小了洗不动字）。
  */
 export const SWEEP_SHAPE_MASK =
-  `linear-gradient(90deg, transparent 0%, rgb(0 0 0 / ${Math.round(SWEEP_PLATE_ALPHA * 100)}%) 55%, transparent 100%)`
+  `linear-gradient(90deg, transparent 0%, rgb(0 0 0 / ${Math.round(SWEEP_PLATE_ALPHA * 100)}%) ${SWEEP_PEAK_STOP}, transparent 100%)`
 
 /**
  * 给锚点挂上「官方默认」门（与 `surface.ts` 的 `gatedAnchor` 同法：门并进锚点自己的 `body`）。

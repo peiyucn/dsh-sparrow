@@ -409,10 +409,12 @@ export const rimFor = (scheme: 'light' | 'dark'): string => {
  */
 const edgeFade = (edge: GlassEdgeFade, color: string): string => {
   // 百分比保留两位小数 —— 直接用 `rx * 100` 会漏出浮点噪声（`1.1 * 100 = 110.00000000000001`）。
-  const pct = (v: number): string => `${Number((v * 100).toFixed(2))}%`
+  // ⚠️ 这个**保留小数**的换算与模块级 {@link pct}（取整）不同，故单独命名，
+  // 不要合并：那个取整是给 alpha 用的，这里给的是椭圆半径，进位规则一改就会动几何。
+  const pctExact = (v: number): string => `${Number((v * 100).toFixed(2))}%`
   const a = Math.round(edge.alpha * 100)
   const stop = Math.round(edge.stop * 100)
-  return `radial-gradient(ellipse ${pct(edge.rx)} ${pct(edge.ry)} at 0% 0%, `
+  return `radial-gradient(ellipse ${pctExact(edge.rx)} ${pctExact(edge.ry)} at 0% 0%, `
     + `color-mix(in srgb, ${color} ${a}%, transparent) 0%, transparent ${stop}%)`
 }
 
@@ -574,7 +576,12 @@ export function phaseGate(phases: readonly string[]): string {
   return parts.length === 1 ? parts[0] : `:is(${parts.join(', ')})`
 }
 
-/** 0–1 的不透明度 → CSS 百分比字面量。 */
+/**
+ * 0–1 的不透明度 → CSS 百分比字面量（**取整**）。
+ *
+ * 只给 alpha / 停点用。几何类的百分比（椭圆半径）走 {@link edgeFade} 内的 `pctExact` ——
+ * 那里必须保留两位小数，否则 `1.1 * 100` 会漏出浮点噪声。
+ */
 function pct(alpha: number): string {
   return `${Math.round(alpha * 100)}%`
 }
