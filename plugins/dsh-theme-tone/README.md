@@ -4,8 +4,6 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 A background-tone layer under the official light/dark theme — a DeepSeek Harness (DSH) web plugin (dsh-sparrow collection member).
 
-DSH's official theme gives you one colour axis: light or dark. This plugin adds a second one underneath it — a **tone**, picked separately for each axis, so the light side and the dark side each get their own atmosphere. A tone repaints the app background, the sidebar, the glow falling across them, and everything that sits on top: menus, dialogs, cards. Picking **Default** leaves the official look untouched.
-
 ## Install
 
 ```bash
@@ -22,26 +20,16 @@ Open **Settings → General** — a **Tone** row sits directly under the officia
 
 | Axis | Tones |
 | :--- | :--- |
-| Dark | Default, Space (blue-violet), Ember (red), Glade (green) |
-| Light | Default, Frost (blue), Sakura (pink), Moss (green) |
-
-* The row shows the tones for the **current** axis; switching light/dark refreshes it in place
-* Each axis remembers its own choice, so switching to light and back keeps your dark tone
-* Each card previews the tone it applies — what you pick is what you get
-* Picking a tone takes effect immediately; no page reload
-* **Default** changes nothing at all, so the untouched official look is always one click away
-
-A tone reaches past the background: menus, dialogs and cards inherit its hue, hover / pressed / selected states, separators and scrollbars are tinted to match, and so are code blocks and the three cards above the composer (todo, goal, queued messages).
+| Dark | Default (the official dark), Space, Ember, Glade |
+| Light | Default (the official light), Frost, Sakura, Moss |
 
 ## Compatibility
 
 * Targets dsh 0.1.5-rc.2 — the exact official version line this release is built and verified against (other lines are not covered)
 * Purely visual: it never blocks the UI or changes how anything works
-* If the host or the browser is missing something it needs, it disables itself with a user-facing warning instead of half-working
+* If the host or the browser is missing something it needs, it disables itself with a user-facing warning
 
 ## Screenshots
-
-The new-session page on each axis — dark, then light:
 
 ![Dark axis on the new-session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png)
 
