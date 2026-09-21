@@ -27,7 +27,7 @@ import {
   TOP_VARIABLE,
   WIDTH_HANDLE_ATTR,
 } from './constants.js'
-import { toneFor, toneIdOf, type ColorScheme, type ThemeToneSettings, type ToneId } from './tones.js'
+import { normalizeScheme, toneFor, toneIdOf, type ColorScheme, type ThemeToneSettings, type ToneId } from './tones.js'
 
 
 /**
@@ -93,9 +93,9 @@ export const BOTTOM_RADIAL_SHAPE = 'ellipse 70vw 45vh at 50% 112vh'
 /**
  * 上方金光的**默认**收束位置 —— pyai.site 原值 `62%`。
  *
- * 真机上两轴已经分开取值（见 `constants.ts` 的 {@link TOP_STOP_VARIABLE} 与 `tones.ts` 的
- * `TOP_STOP_BY_SCHEME`：浅色轴 `100%` / 深色轴 `62%`），这里只作为 **CSS 变量的 fallback**
- * ——变量缺失时（理论上不会，但守卫掉）退回原值，而不是退成「没有收束点」。
+ * 真机上的值经 {@link TOP_STOP_VARIABLE} 由 `tones.ts` 的 `TOP_STOP` 发出（两轴同值 `62%`，
+ * 与这里一致）；本常量作为 **CSS 变量的 fallback** —— 变量缺失时（理论上不会，但守卫掉）
+ * 退回原值，而不是退成「没有收束点」。
  */
 export const RADIAL_STOP = '62%'
 
@@ -364,15 +364,16 @@ export interface BackdropPlan {
 
 /**
  * 由当前轴与设置节算出渲染计划。当前轴的色调没有染色色值（`official` 或留位色被脏写入）时隐藏整层。
- * @param scheme - 当前解析出的明暗轴（`system` 已由 ui-theme 解析）。
- * @param settings - 已解析的设置节。
+ * @param scheme - 当前解析出的明暗轴（`system` 已由 ui-theme 解析；脏值按浅色轴处理）。
+ * @param settings - 已解析的设置节（`null` / `undefined` 按空设置处理）。
  * @returns 背景层渲染计划。
  */
 export function backdropPlan(scheme: ColorScheme, settings: ThemeToneSettings): BackdropPlan {
-  const tone = toneFor(scheme, toneIdOf(settings, scheme))
+  const axis = normalizeScheme(scheme)
+  const tone = toneFor(axis, toneIdOf(settings, axis))
   const painted = tone.top !== '' && tone.bottom !== ''
   return {
-    scheme,
+    scheme: axis,
     hidden: !painted,
     top: tone.top,
     bottom: tone.bottom,
@@ -390,16 +391,17 @@ export function backdropPlan(scheme: ColorScheme, settings: ThemeToneSettings): 
  *
  * 颗粒由样式表的 `.cube::after` 承担（`mix-blend-mode: screen` 没法用 inline style 表达），
  * 组件只需按 `tone.grain` 打 `data-grain`。
- * @param scheme - 明暗轴。
+ * @param scheme - 明暗轴（脏值按浅色轴处理）。
  * @param id - 该轴上要预览的色调 id。
  * @returns 可直接摊进 React `style` 的背景两件套。
  */
 export function tonePreview(scheme: ColorScheme, id: ToneId): { backgroundColor: string; backgroundImage: string } {
-  const tone = toneFor(scheme, id)
+  const axis = normalizeScheme(scheme)
+  const tone = toneFor(axis, id)
   if (tone.top === '' || tone.bottom === '') {
     return { backgroundColor: tone.base, backgroundImage: 'none' }
   }
-  const scale = PREVIEW_ALPHA_SCALE[scheme]
+  const scale = PREVIEW_ALPHA_SCALE[axis]
   const light = (color: string): string => boostAlpha(color, scale.light)
   const depth = (color: string): string => boostAlpha(color, scale.depth)
   const layers = [

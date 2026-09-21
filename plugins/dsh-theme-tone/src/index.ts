@@ -43,6 +43,7 @@ export {
   SURFACE_RUNGS,
   SURFACE_TINT,
   SURFACE_TOKENS,
+  TOP_STOP,
   WASH_TINT,
   WASH_TOKENS,
   availableToneIds,

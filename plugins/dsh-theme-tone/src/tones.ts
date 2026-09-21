@@ -20,30 +20,15 @@ import {
 } from './constants.js'
 
 /**
- * **顶光收束点**（按轴取值，缘由见 `constants.ts` 的 `TOP_STOP_VARIABLE`）。
+ * **顶光收束点**（两轴同值）。
  *
- * ## 两轴**同一个值**（`62%`，2026-09-18 owner 定案）
+ * 浅色轴不再有自己的一套几何：**方向 / 位置 / 收束点一律照深色轴那束金**，
+ * 两轴严格镜像（近黑底 + 金光源 / 近白底 + 主色光源）。
  *
- * owner：「浅色的我想的是**依然是官方的底色配置**，然后**打光用主色**，
- * **打光的方向位置和深色的金光一样**。而不是现在整体都是主色的感觉。」
- *
- * 所以浅色轴不再有自己的一套几何 —— **方向 / 位置 / 收束点一律照深色轴那束金**
- * （`62%`），两轴严格镜像：近黑底 + 金光源 / 近白底 + 主色光源。
- *
- * ## 历史：浅色轴曾单独取 `100%`
- *
- * 那时浅色轴的三层光 alpha 是 `.48 / .54 / .38`（比深色重一个量级），
- * 同样收在 `62%` 会让那条「到此为止」的硬边明显 6 倍，且边外是一大片**没有渐变的死区**
- * （实测顶光在 y ≈ 145px 就没，屏高 18%~84% 全平）。owner 当时反馈
- * 「浅色模式上下主色向中间渐变整体比较愣」→ 推到 `100%` 把色量摊开。
- *
- * **现在不需要那个补丁了**：alpha 已降到 `.16`（与深色 `.09` 同量级），
- * `.09` 的淡光本来就看不见边 —— 浅色轴跟着用 `62%` 即可（见下方 alpha 表）。
+ * 两轴的三层光 alpha 同量级（深 `.09 / .11 / .18`、浅 `.16 / .19 / .30`），
+ * 都是「淡光」，收束点那道边本来就看不出 —— 故共用同一个值。
  */
-const TOP_STOP_BY_SCHEME: Readonly<Record<ColorScheme, string>> = Object.freeze({
-  light: '62%',
-  dark: '62%',
-})
+export const TOP_STOP = '62%'
 
 /** 明暗轴。 */
 export type ColorScheme = 'light' | 'dark'
@@ -923,6 +908,20 @@ const TONES_BY_SCHEME: Readonly<Record<ColorScheme, Readonly<Record<string, Tone
   dark: DARK_TONES,
 })
 
+/**
+ * 把任意输入收敛到一个合法明暗轴 —— **纯函数硬化**。
+ *
+ * 合法调用方（`ctx.theme.getTheme().active.colorScheme`）永远给 `'light' | 'dark'`，
+ * 所以这不是在修 bug，而是让这些**已作为公开 API 导出**的纯函数对脏输入也有安全默认值
+ * （仓库《鲁棒性》：异常输入要有安全默认值）。非法值一律当**浅色轴**处理 ——
+ * 与 {@link toneFieldFor} 原本就有的「非 dark 即 light」口径一致。
+ * @param scheme - 任意输入（可能是 `undefined` / `null` / 大写 / 别的字符串）。
+ * @returns 合法的明暗轴。
+ */
+export function normalizeScheme(scheme: unknown): ColorScheme {
+  return scheme === 'dark' ? 'dark' : 'light'
+}
+
 /** 某一轴的色调 id 顺序。 */
 export function toneIdsFor(scheme: ColorScheme): readonly ToneId[] {
   return scheme === 'dark' ? DARK_TONE_IDS : LIGHT_TONE_IDS
@@ -930,36 +929,38 @@ export function toneIdsFor(scheme: ColorScheme): readonly ToneId[] {
 
 /** 某一轴的**可取**色调 id（设置行只渲染这些）。 */
 export function availableToneIds(scheme: ColorScheme): ToneId[] {
-  const tones = TONES_BY_SCHEME[scheme]
-  return toneIdsFor(scheme).filter(id => tones[id]?.available === true)
+  const tones = TONES_BY_SCHEME[normalizeScheme(scheme)]
+  return toneIdsFor(normalizeScheme(scheme)).filter(id => tones[id]?.available === true)
 }
 
 /**
  * 取某一轴上某个 id 的色调；id 不属于该轴（脏设置 / 跨轴串味）时回落到该轴默认。
- * @param scheme - 明暗轴。
+ * @param scheme - 明暗轴（脏值按浅色轴处理，见 {@link normalizeScheme}）。
  * @param id - 候选色调 id。
  * @returns 该轴上安全可用的色调取值。
  */
 export function toneFor(scheme: ColorScheme, id: ToneId): ToneSpec {
-  const tones = TONES_BY_SCHEME[scheme]
+  const axis = normalizeScheme(scheme)
+  const tones = TONES_BY_SCHEME[axis]
   const direct = tones[id]
   if (direct !== undefined && direct.available) return direct
-  const fallbackId = scheme === 'dark' ? DEFAULT_SETTINGS.darkTone : DEFAULT_SETTINGS.lightTone
+  const fallbackId = axis === 'dark' ? DEFAULT_SETTINGS.darkTone : DEFAULT_SETTINGS.lightTone
   return tones[fallbackId] ?? LIGHT_TONES.official
 }
 
 /**
  * 读某一轴当前选中的色调 id。脏值（不属于该轴、或该轴上仍是留位不可选的色）一律
  * 回落到该轴默认 id —— 与 {@link toneFor} 的回落口径一致，避免「选中态显示 A、实际画 B」。
- * @param settings - 已解析的设置节。
- * @param scheme - 明暗轴。
+ * @param settings - 已解析的设置节（`null` / `undefined` 按空设置处理）。
+ * @param scheme - 明暗轴（脏值按浅色轴处理，见 {@link normalizeScheme}）。
  * @returns 该轴上可用且被选中的色调 id。
  */
 export function toneIdOf(settings: ThemeToneSettings, scheme: ColorScheme): ToneId {
-  const candidate = scheme === 'dark' ? settings.darkTone : settings.lightTone
-  const spec = candidate === undefined ? undefined : TONES_BY_SCHEME[scheme][candidate]
+  const axis = normalizeScheme(scheme)
+  const candidate = axis === 'dark' ? settings?.darkTone : settings?.lightTone
+  const spec = candidate === undefined ? undefined : TONES_BY_SCHEME[axis][candidate]
   if (spec !== undefined && spec.available) return candidate as ToneId
-  return scheme === 'dark' ? DEFAULT_SETTINGS.darkTone : DEFAULT_SETTINGS.lightTone
+  return axis === 'dark' ? DEFAULT_SETTINGS.darkTone : DEFAULT_SETTINGS.lightTone
 }
 
 /**
@@ -994,7 +995,7 @@ export type TokenOverrides = Record<string, TokenModes>
  * 3. **插件自己的光色**：顶光 / 底光 / 颗粒贴图（{@link LIGHT_TOKENS}）—— 背景层与浮层都要读，
  *    而浮层是 `body` 的后代、读不到背景层元素上的内联变量，所以这几个值必须发到 `body` 上。
  * 4. **浮层面板底色**：`PANEL_VARIABLE` 单独一份，给自带硬编码底色的弹层兜底。
- * @param settings - 已解析的设置节。
+ * @param settings - 已解析的设置节（`null` / `undefined` 按空设置处理 → 两轴都走默认）。
  * @returns 完整覆盖层。
  */
 export function tokenOverrides(settings: ThemeToneSettings): TokenOverrides {
@@ -1034,11 +1035,8 @@ export function tokenOverrides(settings: ThemeToneSettings): TokenOverrides {
   for (const { token, pick } of LIGHT_TOKENS) {
     overrides[token] = { light: pick(light, 'light'), dark: pick(dark, 'dark') }
   }
-  // 顶光收束点：两轴几何相同、alpha 差一个量级，收束点必须跟着分开（见 TOP_STOP_BY_SCHEME）。
-  overrides[TOP_STOP_VARIABLE] = {
-    light: TOP_STOP_BY_SCHEME.light,
-    dark: TOP_STOP_BY_SCHEME.dark,
-  }
+  // 顶光收束点：两轴同值（见 TOP_STOP）。
+  overrides[TOP_STOP_VARIABLE] = { light: TOP_STOP, dark: TOP_STOP }
   // 交互态：无 alpha 的面走 color-mix，低 alpha 的洗染只换 RGB、保住 alpha。
   for (const entry of STATE_TOKENS) {
     overrides[entry.token] = {

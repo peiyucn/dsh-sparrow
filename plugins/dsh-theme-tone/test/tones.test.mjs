@@ -7,12 +7,14 @@ import {
   LIGHT_GLOW_ALPHA,
   LIGHT_TONES,
   availableToneIds,
+  normalizeScheme,
   toneFieldFor,
   toneFor,
   toneIdOf,
   toneIdsFor,
   tokenOverrides,
 } from '../lib/tones.js'
+import { backdropPlan, tonePreview } from '../lib/backdrop.js'
 import { en, zh } from '../lib/client/locales.js'
 
 const ALL_TONE_IDS = [...toneIdsFor('light'), ...toneIdsFor('dark')].filter(
@@ -385,6 +387,31 @@ describe('色调取值回落', () => {
   it('toneFieldFor 应该 把明暗轴映射到对应设置字段', () => {
     assert.equal(toneFieldFor('dark'), 'darkTone')
     assert.equal(toneFieldFor('light'), 'lightTone')
+  })
+
+  it('纯函数应该 对脏输入也有安全默认值（不抛错）', () => {
+    // 这些函数已作为公开 API 从 index.ts 导出，故脏输入不该抛 ——
+    // 仓库《鲁棒性》要求「异常输入返回安全默认值」。
+    // 生产调用方给的一定是 `'light' | 'dark'` 与已解析的设置节，所以这不是修 bug，是硬化接口。
+    const dirtySchemes = ['LIGHT', 'Dark', '', 'system', null, undefined, 0, {}]
+    for (const s of dirtySchemes) {
+      // 非法轴一律当浅色轴 —— 与 toneFieldFor 原有的「非 dark 即 light」口径一致
+      assert.equal(normalizeScheme(s), s === 'dark' ? 'dark' : 'light', `normalizeScheme(${String(s)})`)
+      assert.equal(toneFieldFor(s), 'lightTone', `toneFieldFor(${String(s)})`)
+      assert.doesNotThrow(() => toneIdOf(undefined, s), `toneIdOf(${String(s)})`)
+      assert.doesNotThrow(() => toneFor(s, 'blue'), `toneFor(${String(s)})`)
+      assert.doesNotThrow(() => backdropPlan(s, undefined), `backdropPlan(${String(s)})`)
+      assert.doesNotThrow(() => tonePreview(s, 'blue'), `tonePreview(${String(s)})`)
+      assert.doesNotThrow(() => availableToneIds(s), `availableToneIds(${String(s)})`)
+    }
+    // 设置节为 null / undefined 时按空设置处理 → 两轴都走默认
+    for (const empty of [null, undefined]) {
+      const o = tokenOverrides(empty)
+      assert.equal(o['--dsw-alias-bg-layer-1'].light, tokenOverrides(DEFAULT_SETTINGS)['--dsw-alias-bg-layer-1'].light)
+      assert.equal(backdropPlan('dark', empty).scheme, 'dark')
+    }
+    // 大小写不匹配的轴名当浅色轴（**不是**当深色）—— 否则深色用户会看到浅色配方
+    assert.equal(backdropPlan('DARK', DEFAULT_SETTINGS).scheme, 'light')
   })
 })
 
