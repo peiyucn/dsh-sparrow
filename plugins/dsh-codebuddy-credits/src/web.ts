@@ -51,10 +51,13 @@ export interface CodeBuddyCreditsShared {
   removeKey(): Promise<void>
   /** 查询企业周期配额。 */
   quota(): Promise<QuotaStatus>
-  /** 会话累计积分与调用次数（进程内 usage 记账），附按模型聚合的调用明细。 */
-  sessionUsage(sessionId: string): TurnUsageView
-  /** 单轮积分与调用次数（每轮积分胶囊弹窗用）。 */
-  turnUsage(sessionId: string, turn: number): TurnUsageView
+  /**
+   * 会话累计积分与调用次数（从会话事件重放，重启后仍准确），附按模型聚合的明细。
+   * 异步：冷会话（重启后未激活）需读持久化事件前缀。
+   */
+  sessionUsage(sessionId: string): Promise<TurnUsageView>
+  /** 单轮积分与调用次数（每轮积分胶囊弹窗用；同样来自事件重放）。 */
+  turnUsage(sessionId: string, turn: number): Promise<TurnUsageView>
   /** route 是否注册（状态接口诊断用）。 */
   active(): boolean
   /** 账号快照（来自 /v2/accounts）。 */
@@ -73,52 +76,12 @@ export interface CodeBuddyCreditsShared {
   setMaxMode(enabled: boolean): Promise<void>
 }
 
-/** usage 记账条目的最小面（turnUsageOf 的输入）。 */
-export interface UsageEntryLike {
-  sessionId?: string
-  turn?: number
-  credit?: number
-  model?: string
-}
-
 /** 积分聚合视图：合计 + 调用次数 + 按模型聚合的明细（供轮次/会话面板）。 */
 export interface TurnUsageView {
   credit: number
   calls: number
   /** 按模型聚合：每模型合计积分 + 调用次数（顺序 = 首次出现）。 */
   byModel: ReadonlyArray<{ model: string; credit: number; calls: number }>
-}
-
-/**
- * usage 记账聚合（纯函数）：按会话（+可选轮次）合计积分与调用次数，
- * 并按模型聚合明细（同一模型多次调用合并成一行，避免重复条目刷屏）。
- */
-export function turnUsageOf(
-  entries: readonly UsageEntryLike[],
-  sessionId: string,
-  turn: number | undefined,
-): TurnUsageView {
-  let credit = 0
-  let calls = 0
-  const byModel: { model: string; credit: number; calls: number }[] = []
-  const index = new Map<string, number>()
-  for (const usage of entries) {
-    if (usage.sessionId !== sessionId) continue
-    if (turn !== undefined && usage.turn !== turn) continue
-    calls += 1
-    if (usage.credit !== undefined) credit += usage.credit
-    const model = usage.model ?? ''
-    let slot = index.get(model)
-    if (slot === undefined) {
-      slot = byModel.length
-      index.set(model, slot)
-      byModel.push({ model, credit: 0, calls: 0 })
-    }
-    const bucket = byModel[slot]
-    bucket.calls += 1
-    if (usage.credit !== undefined) bucket.credit += usage.credit
-  }
-  return { credit, calls, byModel }
 }
 
 /** 模型事实 → 状态接口视图。 */
@@ -220,7 +183,7 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
               sendJson(res, 400, { error: '缺少 sessionId' })
               return
             }
-            sendJson(res, 200, shared.sessionUsage(sessionId))
+            sendJson(res, 200, await shared.sessionUsage(sessionId))
             return
           }
           if (req.method === 'GET' && pathname === PREFIX + '/turn-usage') {
@@ -236,7 +199,7 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
               sendJson(res, 400, { error: 'turn 必须是非负整数' })
               return
             }
-            sendJson(res, 200, shared.turnUsage(sessionId, turn))
+            sendJson(res, 200, await shared.turnUsage(sessionId, turn))
             return
           }
           if (req.method === 'POST' && pathname === PREFIX + '/key') {

@@ -1,16 +1,16 @@
 /**
- * 企业周期配额查询：POST www.codebuddy.cn/v2/billing/meter/get-enterprise-user-usage。
+ * 企业周期配额查询：POST {CODEBUDDY_ORIGIN}/v2/billing/meter/get-enterprise-user-usage。
  * 实测（2026-09-03）：仅 X-API-Key 即可（无登录态），响应含本期已消耗、
  * 周期额度、周期范围与重置时间。请求形态与官方 CLI 一致（统一请求头规矩）。
+ * 端点常量与推理/目录同源（`CODEBUDDY_ORIGIN`），不另立字面量。
  */
 
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import { requestHeaders } from './catalog.js'
-import { QUOTA_FETCH_TIMEOUT_MS } from './constants.js'
+import { QUOTA_FETCH_TIMEOUT_MS, QUOTA_URL } from './constants.js'
 
 /** 配额快照（展示用）。 */
-export interface QuotaStatus {
-  /** 本期已消耗积分。 */
+export interface QuotaStatus {  /** 本期已消耗积分。 */
   used: number
   /** 周期额度上限。 */
   limit: number
@@ -23,8 +23,6 @@ export interface QuotaStatus {
   /** 下次重置时间。 */
   resetAt?: string
 }
-
-const QUOTA_URL = 'https://www.codebuddy.cn/v2/billing/meter/get-enterprise-user-usage'
 
 function numberOr(raw: unknown, fallback: number): number {
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : fallback

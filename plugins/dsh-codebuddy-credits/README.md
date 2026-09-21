@@ -84,8 +84,9 @@ conversation UI:
   of its action row), with a popup breaking the total down per call and per
   model.
 
-Session and per-turn figures are accumulated in memory and reset when DSH
-restarts; the quota panel always reads the authoritative server-side number.
+Session and per-turn figures are replayed from the session's own event log, so
+they survive a DSH restart and stay correct when you reopen an older session;
+the quota panel always reads the authoritative server-side number.
 
 ## Screenshots
 

@@ -15,16 +15,76 @@ export const DISPLAY_NAME = 'CodeBuddy Credits'
 export const API_KEY_ENV = 'CODEBUDDY_CREDITS_API_KEY'
 /** 旧版引用（早期版本用 CODEBUDDY_API_KEY 存 Key）：解析时兼容并迁移。 */
 export const LEGACY_API_KEY_ENV = 'CODEBUDDY_API_KEY'
-/** CodeBuddy 推理端点（OpenAI Chat Completions 方言，仅支持流式）。 */
-export const BASE_URL = 'https://copilot.tencent.com/v2'
-/** 模型目录端点：按当前 API key 的账号权限返回可用模型。 */
-export const CONFIG_URL = 'https://copilot.tencent.com/v3/config'
 /**
- * CodeBuddy 官方 CLI 请求标识。服务端校验该标识（非官方 UA 的请求会被拒绝，
- * 表现为 500 no body——社区插件的公开踩坑记录），而 user-agent 是 DSH
- * attribution 保留名、profile.headers 无法覆盖，因此由 provider 包装层注入。
+ * CodeBuddy 服务根域名（**唯一来源**，勿在别处硬写字面量）。
+ *
+ * `www.codebuddy.cn` 与 `copilot.tencent.com` 是**同一套服务的两个入口**
+ * （2026-09-18 实测：13 个用例归一化后深度相等；流式帧结构与 `usage` 字段集合一致；
+ * 以付费模型双向验证共享同一份配额账本；两域名公共 DoH 解析到同一组 EdgeOne IP）。
+ *
+ * **取 `copilot.tencent.com`**：官方 CLI 与开放平台文档用的就是它，且为**国际通用入口**；
+ * `www.codebuddy.cn` 是国内区域名 —— 本插件面向所有用户，不钉区域名。
+ * 两者服务等价，故这是取舍而非功能差异。
+ *
+ * ⚠️ 该域名在个别办公网内可能解析到已退役的边缘 IP 而**连不上**（`copilot.tencent.com`
+ * 的 CNAME 曾指向遗留池 `…share.dnse5.com`）；同批边缘 IP 用它的 SNI 可正常握手，
+ * 说明**服务本身是好的，坏的是本机解析**。遇到时改本机 DNS 即可，不要改这个常量。
+ *
+ * 国际版 `www.codebuddy.ai` **不是别名**，是独立后端（IP `43.160.158.125`、
+ * 31 vs 21 个模型、`/v2/accounts` 返回 401），不可与之混用。
  */
-export const OFFICIAL_USER_AGENT = 'CLI/unknown CodeBuddy/2.137.1'
+export const CODEBUDDY_ORIGIN = 'https://copilot.tencent.com'
+/**
+ * 个人主页地址：积分弹层右上角用户徽章点击后打开（与 README 的登录地址同源）。
+ * 取自 `CODEBUDDY_ORIGIN`，不写第二份字面量。
+ */
+export const PROFILE_URL = `${CODEBUDDY_ORIGIN}/profile/`
+/** CodeBuddy 推理端点（OpenAI Chat Completions 方言，仅支持流式）。 */
+export const BASE_URL = `${CODEBUDDY_ORIGIN}/v2`
+/** 模型目录端点：按当前 API key 的账号权限返回可用模型。 */
+export const CONFIG_URL = `${CODEBUDDY_ORIGIN}/v3/config`
+/** 账号信息端点（企业上下文头的来源）。 */
+export const ACCOUNTS_URL = `${CODEBUDDY_ORIGIN}/v2/accounts`
+/** 企业周期配额端点（额度卡数据源）。 */
+export const QUOTA_URL = `${CODEBUDDY_ORIGIN}/v2/billing/meter/get-enterprise-user-usage`
+/**
+ * 本插件的客户端身份：请求 UA 前段与 `X-IDE-Name` 同名，便于服务端与
+ * 企业管理后台把我们认成独立客户端（用量明细的 client 字段即取该头，
+ * 2026-09-18 实测：X-IDE-Name 是唯一起作用的头，X-IDE-Type/Version 不参与）。
+ */
+export const CLIENT_NAME = 'deepseek harness'
+/**
+ * `/v3/config`（模型目录）要求的**客户端类别记号**。
+ *
+ * 实测（2026-09-18，同一 Key 逐项对照）：UA 里**必须出现 `CLI/` 记号**，
+ * 服务端才在 `data.models` 返回模型数组；不含该记号时它**返回 HTTP 200 +
+ * `code:0/msg:OK` 但静默省略 models 字段**——没有报错、没有非 2xx，插件侧
+ * 只能表现为「模型目录为空」，极难排查。已验形态：
+ *
+ * | UA | models |
+ * | --- | --- |
+ * | `CLI/unknown CodeBuddy/2.137.1` | 31 |
+ * | `deepseekharness CLI/unknown CodeBuddy/2.137.1` | 31 |
+ * | `CLI/deepseekharness CodeBuddy/2.137.1` | 31 |
+ * | `deepseekharness CodeBuddy/2.137.1` | **无（静默空目录）** |
+ * | `deepseekharness/0.1.5 CodeBuddy/2.137.1` | **无** |
+ *
+ * 另一条独立校验：UA 解析不出 `CodeBuddy/<版本>` 时返回 400
+ * `check ua, get coding copilot version error`（如 `CodeBuddy-CLI/2.137.1`）。
+ *
+ * 故 UA 取「本插件名 + 官方记号 + 官方版本段」：**如实自报身份**（名字在最前），
+ * 同时满足服务端两条校验。`x-ide-name` 不受此约束，仍是后台 `client` 字段的来源。
+ */
+export const CLI_UA_MARKER = 'CLI/unknown'
+/**
+ * 官方 CLI 版本段（`CodeBuddy/<版本>`），服务端校验所需。需随官方 CLI 更新同步。
+ */
+export const CODEBUDDY_CLI_VERSION = '2.137.1'
+/**
+ * 请求 UA：`<本插件名> CLI/unknown CodeBuddy/<官方版本>`。
+ * 不带本插件版本号，避免每次发版都要改这里；官方版本段才是服务端要的。
+ */
+export const REQUEST_USER_AGENT = `${CLIENT_NAME.replace(/ /g, '')} ${CLI_UA_MARKER} CodeBuddy/${CODEBUDDY_CLI_VERSION}`
 /** 产品部署类型标识，随请求发送。 */
 export const PRODUCT_HEADER = 'SaaS'
 

@@ -17,17 +17,19 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-agent'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-settings'
 import { CodeBuddyAdapter } from './adapter.js'
-import type { CodeBuddyUsage } from './adapter.js'
-import { discoverCodeBuddyModels, factsFromEntries, fetchCodeBuddyModels } from './catalog.js'
+import { discoverCodeBuddyModels, factsFromEntries, fetchCodeBuddyModels, requestHeaders } from './catalog.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
 import { assertCapabilities } from './compat.js'
 import { Config, keyRefs } from './config.js'
 import {
   ACCOUNT_FETCH_TIMEOUT_MS,
+  ACCOUNTS_URL,
   DISPLAY_NAME,
   IMAGE_REQUEST_POLICY,
   MODEL_REFRESH_COOLDOWN_MS,
@@ -36,10 +38,28 @@ import {
   STREAM_IDLE_TIMEOUT_MS,
 } from './constants.js'
 import { fetchQuota } from './quota.js'
-import { installCodeBuddyWeb, turnUsageOf } from './web.js'
+import { installCodeBuddyWeb } from './web.js'
+import type { TurnUsageView } from './web.js'
+import {
+  foldSessionCredits,
+  sessionViewOf,
+  turnViewOf,
+} from './credits-ledger.js'
+import type { CreditLedger } from './credits-ledger.js'
+import { createLedgerResolver } from './credits-source.js'
 
 export const name = 'llm-codebuddy-credits'
-export const inject = ['llm', 'attachments']
+/**
+ * 硬依赖服务。`sessions` 是积分账本的数据源（live 会话读内存日志）——本插件本就
+ * `import { SessionId } from '@deepseek-ai/dsh-session'`，客户端侧也声明了
+ * `ctx.inject(['sessions'], …)`；漏在宿主侧声明会让 `ctx.sessions` 直接抛
+ * 「cannot get property "sessions" without inject」（cordis 服务须经 inject 绑定到
+ * 本插件 fiber，见 `cordis/lib/index.js:672-694`）。
+ */
+export const inject = ['llm', 'attachments', 'sessions']
+
+/** 无账本时的空视图（会话不存在 / 冷读失败且无缓存）。 */
+const EMPTY_USAGE: TurnUsageView = { credit: 0, calls: 0, byModel: [] }
 
 export { Config } from './config.js'
 
@@ -61,6 +81,7 @@ export function apply(ctx: Context, config: Config): void {
   assertCapabilities(ctx, name, [
     { name: 'llm.registerAdapter', ok: typeof (ctx.llm as { registerAdapter?: unknown } | undefined)?.registerAdapter === 'function' },
     { name: 'llm.resolveModelInfo', ok: typeof (ctx.llm as { resolveModelInfo?: unknown } | undefined)?.resolveModelInfo === 'function' },
+    { name: 'sessions.get', ok: typeof (ctx.sessions as { get?: unknown } | undefined)?.get === 'function' },
   ])
   let current: () => Config = () => config
 
@@ -102,25 +123,28 @@ export function apply(ctx: Context, config: Config): void {
     )
   }
 
-  /** 会话/积分统计（进程内累计，展示走状态接口）。 */
-  /** usage 条目附带轮次（agent/request 载荷透出，供每轮积分展示）。 */
-  interface TaggedUsage extends CodeBuddyUsage {
-    turn?: number
-  }
-  const usageLog: TaggedUsage[] = []
-
   /**
-   * 请求信号 → turn 关联：agent/request 载荷的 signal 与适配器
-   * options.signal 是同一实例（官方 loop prepareCall 透传，已查证），
-   * WeakMap 按信号精确关联；请求被中断时条目随信号回收、无残留错位。
+   * 会话积分账本：从**会话事件重放**得到，替代早期的进程内 usageLog（重启清零）。
+   * credit 由适配器写进 finish 块的 `replayState.response.usage`（随事件持久化），
+   * 故重启后仍可从事件前缀重放；live 会话走内存日志（同步、零 IO），
+   * 冷会话（重启后未激活）走 sessionController.inspect 读持久化前缀。
    */
-  const requestTurns = new WeakMap<AbortSignal, { turn: number }>()
-  ctx.on('agent/request', async (payload, next) => {
-    const config = await next()
-    if (config.provider === PROVIDER) {
-      requestTurns.set(payload.signal, { turn: payload.turn })
-    }
-    return config
+  const ledgers = createLedgerResolver({
+    live: (sessionId, cached) => {
+      const session = ctx.sessions.get(SessionId(sessionId))
+      if (session === undefined) return undefined
+      // 增量折叠：只折 cached.asOfSeq 之后的事件（客户端在流式期间高频轮询）。
+      return foldSessionCredits(session.snapshotEvents(), cached)
+    },
+    inspect: async (sessionId) => {
+      // sessionController 只随 web-app bundle 加载，故软获取；缺失即降级为
+      // 「仅 live 会话准确」。每次调用重新 get：服务是延迟解析的。
+      const controller = ctx.get('sessionController') as
+        | { inspect(id: unknown): Promise<{ events: readonly SessionEvent[] }> }
+        | undefined
+      if (controller === undefined) return undefined
+      return (await controller.inspect(SessionId(sessionId))).events
+    },
   })
 
   // route 条件注册：Key 可用即注册（模型目录可能还是空的——首次打开选择器时
@@ -163,13 +187,8 @@ export function apply(ctx: Context, config: Config): void {
   async function refreshAccountWithKey(key: string): Promise<void> {
     const generation = factsGeneration
     try {
-      const res = await fetch('https://copilot.tencent.com/v2/accounts', {
-        headers: {
-          accept: 'application/json',
-          'x-api-key': key,
-          'user-agent': 'CLI/unknown CodeBuddy/2.137.1',
-          'x-product': 'SaaS',
-        },
+      const res = await fetch(ACCOUNTS_URL, {
+        headers: requestHeaders(key),
         // /status 会触发补拉：加超时避免把状态接口挂住。
         signal: AbortSignal.timeout(ACCOUNT_FETCH_TIMEOUT_MS),
       })
@@ -198,19 +217,8 @@ export function apply(ctx: Context, config: Config): void {
     account: () => account,
     streamIdleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,
     maxMode: () => current().maxMode === true,
-    onUsage: (usage) => {
-      const tagged = usage.signal === undefined ? undefined : requestTurns.get(usage.signal)
-      // signal 只在关联轮次时用一次：不随条目滞留（AbortSignal 引用会钉住请求的
-      // 取消监听，纯属无用保留），条目只存统计需要的字段。
-      usageLog.push({
-        tokens: usage.tokens,
-        model: usage.model,
-        ...(usage.credit === undefined ? {} : { credit: usage.credit }),
-        ...(usage.sessionId === undefined ? {} : { sessionId: usage.sessionId }),
-        ...(tagged === undefined ? {} : { turn: tagged.turn }),
-      })
-      if (usageLog.length > 1000) usageLog.splice(0, usageLog.length - 1000)
-    },
+    // 不再挂 onUsage：记账改由会话事件重放承担（credits-ledger）。适配器把 credit
+    // 写进 finish 块的 replayState（随事件持久化），这里再存一份只会重复且重启即失。
     onCatalogRead: () => {
       kickModelRefresh()
     },
@@ -463,13 +471,15 @@ export function apply(ctx: Context, config: Config): void {
     async refreshModels() {
       return refreshModelsManually()
     },
-    /** 会话累计积分：usage 回调按 sessionId 记账（进程内，重启清零）。 */
-    sessionUsage(sessionId) {
-      return turnUsageOf(usageLog, sessionId, undefined)
+    /** 会话累计积分：从会话事件重放（重启后仍准确）。 */
+    async sessionUsage(sessionId) {
+      const ledger = await ledgers.for(sessionId)
+      return ledger === undefined ? EMPTY_USAGE : sessionViewOf(ledger)
     },
-    /** 单轮积分：按 sessionId + turn 记账（每轮积分胶囊用）。 */
-    turnUsage(sessionId, turn) {
-      return turnUsageOf(usageLog, sessionId, turn)
+    /** 单轮积分：按事件里的 turn 取用（每轮积分胶囊用）。 */
+    async turnUsage(sessionId, turn) {
+      const ledger = await ledgers.for(sessionId)
+      return ledger === undefined ? EMPTY_USAGE : turnViewOf(ledger, turn)
     },
     account: () => ({
       ...(account?.enterpriseName === undefined ? {} : { enterpriseName: account.enterpriseName }),

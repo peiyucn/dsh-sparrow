@@ -25,6 +25,7 @@ import type { CSSProperties } from 'react'
 import { setMaxMode, subscribeMaxMode, getMaxMode, syncMaxMode } from './maxMode.js'
 import { formatModelFacts } from './format.js'
 import { fetchLocal } from './fetch-timeout.js'
+import { PROFILE_URL, safeExternalHref } from './external-links.js'
 import { PROVIDER_ID, syncModelFacts, type ModelFactView } from './model-facts.js'
 
 const STATUS_URL = '/api/codebuddy-credits/status'
@@ -474,20 +475,31 @@ export function CodeBuddyCreditsIndicator({
               </span>
               {userBadge !== undefined
                 ? (
-                  <span style={{
-                    marginLeft: 'auto',
-                    flex: '0 0 auto',
-                    padding: '0 6px',
-                    borderRadius: '4px',
-                    background: 'var(--dsw-alias-interactive-bg-hover)',
-                    color: 'var(--dsw-alias-label-secondary)',
-                    fontSize: '12px',
-                    lineHeight: '18px',
-                    fontWeight: 500,
-                    whiteSpace: 'nowrap',
-                  }}>
+                  // 用户徽章：点击在新标签打开 CodeBuddy 个人主页（固定常量 URL，
+                  // 经 safeExternalHref 白名单校验）。锚点样式沿用徽章本身，
+                  // 只去掉下划线、加 hover 反馈，保持原有视觉。
+                  <a
+                    href={safeExternalHref(PROFILE_URL)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={t('indicator.profile')}
+                    style={{
+                      marginLeft: 'auto',
+                      flex: '0 0 auto',
+                      padding: '0 6px',
+                      borderRadius: '4px',
+                      background: 'var(--dsw-alias-interactive-bg-hover)',
+                      color: 'var(--dsw-alias-label-secondary)',
+                      fontSize: '12px',
+                      lineHeight: '18px',
+                      fontWeight: 500,
+                      whiteSpace: 'nowrap',
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
                     {userBadge}
-                  </span>
+                  </a>
                 )
                 : null}
             </div>

@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { fetchQuota } from '../lib/quota.js'
-
-const QUOTA_URL = 'https://www.codebuddy.cn/v2/billing/meter/get-enterprise-user-usage'
+import { QUOTA_URL } from '../lib/constants.js'
 
 describe('fetchQuota', () => {
   it('解析实测配额形状（credit/limitNum/周期时间，剩余 = 额度 - 已用）', async () => {

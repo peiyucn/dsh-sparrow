@@ -42,19 +42,79 @@
 
 ## seam 特例（概括，详见根 AGENTS）
 
-无私有 seam。协议层自建后，官方请求标识（user-agent / x-product / 企业上下文头）
+无私有 seam。协议层自建后，客户端身份标识（user-agent / x-product / x-ide-name / 企业上下文头）
 直接在请求头里显式发送，不再有包装层。
 
-## 请求形态规矩（2026-09-03 定，owner 拍板）
+## 请求形态规矩（2026-09-03 定；2026-09-18 两次修订）
 
-> 官方未公开 API 服务（只有 CLI 是公开产品），我们的调用**保持与官方 CLI 一致的行为**：
-> 不管哪个接口，统一带上完整请求形态，服务端视角与官方客户端无异。这是安全边界，不是装饰。
+> 官方未公开 API 服务（只有 CLI 是公开产品），我们的调用保持与官方 CLI 一致的**协议形态**，
+> 但**身份如实自报**：用量后台能区分我们与官方 IDE/CLI 的消耗。不伪装、不隐藏。
 
 - 认证：`X-API-Key: <用户 Key>`（所有接口）
-- UA：官方 CLI 标识 `CLI/unknown CodeBuddy/<版本>`（跟随官方 CLI 版本同步，勿用浏览器 UA）
+- UA：`deepseekharness CLI/unknown CodeBuddy/<官方版本>`，三段各有用处：
+  - **`CLI/` 记号**（服务端硬要求，2026-09-18 实测）：UA 里不出现 `CLI/` 时，
+    `/v3/config` **返回 HTTP 200 + `code:0/msg:OK` 但静默省略 `data.models`**——
+    没有错误、没有非 2xx，插件侧只表现为「模型目录为空」，用户选不到 CodeBuddy 模型。
+    这是**静默降级**，排查成本极高（见下方事故记录）
+  - **`CodeBuddy/<官方版本>` 段**：解析不出时 `/v3/config` 返回 400
+    `check ua, get coding copilot version error`（如 `CodeBuddy-CLI/2.137.1`）
+  - **`deepseekharness` 前缀**：本插件如实身份，放在最前
+  - `/v2/chat/completions`、`/v2/accounts` 不校验 UA
 - `X-Product: SaaS`（所有接口）
+- **`X-IDE-Name: deepseek harness`**（所有接口）——企业用量明细的 `client` 字段取该头。
+  2026-09-18 实测确认：`X-IDE-Name` 是唯一起作用的头（`X-IDE-Type`/`X-IDE-Version` 不参与），
+  且取值不受白名单限制。未发送时该字段为空字符串，管理后台把这类消耗归入无标签桶。
+  **该头与 UA 的 `CLI/` 约束互不影响**：实测 `CLI/unknown CodeBuddy/…` + `X-IDE-Name: deepseek harness`
+  同时满足「返回 31 个模型」与「后台 client 记为 deepseek harness」。
 - 企业上下文头：`X-Enterprise-Id`、`X-Tenant-Id`、`X-User-Id`（值来自 /v2/accounts：enterpriseId/enterpriseId/uid；拿到后所有接口都带）
 - 无 Key 时**任何接口都不发请求**（零网络行为）；配 Key 后才按需调用
+
+**修订理由（第一次）**：旧口径要求 UA 伪装成官方 CLI（`CLI/unknown CodeBuddy/<版本>`），
+使服务端「视角与官方客户端无异」。该伪装对 `client` 字段其实无效（伪装期间我们仍落入空桶），
+却让部门用量统计无法区分 DSH 与官方客户端的消耗。owner 决定改为如实标识。
+
+**修订理由（第二次，2026-09-18 当日事故）**：第一次修订把 UA 改成 `deepseekharness CodeBuddy/<版本>`，
+**丢掉了 `CLI/` 记号**，导致 `/v3/config` 静默不再返回模型列表——provider 正常注册、
+`/status` 正常返回 200、137 个单测全绿，但 `models: []`，用户选不到 CodeBuddy 模型。
+根因是「服务端对不认识的 UA 静默降级」这一未记录的约束。修法：把 `CLI/` 记号加回，
+保留 `deepseekharness` 前缀（诚实）与 `X-IDE-Name`（后台可见），三者共存已验证。
+**教训**：改动请求头属于**协议面改动**，必须对 `/v3/config` 实测返回模型数，不能只看 HTTP 状态码。
+
+## 域名（单一来源）
+
+全插件只保留一个域名常量 `CODEBUDDY_ORIGIN = https://copilot.tencent.com`，
+`BASE_URL` / `CONFIG_URL` / `ACCOUNTS_URL` / `QUOTA_URL` / `PROFILE_URL` 全部由它派生；
+源码里不得出现第二处域名字面量。
+
+### 两个入口：`copilot.tencent.com` 与 `www.codebuddy.cn`
+
+**同一套服务**，可互换，实测依据三条：
+
+1. **应用层**：13 个用例（成功 / 404 / 401 / 400 / 坏 JSON / 缺字段 / GET 打推理）
+   归一化后**深度相等**，连错误文案都一字不差；流式响应的帧结构、`usage` 字段集合
+   （含 `credit`）逐项相同。
+2. **网络层**：公共 DNS 下两域名解析到**同一组 CDN 节点**，该组节点对两个 SNI 均能完成
+   TLS 握手并返回各自域名的证书。
+3. **账本**：以付费模型双向验证——从任一域名发起的消耗，另一域名读配额均可见，
+   且两边读数恒等（共享同一份账）。
+
+取 `copilot.tencent.com`：**官方 CLI 与开放平台文档使用的就是它**，且为国际通用入口；
+`www.codebuddy.cn` 是国内区域名。本插件面向所有用户，故不钉区域名。
+
+**排查提示**：两入口功能一致，**故障排查不要直接归因于域名**。若某网络下本域名
+「配置接口全挂」（模型目录为空、配额超时），先分层定位
+（DNS 解析 / TCP 连通 / TLS 握手 / 应用层响应）——常见成因是该网络的 DNS 把它解析到了
+外部不可达的节点（TCP 可建连但 TLS 握手超时），而非服务下线或 Key 失效；
+此时换用另一入口可继续验证。
+
+### 国际版 `www.codebuddy.ai` **不是**别名
+
+独立后端（不同 CDN 节点、31 vs 21 个模型、`/v2/accounts` 返回
+`401 {"message":"not_found"}`、错误体格式也不同）。README 中作为国际版入口提及，
+**代码路径不得使用**。
+
+守卫：`test/origin.test.mjs` 钉住「端点常量均由 `CODEBUDDY_ORIGIN` 派生」+
+「代码行不得出现区域性别名」+「README 登录入口与 `PROFILE_URL` 同源」+「不得使用 `codebuddy.ai`」。
 
 ## 接口事实（2026-09-02 实测）
 
@@ -66,11 +126,14 @@
 
 | 接口 | 方法 | 用途 |
 |---|---|---|
-| `copilot.tencent.com/v3/config` | GET | 模型目录 + credits 系数 + 精确思考档位 |
-| `copilot.tencent.com/v2/accounts` | GET | 账号/企业信息（uid、enterpriseId、企业名、类型） |
-| `copilot.tencent.com/v2/chat/completions` | POST | 推理（仅流式）+ usage.credit |
+| `www.codebuddy.cn/v3/config` | GET | 模型目录 + credits 系数 + 精确思考档位 |
+| `www.codebuddy.cn/v2/accounts` | GET | 账号/企业信息（uid、enterpriseId、企业名、类型） |
+| `www.codebuddy.cn/v2/chat/completions` | POST | 推理（仅流式）+ usage.credit |
 | `www.codebuddy.cn/v2/billing/meter/get-enterprise-user-usage` | POST | 配额：credit（本期已消耗）、limitNum（周期额度）、cycleStartTime/cycleEndTime、cycleResetTime。**仅 X-API-Key 即可**（实测四种头组合同结果） |
 | `www.codebuddy.cn/v2/billing/meter/get-user-resource` | POST | 个人资源（企业账号下返回空 Accounts，暂不用） |
+| `www.codebuddy.cn/profile/` | GET | 个人主页（积分弹层用户徽章点击打开；与 README 登录入口同址） |
+
+> 上表域名均与 `CODEBUDDY_ORIGIN` 同源；`copilot.tencent.com` 是同一服务的等价入口（见《域名收敛》）。
 
 ### 明确不做的
 

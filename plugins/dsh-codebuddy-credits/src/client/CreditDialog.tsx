@@ -18,7 +18,7 @@ const panelStyle: CSSProperties = {
   zIndex: 1100,
   boxSizing: 'border-box',
   width: 'max-content',
-  minWidth: 'min(300px, calc(100vw - 24px))',
+  minWidth: 'min(260px, calc(100vw - 24px))',
   maxWidth: 'min(440px, calc(100vw - 24px))',
   padding: '16px',
   border: '0',

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { CodeBuddyAdapter, effectiveReasoningEffort, mapFinish, mapUsage, parseSseLine, toWireMessages, toWireTools } from '../lib/adapter.js'
+import { BASE_URL } from '../lib/constants.js'
 
 describe('toWireTools', () => {
   it('DSH 工具 schema 包成 OpenAI function 信封（name/description/parameters 原位）', () => {
@@ -185,7 +186,7 @@ describe('CodeBuddyAdapter.stream', () => {
 
     let requestBody
     globalThis.fetch = async (url, init) => {
-      assert.equal(String(url), 'https://copilot.tencent.com/v2/chat/completions')
+      assert.equal(String(url), `${BASE_URL}/chat/completions`)
       requestBody = JSON.parse(init.body)
       return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } })
     }

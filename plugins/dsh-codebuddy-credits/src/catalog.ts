@@ -15,13 +15,14 @@ import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-llm'
 import {
   BASE_URL,
+  CLIENT_NAME,
   CONFIG_URL,
   DEFAULT_CONTEXT_WINDOW,
   DEFAULT_MAX_TOKENS,
   MODEL_DISCOVERY_TIMEOUT_MS,
-  OFFICIAL_USER_AGENT,
   PRODUCT_HEADER,
   PROVIDER,
+  REQUEST_USER_AGENT,
 } from './constants.js'
 
 /** 思考档位声明：false 禁用；dict 显式声明（key 为档位 id，value 为 wire 拼写，null 表示不发参数）。 */
@@ -99,7 +100,10 @@ export function factsFromEntries(entries: readonly CodeBuddyModelEntry[]): CodeB
   })
 }
 
-/** 请求头：官方请求标识 + 企业上下文（值与官方 CLI 一致；uid/enterpriseId 来自 /v2/accounts）。 */
+/**
+ * 请求头：本插件身份标识 + 企业上下文（uid/enterpriseId 来自 /v2/accounts）。
+ * 三个端点（/v2/chat/completions、/v3/config、/v2/accounts）共用此出口。
+ */
 export function requestHeaders(
   apiKey: string,
   account?: { userId?: string; enterpriseId?: string },
@@ -107,8 +111,11 @@ export function requestHeaders(
   return {
     accept: 'application/json',
     'x-api-key': apiKey,
-    'user-agent': OFFICIAL_USER_AGENT,
+    'user-agent': REQUEST_USER_AGENT,
     'x-product': PRODUCT_HEADER,
+    // 企业用量后台的 client 字段取该头（实测唯一起作用的头）——如实上报本插件身份，
+    // 使 CodeBuddy 管理后台能区分我们与官方 IDE/CLI 的消耗。
+    'x-ide-name': CLIENT_NAME,
     ...(account?.enterpriseId === undefined ? {} : {
       'x-enterprise-id': account.enterpriseId,
       'x-tenant-id': account.enterpriseId,
