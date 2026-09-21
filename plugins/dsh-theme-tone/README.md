@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 A background-tone layer under the official light/dark theme — a DeepSeek Harness (DSH) web plugin (dsh-sparrow collection member).
 
-DSH's official theme gives you one colour axis: light or dark. This plugin adds a second, orthogonal one: a **tone** picked independently for each axis, so the light side and the dark side can each carry their own mood. Picking a tone repaints the app background, the sidebar fill and the glow that falls across them, and the tone carries through to menus, dialogs and cards as well. Switching to **Default** puts everything back to the untouched official look.
+DSH's official theme gives you one colour axis: light or dark. This plugin adds a second one underneath it — a **tone**, picked separately for each axis, so the light side and the dark side each get their own atmosphere. A tone repaints the app background, the sidebar, the glow falling across them, and everything that sits on top: menus, dialogs, cards. Picking **Default** leaves the official look untouched.
 
 ## Install
 
@@ -18,41 +18,26 @@ Requires dsh 0.1.5-rc.2 — the exact official version line this release is buil
 
 ## Usage
 
-Open **Settings → General**. A **Tone** row sits directly under the official **Appearance** row.
-
-* The row shows the tones for the **current** axis only; switching light/dark refreshes it in place
-* Each axis stores its own choice, so switching to light and back keeps your dark tone
-* Four tones per axis, plus **Default**:
+Open **Settings → General** — a **Tone** row sits directly under the official **Appearance** row. Four tones per axis, plus **Default**:
 
 | Axis | Tones |
 | :--- | :--- |
 | Dark | Default, Space (blue-violet), Ember (red), Glade (green) |
 | Light | Default, Frost (blue), Sakura (pink), Moss (green) |
 
-* **Default** overrides no tokens and paints no background layer, so you always have an untouched official look to compare against
-* Each card previews the tone it applies, so what you pick is what you get
+* The row shows the tones for the **current** axis; switching light/dark refreshes it in place
+* Each axis remembers its own choice, so switching to light and back keeps your dark tone
+* Each card previews the tone it applies — what you pick is what you get
 * Picking a tone takes effect immediately; no page reload
+* **Default** changes nothing at all, so the untouched official look is always one click away
 
-Because both axes are available, the plugin never forces you onto a tone — uninstalling it (or selecting Default on both axes) restores the official appearance.
-
-The one deliberate exception: the official **hover preview card** hard-codes its own background and text colours, which would stay a fixed dark grey under any tone. The plugin re-tints that one card so it follows the theme like everything else.
-
-## What the tone drives
-
-* The app background and the sidebar fill
-* A soft glow across the screen (upper light, lower depth, and a halo over the left sidebar)
-* A fine grain texture
-* Raised surfaces — menus, dialogs and elevated cards — inherit the tone's hue; interactive states, separators and scrollbars are tinted to match
-* Inset grey surfaces — code blocks and the three cards above the composer (todo, goal, queued messages) — sit one step heavier than the page background, so their edges read at a glance
-
-The dark axis keeps the deep-space palette from [pyai.site](https://pyai.site) — a near-black ground with a single warm-gold light source. The light axis mirrors that structure with an official white ground lit by the tone's own colour.
+A tone reaches past the background: menus, dialogs and cards inherit its hue, hover / pressed / selected states, separators and scrollbars are tinted to match, and so are code blocks and the three cards above the composer (todo, goal, queued messages). The dark **Space** tone is the deep-space palette from [pyai.site](https://pyai.site).
 
 ## Compatibility
 
 * Targets dsh 0.1.5-rc.2 — the exact official version line this release is built and verified against (other lines are not covered)
-* If the host is missing a capability this plugin depends on (`ctx.theme.overrideTokens`, `ctx.settingsScope`, `ctx.slots` or `ctx.locale`), the plugin does not start
-* If the browser lacks the CSS features the background layer needs (`mix-blend-mode: screen`, `radial-gradient()`), the plugin disables itself with a user-facing warning rather than injecting rules that cannot work. The glass effect needs `backdrop-filter` too, but that one does **not** disable the plugin — without it the glass simply becomes a translucent panel, and the rest of the plugin keeps working
-* The plugin never touches official DOM structure, official React components, or hashed CSS-module class names
+* Purely visual: it never blocks the UI or changes how anything works
+* If the host or the browser is missing something it needs, it disables itself with a user-facing warning instead of half-working
 
 ## Screenshots
 
@@ -64,7 +49,7 @@ The new-session page on each axis — dark, then light:
 
 ## Uninstall & leftovers
 
-* Uninstalling removes the token overrides, the background layer and the injected stylesheet; the settings row disappears and the look returns to the official one
+* Uninstalling removes everything the plugin added; the settings row disappears and the look returns to the official one
 * Your selection stays in `$DSH_HOME/settings.yaml` under `ui-theme-tone` but has no effect after removal — delete that section if you want it gone
 
 **Changelog**: [CHANGELOG.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-theme-tone/CHANGELOG.md)
