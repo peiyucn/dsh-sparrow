@@ -83,14 +83,35 @@ test('忽略非 assistant/message 事件与缺 usage 的消息', () => {
   assert.equal(ledger.credit, 3)
 })
 
-test('同 (turn, step) 重试：last-wins 替换而非累加（对齐官方 token-meter retry 语义）', () => {
+test('同 (turn, step) 的多次尝试：每次真实扣费都累加，不得被覆盖隐藏', () => {
+  // owner 口径（2026-09-21）：「真实表达，不能真花了我们又给藏起来」。
+  // 官方 token-meter 在 llm/retry-started 时清空 last 槽（usage-projection.ts:123-127），
+  // 使两次样本都留在总数里；本插件与之一致：逐次累加，不做替换。
   const events = [
     assistantEvent({ seq: 0, turn: 1, step: 1, credit: 5 }),
-    assistantEvent({ seq: 1, turn: 1, step: 1, credit: 2 }), // 重试后的新样本
+    assistantEvent({ seq: 1, turn: 1, step: 1, credit: 2 }), // 重试后的第二次扣费
   ]
   const ledger = foldSessionCredits(events)
-  assert.equal(ledger.calls, 1, '同一步只记一次')
-  assert.equal(ledger.credit, 2, '取新样本')
+  assert.equal(ledger.credit, 7, '两次扣费都要在：5 + 2')
+  assert.equal(ledger.calls, 2, '两次调用都记')
+  assert.equal(ledger.byTurn.get(1).credit, 7)
+  assert.equal(ledger.byTurn.get(1).calls, 2)
+})
+
+test('⛔ 同一事件被重复折叠不得重复计数（累加的前提是幂等）', () => {
+  // 客户端在流式期间按去抖反复拉全量前缀 → 同一批事件会被折叠多次。
+  // 条目按事件 seq 键控，同一事件覆盖同一个键，故重复折叠结果不变。
+  const events = [
+    assistantEvent({ seq: 0, turn: 1, step: 1, credit: 5 }),
+    assistantEvent({ seq: 1, turn: 1, step: 1, credit: 2 }),
+  ]
+  const once = foldSessionCredits(events)
+  const twice = foldSessionCredits(events, once)   // 再来一遍全量
+  const thrice = foldSessionCredits(events, twice)
+  assert.equal(twice.credit, 7, '重复折叠不得翻倍')
+  assert.equal(thrice.credit, 7, '反复折叠仍为 7')
+  assert.equal(thrice.calls, 2)
+  assert.equal(thrice.entries.size, 2, '条目数不变')
 })
 
 test('增量折叠：from 之后的事件才计入，且结果与一次性折叠一致', () => {

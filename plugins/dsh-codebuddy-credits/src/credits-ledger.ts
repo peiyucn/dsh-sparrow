@@ -11,8 +11,30 @@
  *   - `data.stream[].chunk.replayState.response.usage.credit`（同一份数据）
  * 取前者：无需展开数组；且 `data.message.source` 带 provider，可精确判别归属。
  *
- * 记账口径对齐官方 token-meter 的 retry 语义：按 (turn, step) **last-wins**，
- * 而非无脑累加——重试产生的新样本替换同一步的旧样本。
+ * 记账口径：**每一次真实扣费都计入**（按事件 `seq` 键控去重，见下）。
+ *
+ * ## 为什么不再是「同 (turn, step) 只取最后一次」
+ *
+ * owner 口径（2026-09-21）：「**真实表达，不能真花了我们又给藏起来**」。
+ * 原先按 `(turn, step)` last-wins，重试时新样本会**覆盖**旧样本 —— 若两次尝试
+ * 都被服务端计费，被覆盖的那次就**从账面上消失了**。
+ *
+ * 官方 `token-meter` 同样**不覆盖**：收到 `llm/retry-started` 时它把 `last` 槽清空
+ * （`usage-projection.ts:123-127`），使重试样本走 `addReplacing`（:34-40）时
+ * `previous` 为 undefined → **两次消耗都留在总数里**。故本插件改为**逐次累加**，
+ * 与官方口径一致，且不会有任何一次扣费被隐藏。
+ *
+ * ## 幂等怎么保证（不能因为改成累加就重复计数）
+ *
+ * 条目表按**事件自身的 `seq`** 键控，而不是 `(turn, step)`：
+ * * 不同事件 → 不同 seq → 不同条目 → **各自累加**（重试两次就是两笔）；
+ * * 同一事件被重复折叠（客户端流式期间按去抖反复拉全量前缀）→ 同一个 seq →
+ *   `Map.set` 覆盖同一个键 → **值不变**，天然幂等。
+ *
+ * 另有 `seq <= asOfSeq` 的增量跳过作为第二道闸门。两者叠加：既如实、又可重复调用。
+ * （实测 2026-09-21：21 个真实会话 / 9331 份 credit，`(turn,step)` **全部唯一**，
+ * 即「覆盖」这条分支在既有数据里从未生效 —— 本次改动是消除**潜在**的隐藏风险，
+ * 不改变任何既有会话的现有数字。）
  */
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -41,7 +63,7 @@ export interface TurnCredits {
 
 /**
  * 账本读面（对外只给聚合值 + 可增量续算的游标）。
- * `entries` 是 last-wins 后的条目表，也是聚合的唯一真源。
+ * `entries` 按**事件 seq** 键控，是聚合的唯一真源。
  */
 export interface CreditLedger {
   readonly credit: number
@@ -50,7 +72,7 @@ export interface CreditLedger {
   readonly byTurn: ReadonlyMap<number, TurnCredits>
   /** 已折叠到的最后事件 seq；-1 表示空日志（增量折叠的游标）。 */
   readonly asOfSeq: number
-  /** 条目表（内部用于 last-wins 与增量续算，调用方不应依赖其顺序）。 */
+  /** 条目表（键 = 事件 seq；内部用于增量续算与幂等，调用方不应依赖其顺序）。 */
   readonly entries: ReadonlyMap<string, CreditEntry>
 }
 
@@ -154,7 +176,7 @@ export function foldSessionCredits(
   events: readonly SessionEvent[],
   from?: CreditLedger,
 ): CreditLedger {
-  // 复制一份条目表：last-wins 需要覆盖写，但不能碰入参。
+  // 复制一份条目表：写入落在副本上，不碰入参（纯函数）。
   const entries = new Map<string, CreditEntry>(from?.entries ?? [])
   let asOfSeq = from?.asOfSeq ?? -1
   let touched = false
@@ -167,8 +189,16 @@ export function foldSessionCredits(
     }
     const sample = creditSampleOf(event)
     if (sample === undefined) continue
-    // (turn, step) last-wins：同一步的新样本替换旧样本（重试语义，对齐官方 token-meter）。
-    entries.set(`${sample.turn}/${sample.step}`, sample)
+    // 键的选择决定「重试是否被隐藏」与「重复折叠是否翻倍」，两者都要成立：
+    //
+    // * **有数字 seq**（真实日志恒有）：按 seq 键控 → 不同事件各占一条（每次真实扣费
+    //   都保留，重试不互相覆盖）；同一事件被重复折叠时命中同一个键 → 覆盖同值 → 幂等。
+    // * **没有数字 seq**（防御上游形状变化）：退化为 `(turn, step)` 键控。同一步的
+    //   第二笔会覆盖第一笔 —— 这是**已知且有意**的取舍：无 seq 时无法区分「同一事件
+    //   被折两次」与「同一步真扣了两笔」，而**重复计数**比**少算**更危险（前者会让
+    //   用户以为花了更多钱）。有 seq 的主路径不受影响。
+    const key = typeof seq === 'number' ? `s${seq}` : `t${sample.turn}/${sample.step}`
+    entries.set(key, sample)
     touched = true
   }
 
