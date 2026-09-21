@@ -17,8 +17,8 @@ function buildHarness(overrides = {}) {
     reapply: async () => {},
     removeKey: async () => {},
     quota: async () => ({ total: 0, used: 0 }),
-    sessionUsage: () => ({ credit: 0, calls: 0, byModel: [] }),
-    turnUsage: () => ({ credit: 0, calls: 0, byModel: [] }),
+    sessionUsage: async () => ({ credit: 0, calls: 0, byModel: [] }),
+    turnUsage: async () => ({ credit: 0, calls: 0, byModel: [] }),
     active: () => true,
     account: () => ({ enterpriseName: 'Acme' }),
     ensureAccount: async () => {},
@@ -105,5 +105,65 @@ describe('codebuddy host 路由：/refresh-models', () => {
     const result = await request(h.handler, '/api/codebuddy-credits/refresh-models')
     assert.equal(result.statusCode, 400)
     assert.match(result.body.error, /401/u)
+  })
+})
+
+describe('codebuddy host 路由：/session-usage 与 /turn-usage（异步积分面）', () => {
+  // 这两条路由是「积分改由事件重放」时唯一变 sync→async 的出口。此前**零覆盖**：
+  // 实测删掉整段 if、或去掉 await，148 个用例全绿 —— 而 `await` 一旦漏掉，
+  // `JSON.stringify(Promise)` 会静默变成 `{}` 发给客户端，积分面板永远空。
+  it('GET /session-usage 应该 await 异步账本并原样回传', async () => {
+    let asked = null
+    const h = buildHarness({
+      sessionUsage: async (sessionId) => {
+        asked = sessionId
+        return { credit: 12.5, calls: 3, byModel: [{ model: 'hy4-preview', credit: 12.5, calls: 3 }] }
+      },
+    })
+    const result = await request(h.handler, '/api/codebuddy-credits/session-usage?sessionId=abc', { method: 'GET' })
+    assert.equal(result.statusCode, 200)
+    assert.equal(asked, 'abc')
+    assert.equal(result.body.credit, 12.5, '必须是解析后的对象，不能是 {}')
+    assert.equal(result.body.calls, 3)
+    assert.equal(result.body.byModel[0].model, 'hy4-preview')
+  })
+
+  it('GET /session-usage 缺 sessionId 应该 400 且不调账本', async () => {
+    let called = 0
+    const h = buildHarness({ sessionUsage: async () => { called += 1; return { credit: 0, calls: 0, byModel: [] } } })
+    const result = await request(h.handler, '/api/codebuddy-credits/session-usage', { method: 'GET' })
+    assert.equal(result.statusCode, 400)
+    assert.equal(called, 0)
+  })
+
+  it('GET /turn-usage 应该 回该轮视图', async () => {
+    const seen = []
+    const h = buildHarness({
+      turnUsage: async (sessionId, turn) => {
+        seen.push([sessionId, turn])
+        return { credit: 4, calls: 1, byModel: [] }
+      },
+    })
+    const result = await request(h.handler, '/api/codebuddy-credits/turn-usage?sessionId=s1&turn=7', { method: 'GET' })
+    assert.equal(result.statusCode, 200)
+    assert.deepEqual(seen, [['s1', 7]])
+    assert.equal(result.body.credit, 4)
+  })
+
+  it('GET /turn-usage 非法 turn 应该 400（负数 / 非整数 / 缺参）', async () => {
+    let called = 0
+    const h = buildHarness({ turnUsage: async () => { called += 1; return { credit: 0, calls: 0, byModel: [] } } })
+    for (const query of ['sessionId=s1&turn=-1', 'sessionId=s1&turn=1.5', 'sessionId=s1', 'turn=2']) {
+      const result = await request(h.handler, `/api/codebuddy-credits/turn-usage?${query}`, { method: 'GET' })
+      assert.equal(result.statusCode, 400, `${query} 应 400`)
+    }
+    assert.equal(called, 0, '非法入参不得触达账本')
+  })
+
+  it('账本抛错 应该 被路由统一 catch 成 400（不冒泡进宿主管线）', async () => {
+    const h = buildHarness({ sessionUsage: async () => { throw new Error('replay boom') } })
+    const result = await request(h.handler, '/api/codebuddy-credits/session-usage?sessionId=abc', { method: 'GET' })
+    assert.equal(result.statusCode, 400)
+    assert.match(result.body.error, /replay boom/u)
   })
 })

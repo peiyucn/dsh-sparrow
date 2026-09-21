@@ -35,7 +35,7 @@ export interface CodeBuddyUsage {
   model: string
   /** 会话 id（GenerateOptions.sessionId 透传；无会话的调用缺省）。 */
   sessionId?: string
-  /** 本次请求的取消信号（与 agent/request 载荷同一实例，插件据此关联 turn）。 */
+  /** 本次请求的取消信号（由适配器从 GenerateOptions 透传，供上层诊断/取消用）。 */
   signal?: AbortSignal
 }
 
@@ -327,7 +327,9 @@ export class CodeBuddyAdapter extends LlmAdapter {
     return Promise.resolve(info)
   }
 
-  override async prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
+  // 与官方基类同款命名（`_signal`）：本适配器不消费 prepare 期的取消信号
+  // （取消在 stream 期经 options.signal 处理），下划线前缀即表达「有意未用」。
+  override async prepareCall(provider: string, model: string, _signal?: AbortSignal): Promise<PreparedAdapterCall> {
     return {
       model: await this.resolveModel(provider, model),
       stream: options => this.stream(options),
@@ -345,17 +347,13 @@ export class CodeBuddyAdapter extends LlmAdapter {
       ? consumer.signal
       : AbortSignal.any([options.signal, consumer.signal])
     const timer = setTimeout(() => consumer.abort(new Error('stream idle timeout')), this.config.streamIdleTimeoutMs)
-    let exhausted = false
     try {
       const iterator = this.request(options, apiKey, upstream, () => {
         timer.refresh()
       })[Symbol.asyncIterator]()
       while (true) {
         const { done, value } = await iterator.next()
-        if (done) {
-          exhausted = true
-          return
-        }
+        if (done) return
         yield value
       }
     } catch (error: unknown) {

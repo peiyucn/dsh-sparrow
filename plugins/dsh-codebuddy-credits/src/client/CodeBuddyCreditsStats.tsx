@@ -11,7 +11,7 @@
  * 只 append/remove 自有节点，不包装、不替换任何官方子节点；官方行每次重渲染
  * （每步）会丢弃注入节点，本组件以相同 nodes 信号重新解析落点并重挂，视觉无
  * 断档。该会话没有 CodeBuddy 调用时不注入，官方统计行保持原样。
- * 数据走 host /session-usage（进程内 usage 记账），节点推进去抖刷新。
+ * 数据走 host /session-usage（由会话事件重放，重启后仍准确——见 src/credits-ledger.ts），节点推进去抖刷新。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'

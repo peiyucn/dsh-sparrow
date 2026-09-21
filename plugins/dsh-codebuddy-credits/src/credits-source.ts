@@ -80,7 +80,20 @@ export function createLedgerResolver(
     liveOf,
     get size() { return cache.size },
     async for(sessionId: string): Promise<CreditLedger | undefined> {
-      const live = liveOf(sessionId)
+      // ⚠️ **live 读也必须包在 try 里**：`sources.live` 会调宿主 `Session` 上的方法
+      // （`snapshotEvents()`）。那是**类方法**、不是服务/导出，能力门探不到它 ——
+      // 官方换形状时它是「能拿到 Session 对象、但方法没了」的形态，`liveOf` 直接抛
+      // `TypeError`。而它此前位于下面的 try **之外**，异常会一路穿出 `for()` 到
+      // web 路由的兜底 catch，把 `s.snapshotEvents is not a function` 这种内部
+      // TypeError 原样回给浏览器（实测 HTTP 400 带该文案），插件则继续带病运行。
+      // 按根规范《扩展与宿主兼容·运行期不冒泡》：自有入口内部兜住异常、
+      // 失败即降级 —— live 读不可用就当冷会话处理（走 inspect / 退回缓存）。
+      let live: CreditLedger | undefined
+      try {
+        live = liveOf(sessionId)
+      } catch {
+        live = undefined
+      }
       if (live !== undefined) return live
 
       const ongoing = inflight.get(sessionId)

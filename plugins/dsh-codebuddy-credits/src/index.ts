@@ -25,7 +25,7 @@ import type {} from '@deepseek-ai/dsh-settings'
 import { CodeBuddyAdapter } from './adapter.js'
 import { discoverCodeBuddyModels, factsFromEntries, fetchCodeBuddyModels, requestHeaders } from './catalog.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
-import { assertCapabilities } from './compat.js'
+import { assertCapabilities, hostSessionFormatVersion, unsupportedSessionFormatReason } from './compat.js'
 import { Config, keyRefs } from './config.js'
 import {
   ACCOUNT_FETCH_TIMEOUT_MS,
@@ -45,7 +45,6 @@ import {
   sessionViewOf,
   turnViewOf,
 } from './credits-ledger.js'
-import type { CreditLedger } from './credits-ledger.js'
 import { createLedgerResolver } from './credits-source.js'
 
 export const name = 'llm-codebuddy-credits'
@@ -83,6 +82,14 @@ export function apply(ctx: Context, config: Config): void {
     { name: 'llm.resolveModelInfo', ok: typeof (ctx.llm as { resolveModelInfo?: unknown } | undefined)?.resolveModelInfo === 'function' },
     { name: 'sessions.get', ok: typeof (ctx.sessions as { get?: unknown } | undefined)?.get === 'function' },
   ])
+  // 会话格式**软判定**：积分重放要逐字段读会话事件，格式换了就是静默读出 0。
+  // 但它只是展示面 —— 为此把整个 provider（推理）停掉是过度取舍，故这里只告警。
+  // 为什么不能只靠上面的能力门：`snapshotEvents()` 是 `Session` 的**类方法**，
+  // 能力门探不到；格式换代又往往不改 API 形状。详见 src/compat.ts 的说明。
+  const formatReason = unsupportedSessionFormatReason(hostSessionFormatVersion())
+  if (formatReason !== undefined) {
+    ctx.logger.warn(`${name}: ${formatReason}；积分可能显示为 0（推理不受影响）`)
+  }
   let current: () => Config = () => config
 
   /**
