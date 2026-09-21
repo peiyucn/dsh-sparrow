@@ -1,6 +1,6 @@
 {
   "name": "@dsh-sparrow/dsh-theme-tone",
-  "description": "DSH web plugin: a background-tone layer under the official light/dark theme — pick a background tone per axis in Settings, with the pyai.site deep-space palette as the first shipped dark tone",
+  "description": "DSH web plugin: a background-tone layer under the official light/dark theme — pick a background tone per axis in Settings",
   "version": "0.1.5-rc.2",
   "license": "MIT",
   "repository": {

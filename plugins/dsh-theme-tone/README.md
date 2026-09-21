@@ -31,7 +31,7 @@ Open **Settings → General** — a **Tone** row sits directly under the officia
 * Picking a tone takes effect immediately; no page reload
 * **Default** changes nothing at all, so the untouched official look is always one click away
 
-A tone reaches past the background: menus, dialogs and cards inherit its hue, hover / pressed / selected states, separators and scrollbars are tinted to match, and so are code blocks and the three cards above the composer (todo, goal, queued messages). The dark **Space** tone is the deep-space palette from [pyai.site](https://pyai.site).
+A tone reaches past the background: menus, dialogs and cards inherit its hue, hover / pressed / selected states, separators and scrollbars are tinted to match, and so are code blocks and the three cards above the composer (todo, goal, queued messages).
 
 ## Compatibility
 
