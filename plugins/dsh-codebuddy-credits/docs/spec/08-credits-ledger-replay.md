@@ -41,9 +41,16 @@ if (usageLog.length > 1000) usageLog.splice(0, usageLog.length - 1000)
    同一条数据两处出现。取 `data.message.source.*`：每条事件恰一份、无数组展开。
 4. `data.message.source` 同时带 `kind` / `provider` / `model`，可**精确判别是否本 provider**
    （实测该会话 262 条全为 `provider: 'codebuddy-credits'`）——不必靠 sessionId 猜。
-5. 无重复计风险：实测同一 `turn/step` 未出现「值不同的重复事件」（重试迹象）0 例。
-   但官方 `token-meter` 对 `llm/retry-started` 有专门的替换语义（`usage-projection.ts:123-127`），
-   本设计按 (turn, step) **last-wins 记账**对齐该语义，而非无脑累加。
+5. 记账口径 = **每次真实扣费都计入**（owner 2026-09-21：「真实表达，不能真花了我们又给藏起来」）。
+   条目按**事件 `seq`** 键控：不同事件各占一条 → 重试的每一笔都保留；同一事件被重复折叠
+   命中同一个键 → 覆盖同值 → **幂等**（客户端流式期间按去抖反复拉全量前缀不会翻倍）。
+   另有 `seq <= asOfSeq` 的增量跳过作为第二道闸门。
+   官方 `token-meter` 对 `llm/retry-started` 的处置是**清空 `last` 槽**（`usage-projection.ts:123-127`），
+   使其 `addReplacing`（`:34-40`）在重试时走 `previous === undefined` 分支 —— 即**两次消耗都累加**。
+   本实现与之一致：**不做替换**，不会有任何一次扣费从账面上消失。
+   实测（2026-09-21，21 个真实会话 / 9331 份 credit）：`(turn, step)` **全部唯一**，
+   故本次改动**不改变任何既有会话的现有数字**（新口径与旧口径总额逐会话相同、重复折叠幂等），
+   它消除的是「同一步真扣两笔时被覆盖隐藏」这条**潜在**风险。
 6. 冷会话（重启后未激活）可读：`ctx.sessionController.inspect(sessionId)` 返回
    「持久化 header + 完整事件前缀」，且**不激活 Agent**（`session-controller/src/index.ts:201-214`，
    底层 `inspectApiSession` → `ctx.sessionQuery.observeSession`）。
