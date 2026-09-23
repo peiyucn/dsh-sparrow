@@ -3,7 +3,9 @@
  * 请求封装见 api.ts、样式见 styles.ts、视图见 FileManageDock.tsx；客户端不直接碰任何文件或凭据。
  */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+// 官方 0.1.7 起 `Context.slots` 的声明在 ui-renderer（纯类型空导入，无运行时代码）。
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { countApi, deleteApi, listApi } from './api.js'

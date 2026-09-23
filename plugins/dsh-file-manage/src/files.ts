@@ -1,4 +1,4 @@
-/** dsh-file-manage 纯逻辑：分页参数、行格式化、上游错误分类。 @module dsh-file-manage/files */
+/** dsh-file-manage 纯逻辑：端点解析、分页参数、行格式化、上游错误分类。 @module dsh-file-manage/files */
 
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { DeepSeekFileObject } from '@deepseek-ai/dsh-llm-deepseek'
@@ -18,24 +18,49 @@ export const MAX_COUNT_PAGES = 12
 /** 总数统计每页请求超时。 */
 export const COUNT_PAGE_TIMEOUT_MS = 15_000
 
+/**
+ * 交给官方 `DeepSeekFilesClient` 的 baseURL。
+ *
+ * 只解析根、**不在这里拼 `/v1`**：官方 client 构造时自己归一化——路径不以 `/v1`
+ * 结尾就追加（rc.1 `packages/llm/llm-deepseek/src/messages-api.ts:11-14`），
+ * 我方再拼会得到 `/v1/v1/files`。公共端点同样不硬编码：rc.1 起官方
+ * `PUBLIC_BASE_URL` 由 `https://api.deepseek.com` 改为 `https://api.deepseek.com/anthropic`
+ * （`config.ts:115`），由调用方传官方导出的常量，官方再改端点本插件自动跟随。
+ * @param sectionBaseURL - `llm-deepseek` 设置节里的 baseURL（未配置时为 undefined）。
+ * @param envBaseURL - `$DEEPSEEK_BASE_URL`（未设置为 undefined）。
+ * @param publicBaseURL - 官方导出的公共 API 根。
+ * @returns 交给官方 client 的 baseURL（不含 `/v1`）。
+ */
+export function resolveBaseURL(
+  sectionBaseURL: string | undefined,
+  envBaseURL: string | undefined,
+  publicBaseURL: string,
+): string {
+  return sectionBaseURL ?? envBaseURL ?? publicBaseURL
+}
+
 /** 归一化后的分页参数。 */
 export interface PageQuery {
   after?: string
   limit: number
-  order: 'asc' | 'desc'
 }
 
 /**
- * 分页参数归一化：limit 钳到 [1, 1000]（非法回退 PAGE_SIZE）；order 非 asc 视为 desc；空 after 省略。
+ * 分页参数归一化：limit 钳到 [1, 1000]（非法回退 PAGE_SIZE）；空 after 省略。
  * 异常输入返回安全默认值，不抛。
+ *
+ * 不再有 `order`：官方 Files API 已无可用的排序查询——rc.1 官方 client 的 `list()`
+ * 只接受 `after` / `limit` / `signal`（`files-api.ts:215-219`），官方自己的
+ * `reclaimOldestOwned` 也改成「翻完所有页再按 createdAt 本地排序」并注明
+ * “The API offers no ascending-order query”（`file-store.ts:318`）。传了也不生效。
  */
-export function normalizePageQuery(query: { after?: string; limit?: string; order?: string }): PageQuery {
+export function normalizePageQuery(query: { after?: string; limit?: string }): PageQuery {
   // 只接受纯数字串（Number('') === 0 会把空串误判为 0，需先拦）。
   const limitText = query.limit
   const limitRaw = limitText !== undefined && /^\d+$/u.test(limitText) ? Number(limitText) : Number.NaN
   const limit = Number.isInteger(limitRaw) ? Math.min(1000, Math.max(1, limitRaw)) : PAGE_SIZE
   const after = query.after !== undefined && query.after !== '' ? query.after : undefined
-  return { ...after === undefined ? {} : { after }, limit, order: query.order === 'asc' ? 'asc' : 'desc' }
+  return { ...after === undefined ? {} : { after }, limit }
 }
 
 /** 人读大小（二进制单位）：B / KiB / MiB / GiB；异常输入返回 '0 B'。 */
