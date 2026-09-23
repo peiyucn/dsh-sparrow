@@ -18,6 +18,21 @@
 * 官方**已在自己注册**会话行 action：`sidebar.workspaces.session.menu.item` 与 `…row.action` 各有 `id: 'archive'` 条目（`ui-workspace/src/client/index.ts:274,277`）。
 * 官方明确不做：「**没有 Session 删除**」（`ui-workspace/README.zh.md:208`）。
 
+### 2.1 官方「归档」到底是什么（源码 + 真机逐条核过）
+
+* **存储**：注册表全局 id 集合 `archivedSessionIds`（`packages/workspace/workspace/src/index.ts:340`），随 workspace 状态持久化（`workspace/src/spec.ts:62`）。
+* **不动工作区归属**：archive 只写集合 + 把该 id 从 pinned 里剔除（`:361-383`）；unarchive 只从集合移除，注释明说「记账槽位从未被动过，会话回到原记录位置」（`:385-405`）。
+* **UI 表现 = 原位灰显 + 默认隐藏 + 不可打开**（`ui-workspace/src/client/tree.ts:62-63`「shown grayed in place and not openable」；文案「已归档」「已归档对话暂时无法查看，请取消归档后查看」）。
+* **显隐靠筛选，没有「已归档」容器**：真机点开 View options，菜单就三组开关 —— **Group by**（WorkSpace / Workspace Tree / In one list）、**Order by**（Manual / Last updated）、**Filter sessions**（**Show archived / Archived only**）。侧栏里的 **「未分组 / Ungrouped」是「不属于任何已注册工作区」的会话分组**（`tree.ts:449-470` 的 `groupByWorkspace(..., view.ungroupedOrder)`），**与归档无关** —— 归档不会把会话搬进它。
+* **入口**：会话行 hover 按钮（order 100）+ "…" 菜单（order 400）；有在跑工作时走「停止并归档」确认（`ui-workspace/src/client/locales.ts:61-75`）。
+* **归档还是宿主硬门**：archived 会话及其 subagent 后代不能再跑模型步（`api/session-controller/src/archived-session-gate.ts:27-31,43-55`）→ 官方归档 = **停用 + 藏起来**，不只是分类。
+
+### 2.2 官方归档**没覆盖**的面（这是缺口，也是我方价值位）
+
+* **`@` 会话引用列表完全不过滤归档**：`@` 的会话候选由宿主 `session-reference` 提供，实现是 `ctx.sessionQuery.listSessions()` **全量列举**，只做「排除自己 + 查询串匹配 + cwd 亲缘排序」，**全文没有读 `archivedSessionIds`**（`context/session-reference/src/index.ts:190-223`）；客户端只是把 remote 结果渲染成行（`ui-reference/src/client/index.ts:71-75`）。→ **被归档的会话照样出现在 `@` 里。**
+* 其它走 `listSessions` 的面拿到的也是全量（`api/session-controller/src/list.ts:128` 的会话列表 API）；是否过滤取决于各自 UI —— 侧栏搜索**跟随** archived 筛选（`tree.ts:541-542`），`@` 不跟随。
+* 结论：**官方归档是半套语义** —— 只管「侧栏藏 + 停模型步」，引用/提及等列表照旧。
+
 **我方依赖面（都已核实未变，业务代码不用改）**：`webServer` / `sessions` / `agents` / `workspaceRegistry` / `sessionPersistence`（`list()` 形状逐字段一致、`locate()` 仍在）/ `sessionQuery` / `storageDomain` 服务名与形状未变；WorkspaceRegistry 私有写通道 `enqueueOperation` / `requireState` / `setState` 仍在（`packages/workspace/workspace/src/index.ts:874,879,884`）。
 
 ## 3) 改动清单
@@ -38,6 +53,8 @@
 2. **入口放哪**：(a) 挂官方会话行 action（省事、跟随官方 UI 演进）vs (b) 保留现有 `sidebar.footer.action` 面板（一屏看全部归档会话 + 批量操作）。我倾向 (a) 做单会话动作 + (b) 保留为「回收站/批量」入口，但这会让插件有两处入口，需要你定。
 3. **命名**：官方 `archive` = 归档会话；我方的「移动/删除」语义若继续叫「归档」，会与官方入口混淆 —— 是否把插件定位改名为「会话清理 / 回收站」类语义（影响 README、包名不改）。
 4. **回收站与备份是否仍要**：官方完全没有；这两块是纯我方价值，但也意味着长期维护成本。保留 / 砍掉（砍掉即整插件退役，只留删除）。
+5. **（新，来自 §2.2）要不要补官方这个缺口**：`@` 引用列表不认归档（源码已确证），其它 `listSessions` 消费面同理。两个选项 —— (a) **补缺**：让归档在全链路一致（至少 `@` 不再列出已归档会话）—— 需要包装/替换官方 `sessionReferenceResolver` 的候选，属于「包装公开 seam」这一档，要么走官方上游提 issue/PR； (b) **不碰官方引用面**，插件只做删除/回收站/备份。我倾向先 (b)，把 (a) 作为「官方归档一致性」单独提案（含上游 issue），避免我们替官方背引用面的维护。
+6. **你观察到的「未分组承载」**：按代码归档不搬动会话（§2.1），若你实测确实看到已归档会话落在「未分组」下，请把当时 View options 的 **Group by / Filter sessions** 两档选择告诉我，我按同样路径复现确认（我这边隔离实例是空会话，没法走完归档动作）。
 
 ## 5) 验收口径 / 未核实项
 
