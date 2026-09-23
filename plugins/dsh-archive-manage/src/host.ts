@@ -421,7 +421,12 @@ async function emitSessionAdded(ctx: Context, sessionId: SessionId, headerFacts:
     const { headers } = await headerFacts.get()
     const header = headers.find(candidate => String(candidate.id) === String(sessionId))
     if (header === undefined) return
-    ctx.emit('api-session/added', addedSummaryFor(header, await readStrayBlankness(ctx, sessionId)))
+    // rc.1 起 SessionSummary 新增必填 `agentAvailable`（该会话当前是否持有 live Agent，
+    // 见 `api/session-controller/src/types.ts:177-188`）：与官方语义一致，用 agents 注册表判定。
+    ctx.emit('api-session/added', {
+      ...addedSummaryFor(header, await readStrayBlankness(ctx, sessionId)),
+      agentAvailable: ctx.agents.get(sessionId) !== undefined,
+    })
   } catch (error) {
     ctx.logger.warn(`dsh-archive-manage: api-session/added 通知失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
   }
