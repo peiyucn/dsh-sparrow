@@ -69,10 +69,14 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 
 * **入口契约**：模块 export `name` / `inject` / `apply`；`inject` 只声明硬依赖服务，缺失时插件不启动
 * **生命周期**：一切副作用在 `apply` 内注册并配 `ctx.effect` 清理；不泄漏定时器 / watcher / 监听
-* **宿主兼容自检（六个活跃插件全有）**：`apply` 开头先跑本插件 `src/compat.ts` 的门，不通过即**抛错自停用**——cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响（`lib/index.js:1350-1362`）。用户只升级 dsh、不升级插件时，插件必须自己让位。两档门：
+* **宿主兼容自检（六个活跃插件全有）**：`apply` 开头先跑本插件 `src/compat.ts` 的门，不通过即**自停用**——cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响（`lib/index.js:1350-1362`）。用户只升级 dsh、不升级插件时，插件必须自己让位。两档门：
   * **能力门**（全部插件）：`assertCapabilities(ctx, name, [{ name, ok }])`——宿主服务 / 方法 / 导出、运行环境特性（如 nav-pin 依赖的 `:has()` 与 container query）缺任一即停用；探针用**命名空间访问或惰性 import**，不产生链接期失败
   * **会话格式门**（读会话数据的 archive / chat-fim）：常量探针 `assertHostCompatible(ctx, name)`（官方 `SESSION_FORMAT_VERSION` 须在支持集合内）+ **宿主真值** `unsupportedStoredFormatReason(headers)`——常量探针在 `link:` / peer 副本场景会读到插件自己的旧版官方包，故以宿主给出的会话 `header.version` 为准（archive 在移动 / 删除前逐 header 校验，chat-fim 在读取前校验）
   * 判定逻辑纯函数化并补单测（含「不兼容 → 告警 + 抛错」接线用例）；停用文案统一为「已停用插件以免影响 dsh（升级本插件或运行环境后自动恢复）」
+* **client half 另有硬约束（与 host half 不同，别照抄）**：DSH Web 的客户端 boot 审计把**任一 client entry 非 active** 当**致命**失败——`bootClient` 抛 `web boot: N entry did not activate`，宿主整页只渲染 "Failed to load plugins"。也就是说客户端**没有**「逐插件捕获 `apply` 异常」的隔离，且 entry 停在 `pending`（`inject` 里缺服务）同样算。故 client half：
+  * **门不许抛错**：用 `warnMissingCapabilities`（告警 + 返回 false，调用方直接 `return`，不注册任何槽位 / 样式 / 监听）做**惰性停用**；抛错版 `assertCapabilities` 只给 host half 用
+  * **`inject` 只放跨版本稳定存在的服务**：易变面（如设置读取面 `settingsScope`——0.1.7-alpha.1 起改名为 `configForms`）走 `ctx.inject([...], cb)` 起的**可选依赖 fork**：服务出现才装，这条宿主线没有就什么都不做；fork 是 entry 的子 fiber，不进审计的 entry 列表
+  * 依据（实测）：dsh 0.1.7-alpha.1 `packages/client/web/src/boot-client.ts:63-82`（审计）、`:73-75`（pending 判定）
 * **组合行**：`cordis.patch.yml` insert 按官方 bundle patch 规范——`id` 用短名（供后续 patch 定位），`name` 用 scoped 包名（loader 按包名解析）
 * **seam 纪律（三档）**：① **正路**：只用公开 seam（`ctx.llm` / `ctx.webServer` / `ctx.tools` / slots / provide 等）② **包装**：公开 seam 不满足需求时包装它——保持原签名与 `this` 语义、可逆恢复，并记录适配的 dsh 版本 ③ **私有 seam 依赖**：官方无公开能力时允许调 private 方法 / 读写 private 状态；护栏是不替换 / 不包装 / 不覆写官方函数，优先复用官方自身写入路径（如 `enqueueOperation` + `setState`），启动时能力检查、surface 变化即 fail-fast，且须 owner 批准并记入 `docs/private-seams.md`
 * **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直读内部文件（确需直碰内部文件的特例须记入 `docs/private-seams.md` + owner 认可）
