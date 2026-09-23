@@ -46,10 +46,17 @@ export function slotSelector(label: string): string {
   return `[data-conversation-scroll] div:has(> nav[aria-label="${escapeCssString(label)}"])`
 }
 
-/** 恒显规则：压过官方 @container (max-width: 900px) 的 display: none（特异性更高，无需 !important）。 */
+/**
+ * 恒显规则：压过官方 `@container (max-width: 900px)` 的 `display: none`（特异性更高，无需 !important）。
+ *
+ * ⚠️ 0.1.7 起官方把隐藏规则的作用目标从外层 `div.slot` 换成了 **`nav.frame` 本身**
+ * （rc.2 `TurnNavigator.module.css:217-221` 隐藏 `.slot`；rc.1 `:206-210` 隐藏 `.frame`，
+ * 而 `.frame` 就是那个 `<nav aria-label=…>`）—— 故本规则也必须跟着打到 **nav** 上，
+ * 打在外层 slot 上等于空操作（实测：≤900px 导航依旧 display:none）。
+ */
 function alwaysVisibleRule(labels: readonly string[]): string {
-  const slots = labels.map(slotSelector).join(',\n')
-  return `${slots} {
+  const navs = labels.map(label => `${slotSelector(label)} > nav`).join(',\n')
+  return `${navs} {
   display: block;
 }`
 }
