@@ -17,7 +17,8 @@
 * 三方色调仍是官方扩展点：「第三方主题可通过 `ctx.theme` 注册别名 token 覆盖」（`ui-theme/README.zh.md:12`），且直言「第三方主题是扩展点，不是产品」（`:103`）。
 * `ctx.theme.overrideTokens(source, tokens)` **本版完全没变**（签名/校验/层叠：`ui-theme/src/client/index.ts:309-318`、`:384-404`），且有 14 个受认可 token 白名单（`:131-146`）与 `exportInspectTokens()`（`:211`）。
 * 官方强制覆盖值必须 `{light, dark}` 成对（裸字符串抛教学式错误 `:384-404`）—— 与 theme-tone「每轴一套」的口径一致。
-* 官方样式契约劝阻静态表做法：「功能包使用语义别名，**不得另行定义全局主题**」（`docs/web-styling.zh.md:9`）、「不得复制静态色板值或写入颜色字面量」（`:17`）。
+* **官方分工（是分工，不是禁令）**：`docs/web-styling.zh.md:5` 写明该文档规定的是**浏览器客户端包**（仓库内功能包）的样式职责 —— 全局主题（`--dsw-*` 静态色阶、语义别名、明暗偏好、全局样式表）归 `ui-theme`（`:9,11`），功能包只许用语义别名、不得写颜色字面量、不得含主题选择器（`:17,18`）；第三方扩展点是 `ctx.theme`（`ui-theme/README.zh.md:12`）。theme-tone 的自铺静态表是在**手工复制主题层的职责**，所以换到 API 更合官方分工 —— 但这条文档对第三方插件不构成禁令。
+* **一条我方当前会违反的明文规则**：半透明 `--dsw-specific-menu` 填充的高层级表面**必须在同一规则中**加 `backdrop-filter: var(--dsw-menu-backdrop-filter)`（`docs/web-styling.zh.md:25`）；我方现在 opaque 覆盖该 token 且不配 filter，既破了这个配对、也吃掉官方菜单玻璃（详见 §3 第 6 条）。
 * **官方没覆盖的两块**：① 色调预设/自定义 CSS（外观行硬编码 light/dark/system 三个 cube，`ui-theme/src/client/AppearanceRow.tsx:31-35`）；② 自绘背景与质感（官方新增玻璃只到菜单/停靠面板，**顶栏与输入框不在内**）。
 * **两个天花板**：三方主题 id 不跨内置 settings schema、**无法持久化**（`ui-theme/src/client/index.ts:232-240`，README 明说「仍是进程内扩展」`README.zh.md:36`）；注册的主题**不会出现在官方外观行**。
 
