@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { useAnchoredMaxHeight, IconSparkle16, IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { useAnchoredMaxHeight, IconSparkleRegular, IconChevronDownOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
@@ -677,7 +677,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
           setSuggestEnabled(!enabled)
         }}
       >
-        <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
+        <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkleRegular size={14} /></span>
         <span className="dsh-chat-fim-switch-label">{t('switch.label')}</span>
         <span
           className="dsh-chat-fim-switch-picker"
@@ -714,7 +714,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
             className={pickerOpen ? 'dsh-chat-fim-switch-arrow dsh-chat-fim-switch-arrow-open' : 'dsh-chat-fim-switch-arrow'}
             aria-hidden
           >
-            <IconChevronDownOutline14 size={12} />
+            <IconChevronDownOutlineRegular size={12} />
           </span>
         </span>
       </button>
