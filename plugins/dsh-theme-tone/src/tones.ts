@@ -297,7 +297,7 @@ export const SURFACE_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRun
 ])
 
 /**
- * **菜单族**那两个 token —— 与 {@link SURFACE_TOKENS} 同一种做法：**只装颜色，不装图层**。
+ * **菜单族**那个 token —— 与 {@link SURFACE_TOKENS} 同一种做法：**只装颜色，不装图层**。
  *
  * ## 为什么曾经装过图层，又为什么撤回来
  *
@@ -312,12 +312,26 @@ export const SURFACE_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRun
  * 同一条 `ellipse 120% 42% at 50% -12%` 落在一条 24px 高的横条上会重新压成一道
  * 带硬边的金色带，与菜单主体对不上（实测：整条几乎全被顶光染满，而主体只在顶部 20%）。
  *
- * 结论：**token 只给颜色**（消费方共享同一个不透明色，小条天然与主体同色），
+ * 结论：**token 只给颜色**（消费方共享同一个色值，小条天然与主体同色），
  * **图层交给 `surface.ts` 的选择器表**（按 role 命中真正的浮层）。代价是那个无 role 的
  * `<ul>` 只拿到颜色、拿不到颗粒与光 —— 已知且记账（见 05-surfaces §8.2）。
+ *
+ * ## ⚠️ 0.1.7 起：颜色也必须**保住官方 alpha**
+ *
+ * 官方该 token 现在是**半透明玻璃色**（浅 `rgba(248,249,250,.58)` / 深 `rgba(48,49,54,.5)`，
+ * `design-platform.css:261,367`），浮层自己配 `backdrop-filter: var(--dsw-menu-backdrop-filter)`
+ * （`gradient-shadow-text.css:20`；官方样式规则也要求两者成对出现，见 `docs/web-styling.zh.md:25`）。
+ * 我方若像抬升面那样涂成不透明色，官方玻璃就整块失效 —— 故这里走 {@link washFill}
+ * （**只换 RGB、alpha 一字不动**），既保住色调，也让官方玻璃照常工作。
  */
-export const POPUP_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRung }>[] = Object.freeze([
-  Object.freeze({ token: '--dsw-specific-menu', rung: 'layer3' as const }),
+export const POPUP_TOKENS: readonly Readonly<{
+  token: string
+  official: Readonly<Record<ColorScheme, string>>
+}>[] = Object.freeze([
+  Object.freeze({
+    token: '--dsw-specific-menu',
+    official: Object.freeze({ light: 'rgba(248, 249, 250, 0.58)', dark: 'rgba(48, 49, 54, 0.5)' }),
+  }),
 ])
 // ⚠️ `--dsw-specific-tip` **曾在此表**（当它是「菜单族」），现已移出：
 // 它的三个消费方是**三张停靠卡**（TodoPanel / GoalBar / QueueDock），不是菜单；
@@ -677,18 +691,19 @@ export const STATE_TOKENS: readonly Readonly<{
 ])
 
 /**
- * 交互态洗染色值：**只换 RGB，alpha 一字不动**。
+ * 洗染色值：**只换 RGB，alpha 一字不动**。
  * @param tint - 本色通道值（`'R, G, B'`）；`''` → 直通官方字面量。
- * @param scheme - 明暗轴（决定混合比例）。
+ * @param scheme - 明暗轴（决定默认混合比例）。
  * @param official - 官方原字面量（`rgba(r, g, b, a)`）。
+ * @param scale - 混合比例（0–1）；省略时取 {@link WASH_TINT}。菜单族传 `PANEL_TINT`，
+ *   以沿用「浅色轴的面不染色」那条既有口径。
  * @returns CSS 颜色字面量。
  */
-export function washFill(tint: string, scheme: ColorScheme, official: string): string {
-  if (tint === '') return official
+export function washFill(tint: string, scheme: ColorScheme, official: string, scale = WASH_TINT[scheme]): string {
+  if (tint === '' || scale === 0) return official
   const match = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/u.exec(official)
   if (match === null) return official
   const hue = tint.split(',').map(part => Number.parseInt(part.trim(), 10))
-  const scale = WASH_TINT[scheme]
   const mixed = [0, 1, 2].map(i => Math.round(hue[i] * scale + Number(match[i + 1]) * (1 - scale)))
   return `rgba(${mixed[0]}, ${mixed[1]}, ${mixed[2]}, ${match[4]})`
 }
@@ -1012,11 +1027,13 @@ export function tokenOverrides(settings: ThemeToneSettings): TokenOverrides {
       dark: surfaceFill(dark.tint, 'dark', rung),
     }
   }
-  // 菜单族：**只给颜色**（图层交给 surface.ts 的选择器表，理由见 POPUP_TOKENS）。
-  for (const { token, rung } of POPUP_TOKENS) {
+  // 菜单族：**只给颜色，且保住官方 alpha**（0.1.7 起该 token 是半透明玻璃色，
+  // 涂不透明会吃掉官方 backdrop-filter；理由见 POPUP_TOKENS）。
+  // 比例用 PANEL_TINT（与抬升面同口径：浅色轴 0 → 直通官方，不在白面上再染一层）。
+  for (const { token, official } of POPUP_TOKENS) {
     overrides[token] = {
-      light: surfaceFill(light.tint, 'light', rung),
-      dark: surfaceFill(dark.tint, 'dark', rung),
+      light: washFill(light.tint, 'light', official.light, PANEL_TINT.light),
+      dark: washFill(dark.tint, 'dark', official.dark, PANEL_TINT.dark),
     }
   }
   // 浅灰内嵌面（代码块 / 三张停靠卡）：**独立通道、独立比例**，取官方自己那一档。

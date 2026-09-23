@@ -8,7 +8,6 @@
 
 import {
   ABOVE_CONTENT_Z_INDEX,
-  ABOVE_FLOAT_HOST_Z_INDEX,
   BACKDROP_CLASS,
   BACKDROP_Z_INDEX,
   BOTTOM_VARIABLE,
@@ -21,9 +20,9 @@ import {
   MARKER_ATTR,
   PLAIN_ATTR,
   RIGHT_PANEL_ATTR,
-  RIGHT_FLOAT_HOST_ATTR,
   SHELL_OVERLAY_ATTR,
   SIDE_ATTR,
+  TAB_MENU_Z_INDEX,
   TOP_STOP_VARIABLE,
   TOP_VARIABLE,
   WIDTH_HANDLE_ATTR,
@@ -345,16 +344,17 @@ body:not([${PLAIN_ATTR}]) [${CONTENT_ATTR}] {
    清单与「为什么」见 constants.ts 的 ABOVE_CONTENT_Z_INDEX —— 那是一条**不变式**：
    凡 z-index < 81 且要压在内容之上的官方层，都得抬。
    对话顶栏不在这里（它的 z-index 在 glass.ts，是玻璃规则的一部分），同样取 82。
-   注意 dockkit 标签菜单取的是**更高一档**（83）—— 官方明写它必须高于右栏浮层宿主
-   （dockkit.module.css:438-443 原话：a menu opened from a tab must never sit under a panel），
-   两个层号必须一起抬才能保住这个次序（60/70 → 82/83）。 */
+   注意 dockkit 标签菜单取的是**更高一档**（83）—— 官方明写它必须高于右栏面板
+   （dockkit.module.css:538-543 原话：a menu opened from a tab must never sit under a panel），
+   所以面板 82 / 标签菜单 83 一起抬才保住这个次序。
+   ⚠️ 0.1.7 起官方删了右栏浮层宿主（原 data-sidebar-right-float-host），本表不再收录它。
+   （本段在模板字符串里，注释中不能出现反引号。） */
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
-body:not([${PLAIN_ATTR}]) [${SHELL_OVERLAY_ATTR}],
-body:not([${PLAIN_ATTR}]) [${RIGHT_FLOAT_HOST_ATTR}] {
+body:not([${PLAIN_ATTR}]) [${SHELL_OVERLAY_ATTR}] {
   z-index: ${ABOVE_CONTENT_Z_INDEX};
 }
 body:not([${PLAIN_ATTR}]) [${DOCKKIT_MENU_ATTR}] {
-  z-index: ${ABOVE_FLOAT_HOST_Z_INDEX};
+  z-index: ${TAB_MENU_Z_INDEX};
 }
 /* **拖拽条**（拖它调左右栏 / 对话区宽度）—— owner 真机报「调整对话区域的条整没了」。
    官方有**两条**，属性不同（见 constants.ts 的 WIDTH_HANDLE_ATTR）：

@@ -13,7 +13,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
 import type { BoundActions } from '@deepseek-ai/dsh-client-store'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only：拉入 ui-renderer 的 SlotRegistry 服务合并（ctx.slots）。
@@ -65,11 +65,11 @@ import { createThemeToneRowStore } from './store.js'
 /**
  * 客户端硬依赖：主题、槽位、文案 —— **只放跨版本稳定存在的服务**。
  *
- * ⚠️ 设置的读取面（0.1.5-rc.2 的 `settingsScope`）**绝不能**写进这里：
+ * ⚠️ 设置的读取面（官方的 `configForms`）**绝不能**写进这里：
  * `inject` 里缺服务时 fiber 会**永远 pending**，而客户端 boot 审计把 pending 当致命失败
- * （`dsh 0.1.7-alpha.1`：`packages/client/web/src/boot-client.ts:63-82`，pending 判定在 `:73-75`）
- * —— 实测该版本下页面直接停在 "Failed to load plugins：@dsh-sparrow/dsh-theme-tone:
- * pending (waiting for service: settingsScope)"，即插件把宿主整个 Web UI 拖死。
+ * （`packages/client/web/src/boot-client.ts` 的 `assertEntriesActive`）—— 实测（0.1.7-alpha.1）
+ * 页面直接停在 "Failed to load plugins：@dsh-sparrow/dsh-theme-tone: pending
+ * (waiting for service: …)"，即插件把宿主整个 Web UI 拖死。
  * 换成 `ctx.inject` 起的**可选依赖 fork**（见 apply）：缺设置面只是本插件不画，宿主照常启动。
  */
 export const inject = ['theme', 'slots', 'locale']
@@ -137,30 +137,29 @@ export function apply(ctx: Context): void {
   ])) return
 
   /**
-   * 设置读取面（`settingsScope`）走**可选依赖**：`ctx.inject` 起一个 fork，等它出现再装。
+   * 设置读取面（`configForms`）走**可选依赖**：`ctx.inject` 起一个 fork，等它出现再装。
    *
    * ⚠️ 它**不能**写进本模块的 `inject`：inject 里缺服务时 fiber 会**永远 pending**，
-   * 而客户端 boot 审计把 pending 当致命失败（`dsh 0.1.7-alpha.1`
-   * `packages/client/web/src/boot-client.ts:63-82`，pending 判定在 `:73-75`）—— 实测该版本下
-   * 宿主整页停在 "Failed to load plugins …: pending (waiting for service: settingsScope)"。
-   * 也**不能**在这里当场一次性探测（`ctx.settingsScope?.bind`）：0.1.5-rc.2 上 ui-settings
-   * 常常晚于本 entry 提供该服务，当场探必空 → 插件在**受支持的那条线**上白停用（实测过）。
+   * 而客户端 boot 审计把 pending 当致命失败（`packages/client/web/src/boot-client.ts`
+   * 的 `assertEntriesActive`）—— 实测（0.1.7-alpha.1）宿主整页停在
+   * "Failed to load plugins …: pending (waiting for service: …)"。
+   * 也**不能**在这里当场一次性探测（`ctx.configForms?.get`）：ui-settings 可能晚于本 entry
+   * 提供该服务，当场探必空 → 插件在**受支持的那条线**上白停用（0.1.5-rc.2 上实测过同类情形）。
    *
-   * fork 的两种结局：服务出现 → 装；这条宿主线根本没有该服务（0.1.7+ 已改名 `configForms`）
-   * → fork 一直挂着，本插件什么都不做。fork 是本 entry 的**子 fiber**，不进宿主 boot 审计的
-   * entry 列表（`ctx.loader.entries()`），故它 pending 不会拖垮宿主启动 —— 这正是
-   * 「宁可自己什么都不做，也不让宿主起不来」。
+   * fork 的两种结局：服务出现 → 装；这条宿主线没有该服务 → fork 一直挂着，本插件什么都不做。
+   * fork 是本 entry 的**子 fiber**，不进宿主 boot 审计的 entry 列表（`ctx.loader.entries()`），
+   * 故它 pending 不会拖垮宿主启动 —— 这正是「宁可自己什么都不做，也不让宿主起不来」。
    */
-  ctx.inject(['settingsScope'], (settingsCtx) => { install(settingsCtx) })
+  ctx.inject(['configForms'], (settingsCtx) => { install(settingsCtx) })
 }
 
 /**
  * 装上插件：色调 token 覆盖 + 背景层 + 玻璃 / 缝隙 / 抬升面 / 扫光样式表 + 设置行 + 订阅。
  *
- * 由 {@link apply} 在 `settingsScope` 就绪后调用；入参是该 fork 的上下文，所有
+ * 由 {@link apply} 在 `configForms` 就绪后调用；入参是该 fork 的上下文，所有
  * `ctx.effect` / `ctx.on` / 槽位注册都记在 fork 上 —— 本插件 entry 卸载（或设置服务消失）
  * 时它们随 fork 一起回收，不留 style / 背景层 / 监听。
- * @param ctx - 已就绪 `settingsScope` 的 Cordis 上下文。
+ * @param ctx - 已就绪 `configForms` 的 Cordis 上下文。
  */
 function install(ctx: Context): void {
 
@@ -200,7 +199,7 @@ function install(ctx: Context): void {
    * 先武装清理，再创建资源。
    *
    * ⚠️ **顺序不能反**：cordis 只跑**已注册**的 disposer。若先 `ensureStyles()` /
-   * `ensureLayer()` 再注册清理，那么两者之间任一环节抛错（`settingsScope.bind`、
+   * `ensureLayer()` 再注册清理，那么两者之间任一环节抛错（`configForms.get`、
    * 首次 `repaint` 里的 `overrideTokens` 校验、`locale.register` 重名…）都会让
    * `<style>` 与背景层**永久留在 DOM 里**，而 `PLAIN_ATTR` 从未置上 →
    * 三张表的 `body:not([PLAIN_ATTR])` 规则全部 fail-open 命中，
@@ -228,7 +227,7 @@ function install(ctx: Context): void {
    * 门属性是 `body:not([PLAIN_ATTR])` 的**唯一开关**，而它此前只在 `paintLayer` 里写
    * （即 `paintPlain(plan.hidden)`）。可样式表是在本函数下面**无条件**注入的，而首次
    * `repaint()` 又要过 `shouldPaint()` 那道门 —— `status === 'loading'`（宿主还没回第一帧，
-   * 官方 `SettingsScopeController` 的初值恒为 `'loading'`，见 `ui-settings/.../settings-scope.ts:71`）
+   * 官方设置表单控制器的初值恒为 `'loading'`，见 `ui-settings/src/client/config-form.ts`）
    * 时它**直接 return，从不调用 `paintLayer`**。于是从「样式表注入」到「宿主回值」之间
    * 存在一个窗口：门属性**不存在** → 38 条带门的规则里**有 11 条当场命中**。
    *
@@ -246,9 +245,9 @@ function install(ctx: Context): void {
   // 只留 layer 的局部别名（渲染计划要写它的 style 属性）；
   // style 仅由清理 effect 经 holder 回收，无其它读取点，故不取名。
   const layer = resources.layer
-  const scope: SettingsScope<ThemeToneSettings> = ctx.settingsScope.bind<ThemeToneSettings>({
-    namespace: SETTINGS_NAMESPACE,
-  })
+  // 设置读取面：官方 0.1.7 起客户端设置基座服务是 `configForms`，
+  // 命名空间 = 本插件在 profile 里的**条目 id**（= SETTINGS_NAMESPACE）。
+  const scope: ConfigForm<ThemeToneSettings> = ctx.configForms.get<ThemeToneSettings>(SETTINGS_NAMESPACE)
   const rowStore = createThemeToneRowStore()
 
   let disposeTokens: (() => void) | undefined
@@ -261,10 +260,9 @@ function install(ctx: Context): void {
    * 用它承载本次会话的选择。
    *
    * 为什么必须有：官方契约 `mode: 'memory'` 时 `writable` 恒为 false，
-   * 且 `SettingsScopeController.enqueue()` 在 memory 下**直接 return**
-   * （官方 `ui-settings/lib/client.js`：`if (this.persistence === "memory" || this.disposed)
-   * return Promise.resolve()`）。也就是说此时 `set()` 是**静默空操作**、`subscribe` 永不触发
-   * （只有 `persistence === "host"` 才订阅 mirror）。
+   * 且写入在 memory 下**不落地**（`ConfigFormController` 把写入当空操作、`set()` 返回 false，
+   * 见 `ui-settings/src/client/config-form.ts` 的 memory 分支）。也就是说此时 `set()`
+   * 是**静默空操作**、`subscribe` 也不会因宿主推送而触发（只有 `mode === 'host'` 才同步 mirror）。
    *
    * 若不做兜底：用户点色调**屏幕毫无反应、也无任何日志** —— 既违反本插件 spec
    * （01-design §6「按 ui-theme 对非 loopback 的口径降级为进程内状态，并在日志里说明」），

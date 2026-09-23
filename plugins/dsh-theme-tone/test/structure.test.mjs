@@ -85,8 +85,8 @@ describe('dsh-theme-tone 结构', () => {
   })
 
   it('⛔ 宿主不可写时必须落到进程内兜底并告警（不得静默空操作）', async () => {
-    // 回归守卫：官方 `SettingsScopeController.enqueue()` 在 memory 模式直接 return，
-    // `subscribe` 也永不触发。若 setTone 只调 scope.set，用户点色调会毫无反应且无日志。
+    // 回归守卫：官方设置表单在 memory 模式下把写入当空操作（`set()` 返回 false）、
+    // 也不会有宿主推送。若 setTone 只调 scope.set，用户点色调会毫无反应且无日志。
     const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
     assert.match(src, /localSettings/u, '要有进程内兜底值')
     assert.match(src, /snapshot\.writable/u, 'setTone 要检查 writable')
@@ -100,10 +100,9 @@ describe('dsh-theme-tone 结构', () => {
 
   it('⛔ client inject 只放跨版本稳定服务（易变面进 inject 会把宿主整页拖死）', async () => {
     // 回归守卫（实测事故）：`inject` 里放一个新版宿主已经改名 / 移除的服务时，fiber 永远
-    // pending，而客户端 boot 审计把 pending 当致命失败（dsh 0.1.7-alpha.1
-    // packages/client/web/src/boot-client.ts:63-82，pending 判定在 :73-75）——
-    // 实测 0.1.7-alpha.1 页面停在「Failed to load plugins：@dsh-sparrow/dsh-theme-tone:
-    // pending (waiting for service: settingsScope)」，宿主 Web UI 完全起不来。
+    // pending，而客户端 boot 审计把 pending 当致命失败（packages/client/web/src/boot-client.ts
+    // 的 assertEntriesActive）—— 实测 0.1.7-alpha.1 页面停在「Failed to load plugins：
+    // @dsh-sparrow/dsh-theme-tone: pending (waiting for service: …)」，宿主 Web UI 完全起不来。
     const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
     const inject = /export const inject = \[([^\]]*)\]/u.exec(src)?.[1] ?? ''
     const names = [...inject.matchAll(/'([^']+)'/gu)].map(match => match[1])
@@ -111,7 +110,7 @@ describe('dsh-theme-tone 结构', () => {
     assert.ok(!/settings/u.test(inject), '设置面不得进 inject —— 它是会被宿主改名 / 移除的易变面')
     assert.match(
       src,
-      /ctx\.inject\(\s*\[\s*'settingsScope'\s*\]/u,
+      /ctx\.inject\(\s*\[\s*'configForms'\s*\]/u,
       '设置面要走 ctx.inject 起的可选依赖 fork（缺了只是不装，entry 仍 active）',
     )
   })

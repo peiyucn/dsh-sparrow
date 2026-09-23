@@ -59,7 +59,7 @@ export {
   type ToneId,
   type ToneSpec,
 } from './tones.js'
-export { ThemeToneSettingsSchema } from './settings-schema.js'
+export { Config } from './settings-schema.js'
 export {
   GLASS_BLUR,
   GLASS_CARD_ALPHA,

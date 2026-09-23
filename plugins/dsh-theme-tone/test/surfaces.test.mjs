@@ -304,18 +304,23 @@ describe('抬升面：谁被染', () => {
     }
   })
 
-  it('菜单族应该 与 layer-3 同色（rung 名可以不同，值必须一样）', () => {
-    // `tip` 走的是 `tip` 那个档位名，但 SURFACE_RUNGS 已经把整族收敛成同一个色阶，
-    // 所以「档位名不同」不影响「颜色相同」—— 这条正是这个家族统一与否的判据。
-    const layer3 = SURFACE_TOKENS.find(entry => entry.token === '--dsw-alias-bg-layer-3')
-    for (const entry of POPUP_TOKENS) {
+  it('菜单族应该 保住官方 alpha（官方玻璃 token），浅色轴且不染色', () => {
+    // ⚠️ 0.1.7 起官方 `--dsw-specific-menu` 是**半透明玻璃色**，浮层自己配
+    // `backdrop-filter: var(--dsw-menu-backdrop-filter)`（官方样式规则要求两者成对，
+    // `docs/web-styling.zh.md:25`）。我方只换 RGB，**alpha 必须逐字保持官方值** ——
+    // 涂成不透明会把官方玻璃整块吃掉（旧契约「菜单与 layer-3 同色」已作废）。
+    const alphaOf = color => /,\s*([\d.]+)\)$/u.exec(color)?.[1]
+    const overrides = tokenOverrides({ lightTone: 'blue', darkTone: 'forest' })
+    for (const { token, official } of POPUP_TOKENS) {
       for (const scheme of SCHEMES) {
         assert.equal(
-          SURFACE_RUNGS[scheme][entry.rung],
-          SURFACE_RUNGS[scheme][layer3.rung],
-          `${scheme}: ${entry.token} 应与 layer-3 同色`,
+          alphaOf(overrides[token][scheme]),
+          alphaOf(official[scheme]),
+          `${scheme}: ${token} 必须保持官方 alpha（否则官方玻璃失效）`,
         )
       }
+      // 浅色轴沿用面板口径（PANEL_TINT.light = 0）→ 直通官方字面量。
+      assert.equal(overrides[token].light, official.light, `${token}.light 应直通官方`)
     }
   })
 
@@ -324,8 +329,13 @@ describe('抬升面：谁被染', () => {
     // 于是官方默认的 `layer-3` 从官方的 `800` 被改深了 —— 「官方默认的都不要动」当场就破了。
     const identity = tokenOverrides({ lightTone: 'official', darkTone: 'official' })
     for (const scheme of SCHEMES) {
-      for (const { token, rung } of [...SURFACE_TOKENS, ...POPUP_TOKENS]) {
+      for (const { token, rung } of SURFACE_TOKENS) {
         assert.equal(identity[token][scheme], `var(${RUNG_VARIABLE[scheme][rung]})`, `${token}.${scheme}`)
+      }
+      // 菜单族在「默认」轴同样逐字回官方 —— 只是它现在回的是官方的**半透明字面量**
+      // （不再是被我们改档的 rung，也不再是 `var()` 引用）。
+      for (const { token, official } of POPUP_TOKENS) {
+        assert.equal(identity[token][scheme], official[scheme], `${token}.${scheme} 官方默认应直通官方字面量`)
       }
       assert.equal(identity[PANEL_VARIABLE][scheme], `var(${RUNG_VARIABLE[scheme].layer3})`, `panel.${scheme}`)
       // 浅灰内嵌面同样要**逐条回官方**：代码块与三张停靠卡在「默认」轴必须与官方逐字符相同。
@@ -352,7 +362,8 @@ describe('抬升面：谁被染', () => {
   })
 
   it('每个 rung 都应该 在 rung 表里有定义', () => {
-    for (const { token, rung } of [...SURFACE_TOKENS, ...POPUP_TOKENS]) {
+    // 菜单族不再走 rung（0.1.7 起是官方半透明字面量，见上一条），故只查抬升面。
+    for (const { token, rung } of SURFACE_TOKENS) {
       for (const scheme of SCHEMES) {
         assert.ok(SURFACE_RUNGS[scheme][rung], `${token} 的 rung ${rung} 在 ${scheme} 上未定义`)
       }
@@ -401,12 +412,17 @@ describe('抬升面：覆盖层取值', () => {
     // 被我们染成 `#f9fdfa` 后与代码块同色 → 灰底消失。
     // 浅色口径是「官方底色配置 + 打光用主色」：底色不染，色调由打光层承担。
     const overrides = tokenOverrides({ lightTone: 'green', darkTone: 'violet' })
-    for (const { token, rung } of [...SURFACE_TOKENS, ...POPUP_TOKENS]) {
+    for (const { token, rung } of SURFACE_TOKENS) {
       assert.equal(
         overrides[token].light,
         `var(${SURFACE_RUNGS.light[rung]})`,
         `${token} 的浅色轴必须是纯官方引用`,
       )
+    }
+    // 菜单族同理：浅色轴走 PANEL_TINT.light = 0 → 直通官方**字面量**（它现在是半透明玻璃色，
+    // 没有 var() 绑定可引用；但「不在白面上再染一层」这条浅色口径不变）。
+    for (const { token, official } of POPUP_TOKENS) {
+      assert.equal(overrides[token].light, official.light, `${token} 的浅色轴必须是官方原值`)
     }
   })
 
@@ -445,8 +461,19 @@ describe('抬升面：不变量', () => {
         assert.equal(overrides[token][scheme], expected, `${token}.${scheme} 应与面板底色同值`)
       }
       assert.equal(overrides[PANEL_VARIABLE][scheme], expected, `PANEL_VARIABLE.${scheme} 应与面板底色同值`)
-      for (const { token } of POPUP_TOKENS) {
-        assert.ok(overrides[token][scheme].endsWith(expected), `${token}.${scheme} 的底色层应是同一个值`)
+      // 菜单族自 0.1.7 起**不共享**这个不透明字面量：它是半透明玻璃色（官方 alpha +
+      // 本色 RGB），只保证与面板同色相、且 alpha 不被我们改（见「菜单族应该 保住官方 alpha」）。
+      for (const { token, official } of POPUP_TOKENS) {
+        assert.notEqual(overrides[token][scheme], expected, `${token}.${scheme} 不应等于不透明面板底色`)
+        assert.ok(
+          overrides[token][scheme].startsWith('rgba(') && /,\s*([\d.]+)\)$/u.test(overrides[token][scheme]),
+          `${token}.${scheme} 应是带 alpha 的 rgba 字面量`,
+        )
+        assert.ok(
+          Number(/,\s*([\d.]+)\)$/u.exec(overrides[token][scheme])[1])
+            === Number(/,\s*([\d.]+)\)$/u.exec(official[scheme])[1]),
+          `${token}.${scheme} 的 alpha 必须等于官方值`,
+        )
       }
     }
   })
@@ -473,14 +500,15 @@ describe('抬升面：不变量', () => {
     }
   })
 
-  it('官方默认的菜单族应该 直通官方色阶（不带任何图层）', () => {
+  it('官方默认的菜单族应该 直通官方原值（不带任何图层）', () => {
     // 「默认 = 完全不介入」在 token 层也要成立：值里不能出现 gradient / 颗粒，
-    // 且色阶必须是**官方**的（`RUNG_VARIABLE`），不是我们选的档。
-    const official = tokenOverrides({ lightTone: 'official', darkTone: 'official' })
-    for (const { token, rung } of POPUP_TOKENS) {
+    // 且必须是**官方**那一份值。菜单族自 0.1.7 起是官方的半透明玻璃字面量
+    // （不再是 `var(--dsw-static-…)` 引用），故逐字比官方字面量。
+    const overrides = tokenOverrides({ lightTone: 'official', darkTone: 'official' })
+    for (const { token, official: officialValue } of POPUP_TOKENS) {
       for (const scheme of SCHEMES) {
-        const value = official[token][scheme]
-        assert.equal(value, `var(${RUNG_VARIABLE[scheme][rung]})`, `${token}.${scheme}`)
+        const value = overrides[token][scheme]
+        assert.equal(value, officialValue[scheme], `${token}.${scheme}`)
         assert.ok(!value.includes('gradient') && !value.includes('url('))
       }
     }
