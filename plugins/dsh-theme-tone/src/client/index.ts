@@ -19,7 +19,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only：拉入 ui-renderer 的 SlotRegistry 服务合并（ctx.slots）。
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import { assertCapabilities, cssSupports, hasCapability } from '../compat.js'
+import { cssSupports, hasCapability, warnMissingCapabilities, warnUser } from '../compat.js'
 import {
   BACKDROP_CLASS,
   BOTTOM_VARIABLE,
@@ -62,8 +62,17 @@ import { en, zh } from './locales.js'
 import { buildRowCss } from './styles.js'
 import { createThemeToneRowStore } from './store.js'
 
-/** 客户端硬依赖：主题服务、槽位、文案、settings 读取面。 */
-export const inject = ['theme', 'slots', 'locale', 'settingsScope']
+/**
+ * 客户端硬依赖：主题、槽位、文案 —— **只放跨版本稳定存在的服务**。
+ *
+ * ⚠️ 设置的读取面（0.1.5-rc.2 的 `settingsScope`）**绝不能**写进这里：
+ * `inject` 里缺服务时 fiber 会**永远 pending**，而客户端 boot 审计把 pending 当致命失败
+ * （`dsh 0.1.7-alpha.1`：`packages/client/web/src/boot-client.ts:63-82`，pending 判定在 `:73-75`）
+ * —— 实测该版本下页面直接停在 "Failed to load plugins：@dsh-sparrow/dsh-theme-tone:
+ * pending (waiting for service: settingsScope)"，即插件把宿主整个 Web UI 拖死。
+ * 换成 `ctx.inject` 起的**可选依赖 fork**（见 apply）：缺设置面只是本插件不画，宿主照常启动。
+ */
+export const inject = ['theme', 'slots', 'locale']
 
 /**
  * 注入样式表（背景层 + 设置行 + 玻璃 + 缝挡板 + 抬升面合成一张；按标记属性去重，HMR / 重载不叠加）。
@@ -105,16 +114,19 @@ function ensureLayer(): HTMLDivElement {
 }
 
 /**
- * client half 入口。
+ * client half 入口：稳定面能力门 → 等设置面就绪后装插件（见 {@link install}）。
  * @param ctx - 浏览器侧 Cordis 上下文。
  */
 export function apply(ctx: Context): void {
-  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》）：任一能力缺失即抛错自停用，
-  // 绝不带上不认识的契约跑。
-  assertCapabilities(ctx, name, [
+  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》）：稳定面缺失即**惰性停用** ——
+  // 告警后直接返回，不注册任何槽位 / 样式 / 监听。
+  //
+  // ⚠️ 客户端这半边**不能抛错**（故用 `warnMissingCapabilities` 而不是抛错版能力门）：
+  // 客户端 boot 审计把任何非 active 的 entry 当致命失败，`apply` 抛错 = 宿主整页停在
+  // "Failed to load plugins"。所以这里只检查**跨版本稳定**的能力面。
+  if (!warnMissingCapabilities(ctx, name, [
     { name: 'ctx.theme.getTheme', ok: hasCapability(() => ctx.theme?.getTheme) },
     { name: 'ctx.theme.overrideTokens', ok: hasCapability(() => ctx.theme?.overrideTokens) },
-    { name: 'ctx.settingsScope.bind', ok: hasCapability(() => ctx.settingsScope?.bind) },
     { name: 'ctx.slots.inject', ok: hasCapability(() => ctx.slots?.inject) },
     { name: 'ctx.slots.register', ok: hasCapability(() => ctx.slots?.register) },
     { name: 'ctx.locale.register', ok: hasCapability(() => ctx.locale?.register) },
@@ -122,7 +134,35 @@ export function apply(ctx: Context): void {
       name: `CSS ${feature.name}`,
       ok: cssSupports(feature.probe),
     })),
-  ])
+  ])) return
+
+  /**
+   * 设置读取面（`settingsScope`）走**可选依赖**：`ctx.inject` 起一个 fork，等它出现再装。
+   *
+   * ⚠️ 它**不能**写进本模块的 `inject`：inject 里缺服务时 fiber 会**永远 pending**，
+   * 而客户端 boot 审计把 pending 当致命失败（`dsh 0.1.7-alpha.1`
+   * `packages/client/web/src/boot-client.ts:63-82`，pending 判定在 `:73-75`）—— 实测该版本下
+   * 宿主整页停在 "Failed to load plugins …: pending (waiting for service: settingsScope)"。
+   * 也**不能**在这里当场一次性探测（`ctx.settingsScope?.bind`）：0.1.5-rc.2 上 ui-settings
+   * 常常晚于本 entry 提供该服务，当场探必空 → 插件在**受支持的那条线**上白停用（实测过）。
+   *
+   * fork 的两种结局：服务出现 → 装；这条宿主线根本没有该服务（0.1.7+ 已改名 `configForms`）
+   * → fork 一直挂着，本插件什么都不做。fork 是本 entry 的**子 fiber**，不进宿主 boot 审计的
+   * entry 列表（`ctx.loader.entries()`），故它 pending 不会拖垮宿主启动 —— 这正是
+   * 「宁可自己什么都不做，也不让宿主起不来」。
+   */
+  ctx.inject(['settingsScope'], (settingsCtx) => { install(settingsCtx) })
+}
+
+/**
+ * 装上插件：色调 token 覆盖 + 背景层 + 玻璃 / 缝隙 / 抬升面 / 扫光样式表 + 设置行 + 订阅。
+ *
+ * 由 {@link apply} 在 `settingsScope` 就绪后调用；入参是该 fork 的上下文，所有
+ * `ctx.effect` / `ctx.on` / 槽位注册都记在 fork 上 —— 本插件 entry 卸载（或设置服务消失）
+ * 时它们随 fork 一起回收，不留 style / 背景层 / 监听。
+ * @param ctx - 已就绪 `settingsScope` 的 Cordis 上下文。
+ */
+function install(ctx: Context): void {
 
   /**
    * 标记属性的**唯一宿主** —— 所有 `PLAIN_ATTR` / `WORKSTART_ATTR` 的读写都用它。
@@ -265,7 +305,8 @@ export function apply(ctx: Context): void {
     if (snapshot.status === 'ready' && snapshot.writable) return
     if (snapshot.status === 'loading') return
     warnedNoPersistence = true
-    ctx.logger?.warn(
+    warnUser(
+      ctx,
       `${name}: 本次会话的设置无法写入宿主（${snapshot.mode === 'memory' ? '页面非本机回环地址' : '该设置项对当前客户端不可用'}）；`
       + '色调仍会在本次会话内生效，但不会持久化。从本机回环地址访问 dsh 即可保存。',
     )

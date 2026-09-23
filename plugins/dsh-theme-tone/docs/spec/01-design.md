@@ -173,17 +173,28 @@ ctx.slots.inject('settings.general.item', () => ctx.slots.register({
 
 ## 6) 兼容门（根规范《扩展与宿主兼容》）
 
-`apply` 开头按 `src/compat.ts`（复用 `dsh-nav-pin` 的 `HostCapability` / `missingCapabilities` / `assertCapabilities` 形态）自检，不通过即**抛错自停用**——cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive（`lib/index.js:1350-1362`），dsh 与其余插件不受影响。
+`apply` 开头按 `src/compat.ts` 自检。**两半的门语义不同，不可互换**：
 
-* **能力门（客户端）**：`typeof ctx.theme?.overrideTokens === 'function'`、`typeof ctx.theme?.getTheme === 'function'`、`typeof ctx.settingsScope?.bind === 'function'`、`typeof ctx.slots?.inject === 'function' && typeof ctx.slots?.register === 'function'`、`typeof ctx.locale?.register === 'function'`。
+* **client half 走惰性停用**（`warnMissingCapabilities`：告警 + 直接 return，**不抛错**）。理由（实测）：客户端 boot 审计把「任一 entry 非 active」当**致命**失败，`apply` 抛错或 fiber 停在 pending 都会让 `bootClient` 抛 `web boot: N entry did not activate`，宿主整个 Web UI 只渲染失败页（dsh 0.1.7-alpha.1 `packages/client/web/src/boot-client.ts:63-82`）。插件宁可自己什么都不画，也不能拖垮宿主启动。
+* host half 没有必需服务（settings 走可选注入），故不需要门。其余只在 host half 装门的插件（archive / chat-fim / codebuddy / file-manage）继续用抛错自停用 —— cordis 逐插件捕获 `apply` 异常并把该插件标 inactive，dsh 与其余插件不受影响（`lib/index.js:1350-1362`）。
+
+**`inject` 只放跨版本稳定存在的服务**（`['theme', 'slots', 'locale']`）：inject 里放了新版宿主已经改名 / 移除的服务，fiber 会永远 pending，同样是致命失败（pending 判定见 `boot-client.ts:73-75`）。设置读取面（0.1.5-rc.2 的 `settingsScope`）是易变面，改走**可选依赖 fork** `ctx.inject(['settingsScope'], …)`：
+
+* 服务出现就装（0.1.5-rc.2 上 ui-settings 常晚于本 entry 提供它，fork 正好等它）；
+* 这条宿主线没有该服务（0.1.7-alpha.1 起改名 `configForms`）→ fork 一直挂着，本插件什么都不做；
+* fork 是本 entry 的**子 fiber**，不进 `bootClient` 审计的 entry 列表（`ctx.loader.entries()`），所以它 pending **不会**让宿主启动失败 —— 这正是本插件要的结果。
+* **不写「惰性停用」告警**：apply 那一刻无法区分「服务还没到」与「这条线没有」（0.1.5-rc.2 实测就是还没到），写了只会在受支持的那条线上误报。可靠提示要等适配 0.1.7 时按 `configForms` 走正路，见下面的「已知不兼容线」。
+
+* **能力门（客户端，跨版本稳定面）**：`typeof ctx.theme?.overrideTokens === 'function'`、`typeof ctx.theme?.getTheme === 'function'`、`typeof ctx.slots?.inject === 'function' && typeof ctx.slots?.register === 'function'`、`typeof ctx.locale?.register === 'function'`；缺任一 → 告警 + 惰性停用（不注册任何东西）。
 * **能力门（宿主）**：`ctx.get('settings')` 可为空——`installSection` 本身支持「服务不存在时回退到组合 entry 配置」；但那样**选择无法持久化**，按 ui-theme 对非 loopback 的口径降级为进程内状态，并在日志里说明。
 * **浏览器特性门**：`CSS.supports('mix-blend-mode', 'screen')`（深色轴配方依赖）；径向渐变用 `CSS.supports('background', 'radial-gradient(red, blue)')`。缺任一 → 停用（**不降级**为正片叠底：浅色配方不依赖 blend，但深色配方是非 screen 就会压暗内容）。
 * **无会话格式门**：本插件不读会话数据。
-* 判定纯函数化并补单测（含「不兼容 → 告警 + 抛错」接线用例）；停用文案统一为「已停用插件以免影响 dsh（升级本插件或运行环境后自动恢复）」。
+* 判定纯函数化并补单测（含「不兼容 → 告警 + 惰性停用（不抛错）」接线用例）；停用文案统一为「已停用插件以免影响 dsh（升级本插件或运行环境后自动恢复）」。
+* **已知不兼容线**：官方 0.1.7-alpha.1 起客户端设置基座服务由 `settingsScope` 改为 `configForms`（`packages/client/ui-settings/src/client/config-form.ts:266`）。本插件只承诺版本号所标示的那条线（0.1.5-rc.2）；在 0.1.7+ 上按上面的 fork 机制**什么都不做**（不报错、不拖垮宿主启动），适配属于后续正式任务。
 
 ## 7) 生命周期与去重
 
-* `apply` 内：能力门 → 注册 locale 字典 → `settingsScope.bind` → `ctx.theme.overrideTokens` → 注入样式表 → 插入背景层 → 注册设置行 → 登记订阅（`theme/change` + scope 订阅）。所有副作用收进 `ctx.effect` 清理，卸载顺序与插入相反。
+* `apply` 内：能力门（不通过即 return）→ 注册 locale 字典 → `settingsScope.bind` → `ctx.theme.overrideTokens` → 注入样式表 → 插入背景层 → 注册设置行 → 登记订阅（`theme/change` + scope 订阅）。所有副作用收进 `ctx.effect` 清理，卸载顺序与插入相反。
 * **HMR / 重载去重**：样式表按 `style[data-dsh-theme-tone]` 命中即复用并按内容刷新；背景层按 `[data-dsh-theme-tone]` 命中即复用（同 `dsh-nav-pin`）。
 * **不产生写入循环**：`theme/change` 与 scope 订阅只读不写；写入只发生在立方块点击。
 * client half 不 import Node 模块；host half 只做 settings 命名空间注册（`@deepseek-ai/schemastery` 在 host half 用，client bundle 不需要它）。

@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { assertCapabilities, cssSupports, hasCapability, missingCapabilities } from '../lib/compat.js'
+import { cssSupports, hasCapability, missingCapabilities, warnMissingCapabilities, warnUser } from '../lib/compat.js'
 
-// 根 AGENTS《插件与宿主兼容》：宿主契约不认识时插件必须自停用（抛错 → cordis 标 inactive），
-// 而不是带病运行。本文件覆盖能力门纯判定与接线；容器行为由 cordis 保证（lib/index.js:1350-1362）。
-describe('compat 宿主兼容自检（纯能力版）', () => {
+// 根 AGENTS《插件与宿主兼容》：宿主契约不认识时插件必须自停用，而不是带病运行。
+// 本插件的门装在 **client half**，语义是「惰性停用」—— 告警后直接返回，**绝不抛错**：
+// 客户端 boot 审计把任何非 active 的 entry 当致命失败（dsh 0.1.7-alpha.1
+// packages/client/web/src/boot-client.ts:63-82），client 侧抛错会让宿主整个 Web UI
+// 停在 "Failed to load plugins"。本文件覆盖能力门纯判定与接线。
+describe('compat 宿主兼容自检（纯能力版，客户端惰性停用）', () => {
   const fakeCtx = () => {
     const warns = []
     return { ctx: { logger: { warn: message => { warns.push(message) } } }, warns }
@@ -20,21 +23,38 @@ describe('compat 宿主兼容自检（纯能力版）', () => {
     assert.deepEqual(missingCapabilities([]), [])
   })
 
-  it('能力齐备 应该 不抛不告警', () => {
+  it('能力齐备 应该 返回 true 且不告警', (t) => {
+    const printed = t.mock.method(console, 'warn', () => {})
     const { ctx, warns } = fakeCtx()
-    assert.doesNotThrow(() => { assertCapabilities(ctx, 'dsh-x', [{ name: 'theme.overrideTokens', ok: true }]) })
+    assert.equal(warnMissingCapabilities(ctx, 'dsh-x', [{ name: 'theme.overrideTokens', ok: true }]), true)
     assert.equal(warns.length, 0)
+    assert.equal(printed.mock.callCount(), 0)
   })
 
-  it('能力缺失 应该 告警并抛错（停用）', () => {
+  it('能力缺失 应该 告警（logger + console 同一句）并返回 false —— 不抛错', (t) => {
+    // 抛错 = 宿主整页起不来；只写 logger = 用户看不到（客户端 logger 默认只有环形缓冲
+    // exporter，浏览器侧没有 console 通道）。故两条通道都要写。
+    const printed = []
+    t.mock.method(console, 'warn', message => { printed.push(message) })
     const { ctx, warns } = fakeCtx()
-    assert.throws(
-      () => { assertCapabilities(ctx, 'dsh-x', [{ name: 'theme.overrideTokens', ok: false }]) },
-      /theme\.overrideTokens/u,
-    )
+    let ok
+    assert.doesNotThrow(() => {
+      ok = warnMissingCapabilities(ctx, 'dsh-x', [{ name: 'ctx.settingsScope.bind', ok: false }])
+    })
+    assert.equal(ok, false)
     assert.equal(warns.length, 1)
+    assert.equal(printed.length, 1)
+    assert.equal(printed[0], warns[0], 'console 与 logger 必须是同一句话')
+    assert.match(warns[0], /ctx\.settingsScope\.bind/u)
     assert.match(warns[0], /已停用插件以免影响 dsh/u)
     assert.match(warns[0], /升级本插件或运行环境后自动恢复/u)
+  })
+
+  it('warnUser 应该 在 ctx.logger 缺失时仍然告警（console 是无条件通道）', (t) => {
+    const printed = []
+    t.mock.method(console, 'warn', message => { printed.push(message) })
+    assert.doesNotThrow(() => { warnUser({}, 'dsh-x: 缺服务') })
+    assert.deepEqual(printed, ['dsh-x: 缺服务'])
   })
 })
 

@@ -90,12 +90,45 @@ describe('dsh-theme-tone 结构', () => {
     const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
     assert.match(src, /localSettings/u, '要有进程内兜底值')
     assert.match(src, /snapshot\.writable/u, 'setTone 要检查 writable')
-    assert.match(src, /ctx\.logger\?\.warn/u, '不可持久化时要记一条面向用户的告警')
+    assert.match(src, /warnUser\(/u, '不可持久化 / 停用时要走面向用户的告警（logger + console）')
     // setTone 的分支里必须真的写兜底值 + 立刻重绘
     const i = src.indexOf('setTone:')
     const seg = src.slice(i, i + 800)
     assert.ok(seg.includes('localSettings'), 'setTone 不可写分支要写 localSettings')
     assert.ok(seg.includes('repaint()'), 'setTone 不可写分支要立刻重绘')
+  })
+
+  it('⛔ client inject 只放跨版本稳定服务（易变面进 inject 会把宿主整页拖死）', async () => {
+    // 回归守卫（实测事故）：`inject` 里放一个新版宿主已经改名 / 移除的服务时，fiber 永远
+    // pending，而客户端 boot 审计把 pending 当致命失败（dsh 0.1.7-alpha.1
+    // packages/client/web/src/boot-client.ts:63-82，pending 判定在 :73-75）——
+    // 实测 0.1.7-alpha.1 页面停在「Failed to load plugins：@dsh-sparrow/dsh-theme-tone:
+    // pending (waiting for service: settingsScope)」，宿主 Web UI 完全起不来。
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    const inject = /export const inject = \[([^\]]*)\]/u.exec(src)?.[1] ?? ''
+    const names = [...inject.matchAll(/'([^']+)'/gu)].map(match => match[1])
+    assert.deepEqual(names, ['theme', 'slots', 'locale'], 'inject 只允许放跨版本稳定存在的服务')
+    assert.ok(!/settings/u.test(inject), '设置面不得进 inject —— 它是会被宿主改名 / 移除的易变面')
+    assert.match(
+      src,
+      /ctx\.inject\(\s*\[\s*'settingsScope'\s*\]/u,
+      '设置面要走 ctx.inject 起的可选依赖 fork（缺了只是不装，entry 仍 active）',
+    )
+  })
+
+  it('⛔ client half 的能力门不得抛错（抛错 = 宿主整页起不来）', async () => {
+    // 客户端侧没有「逐插件捕获 apply 异常」的隔离：任何非 active 的 entry 都是致命失败
+    // （boot-client.ts:63-82）。故 client half 走惰性停用（告警 + return），不使用抛错版能力门。
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(src, /warnMissingCapabilities\(/u, 'client half 要走不抛错的能力门')
+    assert.ok(!/assertCapabilities/u.test(src), 'client half 不得用抛错版能力门')
+    const iGate = src.indexOf('warnMissingCapabilities(')
+    const iReturn = src.indexOf('])) return')
+    const iInstall = src.indexOf('function install(')
+    const iStyles = src.indexOf('resources.style = ensureStyles()')
+    assert.ok(iGate > 0 && iReturn > 0 && iInstall > 0 && iStyles > 0, '锚点缺失（实现改过？）')
+    assert.ok(iGate < iReturn, '门不通过要直接 return（不继续装）')
+    assert.ok(iReturn < iInstall && iInstall < iStyles, '惰性停用必须在创建 style / 背景层之前返回')
   })
 
   it('⛔ 资源必须先武装清理、再创建（中途抛错不得留下无生命周期的 style / 层）', async () => {
