@@ -13,7 +13,12 @@
  */
 
 import type { ReactNode } from 'react'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+// 官方 0.1.7 起客户端服务声明分散在各包：slots → ui-renderer、sessions →
+// api-session-controller、modelDirectories → ui-model-selection（纯类型空导入）。
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { CodeBuddyCreditsCard, ensureCardStyles } from './CodeBuddyCreditsCard.js'
 import {

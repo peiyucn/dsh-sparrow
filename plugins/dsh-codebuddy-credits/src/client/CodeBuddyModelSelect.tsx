@@ -19,8 +19,10 @@ import {
   type FocusEvent, type KeyboardEvent,
 } from 'react'
 import {
-  IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
-  IconWarningOutline16, Toast,
+  // 图标名只标字形与字重（Regular = 1px 描边），渲染尺寸改由 size prop 决定：
+  // 下列使用点一律显式传 size（对照官方改名前的 Icon*Outline16 / Icon*Outline14）。
+  IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular,
+  IconWarningOutlineRegular, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getMaxMode, subscribeMaxMode } from './maxMode.js'
 import { formatModelFacts } from './format.js'
@@ -342,7 +344,7 @@ export function CodeBuddyModelSelect(
       >
         <span className="ccb-model-triggerLabel">{modelLabel}</span>
         {effortLabel !== undefined && <span className="ccb-model-triggerEffort">{effortLabel}</span>}
-        <IconChevronDownOutline14 className={clsx('ccb-model-chevron', open && 'ccb-model-chevronOpen')} />
+        <IconChevronDownOutlineRegular size={14} className={clsx('ccb-model-chevron', open && 'ccb-model-chevronOpen')} />
       </button>
 
       {open && (
@@ -358,13 +360,13 @@ export function CodeBuddyModelSelect(
               <button ref={itemRef()} type="button" role="menuitem" className="ccb-model-cell" onClick={() => { setPane('model') }}>
                 <span className="ccb-model-cellLabel">{t('picker.menu.model')}</span>
                 <span className="ccb-model-cellValue">{modelLabel}</span>
-                <IconChevronRightOutline14 className="ccb-model-cellChevron" />
+                <IconChevronRightOutlineRegular size={14} className="ccb-model-cellChevron" />
               </button>
               {reasoning !== undefined && (
                 <button ref={itemRef()} type="button" role="menuitem" className="ccb-model-cell" onClick={() => { setPane('effort') }}>
                   <span className="ccb-model-cellLabel">{t('picker.menu.effort')}</span>
                   <span className="ccb-model-cellValue">{effortLabel}</span>
-                  <IconChevronRightOutline14 className="ccb-model-cellChevron" />
+                  <IconChevronRightOutlineRegular size={14} className="ccb-model-cellChevron" />
                 </button>
               )}
             </>
@@ -421,7 +423,7 @@ export function CodeBuddyModelSelect(
                               </span>
                             </span>
                             <span className="ccb-model-check">
-                              {selected ? <IconCheckOutline16 /> : null}
+                              {selected ? <IconCheckOutlineRegular size={16} /> : null}
                             </span>
                           </button>
                         )
@@ -469,7 +471,7 @@ export function CodeBuddyModelSelect(
                             <span className="ccb-model-name">{level.label}</span>
                           </span>
                           <span className="ccb-model-check">
-                            {isMax ? <IconCheckOutline16 /> : null}
+                            {isMax ? <IconCheckOutlineRegular size={16} /> : null}
                           </span>
                         </button>
                       )
@@ -494,7 +496,7 @@ export function CodeBuddyModelSelect(
                         <span className="ccb-model-name">{level.label}</span>
                       </span>
                       <span className="ccb-model-check">
-                        {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
+                        {effectiveEffort === level.effort ? <IconCheckOutlineRegular size={16} /> : null}
                       </span>
                     </button>
                   ))}
@@ -506,7 +508,7 @@ export function CodeBuddyModelSelect(
         <Toast
           key={toast.seq}
           text={toast.text}
-          icon={<IconWarningOutline16 />}
+          icon={<IconWarningOutlineRegular size={16} />}
           anchor={rootRef.current?.closest<HTMLElement>('[data-composer-card]') ?? null}
           onDone={() => { setToast(null) }}
         />
