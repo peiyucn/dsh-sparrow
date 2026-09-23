@@ -27,7 +27,7 @@ Open **Settings → General** — a **Tone** row sits directly under the officia
 
 * Targets dsh 0.1.5-rc.2 — the exact official version line this release is built and verified against (other lines are not covered)
 * Appearance only: it never blocks the UI or changes how anything works
-* If the host or the browser is missing something it needs, it disables itself with a user-facing warning
+* When the host or the browser is missing something it needs, the plugin steps aside: the UI opens normally and it draws nothing (for a missing theme, slot, or browser feature it also logs a user-facing warning)
 
 ## Screenshots
 
