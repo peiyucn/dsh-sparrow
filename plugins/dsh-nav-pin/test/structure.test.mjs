@@ -29,4 +29,18 @@ describe('dsh-nav-pin 结构', () => {
     assert.match(patch, /id: dsh-nav-pin/u)
     assert.match(patch, /name: '@dsh-sparrow\/dsh-nav-pin'/u)
   })
+
+  it('⛔ client half 的能力门不得抛错（抛错 = 宿主整页起不来）', async () => {
+    // 客户端侧没有「逐插件捕获 apply 异常」的隔离：任何非 active 的 entry 都是致命失败
+    // （dsh 0.1.7-alpha.1 packages/client/web/src/boot-client.ts:63-82）。故 client half
+    // 走惰性停用（告警 + return），不使用抛错版能力门。
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(src, /warnMissingCapabilities\(/u, 'client half 要走不抛错的能力门')
+    assert.ok(!/assertCapabilities/u.test(src), 'client half 不得用抛错版能力门')
+    const iGate = src.indexOf('warnMissingCapabilities(')
+    const iReturn = src.indexOf('return', iGate)
+    const iStyles = src.indexOf('const style = ensureNavPinStyles()')
+    assert.ok(iGate > 0 && iReturn > 0 && iStyles > 0, '锚点缺失（实现改过？）')
+    assert.ok(iGate < iReturn && iReturn < iStyles, '惰性停用必须在注入样式表之前返回')
+  })
 })

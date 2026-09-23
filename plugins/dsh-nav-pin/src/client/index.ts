@@ -7,7 +7,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { buildNavPinCss, REQUIRED_CSS_FEATURES } from '../nav-pin.js'
-import { assertCapabilities } from '../compat.js'
+import { cssSupports, warnMissingCapabilities } from '../compat.js'
 import { name } from '../host.js'
 
 /** 客户端不依赖任何 cordis 服务（纯 DOM 样式注入）。 */
@@ -34,18 +34,16 @@ function ensureNavPinStyles(): HTMLStyleElement {
  * @param ctx - 浏览器侧 Cordis 上下文。
  */
 export function apply(ctx: Context): void {
-  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》）：样式依赖的浏览器特性缺失时
-  // 注入的是无效规则——按统一能力门自停用，而不是假装在工作。
-  assertCapabilities(ctx, name, REQUIRED_CSS_FEATURES.map(feature => ({
+  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》）：样式依赖的浏览器特性缺失时注入的是无效
+  // 规则 —— 按统一能力门**惰性停用**（告警 + 直接返回），而不是假装在工作。
+  //
+  // ⚠️ 客户端这半边**不能抛错**（故用 `warnMissingCapabilities` 而不是抛错版能力门）：
+  // 客户端 boot 审计把任何非 active 的 entry 当致命失败，`apply` 抛错 = 宿主整页停在
+  // "Failed to load plugins"（dsh 0.1.7-alpha.1：packages/client/web/src/boot-client.ts:63-82）。
+  if (!warnMissingCapabilities(ctx, name, REQUIRED_CSS_FEATURES.map(feature => ({
     name: feature.name,
-    ok: typeof CSS !== 'undefined' && (() => {
-      try {
-        return CSS.supports(feature.probe)
-      } catch {
-        return false
-      }
-    })(),
-  })))
+    ok: cssSupports(feature.probe),
+  })))) return
   const style = ensureNavPinStyles()
   ctx.effect(() => () => { style.remove() }, 'dsh-nav-pin: styles')
 }
