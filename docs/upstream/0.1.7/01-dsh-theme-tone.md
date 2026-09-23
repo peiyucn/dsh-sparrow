@@ -20,6 +20,12 @@
 * **官方分工（是分工，不是禁令）**：`docs/web-styling.zh.md:5` 写明该文档规定的是**浏览器客户端包**（仓库内功能包）的样式职责 —— 全局主题（`--dsw-*` 静态色阶、语义别名、明暗偏好、全局样式表）归 `ui-theme`（`:9,11`），功能包只许用语义别名、不得写颜色字面量、不得含主题选择器（`:17,18`）；第三方扩展点是 `ctx.theme`（`ui-theme/README.zh.md:12`）。theme-tone 的自铺静态表是在**手工复制主题层的职责**，所以换到 API 更合官方分工 —— 但这条文档对第三方插件不构成禁令。
 * **一条我方当前会违反的明文规则**：半透明 `--dsw-specific-menu` 填充的高层级表面**必须在同一规则中**加 `backdrop-filter: var(--dsw-menu-backdrop-filter)`（`docs/web-styling.zh.md:25`）；我方现在 opaque 覆盖该 token 且不配 filter，既破了这个配对、也吃掉官方菜单玻璃（详见 §3 第 6 条）。
 * **官方没覆盖的两块**：① 色调预设/自定义 CSS（外观行硬编码 light/dark/system 三个 cube，`ui-theme/src/client/AppearanceRow.tsx:31-35`）；② 自绘背景与质感（官方新增玻璃只到菜单/停靠面板，**顶栏与输入框不在内**）。
+* **官方对三方主题的立场：支持（别误读成「不推荐做」）**：
+  * 产品文档明写「**第三方主题可通过 `ctx.theme` 注册别名 token 覆盖**」（`ui-theme/README.zh.md:12`）；README 另有独立小节「**注册主题**」（`:34-36`）：「覆盖层按注册顺序折入活动快照的 token 中。移除其中一个绝不会覆盖最后一个持久化的内置偏好。」
+  * 公开 API 目录同样收录：`overrideTokens`「stacks partial token layers over the active theme without touching the registry」（`packages/extensions/cordis-client-runner/src/client/api-catalog.ts:264`）。
+  * 已知限制只有两条（`:101-104`）：①「**第三方主题是扩展点，不是产品**」= 不校验一组覆盖是否完整、不进官方外观行、不跨 settings schema 持久化 —— 说的是**不做产品级配套**，不是不推荐做；②「**token 样式表是颜色值的唯一权威来源**」= 设计系统里缺的值不会为某个三方配色补上，只能用最接近的语义 token。
+  * 与 `web-styling.zh.md` 的关系：那四条写给**仓库内功能包**（该文档 `:5` 限定受众），目的是官方功能包不各自为政，**不是**对第三方主题插件的禁令。
+  * → **做主题插件被官方支持**；官方不补的配套（色调选择行、持久化、自绘背景/玻璃）由插件自己承担 —— 与本插件「需重设计、不退役」的判定一致。
 * **两个天花板**：三方主题 id 不跨内置 settings schema、**无法持久化**（`ui-theme/src/client/index.ts:232-240`，README 明说「仍是进程内扩展」`README.zh.md:36`）；注册的主题**不会出现在官方外观行**。
 
 ## 3) 改动清单
