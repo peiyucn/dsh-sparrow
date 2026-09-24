@@ -248,7 +248,9 @@ function install(ctx: Context): void {
   // 设置读取面：官方 0.1.7 起客户端设置基座服务是 `configForms`，
   // 命名空间 = 本插件在 profile 里的**条目 id**（= SETTINGS_NAMESPACE）。
   const scope: ConfigForm<ThemeToneSettings> = ctx.configForms.get<ThemeToneSettings>(SETTINGS_NAMESPACE)
-  const rowStore = createThemeToneRowStore()
+  // 行 store 的**初值取实时主题轴**（不写死 dark）：浅色页面上首帧就该渲染浅色轴卡片，
+  // 否则用户可能在行还没同步时点到深色轴卡片 → 写入被 schema 拒（见 store.ts 的 ⚠️）。
+  const rowStore = createThemeToneRowStore(ctx.theme.getTheme().active.colorScheme)
 
   let disposeTokens: (() => void) | undefined
   let boundRow: BoundActions<typeof rowStore> | undefined
@@ -379,6 +381,12 @@ function install(ctx: Context): void {
    * 未就绪一律不画：层保持 `hidden`、门保持关，等本插件拿到权威值再一次性画对。
    */
   const paintLayer = (snapshot: ThemeSnapshot): void => {
+    // ⚠️ **行同步必须排在 `shouldPaint()` 那道门之前**（owner 真机报「浅色模式下选色调
+    // 无法维持」的第二层根因）：门是给**上色**用的（未就绪不上色，避免闪变），
+    // 但**行渲染哪一轴的卡片**纯由当前主题决定，与设置是否就绪无关。
+    // 曾把 `boundRow.sync` 放在门后面 → 设置还在 `loading` 时行不更新，
+    // 浅色页面上显示的却是**深色轴的卡片**；此时点卡片会把浅色 id 写进深色字段。
+    syncRow(snapshot.active.colorScheme)
     if (!shouldPaint()) return
     const settings = readSettings()
     const scheme: ColorScheme = snapshot.active.colorScheme
@@ -395,19 +403,35 @@ function install(ctx: Context): void {
       else layer.style.setProperty(LEFT_VARIABLE, plan.left)
     }
     layer.setAttribute(GRAIN_ATTR, plan.grain ? 'on' : 'off')
+  }
+
+  /**
+   * 把「当前明暗轴 + 该轴选中的色调」推给设置行。
+   *
+   * ⚠️ **不走上色那道门**（见 {@link paintLayer} 的 ⚠️）：行渲染哪一轴只取决于主题，
+   * 设置未就绪时用进程内兜底值算选中态即可（那正是 {@link readSettings} 的口径）。
+   * @param scheme - 当前解析出的明暗轴。
+   */
+  const syncRow = (scheme: ColorScheme): void => {
     revision += 1
-    boundRow?.sync(scheme, toneIdOf(settings, scheme), revision)
+    boundRow?.sync(scheme, toneIdOf(readSettings(), scheme), revision)
   }
 
   /** 设置变更：token、层、行全都要重算。 */
   const repaint = (): void => {
+    const snapshot = scope.getSnapshot()
+    // ⚠️ **先收乐观值、再同步行**：顺序反了的话，宿主**拒绝**这一笔时行会先用
+    // 乐观值画一帧选中态、随后才纠正 —— 用户能看到一次闪动的假选中。
+    // 快照 revision 前进过 = 宿主已就那一笔给出结论（接受 / 拒绝）→ 收掉乐观值。
+    clearSettledPending(snapshot.status === 'ready' ? snapshot.value : undefined, snapshot.revision)
+    // ⚠️ 行同步**不设门**（理由见 `paintLayer` 的 ⚠️）：它只依赖当前主题，
+    // 必须在 `shouldPaint()` 返回之前就更新 —— 否则设置未就绪时行不刷新，
+    // 浅色页面会显示深色轴卡片，点下去就把浅色 id 写进深色字段（被 schema 拒）。
+    syncRow(ctx.theme.getTheme().active.colorScheme)
     // 宿主还没回第一帧（`loading`）就不上色 —— 此刻没有权威值，按默认画一遍再纠正
     // 就是一次可避免的闪变（见 readSettings 的 ⚠️）。
     if (!shouldPaint()) return
     warnIfNotPersistable()
-    const snapshot = scope.getSnapshot()
-    // 快照 revision 前进过 = 宿主已就那一笔给出结论（接受 / 拒绝）→ 收掉乐观值。
-    clearSettledPending(snapshot.status === 'ready' ? snapshot.value : undefined, snapshot.revision)
     const settings = readSettings()
     paintTokens(settings)
     paintLayer(ctx.theme.getTheme())

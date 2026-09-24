@@ -26,11 +26,21 @@ type ThemeToneRowActions = {
 
 /**
  * 声明设置行的状态与写入面。
+ *
+ * ⚠️ **初值不能写死 `'dark'`**（owner 真机报「浅色模式下选色调无法维持」的第三层根因）：
+ * 行在 `apply` 里注册、`inject` 时补一次同步，但**首次同步之前**若渲染过一帧，
+ * 写死 dark 会让浅色页面先画出**深色轴的卡片**；用户此时点下去就写进深色字段，
+ * 而两轴合法集合不重叠 → 被 schema 拒绝。
+ * 改成按**调用方传进来的当前轴**初始化（`apply` 处传 `ctx.theme` 的实时值），
+ * 使首帧就与真实主题一致；`revision: -1` 仍保证首次 `sync` 必定落成一次变更。
+ * @param scheme - 当前解析出的明暗轴（调用方应传实时主题；缺省回退 `dark`）。
  * @returns store 句柄（交给槽位注册的 `store` 座位）。
  */
-export function createThemeToneRowStore(): EngineStoreHandle<ThemeToneRowState, ThemeToneRowActions> {
+export function createThemeToneRowStore(
+  scheme: ColorScheme = 'dark',
+): EngineStoreHandle<ThemeToneRowState, ThemeToneRowActions> {
   return defineStore({
-    init: (): ThemeToneRowState => ({ colorScheme: 'dark', tone: 'official', revision: -1 }),
+    init: (): ThemeToneRowState => ({ colorScheme: scheme, tone: 'official', revision: -1 }),
     actions: {
       sync: (d, colorScheme: ColorScheme, tone: ToneId, revision: number) => {
         if (revision <= d.revision) return

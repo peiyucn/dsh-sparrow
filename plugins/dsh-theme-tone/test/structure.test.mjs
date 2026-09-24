@@ -127,6 +127,50 @@ describe('dsh-theme-tone 结构', () => {
     assert.match(row, /setTone\(id, colorScheme\)/u, 'onClick 要传渲染轴 colorScheme')
   })
 
+  it('⛔ 行同步不得被「未就绪不上色」那道门挡住（否则浅色页面显示深色卡片）', async () => {
+    // 同一事故的第二层：`shouldPaint()` 是给**上色**用的（未就绪不上色，避免闪变），
+    // 但「行渲染哪一轴」只取决于当前主题。曾把 `boundRow.sync` 排在门后面 →
+    // 设置 loading 期间行不更新，浅色页面显示**深色轴卡片**，点下去写进深色字段被拒。
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    // 抽出 syncRow 与 paintLayer 的位置：syncRow 必须在每个 shouldPaint 早退之前
+    const syncIdx = src.indexOf('const syncRow =')
+    assert.ok(syncIdx > 0, '应有独立的 syncRow')
+    // paintLayer 体内：syncRow 调用必须早于该函数里的 `if (!shouldPaint()) return`
+    const plIdx = src.indexOf('const paintLayer =')
+    const pl = src.slice(plIdx, plIdx + 1600)
+    const syncCall = pl.indexOf('syncRow(')
+    const gateCall = pl.indexOf('if (!shouldPaint())')
+    assert.ok(syncCall > 0 && gateCall > 0, 'paintLayer 里应同时有 syncRow 与门')
+    assert.ok(syncCall < gateCall, 'paintLayer 里的 syncRow 必须排在门之前')
+    // repaint 同理
+    const rpIdx = src.indexOf('const repaint =')
+    const rp = src.slice(rpIdx, rpIdx + 1200)
+    const rpSync = rp.indexOf('syncRow(')
+    const rpGate = rp.indexOf('if (!shouldPaint())')
+    assert.ok(rpSync > 0 && rpGate > 0 && rpSync < rpGate, 'repaint 里的 syncRow 必须排在门之前')
+  })
+
+  it('⛔ 行 store 初值取实时主题轴（写死 dark 会让浅色页面首帧就画错）', async () => {
+    // 同一事故的第三层：store 初值曾写死 `colorScheme: 'dark'`，
+    // 浅色页面在首次 sync 之前会渲染深色轴卡片 —— 与上一条同源。
+    const store = await readFile(new URL('../src/client/store.ts', import.meta.url), 'utf8')
+    assert.match(store, /scheme: ColorScheme = 'dark'/u, '签名应接受调用方传入的轴')
+    assert.match(store, /init: \(\): ThemeToneRowState => \(\{ colorScheme: scheme/u, 'init 要用传入的 scheme')
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(src, /createThemeToneRowStore\(ctx\.theme\.getTheme\(\)\.active\.colorScheme\)/u,
+      'apply 处必须传实时主题轴')
+  })
+
+  it('⛔ 两轴合法色调集合不得重叠（跨轴写入必被 schema 拒）', async () => {
+    // 事故的**前提条件**：两轴 id 集合不重叠，所以「写错轴」不是观感问题而是**写入被拒**。
+    // 若将来某天两轴集合合并成一个，本守卫会失败 —— 那时可以放宽上面几条的措辞，
+    // 但必须先确认这个前提真的变了（别默默让守卫失效）。
+    const { LIGHT_TONE_IDS, DARK_TONE_IDS } = await import('../lib/tones.js')
+    const overlap = LIGHT_TONE_IDS.filter(id => DARK_TONE_IDS.includes(id))
+    assert.deepEqual(overlap, ['official'], '两轴只应共享 official（其余必须互斥）')
+    assert.ok(LIGHT_TONE_IDS.some(id => !DARK_TONE_IDS.includes(id)), '浅色轴要有深色轴没有的 id')
+  })
+
   it('⛔ client inject 只放跨版本稳定服务（易变面进 inject 会把宿主整页拖死）', async () => {
     // 回归守卫（实测事故）：`inject` 里放一个新版宿主已经改名 / 移除的服务时，fiber 永远
     // pending，而客户端 boot 审计把 pending 当致命失败（packages/client/web/src/boot-client.ts
