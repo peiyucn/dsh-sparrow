@@ -324,21 +324,25 @@ describe('glass：输入框底座', () => {
     assert.ok(!body.includes('backdrop-filter'), '不透带不模糊')
   })
 
-  it('⛔ 不许再改拖拽条的几何（改了会把官方 hover 光带的位置算歪）', () => {
-    // 回归守卫（owner 真机报「hover 的时候光带会靠下，点住才回到鼠标上」）：
-    // 这里曾经有一条 `[data-width-handle] { top: 76px }`，用来把光带压回顶栏下缘以下。
-    // 但官方光带的位置是 `var(--dsh-width-handle-pointer-y, 50%)`，`50%` 相对**这个盒子**算：
-    // 把 top 压到 76 后盒子变成 [76,720]，50% = 398，而视口中心是 360 —— hover 时那条
-    // 淡显光带（仍用兜底 50%）比屏幕中心低 38px。实测（真机 3080）：
-    //   带此规则 center=398；移除后 center=360（= 视口中心）。
-    // 取舍：宁可让光带在浮层顶栏区多画一截（顶栏是半透明玻璃），也不改这个盒子的几何。
-    assert.equal(
-      rules.indexOf(`[${WIDTH_HANDLE_ATTR}] {`), -1,
-      '不得再有 [data-width-handle] 的规则块 —— 任何 top/height 都会挪动官方光带的 50% 基准',
-    )
-    // ⚠️ 本断言只针对**玻璃这张表**：backdrop.ts 里另有一条 `[data-width-handle] { z-index: 82 }`，
-    // 那条只抬层级（不让内容盖住拖拽条）、不动几何，是合法且必要的，不在此守卫范围内。
-    assert.ok(!rules.includes(`[${WIDTH_HANDLE_ATTR}]`), '玻璃表不得以任何形式选择 data-width-handle')
+  it('拖拽条只裁上段（恢复官方几何），且**不得**动它的指针基准', () => {
+    // owner 2026-09-24：「左右边宽度拖动条**在顶栏依然穿模**」—— 顶栏浮层化的副作用：
+    // 官方 .widthHandle 是 .body 里的 absolute + top:0/bottom:0，官方顶栏在流内占 76px，
+    // 所以光带只在顶栏下缘以下；本插件把顶栏改成浮层后 .body 从 0 起，那截就透过半透明顶栏显出来。
+    // ✅ 现在的做法 = 把盒子**还原成官方那一份**（[76,720]），几何基准与官方完全一致。
+    // ⛔ 仍然**不许**碰 `--dsh-width-handle-pointer-y`：官方那套 calc(var(...) ± 36px) 必须
+    //    继续按盒子解析，hover / 拖拽时写真实 clientY 的是官方与 nav-pin（不是本插件）。
+    const handleRules = rulesFor(css, `[${WIDTH_HANDLE_ATTR}]`).filter((r) => r.includes('top:'))
+    assert.equal(handleRules.length, 1, `应恰好有一条拖拽条裁切规则，实际 ${handleRules.length}`)
+    const clip = handleRules[0]
+    const body = clip.slice(clip.indexOf('{') + 1, clip.lastIndexOf('}'))
+    assert.match(body, /top: 76px/u, '只裁上段：top 取官方顶栏高度')
+    assert.ok(!body.includes('--dsh-width-handle-pointer-y'), '不得改写官方指针变量（那是 nav-pin 的职责）')
+    assert.ok(!/height|bottom/u.test(body), '不动高度/下缘 —— 只把上段让给顶栏')
+    // 只在「顶栏被浮层化」的那个状态出现：色调档 + active 相位
+    const selector = clip.slice(0, clip.indexOf('{'))
+    assert.match(selector, new RegExp(`:not\\(\\[${PLAIN_ATTR}\\]\\)`, 'u'), '必须带官方默认门')
+    assert.match(selector, /\[data-phase='active'\]/u, '必须限定 active 相位（hero 下官方顶栏就在流内）')
+    // ⚠️ backdrop.ts 里另有一条 `[data-width-handle] { z-index: 82 }`：只抬层级，不动几何，合法。
   })
 
   it('不得给底座写 position —— 本选择器 (0,3,1) 比官方 (0,3,0) 高，写了就会顶掉 sticky', () => {
