@@ -865,7 +865,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             {item.running ? ` · ${t('state.running')}` : item.live ? (
               <>
                 {' · '}
-                <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>{t('state.unreleased')}</span>
+                <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)' }}>{t('state.unreleased')}</span>
               </>
             ) : ''}
             {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
@@ -1002,7 +1002,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
               {hasChildren ? (
                 <>
                   {' · '}
-                  <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>
+                  <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)' }}>
                     {t('tree.childCount', { n: item.children.length })}
                   </span>
                 </>
@@ -1011,12 +1011,12 @@ export function ArchiveDock(props: ArchiveDockProps) {
               {item.running ? ` · ${t('state.running')}` : item.live ? (
                 <>
                   {' · '}
-                  <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>{t('state.unreleased')}</span>
+                  <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)' }}>{t('state.unreleased')}</span>
                 </>
               ) : descendantLive(item) ? (
                 <>
                   {' · '}
-                  <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>{t('state.subagentUnreleased')}</span>
+                  <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)' }}>{t('state.subagentUnreleased')}</span>
                 </>
               ) : ''}
               {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
@@ -1162,7 +1162,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
               {hasChildren ? (
                 <>
                   {' · '}
-                  <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>
+                  <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)' }}>
                     {t('tree.childCount', { n: children.length })}
                   </span>
                 </>
@@ -1465,7 +1465,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                     </div>
                   ) : null}
                   {trashItems.length > 0 ? (
-                    <p role="note" style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)', fontSize: 12, lineHeight: '18px', margin: '0 0 4px' }}>
+                    <p role="note" style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)', fontSize: 12, lineHeight: '18px', margin: '0 0 4px' }}>
                       {t('trash.uninstallHint')}
                     </p>
                   ) : null}

@@ -724,7 +724,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
         </span>
       </button>
       {error !== null ? (
-        <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)', fontSize: 12 }} title={error}>⚠</span>
+        <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)', fontSize: 12 }} title={error}>⚠</span>
       ) : null}
       {pickerOpen && pickerPoint !== null
         ? createPortal(
