@@ -362,112 +362,30 @@ function gatedAnchor(anchor: string): string {
 }
 
 /**
- * 官方**菜单材质**的两个变量名（0.1.7 起成对出现，缺一个就退化成一块半透明塑料）。
- *
- * 官方 `docs/web-styling.zh.md:25` 的原话：凡用半透明 `--dsw-specific-menu` 填面的规则，
- * **必须**在**同一条规则**里配上 `backdrop-filter: var(--dsw-menu-backdrop-filter)`。
- */
-export const MENU_FILL_VARIABLE = '--dsw-specific-menu'
-/** 菜单配套模糊（`blur(40px) saturate(150%)`，见 `gradient-shadow-text.css:20`）。 */
-export const MENU_BLUR_VARIABLE = '--dsw-menu-backdrop-filter'
-
-/**
- * **菜单族**锚点：官方 0.1.7 给它们换成了**半透明 + 模糊**材质，我们必须跟着换。
- *
- * owner：「官方的弹出窗，我看都是透明模糊的效果了，我们几个主题色也得跟着一起适配吧。」
- *
- * 证据（rc.1 逐文件核过）—— 这些组件**全部**是同一材质
- * `background: var(--dsw-specific-menu)` + `backdrop-filter: var(--dsw-menu-backdrop-filter)`：
- *
- * | 组件 | 文件 |
- * | :--- | :--- |
- * | 菜单原语 | `ui-primitives/Menu.module.css:17-18` |
- * | 命令面板卡片 | `ui-commands/PopupSelectView.module.css:27-28` |
- * | 输入触发器菜单 | `ui-input-trigger/MenuView.module.css:28-29` |
- * | 轮次用量弹窗 | `ui-chat/stat-dialog.module.css:23-24` |
- * | 子代理血缘弹层 | `ui-subagent/SubagentHeaderLineage.module.css:119-120` |
- *
- * 而 {@link SURFACE_ANCHORS} 那条兜底规则给它们刷的是**不透明**的 `PANEL_VARIABLE`
- * —— 官方的模糊还在，只是被不透明底盖住看不见了，于是「官方的透明模糊效果没了」。
- *
- * ⚠️ **不改 token，只改这条规则用的填充变量**：`--dsw-specific-menu` 本身已由
- * `tones.ts` 的 `POPUP_TOKENS` **按色调染过且保留官方 alpha**（实测 dark `rgba(55,53,70,0.5)`），
- * 所以这里直接引用它，天然就是「色调 + 官方材质」。
- *
- * ⚠️ **不动 `[role='dialog']`**：官方 Modal 是**不透明**面
- * （`Modal.module.css:37` 用 `--dsw-alias-bg-layer-2`，只有它**后面**的遮罩 `:21-22` 走模糊），
- * 所以对话框继续走不透明那条路。菜单族与它是两种材质，别混。
- */
-export const MENU_MATERIAL_ANCHORS: readonly string[] = Object.freeze([
-  "body [role='menu']",
-  'body [data-trigger-menu]',
-  "body :has(> [role='listbox'])",
-  "body [role='listbox']:not([data-trigger-menu] *)",
-  "body > [role='tree']",
-  /**
-   * **子代理会话弹层**（见 SURFACE_ANCHORS 里那条的完整说明）。
-   *
-   * owner：「subagent 的弹出和 background jobs 的弹出**风格得一致**」——
-   * 两个官方组件的材质逐字相同，差别在**有没有我们的质感层**。本表收它，
-   * 于是两者拿到同一套（颗粒 + 光）与同一对官方材质变量。
-   */
-  "body > :has(> [role='tree'])",
-  /**
-   * **后台任务列表**（`JobListAction` 那枚任务数按钮弹出的 `<ul>`）。
-   *
-   * 它是弹层里**唯一没有 role** 的一个（锚点见 SURFACE_ANCHORS 里那条注释），
-   * 此前只进了兜底表、**没进本表** → 全部弹层里只有它是不透明 + 无模糊
-   * （owner：「菜单，弹窗的设置都不统一，有的完全透明，有的不透明」）。
-   * 官方那 `<ul>` 自己是 `--dsw-specific-menu` + `--dsw-menu-backdrop-filter`
-   * （`ui-jobs/JobListAction.module.css:59`），所以它本来就该在本表里。
-   */
-  "body [data-slot='conversation.session.header.actions'] ul",
-])
-
-/**
- * 官方**漏配** `backdrop-filter` 的半透明面 —— 由本插件补齐（修官方 bug，**不带官方默认门**）。
- *
- * ## 为什么需要单独一张表
- *
- * 0.1.7 起官方要求「用半透明 `--dsw-specific-menu` 填面的规则必须**成对**配
- * `backdrop-filter: var(--dsw-menu-backdrop-filter)`」（`docs/web-styling.zh.md:25`）。
- * 逐文件审计 rc.1（脚本扫「`background: var(--dsw-specific-menu)` 之后 6 行内有无
- * backdrop-filter」）后，**弹层表面**只剩一处漏配：
- *
- * | 漏配处 | 规矩在哪 | 后果 |
- * | :--- | :--- | :--- |
- * | `ModelSelect.module.css:175` 的 `.groupTitle` | `position: sticky; top: 0` 的分类条 | 它**半透明且没有模糊** → 列表从底下滚过去时**透出来**（owner：「官方模型选择菜单，分类显示条有背景色，并且和后面串色」） |
- *
- * （同文件 `:108` 的菜单面就配了；其余 `JobListAction` 的几处缺配是菜单**内部 20px
- * 小徽标 / 按钮**，底下就是菜单自己的模糊面，不需要各自再配 —— 故不收。）
- *
- * ## ⚠️ 为什么不带 {@link PLAIN_ATTR} 门（与全表其它规则不同）
- *
- * owner 的报障截图正是在**官方默认（深色官方）**下拍的 —— 那条带子**在官方档也出现**，
- * 因为它是**官方自己的漏配**，与本插件的色调无关。若给它加门，官方档下不生效 → 带子照旧。
- * 这与悬停卡（{@link HOVER_CARD_ANCHOR}）是同一条口径：**官方默认档下先修官方自己的毛病**，
- * 且只补官方**本来就想要**的那个属性（它的菜单面全都配了模糊，只有这一处漏），
- * 不引入任何外来色相 —— 所以「官方档逐像素不变」的承诺仍成立（官方修好后这行即冗余无害）。
- */
-export const OFFICIAL_MISSING_BLUR_SELECTOR = `${GROUPED_MENU_SELECTOR} ${GROUPED_MENU_TITLE_SELECTOR}`
-
-/**
  * 抬升面样式表文本（**只加质感，不刷底色**）。
  *
- * ## ⚠️ 2026-09-24 架构收口：底色交回官方，我们只加质感
+ * ## ⚠️ 2026-09-24 架构收口：底色与模糊全部交回官方
  *
  * owner 定的口径：「**统一设计语言**，该透明模糊的就透明模糊，不破坏我们原来的设计，
- * 适配新的官方设计语言」。
+ * 适配新的官方设计语言」，且明确「透明和模糊**和官方默认一样**就行」。
  *
- * 这条表原先会给每个锚点刷一层**不透明** `background-color: var(PANEL_VARIABLE) !important`
- * —— 那是 0.1.5 时代的兜底（当时官方弹层底色散落、还多是实色）。
- * 0.1.7 官方把弹层统一成「`--dsw-specific-menu`（半透明）+ `--dsw-menu-backdrop-filter`（模糊）」
- * 之后，这层**不透明**兜底反而把官方的玻璃**整块盖掉**：owner 反复报的
- * 「后台任务 / CodeBuddy 弹窗不是透明模糊效果」就是它。
+ * 官方 0.1.7 的菜单族材质契约（`docs/web-styling.zh.md:25`）：凡用半透明
+ * `--dsw-specific-menu` 填面的规则，**必须**在同一条规则里配上
+ * `backdrop-filter: var(--dsw-menu-backdrop-filter)` —— 这两个变量已由 `tones.ts` 的
+ * `POPUP_TOKENS` 按色调染过（只换 RGB、保住官方 alpha），所以**官方自己就是带色调的**，
+ * 本插件不需要再声明这一对。
  *
- * 现在只保留 `background-image` 的**图层**（颗粒 + 光），底色与模糊**一律由官方自己的材质
- * 与官方 token 承担** —— 色调通过 `ctx.theme.overrideTokens` 染进 token（官方接入方式），
- * 于是所有官方面自带色调，且材质与官方逐字一致。
+ * 这条表演进过三步，全部记录在此（免得再走）：
+ *
+ * 1. **刷不透明底**（0.1.5 时代）→ 0.1.7 官方把弹层统一成「半透明 + 模糊」之后，
+ *    这层不透明底把官方玻璃**整块盖掉**（owner：「后台任务 / CodeBuddy 弹窗不是透明模糊」）；
+ * 2. **改成刷官方的半透明 + 模糊**→ 官方**已经画过**，于是变成画两遍：
+ *    官方画在元素自己身上的（菜单原语、`JobListAction` 的 `<ul>`）是同值覆盖、无碍；
+ *    但官方画在 `::before` 上的（`SubagentCatalogAction`）**叠两次同色 ⇒ 等效 0.75**
+ *    （owner：「子代理卡片好像没有透明模糊吧？」）；
+ * 3. **本版：一个材质声明都不写** —— 由官方自己的材质原样生效（= 官方默认的透明与模糊），
+ *    本表只负责 `background-image` 的**质感层**（颗粒 + 光），色调走 `ctx.theme.overrideTokens`
+ *    染进官方 token（官方接入方式）。
  *
  * 仍然保留 `!important`：官方写的是 `background:` **简写**（内含 `background-image: none`），
  * 特异度又各写各的，压不过就是静默失效。
@@ -479,60 +397,57 @@ export function buildSurfaceCss(): string {
 ${SURFACE_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
   background-image: ${surfaceLayers()} !important;
 }`).join('\n')}
-/* --- 菜单族：跟随官方 0.1.7 的**半透明 + 模糊**材质 ---
-   owner：「官方的弹出窗，我看都是透明模糊的效果了，我们几个主题色也得跟着一起适配吧。」
-   填充用**已被色调染过、且保留官方 alpha** 的 --dsw-specific-menu，并补上配套模糊
-   （官方要求两者**成对**，见 docs/web-styling.zh.md:25）。
-   这一块现在**不是在盖兜底**（不透明兜底已在 2026-09-24 撤掉，见 buildSurfaceCss 的说明），
-   而是**兜住官方没配成对的地方**：官方的填充与模糊必须同时出现，
-   少一个就是"半透明塑料片"（owner 报的"全透明"正是这个形态）。
+/* --- 菜单族：**不再由我们声明填充与模糊**（官方 0.1.7 已经成对画好了）---
+   owner：「透明和模糊和**官方默认一样**就行」。
+
+   ⚠️ 这里原先会给每个菜单族锚点刷一对
+   "background-color: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter)"，
+   本意是「兜住官方没配成对的地方」。但 0.1.7 官方**到处都配好了**，于是这条规则变成
+   **在官方已经画过材质的地方再画一遍** —— 后果按官方的画法分两种：
+
+   | 官方的材质画在哪 | 我们再画一遍的结果 |
+   | :--- | :--- |
+   | **元素自己身上**（菜单原语、"JobListAction" 的 "<ul>"、本仓库各组件） | 同值覆盖，看不出问题 |
+   | **元素的 "::before" 上**（"SubagentCatalogAction" 的 ".…_menu:before"） | **同一个 50% 色叠两次 ⇒ 等效 75%** —— 卡片看着"不透明"（owner：「子代理卡片好像没有透明模糊吧？」） |
+
+   所以这一整块**撤掉**：官方的材质原样生效（= 官方默认的透明与模糊），我们只负责
+   "background-image" 的质感层与 token 层的色调。
+
+   唯一真正需要补的是官方自己漏配的那一处（粘性分组标题），它单独在下面处理。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
-${MENU_MATERIAL_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
-  background-color: var(${MENU_FILL_VARIABLE}) !important;
-  backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important;
-}`).join('\n')}
+
 /* --- 带**粘性分组标题**的菜单：**只去掉顶光**（见 GROUPED_MENU_SELECTOR 的表）---
    两条 owner 反馈夹出来的解：全给图层 → 分组标题显形成横带；全不给 → 「是纯色的」。
    顶光锚在盒子顶部、正好被标题压住，是横带的**唯一来源** → 去掉它；
    颗粒（均匀贴图）与底光（锚盒子底部、与吸顶的标题不相遇）都留着，质感还在。
-   随后把**颗粒补给标题条本身**，否则标题上没颗粒、菜单上有，仍留一层极淡的接缝。
+   ⚠️ **不要给标题条本身补颗粒**（曾经补过，已撤）—— 那会让标题比菜单主体亮一档
+   （实测落差 17.6 级），正是 owner 报的"分类显示条有背景色"。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 ${gatedAnchor(GROUPED_MENU_SELECTOR)} {
   background-image: ${menuSurfaceLayers()} !important;
 }
-/* --- 粘性分组标题：**什么都不画**（官方把同一个半透明色叠了两次）---
-   owner 两轮都报：「模型选择菜单，分类显示条**有背景色**，并且**和后面串色**」——
-   官方档与我们的色调档下都在（官方自己也是坏的）。
+/* --- 粘性分组标题：**交回官方默认，我们一个字都不写** ---
+   owner 三轮报这条，最终口径是：「透明和模糊**和官方默认一样**就行」。
 
-   根因：官方给菜单主体的填充是 "background: var(--dsw-specific-menu)"，
-   给**吸顶标题**的填充**也是同一个 token** —— 标题是菜单的子元素，于是那一小块把
-   同一个半透明色**又合成了一遍**（深色轴 0.5 上再叠 0.5 → 等效 0.75）：
-   既比菜单主体**亮一档**（看着就是"一条有背景色的横带"），又因为只有 50% 不透明，
-   行从它底下滚过时仍然**透出来**（"串色"）。
+   官方原样（"ModelSelect.module.css" 的 ".groupTitle" 与 codebuddy 的
+   ".ccb-model-groupTitle"）就是：
+   "position: sticky; top: 0; z-index: 1; background: var(--dsw-specific-menu)"。
+   它**本来就是对的** —— 标题要挡住从底下滚过去的行，就必须有填充；
+   而那个填充与菜单主体**同源同 alpha**，所以标题与菜单浑然一体。
 
-   **官方想要的其实就是"标题与菜单主体同色"**，而菜单主体的色**已经画在标题底下了**
-   （标题是菜单的子元素，父级的填充本来就在它下面，且菜单自己有 backdrop-filter）。
-   所以正解是：**标题这一层什么都不画** —— 既不填色、也不叠质感。
+   我连着两轮错在**替官方"修"它**，两版都是副作用：
+   * 刷不透明白底 + 菜单色 → 横带没了，但标题成**实心块**（不是一种材质）；
+   * 什么都不画（"background: none"）→ **行直接透上来**
+     （owner：「分类标题滚动的时候都和模型名称重叠了」）。
 
-   ⚠️ **颗粒也要撤**（实测数据）：只把 background-color 置 transparent 是不够的 ——
-   颗粒贴图叠在**透明**标题上会变成一条**比菜单主体亮 17.6 级**的带子
-   （真机逐像素：标题区亮度 69.0 vs 列表区 51.4；去掉颗粒后落差消失）。
-   原因：菜单主体的颗粒是叠在**半透明底色**上的（被底色压暗），而标题上没有底色，
-   同一张颗粒直接落在玻璃上 → 纯加亮。
+   ⚠️ **正式结论：本插件对这条**不做任何声明** —— 不写 background、不写
+   backdrop-filter、不叠颗粒。官方那处**没配模糊是有意的**：标题在**菜单内部**，
+   菜单自己已经是 backdrop root，标题再声明模糊只会采样子树（滚动的行）。
 
-   曾试过三条弯路，都记在这里免得再走：
-   * 「补一层同色填充」→ 就是官方现在的样子（叠两次，亮一档）；
-   * 「刷不透明白底 + 一层菜单色」→ 横带没了，但标题变成**实心块**，与"半透明 + 模糊"
-     的菜单主体仍不是一种材质（owner 复验：「依然有背景色」）；
-   * 「只置 transparent 不撤颗粒」→ 标题变成一条**亮带**（上条实测数据）。
-
-   ⚠️ **本条不带官方默认门**：owner 那张截图就是在**官方默认档**下拍的，带子在官方档也在。
-   我们只去掉官方重复合成的那一次，色相 / 透明度语义仍完全来自官方 token。
+   （下方 GROUPED_MENU_SELECTOR 那条只负责"菜单本体去掉顶光"，
+   它**不碰标题** —— 选择器只命中 "[role='menu']:has([role='group'])" 自己。）
    （本段在模板字符串里，注释中**不能出现反引号**。） */
-${OFFICIAL_MISSING_BLUR_SELECTOR} {
-  background: none !important;
-  backdrop-filter: none !important;
-}
+
 /* --- 输入框上方那三张**停靠卡**（排队 / 目标 / 待办）---
    owner：「**输入框上面那个区域也没适配**，刚才我记得让改了，但是没改。」
    锚点与「为什么画在子元素上」见 COMPOSER_CARD_ANCHORS。

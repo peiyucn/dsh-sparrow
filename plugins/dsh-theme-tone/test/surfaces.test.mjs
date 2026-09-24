@@ -25,7 +25,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { GRAIN_DATA_URI } from '../lib/backdrop.js'
-import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, MENU_BLUR_VARIABLE, MENU_FILL_VARIABLE, MENU_MATERIAL_ANCHORS, OFFICIAL_MISSING_BLUR_SELECTOR, SURFACE_ANCHORS, buildSurfaceCss, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
+import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, SURFACE_ANCHORS, buildSurfaceCss, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -894,65 +894,63 @@ describe('抬升面：表面绘制', () => {
     assert.ok(buildGlassCss().includes(`inset ${GLASS_SPECULAR_RING[0].x}px ${GLASS_SPECULAR_RING[0].y}px`), '输入框卡片应带镜面高光')
   })
 
-  it('⛔ 粘性分组标题必须**不带门**地去掉那层重复填充（官方档下也要修）', () => {
-    // owner 两轮都报：模型选择菜单的**分类显示条有背景色、与后面内容串色** ——
-    // 官方档与我们的色调档下都在（`ModelSelect.module.css` 的 `.groupTitle` 与
-    // codebuddy 的 `.ccb-model-groupTitle` 都用同一个**半透明**菜单 token 做填充）。
-    // 根因：菜单主体已经是 0.5 的菜单色，标题再把同一个色叠一遍 → 等效 0.75
-    //（比主体亮一档 =「有背景色」），且只有 50% 不透明 → 行从底下滚过时透出来（「串色」）。
-    // 正解：**不要再画一遍** —— 标题是菜单的子元素，父级的填充本来就在它下面；
-    // 置 transparent 后它直接显示菜单自己的玻璃，滚过来的行由官方那对模糊交代。
-    //（曾试过「补 blur」→ 菜单自己是 backdrop root，补了也只采样子树；
-    //  也试过「刷不透明白底 + 菜单色」→ 横带没了但标题成实心块，owner 复验仍说「有背景色」。）
-    const ungated = blockFor(css, OFFICIAL_MISSING_BLUR_SELECTOR)
-    assert.ok(ungated !== '', `应有分组标题规则（不带门）：${OFFICIAL_MISSING_BLUR_SELECTOR}`)
-    assert.ok(
-      ungated.includes('background: none !important'),
-      '标题**什么都不画** —— 官方那层重复合成就是「有背景色」的来源',
+  it('⛔ 粘性分组标题必须**一个声明都不写** —— 完全交回官方默认', () => {
+    // owner 三轮报这条，最终口径：「透明和模糊**和官方默认一样**就行」。
+    //
+    // 官方原样就是 "position: sticky; top: 0; z-index: 1; background: var(--dsw-specific-menu)"
+    // —— 它**本来就是对的**：标题要挡住从底下滚过去的行，就必须有填充；那个填充与菜单主体
+    // 同源同 alpha，所以标题与菜单浑然一体。
+    //
+    // 我连着两轮错在**替官方"修"它**，两版都是副作用（都记在这里免得再走）：
+    // * 刷不透明白底 + 菜单色 → 横带没了，但标题成**实心块**（不是一种材质）；
+    // * 什么都不画（`background: none`）→ **行直接透上来**
+    //   （owner：「分类标题滚动的时候都和模型名称重叠了」）。
+    // 还试过给标题补 backdrop-filter → 它在菜单内部，菜单自己已是 backdrop root，
+    // 补了只能采样子树（滚动的行），反而把行糊在标题上 —— 官方不配是正确的。
+    //
+    // 故本插件对标题**不做任何声明**：不写 background / backdrop-filter / 图层。
+    const titleSelector = `${GROUPED_MENU_SELECTOR} ${GROUPED_MENU_TITLE_SELECTOR}`
+    assert.equal(
+      blockFor(css, titleSelector), '',
+      '不得为分组标题生成任何规则 —— 交回官方默认（写了就会出现「实心块」或「行透上来」）',
     )
-    assert.ok(
-      ungated.includes('backdrop-filter: none !important'),
-      '标题也不该再做一次模糊（父级菜单自己已经有一层）',
-    )
-    // ⚠️ 颗粒必须一并撤掉：它是**实测**出来的第三条弯路 —— 只置 transparent 时，
-    //    同一张颗粒直接落在玻璃上（没有被底色压暗）会变成一条**比菜单主体亮 17.6 级**的带子。
-    assert.ok(
-      !ungated.includes('GRAIN_TILE') && !ungated.includes('background-image'),
-      '标题不得叠颗粒/图层（会变成一条亮带）',
-    )
-    // 关键：整条修复必须出现在**无门**那条规则里（官方档下也生效）。
-    // ⚠️ 不能断言「带门的选择器不存在」—— 分组标题的**菜单面**规则本来就带门，选择器文本相同。
-    const gatedBlock = blockFor(css, OFFICIAL_MISSING_BLUR_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`))
-    assert.ok(
-      !gatedBlock.includes('background-color'),
-      '带门那条（菜单面图层）不得承担这条修复 —— 否则官方档下带子照旧',
-    )
+    // 也确认它没被别的规则顺带选中（例如某个只写 background-image 的锚点）
+    for (const anchor of SURFACE_ANCHORS) {
+      assert.ok(
+        !anchor.includes(':first-child') && !anchor.includes("[role='group']"),
+        `锚点不得命中分组标题：${anchor}`,
+      )
+    }
   })
 
-  it('菜单族应该 跟随官方 0.1.7 的**半透明 + 模糊**材质（色调 + 官方材质）', () => {
-    // owner：「官方的弹出窗，我看都是透明模糊的效果了，我们几个主题色也得跟着一起适配吧。」
-    // 官方 rc.1 里菜单原语 / 命令面板 / 输入触发器 / 轮次用量 / 子代理血缘**全是**同一材质：
-    //   background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter);
-    // 而我们的兜底规则给它们刷的是不透明 PANEL_VARIABLE —— 官方的模糊还在，只是被盖住了。
-    assert.ok(MENU_MATERIAL_ANCHORS.length >= 5, '菜单族锚点应覆盖菜单 / 触发器 / listbox×2 / 血缘树')
-    // 只覆盖材质，不新增命中面：菜单族必须本来就都在 SURFACE_ANCHORS 里
-    for (const anchor of MENU_MATERIAL_ANCHORS) {
-      assert.ok(SURFACE_ANCHORS.includes(anchor), `菜单族锚点必须在 SURFACE_ANCHORS 内：${anchor}`)
+  it('⛔ 菜单族材质必须**完全交回官方** —— 我们不声明填充与模糊', () => {
+    // owner 最终口径：「透明和模糊**和官方默认一样**就行」。
+    //
+    // 这条测试是第三次修订，前两版都对应一段走过的弯路（记下来免得再走）：
+    // ① 原版断言「每个菜单族锚点都必须刷 background-color + backdrop-filter」——
+    //    官方 0.1.7 **已经画好了**，于是我们在官方画过的地方又画一遍：
+    //    官方画在 `::before` 上的（`SubagentCatalogAction` 的 `.…_menu:before`）
+    //    会**叠两次同色**（0.5 → 等效 0.75）—— owner 复验「子代理卡片好像没有透明模糊吧？」；
+    // ② 中间还试过刷成不透明面板色 —— 那就把官方的玻璃整块盖掉了。
+    //
+    // 正确形态：本表**一个材质声明都不写**，官方的半透明与模糊原样生效。
+    for (const anchor of SURFACE_ANCHORS) {
       const block = blockFor(css, anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`))
-      assert.ok(block !== '', `应有菜单族规则：${anchor}`)
-      // 填充换成**已被色调染过、且保留官方 alpha** 的菜单 token
+      assert.ok(block !== '', `每条锚点都应有质感规则：${anchor}`)
       assert.ok(
-        block.includes(`background-color: var(${MENU_FILL_VARIABLE}) !important`),
-        `菜单族填充应改用 ${MENU_FILL_VARIABLE}（半透明、带色调）：${anchor}`,
+        !block.includes('background-color'),
+        `不得声明填充 —— 官方自己的半透明材质要能原样透上来：${anchor}`,
       )
-      // 官方要求两者**成对**（docs/web-styling.zh.md:25），缺一个就退化成半透明塑料
       assert.ok(
-        block.includes(`backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important`),
-        `菜单族必须配官方模糊 ${MENU_BLUR_VARIABLE}（成对出现）：${anchor}`,
+        !block.includes('backdrop-filter'),
+        `不得声明模糊 —— 官方自己成对画好了，再画一遍会让半透明叠两次：${anchor}`,
       )
-      // ⚠️ 只是换材质，**不许**因此去动不透明面板色那条兜底（它仍服务对话框等）
-      assert.ok(!block.includes(`var(${PANEL_VARIABLE})`), `菜单族不该再引用不透明面板色：${anchor}`)
     }
+    // 这两个官方变量**我们一个字都不写**（常量本身也已从实现里删掉）——
+    // 官方材质由官方自己声明；我们只在 token 层染色（`POPUP_TOKENS`）。
+    const decls = css.replace(/\/\*[\s\S]*?\*\//gu, '')
+    assert.ok(!decls.includes('--dsw-specific-menu'), '生成的 CSS 里不得声明官方的菜单填充变量')
+    assert.ok(!decls.includes('--dsw-menu-backdrop-filter'), '生成的 CSS 里不得声明官方的菜单模糊变量')
   })
 
   it('带分组标题的菜单应该 保留质感、只去掉顶光（不能整条排除 → 会变成纯色）', () => {
@@ -980,12 +978,9 @@ describe('抬升面：表面绘制', () => {
     assert.ok(gatedBody.includes(layers), '去顶光的图层串必须在**这条规则**里')
     assert.ok(!gatedBody.includes(TOP_VARIABLE), '本条规则不得含顶光变量')
 
-    // 标题条本身：**什么都不画**（既无填充也无质感）—— 它只是块"透明窗口"，
-    // 直接显示菜单自己那层玻璃。这条规则**不带官方默认门** —— owner 的截图就是官方档拍的。
-    // ⚠️ 颗粒也要撤：实测贴图落在透明标题上会变成一条比菜单主体亮 17.6 级的带子。
-    assert.ok(css.includes(OFFICIAL_MISSING_BLUR_SELECTOR), `标题条要单独修：${OFFICIAL_MISSING_BLUR_SELECTOR}`)
-    const titleBody = blockFor(css, OFFICIAL_MISSING_BLUR_SELECTOR)
-    assert.ok(titleBody.includes('background: none !important'), '标题不得有任何填充或图层')
+    // 标题条本身：**本插件一个声明都不写**（见上面那条用例的完整说明）。
+    const titleSelector = `${GROUPED_MENU_SELECTOR} ${GROUPED_MENU_TITLE_SELECTOR}`
+    assert.equal(blockFor(css, titleSelector), '', '标题必须完全交回官方默认')
     // 结构锚点，不碰 hashed 类名（codebuddy 那个类还是非哈希的 ccb-model-groupTitle）
     assert.ok(GROUPED_MENU_TITLE_SELECTOR.includes("role='group'"), '标题用 role=group 的结构锚定')
     assert.ok(!/class\*?=/.test(GROUPED_MENU_TITLE_SELECTOR), '不得用类名匹配标题')
