@@ -613,13 +613,26 @@ export function buildGlassCss(): string {
   const fill = (token: string, alpha: number): string => `color-mix(in srgb, ${token} ${pct(alpha)}, transparent)`
   return `/* ===== dsh-theme-tone 玻璃效果（顶栏 + 输入框；卸载即随样式表移除） ===== */
 
-/* --- 顶栏：改成浮层，内容才会从它下面滚过 --- */
+/* --- 顶栏：改成浮层，内容才会从它下面滚过 ---
+   ⚠️ **0.1.7 起选择器换了目标，别改回去**（owner 真机报「顶栏崩了」的根因）。
+   结构对照（两版都核过）：
+
+   | 版本 | 会话槽位产出物挂在哪 | 谁生成盒子 |
+   | :--- | :--- | :--- |
+   | 0.1.5-rc.2 | conversation.session.header 的产出物**直接是 .root 的子元素** | 槽位产出物自己 |
+   | 0.1.7-rc.1 | 嵌在 header[data-slot='conversation.header'] 里；外层 conversation.header 与会话槽位都是 display:contents | **那个 header 元素**（官方 .header 是 grid、min-height 76px） |
+
+   旧写法打的是 [data-slot='conversation.session.header'] 的直接子元素。在 rc.1 上那个槽位是
+   display:contents、其子元素是官方 .titleRow —— 于是**标题行被抽成绝对定位浮层**，
+   header 自身塌成 10px（实测：40px → 10px），官方顶栏整条崩掉。
+   现在改成打**真正生成盒子的那个 header 元素**（由 conversation.header 槽位宿主定位）。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
 body:not([${PLAIN_ATTR}]) [data-phase='active'] {
   /* ① 定位祖先 */
   position: relative;
 }
-body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.session.header'] > * {
-  /* ② 槽位产出物是 display:contents，真正生成盒子的是它的子元素 */
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'] > header {
+  /* ② 官方顶栏本体：官方 .header 是 grid / min-height 76px / 自带 padding 与下边框 */
   position: absolute;
   top: 0;
   left: 0;

@@ -42,21 +42,37 @@ const cardRule = (text) => {
 }
 
 // 玻璃效果依赖几个**公开 DOM 锚点**（官方自己的 CSS 也依赖它们）：
-//   [data-phase] / [data-slot='conversation.session.header'] /
-//   [data-conversation-scroll] / [data-composer-seat]
+//   [data-phase] / [data-slot='conversation.header'] / [data-conversation-scroll] /
+//   [data-composer-seat]
 // 以及一个**魔法数字** 76px（顶栏高度）。这些耦合是这套效果最脆的地方，逐条钉住。
+//
+// ⚠️ 顶栏那条锚点在 0.1.7 换了（owner 真机报「顶栏崩了」的根因）：
+//   0.1.5-rc.2 里 `conversation.session.header` 的产出物**直接是 .root 的子元素**，
+//   故打 `> *` 命中它；0.1.7-rc.1 把它嵌进 `<header data-slot='conversation.header'>`，
+//   而那个会话槽位自己是 display:contents —— `> *` 于是命中了官方的 .titleRow，
+//   把标题行抽成绝对定位浮层、`<header>` 塌成 10px（实测 40px → 10px）。
+//   现在的规则打**真正生成盒子的那个 `<header>`**，下面的回归守卫钉住这一点。
 describe('glass：顶栏浮层', () => {
   it('三处改动应该 同时存在（少一个正文首行会被顶栏盖住）', () => {
     assert.match(css, /\[data-phase='active'\]\s*\{[^}]*position: relative/u, '① 需要定位祖先')
     assert.match(
       css,
-      /\[data-slot='conversation\.session\.header'\] > \*[\s\S]*?position: absolute/u,
-      '② 顶栏要浮起来',
+      /\[data-slot='conversation\.header'\] > header[\s\S]*?position: absolute/u,
+      '② 顶栏要浮起来（打在官方那个 <header> 上）',
     )
     assert.match(
       css,
       new RegExp(`\\[data-conversation-scroll\\][\\s\\S]*?padding-top: ${HEADER_HEIGHT_PX}px`, 'u'),
       '③ 滚区顶部要补出顶栏高度',
+    )
+  })
+
+  it('⛔ 顶栏不许再打 `conversation.session.header` 的子元素（0.1.7 起会打崩官方顶栏）', () => {
+    // 回归守卫：0.1.7-rc.1 里该槽位是 display:contents、其子元素是官方 .titleRow，
+    // 绝对定位它会让 <header> 塌成 10px（实测 40 → 10），顶栏整条崩掉。
+    assert.ok(
+      !/data-slot='conversation\.session\.header'\]\s*>\s*\*/u.test(css),
+      '顶栏规则不得再打 conversation.session.header 的直接子元素',
     )
   })
 
@@ -85,7 +101,9 @@ describe('glass：顶栏浮层', () => {
     // 就吃不到了（owner：「怎么顶栏的金光没有了」）。所以要自己画一遍，且必须**同源**。
     // ⚠️ 光还要按顶栏自己的填充 alpha 同步压：底乘 70%、光却是满的 → 那一片比周围亮一截
     //（owner 对底座那处说的「相当于两层光了」是同一个毛病，顶栏半透明同样逃不掉）。
-    const header = css.slice(css.indexOf('session.header'), css.indexOf('}', css.indexOf('session.header')))
+    // 锚点用 0.1.7 起的那条（conversation.header > header）—— 见本文件顶部的结构对照。
+    const anchor = "[data-slot='conversation.header'] > header"
+    const header = css.slice(css.indexOf(anchor), css.indexOf('}', css.indexOf(anchor)))
     assert.ok(header.includes(dimmedBackdropGradients(GLASS_HEADER_ALPHA)), '顶栏的光必须按同一 alpha 压')
     assert.match(header, /background-attachment: fixed/u, '必须 fixed —— 否则 76px 高的盒子会把渐变重新缩放成硬边带')
     assert.match(header, /background-color: color-mix/u, '玻璃填充仍在（背景色与渐变分层）')
@@ -677,7 +695,7 @@ describe('glass：边界与纪律', () => {
   it('应该 只引用四个公开 data 锚点', () => {
     for (const hook of [
       '[data-phase=',
-      "[data-slot='conversation.session.header']",
+      "[data-slot='conversation.header']",
       '[data-conversation-scroll]',
       '[data-composer-seat]',
     ]) {

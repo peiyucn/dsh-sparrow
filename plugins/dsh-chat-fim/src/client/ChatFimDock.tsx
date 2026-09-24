@@ -449,7 +449,10 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   flex-direction: column;
   border: 1px solid var(--dsw-alias-button-info-fill, #4d6bfe);
   border-radius: 12px;
+  /* 0.1.7 起 --dsw-specific-menu 是**半透明**玻璃色，官方要求同规则内配对 backdrop-filter
+     （见官方 docs/web-styling.zh.md:25），否则背后文字会透出来。 */
   background: var(--dsw-specific-menu);
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
   box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
 }
 .dsh-chat-fim-menu-row {
@@ -534,7 +537,9 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   padding: 4px;
   border: 1px solid var(--dsw-alias-border-inverted);
   border-radius: 12px;
+  /* 同上：半透明菜单面必须配对 backdrop-filter（官方 docs/web-styling.zh.md:25）。 */
   background: var(--dsw-specific-menu);
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
   box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
 }
 .dsh-chat-fim-menu-usage {
