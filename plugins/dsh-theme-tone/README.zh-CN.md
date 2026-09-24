@@ -10,7 +10,7 @@
 dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone
 ```
 
-适配 dsh 0.1.7-rc.1（本版构建与验证所对齐的确切官方版本线；更新的版本线、尤其是预发布版本不在承诺范围内），并需要可用的 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
+适配 dsh 0.1.7-rc.2（本版构建与验证所对齐的确切官方版本线；更新的版本线、尤其是预发布版本不在承诺范围内），并需要可用的 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
 
 > **不要**直接执行 `npm install @dsh-sparrow/dsh-theme-tone`：那只会把包下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用上面的 `dsh plugin` 命令安装，并在安装后重启 DSH。
 
@@ -25,7 +25,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone
 
 ## 版本兼容性
 
-* 适配 dsh 0.1.7-rc.1（本版构建与验证所对齐的确切官方版本线，其它版本线不在承诺范围内）
+* 适配 dsh 0.1.7-rc.2（本版构建与验证所对齐的确切官方版本线，其它版本线不在承诺范围内）
 * 只改外观：不会让界面卡住，也不改任何功能
 * 宿主或浏览器缺东西时它会自己让位：界面照常开、它什么都不画（缺的是主题、插槽或浏览器特性时，另记一条面向用户的告警）
 
