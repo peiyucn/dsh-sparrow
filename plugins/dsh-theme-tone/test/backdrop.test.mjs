@@ -31,7 +31,7 @@ import {
 } from '../lib/constants.js'
 import { buildRowCss } from '../lib/client/styles.js'
 import { buildGlassCss } from '../lib/glass.js'
-import { BACKDROP_CLASS, BACKDROP_Z_INDEX, GRAIN_ATTR, MARKER_ATTR } from '../lib/constants.js'
+import { BACKDROP_CLASS, BACKDROP_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_ATTR, MARKER_ATTR } from '../lib/constants.js'
 import { DARK_TONES, DEFAULT_SETTINGS, DEPTH_ALPHA, LIGHT_TONES } from '../lib/tones.js'
 
 const settings = (lightTone, darkTone) => ({ lightTone, darkTone })
@@ -65,9 +65,15 @@ describe('背景层样式表', () => {
     assert.match(css, /\[hidden\] \{\s*display: none;/u)
   })
 
-  it('颗粒层应该 带上 pyai.site 同款 data URI 与不透明度', () => {
+  it('颗粒层应该 带上 pyai.site 同款 data URI 与**统一来源的**不透明度', () => {
     assert.ok(css.includes(GRAIN_DATA_URI))
-    assert.match(css, new RegExp(`opacity: ${GRAIN_OPACITY}`, 'u'))
+    // 2026-09-24：强度改为读运行期变量（唯一来源 GRAIN_ALPHA，owner：「噪点值统一变量，
+    // 方便后续我们减弱」），括号里是回落值（变量缺席时与旧行为一致）。
+    assert.match(
+      css,
+      new RegExp(`opacity: var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY}\\)`, 'u'),
+      `颗粒层 opacity 应读 ${GRAIN_ALPHA_VARIABLE}（回落 ${GRAIN_OPACITY}）`,
+    )
     assert.match(css, /\[data-grain='off'\]::after \{\s*display: none;/u)
   })
 
@@ -402,9 +408,13 @@ describe('色调卡样式', () => {
     assert.equal(Number(minHeight[1]), OFFICIAL_CUBE_HEIGHT, '应钉在与官方卡等高的 83px')
   })
 
-  it('卡面应该 带颗粒质感（与实况同一条纹理、同一不透明度、同一 screen 混合）', () => {
+  it('卡面应该 带颗粒质感（与实况同一条纹理、同一不透明度来源、同一 screen 混合）', () => {
     assert.ok(css.includes(GRAIN_DATA_URI), '卡面要用与实况同一条颗粒纹理')
-    assert.match(css, new RegExp(`opacity: ${GRAIN_OPACITY}`, 'u'), '不透明度与实况一致')
+    assert.match(
+      css,
+      new RegExp(`opacity: var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY}\\)`, 'u'),
+      '不透明度与实况同源（同一个统一变量）',
+    )
     assert.match(css, /mix-blend-mode: screen/u, 'screen 混合才只加亮、不发脏')
   })
 

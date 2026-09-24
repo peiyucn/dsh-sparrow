@@ -11,12 +11,14 @@
 
 import {
   BOTTOM_VARIABLE,
+  GRAIN_ALPHA,
+  GRAIN_ALPHA_VARIABLE,
   GRAIN_TILE_VARIABLE,
   LEFT_VARIABLE,
   PANEL_VARIABLE,
-  POPUP_GRAIN_DATA_URI,
   TOP_STOP_VARIABLE,
   TOP_VARIABLE,
+  grainTileUri,
 } from './constants.js'
 
 /**
@@ -913,7 +915,19 @@ export const LIGHT_TOKENS: readonly Readonly<{
   }),
   Object.freeze({
     token: GRAIN_TILE_VARIABLE,
-    pick: (tone: ToneSpec) => tone.grain ? POPUP_GRAIN_DATA_URI : 'none',
+    // 贴图里烘的 alpha 由 `GRAIN_ALPHA`（唯一来源）按轴派生 —— 见 constants.ts。
+    pick: (tone: ToneSpec, scheme: ColorScheme) =>
+      tone.grain ? grainTileUri(GRAIN_ALPHA[scheme]) : 'none',
+  }),
+  /**
+   * **颗粒强度的运行期变量** —— 伪元素那种「贴图 + 独立 `opacity`」的颗粒层读它。
+   *
+   * 与上面那张贴图同一个来源（{@link GRAIN_ALPHA}）：owner 说「噪点值统一变量，
+   * 方便后续我们减弱」，所以**两路都从这一处派生** —— 减弱 = 改 `GRAIN_ALPHA` 一个对象。
+   */
+  Object.freeze({
+    token: GRAIN_ALPHA_VARIABLE,
+    pick: (_tone: ToneSpec, scheme: ColorScheme) => String(GRAIN_ALPHA[scheme]),
   }),
 ])
 

@@ -29,17 +29,19 @@ import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SELECTO
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
+  GRAIN_ALPHA,
+  GRAIN_ALPHA_VARIABLE,
   GRAIN_TILE_VARIABLE,
   HOVER_CARD_ANCHOR,
   HOVER_CARD_TEXT_TOKENS,
   PANEL_VARIABLE,
   PLAIN_ATTR,
   POPUP_BOTTOM_SHAPE,
-  POPUP_GRAIN_DATA_URI,
   POPUP_STOP,
   POPUP_TOP_SHAPE,
   TOP_VARIABLE,
   LEFT_VARIABLE,
+  grainTileUri,
 } from '../lib/constants.js'
 import { buildGlassCss, GLASS_SPECULAR_RING } from '../lib/glass.js'
 
@@ -531,7 +533,7 @@ describe('抬升面：不变量', () => {
 })
 
 describe('抬升面：光色变量（插件自己的 token）', () => {
-  it('四个光色变量应该 都发到 token 层，且两个模式都给', () => {
+  it('光色变量应该 都发到 token 层，且两个模式都给', () => {
     // 浮层是 portal 到 body 的官方元素，读不到背景层元素上的内联变量 —— 必须发到 body 上。
     const overrides = tokenOverrides(DEFAULT_SETTINGS)
     for (const { token } of LIGHT_TOKENS) {
@@ -540,9 +542,10 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
     }
     // 回归守卫：**left 曾经漏在这里**（只在背景层元素上写内联样式）→ 浮层读不到，
     // 所有弹层的左光一直是缺的（owner 报「其他能弹出的…都没有下面的光」那次一并查出）。
+    // 2026-09-24 追加 GRAIN_ALPHA_VARIABLE（颗粒强度的统一旋钮，owner：「噪点值统一变量」）。
     assert.deepEqual(
       LIGHT_TOKENS.map(entry => entry.token),
-      [TOP_VARIABLE, BOTTOM_VARIABLE, LEFT_VARIABLE, GRAIN_TILE_VARIABLE],
+      [TOP_VARIABLE, BOTTOM_VARIABLE, LEFT_VARIABLE, GRAIN_TILE_VARIABLE, GRAIN_ALPHA_VARIABLE],
     )
   })
 
@@ -570,13 +573,14 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
 
   it('颗粒贴图应该 跟着色调的 grain 开关走（**两轴六款都开**，只有官方默认关）', () => {
     const on = tokenOverrides({ lightTone: 'sakura', darkTone: 'violet' })
-    assert.equal(on[GRAIN_TILE_VARIABLE].dark, POPUP_GRAIN_DATA_URI)
+    // 贴图里烘的 alpha 由 GRAIN_ALPHA 按轴派生（唯一来源）—— 深浅两轴各一张。
+    assert.equal(on[GRAIN_TILE_VARIABLE].dark, grainTileUri(GRAIN_ALPHA.dark))
     // owner：「浅色版也可以和深色版有相同的渐变质感」→ 浅色轴也开颗粒
-    assert.equal(on[GRAIN_TILE_VARIABLE].light, POPUP_GRAIN_DATA_URI, '浅色轴现在也叠颗粒')
+    assert.equal(on[GRAIN_TILE_VARIABLE].light, grainTileUri(GRAIN_ALPHA.light), '浅色轴现在也叠颗粒')
     for (const scheme of SCHEMES) {
       for (const id of NON_OFFICIAL[scheme]) {
         const spec = TONES[scheme][id]
-        const expected = spec.grain ? POPUP_GRAIN_DATA_URI : 'none'
+        const expected = spec.grain ? grainTileUri(GRAIN_ALPHA[scheme]) : 'none'
         // 注意：键名必须是 settings 的真实字段名（`lightTone` / `darkTone`）。
         // 这里曾误写成 `{ light, dark }` → `toneIdOf` 读不到 → 回落 official（grain off），
         // 而当时浅色轴本就 expected='none'，于是**测试一直假通过**；改成 grain:true 后才暴露。
@@ -593,11 +597,31 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
 
   it('浮层颗粒贴图应该 与背景层同一张噪声，只差烘进去的强度', () => {
     // `background-image` 的图层没有独立 opacity，所以浮层那张把 `<rect opacity>` 烘进了 SVG；
-    // 背景层那张靠 `::after { opacity: .13 }`。数值必须一致，否则两种材质看起来不是一种。
-    const strip = uri => uri.replace(" opacity='0.13'", '')
-    assert.equal(strip(POPUP_GRAIN_DATA_URI), GRAIN_DATA_URI, '两张贴图除 opacity 外必须逐字一致')
-    assert.ok(POPUP_GRAIN_DATA_URI.includes("opacity='0.13'"), '浮层那张要烘 .13')
-    assert.ok(POPUP_GRAIN_DATA_URI.includes("baseFrequency='0.8'"), '同一套 feTurbulence 参数')
+    // 背景层那张靠 `::after { opacity: … }`。两处强度由 GRAIN_ALPHA **同一个来源**派生。
+    const strip = uri => uri.replace(/ opacity='[\d.]+'/u, '')
+    assert.equal(strip(grainTileUri(GRAIN_ALPHA.dark)), GRAIN_DATA_URI, '两张贴图除 opacity 外必须逐字一致')
+    assert.ok(grainTileUri(GRAIN_ALPHA.dark).includes(`opacity='${GRAIN_ALPHA.dark}'`), '浮层那张要烘深色轴的值')
+    assert.ok(grainTileUri(GRAIN_ALPHA.light).includes(`opacity='${GRAIN_ALPHA.light}'`), '浅色轴那张烘浅色轴的值')
+    assert.ok(GRAIN_DATA_URI.includes("baseFrequency='0.8'"), '同一套 feTurbulence 参数')
+  })
+
+  it('颗粒强度必须**只有一个来源**（owner：「噪点值统一变量，方便后续我们减弱」）', () => {
+    // 改 GRAIN_ALPHA 一个对象 → 三处一起变：运行期变量、贴图预乘 alpha、以及所有引用它们的规则。
+    // ⚠️ 必须用**非官方**的两轴（官方默认档 grain 是关的，贴图是 'none'，断言会假过）。
+    const overrides = tokenOverrides({ lightTone: 'sakura', darkTone: 'violet' })
+    for (const scheme of SCHEMES) {
+      assert.equal(
+        Number(overrides[GRAIN_ALPHA_VARIABLE][scheme]),
+        GRAIN_ALPHA[scheme],
+        `${scheme} 的运行期颗粒强度应等于 GRAIN_ALPHA`,
+      )
+      assert.ok(
+        overrides[GRAIN_TILE_VARIABLE][scheme].includes(`opacity='${GRAIN_ALPHA[scheme]}'`),
+        `${scheme} 的贴图预乘 alpha 也应来自 GRAIN_ALPHA`,
+      )
+    }
+    // 两轴取值不同是物理原因（screen 加亮 vs multiply 压暗），不是没调好 —— 钉住这个事实。
+    assert.notEqual(GRAIN_ALPHA.light, GRAIN_ALPHA.dark, '两轴不该相同（浅色轴需更大的值才有等值质感）')
   })
 })
 

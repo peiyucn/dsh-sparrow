@@ -6,7 +6,7 @@
  * 类名前缀 —— 不复刻官方 hashed 类名、不依赖官方 DOM 结构。
  */
 
-import { BACKDROP_CLASS, GRAIN_ATTR } from '../constants.js'
+import { BACKDROP_CLASS, GRAIN_ALPHA_VARIABLE, GRAIN_ATTR } from '../constants.js'
 import { GRAIN_DATA_URI, GRAIN_OPACITY } from '../backdrop.js'
 
 /** 行的类名（对外导出给组件用，避免两处各写一遍字符串）。 */
@@ -85,7 +85,7 @@ export function buildRowCss(): string {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: ${GRAIN_OPACITY};
+  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY});
   background-image: ${GRAIN_DATA_URI};
   mix-blend-mode: screen;
 }

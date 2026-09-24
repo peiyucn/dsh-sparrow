@@ -35,7 +35,7 @@
  * 属性由 client 按 `backdropPlan(...).hidden` 打上 / 摘掉（见 constants.ts 的 `PLAIN_ATTR`）。
  */
 
-import { ABOVE_CONTENT_Z_INDEX, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
+import { ABOVE_CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, dimmedBackdropGradients, grainOverGradients } from './backdrop.js'
 
 /** 顶栏高度（px）。官方把它钉在这个值上，与左栏 38+38 对齐（`ConversationRoot.module.css:37-41`）。 */
@@ -957,7 +957,7 @@ body:not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
   inset: 0;
   pointer-events: none;
   background-image: ${GRAIN_DATA_URI};
-  opacity: ${GRAIN_OPACITY};
+  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY});
 }
 body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
 body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
@@ -966,7 +966,7 @@ body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
 body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
 body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
   mix-blend-mode: multiply;
-  opacity: ${GRAIN_OPACITY_LIGHT};
+  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT});
 }
 
 /* 模态弹窗（[role='dialog']）**不做玻璃** —— 它是内容面（设置 / 文件 / 归档列表），

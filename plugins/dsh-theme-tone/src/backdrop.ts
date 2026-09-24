@@ -14,6 +14,8 @@ import {
   CONTENT_ATTR,
   CONTENT_Z_INDEX,
   DOCKKIT_MENU_ATTR,
+  GRAIN_ALPHA,
+  GRAIN_ALPHA_VARIABLE,
   GRAIN_ATTR,
   GRAIN_TILE_VARIABLE,
   LEFT_VARIABLE,
@@ -33,9 +35,13 @@ import { normalizeScheme, toneFor, toneIdOf, type ColorScheme, type ThemeToneSet
 /**
  * 颗粒叠加层不透明度（**深色轴**）—— 与 pyai.site `global.css:75` 一致。
  *
+ * ⚠️ 2026-09-24：**唯一来源已收到 constants.ts 的 {@link GRAIN_ALPHA}**（owner：
+ * 「噪点值统一变量，方便后续我们减弱」）。这里保留这两个名字只为兼容既有引用与测试，
+ * 值一律从 `GRAIN_ALPHA` 派生 —— **不要再在这里改数字**。
+ *
  * 浅色轴要更大的值，见 {@link GRAIN_OPACITY_LIGHT}。
  */
-export const GRAIN_OPACITY = 0.13
+export const GRAIN_OPACITY = GRAIN_ALPHA.dark
 
 /**
  * 颗粒不透明度（**浅色轴**）—— `.16`。
@@ -65,7 +71,7 @@ export const GRAIN_OPACITY = 0.13
  * **只能往下刻**，刻多深就掉多少亮度。
  * 所以浅色轴的质感**注定比深色轴弱一档**，这是近白底的固有代价，不是取值没调好。
  */
-export const GRAIN_OPACITY_LIGHT = 0.16
+export const GRAIN_OPACITY_LIGHT = GRAIN_ALPHA.light
 
 /**
  * 颗粒纹理：200×200 `feTurbulence`（`fractalNoise` / `baseFrequency .8` /
@@ -310,7 +316,7 @@ export function buildBackdropCss(): string {
   content: '';
   position: absolute;
   inset: 0;
-  opacity: ${GRAIN_OPACITY};
+  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY});
   background-image: ${GRAIN_DATA_URI};
 }
 .${BACKDROP_CLASS}[${GRAIN_ATTR}='off']::after {
@@ -328,7 +334,7 @@ body:not([data-ds-dark-theme]) .${BACKDROP_CLASS} {
 }
 body:not([data-ds-dark-theme]) .${BACKDROP_CLASS}::after {
   mix-blend-mode: multiply;
-  opacity: ${GRAIN_OPACITY_LIGHT};
+  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT});
 }
 /* ===== 用户内容豁免 =====
    背景层为了给「应用底 + 左右栏 + 对话区」着色，必须压在内容之上；但用户内容

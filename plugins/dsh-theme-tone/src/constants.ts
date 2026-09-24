@@ -258,6 +258,30 @@ export const PANEL_VARIABLE = '--dsh-theme-tone-panel'
 export const GRAIN_TILE_VARIABLE = '--dsh-theme-tone-grain-tile'
 
 /**
+ * **颗粒强度** —— 全插件**唯一来源**（每轴一档）。
+ *
+ * owner 2026-09-24：「噪点值统一变量，方便后续我们减弱」。
+ * 改这一个对象，下面三处一起变：
+ *
+ * 1. 运行期变量 {@link GRAIN_ALPHA_VARIABLE}（所有**伪元素**颗粒层的 `opacity`）；
+ * 2. 浮层贴图里烘的 alpha（`grainTileUri`，`background-image` 图层没有独立 opacity，只能预乘）；
+ * 3. 由 1、2 派生的一切（背景层 / 右栏 / 弹层 / 设置行）。
+ *
+ * 两轴取值不同是**物理原因**，不是没调好：深色轴 `screen` 是加亮（白点在暗底 = 星光），
+ * 浅色轴只能 `multiply` 压暗，而近白底往上只剩几级余量、纹理只能往下刻。
+ * 实测（真机同一无 UI 区域，整体亮度 / 高频质感）：深 `.13` → 3.369；浅 `.16` → 240.1 / 2.129。
+ */
+export const GRAIN_ALPHA: Readonly<Record<'light' | 'dark', number>> = Object.freeze({ light: 0.16, dark: 0.13 })
+
+/**
+ * 颗粒强度的**运行期变量**（由色调层写到 `body` 上）。
+ *
+ * 伪元素那种「贴图 + 独立 opacity」的颗粒层直接读它；贴图预乘那一路由
+ * {@link GRAIN_ALPHA} 在同一处派生。**两路同源**，所以 `GRAIN_ALPHA` 仍是唯一旋钮。
+ */
+export const GRAIN_ALPHA_VARIABLE = '--dsh-theme-tone-grain-alpha'
+
+/**
  * **悬停卡锚点**（`HoverCard`，左边栏会话 hover 那张 244px 预览卡）。
  *
  * 它从 {@link SURFACE_ANCHORS} 里单独摘出来，因为它要**破两条规矩**，两条都是 owner 明确定的口径：
@@ -377,12 +401,20 @@ export const DIALOG_ANCHOR = "body [role='dialog']:not(:has(> img))"
 /**
  * 浮层用的颗粒贴图：与背景层同一张 `feTurbulence` 噪声（逐字同参数），
  * **但把强度烘进了 SVG** —— `background-image` 的图层没有独立 `opacity`，
- * 只能靠 `<rect opacity>` 预乘（背景层那边是 `::after { opacity: .13 }`）。
+ * 只能靠 `<rect opacity>` 预乘（背景层那边是 `::after { opacity: … }`）。
  *
- * 数值与背景层一致（`.13`），因为浮层与背景要读成同一种材质；改一处要连另一处一起看。
+ * ⚠️ 2026-09-24：数值改为从 {@link GRAIN_ALPHA} **派生**，不再各写各的（owner：
+ * 「噪点值统一变量，方便后续我们减弱」）。
  */
-export const POPUP_GRAIN_DATA_URI
-  = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='0.13' filter='url(%23n)'/%3E%3C/svg%3E\")"
+export function grainTileUri(alpha: number): string {
+  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='${alpha}' filter='url(%23n)'/%3E%3C/svg%3E")`
+}
+
+/** 浮层颗粒贴图（深色轴）—— 由 {@link GRAIN_ALPHA} 派生。 */
+export const POPUP_GRAIN_DATA_URI = grainTileUri(GRAIN_ALPHA.dark)
+
+/** 浮层颗粒贴图（浅色轴）—— 由 {@link GRAIN_ALPHA} 派生。 */
+export const POPUP_GRAIN_DATA_URI_LIGHT = grainTileUri(GRAIN_ALPHA.light)
 
 /** 颗粒开关的 DOM 属性（`off` 时 `::after` 不渲染）。 */
 export const GRAIN_ATTR = 'data-grain'
