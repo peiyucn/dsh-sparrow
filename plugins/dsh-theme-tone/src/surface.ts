@@ -332,6 +332,51 @@ function gatedAnchor(anchor: string): string {
 }
 
 /**
+ * 官方**菜单材质**的两个变量名（0.1.7 起成对出现，缺一个就退化成一块半透明塑料）。
+ *
+ * 官方 `docs/web-styling.zh.md:25` 的原话：凡用半透明 `--dsw-specific-menu` 填面的规则，
+ * **必须**在**同一条规则**里配上 `backdrop-filter: var(--dsw-menu-backdrop-filter)`。
+ */
+export const MENU_FILL_VARIABLE = '--dsw-specific-menu'
+/** 菜单配套模糊（`blur(40px) saturate(150%)`，见 `gradient-shadow-text.css:20`）。 */
+export const MENU_BLUR_VARIABLE = '--dsw-menu-backdrop-filter'
+
+/**
+ * **菜单族**锚点：官方 0.1.7 给它们换成了**半透明 + 模糊**材质，我们必须跟着换。
+ *
+ * owner：「官方的弹出窗，我看都是透明模糊的效果了，我们几个主题色也得跟着一起适配吧。」
+ *
+ * 证据（rc.1 逐文件核过）—— 这些组件**全部**是同一材质
+ * `background: var(--dsw-specific-menu)` + `backdrop-filter: var(--dsw-menu-backdrop-filter)`：
+ *
+ * | 组件 | 文件 |
+ * | :--- | :--- |
+ * | 菜单原语 | `ui-primitives/Menu.module.css:17-18` |
+ * | 命令面板卡片 | `ui-commands/PopupSelectView.module.css:27-28` |
+ * | 输入触发器菜单 | `ui-input-trigger/MenuView.module.css:28-29` |
+ * | 轮次用量弹窗 | `ui-chat/stat-dialog.module.css:23-24` |
+ * | 子代理血缘弹层 | `ui-subagent/SubagentHeaderLineage.module.css:119-120` |
+ *
+ * 而 {@link SURFACE_ANCHORS} 那条兜底规则给它们刷的是**不透明**的 `PANEL_VARIABLE`
+ * —— 官方的模糊还在，只是被不透明底盖住看不见了，于是「官方的透明模糊效果没了」。
+ *
+ * ⚠️ **不改 token，只改这条规则用的填充变量**：`--dsw-specific-menu` 本身已由
+ * `tones.ts` 的 `POPUP_TOKENS` **按色调染过且保留官方 alpha**（实测 dark `rgba(55,53,70,0.5)`），
+ * 所以这里直接引用它，天然就是「色调 + 官方材质」。
+ *
+ * ⚠️ **不动 `[role='dialog']`**：官方 Modal 是**不透明**面
+ * （`Modal.module.css:37` 用 `--dsw-alias-bg-layer-2`，只有它**后面**的遮罩 `:21-22` 走模糊），
+ * 所以对话框继续走不透明那条路。菜单族与它是两种材质，别混。
+ */
+export const MENU_MATERIAL_ANCHORS: readonly string[] = Object.freeze([
+  "body [role='menu']",
+  'body [data-trigger-menu]',
+  "body :has(> [role='listbox'])",
+  "body [role='listbox']:not([data-trigger-menu] *)",
+  "body > [role='tree']",
+])
+
+/**
  * 抬升面样式表文本（**兜底通道**）。
  *
  * 只声明两样：**面板底色**（`PANEL_VARIABLE`，与 token 层同一个值）与**图层**。
@@ -347,6 +392,18 @@ export function buildSurfaceCss(): string {
 ${SURFACE_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
   background-color: var(${PANEL_VARIABLE}) !important;
   background-image: ${surfaceLayers()} !important;
+}`).join('\n')}
+/* --- 菜单族：跟随官方 0.1.7 的**半透明 + 模糊**材质 ---
+   owner：「官方的弹出窗，我看都是透明模糊的效果了，我们几个主题色也得跟着一起适配吧。」
+   上面那条兜底给的是不透明填充（把官方的模糊盖住了），这里按官方材质改回来：
+   填充用**已被色调染过、且保留官方 alpha** 的 --dsw-specific-menu，并补上配套模糊
+   （官方要求两者**成对**，见 docs/web-styling.zh.md:25）。
+   放在这条**之后**：两条都带 !important，同特异度下后者胜 —— 于是填充换成半透明，
+   而 background-image 的图层仍由上面那条提供（本块不碰它），色调质感不丢。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+${MENU_MATERIAL_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
+  background-color: var(${MENU_FILL_VARIABLE}) !important;
+  backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important;
 }`).join('\n')}
 /* --- 带**粘性分组标题**的菜单：**只去掉顶光**（见 GROUPED_MENU_SELECTOR 的表）---
    两条 owner 反馈夹出来的解：全给图层 → 分组标题显形成横带；全不给 → 「是纯色的」。

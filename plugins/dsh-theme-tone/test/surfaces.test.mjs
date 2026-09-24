@@ -25,7 +25,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { GRAIN_DATA_URI } from '../lib/backdrop.js'
-import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, SURFACE_ANCHORS, buildSurfaceCss, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
+import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, MENU_BLUR_VARIABLE, MENU_FILL_VARIABLE, MENU_MATERIAL_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -796,6 +796,36 @@ describe('抬升面：框内元素（描边 / 分隔线 / 滚动条）', () => {
   })
 })
 
+/**
+ * 取样式表里**某条规则**的文本（选择器 + 声明），供逐条断言。
+ *
+ * 用 `}` 切块会带上前一条规则的尾巴，故再按 `{` 切一刀只留本条 —— 断言里既有
+ * 「必须含某声明」也有「不得含某声明」，边界不清就会误判（本轮就踩过：
+ * 菜单族那条被上一条规则的尾部污染）。
+ *
+ * ⚠️ 同一个选择器可能出现**多条**规则（菜单族就是：兜底一条、换材质一条），
+ * 故取**最后一条** —— 同特异度 + 都带 `!important` 时按源码顺序后者胜，
+ * 「最后一条」才是真正生效的那条（取第一条会把断言指到已被覆盖的旧规则上）。
+ *
+ * ⚠️ 匹配必须**选择器全等**，不能用 `includes` —— 分组菜单那条的选择器
+ * （`… [role='menu']:has([role='group'])`）**包含**菜单选择器，用 includes 会命中它。
+ * @param source - 完整样式表文本。
+ * @param selector - 完整选择器（单条，不含逗号）。
+ * @returns 最后一条匹配规则的声明部分；找不到返回空串。
+ */
+function blockFor(source, selector) {
+  // ⚠️ 先剥注释：规则前面若紧挨着块注释，切块时会把注释一起算进「选择器」里，
+  // 于是全等匹配必然落空（本轮踩过）。
+  const clean = source.replace(/\/\*[\s\S]*?\*\//gu, '')
+  let found = ''
+  for (const chunk of clean.split('}')) {
+    const open = chunk.indexOf('{')
+    if (open < 0) continue
+    if (chunk.slice(0, open).trim() === selector.trim()) found = chunk.slice(open + 1)
+  }
+  return found
+}
+
 describe('抬升面：表面绘制', () => {
   const css = buildSurfaceCss()
   const layers = surfaceLayers()
@@ -812,10 +842,15 @@ describe('抬升面：表面绘制', () => {
       "body [role='tooltip']:not([data-side])",
     ])
     // 模态弹窗**不做玻璃**（它是内容面，Apple HIG：Don't put glass on lists/cards/content）
-    assert.ok(!css.includes('backdrop-filter'), `表面表里不该有任何 backdrop-filter（玻璃在 glass.ts）：${DIALOG_ANCHOR}`)
+    // ⚠️ 0.1.7 起**菜单族**改用官方半透明 + 模糊材质（见 MENU_MATERIAL_ANCHORS），
+    // 所以「表面表整体不许有 backdrop-filter」这条旧口径已不成立 —— 改为**只对内容面**断言。
+    assert.ok(
+      !blockFor(css, DIALOG_ANCHOR).includes('backdrop-filter'),
+      `内容面（对话框）不该有 backdrop-filter：${DIALOG_ANCHOR}`,
+    )
   })
 
-  it('模态弹窗应该 与菜单同一套**实色**面 —— 玻璃只留给控制层（输入框 / 顶栏）', () => {
+  it('模态弹窗（内容面）应该 仍是**实色** —— 玻璃只留给控制层（输入框 / 顶栏）', () => {
     // 一段撤掉的弯路：owner 说「对话框要有液态玻璃」，**我理解成 `[role='dialog']` 模态弹窗**，
     // 于是给它做了玻璃 —— 结果设置 / 云端文件 / 归档三个**内容面**变玻璃（其中两个内容还透出来），
     // 而 owner 真正指的**输入框**一动没动（owner 澄清：「**就是我输入对话的对话框啊**」）。
@@ -823,9 +858,39 @@ describe('抬升面：表面绘制', () => {
     // 玻璃是给 navigation/control layer 的，不是给内容面的。
     assert.equal(DIALOG_ANCHOR, "body [role='dialog']:not(:has(> img))", '模态弹窗回到普通实色锚点（含灯箱排除）')
     assert.ok(!DIALOG_ANCHOR.includes('aria-modal'), '不再按 aria-modal 分流（两类弹窗都走实色）')
-    assert.ok(!css.includes('backdrop-filter'), '表面表里不该有任何 backdrop-filter（玻璃都在 glass.ts）')
+    // 内容面必须**实色**：不得有模糊（这是与菜单族的分界 —— 见下一条用例）
+    assert.ok(
+      !blockFor(css, DIALOG_ANCHOR).includes('backdrop-filter'),
+      '对话框是内容面，不该有 backdrop-filter（模糊只给菜单族）',
+    )
     // 玻璃确实做在了控制层：输入框卡片带**沿圆角一圈**的镜面高光（inset 阴影）
     assert.ok(buildGlassCss().includes(`inset ${GLASS_SPECULAR_RING[0].x}px ${GLASS_SPECULAR_RING[0].y}px`), '输入框卡片应带镜面高光')
+  })
+
+  it('菜单族应该 跟随官方 0.1.7 的**半透明 + 模糊**材质（色调 + 官方材质）', () => {
+    // owner：「官方的弹出窗，我看都是透明模糊的效果了，我们几个主题色也得跟着一起适配吧。」
+    // 官方 rc.1 里菜单原语 / 命令面板 / 输入触发器 / 轮次用量 / 子代理血缘**全是**同一材质：
+    //   background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter);
+    // 而我们的兜底规则给它们刷的是不透明 PANEL_VARIABLE —— 官方的模糊还在，只是被盖住了。
+    assert.ok(MENU_MATERIAL_ANCHORS.length >= 5, '菜单族锚点应覆盖菜单 / 触发器 / listbox×2 / 血缘树')
+    // 只覆盖材质，不新增命中面：菜单族必须本来就都在 SURFACE_ANCHORS 里
+    for (const anchor of MENU_MATERIAL_ANCHORS) {
+      assert.ok(SURFACE_ANCHORS.includes(anchor), `菜单族锚点必须在 SURFACE_ANCHORS 内：${anchor}`)
+      const block = blockFor(css, anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`))
+      assert.ok(block !== '', `应有菜单族规则：${anchor}`)
+      // 填充换成**已被色调染过、且保留官方 alpha** 的菜单 token
+      assert.ok(
+        block.includes(`background-color: var(${MENU_FILL_VARIABLE}) !important`),
+        `菜单族填充应改用 ${MENU_FILL_VARIABLE}（半透明、带色调）：${anchor}`,
+      )
+      // 官方要求两者**成对**（docs/web-styling.zh.md:25），缺一个就退化成半透明塑料
+      assert.ok(
+        block.includes(`backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important`),
+        `菜单族必须配官方模糊 ${MENU_BLUR_VARIABLE}（成对出现）：${anchor}`,
+      )
+      // ⚠️ 只是换材质，**不许**因此去动不透明面板色那条兜底（它仍服务对话框等）
+      assert.ok(!block.includes(`var(${PANEL_VARIABLE})`), `菜单族不该再引用不透明面板色：${anchor}`)
+    }
   })
 
   it('带分组标题的菜单应该 保留质感、只去掉顶光（不能整条排除 → 会变成纯色）', () => {
