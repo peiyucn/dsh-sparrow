@@ -273,9 +273,12 @@ function install(ctx: Context): void {
 
   /**
    * 用户刚点、还在跨宿主往返中的那一笔色调（乐观更新，见 {@link readSettings}）。
-   * 宿主快照追上或明确拒掉时清除（见 {@link clearSettledPending}）。
+   *
+   * `revision` 记录**发出这笔写入时**快照的 revision —— 之后 revision 一旦前进，
+   * 说明宿主已给出结论（接受 / 拒绝 / 恢复读），那一笔就该收掉
+   * （见 {@link clearSettledPending}）。
    */
-  let pendingTone: { field: keyof ThemeToneSettings; id: ToneId } | undefined
+  let pendingTone: { field: keyof ThemeToneSettings; id: ToneId; revision: number | undefined } | undefined
 
   /**
    * 当前该用哪份设置。
@@ -299,13 +302,26 @@ function install(ctx: Context): void {
   }
 
   /**
-   * 宿主快照已追上那一笔乐观更新时把它丢掉；若快照明确停在**别的**值上（说明宿主拒了这笔），
-   * 也一并丢掉 —— 让画面回到宿主的权威值，而不是永久停在乐观值上。
+   * 宿主对那一笔乐观更新**给出结论**时收掉它。
+   *
+   * ⚠️ **判据是「快照 revision 前进过」，不是「值变没变」**：
+   * `repaint()` 就在 `setTone` 里、**宿主还没回话时**被调用一次 —— 那一刻快照仍是旧的
+   * 值，若按「值不等于乐观值」判拒绝，乐观值会**当场被抹掉**（等于没做乐观更新）。
+   * 也不能按「值等于乐观值」判接受：宿主**拒绝**时值同样不等于乐观值，那样
+   * `pending` 会**永久留着**，画面停在一个刷新就消失的颜色上（「假成功」）。
+   *
+   * 官方 `ConfigForm` 的契约给了干净的判据：写入携带 revision 围栏，
+   * 宿主接受 / 拒绝 / 恢复读都会让**镜像 revision 前进**
+   * （见 `config-form-types.d.ts` 的 `revision` 与 `ConfigFormController` 的
+   * pendingRevision / latest-settlement 语义）。故：revision 变了 = 有结论，收掉。
    * @param settings - 快照里解析出的设置节（未就绪时传 `undefined`）。
+   * @param revision - 当前快照的 revision。
    */
-  const clearSettledPending = (settings: ThemeToneSettings | undefined): void => {
+  const clearSettledPending = (settings: ThemeToneSettings | undefined, revision: number | undefined): void => {
     if (pendingTone === undefined || settings === undefined) return
-    if (settings[pendingTone.field] === pendingTone.id) pendingTone = undefined
+    // revision 未变 = 宿主还没回话 → 乐观值继续生效。
+    if (revision === undefined || revision === pendingTone.revision) return
+    pendingTone = undefined
   }
 
   /**
@@ -390,8 +406,8 @@ function install(ctx: Context): void {
     if (!shouldPaint()) return
     warnIfNotPersistable()
     const snapshot = scope.getSnapshot()
-    // 快照已追上（或已明确偏离）那一笔乐观更新 → 收掉它，回到以宿主为准。
-    clearSettledPending(snapshot.status === 'ready' ? snapshot.value : undefined)
+    // 快照 revision 前进过 = 宿主已就那一笔给出结论（接受 / 拒绝）→ 收掉乐观值。
+    clearSettledPending(snapshot.status === 'ready' ? snapshot.value : undefined, snapshot.revision)
     const settings = readSettings()
     paintTokens(settings)
     paintLayer(ctx.theme.getTheme())
@@ -488,8 +504,20 @@ function install(ctx: Context): void {
       // 仍走 repaint 那道「未就绪不上色」的门 —— 注册早于宿主回值时不画默认色。
       repaint()
       return {
-        setTone: (id: ToneId) => {
-          const scheme = ctx.theme.getTheme().active.colorScheme
+        setTone: (id: ToneId, scheme: ColorScheme) => {
+          /**
+           * ⚠️ **轴由行传入，不在这里重新查询 `ctx.theme.getTheme()`**
+           * （owner 真机报「浅色模式选色调后很快回到深色官方黑」的根因）。
+           *
+           * 行渲染哪一轴的卡片，取决于 store 里的 `colorScheme`；而它由上一次 `paintLayer`
+           * 同步（`theme/change` 驱动）。写入时若重新查询实时主题，两者在**切换模式的那一小段
+           * 时间窗内会错开**（store 还没同步，或 `theme/change` 的到达次序与 settings 回值交错）。
+           *
+           * 一旦错开，就会把**浅色轴的 id 写进深色轴字段** —— 而两轴合法集合**不重叠**
+           * （浅 official/blue/sakura/green、深 official/violet/crimson/forest），
+           * 宿主 schema 校验直接拒绝 → 选择不生效、该轴停在官方值，观感就是
+           * 「选了色调但很快回到官方」。用渲染轴写入则永远写入合法值。
+           */
           const field = toneFieldFor(scheme)
           const snapshot = scope.getSnapshot()
           /**
@@ -508,7 +536,7 @@ function install(ctx: Context): void {
            * 因此同一条路同时承担「不可持久化时也要在本次会话内生效」。
            */
           localSettings = { ...localSettings, [field]: id }
-          pendingTone = { field, id }
+          pendingTone = { field, id, revision: snapshot.revision }
           repaint()
           if (snapshot.status !== 'ready' || !snapshot.writable) {
             warnIfNotPersistable()

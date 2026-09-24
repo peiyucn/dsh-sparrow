@@ -107,6 +107,26 @@ describe('dsh-theme-tone 结构', () => {
       `顺序必须是「先本地落值 → 立刻重绘 → 再发写入」（local=${localAt} repaint=${repaintAt} set=${setAt}）`)
   })
 
+  it('⛔ 写轴必须等于渲染轴（否则浅色选的 id 会被写进深色字段，宿主直接拒）', async () => {
+    // 回归守卫（owner 真机报「浅色模式下选色调无法维持，很快回到深色官方黑」）：
+    // 行渲染哪一轴的卡片取决于 store 的 colorScheme，而写入时若重新查询
+    // ctx.theme.getTheme()，两者在模式切换的时间窗内会错开 → 把浅色轴的 id
+    // （blue/sakura/green）写进 darkTone 字段，而两轴合法集合**不重叠**
+    // （深色只有 official/violet/crimson/forest）→ 宿主 schema 拒绝 → 选择不生效。
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    const i = src.indexOf('setTone:')
+    assert.ok(i > 0, '找不到 setTone')
+    // ⚠️ 必须先剥注释再断言：本段的注释里**故意**写着 `ctx.theme.getTheme()` 作为反面教材，
+    // 不剥就会把说明文字本身当成实现（本仓库栽过同型误报）。
+    const seg = src.slice(i, i + 2000).replace(/\/\*[\s\S]*?\*\//gu, '').replace(/\/\/[^\n]*/gu, '')
+    assert.ok(!/getTheme\(\)/u.test(seg), 'setTone 不得重新查询实时主题来决定写哪一轴')
+    assert.match(seg, /toneFieldFor\(scheme\)/u, '写轴必须用传入的 scheme')
+    // 行组件必须把**渲染用的轴**一起传下来
+    const row = await readFile(new URL('../src/client/ThemeToneRow.tsx', import.meta.url), 'utf8')
+    assert.match(row, /setTone: \(id: ToneId, scheme: ColorScheme\) => void/u, '注入面要收 scheme')
+    assert.match(row, /setTone\(id, colorScheme\)/u, 'onClick 要传渲染轴 colorScheme')
+  })
+
   it('⛔ client inject 只放跨版本稳定服务（易变面进 inject 会把宿主整页拖死）', async () => {
     // 回归守卫（实测事故）：`inject` 里放一个新版宿主已经改名 / 移除的服务时，fiber 永远
     // pending，而客户端 boot 审计把 pending 当致命失败（packages/client/web/src/boot-client.ts

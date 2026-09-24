@@ -374,7 +374,41 @@ export const MENU_MATERIAL_ANCHORS: readonly string[] = Object.freeze([
   "body :has(> [role='listbox'])",
   "body [role='listbox']:not([data-trigger-menu] *)",
   "body > [role='tree']",
+  /**
+   * **后台任务列表**（`JobListAction` 那枚任务数按钮弹出的 `<ul>`）。
+   *
+   * 它是弹层里**唯一没有 role** 的一个（锚点见 SURFACE_ANCHORS 里那条注释），
+   * 此前只进了兜底表、**没进本表** → 全部弹层里只有它是不透明 + 无模糊
+   * （owner：「菜单，弹窗的设置都不统一，有的完全透明，有的不透明」）。
+   * 官方那 `<ul>` 自己是 `--dsw-specific-menu` + `--dsw-menu-backdrop-filter`
+   * （`ui-jobs/JobListAction.module.css:59`），所以它本来就该在本表里。
+   */
+  "body [data-slot='conversation.session.header.actions'] ul",
 ])
+
+/**
+ * 官方**漏配** `backdrop-filter` 的半透明面 —— 由本插件补齐（修官方 bug）。
+ *
+ * ## 为什么需要单独一张表
+ *
+ * 0.1.7 起官方要求「用半透明 `--dsw-specific-menu` 填面的规则必须**成对**配
+ * `backdrop-filter: var(--dsw-menu-backdrop-filter)`」（`docs/web-styling.zh.md:25`）。
+ * 逐文件审计 rc.1（脚本扫「`background: var(--dsw-specific-menu)` 之后 6 行内有无
+ * backdrop-filter」）后，**弹层表面**只剩一处漏配：
+ *
+ * | 漏配处 | 规矩在哪 | 后果 |
+ * | :--- | :--- | :--- |
+ * | `ModelSelect.module.css:175` 的 `.groupTitle` | `position: sticky; top: 0` 的分类条 | 它**半透明且没有模糊** → 列表从底下滚过去时**透出来**（owner：「官方模型选择菜单，分类显示条有背景色，并且和后面串色」） |
+ *
+ * （同文件 `:108` 的菜单面就配了；其余 `JobListAction` 的几处缺配是菜单**内部 20px
+ * 小徽标 / 按钮**，底下就是菜单自己的模糊面，不需要各自再配 —— 故不收。）
+ *
+ * ## 修法
+ *
+ * 分类条自己也要模糊（它是 sticky、压在列表之上，模糊的正是从它底下滚过去的内容）。
+ * 只补 `backdrop-filter`，**不动它的底色** —— 官方给它的就是菜单色，我们照旧。
+ */
+export const OFFICIAL_MISSING_BLUR_SELECTOR = `${GROUPED_MENU_SELECTOR} ${GROUPED_MENU_TITLE_SELECTOR}`
 
 /**
  * 抬升面样式表文本（**兜底通道**）。
@@ -416,6 +450,15 @@ ${gatedAnchor(GROUPED_MENU_SELECTOR)} {
 }
 ${gatedAnchor(GROUPED_MENU_SELECTOR)} ${GROUPED_MENU_TITLE_SELECTOR} {
   background-image: var(${GRAIN_TILE_VARIABLE}, none) !important;
+}
+/* --- 官方漏配的那一处：给 sticky 分组标题补上配套模糊（修官方 bug）---
+   owner：「官方模型选择菜单也有 bug，分类显示条有背景色，并且和后面串色」。
+   根因：官方 0.1.7 把 --dsw-specific-menu 改成半透明，却漏给这条 sticky 标题配
+   backdrop-filter（同文件的菜单面就配了）→ 列表从它底下滚过去时透出来。
+   只补模糊，不动底色（官方给它的就是菜单色）。理由详见 OFFICIAL_MISSING_BLUR_SELECTOR。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+${gatedAnchor(OFFICIAL_MISSING_BLUR_SELECTOR)} {
+  backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important;
 }
 /* --- 输入框上方那三张**停靠卡**（排队 / 目标 / 待办）---
    owner：「**输入框上面那个区域也没适配**，刚才我记得让改了，但是没改。」
