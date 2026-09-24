@@ -116,9 +116,25 @@ export function ensurePickerStyles(): void {
     '.ccb-model-error, .ccb-model-warning { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; padding: 7px 8px; border-radius: 8px; background: var(--dsw-alias-interactive-bg-hover-danger); color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; }',
     '.ccb-model-warning { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-state-warn-label); }',
     '.ccb-model-retry { flex: 0 0 auto; padding: 0; border: none; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }',
-    '.ccb-model-groups { min-height: 0; overflow-y: auto; }',
+    '.ccb-model-groups { min-height: 0; overflow-y: auto; overflow-x: hidden; }',
+    // ⚠️ **sticky 挂在 section 上，不是挂在标题上**（2026-09-24，owner 报「分类标题滚动时
+    //    和模型名字重叠，而且还有背景色」的根因）。
+    //
+    // 曾经写的是 `.ccb-model-groupTitle { position: sticky; top: 0 }` —— 那是**抄官方**
+    //（`ModelSelect.module.css` 的 `.groupTitle` 与 codebuddy 原实现都这么写），但
+    // **它在两处都是坏的**（owner：「这是官方的 bug」—— 数据支持这个判断）：
+    // sticky 元素只在**自己的包含块**（那个 `<section>`）内滑动，section 一滚过容器顶，
+    // 标题就被**带着一起越出滚动容器**（真机实测：容器 top=281 时标题跑到 261、157、…，
+    // 溢出量随 scrollTop 线性增长），越过菜单 `overflow: hidden` 后与页面内容叠在一起
+    // = 看到的"重叠"；它自带 `background: var(--dsw-specific-menu)` = 看到的"背景色"。
+    // 最小复现（无本插件、纯 DOM）同样复现 → 是这套**结构**的固有问题，不是样式写错。
+    //
+    // 修法：把 sticky 提到 `<section>` 自己身上 —— section 吸顶时标题作为它的首行一起吸住，
+    // 后一个 section 从下方推上来时**把前一个整体顶走**，永不越界（真机 + 最小复现双验）。
+    '.ccb-model-group { position: sticky; top: 0; z-index: 1; }',
     '.ccb-model-group + .ccb-model-group { margin-top: 4px; }',
-    '.ccb-model-groupTitle { position: sticky; top: 0; z-index: 1; padding: 5px 8px 3px; background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
+    // 标题只负责"长什么样"，不再承担定位（定位交给 section）。
+    '.ccb-model-groupTitle { padding: 5px 8px 3px; background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
     '.ccb-model-option { box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: auto; min-width: 100%; min-height: 38px; padding: 6px 8px; border: none; border-radius: 10px; outline: none; background: transparent; color: inherit; text-align: left; cursor: pointer; }',
     '.ccb-model-option:hover:not(:disabled), .ccb-model-option:focus-visible { background: var(--dsw-alias-interactive-bg-hover); }',
     '.ccb-model-option:disabled { color: var(--dsw-alias-label-dimmed); cursor: default; }',
