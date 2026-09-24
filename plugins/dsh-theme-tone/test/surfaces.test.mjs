@@ -854,7 +854,7 @@ describe('抬升面：表面绘制', () => {
   const css = buildSurfaceCss()
   const layers = surfaceLayers()
 
-  it('锚点应该 覆盖菜单族 / listbox 弹层 / 模态弹窗 / 血缘树 / 任务列表 / 提示条，并排除图片灯箱', () => {
+  it('锚点应该 覆盖菜单族 / listbox / 模态弹窗 / 两个 tree 弹层 / 任务列表 / 提示条，并排除图片灯箱', () => {
     assert.deepEqual([...SURFACE_ANCHORS], [
       "body [role='menu']",
       'body [data-trigger-menu]',
@@ -862,6 +862,9 @@ describe('抬升面：表面绘制', () => {
       "body [role='listbox']:not([data-trigger-menu] *)",
       DIALOG_ANCHOR,
       "body > [role='tree']",
+      // 子代理会话弹层：`role='tree'` 在**内层**，外层盒子才画材质 —— 故用 :has 向上找。
+      // owner：「subagent 的弹出和 background jobs 的弹出风格得一致」。
+      "body > :has(> [role='tree'])",
       "body [data-slot='conversation.session.header.actions'] ul",
       "body [role='tooltip']:not([data-side])",
     ])

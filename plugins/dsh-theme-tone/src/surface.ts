@@ -137,6 +137,36 @@ export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
    */
   "body > [role='tree']",
   /**
+   * **子代理会话弹层**（`SubagentCatalogAction`，头部那枚「N subagents」按钮弹出的面板）。
+   *
+   * owner：「subagent 的弹出和 background jobs 的弹出**风格得一致**」。
+   *
+   * 两个弹层的**官方材质本来就完全相同**（逐字核过）：
+   * * `JobListAction.module.css` 的 `.…_menu { background: var(--dsw-specific-menu);
+   *   backdrop-filter: var(--dsw-menu-backdrop-filter); border-radius: 16px;
+   *   box-shadow: var(--dsw-elevation-prominent) }`
+   * * `SubagentCatalogAction` 的 `.…_menu:before { background: var(--dsw-specific-menu);
+   *   backdrop-filter: var(--dsw-menu-backdrop-filter); border-radius: 16px }`
+   *
+   * 差别**只在我们的锚点表**：jobs 那个 `<ul>` 有一条锚点（见下），
+   * 而 subagents 这个弹层一条都命中不到 ⇒ 只有它**没有我们的颗粒与光**。
+   *
+   * ## 为什么锚点是 `body > :has(> [role='tree'])` 而不是 `body > [role='tree']`
+   *
+   * 相邻那条（血缘弹层）用 `body > [role='tree']` 是**对的**，但**命中不到本弹层**：
+   * 本弹层的结构是 outer(`createPortal` 直挂 body) > …… > `[role='tree']`（内层视口），
+   * 即 `role='tree'` 在**内层**、外层才是那个画材质的盒子。
+   * 故改为问「**body 的哪个直接子元素含有 role=tree**」。
+   *
+   * ## 为什么这条不会误伤（真机实测）
+   *
+   * 在真实会话里逐条数过：`body > :has(> [role='tree'])` = **1 个**，
+   * 且那一个正是本弹层（`body` 直接子元素、`position: fixed`、`z-index: 100`）。
+   * `JsonTree` / `WorkspaceBrowser` / `TrajectoryTable` 都是**内联**组件（不在 body 直下），
+   * 与逐条锚点同一条口径：**收窄在 body 直下**，只命中 portal 出来的浮层。
+   */
+  "body > :has(> [role='tree'])",
+  /**
    * **后台任务列表**（`JobListAction`，头部那枚任务数按钮弹出的 `<ul>`）。
    *
    * 这是全表唯一**没有 role** 的锚点 —— owner 反馈「后台任务和子代理的弹出是不是没适配样式」。
@@ -374,6 +404,14 @@ export const MENU_MATERIAL_ANCHORS: readonly string[] = Object.freeze([
   "body :has(> [role='listbox'])",
   "body [role='listbox']:not([data-trigger-menu] *)",
   "body > [role='tree']",
+  /**
+   * **子代理会话弹层**（见 SURFACE_ANCHORS 里那条的完整说明）。
+   *
+   * owner：「subagent 的弹出和 background jobs 的弹出**风格得一致**」——
+   * 两个官方组件的材质逐字相同，差别在**有没有我们的质感层**。本表收它，
+   * 于是两者拿到同一套（颗粒 + 光）与同一对官方材质变量。
+   */
+  "body > :has(> [role='tree'])",
   /**
    * **后台任务列表**（`JobListAction` 那枚任务数按钮弹出的 `<ul>`）。
    *
