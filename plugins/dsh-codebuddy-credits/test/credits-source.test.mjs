@@ -68,6 +68,30 @@ test('inspect 抛错时退回缓存，不抛出', async () => {
   assert.equal(await coldOnly.for('s1'), undefined)
 })
 
+test('⛔ 宿主 Session 方法消失时安全降级（官方 0.1.7 已把 snapshotEvents 标废弃）', async () => {
+  // 回归守卫：`Session.snapshotEvents()` 在 0.1.7 起带 `@deprecated`
+  //（官方 `.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md`
+  // 原话：「new calls are prohibited」，既有调用允许延后迁移）。
+  // 它是**类方法**、不是服务/导出，能力门探不到 —— 官方一旦移除或改名，
+  // 表现是「拿得到 Session 对象、但方法没了」→ `live` 里抛 TypeError。
+  // 按根规范《运行期不冒泡》，此时必须降级（当冷会话走 inspect），不得把异常抛给调用方。
+  const boom = () => { throw new TypeError('session.snapshotEvents is not a function') }
+  const resolver = createLedgerResolver({
+    live: boom,
+    inspect: async () => [ev({ seq: 0, turn: 1, step: 1, credit: 7 })],
+  })
+  const ledger = await resolver.for('s1')
+  assert.equal(ledger?.credit, 7, 'live 抛错应降级到 inspect，而不是抛出')
+})
+
+test('⛔ 宿主方法消失且无持久化可用时：返回 undefined，不抛出', async () => {
+  const resolver = createLedgerResolver({
+    live: () => { throw new TypeError('session.snapshotEvents is not a function') },
+    inspect: async () => { throw new Error('controller missing') },
+  })
+  assert.equal(await resolver.for('s1'), undefined, '两条路都不可用时应静默降级为空视图')
+})
+
 test('并发冷读单飞：多个请求只触发一次持久化读取', async () => {
   const { sources, calls } = fakeSources({ cold: { s1: [ev({ seq: 0, turn: 1, step: 1, credit: 1 })] }, inspectDelay: 30 })
   const resolver = createLedgerResolver(sources)

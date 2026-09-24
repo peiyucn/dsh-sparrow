@@ -134,12 +134,35 @@ export function apply(ctx: Context, config: Config): void {
    * credit 由适配器写进 finish 块的 `replayState.response.usage`（随事件持久化），
    * 故重启后仍可从事件前缀重放；live 会话走内存日志（同步、零 IO），
    * 冷会话（重启后未激活）走 sessionController.inspect 读持久化前缀。
+   *
+   * ## ⚠️ `Session.snapshotEvents()` 自 0.1.7 起被官方标为 `@deprecated`
+   *
+   * 依据：`packages/core/session/src/index.ts` 的 JSDoc 与官方设计记录
+   * `.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md`
+   * —— 原话是「Existing logic may remain unmigrated for now, but **new calls are prohibited**」，
+   * 即**既有调用允许延后迁移**，但不得新增（官方生产代码同样是留调用 + 逐行 lint waiver，
+   * 例如 `packages/api/session-controller/src/commands.ts` 的
+   * `oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.`）。
+   *
+   * 本插件属于**既有调用**（0.1.5 线就在用），故按官方口径保留，理由与代价：
+   *
+   * * 它是**类方法**而非服务/导出，能力门探不到 —— 官方移除/改名后的表现是
+   *   「拿得到 `Session` 对象、但方法没了」→ 抛 `TypeError`；
+   * * 因此**必须**安全降级：`credits-source.ts` 的 `for()` 把 live 读包在 try/catch 里，
+   *   失败即当冷会话走 `inspect`，两条都不可用就返回 `undefined`（调用方降级为空视图），
+   *   绝不把异常抛进宿主管线（根规范《扩展与宿主兼容·运行期不冒泡》）。有单测钉住这两条路径。
+   *
+   * **迁移方向**（将来做，不是在 0.1.7 这一版）：官方替代面是状态驱动的投影
+   * `ctx.sessionProjections`（`packages/session/session-projection/src/index.ts`）——
+   * 把 credit 折成一个 projection、恢复期重建、此后只吃新提交的事件，
+   * 即可彻底摆脱对同步历史读的依赖。届时这里改读投影状态。
    */
   const ledgers = createLedgerResolver({
     live: (sessionId, cached) => {
       const session = ctx.sessions.get(SessionId(sessionId))
       if (session === undefined) return undefined
       // 增量折叠：只折 cached.asOfSeq 之后的事件（客户端在流式期间高频轮询）。
+      // 见上方 ⚠️：同步历史读已被官方标废弃（既有调用允许延后迁移）。
       return foldSessionCredits(session.snapshotEvents(), cached)
     },
     inspect: async (sessionId) => {
