@@ -904,12 +904,18 @@ describe('抬升面：表面绘制', () => {
     const ungated = blockFor(css, OFFICIAL_MISSING_BLUR_SELECTOR)
     assert.ok(ungated !== '', `应有分组标题规则（不带门）：${OFFICIAL_MISSING_BLUR_SELECTOR}`)
     assert.ok(
-      ungated.includes('background-color: transparent !important'),
-      '标题填充必须置 transparent —— 官方那层重复合成就是「有背景色」的来源',
+      ungated.includes('background: none !important'),
+      '标题**什么都不画** —— 官方那层重复合成就是「有背景色」的来源',
     )
     assert.ok(
-      ungated.includes(`backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important`),
-      '必须补上官方那对模糊（与菜单面同一档），否则滚过来的行是硬的',
+      ungated.includes('backdrop-filter: none !important'),
+      '标题也不该再做一次模糊（父级菜单自己已经有一层）',
+    )
+    // ⚠️ 颗粒必须一并撤掉：它是**实测**出来的第三条弯路 —— 只置 transparent 时，
+    //    同一张颗粒直接落在玻璃上（没有被底色压暗）会变成一条**比菜单主体亮 17.6 级**的带子。
+    assert.ok(
+      !ungated.includes('GRAIN_TILE') && !ungated.includes('background-image'),
+      '标题不得叠颗粒/图层（会变成一条亮带）',
     )
     // 关键：整条修复必须出现在**无门**那条规则里（官方档下也生效）。
     // ⚠️ 不能断言「带门的选择器不存在」—— 分组标题的**菜单面**规则本来就带门，选择器文本相同。
@@ -971,10 +977,12 @@ describe('抬升面：表面绘制', () => {
     assert.ok(gatedBody.includes(layers), '去顶光的图层串必须在**这条规则**里')
     assert.ok(!gatedBody.includes(TOP_VARIABLE), '本条规则不得含顶光变量')
 
-    // 标题条本身：现在是**单次合成的不透明块**（页面底色 + 一层菜单色 + 颗粒）。
-    // 这条规则**不带官方默认门** —— owner 的截图就是官方档拍的（见上一条测试）。
+    // 标题条本身：**什么都不画**（既无填充也无质感）—— 它只是块"透明窗口"，
+    // 直接显示菜单自己那层玻璃。这条规则**不带官方默认门** —— owner 的截图就是官方档拍的。
+    // ⚠️ 颗粒也要撤：实测贴图落在透明标题上会变成一条比菜单主体亮 17.6 级的带子。
     assert.ok(css.includes(OFFICIAL_MISSING_BLUR_SELECTOR), `标题条要单独修：${OFFICIAL_MISSING_BLUR_SELECTOR}`)
-    assert.ok(css.includes(`var(${GRAIN_TILE_VARIABLE}, none) !important`), '补的是同款颗粒瓦片')
+    const titleBody = blockFor(css, OFFICIAL_MISSING_BLUR_SELECTOR)
+    assert.ok(titleBody.includes('background: none !important'), '标题不得有任何填充或图层')
     // 结构锚点，不碰 hashed 类名（codebuddy 那个类还是非哈希的 ccb-model-groupTitle）
     assert.ok(GROUPED_MENU_TITLE_SELECTOR.includes("role='group'"), '标题用 role=group 的结构锚定')
     assert.ok(!/class\*?=/.test(GROUPED_MENU_TITLE_SELECTOR), '不得用类名匹配标题')
