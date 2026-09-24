@@ -25,7 +25,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { GRAIN_DATA_URI } from '../lib/backdrop.js'
-import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, MENU_BLUR_VARIABLE, MENU_FILL_VARIABLE, MENU_MATERIAL_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
+import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, MENU_BLUR_VARIABLE, MENU_FILL_VARIABLE, MENU_MATERIAL_ANCHORS, OFFICIAL_MISSING_BLUR_SELECTOR, SURFACE_ANCHORS, buildSurfaceCss, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -865,6 +865,36 @@ describe('抬升面：表面绘制', () => {
     )
     // 玻璃确实做在了控制层：输入框卡片带**沿圆角一圈**的镜面高光（inset 阴影）
     assert.ok(buildGlassCss().includes(`inset ${GLASS_SPECULAR_RING[0].x}px ${GLASS_SPECULAR_RING[0].y}px`), '输入框卡片应带镜面高光')
+  })
+
+  it('⛔ 官方漏配的 sticky 分组标题模糊必须**不带门**（官方档下也要修）', () => {
+    // owner 的报障截图正是**官方默认（深色官方）**下拍的：模型选择菜单的分类显示条
+    // 有背景色、与后面内容串色 —— 那是**官方自己的漏配**
+    //（`ModelSelect.module.css:175` 的 `.groupTitle` 是半透明菜单色却没配 backdrop-filter，
+    // 而同文件 `:108` 的菜单面配了）。若给这条修复加官方默认门，官方档下不生效 → 带子照旧。
+    // 这与悬停卡同一条口径：**官方默认档下先修官方自己的毛病**，只补它本来就想要的属性。
+    const ungated = blockFor(css, OFFICIAL_MISSING_BLUR_SELECTOR)
+    assert.ok(ungated !== '', `应有补 blur 的规则（不带门）：${OFFICIAL_MISSING_BLUR_SELECTOR}`)
+    assert.ok(
+      ungated.includes(`backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important`),
+      '补的必须是官方那对模糊变量',
+    )
+    // 不得动底色：官方给它的就是菜单色
+    assert.ok(!ungated.includes('background-color'), '只补模糊，不得改底色')
+    assert.ok(!ungated.includes('background-image'), '只补模糊，不得加图层')
+    // 关键：模糊必须出现在**无门**那条规则里。
+    // ⚠️ 不能断言「带门的选择器不存在」—— 分组标题的**颗粒**规则本来就带门，
+    // 两者选择器文本相同（`gatedAnchor` 只替换开头的 body），故只能按**声明**区分。
+    const ungatedBlock = blockFor(css, OFFICIAL_MISSING_BLUR_SELECTOR)
+    assert.ok(
+      ungatedBlock.includes(`backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important`),
+      '无门那条规则里必须有补的模糊',
+    )
+    const gatedBlock = blockFor(css, OFFICIAL_MISSING_BLUR_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`))
+    assert.ok(
+      !gatedBlock.includes('backdrop-filter'),
+      '带门那条（颗粒）不得承担模糊 —— 否则官方档下带子照旧',
+    )
   })
 
   it('菜单族应该 跟随官方 0.1.7 的**半透明 + 模糊**材质（色调 + 官方材质）', () => {

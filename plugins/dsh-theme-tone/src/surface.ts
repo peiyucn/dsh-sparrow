@@ -387,7 +387,7 @@ export const MENU_MATERIAL_ANCHORS: readonly string[] = Object.freeze([
 ])
 
 /**
- * 官方**漏配** `backdrop-filter` 的半透明面 —— 由本插件补齐（修官方 bug）。
+ * 官方**漏配** `backdrop-filter` 的半透明面 —— 由本插件补齐（修官方 bug，**不带官方默认门**）。
  *
  * ## 为什么需要单独一张表
  *
@@ -403,10 +403,13 @@ export const MENU_MATERIAL_ANCHORS: readonly string[] = Object.freeze([
  * （同文件 `:108` 的菜单面就配了；其余 `JobListAction` 的几处缺配是菜单**内部 20px
  * 小徽标 / 按钮**，底下就是菜单自己的模糊面，不需要各自再配 —— 故不收。）
  *
- * ## 修法
+ * ## ⚠️ 为什么不带 {@link PLAIN_ATTR} 门（与全表其它规则不同）
  *
- * 分类条自己也要模糊（它是 sticky、压在列表之上，模糊的正是从它底下滚过去的内容）。
- * 只补 `backdrop-filter`，**不动它的底色** —— 官方给它的就是菜单色，我们照旧。
+ * owner 的报障截图正是在**官方默认（深色官方）**下拍的 —— 那条带子**在官方档也出现**，
+ * 因为它是**官方自己的漏配**，与本插件的色调无关。若给它加门，官方档下不生效 → 带子照旧。
+ * 这与悬停卡（{@link HOVER_CARD_ANCHOR}）是同一条口径：**官方默认档下先修官方自己的毛病**，
+ * 且只补官方**本来就想要**的那个属性（它的菜单面全都配了模糊，只有这一处漏），
+ * 不引入任何外来色相 —— 所以「官方档逐像素不变」的承诺仍成立（官方修好后这行即冗余无害）。
  */
 export const OFFICIAL_MISSING_BLUR_SELECTOR = `${GROUPED_MENU_SELECTOR} ${GROUPED_MENU_TITLE_SELECTOR}`
 
@@ -456,8 +459,10 @@ ${gatedAnchor(GROUPED_MENU_SELECTOR)} ${GROUPED_MENU_TITLE_SELECTOR} {
    根因：官方 0.1.7 把 --dsw-specific-menu 改成半透明，却漏给这条 sticky 标题配
    backdrop-filter（同文件的菜单面就配了）→ 列表从它底下滚过去时透出来。
    只补模糊，不动底色（官方给它的就是菜单色）。理由详见 OFFICIAL_MISSING_BLUR_SELECTOR。
-   （本段在模板字符串里，注释中**不能出现反引号**。） */
-${gatedAnchor(OFFICIAL_MISSING_BLUR_SELECTOR)} {
+
+   ⚠️ **本条不带官方默认门**：owner 的截图正是**官方默认档**下拍的 —— 带子在官方档也出现。
+   补的是官方**本来就想要**的属性（它其余菜单面全配了模糊），不引入外来色相。 */
+${OFFICIAL_MISSING_BLUR_SELECTOR} {
   backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important;
 }
 /* --- 输入框上方那三张**停靠卡**（排队 / 目标 / 待办）---
