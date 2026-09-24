@@ -643,15 +643,43 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'
      内容层抬到 81 之后顶栏就被内容盖住了（owner 真机反馈「顶栏盖不住对话内容了」）。
      统一取 ABOVE_CONTENT_Z_INDEX（82）：仍高于 7/8，仍低于菜单 100。 */
   z-index: ${ABOVE_CONTENT_Z_INDEX};
-  /* **自己画一遍背景层的渐变栈** —— 抬到背景层之上就吃不到那层光了。
-     背景层（z-index 80）原本压在顶栏（原 z-index 9）之上，顶光其实是**直接盖在顶栏上**的；
-     顶栏为了不被内容盖住抬到 82 之后，光就没了（owner：「怎么顶栏的金光没有了」）。
-     background-attachment: fixed 让百分比按**视口**解析 —— 顶栏只有 76px 高，
-     同一串 ellipse 80% 45% 若按自身盒子解析会重新缩放成一条硬边带。
-     **光必须按顶栏自己的填充 alpha 同步压**（dimmedBackdropGradients(同一个 alpha)）：
-     底乘 70%、光却是满的 → 那一片会比周围**亮一截**（owner 对底座那处说的
-     「相当于两层光了」是同一个毛病；顶栏是半透明的，同样逃不掉）。
-     （注：本段在模板字符串里，注释中**不能出现反引号**，否则会把字符串截断。） */
+  /* ⚠️ 本体**不承担玻璃**（这里刻意不写 background-color / background-image /
+     backdrop-filter）—— 理由见下面 ::before 那条。本体只负责「浮起来」。
+     （本段在模板字符串里，注释中**不能出现反引号**。） */
+}
+
+/* ②b 玻璃（填充 + 渐变 + 模糊）挂在顶栏的 **::before** 上，不挂顶栏本体。
+   owner 2026-09-24 真机报「弹层全透明 / 分区标题带子串色 / 联想对话框也全透明」的根因就在这里：
+   带 backdrop-filter（非 none）的元素会成为**它后代的 backdrop root**，同时成为
+   position: fixed 后代的**包含块**。而官方弹层大量渲染在顶栏子树里
+   （模型选择菜单、顶栏动作区的弹层 —— 我们自己的材质锚点表里就写着
+   [data-slot='conversation.session.header.actions'] ul 这条锚点）。
+   于是弹层自己的 backdrop-filter: var(--dsw-menu-backdrop-filter)（官方 blur(40px)）
+   **只能采样这个子树**，模糊等于失效 —— 只剩半透明底色（深色轴 #30313680），
+   背后的对话文字没被模糊、直接可读，也就是「全透明 / 串色」。
+   官方深浅两档一直是好的，正因为这两档下本插件的玻璃规则被官方默认门关掉。
+
+   改法：玻璃交给伪元素。伪元素没有后代 ⇒ 不会把任何官方弹层关进它的 root；
+   顶栏本体也不再是 backdrop root / 不再是 fixed 后代的包含块 ⇒ 弹层自己的模糊与定位一起恢复。
+   顶栏本体已经是 position: absolute + z-index（自成层叠上下文）⇒ 伪元素 z-index: -1
+   正好画在「顶栏内容之下、页面内容之上」，观感与改前一致。
+   pointer-events: none —— 别让这一层参与命中测试（顶部有条拖动区）。
+
+   **自己画一遍背景层的渐变栈** —— 抬到背景层之上就吃不到那层光了：
+   背景层（z-index 80）原本压在顶栏（原 z-index 9）之上，顶光其实是**直接盖在顶栏上**的；
+   顶栏为了不被内容盖住抬到 82 之后，光就没了（owner：「怎么顶栏的金光没有了」）。
+   background-attachment: fixed 让百分比按**视口**解析 —— 顶栏只有 76px 高，
+   同一串 ellipse 80% 45% 若按自身盒子解析会重新缩放成一条硬边带。
+   **光必须按顶栏自己的填充 alpha 同步压**（dimmedBackdropGradients(同一个 alpha)）：
+   底乘 70%、光却是满的 → 那一片会比周围**亮一截**（owner 对底座那处说的
+   「相当于两层光了」是同一个毛病；顶栏是半透明的，同样逃不掉）。
+   （本段在模板字符串里，注释中**不能出现反引号**，否则会把字符串截断。） */
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'] > header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-color: ${fill('var(--dsw-alias-bg-base)', GLASS_HEADER_ALPHA)};
   background-image: ${dimmedBackdropGradients(GLASS_HEADER_ALPHA)};
   background-attachment: fixed;
@@ -763,19 +791,47 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat]::after {
    **只有这两条卡片规则**放宽相位；底座 ::after 等仍死守 active（理由见 GLASS_CARD_PHASES）。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 body:not([${PLAIN_ATTR}]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card] {
-  background-color: ${fill('var(--dsw-specific-input-major)', GLASS_CARD_ALPHA)};
-  background-image: ${edgeFadeLayers('dark')};
+  /* ⚠️ 卡片本体不承担玻璃（不写 background-color / background-image / backdrop-filter）——
+     与顶栏同一条理由：卡片的子树里也渲染官方弹层（官方的输入触发器菜单就以
+     closest('[data-composer-card]') 为锚，见 InputBar.tsx），
+     本体一带 backdrop-filter 就成了它们的 backdrop root，模糊被关进子树里失效
+     （owner 报的「联想对话框也是全透明的」）。
+     position: relative 官方 .card 本来就有（写出来是给 ::before 一个包含块）；
+     z-index: 0 是为了**自成层叠上下文**，好让 ::before 的 z-index: -1 留在卡内 ——
+     它与 z-index: auto 在绘制顺序上等价（都是第 8 步、同按 DOM 次序），观感不变。
+     background-color: transparent 是必须的：官方 .card 自己刷的是不透明
+     --dsw-specific-input-major，不让位就给玻璃盖死了。 */
+  position: relative;
+  z-index: 0;
+  background-color: transparent;
+  background-image: none;
   /* 官方那条**外**投影（抬升语义）→ 我们的**悬浮**投影（{@link GLASS_CARD_LIFT}）
      → 我们的**边光**（inset，玻璃厚度）。三段并列，各管各的。 */
   box-shadow: var(--dsw-elevation-soft),
     ${GLASS_CARD_LIFT},
     ${rimFor('dark')};
+}
+/* 卡片玻璃本体（填充 + 边光渐变 + 模糊）—— 挂 ::before，理由见上面卡片规则内。
+   border-radius: inherit 必须写：官方 .card 是 22px 圆角，伪元素不继承它就会画成方角。
+   pointer-events: none —— 玻璃层不参与命中测试（卡里有 textarea 与按钮）。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+body:not([${PLAIN_ATTR}]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background-color: ${fill('var(--dsw-specific-input-major)', GLASS_CARD_ALPHA)};
+  background-image: ${edgeFadeLayers('dark')};
   backdrop-filter: ${GLASS_CARD_BLUR};
 }
 /* 浅色轴：同样的光路，只有**阴影浓度**不同（近白底上阴影要更明显才立得住形）。
    注意官方默认门（body:not([PLAIN])）必须写在**最前** —— 有一条守卫按前缀认它。 */
-body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card] {
+body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card]::before {
   background-image: ${edgeFadeLayers('light')};
+}
+body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card] {
   box-shadow: var(--dsw-elevation-soft),
     ${GLASS_CARD_LIFT},
     ${rimFor('light')};
@@ -792,7 +848,8 @@ body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) ${phaseGate(GLASS_CARD_PHASE
    * inset 边光 rimFor（镜面 + 暗壁）—— 与虚线并存就是两条边。
 
    **保留**：官方自己的 --dsw-elevation-soft（那是官方的抬升语义，不归我们管）、
-   玻璃填充与 backdrop-filter（卡片本体仍是玻璃，只是边缘交给官方）。
+   玻璃本身（填充 + 渐变 + 模糊挂在卡片的 ::before 上，不在本体 —— 见卡片规则内的说明；
+   边缘交给官方，玻璃照旧）。
 
    ⚠️ 判定属性由 client 的**行为探针**打上（见 constants.ts 的 WORKSTART_ATTR：
    那条类名是哈希、语义属性又全被污染，只有读 ::after 的 mask 才认得出）。

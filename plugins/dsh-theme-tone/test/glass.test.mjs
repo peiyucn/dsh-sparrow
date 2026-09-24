@@ -57,6 +57,57 @@ const cardRule = (text) => {
   return clean.slice(start, clean.indexOf('}', start))
 }
 
+/**
+ * 取所有**选择器里含 needle 的规则**（选择器 + 声明）—— 用大括号配平切规则。
+ *
+ * ⚠️ 2026-09-24 起卡片/顶栏的玻璃搬到了 `::before` 上，`cardRule` 那种
+ * 「从选择器切到第一个 `}`」的取法只能拿到**本体**那一条；要断言玻璃本体得用本函数。
+ * @param text - 样式表文本（注释会被剥掉）。
+ * @param needle - 选择器片段。
+ * @returns 命中规则的文本数组（每项含选择器与整段声明）。
+ */
+const rulesFor = (text, needle) => {
+  const clean = text.replace(/\/\*[\s\S]*?\*\//gu, '')
+  const out = []
+  let i = 0
+  while ((i = clean.indexOf(needle, i)) !== -1) {
+    const open = clean.indexOf('{', i)
+    if (open === -1) break
+    let depth = 0
+    let end = open
+    for (; end < clean.length; end++) {
+      if (clean[end] === '{') depth += 1
+      else if (clean[end] === '}') {
+        depth -= 1
+        if (depth === 0) break
+      }
+    }
+    out.push(clean.slice(clean.lastIndexOf('}', i) + 1, end + 1))
+    i = end + 1
+  }
+  return out
+}
+
+/** 卡片**玻璃层**（`[data-composer-card]::before`）的全部规则。 */
+const cardGlassRule = (text) => rulesFor(text, '[data-composer-card]::before').join('\n')
+
+/**
+ * 卡片玻璃层里那条**通用（深色轴）**规则 —— 光路形状的基准。
+ *
+ * 浅色轴那条只覆盖 `background-image`（阴影浓度不同），两条都被 `cardGlassRule` 收进来时
+ * 椭圆数会翻倍，故几何类断言取通用那条。
+ * @param text - 样式表文本。
+ * @returns 通用玻璃层规则的文本。
+ */
+const cardGlassBaseRule = (text) =>
+  rulesFor(text, '[data-composer-card]::before').find((r) => !r.includes(':not([data-ds-dark-theme])')) ?? ''
+
+/** 卡片**本体**（不含 ::before / ::after 伪元素）的全部规则。 */
+const cardElementRule = (text) =>
+  rulesFor(text, '[data-composer-card]')
+    .filter((r) => !/::before|::after/u.test(r.slice(0, r.indexOf('{'))))
+    .join('\n')
+
 // 玻璃效果依赖几个**公开 DOM 锚点**（官方自己的 CSS 也依赖它们）：
 //   [data-phase] / [data-slot='conversation.header'] / [data-conversation-scroll] /
 //   [data-composer-seat]
@@ -118,11 +169,34 @@ describe('glass：顶栏浮层', () => {
     // ⚠️ 光还要按顶栏自己的填充 alpha 同步压：底乘 70%、光却是满的 → 那一片比周围亮一截
     //（owner 对底座那处说的「相当于两层光了」是同一个毛病，顶栏半透明同样逃不掉）。
     // 锚点用 0.1.7 起的那条（conversation.header > header）—— 见本文件顶部的结构对照。
-    const anchor = "[data-slot='conversation.header'] > header"
-    const header = css.slice(css.indexOf(anchor), css.indexOf('}', css.indexOf(anchor)))
+    // ⚠️ 2026-09-24 起玻璃挂 **::before**（本体不许带 backdrop-filter，见下面那条守护）。
+    const header = rulesFor(css, "[data-slot='conversation.header'] > header::before").join('\n')
+    assert.ok(header.length > 0, '顶栏玻璃层（::before）应存在')
     assert.ok(header.includes(dimmedBackdropGradients(GLASS_HEADER_ALPHA)), '顶栏的光必须按同一 alpha 压')
     assert.match(header, /background-attachment: fixed/u, '必须 fixed —— 否则 76px 高的盒子会把渐变重新缩放成硬边带')
     assert.match(header, /background-color: color-mix/u, '玻璃填充仍在（背景色与渐变分层）')
+  })
+
+  it('⛔ 顶栏本体与卡片本体**都不得**带 backdrop-filter —— 会把官方弹层的模糊关进子树', () => {
+    // owner 2026-09-24 真机报「弹层全透明 / 分区标题带子串色 / 联想对话框全透明」的根因：
+    // 带 backdrop-filter（非 none）的元素会成为**它后代的 backdrop root**，同时成为
+    // position: fixed 后代的包含块。而官方弹层就渲染在顶栏 / 输入卡子树里
+    //（官方 InputBar 用 closest('[data-composer-card]') 给触发器菜单找锚，
+    //  顶栏动作区的弹层锚点见 surface.ts 的 MENU_MATERIAL_ANCHORS）——
+    // 于是弹层自己的 `backdrop-filter: var(--dsw-menu-backdrop-filter)`（官方 blur(40px)）
+    // 只能采样子树，模糊失效，只剩半透明底色 → 看着就是「全透明 + 串色」。
+    // 玻璃因此一律挂 ::before：伪元素没有后代，不会把官方弹层关进去。
+    const headerElement = rulesFor(css, "[data-slot='conversation.header'] > header")
+      .filter((r) => !/::before|::after/u.test(r.slice(0, r.indexOf('{'))))
+      .join('\n')
+    assert.ok(headerElement.length > 0, '顶栏本体规则应存在')
+    assert.ok(!headerElement.includes('backdrop-filter'), '顶栏本体不得带 backdrop-filter（backdrop root）')
+    const cardElement = cardElementRule(css)
+    assert.ok(cardElement.length > 0, '卡片本体规则应存在')
+    assert.ok(!cardElement.includes('backdrop-filter'), '卡片本体不得带 backdrop-filter（backdrop root）')
+    // 而玻璃本身必须还在（只是换了挂载点）
+    assert.ok(rulesFor(css, "[data-slot='conversation.header'] > header::before").join('').includes('backdrop-filter'))
+    assert.ok(cardGlassRule(css).includes('backdrop-filter'))
   })
 
   it('⛔ 右边栏**不得**用 background-attachment: fixed —— transform 会让它静默改判定位区', () => {
@@ -297,10 +371,11 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // ⚠️ 必须 round —— 直接 `0.58 * 100` 会得到 `57.99999999999999`，与 CSS 里的 `58%` 对不上
     // （实现侧的 `pct()` 是 `Math.round(alpha * 100)`，两边得用同一种取整）。
     assert.match(css, new RegExp(`${Math.round(GLASS_CARD_ALPHA * 100)}%, transparent`, 'u'))
-    // 玻璃的**形状**必须等于卡片（靠卡片自己的 backdrop-filter）——
-    // 这是 owner 那条架构要求的落点：「应该改变的是**输入框本身**，不是靠夹层」。
-    const card = cardRule(css)
-    assert.match(card, /backdrop-filter/u, '卡片自己承担模糊（不再靠底座上的夹层）')
+    // 玻璃的**形状**必须等于卡片 —— 靠卡片自己那条 ::before 的 backdrop-filter
+    //（不是底座上的夹层；2026-09-24 起也从卡片**本体**挪到伪元素，理由见上面的 backdrop root 守护）。
+    const card = cardGlassRule(css)
+    assert.match(card, /backdrop-filter/u, '卡片自己的玻璃层承担模糊（不是底座夹层、也不挂本体）')
+    assert.match(card, /border-radius: inherit/u, '伪元素必须继承卡片的 22px 圆角，否则玻璃画成方角')
   })
 
   it('卡片的不透明度必须留出可辨的透出量（太高就等于实色，模糊看不见）', () => {
@@ -357,7 +432,9 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // owner 连问：「**左边是满光么？？**」「**上边应该也不是均匀的光条吧？**」。
     // `inset box-shadow` 每条边**天生均匀** —— 只能做「一圈等亮的壁」，
     // 做不出「光从左上方来、沿边衰减」。所以主光改用 `background-image` 的细长椭圆。
-    const card = cardRule(css)
+    // ⚠️ 2026-09-24 起这条 background-image 在**卡片的 ::before**（玻璃层）上；
+    //    几何取通用那条（浅色轴只换阴影浓度、椭圆形状同源）。
+    const card = cardGlassBaseRule(css)
     assert.match(card, /background-image:/u, '沿边衰减的光应写在 background-image 里')
     // 两条椭圆都锚在**左上角**（光源处），这样左上角最亮、向右向下各自衰减
     const anchored = card.match(/radial-gradient\([^;]*?at 0% 0%/gu) ?? []
@@ -456,7 +533,8 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // ③ 左缘（迎光侧）不该有阴影
     assert.ok(!shade.includes('left'), '左缘是迎光侧，不该有阴影')
     // ④ 上缘与左缘都要有**主光** —— 在渐变层里（两条椭圆，都锚左上角）
-    const card = cardRule(css)
+    // ⚠️ 2026-09-24 起渐变层在卡片的 ::before（玻璃层）上；取通用那条。
+    const card = cardGlassBaseRule(css)
     const ellipses = card.match(/radial-gradient\([^;]*?at 0% 0%/gu) ?? []
     assert.equal(ellipses.length, 2, '主光应有两条椭圆（上缘一条、左缘一条）')
     assert.ok(GLASS_EDGE_TOP.alpha > 0, '上缘应有主光')
@@ -518,10 +596,15 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('卡片填充必须用 longhand —— background 简写会重置其他背景层', () => {
-    const card = cardRule(css)
-    assert.match(card, /background-color:/u, '填充应写成 background-color')
-    assert.ok(!/\bbackground:/u.test(card), '不得用 background 简写')
-    assert.ok(card.includes(`backdrop-filter: ${GLASS_CARD_BLUR}`), '卡片应带自己的模糊档')
+    // 填充/模糊都在卡片的 ::before（玻璃层）上；**本体**另有一条「background-color: transparent」
+    // 用来给官方那条不透明实色让位 —— 两处都只许 longhand。
+    const glass = cardGlassRule(css)
+    assert.match(glass, /background-color:/u, '填充应写成 background-color')
+    assert.ok(!/\bbackground:/u.test(glass), '不得用 background 简写')
+    assert.ok(glass.includes(`backdrop-filter: ${GLASS_CARD_BLUR}`), '玻璃层应带自己的模糊档')
+    const element = cardElementRule(css)
+    assert.ok(!/\bbackground:/u.test(element), '本体让位也不得用 background 简写')
+    assert.match(element, /background-color: transparent/u, '本体必须让出底色（官方那条是不透明实色）')
   })
 
   it('模糊应该 收到「通透」那一档（太大 → 抹掉背后形状，像磨砂塑料而非玻璃）', () => {
@@ -621,11 +704,12 @@ describe('glass：边界与纪律', () => {
     for (const phase of GLASS_CARD_PHASES) {
       assert.match(css, new RegExp(`\\[data-phase='${phase}'\\]`, 'u'), `卡片规则应覆盖 ${phase} 相位`)
     }
-    // 三条卡片规则（深轴 / 浅轴 / 未选工作区）都得带相位门。
+    // 卡片规则（深轴本体 + 深轴玻璃层 + 浅轴本体 + 浅轴玻璃层 + 未选工作区）都得带相位门。
     // ⚠️ 第三条（待启动态）**也必须覆盖 hero** —— 「未选工作区」就发生在 hero 页
     // （`InputBar` 的 workspaceTrigger 条件：inert && !removed && onRequestWorkspace）。
+    // 2026-09-24 起玻璃拆成「本体 + ::before」两条，故由 3 条变 5 条。
     const cardBlocks = rules.split('}').filter(b => b.includes('[data-composer-card]'))
-    assert.equal(cardBlocks.length, 3, '卡片应有深轴 / 浅轴 / 待启动态三条规则')
+    assert.equal(cardBlocks.length, 5, '卡片应有深轴（本体 + 玻璃层）/ 浅轴（本体 + 玻璃层）/ 待启动态五条规则')
     for (const block of cardBlocks) {
       const selector = block.slice(0, block.indexOf('{')).trim()
       for (const phase of GLASS_CARD_PHASES) {
