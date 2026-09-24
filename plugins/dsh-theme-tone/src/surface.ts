@@ -451,19 +451,33 @@ ${MENU_MATERIAL_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
 ${gatedAnchor(GROUPED_MENU_SELECTOR)} {
   background-image: ${menuSurfaceLayers()} !important;
 }
-${gatedAnchor(GROUPED_MENU_SELECTOR)} ${GROUPED_MENU_TITLE_SELECTOR} {
-  background-image: var(${GRAIN_TILE_VARIABLE}, none) !important;
-}
-/* --- 官方漏配的那一处：给 sticky 分组标题补上配套模糊（修官方 bug）---
-   owner：「官方模型选择菜单也有 bug，分类显示条有背景色，并且和后面串色」。
-   根因：官方 0.1.7 把 --dsw-specific-menu 改成半透明，却漏给这条 sticky 标题配
-   backdrop-filter（同文件的菜单面就配了）→ 列表从它底下滚过去时透出来。
-   只补模糊，不动底色（官方给它的就是菜单色）。理由详见 OFFICIAL_MISSING_BLUR_SELECTOR。
+/* --- 粘性分组标题：把「同一个半透明色合成两次」改成**单次合成的不透明块**（修官方 bug）---
+   owner 两轮都报：「模型选择菜单，分类显示条**有背景色**，并且**和后面串色**」——
+   官方档与我们的色调档下都在（官方自己也是坏的）。
 
-   ⚠️ **本条不带官方默认门**：owner 的截图正是**官方默认档**下拍的 —— 带子在官方档也出现。
-   补的是官方**本来就想要**的属性（它其余菜单面全配了模糊），不引入外来色相。 */
+   根因：菜单主体是 "background: var(--dsw-specific-menu)"（0.1.7 起 **半透明**，
+   深色轴 = 官方 bluish-800 加 50% 不透明度）+ 官方模糊；而官方给吸顶标题的填充**也是同一个 token**，
+   于是标题那一小块把同一个半透明色**又合成了一遍**（0.5 上再叠 0.5 → 等效 0.75）：
+   既比菜单主体**亮一档**（看着就是"有背景色的横带"），又因为只有 50% 不透明，
+   行从它底下滚过时仍然**透出来**（"串色"）。
+
+   为什么不能靠 "backdrop-filter" 解决（曾这么修过，没用）：标题在**菜单内部**，
+   而菜单自己带 "backdrop-filter" ⇒ 菜单已经成为 **backdrop root**，
+   标题的模糊只能采样子树（滚动的行），补了模糊也依然是"半透明 + 糊影"。
+
+   正解 = **让这一块像素等于菜单主体压在页面底色上的那一个颜色**（单次合成、不透明）：
+   不透明白底（"--dsw-alias-bg-base"，已被色调染过）+ 一层菜单色（官方 alpha 原样保留）
+   → 合成结果与菜单主体逐像素同色，既不再亮一档，也把滚过来的行**挡住**。
+   颗粒照旧补在最上面一层（否则标题没颗粒、菜单有，接缝处仍看得出来）。
+
+   ⚠️ **本条不带官方默认门**：owner 那张截图就是在**官方默认档**下拍的，带子在官方档也在。
+   我们改的是**官方自己出错的合成**（同一个色叠两次），不是换它的色相或材质 ——
+   标题的色相/透明度语义仍完全来自官方 token。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
 ${OFFICIAL_MISSING_BLUR_SELECTOR} {
-  backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important;
+  background-color: var(--dsw-alias-bg-base) !important;
+  background-image: linear-gradient(var(${MENU_FILL_VARIABLE}), var(${MENU_FILL_VARIABLE})),
+    var(${GRAIN_TILE_VARIABLE}, none) !important;
 }
 /* --- 输入框上方那三张**停靠卡**（排队 / 目标 / 待办）---
    owner：「**输入框上面那个区域也没适配**，刚才我记得让改了，但是没改。」

@@ -867,33 +867,34 @@ describe('抬升面：表面绘制', () => {
     assert.ok(buildGlassCss().includes(`inset ${GLASS_SPECULAR_RING[0].x}px ${GLASS_SPECULAR_RING[0].y}px`), '输入框卡片应带镜面高光')
   })
 
-  it('⛔ 官方漏配的 sticky 分组标题模糊必须**不带门**（官方档下也要修）', () => {
-    // owner 的报障截图正是**官方默认（深色官方）**下拍的：模型选择菜单的分类显示条
-    // 有背景色、与后面内容串色 —— 那是**官方自己的漏配**
-    //（`ModelSelect.module.css:175` 的 `.groupTitle` 是半透明菜单色却没配 backdrop-filter，
-    // 而同文件 `:108` 的菜单面配了）。若给这条修复加官方默认门，官方档下不生效 → 带子照旧。
-    // 这与悬停卡同一条口径：**官方默认档下先修官方自己的毛病**，只补它本来就想要的属性。
+  it('⛔ 粘性分组标题必须**不带门**地改成单次合成的不透明块（官方档下也要修）', () => {
+    // owner 两轮都报：模型选择菜单的**分类显示条有背景色、与后面内容串色** ——
+    // 官方档与我们的色调档下都在（`ModelSelect.module.css` 的 `.groupTitle` 与
+    // codebuddy 的 `.ccb-model-groupTitle` 都用同一个**半透明**菜单 token 做填充）。
+    // 根因：菜单主体已经是 0.5 的菜单色，标题再把同一个色叠一遍 → 等效 0.75
+    //（比主体亮一档 =「有背景色」），且只有 50% 不透明 → 行从底下滚过时透出来（「串色」）。
+    // 靠 backdrop-filter 修不掉（标题在菜单内，菜单自己是 backdrop root，模糊只能采样子树）。
+    // 正解：不透明白底（页面底色）+ 一层菜单色 = **菜单主体那一个颜色**（单次合成）。
     const ungated = blockFor(css, OFFICIAL_MISSING_BLUR_SELECTOR)
-    assert.ok(ungated !== '', `应有补 blur 的规则（不带门）：${OFFICIAL_MISSING_BLUR_SELECTOR}`)
+    assert.ok(ungated !== '', `应有分组标题规则（不带门）：${OFFICIAL_MISSING_BLUR_SELECTOR}`)
     assert.ok(
-      ungated.includes(`backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important`),
-      '补的必须是官方那对模糊变量',
+      ungated.includes('background-color: var(--dsw-alias-bg-base) !important'),
+      '必须给不透明白底（页面底色）—— 否则行从下面滚过时透出来',
     )
-    // 不得动底色：官方给它的就是菜单色
-    assert.ok(!ungated.includes('background-color'), '只补模糊，不得改底色')
-    assert.ok(!ungated.includes('background-image'), '只补模糊，不得加图层')
-    // 关键：模糊必须出现在**无门**那条规则里。
-    // ⚠️ 不能断言「带门的选择器不存在」—— 分组标题的**颗粒**规则本来就带门，
-    // 两者选择器文本相同（`gatedAnchor` 只替换开头的 body），故只能按**声明**区分。
-    const ungatedBlock = blockFor(css, OFFICIAL_MISSING_BLUR_SELECTOR)
     assert.ok(
-      ungatedBlock.includes(`backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important`),
-      '无门那条规则里必须有补的模糊',
+      ungated.includes(`linear-gradient(var(${MENU_FILL_VARIABLE}), var(${MENU_FILL_VARIABLE}))`),
+      '必须再叠一层菜单色（官方 alpha 原样）—— 两层合起来才是菜单主体的颜色',
     )
+    assert.ok(
+      ungated.includes(`var(${GRAIN_TILE_VARIABLE}, none)`),
+      '颗粒要补在标题上（否则标题没颗粒、菜单有，接缝处看得出来）',
+    )
+    // 关键：整条修复必须出现在**无门**那条规则里（官方档下也生效）。
+    // ⚠️ 不能断言「带门的选择器不存在」—— 分组标题的**菜单面**规则本来就带门，选择器文本相同。
     const gatedBlock = blockFor(css, OFFICIAL_MISSING_BLUR_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`))
     assert.ok(
-      !gatedBlock.includes('backdrop-filter'),
-      '带门那条（颗粒）不得承担模糊 —— 否则官方档下带子照旧',
+      !gatedBlock.includes('background-color'),
+      '带门那条（菜单面图层）不得承担这条修复 —— 否则官方档下带子照旧',
     )
   })
 
@@ -948,9 +949,9 @@ describe('抬升面：表面绘制', () => {
     assert.ok(gatedBody.includes(layers), '去顶光的图层串必须在**这条规则**里')
     assert.ok(!gatedBody.includes(TOP_VARIABLE), '本条规则不得含顶光变量')
 
-    // 标题条本身也要拿回颗粒，否则标题上没颗粒、菜单上有 → 一层极淡的接缝
-    const titleRule = `${gated} ${GROUPED_MENU_TITLE_SELECTOR}`
-    assert.ok(css.includes(titleRule), `标题条要单独补颗粒：${titleRule}`)
+    // 标题条本身：现在是**单次合成的不透明块**（页面底色 + 一层菜单色 + 颗粒）。
+    // 这条规则**不带官方默认门** —— owner 的截图就是官方档拍的（见上一条测试）。
+    assert.ok(css.includes(OFFICIAL_MISSING_BLUR_SELECTOR), `标题条要单独修：${OFFICIAL_MISSING_BLUR_SELECTOR}`)
     assert.ok(css.includes(`var(${GRAIN_TILE_VARIABLE}, none) !important`), '补的是同款颗粒瓦片')
     // 结构锚点，不碰 hashed 类名（codebuddy 那个类还是非哈希的 ccb-model-groupTitle）
     assert.ok(GROUPED_MENU_TITLE_SELECTOR.includes("role='group'"), '标题用 role=group 的结构锚定')
