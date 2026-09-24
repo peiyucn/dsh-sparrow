@@ -397,6 +397,29 @@ export function buildSurfaceCss(): string {
 ${SURFACE_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
   background-image: ${surfaceLayers()} !important;
 }`).join('\n')}
+/* --- 质感**同时**叠到 ::before 上（官方把材质画在 ::before 的那些弹层）---
+   owner 2026-09-24：「子代理**透明了**，但是**纹理和打光又没了**」。
+
+   根因是**绘制顺序**：官方 "SubagentCatalogAction" 把材质画在自己的 "::before" 上
+   （"content: ''; position: absolute; inset: 0; z-index: -1; background: var(--dsw-specific-menu);
+   backdrop-filter: var(--dsw-menu-backdrop-filter)"）。
+   负 z-index 的伪元素画在**父元素的背景与边框之上、内容之下** ——
+   而我们上面那条把颗粒与光画在**父元素自己的 background-image** 上，
+   于是**官方那层半透明材质把我们整个质感盖住了**（观感：「透明了，但纹理没了」）。
+
+   修法与输入卡同一套（那一处踩过完全相同的坑，见 glass.ts 的卡片 ::before）：
+   把同一串图层**再画一份到 ::before** —— 同一元素上，伪元素背景与它自己的
+   background-color / backdrop-filter 同层合成，质感就压在材质之上了。
+
+   ⚠️ **两层都要留**：材质画在元素自己身上的那些弹层（菜单原语、后台任务 "<ul>"）只有
+   上面那条生效；画在 "::before" 上的（本弹层）只有这条生效。两条互不冲突
+   （后者在伪元素上，各画各的）。
+   ⚠️ 用 "background-image" 而不是叠加整串 "background" 简写 —— 简写会把官方那张材质的
+   "background-color" 一起重置掉。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+${SURFACE_ANCHORS.map(anchor => `${gatedAnchor(anchor)}::before {
+  background-image: ${surfaceLayers()} !important;
+}`).join('\n')}
 /* --- 菜单族：**不再由我们声明填充与模糊**（官方 0.1.7 已经成对画好了）---
    owner：「透明和模糊和**官方默认一样**就行」。
 
@@ -461,8 +484,19 @@ ${gatedAnchor(GROUPED_MENU_SELECTOR)} {
    看不出问题。等抬升面收到 0（面板变量在浅色轴变成纯白）之后，
    这条 !important 就把三张卡的面**盖成了纯白**，--dsw-specific-tip 的染色完全失效 ——
    owner 随即反馈「goal、todo、排队对话好像都没改」。**只写图层、不写底色**即根治：
-   底色交给 token 层（§4.0.2 那条通道），这里只负责它拿不到的那部分（颗粒 + 光）。 */
+   底色交给 token 层（§4.0.2 那条通道），这里只负责它拿不到的那部分（颗粒 + 光）。
+
+   ⚠️ **2026-09-24 起图层也画一份到 ::before**（owner：「输入框上面的各种停靠卡
+   **也没有适配纹理和打光**」）—— 与 subagents / AgentTeam 同一条**绘制顺序**问题：
+   官方这几张卡的材质同样画在**自己的 "::before"（z-index: -1）**上
+   （真机实测 QueueDock 的 "._7yHdaG_panel::before" = "rgba(61,50,58,.5)"），
+   负 z-index 伪元素画在**父元素背景之上**，于是把我们画在父元素 background-image
+   上的颗粒与光整个盖住。两层都留：材质画在元素自己身上的场景只有上面那条生效。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
 ${COMPOSER_CARD_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
+  background-image: ${menuSurfaceLayers()} !important;
+}`).join('\n')}
+${COMPOSER_CARD_ANCHORS.map(anchor => `${gatedAnchor(anchor)}::before {
   background-image: ${menuSurfaceLayers()} !important;
 }`).join('\n')}
 /* --- 为什么**不**改这三张卡的几何（owner：「官方处理方式不一样？」—— 是的，确实不一样）---

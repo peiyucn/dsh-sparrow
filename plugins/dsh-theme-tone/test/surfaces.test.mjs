@@ -1279,9 +1279,13 @@ describe('抬升面：表面绘制', () => {
     for (const name of [GRAIN_TILE_VARIABLE, TOP_VARIABLE, BOTTOM_VARIABLE, PANEL_VARIABLE]) {
       assert.ok(css.includes(`var(${name}`), `缺变量 ${name}`)
     }
-    // 硬编码色值 = 有人把色调写死在了这里
-    assert.ok(!/#[0-9a-f]{3,8}\b/iu.test(css), `表面表里不得出现硬编码色值：${css}`)
-    assert.ok(!/\brgba?\(/u.test(css), '表面表里不得出现硬编码色值')
+    // 硬编码色值 = 有人把色调写死在了这里。
+    // ⚠️ 断言前**必须剥注释**：注释里记录实测到的官方色值（如后台任务弹层 ::before 的半透明填充）
+    // 是有价值的排查证据，不该被读成「把色调写死」；真正要拦的是**声明**里的硬编码。
+    // `blockFor` 出于同样的理由先剥注释。
+    const code = css.replace(/\/\*[\s\S]*?\*\//gu, '')
+    assert.ok(!/#[0-9a-f]{3,8}\b/iu.test(code), `表面表里不得出现硬编码色值：${code}`)
+    assert.ok(!/\brgba?\(/u.test(code), '表面表里不得出现硬编码色值')
   })
 
   it('输入框里的图标按钮应该 默认去底、保留 hover 底', () => {
@@ -1318,7 +1322,9 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('不应该 依赖官方 hashed 类名，也不应该 限定相位', () => {
-    assert.ok(!/\.[A-Za-z0-9]*_[A-Za-z0-9]{4,}/u.test(css), '不得出现 hashed 类名')
-    assert.ok(!css.includes('data-phase'), 'hero 相位下侧栏菜单照样要弹')
+    // 同样先剥注释：注释里会引用实测到的官方 hashed 类名（如弹层 ::before 那条规则）作为证据。
+    const code = css.replace(/\/\*[\s\S]*?\*\//gu, '')
+    assert.ok(!/\.[A-Za-z0-9]*_[A-Za-z0-9]{4,}/u.test(code), '不得出现 hashed 类名')
+    assert.ok(!code.includes('data-phase'), 'hero 相位下侧栏菜单照样要弹')
   })
 })
