@@ -975,6 +975,30 @@ body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-empty]::after 
   opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT});
 }
 
+/* ===== 官方那些**吸顶遮罩行**：底色要等于它盖住的内容底 =====
+   owner 2026-09-24：「该适配的地方没适配，**think 那条黑框**，渲染是官方黑的遗留」。
+
+   根因：官方给这类吸顶行的底色是 **不透明纯色** var(--dsw-alias-bg-base) ——
+   "lcKema_root[data-expanded] [data-open] [data-disclosure-row] { position: sticky; top: 0;
+   background: var(--dsw-alias-bg-base) }"（展开的 Think 行吸在滚区顶部，压住滚过去的正文）。
+   官方档下 bg-base 就是地面那块纯色，所以**看不出有一条带子**；
+   而我们的地面是**渐变光带 + 颗粒**，纯色底一盖上去就显成一条「黑框」。
+
+   修法与顶栏同一套（它就是同一类东西：抬到地面之上、又必须等于地面）：
+   **把地面原样重画一遍** —— 同色 + 同渐变 + 同颗粒，且 background-attachment: fixed
+   让百分比按视口解析（行的盒子很小，按自身盒子解析会把渐变重新压成硬边带）。
+   底色仍是官方自己的 bg-base（已被色调染过），我们只补它拿不到的那层光与颗粒。
+
+   ⚠️ 锚点用官方的 "data-disclosure-row"（公开属性、非哈希类名）——
+   "lcKema" 是哈希前缀，仓库红线禁止写。
+   ⚠️ **收窄到官方自己加底的那个状态**（"[data-expanded] [data-open]"，逐字对齐官方那条规则）：
+   只写 "[data-disclosure-row]" 会把**所有**折叠行都刷上一层底（官方只在展开吸顶时才刷）。
+   ⚠️ 只挂色调档 —— 官方默认档下地面本来就是纯色，重画等于没事找事。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+body:not([${PLAIN_ATTR}]) [data-expanded] [data-open] [data-disclosure-row] {
+  ${backingPaint()}
+}
+
 /* 模态弹窗（[role='dialog']）**不做玻璃** —— 它是内容面（设置 / 文件 / 归档列表），
    走 src/surface.ts 的实色抬升面。Apple HIG：「Don't put glass on lists, cards, or media content」。
    曾经把液态玻璃做在了它上面（理解错了 owner 说的「对话框」= 输入框），已撤。
