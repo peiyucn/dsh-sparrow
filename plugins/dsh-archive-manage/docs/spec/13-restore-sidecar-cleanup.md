@@ -4,6 +4,11 @@
 
 ## 现象
 
+> ⚠️ **文件名注**：本文写于会话格式还是 **v3** 的时候，示例里因此写 `session.v3.jsonl.zstd`。
+> 0.1.7-rc.1 当前代是 **v4**（真机磁盘上实际为 `session.v4.jsonl.zstd`）。
+> 下文凡提到该文件名处，**版本次号以当时为准**，语义（「官方的会话日志文件」）不变 ——
+> 本文是历史定案记录，不追改正文。
+
 `restoreTrashDir` 用 `rename(trashDir → sidecar.originalPath)` 把回收站条目搬回原位——但回收站目录里
 除了会话日志与 `subagents/`，还有插件的记账文件 `dsh-archive-manage.json`（`TRASH_SIDECAR`）。
 `subagents/` 子目录有清理，sidecar 没有，于是**还原后它会跟着落回用户的会话目录**：
