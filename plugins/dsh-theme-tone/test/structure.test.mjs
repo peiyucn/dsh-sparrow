@@ -91,11 +91,20 @@ describe('dsh-theme-tone 结构', () => {
     assert.match(src, /localSettings/u, '要有进程内兜底值')
     assert.match(src, /snapshot\.writable/u, 'setTone 要检查 writable')
     assert.match(src, /warnUser\(/u, '不可持久化 / 停用时要走面向用户的告警（logger + console）')
-    // setTone 的分支里必须真的写兜底值 + 立刻重绘
+    // setTone 的分支里必须真的写兜底值 + 立刻重绘，且顺序是「本地落值 → 重绘 → 发写入」。
+    // 窗口取足够宽（注释长短会变，曾用固定 800 字符导致误报）；只断言**相对顺序**。
     const i = src.indexOf('setTone:')
-    const seg = src.slice(i, i + 800)
+    assert.ok(i > 0, '找不到 setTone')
+    const seg = src.slice(i, i + 4000)
     assert.ok(seg.includes('localSettings'), 'setTone 不可写分支要写 localSettings')
     assert.ok(seg.includes('repaint()'), 'setTone 不可写分支要立刻重绘')
+    const localAt = seg.indexOf('localSettings = ')
+    const repaintAt = seg.indexOf('repaint()')
+    // ⚠️ 匹配**真实调用**（`void scope.set(`），不能用 `scope.set(` —— 上面那段注释里
+    // 也提到了 `scope.set()`，会把它的位置当成调用位置。
+    const setAt = seg.indexOf('void scope.set(')
+    assert.ok(localAt >= 0 && repaintAt > localAt && setAt > repaintAt,
+      `顺序必须是「先本地落值 → 立刻重绘 → 再发写入」（local=${localAt} repaint=${repaintAt} set=${setAt}）`)
   })
 
   it('⛔ client inject 只放跨版本稳定服务（易变面进 inject 会把宿主整页拖死）', async () => {

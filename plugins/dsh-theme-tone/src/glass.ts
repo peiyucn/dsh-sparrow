@@ -806,10 +806,22 @@ body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [da
 /* ===== 右边栏：自己画一遍背景层的光与颗粒 =====
    为什么需要：为了不被抬到 81 的内容层盖住，右边栏被抬到了 82（见 backdrop.ts 的不变式）——
    而背景层在 80，于是它**跑到背景层上面**，吃不到那层色调的光与颗粒。
-   它官方是 background: var(--dsw-alias-bg-base)（**不透明实色**，SidebarRight.module.css:34），
    所以底色**已经**被 token 染对了、只是缺质感 —— 把背景层那套渐变与颗粒**叠上去**即可
    （与顶栏同一个思路，区别是顶栏半透明、这里在实色底上叠）。
    用 background-image 与 background-color 分层，不碰官方底色本身。
+
+   ⚠️ **0.1.7 起还要管一层「内胆」**（owner 真机报「右边栏完全没适配」）。
+   0.1.5 线里右边栏是 SidebarRight.module.css 的 .panel 自己刷不透明底色；
+   0.1.7 起右边栏整块改由 **dockkit** 承载，真正刷底色的是它的**内容宿主**
+   [data-dockkit-pane]（= dockkit.module.css:168-172 的
+   .tabHost:not(.float), .emptyTabHost { background: var(--dsw-alias-bg-base) }）。
+   那层是**不透明**的、且是 .panel 的**后代** —— 于是本规则画在 .panel 上的
+   渐变与颗粒**整个被它盖掉**，右边栏看着就是一块没有任何色调质感的纯色板。
+   修法：把同一套图层**同时**画到内容宿主上（.panel 那条保留 —— 它仍负责面板本体、
+   浮动面板与空态这两种不经过 .tabHost 的场景）。
+   data-dockkit-pane / data-dockkit-host / data-dockkit-surface 都是官方公开属性
+   （TabLayout.tsx:80-90），不碰 hashed 类名。
+   （本段在模板字符串里，注释中**不能出现反引号**。）
 
    已知近似一处（**待 owner 真机判断**）：颗粒用的是**浮层那张贴图**（GRAIN_TILE_VARIABLE，
    强度烘进 SVG、正常合成），而背景层的颗粒是 ::after + 独立 opacity + 深色轴走 screen。
@@ -848,7 +860,9 @@ body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [da
    值少于层数时**会按顺序循环补齐**（本插件栽过：写「scroll, fixed」等于两者交替，
    第 1、3 段渐变退回按元素盒解析）。**不许再退回任何一个 per-layer 属性只给一两个值。**
    （本段在模板字符串里，注释中**不能出现反引号**。） */
-body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}] {
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
+body:not([${PLAIN_ATTR}]) [data-dockkit-pane],
+body:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
   background-image: ${grainOverGradients()};
   background-attachment: scroll;
   background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;

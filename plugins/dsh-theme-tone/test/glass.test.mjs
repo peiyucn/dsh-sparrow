@@ -28,6 +28,22 @@ const css = buildGlassCss()
 const rules = css.replace(/\/\*[\s\S]*?\*\//gu, '')
 
 /**
+ * 取**右边栏那条图层规则**的起点（已剥注释）。
+ *
+ * ⚠️ 0.1.7 起这条规则是**三条选择器共用同一段声明**：
+ * `[data-sidebar-right-panel], [data-dockkit-pane], [data-dockkit-empty]` ——
+ * 因为右边栏改由 dockkit 承载，真正刷不透明底色的是它的内容宿主
+ * `[data-dockkit-pane]`（画在 `.panel` 上会被那层整个盖掉）。
+ * 故定位用**选择器组的首行**（`[data-sidebar-right-panel],`），不能写成
+ * `[data-sidebar-right-panel] {`（那个串已不存在）。
+ * @param source - 已剥注释的样式表文本。
+ * @returns 该规则的起始下标（找不到为 -1）。
+ */
+function rightPanelRuleStart(source) {
+  return source.indexOf(`[${RIGHT_PANEL_ATTR}],`)
+}
+
+/**
  * 取**输入框卡片**那条规则（已剥注释）。
  *
  * 必须剥注释：本模块的注释里会引用 `linear-gradient` / `background:` 这类**反面教材**
@@ -121,7 +137,7 @@ describe('glass：顶栏浮层', () => {
     //
     // 实测（面板几何完全相同，逐像素与「无面板」参照比对）：
     //   静止 + fixed + at 50% → mad 0.2（对）；动画 + fixed + at 50% → mad 26.4 / max 90（错）。
-    const panel = rules.slice(rules.indexOf(`[${RIGHT_PANEL_ATTR}] {`))
+    const panel = rules.slice(rightPanelRuleStart(rules))
     const body = panel.slice(0, panel.indexOf('}') + 1)
     assert.ok(!/background-attachment:\s*fixed/u.test(body), 'fixed 在 transform 下会改判定位区')
     assert.match(body, /background-attachment: scroll;/u, '附着用 scroll（与元素盒一致，恒定）')
@@ -136,7 +152,7 @@ describe('glass：顶栏浮层', () => {
     // ⚠️ 三个 per-layer 属性（size / position / repeat）**都必须给足 4 个值**：
     // 值少于层数时会**按顺序循环补齐**（本插件栽过 —— 写「scroll, fixed」等于两者交替，
     // 第 1、3 段渐变退回按元素盒解析）。所以这里逐个钉住。
-    const panel = rules.slice(rules.indexOf(`[${RIGHT_PANEL_ATTR}] {`))
+    const panel = rules.slice(rightPanelRuleStart(rules))
     const body = panel.slice(0, panel.indexOf('}') + 1)
     const decl = (prop) => {
       const m = body.match(new RegExp(`${prop}\\s*:\\s*([^;]+);`, 'u'))
@@ -636,7 +652,7 @@ describe('glass：边界与纪律', () => {
     // 根因：为不被抬到 81 的内容层盖住，右边栏被抬到了 82 —— 而背景层在 80，
     // 于是它**跑到背景层上面**，底色被 token 染对了、但那层**光与颗粒吃不到**。
     // 修法：让它自己叠一遍背景层那套（与顶栏同一思路；区别是顶栏半透明、它是不透明实色底）。
-    const start = rules.indexOf(`[${RIGHT_PANEL_ATTR}] {`)
+    const start = rightPanelRuleStart(rules)
     assert.ok(start > 0, '应能找到右边栏规则')
     const rule = rules.slice(start, rules.indexOf('}', start))
     assert.match(rule, /background-image:/u, '右边栏应自己叠光与颗粒')
@@ -646,6 +662,13 @@ describe('glass：边界与纪律', () => {
     // ⚠️ 不得写 background 简写 —— 那会把官方的 bg-base 底色一起重置
     assert.ok(!/\bbackground:/u.test(rule), '不得用 background 简写（会重置官方底色）')
     assert.ok(!rule.includes('background-color:'), '不该动官方底色（它已被 token 染对）')
+    // ⚠️ 0.1.7：必须**同时**覆盖 dockkit 的内容宿主，否则被它的不透明底色整个盖掉
+    //（owner 真机报「右边栏完全没适配」）。
+    assert.ok(
+      rule.includes('[data-dockkit-pane]'),
+      '右边栏图层必须画到 [data-dockkit-pane] 上 —— dockkit 的内容宿主才是不透明那层',
+    )
+    assert.ok(rule.includes('[data-dockkit-empty]'), '空态宿主（[data-dockkit-empty]）同样要覆盖')
   })
 
   it('不应该 给浮层写规则（浮层是不透明 + 质感，走 src/surface.ts）', () => {

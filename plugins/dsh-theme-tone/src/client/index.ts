@@ -272,6 +272,12 @@ function install(ctx: Context): void {
   let warnedNoPersistence = false
 
   /**
+   * 用户刚点、还在跨宿主往返中的那一笔色调（乐观更新，见 {@link readSettings}）。
+   * 宿主快照追上或明确拒掉时清除（见 {@link clearSettledPending}）。
+   */
+  let pendingTone: { field: keyof ThemeToneSettings; id: ToneId } | undefined
+
+  /**
    * 当前该用哪份设置。
    *
    * ⚠️ 这里**不能**写成 `value ?? DEFAULT_SETTINGS`：`status === 'loading'` 时
@@ -280,11 +286,26 @@ function install(ctx: Context): void {
    * （浅色轴默认 `official`、深色轴默认 `violet`，与多数人的实际选择不同）。
    * 就绪前一律用**进程内兜底值**（初值 = 默认，且此时没人改过它），
    * 并由 {@link shouldPaint} 决定先不上色。
+   *
+   * **乐观更新**：{@link pendingTone} 里那一笔（用户刚点、还在跨宿主往返中）优先于
+   * 宿主快照 —— 否则点下去要等一个 RTT 才变色（owner：「点色卡后半天才换过来」）。
+   * 一旦快照里的该字段追上这一笔，pending 自然失效（见 {@link clearSettledPending}）。
    */
   const readSettings = (): ThemeToneSettings => {
     const snapshot = scope.getSnapshot()
-    if (snapshot.status === 'ready' && snapshot.value !== undefined) return snapshot.value
-    return localSettings
+    const base = snapshot.status === 'ready' && snapshot.value !== undefined ? snapshot.value : localSettings
+    if (pendingTone === undefined) return base
+    return { ...base, [pendingTone.field]: pendingTone.id }
+  }
+
+  /**
+   * 宿主快照已追上那一笔乐观更新时把它丢掉；若快照明确停在**别的**值上（说明宿主拒了这笔），
+   * 也一并丢掉 —— 让画面回到宿主的权威值，而不是永久停在乐观值上。
+   * @param settings - 快照里解析出的设置节（未就绪时传 `undefined`）。
+   */
+  const clearSettledPending = (settings: ThemeToneSettings | undefined): void => {
+    if (pendingTone === undefined || settings === undefined) return
+    if (settings[pendingTone.field] === pendingTone.id) pendingTone = undefined
   }
 
   /**
@@ -368,6 +389,9 @@ function install(ctx: Context): void {
     // 就是一次可避免的闪变（见 readSettings 的 ⚠️）。
     if (!shouldPaint()) return
     warnIfNotPersistable()
+    const snapshot = scope.getSnapshot()
+    // 快照已追上（或已明确偏离）那一笔乐观更新 → 收掉它，回到以宿主为准。
+    clearSettledPending(snapshot.status === 'ready' ? snapshot.value : undefined)
     const settings = readSettings()
     paintTokens(settings)
     paintLayer(ctx.theme.getTheme())
@@ -468,13 +492,26 @@ function install(ctx: Context): void {
           const scheme = ctx.theme.getTheme().active.colorScheme
           const field = toneFieldFor(scheme)
           const snapshot = scope.getSnapshot()
-          // 宿主不可写（memory 模式 / 命名空间未暴露）时 `scope.set` 是**静默空操作**，
-          // 点下去屏幕不会有任何反应。此时写进程内兜底值并立刻重绘，
-          // 让选择在**本次会话内**照常生效（只是不持久化），并记一条告警说明原因。
+          /**
+           * ⚠️ **先本地落值 + 立刻重绘，再发写入**（owner 真机报「点色卡后半天才换过来」）。
+           *
+           * 原因：`scope.set()` 是**跨宿主的一趟往返**（写设置文档 → 宿主回新镜像 →
+           * `subscribe` 触发 `repaint`），在往返回来之前 `readSettings()` 读到的仍是**旧值**，
+           * 所以画面要等一个 RTT 才变。色卡是纯本地观感、双击率又高，这一等很显眼。
+           *
+           * 修法：把用户的选择**先写进进程内兜底值**并立刻重绘（乐观更新），随后再发写入。
+           * `readSettings()` 优先读宿主快照，故宿主一旦回值即以宿主为准 —— 天然自愈，
+           * 不需要额外的「作废旧值」逻辑：若宿主把这一笔拒了（值非法 / 写入被拒），
+           * 快照仍停在旧值，下一次 `subscribe` / 事件驱动的 `repaint` 会把它纠正回去。
+           *
+           * 宿主不可写（memory 模式 / 命名空间未暴露）时这是**唯一**的落值途径，
+           * 因此同一条路同时承担「不可持久化时也要在本次会话内生效」。
+           */
+          localSettings = { ...localSettings, [field]: id }
+          pendingTone = { field, id }
+          repaint()
           if (snapshot.status !== 'ready' || !snapshot.writable) {
-            localSettings = { ...localSettings, [field]: id }
             warnIfNotPersistable()
-            repaint()
             return
           }
           void scope.set(field, id)
