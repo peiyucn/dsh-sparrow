@@ -867,27 +867,25 @@ describe('抬升面：表面绘制', () => {
     assert.ok(buildGlassCss().includes(`inset ${GLASS_SPECULAR_RING[0].x}px ${GLASS_SPECULAR_RING[0].y}px`), '输入框卡片应带镜面高光')
   })
 
-  it('⛔ 粘性分组标题必须**不带门**地改成单次合成的不透明块（官方档下也要修）', () => {
+  it('⛔ 粘性分组标题必须**不带门**地去掉那层重复填充（官方档下也要修）', () => {
     // owner 两轮都报：模型选择菜单的**分类显示条有背景色、与后面内容串色** ——
     // 官方档与我们的色调档下都在（`ModelSelect.module.css` 的 `.groupTitle` 与
     // codebuddy 的 `.ccb-model-groupTitle` 都用同一个**半透明**菜单 token 做填充）。
     // 根因：菜单主体已经是 0.5 的菜单色，标题再把同一个色叠一遍 → 等效 0.75
     //（比主体亮一档 =「有背景色」），且只有 50% 不透明 → 行从底下滚过时透出来（「串色」）。
-    // 靠 backdrop-filter 修不掉（标题在菜单内，菜单自己是 backdrop root，模糊只能采样子树）。
-    // 正解：不透明白底（页面底色）+ 一层菜单色 = **菜单主体那一个颜色**（单次合成）。
+    // 正解：**不要再画一遍** —— 标题是菜单的子元素，父级的填充本来就在它下面；
+    // 置 transparent 后它直接显示菜单自己的玻璃，滚过来的行由官方那对模糊交代。
+    //（曾试过「补 blur」→ 菜单自己是 backdrop root，补了也只采样子树；
+    //  也试过「刷不透明白底 + 菜单色」→ 横带没了但标题成实心块，owner 复验仍说「有背景色」。）
     const ungated = blockFor(css, OFFICIAL_MISSING_BLUR_SELECTOR)
     assert.ok(ungated !== '', `应有分组标题规则（不带门）：${OFFICIAL_MISSING_BLUR_SELECTOR}`)
     assert.ok(
-      ungated.includes('background-color: var(--dsw-alias-bg-base) !important'),
-      '必须给不透明白底（页面底色）—— 否则行从下面滚过时透出来',
+      ungated.includes('background-color: transparent !important'),
+      '标题填充必须置 transparent —— 官方那层重复合成就是「有背景色」的来源',
     )
     assert.ok(
-      ungated.includes(`linear-gradient(var(${MENU_FILL_VARIABLE}), var(${MENU_FILL_VARIABLE}))`),
-      '必须再叠一层菜单色（官方 alpha 原样）—— 两层合起来才是菜单主体的颜色',
-    )
-    assert.ok(
-      ungated.includes(`var(${GRAIN_TILE_VARIABLE}, none)`),
-      '颗粒要补在标题上（否则标题没颗粒、菜单有，接缝处看得出来）',
+      ungated.includes(`backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important`),
+      '必须补上官方那对模糊（与菜单面同一档），否则滚过来的行是硬的',
     )
     // 关键：整条修复必须出现在**无门**那条规则里（官方档下也生效）。
     // ⚠️ 不能断言「带门的选择器不存在」—— 分组标题的**菜单面**规则本来就带门，选择器文本相同。
@@ -1026,7 +1024,15 @@ describe('抬升面：表面绘制', () => {
       '悬停卡选择器不该带官方默认门（两个档都要修）',
     )
     assert.ok(css.includes(`${HOVER_CARD_ANCHOR} {`), '应有一条直接以悬停卡锚点开头的规则')
-    assert.ok(css.includes(`var(${PANEL_VARIABLE})`), '面应取面板变量（官方默认档下即官方自己的 layer3）')
+    // ⚠️ 断言必须落在**这条规则体**里（剥注释）：全表 `css.includes(...)` 会被别处的巧合喂饱 ——
+    //    「底色交回官方」之后，这条是**唯一**还写 `var(PANEL_VARIABLE)` 的地方。
+    //    悬停卡不在 SURFACE_ANCHORS 里，所以那次收口没动它：官方给它的面是组件内**硬编码字面量**
+    //    （恒深灰、两轴同值），不染就与我们的弹层材质割裂 —— owner 定案「先把官方默认修了」。
+    const hoverBody = blockFor(css, HOVER_CARD_ANCHOR)
+    assert.ok(
+      hoverBody.includes(`background-color: var(${PANEL_VARIABLE}, var(--dsw-alias-bg-layer-3)) !important`),
+      '面应取面板变量，并带官方 layer-3 兜底（token 层未就绪时不能变全透明）',
+    )
 
     // ④ 字色必须**逐条**覆盖，且用主题感知的官方 label token
     for (const { suffix, token } of HOVER_CARD_TEXT_TOKENS) {
@@ -1201,15 +1207,24 @@ describe('抬升面：表面绘制', () => {
     assert.equal((layers.match(new RegExp(POPUP_STOP, 'gu')) ?? []).length, 2, '两层都用浮层收束位置')
   })
 
-  it('每一条锚点规则应该 只改填充与图层两样，且都带官方默认门', () => {
+  it('每一条锚点规则应该 **只叠图层、不刷底色**，且都带官方默认门', () => {
+    // ⚠️ 2026-09-24 架构收口（owner：「统一设计语言，该透明模糊的就透明模糊，用 dsh 官方新代码的
+    // 接入方式接入」）：这层**不透明填充**是 0.1.5 时代的兜底，0.1.7 官方把弹层统一成
+    // 「半透明 --dsw-specific-menu + --dsw-menu-backdrop-filter」之后，它反而把官方的玻璃
+    // 整块盖掉 —— 就是 owner 反复报的「后台任务 / CodeBuddy 弹窗不是透明模糊效果」。
+    // 现在：底色与模糊一律交给**官方自己的材质 + 官方 token**（色调走 overrideTokens 染进 token），
+    // 我们只叠 `background-image` 的质感层（颗粒 + 光）。
     for (const anchor of SURFACE_ANCHORS) {
       const gated = anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
       const at = css.indexOf(`${gated} {`)
       assert.ok(at >= 0, `缺规则 ${gated}`)
       const body = css.slice(at, css.indexOf('}', at))
-      assert.ok(body.includes(`background-color: var(${PANEL_VARIABLE}) !important`), `${anchor} 要锚面板底色`)
       assert.ok(body.includes('background-image:'), `${anchor} 要画图层`)
-      assert.ok(!body.includes('backdrop-filter'), `${anchor} 不透明，不需要模糊`)
+      assert.ok(
+        !body.includes('background-color'),
+        `${anchor} 不得刷底色 —— 官方的半透明材质要能透上来（色调已由 token 层染过）`,
+      )
+      assert.ok(!body.includes('backdrop-filter'), `${anchor} 模糊归官方素材，不在本表声明`)
       assert.ok(!/\bbackground:\s/u.test(body), `${anchor} 不得用简写（会重置 background-position 等）`)
     }
   })

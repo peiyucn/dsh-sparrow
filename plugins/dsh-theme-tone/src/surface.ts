@@ -414,29 +414,40 @@ export const MENU_MATERIAL_ANCHORS: readonly string[] = Object.freeze([
 export const OFFICIAL_MISSING_BLUR_SELECTOR = `${GROUPED_MENU_SELECTOR} ${GROUPED_MENU_TITLE_SELECTOR}`
 
 /**
- * 抬升面样式表文本（**兜底通道**）。
+ * 抬升面样式表文本（**只加质感，不刷底色**）。
  *
- * 只声明两样：**面板底色**（`PANEL_VARIABLE`，与 token 层同一个值）与**图层**。
+ * ## ⚠️ 2026-09-24 架构收口：底色交回官方，我们只加质感
  *
- * `!important` 的理由：官方写的是 `background:` **简写**（内含 `background-image: none`），
- * 特异度又各写各的（`.list` / `.card` / `.portal .menu` …），无法穷举；压不过就是静默失效。
- * 反过来，因为只动这两样，万一某处锚点没命中，那处也只是一个官方面，不会出现「半截样式」。
+ * owner 定的口径：「**统一设计语言**，该透明模糊的就透明模糊，不破坏我们原来的设计，
+ * 适配新的官方设计语言」。
+ *
+ * 这条表原先会给每个锚点刷一层**不透明** `background-color: var(PANEL_VARIABLE) !important`
+ * —— 那是 0.1.5 时代的兜底（当时官方弹层底色散落、还多是实色）。
+ * 0.1.7 官方把弹层统一成「`--dsw-specific-menu`（半透明）+ `--dsw-menu-backdrop-filter`（模糊）」
+ * 之后，这层**不透明**兜底反而把官方的玻璃**整块盖掉**：owner 反复报的
+ * 「后台任务 / CodeBuddy 弹窗不是透明模糊效果」就是它。
+ *
+ * 现在只保留 `background-image` 的**图层**（颗粒 + 光），底色与模糊**一律由官方自己的材质
+ * 与官方 token 承担** —— 色调通过 `ctx.theme.overrideTokens` 染进 token（官方接入方式），
+ * 于是所有官方面自带色调，且材质与官方逐字一致。
+ *
+ * 仍然保留 `!important`：官方写的是 `background:` **简写**（内含 `background-image: none`），
+ * 特异度又各写各的，压不过就是静默失效。
  * @returns 注入 `<style>` 的 CSS 文本。
  */
 export function buildSurfaceCss(): string {
-  return `/* ===== dsh-theme-tone 抬升面（菜单 / 对话框）：兜底给硬编码底色的弹层上同一套面 =====
+  return `/* ===== dsh-theme-tone 抬升面（菜单 / 对话框）：只叠质感，底色交回官方 =====
    选择器带 ${PLAIN_ATTR} 门：官方默认下整表不命中（owner：官方默认的都不要动）。 */
 ${SURFACE_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
-  background-color: var(${PANEL_VARIABLE}) !important;
   background-image: ${surfaceLayers()} !important;
 }`).join('\n')}
 /* --- 菜单族：跟随官方 0.1.7 的**半透明 + 模糊**材质 ---
    owner：「官方的弹出窗，我看都是透明模糊的效果了，我们几个主题色也得跟着一起适配吧。」
-   上面那条兜底给的是不透明填充（把官方的模糊盖住了），这里按官方材质改回来：
    填充用**已被色调染过、且保留官方 alpha** 的 --dsw-specific-menu，并补上配套模糊
    （官方要求两者**成对**，见 docs/web-styling.zh.md:25）。
-   放在这条**之后**：两条都带 !important，同特异度下后者胜 —— 于是填充换成半透明，
-   而 background-image 的图层仍由上面那条提供（本块不碰它），色调质感不丢。
+   这一块现在**不是在盖兜底**（不透明兜底已在 2026-09-24 撤掉，见 buildSurfaceCss 的说明），
+   而是**兜住官方没配成对的地方**：官方的填充与模糊必须同时出现，
+   少一个就是"半透明塑料片"（owner 报的"全透明"正是这个形态）。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 ${MENU_MATERIAL_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
   background-color: var(${MENU_FILL_VARIABLE}) !important;
@@ -451,33 +462,33 @@ ${MENU_MATERIAL_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
 ${gatedAnchor(GROUPED_MENU_SELECTOR)} {
   background-image: ${menuSurfaceLayers()} !important;
 }
-/* --- 粘性分组标题：把「同一个半透明色合成两次」改成**单次合成的不透明块**（修官方 bug）---
+/* --- 粘性分组标题：**去掉那层重复的填充**（官方把同一个半透明色叠了两次）---
    owner 两轮都报：「模型选择菜单，分类显示条**有背景色**，并且**和后面串色**」——
    官方档与我们的色调档下都在（官方自己也是坏的）。
 
-   根因：菜单主体是 "background: var(--dsw-specific-menu)"（0.1.7 起 **半透明**，
-   深色轴 = 官方 bluish-800 加 50% 不透明度）+ 官方模糊；而官方给吸顶标题的填充**也是同一个 token**，
-   于是标题那一小块把同一个半透明色**又合成了一遍**（0.5 上再叠 0.5 → 等效 0.75）：
-   既比菜单主体**亮一档**（看着就是"有背景色的横带"），又因为只有 50% 不透明，
+   根因：官方给菜单主体的填充是 "background: var(--dsw-specific-menu)"，
+   给**吸顶标题**的填充**也是同一个 token** —— 标题是菜单的子元素，于是那一小块把
+   同一个半透明色**又合成了一遍**（深色轴 0.5 上再叠 0.5 → 等效 0.75）：
+   既比菜单主体**亮一档**（看着就是"一条有背景色的横带"），又因为只有 50% 不透明，
    行从它底下滚过时仍然**透出来**（"串色"）。
 
-   为什么不能靠 "backdrop-filter" 解决（曾这么修过，没用）：标题在**菜单内部**，
-   而菜单自己带 "backdrop-filter" ⇒ 菜单已经成为 **backdrop root**，
-   标题的模糊只能采样子树（滚动的行），补了模糊也依然是"半透明 + 糊影"。
+   **官方想要的其实就是"标题和菜单主体同色"** —— 而菜单主体的色**已经画在标题底下了**
+   （标题是菜单的子元素，父级的填充本来就在它下面）。所以正解是**不要再画一遍**：
+   标题的填充置为透明，让它直接显示菜单自己的那层玻璃；滚过来的行由官方那对模糊交代
+   （标题补上配套的 "backdrop-filter"，与菜单面同一档）。
 
-   正解 = **让这一块像素等于菜单主体压在页面底色上的那一个颜色**（单次合成、不透明）：
-   不透明白底（"--dsw-alias-bg-base"，已被色调染过）+ 一层菜单色（官方 alpha 原样保留）
-   → 合成结果与菜单主体逐像素同色，既不再亮一档，也把滚过来的行**挡住**。
-   颗粒照旧补在最上面一层（否则标题没颗粒、菜单有，接缝处仍看得出来）。
+   曾试过两条弯路，都记在这里免得再走：
+   * 给它「补一层同色填充」→ 就是官方现在的样子（叠两次，亮一档）；
+   * 给它「刷不透明白底 + 一层菜单色」→ 横带是没了，但标题变成**实心块**，
+     与"半透明 + 模糊"的菜单主体仍不是一种材质（owner 复验：「依然有背景色」）。
 
    ⚠️ **本条不带官方默认门**：owner 那张截图就是在**官方默认档**下拍的，带子在官方档也在。
-   我们改的是**官方自己出错的合成**（同一个色叠两次），不是换它的色相或材质 ——
-   标题的色相/透明度语义仍完全来自官方 token。
+   我们只去掉官方重复合成的那一次，色相 / 透明度语义仍完全来自官方 token。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 ${OFFICIAL_MISSING_BLUR_SELECTOR} {
-  background-color: var(--dsw-alias-bg-base) !important;
-  background-image: linear-gradient(var(${MENU_FILL_VARIABLE}), var(${MENU_FILL_VARIABLE})),
-    var(${GRAIN_TILE_VARIABLE}, none) !important;
+  background-color: transparent !important;
+  backdrop-filter: var(${MENU_BLUR_VARIABLE}) !important;
+  background-image: var(${GRAIN_TILE_VARIABLE}, none) !important;
 }
 /* --- 输入框上方那三张**停靠卡**（排队 / 目标 / 待办）---
    owner：「**输入框上面那个区域也没适配**，刚才我记得让改了，但是没改。」
