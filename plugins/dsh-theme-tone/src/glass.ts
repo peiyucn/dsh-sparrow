@@ -805,15 +805,19 @@ body:not([${PLAIN_ATTR}]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [
   z-index: 0;
   background-color: transparent;
   background-image: none;
-  /* 官方那条**外**投影（抬升语义）→ 我们的**悬浮**投影（{@link GLASS_CARD_LIFT}）
-     → 我们的**边光**（inset，玻璃厚度）。三段并列，各管各的。 */
+  /* ⚠️ 本体只留**外**投影：官方那条抬升（--dsw-elevation-soft）+ 我们的悬浮（GLASS_CARD_LIFT）。
+     **inset 边光（rimFor）不能写在这里** —— 绘制顺序是「元素自己的背景/边框/box-shadow」
+     先画，**负 z-index 子层随后盖上去**：::before 那道玻璃会把本体的 inset 环整个埋掉，
+     实测就是 owner 2026-09-24 报的「输入框玻璃效果改坏了，边缘光效和之前不同了」。
+     所以边光跟着玻璃一起挂到 ::before 上（见下一条）。 */
   box-shadow: var(--dsw-elevation-soft),
-    ${GLASS_CARD_LIFT},
-    ${rimFor('dark')};
+    ${GLASS_CARD_LIFT};
 }
-/* 卡片玻璃本体（填充 + 边光渐变 + 模糊）—— 挂 ::before，理由见上面卡片规则内。
+/* 卡片玻璃本体（填充 + 边光渐变 + **inset 边光** + 模糊）—— 挂 ::before，理由见上面卡片规则内。
    border-radius: inherit 必须写：官方 .card 是 22px 圆角，伪元素不继承它就会画成方角。
    pointer-events: none —— 玻璃层不参与命中测试（卡里有 textarea 与按钮）。
+   ⚠️ inset 环必须与填充在**同一层**：box-shadow 的 inset 段画在该元素自己的背景之上、
+     内容之下，所以放这里才读得出「玻璃厚度」（放本体就会被这层玻璃埋掉，见上）。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 body:not([${PLAIN_ATTR}]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card]::before {
   content: '';
@@ -824,17 +828,14 @@ body:not([${PLAIN_ATTR}]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [
   border-radius: inherit;
   background-color: ${fill('var(--dsw-specific-input-major)', GLASS_CARD_ALPHA)};
   background-image: ${edgeFadeLayers('dark')};
+  box-shadow: ${rimFor('dark')};
   backdrop-filter: ${GLASS_CARD_BLUR};
 }
 /* 浅色轴：同样的光路，只有**阴影浓度**不同（近白底上阴影要更明显才立得住形）。
    注意官方默认门（body:not([PLAIN])）必须写在**最前** —— 有一条守卫按前缀认它。 */
 body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card]::before {
   background-image: ${edgeFadeLayers('light')};
-}
-body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card] {
-  box-shadow: var(--dsw-elevation-soft),
-    ${GLASS_CARD_LIFT},
-    ${rimFor('light')};
+  box-shadow: ${rimFor('light')};
 }
 
 /* --- 未选工作区（待启动态）：**把边界让回官方那条虚线框** ---
@@ -856,6 +857,11 @@ body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) ${phaseGate(GLASS_CARD_PHASE
    这两条必须放在上面两条**之后** —— 同特异性下靠后者胜出。 */
 body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card] {
   box-shadow: var(--dsw-elevation-soft);
+}
+/* ⚠️ 边光与玻璃同在 ::before（2026-09-24 起）—— 待启动态要撤的那条 inset 环也必须打在这里，
+   只改本体的话边光会留着，与官方那条虚线框并存（owner 2026-09-20 定案：边缘让给官方）。 */
+body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card]::before {
+  box-shadow: none;
 }
 
 /* ===== 右边栏：自己画一遍背景层的光与颗粒 =====

@@ -20,7 +20,7 @@ import {
 } from '../lib/glass.js'
 /** 浅色轴暗边用的官方最深静态色 token。 */
 const SHADE_TOKEN = '--dsw-static-neutral-bluish-1000'
-import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_TILE_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, SIDE_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
+import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_TILE_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, SIDE_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, dimmedBackdropGradients } from '../lib/backdrop.js'
 
 const css = buildGlassCss()
@@ -423,7 +423,9 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // 又说「液态玻璃效果好像不只是上面加亮条，你可以看看苹果的设计。」
     // Apple 的材质是 `specular highlights, refraction` —— 高光沿玻璃的**整圈边缘**、
     // 随主光方向强弱不同；四条等亮那是**塑料描边**，不是玻璃。
-    const card = cardRule(css)
+    // ⚠️ 2026-09-24：inset 环与玻璃同在 **::before**（放本体会被玻璃层埋掉 ——
+    //   owner 报的「输入框玻璃效果改坏了，边缘光效和之前不同」就是它）。
+    const card = cardGlassBaseRule(css)
     for (const { key } of GLASS_SPECULAR_RING) {
       assert.ok(card.includes('inset '), `卡片应有 ${key} 方向的 inset 阴影`)
     }
@@ -499,7 +501,9 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // 而 `linear-gradient` 画的是**直线带** —— 到圆角处被裁断，**光绕不过圆角**。
     // `inset` 阴影沿元素自身的圆角轮廓走，天然绕圈 —— 现在它负责**一圈底光**
     // （右下角那一带靠它，椭圆到不了），主光则交给 background-image 的椭圆。
-    const card = cardRule(css)
+    // ⚠️ 2026-09-24：inset 环与玻璃同在 **::before** —— 放本体（背景/box-shadow 先画）
+    //   会被后画的负 z-index 玻璃层整个埋掉，正是 owner 报的「边缘光效和之前不同了」。
+    const card = cardGlassBaseRule(css)
     assert.match(card, /box-shadow:/u, '底光应写在 box-shadow 里')
     assert.ok(!/background-image:[^;]*linear-gradient/u.test(card), '直线带画不出圆角（不得用 linear-gradient 画边光）')
     const insets = card.match(/inset /gu) ?? []
@@ -690,10 +694,21 @@ describe('glass：边界与纪律', () => {
     // **例外二**：卡片那两条走 `:is(active, hero)` —— 首页也要玻璃（见下一条用例）。
     // 这里断言其余规则**逐个**都是**单** active 相位，别顺手放宽了别的。
     const CARD = '[data-composer-card]'
+    // **例外三**：官方那些**吸顶遮罩行**（`[data-disclosure-row]`，展开的 Think 行）——
+    // 它们在**滚区内部**，与顶栏相位无关（hero 下也能展开），所以不带 active 门。
+    // 它们要的是「底色等于它盖住的内容底」，而地面在任何相位都着色。
+    const DISCLOSURE = '[data-disclosure-row]'
     const blocks = rules.split('}').filter(block => block.includes('{'))
     for (const block of blocks) {
       const selector = block.slice(0, block.indexOf('{')).trim()
       if (selector === '' || EXEMPT.some(e => selector.includes(e)) || selector.includes(CARD)) continue
+      if (selector.includes(DISCLOSURE)) {
+        assert.ok(
+          selector.includes('[data-expanded]') && selector.includes('[data-open]'),
+          `吸顶遮罩行必须收窄到官方加底的那个状态：${selector}`,
+        )
+        continue
+      }
       assert.match(selector, /\[data-phase='active'\]/u, `规则「${selector}」必须限定 active 相位`)
       assert.ok(!selector.includes(':is('), `规则「${selector}」不得放宽相位 —— 只有卡片两条可以`)
     }
@@ -777,7 +792,11 @@ describe('glass：边界与纪律', () => {
     assert.ok(block.includes('content:'), '颗粒伪元素要有 content')
     assert.ok(block.includes('inset: 0'), '颗粒要铺满宿主')
     assert.ok(block.includes(GRAIN_DATA_URI), '颗粒贴图必须与背景层**同一张**（GRAIN_DATA_URI 直引）')
-    assert.match(block, new RegExp(`opacity:\\s*${GRAIN_OPACITY}`, 'u'), '深色轴 opacity 必须等于背景层')
+    assert.match(
+      block,
+      new RegExp(`opacity:\\s*var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY}\\)`, 'u'),
+      '深色轴 opacity 必须与背景层同源（同一个统一变量 + 同一个回落值）',
+    )
     assert.ok(
       block.includes('pointer-events: none'),
       '颗粒层不得吃指针事件（拖拽条 / 面板交互不能被它挡住）',
@@ -790,8 +809,8 @@ describe('glass：边界与纪律', () => {
     const lightBlock = rules.slice(rules.indexOf('data-ds-dark-theme]:not('), rules.length)
     assert.match(
       lightBlock,
-      new RegExp(`opacity:\\s*${GRAIN_OPACITY_LIGHT}`, 'u'),
-      '浅色轴 opacity 必须等于背景层的 GRAIN_OPACITY_LIGHT',
+      new RegExp(`opacity:\\s*var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT}\\)`, 'u'),
+      '浅色轴 opacity 必须与背景层同源（同一个统一变量 + 浅色轴回落值）',
     )
     // ⚠️ ::after 需要包含块，而官方 .tabHost / .emptyTabHost 是 static —— 必须补 position
     const rpStart = rightPanelRuleStart(rules)
