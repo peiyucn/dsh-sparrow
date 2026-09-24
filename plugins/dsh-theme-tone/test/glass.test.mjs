@@ -21,7 +21,7 @@ import {
 /** 浅色轴暗边用的官方最深静态色 token。 */
 const SHADE_TOKEN = '--dsw-static-neutral-bluish-1000'
 import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_TILE_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, SIDE_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
-import { BACKDROP_GRADIENTS, dimmedBackdropGradients } from '../lib/backdrop.js'
+import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, dimmedBackdropGradients } from '../lib/backdrop.js'
 
 const css = buildGlassCss()
 // 注释里也会出现 `{` 这类结构字符，对全文做结构断言会误判，故先剥注释。
@@ -144,14 +144,15 @@ describe('glass：顶栏浮层', () => {
     assert.ok(body.includes(BACKDROP_GRADIENTS), '光仍与背景层同源')
   })
 
-  it('右边栏改用「显式视口尺寸的背景盒」——三个 per-layer 属性都必须给足 4 个值', () => {
+  it('右边栏改用「显式视口尺寸的背景盒」——三个 per-layer 属性都必须给足 3 个值', () => {
     // 替代方案：不用 fixed，而是把图片盒**显式**写成 100vw×100vh 并右对齐。
     // .panel 是 position:absolute; right:0，承载它的 frame 全窗宽 → 面板右缘恒等于视口右缘，
     // 于是该盒恰好覆盖视口，at 50% 落在视口中心；两种 transform regime 同解，没有可切换的东西。
     //
-    // ⚠️ 三个 per-layer 属性（size / position / repeat）**都必须给足 4 个值**：
+    // ⚠️ 三个 per-layer 属性（size / position / repeat）**都必须给足层数**：
     // 值少于层数时会**按顺序循环补齐**（本插件栽过 —— 写「scroll, fixed」等于两者交替，
     // 第 1、3 段渐变退回按元素盒解析）。所以这里逐个钉住。
+    // 层数现在是 **3**（颗粒已改为独立的 ::after，不再占背景层 —— 见下一条用例）。
     const panel = rules.slice(rightPanelRuleStart(rules))
     const body = panel.slice(0, panel.indexOf('}') + 1)
     const decl = (prop) => {
@@ -159,17 +160,16 @@ describe('glass：顶栏浮层', () => {
       assert.ok(m, `${prop} 缺失`)
       return m[1].split(',').map(s => s.trim())
     }
-    assert.equal(decl('background-size').length, 4, 'background-size 必须 4 个值')
-    assert.equal(decl('background-position').length, 4, 'background-position 必须 4 个值')
-    assert.equal(decl('background-repeat').length, 4, 'background-repeat 必须 4 个值')
+    assert.equal(decl('background-size').length, 3, 'background-size 必须 3 个值（= 层数）')
+    assert.equal(decl('background-position').length, 3, 'background-position 必须 3 个值（= 层数）')
+    assert.equal(decl('background-repeat').length, 3, 'background-repeat 必须 3 个值（= 层数）')
     // 三段渐变的盒子尺寸必须是**显式视口尺寸**（auto 会让盒宽随 regime 变）
-    assert.deepEqual(decl('background-size').slice(1), ['100vw 100vh', '100vw 100vh', '100vw 100vh'],
+    assert.deepEqual(decl('background-size'), ['100vw 100vh', '100vw 100vh', '100vw 100vh'],
       '三段渐变必须显式 100vw 100vh')
-    // 渐变右对齐（右缘 = 视口右缘）；颗粒层锚到视口原点以对齐相位
-    assert.deepEqual(decl('background-position').slice(1), ['right top', 'right top', 'right top'],
+    // 渐变右对齐（右缘 = 视口右缘）
+    assert.deepEqual(decl('background-position'), ['right top', 'right top', 'right top'],
       '三段渐变右对齐')
-    assert.match(decl('background-position')[0], /100vw/u, '颗粒层须用 calc 消掉元素偏移')
-    assert.deepEqual(decl('background-repeat'), ['repeat', 'no-repeat', 'no-repeat', 'no-repeat'])
+    assert.deepEqual(decl('background-repeat'), ['no-repeat', 'no-repeat', 'no-repeat'])
   })
 })
 
@@ -597,14 +597,16 @@ describe('glass：边界与纪律', () => {
   it('except 右边栏与卡片，规则应该 限定在 active 相位（hero / settling 下顶栏是隐藏的，补 76px 会把正文顶下去）', () => {
     // **例外一**：右边栏（`[data-sidebar-right-panel]`）在**所有相位**都存在
     // （hero 页也能开文件面板），所以它那条不该限定 active。
-    const EXEMPT = `[${RIGHT_PANEL_ATTR}]`
+    // 它的**内容宿主**同理：dockkit 的 `[data-dockkit-pane]` / `[data-dockkit-empty]`
+    // 是真正刷底色的那两层，面板在任何相位都要着色 —— 一并豁免。
+    const EXEMPT = [`[${RIGHT_PANEL_ATTR}]`, '[data-dockkit-pane]', '[data-dockkit-empty]']
     // **例外二**：卡片那两条走 `:is(active, hero)` —— 首页也要玻璃（见下一条用例）。
     // 这里断言其余规则**逐个**都是**单** active 相位，别顺手放宽了别的。
     const CARD = '[data-composer-card]'
     const blocks = rules.split('}').filter(block => block.includes('{'))
     for (const block of blocks) {
       const selector = block.slice(0, block.indexOf('{')).trim()
-      if (selector === '' || selector.includes(EXEMPT) || selector.includes(CARD)) continue
+      if (selector === '' || EXEMPT.some(e => selector.includes(e)) || selector.includes(CARD)) continue
       assert.match(selector, /\[data-phase='active'\]/u, `规则「${selector}」必须限定 active 相位`)
       assert.ok(!selector.includes(':is('), `规则「${selector}」不得放宽相位 —— 只有卡片两条可以`)
     }
@@ -660,7 +662,10 @@ describe('glass：边界与纪律', () => {
     assert.match(rule, /background-image:/u, '右边栏应自己叠光与颗粒')
     // 必须用与背景层**同源**的渐变串（不复制粘贴数值）
     assert.ok(rule.includes(BACKDROP_GRADIENTS), '应复用 BACKDROP_GRADIENTS（与背景层同源）')
-    assert.ok(rule.includes(GRAIN_TILE_VARIABLE), '应叠颗粒层')
+    // ⚠️ 颗粒**不许**当普通背景层（owner 真机报「6 个色调背景依然没改好」的那条竖线）：
+    // 背景层的颗粒走 ::after + opacity + 深色轴 mix-blend-mode: screen，
+    // 而正常合成的第 4 层会**同时压暗**黑像素 —— 两者质感不同，交界即竖线。
+    assert.ok(!rule.includes(GRAIN_TILE_VARIABLE), '不得把颗粒当普通背景层（质感与背景层对不上）')
     // ⚠️ 不得写 background 简写 —— 那会把官方的 bg-base 底色一起重置
     assert.ok(!/\bbackground:/u.test(rule), '不得用 background 简写（会重置官方底色）')
     assert.ok(!rule.includes('background-color:'), '不该动官方底色（它已被 token 染对）')
@@ -671,6 +676,39 @@ describe('glass：边界与纪律', () => {
       '右边栏图层必须画到 [data-dockkit-pane] 上 —— dockkit 的内容宿主才是不透明那层',
     )
     assert.ok(rule.includes('[data-dockkit-empty]'), '空态宿主（[data-dockkit-empty]）同样要覆盖')
+  })
+
+  it('右边栏的颗粒必须与背景层**同构**（::after + opacity + 同混合模式）', () => {
+    // owner：「另外咱们 6 个色调背景问题依然没改好」——右边栏与会话区之间那条竖直分界线。
+    // 根因：背景层颗粒 = ::after + opacity +（深色轴）mix-blend-mode: screen（纯加法，只加亮）；
+    // 而本模块曾把颗粒当**第 4 个背景层正常合成**（会同时压暗黑像素）→ 两侧质感差一档。
+    // 修法：面板侧也改成 ::after，并与背景层**逐项对齐**（贴图 / opacity / 混合模式）。
+    const afterStart = rules.indexOf('[data-dockkit-pane]::after')
+    assert.ok(afterStart > 0, '应有一条 [data-dockkit-pane]::after 的颗粒规则')
+    const block = rules.slice(afterStart, rules.indexOf('}', afterStart))
+    assert.ok(block.includes('content:'), '颗粒伪元素要有 content')
+    assert.ok(block.includes('inset: 0'), '颗粒要铺满宿主')
+    assert.ok(block.includes(GRAIN_DATA_URI), '颗粒贴图必须与背景层**同一张**（GRAIN_DATA_URI 直引）')
+    assert.match(block, new RegExp(`opacity:\\s*${GRAIN_OPACITY}`, 'u'), '深色轴 opacity 必须等于背景层')
+    assert.ok(
+      block.includes('pointer-events: none'),
+      '颗粒层不得吃指针事件（拖拽条 / 面板交互不能被它挡住）',
+    )
+    // 两个轴的混合模式都要在（深色 screen / 浅色 multiply），且值直引背景层常量
+    assert.ok(
+      rules.includes(`mix-blend-mode: screen`) && rules.includes(`mix-blend-mode: multiply`),
+      '深色轴 screen、浅色轴 multiply —— 与背景层同构',
+    )
+    const lightBlock = rules.slice(rules.indexOf('data-ds-dark-theme]:not('), rules.length)
+    assert.match(
+      lightBlock,
+      new RegExp(`opacity:\\s*${GRAIN_OPACITY_LIGHT}`, 'u'),
+      '浅色轴 opacity 必须等于背景层的 GRAIN_OPACITY_LIGHT',
+    )
+    // ⚠️ ::after 需要包含块，而官方 .tabHost / .emptyTabHost 是 static —— 必须补 position
+    const rpStart = rightPanelRuleStart(rules)
+    const rpRule = rules.slice(rpStart, rules.indexOf('}', rpStart))
+    assert.match(rpRule, /position:\s*relative/u, '宿主必须补 position: relative 给 ::after 当包含块')
   })
 
   it('不应该 给浮层写规则（浮层是不透明 + 质感，走 src/surface.ts）', () => {
@@ -695,8 +733,10 @@ describe('glass：边界与纪律', () => {
     for (const block of blocks) {
       const selector = block.slice(0, block.indexOf('{')).trim()
       if (selector === '') continue
+      // 门必须在，但**允许前面带明暗轴限定**（如 `body[data-ds-dark-theme]:not([plain])`）
+      // —— 颗粒那两条按轴分混合模式，不能要求一定以 `body:not([plain])` 开头。
       assert.ok(
-        selector.startsWith(`body:not([${PLAIN_ATTR}])`),
+        selector.startsWith('body') && selector.includes(`:not([${PLAIN_ATTR}])`),
         `规则「${selector}」缺少官方默认门`,
       )
     }

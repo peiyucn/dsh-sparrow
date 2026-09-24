@@ -36,7 +36,7 @@
  */
 
 import { ABOVE_CONTENT_Z_INDEX, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
-import { dimmedBackdropGradients, grainOverGradients } from './backdrop.js'
+import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, dimmedBackdropGradients, grainOverGradients } from './backdrop.js'
 
 /** 顶栏高度（px）。官方把它钉在这个值上，与左栏 38+38 对齐（`ConversationRoot.module.css:37-41`）。 */
 export const HEADER_HEIGHT_PX = 76
@@ -854,18 +854,62 @@ body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [da
    附着用 scroll（初值）**自始至终不变** ⇒ 动画中面板外观是**刚性平移**，连续、无跳变。
    实测：静止态与改前逐像素 **0.0/0**；静止帧与动画首帧 **0.0/0**（交班处无缝）。
 
-   ⚠️ background-size / -position / -repeat 都是 **4 层**，**必须给足 4 个值** ——
+   ⚠️ **颗粒必须与背景层"同构"**（owner 真机报「6 个色调背景依然没改好」的那条竖线）：
+   背景层是「3 层渐变写在自己身上 + 颗粒走 ::after + opacity + 深色轴 mix-blend-mode: screen」，
+   而这里曾经把颗粒当成**第 4 个背景层**（grainOverGradients()）**正常合成** ——
+   深色轴上 screen 是纯加法（只加亮、不压暗），正常合成却会同时压暗黑像素，
+   两者的**质感不同**，于是右边栏与会话区在交界处差一档 → 一条竖直分界线。
+   修法：这里也改成「3 层渐变 + ::after 颗粒」，opacity 与混合模式**逐字对齐背景层**
+   （常量直引 GRAIN_OPACITY / GRAIN_OPACITY_LIGHT / GRAIN_DATA_URI，不复制数值）。
+
+   ⚠️ ::after 需要定位上下文，而官方 .tabHost / .emptyTabHost **没有 position**（static）
+   —— 故这条 gated 规则同时补 position: relative（不动官方任何几何：grid 项的相对定位
+   不改变摆放，只是给伪元素一个包含块）。
+
+   ⚠️ background-size / -position / -repeat 现在是 **3 层**，**必须给足 3 个值** ——
    值少于层数时**会按顺序循环补齐**（本插件栽过：写「scroll, fixed」等于两者交替，
    第 1、3 段渐变退回按元素盒解析）。**不许再退回任何一个 per-layer 属性只给一两个值。**
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
 body:not([${PLAIN_ATTR}]) [data-dockkit-pane],
 body:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
-  background-image: ${grainOverGradients()};
+  position: relative;
+  background-image: ${BACKDROP_GRADIENTS};
   background-attachment: scroll;
-  background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;
-  background-position: calc(100% - 100vw) top, right top, right top, right top;
-  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-size: 100vw 100vh, 100vw 100vh, 100vw 100vh;
+  background-position: right top, right top, right top;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+}
+/* 渐变本身的合成方式也必须同构：深色轴上**背景层整层**是 mix-blend-mode: screen
+   （渐变与颗粒都走加法），而面板这里的背景层是**正常合成** ——
+   于是同样的渐变在两边亮度不同，交界处又是一条分界线。
+   background-blend-mode 让面板自己的背景层与它的 background-color（官方 bg-base，
+   与页面底色同一个值）按 screen 混合，等效于背景层与页面底色混合。
+   浅色轴背景层用 normal（见 backdrop.ts），故这里不需要浅色规则。
+   （本段在模板字符串里，注释中不能出现反引号。） */
+body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
+body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-pane],
+body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
+  background-blend-mode: screen, screen, screen;
+}
+/* 颗粒：与背景层那条 ::after 同构（同贴图、同 opacity、同混合模式）。 */
+body:not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
+body:not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: ${GRAIN_DATA_URI};
+  opacity: ${GRAIN_OPACITY};
+}
+body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
+body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
+  mix-blend-mode: screen;
+}
+body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
+body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
+  mix-blend-mode: multiply;
+  opacity: ${GRAIN_OPACITY_LIGHT};
 }
 
 /* 模态弹窗（[role='dialog']）**不做玻璃** —— 它是内容面（设置 / 文件 / 归档列表），
