@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-settings'
 import type { DeepSeekFileId, DeepSeekFilePage } from '@deepseek-ai/dsh-llm-deepseek'
 import { assertCapabilities } from './compat.js'
-import { classifyUpstreamError, COUNT_PAGE_LIMIT, COUNT_PAGE_TIMEOUT_MS, decodeFileIdParam, formatBytes, MAX_COUNT_PAGES, normalizePageQuery, resolveBaseURL, toFileRow } from './files.js'
+import { classifyUpstreamError, COUNT_PAGE_LIMIT, COUNT_PAGE_TIMEOUT_MS, decodeFileIdParam, formatBytes, MAX_COUNT_PAGES, normalizePageQuery, resolveBaseURL, toFileRow, authHeaders, probeFilesClientShape } from './files.js'
 
 export const name = 'dsh-file-manage'
 export const inject = ['webServer', 'credentials', 'settings']
@@ -103,7 +103,15 @@ function sendUpstreamError(res: ServerResponse, error: unknown): void {
  */
 interface DeepSeekSurface {
   readonly DeepSeekFileId: (value: string) => DeepSeekFileId
-  readonly DeepSeekFilesClient: new (options: { baseURL: string; apiKey: string }) => {
+  /**
+   * rc.2 起构造签名是 `{ baseURL, headers, fetch? }`；rc.1 的 `{ baseURL, apiKey, accountCredential? }`
+   * 在 rc.2 上会被忽略并在请求时抛错 —— 见 {@link probeFilesClientShape}。
+   */
+  readonly DeepSeekFilesClient: new (options: {
+    baseURL: string
+    headers: Readonly<Record<string, string>>
+    fetch?: typeof fetch
+  }) => {
     list(options?: { after?: DeepSeekFileId; limit?: number; signal?: AbortSignal }): Promise<DeepSeekFilePage>
     delete(fileId: DeepSeekFileId, signal?: AbortSignal): Promise<void>
   }
@@ -125,6 +133,14 @@ async function deepSeekSurface(): Promise<DeepSeekSurface> {
     throw new FileManageError(
       'UNSUPPORTED_HOST',
       `当前 dsh 的 dsh-llm-deepseek 不再导出 ${missing.join('、')}；本插件已停用（升级本插件后自动恢复）`,
+      501,
+    )
+  }
+  // 形状门：符号在、参数换名（rc.1 `apiKey` → rc.2 `headers`）同样会让插件带病运行。
+  if (!await probeFilesClientShape(module.DeepSeekFilesClient as never)) {
+    throw new FileManageError(
+      'UNSUPPORTED_HOST',
+      '当前 dsh 的 DeepSeekFilesClient 不接受 headers/fetch 构造参数（rc.2 起签名）；本插件已停用（升级本插件后自动恢复）',
       501,
     )
   }
@@ -157,7 +173,7 @@ export async function apply(ctx: Context): Promise<void> {
             limit: url.searchParams.get('limit') ?? undefined,
           })
           const connection = await resolveConnection(ctx, surface)
-          const client = new surface.DeepSeekFilesClient({ baseURL: connection.baseURL, apiKey: connection.apiKey })
+          const client = new surface.DeepSeekFilesClient({ baseURL: connection.baseURL, headers: authHeaders(connection.apiKey) })
           const page = await client.list({
             ...query.after === undefined ? {} : { after: surface.DeepSeekFileId(query.after) },
             limit: query.limit,
@@ -173,7 +189,7 @@ export async function apply(ctx: Context): Promise<void> {
         if (req.method === 'GET' && pathname === `${PREFIX}/count`) {
           // 官方 list 无总数字段：翻到底累计（每页 1000，配额内最多 10 页，MAX_COUNT_PAGES 兜底）。
           const connection = await resolveConnection(ctx, surface)
-          const client = new surface.DeepSeekFilesClient({ baseURL: connection.baseURL, apiKey: connection.apiKey })
+          const client = new surface.DeepSeekFilesClient({ baseURL: connection.baseURL, headers: authHeaders(connection.apiKey) })
           let count = 0
           let totalBytes = 0
           let after: DeepSeekFileId | undefined
@@ -207,7 +223,7 @@ export async function apply(ctx: Context): Promise<void> {
             return
           }
           const connection = await resolveConnection(ctx, surface)
-          const client = new surface.DeepSeekFilesClient({ baseURL: connection.baseURL, apiKey: connection.apiKey })
+          const client = new surface.DeepSeekFilesClient({ baseURL: connection.baseURL, headers: authHeaders(connection.apiKey) })
           await client.delete(surface.DeepSeekFileId(id), AbortSignal.timeout(UPSTREAM_TIMEOUT_MS))
           sendJson(res, 200, { deleted: true, id })
           return
