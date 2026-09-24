@@ -91,19 +91,38 @@ function hoverRevealBlock(labels: readonly string[], breakpointPx: number): stri
 }`
 }
 
-/** 会话内容最大宽度钳制：宽列拖宽上限收紧（官方 88px → 插件 120px / 侧）、窄列地板 640 让出导航余量。 */
+/**
+ * 会话内容最大宽度钳制：宽列拖宽上限收紧（官方 88px → 插件 120px / 侧）、窄列地板 640 让出导航余量。
+ *
+ * ⚠️ **捕获点必须落在真正定义 `--dsh-chat-content-width` 的那个元素上**（owner 真机报
+ * 「官方调整对话界面整体宽度的按钮没了、两边很挤」的根因）：
+ *
+ * | 版本 | `--dsh-chat-content-width` 定义在 |
+ * | :--- | :--- |
+ * | 0.1.5-rc.2 | `.root`（= `[data-phase]`） |
+ * | 0.1.7-rc.1 | `.body`（`[data-phase]` 的**子**元素） |
+ *
+ * 旧写法把捕获写在 `[data-phase]` 上。rc.1 里那个元素**自己没有**该变量、只有一个后代才有，
+ * 于是 `var(--dsh-chat-content-width)` 在 `[data-phase]` 上解析为空 → `--dsh-nav-pin-official-width`
+ * 是空值 → 下游 `min(空, …)` 整条自定义属性变成 invalid → `--dsh-chat-content-width` 在滚动体
+ * 与拖拽条上**全部失效**（实测两者都拿到空值，拖拽条宽度从 10px 塌成 0）。
+ *
+ * 现在捕获在 `.body`（`[data-phase]` 下那个含滚动体的直接子元素）上：**两版都成立** ——
+ * rc.1 上它自带该变量；0.1.5 上它从 `.root` 继承（自定义属性会继承，`var()` 照样解析得到值）。
+ */
 function widthCapBlock(): string {
-  return `[data-phase] {
+  const body = `[data-phase] > div:has(> [data-conversation-scroll])`
+  return `${body} {
   --dsh-nav-pin-official-width: var(--dsh-chat-content-width);
 }
-[data-phase] [data-conversation-scroll],
-[data-phase] [data-width-handle] {
+${body} > [data-conversation-scroll],
+${body} [data-width-handle] {
   --dsh-chat-content-width: min(
     var(--dsh-nav-pin-official-width),
     max(${CONTENT_MIN_FLOOR_PX}px, calc(var(--dsh-conversation-column-width) - ${CONTENT_MAX_SIDE_CLEARANCE_PX * 2}px))
   );
 }
-[data-phase] [data-conversation-scroll] {
+${body} > [data-conversation-scroll] {
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + ${CARD_EXTRA_WIDTH_PX}px);
 }`
 }
