@@ -26,6 +26,7 @@ Requires dsh 0.1.7-rc.1 — the exact official version line this release is buil
 * Conversation column > 700px: the rail is always visible (the official 900px hide is overridden)
 * Conversation column ≤ 700px: the rail is hidden by default; hover the right edge of the conversation (or Tab into the rail) and it fades in (~120ms) with no frame or background; moving away hides it again
 * The conversation content width is capped: on wide columns even dragged to the widest it keeps at least 120px clearance per side (official: 88px); on narrow columns the content clamps to the official 640px minimum to make room for the rail, so the right drag handle no longer crowds the turn rail
+* Also fixes a small official glitch: hovering either "resize conversation" drag handle left the official vertical glow sitting low (it only snapped to the pointer once you held the button down). The glow now follows the pointer on hover too, matching the 0.1.5 official feel
 * **Note**: the official rail only renders from the second turn on — a single-turn session has no rail to pin, and this plugin does not change that threshold
 * Uninstalling restores the official 900px behavior; no persisted state, no leftovers
 
@@ -35,7 +36,7 @@ Requires dsh 0.1.7-rc.1 — the exact official version line this release is buil
 
 ## Uninstall & leftovers
 
-* The plugin writes no files and touches no `.dsh` internals; its only action is injecting one stylesheet, removed together with the plugin lifecycle
+* The plugin writes no files and touches no `.dsh` internals; it injects one stylesheet plus one passive pointer listener (the latter backs the drag-handle glow fix above), both removed with the plugin lifecycle
 * No localStorage keys, no config residue
 
 **Changelog**: [CHANGELOG.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-nav-pin/CHANGELOG.md)
