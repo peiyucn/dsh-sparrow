@@ -35,7 +35,7 @@
  * 属性由 client 按 `backdropPlan(...).hidden` 打上 / 摘掉（见 constants.ts 的 `PLAIN_ATTR`）。
  */
 
-import { ABOVE_CONTENT_Z_INDEX, PLAIN_ATTR, RIGHT_PANEL_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from './constants.js'
+import { ABOVE_CONTENT_Z_INDEX, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
 import { dimmedBackdropGradients, grainOverGradients } from './backdrop.js'
 
 /** 顶栏高度（px）。官方把它钉在这个值上，与左栏 38+38 对齐（`ConversationRoot.module.css:37-41`）。 */
@@ -661,29 +661,27 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-scroll] {
   /* ③ 滚区顶部补出顶栏高度 —— 与浮层是一对，少一个正文首行会被盖住 */
   padding-top: ${HEADER_HEIGHT_PX}px;
 }
-/* --- ④ 拖拽条：把光带压回**顶栏下缘以下**（顶栏浮层化的必然连带，owner 真机报的） ---
-   owner：「官方这个调整宽度的条，现在咱们顶栏也盖不住了。」
+/* --- ④ 拖拽条：**不碰它**（owner 2026-09-24 拍板：「theme-tone 不要动这个光带了吧」） ---
+   ⚠️ 这里曾经有一条「[data-width-handle] 的 top: 76px」，现已删除。保留这段说明以免被改回去。
 
-   几何链（官方源码核过，ConversationRoot.tsx:372-392）：
-   .root > [顶栏槽位] + .body > (.scrollBody + .widthHandle)。
-   官方顶栏**在流内**、占 76px，所以 .body 从 y=76 起 —— 而 .widthHandle 是
-   .body 里的 absolute + top: 0/bottom: 0，它的**光带**（::after，悬停 / 拖动时 opacity 1）
-   天然落在顶栏下缘之下，永远进不了顶栏。
+   它原本要解决的问题是真的：官方 .widthHandle 是 .body 里的 absolute + top: 0/bottom: 0，
+   而官方顶栏**在流内**占 76px，所以 .body 从 y=76 起、光带天然落在顶栏下缘之下；
+   本插件把顶栏改成 absolute 浮层后 .body 从 y=0 起，光带于是**爬进顶栏区**
+   （04-glass §4 早已记为已知副作用）。
 
-   本插件把顶栏改成 position: absolute 浮层后，.body 从 y=0 起 → 光带跟着爬进顶栏区
-   （04-glass §4「已知观感副作用」早就把这条记下并要求真机目视）。
-   owner 现在确认**不可接受**，故把拖拽条本体压回 76px —— 这同时是**恢复官方几何**
-   （官方那条本来就从 body 顶开始，而 body 顶就在顶栏下缘）。
+   但那条修法的代价更大 —— 它动了**光带的几何基准**：
+   官方的光带位置是 var(--dsh-width-handle-pointer-y, 50%)，而 50% 是相对**这个盒子**算的。
+   把 top 压到 76 之后盒子变成 [76, 720]，50% = 398，而视口中心是 360 ——
+   **hover 时那条淡显光带（仍用兜底 50%）比屏幕中心低 38px**。
+   owner 真机报「hover 的时候光带会靠下，点住才回到鼠标上」就是这个偏移：
+   拖拽时官方写真实 clientY，把那个百分比覆盖掉，看着才正常。
+   实测（真机 3080）：带此规则 center=398；移除后 center=360（= 视口中心），偏移消失。
 
-   * 只动 [data-width-handle]（ConversationRoot 那条、带光带）。
-     AppFrame 的 [data-side] 手柄长在 frame 里、**没有光带**（AppFrame.module.css:40-44
-     明写 no handle draws a visible pill），不需要也不该动它。
-   * 只动 top，不动 bottom / 宽度 —— 拖拽带的可拖高度只少掉顶栏那 76px，
-     与官方一致（官方在顶栏区本来就拖不到）。
-   特异度：本条 (0,2,1) > 官方 .widthHandle (0,1,0)，无需 !important。 */
-body:not([${PLAIN_ATTR}]) [data-phase='active'] [${WIDTH_HANDLE_ATTR}] {
-  top: ${HEADER_HEIGHT_PX}px;
-}
+   所以取舍是：**宁可让光带在浮层顶栏区多画一截（顶栏是半透明玻璃，观感影响很小），
+   也不去改这个盒子的几何** —— 那会把官方一条公开的指针提示算歪。
+   若将来仍要压，正确做法是**补 --dsh-width-handle-pointer-y 的基准**（而不是动 top），
+   且必须在 hover 与 dragging 两种状态下都验过。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
 
 /* --- 输入框底座：只撤掉官方那条实色渐隐带，**玻璃完全由卡片自己承担** ---
    owner 定的架构（推翻本插件早先的「夹层」做法）：

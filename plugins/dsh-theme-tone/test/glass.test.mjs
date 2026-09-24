@@ -250,19 +250,21 @@ describe('glass：输入框底座', () => {
     assert.ok(!body.includes('backdrop-filter'), '不透带不模糊')
   })
 
-  it('拖拽条必须被压回顶栏下缘以下 —— 顶栏浮层化后 .body 从 y=0 起，光带会爬进顶栏', () => {
-    // owner：「官方这个调整宽度的条，现在咱们顶栏也盖不住了。」
-    // 官方 .widthHandle 长在 .body 里（top: 0），而官方顶栏在流内占 76px → 光带天然落在顶栏下方。
-    // 我们的顶栏改成 absolute 浮层后 .body 从 0 起 → 光带爬进顶栏区（04-glass §4 早记为已知副作用）。
-    const idx = rules.indexOf(`[${WIDTH_HANDLE_ATTR}] {`)
-    assert.ok(idx >= 0, '必须有拖拽条那条规则')
-    const body = rules.slice(idx, rules.indexOf('}', idx))
-    assert.match(body, new RegExp(`top: ${HEADER_HEIGHT_PX}px`, 'u'), `要压回顶栏下缘（${HEADER_HEIGHT_PX}px）`)
-    // 只动 top —— bottom / 宽度都是官方几何，动了就改变可拖范围
-    assert.ok(!/bottom\s*:/u.test(body), '不得动 bottom（会改变可拖范围）')
-    assert.ok(!/width\s*:|height\s*:/u.test(body), '不得动宽度 / 高度')
-    // AppFrame 那条手柄没有光带，不该跟着动（它靠 data-side 认，在 frame 里）
-    assert.ok(!body.includes(String(SIDE_ATTR)), '这条只该锚 data-width-handle，不该碰 data-side')
+  it('⛔ 不许再改拖拽条的几何（改了会把官方 hover 光带的位置算歪）', () => {
+    // 回归守卫（owner 真机报「hover 的时候光带会靠下，点住才回到鼠标上」）：
+    // 这里曾经有一条 `[data-width-handle] { top: 76px }`，用来把光带压回顶栏下缘以下。
+    // 但官方光带的位置是 `var(--dsh-width-handle-pointer-y, 50%)`，`50%` 相对**这个盒子**算：
+    // 把 top 压到 76 后盒子变成 [76,720]，50% = 398，而视口中心是 360 —— hover 时那条
+    // 淡显光带（仍用兜底 50%）比屏幕中心低 38px。实测（真机 3080）：
+    //   带此规则 center=398；移除后 center=360（= 视口中心）。
+    // 取舍：宁可让光带在浮层顶栏区多画一截（顶栏是半透明玻璃），也不改这个盒子的几何。
+    assert.equal(
+      rules.indexOf(`[${WIDTH_HANDLE_ATTR}] {`), -1,
+      '不得再有 [data-width-handle] 的规则块 —— 任何 top/height 都会挪动官方光带的 50% 基准',
+    )
+    // ⚠️ 本断言只针对**玻璃这张表**：backdrop.ts 里另有一条 `[data-width-handle] { z-index: 82 }`，
+    // 那条只抬层级（不让内容盖住拖拽条）、不动几何，是合法且必要的，不在此守卫范围内。
+    assert.ok(!rules.includes(`[${WIDTH_HANDLE_ATTR}]`), '玻璃表不得以任何形式选择 data-width-handle')
   })
 
   it('不得给底座写 position —— 本选择器 (0,3,1) 比官方 (0,3,0) 高，写了就会顶掉 sticky', () => {
