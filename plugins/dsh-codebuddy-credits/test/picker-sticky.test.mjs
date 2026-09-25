@@ -15,9 +15,14 @@ import { describe, it } from 'node:test'
  * 吸顶、两条标题在同一个 top 上互相压住（真机实测重叠 12px）。
  * 这两条断言把「谁吸顶」「底走哪个 token」钉死。
  *
- * 第二条当天下午又改过一次：为了挡住滚过去的行，先是加了不透明白底，owner 随即
- * 指出那条底**自己看得见**（「把分类标题的背景色去掉，有点突兀」）。最终口径是
- * **与卡片同源**——官方 `--dsw-specific-menu` 本来就直指卡片那个 token。
+ * 第二条改过两次，两次都是 owner 当场否掉的：
+ * ① 先加了不透明白底（无质感）→ owner：「把分类标题的背景色去掉，**有点突兀**」
+ *    （底色比卡片亮一档，而且是**纯色平带**压在带颗粒的卡片上）；
+ * ② 我照字面理解成「去掉背景」→ 改成半透明 → owner：「给修坏了又。又重叠了。
+ *    **只是把那个背景去掉，不是变成透明的**」（行又透上来了）。
+ * 最终口径 = **不透明**（必须挡住滚过去的行）**且**与卡片同配方（不成带）：
+ * background-color 打不透明底，菜单色作为**图层**叠上去，质感由主题插件在
+ * 两处标题（我们的 + 官方 ModelSelect）一起补。
  */
 const SOURCE = new URL('../src/client/CodeBuddyModelSelect.tsx', import.meta.url)
 const source = await readFile(SOURCE, 'utf8')
@@ -53,25 +58,28 @@ describe('模型选择器：分组标题吸顶（几何契约）', () => {
     )
   })
 
-  it('标题底必须与卡片**同源**：只走 --dsw-specific-menu，不得自加其它底色', () => {
+  it('标题底必须 **不透明**，且与卡片同配方（不是变成透明）', () => {
     const title = ruleFor('ccb-model-groupTitle')
-    // 官方与卡片是**同一个 token**（design-platform.css:264-265 把 --dsw-specific-menu
-    // 直指 --dsw-menu-surface-fill），所以标题只用它就跟卡片同材质、且跟随色调。
+    // ⚠️ 这一条被 owner 当场否过一次，别再改成半透明：把 background-color 换成
+    // `var(--dsw-specific-menu)`（理由是"官方也这么写"）→ 行立刻从标题底下透上来
+    // （owner：「给修坏了又。又重叠了。**只是把那个背景去掉，不是变成透明的**」）。
+    // 官方能那么写，是因为它那层半透明填充**叠在卡片填充之上**；我们一旦只留半透明，
+    // 标题区域就比卡片主体少一层 —— 底下的行直接显形。
     assert.match(
       title.body,
-      /background-color:\s*var\(--dsw-specific-menu\)/u,
-      '标题底要用官方那个菜单 token（与卡片同源）',
+      /background-color:\s*var\(--dsw-alias-bg-base\)/u,
+      '标题要有**不透明**地面色打底（挡住滚过去的行）；透明化就是 owner 否掉的那版',
     )
-    // **不得**再压一层自己的填充 —— 上一版那条不透明白底
-    // （--dsw-alias-bg-base）实测比卡片亮 26 级且是纯色平带，正是 owner 说的「有点突兀」。
-    assert.ok(
-      !/--dsw-alias-bg-base/u.test(title.body),
-      '标题不得自加不透明白底（会比卡片亮一档、且是纯色平带 = owner 报的「突兀」）',
+    // 菜单色调留在**图层**上（与主题层同源、跟随色调），不能改成不透明色写死。
+    assert.match(
+      title.body,
+      /background-image:\s*linear-gradient\(var\(--dsw-specific-menu\)/u,
+      '菜单色调要叠在不透明底之上（走 token，跟随色调）',
     )
-    assert.ok(
-      !/background-image/u.test(title.body),
-      '标题不得自己画图层 —— 质感层归主题插件统一处理',
-    )
+    // 「有点突兀」的成因是**底色的算式与卡片不同**，而不是透明度：
+    // 卡片 = 菜单填充叠在**被模糊过的真实页面**上再吃一层颗粒；本条当时叠在纯白上且没有颗粒。
+    // 缺的那层颗粒由主题插件补给**两处标题**（我们的 + 官方 ModelSelect），见
+    // dsh-theme-tone 的 surface.ts —— 这样卡片与标题同配方，带子就没了。
     // 不得用 background 简写：它会把主题层可能加到这条上的 background-image 一起重置。
     assert.ok(
       !/(?:^|;)\s*background:\s/u.test(title.body),

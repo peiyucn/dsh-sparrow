@@ -135,39 +135,35 @@ export function ensurePickerStyles(): void {
     //
     // 注意 `<section>` 这里**一个字都不写**：它保持文档流，边界作用天然成立。
     '.ccb-model-group + .ccb-model-group { margin-top: 4px; }',
-    // 标题：吸顶 + **与卡片同一材质**的底（2026-09-25 第二次定案，别再改成不透明白底）。
+    // 标题：吸顶 + **不透明**的底。底必须挡住滚过去的行，同时不许看得见「另一块颜色」。
     //
-    // 上一版写的是「不透明白底 + 一层菜单色渐变」（`--dsw-alias-bg-base` 打底）。
-    // 它确实挡得住滚过去的行，但 owner 当场指出**那条底本身看得见**：
-    // 「把模型选择列表分类标题的背景色去掉，有点突兀」——真机像素实测正是如此：
-    //   标题带   RGB(250.9, 251.5, 252.1)  方差 0.26（纯色平带）
-    //   卡片表面 RGB(241.0, 243.0, 244.3)  方差 3.19（有颗粒质感）
-    //   ⇒ 差 26 级，且「平带压在带纹理的面上」比色差本身更显眼。
+    // ⚠️ 这里来回走过一版**错的**（2026-09-25，记下来别再走）：把 `background-color` 换成
+    //   半透明的 `var(--dsw-specific-menu)`，理由是「官方也这么写」。结果就是 owner 当场看到的
+    //   **行从标题底下透上来**（「给修坏了又。又重叠了。**只是把那个背景去掉，不是变成透明的**」）。
+    //   官方能那么写，是因为**卡片与标题合成的是同一个 token**；我们一旦改成透明，
+    //   标题区域就只剩「卡片填充」，比卡片主体少一层 —— 行（在标题之下）直接显形。
+    //   **官方那版标题不是透明的**：它是半透明填充**叠在卡片填充之上**（等效约 0.82）。
     //
-    // 根因在**材质来源不同**（官方源码逐条核过）：
-    //   * 卡片 = `MenuSurface.module.css:21-29` 的 `.material`，填充 `--dsw-menu-surface-fill`；
-    //   * 标题 = `ModelSelect.module.css:167-177`，填充 `var(--dsw-specific-menu)`；
-    //   而 `design-platform.css:264-265` 把 `--dsw-specific-menu` **直接指向**
-    //   `--dsw-menu-surface-fill`（浅轴 `rgba(248,249,250,.58)`，深轴 `rgba(67,69,74,.45)`）。
-    //   ⇒ 官方的标题与卡片**本来就是同一个 token、同一种材质**，所以官方那版看不出背景条。
-    //   我们多压的那层**不透明白底**才是「另一块颜色」的唯一来源。
+    // 现在这条底 = **把卡片表面按同一配方重画一遍**：
+    //   background-color = var(--dsw-alias-bg-base)   ← 卡片浮着的那层地面（不透明 ⇒ 挡住行）
+    //   background-image = 一层 var(--dsw-specific-menu) 渐变
+    // 合成 = 0.58·菜单色 + 0.42·地面色 —— 与卡片**同一个算式**（官方卡片就是菜单填充叠在地面上）。
     //
-    // 故本版**收回我们自加的那层底**，标题只用官方那一个 token —— 与卡片同源、跟随色调，
-    // 也等于官方 `ModelSelect` 的写法（owner：「咱们的和官方的一起处理」）。
+    // 真机像素（标题带里没有文字的那段空白 vs 菜单 padding 带）：
+    //   官方半透明写法      ΔR=ΔG=ΔB=7.00（|Δ|sum=21.00，一条看得见的横带）
+    //   本写法（深色轴）    |Δ|sum=1.38（噪声级）
     //
-    // ⚠️ 语义变化要知情：该 token 是**半透明**的，所以滚过去的行会被它压暗 58%（不是消失）。
-    //   这正是官方自己的表现（官方也没有 backdrop-filter）——「透明和模糊和官方默认一样就行」。
-    //   曾经试过的两个极端都更糟（真机像素实测，标题带 26px，「行可见 vs 行隐藏」差异）：
-    //     * 完全不画底      → 行 100% 透上来（owner：「都和模型名称重叠了」）；
-    //     * 标题上补模糊    → 31.719/px、63.89% 像素变化，比不补更脏（菜单自己已是 backdrop root，
-    //                        标题再声明模糊只会采样子树里滚动的行）。
-    //   若将来 owner 仍嫌行透，正确的一步是「把底换成与卡片合成色一致的不透明色」，
-    //   而不是退回白底 —— 白底就是这次被否掉的那版。
+    // ⚠️ **浅色轴还差一档，那一档由主题插件补**：卡片上还叠着 theme-tone 的**颗粒**
+    //   （`menuSurfaceLayers()`），颗粒把卡片压暗约 5.5 级；标题若没有同款颗粒，就成了一条
+    //   「平的、偏亮」的带 —— 这正是 owner 说的「有点突兀」。补法在 `dsh-theme-tone` 的
+    //   `surface.ts`（它同时管官方 `ModelSelect`，即「咱们的和官方的一起处理」）。
+    //   本插件这条是**不带主题插件时的等价物**：官方档下卡片也没有颗粒，两者逐像素相等。
     //
     // ⚠️ **不用 background 简写**：简写会把主题层可能加到这条上的 `background-image`
     //   （质感层）一起重置掉 —— 这个坑本仓库已经踩过两次。
-    // ⚠️ **不写 backdrop-filter**：与官方一致（理由见上）。
-    '.ccb-model-groupTitle { position: sticky; top: 0; z-index: 1; padding: 5px 8px 3px; background-color: var(--dsw-specific-menu); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
+    // ⚠️ **不写 backdrop-filter**：与官方一致。标题在**菜单内部**，菜单自己已经是
+    //   backdrop root，标题再声明模糊只会采样子树里正在滚动的行（真机实测 31.719/px，更脏）。
+    '.ccb-model-groupTitle { position: sticky; top: 0; z-index: 1; padding: 5px 8px 3px; background-color: var(--dsw-alias-bg-base); background-image: linear-gradient(var(--dsw-specific-menu), var(--dsw-specific-menu)); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
     '.ccb-model-option { box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: auto; min-width: 100%; min-height: 38px; padding: 6px 8px; border: none; border-radius: 10px; outline: none; background: transparent; color: inherit; text-align: left; cursor: pointer; }',
     '.ccb-model-option:hover:not(:disabled), .ccb-model-option:focus-visible { background: var(--dsw-alias-interactive-bg-hover); }',
     '.ccb-model-option:disabled { color: var(--dsw-alias-label-dimmed); cursor: default; }',

@@ -894,33 +894,58 @@ describe('抬升面：表面绘制', () => {
     assert.ok(buildGlassCss().includes(`inset ${GLASS_SPECULAR_RING[0].x}px ${GLASS_SPECULAR_RING[0].y}px`), '输入框卡片应带镜面高光')
   })
 
-  it('⛔ 粘性分组标题必须**一个声明都不写** —— 完全交回官方默认', () => {
-    // owner 三轮报这条，最终口径：「透明和模糊**和官方默认一样**就行」。
+  it('粘性分组标题：**不透明底 + 颗粒 + 菜单填充**，且不得有模糊', () => {
+    // owner 三轮报这条，三句原话构成全部约束：
+    //   ① 「把分类标题的背景色去掉，有点突兀，咱们的和官方的一起处理。」
+    //   ② 「透明和模糊和官方默认一样就行。」
+    //   ③ 「给修坏了又。又重叠了。**只是把那个背景去掉，不是变成透明的**。」
+    // ②+③ ⇒ 底色必须挡住滚过去的行（不能透明），但不许看成一条带。
     //
-    // 官方原样就是 "position: sticky; top: 0; z-index: 1; background: var(--dsw-specific-menu)"
-    // —— 它**本来就是对的**：标题要挡住从底下滚过去的行，就必须有填充；那个填充与菜单主体
-    // 同源同 alpha，所以标题与菜单浑然一体。
+    // 三次走过弯路（都记下来免得再走）：
+    // * 官方写法（只刷半透明 `--dsw-specific-menu`）→ 比卡片**多叠一层**，色偏一档 = ①「突兀」；
+    // * 刷纯白底（`--dsw-alias-bg-base` 打底、无颗粒）→ 也偏一档，且是**纯色平带**，
+    //   "平带压在有纹理的面上"比色差更刺眼 = 同样是①；
+    // * 干脆什么都不写（本用例的上一版就是这么断言的）→ **行直接透上来** = ③。
     //
-    // 我连着两轮错在**替官方"修"它**，两版都是副作用（都记在这里免得再走）：
-    // * 刷不透明白底 + 菜单色 → 横带没了，但标题成**实心块**（不是一种材质）；
-    // * 什么都不画（`background: none`）→ **行直接透上来**
-    //   （owner：「分类标题滚动的时候都和模型名称重叠了」）。
-    // 还试过给标题补 backdrop-filter → 它在菜单内部，菜单自己已是 backdrop root，
-    // 补了只能采样子树（滚动的行），反而把行糊在标题上 —— 官方不配是正确的。
-    //
-    // 故本插件对标题**不做任何声明**：不写 background / backdrop-filter / 图层。
-    const titleSelector = `${GROUPED_MENU_SELECTOR} ${GROUPED_MENU_TITLE_SELECTOR}`
-    assert.equal(
-      blockFor(css, titleSelector), '',
-      '不得为分组标题生成任何规则 —— 交回官方默认（写了就会出现「实心块」或「行透上来」）',
+    // 正解 = 把卡片的算式原样重画、只把打底层换成不透明的：
+    //   background-color = bg-base（不透明地面）→ 挡住行
+    //   background-image = 菜单填充渐变（同一色调）+ 颗粒（同一质感）→ 不成带
+    const titleSelector = `${GROUPED_MENU_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`
+    const block = blockFor(css, titleSelector)
+    assert.notEqual(block, '', '必须为分组标题生成规则 —— 不写就是行透上来（owner ③）')
+    // ① 不透明打底：这是"挡住行"的唯一保证，**不得**是半透明色。
+    assert.match(
+      block,
+      /background-color:\s*var\(--dsw-alias-bg-base\)/u,
+      '标题要有**不透明**打底（挡住滚过去的行，owner ③）',
     )
-    // 也确认它没被别的规则顺带选中（例如某个只写 background-image 的锚点）
-    for (const anchor of SURFACE_ANCHORS) {
-      assert.ok(
-        !anchor.includes(':first-child') && !anchor.includes("[role='group']"),
-        `锚点不得命中分组标题：${anchor}`,
-      )
-    }
+    // ② 菜单填充走**图层**（保住官方的半透明 alpha 与色调跟随），不写死颜色。
+    assert.match(
+      block,
+      /linear-gradient\(var\(--dsw-specific-menu\),\s*var\(--dsw-specific-menu\)\)/u,
+      '菜单色调要作为图层叠在不透明底之上（跟随色调、保住官方 alpha）',
+    )
+    // ③ 颗粒必须一起重画：否则等于把卡片那片颗粒挖掉，露出"平带"（owner ①）。
+    //    强度只引用 GRAIN_TILE_VARIABLE（其值由 GRAIN_ALPHA 唯一派生），不在本表写死。
+    assert.ok(
+      block.includes(`var(${GRAIN_TILE_VARIABLE}`) || block.includes(GRAIN_TILE_VARIABLE),
+      '标题必须重画颗粒 —— 否则比菜单主体少一层质感，就是 owner 说的「突兀」',
+    )
+    assert.ok(
+      !block.includes('/9j/') && !block.includes('feTurbulence') && !/opacity='?\d/u.test(block),
+      '颗粒强度不得在标题规则里写字面量（唯一旋钮是 GRAIN_ALPHA，owner：噪点值统一变量）',
+    )
+    // ④ 不得声明模糊 —— 标题在菜单内部，菜单自己已是 backdrop root，
+    //    再声明只会采样子树里滚动的行（实测 31.719/px，比不写更脏）。
+    assert.ok(
+      !block.includes('backdrop-filter'),
+      '标题不得声明 backdrop-filter（会采样到滚动的行，反而更脏）',
+    )
+    // ⑤ 先铺填充、再压颗粒（与卡片的层序一致：填充是负 z 的 .material，压在质感之上）。
+    assert.ok(
+      block.indexOf('linear-gradient') < block.indexOf(GRAIN_TILE_VARIABLE),
+      '层序必须是「填充渐变 在上、颗粒 在下」——与卡片 .material(z-index:-1) 的结构一致',
+    )
   })
 
   it('⛔ 菜单族材质必须**完全交回官方** —— 我们不声明填充与模糊', () => {
@@ -946,11 +971,21 @@ describe('抬升面：表面绘制', () => {
         `不得声明模糊 —— 官方自己成对画好了，再画一遍会让半透明叠两次：${anchor}`,
       )
     }
-    // 这两个官方变量**我们一个字都不写**（常量本身也已从实现里删掉）——
+    // 这两个官方变量**我们一个字都不声明**（常量本身也已从实现里删掉）——
     // 官方材质由官方自己声明；我们只在 token 层染色（`POPUP_TOKENS`）。
+    //
+    // ⚠️ 判据是**声明**（`--x:`）而不是**出现**：分组标题那条规则里**引用**
+    // `var(--dsw-specific-menu)` 是正当的（那是"跟随色调"的唯一办法，见
+    // buildSurfaceCss 里标题规则的注释）—— 被禁的是我们**自己给它赋值**。
     const decls = css.replace(/\/\*[\s\S]*?\*\//gu, '')
-    assert.ok(!decls.includes('--dsw-specific-menu'), '生成的 CSS 里不得声明官方的菜单填充变量')
-    assert.ok(!decls.includes('--dsw-menu-backdrop-filter'), '生成的 CSS 里不得声明官方的菜单模糊变量')
+    assert.ok(
+      !/--dsw-specific-menu\s*:/u.test(decls),
+      '生成的 CSS 里不得**声明**官方的菜单填充变量（引用 var() 是允许的）',
+    )
+    assert.ok(
+      !/--dsw-menu-backdrop-filter\s*:/u.test(decls),
+      '生成的 CSS 里不得**声明**官方的菜单模糊变量（引用 var() 是允许的）',
+    )
   })
 
   it('带分组标题的菜单应该 保留质感、只去掉顶光（不能整条排除 → 会变成纯色）', () => {
