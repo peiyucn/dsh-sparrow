@@ -220,8 +220,9 @@ export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
  * | **顶光** | ❌ | 它锚在**盒子顶部**（`ellipse 120% 42% at 50% -12%`），而分组标题正好压在菜单顶部 → 同色的一栏在带光的面上显形，**横带就是它造的** |
  * | 底光 | ✅ | 锚在盒子**底部**，而分组标题永远吸在**顶部**（`position: sticky; top: 0`）→ 两者不相遇，留着它才有纵深 |
  *
- * 另把**颗粒补给分组标题条本身**（{@link GROUPED_MENU_TITLE_SELECTOR}）——
- * 否则标题上没颗粒、菜单上有，仍是一层极淡的接缝。
+ * ⚠️ **颗粒不要补给分组标题条本身**（{@link GROUPED_MENU_TITLE_SELECTOR}）——试过，已撤：
+ * 标题上没有底色压着，同一张贴图落在它上面就成了**纯加亮**，标题比菜单主体**亮 17.6 级**，
+ * 反而成了一条更明显的横带。本插件对标题**一个声明都不写**（见 `buildSurfaceCss` 里的注释）。
  */
 export const GROUPED_MENU_SELECTOR = "body [role='menu']:has([role='group'])"
 
