@@ -117,24 +117,47 @@ export function ensurePickerStyles(): void {
     '.ccb-model-warning { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-state-warn-label); }',
     '.ccb-model-retry { flex: 0 0 auto; padding: 0; border: none; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }',
     '.ccb-model-groups { min-height: 0; overflow-y: auto; overflow-x: hidden; }',
-    // ⚠️ **sticky 挂在 section 上，不是挂在标题上**（2026-09-24，owner 报「分类标题滚动时
-    //    和模型名字重叠，而且还有背景色」的根因）。
+    // ⚠️ **吸顶的是「分类标题」，不是「分组容器」**（2026-09-25 真机定案，别再改回去）。
     //
-    // 曾经写的是 `.ccb-model-groupTitle { position: sticky; top: 0 }` —— 那是**抄官方**
-    //（`ModelSelect.module.css` 的 `.groupTitle` 与 codebuddy 原实现都这么写），但
-    // **它在两处都是坏的**（owner：「这是官方的 bug」—— 数据支持这个判断）：
-    // sticky 元素只在**自己的包含块**（那个 `<section>`）内滑动，section 一滚过容器顶，
-    // 标题就被**带着一起越出滚动容器**（真机实测：容器 top=281 时标题跑到 261、157、…，
-    // 溢出量随 scrollTop 线性增长），越过菜单 `overflow: hidden` 后与页面内容叠在一起
-    // = 看到的"重叠"；它自带 `background: var(--dsw-specific-menu)` = 看到的"背景色"。
-    // 最小复现（无本插件、纯 DOM）同样复现 → 是这套**结构**的固有问题，不是样式写错。
+    // 上一轮曾把 sticky 提到 `<section class="ccb-model-group">` 上，理由是「sticky 元素只在
+    // 自己的包含块内滑动，标题会被 section 带出滚动容器」。**那个理由推错了**：sticky 的
+    // 包含块是**最近的滚动祖先**（`.ccb-model-groups`），不是 section —— section 只是它
+    // 滑动的**边界**。把 sticky 放到 section 上会引入一个更严重的缺陷：
     //
-    // 修法：把 sticky 提到 `<section>` 自己身上 —— section 吸顶时标题作为它的首行一起吸住，
-    // 后一个 section 从下方推上来时**把前一个整体顶走**，永不越界（真机 + 最小复现双验）。
-    '.ccb-model-group { position: sticky; top: 0; z-index: 1; }',
+    //   前一个 section 的**底边**还在滚动口之下时它保持吸顶，
+    //   同时后一个 section 的**顶边**也滚到了口沿并开始吸顶
+    //   ⇒ **两条 26px 高的条同时贴在同一个 top 上互相压住**。
+    //
+    // 真机实测（owner 实例，scroll=120）：吸顶 = [DeepSeek, CodeBuddy Credits]，
+    // 两条标题重叠 12px —— 正是 owner 截图里 "Hy4 preview" 与 "Hy3" 叠字那一幕。
+    // 而 sticky 挂在标题上时：吸顶 = [CodeBuddy Credits] 单条，重叠 = 无；
+    // 后一个 section 从下方推上来会把前一条**自然顶走**（这是 sticky 的标准语义）。
+    //
+    // 注意 `<section>` 这里**一个字都不写**：它保持文档流，边界作用天然成立。
     '.ccb-model-group + .ccb-model-group { margin-top: 4px; }',
-    // 标题只负责"长什么样"，不再承担定位（定位交给 section）。
-    '.ccb-model-groupTitle { padding: 5px 8px 3px; background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
+    // 标题：吸顶 + **不透明**且与卡片表面同色的底。
+    //
+    // 为什么必须不透明：官方（`ModelSelect.module.css` 的 `.groupTitle`）只写
+    // `background: var(--dsw-specific-menu)`（半透明、且**没有** backdrop-filter），
+    // 于是滚过去的模型行会**从标题底下透出来**，看起来就是「标题和模型名重叠」。
+    // 真机像素实测（标题带 26px，「行可见」vs「行隐藏」两张截图的差异）：
+    //   官方半透明写法  19.885/px，10.53% 像素变化   ← 行透上来了
+    //   再补一层菜单模糊 31.719/px，63.89% 像素变化   ← 更糟：模糊把底下的行整片拖进来
+    //
+    // 解法 = 「标题自己那层半透明色，压在不透明的地面色上」：
+    //   background-color = var(--dsw-alias-bg-base)            ← 卡片浮在它之上的地面
+    //   background-image = 一层 var(--dsw-specific-menu) 渐变
+    // 合成 = 0.5·菜单色 + 0.5·地面色。而卡片表面本身就是「菜单色叠在同一个地面上」
+    // ⇒ 两者**数学上同色**：真机实测（取标题带里**没有文字**的那段空白对比菜单 padding 带）
+    //   ΔR=0.10 ΔG=0.40 ΔB=0.88（|Δ|sum=1.38，即噪声级）
+    //   对照组官方半透明标题：ΔR=ΔG=ΔB=7.00（|Δ|sum=21.00，一条看得见的横带）
+    // 也就是说这个写法比官方那版**更不像"另一块颜色"**，同时一滴都不透。
+    //
+    // ⚠️ 两条长属性分开写、**不用 background 简写**：简写会把主题层可能加到这条上的
+    // `background-image`（质感层）一起重置掉 —— 这个坑本仓库已经踩过两次。
+    // ⚠️ **不写 backdrop-filter**：与官方一致。标题在**菜单内部**，菜单自己已经是
+    // backdrop root，标题再声明模糊只会采样子树里正在滚动的行（上表的实测数字）。
+    '.ccb-model-groupTitle { position: sticky; top: 0; z-index: 1; padding: 5px 8px 3px; background-color: var(--dsw-alias-bg-base); background-image: linear-gradient(var(--dsw-specific-menu), var(--dsw-specific-menu)); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
     '.ccb-model-option { box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: auto; min-width: 100%; min-height: 38px; padding: 6px 8px; border: none; border-radius: 10px; outline: none; background: transparent; color: inherit; text-align: left; cursor: pointer; }',
     '.ccb-model-option:hover:not(:disabled), .ccb-model-option:focus-visible { background: var(--dsw-alias-interactive-bg-hover); }',
     '.ccb-model-option:disabled { color: var(--dsw-alias-label-dimmed); cursor: default; }',
