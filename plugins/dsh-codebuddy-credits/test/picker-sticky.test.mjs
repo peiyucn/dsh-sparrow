@@ -13,7 +13,11 @@ import { describe, it } from 'node:test'
  * 而且不应该出现重叠」。当时线上跑的是一版把 `position: sticky` 放到了
  * `<section class="ccb-model-group">` 上的实现 —— 结果是前后两个 section **同时**
  * 吸顶、两条标题在同一个 top 上互相压住（真机实测重叠 12px）。
- * 这两条断言把「谁吸顶」「底要不透明」钉死。
+ * 这两条断言把「谁吸顶」「底走哪个 token」钉死。
+ *
+ * 第二条当天下午又改过一次：为了挡住滚过去的行，先是加了不透明白底，owner 随即
+ * 指出那条底**自己看得见**（「把分类标题的背景色去掉，有点突兀」）。最终口径是
+ * **与卡片同源**——官方 `--dsw-specific-menu` 本来就直指卡片那个 token。
  */
 const SOURCE = new URL('../src/client/CodeBuddyModelSelect.tsx', import.meta.url)
 const source = await readFile(SOURCE, 'utf8')
@@ -49,19 +53,24 @@ describe('模型选择器：分组标题吸顶（几何契约）', () => {
     )
   })
 
-  it('标题底应该 **不透明** —— 半透明会让滚过的行透上来（"重叠"）', () => {
+  it('标题底必须与卡片**同源**：只走 --dsw-specific-menu，不得自加其它底色', () => {
     const title = ruleFor('ccb-model-groupTitle')
-    // 必须有不透明的底色（background-color），而不是只有半透明菜单色。
+    // 官方与卡片是**同一个 token**（design-platform.css:264-265 把 --dsw-specific-menu
+    // 直指 --dsw-menu-surface-fill），所以标题只用它就跟卡片同材质、且跟随色调。
     assert.match(
       title.body,
-      /background-color:\s*var\(--dsw-alias-bg-base\)/u,
-      '标题要有不透明地面色打底；官方那版只有半透明 --dsw-specific-menu，行会透出来',
+      /background-color:\s*var\(--dsw-specific-menu\)/u,
+      '标题底要用官方那个菜单 token（与卡片同源）',
     )
-    // 菜单色调保留在**图层**上（与主题层同源、跟随色调），不能改成不透明色写死。
-    assert.match(
-      title.body,
-      /background-image:\s*linear-gradient\(var\(--dsw-specific-menu\)/u,
-      '菜单色调要叠在不透明底之上（走 token，跟随色调）',
+    // **不得**再压一层自己的填充 —— 上一版那条不透明白底
+    // （--dsw-alias-bg-base）实测比卡片亮 26 级且是纯色平带，正是 owner 说的「有点突兀」。
+    assert.ok(
+      !/--dsw-alias-bg-base/u.test(title.body),
+      '标题不得自加不透明白底（会比卡片亮一档、且是纯色平带 = owner 报的「突兀」）',
+    )
+    assert.ok(
+      !/background-image/u.test(title.body),
+      '标题不得自己画图层 —— 质感层归主题插件统一处理',
     )
     // 不得用 background 简写：它会把主题层可能加到这条上的 background-image 一起重置。
     assert.ok(
@@ -69,7 +78,7 @@ describe('模型选择器：分组标题吸顶（几何契约）', () => {
       '不得用 background 简写（会重置主题层叠加的 background-image）',
     )
     // 不得声明 backdrop-filter：标题在菜单内部，菜单自己已是 backdrop root，
-    // 再声明模糊只会采样子树里滚动的行（实测反而更脏）。
+    // 再声明模糊只会采样子树里滚动的行（实测反而更脏：31.719/px vs 19.885/px）。
     assert.ok(
       !/backdrop-filter/u.test(title.body),
       '标题不得声明 backdrop-filter（会采样到滚动的行，反而更脏）',
