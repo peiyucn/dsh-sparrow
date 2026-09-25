@@ -18,7 +18,8 @@
  * 所以两处**同源但分工**：
  *
  * * token 层（`tones.ts` 的 `POPUP_TOKENS`）**只给颜色** —— `--dsw-specific-menu` /
- *   `--dsw-specific-tip` = 同一个不透明面板色。覆盖全部消费方，role 有没有都算数；
+ *   `--dsw-menu-surface-fill` = 同一个**半透明**菜单填充色（0.1.7 起官方是玻璃色，
+ *   见 `POPUP_TOKENS`；`--dsw-specific-tip` 另走内嵌面通道）。覆盖全部消费方，role 有没有都算数；
  * * 本模块的选择器**给图形** —— 按 role 命中真正的浮层，补上颗粒与顶 / 底光，
  *   底色仍读 `PANEL_VARIABLE`（与上面那个 token 同源）。
  *
@@ -39,6 +40,7 @@
  * 官方原值（`surfaceFill` 对 `tint === ''` 直接返回色阶引用），两条通道一起让路。
  */
 
+import { grainOverGradients } from './backdrop.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -353,6 +355,49 @@ export function menuSurfaceLayers(): string {
 }
 
 /**
+ * 菜单填充色变量 —— 标题条与卡片**必须读同一个**，否则标题就是一条色差带。
+ *
+ * 官方 0.1.7 把菜单表面的填充收进 `--dsw-menu-surface-fill`（`MenuSurface.module.css:26`
+ * 的 `.material` 用它），而 `--dsw-specific-menu` 是它的**别名**
+ * （实测官方样式表：`body { --dsw-specific-menu: var(--dsw-menu-surface-fill) }`）。
+ * 两个 token 名字不同、值同源，所以这里**两个一起染**（见 `POPUP_TOKENS`），
+ * 规则里优先读语义更准的那个、并留别名兜底。
+ */
+const MENU_FILL = `var(--dsw-menu-surface-fill, var(--dsw-specific-menu))`
+
+/**
+ * 粘性分组标题条的 `background-image`，**从上到下**：
+ *
+ * 1. **卡片自己的颗粒** —— 卡片把它画在菜单元素的 `background-image` 最上层
+ *    （{@link menuSurfaceLayers}），所以标题也得画在最上层、**满强度**；
+ * 2. **卡片填充** —— 与卡片同一个 token、同一个 alpha；
+ * 3. **地面原样重画**（{@link grainOverGradients}：颗粒 + 三段光，`fixed` 对齐视口）
+ *    —— 卡片是玻璃，它看到的就是「地面」这四层；标题另有不透明底，必须把地面重画一遍，
+ *    否则「地面长什么样」这件事在标题上就丢了。
+ *
+ * 合成结果 = 颗粒 叠在（填充 叠在 地面 上）—— 与卡片**逐层同源**，实测两轴都在 1 级以内。
+ * @returns 可直接写进 `background-image` 的图层串。
+ */
+export function groupTitleLayers(): string {
+  return [
+    `var(${GRAIN_TILE_VARIABLE}, none)`,
+    `linear-gradient(${MENU_FILL}, ${MENU_FILL})`,
+    grainOverGradients(),
+  ].join(',\n    ')
+}
+
+/**
+ * {@link groupTitleLayers} 的**逐层 `background-attachment`**：最上面两层（标题自己的颗粒、
+ * 卡片填充）按元素盒子，地面那四层 `fixed` —— 地面是 `position: fixed` 的整屏层，
+ * 百分比按视口解析；少了 `fixed`，一条 26px 的横条会把 `ellipse 80vw 45vh` 压成硬边带
+ * （05-surfaces §8.2 记的那个坑）。
+ *
+ * ⚠️ **值必须逐层给足**：CSS 在值少于层数时是**整串重复**，只写三个的话第 4、5 层会回到
+ * `scroll`，光层当场被压扁。
+ */
+export const GROUP_TITLE_ATTACHMENT = 'scroll, scroll, fixed, fixed, fixed, fixed'
+
+/**
  * 给锚点挂上「官方默认」门。
  *
  * **不能**写成 `body:not([…]) ${anchor}` —— 锚点自带 `body ` 前缀，那样会拼出
@@ -364,6 +409,20 @@ export function menuSurfaceLayers(): string {
  */
 function gatedAnchor(anchor: string): string {
   return anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
+}
+
+/**
+ * 分组标题条规则的**选择器构造**：把 {@link GROUPED_MENU_SELECTOR} 自带的 "body " 前缀
+ * 换成调用方给的前缀（要带门 / 还要带轴门）。
+ *
+ * **不能**直接拼 `${prefix} ${GROUPED_MENU_SELECTOR}` —— 锚点自带 `body `，
+ * 会拼出 `body:not([…]) body [role='menu']…`（**body 套 body**），规则静默失效
+ * —— 与 {@link gatedAnchor} 的 ⚠️ 是同一个坑（那里选择把门并进锚点，这里选择换前缀）。
+ * @param bodyPrefix - 新的 body 前缀（已含所需的门）。
+ * @returns 完整选择器。
+ */
+function groupTitleRule(bodyPrefix: string): string {
+  return `${bodyPrefix} ${GROUPED_MENU_SELECTOR.replace(/^body\s+/u, '')} ${GROUPED_MENU_TITLE_SELECTOR}`
 }
 
 /**
@@ -448,60 +507,85 @@ ${SURFACE_ANCHORS.map(anchor => `${gatedAnchor(anchor)}::before {
    两条 owner 反馈夹出来的解：全给图层 → 分组标题显形成横带；全不给 → 「是纯色的」。
    顶光锚在盒子顶部、正好被标题压住，是横带的**唯一来源** → 去掉它；
    颗粒（均匀贴图）与底光（锚盒子底部、与吸顶的标题不相遇）都留着，质感还在。
-   ⚠️ **不要给标题条本身补颗粒**（曾经补过，已撤）—— 那会让标题比菜单主体亮一档
-   （实测落差 17.6 级），正是 owner 报的"分类显示条有背景色"。
+   ⚠️ **标题条自己也要补颗粒**（{@link groupTitleLayers}）—— 标题有不透明底，
+   那片颗粒不会「落在同一张贴图上等于纯加亮」，而是卡片质感的一部分；
+   不补就等于把卡片那片颗粒挖掉一块、露出一条平带。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 ${gatedAnchor(GROUPED_MENU_SELECTOR)} {
   background-image: ${menuSurfaceLayers()} !important;
 }
-/* --- 粘性分组标题：把**卡片的表面配方原样重画**，但打底那层换成不透明的 ---
-   owner 对这条报了三轮，其中两次是我修坏的。三句原话合起来就是全部约束：
+/* --- 粘性分组标题：把**卡片那一摞层**原样重画，只在最下面垫一层不透明的 ---
+   owner 对这条报了四轮，其中三次是我修坏的。四句原话合起来就是全部约束：
      ① 「把分类标题的背景色去掉，有点突兀，咱们的和官方的一起处理。」
      ② 「透明和模糊和官方默认一样就行。」
      ③ 「给修坏了又。又重叠了。**只是把那个背景去掉，不是变成透明的**。」
-   ②+③ = 底色**必须挡住滚过去的行**（不能透明），**又不许看成一条带**。
+     ④ 「背景条又出来了…那条背景条要和菜单底色一致，这样就看不出来有那一条。」
+   ②+③+④ = 底色**必须挡住滚过去的行**（不透明），**又必须和卡片同色**（看不出那条）。
 
-   难在哪：菜单卡片是**半透明玻璃**（"rgba(248,249,250,0.58)" + blur(40px)），
-   它的实际表面 = 菜单填充 叠在**被模糊过的页面内容**上，再吃一层本插件的颗粒。
-   于是：
-   * 官方标题再叠一层同一个半透明 token → 比卡片**多叠一层**，色偏一档 = owner ① 的"突兀"；
-   * 我刷过的**纯白底**（bg-base 打底）→ 也偏一档，而且是**纯色平带**
-     （卡片有颗粒、那条没有），"平带压在有纹理的面上"比色差本身更刺眼 = 同样的"突兀"；
-   * 我第二版干脆**不画** → 行直接透上来 = owner ③。
+   难在哪：卡片是**半透明玻璃**，它的表面不是一个静态色，而是一摞合成：
+     卡片 = [颗粒] 叠在（菜单填充 叠在 [地面] 上）        ← 地面 = 底色 + 三段光 + 颗粒
+   标题要挡住行，就必须自带不透明底；于是唯一能让它"看不出"的写法是
+   **把上面那一摞逐层重画一遍**，只把最下面的「页面内容」换成静态的「地面」。
 
-   本版 = 卡片的算式，逐项同源，只把打底层做成不透明：
-     background-color = bg-base                    ← 不透明地面上打底（⇒ 挡住行）
-     background-image = 颗粒, 菜单填充渐变          ← 同一个色调 + 同一个质感
-   ⇒ 合成 = "菜单填充 叠在 地面上"，再吃颗粒，与卡片**同一套层**。
+   ## 第四轮的真实根因：**层序反了**（不是配色问题）
 
-   ⚠️ **颗粒必须在这里重画**：颗粒是画在**菜单自己的 background-image** 上的，
-   而标题是它的子元素、正盖在上面 —— 不重画就等于把卡片那片颗粒挖掉一块，
-   露出的"平带"正是 owner ① 说的突兀。颗粒强度走 GRAIN_ALPHA 那**唯一一个**变量
-   （owner：「噪点值统一变量，方便后续我们减弱」），这里只引用，不再写值。
+   第三版写的是 "background-image: 填充渐变, 颗粒" —— 列表在前的画在**上面**，
+   于是合成成了 [填充] 叠在（颗粒 叠在 bg-base 上），与卡片的 [颗粒] 叠在（填充 叠在 地面上）
+   正好把两层调了个个儿。后果实测（真机 dsh 0.1.7，截图取样）：
 
-   ⚠️ **不加底光**（不直接用 menuSurfaceLayers）：底光锚在**盒子底部**，
-   而这条只有 26px 高 —— 百分比渐变会按小盒子缩放，压成一道硬边金带
-   （就是 05-surfaces §8.2 记的那个坑）。菜单主体的底光在**顶部**本来也贡献约 0，
-   所以"只画颗粒"恰好等于它底下那层。
+   | 轴 / 色调 | 标题条 | 卡片 | 差 |
+   | :--- | :--- | :--- | :--- |
+   | 浅色轴 霜蓝 | (248.5, 249.1, 249.7) | (243.1, 244.7, 244.6) | **+5 级（标题偏亮）** |
+   | 深色轴 绯红 | (43.4, 35.4, 39.9) | (54.5, 45.0, 49.2) | **−10 级（标题偏暗）** |
+
+   两个方向都错，而且颗粒还被填充的 alpha 压掉了 42%（卡片是满强度）——
+   "一条更亮/更暗、且更平的带子"，正是 owner ④ 说的"背景条又出来了"。
+
+   ## 本版：三组层、逐层同源（{@link groupTitleLayers}）
+
+     background-color = bg-base        ← 不透明的地面**底色**（⇒ 挡住行；它只是底色，不是"白板"）
+     background-image = 颗粒, 填充渐变, 地面（颗粒 + 三段光）
+     ⇒ 合成 = [颗粒] 叠在（填充 叠在 地面上），与卡片**逐层同源**
+
+   实测同一套取样：浅色轴霜蓝差 (−0.1, −0.9, −0.4)；深色轴绯红亮度差 0.2
+   （逐通道最大 1.6，肉眼不可辨）。
+
+   ⚠️ **颗粒必须画在最上面、且是满强度**（不是"多画一层"）：卡片就是这么画的
+   （见 surfaceLayers 的图层表：颗粒压在最上面才像砂面）。
+   第三版把颗粒压在填充下面 → 只剩 42% 强度，标题成了"平带"。
+
+   ⚠️ **地面那四层必须 fixed**（{@link GROUP_TITLE_ATTACHMENT}）：地面是整屏的
+   "position: fixed" 层，百分比按**视口**解析；一条 26px 的横条若按自身盒子解析，
+   "ellipse 80vw 45vh" 会被压成一道硬边光带（05-surfaces §8.2 记的就是这个坑）。
+   最上面两层（标题自己的颗粒、卡片填充）仍按元素盒子 —— 与卡片一致。
+
+   ⚠️ **地面颗粒的混合模式要跟着轴走**：地面深色轴用 screen、浅色轴用 multiply
+   （见 buildBackdropCss）。所以下面第二条规则只改 background-blend-mode ——
+   元素**自己内部**的图层之间用 background-blend-mode，跨元素的 mix-blend-mode 在这里不适用。
 
    ⚠️ **不写 backdrop-filter**：标题在**菜单内部**，菜单自己已经是 backdrop root，
    标题再声明模糊只会采样子树里**正在滚动的行**（实测 31.719/px，比不写更脏 19.885/px）。
    官方那处没配模糊是有意的 —— 这一条我们跟官方一致（owner ②）。
 
-   ⚠️ **这一条同时管住两个标题**：官方 "ModelSelect" 的 ".groupTitle" 与
-   codebuddy 插件的 ".ccb-model-groupTitle"（owner ①：「咱们的和官方的一起处理」）。
-   插件那段 CSS 里是**同一套算式但没颗粒**（不装本插件时卡片也没有颗粒，两边相等）；
-   装上本插件后由这条接管、补上颗粒，两处标题一起处理。
+   ⚠️ **这一条同时管住两个标题**：官方 "ModelSelect" 的 ".groupTitle"（真机类名
+   "._7KE1Ra_groupTitle"）与 codebuddy 插件的 ".ccb-model-groupTitle"
+   （owner ①：「咱们的和官方的一起处理」）。codebuddy 那段 CSS 是**没有本插件时**的兜底：
+   那时卡片没有颗粒、地面也没有光，所以"bg-base + 填充"就够（真机实测差 1 级）；
+   装上本插件后由这条接管，把颗粒与地面一并补上。
 
-   ⚠️ 已知近似（诚实记录）：卡片背后是**被 blur 过的动态页面内容**（可能是对话正文），
-   这一层**无法静态算出**，所以这里只能取"地面"这个唯一可静态确定的参照。
-   残留误差取决于菜单当时压住什么内容，通常 1–5 级；而上一版（纯白打底）是固定偏一档。
-   要完全消掉只能给标题上 backdrop-filter，而那会把滚动的行糊进来（见上）。
+   ⚠️ 已知近似（诚实记录）：卡片是玻璃，它的背景是**被 blur 过的动态内容**；
+   菜单压在正文上时那部分无法静态算出，只能取"地面"这个唯一可静态确定的参照，
+   残留随内容而定（通常 1–5 级）。要完全消掉只能给标题上 backdrop-filter，
+   而那会把滚动的行糊进来（见上）—— 两害相权，取静态同源。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
-${gatedAnchor(GROUPED_MENU_SELECTOR)} ${GROUPED_MENU_TITLE_SELECTOR} {
+${groupTitleRule(`body:not([${PLAIN_ATTR}])`)} {
   background-color: var(--dsw-alias-bg-base) !important;
-  background-image: linear-gradient(var(--dsw-specific-menu), var(--dsw-specific-menu)),
-    var(${GRAIN_TILE_VARIABLE}, none) !important;
+  background-image: ${groupTitleLayers()} !important;
+  background-attachment: ${GROUP_TITLE_ATTACHMENT} !important;
+  background-blend-mode: normal, normal, multiply, normal, normal, normal !important;
+}
+${groupTitleRule(`body[data-ds-dark-theme]:not([${PLAIN_ATTR}])`)} {
+  background-blend-mode: normal, normal, screen, normal, normal, normal !important;
 }
 
 /* --- 输入框上方那三张**停靠卡**（排队 / 目标 / 待办）---

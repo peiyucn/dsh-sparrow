@@ -24,8 +24,8 @@ import {
   tokenOverrides,
   washFill,
 } from '../lib/tones.js'
-import { GRAIN_DATA_URI } from '../lib/backdrop.js'
-import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, SURFACE_ANCHORS, buildSurfaceCss, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
+import { GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
+import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUP_TITLE_ATTACHMENT, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -247,13 +247,17 @@ describe('抬升面：谁被染', () => {
     }
   })
 
-  it('菜单族应该 单独成组，但只装颜色（图层归 surface.ts，见 POPUP_TOKENS）', () => {
+  it('菜单族应该 两个名字都染（同值），且只装颜色（图层归 surface.ts，见 POPUP_TOKENS）', () => {
     // 菜单走 POPUP_TOKENS：**只给颜色**。曾经塞过整份图层配方，但官方把这个
     // token 也用在 sticky 分组标题上，百分比渐变按元素盒子缩放会把小条压成硬边金带。
     // ⚠️ 2026-09-20：`--dsw-specific-tip` **已移出本表** —— 它的消费方是三张停靠卡
     // （TodoPanel / GoalBar / QueueDock），不是菜单；且它要「比地面重」而菜单族要「比地面浅」，
     // 目标相反。现归 INSET_TOKENS（见下一条）。
-    assert.deepEqual(POPUP_TOKENS.map(entry => entry.token), ['--dsw-specific-menu'])
+    // ⚠️ 0.1.7：官方把菜单填充收进 `--dsw-menu-surface-fill`（`.material` 读它），
+    // `--dsw-specific-menu` 只是它的别名，而**两个名字都有消费方**（后者见官方
+    // `.groupTitle` 与本仓库 codebuddy 的菜单）。只染一个 → 同一张卡片与它自己的
+    // 粘性标题各读一个 → 标题显成色差横带，故**两个一起染、且同值**。
+    assert.deepEqual(POPUP_TOKENS.map(entry => entry.token), ['--dsw-menu-surface-fill', '--dsw-specific-menu'])
     for (const token of tokens) {
       assert.ok(!['--dsw-specific-menu', '--dsw-specific-tip'].includes(token), `${token} 不该同时在两张表里`)
     }
@@ -850,6 +854,56 @@ function blockFor(source, selector) {
   return found
 }
 
+/**
+ * 取规则体里某个声明的值（已经去掉 `!important`）。
+ * @param block - {@link blockFor} 的返回值。
+ * @param prop - 属性名。
+ * @returns 声明值；缺声明时空串。
+ */
+function declFor(block, prop) {
+  const match = new RegExp(`(?:^|;)\\s*${prop}\\s*:([^;]*)`, 'u').exec(block)
+  return match === null ? '' : match[1].replace(/!important/u, '').trim()
+}
+
+/**
+ * 按**顶层**逗号切分 `background-image` / `background-attachment` 这类逐层列表。
+ *
+ * 必须认括号：`radial-gradient(ellipse 80vw 45vh at 50% -10vh, var(--a, transparent), transparent 62%)`
+ * 里全是逗号，朴素 `split(',')` 会把一层切成四五层，于是「值数 == 层数」这条判据当场失真。
+ * @param value - 声明值。
+ * @returns 逐层的字符串数组（已 trim，去空段）。
+ */
+function splitLayers(value) {
+  const out = []
+  let depth = 0
+  let current = ''
+  for (const char of value) {
+    if (char === '(') depth += 1
+    if (char === ')') depth -= 1
+    if (char === ',' && depth === 0) {
+      out.push(current.trim())
+      current = ''
+      continue
+    }
+    current += char
+  }
+  if (current.trim() !== '') out.push(current.trim())
+  return out
+}
+
+/**
+ * 官方菜单填充的**当前**字面量（0.1.7-rc.2，真机实测：`#f8f9fa94` / `#43454a73`）。
+ *
+ * 为什么要在测试里写死一份：本插件的染色以官方原值为基，而基值是从官方样式表**抄下来的快照** ——
+ * 抄旧了就会连「官方默认」那一档都发着过期色（0.1.7-rc.1 深色轴曾是 `rgba(48,49,54,.5)`，
+ * 本插件真的发过一段时间）。官方升级时按真机 `getComputedStyle(body)` 的
+ * `--dsw-menu-surface-fill` 复核这两个值即可。
+ */
+const OFFICIAL_MENU_FILL = Object.freeze({
+  light: 'rgba(248, 249, 250, 0.58)',
+  dark: 'rgba(67, 69, 74, 0.45)',
+})
+
 describe('抬升面：表面绘制', () => {
   const css = buildSurfaceCss()
   const layers = surfaceLayers()
@@ -894,22 +948,24 @@ describe('抬升面：表面绘制', () => {
     assert.ok(buildGlassCss().includes(`inset ${GLASS_SPECULAR_RING[0].x}px ${GLASS_SPECULAR_RING[0].y}px`), '输入框卡片应带镜面高光')
   })
 
-  it('粘性分组标题：**不透明底 + 颗粒 + 菜单填充**，且不得有模糊', () => {
-    // owner 三轮报这条，三句原话构成全部约束：
+  it('粘性分组标题：**不透明底 + 卡片那一摞层（颗粒在上）+ 地面**，且不得有模糊', () => {
+    // owner **四轮**报这条，四句原话构成全部约束：
     //   ① 「把分类标题的背景色去掉，有点突兀，咱们的和官方的一起处理。」
     //   ② 「透明和模糊和官方默认一样就行。」
     //   ③ 「给修坏了又。又重叠了。**只是把那个背景去掉，不是变成透明的**。」
-    // ②+③ ⇒ 底色必须挡住滚过去的行（不能透明），但不许看成一条带。
+    //   ④ 「背景条又出来了…那条背景条**要和菜单底色一致**，这样就看不出来有那一条。」
+    // ②+③+④ ⇒ 底色必须挡住滚过去的行（不能透明），但合成出来又必须**等于卡片**。
     //
-    // 三次走过弯路（都记下来免得再走）：
+    // 四次走过弯路（都记下来免得再走）：
     // * 官方写法（只刷半透明 `--dsw-specific-menu`）→ 比卡片**多叠一层**，色偏一档 = ①「突兀」；
-    // * 刷纯白底（`--dsw-alias-bg-base` 打底、无颗粒）→ 也偏一档，且是**纯色平带**，
-    //   "平带压在有纹理的面上"比色差更刺眼 = 同样是①；
-    // * 干脆什么都不写（本用例的上一版就是这么断言的）→ **行直接透上来** = ③。
+    // * 刷纯白底（`--dsw-alias-bg-base` 打底、无颗粒）→ 也偏一档，且是**纯色平带** = 同样是①；
+    // * 干脆什么都不写 → **行直接透上来** = ③；
+    // * 上一版（③与④之间）：**层序写反了** —— `background-image: 填充渐变, 颗粒` 里
+    //   **填充压住了颗粒**，而卡片是**颗粒压住填充**；实测浅色轴偏亮 5 级、深色轴偏暗 10 级，
+    //   正是 owner ④ 的"背景条又出来了"。
     //
-    // 正解 = 把卡片的算式原样重画、只把打底层换成不透明的：
-    //   background-color = bg-base（不透明地面）→ 挡住行
-    //   background-image = 菜单填充渐变（同一色调）+ 颗粒（同一质感）→ 不成带
+    // 正解 = 把卡片那一摞层**逐层同源**地重画，只把最下面的「页面内容」换成不透明的「地面」：
+    //   合成 = [颗粒] 叠在（菜单填充 叠在 [地面：底色 + 三段光 + 颗粒] 上）
     const titleSelector = `${GROUPED_MENU_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`
     const block = blockFor(css, titleSelector)
     assert.notEqual(block, '', '必须为分组标题生成规则 —— 不写就是行透上来（owner ③）')
@@ -919,11 +975,14 @@ describe('抬升面：表面绘制', () => {
       /background-color:\s*var\(--dsw-alias-bg-base\)/u,
       '标题要有**不透明**打底（挡住滚过去的行，owner ③）',
     )
-    // ② 菜单填充走**图层**（保住官方的半透明 alpha 与色调跟随），不写死颜色。
-    assert.match(
-      block,
-      /linear-gradient\(var\(--dsw-specific-menu\),\s*var\(--dsw-specific-menu\)\)/u,
-      '菜单色调要作为图层叠在不透明底之上（跟随色调、保住官方 alpha）',
+    // ② 菜单填充走**图层**（保住官方的半透明 alpha 与色调跟随），不写死颜色；
+    //    且必须读**卡片自己那个 token** —— 官方 `.material` 读 `--dsw-menu-surface-fill`，
+    //    别名 `--dsw-specific-menu` 是官方 `.groupTitle` 与 codebuddy 菜单读的那个，
+    //    两个名字官方同源（`--dsw-specific-menu: var(--dsw-menu-surface-fill)`），
+    //    故这里优先取语义更准的那个、留别名兜底；两个名字由 POPUP_TOKENS 一起染（见下一条）。
+    assert.ok(
+      block.includes('linear-gradient(var(--dsw-menu-surface-fill, var(--dsw-specific-menu))'),
+      `菜单填充要作为图层叠在不透明底之上，且读卡片自己的 token：${block.slice(0, 220)}`,
     )
     // ③ 颗粒必须一起重画：否则等于把卡片那片颗粒挖掉，露出"平带"（owner ①）。
     //    强度只引用 GRAIN_TILE_VARIABLE（其值由 GRAIN_ALPHA 唯一派生），不在本表写死。
@@ -941,11 +1000,83 @@ describe('抬升面：表面绘制', () => {
       !block.includes('backdrop-filter'),
       '标题不得声明 backdrop-filter（会采样到滚动的行，反而更脏）',
     )
-    // ⑤ 先铺填充、再压颗粒（与卡片的层序一致：填充是负 z 的 .material，压在质感之上）。
+    // ⑤ **层序**：颗粒在最上、填充其次、地面在下 —— 与卡片的合成顺序逐层一致。
+    //    这条是第四轮那个 bug 的**唯一守卫**：上一版断言的恰恰是反的（"填充在上"）。
+    const image = declFor(block, 'background-image')
+    const layers = splitLayers(image)
+    assert.ok(layers.length >= 3, `标题必须是多层合成（实测 ${layers.length} 层）`)
+    assert.ok(layers[0].includes(GRAIN_TILE_VARIABLE), `第一层（最上）必须是颗粒：${layers[0]}`)
+    assert.ok(layers[1].startsWith('linear-gradient('), `第二层必须是菜单填充：${layers[1]}`)
+    // 地面那几层必须**逐字**来自 grainOverGradients()（颗粒 + 三段光，同源不许手抄）
     assert.ok(
-      block.indexOf('linear-gradient') < block.indexOf(GRAIN_TILE_VARIABLE),
-      '层序必须是「填充渐变 在上、颗粒 在下」——与卡片 .material(z-index:-1) 的结构一致',
+      image.includes(grainOverGradients()),
+      '不透明底之上必须原样重画地面（grainOverGradients：颗粒 + 三段光）',
     )
+    // ⑥ 逐层 attachment / blend 的**值数必须等于层数**：CSS 在值少于层数时是整串重复，
+    //    少写一个就会让第 4、5 层退回 `scroll`、光层被压扁（05-surfaces §8.2 的坑）。
+    for (const prop of ['background-attachment', 'background-blend-mode']) {
+      const values = splitLayers(declFor(block, prop))
+      assert.equal(values.length, layers.length, `${prop} 必须逐层给足（${layers.length} 层）`)
+    }
+    assert.equal(declFor(block, 'background-attachment'), GROUP_TITLE_ATTACHMENT, '地面那几层必须 fixed')
+    assert.ok(
+      splitLayers(declFor(block, 'background-attachment')).slice(0, 2).every(v => v === 'scroll'),
+      '最上面两层（标题颗粒 / 卡片填充）按元素盒子，与卡片一致',
+    )
+    // ⑦ 地面颗粒的混合模式跟着轴走（地面深色轴 screen / 浅色轴 multiply）：
+    //    第二条规则只改 background-blend-mode，其余声明继续由第一条承担（配方只有一份）。
+    const darkTitleSelector = `${GROUPED_MENU_SELECTOR.replace(/^body\b/u, `body[data-ds-dark-theme]:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`
+    const darkBlock = blockFor(css, darkTitleSelector)
+    assert.notEqual(darkBlock, '', '深色轴必须有一条只改混合模式的规则')
+    assert.match(darkBlock, /background-blend-mode:\s*[^;]*screen/u, '深色轴地面颗粒走 screen（与背景层一致）')
+    assert.match(block, /background-blend-mode:\s*[^;]*multiply/u, '浅色轴地面颗粒走 multiply（与背景层一致）')
+    assert.ok(
+      !darkBlock.includes('background-color') && !darkBlock.includes('background-image'),
+      '第二条规则只改混合模式 —— 避免两处各写一份配方（改一处漏一处）',
+    )
+  })
+
+  it('⛔ 分组标题的合成必须逐层等于卡片（层序 + 地面同源 + 两个 token 不分叉）', () => {
+    // 把"看起来像一条带"的**成因**钉死成三条纯逻辑判据，免得再靠肉眼回归：
+    //   1. 层序：颗粒在填充之上（第四轮就是反的）；
+    //   2. 地面：不透明底之上必须重画地面，否则卡片透出来的光与颗粒在标题上丢了；
+    //   3. token 不分叉：标题读的填充 token 与卡片读的 token 必须**同值**
+    //      （官方 `.material` 读 `--dsw-menu-surface-fill`，`.groupTitle` / codebuddy 菜单读
+    //      `--dsw-specific-menu`，官方两者同源 —— 只染一个就分叉成色差带）。
+    const layers = splitLayers(groupTitleLayers())
+    assert.ok(layers[0].includes(GRAIN_TILE_VARIABLE), '层序：颗粒在最上')
+    assert.ok(layers[1].includes('linear-gradient('), '层序：填充在颗粒之下')
+    // 地面那几层 = 函数返回串的后半段，**逐字**等于 grainOverGradients()（只差排版空白）
+    const ground = layers.slice(2).join(', ').replace(/\s+/gu, ' ')
+    assert.equal(
+      ground,
+      grainOverGradients().replace(/\s+/gu, ' '),
+      '层序：地面在最下，且必须原样重画（grainOverGradients：颗粒 + 三段光）',
+    )
+    // 两个 token 都要在覆盖层里，且**每个轴上取值必须完全相同**。
+    assert.deepEqual(
+      POPUP_TOKENS.map(entry => entry.token),
+      ['--dsw-menu-surface-fill', '--dsw-specific-menu'],
+      '菜单填充的两个名字都要染',
+    )
+    for (const settings of [
+      { lightTone: 'official', darkTone: 'official' },
+      { lightTone: 'blue', darkTone: 'crimson' },
+      { lightTone: 'sakura', darkTone: 'forest' },
+    ]) {
+      const overrides = tokenOverrides(settings)
+      for (const scheme of SCHEMES) {
+        assert.equal(
+          overrides['--dsw-menu-surface-fill'][scheme],
+          overrides['--dsw-specific-menu'][scheme],
+          `${scheme}：两个填充 token 必须同值（否则标题与卡片各读一个 → 色差带）`,
+        )
+      }
+      if (settings.lightTone === 'official') {
+        assert.equal(overrides['--dsw-menu-surface-fill'].light, OFFICIAL_MENU_FILL.light, '浅色轴官方档直通')
+        assert.equal(overrides['--dsw-menu-surface-fill'].dark, OFFICIAL_MENU_FILL.dark, '深色轴官方档直通')
+      }
+    }
   })
 
   it('⛔ 菜单族材质必须**完全交回官方** —— 我们不声明填充与模糊', () => {
