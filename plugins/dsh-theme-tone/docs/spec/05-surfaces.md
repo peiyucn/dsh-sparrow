@@ -594,11 +594,12 @@ body > [role='button'] [class*='_hoverStatus'] { color: var(--dsw-alias-label-te
 
 | 通道 | 给什么 | 覆盖谁 | 代价 |
 | :--- | :--- | :--- | :--- |
-| **token**（`POPUP_TOKENS`） | **只有颜色**（一个不透明面板色） | 全部消费方，**有无 `role` 都算** | 无 `role` 的弹层拿不到颗粒与光 |
+| **token**（`POPUP_TOKENS`） | **只有颜色**（官方那款**半透明玻璃色**，只换 RGB、保 alpha），且**两个名字同值**（`--dsw-menu-surface-fill` 与别名 `--dsw-specific-menu`） | 全部消费方，**有无 `role` 都算** | 无 `role` 的弹层拿不到颗粒与光 |
 | **选择器**（`surface.ts`） | **图形**（颗粒 + 顶 / 底光）+ 同源底色 | 带 `role` 的**真浮层** | 那一个无 `role` 的 `<ul>`（`ui-jobs/JobListAction.tsx:157`）只有颜色 |
 
 **为什么配方不能进 token**：官方把同一个 `--dsw-specific-menu` 也用在 `ModelSelect` 的
-`.groupTitle`（`ModelSelect.module.css:184`）与 codebuddy 的 `.ccb-model-groupTitle` 上。
+`.groupTitle`（`ModelSelect.module.css:167-177`，`background` 在 `:172`）与 codebuddy 的
+`.ccb-model-groupTitle` 上。
 它们是 `position: sticky; top: 0` 的小条，必须与菜单主体**同色**；而百分比渐变是
 **按元素自身盒子缩放**的 —— 同一条 `ellipse 120% 42% at 50% -12%` 落在一条 24px 高的横条上
 会被重新压成一道带硬边的金色带，而菜单主体只在顶部 20%。**同一份值、两个高度、两种结果**，
@@ -608,14 +609,19 @@ body > [role='button'] [class*='_hoverStatus'] { color: var(--dsw-alias-label-te
 无 `role` 下拉只拿到颜色、没有颗粒与光 —— 它没有任何可用的语义锚点，
 用 hashed 类名去兜违反本插件红线，所以接受。
 
-> **分组标题的定案（2026-09-25；完整决策记录见
-> [`docs/upstream/0.1.7/适配完成报告.md`](../../../docs/upstream/0.1.7/适配完成报告.md) 的「第九轮」）**：
+> **分组标题的定案（2026-09-25 第四轮；完整决策记录见
+> [`docs/upstream/0.1.7/适配完成报告.md`](../../../docs/upstream/0.1.7/适配完成报告.md) 的「第十轮」）**：
 > 上面这条约束的结论是"配方不能进 token"，
-> **不是**"标题什么都不画"。标题现在由 `surface.ts` **单独一条规则**接管
-> （锚点 `GROUPED_MENU_SELECTOR` + `GROUPED_MENU_TITLE_SELECTOR`），内容是
-> **不透明打底 + 菜单填充图层 + 颗粒**（`background-image` 只放**均匀贴图与色块**，
-> **不放百分比渐变** → 恰好绕开本节说的"小条被压成金带"）。两处标题一起管
-> （官方 `ModelSelect` 与本仓库 codebuddy 插件）。
+> **不是**"标题什么都不画"。标题由 `surface.ts` **单独一条规则**接管
+> （锚点 `GROUPED_MENU_SELECTOR` + `GROUPED_MENU_TITLE_SELECTOR`），合成 =
+> **[颗粒] 叠在（菜单填充 叠在 [地面] 上）** —— 与卡片**逐层同源**：
+> `background-color` = 不透明 `--dsw-alias-bg-base`（挡住滚过的行），
+> `background-image` = 颗粒、填充、地面（`grainOverGradients()`：颗粒 + 三段光，
+> 后四层 `fixed` 按视口解析 → 小条不会被压成金带，见 §8.2 上面那段）。
+> 地面颗粒的混合模式跟着轴走（浅 `multiply` / 深 `screen`，元素内部用 `background-blend-mode`）。
+> 两处标题一起管（官方 `ModelSelect` 与本仓库 codebuddy 插件）。
+> 实测（真机 0.1.7，截图取样）：浅色轴霜蓝差 ≤0.9 级、深色轴绯红亮度差 ≈1.1 级；
+> 改前的上一版层序反了，差 +5 / −10 级（owner：「背景条又出来了」）。
 
 ### 8.3 官方默认档：门 + 两张 rung 表
 
