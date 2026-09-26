@@ -47,6 +47,11 @@ prohibited」**，并给出替代方向：
 | 缓存落盘做**无损 JSON** 校验 | `session-projection-cache/src/index.ts:389-394` 调 `snapshotJsonValue`，失败**抛 TypeError** | 状态里出现 `Map` / `NaN` 会让**整条**记录写盘失败 |
 | host-only 单元（不带 `wire`） | `:241-252` | 积分只给自己的 HTTP 路由读，不需要给客户端投影表加键 |
 
+> **`ctx.inject()` 是异步的**（`cordis/lib/index.js:1600-1606`）：
+> `inject(inject, callback) { return this.plugin({ inject, apply: callback }) }`，
+> 而 `plugin()` 新建 Fiber 后交由容器调度 —— **fork 回调不在调用点同步执行**。
+> 我写验证脚本时正因为没 `await` 而误判「fork 没触发」（见「正确性与验证」）。
+
 **关键安全事实**（`restore()` / `restoreFloor()`）：
 
 - `restoreFloor(checkpoint)` 对**没有缓存行**的 key 返回 `0`
@@ -148,6 +153,33 @@ state = { credit, calls, byModel[], byTurn: { [String(turn)]: { credit, calls, b
   ② `ctx.get('sessionProjections')` 软获取成功、注册表缺席时静默返回 `undefined`
   （降级路径成立）；③ 集成测试加载的官方投影是 **0.1.7-rc.2**，与运行中的 dsh 版本线一致
   （安装树里另有一个 rc.1 的旧 base bundle 副本，别被它误导）。
+
+### ⛔ 一条**尚未完成**的验证：运行中的 3080 实例还没跑迁移后的代码
+
+`dsh web` 是 08:04 启动的，而本轮 build 产出在 10:37（host half 不走 HMR，
+`link:` 只是让**新进程**能读到新代码）。这件事**不能靠猜**，用了一个决定性判别器：
+
+> 只有迁移后的代码会往官方投影缓存里写 `codebuddyCredits` 这个 key。
+
+查 `~/.dsh/storages/session_projcache/sessions/*.json`
+（`_poc/TEMP/check-projcache-keys.mjs`，注意 rows 在 `record.rows` 下）：
+
+| 事实 | 值 |
+| :--- | :--- |
+| 缓存文件数 | 17 |
+| 各文件都有的 key | 24 个（title / tokenUsage / sessionStats / … / imageLimits） |
+| **含 `codebuddyCredits` 的文件** | **0** |
+| 最新一次缓存写盘 | **10:40:28**（晚于 build 的 10:37） |
+
+即：10:40 仍在写盘的进程里**没有**本单元 → **运行中的实例执行的是迁移前的代码**。
+所以「真机三路一致」验证的是**数字口径等价**，不是新接线在跑。
+
+**结论（诚实记账）**：迁移的正确性由三层独立证据支撑 ——
+真实注册表集成（真包 + 真 Session + 真事件驱动）、真实 `apply()` 在真 cordis 容器上
+的接线（fork 确实注册）、33,617 条真实事件逐字段等价；而**「owner 当前那个 3080 进程
+里跑的就是新代码」这一条，要等下次重启 dsh 才能确认**。
+重启后最快的确认方式：重跑 `_poc/TEMP/check-projcache-keys.mjs`，
+`含 codebuddyCredits 的文件数` 应 > 0。
 
 ## 已知限制与取舍
 
