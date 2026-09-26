@@ -111,11 +111,18 @@ export function ensurePickerStyles(): void {
     '.ccb-model-triggerEffort { flex: 0 0 auto; color: var(--dsw-alias-label-caption); }',
     '.ccb-model-chevron { flex: 0 0 auto; color: var(--dsw-alias-label-caption); transition: transform 120ms ease; }',
     '.ccb-model-chevronOpen { transform: rotate(180deg); }',
-    '.ccb-model-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
+    // ⚠️ `--dsh-theme-tone-menu-inner-radius` = **本菜单的同心内圆角**，供 theme-tone 的
+    //   「滚动容器圆角」规则读取（见下条 `.ccb-model-groups` 的说明）。写在这里是因为
+    //   只有本文件知道自己的外圆角是 20px：同心内圆角 = 20 − 内边距 4 = 16 = --dsw-radius-lg。
+    '.ccb-model-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); --dsh-theme-tone-menu-inner-radius: var(--dsw-radius-lg, 16px); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
     '.ccb-model-status, .ccb-model-empty { padding: 10px; color: var(--dsw-alias-label-tertiary); font-size: 13px; line-height: 20px; }',
     '.ccb-model-error, .ccb-model-warning { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; padding: 7px 8px; border-radius: 8px; background: var(--dsw-alias-interactive-bg-hover-danger); color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; }',
     '.ccb-model-warning { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-state-warn-label); }',
     '.ccb-model-retry { flex: 0 0 auto; padding: 0; border: none; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }',
+    // ⚠️ **本插件不自己给滚动容器写圆角**：同心半径由 theme-tone 那条「滚动容器圆角」规则
+    //   统一施加（它同时管官方菜单与本菜单，半径经变量取值，见下条标题规则与
+    //   `.ccb-model-menu` 上的 --dsh-theme-tone-menu-inner-radius）。两条都带 !important，
+    //   这里再写一份会互相打架（实测踩过：本插件写 16 被 theme-tone 的 12 压掉）。
     '.ccb-model-groups { min-height: 0; overflow-y: auto; overflow-x: hidden; }',
     // ⚠️ **吸顶的是「分类标题」，不是「分组容器」**（2026-09-25 真机定案，别再改回去）。
     //
@@ -167,11 +174,30 @@ export function ensurePickerStyles(): void {
     //   （质感层）一起重置掉 —— 这个坑本仓库已经踩过两次。
     // ⚠️ **不写 backdrop-filter**：与官方一致。标题在**菜单内部**，菜单自己已经是
     //   backdrop root，标题再声明模糊只会采样子树里正在滚动的行（真机实测 31.719/px，更脏）。
-    // ⚠️ **圆角取 `--dsw-radius-lg`**（owner：「把这个条变成圆角的，**和菜单的圆角一致**」）：
-    //   本菜单 `border-radius: 20px` + `padding: 4px` ⇒ 同心内圆角 = **16px** = `--dsw-radius-lg`，
-    //   恰好也是官方菜单自己的圆角 token。切圆解决的是**下沿那道直边**（上两角本来就被菜单
-    //   的 overflow:hidden 切掉了）—— 它才是"看着像一条背景条"的来源。
-    '.ccb-model-groupTitle { position: sticky; top: 0; z-index: 1; padding: 5px 8px 3px; border-radius: var(--dsw-radius-lg, 16px); background-color: var(--dsw-alias-bg-base); background-image: linear-gradient(var(--dsw-specific-menu), var(--dsw-specific-menu)); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
+    // ⚠️ **圆角写在滚动容器上，不写在标题上**（2026-09-25 owner 第六轮定案，别再改回去）。
+    //   第五轮把圆角写在标题上，owner 随即报「改成圆角后**确实边缘会漏**」。
+    //   根因是几何必然：标题自己带圆角 ⇒ 「标题矩形 − 圆角」那块缺口**真的没画**，
+    //   而缺口里正好是滚动的行（`.ccb-model-option` 的悬停底铺满整行宽、行文字从 x=8 起）
+    //   ⇒ 行从缺口透出来。真机实测（吸顶标题，数标题矩形内"漏出的行"像素）：
+    //
+    //     | 标题圆角 | 4px | 6px | 8px | 16px（被 clamp 成 13） | 0（方角） |
+    //     | :--- | ---: | ---: | ---: | ---: | ---: |
+    //     | 漏出的行像素 | 6 | 16 | 30 | **70** | **0** |
+    //
+    //   把圆角改由 `.ccb-model-groups`（**滚动容器**）承担：容器顶角的裁剪**同时作用于
+    //   标题与行** ⇒ 那里既没有标题、也没有行，露出的是菜单自己的玻璃（与卡片同源）；
+    //   标题保持方角 ⇒ 没有缺口 ⇒ **结构上不可能漏**。真机实测 6 个滚动位置全 0。
+    //
+    //   ⚠️ **半径不能写死在容器规则里**：theme-tone 那条容器规则的选择器同时命中
+    //   官方菜单与本菜单，写死一个值必然让其中一个的同心关系错掉（实测踩过一次）。
+    //   故本插件在**自己的菜单元素上**声明 --dsh-theme-tone-menu-inner-radius，
+    //   theme-tone 的容器规则读它（自定义属性沿继承树向下传，滚动容器是菜单的后代）。
+    //   本菜单外圆角 20px + 内边距 4px ⇒ 同心值 = **16px** = --dsw-radius-lg。
+    //   右上角由 theme-tone 那条统一补一个滚动条宽（所有行的右边缘在内容盒上，
+    //   比容器右边缘靠左一个滚动条宽，不补就是"左圆右方"）。只圆**上两角** ——
+    //   下两角若也圆，滚到底时最后一行会被啃掉。
+    //   （没有 theme-tone 时本插件无圆角：那是纯样式增强，缺了不影响功能。）
+    '.ccb-model-groupTitle { position: sticky; top: 0; z-index: 1; padding: 5px 8px 3px; border-radius: 0; background-color: var(--dsw-alias-bg-base); background-image: linear-gradient(var(--dsw-specific-menu), var(--dsw-specific-menu)); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
     '.ccb-model-option { box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: auto; min-width: 100%; min-height: 38px; padding: 6px 8px; border: none; border-radius: 10px; outline: none; background: transparent; color: inherit; text-align: left; cursor: pointer; }',
     '.ccb-model-option:hover:not(:disabled), .ccb-model-option:focus-visible { background: var(--dsw-alias-interactive-bg-hover); }',
     '.ccb-model-option:disabled { color: var(--dsw-alias-label-dimmed); cursor: default; }',

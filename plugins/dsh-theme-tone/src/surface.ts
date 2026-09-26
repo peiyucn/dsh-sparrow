@@ -234,7 +234,7 @@ export const GROUPED_MENU_SELECTOR = "body [role='menu']:has([role='group'])"
 
 /**
  * 分组标题条：`<section role='group'>` 的**第一个子元素**（两个选择器都是这么渲染的，
- * 见 `ModelSelect.tsx:338-339` 与 `CodeBuddyModelSelect.tsx:394-395`）。
+ * 见 `ModelSelect.tsx:441-442` 与 `CodeBuddyModelSelect.tsx:449-450`）。
  * 用**结构**锚定，不碰 hashed 类名 —— 用 `[class*='_groupTitle']` 还得额外照顾
  * codebuddy 那个非哈希的 `ccb-model-groupTitle`，结构锚点一条就够。
  */
@@ -398,36 +398,134 @@ export function groupTitleLayers(): string {
 export const GROUP_TITLE_ATTACHMENT = 'scroll, scroll, fixed, fixed, fixed, fixed'
 
 /**
- * 分组标题条的**圆角** —— owner 第五轮给的做法：「官方原样，但把这个条变成圆角的，
- * **和菜单的圆角一致**」。
+ * 分组菜单的**滚动容器**（分组标题的吸顶上下文）—— 菜单的**直接子元素**里那个
+ * "装着全部 `[role='group']`"的盒子。
  *
- * ## 为什么取 `--dsw-radius-lg`
+ * 用**结构**锚定：官方 `ModelSelect.tsx:437` 是 `div.groups`，本仓库 codebuddy 的
+ * `CodeBuddyModelSelect.tsx:445` 是 `div.ccb-model-groups`；两者都是菜单的直接子元素、
+ * 都装着 `section[role='group']`。不碰 hashed 类名。
  *
- * 菜单是「圆角盒 + 内边距」，标题在内边距里侧，所以**同心圆角 = 菜单圆角 − 内边距**：
- *
- * | 菜单 | 圆角 | 内边距 | 同心内圆角 |
- * | :--- | ---: | ---: | ---: |
- * | 官方 `MenuSurface` `.surface`（`--dsw-radius-lg`） | 16px | 4px | 12px |
- * | 本仓库 codebuddy `.ccb-model-menu` | 20px | 4px | **16px** |
- *
- * 两个值分别是 `--dsw-radius-lg`(16) 与 `--dsw-radius-md`(12) —— 取 **`--dsw-radius-lg`**
- * 的理由：① 它正是**官方菜单自己的圆角 token**（`MenuSurface.module.css:3`，
- * 与 owner「和菜单的圆角一致」的字面要求一致）；② 对 codebuddy 那个 20px 菜单它**恰好就是
- * 同心值**，于是两个菜单都落在"与菜单同族"的读数上。
- *
- * ## 圆角解决的是哪一半问题
- *
- * 标题上沿那两角**本来就被菜单自己切掉了**（菜单 `overflow: hidden` + 20px 圆角），
- * 所以真正的可见边界是**下沿那道横贯全宽的直边** —— 那才是 owner 说的「一条背景条」。
- * 切圆之后它读成一个"圆角块"而不是"一条带"。
- *
- * ⚠️ **切圆不改变填充**：底仍然是不透明的（见 `groupTitleLayers`）—— 这是 owner 第三轮
- * 定的硬约束（「不是变成透明的」）。实测（真机 0.1.7，滚动差分）：切圆后标题带在
- * 滚动前后**逐像素不变**（66.32 → 66.32），而"官方原样"那版会从 72.45 变到 95.84（露行）。
- * 下两角内侧（x=13..22, y=23..30）在 4 个滚动位置上最大偏差 12 级 —— 那是弧线的抗锯齿边缘，
- * 不是露行；对比同位置的"官方原样"版是 23 级且整条带都在变。
+ * ⚠️ **本常量是"后代片段"，以组合符开头**（与 {@link GROUPED_MENU_TITLE_SELECTOR} 同类），
+ * 使用时拼在菜单锚点之后（`${菜单选择器} ${本常量}`）。
+ * **不能**写成 `:scope > …`：`:scope` 是给 `querySelector` 用的，
+ * 在**样式表**里没有上下文引用元素，按规范退化成 `:root` ⇒ 规则静默失效
+ * （正是本文件反复记录的那类"规则一条都命不中"的坑）。
  */
-export const GROUP_TITLE_RADIUS = `var(--dsw-radius-lg, 16px)`
+export const GROUPED_MENU_SCROLLER_SELECTOR = "> :has([role='group'])"
+
+/**
+ * 「分组菜单**内圈**圆角」的自定义属性名 —— {@link GROUPED_MENU_SCROLLER_RADIUS} 经它取值。
+ *
+ * ## 为什么需要一个变量，而不直接把半径写进规则
+ *
+ * 同心圆角 = **菜单自己的外圆角 − 菜单自己的内边距**，而各菜单的外圆角不同
+ * （官方 `MenuSurface` 16 ⇒ 12；本仓库 codebuddy 菜单 20 ⇒ 16）。可滚动容器那条规则的
+ * 选择器**同时命中两个菜单**（真机实测：页面上含 `[role='group']` 的 `role='menu'`
+ * 就是这两个），把半径写死在规则里必然让其中一个的同心关系错掉 ——
+ * 这条已经实测踩过一次（写 12px 之后 codebuddy 菜单读到 `12px 17px 0 0`，
+ * 而它的正确值是 `16px 21px 0 0`）。
+ *
+ * 做法：规则只读变量、**默认值是官方菜单的同心值**；菜单所有者在自己菜单元素上覆盖它
+ * （自定义属性沿继承树向下传，滚动容器是菜单的后代 ⇒ 各自读到各自的值）。
+ * 于是"配方"（同心半径 + 滚动条补偿 + 只圆上两角）**只有一份**，
+ * 各菜单只负责报出自己那个数。
+ *
+ * ⚠️ **命名带插件前缀**（`--dsh-theme-tone-*`，与本插件其它热变量一致），
+ * 不用泛化的 `--dsh-menu-inner-radius`：前者明确"谁写的、谁能覆盖"，也不会与官方未来
+ * 可能引入的同名变量撞车。
+ */
+export const GROUPED_MENU_INNER_RADIUS_VARIABLE = '--dsh-theme-tone-menu-inner-radius'
+
+/**
+ * 分组标题条的圆角：**0**（方角）。
+ *
+ * owner 第五轮要的是"把这个条变成圆角的"；第六轮反馈「改成圆角后确实边缘会漏」。
+ * 实测确认这是几何必然（缺口里露出滚动的行），因此圆角**改由滚动容器承担**
+ * （见 {@link GROUPED_MENU_SCROLLER_RADIUS}），条本身必须回到方角 ——
+ * 它一旦有圆角，缺口就回来了。
+ *
+ * ⚠️ 保留这个常量（而不是在规则里裸写 `0`）是为了让"圆角归零"这件事在一处可读、可断言。
+ */
+export const GROUP_TITLE_RADIUS = '0'
+
+/**
+ * **圆角写在滚动容器上，不写在标题条上** —— owner 第六轮的新办法。
+ *
+ * ## 为什么不能写在标题条上（第五轮那版为什么漏）
+ *
+ * 标题条自己带圆角 ⇒ 「条矩形 − 圆角」那块缺口是**真的没画**，而缺口里正好是滚动的行
+ * （`.ccb-model-option` 的悬停底铺满整行宽，行文字从 x=8 起）。于是行从缺口里透出来 ——
+ * 这就是 owner 第六轮报的「边缘会漏」。**这是几何必然，跟半径大小、配色都无关。**
+ *
+ * 真机实测（owner 实例，吸顶条，把条后面的行刷成洋红、数条矩形内的洋红像素）：
+ *
+ * | 条的圆角 | 4px | 6px | 8px | 16px（被 clamp 成 13） | 0（方角） |
+ * | :--- | ---: | ---: | ---: | ---: | ---: |
+ * | 漏出的行像素 | 6 | 16 | 30 | **70** | **0** |
+ *
+ * 附：条高 26px，所以声明 16px 会被**等比压到 13px**（半高）—— 那一版其实是个胶囊。
+ *
+ * ## 新办法：圆角交给滚动容器
+ *
+ * 容器顶角的裁剪**同时作用于条与行** ⇒ 那里既没有条、也没有行，露出的是**菜单自己的玻璃**
+ * （与卡片同源，不用猜任何颜色）；条自己保持方角 ⇒ 它没有缺口 ⇒ **结构上不可能漏**。
+ *
+ * 真机实测（6 个滚动位置 0/40/90/140/200/300，同上判据）：
+ *
+ * | 写法 | 漏 |
+ * | :--- | ---: |
+ * | 条方角 + 容器不圆 | 0 / 0 / 0 / 0 / 0 / 0 |
+ * | 条方角 + 容器上两角（本常量） | **0 / 0 / 0 / 0 / 0 / 0** |
+ * | 条自己四角 16px（第五轮那版） | 0 / 44 / 70 / 70 / 39 / 0 |
+ *
+ * ## 半径取「同心值」= 菜单圆角 − 菜单内边距
+ *
+ * 菜单是「圆角盒 + 4px 内边距」，容器贴在内边距里侧；要让容器的弧线与菜单的弧线**重合**，
+ * 就必须同圆心，即内圆角 = 外圆角 − 内边距。而**每个菜单的外圆角不同**：
+ *
+ * | 菜单 | 外圆角 | 内边距 | 同心内圆角 |
+ * | :--- | ---: | ---: | ---: |
+ * | 官方 `MenuSurface` `.surface` | `--dsw-radius-lg`(16) | 4px | **12px = `--dsw-radius-md`** |
+ * | 本仓库 codebuddy `.ccb-model-menu` | 20px | 4px | **16px = `--dsw-radius-lg`** |
+ *
+ * 所以半径**不能写死在这条规则里** —— 本规则的选择器同时命中两个菜单（真机实测确实如此），
+ * 写死一个值会让另一个菜单的同心关系错掉（踩过一次：写 12px 之后 codebuddy 菜单实测
+ * `12px 17px 0 0`，而它的同心值应是 `16px 21px 0 0`）。
+ *
+ * 做法：半径经 {@link GROUPED_MENU_INNER_RADIUS_VARIABLE} 间接取值，**默认给官方菜单的
+ * 同心值**；菜单所有者可以在自己的菜单元素上覆盖它（codebuddy 就在 `.ccb-model-menu` 上
+ * 声明 16px）。自定义属性沿继承树向下传，容器是菜单的后代 ⇒ 自然读到各自菜单的值。
+ * 这样"配方（半径 + 滚动条补偿 + 只圆上两角）"只有一份，**各菜单只报自己那个数**。
+ *
+ * ## 为什么右上角多补一个滚动条宽
+ *
+ * 所有行的右边缘都在容器的**内容盒**上，比容器 border-box 右边缘**靠左一个滚动条宽**
+ * （官方 `--dsh-scrollbar-width`，实测 5px）；左边缘则与容器左边缘齐平。同一个半径下，
+ * 右角的弧线切进条里的深度会比左角**浅 5px**。真机实测（吸顶条逐行「最左 / 最右被裁像素」）：
+ *
+ * | 写法 | 左角内缩 | 右角内缩 |
+ * | :--- | :--- | :--- |
+ * | `R R 0 0` | 10,7,5,4,3,2,2,1,1,1 | 5,2,0,0,…（右侧偏浅） |
+ * | `R calc(R+sb) 0 0` | 10,7,5,4,3,2,2,1,1,1 | 9,5,3,1,…（基本对称） |
+ *
+ * ⚠️ **已知取舍（诚实记录）**：补了之后，**内容不溢出**（没有滚动条）时右角会比同心值**深 5px**。
+ * 这一条没有可靠的 CSS 判据（滚动条有无在 CSS 里不可知），而两个方向的偏差都发生在
+ * 「条与卡片」的边界上 —— 实测这两者只差 **0.7 级**（41.7,42.6,46.0 vs 41.0,42.0,46.0），
+ * 误差肉眼不可辨；取"有滚动条"那一侧，因为分组菜单满屏时才是常态。
+ *
+ * ## 顺带解决了"圆角其实看不见"这件事
+ *
+ * 真机实测：条内部 (41.7, 42.6, 46.0) vs 条正下方 (41.0, 42.0, 46.0) —— 差 0.7 级。
+ * 也就是说第五轮那条圆角**本来就是靠"缺口里露出的行"（比条亮 18~45 级）才被看见的**；
+ * 换句话说，「圆角看得见」与「边缘不漏」在该写法下互斥。改由容器承担之后，圆弧的边界是
+ * 「条 / 菜单玻璃」，两者同源 ⇒ 视觉上就是**卡片自己的圆角**，而不是一条带子的角。
+ *
+ * ⚠️ **切圆仍然不改变填充**：条的不透明底照旧（见 `groupTitleLayers`）——
+ * owner 第三轮定的硬约束（「不是变成透明的」）。
+ */
+export const GROUPED_MENU_SCROLLER_RADIUS =
+  `var(${GROUPED_MENU_INNER_RADIUS_VARIABLE}, var(--dsw-radius-md, 12px)) ` +
+  `calc(var(${GROUPED_MENU_INNER_RADIUS_VARIABLE}, var(--dsw-radius-md, 12px)) + var(--dsh-scrollbar-width, 5px)) 0 0`
 
 /**
  * 给锚点挂上「官方默认」门。
@@ -615,12 +713,24 @@ ${groupTitleRule(`body:not([${PLAIN_ATTR}])`)} {
   background-image: ${groupTitleLayers()} !important;
   background-attachment: ${GROUP_TITLE_ATTACHMENT} !important;
   background-blend-mode: normal, normal, multiply, normal, normal, normal !important;
-  /* owner 第五轮：「官方原样，但把这个条变成圆角的，**和菜单的圆角一致**」。
-     见 GROUP_TITLE_RADIUS —— 同心圆角，且正是官方菜单自己那个 token。 */
+  /* ⚠️ owner 第六轮改判：圆角**不写在标题条上**，改由下面的滚动容器承担。
+     写在条上会漏（缺口里露出滚动的行）—— 完整实测与几何见
+     GROUPED_MENU_SCROLLER_RADIUS 的文档块。这里显式归零，是为了盖住
+     优先级更低的旧写法（codebuddy 兜底样式 / 缓存里的旧 CSS）。 */
   border-radius: ${GROUP_TITLE_RADIUS} !important;
 }
 ${groupTitleRule(`body[data-ds-dark-theme]:not([${PLAIN_ATTR}])`)} {
   background-blend-mode: normal, normal, screen, normal, normal, normal !important;
+}
+/* --- 圆角交给**滚动容器**（owner 第六轮新办法）---
+   见 GROUPED_MENU_SCROLLER_RADIUS 的文档块：容器顶角的裁剪同时作用于标题条与行
+   ⇒ 缺口里既没有条、也没有行，露出的是菜单自己的玻璃；条自己方角 ⇒ 结构上不可能漏。
+   半径**走变量**（GROUPED_MENU_INNER_RADIUS_VARIABLE），默认给官方菜单的同心值
+   （16 − 内边距 4 = 12 = --dsw-radius-md）；菜单外圆角不同的那些在自己的菜单元素上覆盖它
+   （真机实测页面上含 role=group 的 role=menu 就是官方与 codebuddy 两个，后者是 20 ⇒ 16px）。
+   ⚠️ 只圆**上两角**：下两角若也圆，滚到底时最后一行会被啃掉。 */
+${`${gatedAnchor(GROUPED_MENU_SELECTOR)} ${GROUPED_MENU_SCROLLER_SELECTOR}`} {
+  border-radius: ${GROUPED_MENU_SCROLLER_RADIUS} !important;
 }
 
 /* --- 输入框上方那三张**停靠卡**（排队 / 目标 / 待办）---

@@ -93,28 +93,51 @@ describe('模型选择器：分组标题吸顶（几何契约）', () => {
     )
   })
 
-  it('标题应该 切同心圆角（和菜单一致），但**不得**因此变透明', () => {
-    // owner 第五轮：「能否官方原样，但把这个条变成圆角的，和菜单的圆角一致」。
+  it('圆角应该 交给**滚动容器**，标题自己保持方角（否则边缘会漏）', () => {
+    // owner 第五轮：「能否官方原样，但把这个条变成圆角的，和菜单的圆角一致」
+    // → 第五轮照做；第六轮 owner 报「**改成圆角后确实边缘会漏**」。
     //
-    // 几何：本菜单 `border-radius: 20px` + `padding: 4px` ⇒ 同心内圆角 = **16px**
-    // = `--dsw-radius-lg`（真机读到该 token 就是 16px），也**正是官方菜单自己的圆角 token**
-    // （`ui-primitives/MenuSurface.module.css:3` 的 `.surface { border-radius: var(--dsw-radius-lg) }`）。
-    //
-    // 切圆要治的是**下沿那道横贯全宽的直边** —— 它才是"看着像一条背景条"的来源
-    // （上两角本来就被菜单的 `overflow: hidden` + 20px 圆角切掉了，加了也看不见）。
+    // 真机实测确认那是**几何必然**：标题自己带圆角 ⇒「标题矩形 − 圆角」那块缺口
+    // **真的没画**，而缺口里正好是滚动的行（悬停底铺满整行宽、行文字从 x=8 起）
+    // ⇒ 行从缺口透出来。漏量随半径增长（4px→6、6→16、8→30、16(clamp 13)→**70**；
+    // 方角→**0**）。所以圆角改由**滚动容器**承担：容器顶角的裁剪**同时作用于标题与行**
+    // ⇒ 缺口里既没有标题也没有行，露出的是菜单自己的玻璃；标题方角 ⇒ 结构上不漏。
+    // 真机复验：6 个滚动位置全 0。
     const title = ruleFor('ccb-model-groupTitle')
     assert.match(
       title.body,
-      /border-radius:\s*var\(--dsw-radius-lg/u,
-      '标题要切同心圆角，且走官方菜单自己的圆角 token（不写死像素）',
+      /border-radius:\s*0(?:px)?\b/u,
+      '标题必须方角 —— 它一旦有圆角，缺口就会把滚动的行露出来（owner 第六轮）',
     )
+    assert.ok(
+      !/border-radius:\s*var\(--dsw-radius/u.test(title.body),
+      '标题不得再切圆角（第五轮那版就是这么漏的）',
+    )
+    // 圆角落在滚动容器上 —— **但半径由 theme-tone 的规则统一读变量给出**，本插件只负责
+    // 在自己菜单上声明那个变量。原因：theme-tone 那条容器规则的选择器**同时命中官方菜单
+    // 与本菜单**（真机实测：页面上含 role=group 的 role=menu 就是这两个），半径写死在规则里
+    // 必然让其中一个的同心关系错掉（实测踩过一次：写 12px 之后本菜单读到 `12px 17px 0 0`，
+    // 正确值是 `16px 21px 0 0`）。变量沿继承树向下传，滚动容器是菜单的后代 ⇒ 各读各的。
+    const menu = ruleFor('ccb-model-menu')
+    assert.match(
+      menu.body,
+      /--dsh-theme-tone-menu-inner-radius:\s*var\(--dsw-radius-lg/u,
+      '菜单要声明同心内圆角变量（外圆角 20 − 内边距 4 = 16px），供 theme-tone 的容器规则读取',
+    )
+    // 本插件**不再**自己给容器写圆角：那会与 theme-tone 那条撞车（两条都 !important）。
+    const groupsAt = source.indexOf("'.ccb-model-groups {")
+    if (groupsAt >= 0) {
+      const groupsRaw = source.slice(groupsAt + 1, source.indexOf("'", groupsAt + 1))
+      assert.ok(
+        !/border-radius/u.test(groupsRaw),
+        '本插件不得自己给滚动容器写 border-radius —— 同心半径由 theme-tone 那条统一施加',
+      )
+    }
     // ⚠️ 切圆**不是**把底变透明：这两条必须同时成立，否则就又回到 owner 否掉的那版。
     assert.match(
       title.body,
       /background-color:\s*var\(--dsw-alias-bg-base\)/u,
       '切圆之后底必须仍然不透明（owner：「不是变成透明的」）',
     )
-    // 真机滚动差分（0.1.7）：切圆前后标题带逐像素不变（不透明 ⇒ 挡住滚过的行）。
-    // 若哪天有人"顺手"把底改成半透明去配圆角，上面那条断言会先拦住。
   })
 })

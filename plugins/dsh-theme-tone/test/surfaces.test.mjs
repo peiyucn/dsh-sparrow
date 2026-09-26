@@ -25,7 +25,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
-import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
+import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -1023,20 +1023,57 @@ describe('抬升面：表面绘制', () => {
       splitLayers(declFor(block, 'background-attachment')).slice(0, 2).every(v => v === 'scroll'),
       '最上面两层（标题颗粒 / 卡片填充）按元素盒子，与卡片一致',
     )
-    // ⑦ 圆角：owner 第五轮「官方原样，但把这个条变成圆角的，**和菜单的圆角一致**」。
-    //    同心圆角 = 菜单圆角 − 内边距，两条已知菜单都落在官方圆角 token 上
-    //    （官方 `MenuSurface` 16−4=12 = `--dsw-radius-md`；codebuddy 20−4=16 = `--dsw-radius-lg`），
-    //    统一取 `--dsw-radius-lg` —— 它正是**官方菜单自己**的圆角 token。
-    //    切圆要解决的是**下沿那道横贯全宽的直边**（上两角已被菜单的 overflow:hidden 切掉），
-    //    而**不是**把底变透明：实测滚动差分上，切圆后标题带逐像素不变（不透明底仍在）。
+    // ⑦ 圆角：owner 第五轮「官方原样，但把这个条变成圆角的，**和菜单的圆角一致**」，
+    //    第六轮反馈「改成圆角后**确实边缘会漏**」。真机实测确认是几何必然：
+    //    标题自己带圆角 ⇒「标题矩形 − 圆角」那块缺口真的没画，而缺口里正好是滚动的行
+    //    （悬停底铺满整行宽、行文字从 x=8 起）⇒ 行透出来。漏量随半径增长
+    //    （4px→6、6→16、8→30、16(clamp 13)→**70**；方角→**0**）。
+    //    ⇒ 圆角改由**滚动容器**承担（容器顶角的裁剪同时作用于标题与行），标题回到方角。
+    assert.equal(GROUP_TITLE_RADIUS, '0', '标题必须方角（有圆角就有缺口，缺口就漏行）')
     assert.equal(
       declFor(block, 'border-radius'),
       GROUP_TITLE_RADIUS,
-      '标题要切同心圆角（owner：「和菜单的圆角一致」）',
+      '标题的圆角必须显式归零 —— 要盖住优先级更低的旧写法（codebuddy 兜底 / 缓存旧 CSS）',
+    )
+    // 圆角落在滚动容器上。半径**走变量**（不是写死值）—— 该规则的选择器同时命中
+    // 官方菜单与 codebuddy 菜单，两个菜单的同心值不同（官方 16−4=12；codebuddy 20−4=16），
+    // 写死一个必然让另一个错掉（实测踩过一次）。变量默认给官方菜单的同心值，
+    // 菜单所有者可在自己菜单元素上覆盖（自定义属性沿继承树向下传）。
+    assert.ok(
+      GROUPED_MENU_SCROLLER_RADIUS.includes(GROUPED_MENU_INNER_RADIUS_VARIABLE),
+      '容器圆角必须经变量取值 —— 两个菜单的同心值不同，写死会让其中一个错掉',
     )
     assert.ok(
-      GROUP_TITLE_RADIUS.includes('--dsw-radius-lg'),
-      '圆角走官方菜单自己的 token（不写死像素）',
+      GROUPED_MENU_SCROLLER_RADIUS.includes('--dsw-radius-md'),
+      '变量默认值是官方菜单的同心值（官方 MenuSurface 16 − 内边距 4 = 12 = --dsw-radius-md）',
+    )
+    assert.match(
+      GROUPED_MENU_INNER_RADIUS_VARIABLE,
+      /^--dsh-theme-tone-/u,
+      '热变量要带插件前缀（明确谁写的、谁能覆盖，也不与官方未来同名变量撞车）',
+    )
+    assert.ok(
+      GROUPED_MENU_SCROLLER_RADIUS.includes('--dsh-scrollbar-width'),
+      '容器右上角补一个滚动条宽（否则左圆右方）',
+    )
+    assert.match(
+      GROUPED_MENU_SCROLLER_RADIUS,
+      /\)\s+0\s+0$/u,
+      '容器只圆上两角 —— 下两角会让滚到底时的最后一行被啃掉',
+    )
+    const scrollerSelector = `${GROUPED_MENU_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_SCROLLER_SELECTOR}`
+    const scrollerBlock = blockFor(css, scrollerSelector)
+    assert.notEqual(scrollerBlock, '', '必须为滚动容器生成圆角规则')
+    assert.equal(declFor(scrollerBlock, 'border-radius'), GROUPED_MENU_SCROLLER_RADIUS, '容器圆角值')
+    // ⚠️ 选择器不得用 `:scope`：它是给 querySelector 用的，在样式表里退化成 `:root`
+    //    ⇒ 规则静默失效（本文件反复记录的那类"一条都命不中"的坑）。
+    assert.ok(
+      !scrollerSelector.includes(':scope'),
+      '样式表选择器不得用 :scope（会退化成 :root，规则静默失效）',
+    )
+    assert.ok(
+      GROUPED_MENU_SCROLLER_SELECTOR.startsWith('>'),
+      '滚动容器锚点是后代片段，必须以组合符开头（拼在菜单锚点之后才有效）',
     )
     // ⑧ 地面颗粒的混合模式跟着轴走（地面深色轴 screen / 浅色轴 multiply）：
     //    第二条规则只改 background-blend-mode，其余声明继续由第一条承担（配方只有一份）。
