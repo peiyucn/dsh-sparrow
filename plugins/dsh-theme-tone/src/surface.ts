@@ -233,6 +233,49 @@ export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
 export const GROUPED_MENU_SELECTOR = "body [role='menu']:has([role='group'])"
 
 /**
+ * {@link GROUPED_MENU_SELECTOR} 的**无守卫写法**，专供「与后代锚点组合」的规则使用。
+ *
+ * ## 为什么要有这一条（owner：「咱们主题明显比官方的卡」）
+ *
+ * 真机消融实测（同 DOM、同色调档，只 `styleEl.disabled = true/false`，150 帧 × 每帧插 6 节点）：
+ *
+ * | 变体 | 规则数 | 样式重算耗时 |
+ * | :--- | ---: | ---: |
+ * | 原样 | 151 | **3.192s** |
+ * | 去掉全部 `:has()` | 139 | **1.216s** |
+ * | 只留 `:has()` | 12 | **2.809s** |
+ * | 151 条**平凡**规则（`.zzz-N{color:inherit}`） | 151 | 1.256s |
+ * | 空表 | 0 | 1.382s |
+ *
+ * ⇒ **规则条数无关**（平凡规则 ≈ 空表），**开销集中在 12 条 `:has()` 上（约 62%）**。
+ * 再逐条定位，最贵的三条里两条是**这里这种「重复守卫」**：
+ * `[role='menu']:has([role='group']) [role='group'] > :first-child`（+1.38s，p95 74ms）
+ * `[role='menu']:has([role='group']) > :has([role='group'])`（+1.53s，p95 78ms）
+ *
+ * ## 为什么可以去掉（**严格等价，不是近似**）
+ *
+ * `:has([role='group'])` 问的是「这个菜单里有没有分组」。而组合规则的后半段
+ * **本身就已经要求**「命中元素是某个 `[role='group']` 的后代 / 那个 group 本身」——
+ * 既然那个 group 在菜单里面，菜单当然有分组。所以守卫是**冗余的**：
+ *
+ * * 标题：`menu:has(group) group > :first-child` ≡ `menu group > :first-child`
+ * * 滚动容器：`menu:has(group) > :has(group)` ≡ `menu > :has(group)`
+ *   （子元素里有 group ⇒ 父菜单里必然也有 group）
+ *
+ * 真机逐元素验过（菜单开着 + 关着两种状态）：三条规则的命中集合
+ * **数量与逐个 `isSameNode` 完全一致**（3/3、3/3、1/1，关闭时同为 0/0）。
+ *
+ * ## 收益（真机实测，三轮交替取平均）
+ *
+ * 只改这三条：样式重算 **4.443s → 3.633s（0.82×，省 18%）**。
+ * 只删冗余、不改观感 —— 是这批开销里**唯一零风险**的那部分。
+ *
+ * ⚠️ 单独使用的场合（那条给菜单本体上料的规则）**必须**保留 `:has()`
+ * ——那里没有别的锚点能表达「这是个带分组的菜单」，去掉就等于命中的所有菜单。
+ */
+export const GROUPED_MENU_UNGUARDED_SELECTOR = "body [role='menu']"
+
+/**
  * 分组标题条：`<section role='group'>` 的**第一个子元素**（两个选择器都是这么渲染的，
  * 见 `ModelSelect.tsx:441-442` 与 `CodeBuddyModelSelect.tsx:449-450`）。
  * 用**结构**锚定，不碰 hashed 类名 —— 用 `[class*='_groupTitle']` 还得额外照顾
@@ -552,7 +595,10 @@ function gatedAnchor(anchor: string): string {
  * @returns 完整选择器。
  */
 function groupTitleRule(bodyPrefix: string): string {
-  return `${bodyPrefix} ${GROUPED_MENU_SELECTOR.replace(/^body\s+/u, '')} ${GROUPED_MENU_TITLE_SELECTOR}`
+  // ⚠️ 用**无守卫**锚点：组合规则的后半段已经要求 `[role='group']` 的存在，
+  // `:has()` 是冗余的，而它每次 DOM 变动都要重匹配（真机实测最贵的三条之一）。
+  // 等价性与收益见 {@link GROUPED_MENU_UNGUARDED_SELECTOR}。
+  return `${bodyPrefix} ${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\s+/u, '')} ${GROUPED_MENU_TITLE_SELECTOR}`
 }
 
 /**
@@ -728,8 +774,11 @@ ${groupTitleRule(`body[data-ds-dark-theme]:not([${PLAIN_ATTR}])`)} {
    半径**走变量**（GROUPED_MENU_INNER_RADIUS_VARIABLE），默认给官方菜单的同心值
    （16 − 内边距 4 = 12 = --dsw-radius-md）；菜单外圆角不同的那些在自己的菜单元素上覆盖它
    （真机实测页面上含 role=group 的 role=menu 就是官方与 codebuddy 两个，后者是 20 ⇒ 16px）。
-   ⚠️ 只圆**上两角**：下两角若也圆，滚到底时最后一行会被啃掉。 */
-${`${gatedAnchor(GROUPED_MENU_SELECTOR)} ${GROUPED_MENU_SCROLLER_SELECTOR}`} {
+   ⚠️ 只圆**上两角**：下两角若也圆，滚到底时最后一行会被啃掉。
+   ⚠️ 锚点用**无守卫**版：:has() 在这里冗余（后半段已经要求 group 存在），
+   去掉它省一次重匹配 —— 等价性与实测见 GROUPED_MENU_UNGUARDED_SELECTOR。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+${`${gatedAnchor(GROUPED_MENU_UNGUARDED_SELECTOR)} ${GROUPED_MENU_SCROLLER_SELECTOR}`} {
   border-radius: ${GROUPED_MENU_SCROLLER_RADIUS} !important;
 }
 

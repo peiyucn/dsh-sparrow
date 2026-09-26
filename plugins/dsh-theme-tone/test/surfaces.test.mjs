@@ -25,7 +25,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
-import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
+import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -966,7 +966,11 @@ describe('抬升面：表面绘制', () => {
     //
     // 正解 = 把卡片那一摞层**逐层同源**地重画，只把最下面的「页面内容」换成不透明的「地面」：
     //   合成 = [颗粒] 叠在（菜单填充 叠在 [地面：底色 + 三段光 + 颗粒] 上）
-    const titleSelector = `${GROUPED_MENU_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`
+    // ⚠️ 锚点用**无守卫**版（GROUPED_MENU_UNGUARDED_SELECTOR）：组合规则的后半段
+    //    已经要求 `[role='group']` 存在，`:has()` 是冗余的；而它每次 DOM 变动都要
+    //    重匹配 —— 真机消融实测这三条是 12 条 `:has()` 里最贵的（合计约 +2.9s 重算），
+    //    去掉后同负载重算 4.443s → 3.633s（0.82×）。等价性见下一条断言。
+    const titleSelector = `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`
     const block = blockFor(css, titleSelector)
     assert.notEqual(block, '', '必须为分组标题生成规则 —— 不写就是行透上来（owner ③）')
     // ① 不透明打底：这是"挡住行"的唯一保证，**不得**是半透明色。
@@ -1061,7 +1065,7 @@ describe('抬升面：表面绘制', () => {
       /\)\s+0\s+0$/u,
       '容器只圆上两角 —— 下两角会让滚到底时的最后一行被啃掉',
     )
-    const scrollerSelector = `${GROUPED_MENU_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_SCROLLER_SELECTOR}`
+    const scrollerSelector = `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_SCROLLER_SELECTOR}`
     const scrollerBlock = blockFor(css, scrollerSelector)
     assert.notEqual(scrollerBlock, '', '必须为滚动容器生成圆角规则')
     assert.equal(declFor(scrollerBlock, 'border-radius'), GROUPED_MENU_SCROLLER_RADIUS, '容器圆角值')
@@ -1077,7 +1081,7 @@ describe('抬升面：表面绘制', () => {
     )
     // ⑧ 地面颗粒的混合模式跟着轴走（地面深色轴 screen / 浅色轴 multiply）：
     //    第二条规则只改 background-blend-mode，其余声明继续由第一条承担（配方只有一份）。
-    const darkTitleSelector = `${GROUPED_MENU_SELECTOR.replace(/^body\b/u, `body[data-ds-dark-theme]:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`
+    const darkTitleSelector = `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body[data-ds-dark-theme]:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`
     const darkBlock = blockFor(css, darkTitleSelector)
     assert.notEqual(darkBlock, '', '深色轴必须有一条只改混合模式的规则')
     assert.match(darkBlock, /background-blend-mode:\s*[^;]*screen/u, '深色轴地面颗粒走 screen（与背景层一致）')
@@ -1413,8 +1417,42 @@ describe('抬升面：表面绘制', () => {
   })
 
 
-  it('锚点必须带 body 前缀 —— 官方写的是 background 简写，裸属性选择器会被反压', () => {
-    for (const anchor of SURFACE_ANCHORS) {
+  it('⛔ 分组菜单的**组合**规则不得用带 :has() 的守卫锚点（性能，且冗余）', () => {
+    // 背景（owner：「咱们主题明显比官方的卡」）：真机消融实测（同 DOM、同色调档，
+    // 只 styleEl.disabled 切换）—— 151 条规则里 12 条 :has() 吃掉约 62% 的样式重算；
+    // 151 条**平凡**规则 ≈ 空表 ⇒ **条数无关**。逐条定位后最贵的三条里两条是
+    // 「菜单守卫 + 后代锚点」这种**重复守卫**（+1.38s / +1.53s）。
+    // 去掉后：重算 4.443s → 3.633s（0.82×），且命中集合逐个 isSameNode 完全一致。
+    //
+    // 本用例把这条**钉死**：组合规则（标题 / 滚动容器）一旦被改回带 `:has()` 的锚点，
+    // 性能就悄悄退回去 —— 而外观毫无变化，没有任何视觉回归能发现它。
+    const css = buildSurfaceCss()
+    const composed = [
+      `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`,
+      `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_SCROLLER_SELECTOR}`,
+    ]
+    for (const selector of composed) {
+      assert.notEqual(blockFor(css, selector), '', `组合规则要用无守卫锚点：${selector}`)
+      assert.ok(
+        !selector.includes(':has([role=\'group\']) ') || !selector.startsWith('body:not'),
+        '组合规则的**主体**不该再带 :has() 守卫',
+      )
+    }
+    // 守卫仍在的那条（给菜单本体上料、没有别的锚点可表达「带分组的菜单」）必须保留 :has()，
+    // 否则会把页面上**所有**菜单都染上 —— 这条是"别把冗余删除推广过头"的护栏。
+    assert.match(
+      GROUPED_MENU_SELECTOR,
+      /:has\(\[role='group'\]\)/u,
+      '单独使用的菜单锚点必须保留 :has()（去掉会命中所有菜单）',
+    )
+    assert.equal(
+      GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\s+/u, ''),
+      "[role='menu']",
+      '无守卫版只应去掉 :has()，锚点本体必须一致',
+    )
+  })
+
+  it('锚点必须带 body 前缀 —— 官方写的是 background 简写，裸属性选择器会被反压', () => {    for (const anchor of SURFACE_ANCHORS) {
       assert.match(anchor, /^body /u, `${anchor} 要有 body 前缀抬特异度`)
     }
   })
@@ -1429,6 +1467,8 @@ describe('抬升面：表面绘制', () => {
     for (const [label, constant] of [
       ['COMPOSER_ICON_BUTTON_SCOPE', COMPOSER_ICON_BUTTON_SCOPE],
       ['GROUPED_MENU_SELECTOR', GROUPED_MENU_SELECTOR],
+      // 无守卫版同样会被 gatedAnchor 处理（标题 / 滚动容器两条规则都改用了它）。
+      ['GROUPED_MENU_UNGUARDED_SELECTOR', GROUPED_MENU_UNGUARDED_SELECTOR],
     ]) {
       assert.match(constant, /^body /u, `${label} 要有 body 前缀，否则 gatedAnchor 静默失门：${constant}`)
     }
