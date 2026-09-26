@@ -5,3 +5,7 @@ lib/
 
 dist/
 .release-notes/
+
+# 本机开发用的 patch overlay：name 是本机绝对路径（file:///C:/Users/<用户名>/…），
+# 不该进这个**公开**仓库。模板见各插件 docs/spec；需要时本机自行创建。
+dev.patch.yml

@@ -194,14 +194,14 @@ describe('archive-manage 纯逻辑', () => {
   describe('maskHomePath', () => {
     it('Windows home 前缀 应该 掩码为 ~', () => {
       assert.equal(
-        maskHomePath('C:\\Users\\DJ028191\\.dsh\\.sessions-trash', 'C:\\Users\\DJ028191'),
+        maskHomePath('C:\\Users\\alice\\.dsh\\.sessions-trash', 'C:\\Users\\alice'),
         '~\\.dsh\\.sessions-trash',
       )
     })
 
     it('Windows 大小写不同 应该 也能掩码', () => {
       assert.equal(
-        maskHomePath('c:\\users\\dj028191\\.dsh\\x', 'C:\\Users\\DJ028191'),
+        maskHomePath('c:\\users\\alice\\.dsh\\x', 'C:\\Users\\alice'),
         '~\\.dsh\\x',
       )
     })

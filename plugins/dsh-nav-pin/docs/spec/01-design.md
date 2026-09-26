@@ -84,4 +84,4 @@
 
 ## 适配版本基线
 
-本机 dsh checkout：`C:\Users\DJ028191\.dsh-launcher-panel\source`（release/dsh-0.1.2-alpha.3）。开工时复核上述行号与标签文案。
+本机 dsh checkout：`~/.dsh-launcher-panel/source`（release/dsh-0.1.2-alpha.3）。开工时复核上述行号与标签文案。

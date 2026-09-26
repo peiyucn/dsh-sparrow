@@ -80,7 +80,8 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 * **组合行**：`cordis.patch.yml` insert 按官方 bundle patch 规范——`id` 用短名（供后续 patch 定位），`name` 用 scoped 包名（loader 按包名解析）
 * **seam 纪律（三档）**：① **正路**：只用公开 seam（`ctx.llm` / `ctx.webServer` / `ctx.tools` / slots / provide 等）② **包装**：公开 seam 不满足需求时包装它——保持原签名与 `this` 语义、可逆恢复，并记录适配的 dsh 版本 ③ **私有 seam 依赖**：官方无公开能力时允许调 private 方法 / 读写 private 状态；护栏是不替换 / 不包装 / 不覆写官方函数，优先复用官方自身写入路径（如 `enqueueOperation` + `setState`），启动时能力检查、surface 变化即 fail-fast，且须 owner 批准并记入 `docs/private-seams.md`
 * **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直读内部文件（确需直碰内部文件的特例须记入 `docs/private-seams.md` + owner 认可）
-* **查证原则**：引用 DSH 服务 / 事件 / 插槽契约前先 grep 官方源码（本机 checkout：`C:\Users\DJ028191\.dsh-launcher-panel\source`），禁止凭记忆编造
+* **查证原则**：引用 DSH 服务 / 事件 / 插槽契约前先 grep 官方源码（本机 checkout：`~/.dsh-launcher-panel/source`，可用 `DSH_SOURCE` 覆盖），禁止凭记忆编造
+* **不许写本机绝对路径 / 用户名**：本仓库公开，文档、注释、测试夹具、开发脚本里**一律**用 `~/…` 相对写法或占位名（如 `alice`）；`scripts/check-no-local-paths.mjs` 会把这条钉死（`pnpm run verify` 第一步就会跑）
 
 ### 插件私有 seam 特例
 

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 import { DEFAULT_MODEL } from '../lib/suggest.js'
@@ -33,8 +34,16 @@ describe('dsh-chat-fim 结构', () => {
   })
 
   it('两个 patch 文件的补全模型 应该 都与 DEFAULT_MODEL 一致（防配置漂移）', async () => {
+    // `cordis.patch.yml` 是**随包发布**的组合补丁（loader 按包名解析），任何环境都存在；
+    // `dev.patch.yml` 是**本机开发用的 overlay**（name 是本机绝对路径、不进仓库，见 .gitignore），
+    // 干净检出 / CI 上不存在 —— 故只在它存在时才比对，不因缺文件而红。
     for (const file of ['../cordis.patch.yml', '../dev.patch.yml']) {
-      const patch = await readFile(new URL(file, import.meta.url), 'utf8')
+      const url = new URL(file, import.meta.url)
+      if (!existsSync(url)) {
+        assert.equal(file, '../dev.patch.yml', `${file} 应当存在（只有本机开发 overlay 允许缺席）`)
+        continue
+      }
+      const patch = await readFile(url, 'utf8')
       const match = /^\s*model:\s*(\S+)\s*$/mu.exec(patch)
       assert.equal(match?.[1], DEFAULT_MODEL, `${file} 的 model 与 DEFAULT_MODEL 不一致`)
     }
