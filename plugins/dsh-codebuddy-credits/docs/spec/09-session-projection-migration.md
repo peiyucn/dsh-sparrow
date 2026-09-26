@@ -33,7 +33,7 @@ prohibited」**，并给出替代方向：
 
 ## 官方契约（逐条核验，决定实现形状）
 
-官方 checkout：`C:\Users\DJ028191\.dsh-launcher-panel\source`
+官方 checkout：`~/.dsh-launcher-panel/source`
 （`session-projection/src/index.ts`，0.1.7-rc.2）。
 
 | 契约 | 原文位置 | 对我们的约束 |

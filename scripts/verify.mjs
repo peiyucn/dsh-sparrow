@@ -7,6 +7,7 @@
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 const mode = process.argv[2] // undefined | '--typecheck' | '--build' | '--test' | '--package'
@@ -20,7 +21,10 @@ const cwd = process.cwd()
 const workspaceRoot = resolve(cwd, '..', '..')
 // 本机优先用 dsh checkout 的 tsc（与运行时源码一致）；CI / 无 checkout 时回退到
 // workspace 根安装的 typescript（root devDependencies 固定与本机同版本）。
-const checkoutTsc = join(process.env.DSH_SOURCE ?? 'C:/Users/DJ028191/.dsh-launcher-panel/source', 'node_modules', 'typescript', 'bin', 'tsc')
+// ⚠️ 本仓库**公开**，一律不写本机绝对路径 —— checkout 位置按约定从主目录推导，
+// 需要非默认位置时用 DSH_SOURCE 覆盖（由 check-no-local-paths.mjs 守着）。
+const checkoutSource = process.env.DSH_SOURCE ?? join(homedir(), '.dsh-launcher-panel', 'source')
+const checkoutTsc = join(checkoutSource, 'node_modules', 'typescript', 'bin', 'tsc')
 const tsc = existsSync(checkoutTsc) ? checkoutTsc : resolve(workspaceRoot, 'node_modules', 'typescript', 'bin', 'tsc')
 
 if ((runTypecheck || runBuild) && !existsSync(tsc)) {

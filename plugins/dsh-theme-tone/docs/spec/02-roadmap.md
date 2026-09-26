@@ -8,7 +8,7 @@
 | 范围 | 落地物 | 细节 |
 | :--- | :--- | :--- |
 | 查证与定案 | pyai.site 素材（色相 / 底色 / 金光 / 颗粒，源码与 `dist` 产物一致）；DSH 侧明暗 token、4 个不透明底色面、`--dsw-alias-bg-base` 的复用面、全部公开 seam、`packages/client/**` 的 z-index 分布、应用外壳无 CSP | 01-design §1、§9 |
-| 脚手架 | `package.json`（`dsh.bundle.patch` + `dsh.client.platform/inject`、`files` 清单）、`cordis.patch.yml` / `dev.patch.yml`、`tsconfig.json`、`scripts/bundle-client.mjs`、`src/compat.ts`（能力门纯函数 + 探针 + 单测） | 01-design |
+| 脚手架 | `package.json`（`dsh.bundle.patch` + `dsh.client.platform/inject`、`files` 清单）、`cordis.patch.yml` / `dev.patch.yml`（**后者是本机开发 overlay**，name 为本机绝对路径，不进仓库、见 `.gitignore`）、`tsconfig.json`、`scripts/bundle-client.mjs`、`src/compat.ts`（能力门纯函数 + 探针 + 单测） | 01-design |
 | 纯逻辑与数据 | `src/tones.ts`（两轴色调表 + 默认值 + 类型 + 取值回落）；`src/settings-schema.ts`（schemastery schema **与色调表分离**，保证它不进客户端 bundle，有结构测试钉住）；`src/constants.ts`；`src/backdrop.ts` | 03-palette |
 | 接线 | `src/host.ts`（导出 `Config` + `ctx.inject(['settings'], …)` 里 `configure({ auto: false })`）；`src/client/index.ts`（稳定面能力门 → `ctx.inject(['configForms'])` fork → locale → `configForms.get` → `overrideTokens` → 样式表 + 背景层 → `settings.general.item` 槽位 → `theme/change` 与 scope 订阅 → `ctx.effect` 清理）；`ThemeToneRow.tsx` + `store.ts` + `locales.ts` + `styles.ts` | 01-design §4.1–4.3 |
 | 玻璃效果 | 顶栏浮层三件套 + 输入框卡片玻璃（填充 + 模糊 + 边光 + 悬浮投影）；底座 `::after` 不透明背衬 + 停靠卡缝挡板；相位（卡片走 `active` + `hero`，其余守 `active`） | 04-glass |

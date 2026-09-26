@@ -2,7 +2,7 @@
 
 > 本文是 seam 查证结论 + 架构，与实现一一对应。
 >
-> **查证基线**：本机 dsh checkout `C:\Users\DJ028191\.dsh-launcher-panel\source`，`0.1.5-rc.2`，HEAD `fb2c4b9e698e30edb738bca4cf0618587db7d203`（tag `dsh-v0.1.5-rc.2`）。
+> **查证基线**：本机 dsh checkout `~/.dsh-launcher-panel/source`，`0.1.5-rc.2`，HEAD `fb2c4b9e698e30edb738bca4cf0618587db7d203`（tag `dsh-v0.1.5-rc.2`）。
 
 ## 1) seam 查证结论（全部为公开 seam，且本仓库已有先例）
 
@@ -229,4 +229,4 @@ ctx.slots.inject('settings.general.item', () => ctx.slots.register({
 
 ## 10) 适配版本基线
 
-本机 dsh checkout `C:\Users\DJ028191\.dsh-launcher-panel\source`（`0.1.5-rc.2`）。本文引用的官方事实出自：`design-platform.css` 的 `--dsw-alias-bg-base` / `--dsw-specific-sidebar-fill` 行号与值、`ThemeRuntime.overrideTokens` 与 `getTheme` 签名、`settings.general.item` 槽位声明、`PLATFORM_MODULES` 清单、`packages/client/**` 的 z-index 分布。
+本机 dsh checkout `~/.dsh-launcher-panel/source`（`0.1.5-rc.2`）。本文引用的官方事实出自：`design-platform.css` 的 `--dsw-alias-bg-base` / `--dsw-specific-sidebar-fill` 行号与值、`ThemeRuntime.overrideTokens` 与 `getTheme` 签名、`settings.general.item` 槽位声明、`PLATFORM_MODULES` 清单、`packages/client/**` 的 z-index 分布。

@@ -1,6 +1,6 @@
 # 01 · 详细设计 — dsh-vision-bridge
 
-> seam 结论均来自本机 dsh checkout（≥ 0.1.1-rc.2，C:\Users\DJ028191\.dsh-launcher-panel\source）的源码查证，file:line 见各表。
+> seam 结论均来自本机 dsh checkout（≥ 0.1.1-rc.2，~/.dsh-launcher-panel/source）的源码查证，file:line 见各表。
 
 ## 架构总览（三段式）
 

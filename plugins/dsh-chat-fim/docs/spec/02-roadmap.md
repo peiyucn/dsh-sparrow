@@ -4,7 +4,7 @@
 
 ## M1 · host half（转发路由）
 
-* [x] 脚手架：package.json / tsconfig / cordis.patch.yml / dev.patch.yml；tsconfig 类型路径指向当前 `@deepseek-ai/cordis` 实际位置
+* [x] 脚手架：package.json / tsconfig / cordis.patch.yml / dev.patch.yml（**后者是本机开发 overlay**，name 为本机绝对路径，不进仓库、见 `.gitignore`）；tsconfig 类型路径指向当前 `@deepseek-ai/cordis` 实际位置
 * [x] 路由实现：`webServer.register`（exact `/api/chat-fim/complete`）+ 会话校验（`sessions.get`，未命中即拒）+ 凭据（`credentials.resolve(credentialRef(...))`）
 * [x] 转发 + 超时/取消 + 错误映射（纯函数）+ 配置（baseURL/model/maxTokens/apiKeyEnv）
 * [x] 单测：请求校验 / 错误映射 / 请求体解析
