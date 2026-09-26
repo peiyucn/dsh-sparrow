@@ -41,10 +41,10 @@ import { fetchQuota } from './quota.js'
 import { installCodeBuddyWeb } from './web.js'
 import type { TurnUsageView } from './web.js'
 import {
-  foldSessionCredits,
-  sessionViewOf,
-  turnViewOf,
-} from './credits-ledger.js'
+  codebuddyCreditsProjectionDefinition,
+  viewOfCreditsState,
+} from './credits-projection.js'
+import type { CreditsProjectionState } from './credits-projection.js'
 import { createLedgerResolver } from './credits-source.js'
 
 export const name = 'llm-codebuddy-credits'
@@ -82,10 +82,13 @@ export function apply(ctx: Context, config: Config): void {
     { name: 'llm.resolveModelInfo', ok: typeof (ctx.llm as { resolveModelInfo?: unknown } | undefined)?.resolveModelInfo === 'function' },
     { name: 'sessions.get', ok: typeof (ctx.sessions as { get?: unknown } | undefined)?.get === 'function' },
   ])
-  // 会话格式**软判定**：积分重放要逐字段读会话事件，格式换了就是静默读出 0。
+  // 会话格式**软判定**：积分要逐字段读事件里的 `data.message.source.replayState.response.usage.credit`，
+  // 格式换代可能改变事件布局 —— 认错就是静默读出 0。
   // 但它只是展示面 —— 为此把整个 provider（推理）停掉是过度取舍，故这里只告警。
-  // 为什么不能只靠上面的能力门：`snapshotEvents()` 是 `Session` 的**类方法**，
-  // 能力门探不到；格式换代又往往不改 API 形状。详见 src/compat.ts 的说明。
+  // 为什么不能只靠上面的能力门：这是**数据格式**门，不是能力门 —— 格式换代往往不改
+  // API 形状（`sessionProjections.stateOf()` 与 `sessionController.inspect()` 都照常存在、
+  // 照常返回事件流），只是事件里的字段布局变了。能力探测发现不了这一类。
+  // 详见 src/compat.ts 的说明。
   const formatReason = unsupportedSessionFormatReason(hostSessionFormatVersion())
   if (formatReason !== undefined) {
     ctx.logger.warn(`${name}: ${formatReason}；积分可能显示为 0（推理不受影响）`)
@@ -131,39 +134,46 @@ export function apply(ctx: Context, config: Config): void {
 
   /**
    * 会话积分账本：从**会话事件重放**得到，替代早期的进程内 usageLog（重启清零）。
-   * credit 由适配器写进 finish 块的 `replayState.response.usage`（随事件持久化），
-   * 故重启后仍可从事件前缀重放；live 会话走内存日志（同步、零 IO），
-   * 冷会话（重启后未激活）走 sessionController.inspect 读持久化前缀。
+   * credit 由适配器写进 finish 块的 `replayState.response.usage`（随事件持久化）。
    *
-   * ## ⚠️ `Session.snapshotEvents()` 自 0.1.7 起被官方标为 `@deprecated`
+   * ## ✅ 0.1.7 迁移：改用官方投影，**不再调用被废弃的同步历史读**
    *
-   * 依据：`packages/core/session/src/index.ts` 的 JSDoc 与官方设计记录
-   * `.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md`
-   * —— 原话是「Existing logic may remain unmigrated for now, but **new calls are prohibited**」，
-   * 即**既有调用允许延后迁移**，但不得新增（官方生产代码同样是留调用 + 逐行 lint waiver，
-   * 例如 `packages/api/session-controller/src/commands.ts` 的
-   * `oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.`）。
+   * 旧实现读 `Session.snapshotEvents()`——官方自 0.1.7 起把该方法标为
+   * `@deprecated … new calls are prohibited`
+   * （`.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md`）。
+   * 官方给出的替代方向是**把领域状态折成 session projection**：「After resume, ordinary logic
+   * reads the projection or processes the delivered current event instead of looking back
+   * through historical events.」
    *
-   * 本插件属于**既有调用**（0.1.5 线就在用），故按官方口径保留，理由与代价：
+   * 现在 live 路径 = `credits-projection.ts` 的投影单元（注册表逐事件驱动），
+   * 冷会话路径 = `sessionController.inspect()` + 一次性重放（见 `credits-source.ts`）。
+   * **本插件已无任何对 `snapshotEvents` / `eventAt` / `ownEvents` 的调用。**
    *
-   * * 它是**类方法**而非服务/导出，能力门探不到 —— 官方移除/改名后的表现是
-   *   「拿得到 `Session` 对象、但方法没了」→ 抛 `TypeError`；
-   * * 因此**必须**安全降级：`credits-source.ts` 的 `for()` 把 live 读包在 try/catch 里，
-   *   失败即当冷会话走 `inspect`，两条都不可用就返回 `undefined`（调用方降级为空视图），
-   *   绝不把异常抛进宿主管线（根规范《扩展与宿主兼容·运行期不冒泡》）。有单测钉住这两条路径。
+   * 迁移带来的两个附带好处（不是目的，是结果）：
    *
-   * **迁移方向**（将来做，不是在 0.1.7 这一版）：官方替代面是状态驱动的投影
-   * `ctx.sessionProjections`（`packages/session/session-projection/src/index.ts`）——
-   * 把 credit 折成一个 projection、恢复期重建、此后只吃新提交的事件，
-   * 即可彻底摆脱对同步历史读的依赖。届时这里改读投影状态。
+   * * **不再需要按 seq 键控的去重表**：注册表的水位保证每条事件只被喂进 `apply` 一次，
+   *   重复读只是读状态，天然幂等；旧实现要靠 seq 键控来防「同一批事件被反复全量折叠」。
+   * * **不再每次读都全量重折**：旧实现每次请求都把整段历史折一遍（O(事件数)），
+   *   客户端流式期间按去抖拉取时是笔实打实的重复开销；现在是 O(1) 读状态。
+   *
+   * 注册走 `ctx.inject(['sessionProjections'], …)` —— **可选依赖**：该服务在组合里缺席时
+   * 什么都不注册，插件主体（推理 provider）照常工作，只是积分降级为「仅冷路径」。
+   * 不放进 `inject` 硬依赖，是因为积分是展示面，不该因它把用户的推理能力一起停掉。
    */
   const ledgers = createLedgerResolver({
-    live: (sessionId, cached) => {
+    live: (sessionId) => {
+      // 软获取：服务缺失即降级（`ctx.get` 而非 `ctx.sessionProjections`，
+      // 后者在未 inject 时会抛，而我们是可选注册）。
+      const registry = ctx.get('sessionProjections') as
+        | { stateOf(session: unknown, key: string): unknown }
+        | undefined
+      if (registry === undefined) return undefined
       const session = ctx.sessions.get(SessionId(sessionId))
       if (session === undefined) return undefined
-      // 增量折叠：只折 cached.asOfSeq 之后的事件（客户端在流式期间高频轮询）。
-      // 见上方 ⚠️：同步历史读已被官方标废弃（既有调用允许延后迁移）。
-      return foldSessionCredits(session.snapshotEvents(), cached)
+      const state = registry.stateOf(session, 'codebuddyCredits')
+      // 未注册（或状态类型不认识）时降级：交给冷路径。
+      if (state === undefined || state === null || typeof state !== 'object') return undefined
+      return viewOfCreditsState(state as CreditsProjectionState)
     },
     inspect: async (sessionId) => {
       // sessionController 只随 web-app bundle 加载，故软获取；缺失即降级为
@@ -174,6 +184,13 @@ export function apply(ctx: Context, config: Config): void {
       if (controller === undefined) return undefined
       return (await controller.inspect(SessionId(sessionId))).events
     },
+  })
+
+  // 投影单元注册：可选依赖 fork——服务出现才注册，本宿主线没有就什么都不做
+  // （fork 是 entry 的子 fiber，不影响 audit 的 entry 列表）。注册随 fiber 释放，
+  // 无需手工反注册（`register()` 的返回值就是 disposer，由 effect 托管）。
+  ctx.inject(['sessionProjections'], (projectionCtx) => {
+    projectionCtx.sessionProjections.register(codebuddyCreditsProjectionDefinition)
   })
 
   // route 条件注册：Key 可用即注册（模型目录可能还是空的——首次打开选择器时
@@ -498,15 +515,15 @@ export function apply(ctx: Context, config: Config): void {
     async refreshModels() {
       return refreshModelsManually()
     },
-    /** 会话累计积分：从会话事件重放（重启后仍准确）。 */
+    /** 会话累计积分：live 走官方投影状态，冷会话走持久化重放（重启后仍准确）。 */
     async sessionUsage(sessionId) {
-      const ledger = await ledgers.for(sessionId)
-      return ledger === undefined ? EMPTY_USAGE : sessionViewOf(ledger)
+      const view = await ledgers.for(sessionId)
+      return view === undefined ? EMPTY_USAGE : view.session()
     },
     /** 单轮积分：按事件里的 turn 取用（每轮积分胶囊用）。 */
     async turnUsage(sessionId, turn) {
-      const ledger = await ledgers.for(sessionId)
-      return ledger === undefined ? EMPTY_USAGE : turnViewOf(ledger, turn)
+      const view = await ledgers.for(sessionId)
+      return view === undefined ? EMPTY_USAGE : view.turn(turn)
     },
     account: () => ({
       ...(account?.enterpriseName === undefined ? {} : { enterpriseName: account.enterpriseName }),

@@ -9,13 +9,15 @@
  *   会让用户**整个 lose 掉 LLM provider**（推理也停）——那比积分显示不准严重得多。
  *   故此处**有意不设**「格式不符即自停用」的硬门，改为软降级 + 告警：
  *   见 `src/index.ts` 对 `hostSessionFormatVersion()` 的核对与 `logger.warn`。
- * * `snapshotEvents()` 是 `Session` 上的**类方法**、不是服务/导出，能力门探不到它
- *   （根规范《扩展与宿主兼容》里「格式/版本变更往往不改 API 形状，能力探测发现不了」
- *   正是这一类）。运行时兜底是 `credits-source.ts` 把 live 读包进 try —— 抛错即降级，
+ * * **0.1.7 迁移已完成**：live 积分路径不再读会话历史，改读官方**会话投影**
+ *   （`src/credits-projection.ts`，经 `ctx.inject(['sessionProjections'], …)` 可选注册）。
+ *   投影状态由注册表按已提交事件逐事件驱动，因此**不需要**探 `snapshotEvents()` 这类
+ *   类方法——能力门探不到它（根规范《扩展与宿主兼容》里「格式/版本变更往往不改 API 形状，
+ *   能力探测发现不了」正是这一类）的历史问题随之消失。运行时兜底仍在
+ *   `credits-source.ts` 的 `for()`：投影服务缺失 / 取状态抛错即降级到冷路径，
  *   绝不把异常冒泡进宿主管线。
- * * **rc 线正式适配时必须改用异步会话读**：官方 alpha.2 已把同步读接口标为
- *   `@deprecated … new calls are prohibited`（`packages/core/session/src/index.ts:627/640/659`），
- *   而本插件的 live 账本路径属于「新调用」。见 `docs/upstream/0.1.6-alpha.1-migration-notes.md`。
+ * * 冷会话仍走 `sessionController.inspect()` + 一次性重放——那是**官方公开的异步读面**，
+ *   不在被废弃的同步读之列（官方对「需要完整历史」的场景明确保留显式存储读）。
  *
  * 下面的能力门是本插件**真正会带病运行**的守卫点（缺了就无法注册 provider）。
  */
