@@ -20,7 +20,6 @@ import type {
   StreamChunk,
   TokenUsage,
   ToolCallBlock,
-  ToolResultMessage,
   ToolSchema,
 } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -85,12 +84,12 @@ interface WireMessage {
   tool_call_id?: string
 }
 
-/** 文本块合并（tool-result 的嵌套内容一并展平为文本）。 */
+/** 文本块合并（0.1.7-rc.1 起工具结果是独立的 tool 角色消息，不再是嵌套块——
+ *  `ContentBlockMap` 里没有 `tool-result`，见 `packages/llm/llm/src/types.ts:138-151`）。 */
 function textOf(blocks: readonly ContentBlock[]): string {
   let text = ''
   for (const block of blocks) {
     if (block.type === 'text') text += block.text
-    else if (block.type === 'tool-result') text += textOf(block.content)
   }
   return text
 }
@@ -104,7 +103,15 @@ async function imageDataUrl(ref: ImageAttachmentRef, readImage: CodeBuddyReadIma
 
 /** DSH Message → CodeBuddy 线格式（OpenAI 方言）。reasoning 块不进历史；
  *  图片块经附件 seam 序列化为 image_url data URL；连续 user 消息合并为一条
- *  （上游只认最后一条 user 消息里的图片，见下方注释与 spec 04）。 */
+ *  （上游只认最后一条 user 消息里的图片，见下方注释与 spec 04）。
+ *
+ *  0.1.7-rc.1 的消息模型：工具结果是**独立的 `tool` 角色消息**
+ *  （`ToolResultMessage.toolCallId`，见 `packages/llm/llm/src/message.ts:172-180`），
+ *  不再是 user 消息里的 `tool-result` 内容块；`developer` 消息与
+ *  tool-addition / tool-removal 块是为 Session V4 预留的，官方两个适配器都明确
+ *  拒绝（`packages/llm/llm-pi-ai/src/context.ts:53`、
+ *  `packages/llm/llm-deepseek/src/serialize.ts:90-93`），本适配器同口径。
+ */
 export async function toWireMessages(
   options: GenerateOptions,
   readImage?: CodeBuddyReadImage,
@@ -118,14 +125,20 @@ export async function toWireMessages(
       messages.push({ role: 'system', content: textOf(message.content) })
       continue
     }
-    if (message.role === 'user' && message.source.kind === 'tool') {
-      const toolResult = message as ToolResultMessage
+    // 工具结果 → wire 的 tool 角色（官方同口径：`role === 'tool'` 取
+    // `message.toolCallId` 作 tool_call_id，见 llm-deepseek serialize.ts:109-113）。
+    if (message.role === 'tool') {
       messages.push({
         role: 'tool',
-        tool_call_id: String(toolResult.source.callId),
-        content: textOf(toolResult.content),
+        tool_call_id: String(message.toolCallId),
+        content: textOf(message.content),
       })
       continue
+    }
+    // developer 消息（工具增删记录）没有 CodeBuddy 线格式可映射：宁可明确失败，
+    // 也不能落进下面的 assistant 分支变成一条空 assistant 消息（静默改写历史）。
+    if (message.role === 'developer') {
+      throw new LlmError('CodeBuddy 适配器无法表示 developer 消息', 'UNSUPPORTED_CONTENT')
     }
     if (message.role === 'user') {
       // 文本优先；图片块经附件 seam 读字节，转 OpenAI 方言 image_url data URL。

@@ -24,6 +24,9 @@ const panelStyle: CSSProperties = {
   border: '0',
   borderRadius: '12px',
   background: 'var(--dsw-specific-menu)',
+  // 0.1.7 起 --dsw-specific-menu 是半透明玻璃色，官方要求同规则内配对 backdrop-filter
+  // （docs/web-styling.zh.md:25），否则背后文字会透出来（owner 真机报「全透明了」）。
+  backdropFilter: 'var(--dsw-menu-backdrop-filter)',
   '--dsw-elevation-stroke-color': 'var(--dsw-alias-border-l1)',
   boxShadow: 'var(--dsw-elevation-prominent)',
   fontSize: '12px',

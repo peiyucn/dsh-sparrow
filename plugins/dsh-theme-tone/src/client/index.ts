@@ -13,7 +13,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ReactNode } from 'react'
 import type { BoundActions } from '@deepseek-ai/dsh-client-store'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only：拉入 ui-renderer 的 SlotRegistry 服务合并（ctx.slots）。
@@ -65,11 +65,11 @@ import { createThemeToneRowStore } from './store.js'
 /**
  * 客户端硬依赖：主题、槽位、文案 —— **只放跨版本稳定存在的服务**。
  *
- * ⚠️ 设置的读取面（0.1.5-rc.2 的 `settingsScope`）**绝不能**写进这里：
+ * ⚠️ 设置的读取面（官方的 `configForms`）**绝不能**写进这里：
  * `inject` 里缺服务时 fiber 会**永远 pending**，而客户端 boot 审计把 pending 当致命失败
- * （`dsh 0.1.7-alpha.1`：`packages/client/web/src/boot-client.ts:63-82`，pending 判定在 `:73-75`）
- * —— 实测该版本下页面直接停在 "Failed to load plugins：@dsh-sparrow/dsh-theme-tone:
- * pending (waiting for service: settingsScope)"，即插件把宿主整个 Web UI 拖死。
+ * （`packages/client/web/src/boot-client.ts` 的 `assertEntriesActive`）—— 实测（0.1.7-alpha.1）
+ * 页面直接停在 "Failed to load plugins：@dsh-sparrow/dsh-theme-tone: pending
+ * (waiting for service: …)"，即插件把宿主整个 Web UI 拖死。
  * 换成 `ctx.inject` 起的**可选依赖 fork**（见 apply）：缺设置面只是本插件不画，宿主照常启动。
  */
 export const inject = ['theme', 'slots', 'locale']
@@ -137,30 +137,29 @@ export function apply(ctx: Context): void {
   ])) return
 
   /**
-   * 设置读取面（`settingsScope`）走**可选依赖**：`ctx.inject` 起一个 fork，等它出现再装。
+   * 设置读取面（`configForms`）走**可选依赖**：`ctx.inject` 起一个 fork，等它出现再装。
    *
    * ⚠️ 它**不能**写进本模块的 `inject`：inject 里缺服务时 fiber 会**永远 pending**，
-   * 而客户端 boot 审计把 pending 当致命失败（`dsh 0.1.7-alpha.1`
-   * `packages/client/web/src/boot-client.ts:63-82`，pending 判定在 `:73-75`）—— 实测该版本下
-   * 宿主整页停在 "Failed to load plugins …: pending (waiting for service: settingsScope)"。
-   * 也**不能**在这里当场一次性探测（`ctx.settingsScope?.bind`）：0.1.5-rc.2 上 ui-settings
-   * 常常晚于本 entry 提供该服务，当场探必空 → 插件在**受支持的那条线**上白停用（实测过）。
+   * 而客户端 boot 审计把 pending 当致命失败（`packages/client/web/src/boot-client.ts`
+   * 的 `assertEntriesActive`）—— 实测（0.1.7-alpha.1）宿主整页停在
+   * "Failed to load plugins …: pending (waiting for service: …)"。
+   * 也**不能**在这里当场一次性探测（`ctx.configForms?.get`）：ui-settings 可能晚于本 entry
+   * 提供该服务，当场探必空 → 插件在**受支持的那条线**上白停用（0.1.5-rc.2 上实测过同类情形）。
    *
-   * fork 的两种结局：服务出现 → 装；这条宿主线根本没有该服务（0.1.7+ 已改名 `configForms`）
-   * → fork 一直挂着，本插件什么都不做。fork 是本 entry 的**子 fiber**，不进宿主 boot 审计的
-   * entry 列表（`ctx.loader.entries()`），故它 pending 不会拖垮宿主启动 —— 这正是
-   * 「宁可自己什么都不做，也不让宿主起不来」。
+   * fork 的两种结局：服务出现 → 装；这条宿主线没有该服务 → fork 一直挂着，本插件什么都不做。
+   * fork 是本 entry 的**子 fiber**，不进宿主 boot 审计的 entry 列表（`ctx.loader.entries()`），
+   * 故它 pending 不会拖垮宿主启动 —— 这正是「宁可自己什么都不做，也不让宿主起不来」。
    */
-  ctx.inject(['settingsScope'], (settingsCtx) => { install(settingsCtx) })
+  ctx.inject(['configForms'], (settingsCtx) => { install(settingsCtx) })
 }
 
 /**
  * 装上插件：色调 token 覆盖 + 背景层 + 玻璃 / 缝隙 / 抬升面 / 扫光样式表 + 设置行 + 订阅。
  *
- * 由 {@link apply} 在 `settingsScope` 就绪后调用；入参是该 fork 的上下文，所有
+ * 由 {@link apply} 在 `configForms` 就绪后调用；入参是该 fork 的上下文，所有
  * `ctx.effect` / `ctx.on` / 槽位注册都记在 fork 上 —— 本插件 entry 卸载（或设置服务消失）
  * 时它们随 fork 一起回收，不留 style / 背景层 / 监听。
- * @param ctx - 已就绪 `settingsScope` 的 Cordis 上下文。
+ * @param ctx - 已就绪 `configForms` 的 Cordis 上下文。
  */
 function install(ctx: Context): void {
 
@@ -200,7 +199,7 @@ function install(ctx: Context): void {
    * 先武装清理，再创建资源。
    *
    * ⚠️ **顺序不能反**：cordis 只跑**已注册**的 disposer。若先 `ensureStyles()` /
-   * `ensureLayer()` 再注册清理，那么两者之间任一环节抛错（`settingsScope.bind`、
+   * `ensureLayer()` 再注册清理，那么两者之间任一环节抛错（`configForms.get`、
    * 首次 `repaint` 里的 `overrideTokens` 校验、`locale.register` 重名…）都会让
    * `<style>` 与背景层**永久留在 DOM 里**，而 `PLAIN_ATTR` 从未置上 →
    * 三张表的 `body:not([PLAIN_ATTR])` 规则全部 fail-open 命中，
@@ -228,7 +227,7 @@ function install(ctx: Context): void {
    * 门属性是 `body:not([PLAIN_ATTR])` 的**唯一开关**，而它此前只在 `paintLayer` 里写
    * （即 `paintPlain(plan.hidden)`）。可样式表是在本函数下面**无条件**注入的，而首次
    * `repaint()` 又要过 `shouldPaint()` 那道门 —— `status === 'loading'`（宿主还没回第一帧，
-   * 官方 `SettingsScopeController` 的初值恒为 `'loading'`，见 `ui-settings/.../settings-scope.ts:71`）
+   * 官方设置表单控制器的初值恒为 `'loading'`，见 `ui-settings/src/client/config-form.ts`）
    * 时它**直接 return，从不调用 `paintLayer`**。于是从「样式表注入」到「宿主回值」之间
    * 存在一个窗口：门属性**不存在** → 38 条带门的规则里**有 11 条当场命中**。
    *
@@ -246,10 +245,12 @@ function install(ctx: Context): void {
   // 只留 layer 的局部别名（渲染计划要写它的 style 属性）；
   // style 仅由清理 effect 经 holder 回收，无其它读取点，故不取名。
   const layer = resources.layer
-  const scope: SettingsScope<ThemeToneSettings> = ctx.settingsScope.bind<ThemeToneSettings>({
-    namespace: SETTINGS_NAMESPACE,
-  })
-  const rowStore = createThemeToneRowStore()
+  // 设置读取面：官方 0.1.7 起客户端设置基座服务是 `configForms`，
+  // 命名空间 = 本插件在 profile 里的**条目 id**（= SETTINGS_NAMESPACE）。
+  const scope: ConfigForm<ThemeToneSettings> = ctx.configForms.get<ThemeToneSettings>(SETTINGS_NAMESPACE)
+  // 行 store 的**初值取实时主题轴**（不写死 dark）：浅色页面上首帧就该渲染浅色轴卡片，
+  // 否则用户可能在行还没同步时点到深色轴卡片 → 写入被 schema 拒（见 store.ts 的 ⚠️）。
+  const rowStore = createThemeToneRowStore(ctx.theme.getTheme().active.colorScheme)
 
   let disposeTokens: (() => void) | undefined
   let boundRow: BoundActions<typeof rowStore> | undefined
@@ -261,10 +262,9 @@ function install(ctx: Context): void {
    * 用它承载本次会话的选择。
    *
    * 为什么必须有：官方契约 `mode: 'memory'` 时 `writable` 恒为 false，
-   * 且 `SettingsScopeController.enqueue()` 在 memory 下**直接 return**
-   * （官方 `ui-settings/lib/client.js`：`if (this.persistence === "memory" || this.disposed)
-   * return Promise.resolve()`）。也就是说此时 `set()` 是**静默空操作**、`subscribe` 永不触发
-   * （只有 `persistence === "host"` 才订阅 mirror）。
+   * 且写入在 memory 下**不落地**（`ConfigFormController` 把写入当空操作、`set()` 返回 false，
+   * 见 `ui-settings/src/client/config-form.ts` 的 memory 分支）。也就是说此时 `set()`
+   * 是**静默空操作**、`subscribe` 也不会因宿主推送而触发（只有 `mode === 'host'` 才同步 mirror）。
    *
    * 若不做兜底：用户点色调**屏幕毫无反应、也无任何日志** —— 既违反本插件 spec
    * （01-design §6「按 ui-theme 对非 loopback 的口径降级为进程内状态，并在日志里说明」），
@@ -272,6 +272,15 @@ function install(ctx: Context): void {
    */
   let localSettings: ThemeToneSettings = DEFAULT_SETTINGS
   let warnedNoPersistence = false
+
+  /**
+   * 用户刚点、还在跨宿主往返中的那一笔色调（乐观更新，见 {@link readSettings}）。
+   *
+   * `revision` 记录**发出这笔写入时**快照的 revision —— 之后 revision 一旦前进，
+   * 说明宿主已给出结论（接受 / 拒绝 / 恢复读），那一笔就该收掉
+   * （见 {@link clearSettledPending}）。
+   */
+  let pendingTone: { field: keyof ThemeToneSettings; id: ToneId; revision: number | undefined } | undefined
 
   /**
    * 当前该用哪份设置。
@@ -282,11 +291,39 @@ function install(ctx: Context): void {
    * （浅色轴默认 `official`、深色轴默认 `violet`，与多数人的实际选择不同）。
    * 就绪前一律用**进程内兜底值**（初值 = 默认，且此时没人改过它），
    * 并由 {@link shouldPaint} 决定先不上色。
+   *
+   * **乐观更新**：{@link pendingTone} 里那一笔（用户刚点、还在跨宿主往返中）优先于
+   * 宿主快照 —— 否则点下去要等一个 RTT 才变色（owner：「点色卡后半天才换过来」）。
+   * 一旦快照里的该字段追上这一笔，pending 自然失效（见 {@link clearSettledPending}）。
    */
   const readSettings = (): ThemeToneSettings => {
     const snapshot = scope.getSnapshot()
-    if (snapshot.status === 'ready' && snapshot.value !== undefined) return snapshot.value
-    return localSettings
+    const base = snapshot.status === 'ready' && snapshot.value !== undefined ? snapshot.value : localSettings
+    if (pendingTone === undefined) return base
+    return { ...base, [pendingTone.field]: pendingTone.id }
+  }
+
+  /**
+   * 宿主对那一笔乐观更新**给出结论**时收掉它。
+   *
+   * ⚠️ **判据是「快照 revision 前进过」，不是「值变没变」**：
+   * `repaint()` 就在 `setTone` 里、**宿主还没回话时**被调用一次 —— 那一刻快照仍是旧的
+   * 值，若按「值不等于乐观值」判拒绝，乐观值会**当场被抹掉**（等于没做乐观更新）。
+   * 也不能按「值等于乐观值」判接受：宿主**拒绝**时值同样不等于乐观值，那样
+   * `pending` 会**永久留着**，画面停在一个刷新就消失的颜色上（「假成功」）。
+   *
+   * 官方 `ConfigForm` 的契约给了干净的判据：写入携带 revision 围栏，
+   * 宿主接受 / 拒绝 / 恢复读都会让**镜像 revision 前进**
+   * （见 `config-form-types.d.ts` 的 `revision` 与 `ConfigFormController` 的
+   * pendingRevision / latest-settlement 语义）。故：revision 变了 = 有结论，收掉。
+   * @param settings - 快照里解析出的设置节（未就绪时传 `undefined`）。
+   * @param revision - 当前快照的 revision。
+   */
+  const clearSettledPending = (settings: ThemeToneSettings | undefined, revision: number | undefined): void => {
+    if (pendingTone === undefined || settings === undefined) return
+    // revision 未变 = 宿主还没回话 → 乐观值继续生效。
+    if (revision === undefined || revision === pendingTone.revision) return
+    pendingTone = undefined
   }
 
   /**
@@ -344,6 +381,12 @@ function install(ctx: Context): void {
    * 未就绪一律不画：层保持 `hidden`、门保持关，等本插件拿到权威值再一次性画对。
    */
   const paintLayer = (snapshot: ThemeSnapshot): void => {
+    // ⚠️ **行同步必须排在 `shouldPaint()` 那道门之前**（owner 真机报「浅色模式下选色调
+    // 无法维持」的第二层根因）：门是给**上色**用的（未就绪不上色，避免闪变），
+    // 但**行渲染哪一轴的卡片**纯由当前主题决定，与设置是否就绪无关。
+    // 曾把 `boundRow.sync` 放在门后面 → 设置还在 `loading` 时行不更新，
+    // 浅色页面上显示的却是**深色轴的卡片**；此时点卡片会把浅色 id 写进深色字段。
+    syncRow(snapshot.active.colorScheme)
     if (!shouldPaint()) return
     const settings = readSettings()
     const scheme: ColorScheme = snapshot.active.colorScheme
@@ -360,12 +403,31 @@ function install(ctx: Context): void {
       else layer.style.setProperty(LEFT_VARIABLE, plan.left)
     }
     layer.setAttribute(GRAIN_ATTR, plan.grain ? 'on' : 'off')
+  }
+
+  /**
+   * 把「当前明暗轴 + 该轴选中的色调」推给设置行。
+   *
+   * ⚠️ **不走上色那道门**（见 {@link paintLayer} 的 ⚠️）：行渲染哪一轴只取决于主题，
+   * 设置未就绪时用进程内兜底值算选中态即可（那正是 {@link readSettings} 的口径）。
+   * @param scheme - 当前解析出的明暗轴。
+   */
+  const syncRow = (scheme: ColorScheme): void => {
     revision += 1
-    boundRow?.sync(scheme, toneIdOf(settings, scheme), revision)
+    boundRow?.sync(scheme, toneIdOf(readSettings(), scheme), revision)
   }
 
   /** 设置变更：token、层、行全都要重算。 */
   const repaint = (): void => {
+    const snapshot = scope.getSnapshot()
+    // ⚠️ **先收乐观值、再同步行**：顺序反了的话，宿主**拒绝**这一笔时行会先用
+    // 乐观值画一帧选中态、随后才纠正 —— 用户能看到一次闪动的假选中。
+    // 快照 revision 前进过 = 宿主已就那一笔给出结论（接受 / 拒绝）→ 收掉乐观值。
+    clearSettledPending(snapshot.status === 'ready' ? snapshot.value : undefined, snapshot.revision)
+    // ⚠️ 行同步**不设门**（理由见 `paintLayer` 的 ⚠️）：它只依赖当前主题，
+    // 必须在 `shouldPaint()` 返回之前就更新 —— 否则设置未就绪时行不刷新，
+    // 浅色页面会显示深色轴卡片，点下去就把浅色 id 写进深色字段（被 schema 拒）。
+    syncRow(ctx.theme.getTheme().active.colorScheme)
     // 宿主还没回第一帧（`loading`）就不上色 —— 此刻没有权威值，按默认画一遍再纠正
     // 就是一次可避免的闪变（见 readSettings 的 ⚠️）。
     if (!shouldPaint()) return
@@ -466,17 +528,42 @@ function install(ctx: Context): void {
       // 仍走 repaint 那道「未就绪不上色」的门 —— 注册早于宿主回值时不画默认色。
       repaint()
       return {
-        setTone: (id: ToneId) => {
-          const scheme = ctx.theme.getTheme().active.colorScheme
+        setTone: (id: ToneId, scheme: ColorScheme) => {
+          /**
+           * ⚠️ **轴由行传入，不在这里重新查询 `ctx.theme.getTheme()`**
+           * （owner 真机报「浅色模式选色调后很快回到深色官方黑」的根因）。
+           *
+           * 行渲染哪一轴的卡片，取决于 store 里的 `colorScheme`；而它由上一次 `paintLayer`
+           * 同步（`theme/change` 驱动）。写入时若重新查询实时主题，两者在**切换模式的那一小段
+           * 时间窗内会错开**（store 还没同步，或 `theme/change` 的到达次序与 settings 回值交错）。
+           *
+           * 一旦错开，就会把**浅色轴的 id 写进深色轴字段** —— 而两轴合法集合**不重叠**
+           * （浅 official/blue/sakura/green、深 official/violet/crimson/forest），
+           * 宿主 schema 校验直接拒绝 → 选择不生效、该轴停在官方值，观感就是
+           * 「选了色调但很快回到官方」。用渲染轴写入则永远写入合法值。
+           */
           const field = toneFieldFor(scheme)
           const snapshot = scope.getSnapshot()
-          // 宿主不可写（memory 模式 / 命名空间未暴露）时 `scope.set` 是**静默空操作**，
-          // 点下去屏幕不会有任何反应。此时写进程内兜底值并立刻重绘，
-          // 让选择在**本次会话内**照常生效（只是不持久化），并记一条告警说明原因。
+          /**
+           * ⚠️ **先本地落值 + 立刻重绘，再发写入**（owner 真机报「点色卡后半天才换过来」）。
+           *
+           * 原因：`scope.set()` 是**跨宿主的一趟往返**（写设置文档 → 宿主回新镜像 →
+           * `subscribe` 触发 `repaint`），在往返回来之前 `readSettings()` 读到的仍是**旧值**，
+           * 所以画面要等一个 RTT 才变。色卡是纯本地观感、双击率又高，这一等很显眼。
+           *
+           * 修法：把用户的选择**先写进进程内兜底值**并立刻重绘（乐观更新），随后再发写入。
+           * `readSettings()` 优先读宿主快照，故宿主一旦回值即以宿主为准 —— 天然自愈，
+           * 不需要额外的「作废旧值」逻辑：若宿主把这一笔拒了（值非法 / 写入被拒），
+           * 快照仍停在旧值，下一次 `subscribe` / 事件驱动的 `repaint` 会把它纠正回去。
+           *
+           * 宿主不可写（memory 模式 / 命名空间未暴露）时这是**唯一**的落值途径，
+           * 因此同一条路同时承担「不可持久化时也要在本次会话内生效」。
+           */
+          localSettings = { ...localSettings, [field]: id }
+          pendingTone = { field, id, revision: snapshot.revision }
+          repaint()
           if (snapshot.status !== 'ready' || !snapshot.writable) {
-            localSettings = { ...localSettings, [field]: id }
             warnIfNotPersistable()
-            repaint()
             return
           }
           void scope.set(field, id)

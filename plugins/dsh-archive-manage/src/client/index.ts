@@ -3,7 +3,12 @@
  * 所有写操作都走 host 自有路由；客户端不直接碰文件。
  */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+// Type-only：拉入 ui-renderer 的 SlotRegistry 服务合并（ctx.slots），
+// 以及 remote / sessions 两个客户端服务的声明（官方 0.1.7 起分散在各包）。
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { ArchiveDock, ensureArchiveStyles } from './ArchiveDock.js'

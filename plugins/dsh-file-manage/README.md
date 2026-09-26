@@ -12,14 +12,14 @@ Large images pasted into DSH are auto-uploaded to the DeepSeek Files API, but th
 dsh plugin --profile web add @dsh-sparrow/dsh-file-manage
 ```
 
-Requires dsh 0.1.5-rc.2 — the exact official version line this release is built and verified against (newer lines, pre-releases in particular, are not covered) — and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
+Requires dsh 0.1.7-rc.2 — the exact official version line this release is built and verified against (newer lines, pre-releases in particular, are not covered) — and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
 
 > Do **not** run `npm install @dsh-sparrow/dsh-file-manage` directly: that only downloads the package into some `node_modules` and does not register it with the DSH web profile. Use the `dsh plugin` command above, then restart DSH.
 
 ## Usage
 
 * **Entry**: the "Cloud Files" button at the sidebar footer
-* **List**: newest first with "Load more" at the bottom (20 more files per click, official after cursor); each row shows filename / size / upload time / expiry time (when present)
+* **List**: in the order the service returns (server-determined; this plugin does not re-sort) with "Load more" at the bottom (20 more files per click, official after cursor); each row shows filename / size / upload time / expiry time (when present)
 * **Quota**: the panel header shows the total count and a netdisk-style quota bar (used storage / the official 25 GiB limit)
 * **Delete**: per-row delete with confirmation; "DSH auto-uploaded" files (`dsh-` prefix) get an extra note — sessions referencing them will transparently re-upload on next use (may be slower)
 * **Copy file_id**: one-click copy per row

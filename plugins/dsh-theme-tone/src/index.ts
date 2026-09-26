@@ -59,7 +59,7 @@ export {
   type ToneId,
   type ToneSpec,
 } from './tones.js'
-export { ThemeToneSettingsSchema } from './settings-schema.js'
+export { Config } from './settings-schema.js'
 export {
   GLASS_BLUR,
   GLASS_CARD_ALPHA,
@@ -78,8 +78,12 @@ export {
 export {
   COMPOSER_CARD_ANCHORS,
   COMPOSER_ICON_BUTTON_SCOPE,
+  GROUPED_MENU_INNER_RADIUS_VARIABLE,
+  GROUPED_MENU_SCROLLER_RADIUS,
+  GROUPED_MENU_SCROLLER_SELECTOR,
   GROUPED_MENU_SELECTOR,
   GROUPED_MENU_TITLE_SELECTOR,
+  GROUP_TITLE_RADIUS,
   SURFACE_ANCHORS,
   buildSurfaceCss,
   menuSurfaceLayers,

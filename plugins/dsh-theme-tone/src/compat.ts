@@ -66,7 +66,7 @@ export function warnUser(
  * 同一条审计里，`pending` 的判定就是「`inject` 的服务在 ctx 里取不到」（`:73-75`），
  * 所以「往 `inject` 里塞一个新版宿主已经没有的服务」同样等于拖垮宿主启动 ——
  * `inject` 只允许放**跨版本稳定存在**的服务；易变面（设置读取面）另走可选依赖 fork
- * （`ctx.inject(['settingsScope'], …)`，缺了只是不装），见 `src/client/index.ts` 的 apply。
+ * （`ctx.inject(['configForms'], …)`，缺了只是不装），见 `src/client/index.ts` 的 apply。
  * @param ctx - 插件上下文（只用到 logger）。
  * @param pluginName - 插件名（日志前缀）。
  * @param capabilities - 本插件声明的能力。

@@ -141,9 +141,12 @@ describe('toWireMessages', () => {
         { id: 'm1', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '跑一下' }] },
         {
           id: 'm2',
-          role: 'user',
+          // 0.1.7-rc.1：工具结果是独立的 tool 角色消息（toolCallId 在消息根部，
+          // 不再是 user 消息里的 tool-result 内容块）。
+          role: 'tool',
           source: { kind: 'tool', callId: 'call_1' },
-          content: [{ type: 'tool-result', content: [{ type: 'text', text: '结果' }] }],
+          toolCallId: 'call_1',
+          content: [{ type: 'text', text: '结果' }],
         },
         { id: 'm3', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '继续' }] },
       ],
@@ -153,6 +156,22 @@ describe('toWireMessages', () => {
       { role: 'tool', tool_call_id: 'call_1', content: '结果' },
       { role: 'user', content: '继续' },
     ])
+  })
+
+  it('developer 消息 应该 以明确错误失败（不静默改写成空 assistant）', async () => {
+    await assert.rejects(
+      toWireMessages({
+        provider: 'codebuddy-credits',
+        model: 'deepseek-v4-flash',
+        messages: [{
+          id: 'm1',
+          role: 'developer',
+          source: { kind: 'tool-registry' },
+          content: [{ type: 'tool-addition', toolName: 'search' }],
+        }],
+      }),
+      /developer/,
+    )
   })
 
   it('被 assistant 隔开的 user 消息 应该 不合并', async () => {

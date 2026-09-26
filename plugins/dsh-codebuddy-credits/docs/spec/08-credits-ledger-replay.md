@@ -79,7 +79,16 @@ live 路径必须避免每次全量重折：按会话缓存 `(seq → 聚合结�
 
 ## 与官方机制的关系（诚实记录）
 
-**不注册 session projection**，而是自己 fold 事件。理由：
+**⚠️ 本节已被 [`09-session-projection-migration.md`](09-session-projection-migration.md) 取代
+（2026-09-26）**：当时选择「不注册 session projection，自己 fold」的**三条理由里，第一条
+（取数面是自有 HTTP 路由、引入 projection 收益不匹配）仍然成立，但第二/三条被现实推翻 ——
+官方把 `Session.snapshotEvents()` 标成了 `@deprecated … new calls are prohibited`，
+于是「自己 fold 内存日志」这条路本身不再合规。现在 live 路径**就是**注册的 projection
+（`src/credits-projection.ts`），本节保留为决策历史。
+
+原决策（2026-09-18，现已被取代）：
+
+~~不注册 session projection，而是自己 fold 事件。理由：~~
 
 - projection 的价值在于「框架驱动 + 客户端 push + checkpoint 持久化」；本插件的取数面
   是**自有 HTTP 路由 + 客户端拉取**（既有架构），引入 projection 需要额外的 wire 层与
@@ -89,6 +98,7 @@ live 路径必须避免每次全量重折：按会话缓存 `(seq → 聚合结�
 - 代价：冷会话首次读取要走一次持久化 IO（后续按会话缓存）。
 
 若后续要接官方 projection 的 push 面，fold 纯函数可直接复用为 `apply`。
+—— **这句预判是对的**：迁到 projection 时，`creditSampleOf()` 原样复用为 `apply` 的取样函数。
 
 ## 涉及文件
 

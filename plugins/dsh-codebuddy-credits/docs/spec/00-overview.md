@@ -35,7 +35,7 @@
 
 - `src/adapter.ts`：自建 `CodeBuddyAdapter extends LlmAdapter`——请求构造、
   SSE 解析、块组装、usage/credit 提取、企业策略错误透传全部显式实现
-- `registerConfigurableProviders` + `registerAdapter`（自建 adapter）+ `registerModelDiscovery` + `settings.installSection`
+- `registerConfigurableProviders` + `registerAdapter`（自建 adapter）+ `registerModelDiscovery` + 导出的 Cordis `Config`（0.1.7 起设置表单由它投影，命名空间 = profile 条目 id；自带设置界面的插件在 `ctx.inject(['settings'], …)` 子级里以 effect 注册 `configure({ auto: false }, ctx.fiber)` 关掉自动生成的配置页）
 - 不 disable 内置插件，与内置 provider 路由共存；无 pi-ai 依赖（依赖净减 84 包）
 - 参考插件（dsh-llm-codebuddy）用 PiAiAdapter + pi-ai 协议层：usage.credit 被
   pi-ai 丢弃、reasoning_effort 拼写未验证——方言漏水点即本插件自建的动机

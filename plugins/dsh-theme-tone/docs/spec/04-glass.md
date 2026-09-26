@@ -31,7 +31,10 @@
   background: color-mix(in srgb, var(--dsw-alias-bg-base) 70%, transparent);
   backdrop-filter: blur(12px) saturate(1.15);                                    /* GLASS_BLUR */
 }
-[data-phase='active'] [data-conversation-scroll] { padding-top: 76px; }          /* ③ 滚区补高 */
+[data-phase='active'] [data-conversation-scroll] {                              /* ③ 滚区补高 */
+  border-top: 76px solid transparent;   /* ⚠️ border-top，不是 padding-top */
+  box-sizing: content-box;
+}
 ```
 
 > 上面的 `z-index` / `blur` 在源码里是模板插值（`ABOVE_CONTENT_Z_INDEX`、`GLASS_BLUR`）——
@@ -52,6 +55,27 @@
 
 → **静止时布局等值**，顶栏的分隔线仍与左栏（tab strip 38px + 面板标题 38px = 76px）在列边缘接上
 （`ConversationRoot.module.css:37-41` 那条契约）。差别只在「内容现在从它下面滚过」。
+
+> ⚠️ **③ 为什么是 `border-top` 而不是 `padding-top`**（owner 2026-09-26 报
+> 「顶栏透明后，右侧滚动条也会跑上去」）：
+> **滚动条画在滚动容器的 padding box 上，`padding-top` 只推内容、不推它。**
+> 于是轨道与滑块仍从 y=0 起画，前 76px 正落在**半透明顶栏下面** —— 顶栏现在是
+> `color-mix(… 70%)` + `blur(12px)`，挡不住，于是那段滚动条以 1~3 级的淡痕透出来。
+> 官方因为顶栏**在流内**，滚区天然从 y=76 起，滚动条也就从 76 起。
+>
+> `border-top` 同样是「推内容」，但它把 **padding box 整体下移** 76px ⇒
+> 滚动条与内容一起回到官方位置。真机三档对照（滑块染不透明橙，只在滚动条那一列扫描）：
+>
+> | 档 | 滚区 clientHeight | 滑块顶端 y | 说明 |
+> | :--- | ---: | ---: | :--- |
+> | 官方默认（顶栏在流内） | 680 | **78** | = 76 + 官方轨道 2px 边距 |
+> | 改前 `padding-top: 76px` | 756 | **0** | 画进顶栏带（透出来） |
+> | 本版 `border-top: 76px` | **680** | **78** | 与官方逐项相同 ✓ |
+>
+> ⚠️ 必须**配对**声明 `box-sizing: content-box`：官方 `.scrollBody` 本身就是 content-box
+> 且无边框，本插件引入边框后若按 border-box 解析，那 76px 会从内容高度里扣掉、
+> 滚区内容区被压缩。真机复验：`clientHeight` 680（= 官方值）、`offsetHeight` 756（总高不变）、
+> 输入框座位位置逐像素不变、不产生页面级纵向溢出。
 
 ## 3) 输入框：玻璃**只做在卡片上**
 
@@ -207,19 +231,30 @@ surface 表有一条守卫「不许出现 `data-phase`」——而本表两条�
 **不依赖任何官方 hashed 类名**（有测试），所以官方改组件内部样式不会连累我们；但**锚点改名会静默失效**，
 这也是为什么每一处都留了测试与注释。
 
-**拖拽条（`.widthHandle`）必须压回 `top: 76px`**：官方把它「绝对定位在 `.body` 里，
-让辉光落在顶栏下缘之下」，而顶栏浮层化之后 `.body` 从 y=0 开始 → 辉光会延伸到顶栏区域，
-且**画在玻璃顶栏之上**。
+**拖拽条（`.widthHandle`）：已改为「不碰」**（owner 2026-09-24 拍板）。
 
-几何链（`ConversationRoot.tsx:372-392`）：`.root > [顶栏槽位] + .body > (.scrollBody + .widthHandle)`，
-官方的 `.widthHandle` 是 `.body` 里的 `absolute; top: 0; bottom: 0` ——
-**官方顶栏在流内占 76px，所以 `.body` 从 76 起，辉光天然进不了顶栏**。
+一段历史：官方把它「绝对定位在 `.body` 里，让辉光落在顶栏下缘之下」，而顶栏浮层化之后
+`.body` 从 y=0 开始 → 辉光会延伸到顶栏区域。曾经的对策是把拖拽条本体压回 `top: 76px`
+（= `HEADER_HEIGHT_PX`），即「恢复官方几何」。
 
-**修法：把拖拽条本体压回 `top: 76px`（= `HEADER_HEIGHT_PX`），即恢复官方几何。**
-只锚 `[data-width-handle]`（ConversationRoot 那条、带 `::after` 光带）；
-AppFrame 的 `[data-side]` 手柄长在 frame 里且**没有光带**，不动它。
-只改 `top`，不动 `bottom` / 宽度 —— 可拖高度少掉顶栏那 76px，与官方一致（官方在顶栏区本来就拖不到）。
-守卫见 `test/glass.test.mjs`。
+**那条对策已删除**，因为它把官方光带的**几何基准**改歪了：官方光带位置是
+`var(--dsh-width-handle-pointer-y, 50%)`，而 `50%` 相对**这个盒子**计算 ——
+把 `top` 压到 76 后盒子变成 `[76, 720]`，`50% = 398`，而视口中心是 360：
+
+| 状态 | 光带位置 |
+| :--- | :--- |
+| **hover**（变量从未被写，用兜底 `50%`） | **398**（比屏幕中心低 38px）← owner 真机报「光带靠下」 |
+| **按住拖动**（官方写真实 `clientY`） | 跟随鼠标（看着"正常"了） |
+
+实测（真机 3080）：带此规则 `center=398`；移除后 `center=360`（= 视口中心）。
+
+**取舍**：宁可让光带在浮层顶栏区多画一截（顶栏是半透明玻璃，观感影响很小），
+也不去改这个盒子的几何 —— 那会把官方一条公开的指针提示算歪。
+若将来确需压，正确做法是**补 `--dsh-width-handle-pointer-y` 的基准**（而不是动 `top`），
+且必须在 hover 与 dragging 两种状态下都验过。
+
+几何链（`ConversationRoot.tsx`）：`.root > [顶栏槽位] + .body > (.scrollBody + .widthHandle)`。
+守卫见 `test/glass.test.mjs`（断言**不得**再出现 `[data-width-handle]` 规则）。
 
 ## 5) 浮层**不做玻璃**；液态玻璃做在**输入框**上
 

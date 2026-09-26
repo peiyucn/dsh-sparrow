@@ -1,6 +1,6 @@
 /** client half 纯逻辑：目录 store 惰性订阅（首帧会话 scope 未就绪时延迟挂接，解析后订阅迁移）。 */
 
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /** 官方目录 store 最小面：快照（含 current 字段）+ 订阅（与 modelDirectories 的 store 同构）。 */
 export interface LazyDirectorySource<S> {

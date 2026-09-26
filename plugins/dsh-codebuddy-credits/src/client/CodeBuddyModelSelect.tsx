@@ -19,8 +19,10 @@ import {
   type FocusEvent, type KeyboardEvent,
 } from 'react'
 import {
-  IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
-  IconWarningOutline16, Toast,
+  // 图标名只标字形与字重（Regular = 1px 描边），渲染尺寸改由 size prop 决定：
+  // 下列使用点一律显式传 size（对照官方改名前的 Icon*Outline16 / Icon*Outline14）。
+  IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular,
+  IconWarningOutlineRegular, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getMaxMode, subscribeMaxMode } from './maxMode.js'
 import { formatModelFacts } from './format.js'
@@ -109,14 +111,93 @@ export function ensurePickerStyles(): void {
     '.ccb-model-triggerEffort { flex: 0 0 auto; color: var(--dsw-alias-label-caption); }',
     '.ccb-model-chevron { flex: 0 0 auto; color: var(--dsw-alias-label-caption); transition: transform 120ms ease; }',
     '.ccb-model-chevronOpen { transform: rotate(180deg); }',
-    '.ccb-model-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; background: var(--dsw-specific-menu); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
+    // ⚠️ `--dsh-theme-tone-menu-inner-radius` = **本菜单的同心内圆角**，供 theme-tone 的
+    //   「滚动容器圆角」规则读取（见下条 `.ccb-model-groups` 的说明）。写在这里是因为
+    //   只有本文件知道自己的外圆角是 20px：同心内圆角 = 20 − 内边距 4 = 16 = --dsw-radius-lg。
+    '.ccb-model-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); --dsh-theme-tone-menu-inner-radius: var(--dsw-radius-lg, 16px); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
     '.ccb-model-status, .ccb-model-empty { padding: 10px; color: var(--dsw-alias-label-tertiary); font-size: 13px; line-height: 20px; }',
     '.ccb-model-error, .ccb-model-warning { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; padding: 7px 8px; border-radius: 8px; background: var(--dsw-alias-interactive-bg-hover-danger); color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; }',
     '.ccb-model-warning { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-state-warn-label); }',
     '.ccb-model-retry { flex: 0 0 auto; padding: 0; border: none; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }',
-    '.ccb-model-groups { min-height: 0; overflow-y: auto; }',
+    // ⚠️ **本插件不自己给滚动容器写圆角**：同心半径由 theme-tone 那条「滚动容器圆角」规则
+    //   统一施加（它同时管官方菜单与本菜单，半径经变量取值，见下条标题规则与
+    //   `.ccb-model-menu` 上的 --dsh-theme-tone-menu-inner-radius）。两条都带 !important，
+    //   这里再写一份会互相打架（实测踩过：本插件写 16 被 theme-tone 的 12 压掉）。
+    '.ccb-model-groups { min-height: 0; overflow-y: auto; overflow-x: hidden; }',
+    // ⚠️ **吸顶的是「分类标题」，不是「分组容器」**（2026-09-25 真机定案，别再改回去）。
+    //
+    // 上一轮曾把 sticky 提到 `<section class="ccb-model-group">` 上，理由是「sticky 元素只在
+    // 自己的包含块内滑动，标题会被 section 带出滚动容器」。**那个理由推错了**：sticky 的
+    // 包含块是**最近的滚动祖先**（`.ccb-model-groups`），不是 section —— section 只是它
+    // 滑动的**边界**。把 sticky 放到 section 上会引入一个更严重的缺陷：
+    //
+    //   前一个 section 的**底边**还在滚动口之下时它保持吸顶，
+    //   同时后一个 section 的**顶边**也滚到了口沿并开始吸顶
+    //   ⇒ **两条 26px 高的条同时贴在同一个 top 上互相压住**。
+    //
+    // 真机实测（owner 实例，scroll=120）：吸顶 = [DeepSeek, CodeBuddy Credits]，
+    // 两条标题重叠 12px —— 正是 owner 截图里 "Hy4 preview" 与 "Hy3" 叠字那一幕。
+    // 而 sticky 挂在标题上时：吸顶 = [CodeBuddy Credits] 单条，重叠 = 无；
+    // 后一个 section 从下方推上来会把前一条**自然顶走**（这是 sticky 的标准语义）。
+    //
+    // 注意 `<section>` 这里**一个字都不写**：它保持文档流，边界作用天然成立。
     '.ccb-model-group + .ccb-model-group { margin-top: 4px; }',
-    '.ccb-model-groupTitle { position: sticky; top: 0; z-index: 1; padding: 5px 8px 3px; background: var(--dsw-specific-menu); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
+    // 标题：吸顶 + **不透明**的底。底必须挡住滚过去的行，同时不许看得见「另一块颜色」。
+    //
+    // ⚠️ 这里来回走过一版**错的**（2026-09-25，记下来别再走）：把 `background-color` 换成
+    //   半透明的 `var(--dsw-specific-menu)`，理由是「官方也这么写」。结果就是 owner 当场看到的
+    //   **行从标题底下透上来**（「给修坏了又。又重叠了。**只是把那个背景去掉，不是变成透明的**」）。
+    //   官方能那么写，是因为**卡片与标题合成的是同一个 token**；我们一旦改成透明，
+    //   标题区域就只剩「卡片填充」，比卡片主体少一层 —— 行（在标题之下）直接显形。
+    //   **官方那版标题不是透明的**：它是半透明填充**叠在卡片填充之上**（等效约 0.82）。
+    //
+    // 现在这条底 = **把卡片表面按同一配方重画一遍**：
+    //   background-color = var(--dsw-alias-bg-base)   ← 卡片浮着的那层地面（不透明 ⇒ 挡住行）
+    //   background-image = 一层 var(--dsw-specific-menu) 渐变
+    // 合成 = 0.58·菜单色 + 0.42·地面色 —— 与卡片**同一个算式**（官方卡片就是菜单填充叠在地面上）。
+    //
+    // 真机像素（标题带里没有文字的那段空白 vs 菜单 padding 带）：
+    //   官方半透明写法      ΔR=ΔG=ΔB=7.00（|Δ|sum=21.00，一条看得见的横带）
+    //   本写法（深色轴）    |Δ|sum=1.38（噪声级）
+    //
+    // ⚠️ **浅色轴还差一档，那一档由主题插件补**：卡片上还叠着 theme-tone 的**颗粒**
+    //   （`menuSurfaceLayers()`），颗粒把卡片压暗约 5.5 级；标题若没有同款颗粒，就成了一条
+    //   「平的、偏亮」的带 —— 这正是 owner 说的「有点突兀」。补法在 `dsh-theme-tone` 的
+    //   `surface.ts`（它同时管官方 `ModelSelect`，即「咱们的和官方的一起处理」）：
+    //   那条规则把**颗粒 + 地面（颗粒与三段光）**一并重画，合成与卡片逐层同源
+    //   （真机实测浅色轴差 ≤0.9 级、深色轴 ≈1.1 级）。
+    //   本插件这条是**不带主题插件时的等价物**：官方档下卡片也没有颗粒，两者逐像素相等。
+    //   另：`--dsw-specific-menu` 与官方的 `--dsw-menu-surface-fill` 由 theme-tone **一起染、同值**
+    //   （官方 0.1.7 里后者是本体、前者只是别名），所以这里读别名与卡片同色；
+    //
+    // ⚠️ **不用 background 简写**：简写会把主题层可能加到这条上的 `background-image`
+    //   （质感层）一起重置掉 —— 这个坑本仓库已经踩过两次。
+    // ⚠️ **不写 backdrop-filter**：与官方一致。标题在**菜单内部**，菜单自己已经是
+    //   backdrop root，标题再声明模糊只会采样子树里正在滚动的行（真机实测 31.719/px，更脏）。
+    // ⚠️ **圆角写在滚动容器上，不写在标题上**（2026-09-25 owner 第六轮定案，别再改回去）。
+    //   第五轮把圆角写在标题上，owner 随即报「改成圆角后**确实边缘会漏**」。
+    //   根因是几何必然：标题自己带圆角 ⇒ 「标题矩形 − 圆角」那块缺口**真的没画**，
+    //   而缺口里正好是滚动的行（`.ccb-model-option` 的悬停底铺满整行宽、行文字从 x=8 起）
+    //   ⇒ 行从缺口透出来。真机实测（吸顶标题，数标题矩形内"漏出的行"像素）：
+    //
+    //     | 标题圆角 | 4px | 6px | 8px | 16px（被 clamp 成 13） | 0（方角） |
+    //     | :--- | ---: | ---: | ---: | ---: | ---: |
+    //     | 漏出的行像素 | 6 | 16 | 30 | **70** | **0** |
+    //
+    //   把圆角改由 `.ccb-model-groups`（**滚动容器**）承担：容器顶角的裁剪**同时作用于
+    //   标题与行** ⇒ 那里既没有标题、也没有行，露出的是菜单自己的玻璃（与卡片同源）；
+    //   标题保持方角 ⇒ 没有缺口 ⇒ **结构上不可能漏**。真机实测 6 个滚动位置全 0。
+    //
+    //   ⚠️ **半径不能写死在容器规则里**：theme-tone 那条容器规则的选择器同时命中
+    //   官方菜单与本菜单，写死一个值必然让其中一个的同心关系错掉（实测踩过一次）。
+    //   故本插件在**自己的菜单元素上**声明 --dsh-theme-tone-menu-inner-radius，
+    //   theme-tone 的容器规则读它（自定义属性沿继承树向下传，滚动容器是菜单的后代）。
+    //   本菜单外圆角 20px + 内边距 4px ⇒ 同心值 = **16px** = --dsw-radius-lg。
+    //   右上角由 theme-tone 那条统一补一个滚动条宽（所有行的右边缘在内容盒上，
+    //   比容器右边缘靠左一个滚动条宽，不补就是"左圆右方"）。只圆**上两角** ——
+    //   下两角若也圆，滚到底时最后一行会被啃掉。
+    //   （没有 theme-tone 时本插件无圆角：那是纯样式增强，缺了不影响功能。）
+    '.ccb-model-groupTitle { position: sticky; top: 0; z-index: 1; padding: 5px 8px 3px; border-radius: 0; background-color: var(--dsw-alias-bg-base); background-image: linear-gradient(var(--dsw-specific-menu), var(--dsw-specific-menu)); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
     '.ccb-model-option { box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: auto; min-width: 100%; min-height: 38px; padding: 6px 8px; border: none; border-radius: 10px; outline: none; background: transparent; color: inherit; text-align: left; cursor: pointer; }',
     '.ccb-model-option:hover:not(:disabled), .ccb-model-option:focus-visible { background: var(--dsw-alias-interactive-bg-hover); }',
     '.ccb-model-option:disabled { color: var(--dsw-alias-label-dimmed); cursor: default; }',
@@ -342,7 +423,7 @@ export function CodeBuddyModelSelect(
       >
         <span className="ccb-model-triggerLabel">{modelLabel}</span>
         {effortLabel !== undefined && <span className="ccb-model-triggerEffort">{effortLabel}</span>}
-        <IconChevronDownOutline14 className={clsx('ccb-model-chevron', open && 'ccb-model-chevronOpen')} />
+        <IconChevronDownOutlineRegular size={14} className={clsx('ccb-model-chevron', open && 'ccb-model-chevronOpen')} />
       </button>
 
       {open && (
@@ -358,13 +439,13 @@ export function CodeBuddyModelSelect(
               <button ref={itemRef()} type="button" role="menuitem" className="ccb-model-cell" onClick={() => { setPane('model') }}>
                 <span className="ccb-model-cellLabel">{t('picker.menu.model')}</span>
                 <span className="ccb-model-cellValue">{modelLabel}</span>
-                <IconChevronRightOutline14 className="ccb-model-cellChevron" />
+                <IconChevronRightOutlineRegular size={14} className="ccb-model-cellChevron" />
               </button>
               {reasoning !== undefined && (
                 <button ref={itemRef()} type="button" role="menuitem" className="ccb-model-cell" onClick={() => { setPane('effort') }}>
                   <span className="ccb-model-cellLabel">{t('picker.menu.effort')}</span>
                   <span className="ccb-model-cellValue">{effortLabel}</span>
-                  <IconChevronRightOutline14 className="ccb-model-cellChevron" />
+                  <IconChevronRightOutlineRegular size={14} className="ccb-model-cellChevron" />
                 </button>
               )}
             </>
@@ -421,7 +502,7 @@ export function CodeBuddyModelSelect(
                               </span>
                             </span>
                             <span className="ccb-model-check">
-                              {selected ? <IconCheckOutline16 /> : null}
+                              {selected ? <IconCheckOutlineRegular size={16} /> : null}
                             </span>
                           </button>
                         )
@@ -469,7 +550,7 @@ export function CodeBuddyModelSelect(
                             <span className="ccb-model-name">{level.label}</span>
                           </span>
                           <span className="ccb-model-check">
-                            {isMax ? <IconCheckOutline16 /> : null}
+                            {isMax ? <IconCheckOutlineRegular size={16} /> : null}
                           </span>
                         </button>
                       )
@@ -494,7 +575,7 @@ export function CodeBuddyModelSelect(
                         <span className="ccb-model-name">{level.label}</span>
                       </span>
                       <span className="ccb-model-check">
-                        {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
+                        {effectiveEffort === level.effort ? <IconCheckOutlineRegular size={16} /> : null}
                       </span>
                     </button>
                   ))}
@@ -506,7 +587,7 @@ export function CodeBuddyModelSelect(
         <Toast
           key={toast.seq}
           text={toast.text}
-          icon={<IconWarningOutline16 />}
+          icon={<IconWarningOutlineRegular size={16} />}
           anchor={rootRef.current?.closest<HTMLElement>('[data-composer-card]') ?? null}
           onDone={() => { setToast(null) }}
         />

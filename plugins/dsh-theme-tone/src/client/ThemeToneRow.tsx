@@ -14,14 +14,24 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { GRAIN_ATTR } from '../constants.js'
 import { tonePreview } from '../backdrop.js'
-import { availableToneIds, toneFor, type ToneId } from '../tones.js'
+import { availableToneIds, toneFor, type ColorScheme, type ToneId } from '../tones.js'
 import type { createThemeToneRowStore } from './store.js'
 import { ROW_CLASS } from './styles.js'
 
 /** 注入的业务面：色调写入。 */
 export interface ThemeToneRowInjected {
-  /** 写当前明暗轴的色调选择。 */
-  setTone: (id: ToneId) => void
+  /**
+   * 写指定明暗轴的色调选择。
+   *
+   * ⚠️ **轴必须由调用方传入（= 正在渲染这批卡片的那个轴），不能在写入时重新查询**
+   * （owner 真机报「浅色模式下选色调无法维持，很快回到官方」）：写轴若与渲染轴错开，
+   * 就会把浅色轴的 id 写进深色轴字段 —— 而两轴的合法集合**不重叠**
+   * （浅 `official/blue/sakura/green`、深 `official/violet/crimson/forest`），
+   * 宿主 schema 直接拒绝 → 选择不生效、该轴停在官方值。
+   * @param id - 该轴上的色调 id。
+   * @param scheme - 这批卡片对应的明暗轴。
+   */
+  setTone: (id: ToneId, scheme: ColorScheme) => void
 }
 
 /** 完整组件 props：运行时份额 + store 份额 + locale 座位 + 注入面。 */
@@ -54,7 +64,7 @@ export function ThemeToneRow({ t, useStore, setTone }: ThemeToneRowComponentProp
                样式表按这个属性决定 ::after 显不显 */
             {...{ [GRAIN_ATTR]: toneFor(colorScheme, id).grain ? 'on' : 'off' }}
             aria-pressed={id === tone}
-            onClick={() => { setTone(id) }}
+            onClick={() => { setTone(id, colorScheme) }}
           >
             {t(`tone.${id}`)}
           </button>

@@ -201,7 +201,7 @@ describe('archive-manage 纯逻辑', () => {
 
     it('Windows 大小写不同 应该 也能掩码', () => {
       assert.equal(
-        maskHomePath('c:\\users\\alice\\.dsh\\x', 'C:\\Users\\alice'),
+        maskHomePath('c:\\users\\alice\\.dsh\\x', 'C:\\Users\\Alice'),
         '~\\.dsh\\x',
       )
     })

@@ -39,6 +39,25 @@ function stripComments(text) {
   return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 }
 
+/**
+ * 取 `ctx.inject(['a', 'b'], cb)` 里声明的**可选依赖**服务名。
+ *
+ * 可选依赖 fork（服务出现才装）是根规范《扩展与宿主兼容》要求的写法：
+ * 易变面/展示面不放进硬 `inject`，免得服务缺席时把插件主体一起拖停。
+ * fork 内部经**作用域上下文**访问服务（如 `projectionCtx.sessionProjections`），
+ * 故下面的服务名扫描要把这些名字认下来。
+ */
+function optionalInjectServices(text) {
+  const names = new Set()
+  for (const m of stripComments(text).matchAll(/ctx\.inject\(\s*\[([^\]]*)\]/g)) {
+    for (const part of m[1].split(',')) {
+      const name = part.trim().replace(/^['"]|['"]$/g, '')
+      if (name) names.add(name)
+    }
+  }
+  return names
+}
+
 /** 取 `export const inject = [...]` 里声明的服务名。 */
 function declaredInject(text) {
   const m = /export\s+const\s+inject\s*=\s*\[([^\]]*)\]/.exec(text)
@@ -51,25 +70,35 @@ function declaredInject(text) {
   )
 }
 
-/** 扫描源码里直接出现在 `ctx.` 之后的服务名。 */
+/**
+ * 扫描源码里直接出现在 `ctx.` / 作用域上下文（`<x>Ctx.`）之后的成员名。
+ * fork 回调参数按惯例以 `Ctx` 结尾（`settingsCtx`、`projectionCtx`、`webCtx` …），
+ * 这些上下文上取服务同样要求服务已由该 fork 的 `ctx.inject([...])` 声明，
+ * 故一并纳管——否则 fork 里写错服务名不会被发现。
+ */
 function usedServices(text) {
   const used = new Set()
-  for (const m of stripComments(text).matchAll(/\bctx\.([A-Za-z_$][\w$]*)/g)) used.add(m[1])
+  const clean = stripComments(text)
+  for (const m of clean.matchAll(/\bctx\.([A-Za-z_$][\w$]*)/g)) used.add(m[1])
+  for (const m of clean.matchAll(/\b[A-Za-z_$][\w$]*Ctx\.([A-Za-z_$][\w$]*)/g)) used.add(m[1])
   return used
 }
 
-test('宿主侧访问的每个 ctx 服务都在 inject 里声明（或为内建）', () => {
+test('宿主侧访问的每个 ctx 服务都在 inject 里声明（或为内建 / 可选依赖 fork）', () => {
   const file = path.join(SRC, 'index.ts')
   const text = fs.readFileSync(file, 'utf8')
   const declared = declaredInject(text)
-  const missing = [...usedServices(text)].filter((s) => !BUILTINS.has(s) && !declared.has(s))
+  const optional = optionalInjectServices(text)
+  const missing = [...usedServices(text)]
+    .filter((s) => !BUILTINS.has(s) && !declared.has(s) && !optional.has(s))
 
   assert.deepEqual(
     missing,
     [],
     `src/index.ts 访问了未在 inject 声明的服务：${missing.join(', ')}。`
       + 'cordis 要求服务经 inject 绑定，否则运行期抛 "cannot get property ... without inject"；'
-      + `请在 export const inject 中补上（当前：${[...declared].join(', ')}）。`,
+      + `请在 export const inject 中补上（硬依赖），或经 ctx.inject([...], cb) 起可选 fork（可选依赖）。`
+      + `当前硬依赖：${[...declared].join(', ')}；可选 fork：${[...optional].join(', ')}。`,
   )
 })
 
@@ -78,8 +107,53 @@ test('sessions 已声明为硬依赖（2026-09-18 事故的回归守卫）', () 
   const declared = declaredInject(text)
   assert.ok(
     declared.has('sessions'),
-    '积分账本从会话事件重放取数，必须声明 sessions 硬依赖；'
+    '积分账本要按会话 id 取 live 会话对象，必须声明 sessions 硬依赖；'
       + '漏声明会让 /session-usage 与 /turn-usage 在运行期抛 inject 错误。',
+  )
+})
+
+test('sessionProjections 是**可选** fork，不得进硬 inject（2026-09-26 迁移）', () => {
+  const text = fs.readFileSync(path.join(SRC, 'index.ts'), 'utf8')
+  const declared = declaredInject(text)
+  assert.equal(
+    declared.has('sessionProjections'),
+    false,
+    '积分是展示面：投影服务缺席时不该把用户的推理 provider 一起停掉，'
+      + '故它必须是 ctx.inject([...], cb) 起的可选 fork，而不是硬依赖。',
+  )
+  assert.ok(
+    optionalInjectServices(text).has('sessionProjections'),
+    '可选 fork 必须真的声明 sessionProjections（否则注册表永远拿不到，积分静默只剩冷路径）。',
+  )
+  assert.ok(
+    /sessionProjections\.register\(/.test(stripComments(text)),
+    'fork 里必须注册投影单元。',
+  )
+})
+
+test('⛔ 不得再调用被官方废弃的同步会话读（2026-09-26 迁移的回归守卫）', () => {
+  // 官方 0.1.7 起把 `Session.eventAt()` / `snapshotEvents()` / `ownEvents()` 标为
+  // `@deprecated … new calls are prohibited`
+  //（`.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md`）。
+  // 本插件的 live 账本路径曾用它，现已迁到官方投影注册表。
+  // 这条守卫防的是「以后又有人图省事把它加回来」——那是**新增**被禁调用。
+  const offenders = []
+  for (const entry of fs.readdirSync(SRC, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.ts')) continue
+    const file = path.join(entry.parentPath ?? entry.path, entry.name)
+    const text = stripComments(fs.readFileSync(file, 'utf8'))
+    for (const method of ['snapshotEvents', 'eventAt', 'ownEvents']) {
+      // 只看调用形态（成员访问 + 左括号），注释里的说明不算
+      if (new RegExp(`\\.${method}\\s*\\(`).test(text)) {
+        offenders.push(`${path.relative(SRC, file)} → .${method}()`)
+      }
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `宿主侧不得调用被废弃的同步会话读：${offenders.join(', ')}。`
+      + 'live 路径请读 ctx.sessionProjections 的投影状态，冷路径走 sessionController.inspect()。',
   )
 })
 
@@ -90,4 +164,12 @@ test('inject 只列真实存在的服务名（无笔误）', () => {
   const KNOWN = new Set(['llm', 'attachments', 'sessions'])
   const unknown = [...declared].filter((s) => !KNOWN.has(s))
   assert.deepEqual(unknown, [], `inject 里出现未登记的服务名：${unknown.join(', ')}`)
+})
+
+test('可选 fork 只列真实存在的服务名（无笔误）', () => {
+  const text = fs.readFileSync(path.join(SRC, 'index.ts'), 'utf8')
+  const optional = optionalInjectServices(text)
+  const KNOWN = new Set(['sessionProjections', 'settings'])
+  const unknown = [...optional].filter((s) => !KNOWN.has(s))
+  assert.deepEqual(unknown, [], `可选 fork 里出现未登记的服务名：${unknown.join(', ')}`)
 })

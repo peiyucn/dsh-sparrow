@@ -11,8 +11,15 @@ export const name = 'dsh-theme-tone'
 /** npm 包名：client bundle 注册 id，也是 theme 覆盖层的 source。 */
 export const PACKAGE_NAME = '@dsh-sparrow/dsh-theme-tone'
 
-/** 色调选择持久化的 settings 命名空间（小写字母 / 数字 / 连字符，`settings.register` 硬要求）。 */
-export const SETTINGS_NAMESPACE = 'ui-theme-tone'
+/**
+ * 色调选择持久化的设置命名空间。
+ *
+ * 官方 0.1.7 起设置命名空间就是**本插件在 profile 里的条目 id**（`cordis.patch.yml`
+ * 的 `insert.id`，与 {@link name} 同值）—— 不再是插件自注册的任意名字。
+ * ⚠️ 改名要同步 `cordis.patch.yml`；旧线（0.1.5-rc.2）里叫 `ui-theme-tone`，
+ * 升级后旧值不会被自动迁移（见 README「卸载与残留」）。
+ */
+export const SETTINGS_NAMESPACE = name
 
 /** 设置行文案的 locale 命名空间。 */
 export const LOCALE_NAMESPACE = 'theme-tone'
@@ -84,39 +91,26 @@ export const SHELL_OVERLAY_ATTR = 'data-shell-overlay'
 export const DOCKKIT_MENU_ATTR = 'data-dockkit-tab-menu'
 
 /**
- * 官方容器属性：右边栏的**浮层宿主**（`position: fixed; z-index: 60`，见
- * `SidebarRight.module.css:115-118`）。
+ * 抬到内容层之上的第二档（给官方原本就**高于右栏面板**的层用）。
  *
- * ## 为什么它必须单独记账
- *
- * 右栏里的浮动面板要**横跨整列与对话区**，所以官方把它 portal 到 `document.body` —
- * 而「app root 的兄弟不继承 root 的层叠」，于是官方在这里**明写了 60**（注释原话）。
- * 60 < 内容层 81 → **浮动面板会被对话内容盖住**。
- *
- * 这与 owner 报过的两次是**同一类 bug**（顶栏「金光没了」、拖拽条「整没了」），
- * 区别只在于：那两个是「本来压在内容之上却被盖」，这个是「官方层号本来就高于面板，
- * 但低于我们的内容层」—— 按 {@link ABOVE_CONTENT_Z_INDEX} 那条不变式，同样该抬。
- *
- * **取值必须保持官方相对次序**：官方是 `floatHost 60` < `tabMenu 70`，
- * 抬的时候也必须是 `float 82` < `tabMenu 83`，否则会把「标签菜单压在浮动面板之上」的
- * 官方意图反过来。故此处不共用 {@link ABOVE_CONTENT_Z_INDEX}，而是各留一档（见下表）。
- */
-export const RIGHT_FLOAT_HOST_ATTR = 'data-sidebar-right-float-host'
-
-/**
- * 抬到内容层之上的第二档（给官方原本就**高于右栏浮层宿主**的层用）。
- *
- * 官方 `position: fixed` 浮层的层号阶梯（查过源码）：
+ * 官方 `position: fixed` 浮层的层号阶梯（rc.1 查过源码）：
  *
  * | 官方层 | 原 | 抬到 |
  * | :--- | :--- | :--- |
- * | 右栏浮层宿主 `[data-sidebar-right-float-host]` | 60 | {@link ABOVE_CONTENT_Z_INDEX}（82） |
+ * | 右栏面板 `[data-sidebar-right-panel]` | 10（全屏 40） | {@link ABOVE_CONTENT_Z_INDEX}（82） |
  * | dockkit 标签菜单 `[data-dockkit-tab-menu]` | 70 | **本值（83）** |
+ *
+ * 两者必须**一起**抬才能保住官方的相对次序（`dockkit.module.css:538,543` 原话：
+ * 从标签打开的菜单绝不能落在面板之下）。dockkit 自己的浮层档
+ * （`--dsh-dockkit-float-layer`，默认 60）**不抬**：它在面板的层叠上下文内，随面板一起上移。
  *
  * 菜单 / tooltip 一族官方取 100（`Menu.module.css:35`、`Tooltip.module.css:3` 等），
  * 本来就高于 81，**不用抬**。
+ *
+ * ⚠️ 0.1.7 起官方删掉了 `[data-sidebar-right-float-host]`（0.1.5 线里 portal 到 body 的
+ * 那个 60 浮层宿主），故本档不再有第二个抬升对象，常量也随之只服务标签菜单。
  */
-export const ABOVE_FLOAT_HOST_Z_INDEX = 83
+export const TAB_MENU_Z_INDEX = 83
 
 /**
  * 官方容器属性：**列宽拖拽条**（拖它调左右栏 / 对话区宽度）。
@@ -166,18 +160,15 @@ export const SIDE_ATTR = 'data-side'
  * | **左右栏拖拽条** `[data-side]:not([role='tooltip'])` | 11 | **owner 真机报「调整对话区域的条整没了」** |
  * | **对话区拖拽条** `[data-width-handle]` | —— | 同上（它没有独有属性） |
  * | 外壳浮层 `[data-shell-overlay]` | 20 | 拖拽 / 遮罩层 |
- * | **右栏浮层宿主** `[data-sidebar-right-float-host]` | 60 | 横跨整列的浮动面板（见该常量；**本轮补上**） |
- * | dockkit 标签菜单 `[data-dockkit-tab-menu]` | 70 | 固定定位的浮出菜单，且**必须高于浮动面板**（官方注释明写）→ 取 83 |
+ * | dockkit 标签菜单 `[data-dockkit-tab-menu]` | 70 | 固定定位的浮出菜单，且**必须高于右栏面板**（官方注释明写）→ 取 83 |
  *
  * **已知未收录（低风险，记账）**：`dockkit .dockScrim/.dockHint`（拖拽落点提示，z=10，
  * 只在下方的 dock 区内，没有专用语义属性）。**新增官方浮层时按上表核对。**
  *
- * ⚠️ **一处靠 DOM 次序、不靠层号的脆弱点（推理，未经真机确认）**：
- * 右栏**全屏态**官方是 40、浮层宿主是 60，**浮层在上**；我们两个都抬成 82 → **同号**。
- * 同号时由绘制次序决胜：面板在 `#root` 内，而浮层宿主是 portal 到 `document.body` 的
- * **后插入节点**（`SidebarRight.tsx:332-344`）→ 浮层仍然后画、仍然在上，**结果与官方一致**。
- * 但这依赖「portal 节点排在 `#root` 之后」这一 React 行为，**换实现方式就可能反过来**。
- * 真机上值得专门看一眼「右栏全屏 + 从右栏浮出一个面板」这个组合。
+ * ⚠️ **0.1.7 起原先那条「同号靠绘制次序决胜」的脆弱点已不存在**：官方删掉了 portal 到
+ * `document.body` 的右栏浮层宿主（`[data-sidebar-right-float-host]`），右栏整块归 dockkit
+ * 布局，浮层档（`--dsh-dockkit-float-layer`，默认 60）在面板的层叠上下文内，随面板一起上移。
+ * 仍建议真机看一眼「右栏全屏 + 从右栏浮出一个面板」这个组合（本版未实测）。
  */
 export const ABOVE_CONTENT_Z_INDEX = 82
 
@@ -265,6 +256,30 @@ export const PANEL_VARIABLE = '--dsh-theme-tone-panel'
  * （见 {@link POPUP_GRAIN_DATA_URI}），由色调的 `grain` 开关在本变量与 `none` 之间切换。
  */
 export const GRAIN_TILE_VARIABLE = '--dsh-theme-tone-grain-tile'
+
+/**
+ * **颗粒强度** —— 全插件**唯一来源**（每轴一档）。
+ *
+ * owner 2026-09-24：「噪点值统一变量，方便后续我们减弱」。
+ * 改这一个对象，下面三处一起变：
+ *
+ * 1. 运行期变量 {@link GRAIN_ALPHA_VARIABLE}（所有**伪元素**颗粒层的 `opacity`）；
+ * 2. 浮层贴图里烘的 alpha（`grainTileUri`，`background-image` 图层没有独立 opacity，只能预乘）；
+ * 3. 由 1、2 派生的一切（背景层 / 右栏 / 弹层 / 设置行）。
+ *
+ * 两轴取值不同是**物理原因**，不是没调好：深色轴 `screen` 是加亮（白点在暗底 = 星光），
+ * 浅色轴只能 `multiply` 压暗，而近白底往上只剩几级余量、纹理只能往下刻。
+ * 实测（真机同一无 UI 区域，整体亮度 / 高频质感）：深 `.13` → 3.369；浅 `.16` → 240.1 / 2.129。
+ */
+export const GRAIN_ALPHA: Readonly<Record<'light' | 'dark', number>> = Object.freeze({ light: 0.16, dark: 0.13 })
+
+/**
+ * 颗粒强度的**运行期变量**（由色调层写到 `body` 上）。
+ *
+ * 伪元素那种「贴图 + 独立 opacity」的颗粒层直接读它；贴图预乘那一路由
+ * {@link GRAIN_ALPHA} 在同一处派生。**两路同源**，所以 `GRAIN_ALPHA` 仍是唯一旋钮。
+ */
+export const GRAIN_ALPHA_VARIABLE = '--dsh-theme-tone-grain-alpha'
 
 /**
  * **悬停卡锚点**（`HoverCard`，左边栏会话 hover 那张 244px 预览卡）。
@@ -386,12 +401,20 @@ export const DIALOG_ANCHOR = "body [role='dialog']:not(:has(> img))"
 /**
  * 浮层用的颗粒贴图：与背景层同一张 `feTurbulence` 噪声（逐字同参数），
  * **但把强度烘进了 SVG** —— `background-image` 的图层没有独立 `opacity`，
- * 只能靠 `<rect opacity>` 预乘（背景层那边是 `::after { opacity: .13 }`）。
+ * 只能靠 `<rect opacity>` 预乘（背景层那边是 `::after { opacity: … }`）。
  *
- * 数值与背景层一致（`.13`），因为浮层与背景要读成同一种材质；改一处要连另一处一起看。
+ * ⚠️ 2026-09-24：数值改为从 {@link GRAIN_ALPHA} **派生**，不再各写各的（owner：
+ * 「噪点值统一变量，方便后续我们减弱」）。
  */
-export const POPUP_GRAIN_DATA_URI
-  = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='0.13' filter='url(%23n)'/%3E%3C/svg%3E\")"
+export function grainTileUri(alpha: number): string {
+  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='${alpha}' filter='url(%23n)'/%3E%3C/svg%3E")`
+}
+
+/** 浮层颗粒贴图（深色轴）—— 由 {@link GRAIN_ALPHA} 派生。 */
+export const POPUP_GRAIN_DATA_URI = grainTileUri(GRAIN_ALPHA.dark)
+
+/** 浮层颗粒贴图（浅色轴）—— 由 {@link GRAIN_ALPHA} 派生。 */
+export const POPUP_GRAIN_DATA_URI_LIGHT = grainTileUri(GRAIN_ALPHA.light)
 
 /** 颗粒开关的 DOM 属性（`off` 时 `::after` 不渲染）。 */
 export const GRAIN_ATTR = 'data-grain'

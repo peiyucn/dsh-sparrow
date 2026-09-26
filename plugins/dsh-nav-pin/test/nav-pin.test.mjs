@@ -71,14 +71,49 @@ describe('dsh-nav-pin 纯逻辑', () => {
     })
 
     it('宽度钳制 应该 覆盖滚动体与两侧拖拽条', () => {
-      assert.ok(css.includes('[data-phase] [data-conversation-scroll],\n[data-phase] [data-width-handle]'))
-      assert.ok(css.includes('[data-phase] [data-width-handle]'))
+      assert.ok(css.includes('> [data-conversation-scroll],\n'))
+      assert.ok(css.includes('[data-width-handle] {'))
+    })
+
+    it('⛔ 宽度钳制 的捕获点必须落在真正定义 --dsh-chat-content-width 的元素上', () => {
+      // 回归守卫（owner 真机报「官方调整对话界面整体宽度的按钮没了、两边很挤」）：
+      // 0.1.5-rc.2 里该变量定义在 .root（= [data-phase]），0.1.7-rc.1 起改到 .body
+      // （[data-phase] 的子元素）。捕获写在 [data-phase] 上时，rc.1 下解析为空 →
+      // min(空, …) 让整条自定义属性 invalid → 滚动体与拖拽条的宽度轴全失效
+      // （实测拖拽条宽度 10px 塌成 0）。
+      const body = "[data-phase] > div:has(> [data-conversation-scroll])"
+      assert.ok(
+        css.includes(`${body} {\n  --dsh-nav-pin-official-width: var(--dsh-chat-content-width);`),
+        '捕获必须写在那层「含滚动体的直接子元素」上（两版都成立）',
+      )
+      assert.ok(!/\[data-phase\] \{\n\s*--dsh-nav-pin-official-width/u.test(css), '不得再捕获在 [data-phase] 自身上')
+      // 钳制只落在该层之下，绝不回写它自己（否则会把官方值覆盖掉）
+      assert.ok(css.includes(`${body} > [data-conversation-scroll]`))
+      assert.ok(css.includes(`${body} [data-width-handle]`))
+      assert.ok(css.includes('--dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px)'))
     })
 
     it('宽度钳制 应该 全部由官方 [data-phase] 标记守卫（标记消失即整体不生效，不反噬官方宽度轴）', () => {
-      assert.ok(css.includes('[data-phase] {\n  --dsh-nav-pin-official-width: var(--dsh-chat-content-width);\n}'))
-      assert.ok(css.includes('[data-phase] [data-conversation-scroll] {'))
-      assert.ok(css.includes('--dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px)'))
+      // 判据用**规则体**里的声明（注释里也提到过变量名，故不能拿全文 includes 数）。
+      // 三条规则：① 捕获官方值 ② 滚动体 min() 钳制 ③ 拖拽条 min() 钳制。
+      const capture = css.indexOf('--dsh-nav-pin-official-width: var(--dsh-chat-content-width)')
+      assert.ok(capture > 0, '应捕获官方宽度值')
+      // 找出承载这三条声明的规则选择器：从各声明的 `{` 往前回溯到上一个 `}` 之后
+      const selectorFor = (needle) => {
+        const at = css.indexOf(needle)
+        assert.ok(at > 0, `找不到声明 ${needle}`)
+        const open = css.lastIndexOf('{', at)
+        const prevClose = css.lastIndexOf('}', open)
+        return css.slice(prevClose + 1, open).split('\n').filter(l => l.trim() !== '').pop() ?? ''
+      }
+      for (const needle of [
+        '--dsh-nav-pin-official-width: var(--dsh-chat-content-width)',
+        '--dsh-chat-content-width: min(',
+        '--dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px)',
+      ]) {
+        const sel = selectorFor(needle)
+        assert.ok(sel.includes('[data-phase]'), `规则必须带 [data-phase] 守卫：${sel.trim()}`)
+      }
     })
 
     it('宽度钳制 应该 同步重算输入卡片最大宽度', () => {

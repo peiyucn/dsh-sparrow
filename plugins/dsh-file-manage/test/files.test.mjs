@@ -8,13 +8,13 @@ import {
 
 describe('dsh-file-manage 纯逻辑', () => {
   describe('normalizePageQuery', () => {
-    it('空参数 应该 返回默认分页（20 条、最新在前）', () => {
-      assert.deepEqual(normalizePageQuery({}), { limit: PAGE_SIZE, order: 'desc' })
+    it('空参数 应该 返回默认分页（20 条）', () => {
+      assert.deepEqual(normalizePageQuery({}), { limit: PAGE_SIZE })
     })
 
     it('非法 limit（非整数 / 空 / 小数）应该 回退默认 20', () => {
       for (const bad of ['abc', '', '-3.5', '3.7', '1.5']) {
-        assert.deepEqual(normalizePageQuery({ limit: bad }), { limit: PAGE_SIZE, order: 'desc' })
+        assert.deepEqual(normalizePageQuery({ limit: bad }), { limit: PAGE_SIZE })
       }
     })
 
@@ -25,12 +25,11 @@ describe('dsh-file-manage 纯逻辑', () => {
       assert.equal(normalizePageQuery({ limit: '99999' }).limit, 1000)
     })
 
-    it('空 after 应该 省略、非空保留；order 非 asc 一律 desc', () => {
-      assert.deepEqual(normalizePageQuery({ after: '' }), { limit: PAGE_SIZE, order: 'desc' })
-      assert.deepEqual(normalizePageQuery({ after: 'file-api-x' }), { after: 'file-api-x', limit: PAGE_SIZE, order: 'desc' })
-      assert.equal(normalizePageQuery({ order: 'asc' }).order, 'asc')
-      assert.equal(normalizePageQuery({ order: 'DESC' }).order, 'desc')
-      assert.equal(normalizePageQuery({ order: 'whatever' }).order, 'desc')
+    it('空 after 应该 省略、非空保留（官方 list 已无 order 参数，我方不再透传）', () => {
+      assert.deepEqual(normalizePageQuery({ after: '' }), { limit: PAGE_SIZE })
+      assert.deepEqual(normalizePageQuery({ after: 'file-api-x' }), { after: 'file-api-x', limit: PAGE_SIZE })
+      // 传了 order 也不进结果：官方 rc.1 的 list() 只接受 after / limit / signal。
+      assert.deepEqual(normalizePageQuery({ order: 'asc' }), { limit: PAGE_SIZE })
     })
   })
 
@@ -68,7 +67,7 @@ describe('dsh-file-manage 纯逻辑', () => {
 
   describe('toFileRow', () => {
     it('普通文件 应该 格式化标签且不标 dsh 角标', () => {
-      const row = toFileRow({ id: 'file-api-one', bytes: 1024, createdAt: 1700000000, filename: 'photo.png', purpose: 'user_data' })
+      const row = toFileRow({ id: 'file-api-one', bytes: 1024, createdAt: 1700000000, filename: 'photo.png' })
       assert.equal(row.id, 'file-api-one')
       assert.equal(row.filename, 'photo.png')
       assert.equal(row.bytes, 1024)
@@ -79,13 +78,13 @@ describe('dsh-file-manage 纯逻辑', () => {
     })
 
     it('dsh- 前缀文件 应该 标自动上传角标', () => {
-      const row = toFileRow({ id: 'file-api-x', bytes: 1, createdAt: 1, filename: DSH_OWNED_FILE_PREFIX + 'abc.png', purpose: 'user_data' })
+      const row = toFileRow({ id: 'file-api-x', bytes: 1, createdAt: 1, filename: DSH_OWNED_FILE_PREFIX + 'abc.png' })
       assert.equal(row.dshOwned, true)
       assert.equal(row.bytes, 1)
     })
 
     it('带到期时间的文件 应该 输出到期标签', () => {
-      const row = toFileRow({ id: 'file-api-y', bytes: 1, createdAt: 1, filename: 'a.png', purpose: 'user_data', expiresAt: 1700000000 })
+      const row = toFileRow({ id: 'file-api-y', bytes: 1, createdAt: 1, filename: 'a.png', expiresAt: 1700000000 })
       assert.match(row.expiresAtLabel ?? '', /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
     })
   })

@@ -9,7 +9,12 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+// Type-only：拉入 ui-renderer 的 SlotRegistry 服务合并（ctx.slots），
+// 以及 sessions / modelDirectories 两个客户端服务的声明（官方 0.1.7 起分散在各包）。
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
@@ -85,14 +90,17 @@ interface ClientAgentScope extends Context {
  * client half 入口：注册 locale 字典 + 两个槽位（开关 / 建议条）。
  * @param ctx - 浏览器侧 Cordis 上下文。
  */
-export function apply(ctx: ClientContext): void {
+export function apply(ctx: Context): void {
   const sessions = ctx.sessions as unknown as ClientSessionScope
   const busyStyles = ensureSuggestBusyStyles()
   ctx.effect(() => () => { busyStyles.remove() }, 'dsh-chat-fim: busy styles')
   const disposeDictionaries = ctx.locale.register('chat-fim', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
   ctx.effect(() => disposeDictionaries, 'dsh-chat-fim: locale dictionaries')
 
-  const injectedFace = (sessionId: SessionId) => {
+  const injectedFace = (rawSessionId: string) => {
+    // 官方 slot 的 `inject` 工厂签名是 `(sessionId: string) => …`（rc.1 契约）；
+    // SessionId 是编译期品牌、运行期就是同一个字符串，故在边界处收口一次。
+    const sessionId = rawSessionId as unknown as SessionId
     const scope = sessions.scope(sessionId)
     if (scope === undefined) {
       throw new Error(`dsh-chat-fim: session "${String(sessionId)}" 没有浏览器 scope`)

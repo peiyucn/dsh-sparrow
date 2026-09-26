@@ -14,7 +14,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import type {} from '@deepseek-ai/dsh-attachment'
+import { requestImageDimensions } from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-agent'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -41,10 +41,10 @@ import { fetchQuota } from './quota.js'
 import { installCodeBuddyWeb } from './web.js'
 import type { TurnUsageView } from './web.js'
 import {
-  foldSessionCredits,
-  sessionViewOf,
-  turnViewOf,
-} from './credits-ledger.js'
+  codebuddyCreditsProjectionDefinition,
+  viewOfCreditsState,
+} from './credits-projection.js'
+import type { CreditsProjectionState } from './credits-projection.js'
 import { createLedgerResolver } from './credits-source.js'
 
 export const name = 'llm-codebuddy-credits'
@@ -82,15 +82,17 @@ export function apply(ctx: Context, config: Config): void {
     { name: 'llm.resolveModelInfo', ok: typeof (ctx.llm as { resolveModelInfo?: unknown } | undefined)?.resolveModelInfo === 'function' },
     { name: 'sessions.get', ok: typeof (ctx.sessions as { get?: unknown } | undefined)?.get === 'function' },
   ])
-  // 会话格式**软判定**：积分重放要逐字段读会话事件，格式换了就是静默读出 0。
+  // 会话格式**软判定**：积分要逐字段读事件里的 `data.message.source.replayState.response.usage.credit`，
+  // 格式换代可能改变事件布局 —— 认错就是静默读出 0。
   // 但它只是展示面 —— 为此把整个 provider（推理）停掉是过度取舍，故这里只告警。
-  // 为什么不能只靠上面的能力门：`snapshotEvents()` 是 `Session` 的**类方法**，
-  // 能力门探不到；格式换代又往往不改 API 形状。详见 src/compat.ts 的说明。
+  // 为什么不能只靠上面的能力门：这是**数据格式**门，不是能力门 —— 格式换代往往不改
+  // API 形状（`sessionProjections.stateOf()` 与 `sessionController.inspect()` 都照常存在、
+  // 照常返回事件流），只是事件里的字段布局变了。能力探测发现不了这一类。
+  // 详见 src/compat.ts 的说明。
   const formatReason = unsupportedSessionFormatReason(hostSessionFormatVersion())
   if (formatReason !== undefined) {
     ctx.logger.warn(`${name}: ${formatReason}；积分可能显示为 0（推理不受影响）`)
   }
-  let current: () => Config = () => config
 
   /**
    * 当前生效模型事实（进程内，完全由 Key 授权下的 /v3/config 填充）。
@@ -113,11 +115,11 @@ export function apply(ctx: Context, config: Config): void {
    * 每请求解析凭据：credentials 缝优先，无缝时整个凭据平面就是进程环境。
    * 引用列表由配置节的 apiKeyEnv 决定（默认对齐官方页面派生名
    * CODEBUDDY_CREDITS_API_KEY），旧引用（CODEBUDDY_API_KEY）兜底——旧版
-   * 存过的 Key 不用重配。
+   * 存过的 Key 不用重配。apiKeyEnv 是 volatile 引用，`.get()` 每次现读最新值。
    */
   const resolveApiKey = async (): Promise<string> => {
     const credentials = ctx.get('credentials')
-    const refs = keyRefs(current())
+    const refs = keyRefs(config.apiKeyEnv.get())
     for (const ref of refs) {
       const hit = credentials !== undefined
         ? (await credentials.resolve(credentialRef(ref)))?.value
@@ -132,16 +134,46 @@ export function apply(ctx: Context, config: Config): void {
 
   /**
    * 会话积分账本：从**会话事件重放**得到，替代早期的进程内 usageLog（重启清零）。
-   * credit 由适配器写进 finish 块的 `replayState.response.usage`（随事件持久化），
-   * 故重启后仍可从事件前缀重放；live 会话走内存日志（同步、零 IO），
-   * 冷会话（重启后未激活）走 sessionController.inspect 读持久化前缀。
+   * credit 由适配器写进 finish 块的 `replayState.response.usage`（随事件持久化）。
+   *
+   * ## ✅ 0.1.7 迁移：改用官方投影，**不再调用被废弃的同步历史读**
+   *
+   * 旧实现读 `Session.snapshotEvents()`——官方自 0.1.7 起把该方法标为
+   * `@deprecated … new calls are prohibited`
+   * （`.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md`）。
+   * 官方给出的替代方向是**把领域状态折成 session projection**：「After resume, ordinary logic
+   * reads the projection or processes the delivered current event instead of looking back
+   * through historical events.」
+   *
+   * 现在 live 路径 = `credits-projection.ts` 的投影单元（注册表逐事件驱动），
+   * 冷会话路径 = `sessionController.inspect()` + 一次性重放（见 `credits-source.ts`）。
+   * **本插件已无任何对 `snapshotEvents` / `eventAt` / `ownEvents` 的调用。**
+   *
+   * 迁移带来的两个附带好处（不是目的，是结果）：
+   *
+   * * **不再需要按 seq 键控的去重表**：注册表的水位保证每条事件只被喂进 `apply` 一次，
+   *   重复读只是读状态，天然幂等；旧实现要靠 seq 键控来防「同一批事件被反复全量折叠」。
+   * * **不再每次读都全量重折**：旧实现每次请求都把整段历史折一遍（O(事件数)），
+   *   客户端流式期间按去抖拉取时是笔实打实的重复开销；现在是 O(1) 读状态。
+   *
+   * 注册走 `ctx.inject(['sessionProjections'], …)` —— **可选依赖**：该服务在组合里缺席时
+   * 什么都不注册，插件主体（推理 provider）照常工作，只是积分降级为「仅冷路径」。
+   * 不放进 `inject` 硬依赖，是因为积分是展示面，不该因它把用户的推理能力一起停掉。
    */
   const ledgers = createLedgerResolver({
-    live: (sessionId, cached) => {
+    live: (sessionId) => {
+      // 软获取：服务缺失即降级（`ctx.get` 而非 `ctx.sessionProjections`，
+      // 后者在未 inject 时会抛，而我们是可选注册）。
+      const registry = ctx.get('sessionProjections') as
+        | { stateOf(session: unknown, key: string): unknown }
+        | undefined
+      if (registry === undefined) return undefined
       const session = ctx.sessions.get(SessionId(sessionId))
       if (session === undefined) return undefined
-      // 增量折叠：只折 cached.asOfSeq 之后的事件（客户端在流式期间高频轮询）。
-      return foldSessionCredits(session.snapshotEvents(), cached)
+      const state = registry.stateOf(session, 'codebuddyCredits')
+      // 未注册（或状态类型不认识）时降级：交给冷路径。
+      if (state === undefined || state === null || typeof state !== 'object') return undefined
+      return viewOfCreditsState(state as CreditsProjectionState)
     },
     inspect: async (sessionId) => {
       // sessionController 只随 web-app bundle 加载，故软获取；缺失即降级为
@@ -152,6 +184,13 @@ export function apply(ctx: Context, config: Config): void {
       if (controller === undefined) return undefined
       return (await controller.inspect(SessionId(sessionId))).events
     },
+  })
+
+  // 投影单元注册：可选依赖 fork——服务出现才注册，本宿主线没有就什么都不做
+  // （fork 是 entry 的子 fiber，不影响 audit 的 entry 列表）。注册随 fiber 释放，
+  // 无需手工反注册（`register()` 的返回值就是 disposer，由 effect 托管）。
+  ctx.inject(['sessionProjections'], (projectionCtx) => {
+    projectionCtx.sessionProjections.register(codebuddyCreditsProjectionDefinition)
   })
 
   // route 条件注册：Key 可用即注册（模型目录可能还是空的——首次打开选择器时
@@ -174,7 +213,7 @@ export function apply(ctx: Context, config: Config): void {
 
   function ambientKey(): boolean {
     const environment = launchEnvironmentOf(ctx)
-    for (const ref of keyRefs(current())) {
+    for (const ref of keyRefs(config.apiKeyEnv.get())) {
       const value = environment.get(credentialRef(ref))?.value
       if (value !== undefined && value.length > 0) return true
     }
@@ -223,18 +262,24 @@ export function apply(ctx: Context, config: Config): void {
     resolveApiKey,
     account: () => account,
     streamIdleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,
-    maxMode: () => current().maxMode === true,
+    maxMode: () => config.maxMode.get() === true,
     // 不再挂 onUsage：记账改由会话事件重放承担（credits-ledger）。适配器把 credit
     // 写进 finish 块的 replayState（随事件持久化），这里再存一份只会重复且重启即失。
     onCatalogRead: () => {
       kickModelRefresh()
     },
-    // 图片字节只经官方附件 seam：按官方 CLI 压缩档派生请求版本（最长边
-    // 2000px + 字节目标，JPEG 质量阶梯由附件服务实现），后端不支持投影时
+    // 图片字节只经官方附件 seam：按官方 CLI 压缩档派生请求版本（总像素预算
+    // 2000×2000 + 字节目标，JPEG 质量阶梯由附件服务实现），后端不支持投影时
     // 退回规范化存储字节（协议仍成立，只是跳过缩放）。
+    // 0.1.7-rc.1 的 `ImageRequestTarget` 是 { width, height, maxBytes }——像素预算
+    // 经官方的 `requestImageDimensions` 换算成保持宽高比的目标尺寸，与官方
+    // llm-pi-ai 的用法逐字一致（`packages/llm/llm-pi-ai/src/context.ts:249-251`）。
     readImage: async (ref, signal) => {
       try {
-        const request = await ctx.attachments.readImageRequest(ref, IMAGE_REQUEST_POLICY, signal)
+        const request = await ctx.attachments.readImageRequest(ref, {
+          ...requestImageDimensions(ref.width, ref.height, IMAGE_REQUEST_POLICY.maxPixels),
+          maxBytes: IMAGE_REQUEST_POLICY.maxBytes,
+        }, signal)
         return { mediaType: request.mediaType, data: request.data }
       } catch {
         const stored = await ctx.attachments.readImage(ref, signal)
@@ -351,7 +396,7 @@ export function apply(ctx: Context, config: Config): void {
     // 整体打断）。
     try {
       const credentials = ctx.get('credentials')
-      const [primary, legacyRef] = keyRefs(current())
+      const [primary, legacyRef] = keyRefs(config.apiKeyEnv.get())
       if (credentials !== undefined && legacyRef !== undefined && legacyRef !== primary) {
         const fresh = await credentials.resolve(credentialRef(primary)).catch(() => undefined)
         const storedLegacy = await credentials.resolve(credentialRef(legacyRef)).catch(() => undefined)
@@ -367,24 +412,17 @@ export function apply(ctx: Context, config: Config): void {
       ctx.logger.warn(`${name}: boot 凭据迁移失败（不阻塞注册）`)
       ctx.logger.warn(error)
     }
-    // 官方行头圆点读整节根部 apiKeyEnv：节根未写时补写（写配置引用的值，
-    // 不覆盖用户已有自定义）；旧版本存的 providers 子树一并清掉——整节型
-    // schema 已不再有该层。
-    try {
-      const settingsBoot = ctx.get('settings')
-      if (settingsBoot !== undefined) {
-        const section = settingsBoot.get(NS) as { apiKeyEnv?: unknown } | undefined
-        const primary = keyRefs(current())[0]
-        const hasApiKeyEnv = typeof section?.apiKeyEnv === 'string' && section.apiKeyEnv.length > 0
-        await settingsBoot.mutate(NS, [
-          ...(hasApiKeyEnv ? [] : [{ op: 'set' as const, path: ['apiKeyEnv'], value: primary }]),
-          { op: 'unset' as const, path: ['providers'] },
-        ]).catch(() => {})
-      }
-    } catch (error) {
-      ctx.logger.warn(`${name}: boot 设置补写失败（不阻塞注册）`)
-      ctx.logger.warn(error)
-    }
+    // 官方行头圆点**不再需要**在 boot 期把 apiKeyEnv 物化进 profile：0.1.7 起
+    // schema 默认值本身就在官方读取路径上（设置页按节根 apiKeyEnv 解析，
+    // `packages/settings/settings/src/index.ts:319` 的 value = 投影后的
+    // `plainConfig(entry.fiber.config)`，含 schema 默认），且 provider 行在
+    // settingsPath 为空时 `configured` 恒真、`removable` 恒假
+    // （`packages/client/ui-settings-models/src/client/store.ts:199-215`）——
+    // 物化不改变任何可见状态。旧版遗留的 `providers` 子树也不再清理：rc.1 的
+    // 设置写入只接受 volatile 路径，非 schema 字段会直接抛
+    // 「Config field "providers" is not volatile」
+    // （`packages/settings/settings/src/index.ts:387-389`）；残留键只是普通配置，
+    // 不进表单（`packages/settings/settings/src/schema.ts:59-67` 按 schema 投影）。
     await refreshAccountWithKey(key)
     // Key 可用即注册 route——模型目录可后补（选择器建目录/状态读取会补拉）。
     try {
@@ -405,7 +443,8 @@ export function apply(ctx: Context, config: Config): void {
   })
 
   // 设置卡片路由：Key 的保存、配额查询、状态。删除走官方行头「移除」
-  // （引用对齐后官方流程会连带清凭据与 profile，installSection onChange 收尾）。
+  // （整节型 provider 的 settingsPath 为空，官方页面本就不提供「移除」，
+  // 凭据清理由本插件的「清空 Key」承担，见 /remove-key）。
   installCodeBuddyWeb(ctx, {
     async keyConfigured() {
       return hasKey()
@@ -427,19 +466,17 @@ export function apply(ctx: Context, config: Config): void {
       // 作废所有仍用旧 Key 的在飞刷新（审计 S2）。
       factsGeneration += 1
       facts = factsFromEntries(entries)
-      const [primary, legacyRef] = keyRefs(current())
+      const [primary, legacyRef] = keyRefs(config.apiKeyEnv.get())
       await credentials.set(credentialRef(primary), key)
       // 旧引用迁移：老版本存在 CODEBUDDY_API_KEY 下的 Key 挪到主引用并清掉旧值。
       if (legacyRef !== undefined && legacyRef !== primary) {
         const legacy = await credentials.resolve(credentialRef(legacyRef)).catch(() => undefined)
         if (legacy?.value !== undefined) await credentials.unset?.(credentialRef(legacyRef))
       }
-      // 官方页面的凭据 join 读 profile.apiKeyEnv：物化到用户层，行头圆点才会
-      // 亮绿；顺带清掉旧版遗留的 providers 子树（整节型 schema 已无该层）。
-      await settings.mutate(NS, [
-        { op: 'set', path: ['apiKeyEnv'], value: primary },
-        { op: 'unset', path: ['providers'] },
-      ])
+      // 官方页面的凭据 join 按节根 apiKeyEnv 解析：把用户当前生效的引用物化到
+      // 用户层（apiKeyEnv 是 volatile 字段，rc.1 的设置写入只认 volatile 路径）。
+      // 旧版遗留的 providers 子树不再清理——非 schema 字段不可写（同理见 boot 段注释）。
+      await settings.mutate(NS, [{ op: 'set', path: ['apiKeyEnv'], value: primary }])
       ensureRoutes(true)
     },
     async reapply() {
@@ -458,7 +495,7 @@ export function apply(ctx: Context, config: Config): void {
       const credentials = ctx.get('credentials')
       const unset = credentials?.unset
       if (credentials !== undefined && typeof unset === 'function') {
-        for (const ref of keyRefs(current())) {
+        for (const ref of keyRefs(config.apiKeyEnv.get())) {
           try {
             await unset.call(credentials, credentialRef(ref))
           } catch {
@@ -478,15 +515,15 @@ export function apply(ctx: Context, config: Config): void {
     async refreshModels() {
       return refreshModelsManually()
     },
-    /** 会话累计积分：从会话事件重放（重启后仍准确）。 */
+    /** 会话累计积分：live 走官方投影状态，冷会话走持久化重放（重启后仍准确）。 */
     async sessionUsage(sessionId) {
-      const ledger = await ledgers.for(sessionId)
-      return ledger === undefined ? EMPTY_USAGE : sessionViewOf(ledger)
+      const view = await ledgers.for(sessionId)
+      return view === undefined ? EMPTY_USAGE : view.session()
     },
     /** 单轮积分：按事件里的 turn 取用（每轮积分胶囊用）。 */
     async turnUsage(sessionId, turn) {
-      const ledger = await ledgers.for(sessionId)
-      return ledger === undefined ? EMPTY_USAGE : turnViewOf(ledger, turn)
+      const view = await ledgers.for(sessionId)
+      return view === undefined ? EMPTY_USAGE : view.turn(turn)
     },
     account: () => ({
       ...(account?.enterpriseName === undefined ? {} : { enterpriseName: account.enterpriseName }),
@@ -524,25 +561,29 @@ export function apply(ctx: Context, config: Config): void {
     },
     active: () => registered,
     models: () => models(),
-    maxMode: () => current().maxMode === true,
+    maxMode: () => config.maxMode.get() === true,
     async setMaxMode(enabled) {
       const settings = ctx.get('settings')
       if (settings === undefined) {
         throw new LlmError(`${name}: 本组合没有设置服务，无法保存 Max 模式`, 'NO_SETTINGS_STORE')
       }
+      // maxMode 是 Config 里的 volatile 字段：设置命名空间 = profile 条目 id（NS），
+      // 且 rc.1 只接受 volatile 路径的写入（`packages/settings/settings/src/index.ts:387-389`）。
       await settings.mutate(NS, [{ op: 'set', path: ['maxMode'], value: enabled }])
     },
   })
 
+  // 设置面接线（0.1.7 新机制）：表单由本插件导出的 `Config` 投影，`settings` 仍是
+  // **可选服务**——`ctx.inject` 起的子级在它缺席时一直挂着，插件其余部分照常运行
+  // （不会让 entry 停在 pending，见根 AGENTS《扩展与宿主兼容》）。本插件自带设置
+  // 界面（Models 页的 provider 卡片），故关掉按 schema 自动生成的配置页，避免同一
+  // 份值在两个界面里编辑（官方 README 原话：
+  // `packages/settings/settings/README.zh.md:39`；官方 llm-deepseek 同款写法：
+  // `packages/llm/llm-deepseek/src/index.ts:60`）。策略不移除配置读写。
   ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, NS, Config, config, {
-      setSource: (source) => {
-        current = source
-      },
-      onChange: () => {
-        // 整节型 provider（settingsPath 为空）官方页面不提供「移除」，凭据
-        // 清理由我们的「清空 Key」承担（/remove-key）；设置变化无需收尾。
-      },
-    })
+    settingsCtx.effect(
+      () => settingsCtx.settings.configure({ auto: false }, ctx.fiber),
+      `${name}: settings page policy`,
+    )
   })
 }

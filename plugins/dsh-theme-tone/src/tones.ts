@@ -11,12 +11,14 @@
 
 import {
   BOTTOM_VARIABLE,
+  GRAIN_ALPHA,
+  GRAIN_ALPHA_VARIABLE,
   GRAIN_TILE_VARIABLE,
   LEFT_VARIABLE,
   PANEL_VARIABLE,
-  POPUP_GRAIN_DATA_URI,
   TOP_STOP_VARIABLE,
   TOP_VARIABLE,
+  grainTileUri,
 } from './constants.js'
 
 /**
@@ -281,8 +283,13 @@ export const SURFACE_RUNGS: Readonly<Record<ColorScheme, Readonly<Record<Surface
  * | `--dsw-alias-bg-layer-2` | 模态对话框（`ui-primitives/Modal.module.css:33`）、`DirectoryBrowser`、`SettingsRoot` |
  * | `--dsw-alias-bg-layer-1` | `OnboardingSurface`、`FeedbackDialog`、`Input`、`JsonTree` 等抬升面 |
  * | `--dsw-specific-tip` | 浮动提示条：`TodoPanel`、`QueueDock`、`GoalBar` |
- * | `--dsw-specific-menu` | 菜单专用别名。官方写的是 `var(--dsw-alias-bg-layer-3)`，覆盖 layer-3 本可
- *   自动跟随；**仍然显式覆盖一份**，这样官方哪天把菜单改指别处，菜单也还在色调里 |
+ * | `--dsw-specific-menu` | 菜单专用别名。**0.1.7 起官方指向 `var(--dsw-menu-surface-fill)`**
+ *   （真机样式表实测；旧版曾指向 `--dsw-alias-bg-layer-3`）—— 所以它现在**不在本表**，
+ *   归 {@link POPUP_TOKENS} 与本体一起染（保住官方玻璃 alpha，且两个名字同值） |
+ *
+ * ⚠️ **`--dsw-specific-menu` 的归属变过一次**：旧版官方把它绑在 `layer-3` 上，那时覆盖 layer-3
+ * 就能连带染到菜单，故只列在本表；0.1.7 官方把它改指 `--dsw-menu-surface-fill` 之后，
+ * **覆盖 layer-3 不再影响菜单**，必须显式染那两个名字（见 {@link POPUP_TOKENS}）。
  *
  * **不染的几处（有意）**：工具提示 `--dsw-alias-tooltip-bg`、轻提示 `--dsw-alias-toast-bg` /
  * `--dsw-alias-button-contrast-fill` 在两轴上都是**反色**（浅色轴上工具提示是深灰），
@@ -297,7 +304,7 @@ export const SURFACE_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRun
 ])
 
 /**
- * **菜单族**那两个 token —— 与 {@link SURFACE_TOKENS} 同一种做法：**只装颜色，不装图层**。
+ * **菜单族**那个 token —— 与 {@link SURFACE_TOKENS} 同一种做法：**只装颜色，不装图层**。
  *
  * ## 为什么曾经装过图层，又为什么撤回来
  *
@@ -312,12 +319,57 @@ export const SURFACE_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRun
  * 同一条 `ellipse 120% 42% at 50% -12%` 落在一条 24px 高的横条上会重新压成一道
  * 带硬边的金色带，与菜单主体对不上（实测：整条几乎全被顶光染满，而主体只在顶部 20%）。
  *
- * 结论：**token 只给颜色**（消费方共享同一个不透明色，小条天然与主体同色），
+ * 结论：**token 只给颜色**（消费方共享同一个色值，小条天然与主体同色），
  * **图层交给 `surface.ts` 的选择器表**（按 role 命中真正的浮层）。代价是那个无 role 的
  * `<ul>` 只拿到颜色、拿不到颗粒与光 —— 已知且记账（见 05-surfaces §8.2）。
+ *
+ * ## ⚠️ 0.1.7 起：颜色也必须**保住官方 alpha**
+ *
+ * 官方该 token 现在是**半透明玻璃色**（浅 `rgba(248,249,250,.58)` / 深 `rgba(67,69,74,.45)`，
+ * 实测官方样式表 `body` 与 `body[data-ds-dark-theme]` 两条规则：`--dsw-menu-surface-fill`
+ * 分别 `#f8f9fa94` / `#43454a73`），浮层自己配 `backdrop-filter: var(--dsw-menu-backdrop-filter)`
+ * （`gradient-shadow-text.css:20`；官方样式规则也要求两者成对出现，见 `docs/web-styling.zh.md:25`）。
+ * 我方若像抬升面那样涂成不透明色，官方玻璃就整块失效 —— 故这里走 {@link washFill}
+ * （**只换 RGB、alpha 一字不动**），既保住色调，也让官方玻璃照常工作。
+ *
+ * ## ⚠️ 为什么**两个 token 都要染**、为什么必须以官方原值为基
+ *
+ * 官方 0.1.7 把菜单表面的填充收进 `--dsw-menu-surface-fill`（`MenuSurface.module.css:26`
+ * 的 `.material` 读它），而 `--dsw-specific-menu` 只是它的**别名**
+ * （实测官方样式表：`body { --dsw-specific-menu: var(--dsw-menu-surface-fill) }`）。
+ * 消费方却两边都有：
+ *
+ * | 谁 | 读哪个 |
+ * | :--- | :--- |
+ * | 官方菜单原语 `.material`（卡片的填充层） | `--dsw-menu-surface-fill` |
+ * | 官方 `ModelSelect` 的 `.groupTitle`、本仓库 codebuddy 的 `.ccb-model-menu` | `--dsw-specific-menu` |
+ *
+ * 只染一个 → **同一张卡片与它自己的粘性标题读到的不是同一个值** →
+ * 标题显成一条色差横带（owner 第四轮报的就是它；深色轴偏差最大，
+ * 因为浅色轴两值本就相同：`.58` 的白，深色轴一个被染、一个是官方蓝灰）。
+ * 故两个都染、且**同值**。
+ *
+ * 基底值以前是从官方样式表**抄下来的快照**，其中深色轴那份抄的是旧版
+ * `rgba(48,49,54,.5)`（0.1.7-rc.1）—— rc.2 已改成 `rgba(67,69,74,.45)`，
+ * 于是连"官方默认"那一档都发着过期色（本插件承诺过官方档=逐像素不介入）。
+ * 本版起快照与官方 rc.2 对齐：**官方档下写进去的就是官方自己的值**。
  */
-export const POPUP_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRung }>[] = Object.freeze([
-  Object.freeze({ token: '--dsw-specific-menu', rung: 'layer3' as const }),
+export const POPUP_TOKENS: readonly Readonly<{
+  token: string
+  official: Readonly<Record<ColorScheme, string>>
+}>[] = Object.freeze([
+  Object.freeze({
+    token: '--dsw-menu-surface-fill',
+    official: Object.freeze({ light: 'rgba(248, 249, 250, 0.58)', dark: 'rgba(67, 69, 74, 0.45)' }),
+  }),
+  // 别名那一半：官方 0.1.7 起 `--dsw-specific-menu: var(--dsw-menu-surface-fill)`，
+  // 但**大量消费方直接读它**（官方 `.groupTitle`、本仓库 codebuddy 的模型菜单），
+  // 而官方的 macOS 分支还会单独改写它（`html[data-platform='darwin'] body`）——
+  // 只改一个名字就会分叉，故两个一起发、发同一个值（理由见上面的表）。
+  Object.freeze({
+    token: '--dsw-specific-menu',
+    official: Object.freeze({ light: 'rgba(248, 249, 250, 0.58)', dark: 'rgba(67, 69, 74, 0.45)' }),
+  }),
 ])
 // ⚠️ `--dsw-specific-tip` **曾在此表**（当它是「菜单族」），现已移出：
 // 它的三个消费方是**三张停靠卡**（TodoPanel / GoalBar / QueueDock），不是菜单；
@@ -677,18 +729,19 @@ export const STATE_TOKENS: readonly Readonly<{
 ])
 
 /**
- * 交互态洗染色值：**只换 RGB，alpha 一字不动**。
+ * 洗染色值：**只换 RGB，alpha 一字不动**。
  * @param tint - 本色通道值（`'R, G, B'`）；`''` → 直通官方字面量。
- * @param scheme - 明暗轴（决定混合比例）。
+ * @param scheme - 明暗轴（决定默认混合比例）。
  * @param official - 官方原字面量（`rgba(r, g, b, a)`）。
+ * @param scale - 混合比例（0–1）；省略时取 {@link WASH_TINT}。菜单族传 `PANEL_TINT`，
+ *   以沿用「浅色轴的面不染色」那条既有口径。
  * @returns CSS 颜色字面量。
  */
-export function washFill(tint: string, scheme: ColorScheme, official: string): string {
-  if (tint === '') return official
+export function washFill(tint: string, scheme: ColorScheme, official: string, scale = WASH_TINT[scheme]): string {
+  if (tint === '' || scale === 0) return official
   const match = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/u.exec(official)
   if (match === null) return official
   const hue = tint.split(',').map(part => Number.parseInt(part.trim(), 10))
-  const scale = WASH_TINT[scheme]
   const mixed = [0, 1, 2].map(i => Math.round(hue[i] * scale + Number(match[i + 1]) * (1 - scale)))
   return `rgba(${mixed[0]}, ${mixed[1]}, ${mixed[2]}, ${match[4]})`
 }
@@ -898,7 +951,19 @@ export const LIGHT_TOKENS: readonly Readonly<{
   }),
   Object.freeze({
     token: GRAIN_TILE_VARIABLE,
-    pick: (tone: ToneSpec) => tone.grain ? POPUP_GRAIN_DATA_URI : 'none',
+    // 贴图里烘的 alpha 由 `GRAIN_ALPHA`（唯一来源）按轴派生 —— 见 constants.ts。
+    pick: (tone: ToneSpec, scheme: ColorScheme) =>
+      tone.grain ? grainTileUri(GRAIN_ALPHA[scheme]) : 'none',
+  }),
+  /**
+   * **颗粒强度的运行期变量** —— 伪元素那种「贴图 + 独立 `opacity`」的颗粒层读它。
+   *
+   * 与上面那张贴图同一个来源（{@link GRAIN_ALPHA}）：owner 说「噪点值统一变量，
+   * 方便后续我们减弱」，所以**两路都从这一处派生** —— 减弱 = 改 `GRAIN_ALPHA` 一个对象。
+   */
+  Object.freeze({
+    token: GRAIN_ALPHA_VARIABLE,
+    pick: (_tone: ToneSpec, scheme: ColorScheme) => String(GRAIN_ALPHA[scheme]),
   }),
 ])
 
@@ -1012,11 +1077,13 @@ export function tokenOverrides(settings: ThemeToneSettings): TokenOverrides {
       dark: surfaceFill(dark.tint, 'dark', rung),
     }
   }
-  // 菜单族：**只给颜色**（图层交给 surface.ts 的选择器表，理由见 POPUP_TOKENS）。
-  for (const { token, rung } of POPUP_TOKENS) {
+  // 菜单族：**只给颜色，且保住官方 alpha**（0.1.7 起该 token 是半透明玻璃色，
+  // 涂不透明会吃掉官方 backdrop-filter；理由见 POPUP_TOKENS）。
+  // 比例用 PANEL_TINT（与抬升面同口径：浅色轴 0 → 直通官方，不在白面上再染一层）。
+  for (const { token, official } of POPUP_TOKENS) {
     overrides[token] = {
-      light: surfaceFill(light.tint, 'light', rung),
-      dark: surfaceFill(dark.tint, 'dark', rung),
+      light: washFill(light.tint, 'light', official.light, PANEL_TINT.light),
+      dark: washFill(dark.tint, 'dark', official.dark, PANEL_TINT.dark),
     }
   }
   // 浅灰内嵌面（代码块 / 三张停靠卡）：**独立通道、独立比例**，取官方自己那一档。

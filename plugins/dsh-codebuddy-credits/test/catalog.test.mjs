@@ -294,16 +294,17 @@ describe('toWireMessages', () => {
       tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'Bash', arguments: '{"cmd":"ls"}' } }],
     })
   })
-  it('tool-result 消息转 role=tool', async () => {
+  it('tool 角色消息转 role=tool（0.1.7-rc.1：工具结果是独立消息，toolCallId 在根部）', async () => {
     const messages = await toWireMessages({
       provider: 'codebuddy-credits',
       model: 'hy3',
       messages: [
         {
           id: 'm1',
-          role: 'user',
-          content: [{ type: 'tool-result', toolCallId: 'call-1', content: [{ type: 'text', text: 'ok' }] }],
+          role: 'tool',
+          content: [{ type: 'text', text: 'ok' }],
           source: { kind: 'tool', callId: 'call-1' },
+          toolCallId: 'call-1',
         },
       ],
     })

@@ -20,12 +20,28 @@ import {
 } from '../lib/glass.js'
 /** 浅色轴暗边用的官方最深静态色 token。 */
 const SHADE_TOKEN = '--dsw-static-neutral-bluish-1000'
-import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_TILE_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, SIDE_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
-import { BACKDROP_GRADIENTS, dimmedBackdropGradients } from '../lib/backdrop.js'
+import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_TILE_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, SIDE_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
+import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, dimmedBackdropGradients } from '../lib/backdrop.js'
 
 const css = buildGlassCss()
 // 注释里也会出现 `{` 这类结构字符，对全文做结构断言会误判，故先剥注释。
 const rules = css.replace(/\/\*[\s\S]*?\*\//gu, '')
+
+/**
+ * 取**右边栏那条图层规则**的起点（已剥注释）。
+ *
+ * ⚠️ 0.1.7 起这条规则是**三条选择器共用同一段声明**：
+ * `[data-sidebar-right-panel], [data-dockkit-pane], [data-dockkit-empty]` ——
+ * 因为右边栏改由 dockkit 承载，真正刷不透明底色的是它的内容宿主
+ * `[data-dockkit-pane]`（画在 `.panel` 上会被那层整个盖掉）。
+ * 故定位用**选择器组的首行**（`[data-sidebar-right-panel],`），不能写成
+ * `[data-sidebar-right-panel] {`（那个串已不存在）。
+ * @param source - 已剥注释的样式表文本。
+ * @returns 该规则的起始下标（找不到为 -1）。
+ */
+function rightPanelRuleStart(source) {
+  return source.indexOf(`[${RIGHT_PANEL_ATTR}],`)
+}
 
 /**
  * 取**输入框卡片**那条规则（已剥注释）。
@@ -41,22 +57,108 @@ const cardRule = (text) => {
   return clean.slice(start, clean.indexOf('}', start))
 }
 
+/**
+ * 取所有**选择器里含 needle 的规则**（选择器 + 声明）—— 用大括号配平切规则。
+ *
+ * ⚠️ 2026-09-24 起卡片/顶栏的玻璃搬到了 `::before` 上，`cardRule` 那种
+ * 「从选择器切到第一个 `}`」的取法只能拿到**本体**那一条；要断言玻璃本体得用本函数。
+ * @param text - 样式表文本（注释会被剥掉）。
+ * @param needle - 选择器片段。
+ * @returns 命中规则的文本数组（每项含选择器与整段声明）。
+ */
+const rulesFor = (text, needle) => {
+  const clean = text.replace(/\/\*[\s\S]*?\*\//gu, '')
+  const out = []
+  let i = 0
+  while ((i = clean.indexOf(needle, i)) !== -1) {
+    const open = clean.indexOf('{', i)
+    if (open === -1) break
+    let depth = 0
+    let end = open
+    for (; end < clean.length; end++) {
+      if (clean[end] === '{') depth += 1
+      else if (clean[end] === '}') {
+        depth -= 1
+        if (depth === 0) break
+      }
+    }
+    out.push(clean.slice(clean.lastIndexOf('}', i) + 1, end + 1))
+    i = end + 1
+  }
+  return out
+}
+
+/** 卡片**玻璃层**（`[data-composer-card]::before`）的全部规则。 */
+const cardGlassRule = (text) => rulesFor(text, '[data-composer-card]::before').join('\n')
+
+/**
+ * 卡片玻璃层里那条**通用（深色轴）**规则 —— 光路形状的基准。
+ *
+ * 浅色轴那条只覆盖 `background-image`（阴影浓度不同），两条都被 `cardGlassRule` 收进来时
+ * 椭圆数会翻倍，故几何类断言取通用那条。
+ * @param text - 样式表文本。
+ * @returns 通用玻璃层规则的文本。
+ */
+const cardGlassBaseRule = (text) =>
+  rulesFor(text, '[data-composer-card]::before').find((r) => !r.includes(':not([data-ds-dark-theme])')) ?? ''
+
+/** 卡片**本体**（不含 ::before / ::after 伪元素）的全部规则。 */
+const cardElementRule = (text) =>
+  rulesFor(text, '[data-composer-card]')
+    .filter((r) => !/::before|::after/u.test(r.slice(0, r.indexOf('{'))))
+    .join('\n')
+
 // 玻璃效果依赖几个**公开 DOM 锚点**（官方自己的 CSS 也依赖它们）：
-//   [data-phase] / [data-slot='conversation.session.header'] /
-//   [data-conversation-scroll] / [data-composer-seat]
+//   [data-phase] / [data-slot='conversation.header'] / [data-conversation-scroll] /
+//   [data-composer-seat]
 // 以及一个**魔法数字** 76px（顶栏高度）。这些耦合是这套效果最脆的地方，逐条钉住。
+//
+// ⚠️ 顶栏那条锚点在 0.1.7 换了（owner 真机报「顶栏崩了」的根因）：
+//   0.1.5-rc.2 里 `conversation.session.header` 的产出物**直接是 .root 的子元素**，
+//   故打 `> *` 命中它；0.1.7-rc.1 把它嵌进 `<header data-slot='conversation.header'>`，
+//   而那个会话槽位自己是 display:contents —— `> *` 于是命中了官方的 .titleRow，
+//   把标题行抽成绝对定位浮层、`<header>` 塌成 10px（实测 40px → 10px）。
+//   现在的规则打**真正生成盒子的那个 `<header>`**，下面的回归守卫钉住这一点。
 describe('glass：顶栏浮层', () => {
   it('三处改动应该 同时存在（少一个正文首行会被顶栏盖住）', () => {
     assert.match(css, /\[data-phase='active'\]\s*\{[^}]*position: relative/u, '① 需要定位祖先')
     assert.match(
       css,
-      /\[data-slot='conversation\.session\.header'\] > \*[\s\S]*?position: absolute/u,
-      '② 顶栏要浮起来',
+      /\[data-slot='conversation\.header'\] > header[\s\S]*?position: absolute/u,
+      '② 顶栏要浮起来（打在官方那个 <header> 上）',
     )
+    // ③ 滚区顶部要补出顶栏高度 —— **必须是 border-top，不能是 padding-top**。
+    //    owner 2026-09-26 报「顶栏透明后，右侧滚动条也会跑上去」：滚动条画在滚动容器的
+    //    **padding box** 上，padding-top 只推内容、不推它 ⇒ 轨道与滑块仍从 y=0 起画，
+    //    前 76px 落在半透明顶栏下面 ⇒ 透出来。官方顶栏**在流内**，滚区天然从 76 起。
+    //    真机实测（滑块染不透明橙，只在滚动条那一列扫描）：
+    //      官方默认档        clientHeight=680，滑块顶端 y=78（= 76 + 官方轨道 2px）
+    //      padding-top: 76   clientHeight=756，滑块顶端 y=0（画进顶栏带）
+    //      border-top: 76    clientHeight=680，滑块顶端 y=78  ← 与官方逐项相同
     assert.match(
       css,
-      new RegExp(`\\[data-conversation-scroll\\][\\s\\S]*?padding-top: ${HEADER_HEIGHT_PX}px`, 'u'),
-      '③ 滚区顶部要补出顶栏高度',
+      new RegExp(`\\[data-conversation-scroll\\][\\s\\S]*?border-top: ${HEADER_HEIGHT_PX}px solid transparent`, 'u'),
+      '③ 滚区顶部补出顶栏高度，且必须用**透明 border-top**（padding-top 不推滚动条）',
+    )
+    assert.ok(
+      !/\[data-conversation-scroll\][^}]*padding-top/u.test(rules),
+      '不得再用 padding-top 顶开顶栏 —— 它推不动滚动条，会让滚动条画进顶栏（owner 报过）',
+    )
+    // 与上一条配对：border 只是把 padding box 下移，**不能**让元素被撑高 76px。
+    // 官方 .scrollBody 是 content-box 且无边框，本插件引入边框后必须显式声明同一口径。
+    assert.match(
+      css,
+      new RegExp(`\\[data-conversation-scroll\\][\\s\\S]*?box-sizing: content-box`, 'u'),
+      '④ 必须与 border-top 配对声明 box-sizing: content-box（否则边框把滚区撑高 76px）',
+    )
+  })
+
+  it('⛔ 顶栏不许再打 `conversation.session.header` 的子元素（0.1.7 起会打崩官方顶栏）', () => {
+    // 回归守卫：0.1.7-rc.1 里该槽位是 display:contents、其子元素是官方 .titleRow，
+    // 绝对定位它会让 <header> 塌成 10px（实测 40 → 10），顶栏整条崩掉。
+    assert.ok(
+      !/data-slot='conversation\.session\.header'\]\s*>\s*\*/u.test(css),
+      '顶栏规则不得再打 conversation.session.header 的直接子元素',
     )
   })
 
@@ -85,10 +187,35 @@ describe('glass：顶栏浮层', () => {
     // 就吃不到了（owner：「怎么顶栏的金光没有了」）。所以要自己画一遍，且必须**同源**。
     // ⚠️ 光还要按顶栏自己的填充 alpha 同步压：底乘 70%、光却是满的 → 那一片比周围亮一截
     //（owner 对底座那处说的「相当于两层光了」是同一个毛病，顶栏半透明同样逃不掉）。
-    const header = css.slice(css.indexOf('session.header'), css.indexOf('}', css.indexOf('session.header')))
+    // 锚点用 0.1.7 起的那条（conversation.header > header）—— 见本文件顶部的结构对照。
+    // ⚠️ 2026-09-24 起玻璃挂 **::before**（本体不许带 backdrop-filter，见下面那条守护）。
+    const header = rulesFor(css, "[data-slot='conversation.header'] > header::before").join('\n')
+    assert.ok(header.length > 0, '顶栏玻璃层（::before）应存在')
     assert.ok(header.includes(dimmedBackdropGradients(GLASS_HEADER_ALPHA)), '顶栏的光必须按同一 alpha 压')
     assert.match(header, /background-attachment: fixed/u, '必须 fixed —— 否则 76px 高的盒子会把渐变重新缩放成硬边带')
     assert.match(header, /background-color: color-mix/u, '玻璃填充仍在（背景色与渐变分层）')
+  })
+
+  it('⛔ 顶栏本体与卡片本体**都不得**带 backdrop-filter —— 会把官方弹层的模糊关进子树', () => {
+    // owner 2026-09-24 真机报「弹层全透明 / 分区标题带子串色 / 联想对话框全透明」的根因：
+    // 带 backdrop-filter（非 none）的元素会成为**它后代的 backdrop root**，同时成为
+    // position: fixed 后代的包含块。而官方弹层就渲染在顶栏 / 输入卡子树里
+    //（官方 InputBar 用 closest('[data-composer-card]') 给触发器菜单找锚，
+    //  顶栏动作区的弹层锚点见 surface.ts 的 MENU_MATERIAL_ANCHORS）——
+    // 于是弹层自己的 `backdrop-filter: var(--dsw-menu-backdrop-filter)`（官方 blur(40px)）
+    // 只能采样子树，模糊失效，只剩半透明底色 → 看着就是「全透明 + 串色」。
+    // 玻璃因此一律挂 ::before：伪元素没有后代，不会把官方弹层关进去。
+    const headerElement = rulesFor(css, "[data-slot='conversation.header'] > header")
+      .filter((r) => !/::before|::after/u.test(r.slice(0, r.indexOf('{'))))
+      .join('\n')
+    assert.ok(headerElement.length > 0, '顶栏本体规则应存在')
+    assert.ok(!headerElement.includes('backdrop-filter'), '顶栏本体不得带 backdrop-filter（backdrop root）')
+    const cardElement = cardElementRule(css)
+    assert.ok(cardElement.length > 0, '卡片本体规则应存在')
+    assert.ok(!cardElement.includes('backdrop-filter'), '卡片本体不得带 backdrop-filter（backdrop root）')
+    // 而玻璃本身必须还在（只是换了挂载点）
+    assert.ok(rulesFor(css, "[data-slot='conversation.header'] > header::before").join('').includes('backdrop-filter'))
+    assert.ok(cardGlassRule(css).includes('backdrop-filter'))
   })
 
   it('⛔ 右边栏**不得**用 background-attachment: fixed —— transform 会让它静默改判定位区', () => {
@@ -103,39 +230,39 @@ describe('glass：顶栏浮层', () => {
     //
     // 实测（面板几何完全相同，逐像素与「无面板」参照比对）：
     //   静止 + fixed + at 50% → mad 0.2（对）；动画 + fixed + at 50% → mad 26.4 / max 90（错）。
-    const panel = rules.slice(rules.indexOf(`[${RIGHT_PANEL_ATTR}] {`))
+    const panel = rules.slice(rightPanelRuleStart(rules))
     const body = panel.slice(0, panel.indexOf('}') + 1)
     assert.ok(!/background-attachment:\s*fixed/u.test(body), 'fixed 在 transform 下会改判定位区')
     assert.match(body, /background-attachment: scroll;/u, '附着用 scroll（与元素盒一致，恒定）')
     assert.ok(body.includes(BACKDROP_GRADIENTS), '光仍与背景层同源')
   })
 
-  it('右边栏改用「显式视口尺寸的背景盒」——三个 per-layer 属性都必须给足 4 个值', () => {
+  it('右边栏改用「显式视口尺寸的背景盒」——三个 per-layer 属性都必须给足 3 个值', () => {
     // 替代方案：不用 fixed，而是把图片盒**显式**写成 100vw×100vh 并右对齐。
     // .panel 是 position:absolute; right:0，承载它的 frame 全窗宽 → 面板右缘恒等于视口右缘，
     // 于是该盒恰好覆盖视口，at 50% 落在视口中心；两种 transform regime 同解，没有可切换的东西。
     //
-    // ⚠️ 三个 per-layer 属性（size / position / repeat）**都必须给足 4 个值**：
+    // ⚠️ 三个 per-layer 属性（size / position / repeat）**都必须给足层数**：
     // 值少于层数时会**按顺序循环补齐**（本插件栽过 —— 写「scroll, fixed」等于两者交替，
     // 第 1、3 段渐变退回按元素盒解析）。所以这里逐个钉住。
-    const panel = rules.slice(rules.indexOf(`[${RIGHT_PANEL_ATTR}] {`))
+    // 层数现在是 **3**（颗粒已改为独立的 ::after，不再占背景层 —— 见下一条用例）。
+    const panel = rules.slice(rightPanelRuleStart(rules))
     const body = panel.slice(0, panel.indexOf('}') + 1)
     const decl = (prop) => {
       const m = body.match(new RegExp(`${prop}\\s*:\\s*([^;]+);`, 'u'))
       assert.ok(m, `${prop} 缺失`)
       return m[1].split(',').map(s => s.trim())
     }
-    assert.equal(decl('background-size').length, 4, 'background-size 必须 4 个值')
-    assert.equal(decl('background-position').length, 4, 'background-position 必须 4 个值')
-    assert.equal(decl('background-repeat').length, 4, 'background-repeat 必须 4 个值')
+    assert.equal(decl('background-size').length, 3, 'background-size 必须 3 个值（= 层数）')
+    assert.equal(decl('background-position').length, 3, 'background-position 必须 3 个值（= 层数）')
+    assert.equal(decl('background-repeat').length, 3, 'background-repeat 必须 3 个值（= 层数）')
     // 三段渐变的盒子尺寸必须是**显式视口尺寸**（auto 会让盒宽随 regime 变）
-    assert.deepEqual(decl('background-size').slice(1), ['100vw 100vh', '100vw 100vh', '100vw 100vh'],
+    assert.deepEqual(decl('background-size'), ['100vw 100vh', '100vw 100vh', '100vw 100vh'],
       '三段渐变必须显式 100vw 100vh')
-    // 渐变右对齐（右缘 = 视口右缘）；颗粒层锚到视口原点以对齐相位
-    assert.deepEqual(decl('background-position').slice(1), ['right top', 'right top', 'right top'],
+    // 渐变右对齐（右缘 = 视口右缘）
+    assert.deepEqual(decl('background-position'), ['right top', 'right top', 'right top'],
       '三段渐变右对齐')
-    assert.match(decl('background-position')[0], /100vw/u, '颗粒层须用 calc 消掉元素偏移')
-    assert.deepEqual(decl('background-repeat'), ['repeat', 'no-repeat', 'no-repeat', 'no-repeat'])
+    assert.deepEqual(decl('background-repeat'), ['no-repeat', 'no-repeat', 'no-repeat'])
   })
 })
 
@@ -216,19 +343,25 @@ describe('glass：输入框底座', () => {
     assert.ok(!body.includes('backdrop-filter'), '不透带不模糊')
   })
 
-  it('拖拽条必须被压回顶栏下缘以下 —— 顶栏浮层化后 .body 从 y=0 起，光带会爬进顶栏', () => {
-    // owner：「官方这个调整宽度的条，现在咱们顶栏也盖不住了。」
-    // 官方 .widthHandle 长在 .body 里（top: 0），而官方顶栏在流内占 76px → 光带天然落在顶栏下方。
-    // 我们的顶栏改成 absolute 浮层后 .body 从 0 起 → 光带爬进顶栏区（04-glass §4 早记为已知副作用）。
-    const idx = rules.indexOf(`[${WIDTH_HANDLE_ATTR}] {`)
-    assert.ok(idx >= 0, '必须有拖拽条那条规则')
-    const body = rules.slice(idx, rules.indexOf('}', idx))
-    assert.match(body, new RegExp(`top: ${HEADER_HEIGHT_PX}px`, 'u'), `要压回顶栏下缘（${HEADER_HEIGHT_PX}px）`)
-    // 只动 top —— bottom / 宽度都是官方几何，动了就改变可拖范围
-    assert.ok(!/bottom\s*:/u.test(body), '不得动 bottom（会改变可拖范围）')
-    assert.ok(!/width\s*:|height\s*:/u.test(body), '不得动宽度 / 高度')
-    // AppFrame 那条手柄没有光带，不该跟着动（它靠 data-side 认，在 frame 里）
-    assert.ok(!body.includes(String(SIDE_ATTR)), '这条只该锚 data-width-handle，不该碰 data-side')
+  it('拖拽条只裁上段（恢复官方几何），且**不得**动它的指针基准', () => {
+    // owner 2026-09-24：「左右边宽度拖动条**在顶栏依然穿模**」—— 顶栏浮层化的副作用：
+    // 官方 .widthHandle 是 .body 里的 absolute + top:0/bottom:0，官方顶栏在流内占 76px，
+    // 所以光带只在顶栏下缘以下；本插件把顶栏改成浮层后 .body 从 0 起，那截就透过半透明顶栏显出来。
+    // ✅ 现在的做法 = 把盒子**还原成官方那一份**（[76,720]），几何基准与官方完全一致。
+    // ⛔ 仍然**不许**碰 `--dsh-width-handle-pointer-y`：官方那套 calc(var(...) ± 36px) 必须
+    //    继续按盒子解析，hover / 拖拽时写真实 clientY 的是官方与 nav-pin（不是本插件）。
+    const handleRules = rulesFor(css, `[${WIDTH_HANDLE_ATTR}]`).filter((r) => r.includes('top:'))
+    assert.equal(handleRules.length, 1, `应恰好有一条拖拽条裁切规则，实际 ${handleRules.length}`)
+    const clip = handleRules[0]
+    const body = clip.slice(clip.indexOf('{') + 1, clip.lastIndexOf('}'))
+    assert.match(body, /top: 76px/u, '只裁上段：top 取官方顶栏高度')
+    assert.ok(!body.includes('--dsh-width-handle-pointer-y'), '不得改写官方指针变量（那是 nav-pin 的职责）')
+    assert.ok(!/height|bottom/u.test(body), '不动高度/下缘 —— 只把上段让给顶栏')
+    // 只在「顶栏被浮层化」的那个状态出现：色调档 + active 相位
+    const selector = clip.slice(0, clip.indexOf('{'))
+    assert.match(selector, new RegExp(`:not\\(\\[${PLAIN_ATTR}\\]\\)`, 'u'), '必须带官方默认门')
+    assert.match(selector, /\[data-phase='active'\]/u, '必须限定 active 相位（hero 下官方顶栏就在流内）')
+    // ⚠️ backdrop.ts 里另有一条 `[data-width-handle] { z-index: 82 }`：只抬层级，不动几何，合法。
   })
 
   it('不得给底座写 position —— 本选择器 (0,3,1) 比官方 (0,3,0) 高，写了就会顶掉 sticky', () => {
@@ -261,10 +394,11 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // ⚠️ 必须 round —— 直接 `0.58 * 100` 会得到 `57.99999999999999`，与 CSS 里的 `58%` 对不上
     // （实现侧的 `pct()` 是 `Math.round(alpha * 100)`，两边得用同一种取整）。
     assert.match(css, new RegExp(`${Math.round(GLASS_CARD_ALPHA * 100)}%, transparent`, 'u'))
-    // 玻璃的**形状**必须等于卡片（靠卡片自己的 backdrop-filter）——
-    // 这是 owner 那条架构要求的落点：「应该改变的是**输入框本身**，不是靠夹层」。
-    const card = cardRule(css)
-    assert.match(card, /backdrop-filter/u, '卡片自己承担模糊（不再靠底座上的夹层）')
+    // 玻璃的**形状**必须等于卡片 —— 靠卡片自己那条 ::before 的 backdrop-filter
+    //（不是底座上的夹层；2026-09-24 起也从卡片**本体**挪到伪元素，理由见上面的 backdrop root 守护）。
+    const card = cardGlassRule(css)
+    assert.match(card, /backdrop-filter/u, '卡片自己的玻璃层承担模糊（不是底座夹层、也不挂本体）')
+    assert.match(card, /border-radius: inherit/u, '伪元素必须继承卡片的 22px 圆角，否则玻璃画成方角')
   })
 
   it('卡片的不透明度必须留出可辨的透出量（太高就等于实色，模糊看不见）', () => {
@@ -308,7 +442,9 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // 又说「液态玻璃效果好像不只是上面加亮条，你可以看看苹果的设计。」
     // Apple 的材质是 `specular highlights, refraction` —— 高光沿玻璃的**整圈边缘**、
     // 随主光方向强弱不同；四条等亮那是**塑料描边**，不是玻璃。
-    const card = cardRule(css)
+    // ⚠️ 2026-09-24：inset 环与玻璃同在 **::before**（放本体会被玻璃层埋掉 ——
+    //   owner 报的「输入框玻璃效果改坏了，边缘光效和之前不同」就是它）。
+    const card = cardGlassBaseRule(css)
     for (const { key } of GLASS_SPECULAR_RING) {
       assert.ok(card.includes('inset '), `卡片应有 ${key} 方向的 inset 阴影`)
     }
@@ -321,7 +457,9 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // owner 连问：「**左边是满光么？？**」「**上边应该也不是均匀的光条吧？**」。
     // `inset box-shadow` 每条边**天生均匀** —— 只能做「一圈等亮的壁」，
     // 做不出「光从左上方来、沿边衰减」。所以主光改用 `background-image` 的细长椭圆。
-    const card = cardRule(css)
+    // ⚠️ 2026-09-24 起这条 background-image 在**卡片的 ::before**（玻璃层）上；
+    //    几何取通用那条（浅色轴只换阴影浓度、椭圆形状同源）。
+    const card = cardGlassBaseRule(css)
     assert.match(card, /background-image:/u, '沿边衰减的光应写在 background-image 里')
     // 两条椭圆都锚在**左上角**（光源处），这样左上角最亮、向右向下各自衰减
     const anchored = card.match(/radial-gradient\([^;]*?at 0% 0%/gu) ?? []
@@ -382,7 +520,9 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // 而 `linear-gradient` 画的是**直线带** —— 到圆角处被裁断，**光绕不过圆角**。
     // `inset` 阴影沿元素自身的圆角轮廓走，天然绕圈 —— 现在它负责**一圈底光**
     // （右下角那一带靠它，椭圆到不了），主光则交给 background-image 的椭圆。
-    const card = cardRule(css)
+    // ⚠️ 2026-09-24：inset 环与玻璃同在 **::before** —— 放本体（背景/box-shadow 先画）
+    //   会被后画的负 z-index 玻璃层整个埋掉，正是 owner 报的「边缘光效和之前不同了」。
+    const card = cardGlassBaseRule(css)
     assert.match(card, /box-shadow:/u, '底光应写在 box-shadow 里')
     assert.ok(!/background-image:[^;]*linear-gradient/u.test(card), '直线带画不出圆角（不得用 linear-gradient 画边光）')
     const insets = card.match(/inset /gu) ?? []
@@ -420,7 +560,8 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // ③ 左缘（迎光侧）不该有阴影
     assert.ok(!shade.includes('left'), '左缘是迎光侧，不该有阴影')
     // ④ 上缘与左缘都要有**主光** —— 在渐变层里（两条椭圆，都锚左上角）
-    const card = cardRule(css)
+    // ⚠️ 2026-09-24 起渐变层在卡片的 ::before（玻璃层）上；取通用那条。
+    const card = cardGlassBaseRule(css)
     const ellipses = card.match(/radial-gradient\([^;]*?at 0% 0%/gu) ?? []
     assert.equal(ellipses.length, 2, '主光应有两条椭圆（上缘一条、左缘一条）')
     assert.ok(GLASS_EDGE_TOP.alpha > 0, '上缘应有主光')
@@ -482,10 +623,15 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('卡片填充必须用 longhand —— background 简写会重置其他背景层', () => {
-    const card = cardRule(css)
-    assert.match(card, /background-color:/u, '填充应写成 background-color')
-    assert.ok(!/\bbackground:/u.test(card), '不得用 background 简写')
-    assert.ok(card.includes(`backdrop-filter: ${GLASS_CARD_BLUR}`), '卡片应带自己的模糊档')
+    // 填充/模糊都在卡片的 ::before（玻璃层）上；**本体**另有一条「background-color: transparent」
+    // 用来给官方那条不透明实色让位 —— 两处都只许 longhand。
+    const glass = cardGlassRule(css)
+    assert.match(glass, /background-color:/u, '填充应写成 background-color')
+    assert.ok(!/\bbackground:/u.test(glass), '不得用 background 简写')
+    assert.ok(glass.includes(`backdrop-filter: ${GLASS_CARD_BLUR}`), '玻璃层应带自己的模糊档')
+    const element = cardElementRule(css)
+    assert.ok(!/\bbackground:/u.test(element), '本体让位也不得用 background 简写')
+    assert.match(element, /background-color: transparent/u, '本体必须让出底色（官方那条是不透明实色）')
   })
 
   it('模糊应该 收到「通透」那一档（太大 → 抹掉背后形状，像磨砂塑料而非玻璃）', () => {
@@ -561,14 +707,27 @@ describe('glass：边界与纪律', () => {
   it('except 右边栏与卡片，规则应该 限定在 active 相位（hero / settling 下顶栏是隐藏的，补 76px 会把正文顶下去）', () => {
     // **例外一**：右边栏（`[data-sidebar-right-panel]`）在**所有相位**都存在
     // （hero 页也能开文件面板），所以它那条不该限定 active。
-    const EXEMPT = `[${RIGHT_PANEL_ATTR}]`
+    // 它的**内容宿主**同理：dockkit 的 `[data-dockkit-pane]` / `[data-dockkit-empty]`
+    // 是真正刷底色的那两层，面板在任何相位都要着色 —— 一并豁免。
+    const EXEMPT = [`[${RIGHT_PANEL_ATTR}]`, '[data-dockkit-pane]', '[data-dockkit-empty]']
     // **例外二**：卡片那两条走 `:is(active, hero)` —— 首页也要玻璃（见下一条用例）。
     // 这里断言其余规则**逐个**都是**单** active 相位，别顺手放宽了别的。
     const CARD = '[data-composer-card]'
+    // **例外三**：官方那些**吸顶遮罩行**（`[data-disclosure-row]`，展开的 Think 行）——
+    // 它们在**滚区内部**，与顶栏相位无关（hero 下也能展开），所以不带 active 门。
+    // 它们要的是「底色等于它盖住的内容底」，而地面在任何相位都着色。
+    const DISCLOSURE = '[data-disclosure-row]'
     const blocks = rules.split('}').filter(block => block.includes('{'))
     for (const block of blocks) {
       const selector = block.slice(0, block.indexOf('{')).trim()
-      if (selector === '' || selector.includes(EXEMPT) || selector.includes(CARD)) continue
+      if (selector === '' || EXEMPT.some(e => selector.includes(e)) || selector.includes(CARD)) continue
+      if (selector.includes(DISCLOSURE)) {
+        assert.ok(
+          selector.includes('[data-expanded]') && selector.includes('[data-open]'),
+          `吸顶遮罩行必须收窄到官方加底的那个状态：${selector}`,
+        )
+        continue
+      }
       assert.match(selector, /\[data-phase='active'\]/u, `规则「${selector}」必须限定 active 相位`)
       assert.ok(!selector.includes(':is('), `规则「${selector}」不得放宽相位 —— 只有卡片两条可以`)
     }
@@ -583,11 +742,12 @@ describe('glass：边界与纪律', () => {
     for (const phase of GLASS_CARD_PHASES) {
       assert.match(css, new RegExp(`\\[data-phase='${phase}'\\]`, 'u'), `卡片规则应覆盖 ${phase} 相位`)
     }
-    // 三条卡片规则（深轴 / 浅轴 / 未选工作区）都得带相位门。
+    // 卡片规则（深轴本体 + 深轴玻璃层 + 浅轴本体 + 浅轴玻璃层 + 未选工作区）都得带相位门。
     // ⚠️ 第三条（待启动态）**也必须覆盖 hero** —— 「未选工作区」就发生在 hero 页
     // （`InputBar` 的 workspaceTrigger 条件：inert && !removed && onRequestWorkspace）。
+    // 2026-09-24 起玻璃拆成「本体 + ::before」两条，故由 3 条变 5 条。
     const cardBlocks = rules.split('}').filter(b => b.includes('[data-composer-card]'))
-    assert.equal(cardBlocks.length, 3, '卡片应有深轴 / 浅轴 / 待启动态三条规则')
+    assert.equal(cardBlocks.length, 5, '卡片应有深轴（本体 + 玻璃层）/ 浅轴（本体 + 玻璃层）/ 待启动态五条规则')
     for (const block of cardBlocks) {
       const selector = block.slice(0, block.indexOf('{')).trim()
       for (const phase of GLASS_CARD_PHASES) {
@@ -618,16 +778,63 @@ describe('glass：边界与纪律', () => {
     // 根因：为不被抬到 81 的内容层盖住，右边栏被抬到了 82 —— 而背景层在 80，
     // 于是它**跑到背景层上面**，底色被 token 染对了、但那层**光与颗粒吃不到**。
     // 修法：让它自己叠一遍背景层那套（与顶栏同一思路；区别是顶栏半透明、它是不透明实色底）。
-    const start = rules.indexOf(`[${RIGHT_PANEL_ATTR}] {`)
+    const start = rightPanelRuleStart(rules)
     assert.ok(start > 0, '应能找到右边栏规则')
     const rule = rules.slice(start, rules.indexOf('}', start))
     assert.match(rule, /background-image:/u, '右边栏应自己叠光与颗粒')
     // 必须用与背景层**同源**的渐变串（不复制粘贴数值）
     assert.ok(rule.includes(BACKDROP_GRADIENTS), '应复用 BACKDROP_GRADIENTS（与背景层同源）')
-    assert.ok(rule.includes(GRAIN_TILE_VARIABLE), '应叠颗粒层')
+    // ⚠️ 颗粒**不许**当普通背景层（owner 真机报「6 个色调背景依然没改好」的那条竖线）：
+    // 背景层的颗粒走 ::after + opacity + 深色轴 mix-blend-mode: screen，
+    // 而正常合成的第 4 层会**同时压暗**黑像素 —— 两者质感不同，交界即竖线。
+    assert.ok(!rule.includes(GRAIN_TILE_VARIABLE), '不得把颗粒当普通背景层（质感与背景层对不上）')
     // ⚠️ 不得写 background 简写 —— 那会把官方的 bg-base 底色一起重置
     assert.ok(!/\bbackground:/u.test(rule), '不得用 background 简写（会重置官方底色）')
     assert.ok(!rule.includes('background-color:'), '不该动官方底色（它已被 token 染对）')
+    // ⚠️ 0.1.7：必须**同时**覆盖 dockkit 的内容宿主，否则被它的不透明底色整个盖掉
+    //（owner 真机报「右边栏完全没适配」）。
+    assert.ok(
+      rule.includes('[data-dockkit-pane]'),
+      '右边栏图层必须画到 [data-dockkit-pane] 上 —— dockkit 的内容宿主才是不透明那层',
+    )
+    assert.ok(rule.includes('[data-dockkit-empty]'), '空态宿主（[data-dockkit-empty]）同样要覆盖')
+  })
+
+  it('右边栏的颗粒必须与背景层**同构**（::after + opacity + 同混合模式）', () => {
+    // owner：「另外咱们 6 个色调背景问题依然没改好」——右边栏与会话区之间那条竖直分界线。
+    // 根因：背景层颗粒 = ::after + opacity +（深色轴）mix-blend-mode: screen（纯加法，只加亮）；
+    // 而本模块曾把颗粒当**第 4 个背景层正常合成**（会同时压暗黑像素）→ 两侧质感差一档。
+    // 修法：面板侧也改成 ::after，并与背景层**逐项对齐**（贴图 / opacity / 混合模式）。
+    const afterStart = rules.indexOf('[data-dockkit-pane]::after')
+    assert.ok(afterStart > 0, '应有一条 [data-dockkit-pane]::after 的颗粒规则')
+    const block = rules.slice(afterStart, rules.indexOf('}', afterStart))
+    assert.ok(block.includes('content:'), '颗粒伪元素要有 content')
+    assert.ok(block.includes('inset: 0'), '颗粒要铺满宿主')
+    assert.ok(block.includes(GRAIN_DATA_URI), '颗粒贴图必须与背景层**同一张**（GRAIN_DATA_URI 直引）')
+    assert.match(
+      block,
+      new RegExp(`opacity:\\s*var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY}\\)`, 'u'),
+      '深色轴 opacity 必须与背景层同源（同一个统一变量 + 同一个回落值）',
+    )
+    assert.ok(
+      block.includes('pointer-events: none'),
+      '颗粒层不得吃指针事件（拖拽条 / 面板交互不能被它挡住）',
+    )
+    // 两个轴的混合模式都要在（深色 screen / 浅色 multiply），且值直引背景层常量
+    assert.ok(
+      rules.includes(`mix-blend-mode: screen`) && rules.includes(`mix-blend-mode: multiply`),
+      '深色轴 screen、浅色轴 multiply —— 与背景层同构',
+    )
+    const lightBlock = rules.slice(rules.indexOf('data-ds-dark-theme]:not('), rules.length)
+    assert.match(
+      lightBlock,
+      new RegExp(`opacity:\\s*var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT}\\)`, 'u'),
+      '浅色轴 opacity 必须与背景层同源（同一个统一变量 + 浅色轴回落值）',
+    )
+    // ⚠️ ::after 需要包含块，而官方 .tabHost / .emptyTabHost 是 static —— 必须补 position
+    const rpStart = rightPanelRuleStart(rules)
+    const rpRule = rules.slice(rpStart, rules.indexOf('}', rpStart))
+    assert.match(rpRule, /position:\s*relative/u, '宿主必须补 position: relative 给 ::after 当包含块')
   })
 
   it('不应该 给浮层写规则（浮层是不透明 + 质感，走 src/surface.ts）', () => {
@@ -652,8 +859,10 @@ describe('glass：边界与纪律', () => {
     for (const block of blocks) {
       const selector = block.slice(0, block.indexOf('{')).trim()
       if (selector === '') continue
+      // 门必须在，但**允许前面带明暗轴限定**（如 `body[data-ds-dark-theme]:not([plain])`）
+      // —— 颗粒那两条按轴分混合模式，不能要求一定以 `body:not([plain])` 开头。
       assert.ok(
-        selector.startsWith(`body:not([${PLAIN_ATTR}])`),
+        selector.startsWith('body') && selector.includes(`:not([${PLAIN_ATTR}])`),
         `规则「${selector}」缺少官方默认门`,
       )
     }
@@ -677,7 +886,7 @@ describe('glass：边界与纪律', () => {
   it('应该 只引用四个公开 data 锚点', () => {
     for (const hook of [
       '[data-phase=',
-      "[data-slot='conversation.session.header']",
+      "[data-slot='conversation.header']",
       '[data-conversation-scroll]',
       '[data-composer-seat]',
     ]) {

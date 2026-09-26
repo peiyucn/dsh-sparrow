@@ -206,9 +206,31 @@ export function foldSessionCredits(
   return materialize(entries, asOfSeq)
 }
 
+/**
+ * 账本读面 —— **两条取数路径共同的对外形状**。
+ *
+ * live 会话由官方投影单元（`credits-projection.ts`）提供，冷会话由本模块的
+ * `foldSessionCredits()` 重放提供；两者都归约成这个接口，上层的 HTTP 路由与
+ * 视图层因此对「数据从哪条路来」完全无感。
+ */
+export interface CreditsView {
+  /** 会话累计视图（全会话合计）。 */
+  session(): TurnCredits
+  /** 单轮视图；无该轮的返回零值（`calls=0`，供上层判空不渲染）。 */
+  turn(turn: number): TurnCredits
+}
+
 /** 取某轮的积分视图；无该轮返回零值（`calls=0`，供上层判空不渲染）。 */
 export function turnViewOf(ledger: CreditLedger, turn: number): TurnCredits {
   return ledger.byTurn.get(turn) ?? { credit: 0, calls: 0, byModel: [] }
+}
+
+/** 把账本包成读面（冷会话路径用）。 */
+export function viewOfLedger(ledger: CreditLedger): CreditsView {
+  return {
+    session: () => sessionViewOf(ledger),
+    turn: turn => turnViewOf(ledger, turn),
+  }
 }
 
 /** 会话视图（全会话合计）。 */

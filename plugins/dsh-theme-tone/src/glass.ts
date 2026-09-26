@@ -35,8 +35,8 @@
  * 属性由 client 按 `backdropPlan(...).hidden` 打上 / 摘掉（见 constants.ts 的 `PLAIN_ATTR`）。
  */
 
-import { ABOVE_CONTENT_Z_INDEX, PLAIN_ATTR, RIGHT_PANEL_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from './constants.js'
-import { dimmedBackdropGradients, grainOverGradients } from './backdrop.js'
+import { ABOVE_CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
+import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, dimmedBackdropGradients, grainOverGradients } from './backdrop.js'
 
 /** 顶栏高度（px）。官方把它钉在这个值上，与左栏 38+38 对齐（`ConversationRoot.module.css:37-41`）。 */
 export const HEADER_HEIGHT_PX = 76
@@ -613,13 +613,26 @@ export function buildGlassCss(): string {
   const fill = (token: string, alpha: number): string => `color-mix(in srgb, ${token} ${pct(alpha)}, transparent)`
   return `/* ===== dsh-theme-tone 玻璃效果（顶栏 + 输入框；卸载即随样式表移除） ===== */
 
-/* --- 顶栏：改成浮层，内容才会从它下面滚过 --- */
+/* --- 顶栏：改成浮层，内容才会从它下面滚过 ---
+   ⚠️ **0.1.7 起选择器换了目标，别改回去**（owner 真机报「顶栏崩了」的根因）。
+   结构对照（两版都核过）：
+
+   | 版本 | 会话槽位产出物挂在哪 | 谁生成盒子 |
+   | :--- | :--- | :--- |
+   | 0.1.5-rc.2 | conversation.session.header 的产出物**直接是 .root 的子元素** | 槽位产出物自己 |
+   | 0.1.7-rc.1 | 嵌在 header[data-slot='conversation.header'] 里；外层 conversation.header 与会话槽位都是 display:contents | **那个 header 元素**（官方 .header 是 grid、min-height 76px） |
+
+   旧写法打的是 [data-slot='conversation.session.header'] 的直接子元素。在 rc.1 上那个槽位是
+   display:contents、其子元素是官方 .titleRow —— 于是**标题行被抽成绝对定位浮层**，
+   header 自身塌成 10px（实测：40px → 10px），官方顶栏整条崩掉。
+   现在改成打**真正生成盒子的那个 header 元素**（由 conversation.header 槽位宿主定位）。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
 body:not([${PLAIN_ATTR}]) [data-phase='active'] {
   /* ① 定位祖先 */
   position: relative;
 }
-body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.session.header'] > * {
-  /* ② 槽位产出物是 display:contents，真正生成盒子的是它的子元素 */
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'] > header {
+  /* ② 官方顶栏本体：官方 .header 是 grid / min-height 76px / 自带 padding 与下边框 */
   position: absolute;
   top: 0;
   left: 0;
@@ -630,45 +643,93 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.session
      内容层抬到 81 之后顶栏就被内容盖住了（owner 真机反馈「顶栏盖不住对话内容了」）。
      统一取 ABOVE_CONTENT_Z_INDEX（82）：仍高于 7/8，仍低于菜单 100。 */
   z-index: ${ABOVE_CONTENT_Z_INDEX};
-  /* **自己画一遍背景层的渐变栈** —— 抬到背景层之上就吃不到那层光了。
-     背景层（z-index 80）原本压在顶栏（原 z-index 9）之上，顶光其实是**直接盖在顶栏上**的；
-     顶栏为了不被内容盖住抬到 82 之后，光就没了（owner：「怎么顶栏的金光没有了」）。
-     background-attachment: fixed 让百分比按**视口**解析 —— 顶栏只有 76px 高，
-     同一串 ellipse 80% 45% 若按自身盒子解析会重新缩放成一条硬边带。
-     **光必须按顶栏自己的填充 alpha 同步压**（dimmedBackdropGradients(同一个 alpha)）：
-     底乘 70%、光却是满的 → 那一片会比周围**亮一截**（owner 对底座那处说的
-     「相当于两层光了」是同一个毛病；顶栏是半透明的，同样逃不掉）。
-     （注：本段在模板字符串里，注释中**不能出现反引号**，否则会把字符串截断。） */
+  /* ⚠️ 本体**不承担玻璃**（这里刻意不写 background-color / background-image /
+     backdrop-filter）—— 理由见下面 ::before 那条。本体只负责「浮起来」。
+     （本段在模板字符串里，注释中**不能出现反引号**。） */
+}
+
+/* ②b 玻璃（填充 + 渐变 + 模糊）挂在顶栏的 **::before** 上，不挂顶栏本体。
+   owner 2026-09-24 真机报「弹层全透明 / 分区标题带子串色 / 联想对话框也全透明」的根因就在这里：
+   带 backdrop-filter（非 none）的元素会成为**它后代的 backdrop root**，同时成为
+   position: fixed 后代的**包含块**。而官方弹层大量渲染在顶栏子树里
+   （模型选择菜单、顶栏动作区的弹层 —— 我们自己的材质锚点表里就写着
+   [data-slot='conversation.session.header.actions'] ul 这条锚点）。
+   于是弹层自己的 backdrop-filter: var(--dsw-menu-backdrop-filter)（官方 blur(40px)）
+   **只能采样这个子树**，模糊等于失效 —— 只剩半透明底色（深色轴 #30313680），
+   背后的对话文字没被模糊、直接可读，也就是「全透明 / 串色」。
+   官方深浅两档一直是好的，正因为这两档下本插件的玻璃规则被官方默认门关掉。
+
+   改法：玻璃交给伪元素。伪元素没有后代 ⇒ 不会把任何官方弹层关进它的 root；
+   顶栏本体也不再是 backdrop root / 不再是 fixed 后代的包含块 ⇒ 弹层自己的模糊与定位一起恢复。
+   顶栏本体已经是 position: absolute + z-index（自成层叠上下文）⇒ 伪元素 z-index: -1
+   正好画在「顶栏内容之下、页面内容之上」，观感与改前一致。
+   pointer-events: none —— 别让这一层参与命中测试（顶部有条拖动区）。
+
+   **自己画一遍背景层的渐变栈** —— 抬到背景层之上就吃不到那层光了：
+   背景层（z-index 80）原本压在顶栏（原 z-index 9）之上，顶光其实是**直接盖在顶栏上**的；
+   顶栏为了不被内容盖住抬到 82 之后，光就没了（owner：「怎么顶栏的金光没有了」）。
+   background-attachment: fixed 让百分比按**视口**解析 —— 顶栏只有 76px 高，
+   同一串 ellipse 80% 45% 若按自身盒子解析会重新缩放成一条硬边带。
+   **光必须按顶栏自己的填充 alpha 同步压**（dimmedBackdropGradients(同一个 alpha)）：
+   底乘 70%、光却是满的 → 那一片会比周围**亮一截**（owner 对底座那处说的
+   「相当于两层光了」是同一个毛病；顶栏是半透明的，同样逃不掉）。
+   （本段在模板字符串里，注释中**不能出现反引号**，否则会把字符串截断。） */
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'] > header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-color: ${fill('var(--dsw-alias-bg-base)', GLASS_HEADER_ALPHA)};
   background-image: ${dimmedBackdropGradients(GLASS_HEADER_ALPHA)};
   background-attachment: fixed;
   backdrop-filter: ${GLASS_BLUR};
 }
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-scroll] {
-  /* ③ 滚区顶部补出顶栏高度 —— 与浮层是一对，少一个正文首行会被盖住 */
-  padding-top: ${HEADER_HEIGHT_PX}px;
+  /* ③ 滚区顶部补出顶栏高度 —— 与浮层是一对，少一个正文首行会被盖住。
+     ⚠️ **必须用 border-top，不能用 padding-top**（owner 2026-09-26 报
+     「顶栏透明后，右侧滚动条也会跑上去」）：
+     滚动条是画在滚动容器的 **padding box** 上的，**padding-top 只推内容、不推它** ——
+     于是玻璃档下轨道与滑块仍从 y=0 起画，前 76px 正落在**半透明顶栏下面** ⇒ 透出来。
+     官方因为顶栏**在流内**，滚区天然从 y=76 起，滚动条也就从 76 起。
+
+     border-top 同样是「推内容」，但它把 **padding box 整体下移** 76px ⇒
+     滚动条与内容一起回到官方位置。真机实测（滑块染不透明橙、只在滚动条那一列扫描）：
+
+     | 写法 | 滚区 clientHeight | 滑块顶端 y | 官方基准 |
+     | :--- | ---: | ---: | :--- |
+     | 官方默认档（顶栏在流内） | 680 | **78**（= 76 + 官方轨道 2px） | —— |
+     | padding-top: 76px（改前） | 756 | **0**（画进顶栏带，透出来） | ✗ |
+     | border-top: 76px（本版） | **680** | **78** | ✓ 逐项相同 |
+
+     ⚠️ 前提是 **box-sizing: content-box**（官方 .scrollBody 就是；实测该元素也是）——
+     它是 border-box 的话边框会吃掉内容高度。下面的 border 与 box-sizing 两条一起钉住。
+     ⚠️ border 是**透明**的：滚区自己的背景仍按 border-box 铺（border 区照旧有底色），
+     且那 76px 之上盖着顶栏浮层 ⇒ 观感与改前一致。
+     ⚠️ 正文首行位置**不变**（实测两种写法都是相对滚区顶 76px）—— 这条只挪滚动条与
+     clientHeight，不挪内容。 */
+  border-top: ${HEADER_HEIGHT_PX}px solid transparent;
+  box-sizing: content-box;
 }
-/* --- ④ 拖拽条：把光带压回**顶栏下缘以下**（顶栏浮层化的必然连带，owner 真机报的） ---
-   owner：「官方这个调整宽度的条，现在咱们顶栏也盖不住了。」
+/* --- ④ 拖拽条：把上段裁到顶栏下缘（**恢复官方几何**，不新造基准） ---
+   owner 2026-09-24 又报：「左右边宽度拖动条**在顶栏依然穿模**」—— 顶栏浮层化的直接副作用。
 
-   几何链（官方源码核过，ConversationRoot.tsx:372-392）：
-   .root > [顶栏槽位] + .body > (.scrollBody + .widthHandle)。
-   官方顶栏**在流内**、占 76px，所以 .body 从 y=76 起 —— 而 .widthHandle 是
-   .body 里的 absolute + top: 0/bottom: 0，它的**光带**（::after，悬停 / 拖动时 opacity 1）
-   天然落在顶栏下缘之下，永远进不了顶栏。
+   官方 .widthHandle 是 .body 里的 "absolute + top: 0/bottom: 0"，而官方顶栏**在流内**占 76px，
+   所以 .body 从 y=76 起、光带天然只画在顶栏下缘以下；本插件把顶栏改成 absolute 浮层后
+   .body 从 y=0 起，光带于是**爬进顶栏区**，而顶栏是半透明玻璃 → 那截就"透"出来（穿模）。
 
-   本插件把顶栏改成 position: absolute 浮层后，.body 从 y=0 起 → 光带跟着爬进顶栏区
-   （04-glass §4「已知观感副作用」早就把这条记下并要求真机目视）。
-   owner 现在确认**不可接受**，故把拖拽条本体压回 76px —— 这同时是**恢复官方几何**
-   （官方那条本来就从 body 顶开始，而 body 顶就在顶栏下缘）。
+   本规则的几何**正是官方那一份**（盒子 [76, 720]），所以：
+   * 光带的几何基准没有变 —— 官方那套 "calc(var(pointer-y, 50%) ± 36px)" 照旧按盒子解析，
+     盒子回到官方尺寸后，"50%" 兜底值也回到官方语义（光带静止时的位置与官方一致）；
+   * hover / 拖拽时官方与 nav-pin 都会写**真实 clientY**（内联样式，优先级高于本规则），
+     所以"跟随指针"的行为不受影响（nav-pin 的 6 条纯函数守卫钉着同一公式）。
 
-   * 只动 [data-width-handle]（ConversationRoot 那条、带光带）。
-     AppFrame 的 [data-side] 手柄长在 frame 里、**没有光带**（AppFrame.module.css:40-44
-     明写 no handle draws a visible pill），不需要也不该动它。
-   * 只动 top，不动 bottom / 宽度 —— 拖拽带的可拖高度只少掉顶栏那 76px，
-     与官方一致（官方在顶栏区本来就拖不到）。
-   特异度：本条 (0,2,1) > 官方 .widthHandle (0,1,0)，无需 !important。 */
-body:not([${PLAIN_ATTR}]) [data-phase='active'] [${WIDTH_HANDLE_ATTR}] {
+   ⚠️ 只挂在 "active" 相位：hero/其他相位下官方顶栏本来就在流内，".body" 已从 76 起，
+   再压一次会多推 76px（这正是早先删掉这条规则时留下的教训）。
+   ⚠️ 与官方默认档无关：**本规则只在顶栏被浮层化的那个状态出现**（色调档 + active），
+   官方档下本插件不碰任何几何。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
@@ -752,22 +813,51 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat]::after {
    **只有这两条卡片规则**放宽相位；底座 ::after 等仍死守 active（理由见 GLASS_CARD_PHASES）。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 body:not([${PLAIN_ATTR}]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card] {
+  /* ⚠️ 卡片本体不承担玻璃（不写 background-color / background-image / backdrop-filter）——
+     与顶栏同一条理由：卡片的子树里也渲染官方弹层（官方的输入触发器菜单就以
+     closest('[data-composer-card]') 为锚，见 InputBar.tsx），
+     本体一带 backdrop-filter 就成了它们的 backdrop root，模糊被关进子树里失效
+     （owner 报的「联想对话框也是全透明的」）。
+     position: relative 官方 .card 本来就有（写出来是给 ::before 一个包含块）；
+     z-index: 0 是为了**自成层叠上下文**，好让 ::before 的 z-index: -1 留在卡内 ——
+     它与 z-index: auto 在绘制顺序上等价（都是第 8 步、同按 DOM 次序），观感不变。
+     background-color: transparent 是必须的：官方 .card 自己刷的是不透明
+     --dsw-specific-input-major，不让位就给玻璃盖死了。 */
+  position: relative;
+  z-index: 0;
+  background-color: transparent;
+  background-image: none;
+  /* ⚠️ 本体只留**外**投影：官方那条抬升（--dsw-elevation-soft）+ 我们的悬浮（GLASS_CARD_LIFT）。
+     **inset 边光（rimFor）不能写在这里** —— 绘制顺序是「元素自己的背景/边框/box-shadow」
+     先画，**负 z-index 子层随后盖上去**：::before 那道玻璃会把本体的 inset 环整个埋掉，
+     实测就是 owner 2026-09-24 报的「输入框玻璃效果改坏了，边缘光效和之前不同了」。
+     所以边光跟着玻璃一起挂到 ::before 上（见下一条）。 */
+  box-shadow: var(--dsw-elevation-soft),
+    ${GLASS_CARD_LIFT};
+}
+/* 卡片玻璃本体（填充 + 边光渐变 + **inset 边光** + 模糊）—— 挂 ::before，理由见上面卡片规则内。
+   border-radius: inherit 必须写：官方 .card 是 22px 圆角，伪元素不继承它就会画成方角。
+   pointer-events: none —— 玻璃层不参与命中测试（卡里有 textarea 与按钮）。
+   ⚠️ inset 环必须与填充在**同一层**：box-shadow 的 inset 段画在该元素自己的背景之上、
+     内容之下，所以放这里才读得出「玻璃厚度」（放本体就会被这层玻璃埋掉，见上）。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+body:not([${PLAIN_ATTR}]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
   background-color: ${fill('var(--dsw-specific-input-major)', GLASS_CARD_ALPHA)};
   background-image: ${edgeFadeLayers('dark')};
-  /* 官方那条**外**投影（抬升语义）→ 我们的**悬浮**投影（{@link GLASS_CARD_LIFT}）
-     → 我们的**边光**（inset，玻璃厚度）。三段并列，各管各的。 */
-  box-shadow: var(--dsw-elevation-soft),
-    ${GLASS_CARD_LIFT},
-    ${rimFor('dark')};
+  box-shadow: ${rimFor('dark')};
   backdrop-filter: ${GLASS_CARD_BLUR};
 }
 /* 浅色轴：同样的光路，只有**阴影浓度**不同（近白底上阴影要更明显才立得住形）。
    注意官方默认门（body:not([PLAIN])）必须写在**最前** —— 有一条守卫按前缀认它。 */
-body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card] {
+body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card]::before {
   background-image: ${edgeFadeLayers('light')};
-  box-shadow: var(--dsw-elevation-soft),
-    ${GLASS_CARD_LIFT},
-    ${rimFor('light')};
+  box-shadow: ${rimFor('light')};
 }
 
 /* --- 未选工作区（待启动态）：**把边界让回官方那条虚线框** ---
@@ -781,7 +871,8 @@ body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) ${phaseGate(GLASS_CARD_PHASE
    * inset 边光 rimFor（镜面 + 暗壁）—— 与虚线并存就是两条边。
 
    **保留**：官方自己的 --dsw-elevation-soft（那是官方的抬升语义，不归我们管）、
-   玻璃填充与 backdrop-filter（卡片本体仍是玻璃，只是边缘交给官方）。
+   玻璃本身（填充 + 渐变 + 模糊挂在卡片的 ::before 上，不在本体 —— 见卡片规则内的说明；
+   边缘交给官方，玻璃照旧）。
 
    ⚠️ 判定属性由 client 的**行为探针**打上（见 constants.ts 的 WORKSTART_ATTR：
    那条类名是哈希、语义属性又全被污染，只有读 ::after 的 mask 才认得出）。
@@ -789,14 +880,31 @@ body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) ${phaseGate(GLASS_CARD_PHASE
 body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card] {
   box-shadow: var(--dsw-elevation-soft);
 }
+/* ⚠️ 边光与玻璃同在 ::before（2026-09-24 起）—— 待启动态要撤的那条 inset 环也必须打在这里，
+   只改本体的话边光会留着，与官方那条虚线框并存（owner 2026-09-20 定案：边缘让给官方）。 */
+body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card]::before {
+  box-shadow: none;
+}
 
 /* ===== 右边栏：自己画一遍背景层的光与颗粒 =====
    为什么需要：为了不被抬到 81 的内容层盖住，右边栏被抬到了 82（见 backdrop.ts 的不变式）——
    而背景层在 80，于是它**跑到背景层上面**，吃不到那层色调的光与颗粒。
-   它官方是 background: var(--dsw-alias-bg-base)（**不透明实色**，SidebarRight.module.css:34），
    所以底色**已经**被 token 染对了、只是缺质感 —— 把背景层那套渐变与颗粒**叠上去**即可
    （与顶栏同一个思路，区别是顶栏半透明、这里在实色底上叠）。
    用 background-image 与 background-color 分层，不碰官方底色本身。
+
+   ⚠️ **0.1.7 起还要管一层「内胆」**（owner 真机报「右边栏完全没适配」）。
+   0.1.5 线里右边栏是 SidebarRight.module.css 的 .panel 自己刷不透明底色；
+   0.1.7 起右边栏整块改由 **dockkit** 承载，真正刷底色的是它的**内容宿主**
+   [data-dockkit-pane]（= dockkit.module.css:168-172 的
+   .tabHost:not(.float), .emptyTabHost { background: var(--dsw-alias-bg-base) }）。
+   那层是**不透明**的、且是 .panel 的**后代** —— 于是本规则画在 .panel 上的
+   渐变与颗粒**整个被它盖掉**，右边栏看着就是一块没有任何色调质感的纯色板。
+   修法：把同一套图层**同时**画到内容宿主上（.panel 那条保留 —— 它仍负责面板本体、
+   浮动面板与空态这两种不经过 .tabHost 的场景）。
+   data-dockkit-pane / data-dockkit-host / data-dockkit-surface 都是官方公开属性
+   （TabLayout.tsx:80-90），不碰 hashed 类名。
+   （本段在模板字符串里，注释中**不能出现反引号**。）
 
    已知近似一处（**待 owner 真机判断**）：颗粒用的是**浮层那张贴图**（GRAIN_TILE_VARIABLE，
    强度烘进 SVG、正常合成），而背景层的颗粒是 ::after + 独立 opacity + 深色轴走 screen。
@@ -831,16 +939,86 @@ body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [da
    附着用 scroll（初值）**自始至终不变** ⇒ 动画中面板外观是**刚性平移**，连续、无跳变。
    实测：静止态与改前逐像素 **0.0/0**；静止帧与动画首帧 **0.0/0**（交班处无缝）。
 
-   ⚠️ background-size / -position / -repeat 都是 **4 层**，**必须给足 4 个值** ——
+   ⚠️ **颗粒必须与背景层"同构"**（owner 真机报「6 个色调背景依然没改好」的那条竖线）：
+   背景层是「3 层渐变写在自己身上 + 颗粒走 ::after + opacity + 深色轴 mix-blend-mode: screen」，
+   而这里曾经把颗粒当成**第 4 个背景层**（grainOverGradients()）**正常合成** ——
+   深色轴上 screen 是纯加法（只加亮、不压暗），正常合成却会同时压暗黑像素，
+   两者的**质感不同**，于是右边栏与会话区在交界处差一档 → 一条竖直分界线。
+   修法：这里也改成「3 层渐变 + ::after 颗粒」，opacity 与混合模式**逐字对齐背景层**
+   （常量直引 GRAIN_OPACITY / GRAIN_OPACITY_LIGHT / GRAIN_DATA_URI，不复制数值）。
+
+   ⚠️ ::after 需要定位上下文，而官方 .tabHost / .emptyTabHost **没有 position**（static）
+   —— 故这条 gated 规则同时补 position: relative（不动官方任何几何：grid 项的相对定位
+   不改变摆放，只是给伪元素一个包含块）。
+
+   ⚠️ background-size / -position / -repeat 现在是 **3 层**，**必须给足 3 个值** ——
    值少于层数时**会按顺序循环补齐**（本插件栽过：写「scroll, fixed」等于两者交替，
    第 1、3 段渐变退回按元素盒解析）。**不许再退回任何一个 per-layer 属性只给一两个值。**
    （本段在模板字符串里，注释中**不能出现反引号**。） */
-body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}] {
-  background-image: ${grainOverGradients()};
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
+body:not([${PLAIN_ATTR}]) [data-dockkit-pane],
+body:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
+  position: relative;
+  background-image: ${BACKDROP_GRADIENTS};
   background-attachment: scroll;
-  background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;
-  background-position: calc(100% - 100vw) top, right top, right top, right top;
-  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-size: 100vw 100vh, 100vw 100vh, 100vw 100vh;
+  background-position: right top, right top, right top;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+}
+/* 渐变本身的合成方式也必须同构：深色轴上**背景层整层**是 mix-blend-mode: screen
+   （渐变与颗粒都走加法），而面板这里的背景层是**正常合成** ——
+   于是同样的渐变在两边亮度不同，交界处又是一条分界线。
+   background-blend-mode 让面板自己的背景层与它的 background-color（官方 bg-base，
+   与页面底色同一个值）按 screen 混合，等效于背景层与页面底色混合。
+   浅色轴背景层用 normal（见 backdrop.ts），故这里不需要浅色规则。
+   （本段在模板字符串里，注释中不能出现反引号。） */
+body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
+body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-pane],
+body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
+  background-blend-mode: screen, screen, screen;
+}
+/* 颗粒：与背景层那条 ::after 同构（同贴图、同 opacity、同混合模式）。 */
+body:not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
+body:not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: ${GRAIN_DATA_URI};
+  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY});
+}
+body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
+body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
+  mix-blend-mode: screen;
+}
+body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
+body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
+  mix-blend-mode: multiply;
+  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT});
+}
+
+/* ===== 官方那些**吸顶遮罩行**：底色要等于它盖住的内容底 =====
+   owner 2026-09-24：「该适配的地方没适配，**think 那条黑框**，渲染是官方黑的遗留」。
+
+   根因：官方给这类吸顶行的底色是 **不透明纯色** var(--dsw-alias-bg-base) ——
+   "lcKema_root[data-expanded] [data-open] [data-disclosure-row] { position: sticky; top: 0;
+   background: var(--dsw-alias-bg-base) }"（展开的 Think 行吸在滚区顶部，压住滚过去的正文）。
+   官方档下 bg-base 就是地面那块纯色，所以**看不出有一条带子**；
+   而我们的地面是**渐变光带 + 颗粒**，纯色底一盖上去就显成一条「黑框」。
+
+   修法与顶栏同一套（它就是同一类东西：抬到地面之上、又必须等于地面）：
+   **把地面原样重画一遍** —— 同色 + 同渐变 + 同颗粒，且 background-attachment: fixed
+   让百分比按视口解析（行的盒子很小，按自身盒子解析会把渐变重新压成硬边带）。
+   底色仍是官方自己的 bg-base（已被色调染过），我们只补它拿不到的那层光与颗粒。
+
+   ⚠️ 锚点用官方的 "data-disclosure-row"（公开属性、非哈希类名）——
+   "lcKema" 是哈希前缀，仓库红线禁止写。
+   ⚠️ **收窄到官方自己加底的那个状态**（"[data-expanded] [data-open]"，逐字对齐官方那条规则）：
+   只写 "[data-disclosure-row]" 会把**所有**折叠行都刷上一层底（官方只在展开吸顶时才刷）。
+   ⚠️ 只挂色调档 —— 官方默认档下地面本来就是纯色，重画等于没事找事。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+body:not([${PLAIN_ATTR}]) [data-expanded] [data-open] [data-disclosure-row] {
+  ${backingPaint()}
 }
 
 /* 模态弹窗（[role='dialog']）**不做玻璃** —— 它是内容面（设置 / 文件 / 归档列表），

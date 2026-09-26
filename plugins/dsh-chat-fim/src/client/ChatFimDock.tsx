@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { useAnchoredMaxHeight, IconSparkle16, IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { useAnchoredMaxHeight, IconSparkleRegular, IconChevronDownOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
@@ -449,7 +449,10 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   flex-direction: column;
   border: 1px solid var(--dsw-alias-button-info-fill, #4d6bfe);
   border-radius: 12px;
+  /* 0.1.7 起 --dsw-specific-menu 是**半透明**玻璃色，官方要求同规则内配对 backdrop-filter
+     （见官方 docs/web-styling.zh.md:25），否则背后文字会透出来。 */
   background: var(--dsw-specific-menu);
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
   box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
 }
 .dsh-chat-fim-menu-row {
@@ -534,7 +537,9 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   padding: 4px;
   border: 1px solid var(--dsw-alias-border-inverted);
   border-radius: 12px;
+  /* 同上：半透明菜单面必须配对 backdrop-filter（官方 docs/web-styling.zh.md:25）。 */
   background: var(--dsw-specific-menu);
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
   box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
 }
 .dsh-chat-fim-menu-usage {
@@ -677,7 +682,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
           setSuggestEnabled(!enabled)
         }}
       >
-        <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkle16 size={14} /></span>
+        <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkleRegular size={14} /></span>
         <span className="dsh-chat-fim-switch-label">{t('switch.label')}</span>
         <span
           className="dsh-chat-fim-switch-picker"
@@ -714,12 +719,12 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
             className={pickerOpen ? 'dsh-chat-fim-switch-arrow dsh-chat-fim-switch-arrow-open' : 'dsh-chat-fim-switch-arrow'}
             aria-hidden
           >
-            <IconChevronDownOutline14 size={12} />
+            <IconChevronDownOutlineRegular size={12} />
           </span>
         </span>
       </button>
       {error !== null ? (
-        <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)', fontSize: 12 }} title={error}>⚠</span>
+        <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)', fontSize: 12 }} title={error}>⚠</span>
       ) : null}
       {pickerOpen && pickerPoint !== null
         ? createPortal(

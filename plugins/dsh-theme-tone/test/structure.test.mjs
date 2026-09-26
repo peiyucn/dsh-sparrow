@@ -85,25 +85,97 @@ describe('dsh-theme-tone 结构', () => {
   })
 
   it('⛔ 宿主不可写时必须落到进程内兜底并告警（不得静默空操作）', async () => {
-    // 回归守卫：官方 `SettingsScopeController.enqueue()` 在 memory 模式直接 return，
-    // `subscribe` 也永不触发。若 setTone 只调 scope.set，用户点色调会毫无反应且无日志。
+    // 回归守卫：官方设置表单在 memory 模式下把写入当空操作（`set()` 返回 false）、
+    // 也不会有宿主推送。若 setTone 只调 scope.set，用户点色调会毫无反应且无日志。
     const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
     assert.match(src, /localSettings/u, '要有进程内兜底值')
     assert.match(src, /snapshot\.writable/u, 'setTone 要检查 writable')
     assert.match(src, /warnUser\(/u, '不可持久化 / 停用时要走面向用户的告警（logger + console）')
-    // setTone 的分支里必须真的写兜底值 + 立刻重绘
+    // setTone 的分支里必须真的写兜底值 + 立刻重绘，且顺序是「本地落值 → 重绘 → 发写入」。
+    // 窗口取足够宽（注释长短会变，曾用固定 800 字符导致误报）；只断言**相对顺序**。
     const i = src.indexOf('setTone:')
-    const seg = src.slice(i, i + 800)
+    assert.ok(i > 0, '找不到 setTone')
+    const seg = src.slice(i, i + 4000)
     assert.ok(seg.includes('localSettings'), 'setTone 不可写分支要写 localSettings')
     assert.ok(seg.includes('repaint()'), 'setTone 不可写分支要立刻重绘')
+    const localAt = seg.indexOf('localSettings = ')
+    const repaintAt = seg.indexOf('repaint()')
+    // ⚠️ 匹配**真实调用**（`void scope.set(`），不能用 `scope.set(` —— 上面那段注释里
+    // 也提到了 `scope.set()`，会把它的位置当成调用位置。
+    const setAt = seg.indexOf('void scope.set(')
+    assert.ok(localAt >= 0 && repaintAt > localAt && setAt > repaintAt,
+      `顺序必须是「先本地落值 → 立刻重绘 → 再发写入」（local=${localAt} repaint=${repaintAt} set=${setAt}）`)
+  })
+
+  it('⛔ 写轴必须等于渲染轴（否则浅色选的 id 会被写进深色字段，宿主直接拒）', async () => {
+    // 回归守卫（owner 真机报「浅色模式下选色调无法维持，很快回到深色官方黑」）：
+    // 行渲染哪一轴的卡片取决于 store 的 colorScheme，而写入时若重新查询
+    // ctx.theme.getTheme()，两者在模式切换的时间窗内会错开 → 把浅色轴的 id
+    // （blue/sakura/green）写进 darkTone 字段，而两轴合法集合**不重叠**
+    // （深色只有 official/violet/crimson/forest）→ 宿主 schema 拒绝 → 选择不生效。
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    const i = src.indexOf('setTone:')
+    assert.ok(i > 0, '找不到 setTone')
+    // ⚠️ 必须先剥注释再断言：本段的注释里**故意**写着 `ctx.theme.getTheme()` 作为反面教材，
+    // 不剥就会把说明文字本身当成实现（本仓库栽过同型误报）。
+    const seg = src.slice(i, i + 2000).replace(/\/\*[\s\S]*?\*\//gu, '').replace(/\/\/[^\n]*/gu, '')
+    assert.ok(!/getTheme\(\)/u.test(seg), 'setTone 不得重新查询实时主题来决定写哪一轴')
+    assert.match(seg, /toneFieldFor\(scheme\)/u, '写轴必须用传入的 scheme')
+    // 行组件必须把**渲染用的轴**一起传下来
+    const row = await readFile(new URL('../src/client/ThemeToneRow.tsx', import.meta.url), 'utf8')
+    assert.match(row, /setTone: \(id: ToneId, scheme: ColorScheme\) => void/u, '注入面要收 scheme')
+    assert.match(row, /setTone\(id, colorScheme\)/u, 'onClick 要传渲染轴 colorScheme')
+  })
+
+  it('⛔ 行同步不得被「未就绪不上色」那道门挡住（否则浅色页面显示深色卡片）', async () => {
+    // 同一事故的第二层：`shouldPaint()` 是给**上色**用的（未就绪不上色，避免闪变），
+    // 但「行渲染哪一轴」只取决于当前主题。曾把 `boundRow.sync` 排在门后面 →
+    // 设置 loading 期间行不更新，浅色页面显示**深色轴卡片**，点下去写进深色字段被拒。
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    // 抽出 syncRow 与 paintLayer 的位置：syncRow 必须在每个 shouldPaint 早退之前
+    const syncIdx = src.indexOf('const syncRow =')
+    assert.ok(syncIdx > 0, '应有独立的 syncRow')
+    // paintLayer 体内：syncRow 调用必须早于该函数里的 `if (!shouldPaint()) return`
+    const plIdx = src.indexOf('const paintLayer =')
+    const pl = src.slice(plIdx, plIdx + 1600)
+    const syncCall = pl.indexOf('syncRow(')
+    const gateCall = pl.indexOf('if (!shouldPaint())')
+    assert.ok(syncCall > 0 && gateCall > 0, 'paintLayer 里应同时有 syncRow 与门')
+    assert.ok(syncCall < gateCall, 'paintLayer 里的 syncRow 必须排在门之前')
+    // repaint 同理
+    const rpIdx = src.indexOf('const repaint =')
+    const rp = src.slice(rpIdx, rpIdx + 1200)
+    const rpSync = rp.indexOf('syncRow(')
+    const rpGate = rp.indexOf('if (!shouldPaint())')
+    assert.ok(rpSync > 0 && rpGate > 0 && rpSync < rpGate, 'repaint 里的 syncRow 必须排在门之前')
+  })
+
+  it('⛔ 行 store 初值取实时主题轴（写死 dark 会让浅色页面首帧就画错）', async () => {
+    // 同一事故的第三层：store 初值曾写死 `colorScheme: 'dark'`，
+    // 浅色页面在首次 sync 之前会渲染深色轴卡片 —— 与上一条同源。
+    const store = await readFile(new URL('../src/client/store.ts', import.meta.url), 'utf8')
+    assert.match(store, /scheme: ColorScheme = 'dark'/u, '签名应接受调用方传入的轴')
+    assert.match(store, /init: \(\): ThemeToneRowState => \(\{ colorScheme: scheme/u, 'init 要用传入的 scheme')
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(src, /createThemeToneRowStore\(ctx\.theme\.getTheme\(\)\.active\.colorScheme\)/u,
+      'apply 处必须传实时主题轴')
+  })
+
+  it('⛔ 两轴合法色调集合不得重叠（跨轴写入必被 schema 拒）', async () => {
+    // 事故的**前提条件**：两轴 id 集合不重叠，所以「写错轴」不是观感问题而是**写入被拒**。
+    // 若将来某天两轴集合合并成一个，本守卫会失败 —— 那时可以放宽上面几条的措辞，
+    // 但必须先确认这个前提真的变了（别默默让守卫失效）。
+    const { LIGHT_TONE_IDS, DARK_TONE_IDS } = await import('../lib/tones.js')
+    const overlap = LIGHT_TONE_IDS.filter(id => DARK_TONE_IDS.includes(id))
+    assert.deepEqual(overlap, ['official'], '两轴只应共享 official（其余必须互斥）')
+    assert.ok(LIGHT_TONE_IDS.some(id => !DARK_TONE_IDS.includes(id)), '浅色轴要有深色轴没有的 id')
   })
 
   it('⛔ client inject 只放跨版本稳定服务（易变面进 inject 会把宿主整页拖死）', async () => {
     // 回归守卫（实测事故）：`inject` 里放一个新版宿主已经改名 / 移除的服务时，fiber 永远
-    // pending，而客户端 boot 审计把 pending 当致命失败（dsh 0.1.7-alpha.1
-    // packages/client/web/src/boot-client.ts:63-82，pending 判定在 :73-75）——
-    // 实测 0.1.7-alpha.1 页面停在「Failed to load plugins：@dsh-sparrow/dsh-theme-tone:
-    // pending (waiting for service: settingsScope)」，宿主 Web UI 完全起不来。
+    // pending，而客户端 boot 审计把 pending 当致命失败（packages/client/web/src/boot-client.ts
+    // 的 assertEntriesActive）—— 实测 0.1.7-alpha.1 页面停在「Failed to load plugins：
+    // @dsh-sparrow/dsh-theme-tone: pending (waiting for service: …)」，宿主 Web UI 完全起不来。
     const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
     const inject = /export const inject = \[([^\]]*)\]/u.exec(src)?.[1] ?? ''
     const names = [...inject.matchAll(/'([^']+)'/gu)].map(match => match[1])
@@ -111,7 +183,7 @@ describe('dsh-theme-tone 结构', () => {
     assert.ok(!/settings/u.test(inject), '设置面不得进 inject —— 它是会被宿主改名 / 移除的易变面')
     assert.match(
       src,
-      /ctx\.inject\(\s*\[\s*'settingsScope'\s*\]/u,
+      /ctx\.inject\(\s*\[\s*'configForms'\s*\]/u,
       '设置面要走 ctx.inject 起的可选依赖 fork（缺了只是不装，entry 仍 active）',
     )
   })

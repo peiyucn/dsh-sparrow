@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState, type ReactElement } from 'rea
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { IconCloseOutline16, IconFolderOpenOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+// 图标名只标字形与字重（Regular = 1px 描边），渲染尺寸由 size prop 决定；
+// 两处使用点原本已显式传 size，改名后保持原尺寸不变。
+import { IconCloseOutlineRegular, IconFolderOpenOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FileRow } from '../files.js'
 import type { FileCountSummary } from './api.js'
 import { hasLoadMore, renderedRowCount, RENDER_PAGE_SIZE } from './paging.js'
@@ -258,7 +260,7 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
         aria-expanded={open}
         onClick={() => { setOpen(value => !value) }}
       >
-        <IconFolderOpenOutline16 className="dsh-file-manage-trigger-icon" size={wide ? 16 : 18} />
+        <IconFolderOpenOutlineRegular className="dsh-file-manage-trigger-icon" size={wide ? 16 : 18} />
         {wide ? <span className="dsh-file-manage-trigger-label">{t('button.label')}</span> : null}
       </button>
       {open ? (
@@ -269,7 +271,7 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
             <div className="dsh-file-manage-panel-header">
               <h2 className="dsh-file-manage-panel-title" style={{ margin: 0 }}>{t('dialog.title')}</h2>
               <button ref={closeButtonRef} type="button" className="dsh-file-manage-close" aria-label={t('dialog.close')} onClick={() => { setOpen(false) }}>
-                <IconCloseOutline16 size={14} />
+                <IconCloseOutlineRegular size={14} />
               </button>
             </div>
             {summary !== null ? (

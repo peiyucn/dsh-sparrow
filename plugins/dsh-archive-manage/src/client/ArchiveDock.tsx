@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactEle
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { IconArchiveOutline20, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconArchiveOutlineRegular, IconCloseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { descendantLive, dropArchivedIds, isCollapsed, subtreeIdsOf, subtreeLive, trashSubagentTree, type ArchivedSessionItem, type TrashSubagentNode } from './archivedTree.js'
 import { countVisibleRows } from './paging.js'
 
@@ -865,7 +865,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             {item.running ? ` · ${t('state.running')}` : item.live ? (
               <>
                 {' · '}
-                <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>{t('state.unreleased')}</span>
+                <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)' }}>{t('state.unreleased')}</span>
               </>
             ) : ''}
             {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
@@ -1002,7 +1002,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
               {hasChildren ? (
                 <>
                   {' · '}
-                  <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>
+                  <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)' }}>
                     {t('tree.childCount', { n: item.children.length })}
                   </span>
                 </>
@@ -1011,12 +1011,12 @@ export function ArchiveDock(props: ArchiveDockProps) {
               {item.running ? ` · ${t('state.running')}` : item.live ? (
                 <>
                   {' · '}
-                  <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>{t('state.unreleased')}</span>
+                  <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)' }}>{t('state.unreleased')}</span>
                 </>
               ) : descendantLive(item) ? (
                 <>
                   {' · '}
-                  <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>{t('state.subagentUnreleased')}</span>
+                  <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)' }}>{t('state.subagentUnreleased')}</span>
                 </>
               ) : ''}
               {item.backendSupported ? '' : ` · ${t('state.backendUnsupported')}`}
@@ -1162,7 +1162,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
               {hasChildren ? (
                 <>
                   {' · '}
-                  <span style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)' }}>
+                  <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)' }}>
                     {t('tree.childCount', { n: children.length })}
                   </span>
                 </>
@@ -1320,7 +1320,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
         aria-expanded={open}
         onClick={() => { setOpen(value => !value) }}
       >
-        <IconArchiveOutline20 size={wide ? 16 : 18} />
+        <IconArchiveOutlineRegular size={wide ? 16 : 18} />
         {wide ? <span>{t('button.label')}</span> : null}
       </button>
 
@@ -1332,7 +1332,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             <div className="dsh-archive-panel-header">
               <h2 className="dsh-archive-panel-title" style={{ margin: 0 }}>{t('dialog.title')}</h2>
               <button ref={closeButtonRef} type="button" className="dsh-archive-close" aria-label={t('dialog.close')} onClick={() => { setOpen(false) }}>
-                <IconCloseOutline16 size={14} />
+                <IconCloseOutlineRegular size={14} />
               </button>
             </div>
             <div className="dsh-archive-panel-body" aria-busy={refreshing} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
@@ -1465,7 +1465,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
                     </div>
                   ) : null}
                   {trashItems.length > 0 ? (
-                    <p role="note" style={{ color: 'var(--dsw-alias-state-warning-primary, #d9822b)', fontSize: 12, lineHeight: '18px', margin: '0 0 4px' }}>
+                    <p role="note" style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)', fontSize: 12, lineHeight: '18px', margin: '0 0 4px' }}>
                       {t('trash.uninstallHint')}
                     </p>
                   ) : null}

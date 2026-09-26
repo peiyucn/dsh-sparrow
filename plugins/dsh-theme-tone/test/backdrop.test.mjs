@@ -19,20 +19,19 @@ import {
 } from '../lib/backdrop.js'
 import {
   ABOVE_CONTENT_Z_INDEX,
-  ABOVE_FLOAT_HOST_Z_INDEX,
   CONTENT_ATTR,
   CONTENT_Z_INDEX,
   DOCKKIT_MENU_ATTR,
   SIDE_ATTR,
   WIDTH_HANDLE_ATTR,
   PLAIN_ATTR,
-  RIGHT_FLOAT_HOST_ATTR,
   RIGHT_PANEL_ATTR,
   SHELL_OVERLAY_ATTR,
+  TAB_MENU_Z_INDEX,
 } from '../lib/constants.js'
 import { buildRowCss } from '../lib/client/styles.js'
 import { buildGlassCss } from '../lib/glass.js'
-import { BACKDROP_CLASS, BACKDROP_Z_INDEX, GRAIN_ATTR, MARKER_ATTR } from '../lib/constants.js'
+import { BACKDROP_CLASS, BACKDROP_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_ATTR, MARKER_ATTR } from '../lib/constants.js'
 import { DARK_TONES, DEFAULT_SETTINGS, DEPTH_ALPHA, LIGHT_TONES } from '../lib/tones.js'
 
 const settings = (lightTone, darkTone) => ({ lightTone, darkTone })
@@ -66,9 +65,15 @@ describe('背景层样式表', () => {
     assert.match(css, /\[hidden\] \{\s*display: none;/u)
   })
 
-  it('颗粒层应该 带上 pyai.site 同款 data URI 与不透明度', () => {
+  it('颗粒层应该 带上 pyai.site 同款 data URI 与**统一来源的**不透明度', () => {
     assert.ok(css.includes(GRAIN_DATA_URI))
-    assert.match(css, new RegExp(`opacity: ${GRAIN_OPACITY}`, 'u'))
+    // 2026-09-24：强度改为读运行期变量（唯一来源 GRAIN_ALPHA，owner：「噪点值统一变量，
+    // 方便后续我们减弱」），括号里是回落值（变量缺席时与旧行为一致）。
+    assert.match(
+      css,
+      new RegExp(`opacity: var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY}\\)`, 'u'),
+      `颗粒层 opacity 应读 ${GRAIN_ALPHA_VARIABLE}（回落 ${GRAIN_OPACITY}）`,
+    )
     assert.match(css, /\[data-grain='off'\]::after \{\s*display: none;/u)
   })
 
@@ -89,7 +94,8 @@ describe('背景层样式表', () => {
     // 内容抬升后，必须压住内容的官方层也要跟着抬，否则会被内容盖住。
     // 这是一条**不变式**（见 constants.ts 的 ABOVE_CONTENT_Z_INDEX）：凡 z-index < 81
     // 且要压在内容之上的官方层，都得抬到 82。
-    const RAISED = [RIGHT_PANEL_ATTR, SHELL_OVERLAY_ATTR, RIGHT_FLOAT_HOST_ATTR]
+    // ⚠️ 0.1.7 起官方删掉了 `[data-sidebar-right-float-host]`，故本表只剩两个锚点。
+    const RAISED = [RIGHT_PANEL_ATTR, SHELL_OVERLAY_ATTR]
     for (const attr of RAISED) {
       assert.ok(css.includes(`[${attr}]`), `应抬起 [${attr}]`)
       assert.ok(
@@ -97,23 +103,18 @@ describe('背景层样式表', () => {
         `${attr} 的高度 ${ABOVE_CONTENT_Z_INDEX} 应高于内容层 ${CONTENT_Z_INDEX}`,
       )
     }
-    // **标签菜单单独一档**：官方明写「从标签打开的菜单绝不能落在浮动面板之下」
-    // （dockkit.module.css:438-443），原序是 floatHost 60 < tabMenu 70。
+    // **标签菜单单独一档**：官方明写「从标签打开的菜单绝不能落在面板之下」
+    // （dockkit.module.css:538-543），原序是 floatLayer 60 < tabMenu 70。
     // 抬的时候必须一起抬、且保住这个次序，否则会把官方的相对层级反过来。
     assert.ok(css.includes(`[${DOCKKIT_MENU_ATTR}]`), `应抬起 [${DOCKKIT_MENU_ATTR}]`)
     assert.ok(
-      ABOVE_FLOAT_HOST_Z_INDEX > ABOVE_CONTENT_Z_INDEX,
-      `标签菜单 ${ABOVE_FLOAT_HOST_Z_INDEX} 必须高于右栏浮层宿主 ${ABOVE_CONTENT_Z_INDEX}（官方 70 > 60 的次序）`,
+      TAB_MENU_Z_INDEX > ABOVE_CONTENT_Z_INDEX,
+      `标签菜单 ${TAB_MENU_Z_INDEX} 必须高于右栏面板 ${ABOVE_CONTENT_Z_INDEX}（官方 70 > 60 的次序）`,
     )
     assert.match(
       css,
-      new RegExp(`\\[${DOCKKIT_MENU_ATTR}\\] \\{\\s*z-index: ${ABOVE_FLOAT_HOST_Z_INDEX};`, 'u'),
-      '标签菜单应取更高一档，而不是与浮动面板同号',
-    )
-    assert.match(
-      css,
-      new RegExp(`\\[${RIGHT_FLOAT_HOST_ATTR}\\]`, 'u'),
-      '右栏浮层宿主（z=60）也必须抬，否则浮动面板会被内容盖住',
+      new RegExp(`\\[${DOCKKIT_MENU_ATTR}\\] \\{\\s*z-index: ${TAB_MENU_Z_INDEX};`, 'u'),
+      '标签菜单应取更高一档，而不是与面板同号',
     )
     // 官方默认门：这些规则也必须是 gated 的（选了官方默认就完全不动官方布局）
     // **拖拽条**（owner 真机报「调整对话区域的条整没了」）—— 官方有两条，属性不同：
@@ -407,9 +408,13 @@ describe('色调卡样式', () => {
     assert.equal(Number(minHeight[1]), OFFICIAL_CUBE_HEIGHT, '应钉在与官方卡等高的 83px')
   })
 
-  it('卡面应该 带颗粒质感（与实况同一条纹理、同一不透明度、同一 screen 混合）', () => {
+  it('卡面应该 带颗粒质感（与实况同一条纹理、同一不透明度来源、同一 screen 混合）', () => {
     assert.ok(css.includes(GRAIN_DATA_URI), '卡面要用与实况同一条颗粒纹理')
-    assert.match(css, new RegExp(`opacity: ${GRAIN_OPACITY}`, 'u'), '不透明度与实况一致')
+    assert.match(
+      css,
+      new RegExp(`opacity: var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY}\\)`, 'u'),
+      '不透明度与实况同源（同一个统一变量）',
+    )
     assert.match(css, /mix-blend-mode: screen/u, 'screen 混合才只加亮、不发脏')
   })
 

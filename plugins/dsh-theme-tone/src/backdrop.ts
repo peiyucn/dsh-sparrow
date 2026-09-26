@@ -8,22 +8,23 @@
 
 import {
   ABOVE_CONTENT_Z_INDEX,
-  ABOVE_FLOAT_HOST_Z_INDEX,
   BACKDROP_CLASS,
   BACKDROP_Z_INDEX,
   BOTTOM_VARIABLE,
   CONTENT_ATTR,
   CONTENT_Z_INDEX,
   DOCKKIT_MENU_ATTR,
+  GRAIN_ALPHA,
+  GRAIN_ALPHA_VARIABLE,
   GRAIN_ATTR,
   GRAIN_TILE_VARIABLE,
   LEFT_VARIABLE,
   MARKER_ATTR,
   PLAIN_ATTR,
   RIGHT_PANEL_ATTR,
-  RIGHT_FLOAT_HOST_ATTR,
   SHELL_OVERLAY_ATTR,
   SIDE_ATTR,
+  TAB_MENU_Z_INDEX,
   TOP_STOP_VARIABLE,
   TOP_VARIABLE,
   WIDTH_HANDLE_ATTR,
@@ -34,9 +35,13 @@ import { normalizeScheme, toneFor, toneIdOf, type ColorScheme, type ThemeToneSet
 /**
  * 颗粒叠加层不透明度（**深色轴**）—— 与 pyai.site `global.css:75` 一致。
  *
+ * ⚠️ 2026-09-24：**唯一来源已收到 constants.ts 的 {@link GRAIN_ALPHA}**（owner：
+ * 「噪点值统一变量，方便后续我们减弱」）。这里保留这两个名字只为兼容既有引用与测试，
+ * 值一律从 `GRAIN_ALPHA` 派生 —— **不要再在这里改数字**。
+ *
  * 浅色轴要更大的值，见 {@link GRAIN_OPACITY_LIGHT}。
  */
-export const GRAIN_OPACITY = 0.13
+export const GRAIN_OPACITY = GRAIN_ALPHA.dark
 
 /**
  * 颗粒不透明度（**浅色轴**）—— `.16`。
@@ -66,7 +71,7 @@ export const GRAIN_OPACITY = 0.13
  * **只能往下刻**，刻多深就掉多少亮度。
  * 所以浅色轴的质感**注定比深色轴弱一档**，这是近白底的固有代价，不是取值没调好。
  */
-export const GRAIN_OPACITY_LIGHT = 0.16
+export const GRAIN_OPACITY_LIGHT = GRAIN_ALPHA.light
 
 /**
  * 颗粒纹理：200×200 `feTurbulence`（`fractalNoise` / `baseFrequency .8` /
@@ -311,7 +316,7 @@ export function buildBackdropCss(): string {
   content: '';
   position: absolute;
   inset: 0;
-  opacity: ${GRAIN_OPACITY};
+  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY});
   background-image: ${GRAIN_DATA_URI};
 }
 .${BACKDROP_CLASS}[${GRAIN_ATTR}='off']::after {
@@ -329,7 +334,7 @@ body:not([data-ds-dark-theme]) .${BACKDROP_CLASS} {
 }
 body:not([data-ds-dark-theme]) .${BACKDROP_CLASS}::after {
   mix-blend-mode: multiply;
-  opacity: ${GRAIN_OPACITY_LIGHT};
+  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT});
 }
 /* ===== 用户内容豁免 =====
    背景层为了给「应用底 + 左右栏 + 对话区」着色，必须压在内容之上；但用户内容
@@ -345,16 +350,17 @@ body:not([${PLAIN_ATTR}]) [${CONTENT_ATTR}] {
    清单与「为什么」见 constants.ts 的 ABOVE_CONTENT_Z_INDEX —— 那是一条**不变式**：
    凡 z-index < 81 且要压在内容之上的官方层，都得抬。
    对话顶栏不在这里（它的 z-index 在 glass.ts，是玻璃规则的一部分），同样取 82。
-   注意 dockkit 标签菜单取的是**更高一档**（83）—— 官方明写它必须高于右栏浮层宿主
-   （dockkit.module.css:438-443 原话：a menu opened from a tab must never sit under a panel），
-   两个层号必须一起抬才能保住这个次序（60/70 → 82/83）。 */
+   注意 dockkit 标签菜单取的是**更高一档**（83）—— 官方明写它必须高于右栏面板
+   （dockkit.module.css:538-543 原话：a menu opened from a tab must never sit under a panel），
+   所以面板 82 / 标签菜单 83 一起抬才保住这个次序。
+   ⚠️ 0.1.7 起官方删了右栏浮层宿主（原 data-sidebar-right-float-host），本表不再收录它。
+   （本段在模板字符串里，注释中不能出现反引号。） */
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
-body:not([${PLAIN_ATTR}]) [${SHELL_OVERLAY_ATTR}],
-body:not([${PLAIN_ATTR}]) [${RIGHT_FLOAT_HOST_ATTR}] {
+body:not([${PLAIN_ATTR}]) [${SHELL_OVERLAY_ATTR}] {
   z-index: ${ABOVE_CONTENT_Z_INDEX};
 }
 body:not([${PLAIN_ATTR}]) [${DOCKKIT_MENU_ATTR}] {
-  z-index: ${ABOVE_FLOAT_HOST_Z_INDEX};
+  z-index: ${TAB_MENU_Z_INDEX};
 }
 /* **拖拽条**（拖它调左右栏 / 对话区宽度）—— owner 真机报「调整对话区域的条整没了」。
    官方有**两条**，属性不同（见 constants.ts 的 WIDTH_HANDLE_ATTR）：

@@ -18,7 +18,7 @@ DeepSeek Files API 云端文件的**可视化管理面板**：侧边栏 footer �
 **做**：
 
 * 侧边栏 footer 入口按钮 + 弹窗（同 archive-manage 模式）。
-* 列表：游标翻页（after / limit / order，默认 desc 最新在前）；行内展示文件名、大小（人读）、上传时间（created_at）、到期时间（expires_at，有则显）、file_id（一键复制）；`dsh-` 前缀文件标注「DSH 自动上传」。
+* 列表：游标翻页（after / limit；官方 Files API 已无排序查询，返回顺序由服务端决定）；行内展示文件名、大小（人读）、上传时间（created_at）、到期时间（expires_at，有则显）、file_id（一键复制）；`dsh-` 前缀文件标注「DSH 自动上传」。
 * 删除单条：二次确认；`dsh-` 前缀额外说明「删除后再次引用时官方会自动重新上传」。
 * 复制 file_id。
 
@@ -39,7 +39,7 @@ DeepSeek Files API 云端文件的**可视化管理面板**：侧边栏 footer �
 
 ### 列表
 
-* 游标翻页与官方一致（after / limit / order）；「加载更多」延伸渲染窗口、窗口盖满已加载行时再按 has_more 拉下一页。
+* 游标翻页与官方一致（after / limit）；「加载更多」延伸渲染窗口、窗口盖满已加载行时再按 has_more 拉下一页。
 * 行信息完整（文件名 / 大小人读 / 上传与到期时间 / file_id 复制）；`dsh-` 角标正确。
 
 ### 删除

@@ -1,6 +1,15 @@
 /** 插件的全局常量：settings 命名空间、provider 路由、CodeBuddy 端点与官方请求标识。 */
 
-/** Settings 命名空间（小写连字符标识，installSection 契约要求）。 */
+/**
+ * 设置命名空间 = **profile 条目 id**（0.1.7 起官方设置面按条目 id 寻址：配置表单由
+ * 插件导出的 `Config` 投影，`SettingsForms` 的 describe/update/mutate 全部以条目 id
+ * 为 key——`packages/settings/settings/src/index.ts:304-315,382`）。
+ *
+ * 本插件的条目 id 由自带的 `cordis.patch.yml`（`dsh.bundle.patch`）insert 决定，值
+ * 就是这里；它与插件 `name`、客户端 provider 卡片槽位的 key 必须**三者一致**
+ * （卡片按 provider 行的 settingsNs 匹配、模型发现按同一 key 注册），
+ * `test/config.test.mjs` 有对应守卫。
+ */
 export const NS = 'llm-codebuddy-credits'
 /** DSH provider 路由 key，也是模型条目与凭据配置的锚点（client 端 model-facts.ts 的 PROVIDER_ID 必须与此一致）。 */
 export const PROVIDER = 'codebuddy-credits'
@@ -111,8 +120,13 @@ export const DEFAULT_MAX_TOKENS = 32_768
  * 图片请求预算：照搬官方 CLI 的默认压缩档（2000 档，源码实测）——
  * 默认最长边 2000px（CODEBUDDY_CODE_IMAGE_COMPRESSION_MAX_DIMENSION 可调，
  * 我们跟随默认档，不引入该环境变量）、JPEG 质量阶梯 [80,60,40,20]、
- * 原始字节目标 3_932_160（base64 上限 5_242_880）。DSH 附件策略只有
- * maxPixels（宽×高）没有单边上限，取 2000×2000 近似官方档。
+ * 原始字节目标 3_932_160（base64 上限 5_242_880）。
+ *
+ * 0.1.7-rc.1 的 `ImageRequestTarget` 是 `{ width, height, maxBytes }`：像素预算这
+ * 一项由调用方经官方的 `requestImageDimensions(width, height, maxPixels)` 换算成
+ * 保持宽高比的目标尺寸（与官方 llm-pi-ai 的 `requestImageTarget` 逐字同构，
+ * `packages/llm/llm-pi-ai/src/context.ts:249-251`）。官方档是**单边** 2000px，
+ * 而这里沿用历来的总像素预算 2000×2000（旧版附件策略的语义，换算结果与之前一致）。
  */
 export const IMAGE_REQUEST_POLICY = {
   maxPixels: 2000 * 2000,

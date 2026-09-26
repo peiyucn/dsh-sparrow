@@ -210,7 +210,7 @@
 body:not([data-dsh-theme-tone-plain]) [data-conversation-scroll] { position: relative; z-index: 81 }
 body:not([data-dsh-theme-tone-plain]) [data-sidebar-right-panel],
 body:not([data-dsh-theme-tone-plain]) [data-shell-overlay],
-body:not([data-dsh-theme-tone-plain]) [data-sidebar-right-float-host] { z-index: 82 }
+/* 0.1.7 起官方删除了 [data-sidebar-right-float-host]，该行已移除 */
 body:not([data-dsh-theme-tone-plain]) [data-dockkit-tab-menu] { z-index: 83 }
 ```
 
@@ -245,7 +245,7 @@ body:not([data-dsh-theme-tone-plain]) [data-dockkit-tab-menu] { z-index: 83 }
 | **左右栏拖拽条**（`AppFrame .handle`，靠 `[data-side]` 认） | 11 | ✓ 已抬（82）—— 漏过：拖拽条被整条盖掉 |
 | **对话区拖拽条**（`ConversationRoot .widthHandle`） | —— | ✓ 已抬（82）—— 同上，它靠独有属性 `data-width-handle` 认 |
 | 外壳浮层 `[data-shell-overlay]` | 20 | ✓ 已抬（82） |
-| **右栏浮层宿主** `[data-sidebar-right-float-host]` | 60 | ✓ 已抬（82）—— portal 到 body 的浮动面板，原 60 < 81 会被内容盖住 |
+| ~~右栏浮层宿主~~ | — | 0.1.7 起官方已删除该锚点，规则同步移除 |
 | dockkit 标签菜单 `[data-dockkit-tab-menu]` | 70 | ✓ 已抬（**83**）—— 官方明写它必须高于浮动面板，故**高一档** |
 | dockkit 拖拽落点提示（`.dockScrim` / `.dockHint`） | 10 | ⚠️ **未收录**（只在下方 dock 区内，无专用语义属性） |
 
