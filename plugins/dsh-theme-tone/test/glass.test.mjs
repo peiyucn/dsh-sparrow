@@ -127,10 +127,29 @@ describe('glass：顶栏浮层', () => {
       /\[data-slot='conversation\.header'\] > header[\s\S]*?position: absolute/u,
       '② 顶栏要浮起来（打在官方那个 <header> 上）',
     )
+    // ③ 滚区顶部要补出顶栏高度 —— **必须是 border-top，不能是 padding-top**。
+    //    owner 2026-09-26 报「顶栏透明后，右侧滚动条也会跑上去」：滚动条画在滚动容器的
+    //    **padding box** 上，padding-top 只推内容、不推它 ⇒ 轨道与滑块仍从 y=0 起画，
+    //    前 76px 落在半透明顶栏下面 ⇒ 透出来。官方顶栏**在流内**，滚区天然从 76 起。
+    //    真机实测（滑块染不透明橙，只在滚动条那一列扫描）：
+    //      官方默认档        clientHeight=680，滑块顶端 y=78（= 76 + 官方轨道 2px）
+    //      padding-top: 76   clientHeight=756，滑块顶端 y=0（画进顶栏带）
+    //      border-top: 76    clientHeight=680，滑块顶端 y=78  ← 与官方逐项相同
     assert.match(
       css,
-      new RegExp(`\\[data-conversation-scroll\\][\\s\\S]*?padding-top: ${HEADER_HEIGHT_PX}px`, 'u'),
-      '③ 滚区顶部要补出顶栏高度',
+      new RegExp(`\\[data-conversation-scroll\\][\\s\\S]*?border-top: ${HEADER_HEIGHT_PX}px solid transparent`, 'u'),
+      '③ 滚区顶部补出顶栏高度，且必须用**透明 border-top**（padding-top 不推滚动条）',
+    )
+    assert.ok(
+      !/\[data-conversation-scroll\][^}]*padding-top/u.test(rules),
+      '不得再用 padding-top 顶开顶栏 —— 它推不动滚动条，会让滚动条画进顶栏（owner 报过）',
+    )
+    // 与上一条配对：border 只是把 padding box 下移，**不能**让元素被撑高 76px。
+    // 官方 .scrollBody 是 content-box 且无边框，本插件引入边框后必须显式声明同一口径。
+    assert.match(
+      css,
+      new RegExp(`\\[data-conversation-scroll\\][\\s\\S]*?box-sizing: content-box`, 'u'),
+      '④ 必须与 border-top 配对声明 box-sizing: content-box（否则边框把滚区撑高 76px）',
     )
   })
 

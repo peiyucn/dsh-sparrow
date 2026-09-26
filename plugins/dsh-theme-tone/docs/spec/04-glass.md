@@ -31,7 +31,10 @@
   background: color-mix(in srgb, var(--dsw-alias-bg-base) 70%, transparent);
   backdrop-filter: blur(12px) saturate(1.15);                                    /* GLASS_BLUR */
 }
-[data-phase='active'] [data-conversation-scroll] { padding-top: 76px; }          /* ③ 滚区补高 */
+[data-phase='active'] [data-conversation-scroll] {                              /* ③ 滚区补高 */
+  border-top: 76px solid transparent;   /* ⚠️ border-top，不是 padding-top */
+  box-sizing: content-box;
+}
 ```
 
 > 上面的 `z-index` / `blur` 在源码里是模板插值（`ABOVE_CONTENT_Z_INDEX`、`GLASS_BLUR`）——
@@ -52,6 +55,27 @@
 
 → **静止时布局等值**，顶栏的分隔线仍与左栏（tab strip 38px + 面板标题 38px = 76px）在列边缘接上
 （`ConversationRoot.module.css:37-41` 那条契约）。差别只在「内容现在从它下面滚过」。
+
+> ⚠️ **③ 为什么是 `border-top` 而不是 `padding-top`**（owner 2026-09-26 报
+> 「顶栏透明后，右侧滚动条也会跑上去」）：
+> **滚动条画在滚动容器的 padding box 上，`padding-top` 只推内容、不推它。**
+> 于是轨道与滑块仍从 y=0 起画，前 76px 正落在**半透明顶栏下面** —— 顶栏现在是
+> `color-mix(… 70%)` + `blur(12px)`，挡不住，于是那段滚动条以 1~3 级的淡痕透出来。
+> 官方因为顶栏**在流内**，滚区天然从 y=76 起，滚动条也就从 76 起。
+>
+> `border-top` 同样是「推内容」，但它把 **padding box 整体下移** 76px ⇒
+> 滚动条与内容一起回到官方位置。真机三档对照（滑块染不透明橙，只在滚动条那一列扫描）：
+>
+> | 档 | 滚区 clientHeight | 滑块顶端 y | 说明 |
+> | :--- | ---: | ---: | :--- |
+> | 官方默认（顶栏在流内） | 680 | **78** | = 76 + 官方轨道 2px 边距 |
+> | 改前 `padding-top: 76px` | 756 | **0** | 画进顶栏带（透出来） |
+> | 本版 `border-top: 76px` | **680** | **78** | 与官方逐项相同 ✓ |
+>
+> ⚠️ 必须**配对**声明 `box-sizing: content-box`：官方 `.scrollBody` 本身就是 content-box
+> 且无边框，本插件引入边框后若按 border-box 解析，那 76px 会从内容高度里扣掉、
+> 滚区内容区被压缩。真机复验：`clientHeight` 680（= 官方值）、`offsetHeight` 756（总高不变）、
+> 输入框座位位置逐像素不变、不产生页面级纵向溢出。
 
 ## 3) 输入框：玻璃**只做在卡片上**
 

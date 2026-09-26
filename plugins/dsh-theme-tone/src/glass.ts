@@ -686,8 +686,30 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'
   backdrop-filter: ${GLASS_BLUR};
 }
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-scroll] {
-  /* ③ 滚区顶部补出顶栏高度 —— 与浮层是一对，少一个正文首行会被盖住 */
-  padding-top: ${HEADER_HEIGHT_PX}px;
+  /* ③ 滚区顶部补出顶栏高度 —— 与浮层是一对，少一个正文首行会被盖住。
+     ⚠️ **必须用 border-top，不能用 padding-top**（owner 2026-09-26 报
+     「顶栏透明后，右侧滚动条也会跑上去」）：
+     滚动条是画在滚动容器的 **padding box** 上的，**padding-top 只推内容、不推它** ——
+     于是玻璃档下轨道与滑块仍从 y=0 起画，前 76px 正落在**半透明顶栏下面** ⇒ 透出来。
+     官方因为顶栏**在流内**，滚区天然从 y=76 起，滚动条也就从 76 起。
+
+     border-top 同样是「推内容」，但它把 **padding box 整体下移** 76px ⇒
+     滚动条与内容一起回到官方位置。真机实测（滑块染不透明橙、只在滚动条那一列扫描）：
+
+     | 写法 | 滚区 clientHeight | 滑块顶端 y | 官方基准 |
+     | :--- | ---: | ---: | :--- |
+     | 官方默认档（顶栏在流内） | 680 | **78**（= 76 + 官方轨道 2px） | —— |
+     | padding-top: 76px（改前） | 756 | **0**（画进顶栏带，透出来） | ✗ |
+     | border-top: 76px（本版） | **680** | **78** | ✓ 逐项相同 |
+
+     ⚠️ 前提是 **box-sizing: content-box**（官方 .scrollBody 就是；实测该元素也是）——
+     它是 border-box 的话边框会吃掉内容高度。下面的 border 与 box-sizing 两条一起钉住。
+     ⚠️ border 是**透明**的：滚区自己的背景仍按 border-box 铺（border 区照旧有底色），
+     且那 76px 之上盖着顶栏浮层 ⇒ 观感与改前一致。
+     ⚠️ 正文首行位置**不变**（实测两种写法都是相对滚区顶 76px）—— 这条只挪滚动条与
+     clientHeight，不挪内容。 */
+  border-top: ${HEADER_HEIGHT_PX}px solid transparent;
+  box-sizing: content-box;
 }
 /* --- ④ 拖拽条：把上段裁到顶栏下缘（**恢复官方几何**，不新造基准） ---
    owner 2026-09-24 又报：「左右边宽度拖动条**在顶栏依然穿模**」—— 顶栏浮层化的直接副作用。
