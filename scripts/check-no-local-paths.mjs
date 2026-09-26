@@ -42,6 +42,9 @@ const isPlaceholderToken = (token) =>
   token.startsWith('<') || token.startsWith('%') || token.startsWith('$') || token.startsWith('{')
   || PLACEHOLDERS.has(token.toLowerCase())
 
+/** 那三段的字面量在本文件里都被 `join('-')` 拼起来用，**不整体出现**（见下面那条规则）。 */
+const LOCAL_WORKSPACE_PARTS = ['pyai', 'meta', 'repo']
+
 /** 判据 2 的三条通用模式。加规则时**不要写真实用户名**（本文件也在索引里）。 */
 const GENERIC_RULES = [
   {
@@ -56,7 +59,9 @@ const GENERIC_RULES = [
   },
   {
     name: '本机 workspace 路径',
-    re: /pyai-meta-repo/gu,
+    // ⚠️ 模式**拼出来**，不写字面量：本文件自己也在 git 索引里，
+    // 直接写目录名会被本守卫当成一处泄漏（实测踩过）。这是本守卫的**自证**。
+    re: new RegExp([LOCAL_WORKSPACE_PARTS[0], LOCAL_WORKSPACE_PARTS[1], LOCAL_WORKSPACE_PARTS[2]].join('-'), 'gu'),
     token: () => null, // 没有占位豁免：这个目录名就是本机专属
   },
 ]
