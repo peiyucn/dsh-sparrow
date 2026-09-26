@@ -92,4 +92,29 @@ describe('模型选择器：分组标题吸顶（几何契约）', () => {
       '标题不得声明 backdrop-filter（会采样到滚动的行，反而更脏）',
     )
   })
+
+  it('标题应该 切同心圆角（和菜单一致），但**不得**因此变透明', () => {
+    // owner 第五轮：「能否官方原样，但把这个条变成圆角的，和菜单的圆角一致」。
+    //
+    // 几何：本菜单 `border-radius: 20px` + `padding: 4px` ⇒ 同心内圆角 = **16px**
+    // = `--dsw-radius-lg`（真机读到该 token 就是 16px），也**正是官方菜单自己的圆角 token**
+    // （`ui-primitives/MenuSurface.module.css:3` 的 `.surface { border-radius: var(--dsw-radius-lg) }`）。
+    //
+    // 切圆要治的是**下沿那道横贯全宽的直边** —— 它才是"看着像一条背景条"的来源
+    // （上两角本来就被菜单的 `overflow: hidden` + 20px 圆角切掉了，加了也看不见）。
+    const title = ruleFor('ccb-model-groupTitle')
+    assert.match(
+      title.body,
+      /border-radius:\s*var\(--dsw-radius-lg/u,
+      '标题要切同心圆角，且走官方菜单自己的圆角 token（不写死像素）',
+    )
+    // ⚠️ 切圆**不是**把底变透明：这两条必须同时成立，否则就又回到 owner 否掉的那版。
+    assert.match(
+      title.body,
+      /background-color:\s*var\(--dsw-alias-bg-base\)/u,
+      '切圆之后底必须仍然不透明（owner：「不是变成透明的」）',
+    )
+    // 真机滚动差分（0.1.7）：切圆前后标题带逐像素不变（不透明 ⇒ 挡住滚过的行）。
+    // 若哪天有人"顺手"把底改成半透明去配圆角，上面那条断言会先拦住。
+  })
 })

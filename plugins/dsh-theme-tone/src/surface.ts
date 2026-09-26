@@ -398,6 +398,38 @@ export function groupTitleLayers(): string {
 export const GROUP_TITLE_ATTACHMENT = 'scroll, scroll, fixed, fixed, fixed, fixed'
 
 /**
+ * 分组标题条的**圆角** —— owner 第五轮给的做法：「官方原样，但把这个条变成圆角的，
+ * **和菜单的圆角一致**」。
+ *
+ * ## 为什么取 `--dsw-radius-lg`
+ *
+ * 菜单是「圆角盒 + 内边距」，标题在内边距里侧，所以**同心圆角 = 菜单圆角 − 内边距**：
+ *
+ * | 菜单 | 圆角 | 内边距 | 同心内圆角 |
+ * | :--- | ---: | ---: | ---: |
+ * | 官方 `MenuSurface` `.surface`（`--dsw-radius-lg`） | 16px | 4px | 12px |
+ * | 本仓库 codebuddy `.ccb-model-menu` | 20px | 4px | **16px** |
+ *
+ * 两个值分别是 `--dsw-radius-lg`(16) 与 `--dsw-radius-md`(12) —— 取 **`--dsw-radius-lg`**
+ * 的理由：① 它正是**官方菜单自己的圆角 token**（`MenuSurface.module.css:3`，
+ * 与 owner「和菜单的圆角一致」的字面要求一致）；② 对 codebuddy 那个 20px 菜单它**恰好就是
+ * 同心值**，于是两个菜单都落在"与菜单同族"的读数上。
+ *
+ * ## 圆角解决的是哪一半问题
+ *
+ * 标题上沿那两角**本来就被菜单自己切掉了**（菜单 `overflow: hidden` + 20px 圆角），
+ * 所以真正的可见边界是**下沿那道横贯全宽的直边** —— 那才是 owner 说的「一条背景条」。
+ * 切圆之后它读成一个"圆角块"而不是"一条带"。
+ *
+ * ⚠️ **切圆不改变填充**：底仍然是不透明的（见 `groupTitleLayers`）—— 这是 owner 第三轮
+ * 定的硬约束（「不是变成透明的」）。实测（真机 0.1.7，滚动差分）：切圆后标题带在
+ * 滚动前后**逐像素不变**（66.32 → 66.32），而"官方原样"那版会从 72.45 变到 95.84（露行）。
+ * 下两角内侧（x=13..22, y=23..30）在 4 个滚动位置上最大偏差 12 级 —— 那是弧线的抗锯齿边缘，
+ * 不是露行；对比同位置的"官方原样"版是 23 级且整条带都在变。
+ */
+export const GROUP_TITLE_RADIUS = `var(--dsw-radius-lg, 16px)`
+
+/**
  * 给锚点挂上「官方默认」门。
  *
  * **不能**写成 `body:not([…]) ${anchor}` —— 锚点自带 `body ` 前缀，那样会拼出
@@ -583,6 +615,9 @@ ${groupTitleRule(`body:not([${PLAIN_ATTR}])`)} {
   background-image: ${groupTitleLayers()} !important;
   background-attachment: ${GROUP_TITLE_ATTACHMENT} !important;
   background-blend-mode: normal, normal, multiply, normal, normal, normal !important;
+  /* owner 第五轮：「官方原样，但把这个条变成圆角的，**和菜单的圆角一致**」。
+     见 GROUP_TITLE_RADIUS —— 同心圆角，且正是官方菜单自己那个 token。 */
+  border-radius: ${GROUP_TITLE_RADIUS} !important;
 }
 ${groupTitleRule(`body[data-ds-dark-theme]:not([${PLAIN_ATTR}])`)} {
   background-blend-mode: normal, normal, screen, normal, normal, normal !important;

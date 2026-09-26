@@ -167,7 +167,11 @@ export function ensurePickerStyles(): void {
     //   （质感层）一起重置掉 —— 这个坑本仓库已经踩过两次。
     // ⚠️ **不写 backdrop-filter**：与官方一致。标题在**菜单内部**，菜单自己已经是
     //   backdrop root，标题再声明模糊只会采样子树里正在滚动的行（真机实测 31.719/px，更脏）。
-    '.ccb-model-groupTitle { position: sticky; top: 0; z-index: 1; padding: 5px 8px 3px; background-color: var(--dsw-alias-bg-base); background-image: linear-gradient(var(--dsw-specific-menu), var(--dsw-specific-menu)); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
+    // ⚠️ **圆角取 `--dsw-radius-lg`**（owner：「把这个条变成圆角的，**和菜单的圆角一致**」）：
+    //   本菜单 `border-radius: 20px` + `padding: 4px` ⇒ 同心内圆角 = **16px** = `--dsw-radius-lg`，
+    //   恰好也是官方菜单自己的圆角 token。切圆解决的是**下沿那道直边**（上两角本来就被菜单
+    //   的 overflow:hidden 切掉了）—— 它才是"看着像一条背景条"的来源。
+    '.ccb-model-groupTitle { position: sticky; top: 0; z-index: 1; padding: 5px 8px 3px; border-radius: var(--dsw-radius-lg, 16px); background-color: var(--dsw-alias-bg-base); background-image: linear-gradient(var(--dsw-specific-menu), var(--dsw-specific-menu)); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
     '.ccb-model-option { box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: auto; min-width: 100%; min-height: 38px; padding: 6px 8px; border: none; border-radius: 10px; outline: none; background: transparent; color: inherit; text-align: left; cursor: pointer; }',
     '.ccb-model-option:hover:not(:disabled), .ccb-model-option:focus-visible { background: var(--dsw-alias-interactive-bg-hover); }',
     '.ccb-model-option:disabled { color: var(--dsw-alias-label-dimmed); cursor: default; }',

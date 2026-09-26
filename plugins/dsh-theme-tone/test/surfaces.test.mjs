@@ -25,7 +25,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
-import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUP_TITLE_ATTACHMENT, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
+import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -1023,7 +1023,22 @@ describe('抬升面：表面绘制', () => {
       splitLayers(declFor(block, 'background-attachment')).slice(0, 2).every(v => v === 'scroll'),
       '最上面两层（标题颗粒 / 卡片填充）按元素盒子，与卡片一致',
     )
-    // ⑦ 地面颗粒的混合模式跟着轴走（地面深色轴 screen / 浅色轴 multiply）：
+    // ⑦ 圆角：owner 第五轮「官方原样，但把这个条变成圆角的，**和菜单的圆角一致**」。
+    //    同心圆角 = 菜单圆角 − 内边距，两条已知菜单都落在官方圆角 token 上
+    //    （官方 `MenuSurface` 16−4=12 = `--dsw-radius-md`；codebuddy 20−4=16 = `--dsw-radius-lg`），
+    //    统一取 `--dsw-radius-lg` —— 它正是**官方菜单自己**的圆角 token。
+    //    切圆要解决的是**下沿那道横贯全宽的直边**（上两角已被菜单的 overflow:hidden 切掉），
+    //    而**不是**把底变透明：实测滚动差分上，切圆后标题带逐像素不变（不透明底仍在）。
+    assert.equal(
+      declFor(block, 'border-radius'),
+      GROUP_TITLE_RADIUS,
+      '标题要切同心圆角（owner：「和菜单的圆角一致」）',
+    )
+    assert.ok(
+      GROUP_TITLE_RADIUS.includes('--dsw-radius-lg'),
+      '圆角走官方菜单自己的 token（不写死像素）',
+    )
+    // ⑧ 地面颗粒的混合模式跟着轴走（地面深色轴 screen / 浅色轴 multiply）：
     //    第二条规则只改 background-blend-mode，其余声明继续由第一条承担（配方只有一份）。
     const darkTitleSelector = `${GROUPED_MENU_SELECTOR.replace(/^body\b/u, `body[data-ds-dark-theme]:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`
     const darkBlock = blockFor(css, darkTitleSelector)
@@ -1031,7 +1046,7 @@ describe('抬升面：表面绘制', () => {
     assert.match(darkBlock, /background-blend-mode:\s*[^;]*screen/u, '深色轴地面颗粒走 screen（与背景层一致）')
     assert.match(block, /background-blend-mode:\s*[^;]*multiply/u, '浅色轴地面颗粒走 multiply（与背景层一致）')
     assert.ok(
-      !darkBlock.includes('background-color') && !darkBlock.includes('background-image'),
+      !darkBlock.includes('background-color') && !darkBlock.includes('background-image') && !darkBlock.includes('border-radius'),
       '第二条规则只改混合模式 —— 避免两处各写一份配方（改一处漏一处）',
     )
   })
