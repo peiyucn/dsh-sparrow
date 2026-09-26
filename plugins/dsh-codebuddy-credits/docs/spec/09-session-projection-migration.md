@@ -128,6 +128,27 @@ state = { credit, calls, byModel[], byTurn: { [String(turn)]: { credit, calls, b
   差 3 笔。**结论：跨进程对照必须挑 mtime 连续两次不变的空闲会话**，
   脚本现在会先验证空闲再比对。
 
+  ⚠️ **另一条更该记的诚实说明**：上面这次真机对照跑的是**进程启动于 08:04 的旧实例**，
+  而本轮的 build 产出在 10:35 —— 也就是说它验证的是**数字口径等价**（旧 live 实现 vs
+  离线重放，两者都是 `foldSessionCredits`），**不是**新接线已经在跑。
+  新接线由下面两条补上（都不需要重启那个实例）。
+
+- **真实 `apply()` 端到端接线**（`_poc/TEMP/verify-apply-wiring.mjs`）：把插件**真实的
+  `apply()`** 跑在真 cordis 容器上（真 `SessionStore` + 真 `SessionProjectionRegistry`，
+  只给 `llm` / `attachments` / `webServer` 打最小桩），验证：`apply()` 不抛、
+  **可选 fork 真的把投影单元注册上了**（`stateOf` 有值）、投影状态与离线重折逐字段一致、
+  容器能干净停止。
+  **为什么非跑不可**：前面的集成测试都是我手工调 `registry.register()`，而插件实际走
+  `ctx.inject(['sessionProjections'], cb)` —— fork 若不触发，投影永远不注册，
+  `live()` 会**静默降级**成冷路径（数字看着还对，迁移却白做了，而且没有任何报错）。
+- **fork 触发语义 + 版本核对**（`_poc/TEMP/verify-fork-and-version.mjs`）：
+  ① `ctx.inject()` 返回 **fiber、不是同步执行**（`cordis/lib/index.js:1600-1606`：
+  `inject(inject, callback) { return this.plugin({ inject, apply: callback }) }`，
+  `plugin()` 新建 Fiber 后由容器调度）—— 我第一版脚本就是因为没 await 而误判「fork 没触发」；
+  ② `ctx.get('sessionProjections')` 软获取成功、注册表缺席时静默返回 `undefined`
+  （降级路径成立）；③ 集成测试加载的官方投影是 **0.1.7-rc.2**，与运行中的 dsh 版本线一致
+  （安装树里另有一个 rc.1 的旧 base bundle 副本，别被它误导）。
+
 ## 已知限制与取舍
 
 1. **host-only 单元仍会被官方投影缓存 checkpoint**（这是它「所有单元一视同仁」的设计）。
