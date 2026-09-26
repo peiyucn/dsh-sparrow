@@ -19,7 +19,7 @@
 * **蓝紫**色调的**色相值**来自 pyai.site，已核对源码与 `dist` 产物：
   * 底色 `#0a0a10` —— `pyai.site/src/styles/global.css:57`
   * 顶部金色光晕 `rgb(232, 162, 74)` / 底部蓝紫辉光 `rgb(96, 78, 168)`，均为 `radial-gradient(ellipse …, transparent 62%)` —— `pyai.site/src/components/SpaceBackdrop.astro:29-39`
-  * 颗粒星尘 `opacity: .13` + `mix-blend-mode: screen` + `feTurbulence` data URI —— `pyai.site/src/styles/global.css:69-78`
+  * 颗粒星尘 `opacity: .13` + `mix-blend-mode: screen` + `feTurbulence` data URI —— `pyai.site/src/styles/global.css:69-78`（**我方实况已降到 `.0975`**，见 03-palette）
   * 三色在 `pyai.site/dist/_astro/Base.Bmz1AN8R.css` 中已复核
 * **与 pyai.site 的两处有意偏离**（都在深色轴的底部辉光那一层；pyai.site 是留白为主的博客，同浓度放到 DSW 这种满屏 UI 上会显得太淡）：
   * alpha `.08` → **`.18`**（三款深色同步）
@@ -56,7 +56,7 @@
   色调只由打光表达。见 03-palette。
 * 三层染色的角色固定：`top` = 上方光源、`bottom` = 下方纵深、`left` = 左上方光晕（左栏与接缝）。「左侧光晕」锚在视口左上角而不是按接缝定位 —— 官方没把左栏宽度暴露成 CSS 变量（`SidebarRoot` 是 inline width + hashed 类名），锚左上角在左栏 264–420px 之间变化时观感都成立。
 * 「官方默认」的 token 值用 `var(--dsw-static-neutral-*)` **引用官方变量**而不是硬编码色值 —— 官方换色我们自动跟随，且语义上就是「官方原值」；三层染色为空 → 背景层整层隐藏。
-* 颗粒星尘：两轴都开。深色轴 `screen` / `.13`（只加亮）；浅色轴 `multiply` / `.16`（白底上往下刻纹理）。
+* 颗粒星尘：两轴都开。深色轴 `screen` / `.0975`（只加亮）；浅色轴 `multiply` / `.16`（白底上往下刻纹理）。
 
 ## 痛点与根因（已查证，dsh 0.1.5-rc.2）
 

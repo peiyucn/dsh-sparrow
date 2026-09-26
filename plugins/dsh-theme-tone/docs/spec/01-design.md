@@ -109,7 +109,7 @@ release = ctx.theme.overrideTokens('@dsh-sparrow/dsh-theme-tone', {
   content: '';
   position: absolute;
   inset: 0;
-  opacity: 0.13;
+  opacity: 0.0975;
   background-image: url("data:image/svg+xml,…feTurbulence fractalNoise…");
 }
 

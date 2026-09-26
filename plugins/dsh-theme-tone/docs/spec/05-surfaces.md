@@ -294,7 +294,7 @@ body > [role='button'] {
 * **两个属性都 `!important`**：官方写的是 `background:` **简写**（内含 `background-image: none`），
   特异度又各写各的（`.list` / `.card` / `.portal .menu` …），无法穷举；压不过就是静默失效。
   反过来，因为只动这两样，万一锚点没命中，剩下的也只是一个官方面，不会出现「半截样式」。
-* **不设 blend mode**：颗粒的强度烘在贴图里（`POPUP_GRAIN_DATA_URI` 的 `<rect opacity='0.13'>`）。
+* **不设 blend mode**：颗粒的强度烘在贴图里（`POPUP_GRAIN_DATA_URI` 的 `<rect opacity='0.0975'>`）。
 * **不用 `background:` 简写**：那会连带重置 `background-position` / `-repeat` 等，官方这些面里
   有靠它们的（如 `dockkit` 的浮层）。
 
