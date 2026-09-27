@@ -101,7 +101,10 @@ export const creditsProjectionStateSchema = z.object({
   credit: z.number(),
   calls: z.number().int().nonnegative(),
   byModel: z.array(modelCreditsSchema),
-  byTurn: z.record(z.string(), turnCreditsSchema),
+  // `.strict()` 与其余三处一致（2026-09 审计发现漏了）：`byTurn` 是**按 turn key 的字典**，
+  // 宽松模式会让一条带多余字段的脏行静默通过校验、把没被理解的旧形状当作有效缓存继续用 ——
+  // 与「形状不认识就作废该行并整段重折」的既定口径相反。
+  byTurn: z.record(z.string(), turnCreditsSchema.strict()),
 }).strict()
 
 declare module '@deepseek-ai/dsh-session-projection/types' {

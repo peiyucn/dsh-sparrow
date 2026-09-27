@@ -436,8 +436,10 @@ export function grainTileUri(alpha: number): string {
 /** 浮层颗粒贴图（深色轴）—— 由 {@link GRAIN_ALPHA} 派生。 */
 export const POPUP_GRAIN_DATA_URI = grainTileUri(GRAIN_ALPHA.dark)
 
-/** 浮层颗粒贴图（浅色轴）—— 由 {@link GRAIN_ALPHA} 派生。 */
-export const POPUP_GRAIN_DATA_URI_LIGHT = grainTileUri(GRAIN_ALPHA.light)
+// ⚠️ 这里曾有一条 `POPUP_GRAIN_DATA_URI_LIGHT = grainTileUri(GRAIN_ALPHA.light)`，
+// 已删除（2026-09 审计：全仓零引用）。浅色轴的贴图由 tones.ts 在运行时按 scheme
+// 现算 `grainTileUri(GRAIN_ALPHA[scheme])` —— 那条常量既不是唯一来源、也没有消费者，
+// 留着只会让下一个维护者以为「浅色轴走的是另一条路径」。
 
 /** 颗粒开关的 DOM 属性（`off` 时 `::after` 不渲染）。 */
 export const GRAIN_ATTR = 'data-grain'

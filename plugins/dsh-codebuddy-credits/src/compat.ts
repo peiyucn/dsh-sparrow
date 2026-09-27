@@ -29,8 +29,13 @@ import * as dshSessionSurface from '@deepseek-ai/dsh-session'
  *
  * 积分重放会**逐字段解析**事件里的 `data.message.source.replayState.response.usage.credit`，
  * 会话格式换代可能改变事件布局 —— 认错就是静默读出 0。
+ *
+ * 官方会话格式是单调整数：0.1.2-rc.1 为 `0`，0.1.5-rc.1 为 `3`，0.1.7 起为 `4`
+ * （`packages/core/session/src/types.ts` 的 `SESSION_FORMAT_VERSION`，rc.1 → rc.2 未变）。
+ * `4` 必须在内 —— 否则在官方当前版本上每次启动都会发一条「积分可能显示为 0」的
+ * 误导告警（2026-09 审计发现：本集合此前是 `[0, 3]`，漏了 `4`）。
  */
-export const SUPPORTED_SESSION_FORMAT_VERSIONS: readonly number[] = [0, 3]
+export const SUPPORTED_SESSION_FORMAT_VERSIONS: readonly number[] = [0, 3, 4]
 
 /**
  * 宿主上报的会话格式版本。
