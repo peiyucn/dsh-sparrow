@@ -11,4 +11,20 @@
 * `dsh-file-manage`：直接 import 官方导出 `DeepSeekFilesClient`；只读官方 `llm-deepseek` 设置节取 `baseURL`/`apiKeyEnv`
 * `dsh-nav-pin`：只读依赖官方 DOM 标记与 aria-label 文案；CSS 特异性压制官方窄屏隐藏规则；宽度轴经官方公开 data 属性钳制；悬停时补写官方**自己声明**的光带变量 `--dsh-width-handle-pointer-y`（官方只在拖拽中写它，故悬停时那条光带位置不对，见 `plugins/dsh-nav-pin/src/handle-glow.ts`）——**不是私有 seam**：不替换 / 不包装 / 不覆写官方任何函数、不读官方内部状态，只是把官方**自己公开消费**的属性补上它漏掉的取值；官方改名即静默失效（fail-safe）
 * `dsh-codebuddy-credits`：无私有 seam——协议层自建（`CodeBuddyAdapter extends LlmAdapter`，不依赖 pi-ai）：请求构造、SSE 解析、usage.credit 提取、企业策略错误透传全部显式实现；客户端身份标识（user-agent/x-product/x-ide-name/企业上下文头）直接进请求头；`conversation.input.model` 槽位以 priority -1 遮蔽官方 ModelSelect（官方注册表语义：同 cell 最低 priority 渲染，非 monkey-patch）——vendored 选择器（MIT 署名，源码 ui-model-selection）只为积分系数右对齐列，启动能力检查缺 `modelDirectories`/`sessions` 服务即保留官方选择器；只读依赖官方 DOM 标记 `[data-composer-card]`（Toast 锚定）；捕获阶段点击拦截官方行头「编辑」按钮（按钮保留官方原位与样式，`stopPropagation` 阻断官方编辑器打开，行为改为展开本插件自建编辑器——官方编辑器对本命名空间只渲染占位提示）；首装 setup 占位编辑器以 CSS 隐藏（`:has(.ccb-card-root)` 锚点 + DOM 结构定位——官方类名是纯哈希、片段匹配无效）；凭据引用对齐官方派生名 `CODEBUDDY_CREDITS_API_KEY`（deriveKeyRef 口径，旧引用 `CODEBUDDY_API_KEY` 兼容迁移），使官方行头凭据圆点原生生效；每轮积分胶囊挂官方 `conversation.chat.assistant-actions` 槽位（公开 seam），DOM 级移动到该行动作行末尾时间之前（只移动本插件自有节点，不包装/替换官方组件）；轮次关联按会话事件自带的 `turn`/`step` 字段（积分改由事件重放后不再依赖请求期 signal 关联）；会话积分胶囊挂官方 `conversation.composer.dock` 槽位，DOM 级把自有 React 节点（portal）追加进官方统计胶囊行末尾（只 append 自有节点，不包装/替换官方节点；官方行以 `[data-composer-stats]` 标记寻址，每步重渲染丢节点后按同 nodes 信号重解析重挂）——形状照官方 `.pill`（官方 0.1.5-rc.2 起该行是图标胶囊排，旧的「纯文字 + | 分隔符追加到官方 StatsLine」已随官方改版弃用），点击展开官方 stat-dialog 同皮明细，定位/外点关闭/Esc 走公开 primitive `useAnchoredPosition`/`useDismissOnOutsidePointer`；额度卡挂官方 `conversation.session.header.utilities` 槽位（公开 seam，owner 无专属字段），order -10 渲染在官方 session log 下载按钮左边（原侧栏位置会遮挡官方连接状态提示，故迁至头部；面板仍走 portal + fixed 定位）；blank 会话 hero 态官方 header 整体隐藏（hideChrome，utilities 不渲染），额度入口另挂官方 `conversation.input.dock` 槽位（公开 seam，hero/active 两态都渲染）的 hero 锚点——只读官方根元素 `data-phase` 公开 DOM 标记，相位为 hero 时 portal 到会话根右上角（absolute 对齐 header 行几何），active 相位返回 null 让位 header 常驻入口（公开槽位 + 公开标记，非私有 seam）
-* `dsh-theme-tone`：**无私有 seam** —— 颜色经公开 `ctx.theme.overrideTokens` 落地，设置行走 `ctx.settingsScope` + `settings.general.item` 槽位，双语文案走 `ctx.locale.register`。只读依赖官方**公开语义标记**给自有元素定位着色/做玻璃：`data-phase` / `data-slot` / `data-conversation-scroll` / `data-composer-seat` / `data-composer-card` / `data-sidebar-right-panel` / `data-sidebar-right-float-host` / `data-shell-overlay` / `data-dockkit-tab-menu` / `data-width-handle` / `data-side` / `data-state` / `data-variant` / `data-tool` / `data-queue-dock` / `data-goal-bar` / `data-testid='todo-panel'` / `data-trigger-menu` / `role=menu|dialog|listbox|tooltip|group|tree|button`。**不碰官方 DOM 结构、不包装/覆写官方函数、不依赖 hashed CSS-module 类名** —— 唯一例外是悬停卡的字色按**稳定类名后缀**匹配（`[class*='_hoverTitle']` 等，因为官方把字色写成了组件内字面量），见 `plugins/dsh-theme-tone/docs/spec/05-surfaces.md`
+* `dsh-theme-tone`：**无私有 seam** —— 颜色经公开 `ctx.theme.overrideTokens` 落地，设置行走
+  **`ctx.configForms`**（官方 0.1.7-alpha.1 起由 `settingsScope` 改名；本插件已随迁，全仓无
+  `settingsScope` 残留）+ `settings.general.item` 槽位，双语文案走 `ctx.locale.register`。
+  设置面服务走 `ctx.inject([...], cb)` 的可选依赖 fork（服务缺失时什么都不做，不进 client boot 审计）。
+  只读依赖官方**公开语义标记**给自有元素定位着色/做玻璃：`data-phase` / `data-slot` /
+  `data-conversation-scroll` / `data-composer-seat` / `data-composer-card` /
+  `data-sidebar-right-panel` / `data-sidebar-right-float-host` / `data-shell-overlay` /
+  `data-dockkit-tab-menu` / `data-dockkit-pane` / `data-dockkit-empty` / `data-width-handle` /
+  `data-side` / `data-state` / `data-variant` / `data-tool` / `data-sample` / `data-queue-dock` /
+  `data-goal-bar` / `data-testid='todo-panel'` / `data-trigger-menu` / `data-expanded` /
+  `data-open` / `data-disclosure-row` / `data-platform` / `data-ds-dark-theme` /
+  `role=menu|dialog|listbox|tooltip|group|tree|button`。
+  **不碰官方 DOM 结构、不包装/覆写官方函数、不依赖 hashed CSS-module 类名** —— 唯一例外是
+  悬停卡的字色按**稳定类名后缀**匹配（`[class*='_hoverTitle']` 等，因为官方把字色写成了组件内
+  字面量），见 `plugins/dsh-theme-tone/docs/spec/05-surfaces.md`。**这是本插件唯一会因官方
+  重命名类名后缀而静默失效的点**（无测试能发现，因为是运行时 CSS），记录在此备查。
+  锚点明细以各插件 `docs/spec` 与代码常量表为准（本文件不复制一份，避免二次漂移）。

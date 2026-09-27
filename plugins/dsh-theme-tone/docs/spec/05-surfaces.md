@@ -250,31 +250,43 @@
 第 3 节的 token 染色只解决了**色相**；浮层仍是**一块平的纯色**，和整屏那种「近黑底 + 顶部金光 + 底部本色辉光 + 星尘」
 不是一个材质。所以还要把**背景层那套配方**按浮层尺度再画一遍 —— 这就是 `src/surface.ts`。
 
-### 6.1 兜底通道：填充 + 三个图层
+### 6.1 主通道：**只叠图层，一个材质声明都不写**
+
+> ⚠️ **本节此前写的是「填充 + 三个图层」并附带
+> `background-color: var(--dsh-theme-tone-panel) !important` —— 那已被推翻**（commit
+> `f88831f`「材质一律交回官方默认」）。0.1.7 官方已经把「半透明填充 + 模糊」成对画好了，
+> 我们再声明一遍 = **在官方画过的地方叠第二次**：同值覆盖看不出来，但如果官方那层是
+> 半透明（如 50%），叠两次就等效 **75%** —— 卡片看起来「不透明」，正是 owner 报的
+> 「子代理卡片好像没有透明模糊吧？」。故本表**撤掉全部材质声明**。
 
 ```css
-/* 带门的五条锚点（[role='dialog'] 那条见下方注）*/
+/* 带门的锚点（逐条见 SURFACE_ANCHORS；[role='dialog'] 那条带 :not(:has(> img))）*/
 body:not([data-dsh-theme-tone-plain]) [role='menu'],
 body:not([data-dsh-theme-tone-plain]) [data-trigger-menu],
 body:not([data-dsh-theme-tone-plain]) :has(> [role='listbox']),
 body:not([data-dsh-theme-tone-plain]) [role='listbox']:not([data-trigger-menu] *),
 body:not([data-dsh-theme-tone-plain]) [role='dialog']:not(:has(> img)) {
-  background-color: var(--dsh-theme-tone-panel) !important;
+  /* 只有图层 —— 没有 background-color，也没有 backdrop-filter（两者都归官方） */
   background-image:
     var(--dsh-theme-tone-grain-tile, none),
     radial-gradient(ellipse 120% 42% at 50% -12%, var(--dsh-theme-tone-top, transparent), transparent 76%),
     radial-gradient(ellipse 110% 52% at 50% 112%, var(--dsh-theme-tone-bottom, transparent), transparent 76%) !important;
 }
-
-/* ⚠️ 悬停卡是**唯一不带门**的一条（见 §8.4）：官方把它的面与字写死成组件内字面量，
-   「先把官方默认修了，然后再适配咱们的」，所以两个档都要修。
-   底色带**官方 layer-3 兜底** —— 它是唯一「token 层未就绪时也照常生效」的规则，
-   没有兜底而 var() 解析为空时，!important 会把卡片压成全透明（比不生效更糟）。 */
-body > [role='button'] {
-  background-color: var(--dsh-theme-tone-panel, var(--dsw-alias-bg-layer-3)) !important;
-  background-image: … !important;
-}
 ```
+
+⚠️ 覆盖用的伪元素层用 **`::after` + `content:''` + `z-index:-1`**（不是不带 `content` 的
+`::before`，也不是 `::before`）—— 理由与实测表见 §6.4 与
+[`docs/upstream/0.1.7-rc.2.md`](../../../../docs/upstream/0.1.7-rc.2.md) §6.4：
+不带 `content` 不生成盒子（空转），`::before` 在树序上早于官方材质（被盖）。
+
+**表里仅有的两处 `background-color`，都不是菜单族**：
+
+* `[role='menu'] [role='group'] > :first-child` —— 粘性分组标题条，它需要**不透明底**
+  才挡得住从下面滚过的行（见 §8.2）；
+* `body > [role='button']` —— 悬停卡，**唯一不带门**的一条（官方把它的面与字写死成组件内
+  字面量，「先把官方默认修了，然后再适配咱们的」，故两个档都修）。它的底色带
+  **官方 layer-3 兜底**：这是唯一「token 层未就绪时也照常生效」的规则，没有兜底而 `var()`
+  解析为空时，`!important` 会把卡片压成全透明（比不生效更糟）。
 
 > 注意**门是并进锚点自身的 `body`** 的（不是 `body:not([…]) body …`）——
 > 后者会拼出「body 套 body」永远不命中。见 §6.3.1。

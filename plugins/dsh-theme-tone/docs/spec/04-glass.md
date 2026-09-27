@@ -25,7 +25,7 @@
 
 ```css
 [data-phase='active'] { position: relative; }                                    /* ① 定位祖先 */
-[data-phase='active'] [data-slot='conversation.session.header'] > * {            /* ② 浮起来 */
+[data-phase='active'] [data-slot='conversation.header'] > header {               /* ② 浮起来 */
   position: absolute; top: 0; left: 0; right: 0;
   z-index: 82;                                                                   /* ABOVE_CONTENT_Z_INDEX */
   background: color-mix(in srgb, var(--dsw-alias-bg-base) 70%, transparent);
@@ -41,11 +41,21 @@
 
 > 上面的 `z-index` / `blur` 在源码里是模板插值（`ABOVE_CONTENT_Z_INDEX`、`GLASS_BLUR`）——
 > **改这两项要去 `constants.ts` / `glass.ts` 改常量**，不要以为这里是一个字面量。
+> 76 / 78 同理来自 `HEADER_HEIGHT_PX`（源里写 `calc(${HEADER_HEIGHT_PX}px + 2px)`）。
 
-**为什么是 `[data-slot='…'] > *` 而不是槽位元素本身**：槽位产出物带 `data-slot` 锚点，
-但它是 `display: contents`（`ui-renderer/src/client/scoped-slots.tsx:709-716` 的锚点契约：
-「`display:contents` keeps it layout-neutral」）—— **它自己不生成盒子**，定位它没有任何效果；
-真正生成盒子的是它的子元素。
+**为什么打 `> header` 而不是 `> *`，也不是槽位元素本身**（**这条改过一次，别改回去**）：
+
+* 槽位产出物带 `data-slot` 锚点，但它是 `display: contents`
+  （`ui-renderer/src/client/scoped-slots.tsx` 的锚点契约：「`display:contents` keeps it
+  layout-neutral」）—— **它自己不生成盒子**，定位它没有任何效果。
+* **`> *` 是 0.1.5-rc.2 时代的写法**：那时 `conversation.session.header` 的产出物直接是 `.root`
+  的子元素，打直接子元素是对的。**0.1.7-rc.1 起官方改了嵌套**：产出物嵌进
+  `header[data-slot='conversation.header']` 里，它的直接子元素变成官方 `.titleRow` ——
+  于是 `> *` 把**标题行**抽成绝对定位浮层，header 自身塌成 10px（真机实测 40px → 10px），
+  **官方顶栏整条崩掉**。
+* 现在打的是**真正生成盒子的那个 header 元素**（官方 `.header` 是 grid、`min-height: 76px`、
+  自带 padding 与下边框，由 `conversation.header` 槽位宿主定位）。回归守卫见
+  `test/glass.test.mjs` 里断言**不得**出现 `[data-slot='conversation.session.header'] > *` 的用例。
 
 **为什么 ③ 不能少**：① 让 `position: absolute` 认对祖先；② 让顶栏脱离流。脱离流后滚区会顶到 y=0，
 正文第一行就被顶栏盖住。补 76px 后：
@@ -245,30 +255,29 @@ surface 表有一条守卫「不许出现 `data-phase`」——而本表两条�
 **不依赖任何官方 hashed 类名**（有测试），所以官方改组件内部样式不会连累我们；但**锚点改名会静默失效**，
 这也是为什么每一处都留了测试与注释。
 
-**拖拽条（`.widthHandle`）：已改为「不碰」**（owner 2026-09-24 拍板）。
+**拖拽条（`[data-width-handle]`）：恢复官方几何 —— `top: 76px`，**规则是活的**。**
 
-一段历史：官方把它「绝对定位在 `.body` 里，让辉光落在顶栏下缘之下」，而顶栏浮层化之后
-`.body` 从 y=0 开始 → 辉光会延伸到顶栏区域。曾经的对策是把拖拽条本体压回 `top: 76px`
-（= `HEADER_HEIGHT_PX`），即「恢复官方几何」。
+一段历史（**中途反转过一次，读的时候别只看一半**）：
 
-**那条对策已删除**，因为它把官方光带的**几何基准**改歪了：官方光带位置是
-`var(--dsh-width-handle-pointer-y, 50%)`，而 `50%` 相对**这个盒子**计算 ——
-把 `top` 压到 76 后盒子变成 `[76, 720]`，`50% = 398`，而视口中心是 360：
+1. 官方把它「绝对定位在 `.body` 里，让辉光落在顶栏下缘之下」，而顶栏浮层化之后
+   `.body` 从 y=0 开始 → **光带爬进顶栏区，在玻璃上穿模**（owner 2026-09-24 报
+   「左右边宽度拖动条**在顶栏依然穿模**」）。
+2. 曾有一版**删掉**该规则，理由是「怕把官方光带的几何基准改歪」：官方光带位置是
+   `var(--dsh-width-handle-pointer-y, 50%)`，`50%` 相对**这个盒子**解析 —— 把 `top` 压到 76
+   后盒子变成 `[76, 720]`，`50% = 398`，而视口中心是 360，于是 hover 时（该变量从未被写、
+   走 `50%` 兜底）光带比屏幕中心低 38px。
+3. **该顾虑已被证伪，规则因此加回来**（当前状态）：`top: 76px` 让盒子回到**官方那一份**
+   `[76, 720]`，所以 `50%` 兜底值也回到**官方语义**（静止时光带位置与官方一致）；
+   而 hover / 拖拽时**真值由官方与 nav-pin 写入**（内联样式优先级高于本规则）——
+   nav-pin 的 handle-glow 在指针移动时补写 `--dsh-width-handle-pointer-y`，官方自己在
+   dragging 时也写。⇒ 「跟随指针」不受影响，穿模同时消失。
 
-| 状态 | 光带位置 |
-| :--- | :--- |
-| **hover**（变量从未被写，用兜底 `50%`） | **398**（比屏幕中心低 38px）← owner 真机报「光带靠下」 |
-| **按住拖动**（官方写真实 `clientY`） | 跟随鼠标（看着"正常"了） |
+⚠️ 只挂在 `active` 相位：hero / 其他相位下官方顶栏本来就在流内、`.body` 已从 76 起，
+再压一次会多推 76px（这正是中途删掉它时留下的教训）。官方默认档下**整条规则不命中**。
 
-实测（真机 3080）：带此规则 `center=398`；移除后 `center=360`（= 视口中心）。
-
-**取舍**：宁可让光带在浮层顶栏区多画一截（顶栏是半透明玻璃，观感影响很小），
-也不去改这个盒子的几何 —— 那会把官方一条公开的指针提示算歪。
-若将来确需压，正确做法是**补 `--dsh-width-handle-pointer-y` 的基准**（而不是动 `top`），
-且必须在 hover 与 dragging 两种状态下都验过。
-
-几何链（`ConversationRoot.tsx`）：`.root > [顶栏槽位] + .body > (.scrollBody + .widthHandle)`。
-守卫见 `test/glass.test.mjs`（断言**不得**再出现 `[data-width-handle]` 规则）。
+守卫见 `test/glass.test.mjs`：用例「拖拽条只裁上段（恢复官方几何）」断言该规则**存在**
+（`handleRules.length === 1` 且 `top` = `HEADER_HEIGHT_PX`）—— 与「不得再出现」正好相反，
+**别照旧文档去删它**。
 
 ## 5) 浮层**不做玻璃**；液态玻璃做在**输入框**上
 
