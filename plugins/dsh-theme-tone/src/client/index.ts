@@ -45,6 +45,7 @@ import {
   buildBackdropCss,
 } from '../backdrop.js'
 import { buildGlassCss, buildSeamCss } from '../glass.js'
+import { buildMaskCss } from '../mask.js'
 import { buildSurfaceCss } from '../surface.js'
 import { buildSweepCss } from '../sweep.js'
 import { isWorkstartProbe } from '../workstart.js'
@@ -75,11 +76,12 @@ import { createThemeToneRowStore } from './store.js'
 export const inject = ['theme', 'slots', 'locale']
 
 /**
- * 注入样式表（背景层 + 设置行 + 玻璃 + 缝挡板 + 抬升面合成一张；按标记属性去重，HMR / 重载不叠加）。
+ * 注入样式表（背景层 + 设置行 + 玻璃 + 缝挡板 + 抬升面 + 遮罩模糊 + 扫光带合成一张；
+ * 按标记属性去重，HMR / 重载不叠加）。
  * @returns 供卸载清理的 style 元素。
  */
 function ensureStyles(): HTMLStyleElement {
-  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildSweepCss()}`
+  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}`
   const existing = document.querySelector<HTMLStyleElement>(STYLE_SELECTOR)
   if (existing !== null) {
     // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之。

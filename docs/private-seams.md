@@ -26,14 +26,34 @@
   `data-goal-bar` / `data-testid='todo-panel'` / `data-trigger-menu` / `data-expanded` /
   `data-open` / `data-disclosure-row` / `data-ds-dark-theme` /
   `role=menu|dialog|listbox|tooltip|group|tree|button`。
-  **不碰官方 DOM 结构、不包装/覆写官方函数、不依赖 hashed CSS-module 类名** —— 例外是**两处**
-  按**稳定类名后缀**匹配的规则（见下），两处都无测试能发现官方重命名后缀，属**同一类静默失效风险**：
+  **不碰官方 DOM 结构、不包装/覆写官方函数、不依赖 hashed CSS-module 类名** —— 例外是**三处**
+  按**稳定类名后缀**匹配的规则（见下），三处都无测试能发现官方重命名后缀，属**同一类静默失效风险**：
   1. **悬停卡字色**（`HOVER_CARD_TEXT_TOKENS`，`src/constants.ts`）：`[class*='_hoverTitle']` /
      `_hoverPath` / `_hoverTime` / `_hoverStatus` —— 官方把字色写成了组件内字面量，只能按后缀取。
   2. **扫光带**（`SWEEP_ANCHORS`，`src/sweep.ts`）：`... [class*='_row']::after` 两条 ——
      官方把扫光画在 `.row::after` 上。**已收窄**：必须同时带 `data-variant` / `data-tool` 才会命中
      （裸 `[data-state='running'] [class*='_row']` 会误伤一堆无关伪元素，`test/sweep.test.mjs` 钉住不得回退）。
+  3. **弹窗遮罩模糊**（`src/mask.ts`）：`[class*='_mask']` —— 官方 rc.2 把 `--dsw-mask-blur`
+     改成 `none`（有意为之），owner 要求恢复成 0.1.5 的 `blur(2px)`，而官方那 3 个遮罩
+     只在哈希类名上可辨（`Modal` / `SettingsRoot` / `ImageLightbox` 的 `.mask`）。
+     已由 `test/mask.test.mjs` 逐条钉住产物（含「不得加官方默认门」「不得改 body 全局变量」）。
+
   锚点明细以各插件 `docs/spec` 与代码常量表为准（本文件不复制一份，避免二次漂移）。
+
+  ### 刻意改官方默认外观的例外（**两处**）
+
+  > 仓库硬规矩是「官方默认的都不要动，给个完全不动的参考」。下列两处经 owner 明确要求破例，
+  > 它们的共同特征是：**官方自己把某个值写死了**，而那个值与主题无关、看起来像 bug。
+
+  1. **悬停卡**（`HOVER_CARD_ANCHOR`，`src/constants.ts`）：官方把这张卡的面（恒深灰字面量）
+     与字（`#FFFFFF` 等，注释写明 `dark surface, fixed colors both themes`）都写死了，
+     浅色轴下官方自己就是一张深卡。owner：「深卡不对吧」→ 跟随主题、两个档都修。
+  2. **弹窗遮罩模糊**（`src/mask.ts`，2026-09-27 新增）：官方 0.1.7-rc.2 把 `--dsw-mask-blur`
+     从 `blur(2px)` 改成 `none`（提交 `fdd14a0989`，连注释都改写、并有 e2e 断言钉住），
+     **是官方有意调整**；owner 明确要求恢复 0.1.5 观感 ⇒ 两个档都恢复。
+     证据链见 `docs/upstream/0.1.7-rc.2-mask-blur.md`。
+
+  ⚠️ 新增此类破例时，**必须同步更新本节计数**（曾经写着「唯一一处」，加了第二处后即失真）。
 
   > ⚠️ **本节 2026-09-27 更正过三处**（原文把这些都列成「只读依赖的官方标记」，实际不成立）：
   > `data-sidebar-right-float-host` —— 官方 0.1.7 起**已删除**该锚点，代码里只剩「它没了」的注释，

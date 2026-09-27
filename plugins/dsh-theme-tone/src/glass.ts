@@ -1090,7 +1090,9 @@ body:not([${PLAIN_ATTR}]) [data-expanded] [data-open] [data-disclosure-row] {
 /* 模态弹窗（[role='dialog']）**不做玻璃** —— 它是内容面（设置 / 文件 / 归档列表），
    走 src/surface.ts 的实色抬升面。Apple HIG：「Don't put glass on lists, cards, or media content」。
    曾经把液态玻璃做在了它上面（理解错了 owner 说的「对话框」= 输入框），已撤。
-   ⚠️ 本段整块在模板字符串里 —— **注释里不能出现反引号**，否则字符串被截断、后面的方括号会被当成 TS 代码。 */
+   ⚠️ 本段整块在模板字符串里 —— **注释里不能出现反引号**，否则字符串被截断、后面的方括号会被当成 TS 代码。
+   （弹窗遮罩的模糊恢复**不在这里** —— 它既不属玻璃、也不受相位约束，
+   故独立成 src/mask.ts，避免破坏本模块「每条规则都带官方默认门 + 限定相位」的纪律。） */
 `
 }
 
