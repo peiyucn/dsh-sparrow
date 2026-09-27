@@ -637,28 +637,46 @@ export function buildSurfaceCss(): string {
 ${SURFACE_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
   background-image: ${surfaceLayers()} !important;
 }`).join('\n')}
-/* --- 质感**同时**叠到 ::before 上（官方把材质画在 ::before 的那些弹层）---
-   owner 2026-09-24：「子代理**透明了**，但是**纹理和打光又没了**」。
+/* --- 质感**同时**叠到 ::after 上（官方 0.1.7 把材质画进 z-index:-1 的子元素）---
 
-   根因是**绘制顺序**：官方 "SubagentCatalogAction" 把材质画在自己的 "::before" 上
-   （"content: ''; position: absolute; inset: 0; z-index: -1; background: var(--dsw-specific-menu);
-   backdrop-filter: var(--dsw-menu-backdrop-filter)"）。
-   负 z-index 的伪元素画在**父元素的背景与边框之上、内容之下** ——
-   而我们上面那条把颗粒与光画在**父元素自己的 background-image** 上，
-   于是**官方那层半透明材质把我们整个质感盖住了**（观感：「透明了，但纹理没了」）。
+   ⚠️⚠️ 这一层用的是 "::after" + "z-index: -1"，**不是** "::before"，也不是不带 content 的
+   "::before"。三条都是实测结论（真机同构复刻官方 rc.2 MenuSurface，逐变体取像素）：
 
-   修法与输入卡同一套（那一处踩过完全相同的坑，见 glass.ts 的卡片 ::before）：
-   把同一串图层**再画一份到 ::before** —— 同一元素上，伪元素背景与它自己的
-   background-color / backdrop-filter 同层合成，质感就压在材质之上了。
+   | 变体 | computed content | 空白区纹理标准差 | 文字是否被盖 |
+   | :--- | :--- | ---: | :--- |
+   | "::before"（**无 content**，本插件此前写法） | "none" | 0.30（= 被材质洗掉） | 否 |
+   | "::before" + "content:''" + "z-index:-1" | '""' | 0.30 | 否 |
+   | "::before" + "content:''"（无 z-index） | '""' | 10.83 但**压住文字** | **是** |
+   | **"::after" + "content:''" + "z-index:-1"** | '""' | **8.29** | 否 |
 
-   ⚠️ **两层都要留**：材质画在元素自己身上的那些弹层（菜单原语、后台任务 "<ul>"）只有
-   上面那条生效；画在 "::before" 上的（本弹层）只有这条生效。两条互不冲突
-   （后者在伪元素上，各画各的）。
+   逐条道理：
+
+   ① **不带 "content" 的伪元素不生成盒子** —— 那条 "background-image" 是**空转**的。
+      此前 12 条 ::before 规则全部如此（"content: none"），所以 rc.2 那条「材质在子元素上、
+      再补一份到伪元素」的修法**从未真正生效**（这也是它的真机 A/B 与代码对不上的原因）。
+
+   ② 负 z-index 带内的绘制顺序 = **父元素背景 → 负 z 层（按树序）→ 行内内容**。
+      官方 "MenuSurface" 渲染的是 "<div class='material'>" **子元素**（"z-index:-1"）+ 菜单文字。
+      "::before" 在树序上排在 ".material" **前面** ⇒ 被它盖住（上表第 2 行，纹理 0.30）。
+      "::after" 排在**最后** ⇒ 在同一个负 z 带里画在 ".material" **之上**，
+      而整个负 z 带仍然在**行内文字之下** ⇒ 纹理可见且不盖字（第 4 行）。
+
+   ③ 所以这一层不是可选的美化，而是**当前唯一有效**的质感通道：官方材质（alpha .45 +
+   "backdrop-filter: blur(40px)"）会把元素自身 "background-image" 上的颗粒彻底洗掉
+   （上表第 1 行实测标准差 0.30 —— 与「纯色」无异）。上面那条元素级规则因此只对
+   **材质画在自己身上**的弹层有效（那种情况下没人盖它）。
+
    ⚠️ 用 "background-image" 而不是叠加整串 "background" 简写 —— 简写会把官方那张材质的
    "background-color" 一起重置掉。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
-${SURFACE_ANCHORS.map(anchor => `${gatedAnchor(anchor)}::before {
+${SURFACE_ANCHORS.map(anchor => `${gatedAnchor(anchor)}::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
   background-image: ${surfaceLayers()} !important;
+  pointer-events: none;
 }`).join('\n')}
 /* --- 菜单族：**不再由我们声明填充与模糊**（官方 0.1.7 已经成对画好了）---
    owner：「透明和模糊和**官方默认一样**就行」。
@@ -797,18 +815,29 @@ ${`${gatedAnchor(GROUPED_MENU_UNGUARDED_SELECTOR)} ${GROUPED_MENU_SCROLLER_SELEC
    owner 随即反馈「goal、todo、排队对话好像都没改」。**只写图层、不写底色**即根治：
    底色交给 token 层（§4.0.2 那条通道），这里只负责它拿不到的那部分（颗粒 + 光）。
 
-   ⚠️ **2026-09-24 起图层也画一份到 ::before**（owner：「输入框上面的各种停靠卡
+   ⚠️ **2026-09-24 起图层也画一份到 ::after**（owner：「输入框上面的各种停靠卡
    **也没有适配纹理和打光**」）—— 与 subagents / AgentTeam 同一条**绘制顺序**问题：
-   官方这几张卡的材质同样画在**自己的 "::before"（z-index: -1）**上
+   官方这几张卡的材质同样画在**伪元素（z-index: -1）**上
    （真机实测 QueueDock 的 "._7yHdaG_panel::before" = "rgba(61,50,58,.5)"），
    负 z-index 伪元素画在**父元素背景之上**，于是把我们画在父元素 background-image
    上的颗粒与光整个盖住。两层都留：材质画在元素自己身上的场景只有上面那条生效。
+
+   ⚠️ 必须用 "::after" + "z-index: -1"（同 SURFACE_ANCHORS 那张表的实测结论）：
+   官方 "QueueDock .panel::before" 是那个 z-index:-1 的材质层，而 "::before" 在树序上
+   排在它前面 ⇒ 会被它盖住；"::after" 排在最后 ⇒ 画在它之上，且整个负 z 带仍低于文字。
+   写成不带 content 的 "::before" 则**连盒子都不生成**，规则完全空转。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 ${COMPOSER_CARD_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
   background-image: ${menuSurfaceLayers()} !important;
 }`).join('\n')}
-${COMPOSER_CARD_ANCHORS.map(anchor => `${gatedAnchor(anchor)}::before {
+${COMPOSER_CARD_ANCHORS.map(anchor => `${gatedAnchor(anchor)}::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
   background-image: ${menuSurfaceLayers()} !important;
+  pointer-events: none;
 }`).join('\n')}
 /* --- 为什么**不**改这三张卡的几何（owner：「官方处理方式不一样？」—— 是的，确实不一样）---
    owner 连问两次：「官方默认样式为啥有缝了？是咱们改的么？」「还是说，信息队列，todo，

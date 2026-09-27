@@ -1394,21 +1394,30 @@ describe('抬升面：表面绘制', () => {
       if (at < 0) continue
       const block = css.slice(at, css.indexOf('}', at))
       assert.ok(!/margin/u.test(block), `${anchor} 不得改外边距（会把官方 6px 缝收掉）`)
-      assert.ok(!/border[a-z-]*radius/u.test(block), `${anchor} 不得改圆角（官方三张卡本就不一致）`)
+      // 圆角只允许**继承**（`border-radius: inherit`）——那是把官方自己的圆角
+      // 原样透给覆盖用的伪元素，几何分毫未动（伪元素是 absolute; inset:0，圆角不 inherit
+      // 就会在四角露出直角，反倒成了「改了观感」）。具体数值（12px / 0 0 / 变量）一律禁止。
+      const radiusDecls = [...block.matchAll(/border[a-z-]*radius\s*:\s*([^;}]+)/gu)].map(m => m[1].trim())
+      for (const value of radiusDecls) {
+        assert.equal(value, 'inherit', `${anchor} 不得改圆角（官方三张卡本就不一致）；只允许 inherit，实际是 ${value}`)
+      }
     }
     // 整张表里都不许出现针对停靠卡的 margin / radius 规则
     assert.ok(
       !/margin-bottom:\s*calc\(0px - var\(--dsh-composer-stack-gap\)\)/u.test(css),
       '不得收停靠卡的栈间距（那是 QueueDock 专属做法，官方只对它自己做）',
     )
-    assert.ok(
-      !/\[data-testid='todo-panel'\][^{]*\{[^}]*border-[a-z-]*radius/u.test(css),
-      '不得改待办卡圆角',
-    )
-    assert.ok(
-      !/\[data-goal-bar\][^{]*\{[^}]*border-[a-z-]*radius/u.test(css),
-      '不得改目标卡圆角',
-    )
+    // 这里同样只禁**具体数值**，放行 `inherit`（见上）。
+    // ⚠️ 不用带负向先行断言的正则：`radius\s*:\s*(?!inherit)` 里的 `\s*` 会回溯成空、
+    // 于是先行断言看到的是空格而不是 `inherit`，正则**永远命中**（这个坑我自己踩过一次）。
+    // 改成显式取值判定，意图也更清楚。
+    for (const [label, anchor] of [['待办卡', "[data-testid='todo-panel']"], ['目标卡', '[data-goal-bar]']]) {
+      for (const match of css.matchAll(new RegExp(`${anchor.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}[^{]*\\{([^}]*)\\}`, 'gu'))) {
+        for (const decl of match[1].matchAll(/border[a-z-]*radius\s*:\s*([^;}]+)/gu)) {
+          assert.equal(decl[1].trim(), 'inherit', `${label} 不得改圆角；只允许 inherit，实际是 ${decl[1].trim()}`)
+        }
+      }
+    }
     // 也不得给它们加顶角规则（兄弟选择器那套一并撤回）
     assert.ok(
       !/\[data-slot='conversation\.input\.dock'\][^{]*~/u.test(css),
@@ -1530,6 +1539,43 @@ describe('抬升面：表面绘制', () => {
       const gated = anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
       assert.ok(css.includes(`${gated} {`), `缺带门规则 ${gated}`)
       assert.equal((gated.match(/\bbody\b/gu) ?? []).length, 1, `${gated} 里只该有一个 body`)
+    }
+  })
+
+  it('⛔ 覆盖用的伪元素必须**生成盒子**（content + 定位），且必须用 ::after 压在官方材质之上', () => {
+    // ## 这条守卫为什么存在（2026-09 审计，HIGH）
+    //
+    // rc.2 起官方把菜单/卡片的材质画进 **z-index:-1 的子元素或伪元素**（MenuSurface 的
+    // `.material`、QueueDock 的 `.panel::before`），于是本插件加了一层「把同一串图层再画到
+    // 伪元素上」的修法。但那一版发出去的是**不带 `content` 的 `::before`** ——
+    // **不带 content 的伪元素不生成盒子**，那 12 条规则的 `background-image` 全部空转。
+    //
+    // 真机同构复刻实测（官方 rc.2 MenuSurface：`.material` 子元素 + alpha .45 + blur(40px)）：
+    //   | 变体                                   | content | 空白区纹理标准差 |
+    //   | :------------------------------------- | :------ | ---------------: |
+    //   | `::before`（无 content）                | none    |            0.30 |
+    //   | `::before` + content + z-index:-1       | ""      |            0.30 |
+    //   | `::before` + content（无 z-index）      | ""      |   10.83（压住文字）|
+    //   | **`::after` + content + z-index:-1**    | ""      |        **8.29** |
+    // 标准差 0.30 ≈ 纯色 ⇒ 被官方材质彻底洗掉；8.29 才是质感真的画上去了。
+    // 原因是绘制顺序：负 z 带内按树序，`::before` 排在 `.material` **前面**（被盖），
+    // `::after` 排在**最后**（压在其上），而整个负 z 带仍在行内文字之下（不盖字）。
+    //
+    // 故这几条都是**硬契约**，缺一律静默失效（外观只是"没质感"，没有任何报错）：
+    //   ① 每条覆盖规则必须声明 `content`；
+    //   ② 必须有非 static 定位（否则 `inset` 不生效、盒子塌成 0 面积）；
+    //   ③ 必须是 `::after`（`::before` 会被官方材质盖住）。
+    const pseudoRules = [...css.matchAll(/([^{}\n][^{}]*?::(?:before|after))\s*\{([^}]*)\}/gu)]
+      .filter(m => /background-image\s*:/u.test(m[2]))
+    assert.ok(pseudoRules.length >= 12, `覆盖用伪元素规则太少（${pseudoRules.length}）—— 锚点表是不是被删了？`)
+    for (const rule of pseudoRules) {
+      const selector = rule[1].trim().replace(/\s+/gu, ' ')
+      const body = rule[2]
+      assert.ok(/content\s*:/u.test(body), `${selector} 缺 content —— 不生成盒子，background-image 空转`)
+      assert.ok(/position\s*:\s*absolute/u.test(body), `${selector} 缺 position:absolute —— inset 不生效`)
+      assert.ok(/inset\s*:\s*0/u.test(body), `${selector} 缺 inset:0 —— 盒子会被内容撑开或塌成 0`)
+      assert.ok(/z-index\s*:\s*-1/u.test(body), `${selector} 缺 z-index:-1 —— 会跑到文字层之上、盖住内容`)
+      assert.match(selector, /::after$/u, `${selector} 必须用 ::after —— ::before 在树序上早于官方材质，会被它盖住`)
     }
   })
 
