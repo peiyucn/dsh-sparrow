@@ -2,12 +2,14 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   BORDER_TOKENS,
+  DARK_TONE_IDS,
   DARK_TONES,
   DEFAULT_SETTINGS,
   DEPTH_ALPHA,
   INSET_TINT,
   INSET_TOKENS,
   LIGHT_GLOW_ALPHA,
+  LIGHT_TONE_IDS,
   LIGHT_TOKENS,
   LIGHT_TONES,
   PANEL_TINT,
@@ -244,6 +246,41 @@ describe('抬升面：谁被染', () => {
   it('应该 覆盖「面」的三个 layer token', () => {
     for (const token of ['--dsw-alias-bg-layer-1', '--dsw-alias-bg-layer-2', '--dsw-alias-bg-layer-3']) {
       assert.ok(tokens.includes(token), `缺少抬升面 token ${token}`)
+    }
+  })
+
+  it('⛔ `--dsw-specific-input-major` 必须被染，且与 layer-2 同档同值', () => {
+    // ## 为什么（2026-09-27 owner 真机反馈）
+    //
+    // owner：「**这个问题清单本身还是官方原色，没适配**」—— 指的是 `ask_user_question`
+    // 弹的那个问询面板（`ui-user-questions` 的 `PlanReviewPanel` / `QuestionComposer`）。
+    // 根因：它用 `--dsw-specific-input-major` 画面，而该 token **不在任何覆盖表里**
+    // （实测 `tokenOverrides()` 产出的 40 个 token 不含它）⇒ 一直是官方灰/白，
+    // 而旁边的面都跟着色调走，于是显出一块没适配的板子。
+    //
+    // **归 `layer2` 档**不是随手挑的：官方把两个 token 在两轴上**绑到同一个 static 变量**
+    // （`design-platform.css` 的 `:171`/`:262` 浅轴都是 `bluish-00`，`:281`/`:372` 深轴都是
+    // `bluish-850`）—— 语义等价，染成同一档才不会分叉。
+    //
+    // 影响面（官方用这个 token 画面的一共 9 个组件，逐文件核过）：
+    // `PlanReviewPanel`、`QuestionComposer`（问询卡片）、`ApprovalPanel`、
+    // `AttachmentRail`、`FileCard`、`MessageItem`、`InputBar`、`ImageLightbox`、`AccountNotice`。
+    assert.ok(tokens.includes('--dsw-specific-input-major'), '缺少 --dsw-specific-input-major —— 问询卡片会退回官方原色')
+    const entry = SURFACE_TOKENS.find(e => e.token === '--dsw-specific-input-major')
+    assert.equal(entry.rung, 'layer2', 'input-major 必须与 layer-2 同档（官方把两者绑在同一个 static 变量上）')
+    // 逐色调验证两者**始终同值**，防止将来有人只改其中一个。
+    // （`LIGHT_TONES` / `DARK_TONES` 是**对象**（id → ToneSpec），不是数组 —— 迭代用 `*_TONE_IDS`。）
+    for (const lightTone of LIGHT_TONE_IDS) {
+      for (const darkTone of DARK_TONE_IDS) {
+        const overrides = tokenOverrides({ lightTone, darkTone })
+        for (const scheme of SCHEMES) {
+          assert.equal(
+            overrides['--dsw-specific-input-major'][scheme],
+            overrides['--dsw-alias-bg-layer-2'][scheme],
+            `${scheme} 轴（${lightTone}/${darkTone}）下 input-major 与 layer-2 分叉了`,
+          )
+        }
+      }
     }
   })
 

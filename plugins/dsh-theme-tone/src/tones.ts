@@ -283,9 +283,23 @@ export const SURFACE_RUNGS: Readonly<Record<ColorScheme, Readonly<Record<Surface
  * | `--dsw-alias-bg-layer-2` | 模态对话框（`ui-primitives/Modal.module.css:33`）、`DirectoryBrowser`、`SettingsRoot` |
  * | `--dsw-alias-bg-layer-1` | `OnboardingSurface`、`FeedbackDialog`、`Input`、`JsonTree` 等抬升面 |
  * | `--dsw-specific-tip` | 浮动提示条：`TodoPanel`、`QueueDock`、`GoalBar` |
+ * | `--dsw-specific-input-major` | **大型输入/面板面**：`ui-user-questions` 的
+ *   `PlanReviewPanel` / `QuestionComposer`（**问询卡片**）、`ui-approval` 的 `ApprovalPanel`、
+ *   `ui-attachment` 的 `AttachmentRail` / `FileCard`、`ui-chat` 的 `MessageItem`、
+ *   `InputBar`、`ImageLightbox`、`AccountNotice` |
  * | `--dsw-specific-menu` | 菜单专用别名。**0.1.7 起官方指向 `var(--dsw-menu-surface-fill)`**
  *   （真机样式表实测；旧版曾指向 `--dsw-alias-bg-layer-3`）—— 所以它现在**不在本表**，
  *   归 {@link POPUP_TOKENS} 与本体一起染（保住官方玻璃 alpha，且两个名字同值） |
+ *
+ * ⚠️ **`--dsw-specific-input-major` 是 2026-09-27 补进来的（owner 真机反馈）**，此前**漏了**。
+ * owner 原话：「这个问题清单本身还是官方原色，没适配」——指的就是**问询卡片**
+ * （`ask_user_question` 弹的那个面板）。根因：它用 `--dsw-specific-input-major` 画面，
+ * 而这个 token **不在任何覆盖表里**（实测 `tokenOverrides()` 产出的 40 个 token 不含它），
+ * 于是它一直是官方灰/白，而旁边的面都跟着色调走 ⇒ 一块没适配的板子。
+ *
+ * **归到 `layer2` 档**的依据是官方自己的绑定（`design-platform.css:171` 与 `:262`、`:281` 与 `:372`）：
+ * 两个 token 在两轴上**取同一个 static 变量**（浅 `bluish-00` / 深 `bluish-850`）——
+ * 既然官方语义等价，染成同一档才不会分叉。
  *
  * ⚠️ **`--dsw-specific-menu` 的归属变过一次**：旧版官方把它绑在 `layer-3` 上，那时覆盖 layer-3
  * 就能连带染到菜单，故只列在本表；0.1.7 官方把它改指 `--dsw-menu-surface-fill` 之后，
@@ -301,6 +315,8 @@ export const SURFACE_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRun
   Object.freeze({ token: '--dsw-alias-bg-layer-1', rung: 'layer1' as const }),
   Object.freeze({ token: '--dsw-alias-bg-layer-2', rung: 'layer2' as const }),
   Object.freeze({ token: '--dsw-alias-bg-layer-3', rung: 'layer3' as const }),
+  // 官方把这两个绑在同一个 static 变量上（见上表注），故同档。
+  Object.freeze({ token: '--dsw-specific-input-major', rung: 'layer2' as const }),
 ])
 
 /**
