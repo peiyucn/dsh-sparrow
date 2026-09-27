@@ -687,29 +687,49 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'
 }
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-scroll] {
   /* ③ 滚区顶部补出顶栏高度 —— 与浮层是一对，少一个正文首行会被盖住。
-     ⚠️ **必须用 border-top，不能用 padding-top**（owner 2026-09-26 报
-     「顶栏透明后，右侧滚动条也会跑上去」）：
-     滚动条是画在滚动容器的 **padding box** 上的，**padding-top 只推内容、不推它** ——
-     于是玻璃档下轨道与滑块仍从 y=0 起画，前 76px 正落在**半透明顶栏下面** ⇒ 透出来。
-     官方因为顶栏**在流内**，滚区天然从 y=76 起，滚动条也就从 76 起。
+     用 **padding-top**：它让 **padding box 从 y=0 起**，于是正文能滚到顶栏下面去 ——
+     这正是玻璃有东西可透的前提。
 
-     border-top 同样是「推内容」，但它把 **padding box 整体下移** 76px ⇒
-     滚动条与内容一起回到官方位置。真机实测（滑块染不透明橙、只在滚动条那一列扫描）：
+     ⚠️⚠️ **不能改成 border-top**（我 2026-09-26 那么改过，owner 随即报
+     「顶栏变成不透明的了」）。两件事必须分开看：
 
-     | 写法 | 滚区 clientHeight | 滑块顶端 y | 官方基准 |
-     | :--- | ---: | ---: | :--- |
-     | 官方默认档（顶栏在流内） | 680 | **78**（= 76 + 官方轨道 2px） | —— |
-     | padding-top: 76px（改前） | 756 | **0**（画进顶栏带，透出来） | ✗ |
-     | border-top: 76px（本版） | **680** | **78** | ✓ 逐项相同 |
+     | | 正文能否滚到顶栏下（= 玻璃"透"） | 滚动条位置 |
+     | :--- | :--- | :--- |
+     | padding-top: 76px | ✅ 能（裁剪线在 y=0） | ❌ 画进顶栏带 |
+     | border-top: 76px | ❌ **不能**（padding box 下移到 76，溢出裁剪线也到 76） | ✅ 在顶栏下方 |
 
-     ⚠️ 前提是 **box-sizing: content-box**（官方 .scrollBody 就是；实测该元素也是）——
-     它是 border-box 的话边框会吃掉内容高度。下面的 border 与 box-sizing 两条一起钉住。
-     ⚠️ border 是**透明**的：滚区自己的背景仍按 border-box 铺（border 区照旧有底色），
-     且那 76px 之上盖着顶栏浮层 ⇒ 观感与改前一致。
-     ⚠️ 正文首行位置**不变**（实测两种写法都是相对滚区顶 76px）—— 这条只挪滚动条与
-     clientHeight，不挪内容。 */
-  border-top: ${HEADER_HEIGHT_PX}px solid transparent;
-  box-sizing: content-box;
+     也就是说 **border-top 是拿"玻璃的透"换"滚动条位置"**：模糊与 alpha 都还在，
+     但顶栏底下**什么都没有**，玻璃退化成一条平板 —— owner 看到的就是"不透明"。
+     真机 A/B（滚动 0→1500，量顶栏带内像素变化；滑块染橙量顶端 y）：
+
+     | 写法 | 顶栏带内变化 | 滑块顶端 y |
+     | :--- | ---: | ---: |
+     | 官方默认档（顶栏在流内） | 有 | **78**（= 76 + 官方轨道 2px） |
+     | padding-top: 76px | **31295 px** ✅ | 75 ✗ |
+     | border-top: 76px | **971 px** ❌ 顶栏下没东西 | 78 ✓ |
+     | **本版：padding-top + 轨道 margin-top** | **31176 px** ✅ | **78** ✓ |
+
+     ⚠️ 所以滚动条那半边**改由轨道自己下推**（下一段规则），而不是靠 border 挪 padding box。
+     正文首行位置两种写法都一样（相对滚区顶 76px）—— 这条只管补高，不挪内容。 */
+  padding-top: ${HEADER_HEIGHT_PX}px;
+}
+/* --- ③b 滚动条：把轨道整体下推到顶栏下缘 ---
+     owner 2026-09-26 报「顶栏透明后，右侧滚动条也会跑上去」。
+     根因：**滚动条画在滚动容器的 padding box 上，padding-top 只推内容、不推它** ——
+     轨道与滑块仍从 y=0 起画，前 76px 正落在半透明顶栏下面 ⇒ 透出来。
+
+     ⚠️ **不要用 border-top 去推**（见上一条的对照表）：那会连溢出裁剪线一起下移，
+     顶栏底下就再也没有内容滚过了，玻璃看着变成不透明。**轨道要单独推。**
+
+     轨道 margin 是 WebKit 滚动条伪元素的原生能力，且**官方自己就在用它**
+     （官方 .scrollBody::-webkit-scrollbar-track { margin: 2px }，实测计算值 2px）——
+     我们只是把上边距从 2px 加到顶栏下缘。dsh Web 只跑 Chromium，口径与官方一致。
+
+     ⚠️ 值取 **78px 而不是 76**：官方轨道自己留 2px 上边距，加起来正是官方档下
+     滑块顶端的那个 y=78（见上表），**与官方逐项相同**。
+     ⚠️ 四值写法（上 右 下 左）：只加上边距，右/下/左沿用官方那 2px。 */
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-scroll]::-webkit-scrollbar-track {
+  margin: calc(${HEADER_HEIGHT_PX}px + 2px) 2px 2px;
 }
 /* --- ④ 拖拽条：把上段裁到顶栏下缘（**恢复官方几何**，不新造基准） ---
    owner 2026-09-24 又报：「左右边宽度拖动条**在顶栏依然穿模**」—— 顶栏浮层化的直接副作用。

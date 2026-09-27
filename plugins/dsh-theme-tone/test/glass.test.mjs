@@ -127,29 +127,44 @@ describe('glass：顶栏浮层', () => {
       /\[data-slot='conversation\.header'\] > header[\s\S]*?position: absolute/u,
       '② 顶栏要浮起来（打在官方那个 <header> 上）',
     )
-    // ③ 滚区顶部要补出顶栏高度 —— **必须是 border-top，不能是 padding-top**。
-    //    owner 2026-09-26 报「顶栏透明后，右侧滚动条也会跑上去」：滚动条画在滚动容器的
-    //    **padding box** 上，padding-top 只推内容、不推它 ⇒ 轨道与滑块仍从 y=0 起画，
-    //    前 76px 落在半透明顶栏下面 ⇒ 透出来。官方顶栏**在流内**，滚区天然从 76 起。
-    //    真机实测（滑块染不透明橙，只在滚动条那一列扫描）：
-    //      官方默认档        clientHeight=680，滑块顶端 y=78（= 76 + 官方轨道 2px）
-    //      padding-top: 76   clientHeight=756，滑块顶端 y=0（画进顶栏带）
-    //      border-top: 76    clientHeight=680，滑块顶端 y=78  ← 与官方逐项相同
+    // ③ 滚区顶部要补出顶栏高度 —— **必须是 padding-top，且滚动条由轨道 margin 单独下推**。
+    //
+    //    这条踩过两次，两个方向各自坏一半，必须一起看：
+    //
+    //    | 写法 | 正文能否滚到顶栏下（= 玻璃"透"） | 滚动条位置 |
+    //    | :--- | :--- | :--- |
+    //    | padding-top: 76            | ✅ 能（padding box 从 y=0 起） | ❌ 画进顶栏带（owner 报「滚动条跑上去」） |
+    //    | border-top: 76             | ❌ **不能**（padding box 下移到 76，溢出裁剪线跟着到 76） | ✅ 在顶栏下方 |
+    //    | padding-top + 轨道 margin  | ✅ 能 | ✅ 在顶栏下方 |
+    //
+    //    **border-top 是拿"玻璃的透"换"滚动条位置"**：模糊与 alpha 都还在，但顶栏底下
+    //    什么都没有 ⇒ 玻璃退化成平板，owner 看到的就是「顶栏变成不透明了」。
+    //    真机 A/B（滚动 0→1500，量顶栏带内像素变化；滑块染橙量顶端 y）：
+    //      官方默认档                    顶栏带内有变化，滑块顶端 y=78（= 76 + 官方轨道 2px）
+    //      padding-top: 76               31295 px ✅            滑块顶端 75 ✗
+    //      border-top: 76                 971 px ❌ 顶栏下没东西  滑块顶端 78 ✓
+    //      padding-top + 轨道 margin      31176 px ✅            滑块顶端 78 ✓
     assert.match(
       css,
-      new RegExp(`\\[data-conversation-scroll\\][\\s\\S]*?border-top: ${HEADER_HEIGHT_PX}px solid transparent`, 'u'),
-      '③ 滚区顶部补出顶栏高度，且必须用**透明 border-top**（padding-top 不推滚动条）',
+      new RegExp(`\\[data-conversation-scroll\\]\\s*\\{[^}]*padding-top: ${HEADER_HEIGHT_PX}px`, 'u'),
+      '③ 滚区顶部补出顶栏高度，且必须用 padding-top（border-top 会把溢出裁剪线一起下移，玻璃就"透"不出东西了）',
     )
     assert.ok(
-      !/\[data-conversation-scroll\][^}]*padding-top/u.test(rules),
-      '不得再用 padding-top 顶开顶栏 —— 它推不动滚动条，会让滚动条画进顶栏（owner 报过）',
+      !/\[data-conversation-scroll\]\s*\{[^}]*border-top/u.test(rules),
+      '⛔ 滚区不得用 border-top 顶开顶栏 —— 它下移 padding box，正文再也不能滚到顶栏下面，'
+      + '玻璃看着变成不透明（owner 报过「顶栏变成不透明的了」）',
     )
-    // 与上一条配对：border 只是把 padding box 下移，**不能**让元素被撑高 76px。
-    // 官方 .scrollBody 是 content-box 且无边框，本插件引入边框后必须显式声明同一口径。
+    // 滚动条那半边**单独推**：轨道上边距 = 顶栏高 + 官方自己那 2px。
+    // 用轨道 margin 而不是 border，是因为前者不动溢出裁剪线。
     assert.match(
       css,
-      new RegExp(`\\[data-conversation-scroll\\][\\s\\S]*?box-sizing: content-box`, 'u'),
-      '④ 必须与 border-top 配对声明 box-sizing: content-box（否则边框把滚区撑高 76px）',
+      new RegExp(`\\[data-conversation-scroll\\]::-webkit-scrollbar-track\\s*\\{[^}]*`
+        + `margin: calc\\(${HEADER_HEIGHT_PX}px \\+ 2px\\) 2px 2px`, 'u'),
+      '③b 轨道要单独下推到顶栏下缘（值 = 顶栏高 + 官方轨道 2px，四值只改上边距）',
+    )
+    assert.ok(
+      !/\[data-conversation-scroll\]\s*\{[^}]*box-sizing/u.test(rules),
+      '不再需要 content-box（那是给 border-top 配对用的；改回 padding-top 后是多余声明）',
     )
   })
 

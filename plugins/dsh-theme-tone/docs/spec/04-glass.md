@@ -32,8 +32,10 @@
   backdrop-filter: blur(12px) saturate(1.15);                                    /* GLASS_BLUR */
 }
 [data-phase='active'] [data-conversation-scroll] {                              /* ③ 滚区补高 */
-  border-top: 76px solid transparent;   /* ⚠️ border-top，不是 padding-top */
-  box-sizing: content-box;
+  padding-top: 76px;                    /* ⚠️ 必须 padding-top（见下） */
+}
+[data-phase='active'] [data-conversation-scroll]::-webkit-scrollbar-track {
+  margin: 78px 2px 2px;                 /* ③b 滚动条单独下推（= 顶栏 76 + 官方轨道 2） */
 }
 ```
 
@@ -56,26 +58,38 @@
 → **静止时布局等值**，顶栏的分隔线仍与左栏（tab strip 38px + 面板标题 38px = 76px）在列边缘接上
 （`ConversationRoot.module.css:37-41` 那条契约）。差别只在「内容现在从它下面滚过」。
 
-> ⚠️ **③ 为什么是 `border-top` 而不是 `padding-top`**（owner 2026-09-26 报
-> 「顶栏透明后，右侧滚动条也会跑上去」）：
-> **滚动条画在滚动容器的 padding box 上，`padding-top` 只推内容、不推它。**
-> 于是轨道与滑块仍从 y=0 起画，前 76px 正落在**半透明顶栏下面** —— 顶栏现在是
-> `color-mix(… 70%)` + `blur(12px)`，挡不住，于是那段滚动条以 1~3 级的淡痕透出来。
-> 官方因为顶栏**在流内**，滚区天然从 y=76 起，滚动条也就从 76 起。
+> ⚠️ **③ 必须用 `padding-top`，滚动条由 ③b 单独下推** —— 这两条**踩过两次**，两个方向各自坏一半：
 >
-> `border-top` 同样是「推内容」，但它把 **padding box 整体下移** 76px ⇒
-> 滚动条与内容一起回到官方位置。真机三档对照（滑块染不透明橙，只在滚动条那一列扫描）：
+> | 写法 | 正文能否滚到顶栏下（= 玻璃"透"） | 滚动条位置 |
+> | :--- | :--- | :--- |
+> | `padding-top: 76px` | ✅ 能（padding box 从 y=0 起，**溢出裁剪线也在 y=0**） | ❌ 画进顶栏带 |
+> | `border-top: 76px` + `content-box` | ❌ **不能**（padding box 下移到 76，裁剪线跟着到 76） | ✅ 在顶栏下方 |
+> | **`padding-top` + 轨道 `margin-top`（本版）** | ✅ 能 | ✅ 在顶栏下方 |
 >
-> | 档 | 滚区 clientHeight | 滑块顶端 y | 说明 |
-> | :--- | ---: | ---: | :--- |
-> | 官方默认（顶栏在流内） | 680 | **78** | = 76 + 官方轨道 2px 边距 |
-> | 改前 `padding-top: 76px` | 756 | **0** | 画进顶栏带（透出来） |
-> | 本版 `border-top: 76px` | **680** | **78** | 与官方逐项相同 ✓ |
+> **两次报障分别对应上表的两个 ✗**：
 >
-> ⚠️ 必须**配对**声明 `box-sizing: content-box`：官方 `.scrollBody` 本身就是 content-box
-> 且无边框，本插件引入边框后若按 border-box 解析，那 76px 会从内容高度里扣掉、
-> 滚区内容区被压缩。真机复验：`clientHeight` 680（= 官方值）、`offsetHeight` 756（总高不变）、
-> 输入框座位位置逐像素不变、不产生页面级纵向溢出。
+> * owner 2026-09-26 报「**顶栏透明后，右侧滚动条也会跑上去**」⇒ 那是第一行：**滚动条画在滚动容器的
+>   padding box 上，`padding-top` 只推内容、不推它**，轨道与滑块仍从 y=0 起画，前 76px 落在
+>   半透明顶栏下面 ⇒ 透出来。
+> * 第一版改用 `border-top` 修好了滚动条，owner 随即报「**顶栏变成不透明的了**」⇒ 那是第二行：
+>   **`border-top` 是拿"玻璃的透"换"滚动条位置"** —— 模糊与 alpha 都还在、computed style 一切正常，
+>   但裁剪线随 padding box 下移到 76，**顶栏底下再也没有内容滚过去**，玻璃退化成一条平板。
+>
+> 真机 A/B 数据（滚动 0→1500 量**顶栏带内**像素变化；滑块染橙量顶端 y）：
+>
+> | 写法 | 顶栏带内变化 | 滑块顶端 y |
+> | :--- | ---: | ---: |
+> | 官方默认（顶栏在流内） | 有 | **78**（= 76 + 官方轨道 2px 边距） |
+> | `padding-top: 76px` | **31295 px** ✅ | 75 ✗ |
+> | `border-top: 76px` | **971 px** ❌ 顶栏下没东西 | 78 ✓ |
+> | **本版** | **31176 px** ✅ | **78** ✓ |
+>
+> **判据的要点**：「玻璃透不透」不能只看 `backdrop-filter` 与填充 alpha（那两项在坏的那版里
+> 全是正常的），必须量**顶栏带内有没有随滚动变化的像素** —— 那才是"底下有东西可透"的证据。
+>
+> ③b 取 **78 而不是 76**：官方轨道自己留 2px 上边距，加起来正是官方档下滑块顶端的 y=78。
+> 轨道 margin 是 WebKit 滚动条伪元素的原生能力，且**官方自己就在用**
+> （`.scrollBody::-webkit-scrollbar-track { margin: 2px }`）；dsh Web 只跑 Chromium，口径一致。
 
 ## 3) 输入框：玻璃**只做在卡片上**
 
