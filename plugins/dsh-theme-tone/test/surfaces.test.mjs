@@ -44,6 +44,8 @@ import {
   TOP_VARIABLE,
   LEFT_VARIABLE,
   grainTileUri,
+  popupGrainAlpha,
+  POPUP_GRAIN_COMPENSATION,
 } from '../lib/constants.js'
 import { buildGlassCss, GLASS_SPECULAR_RING } from '../lib/glass.js'
 
@@ -614,14 +616,15 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
 
   it('颗粒贴图应该 跟着色调的 grain 开关走（**两轴六款都开**，只有官方默认关）', () => {
     const on = tokenOverrides({ lightTone: 'sakura', darkTone: 'violet' })
-    // 贴图里烘的 alpha 由 GRAIN_ALPHA 按轴派生（唯一来源）—— 深浅两轴各一张。
-    assert.equal(on[GRAIN_TILE_VARIABLE].dark, grainTileUri(GRAIN_ALPHA.dark))
+    // 贴图里烘的 alpha 由 `GRAIN_ALPHA × POPUP_GRAIN_COMPENSATION` 派生（唯一来源见下一条）。
+    // ⚠️ **不是** GRAIN_ALPHA 原值：浮层那条路没有 screen 混合，同 alpha 会重约 43%。
+    assert.equal(on[GRAIN_TILE_VARIABLE].dark, grainTileUri(popupGrainAlpha('dark')))
     // owner：「浅色版也可以和深色版有相同的渐变质感」→ 浅色轴也开颗粒
-    assert.equal(on[GRAIN_TILE_VARIABLE].light, grainTileUri(GRAIN_ALPHA.light), '浅色轴现在也叠颗粒')
+    assert.equal(on[GRAIN_TILE_VARIABLE].light, grainTileUri(popupGrainAlpha('light')), '浅色轴现在也叠颗粒')
     for (const scheme of SCHEMES) {
       for (const id of NON_OFFICIAL[scheme]) {
         const spec = TONES[scheme][id]
-        const expected = spec.grain ? grainTileUri(GRAIN_ALPHA[scheme]) : 'none'
+        const expected = spec.grain ? grainTileUri(popupGrainAlpha(scheme)) : 'none'
         // 注意：键名必须是 settings 的真实字段名（`lightTone` / `darkTone`）。
         // 这里曾误写成 `{ light, dark }` → `toneIdOf` 读不到 → 回落 official（grain off），
         // 而当时浅色轴本就 expected='none'，于是**测试一直假通过**；改成 grain:true 后才暴露。
@@ -638,16 +641,28 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
 
   it('浮层颗粒贴图应该 与背景层同一张噪声，只差烘进去的强度', () => {
     // `background-image` 的图层没有独立 opacity，所以浮层那张把 `<rect opacity>` 烘进了 SVG；
-    // 背景层那张靠 `::after { opacity: … }`。两处强度由 GRAIN_ALPHA **同一个来源**派生。
+    // 背景层那张靠 `::after { opacity: … }`。
     const strip = uri => uri.replace(/ opacity='[\d.]+'/u, '')
-    assert.equal(strip(grainTileUri(GRAIN_ALPHA.dark)), GRAIN_DATA_URI, '两张贴图除 opacity 外必须逐字一致')
-    assert.ok(grainTileUri(GRAIN_ALPHA.dark).includes(`opacity='${GRAIN_ALPHA.dark}'`), '浮层那张要烘深色轴的值')
-    assert.ok(grainTileUri(GRAIN_ALPHA.light).includes(`opacity='${GRAIN_ALPHA.light}'`), '浅色轴那张烘浅色轴的值')
+    assert.equal(
+      strip(grainTileUri(popupGrainAlpha('dark'))),
+      GRAIN_DATA_URI,
+      '两张贴图除 opacity 外必须逐字一致（噪声参数同源）',
+    )
+    assert.ok(grainTileUri(popupGrainAlpha('dark')).includes(`opacity='${popupGrainAlpha('dark')}'`), '浮层那张烘深色轴的值')
+    assert.ok(grainTileUri(popupGrainAlpha('light')).includes(`opacity='${popupGrainAlpha('light')}'`), '浅色轴那张烘浅色轴的值')
     assert.ok(GRAIN_DATA_URI.includes("baseFrequency='0.8'"), '同一套 feTurbulence 参数')
   })
 
   it('颗粒强度必须**只有一个来源**（owner：「噪点值统一变量，方便后续我们减弱」）', () => {
-    // 改 GRAIN_ALPHA 一个对象 → 三处一起变：运行期变量、贴图预乘 alpha、以及所有引用它们的规则。
+    // 改 GRAIN_ALPHA 一个对象 → 下面两处**一起变**：
+    //   ① 运行期变量（背景层那条路的 CSS opacity）；
+    //   ② 浮层贴图预乘的 alpha = GRAIN_ALPHA × POPUP_GRAIN_COMPENSATION。
+    //
+    // ⚠️ **2026-09-27 修正**：此前这里断言「贴图 alpha === GRAIN_ALPHA」，即两条路用同一个数。
+    // 真机实测推翻了这个前提 —— owner 报「弹出元素还是噪点太重了，和背景不是一个档位」，
+    // 实测弹出层确实重约 43%（两个 alpha 之间隔着一个 0.7 的补偿系数，理由见 constants.ts）。
+    // 「唯一来源」的真正含义是**只有一个可调旋钮、两处由它派生且保持同档**，
+    // 不是「两处字面相等」。下面同时钉住派生关系与单调性，避免有人把系数悄悄改掉。
     // ⚠️ 必须用**非官方**的两轴（官方默认档 grain 是关的，贴图是 'none'，断言会假过）。
     const overrides = tokenOverrides({ lightTone: 'sakura', darkTone: 'violet' })
     for (const scheme of SCHEMES) {
@@ -657,8 +672,23 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
         `${scheme} 的运行期颗粒强度应等于 GRAIN_ALPHA`,
       )
       assert.ok(
-        overrides[GRAIN_TILE_VARIABLE][scheme].includes(`opacity='${GRAIN_ALPHA[scheme]}'`),
-        `${scheme} 的贴图预乘 alpha 也应来自 GRAIN_ALPHA`,
+        overrides[GRAIN_TILE_VARIABLE][scheme].includes(`opacity='${popupGrainAlpha(scheme)}'`),
+        `${scheme} 的贴图预乘 alpha 应等于 GRAIN_ALPHA × 补偿系数`,
+      )
+    }
+    // 补偿系数本身：必须在 (0,1) 内（浮层要比背景**弱**，因为少了 screen 混合的削弱），
+    // 且不能小到几乎看不见。
+    assert.ok(
+      POPUP_GRAIN_COMPENSATION > 0.4 && POPUP_GRAIN_COMPENSATION < 1,
+      `补偿系数应在 (0.4, 1) 内，实际 ${POPUP_GRAIN_COMPENSATION}`,
+    )
+    // 派生关系必须是**乘法**：GRAIN_ALPHA 变了，浮层贴图跟着成比例变（不是写死的常数）。
+    // 这是「一个旋钮」的真正含义 —— 用「两轴比值 == 系数」来钉。
+    // ⚠️ 容差要容纳 `popupGrainAlpha` 的 4 位小数舍入（见该函数注释），故用 1e-3 而非 1e-4。
+    for (const scheme of SCHEMES) {
+      assert.ok(
+        Math.abs(popupGrainAlpha(scheme) / GRAIN_ALPHA[scheme] - POPUP_GRAIN_COMPENSATION) < 1e-3,
+        `${scheme}: popupGrainAlpha 必须是 GRAIN_ALPHA × ${POPUP_GRAIN_COMPENSATION}（实际比值 ${popupGrainAlpha(scheme) / GRAIN_ALPHA[scheme]}）`,
       )
     }
     // 两轴取值不同是物理原因（screen 加亮 vs multiply 压暗），不是没调好 —— 钉住这个事实。

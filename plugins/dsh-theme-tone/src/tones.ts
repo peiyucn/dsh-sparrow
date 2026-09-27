@@ -19,6 +19,7 @@ import {
   TOP_STOP_VARIABLE,
   TOP_VARIABLE,
   grainTileUri,
+  popupGrainAlpha,
 } from './constants.js'
 
 /**
@@ -967,9 +968,11 @@ export const LIGHT_TOKENS: readonly Readonly<{
   }),
   Object.freeze({
     token: GRAIN_TILE_VARIABLE,
-    // 贴图里烘的 alpha 由 `GRAIN_ALPHA`（唯一来源）按轴派生 —— 见 constants.ts。
+    // 贴图里烘的 alpha = `GRAIN_ALPHA` × `POPUP_GRAIN_COMPENSATION`（唯一来源在 constants.ts）。
+    // ⚠️ **不能直接用 GRAIN_ALPHA**：浮层那条路没有 `mix-blend-mode: screen`，同一 alpha 会比
+    // 背景层重约 43%（真机实测），owner 报「弹出元素还是噪点太重了，和背景不是一个档位」。
     pick: (tone: ToneSpec, scheme: ColorScheme) =>
-      tone.grain ? grainTileUri(GRAIN_ALPHA[scheme]) : 'none',
+      tone.grain ? grainTileUri(popupGrainAlpha(scheme)) : 'none',
   }),
   /**
    * **颗粒强度的运行期变量** —— 伪元素那种「贴图 + 独立 `opacity`」的颗粒层读它。

@@ -426,15 +426,71 @@ export const DIALOG_ANCHOR = "body [role='dialog']:not(:has(> img))"
  * **但把强度烘进了 SVG** —— `background-image` 的图层没有独立 `opacity`，
  * 只能靠 `<rect opacity>` 预乘（背景层那边是 `::after { opacity: … }`）。
  *
- * ⚠️ 2026-09-24：数值改为从 {@link GRAIN_ALPHA} **派生**，不再各写各的（owner：
- * 「噪点值统一变量，方便后续我们减弱」）。
+ * ## ⚠️ 2026-09-27：浮层贴图的强度**必须比背景层低**，不能直接喂 GRAIN_ALPHA
+ *
+ * owner 真机反馈：「弹出元素还是噪点太重了，和背景不是一个档位……模型选择列表，
+ * 背景任务列表，还有其他点击按钮弹出的对话框，hover 出现的对话框等。」
+ *
+ * **真机实测（本机 3080，模型选择菜单；颗粒贡献 = 颗粒开/关的逐像素平均差）**：
+ *
+ * | 烘入 alpha | 弹出层颗粒贡献 | 弹出 / 背景 |
+ * | ---: | ---: | ---: |
+ * | 0.0975（= GRAIN_ALPHA，原做法） | 12.581 | **1.43** |
+ * | 0.0780 | 10.268 | 1.17 |
+ * | **0.0682（= ×0.7，本值）** | **8.851** | **1.01** |
+ * | 0.0585 | 7.907 | 0.90 |
+ * | 0.0488 | 6.405 | 0.73 |
+ * | 0.0390 | 5.364 | 0.61 |
+ *
+ * 背景层同刻实测 **8.798**（三轮完全一致，读数无抖动）。
+ * 即：**同一个 alpha 喂给两条路，浮层会重约 43%** —— 因为两条路的合成方式不同：
+ *
+ * | | 背景层 | 浮层 |
+ * | :--- | :--- | :--- |
+ * | 强度载体 | `opacity: var(--…-grain-alpha)` | 烘进贴图 `<rect opacity>` |
+ * | 混合模式 | **`mix-blend-mode: screen`**（深色轴，加法） | **无**（普通 source-over） |
+ *
+ * `screen` 是**加法**且以「自身 alpha」为权重：同样的 alpha 下，它比普通合成**更弱**
+ * （暗底上加白点，50% alpha 的 screen 只提到约 1-(1-a)(1-b) 而不是线性叠加）。
+ * 所以要保持两处观感一致，**浮层那一侧必须调低**。这不是「取值没调好」，是两条管线的补偿。
+ *
+ * ## 为什么用「补偿系数」而不是改 GRAIN_ALPHA
+ *
+ * `GRAIN_ALPHA` 是**背景层**的强度（owner 上一轮在那儿定的 0.0975，有 8× 放大逐档对比）。
+ * 浮层要的是「与背景同档」，所以派生关系写成 `GRAIN_ALPHA × POPUP_GRAIN_COMPENSATION`
+ * —— 将来 owner 再调 `GRAIN_ALPHA`，两处**一起动且保持同档**，不会又分叉。
+ *
+ * ⚠️ 深色轴与浅色轴用**同一个系数**（0.7）：实测两轴都是「浮层重约 43%」这一条规律，
+ * 而两轴的绝对强度本就不同（`.0975` / `.16`），系数保持共享才不引入第三种自由度。
+ */
+export const POPUP_GRAIN_COMPENSATION = 0.7
+
+/**
+ * 浮层颗粒强度（按轴）。
+ *
+ * 见 {@link POPUP_GRAIN_COMPENSATION}：浮层不能用 `GRAIN_ALPHA` 原值，否则比背景重约 43%。
+ *
+ * ⚠️ 结果**四舍五入到 4 位小数**：直接乘会得到 `0.06824999999999999` 这种浮点尾数，
+ * 而它会被**逐字烘进 data URI**（`opacity='0.06824999999999999'`）—— 既难看、也让
+ * 「贴图里的值 == 常量」这类断言变脆。4 位足够（视觉上 1/10000 的差异不可见）。
+ * @param scheme - 明暗轴。
+ * @returns 该轴烘进浮层贴图的 alpha。
+ */
+export function popupGrainAlpha(scheme: 'light' | 'dark'): number {
+  return Math.round(GRAIN_ALPHA[scheme] * POPUP_GRAIN_COMPENSATION * 1e4) / 1e4
+}
+
+/**
+ * 构造浮层颗粒贴图（把强度烘进 SVG）。
+ * @param alpha - 烘入的 alpha（通常传 {@link popupGrainAlpha} 的结果）。
+ * @returns 可直接写进 `background-image` 的 data URI。
  */
 export function grainTileUri(alpha: number): string {
   return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='${alpha}' filter='url(%23n)'/%3E%3C/svg%3E")`
 }
 
-/** 浮层颗粒贴图（深色轴）—— 由 {@link GRAIN_ALPHA} 派生。 */
-export const POPUP_GRAIN_DATA_URI = grainTileUri(GRAIN_ALPHA.dark)
+/** 浮层颗粒贴图（深色轴）—— 由 {@link GRAIN_ALPHA} × {@link POPUP_GRAIN_COMPENSATION} 派生。 */
+export const POPUP_GRAIN_DATA_URI = grainTileUri(popupGrainAlpha('dark'))
 
 // ⚠️ 这里曾有一条 `POPUP_GRAIN_DATA_URI_LIGHT = grainTileUri(GRAIN_ALPHA.light)`，
 // 已删除（2026-09 审计：全仓零引用）。浅色轴的贴图由 tones.ts 在运行时按 scheme
