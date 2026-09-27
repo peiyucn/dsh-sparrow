@@ -9,6 +9,7 @@ import type {} from '@deepseek-ai/dsh-settings'
 import type { DeepSeekFileId, DeepSeekFilePage } from '@deepseek-ai/dsh-llm-deepseek'
 import { assertCapabilities } from './compat.js'
 import { classifyUpstreamError, COUNT_PAGE_LIMIT, COUNT_PAGE_TIMEOUT_MS, decodeFileIdParam, formatBytes, MAX_COUNT_PAGES, normalizePageQuery, resolveBaseURL, toFileRow, authHeaders, probeFilesClientShape } from './files.js'
+import { isTrustedPluginRequest, officialTrustedHosts } from './trust.js'
 
 export const name = 'dsh-file-manage'
 export const inject = ['webServer', 'credentials', 'settings']
@@ -149,7 +150,7 @@ async function deepSeekSurface(): Promise<DeepSeekSurface> {
 }
 
 /**
- * host half 入口：注册 prefix 路由（list / 单条删除），全部副作用挂在 apply 的 effect 上。
+ * host half 入口：注册 prefix 路由（list / count / 单条删除），全部副作用挂在 apply 的 effect 上。
  * @param ctx - DSH 插件上下文。
  */
 export async function apply(ctx: Context): Promise<void> {
@@ -163,6 +164,14 @@ export async function apply(ctx: Context): Promise<void> {
     kind: 'prefix',
     path: PREFIX,
     handler: async (req: IncomingMessage, res: ServerResponse) => {
+      // 浏览器信任栅栏（官方 /api 栅栏同口径，见 trust.ts）：必须在本路由**任何**
+      // 分发之前 —— 官方栅栏挂在 /api 前缀上，而本路由 /api/file-manage 更长，
+      // 「前缀最长者胜」使请求根本走不到官方那道检查。
+      // 额外信任面复用官方 webRuntime.trustedHosts（故这里在**请求期**读取）。
+      if (!isTrustedPluginRequest(req.headers, officialTrustedHosts(ctx))) {
+        sendError(res, new FileManageError('FORBIDDEN', '拒绝跨站来源的请求', 403))
+        return
+      }
       const url = new URL(req.url ?? '/', 'http://localhost')
       const pathname = url.pathname
       try {

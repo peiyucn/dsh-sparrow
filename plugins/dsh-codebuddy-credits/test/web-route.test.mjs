@@ -7,8 +7,10 @@ import { installCodeBuddyWeb } from '../lib/web.js'
  * 覆盖「请求 → 入参校验 → shared 调用 → JSON 响应」整条链路（对照 vision-bridge 的 host-route 测试）。
  * 注意 cordis 的语义：ctx.inject 与 ctx.effect 都会**同步执行**回调注册副作用，mock 必须复现，
  * 否则 webServer.register 不会发生、路由测试就是空转。
+ * @param overrides - shared 覆盖项。
+ * @param webRuntime - mock 的官方 `webRuntime` 服务值（栅栏的额外信任面）；默认无该服务。
  */
-function buildHarness(overrides = {}) {
+function buildHarness(overrides = {}, webRuntime = undefined) {
   const calls = { refreshModels: 0 }
   let handler = null
   const shared = {
@@ -32,13 +34,17 @@ function buildHarness(overrides = {}) {
   const ctx = {
     inject: (_names, cb) => { cb({ webServer: { register: (def) => { handler = def.handler; return () => {} } } }) },
     effect: (fn) => { const dispose = fn(); return typeof dispose === 'function' ? dispose : () => {} },
+    get: (name) => (name === 'webRuntime' ? webRuntime : undefined),
   }
   installCodeBuddyWeb(ctx, shared)
   return { shared, calls, get handler() { return handler } }
 }
 
-/** 最小 req/res：req 带 loopback remoteAddress（路由的 localOnly 栅栏依赖它）。 */
-async function request(handler, url, { method = 'POST', address = '127.0.0.1' } = {}) {
+/**
+ * 最小 req/res：req 带 loopback remoteAddress 与同源 Host 头（路由的浏览器信任栅栏
+ * 与 localOnly 网段检查都依赖它们）。默认 `host: '127.0.0.1:3080'` = DSH 页面同源请求。
+ */
+async function request(handler, url, { method = 'POST', address = '127.0.0.1', headers = { host: '127.0.0.1:3080' } } = {}) {
   let statusCode = 0
   const chunks = []
   const res = {
@@ -47,7 +53,7 @@ async function request(handler, url, { method = 'POST', address = '127.0.0.1' } 
     end: (chunk) => { chunks.push(chunk ?? '') },
   }
   Object.defineProperty(res, 'statusCode', { set: (value) => { statusCode = value }, get: () => statusCode })
-  await handler({ method, url, socket: { remoteAddress: address } }, res)
+  await handler({ method, url, headers, socket: { remoteAddress: address } }, res)
   const text = chunks.join('')
   return { statusCode, body: text === '' ? undefined : JSON.parse(text) }
 }
@@ -165,5 +171,102 @@ describe('codebuddy host 路由：/session-usage 与 /turn-usage（异步积分�
     const result = await request(h.handler, '/api/codebuddy-credits/session-usage?sessionId=abc', { method: 'GET' })
     assert.equal(result.statusCode, 400)
     assert.match(result.body.error, /replay boom/u)
+  })
+})
+
+/**
+ * 浏览器信任栅栏的**接线**用例（栅栏存在但从没被调用 = 零价值，故这里走真实 handler）。
+ *
+ * 回归背景（实测于 0.1.7-rc.2）：官方 Host/Origin 栅栏与浏览器令牌认证都注册在
+ * `/api` 前缀路由上，而 webServer 是「精确表优先、前缀最长者胜」——本插件的
+ * `/api/codebuddy-credits` 更长，请求根本走不到官方检查。实测无栅栏时
+ * `GET /api/codebuddy-credits/status` 无凭据 200，而官方 `/api/sessions` 401。
+ */
+describe('codebuddy host 路由：浏览器信任栅栏接线（DNS rebinding / CSRF）', () => {
+  it('⛔ rebinding：Host 与 Origin 同为攻击者域名 应该 403 且不触达 shared', async () => {
+    const h = buildHarness()
+    const result = await request(h.handler, '/api/codebuddy-credits/status', {
+      method: 'GET',
+      headers: { host: 'evil.example:3080', origin: 'http://evil.example:3080' },
+    })
+    assert.equal(result.statusCode, 403)
+    assert.equal(result.body.error, '拒绝跨站来源的请求')
+  })
+
+  it('⛔ rebinding：无 Origin 只有攻击者 Host（浏览器图片式读取）应该 403', async () => {
+    const h = buildHarness()
+    const result = await request(h.handler, '/api/codebuddy-credits/status', {
+      method: 'GET',
+      headers: { host: 'evil.example:3080' },
+    })
+    assert.equal(result.statusCode, 403)
+  })
+
+  it('⛔ 跨站 Origin 应该 403（Host 是回环也拒）', async () => {
+    const h = buildHarness()
+    const result = await request(h.handler, '/api/codebuddy-credits/status', {
+      method: 'GET',
+      headers: { host: '127.0.0.1:3080', origin: 'http://evil.example' },
+    })
+    assert.equal(result.statusCode, 403)
+  })
+
+  it('⛔ sec-fetch-site: cross-site 应该 403（即使无 Origin，且 Host 是回环）', async () => {
+    const h = buildHarness()
+    const result = await request(h.handler, '/api/codebuddy-credits/status', {
+      method: 'GET',
+      headers: { host: '127.0.0.1:3080', 'sec-fetch-site': 'cross-site' },
+    })
+    assert.equal(result.statusCode, 403)
+  })
+
+  it('⛔ 缺 Host 头 应该 403', async () => {
+    const h = buildHarness()
+    const result = await request(h.handler, '/api/codebuddy-credits/status', { method: 'GET', headers: {} })
+    assert.equal(result.statusCode, 403)
+  })
+
+  it('⛔ 变更类路由（POST /remove-key）同样先过栅栏：跨站请求不得触达 removeKey', async () => {
+    let removed = 0
+    const h = buildHarness({ removeKey: async () => { removed += 1 } })
+    const result = await request(h.handler, '/api/codebuddy-credits/remove-key', {
+      headers: { host: 'evil.example:3080', origin: 'http://evil.example:3080' },
+    })
+    assert.equal(result.statusCode, 403)
+    assert.equal(removed, 0, '被栅栏拒绝的请求不得执行任何副作用')
+  })
+
+  it('同源浏览器请求（DSH 页面自身）应该 照常 200 —— 修复不得打断自家 UI', async () => {
+    const h = buildHarness()
+    const result = await request(h.handler, '/api/codebuddy-credits/status', {
+      method: 'GET',
+      headers: { host: '127.0.0.1:3080', origin: 'http://127.0.0.1:3080', 'sec-fetch-site': 'same-origin' },
+    })
+    assert.equal(result.statusCode, 200)
+    assert.equal(result.body.active, true)
+  })
+
+  it('无浏览器标记的本机客户端（curl / 脚本）应该 照常放行', async () => {
+    const h = buildHarness()
+    const result = await request(h.handler, '/api/codebuddy-credits/status', { method: 'GET', headers: { host: 'localhost:3080' } })
+    assert.equal(result.statusCode, 200)
+  })
+
+  it('官方 webRuntime 列出的 LAN authority：同源 LAN 请求放行，未列的仍 403', async () => {
+    // 官方信任面在场（web-app 绑定 0.0.0.0 时采样出的 LAN 地址）：同源 LAN 请求应放行。
+    const allowed = buildHarness({}, { lanAddresses: ['192.168.1.5'], trustedHosts: ['192.168.1.5'] })
+    const ok = await request(allowed.handler, '/api/codebuddy-credits/status', {
+      method: 'GET',
+      headers: { host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' },
+    })
+    assert.equal(ok.statusCode, 200)
+    // 官方信任面缺席（老宿主 / 非 web 组合）→ 保守回退为只信回环。
+    // 注意 remoteAddress 仍是回环：localOnly 只认 socket 来源，栅栏才是 Host/Origin 那道。
+    const other = buildHarness()
+    const denied = await request(other.handler, '/api/codebuddy-credits/status', {
+      method: 'GET',
+      headers: { host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' },
+    })
+    assert.equal(denied.statusCode, 403, '官方信任面缺席时未列的 LAN authority 必须拒')
   })
 })

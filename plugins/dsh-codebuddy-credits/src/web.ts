@@ -10,6 +10,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { CodeBuddyModelFacts } from './catalog.js'
 import type { QuotaStatus } from './quota.js'
+import { isTrustedPluginRequest, officialTrustedHosts } from './trust.js'
 
 const PREFIX = '/api/codebuddy-credits'
 const MAX_BODY_BYTES = 16 * 1024
@@ -128,6 +129,10 @@ function localOnly(req: IncomingMessage): boolean {
   return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1'
 }
 
+/**
+ * @param ctx - 插件上下文。
+ * @param shared - 路由共用的最小操作面。
+ */
 export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared): void {
   ctx.inject(['webServer'], (webCtx) => {
     ctx.effect(() => webCtx.webServer.register({
@@ -136,6 +141,16 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
       handler: async (req, res) => {
         const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
         try {
+          // 浏览器信任栅栏（官方 /api 栅栏同口径，见 trust.ts）：必须在本路由**任何**
+          // 分发与请求体读取之前 —— 官方栅栏挂在 /api 前缀上，而本路由
+          // /api/codebuddy-credits 更长，「前缀最长者胜」使请求根本走不到官方那道检查。
+          // 额外信任面复用官方 webRuntime.trustedHosts（故这里在**请求期**读取）。
+          // localOnly 只看 socket 来源，拦不住跨站 / rebinding（那种请求也来自 127.0.0.1），
+          // 故两道都留：下面这道网段检查是纵深防御，不是本缺陷的修复。
+          if (!isTrustedPluginRequest(req.headers, officialTrustedHosts(ctx))) {
+            sendJson(res, 403, { error: '拒绝跨站来源的请求' })
+            return
+          }
           if (!localOnly(req)) {
             sendJson(res, 403, { error: '只允许从本机 DSH 页面访问' })
             return
