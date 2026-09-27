@@ -47,11 +47,12 @@ import {
   GRAIN_TILE_VARIABLE,
   HOVER_CARD_ANCHOR,
   HOVER_CARD_TEXT_TOKENS,
+  LEFT_VARIABLE,
   PANEL_VARIABLE,
   PLAIN_ATTR,
   TOP_VARIABLE,
 } from './constants.js'
-import { POPUP_BOTTOM_SHAPE, POPUP_STOP, POPUP_TOP_SHAPE } from './constants.js'
+import { POPUP_BOTTOM_SHAPE, POPUP_LEFT_SHAPE, POPUP_STOP, POPUP_TOP_SHAPE } from './constants.js'
 
 /**
  * 浮层的**语义锚点** —— 兜底通道：token 管不到的（自带硬编码底色的）弹层靠这几条。
@@ -471,7 +472,14 @@ export const COMPOSER_ICON_BUTTON_SCOPE = 'body [data-composer-card]'
  *
  * 1. 颗粒（只有色调开了 `grain` 才是图，否则是 `none`）—— 压在最上面才像砂面；
  * 2. 顶部光层（深色轴暖金 / 浅色轴主色，三层光同源，见 `tones.ts`）；
- * 3. 底部本色辉光（该色调自己的纵深）。
+ * 3. 底部本色辉光（该色调自己的纵深）；
+ * 4. **左侧金晕**（与背景层同一份配方，几何按浮层尺度缩小 —— 见 {@link POPUP_LEFT_SHAPE}）。
+ *
+ * ⚠️ **第 4 道是 2026-09-27 补的**：此前只有顶 / 底两道，而背景层是**三道** ——
+ * owner 报「设置弹窗的打光和其他的好像不一样……我记得咱们的深色主题是三道光，
+ * 应该所有元素都统一」。根因不是拿不到变量（`tones.ts` 早已把左光发到 `body`、
+ * 浮层继承得到），而是**这个图层串没有引用它**（`LEFT_VARIABLE` 在 surface.ts 里
+ * 一次都没出现过）。补上之后浮层与背景层同为三道光。
  *
  * 三层全部走变量，缺变量时落到 `transparent` / `none` —— 即「官方默认」下等于什么都不画
  * （官方默认下这些规则本来也被 `PLAIN_ATTR` 挡住）。
@@ -483,11 +491,17 @@ export function surfaceLayers(): string {
     `var(${GRAIN_TILE_VARIABLE}, none)`,
     `radial-gradient(${POPUP_TOP_SHAPE}, var(${TOP_VARIABLE}, transparent), ${POPUP_STOP})`,
     `radial-gradient(${POPUP_BOTTOM_SHAPE}, var(${BOTTOM_VARIABLE}, transparent), ${POPUP_STOP})`,
+    `radial-gradient(${POPUP_LEFT_SHAPE}, var(${LEFT_VARIABLE}, transparent), ${POPUP_STOP})`,
   ].join(',\n    ')
 }
 
 /**
  * {@link GROUPED_MENU_SELECTOR} 专用的图层串：**颗粒 + 底光，没有顶光**（理由见该常量的表）。
+ *
+ * ⚠️ 这里**也不含左光**：那个菜单很矮（分组标题 + 若干行），顶光与左光在这个尺度上
+ * 都只覆盖一条边、读不出「一道光」，反而会与粘性分组标题的横带打架（该横带的成因见
+ * `GROUPED_MENU_SELECTOR` 的注释）。「三道光统一」这条口径针对的是
+ * **有独立面的浮层**（对话框 / 菜单本体），分组菜单是它的内部结构。
  * @returns 可直接写进 `background-image` 的图层串。
  */
 export function menuSurfaceLayers(): string {

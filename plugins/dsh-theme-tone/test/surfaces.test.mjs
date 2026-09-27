@@ -26,7 +26,7 @@ import {
   tokenOverrides,
   washFill,
 } from '../lib/tones.js'
-import { GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
+import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
 import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, usesOfficialBeforeLayer } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
@@ -39,6 +39,7 @@ import {
   PANEL_VARIABLE,
   PLAIN_ATTR,
   POPUP_BOTTOM_SHAPE,
+  POPUP_LEFT_SHAPE,
   POPUP_STOP,
   POPUP_TOP_SHAPE,
   TOP_VARIABLE,
@@ -532,16 +533,41 @@ describe('抬升面：不变量', () => {
     }
   })
 
-  it('浮层的配方应该 三层齐备（颗粒 / 顶光 / 底光）—— 但画在选择器那层，不进 token', () => {
+  it('浮层的配方应该 四层齐备（颗粒 / 顶光 / 底光 / 左光）—— 但画在选择器那层，不进 token', () => {
     // 曾经这条测的是 `--dsw-specific-menu` 的值，现在配方归 `surfaceLayers()`：
     // token 只装颜色（否则 sticky 分组标题会把百分比渐变压成硬边金带，见 05-surfaces §8.2）。
+    //
+    // ⚠️ **2026-09-27：层数由 3 改成 4** —— 补上左光。owner 报
+    // 「设置弹窗的打光和其他的好像不一样……我记得咱们的深色主题是三道光，应该所有元素都统一」，
+    // 实测确认：背景层是**三道光**（顶/底/左），而浮层只引用了顶与底两道，
+    // `LEFT_VARIABLE` 在 surface.ts 里一次都没出现过（不是拿不到 —— tones 早已把它发到 body，
+    // 浮层继承得到，只是没用）。补上后浮层与背景层同为三道光。
     const layers = surfaceLayers().split(',\n    ')
-    assert.equal(layers.length, 3, '颗粒 + 顶光 + 底光')
+    assert.equal(layers.length, 4, '颗粒 + 顶光 + 底光 + 左光')
     assert.equal(layers[0], `var(${GRAIN_TILE_VARIABLE}, none)`, '颗粒压在最上面才像砂面')
     assert.ok(layers[1].includes(POPUP_TOP_SHAPE), '第二层是顶光')
     assert.ok(layers[2].includes(POPUP_BOTTOM_SHAPE), '第三层是底光')
+    assert.ok(layers[3].includes(POPUP_LEFT_SHAPE), '第四层是左光（与背景层对齐）')
     for (const layer of layers.slice(1)) {
       assert.ok(layer.includes(POPUP_STOP), `每层都以同一个收束点结束：${POPUP_STOP}`)
+    }
+    // 三条光必须**都**引用各自的运行期变量，且都带 transparent 兜底
+    // （官方默认档下这些变量是 transparent ⇒ 等于什么都不画）。
+    for (const [shape, variable] of [[POPUP_TOP_SHAPE, TOP_VARIABLE], [POPUP_BOTTOM_SHAPE, BOTTOM_VARIABLE], [POPUP_LEFT_SHAPE, LEFT_VARIABLE]]) {
+      const layer = layers.find(l => l.includes(shape))
+      assert.ok(layer !== undefined, `缺少引用 ${variable} 的那层`)
+      assert.ok(layer.includes(`var(${variable}, transparent)`), `${variable} 必须走变量并带 transparent 兜底`)
+    }
+  })
+
+  it('⛔ 浮层的三道光必须与背景层的三道光**逐道对应**', () => {
+    // 这条守卫防的是「又漏一道」：两边的配方是**同一套三道光的两个尺度**，
+    // 任何一边新增/删除一道都必须同步 —— 否则观感又会分叉（owner 报的就是这个）。
+    const popup = surfaceLayers()
+    const backdrop = BACKDROP_GRADIENTS
+    for (const variable of [TOP_VARIABLE, BOTTOM_VARIABLE, LEFT_VARIABLE]) {
+      assert.ok(backdrop.includes(`var(${variable}`), `背景层应引用 ${variable}（不变量基准）`)
+      assert.ok(popup.includes(`var(${variable}`), `浮层缺少 ${variable} —— 与背景层分叉了`)
     }
   })
 
@@ -1573,7 +1599,10 @@ describe('抬升面：表面绘制', () => {
   it('几何应该 用浮层尺度那三条常量（不是整屏的、也不是色卡的）', () => {
     assert.ok(layers.includes(`radial-gradient(${POPUP_TOP_SHAPE},`))
     assert.ok(layers.includes(`radial-gradient(${POPUP_BOTTOM_SHAPE},`))
-    assert.equal((layers.match(new RegExp(POPUP_STOP, 'gu')) ?? []).length, 2, '两层都用浮层收束位置')
+    // 左光（2026-09-27 补）：与另两道同为**浮层尺度**（百分比几何），不是整屏的 `vw/vh`。
+    assert.ok(layers.includes(`radial-gradient(${POPUP_LEFT_SHAPE},`), '左光必须用浮层尺度的形状')
+    assert.ok(!layers.includes('vw') && !layers.includes('vh'), '浮层几何不得混入整屏的 vw/vh 单位')
+    assert.equal((layers.match(new RegExp(POPUP_STOP, 'gu')) ?? []).length, 3, '三层都用浮层收束位置')
   })
 
   it('每一条锚点规则应该 **只叠图层、不刷底色**，且都带官方默认门', () => {
