@@ -985,9 +985,11 @@ describe('抬升面：表面绘制', () => {
       "body :has(> [role='listbox'])",
       "body [role='listbox']:not([data-trigger-menu] *)",
       DIALOG_ANCHOR,
-      "body > [role='tree']",
       // 子代理会话弹层：`role='tree'` 在**内层**，外层盒子才画材质 —— 故用 :has 向上找。
       // owner：「subagent 的弹出和 background jobs 的弹出风格得一致」。
+      // ⚠️ 这里**只有**一条 tree 锚点：此前的 `body > [role='tree']` 经实测是**死锚点**
+      // （官方 portal 层级是 body > div.menu > div.menuBody[role=tree]，role=tree 不在 body 直下，
+      //   实测命中 0 个），已于 2026-09-27 删除。
       "body > :has(> [role='tree'])",
       "body [data-slot='conversation.session.header.actions'] ul",
       "body [role='tooltip']:not([data-side])",
@@ -1671,9 +1673,9 @@ describe('抬升面：表面绘制', () => {
       // 正则与本正则各自 `matchAll` 出的对象**不是同一个引用**，用 `.includes(m)` 永远为 false，
       // 例外就会被下面那组契约照样判违规（本仓库当下这条守卫就踩过）。
       .filter(m => !officialBeforeRules.some(o => o[1].trim().replace(/\s+/gu, ' ') === m[1].trim().replace(/\s+/gu, ' ')))
-    // 覆盖层规则数：12 条锚点 − 1 条被排除（QueueDock，官方 `.panel::after` 是描边）
-    // = 11 条。下界取 11，既拦住「锚点表被删空」，也不因正常的排除而误报。
-    assert.ok(pseudoRules.length >= 11, `覆盖用伪元素规则太少（${pseudoRules.length}）—— 锚点表是不是被删了？`)
+    // 覆盖层规则数：8 条锚点 − 1 条被排除（QueueDock，官方 `.panel::after` 是描边）
+    // = 7 条。下界取 7，既拦住「锚点表被删空」，也不因正常的排除而误报。
+    assert.ok(pseudoRules.length >= 7, `覆盖用伪元素规则太少（${pseudoRules.length}）—— 锚点表是不是被删了？`)
     for (const rule of pseudoRules) {
       const selector = rule[1].trim().replace(/\s+/gu, ' ')
       const body = rule[2]

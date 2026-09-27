@@ -141,13 +141,22 @@ export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
   /**
    * **子代理血缘弹层**（`SubagentHeaderLineage`，头部那枚 `1/3 ⌄`）。
    *
-   * 为什么必须收窄成 `body >`：`role='tree'` 官方有**四处**在用 ——
-   * `SubagentHeaderLineage`（浮层，`createPortal` 直挂 body）、`JsonTree`、`WorkspaceBrowser`
-   * 的会话树、`TrajectoryTable`。后三者都是**内联**组件（长在面板里、不是浮层），
-   * 直接写 `[role='tree']` 会把它们的背景换成不透明填充 + 光 + 颗粒 —— 那就错了。
-   * 只有子代理那个是 portal 出来的 body 直接子元素。
+   * ⚠️ **2026-09-27 实测更正：这条锚点（`body > [role='tree']`）是死锚点，已删除。**
+   * 官方那处 portal 的真实层级是
+   * `body > div.menu > div.menuBody[role='tree']` —— `role='tree'` 在**内层**，
+   * 不是 `body` 的直接子元素，所以这条**一个元素都命不中**（真机实测 0 个；
+   * 用官方层级复刻亦然）。原注释写「本弹层的 role='tree' 是 portal 出来的 body 直接子元素」
+   * 是**错的推断**，没有任何元素靠它上色 —— 删掉不改变任何观感。
+   *
+   * 真正覆盖这个弹层的是紧邻那条 `body > :has(> [role='tree'])`（实测命中外层 `.menu`，
+   * 1 个，正是画材质的那个盒子）。
+   *
+   * 保留收窄的理由（仍然成立）：`role='tree'` 官方有**五处**在用 —— 本弹层、`JsonTree`、
+   * `ui-workspace` 的 `WorkspaceBrowser` / `AnimatedRows`，以及**左侧栏会话列表**
+   * （`bhn1Oq_list`，真机实测 `270x538`、`role='tree'`、非 body 直系）。
+   * 后四者都是**内联/常驻**组件，裸写 `[role='tree']` 会把它们的背景换成不透明填充 + 光 + 颗粒
+   * —— 那才是真事故。`body >` 这一层收窄因此必须留着。
    */
-  "body > [role='tree']",
   /**
    * **子代理会话弹层**（`SubagentCatalogAction`，头部那枚「N subagents」按钮弹出的面板）。
    *
@@ -163,19 +172,20 @@ export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
    * 差别**只在我们的锚点表**：jobs 那个 `<ul>` 有一条锚点（见下），
    * 而 subagents 这个弹层一条都命中不到 ⇒ 只有它**没有我们的颗粒与光**。
    *
-   * ## 为什么锚点是 `body > :has(> [role='tree'])` 而不是 `body > [role='tree']`
+   * ## 为什么锚点是 `body > :has(> [role='tree'])`
    *
-   * 相邻那条（血缘弹层）用 `body > [role='tree']` 是**对的**，但**命中不到本弹层**：
-   * 本弹层的结构是 outer(`createPortal` 直挂 body) > …… > `[role='tree']`（内层视口），
+   * 本弹层的结构是 outer(`createPortal` 直挂 body) > `[role='tree']`（内层视口），
    * 即 `role='tree'` 在**内层**、外层才是那个画材质的盒子。
    * 故改为问「**body 的哪个直接子元素含有 role=tree**」。
+   * ⚠️ 顺带纠正：相邻那条 `body > [role='tree']` **本身也是死锚点**（实测 0 命中），
+   * 已删除并写明理由 —— 本弹层此前并不存在「另一条能命中的锚点」。
    *
    * ## 为什么这条不会误伤（真机实测）
    *
    * 在真实会话里逐条数过：`body > :has(> [role='tree'])` = **1 个**，
    * 且那一个正是本弹层（`body` 直接子元素、`position: fixed`、`z-index: 100`）。
-   * `JsonTree` / `WorkspaceBrowser` / `TrajectoryTable` 都是**内联**组件（不在 body 直下），
-   * 与逐条锚点同一条口径：**收窄在 body 直下**，只命中 portal 出来的浮层。
+   * `JsonTree` / `WorkspaceBrowser` / `AnimatedRows` / 左侧栏会话列表都是**内联或常驻**组件
+   * （不在 body 直下），与逐条锚点同一条口径：**收窄在 body 直下**，只命中 portal 出来的浮层。
    */
   "body > :has(> [role='tree'])",
   /**
