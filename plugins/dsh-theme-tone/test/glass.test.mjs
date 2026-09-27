@@ -12,6 +12,7 @@ import {
   GLASS_SHADE_RING,
   GLASS_SPECULAR_RING,
   HEADER_HEIGHT_PX,
+  HEADER_LIGHT_SCALE,
   SEAT_SOLID_PX,
   SEAT_SOLID_RAMP_PX,
   SHADE_ALPHA,
@@ -197,16 +198,28 @@ describe('glass：顶栏浮层', () => {
     )
   })
 
-  it('顶栏应该 **自己画一遍背景层的渐变栈**，且按自己的填充 alpha 同步压光', () => {
+  it('顶栏应该 **自己画一遍背景层的渐变栈**，且光与填充各自独立定强度', () => {
     // 背景层（80）原本压在顶栏之上，顶光是**直接盖在顶栏上**的；顶栏为躲开内容抬到 82 后
     // 就吃不到了（owner：「怎么顶栏的金光没有了」）。所以要自己画一遍，且必须**同源**。
-    // ⚠️ 光还要按顶栏自己的填充 alpha 同步压：底乘 70%、光却是满的 → 那一片比周围亮一截
-    //（owner 对底座那处说的「相当于两层光了」是同一个毛病，顶栏半透明同样逃不掉）。
+    // ⚠️ **2026-09-27：光不再跟着填充 alpha 一起压**（owner：「顶部的光被顶栏挡住了」）。
+    // 实测光一直没丢（重画忠实度 A/G = 0.98）——问题是底色 α0.7 把那条带整体压暗 26%，
+    // 观感成了一条暗带。改为光 ×HEADER_LIGHT_SCALE(=1.0)：台阶 5.15 → 3.44（仍是顶栏略暗），
+    // 顶栏内的光贡献 +42%。
     // 锚点用 0.1.7 起的那条（conversation.header > header）—— 见本文件顶部的结构对照。
     // ⚠️ 2026-09-24 起玻璃挂 **::before**（本体不许带 backdrop-filter，见下面那条守护）。
     const header = rulesFor(css, "[data-slot='conversation.header'] > header::before").join('\n')
     assert.ok(header.length > 0, '顶栏玻璃层（::before）应存在')
-    assert.ok(header.includes(dimmedBackdropGradients(GLASS_HEADER_ALPHA)), '顶栏的光必须按同一 alpha 压')
+    assert.ok(
+      header.includes(dimmedBackdropGradients(HEADER_LIGHT_SCALE)),
+      '顶栏的光必须按 HEADER_LIGHT_SCALE 画（不再跟填充 alpha 同步压）',
+    )
+    // 光与底色分离之后，这条不变式要守住：两者**不得**再相等 ——
+    // 相等的旧做法正是 owner 报的「光被顶栏挡住」。
+    assert.notEqual(
+      HEADER_LIGHT_SCALE,
+      GLASS_HEADER_ALPHA,
+      '光的比例必须与填充 alpha 分开（相等即退回「顶栏整体偏暗、光被挡住」）',
+    )
     assert.match(header, /background-attachment: fixed/u, '必须 fixed —— 否则 76px 高的盒子会把渐变重新缩放成硬边带')
     assert.match(header, /background-color: color-mix/u, '玻璃填充仍在（背景色与渐变分层）')
   })

@@ -471,6 +471,40 @@ export const GLASS_CARD_BLUR = 'blur(10px) saturate(1.45)'
 export const GLASS_HEADER_ALPHA = 0.7
 
 /**
+ * 顶栏**光层**的强度比例 —— 与底色的 {@link GLASS_HEADER_ALPHA} **分离**。
+ *
+ * ## 为什么不再跟底色同步压（owner 2026-09-27）
+ *
+ * owner：「我看到顶部的光了被顶栏挡住了，感觉应该加在顶栏上。」
+ *
+ * 顶栏其实**一直**在重画那三道光（`dimmedBackdropGradients`），实测重画的忠实度
+ * A/G = **0.98**（`A` = 顶栏带内光的贡献，`G` = 同一带在顶栏隐藏时地面给的贡献）——
+ * 也就是说**光没有丢**。真正的问题在**底色**：顶栏用 α0.7 的深色填充压在自己身上，
+ * 于是那条带整体比下方暗 26%（实测 20.11 vs 25.26），观感上就是「一条暗带把光挡住了」。
+ *
+ * 原做法让**光跟着底色一起**乘 0.7（`dimmedBackdropGradients(GLASS_HEADER_ALPHA)`），
+ * 理由是「底乘 70%、光却是满的 ⇒ 那一片会比周围亮一截」。那条理由针对的是
+ * **不透明抬升面**（底座）；顶栏是半透明的玻璃，光在它上面本就要透出来。
+ * 真机实测把光提到 ×1.0（底色仍 0.7）：
+ *
+ * | 配置 | 顶栏带亮度 | 下方带亮度 | 台阶（下−上） | 顶栏光贡献 |
+ * | :--- | ---: | ---: | ---: | ---: |
+ * | 底色 0.7 + 光 0.7（原） | 20.11 | 25.26 | 5.15 | 4.060 |
+ * | **底色 0.7 + 光 1.0（本值）** | **21.83** | 25.26 | **3.44** | **5.772** |
+ * | 底色 0.45 + 光 1.0 | 25.78 | 25.26 | −0.52 | 5.772 |
+ *
+ * 取 ×1.0 而不是「再降底色」：**降底色会动到 owner 已经定过的通透度**
+ * （{@link GLASS_HEADER_ALPHA} 0.7 是 owner 要的「别太实」），而本条只调光。
+ * 台阶从 5.15 收到 3.44，仍是**顶栏略暗**（不会变成「比周围亮一截」），
+ * 同时顶栏里的光贡献提升 42% ⇒ 那道金光在顶栏上真正显出来。
+ *
+ * ⚠️ 与 {@link POPUP_LIGHT_COMPENSATION}（浮层那条路）**不是**同一件事：
+ * 那条是把浮层的光**压到**与地面等 alpha；本条是让顶栏的光**足额**画出来。
+ * 两者当前数值都是 0.7 只是巧合（一条是「压下去的系数」、一条是底色的 alpha）。
+ */
+export const HEADER_LIGHT_SCALE = 1
+
+/**
  * 输入框**卡片**的填充比例。它**是**用户盯着的那块玻璃（抬升面里唯一的玻璃面）。
  *
  * 早先底座上还挂着一层 40% 填充，卡片要跟它合成，故当时按「合成不透明度」定值；
@@ -678,9 +712,12 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'
    顶栏为了不被内容盖住抬到 82 之后，光就没了（owner：「怎么顶栏的金光没有了」）。
    background-attachment: fixed 让百分比按**视口**解析 —— 顶栏只有 76px 高，
    同一串 ellipse 80% 45% 若按自身盒子解析会重新缩放成一条硬边带。
-   **光必须按顶栏自己的填充 alpha 同步压**（dimmedBackdropGradients(同一个 alpha)）：
-   底乘 70%、光却是满的 → 那一片会比周围**亮一截**（owner 对底座那处说的
-   「相当于两层光了」是同一个毛病；顶栏是半透明的，同样逃不掉）。
+   **光必须足额画出来，不能跟着填充 alpha 一起压**（owner 2026-09-27，见
+   {@link HEADER_LIGHT_SCALE} 的表）：早先光与底色同乘 GLASS_HEADER_ALPHA，
+   结果那条带整体比下方暗 26%，观感就是「一条暗带把顶光挡住了」——
+   owner 原话「我看到顶部的光了被顶栏挡住了，感觉应该加在顶栏上」。
+   实测把光提到 ×1.0（底色仍 0.7）：台阶 5.15 → 3.44（仍是顶栏略暗，不会反过来亮一截），
+   顶栏里的光贡献 +42%。
    （本段在模板字符串里，注释中**不能出现反引号**，否则会把字符串截断。） */
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'] > header::before {
   content: '';
@@ -689,7 +726,7 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'
   z-index: -1;
   pointer-events: none;
   background-color: ${fill('var(--dsw-alias-bg-base)', GLASS_HEADER_ALPHA)};
-  background-image: ${dimmedBackdropGradients(GLASS_HEADER_ALPHA)};
+  background-image: ${dimmedBackdropGradients(HEADER_LIGHT_SCALE)};
   background-attachment: fixed;
   backdrop-filter: ${GLASS_BLUR};
 }
