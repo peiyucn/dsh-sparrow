@@ -359,6 +359,54 @@ export const AFTER_LAYER_EXCLUDED_ANCHORS: readonly string[] = Object.freeze([
 ])
 
 /**
+ * 被 {@link AFTER_LAYER_EXCLUDED_ANCHORS} 排除后，改往**官方自己的 `::before`** 补图层的锚点。
+ *
+ * ## 为什么光靠「元素级那条」不够（2026-09-27 复核，我自己先这么以为，实测推翻了）
+ *
+ * `18db3e2` 的结论写的是「被排除的锚点仍保留**元素级** `background-image`」——
+ * 对 QueueDock 这句话**不成立**：它的官方材质**不在元素自己身上**，而在它自己的
+ * `.panel::before`（`z-index: -1` + `backdrop-filter: blur(40px)`）上。
+ * 元素级 `background-image` 画在**元素背景层**、位于负 z 带**之下** ⇒
+ * 被那层半透明材质连同它的模糊一起洗掉。
+ *
+ * 真机同构复刻实测（官方 QueueDock rc.2 逐字；取样区亮度标准差 = 质感可见度，
+ * 官方材质本身平坦 ⇒ 基线 **0.000**）：
+ *
+ * | 变体 | 颗粒 std | 官方 `::after` 描边 |
+ * | :--- | ---: | :--- |
+ * | 只元素级那条（`18db3e2` 现状） | **0.229** ← 与纯色无异 | 完好 |
+ * | 补一条到官方 `::before`（本常量） | **2.162** ✅ | **完好** |
+ * | （对照）`1527612` 的 `::after` 版 | 2.261 | **被盖掉 ✗** |
+ *
+ * ## 为什么补 `::before` 是安全的
+ *
+ * 官方那个伪元素**已经声明**了 `content: ''` 与完整几何（`position/inset/border-radius`），
+ * 所以本表**只补 `background-image` 一个属性**：
+ *
+ * * 不写 `content` ⇒ 不动官方的盒子（它本来就有）；
+ * * 同一个元素上 `background-image` 画在 `background-color` **之上** ⇒
+ *   质感压在官方材质之上，且**不经过**那个 `backdrop-filter`（它只过滤元素**背后**的东西）；
+ * * **完全不碰 `::after`** ⇒ 官方那条描边照旧（实测左右上三边全在）。
+ *
+ * ⚠️ **不得把这条推广到别的锚点**：它成立的前提是「官方材质确实画在该元素自己的 `::before`
+ * 上、且官方已声明 `content`」。给一个官方**没有** `::before` 的元素补这条，
+ * 会造出一个**无 content 的伪元素** —— 正是 `1527612` 修掉的那个空转形态。
+ * @see AFTER_LAYER_EXCLUDED_ANCHORS
+ */
+export const OFFICIAL_BEFORE_LAYER_ANCHORS: readonly string[] = Object.freeze([
+  'body [data-queue-dock] > :first-child',
+])
+
+/**
+ * 某个锚点是否要往**官方自己的 `::before`** 补图层（只补 `background-image`）。
+ * @param anchor - 锚点选择器。
+ * @returns 需要补时 true。
+ */
+export function usesOfficialBeforeLayer(anchor: string): boolean {
+  return OFFICIAL_BEFORE_LAYER_ANCHORS.includes(anchor)
+}
+
+/**
  * 某个锚点是否要叠 `::after` 覆盖层。
  * @param anchor - 锚点选择器。
  * @returns 需要叠时 true。
@@ -868,8 +916,17 @@ ${`${gatedAnchor(GROUPED_MENU_UNGUARDED_SELECTOR)} ${GROUPED_MENU_SCROLLER_SELEC
    官方 "QueueDock .panel::before" 是那个 z-index:-1 的材质层，而 "::before" 在树序上
    排在它前面 ⇒ 会被它盖住；"::after" 排在最后 ⇒ 画在它之上，且整个负 z 带仍低于文字。
    写成不带 content 的 "::before" 则**连盒子都不生成**，规则完全空转。
+
+   ⚠️ **但 QueueDock 不能走 "::after"**：官方在这一个元素的 "::after" 上有自己的 0.5px 描边。
+   它改走下面那条「补到**官方自己的 ::before**」——只补 background-image 一个属性，
+   官方那个伪元素的 content 与几何原样不动，所以既拿到质感也不碰描边
+   （实测 std 0.229 → 2.162，描边三边全在）。理由与全部读数见
+   OFFICIAL_BEFORE_LAYER_ANCHORS。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 ${COMPOSER_CARD_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
+  background-image: ${menuSurfaceLayers()} !important;
+}`).join('\n')}
+${COMPOSER_CARD_ANCHORS.filter(usesOfficialBeforeLayer).map(anchor => `${gatedAnchor(anchor)}::before {
   background-image: ${menuSurfaceLayers()} !important;
 }`).join('\n')}
 ${COMPOSER_CARD_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)}::after {

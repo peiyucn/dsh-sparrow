@@ -25,7 +25,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
-import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
+import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, usesOfficialBeforeLayer } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -1565,11 +1565,45 @@ describe('抬升面：表面绘制', () => {
     // `::after` 排在**最后**（压在其上），而整个负 z 带仍在行内文字之下（不盖字）。
     //
     // 故这几条都是**硬契约**，缺一律静默失效（外观只是"没质感"，没有任何报错）：
-    //   ① 每条覆盖规则必须声明 `content`；
+    //   ① 每条覆盖规则必须声明 `content`；除非它补的是**官方自己的 `::before`**（见下）；
     //   ② 必须有非 static 定位（否则 `inset` 不生效、盒子塌成 0 面积）；
-    //   ③ 必须是 `::after`（`::before` 会被官方材质盖住）。
+    //   ③ 必须是 `::after`（`::before` 会被官方材质盖住）—— 同理，官方 `::before` 那条例外。
+    //
+    // ⚠️ **例外只有一处且必须显式登记**：`OFFICIAL_BEFORE_LAYER_ANCHORS` 里的锚点，
+    // 官方自己已经在那个 `::before` 上声明了 `content` 与完整几何，我方**只补一个
+    // `background-image`**。判据不是"名字对上就行"，而是三条同时成立：
+    // ① 该锚点在 `OFFICIAL_BEFORE_LAYER_ANCHORS` 里；② 这条规则**没有** `content` 声明
+    //（有就说明我们在自己造盒子 —— 那正是要拦的空转形态）；③ 它**不在** `::after` 覆盖层里。
+    // 背景：QueueDock 被排除出 `::after` 后，光靠元素级那条**拿不到质感** ——
+    // 官方材质在它自己的 `::before`（负 z 带）上，元素级背景在它**之下**，实测 std 0.229 ≈ 纯色；
+    // 补一条到官方 `::before` 后 std 2.162，且官方 `::after` 的描边三边全在。
+    const officialBeforeRules = [...css.matchAll(/([^{}\n][^{}]*?::before)\s*\{([^}]*)\}/gu)]
+      .filter(m => /background-image\s*:/u.test(m[2]))
+    /** 锚点在 CSS 里是**带门**的形态（`gatedAnchor` 把门并进 `body`），比对时要还原。 */
+    const gated = anchor => anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
+    for (const rule of officialBeforeRules) {
+      const selector = rule[1].trim().replace(/\s+/gu, ' ')
+      const body = rule[2]
+      assert.ok(
+        OFFICIAL_BEFORE_LAYER_ANCHORS.some(anchor => selector === `${gated(anchor)}::before`),
+        `${selector} —— 只有登记在 OFFICIAL_BEFORE_LAYER_ANCHORS 里的锚点才准发 ::before 图层规则`,
+      )
+      assert.ok(
+        !/content\s*:/u.test(body),
+        `${selector} —— 补官方 ::before 时**不得**声明 content（盒子归官方；自己造会再踩一次空转）`,
+      )
+      assert.ok(
+        !/::after/u.test(selector),
+        `${selector} —— 补助规则不该同时出现在 ::after 层`,
+      )
+    }
     const pseudoRules = [...css.matchAll(/([^{}\n][^{}]*?::(?:before|after))\s*\{([^}]*)\}/gu)]
       .filter(m => /background-image\s*:/u.test(m[2]))
+      // 官方 `::before` 那条例外自带盒子，不参与「必须 ::after」这组契约。
+      // ⚠️ 必须按**选择器字符串**排除，不能按 match 对象 —— 上面那个 `::before` 专用的
+      // 正则与本正则各自 `matchAll` 出的对象**不是同一个引用**，用 `.includes(m)` 永远为 false，
+      // 例外就会被下面那组契约照样判违规（本仓库当下这条守卫就踩过）。
+      .filter(m => !officialBeforeRules.some(o => o[1].trim().replace(/\s+/gu, ' ') === m[1].trim().replace(/\s+/gu, ' ')))
     // 覆盖层规则数：12 条锚点 − 1 条被排除（QueueDock，官方 `.panel::after` 是描边）
     // = 11 条。下界取 11，既拦住「锚点表被删空」，也不因正常的排除而误报。
     assert.ok(pseudoRules.length >= 11, `覆盖用伪元素规则太少（${pseudoRules.length}）—— 锚点表是不是被删了？`)
@@ -1617,6 +1651,50 @@ describe('抬升面：表面绘制', () => {
       /\[data-queue-dock\] > :first-child\s*\{[^}]*background-image/u.test(css),
       'QueueDock 只是不叠伪元素层，元素级那条仍要在（材质画在自己身上时靠它）',
     )
+  })
+
+  it('⛔ QueueDock 排除 ::after 之后必须**补到官方自己的 ::before**（否则它没有质感）', () => {
+    // ## 为什么（2026-09-27 复核，实测推翻上一轮的结论）
+    //
+    // `18db3e2` 把 QueueDock 排除出 `::after` 层，理由（官方那 0.5px 描边）是对的，
+    // 但它的结论写的是「被排除的锚点仍保留**元素级** `background-image`」——
+    // **对 QueueDock 不成立**：官方材质不在元素自己身上，而在它自己的 `.panel::before`
+    // （`z-index:-1` + `backdrop-filter: blur(40px)`）上；元素级背景在负 z 带**之下**，
+    // 被那层半透明材质连同模糊一起洗掉。
+    //
+    // 真机同构复刻实测（官方 QueueDock rc.2 逐字；取样区亮度标准差 = 质感可见度，
+    // 官方材质本身平坦 ⇒ 基线 0.000）：
+    //   | 变体                              | 颗粒 std | 官方 ::after 描边 |
+    //   | :-------------------------------- | -------: | :---------------- |
+    //   | 只元素级那条（18db3e2 现状）        | **0.229** ← 与纯色无异 | 完好 |
+    //   | **补一条到官方 ::before（本修法）** | **2.162** ✅ | **完好** |
+    //   | （对照）1527612 的 ::after 版       | 2.261 | **被盖掉 ✗** |
+    //
+    // 补 `::before` 安全的**前提**是官方那个伪元素**已经声明了 content 与完整几何**，
+    // 所以我方**只补 `background-image` 一个属性**：不动官方盒子，同一元素上
+    // `background-image` 画在 `background-color` 之上（且不经过那个只过滤「背后」的
+    // `backdrop-filter`），并且**完全不碰 `::after`** ⇒ 官方描边照旧。
+    assert.ok(
+      OFFICIAL_BEFORE_LAYER_ANCHORS.includes('body [data-queue-dock] > :first-child'),
+      'QueueDock 必须补在官方 ::before 上（元素级那条会被官方材质洗掉）',
+    )
+    assert.equal(usesOfficialBeforeLayer('body [data-queue-dock] > :first-child'), true)
+    // 补助规则必须存在，且**只补 background-image**（不得自己造盒子、不得碰 ::after）
+    const gated = 'body [data-queue-dock] > :first-child'.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
+    const at = css.indexOf(`${gated}::before {`)
+    assert.ok(at >= 0, `缺 QueueDock 的 ::before 补助规则：${gated}::before`)
+    const body = css.slice(css.indexOf('{', at) + 1, css.indexOf('}', at))
+    assert.ok(body.includes(menuSurfaceLayers()), '补助规则要画「颗粒 + 底光」')
+    for (const forbidden of ['content', 'position', 'inset', 'z-index', 'border-radius', 'pointer-events']) {
+      assert.ok(
+        !new RegExp(`(?:^|;)\\s*${forbidden}\\s*:`, 'u').test(body),
+        `补助规则不得声明 ${forbidden} —— 盒子与几何都归官方，我们只加一个 background-image`,
+      )
+    }
+    // 反向：这条例外**不许**被推广到别的锚点（给没有 ::before 的元素补 = 又造一个空转盒子）
+    assert.deepEqual([...OFFICIAL_BEFORE_LAYER_ANCHORS], ['body [data-queue-dock] > :first-child'])
+    assert.equal(usesOfficialBeforeLayer("body [data-testid='todo-panel']"), false)
+    assert.equal(usesOfficialBeforeLayer("body [data-goal-bar] > :first-child"), false)
   })
 
   it('颜色应该 全部走变量（换色调 / 切轴时自动跟随，不由本模块重写）', () => {
