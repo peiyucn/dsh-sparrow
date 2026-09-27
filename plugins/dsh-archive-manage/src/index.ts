@@ -5,3 +5,6 @@ export {
   TRASH_SIDECAR, isDeleteConfirmationSufficient, legacyTrashItem, normalizeArchiveConfig,
   parseTrashSidecar, sanitizeSegment,
 } from './archive.js'
+export {
+  assertTrustedAuthority, isLoopbackHostname, isTrustedAuthority, isTrustedPluginRequest, parseAuthority,
+} from './trust.js'

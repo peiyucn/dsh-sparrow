@@ -25,6 +25,7 @@ import {
   type SessionTreeHeader, type SessionTreeNode, type SubagentIdentityValue,
 } from './archive.js'
 import { assertHostCompatible, unsupportedStoredFormatReason } from './compat.js'
+import { isTrustedPluginRequest, officialTrustedHosts } from './trust.js'
 
 export const name = 'dsh-archive-manage'
 export const inject = ['webServer', 'sessions', 'agents', 'workspaceRegistry', 'sessionPersistence', 'sessionQuery', 'storageDomain']
@@ -63,6 +64,7 @@ type ArchiveErrorCode =
   | 'BACKEND_UNSUPPORTED'
   | 'CONFIRMATION_FAILED'
   | 'TARGET_EXISTS'
+  | 'FORBIDDEN'
   | 'IO_ERROR'
 
 class ArchiveError extends Error {
@@ -997,6 +999,14 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
     handler: async (req, res) => {
       const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
       try {
+        // 信任栅栏（先于一切路由，含只读路由）：本插件的 `/api/archive-manage` 前缀比
+        // 官方 `/api` 长 ⇒ 官方那道栅栏与鉴权都不会执行（见 trust.ts）。
+        // 本插件含移动 / 删除会话文件的不可逆路由，故整条前缀一律先过门。
+        // 额外信任面直接复用官方 webRuntime.trustedHosts（LAN 部署与官方同一份口径）。
+        if (!isTrustedPluginRequest(req.headers, officialTrustedHosts(ctx))) {
+          sendError(res, new ArchiveError('FORBIDDEN', '拒绝非本机同源的请求', 403))
+          return
+        }
         if (req.method === 'GET' && pathname === `${PREFIX}/list`) {
           // spec 08：归档区 = 已归档会话的父子树；先惰性对齐再构建（事件驱动之外的兜底）。
           await alignChildArchives(ctx, surface, headerFacts)
