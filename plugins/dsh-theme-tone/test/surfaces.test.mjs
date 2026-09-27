@@ -40,6 +40,7 @@ import {
   PLAIN_ATTR,
   POPUP_BOTTOM_SHAPE,
   POPUP_LEFT_SHAPE,
+  POPUP_LIGHT_COMPENSATION,
   POPUP_STOP,
   POPUP_TOP_SHAPE,
   TOP_VARIABLE,
@@ -48,7 +49,7 @@ import {
   popupGrainAlpha,
   POPUP_GRAIN_COMPENSATION,
 } from '../lib/constants.js'
-import { buildGlassCss, GLASS_SPECULAR_RING } from '../lib/glass.js'
+import { buildGlassCss, GLASS_HEADER_ALPHA, GLASS_SPECULAR_RING } from '../lib/glass.js'
 
 /**
  * 取**某一条规则**的规则体（花括号内的声明串）。
@@ -558,6 +559,74 @@ describe('抬升面：不变量', () => {
       assert.ok(layer !== undefined, `缺少引用 ${variable} 的那层`)
       assert.ok(layer.includes(`var(${variable}, transparent)`), `${variable} 必须走变量并带 transparent 兜底`)
     }
+  })
+
+  it('⛔ 浮层三道光必须**都**乘同一个补偿系数（owner：顶光明显比别人强，要统一）', () => {
+    // 判据：「同一屏幕位置上，浮层的 alpha 应等于地面的 alpha」（解析，可逐字复核）。
+    // 两道光的配方都是锁定常量 ⇒ 直接解 alpha浮层 = alpha地面：
+    //   对话框顶边中央 (700,50) → k=0.709
+    //   对话框顶边左 1/4 (500,50) → k=0.592
+    //   对话列顶部中央 (700,10) → k=0.771
+    // ⇒ k* ≈ 0.69，取 0.7（与顶栏 GLASS_HEADER_ALPHA 同值）。
+    // 交叉验证：峰值口径实测 k=0.33 → 浮层/地面 0.48，解析预测 0.47，两者吻合。
+    // ⚠️ 这里曾定成 0.33，依据是一条**错误**的扫描（只覆盖元素级、且三道光比单道顶光）。
+    //    稳定的读数不等于正确的读数 —— 保留这条注释提醒后来者核对口径。
+    const layers = surfaceLayers().split(',\n    ')
+    const lightLayers = layers.slice(1)
+    assert.equal(lightLayers.length, 3, '三道光')
+    for (const layer of lightLayers) {
+      assert.ok(
+        layer.includes('color-mix(in srgb, var(--dsh-theme-tone-'),
+        `每道光都要走 color-mix 压强度（否则就回到「比地面强」）：${layer.slice(0, 90)}`,
+      )
+      assert.ok(
+        layer.includes(`${Math.round(POPUP_LIGHT_COMPENSATION * 100)}%, transparent)`),
+        `每道光的系数必须来自 POPUP_LIGHT_COMPENSATION（${POPUP_LIGHT_COMPENSATION}）`,
+      )
+      // 用 color-mix 而非解析成具体色值：变量里是任意合法颜色，插件不该去解析它；
+      // 且 transparent 混出来仍是透明 ⇒ 官方默认档下等于什么都不画。
+      assert.ok(!/rgba?\(\s*\d/u.test(layer), '不得把变量解析成具体色值（变量的内容插件不该关心）')
+    }
+    // 系数必须落在解析解附近：偏离会让浮层与地面明显不同档。
+    assert.ok(
+      Math.abs(POPUP_LIGHT_COMPENSATION - 0.7) < 0.08,
+      `补偿系数应贴近解析解 0.69（取 0.7 与顶栏同值），实际 ${POPUP_LIGHT_COMPENSATION}`,
+    )
+    // 分组菜单那条是**同一族的另一套**图层串，其底光也必须同系数，免得同族两处又分叉。
+    assert.ok(
+      menuSurfaceLayers().includes(`${Math.round(POPUP_LIGHT_COMPENSATION * 100)}%, transparent)`),
+      'menuSurfaceLayers 的底光必须用同一个补偿系数',
+    )
+  })
+
+  it('浮层的补偿系数应与顶栏的系数一致 —— 两处理由不同但落到同一个数', () => {
+    // 顶栏走 glass.ts 的 dimmedBackdropGradients(GLASS_HEADER_ALPHA)（按自己的填充 alpha 同步压）；
+    // 浮层走本表的 color-mix 补偿（按「与地面等 alpha」解出）。
+    // 两条路推出来的都是 0.7（顶栏实测 A/G=0.98）。钉住这个巧合：
+    // 将来调其中一处时，这条会提醒「另一处是不是也该动」。
+    assert.equal(
+      POPUP_LIGHT_COMPENSATION,
+      GLASS_HEADER_ALPHA,
+      '浮层与顶栏的强度系数当前相等（0.7）；若有意分开，请同步更新本条与两处注释',
+    )
+  })
+
+  it('顶栏的光必须走它自己那条路（按 HEADER_LIGHT_SCALE），不得改调 surfaceLayers()', () => {
+    // ⚠️ 断言要看**渲染出来的 CSS**，不能查函数名 —— `dimmedBackdropGradients` 是**构建期**调用的，
+    // 它的名字不会出现在产物里（我第一版就是这么写错的）。
+    // 顶栏与浮层两条路的区别是**几何**：顶栏用**视口尺度**的 vw/vh（background-attachment: fixed
+    // 让百分比按视口解析），浮层用**自身盒子**的百分比。用这一点区分。
+    const glass = buildGlassCss()
+    const header = glass.slice(glass.indexOf("[data-slot='conversation.header'] > header::before"))
+    const headerRule = header.slice(0, header.indexOf('}'))
+    assert.match(headerRule, /background-image:/u, '顶栏 ::before 要画光')
+    assert.match(headerRule, /vw|vh/u, '顶栏的光必须用视口尺度几何（vw/vh）—— 那是它自己那条路的标志')
+    assert.match(headerRule, /background-attachment: fixed/u, '并要求 fixed，否则百分比会按 76px 的盒子重算')
+    // 反过来：浮层那套几何（百分比、无 fixed）不得出现在顶栏规则里。
+    assert.ok(
+      !headerRule.includes(POPUP_TOP_SHAPE),
+      '顶栏不得改用浮层的几何（POPUP_TOP_SHAPE 是浮层盒尺度）',
+    )
   })
 
   it('⛔ 浮层的三道光必须与背景层的三道光**逐道对应**', () => {

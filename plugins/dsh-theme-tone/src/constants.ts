@@ -516,8 +516,52 @@ export function grainTileUri(alpha: number): string {
   return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='${alpha}' filter='url(%23n)'/%3E%3C/svg%3E")`
 }
 
-/** 浮层颗粒贴图（深色轴）—— 由 {@link GRAIN_ALPHA} × {@link POPUP_GRAIN_COMPENSATION} 派生。 */
+/**
+ * 浮层颗粒贴图（深色轴）—— 由 {@link GRAIN_ALPHA} × {@link POPUP_GRAIN_COMPENSATION} 派生。
+ */
 export const POPUP_GRAIN_DATA_URI = grainTileUri(popupGrainAlpha('dark'))
+
+/**
+ * **浮层三道光相对「地面」的强度补偿** —— owner 2026-09-27 报
+ * 「设置页 / 子代理 / 后台任务 / 模型列表的顶光，明显比别的元素强，希望都有元素的顶光强度要统一」。
+ *
+ * ## 「统一」的判据：**同一屏幕位置上，浮层的 alpha 应等于地面的 alpha**
+ *
+ * 两道光的配方都是锁定的常量，可直接解析算清楚（不靠像素，可逐字复核）：
+ *
+ * | | 配方 | 作用盒 |
+ * | :--- | :--- | :--- |
+ * | 地面（`BACKDROP_GRADIENTS` 第 1 段） | `radial-gradient(ellipse 80vw 45vh at 50% -10vh, C, transparent 62%)` | 视口 1400×900 |
+ * | 浮层（`POPUP_TOP_SHAPE`） | `radial-gradient(ellipse 120% 42% at 50% -12%, C, transparent 76%)` | 对话框 800×800 |
+ *
+ * 其中 `C = rgba(232,162,74,.09)`。以 800×800 对话框（屏幕位置 300,50）逐点解 `alpha浮层 = alpha地面`：
+ *
+ * | 同一屏幕位置 | 地面 alpha | 浮层 alpha(k=1) | 解出的 k |
+ * | :--- | ---: | ---: | ---: |
+ * | 对话框顶边中央 (700,50) | 0.03982 | 0.05617 | 0.709 |
+ * | 对话框顶边左 1/4 (500,50) | 0.01785 | 0.03017 | 0.592 |
+ * | 对话列顶部中央 (700,10) | 0.05416 | 0.07026 | 0.771 |
+ *
+ * ⇒ **k\* ≈ 0.69**。取 **0.7** —— 与顶栏那条路的 {@link GLASS_HEADER_ALPHA} 同值。
+ * 两者理由不同（顶栏是「按自己的填充 alpha 同步压」，浮层是「与地面等 alpha」），
+ * 但落到同一个数，所以这里直接写明这层巧合，将来调一处时能立刻想到另一处。
+ *
+ * ## 与实测交叉验证（解析模型可信）
+ *
+ * 峰值口径实测（本机 3080，对话框顶部带 4000+ 空白点，只切变量的逐像素平均差）：
+ * `k=0.33` 时浮层/地面 = **0.48**；解析模型在同一点预测 `0.47` —— 两种独立方法吻合。
+ *
+ * ## ⚠️ 记一次我自己踩的坑（保留，免得后人重走）
+ *
+ * 第一版我把系数定成了 `0.33`，依据是一条「浮层比地面强 3.03 倍」的扫描。
+ * 那条扫描**是错的**，两处量具缺陷叠加：
+ * 1. 只覆盖了**元素级**那条规则，`::after` 仍是满强度 ⇒ 量到的只是半层的贡献；
+ * 2. 拿「浮层三道光的总和」去比「地面只顶光」，分子分母不同口径。
+ * 修正后（两层一起覆盖 + 同口径）结论完全反过来：浮层在 `k=1` 时只比地面强约 1.4 倍，
+ * 而非 3 倍。**教训：A/B 之前先确认「两边的口径与覆盖范围一致」**，否则数字再稳定也是错的
+ * （那版扫描每档重复两次都完全一致、且单调 —— 稳定 ≠ 正确）。
+ */
+export const POPUP_LIGHT_COMPENSATION = 0.7
 
 // ⚠️ 这里曾有一条 `POPUP_GRAIN_DATA_URI_LIGHT = grainTileUri(GRAIN_ALPHA.light)`，
 // 已删除（2026-09 审计：全仓零引用）。浅色轴的贴图由 tones.ts 在运行时按 scheme

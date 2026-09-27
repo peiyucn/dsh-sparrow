@@ -50,6 +50,7 @@ import {
   LEFT_VARIABLE,
   PANEL_VARIABLE,
   PLAIN_ATTR,
+  POPUP_LIGHT_COMPENSATION,
   TOP_VARIABLE,
 } from './constants.js'
 import { POPUP_BOTTOM_SHAPE, POPUP_LEFT_SHAPE, POPUP_STOP, POPUP_TOP_SHAPE } from './constants.js'
@@ -481,33 +482,54 @@ export const COMPOSER_ICON_BUTTON_SCOPE = 'body [data-composer-card]'
  * 浮层继承得到），而是**这个图层串没有引用它**（`LEFT_VARIABLE` 在 surface.ts 里
  * 一次都没出现过）。补上之后浮层与背景层同为三道光。
  *
+ * ⚠️ **三道光的强度都乘 {@link POPUP_LIGHT_COMPENSATION}**（2026-09-27 同日）：
+ * owner 接着报「设置页 / 子代理 / 后台任务 / 模型列表的顶光，明显比别的元素强」。
+ * 实测同类浮层的光贡献是**地面的 3.03 倍**，本函数按 0.33 压到 1.00（真机扫描，6 档单调、
+ * 每档重复两次一致）—— 理由与定标表见 `constants.ts` 的该常量。
+ * 压的是**强度**，几何与收束点一字不动。
+ *
  * 三层全部走变量，缺变量时落到 `transparent` / `none` —— 即「官方默认」下等于什么都不画
  * （官方默认下这些规则本来也被 `PLAIN_ATTR` 挡住）。
- * **每一层的 alpha 都用色调表里的原始值**（不放大）：浮层是**实况**，不是色卡预览。
  * @returns 可直接写进 `background-image` 的图层串。
  */
 export function surfaceLayers(): string {
   return [
     `var(${GRAIN_TILE_VARIABLE}, none)`,
-    `radial-gradient(${POPUP_TOP_SHAPE}, var(${TOP_VARIABLE}, transparent), ${POPUP_STOP})`,
-    `radial-gradient(${POPUP_BOTTOM_SHAPE}, var(${BOTTOM_VARIABLE}, transparent), ${POPUP_STOP})`,
-    `radial-gradient(${POPUP_LEFT_SHAPE}, var(${LEFT_VARIABLE}, transparent), ${POPUP_STOP})`,
+    `radial-gradient(${POPUP_TOP_SHAPE}, ${popupLight(TOP_VARIABLE)}, ${POPUP_STOP})`,
+    `radial-gradient(${POPUP_BOTTOM_SHAPE}, ${popupLight(BOTTOM_VARIABLE)}, ${POPUP_STOP})`,
+    `radial-gradient(${POPUP_LEFT_SHAPE}, ${popupLight(LEFT_VARIABLE)}, ${POPUP_STOP})`,
   ].join(',\n    ')
+}
+
+/**
+ * 把一道光的运行期变量按 {@link POPUP_LIGHT_COMPENSATION} 压暗，供浮层图层串使用。
+ *
+ * 用 `color-mix` 而不是改 alpha 数值：变量里是**任意合法颜色**（可能是 `rgba()`、
+ * 也可能是 `transparent`），插件不该去解析它。`color-mix(in srgb, <色> k%, transparent)`
+ * 对任何颜色都成立，且 `transparent` 混出来仍是透明 ⇒ 官方默认档下等于什么都不画。
+ * @param variable - 该道光的 CSS 变量名（含 `--`）。
+ * @returns 可直接放进 `radial-gradient()` 色标位置的表达式。
+ */
+function popupLight(variable: string): string {
+  return `color-mix(in srgb, var(${variable}, transparent) ${Math.round(POPUP_LIGHT_COMPENSATION * 100)}%, transparent)`
 }
 
 /**
  * {@link GROUPED_MENU_SELECTOR} 专用的图层串：**颗粒 + 底光，没有顶光**（理由见该常量的表）。
  *
- * ⚠️ 这里**也不含左光**：那个菜单很矮（分组标题 + 若干行），顶光与左光在这个尺度上
+ * ⚠️ 这里**也不含左光与顶光**：那个菜单很矮（分组标题 + 若干行），顶光与左光在这个尺度上
  * 都只覆盖一条边、读不出「一道光」，反而会与粘性分组标题的横带打架（该横带的成因见
  * `GROUPED_MENU_SELECTOR` 的注释）。「三道光统一」这条口径针对的是
  * **有独立面的浮层**（对话框 / 菜单本体），分组菜单是它的内部结构。
+ *
+ * 底光同样乘 {@link POPUP_LIGHT_COMPENSATION} —— 与 {@link surfaceLayers} 同一个来源，
+ * 免得同族两处强度又分叉。
  * @returns 可直接写进 `background-image` 的图层串。
  */
 export function menuSurfaceLayers(): string {
   return [
     `var(${GRAIN_TILE_VARIABLE}, none)`,
-    `radial-gradient(${POPUP_BOTTOM_SHAPE}, var(${BOTTOM_VARIABLE}, transparent), ${POPUP_STOP})`,
+    `radial-gradient(${POPUP_BOTTOM_SHAPE}, ${popupLight(BOTTOM_VARIABLE)}, ${POPUP_STOP})`,
   ].join(',\n    ')
 }
 
