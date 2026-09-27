@@ -9,6 +9,7 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import { assertCapabilities, assertHostCompatible, unsupportedStoredFormatReason } from './compat.js'
+import { isTrustedBrowserRequest, officialTrustedHosts } from './trust.js'
 import {
   buildFimPrompt, cleanSuggestion, currentMainRoute, detectDraftLanguage, extractSuggestions, extractUsage, speakerStopSequences,
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, isLanguageConsistent,
@@ -31,26 +32,6 @@ const ECHO_RETRY_TEMPERATURE = 0.5
 const TEMPERATURE_SPREAD_STEP = 0.4
 /** 采样温度上限（DeepSeek API 允许范围 0-2）。 */
 const MAX_TEMPERATURE = 2
-
-/**
- * 与官方 connection 信任栅栏同口径的浏览器标记检查（packages/client/connection/src/api-request-trust.ts）：
- * webServer 的 exact 路由不走官方 /api 前缀栅栏（前缀匹配被精确路由抢先），而本路由的 POST
- * 会以服务端 API key 执行计费上游请求——跨站页面可盲发 no-cors 请求。口径：带 Origin 必须与
- * Host 同源；sec-fetch-site 跨站直接拒绝；origin "null"（沙箱 iframe）与非法值拒绝；
- * 非浏览器客户端（curl 等，无浏览器标记）放行。
- */
-export function isTrustedBrowserRequest(headers: { host?: string; origin?: string; 'sec-fetch-site'?: string }): boolean {
-  const host = headers.host
-  if (host === undefined || host === '') return false
-  if (headers['sec-fetch-site'] === 'cross-site') return false
-  const origin = headers.origin
-  if (origin === undefined) return true
-  try {
-    return new URL(origin).host === host
-  } catch {
-    return false
-  }
-}
 
 export type DiagnosticKey = 'requests' | 'fulfilled' | 'retries' | 'shown' | 'empty' | 'filteredSpeaker' | 'filteredRepeat' | 'filteredEcho' | 'filteredLanguage' | 'aborted' | 'timeout' | 'upstreamError'
 
@@ -259,6 +240,15 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
     kind: 'exact',
     path: ROUTE_PATH,
     handler: async (req, res) => {
+      // 信任栅栏（先于一切路由分发）：官方那道门只装在它自己的 `/api` 前缀路由上，
+      // 本插件的 exact 路由不会经过它（见 trust.ts）。POST 会以服务端 API key 执行
+      // **计费**上游请求，GET 会读出会话模型信息，故整条路由一律先过门。
+      // 额外信任面复用官方 webRuntime.trustedHosts（LAN 部署与官方同一份口径）。
+      if (!isTrustedBrowserRequest(req.headers, officialTrustedHosts(ctx))) {
+        sendError(res, 403, { code: 'FORBIDDEN', message: '拒绝非本机同源的请求' })
+        return
+      }
+
       if (req.method === 'GET') {
         // 状态查询：主模型是否支持（deepseek 系列）。客户端据此整体隐藏开关。
         const url = new URL(req.url ?? '/', 'http://localhost')
@@ -292,12 +282,6 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
 
       if (req.method !== 'POST') {
         sendError(res, 405, { code: 'BAD_BODY', message: '只接受 POST /api/chat-fim/complete' })
-        return
-      }
-
-      // POST 会执行计费上游请求：按官方 /api 栅栏同口径拒绝跨站浏览器请求（GET 只读，不设防）。
-      if (!isTrustedBrowserRequest(req.headers)) {
-        sendError(res, 403, { code: 'FORBIDDEN', message: '拒绝跨站请求' })
         return
       }
 
