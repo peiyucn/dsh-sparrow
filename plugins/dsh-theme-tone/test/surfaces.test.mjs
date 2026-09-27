@@ -1313,9 +1313,19 @@ describe('抬升面：表面绘制', () => {
     // ② 中间还试过刷成不透明面板色 —— 那就把官方的玻璃整块盖掉了。
     //
     // 正确形态：本表**一个材质声明都不写**，官方的半透明与模糊原样生效。
+    //
+    // ⚠️ **2026-09-27（M2）改判据**：此前断言「每条锚点都有一条**元素级**质感规则」。
+    // 单载体收口后元素级那条已删（它是双层的另一半，且在没有材质子元素的组件上造成双倍），
+    // 故判据改为「每条锚点**恰好有一个载体**」，不再要求是元素级。
     for (const anchor of SURFACE_ANCHORS) {
-      const block = blockFor(css, anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`))
-      assert.ok(block !== '', `每条锚点都应有质感规则：${anchor}`)
+      const gated = anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
+      const carriers = [
+        blockFor(css, gated),
+        blockFor(css, `${gated}::after`),
+        blockFor(css, `${gated}::before`),
+      ].filter(b => b.includes('background-image:'))
+      assert.equal(carriers.length, 1, `每条锚点应**恰好一个**质感载体（M2 单载体）：${anchor}`)
+      const block = carriers[0]
       assert.ok(
         !block.includes('background-color'),
         `不得声明填充 —— 官方自己的半透明材质要能原样透上来：${anchor}`,
@@ -1489,9 +1499,14 @@ describe('抬升面：表面绘制', () => {
     ])
     for (const anchor of COMPOSER_CARD_ANCHORS) {
       const gated = anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
-      const at = css.indexOf(`${gated} {`)
-      assert.ok(at >= 0, `缺规则 ${gated}`)
-      const body = css.slice(at, css.indexOf('}', at))
+      // ⚠️ 2026-09-27（M2）：单载体 —— 元素级那条已删，载体可能是 ::after 或官方 ::before。
+      const carriers = [
+        blockFor(css, gated),
+        blockFor(css, `${gated}::after`),
+        blockFor(css, `${gated}::before`),
+      ].filter(b => b.includes('background-image:'))
+      assert.equal(carriers.length, 1, `${anchor} 应**恰好一个**质感载体（M2 单载体）`)
+      const body = carriers[0]
       // ⚠️ 2026-09-20：这里**不许**再写 background-color。
       // 曾经写 `background-color: var(<面板变量>) !important` —— 那时浅色轴面板比例 .07、
       // 与卡自己的 `--dsw-specific-tip` 观感接近，看不出问题。等抬升面收到 `0`
@@ -1683,9 +1698,14 @@ describe('抬升面：表面绘制', () => {
     // 我们只叠 `background-image` 的质感层（颗粒 + 光）。
     for (const anchor of SURFACE_ANCHORS) {
       const gated = anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
-      const at = css.indexOf(`${gated} {`)
-      assert.ok(at >= 0, `缺规则 ${gated}`)
-      const body = css.slice(at, css.indexOf('}', at))
+      // ⚠️ 2026-09-27（M2）：单载体 —— 元素级那条已删，载体可能是 ::after / 官方 ::before。
+      const carriers = [
+        blockFor(css, gated),
+        blockFor(css, `${gated}::after`),
+        blockFor(css, `${gated}::before`),
+      ].filter(b => b.includes('background-image:'))
+      assert.equal(carriers.length, 1, `${anchor} 应**恰好一个**质感载体（M2 单载体）`)
+      const body = carriers[0]
       assert.ok(body.includes('background-image:'), `${anchor} 要画图层`)
       assert.ok(
         !body.includes('background-color'),
@@ -1704,10 +1724,13 @@ describe('抬升面：表面绘制', () => {
       !/body:not\(\[[^\]]*\]\)\s+body\b/u.test(css),
       '不得出现 `body:not([…]) body`：锚点自带 body 前缀，门必须并进去',
     )
-    // 正面断言：每条锚点都变成 `body:not([…]) [role=…]` 这种形状
+    // 正面断言：每条锚点都变成 `body:not([…]) [role=…]` 这种形状（载体是伪元素时同样如此）
     for (const anchor of SURFACE_ANCHORS) {
       const gated = anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
-      assert.ok(css.includes(`${gated} {`), `缺带门规则 ${gated}`)
+      // ⚠️ 2026-09-27（M2）：判据从「必须有一条元素级带门规则」改为
+      // 「**某个载体**上有一条带门规则」—— 元素级那条已删。
+      const has = [gated, `${gated}::after`, `${gated}::before`].some(sel => css.includes(`${sel} {`))
+      assert.ok(has, `缺带门规则 ${gated}（任一载体皆可）`)
       assert.equal((gated.match(/\bbody\b/gu) ?? []).length, 1, `${gated} 里只该有一个 body`)
     }
   })
@@ -1744,7 +1767,11 @@ describe('抬升面：表面绘制', () => {
     // 背景：QueueDock 被排除出 `::after` 后，光靠元素级那条**拿不到质感** ——
     // 官方材质在它自己的 `::before`（负 z 带）上，元素级背景在它**之下**，实测 std 0.229 ≈ 纯色；
     // 补一条到官方 `::before` 后 std 2.162，且官方 `::after` 的描边三边全在。
-    const officialBeforeRules = [...css.matchAll(/([^{}\n][^{}]*?::before)\s*\{([^}]*)\}/gu)]
+    // ⚠️ **必须先剥注释再 match**：本文件用的正则 `[^{}\n][^{}]*?::before` 会跨行吃掉
+    // 注释块，把注释里提到的 `::before` 字面量当成一条规则 —— 加一条含该字样的注释就会
+    // 误报（2026-09-27 踩到）。`blockFor` 早就剥了注释，这里此前没剥。
+    const cssNoComment = css.replace(/\/\*[\s\S]*?\*\//gu, '')
+    const officialBeforeRules = [...cssNoComment.matchAll(/([^{}\n][^{}]*?::before)\s*\{([^}]*)\}/gu)]
       .filter(m => /background-image\s*:/u.test(m[2]))
     /** 锚点在 CSS 里是**带门**的形态（`gatedAnchor` 把门并进 `body`），比对时要还原。 */
     const gated = anchor => anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
@@ -1764,7 +1791,7 @@ describe('抬升面：表面绘制', () => {
         `${selector} —— 补助规则不该同时出现在 ::after 层`,
       )
     }
-    const pseudoRules = [...css.matchAll(/([^{}\n][^{}]*?::(?:before|after))\s*\{([^}]*)\}/gu)]
+    const pseudoRules = [...cssNoComment.matchAll(/([^{}\n][^{}]*?::(?:before|after))\s*\{([^}]*)\}/gu)]
       .filter(m => /background-image\s*:/u.test(m[2]))
       // 官方 `::before` 那条例外自带盒子，不参与「必须 ::after」这组契约。
       // ⚠️ 必须按**选择器字符串**排除，不能按 match 对象 —— 上面那个 `::before` 专用的
@@ -1813,10 +1840,17 @@ describe('抬升面：表面绘制', () => {
     // 排除是**有意**的例外，不能变成"整张表都不叠"：多数锚点仍必须有覆盖层。
     const overlay = [...css.matchAll(/::after\s*\{/gu)].length
     assert.ok(overlay >= 10, `覆盖层规则太少（${overlay}）—— 排除表是不是被写宽了？`)
-    // 元素级那条（画在元素自己的 background-image 上）**不受排除影响**，仍要给 QueueDock。
+    // ⚠️ **2026-09-27（M2）本条改判**：此前断言「元素级那条仍要在（材质画在自己身上时靠它）」。
+    // 单载体收口后元素级那条**已按设计删除** —— 它在没有材质子元素的组件上造成双倍，
+    // 而在 QueueDock 上又会被官方 ::before 盖住（实测 std 0.229 ≈ 纯色，等于没用）。
+    // 现在 QueueDock 的质感**只由「补官方 ::before」那条承担**（下一条用例钉住它真的在）。
     assert.ok(
-      /\[data-queue-dock\] > :first-child\s*\{[^}]*background-image/u.test(css),
-      'QueueDock 只是不叠伪元素层，元素级那条仍要在（材质画在自己身上时靠它）',
+      /\[data-queue-dock\] > :first-child::before\s*\{[^}]*background-image/u.test(css),
+      'QueueDock 排除 ::after 后，质感必须由「补官方 ::before」承担（M2 起这是它唯一载体）',
+    )
+    assert.ok(
+      !/\[data-queue-dock\] > :first-child\s*\{[^}]*background-image/u.test(css),
+      'M2 单载体：QueueDock 也不得再有元素级图层规则（会与 ::before 那条叠成双层）',
     )
   })
 

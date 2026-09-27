@@ -372,7 +372,6 @@ export const HOVER_CARD_TEXT_TOKENS: readonly { suffix: string; token: string }[
  * 根因判断都不受影响 —— 本色本来就是这个空间的主色，不会引入外来色相。
  */
 export const POPUP_TOP_SHAPE = 'ellipse 120% 42% at 50% -12%'
-
 /** 浮层表面底部染色形状（覆盖底部约 27%，与整屏的 ~31% 同量级，未动过）。 */
 export const POPUP_BOTTOM_SHAPE = 'ellipse 110% 52% at 50% 112%'
 

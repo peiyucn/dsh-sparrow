@@ -769,42 +769,40 @@ function groupTitleRule(bodyPrefix: string): string {
  */
 export function buildSurfaceCss(): string {
   return `/* ===== dsh-theme-tone 抬升面（菜单 / 对话框）：只叠质感，底色交回官方 =====
-   选择器带 ${PLAIN_ATTR} 门：官方默认下整表不命中（owner：官方默认的都不要动）。 */
-${SURFACE_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
-  background-image: ${surfaceLayers()} !important;
-}`).join('\n')}
-/* --- 质感**同时**叠到 ::after 上（官方 0.1.7 把材质画进 z-index:-1 的子元素）---
+   选择器带 ${PLAIN_ATTR} 门：官方默认下整表不命中（owner：官方默认的都不要动）。
 
-   ⚠️⚠️ 这一层用的是 "::after" + "z-index: -1"，**不是** "::before"，也不是不带 content 的
-   "::before"。三条都是实测结论（真机同构复刻官方 rc.2 MenuSurface，逐变体取像素）：
+   ⚠️⚠️ **2026-09-27（M2）：元素级那条 background-image 已删除 —— 只留单一载体。**
 
-   | 变体 | computed content | 空白区纹理标准差 | 文字是否被盖 |
-   | :--- | :--- | ---: | :--- |
-   | "::before"（**无 content**，本插件此前写法） | "none" | 0.30（= 被材质洗掉） | 否 |
-   | "::before" + "content:''" + "z-index:-1" | '""' | 0.30 | 否 |
-   | "::before" + "content:''"（无 z-index） | '""' | 10.83 但**压住文字** | **是** |
-   | **"::after" + "content:''" + "z-index:-1"** | '""' | **8.29** | 否 |
+   此前每个锚点**两处都画**（元素级 + ::after 各一份同一配方）。那不是设计，
+   是历史叠加的产物，后果实测确认过：
 
-   逐条道理：
+   | 表面 | 元素级 | ::after | 净结果 |
+   | :--- | :--- | :--- | :--- |
+   | 地面 | 3 道光 | 颗粒 | 每道光 **1 份** |
+   | 设置弹窗 | 4 层 | 4 层 | 每道光 **2 份**、颗粒 **2 份** ⇒ 观感偏重 |
+   | 分组菜单 | 2 层 | 4 层 | 底光 2 份、顶/左光 1 份 ⇒ 更乱 |
 
-   ① **不带 "content" 的伪元素不生成盒子** —— 那条 "background-image" 是**空转**的。
-      此前 12 条 ::before 规则全部如此（"content: none"），所以 rc.2 那条「材质在子元素上、
-      再补一份到伪元素」的修法**从未真正生效**（这也是它的真机 A/B 与代码对不上的原因）。
+   而且「两份是否叠加」**取决于官方组件有没有渲染 z-index:-1 的材质子元素**
+   （官方 MenuSurface 有、插件自有组件没有）—— 从我们的锚点表**根本预测不了**。
+   owner 反馈的「弹窗噪点比别的强」正是这个不可预测性。
 
-   ② 负 z-index 带内的绘制顺序 = **父元素背景 → 负 z 层（按树序）→ 行内内容**。
-      官方 "MenuSurface" 渲染的是 "<div class='material'>" **子元素**（"z-index:-1"）+ 菜单文字。
-      "::before" 在树序上排在 ".material" **前面** ⇒ 被它盖住（上表第 2 行，纹理 0.30）。
-      "::after" 排在**最后** ⇒ 在同一个负 z 带里画在 ".material" **之上**，
-      而整个负 z 带仍然在**行内文字之下** ⇒ 纹理可见且不盖字（第 4 行）。
+   ## 为什么只留 ::after 就够（两种情形都覆盖）
 
-   ③ 所以这一层不是可选的美化，而是**当前唯一有效**的质感通道：官方材质（alpha .45 +
-   "backdrop-filter: blur(40px)"）会把元素自身 "background-image" 上的颗粒彻底洗掉
-   （上表第 1 行实测标准差 0.30 —— 与「纯色」无异）。上面那条元素级规则因此只对
-   **材质画在自己身上**的弹层有效（那种情况下没人盖它）。
+   负 z-index 带内的绘制顺序是：**父元素背景 → 负 z 层（按树序）→ 行内内容**。
+   ::after 排在树序**最后**，于是：
 
-   ⚠️ 用 "background-image" 而不是叠加整串 "background" 简写 —— 简写会把官方那张材质的
-   "background-color" 一起重置掉。
-   （本段在模板字符串里，注释中**不能出现反引号**。） */
+   | 官方的材质画在哪 | ::after 的结果 |
+   | :--- | :--- |
+   | **z-index:-1 的子元素**（MenuSurface 的 .material） | ::after 在它**之后** ⇒ 画在它之上，可见 |
+   | **元素自己身上** | ::after 在元素背景**之后** ⇒ 画在它之上，可见 |
+
+   两种情形都可见 ⇒ **元素级那份是纯冗余，且在没有材质子元素的组件上造成双倍**。
+   删它不丢任何东西，只是把「不可预测的双层」变成「确定的单层」。
+
+   ## 下一句要改的常数
+
+   单层之后每条光的实际观感**会比现状淡**（少了一半）——这是**预期的中间态**：
+   M6 会在单载体、同口径下重新定标 {@link POPUP_LIGHT_COMPENSATION} 与颗粒强度。 */
 ${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)}::after {
   content: '';
   position: absolute;
@@ -813,6 +811,13 @@ ${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)}::
   border-radius: inherit;
   background-image: ${surfaceLayers()} !important;
   pointer-events: none;
+}`).join('\n')}
+/* --- QueueDock：官方占用了它自己的 ::after（0.5px 描边），故补官方自己的 ::before ---
+   只补 background-image 一个属性，官方那个伪元素的 content 与几何原样不动 ⇒
+   既拿到质感也不碰描边（实测 std 0.229 → 2.162，描边三边全在）。
+   理由与全部读数见 OFFICIAL_BEFORE_LAYER_ANCHORS。 */
+${SURFACE_ANCHORS.filter(usesOfficialBeforeLayer).map(anchor => `${gatedAnchor(anchor)}::before {
+  background-image: ${surfaceLayers()} !important;
 }`).join('\n')}
 /* --- 菜单族：**不再由我们声明填充与模糊**（官方 0.1.7 已经成对画好了）---
    owner：「透明和模糊和**官方默认一样**就行」。
@@ -968,10 +973,10 @@ ${`${gatedAnchor(GROUPED_MENU_UNGUARDED_SELECTOR)} ${GROUPED_MENU_SCROLLER_SELEC
    官方那个伪元素的 content 与几何原样不动，所以既拿到质感也不碰描边
    （实测 std 0.229 → 2.162，描边三边全在）。理由与全部读数见
    OFFICIAL_BEFORE_LAYER_ANCHORS。
+
+   ⚠️ **2026-09-27（M2）：元素级那条同样已删除** —— 与 SURFACE_ANCHORS 同一收口，
+   每个锚点只留**一个**载体（::after，或 QueueDock 的官方 ::before）。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
-${COMPOSER_CARD_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
-  background-image: ${menuSurfaceLayers()} !important;
-}`).join('\n')}
 ${COMPOSER_CARD_ANCHORS.filter(usesOfficialBeforeLayer).map(anchor => `${gatedAnchor(anchor)}::before {
   background-image: ${menuSurfaceLayers()} !important;
 }`).join('\n')}
