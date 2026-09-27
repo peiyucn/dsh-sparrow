@@ -14,8 +14,8 @@
  * * **输入框**（底座 `.composerSeat` 是 `position: sticky; bottom: 0`）—— **真的**压在滚动体之上，
  *   内容从它后面滚过 → 玻璃成立。
  * * **对话顶栏**——官方写它是 `ordinary column chrome above the scrollport (not sticky)`
- *   （`ui-conversation/.../ConversationRoot.module.css:319`）：内容从它**下面过不去**。
- *   所以必须先把它改成浮层（本模块干的事）。
+ *   （`ui-conversation/.../ConversationRoot.module.css` 的 `.root[data-phase='active']` 那一段）：
+ *   内容从它**下面过不去**。所以必须先把它改成浮层（本模块干的事）。
  *
  * ## 输入框：玻璃只做在**卡片**上（一次教训）
  *
@@ -38,7 +38,11 @@
 import { ABOVE_CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, dimmedBackdropGradients, grainOverGradients } from './backdrop.js'
 
-/** 顶栏高度（px）。官方把它钉在这个值上，与左栏 38+38 对齐（`ConversationRoot.module.css:37-41`）。 */
+/**
+ * 顶栏高度（px）。官方把它钉在这个值上，与左栏 38+38 对齐
+ * （`ConversationRoot.module.css` 的 `.header`：`min-height: 76px`，上方注释写明
+ * 「76px with its rule: the height of the Sidebar's tab strip and header row」）。
+ */
 export const HEADER_HEIGHT_PX = 76
 
 /*
@@ -108,7 +112,8 @@ export const GLASS_BLUR = 'blur(12px) saturate(1.15)'
  * ## 为什么要单独一遍（第五版）：`linear-gradient` 画不出圆角
  *
  * 前四版用 `background-image` 的 `linear-gradient` 画「直线带」，理由是怕 `box-shadow`
- * 压掉官方投影。**但 `linear-gradient` 画不出圆角** —— 官方卡片是 `border-radius: 22px`，
+ * 压掉官方投影。**但 `linear-gradient` 画不出圆角** —— 官方卡片是
+ * `border-radius: var(--dsw-radius-panel)`（0.1.5 时代那里是字面量 `22px`），
  * 直线带到圆角处被裁断，**光绕不过圆角**（owner：「不太对呢，你看 iphone 这个」）。
  *
  * 改用 `inset` 阴影：它**沿元素自身的圆角轮廓描边**，天然绕圈。
@@ -378,7 +383,7 @@ const SHADE_TINT = 'var(--dsw-static-neutral-bluish-1000)' // 官方最深静态
 /**
  * 镜面高光的 `inset` 阴影串 —— **接到官方那条外投影之后**（用逗号并列，两者都保留）。
  *
- * 官方卡片自带 `box-shadow: var(--dsw-elevation-soft)`（外投影，`InputBar.module.css:57`），
+ * 官方卡片自带 `box-shadow: var(--dsw-elevation-soft)`（外投影，`InputBar.module.css` 的 `.card`），
  * 所以卡片规则里要写成 `box-shadow: var(--dsw-elevation-soft), <我们这几条 inset>` ——
  * **不能**只用 `!important` 覆盖，那会把官方的抬升感一起抹掉。
  */
@@ -482,7 +487,7 @@ export const GLASS_CARD_ALPHA = 0.58
  *
  * ## 为什么需要它：官方那条淡到几乎不可见
  *
- * 官方卡片自带 `box-shadow: var(--dsw-elevation-soft)`（`InputBar.module.css:57`），
+ * 官方卡片自带 `box-shadow: var(--dsw-elevation-soft)`（`InputBar.module.css` 的 `.card`），
  * 真机实测其值 ≈ `0 4px 16px #00000008, 0 0 24px #00000008` ——
  * **只有 3% 黑**，在这套带色调光的背景上读不出抬升。owner：
  * 「输入框本身在背景上**增加一些悬浮感**，我理解是得加一些阴影吧？」—— 理解正确。
@@ -543,11 +548,12 @@ export const GLASS_CARD_LIFT = '0 7px 20px rgba(0, 0, 0, 0.21),\n    0 2px 5px r
  *
  * owner：「**新会话首页的输入框，也得适配下**」（配图：首页那张卡是**不透明灰板**）。
  *
- * 根因：官方 `data-phase` 有**三档**（`ConversationRoot.tsx:355`：
+ * 根因：官方 `data-phase` 有**三档**（`ConversationMainPanel.tsx` 的
+ * `conversationPhase(session, conversation)`：
  * `settling ? 'settling' : hero ? 'hero' : 'active'`），而首页走的是 **`hero`**。
  * 本模块原先每条规则都写死 `[data-phase='active']`，于是首页**一条都不命中** ——
  * 卡片留着官方的 `background: var(--dsw-specific-input-major)`（不透明实色，
- * `InputBar.module.css:56`）→ 就是那张「纯色灰板」。
+ * `InputBar.module.css` 的 `.card`）→ 就是那张「纯色灰板」。
  *
  * ⚠️ **只许放宽卡片这条**，别顺手把别的一起放开：
  * * 底座 `::after`（不透带）**必须留在 active**：它锚 `bottom: 0` 绝对定位，
@@ -555,9 +561,11 @@ export const GLASS_CARD_LIFT = '0 7px 20px rgba(0, 0, 0, 0.21),\n    0 2px 5px r
  *   .composerSeat` 里）。hero 下底座是 **static** → 那条带子会改锚到最近的定位祖先
  *   （`.root`），在**整个对话区底部**横着画一条实色带。
  * * 顶栏浮层 / 滚区补 76px / 拖拽条同理都是 active 专有（hero 下顶栏本就 `display: none`，
- *   补 76px 会把正文顶下去；hero 也没有拖拽条 —— `ConversationRoot.tsx:382`）。
+ *   补 76px 会把正文顶下去；hero 也没有拖拽条 —— `ConversationWidthControls.tsx`
+ *   在 `phase !== 'active'` 时直接 `return null`）。
  *
- * `settling` 不在列内：官方把底座设成 `visibility: hidden`（`ConversationRoot.module.css:474`），
+ * `settling` 不在列内：官方把底座设成 `visibility: hidden`
+ * （`ConversationRoot.module.css` 里 `.root[data-phase='settling'] .composerSeat`），
  * 卡片随之不可见，画不画都一样（少一个相位少一份意外）。
  */
 export const GLASS_CARD_PHASES: readonly string[] = Object.freeze(['active', 'hero'])
@@ -856,7 +864,8 @@ body:not([${PLAIN_ATTR}]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [
     ${GLASS_CARD_LIFT};
 }
 /* 卡片玻璃本体（填充 + 边光渐变 + **inset 边光** + 模糊）—— 挂 ::before，理由见上面卡片规则内。
-   border-radius: inherit 必须写：官方 .card 是 22px 圆角，伪元素不继承它就会画成方角。
+   border-radius: inherit 必须写：官方 .card 走 --dsw-radius-panel（rc.2 = 28px），
+   伪元素不继承它就会画成方角。
    pointer-events: none —— 玻璃层不参与命中测试（卡里有 textarea 与按钮）。
    ⚠️ inset 环必须与填充在**同一层**：box-shadow 的 inset 段画在该元素自己的背景之上、
      内容之下，所以放这里才读得出「玻璃厚度」（放本体就会被这层玻璃埋掉，见上）。

@@ -25,7 +25,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
-import { COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
+import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -911,7 +911,10 @@ describe('抬升面：表面绘制', () => {
   it('锚点应该 覆盖菜单族 / listbox / 模态弹窗 / 两个 tree 弹层 / 任务列表 / 提示条，并排除图片灯箱', () => {
     assert.deepEqual([...SURFACE_ANCHORS], [
       "body [role='menu']",
-      'body [data-trigger-menu]',
+      // ⚠️ trigger-menu 必须收窄排除 `[data-overflow-below]`：那个状态下官方在**同一个**
+      // `::after` 上画「下面还有内容」的渐隐提示（`MenuView.tsx` 把两个属性打在同一个元素上），
+      // 不收窄就会把官方提示顶掉（2026-09-27 审计，实测提示带 (109,162,229) → (43,43,50)）。
+      'body [data-trigger-menu]:not([data-overflow-below])',
       "body :has(> [role='listbox'])",
       "body [role='listbox']:not([data-trigger-menu] *)",
       DIALOG_ANCHOR,
@@ -1567,7 +1570,9 @@ describe('抬升面：表面绘制', () => {
     //   ③ 必须是 `::after`（`::before` 会被官方材质盖住）。
     const pseudoRules = [...css.matchAll(/([^{}\n][^{}]*?::(?:before|after))\s*\{([^}]*)\}/gu)]
       .filter(m => /background-image\s*:/u.test(m[2]))
-    assert.ok(pseudoRules.length >= 12, `覆盖用伪元素规则太少（${pseudoRules.length}）—— 锚点表是不是被删了？`)
+    // 覆盖层规则数：12 条锚点 − 1 条被排除（QueueDock，官方 `.panel::after` 是描边）
+    // = 11 条。下界取 11，既拦住「锚点表被删空」，也不因正常的排除而误报。
+    assert.ok(pseudoRules.length >= 11, `覆盖用伪元素规则太少（${pseudoRules.length}）—— 锚点表是不是被删了？`)
     for (const rule of pseudoRules) {
       const selector = rule[1].trim().replace(/\s+/gu, ' ')
       const body = rule[2]
@@ -1577,6 +1582,41 @@ describe('抬升面：表面绘制', () => {
       assert.ok(/z-index\s*:\s*-1/u.test(body), `${selector} 缺 z-index:-1 —— 会跑到文字层之上、盖住内容`)
       assert.match(selector, /::after$/u, `${selector} 必须用 ::after —— ::before 在树序上早于官方材质，会被它盖住`)
     }
+  })
+
+  it('⛔ 官方在同一伪元素上有装饰的锚点**必须排除**在 ::after 覆盖层之外', () => {
+    // ## 为什么（2026-09-27 审计，两处真实副作用）
+    //
+    // 覆盖层用 `::after`，若官方**自己**也在这个元素的 `::after` 上画东西，就会互相顶掉：
+    //
+    // ① `[data-queue-dock] > :first-child` = 官方 `QueueDock` 的 `.panel`，它的 `::after`
+    //    是 **0.5px 描边**（`content:''` + `inset:0` + `border`，`z-index:auto`）。我方把同伪元素
+    //    `z-index` 压到 `-1` ⇒ 描边进负 z 带 ⇒ 被整行宽的悬停行底盖掉。
+    //    ⚠️ 顶边因在悬停行之上仍在 —— **只抽样顶边发现不了**，初版正是这样漏掉的。
+    // ② `[data-trigger-menu][data-overflow-below]` = 官方 `MenuView` 的「下面还有内容」渐隐提示
+    //    （同一个 `::after`）。锚点必须收窄 `:not([data-overflow-below])` 让官方提示留下。
+    //
+    // 这条守卫把两处**都钉死**：排除表必须含 queue-dock；trigger-menu 锚点必须带收窄条件。
+    assert.ok(
+      AFTER_LAYER_EXCLUDED_ANCHORS.includes('body [data-queue-dock] > :first-child'),
+      'QueueDock 面板必须排除在 ::after 覆盖层之外（否则官方 0.5px 描边被盖）',
+    )
+    assert.ok(
+      !/\bbody \[data-queue-dock\][^{]*::after/u.test(css),
+      '不得给 QueueDock 面板发 ::after 规则（官方那条是它的描边）',
+    )
+    assert.ok(
+      SURFACE_ANCHORS.some(a => a.includes('data-trigger-menu') && a.includes(':not([data-overflow-below])')),
+      'trigger-menu 锚点必须收窄排除 [data-overflow-below]（该状态下官方在同一个 ::after 上画渐隐提示）',
+    )
+    // 排除是**有意**的例外，不能变成"整张表都不叠"：多数锚点仍必须有覆盖层。
+    const overlay = [...css.matchAll(/::after\s*\{/gu)].length
+    assert.ok(overlay >= 10, `覆盖层规则太少（${overlay}）—— 排除表是不是被写宽了？`)
+    // 元素级那条（画在元素自己的 background-image 上）**不受排除影响**，仍要给 QueueDock。
+    assert.ok(
+      /\[data-queue-dock\] > :first-child\s*\{[^}]*background-image/u.test(css),
+      'QueueDock 只是不叠伪元素层，元素级那条仍要在（材质画在自己身上时靠它）',
+    )
   })
 
   it('颜色应该 全部走变量（换色调 / 切轴时自动跟随，不由本模块重写）', () => {

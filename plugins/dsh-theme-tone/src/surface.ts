@@ -95,15 +95,25 @@ export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
   /**
    * **菜单族**（含带分组标题的模型选择器 —— 它们走下面那条**去顶光**的专用规则）。
    *
-   * | 锚点 | 谁长这样 |
-   *
    * 曾经把带分组标题的菜单整条 `:not(:has([role='group']))` 排除在外，
    * 结果 owner 立刻看出代价：「**模型选择列表那个框好像没有适配咱们样式，是纯色的**」——
    * 排除图层只剩一个不透明色，就是「纯色」。故改回**全量收录**，
    * 用 {@link GROUPED_MENU_SELECTOR} 那条**只去掉顶光**的规则解决横带（见 buildSurfaceCss）。
    */
   "body [role='menu']",
-  'body [data-trigger-menu]',
+  /**
+   * **命令面板 / 输入触发菜单**（`ui-input-trigger` 的 `MenuView`）。
+   *
+   * ⚠️ **必须排除 `[data-overflow-below]`**（2026-09-27 审计发现，见
+   * {@link AFTER_LAYER} 的说明）：该状态下官方**自己**用同一个 `::after` 画「下面还有内容」
+   * 的渐隐提示（`MenuView.module.css` 的 `.menu[data-overflow-below]::after`，`content:''` +
+   * 自己的 `right/bottom/left/height` + `background: linear-gradient(to bottom, transparent,
+   * var(--dsw-specific-menu))`）。而 `data-trigger-menu` 与 `data-overflow-below` 打在
+   * **同一个元素**上（`MenuView.tsx` 的 `MenuSurface`）—— 我方那条 `::after` 会**把官方的提示
+   * 整个顶掉**（实测提示带从 (109,162,229) 掉成 (43,43,50)）。
+   * 排除后代价明确：**该状态下这一处没有我们的质感**（官方提示优先）。
+   */
+  "body [data-trigger-menu]:not([data-overflow-below])",
   /**
    * **命令面板的卡片** —— `PopupSelectView` 的背景长在**祖先**上、`role` 在内层视口上，
    * 所以只能问「谁的直接子元素是 listbox」。
@@ -324,6 +334,38 @@ export const COMPOSER_CARD_ANCHORS: readonly string[] = Object.freeze([
   'body [data-goal-bar] > :first-child',
   "body [data-testid='todo-panel']",
 ])
+
+/**
+ * **不参与 `::after` 覆盖层**的锚点（2026-09-27 审计发现）。
+ *
+ * 理由只有一条：**官方自己在同一个元素的 `::after` 上画了装饰**，我方再用同款伪元素
+ * 就会把它顶掉或拽坏。逐条实证：
+ *
+ * | 锚点 | 官方在 `::after` 上画了什么 | 我方覆盖的后果 |
+ * | :--- | :--- | :--- |
+ * | `[data-queue-dock] > :first-child`（= 官方 `.panel`） | `0.5px` 描边（`content:''` + `inset:0` + `border`，`z-index:auto`） | 我方把同伪元素 `z-index` 压到 `-1` ⇒ 描边进负 z 带 ⇒ **被整行宽的悬停行底盖掉**（实测左右边缘在悬停行高度内读数变成行底色）。⚠️ 顶边因位于悬停行之上仍在 —— **只抽样顶边的检查发现不了**，这正是初版漏掉它的原因 |
+ * | `[data-trigger-menu][data-overflow-below]` | 「下面还有内容」的渐隐提示（`linear-gradient(to bottom, transparent, var(--dsw-specific-menu))`） | 我方 `background-image` 把提示整个顶掉（实测提示带 (109,162,229) → (43,43,50)） |
+ *
+ * 这两处**不是**「完全失效」：一处是 0.5px 发丝线、一处是渐隐提示带。但**覆盖官方装饰必须
+ * 记明**（本文件的一贯规矩），且代价可控 —— 被排除的锚点仍保留**元素级**那条
+ * `background-image`（材质画在元素自己身上时它有效），只是失去伪元素那条通道。
+ * @see usesAfterLayer
+ *
+ * 上游那条 trigger-menu 锚点用选择器 `:not([data-overflow-below])` 收窄（见
+ * {@link SURFACE_ANCHORS}），所以这里只列 QueueDock 一条。
+ */
+export const AFTER_LAYER_EXCLUDED_ANCHORS: readonly string[] = Object.freeze([
+  'body [data-queue-dock] > :first-child',
+])
+
+/**
+ * 某个锚点是否要叠 `::after` 覆盖层。
+ * @param anchor - 锚点选择器。
+ * @returns 需要叠时 true。
+ */
+export function usesAfterLayer(anchor: string): boolean {
+  return !AFTER_LAYER_EXCLUDED_ANCHORS.includes(anchor)
+}
 
 
 /**
@@ -669,7 +711,7 @@ ${SURFACE_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
    ⚠️ 用 "background-image" 而不是叠加整串 "background" 简写 —— 简写会把官方那张材质的
    "background-color" 一起重置掉。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
-${SURFACE_ANCHORS.map(anchor => `${gatedAnchor(anchor)}::after {
+${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)}::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -830,7 +872,7 @@ ${`${gatedAnchor(GROUPED_MENU_UNGUARDED_SELECTOR)} ${GROUPED_MENU_SCROLLER_SELEC
 ${COMPOSER_CARD_ANCHORS.map(anchor => `${gatedAnchor(anchor)} {
   background-image: ${menuSurfaceLayers()} !important;
 }`).join('\n')}
-${COMPOSER_CARD_ANCHORS.map(anchor => `${gatedAnchor(anchor)}::after {
+${COMPOSER_CARD_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)}::after {
   content: '';
   position: absolute;
   inset: 0;

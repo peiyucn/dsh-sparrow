@@ -13,8 +13,8 @@
 
 | 候选 | 是否压着滚动内容 | 依据 |
 | :--- | :--- | :--- |
-| **输入框底座** `.composerSeat` | ✅ 是 | `position: sticky; bottom: 0; z-index: 7`（`ConversationRoot.module.css:369-374`），sticky 在滚动体内部 |
-| 对话顶栏 | ❌ 否 | 官方注释：`header is ordinary column chrome above the scrollport (not sticky)`（`:319`） |
+| **输入框底座** `.composerSeat` | ✅ 是 | `position: sticky; bottom: 0; z-index: 7`（`ConversationRoot.module.css` 的 `.root[data-phase='active'] .composerSeat`），sticky 在滚动体内部 |
+| 对话顶栏 | ❌ 否 | 官方注释：`header is ordinary column chrome above the scrollport (not sticky)`（`ConversationRoot.module.css` 的 `.root[data-phase='active']` 那一段） |
 | 左侧栏 logo 行 / tab strip | ❌ 否 | 全树无 `position: sticky` |
 | 右侧栏面板 | ❌ 否 | 同上 |
 
@@ -66,7 +66,8 @@
 | 本插件 | 脱离流、浮在 y=0..76 | y = 0 + 76 = 76 | y = 76 |
 
 → **静止时布局等值**，顶栏的分隔线仍与左栏（tab strip 38px + 面板标题 38px = 76px）在列边缘接上
-（`ConversationRoot.module.css:37-41` 那条契约）。差别只在「内容现在从它下面滚过」。
+（`ConversationRoot.module.css` 里 `.header` 那条契约，注释就写在 `min-height: 76px` 上方）。
+差别只在「内容现在从它下面滚过」。
 
 > ⚠️ **③ 必须用 `padding-top`，滚动条由 ③b 单独下推** —— 这两条**踩过两次**，两个方向各自坏一半：
 >
@@ -103,7 +104,7 @@
 
 ## 3) 输入框：玻璃**只做在卡片上**
 
-输入框是**底座**（`.composerSeat`）套**卡片**（`[data-composer-card]`，卡片在 `InputBar.tsx:429`）。
+输入框是**底座**（`.composerSeat`）套**卡片**（`[data-composer-card]`，卡片在 `InputBar.tsx` 的 `data-composer-card` 属性处）。
 官方两层都是**不透明**的，所以玻璃只做在**卡片**这一层：
 
 | 层 | 官方 | 现在 | 理由 |
@@ -248,9 +249,9 @@ surface 表有一条守卫「不许出现 `data-phase`」——而本表两条�
 | 顶栏槽位名 | `data-slot='conversation.session.header'` | 官方改名 → 顶栏不浮（不报错，静默失效） |
 | 滚动体 | `[data-conversation-scroll]` | 同上 |
 | 输入框底座 | `[data-composer-seat]` | 同上 |
-| 输入框卡片 | `[data-composer-card]`（`InputBar.tsx:429`） | 同上 |
-| 相位 | `data-phase='active'`（**卡片额外含 `hero`**） | 官方有**三档**：`settling` / `hero`（新建会话首页）/ `active`（`ConversationRoot.tsx:355`）。hero / settling 下顶栏是 `display: none`，补 76px 会把正文顶下去 —— 所以除**卡片那两条**外**所有规则都限定单 active**（有测试）。卡片走 `:is(active, hero)`，理由见 §5.4 |
-| 渐隐带高度 | **36px**（官方 `:381-385` 的 px 停点） | 官方改这个数字 → 我们的 mask 曲线与几何渐隐带错位；**现在它同时是「几何」和「遮罩曲线」两个用途** |
+| 输入框卡片 | `[data-composer-card]`（`InputBar.tsx`） | 同上 |
+| 相位 | `data-phase='active'`（**卡片额外含 `hero`**） | 官方有**三档**：`settling` / `hero`（新建会话首页）/ `active`（判据出自 `ConversationMainPanel.tsx` 的 `conversationPhase(...)`）。hero / settling 下顶栏是 `display: none`，补 76px 会把正文顶下去 —— 所以除**卡片那两条**外**所有规则都限定单 active**（有测试）。卡片走 `:is(active, hero)`，理由见 §5.4 |
+| 渐隐带高度 | **36px**（官方 `.composerSeat` 那条 `linear-gradient` 的 px 停点） | 官方改这个数字 → 我们的 mask 曲线与几何渐隐带错位；**现在它同时是「几何」和「遮罩曲线」两个用途** |
 
 **不依赖任何官方 hashed 类名**（有测试），所以官方改组件内部样式不会连累我们；但**锚点改名会静默失效**，
 这也是为什么每一处都留了测试与注释。
@@ -450,7 +451,9 @@ surface 表有一条守卫「不许出现 `data-phase`」——而本表两条�
 
 #### 为什么 `inset` 仍不可少
 
-官方卡片圆角 **`border-radius: 22px`**（`InputBar.module.css:55`）。`linear-gradient` 是**直线带**，
+官方卡片圆角 **`border-radius: var(--dsw-radius-panel)`**（`InputBar.module.css` 的 `.card`；
+0.1.5 时代那里是字面量 `22px`，0.1.7 起改走 token，rc.2 的值为 **28px**）。
+`linear-gradient` 是**直线带**，
 到圆角处被裁断 —— **光绕不过圆角**。`inset` 阴影沿元素**自身圆角轮廓**描边，天然绕圈
 （右下角那一带靠它，椭圆到不了）。避开 `box-shadow` 的理由**不成立**：
 官方那条 `--dsw-elevation-soft` 是**外**投影，与内阴影**可并存**（逗号并列），
@@ -476,7 +479,8 @@ surface 表有一条守卫「不许出现 `data-phase`」——而本表两条�
 
 ### 5.4 新建会话首页（`hero`）：卡片也要玻璃
 
-**根因**：官方 `data-phase` 有**三档**（`ConversationRoot.tsx:355`）：
+**根因**：官方 `data-phase` 有**三档**（判据出自 `ConversationMainPanel.tsx` 的
+`shellPhase = … : conversationPhase(session, conversation)`）：
 
 ```
 const phase = settling ? 'settling' : hero ? 'hero' : 'active'
@@ -484,7 +488,7 @@ const phase = settling ? 'settling' : hero ? 'hero' : 'active'
 
 首页（还没有会话）走的是 **`hero`**，所以只写死 `[data-phase='active']` 的规则在首页
 **一条都不命中**，卡片会留着官方的 `background: var(--dsw-specific-input-major)`
-（**不透明实色**，`InputBar.module.css:56`）= 一张灰板。
+（**不透明实色**，`InputBar.module.css` 的 `.card`）= 一张灰板。
 
 **修法**：把**卡片那两条**（深 / 浅轴）的相位门放宽成 `GLASS_CARD_PHASES = ['active', 'hero']`，
 经 `phaseGate()` 拼成 `:is([data-phase='active'], [data-phase='hero'])`。
@@ -497,12 +501,12 @@ const phase = settling ? 'settling' : hero ? 'hero' : 'active'
 
 | 规则 | 为什么**必须**留在单 `active` |
 | :--- | :--- |
-| 底座 `::after`（不透带） | 它是 `position: absolute; bottom: 0`，**包含块来自底座自己**；而官方只在 `.root[data-phase='active'] .composerSeat` 里写 `position: sticky`（`ConversationRoot.module.css:369-371`），`.composerSeat` 基规则**不含** position ——**hero 下底座不是定位元素**，带子会改锚最近的定位祖先（hero 下是 `.root`；若该 tab 有 composer overlay 则是 `.scrollBody`，见 `:421-422`）——两者都**不等于**「卡片下沿到座底那一小条」，于是带子会跑到别处去画 |
+| 底座 `::after`（不透带） | 它是 `position: absolute; bottom: 0`，**包含块来自底座自己**；而官方只在 `.root[data-phase='active'] .composerSeat` 里写 `position: sticky`（`ConversationRoot.module.css`），`.composerSeat` 基规则**不含** position ——**hero 下底座不是定位元素**，带子会改锚最近的定位祖先（hero 下是 `.root`；若该 tab 有 composer overlay 则是 `.scrollBody`，见同文件里 `.scrollBody:has([data-conversation-composer-overlay])` 那段）——两者都**不等于**「卡片下沿到座底那一小条」，于是带子会跑到别处去画 |
 | 顶栏浮层 + 滚区补 76px | hero 下顶栏本就 `display: none`，补 76px 会把正文顶下去 |
-| 拖拽条 | hero 没有拖拽条（`ConversationRoot.tsx:382` 只在 `phase === 'active'` 渲染） |
+| 拖拽条 | hero 没有拖拽条（`ConversationWidthControls.tsx` 的 `if (container === null \|\| phase !== 'active') return null` 只在 `phase === 'active'` 渲染） |
 
 `settling` **不在列内**：官方把底座设成 `visibility: hidden`
-（`ConversationRoot.module.css:474`），卡片随之不可见，画不画都一样。
+（`ConversationRoot.module.css` 里 `.root[data-phase='settling'] .composerSeat`），卡片随之不可见，画不画都一样。
 
 守卫（`test/glass.test.mjs`）逐条钉住：卡片两条都必须同时含两个相位；
 其余每条规则必须是**单** active 且不得出现 `:is(`；底座不透带那条不得含 `hero`。
@@ -603,8 +607,10 @@ body:not([PLAIN]) [data-sidebar-right-panel] {
 > 祖先链上若有**静态** `transform`，那两处的渐变会**长期**错位 —— 而它们的静止外观已目视确认无误，
 > 故静止时祖先链上无 `transform`；动画期间若**新增** `transform`，会出现与右边栏同款的
 > 「骤增」，而两处动画中均无此现象。两者合起来 ⇒ 当前祖先链上无 `transform`。
-> （`ConversationRoot.module.css:436-439` 也明写 `composerHero` 刻意不用 `transform`，
-> 正是为了不改变 `position: fixed` 后代的包含块。）
+> （`ConversationRoot.module.css` 里 `.composerHero` 上方那段注释也明写
+> `Flex, NOT absolute+transform: a transform would make this box the containing block
+> for position:fixed descendants (pickers/modals), shrinking them.` ——
+> 官方自己就是为了不改变 `position: fixed` 后代的包含块才不用 `transform`。）
 >
 > ⚠️ **但这是「当前事实」而非「结构保证」**：官方一旦给这两处任一祖先加个滑入动画，
 > 它们会**静默**坏掉（症状与右边栏那条相同）。改动顶栏 / 底座那两处附近时先回来读这段。
