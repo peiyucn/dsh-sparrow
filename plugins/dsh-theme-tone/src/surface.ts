@@ -515,15 +515,17 @@ function popupLight(variable: string): string {
 }
 
 /**
- * {@link GROUPED_MENU_SELECTOR} 专用的图层串：**颗粒 + 底光，没有顶光**（理由见该常量的表）。
+ * {@link GROUPED_MENU_SELECTOR} 专用的图层串 —— **已废弃，保留仅为兼容导出**。
  *
- * ⚠️ 这里**也不含左光与顶光**：那个菜单很矮（分组标题 + 若干行），顶光与左光在这个尺度上
- * 都只覆盖一条边、读不出「一道光」，反而会与粘性分组标题的横带打架（该横带的成因见
- * `GROUPED_MENU_SELECTOR` 的注释）。「三道光统一」这条口径针对的是
- * **有独立面的浮层**（对话框 / 菜单本体），分组菜单是它的内部结构。
+ * ⚠️ **2026-09-27（M3）起不再使用**：它只有 2 层（颗粒 + 底光），是「同族元素份数不一致」
+ * 的来源之一 —— owner 报「模型选择列表……和别的元素不是一个档位」、以及
+ * 「todo 列表我刚发现没有打光了」。
  *
- * 底光同样乘 {@link POPUP_LIGHT_COMPENSATION} —— 与 {@link surfaceLayers} 同一个来源，
- * 免得同族两处强度又分叉。
+ * 现在统一走 {@link surfaceLayers}（4 层），由三张规范表决定几何与强度
+ * （见 docs/spec/07-surface-model.md §3）。本函数保留是为了让旧导出不突然消失
+ * （`src/index.ts` 有再导出），**不要再有新的调用方**；下一次大版本删除。
+ *
+ * @deprecated 用 {@link surfaceLayers} —— 每类表面都拿同样的 4 层。
  * @returns 可直接写进 `background-image` 的图层串。
  */
 export function menuSurfaceLayers(): string {
@@ -838,17 +840,32 @@ ${SURFACE_ANCHORS.filter(usesOfficialBeforeLayer).map(anchor => `${gatedAnchor(a
    唯一真正需要补的是官方自己漏配的那一处（粘性分组标题），它单独在下面处理。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 
-/* --- 带**粘性分组标题**的菜单：**只去掉顶光**（见 GROUPED_MENU_SELECTOR 的表）---
-   两条 owner 反馈夹出来的解：全给图层 → 分组标题显形成横带；全不给 → 「是纯色的」。
-   顶光锚在盒子顶部、正好被标题压住，是横带的**唯一来源** → 去掉它；
-   颗粒（均匀贴图）与底光（锚盒子底部、与吸顶的标题不相遇）都留着，质感还在。
-   ⚠️ **标题条自己也要补颗粒**（{@link groupTitleLayers}）—— 标题有不透明底，
-   那片颗粒不会「落在同一张贴图上等于纯加亮」，而是卡片质感的一部分；
-   不补就等于把卡片那片颗粒挖掉一块、露出一条平带。
+/* --- 分组菜单（模型选择列表）：**并入通用菜单配方**，不再有专用规则 ---
+
+   ⚠️⚠️ **2026-09-27（M3）本条已删除** —— 它此前是「不统一」最刺眼的一处：
+
+   | 载体 | 命中规则 | 层数 |
+   | :--- | :--- | :--- |
+   | 元素级 | 本专用规则（"[role='menu']:has([role='group'])"，特异度更高） | 2（颗粒 + 底光） |
+   | ::after | **通用** "[role='menu']" 那条（通用规则没有对应的专用版本） | 4（颗粒 + 三道光） |
+
+   净结果：**颗粒 2 份、底光 2 份，而顶光与左光各只有 1 份** —— 同一个菜单上各层份数都不同。
+   这正是 owner 报的「模型选择列表……和别的元素不是一个档位」。
+
+   ## 为什么直接删就对了（而不是给它也写一份专用规则）
+
+   那个菜单元素**本来就同时匹配**通用 "[role='menu']" ⇒ 通用那条 "::after"（4 层）
+   **一直在它身上生效**。所以此前那条专用规则的唯一作用就是**在元素级多画一遍 2 层**。
+   删掉它 ⇒ 分组菜单与普通菜单拿到**完全相同**的配方（4 层、单载体），无需任何特例。
+
+   ## 那个「去掉顶光避免横带」的旧办法为什么现在不需要了
+
+   旧注释说「顶光锚在盒子顶部、正好被标题压住，是横带的唯一来源，所以去掉它」——
+   但那只作用于**元素级**那一份；"::after" 那份**本来就带顶光**且一直在生效。
+   两处的差别只在绘制载体，不在几何 ⇒ 「元素级去掉顶光」并不能真的消除横带，
+   只是让元素级那份少一道光（额外造成份数不齐）。横带的正解在**粘性标题自己那一条**
+   （{@link groupTitleLayers}：把卡片那一摞原样重画 + 圆角交给滚动容器），与本节无关。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
-${gatedAnchor(GROUPED_MENU_SELECTOR)} {
-  background-image: ${menuSurfaceLayers()} !important;
-}
 /* --- 粘性分组标题：把**卡片那一摞层**原样重画，只在最下面垫一层不透明的 ---
    owner 对这条报了四轮，其中三次是我修坏的。四句原话合起来就是全部约束：
      ① 「把分类标题的背景色去掉，有点突兀，咱们的和官方的一起处理。」
@@ -976,9 +993,14 @@ ${`${gatedAnchor(GROUPED_MENU_UNGUARDED_SELECTOR)} ${GROUPED_MENU_SCROLLER_SELEC
 
    ⚠️ **2026-09-27（M2）：元素级那条同样已删除** —— 与 SURFACE_ANCHORS 同一收口，
    每个锚点只留**一个**载体（::after，或 QueueDock 的官方 ::before）。
+
+   ⚠️⚠️ **2026-09-27（M3）：配方从 2 层改为 4 层**（原来走 menuSurfaceLayers：颗粒 + 底光）。
+   owner 报「todo 列表我刚发现没有打光了」—— 根因就是它拿的是**另一份配方**，
+   比别的浮层少顶光与左光。现在三张停靠卡与菜单/对话框**同一配方**（颗粒 + 三道光），
+   差别只在尺度。矮条在这个尺度上顶光是否读得出，M10 真机复核（07 §3.2 的 C 档备注）。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 ${COMPOSER_CARD_ANCHORS.filter(usesOfficialBeforeLayer).map(anchor => `${gatedAnchor(anchor)}::before {
-  background-image: ${menuSurfaceLayers()} !important;
+  background-image: ${surfaceLayers()} !important;
 }`).join('\n')}
 ${COMPOSER_CARD_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)}::after {
   content: '';
@@ -986,7 +1008,7 @@ ${COMPOSER_CARD_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anch
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  background-image: ${menuSurfaceLayers()} !important;
+  background-image: ${surfaceLayers()} !important;
   pointer-events: none;
 }`).join('\n')}
 /* --- 为什么**不**改这三张卡的几何（owner：「官方处理方式不一样？」—— 是的，确实不一样）---

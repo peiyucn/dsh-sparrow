@@ -1352,30 +1352,37 @@ describe('抬升面：表面绘制', () => {
     )
   })
 
-  it('带分组标题的菜单应该 保留质感、只去掉顶光（不能整条排除 → 会变成纯色）', () => {
-    // owner 前后两条反馈把解夹死了：
-    // ①「模型选择器里面两个分类标题的背景，也得处理下。官方默认样式里是看不到这个背景条的。」
-    // ②（我第一版把整个菜单 `:not(:has([role='group']))` 排除出图层之后）
-    //   「模型选择列表那个框好像没有适配咱们样式，是纯色的。」
-    // 所以：顶光必须去掉（它锚盒子**顶部**，正好被吸顶的分组标题压住 → 横带就是它造的），
-    // 颗粒与底光必须留（质感来源；底光锚盒子**底部**、与吸顶标题不相遇）。
+  it('带分组标题的菜单应该 与普通菜单**同一配方**（不再有「去顶光」特例）', () => {
+    // owner 前后几条反馈把这件事推到了正解：
+    // ①「模型选择器里面两个分类标题的背景，也得处理下。」
+    // ②（我第一版把整个菜单排除出图层之后）「模型选择列表那个框……是纯色的。」
+    // ③「模型选择列表，子代理列表，后台任务列表……和别的元素不是一个档位」
+    //
+    // ⚠️ **2026-09-27（M3）改判**：此前这里断言「分组菜单必须有一条**去顶光**的专用规则」。
+    // 那个办法**从未真正对齐过份数**，反而制造了最刺眼的不齐：
+    //
+    //   | 载体 | 命中规则 | 层数 |
+    //   | :--- | :--- | :--- |
+    //   | 元素级 | 专用规则（特异度更高） | 2（颗粒 + 底光） |
+    //   | ::after | **通用** [role='menu'] 那条 | 4（颗粒 + 三道光） |
+    //
+    // ⇒ 颗粒 2 份、底光 2 份，顶光/左光各 1 份。**而且通用那条 ::after 一直带着顶光**，
+    // 所以「元素级去顶光」根本消除不了横带 —— 它只是让元素级那份少一道光。
+    //
+    // 现在：专用规则**整条删除**，分组菜单由通用 [role='menu']::after 承担，
+    // 与普通菜单**逐层相同**。横带的正解在粘性标题自己那一条（groupTitleLayers）。
+    assert.ok(
+      !css.includes(`${GROUPED_MENU_SELECTOR} {`) && !css.includes(`${GROUPED_MENU_SELECTOR}::after {`),
+      'M3：分组菜单不得再有专用图层规则 —— 它会与通用 [role=menu]::after 叠成双层、份数不齐',
+    )
+    // 通用菜单锚点仍必须全量收录（排除 = 纯色），分组菜单靠它拿到与普通菜单相同的配方。
     const menu = SURFACE_ANCHORS.find(a => a.includes("[role='menu']"))
     assert.equal(menu, "body [role='menu']", '菜单族必须全量收录（排除 = 纯色）')
-
-    const gated = GROUPED_MENU_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
-    assert.ok(css.includes(gated), `必须有去顶光那条规则：${gated}`)
-
-    const layers = menuSurfaceLayers()
-    assert.ok(layers.includes(GRAIN_TILE_VARIABLE), '颗粒要留（质感来源，且与盒子高度无关 → 不造横带）')
-    assert.ok(layers.includes(POPUP_BOTTOM_SHAPE), '底光要留（锚盒子底部，与吸顶标题不相遇）')
-    assert.ok(!layers.includes(POPUP_TOP_SHAPE), '**顶光必须去掉** —— 它是横带的唯一来源')
-    assert.ok(!layers.includes(TOP_VARIABLE), '顶光变量也不该出现在这条里')
-    // ⚠️ 必须断言**在这一条规则的规则体里**，不能用全表 `css.includes(layers)` ——
-    // 那个串同时被三条停靠卡规则使用，`includes` 会被别处喂饱：
-    // 即使本规则改回含顶光的 `surfaceLayers()`，全表断言照样为真（守卫形同虚设）。
-    const gatedBody = bodyOfRule(css, `${gated} {`)
-    assert.ok(gatedBody.includes(layers), '去顶光的图层串必须在**这条规则**里')
-    assert.ok(!gatedBody.includes(TOP_VARIABLE), '本条规则不得含顶光变量')
+    // 而这条通用规则的配方必须是**完整 4 层**（含顶光）—— 分组菜单因此也有顶光。
+    const menuBody = blockFor(css, `${menu.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)}::after`)
+    assert.ok(menuBody.includes(surfaceLayers()), '通用菜单 ::after 必须画完整 4 层配方')
+    assert.ok(menuBody.includes(TOP_VARIABLE), '含顶光（分组菜单也走这条 ⇒ 三道光齐备）')
+    assert.ok(menuBody.includes(LEFT_VARIABLE), '含左光')
 
     // 标题条本身：**本插件一个声明都不写**（见上面那条用例的完整说明）。
     const titleSelector = `${GROUPED_MENU_SELECTOR} ${GROUPED_MENU_TITLE_SELECTOR}`
@@ -1517,7 +1524,13 @@ describe('抬升面：表面绘制', () => {
         !/background-color/u.test(body),
         `${anchor} 不得写 background-color —— 写死面板变量会盖掉 --dsw-specific-tip 的染色`,
       )
-      assert.ok(body.includes(menuSurfaceLayers()), `${anchor} 要画「颗粒 + 底光」`)
+      assert.ok(body.includes(surfaceLayers()), `${anchor} 要画**完整 4 层**配方（M3 起与菜单/对话框同一配方）`)
+      // ⚠️ 2026-09-27（M3）：此前断言用的是 menuSurfaceLayers()（只有颗粒 + 底光）。
+      // owner 报「todo 列表我刚发现没有打光了」—— 根因就是这几张卡拿的是**另一份配方**。
+      // 现在统一 surfaceLayers()（颗粒 + 顶/底/左三道光），故这里钉死不含旧配方。
+      assert.ok(!body.includes(menuSurfaceLayers()), `${anchor} 不得再用 2 层的旧配方（会缺顶光与左光）`)
+      assert.ok(body.includes(TOP_VARIABLE), `${anchor} 必须有顶光（owner 报过「todo 没有打光」）`)
+      assert.ok(body.includes(LEFT_VARIABLE), `${anchor} 必须有左光`)
       assert.ok(!body.includes('backdrop-filter'), `${anchor} 是内容面，不做玻璃`)
     }
   })
@@ -1885,7 +1898,7 @@ describe('抬升面：表面绘制', () => {
     const at = css.indexOf(`${gated}::before {`)
     assert.ok(at >= 0, `缺 QueueDock 的 ::before 补助规则：${gated}::before`)
     const body = css.slice(css.indexOf('{', at) + 1, css.indexOf('}', at))
-    assert.ok(body.includes(menuSurfaceLayers()), '补助规则要画「颗粒 + 底光」')
+    assert.ok(body.includes(surfaceLayers()), '补助规则要画**完整 4 层**配方（M3 起与菜单同一配方）')
     for (const forbidden of ['content', 'position', 'inset', 'z-index', 'border-radius', 'pointer-events']) {
       assert.ok(
         !new RegExp(`(?:^|;)\\s*${forbidden}\\s*:`, 'u').test(body),
