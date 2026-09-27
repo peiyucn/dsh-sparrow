@@ -771,12 +771,26 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
         `${scheme} 的贴图预乘 alpha 应等于 GRAIN_ALPHA × 补偿系数`,
       )
     }
-    // 补偿系数本身：必须在 (0,1) 内（浮层要比背景**弱**，因为少了 screen 混合的削弱），
-    // 且不能小到几乎看不见。
+    // ⚠️ **2026-09-27（M6）再次改判**：范围从 (0.4, 1) 改为 (0.4, 1.6)。
+    //
+    // 上一版断言「浮层要比背景**弱**（< 1），因为少了 screen 混合的削弱」——
+    // 那个理由**方向是反的**：screen 在深色轴上把噪声**提亮**，所以地面的颗粒比名义 alpha
+    // 更显眼；浮层是普通合成，同样 alpha 反而更淡 ⇒ 浮层要比地面**强**才对得上。
+    // 单载体、同屏幕位置重定标给出 k* = 1.23（7 点扫描独立复核 1.264）。
+    //
+    // 上界 1.6 防的是「系数被误改成离谱值」（如 3、10）；下界 0.4 防「几乎看不见」。
+    // alpha 实际安全的前提是 GRAIN_ALPHA × k ≤ 1 ⇒ 另有一条单独断言（见下）。
     assert.ok(
-      POPUP_GRAIN_COMPENSATION > 0.4 && POPUP_GRAIN_COMPENSATION < 1,
-      `补偿系数应在 (0.4, 1) 内，实际 ${POPUP_GRAIN_COMPENSATION}`,
+      POPUP_GRAIN_COMPENSATION > 0.4 && POPUP_GRAIN_COMPENSATION < 1.6,
+      `补偿系数应在 (0.4, 1.6) 内，实际 ${POPUP_GRAIN_COMPENSATION}`,
     )
+    // 关键物理约束：预乘 alpha 不得超过 1（超过就是无效值，观感会完全不同）。
+    for (const scheme of SCHEMES) {
+      assert.ok(
+        GRAIN_ALPHA[scheme] * POPUP_GRAIN_COMPENSATION <= 1,
+        `${scheme}：GRAIN_ALPHA × 补偿系数 = ${GRAIN_ALPHA[scheme]} × ${POPUP_GRAIN_COMPENSATION} 超过 1`,
+      )
+    }
     // 派生关系必须是**乘法**：GRAIN_ALPHA 变了，浮层贴图跟着成比例变（不是写死的常数）。
     // 这是「一个旋钮」的真正含义 —— 用「两轴比值 == 系数」来钉。
     // ⚠️ 容差要容纳 `popupGrainAlpha` 的 4 位小数舍入（见该函数注释），故用 1e-3 而非 1e-4。
