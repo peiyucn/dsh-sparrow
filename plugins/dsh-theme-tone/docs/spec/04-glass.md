@@ -130,6 +130,28 @@
 > 有回归测试钉住：底座不得再出现 `::before`、只许有 `::after` 一个伪元素、
 > 且本体的 `background` 只能全是 `none`。
 
+#### 4.1.1) 本表里「不带 `content` 的伪元素规则」为什么**是**对的（与 05 那张表相反）
+
+`buildGlassCss()` 一共 9 条伪元素规则，其中 **5 条不带 `content`**。这与 05-surfaces 里
+「覆盖层必须声明 `content`」的契约**不冲突**，因为它们是**另一种东西**：不是"新建一个伪元素
+去画图"，而是**给官方（或本表别处）已经生成的那个伪元素补属性**。逐条判定：
+
+| 规则 | 为什么不带 `content` 是正确的 |
+| :--- | :--- |
+| `…[data-conversation-scroll]::-webkit-scrollbar-track` | **滚动条伪元素**，浏览器原生生成盒子，`content` 对它无意义（它根本不适用）。本条只改 `margin` |
+| `…[data-composer-card]::before`（浅色轴的 `background-image`） | 同元素上已有一条**带 `content`** 的 `::before` 基规则（本表第 3 条）先声明了盒子；这条只是**按轴覆盖**其中一个属性。CSS 里同一伪元素的多条规则会合并，盒子由基规则给 |
+| `…[data-composer-card]::before`（`[data-dsh-theme-tone-workstart]`，只写 `box-shadow: none`） | 同上 —— 待启动态要撤的就是基规则里那条 inset 边光 |
+| `…[data-dockkit-pane]::after, …[data-dockkit-empty]::after`（深色轴 `mix-blend-mode`） | 基规则（本表第 6 条）已声明 `content` 与几何；这两条只按轴改混合模式与 opacity |
+| 同上（浅色轴 `mix-blend-mode` + `opacity`） | 同上 |
+
+**判据（一句话）**：`content` 的必要性看**这个伪元素在本表里有没有别处给它盒子** ——
+有就不必重复声明（写了也不出错，但会掩盖"盒子归谁"这个事实）；**一处都没有**才是空转。
+05-surfaces 那 12 条是后者（新建伪元素），本表这 5 条是前者（补属性），所以**不能一刀切**。
+
+> 这也是本次审计的一条方法结论：**「所有无 `content` 的伪元素规则都是 bug」是错的**，
+> 它会把上面 5 条正确的规则一起"修"坏（多写 `content:''` 等于自己造一个盒子，
+> 与官方那个既有盒子叠在一起 —— 那才是真事故）。
+
 * **底座为什么必须 `!important`**：官方同位置规则 `.root[data-phase='active'] .composerSeat`（0,3,0），
   我们的 `[data-phase='active'] [data-composer-seat]` 是 0,2,0，压不过。
   **卡片不需要** —— `[data-composer-seat] [data-composer-card]` 是 (0,3,0) > 官方 `.card` (0,1,0)。

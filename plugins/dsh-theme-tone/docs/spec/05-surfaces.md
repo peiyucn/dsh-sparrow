@@ -295,10 +295,37 @@ body:not([data-dsh-theme-tone-plain]) [role='dialog']:not(:has(> img)) {
 `AFTER_LAYER_EXCLUDED_ANCHORS` / `usesAfterLayer()` —— trigger-menu 那条直接在**锚点**上
 用 `:not([data-overflow-below])` 收窄，QueueDock 那条进排除表。
 
-**代价（诚实记录）**：被排除的锚点仍保留**元素级**那条 `background-image`，只是失去伪元素通道。
-对 QueueDock 而言元素级那条本来就够用（它的材质画在 `::before`、元素自身没有负 z 材质层盖它，
-实测质感正常）；trigger-menu 在 `data-overflow-below`（即列表**溢出**、官方给提示）时
-**这一处没有我们的质感** —— 官方提示优先。
+##### ⚠️ QueueDock 还有第二步：排除之后必须**补到官方自己的 `::before`**
+
+**「排除掉就够了」是错的**（这条我上一版写成「QueueDock 靠元素级那条本来就够用」，实测推翻）。
+官方 QueueDock 的材质**不在元素自己身上**，而在它自己的 `.panel::before`
+（`z-index: -1` + `backdrop-filter: var(--dsw-menu-backdrop-filter)`）上。元素级
+`background-image` 画在**元素背景层**、位于负 z 带**之下** ⇒ 被那层半透明材质连同模糊一起洗掉。
+
+真机同构复刻实测（官方 QueueDock rc.2 逐字；取样区亮度标准差 = 质感可见度，
+官方材质本身平坦 ⇒ 基线 **0.000**）：
+
+| 变体 | 颗粒 std | 官方 `::after` 描边 |
+| :--- | ---: | :--- |
+| 只元素级那条 | **0.229** ← 与纯色无异 | 完好 |
+| **补一条到官方 `::before`（现做法）** | **2.162** ✅ | **完好**（左右上三边全在） |
+| （对照）早期的 `::after` 版 | 2.261 | **被盖掉 ✗** |
+
+**做法**：`OFFICIAL_BEFORE_LAYER_ANCHORS` / `usesOfficialBeforeLayer()` —— 对登记在册的锚点
+**只补 `background-image` 一个属性**：
+
+* 官方那个伪元素**已经声明**了 `content: ''` 与完整几何，所以**不写 `content`**、不写
+  `position/inset/border-radius`（写了就是我们在自己造盒子，又回到空转那条老路）；
+* 同一元素上 `background-image` 画在 `background-color` **之上**，且**不经过**那个只过滤
+  「元素背后」的 `backdrop-filter` ⇒ 质感压在材质之上；
+* **完全不碰 `::after`** ⇒ 官方那条描边照旧。
+
+⛔ **这条例外不许推广**：给一个官方**没有** `::before` 的元素补这条，会造出一个
+**无 `content` 的伪元素** —— 正是本缺陷的原始形态。守卫钉住：只有登记在册的锚点才准发
+`::before` 图层规则，且该规则**不得**出现 `content`（反向注入四种回归各被拦下）。
+
+**代价（诚实记录）**：唯一剩下的是 trigger-menu 在 `data-overflow-below`
+（即列表**溢出**、官方给提示）时**这一处没有我们的质感** —— 官方提示优先。
 
 **表里仅有的两处 `background-color`，都不是菜单族**：
 
