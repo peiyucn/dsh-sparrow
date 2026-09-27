@@ -34,27 +34,45 @@
  * 五花八门（分隔线 / 描边 / 拖拽柄 / 展开箭头…），于是给一堆无关伪元素刷上了背景板，
  * owner 报「**整个对话区域的底部好像被一个纯色块给盖住了**」。
  *
- * 现在**必须**同时要求官方那 5 处各自独有的语义属性（逐个核过源码）：
+ * 现在**必须**同时要求官方那几处各自独有的语义属性（逐个核过源码）：
  *
  * | 组件 | 独有属性 | 扫光带长在哪 |
  * | :--- | :--- | :--- |
- * | `ui-tool` bash-sample | `data-sample="bash"` / `data-variant="bash"` | 容器自身 `::after` |
  * | `ui-chat` ReasoningRow | `data-variant="think"` | `.row::after` |
- * | `ui-chat` GenericCommandCard | `data-variant="others"` | `.row::after` |
- * | `ui-tool` ToolRow | `data-variant` + `data-tool` | `.row::after` |
  * | `ui-skill` SkillRow | `data-tool="skill"` | `.row::after` |
+ * | `ui-tool` bash-sample | `data-sample="bash"` / `data-variant="bash"` | 容器自身 `::after` |
+ * | `ui-tool` GenericCommandCard | `data-variant="others"` | `.row::after` |
+ * | `ui-tool` ToolRow | `data-variant` + `data-tool` | `.row::after` |
  *
  * 五处都带 `data-variant` 或 `data-tool` —— 这就是收窄的判据（测试里钉死）。
+ *
+ * ## ⚠️ rc.2 现状：官方只剩 2 处（2026-09 审计核对）
+ *
+ * 逐文件核对 `dsh-v0.1.7-rc.2` 后确认，官方**仍在画扫光带**的只有两处：
+ * `ui-chat/…/ReasoningRow.module.css`（`.root[data-state='running'] .row::after`）与
+ * `ui-skill/…/SkillRow.module.css`（`.card[data-state='running'] .row::after`，
+ * 另含 `preparing`）。原先记的 bash-sample / ToolRow / GenericCommandCard 三处在 rc.2
+ * 的 CSS 里已**没有 `::after`**（文件路径也搬过：`tool/components/` → `tool/toolviews/`）。
+ *
+ * 因此上表前两条锚点（`[data-variant]::after` / `[data-tool]::after`，直指容器自身的那种）
+ * 在 rc.2 上**不匹配任何官方伪元素** —— 它们是给「容器自己画带子」那种实现准备的，
+ * **保留**是因为：① 官方可能再改回容器级 `::after`；② 它们已收窄到 `data-variant` /
+ * `data-tool`，不会误中无关伪元素（这正是上一版回归的教训）。**代价是静默失效**
+ * （少两处扫光带），不是崩溃。
  */
 
 import { PLAIN_ATTR } from './constants.js'
 import { grainOverGradients } from './backdrop.js'
 
 /**
- * 扫光带的锚点 —— 覆盖官方那 5 处实现，**且只覆盖它们**（理由见文件头）。
+ * 扫光带的锚点 —— 覆盖官方那几处 `::after` 实现，**且只覆盖它们**（理由见文件头）。
  *
  * 每个锚点都要求 `[data-state='running']` **加上** `data-variant` / `data-tool`
- * —— 只有那 5 个组件同时具备，通用容器（对话区、底座、队列卡的 `::after`…）不会误中。
+ * —— 只有那几个组件同时具备，通用容器（对话区、底座、队列卡的 `::after`…）不会误中。
+ *
+ * ⚠️ rc.2 实测（见文件头「rc.2 现状」）：官方只剩 2 处真在画带子，前两条锚点
+ * （容器自身 `::after`）当前**不匹配任何官方伪元素**，保留是为防官方改回容器级画法；
+ * 它们是**静默失效**而非错误命中。
  */
 export const SWEEP_ANCHORS: readonly string[] = Object.freeze([
   "body [data-state='running'][data-variant]::after",

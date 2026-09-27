@@ -879,6 +879,15 @@ async function restoreTrashDir(ctx: Context, surface: RegistryMutationSurface, t
   if (ctx.sessions.get(sessionId) !== undefined || ctx.agents.get(sessionId) !== undefined) {
     throw new ArchiveError('SESSION_LIVE', '该会话仍被 dsh 进程占用（未释放），不能重复还原')
   }
+  // 格式门为什么**不**装在这里（与同文件的 trash / delete 不对称，是有意的）：
+  // ① 宿主级门已在 apply() 开头由 assertHostCompatible 把住 —— 宿主会话格式不在支持集里时
+  //    整个插件早已自停用，本函数根本不会被调用；
+  // ② trash / delete 那里的逐 header 门（assertHeaderFormatSupported）针对的是「磁盘上混着
+  //    旧代文件」，而**还原是撤销我们自己刚才那次移动**：把目录 rename 回 sidecar.originalPath，
+  //    不解析任何会话内容，因此没有「认错格式 ⇒ 丢数据」的通路；
+  // ③ 反过来，在这里加门会**把用户自己的撤销动作锁死** —— 回收站里躺着的旧代会话将永远
+  //    无法还原（那时用户唯一的选择只剩彻底删除）。撤销路径必须始终可走。
+  // sidecar 也不记录会话格式版本（见 archive.ts 的 ArchiveSidecar），本来就没有可判据。
 
   const subagentTargets = (sidecar.subagents ?? []).map(child => {
     const childId = SessionId(child.sessionId)
