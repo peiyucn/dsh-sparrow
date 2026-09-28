@@ -1102,6 +1102,13 @@ describe('抬升面：表面绘制', () => {
       "body > :has(> [role='tree'])",
       "body [data-slot='conversation.session.header.actions'] ul",
       "body [role='tooltip']:not([data-side])",
+      // ⚠️ 2026-09-27 新增两条：**问答卡 / 计划审阅卡**（官方 ui-user-questions）。
+      // owner 真机验收时选了「没纹理（颗粒/打光看不到）」。
+      // 卡片本体只有 hashed 类名（`<section class="…_card">`）、无 role，
+      // 故改用官方的**非哈希数据属性 + 直接子元素**收窄；
+      // 底色 token（`--dsw-specific-input-major`）我们早已染过 ⇒ 表现为「颜色对、质感没有」。
+      'body [data-question-key] > section',
+      'body [data-plan-review-key] > section',
     ])
     // 模态弹窗**不做玻璃**（它是内容面，Apple HIG：Don't put glass on lists/cards/content）
     // ⚠️ 0.1.7 起**菜单族**改用官方半透明 + 模糊材质（见 MENU_MATERIAL_ANCHORS），

@@ -227,6 +227,47 @@ export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
    * 「不染的几处（有意）」。给它糊上夜色面板 + 颗粒会把气泡读成一个小菜单，反而丢掉可辨性。
    */
   "body [role='tooltip']:not([data-side])",
+  /**
+   * **问答卡**（`ui-user-questions` 的 `QuestionComposer`）—— owner 真机验收
+   * 时选了「没纹理（颗粒/打光看不到）」，即本条补的东西。
+   *
+   * ## 为什么以前命不中
+   *
+   * 卡片本体是 `<section className={clsx(css.card, …)}>` —— **只有 hashed 类名**，
+   * 没有 `role`、没有别的稳定属性；底色走 `--dsw-specific-input-major`
+   * （`QuestionComposer.module.css:25`，这条 token 我们**已经染过**，所以颜色一直是对的
+   * —— owner 反馈的正是「颜色对、质感没有」）。
+   * 于是它既不在 {@link SURFACE_ANCHORS} 任何一条里，也不在
+   * {@link COMPOSER_CARD_ANCHORS}（那三条靠 `data-queue-dock` / `data-goal-bar` /
+   * `data-testid`）里 ⇒ **一张图层规则都没命中** ⇒ 只有 token 给的一个不透明色。
+   *
+   * ## 锚点怎么选的
+   *
+   * 用官方的**非哈希数据属性** `data-question-key`（`QuestionComposer.tsx:278`），
+   * 收窄到它的**直接子元素** —— 卡片就在那一层：
+   *
+   * ```
+   * <div data-question-key={pending.key}>          ← 稳定钩子
+   *   <section className={css.card}>               ← 要上质感的那张卡
+   * ```
+   *
+   * ⚠️ 用**子选择器 `>`** 而不是后代：`data-question-key` 那棵子树里还有
+   * `role='radiogroup'` / `role='group'` 等一堆后代容器，后代写法会给它们全部叠图层。
+   *
+   * ⚠️ 必须带 `body ` 前缀（全表约定）：`gatedAnchor()` 用 `replace(/^body\b/, …)` 把
+   * 「官方默认门」并进去；少了前缀就**静默不替换** ⇒ 这条在官方默认档下也会生效，
+   * 破坏「官方默认不动」的底线（本仓库为这条约定单设了一个测试）。
+   */
+  'body [data-question-key] > section',
+  /**
+   * **计划审阅卡**（`ui-user-questions` 的 `PlanReviewPanel`）—— 与问答卡**同族同形**，
+   * 只是钩子属性不同（`data-plan-review-key`，`PlanReviewPanel.tsx:10`），
+   * 结构完全一致（`<div data-plan-review-key><section className={css.card}>`）。
+   *
+   * 两条分开写而不是合并成 `:is(...)`：保持每条锚点**单一来源**可读
+   * （两张卡是不同官方组件、将来可能只改其中一个）。
+   */
+  'body [data-plan-review-key] > section',
 ])
 
 /**
