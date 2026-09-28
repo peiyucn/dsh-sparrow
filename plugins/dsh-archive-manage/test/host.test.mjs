@@ -322,6 +322,49 @@ describe('archive-manage host 纯逻辑', () => {
       assert.deepEqual(calls, [])
     })
 
+    it('⛔ 官方 cachedSnapshot 签名跨版本变化 —— 必须按形参个数自适应', async () => {
+      // ## 为什么（2026-09-27，owner：「归档会话名字也都没了，只剩 id 了」）
+      //
+      // 官方该方法的形参个数**变过**：
+      //   * 0.1.5-rc.3 / 0.1.6-alpha.2：`(meta, inheritedEventCount, keys?)` —— 3 参
+      //   * **0.1.7-rc.1 起：`(meta, keys?)`** —— 中间参数被删，变 2 参
+      //
+      // 插件原先写死 `cachedSnapshot(header, 0, ['title'])`，在 0.1.7 上 `keys` 收到数字 `0`
+      // ⇒ 取不到任何单元 ⇒ **「冷缓存」档永远 miss** ⇒ 每次都退到有界折叠 ⇒
+      // 折叠要解压扫描会话全量日志（实测 1.7/9.3/37 MB）⇒ 超 8 s 预算 ⇒ 落 fallback = **会话 id**。
+      //
+      // 真机实测：连续 12 次 `/list` 全部 8000~9100 ms，3 条标题全是 id。
+      //
+      // ⚠️ 用 `try/catch` 兜不住：多传参数**不会抛错**，只会被忽略 ⇒ 必须显式按 `fn.length` 分派。
+      const cases = [
+        {
+          name: '0.1.7+（2 参）',
+          // 模拟官方 0.1.7+：keys 不是数组就取不到值
+          fn: function cachedSnapshot(meta, keys) { return Array.isArray(keys) ? { values: { title: 't-017' } } : undefined },
+          expect: 't-017',
+        },
+        {
+          name: '0.1.5/0.1.6（3 参）',
+          fn: function cachedSnapshot(meta, inheritedEventCount, keys) {
+            return typeof inheritedEventCount === 'number' && Array.isArray(keys) ? { values: { title: 't-015' } } : undefined
+          },
+          expect: 't-015',
+        },
+      ]
+      for (const c of cases) {
+        const readCalls = []
+        const ctx = {
+          sessions: { get: () => undefined },
+          sessionQuery: { readTitleSnapshots: async (ids) => { readCalls.push(ids.map(String)); return ids.map(id => fulfilled(String(id), 'folded')) } },
+          get: (n) => (n === 'sessionProjectionCache' ? { cachedSnapshot: c.fn } : undefined),
+          logger: { warn: () => {} },
+        }
+        const titles = await titlesFor(ctx, [titleHeader('a')], header => header.id)
+        assert.equal(titles.get('a'), c.expect, `${c.name}：应按形参个数传对参数，取到缓存标题`)
+        assert.deepEqual(readCalls, [], `${c.name}：命中缓存就不该进折叠批（进了就会慢到超时、退化成 id）`)
+      }
+    })
+
     it('单条 rejected（会话已被移走）应该 只退化为该条的 fallback', async () => {
       const ctx = titlesCtx({
         readTitleSnapshots: async (ids) => ids.map(id => String(id) === 'gone'

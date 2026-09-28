@@ -199,11 +199,39 @@ function cachedTitle(ctx: Context, header: SessionHeader, live: unknown): string
     return undefined
   }
   const cache = ctx.get('sessionProjectionCache') as unknown as {
-    cachedSnapshot?: (header: unknown, cut: unknown, units: readonly string[]) => { values: Record<string, unknown> } | undefined
+    cachedSnapshot?: (...args: unknown[]) => { values: Record<string, unknown> } | undefined
   } | undefined
   if (cache !== undefined && typeof cache.cachedSnapshot === 'function') {
     try {
-      const hit = read(cache.cachedSnapshot(header, 0, ['title'])?.values)
+      // ⚠️⚠️ **2026-09-27 修：签名在 0.1.7 变了，旧的三参调用会让这一档永远 miss。**
+      //
+      // 官方 `cachedSnapshot` 的形参个数跨版本变过：
+      //
+      // | 版本 | 签名 |
+      // | :--- | :--- |
+      // | `0.1.5-rc.3` / `0.1.6-alpha.2` | `(meta, inheritedEventCount, keys?)` |
+      // | **`0.1.7-rc.1` 起** | **`(meta, keys?)`** —— 中间那个参数**被删掉了** |
+      //
+      // 本插件原先按旧契约写 `cachedSnapshot(header, 0, ['title'])`，
+      // 在 0.1.7 上 `keys` 实际收到的是数字 `0` ⇒ `viewCheckpoint(rows, 0)` 取不到任何单元
+      // ⇒ **「冷缓存」这一档永远 miss**。
+      //
+      // 后果（真机实测，owner 报「归档会话名字也都没了，只剩 id 了」）：
+      // 全部 miss ⇒ 每次都退到第三档「有界折叠」⇒ 折叠要解压并扫描这几个会话的**全量日志**
+      // （实测 1.7 MB / 9.3 MB / **37 MB** 压缩态）⇒ 超过 `TITLE_FOLD_BUDGET_MS`(8 s) ⇒
+      // 整批按失败处理 ⇒ 落 fallback = **会话 id**。
+      // 实测：连续 12 次 `/list` 全部 8000~9100 ms 返回、3 条标题全是 id，
+      // 且 `/list`（8.3 s）远慢于 `/trash`（1.3 s）—— 差别就在标题折叠。
+      //
+      // 修法：**按形参个数自适应**（`fn.length`），而不是写死某版本的参数表 ——
+      // 这样 0.1.5/0.1.6（3 参）与 0.1.7+（2 参）都能正确调用。
+      // 用 `fn.length` 而不是 try/catch 回退：多传参数**不会抛错**（只是被忽略），
+      // 所以 catch 兜不住这个错，必须显式判断。
+      const fn = cache.cachedSnapshot as (...args: unknown[]) => { values: Record<string, unknown> } | undefined
+      const snap = fn.length >= 3
+        ? fn.call(cache, header, 0, ['title'])
+        : fn.call(cache, header, ['title'])
+      const hit = read(snap?.values)
       if (hit !== undefined) return hit
     } catch (error) {
       ctx.logger.warn(`dsh-archive-manage: 标题投影缓存读取失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
