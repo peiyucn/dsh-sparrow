@@ -814,6 +814,46 @@ ${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)}::
   background-image: ${surfaceLayers()} !important;
   pointer-events: none;
 }`).join('\n')}
+/* --- ⚠️⚠️ 让锚点自己**形成层叠上下文**（2026-09-27，owner 报「归档页 / 云端文件页
+   全都没适配纹理和打光」的**根因**）---
+
+   ## 现象与根因（实测，不是推断）
+
+   归档页 / 云端文件页这两个**我们自家插件的页面**上，"::after" 明明有 4 层
+   （radial 3 + 颗粒），但**实测颗粒贡献 = 0.000**（把颗粒关掉，面板区域像素**一个都不变**）。
+
+   根因是一条 CSS 规则的边界条件：
+
+   > "z-index: -1" 的伪元素只画在**它所属的层叠上下文内部**。若父元素**自己不成层叠上下文**，
+   > 这个负 z 层就会**逃逸到上一层**去排队 —— 于是它被父元素**自己的不透明背景**盖住。
+
+   实测判据（布尔式：把 "::after" 设成纯绿，数对话框内的绿点）：
+
+   | 表面 | 元素自身 | "::after" 设纯绿后对话框内绿点 |
+   | :--- | :--- | ---: |
+   | 云文件页 dialog | "z-index: auto"、"isolation: auto" | **0 / 40000**（完全不可见） |
+   | 同上 **+ "isolation: isolate"** | 成上下文 | **38392 / 40000** ✅ |
+   | codebuddy 弹层（对照，已适配） | "z-index: 20" ⇒ 已有上下文 | **6085 / 6336** ✅ |
+
+   ⇒ **「能否看见纹理」取决于该元素是不是自己形成层叠上下文** ——
+   而这件事**各插件写法不同**：官方与其系组件常带 "z-index" / "backdrop-filter"（自然成上下文），
+   我们自家插件的 dialog 是 "position: relative" + "z-index: auto" ⇒ **不成上下文** ⇒ 纹理全被盖住。
+
+   这就是 owner 那句「codebuddy 插件的弹层就适配了，区别在哪」的答案。
+
+   ## 修法："isolation: isolate"（最轻的手段）
+
+   它**只**创建层叠上下文，不改定位、不改尺寸、不产生包含块
+   ⇒ 对已经成上下文的元素是**无操作**，对不成上下文的元素是**恰好补齐**。
+   （对比："z-index" 需要 "position" 配合且可能干扰官方层序；"transform" / "filter" 会改变
+   "fixed" 后代的包含块 —— 本仓库在顶栏那条踩过这个坑。故一律用 "isolation"。）
+
+   ⚠️ 只能加在**我们自己出图层**的那些锚点上（下方按 usesAfterLayer 生成）；
+   对官方自己不需要它的元素不加，避免无谓的层叠上下文。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)} {
+  isolation: isolate;
+}`).join('\n')}
 /* --- QueueDock：官方占用了它自己的 ::after（0.5px 描边），故补官方自己的 ::before ---
    只补 background-image 一个属性，官方那个伪元素的 content 与几何原样不动 ⇒
    既拿到质感也不碰描边（实测 std 0.229 → 2.162，描边三边全在）。
@@ -1010,6 +1050,11 @@ ${COMPOSER_CARD_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anch
   border-radius: inherit;
   background-image: ${surfaceLayers()} !important;
   pointer-events: none;
+}`).join('\n')}
+/* 同 SURFACE_ANCHORS：让这几张卡也**自己成层叠上下文**，否则 :after 的 z-index:-1
+   会逃逸到父层、被卡片自己的背景盖住（归档/云文件页那个坑的同一机制）。 */
+${COMPOSER_CARD_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)} {
+  isolation: isolate;
 }`).join('\n')}
 /* --- 为什么**不**改这三张卡的几何（owner：「官方处理方式不一样？」—— 是的，确实不一样）---
    owner 连问两次：「官方默认样式为啥有缝了？是咱们改的么？」「还是说，信息队列，todo，

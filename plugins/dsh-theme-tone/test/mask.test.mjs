@@ -71,4 +71,25 @@ describe('mask：弹窗遮罩模糊', () => {
     )
     assert.ok(!/dsh-theme-tone/u.test(clean), '遮罩选择器不应涉及插件自有类名')
   })
+
+  it('⛔ 必须覆盖**两种**遮罩写法（官方哈希类名 + 自家 role=presentation）', () => {
+    // ## 为什么（2026-09-27，owner：「归档页，云端文件页弹出后背景虚化也没有」）
+    //
+    // 第一版只写了 `[class*='_mask']` —— 那只命中**官方**的哈希遮罩类名。
+    // 而本仓库自家的 dsh-archive-manage / dsh-file-manage 用的是
+    // `<div role="presentation" style="backdropFilter: var(--dsw-mask-blur)">`，
+    // 类名是 `dsh-*-confirm-overlay`，**不含 `_mask`** ⇒ 完全没被覆盖
+    // ⇒ 那两个页面**没有虚化**（实测 `backdrop-filter: none`）。
+    //
+    // 两条都必须有，且 role 那条**要限定「自己声明了该变量」这个用法特征** ——
+    // `role="presentation"` 本身很泛（面板容器也常用），无条件命中会给无关元素建上下文。
+    assert.ok(MASK_SELECTOR.includes("_mask"), '要覆盖官方哈希遮罩类名')
+    assert.ok(
+      /\[role='presentation'\]/u.test(MASK_SELECTOR) && /--dsw-mask-blur/u.test(MASK_SELECTOR),
+      '要覆盖自家插件的 role="presentation" 遮罩，且必须限定 style 含 --dsw-mask-blur',
+    )
+    // 产物里两条都要出现
+    assert.ok(clean.includes("_mask"), '产物缺官方遮罩那条')
+    assert.match(clean, /\[role='presentation'\]/u, '产物缺自家遮罩那条')
+  })
 })

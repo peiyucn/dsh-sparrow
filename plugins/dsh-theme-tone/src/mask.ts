@@ -71,12 +71,26 @@
 export const MASK_BLUR_RESTORED = 'blur(2px)'
 
 /**
- * 遮罩元素的选择器 —— 按**稳定类名后缀**匹配（哈希类名规矩见模块头注释）。
+ * 遮罩元素的选择器 —— 覆盖**两种**遮罩写法（2026-09-27 补齐第二种）。
  *
- * 收窄成 `[class*='_mask']` 而不是 `[aria-hidden='true']`：后者会命中本插件自己的
- * 背景层（`.dsh-theme-tone` 也带 `aria-hidden="true"`，实测），属误伤。
+ * ## 为什么是两组（owner 报「归档页 / 云端文件页弹出后背景虚化也没有」）
+ *
+ * 官方与自家插件用了**两种不同的遮罩标记**，第一版只覆盖了第一种：
+ *
+ * | 写法 | 谁在用 | 旧选择器是否命中 |
+ * | :--- | :--- | :--- |
+ * | 哈希类名 `xxx_mask` | 官方 `Modal` / `SettingsRoot` / `ImageLightbox` | ✅ |
+ * | **`role="presentation"` 且内联 `backdrop-filter`** | **本仓库 `dsh-archive-manage` / `dsh-file-manage`** | ❌ **漏掉** |
+ *
+ * 自家插件的遮罩是 `<div role="presentation" style="backdropFilter: var(--dsw-mask-blur)">`
+ * （见 `ArchiveDock.tsx` / `FileManageDock.tsx`）—— 类名是 `dsh-*-confirm-overlay`，
+ * **不含 `_mask`**，所以第一版完全没管到它们 ⇒ owner 看到的「没有虚化」。
+ *
+ * ⚠️ 两条都限定「自己声明了 `backdrop-filter: var(--dsw-mask-blur)`」这个**用法特征**
+ * 才安全：`role="presentation"` 本身很泛（面板容器也常用），
+ * 无条件命中会给无关元素建层叠上下文。
  */
-export const MASK_SELECTOR = "[class*='_mask']"
+export const MASK_SELECTOR = "[class*='_mask'], [role='presentation'][style*='--dsw-mask-blur']"
 
 /**
  * 弹窗遮罩模糊的样式表文本。

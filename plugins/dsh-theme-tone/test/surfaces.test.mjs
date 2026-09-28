@@ -27,7 +27,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
-import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, usesOfficialBeforeLayer } from '../lib/surface.js'
+import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, usesAfterLayer, usesOfficialBeforeLayer } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -1672,6 +1672,40 @@ describe('抬升面：表面绘制', () => {
 
   it('锚点必须带 body 前缀 —— 官方写的是 background 简写，裸属性选择器会被反压', () => {    for (const anchor of SURFACE_ANCHORS) {
       assert.match(anchor, /^body /u, `${anchor} 要有 body 前缀抬特异度`)
+    }
+  })
+
+  it('⛔ 出图层的锚点必须自己**形成层叠上下文**（否则 ::after 负 z 逃逸、纹理被自身背景盖住）', () => {
+    // ## 为什么（2026-09-27，owner：「归档页，云端文件页……全都没适配纹理和打光」）
+    //
+    // 根因：`z-index: -1` 的伪元素只画在**它所属的层叠上下文内部**。父元素若自己不成
+    // 层叠上下文，这个负 z 层就**逃逸到上一层**排队 ⇒ 被父元素**自己的不透明背景**盖住。
+    //
+    // 布尔判据（把 `::after` 设纯绿，数表面内的绿点）：
+    //   | 表面                    | 元素自身                        | 绿点            |
+    //   | 云文件页 dialog          | z-index:auto / isolation:auto   | **0 / 40000**   |
+    //   | 同上 + isolation:isolate | 成上下文                        | **38392/40000** |
+    //   | codebuddy 弹层（对照）    | z-index:20 ⇒ 已有上下文          | **6085 / 6336** |
+    //
+    // 各插件写法不同：官方系组件常带 z-index / backdrop-filter（自然成上下文），
+    // 而自家插件的 dialog 是 `position: relative` + `z-index: auto` ⇒ 不成上下文。
+    // owner 原话「codebuddy 插件的弹层就适配了，区别在哪？」—— 区别就在这里。
+    //
+    // `isolation: isolate` 只创建层叠上下文（不改定位 / 尺寸 / 包含块），
+    // 对已成上下文的元素是无操作 ⇒ 给所有出图层的锚点加都安全。
+    for (const anchor of [...SURFACE_ANCHORS, ...COMPOSER_CARD_ANCHORS]) {
+      if (!usesAfterLayer(anchor)) continue // 官方 ::before 那条不需要（官方自带盒子）
+      const gated = anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
+      // ⚠️ **必须先剥注释**：本用例的说明里就写着 "isolation: isolate" 这个字面量，
+      // 若拿未剥注释的产物去切块，块注释会被当成规则体命中 ⇒ 断言假过（本仓库反复踩）。
+      const noComment = css.replace(/\/\*[\s\S]*?\*\//gu, '')
+      const block = blockFor(noComment, gated)
+      assert.ok(block !== '', `${anchor} 应有一条「自身」规则`)
+      assert.match(
+        block,
+        /isolation\s*:\s*isolate/u,
+        `${anchor} 必须 isolation:isolate —— 否则 ::after 的 z-index:-1 逃逸、纹理被自身背景盖住`,
+      )
     }
   })
 
