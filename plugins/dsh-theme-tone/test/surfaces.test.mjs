@@ -27,7 +27,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
-import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, usesAfterLayer, usesOfficialBeforeLayer } from '../lib/surface.js'
+import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, STATIC_SURFACE_ANCHORS, usesAfterLayer, usesOfficialBeforeLayer } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -1031,6 +1031,27 @@ function blockFor(source, selector) {
 }
 
 /**
+ * 取某选择器的**全部**规则体（`blockFor` 只返回最后一条）。
+ *
+ * ⚠️ 为什么需要：同一选择器可能有多条规则 —— 例如每个出图层的锚点现在有**两条**
+ * （一条 `isolation: isolate`、一条 `position: relative`）。
+ * 用 `blockFor` 只会拿到最后那条 ⇒ 断言会漏判前一条（本仓库刚踩到）。
+ * @param source - 产物 CSS（内部会再剥一次注释）。
+ * @param selector - 精确匹配的选择器（含官方默认门的形态）。
+ * @returns 匹配到的全部规则体；无匹配则为空数组。
+ */
+function blocksFor(source, selector) {
+  const clean = source.replace(/\/\*[\s\S]*?\*\//gu, '')
+  const out = []
+  for (const chunk of clean.split('}')) {
+    const open = chunk.indexOf('{')
+    if (open < 0) continue
+    if (chunk.slice(0, open).trim() === selector.trim()) out.push(chunk.slice(open + 1))
+  }
+  return out
+}
+
+/**
  * 取规则体里某个声明的值（已经去掉 `!important`）。
  * @param block - {@link blockFor} 的返回值。
  * @param prop - 属性名。
@@ -1706,13 +1727,56 @@ describe('抬升面：表面绘制', () => {
       // ⚠️ **必须先剥注释**：本用例的说明里就写着 "isolation: isolate" 这个字面量，
       // 若拿未剥注释的产物去切块，块注释会被当成规则体命中 ⇒ 断言假过（本仓库反复踩）。
       const noComment = css.replace(/\/\*[\s\S]*?\*\//gu, '')
-      const block = blockFor(noComment, gated)
-      assert.ok(block !== '', `${anchor} 应有一条「自身」规则`)
-      assert.match(
-        block,
-        /isolation\s*:\s*isolate/u,
+      // ⚠️ 必须取该选择器的**全部**规则体：同一选择器现在有**两条**规则
+      // （一条 isolation、一条 position），`blockFor` 只返回最后一条 ⇒ 会漏判。
+      const blocks = blocksFor(noComment, gated)
+      assert.ok(blocks.length > 0, `${anchor} 应有一条「自身」规则`)
+      assert.ok(
+        blocks.some(b => /isolation\s*:\s*isolate/u.test(b)),
         `${anchor} 必须 isolation:isolate —— 否则 ::after 的 z-index:-1 逃逸、纹理被自身背景盖住`,
       )
+    }
+  })
+
+  it('⛔ static 锚点必须有 position:relative（否则 ::after 的包含块跑到视口、纹理铺满全屏）', () => {
+    // ## 为什么（2026-09-27，owner 截图报问答卡「出 bug 了」）
+    //
+    // `::after { position: absolute; inset: 0 }` 需要一个**定位祖先**当包含块。
+    // 官方问答卡的 `.card` 是 `position: static`，且祖先链上也没有 positioned 元素
+    // ⇒ 包含块退到**视口** ⇒ 纹理铺满全屏（`overflow: hidden` 也裁不住，
+    //    因为裁剪只作用于包含块链上的后代盒）。
+    //
+    // 布尔判据（把 `::after` 设纯红，数卡内/卡外红点）：
+    //   | | 卡内 | 卡外 |
+    //   | 修复前 | **0** | **78013 / 78750**（糊满全屏） |
+    //   | 修复后 | **11240 / 11250** | **0 / 67500** |
+    //
+    // ⚠️ **绝不能给全表统一补** `position: relative`：本表多数锚点本就是
+    // `absolute` / `fixed`，盖一条 relative 会把绝对定位改成相对定位 ⇒ 弹层当场错位。
+    // 故只有 `STATIC_SURFACE_ANCHORS` 里**实测 static** 的那几条才补。
+    assert.deepEqual([...STATIC_SURFACE_ANCHORS], [
+      'body [data-question-key] > section',
+      'body [data-plan-review-key] > section',
+    ], 'static 锚点表变了 —— 请先实测新锚点的 computed position 再登记')
+    const noComment = css.replace(/\/\*[\s\S]*?\*\//gu, '')
+    for (const anchor of STATIC_SURFACE_ANCHORS) {
+      const gated = anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
+      const blocks = blocksFor(noComment, gated)
+      assert.ok(
+        blocks.some(b => /position\s*:\s*relative/u.test(b)),
+        `${anchor} 必须 position:relative —— 否则 ::after 的包含块退到视口、纹理铺满全屏`,
+      )
+    }
+    // 反向：**其它**锚点不得被盖上 position（会破坏绝对定位的弹层）
+    for (const anchor of [...SURFACE_ANCHORS, ...COMPOSER_CARD_ANCHORS]) {
+      if (STATIC_SURFACE_ANCHORS.includes(anchor)) continue
+      const gated = anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
+      for (const b of blocksFor(noComment, gated)) {
+        assert.ok(
+          !/position\s*:\s*relative/u.test(b),
+          `${anchor} 不该被强制 relative —— 它可能是 absolute / fixed，改了会错位`,
+        )
+      }
     }
   })
 

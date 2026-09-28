@@ -271,6 +271,35 @@ export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
 ])
 
 /**
+ * **实测为 `position: static` 的锚点** —— 只有这些才需要补 `position: relative`。
+ *
+ * ## 为什么必须单列一张表（差点写出灾难性回归）
+ *
+ * `::after { position: absolute; inset: 0 }` 需要一个**定位祖先**当包含块。
+ * 若锚点元素是 `static` 且祖先链上也没有 positioned 元素，包含块会退到**视口**
+ * ⇒ 纹理铺满全屏（问答卡实测：卡内红点 0、卡外 **78013/78750**）。
+ *
+ * **但绝不能给全表统一补 `position: relative`**：本表里多数锚点本来就是
+ * `absolute` / `fixed`（菜单、气泡、弹层），盖一条 `relative` 会把绝对定位改成相对定位
+ * ⇒ 弹层当场错位。故只列**实测确认 static** 的：
+ *
+ * | 锚点 | 官方来源 | 实测 |
+ * | :--- | :--- | :--- |
+ * | `[data-question-key] > section` | `QuestionComposer.module.css` 的 `.card` | **static**（实测） |
+ * | `[data-plan-review-key] > section` | `PlanReviewPanel.module.css` 的 `.card` | **static**（同族同形） |
+ *
+ * 其余锚点**未列入**（不改它们的 `position`）—— 它们要么本就 positioned，
+ * 要么其 `::after` 已实测正常（如归档/云文件的 dialog 自带 `relative`）。
+ *
+ * ⚠️ 新增锚点时：先**实测**它的 computed `position`，确为 `static` 再登记到这里；
+ * 不要凭"看起来像静态"就加 —— 这一条写错的代价是弹层错位。
+ */
+export const STATIC_SURFACE_ANCHORS: readonly string[] = Object.freeze([
+  'body [data-question-key] > section',
+  'body [data-plan-review-key] > section',
+])
+
+/**
  * 带**粘性分组标题**的菜单（官方 `ModelSelect` / `dsh-codebuddy-credits` 的模型选择器）。
  *
  * owner 前后两条反馈把它夹成了一个精确解：
@@ -894,6 +923,50 @@ ${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)}::
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 ${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)} {
   isolation: isolate;
+}`).join('\n')}
+/* --- ⚠️⚠️ 让锚点成为 "::after" 的**包含块**（2026-09-27，问答卡上踩到）---
+
+   ## 现象
+
+   给问答卡加上锚点后，owner 截图报「出 bug 了」。实测判据（把 "::after" 设成纯红，
+   数卡内/卡外的红点）：
+
+   | 位置 | 红点 |
+   | :--- | ---: |
+   | 卡**内** | **0** |
+   | 卡**外** | **78013 / 78750**（几乎全屏） |
+
+   ⇒ 纹理**整层糊到了卡片之外的全屏**上，而不是画在卡里。
+
+   ## 根因
+
+   我们的 "+::after" 是 "position: absolute; inset: 0" —— 它需要一个**定位祖先**当包含块。
+   而官方 ".card" 是 **"position: static"**，且它的**整条祖先链上没有任何 positioned 元素**
+   ⇒ 包含块一路退到**视口** ⇒ "::after" 铺满全屏。
+   此时卡片的 "overflow: hidden" **裁不住它** —— 裁剪只作用于包含块链上的后代盒，
+   而"包含块跑到视口"意味着这层已经不在卡片的裁剪范围内。
+
+   ## 修法："position: relative"
+
+   只补定位、**不改任何几何**（"relative" + 无偏移 = 不移动、不改尺寸、不改变 flex/grid 摆放），
+   与右栏那条（glass.ts 的 [data-sidebar-right-panel] 也是 static，同样补了 relative）
+   同一套做法。**不是**本仓库否定过的 "z-index"（那会引入层序副作用）。
+
+   ⚠️ 这条与上面的 "isolation: isolate" 是**两件不同的事**，都必须有：
+   * "isolation" 管**层叠上下文**（决定 "z-index:-1" 会不会逃逸到父层被自身背景盖住）；
+   * "position: relative" 管**包含块**（决定 "inset: 0" 相对于谁解析、会不会铺满视口）。
+   归档/云文件页的 dialog 自带 "position: relative"（自家组件写了），所以只缺 isolation；
+   问答卡的 ".card" 两样都缺（static + 无上下文）⇒ 两条都要补。
+
+   ## ⚠️⚠️ 但**绝不能给全表加 "position: relative"**（差点写错，记录在此）
+
+   本表里多数锚点**本来就是** "position: absolute" / "fixed"（菜单、气泡、弹层…）。
+   给它们盖一条 "position: relative" 会**把绝对定位改成相对定位** ⇒ 弹层当场错位，
+   属灾难性回归。故只给**实测确认为 "static"** 的锚点补，见
+   {@link STATIC_SURFACE_ANCHORS}。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+${STATIC_SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)} {
+  position: relative;
 }`).join('\n')}
 /* --- QueueDock：官方占用了它自己的 ::after（0.5px 描边），故补官方自己的 ::before ---
    只补 background-image 一个属性，官方那个伪元素的 content 与几何原样不动 ⇒
