@@ -29,9 +29,16 @@ test('UA 含 CLI/ 记号（否则 /v3/config 静默不返回模型列表）', ()
 })
 
 test('UA 含 CodeBuddy/<版本> 段（否则 /v3/config 返回 400 check ua）', () => {
-  assert.match(
-    REQUEST_USER_AGENT,
-    new RegExp(`CodeBuddy/${CODEBUDDY_CLI_VERSION.replace(/\./g, '\\.')}`),
+  // ⚠️ 用 `includes` 而不是 `new RegExp`（2026-09-28，CodeQL `js/incomplete-sanitization` 告警）：
+  // 原先写成 `new RegExp(\`CodeBuddy/${VER.replace(/\./g, '\\.')}\`)` —— 那个手写的转义
+  // **只处理了点号**，漏了 `\` 等其它正则元字符，CodeQL 因此报「不完整的字符串转义」。
+  //
+  // 这里的**意图本来就是「子串包含」**，不是模式匹配 ⇒ 用 `includes` 更准确也更严格：
+  //   * 无正则元字符问题（那句 `replace` 整条删掉，告警类彻底消失）；
+  //   * `2.137.1` 里的 `.` 在正则里是「任意字符」，`includes` 则要求**逐字相等** —— 更严。
+  // ⚠️ 若将来真要按模式匹配，用现成的转义工具，**不要手写 `.replace`**。
+  assert.ok(
+    REQUEST_USER_AGENT.includes(`CodeBuddy/${CODEBUDDY_CLI_VERSION}`),
     `UA 必须含可解析的 CodeBuddy/<版本> 段（当前：${REQUEST_USER_AGENT}）`,
   )
 })
