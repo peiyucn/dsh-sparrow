@@ -1,61 +1,63 @@
 # DSH 插件私有 seam 特例
 
-> 各插件依赖的私有 seam / 官方 DOM 锚点明细。**从 AGENTS.md 移出**——AGENTS 只放规则，明细放这里。
+> 本文件**只登记"欠官方的债"**——需要 owner 认可的例外。三类：
+> **A 私有 seam**（官方无公开能力）、**B 刻意改官方默认外观**、**C 无门可拦的静默失效风险**。
+>
+> **公开 seam 的正常使用不进本文件**：公开服务 / 公开槽位 / 公开事件 / 公开 DOM 标记 / 公开导出
+> 一律视为正路，用了就用了，不写。**收缩原则**：条目应随官方补齐公开能力而**减少**——
+> 官方一旦提供公开替代，就地删除条目、换用公开路径。新增条目须 owner 认可。
+>
+> **官方公开锚点也不在此手工维护**：权威来源是各插件 `src/` 里的选择器字面量，跟版审计时现取
+> （方法与口径见 [`docs/upstream/0.2.0-rc.1.md`](upstream/0.2.0-rc.1.md) §4.1）。
+> 理由：手工清单已证会漂——0.2.0-rc.1 审计时发现它漏列了三处一直在用的锚点。
+>
+> 最近一次核对：dsh `0.2.0-rc.1`（2026-09-29），本文件点名的例外逐条验存续，**零回归**。
 
+---
 
-> dsh 迭代快，特例不写死细节：开发时以临场查证官方源码为准；新增/变更特例须 owner 认可，实现细节以代码注释与各插件 docs/spec 为准。
+## A. 私有 seam（官方无公开能力，启动能力检查缺失即 fail-fast）
 
-* `dsh-chat-fim`：候选菜单挂 `conversation.input.dock`（只读草稿快照，写入走官方 `slash/input-insert-text` 事件）+ `conversation.input.overlay`（官方菜单视觉 token）；与官方触发菜单互斥（只读检测 `[data-trigger-menu]`）；host 取主路由走官方公开 API `session.requestHeader()`（增量折叠、无 TTL；2026-09-10 起不再直读 `snapshotEvents()`）
-* `dsh-vision-bridge`（已退役，2026-09-10；以下记录仅作历史）：可逆包装 `ctx.llm.resolveModelInfo` 抹除文本路由的 image 门禁；`agent/request` 拦截按主模型能力屏蔽 `vision_read` 工具；图片字节只经官方 `ctx.attachments.readImage`；直读 `snapshotEvents()`；状态图标与模型座位共享官方 `ctx.modelDirectories` 目录 store，能力判定走无会话依赖的 `/api/vision-bridge/capability` 路由
-* `dsh-archive-manage`：允许移动/删除会话日志目录（仅 jsonl 单会话目录，其余 `BACKEND_UNSUPPORTED`；trash/delete 以父为单位覆盖**整棵子会话树**——全部后代任意深度，见 spec 12）；归档集变更走官方 WorkspaceRegistry 私有写通道（`enqueueOperation`/`requireState`/`setState`，启动能力检查缺方法即 fail-fast）；`sessionPersistence.list()` 双形状兼容（master 返回快照、旧版返回裸 header）；`sessionPersistence.locate` 为后端私有方法（alpha.5 发布后从公开契约降级，启动能力检查缺方法即 fail-fast）；live 会话拒绝处理；回收站目录写 sidecar 记账
-* `dsh-file-manage`：直接 import 官方导出 `DeepSeekFilesClient`；只读官方 `llm-deepseek` 设置节取 `baseURL`/`apiKeyEnv`
-* `dsh-nav-pin`：只读依赖官方 DOM 标记与 aria-label 文案；CSS 特异性压制官方窄屏隐藏规则；宽度轴经官方公开 data 属性钳制；悬停时补写官方**自己声明**的光带变量 `--dsh-width-handle-pointer-y`（官方只在拖拽中写它，故悬停时那条光带位置不对，见 `plugins/dsh-nav-pin/src/handle-glow.ts`）——**不是私有 seam**：不替换 / 不包装 / 不覆写官方任何函数、不读官方内部状态，只是把官方**自己公开消费**的属性补上它漏掉的取值；官方改名即静默失效（fail-safe）
-* `dsh-codebuddy-credits`：无私有 seam——协议层自建（`CodeBuddyAdapter extends LlmAdapter`，不依赖 pi-ai）：请求构造、SSE 解析、usage.credit 提取、企业策略错误透传全部显式实现；客户端身份标识（user-agent/x-product/x-ide-name/企业上下文头）直接进请求头；`conversation.input.model` 槽位以 priority -1 遮蔽官方 ModelSelect（官方注册表语义：同 cell 最低 priority 渲染，非 monkey-patch）——vendored 选择器（MIT 署名，源码 ui-model-selection）只为积分系数右对齐列，启动能力检查缺 `modelDirectories`/`sessions` 服务即保留官方选择器；只读依赖官方 DOM 标记 `[data-composer-card]`（Toast 锚定）；捕获阶段点击拦截官方行头「编辑」按钮（按钮保留官方原位与样式，`stopPropagation` 阻断官方编辑器打开，行为改为展开本插件自建编辑器——官方编辑器对本命名空间只渲染占位提示）；首装 setup 占位编辑器以 CSS 隐藏（`:has(.ccb-card-root)` 锚点 + DOM 结构定位——官方类名是纯哈希、片段匹配无效）；凭据引用对齐官方派生名 `CODEBUDDY_CREDITS_API_KEY`（deriveKeyRef 口径，旧引用 `CODEBUDDY_API_KEY` 兼容迁移），使官方行头凭据圆点原生生效；每轮积分胶囊挂官方 `conversation.chat.assistant-actions` 槽位（公开 seam），DOM 级移动到该行动作行末尾时间之前（只移动本插件自有节点，不包装/替换官方组件）；轮次关联按会话事件自带的 `turn`/`step` 字段（积分改由事件重放后不再依赖请求期 signal 关联）；会话积分胶囊挂官方 `conversation.composer.dock` 槽位，DOM 级把自有 React 节点（portal）追加进官方统计胶囊行末尾（只 append 自有节点，不包装/替换官方节点；官方行以 `[data-composer-stats]` 标记寻址，每步重渲染丢节点后按同 nodes 信号重解析重挂）——形状照官方 `.pill`（官方 0.1.5-rc.2 起该行是图标胶囊排，旧的「纯文字 + | 分隔符追加到官方 StatsLine」已随官方改版弃用），点击展开官方 stat-dialog 同皮明细，定位/外点关闭/Esc 走公开 primitive `useAnchoredPosition`/`useDismissOnOutsidePointer`；额度卡挂官方 `conversation.session.header.utilities` 槽位（公开 seam，owner 无专属字段），order -10 渲染在官方 session log 下载按钮左边（原侧栏位置会遮挡官方连接状态提示，故迁至头部；面板仍走 portal + fixed 定位）；blank 会话 hero 态官方 header 整体隐藏（hideChrome，utilities 不渲染），额度入口另挂官方 `conversation.input.dock` 槽位（公开 seam，hero/active 两态都渲染）的 hero 锚点——只读官方根元素 `data-phase` 公开 DOM 标记，相位为 hero 时 portal 到会话根右上角（absolute 对齐 header 行几何），active 相位返回 null 让位 header 常驻入口（公开槽位 + 公开标记，非私有 seam）
-* `dsh-theme-tone`：**无私有 seam** —— 颜色经公开 `ctx.theme.overrideTokens` 落地，设置行走
-  **`ctx.configForms`**（官方 0.1.7-alpha.1 起由 `settingsScope` 改名；本插件已随迁 ——
-  `plugins/*/src/` 与构建产物 `lib/` 里 `settingsScope` **零命中**，仅剩
-  `plugins/dsh-theme-tone/test/compat.test.mjs` 把它当**测试夹具字符串**用；
-  历史记述见 `docs/upstream/0.1.7-alpha.2.md` 与 `0.1.7-rc.1.md`）+
-  `settings.general.item` 槽位，双语文案走 `ctx.locale.register`。
-  设置面服务走 `ctx.inject([...], cb)` 的可选依赖 fork（服务缺失时什么都不做，不进 client boot 审计）。
-  只读依赖官方**公开语义标记**给自有元素定位着色/做玻璃（下表逐个核过 `src/` 里**非注释**的
-  选择器字面量，2026-09-27）：`data-phase` / `data-slot` / `data-conversation-scroll` /
-  `data-composer-seat` / `data-composer-card` / `data-sidebar-right-panel` / `data-shell-overlay` /
-  `data-dockkit-tab-menu` / `data-dockkit-pane` / `data-dockkit-empty` / `data-width-handle` /
-  `data-side` / `data-state` / `data-variant` / `data-tool` / `data-queue-dock` /
-  `data-goal-bar` / `data-testid='todo-panel'` / `data-trigger-menu` / `data-expanded` /
-  `data-open` / `data-disclosure-row` / `data-ds-dark-theme` /
-  `role=menu|dialog|listbox|tooltip|group|tree|button`。
-  **不碰官方 DOM 结构、不包装/覆写官方函数、不依赖 hashed CSS-module 类名** —— 例外是**三处**
-  按**稳定类名后缀**匹配的规则（见下），三处都无测试能发现官方重命名后缀，属**同一类静默失效风险**：
-  1. **悬停卡字色**（`HOVER_CARD_TEXT_TOKENS`，`src/constants.ts`）：`[class*='_hoverTitle']` /
-     `_hoverPath` / `_hoverTime` / `_hoverStatus` —— 官方把字色写成了组件内字面量，只能按后缀取。
-  2. **扫光带**（`SWEEP_ANCHORS`，`src/sweep.ts`）：`... [class*='_row']::after` 两条 ——
-     官方把扫光画在 `.row::after` 上。**已收窄**：必须同时带 `data-variant` / `data-tool` 才会命中
-     （裸 `[data-state='running'] [class*='_row']` 会误伤一堆无关伪元素，`test/sweep.test.mjs` 钉住不得回退）。
-  3. **弹窗遮罩模糊**（`src/mask.ts`）：`[class*='_mask']` —— 官方 rc.2 把 `--dsw-mask-blur`
-     改成 `none`（有意为之），owner 要求恢复成 0.1.5 的 `blur(2px)`，而官方那 3 个遮罩
-     只在哈希类名上可辨（`Modal` / `SettingsRoot` / `ImageLightbox` 的 `.mask`）。
-     已由 `test/mask.test.mjs` 逐条钉住产物（含「不得加官方默认门」「不得改 body 全局变量」）。
+* **`dsh-archive-manage`**
+  * **`sessionPersistence.locate`** —— 后端私有方法（alpha.5 后从公开契约降级），是拿到会话**产物目录**的
+    唯一途径：公开契约 `SessionPersistence` 只有 `create` / `open` / `flush` / `stat` / `list`，
+    而 `stat` / `list` 返回的 `SessionPersistenceSnapshot` 只含 `header` / `revision` / `eventCount` /
+    `sizeBytes`，**不含路径**；`SessionLocation`（`kind` + `path`）只出现在 `errors.ts`。
+  * **WorkspaceRegistry 私有写通道**（`enqueueOperation` / `requireState` / `setState`）——
+    归档集没有公开写入口。
 
-  锚点明细以各插件 `docs/spec` 与代码常量表为准（本文件不复制一份，避免二次漂移）。
+## B. 刻意改官方默认外观的例外（**均不带官方默认门**，两个档位都生效）
 
-  ### 刻意改官方默认外观的例外（**两处**）
+> 判据：「恢复官方本该有的行为」（修 bug、复原）⇒ 不带门；「改变官方有意的设计选择」（断点、留白）⇒ 带门。
+>
+> ⚠️ 不带门的规则另有一条硬约束：**不得依赖插件 token 层就绪**——token 层在 `status: loading` 窗口内
+> 不具备，`var()` 解析为空，比不生效更糟（悬停卡栽过一次，卡片变全透明）。
 
-  > 仓库硬规矩是「官方默认的都不要动，给个完全不动的参考」。下列两处经 owner 明确要求破例，
-  > 它们的共同特征是：**官方自己把某个值写死了**，而那个值与主题无关、看起来像 bug。
+1. **悬停卡**（`HOVER_CARD_ANCHOR`）：官方把这张卡的面与字都写成组件内字面量（浅色轴下官方自己就是深卡）。
+   owner：「深卡不对吧」→ 跟随主题、两个档都修。
+2. **弹窗遮罩模糊**（`src/mask.ts`）：官方 0.1.7-rc.2 把 `--dsw-mask-blur` 改成 `none`（**有意为之**），
+   owner 要求恢复 0.1.5 观感。证据链见 [`0.1.7-rc.2-mask-blur.md`](upstream/0.1.7-rc.2-mask-blur.md)。
+3. **悬停光带跟随指针**（`dsh-nav-pin` 的 `handle-glow.ts`，**已定、待合并实施**）：官方
+   `--dsh-width-handle-pointer-y` 只在**拖拽中**被写，纯悬停走 CSS 兜底 `50%`，而那个 `50%` 是相对
+   `.body` 盒（官方顶栏在流内占 76px）算的 ⇒ 光带比视口中心低 38px。官方**无意的 bug**，
+   owner 2026-09-29 定案「官方的也一起修复」。
 
-  1. **悬停卡**（`HOVER_CARD_ANCHOR`，`src/constants.ts`）：官方把这张卡的面（恒深灰字面量）
-     与字（`#FFFFFF` 等，注释写明 `dark surface, fixed colors both themes`）都写死了，
-     浅色轴下官方自己就是一张深卡。owner：「深卡不对吧」→ 跟随主题、两个档都修。
-  2. **弹窗遮罩模糊**（`src/mask.ts`，2026-09-27 新增）：官方 0.1.7-rc.2 把 `--dsw-mask-blur`
-     从 `blur(2px)` 改成 `none`（提交 `fdd14a0989`，连注释都改写、并有 e2e 断言钉住），
-     **是官方有意调整**；owner 明确要求恢复 0.1.5 观感 ⇒ 两个档都恢复。
-     证据链见 `docs/upstream/0.1.7-rc.2-mask-blur.md`。
+⚠️ 新增破例时**必须同步更新本节计数**（曾经写着「唯一一处」，加到第二处后即失真）。
+第 3 处随 `dsh-nav-pin` 并入 `dsh-theme-tone` 落地；实施时本节改为「三处」，
+并顺手修 `src/surface.ts:1223` 那句已过期的「全插件**唯一**不带官方默认门的一条」（实为两条）。
 
-  ⚠️ 新增此类破例时，**必须同步更新本节计数**（曾经写着「唯一一处」，加了第二处后即失真）。
+## C. 静默失效风险（官方改名 / 改行为即失效，没有任何门能拦）
 
-  > ⚠️ **本节 2026-09-27 更正过三处**（原文把这些都列成「只读依赖的官方标记」，实际不成立）：
-  > `data-sidebar-right-float-host` —— 官方 0.1.7 起**已删除**该锚点，代码里只剩「它没了」的注释，
-  > 不是依赖；`data-sample` / `data-platform` —— 只出现在注释（描述官方实现 / 官方 macOS 分支），
-  > **不是本插件的选择器**。三者已从上表移除。
+* **`dsh-theme-tone`** —— 仓库规矩是「不依赖 hashed CSS-module 类名」，以下三处**例外**，
+  且测试**抓不到官方重命名后缀**：
+  1. **悬停卡字色**（`HOVER_CARD_TEXT_TOKENS`，`src/constants.ts`）：`[class*='_hoverTitle'|'_hoverPath'|'_hoverTime'|'_hoverStatus']`
+  2. **扫光带**（`SWEEP_ANCHORS`，`src/sweep.ts`）：`[class*='_row']::after` —— **已收窄**：必须同时带
+     `data-variant` / `data-tool` 才命中（`test/sweep.test.mjs` 钉住不得回退）
+  3. **弹窗遮罩**（`MASK_SELECTOR`，`src/mask.ts`）：`[class*='_mask']`（官方三个遮罩 `Modal` /
+     `SettingsRoot` / `ImageLightbox` 只在哈希类名上可辨）
+* **`dsh-codebuddy-credits`** —— 捕获阶段拦截官方行头「编辑」按钮（`stopPropagation` 阻断官方编辑器打开，
+  改为展开本插件自建编辑器）：按钮保留官方原位与样式，但**官方改这个按钮即静默失效**。
+
+## D. 已退役（历史，不再维护）
+
+* **`dsh-vision-bridge`**（2026-09-10 退役）：曾可逆包装 `ctx.llm.resolveModelInfo` 抹除文本路由的
+  image 门禁，并直读 `snapshotEvents()`。代码原地保留，本节仅作历史。
