@@ -6,6 +6,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 - Version-line alignment with official dsh 0.2.0-rc.2.
 - The panel loading indicator now matches the official dsh loader (the old dot-matrix animation is gone).
+- The panel's loading state is just the spinner now — the "Loading…" label beside it is gone, matching how dsh itself shows `StateDot`.
 - Fixed archived session titles showing the session id instead of the name.
 - The Archive and Trash **section header rows no longer highlight on hover** (they are just fold toggles; a wash read as "this row is selectable").
 - The panel opens faster: the plugin no longer races DSH's own full scan at startup, and does that sweep when the panel is first opened instead.

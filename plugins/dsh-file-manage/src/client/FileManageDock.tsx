@@ -280,9 +280,8 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
             ) : null}
             <div ref={bodyRef} style={{ ...styles.body, padding: summary !== null ? '0 24px 24px' : '12px 24px 24px' }} className="dsh-file-manage-body">
               {initialLoading ? (
-                <div className="dsh-file-manage-loading" role="status">
+                <div className="dsh-file-manage-loading" role="status" aria-label={t('loading')}>
                   <StateDot state="ongoing" />
-                  <span>{t('loading')}</span>
                 </div>
               ) : (
                 <>

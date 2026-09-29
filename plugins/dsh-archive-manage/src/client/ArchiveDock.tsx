@@ -420,16 +420,17 @@ export function ensureArchiveStyles(): void {
 /* 整页 loading：四个初始请求（归档/游离/回收站/回收站目录）都落定前占满内容区，
    避免「打开后加载闪动」（2026-09-01）。
    ⚠️ 转动动画 / 配色 / 减动效兜底**全部来自官方 StateDot**（见本文件顶部那段注释），
-   这里不再有任何 keyframes 或点阵几何；间距取官方 inline 档的 8px。 */
+   这里没有任何 keyframes 或点阵几何。
+   ⚠️ 2026-09-30 改判：**只留转圈，不给可见文案**。官方 8 处 StateDot(state=ongoing) 基本都是
+   光秃秃一个转圈（替换图标那种用法），唯一带可见文字的「文档读取」loader 写的是具体动作而不是
+   通用的 loading。文案改挂在 role="status" 的 aria-label 上，读屏器仍能念出来。 */
 .dsh-archive-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   min-height: 240px;
+  /* 只作 StateDot 自带着色失效时的继承兜底（转圈本身用官方 tertiary 中性色） */
   color: var(--dsw-alias-label-secondary, #6b7280);
-  font-size: 14px;
-  line-height: 22px;
 }
 `
   const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-archive-trigger]')
@@ -1303,9 +1304,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
             </div>
             <div className="dsh-archive-panel-body" aria-busy={refreshing} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
             {loading ? (
-              <div className="dsh-archive-loading" role="status">
+              <div className="dsh-archive-loading" role="status" aria-label={t('loading')}>
                 <StateDot state="ongoing" />
-                <span>{t('loading')}</span>
               </div>
             ) : (
             <>
