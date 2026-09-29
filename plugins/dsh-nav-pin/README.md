@@ -24,13 +24,16 @@ The official turn navigation (the tick rail on the right side of a conversation 
 dsh plugin --profile web add @dsh-sparrow/dsh-nav-pin
 ```
 
-Requires dsh 0.2.0-rc.1 — the exact official version line this release is built and verified against (newer lines, pre-releases in particular, are not covered) — and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
+~~Requires dsh 0.2.0-rc.1 — the exact official version line this release is built and verified against (newer lines, pre-releases in particular, are not covered) — and a working `pnpm` (`dsh plugin` forwards installation to pnpm).~~
+
+> **No longer applies**: this plugin was retired at `0.1.5-rc.2` — it never shipped a release for 0.2.0-rc.1, and its behavior now lives in `dsh-theme-tone` (see the retirement notice at the top). The rest of this document is kept for historical reference.
 
 > Do **not** run `npm install @dsh-sparrow/dsh-nav-pin` directly: that only downloads the package into some `node_modules` and does not register it with the DSH web profile. Use the `dsh plugin` command above, then restart DSH.
 
 ## Compatibility
 
-* Targets dsh 0.2.0-rc.1 — the exact official version line this release is built and verified against (other lines are not covered); the injected stylesheet at worst matches nothing (a no-op) and never breaks the UI
+* ~~Targets dsh 0.2.0-rc.1 — the exact official version line this release is built and verified against (other lines are not covered); the injected stylesheet at worst matches nothing (a no-op) and never breaks the UI~~
+  * This plugin was retired at `0.1.5-rc.2` and never shipped for 0.2.0-rc.1; for this behavior install `dsh-theme-tone` and pick any tone.
 
 ## Usage
 
