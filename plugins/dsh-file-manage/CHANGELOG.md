@@ -2,6 +2,12 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.2.0-rc.1 (2026-09-29)
+
+- Version-line alignment with official dsh 0.2.0-rc.1.
+- Fixed the cloud file list failing to load on the new line (endpoint generation change, `order` parameter removed, renamed icons).
+- Fixed operations failing after a version-line upgrade because the files client constructor signature changed.
+
 ## 0.1.5-rc.2.1 (2026-09-11)
 
 - "Load more" now reveals 20 more files per click (previously 100).

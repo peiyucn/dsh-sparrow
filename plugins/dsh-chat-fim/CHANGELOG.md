@@ -2,6 +2,12 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.2.0-rc.1 (2026-09-29)
+
+- Version-line alignment with official dsh 0.2.0-rc.1.
+- Fixed the suggestion toggle and candidate menu not showing after adapting to the 0.1.7 line (session format v4, renamed icons, slot injection signature).
+- Fixed one warning colour rendering wrong.
+
 ## 0.1.5-rc.2.1 (2026-09-21)
 
 - Fixed the suggestion toggle ignoring the selected model right after DSH starts.

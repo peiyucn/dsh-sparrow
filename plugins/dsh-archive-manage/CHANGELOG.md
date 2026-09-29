@@ -2,6 +2,13 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.2.0-rc.1 (2026-09-29)
+
+- Version-line alignment with official dsh 0.2.0-rc.1.
+- Fixed archived session titles showing the session id instead of the name.
+- The Archive and Trash **section header rows no longer highlight on hover** (they are just fold toggles; a wash read as "this row is selectable").
+- The panel opens faster: the plugin no longer races DSH's own full scan at startup, and does that sweep when the panel is first opened instead.
+
 ## 0.1.5-rc.2.4 (2026-09-21)
 
 - Fixed the sub-session connector line display in the session tree.

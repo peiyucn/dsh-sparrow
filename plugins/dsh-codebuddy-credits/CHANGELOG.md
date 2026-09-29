@@ -3,6 +3,14 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
+## 0.2.0-rc.1 (2026-09-29)
+
+- Version-line alignment with official dsh 0.2.0-rc.1.
+- Fixed the plugin not working after adapting to the 0.1.7 line (host-facing contract, image targets, message model).
+- Fixed credits resetting after a restart: credits now read the official session projection instead of the deprecated sync history.
+- Fixed the CodeBuddy entry on the hero page **overlapping** the official top-right button.
+- Fixed the background band and hover colour bleeding on the model picker's grouped section titles.
+
 ## 0.1.5-rc.2.2 (2026-09-21)
 
 - Session and per-turn credit figures **no longer reset after a DSH restart**, and reopening an older session still shows the full total.
