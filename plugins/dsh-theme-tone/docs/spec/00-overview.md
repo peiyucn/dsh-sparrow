@@ -8,6 +8,7 @@
 > | :--- | :--- |
 > | 表面模型（颗粒 / 三道光 / 强度 / 性能预算）—— **一切抬升面的唯一规范** | [`07-surface-model.md`](07-surface-model.md) |
 > | **统一重构执行计划**（含「恢复弹窗遮罩模糊」）| [`08-refactor-plan.md`](08-refactor-plan.md) |
+> | **`dsh-nav-pin` 合并方案**（待评审）| [`09-nav-pin-merge.md`](09-nav-pin-merge.md) |
 > | 色调取值与几何 | `03-palette.md` |
 > | 玻璃（顶栏 / 输入卡的模糊与通透） | `04-glass.md` |
 > | 抬升面的**机制记述**（历史成因与实证，规范已移交 07） | `05-surfaces.md` |
