@@ -489,12 +489,67 @@ export function usesOfficialBeforeLayer(anchor: string): boolean {
 }
 
 /**
+ * **锚点自身就是滚动容器**的那些面 —— 图层必须画在**元素级**，不能用 `::after`。
+ *
+ * ## 现象与根因（owner 2026-09-29 报：「后台任务的列表里，任务多到出现滚动条后，
+ *    滚动出来的部分没有适配」）
+ *
+ * 我们的图层一直是 `::after { position: absolute; inset: 0; z-index: -1 }`。
+ * 绝对定位伪元素的包含块是**元素自己的 padding box**，而且它**在内容流里** ——
+ * 当元素**自己**是滚动容器时，这个伪元素会**随内容一起滚走**：
+ * 于是它只盖住「初始可见的那一屏」，往下滚出来的行就没有质感了。
+ *
+ * 实测判据（把该层刷纯红、数元素截图里的红像素）：
+ *
+ * | 承载方式 | `scrollTop = 0` | 滚到底（600 / 150） |
+ * | :--- | ---: | ---: |
+ * | `::after`（现状） | 95.6% | **0.0%**（层完全滚走） |
+ * | **元素级 `background-image`** | — | **99.2%** ✅ |
+ *
+ * ## 为什么元素级这条不随内容滚
+ *
+ * `background-attachment` 的**默认值就是 `scroll`** —— 对滚动容器而言它的含义是
+ * 「背景固定在元素自己的盒子（padding box）上，不随内容滚动」。这正是我们要的。
+ * （另一个值是 `local`，那个才会跟着内容滚 —— 本插件栽过相关的一次，见 glass.ts 的
+ * `background-attachment: fixed` 那段。）
+ *
+ * ## 为什么不干脆全表改成元素级
+ *
+ * 因为 `::after` 有一条元素级拿不到的能力：它是**负 z 层**，能压在官方
+ * **画在元素自己身上的**材质之上（M2 那次实测：官方材质常画在元素背景层，
+ * 元素级 `background-image` 会被它盖住）。而多数锚点**自己不滚**（真正的滚动容器是
+ * 它们内部的 `.viewport`，官方 `Menu.module.css:75`、`MenuView.module.css:48`、
+ * `PopupSelectView.module.css:35` 都是这种结构）—— 那些面 `::after` 工作正常，
+ * 不该为了这个 bug 丢掉负 z 这条通道。
+ *
+ * ⇒ 故只给**自身是滚动容器**的锚点换成元素级，且**只换不加**（避免 M2 修掉的
+ * 「同一个面画两遍」）。
+ *
+ * ⚠️ 新增锚点时**必须实测它自己会不会滚**（`el.scrollHeight > el.clientHeight`）；
+ * 会滚就加进本表，否则滚动后露出的部分没有质感。
+ * @see usesAfterLayer
+ */
+export const OWN_BACKGROUND_ANCHORS: readonly string[] = Object.freeze([
+  /** 后台任务列表：官方 `.menu` 自己就是滚动容器（`JobListAction.module.css:55` `overflow: auto`）。 */
+  "body [data-slot='conversation.session.header.actions'] ul",
+])
+
+/**
+ * 某个锚点是否要把图层画在**元素级**（因为它自己就是滚动容器）。
+ * @param anchor - 锚点选择器。
+ * @returns 用元素级时为 true。
+ */
+export function usesOwnBackground(anchor: string): boolean {
+  return OWN_BACKGROUND_ANCHORS.includes(anchor)
+}
+
+/**
  * 某个锚点是否要叠 `::after` 覆盖层。
  * @param anchor - 锚点选择器。
  * @returns 需要叠时 true。
  */
 export function usesAfterLayer(anchor: string): boolean {
-  return !AFTER_LAYER_EXCLUDED_ANCHORS.includes(anchor)
+  return !AFTER_LAYER_EXCLUDED_ANCHORS.includes(anchor) && !usesOwnBackground(anchor)
 }
 
 
@@ -883,6 +938,28 @@ ${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)}::
   border-radius: inherit;
   background-image: ${surfaceLayers()} !important;
   pointer-events: none;
+}`).join('\n')}
+/* --- ⚠️ 自身是滚动容器的锚点：图层改画在**元素级**（2026-09-29，owner 报
+   「后台任务列表滚动出来的部分没有适配」）---
+
+   为什么这些面不能用上面那条 "::after"：那条是 "position: absolute; inset: 0"，
+   而它**在内容流里** —— 元素自己会滚时，伪元素**随内容一起滚走**，
+   只盖住初始可见的那一屏。实测（把层刷纯红、数元素截图红像素）：
+   scrollTop=0 覆盖 95.6%，滚到底 **0.0%**；换成元素级 background-image 后 **99.2%**。
+
+   元素级为什么不滚：background-attachment 的**默认值 scroll** 对滚动容器就是
+   「背景钉在元素自己的盒子上」。（切记不是 local —— 那个才跟内容滚。）
+
+   ⚠️ 只换承载方式，**不保留 ::after**（M2 已把「同一个面画两遍」收成单载体，
+   这里同样只留一份）。上方 "filter(usesAfterLayer)" 已把本表排除在外。
+
+   ⚠️ 与 ::after 那条的差异（已知且接受）：元素级图层画在**元素自己的背景层**上，
+   压不过画在同一元素上的官方不透明材质。后台任务列表的官方底色是半透明的
+   （JobListAction.module.css:59 的 --dsw-specific-menu + :60 的 backdrop-filter），
+   底色本身由官方给出、我们只叠质感，故不受影响。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+${SURFACE_ANCHORS.filter(usesOwnBackground).map(anchor => `${gatedAnchor(anchor)} {
+  background-image: ${surfaceLayers()} !important;
 }`).join('\n')}
 /* --- ⚠️⚠️ 让锚点自己**形成层叠上下文**（2026-09-27，owner 报「归档页 / 云端文件页
    全都没适配纹理和打光」的**根因**）---

@@ -27,7 +27,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
-import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, STATIC_SURFACE_ANCHORS, usesAfterLayer, usesOfficialBeforeLayer } from '../lib/surface.js'
+import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, OWN_BACKGROUND_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, STATIC_SURFACE_ANCHORS, usesAfterLayer, usesOfficialBeforeLayer, usesOwnBackground } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -1468,6 +1468,31 @@ describe('抬升面：表面绘制', () => {
     assert.ok(jobs !== undefined, '必须有槽位锚点')
     assert.ok(jobs.includes("conversation.session.header.actions"), `应锚在官方槽位上：${jobs}`)
     assert.ok(jobs.endsWith(' ul'), `应收窄到那个 ul：${jobs}`)
+  })
+
+  it('⛔ 自身是滚动容器的锚点（后台任务列表）必须用**元素级**图层，不能用 ::after', () => {
+    // 回归守卫（owner 2026-09-29 报「后台任务列表任务多到出滚动条后，滚出来的部分没适配」）：
+    // ::after 是 "position: absolute; inset: 0"，**在内容流里** ⇒ 元素自己会滚时
+    // 伪元素随内容滚走（实测：把层刷纯红，scrollTop=0 覆盖 95.6%、滚到底 **0.0%**）。
+    // 元素级 background-image 的背景默认 "background-attachment: scroll"，
+    // 对滚动容器含义是「钉在元素自己的盒子上」⇒ 实测滚到底覆盖 **99.2%**。
+    const jobs = SURFACE_ANCHORS.find(a => a.includes('data-slot='))
+    assert.ok(jobs !== undefined, '必须有槽位锚点')
+
+    // ① 登记在「自身滚动」表里，且 usesAfterLayer 对它返回 false
+    assert.deepEqual([...OWN_BACKGROUND_ANCHORS], [jobs], '后台任务列表必须在 OWN_BACKGROUND_ANCHORS 里')
+    assert.equal(usesOwnBackground(jobs), true, '应判定为「用元素级」')
+    assert.equal(usesAfterLayer(jobs), false, '不得再给它叠 ::after（M2 的单载体纪律）')
+
+    // ② 产出里：该锚点有一条**元素级** background-image 规则（带门写法与实现同源）
+    const gated = jobs.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
+    assert.ok(css.includes(`${gated} {`), `应有一条元素级规则：${gated} {`)
+    const at = css.indexOf(`${gated} {`)
+    const body = css.slice(at, css.indexOf('}', at))
+    assert.ok(body.includes('background-image:'), '元素级那条必须画 background-image')
+
+    // ③ 产出里：**不得**再有该锚点的 ::after 规则（只换不加，避免同一个面画两遍）
+    assert.ok(!css.includes(`${gated}::after`), '不得同时保留 ::after（会画两遍）')
   })
 
   it('灯箱排除条件应该 用 `> img`，不能用 `> [aria-hidden]`（会误伤 token 消耗弹层）', () => {
