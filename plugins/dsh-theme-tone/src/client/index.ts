@@ -46,6 +46,8 @@ import {
 } from '../backdrop.js'
 import { buildGlassCss, buildSeamCss } from '../glass.js'
 import { buildMaskCss } from '../mask.js'
+import { buildNavPinCss } from '../nav-pin.js'
+import { HANDLE_SELECTOR, applyGlow } from '../handle-glow.js'
 import { buildSurfaceCss } from '../surface.js'
 import { buildSweepCss } from '../sweep.js'
 import { isWorkstartProbe } from '../workstart.js'
@@ -76,12 +78,15 @@ import { createThemeToneRowStore } from './store.js'
 export const inject = ['theme', 'slots', 'locale']
 
 /**
- * 注入样式表（背景层 + 设置行 + 玻璃 + 缝挡板 + 抬升面 + 遮罩模糊 + 扫光带合成一张；
- * 按标记属性去重，HMR / 重载不叠加）。
+ * 注入样式表（背景层 + 设置行 + 玻璃 + 缝挡板 + 抬升面 + 遮罩模糊 + 扫光带 + **轮次导航/宽度钳制**
+ * 合成一张；按标记属性去重，HMR / 重载不叠加）。
+ *
+ * ⚠️ nav-pin 那两段并入**本表**、不再单开 `style[data-dsh-nav-pin]`（方案 §3.5 决策）：
+ * 少一个 style 元素、少一套去重逻辑，卸载清理也只需管一处。
  * @returns 供卸载清理的 style 元素。
  */
 function ensureStyles(): HTMLStyleElement {
-  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}`
+  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}`
   const existing = document.querySelector<HTMLStyleElement>(STYLE_SELECTOR)
   if (existing !== null) {
     // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之。
@@ -113,6 +118,62 @@ function ensureLayer(): HTMLDivElement {
   // 挂在 `<html>` 上照常显示。标记属性则必须挂 body —— 消费侧写的是 `body:not([…])`。
   ;(document.body ?? document.documentElement).appendChild(layer)
   return layer
+}
+
+/**
+ * 让官方宽度拖拽条的**悬停光带**跟随指针（修官方 bug，理由见 `../handle-glow.ts` 模块头）。
+ *
+ * **自 `dsh-nav-pin` 并入（2026-09-29，方案 §3.3）**。接线只负责取事件与元素，判定全在纯函数里。
+ * 用**一个** `pointermove`（passive，不 `preventDefault`），且只在指针真的落在拖拽条上时才干活；
+ * 用 `requestAnimationFrame` **合并同帧多次移动** —— `getBoundingClientRect` 会强制布局，
+ * 不合并的话高频移动会把主线程拖满（本仓库栽过一次：`getComputedStyle` 未合并导致卡顿）。
+ *
+ * ⚠️ **不给它加能力门**：`pointermove` / `requestAnimationFrame` 缺失时监听自然收不到事件，
+ * 效果只是「回到官方现状」（光带固定居中），属可接受降级；而**加门会把整张样式表一起停掉**。
+ * 故这里刻意只降级、不停用。
+ *
+ * ⚠️ **失败不冒泡**（根 AGENTS《运行期不冒泡》）：取几何那一步包了 try/catch，
+ * 任一环节异常都只是这一步不生效，绝不抛进宿主管线。
+ *
+ * ⚠️ 本条**不带色调门**（方案 §3.1 决策 5）：官方默认档下也要修这个官方 bug。
+ * 它不读任何 CSS 变量，故不依赖 token 层就绪。
+ * @param ctx - 浏览器侧 Cordis 上下文（用于注册卸载清理）。
+ */
+function followHandleGlow(ctx: Context): void {
+  /** 同帧待处理的一次移动（只留最后一次 —— 光带只需要最新位置）。 */
+  let pending: { readonly handle: HTMLElement; readonly clientY: number } | null = null
+  let frame: number | null = null
+
+  const flush = (): void => {
+    frame = null
+    const job = pending
+    pending = null
+    if (job === null) return
+    try {
+      applyGlow(job.handle, job.clientY)
+    } catch {
+      // 元素已从文档摘除 / 取不到几何 —— 跳过这一帧，下一次移动会重新解析。
+    }
+  }
+
+  const onPointerMove = (event: PointerEvent): void => {
+    const target = event.target
+    // 事件目标未必是 Element（如文本节点）；`closest` 前先收窄。
+    if (!(target instanceof Element)) return
+    const handle = target.closest(HANDLE_SELECTOR)
+    // 不是拖拽条就立刻返回 —— 页面里绝大多数移动都走这条路径。
+    if (!(handle instanceof HTMLElement)) return
+    pending = { handle, clientY: event.clientY }
+    frame ??= requestAnimationFrame(flush)
+  }
+
+  document.addEventListener('pointermove', onPointerMove, { passive: true })
+  ctx.effect(() => () => {
+    document.removeEventListener('pointermove', onPointerMove)
+    if (frame !== null) cancelAnimationFrame(frame)
+    frame = null
+    pending = null
+  }, 'dsh-theme-tone: handle glow follows pointer')
 }
 
 /**
@@ -247,6 +308,9 @@ function install(ctx: Context): void {
   // 只留 layer 的局部别名（渲染计划要写它的 style 属性）；
   // style 仅由清理 effect 经 holder 回收，无其它读取点，故不取名。
   const layer = resources.layer
+  // 官方悬停光带修复（自 nav-pin 并入，方案 §3.3）：**不带色调门**，两档都生效。
+  // 放在这里注册 —— ctx 是 configForms fork 的上下文，卸载时随 fork 一起回收监听。
+  followHandleGlow(ctx)
   // 设置读取面：官方 0.1.7 起客户端设置基座服务是 `configForms`，
   // 命名空间 = 本插件在 profile 里的**条目 id**（= SETTINGS_NAMESPACE）。
   const scope: ConfigForm<ThemeToneSettings> = ctx.configForms.get<ThemeToneSettings>(SETTINGS_NAMESPACE)
