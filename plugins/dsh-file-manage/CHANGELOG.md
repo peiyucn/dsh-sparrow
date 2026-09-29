@@ -2,9 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.2.0-rc.1 (2026-09-29)
+## 0.2.0-rc.2 (2026-09-30)
 
-- Version-line alignment with official dsh 0.2.0-rc.1.
+- Version-line alignment with official dsh 0.2.0-rc.2.
+- The panel loading indicator now matches the official dsh loader (the old dot-matrix animation is gone).
 - Fixed the cloud file list failing to load on the new line (endpoint generation change, `order` parameter removed, renamed icons).
 - Fixed operations failing after a version-line upgrade because the files client constructor signature changed.
 
