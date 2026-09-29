@@ -1,7 +1,7 @@
 {
   "name": "@dsh-sparrow/dsh-theme-tone",
   "description": "Tone skins for the official light and dark themes, plus conversation-area layout tuning once a tone is picked",
-  "version": "0.1.5-rc.2",
+  "version": "0.2.0-rc.1",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -1,7 +1,7 @@
 {
   "name": "@dsh-sparrow/dsh-chat-fim",
   "description": "Chat input suggestions via DeepSeek FIM completion (Beta) — a card suggests what you may type next, Tab adopts, Esc dismisses; trigger sensitivity adjustable (high/medium/low)",
-  "version": "0.1.5-rc.2.1",
+  "version": "0.2.0-rc.1",
   "license": "MIT",
   "repository": {
     "type": "git",
