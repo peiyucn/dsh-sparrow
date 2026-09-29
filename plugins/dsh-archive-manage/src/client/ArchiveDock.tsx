@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactEle
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { IconArchiveOutlineRegular, IconCloseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconArchiveOutlineRegular, IconCloseOutlineRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import { descendantLive, dropArchivedIds, isCollapsed, subtreeIdsOf, subtreeLive, trashSubagentTree, type ArchivedSessionItem, type TrashSubagentNode } from './archivedTree.js'
 import { countVisibleRows } from './paging.js'
 
@@ -13,35 +13,20 @@ const ARCHIVE_PAGE_SIZE = 100
 /** 会话进出事件的刷新防抖（spec 09）：多个会话释放事件合并成一次全量刷新。 */
 const SESSIONS_CHANGED_DEBOUNCE_MS = 300
 
-/** dsh 官方 ongoing 点阵几何（ui-primitives StateDot 的 matrix 分支）：10px 网格上的
- *  外圈 8 个 2px 方块、从左上起顺时针；每格负延时 125ms = 一圈 1s。 */
-const MATRIX_CELLS: readonly (readonly [number, number])[] = [
-  [0, 0], [4, 0], [8, 0], [8, 4], [8, 8], [4, 8], [0, 8], [0, 4],
-]
-/** 点阵相位步长（毫秒）：与官方 StateDot 一致。 */
-const MATRIX_PHASE_STEP_MS = 125
-
 /**
- * dsh 官方点阵 loading：几何与节奏照搬 ui-primitives StateDot 的 ongoing 分支
- * （10×10 viewBox、crispEdges、逐格负延时相位）；配色与 keyframes 见注入的样式表。
+ * 面板 loading 用**官方自己的** `StateDot`（`ui-primitives`，`state="ongoing"`）。
+ *
+ * ⚠️ 2026-09-30 改判：这里原来**手搓过**一套 10×10 点阵（8 个 2px 方块追逐 + 自带 keyframes），
+ * 注释写着「照搬 ui-primitives StateDot 的 matrix 分支」—— 那是对**更老的官方**对齐：
+ * 官方早在 `4937343a5e feat(web): unify the client visual language`（先于 `0.1.7-rc.1`）
+ * 就把 ongoing 换成了 **SVG 圆弧 spinner**（`StateDot.module.css`：1.5s 旋转 + dasharray 呼吸，
+ * track 25% 不透明，带 `prefers-reduced-motion` 兜底）。我们没跟 ⇒ owner 看到的是
+ * 「官方改了、我们没跟进」的那种不一致。
+ *
+ * 改为直接 import 官方组件：`ui-primitives` 是**平台种子词**（`PLATFORM_MODULES`）里的外部依赖、
+ * 宿主提供，且它**本来就是本插件的 devDependency** ⇒ 零依赖改动；以后官方再改动画，
+ * 我们自动跟随，不必再抄一遍几何。故本文件不再有任何 loading 的 keyframes / 几何常量。
  */
-function MatrixLoading(): ReactElement {
-  return (
-    <svg className="dsh-archive-matrix" width="16" height="16" viewBox="0 0 10 10" shapeRendering="crispEdges" aria-hidden="true">
-      {MATRIX_CELLS.map(([x, y], index) => (
-        <rect
-          key={`${x}-${y}`}
-          className="dsh-archive-matrix-cell"
-          x={x}
-          y={y}
-          width="2"
-          height="2"
-          style={{ animationDelay: `${(index - MATRIX_CELLS.length) * MATRIX_PHASE_STEP_MS}ms` }}
-        />
-      ))}
-    </svg>
-  )
-}
 
 /** 归档树节点与本地变更纯逻辑：见 archivedTree.ts（零依赖纯模块，node:test 可直接导入）。 */
 export type { ArchivedSessionItem } from './archivedTree.js'
@@ -433,36 +418,18 @@ export function ensureArchiveStyles(): void {
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
 /* 整页 loading：四个初始请求（归档/游离/回收站/回收站目录）都落定前占满内容区，
-   避免「打开后加载闪动」（2026-09-01）。 */
+   避免「打开后加载闪动」（2026-09-01）。
+   ⚠️ 转动动画 / 配色 / 减动效兜底**全部来自官方 StateDot**（见本文件顶部那段注释），
+   这里不再有任何 keyframes 或点阵几何；间距取官方 inline 档的 8px。 */
 .dsh-archive-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   min-height: 240px;
   color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 14px;
   line-height: 22px;
-}
-/* dsh 官方 ongoing 点阵（ui-primitives StateDot matrix）：10×10 网格上 8 个 2px 方块
-   顺时针追逐，每格负延时 125ms（一圈 1s），透明度按 1 → .6 → .35 → .15 平键帧跳变。 */
-.dsh-archive-matrix {
-  flex: none;
-  color: var(--dsw-static-deepseek-450, #5686fe);
-}
-.dsh-archive-matrix .dsh-archive-matrix-cell {
-  fill: currentColor;
-  opacity: 0.15;
-  animation: dsh-archive-dot-chase 1s infinite;
-}
-@keyframes dsh-archive-dot-chase {
-  0%, 12.4% { opacity: 1; }
-  12.5%, 24.9% { opacity: 0.6; }
-  25%, 37.4% { opacity: 0.35; }
-  37.5%, 100% { opacity: 0.15; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dsh-archive-matrix .dsh-archive-matrix-cell { animation: none; opacity: 0.7; }
 }
 `
   const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-archive-trigger]')
@@ -1337,7 +1304,7 @@ export function ArchiveDock(props: ArchiveDockProps) {
             <div className="dsh-archive-panel-body" aria-busy={refreshing} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
             {loading ? (
               <div className="dsh-archive-loading" role="status">
-                <MatrixLoading />
+                <StateDot state="ongoing" />
                 <span>{t('loading')}</span>
               </div>
             ) : (

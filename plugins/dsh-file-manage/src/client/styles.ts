@@ -57,36 +57,18 @@ export function ensureFileManageStyles(): void {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* 整页 loading：首屏数据（列表 + 总数）落定前占满内容区，避免「打开后加载闪动」（2026-09-01）。 */
+/* 整页 loading：首屏数据（列表 + 总数）落定前占满内容区，避免「打开后加载闪动」（2026-09-01）。
+   ⚠️ 转动动画 / 配色 / 减动效兜底**全部来自官方 StateDot**（见 FileManageDock.tsx 顶部那段注释），
+   这里不再有任何 keyframes 或点阵几何；间距取官方 inline 档的 8px。 */
 .dsh-file-manage-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   min-height: 240px;
   color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 14px;
   line-height: 22px;
-}
-/* dsh 官方 ongoing 点阵（ui-primitives StateDot matrix）：10×10 网格上 8 个 2px 方块
-   顺时针追逐，每格负延时 125ms（一圈 1s），透明度按 1 → .6 → .35 → .15 平键帧跳变。 */
-.dsh-file-manage-matrix {
-  flex: none;
-  color: var(--dsw-static-deepseek-450, #5686fe);
-}
-.dsh-file-manage-matrix .dsh-file-manage-matrix-cell {
-  fill: currentColor;
-  opacity: 0.15;
-  animation: dsh-file-manage-dot-chase 1s infinite;
-}
-@keyframes dsh-file-manage-dot-chase {
-  0%, 12.4% { opacity: 1; }
-  12.5%, 24.9% { opacity: 0.6; }
-  25%, 37.4% { opacity: 0.35; }
-  37.5%, 100% { opacity: 0.15; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dsh-file-manage-matrix .dsh-file-manage-matrix-cell { animation: none; opacity: 0.7; }
 }
 /* 面板滚动区：官方 settings 同款——elevated surface 重绑 l2 滚动条 token（base 默认 l1，浮层上对比度不对）。 */
 .dsh-file-manage-body {
