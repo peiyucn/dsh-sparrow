@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
-Tone skins for the official light and dark themes — a DeepSeek Harness (DSH) web plugin (dsh-sparrow collection member).
+Tone skins for the official light and dark themes, plus conversation-area layout tuning once a tone is picked — a DeepSeek Harness (DSH) web plugin (dsh-sparrow collection member).
 
 ## Install
 
@@ -22,6 +22,13 @@ Open **Settings → General** — a **Tone** row sits directly under the officia
 | :--- | :--- |
 | Dark | Default (official black), Space, Ember, Glade |
 | Light | Default (official white), Frost, Sakura, Moss |
+
+Picking any tone other than **Default** also tunes the conversation layout (on **Default** everything stays exactly as the official build):
+
+* Turn navigation: the official build hides the rail entirely below a 900px conversation column; with a tone picked the breakpoint moves to 700px, and below 700px the rail is hidden by default and fades in on hover over the right edge (or keyboard focus) — no frame, no background
+* Conversation content clearance: on wide columns at least 120px per side (official: 88px); on narrow columns the content clamps to the official 640px minimum so the right drag handle no longer crowds the rail
+
+It also fixes a small official glitch (**no tone needed — active on both**): hovering either "resize conversation" drag handle left the official vertical glow sitting low (it only snapped to the pointer once you held the button down); the glow now follows the pointer on hover too.
 
 ## Compatibility
 
