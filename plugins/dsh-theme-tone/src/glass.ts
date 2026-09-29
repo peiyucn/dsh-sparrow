@@ -1065,8 +1065,20 @@ body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [da
    ⚠️ background-size / -position / -repeat 现在是 **3 层**，**必须给足 3 个值** ——
    值少于层数时**会按顺序循环补齐**（本插件栽过：写「scroll, fixed」等于两者交替，
    第 1、3 段渐变退回按元素盒解析）。**不许再退回任何一个 per-layer 属性只给一两个值。**
+
+   ⚠️⚠️ **面板那条必须门在「已展开」上（2026-09-29 修，owner 报「右边栏打开过一次，
+   背景就花了」）**：官方 .panel 是常驻元素，**收起时它并不消失、也不变窄** ——
+   宽度来自持久化的 --dsh-sidebar-width（实测 576px），盒子仍在
+   x=704..1280、z-index 82、我们那条 screen 混合仍在。收起时官方只是把**里面的**
+   dockkit 宿主 translateX 移出 + visibility:hidden，面板**自己**照旧可见 ⇒
+   我们这片 100vw x 100vh 的渐变贴在面板盒上、以 screen 压在会话区右侧
+   （实测同一状态下摘掉本条：面板区域像素差均值 5.1、13.3% 像素变化）。
+   冷启动从未展开时 --dsh-sidebar-width 为 0、盒子无面积，所以看不出问题 ——
+   展开一次后宽度被持久化，从此常驻 ⇒ 就是 owner 说的「打开过一次就花了」。
+   修法：本条（以及深色轴的 background-blend-mode）一律加到
+   [data-sidebar-right-open] 上；官方在滑动开始前就置该属性，故动画期间照常生效。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
-body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open],
 body:not([${PLAIN_ATTR}]) [data-dockkit-pane],
 body:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
   background-image: ${BACKDROP_GRADIENTS};
@@ -1088,7 +1100,7 @@ body:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
    与页面底色同一个值）按 screen 混合，等效于背景层与页面底色混合。
    浅色轴背景层用 normal（见 backdrop.ts），故这里不需要浅色规则。
    （本段在模板字符串里，注释中不能出现反引号。） */
-body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
+body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open],
 body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-pane],
 body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
   background-blend-mode: screen, screen, screen;

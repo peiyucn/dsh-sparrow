@@ -35,13 +35,17 @@ const rules = css.replace(/\/\*[\s\S]*?\*\//gu, '')
  * `[data-sidebar-right-panel], [data-dockkit-pane], [data-dockkit-empty]` ——
  * 因为右边栏改由 dockkit 承载，真正刷不透明底色的是它的内容宿主
  * `[data-dockkit-pane]`（画在 `.panel` 上会被那层整个盖掉）。
- * 故定位用**选择器组的首行**（`[data-sidebar-right-panel],`），不能写成
- * `[data-sidebar-right-panel] {`（那个串已不存在）。
+ *
+ * ⚠️ 2026-09-29 起面板那条**必须门在「已展开」上**（owner 报「右边栏打开过一次，背景就花了」）：
+ * 官方面板是常驻元素，收起时宽度仍是持久化的 --dsh-sidebar-width、盒子照旧可见，
+ * 我们那片 100vw×100vh 渐变就会以 screen 压在会话区右侧。故选择器写成
+ * `[data-sidebar-right-panel][data-sidebar-right-open]`。
+ * 定位仍用「属性名之后紧跟的字符」，不写死完整选择器。
  * @param source - 已剥注释的样式表文本。
  * @returns 该规则的起始下标（找不到为 -1）。
  */
 function rightPanelRuleStart(source) {
-  return source.indexOf(`[${RIGHT_PANEL_ATTR}],`)
+  return source.indexOf(`[${RIGHT_PANEL_ATTR}][`)
 }
 
 /**
@@ -879,6 +883,32 @@ describe('glass：边界与纪律', () => {
     assert.ok(panePositionRule, 'dockkit 宿主必须有一条 position: relative（给 ::after 当包含块）')
     const panelPositionRule = blocks.find(b => b.split('{')[0].includes('[data-sidebar-right-panel]') && /position:\s*relative/u.test(b.slice(b.indexOf('{'))))
     assert.ok(!panelPositionRule, 'position: relative 不得落在 [data-sidebar-right-panel] 规则上')
+  })
+
+  it('面板的图层必须门在「已展开」上（否则收起时那片渐变会压在会话区右侧）', () => {
+    // owner 2026-09-29 报「右边栏打开过一次，背景就花了」。
+    // 官方面板是**常驻元素**：收起时它不消失、宽度也仍是持久化的 --dsh-sidebar-width
+    // （实测 576px，盒子 x=704..1280），只把**里面的** dockkit 宿主 translateX 移出 +
+    // visibility:hidden。于是我们不门的话，那片 100vw×100vh 渐变会以 screen 常驻压在
+    // 会话区右侧。冷启动从未展开时宽度为 0 所以看不出来 —— 展开一次后宽度被持久化 ⇒
+    // 「打开过一次就花了」。官方在滑动开始前就置 data-sidebar-right-open，故门它不影响动画。
+    // 按规则块逐个查：凡是给 [data-sidebar-right-panel] 画图层的规则（background-image /
+    // background-blend-mode），其选择器都必须带 [data-sidebar-right-open]。
+    const blocks = rules.split('}').map(b => b.trim()).filter(Boolean)
+    const panelPaintRules = blocks.filter(b => {
+      const sel = b.split('{')[0]
+      if (!sel.includes('[data-sidebar-right-panel]')) return false
+      const decl = b.slice(b.indexOf('{'))
+      return /background-image|background-blend-mode/u.test(decl)
+    })
+    assert.ok(panelPaintRules.length > 0, '应能找到面板那条画图层的规则')
+    for (const rule of panelPaintRules) {
+      assert.match(
+        rule.split('{')[0],
+        /\[data-sidebar-right-open\]/u,
+        `面板图层规则必须门在 [data-sidebar-right-open] 上，否则收起时会压住会话区：${rule.split('{')[0].trim()}`,
+      )
+    }
   })
 
   it('不应该 给浮层写规则（浮层是不透明 + 质感，走 src/surface.ts）', () => {
