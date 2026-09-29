@@ -31,6 +31,19 @@ import { PROVIDER_ID, syncModelFacts, type ModelFactView } from './model-facts.j
 const STATUS_URL = '/api/codebuddy-credits/status'
 const QUOTA_URL = '/api/codebuddy-credits/quota'
 
+/**
+ * hero 变体的入口几何：官方 header 在 hero 相位仍渲染右上角「打开右侧栏」按钮
+ * （`[data-conversation-header-corner]`），故入口不能再按固定 top/right 贴死
+ * header 内边距（0.2.0-rc.1 实测：固定 right 28 会与那个 28px 角按钮重叠 12px）。
+ * 改为量角按钮的矩形、贴它左边留 8px 间隙，角按钮取不到时才退回旧几何。
+ */
+const HERO_BADGE_FALLBACK_TOP_PX = 14
+const HERO_BADGE_FALLBACK_RIGHT_PX = 28
+const HERO_BADGE_GAP_PX = 8
+/** 入口按钮高度（与 .ccb-indicator-button 的 28px 一致，用于与角按钮垂直居中）。 */
+const INDICATOR_BUTTON_HEIGHT_PX = 28
+const HEADER_CORNER_SELECTOR = '[data-conversation-header-corner]'
+
 /** 面板标题用的方形渐变图标（Combine 里取出的 Color 单块，独立渐变 id）。 */
 const SQUARE_LOGO_SVG = '<svg height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>CodeBuddy</title><defs><radialGradient cx="0" cy="0" gradientTransform="matrix(-9.00009 -16 16 -9.00009 21 24.5)" gradientUnits="userSpaceOnUse" id="ccb-logo-square-gradient" r="1"><stop stop-color="#2EA99D"></stop><stop offset="1" stop-color="#6C4DFF"></stop></radialGradient></defs><path d="M18.821 0H5.18A5.179 5.179 0 000 5.179V18.82A5.179 5.179 0 005.179 24H18.82A5.179 5.179 0 0024 18.821V5.18A5.179 5.179 0 0018.821 0z" fill="url(#ccb-logo-square-gradient)"></path><path d="M18.777 1.647c.28-.02.536.114.972.51 1.018.926 2.437 2.828 3.318 4.452l.34.631.482.24.11.06v3.638a5.206 5.206 0 00-5.32-1.23c-.491.166-1.021.471-2.08 1.082l-6.09 3.516c-1.057.61-1.586.916-1.975 1.259a5.208 5.208 0 00-1.493 5.572c.165.49.471 1.02 1.082 2.08l.315.543h-3.26c-.685 0-1.34-.135-1.939-.377-.169-.956-.009-1.789.469-2.335.158-.18.164-.189.13-.493a11.846 11.846 0 01-.057-1.711l.02-.444-.667-1.18C2.1 15.622 1.445 14.078 1.192 12.9c-.133-.647-.125-.934.04-1.146.1-.128.427-.261.822-.334.994-.175 3.162-.017 5.575.41l.25.043.551-.487c.915-.81 1.522-1.264 2.641-1.962 1.167-.73 2.484-1.331 3.967-1.807l.476-.152.261-.688c.937-2.471 1.896-4.293 2.58-4.9.235-.21.25-.22.422-.23z" fill="#fff"></path><path d="M12.139 18.2a1.203 1.203 0 011.642.44l1.296 2.243a1.204 1.204 0 01-2.083 1.203l-1.296-2.243a1.203 1.203 0 01.44-1.644zM18.629 14.452a1.203 1.203 0 011.642.44l1.295 2.244a1.203 1.203 0 11-2.083 1.203l-1.295-2.243a1.203 1.203 0 01.44-1.644z" fill="#fff"></path></svg>'
 
@@ -221,6 +234,9 @@ export function CodeBuddyCreditsIndicator({
     width: number
   } | null>(null)
   const rootRef = useRef<HTMLElement | null>(null)
+  // hero 变体的入口落点（相对 portal 容器 hero.rootEl 的 padding box）。
+  // null = 还没量到，用兜底几何渲染，量到后替换。
+  const [heroAnchor, setHeroAnchor] = useState<{ top: number; right: number } | null>(null)
   // 两个加载器各自独立的请求序号：共享一个序号会让并发请求互相作废——展开
   // 面板时 status/quota 同时发出，先发者的响应会被后发者的序号增长丢弃，
   // 面板一直停在「读取中」（实测）。各自维护序号，只作废自己这条流里被
@@ -305,6 +321,39 @@ export function CodeBuddyCreditsIndicator({
       width,
     })
   }, [])
+
+  /** hero 入口落点：贴官方右上角按钮左侧（留 HERO_BADGE_GAP_PX 间隙）、与它垂直居中；
+   *  取不到角按钮时退回旧几何。滚动不改变两者相对位置，故只需在挂载、相位切换与
+   *  窗口/容器尺寸变化时重算。 */
+  const measureHeroAnchor = useCallback(() => {
+    const frame = hero.rootEl?.getBoundingClientRect()
+    if (frame === undefined) return
+    const corner = document.querySelector(HEADER_CORNER_SELECTOR)?.getBoundingClientRect()
+    if (corner !== undefined && corner.width > 0 && corner.height > 0) {
+      setHeroAnchor({
+        top: Math.max(0, corner.top - frame.top + (corner.height - INDICATOR_BUTTON_HEIGHT_PX) / 2),
+        right: Math.max(0, frame.right - corner.left + HERO_BADGE_GAP_PX),
+      })
+      return
+    }
+    setHeroAnchor({ top: HERO_BADGE_FALLBACK_TOP_PX, right: HERO_BADGE_FALLBACK_RIGHT_PX })
+  }, [hero.rootEl])
+
+  useEffect(() => {
+    if (variant !== 'hero' || hero.rootEl === null || !hero.visible) return
+    measureHeroAnchor()
+    window.addEventListener('resize', measureHeroAnchor)
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measureHeroAnchor)
+    if (observer !== undefined) {
+      observer.observe(hero.rootEl)
+      const corner = document.querySelector(HEADER_CORNER_SELECTOR)
+      if (corner !== null) observer.observe(corner)
+    }
+    return () => {
+      window.removeEventListener('resize', measureHeroAnchor)
+      observer?.disconnect()
+    }
+  }, [variant, hero.rootEl, hero.visible, measureHeroAnchor])
 
   // 挂载即读取状态：未配置 Key 时不显示图标（无配置时对话页不该有标）。
   // 配置卡保存/清空 Key 会广播窗口事件，此处联动刷新（无需刷新页面）；
@@ -434,7 +483,13 @@ export function CodeBuddyCreditsIndicator({
     <div
       ref={setRoot}
       style={variant === 'hero'
-        ? { position: 'absolute', top: 14, right: 28, display: 'inline-flex', zIndex: 7 }
+        ? {
+            position: 'absolute',
+            top: heroAnchor?.top ?? HERO_BADGE_FALLBACK_TOP_PX,
+            right: heroAnchor?.right ?? HERO_BADGE_FALLBACK_RIGHT_PX,
+            display: 'inline-flex',
+            zIndex: 7,
+          }
         : { position: 'relative', display: 'inline-flex' }}
     >
       {triggerButton}
