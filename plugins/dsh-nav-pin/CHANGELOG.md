@@ -2,6 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## Retired (2026-09-29)
+
+- Merged into **`dsh-theme-tone`**; this package is no longer maintained. Uninstall it (`dsh plugin --profile web remove @dsh-sparrow/dsh-nav-pin`) and pick any tone in theme-tone to keep the behavior — the drag-handle glow fix needs no tone, the navigation and width clamping do.
+
 ## 0.1.5-rc.2 (2026-09-10)
 
 - Version-line alignment with official dsh 0.1.5-rc.2.

@@ -2,6 +2,10 @@
 
 简体中文 | [English](CHANGELOG.md)
 
+## 已退役（2026-09-29）
+
+- 已并入 **`dsh-theme-tone`**，本包不再维护。请卸载（`dsh plugin --profile web remove @dsh-sparrow/dsh-nav-pin`），并在 theme-tone 里任选一款色调以保留原有行为——拖拽条光带修复不需要色调，轮次导航与宽度钳制需要。
+
 ## 0.1.5-rc.2（2026-09-10）
 
 - 版本线对齐官方 dsh 0.1.5-rc.2。

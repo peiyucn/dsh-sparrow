@@ -1,5 +1,17 @@
 # dsh-nav-pin
 
+> **⚠️ Retired (2026-09-29)** — this plugin has been merged into **`dsh-theme-tone`**. Do **not** install it on new setups.
+>
+> **Already installed it? Remove it.** With both installed the layout rules simply stack (the merged copy is gated on a theme tone, this one is not), so nothing breaks — but you keep a redundant package and its stylesheet:
+>
+> ```bash
+> dsh plugin --profile web remove @dsh-sparrow/dsh-nav-pin
+> ```
+>
+> To keep the behavior, install `dsh-theme-tone` and pick any tone: the turn-navigation fix ships inside it. The drag-handle glow fix is **not** gated, so it stays active on the official default tone too. Navigation and width clamping apply once a tone other than "official" is selected.
+>
+> The rest of this document is kept for historical reference.
+
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 Turn navigation that stays on narrow conversations — a DeepSeek Harness (DSH) web plugin (dsh-sparrow collection member).

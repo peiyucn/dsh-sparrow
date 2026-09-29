@@ -1,5 +1,17 @@
 # dsh-nav-pin
 
+> **⚠️ 已退役（2026-09-29）** —— 本插件已并入 **`dsh-theme-tone`**。**不要**再新装。
+>
+> **已经装了？请自行卸载。** 两个都装时布局规则只是叠加（并入的那份带色调门、这份不带），不会出错——但你会多留一个包和它那张样式表：
+>
+> ```bash
+> dsh plugin --profile web remove @dsh-sparrow/dsh-nav-pin
+> ```
+>
+> 想保留原有行为：装 `dsh-theme-tone` 并任选一款色调，轮次导航修复就在里面。拖拽条光带修复**不带色调门**，所以在「官方默认」色调下也照样生效；导航与宽度钳制则要选非「官方」的色调才会叠加。
+>
+> 以下正文保留作历史记录。
+
 简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 轮次导航窄屏不消失 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
