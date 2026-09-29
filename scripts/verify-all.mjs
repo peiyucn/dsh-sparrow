@@ -9,7 +9,8 @@ const mode = process.argv[2] // undefined | '--typecheck' | '--build' | '--test'
 const root = resolve(import.meta.dirname, '..')
 // 已退役插件不参与全量验证（代码原地保留作历史，见 AGENTS「项目概况」）：
 // 它们不再跟随官方 dsh 版本线升级，留在流水线里只会制造与发布无关的红灯。
-const RETIRED_PLUGINS = new Set(['dsh-vision-bridge'])
+// dsh-nav-pin：2026-09-29 并入 dsh-theme-tone（方案见 plugins/dsh-theme-tone/docs/spec/09-nav-pin-merge.md）。
+const RETIRED_PLUGINS = new Set(['dsh-vision-bridge', 'dsh-nav-pin'])
 // 只验证已脚手架化的插件（有 package.json）；纯文档目录（如 spec 阶段的插件）跳过。
 const plugins = readdirSync(join(root, 'plugins'), { withFileTypes: true })
   .filter(entry => entry.isDirectory())
