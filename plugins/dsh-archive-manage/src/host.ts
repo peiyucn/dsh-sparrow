@@ -42,6 +42,20 @@ const TITLE_FOLD_CONCURRENCY = 4
 /** 标题折叠兜底的整体预算（spec 09）：超时后未完成的折叠按失败处理、回退会话 id。 */
 const TITLE_FOLD_BUDGET_MS = 8_000
 
+/**
+ * 启动三项扫描的兜底延迟（2026-09-29，owner 报「重启后会话列表要等几十秒」）。
+ *
+ * 三项启动读取（幽灵归档 id 清扫 / 投影缓存清扫 / 父子归档对齐）都经
+ * `headerFacts` → `sessionPersistence.list()`，而官方的会话列表接口
+ * （`session/list` → `sessionQuery.listSessions()`）走的是同一条全量扫盘。
+ * 以前它们在 `apply` 里立刻发起，等于**与官方抢同一次全量列举**，正好压住用户
+ * 打开页面后等列表的那一个窗口（真机实测该窗口 40–90 s）。
+ *
+ * 故改为惰性：首次打开归档面板时立即补跑（用户要看的就是这份数据，必须最新）；
+ * 另有本延迟作为「用户一直不开面板」的兜底，保证幽灵清扫最终会发生。
+ */
+const STARTUP_SCAN_DELAY_MS = 30_000
+
 declare module '@deepseek-ai/cordis' {
   interface Events {
     /**
@@ -1014,12 +1028,22 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
 
   // 启动清扫（均不影响加载）：归档集幽灵 id（历史遗留）、投影缓存陈旧行。
   // spec 09 审计：三项启动读取（清扫 ×2 + 对齐）共享 header 事实缓存单飞，启动只扫一次盘。
-  void sweepGhostArchivedIds(ctx, surface, headerFacts)
-  void sweepStaleProjectionCache(ctx, headerFacts)
+  // 2026-09-29：**不再在 apply 里立刻发起**——它们与官方会话列表接口抢同一次全量扫盘，
+  // 会压住用户打开页面后等列表的窗口（真机实测 40–90 s）。改为「首次打开归档面板时补跑」
+  // + 一条延迟兜底，见 runStartupScans 的说明。
+  let startupScansDone = false
+  const runStartupScans = (): void => {
+    if (startupScansDone) return
+    startupScansDone = true
+    void sweepGhostArchivedIds(ctx, surface, headerFacts)
+    void sweepStaleProjectionCache(ctx, headerFacts)
+    void alignChildArchives(ctx, surface, headerFacts)
+  }
+  const startupScanTimer = setTimeout(runStartupScans, STARTUP_SCAN_DELAY_MS)
+  ctx.effect(() => () => clearTimeout(startupScanTimer), 'dsh-archive-manage: 启动清扫兜底定时器')
 
-  // spec 08 父子联动：启动对齐 + 官方 workspace 域写入事件驱动实时对齐（幂等，官方 feed 同款监听）。
+  // spec 08 父子联动：官方 workspace 域写入事件驱动实时对齐（幂等，官方 feed 同款监听）。
   // spec 09：同事件写穿失效 header 缓存（官方菜单归档等外部写不经过本插件路由）。
-  void alignChildArchives(ctx, surface, headerFacts)
   ctx.effect(() => ctx.on('domain/changed', (change) => {
     if (change.domain !== 'workspace' || change.operation !== 'put') return
     headerFacts.invalidate()
@@ -1046,6 +1070,9 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
         }
         if (req.method === 'GET' && pathname === `${PREFIX}/list`) {
           // spec 08：归档区 = 已归档会话的父子树；先惰性对齐再构建（事件驱动之外的兜底）。
+          // 2026-09-29：用户打开面板 = 明确要看归档数据，故这里先补跑启动三项扫描
+          // （幽灵清扫 + 陈旧投影清扫 + 父子对齐），保证首屏就是清扫后的结果。
+          runStartupScans()
           await alignChildArchives(ctx, surface, headerFacts)
           const { headers, sizes } = await headerFacts.get()
           const byId = new Map(headers.map(header => [String(header.id), header]))
