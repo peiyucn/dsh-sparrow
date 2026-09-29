@@ -7,6 +7,7 @@ See [简体中文](./CHANGELOG.zh-CN.md).
 
 - Version-line alignment with official dsh 0.2.0-rc.2.
 - The session-credits pill under the composer now matches the official stat pills exactly (full-capsule corners and the same 12/20 text tier), so the pills in that row no longer look mismatched.
+- Loading states (credits card, account and quota rows, model picker) show a spinner instead of plain "Loading…" text.
 - Fixed the plugin not working after adapting to the 0.1.7 line (host-facing contract, image targets, message model).
 - Fixed credits resetting after a restart: credits now read the official session projection instead of the deprecated sync history.
 - Fixed the CodeBuddy entry on the hero page **overlapping** the official top-right button.

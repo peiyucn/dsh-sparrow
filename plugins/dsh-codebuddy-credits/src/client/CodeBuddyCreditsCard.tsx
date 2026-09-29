@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { formatModelFacts } from './format.js'
+import { BusyDot } from './BusyDot.js'
 import { CLIENT_ACTION_TIMEOUT_MS, fetchLocal } from './fetch-timeout.js'
 import { syncModelFacts, type ModelFactView } from './model-facts.js'
 
@@ -475,7 +476,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
               </button>
             </div>
             {status === undefined
-              ? <p style={hintStyle}>{t('picker.trigger.loading')}</p>
+              ? <BusyDot label={t('picker.trigger.loading')} style={hintStyle} />
               : models.length === 0
                 ? <p style={hintStyle}>{t('models.empty')}</p>
                 : models.map(model => (

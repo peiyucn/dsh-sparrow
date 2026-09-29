@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import { setMaxMode, subscribeMaxMode, getMaxMode, syncMaxMode } from './maxMode.js'
+import { BusyDot } from './BusyDot.js'
 import { formatModelFacts } from './format.js'
 import { fetchLocal } from './fetch-timeout.js'
 import { PROFILE_URL, safeExternalHref } from './external-links.js'
@@ -562,7 +563,7 @@ export function CodeBuddyCreditsIndicator({
                 : null}
             </div>
             {status === undefined && loadError === undefined
-              ? <div style={captionStyle}>{t('indicator.loading')}</div>
+              ? <BusyDot label={t('indicator.loading')} style={captionStyle} />
               : null}
             {status?.keyConfigured === true
               ? (
@@ -571,7 +572,7 @@ export function CodeBuddyCreditsIndicator({
                     ? <div style={captionStyle}>{accountText}</div>
                     : null}
                   {quota === undefined && quotaError === undefined
-                    ? <div style={captionStyle}>{t('indicator.loading')}</div>
+                    ? <BusyDot label={t('indicator.loading')} style={captionStyle} />
                     : null}
                   {quota !== undefined
                     ? (

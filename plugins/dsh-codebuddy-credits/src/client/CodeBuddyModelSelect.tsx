@@ -25,6 +25,7 @@ import {
   IconWarningOutlineRegular, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getMaxMode, subscribeMaxMode } from './maxMode.js'
+import { BusyDot } from './BusyDot.js'
 import { formatModelFacts } from './format.js'
 // 模型事实表与额度卡同源（host /api/codebuddy-credits/status 的 models 列表）：
 // 选择器只订阅读取，不自己发请求（额度卡未挂载时由 ensureModelFacts 补一次）。
@@ -454,7 +455,7 @@ export function CodeBuddyModelSelect(
           {pane === 'model' && (
             <>
               {state.status === 'loading' && (
-                <div className="ccb-model-status">{t('picker.status.loading')}</div>
+                <div className="ccb-model-status"><BusyDot label={t('picker.status.loading')} /></div>
               )}
               {state.error !== null && lastActionRef.current === 'load' && (
                 <div className="ccb-model-error">
