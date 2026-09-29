@@ -170,10 +170,38 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
 let stylesInstalled = false
 
 /**
- * 注入胶囊的样式（对齐官方 StatsPills.module.css 的 `.pill`：字号行高随官方行
- * 继承的 13/20、1px 8px 内边距、24px 圆角、tertiary 文案、hover 提亮、14px
- * 图标）。官方行自带 12px gap，胶囊不自留外边距；官方行与官方两颗胶囊的
- * 标签都自带 `min-width:0 + 省略号`，故窄屏下三颗一起收窄而非溢出。
+ * 胶囊圆角：**官方是全胶囊 `999px`**（`ui-chat/.../StatsPills.module.css:30` 的 `.pill`），
+ * 不是一个固定 px 值。
+ *
+ * ⚠️ 历史（这正是 owner 报「输入框下面几个胶囊圆角不一样」的原因）：
+ * 官方 `0.1.5-rc.2` 与 `0.1.7-rc.1` 用的确实是 `24px`，本插件当时按它对齐；
+ * 官方在 **`0.1.7-rc.2`（commit `fdd14a0989`）改成了 `999px`**，我们没跟。
+ * 于是同一个 dock 行里，官方两颗是全胶囊、我们这颗是 24px。
+ */
+const PILL_RADIUS = '999px'
+
+/**
+ * 官方胶囊的**字号 / 行高不在 `.pill` 上，而在外层 `.root`**
+ * （`StatsPills.module.css:11-12`）：
+ *
+ * ```
+ * font-size: calc(var(--dsh-content-font-size-secondary, 13px) - 1px);
+ * line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
+ * ```
+ *
+ * 我们挂在 `conversation.composer.dock`，**不在那个 `.root` 里** —— `.dock` 自己
+ * 不设字号行高（`ui-conversation/src/client/skeleton/InputBar.module.css:13-20`），
+ * 所以 `font: inherit` 拿到的是外层更大的字。必须把这组值抄到胶囊上，
+ * 否则胶囊比官方那两颗高一档、文字也大一档，看上去的「圆角角度」同样不一样。
+ */
+const PILL_FONT_SIZE = 'calc(var(--dsh-content-font-size-secondary, 13px) - 1px)'
+const PILL_LINE_HEIGHT = 'calc(20px + var(--dsh-content-font-delta-secondary, 0px))'
+
+/**
+ * 注入胶囊的样式（逐条对齐官方 `StatsPills.module.css` 的 `.root` + `.pill`：
+ * 12/20 字号行高、1px 8px 内边距、**全胶囊 999px** + `corner-shape: round`、
+ * tertiary 文案、hover 提亮、14px 图标）。官方行自带 12px gap，胶囊不自留外边距；
+ * 官方行与官方两颗胶囊的标签都自带 `min-width:0 + 省略号`，故窄屏下三颗一起收窄而非溢出。
  */
 export function ensureStatsStyles(): void {
   if (stylesInstalled || typeof document === 'undefined') return
@@ -183,9 +211,12 @@ export function ensureStatsStyles(): void {
     '.ccb-session-stats-pill {',
     '  display: inline-flex; align-items: center; gap: 6px;',
     '  box-sizing: border-box; max-width: 100%;',
-    '  padding: 1px 8px; border: none; border-radius: 24px;',
+    '  padding: 1px 8px; border: none;',
+    `  border-radius: ${PILL_RADIUS}; corner-shape: round;`,
     '  background: transparent; color: var(--dsw-alias-label-tertiary);',
-    '  font: inherit; font-variant-numeric: tabular-nums; line-height: inherit;',
+    '  font: inherit; font-variant-numeric: tabular-nums;',
+    `  font-size: ${PILL_FONT_SIZE};`,
+    `  line-height: ${PILL_LINE_HEIGHT};`,
     '  white-space: nowrap; cursor: pointer;',
     '}',
     '.ccb-session-stats-pill svg {',
