@@ -313,9 +313,8 @@ export function ensureArchiveStyles(): void {
   text-align: left;
   cursor: pointer;
 }
-.dsh-archive-section:hover {
-  background: var(--dsw-specific-sidebar-nav-item-hover, var(--dsw-alias-interactive-bg-hover));
-}
+/* 区块标题行（归档区 / 回收站）不做 hover 底色：它只是折叠开关，泛底色会被读成
+   "这一行被选中/可选"。owner 2026-09-29 口径。 */
 /* 区块卡：官方 settings 内容卡同款 token（ModelsSection .rowCard：border-l2 + r12），
    归档区 / 回收站各包一块，视觉上分割两组列表；应用无全局 border-box，须显式声明。 */
 .dsh-archive-section-card {
