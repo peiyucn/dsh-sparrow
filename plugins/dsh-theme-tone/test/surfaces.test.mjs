@@ -1432,6 +1432,33 @@ describe('抬升面：表面绘制', () => {
     // 结构锚点，不碰 hashed 类名（codebuddy 那个类还是非哈希的 ccb-model-groupTitle）
     assert.ok(GROUPED_MENU_TITLE_SELECTOR.includes("role='group'"), '标题用 role=group 的结构锚定')
     assert.ok(!/class\*?=/.test(GROUPED_MENU_TITLE_SELECTOR), '不得用类名匹配标题')
+
+    // ⛔ rc.2 回归守卫：官方 0.2.0-rc.2 把分组菜单抽成 MenuGroup 原语，它在标题**前面**
+    // 插了一个 1×1 隐形哨兵 `<span data-menu-group-start>`（供 observeStickyMenuGroups
+    // 观测吸顶）⇒ 标题不再是 `:first-child`。只写 `:first-child` 会命中那个哨兵，
+    // 真标题拿不到图层，官方吸顶填充（--dsw-alias-menu-group-header-fill，94% 不透明）
+    // 就压在我们染过色的菜单上 —— 正是这条规则当初要治的「横带」。
+    assert.ok(
+      GROUPED_MENU_TITLE_SELECTOR.includes('[data-menu-group-heading]'),
+      '必须同时锚 0.2.0-rc.2 MenuGroup 的公开属性 data-menu-group-heading',
+    )
+
+    // ⛔ 本常量是**后代片段**，由 groupTitleRule 拼在菜单锚点之后。若写成**顶层**逗号列表，
+    // 拼接处会把整条规则切开：后半段丢掉 body 前缀与色调门，静默生效到全站。
+    // （`:is()` 内部的逗号是嵌套的、不切分外层，故只查括号外的逗号。）
+    const topLevelComma = (selector) => {
+      let depth = 0
+      for (const ch of selector) {
+        if (ch === '(') depth += 1
+        else if (ch === ')') depth -= 1
+        else if (ch === ',' && depth === 0) return true
+      }
+      return false
+    }
+    assert.ok(
+      !topLevelComma(GROUPED_MENU_TITLE_SELECTOR),
+      'GROUPED_MENU_TITLE_SELECTOR 必须是单个复合选择器（顶层逗号会切断后代拼接）',
+    )
   })
 
   it('血缘树应该 用 `body >` 收窄（官方有四处 role=tree，只有子代理那个是 portal）', () => {

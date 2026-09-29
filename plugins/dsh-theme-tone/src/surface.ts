@@ -368,12 +368,36 @@ export const GROUPED_MENU_SELECTOR = "body [role='menu']:has([role='group'])"
 export const GROUPED_MENU_UNGUARDED_SELECTOR = "body [role='menu']"
 
 /**
- * 分组标题条：`<section role='group'>` 的**第一个子元素**（两个选择器都是这么渲染的，
- * 见 `ModelSelect.tsx:441-442` 与 `CodeBuddyModelSelect.tsx:449-450`）。
- * 用**结构**锚定，不碰 hashed 类名 —— 用 `[class*='_groupTitle']` 还得额外照顾
- * codebuddy 那个非哈希的 `ccb-model-groupTitle`，结构锚点一条就够。
+ * 分组标题条：`<section role='group'>` 里的**标题元素**。
+ *
+ * 用**结构 / 公开锚点**定位，不碰 hashed 类名 —— 用 `[class*='_groupTitle']` 还得额外照顾
+ * codebuddy 那个非哈希的 `ccb-model-groupTitle`，而且官方一改名就失效。
+ *
+ * ## ⚠️ 两种结构都要覆盖（0.2.0-rc.2 的官方改版）
+ *
+ * | 结构 | 谁 | 标题在哪 |
+ * | :--- | :--- | :--- |
+ * | 旧 | ≤0.2.0-rc.1 的官方 `ModelSelect`；本仓库 codebuddy 的 `CodeBuddyModelSelect.tsx:475-476` | `[role='group']` 的**第一个子元素** |
+ * | 新 | 0.2.0-rc.2 起官方抽出的 `MenuGroup` 原语（`ui-primitives/src/MenuGroup.tsx:13-16`） | 带公开属性 **`data-menu-group-heading`** 的元素 |
+ *
+ * rc.2 的 `MenuGroup` 在标题**前面**插了一个 1×1 隐形哨兵
+ * `<span data-menu-group-start>`（供 `observeStickyMenuGroups` 观测吸顶），
+ * 于是标题**不再是**第一个子元素。
+ *
+ * **只写 `:first-child` 会在 rc.2 上打错元素**：命中的是那个 1×1 哨兵，
+ * 真正的标题条拿不到图层 ⇒ 官方吸顶时
+ * `background: var(--dsw-alias-menu-group-header-fill)`（新 token，浅深各 94% 不透明）
+ * 直接压在我们染过色的菜单上，回到当初做这条规则要治的「横带」。
+ * （哨兵自身 `opacity: 0`，被顺带命中也看不见，故不额外排除。）
+ *
+ * ⚠️ **必须是单个复合选择器，不能写成逗号列表**：本常量是**后代片段**，
+ * 由 {@link groupTitleRule} 拼在 {@link GROUPED_MENU_UNGUARDED_SELECTOR} 之后 ——
+ * 逗号会在拼接处切开整条规则，后半段丢掉 body 前缀与色调门，静默生效到全站。
+ * 故两个结构用 `:is()` 合并；两个参数特异度同为 (0,1,0)，`:is()` 取最大值 ⇒
+ * 与本版之前的 `:first-child` **特异度完全一致**（不改变与官方规则的胜负关系）。
  */
-export const GROUPED_MENU_TITLE_SELECTOR = "[role='group'] > :first-child"
+export const GROUPED_MENU_TITLE_SELECTOR =
+  "[role='group'] > :is(:first-child, [data-menu-group-heading])"
 
 /**
  * **输入框上方那三张停靠卡**（排队 / 目标 / 待办）—— 它们**不是浮层**，故单列一张表。
