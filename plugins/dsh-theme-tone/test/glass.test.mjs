@@ -859,10 +859,26 @@ describe('glass：边界与纪律', () => {
       new RegExp(`opacity:\\s*var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT}\\)`, 'u'),
       '浅色轴 opacity 必须与背景层同源（同一个统一变量 + 浅色轴回落值）',
     )
-    // ⚠️ ::after 需要包含块，而官方 .tabHost / .emptyTabHost 是 static —— 必须补 position
-    const rpStart = rightPanelRuleStart(rules)
-    const rpRule = rules.slice(rpStart, rules.indexOf('}', rpStart))
-    assert.match(rpRule, /position:\s*relative/u, '宿主必须补 position: relative 给 ::after 当包含块')
+    // ⚠️ ::after 需要包含块，而官方 .tabHost / .emptyTabHost 是 static —— 必须补 position。
+    // 但**只能补在 dockkit 宿主上，不能补在 [data-sidebar-right-panel] 上**：
+    // 官方面板是 ".panel { position: absolute; top/right/bottom: 0 }"，靠 absolute 拉满可视高，
+    // 面板写成 relative 后高度改由内容撑开（实测长文件预览 = 11842px），内层 overflow:auto 失效
+    // ⇒ owner 报的「右边栏文件预览滚动坏了」。故这里断言拆开后的两条规则各自正确。
+    // 注意按**声明**判断，不能正则 "position:" —— 面板那条里有 "background-position:"。
+    const panelStart = rightPanelRuleStart(rules)
+    const panelBody = rules.slice(panelStart, rules.indexOf('}', panelStart))
+    const panelDecls = panelBody.slice(panelBody.indexOf('{') + 1).split(';').map(d => d.trim()).filter(Boolean)
+    assert.ok(
+      !panelDecls.some(d => d.startsWith('position')),
+      '不得给 [data-sidebar-right-panel] 写 position（会顶掉官方 absolute，撑坏右栏滚动）',
+    )
+    // 拆成规则块逐个查：必须存在一条「选择器含 [data-dockkit-pane] 且声明含 position: relative」的规则，
+    // 且**没有任何**声明 position 的规则把 [data-sidebar-right-panel] 列在选择器里。
+    const blocks = rules.split('}').map(b => b.trim()).filter(Boolean)
+    const panePositionRule = blocks.find(b => b.includes('[data-dockkit-pane]') && /position:\s*relative/u.test(b.slice(b.indexOf('{'))))
+    assert.ok(panePositionRule, 'dockkit 宿主必须有一条 position: relative（给 ::after 当包含块）')
+    const panelPositionRule = blocks.find(b => b.split('{')[0].includes('[data-sidebar-right-panel]') && /position:\s*relative/u.test(b.slice(b.indexOf('{'))))
+    assert.ok(!panelPositionRule, 'position: relative 不得落在 [data-sidebar-right-panel] 规则上')
   })
 
   it('不应该 给浮层写规则（浮层是不透明 + 质感，走 src/surface.ts）', () => {

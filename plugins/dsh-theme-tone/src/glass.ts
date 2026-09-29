@@ -1047,8 +1047,20 @@ body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [da
    （常量直引 GRAIN_OPACITY / GRAIN_OPACITY_LIGHT / GRAIN_DATA_URI，不复制数值）。
 
    ⚠️ ::after 需要定位上下文，而官方 .tabHost / .emptyTabHost **没有 position**（static）
-   —— 故这条 gated 规则同时补 position: relative（不动官方任何几何：grid 项的相对定位
-   不改变摆放，只是给伪元素一个包含块）。
+   —— 故这台宿主单独补一条 position: relative。
+
+   ⚠️⚠️ **但 [data-sidebar-right-panel] 本体绝不能写 position（2026-09-29 修，owner 报
+   「右边栏文件预览的滚动坏了」）**：官方面板是
+   SidebarRight.module.css:31-42 的 ".panel { position: absolute; top: 0; right: 0; bottom: 0 }"
+   —— 它靠 absolute + top/bottom 拉满可视高，内部的 ".paneBody{overflow:auto}" 才有一个
+   **有界**的滚动区。本规则原先把 panel 也一起写成 relative（本意只是给 ::after 包含块，
+   而 panel 根本没有 ::after），于是 "bottom: 0" 从「拉满高度」退化成「相对偏移」，
+   面板高度改由内容撑开 —— 实测打开一个长文件预览时 panel 高 **11842px**（视口 720px），
+   父级 .rightbarCol 仍 720px，多出来的部分溢出到 frame 之外，
+   内层滚动条因"没有可滚动余量"（scrollHeight === clientHeight）**彻底失效**。
+   把 position: relative 从 panel 上摘掉后实测 11842 → 720px，滚动恢复。
+   故本规则只保留背景图层；定位上下文只在真正需要它的 dockkit 宿主上补（见下一条）。
+   面板自己的层叠/几何一律交还官方。
 
    ⚠️ background-size / -position / -repeat 现在是 **3 层**，**必须给足 3 个值** ——
    值少于层数时**会按顺序循环补齐**（本插件栽过：写「scroll, fixed」等于两者交替，
@@ -1057,12 +1069,17 @@ body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [da
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
 body:not([${PLAIN_ATTR}]) [data-dockkit-pane],
 body:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
-  position: relative;
   background-image: ${BACKDROP_GRADIENTS};
   background-attachment: scroll;
   background-size: 100vw 100vh, 100vw 100vh, 100vw 100vh;
   background-position: right top, right top, right top;
   background-repeat: no-repeat, no-repeat, no-repeat;
+}
+/* ::after 的包含块：只给官方 static 的 dockkit 宿主（**不含** panel —— 那条见上）。
+   补定位不改几何：relative + 无偏移不移动、不改尺寸，grid/flex 摆放不变。 */
+body:not([${PLAIN_ATTR}]) [data-dockkit-pane],
+body:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
+  position: relative;
 }
 /* 渐变本身的合成方式也必须同构：深色轴上**背景层整层**是 mix-blend-mode: screen
    （渐变与颗粒都走加法），而面板这里的背景层是**正常合成** ——
