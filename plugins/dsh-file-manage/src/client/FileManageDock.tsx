@@ -133,16 +133,38 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
 
   useEffect(() => {
     if (!open) return
-    setConfirming(null)
-    setSummary(null)
-    setRows([])
-    setHasMore(false)
-    setLastId(undefined)
+    // 内容清空 + 置 loading 已由 openPanel（点击处理器）在同一批更新里做完，此处**只发请求**。
+    // ⚠️ 不要在这里再 setRows([]) / setLoading(true)：那会多出一帧「已打开但没有 loading」
+    // 的中间态，正是 owner 看到的闪动（见 openPanel 顶部那段）。
     reload()
   }, [open, reload])
 
   useEffect(() => () => {
     if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current)
+  }, [])
+
+  /**
+   * 打开面板：**在同一批 state 更新里**清空内容并置 loading，让打开后的第一帧就是 loading。
+   *
+   * ⚠️ 为什么不能只靠下面那个 `useEffect`（owner 2026-09-30 报的「打开后先全高展示闪一下，
+   * 然后变矮，出现 loading」，真机逐帧量到 **1 帧 / 12ms**：h=672 带旧列表 → h=409 loading）：
+   * `open` 从 false 翻成 true 时，React **先用上一次关闭时的旧 state 渲染一帧** ——
+   * 那时 `rows` / `summary` 还留着上次的数据、`loading` 还是 false，于是画出**全高旧列表**；
+   * 等 `useEffect` 跑完（`setRows([])` + `reload()` 置 loading）才是第二帧，内容突然变矮。
+   * 把清空动作放进**点击处理器**，React 会把它和 `setOpen(true)` 批进同一次渲染
+   * ⇒ 第一帧就是 loading，那一帧不再存在。
+   */
+  const openPanel = useCallback(() => {
+    setConfirming(null)
+    setSummary(null)
+    setRows([])
+    setHasMore(false)
+    setLastId(undefined)
+    setError(null)
+    // 首屏 ready 门的两半：两者同时置位，第一帧才画 loading 而不是空盒子。
+    setLoading(true)
+    setSummaryPending(true)
+    setOpen(true)
   }, [])
 
   const loadMore = useCallback(() => {
@@ -243,7 +265,7 @@ export function FileManageDock({ wide, listFiles, deleteFile, countFiles, t }: F
         title={t('dialog.title')}
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => { setOpen(value => !value) }}
+        onClick={() => { if (open) setOpen(false); else openPanel() }}
       >
         <IconFolderOpenOutlineRegular className="dsh-file-manage-trigger-icon" size={wide ? 16 : 18} />
         {wide ? <span className="dsh-file-manage-trigger-label">{t('button.label')}</span> : null}
