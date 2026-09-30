@@ -1084,7 +1084,16 @@ body:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
   background-image: ${BACKDROP_GRADIENTS};
   background-attachment: scroll;
   background-size: 100vw 100vh, 100vw 100vh, 100vw 100vh;
-  background-position: right top, right top, right top;
+  /* 垂直相位 = 视口顶 **减去 caption 高度**。
+     桌面端（Windows 标题栏）面板被 caption 挤下，若不减就与页面那层差 40px、失去像素同相
+     （owner 2026-09-30 报「桌面端右边栏展开后咱们也有点兼容问题」）。
+     该变量由 apps/desktop/src/preload-windows.ts 置在 html 上、沿继承树传给 body；
+     **web 下不存在** ⇒ 兜底 0px，与改动前逐像素一致。故这里不需要按平台分两条规则。
+     （本段在模板字符串里，注释中不能出现反引号。） */
+  background-position:
+    right calc(0px - var(--dsh-windows-titlebar-height, 0px)),
+    right calc(0px - var(--dsh-windows-titlebar-height, 0px)),
+    right calc(0px - var(--dsh-windows-titlebar-height, 0px));
   background-repeat: no-repeat, no-repeat, no-repeat;
 }
 /* ::after 的包含块：只给官方 static 的 dockkit 宿主（**不含** panel —— 那条见上）。

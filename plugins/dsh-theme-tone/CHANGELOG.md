@@ -6,6 +6,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 - Version-line alignment with official dsh 0.2.0-rc.2.
 - Fixed grouped menu section titles (model picker, command popup) losing their themed material on dsh 0.2.0-rc.2.
+- Fixed the right sidebar's themed gradient being offset by the window caption on the Windows desktop app (the app pushes the panel down by the title bar, and the gradient did not follow).
 - New: with a tone picked, the turn navigation **no longer disappears on a narrow conversation column** (the official 900px breakpoint moves to 700px; below that it fades in on hover over the right edge), and the conversation content keeps at least 120px clearance per side (official: 88px) so the right drag handle no longer crowds the rail. This is the former `dsh-nav-pin` plugin, now merged in (**inactive on the official Default tone**).
 - Also fixes a small official glitch: hovering a "resize conversation" drag handle no longer leaves the glow sitting low — it follows the pointer (**active with no tone picked too**).
 - Fixed a washed-out band on the right of the conversation that persisted once the right sidebar had been opened.

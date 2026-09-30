@@ -280,10 +280,28 @@ describe('glass：顶栏浮层', () => {
     // 层数现在是 **3**（颗粒已改为独立的 ::after，不再占背景层 —— 见下一条用例）。
     const panel = rules.slice(rightPanelRuleStart(rules))
     const body = panel.slice(0, panel.indexOf('}') + 1)
+    /**
+     * 按**顶层逗号**切分值。
+     * ⚠️ 不能直接 `split(',')`：值里可能含函数（如 `calc(0px - var(--x, 0px))`），
+     * 括号内的逗号不是层分隔符 —— 直接切会把 3 层读成 6 层（本仓库实测踩过）。
+     */
+    const splitTopLevel = (value) => {
+      const out = []
+      let depth = 0
+      let start = 0
+      for (let i = 0; i < value.length; i++) {
+        const ch = value[i]
+        if (ch === '(') depth++
+        else if (ch === ')') depth--
+        else if (ch === ',' && depth === 0) { out.push(value.slice(start, i).trim()); start = i + 1 }
+      }
+      out.push(value.slice(start).trim())
+      return out
+    }
     const decl = (prop) => {
       const m = body.match(new RegExp(`${prop}\\s*:\\s*([^;]+);`, 'u'))
       assert.ok(m, `${prop} 缺失`)
-      return m[1].split(',').map(s => s.trim())
+      return splitTopLevel(m[1])
     }
     assert.equal(decl('background-size').length, 3, 'background-size 必须 3 个值（= 层数）')
     assert.equal(decl('background-position').length, 3, 'background-position 必须 3 个值（= 层数）')
@@ -291,10 +309,26 @@ describe('glass：顶栏浮层', () => {
     // 三段渐变的盒子尺寸必须是**显式视口尺寸**（auto 会让盒宽随 regime 变）
     assert.deepEqual(decl('background-size'), ['100vw 100vh', '100vw 100vh', '100vw 100vh'],
       '三段渐变必须显式 100vw 100vh')
-    // 渐变右对齐（右缘 = 视口右缘）
-    assert.deepEqual(decl('background-position'), ['right top', 'right top', 'right top'],
-      '三段渐变右对齐')
+    // 渐变右对齐（右缘 = 视口右缘），垂直方向**减去 caption 高度**
+    // —— 桌面端（Windows 标题栏）面板被 caption 挤下，不减去就会与页面那层差 40px
+    //    （owner 2026-09-30 报「桌面端右边栏展开后咱们也有点兼容问题」）。
+    const expectedPos = 'right calc(0px - var(--dsh-windows-titlebar-height, 0px))'
+    assert.deepEqual(decl('background-position'), [expectedPos, expectedPos, expectedPos],
+      '三段渐变右对齐，且垂直相位按 caption 高度回正（web 下该变量不存在 ⇒ 0）')
     assert.deepEqual(decl('background-repeat'), ['no-repeat', 'no-repeat', 'no-repeat'])
+  })
+
+  it('桌面端 caption 相位：必须读官方变量并带 0 兜底（web 下逐像素不变）', () => {
+    // 读**官方自己**的变量而不是自己探平台：preload-windows.ts 把它置在 html 上，
+    // 沿继承树传给 body；web 下不存在 ⇒ fallback 0px，与改动前逐像素一致。
+    // 这里钉住「fallback 是 0」这个前提 —— 若有人把兜底写成非 0，web 会当场偏色。
+    const panel = rules.slice(rightPanelRuleStart(rules))
+    const body = panel.slice(0, panel.indexOf('}') + 1)
+    assert.match(body, /var\(--dsh-windows-titlebar-height,\s*0px\)/u,
+      '必须读 --dsh-windows-titlebar-height 且兜底 0px（这是官方 preload 写的变量名）')
+    // 不得为了桌面端另写一条 html 前缀规则绕开本表的「每条规则都要带门」纪律
+    assert.ok(!/^html\[data-windows-titlebar\]/mu.test(rules),
+      '不要新增 html 前缀的图层规则（应像本规则一样以 body 开头并自带门）')
   })
 })
 
