@@ -4,7 +4,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'archive-manage':
       | 'button.label'
       | 'dialog.title'
-      | 'dialog.close'
       | 'dialog.trashDir'
       | 'dialog.copyHint'
       | 'dialog.copied'

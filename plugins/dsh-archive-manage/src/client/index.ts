@@ -1,5 +1,8 @@
 /**
- * dsh-archive-manage client half：sidebar footer 入口 + 归档弹窗。
+ * dsh-archive-manage client half：官方「主面板」入口（左栏上面的图标行 + 中央列的页面）。
+ *
+ * 形态对齐官方 `ui-plugin-manager`（插件）与 `ui-schedule`（自动化任务），见 spec 16：
+ * `main` keyed 槽与 `sidebar.panellist` list 槽**共用同一个 id**。
  * 所有写操作都走 host 自有路由；客户端不直接碰文件。
  */
 
@@ -11,18 +14,28 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import { ArchiveDock, ensureArchiveStyles } from './ArchiveDock.js'
-import type { ArchivedSessionItem, DeleteMutationResult, StraySessionItem, TrashDeleteResult, TrashMutationResult } from './ArchiveDock.js'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import { ArchivePanel, ensureArchiveStyles } from './ArchivePage.js'
+import type { ArchivedSessionItem, DeleteMutationResult, StraySessionItem, TrashDeleteResult, TrashMutationResult } from './ArchivePage.js'
+import { ArchivePanelIcon } from './ArchivePanelIcon.js'
+import { attachMainPanel } from './panel.js'
 
 // remote：官方 Remote 事件载体（api-session/* 桥接，spec 08 §2.5）；硬依赖，缺失时本插件客户端不启动。
+// ⚠️ `layout` **不在这里** —— client half 的 inject 缺服务会让 entry 永远 pending，
+// 而客户端 boot 审计把非 active 的 entry 当致命失败；它走 panel.ts 里的可选依赖 fork。
 export const inject = ['slots', 'locale', 'remote']
+
+/** 入口 id：同时是左栏面板行的 id 与中央列 `main` 槽的 key（官方 `MainPanelId`）。 */
+export const PANEL_ID = 'archive-manage' as MainPanelId
+
+/** 左栏行序：官方 plugins = 0、schedules = 10，本插件沿用原 footer 的 20 号段。 */
+const PANEL_ORDER = 20
 
 /** 本插件的 locale 字典（zh/en）。 */
 const LOCALE_DICTS = {
   zh: {
     'button.label': '归档',
     'dialog.title': '归档会话管理',
-    'dialog.close': '关闭',
     'dialog.trashDir': '回收站位置：',
     'dialog.copyHint': '点击复制完整路径',
     'dialog.copied': '已复制',
@@ -82,7 +95,6 @@ const LOCALE_DICTS = {
   en: {
     'button.label': 'Archive',
     'dialog.title': 'Archived Sessions',
-    'dialog.close': 'Close',
     'dialog.trashDir': 'Trash: ',
     'dialog.copyHint': 'Click to copy the full path',
     'dialog.copied': 'Copied',
@@ -184,7 +196,7 @@ async function postApi<T = { ok?: boolean }>(path: string, body: unknown): Promi
 }
 
 /**
- * client half 入口：注册 sidebar footer action。
+ * client half 入口：locale 字典 + 实时刷新桥 + 官方主面板两处注册。
  * @param ctx - 浏览器侧 Cordis 上下文。
  */
 export function apply(ctx: ClientContext): void {
@@ -192,7 +204,7 @@ export function apply(ctx: ClientContext): void {
   const disposeDictionaries = ctx.locale.register('archive-manage', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
   ctx.effect(() => disposeDictionaries, 'dsh-archive-manage: locale dictionaries')
   // 官方「会话离开 live store」（fiber 销毁，session-controller 转发的 api-session/removed）
-  // → 广播窗口事件，面板打开时据此实时刷新 hold 标记（spec 08 §2.5）。
+  // → 广播窗口事件，页面在屏时据此实时刷新 hold 标记（spec 08 §2.5）。
   // 事件名在 cordis Events 与 TypertRemoteEventSelection 均已声明，但 npm 中间态包的
   // Remote 签名推导拼不出该事件（运行时桥接按名称转发，与类型无关），此处做局部结构断言。
   const remote = ctx.remote as unknown as { $on(event: string, handler: () => void): () => void }
@@ -200,11 +212,13 @@ export function apply(ctx: ClientContext): void {
     window.dispatchEvent(new CustomEvent('dsh-archive-sessions-changed'))
   })
   ctx.effect(() => disposeRemoved, 'dsh-archive-manage: live 状态实时刷新')
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-    name: 'sidebar.footer.action',
+  // 官方主面板两处注册（`main` 页面 + `sidebar.panellist` 图标行）走可选依赖 fork：
+  // 官方布局服务不在位时整条不注册（惰性停用、不抛错），宿主照常启动。
+  attachMainPanel(ctx, {
+    id: PANEL_ID,
+    order: PANEL_ORDER,
     locale: 'archive-manage',
-    id: 'archive-manage',
-    order: 20,
+    label: () => ctx.locale.bind('archive-manage')('button.label'),
     inject: () => ({
       listArchived: () => readTree<ArchivedSessionItem>('/api/archive-manage/list'),
       listStrays: () => readApi<StraySessionItem>('/api/archive-manage/strays'),
@@ -233,8 +247,12 @@ export function apply(ctx: ClientContext): void {
       restoreAllTrash: () => postApi<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ trashId: string; message: string }> }>('/api/archive-manage/trash-restore-all', { confirm: true }),
       deleteAllTrash: () => postApi<{ deleted?: number; failed?: string[] }>('/api/archive-manage/trash-delete-all', { confirm: true }),
     }),
-  }, ArchiveDock))
+    page: ArchivePanel,
+    icon: ArchivePanelIcon,
+  })
 }
 
-export { ArchiveDock, ensureArchiveStyles } from './ArchiveDock.js'
-export type { ArchiveDockInjected, ArchiveDockProps, ArchivedSessionItem, TrashItem } from './ArchiveDock.js'
+export { ArchivePanel, ensureArchiveStyles } from './ArchivePage.js'
+export type { ArchivePanelInjected, ArchivePanelProps, ArchivedSessionItem, TrashItem } from './ArchivePage.js'
+export { ArchivePanelIcon } from './ArchivePanelIcon.js'
+export { attachMainPanel } from './panel.js'

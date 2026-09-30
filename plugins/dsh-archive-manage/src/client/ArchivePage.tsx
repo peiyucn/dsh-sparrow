@@ -1,10 +1,17 @@
-/** 归档会话管理入口：sidebar footer action + 弹窗（zh/en 双语 + loading 态）。 */
+/**
+ * 归档会话管理**页面**（spec 16）：注册进官方 `main` keyed 槽，渲染在**中央列**
+ * （对话区那块位置），与官方「插件」/「自动化任务」同形。
+ *
+ * ⚠️ 本视图**不再是弹窗**：没有遮罩、没有 `role='dialog'` / `aria-modal`、
+ * 没有「点遮罩关闭」、没有焦点陷阱、没有关闭按钮 —— 离开的方式是官方那条
+ * （点左栏会话项 / New Session）。二次确认仍走**官方 `Modal` 原语**
+ * （与官方 `ui-schedule` / `ui-plugin-manager` 在各自主页面里做删除确认的方式一致）。
+ */
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react'
-import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { IconArchiveOutlineRegular, IconCloseOutlineRegular, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Modal, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import { descendantLive, dropArchivedIds, isCollapsed, subtreeIdsOf, subtreeLive, trashSubagentTree, type ArchivedSessionItem, type TrashSubagentNode } from './archivedTree.js'
 import { countVisibleRows } from './paging.js'
 
@@ -12,21 +19,6 @@ import { countVisibleRows } from './paging.js'
 const ARCHIVE_PAGE_SIZE = 100
 /** 会话进出事件的刷新防抖（spec 09）：多个会话释放事件合并成一次全量刷新。 */
 const SESSIONS_CHANGED_DEBOUNCE_MS = 300
-
-/**
- * 面板 loading 用**官方自己的** `StateDot`（`ui-primitives`，`state="ongoing"`）。
- *
- * ⚠️ 2026-09-30 改判：这里原来**手搓过**一套 10×10 点阵（8 个 2px 方块追逐 + 自带 keyframes），
- * 注释写着「照搬 ui-primitives StateDot 的 matrix 分支」—— 那是对**更老的官方**对齐：
- * 官方早在 `4937343a5e feat(web): unify the client visual language`（先于 `0.1.7-rc.1`）
- * 就把 ongoing 换成了 **SVG 圆弧 spinner**（`StateDot.module.css`：1.5s 旋转 + dasharray 呼吸，
- * track 25% 不透明，带 `prefers-reduced-motion` 兜底）。我们没跟 ⇒ owner 看到的是
- * 「官方改了、我们没跟进」的那种不一致。
- *
- * 改为直接 import 官方组件：`ui-primitives` 是**平台种子词**（`PLATFORM_MODULES`）里的外部依赖、
- * 宿主提供，且它**本来就是本插件的 devDependency** ⇒ 零依赖改动；以后官方再改动画，
- * 我们自动跟随，不必再抄一遍几何。故本文件不再有任何 loading 的 keyframes / 几何常量。
- */
 
 /** 归档树节点与本地变更纯逻辑：见 archivedTree.ts（零依赖纯模块，node:test 可直接导入）。 */
 export type { ArchivedSessionItem } from './archivedTree.js'
@@ -83,7 +75,8 @@ export interface TrashDeleteResult {
   readonly trashId?: string
 }
 
-export interface ArchiveDockInjected {
+/** 页面的注入面（业务动作；与旧入口逐项一致，只换了承载的槽位）。 */
+export interface ArchivePanelInjected {
   listArchived: () => Promise<ArchivedSessionItem[]>
   listStrays: () => Promise<StraySessionItem[]>
   listTrashItems: () => Promise<TrashItem[]>
@@ -99,11 +92,47 @@ export interface ArchiveDockInjected {
   deleteAllTrash: () => Promise<{ deleted?: number; failed?: string[] }>
 }
 
-export type ArchiveDockProps = PropsRuntime<'sidebar.footer.action'> & ArchiveDockInjected & { t: TranslateNS<'archive-manage'> }
+/** 页面组件 props：主面板 owner share + 注入动作 + locale 座位（框架组装）。 */
+export type ArchivePanelProps = PropsRuntime<'main'> & InjectFace<ArchivePanelInjected> & PropsLocale<'archive-manage'>
 
-/** 注入侧边栏 footer 触发键样式（对齐官方 settings 触发键：透明底、圆角、悬停亮底、rail 圆形）。 */
+/** 注入归档页面样式：官方入口型页面的居中内容列 + 归档树 + 按钮，按 data 属性去重。 */
 export function ensureArchiveStyles(): void {
   const css = `
+/* 主面板页面：官方入口型页面同款（居中内容列，整页滚动；标题行自带 28px 顶内边距，
+   macOS 下再让出窗口顶带，故行自己的盒子就是窗口的拖拽几何）。 */
+.dsh-archive-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  overflow: auto;
+  padding: 0 clamp(24px, 4vw, 48px) 48px;
+  color: var(--dsw-alias-label-primary);
+  /* 基底面上的滚动条用 l1 一族（原浮层版重绑过 l2，页面上不再需要）。 */
+}
+.dsh-archive-page > * {
+  width: 100%;
+  max-width: 960px;
+}
+.dsh-archive-page-head {
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 28px;
+  margin-bottom: 20px;
+}
+html[data-platform='darwin'] .dsh-archive-page-head {
+  padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
+}
+.dsh-archive-page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+}
 /* spec 08 归档树：父行折叠按钮 + 树状连接线。 */
 .dsh-archive-tree-toggle {
   flex: none;
@@ -143,9 +172,8 @@ export function ensureArchiveStyles(): void {
    ⚠️ 竖线**不能**画成子区容器的 border-left：那样它在**末节点底部**仍会往下拖出一截，
    于是需要一个「用面板底色盖掉残段」的补丁（.dsh-archive-tree-node-last::after）。
    那个补丁只在「与父面**逐像素**同色」时成立 —— 而 dsh-theme-tone 会给抬升面
-   （本面板是 role='dialog'，被它的浮层锚点命中）叠一层**颗粒与光**，父面从此不再是纯色：
-   一条纯色的遮盖带盖在带颗粒的面上，就露成**一条白线**（owner 2026-09-20 报「看见蓝框里
-   那个白线了么…官方纯白色调因为同色所以看不见」）。
+   叠一层**颗粒与光**，父面不再是纯色：一条纯色的遮盖带盖在带颗粒的面上，
+   就露成**一条白线**（owner 2026-09-20 报「看见蓝框里那个白线了么…官方纯白色调因为同色所以看不见」）。
    改成每节点自画竖段后，**没有任何一处依赖「与父面同色」**，色调插件怎么给质感都不会破。
    （本段在模板字符串里，注释中不能出现反引号。） */
 .dsh-archive-tree-children {
@@ -186,39 +214,6 @@ export function ensureArchiveStyles(): void {
   bottom: auto;
   height: 16px;
 }
-.dsh-archive-trigger {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: calc(100% + 4px);
-  height: 42px;
-  margin: 4px -2px;
-  padding: 0 10px 0 8px;
-  box-sizing: border-box;
-  border: none;
-  border-radius: 12px;
-  background: transparent;
-  cursor: pointer;
-  overflow: hidden;
-  color: var(--dsw-alias-label-primary);
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 22px;
-}
-.dsh-archive-trigger:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.dsh-archive-trigger-rail {
-  width: 36px;
-  height: 36px;
-  margin: 8px 0 10px;
-  justify-content: center;
-  gap: 0;
-  padding: 0;
-  border-radius: 50%;
-  corner-shape: round;
-}
 .dsh-archive-btn {
   /* 官方 Button.sm 同款几何：h28 + r14 胶囊（超椭圆角随官方全局规则自动生效）。 */
   height: 28px;
@@ -242,40 +237,6 @@ export function ensureArchiveStyles(): void {
 }
 .dsh-archive-btn-danger {
   color: var(--dsw-alias-state-error-primary, #c62828);
-}
-.dsh-archive-panel-header {
-  flex: none;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  height: 54px;
-  /* 标题文字起点 24px：对齐官方 settings 面板 navTitle（rail 12px + title 12px）。 */
-  padding: 20px 14px 8px 24px;
-  box-sizing: border-box;
-}
-.dsh-archive-panel-title {
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 24px;
-  color: var(--dsw-alias-label-primary);
-}
-.dsh-archive-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: 8px;
-  outline: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--dsw-alias-label-primary);
-}
-.dsh-archive-close:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
 }
 .dsh-archive-section {
   display: flex;
@@ -316,33 +277,11 @@ export function ensureArchiveStyles(): void {
   width: calc(100% + 24px);
   margin: 0 -12px 4px -12px;
 }
-/* web 确认框：替代 window.confirm/prompt（webview 里原生 prompt 被禁用，删除按钮点不动）。 */
-.dsh-archive-confirm-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--dsw-alias-bg-mask-1, rgba(0, 0, 0, 0.28));
-  backdrop-filter: var(--dsw-mask-blur);
-}
-.dsh-archive-confirm-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: min(480px, calc(100vw - 48px));
-  padding: 20px;
-  border-radius: 16px;
-  background: var(--dsw-alias-bg-layer-2, #f6f7f9);
-  color: var(--dsw-alias-label-primary, #1f2329);
-  box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
-}
-.dsh-archive-confirm-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 24px;
+/* 二次确认框：官方 Modal 原语提供遮罩 / 卡片 / Esc / 焦点回收，这里只保留
+   本插件既有的正文排版与几何（不自己造遮罩与对话框语义）。 */
+.dsh-archive-confirm-dialog {
+  width: min(480px, 100%);
+  max-height: calc(100dvh - 48px);
 }
 .dsh-archive-confirm-desc {
   margin: 0;
@@ -368,7 +307,7 @@ export function ensureArchiveStyles(): void {
   border-color: var(--dsw-alias-button-info-fill, #4d6bfe);
 }
 .dsh-archive-confirm-hint {
-  margin: -4px 0 0;
+  margin: 8px 0 0;
   font-size: 12px;
   line-height: 18px;
   color: var(--dsw-alias-state-error-primary, #c62828);
@@ -391,26 +330,15 @@ export function ensureArchiveStyles(): void {
   text-decoration: underline;
 }
 .dsh-archive-confirm-status {
-  margin: 0;
+  margin: 8px 0 0;
   font-size: 13px;
   line-height: 20px;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
-.dsh-archive-confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-/* 面板滚动区：elevated surface 重绑 l2 滚动条 token（base 默认 l1，浮层上对比度不对）。 */
-.dsh-archive-panel-body {
-  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
-  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
-}
-/* 合集品牌 footer：固定面板底部（滚动区之外），顶部分割线与内容区隔开；紧凑规格。 */
-.dsh-archive-panel-footer {
-  flex: none;
+/* 合集品牌 footer：页面内容收尾（原面板底部那条，移到页面末尾）。 */
+.dsh-archive-page-footer {
   box-sizing: border-box;
-  padding: 6px 24px 8px;
+  padding: 16px 0 0;
   border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
   text-align: center;
   font-size: 11px;
@@ -418,12 +346,11 @@ export function ensureArchiveStyles(): void {
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
 /* 整页 loading：四个初始请求（归档/游离/回收站/回收站目录）都落定前占满内容区，
-   避免「打开后加载闪动」（2026-09-01）。
-   ⚠️ 转动动画 / 配色 / 减动效兜底**全部来自官方 StateDot**（见本文件顶部那段注释），
+   避免「打开后加载闪动」。
+   ⚠️ 转动动画 / 配色 / 减动效兜底**全部来自官方 StateDot**（沿用原实现的做法），
    这里没有任何 keyframes 或点阵几何。
-   ⚠️ 2026-09-30 改判：**只留转圈，不给可见文案**。官方 8 处 StateDot(state=ongoing) 基本都是
-   光秃秃一个转圈（替换图标那种用法），唯一带可见文字的「文档读取」loader 写的是具体动作而不是
-   通用的 loading。文案改挂在 role="status" 的 aria-label 上，读屏器仍能念出来。 */
+   ⚠️ **只留转圈，不给可见文案**。官方 StateDot(state=ongoing) 基本都是光秃秃一个转圈
+   （替换图标那种用法）。文案改挂在 role="status" 的 aria-label 上，读屏器仍能念出来。 */
 .dsh-archive-loading {
   display: flex;
   align-items: center;
@@ -446,30 +373,6 @@ export function ensureArchiveStyles(): void {
 }
 
 const styles = {
-  overlay: {
-    position: 'fixed' as const,
-    inset: 0,
-    zIndex: 1000,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'var(--dsw-alias-bg-mask-1, rgba(0, 0, 0, 0.28))',
-    backdropFilter: 'var(--dsw-mask-blur)',
-  } satisfies CSSProperties,
-  panel: {
-    position: 'relative' as const,
-    display: 'flex',
-    flexDirection: 'column',
-    width: 'min(800px, calc(100vw - 48px))',
-    // 高度随内容自适应、上限钳到视口：列表短时不再留一大片空白底（官方 settings 固定高是因为有导航栏 + 长选项区，本面板是短列表）。
-    maxHeight: 'min(800px, calc(100vh - 48px))',
-    borderRadius: 24,
-    overflow: 'hidden',
-    padding: 0,
-    background: 'var(--dsw-alias-bg-layer-2, #f6f7f9)',
-    color: 'var(--dsw-alias-label-primary, #1f2329)',
-    boxShadow: 'var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22))',
-  } satisfies CSSProperties,
   row: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -517,11 +420,15 @@ interface ArchiveConfirmProps {
   readonly pending: PendingConfirm
   readonly t: TranslateNS<'archive-manage'>
   readonly onCancel: () => void
-  /** 执行动作；成功后父级关闭弹窗，失败 reject 并把错误显示在弹窗内。 */
+  /** 执行动作；成功后父级关闭确认框，失败 reject 并把错误显示在确认框内。 */
   readonly onSubmit: (typed: string) => Promise<void>
 }
 
-/** web 确认框：替代 window.confirm/prompt；提交后在弹窗内展示处理中，成功后自动关闭。 */
+/**
+ * 二次确认框：**官方 `Modal` 原语**提供遮罩、Esc、焦点回收与角色的语义
+ * （与官方 ui-schedule / ui-plugin-manager 在主页面里做确认的方式一致）；
+ * 提交后在框内展示处理中，成功后自动关闭。
+ */
 function ArchiveConfirm(props: ArchiveConfirmProps) {
   const { pending, t, onCancel, onSubmit } = props
   const [typed, setTyped] = useState('')
@@ -572,52 +479,47 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
   }
 
   return (
-    <div className="dsh-archive-confirm-overlay" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget && !working) onCancel()
-    }}>
-      <div
-        className="dsh-archive-confirm-card"
-        role="alertdialog"
-        aria-modal="true"
-        aria-label={title}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape' && !working) {
-            event.stopPropagation()
-            onCancel()
-          } else if (event.key === 'Enter' && ready) {
-            event.stopPropagation()
-            submit()
-          }
-        }}
-      >
-        <h3 className="dsh-archive-confirm-title">{title}</h3>
-        <p className="dsh-archive-confirm-desc">{description}</p>
-        {needsTyping ? (
-          <>
-            <input
-              className="dsh-archive-confirm-input"
-              type="text"
-              value={typed}
-              placeholder={pending.kind === 'delete' || pending.kind === 'deleteStray' ? pending.item.title : phrase}
-              disabled={working}
-              autoFocus
-              onChange={(event) => { setTyped(event.currentTarget.value) }}
-            />
-            {mismatch ? (
-              <p className="dsh-archive-confirm-hint" role="alert">
-                {pending.kind === 'delete' || pending.kind === 'deleteStray' ? t('confirm.deleteMismatch') : t('confirm.deleteAllMismatch', { phrase })}
-              </p>
-            ) : null}
-          </>
-        ) : null}
-        {working ? <p className="dsh-archive-confirm-status">{workingText}</p> : null}
-        {failure !== null ? <p className="dsh-archive-confirm-hint" role="alert">{failure}</p> : null}
-        <div className="dsh-archive-confirm-actions">
-          <button type="button" className="dsh-archive-btn" disabled={working} onClick={onCancel}>{t('confirm.cancel')}</button>
-          <button type="button" className="dsh-archive-btn dsh-archive-btn-danger" disabled={!ready} onClick={submit}>{title}</button>
-        </div>
+    <Modal
+      open
+      // 处理中不许用遮罩 / Esc / 关闭键把确认框撤掉（请求未落定时状态会孤儿化）。
+      onClose={() => { if (!working) onCancel() }}
+      title={title}
+      closeLabel={t('confirm.cancel')}
+      className="dsh-archive-confirm-dialog"
+    >
+      <p className="dsh-archive-confirm-desc">{description}</p>
+      {needsTyping ? (
+        <>
+          <input
+            className="dsh-archive-confirm-input"
+            style={{ marginTop: 12 }}
+            type="text"
+            value={typed}
+            placeholder={pending.kind === 'delete' || pending.kind === 'deleteStray' ? pending.item.title : phrase}
+            disabled={working}
+            data-modal-autofocus
+            onChange={(event) => { setTyped(event.currentTarget.value) }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && ready) {
+                event.stopPropagation()
+                submit()
+              }
+            }}
+          />
+          {mismatch ? (
+            <p className="dsh-archive-confirm-hint" role="alert">
+              {pending.kind === 'delete' || pending.kind === 'deleteStray' ? t('confirm.deleteMismatch') : t('confirm.deleteAllMismatch', { phrase })}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+      {working ? <p className="dsh-archive-confirm-status">{workingText}</p> : null}
+      {failure !== null ? <p className="dsh-archive-confirm-hint" role="alert">{failure}</p> : null}
+      <div style={{ ...styles.actions, justifyContent: 'flex-end', marginTop: 20 }}>
+        <button type="button" className="dsh-archive-btn" disabled={working} onClick={onCancel}>{t('confirm.cancel')}</button>
+        <button type="button" className="dsh-archive-btn dsh-archive-btn-danger" disabled={!ready} onClick={submit}>{title}</button>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -627,13 +529,14 @@ const DAY_MS = 86_400_000
 const COPIED_FEEDBACK_MS = 2_000
 
 /**
- * footer action 组件：窄栏显示图标，宽栏显示「归档管理」；弹窗列出轻归档会话与回收站。
- * 打开后先显示加载态，数据就绪后再渲染列表。
- * @param props - slot props + 注入动作。
+ * 主面板页面：中央列列出归档会话与回收站，进入时先显示加载态。
+ * @param props - 主面板 owner share + 注入动作 + locale 座位。
  */
-export function ArchiveDock(props: ArchiveDockProps) {
-  const { wide, listArchived, listStrays, listTrashItems, trashDirPath, moveToTrash, unarchiveSession, archiveSession, deleteSession, restoreTrashItem, deleteTrashItem, restoreAllTrash, deleteAllTrash, t } = props
-  const [open, setOpen] = useState(false)
+export function ArchivePanel(props: ArchivePanelProps) {
+  const { listArchived, listStrays, listTrashItems, trashDirPath, moveToTrash, unarchiveSession, archiveSession, deleteSession, restoreTrashItem, deleteTrashItem, restoreAllTrash, deleteAllTrash, t } = props
+  // 初值即 loading：本页**挂载即打开**（无「打开」这一步），若初值是 false，
+  // 首帧会先画一次空的归档区 / 回收站再被 effect 换成转圈 —— 那正是要避免的闪动。
+  const [loading, setLoading] = useState(true)
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
   const [strays, setStrays] = useState<StraySessionItem[]>([])
   const [trashItems, setTrashItems] = useState<TrashItem[]>([])
@@ -641,7 +544,6 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [archivedOpen, setArchivedOpen] = useState(true)
   const [straysOpen, setStraysOpen] = useState(true)
   const [trashOpen, setTrashOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
   /** 已有数据时的后台刷新（写操作后 / 实时刷新事件）：列表保持挂载，只静默更新（防闪烁）。 */
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -660,20 +562,8 @@ export function ArchiveDock(props: ArchiveDockProps) {
   const [archivedLimit, setArchivedLimit] = useState(ARCHIVE_PAGE_SIZE)
   const [straysLimit, setStraysLimit] = useState(ARCHIVE_PAGE_SIZE)
   const [trashLimit, setTrashLimit] = useState(ARCHIVE_PAGE_SIZE)
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
 
-  // 官方弹窗行为：打开时聚焦关闭按钮，Esc 关闭。
-  useEffect(() => {
-    if (!open) return
-    closeButtonRef.current?.focus()
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => { document.removeEventListener('keydown', onKeyDown) }
-  }, [open])
-
-  // 刷新代际：快速开/关面板产生并发 refresh 时，只让最新一次的结果落地（陈旧列表竞态）。
+  // 刷新代际：快速切换面板产生并发 refresh 时，只让最新一次的结果落地（陈旧列表竞态）。
   const refreshSeqRef = useRef(0)
   /** 首屏是否已成功落过数据：决定刷新走「整页 loading」还是「静默更新」。 */
   const loadedRef = useRef(false)
@@ -729,26 +619,25 @@ export function ArchiveDock(props: ArchiveDockProps) {
     if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current)
   }, [])
 
-  useEffect(() => {
-    if (!open) return
-    void refresh()
-  }, [open])
+  // 挂载即拉数据：本页在中央列按需挂载，离开面板即卸载，重新进入自然重取。
+  const refreshRef = useRef(refresh)
+  refreshRef.current = refresh
+  useEffect(() => { void refreshRef.current() }, [])
 
-  // 官方会话释放（fiber 销毁）→ 面板打开时实时刷新，hold 标记即时清除（spec 08 §2.5）。
+  // 官方会话释放（fiber 销毁）→ 页面在屏时实时刷新，hold 标记即时清除（spec 08 §2.5）。
   // spec 09：300ms 防抖——批量释放会话时合并成一次全量刷新。
   useEffect(() => {
-    if (!open) return
     let timer: number | null = null
     const onSessionsChanged = (): void => {
       if (timer !== null) window.clearTimeout(timer)
-      timer = window.setTimeout(() => { void refresh() }, SESSIONS_CHANGED_DEBOUNCE_MS)
+      timer = window.setTimeout(() => { void refreshRef.current() }, SESSIONS_CHANGED_DEBOUNCE_MS)
     }
     window.addEventListener('dsh-archive-sessions-changed', onSessionsChanged)
     return () => {
       window.removeEventListener('dsh-archive-sessions-changed', onSessionsChanged)
       if (timer !== null) window.clearTimeout(timer)
     }
-  }, [open])
+  }, [])
 
   const confirmTrash = (item: ArchivedSessionItem): void => {
     setPending({ kind: 'trash', item })
@@ -1183,14 +1072,14 @@ export function ArchiveDock(props: ArchiveDockProps) {
   }
 
   /**
-   * 确认框提交：动作全程在弹窗内展示处理中，成功后由这里关闭弹窗；
-   * 失败（含批量部分失败）reject 回弹窗展示错误。
+   * 确认框提交：动作全程在确认框内展示处理中，成功后由这里关闭；
+   * 失败（含批量部分失败）reject 回确认框展示错误。
    *
    * 单条分支不等整页刷新：写操作必然打穿 host 的 header 缓存，紧随其后的刷新要走冷扫描
-   * （列表越大越慢），此前条目与弹窗都干等它落定。改为变更成功后立即按响应里的 id 本地摘掉
-   * 受影响的行并关闭弹窗，refresh() 退到后台对账。摘除集合与 host 完全一致——响应里的 subagentIds
+   * （列表越大越慢），此前条目与确认框都干等它落定。改为变更成功后立即按响应里的 id 本地摘掉
+   * 受影响的行并关闭确认框，refresh() 退到后台对账。摘除集合与 host 完全一致——响应里的 subagentIds
    * 就是随父一起搬走/删掉的**全部后代**子会话（任意深度，见 spec 12），由 refresh 落定。
-   * 失败路径语义不变：变更 reject 时本地状态一律不动，错误仍回弹窗展示。
+   * 失败路径语义不变：变更 reject 时本地状态一律不动，错误仍回确认框展示。
    */
   const submitConfirm = async (typed: string): Promise<void> => {
     if (pending === null) return
@@ -1278,191 +1167,170 @@ export function ArchiveDock(props: ArchiveDockProps) {
   }, 0)
 
   return (
-    <>
-      <button
-        type="button"
-        className={wide ? 'dsh-archive-trigger' : 'dsh-archive-trigger dsh-archive-trigger-rail'}
-        title={t('dialog.title')}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => { setOpen(value => !value) }}
-      >
-        <IconArchiveOutlineRegular size={wide ? 16 : 18} />
-        {wide ? <span>{t('button.label')}</span> : null}
-      </button>
+    <section className="dsh-archive-page" data-archive-panel aria-busy={refreshing}>
+      {/* 标题行自带 28px 顶内边距并打上窗口拖拽标记：内容不再有遮罩，页面顶端就是窗口边缘。 */}
+      <header className="dsh-archive-page-head" data-window-drag>
+        <h1 className="dsh-archive-page-title">{t('dialog.title')}</h1>
+      </header>
 
-      {open ? (
-        <div style={styles.overlay} role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setOpen(false)
-        }}>
-          <div style={styles.panel} role="dialog" aria-modal="true" aria-label={t('dialog.title')}>
-            <div className="dsh-archive-panel-header">
-              <h2 className="dsh-archive-panel-title" style={{ margin: 0 }}>{t('dialog.title')}</h2>
-              <button ref={closeButtonRef} type="button" className="dsh-archive-close" aria-label={t('dialog.close')} onClick={() => { setOpen(false) }}>
-                <IconCloseOutlineRegular size={14} />
-              </button>
-            </div>
-            <div className="dsh-archive-panel-body" aria-busy={refreshing} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 24px 24px' }}>
-            {loading ? (
-              <div className="dsh-archive-loading" role="status" aria-label={t('loading')}>
-                <StateDot state="ongoing" />
-              </div>
-            ) : (
-            <>
-            {error !== null ? (
-              <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)', margin: '0 0 12px' }}>
-                {error}
-                {' '}
-                <button type="button" className="dsh-archive-btn" onClick={() => { void refresh() }}>{t('retry')}</button>
-              </p>
-            ) : null}
+      {loading ? (
+        <div className="dsh-archive-loading" role="status" aria-label={t('loading')}>
+          <StateDot state="ongoing" />
+        </div>
+      ) : (
+        <>
+          {error !== null ? (
+            <p role="alert" style={{ color: 'var(--dsw-alias-state-error-primary, #c62828)', margin: '0 0 12px' }}>
+              {error}
+              {' '}
+              <button type="button" className="dsh-archive-btn" onClick={() => { void refresh() }}>{t('retry')}</button>
+            </p>
+          ) : null}
 
-            <div className="dsh-archive-section-card">
-              <button
-                type="button"
-                className="dsh-archive-section"
-                aria-expanded={archivedOpen}
-                onClick={() => { setArchivedOpen(value => !value) }}
-              >
-                <span aria-hidden>{archivedOpen ? '▾' : '▸'}</span>
-                <span>{t('section.archived', { count: archived.length })}</span>
-              </button>
-              {archivedOpen ? (
-                <>
-                  {archived.length === 0 ? <p style={styles.secondarySmall}>{t('empty.archived')}</p> : null}
-                  {liveItems.length > 0 ? (
-                    <>
-                      <p style={styles.groupHeading}>{t('group.unreleased', { count: liveItems.length })}</p>
-                      {liveItems.map(item => renderArchivedRow(item))}
-                    </>
-                  ) : null}
-                  {coldItems.map(item => renderArchivedRow(item))}
-                  {archivedTotal > archivedLimit ? (
-                    <button
-                      type="button"
-                      className="dsh-archive-btn"
-                      style={{ marginTop: 8 }}
-                      onClick={() => { setArchivedLimit(limit => limit + ARCHIVE_PAGE_SIZE) }}
-                    >
-                      {t('pager.loadMore', { remaining: archivedTotal - archivedLimit })}
-                    </button>
-                  ) : null}
-                </>
-              ) : null}
-            </div>
-
-            {strays.length > 0 ? (
-              <div className="dsh-archive-section-card">
-                <button
-                  type="button"
-                  className="dsh-archive-section"
-                  aria-expanded={straysOpen}
-                  onClick={() => { setStraysOpen(value => !value) }}
-                >
-                  <span aria-hidden>{straysOpen ? '▾' : '▸'}</span>
-                  <span>{t('section.strays', { count: strays.length })}</span>
-                </button>
-                {straysOpen ? (
+          <div className="dsh-archive-section-card">
+            <button
+              type="button"
+              className="dsh-archive-section"
+              aria-expanded={archivedOpen}
+              onClick={() => { setArchivedOpen(value => !value) }}
+            >
+              <span aria-hidden>{archivedOpen ? '▾' : '▸'}</span>
+              <span>{t('section.archived', { count: archived.length })}</span>
+            </button>
+            {archivedOpen ? (
+              <>
+                {archived.length === 0 ? <p style={styles.secondarySmall}>{t('empty.archived')}</p> : null}
+                {liveItems.length > 0 ? (
                   <>
-                    <p style={styles.secondarySmall}>{t('stray.hint')}</p>
-                    {strays.slice(0, straysLimit).map(renderStrayRow)}
-                    {strays.length > straysLimit ? (
-                      <button
-                        type="button"
-                        className="dsh-archive-btn"
-                        style={{ marginTop: 8 }}
-                        onClick={() => { setStraysLimit(limit => limit + ARCHIVE_PAGE_SIZE) }}
-                      >
-                        {t('pager.loadMore', { remaining: strays.length - straysLimit })}
-                      </button>
-                    ) : null}
+                    <p style={styles.groupHeading}>{t('group.unreleased', { count: liveItems.length })}</p>
+                    {liveItems.map(item => renderArchivedRow(item))}
                   </>
                 ) : null}
-              </div>
+                {coldItems.map(item => renderArchivedRow(item))}
+                {archivedTotal > archivedLimit ? (
+                  <button
+                    type="button"
+                    className="dsh-archive-btn"
+                    style={{ marginTop: 8 }}
+                    onClick={() => { setArchivedLimit(limit => limit + ARCHIVE_PAGE_SIZE) }}
+                  >
+                    {t('pager.loadMore', { remaining: archivedTotal - archivedLimit })}
+                  </button>
+                ) : null}
+              </>
             ) : null}
+          </div>
 
+          {strays.length > 0 ? (
             <div className="dsh-archive-section-card">
               <button
                 type="button"
                 className="dsh-archive-section"
-                aria-expanded={trashOpen}
-                onClick={() => { setTrashOpen(value => !value) }}
+                aria-expanded={straysOpen}
+                onClick={() => { setStraysOpen(value => !value) }}
               >
-                <span aria-hidden>{trashOpen ? '▾' : '▸'}</span>
-                <span>{t('section.trash', { count: trashItems.length })}</span>
+                <span aria-hidden>{straysOpen ? '▾' : '▸'}</span>
+                <span>{t('section.strays', { count: strays.length })}</span>
               </button>
-              {trashOpen ? (
+              {straysOpen ? (
                 <>
-                  {/* 回收站位置归回收站区（面板顶部不放全局行）；点击复制完整路径。 */}
-                  {trashDir !== null && trashDir.displayPath !== '' ? (
-                    <p style={styles.secondarySmall}>
-                      {t('dialog.trashDir')}
-                      {' '}
-                      <button
-                        type="button"
-                        className="dsh-archive-trash-dir"
-                        title={`${trashDir.path}（${t('dialog.copyHint')}）`}
-                        onClick={() => { void copyTrashDir() }}
-                      >
-                        {trashDir.displayPath}
-                        {copied ? ` ✓${t('dialog.copied')}` : ''}
-                      </button>
-                    </p>
-                  ) : null}
-                  <p style={styles.secondarySmall}>{t('trash.hint')}</p>
-                  {trashItems.length > 0 ? (
-                    <div style={{ ...styles.actions, padding: '4px 0 8px' }}>
-                      <button
-                        type="button"
-                        className="dsh-archive-btn"
-                        disabled={loading || restorableCount === 0 || restoringId !== null}
-                        onClick={() => { confirmRestoreAll() }}
-                      >
-                        {t('action.restoreAll', { count: restorableCount })}
-                      </button>
-                      <button
-                        type="button"
-                        className="dsh-archive-btn dsh-archive-btn-danger"
-                        disabled={loading || trashItems.length === 0 || restoringId !== null}
-                        onClick={() => { confirmDeleteAll() }}
-                      >
-                        {t('action.deleteAll')}
-                      </button>
-                    </div>
-                  ) : null}
-                  {trashItems.length > 0 ? (
-                    <p role="note" style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)', fontSize: 12, lineHeight: '18px', margin: '0 0 4px' }}>
-                      {t('trash.uninstallHint')}
-                    </p>
-                  ) : null}
-                  {trashItems.length === 0 ? <p style={styles.secondarySmall}>{t('empty.trash')}</p> : null}
-                  {trashItems.some(item => item.legacy) ? (
-                    <p style={styles.secondarySmall}>
-                      {t('legacy.hint')}
-                    </p>
-                  ) : null}
-                  {trashItems.map(renderTrashRow)}
-                  {trashTotal > trashLimit ? (
+                  <p style={styles.secondarySmall}>{t('stray.hint')}</p>
+                  {strays.slice(0, straysLimit).map(renderStrayRow)}
+                  {strays.length > straysLimit ? (
                     <button
                       type="button"
                       className="dsh-archive-btn"
                       style={{ marginTop: 8 }}
-                      onClick={() => { setTrashLimit(limit => limit + ARCHIVE_PAGE_SIZE) }}
+                      onClick={() => { setStraysLimit(limit => limit + ARCHIVE_PAGE_SIZE) }}
                     >
-                      {t('pager.loadMore', { remaining: trashTotal - trashLimit })}
+                      {t('pager.loadMore', { remaining: strays.length - straysLimit })}
                     </button>
                   ) : null}
                 </>
               ) : null}
             </div>
-            </>
-            )}
-            </div>
-            {/* 合集品牌 footer：固定面板底部、不随内容滚动，顶部分割线与内容区隔开。 */}
-            <div className="dsh-archive-panel-footer">🐦 dsh-sparrow</div>
+          ) : null}
+
+          <div className="dsh-archive-section-card">
+            <button
+              type="button"
+              className="dsh-archive-section"
+              aria-expanded={trashOpen}
+              onClick={() => { setTrashOpen(value => !value) }}
+            >
+              <span aria-hidden>{trashOpen ? '▾' : '▸'}</span>
+              <span>{t('section.trash', { count: trashItems.length })}</span>
+            </button>
+            {trashOpen ? (
+              <>
+                {/* 回收站位置归回收站区（页面顶部不放全局行）；点击复制完整路径。 */}
+                {trashDir !== null && trashDir.displayPath !== '' ? (
+                  <p style={styles.secondarySmall}>
+                    {t('dialog.trashDir')}
+                    {' '}
+                    <button
+                      type="button"
+                      className="dsh-archive-trash-dir"
+                      title={`${trashDir.path}（${t('dialog.copyHint')}）`}
+                      onClick={() => { void copyTrashDir() }}
+                    >
+                      {trashDir.displayPath}
+                      {copied ? ` ✓${t('dialog.copied')}` : ''}
+                    </button>
+                  </p>
+                ) : null}
+                <p style={styles.secondarySmall}>{t('trash.hint')}</p>
+                {trashItems.length > 0 ? (
+                  <div style={{ ...styles.actions, padding: '4px 0 8px' }}>
+                    <button
+                      type="button"
+                      className="dsh-archive-btn"
+                      disabled={loading || restorableCount === 0 || restoringId !== null}
+                      onClick={() => { confirmRestoreAll() }}
+                    >
+                      {t('action.restoreAll', { count: restorableCount })}
+                    </button>
+                    <button
+                      type="button"
+                      className="dsh-archive-btn dsh-archive-btn-danger"
+                      disabled={loading || trashItems.length === 0 || restoringId !== null}
+                      onClick={() => { confirmDeleteAll() }}
+                    >
+                      {t('action.deleteAll')}
+                    </button>
+                  </div>
+                ) : null}
+                {trashItems.length > 0 ? (
+                  <p role="note" style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)', fontSize: 12, lineHeight: '18px', margin: '0 0 4px' }}>
+                    {t('trash.uninstallHint')}
+                  </p>
+                ) : null}
+                {trashItems.length === 0 ? <p style={styles.secondarySmall}>{t('empty.trash')}</p> : null}
+                {trashItems.some(item => item.legacy) ? (
+                  <p style={styles.secondarySmall}>
+                    {t('legacy.hint')}
+                  </p>
+                ) : null}
+                {trashItems.map(renderTrashRow)}
+                {trashTotal > trashLimit ? (
+                  <button
+                    type="button"
+                    className="dsh-archive-btn"
+                    style={{ marginTop: 8 }}
+                    onClick={() => { setTrashLimit(limit => limit + ARCHIVE_PAGE_SIZE) }}
+                  >
+                    {t('pager.loadMore', { remaining: trashTotal - trashLimit })}
+                  </button>
+                ) : null}
+              </>
+            ) : null}
           </div>
-        </div>
-      ) : null}
+
+          {/* 合集品牌 footer：页面内容收尾。 */}
+          <div className="dsh-archive-page-footer">🐦 dsh-sparrow</div>
+        </>
+      )}
+
       {pending !== null ? (
         <ArchiveConfirm
           pending={pending}
@@ -1471,6 +1339,6 @@ export function ArchiveDock(props: ArchiveDockProps) {
           onSubmit={submitConfirm}
         />
       ) : null}
-    </>
+    </section>
   )
 }

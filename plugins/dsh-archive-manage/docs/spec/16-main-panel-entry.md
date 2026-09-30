@@ -4,7 +4,8 @@
 > 至少是官方引导的，点击后整个操作区域是对话区这块位置，所以是不是咱们的**归档管理**和
 > **云端文件**也应该是这样？并且两个按钮位置是不是也应该放在**上面**而不是下面？」）。
 >
-> **状态：待 owner 确认后开工** —— 仓库规矩「新功能先写 spec，评审后才开工」（AGENTS《工程管线 · 开发》）。
+> **状态：已实施（owner 2026-09-30 批准开工）** —— 仓库规矩「新功能先写 spec，评审后才开工」（AGENTS《工程管线 · 开发》）。
+> 两个插件同批落地；实施结果与本文档的**决策点**对照见下方《实施记录》。
 > 同批提案见 [`dsh-file-manage/docs/spec/03-main-panel-entry.md`](../../dsh-file-manage/docs/spec/03-main-panel-entry.md)。
 
 ## 一、现状 vs 官方（已查证）
@@ -78,3 +79,46 @@ SidebarRoot.module.css:82-86
 * 收起/展开左栏、切换会话、反复 enable/disable 插件后无残留、无重复项。
 * **host half 与 HTTP 路由完全不动**（本次只改 client 入口与视图承载）。
 * 复核 theme-tone 的 dialog / surface 锚点是否因此失去命中，并同步。
+
+## 七、实施记录（2026-09-30）
+
+按本文档落地；与上面《决策点》《验收》逐条对照：
+
+| 项 | 落地 |
+| :--- | :--- |
+| 决策点 1（是否保留弹窗） | **两个插件都不保留**。owner 定案：「归档管理和云端文件可以改了，**不保留弹窗**，和官方行为保持一致，也不做返回对话。」 |
+| 决策点 2（回对话的路径） | **不做**「点已选中的图标回对话」。官方 `PanelRow` 点已选中项仍是 `selectPanel(id)`，我们**没有**拦截官方行点击 —— 回对话沿用官方路径（点侧边栏会话项 / New Session）。 |
+| 决策点 3（树的尺寸） | 树全部用**固定缩进 + flex 弹性标题**（`.dsh-archive-tree-children` 的 `margin-left` / `padding-left` 是定值，标题 `minWidth: 0` + 省略号），与容器宽度无关 ⇒ 中央列更宽不会破布局。内容列另加 `max-width: 960px`（官方入口型页面同款）。 |
+
+实施细节：
+
+* 两处注册共用同一个 `MainPanelId`（`archive-manage` / `file-manage`），
+  order 沿用原 footer 号段（20 / 21，排在官方 `plugins`=0、`schedules`=10 之后）。
+* `layout` **没有**进 `inject`：走 `ctx.inject(['layout'], cb)` 起的可选依赖 fork
+  （`src/client/panel.ts` 的 `attachMainPanel`），服务缺席即整条不注册、不抛错。
+  该模块零运行时依赖，故惰性停用接线有 `test/panel.test.mjs` 直接覆盖。
+* 页面改为中央列的**正常流**：去掉 `position: fixed` 遮罩、`role='dialog'` / `aria-modal`、
+  点遮罩关闭、焦点陷阱与关闭按钮；标题行自带 28px 顶内边距 + `data-window-drag`
+  （macOS 下再让出 `--dsh-frame-top-clearance`），无遮罩后页面顶端就是窗口边缘。
+* **二次确认框改用官方 `Modal` 原语**（原文写着「保留既有确认框」与「不得留 dialog」
+  相互冲突 —— 指的都是**面板那层弹窗**；确认框属于「确认流程」，
+  与官方 `ui-schedule` / `ui-plugin-manager` 在各自主页面里做确认的做法统一）。
+  确认流程、文案与按钮语义**逐字未变**，只把自建遮罩 / `aria-modal` / 点遮罩关闭 /
+  焦点陷阱换成了官方原语提供的那一套。
+* `ctx.layout.panelInfo.subscribe(...)` **未使用**：本页的状态全是组件内 state，
+  离开面板即随 keyed 槽卸载而复位（官方 plugin-manager 需要它是为了重置存在 store 里的 `view`）。
+
+### ⚠️ 交给 owner / 另一路（不在本插件写域内）
+
+1. **theme-tone 的 `DIALOG_ANCHOR`（`body [role='dialog']:not(:has(> img))`）
+   从此不再命中这两个插件的页面** —— 它们不再是 dialog。后果：色调插件的
+   颗粒 / 打光两张图层规则（`SURFACE_ANCHORS` + `isolation: isolate` 那条）对
+   **归档页 / 云端文件页**失去命中，页面退回官方纯色面（颜色仍由 token 层给）。
+   该文件归另一路（`plugins/dsh-theme-tone/**`），本插件不动它，留待其同步。
+   **二次确认框不受影响**：它现在是官方 `Modal`，遮罩带官方 `_mask` 哈希类、
+   卡片是 `role='dialog'` ⇒ 两条锚点照旧命中。
+2. theme-tone `src/mask.ts` 头部注释里「本仓库 `dsh-archive-manage` / `dsh-file-manage`
+   的遮罩是 `role="presentation"` + 内联 `backdrop-filter`」那句**已过期**
+   （我们的确认框现在走官方 `Modal`）。同样不在本写域内。
+3. **Windows 桌面端收起左栏时 `panelList` 整个 `display: none`**（本文档 §四）——
+   本次改动**没有**修好这一点，仍是「收起态两种入口都不可达」。

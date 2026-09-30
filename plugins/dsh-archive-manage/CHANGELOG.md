@@ -10,6 +10,8 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Fixed archived session titles showing the session id instead of the name.
 - The Archive and Trash **section header rows no longer highlight on hover** (they are just fold toggles; a wash read as "this row is selectable").
 - The panel opens faster: the plugin no longer races DSH's own full scan at startup, and does that sweep when the panel is first opened instead.
+- The Archive entry moved to the **top of the sidebar**, beside the official Plugins and Automations entries, and now opens as a **page in the main area** instead of a pop-up dialog.
+- The archive page no longer dims or blocks the rest of the interface: it is a normal page, and the way back to a conversation is the official one (pick a session in the sidebar, or New Session).
 
 ## 0.1.5-rc.2.4 (2026-09-21)
 
