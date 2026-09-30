@@ -47,13 +47,24 @@
 
 ## C. 静默失效风险（官方改名 / 改行为即失效，没有任何门能拦）
 
-* **`dsh-theme-tone`** —— 仓库规矩是「不依赖 hashed CSS-module 类名」，以下三处**例外**，
+* **`dsh-theme-tone`** —— 仓库规矩是「不依赖 hashed CSS-module 类名」，以下四处**例外**，
   且测试**抓不到官方重命名后缀**：
   1. **悬停卡字色**（`HOVER_CARD_TEXT_TOKENS`，`src/constants.ts`）：`[class*='_hoverTitle'|'_hoverPath'|'_hoverTime'|'_hoverStatus']`
   2. **扫光带**（`SWEEP_ANCHORS`，`src/sweep.ts`）：`[class*='_row']::after` —— **已收窄**：必须同时带
      `data-variant` / `data-tool` 才命中（`test/sweep.test.mjs` 钉住不得回退）
   3. **弹窗遮罩**（`MASK_SELECTOR`，`src/mask.ts`）：`[class*='_mask']`（官方三个遮罩 `Modal` /
      `SettingsRoot` / `ImageLightbox` 只在哈希类名上可辨）
+  4. **桌面端标题栏 overlay**（`src/caption.ts`）：`body > span[style*='--dsw-specific-sidebar-fill'][style*='--dsw-alias-label-primary']`
+     —— 官方那条 Windows preload 探针（`apps/desktop/src/preload-windows.ts`）没有 data 属性，
+     唯一可辨的是它 inline style 里逐字写着的两个 token 名；**两者同时出现 + `body` 直接子**双重收窄
+     （`test/caption.test.mjs` 钉住）。命中后把探针**自己**那个 token 设为 `transparent`，
+     让官方 WCO overlay 透明、由本插件铺满视口的装饰层透上来。官方改写那一行即**不命中**，
+     退回改前外观（不透明 overlay），属良性降级。
+     ⚠️ 本条**刻意不带**官方默认门：官方那套 `MutationObserver` 只 observe
+     `root[lang]` / `body[data-ds-dark-theme,style]` / `head`，**不观察本插件的门属性** ——
+     带门则门翻开时不重发、overlay 停在旧色（实测），是不留痕迹的失效；
+     而不带门在颜色上恒等（探针与官方 `.frame::before` 读的是**同一个** token，必然同值）。
+
 * **`dsh-codebuddy-credits`** —— 捕获阶段拦截官方行头「编辑」按钮（`stopPropagation` 阻断官方编辑器打开，
   改为展开本插件自建编辑器）：按钮保留官方原位与样式，但**官方改这个按钮即静默失效**。
 

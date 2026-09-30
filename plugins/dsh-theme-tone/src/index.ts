@@ -61,6 +61,7 @@ export {
   type ToneSpec,
 } from './tones.js'
 export { Config } from './settings-schema.js'
+export { CAPTION_PROBE_SYMBOL_TOKEN, CAPTION_PROBE_TOKEN, buildCaptionCss } from './caption.js'
 export {
   GLASS_BLUR,
   GLASS_CARD_ALPHA,

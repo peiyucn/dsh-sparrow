@@ -44,6 +44,7 @@ import {
   backdropPlan,
   buildBackdropCss,
 } from '../backdrop.js'
+import { buildCaptionCss } from '../caption.js'
 import { buildGlassCss, buildSeamCss } from '../glass.js'
 import { buildMaskCss } from '../mask.js'
 import { buildNavPinCss } from '../nav-pin.js'
@@ -86,7 +87,7 @@ export const inject = ['theme', 'slots', 'locale']
  * @returns 供卸载清理的 style 元素。
  */
 function ensureStyles(): HTMLStyleElement {
-  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}`
+  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}${buildCaptionCss()}`
   const existing = document.querySelector<HTMLStyleElement>(STYLE_SELECTOR)
   if (existing !== null) {
     // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之。
