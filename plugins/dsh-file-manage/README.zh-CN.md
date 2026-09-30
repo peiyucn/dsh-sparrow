@@ -4,7 +4,7 @@
 
 DeepSeek Files API 云端文件管理 —— DeepSeek Harness（DSH）Web 插件（dsh-sparrow 合集成员）。
 
-DSH 贴图的大图会自动上传到 DeepSeek Files API（云端文件库），但官方没有管理界面。本插件在侧边栏加一个「云端文件」入口，列出你 API key 下的全部云端文件：游标翻页、上传 / 到期时间、大小，支持删除单条与一键复制 file_id。完全复用官方 `DeepSeekFilesClient`，不新增任何凭据。
+DSH 贴图的大图会自动上传到 DeepSeek Files API（云端文件库），但官方没有管理界面。本插件在侧边栏上面加「云端文件」入口（与官方「插件」「自动化任务」并列）：点开在中央区以页面形式列出你 API key 下的全部云端文件：游标翻页、上传 / 到期时间、大小，支持删除单条与一键复制 file_id。完全复用官方 `DeepSeekFilesClient`，不新增任何凭据。
 
 ## 安装
 
@@ -18,9 +18,10 @@ dsh plugin --profile web add @dsh-sparrow/dsh-file-manage
 
 ## 使用
 
-* **入口**：侧边栏底部「云端文件」按钮
+* **入口**：侧边栏上面的「云端文件」图标，点开在中央区以页面形式展示
+* **回对话**：云端文件页是中央区的普通页面、不是弹窗——不压暗、不挡界面。回到对话走官方那条路：点侧边栏的会话项，或用 New Session
 * **列表**：按服务端返回的顺序展示（顺序由服务端决定，本插件不改排），底部「加载更多」每次多显示 20 条（官方 after 游标翻页）；行内展示文件名 / 大小 / 上传时间 / 到期时间（有则显）
-* **配额**：列表顶部显示总数与网盘式配额进度条（已用存储 / 25 GiB 官方上限）
+* **配额**：页面顶部显示总数与网盘式配额进度条（已用存储 / 25 GiB 官方上限）
 * **删除**：行内删除按钮二次确认；「DSH 自动上传」角标（`dsh-` 前缀）的文件有额外提示——删除后旧会话再次引用时官方会自动重新上传（可能稍慢）
 * **复制 file_id**：行内按钮一键复制
 * **错误提示**：鉴权失败 / 限流 / 服务端错误分类展示，可重试
@@ -35,7 +36,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-file-manage
 
 ## 截图
 
-![云端文件面板](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-file-manage.png)
+![云端文件页面](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-file-manage.png)
 
 ## 卸载与残留
 

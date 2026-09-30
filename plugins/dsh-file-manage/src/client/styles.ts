@@ -1,68 +1,57 @@
-/** dsh-file-manage 客户端样式层：注入样式表 + 面板内联样式（官方设计 token；按 data 属性去重）。 @module dsh-file-manage/client/styles */
+/** dsh-file-manage 客户端样式层：注入样式表 + 页面内联样式（官方设计 token；按 data 属性去重）。 @module dsh-file-manage/client/styles */
 
 import type { CSSProperties } from 'react'
 
-/** 注入触发键 / 面板 / 确认框样式；HMR / 重载按 data 属性去重不叠加。 */
+/** 注入页面 / 列表 / 确认框样式；HMR / 重载按 data 属性去重不叠加。 */
 export function ensureFileManageStyles(): void {
-  if (document.querySelector('style[data-dsh-file-manage]') !== null) return
-  const style = document.createElement('style')
-  style.dataset.dshFileManage = ''
-  style.textContent = `/* 官方 .footerActions 是横向 flex 行，slot 包裹层为行内 display:contents：
- * 多插件各自的全宽按钮会并排挤到右缘外（只剩一条边）。这里把包裹层改回真实盒子纵排，
- * Archive / 云端文件两个按钮上下堆叠、各自占满一行（!important 压过行内 contents）。 */
-[data-slot='sidebar.footer.action'] {
-  display: flex !important;
-  flex-direction: column;
-  /* 包裹层是 .footerActions 行容器里的 flex item，需显式撑满，否则两个全宽按钮按内容宽度收缩。 */
-  width: 100%;
-}
-.dsh-file-manage-trigger {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: calc(100% + 4px);
-  height: 42px;
-  margin: 4px -2px;
-  padding: 0 10px 0 8px;
+  const css = `/* 主面板页面：官方入口型页面同款（居中内容列，整页滚动；标题行自带 28px 顶内边距，
+   macOS 下再让出窗口顶带，故行自己的盒子就是窗口的拖拽几何）。 */
+.dsh-file-manage-page {
   box-sizing: border-box;
-  border: none;
-  border-radius: 12px;
-  background: transparent;
-  cursor: pointer;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  overflow: auto;
+  padding: 0 clamp(24px, 4vw, 48px) 48px;
   color: var(--dsw-alias-label-primary);
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 22px;
 }
-.dsh-file-manage-trigger:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+.dsh-file-manage-page > * {
+  width: 100%;
+  max-width: 960px;
 }
-.dsh-file-manage-trigger-rail {
-  width: 36px;
-  height: 36px;
-  margin: 8px 0 10px;
-  justify-content: center;
-  gap: 0;
-  padding: 0;
-  border-radius: 50%;
-  corner-shape: round;
+.dsh-file-manage-page-head {
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 28px;
+  margin-bottom: 20px;
 }
-.dsh-file-manage-trigger-icon {
-  flex: none;
+html[data-platform='darwin'] .dsh-file-manage-page-head {
+  padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
 }
-.dsh-file-manage-trigger-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.dsh-file-manage-page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
 }
-/* 整页 loading：首屏数据（列表 + 总数）落定前占满内容区，避免「打开后加载闪动」（2026-09-01）。
-   ⚠️ 转动动画 / 配色 / 减动效兜底**全部来自官方 StateDot**（见 FileManageDock.tsx 顶部那段注释），
+/* 合集品牌 footer：页面内容收尾。 */
+.dsh-file-manage-page-footer {
+  box-sizing: border-box;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  text-align: center;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
+/* 整页 loading：首屏数据（列表 + 总数）落定前占满内容区，避免「打开后加载闪动」。
+   ⚠️ 转动动画 / 配色 / 减动效兜底**全部来自官方 StateDot**（见 CloudFilesPage.tsx 顶部那段注释），
    这里没有任何 keyframes 或点阵几何。
-   ⚠️ 2026-09-30 改判：**只留转圈，不给可见文案**。官方 8 处 StateDot(state=ongoing) 基本都是
-   光秃秃一个转圈（替换图标那种用法），唯一带可见文字的「文档读取」loader 写的是具体动作而不是
-   通用的 loading。文案改挂在 role="status" 的 aria-label 上，读屏器仍能念出来。 */
+   ⚠️ **只留转圈，不给可见文案**。文案改挂在 role="status" 的 aria-label 上，读屏器仍能念出来。 */
 .dsh-file-manage-loading {
   display: flex;
   align-items: center;
@@ -71,45 +60,7 @@ export function ensureFileManageStyles(): void {
   /* 只作 StateDot 自带着色失效时的继承兜底（转圈本身用官方 tertiary 中性色） */
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
-/* 面板滚动区：官方 settings 同款——elevated surface 重绑 l2 滚动条 token（base 默认 l1，浮层上对比度不对）。 */
-.dsh-file-manage-body {
-  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
-  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
-}
-/* 面板头：官方 settings 面板同款（54px 高、标题起点 24px）。 */
-.dsh-file-manage-panel-header {
-  flex: none;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  height: 54px;
-  padding: 20px 14px 8px 24px;
-  box-sizing: border-box;
-}
-.dsh-file-manage-panel-title {
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 24px;
-  color: var(--dsw-alias-label-primary);
-}
-.dsh-file-manage-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: 8px;
-  outline: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--dsw-alias-label-primary);
-}
-.dsh-file-manage-close:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
+/* 页面滚动区：基底面上的滚动条用 l1 一族（原浮层版重绑过 l2，页面上不再需要）。 */
 .dsh-file-manage-badge {
   flex: none;
   padding: 1px 6px;
@@ -144,33 +95,10 @@ export function ensureFileManageStyles(): void {
 .dsh-file-manage-btn-danger {
   color: var(--dsw-alias-state-error-primary, #c62828);
 }
-/* 删除确认框：官方 web 确认框同款（mask + 毛玻璃 + 480 卡片）。 */
-.dsh-file-manage-confirm-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--dsw-alias-bg-mask-1, rgba(0, 0, 0, 0.28));
-  backdrop-filter: var(--dsw-mask-blur);
-}
-.dsh-file-manage-confirm-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: min(480px, calc(100vw - 48px));
-  padding: 20px;
-  border-radius: 16px;
-  background: var(--dsw-alias-bg-layer-2, #f6f7f9);
-  color: var(--dsw-alias-label-primary, #1f2329);
-  box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
-}
-.dsh-file-manage-confirm-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 24px;
+/* 删除确认框：官方 Modal 原语提供遮罩 / 卡片 / Esc / 焦点回收，这里只保留本插件
+   既有的正文排版与宽度（不自己造遮罩与对话框语义）。 */
+.dsh-file-manage-confirm-dialog {
+  width: min(480px, 100%);
 }
 .dsh-file-manage-confirm-desc {
   margin: 0;
@@ -184,11 +112,9 @@ export function ensureFileManageStyles(): void {
   justify-content: flex-end;
   gap: 8px;
 }
-/* 用量/进度条固定区：面板头下方、不随列表滚动；左侧 24px 与区块卡线框齐平，
-   右侧额外让出滚动条宽度（列表区 scrollbar-gutter: stable 固定占位 8px）。 */
+/* 用量/进度条固定区：标题行下方、不随列表滚动。 */
 .dsh-file-manage-summary {
-  flex: none;
-  padding: 12px calc(24px + var(--dsh-scrollbar-width, 8px)) 8px 24px;
+  padding: 0 0 8px;
 }
 .dsh-file-manage-count {
   margin: 6px 0 0;
@@ -234,7 +160,7 @@ export function ensureFileManageStyles(): void {
   white-space: nowrap;
   color: var(--dsw-alias-label-primary, #1f2329);
   /* 高用量时蓝填充垫底，加一圈底色光晕保证可读。 */
-  text-shadow: 0 0 4px var(--dsw-alias-bg-layer-2, #f6f7f9);
+  text-shadow: 0 0 4px var(--dsw-alias-bg-base, #ffffff);
   pointer-events: none;
 }
 .dsh-file-manage-quota-fill {
@@ -246,42 +172,26 @@ export function ensureFileManageStyles(): void {
   transition: width 220ms ease-out;
 }
 `
+  const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-file-manage]')
+  if (existing !== null) {
+    // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之（与 archive 同款）。
+    if (existing.textContent !== css) existing.textContent = css
+    return
+  }
+  const style = document.createElement('style')
+  style.dataset.dshFileManage = ''
+  style.textContent = css
   document.head.appendChild(style)
 }
 
-/** 面板与行内联样式（对齐官方 Settings / Archive 的面板几何）。 */
+/** 页面与行内联样式（对齐官方 Settings / Archive 的页面几何）。 */
 export const styles = {
-  overlay: {
-    position: 'fixed' as const,
-    inset: 0,
-    zIndex: 1000,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'var(--dsw-alias-bg-mask-1, rgba(0, 0, 0, 0.28))',
-    backdropFilter: 'var(--dsw-mask-blur)',
-  } satisfies CSSProperties,
-  panel: {
-    position: 'relative' as const,
-    display: 'flex',
-    flexDirection: 'column',
-    width: 'min(800px, calc(100vw - 48px))',
-    // 高度随内容自适应、上限钳到视口（官方 settings 同款上限）。
-    maxHeight: 'min(800px, calc(100vh - 48px))',
-    borderRadius: 24,
-    overflow: 'hidden',
-    padding: 0,
-    background: 'var(--dsw-alias-bg-layer-2, #f6f7f9)',
-    color: 'var(--dsw-alias-label-primary, #1f2329)',
-    boxShadow: 'var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22))',
-  } satisfies CSSProperties,
   body: {
-    flex: 1,
+    // 页面自身滚动（外层 .dsh-file-manage-page 已 overflow:auto），此处只做行内容器。
+    flex: 'none',
     minHeight: 0,
-    overflow: 'auto',
     // 滚动条固定占位：卡片右缘不因滚动条出现/消失而左右漂移（与顶部进度条对齐）。
     scrollbarGutter: 'stable',
-    padding: '0 24px 24px',
   } satisfies CSSProperties,
   row: {
     display: 'flex',
@@ -305,16 +215,5 @@ export const styles = {
     color: 'var(--dsw-alias-label-secondary, #6b7280)',
     fontSize: 12,
     lineHeight: '18px',
-  } satisfies CSSProperties,
-  /** 合集品牌 footer：固定面板底部（滚动区之外），顶部分割线与内容区隔开；紧凑规格。 */
-  footer: {
-    flex: 'none',
-    boxSizing: 'border-box',
-    padding: '6px 24px 8px',
-    borderTop: '1px solid var(--dsw-alias-border-l1, #e2e5ea)',
-    textAlign: 'center' as const,
-    fontSize: 11,
-    lineHeight: '16px',
-    color: 'var(--dsw-alias-label-tertiary, #8a919f)',
   } satisfies CSSProperties,
 } as const

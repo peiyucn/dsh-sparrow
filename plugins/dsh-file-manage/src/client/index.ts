@@ -1,6 +1,9 @@
 /**
- * dsh-file-manage client half：sidebar footer 入口 + 云端文件弹窗。
- * 请求封装见 api.ts、样式见 styles.ts、视图见 FileManageDock.tsx；客户端不直接碰任何文件或凭据。
+ * dsh-file-manage client half：官方「主面板」入口（左栏上面的图标行 + 中央列的页面）。
+ *
+ * 形态对齐官方 `ui-plugin-manager`（插件）与 `ui-schedule`（自动化任务），见 spec 03：
+ * `main` keyed 槽与 `sidebar.panellist` list 槽**共用同一个 id**。
+ * 请求封装见 api.ts、样式见 styles.ts、视图见 CloudFilesPage.tsx；客户端不直接碰任何文件或凭据。
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -8,18 +11,28 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { countApi, deleteApi, listApi } from './api.js'
-import { FileManageDock } from './FileManageDock.js'
+import { CloudFilesPanel } from './CloudFilesPage.js'
+import { CloudFilesPanelIcon } from './CloudFilesPanelIcon.js'
+import { attachMainPanel } from './panel.js'
 import { ensureFileManageStyles } from './styles.js'
 
+// ⚠️ `layout` **不在这里** —— client half 的 inject 缺服务会让 entry 永远 pending，
+// 而客户端 boot 审计把非 active 的 entry 当致命失败；它走 panel.ts 里的可选依赖 fork。
 export const inject = ['slots', 'locale']
+
+/** 入口 id：同时是左栏面板行的 id 与中央列 `main` 槽的 key（官方 `MainPanelId`）。 */
+export const PANEL_ID = 'file-manage' as MainPanelId
+
+/** 左栏行序：官方 plugins = 0、schedules = 10，本插件沿用原 footer 的 21 号段。 */
+const PANEL_ORDER = 21
 
 /** 本插件的 locale 字典（zh/en）。 */
 const LOCALE_DICTS = {
   zh: {
     'button.label': '云端文件',
     'dialog.title': '云端文件（DeepSeek Files API）',
-    'dialog.close': '关闭',
     'loading': '加载中…',
     'loadMore': '加载更多',
     'summary.count': '共 {count} 个文件',
@@ -42,7 +55,6 @@ const LOCALE_DICTS = {
   en: {
     'button.label': 'Cloud Files',
     'dialog.title': 'Cloud Files (DeepSeek Files API)',
-    'dialog.close': 'Close',
     'loading': 'Loading…',
     'loadMore': 'Load more',
     'summary.count': '{count} files',
@@ -65,28 +77,34 @@ const LOCALE_DICTS = {
 } as const
 
 /**
- * client half 入口：注册 locale 字典 + sidebar footer action。
+ * client half 入口：locale 字典 + 官方主面板两处注册。
  * @param ctx - 浏览器侧 Cordis 上下文。
  */
 export function apply(ctx: ClientContext): void {
   ensureFileManageStyles()
   const disposeDictionaries = ctx.locale.register('file-manage', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
   ctx.effect(() => disposeDictionaries, 'dsh-file-manage: locale dictionaries')
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-    name: 'sidebar.footer.action',
+  // 官方主面板两处注册（`main` 页面 + `sidebar.panellist` 图标行）走可选依赖 fork：
+  // 官方布局服务不在位时整条不注册（惰性停用、不抛错），宿主照常启动。
+  attachMainPanel(ctx, {
+    id: PANEL_ID,
+    order: PANEL_ORDER,
     locale: 'file-manage',
-    id: 'file-manage',
-    order: 21,
+    label: () => ctx.locale.bind('file-manage')('button.label'),
     inject: () => ({
       listFiles: listApi,
       deleteFile: deleteApi,
       countFiles: countApi,
     }),
-  }, FileManageDock))
+    page: CloudFilesPanel,
+    icon: CloudFilesPanelIcon,
+  })
 }
 
-export { FileManageDock } from './FileManageDock.js'
-export type { FileManageDockInjected, FileManageDockProps } from './FileManageDock.js'
+export { CloudFilesPanel } from './CloudFilesPage.js'
+export type { CloudFilesPanelInjected, CloudFilesPanelProps } from './CloudFilesPage.js'
+export { CloudFilesPanelIcon } from './CloudFilesPanelIcon.js'
+export { attachMainPanel } from './panel.js'
 export { ensureFileManageStyles } from './styles.js'
 export { countApi, deleteApi, listApi } from './api.js'
 export type { FileCountSummary } from './api.js'

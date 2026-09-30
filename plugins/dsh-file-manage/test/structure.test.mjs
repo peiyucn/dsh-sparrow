@@ -43,54 +43,88 @@ describe('dsh-file-manage 结构', () => {
   })
 
   it('lib/ 应该 不残留 src 已删除组件的编译产物（防改名后过期产物随包发布）', () => {
-    // FileSessionDock 曾随 0.1.0 发布（src 已改名 FileManageDock，tsc 不清 lib/）。
-    assert.equal(existsSync(new URL('../lib/client/FileSessionDock.js', import.meta.url)), false)
-    assert.equal(existsSync(new URL('../lib/types/client/FileSessionDock.d.ts', import.meta.url)), false)
+    // FileSessionDock 曾随 0.1.0 发布（src 已改名）；FileManageDock 随 0.2.0-rc.2 的
+    // 主面板改造被 CloudFilesPage 取代（tsc 不清 lib/，须显式删旧产物）。
+    for (const stale of [
+      'lib/client/FileSessionDock.js', 'lib/types/client/FileSessionDock.d.ts',
+      'lib/client/FileManageDock.js', 'lib/types/client/FileManageDock.d.ts',
+    ]) {
+      assert.equal(existsSync(new URL(`../${stale}`, import.meta.url)), false, `lib/ 残留旧产物 ${stale}`)
+    }
   })
 
   /**
-   * 打开面板的**首帧**必须是 loading —— 守卫 owner 2026-09-30 报的
-   * 「打开后先全高展示闪一下，然后变矮，出现 loading」。
+   * spec 03：入口从「左栏 footer action + 自建全屏弹窗」迁到官方「主面板」形态。
    *
-   * 真机逐帧量到的样子（**只有 1 帧 / 12ms**，肉眼却很明显）：
-   * ```
-   * 帧1  h=672  summary=true  loading=false  card=true    ← 上一次关闭时留下的旧列表（全高）
-   * 帧2  h=409  summary=true  loading=true   card=false   ← 才变成 loading
-   * ```
-   * 根因不是样式，是**状态复用**：`open` 翻 true 时 React 先用旧 state 渲染一帧，
-   * 而清空（`setRows([])`）与置 loading 原本放在 `useEffect` 里，只能作用于**第二帧**。
-   *
-   * 修法 = 把清空与置 loading 挪进点击处理器的 `openPanel()`，与 `setOpen(true)` 批进同一次渲染。
-   * 这条测试从源码结构上钉住这个形状（本插件没有 client 侧 DOM 测试环境，
-   * 且该缺陷只有首帧时序能暴露，故按结构断言 —— 与 picker/sticky 那类用例同一取舍）。
+   * 本组守卫钉住**迁走的东西不许回来**：client half 只注册官方两处槽位，
+   * 自建遮罩 / `role='dialog'` / `aria-modal` / 点遮罩关闭 / 焦点陷阱全部消失。
+   * （删除确认仍用弹窗语义，但那是**官方 `Modal` 原语**，不在本文件的守卫范围内。）
    */
-  it('打开面板应该 在同一批更新里清空并置 loading（否则首帧会画出旧列表）', async () => {
-    const src = await readFile(new URL('../src/client/FileManageDock.tsx', import.meta.url), 'utf8')
+  it('client half 应该 只注册官方 main + sidebar.panellist，不再挂 sidebar.footer.action', async () => {
+    const index = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(index, /attachMainPanel\(/u, '入口必须经 attachMainPanel 装配')
+    assert.ok(!/sidebar\.footer\.action/u.test(index), '不得再注册左栏 footer action（已迁到上面）')
+    assert.ok(!/role=['"]dialog['"]/u.test(index), 'client half 不得出现自建 dialog 语义')
+  })
 
-    // ① 打开动作必须走 openPanel（而不是裸 setOpen(true)），否则清空晚一帧
-    assert.match(src, /onClick=\{\(\) => \{ if \(open\) setOpen\(false\); else openPanel\(\) \}\}/u,
-      '入口按钮的 onClick 必须调用 openPanel()')
-
-    // ② openPanel 内部要同时设置 loading 与 summaryPending（首屏 ready 门的两半）
-    const openPanel = /const openPanel = useCallback\(\(\) => \{([\s\S]*?)\}, \[\]\)/u.exec(src)
-    assert.ok(openPanel !== null, '找不到 openPanel 定义')
-    const body = openPanel[1]
-    for (const call of ['setRows([])', 'setSummary(null)', 'setLoading(true)', 'setSummaryPending(true)', 'setOpen(true)']) {
-      assert.ok(body.includes(call), `openPanel 缺少 ${call}（首帧就不是 loading）`)
-    }
-
-    // ③ 打开用的 effect **不得**再自己清空/置 loading：那会多出一帧「已打开但没 loading」的中间态
-    // ⚠️ 正则要**非贪婪到该 effect 自己的收尾** `}, [open, reload])`，否则会跨函数吃到 loadMore 里的 setRows。
-    const openEffect = /useEffect\(\(\) => \{\r?\n\s*if \(!open\) return\r?\n([\s\S]*?)\r?\n\s*\}, \[open, reload\]\)/u.exec(src)
-    assert.ok(openEffect !== null, '找不到 open 对应的 effect')
-    // ⚠️ 先剥注释再判：这段 effect 的注释里**故意**写了「不要在这里再 setRows / setLoading」，
-    // 不剥的话守卫会命中自己的文档（实测踩过一次）。
-    const effectBody = openEffect[1]
+  it('⛔ 页面不得自建遮罩 / dialog 语义 / 焦点陷阱（spec 03 决策点）', async () => {
+    const page = await readFile(new URL('../src/client/CloudFilesPage.tsx', import.meta.url), 'utf8')
+    // 剥注释再判：本文件的注释里**故意**写着「没有 role='dialog'」这类说明，
+    // 不剥的话守卫会命中自己的文档（本文件下方那条 effect 守卫踩过同一个坑）。
+    const code = page
       .replace(/\/\*[\s\S]*?\*\//gu, '')
       .replace(/^\s*\/\/.*$/gmu, '')
-    for (const forbidden of ['setRows(', 'setSummary(', 'setLoading(', 'setSummaryPending(']) {
-      assert.ok(!effectBody.includes(forbidden), `open 的 effect 里不该再有 ${forbidden}（清空已提前到 openPanel）`)
+    for (const forbidden of [
+      "role=\"dialog\"", "role='dialog'",
+      'aria-modal',
+      "role=\"alertdialog\"", "role='alertdialog'",
+      'position: fixed',
+      'backdrop-filter',
+      'dsh-file-manage-confirm-overlay',
+    ]) {
+      assert.ok(!code.includes(forbidden), `页面源码里不该再有 ${forbidden}（主面板是正常流，不是弹窗）`)
     }
-    assert.ok(effectBody.includes('reload()'), 'open 的 effect 仍要负责发请求（reload）')
+    // 删除确认走**官方 Modal 原语**（官方主页面做确认的同款做法）。
+    assert.match(code, /<Modal\b/u, '删除确认必须走官方 Modal 原语')
+  })
+
+  it('页面顶部应该 自带窗口拖拽标记与官方顶带内边距（无遮罩后顶端就是窗口边缘）', async () => {
+    const page = await readFile(new URL('../src/client/CloudFilesPage.tsx', import.meta.url), 'utf8')
+    assert.match(page, /data-window-drag/u, '标题行必须自带 data-window-drag（官方入口型页面同款）')
+    assert.match(page, /dsh-file-manage-page-head/u)
+    const styles = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
+    assert.match(styles, /--dsh-frame-top-clearance/u, '标题行必须让出官方顶带')
+  })
+
+  /**
+   * 首屏 ready 门的**初值**必须是 loading —— 守卫 owner 2026-09-30 报的
+   * 「打开后先全高展示闪一下，然后变矮，出现 loading」。
+   *
+   * ⚠️ 迁到主面板后这条不变、但**触发点变了**：以前是「点入口打开」，
+   * 现在是「页面在中央列挂载」。真机逐帧量到的样子（**只有 1 帧 / 12ms**，肉眼却很明显）：
+   * ```
+   * 帧1  h=672  summary=true  loading=false  card=true    ← 上一次离开时留下的旧列表（全高）
+   * 帧2  h=409  summary=true  loading=true   card=false   ← 才变成 loading
+   * ```
+   * 根因不是样式，是**状态复用**：React 先用旧 state 渲染一帧，而置 loading 原本放在
+   * `useEffect` 里，只能作用于**第二帧**。修法 = 把 `loading` / `summaryPending` 的
+   * **初值**直接给 true，首帧就是 loading，那一帧不再存在。
+   */
+  it('首屏应该 在初值上就是 loading（否则挂载首帧会画出空列表/旧列表）', async () => {
+    const src = await readFile(new URL('../src/client/CloudFilesPage.tsx', import.meta.url), 'utf8')
+
+    // ① 两个 ready 门的初值都必须是 true（不是 useEffect 里补）
+    assert.match(src, /const \[loading, setLoading\] = useState\(true\)/u,
+      'loading 初值必须为 true（挂载首帧就是 loading）')
+    assert.match(src, /const \[summaryPending, setSummaryPending\] = useState\(true\)/u,
+      'summaryPending 初值必须为 true（与 loading 一起构成首屏 ready 门）')
+
+    // ② 挂载 effect 只负责发请求，不得自己再清空/置 loading —— 那会多出一帧中间态
+    const mountEffect = /useEffect\(\(\) => \{ reloadRef\.current\(\) \}, \[\]\)/u.exec(src)
+    assert.ok(mountEffect !== null, '找不到挂载 effect（挂载即拉数据、只发请求）')
+
+    // ③ 入口不得是「点开」形态：没有 open 态、没有打开动作
+    assert.ok(!/const \[open, setOpen\]/u.test(src), '主面板页面不该再有 open 状态（挂载即打开）')
+    assert.ok(!/openPanel/u.test(src), '不该再有 openPanel（「打开」这一步随弹窗一起消失）')
   })
 })

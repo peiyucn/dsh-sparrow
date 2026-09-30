@@ -4,7 +4,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'file-manage':
       | 'button.label'
       | 'dialog.title'
-      | 'dialog.close'
       | 'loading'
       | 'loadMore'
       | 'summary.count'
