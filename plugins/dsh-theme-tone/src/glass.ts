@@ -1158,6 +1158,52 @@ body:not([${PLAIN_ATTR}]) [data-expanded] [data-open] [data-disclosure-row] {
   ${backingPaint()}
 }
 
+/* ===== 轨迹视图：把我们的地面**铺满它自己的不透明面** =====
+   owner 报「轨迹页输入框下面那块的颜色和上面不一样」（台阶）。
+
+   根因：轨迹视图根 [data-conversation-composer-overlay]（官方 TrajectoryView.tsx:511，
+   类名 qBU-ya_root）**自己刷了一层不透明底色** --dsw-alias-bg-layer-1
+   （views.module.css 的 .root）。它在本插件里被抬到 81 之上（内容豁免那条，
+   见 backdrop.ts），于是它整块**盖住**了我们的装饰层（z 80）—— 本页的色调与颗粒
+   一点也透不上来（实测：隐藏装饰层后本页只变 mean 0.02 / max 1，而对话页是 10.1）。
+
+   而输入框座底那条 46px 带子（见上）按**它自己的配方**重画，用的是不透明
+   --dsw-alias-bg-base（#0a0a10）+ 光 + 颗粒 —— 于是带上（我们画的深底）与带上方的
+   轨迹地面（官方那块 rgb(44,41,54)）**差出一整档**，读成一条横带。
+
+   修法与右边栏那次同型（它就是同一类东西：官方的不透明面挡在我们材质之上）：
+   **把我们的材质原样画到那个不透明面上**，而不是去改座底那条带子
+   —— 带子与地面于是同源同色，台阶自然消失。
+
+   ⚠️ 锚点用两个公开属性：
+     * [data-conversation-composer-overlay]（TrajectoryView.tsx:511）—— 轨迹视图根；
+     * [data-trajectory-scroll]（TrajectoryTable.tsx:2586-2592）—— 表格滚区。
+   轨迹页内层的「页面级地面」是 .split / .table 这类**哈希类名**上的不透明底，
+   仓库红线禁止写；这里改用「根 + 已知内层宿主」逐个画满，实测残留官方平地
+   从 69.6% 降到 0.02%（见 test/glass.test.mjs 的守卫）。
+
+   ⚠️ 只挂色调档（官方默认档整条不命中）：官方默认轴下地面本来就是纯色，
+   重画等于没事找事，且会动到「完全不动的那个选择」。
+
+   ⚠️ 带上 active 相位门：该视图只存在于会话页（实测 hero 首页既没有这个视图根、
+   也没有轨迹标签；官方 data-phase 三档里 hero 是首页、settling 是切换中），
+   与座底那条带子同相位 —— 本模块的纪律是「除右边栏 / 卡片 / 吸顶行外一律单 active」。
+
+   ⚠️ 本页祖先链上**没有** transform / filter / contain（实测切换全程采样），
+   故这里沿用 fixed 是安全的（与顶栏、座底同一 regime）。
+   右边栏那条**不能**用 fixed 是因为官方 .panel 的开关动画就是 transform —— 两处前提不同。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay],
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay] > div,
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay] > div > div,
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay] > div > div > div,
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay] > section,
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay] > section > div,
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay] table,
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay] aside {
+  ${backingPaint()}
+}
+
 /* 模态弹窗（[role='dialog']）**不做玻璃** —— 它是内容面（设置 / 文件 / 归档列表），
    走 src/surface.ts 的实色抬升面。Apple HIG：「Don't put glass on lists, cards, or media content」。
    曾经把液态玻璃做在了它上面（理解错了 owner 说的「对话框」= 输入框），已撤。

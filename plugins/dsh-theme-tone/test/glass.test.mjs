@@ -1004,6 +1004,41 @@ describe('glass：边界与纪律', () => {
       assert.ok(css.includes(hook), `缺少锚点 ${hook}`)
     }
   })
+
+  it('轨迹视图（[data-conversation-composer-overlay]）必须自己画一遍地面 —— 座底带子才不会凸出一条横档', () => {
+    // owner 报「轨迹页输入框下面那块的颜色和上面不一样」。
+    // 根因：轨迹视图根自己刷一层**不透明** --dsw-alias-bg-layer-1（官方 views.module.css 的 .root），
+    // 而它在本插件里被抬到 81 之上 ⇒ 我们的装饰层（z 80）整块被它盖住
+    // （实测隐藏装饰层本页只变 mean 0.02 / max 1，对话页是 10.1）。
+    // 座底那条 46px 带子按自己的配方重画（不透明 bg-base + 光 + 颗粒），
+    // 于是带 vs 上方轨迹地面差一整档 = 16（实测）。
+    // 修法同右边栏那次：把我们的材质原样画到那块不透明面上。
+    const OVL = '[data-conversation-composer-overlay]'
+    const ovlRules = rules.split('}').filter(b => b.includes('{') && b.slice(0, b.indexOf('{')).includes(OVL))
+    assert.ok(ovlRules.length > 0, `应能找到轨迹视图的地面规则（锚点 ${OVL}）`)
+    for (const rule of ovlRules) {
+      const selector = rule.slice(0, rule.indexOf('{')).trim()
+      const body = rule.slice(rule.indexOf('{') + 1)
+      // 每个选择器都必须带官方默认门 + 只 active（与座底带子同相位）
+      assert.ok(
+        selector.startsWith(`body:not([${PLAIN_ATTR}])`),
+        `轨迹地面规则必须带官方默认门：${selector}`,
+      )
+      assert.ok(selector.includes("[data-phase='active']"), `轨迹地面规则只该覆盖 active：${selector}`)
+      // 必须是「原样重画地面」：不透明底色 + 同源的光 + 颗粒（漏任一项就与座底带子不同源）
+      assert.match(body, /background-color: var\(--dsw-alias-bg-base\)/u, `轨迹地面必须不透明（原样 token）：${selector}`)
+      assert.ok(body.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), `轨迹地面必须带颗粒：${selector}`)
+      assert.ok(body.includes(BACKDROP_GRADIENTS), `轨迹地面必须与背景层同源的光：${selector}`)
+      assert.match(body, /background-attachment: fixed;/u, `轨迹地面必须用 fixed 让百分比按视口解析：${selector}`)
+      assert.ok(!body.includes('scroll, fixed'), `不得写 scroll, fixed（层数不足会被循环补齐）：${selector}`)
+      assert.ok(!body.includes('backdrop-filter'), `地面不模糊，只是重画：${selector}`)
+      // 不得出现 hashed 类名 / 不得碰几何
+      assert.ok(!/\.[A-Za-z0-9]*_[A-Za-z0-9]{4,}/u.test(selector), `不得用官方 hashed 类名：${selector}`)
+      assert.ok(!/\b(?:top|left|right|bottom|width|height)\s*:/u.test(body), `地面规则不得改几何：${selector}`)
+    }
+    // 锚点必须是**公开属性**（官方 TrajectoryView.tsx:511 / TrajectoryTable.tsx:2586-2592）
+    assert.ok(ovlRules.some(r => r.includes(`${OVL} table`)), '必须覆盖会滚动的表格宿主')
+  })
 })
 
 /**

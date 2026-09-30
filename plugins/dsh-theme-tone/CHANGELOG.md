@@ -18,6 +18,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Fixed the composer and top-bar glass across both themes; the drag handle no longer clips through the top bar.
 - Fixed conversation text showing through the composer card's rounded corners when no dock card (todo / goal / queue) sits above it.
 - Fixed the Windows title bar reading as a seam against the themed sidebar below it: the native window-controls strip was painted a flat colour, so it now goes transparent and the themed backdrop shows through (**window buttons unchanged**).
+- Fixed the trajectory page's colour and texture stopping short of the composer, which left a visible band under the input box.
 
 ## 0.1.5-rc.2 (2026-09-21)
 
