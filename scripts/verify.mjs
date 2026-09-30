@@ -6,7 +6,7 @@
  * 参数：`--typecheck` / `--build` / `--test` / `--package` 只跑对应单项，默认全跑。
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -48,6 +48,14 @@ if (runTypecheck) {
 }
 
 if (runBuild) {
+  // ⚠️ 构建前必须清空 lib/：tsc 只增不删，源文件改名 / 删除后**旧产物会留在 lib/**
+  // 而被 package.json 的 files 清单（lib/**/*.js、lib/types/**/*.d.ts）收进 npm 包。
+  // 实测事故：变异测试留下的 lib/_mutbak.js（92kB）+ lib/types/_mutbak.d.ts（38kB）
+  // 在源文件早已还原之后仍然存活，`npm pack` 把它们一起打了进去。
+  // 清空是安全的：lib/ 整个是构建产物（.gitignore 已忽略），release 一律现构建。
+  const libDir = join(cwd, 'lib')
+  if (existsSync(libDir)) rmSync(libDir, { recursive: true, force: true })
+
   console.log(`verify: build ${cwd}`)
   const build = spawnSync(process.execPath, [tsc, '-p', join(cwd, 'tsconfig.json')], {
     cwd,
