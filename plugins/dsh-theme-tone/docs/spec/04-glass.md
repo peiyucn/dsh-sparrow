@@ -17,9 +17,38 @@
 | 对话顶栏 | ❌ 否 | 官方注释：`header is ordinary column chrome above the scrollport (not sticky)`（`ConversationRoot.module.css` 的 `.root[data-phase='active']` 那一段） |
 | 左侧栏 logo 行 / tab strip | ❌ 否 | 全树无 `position: sticky` |
 | 右侧栏面板 | ❌ 否 | 同上 |
+| **右侧栏顶端两条 38px 带**（dockkit 条 + 文件头行） | ❌ 否 | 实测（2026-10-01，见 §1.1） |
 
 所以：**输入框的玻璃是「真的」**（原生就成立）；**顶栏必须先改成浮层**才有东西可模糊。
 浮层虽然也压在内容之上、玻璃在技术上成立，但浮层不做玻璃 —— 见第 5 节。
+
+### 1.1) 右侧栏那两条 38px 带：**查证结论是「不需要改」**（owner 问「为什么不能像对话区那样虚化」）
+
+owner 报「右栏这块玻璃和对话区不一样」。逐项实测后**没有可修的东西**，证据如下
+（1600×900，深色轴，把视口缩到 500 高强行让文件列表溢出，再 `scrollTop` 0 ↔ 400 逐带比像素）：
+
+| 带 | scroll 0 vs 400 | 结论 |
+| :--- | ---: | :--- |
+| `0..38`（dockkit 条） | mean **0.000** / max 0 / 0.00% | 无内容经过 |
+| `38..76`（文件面板自己的头行） | mean **0.000** / max 0 / 0.00% | 无内容经过 |
+| `0..76`（两条合计） | mean **0.000** / max 0 / 0.00% | 无内容经过 |
+| `76..120`（列表首段，**对照**） | mean 3.801 / 2.81% | 内容从这里开始滚 |
+
+结构依据（`ui-sidebar-files/src/client/FilesBody.module.css`）：文件面板是
+`.root{display:flex;flex-direction:column}`，`.header{flex:0 0 auto; height:38px}` 与
+`.body{flex:1 1 auto; min-height:0; overflow:auto}` 是**并列的兄弟**，
+`.body` 的裁切上沿 = `header.bottom`（实测 `[data-files-body]` top = **76**）。
+所以列表**永远不可能**滚到 `0..76` 里 —— 行盒在 `getBoundingClientRect()` 上会「越过」是
+**假阳性**（该 API 忽略裁切），像素判据才是准的（上表）。
+
+对照：对话区顶栏那条 `0..76` 同样做法实测 mean **3.12** / changed **63.2%** ——
+那里是真有正文滚过，所以它半透明 + 模糊才有意义。两者外观不同是**结构使然，不是缺陷**。
+
+> ⚠️ 唯一在右栏竖剖面上能看到的「台阶」是 **y=75 那条 1px 下边框**
+> （`ui-sidebar-files` `.header { border-bottom: 0.5px solid var(--dsw-alias-border-l3) }`，
+> 实测 `1px solid rgba(215,211,233,0.16)`，跳变 37）。**官方默认档下同样存在**
+> （实测 plain 档 y=75 = `rgb(55,56,63)`，跳变 36），是官方自己的分隔线，不属本插件。
+
 
 ## 2) 顶栏：三处改动是一组，必须同时存在
 

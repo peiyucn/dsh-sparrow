@@ -1068,6 +1068,36 @@ describe('glass：边界与纪律', () => {
     // 锚点必须是**公开属性**（官方 TrajectoryView.tsx:511 / TrajectoryTable.tsx:2586-2592）
     assert.ok(ovlRules.some(r => r.includes(`${OVL} table`)), '必须覆盖会滚动的表格宿主')
   })
+
+  it('⛔ 不得给右侧栏那两条 38px 带去「补模糊 / 补材质」—— 那里没有内容经过（查证结论：不需要改）', () => {
+    // owner 问「右栏这块为什么不能像对话区那样虚化」。实测（2026-10-01，缩到 500 高强行让
+    // 文件列表溢出，scrollTop 0 ↔ 400 逐带比像素）：
+    //   右栏 0..38（dockkit 条）   mean 0.000 / max 0 / 0.00%
+    //   右栏 38..76（文件头行）     mean 0.000 / max 0 / 0.00%
+    //   右栏 0..76（合计）          mean 0.000 / max 0 / 0.00%
+    //   对照 76..120（列表首段）    mean 3.801 / 2.81%   ← 内容从这里才开始滚
+    // 对照 对话区顶栏 0..76       mean 3.12 / changed 63.2% ← 真有正文滚过
+    // 结构依据：`ui-sidebar-files` 的 `.root` 是 flex 列，`.header{flex:0 0 auto;height:38px}` 与
+    // `.body{flex:1 1 auto;min-height:0;overflow:auto}` 是**兄弟**，`.body` 裁切上沿 = header 下沿
+    // （实测 top = 76）⇒ 列表**永远滚不到** 0..76 里。
+    // ⚠️ `getBoundingClientRect()` **忽略裁切**，行盒看着「越过」是假阳性，只有像素判据算数。
+    // 所以这里钉一条**反向**守卫：不许为了「看起来一致」往右栏头部加滤镜/材质规则
+    // —— 那只会给一条没有内容经过的实心带子加开销与新的接缝。
+    // 详见 docs/spec/04-glass.md §1.1。
+    const dockkitStrip = '[data-dockkit-strip]'
+    const filesBody = '[data-files-body]'
+    // 全表都不该出现「选择器指向右栏这两条带、且规则体里带 backdrop-filter」的规则
+    const all = css.replace(/\/\*[\s\S]*?\*\//gu, '')
+    for (const block of all.split('}').filter(b => b.includes('{'))) {
+      const selector = block.slice(0, block.indexOf('{')).trim()
+      const body = block.slice(block.indexOf('{') + 1)
+      if (selector === '' || !selector.includes('backdrop-filter') && !body.includes('backdrop-filter')) continue
+      assert.ok(
+        !selector.includes(dockkitStrip) && !selector.includes(filesBody),
+        `右栏顶端条没有内容经过，不得给它做 backdrop-filter：${selector}`,
+      )
+    }
+  })
 })
 
 /**

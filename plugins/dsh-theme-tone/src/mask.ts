@@ -82,9 +82,15 @@ export const MASK_BLUR_RESTORED = 'blur(2px)'
  * | 哈希类名 `xxx_mask` | 官方 `Modal` / `SettingsRoot` / `ImageLightbox` | ✅ |
  * | **`role="presentation"` 且内联 `backdrop-filter`** | **本仓库 `dsh-archive-manage` / `dsh-file-manage`** | ❌ **漏掉** |
  *
- * 自家插件的遮罩是 `<div role="presentation" style="backdropFilter: var(--dsw-mask-blur)">`
- * （见 `ArchiveDock.tsx` / `FileManageDock.tsx`）—— 类名是 `dsh-*-confirm-overlay`，
+ * 自家插件当年那种确认框遮罩是 `<div role="presentation" style="backdropFilter: var(--dsw-mask-blur)">`
+ * （当时的 `ArchiveDock.tsx` / `FileManageDock.tsx`）—— 类名是 `dsh-*-confirm-overlay`，
  * **不含 `_mask`**，所以第一版完全没管到它们 ⇒ owner 看到的「没有虚化」。
+ *
+ * ⚠️ **2026-10-01 实测：后半条现在一条也不命中**（那两个插件的确认框已改用官方 `Modal`，
+ * 遮罩带官方 `_mask` 哈希类；实测「初始页 / 设置模态 / 归档 / 云文件」四种状态下
+ * `带 --dsw-mask-blur 内联的 presentation` 均为 **0**）。**保留**它是**防御性**的：
+ * 本仓库任一插件若再退回那种自建遮罩写法，这条无需改动即可覆盖；
+ * 代价只是一个永不命中、且被 `style*=` 双重收窄的选择器（不建多余层叠上下文）。
  *
  * ⚠️ 两条都限定「自己声明了 `backdrop-filter: var(--dsw-mask-blur)`」这个**用法特征**
  * 才安全：`role="presentation"` 本身很泛（面板容器也常用），
