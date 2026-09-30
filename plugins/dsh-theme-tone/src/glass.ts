@@ -1183,6 +1183,141 @@ body:not([${PLAIN_ATTR}]) [data-expanded] [data-open] [data-disclosure-row] {
 export const SEAM_NOTCH_PX = 16
 
 /**
+ * **输入框卡自己**那两个上圆角缺口的高度 / 宽度比例 —— 用官方半径 token，不写死数值。
+ *
+ * ## 这一条与 `SEAM_NOTCH_PX` 不是同一件事
+ *
+ * `SEAM_NOTCH_PX` 管的是**停靠卡**（`border-radius: 12px`）与输入框卡之间的缝；
+ * 本值管的是**输入框卡自己**的 `border-radius`（官方 `--dsw-radius-panel`，rc.2 = **28px**）：
+ * 卡片包围盒内、圆角弧线**以外**那一小块三角，卡片自己不绘制（圆角天然的），
+ * 于是背后的正文从那里透出来。owner 2026-09-30 定案：「其实就是圆角导致的」。
+ *
+ * ## 为什么用 token 而不是 28
+ *
+ * 圆角半径是官方**自己的**语义值（`InputBar.module.css` 的 `.card { border-radius: var(--dsw-radius-panel) }`）。
+ * 写死 28 会在官方改半径时静默错位 —— 而这块补丁**错位就是误伤**（补丁伸进卡片里会
+ * 把卡面涂成背景色）。故 mask 的瓦片边长与弧心一律取同一个 token，兜底值只是
+ * 0.2.0-rc.2 的实测值。
+ */
+export const CARD_NOTCH_RADIUS = 'var(--dsw-radius-panel, 28px)'
+
+/**
+ * 卡片宽度 —— 与官方 `.card { width: 100%; max-width: var(--dsh-composer-card-max-width) }`
+ * 在**居中容器**里的解析结果同一个表达式。
+ *
+ * 父元素（官方 `.root`）是 `align-items: center` 的 flex 列、左右各留
+ * `--dsh-composer-side-clearance`，故卡片可用宽度 = 100% − 2×clearance；
+ * 补丁必须与卡片**同宽同左边**，否则补到卡片外的留白上（那就是 owner 否决过的「误伤」）。
+ */
+export const CARD_NOTCH_WIDTH =
+  'min(var(--dsh-composer-card-max-width, 100%), 100% - 2 * var(--dsh-composer-side-clearance, 16px))'
+
+/**
+ * 输入框卡**上圆角缺口**的补丁样式表文本。
+ *
+ * ## 它补的是什么（2026-09-30 owner 定案）
+ *
+ * 「其实就是圆角导致的，没你想的那么复杂。」—— 输入框卡片
+ * `border-radius: var(--dsw-radius-panel)`（28px），**圆角弧线以外、元素包围盒以内**
+ * 那一小块三角元素自己不绘制（圆角天然留的），那块就露出背后滚过去的正文。
+ * 平时上面压着排队卡（它与输入框卡重叠 3px）正好盖住，**独卡时没人盖** ⇒ 露出正文。
+ *
+ * ## 为什么只补**上面**两个角（量出来的，不是省事）
+ *
+ * 逐角量（刷红量具 + 真实背景「藏正文」敏感度，见提交说明）：
+ *
+ * | 角 | 我们露红 | 官方露红 | 露的是正文吗（MAD） |
+ * | :--- | ---: | ---: | ---: |
+ * | 左上 | 123 | 94 | **2.39**（是，用户可见） |
+ * | 右上 | 112 | 95 | 0.39 |
+ * | 左下 | 13 | 0 | 0.04（不是） |
+ * | 右下 | 10 | 0 | 0.00（不是） |
+ *
+ * 下两角已被座底那条 46px 不透带（`SEAT_SOLID_PX + SEAT_SOLID_RAMP_PX`）连带盖住，
+ * 残余的 13 / 10 是那条带顶端 10px 过渡段的**半透明**读数，背后的正文敏感度 0.00–0.04
+ * ⇒ **不是用户可见的漏字**，按「只补真正漏的角」不补。
+ * 官方在左上/右上各露 94–95 是它自己那条 36px 渐隐带的**有意**设计（`::after` 的
+ * `background` 只刷到座位顶 36px 以内），我们不复制那个数字、只把它盖掉。
+ *
+ * ## 为什么挂在**卡的父元素**上、而不用卡自己的 `::after`
+ *
+ * 官方在「未选工作区」态用**卡片自己的 `::after`** 画一圈虚线圆角框
+ * （实测构建产物：那个哈希类的 `:after` 上是 `content:""` + 1px 虚线样式的 `border`
+ * + `border-radius: var(--dsw-radius-panel)` + `position:absolute; inset:0`）；
+ * 而 `mask-image` 作用于**整个伪元素**（含它的边框）⇒ 我们在同处加 mask 会把那条官方虚线擦掉。
+ * 本仓库已有同型先例：`surface.ts` 的 `AFTER_LAYER_EXCLUDED_ANCHORS`（QueueDock 的
+ * `::after` 上有官方 0.5px 描边，故回避）。父元素（官方 `.root`）的 `::before` / `::after`
+ * 实测两个相位都是 `content: none` ⇒ 无碰撞。
+ *
+ * ## 几何（两个视口实测，1440 / 1100）
+ *
+ * * 卡片是父元素的**第一个在流子元素**，父元素 `padding-top: 0` ⇒ 卡片顶 == 父元素顶
+ *   （实测 `cardTopToRootTop = 0`），所以 `top: 0` 就是卡片顶；
+ * * 卡片在父元素里**居中**、宽 = {@link CARD_NOTCH_WIDTH} ⇒ 用 `left: 50%` +
+ *   负 `margin-left` 对齐，两个视口实测左边误差 0（1440 下 189.3 == 189.3；1100 下 70.5 == 70.5）。
+ *
+ * ## 为什么用 mask 而不是「四块实心小方块」
+ *
+ * 实心方块会伸进卡片内部 —— 卡面是半透明的（玻璃 58%），补丁从卡片背后透上来就会
+ * 把圆角处染成背景色，那是**新的误伤**。mask 取「瓦片减去四分之一圆」：
+ * 瓦片边长 = 半径、弧心在瓦片内侧角，于是**只有弧线以外**那小块三角被涂上，
+ * 卡片面与玻璃**一点都碰不到**（实测卡片对背后正文的敏感度改前改后一致、左右留白逐像素相同）。
+ *
+ * ## 门
+ *
+ * 与缝挡板其余三条**一致**：官方默认让路 + 只 `active`。
+ * hero 下底座不是定位元素（官方只在 `active` 写 `position: sticky`），
+ * 本补丁依赖父元素当包含块，故不介入 hero。
+ * （本段在模板字符串外，是函数注释。）
+ * @returns 两条规则文本：宿主补成包含块 + 缺口补丁本体。
+ */
+function buildCardNotchCss(): string {
+  /**
+   * 三个缝挡板共用的门（与 {@link buildSeamCss} 里那个一致：官方默认门 + 只 active）。
+   */
+  const gate = `body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat]`
+  /**
+   * 缺口补丁的宿主：**卡的父元素**。`:has()` 只能是它 —— 卡片本身带 `backdrop-filter`
+   * 自成层叠上下文，挂它身上的伪元素（哪怕 z-index 负）会画在停靠卡之上。
+   */
+  const host = `${gate} :has(> [data-composer-card])`
+  return `/* ===== 输入框卡上圆角缺口（卡片圆角弧外的三角露正文；详见 buildCardNotchCss 注释）===== */
+${host} {
+  /* 只补包含块，不改布局（无偏移、无 z-index）：父元素官方是 static，
+     绝对定位伪元素需要它当包含块。这条与缝挡板那条同型，不新增副作用。 */
+  position: relative;
+}
+${host}::after {
+  content: '';
+  position: absolute;
+  /* 卡片是父元素第一个在流子元素、父元素无上内边距 ⇒ 父元素顶就是卡片顶（实测两视口一致）。 */
+  top: 0;
+  /* 与卡片同宽同左边（父元素是居中 flex 列）：左缘 = 50% − 宽/2。
+     宽度表达式与官方 .card 的 width/max-width 同源，两处不会各自漂移。 */
+  left: calc(50% - ${CARD_NOTCH_WIDTH} / 2);
+  width: ${CARD_NOTCH_WIDTH};
+  height: ${CARD_NOTCH_RADIUS};
+  z-index: -1; /* 画在卡片**背后**（卡片 z-index:0 自成层叠上下文，压在它上面） */
+  pointer-events: none;
+  /* 与座底那条同一份漆：不透明 ⇒ 逐像素等于背景（C = P 精确成立，看不出补丁边界） */
+  ${backingPaint()}
+  /* 瓦片 = 圆角半径见方，弧心在瓦片**内侧角**（左上瓦片：瓦片右下角；右上瓦片：瓦片左下角）。
+     "距弧心 > 半径" 就是弧线以外 ⇒ 涂不透明漆；弧线以内保持透明 ⇒ 完全不碰卡片面与玻璃。
+     ⚠️ 只给上面两个角：下两角已由座底那条 46px 不透带盖住（见函数注释的逐角实测表）。
+     ⚠️ 颜色写 black 关键字而不是十六进制 —— 缝挡板表有一条守卫禁止硬编码色值。 */
+  -webkit-mask-image: radial-gradient(circle at ${CARD_NOTCH_RADIUS} ${CARD_NOTCH_RADIUS}, transparent ${CARD_NOTCH_RADIUS}, black ${CARD_NOTCH_RADIUS}), radial-gradient(circle at 0px ${CARD_NOTCH_RADIUS}, transparent ${CARD_NOTCH_RADIUS}, black ${CARD_NOTCH_RADIUS});
+  mask-image: radial-gradient(circle at ${CARD_NOTCH_RADIUS} ${CARD_NOTCH_RADIUS}, transparent ${CARD_NOTCH_RADIUS}, black ${CARD_NOTCH_RADIUS}), radial-gradient(circle at 0px ${CARD_NOTCH_RADIUS}, transparent ${CARD_NOTCH_RADIUS}, black ${CARD_NOTCH_RADIUS});
+  -webkit-mask-size: ${CARD_NOTCH_RADIUS} ${CARD_NOTCH_RADIUS}, ${CARD_NOTCH_RADIUS} ${CARD_NOTCH_RADIUS};
+  mask-size: ${CARD_NOTCH_RADIUS} ${CARD_NOTCH_RADIUS}, ${CARD_NOTCH_RADIUS} ${CARD_NOTCH_RADIUS};
+  -webkit-mask-position: 0 0, 100% 0;
+  mask-position: 0 0, 100% 0;
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  mask-repeat: no-repeat, no-repeat;
+}
+`
+}
+
+/**
  * 「缝挡板」样式表文本 —— 停靠卡与输入框卡之间那条 6px 缝，用**背景原样的不透明带**挡住。
  *
  * ## 这条缝是什么（实测）
@@ -1303,5 +1438,5 @@ ${host(queueBand)}
 ${band(queueBand, true)}
 ${host(cardBand)}
 ${band(cardBand, false)}
-`
+${buildCardNotchCss()}`
 }

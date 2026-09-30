@@ -16,6 +16,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Fixed the dark band on an expanded "Think" row while it sticks, and the background band / colour bleeding on grouped section titles (model picker and friends).
 - Fixed the top bar's glow being covered up, and uneven lighting strength across overlays.
 - Fixed the composer and top-bar glass across both themes; the drag handle no longer clips through the top bar.
+- Fixed conversation text showing through the composer card's rounded corners when no dock card (todo / goal / queue) sits above it.
 
 ## 0.1.5-rc.2 (2026-09-21)
 

@@ -17,6 +17,9 @@ import {
   SEAT_SOLID_RAMP_PX,
   SHADE_ALPHA,
   buildGlassCss,
+  buildSeamCss,
+  CARD_NOTCH_RADIUS,
+  CARD_NOTCH_WIDTH,
   phaseGate,
 } from '../lib/glass.js'
 /** 浅色轴暗边用的官方最深静态色 token。 */
@@ -1000,5 +1003,153 @@ describe('glass：边界与纪律', () => {
     ]) {
       assert.ok(css.includes(hook), `缺少锚点 ${hook}`)
     }
+  })
+})
+
+/**
+ * 取 `buildSeamCss()` 里**最后一条**匹配 needle 的规则（选择器 + 声明块，已剥注释）。
+ *
+ * 「最后一条」是有意的：缺口补丁追加在缝挡板三条**之后**，而它与缝挡板共用
+ * `:has(> [data-composer-card])` 这个宿主选择器 —— 只有取最后一条才拿得到补丁本体。
+ * @param needle - 选择器片段。
+ * @returns 命中规则文本。
+ */
+const lastRuleWith = (text, needle) => {
+  const clean = text.replace(/\/\*[\s\S]*?\*\//gu, '')
+  const at = clean.lastIndexOf(needle)
+  assert.ok(at >= 0, `找不到规则：${needle}`)
+  return clean.slice(clean.lastIndexOf('}', at) + 1, clean.indexOf('}', at) + 1)
+}
+
+describe('glass：输入框卡上圆角缺口补丁（owner 2026-09-30「其实就是圆角导致的」）', () => {
+  const seam = buildSeamCss()
+  const seamRules = seam.replace(/\/\*[\s\S]*?\*\//gu, '')
+  // 宿主 = 卡的父元素；补丁 = 它上面的 ::after（最后一条，因为缺口补丁追加在缝挡板之后）。
+  const HOST = ':has(> [data-composer-card]) {'
+  const PATCH = ':has(> [data-composer-card])::after'
+  const host = lastRuleWith(seam, HOST)
+  const patch = lastRuleWith(seam, PATCH)
+
+  it('必须挂在**卡的父元素**的 ::after 上 —— 卡片自己的 ::after 归官方虚线框', () => {
+    // 官方「未选工作区」态用**卡片自己的 ::after** 画一圈虚线圆角框（构建产物实测：
+    // content:"" + 1px 虚线 border + border-radius:var(--dsw-radius-panel) + absolute inset:0）。
+    // 而 mask-image 作用于**整个伪元素**（含那条边框）⇒ 同处加 mask 会把官方虚线擦掉。
+    // 父元素（官方 .root）的 ::before / ::after 实测两个相位都是 content:none ⇒ 无碰撞。
+    //（本仓库同型先例：surface.ts 的 AFTER_LAYER_EXCLUDED_ANCHORS —— QueueDock 的 ::after 有官方描边，故回避。）
+    assert.ok(patch.includes(PATCH), '补丁应挂在卡的父元素上')
+    assert.ok(
+      !seamRules.includes('[data-composer-card]::after'),
+      '不得使用**卡片自己**的 ::after —— 那是官方的虚线圆角框（会被 mask 整圈擦掉）',
+    )
+    assert.ok(
+      !seamRules.includes('[data-composer-card]::before'),
+      '也不得用卡片的 ::before —— 那是本插件的玻璃层',
+    )
+  })
+
+  it('宿主必须补成包含块且**无偏移 / 无 z-index**（与缝挡板同一纪律）', () => {
+    assert.match(host, /position: relative/u, '父元素要 relative，绝对定位的补丁才有包含块')
+    assert.ok(!/\btop\s*:/u.test(host) && !/\bleft\s*:/u.test(host), '宿主不得带偏移（不改布局）')
+    assert.ok(!/\bz-index\s*:/u.test(host), '宿主不得带 z-index（那会另开层叠上下文）')
+  })
+
+  it('补丁的漆必须与座底那条**同源**：不透明 bg-base + 同源光 + 颗粒 + 单个 fixed', () => {
+    // 复用的是同一个 backingPaint()：不透明 ⇒ 逐像素等于背景（C = P 精确成立），看不出补丁边界。
+    assert.match(patch, /background-color: var\(--dsw-alias-bg-base\)/u, '必须不透明（原样 token）')
+    assert.ok(patch.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), '颗粒必须在（漏了它就是一块干净平色）')
+    assert.ok(patch.includes(BACKDROP_GRADIENTS), '光必须与背景层**同源**（直引，不复制数值）')
+    assert.match(patch, /background-attachment: fixed;/u, '必须单个 fixed（4 层 background-image）')
+    assert.ok(!patch.includes('scroll, fixed'), '不得写 scroll, fixed（层数不足会被循环补齐）')
+    assert.ok(!/\bbackground:\s/u.test(patch), '不得用 background 简写（会重置其它 background-*）')
+  })
+
+  it('形状只能靠 mask 的「瓦片减四分之一圆」——⛔ 不得写 border-radius', () => {
+    // ⚠️ 这条是**实测反例**：写了 `border-radius: inherit` 会让补丁自己的背景按卡片那个 28px
+    // 圆角被裁掉，而缺口恰好就在圆角**外面** ⇒ 补丁永远补不到（实测只从 123 降到 100，
+    // 而不是 0）。形状必须**全部**交给 mask：底漆不透明，mask 之外全透明 ⇒
+    // 不碰卡片面、不碰玻璃。
+    assert.ok(!/border-radius/u.test(patch), '不得写 border-radius —— 会把补丁裁到弧线以内、补不到缺口')
+    assert.match(patch, /mask-image: radial-gradient\(circle at/u, '形状必须由 radial-gradient 掩膜给出')
+    assert.match(patch, /-webkit-mask-image: radial-gradient\(circle at/u, '必须同时给 -webkit- 前缀（Chromium 走它）')
+    // 掩膜语义：距弧心 **> 半径** 才涂漆（弧线以外那块三角），弧线以内保持 transparent。
+    assert.ok(
+      !/transparent [^,)]*,\s*transparent/u.test(patch),
+      '掩膜必须是「transparent → black」由内到外，写成反的会把卡片内部涂上漆',
+    )
+  })
+
+  it('只补**上面两个角**（量出来的，不是省事）—— 下两角已被座底 46px 不透带盖住', () => {
+    // 逐角实测（刷红量具 + 「藏正文」敏感度）：
+    //   左上 123 / 右上 112 ⇒ 真的要补；左下 13 / 右下 10，且背后正文敏感度 0.00–0.04
+    //   ⇒ 那不是用户可见的漏字（只是座底那条带 10px 过渡段的半透明读数），按纪律不补。
+    const maskImage = /-webkit-mask-image:\s*([^;]+);/u.exec(patch)?.[1] ?? ''
+    assert.equal(
+      (maskImage.match(/radial-gradient\(/gu) ?? []).length,
+      2,
+      '掩膜应恰好两个瓦片（左上 + 右上），别顺手补四角',
+    )
+    // ⚠️ 逐条数**每个**掩膜属性的分量：只查 `mask-image` 会漏掉
+    // 「只改 mask-position 补四角」这种变异（`-webkit-mask-position` 里也含 `mask-position`
+    // 子串，用子串断言会假绿 —— 反向注入实测抓到过）。
+    // ⚠️ 逗号必须按**括号深度 0** 切：分量里写着 `var(--dsw-radius-panel, 28px)`，
+    // 那个逗号在括号内 —— 直接 split(',') 会把 2 个分量数成 6 个（本守卫初版就栽在这）。
+    const topLevelCount = (value) => {
+      let depth = 0
+      let n = 1
+      for (const ch of value) {
+        if (ch === '(') depth += 1
+        else if (ch === ')') depth -= 1
+        else if (ch === ',' && depth === 0) n += 1
+      }
+      return n
+    }
+    for (const prop of ['mask-position', 'mask-size', 'mask-repeat']) {
+      for (const decl of [`-webkit-${prop}`, prop]) {
+        const values = new RegExp(`(?:^|[^-])${decl}:\\s*([^;]+);`, 'mu').exec(patch)?.[1]
+        assert.ok(values, `缺声明 ${decl}`)
+        assert.equal(
+          topLevelCount(values),
+          2,
+          `${decl} 应恰好两个分量（左上 + 右上），实际 ${topLevelCount(values)} 个：${values}`,
+        )
+      }
+    }
+    assert.match(patch, /(?:^|[^-])mask-position: 0 0, 100% 0;/mu, '两个瓦片分别锚左上、右上')
+    assert.match(patch, /(?:^|[^-])mask-repeat: no-repeat, no-repeat;/mu, '瓦片不得平铺（平铺会补满整张卡）')
+    // 横向必须与卡片**同宽同左**：父元素是居中 flex 列，左缘 = 50% − 宽/2。
+    assert.match(patch, /left: calc\(50% - min\(var\(--dsh-composer-card-max-width/u, '左缘按官方卡宽表达式居中')
+    assert.ok(patch.includes(CARD_NOTCH_WIDTH), '宽度必须复用 CARD_NOTCH_WIDTH（与官方 .card 同源表达式）')
+    // 高度只到圆角半径为止 —— 再高就会伸进卡片腹地。
+    assert.ok(patch.includes(CARD_NOTCH_RADIUS), '高度与弧心必须取官方半径 token')
+  })
+
+  it('半径必须走官方 token，不得写死像素 —— 官方改半径时写死会静默错位成误伤', () => {
+    assert.ok(CARD_NOTCH_RADIUS.includes('--dsw-radius-panel'), '半径应取官方 --dsw-radius-panel')
+    assert.ok(CARD_NOTCH_RADIUS.includes('28px'), '应带 rc.2 实测兜底值')
+    // ⚠️ 只允许**作为 token 兜底值**出现（`--dsw-radius-panel, 28px`），不许裸写 28px 当几何。
+    // 裸写会在官方改半径时静默错位 —— 而这块补丁错位就是误伤（补丁伸进卡片 = 卡面被涂成背景色）。
+    for (let at = seamRules.indexOf('28px'); at >= 0; at = seamRules.indexOf('28px', at + 1)) {
+      const before = seamRules.slice(0, at).trimEnd()
+      assert.ok(
+        before.endsWith('--dsw-radius-panel,'),
+        `28px 只能作为 --dsw-radius-panel 的兜底值出现，实际上下文：…${seamRules.slice(Math.max(0, at - 40), at + 4)}`,
+      )
+    }
+  })
+
+  it('门必须与缝挡板一致：官方默认让路 + 只 active（hero 不介入）', () => {
+    for (const rule of [host, patch]) {
+      const selector = rule.slice(0, rule.indexOf('{')).trim()
+      assert.ok(selector.startsWith(`body:not([${PLAIN_ATTR}])`), `缺官方默认门：${selector}`)
+      assert.ok(selector.includes("[data-phase='active']"), `只该覆盖 active：${selector}`)
+    }
+    assert.ok(!/hero/u.test(seam), 'hero 不介入（hero 下底座不是定位元素，补丁没有包含块）')
+  })
+
+  it('补丁必须压在卡片背后、不吃鼠标事件', () => {
+    assert.match(patch, /z-index: -1/u, '补丁要画在卡片背后')
+    assert.match(patch, /pointer-events: none/u, '补丁不得吃鼠标事件（卡里是输入框与按钮）')
+    assert.match(patch, /position: absolute/u, '补丁要绝对定位到卡片顶')
+    assert.match(patch, /top: 0/u, '卡片是父元素第一个在流子元素、父元素无上内边距 ⇒ 父元素顶就是卡片顶')
   })
 })
