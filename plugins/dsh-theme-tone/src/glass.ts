@@ -1213,14 +1213,40 @@ body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-empty]::after 
    70% 与顶栏的 HF 差 0.001、亮度差 0.24 ⇒ 直接沿用 {@link GLASS_HEADER_ALPHA}（同一个 0.7），
    与对话区顶栏**同源同参**，不新造一个数。
 
-   ## 为什么用「条自己 + z-index: 1」而不是给 pane 铺 ::before
+   ## 为什么最后是「各标签自己的头行 ::before、向上铺满 0..76」
+      （owner 2026-10-02 第三次复报「明显有条分割线」后的**第二版**修法）
 
-   也试过给 [data-dockkit-pane]::before 铺满顶部 76px（一举覆盖所有标签页、0..76 无内部接缝）。
-   亮度与 HF 同样达标，但它要给 pane 加 z-index: 0 让它自成层叠上下文 ——
-   而 pane 的祖先链上挂着官方的 --dsh-dockkit-dock-layer（泊靠 10 / 全屏 40）与
-   --dsh-dockkit-float-layer（浮窗 60）。给 pane 自建层叠上下文会把这条官方次序风险引入一个
-   本来与浮层无关的改动里。条自己抬一层（z-index: 1，仍在 pane 内部）**不动官方任何次序**
-   （实测：标签、加号、「关闭」按钮、路径行、滚区的盒子逐像素不变）。
+   第一版修法把面挪到 [data-dockkit-pane]::before（公共祖先、一个面盖住所有标签），
+   缝确实没了；但我随即量出**它自己引入的回归**：pane 属于**所有**标签，而**有的标签
+   根本没有 38px 头行** —— 终端（[data-sidebar-terminal]）就是：它的 .root 从 y=38 起、
+   .screen 从 y=46 起，**正文**正好落在 38..76，没有任何头行替它把这层让开。
+   实测终端正文带 38..76：无我方玻璃 HF 1.53 / 亮度 28.9；挂 pane::before 时
+   HF **0.20** / 亮度 **20.1**（被 70% 填充 + blur 盖住）；挂各标签自己的头行时
+   HF 1.30 / 亮度 23.1（与「无玻璃」同档）。
+   ⇒ 面只能锚在**已经确认有 38px 头行**的那些标签上（下面那份带取值的清单），
+   不许图省事锚在公共祖先上。
+
+   第二版：面挂在头行那个元素自己的 ::before 上，但盒子**向上多铺一条带**
+   （top: -PANEL_BAND_PX、height: HEADER_HEIGHT_PX）⇒ 覆盖面板坐标 0..76。
+   这件「向上铺」才是无缝的成因：blur 的**采样区是边框盒**，只有条那半与头行那半
+   落在**同一个盒子**里，y=38 两侧算出的颜色才一致。
+
+   ## 缝的归因：两个独立盒子本身就是缝，相位只是放大器
+
+   上一版是「条自己 + 各标签头行」两个 ::before 面，owner 随即报了第三次。
+   归因分两步做（TEMP/final2.mjs，预览滚到 200、逐列取**有符号**台阶中位）：
+     * 两个面且相位不对齐（owner 那版）：y=38 台阶 **8.72**，邻域对照行仅 0.28~0.79 ⇒ 11.04 倍。
+     * 把下带相位补 -38px / -76px：6.86 / 4.86 —— 相位对齐**只能**压到 4.86，**压不到 0**。
+     * 无玻璃基准：-0.28。
+   ⇒ 相位（background-position 相对自己盒子顶边解析）是放大器；**采样边界被切成两段**
+   才是主因。静态净玻璃下（内容全藏起来）相位是主导项（摘掉 background-image 台阶恰好归零），
+   但**有真实内容时**采样边界那一刀才是主项。故唯一彻底的解法是让 0..76 落在同一个边框盒里。
+   实测第二版：y=38 台阶 **-0.79**（= 对照行同档）。
+
+   层序（都在 pane 内部）：玻璃面 z-index -1（头行的 ::before）→ 头行 z-index 2
+   （文字 / 图标在玻璃**之上**，仍锐利；实测路径文字段的亮度跨度 231.0 → 235.5，未被压平）
+   → 条 z-index **3**（严格高于头行那层，否则条内标签 / 加号 /「关闭」按钮被那层填充压暗）
+   → 正文滚区不抬（在玻璃**之下**，正是要被糊掉的那层）。
 
    ## ⚠️ 为什么不吃 [data-phase] 相位门
 
@@ -1271,17 +1297,24 @@ body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-empty]::after 
    且条下方紧邻的就是 pane 的颗粒层 —— 正是它把 HF 从 2.313 糊到 0.254，证明模糊真的生效
    （不是「值写上了但没糊」）。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
-body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip],
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state='tree'] > *:first-child,
-body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > *:first-child:not([data-textpreview-changed]):not([data-textpreview-meta-failed]),
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='unsupported'] > *:first-child,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > *:first-child:not([data-textpreview-changed]):not([data-textpreview-meta-failed]),
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > [data-textpreview-changed] + *,
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > [data-textpreview-meta-failed] + * {
-  /* 抬到 pane 的颗粒层之上，自己那份 backdrop-filter 才有东西可糊。
-     relative + 无偏移不改几何；条内标签用的 relative 与关闭按钮的 absolute 都锚在**自己**的
-     行内盒上（实测盒子逐像素不变）。 */
+  /* 头行抬到自己的玻璃面之上（玻璃面就在这条规则自己的 ::before 上，z-index: -1），
+     于是头行的路径文字 / 按钮不被那层 70% 填充压暗；同时也抬到 pane 的颗粒层 ::after 之上，
+     玻璃面才有东西可糊（实测不抬时 HF 仍是 2.3 = 没生效）。
+     relative + 无偏移不改几何；头行内的按钮用的 absolute 锚在**自己**的行内盒上（实测盒子逐像素不变）。 */
   position: relative;
-  z-index: 1;
+  z-index: 2;
+}
+/* ⚠️ 条必须抬到**头行那层之上**（头行 z-index 2、它的面又向**上**铺满条区 0..38），
+   否则条内标签 / 加号 /「关闭」按钮会被那层填充压暗。条自己不画面：
+   有头行的标签由头行的面连条区一起盖住；没有头行的标签（终端等）本来就不许被盖。 */
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip] {
+  position: relative;
+  z-index: 3;
 }
 
 /* ===== 真磨砂：让正文**真的从这两条 38px 带下面滚过去**（owner 2026-10-01 选定） =====
@@ -1298,9 +1331,40 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
    玻璃之所以像玻璃，全靠**背后有东西在动**。所以本段做的只有一件事：
    把滚区的**裁切框上提**到这 76px 之上，正文于是真的从两条带下面滚过去。
 
-   实测（真实浏览器）：滚动带内像素确实变化（滚动 500px 后带内 mean 从 0 → 10.086）；
+   实测（真实浏览器）：滚动 500px 后带内像素确实变化（当时把 0..76 当**一段**量得 mean 10.086）；
    两条带仍 HF 0.18 / 0.03 档（内容经过但不锐利，正是磨砂该有的样子）；
    几何不坏：滚动体上沿 76 → 0、可视高 824 → 900、页面无溢出（docScrollHeight 仍 = 900）。
+
+   ⚠️ 上面那个 10.086 是**把两条带混在一起**量的，掩盖了「其实只有 38..76 通了」——
+   详见下一节，别再用单段平均值当「两条带都好了」的判据。
+
+   ## ⚠️ 38..76 修好了不等于 0..38 也修好了（owner 2026-10-02 复报「只有下半部分有效果」）
+
+   上一条只把**滚区**上提到 0，但 **0..38 仍然画不出东西** —— 因为「条在文档流里」，
+   官方的 pane 是 flex 纵列：头行（38px）+ 体（其余）。体那两层**都从 y=38 起**且**都裁剪**：
+   实测 tabHostBody = 38..900 / overflow:auto，tabBody[data-sidebar-right-tab] = 38..900 / overflow:hidden。
+   于是正文再怎么滚，也只会进到 38 以下 ⇒ **上带（0..38）背后永远只有面板自己的纯色**，
+   糊一块纯色 = 肉眼零变化。下带（38..76）背后是正文，所以「只有下半部分有效果」。
+
+   ⚠️ **我上一轮的验收为什么没抓到**：我把 0..76 当成**一段**取平均。
+   上带的 0 被下带的值平均掉，整段仍 > 0，于是判成通过。
+   教训：**两条带必须分别量**；采样窗还必须落在**有文字的列**上
+   （面板右侧是空白，正文变化按列分布，实测变化只在面板相对 x 0..120 那段）。
+
+   修法：把**头行**在流内占的高度还回去（margin-bottom: -38px），体于是从 y=0 起
+   ⇒ 两层裁剪线消失，正文能进 0..38；再让正文**照原位**从 38 开始（体补 padding-top:38）。
+   实测（同一滚动位置比滚动前后，1600x900）：
+   * y 0..9（条内**没有**任何 chrome 的纯玻璃区）：mean 0 → **7.83**（94.1% 像素变化）；
+   * y 10..38：0 → 6.48；y 38..76：1.53（本来就通）；
+   * 条区 0..38 与改前**逐像素相同**（mean 0 / max 0）—— 条内标签 / 关闭 / 加号一个像素没动；
+   * 几何：头行仍 0..38、条仍 0..38 且仍是 position: relative（**不动它的定位**，
+     因为它同时是我们的玻璃锚点与官方的拖动目标），体 0..900，各标签内容仍从 38 起；
+   * 跳行落点仍 76、scrollTop 归零时首行视口 y 仍 76、maxScroll 仍 8710、docH 仍 900。
+
+   ⚠️ 为什么用**负底距**而不是把头行改成 position: absolute：后者会让条离开文档流，
+   条就不再是官方那套 flex 里的一个格子（拖动 / 命中 / 后续官方改动都多一层风险），
+   而负底距只改**流内占位高度**，条的盒子、定位与层叠完全不动。
+   （本条只给 [data-dockkit-pane] 的**头行**加负底距，故「> *:first-child」是唯一的。）
 
    ## ⚠️ 补偿位移**只能用 transform，不能用 padding-top**（踩过的坑）
 
@@ -1366,7 +1430,19 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state='tree'] [data-files-body] > * {
   transform: translateY(${PANEL_SCROLLER_LIFT_PX}px);
 }
-body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip]::before,
+/* 把 pane 头行（= dockkit 条那一行）在流内占的高度还回去，让体从 y=0 起 ——
+   否则体那两层都从 38 起且都裁剪，0..38 里永远画不出内容（见上一条注释）。
+   只加负底距：条的盒子 / 定位 / 层叠一概不动。 */
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] > *:first-child {
+  margin-bottom: -${PANEL_BAND_PX}px;
+}
+/* 体把负底距让出的 38px 补回来，各标签的内容于是仍从 y=38 开始（照原位）。
+   ⚠️ border-box 必须有：体通常是 height:100%，content-box 下加 padding 会把盒子撑到 938，
+   外层 paneBody(overflow:auto) 于是多出 38px 外滚动（实测 maxScroll 8670 ≠ 8710）。 */
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] > *:last-child > [data-sidebar-right-tab] {
+  padding-top: ${PANEL_BAND_PX}px;
+  box-sizing: border-box;
+}
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state='tree'] > *:first-child::before,
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='unsupported'] > *:first-child::before,
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > *:first-child:not([data-textpreview-changed]):not([data-textpreview-meta-failed])::before,
@@ -1374,7 +1450,15 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > [data-textpreview-meta-failed] + *::before {
   content: '';
   position: absolute;
-  inset: 0;
+  /* ⚠️ 向上铺满 38px，让盒子覆盖**面板坐标 0..76**（不只是头行自己那 38..76）。
+     这一条正是「无缝」的关键：blur 的采样区是**边框盒**，只有两个面的盒子完全重合时，
+     y=38 两侧算出的颜色才一致（实测真实内容下 y=38 的逐列台阶：两面各自 38px 时 8.72，
+     对照行仅 0.28~0.79；铺满 0..76 后同一位置为 -0.79，与对照行同档）。 */
+  top: -${PANEL_BAND_PX}px;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  height: ${HEADER_HEIGHT_PX}px;
   z-index: -1;
   pointer-events: none;
   /* 与对话区顶栏**同一份**配方、同一个 alpha（GLASS_HEADER_ALPHA） */
@@ -1383,7 +1467,9 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
   /* ⚠️ 这里**不能**用 background-attachment: fixed（顶栏那条用了，是因为它自己就是
      absolute 浮层、祖先无 transform）：右栏面板在开关 / 全屏切换时会被官方 translate，
      fixed 会被重解析到 transform 后的坐标系。改用与右栏材质那几条**同一套**
-     100vw x 100vh + 右对齐相位 —— 那套本就是为「面板会被 transform」设计的。 */
+     100vw x 100vh + 右对齐相位 —— 那套本就是为「面板会被 transform」设计的。
+     ⚠️ 相位必须按**面板**顶边（y=0）算：这个伪元素的盒子虽然从 -38 起，
+     但它的包含块（头行）顶边在面板 y=38，故 right 相位不带额外偏移即可对上。 */
   background-image: ${dimmedBackdropGradients(HEADER_LIGHT_SCALE)};
   background-attachment: scroll;
   background-size: 100vw 100vh, 100vw 100vh, 100vw 100vh;

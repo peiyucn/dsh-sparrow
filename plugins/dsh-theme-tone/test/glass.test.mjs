@@ -13,6 +13,7 @@ import {
   GLASS_SPECULAR_RING,
   HEADER_HEIGHT_PX,
   HEADER_LIGHT_SCALE,
+  PANEL_BAND_PX,
   PANEL_SCROLLER_LIFT_PX,
   SEAT_SOLID_PX,
   SEAT_SOLID_RAMP_PX,
@@ -1125,101 +1126,158 @@ describe('glass：边界与纪律', () => {
     const all = css.replace(/\/\*[\s\S]*?\*\//gu, '')
     const blocks = all.split('}').map(b => b.trim()).filter(b => b.includes('{'))
     const STRIP = '[data-dockkit-strip]'
-    // ⚠️ 第二行是**每个标签各自的头行**，不是一个通用锚点能盖住的：文件树一种、
-    //    文档预览另一种（owner 2026-10-01 在「文件 + AGENTS.md」双标签下复报「只做了一半」）。
-    //    故这里**逐个标签**要求：每种都要有一条自己的 ::before 玻璃规则，且收窄到**真有头行**的状态。
-    const TABHEADS = [
-      { name: 'dockkit 条', match: (sel) => sel.includes(STRIP) },
+    // ⚠️ **括号感知**拆分选择器：`> *:first-child:not([a]):not([b])` 里没有裸逗号，
+    //    但将来若写成 `:not(a, b)` 那种带参形式，朴素 split(',') 会把参数切断。
+    const splitSels = (text) => {
+      const parts = []
+      let depth = 0, cur = ''
+      for (const ch of text) {
+        if (ch === '(') depth++
+        else if (ch === ')') depth--
+        if (ch === ',' && depth === 0) { parts.push(cur); cur = '' } else cur += ch
+      }
+      parts.push(cur)
+      return parts.map(s => s.trim()).filter(Boolean)
+    }
+
+    // ⛔ **0..76 只许有一个玻璃面**（owner 2026-10-02 第三次复报「明显有条分割线，应该是一个整体」）。
+    //    上一版是「条自己 + 各标签头行」两个 ::before 面。
+    //    ⚠️ 归因分两步、别只记住第一步：把内容全藏起来只量静态净玻璃时，主导项是**渐变相位**
+    //    （background-position 相对自己盒子顶边解析，下带把同一张 900px 高的渐变图从第 0 行
+    //    重新开始）—— 只摘 background-image 台阶恰好归零。
+    //    但**有真实内容**在带下滚动时，真正的主因是**采样边界**：blur 的采样区是元素的边框盒，
+    //    两个盒子各自在 y=38 结束 / 开始。实测（TEMP/final2.mjs，预览滚到 200、逐列有符号台阶中位）：
+    //      两面相位不对齐 8.72 / 补 -38px 6.86 / 补 -76px 4.86 / 无玻璃 -0.28
+    //    ⇒ 相位对齐**只能压到 4.86、压不到 0**，唯让 0..76 落进**同一个边框盒**才彻底。
+    //    所以这条守卫盯的是「面的个数」，而下面那条「向上多铺一条带」盯的是采样区是否重合。
+    //    ⚠️ 范围只限**右栏面板**：对话区顶栏 / 输入框卡各有自己那份玻璃面，与这条无关。
+    const faces = blocks.filter((b) => {
+      const sel = b.split('{')[0]
+      return sel.includes('::before') && /backdrop-filter/u.test(b)
+        && sel.includes(RIGHT_PANEL_ATTR) && sel.includes('[data-dockkit-pane]')
+    })
+    assert.equal(
+      faces.length, 1,
+      `右栏 0..76 只许有**一个**玻璃面（两个面会在 y=38 切出渐变相位台阶）：`
+      + `${faces.map(b => b.split('{')[0].trim()).join(' | ')}`,
+    )
+    const face = faces[0]
+    const faceSel = face.split('{')[0]
+    const faceBody = face.slice(face.indexOf('{'))
+    // ⛔ **面不得挂在 pane 本体上**（owner 复报「分割线」后我改到这上面过，随即量出回归）。
+    //    pane 是**所有**标签页的公共祖先，挂它上面会盖住**没有头行**的标签：
+    //    终端正文正好从 y=38 起，没有任何 38px 头行替它把这层让开。
+    //    实测终端正文带 38..76：挂 pane 时 HF 1.53 → **0.20**、亮度 28.9 → **20.1**（被糊掉）；
+    //    挂各标签自己的头行上则 HF 1.30 / 亮度 23.1，与「无玻璃」对照（1.33 / 32.4）同档。
+    assert.ok(
+      !/\[data-dockkit-pane\]::before/u.test(faceSel),
+      `玻璃面不得挂在 [data-dockkit-pane]::before 上（会盖住终端这类没有头行的标签的正文）：${faceSel.trim()}`,
+    )
+    // 面必须挂在**各标签自己的 38px 头行**上（逐个用带取值的公开属性锚定）。
+    for (const one of splitSels(faceSel)) {
+      assert.ok(
+        /\[data-files-state='tree'\]|\[data-textpreview-state='(?:text|unsupported)'\]/u.test(one),
+        `玻璃面必须锚在各标签自己的头行上（且属性带取值）：${one}`,
+      )
+      assert.ok(
+        one.trim().endsWith('::before'),
+        `玻璃面必须锚在头行那个元素自己的 ::before 上：${one}`,
+      )
+    }
+    // ⛔ **向上铺满两条带**：面虽然挂在头行上，盒子必须从面板 y=0 起、高 76 ——
+    //    这一条才是「无缝」的成因：blur 的采样区是**边框盒**，只有条那半与头行那半
+    //    落在**同一个盒子**里，y=38 两侧算出的颜色才一致。
+    //    实测（真实内容滚到 200）y=38 的逐列有符号台阶：两个各自 38px 的盒子时 **8.72**
+    //    （对照行仅 0.28~0.79）；铺成 0..76 后 **-0.79**，与对照行同档。
+    assert.match(
+      faceBody, new RegExp(`top:\\s*-\\$\\{PANEL_BAND_PX\\}px|top:\\s*-${PANEL_BAND_PX}px`, 'u'),
+      `玻璃面必须向上多铺一条带（top = -PANEL_BAND_PX = -${PANEL_BAND_PX}px），否则采样区在 y=38 被边界截断、又切出一条缝：${faceBody}`,
+    )
+    // ⚠️ 高度必须是**两条带之和** HEADER_HEIGHT_PX（写死 38 会让上半条没有玻璃 = 退回「只有下半部分」）。
+    assert.match(
+      faceBody, new RegExp(`height:\\s*\\$\\{HEADER_HEIGHT_PX\\}px|height:\\s*${HEADER_HEIGHT_PX}px`, 'u'),
+      `玻璃面必须铺满两条带（height = HEADER_HEIGHT_PX = ${HEADER_HEIGHT_PX}），只铺 38 会让上半条失去玻璃：${faceBody}`,
+    )
+    // ⚠️ 给**伪元素**加 z-index 不等于给 pane 建层叠上下文：pane 本身仍是 relative + auto，
+    //    官方 --dsh-dockkit-dock-layer / float-layer 的次序一点没动（这正是上一版否掉这条路的理由，已不成立）。
+    assert.match(faceBody, /position:\s*absolute/u, `玻璃面必须绝对定位（不参与流）：${faceBody}`)
+    assert.doesNotMatch(faceBody, /\binset:\s*0/u, `玻璃面不得用 inset: 0（那会铺满整个 pane 而不是两条带）：${faceBody}`)
+    // 两道门都要在（与其余右栏规则同纪律）。
+    for (const one of splitSels(faceSel)) {
+      assert.ok(one.includes(`:not([${PLAIN_ATTR}])`), `玻璃面的选择器必须带官方默认门，缺在这条：${one}`)
+      assert.ok(one.includes('[data-sidebar-right-open]'), `玻璃面的选择器必须门在 [data-sidebar-right-open] 上，缺在这条：${one}`)
+    }
+    // 模糊强度与顶栏**同源**（直引常量，不许复制粘贴字面量）
+    assert.ok(faceBody.includes(GLASS_BLUR), `玻璃面的模糊必须直引 GLASS_BLUR（与顶栏同源）`)
+    // 填充比例与顶栏同一个 alpha（GLASS_HEADER_ALPHA），不新造一个数
+    assert.match(
+      faceBody,
+      new RegExp(`color-mix\\(in srgb, var\\(--dsw-alias-bg-base\\) ${Math.round(GLASS_HEADER_ALPHA * 100)}%, transparent\\)`, 'u'),
+      `玻璃面的填充必须用 GLASS_HEADER_ALPHA（${GLASS_HEADER_ALPHA}）与顶栏同参`,
+    )
+    // 光必须与顶栏同源（同一条 dimmedBackdropGradients(HEADER_LIGHT_SCALE)）
+    assert.ok(
+      faceBody.includes(dimmedBackdropGradients(HEADER_LIGHT_SCALE)),
+      `玻璃面的光必须与顶栏同源（dimmedBackdropGradients(HEADER_LIGHT_SCALE)）`,
+    )
+    // ⚠️ 不许用 background-attachment: fixed：面板会被官方 translate，
+    //    fixed 会被重解析到 transform 后的坐标系。必须用右栏那套 100vw x 100vh + 右对齐相位。
+    assert.match(faceBody, /background-attachment:\s*scroll;/u, `玻璃面必须用 scroll（面板会被 transform，fixed 会被重解析）`)
+    assert.ok(faceBody.includes('100vw 100vh'), `玻璃面必须显式给视口尺寸背景盒`)
+    assert.ok(
+      faceBody.includes('right calc(0px - var(--dsh-windows-titlebar-height, 0px))'),
+      `玻璃面必须右对齐并减去 caption 高度（与右栏材质同相位）`,
+    )
+    // ⑧ 不得写官方 hashed 类名
+    assert.ok(!/\.[A-Za-z0-9]*_[A-Za-z0-9]{4,}/u.test(faceSel), `玻璃面不得用官方 hashed 类名：${faceSel.trim()}`)
+
+    // ⑨ 抬到**玻璃面之上**：玻璃面挂在各标签自己的头行上（那条头行规则的 ::before，z-index: -1），
+    //    而头行自己抬成 position: relative + z-index: 2（自己那条规则里 create stacking context），
+    //    条再抬到 z-index: 3 —— 条内的标签 / 按钮于是落在头行那层的填充之上，文字不被压暗
+    //    （实测条内 chrome 37 个元素的盒子与旧版逐像素一致）。
+    //    ⚠️ 条的抬升必须**严格高于**头行的抬升，否则头行那层覆盖条区时会把条内 chrome 压暗。
+    const stripLift = blocks.find((b) => {
+      const sel = b.split('{')[0]
+      const body = b.slice(b.indexOf('{'))
+      return splitSels(sel).some(s => s.includes(STRIP) && !s.includes('::before'))
+        && /z-index:\s*3/u.test(body) && /position:\s*relative/u.test(body)
+    })
+    assert.ok(
+      stripLift !== undefined,
+      'dockkit 条必须抬到 z-index: 3（严格高于头行那层 z-index: 2）—— '
+      + '否则头行的 70% 填充会盖到条上，条内标签与文字被压暗',
+    )
+    // ⚠️ **每一条带都必须自己也在抬升规则里**。
+    //    只查「存在一条含 STRIP 的抬升规则」会漏掉：把第二行从抬升规则里摘掉、条留着，
+    //    上面那条 assert 照样通过 —— 而第二行没被抬起来 ⇒ 它的文字被玻璃压暗。
+    //    第二行的清单 = 各标签头行（带取值，只锚真有头行的状态）。
+    const liftRule = blocks.find((b) => {
+      const sel = b.split('{')[0]
+      const body = b.slice(b.indexOf('{'))
+      return splitSels(sel).some(s => s.includes("[data-files-state='tree']"))
+        && /z-index:\s*2/u.test(body) && /position:\s*relative/u.test(body)
+    })
+    assert.ok(
+      liftRule !== undefined,
+      '各标签头行必须抬到自己的玻璃面之上（position: relative + z-index: 2）—— '
+      + '否则头行自己的路径文字与按钮会被那层 70% 填充压暗',
+    )
+    // 头行抬升规则不得把条也一起抬进来（两者层级必须分开，见上）。
+    assert.ok(
+      !splitSels(liftRule.slice(0, liftRule.indexOf('{'))).some(s => s.includes(STRIP) && !s.includes('::before')),
+      '条与头行的抬升必须分成两条规则（条 z-index 3 / 头行 z-index 2），不得共用一个层级',
+    )
+    const liftSel = liftRule.slice(0, liftRule.indexOf('{'))
+    const liftSels = splitSels(liftSel)
+    const LIFTED = [
       { name: '文件树头行', match: (sel) => sel.includes("[data-files-state='tree']") },
       { name: '文档预览头行（text）', match: (sel) => sel.includes("[data-textpreview-state='text']") },
       { name: '文档预览头行（unsupported）', match: (sel) => sel.includes("[data-textpreview-state='unsupported']") },
     ]
-    for (const t of TABHEADS) {
-      const rule = blocks.find((b) => {
-        const sel = b.split('{')[0]
-        return t.match(sel) && sel.includes('::before') && b.includes('backdrop-filter')
-      })
-      assert.ok(rule !== undefined, `${t.name}必须有一条 ::before 玻璃规则（含 backdrop-filter）`)
-      const sel = rule.split('{')[0]
-      const body = rule.slice(rule.indexOf('{'))
-      // ⚠️ 选择器是**逗号并列**的（条 + 各种头行），必须**逐个**查门：
-      // 只看整串的话，把门从其中一行摘掉照样能通过（反向注入实测踩到过）。
-      // 用**括号感知**的拆分：`> *:first-child:not([a]):not([b])` 里没有裸逗号，
-      // 但将来若写成 `:not(a, b)` 那种带参形式，朴素 split(',') 会把参数切断。
-      const splitSels = (text) => {
-        const parts = []
-        let depth = 0, cur = ''
-        for (const ch of text) {
-          if (ch === '(') depth++
-          else if (ch === ')') depth--
-          if (ch === ',' && depth === 0) { parts.push(cur); cur = '' } else cur += ch
-        }
-        parts.push(cur)
-        return parts.map(s => s.trim()).filter(Boolean)
-      }
-      const sels = splitSels(sel)
-
-      // ② 每一条都必须门在**官方默认**上（选官方默认档时整表让路）
-      for (const one of sels) {
-        assert.ok(
-          one.includes(`:not([${PLAIN_ATTR}])`),
-          `${t.name}的**每一条**选择器都必须带官方默认门，缺在这条：${one}`,
-        )
-      }
-      // ③ 每一条都必须门在**面板已展开**上（收起时不得压住会话区；与右栏材质那几条同一条理由）
-      for (const one of sels) {
-        assert.ok(
-          one.includes('[data-sidebar-right-open]'),
-          `${t.name}的**每一条**选择器都必须门在 [data-sidebar-right-open] 上，缺在这条：${one}`,
-        )
-      }
-      // ④ 模糊强度与顶栏**同源**（直引常量，不许复制粘贴字面量）
-      assert.ok(body.includes(GLASS_BLUR), `${t.name}的模糊必须直引 GLASS_BLUR（与顶栏同源）`)
-      // ⑤ 填充比例与顶栏同一个 alpha（GLASS_HEADER_ALPHA），不新造一个数
-      assert.match(
-        body,
-        new RegExp(`color-mix\\(in srgb, var\\(--dsw-alias-bg-base\\) ${Math.round(GLASS_HEADER_ALPHA * 100)}%, transparent\\)`, 'u'),
-        `${t.name}的填充必须用 GLASS_HEADER_ALPHA（${GLASS_HEADER_ALPHA}）与顶栏同参`,
-      )
-      // ⑥ 光必须与顶栏同源（同一条 dimmedBackdropGradients(HEADER_LIGHT_SCALE)）
-      assert.ok(
-        body.includes(dimmedBackdropGradients(HEADER_LIGHT_SCALE)),
-        `${t.name}的光必须与顶栏同源（dimmedBackdropGradients(HEADER_LIGHT_SCALE)）`,
-      )
-      // ⑦ ⚠️ 不许用 background-attachment: fixed：面板会被官方 translate，
-      //    fixed 会被重解析到 transform 后的坐标系。必须用右栏那套 100vw x 100vh + 右对齐相位。
-      assert.match(body, /background-attachment: scroll;/u, `${t.name}必须用 scroll（面板会被 transform，fixed 会被重解析）`)
-      assert.ok(body.includes('100vw 100vh'), `${t.name}必须显式给视口尺寸背景盒`)
-      assert.ok(
-        body.includes('right calc(0px - var(--dsh-windows-titlebar-height, 0px))'),
-        `${t.name}必须右对齐并减去 caption 高度（与右栏材质同相位）`,
-      )
-      // ⑧ 不得写官方 hashed 类名
-      assert.ok(!/\.[A-Za-z0-9]*_[A-Za-z0-9]{4,}/u.test(sel), `${t.name}不得用官方 hashed 类名：${sel.trim()}`)
-    }
-
-    // ⑨ 抬到颗粒层之上：pane 的 ::after 颗粒盖在整个 pane 之上，
-    //    条不抬起来，它自己的 backdrop-filter 就糊不到任何东西（实测 HF 仍是 2.31，= 没生效）。
-    const liftRule = blocks.find((b) => {
-      const sel = b.split('{')[0]
-      const body = b.slice(b.indexOf('{'))
-      return sel.includes(STRIP) && !sel.includes('::before') && /z-index:\s*1/u.test(body) && /position:\s*relative/u.test(body)
-    })
-    assert.ok(
-      liftRule !== undefined,
-      'dockkit 条必须抬到 pane 的颗粒层之上（position: relative + z-index: 1）—— '
-      + '否则条自己的 backdrop-filter 糊不到那层颗粒（这正是上一轮把「没用」量成 0.028 的原因）',
-    )
-    // ⚠️ **每一条玻璃带都必须自己也在抬升规则里**。
-    //    只查「存在一条含 STRIP 的抬升规则」会漏掉：把第二行从抬升规则里摘掉、条留着，
-    //    上面那条 assert 照样通过 —— 而第二行没被抬起来 ⇒ 它的 backdrop-filter 又糊不到颗粒，
-    //    正是上一轮「值写上了但没生效」那个坑的翻版（反向注入实测：摘掉第二行仍全绿）。
-    const liftSel = liftRule.slice(0, liftRule.indexOf('{'))
-    const liftSels = liftSel.split(',').map(s => s.trim()).filter(Boolean)
-    for (const t of TABHEADS) {
+    for (const t of LIFTED) {
       assert.ok(
         liftSels.some(one => t.match(one)),
-        `${t.name}也必须**自己**出现在抬升规则里（否则它的 backdrop-filter 糊不到那层颗粒）：${liftSel.trim()}`,
+        `${t.name}也必须**自己**出现在抬升规则里（否则它的文字 / 图标会被玻璃压暗）：${liftSel.trim()}`,
       )
     }
 
@@ -1375,6 +1433,82 @@ describe('glass：边界与纪律', () => {
     for (const b of gated) {
       assert.ok(!/\.[A-Za-z0-9]*_[A-Za-z0-9]{4,}/u.test(selsOf(b)), `真磨砂不得用官方 hashed 类名：${selsOf(b).trim()}`)
     }
+  })
+
+  it('右栏真磨砂必须**两条带都通**：0..38 也要有内容经过', () => {
+    const all = css.replace(/\/\*[\s\S]*?\*\//gu, '')
+    const blocks = all.split('}').map(b => b.trim()).filter(b => b.includes('{'))
+    const selsOf = (b) => b.split('{')[0]
+    const P = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open]`
+    const GATE = `body:not([${PLAIN_ATTR}])`
+
+    // ⓞ 上提量必须是**两条带之和**（写死单条 38 会让裁剪线与带下缘错位）。
+    //    与 PANEL_BAND_PX 的两倍关系一并钉住（38 是官方两条固定行高）。
+    assert.equal(PANEL_SCROLLER_LIFT_PX, HEADER_HEIGHT_PX,
+      '上提量必须等于顶栏 76px（= 两条 38px 带之和）')
+
+    // ① 必须有一条规则把 pane 的**头行**在流内占的高度还回去。
+    //    根因：头行在流内 ⇒ 体那两层（tabHostBody / tabBody）都从 y=38 起**且都裁剪**，
+    //    正文永远进不了 0..38 ⇒ 上带背后只有面板纯色（owner：只有下半部分有效果）。
+    //    ⚠️ 这里必须查 `margin-bottom`：把「负底距」误写成 `padding-bottom` 或者漏掉，
+    //    0..38 就重新变成死区，而**下带照样是通的**，只量 0..76 平均值根本发现不了。
+    const headerRule = blocks.find((b) => {
+      const sel = selsOf(b)
+      return sel.includes(GATE) && sel.includes(P) && sel.includes('[data-dockkit-pane]')
+        && sel.includes('> *:first-child') && /margin-bottom:\s*-/u.test(b)
+    })
+    assert.ok(
+      headerRule !== undefined,
+      '必须把 pane 头行在流内占的高度还回去（margin-bottom 负值）—— 否则 0..38 是死区，'
+      + '正文只能进到 38 以下，上带永远磨不到内容（这正是 owner 复报的「只有下半部分有效果」）',
+    )
+    assert.ok(
+      headerRule.includes(`margin-bottom: -${PANEL_BAND_PX}px`),
+      `负底距必须直引 PANEL_BAND_PX（${PANEL_BAND_PX}），不得写别的值：${headerRule}`,
+    )
+
+    // ② 体必须把让出的高度补回来（否则各标签内容整体上移 38px，压在条下面）。
+    const bodyRule = blocks.find((b) => {
+      const sel = selsOf(b)
+      return sel.includes(GATE) && sel.includes(P) && sel.includes('[data-dockkit-pane]')
+        && sel.includes('> *:last-child') && sel.includes('[data-sidebar-right-tab]')
+        && /padding-top/u.test(b)
+    })
+    assert.ok(
+      bodyRule !== undefined,
+      'pane 体必须补 padding-top 把头行让出的高度还给各标签内容（否则内容整体上移 38px 藏进条里）',
+    )
+    assert.ok(
+      bodyRule.includes(`padding-top: ${PANEL_BAND_PX}px`),
+      `补回量必须直引 PANEL_BAND_PX（${PANEL_BAND_PX}），与负底距严格相抵：${bodyRule}`,
+    )
+    // ③ ⛔ border-box 必须有：体常是 height:100%，content-box 下加 padding 会把盒子撑到 938，
+    //    外层 paneBody(overflow:auto) 于是多出 38px 外滚动（实测 maxScroll 从 8710 变 8670）。
+    assert.ok(
+      /box-sizing:\s*border-box/u.test(bodyRule),
+      `补 padding 的那条必须同时写 box-sizing: border-box（否则盒子被撑高、外层多出 38px 滚动）：${bodyRule}`,
+    )
+
+    // ④ ⛔ 不许用 `position: absolute` 实现「头行离开文档流」：条同时是我们的玻璃锚点
+    //    与官方的拖动目标，把它从流里摘出去会多一层风险面。只用负底距。
+    for (const b of [headerRule, bodyRule]) {
+      assert.ok(
+        !/position:\s*absolute/u.test(b),
+        `实现方式必须只用负底距 / padding，不得把条或头行改成 position: absolute：${selsOf(b).trim()}`,
+      )
+    }
+
+    // ⑤ 两道门都要在（与真磨砂其余规则同纪律）。
+    for (const b of [headerRule, bodyRule]) {
+      assert.ok(selsOf(b).includes(`:not([${PLAIN_ATTR}])`), `缺官方默认门：${selsOf(b).trim()}`)
+      assert.ok(selsOf(b).includes('[data-sidebar-right-open]'), `缺面板已展开门：${selsOf(b).trim()}`)
+    }
+
+    // ⑥ ⛔ **两条带必须分别量**这条纪律，也钉在测试里：
+    //    上提量必须覆盖整个 HEADER_HEIGHT_PX（= 两条带），不能只覆盖一条 ——
+    //    `PANEL_BAND_PX * 2 === HEADER_HEIGHT_PX` 是「两条都算进去」的可执行表述。
+    assert.equal(PANEL_BAND_PX * 2, HEADER_HEIGHT_PX,
+      '单条带高 × 2 必须等于顶栏高度（否则「两条带」里必有一条没被覆盖）')
   })
 })
 
