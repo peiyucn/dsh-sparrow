@@ -12,6 +12,8 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - The panel opens faster: the plugin no longer races DSH's own full scan at startup, and does that sweep when the panel is first opened instead.
 - The Archive entry moved to the **top of the sidebar**, beside the official Plugins and Automations entries, and now opens as a **page in the main area** instead of a pop-up dialog.
 - The archive page no longer dims or blocks the rest of the interface: it is a normal page, and the way back to a conversation is the official one (pick a session in the sidebar, or New Session).
+- Fixed the archive page's text rendering larger than elsewhere: rows without a size of their own no longer fall back to the browser default, and text size and line height now match the official lists.
+- Fixed the divider above the "dsh-sparrow" brand line at the bottom of the archive page touching the content above it.
 
 ## 0.1.5-rc.2.4 (2026-09-21)
 

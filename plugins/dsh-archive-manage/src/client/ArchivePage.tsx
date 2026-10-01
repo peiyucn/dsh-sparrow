@@ -109,6 +109,13 @@ export function ensureArchiveStyles(): void {
   overflow: auto;
   padding: 0 clamp(24px, 4vw, 48px) 48px;
   color: var(--dsw-alias-label-primary);
+  /* ⚠️ 基准字号必须自己给：中央列（.centerCol）**没有** font-size，官方入口型页面
+     靠「每个文字元素各自写 font-size」立住；而本页原来挂在 sidebar.footer.action 槽里
+     （DOM 在 SidebarRoot .root 内，那份 .root 有 font-size: 14px），改主面板后搬进中央列，
+     没写字号的行就退回浏览器默认 **16px** —— owner 看到的就是「字变大了」。
+     这里补回旧弹窗本来继承到的 14px 基准（官方 chrome 基准同为 14px），
+     已显式声明字号的元素不受影响。 */
+  font-size: 14px;
   /* 基底面上的滚动条用 l1 一族（原浮层版重绑过 l2，页面上不再需要）。 */
 }
 .dsh-archive-page > * {
@@ -335,9 +342,20 @@ html[data-platform='darwin'] .dsh-archive-page-head {
   line-height: 20px;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
-/* 合集品牌 footer：页面内容收尾（原面板底部那条，移到页面末尾）。 */
+/* 合集品牌 footer：页面内容收尾（原面板底部那条，移到页面末尾）。
+   ⚠️ 分割线上方必须留净空：本页最后一个兄弟是区块卡，卡自带 margin-bottom 12px
+   （它是「卡与卡之间」的间距，不是收尾净空），于是分割线离最后一行内容只有 12px，
+   读起来像贴在一起。这里把收尾净空显式定成 24px，并让「紧邻 footer 的那张卡」
+   不再贡献它自己的卡间距 —— 两处相加才是净空。
+   ⚠️ 本页是 flex 纵列（.dsh-archive-page），**外边距不会合并**，
+   所以 12 + 24 会真的变成 36；必须同时把那张卡的 margin-bottom 归零。
+   （这与云端文件页的 24px 对齐，两页收尾观感一致。） */
+.dsh-archive-section-card:has(+ .dsh-archive-page-footer) {
+  margin-bottom: 0;
+}
 .dsh-archive-page-footer {
   box-sizing: border-box;
+  margin-top: 24px;
   padding: 16px 0 0;
   border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
   text-align: center;
@@ -390,10 +408,18 @@ const styles = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
+    /* ⚠️ 字号与行高都要**显式**给：本页已补 14px 基准，但行高若留 `normal`
+       行盒只有约 16.8px，比官方同位置（会话行标题 14px/20px）矮一档、
+       行间距读起来发挤。官方列表标题的行高是 20px，这里对齐。 */
+    fontSize: 14,
+    lineHeight: '20px',
   } satisfies CSSProperties,
   secondarySmall: {
     color: 'var(--dsw-alias-label-secondary, #6b7280)',
     fontSize: 12,
+    /* ⚠️ 行高也要给：留 `normal` 时行盒只有约 16px，比官方次级文字（12px/18px）
+       与云端文件页同款样式都矮 2px，两页并排看会不一致（实测过）。 */
+    lineHeight: '18px',
   } satisfies CSSProperties,
   /** 子分组小标题（未释放）：官方面板分组标签同款（12px 次级色）。 */
   groupHeading: {

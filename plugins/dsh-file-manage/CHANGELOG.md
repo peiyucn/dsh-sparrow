@@ -12,6 +12,8 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Fixed operations failing after a version-line upgrade because the files client constructor signature changed.
 - The Cloud Files entry moved to the **top of the sidebar**, beside the official Plugins and Automations entries, and now opens as a **page in the main area** instead of a pop-up dialog.
 - The cloud files page no longer dims or blocks the rest of the interface: it is a normal page, and the way back to a conversation is the official one (pick a session in the sidebar, or New Session).
+- Fixed the cloud files page's text rendering larger than elsewhere: rows without a size of their own no longer fall back to the browser default, and text size and line height now match the official lists.
+- Fixed the divider above the "dsh-sparrow" brand line at the bottom of the cloud files page touching the list above it.
 
 ## 0.1.5-rc.2.1 (2026-09-11)
 

@@ -15,6 +15,13 @@ export function ensureFileManageStyles(): void {
   overflow: auto;
   padding: 0 clamp(24px, 4vw, 48px) 48px;
   color: var(--dsw-alias-label-primary);
+  /* ⚠️ 基准字号必须自己给：中央列（.centerCol）**没有** font-size，官方入口型页面
+     靠「每个文字元素各自写 font-size」立住；而本页原来挂在 sidebar.footer.action 槽里
+     （DOM 在 SidebarRoot .root 内，那份 .root 有 font-size: 14px），改主面板后搬进中央列，
+     没写字号的行就退回浏览器默认 **16px** —— owner 看到的就是「字变大了」。
+     这里补回旧弹窗本来继承到的 14px 基准（官方 chrome 基准同为 14px），
+     已显式声明字号的元素不受影响。 */
+  font-size: 14px;
 }
 .dsh-file-manage-page > * {
   width: 100%;
@@ -38,9 +45,15 @@ html[data-platform='darwin'] .dsh-file-manage-page-head {
   font-weight: 500;
   line-height: 28px;
 }
-/* 合集品牌 footer：页面内容收尾。 */
+/* 合集品牌 footer：页面内容收尾。
+   ⚠️ 必须自带 margin-top：列表容器（.dsh-file-manage-body）是最后一个兄弟，
+   它下面直接就是这条 footer ⇒ 分割线会**贴着列表最后一行**（实测间距 0px，
+   owner 报「分割线和上面都挨上了」）。旧浮层版 footer 在固定高度的面板里被
+   body 的弹性撑开，搬进页面正常流后这层净空没了，所以要显式补回来。
+   24px = 列表行 8px 下内边距之外再留出的呼吸（与页头 20px 下边距同档）。 */
 .dsh-file-manage-page-footer {
   box-sizing: border-box;
+  margin-top: 24px;
   padding: 16px 0 0;
   border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
   text-align: center;
@@ -210,6 +223,11 @@ export const styles = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
+    /* ⚠️ 字号与行高都要**显式**给：本页已补 14px 基准，但行高若留 `normal`
+       行盒只有约 16.8px，比官方同位置（列表标题 14px/20px）矮一档、
+       行间距读起来发挤。官方列表标题的行高是 20px，这里对齐。 */
+    fontSize: 14,
+    lineHeight: '20px',
   } satisfies CSSProperties,
   secondarySmall: {
     color: 'var(--dsw-alias-label-secondary, #6b7280)',

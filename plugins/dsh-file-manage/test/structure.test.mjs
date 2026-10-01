@@ -127,4 +127,56 @@ describe('dsh-file-manage 结构', () => {
     assert.ok(!/const \[open, setOpen\]/u.test(src), '主面板页面不该再有 open 状态（挂载即打开）')
     assert.ok(!/openPanel/u.test(src), '不该再有 openPanel（「打开」这一步随弹窗一起消失）')
   })
+
+  /**
+   * owner 2026-10-01 报「改成这种形式后**字变大了**」。
+   *
+   * 根因不是谁把字号调大了，而是**继承换了来源**：本页原先挂在
+   * `sidebar.footer.action` 槽（DOM 落在 `SidebarRoot` 的 `.root` 内，那份 `.root`
+   * 有 `font-size: 14px`），迁到中央列后 `.centerCol` **没有** font-size，
+   * 于是没写字号的文字退回浏览器默认 **16px**。
+   *
+   * 实测（1600×900，真实实例）：云端文件名 16px / line-height `normal`；
+   * 官方同位置（列表标题 / 左栏会话行）是 14px / 20px。
+   *
+   * 所以本守卫钉两件事：① 页面根必须自带 14px 基准；② 行标题必须显式给字号与行高
+   * （只给基准的话行高仍是 `normal`，行盒偏矮、行距发挤）。
+   */
+  it('⛔ 页面根必须自带 14px 基准字号（迁到中央列后不再继承左栏的 14px）', async () => {
+    const styles = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
+    const root = /\.dsh-file-manage-page \{([^}]*)\}/u.exec(styles)
+    assert.ok(root !== null, '缺 .dsh-file-manage-page 规则')
+    // ⚠️ 必须**剥注释**再判：上面那段注释里自己写着「那份 .root 有 font-size: 14px」，
+    // 不剥的话守卫会命中文档、把「声明被删掉」的变异放过去（反向注入实测踩到过）。
+    const decl = root[1].replace(/\/\*[\s\S]*?\*\//gu, '')
+    assert.match(decl, /font-size:\s*14px/u,
+      '页面根必须显式 font-size: 14px —— 中央列不提供基准，漏了文字就退回浏览器默认 16px')
+  })
+
+  it('⛔ 行标题必须显式给字号与行高（不得只靠继承）', async () => {
+    const styles = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
+    const title = /title:\s*\{([^}]*)\}/u.exec(styles)
+    assert.ok(title !== null, '缺 styles.title')
+    const decl = title[1].replace(/\/\*[\s\S]*?\*\//gu, '')
+    assert.match(decl, /fontSize:\s*14/u, 'styles.title 必须显式 fontSize: 14')
+    assert.match(decl, /lineHeight:\s*'20px'/u,
+      "styles.title 必须显式 lineHeight: '20px'（留 normal 行盒偏矮、行距发挤）")
+  })
+
+  /**
+   * owner 2026-10-01 报「下面 dsh-sparrow 的 logo，分割线和上面都挨上了」。
+   *
+   * 实测：本页分割线到上方内容 **0px**（列表容器 `.dsh-file-manage-body` 的底边
+   * 正好等于分割线的位置），读起来就是贴在一起。旧浮层版 footer 在固定高度的面板里
+   * 被 body 的弹性撑开，搬进页面正常流后这层净空没了 ⇒ 必须显式补回。
+   */
+  it('⛔ 品牌 footer 的分割线上方必须留净空（不得贴住内容）', async () => {
+    const styles = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
+    const footer = /\.dsh-file-manage-page-footer \{([^}]*)\}/u.exec(styles)
+    assert.ok(footer !== null, '缺 .dsh-file-manage-page-footer 规则')
+    // 同上：剥注释，否则注释里的「24px」会把声明被删的变异放过去。
+    const decl = footer[1].replace(/\/\*[\s\S]*?\*\//gu, '')
+    assert.match(decl, /margin-top:\s*24px/u,
+      '品牌 footer 必须留 24px 净空 —— 漏了分割线会贴住列表最后一行')
+  })
 })

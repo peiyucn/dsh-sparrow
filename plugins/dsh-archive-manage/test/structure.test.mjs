@@ -112,4 +112,69 @@ describe('dsh-archive-manage 结构', () => {
     assert.equal(existsSync(new URL('../src/client/ArchivePage.tsx', import.meta.url)), true,
       'ArchivePage.tsx 是新的主面板页')
   })
+
+  /**
+   * owner 2026-10-01 报「改成这种形式后**字变大了**」。
+   *
+   * 根因不是谁把字号调大了，而是**继承换了来源**：本页原先挂在
+   * `sidebar.footer.action` 槽（DOM 落在 `SidebarRoot` 的 `.root` 内，那份 `.root`
+   * 有 `font-size: 14px`），迁到中央列后 `.centerCol` **没有** font-size，
+   * 于是没写字号的文字退回浏览器默认 **16px**。
+   *
+   * 实测（1600×900，真实实例）：归档会话标题 16px / line-height `normal`；
+   * 官方同位置（左栏会话行标题）是 14px / 20px。
+   *
+   * 所以本守卫钉两件事：① 页面根必须自带 14px 基准；② 行标题必须显式给字号与行高
+   * （只给基准的话行高仍是 `normal`，行盒偏矮、行距发挤）。
+   */
+  it('⛔ 页面根必须自带 14px 基准字号（迁到中央列后不再继承左栏的 14px）', async () => {
+    const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
+    const root = /\.dsh-archive-page \{([^}]*)\}/u.exec(src)
+    assert.ok(root !== null, '缺 .dsh-archive-page 规则')
+    // ⚠️ 必须**剥注释**再判：上面那段注释里自己写着「那份 .root 有 font-size: 14px」，
+    // 不剥的话守卫会命中文档、把「声明被删掉」的变异放过去（反向注入实测踩到过）。
+    const decl = root[1].replace(/\/\*[\s\S]*?\*\//gu, '')
+    assert.match(decl, /font-size:\s*14px/u,
+      '页面根必须显式 font-size: 14px —— 中央列不提供基准，漏了文字就退回浏览器默认 16px')
+  })
+
+  it('⛔ 行标题必须显式给字号与行高（不得只靠继承）', async () => {
+    const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
+    const title = /title:\s*\{([^}]*)\}/u.exec(src)
+    assert.ok(title !== null, '缺 styles.title')
+    const decl = title[1].replace(/\/\*[\s\S]*?\*\//gu, '')
+    assert.match(decl, /fontSize:\s*14/u, 'styles.title 必须显式 fontSize: 14')
+    assert.match(decl, /lineHeight:\s*'20px'/u,
+      "styles.title 必须显式 lineHeight: '20px'（留 normal 行盒偏矮、行距发挤）")
+  })
+
+  it('⛔ 次级文字必须显式给行高（与云端文件页 / 官方次级文字同为 12px/18px）', async () => {
+    const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
+    const sec = /secondarySmall:\s*\{([^}]*)\}/u.exec(src)
+    assert.ok(sec !== null, '缺 styles.secondarySmall')
+    const decl = sec[1].replace(/\/\*[\s\S]*?\*\//gu, '')
+    assert.match(decl, /fontSize:\s*12/u, 'secondarySmall 必须显式 fontSize: 12')
+    assert.match(decl, /lineHeight:\s*'18px'/u,
+      "secondarySmall 必须显式 lineHeight: '18px'（留 normal 行盒只有约 16px，与另一页不一致）")
+  })
+
+  /**
+   * owner 2026-10-01 报「下面 dsh-sparrow 的 logo，分割线和上面都挨上了」。
+   *
+   * 实测：云端文件页分割线到上方内容 **0px**（列表容器底边 = 分割线）；归档页只有
+   * 卡片自带的 12px 卡间距。本页是 flex 纵列、**外边距不合并**，故必须显式给
+   * 收尾净空 24px，并把紧邻 footer 那张卡的 `margin-bottom` 归零
+   * （否则 12 + 24 变成 36）。
+   */
+  it('⛔ 品牌 footer 的分割线上方必须留净空（不得贴住内容）', async () => {
+    const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
+    const footer = /\.dsh-archive-page-footer \{([^}]*)\}/u.exec(src)
+    assert.ok(footer !== null, '缺 .dsh-archive-page-footer 规则')
+    // 同上：剥注释，否则注释里的「24px」会把声明被删的变异放过去。
+    const decl = footer[1].replace(/\/\*[\s\S]*?\*\//gu, '')
+    assert.match(decl, /margin-top:\s*24px/u,
+      '品牌 footer 必须留 24px 净空 —— 漏了分割线会贴住上方内容')
+    assert.match(src, /\.dsh-archive-section-card:has\(\+ \.dsh-archive-page-footer\)\s*\{[^}]*margin-bottom:\s*0/u,
+      '紧邻 footer 的区块卡必须把自身 margin-bottom 归零（flex 纵列外边距不合并，否则 12+24=36）')
+  })
 })
