@@ -1197,8 +1197,32 @@ body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-empty]::after 
    与对话区顶栏**同高**（.header{height:38px} 紧接在条下面）。
    只做上面那条会在 y=38 切出一条新缝（实测：条已糊到 HF 0.254，而下面那行还是 2.352）。
    两条同配方后 0..76 整段 HF 都是 0.25 档，与顶栏一致。
-   文件头行用**公开属性**锚定：[data-files-state] 的直接子元素即那行
+   文件头行用**公开属性**锚定：[data-files-state] 的直接子元素即那行（**按标签类型逐种覆盖**）
    （ui-sidebar-files 的 FilesBody：.root[data-files-state] > .header + .body[data-files-body]）。
+
+   ## 第二行必须按「标签类型」逐种覆盖（owner 2026-10-01 复报的那条）
+
+   上一版只锚了**文件树**那一种头行，且写成 [data-files-state] 不带取值。
+   但右栏每个标签各有各的头行：文件树一种、**文档预览另一种**（路径 + 查看器 + 换行 / 重载）。
+   owner 正是在「文件 + AGENTS.md」两个标签、且**预览为激活**时看出的问题 ——
+   那时第二行没被任何规则命中，实测 HF 2.36（生颗粒），于是顶栏像「只做了一半」。
+   （owner 原话是「只有下半部分，上半部分没有」；按屏幕坐标，没做的那条其实是
+   **靠下**那条 38..76 —— 条内标签那半在上一版就已经糊好了。）
+
+   ⚠️ 别指望一个通用选择器一劳永逸：div[data-sidebar-right-tab] 能一把盖住顶部 38px，
+   但那个属性同时打在**条内标题 span** 上（SidebarRight.tsx 里同一属性两个座位），
+   按元素命中会把条内标题再压暗一层（实测 -7.4 亮度）；对**没有头行**的标签（终端）还会误伤正文。
+   故按标签类型逐个锚，每种用它自己的**公开正文属性**，并都限定到**真有头行**的那个状态：
+
+   * 文件树：[data-files-state='tree'] —— 必须带取值，否则 data-files-state='no-workspace'
+     （没有工作区时只渲染一段提示文字、没有头行）会把那段提示文字当第一个孩子糊上一层。
+   * 文档预览：[data-textpreview-state='unsupported'] 与 'text' 两种才带头行
+     （'loading' 只有一段加载态）。
+
+   ⚠️ 文档预览的头行**不一定是第一个孩子**：元数据失败或文件已变更时会先插一条
+   [data-textpreview-meta-failed] / [data-textpreview-changed] 横幅。
+   所以除 first-child 外，还要补「横幅的下一个兄弟」那两条 —— 用相邻兄弟组合符表达，
+   **不用 :has()**（玻璃表有一条守卫明令不许出现 :has()：开销集中在它上面，见 src/surface.ts 的实测）。
 
    ## 祖先链上有没有 transform（决定能不能用 backdrop-filter 的前提）
 
@@ -1208,7 +1232,11 @@ body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-empty]::after 
    （不是「值写上了但没糊」）。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip],
-body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state] > *:first-child {
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state='tree'] > *:first-child,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > *:first-child:not([data-textpreview-changed]):not([data-textpreview-meta-failed]),
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='unsupported'] > *:first-child,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > [data-textpreview-changed] + *,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > [data-textpreview-meta-failed] + * {
   /* 抬到 pane 的颗粒层之上，自己那份 backdrop-filter 才有东西可糊。
      relative + 无偏移不改几何；条内标签用的 relative 与关闭按钮的 absolute 都锚在**自己**的
      行内盒上（实测盒子逐像素不变）。 */
@@ -1216,7 +1244,11 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
   z-index: 1;
 }
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip]::before,
-body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state] > *:first-child::before {
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state='tree'] > *:first-child::before,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='unsupported'] > *:first-child::before,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > *:first-child:not([data-textpreview-changed]):not([data-textpreview-meta-failed])::before,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > [data-textpreview-changed] + *::before,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > [data-textpreview-meta-failed] + *::before {
   content: '';
   position: absolute;
   inset: 0;

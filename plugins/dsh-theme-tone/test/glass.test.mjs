@@ -1124,13 +1124,16 @@ describe('glass：边界与纪律', () => {
     const all = css.replace(/\/\*[\s\S]*?\*\//gu, '')
     const blocks = all.split('}').map(b => b.trim()).filter(b => b.includes('{'))
     const STRIP = '[data-dockkit-strip]'
-    const FILEHEAD = '[data-files-state]'
-    // ① 两条带各要有一条 ::before 规则，且带 backdrop-filter 与 GLASS_BLUR
-    const targets = [
+    // ⚠️ 第二行是**每个标签各自的头行**，不是一个通用锚点能盖住的：文件树一种、
+    //    文档预览另一种（owner 2026-10-01 在「文件 + AGENTS.md」双标签下复报「只做了一半」）。
+    //    故这里**逐个标签**要求：每种都要有一条自己的 ::before 玻璃规则，且收窄到**真有头行**的状态。
+    const TABHEADS = [
       { name: 'dockkit 条', match: (sel) => sel.includes(STRIP) },
-      { name: '文件面板头行', match: (sel) => sel.includes(FILEHEAD) },
+      { name: '文件树头行', match: (sel) => sel.includes("[data-files-state='tree']") },
+      { name: '文档预览头行（text）', match: (sel) => sel.includes("[data-textpreview-state='text']") },
+      { name: '文档预览头行（unsupported）', match: (sel) => sel.includes("[data-textpreview-state='unsupported']") },
     ]
-    for (const t of targets) {
+    for (const t of TABHEADS) {
       const rule = blocks.find((b) => {
         const sel = b.split('{')[0]
         return t.match(sel) && sel.includes('::before') && b.includes('backdrop-filter')
@@ -1138,9 +1141,22 @@ describe('glass：边界与纪律', () => {
       assert.ok(rule !== undefined, `${t.name}必须有一条 ::before 玻璃规则（含 backdrop-filter）`)
       const sel = rule.split('{')[0]
       const body = rule.slice(rule.indexOf('{'))
-      // ⚠️ 选择器是**逗号并列**的（条 + 文件头行），必须**逐个**查门：
+      // ⚠️ 选择器是**逗号并列**的（条 + 各种头行），必须**逐个**查门：
       // 只看整串的话，把门从其中一行摘掉照样能通过（反向注入实测踩到过）。
-      const sels = sel.split(',').map(s => s.trim()).filter(Boolean)
+      // 用**括号感知**的拆分：`> *:first-child:not([a]):not([b])` 里没有裸逗号，
+      // 但将来若写成 `:not(a, b)` 那种带参形式，朴素 split(',') 会把参数切断。
+      const splitSels = (text) => {
+        const parts = []
+        let depth = 0, cur = ''
+        for (const ch of text) {
+          if (ch === '(') depth++
+          else if (ch === ')') depth--
+          if (ch === ',' && depth === 0) { parts.push(cur); cur = '' } else cur += ch
+        }
+        parts.push(cur)
+        return parts.map(s => s.trim()).filter(Boolean)
+      }
+      const sels = splitSels(sel)
 
       // ② 每一条都必须门在**官方默认**上（选官方默认档时整表让路）
       for (const one of sels) {
@@ -1193,6 +1209,45 @@ describe('glass：边界与纪律', () => {
       'dockkit 条必须抬到 pane 的颗粒层之上（position: relative + z-index: 1）—— '
       + '否则条自己的 backdrop-filter 糊不到那层颗粒（这正是上一轮把「没用」量成 0.028 的原因）',
     )
+    // ⚠️ **每一条玻璃带都必须自己也在抬升规则里**。
+    //    只查「存在一条含 STRIP 的抬升规则」会漏掉：把第二行从抬升规则里摘掉、条留着，
+    //    上面那条 assert 照样通过 —— 而第二行没被抬起来 ⇒ 它的 backdrop-filter 又糊不到颗粒，
+    //    正是上一轮「值写上了但没生效」那个坑的翻版（反向注入实测：摘掉第二行仍全绿）。
+    const liftSel = liftRule.slice(0, liftRule.indexOf('{'))
+    const liftSels = liftSel.split(',').map(s => s.trim()).filter(Boolean)
+    for (const t of TABHEADS) {
+      assert.ok(
+        liftSels.some(one => t.match(one)),
+        `${t.name}也必须**自己**出现在抬升规则里（否则它的 backdrop-filter 糊不到那层颗粒）：${liftSel.trim()}`,
+      )
+    }
+
+    // ⑩ ⛔ 状态必须**带取值**：把 [data-files-state] / [data-textpreview-state] 写成不带取值，
+    //    会命中「没有头行」的那些状态。实测两处误伤：
+    //      * data-files-state='no-workspace' —— 只渲染一段提示文字，没有 38px 头行，
+    //        写成裸属性会把那段提示文字糊上一层（它正好是第一个孩子）；
+    //      * data-textpreview-state='loading' —— 同理只有加载态。
+    for (const attr of ['[data-files-state]', '[data-textpreview-state]']) {
+      const bare = blocks.filter((b) => {
+        const sel = b.split('{')[0]
+        return sel.includes(attr) && /::before|position/.test(b)
+      })
+      assert.equal(bare.length, 0,
+        `${attr} 必须带取值（只锚真有头行的状态），不得写成裸属性：${bare[0] ? bare[0].split('{')[0].trim() : ''}`)
+    }
+
+    // ⑪ ⚠️ 文档预览的横幅会把头行挤到第二个位置：必须同时覆盖「横幅 + 下一个兄弟」，
+    //    否则元数据失败 / 文件已变更时，那一版的头行又没玻璃（而且 first-child 会命中的是横幅）。
+    for (const banner of ['data-textpreview-meta-failed', 'data-textpreview-changed']) {
+      assert.ok(
+        all.includes(`[${banner}] + *`),
+        `文档预览的 [${banner}] 横幅之后那条头行也必须覆盖（横幅会把它挤到第二个位置）`,
+      )
+    }
+
+    // ⑫ ⛔ 玻璃表不得出现 :has()（仓库既有纪律：开销集中在它上面，实测见 src/surface.ts）。
+    //    本条第二行曾想用 `:has(+ 正文)` 表达「紧邻正文的那个兄弟」，被这条守卫拦下 —— 改用相邻兄弟组合符。
+    assert.ok(!all.includes(':has('), '玻璃表里不该出现 :has()（第二行请用相邻兄弟组合符表达）')
   })
 })
 
