@@ -45,6 +45,46 @@ import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT,
  */
 export const HEADER_HEIGHT_PX = 76
 
+/**
+ * 右栏顶部**两条 38px 带**里，上面那条（dockkit 条）的高度。
+ *
+ * 官方 `dockkit.module.css` 的 `.tabStrip` 与 `ui-sidebar-files` 的 `.header`
+ * 各占 38px，叠成 {@link HEADER_HEIGHT_PX} 那 76px。两条带各自是独立盒子，
+ * 所以「内容要从带下滚过」时，补偿量按**两条之和**算，不按单条算。
+ */
+export const PANEL_BAND_PX = 38
+
+/**
+ * 右栏面板的滚区**上提量**（px）= 两条带之和。
+ *
+ * ## 这一条解决什么（owner 2026-10-01 的视觉诉求）
+ *
+ * 官方面板里「带 0..76」与「滚区 76..底」是**上下相邻的两个盒子**：
+ * 于是那 76px 里永远只有面板自己的纯色底 + 均匀颗粒，`backdrop-filter` 糊一块
+ * 均匀色 = 肉眼零变化。做了玻璃也只是「把这两条压暗一层」，读起来是**实心深色板**，
+ * 不是玻璃。owner 要的玻璃 = **能看穿、看得出背后有东西在动**。
+ *
+ * 修法（owner 选定的「真磨砂」）：把滚区的**裁切框上提**到这 76px 之上，
+ * 让正文真的从两条带下面滚过去；玻璃于是有了可糊的内容。
+ *
+ * ## ⚠️ 补偿位移**只能用 transform，不能用 padding-top**
+ *
+ * 裁切框上提后，内容若不补回来，正文首行会藏到两条带后面（等于藏起来 76px）。
+ * 补回来有两种写法，**语义完全不同** —— 官方 `documentpreview/text/lines.ts`
+ * 的「跳转到第 N 行」是 `body.scrollTop = Math.max(0, row.offsetTop)`，
+ * 直接吃 `offsetTop`：
+ *
+ * | 写法 | 裁切框上沿 | 目标行落点 | 结论 |
+ * | :--- | ---: | ---: | :--- |
+ * | `margin-top: -76px` + `padding-top: 76px` | 0 | **0** | ❌ 藏到带后（回归） |
+ * | `margin-top: -76px` + 内容 `translateY(76px)` | 0 | **76** | ✅ 两全 |
+ *
+ * 因为 **`offsetTop` 把 padding 算进去、但不把 transform 算进去**。
+ * 实测：滚动体上沿 76 → 0、`scrollTop=0` 时首元素视口 y 76 → 76、
+ * 官方跳行落点 76 → 76、滚到底可达 8710 → 8710、页面无溢出。
+ */
+export const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
+
 /*
  * 底座**下半段**那条「不透带」的几何（owner 2026-09-16 定案）。
  *
@@ -1242,6 +1282,89 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
      行内盒上（实测盒子逐像素不变）。 */
   position: relative;
   z-index: 1;
+}
+
+/* ===== 真磨砂：让正文**真的从这两条 38px 带下面滚过去**（owner 2026-10-01 选定） =====
+
+   ## 为什么非要做这一步
+
+   上面那条规则给两条带配了与对话区顶栏**同一份**玻璃（同 blur、同 0.7 alpha、同光层），
+   实测两条带的 HF 也都降到 0.25 档、与顶栏一致。但 owner 看到后仍报「完全没有透明模糊了」。
+   根因不是配方，是**结构**：官方面板里「带 0..76」与「滚区 76..底」是上下相邻的两个盒子，
+   于是那 76px 里永远只有面板自己的纯色底 + 均匀颗粒 —— 拿 12px 模糊去糊一块**均匀色**，
+   合成结果还是那块均匀色，肉眼看不出任何变化，只剩「把这条压暗一层」，
+   读起来就是一块**实心深色板**。
+
+   玻璃之所以像玻璃，全靠**背后有东西在动**。所以本段做的只有一件事：
+   把滚区的**裁切框上提**到这 76px 之上，正文于是真的从两条带下面滚过去。
+
+   实测（真实浏览器）：滚动带内像素确实变化（滚动 500px 后带内 mean 从 0 → 10.086）；
+   两条带仍 HF 0.18 / 0.03 档（内容经过但不锐利，正是磨砂该有的样子）；
+   几何不坏：滚动体上沿 76 → 0、可视高 824 → 900、页面无溢出（docScrollHeight 仍 = 900）。
+
+   ## ⚠️ 补偿位移**只能用 transform，不能用 padding-top**（踩过的坑）
+
+   裁切框上提 76 后，正文首行若不补回来就会藏到两条带后面。补回来有两种写法，
+   而它们的 **offsetTop 语义不同** —— 官方 documentpreview/text/lines.ts 的
+   「跳转到第 N 行」是 body.scrollTop = max(0, row.offsetTop)，直接吃 offsetTop：
+
+   | 写法 | 裁切框上沿 | 目标行落点 | 结论 |
+   | :--- | ---: | ---: | :--- |
+   | margin-top: -76px + padding-top: 76px | 0 | **0** | ❌ 藏到带后（回归） |
+   | margin-top: -76px + 内容 transform: translateY(76px) | 0 | **76** | ✅ 两全 |
+
+   因为 **offsetTop 把 padding 算进去、但不把 transform 算进去**。
+   实测两种写法对「跳行落点」的差异正是 0 与 76，选后者后官方行定位与改前逐值一致。
+
+   ## ⚠️ 只给「流式文档」滚区，不给「自带内部滚动 / 填满盒子」的渲染器
+
+   右栏各标签的内容链形状**实测同形**（都是 body > display:contents 包装 > 内容根），
+   但有两类**不能**上提：
+
+   * **填满型**（官方 code / pdf / image / excel / office）：其内容根是 flex 填满整个 body
+     （实测 code 的内容根高 == body 可视高 824），**永远不会从带下流过**。
+     给它上提 + 下移只会让内容根落到 76..976、而 body 裁到 900 ⇒ 白掉底部 76px。
+   * **loading / unsupported 状态**：没有正文可滚，没有收益。
+
+   所以本段用**白名单**锚定官方的**渲染器 id**（data-document-preview，公开属性，值就是
+   ctx.documentPreviews.register 注册的 id），只放行 markdown 与纯文本这两个流式渲染器。
+   白名单的兜底是**优雅降级**：官方若改了 id，这几条静默不命中 ⇒ 回到今天「两条带是实心板」
+   的样子，**不会把面板弄坏**。
+
+   ## 内容根在哪一层
+
+   markdown 与纯文本的内容根都**不是** body 的直接子元素：它们中间隔着一层
+   display: contents 的插槽包装（不生成盒子 ⇒ 打在它上面 transform 无效）。
+   真正的盒子是它的孩子（实测 markdown = .document、纯文本 = .textDocument）。
+   而**文件树**没有那层包装，它的孩子（ul.level）就是内容根。
+   故预览写「> * > *」、文件树写「> *」，两条都要写对。
+
+   ⚠️ **滚区里还有几个「直接孩子」也要一起挪**，否则它们会比正文高出 76px：
+   加载指示器（[data-document-loading]）、失败行 / 空态（[data-textpreview-failed]）、
+   以及分页的「加载更多」（[data-textpreview-more]）—— 官方把它们渲染在**插槽包装之外**。
+   它们只写「> *」这一层就够了（内容根在下一层，别一并套上，否则会叠成 +152）。
+
+   ⚠️ 这里**不写 position / z-index**：两条带已由上面那条规则抬到 z-index 1，
+   而内容根带 transform 会自建层叠上下文，次序天然正确（实测带仍盖在内容之上）。
+   官方滚区自己就是 position: relative（TextPreview.module.css 的 .body），
+   我们不必也不该再动它。
+
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body],
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body],
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state='tree'] [data-files-body] {
+  margin-top: -${PANEL_SCROLLER_LIFT_PX}px;
+}
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body] > * > *,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body] > * > *,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body] > [data-document-loading],
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body] > [data-textpreview-failed],
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body] > [data-textpreview-more],
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body] > [data-document-loading],
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body] > [data-textpreview-failed],
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body] > [data-textpreview-more],
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state='tree'] [data-files-body] > * {
+  transform: translateY(${PANEL_SCROLLER_LIFT_PX}px);
 }
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip]::before,
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state='tree'] > *:first-child::before,

@@ -13,6 +13,7 @@ import {
   GLASS_SPECULAR_RING,
   HEADER_HEIGHT_PX,
   HEADER_LIGHT_SCALE,
+  PANEL_SCROLLER_LIFT_PX,
   SEAT_SOLID_PX,
   SEAT_SOLID_RAMP_PX,
   SHADE_ALPHA,
@@ -1248,6 +1249,132 @@ describe('glass：边界与纪律', () => {
     // ⑫ ⛔ 玻璃表不得出现 :has()（仓库既有纪律：开销集中在它上面，实测见 src/surface.ts）。
     //    本条第二行曾想用 `:has(+ 正文)` 表达「紧邻正文的那个兄弟」，被这条守卫拦下 —— 改用相邻兄弟组合符。
     assert.ok(!all.includes(':has('), '玻璃表里不该出现 :has()（第二行请用相邻兄弟组合符表达）')
+  })
+
+  it('右栏面板的真磨砂：正文必须真的能从两条 38px 带下面滚过去', () => {
+    const all = css.replace(/\/\*[\s\S]*?\*\//gu, '')
+    const blocks = all.split('}').map(b => b.trim()).filter(b => b.includes('{'))
+    const selsOf = (b) => b.split('{')[0]
+    // 括号感知拆分（与上一条同因：`:not(a, b)` 这类带参形式会被朴素 split(',') 切断）。
+    const splitTop = (text) => {
+      const parts = []
+      let depth = 0, cur = ''
+      for (const ch of text) {
+        if (ch === '(') depth++
+        else if (ch === ')') depth--
+        if (ch === ',' && depth === 0) { parts.push(cur); cur = '' } else cur += ch
+      }
+      parts.push(cur)
+      return parts.map(s => s.trim()).filter(Boolean)
+    }
+
+    // ⓪ 上提量必须**等于顶栏那 76px**（= 两条 38px 之和）。写死一个别的数会让
+    //    裁剪线与带下缘错位：露一条 76 高的空白或把正文切掉一截。
+    assert.equal(
+      PANEL_SCROLLER_LIFT_PX, HEADER_HEIGHT_PX,
+      '上提量必须等于顶栏高度（两条 38px 带之和），否则裁剪线与带下缘错位',
+    )
+
+    // ① 存在「把滚区裁切框上提」的规则，且值直引常量（不复制字面量）。
+    const lift = blocks.find((b) => /margin-top:\s*-/u.test(b) && selsOf(b).includes('data-textpreview-body'))
+    assert.ok(lift !== undefined, `必须有一条把右侧滚区裁切框上提 -${PANEL_SCROLLER_LIFT_PX}px 的规则`)
+    assert.ok(
+      lift.includes(`margin-top: -${PANEL_SCROLLER_LIFT_PX}px`),
+      `上提量必须直引 PANEL_SCROLLER_LIFT_PX（${PANEL_SCROLLER_LIFT_PX}），不得写别的字面量：${lift}`,
+    )
+
+    // ② ⛔ **补偿位移只许用 transform，不许用 padding-top**。
+    //    官方 documentpreview/text/lines.ts 的「跳转到第 N 行」是
+    //    body.scrollTop = max(0, row.offsetTop)，而 offsetTop **把 padding 算进去、
+    //    不把 transform 算进去**。用 padding-top 补会把目标行落到 y=0（藏进两条带后面），
+    //    实测两种写法落点差 76px（0 vs 76）—— 这正是本轮踩过的坑。
+    const liftBody = lift.slice(lift.indexOf('{'))
+    assert.ok(
+      !/padding/u.test(liftBody),
+      `裁切框上提的那条规则不得用 padding 补位移（offsetTop 会把 padding 算进去 ⇒ 官方跳行落点变 0）：${liftBody}`,
+    )
+    const shifted = blocks.filter((b) => {
+      const sel = selsOf(b)
+      return (sel.includes('data-textpreview-body') || sel.includes('data-files-body'))
+        && sel.includes(RIGHT_PANEL_ATTR)
+        && /transform:\s*translateY/u.test(b)
+    })
+    assert.ok(shifted.length > 0, '必须有一条用 transform: translateY 把内容视觉下移来配平上提的规则')
+    assert.ok(
+      shifted.some(b => b.includes(`translateY(${PANEL_SCROLLER_LIFT_PX}px)`)),
+      `内容下移量必须直引 PANEL_SCROLLER_LIFT_PX（${PANEL_SCROLLER_LIFT_PX}），与上提量严格相抵`,
+    )
+
+    // ③ **不得**把 padding-top 用在右侧面板的任何滚区上（同上一条理由，且更宽地兜住）。
+    for (const b of blocks) {
+      const sel = selsOf(b)
+      if (!sel.includes(RIGHT_PANEL_ATTR)) continue
+      if (!sel.includes('data-textpreview-body') && !sel.includes('data-files-body')) continue
+      assert.ok(
+        !/padding(-top)?:/u.test(b),
+        `右侧面板滚区不得用 padding 配平（会把官方行定位推歪 76px）：${sel.trim()}`,
+      )
+    }
+
+    // ④ 每一条上提 / 下移的选择器都必须带**两道门**（官方默认门 + 面板已展开）。
+    const gated = [...blocks.filter(b => /margin-top:\s*-/u.test(b) && selsOf(b).includes('data-textpreview-body')), ...shifted]
+    let gateChecks = 0
+    for (const b of gated) {
+      for (const one of splitTop(selsOf(b))) {
+        assert.ok(one.includes(`:not([${PLAIN_ATTR}])`), `真磨砂的每条选择器都要带官方默认门，缺在这条：${one}`)
+        assert.ok(one.includes('[data-sidebar-right-open]'), `真磨砂的每条选择器都要带 [data-sidebar-right-open]，缺在这条：${one}`)
+        gateChecks++
+      }
+    }
+    assert.ok(gateChecks >= 4, `真磨砂的门检查至少应覆盖 4 条选择器，实际 ${gateChecks} 条`)
+
+    // ⑤ ⛔ **白名单**：只放行「流式文档」的滚区。
+    //    code / pdf / image / excel / office 的**内容根是 flex 填满整个 body**（实测 code 的内容根
+    //    高 == body 可视高），永远不会有内容从带下流过；给它们上提 + 下移只会让内容根落到 76..976
+    //    而 body 裁到 900 ⇒ 白掉底部 76px。所以数据预览必须锚在**渲染器 id** 上，不能只写
+    //    [data-textpreview-body]（那把 code / pdf 一并收了）。
+    for (const b of gated) {
+      const sel = selsOf(b)
+      if (!sel.includes('data-textpreview-body')) continue
+      for (const one of splitTop(sel)) {
+        if (!one.includes('data-textpreview-body')) continue
+        assert.ok(
+          one.includes('data-document-preview'),
+          `文档预览的真磨砂必须按渲染器 id 收窄，不能只写 [data-textpreview-body] `
+          + `（否则会把内容根填满盒子的 code / pdf 一并收进来，白掉底部 76px）：${one}`,
+        )
+      }
+    }
+    // 文件树那条用数据状态收窄（与玻璃头行同一套锚点）。
+    assert.ok(
+      gated.some(b => selsOf(b).includes("[data-files-state='tree']") && selsOf(b).includes('data-files-body')),
+      '文件树的滚区也必须有一条真磨砂规则（它同样有内容可从带下滚过）',
+    )
+
+    // ⑥ 内容根**不是**滚区的直接孩子（中间隔着 display: contents 的插槽包装），
+    //    故预览必须写「> * > *」。写成「> *」会落在不生成盒子的包装上 ⇒ transform 无效。
+    assert.ok(
+      gated.some(b => selsOf(b).includes('data-textpreview-body] > * > *')),
+      '文档预览的内容根在「> * > *」那一层（插槽包装是 display: contents），必须按这一层写',
+    )
+    assert.ok(
+      gated.some(b => selsOf(b).includes('data-files-body] > *')),
+      '文件树的内容根就是滚区的直接孩子，必须按「> *」写',
+    )
+
+    // ⑦ ⚠️ 滚区里**在插槽包装之外**的那几个直接孩子也要一起挪 ——
+    //    加载指示器 / 失败行 / 分页的「加载更多」。漏了它们，它们会比正文高 76px 藏进带里。
+    for (const attr of ['data-document-loading', 'data-textpreview-failed', 'data-textpreview-more']) {
+      assert.ok(
+        gated.some(b => selsOf(b).includes(`> [${attr}]`)),
+        `滚区的直接孩子 [${attr}] 也要一起下移（它渲染在插槽包装之外，漏了会藏进两条带里）`,
+      )
+    }
+
+    // ⑧ 不得写官方 hashed 类名（与上一条同纪律）。
+    for (const b of gated) {
+      assert.ok(!/\.[A-Za-z0-9]*_[A-Za-z0-9]{4,}/u.test(selsOf(b)), `真磨砂不得用官方 hashed 类名：${selsOf(b).trim()}`)
+    }
   })
 })
 
