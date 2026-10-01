@@ -943,12 +943,35 @@ describe('glass：边界与纪律', () => {
       '不得给 [data-sidebar-right-panel] 写 position（会顶掉官方 absolute，撑坏右栏滚动）',
     )
     // 拆成规则块逐个查：必须存在一条「选择器含 [data-dockkit-pane] 且声明含 position: relative」的规则，
-    // 且**没有任何**声明 position 的规则把 [data-sidebar-right-panel] 列在选择器里。
+    // 且**没有任何**规则把 position 声明在**面板元素自己**身上。
+    // ⚠️ 判据是「选择器的**主体**（最后一个复合选择器）是不是面板」，不能只看选择器里
+    // 有没有出现面板属性 —— 2026-10-01 加右栏顶条玻璃时，条的选择器以
+    // `[data-sidebar-right-panel][data-sidebar-right-open] [data-dockkit-strip]` 收窄，
+    // 主体是**条**（面板的后代），把它误判成「在面板上写 position」就是假阳性。
     const blocks = rules.split('}').map(b => b.trim()).filter(Boolean)
     const panePositionRule = blocks.find(b => b.includes('[data-dockkit-pane]') && /position:\s*relative/u.test(b.slice(b.indexOf('{'))))
     assert.ok(panePositionRule, 'dockkit 宿主必须有一条 position: relative（给 ::after 当包含块）')
-    const panelPositionRule = blocks.find(b => b.split('{')[0].includes('[data-sidebar-right-panel]') && /position:\s*relative/u.test(b.slice(b.indexOf('{'))))
-    assert.ok(!panelPositionRule, 'position: relative 不得落在 [data-sidebar-right-panel] 规则上')
+    /** 选择器的**主体**：按逗号拆开后，每个选择器去掉伪元素、取最后一个复合选择器。 */
+    const subjects = (selector) => selector
+      .split(',')
+      .map(s => s.replace(/::?[a-z-]+(\([^)]*\))?/gu, '').trim())
+      .map(s => s.split(/\s+/u).filter(Boolean).pop() ?? '')
+    /** 声明块里是否**真的**声明了 position —— 必须按声明判断，
+     *  不能正则 `position:`：面板那条自带 `background-position:`，正则会误判（本节注释上面的原话）。 */
+    const declaresPosition = (decl) => decl
+      .slice(decl.indexOf('{') + 1)
+      .split(';')
+      .map(d => d.trim())
+      .some(d => d.startsWith('position'))
+    const offending = blocks.filter((b) => {
+      const sel = b.split('{')[0]
+      if (!sel.includes(`[${RIGHT_PANEL_ATTR}]`)) return false
+      if (!declaresPosition(b)) return false
+      // 只有「面板**自己**是主体」才算违规
+      return subjects(sel).some(sub => sub.startsWith(`[${RIGHT_PANEL_ATTR}]`))
+    })
+    assert.equal(offending.length, 0,
+      `position 不得声明在 [data-sidebar-right-panel] **自己**身上（会顶掉官方 absolute，撑坏右栏滚动）：${offending.map(b => b.split('{')[0].trim()).join(' | ')}`)
   })
 
   it('面板的图层必须门在「已展开」上（否则收起时那片渐变会压在会话区右侧）', () => {
@@ -958,12 +981,15 @@ describe('glass：边界与纪律', () => {
     // visibility:hidden。于是我们不门的话，那片 100vw×100vh 渐变会以 screen 常驻压在
     // 会话区右侧。冷启动从未展开时宽度为 0 所以看不出来 —— 展开一次后宽度被持久化 ⇒
     // 「打开过一次就花了」。官方在滑动开始前就置 data-sidebar-right-open，故门它不影响动画。
-    // 按规则块逐个查：凡是给 [data-sidebar-right-panel] 画图层的规则（background-image /
+    // 按规则块逐个查：凡是**在面板自己身上**画图层的规则（background-image /
     // background-blend-mode），其选择器都必须带 [data-sidebar-right-open]。
+    // ⚠️ 判据同「position 那条」：看选择器的**主体**是不是面板自己。
+    // 2026-10-01 加的右栏顶条玻璃（主体是条 / 文件头行，面板只是收窄前缀）也必须带该门，
+    // 但它是以**前缀**形式带的 —— 下面统一要求「选择器里出现该门」，两条都满足。
     const blocks = rules.split('}').map(b => b.trim()).filter(Boolean)
     const panelPaintRules = blocks.filter(b => {
       const sel = b.split('{')[0]
-      if (!sel.includes('[data-sidebar-right-panel]')) return false
+      if (!sel.includes(`[${RIGHT_PANEL_ATTR}]`)) return false
       const decl = b.slice(b.indexOf('{'))
       return /background-image|background-blend-mode/u.test(decl)
     })
@@ -972,7 +998,7 @@ describe('glass：边界与纪律', () => {
       assert.match(
         rule.split('{')[0],
         /\[data-sidebar-right-open\]/u,
-        `面板图层规则必须门在 [data-sidebar-right-open] 上，否则收起时会压住会话区：${rule.split('{')[0].trim()}`,
+        `面板相关图层规则必须门在 [data-sidebar-right-open] 上，否则收起时会压住会话区：${rule.split('{')[0].trim()}`,
       )
     }
   })
@@ -1069,34 +1095,104 @@ describe('glass：边界与纪律', () => {
     assert.ok(ovlRules.some(r => r.includes(`${OVL} table`)), '必须覆盖会滚动的表格宿主')
   })
 
-  it('⛔ 不得给右侧栏那两条 38px 带去「补模糊 / 补材质」—— 那里没有内容经过（查证结论：不需要改）', () => {
-    // owner 问「右栏这块为什么不能像对话区那样虚化」。实测（2026-10-01，缩到 500 高强行让
-    // 文件列表溢出，scrollTop 0 ↔ 400 逐带比像素）：
-    //   右栏 0..38（dockkit 条）   mean 0.000 / max 0 / 0.00%
-    //   右栏 38..76（文件头行）     mean 0.000 / max 0 / 0.00%
-    //   右栏 0..76（合计）          mean 0.000 / max 0 / 0.00%
-    //   对照 76..120（列表首段）    mean 3.801 / 2.81%   ← 内容从这里才开始滚
-    // 对照 对话区顶栏 0..76       mean 3.12 / changed 63.2% ← 真有正文滚过
-    // 结构依据：`ui-sidebar-files` 的 `.root` 是 flex 列，`.header{flex:0 0 auto;height:38px}` 与
-    // `.body{flex:1 1 auto;min-height:0;overflow:auto}` 是**兄弟**，`.body` 裁切上沿 = header 下沿
-    // （实测 top = 76）⇒ 列表**永远滚不到** 0..76 里。
-    // ⚠️ `getBoundingClientRect()` **忽略裁切**，行盒看着「越过」是假阳性，只有像素判据算数。
-    // 所以这里钉一条**反向**守卫：不许为了「看起来一致」往右栏头部加滤镜/材质规则
-    // —— 那只会给一条没有内容经过的实心带子加开销与新的接缝。
-    // 详见 docs/spec/04-glass.md §1.1。
-    const dockkitStrip = '[data-dockkit-strip]'
-    const filesBody = '[data-files-body]'
-    // 全表都不该出现「选择器指向右栏这两条带、且规则体里带 backdrop-filter」的规则
+  /**
+   * 右栏顶部两条 38px 带的玻璃 —— **本条是 2026-10-01 对上一轮错判的纠正**。
+   *
+   * ## 上一轮错在哪（别再照抄那个结论）
+   *
+   * 上一轮（2026-09-30）的结论是「那里没有内容经过 ⇒ 不需要改」，并加了一条**反向**守卫
+   * 禁止给这两条带做 backdrop-filter。那个结论的**测量本身是错的**：
+   * 当时 [data-dockkit-strip] 是 position: static，加在它上面的
+   * ::before { position: absolute; z-index: -1 } 会改锚**最近的定位祖先**
+   * （[data-dockkit-pane]，它是 relative），伪元素根本没画在条上 ——
+   * 量出来的 mean 0.028 是「伪元素画错了地方」，不是「画了没用」。
+   *
+   * 「有没有内容滚过去」与「看起来像不像对话区顶栏」是**两个问题**：
+   * 前者确实成立（列表滚不到 0..76），但 owner 问的是后者。
+   *
+   * ## 真正的判据（2026-10-01 实测，1600x900 深色轴）
+   *
+   * 同一 x 带、同 y，**右栏关（对话区顶栏占位）vs 右栏开**：
+   *   修复前  条 HF 2.313 / 亮度 23.27   ← 颗粒是「生的」（pane 的 ::after 未被 blur 糊过）
+   *   对话区顶栏 HF 0.256 / 亮度 18.46
+   *   修复后  条 HF 0.254 / 亮度 18.27   ⇒ |ΔHF| 0.002、|Δlum| 0.19，同档。
+   *
+   * 所以现在的守卫是**正向**的：这两条必须带上与顶栏同源的玻璃，且必须抬到颗粒层之上
+   * （否则自己的 backdrop-filter 糊不到那层颗粒 —— 那正是上一轮没量对的地方）。
+   */
+  it('右栏顶条必须带与对话区顶栏同源的玻璃（含 backdrop-filter + 抬到颗粒层之上）', () => {
     const all = css.replace(/\/\*[\s\S]*?\*\//gu, '')
-    for (const block of all.split('}').filter(b => b.includes('{'))) {
-      const selector = block.slice(0, block.indexOf('{')).trim()
-      const body = block.slice(block.indexOf('{') + 1)
-      if (selector === '' || !selector.includes('backdrop-filter') && !body.includes('backdrop-filter')) continue
-      assert.ok(
-        !selector.includes(dockkitStrip) && !selector.includes(filesBody),
-        `右栏顶端条没有内容经过，不得给它做 backdrop-filter：${selector}`,
+    const blocks = all.split('}').map(b => b.trim()).filter(b => b.includes('{'))
+    const STRIP = '[data-dockkit-strip]'
+    const FILEHEAD = '[data-files-state]'
+    // ① 两条带各要有一条 ::before 规则，且带 backdrop-filter 与 GLASS_BLUR
+    const targets = [
+      { name: 'dockkit 条', match: (sel) => sel.includes(STRIP) },
+      { name: '文件面板头行', match: (sel) => sel.includes(FILEHEAD) },
+    ]
+    for (const t of targets) {
+      const rule = blocks.find((b) => {
+        const sel = b.split('{')[0]
+        return t.match(sel) && sel.includes('::before') && b.includes('backdrop-filter')
+      })
+      assert.ok(rule !== undefined, `${t.name}必须有一条 ::before 玻璃规则（含 backdrop-filter）`)
+      const sel = rule.split('{')[0]
+      const body = rule.slice(rule.indexOf('{'))
+      // ⚠️ 选择器是**逗号并列**的（条 + 文件头行），必须**逐个**查门：
+      // 只看整串的话，把门从其中一行摘掉照样能通过（反向注入实测踩到过）。
+      const sels = sel.split(',').map(s => s.trim()).filter(Boolean)
+
+      // ② 每一条都必须门在**官方默认**上（选官方默认档时整表让路）
+      for (const one of sels) {
+        assert.ok(
+          one.includes(`:not([${PLAIN_ATTR}])`),
+          `${t.name}的**每一条**选择器都必须带官方默认门，缺在这条：${one}`,
+        )
+      }
+      // ③ 每一条都必须门在**面板已展开**上（收起时不得压住会话区；与右栏材质那几条同一条理由）
+      for (const one of sels) {
+        assert.ok(
+          one.includes('[data-sidebar-right-open]'),
+          `${t.name}的**每一条**选择器都必须门在 [data-sidebar-right-open] 上，缺在这条：${one}`,
+        )
+      }
+      // ④ 模糊强度与顶栏**同源**（直引常量，不许复制粘贴字面量）
+      assert.ok(body.includes(GLASS_BLUR), `${t.name}的模糊必须直引 GLASS_BLUR（与顶栏同源）`)
+      // ⑤ 填充比例与顶栏同一个 alpha（GLASS_HEADER_ALPHA），不新造一个数
+      assert.match(
+        body,
+        new RegExp(`color-mix\\(in srgb, var\\(--dsw-alias-bg-base\\) ${Math.round(GLASS_HEADER_ALPHA * 100)}%, transparent\\)`, 'u'),
+        `${t.name}的填充必须用 GLASS_HEADER_ALPHA（${GLASS_HEADER_ALPHA}）与顶栏同参`,
       )
+      // ⑥ 光必须与顶栏同源（同一条 dimmedBackdropGradients(HEADER_LIGHT_SCALE)）
+      assert.ok(
+        body.includes(dimmedBackdropGradients(HEADER_LIGHT_SCALE)),
+        `${t.name}的光必须与顶栏同源（dimmedBackdropGradients(HEADER_LIGHT_SCALE)）`,
+      )
+      // ⑦ ⚠️ 不许用 background-attachment: fixed：面板会被官方 translate，
+      //    fixed 会被重解析到 transform 后的坐标系。必须用右栏那套 100vw x 100vh + 右对齐相位。
+      assert.match(body, /background-attachment: scroll;/u, `${t.name}必须用 scroll（面板会被 transform，fixed 会被重解析）`)
+      assert.ok(body.includes('100vw 100vh'), `${t.name}必须显式给视口尺寸背景盒`)
+      assert.ok(
+        body.includes('right calc(0px - var(--dsh-windows-titlebar-height, 0px))'),
+        `${t.name}必须右对齐并减去 caption 高度（与右栏材质同相位）`,
+      )
+      // ⑧ 不得写官方 hashed 类名
+      assert.ok(!/\.[A-Za-z0-9]*_[A-Za-z0-9]{4,}/u.test(sel), `${t.name}不得用官方 hashed 类名：${sel.trim()}`)
     }
+
+    // ⑨ 抬到颗粒层之上：pane 的 ::after 颗粒盖在整个 pane 之上，
+    //    条不抬起来，它自己的 backdrop-filter 就糊不到任何东西（实测 HF 仍是 2.31，= 没生效）。
+    const liftRule = blocks.find((b) => {
+      const sel = b.split('{')[0]
+      const body = b.slice(b.indexOf('{'))
+      return sel.includes(STRIP) && !sel.includes('::before') && /z-index:\s*1/u.test(body) && /position:\s*relative/u.test(body)
+    })
+    assert.ok(
+      liftRule !== undefined,
+      'dockkit 条必须抬到 pane 的颗粒层之上（position: relative + z-index: 1）—— '
+      + '否则条自己的 backdrop-filter 糊不到那层颗粒（这正是上一轮把「没用」量成 0.028 的原因）',
+    )
   })
 })
 

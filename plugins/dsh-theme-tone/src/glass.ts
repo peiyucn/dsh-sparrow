@@ -1134,6 +1134,111 @@ body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-empty]::after 
   opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT});
 }
 
+/* ===== 右栏顶部的两条 38px 带（dockkit 条 + 文件面板头行）：补上顶栏那份**玻璃** =====
+   owner 2026-10-01：「**右边栏的顶栏应该透明模糊，忘了做了吧**」。
+
+   ## 先纠正上一轮的错判（重要，别再照抄那个结论）
+
+   上一轮（2026-09-30，见 docs/spec/04-glass.md §1.1）的结论是「**不需要改**」，
+   理由是「把顶栏那条配方套到 [data-dockkit-strip] 上只变 mean 0.028 = 空操作」。
+   **那个测量本身是错的**：当时 [data-dockkit-strip] 还是 position: static，
+   于是加在它上面的 ::before { position: absolute; z-index: -1 } 会改锚**最近的定位祖先**
+   （即 [data-dockkit-pane]，它是 relative），那层伪元素根本没画在条上 ——
+   量出来的 0.028 是「伪元素画错了地方」，不是「画了没用」。
+
+   正确的诊断（本轮实测，1600x900 深色轴）：
+     * [data-dockkit-pane] 的颗粒层 ::after（inset:0、absolute、screen 混合）
+       是画在**整个 pane 之上**的，于是它也盖住了 0..38 那一条 ——
+       条的像素高频 HF = **2.313**，而对话区顶栏（同样含颗粒，但被 blur 化开）HF = **0.253**。
+       两者亮度也不同：条 **23.27** vs 顶栏 **18.03**。
+     * 也就是说：右栏顶部**看起来和别处不是一个材质** —— 颗粒是**生的**（没被 blur 糊过），
+       且没有那层半透明填充把整体压到与顶栏同一档。owner 说「忘了做」正是这个观感。
+     * 把条抬到颗粒层之上（position: relative; z-index: 1）再补那份配方，
+       它自己的 backdrop-filter 才**真的**有东西可糊（糊掉的正是 pane 的颗粒）
+       ⇒ 条 HF 2.313 → **0.254**，亮度 23.27 → **18.27**，与顶栏（0.253 / 18.03）同档。
+
+   ## 填充比例 70% 是量出来的，不是拍的
+
+   对照组 = 右栏关闭时、**同一 x 带**由对话区顶栏占据（同 y、同宽。方法上必须这样比：
+   拿对话区顶栏与右栏条并排比会掺进「两个区域底色本来就不同」这个无关变量）。
+   扫描 30/40/50/60/70%：
+
+   | 填充 | 条亮度 | 条 HF | 与顶栏亮度差 |
+   | ---: | ---: | ---: | ---: |
+   | 30% | 23.18 | 0.257 | 5.15 |
+   | 50% | 20.76 | 0.255 | 2.73 |
+   | 60% | 19.58 | 0.254 | 1.55 |
+   | **70%** | **18.27** | **0.254** | **0.24** |
+
+   70% 与顶栏的 HF 差 0.001、亮度差 0.24 ⇒ 直接沿用 {@link GLASS_HEADER_ALPHA}（同一个 0.7），
+   与对话区顶栏**同源同参**，不新造一个数。
+
+   ## 为什么用「条自己 + z-index: 1」而不是给 pane 铺 ::before
+
+   也试过给 [data-dockkit-pane]::before 铺满顶部 76px（一举覆盖所有标签页、0..76 无内部接缝）。
+   亮度与 HF 同样达标，但它要给 pane 加 z-index: 0 让它自成层叠上下文 ——
+   而 pane 的祖先链上挂着官方的 --dsh-dockkit-dock-layer（泊靠 10 / 全屏 40）与
+   --dsh-dockkit-float-layer（浮窗 60）。给 pane 自建层叠上下文会把这条官方次序风险引入一个
+   本来与浮层无关的改动里。条自己抬一层（z-index: 1，仍在 pane 内部）**不动官方任何次序**
+   （实测：标签、加号、「关闭」按钮、路径行、滚区的盒子逐像素不变）。
+
+   ## ⚠️ 为什么不吃 [data-phase] 相位门
+
+   仓库纪律「除右边栏 / 卡片 / 吸顶行外一律单 active」（test/glass.test.mjs 那条）。
+   本条属于**右边栏那一类豁免**：右栏在 hero 相位同样存在、也能开文件面板
+   （本轮实测：hero 下 [data-dockkit-strip] / [data-dockkit-pane] 都在，
+   且 [data-sidebar-right-open] 可开）—— 与右栏材质那几条同一条豁免理由。
+   故选择器统一以 [${RIGHT_PANEL_ATTR}] [data-dockkit-strip] 收窄到右栏面板内，
+   不影响 dockkit 的其它宿主。
+
+   ## 两条带都做：0..38 与 38..76
+
+   官方把「dockkit 条（38px）+ 文件面板自己的头行（38px）」叠成 76px，
+   与对话区顶栏**同高**（.header{height:38px} 紧接在条下面）。
+   只做上面那条会在 y=38 切出一条新缝（实测：条已糊到 HF 0.254，而下面那行还是 2.352）。
+   两条同配方后 0..76 整段 HF 都是 0.25 档，与顶栏一致。
+   文件头行用**公开属性**锚定：[data-files-state] 的直接子元素即那行
+   （ui-sidebar-files 的 FilesBody：.root[data-files-state] > .header + .body[data-files-body]）。
+
+   ## 祖先链上有没有 transform（决定能不能用 backdrop-filter 的前提）
+
+   backdrop-filter 要求「背后真有东西可糊」且不被祖先 transform 打断采样。
+   本轮实测右栏祖先链无 transform / filter / contain / will-change（切换全程采样亦然），
+   且条下方紧邻的就是 pane 的颗粒层 —— 正是它把 HF 从 2.313 糊到 0.254，证明模糊真的生效
+   （不是「值写上了但没糊」）。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip],
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state] > *:first-child {
+  /* 抬到 pane 的颗粒层之上，自己那份 backdrop-filter 才有东西可糊。
+     relative + 无偏移不改几何；条内标签用的 relative 与关闭按钮的 absolute 都锚在**自己**的
+     行内盒上（实测盒子逐像素不变）。 */
+  position: relative;
+  z-index: 1;
+}
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip]::before,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state] > *:first-child::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* 与对话区顶栏**同一份**配方、同一个 alpha（GLASS_HEADER_ALPHA） */
+  background-color: ${fill('var(--dsw-alias-bg-base)', GLASS_HEADER_ALPHA)};
+  backdrop-filter: ${GLASS_BLUR};
+  /* ⚠️ 这里**不能**用 background-attachment: fixed（顶栏那条用了，是因为它自己就是
+     absolute 浮层、祖先无 transform）：右栏面板在开关 / 全屏切换时会被官方 translate，
+     fixed 会被重解析到 transform 后的坐标系。改用与右栏材质那几条**同一套**
+     100vw x 100vh + 右对齐相位 —— 那套本就是为「面板会被 transform」设计的。 */
+  background-image: ${dimmedBackdropGradients(HEADER_LIGHT_SCALE)};
+  background-attachment: scroll;
+  background-size: 100vw 100vh, 100vw 100vh, 100vw 100vh;
+  background-position:
+    right calc(0px - var(--dsh-windows-titlebar-height, 0px)),
+    right calc(0px - var(--dsh-windows-titlebar-height, 0px)),
+    right calc(0px - var(--dsh-windows-titlebar-height, 0px));
+  background-repeat: no-repeat, no-repeat, no-repeat;
+}
+
 /* ===== 官方那些**吸顶遮罩行**：底色要等于它盖住的内容底 =====
    owner 2026-09-24：「该适配的地方没适配，**think 那条黑框**，渲染是官方黑的遗留」。
 
