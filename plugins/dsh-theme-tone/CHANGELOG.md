@@ -20,6 +20,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Fixed the Windows title bar reading as a seam against the themed sidebar below it: the native window-controls strip was painted a flat colour, so it now goes transparent and the themed backdrop shows through (**window buttons unchanged**).
 - Fixed the right sidebar's top bar not matching the conversation header's material: it is no longer an unsmoothed grain layer, but translucent with blur, from the same recipe as the conversation header (both the tab strip and **each panel's own title row** — files, file preview, and so on). The panel's content now scrolls **underneath** those two rows, so the blur shows actual content passing behind it instead of reading as a flat dark plate — the two rows read as **one continuous surface**, with no seam across the middle, and the title row's own hairline separator is back.
 - Fixed the right sidebar's scrollbar scrolling up into the translucent blur once that blur was added: the thumb now stays below the blur band.
+- Fixed the header's **background-jobs popover having its right half cut off by the right sidebar**: the popover now sits fully inside the conversation column (it used to extend past the column, where the column's own clipping cut it off while the sidebar panel covered it).
 - Fixed the trajectory page's colour and texture stopping short of the composer, which left a visible band under the input box.
 
 ## 0.1.5-rc.2 (2026-09-21)

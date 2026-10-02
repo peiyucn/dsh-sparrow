@@ -63,6 +63,11 @@ export {
 export { Config } from './settings-schema.js'
 export { CAPTION_PROBE_SYMBOL_TOKEN, CAPTION_PROBE_TOKEN, buildCaptionCss } from './caption.js'
 export {
+  HEADER_ACTION_SCOPE,
+  RIGHT_PANEL_OPEN_GATE,
+  buildPopoverCss,
+} from './popover.js'
+export {
   GLASS_BLUR,
   GLASS_CARD_ALPHA,
   GLASS_CARD_BLUR,

@@ -49,6 +49,7 @@ import { buildGlassCss, buildSeamCss } from '../glass.js'
 import { buildMaskCss } from '../mask.js'
 import { buildNavPinCss } from '../nav-pin.js'
 import { HANDLE_SELECTOR, applyGlow } from '../handle-glow.js'
+import { buildPopoverCss } from '../popover.js'
 import { buildSurfaceCss } from '../surface.js'
 import { buildSweepCss } from '../sweep.js'
 import { isWorkstartProbe } from '../workstart.js'
@@ -87,7 +88,7 @@ export const inject = ['theme', 'slots', 'locale']
  * @returns 供卸载清理的 style 元素。
  */
 function ensureStyles(): HTMLStyleElement {
-  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}${buildCaptionCss()}`
+  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}${buildCaptionCss()}${buildPopoverCss()}`
   const existing = document.querySelector<HTMLStyleElement>(STYLE_SELECTOR)
   if (existing !== null) {
     // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之。
