@@ -177,4 +177,48 @@ describe('dsh-archive-manage 结构', () => {
     assert.match(src, /\.dsh-archive-section-card:has\(\+ \.dsh-archive-page-footer\)\s*\{[^}]*margin-bottom:\s*0/u,
       '紧邻 footer 的区块卡必须把自身 margin-bottom 归零（flex 纵列外边距不合并，否则 12+24=36）')
   })
+
+  /**
+   * owner 2026-10-02：「归档页按钮的中文改成归档管理吧」。
+   *
+   * 这条**曾经漂移过**：`button.label` 在 2026-09-01 更名时写作「归档管理」，
+   * 随后被静默改成「归档」（改动混在 `14f9d7b` 入口迁移那次重构里，没有单独说明），
+   * 于是侧边栏那行读起来像「归档**动作**」而不是「归档**页面**」。
+   * 侧边栏入口文案是**用户可见**的，且与同排的「插件 / 自动化任务 / 云端文件」
+   * （都是**名词性入口**）并列，故按名词口径钉住，防再次被顺手缩短。
+   */
+  it('侧边栏入口中文 应该是「归档管理」（名词性入口，与同排「插件」等一致）', async () => {
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(src, /'button\.label':\s*'归档管理'/u,
+      '侧边栏入口中文必须是「归档管理」（不是「归档」——那读成动作，同排入口都是名词）')
+    // 英文按 owner 只提中文的原话保持 "Archive"，这条只在**中文**上做约束。
+    assert.match(src, /'button\.label':\s*'Archive'/u, '英文入口文案保持 "Archive"')
+  })
+
+  /**
+   * locale 字典的中英**键集必须一一对应**：漏一个键只会让该语言下显示成键名
+   * （`archive-manage.button.label`），不报错、不崩——纯靠测试兜住。
+   */
+  it('locale 字典 应该 中英键集一一对应（漏键只会静默显示键名）', async () => {
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    /** 取某语言字典块里的全部键。 */
+    const keysOf = (lang) => {
+      const start = src.indexOf(`  ${lang}: {`)
+      assert.ok(start >= 0, `找不到 ${lang} 字典块`)
+      const end = src.indexOf('\n  },', start)
+      assert.ok(end > start, `${lang} 字典块没有闭合`)
+      return [...src.slice(start, end).matchAll(/^\s*'([^']+)':/gmu)].map(m => m[1])
+    }
+    const zh = keysOf('zh')
+    const en = keysOf('en')
+    assert.ok(zh.length > 0, 'zh 字典为空')
+    assert.deepEqual(
+      zh.filter(key => !en.includes(key)), [],
+      'zh 有而 en 没有的键（英文界面会显示键名）',
+    )
+    assert.deepEqual(
+      en.filter(key => !zh.includes(key)), [],
+      'en 有而 zh 没有的键（中文界面会显示键名）',
+    )
+  })
 })

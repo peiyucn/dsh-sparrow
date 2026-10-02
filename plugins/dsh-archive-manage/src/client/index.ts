@@ -34,7 +34,7 @@ const PANEL_ORDER = 20
 /** 本插件的 locale 字典（zh/en）。 */
 const LOCALE_DICTS = {
   zh: {
-    'button.label': '归档',
+    'button.label': '归档管理',
     'dialog.title': '归档会话管理',
     'dialog.trashDir': '回收站位置：',
     'dialog.copyHint': '点击复制完整路径',
