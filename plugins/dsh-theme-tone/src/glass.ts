@@ -1443,6 +1443,28 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
   padding-top: ${PANEL_BAND_PX}px;
   box-sizing: border-box;
 }
+/* --- 右栏滚区的滚动条：把轨道整体下推到玻璃带下缘 ---
+   owner 2026-10-02：「还有右边栏上面透明模糊后，**滚动条不要跟着滚上去**」。
+   与对话区那次（见上面 ③b）**同因同解**：滚动条画在滚动容器的 **padding box** 上，
+   我们那件「margin-top 负底距 + padding-top 补高」只推内容、不推它 ——
+   轨道与滑块仍从 y=0 起画，前 76px 正落在半透明玻璃带下面 ⇒ 透出来。
+
+   ⚠️ 单写轨道 margin 即可，**不要**顺手重声明滚动条本体（::-webkit-scrollbar）：
+   那会连官方的 width 一起覆盖掉（本轮实测：同一条轨道 margin 在
+   「只写 track」与「track + 重声明本体」两种写法下计算值都是 78px，多写的那条**没必要**，
+   只会把官方的滚动条宽度重复钉死一遍）。
+
+   ⚠️ 值取 **calc(HEADER_HEIGHT_PX + 2px)**（= 78px，与对话区那份逐字同参）：
+   官方轨道自己留 2px 上边距，加起来正是官方档下滑块顶端的那个 y。
+
+   ⚠️ 范围只放**流式文档的滚区**（与上面那份白名单同两个属性）：
+   代码 / PDF / 图片 / 表格 / office 这些「填满盒子」的渲染器自己有内层滚动容器，
+   动它们的轨道等于改官方布局。 */
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body]::-webkit-scrollbar-track,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body]::-webkit-scrollbar-track,
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state='tree'] [data-files-body]::-webkit-scrollbar-track {
+  margin: calc(${HEADER_HEIGHT_PX}px + 2px) 2px 2px;
+}
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-files-state='tree'] > *:first-child::before,
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='unsupported'] > *:first-child::before,
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > *:first-child:not([data-textpreview-changed]):not([data-textpreview-meta-failed])::before,
@@ -1450,15 +1472,22 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-textpreview-state='text'] > [data-textpreview-meta-failed] + *::before {
   content: '';
   position: absolute;
-  /* ⚠️ 向上铺满 38px，让盒子覆盖**面板坐标 0..76**（不只是头行自己那 38..76）。
+  /* ⚠️ 向上铺满 38px，让盒子覆盖**面板坐标 0..75**（不只是头行自己那 38..75）。
      这一条正是「无缝」的关键：blur 的采样区是**边框盒**，只有两个面的盒子完全重合时，
      y=38 两侧算出的颜色才一致（实测真实内容下 y=38 的逐列台阶：两面各自 38px 时 8.72，
-     对照行仅 0.28~0.79；铺满 0..76 后同一位置为 -0.79，与对照行同档）。 */
+     对照行仅 0.28~0.79；铺满后同一位置为 -0.79，与对照行同档）。 */
   top: -${PANEL_BAND_PX}px;
-  bottom: auto;
+  /* ⚠️ **必须 bottom: 0 + height: auto**（owner 2026-10-02：「右边栏下边那条细线没有了」）。
+     官方头行的 border-bottom: 1px solid var(--dsw-alias-border-l3) 画在它**边框盒**的
+     最后 1px（75..76）。写死 height = HEADER_HEIGHT_PX（76px）会让这个面一直铺到 76，
+     把那条 1px 压在自己那层 70% 填充之下 —— 细线于是被洗掉（实测 y=75 亮度 58.7 → **18.8**）。
+     bottom: 0 让面止于**内边距盒**底（= 75），细线回到可见（实测 52.3）。
+     ⚠️ 这也让本面的盒子与**对话区顶栏那个面**完全相同（那边是 inset: 0 ⇒ 同样止于内边距盒、
+     计算 height 同为 75px）—— 两处观感要一致，盒子就得先一致。 */
+  bottom: 0;
   left: 0;
   right: 0;
-  height: ${HEADER_HEIGHT_PX}px;
+  height: auto;
   z-index: -1;
   pointer-events: none;
   /* 与对话区顶栏**同一份**配方、同一个 alpha（GLASS_HEADER_ALPHA） */

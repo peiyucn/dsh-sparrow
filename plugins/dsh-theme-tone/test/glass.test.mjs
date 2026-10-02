@@ -1193,10 +1193,17 @@ describe('glass：边界与纪律', () => {
       faceBody, new RegExp(`top:\\s*-\\$\\{PANEL_BAND_PX\\}px|top:\\s*-${PANEL_BAND_PX}px`, 'u'),
       `玻璃面必须向上多铺一条带（top = -PANEL_BAND_PX = -${PANEL_BAND_PX}px），否则采样区在 y=38 被边界截断、又切出一条缝：${faceBody}`,
     )
-    // ⚠️ 高度必须是**两条带之和** HEADER_HEIGHT_PX（写死 38 会让上半条没有玻璃 = 退回「只有下半部分」）。
-    assert.match(
-      faceBody, new RegExp(`height:\\s*\\$\\{HEADER_HEIGHT_PX\\}px|height:\\s*${HEADER_HEIGHT_PX}px`, 'u'),
-      `玻璃面必须铺满两条带（height = HEADER_HEIGHT_PX = ${HEADER_HEIGHT_PX}），只铺 38 会让上半条失去玻璃：${faceBody}`,
+    // ⚠️ 盒子必须**下沿贴内边距盒底、上沿再往上一条带**（= 覆盖面板坐标 0..75），
+    //    而且**不许写死 height**（owner 2026-10-02：「右边栏下边那条细线没有了」）。
+    //    官方头行的 border-bottom 画在它边框盒的最后 1px（75..76）：
+    //    写死 height: 76 会让面一直铺到 76，把那条细线压在自己 70% 填充之下
+    //    （实测 y=75 亮度 58.7 → 18.8）；bottom: 0 止于内边距盒底（75）后细线回来（52.3）。
+    //    这也让本面的盒子与**对话区顶栏那个面**（inset: 0 ⇒ 计算 height 75px）完全一致。
+    assert.match(faceBody, /bottom:\s*0/u, `玻璃面必须 bottom: 0（止于内边距盒底，把官方那 1px 下边框让出来）：${faceBody}`)
+    assert.match(faceBody, /height:\s*auto/u, `玻璃面必须 height: auto（写死 height 会盖掉头行的下边框）：${faceBody}`)
+    assert.doesNotMatch(
+      faceBody, new RegExp(`height:\\s*(?:\\$\\{HEADER_HEIGHT_PX\\}|${HEADER_HEIGHT_PX})px`, 'u'),
+      `玻璃面不得写死 height = HEADER_HEIGHT_PX（会把头行那条 1px 下边框洗掉，owner 复报过）：${faceBody}`,
     )
     // ⚠️ 给**伪元素**加 z-index 不等于给 pane 建层叠上下文：pane 本身仍是 relative + auto，
     //    官方 --dsh-dockkit-dock-layer / float-layer 的次序一点没动（这正是上一版否掉这条路的理由，已不成立）。
@@ -1301,6 +1308,39 @@ describe('glass：边界与纪律', () => {
       assert.ok(
         all.includes(`[${banner}] + *`),
         `文档预览的 [${banner}] 横幅之后那条头行也必须覆盖（横幅会把它挤到第二个位置）`,
+      )
+    }
+
+    // ⑬ ⛔ 右栏滚区的滚动条轨道必须下推到玻璃带下缘（owner 2026-10-02：
+    //    「还有右边栏上面透明模糊后，滚动条不要跟着滚上去」）。
+    //    与对话区那次同因：滚动条画在滚动容器的 **padding box** 上，那件
+    //    「margin-top 负底距 + padding-top 补高」只推内容、不推它 ⇒ 轨道仍从 y=0 起画，
+    //    前 76px 落在半透明玻璃带下面透出来。官方口径是先例：
+    //    对话区用 `::-webkit-scrollbar-track { margin: calc(HEADER_HEIGHT_PX + 2px) 2px 2px }`。
+    const trackRules = blocks.filter((b) => b.split('{')[0].includes('::-webkit-scrollbar-track'))
+    const panelTrack = trackRules.filter((b) => {
+      const sel = b.split('{')[0]
+      return sel.includes(RIGHT_PANEL_ATTR) && sel.includes('[data-sidebar-right-open]')
+    })
+    assert.equal(
+      panelTrack.length, 1,
+      `右栏必须**恰好一条**滚动条轨道下推规则（漏了滑块会滚进玻璃带）：`
+      + `${panelTrack.map(b => b.split('{')[0].trim()).join(' | ')}`,
+    )
+    assert.match(
+      panelTrack[0], new RegExp(`calc\\(\\$\\{HEADER_HEIGHT_PX\\}px \\+ 2px\\)|calc\\(${HEADER_HEIGHT_PX}px \\+ 2px\\)`, 'u'),
+      `轨道下推量必须是 calc(HEADER_HEIGHT_PX + 2px)（与对话区那份逐字同参）：${panelTrack[0]}`,
+    )
+    // ⚠️ 只许覆盖**流式文档的滚区**（与上面那份白名单同两个属性）：代码 / PDF / 图片 /
+    //    表格 / office 这些「填满盒子」的渲染器有自己的内层滚动容器，动它们的轨道等于改官方布局。
+    for (const one of splitSels(panelTrack[0].split('{')[0])) {
+      assert.ok(
+        one.includes("[data-textpreview-body]") || one.includes("[data-files-body]"),
+        `轨道下推只许覆盖流式文档的滚区（[data-textpreview-body] / [data-files-body]）：${one}`,
+      )
+      assert.ok(
+        one.includes("[data-document-preview$='/markdown']") || one.includes("[data-document-preview$='/text']") || one.includes("[data-files-state='tree']"),
+        `轨道下推必须按**具体渲染器 / 标签**收窄，不得写成宽泛的容器选择器：${one}`,
       )
     }
 

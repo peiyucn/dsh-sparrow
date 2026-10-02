@@ -254,21 +254,81 @@ markdown 与纯文本的内容根**不是**滚区的直接子元素：中间隔�
 ⇒ 结论修正：**两个独立盒子这件事本身就是缝的来源**，相位只是放大器。
 唯一彻底的解法是让 0..76 落在**同一个边框盒**里。
 
-#### 修法：面挂在**各标签自己的头行**上、向**上铺满** 0..76
+#### 修法：面挂在**各标签自己的头行**上、向**上铺满**、下沿止于内边距盒底
 
 ```
-各标签头行::before { position: absolute; top: -38px; left/right: 0; height: 76px;
+各标签头行::before { position: absolute; top: -38px; left/right: 0; bottom: 0; height: auto;
                      z-index: -1; backdrop-filter + 70% 填充 + 同源光 }
 各标签头行         { position: relative; z-index: 2 }   ← 头行文字在玻璃之上
 dockkit 条         { position: relative; z-index: 3 }   ← 严格高于头行那层
 条自己             { 不画面 }
 ```
 
-盒子从 `-38px` 起、高 76px ⇒ 采样区**跨** y=38 且与「条那 38px」完全重合，
+盒子从 `-38px` 起、下沿贴**内边距盒**底 ⇒ 采样区**跨** y=38 且与「条那 38px」完全重合，
 两半算出的颜色一致（实测 y=38 台阶 **-0.79**，与对照行同档）。
 
-#### ⛔ 为什么**不能**挂在 `[data-dockkit-pane]::before` 上
+⛔ **不许写死 `height: HEADER_HEIGHT_PX`**（owner 2026-10-02：「右边栏下边那条细线没有了」）。
+官方头行有 `border-bottom: 1px solid var(--dsw-alias-border-l3)`，那 1px 画在它**边框盒**的
+最后一段（75..76）。写死 76px 会让面一直铺到 76，把细线压在自己那层 70% 填充之下 ——
+实测 y=75 的亮度 **58.7 → 18.8**（线被洗掉）；`bottom: 0` 后回到 **52.3**。
+改成 `bottom: 0 + height: auto` 还有个附带好处：本面的盒子与**对话区顶栏那个面**
+（`inset: 0` ⇒ 计算 `height: 75px`）**逐项一致**，两处观感对得上。
 
+#### ⚠️ 「看着两边不太一样」是**地面**不同，不是配方不同（owner 2026-10-02）
+
+owner 同时问了「右边栏顶部和对话区顶部的透明模糊规格一样么？看着两边好像不太一样」。
+**配方逐项相同**，证据两条：
+
+1. **同名 token 解析值逐个相同**（`TEMP/token.mjs`）：两处玻璃面的 `--dsw-alias-bg-base`
+   （`#0a0a10`）、`--dsw-alias-border-l3`、计算 `backgroundColor`
+   （`color(srgb 0.039 0.039 0.063 / 0.7)`）、`backdropFilter`（`blur(12px) saturate(1.15)`）
+   **全部一字不差**；面板子树没有 rebind 任何一个。
+2. **填充 alpha 扫描解线性**（`TEMP/r4n.mjs`，摘掉渐变光与 blur，`result = a·E + (1−a)·B`）：
+   两个面共用同一组 `(E, B)` 模型，预测与实测吻合到 0.2 以内
+   （alpha=50：预测 58.15/25.25，实测 57.95/25.04；alpha=70：预测 48.33/22.90，实测 48.24/22.88）。
+
+绝对读数差 100% 来自 **B（该面采样到的背后地面）**：对话区地面 **82.7** vs 面板地面 **31.1**。
+官方原样（PLAIN 档）下两者本来就差这么多（`TEMP/r4j.mjs`：地面 90..130 带，
+官方右栏 40.9 vs 对话 33.2 已是不同底色；玻璃带 0..76 官方右栏 43.3 vs 对话 56.8）。
+⇒ 这是「右侧栏是一块独立材质面」的**继承**结果，不是玻璃配方的偏差。
+
+唯一**被迫**的写法差异是两个 `background-*` 三元组：
+
+| | 对话区顶栏 | 右栏 |
+| :--- | :--- | :--- |
+| `background-attachment` | `fixed` | `scroll` |
+| `background-size` | `auto`（跟着 `fixed` 按视口算） | 显式 `100vw 100vh` ×3 |
+| `background-position` | `0% 0%` | `right calc(0px - var(--dsh-windows-titlebar-height, 0px))` |
+| `background-repeat` | `repeat` | `no-repeat` |
+
+原因记在 §5.5 与 `backdrop.ts`：右栏面板在开关 / 全屏时会被官方 `translate`，
+`fixed` 会被重解析到 transform 后的坐标系。**同几何白底实测两者差 `[0, 0, 0]`**
+（`TEMP/r4f.mjs`：两块都贴 x 880..1600、高 76，逐通道完全相同）。
+
+#### ⛔ 滚动条必须单独下推（owner 2026-10-02：「滚动条不要跟着滚上去」）
+
+与对话区那次（§2 ③b）**同因同解**：滚动条画在滚动容器的 **padding box** 上，
+而本插件那件「`margin-top` 负底距 + `padding-top` 补高」只推**内容**、不推它 ——
+轨道与滑块仍从 y=0 起画，前 76px 落在半透明玻璃带下面透出来。
+
+```
+右栏滚区::-webkit-scrollbar-track { margin: calc(76px + 2px) 2px 2px }   /* calc(HEADER_HEIGHT_PX + 2px) */
+```
+
+⚠️ **值取 78 而不是 76**：官方轨道自己留 2px 上边距（`ui-theme/src/styles/scrollbar.css`
+的 `margin-block: var(--dsh-scrollbar-track-margin)`，官方各站设 2px），加起来正是官方档下
+滑块顶端的那个 y —— 与对话区那份**逐字同参**。
+
+⚠️ 范围只放**流式文档的滚区**（`data-document-preview$='/markdown'|'/text'` 与
+`data-files-state='tree'`）：代码 / PDF / 图片 / 表格 / office 这些「填满盒子」的渲染器
+有自己的内层滚动容器，动它们的轨道等于改官方布局。
+
+实测（`TEMP/accept4.mjs`，构建产物）：轨道计算 `margin: 78px 2px 2px`，
+滑块顶端在 `scrollTop = 0 / 4000 / 最大` 三处分别是 **78 / 419.5 / 821.2** —— 全程 ≥ 76。
+
+#### 守卫与反向注入
+
+#### ⛔ 为什么**不能**挂在 `[data-dockkit-pane]::before` 上
 我第一版就是这么改的（pane 是公共祖先、一个面盖住所有标签，看着更省事），
 **随即量出回归**：pane 属于**所有**标签，而**有的标签根本没有 38px 头行** ——
 终端（`[data-sidebar-terminal]`，`.root` 从 y=38 起、`.screen` 从 y=46 起）就是，
@@ -290,12 +350,16 @@ dockkit 条         { position: relative; z-index: 3 }   ← 严格高于头行�
 它**不得**锚在 `[data-dockkit-pane]::before`（锚回 pane ⇒ 红，正是上面那条回归）、
 必须锚在各标签带取值的头行属性上且以 `::before` 结尾、
 `top` 必须直引 `-PANEL_BAND_PX`（去掉这件「向上多铺一条带」⇒ 红）、
-`height` 必须直引 `HEADER_HEIGHT_PX`（写 38 ⇒ 红）、
+**`bottom: 0` + `height: auto`**（写死 `height` ⇒ 红，那会把头行那条 1px 下边框洗掉）、
 `position: absolute` 且**不得** `inset: 0`（那会铺满整个 pane）、两道门、
 同源 blur / alpha / 光 / scroll + `100vw 100vh` + 右对齐相位，
-以及「**条 `z-index: 3` / 头行 `z-index: 2` 必须分成两条规则**」（两者同层或条更低 ⇒ 红）。
+「**条 `z-index: 3` / 头行 `z-index: 2` 必须分成两条规则**」（两者同层或条更低 ⇒ 红），
+以及**恰好一条**带 `[data-sidebar-right-open]` 的轨道下推规则、其量必须是
+`calc(HEADER_HEIGHT_PX + 2px)`、且只覆盖 `[data-textpreview-body]` / `[data-files-body]`
+（删掉整条、改成裸 `78px`、或放宽选择器 ⇒ 红）。
 
-反向注入 9 条（`TEMP/inject3.mjs`）全部红 → 还原绿。
+反向注入：§1.1c 相关 9 条（`TEMP/inject3.mjs`）+ 本轮新增 5 条（`TEMP/inject4.mjs`）
+**全部红 → 还原绿**。
 
 
 ### 1.2) 轨迹视图的地面：**选择器表不是穷举证明，覆盖率指标才是安全网**
