@@ -130,3 +130,44 @@ describe('CodeBuddy 顶栏标记：窄化（容器查询）', () => {
     assert.ok(!/font-size:\s*\d+px/u.test(styles), '字号应由 MARK_FONT_PX 一处给出，不写死在样式表里')
   })
 })
+
+describe('CodeBuddy 顶栏标记：面板不得先在旧位置画一帧', () => {
+  /**
+   * owner 2026-10-02：「codebuddy 图标缩放后，点击弹窗会现在原来位置出现一下」。
+   *
+   * 根因是**效果时机**（两件事相乘才看得见）：
+   * 1. `point` 是 useState、**关闭时不清空** ⇒ 重开时首次渲染直接用上一次的坐标；
+   * 2. `position()` 原先写在 `useEffect`（**被动效果**，绘制之后才跑）⇒
+   *    那一帧已经按旧坐标画出来了，随后 `setPoint` 再把它挪走。
+   *
+   * 图标一旦因容器查询缩放，按钮会横移几十像素（84px ↔ 28px），
+   * 旧坐标与正确坐标差得远 ⇒ 那一下「跳」肉眼可见。
+   *
+   * 修法：把「打开时定位」放进 `useLayoutEffect`（提交后、**绘制前**同步跑），
+   * 其中的 `setPoint` 同帧内完成重渲染 ⇒ 面板从第一帧就在正确位置。
+   *
+   * 实测（TEMP/cb21.mjs 因果验证）：把这一行改回 `useEffect`，4 轮里能抓到
+   * `[827, 135]` 这种「先旧后新」的帧序列；用 `useLayoutEffect` 时 0/4。
+   */
+  it('打开时的定位 必须用 useLayoutEffect（被动效果会先画一帧旧坐标）', () => {
+    // 修掉注释后再找，避免注释里提到 useLayoutEffect 就把断言喂饱。
+    const code = source.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/^\s*\/\/.*$/gmu, '')
+    const layoutCall = /useLayoutEffect\(\(\) => \{\s*if \(!open\) return\s*position\(\)\s*\}, \[open, position\]\)/u
+    assert.match(code, layoutCall,
+      '「打开时定位」必须放在 useLayoutEffect 里（否则会先在旧坐标画一帧）')
+    // 反向：不得同时保留一条同形的 useEffect 定位（那会把被动效果又加回来）。
+    const passive = /useEffect\(\(\) => \{\s*if \(!open\) return\s*position\(\)\s*\}, \[open, position\]\)/u
+    assert.ok(!passive.test(code),
+      '不得再有一条同形的 useEffect 定位 —— 被动效果就是那个「闪现」的来源')
+  })
+
+  it('point 不得在渲染判据里「先信旧值」（要么首帧即正确，要么不渲染）', () => {
+    // 渲染判据是 `open && point !== null`：由于上面已确保定位发生在**绘制前**，
+    // 这一条只需钉住「判据没被改成别的写法」——例如改成 `open && point !== null ? ... :`
+    // 之外的花样，或者引入一个「上次位置」的 ref 让首帧继续用旧值。
+    assert.match(source, /open && point !== null/u, '面板渲染判据应是 open && point !== null')
+    // 不得引入缓存旧坐标的 ref 来渲染（那正是这个 bug 的另一种写法）。
+    assert.ok(!/pointRef|lastPoint|prevPoint/u.test(source.replace(/\/\*[\s\S]*?\*\//gu, '')),
+      '不得缓存「上一次坐标」用于首帧渲染（会重新引入旧位置闪现）')
+  })
+})

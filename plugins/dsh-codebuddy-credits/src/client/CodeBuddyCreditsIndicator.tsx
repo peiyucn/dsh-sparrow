@@ -36,7 +36,7 @@
  * 更窄时残留的是**官方自己**的溢出（把我们的按钮设成 0 宽也照旧），不再继续让位。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import { setMaxMode, subscribeMaxMode, getMaxMode, syncMaxMode } from './maxMode.js'
@@ -416,9 +416,33 @@ export function CodeBuddyCreditsIndicator({
     }
   }, [loadStatus])
 
-  useEffect(() => {
+  /**
+   * 打开面板时**先量再画**：必须用 `useLayoutEffect`，不能用 `useEffect`。
+   *
+   * ⚠️ owner 2026-10-02 报「codebuddy 图标缩放后，点击弹窗会先在原来位置出现一下」。
+   * 根因就在这个时机上：
+   *
+   * 1. `point` 是 useState，**关闭时不清空** ⇒ 重开时第一次渲染直接拿**上一次的坐标**；
+   * 2. `position()` 原来写在 `useEffect`（**被动效果**）里 —— 它在浏览器**绘制之后**才跑
+   *    ⇒ 那一帧已经用旧坐标画出来了，随后 `setPoint` 再把它挪到正确位置。
+   *
+   * 图标一旦缩放（容器查询切换），按钮会横移几十像素，旧坐标与正确坐标差得很远，
+   * 于是那一下「跳」肉眼可见。
+   *
+   * `useLayoutEffect` 在 DOM 变更后、**浏览器绘制前**同步执行，其中的 `setPoint`
+   * 会在同一帧内同步重渲染 ⇒ 面板**从第一帧起就在正确位置**，不需要清空 `point`
+   * 也不需要额外渲染次数。
+   *
+   * 实测（`TEMP/cb18.mjs` 量 style.right 逐帧）：修前窄档→宽档重开时会出现旧坐标帧
+   * （827 → 135），修后首帧即 135。
+   */
+  useLayoutEffect(() => {
     if (!open) return
     position()
+  }, [open, position])
+
+  useEffect(() => {
+    if (!open) return
     void loadStatus()
     void loadQuota()
     const onMouseDown = (event: MouseEvent) => {
