@@ -12,6 +12,7 @@ See [简体中文](./CHANGELOG.zh-CN.md).
 - Fixed credits resetting after a restart: credits now read the official session projection instead of the deprecated sync history.
 - Fixed the CodeBuddy entry on the hero page **overlapping** the official top-right button.
 - Fixed the background band and hover colour bleeding on the model picker's grouped section titles.
+- Fixed the header's CodeBuddy entry colliding with neighbouring buttons when the conversation area gets narrow: it now collapses to the **icon-only, text-free** version of the logo when there is not enough room (the same scaling strategy the official Agent Team button uses).
 
 ## 0.1.5-rc.2.2 (2026-09-21)
 

@@ -76,7 +76,9 @@ conversation UI:
   page alike): opens a panel with your account/enterprise, current-cycle
   quota (used / limit / remaining, progress bar, reset date) and the selected
   CodeBuddy model's read-only facts (credit rate · context window), description,
-  and capabilities.
+  and capabilities. When the conversation area gets narrow this entry
+  automatically collapses to the **icon-only, text-free** version (the same
+  scaling strategy the official Agent Team button uses);
 - **Session credit pill**: one more pill of the same kind in the official stats
   row under the composer — accumulated credits and call count for the current
   conversation; clicking it opens the call count and the per-model breakdown.
