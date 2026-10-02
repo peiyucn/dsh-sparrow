@@ -12,6 +12,7 @@ import {
   GLASS_SHADE_RING,
   GLASS_SPECULAR_RING,
   HEADER_HEIGHT_PX,
+  HEADER_LIGHT_BOOST,
   HEADER_LIGHT_SCALE,
   PANEL_BAND_PX,
   PANEL_SCROLLER_LIFT_PX,
@@ -27,7 +28,19 @@ import {
 /** 浅色轴暗边用的官方最深静态色 token。 */
 const SHADE_TOKEN = '--dsw-static-neutral-bluish-1000'
 import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_TILE_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, SIDE_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
-import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, dimmedBackdropGradients } from '../lib/backdrop.js'
+import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, compensatedBackdropGradients, dimmedBackdropGradients } from '../lib/backdrop.js'
+
+/** 官方 GuideBody 根的属性（`GuideBody.tsx:80`）—— 只在右栏「开始」页出现，故可作状态锚点。 */
+const GUIDE_ATTR = '[data-sidebar-right-guide]'
+
+/**
+ * **单层光**的层数（上光 / 下深 / 左光），从函数自身推导而不是另立一个常量 ——
+ * 免得它与 `dimmedBackdropGradients` 里那三道渐变各自漂移。
+ *
+ * 补偿后的玻璃面应当是它的 **2 倍**（两道同形光叠加）。这个断言**不是自证**：
+ * 它比的是「渲染出来的 CSS 层数」与「函数单层数 × 2」，把补偿改成退化单层必然红。
+ */
+const LIGHT_LAYERS = (dimmedBackdropGradients(1).match(/radial-gradient\(/gu) ?? []).length
 
 const css = buildGlassCss()
 // 注释里也会出现 `{` 这类结构字符，对全文做结构断言会误判，故先剥注释。
@@ -251,9 +264,19 @@ describe('glass：顶栏浮层', () => {
     // ⚠️ 2026-09-24 起玻璃挂 **::before**（本体不许带 backdrop-filter，见下面那条守护）。
     const header = rulesFor(css, "[data-slot='conversation.header'] > header::before").join('\n')
     assert.ok(header.length > 0, '顶栏玻璃层（::before）应存在')
+    // ⛔ **结构断言，不是"产物包含产物"**：`compensatedBackdropGradients` 是**构建期**调用的，
+    //    拿 `header.includes(那个调用)` 去断言是**自证**的 —— 把函数改成退化版，两边同时变、
+    //    断言照样绿（反向注入 N6 实测漏网）。改为直接数**渲染出来的光层数**。
+    assert.equal(
+      (header.match(/radial-gradient\(/gu) ?? []).length,
+      LIGHT_LAYERS * 2,
+      `顶栏的光必须是**两道**各三层的叠加，实际 ${(header.match(/radial-gradient\(/gu) ?? []).length} 层`,
+    )
+    // 第一道满档（与背景层同源）、第二道按**补偿档**压过 —— 缺了第二道就等于没补（N4 / N6）。
+    assert.ok(header.includes('100%, transparent),'), '顶栏的光第一道必须是满档（与背景层同源）')
     assert.ok(
-      header.includes(dimmedBackdropGradients(HEADER_LIGHT_SCALE)),
-      '顶栏的光必须按 HEADER_LIGHT_SCALE 画（不再跟填充 alpha 同步压）',
+      header.includes(`${HEADER_LIGHT_BOOST * 100}%, transparent)`),
+      `顶栏的光必须含补偿层（${HEADER_LIGHT_BOOST * 100}% 那一档）—— 缺了就等于没补`,
     )
     // 光与底色分离之后，这条不变式要守住：两者**不得**再相等 ——
     // 相等的旧做法正是 owner 报的「光被顶栏挡住」。
@@ -1126,6 +1149,92 @@ describe('glass：边界与纪律', () => {
    * 所以现在的守卫是**正向**的：这两条必须带上与顶栏同源的玻璃，且必须抬到颗粒层之上
    * （否则自己的 backdrop-filter 糊不到那层颗粒 —— 那正是上一轮没量对的地方）。
    */
+  /**
+   * 补偿档本身也是个**可被改坏的值**：改成 0 就等于没补（反向注入 N4 实测漏网）。
+   *
+   * 这一条守的是「常量处在**补偿**该在的区间」：大于 0（真的补了）、小于 1（没有喧宾夺主）。
+   * ⚠️ 它**不**守「补偿到亮度刚好」—— 那件事只能靠浏览器实测
+   * （见 docs/spec/04-glass.md §9.4 的阶梯表）。
+   */
+  it('顶栏光的补偿档必须是一个真的补偿（0 < boost < 1），且不与满档/填充混为一谈', () => {
+    assert.ok(HEADER_LIGHT_BOOST > 0, `补偿档必须 > 0（0 = 没补，owner 报的观感就在那里）：${HEADER_LIGHT_BOOST}`)
+    assert.ok(HEADER_LIGHT_BOOST < 1, `补偿档必须 < 1（1 = 第二道与第一道等强，会翻成亮带）：${HEADER_LIGHT_BOOST}`)
+    // 与既有两个「看起来像系数」的常量分开：它们含义不同，值相同只是巧合。
+    assert.notEqual(HEADER_LIGHT_BOOST, HEADER_LIGHT_SCALE, '补偿档不得等于光的满档系数')
+    assert.notEqual(HEADER_LIGHT_BOOST, GLASS_HEADER_ALPHA, '补偿档不得等于玻璃的填充 alpha（含义不同）')
+  })
+
+  /**
+   * 右栏「开始」页那层玻璃 —— owner 2026-10-03：「顶栏本身的模糊玻璃材质上也打光」。
+   *
+   * ## 它是一个**漏掉的状态**，不是观感差异
+   *
+   * 上面那条面的锚点是「**标签自己的 38px 头行**」，而「开始」页的正文直接从 y=38 起
+   * （首屏内容在 y=301），**没有那样一条头行** ⇒ 它从来没被覆盖。实测（开始页）：
+   * 0 个 backdrop-filter 面、0 个渐变面；顶带 HF **4.698**（生颗粒）、暖度 **-0.08**（无光）；
+   * 切到文件树（同为 0..76 带）：HF **2.563**、暖度 **+2.11**。
+   *
+   * ## 锚点为什么是 data-sidebar-right-guide
+   *
+   * 它是官方 GuideBody 的根，**只在开始页存在** ⇒ 天然互斥门：切到别的标签时整棵卸载
+   * （实测 files 活动时该槽位计数 = 0），面随之消失，不会与上面那条面叠成双层。
+   * 也**不需要 :has()**（玻璃表明令禁用，见本文件的纪律那条）。
+   */
+  it('右栏「开始」页也必须有自己的玻璃面（那是一个漏掉的状态，不是说好的例外）', () => {
+    const blocks = rules.split('}').map(b => b.trim()).filter(b => b.includes('{'))
+    const face = blocks.find(b => {
+      const sel = b.split('{')[0]
+      return sel.includes('::before') && sel.includes(GUIDE_ATTR) && sel.includes('[data-dockkit-pane]')
+    })
+    assert.ok(face !== undefined, `开始页必须有自己的玻璃面（锚点 ${GUIDE_ATTR}）`)
+    const sel = face.split('{')[0]
+    const body = face.slice(face.indexOf('{'))
+    // 门：与右栏其余规则同纪律
+    assert.ok(sel.includes(`:not([${PLAIN_ATTR}])`), `开始页玻璃面必须带官方默认门：${sel.trim()}`)
+    assert.ok(sel.includes('[data-sidebar-right-open]'), `开始页玻璃面必须门在 [data-sidebar-right-open] 上：${sel.trim()}`)
+    assert.ok(!/:has\(/u.test(sel), `玻璃表不得用 :has()（开销集中在它上面）：${sel.trim()}`)
+    assert.ok(!/\.[A-Za-z0-9]*_[A-Za-z0-9]{4,}/u.test(sel), `不得用官方 hashed 类名：${sel.trim()}`)
+    // 配方与其余面**逐字同参**（不新造数）
+    assert.ok(body.includes(GLASS_BLUR), '开始页玻璃面必须直引 GLASS_BLUR（与顶栏同源）')
+    assert.match(
+      body,
+      new RegExp(`color-mix\\(in srgb, var\\(--dsw-alias-bg-base\\) ${Math.round(GLASS_HEADER_ALPHA * 100)}%, transparent\\)`, 'u'),
+      `开始页玻璃面的填充必须用 GLASS_HEADER_ALPHA（${GLASS_HEADER_ALPHA}）与顶栏同参`,
+    )
+    // 光：同样用**结构断言**（层数 + 补偿档），不用"产物包含产物"。
+    assert.equal(
+      (body.match(/radial-gradient\(/gu) ?? []).length,
+      LIGHT_LAYERS * 2,
+      `开始页玻璃面的光必须是两道各三层的叠加，实际 ${(body.match(/radial-gradient\(/gu) ?? []).length} 层`,
+    )
+    assert.ok(
+      body.includes(`${HEADER_LIGHT_BOOST * 100}%, transparent)`),
+      `开始页玻璃面必须含补偿层（${HEADER_LIGHT_BOOST * 100}% 那一档）`,
+    )
+    // 盒子 = 面板 0..76；⚠️ 锚点是**整页元素**（不是头行）：不许照抄上面那条的
+    //    top: -PANEL_BAND_PX（那会落到 y=-38），也不许用 bottom: 0（会一路铺到面板底）。
+    assert.match(body, /position:\s*absolute/u, '开始页玻璃面必须绝对定位（不参与流）')
+    assert.ok(!/top:\s*-/u.test(body), '开始页玻璃面不得向上负偏移（它的锚点不是头行，负偏移会落到面板外）')
+    assert.match(body, /top:\s*0/u, `开始页玻璃面必须从包含块顶边（面板 y=0）起：${body}`)
+    // ⚠️ 断言写**解析后**的值：${HEADER_HEIGHT_PX} 是构建期模板变量，产物里只剩数字
+    //    （同 surfaces.test.mjs 那条「要看渲染出来的 CSS，不能查函数名」的教训）。
+    assert.match(
+      body, new RegExp(`height:\\s*${HEADER_HEIGHT_PX}px`, 'u'),
+      `开始页玻璃面必须铺满 HEADER_HEIGHT_PX（${HEADER_HEIGHT_PX}px）—— 它没有头行那 1px 下边框要让`,
+    )
+    assert.ok(!/bottom:\s*0/u.test(body), '开始页玻璃面不得用 bottom: 0（锚点是整页元素，会一路铺到面板底）')
+    // 抬到颗粒层之上，模糊才有东西可糊（实测不抬时 HF 仍是 4.7 = 空转）；
+    // 同时必须低于条那一层（z-index 3），否则条内标签 / 按钮被填充压暗。
+    assert.match(body, /z-index:\s*2/u, '开始页玻璃面必须抬到 z-index: 2（高于 pane 的颗粒层、低于条的 3）')
+    // 不许 background-attachment: fixed（面板会被官方 translate）
+    assert.match(body, /background-attachment:\s*scroll;/u, '开始页玻璃面必须用 scroll（面板会被 transform）')
+    assert.ok(body.includes('100vw 100vh'), '开始页玻璃面必须显式给视口尺寸背景盒')
+    assert.ok(
+      body.includes('right calc(0px - var(--dsh-windows-titlebar-height, 0px))'),
+      '开始页玻璃面必须右对齐并减去 caption 高度（与右栏材质同相位）',
+    )
+  })
+
   it('右栏顶条必须带与对话区顶栏同源的玻璃（含 backdrop-filter + 抬到颗粒层之上）', () => {
     const all = css.replace(/\/\*[\s\S]*?\*\//gu, '')
     const blocks = all.split('}').map(b => b.trim()).filter(b => b.includes('{'))
@@ -1144,7 +1253,13 @@ describe('glass：边界与纪律', () => {
       return parts.map(s => s.trim()).filter(Boolean)
     }
 
-    // ⛔ **0..76 只许有一个玻璃面**（owner 2026-10-02 第三次复报「明显有条分割线，应该是一个整体」）。
+    // ⛔ **同一个状态下 0..76 只许有一个玻璃面**（owner 2026-10-02 第三次复报
+    //    「明显有条分割线，应该是一个整体」）。
+    //    ⚠️ 2026-10-03 推广：右栏有**两组互斥**的面 ——「有头行的标签」（文件树 / 预览）
+    //    与「开始页」（owner：「顶栏本身的模糊玻璃材质上也打光」）。右栏是 dockkit 的
+    //    **单活动标签**宿主，切标签时另一组整棵卸载，两组永不同时存在（实测：files 标签
+    //    活动时 [data-slot='sidebar.right.tab.guide'] 计数 = 0，逐项复核与基准逐字相同）。
+    //    所以不变式按**状态分组**成立，不是「全表只许一个」。
     //    上一版是「条自己 + 各标签头行」两个 ::before 面。
     //    ⚠️ 归因分两步、别只记住第一步：把内容全藏起来只量静态净玻璃时，主导项是**渐变相位**
     //    （background-position 相对自己盒子顶边解析，下带把同一张 900px 高的渐变图从第 0 行
@@ -1160,12 +1275,34 @@ describe('glass：边界与纪律', () => {
       return sel.includes('::before') && /backdrop-filter/u.test(b)
         && sel.includes(RIGHT_PANEL_ATTR) && sel.includes('[data-dockkit-pane]')
     })
+    // 按**状态组**拆：有头行的标签（文件树 / 预览）vs 开始页。两组互斥（见上）。
+    const HEADED = /\[data-files-state='tree'\]|\[data-textpreview-state='(?:text|unsupported)'\]/u
+    const headedFaces = faces.filter(b => HEADED.test(b.split('{')[0]))
+    const guideFaces = faces.filter(b => b.split('{')[0].includes(GUIDE_ATTR))
     assert.equal(
-      faces.length, 1,
-      `右栏 0..76 只许有**一个**玻璃面（两个面会在 y=38 切出渐变相位台阶）：`
+      headedFaces.length, 1,
+      `「有头行的标签」那组 0..76 只许有**一个**玻璃面（两个面会在 y=38 切出渐变相位台阶）：`
+      + `${headedFaces.map(b => b.split('{')[0].trim()).join(' | ')}`,
+    )
+    assert.equal(
+      guideFaces.length, 1,
+      `「开始页」只许有**一个**玻璃面（同一带两个面会切出渐变相位台阶）：`
+      + `${guideFaces.map(b => b.split('{')[0].trim()).join(' | ')}`,
+    )
+    assert.equal(
+      faces.length, headedFaces.length + guideFaces.length,
+      `右栏不该出现第三个玻璃面（只该有「有头行的标签」与「开始页」两组）：`
       + `${faces.map(b => b.split('{')[0].trim()).join(' | ')}`,
     )
-    const face = faces[0]
+    // ⛔ 两组必须**互斥**：任何一条选择器都不得同时命中两组锚点。
+    for (const b of [...headedFaces, ...guideFaces]) {
+      const sel = b.split('{')[0]
+      assert.ok(
+        !(HEADED.test(sel) && sel.includes(GUIDE_ATTR)),
+        `玻璃面的两组锚点不得混在同一条选择器里（那样两个状态会同时命中）：${sel.trim()}`,
+      )
+    }
+    const face = headedFaces[0]
     const faceSel = face.split('{')[0]
     const faceBody = face.slice(face.indexOf('{'))
     // ⛔ **面不得挂在 pane 本体上**（owner 复报「分割线」后我改到这上面过，随即量出回归）。
@@ -1226,10 +1363,15 @@ describe('glass：边界与纪律', () => {
       new RegExp(`color-mix\\(in srgb, var\\(--dsw-alias-bg-base\\) ${Math.round(GLASS_HEADER_ALPHA * 100)}%, transparent\\)`, 'u'),
       `玻璃面的填充必须用 GLASS_HEADER_ALPHA（${GLASS_HEADER_ALPHA}）与顶栏同参`,
     )
-    // 光必须与顶栏同源（同一条 dimmedBackdropGradients(HEADER_LIGHT_SCALE)）
+    // ⛔ 结构断言（同顶栏那条）：数渲染出来的光层数与补偿档，不用"产物包含产物"。
+    assert.equal(
+      (faceBody.match(/radial-gradient\(/gu) ?? []).length,
+      LIGHT_LAYERS * 2,
+      `右栏头行玻璃面的光必须是两道各三层的叠加，实际 ${(faceBody.match(/radial-gradient\(/gu) ?? []).length} 层`,
+    )
     assert.ok(
-      faceBody.includes(dimmedBackdropGradients(HEADER_LIGHT_SCALE)),
-      `玻璃面的光必须与顶栏同源（dimmedBackdropGradients(HEADER_LIGHT_SCALE)）`,
+      faceBody.includes(`${HEADER_LIGHT_BOOST * 100}%, transparent)`),
+      `右栏头行玻璃面必须含补偿层（${HEADER_LIGHT_BOOST * 100}% 那一档）`,
     )
     // ⚠️ 不许用 background-attachment: fixed：面板会被官方 translate，
     //    fixed 会被重解析到 transform 后的坐标系。必须用右栏那套 100vw x 100vh + 右对齐相位。

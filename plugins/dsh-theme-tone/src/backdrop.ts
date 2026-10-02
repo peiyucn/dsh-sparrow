@@ -297,6 +297,42 @@ export function dimmedBackdropGradients(scale: number): string {
 }
 
 /**
+ * 把 {@link dimmedBackdropGradients} 那束光**叠成两层**（第一层满档、第二层按 `boost` 压过）——
+ * 形状、中心、stop 一个都不动，只把**有效 alpha** 抬上去。
+ *
+ * ## 为什么 `scale` 这个旋钮拧不过 1
+ *
+ * {@link dimmedBackdropGradients} 走 `color-mix(in srgb, var(…) N%, transparent)`，
+ * 而**百分比超过 100% 会被钳到 100%**（实测 `100%` / `143%` / `200%` 三档的计算值逐字相同：
+ * 都是同一个 `color(srgb … / 0.141176)`）。想「把光画强一档」时改 `scale` 是**空操作**，
+ * 只能**再叠一层**。
+ *
+ * ## 等效关系与几何不变
+ *
+ * 同一元素的多个 background-image 层是**自上而下 source-over 合成**，同色叠加的有效 alpha 为
+ * `1 − (1 − a)(1 − a·boost)`（`a = 0.14`、`boost = 0.25` ⇒ `0.170`）。渐变的中心、半径、stop
+ * 一个都没动，所以光的形状与落点仍与背景层**逐像素对齐**，只是更亮。
+ *
+ * ## 谁需要它：被抬到背景层之上的玻璃面
+ *
+ * 背景层那束光是整层 `mix-blend-mode: screen`（**纯加法**、压在近黑底上）合出来的，
+ * 而顶栏 / 右栏那些面是「70% 深色填充 + **普通**合成」——同一档 alpha 读出来的亮度天然更低。
+ * 实测（同一带 y6..70，光开 − 光关）：对话区地面亮 **17.98** vs 顶栏玻璃亮 **9.25**（H/G = 0.51）；
+ * 暖度却是 8.89 vs 9.44（H/G = 1.06）—— 也就是**光的颜色足额、亮度只有一半**，
+ * 这正是 owner「顶栏本身看不到打光」的来源。补一档把这个差收回来。
+ *
+ * ⚠️ 补偿有**上限**：补到玻璃比它盖住的地面还亮（台阶翻负）就不再是「一块略暗的玻璃」了。
+ * 实测 f=0.5 时台阶由 +3.47 翻成 −0.71 ⇒ 0.25 是留了余量的档位（台阶仍 +1.43，见 glass.ts 的取值表）。
+ * @param base - 第一层的压光系数（正常取 1）。
+ * @param boost - 第二层的压光系数（`<= 0` 表示不叠第二层，退化成 {@link dimmedBackdropGradients}）。
+ * @returns 可直接写进 `background-image` 的光层串（不含颗粒层）。
+ */
+export function compensatedBackdropGradients(base: number, boost: number): string {
+  if (boost <= 0) return dimmedBackdropGradients(base)
+  return `${dimmedBackdropGradients(base)},\n    ${dimmedBackdropGradients(boost)}`
+}
+
+/**
  * 背景层的样式表文本。z-index 与标记属性都来自常量，便于单测钉住契约。
  * @returns 注入 `<style>` 的 CSS 文本。
  */

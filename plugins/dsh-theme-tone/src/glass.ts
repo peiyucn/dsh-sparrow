@@ -36,7 +36,7 @@
  */
 
 import { ABOVE_CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
-import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, dimmedBackdropGradients, grainOverGradients } from './backdrop.js'
+import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, compensatedBackdropGradients, grainOverGradients } from './backdrop.js'
 
 /**
  * 顶栏高度（px）。官方把它钉在这个值上，与左栏 38+38 对齐
@@ -545,6 +545,43 @@ export const GLASS_HEADER_ALPHA = 0.7
 export const HEADER_LIGHT_SCALE = 1
 
 /**
+ * 顶栏 / 右栏那些**玻璃面**重画的光，要不要再补一档（见 {@link compensatedBackdropGradients}）。
+ *
+ * owner 2026-10-03：「对话区和右边栏的顶栏打光现在好像打到背景层上了，顶栏本身看不到打光」，
+ * 并澄清「光打在背景上，被顶栏盖住了」「顶栏本身的模糊玻璃材质上也打光」。
+ *
+ * ## 实测：光的**颜色**足额、**亮度**只有一半
+ *
+ * 同一带 y6..70，光开 − 光关（把背景层与各面的 `background-image` 一起关掉才是真的关光；
+ * ⚠️ 打 `PLAIN_ATTR` **不算**光开关 —— 背景层的显隐由 `hidden` 控制，与它无关）：
+ *
+ * | 区域 | 地面光(亮/暖) | 顶栏玻璃的光(亮/暖) | 亮 H/G | 暖 H/G |
+ * | :--- | ---: | ---: | ---: | ---: |
+ * | 对话区顶栏带 | 17.98 / 8.89 | 9.25 / 9.44 | **0.51** | 1.06 |
+ * | 右栏顶带 | 5.13 / 4.51 | 5.20 / 5.48 | 1.01 | 1.22 |
+ *
+ * 成因是两种合成方式不同：背景层整层 `mix-blend-mode: screen`（纯加法、压在近黑底上），
+ * 而这些面是「70% 深色填充 + 普通合成」⇒ 同一档 alpha 读出来的**亮度**天然更低。
+ * 观感就是「光落在了背景上，玻璃上没有光」。
+ *
+ * ## 取值 0.25：补到"玻璃仍略暗于它盖住的地面"为止
+ *
+ * | boost | 玻璃光(亮) | H/G | 暖 H/G | 台阶（同带地面亮 − 顶栏带亮） |
+ * | ---: | ---: | ---: | ---: | ---: |
+ * | 0（原） | 9.25 | 0.51 | 1.06 | +3.47 |
+ * | **0.25（本值）** | **11.29** | **0.63** | **1.26** | **+1.43** |
+ * | 0.50 | 13.44 | 0.75 | 1.52 | −0.71 |
+ *
+ * ⚠️ 上限是**台阶必须保持为正** —— 那是既有不变式「顶栏仍是一块略暗的玻璃，
+ * 不会翻成比周围亮一截」（见 {@link HEADER_LIGHT_SCALE} 的取值表）。
+ * 0.5 档台阶翻负 ⇒ 不能再往上补；0.25 留了余量，同时把玻璃上的光提了 22%。
+ *
+ * 三个面（对话区顶栏、右栏各标签头行、右栏「开始」页）**同参共用本值**，
+ * 不按面各调一个数 —— 它们本来就是「同一份配方」。
+ */
+export const HEADER_LIGHT_BOOST = 0.25
+
+/**
  * 输入框**卡片**的填充比例。它**是**用户盯着的那块玻璃（抬升面里唯一的玻璃面）。
  *
  * 早先底座上还挂着一层 40% 填充，卡片要跟它合成，故当时按「合成不透明度」定值；
@@ -799,7 +836,7 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'
   z-index: -1;
   pointer-events: none;
   background-color: ${fill('var(--dsw-alias-bg-base)', GLASS_HEADER_ALPHA)};
-  background-image: ${dimmedBackdropGradients(HEADER_LIGHT_SCALE)};
+  background-image: ${compensatedBackdropGradients(HEADER_LIGHT_SCALE, HEADER_LIGHT_BOOST)};
   background-attachment: fixed;
   backdrop-filter: ${GLASS_BLUR};
 }
@@ -1499,7 +1536,69 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
      100vw x 100vh + 右对齐相位 —— 那套本就是为「面板会被 transform」设计的。
      ⚠️ 相位必须按**面板**顶边（y=0）算：这个伪元素的盒子虽然从 -38 起，
      但它的包含块（头行）顶边在面板 y=38，故 right 相位不带额外偏移即可对上。 */
-  background-image: ${dimmedBackdropGradients(HEADER_LIGHT_SCALE)};
+  background-image: ${compensatedBackdropGradients(HEADER_LIGHT_SCALE, HEADER_LIGHT_BOOST)};
+  background-attachment: scroll;
+  background-size: 100vw 100vh, 100vw 100vh, 100vw 100vh;
+  background-position:
+    right calc(0px - var(--dsh-windows-titlebar-height, 0px)),
+    right calc(0px - var(--dsh-windows-titlebar-height, 0px)),
+    right calc(0px - var(--dsh-windows-titlebar-height, 0px));
+  background-repeat: no-repeat, no-repeat, no-repeat;
+}
+
+/* ===== 右栏「开始」页：一个**没有 38px 头行**的标签，面要单独挂 =====
+
+   owner 2026-10-03：「对话区和右边栏的顶栏打光现在好像打到背景层上了，
+   顶栏本身看不到打光」，随即澄清「光打在背景上，被顶栏盖住了」+
+   「顶栏本身的模糊玻璃材质上也打光」。逐状态普查后确认这是**真的**，
+   而且只在一种状态下成立：
+
+   右栏停在「开始」（guide）页时，面板 0..76 里**一个玻璃面都没有** ——
+  实测 0 个 backdrop-filter 面、0 个渐变面；顶带 HF 4.698（生颗粒、没糊过）、
+  暖度 -0.08（完全没有画在玻璃上的光）。文件树等其它标签都有面
+  （HF 2.563、暖 +2.11），所以这一条不是观感差异，是**漏了一个状态**。
+
+   为什么偏偏漏了它：上面那条面的锚点是「**标签自己的 38px 头行**」，
+   而「开始」页的正文直接从 y=38 起（首屏内容在 y=301），**没有那样一条头行** ——
+   它不在那份「已确认有头行」的清单里，于是从来没被覆盖。
+
+   ⚠️ **不是所有没头行的标签都该补**，别把这条当通则照抄：终端
+   （[data-sidebar-terminal]）同样没有头行，但它的**正文**正好落在 38..76，
+   给它盖一层 70% 填充就等于糊住内容 —— 那正是本文件上面记过的坑
+   （挂 pane 时终端正文 HF 1.53 → 0.20）。「开始」页不同：0..76 里**没有任何内容**
+   （首屏内容在 y=301），盖上去只糊到面板自己的纯色底与渐变，没有东西会被挡。
+   判据 = **那一带里有没有正文**，不是「有没有头行」。
+
+   锚点 = [data-sidebar-right-guide]（官方 GuideBody 的根，只在 guide 页存在
+   ⇒ 天然门：切到别的标签时它整棵卸载，面随之消失，不会与上面那条面叠成双层
+   —— 实测切到文件树后逐项与基准相同，Δ=0）。
+
+   ⚠️ 它的 position 是 static ⇒ 这个 ::before 的包含块是**最近的已定位祖先**
+   _tabHostBody（面板坐标 0..900，实测）⇒ top: 0 正好落在面板 y=0。
+   别照抄上面那条的 top: -PANEL_BAND_PX —— 那只适用于「锚点自己就是头行」的面，
+   用在这里会落到 y=-38。
+
+   z-index: 2 把面抬到 pane 的颗粒层 ::after 之上，backdrop-filter 才有东西可糊
+   （实测不抬时 HF 仍是 4.7 = 模糊等于空转）；同时仍低于条那一层（z-index 3），
+   于是条里的标签 / 关闭 / 加号不被这层填充压暗。
+
+   配方与上面那条面**逐字同参**（同 GLASS_HEADER_ALPHA、同 GLASS_BLUR、同 HEADER_LIGHT_SCALE）。
+   ⚠️ 高度用 HEADER_HEIGHT_PX 而不是 bottom: 0：bottom: 0 在本锚点上会一路铺到 y=900
+   （锚点是个整页元素，不是头行）。这里也不存在那条要避让的官方 1px 下边框
+   （那是**头行**的边框，「开始」页没有头行），故直接铺满 76px。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] [data-sidebar-right-guide]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: ${HEADER_HEIGHT_PX}px;
+  z-index: 2;
+  pointer-events: none;
+  background-color: ${fill('var(--dsw-alias-bg-base)', GLASS_HEADER_ALPHA)};
+  backdrop-filter: ${GLASS_BLUR};
+  background-image: ${compensatedBackdropGradients(HEADER_LIGHT_SCALE, HEADER_LIGHT_BOOST)};
   background-attachment: scroll;
   background-size: 100vw 100vh, 100vw 100vh, 100vw 100vh;
   background-position:

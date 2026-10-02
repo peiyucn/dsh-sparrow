@@ -23,6 +23,8 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Fixed the header's **background-jobs popover having its right half cut off by the right sidebar**: the popover now sits fully inside the conversation column (it used to extend past the column, where the column's own clipping cut it off while the sidebar panel covered it).
 - Fixed the trajectory page's colour and texture stopping short of the composer, which left a visible band under the input box.
 - The dark tones' **two golden lights along the top** (the one centred on the header and the one in the top-left corner) are now **stronger** (about 1.55×). The light tones are unchanged.
+- Fixed the **lighting on the conversation header and the right sidebar's top bar reading as too weak** — it looked as if the glow sat on the background layer and the header covered it up. The glass faces now carry a compensating extra pass of the same light, so the golden glow is visible on the header itself.
+- Fixed the right sidebar having **neither blur nor lighting** across its top two bands while it sits on the **Start** page (opening files, file preview and the other tabs was already fine).
 
 ## 0.1.5-rc.2 (2026-09-21)
 
