@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
+  DARK_GOLD_ALPHA,
+  DARK_GOLD_TINT,
   DARK_TONES,
   DEFAULT_SETTINGS,
   DEPTH_ALPHA,
@@ -84,16 +86,36 @@ describe('色调表', () => {
   })
 
   it('深色三款应该 共享同一束金色光源（切换色调变的是空间，不是光源）', () => {
-    const GOLD = 'rgba(232, 162, 74, .09)'
-    const GOLD_LEFT = 'rgba(232, 162, 74, .11)'
+    // 2026-10-02（owner：「我想让顶部两道金光更强一些」）：这两道金光从六处字面量
+    // 抽成 `DARK_GOLD_ALPHA` 一个旋钮，并调强 ×1.55（`.09/.11` → `.14/.17`）。
+    // 本条改为**对着常量**断言 —— 于是「调强度」不再需要改测试，
+    // 而「三款必须同步」这条契约反而守得更死（写死字面量就会在这里红）。
+    const GOLD = `rgba(${DARK_GOLD_TINT}, ${DARK_GOLD_ALPHA.top})`
+    const GOLD_LEFT = `rgba(${DARK_GOLD_TINT}, ${DARK_GOLD_ALPHA.left})`
     for (const id of ['violet', 'crimson', 'forest']) {
       assert.equal(DARK_TONES[id].top, GOLD, `${id}.top 应共享金色光源`)
       assert.equal(DARK_TONES[id].left, GOLD_LEFT, `${id}.left 应共享金色光源`)
       assert.equal(DARK_TONES[id].grain, true, `${id} 深色轴应叠颗粒`)
     }
+    // 三款**逐字相同**（不只是「各自等于常量」）：防有人给某一款单独写别的 alpha。
+    const tops = new Set(['violet', 'crimson', 'forest'].map(id => DARK_TONES[id].top))
+    const lefts = new Set(['violet', 'crimson', 'forest'].map(id => DARK_TONES[id].left))
+    assert.equal(tops.size, 1, '三款 top 必须逐字相同（共享光源）')
+    assert.equal(lefts.size, 1, '三款 left 必须逐字相同（共享光源）')
     // 差异只在底色与底部纵深
     assert.notEqual(DARK_TONES.crimson.base, DARK_TONES.violet.base)
     assert.notEqual(DARK_TONES.forest.bottom, DARK_TONES.violet.bottom)
+  })
+
+  it('顶上两道金光 应该 强于旧值、且两道都还在「环境级小值」档', () => {
+    // owner 2026-10-02 要求调强。这条把**方向**（更强）与**上限**（仍是环境级）一起钉住，
+    // 免得将来有人顺着「更强」一路加到「顶上糊一片金」。
+    assert.ok(DARK_GOLD_ALPHA.top > 0.09, `顶光应强于旧值 .09，实际 ${DARK_GOLD_ALPHA.top}`)
+    assert.ok(DARK_GOLD_ALPHA.left > 0.11, `侧光应强于旧值 .11，实际 ${DARK_GOLD_ALPHA.left}`)
+    // 上限：两道都必须仍弱于底部纵深（那是三层里最强的），见下一条的次序不变量。
+    assert.ok(DARK_GOLD_ALPHA.top < DARK_GOLD_ALPHA.left, '顶光应弱于侧光（它铺在大面积左栏上）')
+    assert.ok(DARK_GOLD_ALPHA.left < DEPTH_ALPHA.dark, '两道金光都必须弱于底部纵深 .18')
+    assert.ok(DARK_GOLD_ALPHA.top < 0.15, '顶光应仍是环境级小值（< .15）')
   })
 
   it('深色三款的底色应该 同亮度、色相跨度按「音量」定（对比度天然等价）', () => {
@@ -210,9 +232,13 @@ describe('色调表', () => {
     assert.ok(LIGHT_GLOW_ALPHA.top < LIGHT_GLOW_ALPHA.left, '顶光应弱于侧光')
     assert.ok(LIGHT_GLOW_ALPHA.left < DEPTH_ALPHA.light, '侧光应弱于底部纵深')
     // 与深色轴同构：两边都是 top < left < bottom
-    const darkTop = 0.09, darkLeft = 0.11
-    assert.ok(DEPTH_ALPHA.dark > darkLeft, '深色底应最强（bottom > left）')
-    assert.ok(darkTop < darkLeft && darkLeft < DEPTH_ALPHA.dark, '深色轴次序应为 top < left < bottom')
+    // （2026-10-02：深色那两道金光改由 DARK_GOLD_ALPHA 一处定，这里跟着改成读常量 ——
+    //  写死字面量会让「调强金光」每次都误伤本条。）
+    assert.ok(DEPTH_ALPHA.dark > DARK_GOLD_ALPHA.left, '深色底应最强（bottom > left）')
+    assert.ok(
+      DARK_GOLD_ALPHA.top < DARK_GOLD_ALPHA.left && DARK_GOLD_ALPHA.left < DEPTH_ALPHA.dark,
+      '深色轴次序应为 top < left < bottom',
+    )
   })
 
   it('浅色轴的打光几何应该 **与深色金光逐字相同**（收束点 62%）', () => {

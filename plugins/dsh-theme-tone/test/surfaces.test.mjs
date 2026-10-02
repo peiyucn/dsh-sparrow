@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   BORDER_TOKENS,
+  DARK_GOLD_ALPHA,
   DARK_TONE_IDS,
   DARK_TONES,
   DEFAULT_SETTINGS,
@@ -193,9 +194,15 @@ describe('抬升面：本色单一来源', () => {
     assert.equal(DEPTH_ALPHA.light, 0.30)
     assert.ok(LIGHT_GLOW_ALPHA.top < LIGHT_GLOW_ALPHA.left, '侧光 α 应略高于顶光（它铺在大面积左栏上）')
     assert.ok(LIGHT_GLOW_ALPHA.left < DEPTH_ALPHA.light, '底部纵深应最强')
-    // 浅色的每一档都应**重于**深色对应的档（白底余量只有一半，见上一条）
-    assert.ok(LIGHT_GLOW_ALPHA.top > 0.09, '浅色顶光应重于深色顶光 .09')
-    assert.ok(LIGHT_GLOW_ALPHA.left > 0.11, '浅色侧光应重于深色侧光 .11')
+    // 浅色的每一档都应**重于**深色对应的档（白底余量只有一半，见上一条）。
+    // ⚠️ 2026-10-02：深色那两道金光按 owner 要求调强（`.09/.11` → `.14/.17`），
+    //    浅色**未动**（owner 说的是「金光」= 深色轴；浅色那两道是本色），
+    //    故「浅色 > 深色」这条**仍然成立**，只是差距从 1.8 倍收到约 1.12 倍。
+    //    这里改成读常量，免得下次两者一起调时误伤。
+    assert.ok(LIGHT_GLOW_ALPHA.top > DARK_GOLD_ALPHA.top,
+      `浅色顶光应重于深色顶光 ${DARK_GOLD_ALPHA.top}`)
+    assert.ok(LIGHT_GLOW_ALPHA.left > DARK_GOLD_ALPHA.left,
+      `浅色侧光应重于深色侧光 ${DARK_GOLD_ALPHA.left}`)
     assert.ok(DEPTH_ALPHA.light > DEPTH_ALPHA.dark, '浅色底应重于深色底')
   })
 

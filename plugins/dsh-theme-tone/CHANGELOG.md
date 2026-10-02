@@ -22,6 +22,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Fixed the right sidebar's scrollbar scrolling up into the translucent blur once that blur was added: the thumb now stays below the blur band.
 - Fixed the header's **background-jobs popover having its right half cut off by the right sidebar**: the popover now sits fully inside the conversation column (it used to extend past the column, where the column's own clipping cut it off while the sidebar panel covered it).
 - Fixed the trajectory page's colour and texture stopping short of the composer, which left a visible band under the input box.
+- The dark tones' **two golden lights along the top** (the one centred on the header and the one in the top-left corner) are now **stronger** (about 1.55×). The light tones are unchanged.
 
 ## 0.1.5-rc.2 (2026-09-21)
 

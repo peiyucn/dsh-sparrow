@@ -496,6 +496,51 @@ function depthGlow(tint: string, scheme: ColorScheme): string {
 }
 
 /**
+ * 深色轴**共享金光**的通道值 —— pyai.site 原值（`global.css:57`、`SpaceBackdrop.astro:29-39`）。
+ *
+ * 三款深色色调**共用这一束光**：切换色调改变的是「空间」（底色 + 底部纵深），不是「光源」。
+ */
+export const DARK_GOLD_TINT = '232, 162, 74'
+
+/**
+ * 深色轴**顶上那两道金光**的 alpha（`top` = 顶部居中、`left` = 左上角金晕）。
+ *
+ * ## 2026-10-02：owner 要求调强
+ *
+ * owner：「我想让顶部两道金光更强一些」。
+ *
+ * 原文这三款各自**硬编码** `rgba(232, 162, 74, .09)` / `.11`（六处字面量），
+ * 与浅色轴早已抽成 {@link LIGHT_GLOW_ALPHA} 的做法不一致 —— 本次一并抽成常量，
+ * 于是「两道金光」从此是**一个旋钮**（改这两行即三款同步），也消除了六处魔法数字。
+ *
+ * | 层 | 旧值 | **新值** | 倍数 |
+ * | :--- | ---: | ---: | ---: |
+ * | `top`（顶部居中） | `.09` | **`.14`** | ×1.56 |
+ * | `left`（左上角金晕） | `.11` | **`.17`** | ×1.55 |
+ *
+ * ## 为什么停在 `.14` / `.17`（两道金光**单独**可达的上限）
+ *
+ * 两条既有不变量把上限卡住，且**都还成立**（无需放宽任何守卫）：
+ *
+ * 1. **底部纵深必须最强**（`left < bottom`）：深色 `bottom = `{@link DEPTH_ALPHA}`.dark = `.18`
+ *    ⇒ `left` 最高 `.17`。再高就得连底部一起抬 —— 而 owner 只说了「顶部两道金光」。
+ * 2. **深色光层是环境级小值**（`top < .15`，`test/tones.test.mjs` 钉住）⇒ `top` 最高 `.14`。
+ *
+ * 顺带说明：`.14 / .17` 与**浅色轴**的 `.16 / .19` 已是同一量级，而浅色轴那两档
+ * 是 owner 早就认可过的强度 —— 所以这两档不是拍脑袋，是「照浅色轴对齐」。
+ *
+ * ⚠️ **本常量只管深色轴**。浅色轴那两道用的是**本色**（不是金），owner 这次说的是
+ * 「金光」⇒ 只动深色轴；浅色轴 {@link LIGHT_GLOW_ALPHA} 一字未动。
+ * 连带后果：两轴 alpha 的 **1.8 倍**关系（白底通道余量只有一半的物理推导）不再成立，
+ * `docs/spec/03-palette.md` 已同步改写 —— 那条推导的前提是「两轴**观感**等强」，
+ * 而 owner 的判断是深色轴这两道偏弱。
+ */
+export const DARK_GOLD_ALPHA: Readonly<Record<'top' | 'left', number>> = Object.freeze({
+  top: 0.14,
+  left: 0.17,
+})
+
+/**
  * 浅色轴**上光 / 侧光**的 alpha（本色 @ 各自档）。
  *
  * owner 的规格：「**底部和顶部的打光都一样，只是浅色是用主色打光**」——
@@ -874,11 +919,14 @@ export const LIGHT_TONES: Readonly<Record<LightToneId, ToneSpec>> = Object.freez
 
 /**
  * 深色轴色调表。规则见 docs/spec/03-palette.md D1–D5：
- * **三款共享同一束金色光源**（`top` / `left` 都是 pyai.site 的金 `rgb(232, 162, 74)`，
- * alpha 统一 `.09` / `.11`）—— 切换色调改变的是「空间」，不是「光源」；
+ * **三款共享同一束金色光源**（`top` / `left` 都是 {@link DARK_GOLD_TINT}，
+ * alpha 统一取 {@link DARK_GOLD_ALPHA}）—— 切换色调改变的是「空间」，不是「光源」；
  * 各自的差异只在底色（色相染过的近黑）与底部纵深（该色调本色）。
  * `violet` 的三处数值逐字取自 pyai.site（`global.css:57`、`SpaceBackdrop.astro:29-39`、
  * `global.css:69-78`），是其余两款反推规则的基准。
+ *
+ * ⚠️ 顶上两道金光**不在本表里逐款写字面量**（曾经是六处 `.09` / `.11`）：那是**共享光源**，
+ * 三款必须同步 —— 抽成 {@link DARK_GOLD_ALPHA} 后改一处即三款齐动，也不会有人只改一款。
  */
 export const DARK_TONES: Readonly<Record<DarkToneId, ToneSpec>> = Object.freeze({
   official: Object.freeze({
@@ -897,7 +945,8 @@ export const DARK_TONES: Readonly<Record<DarkToneId, ToneSpec>> = Object.freeze(
     sidebarFill: '#14141c',
     // 本色 = pyai.site 的蓝紫（SpaceBackdrop.astro 的底部蓝紫）
     tint: '96, 78, 168',
-    top: 'rgba(232, 162, 74, .09)',
+    // 顶上两道**共享金光**（顶部居中 + 左上角金晕），alpha 由 DARK_GOLD_ALPHA 一处定，三款同步。
+    top: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.top),
     // 色相值仍是 pyai.site 原值，**alpha 由 .08 上调到 .18**：owner 看完色卡后认为实况偏保守
     // （pyai.site 是留白为主的博客，浓度不一定适合 DSW 这种满屏 UI）。三款同步，规则无例外。
     bottom: depthGlow('96, 78, 168', 'dark'),
@@ -905,7 +954,7 @@ export const DARK_TONES: Readonly<Record<DarkToneId, ToneSpec>> = Object.freeze(
     // 用「锚在视口左上角」的椭圆（而不是按左栏宽度定位）——官方没把左栏宽度暴露成
     // CSS 变量（SidebarRoot 是 inline width + hashed 类名），锚左上角无需知道接缝在哪，
     // 且左栏宽度在 264–420px 之间变化时观感都成立。
-    left: 'rgba(232, 162, 74, .11)',
+    left: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.left),
     grain: true,
   }),
   crimson: Object.freeze({
@@ -917,9 +966,9 @@ export const DARK_TONES: Readonly<Record<DarkToneId, ToneSpec>> = Object.freeze(
     // 本色：饱和度向 violet 那档收（原 rgb(150,52,84) 的 S≈.49 偏夸张，压到 .37 又过头，
     // 取中间 S≈.43），只保留 crimson 的色相。
     tint: '144, 58, 86',
-    top: 'rgba(232, 162, 74, .09)',
+    top: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.top),
     bottom: depthGlow('144, 58, 86', 'dark'),
-    left: 'rgba(232, 162, 74, .11)',
+    left: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.left),
     grain: true,
   }),
   forest: Object.freeze({
@@ -928,9 +977,9 @@ export const DARK_TONES: Readonly<Record<DarkToneId, ToneSpec>> = Object.freeze(
     base: '#0a0f0b',
     sidebarFill: '#141915',
     tint: '55, 118, 92',
-    top: 'rgba(232, 162, 74, .09)',
+    top: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.top),
     bottom: depthGlow('55, 118, 92', 'dark'),
-    left: 'rgba(232, 162, 74, .11)',
+    left: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.left),
     grain: true,
   }),
 })

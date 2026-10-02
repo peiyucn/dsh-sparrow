@@ -31,6 +31,8 @@ export {
 } from './constants.js'
 export {
   BORDER_TOKENS,
+  DARK_GOLD_ALPHA,
+  DARK_GOLD_TINT,
   DARK_TONES,
   DEFAULT_SETTINGS,
   DEPTH_ALPHA,
