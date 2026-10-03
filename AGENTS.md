@@ -13,7 +13,9 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 * `plugins/dsh-theme-tone` — 明暗主题之下的色调层 + **对话区布局优化**（每轴各一款「官方默认」+ 若干色调；色调同时驱动抬升面的色相与质感，另含顶栏 / 输入框的玻璃效果；**选了非「默认」色调**时轮次导航窄屏不消失与内容宽度钳制一并生效，拖拽条悬停光带修复则两个档位都生效）
 * **口径：五个活跃插件 + 两个已退役插件**
 * 验证：插件目录 `npm run verify`；全量 = 根 `npm run verify`（**已退役插件不参与**，名单见 `scripts/plugin-set.mjs` 的 `RETIRED_PLUGINS`——**单一真值**，`verify-all.mjs` / `check-dsh-pin.mjs` / `check-plugin-docs.mjs` 共用）；分项 = 根 `pnpm run <step>:all`
-* 根 `verify` = `pnpm run check` + `verify:all`；`check` 是**守卫链**（本地与 CI **同一入口**）：`check:paths`（本机绝对路径）→ `check:dsh-pin`（官方版本 pin 单一真值）→ `check:plugin-docs`（根 README 中英双份的插件表 / 退役小节 / `SECURITY.md` 支持表与 `RETIRED_PLUGINS` 一致）
+* 根 `verify` = `pnpm run check` + `verify:all`；`check` 是**守卫链**（本地与 CI **同一入口**）：`check:paths`（本机绝对路径）→ `check:dsh-pin`（官方版本 pin 单一真值）→ `check:plugin-docs`（文档一致性，见下）
+* `check:plugin-docs` **守的八条**（只比结构与集合，**不比文案** —— 改措辞不该触发红灯）：① 根 README 中英双份的插件表 = 活跃集合；② 两份的《Retired / 已退役》点名全部退役插件；③ `SECURITY.md` 支持表只列活跃插件；④ `AGENTS.md` 点名全部插件且「口径：N 个活跃 + M 个已退役」的数字与实际一致；⑤ 每个活跃插件的 README / CHANGELOG **中英双份**各有 H1、顶部互链、`##` 数一致、顶层条目数一致；⑥ `package.json` 的 version 在两份 CHANGELOG 里都有版本段，且中英版本段序列与每段条目数一致；⑦ `package.json` 的 `files` 点名的 `.md` 都存在；⑧ README 里 `plugins/…` 相对链接都存在
+  * ⚠️ 判据 ⑤⑥ 是**双份文档**的核心：中英是两份文件，改一份不会提醒另一份 —— 漏译一条 / 漏一节即红
   * ⚠️ CI 的每个 job 都跑 `pnpm run check`（不是只跑 `check:paths`）—— 2026-10-03 审计发现 CI 原先只跑 `check:paths`，`check:dsh-pin` 从未在 CI 里生效过。**新增守卫只需加进 `check`，CI 自动覆盖**；别在 workflow 里逐个列脚本。
 
 ## 文档规范
