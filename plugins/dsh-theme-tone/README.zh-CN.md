@@ -45,6 +45,6 @@ dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone
 ## 卸载与残留
 
 * 卸载即移除插件加的一切；设置行消失，外观回到官方
-* 你的选择仍留在 `$DSH_HOME/settings.yaml` 的 `ui-theme-tone` 段，但移除后不再生效；想清掉就删该段
+* 你的选择仍留在 `$DSH_HOME/settings.yaml` 的 `dsh-theme-tone` 段，但移除后不再生效；想清掉就删该段
 
 **更新日志**：[CHANGELOG.zh-CN.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-theme-tone/CHANGELOG.zh-CN.md)

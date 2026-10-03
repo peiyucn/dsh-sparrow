@@ -1,6 +1,6 @@
 # dsh-codebuddy-credits
 
-[English](./README.md)
+简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 把**公司发的 CodeBuddy 额度**接成 DeepSeek Harness（DSH）的 LLM provider——
 企业发放的 WorkBuddy/CodeBuddy 积分，在 DSH 里直接用。官方 API Key 直连：

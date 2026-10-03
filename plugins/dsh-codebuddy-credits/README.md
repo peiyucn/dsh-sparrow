@@ -1,6 +1,6 @@
 # dsh-codebuddy-credits
 
-[简体中文](./README.zh-CN.md)
+English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 Company CodeBuddy credits as a DeepSeek Harness (DSH) LLM provider — your
 enterprise-issued CodeBuddy quota, used directly inside DSH. Official API key

@@ -11,7 +11,9 @@
 > （方法与口径见 [`docs/upstream/0.2.0-rc.1.md`](upstream/0.2.0-rc.1.md) §4.1）。
 > 理由：手工清单已证会漂——0.2.0-rc.1 审计时发现它漏列了三处一直在用的锚点。
 >
-> 最近一次核对：dsh `0.2.0-rc.1`（2026-09-29），本文件点名的例外逐条验存续，**零回归**。
+> 最近一次核对：dsh `0.2.0-rc.2`（2026-10-03），本文件点名的例外逐条验存续。
+> ⚠️ rc.2 这一版**不是零回归**：`role='menu'` 换了承载元素，theme-tone 的分组菜单锚点踩中
+> （见 §D 旁注），已修并补守卫。
 
 ---
 
@@ -24,6 +26,17 @@
     `sizeBytes`，**不含路径**；`SessionLocation`（`kind` + `path`）只出现在 `errors.ts`。
   * **WorkspaceRegistry 私有写通道**（`enqueueOperation` / `requireState` / `setState`）——
     归档集没有公开写入口。
+  * **`session_projcache` 存储域直读 / 直写**（`src/host.ts` 的 `PROJCACHE_DOMAIN_NAME` /
+    `PROJCACHE_SESSIONS_TABLE`）—— 移入回收站 / 删除把目录搬走后，必须让官方投影缓存里那几行失效，
+    否则 @ 列表仍读到已归档会话的标题。
+    ⚠️ **这一条是「可以走公开路径却没走」**：官方**有**导出 `projectionCacheDomainSpec`
+    （`@deepseek-ai/dsh-session-projection-cache`，`src/index.ts:59` 导出、`src/spec.ts` 定义），
+    域名字符串与表名都该从它取。本插件目前写的是**字面量** `'session_projcache'` / `'sessions'`,
+    等于把官方合法的公开契约降级成了私有 seam（官方改域名 / 改表名即静默失效）。
+    **待办**：换成 import 官方 spec（属「收缩原则」，公开替代已存在）。
+  * **`ctx.get('sessionProjections')` / `ctx.get('sessionProjectionCache')` + `fn.length` 形参自适应**
+    （`src/host.ts:202-253`）—— 按被调函数**形参个数**选择调用形态，而不是 try/catch 回退。
+    这是「同一能力在不同 dsh 线里签名不同」的兼容写法；官方给全签名后应删。
 
 ## B. 刻意改官方默认外观的例外（**均不带官方默认门**，两个档位都生效）
 
@@ -36,7 +49,7 @@
    owner：「深卡不对吧」→ 跟随主题、两个档都修。
 2. **弹窗遮罩模糊**（`src/mask.ts`）：官方 0.1.7-rc.2 把 `--dsw-mask-blur` 改成 `none`（**有意为之**），
    owner 要求恢复 0.1.5 观感。证据链见 [`0.1.7-rc.2-mask-blur.md`](upstream/0.1.7-rc.2-mask-blur.md)。
-3. **悬停光带跟随指针**（`dsh-nav-pin` 的 `handle-glow.ts`，**已定、待合并实施**）：官方
+3. **悬停光带跟随指针**（`src/handle-glow.ts`，**已随 `dsh-nav-pin` 并入 `dsh-theme-tone` 落地**）：官方
    `--dsh-width-handle-pointer-y` 只在**拖拽中**被写，纯悬停走 CSS 兜底 `50%`，而那个 `50%` 是相对
    `.body` 盒（官方顶栏在流内占 76px）算的 ⇒ 光带比视口中心低 38px。官方**无意的 bug**，
    owner 2026-09-29 定案「官方的也一起修复」。
@@ -50,6 +63,12 @@
 并顺手修 `src/surface.ts:1223` 那句已过期的「全插件**唯一**不带官方默认门的一条」（实为两条）。
 第 4 处（2026-10-02）加入后本节计数为**四处**；`src/popover.ts` 头注释、
 `test/popover.test.mjs` 与 `docs/spec/04-glass.md` 里凡写「三条 / 四条」处**一并核对**。
+
+> ⚠️ **计数口径**：§B 的「四条」只数**改官方默认外观**这一类（不带官方默认门）。
+> `src/caption.ts` 的桌面端标题栏 overlay 同样不带门，但它是**只读判别 + 改探针自己的 token**、
+> 不改官方外观，故登记在 §D 而不计入 §B —— 凡写「三条 / 四条」时指的是 §B 这一组，别把 §D 那条算进来。
+> 2026-10-03 复核时把 `src/surface.ts`、`docs/spec/00-overview.md`、`docs/spec/05-surfaces.md`
+> 三处过期计数（仍写「唯一」/「三处」）一并校正为「四条（之一）」。
 
 ## C. 官方缺陷（**我们不修**，仅登记以免被反复当成我们的 bug 重查）
 
@@ -89,8 +108,7 @@
 ## D. 静默失效风险（官方改名 / 改行为即失效，没有任何门能拦）
 
 * **`dsh-theme-tone`** —— 仓库规矩是「不依赖 hashed CSS-module 类名」，以下四处**例外**，
-  且测试**抓不到官方重命名后缀**：
-  1. **悬停卡字色**（`HOVER_CARD_TEXT_TOKENS`，`src/constants.ts`）：`[class*='_hoverTitle'|'_hoverPath'|'_hoverTime'|'_hoverStatus']`
+  且测试**抓不到官方重命名后缀**：  1. **悬停卡字色**（`HOVER_CARD_TEXT_TOKENS`，`src/constants.ts`）：`[class*='_hoverTitle'|'_hoverPath'|'_hoverTime'|'_hoverStatus']`
   2. **扫光带**（`SWEEP_ANCHORS`，`src/sweep.ts`）：`[class*='_row']::after` —— **已收窄**：必须同时带
      `data-variant` / `data-tool` 才命中（`test/sweep.test.mjs` 钉住不得回退）
   3. **弹窗遮罩**（`MASK_SELECTOR`，`src/mask.ts`）：`[class*='_mask']`（官方三个遮罩 `Modal` /
@@ -105,9 +123,44 @@
      `root[lang]` / `body[data-ds-dark-theme,style]` / `head`，**不观察本插件的门属性** ——
      带门则门翻开时不重发、overlay 停在旧色（实测），是不留痕迹的失效；
      而不带门在颜色上恒等（探针与官方 `.frame::before` 读的是**同一个** token，必然同值）。
+  5. **轮次导航 nav 的 `aria-label` 文案**（`src/nav-pin.ts` 的 `NAV_ARIA_LABELS`）：
+     `[data-conversation-scroll] div:has(> nav[aria-label="轮次导航"|"Turn navigation"])` ——
+     官方 nav 没有可依赖的公开属性，只能按**本地化文案**认它；代码自己的注释也写了
+     「官方改文案需同步更新」。官方改字即**不命中**（那条窄屏浮现规则静默失效），
+     降级表现 = 窄对话列上轮次导航照官方那样消失。
+  6. **「未选工作区」空态的官方 `::after` 检测**（`src/workstart.ts`）：读官方
+     `::after` 伪元素的 `content` 是否非空、且 `mask-image` 是否含 `stroke-dasharray`，
+     用来判断官方那个虚线圆环（= 没有工作区）在不在。语义属性全被污染、哈希类名又禁用，
+     只剩这条读**计算样式**的路。官方改那个圆环的画法即**不命中**（驱动
+     `WORKSTART_ATTR` 的两条规则失效），降级表现 = 该空态少了我们那点装饰。
+
+  以上 5 / 6 两条都是**本地化文案 / 计算样式**级别的依赖：官方一改就静默失效、不抛错、
+  也不影响宿主，属 §D 的标准类型。
 
 * **`dsh-codebuddy-credits`** —— 捕获阶段拦截官方行头「编辑」按钮（`stopPropagation` 阻断官方编辑器打开，
   改为展开本插件自建编辑器）：按钮保留官方原位与样式，但**官方改这个按钮即静默失效**。
+* **`dsh-codebuddy-credits`** —— 把 current **乐观回写进官方共享模型目录 store**
+  （`src/client/index.ts` 的 `directory.store.update(s => { s.current = selection })`）：
+  官方 `ModelDirectory` 只公开 `select()`，而空白会话的投影不下发，`syncInputs` 读不到 `current`，
+  座位 / 眼睛 / 信息卡就都看不到选择（表现为「点击没反应」）。**这是对官方 store 私有状态的写**，
+  官方改 store 形状即静默失效。
+  ⚠️ **这一条是「可以走公开路径却没走」**：官方 `ModelDirectoryState` 的写入口应由官方提供，
+  目前没有 ⇒ 只能直写。**待办**：官方若给公开 setter 即换过去。
+
+### D-旁注：**不是** hashed 类名、但同样「官方改行为即静默失效」的一类
+
+* **`dsh-theme-tone` 的分组菜单锚点依赖「谁带 `role='menu'`」**（`src/surface.ts`）。
+  这条**不**依赖 hashed 类名（用的是公开 role / data 属性），却在 **0.2.0-rc.2 真的踩了一次**：
+  官方把 `role='menu'` 从菜单**卡片**搬到了内层**滚动容器**上
+  （`ModelSelect.tsx:484` 卡片改成 `role={pane==='model'?'group':'menu'}`；
+  `:551-555` 的 `div.groups.scrollable` 自己带 `role="menu"`）。
+  于是「菜单锚点的**直接子**」这个结构关系整体上移一层，内圈圆角规则
+  `[role='menu'] > :has([role='group'])` 在新结构下**一条也命不中**（实测 rc.2 结构 0 命中 /
+  rc.1 结构 1 命中）—— **token 级审计抓不到**：`role="menu"` 这个名字还在、还出现，
+  只是**换了元素**（§4.4 说的那类行为变化）。
+  现出两条腿各自覆盖（`GROUPED_MENU_SCROLLER_SELECTOR` + `GROUPED_MENU_SELF_SCROLLER_SUFFIX`）；
+  守卫在 `test/surfaces.test.mjs`（反向注入验过有牙齿）。
+  ⚠️ 下次官方再动这一带，要问的是「**哪个元素带这个 role**」，不是「这个 role 还在不在」。
 
 ## E. 已退役（历史，不再维护）
 

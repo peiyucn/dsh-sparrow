@@ -45,6 +45,6 @@ It also fixes a small official glitch (**no tone needed — active on both**): h
 ## Uninstall & leftovers
 
 * Uninstalling removes everything the plugin added; the settings row disappears and the look returns to the official one
-* Your selection stays in `$DSH_HOME/settings.yaml` under `ui-theme-tone` but has no effect after removal — delete that section if you want it gone
+* Your selection stays in `$DSH_HOME/settings.yaml` under `dsh-theme-tone` but has no effect after removal — delete that section if you want it gone
 
 **Changelog**: [CHANGELOG.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-theme-tone/CHANGELOG.md)

@@ -336,7 +336,7 @@ body:not([data-dsh-theme-tone-plain]) [role='dialog']:not(:has(> img)) {
 
 * `[role='menu'] [role='group'] > :first-child` —— 粘性分组标题条，它需要**不透明底**
   才挡得住从下面滚过的行（见 §8.2）；
-* `body > [role='button']` —— 悬停卡，**唯一不带门**的一条（官方把它的面与字写死成组件内
+* `body > [role='button']` —— 悬停卡，**全插件四条不带门规则中的第一条**（官方把它的面与字写死成组件内
   字面量，「先把官方默认修了，然后再适配咱们的」，故两个档都修）。它的底色带
   **官方 layer-3 兜底**：这是唯一「token 层未就绪时也照常生效」的规则，没有兜底而 `var()`
   解析为空时，`!important` 会把卡片压成全透明（比不生效更糟）。
@@ -401,7 +401,8 @@ body:not([data-dsh-theme-tone-plain]) [role='dialog']:not(:has(> img)) {
 （`Toast` = `alert`、`OnboardingSurface` = `presentation`、`DropOverlay` = `status`，都天然被排除。）
 
 > ⚠️ **但它不算通用锚点** —— 它**面和字都被官方写死**，走 §6.3.2 的独立规则：
-> 面与字一起掰回主题，且**两个档都修**（全插件唯一不带官方默认门的一条）。
+> 面与字一起掰回主题，且**两个档都修**（全插件四条不带官方默认门的规则之一，
+> 计数以 `docs/private-seams.md` §B 为准）。
 
 ### 6.3.2 悬停卡：官方把**面和字都写死了** —— 刻意改官方默认的**第一处**
 
@@ -434,7 +435,9 @@ body > [role='button'] [class*='_hoverTime']   { color: var(--dsw-alias-label-se
 body > [role='button'] [class*='_hoverStatus'] { color: var(--dsw-alias-label-tertiary)  !important }
 ```
 
-**⚠️ 这是全插件唯一不带「官方默认」门的浮层规则** —— 其余八条锚点全部带门。
+**⚠️ 这是全插件四条不带「官方默认」门的浮层规则之一**（另三条：`src/mask.ts` 的弹窗遮罩虚化、
+`src/handle-glow.ts` 的拖拽条光带跟随、`src/popover.ts` 的顶栏弹出层列内夹取）—— 其余候选锚点全部带门。
+计数以 `docs/private-seams.md` §B 为准。
 它修的是「官方把一张卡写死了」这个毛病，不是我们的色调偏好，所以不该等选了色调才生效。
 **新增规则时别照着抄这条的门** —— 它是特例，不是新惯例。
 
@@ -460,7 +463,7 @@ body > [role='button'] [class*='_hoverStatus'] { color: var(--dsw-alias-label-te
 | 浮层 | 官方实际长什么样 | 锚点 |
 | :--- | :--- | :--- |
 | **后台任务列表**（`JobListAction`，头部任务数按钮弹出的 `<ul>`） | **没有 role**，只有 `aria-label`（本地化文案，不能当选择器） | `body [data-slot='conversation.session.header.actions'] ul` —— 改用**它所在的官方槽位**锚定 |
-| **子代理血缘弹层**（`SubagentHeaderLineage`，头部 `1/3 ⌄`） | `role='tree'`，`createPortal` **直挂 body** | `body > [role='tree']` |
+| **子代理血缘弹层**（`SubagentHeaderLineage`，头部 `1/3 ⌄`） | 外层 portal 直挂 body，`role='tree'` 在**内层**视口上 | `body > :has(> [role='tree'])`（⚠️ 不是 `body > [role='tree']` —— 那是死锚点，实测 0 命中） |
 | **轮次预览卡**（`TurnNavigator` 右侧刻痕栏 hover / focus 弹出） | `role='tooltip'`，`position: absolute`，**不** portal（长在 `<nav>` 里） | `body [role='tooltip']:not([data-side])` |
 
 ⚠️ **不要写成 `body > [role='tooltip']`**：注释会诱导那么写，
@@ -480,8 +483,10 @@ body > [role='button'] [class*='_hoverStatus'] { color: var(--dsw-alias-label-te
 （浅色轴上它是深灰），那是它的语义（见 `tones.ts`「不染的几处（有意）」）；
 糊上夜色面板 + 颗粒会把它读成一个小菜单。
 
-**为什么 `role='tree'` 必须收窄成 `body >`**：官方**四处**在用这个 role —— 除了子代理那个浮层，
-还有 `JsonTree`、`WorkspaceBrowser` 的会话树、`TrajectoryTable`，**全是内联组件**。
+**为什么 `role='tree'` 必须收窄成 `body >`**：官方**三处**在用这个 role —— 除了子代理那个浮层，
+还有 `JsonTree`（`ui-primitives/JsonTree.tsx`）与 `WorkspaceBrowser` 的搜索会话树
+（`ui-workspace/rows/` 的 `WorkspaceBrowser.tsx` / `AnimatedRows.tsx`），**全是内联组件**；
+`TrajectoryTable` 用的是 `tablist` / `toolbar`，**不含** `tree`（2026-10-03 复核 rc.2 源码修正）。
 无条件写 `[role='tree']` 会把它们的背景换成不透明填充 + 光 + 颗粒（那就错了）。
 只有子代理那个是从 body portal 出来的直接子元素。
 
@@ -711,6 +716,63 @@ body > [role='button'] [class*='_hoverStatus'] { color: var(--dsw-alias-label-te
 > 菜单所有者在自己菜单元素上覆盖（自定义属性沿继承树向下传）。右上角统一补一个
 > `--dsh-scrollbar-width`（行的右边缘在内容盒上，比容器右边缘靠左一个滚动条宽，不补就是"左圆右方"）；
 > 只圆**上两角**（下两角会让滚到底时的最后一行被啃掉）。
+>
+> ### ⚠️ 0.2.0-rc.2：`role='menu'` 从卡片搬到了内层滚动容器上（**必须两条腿**）
+>
+> rc.2 的官方 `ModelSelect` 把 role 换了位置（`ModelSelect.tsx:484` 与 `:551-555`）：
+>
+> | 版本 | 渲染 | 谁带 `role='menu'` |
+> | :--- | :--- | :--- |
+> | ≤0.2.0-rc.1 | `MenuSurface role="menu"` → `div.groups` → `section[role=group]` | **卡片**（滚动容器是它的直接子） |
+> | **0.2.0-rc.2** | `MenuSurface role={pane==='model'?'group':'menu'}` → `div.groups role="menu"` → `section[role=group]` | **滚动容器自己**（卡片变成 `role='group'`） |
+>
+> 于是「菜单锚点的**直接子**」这个关系在 rc.2 上**整体上移了一层**：
+> `[role='menu'] > :has([role='group'])` 在新结构下**一条也命不中**。真机实测
+> （同页放两种 markup 做对照）：**rc.2 结构 0 命中、rc.1 结构 1 命中**
+> ⇒ 内圈圆角在 rc.2 上**静默失效**（"规则一条都命不中"那一类，不报错、不显形）。
+>
+> 故规则出**两条腿**（各自独立一条规则）：
+>
+> * `GROUPED_MENU_SCROLLER_SELECTOR` = `> :has([role='group'])` —— 卡片是菜单锚点（rc.1 官方 / 本仓库 codebuddy）
+> * `GROUPED_MENU_SELF_SCROLLER_SUFFIX` = `:has(> [role='group'])` —— **滚动容器自己就是菜单锚点**（rc.2 官方）
+>
+> ⚠️ **不能合并进一个 `:is()`**：相对选择器（以 `>` 开头）在 `:is()` 里按规范非法，而浏览器
+> **不报错、也不整条丢弃** —— 实测（Edge，读回 `document.styleSheets` 的 `selectorText`）
+> `:is(:has([role='group']), > :has([role='group']))` 被解析成 `:is(:has([role='group']))`
+> = 相对那一支被**静默删掉**，rc.2 那一半照样丢。合并等于把刚修好的洞重新挖开。
+>
+> 三条菜单形态的命中实测（同页探针，`matches()` 逐元素）：
+>
+> | 形态 | 旧腿 `> :has(…)` | 新腿 `:has(> …)` |
+> | :--- | :--- | :--- |
+> | rc.2 官方 `ModelSelect` | **0** | **1**（`div.groups`）|
+> | rc.1 官方 `ModelSelect` | **1**（`div.groups`） | 0 |
+> | 本仓库 codebuddy `CodeBuddyModelSelect` | **1**（`div.ccb-model-groups`） | 0 |
+>
+> 真机计算值（注入后读 `getComputedStyle(...).borderRadius`）：rc.2 滚动容器
+> `12px 17px 0 0`、codebuddy 滚动容器 `16px 21px 0 0` —— 两条腿各吃到自己那份同心值。
+>
+> ### ⚠️ 但「锚点变成滚动容器」**不**意味着材质层会滚走（查证过，**不需要修**）
+>
+> 直觉上会以为：`[role='menu']::after` 是 `position: absolute; inset: 0`，锚点既然成了
+> 滚动容器，这层就该随内容滚掉。**实测否掉了这个直觉**（这是 rc.2 的第二个诱人误判，
+> 与上面那条真缺陷长得很像，差别在**包含块**）：
+>
+> 官方 rc.2 的 `.menu`（卡片）是 **`position: fixed`**、`overflow: hidden`、`padding: 4px`，
+> 而 `.groups`（滚动容器）**没有 position**（static）。于是 `::after` 的包含块是
+> **卡片**、不是滚动容器 ⇒ 它**钉在卡片上、不随内容滚**。
+>
+> 真机同构复刻（逐字照抄上述两条官方 CSS + 一个与 `::after` 同属性的真实元素做镜像：
+> `position:absolute; inset:0; z-index:-1`）：
+>
+> | 采样 | 相对滚动容器的 top | 相对卡片的 top |
+> | :--- | ---: | ---: |
+> | `scrollTop = 0` | −4 | **0** |
+> | 滚到底 | −4（**完全没动**） | **0** |
+>
+> 结论：**材质层照旧钉在菜单卡片上**，rc.2 不需要为它加任何元素级兜底。
+> （对照 §「自身是滚动容器的锚点」那条：后台任务列表**是**滚动容器**且自己带**
+> `::after` 的定位祖先——两者不同，别把那边的结论照搬过来。）
 >
 > ⚠️ **顺带发现：那条圆角本来就看不见**。真机实测标题内部 (41.7,42.6,46.0) vs 标题正下方
 > (41.0,42.0,46.0) —— 差 **0.7 级**。也就是说上一版写在标题上的圆角**是靠"缺口里露出的行"

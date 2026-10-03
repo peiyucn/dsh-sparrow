@@ -33,7 +33,8 @@ pyai.site 的光晕与颗粒都靠 `mix-blend-mode: screen`：在**深色底**�
 
 ## 3) 数据模型
 
-settings 命名空间 `ui-theme-tone`（小写连字符文法是 `register` 的硬要求，`settings/src/index.ts:417`）：
+settings 命名空间 `dsh-theme-tone`（= 本插件的 profile 条目 id；小写连字符文法是 `register` 的硬要求，`settings/src/index.ts:417`）。
+⚠️ 0.1.5 线里它叫 `ui-theme-tone`，0.1.7 起改为条目 id（旧值不自动迁移，见 00-overview 与 README「卸载与残留」）：
 
 ```ts
 export type ToneId =

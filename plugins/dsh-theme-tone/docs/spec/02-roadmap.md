@@ -22,7 +22,7 @@
 * [x] 设置行出现在「外观」正下方；色调卡完整展示色调；卡面文字「默认」；8 款全部可选。
 * [x] 逐款观感与对比度经真机目视确认（8 款）；浅色三款差异足够。
 * [x] 四张卡恒排一行；切明暗行内容立即刷新。
-* [x] 持久化：重启 dsh 后选择保留，`settings.yaml` 出现 `ui-theme-tone`。
+* [x] 持久化：重启 dsh 后选择保留，`settings.yaml` 出现 `dsh-theme-tone`（0.1.5 线里叫 `ui-theme-tone`）。
 * [x] 卸载还原：停用插件后 token / 层 / 样式表 / 设置行全部回收。
 * [x] 截图存仓库根 `resources/dsh-theme-tone.png`（按 AGENTS「发布（npm 包）」：单一来源、不进 npm 包），
   README 双份以绝对 URL 引用。
