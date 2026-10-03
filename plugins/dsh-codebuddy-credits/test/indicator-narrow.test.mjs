@@ -129,6 +129,29 @@ describe('CodeBuddy 顶栏标记：窄化（容器查询）', () => {
     const styles = styleArrayText()
     assert.ok(!/font-size:\s*\d+px/u.test(styles), '字号应由 MARK_FONT_PX 一处给出，不写死在样式表里')
   })
+
+  it('⛔ hero 入口的 portal 容器 必须 落在 @container 上下文内（否则窄化恒不命中）', () => {
+    // 2026-10-03 全面审计发现的**真缺陷**（上面那条窄化守卫抓不到它）：
+    // 容器查询只对**有容器祖先**的元素生效，而官方把 container-type 挂在 .titleRow
+    // （ConversationRoot.module.css:71），.titleRow 又是会话根 [data-phase] 的**后代**。
+    // 原实现 createPortal(trigger, hero.rootEl) 把入口挂到会话根 ⇒ 没有容器祖先
+    // ⇒ 查询恒不命中 ⇒ hero 页入口**永远**是 84px 横排，收不成 28px 方标。
+    // 真机实测：hero 相位 .titleRow 宽 376（≤ 阈值 656）时入口仍是 84px，
+    // 而 header 变体在同一宽度下正确收成 28px —— 同一个按钮、两种行为。
+    const code = source.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/^\s*\/\/.*$/gmu, '')
+    assert.ok(!/createPortal\(trigger,\s*hero\.rootEl\s*\)/u.test(code),
+      'hero 入口不得直接 portal 到会话根 —— 那里没有 @container 上下文，窄化恒不命中')
+    // 必须经 heroPortalTarget 解析（它取角按钮的父元素 = .titleRow = 容器自己）。
+    assert.match(code, /createPortal\(trigger,\s*heroPortalTarget\(hero\.rootEl\)\)/u,
+      'hero 入口必须 portal 到 heroPortalTarget(hero.rootEl)')
+    // 解析器必须**限定在本会话根内**找角按钮：多会话根并存时 document.querySelector 会取错树。
+    const fn = /function heroPortalTarget[\s\S]*?\n\}/u.exec(code)
+    assert.ok(fn, '找不到 heroPortalTarget 的定义')
+    assert.match(fn[0], /rootEl\.querySelector\(HEADER_CORNER_SELECTOR\)/u,
+      'heroPortalTarget 必须在传入的会话根内找角按钮（不得用 document.querySelector）')
+    assert.match(fn[0], /\?\?\s*rootEl/u,
+      '角按钮取不到时必须退回会话根（良性降级成原行为，不抛错）')
+  })
 })
 
 describe('CodeBuddy 顶栏标记：面板不得先在旧位置画一帧', () => {

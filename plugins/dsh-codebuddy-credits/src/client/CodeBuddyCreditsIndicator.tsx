@@ -63,6 +63,43 @@ const INDICATOR_BUTTON_HEIGHT_PX = 28
 const HEADER_CORNER_SELECTOR = '[data-conversation-header-corner]'
 
 /**
+ * hero 入口的 **portal 容器** —— 必须是**拥有 `@container` 上下文**的那个元素。
+ *
+ * ## ⚠️ 为什么不能直接 portal 到会话根（原实现，实测是坏的）
+ *
+ * 窄化靠 `@container (max-width: MARK_COLLAPSE_PX)`，而容器查询只对**有容器祖先**的
+ * 元素生效。官方把 `container-type: inline-size` 挂在 **`.titleRow`** 上
+ * （`ConversationRoot.module.css:71`），而 `.titleRow` 是会话根（`[data-phase]`）的
+ * **后代**、不是祖先。
+ *
+ * 原实现 portal 到会话根 ⇒ 那个节点**没有容器祖先** ⇒ 查询恒不命中 ⇒
+ * 两条默认值（宽标 `inline-flex` / 方标 `none`）一直生效：
+ * 真机实测（hero 相位，`.titleRow` 宽 **376** ≤ 阈值 656 时）入口仍是 **84px** 横排
+ * lockup，而 header 变体在同一宽度下正确收成 **28px** 方标 —— 同一个按钮、两种行为。
+ * （不抛错、不影响 boot，纯观感；也**不重叠**官方元素，故此前没被发现。）
+ *
+ * ## 为什么挂"角按钮的父元素"
+ *
+ * 那个父元素**就是** `.titleRow`（容器自己）⇒ 查询恢复生效。同时它
+ * `position: static`（`ConversationRoot.module.css:64-71` 未设 position）⇒
+ * 绝对定位的包含块**仍是会话根** ⇒ `top` / `right` 那套相对会话根的内边距盒几何
+ * **逐像素不变**。真机实测：容器 376 时右缘 before 428 / after 428（完全一致），
+ * 只有宽度 84 → 28。
+ *
+ * ⚠️ 取角按钮要**限定在本会话根内**（`rootEl.querySelector`），不用
+ * `document.querySelector`：多会话根（如子代理标签）并存时会取错那一棵树。
+ * 角按钮是空的时 `display: none`，但元素仍在 DOM 里，`parentElement` 照常可用。
+ *
+ * 角按钮取不到（官方改结构）时退回会话根 —— 退化成**原行为**（宽标不窄化），
+ * 属良性降级、不抛错。
+ * @param rootEl - 已解析的会话根（`[data-phase]`）。
+ * @returns 承载 `@container` 上下文的 portal 容器。
+ */
+function heroPortalTarget(rootEl: Element): Element {
+  return rootEl.querySelector(HEADER_CORNER_SELECTOR)?.parentElement ?? rootEl
+}
+
+/**
  * 面板标题 + **顶栏窄化**共用的方形渐变图标（Combine 里取出的 Color 单块，独立渐变 id）。
  *
  * ⚠️ 顶栏那枚按钮在容器变窄时会换成**这个**（去掉文字、只留彩色方块）——
@@ -589,7 +626,9 @@ export function CodeBuddyCreditsIndicator({
       {heroHidden
         ? null
         : variant === 'hero' && hero.rootEl !== null
-          ? createPortal(trigger, hero.rootEl)
+          /* ⚠️ portal 容器必须是**拥有 @container 上下文**的那一个（见 heroPortalTarget
+             的文档块）：挂会话根本身会让窄化查询恒不命中，hero 入口永远收不成方标。 */
+          ? createPortal(trigger, heroPortalTarget(hero.rootEl))
           : trigger}
       {open && point !== null
         ? createPortal(
