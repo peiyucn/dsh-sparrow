@@ -1,5 +1,5 @@
 /**
- * 官方「主面板」入口装配守卫（spec 16）。
+ * 官方「主面板」入口装配守卫（spec 03）。
  *
  * 两层：
  * 1. **惰性停用接线**（本文件的核心）：`layout` 服务缺席时 `attachMainPanel` 必须
@@ -57,7 +57,7 @@ function entry(overrides = {}) {
     id: 'file-manage',
     order: 20,
     locale: 'file-manage',
-    label: () => '归档',
+    label: () => '云端文件',
     inject: () => ({ probe: 'injected' }),
     page: function Page() { return null },
     icon: function Icon() { return null },
@@ -65,7 +65,7 @@ function entry(overrides = {}) {
   }
 }
 
-describe('attachMainPanel（spec 16：官方主面板入口装配）', () => {
+describe('attachMainPanel（spec 03：官方主面板入口装配）', () => {
   it('layout 缺席 应该 什么都不注册且不抛错（惰性停用，宿主照常启动）', () => {
     const { ctx, registrations, state } = fakeCtx({ hasLayout: false })
     assert.doesNotThrow(() => { attachMainPanel(ctx, entry()) })

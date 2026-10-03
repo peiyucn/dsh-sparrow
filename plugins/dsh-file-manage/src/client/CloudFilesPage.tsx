@@ -10,7 +10,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { Modal, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FileRow } from '../files.js'
 import type { FileCountSummary } from './api.js'

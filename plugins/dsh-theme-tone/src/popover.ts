@@ -104,8 +104,10 @@ export const RIGHT_PANEL_OPEN_GATE = `body:has([${RIGHT_PANEL_ATTR}][data-sideba
  */
 export function buildPopoverCss(): string {
   /* 门在前，故槽位那条去掉自带的 body 前缀（否则拼出 body… body…，永不命中 ——
-     同款坑见 surface.ts 的 gatedAnchor）。 */
-  const scope = `${RIGHT_PANEL_OPEN_GATE} [data-slot='conversation.session.header.actions']`
+     同款坑见 surface.ts 的 gatedAnchor）。⚠️ 槽位选择器**只此一处**由
+     HEADER_ACTION_SCOPE 提供：早先这里又写了一遍同值字面量，
+     于是常量只剩测试在用（守卫看着绿、生产已改走另一份）。 */
+  const scope = `${RIGHT_PANEL_OPEN_GATE} ${HEADER_ACTION_SCOPE.replace(/^body\s+/u, '')}`
   return `/* ===== dsh-theme-tone 顶栏弹出层的列内夹取（详见本函数注释） =====
    ⚠️ 本表**故意不带官方默认门**（${PLAIN_ATTR}）：它修的是官方无意的裁切 / 层序缺陷，
    两个档都修。全插件第四条同类规则，判据见 docs/spec/09-nav-pin-merge.md §3.1。

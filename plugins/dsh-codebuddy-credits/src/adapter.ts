@@ -24,7 +24,7 @@ import type {
 } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { BASE_URL, effortName, requestHeaders } from './catalog.js'
-import { DISPLAY_NAME } from './constants.js'
+import { DEFAULT_CONTEXT_WINDOW, DISPLAY_NAME } from './constants.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
 
 /** 单次调用的积分回调：插件侧据此做会话/今日统计（credit 为服务端计费值）。 */
@@ -324,7 +324,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
       provider,
       id: model,
       name: facts?.name ?? model,
-      context: { contextWindow: facts?.contextWindow ?? 262_144 },
+      context: { contextWindow: facts?.contextWindow ?? DEFAULT_CONTEXT_WINDOW },
       ...(facts === undefined ? {} : { inputModalities: facts.input }),
       ...(facts?.description === undefined ? {} : { description: facts.description }),
     }
