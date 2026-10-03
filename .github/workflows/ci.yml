@@ -22,8 +22,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check no local paths (repo is public)
-        run: pnpm run check:paths
+      - name: Repo guards (no local paths / dsh pin / plugin docs)
+        run: pnpm run check
       - name: Typecheck all plugins
         run: pnpm run typecheck:all
 
@@ -42,8 +42,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check no local paths (repo is public)
-        run: pnpm run check:paths
+      - name: Repo guards (no local paths / dsh pin / plugin docs)
+        run: pnpm run check
       - name: Build all plugins (tsc → lib/ + client bundle)
         run: pnpm run build:all
 
@@ -62,8 +62,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check no local paths (repo is public)
-        run: pnpm run check:paths
+      - name: Repo guards (no local paths / dsh pin / plugin docs)
+        run: pnpm run check
       - name: Build all plugins (produce lib/ for tests)
         run: pnpm run build:all
       - name: Test all plugins (JUnit reports)
@@ -91,8 +91,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check no local paths (repo is public)
-        run: pnpm run check:paths
+      - name: Repo guards (no local paths / dsh pin / plugin docs)
+        run: pnpm run check
       - name: Build all plugins (produce lib/ for pack)
         run: pnpm run build:all
       - name: Pack check all plugins (npm pack --dry-run)

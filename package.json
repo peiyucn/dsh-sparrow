@@ -5,7 +5,8 @@
   "description": "A collection of small DeepSeek Harness (DSH) web plugins",
   "packageManager": "pnpm@11.22.0",
   "scripts": {
-    "verify": "pnpm run check:paths && pnpm run check:dsh-pin && pnpm run check:plugin-docs && pnpm run verify:all",
+    "verify": "pnpm run check && pnpm run verify:all",
+    "check": "pnpm run check:paths && pnpm run check:dsh-pin && pnpm run check:plugin-docs",
     "check:paths": "node scripts/check-no-local-paths.mjs",
     "check:dsh-pin": "node scripts/check-dsh-pin.mjs",
     "check:plugin-docs": "node scripts/check-plugin-docs.mjs",
