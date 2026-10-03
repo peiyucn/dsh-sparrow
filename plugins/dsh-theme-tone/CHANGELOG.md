@@ -25,6 +25,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - The dark tones' **two golden lights along the top** (the one centred on the header and the one in the top-left corner) are now **stronger** (about 1.55×). The light tones are unchanged.
 - Fixed the **lighting on the conversation header and the right sidebar's top bar reading as too weak** — it looked as if the glow sat on the background layer and the header covered it up. The glass faces now carry a compensating extra pass of the same light, so the golden glow is visible on the header itself.
 - Fixed the right sidebar having **neither blur nor lighting** across its top two bands while it sits on the **Start** page (opening files, file preview and the other tabs was already fine).
+- Fixed the **rounded corners on grouped section titles** in the model picker breaking on dsh 0.2.0-rc.2 (that release moved the menu's role marker to a different element, so our corner rule stopped matching anything).
 
 ## 0.1.5-rc.2 (2026-09-21)
 

@@ -728,12 +728,16 @@ export function groupTitleLayers(): string {
 export const GROUP_TITLE_ATTACHMENT = 'scroll, scroll, fixed, fixed, fixed, fixed'
 
 /**
- * 分组菜单的**滚动容器**（分组标题的吸顶上下文）—— 菜单的**直接子元素**里那个
+ * 分组菜单的**滚动容器**（分组标题的吸顶上下文）—— 菜单卡片里那个
  * "装着全部 `[role='group']`"的盒子。
  *
- * 用**结构**锚定：官方 `ModelSelect.tsx:437` 是 `div.groups`，本仓库 codebuddy 的
- * `CodeBuddyModelSelect.tsx:445` 是 `div.ccb-model-groups`；两者都是菜单的直接子元素、
+ * 用**结构**锚定：官方 ≤rc.1 的 `ModelSelect` 是 `div.groups`，本仓库 codebuddy 的
+ * `CodeBuddyModelSelect.tsx` 是 `div.ccb-model-groups`；两者都是菜单卡片的直接子元素、
  * 都装着 `section[role='group']`。不碰 hashed 类名。
+ *
+ * ⚠️ **0.2.0-rc.2 把 `role='menu'` 从卡片搬到了内层滚动容器上**，本常量因此只覆盖
+ * "卡片还是菜单锚点"的那一半；另一半见 {@link GROUPED_MENU_SELF_SCROLLER_SUFFIX}。
+ * 两个形态的说明与实测都写在那条常量上。
  *
  * ⚠️ **本常量是"后代片段"，以组合符开头**（与 {@link GROUPED_MENU_TITLE_SELECTOR} 同类），
  * 使用时拼在菜单锚点之后（`${菜单选择器} ${本常量}`）。
@@ -742,6 +746,40 @@ export const GROUP_TITLE_ATTACHMENT = 'scroll, scroll, fixed, fixed, fixed, fixe
  * （正是本文件反复记录的那类"规则一条都命不中"的坑）。
  */
 export const GROUPED_MENU_SCROLLER_SELECTOR = "> :has([role='group'])"
+
+/**
+ * 滚动容器**就是菜单锚点自己**时的**后缀片段**（无组合符，直接贴在菜单锚点后）。
+ *
+ * ## 为什么需要第二条腿：0.2.0-rc.2 搬了 `role='menu'`
+ *
+ * | 版本 | 官方 `ModelSelect` 渲染 | 谁带 `role='menu'` |
+ * | :--- | :--- | :--- |
+ * | ≤0.2.0-rc.1 | `MenuSurface role="menu"` → `div.groups` → `section[role=group]` | **卡片**（滚动容器是它的直接子） |
+ * | **0.2.0-rc.2** | `MenuSurface role={pane==='model'?'group':'menu'}` → `div.groups role="menu"` → `section[role=group]` | **滚动容器自己**（卡片变成 `role='group'`） |
+ *
+ * 官方 `ModelSelect.tsx:484`（卡片）与 `:551-555`（`div.groups.scrollable` 自己带
+ * `role="menu"`）。于是「菜单锚点的**直接子**元素」这个关系在 rc.2 上**整体上移了一层**：
+ * `[role='menu'] > :has([role='group'])` 在新结构下**一条也命不中** ——
+ * 真机实测（同页放两种 markup 做对照）：rc.2 结构 **0** 命中、rc.1 结构 **1** 命中
+ * ⇒ 内圈圆角**静默失效**（正是本文件反复记录的那类"规则一条都命不中"的坑）。
+ *
+ * ## 这条后缀为什么是 `:has(> [role='group'])`
+ *
+ * 「**自己**的直接子里有 group」—— rc.2 的 `div.groups[role=menu]` 的直接子正是
+ * `MenuGroup` 渲染的 `section[role='group']` ⇒ 命中，内圈圆角重新落在滚动容器上。
+ *
+ * 反向也安全：rc.1 的卡片与 codebuddy 的 `div.ccb-model-menu` 的直接子都是
+ * 普通 `div`（不是 `section[role=group]`）⇒ **不命中**，不会与
+ * {@link GROUPED_MENU_SCROLLER_SELECTOR} 那条在同一元素上叠着写。
+ *
+ * ⚠️ 两条腿**必须各出一条规则**，不能合并进一个 `:is()`：本常量那条由调用方
+ * **以空格拼接**（后代组合符），而 `:is()` 里的相对选择器无法表达"锚点**自己**"，
+ * 合并会把 rc.2 那一半又弄丢。分开写后两条规则的意图各自可断言。
+ *
+ * ⚠️ rc.2 的 `root` / `effort` 面板卡片带 `role='menu'`（`pane !== 'model'`），
+ * 那两屏没有 `[role='group']` ⇒ 两条腿都不命中，与改前一致。
+ */
+export const GROUPED_MENU_SELF_SCROLLER_SUFFIX = ":has(> [role='group'])"
 
 /**
  * 「分组菜单**内圈**圆角」的自定义属性名 —— {@link GROUPED_MENU_SCROLLER_RADIUS} 经它取值。
@@ -1208,8 +1246,18 @@ ${groupTitleRule(`body[data-ds-dark-theme]:not([${PLAIN_ATTR}])`)} {
    ⚠️ 只圆**上两角**：下两角若也圆，滚到底时最后一行会被啃掉。
    ⚠️ 锚点用**无守卫**版：:has() 在这里冗余（后半段已经要求 group 存在），
    去掉它省一次重匹配 —— 等价性与实测见 GROUPED_MENU_UNGUARDED_SELECTOR。
+   ⚠️ **两条规则**：rc.2 把 role='menu' 从卡片搬到了内层滚动容器上，
+   故「锚点的直接子」与「锚点自己」两个形态各出一条 —— 详见
+   GROUPED_MENU_SCROLLER_SELECTOR / GROUPED_MENU_SELF_SCROLLER_SUFFIX 的文档块。
+   ⚠️ **不能合进一个 :is()**：相对选择器（以 > 开头）在 :is() 里按规范非法，
+   浏览器**不报错也不整条丢弃** —— 实测（Edge，document.styleSheets 读回 selectorText）
+   :is(:has([role='group']), > :has([role='group'])) 被解析成 :is(:has([role='group']))
+   = 相对那一支被**静默删掉**，rc.2 那一半照样丢。故必须两条独立规则。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 ${`${gatedAnchor(GROUPED_MENU_UNGUARDED_SELECTOR)} ${GROUPED_MENU_SCROLLER_SELECTOR}`} {
+  border-radius: ${GROUPED_MENU_SCROLLER_RADIUS} !important;
+}
+${`${gatedAnchor(GROUPED_MENU_UNGUARDED_SELECTOR)}${GROUPED_MENU_SELF_SCROLLER_SUFFIX}`} {
   border-radius: ${GROUPED_MENU_SCROLLER_RADIUS} !important;
 }
 

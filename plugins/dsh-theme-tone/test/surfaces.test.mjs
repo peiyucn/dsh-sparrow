@@ -28,7 +28,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
-import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, OWN_BACKGROUND_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, STATIC_SURFACE_ANCHORS, usesAfterLayer, usesOfficialBeforeLayer, usesOwnBackground } from '../lib/surface.js'
+import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELF_SCROLLER_SUFFIX, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, OWN_BACKGROUND_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, STATIC_SURFACE_ANCHORS, usesAfterLayer, usesOfficialBeforeLayer, usesOwnBackground } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -1294,6 +1294,44 @@ describe('抬升面：表面绘制', () => {
     assert.ok(
       GROUPED_MENU_SCROLLER_SELECTOR.startsWith('>'),
       '滚动容器锚点是后代片段，必须以组合符开头（拼在菜单锚点之后才有效）',
+    )
+    // ⚠️ rc.2 把 `role='menu'` 从菜单**卡片**搬到了内层**滚动容器**上
+    //    （官方 `ModelSelect.tsx`：卡片 role={pane==='model'?'group':'menu'}，
+    //      `div.groups.scrollable` 自己带 role='menu'）⇒「锚点的直接子」这个关系
+    //    整体上移一层，只写 `> :has(...)` 在 rc.2 上**一条也命不中**。
+    //    真机实测（同页两种 markup 对照）：rc.2 结构 0 命中 / rc.1 结构 1 命中。
+    //    故必须**第二条腿**：滚动容器就是菜单锚点自己时的那条规则。
+    const selfScrollerSelector =
+      `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)}${GROUPED_MENU_SELF_SCROLLER_SUFFIX}`
+    const selfScrollerBlock = blockFor(css, selfScrollerSelector)
+    assert.notEqual(
+      selfScrollerBlock, '',
+      '必须为「滚动容器就是菜单锚点自己」（rc.2 官方结构）生成圆角规则 —— 否则内圈圆角在 rc.2 上静默失效',
+    )
+    assert.equal(
+      declFor(selfScrollerBlock, 'border-radius'), GROUPED_MENU_SCROLLER_RADIUS,
+      'rc.2 那条腿必须与 rc.1 那条腿共用同一份半径配方',
+    )
+    // 两条腿必须**各是一条独立规则**：相对选择器（以 `>` 开头）在 `:is()` 里按规范非法，
+    // 浏览器不报错、也不整条丢弃 —— 实测 `:is(:has(x), > :has(x))` 被判成 `:is(:has(x))`，
+    // 相对那一支被**静默删掉**。合并会直接把 rc.2 那一半再弄丢。
+    assert.ok(
+      !GROUPED_MENU_SELF_SCROLLER_SUFFIX.includes(':is('),
+      'rc.2 那条腿不得写进 :is() —— 相对选择器在 :is() 里会被静默删除',
+    )
+    assert.ok(
+      !GROUPED_MENU_SCROLLER_SELECTOR.includes(':is('),
+      'rc.1 那条腿同样不得写进 :is()',
+    )
+    // 两条腿的意图必须可区分：一条以组合符开头（锚点的直接子），一条不以（锚点自己）。
+    assert.ok(
+      GROUPED_MENU_SELF_SCROLLER_SUFFIX.startsWith(':has('),
+      'rc.2 那条腿必须是「锚点自己」形态（不带组合符，直接贴在菜单锚点后）',
+    )
+    assert.notEqual(
+      `${GROUPED_MENU_UNGUARDED_SELECTOR} ${GROUPED_MENU_SCROLLER_SELECTOR}`,
+      `${GROUPED_MENU_UNGUARDED_SELECTOR}${GROUPED_MENU_SELF_SCROLLER_SUFFIX}`,
+      '两条腿必须产出不同的选择器（否则其中一条是死规则）',
     )
     // ⑧ 地面颗粒的混合模式跟着轴走（地面深色轴 screen / 浅色轴 multiply）：
     //    第二条规则只改 background-blend-mode，其余声明继续由第一条承担（配方只有一份）。
