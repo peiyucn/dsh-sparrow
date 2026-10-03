@@ -28,4 +28,10 @@
 * 首屏 ready 门的**初值**改为 loading（挂载即打开 ⇒ 不再有「点击处理器里同批置位」这一步）；
   `test/structure.test.mjs` 的那条首帧守卫已按新形状改写。
 * theme-tone 的 `DIALOG_ANCHOR` 从此**不再命中本页面**（不再是 dialog）——后果与归属见共享 spec
-  《实施记录 → 交给 owner / 另一路》。
+  《实施记录 → 交给 owner / 另一路》第 1 条。
+  ⚠️ **2026-10-03 复核：那条「后果」推断不成立、已结清** —— 锚点确实不再命中，
+  但本页自己是**透明**的（`background-color: rgba(0,0,0,0)`），而 theme-tone 的
+  `position: fixed` 地面层在其后铺满视口 ⇒ 质感与打光**照旧在**（真机像素实测：
+  与对话区地面的亮度 / 颗粒 / 暖度三项同值）。详见
+  [共享 spec 第 1 条](../../dsh-archive-manage/docs/spec/16-main-panel-entry.md) 与
+  [`docs/upstream/audit-2026-10-03.md`](../../../../docs/upstream/audit-2026-10-03.md) §3。

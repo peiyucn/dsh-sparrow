@@ -110,15 +110,28 @@ SidebarRoot.module.css:82-86
 
 ### ⚠️ 交给 owner / 另一路（不在本插件写域内）
 
-1. **theme-tone 的 `DIALOG_ANCHOR`（`body [role='dialog']:not(:has(> img))`）
-   从此不再命中这两个插件的页面** —— 它们不再是 dialog。后果：色调插件的
-   颗粒 / 打光两张图层规则（`SURFACE_ANCHORS` + `isolation: isolate` 那条）对
-   **归档页 / 云端文件页**失去命中，页面退回官方纯色面（颜色仍由 token 层给）。
-   该文件归另一路（`plugins/dsh-theme-tone/**`），本插件不动它，留待其同步。
+1. ~~**theme-tone 的 `DIALOG_ANCHOR` 从此不再命中这两个插件的页面** ⇒ 颗粒 / 打光失去命中，
+   页面退回官方纯色面。~~ → **2026-10-03 全面审计复核：这个推断不成立，已结清。**
+   锚点确实不再命中（本页不再是 dialog），但**质感并没有丢** —— 真机像素实测
+   （暗色轴，各取 200×100 空白区）：
+
+   | 采样区 | 亮度 | 颗粒（亮度标准差） | 暖度 |
+   | :--- | ---: | ---: | ---: |
+   | 归档页空白区 | 19.67 | 2.246 | −5.53 |
+   | 对话区地面（对照） | 19.40 | 2.201 | −5.31 |
+
+   ⇒ 三项基本同值。机制：本页自己是**透明**的（`background-color: rgba(0,0,0,0)`），
+   而 theme-tone 的**地面层**是 `position: fixed` 的整屏元素、在其后铺满视口；
+   单独隐藏地面层该区亮度 19.67 → 10.43（**地面贡献 9.24 亮度**）。
+   ⇒ 「失去命中 = 退回纯色面」只在**页面自己不透明**时成立。**无需再同步。**
+   （原判断的完整记录与实测数据见 [`docs/upstream/audit-2026-10-03.md`](../../../../docs/upstream/audit-2026-10-03.md) §3。）
    **二次确认框不受影响**：它现在是官方 `Modal`，遮罩带官方 `_mask` 哈希类、
    卡片是 `role='dialog'` ⇒ 两条锚点照旧命中。
-2. theme-tone `src/mask.ts` 头部注释里「本仓库 `dsh-archive-manage` / `dsh-file-manage`
-   的遮罩是 `role="presentation"` + 内联 `backdrop-filter`」那句**已过期**
-   （我们的确认框现在走官方 `Modal`）。同样不在本写域内。
+2. ~~theme-tone `src/mask.ts` 头部注释里「本仓库 `dsh-archive-manage` / `dsh-file-manage`
+   的遮罩是 `role="presentation"` + 内联 `backdrop-filter`」那句**已过期**。~~
+   → **已同步**：`src/mask.ts` 那张表保留为历史，紧邻处已写明「2026-10-01 实测：后半条现在
+   一条也不命中」并说明为何**保留**它是防御性的（本仓库任一插件若再退回那种自建遮罩写法，
+   这条无需改动即可覆盖）。计数见 `docs/private-seams.md` §D。
 3. **Windows 桌面端收起左栏时 `panelList` 整个 `display: none`**（本文档 §四）——
    本次改动**没有**修好这一点，仍是「收起态两种入口都不可达」。
+   **未变（2026-10-03 复核）**：代码里仍没有收起态入口，该缺口照旧。
