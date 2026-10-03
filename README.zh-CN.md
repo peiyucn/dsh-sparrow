@@ -31,6 +31,7 @@
 
 ## 已退役
 
+* **[~~dsh-nav-pin~~](plugins/dsh-nav-pin/README.zh-CN.md)**——轮次导航窄屏不消失。已并入 **`dsh-theme-tone`**（2026-09-29）：选了非「默认」色调即内置同款行为。新装请勿安装它。卸载：`dsh plugin --profile web remove @dsh-sparrow/dsh-nav-pin`。
 * **[~~dsh-vision-bridge~~](plugins/dsh-vision-bridge/README.zh-CN.md)**——纯文本主模型的视觉通道：`vision_read` 工具用官方 DeepSeek 视觉模型读图并回传结构化文字报告。DeepSeek 主模型已原生多模态，请直接用 `deepseek-flash`；卸载：`dsh plugin --profile web remove @dsh-sparrow/dsh-vision-bridge`。
 
 ## License
