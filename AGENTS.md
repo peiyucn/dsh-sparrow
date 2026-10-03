@@ -12,7 +12,8 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 * `plugins/dsh-codebuddy-credits` — CodeBuddy 额度 LLM provider（官方 API Key 直连）
 * `plugins/dsh-theme-tone` — 明暗主题之下的色调层 + **对话区布局优化**（每轴各一款「官方默认」+ 若干色调；色调同时驱动抬升面的色相与质感，另含顶栏 / 输入框的玻璃效果；**选了非「默认」色调**时轮次导航窄屏不消失与内容宽度钳制一并生效，拖拽条悬停光带修复则两个档位都生效）
 * **口径：五个活跃插件 + 两个已退役插件**
-* 验证：插件目录 `npm run verify`；全量 = 根 `npm run verify`（**已退役插件不参与**，名单见 `scripts/verify-all.mjs` 的 `RETIRED_PLUGINS`）；分项 = 根 `pnpm run <step>:all`
+* 验证：插件目录 `npm run verify`；全量 = 根 `npm run verify`（**已退役插件不参与**，名单见 `scripts/plugin-set.mjs` 的 `RETIRED_PLUGINS`——**单一真值**，`verify-all.mjs` / `check-dsh-pin.mjs` / `check-plugin-docs.mjs` 共用）；分项 = 根 `pnpm run <step>:all`
+* 根 `verify` 的守卫链（按序）：`check:paths`（本机绝对路径）→ `check:dsh-pin`（官方版本 pin 单一真值）→ `check:plugin-docs`（根 README 中英双份的插件表 / 退役小节 / `SECURITY.md` 支持表与 `RETIRED_PLUGINS` 一致）→ `verify:all`
 
 ## 文档规范
 

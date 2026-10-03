@@ -4,11 +4,16 @@
 
 | 插件 / Plugin | 支持 / Supported |
 | :--- | :--- |
-| `plugins/*` 全部插件（dsh-chat-fim、dsh-archive-manage、dsh-nav-pin、dsh-file-manage） | 仅最新发布版 / Latest release only |
+| `plugins/*` 活跃插件（dsh-theme-tone、dsh-archive-manage、dsh-file-manage、dsh-chat-fim、dsh-codebuddy-credits） | 仅最新发布版 / Latest release only |
 
-> `dsh-vision-bridge` 已于 2026-09-10 退役（DeepSeek 主模型已原生多模态），不再提供支持。
+> 已退役插件不再提供支持（代码原地保留作历史，见根 README《Retired》）：
 >
-> `dsh-vision-bridge` was retired on 2026-09-10 (DeepSeek main models are natively multimodal); it is no longer supported.
+> * `dsh-nav-pin` —— 2026-09-29 并入 `dsh-theme-tone`。
+> * `dsh-vision-bridge` —— 2026-09-10 退役（DeepSeek 主模型已原生多模态）。
+>
+> Retired plugins are no longer supported (their code is kept in-tree for history; see the
+> root README's "Retired" section): `dsh-nav-pin` (merged into `dsh-theme-tone`, 2026-09-29)
+> and `dsh-vision-bridge` (retired 2026-09-10 — DeepSeek main models are natively multimodal).
 
 ## 报告漏洞 / Reporting a Vulnerability
 
