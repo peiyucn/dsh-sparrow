@@ -68,9 +68,14 @@ export function slotSelector(label: string): string {
 /**
  * 恒显规则：压过官方 `@container (max-width: 900px)` 的 `display: none`（特异性更高，无需 !important）。
  *
- * ⚠️ 0.1.7 起官方把隐藏规则的作用目标从外层 `div.slot` 换成了 **`nav.frame` 本身**
- * （rc.2 `TurnNavigator.module.css:217-221` 隐藏 `.slot`；rc.1 `:206-210` 隐藏 `.frame`，
- * 而 `.frame` 就是那个 `<nav aria-label=…>`）—— 故本规则也必须跟着打到 **nav** 上，
+ * ⚠️ 隐藏规则的作用目标换过一次，**换点是 0.1.7-alpha.2**（逐 tag 实测
+ * `packages/client/ui-chat/src/client/chat/TurnNavigator.module.css`，注意不在 ui-conversation）：
+ * v0.1.5-rc.2 / v0.1.6-alpha.2 隐藏外层 `.slot`（:217-221 / :217-221），v0.1.7-alpha.1 仍隐藏 `.slot`（:200-204），
+ * **v0.1.7-alpha.2 起改为隐藏 `nav.frame` 本身**（alpha.2 :206-210、rc.1 :206-210、rc.2 :207-211），
+ * 而 `.frame` 就是那个 `<nav aria-label=…>`。
+ * ⚠️ 本注释原先写成「0.1.7 起换、rc.1 才换」并把行号写成 rc.2 的 217-221 —— **两处都错**：
+ * 217-221 落在 `@media (prefers-reduced-motion: reduce)` 段，与隐藏规则无关。
+ * 结论不变且仍然必须遵守：本规则要跟着打到 **nav** 上，
  * 打在外层 slot 上等于空操作（实测：≤900px 导航依旧 display:none）。
  */
 function alwaysVisibleRule(labels: readonly string[]): string {
