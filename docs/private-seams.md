@@ -35,7 +35,9 @@
     等于把官方合法的公开契约降级成了私有 seam（官方改域名 / 改表名即静默失效）。
     **待办**：换成 import 官方 spec（属「收缩原则」，公开替代已存在）。
   * **`ctx.get('sessionProjections')` / `ctx.get('sessionProjectionCache')` + `fn.length` 形参自适应**
-    （`src/host.ts:202-253`）—— 按被调函数**形参个数**选择调用形态，而不是 try/catch 回退。
+    （`src/host.ts:202-253` 的 `cachedTitle`、`:571-600` 的 `subagentLabel`）—— 按被调函数**形参个数**
+    选择调用形态，而不是 try/catch 回退。**两处调用同一个 `cachedSnapshot`，必须同口径**：
+    只改一处会让另一处静默 miss（能取到缓存却永远读不出 label；不抛错、也不易被测试发现）。
     这是「同一能力在不同 dsh 线里签名不同」的兼容写法；官方给全签名后应删。
 
 ## B. 刻意改官方默认外观的例外（**均不带官方默认门**，两个档位都生效）

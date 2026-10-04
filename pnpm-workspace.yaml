@@ -9,7 +9,7 @@ allowBuilds:
   protobufjs: false
 
 # pnpm 供应链策略要求 24h 内的新版本显式放行；该配置**不支持带版本的 glob**，只能逐条列。
-# 下面 = 六个活跃插件在 dsh 0.2.0-rc.2 上的官方包闭包（按 checkout manifests 重算，含 peer / dependencies 边）
+# 下面 = 五个活跃插件在 dsh 0.2.0-rc.2 上的官方包闭包（按 checkout manifests 重算，含 peer / dependencies 边）
 #  + lockfile 里出现的其它 @deepseek-ai/*（cordis 插件族等）。发布满 24h 后可整段删。
 minimumReleaseAgeExclude:
   - '@deepseek-ai/cordis@4.0.4'

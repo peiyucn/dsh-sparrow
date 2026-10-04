@@ -13,10 +13,11 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 * `plugins/dsh-theme-tone` — 明暗主题之下的色调层 + **对话区布局优化**（每轴各一款「官方默认」+ 若干色调；色调同时驱动抬升面的色相与质感，另含顶栏 / 输入框的玻璃效果；**选了非「默认」色调**时轮次导航窄屏不消失与内容宽度钳制一并生效，拖拽条悬停光带修复则两个档位都生效）
 * **口径：五个活跃插件 + 两个已退役插件**
 * 验证：插件目录 `npm run verify`；全量 = 根 `npm run verify`（**已退役插件不参与**，名单见 `scripts/plugin-set.mjs` 的 `RETIRED_PLUGINS`——**单一真值**，`verify-all.mjs` / `check-dsh-pin.mjs` / `check-plugin-docs.mjs` 共用）；分项 = 根 `pnpm run <step>:all`
-* 根 `verify` = `pnpm run check` + `verify:all`；`check` 是**守卫链**（本地与 CI **同一入口**）：`check:paths`（本机绝对路径）→ `check:dsh-pin`（官方版本 pin 单一真值）→ `check:plugin-docs`（文档一致性，见下）
-* `check:plugin-docs` **守的八条**（只比结构与集合，**不比文案** —— 改措辞不该触发红灯）：① 根 README 中英双份的插件表 = 活跃集合；② 两份的《Retired / 已退役》点名全部退役插件；③ `SECURITY.md` 支持表只列活跃插件；④ `AGENTS.md` 点名全部插件且「口径：N 个活跃 + M 个已退役」的数字与实际一致；⑤ 每个活跃插件的 README / CHANGELOG **中英双份**各有 H1、顶部互链、`##` 数一致、顶层条目数一致；⑥ `package.json` 的 version 在两份 CHANGELOG 里都有版本段，且中英版本段序列与每段条目数一致；⑦ `package.json` 的 `files` 点名的 `.md` 都存在；⑧ README 里 `plugins/…` 相对链接都存在
+* 根 `verify` = `pnpm run check` + `verify:all`；`check` 是**守卫链**（本地与 CI **同一入口**）：`check:paths`（本机绝对路径 / 用户名，含 UNC 与大写不敏感匹配，二进制文件跳过）→ `check:dsh-pin`（官方版本 pin 单一真值；判据 4 按 README **环境要求行本身**校验、真值不唯一时不跳过）→ `check:plugin-docs`（文档一致性，见下）
+* `check:plugin-docs` **守的八条**（只比结构与集合，**不比文案** —— 改措辞不该触发红灯）：① 根 README 中英双份的插件表 = 活跃集合；② 两份的《Retired / 已退役》点名全部退役插件；③ `SECURITY.md` 支持表只列活跃插件；④ `AGENTS.md` 点名全部插件且「口径：N 个活跃 + M 个已退役」的数字与实际一致；⑤ 每个活跃插件的 README / CHANGELOG **中英双份**各有 H1、顶部互链、`##` 数一致、**条目数一致**；⑥ `package.json` 的 version 在两份 CHANGELOG 里都有版本段，且中英版本段序列与每段条目数一致；⑦ `package.json` 的 `files` 点名的 `.md` 都存在；⑧ README 里 `plugins/…` 相对链接都存在
+  * ⚠️ 判据 ⑤⑥ 的「条目数」口径 = **无序与有序、含缩进子条目**；结构统计**先剥掉围栏代码块与 HTML 注释（含跨行块）** —— 注释里的「条目」不算数，被注释吞掉的真条目也不算数
   * ⚠️ 判据 ⑤⑥ 是**双份文档**的核心：中英是两份文件，改一份不会提醒另一份 —— 漏译一条 / 漏一节即红
-  * ⚠️ CI 的每个 job 都跑 `pnpm run check`（不是只跑 `check:paths`）—— 2026-10-03 审计发现 CI 原先只跑 `check:paths`，`check:dsh-pin` 从未在 CI 里生效过。**新增守卫只需加进 `check`，CI 自动覆盖**；别在 workflow 里逐个列脚本。
+  * ⚠️ CI 的每个 job 都跑 `pnpm run check`（不是只跑 `check:paths`）—— **新增守卫只需加进 `check`，CI 自动覆盖**；别在 workflow 里逐个列脚本。
 
 ## 文档规范
 
@@ -53,14 +54,14 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 
 ## 安全基线（本仓库自含要点）
 
-* 已开启（2026-09 逐项核验）：Dependabot alerts（仅报警）、CodeQL default setup（weekly，JS/TS + actions）、secret scanning + push protection、Private vulnerability reporting、根 `SECURITY.md`
-* 分支保护三层（2026-09 逐项核验）：经典保护 ✓（main：要求对话解决 + 不允许绕过）；ruleset 轻保护 ✓（默认分支 + dev 各一条）；合并设置 **Squash-only** ✓；owner 保留 fast-forward 直推，**CI 会跑但不设硬门禁**
+* 已开启：Dependabot alerts（仅报警）、CodeQL default setup（weekly，JS/TS + actions）、secret scanning + push protection、Private vulnerability reporting、根 `SECURITY.md`
+* 分支保护三层：经典保护 ✓（main：要求对话解决 + 不允许绕过）；ruleset 轻保护 ✓（默认分支 + dev 各一条）；合并设置 **Squash-only** ✓；owner 保留 fast-forward 直推，**CI 会跑但不设硬门禁**
 * 外部 PR / Issue 一律开放，owner 审核合并（Squash-only）；核验按根规范《统一安全基线 · 逐项检查命令》逐项跑
 
 ## CI 与自动发布
 
 * `ci.yml`（push dev/main 与 PR）：`typecheck` → `build` → `test`（JUnit artifact；测试依赖 lib/ 故 build 在前）→ `package`（`npm pack --dry-run` 校验 files 清单）
-* `publish.yml`（push `<插件名>-vX.Y.Z` tag 或 workflow_dispatch 指定插件）：解析插件 / 校验版本 / verify 后 `npm publish`；同文件含 promote 手动任务（`npm dist-tag add` 移通道，deprecate 归 owner 本机）；publish job 挂 `environment: npm-publish`，**无 release-control**
+* `publish.yml`（push `<插件名>-vX.Y.Z` tag 或 workflow_dispatch 指定插件）：解析插件 / 校验版本 / **跑根 `pnpm run check`（守卫 fail-closed，守卫红则不发）** / verify 后 `npm publish`；同文件含 promote 手动任务（`npm dist-tag add` 移通道，deprecate 归 owner 本机；三个输入（plugin/version/tag）缺任一即**非零退出**，不静默成功）；publish job 挂 `environment: npm-publish`，**无 release-control**
 * 鉴权双模式：有 `NPM_TOKEN` 走 Automation token（首发必需），无则走 npm Trusted Publishing（OIDC）
 
 ## GitHub 与网络
@@ -80,7 +81,7 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 
 * **生命周期**：一切副作用在 `apply` 内注册并配 `ctx.effect` 清理；不泄漏定时器 / watcher / 监听
 
-* **宿主兼容自检（五个活跃插件全有）**：`apply` 开头先跑本插件 `src/compat.ts` 的门，不通过即**自停用**——cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响（`lib/index.js:1350-1362`）。用户只升级 dsh、不升级插件时，插件必须自己让位。两档门：
+* **宿主兼容自检（五个活跃插件全有）**：`apply` 开头先跑本插件 `src/compat.ts` 的门，不通过即**自停用**——cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响（`@deepseek-ai/cordis` 的 `lib/index.js:1349-1363`，`_reload()` 的 try/catch）。用户只升级 dsh、不升级插件时，插件必须自己让位。两档门：
 
   * **能力门**（全部插件）：`assertCapabilities(ctx, name, [{ name, ok }])`——宿主服务 / 方法 / 导出、运行环境特性缺任一即停用；探针用**命名空间访问或惰性 import**，不产生链接期失败
   * **会话格式门**（读会话数据的 archive / chat-fim）：常量探针 `assertHostCompatible(ctx, name)`（官方 `SESSION_FORMAT_VERSION` 须在支持集合内）+ **宿主真值** `unsupportedStoredFormatReason(headers)`——常量探针在 `link:` / peer 副本场景会读到插件自己的旧版官方包，故以宿主给出的会话 `header.version` 为准（archive 在移动 / 删除前逐 header 校验，chat-fim 在读取前校验）
