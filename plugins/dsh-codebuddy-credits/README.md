@@ -3,21 +3,18 @@
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
 Company CodeBuddy credits as a DeepSeek Harness (DSH) LLM provider — your
-enterprise-issued CodeBuddy quota, used directly inside DSH. Official API key
-only: CodeBuddy contributes just the model inference your credits pay for; the
-agent harness (tools, permissions, context) is entirely DSH's.
+enterprise-issued CodeBuddy quota, used directly inside DSH. API key only:
+CodeBuddy provides the model inference your credits pay for, while tools,
+permissions and context stay with DSH.
 
-The plugin registers a `CodeBuddy Credits` provider (route
-`codebuddy-credits`) in the DSH model picker. DSH runs its own agent loop
-(tools, permissions, context); CodeBuddy only serves inference, billed to your
-CodeBuddy account.
+The plugin adds a `CodeBuddy Credits` provider to the DSH model picker.
 
 ## Why
 
 Companies issue WorkBuddy/CodeBuddy credits that can only be spent inside the
 CodeBuddy ecosystem. If you prefer DSH as your agent harness, this plugin
-spends those credits where you want them — through the official API key
-mechanism, without borrowing browser logins or the CodeBuddy CLI.
+spends those credits where you want them — with an API key, without borrowing
+browser logins or installing the CodeBuddy CLI.
 
 ## Requirements
 
@@ -44,19 +41,17 @@ Restart DSH afterwards. For headless use, repeat with `--profile headless`.
 
 Open **Settings → Models** and paste your key on the **CodeBuddy Credits** row:
 
-- Saving the key queries the CodeBuddy model catalog with that key (models
-  follow the key's account permissions — e.g. the set your enterprise admin
-  granted) and activates the provider. The catalog is held in memory and
-  refreshed on demand; it is never written to settings.
+- Saving the key loads the models that key can use (they follow the key's
+  account permissions — e.g. the set your enterprise admin granted) and turns
+  the provider on. The list is kept in memory and refreshed on demand; it is
+  never written to settings.
 - Once configured, the card also lists the models the key can use (read-only:
   plain name + `x0.00 · 1M` credit rate · context window) with a **Fetch
-  available models** button to re-scan after an administrator changes the
-  list. The refresh only touches this provider.
-- The models then appear in the model picker. The picker is a
-  CodeBuddy-aware variant of the official one: each model row shows the plain
-  model name with its read-only facts on the right (`x0.00 · 1M` — credit rate
-  · context window), and reasoning-effort choices follow what the server
-  declares per model.
+  available models** button, so you can refresh after an administrator changes
+  the list. Refreshing only affects this provider.
+- The models then appear in the model picker. Each model row shows the plain
+  model name with its credit rate and context window on the right
+  (`x0.00 · 1M`), and the available reasoning levels come from the server.
 - Without a key the plugin makes no network requests at all and the provider
   does not appear in the model picker.
 - Removing the key deactivates the provider.
@@ -75,20 +70,19 @@ conversation UI:
   Session log button — shown on conversation pages and on the new-session
   page alike): opens a panel with your account/enterprise, current-cycle
   quota (used / limit / remaining, progress bar, reset date) and the selected
-  CodeBuddy model's read-only facts (credit rate · context window), description,
-  and capabilities. When the conversation area gets narrow this entry
-  automatically collapses to the **icon-only, text-free** version (the same
-  scaling strategy the official Agent Team button uses);
-- **Session credit pill**: one more pill of the same kind in the official stats
-  row under the composer — accumulated credits and call count for the current
-  conversation; clicking it opens the call count and the per-model breakdown.
-- **Per-turn credit pill**: credits spent for one assistant turn (at the end
+  CodeBuddy model's credit rate, context window, description and capabilities.
+  When the conversation area gets narrow this entry automatically collapses to
+  the **icon-only, text-free** version;
+- **Session credits**: shown in the stats row under the composer, together
+  with the accumulated credits and call count for the current conversation;
+  clicking it opens the call count and the per-model breakdown.
+- **Per-turn credits**: credits spent for one assistant turn (at the end
   of its action row), with a popup breaking the total down per call and per
   model.
 
-Session and per-turn figures are replayed from the session's own event log, so
+Session and per-turn figures are kept from the session's own history, so
 they survive a DSH restart and stay correct when you reopen an older session;
-the quota panel always reads the authoritative server-side number.
+the quota panel always reads the latest number from the server.
 
 ## Screenshots
 

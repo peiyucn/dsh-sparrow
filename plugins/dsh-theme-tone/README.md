@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
-Tone skins for the official light and dark themes, plus conversation-area layout tuning once a tone is picked — a DeepSeek Harness (DSH) web plugin (dsh-sparrow collection member).
+Tone skins for DSH's built-in light and dark themes, plus conversation-area layout tuning once a tone is picked — a DeepSeek Harness (DSH) web plugin (dsh-sparrow collection member).
 
 ## Install
 
@@ -16,25 +16,25 @@ Requires dsh 0.2.0-rc.2 — the exact official version line this release is buil
 
 ## Usage
 
-Open **Settings → General** — a **Tone** row sits directly under the official **Appearance** row. Light and dark each get four skins, plus a **Default**:
+Open **Settings → General** — a **Tone** row sits directly under the **Appearance** row. Light and dark each get four skins, plus a **Default**:
 
 | Appearance | Skins |
 | :--- | :--- |
-| Dark | Default (official black), Space, Ember, Glade |
-| Light | Default (official white), Frost, Sakura, Moss |
+| Dark | Default, Space, Ember, Glade |
+| Light | Default, Frost, Sakura, Moss |
 
-Picking any tone other than **Default** also tunes the conversation layout (on **Default** everything stays exactly as the official build):
+Picking any tone other than **Default** also tunes the conversation layout (on **Default** everything stays as it is):
 
-* Turn navigation: the official build hides the rail entirely below a 900px conversation column; with a tone picked the breakpoint moves to 700px, and below 700px the rail is hidden by default and fades in on hover over the right edge (or keyboard focus) — no frame, no background
-* Conversation content clearance: on wide columns at least 120px per side (official: 88px); on narrow columns the content clamps to the official 640px minimum so the right drag handle no longer crowds the rail
+* Turn navigation: with a tone picked, the rail stays available on narrower conversation columns than on **Default**; at the narrowest widths it is hidden by default and fades in on hover over the right edge (or keyboard focus) — no frame, no background
+* Conversation content clearance: the conversation keeps wider side margins on wide columns; on narrow columns the content no longer runs under the right drag handle
 
-It also fixes a small official glitch (**no tone needed — active on both**): hovering either "resize conversation" drag handle left the official vertical glow sitting low (it only snapped to the pointer once you held the button down); the glow now follows the pointer on hover too.
+It also fixes a drag-handle glitch (**no tone needed — active in both themes**): hovering either "resize conversation" drag handle used to leave the highlight sitting low, only snapping to the pointer once you held the button down; the highlight now follows the pointer on hover too.
 
 ## Compatibility
 
 * Targets dsh 0.2.0-rc.2 — the exact official version line this release is built and verified against (other lines are not covered)
 * Appearance only: it never blocks the UI or changes how anything works
-* When the host or the browser is missing something it needs, the plugin steps aside: the UI opens normally and it draws nothing (for a missing theme, slot, or browser feature it also logs a user-facing warning)
+* When the host or the browser is missing something it needs, the plugin steps aside: the UI opens normally and it draws nothing (it also logs a user-facing warning)
 
 ## Screenshots
 
@@ -44,7 +44,7 @@ It also fixes a small official glitch (**no tone needed — active on both**): h
 
 ## Uninstall & leftovers
 
-* Uninstalling removes everything the plugin added; the settings row disappears and the look returns to the official one
+* Uninstalling removes everything the plugin added; the settings row disappears and the look returns to the default one
 * Your selection stays in `$DSH_HOME/settings.yaml` under `dsh-theme-tone` but has no effect after removal — delete that section if you want it gone
 
 **Changelog**: [CHANGELOG.md](https://github.com/peiyucn/dsh-sparrow/blob/main/plugins/dsh-theme-tone/CHANGELOG.md)
