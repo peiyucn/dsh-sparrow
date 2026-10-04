@@ -3,6 +3,50 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 
+/**
+ * npm `files` 数组的 glob 语义（只实现本仓库用到的子集，不引第三方依赖）：
+ * - `*` 匹配**单个**路径段内任意字符（不跨 `/`）；`?` 同理单字符。
+ * - `**` 跨路径段匹配任意深度；`**\/` 可匹配**零个**目录（故 `lib/**\/*.js` 覆盖 `lib/a.js`）。
+ * - 以 `!` 开头的条目是否定项，命中即排除（npm 的 files 里 `!` 是排除语义）。
+ *
+ * 之前这里的守卫写作 `pkg.files.includes('lib/**\/*.js') || pkg.files.includes(\`lib/${dep}.js\`)`——
+ * 第一支是**常量**，短路后恒真，依赖名即使不存在也照样通过（三个插件同型的假守卫）。
+ * 现在改成真的按 glob 算「这个 dep 的产物会不会被打包」。
+ */
+const globToRegExp = (pattern) => {
+  let out = ''
+  for (let i = 0; i < pattern.length; i++) {
+    const char = pattern[i]
+    if (char === '*') {
+      if (pattern[i + 1] === '*') {
+        // `**/` 吃掉整个路径段（含零个）；裸 `**` 跨段匹配。
+        if (pattern[i + 2] === '/') { out += '(?:[^/]+/)*'; i += 2 } else { out += '.*'; i += 1 }
+      } else {
+        out += '[^/]*'
+      }
+    } else if (char === '?') {
+      out += '[^/]'
+    } else {
+      out += char.replace(/[.+^${}()|[\]\\]/gu, '\\$&')
+    }
+  }
+  return new RegExp(`^${out}$`, 'u')
+}
+
+/** 该路径是否会被这份 `files` 清单打进 npm 包（任一正向条目覆盖，且不被任何否定条目排除）。 */
+const packagedByFiles = (files, path) => {
+  let covered = false
+  for (const entry of files) {
+    if (typeof entry !== 'string') continue
+    const negative = entry.startsWith('!')
+    const target = negative ? entry.slice(1) : entry
+    if (!globToRegExp(target).test(path)) continue
+    if (negative) return false
+    covered = true
+  }
+  return covered
+}
+
 describe('dsh-archive-manage 结构', () => {
   it('package.json 应该 声明 dsh.bundle 与 dsh.client（侧边栏入口依赖）', async () => {
     const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
@@ -19,12 +63,26 @@ describe('dsh-archive-manage 结构', () => {
     const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
     const index = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8')
     const deps = [...index.matchAll(/from '\.\/([^']+)\.js'/gu)].map(match => match[1])
+    assert.ok(deps.length > 0, 'src/index.ts 应当静态 re-export 至少一个兄弟模块')
     for (const dep of deps) {
+      // 真按 glob 算：依赖名不存在 / 被否定项排除 / 无正向覆盖，三者都该红。
       assert.ok(
-        pkg.files.includes('lib/**/*.js') || pkg.files.includes(`lib/${dep}.js`),
-        `files 缺少 lib/${dep}.js（lib/index.ts 静态 re-export 了它）`,
+        packagedByFiles(pkg.files, `lib/${dep}.js`),
+        `files 未覆盖 lib/${dep}.js（lib/index.ts 静态 re-export 了它）—— 发布包会缺文件`,
       )
     }
+    // ⚠️ 否定项 `!lib/client/**` 排除的是 **目录** lib/client/ 下的散装模块
+    // （host/客户端共用的 TS 源编译产物），**不**排除同级文件 lib/client.js ——
+    // 后者是 `exports['./client']` 指向的 bundle，必须进包。两条一起钉，
+    // 防有人把否定项写成能误伤 client.js 的形状（或反过来漏掉散装模块）。
+    assert.equal(packagedByFiles(pkg.files, 'lib/client/ArchivePage.js'), false,
+      'lib/client/ 下的散装模块应被 !lib/client/** 排除出包（它们已被 bundle 进 lib/client.js）')
+    assert.equal(packagedByFiles(pkg.files, 'lib/client.js'), true,
+      'lib/client.js 是 exports["./client"] 的 bundle，必须进包（否定项不得误伤）')
+    // 守卫自身不得恒真：把覆盖该 dep 的那条正向规则去掉后，必须判为「不会被打包」。
+    const withoutGlob = pkg.files.filter(entry => entry !== 'lib/**/*.js')
+    assert.equal(packagedByFiles(withoutGlob, 'lib/archive.js'), false,
+      '去掉 lib/**/*.js 后 lib/archive.js 仍被判为会打包 —— glob 匹配恒真，守卫没生效')
   })
 
   it('cordis.patch.yml 应该 按 bundle patch 结构插入 host 行', async () => {
