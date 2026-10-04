@@ -568,17 +568,30 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
     }
     return undefined
   }
+  // 形参表跨版本变过（旧 3 参 `(meta, inheritedEventCount, keys?)` / rc.2 起 2 参 `(meta, keys?)`），
+  // 故这里按 `fn.length` 自适应调用 —— 与 cachedTitle（本文件 :215-247）同一口径、同一理由：
+  // 多传参数**不抛错**（只是被忽略），catch 兜不住「keys 收到 0」这类错，必须显式判断。
   const cache = ctx.get('sessionProjectionCache') as unknown as {
-    cachedSnapshot?: (header: unknown, cut: unknown, units: readonly string[]) => { values: Record<string, SubagentIdentityValue | null | undefined> } | undefined
+    cachedSnapshot?: (...args: unknown[]) => { values: Record<string, SubagentIdentityValue | null | undefined> } | undefined
   } | undefined
   if (cache !== undefined && typeof cache.cachedSnapshot === 'function') {
     try {
       // 行的可靠性由官方保证：cachedSnapshot 先过 identityMatches（createdAt/cwd/isSeeded/
-      // inheritedEventCount，session-projection-cache/src/index.ts:377，由 recordFor:116 调用）
+      // inheritedEventCount，session-projection-cache/src/index.ts:435，由 recordFor:136 调用）
       // 验「这份缓存属于这条生命周期」，viewCheckpoint 再丢弃 ver 与 live unit 不一致的行
       // （session-projection/src/index.ts:448）。所以拿到的 identity 是这份日志的有效折叠
       // 结果，可以直接当权威结论用。
-      const settled = labelFromSubagentIdentity(cache.cachedSnapshot(header, 0, ['subagent'])?.values?.subagent)
+      //
+      // ⚠️ 写死 3 参会静默毁掉这一档：rc.2 的 `cachedSnapshot(meta, keys?)` 只有 2 个形参，
+      // 第 3 实参被丢弃、`keys` 实收数字 `0` ⇒ 官方 `viewCheckpoint` 里 `new Set<string>(0)`
+      // 抛 TypeError（session-projection/src/index.ts:453）⇒ 被下面 catch 吞掉 ⇒ **100% miss**
+      // ⇒ 每次都退到第三档全量日志折叠（实测单会话 1.7 MB~37 MB 压缩态，远超 LABEL_FOLD_TIMEOUT_MS）
+      // ⇒ 归档面板里子会话「名字变 id」。与 cachedTitle 那次的真机表现同源。
+      const fn = cache.cachedSnapshot as (...args: unknown[]) => { values: Record<string, SubagentIdentityValue | null | undefined> } | undefined
+      const snap = fn.length >= 3
+        ? fn.call(cache, header, 0, ['subagent'])
+        : fn.call(cache, header, ['subagent'])
+      const settled = labelFromSubagentIdentity(snap?.values?.subagent)
       if (settled !== undefined) return settled ?? undefined // 有标签返回标签；权威无标签直接结束（不再折叠）
     } catch (error) {
       ctx.logger.warn(`dsh-archive-manage: subagent 投影缓存读取失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)

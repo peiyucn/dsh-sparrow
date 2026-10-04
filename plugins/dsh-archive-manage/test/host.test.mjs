@@ -441,14 +441,43 @@ describe('archive-manage host 纯逻辑', () => {
 
   describe('subagentLabel 三档读链', () => {
     const labelHeader = (id, extra = {}) => ({ id, createdAt: 1, isSeeded: false, origin: 'subagent', ...extra })
-    const labelCtx = ({ live, cacheRow, cacheThrows = false, observe, observeThrows = false }) => ({
+
+    /**
+     * 官方 `viewCheckpoint` 的 keys 语义（session-projection/src/index.ts:453）：
+     * `keys === undefined` 取全部单元；否则 `new Set(keys)` —— **非数组会抛 TypeError**
+     * （数字 `0` 即 `new Set(0)`）。桩按这个语义处理 keys，才能让「写死三参」的调用
+     * 在测试里真的翻车，而不是被常量返回值掩盖。
+     */
+    const viewWithKeys = (row, keys) => {
+      const selected = keys === undefined ? undefined : new Set(keys)
+      if (row === undefined) return undefined
+      if (selected === undefined || selected.has('subagent')) return row
+      return { values: {} }
+    }
+
+    /**
+     * 官方 rc.2 的 `cachedSnapshot(meta, keys?)` 是 **2 形参**；旧契约
+     * （0.1.5-rc.3 / 0.1.6-alpha.2）是 3 形参 `(meta, inheritedEventCount, keys?)`。
+     * 桩必须用**真实形参个数**：0 参桩会让源码里的 `fn.length >= 3` 恒假，
+     * 于是「写死三参调用」这一侧的 bug 永远走不到（这正是本回归漏网的原因）。
+     * @param signature - 'rc2'（2 形参，被测默认）| 'legacy'（3 形参）。
+     */
+    const cacheStub = (row, signature) => {
+      if (signature === 'legacy') {
+        return function cachedSnapshotLegacy(meta, inheritedEventCount, keys) { return viewWithKeys(row, keys) }
+      }
+      return function cachedSnapshotRc2(meta, keys) { return viewWithKeys(row, keys) }
+    }
+
+    const labelCtx = ({ live, cacheRow, cacheThrows = false, cacheSignature = 'rc2', observe, observeThrows = false }) => ({
       sessions: { get: () => live },
       get: (name) => {
         if (name === 'sessionProjections') {
           return live === undefined ? undefined : { snapshot: () => ({ values: { subagent: { label: 'live-label', seq: 7 } } }) }
         }
         if (name === 'sessionProjectionCache') {
-          return { cachedSnapshot: cacheThrows ? () => { throw new Error('cache boom') } : () => cacheRow }
+          if (cacheThrows) return { cachedSnapshot: (meta, keys) => { throw new Error('cache boom') } }
+          return { cachedSnapshot: cacheStub(cacheRow, cacheSignature) }
         }
         if (name === 'sessionQuery') {
           return { observeSession: observeThrows ? async () => { throw new Error('fold boom') } : observe }
@@ -511,6 +540,65 @@ describe('archive-manage host 纯逻辑', () => {
     it('冷会话 + 缓存命中 应该 用缓存行标签', async () => {
       const ctx = labelCtx({ cacheRow: { values: { subagent: { label: 'cached-label' } } } })
       assert.equal(await subagentLabel(ctx, labelHeader('cold-cache-1')), 'cached-label')
+    })
+
+    /**
+     * ⛔ 回归（2026-10-04，H1）：官方 rc.2 的 `cachedSnapshot` 是 **2 参** `(meta, keys?)`，
+     * 而本插件 subagentLabel 第二档曾写死 **3 参** `(header, 0, ['subagent'])` ——
+     * 第 3 实参被丢弃、`keys` 实收数字 `0` ⇒ 官方 `viewCheckpoint` 里 `new Set(0)` 抛
+     * TypeError ⇒ 被 catch 吞掉 ⇒ **这一档 100% miss**（与 cachedTitle 那次同源，
+     * 同一文件 :244-247 已按 `fn.length` 自适应修好，这处漏改）。
+     *
+     * 本用例在修复前**必须红**：桩用真实 2 形参签名，且 keys 非数组即抛错。
+     */
+    it('⛔ 官方 2 参签名（rc.2）+ 冷会话 + 缓存有 label 应该 返回该 label（写死三参会静默 miss）', async () => {
+      const receivedKeys = []
+      const ctx = {
+        sessions: { get: () => undefined },
+        get: (name) => {
+          if (name !== 'sessionProjectionCache') return undefined
+          return {
+            // 真实 rc.2 形态：2 形参，keys 省略 / 数组都要能吃，收到数字即抛（官方 new Set(0) 语义）。
+            cachedSnapshot: function cachedSnapshotRc2(meta, keys) {
+              receivedKeys.push(keys)
+              if (keys !== undefined && !Array.isArray(keys)) {
+                throw new TypeError(`Invalid value used in weak set: ${String(keys)}`)
+              }
+              const selected = keys === undefined ? undefined : new Set(keys)
+              return selected === undefined || selected.has('subagent')
+                ? { values: { subagent: { mode: 'one-shot', label: 'rc2-cached-label', seq: 5 } } }
+                : { values: {} }
+            },
+          }
+        },
+        logger: { warn: () => {} },
+      }
+      assert.equal(await subagentLabel(ctx, labelHeader('rc2-cache-1')), 'rc2-cached-label')
+      // 键位也要对：keys 不能是数字 0，只能是数组（或省略）。
+      assert.deepEqual(receivedKeys, [['subagent']])
+    })
+
+    it('官方旧 3 参签名（0.1.5-rc.3 / 0.1.6-alpha.2）应该 仍取到缓存 label（形参自适应不得只认新签名）', async () => {
+      const receivedKeys = []
+      const ctx = {
+        sessions: { get: () => undefined },
+        get: (name) => {
+          if (name !== 'sessionProjectionCache') return undefined
+          return {
+            // 旧契约：中间那个 inheritedEventCount 位还在，keys 在第 3 位。
+            cachedSnapshot: function cachedSnapshotLegacy(meta, inheritedEventCount, keys) {
+              receivedKeys.push({ inheritedEventCount, keys })
+              const selected = keys === undefined ? undefined : new Set(keys)
+              return selected === undefined || selected.has('subagent')
+                ? { values: { subagent: { mode: 'one-shot', label: 'legacy-cached-label', seq: 5 } } }
+                : { values: {} }
+            },
+          }
+        },
+        logger: { warn: () => {} },
+      }
+      assert.equal(await subagentLabel(ctx, labelHeader('legacy-cache-1')), 'legacy-cached-label')
+      assert.deepEqual(receivedKeys, [{ inheritedEventCount: 0, keys: ['subagent'] }])
     })
 
     it('缓存落空 + 未种子 应该 从日志折叠并释放租约', async () => {

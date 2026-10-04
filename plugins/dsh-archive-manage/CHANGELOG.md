@@ -14,6 +14,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - The archive page no longer dims or blocks the rest of the interface: it is a normal page, and the way back to a conversation is the official one (pick a session in the sidebar, or New Session).
 - Fixed the archive page's text rendering larger than elsewhere: rows without a size of their own no longer fall back to the browser default, and text size and line height now match the official lists.
 - Fixed the divider above the "dsh-sparrow" brand line at the bottom of the archive page touching the content above it.
+- Fixed subagent rows in the archive area and the trash sometimes showing the parent session's text instead of the subagent's own label; that case no longer re-reads whole session logs either.
 
 ## 0.1.5-rc.2.4 (2026-09-21)
 
