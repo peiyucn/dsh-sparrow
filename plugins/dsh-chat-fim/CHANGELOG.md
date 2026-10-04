@@ -7,6 +7,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Version-line alignment with official dsh 0.2.0-rc.2; no user-perceivable change.
 - Fixed the suggestion toggle and candidate menu not showing after adapting to the 0.1.7 line (session format v4, renamed icons, slot injection signature).
 - Fixed one warning colour rendering wrong.
+- Fixed the failure reason shown when the upstream suggestion request times out: it used to say a generic request failure instead of the actual cause.
 
 ## 0.1.5-rc.2.1 (2026-09-21)
 

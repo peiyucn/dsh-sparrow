@@ -110,6 +110,20 @@ function sendError(res: ServerResponse, status: number, error: ChatFimError): vo
   sendJson(res, status, { error })
 }
 
+/**
+ * 是不是本插件自造的 `ChatFimError`。
+ *
+ * `code` 必须是**字符串**：`DOMException` 同样带 `code` / `message`，但它的 `code` 是数字
+ * （`TimeoutError` = 23），且 `JSON.stringify` 对它是 `{}`（枚举属性为空）——形状像
+ * ChatFimError，直接塞进 `{error}` 却会把 message 整个丢掉（实测落盘 body 就是 `{"error":{}}`）。
+ * 故这里按「两个字段都是字符串」判，非本插件形状的一律走下面的归一分支拿可读 message。
+ */
+function isChatFimError(value: unknown): value is ChatFimError {
+  if (typeof value !== 'object' || value === null) return false
+  const candidate = value as { code?: unknown; message?: unknown }
+  return typeof candidate.code === 'string' && typeof candidate.message === 'string'
+}
+
 async function readRequestBody(req: IncomingMessage, maxBodyBytes: number): Promise<{ ok: true; body: string } | { ok: false; error: ChatFimError }> {
   const chunks: Buffer[] = []
   let size = 0
@@ -148,6 +162,40 @@ function requestSignal(res: ServerResponse, timeoutMs: number): { signal: AbortS
       res.off('close', onClose)
     },
   }
+}
+
+/**
+ * 把「本次上游请求为什么被中止」映射成可直接使用的出口动作。
+ *
+ * **为什么必须有它**：请求是经 `Promise.allSettled` 收口的（多建议要部分失败容错），
+ * 于是超时 / 断开的拒绝**不会冒泡**到外层 `catch`，只留在 settled 结果里。若判定只写在
+ * catch 里，那两条分支就是死代码——实测超时返回的是 502 + 空错误体、诊断计数恒 0。
+ * 故判定必须**同时**放在 settled 结果这一侧（见 absorb 的 rejected 分支）。
+ *
+ * 语义与 catch 里的兜底分支逐字一致：超时（上游）→ 504；其余中止 → 客户端断开 → destroy。
+ * 正常完成的请求 `aborted` 恒为 false，两条都不命中，返回 undefined。
+ * @param signal - 本次请求的合并信号（客户端断开 + 超时）。
+ * @returns 中止出口；未中止时 undefined。
+ */
+function abortedOutcome(signal: AbortSignal): 'timeout' | 'aborted' | undefined {
+  if (!signal.aborted) return undefined
+  return isAbortTimeout(signal) ? 'timeout' : 'aborted'
+}
+
+/**
+ * 把一个中止出口记进诊断并写出响应。
+ * 超时 → 504 + TIMEOUT；客户端断开 → 销毁响应（人已不在，写什么都收不到，但绝不悬挂）。
+ * @param res - 响应对象。
+ * @param sessionKey - 诊断用的会话键。
+ * @param outcome - {@link abortedOutcome} 给出的出口。
+ */
+function sendAbortOutcome(res: ServerResponse, sessionKey: string, outcome: 'timeout' | 'aborted'): void {
+  bumpDiagnostics(outcome, sessionKey)
+  if (outcome === 'timeout') {
+    sendError(res, 504, { code: 'TIMEOUT', message: 'DeepSeek 续写上游超时' })
+    return
+  }
+  if (!res.headersSent) res.destroy()
 }
 
 /** 限量读取上游响应正文：超过 MAX_UPSTREAM_BODY_BYTES 即取消剩余流，防止异常上游超大 body 撑爆内存。 */
@@ -446,8 +494,11 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
             }
             const reason = result.reason
             if (firstError !== undefined) continue
-            firstError = typeof reason === 'object' && reason !== null && 'code' in reason && 'message' in reason
-              ? reason as ChatFimError
+            // 中止（超时 / 客户端断开）不是「上游报错」：它的出口是 504 / destroy，
+            // 由下面 abortedOutcome 的短路处理，故不当候选错误记（否则会和 502 抢出口）。
+            if (abortedOutcome(signal.signal) !== undefined) continue
+            firstError = isChatFimError(reason)
+              ? reason
               : { code: 'UPSTREAM_ERROR', message: reason instanceof Error ? reason.message : String(reason) }
           }
         }
@@ -459,14 +510,43 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
           )),
         ))
 
+        // 客户端断开（人已不在）：结果没人接收，直接销毁避免悬挂。
+        // 刻意与下面的超时出口分开判——断开无需再问「有没有候选」。
+        // 这条短路也挡住了断开后的那次「升温度重试」（信号已中止，重试必然白跑）。
+        const disconnected = abortedOutcome(signal.signal)
+        if (disconnected === 'aborted') {
+          sendAbortOutcome(res, sessionKey, 'aborted')
+          return
+        }
+
         // 候选全被护栏过滤（复读/回声）：升温度重试一次，多数时候能跳出复读循环；
         // 仍无候选则静默返回空建议（客户端不显示错误、不打扰用户）。
         if (suggestions.length === 0 && hadFulfilled) {
           bumpDiagnostics('retries', sessionKey)
           absorb(await Promise.allSettled([requestOnce(ECHO_RETRY_TEMPERATURE)]))
+          // 重试期间客户端断开：结果同样没人要，按断开出口收场。
+          if (abortedOutcome(signal.signal) === 'aborted') {
+            sendAbortOutcome(res, sessionKey, 'aborted')
+            return
+          }
         }
-        // 只有上游请求全部失败才报 502。
+        // 只有上游请求全部失败（一个 fulfilled 都没有）才报错。
         if (suggestions.length === 0 && !hadFulfilled) {
+          // 「全失败」分两种，靠 firstError 区分（absorb 已把中止类拒绝排除在 firstError 之外）：
+          //   · firstError 有值 = 上游**真报错**（429/500/非法 JSON…）→ 502 带那个可操作的原因；
+          //   · firstError 为空 + 信号超时 = 单纯超时、无任何可用结果 → 504。
+          // 位置很关键：必须在「有候选就照常返回」之后，否则 suggestionCount>1 时
+          // 「一个请求超时、另一个已拿到候选」会被误报 504 并丢掉到手候选（实测踩到过）。
+          // 为什么不能只靠外层 catch：请求经 allSettled 收口，超时的拒绝不冒泡，
+          // 判定若不放在这里就一直不可达（原缺陷：超时返回 502 + 空错误体、诊断恒 0）。
+          if (firstError === undefined && abortedOutcome(signal.signal) === 'timeout') {
+            sendAbortOutcome(res, sessionKey, 'timeout')
+            return
+          }
+          // 上游真报错（429/500/非法 JSON…）也要记进诊断：这条路同样**不冒泡**到 catch，
+          // 不在这里 bump 的话 `upstreamError` 对它恒为 0 —— 与上面 timeout 那条同一类缺陷
+          // （诊断口径见文件头：「转完圈没出卡片」时先查这三个计数）。
+          if (firstError !== undefined) bumpDiagnostics('upstreamError', sessionKey)
           sendError(res, 502, firstError ?? { code: 'UPSTREAM_ERROR', message: 'DeepSeek 续写上游没有返回可用候选' })
           return
         }
@@ -479,16 +559,15 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
           usage: { promptTokens: totalPromptTokens, completionTokens: totalCompletionTokens },
         })
       } catch (error) {
-        if (isAbortTimeout(signal.signal)) {
-          bumpDiagnostics('timeout', sessionKey)
-          sendError(res, 504, { code: 'TIMEOUT', message: 'DeepSeek 续写上游超时' })
-        } else if (signal.signal.aborted) {
-          // 客户端已断开（多为「还在打字 / 切会话」作废了这次联想）；响应写不写都无所谓，但要避免悬挂。
-          bumpDiagnostics('aborted', sessionKey)
-          if (!res.headersSent) res.destroy()
-        } else if (typeof error === 'object' && error !== null && 'code' in error && 'message' in error) {
+        // 兜底：正常路径的中止已由上面的出口接走，但**非** allSettled 包住的步骤
+        // （凭据解析、会话折叠、prompt 构造等）若因中止抛错，仍从这里出水——
+        // 故这两条分支保留且可达（区别只是它对中止的覆盖不再是唯一的一道）。
+        const outcome = abortedOutcome(signal.signal)
+        if (outcome !== undefined) {
+          sendAbortOutcome(res, sessionKey, outcome)
+        } else if (isChatFimError(error)) {
           bumpDiagnostics('upstreamError', sessionKey)
-          sendError(res, 502, error as ChatFimError)
+          sendError(res, 502, error)
         } else {
           bumpDiagnostics('upstreamError', sessionKey)
           const message = error instanceof Error ? error.message : String(error)
