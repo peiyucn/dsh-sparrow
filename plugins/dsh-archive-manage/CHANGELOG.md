@@ -5,69 +5,70 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 ## 0.2.0-rc.2 (2026-09-30)
 
 - Version-line alignment with official dsh 0.2.0-rc.2.
-- The panel loading indicator now matches the official dsh loader (the old dot-matrix animation is gone).
-- The panel's loading state is just the spinner now — the "Loading…" label beside it is gone, matching how dsh itself shows `StateDot`.
-- Fixed archived session titles showing the session id instead of the name.
-- The Archive and Trash **section header rows no longer highlight on hover** (they are just fold toggles; a wash read as "this row is selectable").
-- The panel opens faster: the plugin no longer races DSH's own full scan at startup, and does that sweep when the panel is first opened instead.
-- The Archive entry moved to the **top of the sidebar**, beside the official Plugins and Automations entries, and now opens as a **page in the main area** instead of a pop-up dialog.
-- The archive page no longer dims or blocks the rest of the interface: it is a normal page, and the way back to a conversation is the official one (pick a session in the sidebar, or New Session).
-- Fixed the archive page's text rendering larger than elsewhere: rows without a size of their own no longer fall back to the browser default, and text size and line height now match the official lists.
-- Fixed the divider above the "dsh-sparrow" brand line at the bottom of the archive page touching the content above it.
-- Fixed subagent rows in the archive area and the trash sometimes showing the parent session's text instead of the subagent's own label; that case no longer re-reads whole session logs either.
+- The archive panel now uses DSH's own loading animation.
+- The archive panel now shows a loading icon only; the "Loading…" text is gone.
+- Fixed archived sessions showing the session id instead of their name.
+- The Archive and Trash section headers no longer highlight on hover.
+- The archive panel opens faster: it scans for sessions when you first open it, not at DSH startup.
+- The Archive entry moved to the top of the sidebar, beside Plugins and Automations, and opens as a page instead of a dialog.
+- The archive page no longer dims or blocks the interface; return to a conversation from the sidebar or with New Session.
+- Fixed the archive page's text looking larger than elsewhere; sizes now match the other lists.
+- Fixed the divider above the "dsh-sparrow" line at the bottom of the archive page touching the content above it.
+- Fixed subagent rows in the archive area and the trash sometimes showing the parent session's text instead of the subagent's own label.
 
 ## 0.1.5-rc.2.4 (2026-09-21)
 
-- Fixed the sub-session connector line display in the session tree.
+- Fixed the sub-session connector lines in the session tree.
+
 ## 0.1.5-rc.2.3 (2026-09-13)
 
-- Subagent trees in the archive area and the trash are now **collapsed by default**: a parent row still shows its subagent count, and a click on ▸ reveals the children — previously the panel unfolded every subagent at once, so a session with many subagents pushed the entries below it out of sight.
-- When a parent session cannot be moved only because one of its **subagents** is still held by dsh, the row now says so ("subagent held by dsh"); previously just the greyed-out buttons and a tooltip hinted at it, hiding which level held the lock.
+- Subagent trees in the archive area and the trash are collapsed by default; a parent row shows its subagent count.
+- When a parent session is locked because one of its subagents is still in use by dsh, the row says so.
 
 ## 0.1.5-rc.2.2 (2026-09-12)
 
-- Moving a session to trash or deleting it permanently now takes along **every** subagent in its tree: subagents that spawned their own subagents (grandchildren and deeper, any depth) are no longer left behind as separate entries you had to clean up one by one.
-- Trash entries expand as a parent/child tree (indented like the archive area): multi-level subagents are no longer flattened into sibling rows; entries moved to trash by earlier versions stay flat.
-- Archiving or unarchiving a parent session now settles the archive state of its whole subagent tree in one go (deeper subagents previously caught up only on a later refresh or panel reopen).
-- Restoring a session no longer leaves the plugin's bookkeeping file inside the session folder, where exported session logs used to carry it along.
-- A session folder that is already missing from disk no longer fails hard: subagents are skipped while the rest moves as usual, permanent deletion treats it as already gone, and moving it to trash reports a clear message instead of a raw filesystem error.
+- Moving to trash or deleting a session now takes its whole subagent tree, however deep; nothing is left behind to clean up.
+- Trash entries now expand as a parent/child tree like the archive area; entries moved by earlier versions stay flat.
+- Archiving or unarchiving a parent session now updates its whole subagent tree at once.
+- Restoring a session no longer leaves an extra file inside the session folder.
+- A session folder already missing from disk no longer fails the action; the rest still moves and deletion goes through.
 
 ## 0.1.5-rc.2.1 (2026-09-11)
 
-- Permanently deleting a session now clears the archived mark only from the subagent sessions that were really deleted: a subagent whose deletion failed keeps its mark and stays operable in the panel, so the deletion can be retried instead of leaving an unaccounted-for entry behind.
+- Permanently deleting a session now clears the archived mark only from the subagents that were really deleted, so a failed one can be retried.
 
 ## 0.1.5-rc.2 (2026-09-10)
 
 - Version-line alignment with official dsh 0.1.5-rc.2.
-- Moving a session to trash or deleting it permanently works again on dsh 0.1.5: the previous release refused both because it did not recognize the new session format.
-- The panel's loading indicator now uses dsh's own dot-matrix chase animation, matching the rest of the UI.
-- Entries disappear as soon as an action succeeds: moving a session to trash, deleting it, unarchiving it or deleting a trash entry no longer leaves the panel waiting for the whole list to reload.
+- Moving a session to trash and permanent deletion work again on dsh 0.1.5.
+- The archive panel's loading animation now matches the rest of the interface.
+- Moving to trash, permanent deletion, unarchiving and deleting trash entries remove the entry right away instead of reloading the whole list.
 
 ## 0.1.2-rc.1.1 (2026-09-09)
 
-- If dsh is upgraded to a version this plugin does not support yet, the plugin now disables itself instead of running against an unknown contract (dsh and other plugins are unaffected).
-- The archive panel opens noticeably faster: subagent labels no longer re-read a session's whole log when the official projection cache has already settled them (previously every open re-folded the log for each subagent).
-- Subagent labels are no longer taken from an inherited ancestor descriptor (a forked child briefly showed the parent's label before writing its own).
-- The panel no longer flickers after an action: the list and its buttons stay as they are and update in place, instead of being replaced by a loading spinner or briefly greying out.
-- Sessions stored in a format this plugin does not recognize are no longer moved or deleted: the action is refused instead of guessed at.
+- If dsh is upgraded to a version this plugin does not support yet, the plugin disables itself; dsh and other plugins are unaffected.
+- The archive panel opens faster on sessions with subagents.
+- A newly created child session no longer briefly shows the parent's label.
+- The panel no longer flickers after an action; the list and its buttons update in place.
+- Sessions this plugin cannot safely handle are no longer moved or deleted; the action is refused instead.
 
 ## 0.1.2-rc.1 (2026-09-05)
 
-- Version-line alignment with official dsh 0.1.2-rc.1 (stability line).
-- Parent-child tree panel: archived sessions show their subagent children nested beneath the parent (orange child count), and operations act on the parent with its children.
-- Stray-session section: sessions that reference a missing parent (blank/orphan tags) are listed for archiving or deletion.
-- Trash: restore or permanently delete entries individually or in bulk, with old-format entries (no sidecar) recognized.
-- The trash location row now sits inside the Trash area (no longer a global row above the panel content).
-- Sessions released mid-use unlock in the panel immediately (live-status refresh), and moves roll back cleanly if the sidecar write fails.
-- Startup sweep: ghost archive ids and stale projection rows are cleaned automatically.
-- Subagent labels read from the authoritative log tier, with in-memory fallbacks.
-- The Archive button now aligns its width with Settings; any-session ids (externally injected) archive and restore correctly.
-- Large archives open fast: session headers are cached in memory (invalidated on every change), titles come from the projection cache instead of re-reading each log, and lists are paginated (100 rows + Load more).
-- A subtle 🐦 dsh-sparrow brand line closes the panel.
+- Version-line alignment with official dsh 0.1.2-rc.1.
+- Archived sessions now show as a parent/child tree; a parent row carries its subagent count.
+- Sessions whose parent is missing are listed separately with a badge, so they can be archived or deleted.
+- Trash entries can be restored or deleted one by one or all at once, including entries from earlier versions.
+- The trash location now appears inside the Trash area instead of at the top of the panel.
+- Sessions released while the panel is open unlock right away, and a failed move rolls back.
+- Entries for sessions that no longer exist are cleaned up automatically.
+- Subagent labels now show correctly for sessions that are not open.
+- The Archive button is now the same width as Settings, and every session id archives and restores correctly.
+- Large archives open fast, and the list is paginated at 100 rows per page with a Load more button.
+- A 🐦 dsh-sparrow brand line closes the panel.
 
 ## 0.1.1-alpha.1 (2026-09-02 · pre-release)
 
-- Compat with dsh master after the 0.1.2-alpha.5 publish: `sessionPersistence.list()` now returns snapshots on master (dual-shape mapping keeps older dsh versions working), and `locate` moved from the public contract to a backend-private method (startup capability check added, failing fast with a clear message).
+- Works with dsh versions released after 0.1.2-alpha.5.
 
 ## 0.1.0 (2026-09-02)
 
@@ -75,20 +76,19 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## 0.1.0-alpha.3 (2026-09-02 · pre-release)
 
-- README screenshots now use absolute URLs and are no longer packed into the npm package (functionally identical to the previous release).
+- No user-perceivable change from the previous release.
 
 ## 0.1.0-alpha.2 (2026-09-01 · pre-release)
 
-- Full-page loading with an error-banner retry button (removes the open flicker).
+- Full-page loading, with a retry button on the error banner.
 
 ## 0.1.0-alpha.1 (2026-09-01 · pre-release)
 
-- First published version, released to the `next` channel for owner validation before the stable `0.1.0`
-- Sidebar footer "Archive" entry with a panel split into two sections: archived / backup
-- Archived section: backup (moves the session off disk, reversible) or delete (irreversible, requires typing the full session title to confirm); sessions still held open in this dsh run are grouped and greyed out, actionable after the next dsh restart
-- Backup section: restore or delete individually / in bulk; the backup location is shown at the top of the panel and copyable
-- Backups write a sidecar (original path / workspace membership) used for restore; legacy directories without a sidecar are list/delete only
-- Backup / delete also handles all subagent sessions of the parent session (moved into the backup together, restored together; orphan subagents are cleaned by the startup sweep)
-- Removed from the @ list immediately after backup: updates the official workspace domain bookkeeping, invalidates projection-cache rows, and re-emits the `api-session/removed` event
-- README positioning: the official archive flag does not filter @ candidates (verified through all three layers of the source); file-level backup is the only reversible way to take a session out of @
-
+- First published version.
+- An "Archive" entry in the sidebar footer, opening a panel with an archive area and a backup area.
+- Archive area: back up a session (moves it off disk, reversible) or delete it permanently (needs the full session title to confirm); sessions in use are greyed out until restart.
+- Backup area: restore or delete entries one by one or all at once, with the backup location shown and copyable.
+- Backups remember where each session came from so they can be restored; backup folders from much older versions can only be listed or deleted.
+- Backing up or deleting a session also handles all of its subagent sessions, and restoring brings the whole family back.
+- Backed-up sessions leave the @ list immediately.
+- DSH's archive marker does not filter the @ candidate list; backing a session up is the reversible way to remove it from @.

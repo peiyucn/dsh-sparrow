@@ -6,55 +6,55 @@ See [简体中文](./CHANGELOG.zh-CN.md).
 ## 0.2.0-rc.2 (2026-09-30)
 
 - Version-line alignment with official dsh 0.2.0-rc.2.
-- The session-credits pill under the composer now matches the official stat pills exactly (full-capsule corners and the same 12/20 text tier), so the pills in that row no longer look mismatched.
-- Loading states (credits card, account and quota rows, model picker) show a spinner instead of plain "Loading…" text.
-- Fixed the plugin not working after adapting to the 0.1.7 line (host-facing contract, image targets, message model).
-- Fixed credits resetting after a restart: credits now read the official session projection instead of the deprecated sync history.
-- Fixed the CodeBuddy entry on the hero page **overlapping** the official top-right button.
-- Fixed the background band and hover colour bleeding on the model picker's grouped section titles.
-- Fixed the header's CodeBuddy entry colliding with neighbouring buttons when the conversation area gets narrow: it now collapses to the **icon-only, text-free** version of the logo when there is not enough room (the same scaling strategy the official Agent Team button uses).
-- Fixed the credits panel **flashing at its old position** for a moment after the entry icon has collapsed.
-- Fixed the entry on the **new-session page** not collapsing with the conversation width: it now switches to the icon-only logo there too, exactly as it does in the session header.
+- The session credits tag under the composer now matches the tags beside it.
+- Loading now shows a loading indicator instead of the "Loading…" text.
+- Fixed the plugin not working after the dsh 0.1.7 upgrade.
+- Fixed credits resetting after a restart.
+- Fixed the CodeBuddy entry overlapping the top-right button on the new-session page.
+- Fixed the wrong background and hover colour on grouped model-picker titles.
+- The CodeBuddy entry shrinks to an icon-only logo on narrow layouts.
+- Fixed the credits panel briefly appearing in the wrong place.
+- The new-session page entry now shrinks to the icon-only logo too.
 
 ## 0.1.5-rc.2.2 (2026-09-21)
 
-- Session and per-turn credit figures **no longer reset after a DSH restart**, and reopening an older session still shows the full total.
+- Credits no longer reset after a restart, and older sessions keep their full totals.
 - The credit dialog is narrower.
-- The user badge in the credit dialog opens the CodeBuddy profile page when clicked.
+- Clicking the user name in the credit dialog opens your CodeBuddy profile.
 
 ## 0.1.5-rc.2.1 (2026-09-11)
 
-- The session credit summary now sits in the composer's stats row as a pill of the same kind as the official ones (brand mark + `Credits N · M calls`) — same size, colours and hover — and clicking it opens the call count with the per-model breakdown. A conversation with no CodeBuddy calls still gets nothing added.
-- The settings card, the credits panel and the model picker now read one shared model catalog, so **Fetch available models** updates all three at once.
-- Saving a key now reads the account context before the model catalog, so the first catalog request already carries the right enterprise headers.
-- A credit rate just below a million no longer reads `1000K` — it shows `1M`.
-- Provider requests can no longer hang: status, save, re-scan, quota and turn-usage calls all give up after a timeout instead of waiting forever.
-- Replacing or clearing the API key no longer lets a refresh that was already in flight write the old account or the old model list back.
+- Session credits now appear in the composer's stats row; clicking shows the per-model breakdown.
+- **Fetch available models** now updates the settings card, credits panel and model picker together.
+- Saving a key now loads your account's model list correctly the first time.
+- A credit rate just below a million now shows `1M` instead of `1000K`.
+- Requests no longer hang; they time out instead of waiting forever.
+- Changing or clearing the key no longer brings back the old account or model list.
 
 ## 0.1.5-rc.2 (2026-09-10)
 
 - Version-line alignment with official dsh 0.1.5-rc.2.
-- A usage frame that arrives after the stream's final frame is now accounted for instead of being dropped, so session credit totals stay accurate.
-- The settings card now lists the models your CodeBuddy key can use, with a "Fetch available models" button to re-scan on the spot after an administrator changes them (read-only; no other provider is touched).
-- Model names no longer carry a credit-rate suffix (a zero rate no longer reads `free`); the settings list, the model picker and the credits panel now all show the plain model name with its read-only facts (`x0.00 · 1M` — credit rate · context window) on the right.
+- Fixed session credit totals sometimes missing the last part of a reply.
+- The settings card now lists the models your key can use, with a **Fetch available models** button.
+- Model names no longer carry a credit-rate suffix; the rate and context window now appear separately.
 
 ## 0.1.2-rc.1.2 (2026-09-09)
 
-- If dsh is upgraded to a version this plugin does not support yet, the plugin now disables itself instead of running against an unknown contract (dsh and other plugins are unaffected).
-- Images now reach vision-capable models reliably: previously the model replied that it could not see images even though the model supports them.
+- The plugin now disables itself on dsh versions it does not support.
+- Fixed images not reaching vision-capable models.
 
 ## 0.1.2-rc.1.1 (2026-09-07)
 
-- **Max mode** (reasoning-effort lock, same idea as the CodeBuddy client's toggle): a switch in the credits panel (above the model card) — once on, every reasoning model in this provider sends the Max effort level; the model picker's effort list shows Max pinned on top with the other levels greyed out until the lock is released
-- Models outside this provider (the official DeepSeek route and others) are never affected by the lock
+- **Max mode**: a switch in the credits panel locks all reasoning models to Max effort.
+- The lock does not affect models from other providers.
 
 ## 0.1.2-rc.1 (2026-09-05)
 
-- Initial release: company CodeBuddy credits as a DSH LLM provider — official API key only, streaming only
-- Configure on the **CodeBuddy Credits** row in Settings → Models: saving validates the catalog with the key before storing it, clearing the key deactivates the provider, and the official credential dot works natively
-- CodeBuddy-aware model picker variant: each model row shows its credit rate (`x0.79`, `free`) on the right, and reasoning-effort choices follow the server's per-model declarations
-- The model catalog follows the saved key entirely (fetched on save, refreshed in the background); it is never written to settings, and no network request is made without a key
-- Credits entry in the conversation header (top-right, next to the Session log button) — shown on conversation pages and the new-session page alike: the panel shows account/enterprise, current-cycle quota (used / limit / remaining, progress bar, reset date), and the selected model's description, capabilities, and spend rate; a subtle 🐦 dsh-sparrow brand line closes the panel
-- Session credits appended to the official stats line under the composer, plus a per-turn credit pill with the per-call breakdown (both in-memory and reset when DSH restarts)
-- Credential reference aligned with the official derived name `CODEBUDDY_CREDITS_API_KEY`; the earlier `CODEBUDDY_API_KEY` is still recognized and migrated automatically
-- Image input for vision-capable models, sent as OpenAI-style data URLs through the official attachment seam (official 2000px compression budget)
+- Initial release: use your company CodeBuddy credits as an LLM provider in DSH.
+- Configure it on the **CodeBuddy Credits** row in Settings → Models; clearing the key disables the provider.
+- The model picker shows each model's credit rate and its available reasoning levels.
+- The model list follows your saved key; without a key no network requests are made.
+- A credits entry in the conversation header opens a panel with your account and current-cycle quota.
+- Session credits appear in the stats row under the composer, plus a per-turn credit tag.
+- The credential is now named `CODEBUDDY_CREDITS_API_KEY`; the old name still works and migrates automatically.
+- Images can now be sent to models that support them.

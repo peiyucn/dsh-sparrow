@@ -5,58 +5,58 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 ## 0.2.0-rc.2 (2026-09-30)
 
 - Version-line alignment with official dsh 0.2.0-rc.2; no user-perceivable change.
-- Fixed the suggestion toggle and candidate menu not showing after adapting to the 0.1.7 line (session format v4, renamed icons, slot injection signature).
-- Fixed one warning colour rendering wrong.
-- Fixed the failure reason shown when the upstream suggestion request times out: it used to say a generic request failure instead of the actual cause.
+- Fixed the suggestion switch and candidate menu disappearing.
+- Fixed a warning message showing the wrong colour.
+- A timed-out suggestion request now reports the actual reason.
 
 ## 0.1.5-rc.2.1 (2026-09-21)
 
-- Fixed the suggestion toggle ignoring the selected model right after DSH starts.
+- Fixed the suggestion switch ignoring the selected model right after DSH starts.
+
 ## 0.1.5-rc.2 (2026-09-10)
 
 - Version-line alignment with official dsh 0.1.5-rc.2.
-- The suggestion switch and the candidate menu are shown again on dsh 0.1.5: the previous release hid them entirely because it did not recognize the new session format.
-- Suggestions no longer copy the whole session log on every request, so they stay responsive in very long sessions.
-- Suggestions now follow the new deepseek-flash main model (an unrecognized main model used to fall back to deepseek-v4-pro), and the fallback default is deepseek-flash too.
+- The suggestion switch and the candidate menu are visible again on dsh 0.1.5.
+- Suggestions stay responsive in very long sessions.
+- Suggestions now follow the current main model, and default to deepseek-flash.
 
 ## 0.1.2-rc.1.1 (2026-09-09)
 
-- The suggestion ring no longer appears over other sessions: it is drawn only by the session whose request is actually in flight.
-- If dsh is upgraded to a version this plugin does not support yet, the plugin now disables itself instead of running against an unknown contract (dsh and other plugins are unaffected).
-- The suggestion ring now blurs together with the background when a dialog opens (it used to float above the mask).
-- No suggestion is requested for a session stored in a format this plugin does not recognize (no billed upstream call is made).
+- A suggestion is now shown only in the session it belongs to.
+- On a dsh version this plugin does not support, it turns itself off and leaves dsh working.
+- The suggestion card now blurs together with the background when a dialog opens.
+- No suggestion request is sent for a session this plugin does not recognize.
 
 ## 0.1.2-rc.1 (2026-09-05)
 
 - Version-line alignment with official dsh 0.1.2-rc.1 (stability line).
-- The FIM switch now tracks the selected model immediately: switching models updates the support state right away, and switching between two unsupported models no longer flashes the card.
-- Clicking the suggestion card outside a button no longer steals focus from the composer (Tab adoption keeps working).
-- Cross-site requests to the completion endpoint are now refused (the route executes billed upstream calls with the server-side API key).
-- Tab adoption now works when the draft contains @-mentioned elements (files/prompts): the adoption span maps in token coordinates instead of expanded-text coordinates.
-- A subtle 🐦 dsh-sparrow brand line sits in the bottom-left corner of the suggestion card.
+- The FIM switch now follows the selected model as soon as you switch models.
+- Clicking the suggestion card no longer steals focus from the input box, so Tab still works.
+- Other websites can no longer send suggestion requests on your behalf.
+- Tab adoption now also works when the draft contains files or prompts mentioned with @.
+- A small 🐦 dsh-sparrow brand line sits in the bottom-left corner of the suggestion card.
 
 ## 0.1.0 (2026-09-02)
 
-- Promoted 0.1.0 (identical to 0.1.0-alpha.3).
+- First stable release.
 
 ## 0.1.0-alpha.3 (2026-09-02 · pre-release)
 
-- Fixed the suggestion halo leaving a gap around the composer card (the ring element was missing box-sizing).
-- README screenshots now use absolute URLs and are no longer packed into the npm package.
+- Fixed a gap around the composer card while a suggestion is shown.
 
 ## 0.1.0-alpha.2 (2026-09-01 · pre-release)
 
-- Version-line alignment 0.1.0-alpha.2 (functionally identical to the previous release).
+- Version-line alignment 0.1.0-alpha.2; no functional change.
 
 ## 0.1.0-alpha.1 (2026-09-01 · pre-release)
 
-- First published version, released to the `next` channel for owner validation before the stable `0.1.0`
-- Chat input suggestions: fired after a typing pause, shown in a floating card styled like the official @ candidate menu; **Tab** adopts, **Esc** dismisses (clicking works too); yields while the official @/slash trigger menu is open
-- Upstream: DeepSeek **FIM completion (Beta)** (`/beta/completions` + speaker-transcribed prompt); the completion model **follows the main model** (auto: v4-pro / v4-flash, falls back to pro for vision etc.), the actual model and temperature are shown in the card corner
-- Switch label **FIM** in both zh and en (decided 2026-09-01: industry-standard term + narrower button)
-- **Three trigger sensitivity levels** (high / medium / low): pause 250/400/800ms, minimum draft (Chinese 4/8/12 chars, English 2/6/8 chars), embedded English half-word, trailing space, and sentence-end punctuation scale per level; the "dots + ▾" zone beside the pill is a separate sensitivity trigger area (clicking the whole zone opens the level menu without toggling the switch), the tooltip follows the level, and the choice persists locally
-- Content-adaptive: the completion language **follows the draft**; suggestions are **truncated to one sentence** (stop at sentence-end punctuation); **Tab chaining** (High allows continuous Tab)
-- Quality guards: role-switch discard, degenerate repetition, history echo (user prefix / assistant window), language consistency; when all candidates are filtered out, one retry at temperature 0.5, then silent empty if still none
-- Switch off by default with local persistence; hidden entirely when the session's main model is not a DeepSeek model; reuses the DeepSeek API key configured in dsh (never enters the browser)
-- **Works on the new-session page**: the data side mounts `conversation.input.dock` (the dsh shell does not render composer.dock in hero state; input.dock mounts in both states)
+- First release.
+- Suggests what you may type next after a pause. **Tab** adopts, **Esc** dismisses.
+- Suggestions follow the main model, and the card shows the model and temperature used.
+- The switch is labelled **FIM** in both Chinese and English.
+- **Three trigger sensitivity levels** (high / medium / low) control when a suggestion is triggered; your choice is remembered.
+- The completion language follows your draft, and a suggestion stops at the first sentence end.
+- Suggestions that only repeat the conversation are dropped.
+- The switch is off by default and its state is remembered; it stays hidden while the main model is not a DeepSeek model.
+- Uses the DeepSeek API key configured in dsh, never sends it to the browser, and also works on the new-session page.
 
