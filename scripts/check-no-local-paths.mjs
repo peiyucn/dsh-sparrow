@@ -45,16 +45,40 @@ const isPlaceholderToken = (token) =>
 /** 那三段的字面量在本文件里都被 `join('-')` 拼起来用，**不整体出现**（见下面那条规则）。 */
 const LOCAL_WORKSPACE_PARTS = ['pyai', 'meta', 'repo']
 
-/** 判据 2 的三条通用模式。加规则时**不要写真实用户名**（本文件也在索引里）。 */
+/**
+ * 判据 2 的通用模式。加规则时**不要写真实用户名**（本文件也在索引里）。
+ *
+ * ⚠️ **每条都踩过一次静默绕过**（实测，见各条注释）：
+ * * Windows 用户目录：原写法 `[A-Za-z]:[\\/]Users[\\/]` 大小写敏感
+ *   ⇒ 盘符与目录名写全小写时（如 `c:` + `\\users\\<名>\\…`）**整行静默**；
+ * * POSIX 用户目录：原写法左边界要求行首 / 空白 / 引号 / 括号
+ *   ⇒ **中文冒号紧贴**（`本地路径：/home/<名>`）静默 —— 中文文档里这种写法极常见；
+ * * UNC：`\\<server>\\<share>\\…` 原本**完全不入网**，而它同样是"别人机器上的位置"。
+ *
+ * ⚠️ **本文件自己也在索引里**，故上面那条 UNC 示例一律用 `<server>` 占位写法
+ * （尖括号形式天然不匹配规则）——照抄成真名字会被本条规则当场抓住。
+ */
 const GENERIC_RULES = [
   {
     name: 'Windows 用户目录绝对路径',
-    re: /[A-Za-z]:[\\/]Users[\\/]([^\\/\s"'`]+)/gu,
+    // i 标记：盘符与 `Users` 都大小写不敏感（Windows 路径本来就大小写不敏感）。
+    re: /[A-Za-z]:[\\/]Users[\\/]([^\\/\s"'`]+)/giu,
     token: (m) => m[1],
   },
   {
     name: 'POSIX 用户目录绝对路径',
-    re: /(?:^|[\s"'`(=])\/(?:home|Users)\/([A-Za-z][\w.-]*)/gmu,
+    // 左边界放宽到「不接在字母/数字/`_`/`.`/`-` 之后」——即前面可以是行首、空白、
+    // 各种标点（含中文冒号、全角括号、「」等），唯独不能是路径名的延续。
+    // 用 `(?<![\w.-])` 负向后顾替代原来的白名单式左边界；顺带避免把 URL
+    // （`…/example.com/home/alice`）里的路径当成本机路径。
+    re: /(?<![\w.-])\/(?:home|Users)\/([A-Za-z][\w.-]*)/gmu,
+    token: (m) => m[1],
+  },
+  {
+    name: 'UNC 网络路径',
+    // `\\<server>\\<share>\\…`：UNC 没有"用户"段，把 **server** 当敏感面报出来。
+    // 占位写法（`\\<server>\\<share>`）根本不匹配本规则，无需豁免。
+    re: /\\\\([A-Za-z0-9][\w.-]*)\\([A-Za-z0-9$][\w.$-]*)/gu,
     token: (m) => m[1],
   },
   {
@@ -100,12 +124,25 @@ const report = (file, line, ruleName, detail) => {
   console.error(`    ${detail.slice(0, 170)}`)
 }
 
+/**
+ * 二进制文件判定（git 同款启发式：前 8000 字节里出现 NUL）。
+ *
+ * ⚠️ **必须显式判**，不能只靠 `readFileSync(…, 'utf8')` 抛异常：二进制读成 utf8
+ * **不会抛**，只会变成一堆替换字符（U+FFFD），于是"扫"的是毫无意义的乱码。
+ * 本仓库 9 个 `resources/*.png` 一直是这么被当成文本扫的 —— 旧规则恰好没在乱码里
+ * 命中，**加了 UNC 规则后立刻命中**（乱码里凑出了反斜杠 + 双字母的字节序列），
+ * 当场假红 3 处。图片本来就不是"文本泄漏"的载体，故直接跳过。
+ */
+const isBinary = (buf) => buf.subarray(0, 8000).includes(0)
+
 for (const file of files) {
   let text
   try {
-    text = readFileSync(join(root, file), 'utf8')
+    const buf = readFileSync(join(root, file))
+    if (isBinary(buf)) continue // 图片等二进制：不是文本泄漏的载体
+    text = buf.toString('utf8')
   } catch {
-    continue // 二进制 / 已删除但仍在索引里的条目
+    continue // 已删除但仍在索引里的条目
   }
   const lines = text.split(/\r?\n/u)
   for (let i = 0; i < lines.length; i++) {

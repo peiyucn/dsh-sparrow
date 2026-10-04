@@ -80,6 +80,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # 根守卫链（`pnpm run check` = check:paths + check:dsh-pin + check:plugin-docs）：
+      # tag 发布会绕过 CI（ci.yml 只在 push dev/main 与 PR 上跑），所以这里必须自己跑一遍，
+      # 否则"文档没跟版 / 文档漂移 / 本机路径泄漏"会**直接随发布出门**。
+      # fail-closed：守卫红 → 这一步失败 → 后面的 publish 步骤不执行。
+      # ⚠️ 新增守卫只需加进根 `check`，这里自动覆盖；别在此逐个列脚本。
+      - name: Guard chain (root pnpm run check)
+        run: pnpm run check
+
       - name: Check tag version matches package.json
         if: github.event_name == 'push'
         shell: bash
@@ -129,11 +137,38 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
       - name: Move dist-tag
+        # workflow_dispatch 有三种输入形态，必须分开对待（否则要么静默成功、要么误报红）：
+        #   ① 只给 plugin       → tag 兜底发布（真正干活的是 publish job），promote 不适用 → 跳过
+        #   ② 给 version 或 tag → 这是 promote 请求 → plugin/version/tag **三个必须齐**，缺一即失败
+        #   ③ 什么都不给        → 这次派发毫无意义，绝不能显示绿色
+        # ⚠️ 原实现把 ①②③ 一律 `echo skip` + `exit 0`：run 是绿的、stderr 一行 skip，
+        #    owner 会把绿色误读成「promote 已完成」，而 dist-tag 根本没动（实测：exit 0）。
         run: |
-          if [[ -z "${{ inputs.plugin }}" || -z "${{ inputs.version }}" || -z "${{ inputs.tag }}" ]]; then
-            echo "skip: promote 需要 plugin / version / tag 三个输入" >&2
+          PLUGIN="${{ inputs.plugin }}"
+          VERSION="${{ inputs.version }}"
+          TAG="${{ inputs.tag }}"
+
+          if [[ -z "${VERSION}" && -z "${TAG}" ]]; then
+            if [[ -z "${PLUGIN}" ]]; then
+              echo "::error::本次 workflow_dispatch 没有任何输入（plugin / version / tag 全空），未执行任何操作。要发布请给 plugin；要 promote 请给全 plugin / version / tag。" >&2
+              exit 1
+            fi
+            echo "skip: 只给了 plugin=${PLUGIN}，属 tag 兜底发布（publish job 负责），promote 不适用。"
             exit 0
           fi
-          npm dist-tag add "@dsh-sparrow/${{ inputs.plugin }}@${{ inputs.version }}" "${{ inputs.tag }}"
+
+          # 用显式 if，不用 `[[ -z "$X" ]] && MISSING="..."`：后者是 AND 列表，
+          # 在 `bash -e`（Actions 的 `run:` 默认）下靠一条"非最后一条命令不触发 errexit"
+          # 的豁免才不出错 —— 能用但脆，直接写 if 没有任何歧义。
+          MISSING=""
+          if [[ -z "${PLUGIN}"  ]]; then MISSING="${MISSING} plugin";  fi
+          if [[ -z "${VERSION}" ]]; then MISSING="${MISSING} version"; fi
+          if [[ -z "${TAG}"     ]]; then MISSING="${MISSING} tag";     fi
+          if [[ -n "${MISSING}" ]]; then
+            echo "::error::promote 需要 plugin / version / tag 三个输入，缺少：${MISSING}。本次运行**未移动任何 dist-tag**，请补齐后重新派发。" >&2
+            exit 1
+          fi
+
+          npm dist-tag add "@dsh-sparrow/${PLUGIN}@${VERSION}" "${TAG}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

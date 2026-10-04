@@ -26,8 +26,9 @@
  * 3. **周边一致**：`pnpm-workspace.yaml` 的 `overrides` 与 `minimumReleaseAgeExclude`
  *    里所有 `@deepseek-ai/dsh*` 条目必须等于该真值（否则装包时会在供应链策略或
  *    版本对齐上出岔）。
- * 4. **文档一致**：根 README 与每个活跃插件的 README（中英双份）必须出现该真值
- *    （环境要求行），防"代码升了线、文档还写着旧线"。
+ * 4. **文档一致**：根 README 与每个活跃插件的 README（中英双份）里**环境要求行本身**
+ *    必须写明该真值（防"代码升了线、文档还写着旧线"）。真值不唯一时判据 4 不跳过，
+ *    改为逐份报告所有不一致的版本串（详见下方判据 4 段落的注释）。
  *
  * ⚠️ **已退役插件不在判据内**：它们不跟版本线（`dsh-nav-pin` 停在 `0.1.5-rc.2`），
  * 名单取自 `plugin-set.mjs`（与 `verify-all.mjs` 同一份，防漂移）。
@@ -126,12 +127,33 @@ for (const { pkg, version } of [...overrides, ...releaseAgeExclude]) {
 if (overrides.length === 0) fail('判据 3 失败：pnpm-workspace.yaml 的 overrides 里没有任何 @deepseek-ai/dsh* 条目')
 
 // ── 判据 4：README 环境要求行 ──
-if (truth !== null) {
+//
+// **两处加固，都是补已实测的可静默绕过：**
+//
+// ① **真值不唯一时不再跳过判据 4**。原实现在 `truth !== null` 时才跑这一段，于是
+//    「活跃插件声明了 2 个不同版本」这种**最该全量报警**的场景里，判据 4 整条静默
+//    消失（实测：把某份 README 的环境要求行整个删掉，输出里只剩判据 1，判据 4 无影）。
+//    现在：真值唯一 → 逐份比对真值；真值不唯一 → **仍然逐份检查并报告**所有
+//    不一致的版本串，让两种病一次看全。
+//
+// ② **按行校验要求行本身**，不再全文 `includes(truth)`。原实现只要文件**别处**
+//    （注释 / 围栏 / 链接 / 另一处 pin）出现真值就通过 —— 把环境要求行写成错的版本
+//    照样绿（实测：theme-tone README 有两处 pin，只改第一处仍通过）。
+//
+// **「环境要求行」的识别规则**：一行同时 ①提到 `dsh`（词边界、大小写不敏感）
+// ②含精确 semver。实测在现存 12 份 README 上命中**恰好**是真要求行：
+// 10 份各 1 行，theme-tone 各 2 行（L13 的 Requires 与 L35 的 Targets，两处都是真 pin），
+// 其余行（Changelog 链接、历史版本叙述）零误入。
+//
+// ⚠️ **必须逐行核，不能全文 includes**：这正是 ② 要堵的洞。
+{
   const readmes = [
     'README.md',
     'README.zh-CN.md',
     ...plugins.flatMap(name => [`plugins/${name}/README.md`, `plugins/${name}/README.zh-CN.md`]),
   ]
+  const SEMVER_ANY = /\b\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?/gu
+
   for (const rel of readmes) {
     let text
     try {
@@ -140,8 +162,69 @@ if (truth !== null) {
       fail(`判据 4（文档一致）失败：读不到 ${rel}`)
       continue
     }
-    if (!text.includes(truth)) {
-      fail(`判据 4（文档一致）失败：${rel} 里没有环境要求版本线 "${truth}"`)
+
+    /**
+     * 这一行是否在说**官方 dsh 宿主**。
+     *
+     * ⚠️ 不能只测 `\bdsh\b`：`@dsh-sparrow/dsh-file-manage@0.2.0-rc.2` 这种**本插件自己的
+     * 包名**里就含 `dsh`（作用域名），而按本仓库「版本线镜像官方 dsh」的口径，插件自己的
+     * 版本号**常常就等于**当前真值 —— 于是一条安装命令就能冒充"环境要求行"，
+     * 把一条不写版本线的要求行喂饱、判据 4 静默放行（实测：EN 侧删掉要求行后，
+     * 顶部加一行 `Install: npm i @dsh-sparrow/dsh-file-manage@0.2.0-rc.2` 即通过）。
+     *
+     * 故**只摘掉本仓库自己的 scoped 包名**（`@dsh-sparrow/…`），官方包名
+     * `@deepseek-ai/dsh*` **保持原样** —— 后者本来就是"在说官方宿主"的正当写法，
+     * 摘掉它会把一条合法要求行（`Requires @deepseek-ai/dsh 0.2.0-rc.2`）误判成
+     * "找不到要求行"，白报一次红。
+     */
+    const mentionsHarnessDsh = (line) =>
+      /\bdsh\b/iu.test(line.replace(/@dsh-sparrow\/[\w.-]+/gu, ' '))
+
+    /** 环境要求行 + 该行出现的版本串（去重，保持出现顺序）。 */
+    const requirementLines = text.split(/\r?\n/u)
+      .map((line, i) => ({ line: line.trim(), no: i + 1 }))
+      .filter(({ line }) => mentionsHarnessDsh(line) && /\b\d+\.\d+\.\d+/u.test(line))
+      .map(({ line, no }) => ({ line, no, versions: [...new Set([...line.matchAll(SEMVER_ANY)].map(m => m[0]))] }))
+
+    const where = () => requirementLines.map(l => `L${l.no}: ${l.line}`).join(' ｜ ')
+
+    if (requirementLines.length === 0) {
+      fail(
+        `判据 4（文档一致）失败：${rel} 里找不到环境要求行（应有一行同时提到 dsh 与版本号）`,
+        truth !== null ? `期望该行写明真值 "${truth}"` : '（真值不唯一，无法比对具体版本）',
+      )
+      continue
+    }
+
+    // ① 真值不唯一：没有单一基准可比，就把每份 README 要求行里的版本串**摊开报告**，
+    //    而不是整段跳过。
+    if (truth === null) {
+      const found = [...new Set(requirementLines.flatMap(l => l.versions))]
+      if (found.length === 0) {
+        fail(`判据 4（文档一致）失败：${rel} 的环境要求行里没有任何版本串（真值不唯一，无法比对）`, where())
+      } else if (found.length > 1) {
+        fail(`判据 4（文档一致）失败：${rel} 的环境要求行里有多个版本串 ${found.map(v => `"${v}"`).join(' / ')}（真值不唯一，无法比对）`, where())
+      } else if (!declared.has(found[0])) {
+        // 这个版本串在活跃插件里谁都没声明过 —— 是个凭空写出来的线。
+        fail(`判据 4（文档一致）失败：${rel} 的环境要求行写着 "${found[0]}"，但没有任何活跃插件声明这个版本（真值不唯一）`, where())
+      }
+      continue
+    }
+
+    // ② 真值唯一：要求行**本身**必须写明真值，且不得夹带别的版本串。
+    const here = [...new Set(requirementLines.flatMap(l => l.versions))]
+    if (!here.includes(truth)) {
+      fail(
+        `判据 4（文档一致）失败：${rel} 的环境要求行没有写明真值 "${truth}"`,
+        where(),
+      )
+    }
+    const strays = here.filter(v => v !== truth)
+    if (strays.length > 0) {
+      fail(
+        `判据 4（文档一致）失败：${rel} 的环境要求行里出现了非真值版本串 ${strays.map(v => `"${v}"`).join(' / ')}（真值 "${truth}"）`,
+        where(),
+      )
     }
   }
 }
