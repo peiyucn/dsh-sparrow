@@ -45,19 +45,25 @@ html[data-platform='darwin'] .dsh-file-manage-page-head {
   font-weight: 500;
   line-height: 28px;
 }
-/* 合集品牌 footer：署名行，钉在页面左下角（owner 2026-10-07 定稿）。
+/* 合集品牌 footer：署名行，钉在页面左下角、与侧边栏底部「设置」入口对齐
+   （owner 2026-10-07：「有点太高了，最好和左边栏下面的设置按钮对齐」）。
    * margin-top: auto —— 本页是 flex 纵列（.dsh-file-manage-page）且 height: 100%，
      故**内容不满一屏时署名被推到页面底部**、内容超高时它自然跟在列表之后。
-   * text-align: left —— 与页标题、列表共用同一个左边缘。此前是居中：全页只有它居中。
-   * **已去掉通栏分割线**：那条 1px 通栏线比 11px 的署名重得多，先被看到的是线而不是字。
-   * padding-top 是内容超高时的**最小**净空（无分割线时不可见，故不能用 margin 顶替 ——
-     margin-top: auto 与固定 margin 不能共存）。
-   ⚠️ 净空口径与归档页一致（两页都是 24px）：本页最后一个兄弟是列表容器
-   （.dsh-file-manage-body），旧浮层版 footer 在固定高度面板里被 body 的弹性撑开，
-   搬进页面正常流后这层净空没了 ⇒ 必须显式补回，否则署名会贴住列表最后一行。 */
+   * text-align: left —— 与页标题、列表共用同一个左边缘。
+   * **无分割线**：那条 1px 通栏线比 11px 的署名重得多，先被看到的是线而不是字。
+   * padding-top: 24px —— 内容超高（署名跟在列表之后）时的**最小**净空。
+     不能用 margin-top 顶替：margin-top: auto 与固定 margin 不能共存。
+   ⚠️ 本页最后一个兄弟是列表容器（.dsh-file-manage-body）：旧浮层版 footer 在固定高度
+   面板里被 body 的弹性撑开，搬进页面正常流后净空就没了 ⇒ 必须显式补回。
+   * **margin-bottom: -25px —— 与侧边栏「设置」行对齐的那一段**（口径与归档页逐字相同）：
+     本页沿用官方入口型页面的 padding-bottom: 48px；不抵消的话署名中心落在
+     「视口底部 −56.5px」，而侧边栏设置行的文字中心在「视口底部 −31.5px」⇒ 差值 25px。
+     ⚠️ 这个 −25 依赖「本页 padding-bottom 48px」+「侧边栏设置行文字中心距底 31.5px」
+     两个外部事实，任一改变都要重算（详见归档页同段注释）。改前先量，别按感觉调。 */
 .dsh-file-manage-page-footer {
   box-sizing: border-box;
   margin-top: auto;
+  margin-bottom: -25px;
   padding-top: 24px;
   text-align: left;
   font-size: 11px;

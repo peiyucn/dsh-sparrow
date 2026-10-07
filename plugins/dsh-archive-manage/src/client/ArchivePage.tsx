@@ -342,24 +342,30 @@ html[data-platform='darwin'] .dsh-archive-page-head {
   line-height: 20px;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
-/* 合集品牌 footer：署名行，钉在页面左下角（owner 2026-10-07 定稿）。
+/* 合集品牌 footer：署名行，钉在页面左下角、与侧边栏底部「设置」入口对齐
+   （owner 2026-10-07：「有点太高了，最好和左边栏下面的设置按钮对齐」）。
    * margin-top: auto —— 本页是 flex 纵列（.dsh-archive-page）且 height: 100%，
      故**内容不满一屏时署名被推到页面底部**、内容超高时它自然跟在内容之后。
-   * text-align: left —— 与页标题、区块卡共用同一个左边缘。此前是居中：全页只有它居中
-     （标题与卡片都左对齐），视线会跳一下。
-   * **已去掉通栏分割线**：那条 1px 通栏线比 11px 的署名重得多，先被看到的是线而不是字；
-     署名只是出处信息，不值一条线把它切成「页脚」。
-   * padding-top 是内容超高时的**最小**净空（无分割线时不可见，故不能用 margin 顶替 ——
-     margin-top: auto 与固定 margin 不能共存）。
-   ⚠️ 净空的口径与云端文件页保持一致（两页都是 24px）：本页最后一个兄弟是区块卡，它自带
-   margin-bottom 12px（那是「卡与卡之间」的间距，不是收尾净空），本页又是 flex 纵列、
-   **外边距不合并** ⇒ 不清零就会变成 12 + 24 = 36。故仍把紧邻 footer 的那张卡归零。 */
+   * text-align: left —— 与页标题、区块卡共用同一个左边缘。
+   * **无分割线**：那条 1px 通栏线比 11px 的署名重得多，先被看到的是线而不是字。
+   * padding-top: 24px —— 内容超高（署名跟在内容之后）时的**最小**净空，
+     以及紧邻卡片的自带卡间距（12px）之外再留的呼吸。
+     不能用 margin-top 顶替：margin-top: auto 与固定 margin 不能共存。
+   ⚠️ 本页是 flex 纵列、**外边距不合并** ⇒ 紧邻 footer 的那张卡要归零，否则 12+24=36。
+   * **margin-bottom: -25px —— 与侧边栏「设置」行对齐的那一段**。本页沿用官方入口型页面
+     的 padding-bottom: 48px；不抵消的话署名中心落在「视口底部 −56.5px」，而侧边栏设置行
+     的文字中心在「视口底部 −31.5px」（实测 720/800/900/1080 四种窗口高度下都是这个值 ——
+     设置行贴着窗口底排，与窗口高度无关）⇒ 差值 25px 就是把署名往下拉的距离。
+     ⚠️ 这个 −25 不是随手写的：**它依赖「本页 padding-bottom 48px」+「侧边栏设置行文字中心
+     距底 31.5px」两个外部事实**。任一改变（官方给入口页换下内边距、设置行改高、或本页
+     自己改 padding-bottom）都要重算，否则署名会重新错位。改前先量，别按感觉调。 */
 .dsh-archive-section-card:has(+ .dsh-archive-page-footer) {
   margin-bottom: 0;
 }
 .dsh-archive-page-footer {
   box-sizing: border-box;
   margin-top: auto;
+  margin-bottom: -25px;
   padding-top: 24px;
   text-align: left;
   font-size: 11px;

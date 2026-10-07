@@ -218,16 +218,24 @@ describe('dsh-archive-manage 结构', () => {
 
   /**
    * owner 2026-10-01 报「下面 dsh-sparrow 的 logo，分割线和上面都挨上了」→ 当时靠 24px
-   * 净空 + 分割线解决；**2026-10-07 owner 改口径**：「固定左下角取消分割线」。
+   * 净空 + 分割线解决；**2026-10-07 owner 两次改口径**：「固定左下角取消分割线」→
+   * 「有点太高了，最好和左边栏下面的设置按钮对齐」。
    *
-   * 现在是**署名行**：钉在页面左下角（`margin-top: auto` 推到底）、左对齐、无分割线。
-   * 三条都要钉住 —— 任一条回退都会让观感退回 owner 否掉的那版：
+   * 现在是**署名行**：钉在页面左下角、左对齐、无分割线，且与侧边栏「设置」行**垂直居中对齐**。
+   * 五条都要钉住 —— 任一条回退都会退回 owner 否掉的那版：
    * * 去掉 `margin-top: auto` ⇒ 署名不再贴底，矮内容页会在它下面留一大片空白；
-   * 变回 `center` ⇒ 全页只有它居中（标题与卡片都左对齐），视线会跳；
-   * 加回通栏分割线 ⇒ 线比 11px 的字重得多，先被看到的变成线。
-   * 还有 `padding-top: 24px`：内容超高（署名跟在内容之后）时的最小净空。
+   * * 变回 `center` ⇒ 全页只有它居中（标题与卡片都左对齐），视线会跳；
+   * * 加回通栏分割线 ⇒ 线比 11px 的字重得多，先被看到的变成线；
+   * * 去掉 `margin-bottom: -25px` ⇒ 署名比侧边栏设置行**高 25px**（owner：「太高了」）；
+   * * 去掉 `padding-top: 24px` ⇒ 内容超高时署名贴住上方内容。
+   *
+   * ⚠️ `-25px` 是算出来的、不是感觉：本页 `padding-bottom: 48px`，署名中心因此落在
+   * 「视口底部 −56.5px」；侧边栏设置行的文字中心在「视口底部 −31.5px」（实测 720/800/900/1080
+   * 四种窗口高度下恒定 —— 设置行贴着窗口底排，与窗口高度无关）⇒ 差 25px。
+   * 所以下面**同时**钉住「本页 padding-bottom: 48px」：官方改入口页下内边距、或设置行改高，
+   * 这个数都必须重算，钉住它能让重算点显式暴露，而不是静默错位。
    */
-  it('⛔ 品牌署名必须钉在左下角、左对齐、无分割线（owner 2026-10-07 口径）', async () => {
+  it('⛔ 品牌署名必须与侧边栏「设置」行对齐（左下角 / 左对齐 / 无分割线）', async () => {
     const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
     const footer = /\.dsh-archive-page-footer \{([^}]*)\}/u.exec(src)
     assert.ok(footer !== null, '缺 .dsh-archive-page-footer 规则')
@@ -241,6 +249,12 @@ describe('dsh-archive-manage 结构', () => {
       '不得有分割线（owner 2026-10-07：「取消分割线」）')
     assert.match(decl, /padding-top:\s*24px/u,
       '内容超高时署名跟在内容之后，必须留 24px 最小净空（否则贴住上方内容）')
+    assert.match(decl, /margin-bottom:\s*-25px/u,
+      '必须 margin-bottom: -25px —— 与侧边栏「设置」行对齐的那一段（owner：「太高了」）')
+    const page = /\.dsh-archive-page \{([^}]*)\}/u.exec(src)
+    assert.ok(page !== null, '缺 .dsh-archive-page 规则')
+    assert.match(page[1].replace(/\/\*[\s\S]*?\*\//gu, ''), /padding:\s*0 clamp\(24px, 4vw, 48px\) 48px/u,
+      '本页下内边距必须仍是 48px —— −25px 正是相对它算出来的；改了这里必须同步重算 margin-bottom')
     assert.match(src, /\.dsh-archive-section-card:has\(\+ \.dsh-archive-page-footer\)\s*\{[^}]*margin-bottom:\s*0/u,
       '紧邻署名的区块卡必须把自身 margin-bottom 归零（flex 纵列外边距不合并，否则 12+24=36）')
   })

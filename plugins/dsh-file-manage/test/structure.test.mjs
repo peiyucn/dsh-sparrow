@@ -170,12 +170,17 @@ describe('dsh-file-manage 结构', () => {
 
   /**
    * owner 2026-10-01 报「下面 dsh-sparrow 的 logo，分割线和上面都挨上了」→ 当时靠 24px
-   * 净空 + 分割线解决；**2026-10-07 owner 改口径**：「固定左下角取消分割线」。
+   * 净空 + 分割线解决；**2026-10-07 owner 两次改口径**：「固定左下角取消分割线」→
+   * 「有点太高了，最好和左边栏下面的设置按钮对齐」。
    *
-   * 与归档页同一口径（两页样式逐字同源，只差前缀）：
-   * `margin-top: auto` 钉底、左对齐、无分割线、`padding-top: 24px` 最小净空。
+   * 与归档页同一口径（两页样式同源，只差前缀）：`margin-top: auto` 钉底、左对齐、无分割线、
+   * `padding-top: 24px` 最小净空、`margin-bottom: -25px` 与侧边栏「设置」行对齐。
+   *
+   * ⚠️ `-25px` = 本页 `padding-bottom: 48px` 造成的「视口底部 −56.5px」与侧边栏设置行文字
+   * 中心「视口底部 −31.5px」之差（实测 720/800/900/1080 四种窗口高度下都成立）。
+   * 故下面同时钉住本页的 48px 下内边距 —— 改了它就必须重算 margin-bottom。
    */
-  it('⛔ 品牌署名必须钉在左下角、左对齐、无分割线（owner 2026-10-07 口径）', async () => {
+  it('⛔ 品牌署名必须与侧边栏「设置」行对齐（左下角 / 左对齐 / 无分割线）', async () => {
     const styles = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
     const footer = /\.dsh-file-manage-page-footer \{([^}]*)\}/u.exec(styles)
     assert.ok(footer !== null, '缺 .dsh-file-manage-page-footer 规则')
@@ -189,6 +194,12 @@ describe('dsh-file-manage 结构', () => {
       '不得有分割线（owner 2026-10-07：「取消分割线」）')
     assert.match(decl, /padding-top:\s*24px/u,
       '内容超高时署名跟在列表之后，必须留 24px 最小净空（否则贴住列表最后一行）')
+    assert.match(decl, /margin-bottom:\s*-25px/u,
+      '必须 margin-bottom: -25px —— 与侧边栏「设置」行对齐的那一段（owner：「太高了」）')
+    const page = /\.dsh-file-manage-page \{([^}]*)\}/u.exec(styles)
+    assert.ok(page !== null, '缺 .dsh-file-manage-page 规则')
+    assert.match(page[1].replace(/\/\*[\s\S]*?\*\//gu, ''), /padding:\s*0 clamp\(24px, 4vw, 48px\) 48px/u,
+      '本页下内边距必须仍是 48px —— −25px 正是相对它算出来的；改了这里必须同步重算 margin-bottom')
   })
 
   /**
