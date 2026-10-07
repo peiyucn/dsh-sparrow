@@ -46,6 +46,17 @@ import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT,
 export const HEADER_HEIGHT_PX = 76
 
 /**
+ * 官方「右栏轨道不存在」时输出的属性（`AppFrame.tsx`：`data-rightbar-collapsed={cols.rightbar === 0 || undefined}`）。
+ *
+ * 它是本插件**相位写法的守卫**：座底那条不透带与卡片缺口改用「显式视口尺寸 + 相位对齐」
+ * 之后，正确性依赖「载体右缘贴视口右缘」；右栏一开这个前提就不成立
+ *（实测缺口 7px → 1303px，逐像素差 4.53 = 肉眼可见的错位）。
+ * 故新写法**只在该属性存在时生效**，其余状态自动退回官方式的 `background-attachment: fixed`
+ * —— 退回去只是慢，绝不会错位。依据与实测见 `docs/spec/10-fixed-attachment-cost.md`。
+ */
+export const RIGHTBAR_COLLAPSED_ATTR = 'data-rightbar-collapsed'
+
+/**
  * 右栏顶部**两条 38px 带**里，上面那条（dockkit 条）的高度。
  *
  * 官方 `dockkit.module.css` 的 `.tabStrip` 与 `ui-sidebar-files` 的 `.header`
@@ -737,24 +748,91 @@ function pct(alpha: number): string {
  * | `100vw 100vh` + `calc(100% - 100vw) top` | 0.000 | 0.000 |
  * | 写死 `1400px 900px` + 负偏移（**反例**） | 0.000 | **1.076（窗口一改就错）** |
  *
- * ## ⚠️ 但**逐站点**实测后**整条回退**了（2026-09-27）
+ * ## ⚠️ 2026-10-08：`fixed` 保留为**默认档**，但滚动在场的那两条另有性能档
  *
- * 上面那张表只测了**顶栏**。逐站点重测发现前提不普遍成立：
+ * `fixed` 的语义（定位区 = 视口）在这里是**想要的** —— 它让百分比/`100vw 100vh` 自动
+ * 与地面逐像素对齐，且**与元素几何无关**（右栏打开、左栏折叠都不影响）。
+ * 它的代价是**每帧按视口栅格化**：实测这是滚动卡顿的主因，且**与图片面积无关**
+ *（声明尺寸缩到 1/225 也不省）。
  *
- * | 站点 | 盒子右缘 | 与视口宽 | 新写法 vs 旧写法 |
- * | :--- | ---: | :--- | ---: |
- * | 顶栏 `::before` | 280+1120 = **1400** | **相等** | 平均 **0.000** / 最大 0.0 ✅ |
- * | 输入框座 `::after` | 280+1113 = **1393** | **差 7px** | 平均 **0.747** / 最大 **19.0** ❌ |
+ * 故策略是「**默认保留 fixed + 在场时切性能档**」：
+ * * {@link viewportPhasePaint} 给出等价的 `scroll` 相位（实测逐像素 0 差）；
+ * * 只在 `data-rightbar-collapsed`（官方报告的「右栏轨道不存在」）下生效 ——
+ *   相位要求「定位区右缘贴视口右缘」，而**右栏一打开就变成差 1303px**；
+ * * 其余状态自动退回本函数的 `fixed` ⇒ **退回去只是慢，绝不会错位**。
  *
- * ⇒ **「右缘 == 视口宽」不是普遍成立**（输入框座差 7px），同一套写法覆盖不了所有站点。
- * 只改顶栏会让同族写法分裂，而收益（滚动性能）**尚未测出明确代价** ⇒ 回退，保持 `fixed`。
- * 将来若要做：须**逐站点**先证明「右缘 == 视口宽」，或改用左对齐 + 该站点实测偏移。
+ * 已切的两条 = 座底不透带 + 卡片缺口（实测 Paint −81% / 绘制次数 −56%）。
+ * 完整实测与逐站点前提见 `docs/spec/10-fixed-attachment-cost.md`。
+ *
+ * ## 历史：2026-09-27 的整条回退（已被取代）
+ *
+ * 当时逐站点重测发现：顶栏右缘 `280+1120 = 1400` == 视口宽（等价，`0.000`），
+ * 但输入框座右缘 `280+1113 = 1393` **差 7px**（平均 `0.747` / 最大 `19.0`）⇒
+ * 「右缘 == 视口宽」不普遍成立，且收益「未测出明确代价」⇒ 整条回退。
+ *
+ * **两条前提现已失效**：① 那 7px 查清了 = 官方 `.scrollBody` 的 `margin-right: 2px`
+ * + `--dsh-scrollbar-width: 5px`，**可用变量精确表达**（实测 0 差）；
+ * ② 收益明确（Paint −81%）。
  * @returns 可直接嵌进规则体的声明串。
  */
 function backingPaint(): string {
   return `background-color: var(--dsw-alias-bg-base);
   background-image: ${grainOverGradients()};
   background-attachment: fixed;`
+}
+
+/**
+ * 官方 `.scrollBody` 的 `margin-right`（px）—— 相位公式里的第一个加数。
+ * 出处：`ConversationRoot.module.css` 的 `.scrollBody { margin-right: 2px }`。
+ */
+export const SCROLL_BODY_MARGIN_PX = 2
+
+/**
+ * 「**用显式视口相位代替 `background-attachment: fixed`**」的逐层声明。
+ *
+ * ## 为什么要有它
+ * `fixed` 让背景的定位区变成**视口**，于是每帧都要按视口栅格化 —— 实测这是
+ * 滚动卡顿的**唯一**主因：把声明尺寸缩到 1/225 也不省（`fixed` 的成本与图片面积无关），
+ * 而同样面积改成 `scroll` 立刻省 71%。详见 `docs/spec/10-fixed-attachment-cost.md`。
+ *
+ * ## 怎么替代（推导）
+ * `fixed` 的语义 = **图片盒与视口重合**。改用 `scroll` 后必须显式复现该相位：
+ *
+ * | 层 | 目标 | 写法 |
+ * | :--- | :--- | :--- |
+ * | 颗粒（200×200 repeat） | 网格原点 ≡ 视口原点（模一个周期） | x `calc(0px - 100vw + 列宽)`，y `calc(100% - 100vh)` |
+ * | 三渐变（`100vw 100vh`） | 图片盒 == 视口 | x `calc(100% + inset)`，y `100%` |
+ *
+ * 两条都可**纯 CSS**表达（不写死数字），且**与元素自身宽度/高度无关**：
+ *
+ * * **x** —— 渐变的百分比按 `(定位区宽 − 图片宽)` 解析；定位区右缘 = 视口右缘 − inset
+ *   ⇒ 图片左缘落在 `−inset`，补 `+inset` 后正好 `0`。颗粒那层用**长度**，直接把网格原点
+ *   推回视口原点（`−leftGap`）。
+ *   ⚠️ 锚的是**定位区**（伪元素绝对定位时 = 宿主的 padding 盒），**与元素盒无关** ——
+ *   所以两条规则可以共用一个配方，不必为「居中」另加偏移（本轮曾按元素盒推导，错，实测偏出 1208 像素）。
+ * * **y** —— 渐变图片高 = 视口高 ⇒ 贴底（`100%`）即与视口底对齐；
+ *   颗粒是 200 的重复网格，取 `calc(100% − 100vh)` ⇒ 原点正好差**一个周期**（`−200`），等价且与高度无关。
+ *
+ * 前提：**P1** 定位区右缘 = 视口右缘 − `inset`；**P2** 定位区**下缘** = 视口下缘。
+ * 两条规则的载体都满足 P2（座是 `sticky bottom: 0`；缺口那条把盒子撑到宿主底）。
+ *
+ * ⚠️ **P1 在「右栏打开」时不成立**（实测差 1303px）⇒ 调用方必须用
+ * {@link RIGHTBAR_COLLAPSED_ATTR} 守住，让那些状态退回 `fixed`（退回去只是慢，不会错位）。
+ *
+ * ⚠️ **两种层的 y 不一样**，别统一：渐变是 `100%`，写成 `calc(100% − 100vh)` 会多减一个
+ * 图片高、把整块推到视口外（这是本轮真发生过的错，逐像素差 2.65 / 31% 像素超 2 级）。
+ * @returns 可直接嵌进规则体的声明串（含结尾分号）。
+ */
+export function viewportPhasePaint(): string {
+  const inset = `calc(${SCROLL_BODY_MARGIN_PX}px + var(--dsh-scrollbar-width, 5px))`
+  const leftGap = `calc(100vw - var(--dsh-conversation-column-width, 100vw))`
+  return `background-attachment: scroll;
+  background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-position: calc(0px - ${leftGap}) calc(100% - 100vh),
+    calc(100% + ${inset}) 100%,
+    calc(100% + ${inset}) 100%,
+    calc(100% + ${inset}) 100%;`
 }
 
 /**
@@ -956,7 +1034,6 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat] {
      「相当于两层光了」。**所以这里选不透明，把那个坑整个绕开。**
 
    高度：**只到卡片下沿为止**（很矮），上面那 RAMP 段是过渡、藏在卡片背后。
-   background-attachment: fixed 让百分比按**视口**解析，光才与背景层逐像素对齐。
    ⚠️ 必须写成**单个 fixed**：本规则 4 层 background-image，per-layer 值少于层数时
    会**按顺序循环补齐**，「scroll, fixed」会让第 1、3 段渐变退回按元素自身盒子解析。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
@@ -974,6 +1051,24 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat]::after {
   /* 顶端 ${SEAT_SOLID_RAMP_PX}px 过渡（落在卡片背后，故不可见），下面 ${SEAT_SOLID_PX}px 全实 */
   -webkit-mask-image: linear-gradient(180deg, transparent 0px, black ${SEAT_SOLID_RAMP_PX}px);
   mask-image: linear-gradient(180deg, transparent 0px, black ${SEAT_SOLID_RAMP_PX}px);
+}
+
+/* --- 上一条的**性能档**：同一份漆，但用显式视口相位，不吃 background-attachment: fixed ---
+   owner 报「模型 think 时插件主题下滚动明显变卡、官方深浅主题不卡」。实测（2880×1800 @120Hz）：
+   滚动 60 帧的 Paint 分项 **345ms → 55ms**，帧间隔中位 **17.8ms → 11.3ms**；
+   而成本**与图片面积无关**（把固定背景的声明尺寸缩到 1/225 也不省），
+   全在这一条 fixed 声明上 —— 详见 docs/spec/10-fixed-attachment-cost.md。
+
+   ⚠️ **守卫不是可选项**：相位要求「座右缘贴视口右缘」，而**右栏一打开**就变成差 1303px
+   （实测逐像素差 4.53 = 肉眼可见）。官方在右栏轨道不存在时输出 data-rightbar-collapsed，
+   实测它就是那条分界线 ⇒ 只在该属性下用相位档，其余状态继续吃上面那条 fixed 档
+   （退回去只是慢，绝不会错位）。
+
+   ⚠️ 两条规则的**层序必须与上面完全一致**（颗粒在最上、三段光其次、底色在下），
+   否则同一像素会算出两种颜色 —— 相位对齐了也没用。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+body:not([${PLAIN_ATTR}]) [${RIGHTBAR_COLLAPSED_ATTR}] [data-phase='active'] [data-composer-seat]::after {
+  ${viewportPhasePaint()}
 }
 
 /* --- 输入框卡片：用户盯着的那个面（数据锚点来自 InputBar.tsx:429 的 data-composer-card） ---
@@ -1808,11 +1903,50 @@ function buildCardNotchCss(): string {
    * 自成层叠上下文，挂它身上的伪元素（哪怕 z-index 负）会画在停靠卡之上。
    */
   const host = `${gate} :has(> [data-composer-card])`
+  /**
+   * 缺口补丁的**性能档**选择器：在门上再加「右栏轨道不存在」。
+   *
+   * ⚠️ 比下面那条**多一个属性选择器** ⇒ 特异度更高，两处声明同时命中时**恒以本档为准**
+   *（不受书写次序影响）；右栏打开时本条不命中，自动退回下面那条 `fixed` 档。
+   * ⚠️ 必须**写在基础档之前**：缝表那边的守卫用「最后一条 `:has(...)::after`」取补丁本体
+   *（见 test/glass.test.mjs 的 lastRuleWith），本档写在后面会把那条守卫指到错规则上。
+   */
+  const phaseHost = `body:not([${PLAIN_ATTR}]) [${RIGHTBAR_COLLAPSED_ATTR}] [data-phase='active'] [data-composer-seat] :has(> [data-composer-card])`
   return `/* ===== 输入框卡上圆角缺口（卡片圆角弧外的三角露正文；详见 buildCardNotchCss 注释）===== */
 ${host} {
   /* 只补包含块，不改布局（无偏移、无 z-index）：父元素官方是 static，
      绝对定位伪元素需要它当包含块。这条与缝挡板那条同型，不新增副作用。 */
   position: relative;
+}
+/* --- 上一条的**性能档**：同一份漆与**一字不改的遮罩**，只把 fixed 换成显式视口相位 ---
+   ⚠️ 与非性能档的差别只有两处，都不可省：
+   ① 盒子撑到宿主底（top:0 / bottom:0 / height:auto）—— 相位里的 100% 指**元素自身高度**，
+      只有下缘贴视口底时它才能把「元素顶到视口顶的距离」抵消掉；保持 28px 高会差 100px。
+   ② 背景逐层给值（{@link viewportPhasePaint}）。
+   遮罩**一个字都不改** ⇒ 两块瓦片仍落在元素顶部的左右两角 = 卡片两角，补的仍是圆角外那块三角。
+
+   ⚠️ 必须用 data-rightbar-collapsed 守卫：相位要求「定位区右缘贴视口右缘」，
+   右栏一打开就变成差 1303px（实测逐像素差 4.53 = 肉眼可见）。
+   ⚠️ 本档与座底那条**必须同进同退**：实测只改一条各只省 ~15~17%，两条一起改省 54%
+   （paintN 435 → 201）—— 滚动容器里只要还留着一条 fixed，那笔按视口栅格化的开销就仍要付。
+   （本段在模板字符串里，注释中**不能出现反引号**。） */
+${phaseHost}::after {
+  /* 撑满宿主的**定位区**（inset 同时定 left/right/top/bottom）。
+     ⚠️ 只写 left/width 会把盒宽钉在卡片宽，而相位公式要的是「定位区右缘 = 视口右缘 − inset」
+     —— 那正是本档成立的前提（P1）。撑满后定位区 = 宿主内边距盒，实测 2593 = 列宽 − inset。 */
+  inset: 0;
+  width: auto;
+  height: auto;
+  ${viewportPhasePaint()}
+  /* ⚠️ 盒子变宽 ⇒ **遮罩百分比基准**跟着从「卡片宽 − 半径」变成「宿主宽 − 半径」，
+     两块瓦片会跑到宿主两角。补回 (宿主宽 − 卡片宽)/2 那个偏移。
+     推导：遮罩百分比按 (定位区宽 − 瓦片宽) 解析，要求瓦片落在「卡片左缘」：
+       0.5·(A − R) + c − cardW/2 = (A − cardW)/2  ⇒  **c = R/2**
+     （与 A 无关 ⇒ 视口/列宽/卡片宽变化都不用改）。右瓦片同理整体相差 cardW − R。 */
+  -webkit-mask-position: calc(50% + ${CARD_NOTCH_RADIUS} / 2 - ${CARD_NOTCH_WIDTH} / 2) 0,
+    calc(50% + ${CARD_NOTCH_RADIUS} / 2 + ${CARD_NOTCH_WIDTH} / 2 - ${CARD_NOTCH_RADIUS}) 0;
+  mask-position: calc(50% + ${CARD_NOTCH_RADIUS} / 2 - ${CARD_NOTCH_WIDTH} / 2) 0,
+    calc(50% + ${CARD_NOTCH_RADIUS} / 2 + ${CARD_NOTCH_WIDTH} / 2 - ${CARD_NOTCH_RADIUS}) 0;
 }
 ${host}::after {
   content: '';
