@@ -163,6 +163,21 @@ ctx.slots.inject('settings.general.item', () => ctx.slots.register({
   **不能用固定 basis + 允许换行**：四张卡放不下时第 4 张会独占第二行，并被 `flex-grow` 拉满整行（左锚光晕在超宽卡上会糊成一大片）。有回归测试钉住 `nowrap` / `flex: 1 1 0` / 不得出现固定 basis。
 * 组件复用官方外观行的视觉语言（`AppearanceRow.tsx:44-61` 的 `group` + `title` + `cubeRow` 结构与描边 / 圆角 / 内边距）——但**分栏策略不同**：官方那行只有 3 个固定 `flex: 180px` 的 cube，我们有 4 张且要恒排一行。
 * 行内状态由 store 镜像，`sync` 由 `apply` 世界的 `theme/change` 订阅与 settings scope 订阅驱动——**与官方外观行同构**（`ui-theme/src/client/index.ts:436-453`）：`revision` 守卫丢弃过期写入，注册后立刻 `sync(theme.getTheme())` 避免丢事件。
+* **乐观值按「哪一笔」归属，不按「快照 revision 前进过」**（owner 2026-10-07 真机报「切换不同 tone 时会来回跳」的根因）：
+  * **写入有多慢**：一次 `settings/mutate` 真机实测 **1.5–4s** —— 宿主 `ConfigEditor.edit` 会走整轮 reconcile（`reconcileProfilePatches` → 写 profile patch → 回新镜像 → `describe`）。色卡是高频点击控件，这段时间里用户必然能再点第二张。
+  * **旧判据错在哪**：「revision 前进过 = 宿主已就我那笔给出结论」在**单笔**在途时成立；两笔在途时，**先发那笔**的结算（或它触发的 `describe` 回读）同样让 revision 前进 → **后发那笔**的乐观值被误当作废 → 画面从「第二张卡」跳回「第一张卡」，等第二笔响应到达再跳回去。
+  * **实测轨迹**（本机 dsh，连点 Default → 40ms 后点 Sakura；`data-*` 与 DOM 两侧一致）：
+
+    | 时刻 | 画面 | 事件 |
+    | ---: | :--- | :--- |
+    | 29ms | Default | 第 1 笔乐观值 |
+    | 82ms | Sakura | 第 2 笔乐观值 |
+    | **1171ms** | **Default** | ← 第 1 笔结算回来，误收掉第 2 笔（**回跳**） |
+    | 2444ms | Sakura | 第 2 笔结算，最终收敛 |
+
+  * **修法**：`src/client/pending.ts` 的在途记账器 —— `begin` 发号、`settle` 只认最新一号、`over` 把在途值盖到快照上。归属**按字段分别记账**（浅 / 深两轴各写各的字段，切轴选色不顶掉另一轴在途那笔）。由**那一笔写入自己的 `set().then(...)`** 收回，接受与传输失败两条路都收；`repaint` 不再承担收尾（它会被别的推进触发，在那里收就是本 bug 的形状）。
+  * **为什么不按「值有没有变」判**：写入刚发出时快照还是旧值，按「值 ≠ 乐观值」判会**当场**抹掉乐观值（等于没做乐观更新）；宿主**拒绝**时值同样不等于乐观值，按「值 = 乐观值」判接受则 pending 永久留着（画面停在一个刷新就消失的颜色上）。按「哪一笔」判两个坑都绕开。
+  * 回归后同一串操作只跳一次（82ms 那次），之后不再回跳；守卫见 `test/pending.test.mjs`（行为）与 `test/structure.test.mjs`（接线：不得再出现按 revision 收的调用、`repaint` 不得收、两条结算路都在）。
 * **只渲染当前轴的 `available` 色调**；切轴由 store 里的 `colorScheme` 触发重渲染。8 款全部可选（深色 4 / 浅色 4）。
 * **标签走意境名**（深空 / 余烬 / 幽林 / 霜蓝 / 樱花 / 苔青）——颜色已由卡面表达，标签只负责给氛围定名；`official` 保持功能性命名（「默认」）。
 * **不写死「设置」标题层级**：本行是自己的 `title`（「色调」）+ 卡组，与官方「外观」「字号」并列，不假装属于官方外观行。

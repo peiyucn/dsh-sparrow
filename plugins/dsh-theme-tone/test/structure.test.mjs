@@ -649,4 +649,42 @@ describe('dsh-theme-tone 结构', () => {
       '卸载清理必须摘掉 WORKSTART_ATTR',
     )
   })
+
+  it('⛔ 乐观值必须按「哪一笔」收，不得再按「快照 revision 前进过」收（来回跳的根因）', async () => {
+    // 事故（owner 真机报「切换不同 tone 时会来回跳」）：旧实现在 `repaint()` 里用
+    // `clearSettledPending(...)` 按「revision 变了 = 有结论」收乐观值。单笔在途时成立，
+    // **多笔在途时是错的** —— 真机实测一次 `settings/mutate` 要 1.5–4s（宿主写 profile
+    // patch 走整轮 reconcile），用户会再点第二张卡；先发那笔的结算（或它触发的 describe
+    // 回读）同样让 revision 前进，于是**后发那笔**的乐观值被误当作废 → 画面从「第二张卡」
+    // 跳回「第一张卡」，等第二笔响应到达再跳回去。实测轨迹见 pending.test.mjs 头部。
+    //
+    // 修法：归属按「哪一笔」记账（`pending.ts` 的 tracker），由**那一笔写入自己的
+    // 结算**收回。本守卫钉住三件事：脱钩 revision、`repaint` 不再收、`set()` 两条路都结算。
+    const src = await readCode('../src/client/index.ts')
+    assert.match(src, /createPendingToneTracker\(/u, '要用按笔归属的 tracker')
+    assert.ok(
+      !/clearSettledPending/u.test(src),
+      '⛔ 不得再有按 revision 收乐观值的 clearSettledPending',
+    )
+    // repaint 体内不得出现「收乐观值」的调用 —— 它会被别的推进（另一笔的结算 / describe 回读）
+    // 触发，在那里收就是本 bug 的形状。允许提到 settlePending（注释已剥），但不得调用它。
+    const rpIdx = src.indexOf('const repaint = (')
+    assert.ok(rpIdx > 0, '缺 repaint 定义（签名改过？）')
+    const rp = bodyTextAt(src, rpIdx)
+    assert.ok(rp.length > 0, '缺 repaint 定义')
+    assert.ok(
+      !/settlePending\s*\(/u.test(rp),
+      '⛔ repaint 里不得收乐观值（会把手更新的那一笔误当作废）',
+    )
+    // setTone 必须挂 .then 结算自己那一笔，且两条路（接受 / 传输失败）都收。
+    const i = src.indexOf('setTone:')
+    assert.ok(i > 0, '找不到 setTone')
+    const seg = src.slice(i, i + 4000)
+    assert.match(seg, /pendingTones\.begin\(field, id\)/u, 'setTone 要按字段发号')
+    assert.match(seg, /scope\.set\(field, id\)\.then\(/u, 'setTone 要结算自己那一笔')
+    assert.ok(
+      (seg.match(/settlePending\(pending\)/gu) ?? []).length >= 2,
+      '接受与传输失败两条路都要结算（否则乐观值会永久留着）',
+    )
+  })
 })

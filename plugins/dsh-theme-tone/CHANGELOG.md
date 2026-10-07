@@ -4,6 +4,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## 0.2.0-rc.2 (2026-09-30)
 
+- Fixed the tone jumping back to an earlier pick when you switch between tones quickly.
 - Version-line alignment with official dsh 0.2.0-rc.2.
 - Fixed grouped headings in the model picker and command popup losing their themed background.
 - Fixed the right sidebar's themed gradient being offset on the Windows desktop app.

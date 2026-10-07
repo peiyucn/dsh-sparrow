@@ -64,6 +64,7 @@ import {
 } from '../tones.js'
 import { ThemeToneRow, type ThemeToneRowInjected } from './ThemeToneRow.js'
 import { en, zh } from './locales.js'
+import { createPendingToneTracker, type PendingToneWrite } from './pending.js'
 import { buildRowCss } from './styles.js'
 import { createThemeToneRowStore } from './store.js'
 
@@ -342,13 +343,12 @@ function install(ctx: Context): void {
   let warnedNoPersistence = false
 
   /**
-   * 用户刚点、还在跨宿主往返中的那一笔色调（乐观更新，见 {@link readSettings}）。
+   * 在途乐观值的记账器（见 {@link pending.ts} / {@link readSettings}）。
    *
-   * `revision` 记录**发出这笔写入时**快照的 revision —— 之后 revision 一旦前进，
-   * 说明宿主已给出结论（接受 / 拒绝 / 恢复读），那一笔就该收掉
-   * （见 {@link clearSettledPending}）。
+   * ⚠️ 按**字段**分别记账，不共用一个槽位 —— 两轴各写各的字段，切轴选色不该顶掉另一轴
+   * 在途的那一笔（`tokenOverrides` 两轴一次给全，那一笔同样要算数）。
    */
-  let pendingTone: { field: keyof ThemeToneSettings; id: ToneId; revision: number | undefined } | undefined
+  const pendingTones = createPendingToneTracker()
 
   /**
    * 当前该用哪份设置。
@@ -360,38 +360,49 @@ function install(ctx: Context): void {
    * 就绪前一律用**进程内兜底值**（初值 = 默认，且此时没人改过它），
    * 并由 {@link shouldPaint} 决定先不上色。
    *
-   * **乐观更新**：{@link pendingTone} 里那一笔（用户刚点、还在跨宿主往返中）优先于
+   * **乐观更新**：{@link pendingTones} 里那一笔（用户刚点、还在跨宿主往返中）优先于
    * 宿主快照 —— 否则点下去要等一个 RTT 才变色（owner：「点色卡后半天才换过来」）。
-   * 一旦快照里的该字段追上这一笔，pending 自然失效（见 {@link clearSettledPending}）。
+   * 该笔由**它自己那次写入的结算**收回，见 {@link settlePending}。
    */
   const readSettings = (): ThemeToneSettings => {
     const snapshot = scope.getSnapshot()
     const base = snapshot.status === 'ready' && snapshot.value !== undefined ? snapshot.value : localSettings
-    if (pendingTone === undefined) return base
-    return { ...base, [pendingTone.field]: pendingTone.id }
+    return pendingTones.over(base)
   }
 
   /**
-   * 宿主对那一笔乐观更新**给出结论**时收掉它。
+   * 一笔写入**结算**时收掉它自己的乐观值。
    *
-   * ⚠️ **判据是「快照 revision 前进过」，不是「值变没变」**：
-   * `repaint()` 就在 `setTone` 里、**宿主还没回话时**被调用一次 —— 那一刻快照仍是旧的
-   * 值，若按「值不等于乐观值」判拒绝，乐观值会**当场被抹掉**（等于没做乐观更新）。
-   * 也不能按「值等于乐观值」判接受：宿主**拒绝**时值同样不等于乐观值，那样
-   * `pending` 会**永久留着**，画面停在一个刷新就消失的颜色上（「假成功」）。
+   * ⚠️ **必须按「是哪一笔」判，不能按「快照 revision 前进过」判**（owner 报的
+   * 「切换不同 tone 时会来回跳」的根因）。真机实测一次 `settings/mutate` 要
+   * **1.5–4s**（宿主写 profile patch 走整轮 reconcile），这段时间里用户会再点第二张卡 ——
+   * 两笔同时在途，各自带自己的结算。若按 revision 收：**先发那笔**的结算（或它触发的
+   * `describe` 回读）同样让 revision 前进，于是**后发那笔**的乐观值被当作废，画面从
+   * 「第二张卡」跳回「第一张卡」，等第二笔响应到达再跳回去。
    *
-   * 官方 `ConfigForm` 的契约给了干净的判据：写入携带 revision 围栏，
-   * 宿主接受 / 拒绝 / 恢复读都会让**镜像 revision 前进**
-   * （见 `config-form-types.d.ts` 的 `revision` 与 `ConfigFormController` 的
-   * pendingRevision / latest-settlement 语义）。故：revision 变了 = 有结论，收掉。
-   * @param settings - 快照里解析出的设置节（未就绪时传 `undefined`）。
-   * @param revision - 当前快照的 revision。
+   * 实测轨迹（本机 dsh，连点 Default → 40ms 后点 Sakura）：
+   *
+   * ```text
+   * t=29ms   Default   第 1 笔乐观值
+   * t=82ms   Sakura    第 2 笔乐观值
+   * t=1171ms Default   ← 第 1 笔结算回来，误收掉第 2 笔（就是这一次回跳）
+   * t=2444ms Sakura    第 2 笔结算，最终收敛
+   * ```
+   *
+   * 改成「先发那笔无权收」后，同一串操作只在 82ms 跳一次、之后不再回跳
+   * （见 `test/pending.test.mjs` 与 `test/structure.test.mjs` 的守卫）。
+   *
+   * 为什么不能按「值与乐观值是否相等」判：写入刚发出时快照还是旧值，判不等会**当场**
+   * 把乐观值抹掉（等于没做乐观更新）；而宿主**拒绝**时值同样不等，判相等则 pending
+   * 永远留着（画面停在一个刷新就消失的颜色上）。按「哪一笔」判两个坑都绕开 ——
+   * 宿主接受与拒绝都会让 `set()` resolve，两条路都由它自己那次调用来收。
+   * @param write - {@link pendingTones} 发的凭据（用户在 `setTone` 里那一笔）。
    */
-  const clearSettledPending = (settings: ThemeToneSettings | undefined, revision: number | undefined): void => {
-    if (pendingTone === undefined || settings === undefined) return
-    // revision 未变 = 宿主还没回话 → 乐观值继续生效。
-    if (revision === undefined || revision === pendingTone.revision) return
-    pendingTone = undefined
+  const settlePending = (write: PendingToneWrite): void => {
+    if (!pendingTones.settle(write)) return
+    // 收掉之后宿主快照才是权威值 —— 立刻重绘一次，让被拒的那一笔当场纠正回来
+    // （接受的那一笔此时快照已含新值，重绘是幂等的）。
+    repaint()
   }
 
   /**
@@ -487,11 +498,11 @@ function install(ctx: Context): void {
 
   /** 设置变更：token、层、行全都要重算。 */
   const repaint = (): void => {
-    const snapshot = scope.getSnapshot()
-    // ⚠️ **先收乐观值、再同步行**：顺序反了的话，宿主**拒绝**这一笔时行会先用
-    // 乐观值画一帧选中态、随后才纠正 —— 用户能看到一次闪动的假选中。
-    // 快照 revision 前进过 = 宿主已就那一笔给出结论（接受 / 拒绝）→ 收掉乐观值。
-    clearSettledPending(snapshot.status === 'ready' ? snapshot.value : undefined, snapshot.revision)
+    // ⚠️ 乐观值**不在这里收**：写设置是跨宿主的一趟往返（真机 1.5–4s），期间
+    // `subscribe` 会因别的推进（另一笔写入的结算、它触发的 describe 回读）多次触发本函数。
+    // 在这里按「revision 变了」收，就会把**更新的那一笔**乐观值误当作废 → 画面来回跳
+    // （owner 报障的根因）。改为由**那一笔写入自己的结算**收，见 settlePending。
+    //
     // ⚠️ 行同步**不设门**（理由见 `paintLayer` 的 ⚠️）：它只依赖当前主题，
     // 必须在 `shouldPaint()` 返回之前就更新 —— 否则设置未就绪时行不刷新，
     // 浅色页面会显示深色轴卡片，点下去就把浅色 id 写进深色字段（被 schema 拒）。
@@ -619,22 +630,37 @@ function install(ctx: Context): void {
            * `subscribe` 触发 `repaint`），在往返回来之前 `readSettings()` 读到的仍是**旧值**，
            * 所以画面要等一个 RTT 才变。色卡是纯本地观感、双击率又高，这一等很显眼。
            *
-           * 修法：把用户的选择**先写进进程内兜底值**并立刻重绘（乐观更新），随后再发写入。
-           * `readSettings()` 优先读宿主快照，故宿主一旦回值即以宿主为准 —— 天然自愈，
-           * 不需要额外的「作废旧值」逻辑：若宿主把这一笔拒了（值非法 / 写入被拒），
-           * 快照仍停在旧值，下一次 `subscribe` / 事件驱动的 `repaint` 会把它纠正回去。
+           * 修法：把用户的选择**先记成在途乐观值**并立刻重绘（乐观更新），随后再发写入。
+           * 该笔由**它自己那次写入的结算**收回（见 {@link settlePending}）：宿主接受 → 快照
+           * 已含新值，收掉后画面不变；宿主拒绝 → 收掉后下一次重绘用快照的旧值纠正回来。
+           *
+           * ⚠️ **不能在这里重新查询 `ctx.theme.getTheme()` 决定收哪一笔**（同上面那条
+           * 「轴由行传入」的理由）：收的凭据必须是**这次写入自己**发的那一号。
            *
            * 宿主不可写（memory 模式 / 命名空间未暴露）时这是**唯一**的落值途径，
-           * 因此同一条路同时承担「不可持久化时也要在本次会话内生效」。
+           * 因此同一条路同时承担「不可持久化时也要在本次会话内生效」——那种情形没有写入
+           * 可结算，乐观值就留在账上（下次同字段的点击会顶替它），由 `localSettings` 兜底。
            */
           localSettings = { ...localSettings, [field]: id }
-          pendingTone = { field, id, revision: snapshot.revision }
+          const pending = pendingTones.begin(field, id)
           repaint()
           if (snapshot.status !== 'ready' || !snapshot.writable) {
             warnIfNotPersistable()
             return
           }
-          void scope.set(field, id)
+          /**
+           * 结算这一笔。
+           *
+           * ⚠️ **必须挂 `.then` 收自己那一笔，不能靠 `repaint` 里的 revision 判定**
+           * （owner 报的「切换不同 tone 时会来回跳」的根因，见 {@link settlePending}）。
+           * 两条路径都要收：`set()` 在宿主**接受与拒绝**时都 resolve（拒绝走 recovery 读），
+           * 只有传输失败才 reject —— 那种情形也从账上收掉（否则乐观值永久留着，
+           * 画面停在一个刷新就消失的颜色上）。
+           */
+          void scope.set(field, id).then(
+            () => { settlePending(pending) },
+            () => { settlePending(pending) },
+          )
         },
       }
     },
