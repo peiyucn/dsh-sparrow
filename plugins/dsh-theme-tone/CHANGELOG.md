@@ -4,6 +4,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## 0.2.0-rc.2 (2026-09-30)
 
+- Scrolling is no longer sluggish while the model is replying; smoothness now matches the official dark and light themes.
 - Fixed the tone jumping back to an earlier pick when you switch between tones quickly.
 - Version-line alignment with official dsh 0.2.0-rc.2.
 - Fixed grouped headings in the model picker and command popup losing their themed background.
