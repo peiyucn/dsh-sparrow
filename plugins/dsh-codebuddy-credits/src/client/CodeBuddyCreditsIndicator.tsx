@@ -36,10 +36,11 @@
  * 更窄时残留的是**官方自己**的溢出（把我们的按钮设成 0 宽也照旧），不再继续让位。
  */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import { setMaxMode, subscribeMaxMode, getMaxMode, syncMaxMode } from './maxMode.js'
+import { scopeMarkSvg } from './mark-ids.js'
 import { BusyDot } from './BusyDot.js'
 import { formatModelFacts } from './format.js'
 import { fetchLocal } from './fetch-timeout.js'
@@ -327,6 +328,28 @@ export function CodeBuddyCreditsIndicator({
   const statusSeq = useRef(0)
   const quotaSeq = useRef(0)
 
+  /**
+   * 品牌标 SVG 的**实例作用域**：本组件在同一文档里会注入多份内联品牌标（顶栏按钮
+   * 的宽/窄两形态 + 展开面板标题行），而两枚常量各自带**写死的渐变 id**。
+   * `fill="url(#id)"` 按文档序**第一个**同名元素解析：对话区宽（> 656px）时窄档那份是
+   * `display:none`，于是面板那份解析到不可见定义 ⇒ 渐变方底不画、只剩硬编码白色字形
+   * ⇒ **浅色模式下看起来就是「logo 没反色」**（owner 2026-10-07 报）。
+   *
+   * 修法（与官方 `ui-primitives` 的 `CodeFileIcon` / `plugin-artwork` 同款）：**每个注入点**
+   * 各自给 id 加实例前缀 ⇒ 每份只引用**自己**那份定义，而那一定义必然在它自己的
+   * （可见）子树里。
+   *
+   * ⚠️ 前缀必须**逐注入点**不同（`wide` / `narrow` / `panel`），不能一个组件只给
+   * 一个前缀就重复用在多处：面板标题行与顶栏窄档用的是**同一枚** `MARK_SQUARE_SVG`，
+   * 共用前缀就又把两个同名 id 摆回同一文档，宽档下症状原样复发（本轮自测抓到的）。
+   *
+   * id 只影响 SVG 内部引用，不参与任何选择器（样式表用 class，见 `ensureIndicatorStyles`）。
+   */
+  const markScope = useId()
+  const markWideSvg = useMemo(() => scopeMarkSvg(LOGO_SVG, `ccb-logo-${markScope}-wide`), [markScope])
+  const markNarrowSvg = useMemo(() => scopeMarkSvg(MARK_SQUARE_SVG, `ccb-logo-${markScope}-narrow`), [markScope])
+  const markPanelSvg = useMemo(() => scopeMarkSvg(MARK_SQUARE_SVG, `ccb-logo-${markScope}-panel`), [markScope])
+
   // 当前选中模型：共享模型目录优先（与选择器同一 store，含目录默认兜底）；
   // 目录不可用（组合里没有 modelDirectories 服务）时退回 session 投影。
   const directory = useMemo(() => {
@@ -585,12 +608,12 @@ export function CodeBuddyCreditsIndicator({
       <span
         className="ccb-mark-wide"
         style={{ fontSize: MARK_FONT_PX, lineHeight: 1 }}
-        dangerouslySetInnerHTML={{ __html: LOGO_SVG }}
+        dangerouslySetInnerHTML={{ __html: markWideSvg }}
       />
       <span
         className="ccb-mark-narrow"
         style={{ fontSize: MARK_FONT_PX, lineHeight: 1 }}
-        dangerouslySetInnerHTML={{ __html: MARK_SQUARE_SVG }}
+        dangerouslySetInnerHTML={{ __html: markNarrowSvg }}
       />
     </button>
   )
@@ -644,7 +667,7 @@ export function CodeBuddyCreditsIndicator({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, lineHeight: '18px', marginBottom: '6px' }}>
-              <span style={{ display: 'inline-flex', flex: '0 0 auto', fontSize: 16, lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: MARK_SQUARE_SVG }} />
+              <span style={{ display: 'inline-flex', flex: '0 0 auto', fontSize: 16, lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: markPanelSvg }} />
               {/* 标题不换行：放不下时省略号截断，把空间让给徽章。 */}
               <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {t('indicator.title')}

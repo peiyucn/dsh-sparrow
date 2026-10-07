@@ -15,6 +15,7 @@ See [简体中文](./CHANGELOG.zh-CN.md).
 - The CodeBuddy entry shrinks to an icon-only logo on narrow layouts.
 - Fixed the credits panel briefly appearing in the wrong place.
 - The new-session page entry now shrinks to the icon-only logo too.
+- Fixed the CodeBuddy logo in the credits panel being nearly invisible in light mode: its square brand-coloured tile was not drawn, leaving only the white mark.
 
 ## 0.1.5-rc.2.2 (2026-09-21)
 

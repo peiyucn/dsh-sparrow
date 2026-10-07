@@ -56,9 +56,14 @@ describe('CodeBuddy 顶栏标记：窄化（容器查询）', () => {
     assert.match(source, /className="ccb-mark-wide"/u, '缺少宽档 span（ccb-mark-wide）')
     assert.match(source, /className="ccb-mark-narrow"/u, '缺少窄档 span（ccb-mark-narrow）')
     // 两个都必须真把 svg 渲染出来（而不是占位空 span）。
+    // ⚠️ 注入的必须是**逐注入点作用域化**后的 svg（mark-ids.ts 的 scopeMarkSvg）：
+    //    直接注入原始常量会让同一文档里的多份标共用写死的渐变 id，宽档下渐变方底
+    //    整个不画 ⇒ 浅色模式看起来像「logo 没反色」（2026-10-07 owner 报，见下一条）。
     const trig = source.slice(source.indexOf('const triggerButton'), source.indexOf('const trigger ='))
-    assert.match(trig, /__html:\s*LOGO_SVG/u, '宽档必须渲染 LOGO_SVG（带字样）')
-    assert.match(trig, /__html:\s*MARK_SQUARE_SVG/u, '窄档必须渲染 MARK_SQUARE_SVG（无文字方标）')
+    assert.match(trig, /__html:\s*markWideSvg/u, '宽档必须渲染作用域化后的 LOGO_SVG（带字样）')
+    assert.match(trig, /__html:\s*markNarrowSvg/u, '窄档必须渲染作用域化后的 MARK_SQUARE_SVG（无文字方标）')
+    assert.ok(!/__html:\s*(LOGO_SVG|MARK_SQUARE_SVG)\b/u.test(source),
+      '不得直接注入未作用域化的原始 SVG 常量（多份同 id ⇒ 渐变解析到不可见定义 ⇒ 浅色下不出图）')
   })
 
   it('⛔ JSX 里 不得 写内联 display —— 会压死 @container 的 display:none', () => {
@@ -116,6 +121,36 @@ describe('CodeBuddy 顶栏标记：窄化（容器查询）', () => {
     const corner = (svg) => /<path d="(M18\.821 0H5\.18[^"]*)"/u.exec(svg)?.[1]
     assert.ok(corner(square) !== undefined, '方标里找不到圆角方块那段 path')
     assert.equal(corner(square), corner(wide), '两个形态的方块必须是同一段 path（切换时视觉连续）')
+  })
+
+  it('⛔ 每个品牌标注入点 必须 用**各自不同**的作用域前缀（同前缀 = 同 id，症状复发）', () => {
+    // 2026-10-07 owner 报「浅色模式下额度卡里的 logo 好像没反色」的**真根因**：
+    // 内联品牌 SVG 的渐变 id 是写死的，同一文档注入多份时 `fill="url(#id)"` 按
+    // **文档序第一个**同名元素解析；宽对话区（> MARK_COLLAPSE_PX）下窄档那份是
+    // `display:none` ⇒ 面板标题行那份解析到不可见定义 ⇒ 渐变方底整个不画，
+    // 只剩硬编码 `fill="#fff"` 的白色字形 ⇒ 浅色底上「看不见 / 像没反色」。
+    //
+    // ⚠️ 光「加了 useId 前缀」还不够：面板与顶栏窄档用的是**同一枚** MARK_SQUARE_SVG，
+    //    若两处共用同一个前缀，两个同名 id 又回到同一文档 ⇒ 宽档下症状原样复发
+    //    （本轮实现第一版正是这样，被这条守卫的思路抓到）。故前缀必须逐注入点不同。
+    const scopes = [...source.matchAll(/scopeMarkSvg\(\s*([A-Z_]+)\s*,\s*`ccb-logo-\$\{markScope\}([^`]*)`/gu)]
+      .map(m => [m[1], m[2]])
+    assert.equal(scopes.length, 3,
+      `应有 3 处作用域化注入（宽档 lockup / 窄档方标 / 面板方标），实际 ${scopes.length} 处：${JSON.stringify(scopes)}`)
+    const prefixes = scopes.map(([, prefix]) => prefix)
+    assert.equal(new Set(prefixes).size, prefixes.length,
+      `三个注入点的前缀必须互不相同（同前缀 = 同 id = 症状复发），实际 ${JSON.stringify(prefixes)}`)
+    // 载入的常量必须是这两枚真值常量，别处不能凭空造标。
+    assert.deepEqual(scopes.map(([name]) => name).sort(), ['LOGO_SVG', 'MARK_SQUARE_SVG', 'MARK_SQUARE_SVG'],
+      `作用域化应只围绕这两枚真值常量，实际 ${JSON.stringify(scopes)}`)
+    // 面板那份与窄档那份都用 MARK_SQUARE_SVG ⇒ 两者前缀必须不同（这条是本条的核心）。
+    const squarePrefixes = scopes.filter(([name]) => name === 'MARK_SQUARE_SVG').map(([, prefix]) => prefix)
+    assert.equal(squarePrefixes.length, 2, '方标应有两个注入点（顶栏窄档 + 面板标题行）')
+    assert.notEqual(squarePrefixes[0], squarePrefixes[1],
+      '顶栏窄档与面板标题行都用 MARK_SQUARE_SVG，两者前缀必须不同（否则同 id，宽档下渐变又解析到隐藏那份）')
+    // 纯函数化：必须走 mark-ids.ts，不在组件里手写 replace。
+    assert.match(source, /import \{ scopeMarkSvg \} from '\.\/mark-ids\.js'/u,
+      '必须 import scopeMarkSvg（纯函数与用途分离，便于单测）')
   })
 
   it('阈值 应该 落在实测定出的区间里，且两个形态共用一个数', () => {
