@@ -13,7 +13,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - The Cloud Files entry now sits at the top of the sidebar with Plugins and Automations, and opens as a page in the main area instead of a pop-up dialog.
 - The cloud files page no longer dims the rest of the interface; use the sidebar or New Session to get back to a conversation.
 - Fixed the text on the cloud files page being larger than elsewhere.
-- Fixed the divider above the "dsh-sparrow" brand line sitting too close to the list above it.
+- Moved the "dsh-sparrow" brand line to the bottom-left of the page and removed the divider above it.
 
 ## 0.1.5-rc.2.1 (2026-09-11)
 

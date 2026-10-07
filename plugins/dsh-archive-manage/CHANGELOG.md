@@ -13,7 +13,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - The Archive entry moved to the top of the sidebar, beside Plugins and Automations, and opens as a page instead of a dialog.
 - The archive page no longer dims or blocks the interface; return to a conversation from the sidebar or with New Session.
 - Fixed the archive page's text looking larger than elsewhere; sizes now match the other lists.
-- Fixed the divider above the "dsh-sparrow" line at the bottom of the archive page touching the content above it.
+- Moved the "dsh-sparrow" brand line to the bottom-left of the page and removed the divider above it.
 - Fixed subagent rows in the archive area and the trash sometimes showing the parent session's text instead of the subagent's own label.
 
 ## 0.1.5-rc.2.4 (2026-09-21)

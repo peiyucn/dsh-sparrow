@@ -169,20 +169,26 @@ describe('dsh-file-manage 结构', () => {
   })
 
   /**
-   * owner 2026-10-01 报「下面 dsh-sparrow 的 logo，分割线和上面都挨上了」。
+   * owner 2026-10-01 报「下面 dsh-sparrow 的 logo，分割线和上面都挨上了」→ 当时靠 24px
+   * 净空 + 分割线解决；**2026-10-07 owner 改口径**：「固定左下角取消分割线」。
    *
-   * 实测：本页分割线到上方内容 **0px**（列表容器 `.dsh-file-manage-body` 的底边
-   * 正好等于分割线的位置），读起来就是贴在一起。旧浮层版 footer 在固定高度的面板里
-   * 被 body 的弹性撑开，搬进页面正常流后这层净空没了 ⇒ 必须显式补回。
+   * 与归档页同一口径（两页样式逐字同源，只差前缀）：
+   * `margin-top: auto` 钉底、左对齐、无分割线、`padding-top: 24px` 最小净空。
    */
-  it('⛔ 品牌 footer 的分割线上方必须留净空（不得贴住内容）', async () => {
+  it('⛔ 品牌署名必须钉在左下角、左对齐、无分割线（owner 2026-10-07 口径）', async () => {
     const styles = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
     const footer = /\.dsh-file-manage-page-footer \{([^}]*)\}/u.exec(styles)
     assert.ok(footer !== null, '缺 .dsh-file-manage-page-footer 规则')
-    // 同上：剥注释，否则注释里的「24px」会把声明被删的变异放过去。
+    // 剥注释，否则注释里的声明会把「真声明被删」的变异放过去。
     const decl = footer[1].replace(/\/\*[\s\S]*?\*\//gu, '')
-    assert.match(decl, /margin-top:\s*24px/u,
-      '品牌 footer 必须留 24px 净空 —— 漏了分割线会贴住列表最后一行')
+    assert.match(decl, /margin-top:\s*auto/u,
+      '必须 margin-top: auto 把署名推到页面底部（否则矮内容页下面留一大片空白）')
+    assert.match(decl, /text-align:\s*left/u,
+      '必须左对齐 —— 与页标题、列表同一个左边缘（全页只有它居中的观感已否掉）')
+    assert.doesNotMatch(decl, /border-top/u,
+      '不得有分割线（owner 2026-10-07：「取消分割线」）')
+    assert.match(decl, /padding-top:\s*24px/u,
+      '内容超高时署名跟在列表之后，必须留 24px 最小净空（否则贴住列表最后一行）')
   })
 
   /**

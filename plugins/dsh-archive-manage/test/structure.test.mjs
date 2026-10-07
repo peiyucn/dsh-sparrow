@@ -217,23 +217,32 @@ describe('dsh-archive-manage 结构', () => {
   })
 
   /**
-   * owner 2026-10-01 报「下面 dsh-sparrow 的 logo，分割线和上面都挨上了」。
+   * owner 2026-10-01 报「下面 dsh-sparrow 的 logo，分割线和上面都挨上了」→ 当时靠 24px
+   * 净空 + 分割线解决；**2026-10-07 owner 改口径**：「固定左下角取消分割线」。
    *
-   * 实测：云端文件页分割线到上方内容 **0px**（列表容器底边 = 分割线）；归档页只有
-   * 卡片自带的 12px 卡间距。本页是 flex 纵列、**外边距不合并**，故必须显式给
-   * 收尾净空 24px，并把紧邻 footer 那张卡的 `margin-bottom` 归零
-   * （否则 12 + 24 变成 36）。
+   * 现在是**署名行**：钉在页面左下角（`margin-top: auto` 推到底）、左对齐、无分割线。
+   * 三条都要钉住 —— 任一条回退都会让观感退回 owner 否掉的那版：
+   * * 去掉 `margin-top: auto` ⇒ 署名不再贴底，矮内容页会在它下面留一大片空白；
+   * 变回 `center` ⇒ 全页只有它居中（标题与卡片都左对齐），视线会跳；
+   * 加回通栏分割线 ⇒ 线比 11px 的字重得多，先被看到的变成线。
+   * 还有 `padding-top: 24px`：内容超高（署名跟在内容之后）时的最小净空。
    */
-  it('⛔ 品牌 footer 的分割线上方必须留净空（不得贴住内容）', async () => {
+  it('⛔ 品牌署名必须钉在左下角、左对齐、无分割线（owner 2026-10-07 口径）', async () => {
     const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
     const footer = /\.dsh-archive-page-footer \{([^}]*)\}/u.exec(src)
     assert.ok(footer !== null, '缺 .dsh-archive-page-footer 规则')
-    // 同上：剥注释，否则注释里的「24px」会把声明被删的变异放过去。
+    // 剥注释，否则注释里的声明会把「真声明被删」的变异放过去。
     const decl = footer[1].replace(/\/\*[\s\S]*?\*\//gu, '')
-    assert.match(decl, /margin-top:\s*24px/u,
-      '品牌 footer 必须留 24px 净空 —— 漏了分割线会贴住上方内容')
+    assert.match(decl, /margin-top:\s*auto/u,
+      '必须 margin-top: auto 把署名推到页面底部（否则矮内容页下面留一大片空白）')
+    assert.match(decl, /text-align:\s*left/u,
+      '必须左对齐 —— 与页标题、区块卡同一个左边缘（全页只有它居中的观感已否掉）')
+    assert.doesNotMatch(decl, /border-top/u,
+      '不得有分割线（owner 2026-10-07：「取消分割线」）')
+    assert.match(decl, /padding-top:\s*24px/u,
+      '内容超高时署名跟在内容之后，必须留 24px 最小净空（否则贴住上方内容）')
     assert.match(src, /\.dsh-archive-section-card:has\(\+ \.dsh-archive-page-footer\)\s*\{[^}]*margin-bottom:\s*0/u,
-      '紧邻 footer 的区块卡必须把自身 margin-bottom 归零（flex 纵列外边距不合并，否则 12+24=36）')
+      '紧邻署名的区块卡必须把自身 margin-bottom 归零（flex 纵列外边距不合并，否则 12+24=36）')
   })
 
   /**

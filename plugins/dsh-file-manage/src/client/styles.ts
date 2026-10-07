@@ -45,18 +45,21 @@ html[data-platform='darwin'] .dsh-file-manage-page-head {
   font-weight: 500;
   line-height: 28px;
 }
-/* 合集品牌 footer：页面内容收尾。
-   ⚠️ 必须自带 margin-top：列表容器（.dsh-file-manage-body）是最后一个兄弟，
-   它下面直接就是这条 footer ⇒ 分割线会**贴着列表最后一行**（实测间距 0px，
-   owner 报「分割线和上面都挨上了」）。旧浮层版 footer 在固定高度的面板里被
-   body 的弹性撑开，搬进页面正常流后这层净空没了，所以要显式补回来。
-   24px = 列表行 8px 下内边距之外再留出的呼吸（与页头 20px 下边距同档）。 */
+/* 合集品牌 footer：署名行，钉在页面左下角（owner 2026-10-07 定稿）。
+   * margin-top: auto —— 本页是 flex 纵列（.dsh-file-manage-page）且 height: 100%，
+     故**内容不满一屏时署名被推到页面底部**、内容超高时它自然跟在列表之后。
+   * text-align: left —— 与页标题、列表共用同一个左边缘。此前是居中：全页只有它居中。
+   * **已去掉通栏分割线**：那条 1px 通栏线比 11px 的署名重得多，先被看到的是线而不是字。
+   * padding-top 是内容超高时的**最小**净空（无分割线时不可见，故不能用 margin 顶替 ——
+     margin-top: auto 与固定 margin 不能共存）。
+   ⚠️ 净空口径与归档页一致（两页都是 24px）：本页最后一个兄弟是列表容器
+   （.dsh-file-manage-body），旧浮层版 footer 在固定高度面板里被 body 的弹性撑开，
+   搬进页面正常流后这层净空没了 ⇒ 必须显式补回，否则署名会贴住列表最后一行。 */
 .dsh-file-manage-page-footer {
   box-sizing: border-box;
-  margin-top: 24px;
-  padding: 16px 0 0;
-  border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  text-align: center;
+  margin-top: auto;
+  padding-top: 24px;
+  text-align: left;
   font-size: 11px;
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary, #8a919f);

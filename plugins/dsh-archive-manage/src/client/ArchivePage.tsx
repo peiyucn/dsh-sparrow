@@ -342,23 +342,26 @@ html[data-platform='darwin'] .dsh-archive-page-head {
   line-height: 20px;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
-/* 合集品牌 footer：页面内容收尾（原面板底部那条，移到页面末尾）。
-   ⚠️ 分割线上方必须留净空：本页最后一个兄弟是区块卡，卡自带 margin-bottom 12px
-   （它是「卡与卡之间」的间距，不是收尾净空），于是分割线离最后一行内容只有 12px，
-   读起来像贴在一起。这里把收尾净空显式定成 24px，并让「紧邻 footer 的那张卡」
-   不再贡献它自己的卡间距 —— 两处相加才是净空。
-   ⚠️ 本页是 flex 纵列（.dsh-archive-page），**外边距不会合并**，
-   所以 12 + 24 会真的变成 36；必须同时把那张卡的 margin-bottom 归零。
-   （这与云端文件页的 24px 对齐，两页收尾观感一致。） */
+/* 合集品牌 footer：署名行，钉在页面左下角（owner 2026-10-07 定稿）。
+   * margin-top: auto —— 本页是 flex 纵列（.dsh-archive-page）且 height: 100%，
+     故**内容不满一屏时署名被推到页面底部**、内容超高时它自然跟在内容之后。
+   * text-align: left —— 与页标题、区块卡共用同一个左边缘。此前是居中：全页只有它居中
+     （标题与卡片都左对齐），视线会跳一下。
+   * **已去掉通栏分割线**：那条 1px 通栏线比 11px 的署名重得多，先被看到的是线而不是字；
+     署名只是出处信息，不值一条线把它切成「页脚」。
+   * padding-top 是内容超高时的**最小**净空（无分割线时不可见，故不能用 margin 顶替 ——
+     margin-top: auto 与固定 margin 不能共存）。
+   ⚠️ 净空的口径与云端文件页保持一致（两页都是 24px）：本页最后一个兄弟是区块卡，它自带
+   margin-bottom 12px（那是「卡与卡之间」的间距，不是收尾净空），本页又是 flex 纵列、
+   **外边距不合并** ⇒ 不清零就会变成 12 + 24 = 36。故仍把紧邻 footer 的那张卡归零。 */
 .dsh-archive-section-card:has(+ .dsh-archive-page-footer) {
   margin-bottom: 0;
 }
 .dsh-archive-page-footer {
   box-sizing: border-box;
-  margin-top: 24px;
-  padding: 16px 0 0;
-  border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  text-align: center;
+  margin-top: auto;
+  padding-top: 24px;
+  text-align: left;
   font-size: 11px;
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
