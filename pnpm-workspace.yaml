@@ -190,3 +190,7 @@ overrides:
   "@deepseek-ai/dsh-util-values": "0.2.0-rc.2"
   "@deepseek-ai/dsh-util-workspace-path": "0.2.0-rc.2"
   "@deepseek-ai/dsh-workspace": "0.2.0-rc.2"
+  # 非官方传递依赖：GHSA-vc2v-76pw-4v95（compression < 1.8.2 提前断连时内存泄漏 ⇒ DoS）。
+  # 它是官方 dsh-host-webserver 的传递依赖，只落进本仓库的 dev 闭包 ——
+  # 本仓库插件只声明 peerDependencies，产物不带它。
+  compression: "1.8.2"
