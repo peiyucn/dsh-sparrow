@@ -1,43 +1,7 @@
 /**
- * 抬升面（弹出来的框）的**表面绘制**：把背景层那套配方 —— 顶部光层 / 底部本色辉光 / 颗粒 ——
- * 画到菜单与对话框上，让它们和整屏读成同一种材质。
- *
- * ## 两条通道，一个目的：颜色不许分叉
- *
- * owner 指着截图说「插件弹出，下拉弹出，设置弹出，按钮的 hover、区分区域的色块，这些还都是
- * 不统一的，有点乱」。根因是**浮层有两条来源**：
- *
- * 1. **走 token 的**（`--dsw-specific-menu` / `--dsw-alias-bg-layer-2/3`）—— 官方组件与
- *    本仓库的插件大多走这条；
- * 2. **自带硬编码底色的**（本仓库插件里那些 `role=` 弹层）—— token 管不到，只能靠选择器兜。
- *
- * 而第 1 条里还有**根本没有 role 属性**的（`ui-jobs/JobListAction.tsx:157` 是个光秃秃的
- * `<li>` 列表容器 `<ul className={css.menu}>`）—— 语义锚点永远命中不到。owner 截图里那个
- * 「后台任务」下拉就是这么漏掉的。
- *
- * 所以两处**同源但分工**：
- *
- * * token 层（`tones.ts` 的 `POPUP_TOKENS`）**只给颜色** —— `--dsw-specific-menu` /
- *   `--dsw-menu-surface-fill` = 同一个**半透明**菜单填充色（0.1.7 起官方是玻璃色，
- *   见 `POPUP_TOKENS`；`--dsw-specific-tip` 另走内嵌面通道）。覆盖全部消费方，role 有没有都算数；
- * * 本模块的选择器**给图形** —— 按 role 命中真正的浮层，补上颗粒与顶 / 底光，
- *   底色仍读 `PANEL_VARIABLE`（与上面那个 token 同源）。
- *
- * **为什么不把图层塞进 token**：官方把同一个 `--dsw-specific-menu` 也用在
- * `ModelSelect` 的 `.groupTitle` 这类 `position: sticky` 小条上，而百分比渐变按元素
- * 自身盒子缩放 —— 一条 24px 的横条会把 `ellipse 120% 42%` 压成一道硬边金带，
- * 与菜单主体对不上。详见 `POPUP_TOKENS` 的注释与 05-surfaces §8.2。
- *
- * ## 浮层是「面板」，不是地面
- *
- * 中途试过「浮层填充 = 对话区底色」，**owner 已收回该建议**。现在浮层回到面板语义：
- * 一档比地面深、彼此统一的底色（`SURFACE_RUNGS`），分层靠描边、阴影与 hover 洗染。
- *
- * ## 「官方默认 = 完全不介入」
- *
- * owner 硬约束：「官方默认的都不要动，也有个参考，给用户一个完全不动的选择。」
- * 所以本表每条规则都带 `body:not([PLAIN_ATTR])` 前缀 —— token 层在官方默认下也已经发的是
- * 官方原值（`surfaceFill` 对 `tint === ''` 直接返回色阶引用），两条通道一起让路。
+ * 抬升面（弹出来的框）的**表面绘制**：把背景层那套配方 —— 顶部光层 / 底部本色辉光 / 颗粒 —— 画到菜单与对话框上，让它们和整屏读成同一种材质；浮层是**面板**语义（一档比地面深、彼此统一的底色，分层靠描边 / 阴影 / hover 洗染）。
+ * **两条通道同源但分工**：token 层（`tones.ts` 的 `POPUP_TOKENS`）**只给颜色**（role 有没有都算数）；本模块的选择器**给图形** —— 按 role / 官方锚点命中真正的浮层，底色仍读 {@link PANEL_VARIABLE}；「官方默认 = 完全不介入」⇒ 本表每条规则都带 `body:not([PLAIN_ATTR])` 前缀。
+ * ⚠️ **图层不能塞进 token**：官方把同一个 `--dsw-specific-menu` 也用在 `position: sticky` 的分组标题小条上，而百分比渐变按元素盒子缩放 —— 一条 24px 的横条会把 `ellipse 120% 42%` 压成一道硬边金带。
  */
 
 import { grainOverGradients } from './backdrop.js'
@@ -57,387 +21,84 @@ import {
 import { POPUP_BOTTOM_SHAPE, POPUP_LEFT_SHAPE, POPUP_STOP, POPUP_TOP_SHAPE } from './constants.js'
 
 /**
- * 浮层的**语义锚点** —— 兜底通道：token 管不到的（自带硬编码底色的）弹层靠这几条。
- *
- * | 锚点 | 谁长这样 |
- * | :--- | :--- |
- * | `[role='menu']:not(:has([role='group']))` | `Menu` 原语的 `.list` / `.submenu`、dockkit `TabMenu`、`dsh-codebuddy-credits` 的模型菜单。**带分组标题的模型选择器被排除**（理由见该条自己的注释） |
- * | `[data-trigger-menu]` | 输入框上方的 `@` / `/` 菜单卡片（官方自己也拿它当 `:has()` 锚点） |
- * | `:has(> [role='listbox'])` | 命令面板**卡片**（背景长在祖先上、`role` 在内层视口上）—— 详见下方该条自己的注释 |
- * | `[role='listbox']:not([data-trigger-menu] *)` | 自带背景的 listbox 弹层（`dsh-chat-fim` 的候选菜单与敏感度弹层） |
- * | `[role='dialog']:not(:has(> img))` | 各对话框（官方 Modal / 设置面板 / 上下文用量 / 轮次用量 + 三家插件自己的对话框） |
- * | `body > [role='button']` | **悬停卡**（`HoverCard.module.css:13-23`）—— `createPortal` 直挂 `body` 的固定层，`role` 只在 `copyable` 时才给，且**没有** `[role='menu']` 之类语义 |
- * | ⛔ 图片灯箱 | 被 `:not(:has(> img))` 排除：它的 `role='dialog'` 长在**整屏容器**上，染它 = 全屏糊一层金光 |
- *
- * **排除条件为什么是 `> img` 而不是 `> [aria-hidden]`**：最初用的是后者，理由是灯箱的遮罩是它的
- * 直接子元素 —— 但那个条件**误伤了「token 消耗」那两个弹层**（`StatsPills` /
- * `TurnUsagePanel` 的 `.panel` 里都有一个 `<div className={titleRule} aria-hidden>` 当直接子元素，
- * 用来画标题下那条细分隔线）。owner 反馈「对话框下面那三个胶囊没改」指的就是它们。
- * 灯箱真正的唯一特征是那枚**整屏 `<img>`**，用它当判据既保住排除、又不误伤。
- *
- * **悬停卡为什么**不在**本表**（曾经在，后被摘出去）：它的底色是组件自己的字面量
- * `--dsw-hovercard-bg: #2C2C2E`（官方注明 light/dark 同值，**声明在元素自身上**，
- * token 覆盖层发到 `body` 上会被它自己的声明盖过，所以只能靠选择器），
- * 而它的**内容字色也一并写死了**（`Rows.module.css:301` 注释 `dark surface, fixed colors both themes`）。
- * owner 截图指出「左边栏会话 hover 忘了适配」后收进本表 —— 但本表读的是**当前轴**的变量，
- * 于是在**浅色轴把面染成近白**、字仍是给深卡准备的浅字 → **白底白字**（owner 真机截图）。
- * owner 定案后它走**独立规则**（见 {@link HOVER_CARD_ANCHOR}）：面与字**一起**掰回主题，
- * 且**两个档都修**（全插件四条不带官方默认门的规则之一，清单见文件末尾那条 `:has()` 的注释）。
- *
- * **注意**：token 那条路**只给颜色**（见 `POPUP_TOKENS`），颗粒与光只能靠本表的选择器。
- * 曾经有三处浮层**只拿到颜色、拿不到质感**（本条注释当时还写它是「唯一」一处）：
- * 没有 role 的官方 `<ul>` 任务列表、子代理血缘弹层（`role='tree'`）、提示条（`role='tooltip'`）——
- * owner 反馈「**后台任务和子代理的弹出是不是没适配样式**」。三者现已全部落进本表。
- * **新增官方浮层时按同一判据核对**：① 先看有没有 role，没有就找它所在的官方槽位；
- * ② 再看**官方这个面是不是两轴同值**（同值 ⇒ 配的是固定字色 ⇒ 必须走恒深规则，别进本表）。
- *
- * 宿主兼容：锚点全是官方公开属性、不碰 hashed 类名；失效只会让浮层退回官方 token 的面
- * （纯观感），不会糊、不会挡点击，所以**不进兼容门**。
+ * 浮层的**语义锚点表** —— 兜底通道：token 管不到的（自带硬编码底色的）弹层靠这几条（菜单族 / 命令面板 / 自带背景的 listbox / 各对话框 / 子代理弹层 / 后台任务列表 / 轮次导航预览卡 / 问答卡 / 计划审阅卡）。
+ * ⚠️ **图片灯箱**被 `:not(:has(> img))` 排除（它的 `role='dialog'` 长在**整屏容器**上，染它 = 全屏糊一层金光），判据用 `> img` 而不是 `> [aria-hidden]`（后者**误伤了「token 消耗」那两个弹层**）；⚠️ **悬停卡不在本表**（见 {@link HOVER_CARD_ANCHOR}）—— 官方把这张卡的面与字都写死了，染面会让浅色轴变成「近白面 + 给深卡准备的浅字」= **白底白字**，故它走独立规则、面与字**一起**掰回主题。
+ * ⚠️ **新增官方浮层时按同一判据核对**：① 有没有 role，没有就找它所在的官方槽位；② 面是不是**两轴同值**（同值 ⇒ 配的是固定字色 ⇒ 必须走恒深规则，别进本表）。宿主兼容：锚点全是官方公开属性、不碰 hashed 类名；失效只会让浮层退回官方 token 的面（纯观感），不进兼容门。
  */
 export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
-  /**
-   * **菜单族**（含带分组标题的模型选择器 —— 它们走下面那条**去顶光**的专用规则）。
-   *
-   * 曾经把带分组标题的菜单整条 `:not(:has([role='group']))` 排除在外，
-   * 结果 owner 立刻看出代价：「**模型选择列表那个框好像没有适配咱们样式，是纯色的**」——
-   * 排除图层只剩一个不透明色，就是「纯色」。故改回**全量收录**，
-   * 用 {@link GROUPED_MENU_SELECTOR} 那条**只去掉顶光**的规则解决横带（见 buildSurfaceCss）。
-   */
+  /** **菜单族**（含带分组标题的模型选择器）。全量收录：把带分组的菜单排除出去会让它只剩一个不透明色
+   *  = 「纯色」；横带问题由 {@link GROUPED_MENU_SELECTOR} / {@link groupTitleLayers} 那套专门解决。 */
   "body [role='menu']",
   /**
-   * **命令面板 / 输入触发菜单**（`ui-input-trigger` 的 `MenuView`）。
-   *
-   * ⚠️ **必须排除 `[data-overflow-below]`**（2026-09-27 审计发现，见
-   * {@link AFTER_LAYER} 的说明）：该状态下官方**自己**用同一个 `::after` 画「下面还有内容」
-   * 的渐隐提示（`MenuView.module.css` 的 `.menu[data-overflow-below]::after`，`content:''` +
-   * 自己的 `right/bottom/left/height` + `background: linear-gradient(to bottom, transparent,
-   * var(--dsw-specific-menu))`）。而 `data-trigger-menu` 与 `data-overflow-below` 打在
-   * **同一个元素**上（`MenuView.tsx` 的 `MenuSurface`）—— 我方那条 `::after` 会**把官方的提示
-   * 整个顶掉**（实测提示带从 (109,162,229) 掉成 (43,43,50)）。
-   * 排除后代价明确：**该状态下这一处没有我们的质感**（官方提示优先）。
+   * **命令面板 / 输入触发菜单**。
+   * ⚠️ **必须排除 `[data-overflow-below]`**：该状态下官方**自己**用同一个 `::after` 画「下面还有内容」
+   * 的渐隐提示，而两个属性打在**同一个元素**上 —— 我方那条 `::after` 会把官方提示**整个顶掉**。
+   * 代价明确：该状态下这一处没有我们的质感（官方提示优先）。
    */
   "body [data-trigger-menu]:not([data-overflow-below])",
   /**
-   * **命令面板的卡片** —— `PopupSelectView` 的背景长在**祖先**上、`role` 在内层视口上，
-   * 所以只能问「谁的直接子元素是 listbox」。
-   *
-   * ⚠️ 这条是**唯一**主体无锚点的 `:has()`（其余几条都收在 `[role='…']` / `[data-…]` 上）。
-   * 审计提出「给它加个有界宿主收窄」，**实测后决定不收**，两条理由：
-   *
-   * 1. **收窄会丢目标**：那个祖先是官方自建的卡片（`PopupSelectView`），
-   *    它**不带** `[data-trigger-menu]` 之类的标记 —— 加任何宿主前缀都会把真正要染的那张卡漏掉；
-   * 2. **收窄没有收益**：真机实测（5000+ 节点）
-   *    `body :has(> [role='listbox'])` 与加宿主后的版本**同价**（1.96ms vs 1.93ms，
-   *    且页面里 listbox 数为 0）；更要紧的是这条在 **CSS 规则**里、由浏览器选择器引擎处理，
-   *    实测样式重算开销**测量不出来**（Δ 0ms）—— 那个 2ms 是 JS `querySelectorAll` 循环的数字，
-   *    本插件并不这么用它。
-   *
-   * 官方 `role='listbox'` 的生产者只有两处（commands / input-trigger），规模很小。
-   *
-   * ⚠️ 2026-10-08：判据改走**锚点属性**（`listboxHost`）—— `:has()` 的开销实测见
-   * docs/spec/11（主表 19 条 `:has()` 贡献 ~3.1 秒 / 100 帧的样式重算）。
+   * **命令面板的卡片** —— 背景长在**祖先**上、`role` 在内层视口上，所以判据是「谁的直接子元素是 listbox」，
+   * 由 client half 算好写成**锚点属性**（`listboxHost`；不用 `:has()`，开销见 docs/spec/11）。
+   * ⚠️ **不给它加宿主收窄**：那个祖先是官方自建的卡片、不带任何标记，加前缀会漏掉真正要染的那张卡。
    */
   `body ${anchorSelector(ANCHOR.listboxHost)}`,
   "body [role='listbox']:not([data-trigger-menu] *)",
-  /**
-   * **模态弹窗**（设置 / 云端文件 / 归档 …）—— **实色**，不做玻璃。
-   * 缘由（含一段撤掉的弯路与 Apple HIG 的依据）见 constants.ts 的 {@link DIALOG_ANCHOR}。
-   */
+  /** **模态弹窗**（设置 / 云端文件 / 归档 …）—— **实色**，不做玻璃（缘由见 constants.ts 的 {@link DIALOG_ANCHOR}）。 */
   DIALOG_ANCHOR,
   /**
-   * **子代理血缘弹层**（`SubagentHeaderLineage`，头部那枚 `1/3 ⌄`）。
-   *
-   * ⚠️ **2026-09-27 实测更正：这条锚点（`body > [role='tree']`）是死锚点，已删除。**
-   * 官方那处 portal 的真实层级是
-   * `body > div.menu > div.menuBody[role='tree']` —— `role='tree'` 在**内层**，
-   * 不是 `body` 的直接子元素，所以这条**一个元素都命不中**（真机实测 0 个；
-   * 用官方层级复刻亦然）。原注释写「本弹层的 role='tree' 是 portal 出来的 body 直接子元素」
-   * 是**错的推断**，没有任何元素靠它上色 —— 删掉不改变任何观感。
-   *
-   * 真正覆盖这个弹层的是紧邻那条 `body > :has(> [role='tree'])`（实测命中外层 `.menu`，
-   * 1 个，正是画材质的那个盒子）。
-   *
-   * 保留收窄的理由（仍然成立）：`role='tree'` 官方有**五处**在用 —— 本弹层、`JsonTree`、
-   * `ui-workspace` 的 `WorkspaceBrowser` / `AnimatedRows`，以及**左侧栏会话列表**
-   * （`bhn1Oq_list`，真机实测 `270x538`、`role='tree'`、非 body 直系）。
-   * 后四者都是**内联/常驻**组件，裸写 `[role='tree']` 会把它们的背景换成不透明填充 + 光 + 颗粒
-   * —— 那才是真事故。`body >` 这一层收窄因此必须留着。
-   */
-  /**
-   * **子代理会话弹层**（`SubagentCatalogAction`，头部那枚「N subagents」按钮弹出的面板）。
-   *
-   * owner：「subagent 的弹出和 background jobs 的弹出**风格得一致**」。
-   *
-   * 两个弹层的**官方材质本来就完全相同**（逐字核过）：
-   * * `JobListAction.module.css` 的 `.…_menu { background: var(--dsw-specific-menu);
-   *   backdrop-filter: var(--dsw-menu-backdrop-filter); border-radius: 16px;
-   *   box-shadow: var(--dsw-elevation-prominent) }`
-   * * `SubagentCatalogAction` 的 `.…_menu:before { background: var(--dsw-specific-menu);
-   *   backdrop-filter: var(--dsw-menu-backdrop-filter); border-radius: 16px }`
-   *
-   * 差别**只在我们的锚点表**：jobs 那个 `<ul>` 有一条锚点（见下），
-   * 而 subagents 这个弹层一条都命中不到 ⇒ 只有它**没有我们的颗粒与光**。
-   *
-   * ## 为什么锚点是 `body > :has(> [role='tree'])`
-   *
-   * 本弹层的结构是 outer(`createPortal` 直挂 body) > `[role='tree']`（内层视口），
-   * 即 `role='tree'` 在**内层**、外层才是那个画材质的盒子。
-   * 故改为问「**body 的哪个直接子元素含有 role=tree**」。
-   * ⚠️ 顺带纠正：相邻那条 `body > [role='tree']` **本身也是死锚点**（实测 0 命中），
-   * 已删除并写明理由 —— 本弹层此前并不存在「另一条能命中的锚点」。
-   *
-   * ## 为什么这条不会误伤（真机实测）
-   *
-   * 在真实会话里逐条数过：`body > :has(> [role='tree'])` = **1 个**，
-   * 且那一个正是本弹层（`body` 直接子元素、`position: fixed`、`z-index: 100`）。
-   * `JsonTree` / `WorkspaceBrowser` / `AnimatedRows` / 左侧栏会话列表都是**内联或常驻**组件
-   * （不在 body 直下），与逐条锚点同一条口径：**收窄在 body 直下**，只命中 portal 出来的浮层。
+   * **子代理会话弹层**（`SubagentCatalogAction`，头部那枚「N subagents」按钮弹出的面板）—— 官方材质与后台任务弹层**逐字相同**，差别只在锚点表（jobs 那个 `<ul>` 有锚点、它没有 ⇒ 此前只有它没有颗粒与光）。结构是 outer（`createPortal` 直挂 body）> `[role='tree']`，故判据是「body 的哪个直接子元素含有 role=tree」（由 client half 算成锚点属性）。
+   * ⚠️ `body >` 这层收窄**必须留着**：官方 `role='tree'` 有五处（本弹层、`JsonTree`、`WorkspaceBrowser` / `AnimatedRows`、左侧栏会话列表），后四者都是**内联 / 常驻**组件，裸写会把它们的背景换成不透明填充 + 光 + 颗粒 —— 那才是真事故。
    */
   `body > ${anchorSelector(ANCHOR.treeHost)}`,
   /**
-   * **后台任务列表**（`JobListAction`，头部那枚任务数按钮弹出的 `<ul>`）。
-   *
-   * 这是全表唯一**没有 role** 的锚点 —— owner 反馈「后台任务和子代理的弹出是不是没适配样式」。
-   * 官方那个 `<ul>` 只有 `aria-label`（本地化文案，不能当选择器），token 里也没有对应图层，
-   * 所以它以前**只拿到颜色、拿不到质感**。这里改用**它所在的官方槽位**锚定：
-   * `JobListAction` 声明自己渲染进 `conversation.session.header.actions`，
-   * 而槽位属性 `data-slot` 是官方公开契约（`glass.ts` 也靠 `conversation.session.header`）。
+   * **后台任务列表**（头部那枚任务数按钮弹出的 `<ul>`）—— 全表唯一**没有 role** 的锚点：那个 `<ul>` 只有
+   * 本地化的 `aria-label`（不能当选择器），改用**它所在的官方槽位**锚定（`JobListAction` 声明自己渲染进
+   * `conversation.session.header.actions`，`data-slot` 是官方公开契约）。
    */
   "body [data-slot='conversation.session.header.actions'] ul",
   /**
-   * **轮次导航的预览卡**（`TurnNavigator` 那条右侧刻痕栏，悬停 / 聚焦某轮时弹出）。
-   *
-   * owner：「官方对话当行 hover 出的框也没有适配样式。」—— 指的就是这张卡。
-   *
-   * ⚠️ **本条曾经写成 `body > [role='tooltip']`，而那是一条死规则**（一条都命不中）。
-   * 当时的注释写「`Tooltip` / `TurnNavigator` 的预览，**均 portal 到 body**」—— **这句话是错的**：
-   *
-   * | 组件 | 定位 | 是 `body` 直接子元素？ |
-   * | :--- | :--- | :--- |
-   * | `ui-primitives/Tooltip` | `position: fixed`，源码开头的注释明写 escape … **without a portal** | ❌ |
-   * | `TurnNavigator` 的预览（本条要的） | `position: absolute`，长在 `<nav>` 里 | ❌ |
-   *
-   * 两个都**不** portal，于是 `body >` 把两者一起漏掉 —— 这张卡一直只拿到 token 的颜色。
-   * 教训：**收窄选择器之前先核实「它到底长在哪」**，别把推断写进注释当依据。
-   *
-   * ## 为什么用 `:not([data-side])` 把 `Tooltip` 那颗气泡排除在外
-   *
-   * 官方 `role='tooltip'` 只有这两个生产者，而它们的定位属性正好可辨：
-   * `ui-primitives/Tooltip` 的气泡**总有** `data-side`（`right` / `bottom` / `top`，用于翻转时的
-   * `transform`，见 `Tooltip.module.css:22-32`）；`TurnNavigator` 的预览**没有**。
-   *
-   * 排除它不是遗漏，而是**有意为之**：`Tooltip` 气泡的底色走的 `--dsw-alias-tooltip-bg`
-   * **在两轴都是反色**（浅色轴上它是深灰），那是它的语义 —— 见 `tones.ts` 里
-   * 「不染的几处（有意）」。给它糊上夜色面板 + 颗粒会把气泡读成一个小菜单，反而丢掉可辨性。
+   * **轮次导航的预览卡**（`TurnNavigator` 那条右侧刻痕栏，悬停 / 聚焦某轮时弹出）。⚠️ 它和 `Tooltip` 的气泡都**不** portal 到 body（前者 `position: absolute` 长在 `<nav>` 里、后者源码明写 escape without a portal）⇒ 用 `body >` 收窄**一条都命不中**。
+   * 用 `:not([data-side])` 排除 `Tooltip` 气泡：官方这枚气泡**总有** `data-side`（翻转用），且底色 `--dsw-alias-tooltip-bg` **两轴反色**、那是它的语义 —— 糊上夜色面板 + 颗粒会把气泡读成一个小菜单、反而丢掉可辨性（见 `tones.ts`「不染的几处（有意）」）。
    */
   "body [role='tooltip']:not([data-side])",
   /**
-   * **问答卡**（`ui-user-questions` 的 `QuestionComposer`）—— owner 真机验收
-   * 时选了「没纹理（颗粒/打光看不到）」，即本条补的东西。
-   *
-   * ## 为什么以前命不中
-   *
-   * 卡片本体是 `<section className={clsx(css.card, …)}>` —— **只有 hashed 类名**，
-   * 没有 `role`、没有别的稳定属性；底色走 `--dsw-specific-input-major`
-   * （`QuestionComposer.module.css:25`，这条 token 我们**已经染过**，所以颜色一直是对的
-   * —— owner 反馈的正是「颜色对、质感没有」）。
-   * 于是它既不在 {@link SURFACE_ANCHORS} 任何一条里，也不在
-   * {@link COMPOSER_CARD_ANCHORS}（那三条靠 `data-queue-dock` / `data-goal-bar` /
-   * `data-testid`）里 ⇒ **一张图层规则都没命中** ⇒ 只有 token 给的一个不透明色。
-   *
-   * ## 锚点怎么选的
-   *
-   * 用官方的**非哈希数据属性** `data-question-key`（`QuestionComposer.tsx:278`），
-   * 收窄到它的**直接子元素** —— 卡片就在那一层：
-   *
-   * ```
-   * <div data-question-key={pending.key}>          ← 稳定钩子
-   *   <section className={css.card}>               ← 要上质感的那张卡
-   * ```
-   *
-   * ⚠️ 用**子选择器 `>`** 而不是后代：`data-question-key` 那棵子树里还有
-   * `role='radiogroup'` / `role='group'` 等一堆后代容器，后代写法会给它们全部叠图层。
-   *
-   * ⚠️ 必须带 `body ` 前缀（全表约定）：`gatedAnchor()` 用 `replace(/^body\b/, …)` 把
-   * 「官方默认门」并进去；少了前缀就**静默不替换** ⇒ 这条在官方默认档下也会生效，
-   * 破坏「官方默认不动」的底线（本仓库为这条约定单设了一个测试）。
+   * **问答卡**（`QuestionComposer`）—— 卡片本体只有 hashed 类名、没有 role，底色走 `--dsw-specific-input-major`（那条 token 我们**已经染过** ⇒ 颜色一直是对的，缺的只是质感）；判据用官方非哈希属性 `data-question-key` 收窄到它的**直接子元素**（卡片就在那一层）。
+   * ⚠️ 用子选择器 `>` 而非后代：那棵子树里还有 `radiogroup` / `group` 等一堆后代容器，后代写法会给它们全叠图层。⚠️ 必须带 `body ` 前缀：`gatedAnchor()` 用 `replace(/^body\b/, …)` 把官方默认门并进去，少了前缀就**静默不替换** ⇒ 这条在官方默认档下也会生效，破坏「官方默认不动」的底线（本仓库为这条约定单设了测试）。
    */
   'body [data-question-key] > section',
-  /**
-   * **计划审阅卡**（`ui-user-questions` 的 `PlanReviewPanel`）—— 与问答卡**同族同形**，
-   * 只是钩子属性不同（`data-plan-review-key`，`PlanReviewPanel.tsx:10`），
-   * 结构完全一致（`<div data-plan-review-key><section className={css.card}>`）。
-   *
-   * 两条分开写而不是合并成 `:is(...)`：保持每条锚点**单一来源**可读
-   * （两张卡是不同官方组件、将来可能只改其中一个）。
-   */
+  /** **计划审阅卡**（`PlanReviewPanel`）—— 与问答卡**同族同形**，只是钩子属性不同（`data-plan-review-key`）；
+   *  两条分开写而不是合并成 `:is(...)`，是为了让每条锚点**单一来源**可读（将来可能只改其中一个）。 */
   'body [data-plan-review-key] > section',
 ])
 
-/**
- * **实测为 `position: static` 的锚点** —— 只有这些才需要补 `position: relative`。
- *
- * ## 为什么必须单列一张表（差点写出灾难性回归）
- *
- * `::after { position: absolute; inset: 0 }` 需要一个**定位祖先**当包含块。
- * 若锚点元素是 `static` 且祖先链上也没有 positioned 元素，包含块会退到**视口**
- * ⇒ 纹理铺满全屏（问答卡实测：卡内红点 0、卡外 **78013/78750**）。
- *
- * **但绝不能给全表统一补 `position: relative`**：本表里多数锚点本来就是
- * `absolute` / `fixed`（菜单、气泡、弹层），盖一条 `relative` 会把绝对定位改成相对定位
- * ⇒ 弹层当场错位。故只列**实测确认 static** 的：
- *
- * | 锚点 | 官方来源 | 实测 |
- * | :--- | :--- | :--- |
- * | `[data-question-key] > section` | `QuestionComposer.module.css` 的 `.card` | **static**（实测） |
- * | `[data-plan-review-key] > section` | `PlanReviewPanel.module.css` 的 `.card` | **static**（同族同形） |
- *
- * 其余锚点**未列入**（不改它们的 `position`）—— 它们要么本就 positioned，
- * 要么其 `::after` 已实测正常（如归档/云文件的 dialog 自带 `relative`）。
- *
- * ⚠️ 新增锚点时：先**实测**它的 computed `position`，确为 `static` 再登记到这里；
- * 不要凭"看起来像静态"就加 —— 这一条写错的代价是弹层错位。
+/** **实测为 `position: static` 的锚点** —— 只有这些才需要补 `position: relative`：`::after { position: absolute; inset: 0 }` 需要一个**定位祖先**当包含块，锚点若 `static` 且祖先链上也没有 positioned 元素，包含块会退到**视口** ⇒ 纹理铺满全屏（问答卡实测：卡内红点 0、卡外几乎全屏）。
+ *  ⚠️ **绝不能给全表统一补**：本表多数锚点本来就是 `absolute` / `fixed`（菜单、气泡、弹层），盖一条 `relative` 会把绝对定位改成相对定位 ⇒ 弹层当场错位；新增锚点前先**实测**它的 computed `position`，确为 `static` 再登记。
  */
 export const STATIC_SURFACE_ANCHORS: readonly string[] = Object.freeze([
   'body [data-question-key] > section',
   'body [data-plan-review-key] > section',
 ])
 
-/**
- * 带**粘性分组标题**的菜单（官方 `ModelSelect` / `dsh-codebuddy-credits` 的模型选择器）。
- *
- * owner 前后两条反馈把它夹成了一个精确解：
- * ①「模型选择器里面两个分类标题的背景，也得处理下。**官方默认样式里是看不到这个背景条的。**」
- * ②（我第一版把整个菜单排除出图层之后）「**模型选择列表那个框好像没有适配咱们样式，是纯色的。**」
- *
- * 所以既不能把图层全给（横带回来），也不能全不给（变成纯色）。定案是**只去掉顶光**：
- *
- * | 图层 | 给不给 | 为什么 |
- * | :--- | :--- | :--- |
- * | 颗粒 | ✅ | 质感的主要来源，且是**均匀贴图**，与盒子高度无关 → 不会造出横带 |
- * | **顶光** | ❌ | 它锚在**盒子顶部**（`ellipse 120% 42% at 50% -12%`），而分组标题正好压在菜单顶部 → 同色的一栏在带光的面上显形，**横带就是它造的** |
- * | 底光 | ✅ | 锚在盒子**底部**，而分组标题永远吸在**顶部**（`position: sticky; top: 0`）→ 两者不相遇，留着它才有纵深 |
- *
- * ⚠️ **颗粒要给分组标题条本身**（{@link GROUPED_MENU_TITLE_SELECTOR}）——2026-09-25 改判，
- * 上一版的"已撤"结论**前提错了**：那次标题上**没有不透明底**，同一张贴图落在它上面
- * 等于**纯加亮**，标题比菜单主体亮 17.6 级，所以撤得对。
- * 现在标题自己刷了**不透明地面色**当底、再把菜单填充画成**图层**（见 `buildSurfaceCss`
- * 里那条规则的注释），所以标题的实际结构 = "地面 + 填充 + 颗粒"，与卡片**同一套层** ⇒
- * 反而**必须**补：不补就是把卡片那片颗粒挖掉一块，露出一条"平带"（owner ①：「有点突兀」）。
- * 判据不是"要不要给标题颗粒"，而是**标题上有没有不透明底**（上一版没有，所以那次该撤）。
+/** 带**粘性分组标题**的菜单（官方 `ModelSelect` / 本仓库 codebuddy 的模型选择器）—— 定案是**只去掉顶光**：全给会让顶光在「正好压在菜单顶部」的分组标题那一栏显形（**横带就是它造的**），全不给又只剩一个不透明色（「纯色」）；**颗粒**要给（均匀贴图，与盒子高度无关）、**底光**要给（锚在盒子底部，与永远吸在顶部的标题不相遇、留着才有纵深）。
+ *  ⚠️ **颗粒也要给分组标题条本身**（见 {@link GROUPED_MENU_TITLE_SELECTOR} / {@link groupTitleLayers}）：标题自己刷了**不透明地面色**当底、再把卡片那一摞层重画 ⇒ 不补就是把卡片那片颗粒挖掉一块、露出「平带」；判据不是「要不要给标题颗粒」，而是**标题上有没有不透明底**。
  */
 export const GROUPED_MENU_SELECTOR = `body ${anchorSelector(ANCHOR.menuGrouped)}`
 
-/**
- * {@link GROUPED_MENU_SELECTOR} 的**无守卫写法**，专供「与后代锚点组合」的规则使用。
- *
- * ## 为什么要有这一条（owner：「咱们主题明显比官方的卡」）
- *
- * 真机消融实测（同 DOM、同色调档，只 `styleEl.disabled = true/false`，150 帧 × 每帧插 6 节点）：
- *
- * | 变体 | 规则数 | 样式重算耗时 |
- * | :--- | ---: | ---: |
- * | 原样 | 151 | **3.192s** |
- * | 去掉全部 `:has()` | 139 | **1.216s** |
- * | 只留 `:has()` | 12 | **2.809s** |
- * | 151 条**平凡**规则（`.zzz-N{color:inherit}`） | 151 | 1.256s |
- * | 空表 | 0 | 1.382s |
- *
- * ⇒ **规则条数无关**（平凡规则 ≈ 空表），**开销集中在 12 条 `:has()` 上（约 62%）**。
- * 再逐条定位，最贵的三条里两条是**这里这种「重复守卫」**：
- * `[role='menu']:has([role='group']) [role='group'] > :first-child`（+1.38s，p95 74ms）
- * `[role='menu']:has([role='group']) > :has([role='group'])`（+1.53s，p95 78ms）
- *
- * ## 为什么可以去掉（**严格等价，不是近似**）
- *
- * `:has([role='group'])` 问的是「这个菜单里有没有分组」。而组合规则的后半段
- * **本身就已经要求**「命中元素是某个 `[role='group']` 的后代 / 那个 group 本身」——
- * 既然那个 group 在菜单里面，菜单当然有分组。所以守卫是**冗余的**：
- *
- * * 标题：`menu:has(group) group > :first-child` ≡ `menu group > :first-child`
- * * 滚动容器：`menu:has(group) > :has(group)` ≡ `menu > :has(group)`
- *   （子元素里有 group ⇒ 父菜单里必然也有 group）
- *
- * 真机逐元素验过（菜单开着 + 关着两种状态）：三条规则的命中集合
- * **数量与逐个 `isSameNode` 完全一致**（3/3、3/3、1/1，关闭时同为 0/0）。
- *
- * ## 收益（真机实测，三轮交替取平均）
- *
- * 只改这三条：样式重算 **4.443s → 3.633s（0.82×，省 18%）**。
- * 只删冗余、不改观感 —— 是这批开销里**唯一零风险**的那部分。
- *
- * ⚠️ 单独使用的场合（那条给菜单本体上料的规则）**必须**保留 `:has()`
- * ——那里没有别的锚点能表达「这是个带分组的菜单」，去掉就等于命中的所有菜单。
+/** {@link GROUPED_MENU_SELECTOR} 的**无守卫写法**，专供「与后代锚点组合」的规则使用 —— 去掉的 `:has([role='group'])` 是**冗余守卫**（组合规则的后半段本身就已要求「命中元素是某个 `[role='group']` 的后代 / 那个 group 本身」⇒ **严格等价，不是近似**）；实测规则条数与开销无关、成本集中在 `:has()` 上，只去掉这几处重复守卫就省约 18% 的样式重算且不改观感。
+ *  ⚠️ **单独使用**（给菜单本体上料那条）必须保留 `:has()` —— 那里没有别的锚点能表达「这是个带分组的菜单」。
  */
 export const GROUPED_MENU_UNGUARDED_SELECTOR = "body [role='menu']"
 
-/**
- * 分组标题条：`<section role='group'>` 里的**标题元素**。
- *
- * 用**结构 / 公开锚点**定位，不碰 hashed 类名 —— 用 `[class*='_groupTitle']` 还得额外照顾
- * codebuddy 那个非哈希的 `ccb-model-groupTitle`，而且官方一改名就失效。
- *
- * ## ⚠️ 两种结构都要覆盖（0.2.0-rc.2 的官方改版）
- *
- * | 结构 | 谁 | 标题在哪 |
- * | :--- | :--- | :--- |
- * | 旧 | ≤0.2.0-rc.1 的官方 `ModelSelect`；本仓库 codebuddy 的 `CodeBuddyModelSelect.tsx:475-476` | `[role='group']` 的**第一个子元素** |
- * | 新 | 0.2.0-rc.2 起官方抽出的 `MenuGroup` 原语（`ui-primitives/src/MenuGroup.tsx:13-16`） | 带公开属性 **`data-menu-group-heading`** 的元素 |
- *
- * rc.2 的 `MenuGroup` 在标题**前面**插了一个 1×1 隐形哨兵
- * `<span data-menu-group-start>`（供 `observeStickyMenuGroups` 观测吸顶），
- * 于是标题**不再是**第一个子元素。
- *
- * **只写 `:first-child` 会在 rc.2 上打错元素**：命中的是那个 1×1 哨兵，
- * 真正的标题条拿不到图层 ⇒ 官方吸顶时
- * `background: var(--dsw-alias-menu-group-header-fill)`（新 token，浅深各 94% 不透明）
- * 直接压在我们染过色的菜单上，回到当初做这条规则要治的「横带」。
- * （哨兵自身 `opacity: 0`，被顺带命中也看不见，故不额外排除。）
- *
- * ⚠️ **必须是单个复合选择器，不能写成逗号列表**：本常量是**后代片段**，
- * 由 {@link groupTitleRule} 拼在 {@link GROUPED_MENU_UNGUARDED_SELECTOR} 之后 ——
- * 逗号会在拼接处切开整条规则，后半段丢掉 body 前缀与色调门，静默生效到全站。
- * 故两个结构用 `:is()` 合并；两个参数特异度同为 (0,1,0)，`:is()` 取最大值 ⇒
- * 与本版之前的 `:first-child` **特异度完全一致**（不改变与官方规则的胜负关系）。
+/** 分组标题条：`<section role='group'>` 里的**标题元素**，用**结构 / 公开锚点**定位、不碰 hashed 类名（`[class*='_groupTitle']` 还得额外照顾 codebuddy 那个非哈希类名，且官方一改名就失效）。
+ *  ⚠️ **两种结构都要覆盖**：旧结构（官方 `ModelSelect` / codebuddy）标题是 `[role='group']` 的**第一个子元素**；新结构（官方抽出的 `MenuGroup` 原语）标题带公开属性 **`data-menu-group-heading`**，且标题**前面**插了一个 1×1 隐形哨兵 `data-menu-group-start`（供观测吸顶）—— 只写 `:first-child` 会打在那个哨兵上，真正的标题条拿不到图层、官方吸顶色会直接压在我们染过色的菜单上（横带回来）。
+ *  ⚠️ **必须是单个复合选择器，不能写成逗号列表**：本常量是**后代片段**，由 {@link groupTitleRule} 拼在 {@link GROUPED_MENU_UNGUARDED_SELECTOR} 之后 —— 逗号会在拼接处切开整条规则，后半段丢掉 body 前缀与色调门、静默生效到全站；故两个结构用 `:is()` 合并（两参数特异度同为 (0,1,0)，取最大值 ⇒ 与改前一致）。
  */
 export const GROUPED_MENU_TITLE_SELECTOR =
   "[role='group'] > :is(:first-child, [data-menu-group-heading])"
 
-/**
- * **输入框上方那三张停靠卡**（排队 / 目标 / 待办）—— 它们**不是浮层**，故单列一张表。
- *
- * ## 为什么以前是「纯色」
- *
- * owner：「**输入框上面那个区域也没适配**，刚才我记得让改了，但是没改。」
- *
- * 三张卡与菜单族共享的是**同一个 token**（`--dsw-specific-tip`），而按本模块的设计
- * （见文件头「两条通道」）**token 那条路只给颜色**、图形必须靠选择器。可它们既没有
- * `role='menu'` 也没有 `[role='dialog']` —— 于是 `SURFACE_ANCHORS` 里**一条都命不中**，
- * 只拿到 token 染过的一个不透明色 = 「纯色」。**这正是我上次只说了「需要一条图层规则」却没写的那条。**
- *
- * ## 每张卡该画在**哪一层**
- *
- * 三张卡都是「外层 wrapper + 内层自己带底色的面」，底色**不在** wrapper 上：
- *
- * | 组件 | wrapper（无底色） | 真正带底色的面（要画的） |
- * | :--- | :--- | :--- |
- * | `QueueDock` | `[data-queue-dock]`（`.dock`） | 它的第一个子元素 `.panel`（`border-radius: 12px 12px 0 0`，与输入框卡上缘相接） |
- * | `GoalBar` | `[data-goal-bar]`（`.dock`） | 它的第一个子元素 `.bar`（`height: 36px`、圆角 12px） |
- * | `TodoPanel` | —— | **根元素自己**（`<section>`，圆角 12px） |
- *
- * ⚠️ **不能直接画在 wrapper 上**：wrapper 是整个停靠列的方框，而面板是**带圆角**的
- * ——画在 wrapper 上会在圆角外露出四个直角。
- *
- * `[data-queue-dock]` / `[data-goal-bar]` 是官方公开的 data 属性（已在发行 bundle
- * `dsh-client-ui-conversation/lib/client.js`、`dsh-client-ui-goal/lib/client.js` 里核到）；
- * `data-testid='todo-panel'` 是那个 `<section>` 上**唯一非本地化**的稳定钩子
- * （它的 `aria-label` 是 `t('todo.title')`，不能当选择器）。
- *
- * ## 它们为什么也吃不到背景层的光
- *
- * 三张卡都在 `[data-composer-seat]` 里，而底座坐落在 `[data-conversation-scroll]`（z 81）
- * **之上**，背景层（z 80）照不进来 —— 与顶栏 / 右边栏 / 底座那条带子**同一条不变式**：
- * 凡抬到背景层之上、且自己有不透明底色的面，**都得自己画一遍颗粒与光**。
+/** **输入框上方那三张停靠卡**（排队 / 目标 / 待办）—— 它们**不是浮层**，故单列一张表：三张卡与菜单族共享 `--dsw-specific-tip`，但按本模块的设计 **token 只给颜色**，而它们既没有 `role='menu'` 也没有 `role='dialog'` ⇒ 图形必须靠选择器。
+ *  **画在带底色的那一层**（三张卡都是「外层 wrapper 无底色 + 内层自己带底色的面」）：`[data-queue-dock] > :first-child`（`.panel`）/ `[data-goal-bar] > :first-child`（`.bar`）/ `[data-testid='todo-panel']`（根元素自己）—— 都是官方公开属性，后者是那个 `<section>` 上唯一**非本地化**的稳定钩子（它的 `aria-label` 是 `t('todo.title')`，不能当选择器）；⚠️ **不能直接画在 wrapper 上**：wrapper 是整个停靠列的方框，会在面板圆角外露出直角。
+ *  ⚠️ 它们也吃不到背景层的光：底座坐落在 `[data-conversation-scroll]`（z 81）**之上**，背景层（z 80）照不进来 —— 与顶栏 / 右栏同一条不变式：**凡抬到背景层之上、且自己有不透明底色的面，都得自己画一遍颗粒与光**。
  */
 export const COMPOSER_CARD_ANCHORS: readonly string[] = Object.freeze([
   'body [data-queue-dock] > :first-child',
@@ -445,205 +106,52 @@ export const COMPOSER_CARD_ANCHORS: readonly string[] = Object.freeze([
   "body [data-testid='todo-panel']",
 ])
 
-/**
- * **不参与 `::after` 覆盖层**的锚点（2026-09-27 审计发现）。
- *
- * 理由只有一条：**官方自己在同一个元素的 `::after` 上画了装饰**，我方再用同款伪元素
- * 就会把它顶掉或拽坏。逐条实证：
- *
- * | 锚点 | 官方在 `::after` 上画了什么 | 我方覆盖的后果 |
- * | :--- | :--- | :--- |
- * | `[data-queue-dock] > :first-child`（= 官方 `.panel`） | `0.5px` 描边（`content:''` + `inset:0` + `border`，`z-index:auto`） | 我方把同伪元素 `z-index` 压到 `-1` ⇒ 描边进负 z 带 ⇒ **被整行宽的悬停行底盖掉**（实测左右边缘在悬停行高度内读数变成行底色）。⚠️ 顶边因位于悬停行之上仍在 —— **只抽样顶边的检查发现不了**，这正是初版漏掉它的原因 |
- * | `[data-trigger-menu][data-overflow-below]` | 「下面还有内容」的渐隐提示（`linear-gradient(to bottom, transparent, var(--dsw-specific-menu))`） | 我方 `background-image` 把提示整个顶掉（实测提示带 (109,162,229) → (43,43,50)） |
- *
- * 这两处**不是**「完全失效」：一处是 0.5px 发丝线、一处是渐隐提示带。但**覆盖官方装饰必须
- * 记明**（本文件的一贯规矩），且代价可控 —— 被排除的锚点仍保留**元素级**那条
- * `background-image`（材质画在元素自己身上时它有效），只是失去伪元素那条通道。
- * @see usesAfterLayer
- *
- * 上游那条 trigger-menu 锚点用选择器 `:not([data-overflow-below])` 收窄（见
- * {@link SURFACE_ANCHORS}），所以这里只列 QueueDock 一条。
+/** **不参与 `::after` 覆盖层**的锚点 —— 理由只有一条：**官方自己在同一个元素的 `::after` 上画了装饰**，我方再用同款伪元素就会把它顶掉或拽坏：QueueDock 的 `.panel::after` 是官方那条 `0.5px` 描边（我方把伪元素 `z-index` 压到 `-1` 会让描边进负 z 带、**被整行宽的悬停行底盖掉** —— ⚠️ 顶边仍在，**只抽样顶边的检查发现不了**）；`[data-trigger-menu][data-overflow-below]` 的 `::after` 是「下面还有内容」的渐隐提示（我方 `background-image` 会把它整个顶掉，该锚点已用 `:not([data-overflow-below])` 收窄）。
+ *  ⚠️ **覆盖官方装饰必须记明**，故单列本表（一处是发丝线、一处是提示带，不算「完全失效」）。@see usesAfterLayer
  */
 export const AFTER_LAYER_EXCLUDED_ANCHORS: readonly string[] = Object.freeze([
   'body [data-queue-dock] > :first-child',
 ])
 
-/**
- * 被 {@link AFTER_LAYER_EXCLUDED_ANCHORS} 排除后，改往**官方自己的 `::before`** 补图层的锚点。
- *
- * ## 为什么光靠「元素级那条」不够（2026-09-27 复核，我自己先这么以为，实测推翻了）
- *
- * `18db3e2` 的结论写的是「被排除的锚点仍保留**元素级** `background-image`」——
- * 对 QueueDock 这句话**不成立**：它的官方材质**不在元素自己身上**，而在它自己的
- * `.panel::before`（`z-index: -1` + `backdrop-filter: blur(40px)`）上。
- * 元素级 `background-image` 画在**元素背景层**、位于负 z 带**之下** ⇒
- * 被那层半透明材质连同它的模糊一起洗掉。
- *
- * 真机同构复刻实测（官方 QueueDock rc.2 逐字；取样区亮度标准差 = 质感可见度，
- * 官方材质本身平坦 ⇒ 基线 **0.000**）：
- *
- * | 变体 | 颗粒 std | 官方 `::after` 描边 |
- * | :--- | ---: | :--- |
- * | 只元素级那条（`18db3e2` 现状） | **0.229** ← 与纯色无异 | 完好 |
- * | 补一条到官方 `::before`（本常量） | **2.162** ✅ | **完好** |
- * | （对照）`1527612` 的 `::after` 版 | 2.261 | **被盖掉 ✗** |
- *
- * ## 为什么补 `::before` 是安全的
- *
- * 官方那个伪元素**已经声明**了 `content: ''` 与完整几何（`position/inset/border-radius`），
- * 所以本表**只补 `background-image` 一个属性**：
- *
- * * 不写 `content` ⇒ 不动官方的盒子（它本来就有）；
- * * 同一个元素上 `background-image` 画在 `background-color` **之上** ⇒
- *   质感压在官方材质之上，且**不经过**那个 `backdrop-filter`（它只过滤元素**背后**的东西）；
- * * **完全不碰 `::after`** ⇒ 官方那条描边照旧（实测左右上三边全在）。
- *
- * ⚠️ **不得把这条推广到别的锚点**：它成立的前提是「官方材质确实画在该元素自己的 `::before`
- * 上、且官方已声明 `content`」。给一个官方**没有** `::before` 的元素补这条，
- * 会造出一个**无 content 的伪元素** —— 正是 `1527612` 修掉的那个空转形态。
- * @see AFTER_LAYER_EXCLUDED_ANCHORS
+/** 被 {@link AFTER_LAYER_EXCLUDED_ANCHORS} 排除后，改往**官方自己的 `::before`** 补图层的锚点。为什么光靠「元素级那条」不够：QueueDock 的官方材质在它自己的 `.panel::before`（`z-index: -1` + `backdrop-filter`）上，而元素级 `background-image` 画在**元素背景层**、位于负 z 带**之下**，会被那层半透明材质连同模糊一起洗掉（实测 std 0.229 ≈ 纯色）。
+ *  为什么补 `::before` 安全：官方那个伪元素**已经声明**了 `content: ''` 与完整几何 ⇒ 本表**只补 `background-image` 一个属性** —— 不动官方的盒子、质感压在官方材质之上（且**不经过**那个 `backdrop-filter`，它只过滤元素背后的东西）、**完全不碰 `::after`** ⇒ 官方描边照旧。
+ *  ⚠️ **不得推广到别的锚点**：前提是「官方材质确实画在该元素自己的 `::before` 上、且官方已声明 `content`」；给官方**没有** `::before` 的元素补这条，会造出一个**无 content 的伪元素**（空转形态）。@see AFTER_LAYER_EXCLUDED_ANCHORS
  */
 export const OFFICIAL_BEFORE_LAYER_ANCHORS: readonly string[] = Object.freeze([
   'body [data-queue-dock] > :first-child',
 ])
 
-/**
- * 某个锚点是否要往**官方自己的 `::before`** 补图层（只补 `background-image`）。
- * @param anchor - 锚点选择器。
- * @returns 需要补时 true。
- */
+/** 该锚点是否要往**官方自己的 `::before`** 补图层（只补 `background-image`）。 */
 export function usesOfficialBeforeLayer(anchor: string): boolean {
   return OFFICIAL_BEFORE_LAYER_ANCHORS.includes(anchor)
 }
 
-/**
- * **锚点自身就是滚动容器**的那些面 —— 图层必须画在**元素级**，不能用 `::after`。
- *
- * ## 现象与根因（owner 2026-09-29 报：「后台任务的列表里，任务多到出现滚动条后，
- *    滚动出来的部分没有适配」）
- *
- * 我们的图层一直是 `::after { position: absolute; inset: 0; z-index: -1 }`。
- * 绝对定位伪元素的包含块是**元素自己的 padding box**，而且它**在内容流里** ——
- * 当元素**自己**是滚动容器时，这个伪元素会**随内容一起滚走**：
- * 于是它只盖住「初始可见的那一屏」，往下滚出来的行就没有质感了。
- *
- * 实测判据（把该层刷纯红、数元素截图里的红像素）：
- *
- * | 承载方式 | `scrollTop = 0` | 滚到底（600 / 150） |
- * | :--- | ---: | ---: |
- * | `::after`（现状） | 95.6% | **0.0%**（层完全滚走） |
- * | **元素级 `background-image`** | — | **99.2%** ✅ |
- *
- * ## 为什么元素级这条不随内容滚
- *
- * `background-attachment` 的**默认值就是 `scroll`** —— 对滚动容器而言它的含义是
- * 「背景固定在元素自己的盒子（padding box）上，不随内容滚动」。这正是我们要的。
- * （另一个值是 `local`，那个才会跟着内容滚 —— 本插件栽过相关的一次，见 glass.ts 的
- * `background-attachment: fixed` 那段。）
- *
- * ## 为什么不干脆全表改成元素级
- *
- * 因为 `::after` 有一条元素级拿不到的能力：它是**负 z 层**，能压在官方
- * **画在元素自己身上的**材质之上（M2 那次实测：官方材质常画在元素背景层，
- * 元素级 `background-image` 会被它盖住）。而多数锚点**自己不滚**（真正的滚动容器是
- * 它们内部的 `.viewport`，官方 `Menu.module.css:75`、`MenuView.module.css:48`、
- * `PopupSelectView.module.css:35` 都是这种结构）—— 那些面 `::after` 工作正常，
- * 不该为了这个 bug 丢掉负 z 这条通道。
- *
- * ⇒ 故只给**自身是滚动容器**的锚点换成元素级，且**只换不加**（避免 M2 修掉的
- * 「同一个面画两遍」）。
- *
- * ⚠️ 新增锚点时**必须实测它自己会不会滚**（`el.scrollHeight > el.clientHeight`）；
- * 会滚就加进本表，否则滚动后露出的部分没有质感。
- * @see usesAfterLayer
+/** **锚点自身就是滚动容器**的那些面 —— 图层必须画在**元素级**，不能用 `::after`：`::after` 是 `position: absolute; inset: 0` 的伪元素、**在内容流里**，元素自己会滚时它会**随内容一起滚走**、只盖住「初始可见的那一屏」（实测 `scrollTop=0` 覆盖 95.6%、滚到底 **0.0%**；换成元素级 `background-image` 后 **99.2%**）。元素级不滚是因为 `background-attachment` 的**默认值 `scroll`** 对滚动容器就是「背景钉在元素自己的盒子上」（**切记不是 `local`** —— 那个才跟内容滚）。
+ *  为什么不干脆全表改元素级：`::after` 是**负 z 层**，能压在官方**画在元素自己身上**的材质之上，而多数锚点**自己不滚**（真正的滚动容器是它们内部的 `.viewport`）⇒ 只给**自身是滚动容器**的锚点换成元素级，且**只换不加**（避免同一个面画两遍）；⚠️ 新增锚点时**必须实测它自己会不会滚**（`el.scrollHeight > el.clientHeight`），会滚就加进本表。@see usesAfterLayer
  */
 export const OWN_BACKGROUND_ANCHORS: readonly string[] = Object.freeze([
-  /** 后台任务列表：官方 `.menu` 自己就是滚动容器（`JobListAction.module.css:55` `overflow: auto`）。 */
+  /** 后台任务列表：官方那个 `.menu` 自己就是滚动容器（`overflow: auto`）。 */
   "body [data-slot='conversation.session.header.actions'] ul",
 ])
 
-/**
- * 某个锚点是否要把图层画在**元素级**（因为它自己就是滚动容器）。
- * @param anchor - 锚点选择器。
- * @returns 用元素级时为 true。
- */
+/** 该锚点是否要把图层画在**元素级**（因为它自己就是滚动容器）。 */
 export function usesOwnBackground(anchor: string): boolean {
   return OWN_BACKGROUND_ANCHORS.includes(anchor)
 }
 
-/**
- * 某个锚点是否要叠 `::after` 覆盖层。
- * @param anchor - 锚点选择器。
- * @returns 需要叠时 true。
- */
+/** 该锚点是否要叠 `::after` 覆盖层（排掉官方占用了伪元素 / 自身是滚动容器的那些）。 */
 export function usesAfterLayer(anchor: string): boolean {
   return !AFTER_LAYER_EXCLUDED_ANCHORS.includes(anchor) && !usesOwnBackground(anchor)
 }
 
 
-/**
- * **输入框卡片里那两个圆形图标按钮**（`+` 命令面板 / 附件）—— 默认去掉底色，只保留 hover 底。
- *
- * ## owner 的诉求
- *
- * 配图圈出这两个按钮：「这两个按钮得适配下，我觉得**像下拉菜单一样，默认底就不要了，
- * 保留 hover 底就行**。」
- *
- * ## 为什么它们看着「凸出来」
- *
- * 官方给它们的底色是 `background: var(--dsw-specific-selector)`
- * —— 一个**不透明实色**（真机 `#353638`）。而这两个按钮**坐在玻璃卡片里面**：
- * 卡片的底色是半透明 + 模糊，按钮却是一块实色板 → 读成两个**贴在玻璃上的塑料片**，
- * 与卡片不是同一种材质。去掉默认底之后，按钮区域显示的就是**卡片自己的玻璃**，材质统一了。
- *
- * ## 做法：覆盖 token，而不是改规则
- *
- * 官方那两条规则是：
- *
- * | 状态 | 官方选择器 | 底色来源 |
- * | :--- | :--- | :--- |
- * | 默认 | 类名 `uV2eYG_add` | `var(--dsw-specific-selector)`（实色） |
- * | **hover** | 同类名 `:hover:not(:disabled)` | `var(--dsw-alias-interactive-bg-hover-solid)`（**另一个 token**） |
- *
- * 两个状态用的是**两个不同的 token** —— 所以只把前者置为 `transparent`，
- * **hover 那条规则天然不受影响**，一行规则即可，不必重写 hover、也不必跟特异度较劲。
- *
- * ## ⚠️ 为什么敢覆盖这个 token（已核消费方）
- *
- * `--dsw-specific-selector` 名字很通用，覆盖前逐包 grep 了官方产物：
- * **全树只有 `.uV2eYG_add` 一个消费方**（`dsh-client-ui-conversation`），
- * 定义在 `dsh-client-ui-theme`（两轴各一份 `--dsw-static-neutral-bluish-60` / `-800`）。
- * 没有别的组件读它。
- *
- * 但**仍然把覆盖范围收在卡片里**（不写 `body`）：这个 token 语义上是「选择器底色」，
- * 官方将来若给别的组件也接上，写 `body` 会**误伤**；收在卡片内则永远不会外溢。
- * 与 owner 那条「不要误伤」（底座夹层那次）同一条纪律。
+/** **输入框卡片里那两个圆形图标按钮**（`+` 命令面板 / 附件）—— 默认去掉底色、只保留 hover 底：官方给的默认底 `--dsw-specific-selector` 是**不透明实色**，而按钮坐在**玻璃卡片**里 ⇒ 读成两块贴在玻璃上的塑料片；官方默认态与 hover 态用的是**两个不同的 token**（后者 `--dsw-alias-interactive-bg-hover-solid`）⇒ 只把前者置为 `transparent` 即可，**hover 那条规则天然不受影响**、不必重写 hover、也不必跟特异度较劲。
+ *  ⚠️ **覆盖范围仍然收在卡片里**（不写 `body`）：这 token 语义上是「选择器底色」，官方将来若给别的组件也接上，写 `body` 会误伤；收在卡片内则永不外溢。
  */
 export const COMPOSER_ICON_BUTTON_SCOPE = 'body [data-composer-card]'
 
-/**
- * 浮层表面要叠的 `background-image` 图层，**从上到下**：
- *
- * 1. 颗粒（只有色调开了 `grain` 才是图，否则是 `none`）—— 压在最上面才像砂面；
- * 2. 顶部光层（深色轴暖金 / 浅色轴主色，三层光同源，见 `tones.ts`）；
- * 3. 底部本色辉光（该色调自己的纵深）；
- * 4. **左侧金晕**（与背景层同一份配方，几何按浮层尺度缩小 —— 见 {@link POPUP_LEFT_SHAPE}）。
- *
- * ⚠️ **第 4 道是 2026-09-27 补的**：此前只有顶 / 底两道，而背景层是**三道** ——
- * owner 报「设置弹窗的打光和其他的好像不一样……我记得咱们的深色主题是三道光，
- * 应该所有元素都统一」。根因不是拿不到变量（`tones.ts` 早已把左光发到 `body`、
- * 浮层继承得到），而是**这个图层串没有引用它**（`LEFT_VARIABLE` 在 surface.ts 里
- * 一次都没出现过）。补上之后浮层与背景层同为三道光。
- *
- * ⚠️ **三道光的强度都乘 {@link POPUP_LIGHT_COMPENSATION}**（2026-09-27 同日）：
- * owner 接着报「设置页 / 子代理 / 后台任务 / 模型列表的顶光，明显比别的元素强」。
- * 实测同类浮层的光贡献是**地面的 3.03 倍**，本函数按 0.33 压到 1.00（真机扫描，6 档单调、
- * 每档重复两次一致）—— 理由与定标表见 `constants.ts` 的该常量。
- * 压的是**强度**，几何与收束点一字不动。
- *
- * 三层全部走变量，缺变量时落到 `transparent` / `none` —— 即「官方默认」下等于什么都不画
- * （官方默认下这些规则本来也被 `PLAIN_ATTR` 挡住）。
- * @returns 可直接写进 `background-image` 的图层串。
+/** 浮层表面要叠的 `background-image` 图层，**从上到下**：① 颗粒（色调关了 `grain` 时是 `none`）—— 压在最上面才像砂面；② 顶部光层 / ③ 底部本色辉光 / ④ **左侧金晕**（与背景层同一份配方，几何按浮层尺度缩小）。
+ *  ⚠️ **必须是三道光**（背景层就是三道，同一个配方）：漏掉左光会让浮层与背景层「打光不一样」；⚠️ **每道光的强度都乘 {@link POPUP_LIGHT_COMPENSATION}**（压的是强度，几何与收束点不动）。全部走变量：缺变量时落到 `transparent` / `none` —— 即「官方默认」下等于什么都不画。
  */
 export function surfaceLayers(): string {
   return [
@@ -654,32 +162,18 @@ export function surfaceLayers(): string {
   ].join(',\n    ')
 }
 
-/**
- * 把一道光的运行期变量按 {@link POPUP_LIGHT_COMPENSATION} 压暗，供浮层图层串使用。
- *
- * 用 `color-mix` 而不是改 alpha 数值：变量里是**任意合法颜色**（可能是 `rgba()`、
- * 也可能是 `transparent`），插件不该去解析它。`color-mix(in srgb, <色> k%, transparent)`
- * 对任何颜色都成立，且 `transparent` 混出来仍是透明 ⇒ 官方默认档下等于什么都不画。
- * @param variable - 该道光的 CSS 变量名（含 `--`）。
- * @returns 可直接放进 `radial-gradient()` 色标位置的表达式。
- */
+/** 把一道光的运行期变量按 {@link POPUP_LIGHT_COMPENSATION} 压暗，供浮层图层串使用。
+ *  用 `color-mix` 而不是改 alpha 数值：变量里是**任意合法颜色**（可能是 `rgba()` 也可能是 `transparent`），
+ *  插件不该去解析它；`color-mix(in srgb, <色> k%, transparent)` 对任何颜色都成立，混出来仍是透明
+ *  ⇒ 官方默认档下等于什么都不画。 */
 function popupLight(variable: string): string {
   return `color-mix(in srgb, var(${variable}, transparent) ${Math.round(POPUP_LIGHT_COMPENSATION * 100)}%, transparent)`
 }
 
-/**
- * {@link GROUPED_MENU_SELECTOR} 专用的图层串 —— **已废弃，保留仅为兼容导出**。
- *
- * ⚠️ **2026-09-27（M3）起不再使用**：它只有 2 层（颗粒 + 底光），是「同族元素份数不一致」
- * 的来源之一 —— owner 报「模型选择列表……和别的元素不是一个档位」、以及
- * 「todo 列表我刚发现没有打光了」。
- *
- * 现在统一走 {@link surfaceLayers}（4 层），由三张规范表决定几何与强度
- * （见 docs/spec/07-surface-model.md §3）。本函数保留是为了让旧导出不突然消失
- * （`src/index.ts` 有再导出），**不要再有新的调用方**；下一次大版本删除。
- *
- * @deprecated 用 {@link surfaceLayers} —— 每类表面都拿同样的 4 层。
- * @returns 可直接写进 `background-image` 的图层串。
+/** {@link GROUPED_MENU_SELECTOR} 专用的图层串 —— **已废弃，保留仅为兼容导出**：它只有 2 层
+ *  （颗粒 + 底光），是「同族元素份数不一致」的来源。现在统一走 {@link surfaceLayers}（4 层）。
+ *  保留是为了让旧导出（`src/index.ts` 有再导出）不突然消失，**不要再有新的调用方**；下一次大版本删除。
+ *  @deprecated 用 {@link surfaceLayers} —— 每类表面都拿同样的 4 层。
  */
 export function menuSurfaceLayers(): string {
   return [
@@ -688,30 +182,16 @@ export function menuSurfaceLayers(): string {
   ].join(',\n    ')
 }
 
-/**
- * 菜单填充色变量 —— 标题条与卡片**必须读同一个**，否则标题就是一条色差带。
- *
- * 官方 0.1.7 把菜单表面的填充收进 `--dsw-menu-surface-fill`（`MenuSurface.module.css:26`
- * 的 `.material` 用它），而 `--dsw-specific-menu` 是它的**别名**
- * （实测官方样式表：`body { --dsw-specific-menu: var(--dsw-menu-surface-fill) }`）。
- * 两个 token 名字不同、值同源，所以这里**两个一起染**（见 `POPUP_TOKENS`），
- * 规则里优先读语义更准的那个、并留别名兜底。
- */
+/** 菜单填充色变量 —— 标题条与卡片**必须读同一个**，否则标题就是一条色差带。
+ *  官方把菜单表面填充收进 `--dsw-menu-surface-fill`，而 `--dsw-specific-menu` 是它的**别名**
+ *  （值同源）；两个名字都染（见 `POPUP_TOKENS`），这里优先读语义更准的那个、并留别名兜底。 */
 const MENU_FILL = `var(--dsw-menu-surface-fill, var(--dsw-specific-menu))`
 
-/**
- * 粘性分组标题条的 `background-image`，**从上到下**：
- *
- * 1. **卡片自己的颗粒** —— 卡片把它画在菜单元素的 `background-image` 最上层
- *    （{@link menuSurfaceLayers}），所以标题也得画在最上层、**满强度**；
- * 2. **卡片填充** —— 与卡片同一个 token、同一个 alpha；
- * 3. **地面原样重画**（{@link grainOverGradients}：颗粒 + 三段光，`fixed` 对齐视口）
- *    —— 卡片是玻璃，它看到的就是「地面」这四层；标题另有不透明底，必须把地面重画一遍，
- *    否则「地面长什么样」这件事在标题上就丢了。
- *
- * 合成结果 = 颗粒 叠在（填充 叠在 地面 上）—— 与卡片**逐层同源**，实测两轴都在 1 级以内。
- * @returns 可直接写进 `background-image` 的图层串。
- */
+/** 粘性分组标题条的 `background-image`，**从上到下**：① **卡片自己的颗粒**（满强度，卡片就把它画在
+ *  最上层）② **卡片填充**（与卡片同一个 token、同一个 alpha）③ **地面原样重画**（{@link grainOverGradients}：
+ *  颗粒 + 三段光，`fixed` 对齐视口）—— 卡片是玻璃，它看到的就是「地面」这四层，标题另有不透明底，
+ *  不重画就丢了「地面长什么样」。
+ *  合成结果 = 颗粒 叠在（填充 叠在 地面 上）—— 与卡片**逐层同源**（实测两轴都在 1 级以内）。 */
 export function groupTitleLayers(): string {
   return [
     `var(${GRAIN_TILE_VARIABLE}, none)`,
@@ -720,282 +200,65 @@ export function groupTitleLayers(): string {
   ].join(',\n    ')
 }
 
-/**
- * {@link groupTitleLayers} 的**逐层 `background-attachment`**：最上面两层（标题自己的颗粒、
- * 卡片填充）按元素盒子，地面那四层 `fixed` —— 地面是 `position: fixed` 的整屏层，
- * 百分比按视口解析；少了 `fixed`，一条 26px 的横条会把 `ellipse 80vw 45vh` 压成硬边带
- * （05-surfaces §8.2 记的那个坑）。
- *
- * ⚠️ **值必须逐层给足**：CSS 在值少于层数时是**整串重复**，只写三个的话第 4、5 层会回到
- * `scroll`，光层当场被压扁。
- */
+/** {@link groupTitleLayers} 的**逐层 `background-attachment`**：最上面两层（标题自己的颗粒、卡片填充）
+ *  按元素盒子，地面那四层 `fixed` —— 地面是整屏 `position: fixed` 层、百分比按**视口**解析；少了 `fixed`，
+ *  一条 26px 的横条会把 `ellipse 80vw 45vh` 压成硬边带。
+ *  ⚠️ **值必须逐层给足**：CSS 在值少于层数时是**整串重复**，只写三个会让第 4、5 层回到 `scroll`、光层被压扁。 */
 export const GROUP_TITLE_ATTACHMENT = 'scroll, scroll, fixed, fixed, fixed, fixed'
 
-/**
- * 分组菜单的**滚动容器**（分组标题的吸顶上下文）—— 菜单卡片里那个
- * "装着全部 `[role='group']`"的盒子。
- *
- * 用**结构**锚定：官方 ≤rc.1 的 `ModelSelect` 是 `div.groups`，本仓库 codebuddy 的
- * `CodeBuddyModelSelect.tsx` 是 `div.ccb-model-groups`；两者都是菜单卡片的直接子元素、
- * 都装着 `section[role='group']`。不碰 hashed 类名。
- *
- * ⚠️ **0.2.0-rc.2 把 `role='menu'` 从卡片搬到了内层滚动容器上**，本常量因此只覆盖
- * "卡片还是菜单锚点"的那一半；另一半见 {@link GROUPED_MENU_SELF_SCROLLER_SUFFIX}。
- * 两个形态的说明与实测都写在那条常量上。
- *
- * ⚠️ **本常量是"后代片段"，以组合符开头**（与 {@link GROUPED_MENU_TITLE_SELECTOR} 同类），
- * 使用时拼在菜单锚点之后（`${菜单选择器} ${本常量}`）。
- * **不能**写成 `:scope > …`：`:scope` 是给 `querySelector` 用的，
- * 在**样式表**里没有上下文引用元素，按规范退化成 `:root` ⇒ 规则静默失效
- * （正是本文件反复记录的那类"规则一条都命不中"的坑）。
+/** 分组菜单的**滚动容器**（分组标题的吸顶上下文）—— 菜单卡片里那个装着全部 `[role='group']` 的盒子，用**结构**锚定：官方 `ModelSelect` 是 `div.groups`、本仓库 codebuddy 是 `div.ccb-model-groups`，两者都是菜单卡片的直接子元素（不碰 hashed 类名）。
+ *  ⚠️ 本常量是**后代片段**（以组合符开头，与 {@link GROUPED_MENU_TITLE_SELECTOR} 同类），使用时拼在菜单锚点之后 —— **不能**写成 `:scope > …`：`:scope` 在**样式表**里没有上下文引用元素、按规范退化成 `:root` ⇒ 规则静默失效。官方改版后 `role='menu'` 搬到了内层滚动容器上，故本常量只覆盖「卡片还是菜单锚点」的那一半，另一半见 {@link GROUPED_MENU_SELF_SCROLLER_SUFFIX}。
  */
 export const GROUPED_MENU_SCROLLER_SELECTOR = `> ${anchorSelector(ANCHOR.menuChild)}`
 
-/**
- * 滚动容器**就是菜单锚点自己**时的**后缀片段**（无组合符，直接贴在菜单锚点后）。
- *
- * ## 为什么需要第二条腿：0.2.0-rc.2 搬了 `role='menu'`
- *
- * | 版本 | 官方 `ModelSelect` 渲染 | 谁带 `role='menu'` |
- * | :--- | :--- | :--- |
- * | ≤0.2.0-rc.1 | `MenuSurface role="menu"` → `div.groups` → `section[role=group]` | **卡片**（滚动容器是它的直接子） |
- * | **0.2.0-rc.2** | `MenuSurface role={pane==='model'?'group':'menu'}` → `div.groups role="menu"` → `section[role=group]` | **滚动容器自己**（卡片变成 `role='group'`） |
- *
- * 官方 `ModelSelect.tsx:484`（卡片）与 `:551-555`（`div.groups.scrollable` 自己带
- * `role="menu"`）。于是「菜单锚点的**直接子**元素」这个关系在 rc.2 上**整体上移了一层**：
- * `[role='menu'] > :has([role='group'])` 在新结构下**一条也命不中** ——
- * 真机实测（同页放两种 markup 做对照）：rc.2 结构 **0** 命中、rc.1 结构 **1** 命中
- * ⇒ 内圈圆角**静默失效**（正是本文件反复记录的那类"规则一条都命不中"的坑）。
- *
- * ## 这条后缀为什么是 `:has(> [role='group'])`
- *
- * 「**自己**的直接子里有 group」—— rc.2 的 `div.groups[role=menu]` 的直接子正是
- * `MenuGroup` 渲染的 `section[role='group']` ⇒ 命中，内圈圆角重新落在滚动容器上。
- *
- * 反向也安全：rc.1 的卡片与 codebuddy 的 `div.ccb-model-menu` 的直接子都是
- * 普通 `div`（不是 `section[role=group]`）⇒ **不命中**，不会与
- * {@link GROUPED_MENU_SCROLLER_SELECTOR} 那条在同一元素上叠着写。
- *
- * ⚠️ 两条腿**必须各出一条规则**，不能合并进一个 `:is()`：本常量那条由调用方
- * **以空格拼接**（后代组合符），而 `:is()` 里的相对选择器无法表达"锚点**自己**"，
- * 合并会把 rc.2 那一半又弄丢。分开写后两条规则的意图各自可断言。
- *
- * ⚠️ rc.2 的 `root` / `effort` 面板卡片带 `role='menu'`（`pane !== 'model'`），
- * 那两屏没有 `[role='group']` ⇒ 两条腿都不命中，与改前一致。
+/** 滚动容器**就是菜单锚点自己**时的**后缀片段**（无组合符，直接贴在菜单锚点后）—— 官方改版把 `role='menu'` **从卡片搬到了内层滚动容器**上，「菜单锚点的直接子元素」这个关系**整体上移了一层** ⇒ `[role='menu'] > :has([role='group'])` 在新结构下**一条也命不中**（实测新结构 0 命中 / 旧结构 1 命中）、内圈圆角静默失效。
+ *  本后缀问「**自己**的直接子里有 group」：新结构的滚动容器直接子正是 `section[role='group']` ⇒ 命中；旧结构的卡片与 codebuddy 菜单的直接子都是普通 `div` ⇒ 不命中，不会与 {@link GROUPED_MENU_SCROLLER_SELECTOR} 那条在同一元素上叠着写。
+ *  ⚠️ 两条腿**必须各出一条规则**，不能合并进一个 `:is()`：`:is()` 里的相对选择器无法表达「锚点自己」，合并会把新结构那一半又弄丢。
  */
 export const GROUPED_MENU_SELF_SCROLLER_SUFFIX = anchorSelector(ANCHOR.menuSelfScroller)
 
-/**
- * 「分组菜单**内圈**圆角」的自定义属性名 —— {@link GROUPED_MENU_SCROLLER_RADIUS} 经它取值。
- *
- * ## 为什么需要一个变量，而不直接把半径写进规则
- *
- * 同心圆角 = **菜单自己的外圆角 − 菜单自己的内边距**，而各菜单的外圆角不同
- * （官方 `MenuSurface` 16 ⇒ 12；本仓库 codebuddy 菜单 20 ⇒ 16）。可滚动容器那条规则的
- * 选择器**同时命中两个菜单**（真机实测：页面上含 `[role='group']` 的 `role='menu'`
- * 就是这两个），把半径写死在规则里必然让其中一个的同心关系错掉 ——
- * 这条已经实测踩过一次（写 12px 之后 codebuddy 菜单读到 `12px 17px 0 0`，
- * 而它的正确值是 `16px 21px 0 0`）。
- *
- * 做法：规则只读变量、**默认值是官方菜单的同心值**；菜单所有者在自己菜单元素上覆盖它
- * （自定义属性沿继承树向下传，滚动容器是菜单的后代 ⇒ 各自读到各自的值）。
- * 于是"配方"（同心半径 + 滚动条补偿 + 只圆上两角）**只有一份**，
- * 各菜单只负责报出自己那个数。
- *
- * ⚠️ **命名带插件前缀**（`--dsh-theme-tone-*`，与本插件其它热变量一致），
- * 不用泛化的 `--dsh-menu-inner-radius`：前者明确"谁写的、谁能覆盖"，也不会与官方未来
- * 可能引入的同名变量撞车。
- */
+/** 「分组菜单**内圈**圆角」的自定义属性名 —— {@link GROUPED_MENU_SCROLLER_RADIUS} 经它取值。
+ *  同心圆角 = **菜单自己的外圆角 − 菜单自己的内边距**，而各菜单外圆角不同（官方 16 ⇒ 12；
+ *  codebuddy 20 ⇒ 16），可滚动容器那条规则**同时命中两个菜单** ⇒ 半径写死在规则里必然让其中一个错掉。
+ *  做法：规则只读变量、**默认值是官方菜单的同心值**；菜单所有者在自己菜单元素上覆盖它
+ *  （自定义属性沿继承树向下传，滚动容器是菜单的后代 ⇒ 各自读到各自的值）。
+ *  ⚠️ **命名带插件前缀**：明确「谁写的、谁能覆盖」，也不会与官方未来可能的同名变量撞车。 */
 export const GROUPED_MENU_INNER_RADIUS_VARIABLE = '--dsh-theme-tone-menu-inner-radius'
 
-/**
- * 分组标题条的圆角：**0**（方角）。
- *
- * owner 第五轮要的是"把这个条变成圆角的"；第六轮反馈「改成圆角后确实边缘会漏」。
- * 实测确认这是几何必然（缺口里露出滚动的行），因此圆角**改由滚动容器承担**
- * （见 {@link GROUPED_MENU_SCROLLER_RADIUS}），条本身必须回到方角 ——
- * 它一旦有圆角，缺口就回来了。
- *
- * ⚠️ 保留这个常量（而不是在规则里裸写 `0`）是为了让"圆角归零"这件事在一处可读、可断言。
- */
+/** 分组标题条的圆角：**0**（方角）—— 标题条一旦自己有圆角，缺口里就会露出滚动的行（**几何必然**，
+ *  与半径大小、配色无关），所以圆角**改由滚动容器承担**（见 {@link GROUPED_MENU_SCROLLER_RADIUS}）。
+ *  ⚠️ 保留这个常量（而不是在规则里裸写 `0`）是为了让「圆角归零」这件事在一处可读、可断言。 */
 export const GROUP_TITLE_RADIUS = '0'
 
-/**
- * **圆角写在滚动容器上，不写在标题条上** —— owner 第六轮的新办法。
- *
- * ## 为什么不能写在标题条上（第五轮那版为什么漏）
- *
- * 标题条自己带圆角 ⇒ 「条矩形 − 圆角」那块缺口是**真的没画**，而缺口里正好是滚动的行
- * （`.ccb-model-option` 的悬停底铺满整行宽，行文字从 x=8 起）。于是行从缺口里透出来 ——
- * 这就是 owner 第六轮报的「边缘会漏」。**这是几何必然，跟半径大小、配色都无关。**
- *
- * 真机实测（owner 实例，吸顶条，把条后面的行刷成洋红、数条矩形内的洋红像素）：
- *
- * | 条的圆角 | 4px | 6px | 8px | 16px（被 clamp 成 13） | 0（方角） |
- * | :--- | ---: | ---: | ---: | ---: | ---: |
- * | 漏出的行像素 | 6 | 16 | 30 | **70** | **0** |
- *
- * 附：条高 26px，所以声明 16px 会被**等比压到 13px**（半高）—— 那一版其实是个胶囊。
- *
- * ## 新办法：圆角交给滚动容器
- *
- * 容器顶角的裁剪**同时作用于条与行** ⇒ 那里既没有条、也没有行，露出的是**菜单自己的玻璃**
- * （与卡片同源，不用猜任何颜色）；条自己保持方角 ⇒ 它没有缺口 ⇒ **结构上不可能漏**。
- *
- * 真机实测（6 个滚动位置 0/40/90/140/200/300，同上判据）：
- *
- * | 写法 | 漏 |
- * | :--- | ---: |
- * | 条方角 + 容器不圆 | 0 / 0 / 0 / 0 / 0 / 0 |
- * | 条方角 + 容器上两角（本常量） | **0 / 0 / 0 / 0 / 0 / 0** |
- * | 条自己四角 16px（第五轮那版） | 0 / 44 / 70 / 70 / 39 / 0 |
- *
- * ## 半径取「同心值」= 菜单圆角 − 菜单内边距
- *
- * 菜单是「圆角盒 + 4px 内边距」，容器贴在内边距里侧；要让容器的弧线与菜单的弧线**重合**，
- * 就必须同圆心，即内圆角 = 外圆角 − 内边距。而**每个菜单的外圆角不同**：
- *
- * | 菜单 | 外圆角 | 内边距 | 同心内圆角 |
- * | :--- | ---: | ---: | ---: |
- * | 官方 `MenuSurface` `.surface` | `--dsw-radius-lg`(16) | 4px | **12px = `--dsw-radius-md`** |
- * | 本仓库 codebuddy `.ccb-model-menu` | 20px | 4px | **16px = `--dsw-radius-lg`** |
- *
- * 所以半径**不能写死在这条规则里** —— 本规则的选择器同时命中两个菜单（真机实测确实如此），
- * 写死一个值会让另一个菜单的同心关系错掉（踩过一次：写 12px 之后 codebuddy 菜单实测
- * `12px 17px 0 0`，而它的同心值应是 `16px 21px 0 0`）。
- *
- * 做法：半径经 {@link GROUPED_MENU_INNER_RADIUS_VARIABLE} 间接取值，**默认给官方菜单的
- * 同心值**；菜单所有者可以在自己的菜单元素上覆盖它（codebuddy 就在 `.ccb-model-menu` 上
- * 声明 16px）。自定义属性沿继承树向下传，容器是菜单的后代 ⇒ 自然读到各自菜单的值。
- * 这样"配方（半径 + 滚动条补偿 + 只圆上两角）"只有一份，**各菜单只报自己那个数**。
- *
- * ## 为什么右上角多补一个滚动条宽
- *
- * 所有行的右边缘都在容器的**内容盒**上，比容器 border-box 右边缘**靠左一个滚动条宽**
- * （官方 `--dsh-scrollbar-width`，实测 5px）；左边缘则与容器左边缘齐平。同一个半径下，
- * 右角的弧线切进条里的深度会比左角**浅 5px**。真机实测（吸顶条逐行「最左 / 最右被裁像素」）：
- *
- * | 写法 | 左角内缩 | 右角内缩 |
- * | :--- | :--- | :--- |
- * | `R R 0 0` | 10,7,5,4,3,2,2,1,1,1 | 5,2,0,0,…（右侧偏浅） |
- * | `R calc(R+sb) 0 0` | 10,7,5,4,3,2,2,1,1,1 | 9,5,3,1,…（基本对称） |
- *
- * ⚠️ **已知取舍（诚实记录）**：补了之后，**内容不溢出**（没有滚动条）时右角会比同心值**深 5px**。
- * 这一条没有可靠的 CSS 判据（滚动条有无在 CSS 里不可知），而两个方向的偏差都发生在
- * 「条与卡片」的边界上 —— 实测这两者只差 **0.7 级**（41.7,42.6,46.0 vs 41.0,42.0,46.0），
- * 误差肉眼不可辨；取"有滚动条"那一侧，因为分组菜单满屏时才是常态。
- *
- * ## 顺带解决了"圆角其实看不见"这件事
- *
- * 真机实测：条内部 (41.7, 42.6, 46.0) vs 条正下方 (41.0, 42.0, 46.0) —— 差 0.7 级。
- * 也就是说第五轮那条圆角**本来就是靠"缺口里露出的行"（比条亮 18~45 级）才被看见的**；
- * 换句话说，「圆角看得见」与「边缘不漏」在该写法下互斥。改由容器承担之后，圆弧的边界是
- * 「条 / 菜单玻璃」，两者同源 ⇒ 视觉上就是**卡片自己的圆角**，而不是一条带子的角。
- *
- * ⚠️ **切圆仍然不改变填充**：条的不透明底照旧（见 `groupTitleLayers`）——
- * owner 第三轮定的硬约束（「不是变成透明的」）。
- */
+/** **圆角写在滚动容器上，不写在标题条上**：容器顶角的裁剪**同时作用于条与行** ⇒ 那里既没有条、也没有行，露出的是**菜单自己的玻璃**（与卡片同源，不用猜颜色），条自己保持方角 ⇒ **结构上不可能漏**；半径取**同心值** = 菜单外圆角 − 内边距（官方 `--dsw-radius-lg` 16 − 4 = 12 = `--dsw-radius-md`；codebuddy 20 − 4 = 16），而本规则**同时命中两个菜单** ⇒ 只能经 {@link GROUPED_MENU_INNER_RADIUS_VARIABLE} 间接取值、默认给官方菜单的同心值。
+ *  右上角**多补一个滚动条宽**：行的右边缘在容器的**内容盒**上（比 border-box 右缘靠左一个滚动条宽），同半径下右角弧线会浅一截；已知取舍：内容不溢出（无滚动条）时右角比同心值深 5px —— CSS 里判不出滚动条有无，而两个方向的偏差都落在「条与卡片」边界上（实测只差 0.7 级，肉眼不可辨）。
+ *  ⚠️ **切圆不改变填充**：条的不透明底照旧（见 {@link groupTitleLayers}）。 */
 export const GROUPED_MENU_SCROLLER_RADIUS =
   `var(${GROUPED_MENU_INNER_RADIUS_VARIABLE}, var(--dsw-radius-md, 12px)) ` +
   `calc(var(${GROUPED_MENU_INNER_RADIUS_VARIABLE}, var(--dsw-radius-md, 12px)) + var(--dsh-scrollbar-width, 5px)) 0 0`
 
-/**
- * 给锚点挂上「官方默认」门。
- *
- * **不能**写成 `body:not([…]) ${anchor}` —— 锚点自带 `body ` 前缀，那样会拼出
- * `body:not([…]) body [role='menu']`（**body 套 body**），永远不可能命中：
- * 规则静默失效，只有走 token 的组件还留着质感，其余弹层全成了纯色。
- * 正确做法是把门**并进**锚点自己的 `body` 上。
- * @param anchor - {@link SURFACE_ANCHORS} 里的一条。
- * @returns 带门的选择器。
- */
+/** 给锚点挂上「官方默认」门 —— **必须把门并进锚点自己的 `body` 上**。
+ *  ⚠️ **不能**写成 `body:not([…]) ${anchor}`：锚点自带 `body ` 前缀，那样会拼出 **body 套 body**、
+ *  永远不可能命中（规则静默失效，只有走 token 的组件还留着质感，其余弹层全成了纯色）。 */
 function gatedAnchor(anchor: string): string {
   return anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
 }
 
-/**
- * 分组标题条规则的**选择器构造**：把 {@link GROUPED_MENU_SELECTOR} 自带的 "body " 前缀
- * 换成调用方给的前缀（要带门 / 还要带轴门）。
- *
- * **不能**直接拼 `${prefix} ${GROUPED_MENU_SELECTOR}` —— 锚点自带 `body `，
- * 会拼出 `body:not([…]) body [role='menu']…`（**body 套 body**），规则静默失效
- * —— 与 {@link gatedAnchor} 的 ⚠️ 是同一个坑（那里选择把门并进锚点，这里选择换前缀）。
- * @param bodyPrefix - 新的 body 前缀（已含所需的门）。
- * @returns 完整选择器。
- */
+/** 分组标题条规则的**选择器构造**：把 {@link GROUPED_MENU_UNGUARDED_SELECTOR} 自带的 `body ` 前缀换成
+ *  调用方给的前缀（要带门 / 还要带轴门）—— 与 {@link gatedAnchor} 是同一个坑的另一种解法
+ *  （那里把门并进锚点，这里换前缀）；直接拼会拼出 **body 套 body**、规则静默失效。 */
 function groupTitleRule(bodyPrefix: string): string {
-  // ⚠️ 用**无守卫**锚点：组合规则的后半段已经要求 `[role='group']` 的存在，
-  // `:has()` 是冗余的，而它每次 DOM 变动都要重匹配（真机实测最贵的三条之一）。
-  // 等价性与收益见 {@link GROUPED_MENU_UNGUARDED_SELECTOR}。
+  // ⚠️ 用**无守卫**锚点：组合规则的后半段已经要求 `[role='group']` 的存在，`:has()` 是冗余的，
+  // 而它每次 DOM 变动都要重匹配。等价性与收益见 {@link GROUPED_MENU_UNGUARDED_SELECTOR}。
   return `${bodyPrefix} ${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\s+/u, '')} ${GROUPED_MENU_TITLE_SELECTOR}`
 }
 
-/**
- * 抬升面样式表文本（**只加质感，不刷底色**）。
- *
- * ## ⚠️ 2026-09-24 架构收口：底色与模糊全部交回官方
- *
- * owner 定的口径：「**统一设计语言**，该透明模糊的就透明模糊，不破坏我们原来的设计，
- * 适配新的官方设计语言」，且明确「透明和模糊**和官方默认一样**就行」。
- *
- * 官方 0.1.7 的菜单族材质契约（`docs/web-styling.zh.md:25`）：凡用半透明
- * `--dsw-specific-menu` 填面的规则，**必须**在同一条规则里配上
- * `backdrop-filter: var(--dsw-menu-backdrop-filter)` —— 这两个变量已由 `tones.ts` 的
- * `POPUP_TOKENS` 按色调染过（只换 RGB、保住官方 alpha），所以**官方自己就是带色调的**，
- * 本插件不需要再声明这一对。
- *
- * 这条表演进过三步，全部记录在此（免得再走）：
- *
- * 1. **刷不透明底**（0.1.5 时代）→ 0.1.7 官方把弹层统一成「半透明 + 模糊」之后，
- *    这层不透明底把官方玻璃**整块盖掉**（owner：「后台任务 / CodeBuddy 弹窗不是透明模糊」）；
- * 2. **改成刷官方的半透明 + 模糊**→ 官方**已经画过**，于是变成画两遍：
- *    官方画在元素自己身上的（菜单原语、`JobListAction` 的 `<ul>`）是同值覆盖、无碍；
- *    但官方画在 `::before` 上的（`SubagentCatalogAction`）**叠两次同色 ⇒ 等效 0.75**
- *    （owner：「子代理卡片好像没有透明模糊吧？」）；
- * 3. **本版：一个材质声明都不写** —— 由官方自己的材质原样生效（= 官方默认的透明与模糊），
- *    本表只负责 `background-image` 的**质感层**（颗粒 + 光），色调走 `ctx.theme.overrideTokens`
- *    染进官方 token（官方接入方式）。
- *
- * 仍然保留 `!important`：官方写的是 `background:` **简写**（内含 `background-image: none`），
- * 特异度又各写各的，压不过就是静默失效。
- * @returns 注入 `<style>` 的 CSS 文本。
- */
+/** 抬升面样式表文本（**只加质感，不刷底色**）—— 底色与模糊全部交回官方：官方已把菜单族统一成「半透明 + 模糊」，本插件再刷一遍就是画两遍（官方画在元素自己身上的那类是同值覆盖、无碍，但官方画在 `::before` 上的那些会**叠两次同色 ⇒ 等效 0.75**，看着不透明），故一个材质声明都不写，官方材质原样生效；色调只走 `tones.ts` 的 `POPUP_TOKENS` 染进官方 token（官方接入方式）。
+ *  仍然保留 `!important`：官方写的是 `background:` **简写**（内含 `background-image: none`）、特异度又各写各的，压不过就是静默失效。
+ *  @returns 注入 `<style>` 的 CSS 文本。 */
 export function buildSurfaceCss(): string {
-  return `/* ===== dsh-theme-tone 抬升面（菜单 / 对话框）：只叠质感，底色交回官方 =====
-   选择器带 ${PLAIN_ATTR} 门：官方默认下整表不命中（owner：官方默认的都不要动）。
-
-   ⚠️⚠️ **2026-09-27（M2）：元素级那条 background-image 已删除 —— 只留单一载体。**
-
-   此前每个锚点**两处都画**（元素级 + ::after 各一份同一配方）。那不是设计，
-   是历史叠加的产物，后果实测确认过：
-
-   | 表面 | 元素级 | ::after | 净结果 |
-   | :--- | :--- | :--- | :--- |
-   | 地面 | 3 道光 | 颗粒 | 每道光 **1 份** |
-   | 设置弹窗 | 4 层 | 4 层 | 每道光 **2 份**、颗粒 **2 份** ⇒ 观感偏重 |
-   | 分组菜单 | 2 层 | 4 层 | 底光 2 份、顶/左光 1 份 ⇒ 更乱 |
-
-   而且「两份是否叠加」**取决于官方组件有没有渲染 z-index:-1 的材质子元素**
-   （官方 MenuSurface 有、插件自有组件没有）—— 从我们的锚点表**根本预测不了**。
-   owner 反馈的「弹窗噪点比别的强」正是这个不可预测性。
-
-   ## 为什么只留 ::after 就够（两种情形都覆盖）
-
-   负 z-index 带内的绘制顺序是：**父元素背景 → 负 z 层（按树序）→ 行内内容**。
-   ::after 排在树序**最后**，于是：
-
-   | 官方的材质画在哪 | ::after 的结果 |
-   | :--- | :--- |
-   | **z-index:-1 的子元素**（MenuSurface 的 .material） | ::after 在它**之后** ⇒ 画在它之上，可见 |
-   | **元素自己身上** | ::after 在元素背景**之后** ⇒ 画在它之上，可见 |
-
-   两种情形都可见 ⇒ **元素级那份是纯冗余，且在没有材质子元素的组件上造成双倍**。
-   删它不丢任何东西，只是把「不可预测的双层」变成「确定的单层」。
-
-   ## 下一句要改的常数
-
-   单层之后每条光的实际观感**会比现状淡**（少了一半）——这是**预期的中间态**：
-   M6 会在单载体、同口径下重新定标 {@link POPUP_LIGHT_COMPENSATION} 与颗粒强度。 */
+  return `/* ===== dsh-theme-tone 抬升面（菜单 / 对话框）：只叠质感、底色交回官方；选择器带 ${PLAIN_ATTR} 门 ===== */
+/* --- 图层：**::after 单载体**（同一个面画两份会让份数取决于官方组件有没有 z-index:-1 的材质子元素，观感不可预测）--- */
 ${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)}::after {
   content: '';
   position: absolute;
@@ -1005,259 +268,41 @@ ${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)}::
   background-image: ${surfaceLayers()} !important;
   pointer-events: none;
 }`).join('\n')}
-/* --- ⚠️ 自身是滚动容器的锚点：图层改画在**元素级**（2026-09-29，owner 报
-   「后台任务列表滚动出来的部分没有适配」）---
-
-   为什么这些面不能用上面那条 "::after"：那条是 "position: absolute; inset: 0"，
-   而它**在内容流里** —— 元素自己会滚时，伪元素**随内容一起滚走**，
-   只盖住初始可见的那一屏。实测（把层刷纯红、数元素截图红像素）：
-   scrollTop=0 覆盖 95.6%，滚到底 **0.0%**；换成元素级 background-image 后 **99.2%**。
-
-   元素级为什么不滚：background-attachment 的**默认值 scroll** 对滚动容器就是
-   「背景钉在元素自己的盒子上」。（切记不是 local —— 那个才跟内容滚。）
-
-   ⚠️ 只换承载方式，**不保留 ::after**（M2 已把「同一个面画两遍」收成单载体，
-   这里同样只留一份）。上方 "filter(usesAfterLayer)" 已把本表排除在外。
-
-   ⚠️ 与 ::after 那条的差异（已知且接受）：元素级图层画在**元素自己的背景层**上，
-   压不过画在同一元素上的官方不透明材质。后台任务列表的官方底色是半透明的
-   （JobListAction.module.css:59 的 --dsw-specific-menu + :60 的 backdrop-filter），
-   底色本身由官方给出、我们只叠质感，故不受影响。
-   （本段在模板字符串里，注释中**不能出现反引号**。） */
+/* --- 自身是滚动容器的锚点：图层改画在**元素级**（::after 会随内容滚走，滚出来的部分没有质感；只换载体、不保留 ::after）--- */
 ${SURFACE_ANCHORS.filter(usesOwnBackground).map(anchor => `${gatedAnchor(anchor)} {
   background-image: ${surfaceLayers()} !important;
 }`).join('\n')}
-/* --- ⚠️⚠️ 让锚点自己**形成层叠上下文**（2026-09-27，owner 报「归档页 / 云端文件页
-   全都没适配纹理和打光」的**根因**）---
-
-   ## 现象与根因（实测，不是推断）
-
-   归档页 / 云端文件页这两个**我们自家插件的页面**上，"::after" 明明有 4 层
-   （radial 3 + 颗粒），但**实测颗粒贡献 = 0.000**（把颗粒关掉，面板区域像素**一个都不变**）。
-
-   根因是一条 CSS 规则的边界条件：
-
-   > "z-index: -1" 的伪元素只画在**它所属的层叠上下文内部**。若父元素**自己不成层叠上下文**，
-   > 这个负 z 层就会**逃逸到上一层**去排队 —— 于是它被父元素**自己的不透明背景**盖住。
-
-   实测判据（布尔式：把 "::after" 设成纯绿，数对话框内的绿点）：
-
-   | 表面 | 元素自身 | "::after" 设纯绿后对话框内绿点 |
-   | :--- | :--- | ---: |
-   | 云文件页 dialog | "z-index: auto"、"isolation: auto" | **0 / 40000**（完全不可见） |
-   | 同上 **+ "isolation: isolate"** | 成上下文 | **38392 / 40000** ✅ |
-   | codebuddy 弹层（对照，已适配） | "z-index: 20" ⇒ 已有上下文 | **6085 / 6336** ✅ |
-
-   ⇒ **「能否看见纹理」取决于该元素是不是自己形成层叠上下文** ——
-   而这件事**各插件写法不同**：官方与其系组件常带 "z-index" / "backdrop-filter"（自然成上下文），
-   我们自家插件的 dialog 是 "position: relative" + "z-index: auto" ⇒ **不成上下文** ⇒ 纹理全被盖住。
-
-   这就是 owner 那句「codebuddy 插件的弹层就适配了，区别在哪」的答案。
-
-   ## 修法："isolation: isolate"（最轻的手段）
-
-   它**只**创建层叠上下文，不改定位、不改尺寸、不产生包含块
-   ⇒ 对已经成上下文的元素是**无操作**，对不成上下文的元素是**恰好补齐**。
-   （对比："z-index" 需要 "position" 配合且可能干扰官方层序；"transform" / "filter" 会改变
-   "fixed" 后代的包含块 —— 本仓库在顶栏那条踩过这个坑。故一律用 "isolation"。）
-
-   ⚠️ 只能加在**我们自己出图层**的那些锚点上（下方按 usesAfterLayer 生成）；
-   对官方自己不需要它的元素不加，避免无谓的层叠上下文。
-   （本段在模板字符串里，注释中**不能出现反引号**。） */
+/* --- 让锚点自己**形成层叠上下文**：否则 ::after 的 z-index:-1 会逃逸到父层、被元素自身的不透明背景盖住 --- */
 ${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)} {
   isolation: isolate;
 }`).join('\n')}
-/* --- ⚠️⚠️ 让锚点成为 "::after" 的**包含块**（2026-09-27，问答卡上踩到）---
-
-   ## 现象
-
-   给问答卡加上锚点后，owner 截图报「出 bug 了」。实测判据（把 "::after" 设成纯红，
-   数卡内/卡外的红点）：
-
-   | 位置 | 红点 |
-   | :--- | ---: |
-   | 卡**内** | **0** |
-   | 卡**外** | **78013 / 78750**（几乎全屏） |
-
-   ⇒ 纹理**整层糊到了卡片之外的全屏**上，而不是画在卡里。
-
-   ## 根因
-
-   我们的 "+::after" 是 "position: absolute; inset: 0" —— 它需要一个**定位祖先**当包含块。
-   而官方 ".card" 是 **"position: static"**，且它的**整条祖先链上没有任何 positioned 元素**
-   ⇒ 包含块一路退到**视口** ⇒ "::after" 铺满全屏。
-   此时卡片的 "overflow: hidden" **裁不住它** —— 裁剪只作用于包含块链上的后代盒，
-   而"包含块跑到视口"意味着这层已经不在卡片的裁剪范围内。
-
-   ## 修法："position: relative"
-
-   只补定位、**不改任何几何**（"relative" + 无偏移 = 不移动、不改尺寸、不改变 flex/grid 摆放），
-   与右栏那条（glass.ts 的 [data-sidebar-right-panel] 也是 static，同样补了 relative）
-   同一套做法。**不是**本仓库否定过的 "z-index"（那会引入层序副作用）。
-
-   ⚠️ 这条与上面的 "isolation: isolate" 是**两件不同的事**，都必须有：
-   * "isolation" 管**层叠上下文**（决定 "z-index:-1" 会不会逃逸到父层被自身背景盖住）；
-   * "position: relative" 管**包含块**（决定 "inset: 0" 相对于谁解析、会不会铺满视口）。
-   归档/云文件页的 dialog 自带 "position: relative"（自家组件写了），所以只缺 isolation；
-   问答卡的 ".card" 两样都缺（static + 无上下文）⇒ 两条都要补。
-
-   ## ⚠️⚠️ 但**绝不能给全表加 "position: relative"**（差点写错，记录在此）
-
-   本表里多数锚点**本来就是** "position: absolute" / "fixed"（菜单、气泡、弹层…）。
-   给它们盖一条 "position: relative" 会**把绝对定位改成相对定位** ⇒ 弹层当场错位，
-   属灾难性回归。故只给**实测确认为 "static"** 的锚点补，见
-   {@link STATIC_SURFACE_ANCHORS}。
-   （本段在模板字符串里，注释中**不能出现反引号**。） */
+/* --- 让 static 锚点成为 ::after 的**包含块**（否则 inset:0 的包含块退到视口、纹理铺满全屏）；只给 STATIC_SURFACE_ANCHORS 里那几个补 --- */
 ${STATIC_SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)} {
   position: relative;
 }`).join('\n')}
-/* --- QueueDock：官方占用了它自己的 ::after（0.5px 描边），故补官方自己的 ::before ---
-   只补 background-image 一个属性，官方那个伪元素的 content 与几何原样不动 ⇒
-   既拿到质感也不碰描边（实测 std 0.229 → 2.162，描边三边全在）。
-   理由与全部读数见 OFFICIAL_BEFORE_LAYER_ANCHORS。 */
+/* --- QueueDock：官方占用了它自己的 ::after（0.5px 描边），故改补到官方自己的 ::before —— 只补 background-image 一个属性，官方伪元素的 content 与几何原样不动 --- */
 ${SURFACE_ANCHORS.filter(usesOfficialBeforeLayer).map(anchor => `${gatedAnchor(anchor)}::before {
   background-image: ${surfaceLayers()} !important;
 }`).join('\n')}
-/* --- 菜单族：**不再由我们声明填充与模糊**（官方 0.1.7 已经成对画好了）---
-   owner：「透明和模糊和**官方默认一样**就行」。
+/* --- 菜单族：**不再由我们声明填充与模糊**（官方已到处成对画好；再刷一遍会让画在 ::before 上的那些叠两次同色 = 等效 75%）--- */
 
-   ⚠️ 这里原先会给每个菜单族锚点刷一对
-   "background-color: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter)"，
-   本意是「兜住官方没配成对的地方」。但 0.1.7 官方**到处都配好了**，于是这条规则变成
-   **在官方已经画过材质的地方再画一遍** —— 后果按官方的画法分两种：
-
-   | 官方的材质画在哪 | 我们再画一遍的结果 |
-   | :--- | :--- |
-   | **元素自己身上**（菜单原语、"JobListAction" 的 "<ul>"、本仓库各组件） | 同值覆盖，看不出问题 |
-   | **元素的 "::before" 上**（"SubagentCatalogAction" 的 ".…_menu:before"） | **同一个 50% 色叠两次 ⇒ 等效 75%** —— 卡片看着"不透明"（owner：「子代理卡片好像没有透明模糊吧？」） |
-
-   所以这一整块**撤掉**：官方的材质原样生效（= 官方默认的透明与模糊），我们只负责
-   "background-image" 的质感层与 token 层的色调。
-
-   唯一真正需要补的是官方自己漏配的那一处（粘性分组标题），它单独在下面处理。
-   （本段在模板字符串里，注释中**不能出现反引号**。） */
-
-/* --- 分组菜单（模型选择列表）：**并入通用菜单配方**，不再有专用规则 ---
-
-   ⚠️⚠️ **2026-09-27（M3）本条已删除** —— 它此前是「不统一」最刺眼的一处：
-
-   | 载体 | 命中规则 | 层数 |
-   | :--- | :--- | :--- |
-   | 元素级 | 本专用规则（"[role='menu']:has([role='group'])"，特异度更高） | 2（颗粒 + 底光） |
-   | ::after | **通用** "[role='menu']" 那条（通用规则没有对应的专用版本） | 4（颗粒 + 三道光） |
-
-   净结果：**颗粒 2 份、底光 2 份，而顶光与左光各只有 1 份** —— 同一个菜单上各层份数都不同。
-   这正是 owner 报的「模型选择列表……和别的元素不是一个档位」。
-
-   ## 为什么直接删就对了（而不是给它也写一份专用规则）
-
-   那个菜单元素**本来就同时匹配**通用 "[role='menu']" ⇒ 通用那条 "::after"（4 层）
-   **一直在它身上生效**。所以此前那条专用规则的唯一作用就是**在元素级多画一遍 2 层**。
-   删掉它 ⇒ 分组菜单与普通菜单拿到**完全相同**的配方（4 层、单载体），无需任何特例。
-
-   ## 那个「去掉顶光避免横带」的旧办法为什么现在不需要了
-
-   旧注释说「顶光锚在盒子顶部、正好被标题压住，是横带的唯一来源，所以去掉它」——
-   但那只作用于**元素级**那一份；"::after" 那份**本来就带顶光**且一直在生效。
-   两处的差别只在绘制载体，不在几何 ⇒ 「元素级去掉顶光」并不能真的消除横带，
-   只是让元素级那份少一道光（额外造成份数不齐）。横带的正解在**粘性标题自己那一条**
-   （{@link groupTitleLayers}：把卡片那一摞原样重画 + 圆角交给滚动容器），与本节无关。
-   （本段在模板字符串里，注释中**不能出现反引号**。） */
-/* --- 粘性分组标题：把**卡片那一摞层**原样重画，只在最下面垫一层不透明的 ---
-   owner 对这条报了四轮，其中三次是我修坏的。四句原话合起来就是全部约束：
-     ① 「把分类标题的背景色去掉，有点突兀，咱们的和官方的一起处理。」
-     ② 「透明和模糊和官方默认一样就行。」
-     ③ 「给修坏了又。又重叠了。**只是把那个背景去掉，不是变成透明的**。」
-     ④ 「背景条又出来了…那条背景条要和菜单底色一致，这样就看不出来有那一条。」
-   ②+③+④ = 底色**必须挡住滚过去的行**（不透明），**又必须和卡片同色**（看不出那条）。
-
-   难在哪：卡片是**半透明玻璃**，它的表面不是一个静态色，而是一摞合成：
-     卡片 = [颗粒] 叠在（菜单填充 叠在 [地面] 上）        ← 地面 = 底色 + 三段光 + 颗粒
-   标题要挡住行，就必须自带不透明底；于是唯一能让它"看不出"的写法是
-   **把上面那一摞逐层重画一遍**，只把最下面的「页面内容」换成静态的「地面」。
-
-   ## 第四轮的真实根因：**层序反了**（不是配色问题）
-
-   第三版写的是 "background-image: 填充渐变, 颗粒" —— 列表在前的画在**上面**，
-   于是合成成了 [填充] 叠在（颗粒 叠在 bg-base 上），与卡片的 [颗粒] 叠在（填充 叠在 地面上）
-   正好把两层调了个个儿。后果实测（真机 dsh 0.1.7，截图取样）：
-
-   | 轴 / 色调 | 标题条 | 卡片 | 差 |
-   | :--- | :--- | :--- | :--- |
-   | 浅色轴 霜蓝 | (248.5, 249.1, 249.7) | (243.1, 244.7, 244.6) | **+5 级（标题偏亮）** |
-   | 深色轴 绯红 | (43.4, 35.4, 39.9) | (54.5, 45.0, 49.2) | **−10 级（标题偏暗）** |
-
-   两个方向都错，而且颗粒还被填充的 alpha 压掉了 42%（卡片是满强度）——
-   "一条更亮/更暗、且更平的带子"，正是 owner ④ 说的"背景条又出来了"。
-
-   ## 本版：三组层、逐层同源（{@link groupTitleLayers}）
-
-     background-color = bg-base        ← 不透明的地面**底色**（⇒ 挡住行；它只是底色，不是"白板"）
-     background-image = 颗粒, 填充渐变, 地面（颗粒 + 三段光）
-     ⇒ 合成 = [颗粒] 叠在（填充 叠在 地面上），与卡片**逐层同源**
-
-   实测同一套取样：浅色轴霜蓝差 (−0.1, −0.9, −0.4)；深色轴绯红亮度差 0.2
-   （逐通道最大 1.6，肉眼不可辨）。
-
-   ⚠️ **颗粒必须画在最上面、且是满强度**（不是"多画一层"）：卡片就是这么画的
-   （见 surfaceLayers 的图层表：颗粒压在最上面才像砂面）。
-   第三版把颗粒压在填充下面 → 只剩 42% 强度，标题成了"平带"。
-
-   ⚠️ **地面那四层必须 fixed**（{@link GROUP_TITLE_ATTACHMENT}）：地面是整屏的
-   "position: fixed" 层，百分比按**视口**解析；一条 26px 的横条若按自身盒子解析，
-   "ellipse 80vw 45vh" 会被压成一道硬边光带（05-surfaces §8.2 记的就是这个坑）。
-   最上面两层（标题自己的颗粒、卡片填充）仍按元素盒子 —— 与卡片一致。
-
-   ⚠️ **地面颗粒的混合模式要跟着轴走**：地面深色轴用 screen、浅色轴用 multiply
-   （见 buildBackdropCss）。所以下面第二条规则只改 background-blend-mode ——
-   元素**自己内部**的图层之间用 background-blend-mode，跨元素的 mix-blend-mode 在这里不适用。
-
-   ⚠️ **不写 backdrop-filter**：标题在**菜单内部**，菜单自己已经是 backdrop root，
-   标题再声明模糊只会采样子树里**正在滚动的行**（实测 31.719/px，比不写更脏 19.885/px）。
-   官方那处没配模糊是有意的 —— 这一条我们跟官方一致（owner ②）。
-
-   ⚠️ **这一条同时管住两个标题**：官方 "ModelSelect" 的 ".groupTitle"（真机类名
-   "._7KE1Ra_groupTitle"）与 codebuddy 插件的 ".ccb-model-groupTitle"
-   （owner ①：「咱们的和官方的一起处理」）。codebuddy 那段 CSS 是**没有本插件时**的兜底：
-   那时卡片没有颗粒、地面也没有光，所以"bg-base + 填充"就够（真机实测差 1 级）；
-   装上本插件后由这条接管，把颗粒与地面一并补上。
-
-   ⚠️ 已知近似（诚实记录）：卡片是玻璃，它的背景是**被 blur 过的动态内容**；
-   菜单压在正文上时那部分无法静态算出，只能取"地面"这个唯一可静态确定的参照，
-   残留随内容而定（通常 1–5 级）。要完全消掉只能给标题上 backdrop-filter，
-   而那会把滚动的行糊进来（见上）—— 两害相权，取静态同源。
-   （本段在模板字符串里，注释中**不能出现反引号**。） */
+/* --- 分组菜单（模型选择列表）：**并入通用菜单配方**，不再有专用规则（它本来就同时匹配通用菜单锚点）--- */
+/* --- 粘性分组标题：把**卡片那一摞层**原样重画，只在最下面垫一层不透明地面色（⇒ 挡住滚过去的行、又看不出那条）--- */
 ${groupTitleRule(`body:not([${PLAIN_ATTR}])`)} {
   background-color: var(--dsw-alias-bg-base) !important;
   background-image: ${groupTitleLayers()} !important;
   background-attachment: ${GROUP_TITLE_ATTACHMENT} !important;
   background-blend-mode: normal, normal, multiply, normal, normal, normal !important;
-  /* ⚠️ owner 第六轮改判：圆角**不写在标题条上**，改由下面的滚动容器承担。
-     写在条上会漏（缺口里露出滚动的行）—— 完整实测与几何见
-     GROUPED_MENU_SCROLLER_RADIUS 的文档块。这里显式归零，是为了盖住
-     优先级更低的旧写法（codebuddy 兜底样式 / 缓存里的旧 CSS）。 */
+  /* 圆角**不写在标题条上**（写在条上会漏：缺口里露出滚动的行），改由下面的滚动容器承担；
+     这里显式归零是为了盖住优先级更低的旧写法（codebuddy 兜底样式 / 缓存里的旧 CSS）。 */
   border-radius: ${GROUP_TITLE_RADIUS} !important;
 }
 ${groupTitleRule(`body[data-ds-dark-theme]:not([${PLAIN_ATTR}])`)} {
   background-blend-mode: normal, normal, screen, normal, normal, normal !important;
 }
-/* --- 圆角交给**滚动容器**（owner 第六轮新办法）---
-   见 GROUPED_MENU_SCROLLER_RADIUS 的文档块：容器顶角的裁剪同时作用于标题条与行
-   ⇒ 缺口里既没有条、也没有行，露出的是菜单自己的玻璃；条自己方角 ⇒ 结构上不可能漏。
-   半径**走变量**（GROUPED_MENU_INNER_RADIUS_VARIABLE），默认给官方菜单的同心值
-   （16 − 内边距 4 = 12 = --dsw-radius-md）；菜单外圆角不同的那些在自己的菜单元素上覆盖它
-   （真机实测页面上含 role=group 的 role=menu 就是官方与 codebuddy 两个，后者是 20 ⇒ 16px）。
-   ⚠️ 只圆**上两角**：下两角若也圆，滚到底时最后一行会被啃掉。
-   ⚠️ 锚点用**无守卫**版：:has() 在这里冗余（后半段已经要求 group 存在），
-   去掉它省一次重匹配 —— 等价性与实测见 GROUPED_MENU_UNGUARDED_SELECTOR。
-   ⚠️ **两条规则**：rc.2 把 role='menu' 从卡片搬到了内层滚动容器上，
-   故「锚点的直接子」与「锚点自己」两个形态各出一条 —— 详见
-   GROUPED_MENU_SCROLLER_SELECTOR / GROUPED_MENU_SELF_SCROLLER_SUFFIX 的文档块。
-   ⚠️ **不能合进一个 :is()**：相对选择器（以 > 开头）在 :is() 里按规范非法，
-   浏览器**不报错也不整条丢弃** —— 实测（Edge，document.styleSheets 读回 selectorText）
-   :is(:has([role='group']), > :has([role='group'])) 被解析成 :is(:has([role='group']))
-   = 相对那一支被**静默删掉**，rc.2 那一半照样丢。故必须两条独立规则。
-   （本段在模板字符串里，注释中**不能出现反引号**。） */
+/* --- 圆角交给**滚动容器**（顶角裁剪同时作用于条与行 ⇒ 缺口里露出的是菜单自己的玻璃；条自己方角 ⇒ 结构上不可能漏）---
+   半径走 GROUPED_MENU_INNER_RADIUS_VARIABLE（默认官方菜单的同心值）；只圆**上两角**（下两角若也圆，滚到底时最后一行会被啃掉）。
+   两条规则分别是「锚点的直接子」与「锚点自己」两个形态 —— 相对选择器（以 > 开头）在 :is() 里会被浏览器**静默删掉**，不能合并。 --- */
 ${`${gatedAnchor(GROUPED_MENU_UNGUARDED_SELECTOR)} ${GROUPED_MENU_SCROLLER_SELECTOR}`} {
   border-radius: ${GROUPED_MENU_SCROLLER_RADIUS} !important;
 }
@@ -1265,47 +310,9 @@ ${`${gatedAnchor(GROUPED_MENU_UNGUARDED_SELECTOR)}${GROUPED_MENU_SELF_SCROLLER_S
   border-radius: ${GROUPED_MENU_SCROLLER_RADIUS} !important;
 }
 
-/* --- 输入框上方那三张**停靠卡**（排队 / 目标 / 待办）---
-   owner：「**输入框上面那个区域也没适配**，刚才我记得让改了，但是没改。」
-   锚点与「为什么画在子元素上」见 COMPOSER_CARD_ANCHORS。
-
-   ⚠️ **底色必须用卡片自己的 token（--dsw-specific-tip），不能用面板变量 PANEL_VARIABLE**。
-   这两者语义不同：面板变量是**抬升面**（浮在地面之上的浮层）的面板色，
-   而这三张卡是**内嵌面**（嵌在地面之内的内容块），官方给它们的底色是 --dsw-specific-tip
-   （浅色轴 bluish-60、深色轴 bluish-800），走的是独立染色通道（见 05-surfaces §4.0.2）。
-
-   曾经这里写 background-color: var(面板变量)：那时浅色轴面板比例 .07、两者观感接近，
-   看不出问题。等抬升面收到 0（面板变量在浅色轴变成纯白）之后，
-   这条 !important 就把三张卡的面**盖成了纯白**，--dsw-specific-tip 的染色完全失效 ——
-   owner 随即反馈「goal、todo、排队对话好像都没改」。**只写图层、不写底色**即根治：
-   底色交给 token 层（§4.0.2 那条通道），这里只负责它拿不到的那部分（颗粒 + 光）。
-
-   ⚠️ **2026-09-24 起图层也画一份到 ::after**（owner：「输入框上面的各种停靠卡
-   **也没有适配纹理和打光**」）—— 与 subagents / AgentTeam 同一条**绘制顺序**问题：
-   官方这几张卡的材质同样画在**伪元素（z-index: -1）**上
-   （真机实测 QueueDock 的 "._7yHdaG_panel::before" = "rgba(61,50,58,.5)"），
-   负 z-index 伪元素画在**父元素背景之上**，于是把我们画在父元素 background-image
-   上的颗粒与光整个盖住。两层都留：材质画在元素自己身上的场景只有上面那条生效。
-
-   ⚠️ 必须用 "::after" + "z-index: -1"（同 SURFACE_ANCHORS 那张表的实测结论）：
-   官方 "QueueDock .panel::before" 是那个 z-index:-1 的材质层，而 "::before" 在树序上
-   排在它前面 ⇒ 会被它盖住；"::after" 排在最后 ⇒ 画在它之上，且整个负 z 带仍低于文字。
-   写成不带 content 的 "::before" 则**连盒子都不生成**，规则完全空转。
-
-   ⚠️ **但 QueueDock 不能走 "::after"**：官方在这一个元素的 "::after" 上有自己的 0.5px 描边。
-   它改走下面那条「补到**官方自己的 ::before**」——只补 background-image 一个属性，
-   官方那个伪元素的 content 与几何原样不动，所以既拿到质感也不碰描边
-   （实测 std 0.229 → 2.162，描边三边全在）。理由与全部读数见
-   OFFICIAL_BEFORE_LAYER_ANCHORS。
-
-   ⚠️ **2026-09-27（M2）：元素级那条同样已删除** —— 与 SURFACE_ANCHORS 同一收口，
-   每个锚点只留**一个**载体（::after，或 QueueDock 的官方 ::before）。
-
-   ⚠️⚠️ **2026-09-27（M3）：配方从 2 层改为 4 层**（原来走 menuSurfaceLayers：颗粒 + 底光）。
-   owner 报「todo 列表我刚发现没有打光了」—— 根因就是它拿的是**另一份配方**，
-   比别的浮层少顶光与左光。现在三张停靠卡与菜单/对话框**同一配方**（颗粒 + 三道光），
-   差别只在尺度。矮条在这个尺度上顶光是否读得出，M10 真机复核（07 §3.2 的 C 档备注）。
-   （本段在模板字符串里，注释中**不能出现反引号**。） */
+/* --- 输入框上方那三张**停靠卡**（排队 / 目标 / 待办）：锚点与「为什么画在子元素上」见 COMPOSER_CARD_ANCHORS ---
+   ⚠️ **只写图层、不写底色**：底色归卡片自己的 token（--dsw-specific-tip，内嵌面通道）—— 面板变量是**抬升面**的色，拿它当底色会把三张卡的面盖成纯白。
+   ⚠️ 用 ::after + z-index:-1（官方这几张卡的材质画在**伪元素**上，会盖住元素级图层）；QueueDock 的 ::after 被官方描边占用 ⇒ 它改补**官方自己的 ::before**（只补 background-image）。 --- */
 ${COMPOSER_CARD_ANCHORS.filter(usesOfficialBeforeLayer).map(anchor => `${gatedAnchor(anchor)}::before {
   background-image: ${surfaceLayers()} !important;
 }`).join('\n')}
@@ -1318,87 +325,30 @@ ${COMPOSER_CARD_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anch
   background-image: ${surfaceLayers()} !important;
   pointer-events: none;
 }`).join('\n')}
-/* 同 SURFACE_ANCHORS：让这几张卡也**自己成层叠上下文**，否则 :after 的 z-index:-1
-   会逃逸到父层、被卡片自己的背景盖住（归档/云文件页那个坑的同一机制）。 */
+/* 同 SURFACE_ANCHORS：让这几张卡也**自己成层叠上下文**，否则 ::after 的 z-index:-1 会逃逸到父层、被卡片自己的背景盖住。 */
 ${COMPOSER_CARD_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)} {
   isolation: isolate;
 }`).join('\n')}
-/* --- 为什么**不**改这三张卡的几何（owner：「官方处理方式不一样？」—— 是的，确实不一样）---
-   owner 连问两次：「官方默认样式为啥有缝了？是咱们改的么？」「还是说，信息队列，todo，
-   还有 goal，官方处理方式不一样？」
-
-   **答案：缝隙是官方的，不是我们造的；而且官方对三张卡的处理确实不同。**
-   逐条查官方产物（dsh-client-ui-conversation / dsh-client-ui-goal 的 client.js）：
-
-   | 官方组件 | 外边距 | 圆角 | 效果 |
-   | :--- | :--- | :--- | :--- |
-   | QueueDock 的 .dock / .panel | margin:0 auto calc(0px - stack-gap - 3px) | 12px 12px 0 0 | **收掉间距 + 压进 3px + 下两角直角 → 贴住输入框** |
-   | TodoPanel 的 .root | margin:0 auto | 12px（四角圆） | **保留 6px 间距** |
-   | GoalBar 的 .dock / .bar | margin:0 auto | 12px（四角圆） | **保留 6px 间距** |
-
-   （上面只写类名的**可读部分**，不抄哈希前缀 —— 本插件红线：产物 CSS 里不得出现哈希类名。）
-
-   间距来自官方的 .composerStack { gap: var(--dsh-composer-stack-gap) }（active 6px）——
-   真机在**官方档**下量到 todo-panel→composer 6.0px，所以那是官方自己的设计，不是本插件改的。
-
-   **那为什么我们这边看着更明显？** 官方用 .composerSeat 的**不透明背衬**把那一段盖住了：
-   座顶往下 36px 由透明渐到 --dsw-alias-bg-base（官方那条 linear-gradient），
-   正好糊住这道 6px。
-   而本插件的玻璃层把这条背衬关掉了（background: none，见 glass.ts 的底座规则），
-   缝隙于是露出**我们的背景**，读成一道更扎眼的带子。
-
-   **结论：本插件不改这三张卡的几何**（此前两版试过「收掉间距 + 打直底角」，那是照
-   QueueDock 的做法推广到了 todo / goal，**与官方不一致**，已整条撤回）。
-   真要处理这道缝，该动的是**底座背衬**那条（官方自己的机制），不是卡片几何。
-
-   ## 2026-09-18 复核：曾经推翻过这条，又推回来了
-   owner 提过「**改颜色**来区分语义」，据此把三张卡全接上、语义交给颜色。真机复核时 owner
-   发现方向不对：「这么连上感觉确实不对了，尤其是 todo，goal，还有对话排队共存的时候，
-   都连在一起，**表达的意思一下就变了**。」
-   **根因：颜色与间距干的是两件事** —— 颜色标记**单个东西的身份**（这张是提示卡），
-   间距标记**分组边界**（这一组到哪里结束）。三张全接上后中间没有任何断点，
-   颜色只能说「这是暗金的」，说不出「从这里起不再是提示信息」。**分组边界只有几何能表达。**
-   故几何整条退回官方，颜色也不加。
-   （本段在模板字符串里，注释中**不能出现反引号**。） */
-/* --- 输入框卡片里的**圆形图标按钮**（+ 命令 / 附件）：默认去底、保留 hover 底 ---
-   owner：「这两个按钮得适配下，我觉得**像下拉菜单一样，默认底就不要了，保留 hover 底就行**。」
-   官方默认底是 var(--dsw-specific-selector) = **不透明实色**，而它们坐在**玻璃卡片**里
-   → 读成两块贴在玻璃上的塑料片。置为 transparent 后露出卡片自己的玻璃，材质就统一了。
-   官方 hover 走的是**另一个 token**，所以只改这一个即可，hover 天然保留（缘由见
-   COMPOSER_ICON_BUTTON_SCOPE 的注释）。覆盖范围**收在卡片里**，不外溢。
-   （本段在模板字符串里，注释中**不能出现反引号**。） */
+/* --- 为什么**不**改这三张卡的几何：缝是官方的（QueueDock 收掉间距贴住输入框，todo / goal 保留官方 6px 间距），
+   本插件只是关掉了底座背衬才让它显形 —— 真要处理该动**底座背衬**那条，不是卡片几何。
+   颜色也不能拿来代替间距：颜色标记单个东西的身份，**分组边界只有几何能表达**。 --- */
+/* --- 输入框卡片里的**圆形图标按钮**（+ 命令 / 附件）：默认去底、保留 hover 底（缘由见 COMPOSER_ICON_BUTTON_SCOPE）--- */
 ${gatedAnchor(COMPOSER_ICON_BUTTON_SCOPE)} {
   --dsw-specific-selector: transparent;
 }
-/* --- 悬停卡：官方把**面和字都写死了**（面 = 恒深灰字面量、字 = 白 / 浅灰 / 次浅灰，
-   全部两轴同值）---
-   owner 定案：这张卡应当**跟随主题**（浅色轴 = 浅卡深字），且「**先把官方默认修了，然后再适配咱们的**」。
-   所以这是全插件**四条不带官方默认门的规则之一** —— 两个档都修（缘由见 constants.ts 的
-   HOVER_CARD_ANCHOR）。另三条是 src/mask.ts（弹窗遮罩虚化）、src/handle-glow.ts
-   （拖拽条悬停光带跟随指针）与 src/popover.ts（顶栏弹出层列内夹取）；判据是「**修官方无意的 bug / 复原**不带门，
-   **改变官方有意的设计选择**（断点、留白）带门」，完整判据表见
-   docs/spec/09-nav-pin-merge.md §3.1。面走 ${PANEL_VARIABLE}：官方默认档下它正是官方自己的 layer3，
-   那个档下只把「恒深面」掰回主题面，不引入外来色相。 */
+/* --- 悬停卡：官方把**面和字都写死了**（两轴同值），这里跟随主题 —— 全插件**四条不带官方默认门的规则之一**
+   （两个档都修，缘由见 constants.ts 的 HOVER_CARD_ANCHOR）；面走 ${PANEL_VARIABLE}，官方默认档下正是官方自己的 layer3。 --- */
 ${HOVER_CARD_ANCHOR} {
-  /* ⚠️ 这条是**不带门**的规则之一，因此也是「插件 token 层还没就绪时」
-     照常生效的一类规则 —— 必须给面板底色变量一个**官方兜底**：
-     它由 tokenOverrides 发出，而 token 层在 status 为 loading 的窗口内（以及
-     overrideTokens 抛错后重试成功之前）是**不具备**的。没有兜底时 var() 解析为空，
-     再加上 !important 压住官方自己那条，卡片会变成**全透明**（实测计算值为
-     全零 alpha），比不生效更糟。
-     兜底取官方 layer-3：正是「这个档下本来该有的那个面」，降级方向正确。
-     （本段在模板字符串里，注释中既不能出现反引号，也不能出现色值字面量——
-     本文件的「不得硬编码色值」守卫是全表扫描、注释也算。） */
+  /* ⚠️ 这条规则不带门 ⇒ token 层未就绪（loading 窗口 / overrideTokens 抛错重试之前）时它也照常生效，
+     故面板色必须给**官方兜底**：没有兜底时 var() 解析为空、卡片会变成**全透明**，比不生效更糟；
+     兜底取官方 layer-3 —— 正是「这个档下本来该有的那个面」。（本段不能出现反引号与色值字面量。） */
   background-color: var(${PANEL_VARIABLE}, var(--dsw-alias-bg-layer-3)) !important;
   background-image: ${surfaceLayers()} !important;
 }
-/* 字色：官方写死的浅字必须一起换成**主题感知**的 label token，否则浅卡配浅字还是白底白字。
-   选择器只能按稳定后缀匹配（哈希类名规矩，见 constants.ts 的 HOVER_CARD_TEXT_TOKENS）。 */
+/* 字色：官方写死的浅字必须一起换成**主题感知**的 label token（否则浅卡配浅字仍是白底白字），按稳定后缀匹配。 */
 ${HOVER_CARD_TEXT_TOKENS.map(({ suffix, token }) => `${HOVER_CARD_ANCHOR} [class*='${suffix}'] {
   color: var(${token}) !important;
 }`).join('\n')}
-/* --- 模态弹窗**不做玻璃**：它是内容面（列表 / 卡片 / 表格），与上面那批同一套实色抬升面。
-   曾经把它做成液态玻璃（把 owner 说的「对话框」误解成模态弹窗），已撤 —— 现在玻璃只留给
-   控制层的**输入框**（见 glass.ts 的 GLASS_SPECULAR）。 */
+/* --- 模态弹窗**不做玻璃**：它是内容面（列表 / 卡片 / 表格），与上面那批同一套实色抬升面；玻璃只留给控制层的**输入框**。 --- */
 `
 }

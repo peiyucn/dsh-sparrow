@@ -1,13 +1,6 @@
 /**
- * 插件的 Cordis `Config`（**宿主侧专用**）。
- *
- * 单独成模块的原因：客户端 bundle 会内联 `tones.ts`，而 schemastery 是宿主侧
- * 依赖 —— 让 schema 与色调表分离，schemastery 就永远不会被打进浏览器产物。
- *
- * 官方 0.1.7 起设置不再由插件自注册命名空间：表单由插件导出的 `Config` 投影，
- * 命名空间就是 **profile 条目 id**（本插件 = `dsh-theme-tone`）。两个字段都标
- * `.volatile()`——只有 volatile 字段会进可读写的设置表单；默认值即
- * {@link DEFAULT_SETTINGS}，非法存量值在投影时就被 schema 判掉，不会流到渲染层。
+ * 插件的 Cordis `Config`（**宿主侧专用**）：单独成模块是为了让 schemastery（宿主侧依赖）不进客户端
+ * bundle（客户端会内联 `tones.ts`）。两个字段必须 `.volatile()` 才进可读写设置表单；命名空间 = profile 条目 id。
  */
 
 import z from '@deepseek-ai/schemastery'

@@ -54,15 +54,8 @@ import {
 import { buildGlassCss, GLASS_HEADER_ALPHA, GLASS_SPECULAR_RING } from '../lib/glass.js'
 
 /**
- * 取**某一条规则**的规则体（花括号内的声明串）。
- *
- * 为什么要这个 helper：全表 `css.includes(x)` 这种非局部断言会被**别处的巧合**喂饱
- * —— 同一个图层串可能被多条规则使用（例如 `menuSurfaceLayers()` 同时被三条停靠卡规则用），
- * 于是「本规则必须用它」这条断言即使本规则改坏了也照样为真。
- * 断言「某条规则的内容」时必须先把作用域收进那条规则。
- * @param css - 整张样式表文本。
- * @param selectorWithBrace - 选择器片段，**含结尾的 ` {`**（避免与前缀相同的另一条撞名）。
- * @returns 该规则的规则体。
+ * 取**某一条规则**的规则体：全表 `css.includes(x)` 会被**别处的巧合**喂饱（同一图层串可能被多条规则使用），
+ * 故断言「某条规则的内容」时必须先把作用域收进那条规则。`selectorWithBrace` 要含结尾的 ` {`。
  */
 function bodyOfRule(css, selectorWithBrace) {
   const at = css.indexOf(selectorWithBrace)
@@ -72,10 +65,8 @@ function bodyOfRule(css, selectorWithBrace) {
 }
 
 /**
- * 官方抬升面 rung 的**数值真值** —— 从官方调色板逐字抄下来的一份契约快照
- * （`ui-theme/src/styles/design-platform.css:53-71` 的 light 静态块、`:129-147` 的 dark 静态块，
- * alias 绑定在 `:156-247` / `:249-340`）。这里抄数值是为了能在测试里算「混合后还亮不亮」，
- * 而 `SURFACE_RUNGS` 里传的是官方变量引用（官方换色自动跟随）—— 两边对不上就是官方动了调色板。
+ * 官方抬升面 rung 的**数值真值** —— 从官方调色板逐字抄下来的契约快照（抄数值是为了能在测试里算
+ * 「混合后还亮不亮」）；`SURFACE_RUNGS` 里传的是官方变量引用 ⇒ 两边对不上就是官方动了调色板。
  */
 const OFFICIAL_RUNGS = {
   light: {
@@ -126,9 +117,8 @@ const mix = (a, b, p) => a.map((value, i) => value * p + b[i] * (1 - p))
 
 describe('抬升面：本色单一来源', () => {
   it('底部辉光应该 就是「本色 @ 该轴共享 alpha」，不另立数值', () => {
-    // 两轴这一层都是**本色的纵向渐变**（owner：「有主色的渐变那版」好看）。
-    // 第 10 轮浅色轴一度换成银白，被 owner 连否两轮（「没反过来啊」→「更像纯色了」）——
-    // 实测纵向极差：本色 17.5 / 银白 2.5。`tint` 与 `bottom` 必须同源，否则本色有两个来源。
+    // 两轴这一层都是**本色的纵向渐变**：银白版被实测否掉（纵向极差 本色 17.5 / 银白 2.5）。
+    // `tint` 与 `bottom` 必须同源，否则本色有两个来源。
     for (const scheme of SCHEMES) {
       for (const id of NON_OFFICIAL[scheme]) {
         const spec = TONES[scheme][id]
@@ -142,11 +132,8 @@ describe('抬升面：本色单一来源', () => {
   })
 
   it('底部那一层应该 提供**色相的纵向渐变**（这才是「不显纯色」的判据）', () => {
-    // 判据不是「加亮 vs 压暗」——深色轴本色比近黑底亮、浅色轴本色比白底暗，两个轴方向相反。
-    // 真正的判据是**有没有色相的纵向变化**。实测纵向极差：底=本色 17.5 / 底=银白 2.5。
-    //
-    // ⚠️ 2026-09-18 后 `base` 是 `var(...)` 引用（浅色轴三款 = 官方白），不再是 hex，
-    // 所以这里要把已知的官方变量解析成通道值再比较。
+    // 判据不是「加亮 vs 压暗」（两轴方向相反），而是**有没有色相的纵向变化**。
+    // ⚠️ `base` 现是 `var(...)` 引用，故要把已知的官方变量解析成通道值再比较。
     const OFFICIAL = {
       'var(--dsw-static-neutral-bluish-00)': [255, 255, 255],
       'var(--dsw-static-neutral-bluish-950)': [21, 21, 23],
@@ -170,36 +157,22 @@ describe('抬升面：本色单一来源', () => {
   })
 
   it('共享 alpha 应该 逐字调好的两档（浅 .30 / 深 .18）', () => {
-    // 深色轴从 pyai.site 原值 .08 两次上调到 .18 时都是三款同动。
-    //
-    // **2026-09-18 浅色轴定为 .30** —— 这是**结构改动**的结果，不是又一次收格：
-    // 浅色轴从「本色染过的近白底 + 三层强主色光（.48/.54/.38 @100%）」
-    // 改成**「官方中性底 + 一束主色光」**，与深色轴（近黑底 + 一束金光）严格镜像。
-    // 新 alpha 取约深色轴的 **1.8 倍**：白底对浅色主色的通道余量只有深底对金的一半
-    // （深底→金 R 差 222；白底→霜蓝 R 差 110），逐字照抄会明显偏弱。
-    // 卡面的纵深 α 由本常量派生 ⇒ 实况与色卡**一起**取该值，仍逐像素相等
-    // （守卫在 backdrop.test.mjs）。
+    // 深色轴从 .08 两次上调到 .18 时都是三款同动。浅色轴定为 .30（约深色轴的 1.8 倍：白底对浅色主色的
+    // 通道余量只有深底对金的一半）。卡面纵深 α 由本常量派生 ⇒ 实况与色卡一起取该值，仍逐像素相等。
     assert.equal(DEPTH_ALPHA.dark, 0.18)
     assert.equal(DEPTH_ALPHA.light, 0.30)
   })
 
   it('浅色轴三层光的 alpha 应该 顶部 < 侧光 < 底部（与深色轴同一次序）', () => {
-    // 两轴严格镜像，所以**次序必须一致**：深色 `top .09 / left .11 / bottom .18`，
-    // 浅色 `top .16 / left .19 / bottom .30`。三层是一个整体的三个方向，
-    // 只动其中一层会让「光从左上来」的几何关系歪掉。
-    //
-    // ⚠️ 注意 `left > top` 看着反直觉，但**两轴都这样**：左侧是**大面积**铺开的左栏，
-    // 顶部是窄带；alpha 相同的话左栏会显得更浓。别把它「修正」成 top > left。
+    // 两轴严格镜像，故**次序必须一致**；三层是一个整体的三个方向，只动一层会让「光从左上来」歪掉。
+    // ⚠️ `left > top` 看着反直觉但**两轴都这样**（左侧是大面积铺开的左栏），别把它「修正」成 top > left。
     assert.equal(LIGHT_GLOW_ALPHA.top, 0.16)
     assert.equal(LIGHT_GLOW_ALPHA.left, 0.19)
     assert.equal(DEPTH_ALPHA.light, 0.30)
     assert.ok(LIGHT_GLOW_ALPHA.top < LIGHT_GLOW_ALPHA.left, '侧光 α 应略高于顶光（它铺在大面积左栏上）')
     assert.ok(LIGHT_GLOW_ALPHA.left < DEPTH_ALPHA.light, '底部纵深应最强')
-    // 浅色的每一档都应**重于**深色对应的档（白底余量只有一半，见上一条）。
-    // ⚠️ 2026-10-02：深色那两道金光按 owner 要求调强（`.09/.11` → `.14/.17`），
-    //    浅色**未动**（owner 说的是「金光」= 深色轴；浅色那两道是本色），
-    //    故「浅色 > 深色」这条**仍然成立**，只是差距从 1.8 倍收到约 1.12 倍。
-    //    这里改成读常量，免得下次两者一起调时误伤。
+    // 浅色每一档都应**重于**深色对应档（白底余量只有一半）。深色金光调强后浅色未动，
+    // 故「浅色 > 深色」仍成立，只是差距从 1.8 倍收到约 1.12 倍；这里读常量，免得下次一起调时误伤。
     assert.ok(LIGHT_GLOW_ALPHA.top > DARK_GOLD_ALPHA.top,
       `浅色顶光应重于深色顶光 ${DARK_GOLD_ALPHA.top}`)
     assert.ok(LIGHT_GLOW_ALPHA.left > DARK_GOLD_ALPHA.left,
@@ -218,15 +191,14 @@ describe('抬升面：本色单一来源', () => {
 
 describe('抬升面：rung 表', () => {
   it('整个家族应该 收敛成每轴一档（不再逐条照抄官方的三档）', () => {
-    // owner：「插件弹出、下拉弹出、设置弹出、按钮的 hover、区分区域的色块，这些还都是不统一的，有点乱」。
-    // 根因之一是官方暗轴的 875/850/800 三档只差 4–6/255，肉眼分不出，染色后更糊。
-    // 现在这个家族统一到一档：暗轴 875、浅轴 60。**这条测试钉住「不许再散开」。**
+    // 官方暗轴 875/850/800 三档只差 4–6/255，肉眼分不出、染色后更糊 ⇒ 这个家族统一到一档：暗轴 875、浅轴 60。
+    // **这条测试钉住「不许再散开」。**
     for (const scheme of SCHEMES) {
       const values = [...LADDER, 'tip'].map(rung => SURFACE_RUNGS[scheme][rung])
       assert.equal(new Set(values).size, 1, `${scheme} 的 rung 应全部相同，实测 ${values.join(' / ')}`)
     }
     assert.equal(SURFACE_RUNGS.dark.layer3, '--dsw-static-neutral-bluish-875')
-    // 浅轴 = 官方自己那档纯白（owner：「弹出框…应该用浅的，否则小范围看着显脏」）
+    // 浅轴 = 官方自己那档纯白（弹层这种小范围该用浅的，否则看着显脏）
     assert.equal(SURFACE_RUNGS.light.layer3, '--dsw-static-neutral-bluish-00')
   })
 
@@ -262,21 +234,9 @@ describe('抬升面：谁被染', () => {
   })
 
   it('⛔ `--dsw-specific-input-major` 必须被染，且与 layer-2 同档同值', () => {
-    // ## 为什么（2026-09-27 owner 真机反馈）
-    //
-    // owner：「**这个问题清单本身还是官方原色，没适配**」—— 指的是 `ask_user_question`
-    // 弹的那个问询面板（`ui-user-questions` 的 `PlanReviewPanel` / `QuestionComposer`）。
-    // 根因：它用 `--dsw-specific-input-major` 画面，而该 token **不在任何覆盖表里**
-    // （实测 `tokenOverrides()` 产出的 40 个 token 不含它）⇒ 一直是官方灰/白，
-    // 而旁边的面都跟着色调走，于是显出一块没适配的板子。
-    //
-    // **归 `layer2` 档**不是随手挑的：官方把两个 token 在两轴上**绑到同一个 static 变量**
-    // （`design-platform.css` 的 `:171`/`:262` 浅轴都是 `bluish-00`，`:281`/`:372` 深轴都是
-    // `bluish-850`）—— 语义等价，染成同一档才不会分叉。
-    //
-    // 影响面（官方用这个 token 画面的一共 9 个组件，逐文件核过）：
-    // `PlanReviewPanel`、`QuestionComposer`（问询卡片）、`ApprovalPanel`、
-    // `AttachmentRail`、`FileCard`、`MessageItem`、`InputBar`、`ImageLightbox`、`AccountNotice`。
+    // 问询面板（`ask_user_question` 的 PlanReviewPanel / QuestionComposer）用 `--dsw-specific-input-major` 画面，
+    // 而该 token 不在任何覆盖表里 ⇒ 一直是官方灰/白，显出一块没适配的板子。
+    // 归 `layer2`：官方把 input-major 与 layer-2 绑到同一个 static 变量（语义等价，染同档才不分叉）。
     assert.ok(tokens.includes('--dsw-specific-input-major'), '缺少 --dsw-specific-input-major —— 问询卡片会退回官方原色')
     const entry = SURFACE_TOKENS.find(e => e.token === '--dsw-specific-input-major')
     assert.equal(entry.rung, 'layer2', 'input-major 必须与 layer-2 同档（官方把两者绑在同一个 static 变量上）')
@@ -297,15 +257,10 @@ describe('抬升面：谁被染', () => {
   })
 
   it('菜单族应该 两个名字都染（同值），且只装颜色（图层归 surface.ts，见 POPUP_TOKENS）', () => {
-    // 菜单走 POPUP_TOKENS：**只给颜色**。曾经塞过整份图层配方，但官方把这个
-    // token 也用在 sticky 分组标题上，百分比渐变按元素盒子缩放会把小条压成硬边金带。
-    // ⚠️ 2026-09-20：`--dsw-specific-tip` **已移出本表** —— 它的消费方是三张停靠卡
-    // （TodoPanel / GoalBar / QueueDock），不是菜单；且它要「比地面重」而菜单族要「比地面浅」，
-    // 目标相反。现归 INSET_TOKENS（见下一条）。
-    // ⚠️ 0.1.7：官方把菜单填充收进 `--dsw-menu-surface-fill`（`.material` 读它），
-    // `--dsw-specific-menu` 只是它的别名，而**两个名字都有消费方**（后者见官方
-    // `.groupTitle` 与本仓库 codebuddy 的菜单）。只染一个 → 同一张卡片与它自己的
-    // 粘性标题各读一个 → 标题显成色差横带，故**两个一起染、且同值**。
+    // 菜单走 POPUP_TOKENS：**只给颜色**（塞整份图层配方会把 sticky 分组标题的百分比渐变压成硬边金带）。
+    // ⚠️ `--dsw-specific-tip` 已移出本表：它的消费方是三张停靠卡，且要「比地面重」，与菜单族目标相反。
+    // ⚠️ 0.1.7 起菜单填充是 `--dsw-menu-surface-fill`，`--dsw-specific-menu` 只是它的别名，
+    // 而**两个名字都有消费方**（后者见官方 `.groupTitle` 与本仓库 codebuddy 的菜单）⇒ 两个一起染、且同值。
     assert.deepEqual(POPUP_TOKENS.map(entry => entry.token), ['--dsw-menu-surface-fill', '--dsw-specific-menu'])
     for (const token of tokens) {
       assert.ok(!['--dsw-specific-menu', '--dsw-specific-tip'].includes(token), `${token} 不该同时在两张表里`)
@@ -321,10 +276,8 @@ describe('抬升面：谁被染', () => {
   })
 
   it('浅灰内嵌面应该 走**独立比例**，且比背景更重（代码块 / 三张停靠卡）', () => {
-    // owner 2026-09-20：「官方白色主题这几个卡，包括代码块，都是浅灰色，所以我考虑要不我们
-    // 用我们的主色来做这个事，这样就会比背景颜色重一些，正好就区分开了。」
-    // 回归意义：这三条一度**与背景同色**（浅色轴抬升面回纯白后，tip 变 #fff）——
-    // 卡片的面整个消失，只剩 4% 描边在撑。
+    // 这三条一度**与背景同色**（浅色轴抬升面回纯白后 tip 变 #fff）⇒ 卡片的面整个消失，只剩 4% 描边在撑。
+    // 故用主色染得比背景重一些，正好区分开。
     assert.deepEqual(
       INSET_TOKENS.map(e => e.token),
       ['--dsw-alias-markdown-code-block', '--dsw-alias-markdown-code-block-banner', '--dsw-specific-tip'],
@@ -457,15 +410,9 @@ describe('抬升面：覆盖层取值', () => {
   })
 
   it('浅色轴 抬升面底色不得染色 —— 否则会与官方「面」色撞车', () => {
-    // 回归守卫（2026-09-20，owner 报「代码块等对话内元素的背景被吃掉」的根因）：
-    // 官方面色 `--dsw-static-neutral-bluish-50` = `#f9fafb`（代码块、左侧栏都用它）；
-    // 浅色轴若按 `.07` 染本色，实测值 `#f9fdfa` 与它只差 1–3 阶 —— 于是
-    // **用官方面色当背景的元素全部失去可辨性**。
-    // 具体落点：Trajectory 视图画布取 `--dsw-alias-bg-layer-1`
-    // （`dsh-client-ui-trajectory` 的 `qBU-ya_root` / `Y0dWHa_split` / `Y0dWHa_table`），
-    // 官方面是 `#fff`、代码块 `#f9fafb`（差 6 阶，读得出灰底）；
-    // 被我们染成 `#f9fdfa` 后与代码块同色 → 灰底消失。
-    // 浅色口径是「官方底色配置 + 打光用主色」：底色不染，色调由打光层承担。
+    // 回归守卫：官方面色 `--dsw-static-neutral-bluish-50` = `#f9fafb`（代码块、左侧栏都用它）；浅色轴若按 `.07`
+    // 染本色，实测值 `#f9fdfa` 与它只差 1–3 阶 ⇒ 用官方面色当背景的元素（Trajectory 视图画布的
+    // `--dsw-alias-bg-layer-1`、代码块）全部失去可辨性。浅色口径是「官方底色配置 + 打光用主色」：底色不染。
     const overrides = tokenOverrides({ lightTone: 'green', darkTone: 'violet' })
     for (const { token, rung } of SURFACE_TOKENS) {
       assert.equal(
@@ -495,9 +442,8 @@ describe('抬升面：覆盖层取值', () => {
 
   it('两轴应该 各一档共享比例（现在同档 .14），且浅轴仍受「不能比底色暗太多」约束', () => {
     assert.deepEqual(Object.keys(SURFACE_TINT).sort(), ['dark', 'light'])
-    // 浅轴原本刻意压到 .05（怕「抬升翻塌陷」）。owner 反馈三款分不清后提到与暗轴同档 .14：
-    // 弹层是界面里数量最多、面积最大的不透明面，而背景中段（约 55% 屏高）只有底色、拉不开。
-    // 实测三款两两差：.05 → 3.9/3.3/3.0（低于肉眼阈），.14 → 11.0/9.3/8.3。
+    // 浅轴曾刻意压到 .05（怕「抬升翻塌陷」），但三款分不清 ⇒ 提到与暗轴同档 .14：
+    // 实测三款两两差 .05 → 3.9/3.3/3.0（低于肉眼阈）、.14 → 11.0/9.3/8.3。
     assert.equal(SURFACE_TINT.light, 0.14)
     assert.equal(SURFACE_TINT.dark, 0.14)
     // 但**不能无限加**：浅轴 rung 比近白底暗，混得越多浮层越暗。守住一个上限。
@@ -507,8 +453,7 @@ describe('抬升面：覆盖层取值', () => {
 
 describe('抬升面：不变量', () => {
   it('面板底色应该 只有一处来源：所有「面」共用同一个值', () => {
-    // owner：「插件弹出、下拉弹出、设置弹出…还都是不统一的」。统一的第一条就是**颜色只有一个值**：
-    // layer-1/2/3（面）、菜单族（token）、兜底选择器读的 PANEL_VARIABLE，全部落在同一个字面量上。
+    // 统一的第一条就是**颜色只有一个值**：layer-1/2/3（面）、菜单族（token）、兜底选择器读的 PANEL_VARIABLE 全落同一字面量。
     const overrides = tokenOverrides({ lightTone: 'green', darkTone: 'forest' })
     for (const scheme of SCHEMES) {
       const expected = panelFill(TONES[scheme][scheme === 'dark' ? 'forest' : 'green'], scheme, 'layer3')
@@ -543,14 +488,10 @@ describe('抬升面：不变量', () => {
   })
 
   it('浮层的配方应该 四层齐备（颗粒 / 顶光 / 底光 / 左光）—— 但画在选择器那层，不进 token', () => {
-    // 曾经这条测的是 `--dsw-specific-menu` 的值，现在配方归 `surfaceLayers()`：
-    // token 只装颜色（否则 sticky 分组标题会把百分比渐变压成硬边金带，见 05-surfaces §8.2）。
-    //
-    // ⚠️ **2026-09-27：层数由 3 改成 4** —— 补上左光。owner 报
-    // 「设置弹窗的打光和其他的好像不一样……我记得咱们的深色主题是三道光，应该所有元素都统一」，
-    // 实测确认：背景层是**三道光**（顶/底/左），而浮层只引用了顶与底两道，
-    // `LEFT_VARIABLE` 在 surface.ts 里一次都没出现过（不是拿不到 —— tones 早已把它发到 body，
-    // 浮层继承得到，只是没用）。补上后浮层与背景层同为三道光。
+    // token 只装颜色，配方归 `surfaceLayers()`（否则 sticky 分组标题会把百分比渐变压成硬边金带）。
+    // ⚠️ 层数由 3 改成 4：补上左光 —— 背景层是三道（顶/底/左），而浮层原先只引用顶与底两道，
+    // `LEFT_VARIABLE` 在 surface.ts 里一次都没出现过（tones 早已发到 body，继承得到，只是没用）。
+    // 补上后浮层与背景层同为三道光。
     const layers = surfaceLayers().split(',\n    ')
     assert.equal(layers.length, 4, '颗粒 + 顶光 + 底光 + 左光')
     assert.equal(layers[0], `var(${GRAIN_TILE_VARIABLE}, none)`, '颗粒压在最上面才像砂面')
@@ -570,15 +511,9 @@ describe('抬升面：不变量', () => {
   })
 
   it('⛔ 浮层三道光必须**都**乘同一个补偿系数（owner：顶光明显比别人强，要统一）', () => {
-    // 判据：「同一屏幕位置上，浮层的 alpha 应等于地面的 alpha」（解析，可逐字复核）。
-    // 两道光的配方都是锁定常量 ⇒ 直接解 alpha浮层 = alpha地面：
-    //   对话框顶边中央 (700,50) → k=0.709
-    //   对话框顶边左 1/4 (500,50) → k=0.592
-    //   对话列顶部中央 (700,10) → k=0.771
-    // ⇒ k* ≈ 0.69，取 0.7（与顶栏 GLASS_HEADER_ALPHA 同值）。
-    // 交叉验证：峰值口径实测 k=0.33 → 浮层/地面 0.48，解析预测 0.47，两者吻合。
-    // ⚠️ 这里曾定成 0.33，依据是一条**错误**的扫描（只覆盖元素级、且三道光比单道顶光）。
-    //    稳定的读数不等于正确的读数 —— 保留这条注释提醒后来者核对口径。
+    // 判据：「同一屏幕位置上，浮层的 alpha 应等于地面的 alpha」（两道光的配方都是锁定常量 ⇒ 可直接解）。
+    // 三点取样 ⇒ k* ≈ 0.69，取 0.7（与顶栏 GLASS_HEADER_ALPHA 同值）；峰值口径交叉验证 0.48 vs 预测 0.47。
+    // ⚠️ 曾定成 0.33，依据是一条**错误**的扫描（只覆盖元素级、且三道光比单道顶光）—— 稳定的读数不等于正确的读数。
     const layers = surfaceLayers().split(',\n    ')
     const lightLayers = layers.slice(1)
     assert.equal(lightLayers.length, 3, '三道光')
@@ -638,8 +573,7 @@ describe('抬升面：不变量', () => {
   })
 
   it('⛔ 浮层的三道光必须与背景层的三道光**逐道对应**', () => {
-    // 这条守卫防的是「又漏一道」：两边的配方是**同一套三道光的两个尺度**，
-    // 任何一边新增/删除一道都必须同步 —— 否则观感又会分叉（owner 报的就是这个）。
+    // 防「又漏一道」：两边的配方是**同一套三道光的两个尺度**，任一边增删一道都必须同步，否则观感又分叉。
     const popup = surfaceLayers()
     const backdrop = BACKDROP_GRADIENTS
     for (const variable of [TOP_VARIABLE, BOTTOM_VARIABLE, LEFT_VARIABLE]) {
@@ -686,9 +620,8 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
       assert.ok(overrides[token], `tokenOverrides 缺少 ${token}`)
       assert.ok(overrides[token].light.length > 0 && overrides[token].dark.length > 0, `${token} 两模式都要给`)
     }
-    // 回归守卫：**left 曾经漏在这里**（只在背景层元素上写内联样式）→ 浮层读不到，
-    // 所有弹层的左光一直是缺的（owner 报「其他能弹出的…都没有下面的光」那次一并查出）。
-    // 2026-09-24 追加 GRAIN_ALPHA_VARIABLE（颗粒强度的统一旋钮，owner：「噪点值统一变量」）。
+    // 回归守卫：**left 曾经漏在这里**（只写在背景层元素的内联样式上）⇒ 浮层读不到、所有弹层的左光一直是缺的。
+    // 2026-09-24 追加 GRAIN_ALPHA_VARIABLE（颗粒强度的统一旋钮）。
     assert.deepEqual(
       LIGHT_TOKENS.map(entry => entry.token),
       [TOP_VARIABLE, BOTTOM_VARIABLE, LEFT_VARIABLE, GRAIN_TILE_VARIABLE, GRAIN_ALPHA_VARIABLE],
@@ -722,7 +655,7 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
     // 贴图里烘的 alpha 由 `GRAIN_ALPHA × POPUP_GRAIN_COMPENSATION` 派生（唯一来源见下一条）。
     // ⚠️ **不是** GRAIN_ALPHA 原值：浮层那条路没有 screen 混合，同 alpha 会重约 43%。
     assert.equal(on[GRAIN_TILE_VARIABLE].dark, grainTileUri(popupGrainAlpha('dark')))
-    // owner：「浅色版也可以和深色版有相同的渐变质感」→ 浅色轴也开颗粒
+    // 浅色版也要和深色版有相同的渐变质感 ⇒ 浅色轴也开颗粒
     assert.equal(on[GRAIN_TILE_VARIABLE].light, grainTileUri(popupGrainAlpha('light')), '浅色轴现在也叠颗粒')
     for (const scheme of SCHEMES) {
       for (const id of NON_OFFICIAL[scheme]) {
@@ -757,16 +690,10 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
   })
 
   it('颗粒强度必须**只有一个来源**（owner：「噪点值统一变量，方便后续我们减弱」）', () => {
-    // 改 GRAIN_ALPHA 一个对象 → 下面两处**一起变**：
-    //   ① 运行期变量（背景层那条路的 CSS opacity）；
-    //   ② 浮层贴图预乘的 alpha = GRAIN_ALPHA × POPUP_GRAIN_COMPENSATION。
-    //
-    // ⚠️ **2026-09-27 修正**：此前这里断言「贴图 alpha === GRAIN_ALPHA」，即两条路用同一个数。
-    // 真机实测推翻了这个前提 —— owner 报「弹出元素还是噪点太重了，和背景不是一个档位」，
-    // 实测弹出层确实重约 43%（两个 alpha 之间隔着一个 0.7 的补偿系数，理由见 constants.ts）。
-    // 「唯一来源」的真正含义是**只有一个可调旋钮、两处由它派生且保持同档**，
-    // 不是「两处字面相等」。下面同时钉住派生关系与单调性，避免有人把系数悄悄改掉。
-    // ⚠️ 必须用**非官方**的两轴（官方默认档 grain 是关的，贴图是 'none'，断言会假过）。
+    // 改 GRAIN_ALPHA 一个对象 ⇒ 两处**一起变**：① 背景层的运行期 opacity；② 浮层贴图预乘的 alpha
+    //（= GRAIN_ALPHA × POPUP_GRAIN_COMPENSATION）。「唯一来源」= 只有一个可调旋钮、两处由它派生且同档，
+    // 不是「两处字面相等」（弹出层颗粒确实更重，因为 screen 在深色轴上把地面提亮了）。
+    // ⚠️ 必须用**非官方**的两轴（官方默认档 grain 关着，贴图是 'none'，断言会假过）。
     const overrides = tokenOverrides({ lightTone: 'sakura', darkTone: 'violet' })
     for (const scheme of SCHEMES) {
       assert.equal(
@@ -779,15 +706,9 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
         `${scheme} 的贴图预乘 alpha 应等于 GRAIN_ALPHA × 补偿系数`,
       )
     }
-    // ⚠️ **2026-09-27（M6）再次改判**：范围从 (0.4, 1) 改为 (0.4, 1.6)。
-    //
-    // 上一版断言「浮层要比背景**弱**（< 1），因为少了 screen 混合的削弱」——
-    // 那个理由**方向是反的**：screen 在深色轴上把噪声**提亮**，所以地面的颗粒比名义 alpha
-    // 更显眼；浮层是普通合成，同样 alpha 反而更淡 ⇒ 浮层要比地面**强**才对得上。
-    // 单载体、同屏幕位置重定标给出 k* = 1.23（7 点扫描独立复核 1.264）。
-    //
-    // 上界 1.6 防的是「系数被误改成离谱值」（如 3、10）；下界 0.4 防「几乎看不见」。
-    // alpha 实际安全的前提是 GRAIN_ALPHA × k ≤ 1 ⇒ 另有一条单独断言（见下）。
+    // 范围 (0.4, 1.6)：上一版断言「浮层要比背景**弱**」—— 那个理由方向是反的：screen 在深色轴上把噪声提亮，
+    // 地面颗粒比名义 alpha 更显眼，浮层是普通合成、同 alpha 反而更淡 ⇒ 浮层要比地面**强**才对得上（k* ≈ 1.23）。
+    // 上界防「系数被误改成离谱值」，下界防「几乎看不见」；alpha 实际安全的前提是 GRAIN_ALPHA × k ≤ 1（另有断言）。
     assert.ok(
       POPUP_GRAIN_COMPENSATION > 0.4 && POPUP_GRAIN_COMPENSATION < 1.6,
       `补偿系数应在 (0.4, 1.6) 内，实际 ${POPUP_GRAIN_COMPENSATION}`,
@@ -1009,21 +930,8 @@ describe('抬升面：框内元素（描边 / 分隔线 / 滚动条）', () => {
 })
 
 /**
- * 取样式表里**某条规则**的文本（选择器 + 声明），供逐条断言。
- *
- * 用 `}` 切块会带上前一条规则的尾巴，故再按 `{` 切一刀只留本条 —— 断言里既有
- * 「必须含某声明」也有「不得含某声明」，边界不清就会误判（本轮就踩过：
- * 菜单族那条被上一条规则的尾部污染）。
- *
- * ⚠️ 同一个选择器可能出现**多条**规则（菜单族就是：兜底一条、换材质一条），
- * 故取**最后一条** —— 同特异度 + 都带 `!important` 时按源码顺序后者胜，
- * 「最后一条」才是真正生效的那条（取第一条会把断言指到已被覆盖的旧规则上）。
- *
- * ⚠️ 匹配必须**选择器全等**，不能用 `includes` —— 分组菜单那条的选择器
- * （`… [role='menu']:has([role='group'])`）**包含**菜单选择器，用 includes 会命中它。
- * @param source - 完整样式表文本。
- * @param selector - 完整选择器（单条，不含逗号）。
- * @returns 最后一条匹配规则的声明部分；找不到返回空串。
+ * 取样式表里**某条规则**的文本（选择器 + 声明）：用 `}` 切块会带上前一条规则的尾巴，故再按 `{` 切一刀。
+ * ⚠️ 同一选择器可能有多条规则 ⇒ 取**最后一条**；⚠️ 匹配必须**选择器全等**（`includes` 会被分组菜单那条命中）。
  */
 function blockFor(source, selector) {
   // ⚠️ 先剥注释：规则前面若紧挨着块注释，切块时会把注释一起算进「选择器」里，
@@ -1039,14 +947,8 @@ function blockFor(source, selector) {
 }
 
 /**
- * 取某选择器的**全部**规则体（`blockFor` 只返回最后一条）。
- *
- * ⚠️ 为什么需要：同一选择器可能有多条规则 —— 例如每个出图层的锚点现在有**两条**
- * （一条 `isolation: isolate`、一条 `position: relative`）。
- * 用 `blockFor` 只会拿到最后那条 ⇒ 断言会漏判前一条（本仓库刚踩到）。
- * @param source - 产物 CSS（内部会再剥一次注释）。
- * @param selector - 精确匹配的选择器（含官方默认门的形态）。
- * @returns 匹配到的全部规则体；无匹配则为空数组。
+ * 取某选择器的**全部**规则体（`blockFor` 只返回最后一条）：同一选择器可能有多条规则（例如每个出图层的
+ * 锚点既有 `isolation: isolate` 又有 `position: relative`），用 `blockFor` 会漏判前一条。
  */
 function blocksFor(source, selector) {
   const clean = source.replace(/\/\*[\s\S]*?\*\//gu, '')
@@ -1059,24 +961,15 @@ function blocksFor(source, selector) {
   return out
 }
 
-/**
- * 取规则体里某个声明的值（已经去掉 `!important`）。
- * @param block - {@link blockFor} 的返回值。
- * @param prop - 属性名。
- * @returns 声明值；缺声明时空串。
- */
+/** 取规则体里某个声明的值（已去掉 `!important`）；缺声明时空串。 */
 function declFor(block, prop) {
   const match = new RegExp(`(?:^|;)\\s*${prop}\\s*:([^;]*)`, 'u').exec(block)
   return match === null ? '' : match[1].replace(/!important/u, '').trim()
 }
 
 /**
- * 按**顶层**逗号切分 `background-image` / `background-attachment` 这类逐层列表。
- *
- * 必须认括号：`radial-gradient(ellipse 80vw 45vh at 50% -10vh, var(--a, transparent), transparent 62%)`
- * 里全是逗号，朴素 `split(',')` 会把一层切成四五层，于是「值数 == 层数」这条判据当场失真。
- * @param value - 声明值。
- * @returns 逐层的字符串数组（已 trim，去空段）。
+ * 按**顶层**逗号切分逐层列表：`radial-gradient(ellipse 80vw 45vh at 50% -10vh, …)` 里全是逗号，
+ * 朴素 `split(',')` 会把一层切成四五层，「值数 == 层数」这条判据当场失真。
  */
 function splitLayers(value) {
   const out = []
@@ -1097,12 +990,8 @@ function splitLayers(value) {
 }
 
 /**
- * 官方菜单填充的**当前**字面量（0.1.7-rc.2，真机实测：`#f8f9fa94` / `#43454a73`）。
- *
- * 为什么要在测试里写死一份：本插件的染色以官方原值为基，而基值是从官方样式表**抄下来的快照** ——
- * 抄旧了就会连「官方默认」那一档都发着过期色（0.1.7-rc.1 深色轴曾是 `rgba(48,49,54,.5)`，
- * 本插件真的发过一段时间）。官方升级时按真机 `getComputedStyle(body)` 的
- * `--dsw-menu-surface-fill` 复核这两个值即可。
+ * 官方菜单填充的**当前**字面量（真机实测 `getComputedStyle(body)` 的 `--dsw-menu-surface-fill`）。
+ * 写死一份是因为本插件的染色以官方原值为基，抄旧了连「官方默认」那一档都会发过期色；官方升级时复核它即可。
  */
 const OFFICIAL_MENU_FILL = Object.freeze({
   light: 'rgba(248, 249, 250, 0.58)',
@@ -1123,19 +1012,13 @@ describe('抬升面：表面绘制', () => {
       `body ${anchorSelector(ANCHOR.listboxHost)}`,
       "body [role='listbox']:not([data-trigger-menu] *)",
       DIALOG_ANCHOR,
-      // 子代理会话弹层：`role='tree'` 在**内层**，外层盒子才画材质 —— 故用 :has 向上找。
-      // owner：「subagent 的弹出和 background jobs 的弹出风格得一致」。
-      // ⚠️ 这里**只有**一条 tree 锚点：此前的 `body > [role='tree']` 经实测是**死锚点**
-      // （官方 portal 层级是 body > div.menu > div.menuBody[role=tree]，role=tree 不在 body 直下，
-      //   实测命中 0 个），已于 2026-09-27 删除。
+      // 子代理会话弹层：`role='tree'` 在**内层**，外层盒子才画材质 —— 故向上找宿主。
+      // ⚠️ 只有一条 tree 锚点：`body > [role='tree']` 实测是**死锚点**（role 不在 body 直下），已删。
       `body > ${anchorSelector(ANCHOR.treeHost)}`,
       "body [data-slot='conversation.session.header.actions'] ul",
       "body [role='tooltip']:not([data-side])",
-      // ⚠️ 2026-09-27 新增两条：**问答卡 / 计划审阅卡**（官方 ui-user-questions）。
-      // owner 真机验收时选了「没纹理（颗粒/打光看不到）」。
-      // 卡片本体只有 hashed 类名（`<section class="…_card">`）、无 role，
-      // 故改用官方的**非哈希数据属性 + 直接子元素**收窄；
-      // 底色 token（`--dsw-specific-input-major`）我们早已染过 ⇒ 表现为「颜色对、质感没有」。
+      // 问答卡 / 计划审阅卡（官方 ui-user-questions）：卡片本体只有 hashed 类名、无 role，
+      // 故用官方的**非哈希数据属性 + 直接子元素**收窄；底色 token 我们早已染过 ⇒ 表现为「颜色对、质感没有」。
       'body [data-question-key] > section',
       'body [data-plan-review-key] > section',
     ])
@@ -1149,11 +1032,7 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('模态弹窗（内容面）应该 仍是**实色** —— 玻璃只留给控制层（输入框 / 顶栏）', () => {
-    // 一段撤掉的弯路：owner 说「对话框要有液态玻璃」，**我理解成 `[role='dialog']` 模态弹窗**，
-    // 于是给它做了玻璃 —— 结果设置 / 云端文件 / 归档三个**内容面**变玻璃（其中两个内容还透出来），
-    // 而 owner 真正指的**输入框**一动没动（owner 澄清：「**就是我输入对话的对话框啊**」）。
-    // Apple HIG 也支持撤：「Don't put glass on lists, cards, or media content」——
-    // 玻璃是给 navigation/control layer 的，不是给内容面的。
+    // 弯路：把「对话框要有液态玻璃」理解成 `[role='dialog']` 模态弹窗 ⇒ 三个**内容面**变玻璃，而真正指的**输入框**一动没动。
     assert.equal(DIALOG_ANCHOR, `body ${anchorSelector(ANCHOR.dialog)}`, '模态弹窗走锚点属性（灯箱排除由 client half 判定，见 docs/spec/11）')
     assert.ok(!DIALOG_ANCHOR.includes('aria-modal'), '不再按 aria-modal 分流（两类弹窗都走实色）')
     // 内容面必须**实色**：不得有模糊（这是与菜单族的分界 —— 见下一条用例）
@@ -1166,27 +1045,9 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('粘性分组标题：**不透明底 + 卡片那一摞层（颗粒在上）+ 地面**，且不得有模糊', () => {
-    // owner **四轮**报这条，四句原话构成全部约束：
-    //   ① 「把分类标题的背景色去掉，有点突兀，咱们的和官方的一起处理。」
-    //   ② 「透明和模糊和官方默认一样就行。」
-    //   ③ 「给修坏了又。又重叠了。**只是把那个背景去掉，不是变成透明的**。」
-    //   ④ 「背景条又出来了…那条背景条**要和菜单底色一致**，这样就看不出来有那一条。」
-    // ②+③+④ ⇒ 底色必须挡住滚过去的行（不能透明），但合成出来又必须**等于卡片**。
-    //
-    // 四次走过弯路（都记下来免得再走）：
-    // * 官方写法（只刷半透明 `--dsw-specific-menu`）→ 比卡片**多叠一层**，色偏一档 = ①「突兀」；
-    // * 刷纯白底（`--dsw-alias-bg-base` 打底、无颗粒）→ 也偏一档，且是**纯色平带** = 同样是①；
-    // * 干脆什么都不写 → **行直接透上来** = ③；
-    // * 上一版（③与④之间）：**层序写反了** —— `background-image: 填充渐变, 颗粒` 里
-    //   **填充压住了颗粒**，而卡片是**颗粒压住填充**；实测浅色轴偏亮 5 级、深色轴偏暗 10 级，
-    //   正是 owner ④ 的"背景条又出来了"。
-    //
-    // 正解 = 把卡片那一摞层**逐层同源**地重画，只把最下面的「页面内容」换成不透明的「地面」：
-    //   合成 = [颗粒] 叠在（菜单填充 叠在 [地面：底色 + 三段光 + 颗粒] 上）
-    // ⚠️ 锚点用**无守卫**版（GROUPED_MENU_UNGUARDED_SELECTOR）：组合规则的后半段
-    //    已经要求 `[role='group']` 存在，`:has()` 是冗余的；而它每次 DOM 变动都要
-    //    重匹配 —— 真机消融实测这三条是 12 条 `:has()` 里最贵的（合计约 +2.9s 重算），
-    //    去掉后同负载重算 4.443s → 3.633s（0.82×）。等价性见下一条断言。
+    // 约束：底色必须挡住滚过去的行（不能透明），但合成出来必须**等于卡片**。
+    // 弯路：只刷半透明 token（多叠一层）、刷纯白底（纯色平带）、什么都不写（行透上来）、层序写反（浅轴偏亮 5 级 / 深轴偏暗 10 级）。
+    // 正解 = 把卡片那一摞层**逐层同源**地重画，只把最下面的「页面内容」换成不透明的「地面」；⚠️ 锚点用**无守卫**版（`:has()` 冗余且最贵）。
     const titleSelector = `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`
     const block = blockFor(css, titleSelector)
     assert.notEqual(block, '', '必须为分组标题生成规则 —— 不写就是行透上来（owner ③）')
@@ -1196,17 +1057,13 @@ describe('抬升面：表面绘制', () => {
       /background-color:\s*var\(--dsw-alias-bg-base\)/u,
       '标题要有**不透明**打底（挡住滚过去的行，owner ③）',
     )
-    // ② 菜单填充走**图层**（保住官方的半透明 alpha 与色调跟随），不写死颜色；
-    //    且必须读**卡片自己那个 token** —— 官方 `.material` 读 `--dsw-menu-surface-fill`，
-    //    别名 `--dsw-specific-menu` 是官方 `.groupTitle` 与 codebuddy 菜单读的那个，
-    //    两个名字官方同源（`--dsw-specific-menu: var(--dsw-menu-surface-fill)`），
-    //    故这里优先取语义更准的那个、留别名兜底；两个名字由 POPUP_TOKENS 一起染（见下一条）。
+    // ② 菜单填充走**图层**（保住官方半透明 alpha 与色调跟随），且必须读**卡片自己那个 token**：
+    //    官方 `.material` 读 `--dsw-menu-surface-fill`，别名 `--dsw-specific-menu` 是 `.groupTitle` / codebuddy 菜单读的（两者同源）。
     assert.ok(
       block.includes('linear-gradient(var(--dsw-menu-surface-fill, var(--dsw-specific-menu))'),
       `菜单填充要作为图层叠在不透明底之上，且读卡片自己的 token：${block.slice(0, 220)}`,
     )
-    // ③ 颗粒必须一起重画：否则等于把卡片那片颗粒挖掉，露出"平带"（owner ①）。
-    //    强度只引用 GRAIN_TILE_VARIABLE（其值由 GRAIN_ALPHA 唯一派生），不在本表写死。
+    // ③ 颗粒必须一起重画，否则等于把卡片那片颗粒挖掉、露出「平带」；强度只引用 GRAIN_TILE_VARIABLE，不写死。
     assert.ok(
       block.includes(`var(${GRAIN_TILE_VARIABLE}`) || block.includes(GRAIN_TILE_VARIABLE),
       '标题必须重画颗粒 —— 否则比菜单主体少一层质感，就是 owner 说的「突兀」',
@@ -1244,11 +1101,7 @@ describe('抬升面：表面绘制', () => {
       splitLayers(declFor(block, 'background-attachment')).slice(0, 2).every(v => v === 'scroll'),
       '最上面两层（标题颗粒 / 卡片填充）按元素盒子，与卡片一致',
     )
-    // ⑦ 圆角：owner 第五轮「官方原样，但把这个条变成圆角的，**和菜单的圆角一致**」，
-    //    第六轮反馈「改成圆角后**确实边缘会漏**」。真机实测确认是几何必然：
-    //    标题自己带圆角 ⇒「标题矩形 − 圆角」那块缺口真的没画，而缺口里正好是滚动的行
-    //    （悬停底铺满整行宽、行文字从 x=8 起）⇒ 行透出来。漏量随半径增长
-    //    （4px→6、6→16、8→30、16(clamp 13)→**70**；方角→**0**）。
+    // ⑦ 圆角：标题自己带圆角 ⇒「标题矩形 − 圆角」那块缺口真的没画，而缺口里正好是滚动的行 ⇒ 行透出来（漏量随半径增长）。
     //    ⇒ 圆角改由**滚动容器**承担（容器顶角的裁剪同时作用于标题与行），标题回到方角。
     assert.equal(GROUP_TITLE_RADIUS, '0', '标题必须方角（有圆角就有缺口，缺口就漏行）')
     assert.equal(
@@ -1296,12 +1149,8 @@ describe('抬升面：表面绘制', () => {
       GROUPED_MENU_SCROLLER_SELECTOR.startsWith('>'),
       '滚动容器锚点是后代片段，必须以组合符开头（拼在菜单锚点之后才有效）',
     )
-    // ⚠️ rc.2 把 `role='menu'` 从菜单**卡片**搬到了内层**滚动容器**上
-    //    （官方 `ModelSelect.tsx`：卡片 role={pane==='model'?'group':'menu'}，
-    //      `div.groups.scrollable` 自己带 role='menu'）⇒「锚点的直接子」这个关系
-    //    整体上移一层，只写 `> :has(...)` 在 rc.2 上**一条也命不中**。
-    //    真机实测（同页两种 markup 对照）：rc.2 结构 0 命中 / rc.1 结构 1 命中。
-    //    故必须**第二条腿**：滚动容器就是菜单锚点自己时的那条规则。
+    // ⚠️ rc.2 把 `role='menu'` 从菜单**卡片**搬到了内层**滚动容器**上 ⇒「锚点的直接子」这个关系整体上移一层，
+    //    只写 `> :has(...)` 在 rc.2 上**一条也命不中**。故必须**第二条腿**：滚动容器就是菜单锚点自己时的那条规则。
     const selfScrollerSelector =
       `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)}${GROUPED_MENU_SELF_SCROLLER_SUFFIX}`
     const selfScrollerBlock = blockFor(css, selfScrollerSelector)
@@ -1354,12 +1203,9 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('⛔ 分组标题的合成必须逐层等于卡片（层序 + 地面同源 + 两个 token 不分叉）', () => {
-    // 把"看起来像一条带"的**成因**钉死成三条纯逻辑判据，免得再靠肉眼回归：
-    //   1. 层序：颗粒在填充之上（第四轮就是反的）；
-    //   2. 地面：不透明底之上必须重画地面，否则卡片透出来的光与颗粒在标题上丢了；
-    //   3. token 不分叉：标题读的填充 token 与卡片读的 token 必须**同值**
-    //      （官方 `.material` 读 `--dsw-menu-surface-fill`，`.groupTitle` / codebuddy 菜单读
-    //      `--dsw-specific-menu`，官方两者同源 —— 只染一个就分叉成色差带）。
+    // 把「看起来像一条带」的成因钉成三条纯逻辑判据：① 层序（颗粒在填充之上）；② 地面（不透明底之上必须重画地面）；
+    // ③ token 不分叉（标题读的填充 token 与卡片读的必须**同值** —— 官方 `.material` 读 `--dsw-menu-surface-fill`、
+    // `.groupTitle` 读 `--dsw-specific-menu`，两者同源，只染一个就分叉成色差带）。
     const layers = splitLayers(groupTitleLayers())
     assert.ok(layers[0].includes(GRAIN_TILE_VARIABLE), '层序：颗粒在最上')
     assert.ok(layers[1].includes('linear-gradient('), '层序：填充在颗粒之下')
@@ -1397,20 +1243,8 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('⛔ 菜单族材质必须**完全交回官方** —— 我们不声明填充与模糊', () => {
-    // owner 最终口径：「透明和模糊**和官方默认一样**就行」。
-    //
-    // 这条测试是第三次修订，前两版都对应一段走过的弯路（记下来免得再走）：
-    // ① 原版断言「每个菜单族锚点都必须刷 background-color + backdrop-filter」——
-    //    官方 0.1.7 **已经画好了**，于是我们在官方画过的地方又画一遍：
-    //    官方画在 `::before` 上的（`SubagentCatalogAction` 的 `.…_menu:before`）
-    //    会**叠两次同色**（0.5 → 等效 0.75）—— owner 复验「子代理卡片好像没有透明模糊吧？」；
-    // ② 中间还试过刷成不透明面板色 —— 那就把官方的玻璃整块盖掉了。
-    //
-    // 正确形态：本表**一个材质声明都不写**，官方的半透明与模糊原样生效。
-    //
-    // ⚠️ **2026-09-27（M2）改判据**：此前断言「每条锚点都有一条**元素级**质感规则」。
-    // 单载体收口后元素级那条已删（它是双层的另一半，且在没有材质子元素的组件上造成双倍），
-    // 故判据改为「每条锚点**恰好有一个载体**」，不再要求是元素级。
+    // 口径「透明和模糊和官方默认一样」⇒ 本表**一个材质声明都不写**，官方的半透明与模糊原样生效。
+    // 弯路：每条锚点都刷背景 + backdrop-filter（官方已画在 `::before` 上 ⇒ 叠两次同色）、刷成不透明面板色（盖掉官方玻璃）。
     for (const anchor of SURFACE_ANCHORS) {
       const gated = anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
       const carriers = [
@@ -1429,12 +1263,8 @@ describe('抬升面：表面绘制', () => {
         `不得声明模糊 —— 官方自己成对画好了，再画一遍会让半透明叠两次：${anchor}`,
       )
     }
-    // 这两个官方变量**我们一个字都不声明**（常量本身也已从实现里删掉）——
-    // 官方材质由官方自己声明；我们只在 token 层染色（`POPUP_TOKENS`）。
-    //
-    // ⚠️ 判据是**声明**（`--x:`）而不是**出现**：分组标题那条规则里**引用**
-    // `var(--dsw-specific-menu)` 是正当的（那是"跟随色调"的唯一办法，见
-    // buildSurfaceCss 里标题规则的注释）—— 被禁的是我们**自己给它赋值**。
+    // 这两个官方变量**我们一个字都不声明**（常量本身也已从实现里删掉）：官方材质由官方声明，我们只在 token 层染色。
+    // ⚠️ 判据是**声明**（`--x:`）而不是**出现**：标题规则里**引用** `var(--dsw-specific-menu)` 是正当的（那是跟随色调的唯一办法）。
     const decls = css.replace(/\/\*[\s\S]*?\*\//gu, '')
     assert.ok(
       !/--dsw-specific-menu\s*:/u.test(decls),
@@ -1447,24 +1277,9 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('带分组标题的菜单应该 与普通菜单**同一配方**（不再有「去顶光」特例）', () => {
-    // owner 前后几条反馈把这件事推到了正解：
-    // ①「模型选择器里面两个分类标题的背景，也得处理下。」
-    // ②（我第一版把整个菜单排除出图层之后）「模型选择列表那个框……是纯色的。」
-    // ③「模型选择列表，子代理列表，后台任务列表……和别的元素不是一个档位」
-    //
-    // ⚠️ **2026-09-27（M3）改判**：此前这里断言「分组菜单必须有一条**去顶光**的专用规则」。
-    // 那个办法**从未真正对齐过份数**，反而制造了最刺眼的不齐：
-    //
-    //   | 载体 | 命中规则 | 层数 |
-    //   | :--- | :--- | :--- |
-    //   | 元素级 | 专用规则（特异度更高） | 2（颗粒 + 底光） |
-    //   | ::after | **通用** [role='menu'] 那条 | 4（颗粒 + 三道光） |
-    //
-    // ⇒ 颗粒 2 份、底光 2 份，顶光/左光各 1 份。**而且通用那条 ::after 一直带着顶光**，
-    // 所以「元素级去顶光」根本消除不了横带 —— 它只是让元素级那份少一道光。
-    //
-    // 现在：专用规则**整条删除**，分组菜单由通用 [role='menu']::after 承担，
-    // 与普通菜单**逐层相同**。横带的正解在粘性标题自己那一条（groupTitleLayers）。
+    // ⚠️ 此前断言「分组菜单必须有一条**去顶光**的专用规则」—— 那个办法从未真正对齐过份数：元素级那条反而与通用
+    // `[role='menu']::after`（4 层：颗粒 + 三道光）叠成双层，颗粒 2 份、底光 2 份、顶光/左光各 1 份，横带照旧。
+    // 现在：专用规则**整条删除**，分组菜单由通用 `[role='menu']::after` 承担、与普通菜单逐层相同；横带的正解在粘性标题那条。
     assert.ok(
       !css.includes(`${GROUPED_MENU_SELECTOR} {`) && !css.includes(`${GROUPED_MENU_SELECTOR}::after {`),
       'M3：分组菜单不得再有专用图层规则 —— 它会与通用 [role=menu]::after 叠成双层、份数不齐',
@@ -1514,22 +1329,17 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('血缘树应该 用 `body >` 收窄（官方有四处 role=tree，只有子代理那个是 portal）', () => {
-    // owner 反馈「后台任务和子代理的弹出是不是没适配样式」。子代理血缘弹层是
-    // createPortal 直挂 body 的 `role='tree'`；但官方 JsonTree / WorkspaceBrowser 会话树 /
-    // TrajectoryTable **也用** role='tree'，它们是内联组件 —— 无条件命中会把面板背景
-    // 换成不透明填充 + 光 + 颗粒。`body >` 只留 portal 出来的那一个。
+    // 子代理血缘弹层是 createPortal 直挂 body 的 `role='tree'`；但官方 JsonTree / WorkspaceBrowser 会话树 /
+    // TrajectoryTable **也用** role='tree' 且是内联组件 ⇒ 无条件命中会误伤。`body >` 只留 portal 出来的那一个。
     const tree = SURFACE_ANCHORS.find(a => a.includes(anchorSelector(ANCHOR.treeHost)))
     assert.ok(tree !== undefined, '必须有 tree 锚点')
     assert.ok(tree.startsWith('body > '), `tree 必须收窄成 body 直接子元素：${tree}`)
   })
 
   it('轮次预览卡应该 用 `:not([data-side])` 把 Tooltip 气泡排除在外', () => {
-    // ⚠️ 回归守卫：这条锚点**曾经写成 `body > [role='tooltip']`**，注释还写着
-    // 「Tooltip / TurnNavigator 的预览，**均 portal 到 body**」—— **那句话是错的**，两个都不 portal：
-    //   * ui-primitives/Tooltip → position: fixed，源码注释明写 escape … without a portal
-    //   * TurnNavigator 的预览   → position: absolute，长在 <nav> 里
-    // 于是 `body >` 把两个一起漏掉，那条规则**一条都命不中**（死规则），
-    // owner 看到的「官方对话当行 hover 出的框也没有适配样式」就是它。
+    // ⚠️ 回归守卫：这条锚点曾经写成 `body > [role='tooltip']`，理由「Tooltip / TurnNavigator 预览均 portal 到 body」
+    // **是错的** —— Tooltip 是 position: fixed（源码明写 escape … without a portal）、TurnNavigator 预览是 absolute 长在 <nav> 里；
+    // 于是 `body >` 把两个一起漏掉、那条规则**一条都命不中**（死规则）。
     const tip = SURFACE_ANCHORS.find(a => a.includes("[role='tooltip']"))
     assert.ok(tip !== undefined, '必须有 tooltip 锚点')
     assert.ok(!tip.startsWith('body > '), `不得再用 body > 收窄（两个生产者都不 portal）：${tip}`)
@@ -1550,11 +1360,8 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('⛔ 自身是滚动容器的锚点（后台任务列表）必须用**元素级**图层，不能用 ::after', () => {
-    // 回归守卫（owner 2026-09-29 报「后台任务列表任务多到出滚动条后，滚出来的部分没适配」）：
-    // ::after 是 "position: absolute; inset: 0"，**在内容流里** ⇒ 元素自己会滚时
-    // 伪元素随内容滚走（实测：把层刷纯红，scrollTop=0 覆盖 95.6%、滚到底 **0.0%**）。
-    // 元素级 background-image 的背景默认 "background-attachment: scroll"，
-    // 对滚动容器含义是「钉在元素自己的盒子上」⇒ 实测滚到底覆盖 **99.2%**。
+    // ::after 是 `position: absolute; inset: 0`、**在内容流里** ⇒ 元素自己滚时伪元素随内容滚走（实测滚到底覆盖 **0.0%**）。
+    // 元素级 background-image 默认 `background-attachment: scroll`（钉在元素自己的盒子上）⇒ 实测滚到底覆盖 **99.2%**。
     const jobs = SURFACE_ANCHORS.find(a => a.includes('data-slot='))
     assert.ok(jobs !== undefined, '必须有槽位锚点')
 
@@ -1575,15 +1382,9 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('灯箱排除条件应该 按「直接子里有没有 img」，不能用 aria-hidden 当判据', () => {
-    // 回归守卫：最初写成 `:not(:has(> [aria-hidden='true']))`，理由是灯箱遮罩是它的直接子元素。
-    // 但 `StatsPills` / `TurnUsagePanel`（owner 说的「token 消耗那些」）的 `.panel` 里也有一个
-    // `<div className={titleRule} aria-hidden>` 当直接子元素（标题下那条分隔线）
-    // → **被一起排除**，表现为「对话框下面那三个胶囊没改」。
-    // 灯箱真正的唯一特征是整屏的 `<img>`；`aria-hidden` 太常见，不能当判据。
-    //
-    // ⚠️ 2026-10-08：判据从 `:not(:has(> img))` 改为**锚点属性**（client half 判定
-    // 「直接子里有没有 img」，见 src/anchors.ts 的 ANCHOR.dialog）——
-    // `:has()` 的样式重算开销实测见 docs/spec/11。判据本身不变，只是换了计算时机。
+    // 回归守卫：判据不能用 `aria-hidden` —— `StatsPills` / `TurnUsagePanel` 的 `.panel` 里也有一个
+    // `aria-hidden` 的直接子（标题下那条分隔线），会把它们一起排除。灯箱真正的唯一特征是整屏的 `<img>`。
+    // ⚠️ 现改为**锚点属性**（client half 判定「直接子里有没有 img」），判据不变、只换了计算时机（`:has()` 开销见 docs/spec/11）。
     const dialog = DIALOG_ANCHOR
     assert.ok(dialog.includes(anchorSelector(ANCHOR.dialog)), '应走弹窗锚点')
     assert.ok(!dialog.includes('aria-hidden'), '不得用 aria-hidden 当判据（会误伤带分隔线的弹层）')
@@ -1594,7 +1395,7 @@ describe('抬升面：表面绘制', () => {
     // 官方把这张卡的**面和字都写死了**：面 `#2C2C2E`（`HoverCard.module.css:13-21`，注释
     // `light/dark identical`），字 `#FFFFFF`/`#CFD3D6`/`#ADB2B8`（`Rows.module.css:301-335`，
     // 注释 `dark surface, fixed colors both themes`）。只染面 → 浅卡配浅字 = 白底白字。
-    // owner 定案：跟随主题，且「先把官方默认修了，然后再适配咱们的」。
+    // 口径：跟随主题，且**先把官方默认修了**再适配自家档。
     //
     // ① 不在通用锚点表里（那条带官方默认门，且不会改字色）
     assert.ok(
@@ -1604,7 +1405,7 @@ describe('抬升面：表面绘制', () => {
     // ② 用 `body >` 收窄：菜单项也有 role='button'，但都在浮层内部，不是 body 的直接子元素
     assert.equal(HOVER_CARD_ANCHOR, "body > [role='button']", '必须用子选择器，不能放宽成后代')
 
-    // ③ **不带官方默认门** —— owner 明确要求两个档都修，这是全插件四条刻意动官方默认外观的规则之一
+    // ③ **不带官方默认门** —— 两个档都要修，这是全插件四条刻意动官方默认外观的规则之一
     //    （另三条：`src/mask.ts` 弹窗遮罩虚化、`src/handle-glow.ts` 拖拽条光带、`src/popover.ts` 顶栏弹出层；
     //    计数口径以 `docs/private-seams.md` §B 为准）。
     //    判据看**选择器**（注释里会出现这个词当说明，所以只查拼接出来的那条选择器）。
@@ -1616,7 +1417,7 @@ describe('抬升面：表面绘制', () => {
     // ⚠️ 断言必须落在**这条规则体**里（剥注释）：全表 `css.includes(...)` 会被别处的巧合喂饱 ——
     //    「底色交回官方」之后，这条是**唯一**还写 `var(PANEL_VARIABLE)` 的地方。
     //    悬停卡不在 SURFACE_ANCHORS 里，所以那次收口没动它：官方给它的面是组件内**硬编码字面量**
-    //    （恒深灰、两轴同值），不染就与我们的弹层材质割裂 —— owner 定案「先把官方默认修了」。
+    //    （恒深灰、两轴同值），不染就与我们的弹层材质割裂 —— 官方默认那一档也要先修。
     const hoverBody = blockFor(css, HOVER_CARD_ANCHOR)
     assert.ok(
       hoverBody.includes(`background-color: var(${PANEL_VARIABLE}, var(--dsw-alias-bg-layer-3)) !important`),
@@ -1637,7 +1438,7 @@ describe('抬升面：表面绘制', () => {
 
   it('字色覆盖应该 只按**稳定后缀**匹配，不写完整哈希类名', () => {
     // 官方类名形如 `Sixlwa_hoverTitle`（哈希每次构建都变）—— 仓库规矩禁止写哈希类名。
-    // 后缀 `_hoverTitle` 是稳定的那一半，owner 已确认走这条路。
+    // 后缀 `_hoverTitle` 是稳定的那一半，故走这条路。
     for (const { suffix } of HOVER_CARD_TEXT_TOKENS) {
       assert.match(suffix, /^_[a-zA-Z]+$/u, `${suffix} 应是「下划线 + 原始类名」的稳定后缀`)
     }
@@ -1649,7 +1450,7 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('输入框上方三张停靠卡应该 各自有一条图层规则（此前只有 token 的颜色 = 纯色）', () => {
-    // owner：「**输入框上面那个区域也没适配**，刚才我记得让改了，但是没改。」
+    // 输入框上面那个区域也要适配（曾漏改过一次）。
     // 根因：三张卡与菜单族共享 token（--dsw-specific-tip），而 token 层**只给颜色**、
     // 图形必须靠选择器 —— 它们既非 menu 也非 dialog，此前一条选择器都没命中。
     assert.deepEqual([...COMPOSER_CARD_ANCHORS], [
@@ -1671,7 +1472,7 @@ describe('抬升面：表面绘制', () => {
       // 曾经写 `background-color: var(<面板变量>) !important` —— 那时浅色轴面板比例 .07、
       // 与卡自己的 `--dsw-specific-tip` 观感接近，看不出问题。等抬升面收到 `0`
       // （面板变量浅色轴 = 纯白 #fff）后，这条 !important 把三张卡的面**盖成纯白**，
-      // token 层的内嵌面染色完全失效（owner：「goal、todo、排队对话好像都没改」）。
+      // token 层的内嵌面染色完全失效（goal / todo / 排队对话都受影响）。
       // 正解：**底色交给 token 层**（05-surfaces §4.0.2 的内嵌面通道），本表只补颗粒 + 光。
       assert.ok(
         !/background-color/u.test(body),
@@ -1679,7 +1480,7 @@ describe('抬升面：表面绘制', () => {
       )
       assert.ok(body.includes(surfaceLayers()), `${anchor} 要画**完整 4 层**配方（M3 起与菜单/对话框同一配方）`)
       // ⚠️ 2026-09-27（M3）：此前断言用的是 menuSurfaceLayers()（只有颗粒 + 底光）。
-      // owner 报「todo 列表我刚发现没有打光了」—— 根因就是这几张卡拿的是**另一份配方**。
+      // todo 列表原本没有打光 —— 根因就是这几张卡拿的是**另一份配方**。
       // 现在统一 surfaceLayers()（颗粒 + 顶/底/左三道光），故这里钉死不含旧配方。
       assert.ok(!body.includes(menuSurfaceLayers()), `${anchor} 不得再用 2 层的旧配方（会缺顶光与左光）`)
       assert.ok(body.includes(TOP_VARIABLE), `${anchor} 必须有顶光（owner 报过「todo 没有打光」）`)
@@ -1715,27 +1516,10 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('停靠卡的几何**一个都不许改** —— 官方对三张卡的处理本来就不一样', () => {
-    // owner 连问两次：「官方默认样式为啥有缝了？是咱们改的么？」
-    //              「还是说，信息队列，todo，还有 goal，官方处理方式不一样？」
-    // 两条都对。官方产物逐条查证（dsh-client-ui-conversation / -goal 的 client.js）：
-    //   QueueDock ._dock   margin:0 auto calc(0px - stack-gap - 3px) + panel radius 12px 12px 0 0
-    //                      → 收间距 + 压进 3px + 下两角直角 = 贴住输入框
-    //   TodoPanel .root    margin:0 auto + radius 12px        → 保留 6px 间距（四角圆）
-    //   GoalBar   .dock/.bar margin:0 auto + radius 12px      → 保留 6px 间距（四角圆）
-    // 6px 缝来自官方 .composerStack{gap:var(--dsh-composer-stack-gap)}，真机官方档量到
-    // todo-panel→composer 6.0px。官方之所以看着没缝，是 .composerSeat 那条**不透明背衬**
-    // （transparent 0px → bg-base 36px）把它糊住了；本插件关掉了那条背衬，缝才露出来。
-    //
-    // 所以本插件**不得**改这三张卡的外边距 / 圆角 —— 那是把 QueueDock 的做法错误地
-    // 推广到 todo / goal。此前两版（收间距、打直底角）正是这么错的，已整条撤回。
-    //
-    // ## 2026-09-18 复核：又试了一次「全接上 + 用颜色分语义」，仍然要退回
-    // owner 提过「改颜色来区分语义」，据此把三张卡全接上走了一遍；真机复核时 owner 判断
-    // 「这么连上感觉确实不对了，尤其是 todo，goal，还有对话排队共存的时候，都连在一起，
-    // **表达的意思一下就变了**」。
-    // **根因：颜色与间距干的是两件事** —— 颜色标记**单个东西的身份**，间距标记**分组边界**。
-    // 三张全接上后中间没有断点，颜色只能说「这是暗金的」，说不出「从这里起不再是提示信息」。
-    // **分组边界只有几何能表达**，所以这条守卫留着，且颜色也不加。
+    // 官方产物逐条查证：QueueDock 用「收间距 + 压进 3px + 下两角直角」贴住输入框，而 TodoPanel / GoalBar 保留 6px 间距
+    // （四角圆）。官方看着没缝是 `.composerSeat` 那条**不透明背衬**把它糊住了，本插件关掉背衬后缝才露出来。
+    // ⇒ 本插件**不得**改这三张卡的外边距 / 圆角（那是把 QueueDock 的做法错误推广到 todo / goal，此前两版正是这么错的）。
+    // 也**不靠颜色**分语义：颜色标记单个东西的身份、间距标记分组边界；三张全接上后中间没有断点，颜色说不出「从这里起不再是提示信息」。
     for (const anchor of COMPOSER_CARD_ANCHORS) {
       const gated = anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
       const at = css.indexOf(gated)
@@ -1775,15 +1559,9 @@ describe('抬升面：表面绘制', () => {
 
 
   it('⛔ 整个表面表不得出现 :has()（性能：它是样式重算的主要来源）', () => {
-    // 背景（owner：「咱们主题明显比官方的卡」）：真机消融实测（同 DOM、同色调档，
-    // 只 styleEl.disabled 切换）—— 151 条规则里 12 条 :has() 吃掉约 62% 的样式重算；
-    // 151 条**平凡**规则 ≈ 空表 ⇒ **条数无关**。
-    //
-    // ⚠️ 2026-10-08 升级为**全表禁 `:has()`**：受控实测（有头 + 真实合成 + 模拟流式，
-    // 见 docs/spec/11）显示**主表 19 条 `:has()` 贡献 ~3.1 秒 / 100 帧**的样式重算，
-    // 而把它们换成**同命中集**的属性选择器可拿回约 100% 的收益（效果一字不变）。
-    // 故判据从「组合规则不带守卫」收紧为「本表一条都不许有」——
-    // 判据本身搬到了 client half（src/anchors.ts），本表只读锚点属性。
+    // 真机消融：151 条规则里 12 条 `:has()` 吃掉约 62% 的样式重算，151 条**平凡**规则 ≈ 空表 ⇒ 条数无关。
+    // ⚠️ 现升级为**全表禁 `:has()`**：主表 19 条 `:has()` 贡献约 3.1 秒 / 100 帧，换成**同命中集**的属性选择器
+    // 可拿回约 100% 的收益（效果一字不变）。判据已搬到 client half（src/anchors.ts），本表只读锚点属性。
     const css = buildSurfaceCss()
     const clean = css.replace(/\/\*[\s\S]*?\*\//gu, '')
     assert.ok(!clean.includes(':has('), '表面表不得出现任何 :has()（开销实测见 docs/spec/11）')
@@ -1805,23 +1583,10 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('⛔ 出图层的锚点必须自己**形成层叠上下文**（否则 ::after 负 z 逃逸、纹理被自身背景盖住）', () => {
-    // ## 为什么（2026-09-27，owner：「归档页，云端文件页……全都没适配纹理和打光」）
-    //
-    // 根因：`z-index: -1` 的伪元素只画在**它所属的层叠上下文内部**。父元素若自己不成
-    // 层叠上下文，这个负 z 层就**逃逸到上一层**排队 ⇒ 被父元素**自己的不透明背景**盖住。
-    //
-    // 布尔判据（把 `::after` 设纯绿，数表面内的绿点）：
-    //   | 表面                    | 元素自身                        | 绿点            |
-    //   | 云文件页 dialog          | z-index:auto / isolation:auto   | **0 / 40000**   |
-    //   | 同上 + isolation:isolate | 成上下文                        | **38392/40000** |
-    //   | codebuddy 弹层（对照）    | z-index:20 ⇒ 已有上下文          | **6085 / 6336** |
-    //
-    // 各插件写法不同：官方系组件常带 z-index / backdrop-filter（自然成上下文），
-    // 而自家插件的 dialog 是 `position: relative` + `z-index: auto` ⇒ 不成上下文。
-    // owner 原话「codebuddy 插件的弹层就适配了，区别在哪？」—— 区别就在这里。
-    //
-    // `isolation: isolate` 只创建层叠上下文（不改定位 / 尺寸 / 包含块），
-    // 对已成上下文的元素是无操作 ⇒ 给所有出图层的锚点加都安全。
+    // 根因：`z-index: -1` 的伪元素只画在**它所属的层叠上下文内部**；父元素若自己不成上下文，这个负 z 层会
+    // **逃逸到上一层**排队 ⇒ 被父元素自己的不透明背景盖住（官方系组件常带 z-index / backdrop-filter 自然成上下文，
+    // 自家插件的 dialog 是 relative + z-index:auto ⇒ 不成）。
+    // `isolation: isolate` 只创建层叠上下文（不改定位 / 尺寸 / 包含块），对已成上下文的元素是无操作 ⇒ 给所有出图层锚点加都安全。
     for (const anchor of [...SURFACE_ANCHORS, ...COMPOSER_CARD_ANCHORS]) {
       if (!usesAfterLayer(anchor)) continue // 官方 ::before 那条不需要（官方自带盒子）
       const gated = anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
@@ -1840,21 +1605,10 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('⛔ static 锚点必须有 position:relative（否则 ::after 的包含块跑到视口、纹理铺满全屏）', () => {
-    // ## 为什么（2026-09-27，owner 截图报问答卡「出 bug 了」）
-    //
-    // `::after { position: absolute; inset: 0 }` 需要一个**定位祖先**当包含块。
-    // 官方问答卡的 `.card` 是 `position: static`，且祖先链上也没有 positioned 元素
-    // ⇒ 包含块退到**视口** ⇒ 纹理铺满全屏（`overflow: hidden` 也裁不住，
-    //    因为裁剪只作用于包含块链上的后代盒）。
-    //
-    // 布尔判据（把 `::after` 设纯红，数卡内/卡外红点）：
-    //   | | 卡内 | 卡外 |
-    //   | 修复前 | **0** | **78013 / 78750**（糊满全屏） |
-    //   | 修复后 | **11240 / 11250** | **0 / 67500** |
-    //
-    // ⚠️ **绝不能给全表统一补** `position: relative`：本表多数锚点本就是
-    // `absolute` / `fixed`，盖一条 relative 会把绝对定位改成相对定位 ⇒ 弹层当场错位。
-    // 故只有 `STATIC_SURFACE_ANCHORS` 里**实测 static** 的那几条才补。
+    // 根因：`::after { position: absolute; inset: 0 }` 需要**定位祖先**当包含块；官方问答卡的 `.card` 是 static，
+    // 祖先链上也没有 positioned 元素 ⇒ 包含块退到**视口**，纹理铺满全屏（`overflow: hidden` 也裁不住）。
+    // ⚠️ **绝不能给全表统一补** `position: relative`：本表多数锚点本就是 absolute / fixed，盖一条会把绝对定位改成相对定位
+    // ⇒ 弹层当场错位。故只有 `STATIC_SURFACE_ANCHORS` 里**实测 static** 的那几条才补。
     assert.deepEqual([...STATIC_SURFACE_ANCHORS], [
       'body [data-question-key] > section',
       'body [data-plan-review-key] > section',
@@ -1923,10 +1677,10 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('每一条锚点规则应该 **只叠图层、不刷底色**，且都带官方默认门', () => {
-    // ⚠️ 2026-09-24 架构收口（owner：「统一设计语言，该透明模糊的就透明模糊，用 dsh 官方新代码的
+    // ⚠️ 架构收口：统一设计语言（该透明模糊的就透明模糊），用 dsh 官方新代码的
     // 接入方式接入」）：这层**不透明填充**是 0.1.5 时代的兜底，0.1.7 官方把弹层统一成
     // 「半透明 --dsw-specific-menu + --dsw-menu-backdrop-filter」之后，它反而把官方的玻璃
-    // 整块盖掉 —— 就是 owner 反复报的「后台任务 / CodeBuddy 弹窗不是透明模糊效果」。
+    // 整块盖掉 —— 后台任务 / CodeBuddy 弹窗因此不是透明模糊效果。
     // 现在：底色与模糊一律交给**官方自己的材质 + 官方 token**（色调走 overrideTokens 染进 token），
     // 我们只叠 `background-image` 的质感层（颗粒 + 光）。
     for (const anchor of SURFACE_ANCHORS) {
@@ -1969,40 +1723,15 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('⛔ 覆盖用的伪元素必须**生成盒子**（content + 定位），且必须用 ::after 压在官方材质之上', () => {
-    // ## 这条守卫为什么存在（2026-09 审计，HIGH）
-    //
-    // rc.2 起官方把菜单/卡片的材质画进 **z-index:-1 的子元素或伪元素**（MenuSurface 的
-    // `.material`、QueueDock 的 `.panel::before`），于是本插件加了一层「把同一串图层再画到
-    // 伪元素上」的修法。但那一版发出去的是**不带 `content` 的 `::before`** ——
-    // **不带 content 的伪元素不生成盒子**，那 12 条规则的 `background-image` 全部空转。
-    //
-    // 真机同构复刻实测（官方 rc.2 MenuSurface：`.material` 子元素 + alpha .45 + blur(40px)）：
-    //   | 变体                                   | content | 空白区纹理标准差 |
-    //   | :------------------------------------- | :------ | ---------------: |
-    //   | `::before`（无 content）                | none    |            0.30 |
-    //   | `::before` + content + z-index:-1       | ""      |            0.30 |
-    //   | `::before` + content（无 z-index）      | ""      |   10.83（压住文字）|
-    //   | **`::after` + content + z-index:-1**    | ""      |        **8.29** |
-    // 标准差 0.30 ≈ 纯色 ⇒ 被官方材质彻底洗掉；8.29 才是质感真的画上去了。
-    // 原因是绘制顺序：负 z 带内按树序，`::before` 排在 `.material` **前面**（被盖），
-    // `::after` 排在**最后**（压在其上），而整个负 z 带仍在行内文字之下（不盖字）。
-    //
-    // 故这几条都是**硬契约**，缺一律静默失效（外观只是"没质感"，没有任何报错）：
-    //   ① 每条覆盖规则必须声明 `content`；除非它补的是**官方自己的 `::before`**（见下）；
+    // rc.2 起官方把菜单 / 卡片的材质画进 **z-index:-1 的子元素或伪元素**（MenuSurface 的 `.material`、
+    // QueueDock 的 `.panel::before`），故本插件把同一串图层再画一遍。以下是**硬契约**，缺一律**静默失效**
+    // （外观只是「没质感」，没有任何报错）：
+    //   ① 每条覆盖规则必须声明 `content` —— **不带 content 的伪元素不生成盒子**，图层全部空转；
     //   ② 必须有非 static 定位（否则 `inset` 不生效、盒子塌成 0 面积）；
-    //   ③ 必须是 `::after`（`::before` 会被官方材质盖住）—— 同理，官方 `::before` 那条例外。
-    //
-    // ⚠️ **例外只有一处且必须显式登记**：`OFFICIAL_BEFORE_LAYER_ANCHORS` 里的锚点，
-    // 官方自己已经在那个 `::before` 上声明了 `content` 与完整几何，我方**只补一个
-    // `background-image`**。判据不是"名字对上就行"，而是三条同时成立：
-    // ① 该锚点在 `OFFICIAL_BEFORE_LAYER_ANCHORS` 里；② 这条规则**没有** `content` 声明
-    //（有就说明我们在自己造盒子 —— 那正是要拦的空转形态）；③ 它**不在** `::after` 覆盖层里。
-    // 背景：QueueDock 被排除出 `::after` 后，光靠元素级那条**拿不到质感** ——
-    // 官方材质在它自己的 `::before`（负 z 带）上，元素级背景在它**之下**，实测 std 0.229 ≈ 纯色；
-    // 补一条到官方 `::before` 后 std 2.162，且官方 `::after` 的描边三边全在。
-    // ⚠️ **必须先剥注释再 match**：本文件用的正则 `[^{}\n][^{}]*?::before` 会跨行吃掉
-    // 注释块，把注释里提到的 `::before` 字面量当成一条规则 —— 加一条含该字样的注释就会
-    // 误报（2026-09-27 踩到）。`blockFor` 早就剥了注释，这里此前没剥。
+    //   ③ 必须是 `::after` —— 绘制顺序上 `::before` 排在官方 `.material` **前面**会被盖住，`::after` 压在其上且不盖行内文字。
+    // ⚠️ 例外只有一处且必须显式登记：`OFFICIAL_BEFORE_LAYER_ANCHORS` 里的锚点，官方自己已在那个 `::before` 上声明了
+    // `content` 与完整几何，我方**只补一个 `background-image`**（若这条有 content，就说明我们在自己造盒子 —— 那正是要拦的空转形态）。
+    // ⚠️ **必须先剥注释再 match**：正则 `[^{}\n][^{}]*?::before` 会跨行吃掉注释块、把注释里提到的 `::before` 当成一条规则。
     const cssNoComment = css.replace(/\/\*[\s\S]*?\*\//gu, '')
     const officialBeforeRules = [...cssNoComment.matchAll(/([^{}\n][^{}]*?::before)\s*\{([^}]*)\}/gu)]
       .filter(m => /background-image\s*:/u.test(m[2]))
@@ -2046,18 +1775,10 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('⛔ 官方在同一伪元素上有装饰的锚点**必须排除**在 ::after 覆盖层之外', () => {
-    // ## 为什么（2026-09-27 审计，两处真实副作用）
-    //
-    // 覆盖层用 `::after`，若官方**自己**也在这个元素的 `::after` 上画东西，就会互相顶掉：
-    //
-    // ① `[data-queue-dock] > :first-child` = 官方 `QueueDock` 的 `.panel`，它的 `::after`
-    //    是 **0.5px 描边**（`content:''` + `inset:0` + `border`，`z-index:auto`）。我方把同伪元素
-    //    `z-index` 压到 `-1` ⇒ 描边进负 z 带 ⇒ 被整行宽的悬停行底盖掉。
-    //    ⚠️ 顶边因在悬停行之上仍在 —— **只抽样顶边发现不了**，初版正是这样漏掉的。
-    // ② `[data-trigger-menu][data-overflow-below]` = 官方 `MenuView` 的「下面还有内容」渐隐提示
-    //    （同一个 `::after`）。锚点必须收窄 `:not([data-overflow-below])` 让官方提示留下。
-    //
-    // 这条守卫把两处**都钉死**：排除表必须含 queue-dock；trigger-menu 锚点必须带收窄条件。
+    // 覆盖层用 `::after`，若官方**自己**也在这个元素的 `::after` 上画东西就会互相顶掉：
+    // ① `[data-queue-dock] > :first-child`（官方 `QueueDock` 的 `.panel`）的 `::after` 是 **0.5px 描边**，
+    //    我方把同伪元素 z-index 压到 -1 ⇒ 描边进负 z 带被盖掉（⚠️ 顶边仍在，**只抽样顶边发现不了**，初版正是这样漏掉的）；
+    // ② `[data-trigger-menu][data-overflow-below]` 是官方的「下面还有内容」渐隐提示，锚点必须收窄让官方提示留下。
     assert.ok(
       AFTER_LAYER_EXCLUDED_ANCHORS.includes('body [data-queue-dock] > :first-child'),
       'QueueDock 面板必须排除在 ::after 覆盖层之外（否则官方 0.5px 描边被盖）',
@@ -2088,26 +1809,11 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('⛔ QueueDock 排除 ::after 之后必须**补到官方自己的 ::before**（否则它没有质感）', () => {
-    // ## 为什么（2026-09-27 复核，实测推翻上一轮的结论）
-    //
-    // `18db3e2` 把 QueueDock 排除出 `::after` 层，理由（官方那 0.5px 描边）是对的，
-    // 但它的结论写的是「被排除的锚点仍保留**元素级** `background-image`」——
-    // **对 QueueDock 不成立**：官方材质不在元素自己身上，而在它自己的 `.panel::before`
-    // （`z-index:-1` + `backdrop-filter: blur(40px)`）上；元素级背景在负 z 带**之下**，
-    // 被那层半透明材质连同模糊一起洗掉。
-    //
-    // 真机同构复刻实测（官方 QueueDock rc.2 逐字；取样区亮度标准差 = 质感可见度，
-    // 官方材质本身平坦 ⇒ 基线 0.000）：
-    //   | 变体                              | 颗粒 std | 官方 ::after 描边 |
-    //   | :-------------------------------- | -------: | :---------------- |
-    //   | 只元素级那条（18db3e2 现状）        | **0.229** ← 与纯色无异 | 完好 |
-    //   | **补一条到官方 ::before（本修法）** | **2.162** ✅ | **完好** |
-    //   | （对照）1527612 的 ::after 版       | 2.261 | **被盖掉 ✗** |
-    //
-    // 补 `::before` 安全的**前提**是官方那个伪元素**已经声明了 content 与完整几何**，
-    // 所以我方**只补 `background-image` 一个属性**：不动官方盒子，同一元素上
-    // `background-image` 画在 `background-color` 之上（且不经过那个只过滤「背后」的
-    // `backdrop-filter`），并且**完全不碰 `::after`** ⇒ 官方描边照旧。
+    // QueueDock 被排除出 `::after` 层是对的（官方那 0.5px 描边），但那轮的结论「被排除的锚点仍保留**元素级**
+    // `background-image`」**对 QueueDock 不成立**：官方材质在它自己的 `.panel::before`（z-index:-1 + blur(40px)）上，
+    // 元素级背景在负 z 带**之下**、被那层半透明材质连同模糊一起洗掉（实测颗粒 std 0.229 ≈ 纯色）。
+    // 补一条到官方 `::before` 后 std 2.162，且官方 `::after` 描边完好 —— 前提是官方那个伪元素**已声明 content 与完整几何**，
+    // 故我方**只补 `background-image` 一个属性**：不动官方盒子，也**完全不碰 `::after`**。
     assert.ok(
       OFFICIAL_BEFORE_LAYER_ANCHORS.includes('body [data-queue-dock] > :first-child'),
       'QueueDock 必须补在官方 ::before 上（元素级那条会被官方材质洗掉）',
@@ -2145,7 +1851,7 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('输入框里的图标按钮应该 默认去底、保留 hover 底', () => {
-    // owner：「这两个按钮得适配下，我觉得**像下拉菜单一样，默认底就不要了，保留 hover 底就行**。」
+    // 这两个按钮要**像下拉菜单一样**：默认底不要，只保留 hover 底。
     // 官方默认底是 var(--dsw-specific-selector) = **不透明实色**，而按钮坐在**玻璃卡片**里
     // → 读成两块贴在玻璃上的塑料片。置 transparent 后露出卡片自己的玻璃。
     const gated = COMPOSER_ICON_BUTTON_SCOPE.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
@@ -2156,14 +1862,9 @@ describe('抬升面：表面绘制', () => {
     // 只要**这一个** token：官方 hover 走的是另一个（--dsw-alias-interactive-bg-hover-solid），
     // 所以改这个不影响 hover —— 不许顺手把 hover 也写了（那会重复官方的职责）。
     assert.ok(!/hover/u.test(body), '不该自己重写 hover（官方那条规则天然保留）')
-    // ⚠️ 不许写到 body 上：这 token 语义通用（现在只有 .uV2eYG_add 一个消费方，
-    // 官方将来若接上别的组件，写 body 会误伤）。范围收在卡片里。
-    //
-    // ⚠️ 这里的 `m` 标志**不能省**：`buildSurfaceCss()` 的产物以注释 `/* … */` 开头，
-    // 没有 `m` 时 `^` 只锚定整个字符串的起点 → 永远匹配不到 → `!test(...)` 恒为真，
-    // 这条断言对任何输入都不动（实测：构造一份真的把该 token 写到 body 上的产物，
-    // 无 `m` 时为 false、加 `m` 后为 true）。故断言改写为「逐规则找是否有 body 级声明」，
-    // 比正则更直白且不受锚点影响。
+    // ⚠️ 不许写到 body 上：这 token 语义通用（官方将来若接上别的组件，写 body 会误伤），范围收在卡片里。
+    // ⚠️ 故判据用「逐规则找是否有 body 级声明」而不是正则：产物以注释开头，缺 `m` 标志时 `^` 只锚定整个字符串起点
+    // ⇒ 永远匹配不到 ⇒ `!test(...)` 恒为真、这条断言对任何输入都不动。
     for (const rule of css.matchAll(/(^|\n)([^{}\n]+)\{([^{}]*)\}/gu)) {
       const selector = rule[2].trim()
       const bodyText = rule[3]

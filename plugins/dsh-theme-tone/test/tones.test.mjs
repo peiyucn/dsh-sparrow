@@ -28,30 +28,24 @@ describe('色调表', () => {
     assert.ok(toneIdsFor('light').includes('official'))
     assert.ok(toneIdsFor('dark').includes('official'))
     assert.deepEqual(toneIdsFor('dark'), ['official', 'violet', 'crimson', 'forest'])
-    // 浅色轴的顺序**与深色轴逐位对应**（owner：「蓝色的在最前面，有点泛红那个在中间，
-    // 最后是绿的，和深色正好对应」）：蓝 ↔ 蓝紫、**樱花（粉/暖）↔ 余烬（红/暖）**、绿 ↔ 绿。
+    // 浅色轴的顺序**与深色轴逐位对应**：蓝 ↔ 蓝紫、**樱花（粉/暖）↔ 余烬（红/暖）**、绿 ↔ 绿。
     assert.deepEqual(toneIdsFor('light'), ['official', 'blue', 'sakura', 'green'])
   })
 
   it('两轴色调顺序应该 **逐位对应**（蓝 / 暖 / 绿）', () => {
-    // 这条守卫「换顺序」这个需求本身：以后加款时也能一眼看出对应关系。
     // 判据用**主通道**，不用色相角 —— 浅色三款的本色都很淡，色相角容易是噪声。
     const slots = scheme => toneIdsFor(scheme).filter(id => id !== 'official').map(id => {
       const tones = scheme === 'dark' ? DARK_TONES : LIGHT_TONES
       const [r, g, b] = tones[id].tint.split(',').map(v => Number(v.trim()))
       const mx = Math.max(r, g, b)
-      // 判「中性」的兜底保留：万一将来又出现一款近中性的本色，这里会暴露出来。
-      // ⚠️ 2026-09-18 起**浅色轴没有中性款了** —— `gray`（素白，色度仅 8）已被
-      // owner 换成 `sakura`（樱花粉，色度 50），理由正是「看不出来是什么颜色」。
+      // 判「中性」的兜底保留：将来若再出现近中性本色，这里会暴露出来（浅色轴目前已无中性款）。
       if (mx - Math.min(r, g, b) <= 15) return 'neutral'
       return r === mx ? 'warm' : g === mx ? 'green' : 'cool'
     })
     assert.deepEqual(slots('dark'), ['cool', 'warm', 'green'], '深色轴：蓝紫 / 红 / 绿')
     // 浅色轴中间那款现在是**暖**（樱花的 R 是主通道）—— 与深色轴的 crimson 同位同调。
-    // 这条断言正是本次改动的**意图本身**：第 2 位两轴都应是暖色。
     assert.deepEqual(slots('light'), ['cool', 'warm', 'green'], '浅色轴：蓝 / 暖（樱花）/ 绿')
     assert.equal(slots('dark').length, slots('light').length, '两轴的非官方款数应相同')
-    // 逐位对齐：两轴的「位」序列应完全相同
     assert.deepEqual(slots('light'), slots('dark'), '两轴逐位对应（蓝 / 暖 / 绿）')
   })
 
@@ -86,10 +80,8 @@ describe('色调表', () => {
   })
 
   it('深色三款应该 共享同一束金色光源（切换色调变的是空间，不是光源）', () => {
-    // 2026-10-02（owner：「我想让顶部两道金光更强一些」）：这两道金光从六处字面量
-    // 抽成 `DARK_GOLD_ALPHA` 一个旋钮，并调强 ×1.55（`.09/.11` → `.14/.17`）。
-    // 本条改为**对着常量**断言 —— 于是「调强度」不再需要改测试，
-    // 而「三款必须同步」这条契约反而守得更死（写死字面量就会在这里红）。
+    // 两道金光从六处字面量抽成 `DARK_GOLD_ALPHA` 一个旋钮 ⇒ 本条对着常量断言：
+    // 「调强度」不再需要改测试，而「三款必须同步」反而守得更死（写死字面量就会在这里红）。
     const GOLD = `rgba(${DARK_GOLD_TINT}, ${DARK_GOLD_ALPHA.top})`
     const GOLD_LEFT = `rgba(${DARK_GOLD_TINT}, ${DARK_GOLD_ALPHA.left})`
     for (const id of ['violet', 'crimson', 'forest']) {
@@ -102,14 +94,12 @@ describe('色调表', () => {
     const lefts = new Set(['violet', 'crimson', 'forest'].map(id => DARK_TONES[id].left))
     assert.equal(tops.size, 1, '三款 top 必须逐字相同（共享光源）')
     assert.equal(lefts.size, 1, '三款 left 必须逐字相同（共享光源）')
-    // 差异只在底色与底部纵深
     assert.notEqual(DARK_TONES.crimson.base, DARK_TONES.violet.base)
     assert.notEqual(DARK_TONES.forest.bottom, DARK_TONES.violet.bottom)
   })
 
   it('顶上两道金光 应该 强于旧值、且两道都还在「环境级小值」档', () => {
-    // owner 2026-10-02 要求调强。这条把**方向**（更强）与**上限**（仍是环境级）一起钉住，
-    // 免得将来有人顺着「更强」一路加到「顶上糊一片金」。
+    // 这条把**方向**（更强）与**上限**（仍是环境级）一起钉住，免得顺着「更强」一路加到顶上糊一片金。
     assert.ok(DARK_GOLD_ALPHA.top > 0.09, `顶光应强于旧值 .09，实际 ${DARK_GOLD_ALPHA.top}`)
     assert.ok(DARK_GOLD_ALPHA.left > 0.11, `侧光应强于旧值 .11，实际 ${DARK_GOLD_ALPHA.left}`)
     // 上限：两道都必须仍弱于底部纵深（那是三层里最强的），见下一条的次序不变量。
@@ -124,16 +114,15 @@ describe('色调表', () => {
       const c = channels(DARK_TONES[id].base)
       return { sum: c[0] + c[1] + c[2], spread: Math.max(...c) - Math.min(...c), maxAt: c.indexOf(Math.max(...c)) }
     }
-    // 三通道和全部锁在 36 → 亮度严格相等，对比度等价
+    // 三通道和全部锁在 36 ⇒ 亮度严格相等，对比度等价
     for (const id of ['violet', 'crimson', 'forest']) {
       assert.equal(spread(id).sum, 36, `${id}.base 三通道和应锁在 36`)
     }
-    // 色相跨度是「音量钮」：violet 6 是已落地基准；红/绿经两轮真机反馈后定在 5
-    // （先反馈偏夸张压到 4，再反馈「压过了」回到 5）
+    // 色相跨度是「音量钮」：violet 6 是已落地基准，红/绿经真机反馈定在 5。
     assert.equal(spread('violet').spread, 6, 'violet 是基准，不动')
     assert.equal(spread('crimson').spread, 5, 'crimson 定在中间档')
     assert.equal(spread('forest').spread, 5, 'forest 定在中间档')
-    // 各自仍由最高通道定色相：violet→B、crimson→R、forest→G
+    // 各自仍由最高通道定色相：violet→B、crimson→R、forest→G。
     assert.deepEqual(channels(DARK_TONES.violet.base), [10, 10, 16])
     assert.deepEqual(channels(DARK_TONES.crimson.base), [15, 10, 11])
     assert.deepEqual(channels(DARK_TONES.forest.base), [10, 15, 11])
@@ -173,17 +162,8 @@ describe('色调表', () => {
   })
 
   it('浅色三款应该 **底色 = 官方配置**（三款完全相同）、**有颗粒**、三层光齐备', () => {
-    // ## 2026-09-18 结构改动（owner 定案）
-    //
-    // owner：「浅色的我想的是**依然是官方的底色配置**，然后**打光用主色**，
-    // **打光的方向位置和深色的金光一样**。而不是现在整体都是主色的感觉。」
-    //
-    // 旧结构是「本色染过的近白底 + 三层强主色光」—— 本用例原先守的正是那个：
-    // base 三通道和锁死 748、三款 base 互不相同、色度 1/14/6。**那套已整体作废**：
-    // 底色不再染色（三款同底），色调**只由打光表达**。
-    //
-    // 所以现在守的是**新结构**：三款 base / sidebarFill **逐字相同**，且都是官方变量引用
-    // （不是写死 hex）—— 官方调整浅色底时三款自动跟随。
+    // 三款 base / sidebarFill **逐字相同**，且都是官方变量引用（不是写死 hex）——
+    // 官方调整浅色底时三款自动跟随；色调**只由打光表达**，底色不再染色。
     const OFFICIAL_BASE = 'var(--dsw-static-neutral-bluish-00)'
     const OFFICIAL_SIDE = 'var(--dsw-static-neutral-bluish-50)'
     for (const id of ['sakura', 'blue', 'green']) {
@@ -197,16 +177,14 @@ describe('色调表', () => {
         assert.match(spec[`${layer}`], /^rgba\(/u, `${id}.${layer} 应给色值`)
       }
     }
-    // 三款底色**逐字相同**（这正是新结构的要点：空间色不再随色调变）
+    // 空间色不再随色调变 ⇒ 三款底色**逐字相同**
     const bases = ['sakura', 'blue', 'green'].map(id => LIGHT_TONES[id].base)
     assert.equal(new Set(bases).size, 1, '三款底色必须相同（已改回官方配置）')
-    // 且与 official 那一款**完全一致** —— 「依然是官方的底色配置」
     assert.equal(LIGHT_TONES.official.base, LIGHT_TONES.blue.base, '有色调的底色应与官方默认款相同')
   })
 
   it('浅色三款应该 **只靠打光区分**（本色各不相同，底色相同）', () => {
-    // 新结构的核心断言：**色相全部由光表达**。
-    // 三款的本色必须互不相同（否则打光也分不出来），而底色相同（见上一条）。
+    // 新结构的核心：**色相全部由光表达** —— 三款本色必须互不相同，底色相同（见上一条）。
     const tints = ['sakura', 'blue', 'green'].map(id => LIGHT_TONES[id].tint)
     assert.equal(new Set(tints).size, 3, '三款本色必须互不相同（那是唯一的区分来源）')
     // 每一款的三层光都来自**它自己的**本色
@@ -222,18 +200,15 @@ describe('色调表', () => {
   })
 
   it('浅色轴的三层光 alpha 应该 与深色轴**同次序**（顶 < 侧 < 底）', () => {
-    // 两轴严格镜像：深色 `top .09 / left .11 / bottom .18`，
-    // 浅色 `top .16 / left .19 / bottom .30` —— **次序完全一致**，只是数值约 1.8 倍
-    // （白底对浅色主色的通道余量只有深底对金的一半，见 tones.ts 的推导）。
+    // 两轴严格镜像：深色 `top .09 / left .11 / bottom .18`，浅色 `top .16 / left .19 / bottom .30`
+    // —— **次序完全一致**，只是数值约 1.8 倍（白底对浅色主色的通道余量只有深底对金的一半）。
     assert.equal(LIGHT_GLOW_ALPHA.top, 0.16)
     assert.equal(LIGHT_GLOW_ALPHA.left, 0.19)
     assert.equal(DEPTH_ALPHA.light, 0.30)
     // 次序：顶（正对光源）< 侧（掠射，但铺在**大面积左栏**上）< 底（纵深，最强）
     assert.ok(LIGHT_GLOW_ALPHA.top < LIGHT_GLOW_ALPHA.left, '顶光应弱于侧光')
     assert.ok(LIGHT_GLOW_ALPHA.left < DEPTH_ALPHA.light, '侧光应弱于底部纵深')
-    // 与深色轴同构：两边都是 top < left < bottom
-    // （2026-10-02：深色那两道金光改由 DARK_GOLD_ALPHA 一处定，这里跟着改成读常量 ——
-    //  写死字面量会让「调强金光」每次都误伤本条。）
+    // 与深色轴同构：两边都是 top < left < bottom（深色那两道读 DARK_GOLD_ALPHA，不写死字面量）。
     assert.ok(DEPTH_ALPHA.dark > DARK_GOLD_ALPHA.left, '深色底应最强（bottom > left）')
     assert.ok(
       DARK_GOLD_ALPHA.top < DARK_GOLD_ALPHA.left && DARK_GOLD_ALPHA.left < DEPTH_ALPHA.dark,
@@ -242,11 +217,8 @@ describe('色调表', () => {
   })
 
   it('浅色轴的打光几何应该 **与深色金光逐字相同**（收束点 62%）', () => {
-    // owner：「**打光的方向位置和深色的金光一样**」——
     // 几何（方向、位置）在 `backdrop.ts` 里两轴共用同一组 SHAPE 常量，
     // 唯一按轴分的变量是**收束点**；本条守「收束点也相同」。
-    // 旧值浅色 `100%` 是「强主色光」时代的补丁（把色量摊开以免收束边太硬），
-    // alpha 降到 `.16` 后那条边本就看不见，补丁随之作废。
     const overrides = tokenOverrides(DEFAULT_SETTINGS)
     const stopLight = overrides['--dsh-theme-tone-top-stop'].light
     const stopDark = overrides['--dsh-theme-tone-top-stop'].dark
@@ -256,8 +228,8 @@ describe('色调表', () => {
   })
 
   it('浅色轴的三层光应该 **全部来自本色**（owner：「只是浅色是用主色打光」）', () => {
-    // 最终规格：两轴打光结构逐项同构 —— 深色轴三层全部是金，浅色轴三层全部是**本色**。
-    // 所以浅色轴**没有**「共享的银白光」；三款各自的光色不同，那是「用主色打光」的必然结果。
+    // 两轴打光结构逐项同构：深色轴三层全是金，浅色轴三层全是**本色**
+    // ⇒ 浅色轴没有「共享的银白光」，三款各自的光色不同。
     for (const id of ['sakura', 'blue', 'green']) {
       const spec = LIGHT_TONES[id]
       for (const layer of ['top', 'bottom', 'left']) {
@@ -267,16 +239,12 @@ describe('色调表', () => {
         )
       }
     }
-    // 三款的光色因此应该**互不相同**（因为它们的主色不同）
     const tops = new Set(['sakura', 'blue', 'green'].map(id => LIGHT_TONES[id].top))
     assert.equal(tops.size, 3, '三款的顶光应各自不同（各自的主色）')
   })
 
   it('浅色轴的三层光应该 与深色轴**结构同构**（都是「主色打光」）', () => {
-    // 走查过的弯路：暖金（owner：「显脏」）→ 冷白 → 银白（owner：「没反过来啊」）。
-    // 最终规格：「浅色版也可以和深色版有相同的渐变质感，底部和顶部的打光都一样，
-    //           只是浅色是用主色打光。」
-    // 深色轴：三层全部是金（比近黑底亮 → 是光）；浅色轴：三层全部是本色。
+    // 深色轴：三层全部是金（比近黑底亮 ⇒ 是光）；浅色轴：三层全部是本色。
     const rgbOf = c => [...c.matchAll(/\d+/gu)].slice(0, 3).map(n => Number(n[0]))
     // 深色轴基准：三层同源
     for (const layer of ['top', 'left']) {
@@ -296,7 +264,7 @@ describe('色调表', () => {
         )
       }
     }
-    // 深色轴的金保持不变（它本来是对的）
+    // 深色轴的金保持不变。
     const [r, , b] = rgbOf(DARK_TONES.violet.top)
     assert.ok(r > b, '深色轴仍是暖金（R > B）')
   })
@@ -306,11 +274,9 @@ describe('色调表', () => {
     const lefts = new Set(['sakura', 'blue', 'green'].map(id => LIGHT_TONES[id].left))
     assert.equal(tops.size, 3, '三款顶光应各自不同（各自的主色）')
     assert.equal(lefts.size, 3, '三款侧光应各自不同')
-    // 底部也是**本色**的渐变 —— 三款必须各异
     const bottoms = new Set(['sakura', 'blue', 'green'].map(id => LIGHT_TONES[id].bottom))
     assert.equal(bottoms.size, 3, '底部渐变应三款各异（那是各款的主色所在）')
-    // 三款的差异**只在光**：base / sidebarFill 现在**相同**（官方配置），
-    // 区分来源是本色的三层光 —— 所以这里只断言 tint 与三层光各异。
+    // 三款的差异**只在光**：base / sidebarFill 现在相同（官方配置），故只断言 tint 与三层光各异。
     const tints = new Set(['sakura', 'blue', 'green'].map(id => LIGHT_TONES[id].tint))
     assert.equal(tints.size, 3, '三款本色必须互不相同（那是打光的来源）')
     const bases = new Set(['sakura', 'blue', 'green'].map(id => LIGHT_TONES[id].base))
@@ -318,8 +284,7 @@ describe('色调表', () => {
   })
 
   it('浅色轴的光层应该 **不是**暖金 / 银白这类外来光源，而是本色', () => {
-    // 历史：暖金（被判「显脏」）→ 冷白 → 银白，最后 owner 定案「用主色打光」。
-    // 这条守卫防止有人再把「共享光源」加回来 —— 那会让浅色轴与深色轴的结构不再同构。
+    // 防止有人再把「共享光源」加回来 —— 那会让浅色轴与深色轴的结构不再同构。
     for (const id of ['sakura', 'blue', 'green']) {
       const spec = LIGHT_TONES[id]
       for (const layer of ['top', 'bottom', 'left']) {
@@ -332,20 +297,16 @@ describe('色调表', () => {
     // 底部 α = 共享常量（与色卡对齐，见 PREVIEW_ALPHA_SCALE）
     const alpha = rgba => Number(/,\s*([\d.]+)\)$/u.exec(rgba)[1])
     assert.equal(alpha(LIGHT_TONES.blue.bottom), DEPTH_ALPHA.light)
-    // 对比：暗色轴的光层本来就是环境级的小值
     assert.ok(alpha(DARK_TONES.violet.top) < 0.15)
   })
 
   it('浅色轴的光层 α 应该 与深色轴同构（上 / 侧 / 底各一档，且底部守住共享常量）', () => {
     /** rgba 的 alpha。 */
     const alpha = rgba => Number(/,\s*([\d.]+)\)$/u.exec(rgba)[1])
-    // owner：「底部和顶部的打光都一样，只是浅色是用主色打光」——
-    // 浅色轴**不再有「必须极淡」或「必须冷调」的限制**（那些是「外来光源」时代的约束）。
     // 现在要守的是**结构**：三层各给一档 alpha，底部与 DEPTH_ALPHA 对齐。
     assert.equal(alpha(LIGHT_TONES.blue.bottom), DEPTH_ALPHA.light, '底部 α 应与共享常量一致')
     assert.equal(alpha(LIGHT_TONES.blue.top), LIGHT_GLOW_ALPHA.top, '顶部 α 应取自共享档')
     assert.equal(alpha(LIGHT_TONES.blue.left), LIGHT_GLOW_ALPHA.left, '侧光 α 应取自共享档')
-    // 对比：暗色轴的光层本来就是环境级的小值
     assert.ok(alpha(DARK_TONES.violet.top) < 0.15)
   })
 
@@ -371,7 +332,7 @@ describe('色调表', () => {
     assert.equal(rgbOf(DARK_TONES.violet.bottom), '96,78,168')
     assert.equal(rgbOf(DARK_TONES.violet.left), '232,162,74')
     assert.equal(DARK_TONES.violet.grain, true)
-    // 底部辉光的 alpha 是**有意上调**的（pyai.site 原值 .08 → 现 .18，owner 认为实况偏保守），
+    // 底部辉光的 alpha 是**有意上调**的（pyai.site 原值 .08 → 现 .18，实况偏保守），
     // 这条断言是为了防止它被误当「抄错」而改回去。
     assert.equal(alphaOf(DARK_TONES.violet.bottom), 0.18)
     assert.ok(alphaOf(DARK_TONES.violet.bottom) > 0.08, 'bottom alpha 已高于 pyai.site 原值')
@@ -487,7 +448,7 @@ describe('双语标签', () => {
     const TONE_NAMES = ALL_TONE_IDS.filter(id => id !== 'official')
     assert.deepEqual([...TONE_NAMES].sort(), ['blue', 'crimson', 'forest', 'green', 'sakura', 'violet'])
     // ⚠️ 上限从 5 放宽到 6（2026-09-18），只为 `Sakura` 一款 ——
-    // owner 把这档从「素白 / Chalk」改成樱花粉时，一并定了英文名 `Sakura`。
+    // 这档从「素白 / Chalk」改成樱花粉时，一并定了英文名 `Sakura`。
     // 它是「樱花」最直接的英文，且仍是**单个单词、三音节**，与另几款的节奏差一档但不成行；
     // 若日后要严格回 5 字母，替代候选是 `Petal`（花瓣，5 字母）——但那不如 `Sakura` 达意。
     for (const id of TONE_NAMES) {
@@ -497,7 +458,7 @@ describe('双语标签', () => {
   })
 
   it('中文色调标签应该 一律两个字（含 `official`）', () => {
-    // owner：「把色卡那里的官方默认改成默认吧」。原来是四个字，在一排两字标签里
+    // 官方默认改成「默认」：四个字在一排两字标签里
     // 会把整行的文字节奏带歪 —— 与英文那条 4–5 字母规则同一个理由。
     for (const id of ALL_TONE_IDS) {
       const label = zh[`tone.${id}`]

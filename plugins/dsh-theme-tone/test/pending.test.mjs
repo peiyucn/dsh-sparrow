@@ -1,26 +1,12 @@
-/**
- * 在途乐观值归属的回归守卫（owner 真机报「切换不同 tone 时会来回跳」）。
- *
- * 事故形状（本机 dsh 实测轨迹，连点 Default → 40ms 后点 Sakura）：
- *
- * ```text
- * t=29ms   Default   第 1 笔乐观值
- * t=82ms   Sakura    第 2 笔乐观值
- * t=1171ms Default   ← 第 1 笔结算回来，误收掉第 2 笔（就是这一次回跳）
- * t=2444ms Sakura    第 2 笔结算，最终收敛
- * ```
- *
- * 根因：旧实现把「快照 revision 前进过」当结算判据，多笔在途时先发那笔的结算会让
- * revision 前进，于是**更新的那一笔**乐观值被当作废。本模块把所有权按「哪一笔」记账。
- *
- * ⚠️ 本文件测的是**行为**（谁能收谁不能收），不是实现形状 —— 换实现只要语义不变仍应通过。
- */
+// 在途乐观值归属：多笔并发时，只有「同一笔」的结算才能收掉自己的乐观值。
+// 别回到「快照 revision 前进过即结算」的判据——多笔在途时会误收更新的那笔。
+// 本文件测**行为**（谁能收谁不能收），不是实现形状：换实现只要语义不变仍应通过。
 
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { createPendingToneTracker } from '../lib/client/pending.js'
 
-/** 两轴都取款（避免复用一个 id 掩饰字段串味）。 */
+/** 两轴用不同 id，避免同一 id 掩盖字段串味。 */
 const LIGHT = 'sakura'
 const DARK = 'forest'
 
@@ -35,7 +21,7 @@ describe('pending.ts · 在途乐观值归属', () => {
   })
 
   it('⛔ 被顶掉的那一笔无权收回（否则画面回跳到旧选择）', () => {
-    // 这就是 owner 报的 bug：两笔在途，先发那笔结算回来时**不得**动乐观值。
+    // 两笔在途时，先发那笔的结算不得动乐观值（本文件的核心契约）。
     const tracker = createPendingToneTracker()
     const base = { lightTone: 'official', darkTone: 'violet' }
     const first = tracker.begin('lightTone', 'sakura')
@@ -48,8 +34,7 @@ describe('pending.ts · 在途乐观值归属', () => {
   })
 
   it('按字段分别记账：切轴选色不顶掉另一轴在途的那一笔', () => {
-    // 两轴各写各的字段；用户快速「浅色选一张 → 切深色再选一张」时，浅色那笔仍在途，
-    // 深色的写入不该把它顶掉（tokenOverrides 两轴一次给全，浅色那笔同样要算数）。
+    // 两轴各写各的字段：深色的写入不该顶掉仍在途的浅色那笔（tokenOverrides 两轴一次给全）。
     const tracker = createPendingToneTracker()
     const base = { lightTone: 'official', darkTone: 'violet' }
     const light = tracker.begin('lightTone', LIGHT)

@@ -37,11 +37,8 @@ import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT,
 const GUIDE_ATTR = '[data-sidebar-right-guide]'
 
 /**
- * **单层光**的层数（上光 / 下深 / 左光），从函数自身推导而不是另立一个常量 ——
- * 免得它与 `dimmedBackdropGradients` 里那三道渐变各自漂移。
- *
- * 补偿后的玻璃面应当是它的 **2 倍**（两道同形光叠加）。这个断言**不是自证**：
- * 它比的是「渲染出来的 CSS 层数」与「函数单层数 × 2」，把补偿改成退化单层必然红。
+ * **单层光**的层数（上光 / 下深 / 左光），从函数自身推导而不是另立常量 —— 免得与那三道渐变各自漂移。
+ * 补偿后的玻璃面应当是它的 **2 倍**；断言比的是渲染出的 CSS 层数，把补偿改成退化单层必然红。
  */
 const LIGHT_LAYERS = (dimmedBackdropGradients(1).match(/radial-gradient\(/gu) ?? []).length
 
@@ -50,32 +47,17 @@ const css = buildGlassCss()
 const rules = css.replace(/\/\*[\s\S]*?\*\//gu, '')
 
 /**
- * 取**右边栏那条图层规则**的起点（已剥注释）。
- *
- * ⚠️ 0.1.7 起这条规则是**三条选择器共用同一段声明**：
- * `[data-sidebar-right-panel], [data-dockkit-pane], [data-dockkit-empty]` ——
- * 因为右边栏改由 dockkit 承载，真正刷不透明底色的是它的内容宿主
- * `[data-dockkit-pane]`（画在 `.panel` 上会被那层整个盖掉）。
- *
- * ⚠️ 2026-09-29 起面板那条**必须门在「已展开」上**（owner 报「右边栏打开过一次，背景就花了」）：
- * 官方面板是常驻元素，收起时宽度仍是持久化的 --dsh-sidebar-width、盒子照旧可见，
- * 我们那片 100vw×100vh 渐变就会以 screen 压在会话区右侧。故选择器写成
- * `[data-sidebar-right-panel][data-sidebar-right-open]`。
- * 定位仍用「属性名之后紧跟的字符」，不写死完整选择器。
- * @param source - 已剥注释的样式表文本。
- * @returns 该规则的起始下标（找不到为 -1）。
+ * 取**右边栏那条图层规则**的起点（已剥注释）：0.1.7 起这条规则是**三条选择器共用同一段声明**。
+ * ⚠️ 面板那条**必须门在「已展开」上**：面板是常驻元素、收起时盒子仍可见，
+ * 不门的话那片 100vw×100vh 渐变会以 screen 常驻压在会话区右侧。
  */
 function rightPanelRuleStart(source) {
   return source.indexOf(`[${RIGHT_PANEL_ATTR}][`)
 }
 
 /**
- * 取**输入框卡片**那条规则（已剥注释）。
- *
- * 必须剥注释：本模块的注释里会引用 `linear-gradient` / `background:` 这类**反面教材**
- * 做对比说明，直接对含注释的切片断言会误判（踩过一次）。
- * @param text - 完整样式表文本。
- * @returns 卡片规则的文本（选择器 + 声明块）。
+ * 取**输入框卡片**那条规则（已剥注释）：注释里会引用 `linear-gradient` / `background:` 这类反面教材，
+ * 直接对含注释的切片断言会误判。
  */
 const cardRule = (text) => {
   const clean = text.replace(/\/\*[\s\S]*?\*\//gu, '')
@@ -84,13 +66,8 @@ const cardRule = (text) => {
 }
 
 /**
- * 取所有**选择器里含 needle 的规则**（选择器 + 声明）—— 用大括号配平切规则。
- *
- * ⚠️ 2026-09-24 起卡片/顶栏的玻璃搬到了 `::before` 上，`cardRule` 那种
- * 「从选择器切到第一个 `}`」的取法只能拿到**本体**那一条；要断言玻璃本体得用本函数。
- * @param text - 样式表文本（注释会被剥掉）。
- * @param needle - 选择器片段。
- * @returns 命中规则的文本数组（每项含选择器与整段声明）。
+ * 取所有**选择器里含 needle 的规则**（选择器 + 声明，用大括号配平切）：
+ * 卡片 / 顶栏的玻璃搬到了 `::before` 上，`cardRule` 那种「切到第一个 `}`」只能拿到**本体**那一条。
  */
 const rulesFor = (text, needle) => {
   const clean = text.replace(/\/\*[\s\S]*?\*\//gu, '')
@@ -118,12 +95,8 @@ const rulesFor = (text, needle) => {
 const cardGlassRule = (text) => rulesFor(text, '[data-composer-card]::before').join('\n')
 
 /**
- * 卡片玻璃层里那条**通用（深色轴）**规则 —— 光路形状的基准。
- *
- * 浅色轴那条只覆盖 `background-image`（阴影浓度不同），两条都被 `cardGlassRule` 收进来时
- * 椭圆数会翻倍，故几何类断言取通用那条。
- * @param text - 样式表文本。
- * @returns 通用玻璃层规则的文本。
+ * 卡片玻璃层里那条**通用（深色轴）**规则 —— 光路形状的基准：浅色轴那条只覆盖 `background-image`，
+ * 两条都收进来时椭圆数会翻倍，故几何类断言取通用那条。
  */
 const cardGlassBaseRule = (text) =>
   rulesFor(text, '[data-composer-card]::before').find((r) => !r.includes(':not([data-ds-dark-theme])')) ?? ''
@@ -134,17 +107,11 @@ const cardElementRule = (text) =>
     .filter((r) => !/::before|::after/u.test(r.slice(0, r.indexOf('{'))))
     .join('\n')
 
-// 玻璃效果依赖几个**公开 DOM 锚点**（官方自己的 CSS 也依赖它们）：
-//   [data-phase] / [data-slot='conversation.header'] / [data-conversation-scroll] /
-//   [data-composer-seat]
-// 以及一个**魔法数字** 76px（顶栏高度）。这些耦合是这套效果最脆的地方，逐条钉住。
-//
-// ⚠️ 顶栏那条锚点在 0.1.7 换了（owner 真机报「顶栏崩了」的根因）：
-//   0.1.5-rc.2 里 `conversation.session.header` 的产出物**直接是 .root 的子元素**，
-//   故打 `> *` 命中它；0.1.7-rc.1 把它嵌进 `<header data-slot='conversation.header'>`，
-//   而那个会话槽位自己是 display:contents —— `> *` 于是命中了官方的 .titleRow，
-//   把标题行抽成绝对定位浮层、`<header>` 塌成 10px（实测 40px → 10px）。
-//   现在的规则打**真正生成盒子的那个 `<header>`**，下面的回归守卫钉住这一点。
+// 玻璃效果依赖几个**公开 DOM 锚点**（官方自己的 CSS 也依赖）：
+//   [data-phase] / [data-slot='conversation.header'] / [data-conversation-scroll] / [data-composer-seat]
+// 以及一个**魔法数字** 76px（顶栏高度）—— 这些耦合最脆，逐条钉住。
+// ⚠️ 顶栏锚点必须是**真正生成盒子的那个 `<header>`**：会话槽位自己是 display:contents，
+//   打 `> *` 会命中官方的 .titleRow（把标题行抽成浮层、`<header>` 塌成 10px）。
 describe('glass：顶栏浮层', () => {
   it('三处改动应该 同时存在（少一个正文首行会被顶栏盖住）', () => {
     assert.match(css, /\[data-phase='active'\]\s*\{[^}]*position: relative/u, '① 需要定位祖先')
@@ -153,23 +120,9 @@ describe('glass：顶栏浮层', () => {
       /\[data-slot='conversation\.header'\] > header[\s\S]*?position: absolute/u,
       '② 顶栏要浮起来（打在官方那个 <header> 上）',
     )
-    // ③ 滚区顶部要补出顶栏高度 —— **必须是 padding-top，且滚动条由轨道 margin 单独下推**。
-    //
-    //    这条踩过两次，两个方向各自坏一半，必须一起看：
-    //
-    //    | 写法 | 正文能否滚到顶栏下（= 玻璃"透"） | 滚动条位置 |
-    //    | :--- | :--- | :--- |
-    //    | padding-top: 76            | ✅ 能（padding box 从 y=0 起） | ❌ 画进顶栏带（owner 报「滚动条跑上去」） |
-    //    | border-top: 76             | ❌ **不能**（padding box 下移到 76，溢出裁剪线跟着到 76） | ✅ 在顶栏下方 |
-    //    | padding-top + 轨道 margin  | ✅ 能 | ✅ 在顶栏下方 |
-    //
-    //    **border-top 是拿"玻璃的透"换"滚动条位置"**：模糊与 alpha 都还在，但顶栏底下
-    //    什么都没有 ⇒ 玻璃退化成平板，owner 看到的就是「顶栏变成不透明了」。
-    //    真机 A/B（滚动 0→1500，量顶栏带内像素变化；滑块染橙量顶端 y）：
-    //      官方默认档                    顶栏带内有变化，滑块顶端 y=78（= 76 + 官方轨道 2px）
-    //      padding-top: 76               31295 px ✅            滑块顶端 75 ✗
-    //      border-top: 76                 971 px ❌ 顶栏下没东西  滑块顶端 78 ✓
-    //      padding-top + 轨道 margin      31176 px ✅            滑块顶端 78 ✓
+    // ③ 滚区顶部要补出顶栏高度 —— **必须是 padding-top，且滚动条由轨道 margin 单独下推**：
+    //    border-top 会让 padding box 下移、溢出裁剪线跟着到 76 ⇒ 顶栏底下什么都没有、玻璃退化成平板；
+    //    只写 padding-top 则滚动条画进顶栏带。两个方向各坏一半，必须一起看。
     assert.match(
       css,
       new RegExp(`\\[data-conversation-scroll\\]\\s*\\{[^}]*padding-top: ${HEADER_HEIGHT_PX}px`, 'u'),
@@ -213,9 +166,7 @@ describe('glass：顶栏浮层', () => {
   it('顶栏应该 半透明 + 真模糊，且 z-index **高于用户内容层**、低于菜单', () => {
     assert.ok(css.includes(GLASS_BLUR), '要用同一套 blur 参数')
     assert.match(css, new RegExp(`color-mix\\(in srgb, var\\(--dsw-alias-bg-base\\) ${GLASS_HEADER_ALPHA * 100}%, transparent\\)`, 'u'))
-    // 顶栏必须高于「用户内容层」（CONTENT_Z_INDEX）：内容层是正 z-index 的定位元素，
-    // 会盖掉一切更小的层。曾经这里是 9（只想着高于拖拽条 8），内容层抬到 81 后
-    // 顶栏就被内容盖住了（owner 真机反馈「顶栏盖不住对话内容了」）。
+    // 顶栏必须高于「用户内容层」（CONTENT_Z_INDEX）：内容层是正 z-index 的定位元素，会盖掉一切更小的层。
     assert.match(css, new RegExp(`z-index: ${ABOVE_CONTENT_Z_INDEX};`, 'u'), '应取 ABOVE_CONTENT_Z_INDEX')
     assert.ok(
       ABOVE_CONTENT_Z_INDEX > CONTENT_Z_INDEX && ABOVE_CONTENT_Z_INDEX < 100,
@@ -224,25 +175,10 @@ describe('glass：顶栏浮层', () => {
   })
 
   it('⛔ 顶栏**不得**抬到右栏面板之上 —— 与面板同档（82）靠 DOM 次序决胜才是官方次序', () => {
-    // owner 报「顶栏的后台任务弹窗被右侧栏压住」。实测（1600x900，真实实例）结论分两半：
-    //
-    // ① **可见的那半是官方裁切缺陷，不是层序**。中列 `centerCol` / `data-phase` 都是
-    //    `overflow: hidden`，裁切右边界 **逐像素等于**面板左缘（实测 centerCol 右缘 880
-    //    = 面板左缘 880）；弹窗向右伸出的部分全被裁掉。**官方默认档下同样裁**
-    //    （theme off 复现）。
-    //    ✅ **2026-10-02 已修**（owner 复报「还是没有修好」后重查）：修法是把弹框的
-    //    **包含块**换成顶栏 / 会话根并夹进列内，**不碰列几何、也不碰任何 z-index** ——
-    //    见 `src/popover.ts` 与 `test/popover.test.mjs`。它属于「修官方无意的 bug」
-    //    那一类，两个档都修（见 docs/private-seams.md §B 第 4 条）。
-    // ② **我们这半不能改**：把顶栏抬到 83 会**违反官方次序**：
-    //    官方面板全屏时 `--dsh-dockkit-dock-layer: 40`（SidebarRight.module.css:64-66）
-    //    本来就高于顶栏的 9 ⇒ 全屏面板必须压住顶栏。实测抬到 83：整块像素
-    //    mean 2.47 / 17.3% 变化（顶栏浮到全屏文件面板之上，实测最深点 Δ235）。
-    //    带「全屏时降回 82」的门虽然 push+全屏都零回归，但仍有第三处风险：
-    //    dockkit **浮窗**（`--dsh-dockkit-float-layer: 60`，官方原序 浮窗 60 > 顶栏 9，
-    //    浮窗拖到顶栏区时该赢）在本插件下面板已被抬成层叠上下文 ⇒ 顶栏 83 会反过来压住它。
-    //    ⚠️ 而**抬高弹框自己的 z-index 是无效的** —— 它长在顶栏那层层叠上下文里，
-    //    那个 100 对外只算 82，出不去（这正是 ① 后半段的成因）。
+    // ① 可见的那半是**官方裁切缺陷，不是层序**：中列 `overflow: hidden`，裁切右边界逐像素等于面板左缘，
+    //    弹窗向右伸出的部分全被裁（官方默认档下同样裁）。已由 `src/popover.ts` 换**包含块**修掉（两档都修）。
+    // ② 我们这半**不能改**：把顶栏抬到 83 会违反官方次序 —— 全屏面板的 dock layer 本身就高于顶栏、
+    //    必须能压住它；dockkit 浮窗同理。而抬高弹框自己的 z-index 无效（它长在顶栏那层层叠上下文里）。
     // 故本用例把「同档 + 菜单仍严格高于面板」钉住，防止将来有人顺手把顶栏抬上去。
     const headerZ = [...css.matchAll(/\[data-slot='conversation\.header'\] > header \{[^}]*?z-index: (\d+);/gu)].map(m => Number(m[1]))
     assert.ok(headerZ.length > 0, '应能找到顶栏那条 z-index')
@@ -257,19 +193,13 @@ describe('glass：顶栏浮层', () => {
   })
 
   it('顶栏应该 **自己画一遍背景层的渐变栈**，且光与填充各自独立定强度', () => {
-    // 背景层（80）原本压在顶栏之上，顶光是**直接盖在顶栏上**的；顶栏为躲开内容抬到 82 后
-    // 就吃不到了（owner：「怎么顶栏的金光没有了」）。所以要自己画一遍，且必须**同源**。
-    // ⚠️ **2026-09-27：光不再跟着填充 alpha 一起压**（owner：「顶部的光被顶栏挡住了」）。
-    // 实测光一直没丢（重画忠实度 A/G = 0.98）——问题是底色 α0.7 把那条带整体压暗 26%，
-    // 观感成了一条暗带。改为光 ×HEADER_LIGHT_SCALE(=1.0)：台阶 5.15 → 3.44（仍是顶栏略暗），
-    // 顶栏内的光贡献 +42%。
-    // 锚点用 0.1.7 起的那条（conversation.header > header）—— 见本文件顶部的结构对照。
-    // ⚠️ 2026-09-24 起玻璃挂 **::before**（本体不许带 backdrop-filter，见下面那条守护）。
+    // 背景层（80）原本压在顶栏之上，顶光是**直接盖在顶栏上**的；顶栏抬到 82 后就吃不到了，故自己重画一遍，且必须**同源**。
+    // ⚠️ 光**不跟着填充 alpha 一起压**：底色 α0.7 会把那条带整体压暗 26%，观感成一条暗带。
+    // 锚点用 0.1.7 起的那条（conversation.header > header）；玻璃挂 **::before**（本体不许带 backdrop-filter）。
     const header = rulesFor(css, "[data-slot='conversation.header'] > header::before").join('\n')
     assert.ok(header.length > 0, '顶栏玻璃层（::before）应存在')
-    // ⛔ **结构断言，不是"产物包含产物"**：`compensatedBackdropGradients` 是**构建期**调用的，
-    //    拿 `header.includes(那个调用)` 去断言是**自证**的 —— 把函数改成退化版，两边同时变、
-    //    断言照样绿（反向注入 N6 实测漏网）。改为直接数**渲染出来的光层数**。
+    // ⛔ **结构断言，不是"产物包含产物"**：拿 `header.includes(那个调用)` 去断言是**自证**的 ——
+    //    把函数改成退化版两边同时变、断言照样绿。故改为直接数**渲染出来的光层数**。
     assert.equal(
       (header.match(/radial-gradient\(/gu) ?? []).length,
       LIGHT_LAYERS * 2,
@@ -281,8 +211,7 @@ describe('glass：顶栏浮层', () => {
       header.includes(`${HEADER_LIGHT_BOOST * 100}%, transparent)`),
       `顶栏的光必须含补偿层（${HEADER_LIGHT_BOOST * 100}% 那一档）—— 缺了就等于没补`,
     )
-    // 光与底色分离之后，这条不变式要守住：两者**不得**再相等 ——
-    // 相等的旧做法正是 owner 报的「光被顶栏挡住」。
+    // 光与底色分离之后，两者**不得**再相等：相等等于又把光压回填充 alpha 里。
     assert.notEqual(
       HEADER_LIGHT_SCALE,
       GLASS_HEADER_ALPHA,
@@ -293,14 +222,9 @@ describe('glass：顶栏浮层', () => {
   })
 
   it('⛔ 顶栏本体与卡片本体**都不得**带 backdrop-filter —— 会把官方弹层的模糊关进子树', () => {
-    // owner 2026-09-24 真机报「弹层全透明 / 分区标题带子串色 / 联想对话框全透明」的根因：
-    // 带 backdrop-filter（非 none）的元素会成为**它后代的 backdrop root**，同时成为
-    // position: fixed 后代的包含块。而官方弹层就渲染在顶栏 / 输入卡子树里
-    //（官方 InputBar 用 closest('[data-composer-card]') 给触发器菜单找锚，
-    //  顶栏动作区的弹层锚点见 surface.ts 的 MENU_MATERIAL_ANCHORS）——
-    // 于是弹层自己的 `backdrop-filter: var(--dsw-menu-backdrop-filter)`（官方 blur(40px)）
-    // 只能采样子树，模糊失效，只剩半透明底色 → 看着就是「全透明 + 串色」。
-    // 玻璃因此一律挂 ::before：伪元素没有后代，不会把官方弹层关进去。
+    // 带 backdrop-filter（非 none）的元素会成为**它后代的 backdrop root**，也是 fixed 后代的包含块；
+    // 官方弹层就渲染在顶栏 / 输入卡子树里 ⇒ 它自己的 backdrop-filter 只能采样子树、模糊失效（观感「全透明 + 串色」）。
+    // 玻璃因此一律挂 **::before**：伪元素没有后代，不会把官方弹层关进去。
     const headerElement = rulesFor(css, "[data-slot='conversation.header'] > header")
       .filter((r) => !/::before|::after/u.test(r.slice(0, r.indexOf('{'))))
       .join('\n')
@@ -315,17 +239,9 @@ describe('glass：顶栏浮层', () => {
   })
 
   it('⛔ 右边栏**不得**用 background-attachment: fixed —— transform 会让它静默改判定位区', () => {
-    // owner 报的动态 bug：「右边栏，在弹出/收回过程中，上下亮度会骤增，静止时没事。」
-    //
-    // 根因（本机无头复现 + 白线探针实测）：**只要元素带非 none 的 transform，
-    // fixed 的定位区就从「视口」变成「元素自己的盒子」**，百分比随之按元素盒解析。
-    // 而官方 .panel 的开关动画恰是 transform（SidebarRight.module.css:36-47，
-    // translateX(100%) ←→ none，0.3s）→ 动画期间 50% 从视口中心 640 跳到面板盒中心 190，
-    // 顶光/底光灌进面板；动画结束 regime 翻回来 → 「骤增」。静止态没事，故截不到图。
-    // ⚠️ transform: translateX(0px) 这种看着是空操作的值**同样触发**。
-    //
-    // 实测（面板几何完全相同，逐像素与「无面板」参照比对）：
-    //   静止 + fixed + at 50% → mad 0.2（对）；动画 + fixed + at 50% → mad 26.4 / max 90（错）。
+    // 根因：元素带非 none 的 transform 时，fixed 的定位区从「视口」变成「元素自己的盒子」，百分比随之按元素盒解析；
+    // 官方 .panel 的开关动画恰是 transform（0.3s）⇒ 动画期间顶光/底光灌进面板（就是「骤增」），静止态没事。
+    // ⚠️ `transform: translateX(0px)` 这种看着像空操作的值**同样触发**。故这里一律不用 fixed。
     const panel = rules.slice(rightPanelRuleStart(rules))
     const body = panel.slice(0, panel.indexOf('}') + 1)
     assert.ok(!/background-attachment:\s*fixed/u.test(body), 'fixed 在 transform 下会改判定位区')
@@ -334,20 +250,15 @@ describe('glass：顶栏浮层', () => {
   })
 
   it('右边栏改用「显式视口尺寸的背景盒」——三个 per-layer 属性都必须给足 3 个值', () => {
-    // 替代方案：不用 fixed，而是把图片盒**显式**写成 100vw×100vh 并右对齐。
-    // .panel 是 position:absolute; right:0，承载它的 frame 全窗宽 → 面板右缘恒等于视口右缘，
-    // 于是该盒恰好覆盖视口，at 50% 落在视口中心；两种 transform regime 同解，没有可切换的东西。
-    //
-    // ⚠️ 三个 per-layer 属性（size / position / repeat）**都必须给足层数**：
-    // 值少于层数时会**按顺序循环补齐**（本插件栽过 —— 写「scroll, fixed」等于两者交替，
-    // 第 1、3 段渐变退回按元素盒解析）。所以这里逐个钉住。
-    // 层数现在是 **3**（颗粒已改为独立的 ::after，不再占背景层 —— 见下一条用例）。
+    // 替代方案：不用 fixed，把图片盒**显式**写成 100vw×100vh 并右对齐 —— 面板右缘恒等于视口右缘，
+    // 该盒恰好覆盖视口、at 50% 落在视口中心，两种 transform regime 同解。
+    // ⚠️ 三个 per-layer 属性（size / position / repeat）**都必须给足层数**：值少于层数会**按顺序循环补齐**。
+    // 层数现在是 **3**（颗粒已改为独立的 ::after）。
     const panel = rules.slice(rightPanelRuleStart(rules))
     const body = panel.slice(0, panel.indexOf('}') + 1)
     /**
-     * 按**顶层逗号**切分值。
-     * ⚠️ 不能直接 `split(',')`：值里可能含函数（如 `calc(0px - var(--x, 0px))`），
-     * 括号内的逗号不是层分隔符 —— 直接切会把 3 层读成 6 层（本仓库实测踩过）。
+     * 按**顶层逗号**切分值：值里可能含函数（如 `calc(0px - var(--x, 0px))`），括号内的逗号不是层分隔符 ——
+     * 直接 `split(',')` 会把 3 层读成 6 层。
      */
     const splitTopLevel = (value) => {
       const out = []
@@ -373,9 +284,8 @@ describe('glass：顶栏浮层', () => {
     // 三段渐变的盒子尺寸必须是**显式视口尺寸**（auto 会让盒宽随 regime 变）
     assert.deepEqual(decl('background-size'), ['100vw 100vh', '100vw 100vh', '100vw 100vh'],
       '三段渐变必须显式 100vw 100vh')
-    // 渐变右对齐（右缘 = 视口右缘），垂直方向**减去 caption 高度**
-    // —— 桌面端（Windows 标题栏）面板被 caption 挤下，不减去就会与页面那层差 40px
-    //    （owner 2026-09-30 报「桌面端右边栏展开后咱们也有点兼容问题」）。
+    // 渐变右对齐（右缘 = 视口右缘），垂直方向**减去 caption 高度** —— 桌面端面板被标题栏挤下，
+    // 不减去就会与页面那层差 40px。
     const expectedPos = 'right calc(0px - var(--dsh-windows-titlebar-height, 0px))'
     assert.deepEqual(decl('background-position'), [expectedPos, expectedPos, expectedPos],
       '三段渐变右对齐，且垂直相位按 caption 高度回正（web 下该变量不存在 ⇒ 0）')
@@ -383,9 +293,8 @@ describe('glass：顶栏浮层', () => {
   })
 
   it('桌面端 caption 相位：必须读官方变量并带 0 兜底（web 下逐像素不变）', () => {
-    // 读**官方自己**的变量而不是自己探平台：preload-windows.ts 把它置在 html 上，
-    // 沿继承树传给 body；web 下不存在 ⇒ fallback 0px，与改动前逐像素一致。
-    // 这里钉住「fallback 是 0」这个前提 —— 若有人把兜底写成非 0，web 会当场偏色。
+    // 读**官方自己**的变量而不是自己探平台：preload 把它置在 html 上、沿继承树传给 body；
+    // web 下不存在 ⇒ fallback 0px，与改动前逐像素一致。这里钉住「fallback 是 0」这个前提。
     const panel = rules.slice(rightPanelRuleStart(rules))
     const body = panel.slice(0, panel.indexOf('}') + 1)
     assert.match(body, /var\(--dsh-windows-titlebar-height,\s*0px\)/u,
@@ -406,24 +315,15 @@ describe('glass：输入框底座', () => {
   })
 
   it('⛔ 底座上**不得**再挂覆盖整座的 ::before 夹层 —— 会糊到卡片两侧的留白上', () => {
-    // owner 定案：「你这个透明，应该改变的是**输入框本身**，不是靠这个**夹层**吧……
-    // 否则会有**误伤**啊。」（发现过程：「还有东西挡着，而且这个还会根据输入框变高一起变高」）
-    //
-    // 根因：`::before { inset: 0 }` 覆盖的是**整个底座**，而底座是**全宽**的
-    // （卡片自己有 max-width，两侧留白）→ 那两条留白也被糊上一层 40% 填充 + 模糊。
-    // 实测（owner 标注截图，排除蓝色标注像素）：周围颗粒能量 **2.87**，
-    // 两侧留白被压到 **1.57 / 1.88** → 两块竖直暗矩形；又因 inset:0 跟着底座走，
-    // **输入框一变高它就跟着变高**。
-    //
-    // 正确分法：玻璃归**卡片**（[data-composer-card]，形状天然等于卡片、不外溢）；
-    // 底座**什么都不画**；只有「卡片下沿到座底」那一小条由 ::after 承担（挡正文）。
+    // 根因：`::before { inset: 0 }` 覆盖的是**整个底座**，而底座是**全宽**的（卡片自己有 max-width）
+    // ⇒ 两侧留白也被糊上填充与模糊，且 inset:0 跟着底座走、输入框一变高它就跟着变高。
+    // 正确分法：玻璃归**卡片**（形状天然等于卡片）；底座什么都不画；只有「卡片下沿到座底」那条由 ::after 承担。
     assert.ok(
       !rules.includes('[data-composer-seat]::before'),
       '底座不得再有 ::before 夹层（inset:0 会覆盖全宽底座 → 卡片两侧留白被误伤）',
     )
     // 留白背后**没有正文**（正文列比卡片窄 32px），所以不画填充也不会露出内容。
-    // ⚠️ 逐条取声明再判值：`background(-color)?:\s*(?!none)` 这种写法会从 `\s*` 回溯，
-    // 把 `background: none` 也判成命中（踩过）。
+    // ⚠️ 逐条取声明再判值：`background(-color)?:\s*(?!none)` 会从 `\s*` 回溯，把 `background: none` 也判成命中。
     const seat = rules.slice(rules.indexOf("[data-phase='active'] [data-composer-seat] {"))
     const body = seat.slice(0, seat.indexOf('}') + 1)
     const decls = [...body.matchAll(/background(?:-color|-image)?\s*:\s*([^;]+);/gu)].map(m => m[1].trim())
@@ -446,14 +346,9 @@ describe('glass：输入框底座', () => {
   })
 
   it('底座 ::after 必须是**很矮 + 不透明**，且按背景底部的样子重画', () => {
-    // owner 定案：「下面这个块，应该是**很矮**才对，**就到输入框下面为止**，
-    // 然后这个块是**不透明的**」「在这个基础上，**按照背景原来底部的样子重画**就对了」。
-    //
-    // 数学：设该点页面色 P = 底色 + L，面以 alpha a 画 C，合成 a·C + (1−a)·P。
-    // 要让它恒等于周围就必须 C = P：
+    // 数学：设该点页面色 P = 底色 + L，面以 alpha a 画 C，合成 a·C + (1−a)·P。要恒等于周围就必须 C = P：
     //   * 不透明（a = 1）⇒ 原样画满 P 即可，**没有可调错的比例** ✓
-    //   * 半透明 ⇒ 得画 a·P（底色与光**都**乘 a）；漏乘光就是「两层光」。
-    // 所以「不透明」不是妥协，而是让等式**精确成立**的取法。
+    //   * 半透明 ⇒ 得画 a·P（底色与光**都**乘 a）；漏乘光就是「两层光」。故「不透明」是让等式精确成立的取法。
     const seat = rules.slice(rules.indexOf("[data-phase='active'] [data-composer-seat] {"))
     const after = seat.slice(seat.indexOf('::after'))
     const body = after.slice(0, after.indexOf('}') + 1)
@@ -468,9 +363,8 @@ describe('glass：输入框底座', () => {
     // 按背景底部的样子重画：同源的光 + 颗粒
     assert.ok(body.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), '颗粒必须在（漏了它就是唯一「干净」的平块）')
     assert.ok(body.includes(BACKDROP_GRADIENTS), '光必须与背景层**同源**（直引，不复制数值）')
-    // ⚠️ 单个 fixed：本规则 4 层 background-image，`scroll, fixed` 会被循环补齐成
-    // scroll/fixed/scroll/fixed，第 1、3 段渐变退回按元素自身盒子解析。
-    // （这是**退回档**：右栏打开等相位前提不成立的状态走它 —— 慢但绝不位移。）
+    // ⚠️ 单个 fixed：本规则 4 层 background-image，`scroll, fixed` 会被循环补齐成 scroll/fixed/scroll/fixed，
+    // 第 1、3 段渐变退回按元素自身盒子解析。（这是**退回档**：相位前提不成立的状态走它 —— 慢但绝不位移。）
     assert.match(body, /background-attachment: fixed;/u, '必须单个 fixed（覆盖全部 4 层）')
     assert.ok(!body.includes('scroll, fixed'), '不得写 scroll, fixed（层数不足会被循环补齐）')
     // 遮盖强度（那条带子是**不透明**的，所以不留 !important 的必要，但也不该被官方简写压掉）
@@ -478,10 +372,8 @@ describe('glass：输入框底座', () => {
   })
 
   it('座底不透带必须有**相位性能档**，且门由运行期几何决定（不是「右栏折叠」）', () => {
-    // owner 报「模型 think 时插件主题下滚动明显变卡、官方深浅主题不卡」的修法。
-    // 实测：绘制次数 417~429 -> 183~186（-56%），Paint 分项 140~195 -> 25~31 ms。
-    // 机制：`background-attachment: fixed` 让定位区变成**视口** ⇒ 每帧按视口栅格化；
-    // 成本**与图片面积无关**（声明尺寸缩到 1/225 也不省）。详见 docs/spec/10-fixed-attachment-cost.md。
+    // 修「think 时滚动明显变卡」：`background-attachment: fixed` 让定位区变成**视口** ⇒ 每帧按视口栅格化，
+    // 成本**与图片面积无关**。本档改成按相位重画（长度相位 ⇒ 与元素几何无关）。详见 docs/spec/10-fixed-attachment-cost.md。
     const phase = rulesFor(css, `[${PHASE_BAND_ATTR}] [data-phase='active'] [data-composer-seat]::after`)
     assert.equal(phase.length, 1, `座底性能档应恰好一条，实际 ${phase.length}`)
     const p = phase[0]
@@ -506,8 +398,7 @@ describe('glass：输入框底座', () => {
     assert.ok(pBody.includes(`var(${PHASE_BAND_VARIABLE})`), 'x 必须读运行期实测的左缘量')
     assert.ok(pBody.includes(`var(${PHASE_BAND_TOP_VARIABLE})`), 'y 必须读运行期实测的上缘量')
     // ⚠️ 不许再出现百分比相位：百分比按「(定位区尺寸 − 图片尺寸)」解析 ⇒ 依赖元素自身宽高，
-    //    于是同一个配方在不同盒子上给出不同结果，且「下缘贴视口底」那类前提会随布局漂移
-    //   （本轮为此返工多次）。长度则与元素几何完全无关。
+    //    同一配方在不同盒子上给出不同结果，且「下缘贴视口底」那类前提会随布局漂移。长度则与元素几何完全无关。
     assert.ok(!/%/u.test((/background-position:\s*([^;]+);/u.exec(pBody) ?? ['', ''])[1]),
       'background-position 不得用百分比（须全用长度，才能与元素宽高无关）')
     // 不许再出现「纯 CSS 推导」的痕迹（那套在右栏打开时是错的）
@@ -546,19 +437,16 @@ describe('glass：输入框底座', () => {
   })
 
   it('卡片缺口：性能档与固定档**成对**存在（只修一条只省 ~15%）', () => {
-    // 实测：只改座底带省 17%、只改缺口省 15%，**两条一起改省 54%**（paintN 435 -> 201）——
-    // 只要滚动容器里还留着一条 fixed，那笔按视口栅格化的开销就仍然要付。
-    // 故两条必须同进同退，这条断言就是防「后人只改一条」。
+    // 实测：只改座底带省 17%、只改缺口省 15%，**两条一起改省 54%** ——
+    // 只要滚动容器里还留着一条 fixed，那笔按视口栅格化的开销就仍然要付。故两条必须同进同退。
     const seamCss = buildSeamCss()
     const notchPhase = rulesFor(seamCss, `[${PHASE_NOTCH_ATTR}] [data-phase='active'] [data-composer-seat] ${anchorSelector(ANCHOR.composerHost)}::after`)
     assert.equal(notchPhase.length, 1, `缺口性能档应恰好一条，实际 ${notchPhase.length}`)
     const body = notchPhase[0].slice(notchPhase[0].indexOf('{') + 1, notchPhase[0].lastIndexOf('}'))
     assert.match(body, /background-attachment:\s*scroll/u, '缺口性能档用 scroll')
-    // ⚠️ **本档只许覆盖 background-\* 四条**，盒子几何与遮罩全部继承基础档。
-    //    这是「用长度做相位」换来的：相位与元素宽高无关 ⇒ 不必为了相位改盒子
-    //    ⇒ 遮罩百分比基准不变、瓦片仍落在卡片两角 ⇒ **逐像素等价**。
-    //    曾经为凑百分比相位把盒子改成 inset:0（再补 R/2 偏移），结果瓦片跑到宿主两角、
-    //    卡片顶边 712 个像素与基础档不同（角弧抗锯齿重采样）。这条断言防它回来。
+    // ⚠️ **本档只许覆盖 background-\* 四条**，盒子几何与遮罩全部继承基础档：相位与元素宽高无关
+    //    ⇒ 不必为了相位改盒子 ⇒ 遮罩百分比基准不变、瓦片仍落在卡片两角 ⇒ **逐像素等价**。
+    //    曾为凑百分比相位把盒子改成 inset:0，结果瓦片跑到宿主两角（角弧抗锯齿重采样）。这条防它回来。
     for (const prop of ['position', 'left', 'right', 'top', 'bottom', 'width', 'height', 'inset', 'mask-position', 'mask-size', 'mask-image', '-webkit-mask-position']) {
       // ⚠️ 必须按**完整属性名**匹配（前后只能是声明边界的 `;`/`{`/空白/行首）——
       //    否则 `background-position` 会被 `position` 这条误伤（本守卫初版就栽在这）。
@@ -577,12 +465,9 @@ describe('glass：输入框底座', () => {
   })
 
   it('拖拽条只裁上段（恢复官方几何），且**不得**动它的指针基准', () => {
-    // owner 2026-09-24：「左右边宽度拖动条**在顶栏依然穿模**」—— 顶栏浮层化的副作用：
-    // 官方 .widthHandle 是 .body 里的 absolute + top:0/bottom:0，官方顶栏在流内占 76px，
-    // 所以光带只在顶栏下缘以下；本插件把顶栏改成浮层后 .body 从 0 起，那截就透过半透明顶栏显出来。
-    // ✅ 现在的做法 = 把盒子**还原成官方那一份**（[76,720]），几何基准与官方完全一致。
-    // ⛔ 仍然**不许**碰 `--dsh-width-handle-pointer-y`：官方那套 calc(var(...) ± 36px) 必须
-    //    继续按盒子解析，hover / 拖拽时写真实 clientY 的是官方与 nav-pin（不是本插件）。
+    // 顶栏浮层化的副作用：官方 .widthHandle 是 .body 里的 absolute + top:0/bottom:0，官方顶栏在流内占 76px，
+    // 光带原本只在顶栏下缘以下；本插件把顶栏改成浮层后 .body 从 0 起，那截就透过半透明顶栏显出来。
+    // 做法 = 把盒子**还原成官方那一份**；⛔ 仍不许碰 `--dsh-width-handle-pointer-y`（那套 calc 必须继续按盒子解析）。
     const handleRules = rulesFor(css, `[${WIDTH_HANDLE_ATTR}]`).filter((r) => r.includes('top:'))
     assert.equal(handleRules.length, 1, `应恰好有一条拖拽条裁切规则，实际 ${handleRules.length}`)
     const clip = handleRules[0]
@@ -598,13 +483,9 @@ describe('glass：输入框底座', () => {
   })
 
   it('不得给底座写 position —— 本选择器 (0,3,1) 比官方 (0,3,0) 高，写了就会顶掉 sticky', () => {
-    // 回归守卫：曾经在这写 `position: relative` 当「兜底定位上下文」，注释以为
-    // 「sticky 已是定位元素、这行不生效」—— 实际本选择器是 (0,3,1)，元素计数多一个，
-    // **压过**官方的 (0,3,0)，底座从 sticky 变成 relative，于是**输入框跟着内容滚走了**
-    // （owner 真机反馈：「对话框现在跟着页面滚动了，应该是固定了，好像搞坏了」）。
-    // 底座官方本来就是 sticky（定位元素），::before 的包含块已经成立，无需兜底。
-    // 用**剥过注释**的 `rules`：这条规则的注释里就写着「曾经写了 position: relative」，
-    // 用带注释的原文会把说明文字本身当成声明。
+    // 回归守卫：曾在这写 `position: relative` 当「兜底定位上下文」，而本选择器特异度 (0,3,1) **压过**官方的 (0,3,0)
+    // ⇒ 底座从 sticky 变成 relative，**输入框跟着内容滚走了**。底座官方本来就是 sticky（定位元素），无需兜底。
+    // 用**剥过注释**的 `rules`：这条规则的注释里就写着「曾经写了 position: relative」。
     const seat = rules.slice(rules.indexOf('[data-phase=\'active\'] [data-composer-seat] {'))
     const body = seat.slice(0, seat.indexOf('}') + 1)
     assert.ok(
@@ -641,10 +522,8 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('未选工作区（待启动态）应该 撤掉我们的边光，把边界让回官方虚线框', () => {
-    // owner 2026-09-20：「点击选择工作区的页面，改成玻璃输入框后，它这个描边就有点不和谐了」
-    //   → 定案 (a)：这个状态下撤我们的边光，官方的虚线框成为唯一边界。
-    // 官方在那个状态**自己**把 --dsw-elevation-stroke-color 设成 transparent，
-    // 即刻意让虚线成为唯一那道边；我们再叠镜面 + 暗壁就是两套边缘语言。
+    // 未选工作区那个状态下撤掉我们的边光：官方**自己**把 --dsw-elevation-stroke-color 设成 transparent，
+    // 即刻意让虚线框成为唯一那道边；再叠镜面 + 暗壁就是两套边缘语言。
     const rule = new RegExp(
       `body:not\\(\\[${PLAIN_ATTR}\\]\\)\\[${WORKSTART_ATTR}\\][^{]*\\[data-composer-card\\]\\s*\\{([^}]*)\\}`,
       'u',
@@ -670,13 +549,8 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('卡片应该 带**一圈镜面高光**（液态玻璃的「玻璃厚度」），且分主光方向', () => {
-    // owner：「无论深色还是浅色模式，对话框能不能有苹果那种液态玻璃的质感？」
-    //   → owner 澄清「对话框」= **打字那个输入框**（不是模态弹窗）；
-    // 又说「液态玻璃效果好像不只是上面加亮条，你可以看看苹果的设计。」
-    // Apple 的材质是 `specular highlights, refraction` —— 高光沿玻璃的**整圈边缘**、
-    // 随主光方向强弱不同；四条等亮那是**塑料描边**，不是玻璃。
-    // ⚠️ 2026-09-24：inset 环与玻璃同在 **::before**（放本体会被玻璃层埋掉 ——
-    //   owner 报的「输入框玻璃效果改坏了，边缘光效和之前不同」就是它）。
+    // Apple 的材质是 `specular highlights, refraction` —— 高光沿玻璃的**整圈边缘**，随主光方向强弱不同；
+    // 四条等亮那是**塑料描边**。⚠️ inset 环与玻璃同在 **::before**（放本体会被玻璃层埋掉）。
     const card = cardGlassBaseRule(css)
     for (const { key } of GLASS_SPECULAR_RING) {
       assert.ok(card.includes('inset '), `卡片应有 ${key} 方向的 inset 阴影`)
@@ -687,11 +561,8 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('边光必须**沿边衰减**（不是均匀光条）—— 靠锚左上角的细长椭圆', () => {
-    // owner 连问：「**左边是满光么？？**」「**上边应该也不是均匀的光条吧？**」。
-    // `inset box-shadow` 每条边**天生均匀** —— 只能做「一圈等亮的壁」，
-    // 做不出「光从左上方来、沿边衰减」。所以主光改用 `background-image` 的细长椭圆。
-    // ⚠️ 2026-09-24 起这条 background-image 在**卡片的 ::before**（玻璃层）上；
-    //    几何取通用那条（浅色轴只换阴影浓度、椭圆形状同源）。
+    // `inset box-shadow` 每条边**天生均匀**，做不出「光从左上方来、沿边衰减」⇒ 主光改用 `background-image` 的细长椭圆。
+    // ⚠️ 它在**卡片的 ::before**（玻璃层）上；几何取通用那条（浅色轴只换阴影浓度、椭圆形状同源）。
     const card = cardGlassBaseRule(css)
     assert.match(card, /background-image:/u, '沿边衰减的光应写在 background-image 里')
     // 两条椭圆都锚在**左上角**（光源处），这样左上角最亮、向右向下各自衰减
@@ -708,12 +579,8 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('玻璃厚度必须落在**柔而不厚**的区间（四次反馈夹出来的）', () => {
-    // owner **四次**反馈（三次同向、一次反向）把这条夹成了一个**区间**，不是单边下限：
-    //   「这个玻璃**特别薄**，是不是光边有点**过于锐利**了？」→ 不能太锐（blur 要有）
-    //   「**整体玻璃厚度的感觉稍微往回收一收，也有点弄大了**」→ 也不能太厚（blur 别过大）
-    //   「把输入框的边缘光，**再稍微弄薄一点点**……**别收大了**」→ 再收一点，但仍在这个区间内
-    //   「厚度感**稍微减低一点点**，**边缘高光还是有点厚了**」→ 再收一档（本轮）
-    // 所以断言是双侧：**≥ 2px（不是描边）且 ≤ 3px（不成板）** —— 别再把区间改成单边。
+    // 这条夹的是一个**区间**（不是单边下限）：**≥ 2px（不是描边）且 ≤ 3px（不成板）**。
+    // 下界来自「太锐」、上界来自「太厚」，两侧都是真机反馈出来的 —— 别改成单边。
     const byKey = Object.fromEntries(GLASS_SPECULAR_RING.map(e => [e.key, e]))
     for (const [key, edge] of Object.entries(byKey)) {
       assert.ok(edge.blur >= 2, `${key} 的柔度 ${edge.blur}px 太小 —— 锐利细线会显得玻璃很薄`)
@@ -724,10 +591,8 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // 渐变层的**柔化带**（`ry`）也是厚度感来源：要窄（薄）但不能为 0（硬边）
     assert.ok(GLASS_EDGE_TOP.ry > 0, '上缘必须有往内的柔化带（为 0 就是硬边）')
     assert.ok(GLASS_EDGE_TOP.ry <= 0.05, `上缘柔化带 ${GLASS_EDGE_TOP.ry} 太宽 —— 玻璃会显得厚`)
-    // ⚠️ **下界 0.03 是量出来的**（不是拍的）：本机无头复现逐像素量上缘亮度剖面 ——
-    //   ry 0.040 → 可见厚度 4px；0.034 → 4px（只改了第 3 像素的亮度，肉眼看不出）；
-    //   0.030 → **3px**（这一档才看得见变化）；0.020 → 2px（开始像描边）。
-    // owner 第 ④ 轮说「**还是**有点厚」，根因就是 ③ 那步只改了 1px 的**亮度**而非**厚度**。
+    // ⚠️ **下界 0.03 是量出来的**（不是拍的）：ry 0.040 / 0.034 → 可见厚度 4px（肉眼看不出差别），
+    // 0.030 → **3px**（这一档才看得见变化），0.020 → 2px（开始像描边）。压的是**厚度**，不是亮度。
     assert.ok(
       GLASS_EDGE_TOP.ry >= 0.03,
       `上缘柔化带 ${GLASS_EDGE_TOP.ry} 低于 0.03 —— 可见带只剩 ≤2px，会读成描边（owner 第①轮否过）`,
@@ -739,22 +604,17 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('⛔ 厚度只能靠**收宽度**表达，不许改用**压亮度**', () => {
-    // owner 四次说的都是「**薄**」（宽度），不是「**淡**」（亮度）—— 第 ③ 轮已明确记过这条口径。
-    // 压 alpha / 阴影浓度会让**光源方向**丢掉（左亮右暗不对称是「光从左上来」的全部证据），
-    // 所以那两项在四轮调整里**一次都没动过**。将来要「再薄一点」仍旧只许动 ry / blur。
+    // 要「薄」（宽度）不能靠压 alpha / 阴影浓度：那两项属于**光源方向**（左亮右暗的不对称是「光从左上来」的全部证据），
+    // 所以将来要「再薄一点」仍旧只许动 ry / blur。
     assert.equal(GLASS_EDGE_TOP.alpha, 0.28, '上缘 α 不该被厚度调整牵动')
     assert.equal(GLASS_EDGE_LEFT.alpha, 0.12, '左缘 α 不该被厚度调整牵动')
     assert.deepEqual(SHADE_ALPHA, { light: 0.10, dark: 0.06 }, '阴影浓度属于「方向」不属于「厚度」')
   })
 
   it('边光必须**沿圆角绕圈**（inset 环负责底光）', () => {
-    // owner 拿 iPhone 图指出：「**不太对呢，你看 iphone 这个**」。
-    // 官方卡片是 `border-radius: 22px`（`InputBar.module.css:55`），
-    // 而 `linear-gradient` 画的是**直线带** —— 到圆角处被裁断，**光绕不过圆角**。
-    // `inset` 阴影沿元素自身的圆角轮廓走，天然绕圈 —— 现在它负责**一圈底光**
-    // （右下角那一带靠它，椭圆到不了），主光则交给 background-image 的椭圆。
-    // ⚠️ 2026-09-24：inset 环与玻璃同在 **::before** —— 放本体（背景/box-shadow 先画）
-    //   会被后画的负 z-index 玻璃层整个埋掉，正是 owner 报的「边缘光效和之前不同了」。
+    // 官方卡片是圆角，而 `linear-gradient` 画的是**直线带** —— 到圆角处被裁断，**光绕不过圆角**；
+    // `inset` 阴影沿元素自身的圆角轮廓走，故由它负责**一圈底光**，主光交给 background-image 的椭圆。
+    // ⚠️ inset 环与玻璃同在 **::before**（放本体会被后画的负 z-index 玻璃层整个埋掉）。
     const card = cardGlassBaseRule(css)
     assert.match(card, /box-shadow:/u, '底光应写在 box-shadow 里')
     assert.ok(!/background-image:[^;]*linear-gradient/u.test(card), '直线带画不出圆角（不得用 linear-gradient 画边光）')
@@ -775,14 +635,9 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('光路必须符合「光从**左上方**来」：上/左是光、**右是阴影**、下是焦散', () => {
-    // owner 点破根因：「**四个边都是光？iphone 那个右边是阴影，左边也不是满光。
-    // 咱们还是要按实际场景模拟，咱们的光主要是从左上方打过来的**」。
-    // 我连错三版的思维定势就是：**把四条边都当成「光」，只调亮度**。
-    // 背光侧壁处在**自己的阴影**里 —— 它比背景**更暗**，那一侧不该有高光。
-    //
-    // ⚠️ **光现在分两层**：`background-image` 的椭圆是**主光**（上缘 + 左缘），
-    // `inset` 环只是**底光**（上 / 下）。所以「左缘有光」要去**渐变层**里查，
-    // 不能只查 ring（曾经把左缘从 ring 撤掉后，这条断言就误报了）。
+    // ⚠️ **光分两层**：`background-image` 的椭圆是**主光**（上缘 + 左缘），`inset` 环只是**底光**（上 / 下）。
+    // 背光侧壁处在**自己的阴影**里（比背景更暗），那一侧不该有高光 —— 所以「左缘有光」要去**渐变层**里查，
+    // 不能只查 ring（曾把左缘从 ring 撤掉后，这条断言就误报了）。
     const shade = GLASS_SHADE_RING.map(e => e.key)
     const ringLits = GLASS_SPECULAR_RING.map(e => e.key)
 
@@ -802,9 +657,8 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('左缘必须**明显弱于**上缘，且很窄（否则会变成「左边那一块」）', () => {
-    // owner：「**左边那块是不是有点过了……**」（附真机截图：一条约 40px 宽、从上亮到下的亮带）。
-    // 第一版给 `rx 5% / α 26%` —— 横向半径 5% × 1320px = 66px，衰减后仍有 ~40px 宽，
-    // 且左上角两层叠加到约 51% 白。物理上侧壁光只是「透过玻璃看到厚度」，应当**窄而暗**。
+    // 第一版给 `rx 5% / α 26%` ⇒ 横向半径 5% × 1320px = 66px，衰减后仍有 ~40px 宽、左上角两层叠到约 51% 白。
+    // 物理上侧壁光只是「透过玻璃看到厚度」，应当**窄而暗**。
     // ① 渐变层：左缘不到上缘的六成
     assert.ok(
       GLASS_EDGE_LEFT.alpha < GLASS_EDGE_TOP.alpha * 0.6,
@@ -823,9 +677,7 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('不要照抄 iPhone 的**对称**（那是正上方光，我们是左上方）', () => {
-    // owner：「**iphone那个我理解是从正上方打的光，咱们是左上方**」。
-    // iPhone 的左右对称；我们必须左右**不对称**，否则光源方向就丢了。
-    // 判据：**左侧有光（渐变层）而右侧是阴影** —— 两者角色不同就叫不对称。
+    // 必须左右**不对称**（iPhone 是左右对称的）：左侧有光而右侧是阴影，否则光源方向就丢了。
     const shade = GLASS_SHADE_RING.map(e => e.key)
     assert.ok(GLASS_EDGE_LEFT.alpha > 0, '左缘有光（渐变层）')
     assert.ok(shade.includes('right'), '右缘是阴影')
@@ -835,10 +687,7 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
 
 
   it('阴影侧应该 **两轴都有**（它属于光路，不是浅色轴的补丁）', () => {
-    // 早先这里是「浅色轴的补丁」（因为近白面上白高光看不见）—— **那个定位是错的**。
-    // 阴影侧与明暗轴无关：它是**光路**的产物（背光侧壁必然比背景暗）。
-    // owner 的原始反馈确实是从浅色模式发现的（「浅色模式的输入框也得处理下」），
-    // 但结论对两轴都成立 —— 差别只在**浓度**。
+    // 阴影侧与明暗轴无关：它是**光路**的产物（背光侧壁必然比背景暗），两轴都成立，差别只在**浓度**。
     assert.ok(GLASS_SHADE_RING.length >= 1, '应有阴影侧')
     for (const { key, alpha } of GLASS_SHADE_RING) {
       assert.ok(alpha > 0 && alpha < 0.2, `${key} 阴影应很轻（现 ${alpha}）—— 重了就是脏/描边`)
@@ -868,18 +717,12 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('模糊应该 收到「通透」那一档（太大 → 抹掉背后形状，像磨砂塑料而非玻璃）', () => {
-    // owner：「**顶栏和输入框下面的模糊，有点太大了，会降低玻璃通透感，得往回收收**」。
-    // 玻璃的「通透」来自**还能认出背后有东西在动** —— 大模糊只剩一团平均色。
-    // 曾用 18px（chrome）/ 24px（卡片），后都收到 12px。
+    // 玻璃的「通透」来自**还能认出背后有东西在动**；大模糊只剩一团平均色（曾用 18px / 24px，后都收到 12px）。
     const px = (s) => Number(/blur\((\d+(?:\.\d+)?)px\)/u.exec(s)?.[1])
     assert.ok(px(GLASS_BLUR) <= 14, `chrome 模糊 ${px(GLASS_BLUR)}px 偏大，会降低通透感`)
     assert.ok(px(GLASS_CARD_BLUR) <= 14, `卡片模糊 ${px(GLASS_CARD_BLUR)}px 偏大，会降低通透感`)
-    // ⚠️ **卡片允许比顶栏更轻**（曾经要求两者严格相等，2026-09-18 放宽）：
-    // 那条「同一块玻璃的两个部件」的顾虑不成立 —— 顶栏在**顶部**、输入框在**底部**，
-    // 两者永不相邻，不存在「交界处露断层」的问题（真正相邻的是底座那条带子与卡片，
-    // 它们在同一个视觉组里，那条约束另行守住）。
-    // owner 明确只要**输入框**更通透：「让**输入框的**背透模糊再轻一点」——
-    // 顶栏不在这次诉求里，故不动它。
+    // ⚠️ **卡片允许比顶栏更轻**：顶栏在**顶部**、输入框在**底部**，两者永不相邻，不存在「交界处露断层」；
+    // 真正相邻的是底座那条带子与卡片（同一个视觉组），那条约束另行守住。
     assert.ok(
       px(GLASS_CARD_BLUR) <= px(GLASS_BLUR),
       '卡片的模糊不得**重于**顶栏（通透是卡片的诉求；顶栏不在其中）',
@@ -890,9 +733,7 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('卡片必须带**悬浮投影** —— 官方那条只有 3% 黑，读不出抬升', () => {
-    // owner：「输入框本身在背景上**增加一些悬浮感**，我理解是得加一些阴影吧？」—— 理解正确。
-    // 官方 `--dsw-elevation-soft` 实测 ≈ `0 4px 16px #00000008`（**3% 黑**），
-    // 在这套带色调光的背景上几乎不可见。
+    // 官方 `--dsw-elevation-soft` ≈ `0 4px 16px #00000008`（**3% 黑**），在这套带色调光的背景上几乎不可见。
     const card = cardRule(css)
     // ① 必须**先是官方那条**：保留它的抬升语义（不能只用 !important 覆盖）
     assert.match(card, /box-shadow:\s*var\(--dsw-elevation-soft\)/u, '官方投影必须留着（并列，不替换）')
@@ -918,14 +759,7 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
   })
 
   it('悬浮投影应该 收在「有抬升但克制」的区间 —— 别再加回去', () => {
-    // ## 2026-09-18 二次调整（owner：「有点重了，阴影有点大，往回收收」）
-    //
-    // 首版取 `.30 / 28px / y10`，owner 真机看后判断偏重。回收后的真机阶梯
-    // （卡片正下方影子带亮度，越高=越淡）：
-    //   首版 .30/28/y10 → 216.8 ；**现 .24/22/y8 → 228.4** ；.12/14/y4 → 243.1 ；.06/10/y3 → 246.6
-    //
-    // 本用例把**上限**钉住：这条影子只能「不被加深」。它不是审美偏好 ——
-    // 是 owner 已经就这同一个旋钮来回走过一次，避免第三个人再推上去。
+    // 首版 `.30 / 28px / y10` 偏重，回收后定 `.24 / 22px / y8`；本用例把**上限**钉住 —— 这条影子只能「不被加深」。
     const alphas = [...GLASS_CARD_LIFT.matchAll(/rgba\(0,\s*0,\s*0,\s*([\d.]+)\)/gu)].map(m => Number(m[1]))
     assert.ok(alphas.length >= 1, '应能解析出投影 alpha')
     assert.ok(Math.max(...alphas) <= 0.26, `主投影 alpha 上限 0.26，实际 ${Math.max(...alphas)}（加回去前先确认 owner）`)
@@ -967,10 +801,8 @@ describe('glass：边界与纪律', () => {
   })
 
   it('新会话首页（hero）的输入框卡片也要玻璃 —— owner：「新会话首页的输入框，也得适配下」', () => {
-    // 根因：官方 `data-phase` 有**三档**（`ConversationRoot.tsx:355`：
-    // settling / hero / active），首页走 **hero**。本模块原先每条规则都写死 active，
-    // 于是首页**一条都不命中** → 卡片留着官方的 `background: var(--dsw-specific-input-major)`
-    // （不透明实色，`InputBar.module.css:56`）= owner 截图里那张「纯色灰板」。
+    // 官方 `data-phase` 有**三档**（settling / hero / active），首页走 **hero**；本模块原先每条规则都写死 active，
+    // 于是首页**一条都不命中** ⇒ 卡片留着官方那条不透明实色背景（就是那张「纯色灰板」）。
     assert.deepEqual([...GLASS_CARD_PHASES], ['active', 'hero'], '卡片必须覆盖 active 与 hero')
     for (const phase of GLASS_CARD_PHASES) {
       assert.match(css, new RegExp(`\\[data-phase='${phase}'\\]`, 'u'), `卡片规则应覆盖 ${phase} 相位`)
@@ -1007,25 +839,21 @@ describe('glass：边界与纪律', () => {
   })
 
   it('右边栏应该 自己画一遍光与颗粒（它被抬到 82，吃不到 80 的背景层）', () => {
-    // owner：「官方的右边栏，咱们样式没有适配过去好像」。
-    // 根因：为不被抬到 81 的内容层盖住，右边栏被抬到了 82 —— 而背景层在 80，
-    // 于是它**跑到背景层上面**，底色被 token 染对了、但那层**光与颗粒吃不到**。
-    // 修法：让它自己叠一遍背景层那套（与顶栏同一思路；区别是顶栏半透明、它是不透明实色底）。
+    // 为不被抬到 81 的内容层盖住，右边栏被抬到 82 —— 而背景层在 80 ⇒ 它跑到背景层**上面**，
+    // 底色被 token 染对了、但那层**光与颗粒吃不到**。修法：让它自己叠一遍背景层那套（与顶栏同一思路）。
     const start = rightPanelRuleStart(rules)
     assert.ok(start > 0, '应能找到右边栏规则')
     const rule = rules.slice(start, rules.indexOf('}', start))
     assert.match(rule, /background-image:/u, '右边栏应自己叠光与颗粒')
     // 必须用与背景层**同源**的渐变串（不复制粘贴数值）
     assert.ok(rule.includes(BACKDROP_GRADIENTS), '应复用 BACKDROP_GRADIENTS（与背景层同源）')
-    // ⚠️ 颗粒**不许**当普通背景层（owner 真机报「6 个色调背景依然没改好」的那条竖线）：
-    // 背景层的颗粒走 ::after + opacity + 深色轴 mix-blend-mode: screen，
-    // 而正常合成的第 4 层会**同时压暗**黑像素 —— 两者质感不同，交界即竖线。
+    // ⚠️ 颗粒**不许**当普通背景层：背景层的颗粒走 ::after + opacity + 深色轴 mix-blend-mode: screen，
+    // 而正常合成的第 4 层会**同时压暗**黑像素 ⇒ 两者质感不同，交界即那条竖线。
     assert.ok(!rule.includes(GRAIN_TILE_VARIABLE), '不得把颗粒当普通背景层（质感与背景层对不上）')
     // ⚠️ 不得写 background 简写 —— 那会把官方的 bg-base 底色一起重置
     assert.ok(!/\bbackground:/u.test(rule), '不得用 background 简写（会重置官方底色）')
     assert.ok(!rule.includes('background-color:'), '不该动官方底色（它已被 token 染对）')
-    // ⚠️ 0.1.7：必须**同时**覆盖 dockkit 的内容宿主，否则被它的不透明底色整个盖掉
-    //（owner 真机报「右边栏完全没适配」）。
+    // ⚠️ 0.1.7：必须**同时**覆盖 dockkit 的内容宿主（`[data-dockkit-pane]`），否则被它的不透明底色整个盖掉。
     assert.ok(
       rule.includes('[data-dockkit-pane]'),
       '右边栏图层必须画到 [data-dockkit-pane] 上 —— dockkit 的内容宿主才是不透明那层',
@@ -1034,10 +862,8 @@ describe('glass：边界与纪律', () => {
   })
 
   it('右边栏的颗粒必须与背景层**同构**（::after + opacity + 同混合模式）', () => {
-    // owner：「另外咱们 6 个色调背景问题依然没改好」——右边栏与会话区之间那条竖直分界线。
-    // 根因：背景层颗粒 = ::after + opacity +（深色轴）mix-blend-mode: screen（纯加法，只加亮）；
-    // 而本模块曾把颗粒当**第 4 个背景层正常合成**（会同时压暗黑像素）→ 两侧质感差一档。
-    // 修法：面板侧也改成 ::after，并与背景层**逐项对齐**（贴图 / opacity / 混合模式）。
+    // 根因：背景层颗粒 = ::after + opacity +（深色轴）mix-blend-mode: screen（纯加法，只加亮），而本模块曾把颗粒当
+    // **第 4 个背景层正常合成**（会同时压暗黑像素）⇒ 两侧质感差一档。修法：面板侧也改成 ::after，并与背景层**逐项对齐**。
     const afterStart = rules.indexOf('[data-dockkit-pane]::after')
     assert.ok(afterStart > 0, '应有一条 [data-dockkit-pane]::after 的颗粒规则')
     const block = rules.slice(afterStart, rules.indexOf('}', afterStart))
@@ -1064,12 +890,9 @@ describe('glass：边界与纪律', () => {
       new RegExp(`opacity:\\s*var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT}\\)`, 'u'),
       '浅色轴 opacity 必须与背景层同源（同一个统一变量 + 浅色轴回落值）',
     )
-    // ⚠️ ::after 需要包含块，而官方 .tabHost / .emptyTabHost 是 static —— 必须补 position。
-    // 但**只能补在 dockkit 宿主上，不能补在 [data-sidebar-right-panel] 上**：
-    // 官方面板是 ".panel { position: absolute; top/right/bottom: 0 }"，靠 absolute 拉满可视高，
-    // 面板写成 relative 后高度改由内容撑开（实测长文件预览 = 11842px），内层 overflow:auto 失效
-    // ⇒ owner 报的「右边栏文件预览滚动坏了」。故这里断言拆开后的两条规则各自正确。
-    // 注意按**声明**判断，不能正则 "position:" —— 面板那条里有 "background-position:"。
+    // ::after 需要包含块，而官方 .tabHost / .emptyTabHost 是 static ⇒ 必须补 position，
+    // 但**只能补在 dockkit 宿主上，不能补在 [data-sidebar-right-panel] 上**：面板靠 absolute 拉满可视高，
+    // 写成 relative 后高度改由内容撑开、内层 overflow:auto 失效（文件预览滚动坏掉）。
     const panelStart = rightPanelRuleStart(rules)
     const panelBody = rules.slice(panelStart, rules.indexOf('}', panelStart))
     const panelDecls = panelBody.slice(panelBody.indexOf('{') + 1).split(';').map(d => d.trim()).filter(Boolean)
@@ -1077,12 +900,9 @@ describe('glass：边界与纪律', () => {
       !panelDecls.some(d => d.startsWith('position')),
       '不得给 [data-sidebar-right-panel] 写 position（会顶掉官方 absolute，撑坏右栏滚动）',
     )
-    // 拆成规则块逐个查：必须存在一条「选择器含 [data-dockkit-pane] 且声明含 position: relative」的规则，
-    // 且**没有任何**规则把 position 声明在**面板元素自己**身上。
-    // ⚠️ 判据是「选择器的**主体**（最后一个复合选择器）是不是面板」，不能只看选择器里
-    // 有没有出现面板属性 —— 2026-10-01 加右栏顶条玻璃时，条的选择器以
-    // `[data-sidebar-right-panel][data-sidebar-right-open] [data-dockkit-strip]` 收窄，
-    // 主体是**条**（面板的后代），把它误判成「在面板上写 position」就是假阳性。
+    // ⚠️ 判据是「选择器的**主体**（最后一个复合选择器）是不是面板」，不能只看选择器里有没有出现面板属性 ——
+    // 右栏顶条玻璃的选择器以面板属性作收窄前缀、主体是**条**，误判成「在面板上写 position」就是假阳性。
+    // 注意按**声明**判断，不能正则 "position:"（面板那条里有 "background-position:"）。
     const blocks = rules.split('}').map(b => b.trim()).filter(Boolean)
     const panePositionRule = blocks.find(b => b.includes('[data-dockkit-pane]') && /position:\s*relative/u.test(b.slice(b.indexOf('{'))))
     assert.ok(panePositionRule, 'dockkit 宿主必须有一条 position: relative（给 ::after 当包含块）')
@@ -1110,17 +930,10 @@ describe('glass：边界与纪律', () => {
   })
 
   it('面板的图层必须门在「已展开」上（否则收起时那片渐变会压在会话区右侧）', () => {
-    // owner 2026-09-29 报「右边栏打开过一次，背景就花了」。
-    // 官方面板是**常驻元素**：收起时它不消失、宽度也仍是持久化的 --dsh-sidebar-width
-    // （实测 576px，盒子 x=704..1280），只把**里面的** dockkit 宿主 translateX 移出 +
-    // visibility:hidden。于是我们不门的话，那片 100vw×100vh 渐变会以 screen 常驻压在
-    // 会话区右侧。冷启动从未展开时宽度为 0 所以看不出来 —— 展开一次后宽度被持久化 ⇒
-    // 「打开过一次就花了」。官方在滑动开始前就置 data-sidebar-right-open，故门它不影响动画。
-    // 按规则块逐个查：凡是**在面板自己身上**画图层的规则（background-image /
-    // background-blend-mode），其选择器都必须带 [data-sidebar-right-open]。
-    // ⚠️ 判据同「position 那条」：看选择器的**主体**是不是面板自己。
-    // 2026-10-01 加的右栏顶条玻璃（主体是条 / 文件头行，面板只是收窄前缀）也必须带该门，
-    // 但它是以**前缀**形式带的 —— 下面统一要求「选择器里出现该门」，两条都满足。
+    // 官方面板是**常驻元素**：收起时不消失、宽度仍是持久化的 --dsh-sidebar-width，只把里面的 dockkit 宿主移出 +
+    // visibility:hidden ⇒ 不门的话那片 100vw×100vh 渐变会以 screen 常驻压在会话区右侧（「打开过一次就花了」）。
+    // 故凡**在面板自己身上**画图层的规则（background-image / background-blend-mode）都必须带 [data-sidebar-right-open]；
+    // ⚠️ 判据看选择器的**主体**是不是面板自己（右栏顶条玻璃的主体是条，面板只是收窄前缀）。
     const blocks = rules.split('}').map(b => b.trim()).filter(Boolean)
     const panelPaintRules = blocks.filter(b => {
       const sel = b.split('{')[0]
@@ -1139,8 +952,7 @@ describe('glass：边界与纪律', () => {
   })
 
   it('不应该 给浮层写规则（浮层是不透明 + 质感，走 src/surface.ts）', () => {
-    // owner 口径：「弹出框透明的效果可以不要」，且 HIG：「Don't put glass on lists/cards/content」。
-    // 两件事正交，混进来就会互相打脸。
+    // 两件事正交（弹出框不要透明 vs HIG「Don't put glass on lists / cards / content」），混进来就会互相打脸。
     // **只看规则的选择器，不看注释** —— 本模块的注释里会引用浮层锚点做对比说明（那是文档，不是规则）。
     const selectors = css
       .replace(/\/\*[\s\S]*?\*\//gu, '') // 去注释
@@ -1196,12 +1008,8 @@ describe('glass：边界与纪律', () => {
   })
 
   it('轨迹视图（[data-conversation-composer-overlay]）必须自己画一遍地面 —— 座底带子才不会凸出一条横档', () => {
-    // owner 报「轨迹页输入框下面那块的颜色和上面不一样」。
-    // 根因：轨迹视图根自己刷一层**不透明** --dsw-alias-bg-layer-1（官方 views.module.css 的 .root），
-    // 而它在本插件里被抬到 81 之上 ⇒ 我们的装饰层（z 80）整块被它盖住
-    // （实测隐藏装饰层本页只变 mean 0.02 / max 1，对话页是 10.1）。
-    // 座底那条 46px 带子按自己的配方重画（不透明 bg-base + 光 + 颗粒），
-    // 于是带 vs 上方轨迹地面差一整档 = 16（实测）。
+    // 根因：轨迹视图根自己刷一层**不透明** --dsw-alias-bg-layer-1，而它在本插件里被抬到 81 之上
+    // ⇒ 我们的装饰层（z 80）整块被它盖住，于是座底那条带子与上方轨迹地面差一整档。
     // 修法同右边栏那次：把我们的材质原样画到那块不透明面上。
     const OVL = '[data-conversation-composer-overlay]'
     const ovlRules = rules.split('}').filter(b => b.includes('{') && b.slice(0, b.indexOf('{')).includes(OVL))
@@ -1231,36 +1039,13 @@ describe('glass：边界与纪律', () => {
   })
 
   /**
-   * 右栏顶部两条 38px 带的玻璃 —— **本条是 2026-10-01 对上一轮错判的纠正**。
-   *
-   * ## 上一轮错在哪（别再照抄那个结论）
-   *
-   * 上一轮（2026-09-30）的结论是「那里没有内容经过 ⇒ 不需要改」，并加了一条**反向**守卫
-   * 禁止给这两条带做 backdrop-filter。那个结论的**测量本身是错的**：
-   * 当时 [data-dockkit-strip] 是 position: static，加在它上面的
-   * ::before { position: absolute; z-index: -1 } 会改锚**最近的定位祖先**
-   * （[data-dockkit-pane]，它是 relative），伪元素根本没画在条上 ——
-   * 量出来的 mean 0.028 是「伪元素画错了地方」，不是「画了没用」。
-   *
-   * 「有没有内容滚过去」与「看起来像不像对话区顶栏」是**两个问题**：
-   * 前者确实成立（列表滚不到 0..76），但 owner 问的是后者。
-   *
-   * ## 真正的判据（2026-10-01 实测，1600x900 深色轴）
-   *
-   * 同一 x 带、同 y，**右栏关（对话区顶栏占位）vs 右栏开**：
-   *   修复前  条 HF 2.313 / 亮度 23.27   ← 颗粒是「生的」（pane 的 ::after 未被 blur 糊过）
-   *   对话区顶栏 HF 0.256 / 亮度 18.46
-   *   修复后  条 HF 0.254 / 亮度 18.27   ⇒ |ΔHF| 0.002、|Δlum| 0.19，同档。
-   *
-   * 所以现在的守卫是**正向**的：这两条必须带上与顶栏同源的玻璃，且必须抬到颗粒层之上
-   * （否则自己的 backdrop-filter 糊不到那层颗粒 —— 那正是上一轮没量对的地方）。
+   * 右栏顶部两条 38px 带的玻璃。
+   * ⚠️ 守卫是**正向**的：这两条必须带上与顶栏同源的玻璃，且必须抬到颗粒层之上 ——
+   * 否则自己的 backdrop-filter 糊不到那层颗粒（量到的是「生颗粒」）。
+   * 「有没有内容滚过去」与「看起来像不像对话区顶栏」是两个问题，要守的是后者。
    */
   /**
-   * 补偿档本身也是个**可被改坏的值**：改成 0 就等于没补（反向注入 N4 实测漏网）。
-   *
-   * 这一条守的是「常量处在**补偿**该在的区间」：大于 0（真的补了）、小于 1（没有喧宾夺主）。
-   * ⚠️ 它**不**守「补偿到亮度刚好」—— 那件事只能靠浏览器实测
-   * （见 docs/spec/04-glass.md §9.4 的阶梯表）。
+   * 补偿档是个**可被改坏的值**：改成 0 就等于没补。本条守「常量处在补偿该在的区间」：> 0（真的补了）且 < 1（没喧宾夺主）。
    */
   it('顶栏光的补偿档必须是一个真的补偿（0 < boost < 1），且不与满档/填充混为一谈', () => {
     assert.ok(HEADER_LIGHT_BOOST > 0, `补偿档必须 > 0（0 = 没补，owner 报的观感就在那里）：${HEADER_LIGHT_BOOST}`)
@@ -1271,20 +1056,9 @@ describe('glass：边界与纪律', () => {
   })
 
   /**
-   * 右栏「开始」页那层玻璃 —— owner 2026-10-03：「顶栏本身的模糊玻璃材质上也打光」。
-   *
-   * ## 它是一个**漏掉的状态**，不是观感差异
-   *
-   * 上面那条面的锚点是「**标签自己的 38px 头行**」，而「开始」页的正文直接从 y=38 起
-   * （首屏内容在 y=301），**没有那样一条头行** ⇒ 它从来没被覆盖。实测（开始页）：
-   * 0 个 backdrop-filter 面、0 个渐变面；顶带 HF **4.698**（生颗粒）、暖度 **-0.08**（无光）；
-   * 切到文件树（同为 0..76 带）：HF **2.563**、暖度 **+2.11**。
-   *
-   * ## 锚点为什么是 data-sidebar-right-guide
-   *
-   * 它是官方 GuideBody 的根，**只在开始页存在** ⇒ 天然互斥门：切到别的标签时整棵卸载
-   * （实测 files 活动时该槽位计数 = 0），面随之消失，不会与上面那条面叠成双层。
-   * 也**不需要 :has()**（玻璃表明令禁用，见本文件的纪律那条）。
+   * 右栏「开始」页那层玻璃 —— 它是一个**漏掉的状态**，不是观感差异：上面那条面的锚点是「标签自己的 38px 头行」，
+   * 而开始页正文直接从 y=38 起，没有那样一条头行 ⇒ 从来没被覆盖。
+   * 锚点 `data-sidebar-right-guide` 是官方 GuideBody 的根、只在开始页存在 ⇒ 天然互斥门，也不会与上面那条叠成双层。
    */
   it('右栏「开始」页也必须有自己的玻璃面（那是一个漏掉的状态，不是说好的例外）', () => {
     const blocks = rules.split('}').map(b => b.trim()).filter(b => b.includes('{'))
@@ -1359,23 +1133,11 @@ describe('glass：边界与纪律', () => {
       return parts.map(s => s.trim()).filter(Boolean)
     }
 
-    // ⛔ **同一个状态下 0..76 只许有一个玻璃面**（owner 2026-10-02 第三次复报
-    //    「明显有条分割线，应该是一个整体」）。
-    //    ⚠️ 2026-10-03 推广：右栏有**两组互斥**的面 ——「有头行的标签」（文件树 / 预览）
-    //    与「开始页」（owner：「顶栏本身的模糊玻璃材质上也打光」）。右栏是 dockkit 的
-    //    **单活动标签**宿主，切标签时另一组整棵卸载，两组永不同时存在（实测：files 标签
-    //    活动时 [data-slot='sidebar.right.tab.guide'] 计数 = 0，逐项复核与基准逐字相同）。
-    //    所以不变式按**状态分组**成立，不是「全表只许一个」。
-    //    上一版是「条自己 + 各标签头行」两个 ::before 面。
-    //    ⚠️ 归因分两步、别只记住第一步：把内容全藏起来只量静态净玻璃时，主导项是**渐变相位**
-    //    （background-position 相对自己盒子顶边解析，下带把同一张 900px 高的渐变图从第 0 行
-    //    重新开始）—— 只摘 background-image 台阶恰好归零。
-    //    但**有真实内容**在带下滚动时，真正的主因是**采样边界**：blur 的采样区是元素的边框盒，
-    //    两个盒子各自在 y=38 结束 / 开始。实测（TEMP/final2.mjs，预览滚到 200、逐列有符号台阶中位）：
-    //      两面相位不对齐 8.72 / 补 -38px 6.86 / 补 -76px 4.86 / 无玻璃 -0.28
-    //    ⇒ 相位对齐**只能压到 4.86、压不到 0**，唯让 0..76 落进**同一个边框盒**才彻底。
-    //    所以这条守卫盯的是「面的个数」，而下面那条「向上多铺一条带」盯的是采样区是否重合。
-    //    ⚠️ 范围只限**右栏面板**：对话区顶栏 / 输入框卡各有自己那份玻璃面，与这条无关。
+    // ⛔ **同一个状态下 0..76 只许有一个玻璃面**。右栏有**两组互斥**的面（「有头行的标签」与「开始页」），
+    //    右栏是 dockkit 的单活动标签宿主、切标签时另一组整棵卸载 ⇒ 不变式按**状态分组**成立，不是「全表只许一个」。
+    //    ⚠️ 归因分两步：只量静态净玻璃时主导项是**渐变相位**；有真实内容滚动时真正的主因是**采样边界**
+    //    （blur 的采样区是元素的边框盒，两个盒子各自在 y=38 结束 / 开始）⇒ 唯让 0..76 落进同一个边框盒才彻底。
+    //    故本条盯「面的个数」，下面那条「向上多铺一条带」盯采样区是否重合。范围只限**右栏面板**。
     const faces = blocks.filter((b) => {
       const sel = b.split('{')[0]
       return sel.includes('::before') && /backdrop-filter/u.test(b)
@@ -1411,11 +1173,8 @@ describe('glass：边界与纪律', () => {
     const face = headedFaces[0]
     const faceSel = face.split('{')[0]
     const faceBody = face.slice(face.indexOf('{'))
-    // ⛔ **面不得挂在 pane 本体上**（owner 复报「分割线」后我改到这上面过，随即量出回归）。
-    //    pane 是**所有**标签页的公共祖先，挂它上面会盖住**没有头行**的标签：
-    //    终端正文正好从 y=38 起，没有任何 38px 头行替它把这层让开。
-    //    实测终端正文带 38..76：挂 pane 时 HF 1.53 → **0.20**、亮度 28.9 → **20.1**（被糊掉）；
-    //    挂各标签自己的头行上则 HF 1.30 / 亮度 23.1，与「无玻璃」对照（1.33 / 32.4）同档。
+    // ⛔ **面不得挂在 pane 本体上**：pane 是**所有**标签页的公共祖先，挂它会盖住**没有头行**的标签
+    //（终端正文正好从 y=38 起，没有 38px 头行替它让开）—— 实测该处 HF 1.53 → **0.20**、亮度 28.9 → **20.1**（被糊掉）。
     assert.ok(
       !/\[data-dockkit-pane\]::before/u.test(faceSel),
       `玻璃面不得挂在 [data-dockkit-pane]::before 上（会盖住终端这类没有头行的标签的正文）：${faceSel.trim()}`,
@@ -1440,12 +1199,9 @@ describe('glass：边界与纪律', () => {
       faceBody, new RegExp(`top:\\s*-\\$\\{PANEL_BAND_PX\\}px|top:\\s*-${PANEL_BAND_PX}px`, 'u'),
       `玻璃面必须向上多铺一条带（top = -PANEL_BAND_PX = -${PANEL_BAND_PX}px），否则采样区在 y=38 被边界截断、又切出一条缝：${faceBody}`,
     )
-    // ⚠️ 盒子必须**下沿贴内边距盒底、上沿再往上一条带**（= 覆盖面板坐标 0..75），
-    //    而且**不许写死 height**（owner 2026-10-02：「右边栏下边那条细线没有了」）。
-    //    官方头行的 border-bottom 画在它边框盒的最后 1px（75..76）：
-    //    写死 height: 76 会让面一直铺到 76，把那条细线压在自己 70% 填充之下
-    //    （实测 y=75 亮度 58.7 → 18.8）；bottom: 0 止于内边距盒底（75）后细线回来（52.3）。
-    //    这也让本面的盒子与**对话区顶栏那个面**（inset: 0 ⇒ 计算 height 75px）完全一致。
+    // ⚠️ 盒子必须**下沿贴内边距盒底、上沿再往上一条带**（覆盖面板坐标 0..75），且**不许写死 height**：
+    // 官方头行的 border-bottom 画在它边框盒的最后 1px（75..76），写死 height: 76 会把那条细线压在自己填充之下
+    //（实测 y=75 亮度 58.7 → 18.8）；bottom: 0 止于内边距盒底后细线回来。这也让本面与对话区顶栏那个面的盒子一致。
     assert.match(faceBody, /bottom:\s*0/u, `玻璃面必须 bottom: 0（止于内边距盒底，把官方那 1px 下边框让出来）：${faceBody}`)
     assert.match(faceBody, /height:\s*auto/u, `玻璃面必须 height: auto（写死 height 会盖掉头行的下边框）：${faceBody}`)
     assert.doesNotMatch(
@@ -1563,12 +1319,8 @@ describe('glass：边界与纪律', () => {
       )
     }
 
-    // ⑬ ⛔ 右栏滚区的滚动条轨道必须下推到玻璃带下缘（owner 2026-10-02：
-    //    「还有右边栏上面透明模糊后，滚动条不要跟着滚上去」）。
-    //    与对话区那次同因：滚动条画在滚动容器的 **padding box** 上，那件
-    //    「margin-top 负底距 + padding-top 补高」只推内容、不推它 ⇒ 轨道仍从 y=0 起画，
-    //    前 76px 落在半透明玻璃带下面透出来。官方口径是先例：
-    //    对话区用 `::-webkit-scrollbar-track { margin: calc(HEADER_HEIGHT_PX + 2px) 2px 2px }`。
+    // ⑬ ⛔ 右栏滚区的滚动条轨道必须下推到玻璃带下缘。与对话区那次同因：滚动条画在滚动容器的 **padding box** 上，
+    // 那件「margin-top 负底距 + padding-top 补高」只推内容、不推它 ⇒ 轨道仍从 y=0 起画、前 76px 从玻璃带下面透出来。
     const trackRules = blocks.filter((b) => b.split('{')[0].includes('::-webkit-scrollbar-track'))
     const panelTrack = trackRules.filter((b) => {
       const sel = b.split('{')[0]
@@ -1741,7 +1493,7 @@ describe('glass：边界与纪律', () => {
 
     // ① 必须有一条规则把 pane 的**头行**在流内占的高度还回去。
     //    根因：头行在流内 ⇒ 体那两层（tabHostBody / tabBody）都从 y=38 起**且都裁剪**，
-    //    正文永远进不了 0..38 ⇒ 上带背后只有面板纯色（owner：只有下半部分有效果）。
+    //    正文永远进不了 0..38 ⇒ 上带背后只有面板纯色（只有下半部分有效果）。
     //    ⚠️ 这里必须查 `margin-bottom`：把「负底距」误写成 `padding-bottom` 或者漏掉，
     //    0..38 就重新变成死区，而**下带照样是通的**，只量 0..76 平均值根本发现不了。
     const headerRule = blocks.find((b) => {
@@ -1805,12 +1557,8 @@ describe('glass：边界与纪律', () => {
 })
 
 /**
- * 取 `buildSeamCss()` 里**最后一条**匹配 needle 的规则（选择器 + 声明块，已剥注释）。
- *
- * 「最后一条」是有意的：缺口补丁追加在缝挡板三条**之后**，而它与缝挡板共用
- * `:has(> [data-composer-card])` 这个宿主选择器 —— 只有取最后一条才拿得到补丁本体。
- * @param needle - 选择器片段。
- * @returns 命中规则文本。
+ * 取 `buildSeamCss()` 里**最后一条**匹配 needle 的规则（已剥注释）：「最后一条」是有意的 ——
+ * 缺口补丁追加在缝挡板三条**之后**，且与它们共用宿主选择器，只有取最后一条才拿得到补丁本体。
  */
 const lastRuleWith = (text, needle) => {
   const clean = text.replace(/\/\*[\s\S]*?\*\//gu, '')

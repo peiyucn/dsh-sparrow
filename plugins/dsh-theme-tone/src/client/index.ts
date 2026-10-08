@@ -1,13 +1,7 @@
 /**
- * dsh-theme-tone client half：
- * - 底色 + 左栏填充经官方 `ctx.theme.overrideTokens` 公开 seam 落地（token 覆盖层，
- *   两个模式一次给全，故明暗轴切换无需重写）。
- * - 两个径向染色 + 颗粒纹理由插件自有的固定背景层承载（token 装不下渐变与纹理），
- *   深色轴走 `mix-blend-mode: screen`、浅色轴走正常合成，见 src/backdrop.ts。
- * - 「设置 → 常规」外观区挂一条「色调」行（`ROW_ORDER`，紧随官方外观与字号之间）。
- *
- * 无 slots 之外的服务写操作、不碰官方 DOM 结构、不 import Node 模块；
- * 卸载即回收 token / 背景层 / 样式表 / 设置行。
+ * dsh-theme-tone client half：底色 + 左栏填充经官方 `ctx.theme.overrideTokens` 公开 seam 落地（token 覆盖层，两个模式一次给全）；两个径向染色 + 颗粒纹理由插件自有的固定背景层承载（token 装不下渐变与纹理），见 `../backdrop.ts`。
+ * 「设置 → 常规」外观区挂一条「色调」行（`ROW_ORDER`，紧随官方外观与字号之间）。
+ * 无 slots 之外的服务写操作、不碰官方 DOM 结构、不 import Node 模块；卸载即回收全部资源与监听。
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -82,24 +76,16 @@ import { buildRowCss } from './styles.js'
 import { createThemeToneRowStore } from './store.js'
 
 /**
- * 客户端硬依赖：主题、槽位、文案 —— **只放跨版本稳定存在的服务**。
- *
- * ⚠️ 设置的读取面（官方的 `configForms`）**绝不能**写进这里：
- * `inject` 里缺服务时 fiber 会**永远 pending**，而客户端 boot 审计把 pending 当致命失败
- * （`packages/client/web/src/boot-client.ts` 的 `assertEntriesActive`）—— 实测（0.1.7-alpha.1）
- * 页面直接停在 "Failed to load plugins：@dsh-sparrow/dsh-theme-tone: pending
- * (waiting for service: …)"，即插件把宿主整个 Web UI 拖死。
- * 换成 `ctx.inject` 起的**可选依赖 fork**（见 apply）：缺设置面只是本插件不画，宿主照常启动。
+ * 客户端硬依赖：主题、槽位、文案 —— **只放跨版本稳定存在的服务**。⚠️ 设置的读取面（`configForms`）**绝不能**
+ * 写进这里：`inject` 里缺服务时 fiber 会**永远 pending**，而客户端 boot 审计把 pending 当致命失败
+ * （`assertEntriesActive`）⇒ 宿主整个 Web UI 停在 "Failed to load plugins"。它走 `ctx.inject` 起的**可选依赖
+ * fork**（见 {@link apply}）：缺设置面只是本插件不画，宿主照常启动。
  */
 export const inject = ['theme', 'slots', 'locale']
 
 /**
- * 注入样式表（背景层 + 设置行 + 玻璃 + 缝挡板 + 抬升面 + 遮罩模糊 + 扫光带 + **轮次导航/宽度钳制**
- * 合成一张；按标记属性去重，HMR / 重载不叠加）。
- *
- * ⚠️ nav-pin 那两段并入**本表**、不再单开 `style[data-dsh-nav-pin]`（方案 §3.5 决策）：
- * 少一个 style 元素、少一套去重逻辑，卸载清理也只需管一处。
- * @returns 供卸载清理的 style 元素。
+ * 注入样式表（背景层 + 设置行 + 玻璃 + 缝挡板 + 抬升面 + 遮罩模糊 + 扫光带 + 轮次导航/宽度钳制合成一张；
+ * 按标记属性去重，HMR / 重载不叠加）。⚠️ nav-pin 那两段并入**本表**、不再单开 `style[data-dsh-nav-pin]`。
  */
 function ensureStyles(): HTMLStyleElement {
   const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}${buildCaptionCss()}${buildPopoverCss()}`
@@ -116,10 +102,7 @@ function ensureStyles(): HTMLStyleElement {
   return style
 }
 
-/**
- * 插入背景层（按标记属性去重，避免重载后叠层）。初始 `hidden`，由渲染计划接管。
- * @returns 供卸载清理的背景层元素。
- */
+/** 插入背景层（按标记属性去重，避免重载后叠层）。初始 `hidden`，由渲染计划接管。 */
 function ensureLayer(): HTMLDivElement {
   const existing = document.querySelector<HTMLDivElement>(LAYER_SELECTOR)
   if (existing !== null) return existing
@@ -129,31 +112,16 @@ function ensureLayer(): HTMLDivElement {
   layer.className = BACKDROP_CLASS
   layer.hidden = true
   // 固定定位层挂 body 即可；极端早期（body 未就绪）退到 documentElement。
-  // ⚠️ 这一处**可以**退到 documentElement（与标记属性不同）：它是 `position: fixed` 的
-  // 纯装饰层，样式表按 `.dsh-theme-tone` **类名**命中、不依赖任何 `body` 锚定选择器，
-  // 挂在 `<html>` 上照常显示。标记属性则必须挂 body —— 消费侧写的是 `body:not([…])`。
+  // ⚠️ 本插件加的**标记属性**没有这个余地 —— 消费侧写的是 `body:not([…])`，挂在 `<html>` 上会 fail-open。
   ;(document.body ?? document.documentElement).appendChild(layer)
   return layer
 }
 
 /**
- * 让官方宽度拖拽条的**悬停光带**跟随指针（修官方 bug，理由见 `../handle-glow.ts` 模块头）。
- *
- * **自 `dsh-nav-pin` 并入（2026-09-29，方案 §3.3）**。接线只负责取事件与元素，判定全在纯函数里。
- * 用**一个** `pointermove`（passive，不 `preventDefault`），且只在指针真的落在拖拽条上时才干活；
- * 用 `requestAnimationFrame` **合并同帧多次移动** —— `getBoundingClientRect` 会强制布局，
- * 不合并的话高频移动会把主线程拖满（本仓库栽过一次：`getComputedStyle` 未合并导致卡顿）。
- *
- * ⚠️ **不给它加能力门**：`pointermove` / `requestAnimationFrame` 缺失时监听自然收不到事件，
- * 效果只是「回到官方现状」（光带固定居中），属可接受降级；而**加门会把整张样式表一起停掉**。
- * 故这里刻意只降级、不停用。
- *
- * ⚠️ **失败不冒泡**（根 AGENTS《运行期不冒泡》）：取几何那一步包了 try/catch，
- * 任一环节异常都只是这一步不生效，绝不抛进宿主管线。
- *
- * ⚠️ 本条**不带色调门**（方案 §3.1 决策 5）：官方默认档下也要修这个官方 bug。
- * 它不读任何 CSS 变量，故不依赖 token 层就绪。
- * @param ctx - 浏览器侧 Cordis 上下文（用于注册卸载清理）。
+ * 让官方宽度拖拽条的**悬停光带**跟随指针（修官方 bug，理由见 `../handle-glow.ts`）。接线只取事件与元素，
+ * 判定全在纯函数里；帧合并（`requestAnimationFrame`）不可省 —— `getBoundingClientRect` 强制布局，高频移动
+ * 不合并会拖满主线程。⚠️ 刻意只降级、不停用：不加能力门（`pointermove` 缺失时监听自然收不到事件 = 回到官方
+ * 现状，而加门会把整张样式表一起停掉）；取几何包 try/catch 不冒泡；本条**不带色调门**，两档都生效。
  */
 function followHandleGlow(ctx: Context): void {
   /** 同帧待处理的一次移动（只留最后一次 —— 光带只需要最新位置）。 */
@@ -177,7 +145,7 @@ function followHandleGlow(ctx: Context): void {
     // 事件目标未必是 Element（如文本节点）；`closest` 前先收窄。
     if (!(target instanceof Element)) return
     const handle = target.closest(HANDLE_SELECTOR)
-    // 不是拖拽条就立刻返回 —— 页面里绝大多数移动都走这条路径。
+    // 页面里绝大多数移动都不落在拖拽条上，这里就是热路径的早退。
     if (!(handle instanceof HTMLElement)) return
     pending = { handle, clientY: event.clientY }
     frame ??= requestAnimationFrame(flush)
@@ -192,17 +160,11 @@ function followHandleGlow(ctx: Context): void {
   }, 'dsh-theme-tone: handle glow follows pointer')
 }
 
-/**
- * client half 入口：稳定面能力门 → 等设置面就绪后装插件（见 {@link install}）。
- * @param ctx - 浏览器侧 Cordis 上下文。
- */
+/** client half 入口：稳定面能力门 → 等设置面就绪后装插件（见 {@link install}）。 */
 export function apply(ctx: Context): void {
-  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》）：稳定面缺失即**惰性停用** ——
-  // 告警后直接返回，不注册任何槽位 / 样式 / 监听。
-  //
-  // ⚠️ 客户端这半边**不能抛错**（故用 `warnMissingCapabilities` 而不是抛错版能力门）：
-  // 客户端 boot 审计把任何非 active 的 entry 当致命失败，`apply` 抛错 = 宿主整页停在
-  // "Failed to load plugins"。所以这里只检查**跨版本稳定**的能力面。
+  // 宿主兼容自检：稳定面缺失即**惰性停用** —— 告警后直接返回，不注册任何槽位 / 样式 / 监听。
+  // ⚠️ 客户端这半边**不能抛错**（故用 `warnMissingCapabilities` 而不是抛错版能力门）：boot 审计把任何
+  // 非 active 的 entry 当致命失败，`apply` 抛错 = 宿主整页停在 "Failed to load plugins"。
   if (!warnMissingCapabilities(ctx, name, [
     { name: 'ctx.theme.getTheme', ok: hasCapability(() => ctx.theme?.getTheme) },
     { name: 'ctx.theme.overrideTokens', ok: hasCapability(() => ctx.theme?.overrideTokens) },
@@ -216,56 +178,33 @@ export function apply(ctx: Context): void {
   ])) return
 
   /**
-   * 设置读取面（`configForms`）走**可选依赖**：`ctx.inject` 起一个 fork，等它出现再装。
-   *
-   * ⚠️ 它**不能**写进本模块的 `inject`：inject 里缺服务时 fiber 会**永远 pending**，
-   * 而客户端 boot 审计把 pending 当致命失败（`packages/client/web/src/boot-client.ts`
-   * 的 `assertEntriesActive`）—— 实测（0.1.7-alpha.1）宿主整页停在
-   * "Failed to load plugins …: pending (waiting for service: …)"。
-   * 也**不能**在这里当场一次性探测（`ctx.configForms?.get`）：ui-settings 可能晚于本 entry
-   * 提供该服务，当场探必空 → 插件在**受支持的那条线**上白停用（0.1.5-rc.2 上实测过同类情形）。
-   *
-   * fork 的两种结局：服务出现 → 装；这条宿主线没有该服务 → fork 一直挂着，本插件什么都不做。
-   * fork 是本 entry 的**子 fiber**，不进宿主 boot 审计的 entry 列表（`ctx.loader.entries()`），
-   * 故它 pending 不会拖垮宿主启动 —— 这正是「宁可自己什么都不做，也不让宿主起不来」。
+   * 设置读取面（`configForms`）走**可选依赖 fork**：服务出现才装，这条宿主线没有就什么都不做。
+   * ⚠️ 既**不能**写进本模块的 `inject`（缺服务 → fiber 永远 pending → boot 审计判致命失败），也**不能**在这里
+   * 当场一次性探测（ui-settings 可能晚于本 entry 提供该服务，当场探必空 ⇒ 插件在受支持的那条线上白停用）。
+   * fork 是本 entry 的**子 fiber**，不进 boot 审计的 entry 列表，故它 pending 不会拖垮宿主启动。
    */
   ctx.inject(['configForms'], (settingsCtx) => { install(settingsCtx) })
 }
 
 /**
  * 装上插件：色调 token 覆盖 + 背景层 + 玻璃 / 缝隙 / 抬升面 / 扫光样式表 + 设置行 + 订阅。
- *
- * 由 {@link apply} 在 `configForms` 就绪后调用；入参是该 fork 的上下文，所有
- * `ctx.effect` / `ctx.on` / 槽位注册都记在 fork 上 —— 本插件 entry 卸载（或设置服务消失）
- * 时它们随 fork 一起回收，不留 style / 背景层 / 监听。
- * @param ctx - 已就绪 `configForms` 的 Cordis 上下文。
+ * 由 {@link apply} 在 `configForms` 就绪后调用；入参是该 fork 的上下文，所有 `ctx.effect` / `ctx.on` /
+ * 槽位注册都记在 fork 上 —— entry 卸载（或设置服务消失）时随 fork 一起回收，不留 style / 背景层 / 监听。
  */
 function install(ctx: Context): void {
 
   /**
-   * 标记属性的**唯一宿主** —— 所有 `PLAIN_ATTR` / `WORKSTART_ATTR` 的读写都用它。
-   *
-   * ⚠️ **不能退到 `documentElement`**：消费侧的选择器全是 `body:not([PLAIN_ATTR])`
-   * 与 `body:not([PLAIN_ATTR])[WORKSTART_ATTR]` —— 属性若挂在 `<html>` 上，
-   * `body:not([...])` 恒真，三张表的门全部 **fail-open**，官方默认档下玻璃与抬升面照样命中。
-   *
-   * `body` 为 null 时（理论上不会：模块在 boot 之后才执行，`index.html` 自带 `<body>`）
-   * 就**不打标记** —— 宁可这次不画，也不要打一个消费侧读不到的标记。
-   * 同一个 `target` 被读/写/清理共用，避免 set 与 remove 目标漂移把属性残留下来。
+   * 标记属性的**唯一宿主** —— 所有 `PLAIN_ATTR` / `WORKSTART_ATTR` 的读写都用它，避免 set 与 remove 目标漂移
+   * 把属性残留下来。⚠️ **不能退到 `documentElement`**：消费侧选择器全是 `body:not([PLAIN_ATTR])`，属性挂在
+   * `<html>` 上时 `body:not([...])` 恒真、三张表的门全部 **fail-open**。`body` 为 null 时就**不打标记**。
    */
   const markerHost = document.body
 
   /**
-   * 把「这一轴是官方默认」挂到 body 上 / 摘掉。
-   *
-   * 玻璃与抬升面两张表的 CSS 仍然静态注入（可测、不重解析），靠 `body:not([PLAIN_ATTR])`
-   * 这个门决定命不命中 —— 官方默认下两张表整表让路，外观与没装插件逐像素一致。
-   * 挂在 `document.body` 上而不是 `documentElement`：presenter 的 token 也写在 body 上，同一处好回收。
-   *
-   * ⚠️ **本函数必须声明在清理 effect 之前**：清理体要调它，若声明在 effect 之后，
-   * 那么「effect 注册」与「声明」之间任一环节抛错时，cordis 跑清理会撞上 TDZ，
-   * 抛 `ReferenceError` 把真正的失败原因盖掉（见下面清理 effect 的 ⚠️）。
-   * @param plain - 当前轴是否为官方默认（= 整层隐藏）。
+   * 把「这一轴是官方默认」挂到 body 上 / 摘掉：两张表的 CSS 静态注入（可测、不重解析），靠
+   * `body:not([PLAIN_ATTR])` 决定命不命中 —— 官方默认下整表让路，外观与没装插件逐像素一致。
+   * ⚠️ **必须声明在清理 effect 之前**：清理体要调它，声明在后则「注册」与「声明」之间抛错时 cordis 跑清理
+   * 会撞上 TDZ，抛 `ReferenceError` 把真正的失败原因盖掉。
    */
   const paintPlain = (plain: boolean): void => {
     const target = markerHost
@@ -275,23 +214,8 @@ function install(ctx: Context): void {
   }
 
   /**
-   * 维护 {@link ANCHOR_ATTR}——把原本写在 CSS 里的 `:has()` 判据搬到运行期。
-   *
-   * ## 为什么（有实测依据，见 docs/spec/11）
-   * 主表里原本 19 条含 `:has()` 的规则。受控实测（有头 + 真实合成 + 模拟流式）：
-   * 现状样式重算 **4622.8ms**，删掉这 19 条 → **1559.4ms**，
-   * **换成同命中集的属性选择器 → 1513.8ms**（拿回约 100% 的收益，效果一字不变）。
-   * 即：成本来自 `:has()` 的失效跟踪，与命中后画什么无关。
-   *
-   * ## 三条开销纪律（否则等于把省下的钱又花回去）
-   * 1. **JS 里绝不用 `:has()` 反查** —— 全部用「标签 / 属性选择器 + 父子关系」表达；
-   * 2. **只在值变化时写属性** —— 用 {@link anchored} 记着上一轮写了什么，做集合差
-   *    （属性写一次就引一次样式失效，流式时尤其不能每帧写）；
-   * 3. **扫描量有界** —— 每个角色都是「先查一批便宜锚点，再看它们的父子关系」，
-   *    不做全树遍历。
-   *
-   * ## 与 rAF 的关系
-   * 由 `scheduleProbe` 在同帧合并后调用，于是连续 DOM 变动只算一次。
+   * 维护 {@link ANCHOR_ATTR}——把原本写在 CSS 里的 `:has()` 判据搬到运行期（成本来自 `:has()` 的失效跟踪，换成同命中集的属性选择器可拿回几乎全部收益，效果一字不变）。由 `scheduleProbe` 同帧合并后调用。
+   * 三条开销纪律：① JS 里**绝不用 `:has()` 反查**，全用标签 / 属性选择器 + 父子关系表达；② **只在值变化时写属性**（写一次引一次样式失效，靠 {@link anchored} 做集合差）；③ **扫描量有界**（先查一批便宜锚点，再看它们的父子关系，不做全树遍历）。
    */
   const maintainAnchors = (): void => {
     const root = markerHost
@@ -315,19 +239,17 @@ function install(ctx: Context): void {
     }
 
     try {
-      // ① 输入框卡片的父元素（缺口补丁的宿主）。
       tagParentsOf('[data-composer-card]', ANCHOR.composerHost)
 
-      // ② 含停靠卡、且不含队列坞的会话座。
       for (const seat of document.querySelectorAll('[data-composer-seat]')) {
         const docked = seat.querySelector("[data-testid='todo-panel'], [data-goal-bar]") !== null
         if (docked && seat.querySelector('[data-queue-dock]') === null) add(seat, ANCHOR.seatDocked)
       }
 
-      // ③ 命令面板卡片的祖元素（背景长在祖先上、role 在内层视口上）。
+      // ③ 命令面板卡片：背景长在祖元素上、role 在内层视口上。
       tagParentsOf("[role='listbox']", ANCHOR.listboxHost)
 
-      // ④ 实色模态弹窗：`role='dialog'` 且**不是**图片灯箱（灯箱的直接子里有 img）。
+      // ④ 实色模态弹窗：`role='dialog'` 且直接子里没有 `img`（图片灯箱除外）。
       for (const dialog of document.querySelectorAll("[role='dialog']")) {
         if (!hasDirectChild(dialog, 'img')) add(dialog, ANCHOR.dialog)
       }
@@ -337,12 +259,8 @@ function install(ctx: Context): void {
         if (hasDirectChild(child, "[role='tree']")) add(child, ANCHOR.treeHost)
       }
 
-      // ⑥⑦⑧ 分组菜单三条腿（**判据各不相同，别合并**）：
-      //   * menuGrouped      —— 后代里有分组（给菜单本体上料）
-      //   * menuSelfScroller —— **直接子**里就有分组（rc.2 的滚动容器是菜单自己）
-      //   * menuChild        —— 含分组的那个直接子元素（rc.1 的滚动容器）
-      // 实测 codebuddy 菜单是 `groupsDirect: 0 / groupsAny: 2` ⇒ 前两条必须分开，
-      // 合并会让那个菜单静默失去质感（本轮真犯过，靠等价性对拍抓到）。
+      // ⑥⑦⑧ 分组菜单三条腿（**判据各不相同，别合并**）：菜单本体 / 直接子里的滚动容器 / 含分组的直接子元素。
+      // 前两条必须分开 —— 实测 codebuddy 菜单是 `groupsDirect: 0 / groupsAny: 2`，合并会让那个菜单静默失去质感。
       for (const menu of document.querySelectorAll("[role='menu']")) {
         if (menu.querySelector("[role='group']") !== null) add(menu, ANCHOR.menuGrouped)
         if (hasDirectChild(menu, "[role='group']")) add(menu, ANCHOR.menuSelfScroller)
@@ -357,7 +275,7 @@ function install(ctx: Context): void {
         for (const nav of scroller.querySelectorAll('nav[aria-label]')) {
           if (NAV_ARIA_LABELS.includes(nav.getAttribute('aria-label') ?? '')) add(nav.parentElement, ANCHOR.turnNavHost)
         }
-        // ⑨ 对话滚动体的直接父元素（官方那个 wrapper，宽度钳制捕获变量的地方）。
+        // ⑨ 对话滚动体的直接父元素（宽度钳制就捕获在它身上）。
         if (scroller.parentElement?.parentElement?.hasAttribute('data-phase') === true) {
           add(scroller.parentElement, ANCHOR.scrollWrap)
         }
@@ -368,12 +286,10 @@ function install(ctx: Context): void {
         add(ul.parentElement, ANCHOR.panelActionsUl)
       }
 
-      // ⑪ 右栏面板已打开（标在 body 上；原写法是 `body:has(…)`，`:has()` 里最贵的一类）。
+      // ⑪ 右栏面板已打开（状态标在 body 上）。
       if (document.querySelector(`[${RIGHT_PANEL_ATTR}][data-sidebar-right-open]`) !== null) {
         add(root, ANCHOR.rightPanelOpen)
       }
-
-      // ── 集合差：只写变化的那些（写一次 = 一次样式失效） ──
       for (const [el, tokens] of want) {
         const value = anchorValue(tokens)
         if (anchored.get(el) === value) continue
@@ -386,7 +302,7 @@ function install(ctx: Context): void {
         anchored.delete(el)
       }
     } catch {
-      // 运行期不冒泡（根 AGENTS）：标不上只是少了质感，绝不打扰宿主。
+      // 运行期不冒泡：标不上只是少了质感，绝不打扰宿主。
     }
   }
 
@@ -395,10 +311,8 @@ function install(ctx: Context): void {
 
   /**
    * 摘掉两道相位门与四个几何变量（卸载 / 降级共用一处，避免漏摘）。
-   *
-   * ⚠️ **必须声明在清理 effect 之前**：清理体要调它，若声明在 effect 之后，
-   * 那么「effect 注册」与「声明」之间任一环节抛错时，cordis 跑清理会撞上 TDZ，
-   * 抛 `ReferenceError` 把真正的失败原因盖掉（与上面 {@link paintPlain} 同一理由）。
+   * ⚠️ **必须声明在清理 effect 之前**：声明在 effect 之后的话，两者之间抛错时 cordis 跑清理会撞上 TDZ，
+   * 抛 `ReferenceError` 把真正的失败原因盖掉（与 {@link paintPlain} 同一理由）。
    */
   const clearPhase = (): void => {
     const target = markerHost
@@ -412,79 +326,46 @@ function install(ctx: Context): void {
     }
   }
 
-  /**
-   * 摘掉全部锚点属性（卸载用）。
-   *
-   * 只摘 {@link anchored} 里记过的元素 —— 那是本插件写过的**全部**元素，
-   * 不做全树扫描（`querySelectorAll` 在卸载路径上没必要，也避免漏摘/误摘）。
-   */
+  /** 摘掉全部锚点属性（卸载用）：只摘 {@link anchored} 里记过的元素 —— 那是本插件写过的**全部**元素。 */
   const clearAnchors = (): void => {
     for (const [el] of anchored) el.removeAttribute(ANCHOR_ATTR)
     anchored.clear()
   }
 
   /**
-   * 先武装清理，再创建资源。
-   *
-   * ⚠️ **顺序不能反**：cordis 只跑**已注册**的 disposer。若先 `ensureStyles()` /
-   * `ensureLayer()` 再注册清理，那么两者之间任一环节抛错（`configForms.get`、
-   * 首次 `repaint` 里的 `overrideTokens` 校验、`locale.register` 重名…）都会让
-   * `<style>` 与背景层**永久留在 DOM 里**，而 `PLAIN_ATTR` 从未置上 →
-   * 三张表的 `body:not([PLAIN_ATTR])` 规则全部 fail-open 命中，
-   * 得到一个「样式生效、无背景层、无生命周期」的半应用态。
-   *
-   * 用一个可变 holder 装资源：`ensureStyles` 自身抛错时 holder 仍为空，清理是空操作；
-   * 它成功而 `ensureLayer` 抛错时，holder 里已有 style，清理照样收得掉。
-   * 注册顺序也顺带正确 —— cordis 按注册的**逆序**跑 disposer，先注册者最后运行，
-   * 正好让资源在所有其它 effect 之后回收。
+   * 先武装清理，再创建资源。⚠️ **顺序不能反**：cordis 只跑**已注册**的 disposer —— 若抛错发生在创建资源与
+   * 注册清理之间（`configForms.get`、首次 `repaint` 的 `overrideTokens` 校验、`locale.register` 重名…），
+   * `<style>` 与背景层会**永久留在 DOM 里**，而 `PLAIN_ATTR` 从未置上 ⇒ 三张表的门全部 fail-open。
+   * holder 保证：`ensureStyles` 抛错时清理是空操作、`ensureLayer` 抛错时已建的 style 仍收得掉。
    */
   const resources: { style?: HTMLStyleElement; layer?: HTMLDivElement } = {}
   ctx.effect(() => () => {
     resources.layer?.remove()
     resources.style?.remove()
     disposeTokens?.()
-    // 门也要摘掉：留着它，卸载后玻璃与抬升面两张表的规则会继续被挡（表本身也随 style 没了，
-    // 但属性不该残留在 body 上）。待启动态标记同理 —— 它是本插件加的，卸载必须收干净。
-    // 相位门与那四个几何变量同理：它们写在 body 的**行内 style** 上，摘不干净会留在 DOM 里。
+    // 门也要摘掉（否则卸载后玻璃与抬升面两张表的规则会继续被挡）；待启动态标记同理 —— 它是本插件加的。
+    // 相位门与那四个几何变量写在 body 的**行内 style** 上，锚点写在任意元素上，摘不干净都会残留在用户 DOM 里。
     paintPlain(false)
     markerHost?.removeAttribute(WORKSTART_ATTR)
     clearPhase()
-    // 锚点也一并收干净：它们写在**任意**元素上（不止 body），漏摘会留在用户 DOM 里。
     clearAnchors()
   }, 'dsh-theme-tone: backdrop + token overrides')
 
   /**
-   * ⚠️ **先把门关成「官方默认」，再注入样式表。**
-   *
-   * 门属性是 `body:not([PLAIN_ATTR])` 的**唯一开关**，而它此前只在 `paintLayer` 里写
-   * （即 `paintPlain(plan.hidden)`）。可样式表是在本函数下面**无条件**注入的，而首次
-   * `repaint()` 又要过 `shouldPaint()` 那道门 —— `status === 'loading'`（宿主还没回第一帧，
-   * 官方设置表单控制器的初值恒为 `'loading'`，见 `ui-settings/src/client/config-form.ts`）
-   * 时它**直接 return，从不调用 `paintLayer`**。于是从「样式表注入」到「宿主回值」之间
-   * 存在一个窗口：门属性**不存在** → 38 条带门的规则里**有 11 条当场命中**。
-   *
-   * 实测（真机 dsh）：该窗口内顶栏拿到 `backdrop-filter: blur(12px)`、输入框卡拿到
-   * `blur(10px) saturate(1.45)` 且底色变成 58% 半透明 —— 一个选了「官方默认」的用户
-   * 会先看到玻璃与染色，等宿主回值再被抹掉，正是本插件承诺「**完全不介入**」时最不该有的闪变。
-   *
-   * 修法：初值取**最保守**的一侧（`plain = true` = 整层让路）。宿主回值后 `paintLayer`
-   * 会按真实色调把它翻成正确的值；期间宁可少画（官方外观），也绝不先画错。
-   * 与 `shouldPaint()`「未就绪不上色」的既有口径完全一致 —— 原来只是漏在门属性这一条上。
+   * ⚠️ **先把门关成「官方默认」，再注入样式表**：门属性是 `body:not([PLAIN_ATTR])` 的**唯一开关**、此前只在 `paintLayer` 里写，而样式表是无条件注入、首次 `repaint()` 又被 `shouldPaint()` 挡住（`status === 'loading'` 时直接 return）⇒ 从「注入」到「宿主回值」之间门属性不存在、带门规则当场命中，选了「官方默认」的用户会先看到玻璃与染色、等宿主回值再被抹掉。
+   * 修法：初值取**最保守**的一侧（`plain = true` = 整层让路），宁可少画（官方外观），也绝不先画错。
    */
   paintPlain(true)
   resources.style = ensureStyles()
   resources.layer = ensureLayer()
-  // 只留 layer 的局部别名（渲染计划要写它的 style 属性）；
-  // style 仅由清理 effect 经 holder 回收，无其它读取点，故不取名。
+  // 只留 layer 的局部别名（渲染计划要写它的 style）；style 仅由清理 effect 经 holder 回收，故不取名。
   const layer = resources.layer
-  // 官方悬停光带修复（自 nav-pin 并入，方案 §3.3）：**不带色调门**，两档都生效。
-  // 放在这里注册 —— ctx 是 configForms fork 的上下文，卸载时随 fork 一起回收监听。
+  // 官方悬停光带修复：**不带色调门**，两档都生效。注册在 fork 的 ctx 上，卸载时随 fork 一起回收监听。
   followHandleGlow(ctx)
-  // 设置读取面：官方 0.1.7 起客户端设置基座服务是 `configForms`，
-  // 命名空间 = 本插件在 profile 里的**条目 id**（= SETTINGS_NAMESPACE）。
+  // 设置读取面：命名空间 = 本插件在 profile 里的**条目 id**（= SETTINGS_NAMESPACE）。
   const scope: ConfigForm<ThemeToneSettings> = ctx.configForms.get<ThemeToneSettings>(SETTINGS_NAMESPACE)
-  // 行 store 的**初值取实时主题轴**（不写死 dark）：浅色页面上首帧就该渲染浅色轴卡片，
-  // 否则用户可能在行还没同步时点到深色轴卡片 → 写入被 schema 拒（见 store.ts 的 ⚠️）。
+  // 行 store 的**初值取实时主题轴**（不写死 dark）：浅色页面首帧就该渲染浅色轴卡片，否则用户可能在行还没
+  // 同步时点到深色轴卡片 → 写入被 schema 拒（见 store.ts 的 ⚠️）。
   const rowStore = createThemeToneRowStore(ctx.theme.getTheme().active.colorScheme)
 
   let disposeTokens: (() => void) | undefined
@@ -493,42 +374,19 @@ function install(ctx: Context): void {
   let revision = 0
 
   /**
-   * 进程内兜底值 —— 宿主侧设置**不可用**时（非 loopback 的 memory 模式，或命名空间未暴露）
-   * 用它承载本次会话的选择。
-   *
-   * 为什么必须有：官方契约 `mode: 'memory'` 时 `writable` 恒为 false，
-   * 且写入在 memory 下**不落地**（`ConfigFormController` 把写入当空操作、`set()` 返回 false，
-   * 见 `ui-settings/src/client/config-form.ts` 的 memory 分支）。也就是说此时 `set()`
-   * 是**静默空操作**、`subscribe` 也不会因宿主推送而触发（只有 `mode === 'host'` 才同步 mirror）。
-   *
-   * 若不做兜底：用户点色调**屏幕毫无反应、也无任何日志** —— 既违反本插件 spec
-   * （01-design §6「按 ui-theme 对非 loopback 的口径降级为进程内状态，并在日志里说明」），
-   * 也违反根规范《鲁棒性·失败路径用户可见》与《扩展与宿主兼容·不得带病运行》。
+   * 进程内兜底值 —— 宿主侧设置**不可用**时（非 loopback 的 memory 模式，或命名空间未暴露）用它承载本次
+   * 会话的选择。为什么必须有：`mode: 'memory'` 时 `writable` 恒为 false，`set()` 是**静默空操作**、
+   * `subscribe` 也不会因宿主推送而触发 —— 不做兜底则用户点色调屏幕毫无反应、也无任何日志。
    */
   let localSettings: ThemeToneSettings = DEFAULT_SETTINGS
   let warnedNoPersistence = false
 
-  /**
-   * 在途乐观值的记账器（见 {@link pending.ts} / {@link readSettings}）。
-   *
-   * ⚠️ 按**字段**分别记账，不共用一个槽位 —— 两轴各写各的字段，切轴选色不该顶掉另一轴
-   * 在途的那一笔（`tokenOverrides` 两轴一次给全，那一笔同样要算数）。
-   */
+  /** 在途乐观值的记账器（见 `./pending.ts`）。⚠️ 按**字段**分别记账 —— 两轴各写各的字段，切轴选色不该顶掉另一轴在途的那一笔。 */
   const pendingTones = createPendingToneTracker()
 
   /**
-   * 当前该用哪份设置。
-   *
-   * ⚠️ 这里**不能**写成 `value ?? DEFAULT_SETTINGS`：`status === 'loading'` 时
-   * `value` 也是 `undefined`，那样会在宿主回第一帧之前**先按默认值上色**，
-   * 等真值到达再纠正 —— 改过色调的用户每次冷加载都会看到一次可见跳变
-   * （浅色轴默认 `official`、深色轴默认 `violet`，与多数人的实际选择不同）。
-   * 就绪前一律用**进程内兜底值**（初值 = 默认，且此时没人改过它），
-   * 并由 {@link shouldPaint} 决定先不上色。
-   *
-   * **乐观更新**：{@link pendingTones} 里那一笔（用户刚点、还在跨宿主往返中）优先于
-   * 宿主快照 —— 否则点下去要等一个 RTT 才变色（owner：「点色卡后半天才换过来」）。
-   * 该笔由**它自己那次写入的结算**收回，见 {@link settlePending}。
+   * 当前该用哪份设置。⚠️ **不能**写成 `value ?? DEFAULT_SETTINGS`：`status === 'loading'` 时 `value` 也是 `undefined` ⇒ 会在宿主回第一帧之前先按默认值上色、等真值到达再纠正（改过色调的用户每次冷加载都会看到一次可见跳变）；就绪前一律用进程内兜底值，并由 {@link shouldPaint} 决定先不上色。
+   * **乐观更新**：{@link pendingTones} 里那一笔（用户刚点、还在跨宿主往返中）优先于宿主快照 —— 否则点下去要等一个 RTT 才变色；该笔由**它自己那次写入的结算**收回，见 {@link settlePending}。
    */
   const readSettings = (): ThemeToneSettings => {
     const snapshot = scope.getSnapshot()
@@ -537,47 +395,16 @@ function install(ctx: Context): void {
   }
 
   /**
-   * 一笔写入**结算**时收掉它自己的乐观值。
-   *
-   * ⚠️ **必须按「是哪一笔」判，不能按「快照 revision 前进过」判**（owner 报的
-   * 「切换不同 tone 时会来回跳」的根因）。真机实测一次 `settings/mutate` 要
-   * **1.5–4s**（宿主写 profile patch 走整轮 reconcile），这段时间里用户会再点第二张卡 ——
-   * 两笔同时在途，各自带自己的结算。若按 revision 收：**先发那笔**的结算（或它触发的
-   * `describe` 回读）同样让 revision 前进，于是**后发那笔**的乐观值被当作废，画面从
-   * 「第二张卡」跳回「第一张卡」，等第二笔响应到达再跳回去。
-   *
-   * 实测轨迹（本机 dsh，连点 Default → 40ms 后点 Sakura）：
-   *
-   * ```text
-   * t=29ms   Default   第 1 笔乐观值
-   * t=82ms   Sakura    第 2 笔乐观值
-   * t=1171ms Default   ← 第 1 笔结算回来，误收掉第 2 笔（就是这一次回跳）
-   * t=2444ms Sakura    第 2 笔结算，最终收敛
-   * ```
-   *
-   * 改成「先发那笔无权收」后，同一串操作只在 82ms 跳一次、之后不再回跳
-   * （见 `test/pending.test.mjs` 与 `test/structure.test.mjs` 的守卫）。
-   *
-   * 为什么不能按「值与乐观值是否相等」判：写入刚发出时快照还是旧值，判不等会**当场**
-   * 把乐观值抹掉（等于没做乐观更新）；而宿主**拒绝**时值同样不等，判相等则 pending
-   * 永远留着（画面停在一个刷新就消失的颜色上）。按「哪一笔」判两个坑都绕开 ——
-   * 宿主接受与拒绝都会让 `set()` resolve，两条路都由它自己那次调用来收。
-   * @param write - {@link pendingTones} 发的凭据（用户在 `setTone` 里那一笔）。
+   * 一笔写入**结算**时收掉它自己的乐观值。⚠️ **必须按「是哪一笔」判，不能按「快照 revision 前进过」判**：一次 `settings/mutate` 要 1.5–4s，期间用户会再点第二张卡，先发那笔的结算同样让 revision 前进 ⇒ **后发那笔**的乐观值被误当作废（画面在两张卡之间来回跳）。
+   * 也不能按「值与乐观值是否相等」判：写入刚发出时快照还是旧值（判不等会当场抹掉乐观值），宿主拒绝时值同样不等（判相等则 pending 永远留着）—— 宿主接受与拒绝都会 resolve，两条路都由那次调用自己收。
    */
   const settlePending = (write: PendingToneWrite): void => {
     if (!pendingTones.settle(write)) return
-    // 收掉之后宿主快照才是权威值 —— 立刻重绘一次，让被拒的那一笔当场纠正回来
-    // （接受的那一笔此时快照已含新值，重绘是幂等的）。
+    // 收掉之后宿主快照才是权威值 —— 立刻重绘一次，让被拒的那一笔当场纠正回来（接受的那笔重绘是幂等的）。
     repaint()
   }
 
-  /**
-   * 现在能不能上色。
-   *
-   * `loading`（宿主还没回第一帧）→ **不上色**：此刻没有任何权威值，
-   * 按默认值画一遍再纠正就是可避免的闪变（见 {@link readSettings}）。
-   * `ready` → 正常上色。`unavailable` → 用进程内兜底值上色（选择仍应生效，只是不持久化）。
-   */
+  /** 现在能不能上色：`loading`（宿主还没回第一帧，没有任何权威值）→ 不上色；`unavailable` → 用进程内兜底值上色（选择仍生效，只是不持久化）。 */
   const shouldPaint = (): boolean => scope.getSnapshot().status !== 'loading'
 
   /** 宿主不可写时记**一条**告警（不重复刷）。 */
@@ -597,11 +424,8 @@ function install(ctx: Context): void {
   /**
    * 写 token 覆盖层。色值与明暗轴无关（两个模式一次给全），故只在设置真的变了才重写 ——
    * `overrideTokens` 会 emit `theme/change`，条件跳过同时也是防自激环的闸门。
-   * 同一 source 再调即整层替换并重排到顶，旧 disposer 随之变 no-op，故只留最新一个。
-   *
-   * ⚠️ `lastTokenKey` **必须在成功后**才前进：先置 key 再调用的话，万一 `overrideTokens`
-   * 抛错（官方会校验入参形状），key 已经前进了 —— 下次同样的设置会被判为「没变」而**永不重试**，
-   * 色调就永久停在旧值上。写在后面则失败不前进，下一次 repaint 会自然重试。
+   * ⚠️ `lastTokenKey` **必须在成功后**才前进：先置 key 再调用的话，万一 `overrideTokens` 抛错，
+   * 下次同样的设置会被判为「没变」而**永不重试**，色调就永久停在旧值上。
    */
   const paintTokens = (settings: ThemeToneSettings): void => {
     const key = `${settings.lightTone}|${settings.darkTone}`
@@ -613,32 +437,22 @@ function install(ctx: Context): void {
   }
 
   /**
-   * 写背景层与行状态：依赖当前解析出的明暗轴。
-   *
-   * ⚠️ **这里也要过 `shouldPaint()` 那道门**（不能只靠 `repaint()` 里的那份）。
-   * `theme/change` 是**另一条**直达本函数的路径，它**不经过 `repaint()`** —— 而官方的
-   * `theme/change` 由 ui-theme 自己的 settings scope 驱动，与本插件的 settings 就绪
-   * **没有先后保证**。于是「ui-theme 先就绪、本插件还在 `loading`」时，本函数会用
-   * `readSettings()` 的进程内兜底值（= 默认值，深色轴 `violet`）算出 `hidden = false`
-   * → `paintPlain(false)` **把门打开** → 一个实际选了「官方默认」的用户照样吃到玻璃与染色，
-   * 直到本插件自己回值再纠正。这与上面 `paintPlain(true)` 要堵的是**同一个洞**，只是另一个入口。
-   *
-   * 未就绪一律不画：层保持 `hidden`、门保持关，等本插件拿到权威值再一次性画对。
+   * 写背景层与行状态：依赖当前解析出的明暗轴。⚠️ **这里也要过 `shouldPaint()` 那道门** —— `theme/change`
+   * 是**另一条**直达本函数的路径、**不经过 `repaint()`**，而官方 `theme/change` 由 ui-theme 自己的 settings
+   * scope 驱动，与本插件 settings 的就绪**没有先后保证**。不过门就会用进程内兜底值算出 `hidden = false`
+   * → `paintPlain(false)` **把门打开**，让实际选了「官方默认」的用户照样吃到玻璃与染色。
    */
   const paintLayer = (snapshot: ThemeSnapshot): void => {
-    // ⚠️ **行同步必须排在 `shouldPaint()` 那道门之前**（owner 真机报「浅色模式下选色调
-    // 无法维持」的第二层根因）：门是给**上色**用的（未就绪不上色，避免闪变），
-    // 但**行渲染哪一轴的卡片**纯由当前主题决定，与设置是否就绪无关。
-    // 曾把 `boundRow.sync` 放在门后面 → 设置还在 `loading` 时行不更新，
-    // 浅色页面上显示的却是**深色轴的卡片**；此时点卡片会把浅色 id 写进深色字段。
+    // ⚠️ **行同步必须排在 `shouldPaint()` 那道门之前**：门是给**上色**用的（未就绪不上色，避免闪变），
+    // 而**行渲染哪一轴的卡片**纯由当前主题决定，与设置是否就绪无关 —— 排在门后会让浅色页面显示深色轴
+    // 卡片，此时点卡片会把浅色 id 写进深色字段（被 schema 拒）。
     syncRow(snapshot.active.colorScheme)
     if (!shouldPaint()) return
     const settings = readSettings()
     const scheme: ColorScheme = snapshot.active.colorScheme
     const plan = backdropPlan(scheme, settings)
     layer.hidden = plan.hidden
-    // 「这一轴选了官方默认」= 没有染色 = 整层隐藏。把这个事实挂到 body 上，
-    // 让玻璃与抬升面两张表整表让路（owner：官方默认的都不要动，给个完全不动的参考）。
+    // 「这一轴选了官方默认」= 没有染色 = 整层隐藏；把这个事实挂到 body 上，让玻璃与抬升面两张表整表让路。
     paintPlain(plan.hidden)
     if (!plan.hidden) {
       layer.style.setProperty(TOP_VARIABLE, plan.top)
@@ -651,11 +465,8 @@ function install(ctx: Context): void {
   }
 
   /**
-   * 把「当前明暗轴 + 该轴选中的色调」推给设置行。
-   *
-   * ⚠️ **不走上色那道门**（见 {@link paintLayer} 的 ⚠️）：行渲染哪一轴只取决于主题，
-   * 设置未就绪时用进程内兜底值算选中态即可（那正是 {@link readSettings} 的口径）。
-   * @param scheme - 当前解析出的明暗轴。
+   * 把「当前明暗轴 + 该轴选中的色调」推给设置行。⚠️ **不走上色那道门**（理由见 {@link paintLayer}）：
+   * 行渲染哪一轴只取决于主题，设置未就绪时用进程内兜底值算选中态即可。
    */
   const syncRow = (scheme: ColorScheme): void => {
     revision += 1
@@ -664,17 +475,14 @@ function install(ctx: Context): void {
 
   /** 设置变更：token、层、行全都要重算。 */
   const repaint = (): void => {
-    // ⚠️ 乐观值**不在这里收**：写设置是跨宿主的一趟往返（真机 1.5–4s），期间
-    // `subscribe` 会因别的推进（另一笔写入的结算、它触发的 describe 回读）多次触发本函数。
-    // 在这里按「revision 变了」收，就会把**更新的那一笔**乐观值误当作废 → 画面来回跳
-    // （owner 报障的根因）。改为由**那一笔写入自己的结算**收，见 settlePending。
+    // ⚠️ 乐观值**不在这里收**：写设置是跨宿主的一趟往返（真机 1.5–4s），期间 `subscribe` 会因别的推进
+    // （另一笔写入的结算、它触发的 describe 回读）多次触发本函数 —— 在这里按「revision 变了」收，就会把
+    // **更新的那一笔**乐观值误当作废，画面来回跳。改为由**那一笔写入自己的结算**收，见 settlePending。
     //
-    // ⚠️ 行同步**不设门**（理由见 `paintLayer` 的 ⚠️）：它只依赖当前主题，
-    // 必须在 `shouldPaint()` 返回之前就更新 —— 否则设置未就绪时行不刷新，
-    // 浅色页面会显示深色轴卡片，点下去就把浅色 id 写进深色字段（被 schema 拒）。
+    // ⚠️ 行同步**不设门**（理由见 `paintLayer` 的 ⚠️）：它只依赖当前主题，必须在 `shouldPaint()` 返回之前
+    // 就更新 —— 否则设置未就绪时行不刷新，浅色页面会显示深色轴卡片，点下去就把浅色 id 写进深色字段。
     syncRow(ctx.theme.getTheme().active.colorScheme)
-    // 宿主还没回第一帧（`loading`）就不上色 —— 此刻没有权威值，按默认画一遍再纠正
-    // 就是一次可避免的闪变（见 readSettings 的 ⚠️）。
+    // 宿主还没回第一帧（`loading`）就不上色 —— 此刻没有权威值，按默认画一遍再纠正就是一次可避免的闪变。
     if (!shouldPaint()) return
     warnIfNotPersistable()
     const settings = readSettings()
@@ -683,17 +491,8 @@ function install(ctx: Context): void {
   }
 
   /**
-   * 「未选工作区」待启动态的观测 —— 给 body 打 {@link WORKSTART_ATTR}，让玻璃把边界让回官方。
-   *
-   * 为什么需要观测：官方那个状态只体现为一个 **CSS-module 哈希类名**（不能写，仓库红线），
-   * 它同时写入的语义属性又全被本插件与官方其它控件污染（三选一全误命中，见 constants.ts）。
-   * 唯一可靠的判据是**那条虚线伪元素自己的签名** —— 所以只能读 `::after` 的计算样式。
-   *
-   * 代价与边界：
-   * * 每次只读**一个**元素（`[data-composer-card]`）的两个计算值，不做子树遍历；
-   * * `getComputedStyle` 会强制样式解析，故**同一帧内合并**（rAF 去抖），
-   *   且只在 DOM 变动时跑 —— hero 页与对话页都很安静，不会成为热路径；
-   * * observer 挂在 `document.body`（官方卡片进出都在其下），随 `ctx.effect` 卸载断开。
+   * 「未选工作区」待启动态的观测 —— 给 body 打 {@link WORKSTART_ATTR}，让玻璃把边界让回官方。判据只能是那条**虚线伪元素自己的签名**（见 `../workstart.ts`）：官方那个状态只体现为一个 **CSS-module 哈希类名**（不能写，仓库红线），它同时写入的语义属性又全被本插件与官方其它控件污染。
+   * 代价有界：只读 `[data-composer-card]` 一个元素的两个计算值，`getComputedStyle` 强制样式解析 ⇒ **同帧合并**、只在 DOM 变动时跑；observer 挂在 body 上，随 `ctx.effect` 断开。
    */
   const probeWorkstart = (): void => {
     const target = markerHost
@@ -715,12 +514,9 @@ function install(ctx: Context): void {
   }
 
   /**
-   * 同一帧内合并多次 DOM 变动，避免连续写属性触发无谓重排。
-   *
-   * ⚠️ rAF 句柄**必须存下来并在卸载时取消**：`ctx.effect` 只管它收集到的 disposer，
-   * 不会替你取消已入队的动画帧。否则「变动入队 → 卸载 → 帧才到」这条时序里，
-   * 回调会在清理**之后**跑，把刚摘掉的 {@link WORKSTART_ATTR} 重新写回 body
-   * （官方那条虚线仍在，判定仍为真）—— 属性就永久残留了。
+   * 同一帧内合并多次 DOM 变动，避免连续写属性触发无谓重排。⚠️ rAF 句柄**必须存下来并在卸载时取消**：
+   * `ctx.effect` 只管它收集到的 disposer，不会替你取消已入队的帧 —— 否则「变动入队 → 卸载 → 帧才到」会把
+   * 刚摘掉的 {@link WORKSTART_ATTR} 重新写回 body，属性就永久残留了。
    */
   let probeScheduled = false
   let probeFrame = 0
@@ -739,39 +535,22 @@ function install(ctx: Context): void {
   }
 
   /**
-   * 收敛式重测：只要上一次测出的相位**还在变**，就继续在后续帧里重测。
-   *
-   * ## 为什么必须有它（真机踩过）
-   * 相位量必须在**布局稳定后**取。可右栏开合是**动画**改 `grid-template-columns`
-   * 内联样式：它既不改 class（MutationObserver 只看 class），也不触发 `window.resize`
-   * （视口没变），而 `ResizeObserver` 也可能落在**动画中途**那一帧上。
-   * 于是采到一个中间值后再无事件 ⇒ 变量**永久停在错的相位**
-   *（实测停在 452.5px，正确值 495.22px，卡片顶边 371 个像素因此画错）。
-   *
-   * 这里用一个自终止的轮询兜底：每次测量后记录四个量，若与上一次不同，
-   * 就再排一帧继续测；**连续两次相同即停**（最多 {@link PHASE_SETTLE_FRAMES} 帧）。
-   * 于是不论动画由什么触发、持续多少帧，最终稳定值一定会被采到。
-   *
-   * 代价可控：只在「值还在变」的那几十帧里多跑几次
-   *（每次仅两个 `querySelector` + 两次 `getBoundingClientRect` + 两次计算样式），
-   * 一旦稳定立刻停 —— 静态页面上一帧都不会多跑。
+   * 收敛式重测：只要上一次测出的相位**还在变**，就继续在后续帧里重测。相位量必须在**布局稳定后**取，而右栏
+   * 开合是**动画**改 `grid-template-columns` 内联样式 —— 既不改 class（MutationObserver 看不到）、也不触发
+   * `window.resize`（视口没变），`ResizeObserver` 也可能落在动画中途那一帧 ⇒ 采到中间值后再无事件，变量
+   * **永久停在错的相位**。自终止轮询：每次测量后比较四个量，**连续两次相同即停**（最多 {@link PHASE_SETTLE_FRAMES} 帧）。
    */
   let settleFrames = 0
   let settlePrev = ''
   /**
-   * 收敛循环**自己**的帧句柄 —— 与 {@link scheduleProbe} 的 `probeFrame` 分开。
-   *
-   * ⚠️ **不能共用句柄**（本轮踩过）：`startPhaseSettle` 一进来就要取消上一个待跑的帧，
-   * 若取消的是 `scheduleProbe` 排的那一帧，`probeScheduled` 就**永远停在 `true`**，
-   * 之后所有 MutationObserver 触发的探测都被「同帧合并」静默吞掉 —— 观测彻底停摆。
+   * 收敛循环**自己**的帧句柄 —— ⚠️ **不能与 {@link scheduleProbe} 的 `probeFrame` 共用**：`startPhaseSettle`
+   * 一进来就要取消上一个待跑的帧，若取消的是 `scheduleProbe` 排的那一帧，`probeScheduled` 就永远停在 `true`，
+   * 之后所有探测都被「同帧合并」静默吞掉 —— 观测彻底停摆。
    */
   let settleFrame = 0
   /**
-   * 起一轮收敛重测（可被任何触发源调用）。
-   *
-   * ⚠️ 用 `requestAnimationFrame` **自己排队**，不借 `scheduleProbe`：
-   * `scheduleProbe` 有「同帧只跑一次」的合并语义（`probeScheduled`），
-   * 而收敛需要**连续多帧**各测一次。两者目的不同，共用会互相压制。
+   * 起一轮收敛重测（可被任何触发源调用）。⚠️ 用 `requestAnimationFrame` **自己排队**，不借 `scheduleProbe` ——
+   * 后者有「同帧只跑一次」的合并语义，而收敛需要**连续多帧**各测一次；共用会互相压制。
    */
   const startPhaseSettle = (): void => {
     settleFrames = 0
@@ -792,47 +571,14 @@ function install(ctx: Context): void {
   }
 
   /**
-   * 实测两个相载体的定位区原点，发布成 CSS 变量 + **两道**门属性。
-   *
-   * ## 为什么必须实测（而不是纯 CSS 推）
-   * 座底不透带与卡片缺口两条规则要用「显式视口相位」替代
-   * `background-attachment: fixed`（后者每帧按视口栅格化 ⇒ 滚动卡顿，见 spec 10）。
-   * 相位要的是「定位区左上角在视口里的坐标」。右栏折叠时纯 CSS 尚能推
-   * （`100vw − 列宽`），但**右栏一开就推不出** —— 左栏偏移与右栏宽同时变，
-   * 一个方程两个未知量（实测载体左缘仍是 280、右缘却从 2873 变 1577）。
-   * 官方把右栏宽只写在 `gridTemplateColumns` 内联样式上、没发布成变量，
-   * 面板宽也不继承到座上 ⇒ 纯 CSS 读不到。于是改为**测量**：测到就用快档，
-   * **所有布局状态一视同仁**（不再有「右栏开着不生效」）。
-   *
-   * ## 两个载体统一走**同一条**推导
-   * 两条规则都是「宿主里的一个绝对定位伪元素」，故都用
-   * {@link pseudoOrigin}：宿主边框盒 + 宿主边框 + 伪元素自身的 `left`/`top`。
-   * 这样**不依赖**任何「伪元素与某个子元素同宽同左」之类的实测不变量 ——
-   * 官方改内边距也不会静默错位。两个载体的差别只是宿主不同：
-   * 座底带宿主 = 座位自身；缺口宿主 = 卡片的父元素。
-   *
-   * ## 为什么是**两道**门
-   * 两个载体的可见性各自独立（hero 没有会话座；卡片不渲染时没有缺口），
-   * 故**各测各的、各挂各的门** —— 合成一道门会让「一个载体暂不可用」
-   * 连带把另一个已经能测到的也拖回慢档。
-   *
-   * ## 精度与降级
-   * 用 `getBoundingClientRect`（视口坐标，已含滚动与变换）。取不到元素、
-   * 或几何不合理（见 {@link solvePhaseOrigin}）时**摘掉那道门** ⇒ 该条规则落回
-   * `fixed` 档 —— 慢但一定正确。绝不写一个可能错位的值。
-   *
-   * ## 开销
-   * 每次只做两次 `querySelector` + 两次 `getBoundingClientRect` + 两次计算样式，
-   * 且**同帧合并**、只在 DOM 变动（class 变化）与 `resize` 时跑。
-   * `resize` 必须监听：窗口宽度变了相位就变，而官方改的是内联
-   * `gridTemplateColumns`（不改 class，观察不到）。
+   * 实测两个相载体的定位区原点，发布成 CSS 变量 + **两道**门属性。必须实测：相位要的是「定位区左上角在视口里的坐标」，右栏一开左栏偏移与右栏宽同时变、官方又没把右栏宽发布成变量 ⇒ 纯 CSS 推不出（详见 `../phase.ts`）。
+   * 两个载体都走 {@link pseudoOrigin}（不依赖任何实测不变量），可见性各自独立 ⇒ **各测各的、各挂各的门**（合成一道门会让一个载体暂不可用连带拖回慢档）；取不到元素或几何不合理（见 {@link solvePhaseOrigin}）就**摘掉那道门** ⇒ 该规则落回 `fixed` 档（慢但一定正确）。
    */
   const publishPhase = (): string | null => {
     const target = markerHost
     if (target === null) return null
     /**
-     * 本次实测到的四个量拼成的签名。返回给 {@link publishPhaseAndSettle} 判断布局是否已稳定。
-     * 用**实测几何**（而不是写入的 CSS 值）拼签名：只有几何真的不动了才算收敛。
+     * 本次实测到的四个量拼成的签名。用**实测几何**（而不是写入的 CSS 值）拼签名：只有几何真的不动了才算收敛。
      */
     const parts: string[] = []
     /** 摘掉一道门连同它的几何变量（绝不留下「门开着但变量是旧的」这种组合）。 */
@@ -863,29 +609,26 @@ function install(ctx: Context): void {
 
     try {
       /**
-       * ① 座底不透带：宿主 = 座位自身（它是 sticky 定位元素，正是 ::after 的包含块）。
+       * ① 座底不透带：宿主 = 座位自身（sticky 定位元素，正是 ::after 的包含块）。
        * ⚠️ 座位只在 `[data-phase='active']` 下才是 sticky；hero 下取不到就摘门。
        */
       applyOne(document.querySelector('[data-composer-seat]'),
         PHASE_BAND_ATTR, PHASE_BAND_VARIABLE, PHASE_BAND_TOP_VARIABLE)
 
       /**
-       * ② 卡片缺口：宿主 = **卡片的父元素**（`buildCardNotchCss` 里那个含 `:has()` 的宿主）。
-       * ⚠️ 伪元素挂在这个宿主上，而它比卡片宽一个大内边距 —— 故必须按伪元素自身算，
-       * 不能拿卡片或宿主顶替（见 {@link pseudoOrigin}）。
+       * ② 卡片缺口：宿主 = **卡片的父元素**（伪元素挂在它上面，且它比卡片宽一个大内边距）——
+       * 故必须按伪元素自身算，不能拿卡片或宿主顶替（见 {@link pseudoOrigin}）。
        */
       applyOne(document.querySelector('[data-composer-card]')?.parentElement ?? null,
         PHASE_NOTCH_ATTR, PHASE_NOTCH_VARIABLE, PHASE_NOTCH_TOP_VARIABLE)
     } catch {
-      // 运行期不冒泡（根 AGENTS）：测量失败只是退回慢档，绝不打扰宿主。
+      // 运行期不冒泡：测量失败只是退回慢档，绝不打扰宿主。
       clearOne(PHASE_BAND_ATTR, PHASE_BAND_VARIABLE, PHASE_BAND_TOP_VARIABLE)
       clearOne(PHASE_NOTCH_ATTR, PHASE_NOTCH_VARIABLE, PHASE_NOTCH_TOP_VARIABLE)
       return null
     }
     return parts.join('|')
   }
-
-  /** 摘掉两道门与四个变量（卸载 / 降级共用一处，避免漏摘）。 */
 
   repaint()
   ctx.effect(() => scope.subscribe(() => { repaint() }), 'dsh-theme-tone: settings scope')
@@ -909,15 +652,10 @@ function install(ctx: Context): void {
   }, 'dsh-theme-tone: workstart probe')
 
   /**
-   * 相位几何：初跑一次 + 监听 `resize`。
-   *
-   * `resize` **不可省**：窗口宽度变化必然改变相位，而官方改的是内联
-   * `gridTemplateColumns` —— 那是 `style` 属性，上面的 observer 只过滤 `class`，
-   * 观察不到。故这里单独听 `resize`（仍走同帧合并，避免拖拽窗口时每像素一次测量）。
-   *
-   * 右栏开合、左栏折叠都不必单独听：它们会改 class（拖拽条 / 面板状态），
-   * 由上面的 MutationObserver 覆盖；而即便漏掉一次，`resize` 与下一次 DOM 变动
-   * 也会补上 —— 且**门在测到之前不挂**，最坏情况只是暂时用慢档（正确）。
+   * 相位几何：初跑一次 + 监听 `resize`。`resize` **不可省** —— 窗口宽度变化必然改变相位，而官方改的是内联
+   * `gridTemplateColumns`（`style` 属性，上面的 observer 只过滤 `class`，观察不到）。
+   * 右栏开合 / 左栏折叠会改 class，由上面的 MutationObserver 覆盖；即便漏掉一次，门在测到之前不挂，
+   * 最坏情况只是暂时用慢档（正确）。
    */
   publishPhase()
   ctx.effect(() => {
@@ -925,13 +663,10 @@ function install(ctx: Context): void {
     window.addEventListener('resize', onResize, { passive: true })
 
     /**
-     * ⚠️ **`ResizeObserver` 不可省**（真机踩过）：右栏开合是**动画**改
-     * `grid-template-columns` 内联样式 —— 它既不改 class（MutationObserver 只看 class），
-     * 也不触发 `window.resize`（视口没变）。观察两个**载体**（座位与缺口宿主），
-     * 它们的尺寸正是随左右栏开合而变的量；配合 {@link startPhaseSettle} 的收敛重测，
-     * 保证动画停下时采到的是**稳定值**（实测不加就会停在中间值 452.5px）。
-     *
-     * 元素不存在时不装（初跑与后续 MutationObserver 会处理它们的出现）。
+     * ⚠️ **`ResizeObserver` 不可省**：右栏开合是**动画**改 `grid-template-columns` 内联样式 —— 既不改 class
+     * （MutationObserver 只看 class），也不触发 `window.resize`（视口没变）。观察两个**载体**（座位与缺口
+     * 宿主）—— 它们的尺寸正是随左右栏开合而变的量；配合 {@link startPhaseSettle} 的收敛重测，保证动画停下时
+     * 采到**稳定值**。元素不存在时不装（初跑与后续 MutationObserver 会处理它们的出现）。
      */
     const targets = [
       document.querySelector('[data-composer-seat]'),
@@ -945,19 +680,18 @@ function install(ctx: Context): void {
     return () => {
       window.removeEventListener('resize', onResize)
       resizeObserver?.disconnect()
-      // 取消尚未触发的收敛帧：否则「入队 → 卸载 → 帧才到」会让回调在清理**之后**
-      // 把刚摘掉的变量与门重新写回 body（与 scheduleProbe 那条 ⚠️ 同理）。
+      // 取消尚未触发的收敛帧：否则回调会在清理**之后**把刚摘掉的变量与门重新写回 body（同 scheduleProbe 那条 ⚠️）。
       if (settleFrame !== 0) cancelAnimationFrame(settleFrame)
       settleFrame = 0
       settleFrames = 0
       settlePrev = ''
-      // 卸载时把两道门与四个变量一起摘干净（根 AGENTS：本插件加的属性不留残余）。
+      // 卸载时把两道门与四个变量一起摘干净（本插件加的属性不留残余）。
       clearPhase()
     }
   }, 'dsh-theme-tone: phase geometry')
 
-  // 明暗轴切换：token 层已按模式给全，presenter 会自己取用，故只需重算层与行。
-  // `ctx.on` 的监听器本身就以 effect 记在当前 fiber 上，卸载自动摘除，无需再包一层。
+  // 明暗轴切换：token 层已按模式给全、presenter 自己取用，故只需重算层与行。
+  // `ctx.on` 的监听器以 effect 记在当前 fiber 上，卸载自动摘除，无需再包一层。
   ctx.on('theme/change', snapshot => { paintLayer(snapshot) })
 
   ctx.effect(() => ctx.locale.register(LOCALE_NAMESPACE, { zh, en }), 'dsh-theme-tone: locale dictionaries')
@@ -970,43 +704,21 @@ function install(ctx: Context): void {
     store: rowStore,
     inject: (actions: BoundActions<typeof rowStore>): ThemeToneRowInjected => {
       boundRow = actions
-      // 注册后立刻补一次同步，避免丢掉「注册」与「首次事件」之间的变化。
-      // 仍走 repaint 那道「未就绪不上色」的门 —— 注册早于宿主回值时不画默认色。
+      // 注册后立刻补一次同步，避免丢掉「注册」与「首次事件」之间的变化（仍走 repaint 那道未就绪不上色的门）。
       repaint()
       return {
         setTone: (id: ToneId, scheme: ColorScheme) => {
           /**
-           * ⚠️ **轴由行传入，不在这里重新查询 `ctx.theme.getTheme()`**
-           * （owner 真机报「浅色模式选色调后很快回到深色官方黑」的根因）。
-           *
-           * 行渲染哪一轴的卡片，取决于 store 里的 `colorScheme`；而它由上一次 `paintLayer`
-           * 同步（`theme/change` 驱动）。写入时若重新查询实时主题，两者在**切换模式的那一小段
-           * 时间窗内会错开**（store 还没同步，或 `theme/change` 的到达次序与 settings 回值交错）。
-           *
-           * 一旦错开，就会把**浅色轴的 id 写进深色轴字段** —— 而两轴合法集合**不重叠**
-           * （浅 official/blue/sakura/green、深 official/violet/crimson/forest），
-           * 宿主 schema 校验直接拒绝 → 选择不生效、该轴停在官方值，观感就是
-           * 「选了色调但很快回到官方」。用渲染轴写入则永远写入合法值。
+           * ⚠️ **轴由行传入，不在这里重新查询 `ctx.theme.getTheme()`**：行渲染哪一轴取决于 store 里的
+           * `colorScheme`（由上一次 `paintLayer` 同步），写入时重新查询两者会在切换模式的时间窗内错开 ——
+           * 于是把**浅色轴的 id 写进深色轴字段**，而两轴合法集合**不重叠**（浅 official/blue/sakura/green、
+           * 深 official/violet/crimson/forest），宿主 schema 直接拒绝 ⇒ 选择不生效、观感是「选完很快回到官方」。
            */
           const field = toneFieldFor(scheme)
           const snapshot = scope.getSnapshot()
           /**
-           * ⚠️ **先本地落值 + 立刻重绘，再发写入**（owner 真机报「点色卡后半天才换过来」）。
-           *
-           * 原因：`scope.set()` 是**跨宿主的一趟往返**（写设置文档 → 宿主回新镜像 →
-           * `subscribe` 触发 `repaint`），在往返回来之前 `readSettings()` 读到的仍是**旧值**，
-           * 所以画面要等一个 RTT 才变。色卡是纯本地观感、双击率又高，这一等很显眼。
-           *
-           * 修法：把用户的选择**先记成在途乐观值**并立刻重绘（乐观更新），随后再发写入。
-           * 该笔由**它自己那次写入的结算**收回（见 {@link settlePending}）：宿主接受 → 快照
-           * 已含新值，收掉后画面不变；宿主拒绝 → 收掉后下一次重绘用快照的旧值纠正回来。
-           *
-           * ⚠️ **不能在这里重新查询 `ctx.theme.getTheme()` 决定收哪一笔**（同上面那条
-           * 「轴由行传入」的理由）：收的凭据必须是**这次写入自己**发的那一号。
-           *
-           * 宿主不可写（memory 模式 / 命名空间未暴露）时这是**唯一**的落值途径，
-           * 因此同一条路同时承担「不可持久化时也要在本次会话内生效」——那种情形没有写入
-           * 可结算，乐观值就留在账上（下次同字段的点击会顶替它），由 `localSettings` 兜底。
+           * ⚠️ **先本地落值 + 立刻重绘，再发写入**：`scope.set()` 是跨宿主的一趟往返，回来之前 `readSettings()` 读到的仍是旧值 ⇒ 画面要等一个 RTT 才变（色卡双击率高，这一等很显眼）；把选择记成在途乐观值并立刻重绘，该笔由**它自己那次写入的结算**收回（见 {@link settlePending}）。
+           * 宿主不可写（memory 模式 / 命名空间未暴露）时这是**唯一**的落值途径，故同一条路同时承担「不可持久化时也要在本次会话内生效」—— 那种情形没有写入可结算，由 `localSettings` 兜底。
            */
           localSettings = { ...localSettings, [field]: id }
           const pending = pendingTones.begin(field, id)
@@ -1016,13 +728,9 @@ function install(ctx: Context): void {
             return
           }
           /**
-           * 结算这一笔。
-           *
-           * ⚠️ **必须挂 `.then` 收自己那一笔，不能靠 `repaint` 里的 revision 判定**
-           * （owner 报的「切换不同 tone 时会来回跳」的根因，见 {@link settlePending}）。
-           * 两条路径都要收：`set()` 在宿主**接受与拒绝**时都 resolve（拒绝走 recovery 读），
-           * 只有传输失败才 reject —— 那种情形也从账上收掉（否则乐观值永久留着，
-           * 画面停在一个刷新就消失的颜色上）。
+           * 结算这一笔：⚠️ **必须挂 `.then` 收自己那一笔，不能靠 `repaint` 里的 revision 判定**
+           * （见 {@link settlePending}）。宿主接受与拒绝都 resolve（拒绝走 recovery 读），只有传输失败才
+           * reject —— 那种情形也从账上收掉，否则乐观值永久留着、画面停在一个刷新就消失的颜色上。
            */
           void scope.set(field, id).then(
             () => { settlePending(pending) },

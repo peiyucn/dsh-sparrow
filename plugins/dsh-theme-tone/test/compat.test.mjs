@@ -2,11 +2,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { cssSupports, hasCapability, missingCapabilities, warnMissingCapabilities, warnUser } from '../lib/compat.js'
 
-// 根 AGENTS《插件与宿主兼容》：宿主契约不认识时插件必须自停用，而不是带病运行。
-// 本插件的门装在 **client half**，语义是「惰性停用」—— 告警后直接返回，**绝不抛错**：
-// 客户端 boot 审计把任何非 active 的 entry 当致命失败（dsh 0.1.7-alpha.1
-// packages/client/web/src/boot-client.ts:63-82），client 侧抛错会让宿主整个 Web UI
-// 停在 "Failed to load plugins"。本文件覆盖能力门纯判定与接线。
+// 根 AGENTS《插件与宿主兼容》：宿主契约不认识时自停用，不带病运行。
+// 本插件的门在 client half，语义是「惰性停用」——告警后直接 return，绝不抛错。
 describe('compat 宿主兼容自检（纯能力版，客户端惰性停用）', () => {
   const fakeCtx = () => {
     const warns = []
@@ -32,8 +29,7 @@ describe('compat 宿主兼容自检（纯能力版，客户端惰性停用）', 
   })
 
   it('能力缺失 应该 告警（logger + console 同一句）并返回 false —— 不抛错', (t) => {
-    // 抛错 = 宿主整页起不来；只写 logger = 用户看不到（客户端 logger 默认只有环形缓冲
-    // exporter，浏览器侧没有 console 通道）。故两条通道都要写。
+    // 两条通道都要写：抛错宿主整页起不来，只写 logger 用户看不到（浏览器侧无 console 出口）。
     const printed = []
     t.mock.method(console, 'warn', message => { printed.push(message) })
     const { ctx, warns } = fakeCtx()

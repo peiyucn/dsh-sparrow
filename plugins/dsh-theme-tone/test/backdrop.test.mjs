@@ -41,7 +41,6 @@ import { DARK_TONES, DEFAULT_SETTINGS, DEPTH_ALPHA, LIGHT_TONES } from '../lib/t
 
 const settings = (lightTone, darkTone) => ({ lightTone, darkTone })
 
-/** 取 rgba(...) 末尾的 alpha 数值。 */
 const alphaOf = color => Number(/,\s*([\d.]+)\)$/u.exec(color)[1])
 
 describe('背景层样式表', () => {
@@ -72,8 +71,6 @@ describe('背景层样式表', () => {
 
   it('颗粒层应该 带上 pyai.site 同款 data URI 与**统一来源的**不透明度', () => {
     assert.ok(css.includes(GRAIN_DATA_URI))
-    // 2026-09-24：强度改为读运行期变量（唯一来源 GRAIN_ALPHA，owner：「噪点值统一变量，
-    // 方便后续我们减弱」），括号里是回落值（变量缺席时与旧行为一致）。
     assert.match(
       css,
       new RegExp(`opacity: var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY}\\)`, 'u'),
@@ -83,10 +80,8 @@ describe('背景层样式表', () => {
   })
 
   it('用户内容应该 被抬到背景层之上（图片不该被染色 / 上颗粒）', () => {
-    // owner：「用户发的图片，不要有咱们的样式，尤其是颗粒那些。」
     // 背景层是覆盖全屏的 fixed 层，必须抬**整个对话容器**而不是单个 img ——
-    // img 会同时高过没有 z-index 的输入框（图片滚动时浮在输入框上），
-    // 而输入框就在同一个滚动容器里，整体抬升才保住内部前后序。
+    // img 会同时高过没有 z-index 的输入框，整体抬升才保住内部前后序。
     assert.ok(
       CONTENT_Z_INDEX > BACKDROP_Z_INDEX,
       `内容层 ${CONTENT_Z_INDEX} 应高于背景层 ${BACKDROP_Z_INDEX}`,
@@ -96,9 +91,7 @@ describe('背景层样式表', () => {
       new RegExp(`\\[${CONTENT_ATTR}\\] \\{\\s*position: relative;\\s*z-index: ${CONTENT_Z_INDEX};`, 'u'),
       '应把对话滚动容器抬到背景层之上',
     )
-    // 内容抬升后，必须压住内容的官方层也要跟着抬，否则会被内容盖住。
-    // 这是一条**不变式**（见 constants.ts 的 ABOVE_CONTENT_Z_INDEX）：凡 z-index < 81
-    // 且要压在内容之上的官方层，都得抬到 82。
+    // 内容抬升后，压住内容的官方层也要跟着抬（不变式：z-index < 81 且要压在内容之上的层 ⇒ 82）。
     // ⚠️ 0.1.7 起官方删掉了 `[data-sidebar-right-float-host]`，故本表只剩两个锚点。
     const RAISED = [RIGHT_PANEL_ATTR, SHELL_OVERLAY_ATTR]
     for (const attr of RAISED) {
@@ -108,8 +101,7 @@ describe('背景层样式表', () => {
         `${attr} 的高度 ${ABOVE_CONTENT_Z_INDEX} 应高于内容层 ${CONTENT_Z_INDEX}`,
       )
     }
-    // **标签菜单单独一档**：官方明写「从标签打开的菜单绝不能落在面板之下」
-    // （dockkit.module.css:538-543），原序是 floatLayer 60 < tabMenu 70。
+    // **标签菜单单独一档**：官方明写「从标签打开的菜单绝不能落在面板之下」，原序是 60 < 70；
     // 抬的时候必须一起抬、且保住这个次序，否则会把官方的相对层级反过来。
     assert.ok(css.includes(`[${DOCKKIT_MENU_ATTR}]`), `应抬起 [${DOCKKIT_MENU_ATTR}]`)
     assert.ok(
@@ -121,15 +113,14 @@ describe('背景层样式表', () => {
       new RegExp(`\\[${DOCKKIT_MENU_ATTR}\\] \\{\\s*z-index: ${TAB_MENU_Z_INDEX};`, 'u'),
       '标签菜单应取更高一档，而不是与面板同号',
     )
-    // 官方默认门：这些规则也必须是 gated 的（选了官方默认就完全不动官方布局）
-    // **拖拽条**（owner 真机报「调整对话区域的条整没了」）—— 官方有两条，属性不同：
+    // **拖拽条**：官方有两条，属性不同（本表须同时抬起两条）。
     assert.ok(css.includes(`[${WIDTH_HANDLE_ATTR}]`), '对话区拖拽条（有独有属性）应被抬起')
-    // AppFrame 那条只有 `data-side`，而官方**三处**在用（含 Tooltip 的 placement）→ 必须排除 tooltip
+    // AppFrame 那条只有 `data-side`，而官方**三处**在用（含 Tooltip 的 placement）⇒ 必须排除 tooltip
     assert.ok(
       css.includes(`[${SIDE_ATTR}]:not([role='tooltip'])`),
       'data-side 必须排除 tooltip（否则把提示框一起抬起来）',
     )
-    // 官方默认门：这些规则也必须是 gated 的（选了官方默认就完全不动官方布局）
+    // 这些规则也必须是 gated 的（选了官方默认就完全不动官方布局）。
     for (const attr of [CONTENT_ATTR, ...RAISED, DOCKKIT_MENU_ATTR]) {
       assert.match(
         css,
@@ -137,8 +128,7 @@ describe('背景层样式表', () => {
         `[${attr}] 的抬升规则应带官方默认门`,
       )
     }
-    // 对话顶栏的 z-index 不在这张表里（它是 glass.ts 的一部分），
-    // 但必须同样高于内容层 —— 否则内容会盖住玻璃顶栏（owner 真机报过的 bug）。
+    // 对话顶栏的 z-index 不在本表（它在 glass.ts 里），但必须同样高于内容层，否则内容会盖住玻璃顶栏。
     const glass = buildGlassCss()
     assert.match(
       glass,
@@ -153,12 +143,11 @@ describe('背景层样式表', () => {
 
   it('渐变几何应该 用视口单位 vw/vh，**不能用 %**（顶栏会复用这串渐变）', () => {
     // 背景层是满视口的 fixed 元素，`%` 与 `vw/vh` 对它完全等价；但顶栏（76px 高）也复用
-    // 这串渐变（BACKDROP_GRADIENTS）—— `%` 会按顶栏自身盒子解析，把 45% 压成 34px 的扁椭圆，
-    // 金光只剩顶部一条细边（owner：「能看出来有一点，但不是特别明显」）。
+    // 这串渐变—— `%` 会按顶栏自身盒子解析，把 45% 压成 34px 的扁椭圆，金光只剩顶部一条细边。
     for (const [name, shape] of [['DARK', DARK_RADIAL_SHAPE], ['BOTTOM', BOTTOM_RADIAL_SHAPE], ['LEFT', LEFT_RADIAL_SHAPE]]) {
       assert.match(shape, /vw/u, `${name}_RADIAL_SHAPE 的横向半径应用 vw：${shape}`)
       assert.match(shape, /vh/u, `${name}_RADIAL_SHAPE 的纵向半径应用 vh：${shape}`)
-      // 半径位置里不该再出现百分比（`at 50%` 是横向居中的例外，允许）
+      // 半径里不该再出现百分比（`at 50%` 是横向居中的例外，允许）
       const radii = shape.replace(/^ellipse\s+/u, '').split(' at ')[0]
       assert.ok(!radii.includes('%'), `${name}_RADIAL_SHAPE 的半径不该用 %：${radii}`)
     }
@@ -207,7 +196,7 @@ describe('背景层渲染计划', () => {
   })
 
   it('跨轴脏值被写入时应该 回落到该轴默认（绝不画出不属于该轴的色）', () => {
-    // gray 是浅色轴的 id，写进 darkTone 是脏值 → 回到深色轴默认 violet
+    // gray 是浅色轴的 id，写进 darkTone 是脏值 ⇒ 回到深色轴默认 violet。
     const plan = backdropPlan('dark', settings('official', 'sakura'))
     assert.equal(plan.top, DARK_TONES.violet.top)
     assert.equal(plan.bottom, DARK_TONES.violet.bottom)
@@ -233,11 +222,10 @@ describe('色调卡预览（完整展示色调）', () => {
     const { backgroundImage } = tonePreview('dark', 'violet')
     assert.equal(PREVIEW_ALPHA_SCALE.dark.light, 1, '深色共享光层不放大（放大了三张卡互相盖住）')
     assert.ok(PREVIEW_ALPHA_SCALE.dark.depth > 1, '深色各款的纵深要放大（那是唯一的区分点）')
-    // 共享光层逐字进卡面（= 与实况 1:1 保真）
+    // 共享光层逐字进卡面（与实况 1:1 保真）。
     for (const raw of [DARK_TONES.violet.top, DARK_TONES.violet.left]) {
       assert.ok(backgroundImage.includes(raw), `${raw} 是共享光层，应逐字进卡面`)
     }
-    // 纵深放大后进卡面，且原始 alpha 不得原样出现
     const depth = boostAlpha(DARK_TONES.violet.bottom, PREVIEW_ALPHA_SCALE.dark.depth)
     assert.ok(backgroundImage.includes(depth), '纵深应放大后进卡面')
     assert.ok(!backgroundImage.includes(DARK_TONES.violet.bottom), '纵深不应原样进卡面（那就是没放大）')
@@ -245,19 +233,11 @@ describe('色调卡预览（完整展示色调）', () => {
   })
 
   it('浅色轴卡面应该 **放大**（结构改动后实况变淡，卡面需补回可辨度）', () => {
-    // ## 2026-09-18 结构改动后的重算
-    //
-    // 旧守卫要求浅色卡面**不放大**（`1 / 1`），理由是「实况 alpha 已追平卡面」——
-    // 那个前提在结构改动后**消失了**：三层光的实况 alpha 从 `.48/.54/.38` 降到 `.16/.30/.19`，
-    // 而卡面 alpha 是从色调表**派生**的，于是跟着降，**三款区分度掉到人眼阈下**
-    // （实测 gray-green 5.7 / blue-green 5.8，阈约 8）= owner 抱怨过的「看不出区别」。
-    //
-    // 修法：倍数设成「把 alpha 抬回结构改动前那一档」—— `.16×3=.48` / `.19×2=.38` / `.30×1.8=.54`。
-    // 实测区分度回到 10.3 / 10.5，可辨。
+    // 浅色卡面必须放大：卡面 alpha 由色调表**派生**，结构改动后三层光的实况 alpha 降低，
+    // 不放大则三款区分度掉到人眼阈下。倍数 = 把 alpha 抬回结构改动前那一档（.48 / .38 / .54）。
     assert.equal(PREVIEW_ALPHA_SCALE.light.light, 3, '浅色共享光层要放大 3 倍（.16 → .48，回到批准时的观感）')
     assert.equal(PREVIEW_ALPHA_SCALE.light.depth, 1.8, '浅色纵深放大 1.8 倍（.30 → .54）')
     const { backgroundImage } = tonePreview('light', 'blue')
-    // 放大后的值进卡面，原始 alpha **不得**原样出现
     for (const raw of [LIGHT_TONES.blue.top, LIGHT_TONES.blue.left, LIGHT_TONES.blue.bottom]) {
       assert.ok(!backgroundImage.includes(raw), `${raw} 是未放大的原值，不该原样进卡面`)
     }
@@ -268,8 +248,7 @@ describe('色调卡预览（完整展示色调）', () => {
   })
 
   it('浅色卡面放大后应该 **仍读得出各款本色**（三款区分度回到阈值以上）', () => {
-    // 放大的是 **alpha**，色相一字不变 —— 所以「三款各用自己的本色」这条不受影响。
-    // 本条守的是放大没把卡面推成「一片浓色」：各款的色相仍逐字来自自己的 tint。
+    // 放大的是 **alpha**，色相一字不变 ⇒ 各款仍用自己的本色 tint。
     for (const id of ['sakura', 'blue', 'green']) {
       const { backgroundImage } = tonePreview('light', id)
       const tint = LIGHT_TONES[id].tint
@@ -279,24 +258,16 @@ describe('色调卡预览（完整展示色调）', () => {
   })
 
   it('浅色轴的卡面纵深应该 **强于实况** —— 小卡需要更强才看得见（与深色轴同理）', () => {
-    // ## 2026-09-18 结构改动后，这条的**方向反过来了**
-    //
-    // 旧守卫要求浅色「卡面 α === 实况 α」（恒等），前提是实况 alpha 已提到 `.54` 的等效值。
-    // 结构改动把实况降到 `.30` 后，恒等意味着卡面也只有 `.30` —— 实测三款区分度掉到阈下。
-    //
-    // 现在浅色与深色**同一个道理**：卡面比实况强（浅 `1.8×` / 深 `3×`），
-    // 因为小卡（135×83）面积小、渐变被压缩，需要更强的染色才读得出。
-    // 唯一的差别只是倍数（浅色实况本就更显，故倍数更小）。
+    // 浅色与深色同一个道理：卡面必须比实况强（浅 `1.8×` / 深 `3×`）——
+    // 小卡（135×83）面积小、渐变被压缩，需要更强的染色才读得出；浅色实况本就更显，故倍数更小。
     const cardAlpha = Number(/,\s*([\d.]+)\)/u.exec(boostAlpha(LIGHT_TONES.blue.bottom, PREVIEW_ALPHA_SCALE.light.depth))[1])
     assert.ok(cardAlpha > DEPTH_ALPHA.light, '浅色卡面纵深应强于实况（小卡辅助）')
     assert.equal(cardAlpha, 0.54, '浅色卡面纵深落在 .54（= 结构改动前的观感）')
   })
 
   it('深色轴的卡面纵深仍然 ×3 —— 那是「小卡看得见」的辅助，不是不对称 bug', () => {
-    // 深色轴**保留** card ≠ reality（卡 0.54 / 实况 0.18）：owner 明确「深色现在没问题」。
-    // 与浅色轴的区别在于**实况本身够不够看**：近黑底余量大，实况 0.18 已产生 Δ亮度 +9~12；
-    // 而浅色底余量只有个位数，实况 0.18 只换来 −6~9，所以那里必须让实况追平卡面。
-    // 这条钉住「别顺手把深色的 ×3 也抹平」——抹平会让深色卡面变平、三款分不开。
+    // 深色轴**保留**卡面强于实况（卡 0.54 / 实况 0.18）：近黑底余量大，实况 0.18 已产生 Δ亮度 +9~12。
+    // 别顺手把深色的 ×3 抹平 —— 抹平会让深色卡面变平、三款分不开。
     const cardAlpha = Number(/,\s*([\d.]+)\)/u.exec(boostAlpha(DARK_TONES.violet.bottom, PREVIEW_ALPHA_SCALE.dark.depth))[1])
     assert.ok(cardAlpha > DEPTH_ALPHA.dark, '深色卡面纵深应强于实况（辅助小卡）')
     assert.equal(cardAlpha, Number((DEPTH_ALPHA.dark * 3).toFixed(3)), '深色卡面倍数仍为 3')
@@ -307,12 +278,10 @@ describe('色调卡预览（完整展示色调）', () => {
     const cards = ids.map(id => tonePreview('dark', id).backgroundImage)
     const reads = cards.map(card => (card.match(/rgba\([^)]+\)/gu) ?? []).join('|'))
     assert.equal(new Set(reads).size, 3, '三张卡的三层色值组合必须互不相同')
-    // 共享的金光三张卡一样（「同一束光」）
     for (const card of cards) {
       assert.ok(card.includes(DARK_TONES.violet.top), '三张卡共享同一束金光')
       assert.ok(card.includes(DARK_TONES.violet.left), '三张卡共享同一束左上金光')
     }
-    // 各款放大后的纵深互不相同，且各自出现在自己的卡里
     const depths = ids.map(id => boostAlpha(DARK_TONES[id].bottom, PREVIEW_ALPHA_SCALE.dark.depth))
     assert.equal(new Set(depths).size, 3, '三款的纵深色值必须互不相同')
     ids.forEach((id, at) => { assert.ok(cards[at].includes(depths[at]), `${id} 卡面应带自己的纵深`)})
@@ -384,11 +353,11 @@ describe('色调卡样式', () => {
   const css = buildRowCss()
 
   it('卡片本体不应该 用样式表上背景 —— 内联的所见即所得底色才是唯一来源', () => {
-    // 只检查「卡本体」那条规则；颗粒层（::after）当然要自带 background-image
+    // 只查「卡本体」那条规则：颗粒层（::after）本来就要自带 background-image。
     const cubeClass = `${BACKDROP_CLASS}-cube`
     const block = new RegExp(`\\.${cubeClass} \\{([\\s\\S]*?)\\n\\}`, 'u').exec(css)
     assert.ok(block, `未找到卡片本体规则 .${cubeClass}`)
-    // 若样式表也设 background，悬停 / 选中态就会与内联底色打架（或静默失效）
+    // 样式表若也设 background，悬停 / 选中态就会与内联底色打架（或静默失效）。
     assert.ok(!/background/u.test(block[1]), '卡片本体的背景必须只由组件内联 style 给')
   })
 
@@ -405,8 +374,8 @@ describe('色调卡样式', () => {
   })
 
   it('卡片应该 与官方「外观」卡等高（83px = padding 20×2 + 图标 16 + gap 4 + 行高 22 + 边框 .5×2）', () => {
-    // 官方 AppearanceRow.module.css 的 themeCube：padding 20px 32px、gap 4px、
-    // 内容 = IconXxxOutline16（16×16）+ 文字 line-height 22px。本卡无图标，用 min-height 补齐。
+    // 官方 themeCube 的度量：padding 20px 32px、gap 4px，内容 = 16×16 图标 + 文字 line-height 22px。
+    // 本卡无图标，故用 min-height 补齐到与官方等高。
     const OFFICIAL_CUBE_HEIGHT = 20 * 2 + 16 + 4 + 22 + 0.5 * 2
     const minHeight = /min-height:\s*([\d.]+)px/u.exec(css)
     assert.ok(minHeight, '卡片应有 min-height')
@@ -439,7 +408,7 @@ describe('DOM 选择器', () => {
     assert.equal(LAYER_SELECTOR, `div[${MARKER_ATTR}]`)
     assert.equal(STYLE_SELECTOR, `style[${MARKER_ATTR}]`)
     assert.notEqual(LAYER_SELECTOR, STYLE_SELECTOR)
-    // 层选择器带 div 限定，才不会在 document.querySelector 时先命中 <head> 里的 <style>
+    // 带 div 限定，才不会在 document.querySelector 时先命中 <head> 里的 <style>。
     assert.ok(LAYER_SELECTOR.startsWith('div['))
     assert.ok(STYLE_SELECTOR.startsWith('style['))
   })
@@ -453,14 +422,14 @@ describe('浏览器特性门', () => {
     for (const must of ['mix-blend-mode: screen', 'radial-gradient()', 'color-mix()']) {
       assert.ok(names.includes(must), `特性门缺 ${must}`)
     }
-    // 有意**不**门的：缺了只是「少覆盖几个面 / 退化成半透明」，为它停用整个插件不划算。
+    // 有意**不**门的：缺了只是观感退化，为它停用整个插件不划算。
     for (const mustNot of ['backdrop-filter', ':has()']) {
       assert.ok(
         !names.some(n => n.includes(mustNot)),
         `${mustNot} 不该进特性门（缺它只是观感退化，见 backdrop.ts 的表）`,
       )
     }
-    // 探针必须非空（会交给 CSS.supports）
+    // 探针会交给 CSS.supports，必须非空。
     for (const feature of REQUIRED_CSS_FEATURES) {
       assert.ok(feature.probe.length > 0, `${feature.name} 缺探针`)
     }
@@ -470,17 +439,14 @@ describe('浏览器特性门', () => {
 
 /**
  * 顶栏那束光的**亮度补偿**（`compensatedBackdropGradients`）—— 纯函数单测。
- *
  * 背景层是整层 `mix-blend-mode: screen`（纯加法），而顶栏 / 右栏那些面是「深色填充 + 普通合成」，
- * 同一档 alpha 读出来的亮度只有一半（实测 H/G = 0.51）。补偿 = **再叠一层**压过的同形光，
- * 见 docs/spec/04-glass.md §9.
+ * 同一档 alpha 读出来的亮度只有一半；补偿 = **再叠一层**压过的同形光，见 docs/spec/04-glass.md §9.
  */
 it('补偿应该 叠成两层：第一层满档、第二层按 boost 压过', () => {
   const once = dimmedBackdropGradients(1)
   const comp = compensatedBackdropGradients(1, 0.25)
   assert.equal((once.match(/radial-gradient\(/gu) ?? []).length, 3, '单层是三道光')
   assert.equal((comp.match(/radial-gradient\(/gu) ?? []).length, 6, '补偿后是两层共六道')
-  // 第一层逐字等于满档那双层的第一半（同源，不新造形状）
   assert.ok(comp.startsWith(once), '补偿串的第一层必须逐字等于满档那串')
 })
 
@@ -493,7 +459,7 @@ it('补偿应该 只改强度、不改形状 / 中心 / stop', () => {
       `两层都必须用同一个几何（${shape}）—— 形状变了就不是"同一束光更亮"`,
     )
   }
-  // stop 也逐字不变：两层里各出现一次同样的 stop
+  // stop 也逐字不变：两层里各出现一次 ⇒ 计数应是单层的 2 倍。
   for (const stop of [RADIAL_STOP, BOTTOM_RADIAL_STOP, LEFT_RADIAL_STOP]) {
     assert.equal(
       (comp.match(new RegExp(stop.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'gu')) ?? []).length,
@@ -507,7 +473,7 @@ it('补偿档应该 只作用在第二层，且 <= 0 时退化成单层（不叠
   const comp = compensatedBackdropGradients(1, 0.25)
   assert.ok(comp.includes('100%, transparent)'), '第一层必须是满档，不得被 boost 一起压')
   assert.ok(comp.includes('25%, transparent)'), '第二层必须按 boost 压到 25%')
-  // boost <= 0 ⇒ 逐字等于单层（避免多一层全透明的空层）
+  // boost <= 0 ⇒ 逐字等于单层（避免多出一层全透明的空层）。
   assert.equal(compensatedBackdropGradients(1, 0), dimmedBackdropGradients(1))
   assert.equal(compensatedBackdropGradients(1, -1), dimmedBackdropGradients(1))
 })

@@ -9,18 +9,14 @@ const css = buildSeamCss()
 // 注释里也会出现 `{` / `::before` 这类结构字符，对全文做结构断言会误判，故先剥注释。
 const rules = css.replace(/\/\*[\s\S]*?\*\//gu, '')
 
-/**
- * 取一条规则的规则体（已剥注释）。
- * @param needle - 选择器片段（含结尾的 ` {`，避免与 `::before` 那条撞名）。
- * @returns 花括号内的声明串。
- */
+/** 取一条规则的规则体（已剥注释）：needle 含结尾的 ` {`，避免与 `::before` 那条撞名。 */
 function bodyOf(needle) {
   const at = rules.indexOf(needle)
   assert.ok(at >= 0, `缺规则：${needle}`)
   return rules.slice(rules.indexOf('{', at) + 1, rules.indexOf('}', at))
 }
 
-/** 两条锚点选择器（原为 `:has()` 判据，现由 client half 在运行期打标 —— 见 docs/spec/11）。 */
+/** 两条锚点选择器（由 client half 在运行期打标 —— 见 docs/spec/11）。 */
 const ANCHOR_SEAT_DOCKED = anchorSelector(ANCHOR.seatDocked)
 const ANCHOR_HOST = anchorSelector(ANCHOR.composerHost)
 
@@ -28,7 +24,7 @@ const ANCHOR_HOST = anchorSelector(ANCHOR.composerHost)
 const GOAL_BAND = "[data-testid='todo-panel'] ~ [data-goal-bar]::before"
 const QUEUE_BAND = ":is([data-testid='todo-panel'], [data-goal-bar]) ~ [data-queue-dock]::before"
 // 最后一条**不挂在输入框卡自己身上** —— 卡片带 backdrop-filter、自成层叠上下文，
-// 挂它身上的伪元素（哪怕 z-index: -1）会画在停靠卡**之上**，补缺口那 16px 会把待办卡底边涂成背景色。
+// 挂它身上的伪元素（哪怕 z-index: -1）会画在停靠卡**之上**。
 const CARD_BAND = `${ANCHOR_HOST}::before`
 
 describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () => {
@@ -39,8 +35,7 @@ describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () =
   })
 
   it('每条规则都应该 带「官方默认」门，且只 active（与座底那条一致）', () => {
-    // 官方默认那一轴必须整表让路；hero 下底座不是 sticky、官方那条背衬也没有，
-    // 这里跟着不介入，免得留下半截带子（hero 的栈间距是 8px，会正好差 2px）。
+    // 官方默认那一轴必须整表让路；hero 下底座不是 sticky、官方那条背衬也没有，这里跟着不介入。
     const blocks = rules.split('}').filter(block => block.includes('{'))
     for (const block of blocks) {
       const selector = block.slice(0, block.indexOf('{')).trim()
@@ -52,8 +47,7 @@ describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () =
   })
 
   it('挡板必须是**不透明 + 背景原样重画**（静态零差别的前提）', () => {
-    // 数学（座底那条注释有完整推导）：面以 alpha a 画 C，要恒等于页面色 P 就必须 C = P；
-    // 取 a = 1 时只要原样画满即可，没有可调错的比例。半透明就得同时压底色与光，那是「两层光」的坑。
+    // 面恒等于页面色就必须原样画满（取 a = 1）；半透明得同时压底色与光，那是「两层光」的坑。
     for (const needle of [GOAL_BAND, QUEUE_BAND, CARD_BAND]) {
       const body = bodyOf(needle)
       assert.match(body, /background-color: var\(--dsw-alias-bg-base\)/u, `${needle} 必须不透明（原样 token）`)
@@ -68,7 +62,7 @@ describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () =
       const body = bodyOf(needle)
       assert.ok(!/\btop\s*:/u.test(body), `${needle} 不得声明 top`)
       assert.match(body, /left: 0/u, `${needle} 横向铺满条目`)
-      // z-index: -1 是安全绳：带子必须画在**条目背后**，万一哪天门松了、带子越界，也是被卡片盖住而不是盖住卡片。
+      // z-index: -1 是安全绳：带子画在**条目背后**，越界时也是被卡片盖住而不是盖住卡片。
       assert.match(body, /z-index: -1/u, `${needle} 必须压在条目背后`)
       assert.match(body, /pointer-events: none/u, `${needle} 不得吃鼠标事件`)
     }
@@ -76,8 +70,6 @@ describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () =
 
   it('高度 = 缝间距 + **圆角缺口**：停靠卡那两条两头都补，输入框卡那条只往上补', () => {
     // 卡片是**圆角**的：只盖那 6px 缝不够 —— 「圆角弧线以外、包围盒以内」那一小块三角仍会露正文。
-    // owner 真机指认：「todo 的**左下角**能看到吧，露出来一点，**右边**估计也有这个问题。」
-    // 白条探针实测缺口小窗读数 **250+**（完全透出），而紧邻的缝区已被挡到 ~35。
     assert.ok(SEAM_NOTCH_PX > 12, '缺口补贴必须大于停靠卡的圆角半径（官方 12px），否则补不满')
     for (const needle of [GOAL_BAND, QUEUE_BAND]) {
       const body = bodyOf(needle)
@@ -92,8 +84,7 @@ describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () =
         `${needle} 高度 = 缝间距 + 2×缺口`,
       )
     }
-    // 输入框卡是**玻璃**：往它顶里伸 = 把背衬塞到玻璃背后，那一片就不再透正文
-    // （实测卡片内部会从 113 掉到 ~41）—— 所以只往上补上面那张停靠卡。
+    // 输入框卡是**玻璃**：往它顶里伸 = 把背衬塞到玻璃背后，那一片就不再透正文 ⇒ 只往上补停靠卡。
     const card = bodyOf(CARD_BAND)
     assert.match(card, /bottom: 100%/u, '输入框卡那条只往上补（不伸进玻璃里）')
     assert.match(
@@ -104,8 +95,7 @@ describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () =
   })
 
   it('背景附着必须只写一个 fixed —— 少于层数会按顺序循环补齐', () => {
-    // 配方 4 层 background-image；写「scroll, fixed」会让第 1、3 段渐变退回按元素自身盒子解析，
-    // 光就不再与背景层对齐（座底那条注释记过这个坑）。
+    // 配方 4 层 background-image；写「scroll, fixed」会让第 1、3 段渐变退回按元素自身盒子解析。
     const body = bodyOf(GOAL_BAND)
     assert.equal((body.match(/background-attachment/gu) ?? []).length, 1, '只能有一个 background-attachment')
     assert.match(body, /background-attachment: fixed/u)
@@ -114,9 +104,9 @@ describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () =
   it('三个宿主都必须补成包含块（否则 bottom:100% 会锚到座位上）', () => {
     assert.match(bodyOf('~ [data-goal-bar] {'), /position: relative/u, '目标条 wrapper 要 position: relative')
     assert.match(bodyOf('~ [data-queue-dock] {'), /position: relative/u, '排队卡 wrapper 要 position: relative')
-    // 输入框卡那条挂在**卡的父元素**上 —— 卡自带 backdrop-filter，挂它身上会被抬到停靠卡之上
+    // 挂**卡的父元素**：卡自带 backdrop-filter，挂它身上会被抬到停靠卡之上。
     assert.match(bodyOf(`${ANCHOR_HOST} {`), /position: relative/u, '输入框卡的父元素要 position: relative')
-    // 无偏移 ⇒ 不改布局；也不能带 z-index（那会另开层叠上下文，把带子的 -1 关进小盒子）
+    // 无偏移 ⇒ 不改布局；带 z-index 会另开层叠上下文，把带子的 -1 关进小盒子。
     for (const needle of ['~ [data-goal-bar] {', '~ [data-queue-dock] {', `${ANCHOR_HOST} {`]) {
       const body = bodyOf(needle)
       assert.ok(!/\btop\s*:/u.test(body) && !/\bleft\s*:/u.test(body), `${needle} 不得带偏移`)
@@ -125,30 +115,25 @@ describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () =
   })
 
   it('⛔ 三种「没有缝」的情形必须被门挡住 —— 否则带子会画到底座外、盖住正文', () => {
-    // ① 前面没有停靠卡时（目标条 / 排队卡是栈内第一项）：官方 `~` 兄弟门。
+    // 目标条 / 排队卡是栈内第一项时：用官方 `~` 兄弟门。
     assert.ok(rules.includes("[data-testid='todo-panel'] ~ [data-goal-bar]::before"), '目标条：必须要求前面有 todo')
     assert.ok(
       rules.includes(":is([data-testid='todo-panel'], [data-goal-bar]) ~ [data-queue-dock]::before"),
       '排队卡：必须要求前面有 todo / goal',
     )
-    // ② 完全没有停靠卡时，输入框卡上方根本没有缝 —— 走**座位锚点**门
-    //    （原为 `[data-composer-seat]:has([data-testid='todo-panel'], [data-goal-bar])`；
-    //      现由 client half 在运行期判定，见 docs/spec/11）。
+    // 完全没有停靠卡时输入框卡上方没有缝 —— 走**座位锚点**门（判定在 client half 运行期做）。
     assert.ok(
       rules.includes(`${ANCHOR_SEAT_DOCKED} ${ANCHOR_HOST}::before`),
       '输入框卡：必须要求底座里有停靠卡（且宿主是卡父元素）',
     )
-    // ③ 排队卡在场时它自带负边距塞进输入框卡下面（实测重叠 3px）—— 那条缝本来就不存在，
-    //    此时再画一条会**盖在排队卡自己身上**。该情形已并入 `seatDocked` 的判定
-    //    （client half 要求「有停靠卡且**无**队列坞」才打标），故这里守卫的是
-    //    「座位锚点里不得再出现 not(:has(…)) 那类运行时判据」。
+    // 排队卡自带负边距塞进输入框卡下面（实测重叠 3px），那条缝本来就不存在，再画会盖在排队卡身上；
+    // 该情形已并入 `seatDocked` 判定，故这里守卫的是「运行时判据不得写回 CSS」。
     assert.ok(!rules.includes('not(:has('), '运行时判据不得写回 CSS（那是 :has() 的开销来源）')
     assert.ok(!rules.includes(':has('), '本表不得再用 :has()')
   })
 
   it('⛔ 输入框卡那条的「门」与「宿主」必须分开：门挂座位、宿主是座位里的卡父元素', () => {
-    // 踩过：把宿主判据直接并进座位（`座位:has(> 卡)`），宿主就变成了**座位自己** ——
-    // 伪元素挂回底座、缝反而漏（实测缝区又回到 250+）。
+    // 踩过：把宿主判据直接并进座位（`座位:has(> 卡)`），宿主就变成了座位自己 —— 伪元素挂回底座、缝反而漏。
     assert.ok(
       rules.includes(ANCHOR_SEAT_DOCKED),
       '门必须挂在座位上（锚点由 client half 按「有停靠卡且无队列坞」打标）',

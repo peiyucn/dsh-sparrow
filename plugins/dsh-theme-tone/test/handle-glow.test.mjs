@@ -1,8 +1,7 @@
 /**
  * dsh-theme-tone：拖拽条悬停光带跟随指针（自 `dsh-nav-pin` 并入，见 `docs/spec/09-nav-pin-merge.md`）。
- *
- * ⚠️ 与原版的**实质差异**：本条**不带色调门**、两个档位都生效（方案 §3.1 决策 5，破例第 3 处）。
- * 故新增两类守卫：① 源码里不得出现色调门；② 不得硬编码 `76`（方案 §3.3，几何只有一个真值来源）。
+ * ⚠️ 与原版的**实质差异**：本条**不带色调门**、两个档位都生效，故新增两类守卫：
+ * ① 源码里不得出现色调门；② 不得硬编码 `76`（几何只有一个真值来源 HEADER_HEIGHT_PX）。
  */
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
@@ -18,11 +17,7 @@ import {
 } from '../lib/handle-glow.js'
 import { PLAIN_ATTR } from '../lib/constants.js'
 
-/**
- * 假拖拽条：只实现本模块真正用到的那一小面（见 `GlowTargetLike`）。
- * @param options - `boxTop` 盒子顶端 y；`dragging` 是否带官方拖拽标记；`initial` 初始内联值。
- * @returns 可断言的假元素。
- */
+/** 假拖拽条：只实现本模块真正用到的那一小面（见 `GlowTargetLike`）。 */
 function fakeHandle({ boxTop = 76, dragging = false, initial = '' } = {}) {
   const written = []
   const style = {
@@ -91,8 +86,7 @@ describe('dsh-theme-tone 拖拽条光带跟随（修官方 bug）', () => {
     })
 
     it('⛔ 不得硬编码 76（几何只有一个真值来源：运行时实测矩形）', async () => {
-      // 方案 §3.3：theme-tone 侧 HEADER_HEIGHT_PX 是几何唯一真值；
-      // 光带这条必须走 getBoundingClientRect()，否则顶栏浮层化后又会偏。
+      // HEADER_HEIGHT_PX 是几何唯一真值来源；光带必须走 getBoundingClientRect()，否则顶栏浮层化后会偏。
       const src = await readFile(new URL('../src/handle-glow.ts', import.meta.url), 'utf8')
       const code = src.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/^\s*\/\/.*$/gmu, '')
       assert.ok(!/\b76\b/u.test(code), 'handle-glow 源码（去注释后）不得出现字面量 76')
