@@ -56,24 +56,49 @@
    官方全屏面板（`--dsh-dockkit-dock-layer: 40`）本就高于顶栏（9），dockkit 浮窗又是 60 ——
    抬顶栏会让它在全屏时浮到面板之上（`d133f2c` 实测过：整块像素 mean 2.47 / 17.3% 变化）。
 
-## 5. 结论
+## 5. 结论与**最终采用的改法**
 
-**这是官方 popover 没有 portal 到 body 造成的结构性缺陷，纯 CSS 无解。**
-能改的只有官方自己（把节点 portal 出去，或改掉 `.titleRow` 的 containment）。
+**「逃出列的裁切」确实无解**（`containment` 把包含块钉在 `.titleRow` 内，`fixed` 也一样）；
+但**不需要逃** —— 只要让弹框**别伸到裁切边界外面**就行。
 
-⚠️ **别再把下面三条当成「还没试过的修法」**——都试过，且都有受控实验：
+### 采用的改法（owner 提议）：**只把对齐方向改成右对齐**
 
-| 已排除的做法 | 为什么不行 |
+官方的 `left: 0` 是「**左缘**贴触发器」⇒ 弹框**向右**伸 500px，伸出列的部分被裁。
+改成「**右缘**贴触发器」（`right: 0` + `left: auto !important`）⇒ 弹框**向左**伸，整块落在列内。
+
+```css
+body[data-tone-anchor~="right-panel-open"] [data-slot='conversation.session.header.actions'] ul {
+  left: auto !important;   /* 压掉官方样式表与内联两处的 left */
+  right: 0;                /* 右缘贴触发器右缘 */
+}
+```
+
+* 包含块不变（官方 `.root { position: relative }`）、`width` 与 `max-width` 仍是官方的、`z-index` 不动、
+  `overflow` 不动 —— **一条规则两条声明**，是本问题能有的最小改动。
+* 门只挂「右栏面板已打开」：面板关着时列本来够宽、官方左对齐不出问题，**不动它**。
+* **残余**（如实记）：列比「触发器右缘到列左缘的距离 + 500px」还窄时，会改成从**左边**溢出被裁 ——
+  面板打开时列宽通常 ≥540px，实测未触发；真要兜住得知道列宽（官方只发布了内容宽，不是列宽），暂不做。
+
+### 已排除的做法（都试过，各有受控实验，别再走一遍）
+
+| 已排除 | 为什么不行 |
 | :--- | :--- |
-| 换包含块（wrapper → `static`） | containment 把包含块钉在 `.titleRow`，逃不出 `.root` 的裁切 |
+| 换包含块（wrapper → `static`） | containment 把包含块钉在 `.titleRow`，仍逃不出 `.root` 的裁切 |
 | `position: fixed` | 同上（containment 也是 fixed 的包含块） |
 | 抬弹框自己的 `z-index` | 出不了顶栏的层叠上下文（实验 A） |
 | 抬顶栏 | 能过层序，但改不了裁切，且违反官方全屏面板次序 |
 | 动中列 `overflow` | 那是列自身的裁切契约 |
 
-## 6. 当前状态（2026-10-08）
+⚠️ 另一条**对位置的**坑记在这里：官方把锚定值写成**相对触发器**的内联 `left`，一旦换了包含块就落在
+错误的坐标系里（实验 B 实测偏 −300px）。**不换包含块就不会踩它。**
 
-**整表已回退到官方原状**：`src/popover.ts` 与其守卫 `test/popover.test.mjs` 已删除，
-client 半边与锚点里的相关接线一并摘掉，`docs/private-seams.md` §B 计数回到**三处**、
-§C 第一条改回「**不修**，仅登记」。
-⇒ 弹框恢复官方的浮层位置与观感；右栏打开时仍会被裁 / 被盖，**这是官方行为，不是本插件的缺陷**。
+## 6. 本次的过程记录（为什么值得留档）
+
+1. 2026-10-02 `0f39393` 用「换包含块 + `left: 0 !important`」修 → 弹框被压成**贴列左缘、横跨整个对话区**。
+2. 2026-10-08 真机复看后 owner 建议「**先恢复成官方原状态再改**」⇒ `a3919c8` 整表回退（删 `popover.ts`
+   与其守卫、摘掉 client 接线与本次新增的锚点/常量），`private-seams` §B 计数回到**三处**、§C 第一条回到「不修」。
+3. 回退后按 owner 提议改成**只右对齐** ⇒ 即 §5 的改法；`test/popover.test.mjs` 重写为 6 条
+   （含 **⛔ 不得再出现 `left: 0`**、**⛔ 不得动 position / z-index / overflow**）。
+
+教训：**先读官方 CSS 再改**。前面两版之所以来回翻，是因为没读 `ConversationRoot.module.css`
+（`overflow: hidden` 在 `.root`、`container-type` 在 `.titleRow`）就假设了包含块可以上移。

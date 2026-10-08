@@ -54,6 +54,7 @@ import { NAV_ARIA_LABELS } from '../nav-pin.js'
 import { buildMaskCss } from '../mask.js'
 import { buildNavPinCss } from '../nav-pin.js'
 import { HANDLE_SELECTOR, applyGlow } from '../handle-glow.js'
+import { buildPopoverCss } from '../popover.js'
 import { buildSurfaceCss } from '../surface.js'
 import { buildSweepCss } from '../sweep.js'
 import { isWorkstartProbe } from '../workstart.js'
@@ -86,7 +87,7 @@ export const inject = ['theme', 'slots', 'locale']
  * 按标记属性去重，HMR / 重载不叠加）。⚠️ nav-pin 那两段并入**本表**、不再单开 `style[data-dsh-nav-pin]`。
  */
 function ensureStyles(): HTMLStyleElement {
-  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}${buildCaptionCss()}`
+  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}${buildCaptionCss()}${buildPopoverCss()}`
   const existing = document.querySelector<HTMLStyleElement>(STYLE_SELECTOR)
   if (existing !== null) {
     // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之。
