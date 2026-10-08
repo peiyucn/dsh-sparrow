@@ -29,9 +29,7 @@ describe('dsh-file-manage 结构', () => {
     const index = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8')
     const deps = [...index.matchAll(/from '\.\/([^']+)\.js'/gu)].map(match => match[1])
     assert.ok(deps.length > 0, 'src/index.ts 应当静态 re-export 至少一个模块')
-    // 逐条按 files 清单的 glob 语义真判（含否定项）——旧写法
-    // `files.includes('lib/**/*.js') || files.includes(`lib/${dep}.js`)` 短路口恒在第一支，
-    // 依赖名不存在也恒真，等于没守（本文件末尾的 `files 清单 glob 语义` 组钉住这点）。
+    // 逐条按 files 清单的 glob 语义真判（旧写法短路口恒真，依赖名不存在也过）。
     for (const dep of deps) {
       assert.ok(
         isPacked(`lib/${dep}.js`, pkg.files),
@@ -48,8 +46,7 @@ describe('dsh-file-manage 结构', () => {
   })
 
   it('lib/ 应该 不残留 src 已删除组件的编译产物（防改名后过期产物随包发布）', () => {
-    // FileSessionDock 曾随 0.1.0 发布（src 已改名）；FileManageDock 随 0.2.0-rc.2 的
-    // 主面板改造被 CloudFilesPage 取代（tsc 不清 lib/，须显式删旧产物）。
+    // 旧组件改名 / 被取代后 tsc 不清 lib/，须显式删旧产物。
     for (const stale of [
       'lib/client/FileSessionDock.js', 'lib/types/client/FileSessionDock.d.ts',
       'lib/client/FileManageDock.js', 'lib/types/client/FileManageDock.d.ts',
@@ -59,11 +56,8 @@ describe('dsh-file-manage 结构', () => {
   })
 
   /**
-   * spec 03：入口从「左栏 footer action + 自建全屏弹窗」迁到官方「主面板」形态。
-   *
-   * 本组守卫钉住**迁走的东西不许回来**：client half 只注册官方两处槽位，
-   * 自建遮罩 / `role='dialog'` / `aria-modal` / 点遮罩关闭 / 焦点陷阱全部消失。
-   * （删除确认仍用弹窗语义，但那是**官方 `Modal` 原语**，不在本文件的守卫范围内。）
+   * spec 03：入口迁到官方「主面板」形态；本组守卫钉住**迁走的东西不许回来** ——
+   * client half 只注册官方两处槽位，自建遮罩 / dialog 语义 / 焦点陷阱全部消失。
    */
   it('client half 应该 只注册官方 main + sidebar.panellist，不再挂 sidebar.footer.action', async () => {
     const index = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
@@ -74,8 +68,7 @@ describe('dsh-file-manage 结构', () => {
 
   it('⛔ 页面不得自建遮罩 / dialog 语义 / 焦点陷阱（spec 03 决策点）', async () => {
     const page = await readFile(new URL('../src/client/CloudFilesPage.tsx', import.meta.url), 'utf8')
-    // 剥注释再判：本文件的注释里**故意**写着「没有 role='dialog'」这类说明，
-    // 不剥的话守卫会命中自己的文档（本文件下方那条 effect 守卫踩过同一个坑）。
+    // 剥注释再判：本文件的注释里**故意**写着「没有 role='dialog'」这类说明，不剥会命中自己的文档。
     const code = page
       .replace(/\/\*[\s\S]*?\*\//gu, '')
       .replace(/^\s*\/\/.*$/gmu, '')
@@ -89,7 +82,6 @@ describe('dsh-file-manage 结构', () => {
     ]) {
       assert.ok(!code.includes(forbidden), `页面源码里不该再有 ${forbidden}（主面板是正常流，不是弹窗）`)
     }
-    // 删除确认走**官方 Modal 原语**（官方主页面做确认的同款做法）。
     assert.match(code, /<Modal\b/u, '删除确认必须走官方 Modal 原语')
   })
 
@@ -102,57 +94,33 @@ describe('dsh-file-manage 结构', () => {
   })
 
   /**
-   * 首屏 ready 门的**初值**必须是 loading —— 守卫 owner 2026-09-30 报的
-   * 「打开后先全高展示闪一下，然后变矮，出现 loading」。
-   *
-   * ⚠️ 迁到主面板后这条不变、但**触发点变了**：以前是「点入口打开」，
-   * 现在是「页面在中央列挂载」。真机逐帧量到的样子（**只有 1 帧 / 12ms**，肉眼却很明显）：
-   * ```
-   * 帧1  h=672  summary=true  loading=false  card=true    ← 上一次离开时留下的旧列表（全高）
-   * 帧2  h=409  summary=true  loading=true   card=false   ← 才变成 loading
-   * ```
-   * 根因不是样式，是**状态复用**：React 先用旧 state 渲染一帧，而置 loading 原本放在
-   * `useEffect` 里，只能作用于**第二帧**。修法 = 把 `loading` / `summaryPending` 的
-   * **初值**直接给 true，首帧就是 loading，那一帧不再存在。
+   * 首屏 ready 门的**初值**必须是 loading：React 先用旧 state 渲染一帧，而置 loading 原本放在
+   * `useEffect` 里、只能作用于第二帧（真机量到那一帧是上次离开时留下的旧列表，全高）。
    */
   it('首屏应该 在初值上就是 loading（否则挂载首帧会画出空列表/旧列表）', async () => {
     const src = await readFile(new URL('../src/client/CloudFilesPage.tsx', import.meta.url), 'utf8')
 
-    // ① 两个 ready 门的初值都必须是 true（不是 useEffect 里补）
     assert.match(src, /const \[loading, setLoading\] = useState\(true\)/u,
       'loading 初值必须为 true（挂载首帧就是 loading）')
     assert.match(src, /const \[summaryPending, setSummaryPending\] = useState\(true\)/u,
       'summaryPending 初值必须为 true（与 loading 一起构成首屏 ready 门）')
 
-    // ② 挂载 effect 只负责发请求，不得自己再清空/置 loading —— 那会多出一帧中间态
     const mountEffect = /useEffect\(\(\) => \{ reloadRef\.current\(\) \}, \[\]\)/u.exec(src)
     assert.ok(mountEffect !== null, '找不到挂载 effect（挂载即拉数据、只发请求）')
 
-    // ③ 入口不得是「点开」形态：没有 open 态、没有打开动作
     assert.ok(!/const \[open, setOpen\]/u.test(src), '主面板页面不该再有 open 状态（挂载即打开）')
     assert.ok(!/openPanel/u.test(src), '不该再有 openPanel（「打开」这一步随弹窗一起消失）')
   })
 
   /**
-   * owner 2026-10-01 报「改成这种形式后**字变大了**」。
-   *
-   * 根因不是谁把字号调大了，而是**继承换了来源**：本页原先挂在
-   * `sidebar.footer.action` 槽（DOM 落在 `SidebarRoot` 的 `.root` 内，那份 `.root`
-   * 有 `font-size: 14px`），迁到中央列后 `.centerCol` **没有** font-size，
-   * 于是没写字号的文字退回浏览器默认 **16px**。
-   *
-   * 实测（1600×900，真实实例）：云端文件名 16px / line-height `normal`；
-   * 官方同位置（列表标题 / 左栏会话行）是 14px / 20px。
-   *
-   * 所以本守卫钉两件事：① 页面根必须自带 14px 基准；② 行标题必须显式给字号与行高
-   * （只给基准的话行高仍是 `normal`，行盒偏矮、行距发挤）。
+   * 迁到中央列后本页不再继承左栏的 14px（`.centerCol` 没有 font-size，文字退回浏览器默认 16px）。
+   * 故钉两件事：① 页面根自带 14px 基准；② 行标题显式给字号与行高（只给基准则行高仍是 normal）。
    */
   it('⛔ 页面根必须自带 14px 基准字号（迁到中央列后不再继承左栏的 14px）', async () => {
     const styles = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
     const root = /\.dsh-file-manage-page \{([^}]*)\}/u.exec(styles)
     assert.ok(root !== null, '缺 .dsh-file-manage-page 规则')
-    // ⚠️ 必须**剥注释**再判：上面那段注释里自己写着「那份 .root 有 font-size: 14px」，
-    // 不剥的话守卫会命中文档、把「声明被删掉」的变异放过去（反向注入实测踩到过）。
+    // ⚠️ 必须**剥注释**再判：上面那段注释里自己写着「font-size: 14px」，不剥会把「声明被删」的变异放过去。
     const decl = root[1].replace(/\/\*[\s\S]*?\*\//gu, '')
     assert.match(decl, /font-size:\s*14px/u,
       '页面根必须显式 font-size: 14px —— 中央列不提供基准，漏了文字就退回浏览器默认 16px')
@@ -169,16 +137,9 @@ describe('dsh-file-manage 结构', () => {
   })
 
   /**
-   * owner 2026-10-01 报「下面 dsh-sparrow 的 logo，分割线和上面都挨上了」→ 当时靠 24px
-   * 净空 + 分割线解决；**2026-10-07 owner 两次改口径**：「固定左下角取消分割线」→
-   * 「有点太高了，最好和左边栏下面的设置按钮对齐」。
-   *
-   * 与归档页同一口径（两页样式同源，只差前缀）：`margin-top: auto` 钉底、左对齐、无分割线、
-   * `padding-top: 24px` 最小净空、`margin-bottom: -25px` 与侧边栏「设置」行对齐。
-   *
-   * ⚠️ `-25px` = 本页 `padding-bottom: 48px` 造成的「视口底部 −56.5px」与侧边栏设置行文字
-   * 中心「视口底部 −31.5px」之差（实测 720/800/900/1080 四种窗口高度下都成立）。
-   * 故下面同时钉住本页的 48px 下内边距 —— 改了它就必须重算 margin-bottom。
+   * 署名钉左下角、左对齐、无分割线，且与侧边栏「设置」行垂直居中（与归档页同口径）。
+   * `-25px` 是算出来的：本页 48px 下内边距 ⇒ 署名中心「视口底 −56.5px」vs 设置行「−31.5px」，
+   * 故同时钉住 48px —— 改了它必须重算 margin-bottom。
    */
   it('⛔ 品牌署名必须与侧边栏「设置」行对齐（左下角 / 左对齐 / 无分割线）', async () => {
     const styles = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
@@ -202,24 +163,18 @@ describe('dsh-file-manage 结构', () => {
       '本页下内边距必须仍是 48px —— −25px 正是相对它算出来的；改了这里必须同步重算 margin-bottom')
   })
 
-  /**
-   * files 守卫的**自证**：钉住 glob 判定的语义，防止守卫自己退化成恒真 / 恒假
-   * （上一版就是恒真：短路停在写死的递归 js 条目上，依赖名不存在也过）。
-   */
+  /** files 守卫的自证：钉住 glob 判定语义，防守卫自己退化成恒真 / 恒假。 */
   it('files 清单 glob 语义自证：`**` 跨层与零层、`*` 不跨层、否定项后写者胜', () => {
     const files = ['lib/**/*.js', '!lib/client/**', 'lib/types/**/*.d.ts']
-    // 正向命中
     assert.equal(isPacked('lib/host.js', files), true, '递归 js 条目应当覆盖 lib/host.js')
     assert.equal(isPacked('lib/deep/nested/x.js', files), true, '双星应当跨层')
     assert.equal(isPacked('lib/types/host.d.ts', files), true, 'types 条目应当覆盖一层')
-    // 否定项排除（后写者胜）
     assert.equal(isPacked('lib/client/index.js', files), false, 'client 子树必须被否定项排掉')
     assert.equal(isPacked('lib/client.js', files), true, '否定项不得误伤 lib/client.js 本体')
-    // 未命中任何规则
     assert.equal(isPacked('lib/host.ts', files), false, '清单只声明了 .js')
     assert.equal(isPacked('src/host.js', files), false, '清单不含 src/')
     assert.equal(isPacked('lib/a/b.js', ['lib/*.js']), false, '单星不跨层')
-    // 对照：旧写法恒真（本轮的修因）——连否定项排除掉的产物、以及清单没声明的扩展名都放行
+    // 对照：旧写法短路口恒真 —— 被否定项排掉的产物、清单没声明的扩展名都放行。
     const legacyGuard = (dep) => files.includes('lib/**/*.js') || files.includes(`lib/${dep}.js`)
     assert.equal(legacyGuard('client/index'), true, '（对照）旧写法对被否定项排掉的产物恒真')
     assert.equal(isPacked('lib/client/index.js', files), false, '新判定认否定项：客户端产物不进包')

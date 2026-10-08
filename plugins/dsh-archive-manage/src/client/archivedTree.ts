@@ -1,8 +1,4 @@
-/**
- * 归档树本地变更纯逻辑（spec 08）：host 写路由成功后，面板按响应里的 id 立即本地摘行，
- * 不等整页刷新落定。另承载归档树展示判定（spec 15：默认收起、锁定来源）。
- * 零依赖纯模块（照 paging.ts 先例），便于 node:test 直接导入。
- */
+/** 归档树本地变更与展示判定纯逻辑（spec 08 / 15）：零依赖，便于 `node:test` 直接导入。 */
 
 /** 归档树节点：顶层为归档会话根，children 为随父归档的子会话（host /list 契约）。 */
 export interface ArchivedSessionItem {
@@ -31,10 +27,8 @@ export function subtreeIdsOf(item: ArchivedSessionItem): string[] {
 }
 
 /**
- * 从归档树按给定 id 集合摘除节点：**只移除命中 id 的节点**（集合由 host 的 trash/delete 响应给出，
- * 现为「根 + 全部后代」整棵子树，见 spec 12）——命中节点的未命中后代上提到该节点位置并标 orphan
- * （host 侧对「父已不在持久化」的子会话同样按孤儿根渲染，见 host.ts /list 的 orphan 字段），
- * 不像旧实现那样连带整棵子树一起消失。
+ * 按给定 id 集合从归档树摘除节点：**只移除命中 id 的节点**，命中节点的未命中后代上提到该位置并
+ * 标 orphan（与 host 侧对「父已不在持久化」的子会话按孤儿根渲染对齐），不连带整棵子树消失。
  */
 export function dropArchivedIds(items: readonly ArchivedSessionItem[], ids: ReadonlySet<string>): ArchivedSessionItem[] {
   const kept: ArchivedSessionItem[] = []
@@ -49,27 +43,17 @@ export function dropArchivedIds(items: readonly ArchivedSessionItem[], ids: Read
   return kept
 }
 
-/**
- * 子树内是否存在未释放（本次 dsh 运行中驻留）的会话：父级操作因它整单锁定（spec 08）。
- * 任意深度——子代理可再派子代理。
- */
+/** 子树内是否存在未释放（本次 dsh 运行中驻留）的会话：父级操作因它整单锁定（spec 08），任意深度。 */
 export function subtreeLive(item: ArchivedSessionItem): boolean {
   return item.live || item.children.some(subtreeLive)
 }
 
-/**
- * 锁定是否来自**后代**（自身不 live、后代里有人 live）：spec 15 的「子会话未释放」判据。
- * 与 `subtreeLive` 的分工：那个答「这行能不能操作」，这个答「锁是不是后代造成的」——
- * 自身 live 已在行内显示「未释放」，不再重复提示。
- */
+/** 锁定是否来自**后代**（自身 live 已在行内提示，不再重复）：spec 15 的「子会话未释放」判据。 */
 export function descendantLive(item: ArchivedSessionItem): boolean {
   return item.children.some(subtreeLive)
 }
 
-/**
- * 默认收起（spec 15）：只有被用户显式展开过的节点才展开——空集即全部收起。
- * 判据收在这里，免得折叠态散落成各处的 `Set.has()` 取反（默认值靠初值预置，容易漏配）。
- */
+/** 默认收起（spec 15）：只有被显式展开过的节点才展开；判据收在这里，免得折叠态散落成各处取反。 */
 export function isCollapsed(expandedIds: ReadonlySet<string>, sessionId: string): boolean {
   return !expandedIds.has(sessionId)
 }
@@ -89,9 +73,8 @@ export interface TrashSubagentNode {
 
 /**
  * 回收站条目的**扁平**子会话清单 → 嵌套树（spec 14）：层级由 sidecar 记的 `parentSessionId` 还原，
- * 任意深度都按归档区同款缩进展示（此前只有一层，深度 ≥2 的后代被平铺成同级行）。
- * 健壮性：重复 id 只收一次；父不在清单内、或父子链成环（畸形数据）的条目按顶层挂——**不丢行**，
- * 也不让渲染转不出来。
+ * 任意深度都按归档区同款缩进展示。健壮性：重复 id 只收一次；父不在清单内、或父子链成环（畸形数据）
+ * 的条目按顶层挂 —— **不丢行**，也不让渲染转不出来。
  */
 export function trashSubagentTree(items: readonly TrashSubagentItem[]): TrashSubagentNode[] {
   const byId = new Map<string, TrashSubagentItem>()

@@ -3,16 +3,8 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 
-/**
- * npm `files` 数组的 glob 语义（只实现本仓库用到的子集，不引第三方依赖）：
- * - `*` 匹配**单个**路径段内任意字符（不跨 `/`）；`?` 同理单字符。
- * - `**` 跨路径段匹配任意深度；`**\/` 可匹配**零个**目录（故 `lib/**\/*.js` 覆盖 `lib/a.js`）。
- * - 以 `!` 开头的条目是否定项，命中即排除（npm 的 files 里 `!` 是排除语义）。
- *
- * 之前这里的守卫写作 `pkg.files.includes('lib/**\/*.js') || pkg.files.includes(\`lib/${dep}.js\`)`——
- * 第一支是**常量**，短路后恒真，依赖名即使不存在也照样通过（三个插件同型的假守卫）。
- * 现在改成真的按 glob 算「这个 dep 的产物会不会被打包」。
- */
+/** npm `files` 数组的 glob 语义（本仓用到的子集，不引第三方依赖）：`*` 不跨段、`?` 单字符、
+ * `**` 跨段（双星后接斜杠可匹配零个目录）、`!` 开头为否定项、命中即排除。 */
 const globToRegExp = (pattern) => {
   let out = ''
   for (let i = 0; i < pattern.length; i++) {
@@ -65,21 +57,19 @@ describe('dsh-archive-manage 结构', () => {
     const deps = [...index.matchAll(/from '\.\/([^']+)\.js'/gu)].map(match => match[1])
     assert.ok(deps.length > 0, 'src/index.ts 应当静态 re-export 至少一个兄弟模块')
     for (const dep of deps) {
-      // 真按 glob 算：依赖名不存在 / 被否定项排除 / 无正向覆盖，三者都该红。
+      // 依赖名不存在 / 被否定项排除 / 无正向覆盖，三者都该红。
       assert.ok(
         packagedByFiles(pkg.files, `lib/${dep}.js`),
         `files 未覆盖 lib/${dep}.js（lib/index.ts 静态 re-export 了它）—— 发布包会缺文件`,
       )
     }
-    // ⚠️ 否定项 `!lib/client/**` 排除的是 **目录** lib/client/ 下的散装模块
-    // （host/客户端共用的 TS 源编译产物），**不**排除同级文件 lib/client.js ——
-    // 后者是 `exports['./client']` 指向的 bundle，必须进包。两条一起钉，
-    // 防有人把否定项写成能误伤 client.js 的形状（或反过来漏掉散装模块）。
+    // ⚠️ 否定项 `!lib/client/**` 只排除**目录** lib/client/ 下的散装模块，
+    // **不**排除同级 lib/client.js（`exports['./client']` 的 bundle，必须进包）—— 两条一起钉。
     assert.equal(packagedByFiles(pkg.files, 'lib/client/ArchivePage.js'), false,
       'lib/client/ 下的散装模块应被 !lib/client/** 排除出包（它们已被 bundle 进 lib/client.js）')
     assert.equal(packagedByFiles(pkg.files, 'lib/client.js'), true,
       'lib/client.js 是 exports["./client"] 的 bundle，必须进包（否定项不得误伤）')
-    // 守卫自身不得恒真：把覆盖该 dep 的那条正向规则去掉后，必须判为「不会被打包」。
+    // 守卫自身不得恒真：去掉覆盖该 dep 的正向规则后必须判为「不会被打包」。
     const withoutGlob = pkg.files.filter(entry => entry !== 'lib/**/*.js')
     assert.equal(packagedByFiles(withoutGlob, 'lib/archive.js'), false,
       '去掉 lib/**/*.js 后 lib/archive.js 仍被判为会打包 —— glob 匹配恒真，守卫没生效')
@@ -93,26 +83,19 @@ describe('dsh-archive-manage 结构', () => {
   })
 
   it('子会话树的竖线应该 由每个节点自画，不得用「实色遮盖」补末节点残段', async () => {
-    // 回归守卫（2026-09-20，owner 报「看见蓝框里那个白线了么…官方纯白色调因为同色所以看不见」）：
-    // 旧实现把竖线画成子区容器的 border-left，于是它在末节点底部多拖一截，
-    // 需要一条 `background: var(--dsw-alias-bg-layer-2)` 的**实色遮盖带**盖掉。
-    // 那个手法只在「与父面**逐像素**同色」时成立 —— 而 dsh-theme-tone 会给抬升面
-    // 叠颗粒与光，父面不再是纯色，纯色遮盖带就露成一条白线。
+    // 实色遮盖只在「与父面逐像素同色」时成立 —— 叠了颗粒与光的主题会让遮盖带露成一条白线。
     const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
-    // ① 子区容器不得再画 border-left（竖线改由节点自画）
     const children = /\.dsh-archive-tree-children \{([^}]*)\}/u.exec(src)
     assert.ok(children !== null, '缺 .dsh-archive-tree-children 规则')
     assert.ok(
       !/border-left/u.test(children[1]),
       '子区容器不该画 border-left —— 竖线要由每个节点自画，否则末节点残段又需要遮盖',
     )
-    // ② 任何 tree 相关规则都不得用「背景色遮盖」当收口手段
     const treeRules = src.slice(src.indexOf('.dsh-archive-tree-children'), src.indexOf('.dsh-archive-trigger'))
     assert.ok(
       !/background:\s*var\(--dsw-alias-bg-layer/u.test(treeRules),
       '树里不得用背景色遮盖残段 —— 那个手法依赖「与父面同色」，叠了颗粒就会露成白线',
     )
-    // ③ 竖线材质必须与横连同一个 token，且末节点只画到肘部（自然收口）
     assert.match(src, /\.dsh-archive-tree-node::after \{/u, '竖线应由 .dsh-archive-tree-node::after 自画')
     const last = /\.dsh-archive-tree-node-last::after \{([^}]*)\}/u.exec(src)
     assert.ok(last !== null, '缺末节点规则')
@@ -121,11 +104,8 @@ describe('dsh-archive-manage 结构', () => {
   })
 
   /**
-   * spec 16：入口从「左栏 footer action + 自建全屏弹窗」迁到官方「主面板」形态。
-   *
-   * 本组守卫钉住**迁走的东西不许回来**：client half 只注册官方两处槽位，
-   * 自建遮罩 / `role='dialog'` / `aria-modal` / 点遮罩关闭 / 焦点陷阱全部消失。
-   * （二次确认框仍用弹窗语义，但那是**官方 `Modal` 原语**，不在本文件的守卫范围内。）
+   * spec 16：入口迁到官方「主面板」形态；本组守卫钉住**迁走的东西不许回来** ——
+   * client half 只注册官方两处槽位，自建遮罩 / dialog 语义 / 焦点陷阱全部消失。
    */
   it('client half 应该 只注册官方 main + sidebar.panellist，不再挂 sidebar.footer.action', async () => {
     const index = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
@@ -136,8 +116,7 @@ describe('dsh-archive-manage 结构', () => {
 
   it('⛔ 页面不得自建遮罩 / dialog 语义 / 焦点陷阱（spec 16 决策点 1）', async () => {
     const page = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
-    // 剥注释再判：本文件的注释里**故意**写着「没有 role='dialog'」这类说明，
-    // 不剥的话守卫会命中自己的文档（file-manage 那边踩过同类坑）。
+    // 剥注释再判：本文件的注释里**故意**写着「没有 role='dialog'」这类说明，不剥会命中自己的文档。
     const code = page
       .replace(/\/\*[\s\S]*?\*\//gu, '')
       .replace(/^\s*\/\/.*$/gmu, '')
@@ -151,7 +130,6 @@ describe('dsh-archive-manage 结构', () => {
     ]) {
       assert.ok(!code.includes(forbidden), `页面源码里不该再有 ${forbidden}（主面板是正常流，不是弹窗）`)
     }
-    // 二次确认走**官方 Modal 原语**（官方主页面做确认的同款做法）。
     assert.match(code, /from '@deepseek-ai\/dsh-client-ui-primitives'/u)
     assert.match(code, /<Modal\b/u, '二次确认必须走官方 Modal 原语')
   })
@@ -160,7 +138,7 @@ describe('dsh-archive-manage 结构', () => {
     const page = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
     assert.match(page, /data-window-drag/u, '标题行必须自带 data-window-drag（官方入口型页面同款）')
     assert.match(page, /dsh-archive-page-head/u)
-    // 顶带让位写在样式表里（macOS 下标题行不能被红绿灯压住）。
+    // 顶带让位（macOS 下标题行不能被红绿灯压住）。
     assert.match(page, /--dsh-frame-top-clearance/u, '标题行必须让出官方顶带')
   })
 
@@ -172,25 +150,14 @@ describe('dsh-archive-manage 结构', () => {
   })
 
   /**
-   * owner 2026-10-01 报「改成这种形式后**字变大了**」。
-   *
-   * 根因不是谁把字号调大了，而是**继承换了来源**：本页原先挂在
-   * `sidebar.footer.action` 槽（DOM 落在 `SidebarRoot` 的 `.root` 内，那份 `.root`
-   * 有 `font-size: 14px`），迁到中央列后 `.centerCol` **没有** font-size，
-   * 于是没写字号的文字退回浏览器默认 **16px**。
-   *
-   * 实测（1600×900，真实实例）：归档会话标题 16px / line-height `normal`；
-   * 官方同位置（左栏会话行标题）是 14px / 20px。
-   *
-   * 所以本守卫钉两件事：① 页面根必须自带 14px 基准；② 行标题必须显式给字号与行高
-   * （只给基准的话行高仍是 `normal`，行盒偏矮、行距发挤）。
+   * 迁到中央列后本页不再继承左栏的 14px（`.centerCol` 没有 font-size，文字退回浏览器默认 16px）。
+   * 故钉两件事：① 页面根自带 14px 基准；② 行标题显式给字号与行高（只给基准则行高仍是 normal）。
    */
   it('⛔ 页面根必须自带 14px 基准字号（迁到中央列后不再继承左栏的 14px）', async () => {
     const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
     const root = /\.dsh-archive-page \{([^}]*)\}/u.exec(src)
     assert.ok(root !== null, '缺 .dsh-archive-page 规则')
-    // ⚠️ 必须**剥注释**再判：上面那段注释里自己写着「那份 .root 有 font-size: 14px」，
-    // 不剥的话守卫会命中文档、把「声明被删掉」的变异放过去（反向注入实测踩到过）。
+    // ⚠️ 必须**剥注释**再判：上面那段注释里自己写着「font-size: 14px」，不剥会把「声明被删」的变异放过去。
     const decl = root[1].replace(/\/\*[\s\S]*?\*\//gu, '')
     assert.match(decl, /font-size:\s*14px/u,
       '页面根必须显式 font-size: 14px —— 中央列不提供基准，漏了文字就退回浏览器默认 16px')
@@ -217,23 +184,8 @@ describe('dsh-archive-manage 结构', () => {
   })
 
   /**
-   * owner 2026-10-01 报「下面 dsh-sparrow 的 logo，分割线和上面都挨上了」→ 当时靠 24px
-   * 净空 + 分割线解决；**2026-10-07 owner 两次改口径**：「固定左下角取消分割线」→
-   * 「有点太高了，最好和左边栏下面的设置按钮对齐」。
-   *
-   * 现在是**署名行**：钉在页面左下角、左对齐、无分割线，且与侧边栏「设置」行**垂直居中对齐**。
-   * 五条都要钉住 —— 任一条回退都会退回 owner 否掉的那版：
-   * * 去掉 `margin-top: auto` ⇒ 署名不再贴底，矮内容页会在它下面留一大片空白；
-   * * 变回 `center` ⇒ 全页只有它居中（标题与卡片都左对齐），视线会跳；
-   * * 加回通栏分割线 ⇒ 线比 11px 的字重得多，先被看到的变成线；
-   * * 去掉 `margin-bottom: -25px` ⇒ 署名比侧边栏设置行**高 25px**（owner：「太高了」）；
-   * * 去掉 `padding-top: 24px` ⇒ 内容超高时署名贴住上方内容。
-   *
-   * ⚠️ `-25px` 是算出来的、不是感觉：本页 `padding-bottom: 48px`，署名中心因此落在
-   * 「视口底部 −56.5px」；侧边栏设置行的文字中心在「视口底部 −31.5px」（实测 720/800/900/1080
-   * 四种窗口高度下恒定 —— 设置行贴着窗口底排，与窗口高度无关）⇒ 差 25px。
-   * 所以下面**同时**钉住「本页 padding-bottom: 48px」：官方改入口页下内边距、或设置行改高，
-   * 这个数都必须重算，钉住它能让重算点显式暴露，而不是静默错位。
+   * 署名钉左下角、左对齐、无分割线，且与侧边栏「设置」行垂直居中：`-25px` 是算出来的
+   * （本页 48px 下内边距 ⇒ 署名中心「视口底 −56.5px」vs 设置行「−31.5px」），故同时钉住 48px。
    */
   it('⛔ 品牌署名必须与侧边栏「设置」行对齐（左下角 / 左对齐 / 无分割线）', async () => {
     const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
@@ -260,29 +212,20 @@ describe('dsh-archive-manage 结构', () => {
   })
 
   /**
-   * owner 2026-10-02：「归档页按钮的中文改成归档管理吧」。
-   *
-   * 这条**曾经漂移过**：`button.label` 在 2026-09-01 更名时写作「归档管理」，
-   * 随后被静默改成「归档」（改动混在 `14f9d7b` 入口迁移那次重构里，没有单独说明），
-   * 于是侧边栏那行读起来像「归档**动作**」而不是「归档**页面**」。
-   * 侧边栏入口文案是**用户可见**的，且与同排的「插件 / 自动化任务 / 云端文件」
-   * （都是**名词性入口**）并列，故按名词口径钉住，防再次被顺手缩短。
+   * 侧边栏入口文案按**名词性**口径钉住（与同排「插件 / 自动化任务 / 云端文件」一致），
+   * 防再次被顺手缩成「归档」—— 那读起来像动作而不是页面。
    */
   it('侧边栏入口中文 应该是「归档管理」（名词性入口，与同排「插件」等一致）', async () => {
     const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
     assert.match(src, /'button\.label':\s*'归档管理'/u,
       '侧边栏入口中文必须是「归档管理」（不是「归档」——那读成动作，同排入口都是名词）')
-    // 英文按 owner 只提中文的原话保持 "Archive"，这条只在**中文**上做约束。
+    // 英文保持 "Archive"，本约束只管中文。
     assert.match(src, /'button\.label':\s*'Archive'/u, '英文入口文案保持 "Archive"')
   })
 
-  /**
-   * locale 字典的中英**键集必须一一对应**：漏一个键只会让该语言下显示成键名
-   * （`archive-manage.button.label`），不报错、不崩——纯靠测试兜住。
-   */
+  /** locale 字典中英**键集必须一一对应**：漏键只会静默显示键名，不报错、不崩。 */
   it('locale 字典 应该 中英键集一一对应（漏键只会静默显示键名）', async () => {
     const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
-    /** 取某语言字典块里的全部键。 */
     const keysOf = (lang) => {
       const start = src.indexOf(`  ${lang}: {`)
       assert.ok(start >= 0, `找不到 ${lang} 字典块`)

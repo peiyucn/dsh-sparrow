@@ -1,22 +1,13 @@
 /**
- * 宿主兼容自检（根 AGENTS《插件与宿主兼容》）。
- *
- * 插件必须比宿主更抗造：宿主契约不认识时**自停用**，绝不拖垮 dsh、绝不在
- * 不认识的契约上执行不可逆操作。判定与文案是纯逻辑，供单测。
+ * 宿主兼容自检（根 AGENTS《插件与宿主兼容》）：宿主契约不认识时**自停用**，判定与文案是纯逻辑，供单测。
  */
 
 import * as dshSessionSurface from '@deepseek-ai/dsh-session'
 
 /**
- * 本插件构建时对齐的 dsh 会话格式版本。
- *
- * 官方会话格式是单调整数（0.1.2-rc.1 为 `0`，0.1.5-rc.1 为 `3`，0.1.7-rc.1 为 `4`），每次升级都
- * 可能改变日志布局、事件语义与落盘文件名。本插件按**目录**移动/删除会话文件，认错格式的代价是丢数据，因此只声明已知可安全
- * 处理的版本。
- *
- * 注意（0.1.5 起）：`sessionPersistence.list()/stat()` 返回的 header 已被持久化层
- * **翻译成当前逻辑版本**（恒等于宿主的 `SESSION_FORMAT_VERSION`），不再反映磁盘上的
- * 物理代——本门判的是「宿主契约代」。同一目录内旧代与 V4 文件可以并存（迁移保留源文件）。
+ * 本插件构建时对齐的 dsh 会话格式版本集合（单调整数）。认错格式的代价是丢数据 —— 本插件按**目录**
+ * 移动/删除会话文件，故只声明已知可安全处理的版本。0.1.5 起 `list()/stat()` 返回的 header 已被
+ * 持久化层翻译成当前逻辑版本，本门判的是「宿主契约代」而非磁盘物理代。
  */
 export const SUPPORTED_SESSION_FORMAT_VERSIONS: readonly number[] = [0, 3, 4]
 
@@ -25,12 +16,7 @@ function disabledLine(pluginName: string, reason: string): string {
   return `${pluginName}: ${reason}；已停用插件以免影响 dsh（升级本插件或运行环境后自动恢复）`
 }
 
-/**
- * 宿主会话格式是否可安全处理；不可时返回可直接进日志的原因。
- * @param version - 宿主上报的 `SESSION_FORMAT_VERSION`（非数字等未知形状一律按不支持处理）。
- * @param supported - 本插件支持的版本集合（默认 {@link SUPPORTED_SESSION_FORMAT_VERSIONS}）。
- * @returns 支持时 `undefined`；否则一句原因文案。
- */
+/** 宿主会话格式是否可安全处理；不可时返回可直接进日志的原因。 */
 export function unsupportedSessionFormatReason(
   version: unknown,
   supported: readonly number[] = SUPPORTED_SESSION_FORMAT_VERSIONS,
@@ -41,16 +27,8 @@ export function unsupportedSessionFormatReason(
 }
 
 /**
- * 宿主**真值**格式门：宿主给出的会话 header 自带 `version`（由宿主的持久化层翻译后
- * 给出），与「插件解析到哪份官方包」无关。
- *
- * 为什么需要它：插件里的 `import '@deepseek-ai/dsh-session'` 可能解析到**插件自己的**
- * peer/开发依赖副本（`link:` 形态、或 npm 按 `^旧范围` 为插件补装的 peer），此时
- * {@link hostSessionFormatVersion} 读到的是旧值，常量探针会误判为兼容。header 由宿主
- * 产生，是唯一不受该问题影响的信号。
- * @param headers - 宿主给出的会话 header（`sessionPersistence.list()` 结果或 live `session.header`）。
- * @param supported - 本插件支持的版本集合（默认 {@link SUPPORTED_SESSION_FORMAT_VERSIONS}）。
- * @returns 任一 header 版本不受支持时返回原因；全部支持（或列表为空）时 `undefined`。
+ * 宿主**真值**格式门：以宿主给出的会话 header 的 `version` 为准（插件里的 `@deepseek-ai/dsh-session`
+ * 可能解析到自己的 peer 副本、常量探针读到旧值而误判兼容；header 由宿主产生，不受影响）。
  */
 export function unsupportedStoredFormatReason(
   headers: readonly { readonly version?: unknown }[],
@@ -64,11 +42,8 @@ export function unsupportedStoredFormatReason(
 }
 
 /**
- * 宿主上报的会话格式版本。
- *
- * 用**命名空间访问**而非具名导入：官方若删除/改名该导出，这里只得到 `undefined`
- * （判定为「未知 → 不支持 → 自停用」），而不是 ESM 链接期失败——链接期失败发生在
- * 模块加载阶段，不在插件容器对 `apply` 的异常保护范围内。
+ * 宿主上报的会话格式版本。用**命名空间访问**而非具名导入：官方删除/改名该导出时这里只得到 `undefined`
+ * （不支持 → 自停用），而不是 ESM 链接期失败（链接期失败不在插件容器的异常保护范围内）。
  */
 export function hostSessionFormatVersion(): unknown {
   return (dshSessionSurface as { readonly SESSION_FORMAT_VERSION?: unknown }).SESSION_FORMAT_VERSION
@@ -80,20 +55,14 @@ export interface HostCapability {
   readonly ok: boolean
 }
 
-/**
- * 缺失的能力名（纯逻辑，供单测）。
- * @param capabilities - 本插件声明的宿主能力。
- * @returns 未满足的能力名，按声明顺序。
- */
+/** 缺失的能力名，按声明顺序（纯逻辑，供单测）。 */
 export function missingCapabilities(capabilities: readonly HostCapability[]): string[] {
   return capabilities.filter(capability => !capability.ok).map(capability => capability.name)
 }
 
 /**
- * 能力门：宿主缺少任一必需能力即抛错（自停用）。
- * @param ctx - 插件上下文（只用到 logger）。
- * @param pluginName - 插件名（日志与错误前缀）。
- * @param capabilities - 本插件声明的宿主能力。
+ * 能力门：宿主缺少任一必需能力即抛错（自停用）—— cordis 逐插件捕获 `apply` 异常并标 inactive，
+ * 抛错前先记一条面向用户的告警（为什么停用、怎么恢复）。
  */
 export function assertCapabilities(
   ctx: { logger: { warn(message: string): void } },
@@ -107,16 +76,7 @@ export function assertCapabilities(
   throw new Error(`${pluginName}: ${reason}`)
 }
 
-/**
- * 启动自检：宿主不兼容即停用本插件（抛错）。
- *
- * cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响
- * （已查证 cordis `lib/index.js:1350-1362`）。抛错前先记一条面向用户的告警，
- * 说明「为什么停用、怎么恢复」。
- * @param ctx - 插件上下文（只用到 logger）。
- * @param pluginName - 插件名（日志与错误前缀）。
- * @param version - 宿主会话格式版本（默认读宿主导出；注入值仅供单测）。
- */
+/** 启动自检：宿主会话格式不在支持集合内即抛错（自停用），抛错前先记面向用户的告警。 */
 export function assertHostCompatible(
   ctx: { logger: { warn(message: string): void } },
   pluginName: string,

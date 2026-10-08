@@ -6,7 +6,7 @@ import type { DeepSeekFileObject } from '@deepseek-ai/dsh-llm-deepseek'
 /** 官方自动上传文件名的前缀（llm-deepseek file-store.ts 的 OWNED_FILE_PREFIX）。 */
 export const DSH_OWNED_FILE_PREFIX = 'dsh-'
 
-/** 列表页大小（owner 拍板 2026-09-01；官方上限 1000）。 */
+/** 列表页大小（官方上限 1000）。 */
 export const PAGE_SIZE = 20
 
 /** 总数统计每页拉取上限（官方 list 上限 1000）。 */
@@ -15,21 +15,12 @@ export const COUNT_PAGE_LIMIT = 1000
 /** 总数统计最多翻页数：官方配额 10000 个文件 ÷ 每页 1000 = 10 页，12 页兜底防配额口径变化。 */
 export const MAX_COUNT_PAGES = 12
 
-/** 总数统计每页请求超时。 */
 export const COUNT_PAGE_TIMEOUT_MS = 15_000
 
 /**
- * 交给官方 `DeepSeekFilesClient` 的 baseURL。
- *
- * 只解析根、**不在这里拼 `/v1`**：官方 client 构造时自己归一化——路径不以 `/v1`
- * 结尾就追加（rc.1 `packages/llm/llm-deepseek/src/messages-api.ts:11-14`），
- * 我方再拼会得到 `/v1/v1/files`。公共端点同样不硬编码：rc.1 起官方
- * `PUBLIC_BASE_URL` 由 `https://api.deepseek.com` 改为 `https://api.deepseek.com/anthropic`
- * （`config.ts:115`），由调用方传官方导出的常量，官方再改端点本插件自动跟随。
- * @param sectionBaseURL - `llm-deepseek` 设置节里的 baseURL（未配置时为 undefined）。
- * @param envBaseURL - `$DEEPSEEK_BASE_URL`（未设置为 undefined）。
- * @param publicBaseURL - 官方导出的公共 API 根。
- * @returns 交给官方 client 的 baseURL（不含 `/v1`）。
+ * 交给官方 `DeepSeekFilesClient` 的 baseURL：只解析根、**不在这里拼 `/v1`** —— 官方 client
+ * 构造时会自己归一化（路径不以 `/v1` 结尾就追加，再拼会得到 `/v1/v1/files`）；
+ * 公共端点同样不硬编码，由调用方传官方导出的常量，官方改端点本插件自动跟随。
  */
 export function resolveBaseURL(
   sectionBaseURL: string | undefined,
@@ -43,14 +34,8 @@ export function resolveBaseURL(
 export const API_KEY_HEADER = 'x-api-key'
 
 /**
- * 交给官方 `DeepSeekFilesClient` 的认证头。
- *
- * **rc.1 → rc.2 的破坏性变更**：构造函数由 `{ baseURL, apiKey, accountCredential? }`
- * 改成 `{ baseURL, headers }`（rc.1 `files-api.ts:71-75`；rc.2 `:71-75`）。
- * 旧参数在 rc.2 上被**静默忽略**，client 内部 `Object.entries(undefined)` 直接抛错。
- * 本插件只走普通 API key 一路（账号令牌走官方账号凭据，不在本插件范围）。
- * @param apiKey - 已由 `ctx.credentials` 解析出的 API key。
- * @returns 官方 client 构造参数里的认证头。
+ * 交给官方 `DeepSeekFilesClient` 的认证头。**rc.1 → rc.2 破坏性变更**：构造参数由 `apiKey`
+ * 改成 `headers`，旧参数会被静默忽略（client 内部 `Object.entries(undefined)` 直接抛错）。
  */
 export function authHeaders(apiKey: string): Record<string, string> {
   return { [API_KEY_HEADER]: apiKey }
@@ -74,14 +59,9 @@ export interface FilesClientConstructor {
 }
 
 /**
- * 探测官方 client 是否**认**我们的构造参数（`headers` + `fetch`）。
- *
- * 为什么不能只查导出符号：rc.1 → rc.2 的破坏性变更恰好是「符号都在、参数换名」
- * （`apiKey` → `headers`）。只查存在性的话插件会**带病启动**——每次 list / delete
- * 都在运行期失败，用户只看到请求报错。这里用官方 client 自己的 request 路径跑一次
- * **无网络**往返（fetch 由探针注入），断言 key 头真的被发出去了。
- * @param Client - 官方导出的 `DeepSeekFilesClient`。
- * @returns 官方 client 是否按当前契约收下 headers 与 fetch。
+ * 探测官方 client 是否**认**我们的构造参数（`headers` + `fetch`）：不能只查导出符号 ——
+ * rc.1 → rc.2 的破坏性变更恰好是「符号都在、参数换名」，只查存在性会让插件**带病启动**
+ * （每次 list / delete 都在运行期失败）。这里注入假 fetch 跑一次**无网络**往返，断言 key 头真的被发了出去。
  */
 export async function probeFilesClientShape(Client: FilesClientConstructor): Promise<boolean> {
   let sent: [string, string][] | undefined
@@ -112,13 +92,9 @@ export interface PageQuery {
 }
 
 /**
- * 分页参数归一化：limit 钳到 [1, 1000]（非法回退 PAGE_SIZE）；空 after 省略。
- * 异常输入返回安全默认值，不抛。
- *
- * 不再有 `order`：官方 Files API 已无可用的排序查询——rc.1 官方 client 的 `list()`
- * 只接受 `after` / `limit` / `signal`（`files-api.ts:215-219`），官方自己的
- * `reclaimOldestOwned` 也改成「翻完所有页再按 createdAt 本地排序」并注明
- * “The API offers no ascending-order query”（`file-store.ts:318`）。传了也不生效。
+ * 分页参数归一化：limit 钳到 [1, 1000]（非法回退 PAGE_SIZE）；空 after 省略；异常输入返回安全默认值，不抛。
+ * 没有 `order`：官方 Files API 已无可用的排序查询（官方 client 的 `list()` 只接受 `after` / `limit` / `signal`，
+ * 传了也不生效），排序改由调用方本地做。
  */
 export function normalizePageQuery(query: { after?: string; limit?: string }): PageQuery {
   // 只接受纯数字串（Number('') === 0 会把空串误判为 0，需先拦）。
