@@ -7,6 +7,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Scrolling is no longer sluggish while the model is replying; smoothness now matches the official dark and light themes, including while the model is thinking.
 - Fixed the tone jumping back to an earlier pick when you switch between tones quickly.
 - Version-line alignment with official dsh 0.2.0-rc.2.
+- Menu and pop-up panels are now translucent and blurred like the rest of dsh, instead of an opaque surface.
 - Fixed grouped headings in the model picker and command popup losing their themed background.
 - Fixed the right sidebar's themed gradient being offset on the Windows desktop app.
 - New: with a tone picked, narrow windows keep the turn navigation, and content gets more side margin.
