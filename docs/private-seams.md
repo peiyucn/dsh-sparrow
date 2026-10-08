@@ -95,10 +95,23 @@
   * 位置那一半另有坑：官方把锚定值写成**相对触发器**的内联 `left`，换了包含块就落在错误的坐标系里
     （实测偏 −300px）；`left: auto` 能让它回到静态位置 = 触发器左缘（受控实测弹框−触发器 = 0）。
 
-  ⇒ 结论：这是**官方 popover 没有 portal 到 body** 造成的结构性缺陷，纯 CSS 无解；
-  真正的修法只有官方把节点 portal 出去，属上游事项。
-  ⚠️ 别再把「换包含块 / 抬弹框 z-index / 抬顶栏」当成还没试过的修法 —— 三条都已试过，
-  受控实验与失败记录在 `docs/spec/12`。
+  ⇒ 结论：这是**官方 popover 没有 portal 到 body** 造成的结构性缺陷。**决定性对照**（同一个顶栏区域）：
+  它旁边的「智能体团队 / 成员」弹窗走 `SubagentHeaderLineage.tsx:727` 的
+  `createPortal(..., document.body)` ⇒ 节点挂在 body 下 ⇒ **既逃出列的裁切、也逃出顶栏的层叠上下文**，
+  所以能完美浮在右栏上面；而 `JobListAction.tsx` 全文**没有** `createPortal`
+  （官方 client 里 27 处 `createPortal(` 一处都不在它身上）⇒ `<ul>` 直接长在顶栏子树里，两道都吃。
+  **官方自己这两处实现不一致**，真正的修法只有官方把 `JobListAction` 也 portal 出去，属上游事项。
+
+  **当前采用的缓解**（最小改动，2026-10-08）：只把弹框**右对齐**（`right: 0` + `left: auto !important`；
+  包含块、`z-index`、`overflow` 全不动）⇒ 它不再向右伸出列、**不再被裁**，但仍盖不到右栏上面
+  （它没离开对话列的范围）。用户可见的说明写在 README 的《Known limitations / 已知限制》。
+
+  ⚠️ 别再把下面这些当成还没试过的修法 —— 全都试过，受控实验与失败记录在 `docs/spec/12`：
+  换包含块 / `position: fixed` / 抬弹框自己的 `z-index` / 抬顶栏 / 动中列 `overflow`。
+  ⚠️ 也别想「我们替它 portal」（把官方那个 `<ul>` 搬到 `document.body`）：React 记录着**原父节点**，
+  卸载时对已搬走的节点 `removeChild` 会抛 `NotFoundError` ⇒ 会把宿主搞崩。
+  ⚠️ 同理别想「把 `.titleRow` 的 `container-type` 关掉」来放 `position: fixed` 出去：
+  那会**同时废掉官方与咱们自己的 `@container` 窄化**（codebuddy 的入口收窄就靠它）。
 
 * **仍不该做的**（此后若有人想「顺手」）：
   * 把顶栏抬到右栏面板之上会违反官方次序 —— 官方全屏面板 `--dsh-dockkit-dock-layer: 40`
