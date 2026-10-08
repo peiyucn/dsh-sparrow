@@ -28,6 +28,13 @@ import {
   LEFT_VARIABLE,
   MARKER_ATTR,
   PACKAGE_NAME,
+  PHASE_BAND_ATTR,
+  PHASE_BAND_TOP_VARIABLE,
+  PHASE_BAND_VARIABLE,
+  PHASE_NOTCH_ATTR,
+  PHASE_NOTCH_TOP_VARIABLE,
+  PHASE_NOTCH_VARIABLE,
+  PHASE_SETTLE_FRAMES,
   PLAIN_ATTR,
   ROW_ID,
   ROW_ORDER,
@@ -53,6 +60,7 @@ import { buildPopoverCss } from '../popover.js'
 import { buildSurfaceCss } from '../surface.js'
 import { buildSweepCss } from '../sweep.js'
 import { isWorkstartProbe } from '../workstart.js'
+import { pseudoOrigin, solvePhaseOrigin } from '../phase.js'
 import {
   DEFAULT_SETTINGS,
   toneFieldFor,
@@ -262,6 +270,25 @@ function install(ctx: Context): void {
   }
 
   /**
+   * 摘掉两道相位门与四个几何变量（卸载 / 降级共用一处，避免漏摘）。
+   *
+   * ⚠️ **必须声明在清理 effect 之前**：清理体要调它，若声明在 effect 之后，
+   * 那么「effect 注册」与「声明」之间任一环节抛错时，cordis 跑清理会撞上 TDZ，
+   * 抛 `ReferenceError` 把真正的失败原因盖掉（与上面 {@link paintPlain} 同一理由）。
+   */
+  const clearPhase = (): void => {
+    const target = markerHost
+    if (target === null) return
+    for (const [attr, ...vars] of [
+      [PHASE_BAND_ATTR, PHASE_BAND_VARIABLE, PHASE_BAND_TOP_VARIABLE],
+      [PHASE_NOTCH_ATTR, PHASE_NOTCH_VARIABLE, PHASE_NOTCH_TOP_VARIABLE],
+    ] as const) {
+      target.removeAttribute(attr)
+      for (const v of vars) target.style.removeProperty(v)
+    }
+  }
+
+  /**
    * 先武装清理，再创建资源。
    *
    * ⚠️ **顺序不能反**：cordis 只跑**已注册**的 disposer。若先 `ensureStyles()` /
@@ -283,8 +310,10 @@ function install(ctx: Context): void {
     disposeTokens?.()
     // 门也要摘掉：留着它，卸载后玻璃与抬升面两张表的规则会继续被挡（表本身也随 style 没了，
     // 但属性不该残留在 body 上）。待启动态标记同理 —— 它是本插件加的，卸载必须收干净。
+    // 相位门与那四个几何变量同理：它们写在 body 的**行内 style** 上，摘不干净会留在 DOM 里。
     paintPlain(false)
     markerHost?.removeAttribute(WORKSTART_ATTR)
+    clearPhase()
   }, 'dsh-theme-tone: backdrop + token overrides')
 
   /**
@@ -565,8 +594,159 @@ function install(ctx: Context): void {
       probeScheduled = false
       probeFrame = 0
       probeWorkstart()
+      // 相位走**收敛式**重测：布局若还在动（右栏开合是动画）就继续测，直到稳定。
+      startPhaseSettle()
     })
   }
+
+  /**
+   * 收敛式重测：只要上一次测出的相位**还在变**，就继续在后续帧里重测。
+   *
+   * ## 为什么必须有它（真机踩过）
+   * 相位量必须在**布局稳定后**取。可右栏开合是**动画**改 `grid-template-columns`
+   * 内联样式：它既不改 class（MutationObserver 只看 class），也不触发 `window.resize`
+   * （视口没变），而 `ResizeObserver` 也可能落在**动画中途**那一帧上。
+   * 于是采到一个中间值后再无事件 ⇒ 变量**永久停在错的相位**
+   *（实测停在 452.5px，正确值 495.22px，卡片顶边 371 个像素因此画错）。
+   *
+   * 这里用一个自终止的轮询兜底：每次测量后记录四个量，若与上一次不同，
+   * 就再排一帧继续测；**连续两次相同即停**（最多 {@link PHASE_SETTLE_FRAMES} 帧）。
+   * 于是不论动画由什么触发、持续多少帧，最终稳定值一定会被采到。
+   *
+   * 代价可控：只在「值还在变」的那几十帧里多跑几次
+   *（每次仅两个 `querySelector` + 两次 `getBoundingClientRect` + 两次计算样式），
+   * 一旦稳定立刻停 —— 静态页面上一帧都不会多跑。
+   */
+  let settleFrames = 0
+  let settlePrev = ''
+  /**
+   * 收敛循环**自己**的帧句柄 —— 与 {@link scheduleProbe} 的 `probeFrame` 分开。
+   *
+   * ⚠️ **不能共用句柄**（本轮踩过）：`startPhaseSettle` 一进来就要取消上一个待跑的帧，
+   * 若取消的是 `scheduleProbe` 排的那一帧，`probeScheduled` 就**永远停在 `true`**，
+   * 之后所有 MutationObserver 触发的探测都被「同帧合并」静默吞掉 —— 观测彻底停摆。
+   */
+  let settleFrame = 0
+  /**
+   * 起一轮收敛重测（可被任何触发源调用）。
+   *
+   * ⚠️ 用 `requestAnimationFrame` **自己排队**，不借 `scheduleProbe`：
+   * `scheduleProbe` 有「同帧只跑一次」的合并语义（`probeScheduled`），
+   * 而收敛需要**连续多帧**各测一次。两者目的不同，共用会互相压制。
+   */
+  const startPhaseSettle = (): void => {
+    settleFrames = 0
+    settlePrev = ''
+    if (settleFrame !== 0) cancelAnimationFrame(settleFrame)
+    const step = (): void => {
+      settleFrame = 0
+      const signature = publishPhase()
+      if (signature === null) { settleFrames = 0; settlePrev = ''; return }
+      // 连续两次一致 ⇒ 布局已稳定，收敛结束。
+      if (signature === settlePrev) { settleFrames = 0; settlePrev = ''; return }
+      settlePrev = signature
+      if (settleFrames >= PHASE_SETTLE_FRAMES) { settleFrames = 0; settlePrev = ''; return }
+      settleFrames += 1
+      settleFrame = requestAnimationFrame(step)
+    }
+    settleFrame = requestAnimationFrame(step)
+  }
+
+  /**
+   * 实测两个相载体的定位区原点，发布成 CSS 变量 + **两道**门属性。
+   *
+   * ## 为什么必须实测（而不是纯 CSS 推）
+   * 座底不透带与卡片缺口两条规则要用「显式视口相位」替代
+   * `background-attachment: fixed`（后者每帧按视口栅格化 ⇒ 滚动卡顿，见 spec 10）。
+   * 相位要的是「定位区左上角在视口里的坐标」。右栏折叠时纯 CSS 尚能推
+   * （`100vw − 列宽`），但**右栏一开就推不出** —— 左栏偏移与右栏宽同时变，
+   * 一个方程两个未知量（实测载体左缘仍是 280、右缘却从 2873 变 1577）。
+   * 官方把右栏宽只写在 `gridTemplateColumns` 内联样式上、没发布成变量，
+   * 面板宽也不继承到座上 ⇒ 纯 CSS 读不到。于是改为**测量**：测到就用快档，
+   * **所有布局状态一视同仁**（不再有「右栏开着不生效」）。
+   *
+   * ## 两个载体统一走**同一条**推导
+   * 两条规则都是「宿主里的一个绝对定位伪元素」，故都用
+   * {@link pseudoOrigin}：宿主边框盒 + 宿主边框 + 伪元素自身的 `left`/`top`。
+   * 这样**不依赖**任何「伪元素与某个子元素同宽同左」之类的实测不变量 ——
+   * 官方改内边距也不会静默错位。两个载体的差别只是宿主不同：
+   * 座底带宿主 = 座位自身；缺口宿主 = 卡片的父元素。
+   *
+   * ## 为什么是**两道**门
+   * 两个载体的可见性各自独立（hero 没有会话座；卡片不渲染时没有缺口），
+   * 故**各测各的、各挂各的门** —— 合成一道门会让「一个载体暂不可用」
+   * 连带把另一个已经能测到的也拖回慢档。
+   *
+   * ## 精度与降级
+   * 用 `getBoundingClientRect`（视口坐标，已含滚动与变换）。取不到元素、
+   * 或几何不合理（见 {@link solvePhaseOrigin}）时**摘掉那道门** ⇒ 该条规则落回
+   * `fixed` 档 —— 慢但一定正确。绝不写一个可能错位的值。
+   *
+   * ## 开销
+   * 每次只做两次 `querySelector` + 两次 `getBoundingClientRect` + 两次计算样式，
+   * 且**同帧合并**、只在 DOM 变动（class 变化）与 `resize` 时跑。
+   * `resize` 必须监听：窗口宽度变了相位就变，而官方改的是内联
+   * `gridTemplateColumns`（不改 class，观察不到）。
+   */
+  const publishPhase = (): string | null => {
+    const target = markerHost
+    if (target === null) return null
+    /**
+     * 本次实测到的四个量拼成的签名。返回给 {@link publishPhaseAndSettle} 判断布局是否已稳定。
+     * 用**实测几何**（而不是写入的 CSS 值）拼签名：只有几何真的不动了才算收敛。
+     */
+    const parts: string[] = []
+    /** 摘掉一道门连同它的几何变量（绝不留下「门开着但变量是旧的」这种组合）。 */
+    const clearOne = (attr: string, ...vars: readonly string[]): void => {
+      target.removeAttribute(attr)
+      for (const v of vars) target.style.removeProperty(v)
+    }
+    /** 一个载体的通用处理：求伪元素原点 → 解算 → 写变量并挂门（或摘门）。 */
+    const applyOne = (host: Element | null, attr: string, leftVar: string, topVar: string): void => {
+      if (host === null) { clearOne(attr, leftVar, topVar); parts.push(`${attr}:none`); return }
+      const r = host.getBoundingClientRect()
+      const s = getComputedStyle(host)
+      const after = getComputedStyle(host, '::after')
+      const borderLeft = Number.parseFloat(s.borderLeftWidth) || 0
+      const borderTop = Number.parseFloat(s.borderTopWidth) || 0
+      const pseudoLeft = Number.parseFloat(after.left) || 0
+      const pseudoTop = Number.parseFloat(after.top) || 0
+      // 签名用**原始几何输入**：它变了说明布局还在动 ⇒ 需要再测一帧。
+      parts.push(`${attr}:${r.left},${r.top},${borderLeft},${borderTop},${pseudoLeft},${pseudoTop}`)
+      const origin = pseudoOrigin(r.left, r.top, borderLeft, borderTop, pseudoLeft, pseudoTop)
+      const solved = solvePhaseOrigin(origin, { width: window.innerWidth, height: window.innerHeight })
+      if (solved === null) { clearOne(attr, leftVar, topVar); return }
+      target.style.setProperty(leftVar, solved.left)
+      target.style.setProperty(topVar, solved.top)
+      // 门**最后**挂：两个变量都已就位，消费侧才是「开即有效」。
+      target.setAttribute(attr, '')
+    }
+
+    try {
+      /**
+       * ① 座底不透带：宿主 = 座位自身（它是 sticky 定位元素，正是 ::after 的包含块）。
+       * ⚠️ 座位只在 `[data-phase='active']` 下才是 sticky；hero 下取不到就摘门。
+       */
+      applyOne(document.querySelector('[data-composer-seat]'),
+        PHASE_BAND_ATTR, PHASE_BAND_VARIABLE, PHASE_BAND_TOP_VARIABLE)
+
+      /**
+       * ② 卡片缺口：宿主 = **卡片的父元素**（`buildCardNotchCss` 里那个含 `:has()` 的宿主）。
+       * ⚠️ 伪元素挂在这个宿主上，而它比卡片宽一个大内边距 —— 故必须按伪元素自身算，
+       * 不能拿卡片或宿主顶替（见 {@link pseudoOrigin}）。
+       */
+      applyOne(document.querySelector('[data-composer-card]')?.parentElement ?? null,
+        PHASE_NOTCH_ATTR, PHASE_NOTCH_VARIABLE, PHASE_NOTCH_TOP_VARIABLE)
+    } catch {
+      // 运行期不冒泡（根 AGENTS）：测量失败只是退回慢档，绝不打扰宿主。
+      clearOne(PHASE_BAND_ATTR, PHASE_BAND_VARIABLE, PHASE_BAND_TOP_VARIABLE)
+      clearOne(PHASE_NOTCH_ATTR, PHASE_NOTCH_VARIABLE, PHASE_NOTCH_TOP_VARIABLE)
+      return null
+    }
+    return parts.join('|')
+  }
+
+  /** 摘掉两道门与四个变量（卸载 / 降级共用一处，避免漏摘）。 */
 
   repaint()
   ctx.effect(() => scope.subscribe(() => { repaint() }), 'dsh-theme-tone: settings scope')
@@ -588,6 +768,54 @@ function install(ctx: Context): void {
       probeScheduled = false
     }
   }, 'dsh-theme-tone: workstart probe')
+
+  /**
+   * 相位几何：初跑一次 + 监听 `resize`。
+   *
+   * `resize` **不可省**：窗口宽度变化必然改变相位，而官方改的是内联
+   * `gridTemplateColumns` —— 那是 `style` 属性，上面的 observer 只过滤 `class`，
+   * 观察不到。故这里单独听 `resize`（仍走同帧合并，避免拖拽窗口时每像素一次测量）。
+   *
+   * 右栏开合、左栏折叠都不必单独听：它们会改 class（拖拽条 / 面板状态），
+   * 由上面的 MutationObserver 覆盖；而即便漏掉一次，`resize` 与下一次 DOM 变动
+   * 也会补上 —— 且**门在测到之前不挂**，最坏情况只是暂时用慢档（正确）。
+   */
+  publishPhase()
+  ctx.effect(() => {
+    const onResize = (): void => { startPhaseSettle() }
+    window.addEventListener('resize', onResize, { passive: true })
+
+    /**
+     * ⚠️ **`ResizeObserver` 不可省**（真机踩过）：右栏开合是**动画**改
+     * `grid-template-columns` 内联样式 —— 它既不改 class（MutationObserver 只看 class），
+     * 也不触发 `window.resize`（视口没变）。观察两个**载体**（座位与缺口宿主），
+     * 它们的尺寸正是随左右栏开合而变的量；配合 {@link startPhaseSettle} 的收敛重测，
+     * 保证动画停下时采到的是**稳定值**（实测不加就会停在中间值 452.5px）。
+     *
+     * 元素不存在时不装（初跑与后续 MutationObserver 会处理它们的出现）。
+     */
+    const targets = [
+      document.querySelector('[data-composer-seat]'),
+      document.querySelector('[data-composer-card]')?.parentElement ?? null,
+    ].filter((el): el is Element => el !== null)
+    const resizeObserver = targets.length === 0
+      ? null
+      : new ResizeObserver(() => { startPhaseSettle() })
+    for (const el of targets) resizeObserver?.observe(el)
+
+    return () => {
+      window.removeEventListener('resize', onResize)
+      resizeObserver?.disconnect()
+      // 取消尚未触发的收敛帧：否则「入队 → 卸载 → 帧才到」会让回调在清理**之后**
+      // 把刚摘掉的变量与门重新写回 body（与 scheduleProbe 那条 ⚠️ 同理）。
+      if (settleFrame !== 0) cancelAnimationFrame(settleFrame)
+      settleFrame = 0
+      settleFrames = 0
+      settlePrev = ''
+      // 卸载时把两道门与四个变量一起摘干净（根 AGENTS：本插件加的属性不留残余）。
+      clearPhase()
+    }
+  }, 'dsh-theme-tone: phase geometry')
 
   // 明暗轴切换：token 层已按模式给全，presenter 会自己取用，故只需重算层与行。
   // `ctx.on` 的监听器本身就以 effect 记在当前 fiber 上，卸载自动摘除，无需再包一层。

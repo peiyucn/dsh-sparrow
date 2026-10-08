@@ -16,21 +16,20 @@ import {
   HEADER_LIGHT_SCALE,
   PANEL_BAND_PX,
   PANEL_SCROLLER_LIFT_PX,
-  RIGHTBAR_COLLAPSED_ATTR,
   SEAT_SOLID_PX,
   SEAT_SOLID_RAMP_PX,
-  SCROLL_BODY_MARGIN_PX,
   SHADE_ALPHA,
   buildGlassCss,
   buildSeamCss,
-  viewportPhasePaint,
+  bandPhasePaint,
+  notchPhasePaint,
   CARD_NOTCH_RADIUS,
   CARD_NOTCH_WIDTH,
   phaseGate,
 } from '../lib/glass.js'
 /** 浅色轴暗边用的官方最深静态色 token。 */
 const SHADE_TOKEN = '--dsw-static-neutral-bluish-1000'
-import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_TILE_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, SIDE_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
+import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_TILE_VARIABLE, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_NOTCH_ATTR, PHASE_BAND_VARIABLE, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, SIDE_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, compensatedBackdropGradients, dimmedBackdropGradients } from '../lib/backdrop.js'
 
 /** 官方 GuideBody 根的属性（`GuideBody.tsx:80`）—— 只在右栏「开始」页出现，故可作状态锚点。 */
@@ -477,15 +476,23 @@ describe('glass：输入框底座', () => {
     assert.ok(!body.includes('backdrop-filter'), '不透带不模糊')
   })
 
-  it('座底不透带必须有**相位性能档**，且被 data-rightbar-collapsed 守住', () => {
+  it('座底不透带必须有**相位性能档**，且门由运行期几何决定（不是「右栏折叠」）', () => {
     // owner 报「模型 think 时插件主题下滚动明显变卡、官方深浅主题不卡」的修法。
-    // 实测（2880x1800 @120Hz，60 帧）：Paint 345ms -> 55ms、帧间隔中位 17.8 -> 11.3ms。
+    // 实测：绘制次数 417~429 -> 183~186（-56%），Paint 分项 140~195 -> 25~31 ms。
     // 机制：`background-attachment: fixed` 让定位区变成**视口** ⇒ 每帧按视口栅格化；
     // 成本**与图片面积无关**（声明尺寸缩到 1/225 也不省）。详见 docs/spec/10-fixed-attachment-cost.md。
-    const phase = rulesFor(css, `[${RIGHTBAR_COLLAPSED_ATTR}] [data-phase='active'] [data-composer-seat]::after`)
+    const phase = rulesFor(css, `[${PHASE_BAND_ATTR}] [data-phase='active'] [data-composer-seat]::after`)
     assert.equal(phase.length, 1, `座底性能档应恰好一条，实际 ${phase.length}`)
     const p = phase[0]
     const pBody = p.slice(p.indexOf('{') + 1, p.lastIndexOf('}'))
+    // ⚠️ 门必须是**运行期几何**属性，不能是 data-rightbar-collapsed：
+    // 后者只在右栏折叠时成立 ⇒ 右栏开着的会话里性能档不生效（等于没修）。
+    assert.ok(p.includes(`[${PHASE_BAND_ATTR}]`), `门必须是 ${PHASE_BAND_ATTR}（运行期几何就绪）`)
+    assert.ok(!p.includes('data-rightbar-collapsed'),
+      '不得再用 data-rightbar-collapsed 当门 —— 那会让「右栏开着」的会话享受不到修复')
+    // ⚠️ **一个载体一道门**：合成一道门时，某个载体暂时测不到（如 hero 无缺口宿主）
+    // 会把另一个已经能测到的也一起拖回慢档。
+    assert.ok(!p.includes(`[${PHASE_NOTCH_ATTR}]`), '座底带不得用缺口的门')
     // 不得再用 fixed（否则那条开销原封不动）
     assert.ok(!/background-attachment:\s*fixed/u.test(pBody), '性能档不得再用 fixed')
     assert.match(pBody, /background-attachment:\s*scroll/u, '性能档用 scroll')
@@ -494,35 +501,47 @@ describe('glass：输入框底座', () => {
       '必须逐层给 background-size（第 1 层颗粒要保持 auto）')
     assert.match(pBody, /background-repeat:\s*repeat,\s*no-repeat,\s*no-repeat,\s*no-repeat/u,
       '必须逐层给 background-repeat')
-    // 相位：颗粒用 leftGap（列宽推出），渐变用 inset（2px 官方 margin-right + 滚动条宽）
-    assert.ok(pBody.includes('calc(100% - 100vh)'), '颗粒 y 必须是 calc(100% - 100vh)（一个贴图周期，与元素高无关）')
-    assert.ok(pBody.includes(`${SCROLL_BODY_MARGIN_PX}px + var(--dsh-scrollbar-width, 5px)`),
-      '渐变 x 的 inset 必须由官方变量导出（2px + 滚动条宽），不许写死 7px')
-    assert.ok(pBody.includes('var(--dsh-conversation-column-width, 100vw)'),
-      '颗粒 x 必须用官方列宽变量推出 leftGap，不许写死 280px')
-    // ⚠️ 反向注入：把两条规则的相位换成 fixed，测试必须能变红
-    //（断言不是摆设 —— 用真实的替换跑一遍）
-    const tampered = css.replace(/(\[data-rightbar-collapsed\][^}]*?::after\s*\{[^}]*?)background-attachment:\s*scroll/u, '$1background-attachment: fixed')
+    // 相位：两个方向都用**长度**读运行期实测的原点（`calc(0px - var(…))`）
+    assert.ok(pBody.includes(`var(${PHASE_BAND_VARIABLE})`), 'x 必须读运行期实测的左缘量')
+    assert.ok(pBody.includes(`var(${PHASE_BAND_TOP_VARIABLE})`), 'y 必须读运行期实测的上缘量')
+    // ⚠️ 不许再出现百分比相位：百分比按「(定位区尺寸 − 图片尺寸)」解析 ⇒ 依赖元素自身宽高，
+    //    于是同一个配方在不同盒子上给出不同结果，且「下缘贴视口底」那类前提会随布局漂移
+    //   （本轮为此返工多次）。长度则与元素几何完全无关。
+    assert.ok(!/%/u.test((/background-position:\s*([^;]+);/u.exec(pBody) ?? ['', ''])[1]),
+      'background-position 不得用百分比（须全用长度，才能与元素宽高无关）')
+    // 不许再出现「纯 CSS 推导」的痕迹（那套在右栏打开时是错的）
+    assert.ok(!/dsh-conversation-column-width/u.test(pBody),
+      '相位量改由运行期实测后，不得再靠 --dsh-conversation-column-width 推（右栏打开时推不出）')
+    assert.ok(!/\b(7|280)px\b/u.test(pBody), '不得写死几何数字')
+    // ⚠️ 反向注入：把 phase 换成 fixed，测试必须能变红
+    const tampered = css.replace(
+      new RegExp(`(\\[${PHASE_BAND_ATTR}\\][^}]*?::after\\s*\\{[^}]*?)background-attachment:\\s*scroll`, 'u'),
+      '$1background-attachment: fixed')
     assert.notEqual(tampered, css, '反向注入应能改动 CSS（否则本断言测不到东西）')
-    const tamperedPhase = rulesFor(tampered, `[${RIGHTBAR_COLLAPSED_ATTR}] [data-phase='active'] [data-composer-seat]::after`)
+    const tamperedPhase = rulesFor(tampered, `[${PHASE_BAND_ATTR}] [data-phase='active'] [data-composer-seat]::after`)
     assert.match(tamperedPhase[0], /background-attachment:\s*fixed/u, '注入后应变成 fixed')
   })
 
-  it('viewportPhasePaint：两种层的 y 必须不同（渐变 100%、颗粒一个周期）', () => {
-    // 这是本轮真犯过的错：把两种层的 y 统一写成 calc(100% - 100vh)，
-    // 结果渐变多减了一个图片高、整块被推到视口外 —— 逐像素差 2.65 / 31% 像素超 2 级。
-    // 两者必须分开：渐变图片高 = 视口高 ⇒ 贴底 100% 即对齐；颗粒是 200 的重复网格 ⇒ 差一个周期仍等价。
-    const decl = viewportPhasePaint()
-    assert.match(decl, /background-position:\s*calc\(0px - calc\(100vw - var\(--dsh-conversation-column-width, 100vw\)\)\) calc\(100% - 100vh\),/u,
-      '颗粒层 x 用 leftGap、y 用 calc(100% - 100vh)')
-    const grads = decl.match(/calc\(100% \+ calc\(2px \+ var\(--dsh-scrollbar-width, 5px\)\)\) 100%/gu) ?? []
-    assert.equal(grads.length, 3, `三段渐变的 y 必须是 100%（不是 calc(100% - 100vh)），实际 ${grads.length}`)
+  it('相位配方：两层共用同一配方（图片左上角钉回视口），两个载体各读自己的量', () => {
+    // 相位必须把**图片左上角钉回视口左上角** —— 那正是 fixed 的语义。
+    // 做法：偏移 = 定位区原点在视口里的坐标取负（长度，不是百分比）。
+    const decl = bandPhasePaint()
+    const pos = (/background-position:\s*([^;]+);/u.exec(decl) ?? ['', ''])[1]
+    const layer = `calc(0px - var(${PHASE_BAND_VARIABLE})) calc(0px - var(${PHASE_BAND_TOP_VARIABLE}))`
+    const layers = pos.split(',').map((s) => s.trim().replace(/\s+/gu, ' ')).filter(Boolean)
+    assert.equal(layers.length, 4, `应逐层给四个位置，实际 ${layers.length}：${pos}`)
+    for (const l of layers) assert.equal(l, layer, `每一层都必须是同一个视口原点配方，实际：${l}`)
     // 逐层三个属性都要给足（4 层）
     assert.match(decl, /background-size:\s*auto, 100vw 100vh, 100vw 100vh, 100vw 100vh/u, 'size 逐层')
     assert.match(decl, /background-repeat:\s*repeat, no-repeat, no-repeat, no-repeat/u, 'repeat 逐层')
-    // 不许出现任何写死的几何数字（7 / 280 之类）
-    assert.ok(!/\b7px\b/u.test(decl), '不得写死 7px（必须由 2px + 滚动条变量导出）')
-    assert.ok(!/\b280px\b/u.test(decl), '不得写死 280px（必须由列宽变量导出）')
+    // 不许出现任何写死的几何数字
+    assert.ok(!/\b(7|280)px\b/u.test(decl), '不得写死几何数字（须读运行期变量）')
+    // 两个载体必须各读**自己**那份量：套用对方的会偏一个内边距
+    const notch = notchPhasePaint()
+    assert.ok(notch.includes(`var(${PHASE_NOTCH_VARIABLE})`), '缺口读缺口载体的左缘量')
+    assert.ok(notch.includes(`var(${PHASE_NOTCH_TOP_VARIABLE})`), '缺口读缺口载体的上缘量')
+    assert.ok(!notch.includes(`var(${PHASE_BAND_VARIABLE})`), '缺口不得套用座底带的左缘量')
+    assert.ok(!notch.includes(`var(${PHASE_BAND_TOP_VARIABLE})`), '缺口不得套用座底带的上缘量')
   })
 
   it('卡片缺口：性能档与固定档**成对**存在（只修一条只省 ~15%）', () => {
@@ -530,48 +549,30 @@ describe('glass：输入框底座', () => {
     // 只要滚动容器里还留着一条 fixed，那笔按视口栅格化的开销就仍然要付。
     // 故两条必须同进同退，这条断言就是防「后人只改一条」。
     const seamCss = buildSeamCss()
-    const notchPhase = rulesFor(seamCss, `[${RIGHTBAR_COLLAPSED_ATTR}] [data-phase='active'] [data-composer-seat] :has(> [data-composer-card])::after`)
+    const notchPhase = rulesFor(seamCss, `[${PHASE_NOTCH_ATTR}] [data-phase='active'] [data-composer-seat] :has(> [data-composer-card])::after`)
     assert.equal(notchPhase.length, 1, `缺口性能档应恰好一条，实际 ${notchPhase.length}`)
     const body = notchPhase[0].slice(notchPhase[0].indexOf('{') + 1, notchPhase[0].lastIndexOf('}'))
     assert.match(body, /background-attachment:\s*scroll/u, '缺口性能档用 scroll')
-    // 盒子必须撑满宿主的**定位区**：相位里的 100% 指元素自身高度，
-    // 保持卡片宽 × 28px 会同时破坏 P1（右缘）与 P2（下缘）。
-    assert.match(body, /inset:\s*0/u, '必须用 inset:0 撑满宿主（同时定 left/right/top/bottom）')
-    assert.match(body, /width:\s*auto/u, '宽度交还给 inset 决定（不得钉在卡片宽）')
-    assert.match(body, /height:\s*auto/u, '高度改为 auto（撑满宿主）')
-    // ⚠️ 盒子变宽 ⇒ 遮罩百分比基准从「卡片宽 − 半径」变成「宿主宽 − 半径」，
-    //    两块瓦片会跑到宿主两角 ⇒ 必须补 (宿主宽 − 卡片宽)/2 那个偏移。
-    //    推导：遮罩按 (定位区宽 − 瓦片宽) 解析，要瓦片落在卡片左缘：
-    //      0.5·(A − R) + c − cardW/2 = (A − cardW)/2 ⇒ **c = R/2**（与 A 无关）。
-    //    实测：不补这个偏移时，卡片两端角弧各差 ~130 像素（且只有角弧差、中间全 0 —— 典型的 x 相位错）。
-    assert.ok(!/mask-position:\s*0 0,\s*100% 0/u.test(body),
-      '遮罩必须跟着盒子变宽而重算 —— 留 0 0 / 100% 0 会把瓦片放到宿主两角')
-    // 语义校验（不比对字面量，免得以后改排版就红）：两条 mask-position 都必须含 `50% + 半径/2`。
-    // ⚠️ 按**括号深度 0** 切分：分量里是 `min(var(..., 100%), 100% - 2 * var(..., 16px))`，
-    //    直接 split(',') 会把 2 个瓦片数成 4 个（本守卫初版就栽在这）。
-    const splitTop = (value) => {
-      const out = []
-      let depth = 0
-      let cur = ''
-      for (const ch of value) {
-        if (ch === '(') depth += 1
-        else if (ch === ')') depth -= 1
-        if (ch === ',' && depth === 0) { out.push(cur.trim()); cur = '' } else cur += ch
-      }
-      if (cur.trim()) out.push(cur.trim())
-      return out
+    // ⚠️ **本档只许覆盖 background-\* 四条**，盒子几何与遮罩全部继承基础档。
+    //    这是「用长度做相位」换来的：相位与元素宽高无关 ⇒ 不必为了相位改盒子
+    //    ⇒ 遮罩百分比基准不变、瓦片仍落在卡片两角 ⇒ **逐像素等价**。
+    //    曾经为凑百分比相位把盒子改成 inset:0（再补 R/2 偏移），结果瓦片跑到宿主两角、
+    //    卡片顶边 712 个像素与基础档不同（角弧抗锯齿重采样）。这条断言防它回来。
+    for (const prop of ['position', 'left', 'right', 'top', 'bottom', 'width', 'height', 'inset', 'mask-position', 'mask-size', 'mask-image', '-webkit-mask-position']) {
+      // ⚠️ 必须按**完整属性名**匹配（前后只能是声明边界的 `;`/`{`/空白/行首）——
+      //    否则 `background-position` 会被 `position` 这条误伤（本守卫初版就栽在这）。
+      assert.ok(!new RegExp(`(?:^|[;{\\s])${prop}\\s*:`, 'mu').test(body),
+        `本档不得重声明 ${prop}（盒子与遮罩须完全继承基础档，否则遮罩基准会漂）`)
     }
-    const maskPos = /(?:-webkit-)?mask-position:\s*([^;]+);/u.exec(body)?.[1] ?? ''
-    const tiles = splitTop(maskPos)
-    assert.equal(tiles.length, 2, `遮罩应恰好两个瓦片位置，实际 ${tiles.length}：${maskPos}`)
-    for (const t of tiles) {
-      assert.ok(t.includes('50%'), `每个瓦片都要以 50% 为基准（会随宿主宽变化），实际：${t}`)
-      assert.ok(t.includes(CARD_NOTCH_RADIUS), `瓦片偏移必须由半径常量导出（c = 半径/2），实际：${t}`)
-      assert.ok(t.includes(CARD_NOTCH_WIDTH), `瓦片间距必须由卡片宽常量导出，实际：${t}`)
-    }
-    // 成对性：座底带与缺口都在同一条守卫下
-    const seatPhase = rulesFor(css, `[${RIGHTBAR_COLLAPSED_ATTR}] [data-phase='active'] [data-composer-seat]::after`)
+    // 但 background-* 必须给足四条（否则 fixed 的开销原封不动）
+    assert.match(body, /background-size:\s*auto,/u, 'size 逐层')
+    assert.match(body, /background-repeat:\s*repeat,/u, 'repeat 逐层')
+    assert.match(body, /background-position:/u, 'position 必须有')
+    // 成对性：座底带与缺口**各自**的门都必须在（合成一道门会让一个载体不可用拖累另一个）
+    const seatPhase = rulesFor(css, `[${PHASE_BAND_ATTR}] [data-phase='active'] [data-composer-seat]::after`)
     assert.equal(seatPhase.length, 1, '座底带性能档也必须在（成对）')
+    // 缺口的门必须是**缺口那道**，不能借用座底的（借用会让两个载体用同一套几何）
+    assert.ok(!notchPhase[0].includes(`[${PHASE_BAND_ATTR}]`), '缺口不得用座底带的门')
   })
 
   it('拖拽条只裁上段（恢复官方几何），且**不得**动它的指针基准', () => {

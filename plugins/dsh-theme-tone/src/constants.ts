@@ -305,6 +305,94 @@ export const GRAIN_ALPHA: Readonly<Record<'light' | 'dark', number>> = Object.fr
 export const GRAIN_ALPHA_VARIABLE = '--dsh-theme-tone-grain-alpha'
 
 /**
+ * **视口相位的定位区原点**（由 client half 实测后写到 `body` 上）。
+ *
+ * 座底不透带与卡片缺口两条规则要用「显式视口相位」替代
+ * `background-attachment: fixed`（理由见 `docs/spec/10-fixed-attachment-cost.md`：
+ * `fixed` 每帧按视口栅格化，是滚动卡顿的主因）。
+ *
+ * ## 每个载体两个量：定位区左缘 / 上缘距视口
+ * | 变量 | 含义 |
+ * | :--- | :--- |
+ * | {@link PHASE_BAND_VARIABLE} / {@link PHASE_BAND_TOP_VARIABLE} | 座底带（座位自身）的左缘 / 上缘距视口 |
+ * | {@link PHASE_NOTCH_VARIABLE} / {@link PHASE_NOTCH_TOP_VARIABLE} | 卡片缺口（**卡片**，伪元素与它同宽同左）的左缘 / 上缘距视口 |
+ *
+ * 相位声明把它们当**长度**用（`calc(0px - var(…))`），把图片左上角钉回**视口左上角** ——
+ * 这正是 `fixed` 的语义，且与元素自身宽高**完全无关**。
+ * 于是 CSS 侧不必为了相位改任何盒子几何（盒子保持修复前的样子 ⇒ 视觉零变化），
+ * 也不再需要「元素下缘贴视口底」这类会随状态漂移的前提。
+ *
+ * ## 为什么必须运行期测
+ * 右栏折叠时纯 CSS 尚能推（`100vw − var(--dsh-conversation-column-width)`）；
+ * **右栏一开就推不出** —— 左栏偏移与右栏宽同时变，一个方程两个未知量
+ *（实测该载体左缘仍是 280、但右缘从 2873 变 1577）。
+ * 而官方把右栏宽只写成 `gridTemplateColumns` 内联样式、**没有发布成 CSS 变量**，
+ * 且面板宽写在面板自己的 inline style 上、**不继承**到座上 ⇒ 纯 CSS 读不到。
+ * 故改为测量：**测到就用快档，所有布局状态一视同仁**（不再有「右栏开着不生效」）。
+ *
+ * ## ⚠️ 测的必须是**载体自己**的原点
+ * `background-position` 的长度相对**元素自身**的定位区解析。缺口伪元素是**卡片宽**的
+ *（`left: calc(50% − 卡片宽/2)` + `width: 卡片宽`），而它的宿主（卡的父元素）是**全宽**的
+ * —— 两者差一个大内边距。拿宿主去算会偏 800 多像素（本轮真犯过）。故按**卡片**矩形取。
+ *
+ * ## 与属性的分工（都不可省）
+ * * **属性**（{@link PHASE_BAND_ATTR} / {@link PHASE_NOTCH_ATTR}）是**门**：
+ *   只在测到有效值时挂。没挂 = 该条相位档整条不命中 = 落回 `fixed` 档。
+ * * **变量**是**值**：门开着时它必有值（同一次写入），故 CSS 里不必带回退值
+ *   （带回退反而危险：变量缺失时 `background-position` 会退成 `0% 0%` = **错位**，不是降级）。
+ */
+export const PHASE_BAND_VARIABLE = '--dsh-theme-tone-phase-band'
+/** 座底带定位区上缘到视口上缘的距离。 */
+export const PHASE_BAND_TOP_VARIABLE = '--dsh-theme-tone-phase-band-top'
+/** 卡片缺口载体（卡片自身）左缘到视口左缘的距离。 */
+export const PHASE_NOTCH_VARIABLE = '--dsh-theme-tone-phase-notch'
+/** 卡片缺口载体（卡片自身）上缘到视口上缘的距离。 */
+export const PHASE_NOTCH_TOP_VARIABLE = '--dsh-theme-tone-phase-notch-top'
+
+/**
+ * 相位量的**收敛重测上限**（帧）。
+ *
+ * 相位量必须在布局**稳定后**取，而右栏开合是动画（改 `grid-template-columns` 内联样式，
+ * 既不触发 `window.resize` 也可能不落在 `ResizeObserver` 的最后一帧上）。
+ * 于是测量做成「连续两帧结果相同才停」的收敛循环 —— 本常量是它的**兜底上限**，
+ * 防止持续动画（如拖拽条被拖住不放）导致后台无限轮询。
+ *
+ * 取 120 帧（约 1 秒 @120Hz）：足够覆盖右栏开合的过渡时长，又不至于长期占帧。
+ */
+export const PHASE_SETTLE_FRAMES = 120
+
+/**
+ * **视口相位档的开关属性**（挂在 `document.body` 上）—— **每个载体一道门**。
+ *
+ * 座底不透带与卡片缺口是**两个不同的定位区**，几何各自独立：
+ * 可能一个测得到、另一个测不到（例如 hero 下没有会话座、卡片未渲染时没有缺口）。
+ * 故各给一道门：
+ *
+ * | 属性 | 管哪条规则 | 配套变量 |
+ * | :--- | :--- | :--- |
+ * | {@link PHASE_BAND_ATTR} | 座底不透带 | {@link PHASE_BAND_VARIABLE} / {@link PHASE_BAND_TOP_VARIABLE} |
+ * | {@link PHASE_NOTCH_ATTR} | 卡片缺口 | {@link PHASE_NOTCH_VARIABLE} / {@link PHASE_NOTCH_TOP_VARIABLE} |
+ *
+ * 挂了 → 该条规则改用 `scroll` + 显式相位（快）；没挂 → 该条落回
+ * `background-attachment: fixed`（慢、但任何布局状态都正确）。
+ *
+ * ⚠️ **合成一道门是不行的**：那会变成「一个载体暂不可用 ⇒ 另一个也被拖回慢档」。
+ * ⚠️ **为什么必须用属性当门，而不是「变量缺失即降级」**：相位档里的 `var()` 不带回退值，
+ * 变量缺失时 `background-position` 会在计算值阶段整条失效、退成 `0% 0%` ——
+ * 那是**错位**，不是降级。用属性当门则「没测到 ⇒ 整条不命中」，天然安全；
+ * 也与本插件既有的 `PLAIN_ATTR` / `WORKSTART_ATTR` / `GRAIN_ATTR` 同一套做法。
+ *
+ * ⚠️ **两门必须分开**：合成一道门时，只要有一个载体没测到就得整档放弃，
+ * 于是「缺口宿主暂时不在」会连带把**已经能测到的座底带**也拖回慢档。
+ *
+ * ⚠️ **不许退到 `documentElement`**：消费侧选择器写的是 `body[...]`，
+ * 挂错宿主会让门恒不命中（相位永不生效）。
+ */
+export const PHASE_BAND_ATTR = 'data-dsh-theme-tone-phase-band'
+/** 卡片缺口相位档的开关属性。 */
+export const PHASE_NOTCH_ATTR = 'data-dsh-theme-tone-phase-notch'
+
+/**
  * **悬停卡锚点**（`HoverCard`，左边栏会话 hover 那张 244px 预览卡）。
  *
  * 它从 {@link SURFACE_ANCHORS} 里单独摘出来，因为它要**破两条规矩**，两条都是 owner 明确定的口径：

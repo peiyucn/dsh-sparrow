@@ -35,7 +35,7 @@
  * 属性由 client 按 `backdropPlan(...).hidden` 打上 / 摘掉（见 constants.ts 的 `PLAIN_ATTR`）。
  */
 
-import { ABOVE_CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
+import { ABOVE_CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_BAND_VARIABLE, PHASE_NOTCH_ATTR, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, compensatedBackdropGradients, grainOverGradients } from './backdrop.js'
 
 /**
@@ -44,17 +44,6 @@ import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT,
  * 「76px with its rule: the height of the Sidebar's tab strip and header row」）。
  */
 export const HEADER_HEIGHT_PX = 76
-
-/**
- * 官方「右栏轨道不存在」时输出的属性（`AppFrame.tsx`：`data-rightbar-collapsed={cols.rightbar === 0 || undefined}`）。
- *
- * 它是本插件**相位写法的守卫**：座底那条不透带与卡片缺口改用「显式视口尺寸 + 相位对齐」
- * 之后，正确性依赖「载体右缘贴视口右缘」；右栏一开这个前提就不成立
- *（实测缺口 7px → 1303px，逐像素差 4.53 = 肉眼可见的错位）。
- * 故新写法**只在该属性存在时生效**，其余状态自动退回官方式的 `background-attachment: fixed`
- * —— 退回去只是慢，绝不会错位。依据与实测见 `docs/spec/10-fixed-attachment-cost.md`。
- */
-export const RIGHTBAR_COLLAPSED_ATTR = 'data-rightbar-collapsed'
 
 /**
  * 右栏顶部**两条 38px 带**里，上面那条（dockkit 条）的高度。
@@ -755,11 +744,12 @@ function pct(alpha: number): string {
  * 它的代价是**每帧按视口栅格化**：实测这是滚动卡顿的主因，且**与图片面积无关**
  *（声明尺寸缩到 1/225 也不省）。
  *
- * 故策略是「**默认保留 fixed + 在场时切性能档**」：
- * * {@link viewportPhasePaint} 给出等价的 `scroll` 相位（实测逐像素 0 差）；
- * * 只在 `data-rightbar-collapsed`（官方报告的「右栏轨道不存在」）下生效 ——
- *   相位要求「定位区右缘贴视口右缘」，而**右栏一打开就变成差 1303px**；
- * * 其余状态自动退回本函数的 `fixed` ⇒ **退回去只是慢，绝不会错位**。
+ * 故策略是「**默认保留 fixed + 测到几何时切性能档**」：
+ * * {@link bandPhasePaint} / {@link notchPhasePaint} 给出等价的 `scroll` 相位（实测逐像素 0 差）；
+ * * 由 client half 实测两个载体的定位区原点，写了变量并挂门才生效
+ *  （`src/phase.ts` + constants 的 `PHASE_BAND_ATTR` / `PHASE_NOTCH_ATTR`）；
+ * * 没测到（脚本未跑 / 元素不在 / 几何异常）就整档不命中，退回 `fixed`
+ *   ⇒ **退回去只是慢，绝不会错位**。
  *
  * 已切的两条 = 座底不透带 + 卡片缺口（实测 Paint −81% / 绘制次数 −56%）。
  * 完整实测与逐站点前提见 `docs/spec/10-fixed-attachment-cost.md`。
@@ -782,57 +772,66 @@ function backingPaint(): string {
 }
 
 /**
- * 官方 `.scrollBody` 的 `margin-right`（px）—— 相位公式里的第一个加数。
- * 出处：`ConversationRoot.module.css` 的 `.scrollBody { margin-right: 2px }`。
- */
-export const SCROLL_BODY_MARGIN_PX = 2
-
-/**
  * 「**用显式视口相位代替 `background-attachment: fixed`**」的逐层声明。
  *
  * ## 为什么要有它
  * `fixed` 让背景的定位区变成**视口**，于是每帧都要按视口栅格化 —— 实测这是
- * 滚动卡顿的**唯一**主因：把声明尺寸缩到 1/225 也不省（`fixed` 的成本与图片面积无关），
+ * 滚动卡顿**唯一**的主因：把声明尺寸缩到 1/225 也不省（成本与图片面积无关），
  * 而同样面积改成 `scroll` 立刻省 71%。详见 `docs/spec/10-fixed-attachment-cost.md`。
  *
- * ## 怎么替代（推导）
- * `fixed` 的语义 = **图片盒与视口重合**。改用 `scroll` 后必须显式复现该相位：
+ * ## 怎么写（关键：**两个方向都用长度**）
+ * `fixed` 的语义 = **图片盒与视口重合**。改用 `scroll` 后要复现它，
+ * 最稳的写法是把偏移写成「该载体定位区原点在视口里的坐标取负」：
  *
- * | 层 | 目标 | 写法 |
+ * | 层 | x | y |
  * | :--- | :--- | :--- |
- * | 颗粒（200×200 repeat） | 网格原点 ≡ 视口原点（模一个周期） | x `calc(0px - 100vw + 列宽)`，y `calc(100% - 100vh)` |
- * | 三渐变（`100vw 100vh`） | 图片盒 == 视口 | x `calc(100% + inset)`，y `100%` |
+ * | 颗粒（200×200 repeat） | `calc(0px - L)` | `calc(0px - T)` |
+ * | 三渐变（`100vw 100vh`） | `calc(0px - L)` | `calc(0px - T)` |
  *
- * 两条都可**纯 CSS**表达（不写死数字），且**与元素自身宽度/高度无关**：
+ * `background-position` 是「图片左上角相对**定位区**左上角的偏移」，
+ * 取 `−L` / `−T` 就把图片左上角钉回**视口左上角** ⇒ 图片盒与视口重合，正是 `fixed` 的语义。
  *
- * * **x** —— 渐变的百分比按 `(定位区宽 − 图片宽)` 解析；定位区右缘 = 视口右缘 − inset
- *   ⇒ 图片左缘落在 `−inset`，补 `+inset` 后正好 `0`。颗粒那层用**长度**，直接把网格原点
- *   推回视口原点（`−leftGap`）。
- *   ⚠️ 锚的是**定位区**（伪元素绝对定位时 = 宿主的 padding 盒），**与元素盒无关** ——
- *   所以两条规则可以共用一个配方，不必为「居中」另加偏移（本轮曾按元素盒推导，错，实测偏出 1208 像素）。
- * * **y** —— 渐变图片高 = 视口高 ⇒ 贴底（`100%`）即与视口底对齐；
- *   颗粒是 200 的重复网格，取 `calc(100% − 100vh)` ⇒ 原点正好差**一个周期**（`−200`），等价且与高度无关。
+ * ⚠️ **为什么两个方向都必须是长度、不许用百分比**：百分比按「(定位区尺寸 − 图片尺寸)」
+ * 解析，于是**依赖元素自身宽高**；那么同一个配方在不同盒子上会给出不同相位，
+ * 而「元素下缘是否贴视口底」这类前提还会随布局状态漂移（本轮为此返工多次）。
+ * 用长度则与元素几何**完全无关** —— 这也是「不必为了相位去改盒子」的原因。
  *
- * 前提：**P1** 定位区右缘 = 视口右缘 − `inset`；**P2** 定位区**下缘** = 视口下缘。
- * 两条规则的载体都满足 P2（座是 `sticky bottom: 0`；缺口那条把盒子撑到宿主底）。
- *
- * ⚠️ **P1 在「右栏打开」时不成立**（实测差 1303px）⇒ 调用方必须用
- * {@link RIGHTBAR_COLLAPSED_ATTR} 守住，让那些状态退回 `fixed`（退回去只是慢，不会错位）。
- *
- * ⚠️ **两种层的 y 不一样**，别统一：渐变是 `100%`，写成 `calc(100% − 100vh)` 会多减一个
- * 图片高、把整块推到视口外（这是本轮真发生过的错，逐像素差 2.65 / 31% 像素超 2 级）。
+ * ⚠️ **两个载体各测各的**：`L`/`T` 是**伪元素自己**的定位区原点（背景定位区按**元素自身**
+ * 解析），不是宿主的。缺口伪元素是卡片宽的、宿主是全宽的，两者差一个大内边距 ——
+ * 拿宿主去算会偏 800 多像素（本轮真犯过）。
+ * @param vars - 该载体的「左缘距视口左缘」「上缘距视口上缘」两个 CSS 变量名。
  * @returns 可直接嵌进规则体的声明串（含结尾分号）。
+ *
+ * ⚠️ **本函数只许挂在该载体的门属性下**：它写的 `var()` 不带回退值，
+ * 变量缺失时 `background-position` 会在计算值阶段失效、退成 `0% 0%` ——
+ * 那是**错位**而不是降级。门负责保证「只有测到有效几何时才命中本档」。
  */
-export function viewportPhasePaint(): string {
-  const inset = `calc(${SCROLL_BODY_MARGIN_PX}px + var(--dsh-scrollbar-width, 5px))`
-  const leftGap = `calc(100vw - var(--dsh-conversation-column-width, 100vw))`
+function viewportPhaseDecls(vars: { readonly left: string; readonly top: string }): string {
+  const L = `var(${vars.left})`
+  const T = `var(${vars.top})`
   return `background-attachment: scroll;
   background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;
   background-repeat: repeat, no-repeat, no-repeat, no-repeat;
-  background-position: calc(0px - ${leftGap}) calc(100% - 100vh),
-    calc(100% + ${inset}) 100%,
-    calc(100% + ${inset}) 100%,
-    calc(100% + ${inset}) 100%;`
+  background-position: calc(0px - ${L}) calc(0px - ${T}),
+    calc(0px - ${L}) calc(0px - ${T}),
+    calc(0px - ${L}) calc(0px - ${T}),
+    calc(0px - ${L}) calc(0px - ${T});`
+}
+
+/**
+ * 座底不透带的相位声明（定位区 = 座位自身）。
+ * @returns 可直接嵌进规则体的声明串。
+ */
+export function bandPhasePaint(): string {
+  return viewportPhaseDecls({ left: PHASE_BAND_VARIABLE, top: PHASE_BAND_TOP_VARIABLE })
+}
+
+/**
+ * 卡片缺口的相位声明（定位区 = **卡片宽的伪元素自身**，与宿主不是同一个盒子）。
+ * @returns 可直接嵌进规则体的声明串。
+ */
+export function notchPhasePaint(): string {
+  return viewportPhaseDecls({ left: PHASE_NOTCH_VARIABLE, top: PHASE_NOTCH_TOP_VARIABLE })
 }
 
 /**
@@ -1054,21 +1053,22 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat]::after {
 }
 
 /* --- 上一条的**性能档**：同一份漆，但用显式视口相位，不吃 background-attachment: fixed ---
-   owner 报「模型 think 时插件主题下滚动明显变卡、官方深浅主题不卡」。实测（2880×1800 @120Hz）：
-   滚动 60 帧的 Paint 分项 **345ms → 55ms**，帧间隔中位 **17.8ms → 11.3ms**；
-   而成本**与图片面积无关**（把固定背景的声明尺寸缩到 1/225 也不省），
-   全在这一条 fixed 声明上 —— 详见 docs/spec/10-fixed-attachment-cost.md。
+   owner 报「模型 think 时插件主题下滚动明显变卡、官方深浅主题不卡」。实测：
+   滚动 60 帧的绘制次数 **417~429 → 183~186（-56%）**，Paint 分项 **140~195 → 25~31 ms**；
+   而成本**与图片面积无关**（把固定背景的声明尺寸缩到 1/225 也不省）。
+   详见 docs/spec/10-fixed-attachment-cost.md。
 
-   ⚠️ **守卫不是可选项**：相位要求「座右缘贴视口右缘」，而**右栏一打开**就变成差 1303px
-   （实测逐像素差 4.53 = 肉眼可见）。官方在右栏轨道不存在时输出 data-rightbar-collapsed，
-   实测它就是那条分界线 ⇒ 只在该属性下用相位档，其余状态继续吃上面那条 fixed 档
-   （退回去只是慢，绝不会错位）。
+   ⚠️ **门必须由运行期几何决定**（data-dsh-theme-tone-phase-band，见 constants 的 PHASE_BAND_ATTR）：
+   相位要「该载体定位区原点在视口里的坐标」，而**纯 CSS 推不出右栏打开时的值**
+   （左栏偏移与右栏宽同时变，一个方程两个未知量；实测左缘 280 不变、右缘 2873 → 1577）。
+   故由 client half 实测后写变量 + 挂门；**门没挂 = 本档整条不命中 = 落回上面那条 fixed 档**
+   （慢、但任何布局状态都正确）—— 所以「右栏开着」不再是例外，测到就生效。
 
    ⚠️ 两条规则的**层序必须与上面完全一致**（颗粒在最上、三段光其次、底色在下），
    否则同一像素会算出两种颜色 —— 相位对齐了也没用。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
-body:not([${PLAIN_ATTR}]) [${RIGHTBAR_COLLAPSED_ATTR}] [data-phase='active'] [data-composer-seat]::after {
-  ${viewportPhasePaint()}
+body:not([${PLAIN_ATTR}])[${PHASE_BAND_ATTR}] [data-phase='active'] [data-composer-seat]::after {
+  ${bandPhasePaint()}
 }
 
 /* --- 输入框卡片：用户盯着的那个面（数据锚点来自 InputBar.tsx:429 的 data-composer-card） ---
@@ -1904,49 +1904,36 @@ function buildCardNotchCss(): string {
    */
   const host = `${gate} :has(> [data-composer-card])`
   /**
-   * 缺口补丁的**性能档**选择器：在门上再加「右栏轨道不存在」。
+   * 缺口补丁的**性能档**选择器：在门上再加「运行期相位已就绪」。
    *
    * ⚠️ 比下面那条**多一个属性选择器** ⇒ 特异度更高，两处声明同时命中时**恒以本档为准**
-   *（不受书写次序影响）；右栏打开时本条不命中，自动退回下面那条 `fixed` 档。
+   *（不受书写次序影响）；几何没测到时本条不命中，自动退回下面那条 `fixed` 档。
    * ⚠️ 必须**写在基础档之前**：缝表那边的守卫用「最后一条 `:has(...)::after`」取补丁本体
    *（见 test/glass.test.mjs 的 lastRuleWith），本档写在后面会把那条守卫指到错规则上。
    */
-  const phaseHost = `body:not([${PLAIN_ATTR}]) [${RIGHTBAR_COLLAPSED_ATTR}] [data-phase='active'] [data-composer-seat] :has(> [data-composer-card])`
+  const phaseHost = `body:not([${PLAIN_ATTR}])[${PHASE_NOTCH_ATTR}] [data-phase='active'] [data-composer-seat] :has(> [data-composer-card])`
   return `/* ===== 输入框卡上圆角缺口（卡片圆角弧外的三角露正文；详见 buildCardNotchCss 注释）===== */
 ${host} {
   /* 只补包含块，不改布局（无偏移、无 z-index）：父元素官方是 static，
      绝对定位伪元素需要它当包含块。这条与缝挡板那条同型，不新增副作用。 */
   position: relative;
 }
-/* --- 上一条的**性能档**：同一份漆与**一字不改的遮罩**，只把 fixed 换成显式视口相位 ---
-   ⚠️ 与非性能档的差别只有两处，都不可省：
-   ① 盒子撑到宿主底（top:0 / bottom:0 / height:auto）—— 相位里的 100% 指**元素自身高度**，
-      只有下缘贴视口底时它才能把「元素顶到视口顶的距离」抵消掉；保持 28px 高会差 100px。
-   ② 背景逐层给值（{@link viewportPhasePaint}）。
-   遮罩**一个字都不改** ⇒ 两块瓦片仍落在元素顶部的左右两角 = 卡片两角，补的仍是圆角外那块三角。
+/* --- 上一条的**性能档**：同一份漆、**同一个盒子、一字不改的遮罩**，只把 fixed 换成显式视口相位 ---
+   ⚠️ 这里**只覆盖 background-* 四条**，盒子几何与遮罩全部继承下面那条基础档。
+   这是「用长度做相位」换来的好处：相位与元素宽高无关 ⇒ 不必为了相位改盒子
+   ⇒ 遮罩的百分比基准不变、瓦片仍落在卡片两角，**逐像素等价**。
 
-   ⚠️ 必须用 data-rightbar-collapsed 守卫：相位要求「定位区右缘贴视口右缘」，
-   右栏一打开就变成差 1303px（实测逐像素差 4.53 = 肉眼可见）。
+   曾经为了凑百分比相位而把盒子改成 inset:0 撑满宿主（再补 R/2 的遮罩偏移）——
+   那会让瓦片跑到宿主两角，实测卡片顶边 712 个像素与基础档不同（角弧抗锯齿重采样）。
+   用长度就不需要任何这类补偿。
+
+   ⚠️ 门是 data-dsh-theme-tone-phase-notch（运行期几何就绪），**不是**「右栏折叠」——
+   实测右栏开时相位原料照样测得到，故所有布局状态共用本档。
    ⚠️ 本档与座底那条**必须同进同退**：实测只改一条各只省 ~15~17%，两条一起改省 54%
-   （paintN 435 → 201）—— 滚动容器里只要还留着一条 fixed，那笔按视口栅格化的开销就仍要付。
+   —— 滚动容器里只要还留着一条 fixed，那笔按视口栅格化的开销就仍要付。
    （本段在模板字符串里，注释中**不能出现反引号**。） */
 ${phaseHost}::after {
-  /* 撑满宿主的**定位区**（inset 同时定 left/right/top/bottom）。
-     ⚠️ 只写 left/width 会把盒宽钉在卡片宽，而相位公式要的是「定位区右缘 = 视口右缘 − inset」
-     —— 那正是本档成立的前提（P1）。撑满后定位区 = 宿主内边距盒，实测 2593 = 列宽 − inset。 */
-  inset: 0;
-  width: auto;
-  height: auto;
-  ${viewportPhasePaint()}
-  /* ⚠️ 盒子变宽 ⇒ **遮罩百分比基准**跟着从「卡片宽 − 半径」变成「宿主宽 − 半径」，
-     两块瓦片会跑到宿主两角。补回 (宿主宽 − 卡片宽)/2 那个偏移。
-     推导：遮罩百分比按 (定位区宽 − 瓦片宽) 解析，要求瓦片落在「卡片左缘」：
-       0.5·(A − R) + c − cardW/2 = (A − cardW)/2  ⇒  **c = R/2**
-     （与 A 无关 ⇒ 视口/列宽/卡片宽变化都不用改）。右瓦片同理整体相差 cardW − R。 */
-  -webkit-mask-position: calc(50% + ${CARD_NOTCH_RADIUS} / 2 - ${CARD_NOTCH_WIDTH} / 2) 0,
-    calc(50% + ${CARD_NOTCH_RADIUS} / 2 + ${CARD_NOTCH_WIDTH} / 2 - ${CARD_NOTCH_RADIUS}) 0;
-  mask-position: calc(50% + ${CARD_NOTCH_RADIUS} / 2 - ${CARD_NOTCH_WIDTH} / 2) 0,
-    calc(50% + ${CARD_NOTCH_RADIUS} / 2 + ${CARD_NOTCH_WIDTH} / 2 - ${CARD_NOTCH_RADIUS}) 0;
+  ${notchPhasePaint()}
 }
 ${host}::after {
   content: '';
