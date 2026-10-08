@@ -4,17 +4,8 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## 0.2.0-rc.2 (2026-10-08)
 
-- Version-line alignment with official dsh 0.2.0-rc.2.
-- The archive panel now uses DSH's own loading animation.
-- The archive panel now shows a loading icon only; the "Loading…" text is gone.
-- Fixed archived sessions showing the session id instead of their name.
-- The Archive and Trash section headers no longer highlight on hover.
-- The archive panel opens faster: it scans for sessions when you first open it, not at DSH startup.
-- The Archive entry moved to the top of the sidebar, beside Plugins and Automations, and opens as a page instead of a dialog.
-- The archive page no longer dims or blocks the interface; return to a conversation from the sidebar or with New Session.
-- Fixed the archive page's text looking larger than elsewhere; sizes now match the other lists.
-- Moved the "dsh-sparrow" brand line to the bottom-left of the page and removed the divider above it.
-- Fixed subagent rows in the archive area and the trash sometimes showing the parent session's text instead of the subagent's own label.
+- Now adapted to official dsh 0.2.0-rc.2 (web and desktop).
+- The Archive entry moved to the top of the sidebar, beside Plugins and Automations, and now opens as a page instead of a dialog.
 
 ## 0.1.5-rc.2.4 (2026-09-21)
 

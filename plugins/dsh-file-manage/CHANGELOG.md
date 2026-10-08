@@ -4,16 +4,8 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## 0.2.0-rc.2 (2026-10-08)
 
-- Version-line alignment with official dsh 0.2.0-rc.2.
-- The loading indicator now matches the one dsh uses in 0.2.0.
-- The loading state now shows only the indicator; the "Loading…" text is gone.
-- Opening the panel no longer briefly shows the previous list before loading.
-- Fixed the cloud file list failing to load.
-- Fixed file operations failing after upgrading dsh.
-- The Cloud Files entry now sits at the top of the sidebar with Plugins and Automations, and opens as a page in the main area instead of a pop-up dialog.
-- The cloud files page no longer dims the rest of the interface; use the sidebar or New Session to get back to a conversation.
-- Fixed the text on the cloud files page being larger than elsewhere.
-- Moved the "dsh-sparrow" brand line to the bottom-left of the page and removed the divider above it.
+- Now adapted to official dsh 0.2.0-rc.2 (web and desktop).
+- The Cloud Files entry moved to the top of the sidebar, beside Plugins and Automations, and now opens as a page in the main area instead of a dialog.
 
 ## 0.1.5-rc.2.1 (2026-09-11)
 

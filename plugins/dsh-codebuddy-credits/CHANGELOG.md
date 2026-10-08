@@ -5,17 +5,8 @@ See [简体中文](./CHANGELOG.zh-CN.md).
 
 ## 0.2.0-rc.2 (2026-10-08)
 
-- Version-line alignment with official dsh 0.2.0-rc.2.
-- The session credits tag under the composer now matches the tags beside it.
-- Loading now shows a loading indicator instead of the "Loading…" text.
-- Fixed the plugin not working after the dsh 0.1.7 upgrade.
-- Fixed credits resetting after a restart.
-- Fixed the CodeBuddy entry overlapping the top-right button on the new-session page.
-- Fixed the wrong background and hover colour on grouped model-picker titles.
+- Now adapted to official dsh 0.2.0-rc.2 (web and desktop).
 - The CodeBuddy entry shrinks to an icon-only logo on narrow layouts.
-- Fixed the credits panel briefly appearing in the wrong place.
-- The new-session page entry now shrinks to the icon-only logo too.
-- Fixed the CodeBuddy logo in the credits panel being nearly invisible in light mode: its square brand-coloured tile was not drawn, leaving only the white mark.
 
 ## 0.1.5-rc.2.2 (2026-09-21)
 
