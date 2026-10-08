@@ -3,7 +3,7 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
-## 0.2.0-rc.2 (2026-09-30)
+## 0.2.0-rc.2 (2026-10-08)
 
 - Version-line alignment with official dsh 0.2.0-rc.2.
 - The session credits tag under the composer now matches the tags beside it.

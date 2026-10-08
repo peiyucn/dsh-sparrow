@@ -2,7 +2,7 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.2.0-rc.2 (2026-09-30)
+## 0.2.0-rc.2 (2026-10-08)
 
 - Version-line alignment with official dsh 0.2.0-rc.2; no user-perceivable change.
 - Fixed the suggestion switch and candidate menu disappearing.
