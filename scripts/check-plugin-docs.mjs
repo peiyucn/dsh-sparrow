@@ -1,56 +1,9 @@
 #!/usr/bin/env node
 /**
- * 守卫：**文档与代码 / 文档与文档之间那几件"靠人记得"的事。**
- *
- * ## 为什么需要它
- *
- * 这个仓库有大量**成对或成组**的文档，改一处、忘一处**完全没有症状** ——
- * 页面照常显示、测试照常全绿，直到有人肉眼看出来：
- *
- * 1. **中英双份**（每个插件的 README / CHANGELOG，根 README）：两份文件，
- *    改一份不会提醒另一份；
- * 2. **多处点名同一件事**（`README` 插件表 / `AGENTS` 插件清单 / `SECURITY` 支持表 /
- *    `package.json` files 清单）：同一份事实写在 N 个地方；
- * 3. **CHANGELOG 与 `package.json` 版本**：定版编辑时两边都要改。
- *
- * ### 实际事故（2026-10-03 审计）
- *
- * `dsh-nav-pin` 退役后，它在**三处**文档里仍被当作活跃插件挂着，两处还带安装命令：
- *
- * * `README.md` 表（英文）—— 改了；
- * * `README.zh-CN.md` 表（中文）—— **改英文时漏了**，隔一轮被 owner 看出来；
- * * `SECURITY.md` 支持表 —— 只提了 `dsh-vision-bridge` 退役。
- *
- * 另有多处**过期计数**（「唯一 / 三条」实为四条）、**过期陈述**（状态仍写「待评审」）、
- * **跑偏的锚点**（引用了已被删除的死锚点）—— 同类病，只是不都由本守卫覆盖。
- *
- * ## 判据
- *
- * | # | 判据 | 为什么 |
- * | :--- | :--- | :--- |
- * | 1 | 根 README 中英双份的插件表 = 活跃集合（不多不少） | 退役的不得列在可安装表里 |
- * | 2 | 根 README 中英双份的《Retired / 已退役》小节点名全部退役插件 | 退役了要能查得着 |
- * | 3 | `SECURITY.md` 支持表只列活跃插件 | 退役的不再提供支持 |
- * | 4 | `AGENTS.md` 点名全部活跃 + 退役插件，且「口径」行数字与实际一致 | AGENTS 是 agent 的入口地图 |
- * | 5 | 每个活跃插件 README / CHANGELOG 中英双份：有 H1、顶部有互链、`##` 数一致、条目数一致 | 双份最容易漏一份 |
- * | 6 | `package.json` 的 version 在该插件两份 CHANGELOG 里都有版本段；中英版本段序列一致、每段条目数一致 | 定版编辑漏一处即幻影版本 |
- * | 7 | `package.json` 的 `files` 里点名的 `.md` 都存在 | 打包清单指向不存在的文件 |
- * | 8 | README 里指向 `plugins/…` 的相对链接都存在 | 改了文件名忘改链接 |
- *
- * ## ⚠️ 只比**结构与集合**，不比**内容**
- *
- * 判据 5/6 数的是「`##` 个数、条目个数、版本号序列」——
- * **不比对文案、不比对措辞、不比对徽章、不比对顺序之外的任何东西**。
- * 改一句描述绝不该触发红灯；而"漏翻一条""漏加一段版本"必须触发。
- *
- * **条目**的口径 = 无序（`- ` / `* `）与有序（`1. ` / `1) `），**缩进子条目也算**
- * （详见 `ITEM_RE`）。这两处加固都是补**已实测的可静默绕过**：
- *
- * * 行首锚定 ⇒ 一条「只在 EN 侧加的缩进子条目」计数守恒、静默放行；
- * * 注释里的行照算 ⇒ 把一条真条目在**中英两侧同时**注释掉，计数守恒、静默放行。
- *
- * 围栏代码块与 **HTML 注释**（含跨行块）内的行**不计入**（详见 `unfenced`）。
- *
+ * 守卫：**文档与代码 / 文档与文档之间那几件"靠人记得"的事** —— 本仓库有成对（中英双份）与成组
+ * （README 插件表 / AGENTS 插件清单 / SECURITY 支持表 / package.json files）的文档，改一处忘一处没有任何症状。
+ * 判据 1-8 见下方各段落标题与 `fail()` 文案。⚠️ **只比结构与集合，不比文案** —— 改措辞不该红灯，
+ * 漏译一条 / 漏加一段版本必须红灯（条目口径与结构剥离见 `ITEM_RE`、`unfenced`）。
  * 退出码：0 = 一致；1 = 有漂移（逐条打印文件 + 具体差在哪）。
  */
 import { existsSync, readFileSync } from 'node:fs'
@@ -71,28 +24,11 @@ const read = (rel) => {
   }
 }
 
-/** 剥掉围栏代码块（里面的行不算结构）。 */
-const unquoteFences = (text) => {
-  const out = []
-  let inFence = false
-  for (const line of text.split(/\r?\n/u)) {
-    if (/^\s*```/u.test(line)) { inFence = !inFence; continue }
-    if (!inFence) out.push(line)
-  }
-  return out
-}
-
 /**
- * 剥掉 HTML 注释（`<!-- … -->`，含跨行块），并剥掉围栏代码块。
- *
- * 注释里的行**不是文档结构** —— 反过来用就会变成「把真条目注释掉、计数却照样算」：
- * 中英两侧同时注释掉一条真条目，条目数守恒 ⇒ 判据 5 **静默放行**（实测）。
- * 故结构统计一律走这里。
- *
- * 实现是逐行状态机，不是把全文 `replace(/<!--[\s\S]*?-->/g, '')`：
- * 后者会把被剥掉的部分整体删掉，**行号会跟着塌**（本脚本多处按行索引），
- * 而且注释块前后的内容会被粘到同一行上（例如 `a<!--x-->b` → `ab`，
- * 凭空造出一个原本不存在的行首条目）。逐行替换成空串则保持行不变。
+ * 剥掉 HTML 注释（`<!-- … -->`，含跨行块）与围栏代码块 —— 结构统计一律走这里：注释里的行不是文档结构，
+ * 照算会让「中英两侧同时注释掉一条真条目」计数守恒、判据 5 静默放行。
+ * ⚠️ 必须是逐行状态机，不能用全文 `replace(/<!--[\s\S]*?-->/g, '')`：那样行号会塌（本脚本多处按行索引），
+ * 且注释块前后的内容会被粘成一行、凭空造出一个原本不存在的行首条目。
  */
 const unfenced = (text) => {
   const out = []
@@ -113,7 +49,7 @@ const unfenced = (text) => {
       }
       const start = rest.indexOf('<!--')
       if (start < 0) { stripped += rest; rest = ''; break }
-      stripped += rest.slice(0, start)            // 注释前的正文保留（保持行号与列位）
+      stripped += rest.slice(0, start)            // 注释前正文保留，行号与列位不变
       inComment = true
       rest = rest.slice(start + 4)
     }
@@ -123,21 +59,8 @@ const unfenced = (text) => {
 }
 
 /**
- * **条目行**：无序（`- ` / `* `）与有序（`1. ` / `1) `），**缩进子条目也算**。
- *
- * 口径演进（都有实测依据）：
- * * 原先只认 `^[-*]\s+\S`（行首、无序）—— **缩进子条目完全不计**。后果：只在英文侧
- *   加一条缩进子条目、中文侧漏译，顶层计数守恒 ⇒ 判据 5 **静默放行**（实测）。
- *   退役的 `dsh-nav-pin/README` 中英「全部条目 11 vs 10」正是这么漏出来的。
- * * 有序列表一并纳入：它同样是"一条用户可见的条目"，漏译一条照样是漏译。
- *   （Markdown 里 `1. ` 起行渲染出来就是列表项，不是普通段落。）
- *
- * ⚠️ 现存 11 对文档在**本口径**下中英仍然全部相等（逐对实测：5 活跃插件 ×
- * README/CHANGELOG + 根 README），故这是"只堵未来"的加固。唯一变化是
- * `dsh-codebuddy-credits` README 的**绝对**条数 14 → 16（把两条编号安装步骤也数进来），
- * 中英同步变化、**不产生红灯**。
- * 退役插件 `dsh-nav-pin/README` 在本口径下中英不等（11 vs 10），但它不在判据 5 的
- * 检查范围内（只查活跃插件），故不触发。
+ * **条目行**：无序（`- ` / `* `）与有序（`1. ` / `1) `），**缩进子条目也算** —— 行首锚定会让
+ * 「只在单侧加的缩进子条目」计数守恒、判据 5 静默放行；有序列表同样是"一条用户可见的条目"。
  */
 const ITEM_RE = /^\s*(?:[-*]|\d+[.)])\s+\S/u
 
@@ -148,14 +71,10 @@ const h2s = (text) => unfenced(text)
   .filter(line => /^##\s+\S/u.test(line))
   .map(line => line.replace(/^##\s+/u, '').trim())
 
-/** 条目数（无序 + 有序，**含缩进子条目**；口径见 `ITEM_RE`）。 */
+/** 条目数（口径见 `ITEM_RE`）。 */
 const topItems = (text) => countOf(unfenced(text), ITEM_RE)
 
-/**
- * 解析 CHANGELOG 的版本段：版本号 + 该段条目数。
- * @param text - CHANGELOG 全文。
- * @returns `[{ version, items }]`，按出现顺序。
- */
+/** 解析 CHANGELOG 的版本段：`[{ version, items }]`，按出现顺序。 */
 function versionSections(text) {
   const out = []
   let current = null
@@ -251,7 +170,7 @@ for (const { file, header, retired: retiredHeading } of ROOT_READMES) {
   const security = read('SECURITY.md')
   if (security === null) fail('判据 3：读不到 SECURITY.md')
   else {
-    // ⚠️ 只看**表格行**：退役说明写在表下引用块里（那里必须点名它们，才说得清谁退役了）。
+    // 只看**表格行**：退役说明写在表下引用块里（那里必须点名它们，才说得清谁退役了）。
     const tableLines = security.split(/\r?\n/u).filter(line => line.trim().startsWith('|')).join('\n')
     for (const name of retired) {
       if (tableLines.includes(name)) {
