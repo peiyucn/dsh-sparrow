@@ -8,7 +8,9 @@
 * 客户端不传模型档位（2026-09-10 起 `pro`/`flash` 两档退役——客户端恒发 auto 早已不可达）→ host `resolveSuggestModel` 按会话事件现读主路由：主模型为 deepseek-official 的 `deepseek-flash`（V4.1 Flash，2026-09-10 加入——V4 Pro 将于 2026-09-14 下线并路由到它）/v4-pro/v4-flash 时跟随；vision-exp / 未知 / 非官方回退配置默认 `model`（`deepseek-flash`）；
 * 切换主模型后下一次联想请求立即生效（每次请求现读，无缓存）；客户端不提供模型选择 UI；
 * 建议菜单右下角仍展示实际模型与温度（跟随结果实时可见）。
-* **待办（V4 Pro 下线后）**：2026-09-14 12:00 后复测 `deepseek-v4-pro` 是否仍可作 FIM 模型 id；若不可用，应把它从 `SUGGEST_MODEL_IDS` 移除——否则主模型仍是 v4-pro 的会话会走跟随分支、拿到上游错误而不是回退到新默认。
+* ~~**待办（V4 Pro 下线后）**：2026-09-14 12:00 后复测 `deepseek-v4-pro` 是否仍可作 FIM 模型 id；若不可用，应把它从 `SUGGEST_MODEL_IDS` 移除。~~
+  **2026-10-08 结清：前提不成立** —— 官方此后改了策略、**并没有下线 v4-pro**（0.2.0-rc.2 的默认模型目录 `llm-deepseek/src/models.ts` 仍列着它）；
+  且联想的语义就是「跟随用户在界面上选的模型」，**能选到即能用**。⇒ `SUGGEST_MODEL_IDS` 保持不动。
 
 ## 灵敏度三档（高 / 中 / 低）
 
