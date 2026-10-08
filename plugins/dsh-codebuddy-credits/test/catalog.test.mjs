@@ -133,7 +133,7 @@ describe('parseModelConfig', () => {
     }
     const models = parseModelConfig(body)
     assert.equal(models.length, 3)
-    // 视觉：supportsImages=true 即视为支持图片输入（deepseek-v4-pro/flash 实测如此）
+    // supportsImages=true 即视为图片输入
     assert.deepEqual(models[0], {
       id: 'deepseek-v4-pro',
       name: 'Deepseek-V4-Pro',
@@ -145,7 +145,6 @@ describe('parseModelConfig', () => {
       reasoningEfforts: { high: 'high' },
       defaultEffort: 'high',
     })
-    // 原生多模态
     assert.deepEqual(models[1], {
       id: 'glm-5.3-flash',
       name: 'GLM-5.3-Flash',
@@ -157,7 +156,7 @@ describe('parseModelConfig', () => {
       reasoningEfforts: { off: null, low: 'low', high: 'high', max: 'max' },
       defaultEffort: 'high',
     })
-    // 视觉 + 不可关思考（无描述字段 → 不携带）
+    // 无 description 字段 → 不携带该键
     assert.deepEqual(models[2], {
       id: 'hy4-preview',
       name: 'Hy4 preview',

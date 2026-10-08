@@ -3,13 +3,9 @@ import { describe, it } from 'node:test'
 import { isLoopbackHostname, isTrustedPluginRequest, officialTrustedHosts } from '../lib/trust.js'
 
 /**
- * 浏览器信任栅栏（官方 /api 栅栏同口径：`packages/client/connection/src/api-request-trust.ts`
- * 的 `isTrustedApiRequest` + `loopback-hostname.ts` 的 `isLoopbackHostname`）。
- *
- * 起因（实测）：官方栅栏注册在 `/api` **前缀**路由上，而 webServer 的路由匹配是
- * 「精确表优先、前缀最长者胜」（`packages/host/webserver/src/index.ts` 的 `match()`）
- * ——本插件的 `/api/codebuddy-credits` 比 `/api` 长，请求命中本路由后不再经过官方检查。
- * 实测 `GET /api/codebuddy-credits/status` 无栅栏时 200、官方 `/api/sessions` 401。
+ * 浏览器信任栅栏：与官方 /api 栅栏同口径（`isTrustedApiRequest` + `isLoopbackHostname`）。
+ * 本插件路由 `/api/codebuddy-credits` 比官方 `/api` 长，webServer 的 `match()` 取最长前缀命中本路由，
+ * 请求不再经官方栅栏检查，故须自建。
  */
 
 describe('isLoopbackHostname 回环判定（官方 loopback-hostname.ts 同口径）', () => {
@@ -50,8 +46,7 @@ describe('isTrustedPluginRequest 浏览器信任栅栏', () => {
   })
 
   it('⛔ DNS rebinding：Host 与 Origin 同是攻击者域名 应该 拒绝', () => {
-    // 这条是「只比 Origin 与 Host 是否同源」的朴素写法会**错误放行**的用例：
-    // rebinding 页面里 host 与 origin 都是攻击者域名、彼此同源，但 Host 不是我们的。
+    // 只比 Origin 与 Host 同源的朴素写法会放行这里：两者都是攻击者域名，但 Host 不是我们的。
     assert.equal(isTrustedPluginRequest({ host: 'evil.example:3080', origin: 'http://evil.example:3080' }), false)
     assert.equal(isTrustedPluginRequest({ host: 'evil.example:3080' }), false)
   })
@@ -155,11 +150,8 @@ describe('isTrustedPluginRequest 的官方信任面（webRuntime.trustedHosts）
 })
 
 /**
- * 官方信任面读取：复用官方 `webRuntime.trustedHosts` 而不是自造第二份白名单。
- *
- * 官方 `@deepseek-ai/dsh-web-app` 的 `resolveLanTrust` + `apply` 在 webServer 绑定后
- * 采样一次 LAN 地址、`ctx.provide('webRuntime', ...)` 提供出来；那份 `trustedHosts`
- * 就是喂给官方 `/api` 栅栏的**同一份值**。本插件逐字复用，服务缺失时保守回退为空。
+ * `officialTrustedHosts`：逐字复用官方 `webRuntime.trustedHosts`（喂给官方 /api 栅栏的同一份值），
+ * 而非自造第二份白名单；服务缺失时保守回退为空数组（只信回环）。
  */
 describe('officialTrustedHosts 官方信任面读取（缺服务时保守回退）', () => {
   it('服务在场 应该 逐字采纳官方取值', () => {
@@ -197,7 +189,7 @@ describe('officialTrustedHosts 官方信任面读取（缺服务时保守回退�
     const ctx = { get: () => ({ trustedHosts: ['192.168.1.5:3080'] }) }
     const headers = { host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' }
     assert.equal(isTrustedPluginRequest(headers, officialTrustedHosts(ctx)), true)
-    // 同一请求、官方没列它（服务缺失）→ 拒绝：上面那条放行确实来自官方取值。
+    // 同一请求在服务缺失时被拒：上一条的放行确实来自官方取值。
     assert.equal(isTrustedPluginRequest(headers, officialTrustedHosts({ get: () => undefined })), false)
   })
 })

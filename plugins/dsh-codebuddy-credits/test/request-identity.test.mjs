@@ -1,14 +1,6 @@
 /**
- * 请求身份契约守卫。
- *
- * 事故背景（2026-09-18）：为了让企业用量后台能区分 DSH 的消耗，把 UA 从
- * `CLI/unknown CodeBuddy/2.137.1` 改成「本插件名 + 官方版本段」。改完
- * **provider 照常注册、请求照常 200、单测全绿**，但 `/v3/config` 悄悄不再返回
- * `data.models`——服务端对不含 `CLI/` 记号的 UA 返回 200 + code:0 却省略模型
- * 列表，插件侧只表现为「模型目录为空」，用户选不到 CodeBuddy 模型。
- *
- * 本测试把这条服务端约束钉死在常量上：UA 必须同时含 `CLI/` 记号与
- * `CodeBuddy/<版本>` 段，且 `x-ide-name` 仍如实为本插件名。
+ * 钉的契约：UA 必须同时含 `CLI/` 记号与 `CodeBuddy/<版本>` 段，`x-ide-name` 如实为本插件名。
+ * 缺 `CLI/` 记号时服务端返回 200 却省略 `data.models`（插件侧只表现为模型目录为空）。
  */
 
 import { test } from 'node:test'
@@ -29,14 +21,8 @@ test('UA 含 CLI/ 记号（否则 /v3/config 静默不返回模型列表）', ()
 })
 
 test('UA 含 CodeBuddy/<版本> 段（否则 /v3/config 返回 400 check ua）', () => {
-  // ⚠️ 用 `includes` 而不是 `new RegExp`（2026-09-28，CodeQL `js/incomplete-sanitization` 告警）：
-  // 原先写成 `new RegExp(\`CodeBuddy/${VER.replace(/\./g, '\\.')}\`)` —— 那个手写的转义
-  // **只处理了点号**，漏了 `\` 等其它正则元字符，CodeQL 因此报「不完整的字符串转义」。
-  //
-  // 这里的**意图本来就是「子串包含」**，不是模式匹配 ⇒ 用 `includes` 更准确也更严格：
-  //   * 无正则元字符问题（那句 `replace` 整条删掉，告警类彻底消失）；
-  //   * `2.137.1` 里的 `.` 在正则里是「任意字符」，`includes` 则要求**逐字相等** —— 更严。
-  // ⚠️ 若将来真要按模式匹配，用现成的转义工具，**不要手写 `.replace`**。
+  // 用 `includes`（本意是子串包含）而非 `new RegExp`：手写转义会漏正则元字符（CodeQL
+  // js/incomplete-sanitization）；真要模式匹配用现成转义工具，不要手写 `.replace`。
   assert.ok(
     REQUEST_USER_AGENT.includes(`CodeBuddy/${CODEBUDDY_CLI_VERSION}`),
     `UA 必须含可解析的 CodeBuddy/<版本> 段（当前：${REQUEST_USER_AGENT}）`,

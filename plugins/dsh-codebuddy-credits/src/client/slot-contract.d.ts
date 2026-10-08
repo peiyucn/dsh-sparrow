@@ -1,13 +1,6 @@
 /**
- * 类型扩充：client 包发布停在 0.1.1-rc.2，下列槽位与词典命名空间的类型
- * 声明尚未随包发布；运行时由官方 web 端声明并提供，这里只补类型层。
- * - conversation.input.model：composer 模型座（kind=single，scope=session，
- *   owner 传 locked）。本插件以 priority -1 注册遮蔽官方 ModelSelect。
- * - settings.models.provider-card：官方设置 → 模型页扩展槽位（keyed by
- *   owning settings namespace），挂 Key 配置卡。
- * - conversation.session.header.utilities：会话头部右对齐工具区（kind=list，
- *   scope=session，owner 无专属字段）。官方 session log 下载按钮在此槽位
- *   （order 0）——本插件以 order -10 挂 CodeBuddy 额度入口，渲染在其左边。
+ * 类型扩充：下列槽位与词典命名空间尚未随 client 包发布，运行时由官方 web 端
+ * 声明并提供，这里只补类型层；input.model 座本插件以 priority -1 遮蔽官方 ModelSelect。
  */
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -26,43 +19,25 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         keyConfigured: boolean
       }
     }
-    /**
-     * 会话头部右对齐工具区（ui-conversation 声明；kind=list，scope=session，
-     * owner 无专属字段）。官方 session log 下载按钮在此槽位（order 0）——
-     * 本插件以 order -10 渲染在其左边。
-     */
+    /** 官方 session log 下载按钮占 order 0；本插件 order -10 排在其左。 */
     'conversation.session.header.utilities': {
       kind: 'list'
       scope: 'session'
       owner: { children?: never }
     }
-    /**
-     * composer 上方全宽扩展槽位（ui-conversation 声明；kind=list，
-     * scope=session，owner 传 InputZone={session,input}）。本插件挂 blank
-     * 会话 hero 额度入口锚点（官方 header 在 hero 态整体隐藏，utilities
-     * 不渲染；锚点读官方根元素 data-phase 标记，hero 相位才显示）。
-     */
+    /** 本插件在此挂 blank 会话 hero 额度入口锚点：hero 态官方 header 隐藏、utilities 不渲染，故改读根元素 data-phase 判相位。 */
     'conversation.input.dock': {
       kind: 'list'
       scope: 'session'
       owner: { session: { sessionId: unknown }; input: unknown }
     }
-    /**
-     * 官方聊天视图的完成态 assistant 行动作槽位（ui-chat 声明；kind=list，
-     * scope=session，owner 传 durable messageId）——官方渲染顺序：复制 →
-     * 本槽位 → 分支 → Usage 胶囊 → 时间。本插件挂每轮积分胶囊。
-     */
+    /** 官方渲染顺序：复制 → 本槽位 → 分支 → Usage 胶囊 → 时间；本插件挂每轮积分胶囊。 */
     'conversation.chat.assistant-actions': {
       kind: 'list'
       scope: 'session'
       owner: { messageId: string }
     }
-    /**
-     * composer 底部扩展槽位（ui-conversation 声明；kind=list，scope=session）。
-     * 官方统计胶囊行挂在这里（order 0，ui-chat StatsPills）——本插件以 order 1
-     * 挂会话积分胶囊，并 DOM 级把自有节点追加进官方行（官方行的 [data-composer-stats]
-     * 标记可寻址），形状与官方 `.pill` 一致。
-     */
+    /** 官方统计胶囊行在 order 0；本插件 order 1 挂会话积分胶囊，并把自有节点追加进官方行（按 [data-composer-stats] 寻址），形状对齐官方 .pill。 */
     'conversation.composer.dock': {
       kind: 'list'
       scope: 'session'

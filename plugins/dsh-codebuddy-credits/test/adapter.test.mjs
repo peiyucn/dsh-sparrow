@@ -87,8 +87,7 @@ describe('toWireMessages', () => {
     )
   })
 
-  // spec 04（2026-09-08 实测）：上游只认最后一条 user 消息里的图片，
-  // DSH 又把 system-reminder 等作为 user 消息追加在真实用户消息之后。
+  // 上游只认最后一条 user 消息里的图片；DSH 会把 system-reminder 等追加在其后。
   it('连续 user 消息应该 合并为一条（文本顺序保持）', async () => {
     const wire = await toWireMessages({
       provider: 'codebuddy-credits',
@@ -141,8 +140,7 @@ describe('toWireMessages', () => {
         { id: 'm1', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '跑一下' }] },
         {
           id: 'm2',
-          // 0.1.7-rc.1：工具结果是独立的 tool 角色消息（toolCallId 在消息根部，
-          // 不再是 user 消息里的 tool-result 内容块）。
+          // 0.1.7-rc.1：工具结果是独立 tool 角色消息，toolCallId 在消息根部。
           role: 'tool',
           source: { kind: 'tool', callId: 'call_1' },
           toolCallId: 'call_1',
@@ -230,19 +228,17 @@ describe('CodeBuddyAdapter.stream', () => {
       globalThis.fetch = undefined
     }
 
-    // 请求体：工具包成 function 信封，且工具名/描述/参数都在。
     assert.deepEqual(requestBody.tools, [{
       type: 'function',
       function: { name: 'read_file', description: 'Read a file', parameters: { type: 'object' } },
     }])
 
-    // 正文增量照发；终块带全文。
     const textDeltas = chunks.filter(c => c.type === 'text-delta').map(c => c.text)
     assert.deepEqual(textDeltas, ['Hello', ' world'])
     const textEnd = chunks.find(c => c.type === 'block-end' && c.index === 1)
     assert.deepEqual(textEnd.block, { type: 'text', text: 'Hello world' })
 
-    // 工具增量：name 只在首帧出现，参数增量累计；终块带全名与全参数。
+    // 上游只在首帧带 name
     const toolDeltas = chunks.filter(c => c.type === 'tool-call-delta')
     assert.equal(toolDeltas.length, 2)
     assert.equal(toolDeltas[0].name, 'read_file')
@@ -252,7 +248,6 @@ describe('CodeBuddyAdapter.stream', () => {
     const toolEnd = chunks.find(c => c.type === 'block-end' && c.index === 2)
     assert.deepEqual(toolEnd.block, { type: 'tool-call', id: 'call_1', name: 'read_file', arguments: '{"path":"a.txt"}' })
 
-    // usage 与 finish 正常收尾。
     const usage = chunks.find(c => c.type === 'usage')
     assert.equal(usage.usage.inputTokens, 10)
     assert.equal(usage.usage.outputTokens, 5)
@@ -325,7 +320,7 @@ describe('CodeBuddyAdapter.stream', () => {
     }
     assert.equal(usages.length, 1)
     assert.equal(usages[0].credit, 0.02)
-    // finish 之后不允许再向流里推块（消费端契约）。
+    // 消费端契约：finish 之后不得再推块
     assert.equal(chunks.filter(c => c.type === 'usage').length, 0)
     assert.equal(chunks.findIndex(c => c.type === 'finish'), chunks.length - 1)
   })

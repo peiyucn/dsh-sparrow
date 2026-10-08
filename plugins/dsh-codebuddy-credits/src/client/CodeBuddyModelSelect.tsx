@@ -1,17 +1,7 @@
 /**
- * CodeBuddy 模型选择器：遮蔽官方 conversation.input.model 单槽位的 vendored
- * 实现（源码自官方 ui-model-selection 的 ModelSelect.tsx / ModelSelect.module.css，
- * MIT License，© 2026 DeepSeek；本仓库仅做插件化适配）。
- *
- * 与官方的差异只有一处：模型行是「模型名 + 右侧只读事实」两列（事实 =
- * 积分系数 · 上下文长度，如 `x0.00 · 1M`；官方选择器只渲染 model.name，
- * 没有描述列）。事实不在模型名里——名字保持服务端原始名，事实按模型 id 查
- * 共享事实表（与额度卡同源，见 model-facts.ts）；
- * 查不到事实的模型只显示名字。其余行为——两层面板（模型/推理等级）、
- * 键盘导航、外点关闭、Toast 锚定、目录共享（同一个 ctx.modelDirectories
- * store）——与官方一致。
- * 槽位遮蔽靠官方注册表语义：同 cell 不同 priority 共存、最低者渲染，
- * 本插件以 priority: -1 注册（默认 0 即官方条目）。
+ * CodeBuddy 模型选择器：vendored 自官方 ui-model-selection 的 ModelSelect（MIT License，© 2026 DeepSeek）。
+ * 遮蔽官方 conversation.input.model 槽位；相对官方只多一列只读事实（积分系数 · 上下文长度，按模型 id 查
+ * model-facts 共享表；模型名保持服务端原名，查不到只显示名字）；priority: -1 靠官方注册表「同 cell 最低者渲染」生效。
  */
 
 import {
@@ -19,16 +9,13 @@ import {
   type FocusEvent, type KeyboardEvent,
 } from 'react'
 import {
-  // 图标名只标字形与字重（Regular = 1px 描边），渲染尺寸改由 size prop 决定：
-  // 下列使用点一律显式传 size（对照官方改名前的 Icon*Outline16 / Icon*Outline14）。
+  // 图标名只标字形与字重（Regular = 1px 描边），渲染尺寸一律由显式 size prop 决定。
   IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular,
   IconWarningOutlineRegular, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getMaxMode, subscribeMaxMode } from './maxMode.js'
 import { BusyDot } from './BusyDot.js'
 import { formatModelFacts } from './format.js'
-// 模型事实表与额度卡同源（host /api/codebuddy-credits/status 的 models 列表）：
-// 选择器只订阅读取，不自己发请求（额度卡未挂载时由 ensureModelFacts 补一次）。
 import {
   PROVIDER_ID, ensureModelFacts, getModelFacts, subscribeModelFacts,
 } from './model-facts.js'
@@ -67,35 +54,34 @@ interface DirectoryStoreLike {
 }
 
 export interface CodeBuddyModelSelectProps {
-  /** Owner 共享：输入行被占用时锁定（与官方 ModelSelect 一致）。 */
+  /** 输入行被占用时锁定（同官方 ModelSelect）。 */
   locked: boolean
-  /** 本会话是否支持模型选择（subagent 寻址会话不可用）。 */
+  /** subagent 寻址会话不可用（恒 false）。 */
   available: boolean
-  /** 会话共享模型目录 store（与官方 /model 弹层同源）。 */
+  /** 与官方 /model 弹层同源的模型目录 store。 */
   directory: DirectoryStoreLike
-  /** 确保共享目录已加载（错误落在 store 上）。 */
   load: () => void
-  /** 提交完整 provider/model/reasoning 选择。 */
+  /** 返回是否被接受；未被接受时错误读 store。 */
   select: (selection: Selection) => Promise<boolean>
   t: (key: string, vars?: Record<string, string>) => string
 }
 
-/** 极简 clsx（避免给 client bundle 引入运行时依赖）。 */
+/** 极简 clsx：不给 client bundle 引入运行时依赖。 */
 function clsx(...parts: Array<string | false | undefined>): string {
   return parts.filter((part): part is string => typeof part === 'string' && part.length > 0).join(' ')
 }
 
-/** Which pane the dropdown shows: the two-row root or one drilled-in list. */
+/** 下拉当前层：root 为两行入口，其余为下钻列表。 */
 type Pane = 'root' | 'model' | 'effort'
 
-/** One dynamic effort row; undefined means preserve the provider default. */
+/** 一个档位行；effort 为 undefined 表示保留 provider 默认。 */
 interface EffortChoice {
   key: string
   effort: string | undefined
   label: string
 }
 
-/** Ensure the picker styles are injected exactly once (classes are plugin-owned). */
+/** picker 样式只注入一次（类名归本插件所有）。 */
 let pickerStylesInstalled = false
 
 export function ensurePickerStyles(): void {
@@ -112,92 +98,19 @@ export function ensurePickerStyles(): void {
     '.ccb-model-triggerEffort { flex: 0 0 auto; color: var(--dsw-alias-label-caption); }',
     '.ccb-model-chevron { flex: 0 0 auto; color: var(--dsw-alias-label-caption); transition: transform 120ms ease; }',
     '.ccb-model-chevronOpen { transform: rotate(180deg); }',
-    // ⚠️ `--dsh-theme-tone-menu-inner-radius` = **本菜单的同心内圆角**，供 theme-tone 的
-    //   「滚动容器圆角」规则读取（见下条 `.ccb-model-groups` 的说明）。写在这里是因为
-    //   只有本文件知道自己的外圆角是 20px：同心内圆角 = 20 − 内边距 4 = 16 = --dsw-radius-lg。
+    // ⚠️ `--dsh-theme-tone-menu-inner-radius` = 本菜单同心内圆角（外圆角 20 − 内边距 4 = 16 = --dsw-radius-lg），供 theme-tone 的滚动容器圆角规则读取。
     '.ccb-model-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); --dsh-theme-tone-menu-inner-radius: var(--dsw-radius-lg, 16px); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
     '.ccb-model-status, .ccb-model-empty { padding: 10px; color: var(--dsw-alias-label-tertiary); font-size: 13px; line-height: 20px; }',
     '.ccb-model-error, .ccb-model-warning { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; padding: 7px 8px; border-radius: 8px; background: var(--dsw-alias-interactive-bg-hover-danger); color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; }',
     '.ccb-model-warning { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-state-warn-label); }',
     '.ccb-model-retry { flex: 0 0 auto; padding: 0; border: none; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }',
-    // ⚠️ **本插件不自己给滚动容器写圆角**：同心半径由 theme-tone 那条「滚动容器圆角」规则
-    //   统一施加（它同时管官方菜单与本菜单，半径经变量取值，见下条标题规则与
-    //   `.ccb-model-menu` 上的 --dsh-theme-tone-menu-inner-radius）。两条都带 !important，
-    //   这里再写一份会互相打架（实测踩过：本插件写 16 被 theme-tone 的 12 压掉）。
+    // ⚠️ 滚动容器圆角由 theme-tone 统一施加（它同时管官方菜单与本菜单），本插件不自己写——两条都带 !important，重复声明会互相打架。
     '.ccb-model-groups { min-height: 0; overflow-y: auto; overflow-x: hidden; }',
-    // ⚠️ **吸顶的是「分类标题」，不是「分组容器」**（2026-09-25 真机定案，别再改回去）。
-    //
-    // 上一轮曾把 sticky 提到 `<section class="ccb-model-group">` 上，理由是「sticky 元素只在
-    // 自己的包含块内滑动，标题会被 section 带出滚动容器」。**那个理由推错了**：sticky 的
-    // 包含块是**最近的滚动祖先**（`.ccb-model-groups`），不是 section —— section 只是它
-    // 滑动的**边界**。把 sticky 放到 section 上会引入一个更严重的缺陷：
-    //
-    //   前一个 section 的**底边**还在滚动口之下时它保持吸顶，
-    //   同时后一个 section 的**顶边**也滚到了口沿并开始吸顶
-    //   ⇒ **两条 26px 高的条同时贴在同一个 top 上互相压住**。
-    //
-    // 真机实测（owner 实例，scroll=120）：吸顶 = [DeepSeek, CodeBuddy Credits]，
-    // 两条标题重叠 12px —— 正是 owner 截图里 "Hy4 preview" 与 "Hy3" 叠字那一幕。
-    // 而 sticky 挂在标题上时：吸顶 = [CodeBuddy Credits] 单条，重叠 = 无；
-    // 后一个 section 从下方推上来会把前一条**自然顶走**（这是 sticky 的标准语义）。
-    //
-    // 注意 `<section>` 这里**一个字都不写**：它保持文档流，边界作用天然成立。
+    // ⚠️ 吸顶的是分类标题，不是 `<section>`：sticky 的包含块是最近的滚动祖先（section 只是滑动边界），
+    // 挂到 section 上会让相邻两条标题同时吸顶、互相压住 —— 别再改回去。
     '.ccb-model-group + .ccb-model-group { margin-top: 4px; }',
-    // 标题：吸顶 + **不透明**的底。底必须挡住滚过去的行，同时不许看得见「另一块颜色」。
-    //
-    // ⚠️ 这里来回走过一版**错的**（2026-09-25，记下来别再走）：把 `background-color` 换成
-    //   半透明的 `var(--dsw-specific-menu)`，理由是「官方也这么写」。结果就是 owner 当场看到的
-    //   **行从标题底下透上来**（「给修坏了又。又重叠了。**只是把那个背景去掉，不是变成透明的**」）。
-    //   官方能那么写，是因为**卡片与标题合成的是同一个 token**；我们一旦改成透明，
-    //   标题区域就只剩「卡片填充」，比卡片主体少一层 —— 行（在标题之下）直接显形。
-    //   **官方那版标题不是透明的**：它是半透明填充**叠在卡片填充之上**（等效约 0.82）。
-    //
-    // 现在这条底 = **把卡片表面按同一配方重画一遍**：
-    //   background-color = var(--dsw-alias-bg-base)   ← 卡片浮着的那层地面（不透明 ⇒ 挡住行）
-    //   background-image = 一层 var(--dsw-specific-menu) 渐变
-    // 合成 = 0.58·菜单色 + 0.42·地面色 —— 与卡片**同一个算式**（官方卡片就是菜单填充叠在地面上）。
-    //
-    // 真机像素（标题带里没有文字的那段空白 vs 菜单 padding 带）：
-    //   官方半透明写法      ΔR=ΔG=ΔB=7.00（|Δ|sum=21.00，一条看得见的横带）
-    //   本写法（深色轴）    |Δ|sum=1.38（噪声级）
-    //
-    // ⚠️ **浅色轴还差一档，那一档由主题插件补**：卡片上还叠着 theme-tone 的**颗粒**
-    //   （`menuSurfaceLayers()`），颗粒把卡片压暗约 5.5 级；标题若没有同款颗粒，就成了一条
-    //   「平的、偏亮」的带 —— 这正是 owner 说的「有点突兀」。补法在 `dsh-theme-tone` 的
-    //   `surface.ts`（它同时管官方 `ModelSelect`，即「咱们的和官方的一起处理」）：
-    //   那条规则把**颗粒 + 地面（颗粒与三段光）**一并重画，合成与卡片逐层同源
-    //   （真机实测浅色轴差 ≤0.9 级、深色轴 ≈1.1 级）。
-    //   本插件这条是**不带主题插件时的等价物**：官方档下卡片也没有颗粒，两者逐像素相等。
-    //   另：`--dsw-specific-menu` 与官方的 `--dsw-menu-surface-fill` 由 theme-tone **一起染、同值**
-    //   （官方 0.1.7 里后者是本体、前者只是别名），所以这里读别名与卡片同色；
-    //
-    // ⚠️ **不用 background 简写**：简写会把主题层可能加到这条上的 `background-image`
-    //   （质感层）一起重置掉 —— 这个坑本仓库已经踩过两次。
-    // ⚠️ **不写 backdrop-filter**：与官方一致。标题在**菜单内部**，菜单自己已经是
-    //   backdrop root，标题再声明模糊只会采样子树里正在滚动的行（真机实测 31.719/px，更脏）。
-    // ⚠️ **圆角写在滚动容器上，不写在标题上**（2026-09-25 owner 第六轮定案，别再改回去）。
-    //   第五轮把圆角写在标题上，owner 随即报「改成圆角后**确实边缘会漏**」。
-    //   根因是几何必然：标题自己带圆角 ⇒ 「标题矩形 − 圆角」那块缺口**真的没画**，
-    //   而缺口里正好是滚动的行（`.ccb-model-option` 的悬停底铺满整行宽、行文字从 x=8 起）
-    //   ⇒ 行从缺口透出来。真机实测（吸顶标题，数标题矩形内"漏出的行"像素）：
-    //
-    //     | 标题圆角 | 4px | 6px | 8px | 16px（被 clamp 成 13） | 0（方角） |
-    //     | :--- | ---: | ---: | ---: | ---: | ---: |
-    //     | 漏出的行像素 | 6 | 16 | 30 | **70** | **0** |
-    //
-    //   把圆角改由 `.ccb-model-groups`（**滚动容器**）承担：容器顶角的裁剪**同时作用于
-    //   标题与行** ⇒ 那里既没有标题、也没有行，露出的是菜单自己的玻璃（与卡片同源）；
-    //   标题保持方角 ⇒ 没有缺口 ⇒ **结构上不可能漏**。真机实测 6 个滚动位置全 0。
-    //
-    //   ⚠️ **半径不能写死在容器规则里**：theme-tone 那条容器规则的选择器同时命中
-    //   官方菜单与本菜单，写死一个值必然让其中一个的同心关系错掉（实测踩过一次）。
-    //   故本插件在**自己的菜单元素上**声明 --dsh-theme-tone-menu-inner-radius，
-    //   theme-tone 的容器规则读它（自定义属性沿继承树向下传，滚动容器是菜单的后代）。
-    //   本菜单外圆角 20px + 内边距 4px ⇒ 同心值 = **16px** = --dsw-radius-lg。
-    //   右上角由 theme-tone 那条统一补一个滚动条宽（所有行的右边缘在内容盒上，
-    //   比容器右边缘靠左一个滚动条宽，不补就是"左圆右方"）。只圆**上两角** ——
-    //   下两角若也圆，滚到底时最后一行会被啃掉。
-    //   （没有 theme-tone 时本插件无圆角：那是纯样式增强，缺了不影响功能。）
+    // ⚠️ 标题底必须不透明且与卡片同配方（`--dsw-alias-bg-base` + 一层 `--dsw-specific-menu` 渐变）：改半透明，滚动的行会从标题下透上来。
+    // 不用 background 简写（会重置主题层加的 background-image）、不写 backdrop-filter（会采样子树里正在滚动的行）。
     '.ccb-model-groupTitle { position: sticky; top: 0; z-index: 1; padding: 5px 8px 3px; border-radius: 0; background-color: var(--dsw-alias-bg-base); background-image: linear-gradient(var(--dsw-specific-menu), var(--dsw-specific-menu)); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
     '.ccb-model-option { box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: auto; min-width: 100%; min-height: 38px; padding: 6px 8px; border: none; border-radius: 10px; outline: none; background: transparent; color: inherit; text-align: left; cursor: pointer; }',
     '.ccb-model-option:hover:not(:disabled), .ccb-model-option:focus-visible { background: var(--dsw-alias-interactive-bg-hover); }',
@@ -216,11 +129,6 @@ export function ensurePickerStyles(): void {
   document.head.append(style)
 }
 
-/**
- * Render the composer model seat (adapted official ModelSelect).
- * @param props - owner share + injected directory face + locale seat.
- * @returns the trigger and, while open, the two-level menu.
- */
 export function CodeBuddyModelSelect(
   { locked, available, directory, load, select, t }:
   CodeBuddyModelSelectProps,
@@ -239,12 +147,11 @@ export function CodeBuddyModelSelect(
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
 
-  // Max 模式（推理档位锁）：锁开时档位面板呈现锁定态（Max 置顶、其余置灰），
-  // 触发器档位显示 Max。锁只影响展示与请求（host 侧强制 max），用户逐模型
-  // 档位偏好保留不覆盖，解锁后原样恢复。
+  // Max 模式（推理档位锁）：只影响展示与请求（host 侧强制 max），
+  // 用户逐模型档位偏好保留不覆盖，解锁后原样恢复。
   const maxMode = useSyncExternalStore(subscribeMaxMode, getMaxMode)
 
-  // 模型只读事实表（按模型 id）：与额度卡同源，查不到事实的行只显示模型名。
+  // 模型只读事实表（按模型 id 查）；查不到事实的行只显示模型名。
   const modelFactTable = useSyncExternalStore(subscribeModelFacts, getModelFacts)
 
   const choices = useMemo(() => state.groups.flatMap(group =>
@@ -259,9 +166,8 @@ export function CodeBuddyModelSelect(
     : choices.findIndex(c => c.selection.provider === state.current?.provider && c.selection.model === state.current.model)
   const currentChoice = choices[selectedIndex]
   const reasoning = currentChoice?.model.reasoning
-  // 锁定期当前选中模型是否被锁接管：只对 codebuddy-credits 域内的 reasoning
-  // 模型生效——选择器遮蔽的是全 provider 槽位，其他 provider（官方 DeepSeek
-  // 等）的请求不走本插件适配器，绝不能呈现锁定态（UI 与实际行为脱节）。
+  // 锁定态只对 codebuddy-credits 域内的 reasoning 模型生效——槽位遮蔽的是全 provider，
+  // 其他 provider 的请求不走本插件适配器，呈现锁定态会与真实行为脱节。
   const lockedByMax = maxMode
     && state.current?.provider === 'codebuddy-credits'
     && reasoning !== undefined
@@ -300,7 +206,7 @@ export function CodeBuddyModelSelect(
     setPane('root')
     setOpen(true)
     reload()
-    // 事实表尚空时补一次 /status（额度卡未挂载/未回包时才真正发请求，单飞）。
+    // 事实表尚空时补一次 /status（额度卡未挂载时才真正发请求，单飞）。
     ensureModelFacts()
   }
 
@@ -477,8 +383,7 @@ export function CodeBuddyModelSelect(
                       <div className="ccb-model-groupTitle" id={headingId}>{group.name}</div>
                       {group.models.map((model) => {
                         const selected = state.current?.provider === group.id && state.current.model === model.id
-                        // 只读事实只对本 provider 的行套用（其他 provider 的目录条目
-                        // 即使 id 相同也不查表）。
+                        // 只读事实只套用本 provider 的行：其他 provider 的条目即使 id 相同也不查表。
                         const facts = group.id === PROVIDER_ID
                           ? formatModelFacts(modelFactTable.get(model.id))
                           : undefined
@@ -529,8 +434,7 @@ export function CodeBuddyModelSelect(
               {lockedByMax
                 ? (
                   <>
-                    {/* Max 锁定态：Max 置顶高亮（声明了 max 的模型与原列表去重），
-                        其余档位全部置灰；底部提示解锁入口在额度卡。 */}
+                    {/* Max 锁定态：其余档位置灰；解锁入口在额度卡。 */}
                     {[
                       { key: 'effort:max', label: t('picker.effort.max') },
                       ...effortChoices.filter(level => level.key !== 'effort:max'),

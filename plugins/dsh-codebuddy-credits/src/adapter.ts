@@ -1,11 +1,8 @@
 /**
  * CodeBuddy 自建适配器：不走 pi-ai 协议层，直接按 CodeBuddy 方言发请求、解析 SSE。
- * 方言要点全部显式处理（每一条都是实测过的行为）：
- * - 仅流式：stream: true 恒定（非流式服务端 11101）
- * - 官方请求标识：x-api-key + CLI user-agent + x-product + 企业上下文头
- * - SSE delta：content 与 reasoning_content 分离（思考进 reasoning 块）
- * - usage 帧含 credit（积分消耗，DSH 的 TokenUsage 无此字段，走回调 + replayState 持久化）
- * - 企业策略错误（如 10081 ip not in whitelist）原样透传服务端文案
+ * 别改的方言行为：stream: true 恒定（非流式服务端 11101）；SSE delta 的 content 与
+ * reasoning_content 分离；usage 帧含 credit（DSH 无此字段，另走回调 + replayState）；
+ * 企业策略错误（如 10081 ip not in whitelist）原样透传服务端文案。
  */
 
 import { LlmAdapter, LlmError } from '@deepseek-ai/dsh-llm'
@@ -27,14 +24,12 @@ import { BASE_URL, effortName, requestHeaders } from './catalog.js'
 import { DEFAULT_CONTEXT_WINDOW, DISPLAY_NAME } from './constants.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
 
-/** 单次调用的积分回调：插件侧据此做会话/今日统计（credit 为服务端计费值）。 */
+/** 单次调用的积分回调（credit 为服务端计费值，DSH 的 TokenUsage 无此字段）。 */
 export interface CodeBuddyUsage {
   tokens: TokenUsage
   credit?: number
   model: string
-  /** 会话 id（GenerateOptions.sessionId 透传；无会话的调用缺省）。 */
   sessionId?: string
-  /** 本次请求的取消信号（由适配器从 GenerateOptions 透传，供上层诊断/取消用）。 */
   signal?: AbortSignal
 }
 
@@ -47,22 +42,16 @@ export type CodeBuddyReadImage = (
 export interface CodeBuddyAdapterOptions {
   /** 当前生效的模型事实（设置节驱动，每次调用现读）。 */
   models(): readonly CodeBuddyModelFacts[]
-  /** 每请求解析 API Key。 */
   resolveApiKey(): Promise<string>
-  /** 企业上下文（uid/enterpriseId 来自 /v2/accounts，与官方 CLI 一致）。 */
+  /** 企业上下文（uid/enterpriseId 出自 /v2/accounts）。 */
   account(): { userId?: string; enterpriseId?: string } | undefined
   /** 流式读取空闲超时（毫秒）。 */
   streamIdleTimeoutMs: number
-  /** 每次调用的用量/积分回调（会话统计用）。 */
   onUsage?: (usage: CodeBuddyUsage) => void
-  /**
-   * 宿主读取本适配器模型目录时的回调（模型选择器建目录触发）。
-   * 插件侧在此做节流后台刷新；目录读取本身同步返回当前事实。
-   */
+  /** 宿主读取本适配器模型目录时的回调（模型选择器建目录触发），插件侧在此做节流后台刷新。 */
   onCatalogRead?: () => void
   /** 图片字节读取（官方附件 seam）；未配置时带图请求以明确错误失败。 */
   readImage?: CodeBuddyReadImage
-  /** Max 模式（推理档位锁）开关读取（设置节驱动，每次调用现读）。 */
   maxMode?: () => boolean
 }
 
@@ -84,8 +73,8 @@ interface WireMessage {
   tool_call_id?: string
 }
 
-/** 文本块合并（0.1.7-rc.1 起工具结果是独立的 tool 角色消息，不再是嵌套块——
- *  `ContentBlockMap` 里没有 `tool-result`，见 `packages/llm/llm/src/types.ts:138-151`）。 */
+/** 文本块合并（工具结果是独立的 tool 角色消息，`ContentBlockMap` 里没有
+ *  `tool-result` 块，故工具结果不经此函数）。 */
 function textOf(blocks: readonly ContentBlock[]): string {
   let text = ''
   for (const block of blocks) {
@@ -94,24 +83,16 @@ function textOf(blocks: readonly ContentBlock[]): string {
   return text
 }
 
-/** 图片附件 → OpenAI 方言 image_url data URL（附件字节经官方 seam 读取；
- *  媒体类型以读取回调返回为准——请求版本可能被重编码为 JPEG）。 */
+/** 图片附件 → OpenAI 方言 image_url data URL；媒体类型以读取回调返回为准
+ *  （附件字节可能被重新编码），不要从 ref 自己推断。 */
 async function imageDataUrl(ref: ImageAttachmentRef, readImage: CodeBuddyReadImage, signal?: AbortSignal): Promise<string> {
   const stored = await readImage(ref, signal)
   return `data:${stored.mediaType};base64,${Buffer.from(stored.data).toString('base64')}`
 }
 
-/** DSH Message → CodeBuddy 线格式（OpenAI 方言）。reasoning 块不进历史；
- *  图片块经附件 seam 序列化为 image_url data URL；连续 user 消息合并为一条
- *  （上游只认最后一条 user 消息里的图片，见下方注释与 spec 04）。
- *
- *  0.1.7-rc.1 的消息模型：工具结果是**独立的 `tool` 角色消息**
- *  （`ToolResultMessage.toolCallId`，见 `packages/llm/llm/src/message.ts:172-180`），
- *  不再是 user 消息里的 `tool-result` 内容块；`developer` 消息与
- *  tool-addition / tool-removal 块是为 Session V4 预留的，官方两个适配器都明确
- *  拒绝（`packages/llm/llm-pi-ai/src/context.ts:53`、
- *  `packages/llm/llm-deepseek/src/serialize.ts:90-93`），本适配器同口径。
- */
+/** DSH Message → CodeBuddy 线格式（OpenAI 方言）。三条非显然约束：reasoning 块不进历史；
+ *  工具结果是独立的 `tool` 角色消息（`ToolResultMessage.toolCallId`），不是 user 消息里的
+ *  `tool-result` 内容块；`developer` 消息与工具增删块无对应线格式，官方两个适配器同口径拒绝。 */
 export async function toWireMessages(
   options: GenerateOptions,
   readImage?: CodeBuddyReadImage,
@@ -125,8 +106,7 @@ export async function toWireMessages(
       messages.push({ role: 'system', content: textOf(message.content) })
       continue
     }
-    // 工具结果 → wire 的 tool 角色（官方同口径：`role === 'tool'` 取
-    // `message.toolCallId` 作 tool_call_id，见 llm-deepseek serialize.ts:109-113）。
+    // 工具结果 → wire 的 tool 角色，用 `message.toolCallId` 作 tool_call_id。
     if (message.role === 'tool') {
       messages.push({
         role: 'tool',
@@ -135,13 +115,13 @@ export async function toWireMessages(
       })
       continue
     }
-    // developer 消息（工具增删记录）没有 CodeBuddy 线格式可映射：宁可明确失败，
-    // 也不能落进下面的 assistant 分支变成一条空 assistant 消息（静默改写历史）。
+    // developer 消息没有 CodeBuddy 线格式可映射：宁可明确失败，也不能落进 assistant
+    // 分支变成空 assistant 消息（静默改写历史）。
     if (message.role === 'developer') {
       throw new LlmError('CodeBuddy 适配器无法表示 developer 消息', 'UNSUPPORTED_CONTENT')
     }
     if (message.role === 'user') {
-      // 文本优先；图片块经附件 seam 读字节，转 OpenAI 方言 image_url data URL。
+      // 文本优先；图片块经附件 seam 读字节，转 OpenAI 方言 image_url。
       const parts: unknown[] = []
       let text = ''
       for (const block of message.content) {
@@ -161,10 +141,9 @@ export async function toWireMessages(
           parts.push({ type: 'image_url', image_url: { url } })
         }
       }
-      // 连续 user 消息合并（spec 04，2026-09-08 实测）：上游网关**只认最后一条 user
-      // 消息里的图片**，更早消息中的图片会被静默丢弃并注入「当前模型不支持图片」的提醒。
-      // 而 DSH 会把 system-reminder / 技能目录 / 运行时上下文等以 user 消息追加在真实
-      // 用户消息之后——不合并的话带图消息永远不是最后一条，图片必然被丢弃。
+      // 连续 user 消息必须合并：上游网关只认最后一条 user 消息里的图片，更早的图片会被
+      // 静默丢弃；而 DSH 会把 system-reminder / 技能目录等以 user 消息追加在真实用户消息
+      // 之后，不合并的话带图消息永远不是最后一条。
       const previous = messages.at(-1)
       if (previous !== undefined && previous.role === 'user') {
         const merged: unknown[] = typeof previous.content === 'string'
@@ -209,12 +188,8 @@ function wireReasoningEffort(effort: GenerateOptions['reasoningEffort']): string
   return effort === undefined ? undefined : String(effort)
 }
 
-/**
- * Max 模式（推理档位锁）的最终生效档位（纯函数，供单测）：
- * 锁开且模型有推理能力 → 强制 "max"（服务端宽容接受未声明的 max，2026-09-07
- * 实测 v4-flash / glm-5.3-flash / hy4-preview 全部 200 且思考预算真实变大）；
- * 锁关或模型无推理能力 → 走调用方档位（undefined = 不发参数，服务端按默认档）。
- */
+/** Max 模式（推理档位锁）的最终生效档位（纯函数，供单测）：锁开且模型有推理能力即强制
+ *  "max"，服务端宽容接受未声明的 max，别改成先校验档位白名单。 */
 export function effectiveReasoningEffort(
   maxMode: boolean,
   modelReasoning: boolean,
@@ -258,10 +233,8 @@ export function mapUsage(raw: Record<string, unknown>): { tokens: TokenUsage; cr
   }
 }
 
-/**
- * SSE 数据行 → 可解析帧（纯函数，供单测）。非 data: 行、[DONE] 与无效 JSON
- * 一律返回 undefined（流解析时跳过，不中断）。
- */
+/** SSE 数据行 → 可解析帧（纯函数，供单测）。非 data: 行、[DONE] 与无效 JSON 一律
+ *  返回 undefined：流解析跳过而不中断。 */
 export function parseSseLine(line: string): Record<string, unknown> | undefined {
   const trimmed = line.trim()
   if (!trimmed.startsWith('data:')) return undefined
@@ -293,10 +266,7 @@ async function providerError(response: Response): Promise<never> {
   throw new LlmError(message, 'PROVIDER', { status: response.status })
 }
 
-/**
- * CodeBuddy 推理适配器。协议层完全自建：请求构造、SSE 解析、块组装、
- * usage/credit 提取都在这里显式实现。
- */
+/** CodeBuddy 推理适配器：协议层完全自建（请求构造、SSE 解析、块组装、usage/credit 提取）。 */
 export class CodeBuddyAdapter extends LlmAdapter {
   constructor(private readonly config: CodeBuddyAdapterOptions) {
     super()
@@ -312,7 +282,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
       provider,
       id: model.id,
       name: model.name,
-      // 显式声明输入模态：text-only 是「明确的负能力」，视觉模型带上 image。
+      // 显式声明输入模态：text-only 是「明确的负能力」，视觉模型才带 image。
       inputModalities: model.input,
       ...(model.description === undefined ? {} : { description: model.description }),
     })))
@@ -397,7 +367,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
     if (options.temperature !== undefined) body.temperature = options.temperature
     if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens
     if (options.stop !== undefined && options.stop.length > 0) body.stop = options.stop
-    // Max 模式（档位锁）：锁开且模型有推理能力时强制 max，覆盖调用方档位。
+    // Max 模式（档位锁）开且模型有推理能力时强制 max，覆盖调用方档位。
     const facts = this.config.models().find(entry => entry.id === options.model)
     const effort = effectiveReasoningEffort(
       this.config.maxMode?.() ?? false,
@@ -423,14 +393,14 @@ export class CodeBuddyAdapter extends LlmAdapter {
     let buffer = ''
     // 块索引：reasoning=0、text=1、tool 调用从 2 起
     const TOOL_BASE = 2
-    /** wire 工具 index（0 起）→ 块索引（≥TOOL_BASE）映射。 */
+    /** wire 工具 index（0 起）→ 块索引（≥TOOL_BASE）。 */
     const toolIndexByWire = new Map<number, number>()
-    /** 无 wire index 方言：工具 id → 块索引。 */
+    /** 无 wire index 的方言：工具 id → 块索引。 */
     const toolIndexById = new Map<string, number>()
     let nextToolIndex = TOOL_BASE
     const opened = new Set<number>()
     const finished = new Set<number>()
-    // 已开块的累计内容：终块必须带全量（DSH 以终块组装最终消息）。
+    // block-end 必须带累计全量（DSH 以终块组装最终消息）。
     const textByIndex = new Map<number, string>()
     const toolIdByIndex = new Map<number, string>()
     const toolNameByIndex = new Map<number, string>()
@@ -476,8 +446,8 @@ export class CodeBuddyAdapter extends LlmAdapter {
             }
             const calls = Array.isArray(delta.tool_calls) ? delta.tool_calls as Array<Record<string, unknown>> : []
             for (const call of calls) {
-              // wire 的工具 index 是 0 起（OpenAI 口径、同消息内编号），与我们的
-              // 块索引空间（0=reasoning、1=text、工具 ≥2）不同——必须映射，不能直用。
+              // wire 工具 index 是 0 起（同消息内编号），块索引空间是 0=reasoning、
+              // 1=text、工具 ≥TOOL_BASE——必须映射，不能直用。
               const wireIndex = typeof call.index === 'number' ? call.index : undefined
               let index: number | undefined
               if (wireIndex !== undefined) {
@@ -519,8 +489,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
           }
           const reason = choice !== undefined && typeof choice.finish_reason === 'string' ? choice.finish_reason : ''
           if (reason.length > 0 && !finishSent) {
-            // 终帧：先收尾所有已开块（携带累计全量内容），再发 usage、finish
-            // （官方顺序：block-end* → usage → finish）。
+            // 终帧：按官方顺序先收尾所有已开块（携带累计全量内容）→ usage → finish。
             for (const index of [...opened].filter(i => !finished.has(i))) {
               finished.add(index)
               chunks.push({
@@ -535,8 +504,8 @@ export class CodeBuddyAdapter extends LlmAdapter {
                 chunks.push({ type: 'usage', usage: tokens })
                 usageSent = true
               }
-              // usage 帧可能先于终帧单独到达（终帧又带一份 usage）：
-              // 记账回调只发一次，避免同一调用重复计入积分。
+              // usage 帧可能先于终帧单独到达（终帧又带一份）：记账回调只发一次，
+              // 避免同一调用重复计入积分。
               if (!usageReported) {
                 usageReported = true
                 this.config.onUsage?.({
@@ -559,9 +528,8 @@ export class CodeBuddyAdapter extends LlmAdapter {
             })
             finishSent = true
           } else if (frame.usage !== null && typeof frame.usage === 'object' && frame.usage !== undefined) {
-            // 尾随 usage 帧（终帧之后单独到达）：块已收尾——只补记账，不再向流里补发 usage 块
-            // （finish 之后再推块违反消费端契约）。此前条件里的 !finishSent 只挡住「终帧之后」
-            // 到达的 usage 帧，那些 usage/credit 会被静默丢弃（审计 S3，2026-09-10）。
+            // 尾随 usage 帧（终帧之后到达）：块已收尾，只补记账，不再向流里补发 usage
+            // 块——finish 之后再推块违反消费端契约。
             const { tokens, credit } = mapUsage(frame.usage as Record<string, unknown>)
             if (!usageSent && !finishSent) {
               chunks.push({ type: 'usage', usage: tokens })
@@ -590,8 +558,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
   }
 }
 
-/** DSH 工具 schema → CodeBuddy（OpenAI 方言）tools 数组。官方映射口径：
- *  DSH 条目是 { name, description, parameters }，wire 上必须包 function 信封；
+/** DSH 工具 schema → CodeBuddy（OpenAI 方言）tools 数组：wire 上必须包 function 信封，
  *  原样直发会被服务端以「Invalid request parameters」拒绝。 */
 export function toWireTools(tools: readonly ToolSchema[]): WireTool[] {
   return tools.map(tool => ({
@@ -604,9 +571,8 @@ export function toWireTools(tools: readonly ToolSchema[]): WireTool[] {
   }))
 }
 
-/** 已开块的最终 ContentBlock 组装（block-end 携带）——必须带累计的完整内容：
- *  DSH 以终块组装最终消息（正文/工具名/参数都从终块取），空内容终块会导致
- *  流式过程可见、结果消失，工具调用会变成「unknown tool ""」。 */
+/** 已开块的最终 ContentBlock 组装（block-end 携带）——必须带累计的完整内容：空内容终块
+ *  会让流式过程可见、结果消失，工具调用变成「unknown tool ""」。 */
 function blockFor(
   index: number,
   textByIndex: ReadonlyMap<number, string>,

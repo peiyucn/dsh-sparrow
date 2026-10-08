@@ -1,21 +1,12 @@
 /**
- * dsh-codebuddy-credits client half：
- * - conversation.input.model 槽位（priority -1 遮蔽官方 ModelSelect，官方
- *   注册表语义：同 cell 最低 priority 渲染）：自建模型选择器，模型行把只读
- *   事实（积分系数 · 上下文长度）右对齐（官方选择器只渲染 model.name）。
- *   行为/材质对齐官方。
- * - settings.models.provider-card 槽位（key = 本插件命名空间）：设置 → 模型页
- *   的 CodeBuddy Credits 行挂 Key 配置卡（对齐 DeepSeek 官方编辑器交互）。
- * - conversation.session.header.utilities 槽位：会话头部右上角挂 CodeBuddy
- *   额度小卡（order -10，渲染在官方 session log 下载按钮左边；文字 logo
- *   展开：账号/额度进度条/重置日期/当前模型信息）。
- * Key 只经本机 host 路由存入 DSH 凭据库；文案经 dsh locale。
+ * client half 挂三个官方槽位：conversation.input.model（priority -1 遮蔽官方 ModelSelect）、
+ * settings.models.provider-card（Key 配置卡）、conversation.session.header.utilities
+ * （额度小卡，order -10）；Key 经本机 host 路由存 DSH 凭据库，文案经 dsh locale。
  */
 
 import type { ReactNode } from 'react'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-// 官方 0.1.7 起客户端服务声明分散在各包：slots → ui-renderer、sessions →
-// api-session-controller、modelDirectories → ui-model-selection（纯类型空导入）。
+// 纯类型空导入：为 inject 用到的客户端服务提供类型声明，勿当死代码删。
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
@@ -171,7 +162,7 @@ const LOCALE_DICTS = {
   },
 } as const
 
-/** 官方共享模型目录的最小形状（ui-model-selection 的公开 cordis 服务）。 */
+/** 官方共享模型目录（ui-model-selection 服务）的最小形状。 */
 interface ModelDirectoryLike {
   readonly store: {
     getSnapshot(): unknown
@@ -204,24 +195,21 @@ export function apply(ctx: ClientContext): void {
     locale: 'codebuddy-credits',
   }, CodeBuddyCreditsCard as unknown as (props: object) => ReactNode))
 
-  // 会话头部小卡：读官方 ctx.modelDirectories（公开 cordis 服务，与模型选择
-  // 器同一 store）。组合缺该服务（旧版 dsh）时捕获并退回 useProjection 兜底。
+  // 读官方 ctx.modelDirectories（与模型选择器同一 store）；缺该服务时捕获返回 undefined。
   const directoryFor = (sessionId: string): DirectoryStoreLike | undefined => {
     try {
-      // 根上下文取官方服务实例（子上下文 get 会实例化出注入不全的副本）。
+      // 必须从根上下文取：子上下文 get 会实例化出注入不全的副本。
       const resolver = ctx.root.get('modelDirectories') as unknown as {
         directoryFor(id: string): { store: DirectoryStoreLike } | undefined
       } | undefined
-      // store 原样传递（快照/订阅方法可能依赖内部状态闭包，不做解构）。
+      // store 原样传递：快照/订阅依赖内部状态闭包，不做解构。
       return resolver?.directoryFor(sessionId)?.store
     } catch {
       return undefined
     }
   }
 
-  // 会话头部额度入口：官方 utilities 槽位（公开 seam；session log 下载按钮
-  // 同槽位，order 0）——order -10 渲染在其左边。原 sidebar.footer.action 位置
-  // 会遮挡官方连接状态提示语（2026-09-05 实测），故整体迁到右上角头部。
+  // 官方 utilities 槽位（session log 下载按钮同槽位 order 0）：order -10 渲染在其左边。
   ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
     name: 'conversation.session.header.utilities',
     id: 'codebuddy-credits',
@@ -230,10 +218,8 @@ export function apply(ctx: ClientContext): void {
     inject: () => ({ directoryFor }),
   }, CodeBuddyCreditsIndicator as unknown as (props: object) => ReactNode))
 
-  // blank 会话 hero 锚点：官方 header 在 hero 态整体隐藏（hideChrome，
-  // utilities 槽位不渲染）——额度入口经 conversation.input.dock 槽位（公开
-  // seam，hero/active 两态都渲染）兜底挂载，读官方根元素 data-phase 标记，
-  // hero 相位 portal 到会话根右上角，active 相位让位 header 常驻入口。
+  // hero 态官方 header 整体隐藏（utilities 不渲染），额度入口改经
+  // conversation.input.dock 挂载：读官方根元素 data-phase 标记，hero 相位 portal。
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock',
     id: 'codebuddy-credits-hero',
@@ -242,16 +228,14 @@ export function apply(ctx: ClientContext): void {
     inject: () => ({ directoryFor }),
   }, CodeBuddyCreditsHeroAnchor as unknown as (props: object) => ReactNode))
 
-  // 每轮积分胶囊：官方 Usage 胶囊同排（assistant-actions 槽位，公开 seam）。
-  // 该轮无 CodeBuddy 调用时组件返回 null，官方行动作行保持原样。
+  // 每轮积分胶囊：挂在官方 Usage 胶囊同槽位（assistant-actions）。
   ctx.slots.inject('conversation.chat.assistant-actions', () => ctx.slots.register({
     name: 'conversation.chat.assistant-actions',
     id: 'codebuddy-credits-turn-credit',
     locale: 'codebuddy-credits',
   }, CodeBuddyTurnCredit as unknown as (props: object) => ReactNode))
 
-  // 会话积分统计行：官方 StatsLine 同槽位（composer.dock，公开 seam），
-  // order 1 渲染在官方统计行之后。无 CodeBuddy 调用时返回 null。
+  // 会话积分统计行：order 1 接在官方 StatsLine 之后（composer.dock 槽位）。
   ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
     name: 'conversation.composer.dock',
     id: 'codebuddy-credits-stats',
@@ -259,13 +243,8 @@ export function apply(ctx: ClientContext): void {
     locale: 'codebuddy-credits',
   }, CodeBuddyCreditsStats as unknown as (props: object) => ReactNode))
 
-  // 模型选择器遮蔽：priority -1（官方条目为默认 0，最低者渲染）。
-  // 双保险注册：(1) 声明式注入等 modelDirectories/sessions 就绪（官方同款
-  // 姿势）；(2) 延迟重试兜底——若注入因任何原因未触发（时序/组合差异），
-  // 服务可用后补注册。pickerRegistered 防重复；始终注册不上则保留官方
-  // 选择器（fail-soft）。
-  // 诊断：注册尝试与结果（刷新后仍回退官方样式时，请用户复制
-  // JSON.stringify(window.__ccbDiag) 发回排查）。
+  // priority -1 遮蔽官方条目（同 cell 最低者渲染）；注册不上则保留官方选择器。
+  // __ccbDiag 是给用户排查回退问题用的诊断快照，勿删。
   const diag: {
     attempts: number
     serviceError?: string
@@ -287,9 +266,7 @@ export function apply(ctx: ClientContext): void {
     diag.attempts += 1
     let resolver: { directoryFor(id: string): { store: DirectoryStoreLike } | undefined }
     let sessions: { subagentAddress(id: string): unknown } | undefined
-    // 必须从根上下文取：官方 ui-model-selection 在根上下文注册该服务；
-    // 在子上下文 get 会另行实例化，其 remote.session 等注入无法装配
-    // （"cannot get property without inject"）——这正是目录空/弃权的根因。
+    // 必须从根上下文取：子上下文 get 会另行实例化且注入不全（目录空/槽位弃权的根因）。
     try {
       resolver = scopeCtx.root.get('modelDirectories') as unknown as typeof resolver
     } catch (error) {
@@ -299,7 +276,7 @@ export function apply(ctx: ClientContext): void {
     try {
       sessions = scopeCtx.root.get('sessions') as unknown as typeof sessions
     } catch {
-      // sessions 可选：缺失时按可用处理。
+      // sessions 可选：缺失按可用处理。
     }
     try {
       scopeCtx.slots.inject('conversation.input.model', () => {
@@ -310,15 +287,12 @@ export function apply(ctx: ClientContext): void {
             priority: -1,
             inject: (sessionId: string) => {
               diag.sessionId = String(sessionId)
-              // 惰性解析目录 store：首次 dispatch 时会话 scope 可能尚未就绪，
-              // directoryFor 会抛错（抛错一次 = 槽位弃权，官方条目顶上）。
-              // 这里绝不抛：解析失败保持未决，getSnapshot/load 后续重试，
-              // 解析成功后通知等待中的订阅者（重挂载前自愈，不弃权）。
+              // 惰性解析目录 store：首次 dispatch 时会话 scope 可能未就绪，
+              // directoryFor 抛错即槽位弃权，故这里绝不抛——失败保持未决、后续重试。
               let resolvedStore: DirectoryStoreLike | undefined
               const pending = new Set<() => void>()
-              // 注意：必须是稳定引用（uSES 的 getSnapshot 每次返回新对象会
-              // 触发无限重渲染，React #185「Maximum update depth exceeded」
-              // → 槽位弃权回退官方——这正是刷新后样式回退的根因之一）。
+              // 必须是稳定引用：uSES 下 getSnapshot 每次返回新对象会无限重渲染
+              // （React #185），槽位弃权回退官方。
               const emptySnapshot = { current: null, routable: null, groups: [], failures: [], status: 'idle', error: null }
               const ensure = (): DirectoryStoreLike | undefined => {
                 if (resolvedStore !== undefined) return resolvedStore
@@ -330,7 +304,6 @@ export function apply(ctx: ClientContext): void {
                     pending.clear()
                   }
                 } catch (error) {
-                  // 会话 scope 未就绪：保持未决，下一次读取重试。
                   diag.ensureFails += 1
                   diag.ensureError = error instanceof Error ? error.message : String(error)
                 }
@@ -359,9 +332,8 @@ export function apply(ctx: ClientContext): void {
                   },
                 } as unknown as DirectoryStoreLike,
                 load: () => {
-                  // load 与 select 一样是目录（ModelDirectory）的方法，store 没有——
-                  // 必须解析目录本身；解析失败挂待命回调（解析成功后补一次 load），
-                  // 每次开菜单还会重试。
+                  // load/select 是目录（ModelDirectory）的方法，store 没有——必须解析
+                  // 目录本身；解析失败挂待命回调（成功后补一次），开菜单时还会重试。
                   let directory: ModelDirectoryLike | undefined
                   try {
                     directory = resolver.directoryFor(sessionId) as unknown as ModelDirectoryLike | undefined
@@ -372,7 +344,7 @@ export function apply(ctx: ClientContext): void {
                           ;(resolver.directoryFor(sessionId) as unknown as ModelDirectoryLike | undefined)
                             ?.load().catch(() => { /* 错误落在 store 上 */ })
                         } catch {
-                          // 会话 scope 仍未就绪：保持待命。
+                          // 仍未就绪：保持待命。
                         }
                       })
                     }
@@ -383,9 +355,8 @@ export function apply(ctx: ClientContext): void {
                   }
                 },
                 select: (selection: unknown) => {
-                  // select 是目录（ModelDirectory）的方法，store 没有——这里直接解析目录；
-                  // 成功后把 current 乐观回写进共享 store：空白会话投影不下发，官方 select
-                  // 末尾 syncInputs 读不到 current，座位/眼睛/信息卡就都看不到选择（点击"没反应"）。
+                  // select 同为目录方法（store 没有）；成功后把 current 乐观回写进共享
+                  // store——否则官方 syncInputs 读不到 current，UI 显示不出所选模型。
                   let directory: ModelDirectoryLike | undefined
                   try {
                     directory = resolver.directoryFor(sessionId) as unknown as ModelDirectoryLike | undefined
@@ -414,7 +385,6 @@ export function apply(ctx: ClientContext): void {
       diag.injectError = error instanceof Error ? error.message : String(error)
     }
   }
-  // 单一确定性路径：声明式注入等两个服务就绪后注册。根因修复后不再需要
-  // 定时重试（服务解析从根上下文走，注入回调必然触发）。
+  // 声明式注入：等两个服务就绪后注册（服务从根上下文解析，回调必然触发，无需重试）。
   ctx.inject(['modelDirectories', 'sessions'], registerPicker)
 }

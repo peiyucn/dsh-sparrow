@@ -1,17 +1,7 @@
 /**
- * 会话积分胶囊：挂官方 conversation.composer.dock 槽位（与官方统计行同槽位）。
- *
- * 官方 0.1.5-rc.2 起统计行是**一排胶囊**（图标 + 文案，24px 圆角、tertiary
- * 文案、hover 提亮、点击开弹层；官方 StatsPills.module.css 的 `.pill`），所以
- * 这里也做成一枚**同款第三颗胶囊**：DOM 级把自有按钮追加到官方行的 flex 末尾
- * （官方行自带 12px gap，材质随行），点击展开与官方 stat-dialog 同皮的会话
- * 明细弹层（总积分 / 调用次数 / 按模型明细）。
- *
- * 注入节点归 React 所有（portal 进官方行——事件、aria、开合状态都由 React 管），
- * 只 append/remove 自有节点，不包装、不替换任何官方子节点；官方行每次重渲染
- * （每步）会丢弃注入节点，本组件以相同 nodes 信号重新解析落点并重挂，视觉无
- * 断档。该会话没有 CodeBuddy 调用时不注入，官方统计行保持原样。
- * 数据走 host /session-usage（由会话事件重放，重启后仍准确——见 src/credits-ledger.ts），节点推进去抖刷新。
+ * 会话积分胶囊：DOM 级追加到官方统计行（槽位 conversation.composer.dock；该行自带 12px gap）。
+ * 注入节点归 React 所有（portal），只 append/remove 自有节点，不包装、不替换官方子节点。
+ * 数据走 host /session-usage（会话事件重放，重启后仍准确）；该会话无 CodeBuddy 调用时不注入。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -24,23 +14,22 @@ import { fetchLocal } from './fetch-timeout.js'
 import { formatCredits } from './format.js'
 
 const SESSION_USAGE_URL = '/api/codebuddy-credits/session-usage'
-/** 节点推进后的刷新去抖（流式每步都变，800ms 合并成一次本地查询）。 */
+/** 流式每步都变，去抖合并成一次本地查询。 */
 const REFRESH_DEBOUNCE_MS = 800
-/** 官方统计行的槽位锚点（官方 renderSlot 契约：每个渲染点都有稳定 wrapper）。 */
+/** 官方槽位锚点（官方 renderSlot 契约：每个渲染点都有稳定 wrapper）。 */
 const DOCK_SELECTOR = '[data-slot="conversation.composer.dock"]'
-/** 官方统计行自身的标记（官方 CSS 的 `:has([data-composer-stats])` 同款）。 */
+/** 官方统计行标记（同官方 CSS 的 `:has([data-composer-stats])` 口径）。 */
 const ROW_SELECTOR = '[data-composer-stats]'
 
 interface SessionUsageView {
   credit: number
   calls: number
-  /** 按模型聚合的调用明细（同模型多次调用合并一行）。 */
   byModel: ReadonlyArray<{ model: string; credit: number; calls: number }>
 }
 
-/** 会话级缓存：槽位重挂载（切会话/视图）时以它初始化，避免「空 → 出现」闪烁。 */
+/** 槽位重挂载（切会话/视图）时以它初始化，避免「空 → 出现」闪烁。 */
 const usageCache = new Map<string, SessionUsageView>()
-/** 缓存条目上限：切过的会话数可无限增长，按 FIFO 淘汰最老条目（有界，审计「按会话累积状态」条目）。 */
+/** 切过的会话数可无限增长，按 FIFO 淘汰最老条目。 */
 const USAGE_CACHE_MAX = 200
 
 export interface CodeBuddyCreditsStatsProps {
@@ -66,7 +55,7 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
         setUsage(value)
       })
       .catch(() => {
-        // 查询失败保持现状（保守，不影响主流程）。
+        // 查询失败保持现状，不影响主流程。
       })
   }, [sessionId])
 
@@ -82,22 +71,19 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
     }
   }, [load])
 
-  // 节点身份变化（流式/回合推进）→ 去抖刷新：本地查询，代价可忽略。
+  // 节点推进（流式/回合）→ 去抖刷新；本地查询，代价可忽略。
   const nodes = useChat(snapshot => snapshot.legacy?.nodes ?? null)
   useEffect(() => {
     const timer = setTimeout(() => { load() }, REFRESH_DEBOUNCE_MS)
     return () => { clearTimeout(timer) }
   }, [nodes, load])
 
-  // 解析官方统计行，并跟随它的重建：官方行每步重渲染、也可能被整体换掉
-  // （或在我们挂载之后才因首步出现），所以每次渲染后重新解析一次——DOM 读
-  // 两次 querySelector，代价可忽略；解析结果与当前 state 同引用时不 setState
-  // （React 直接 bail out，不会自激）。拿不到就置 null（不注入，fail-safe）。
+  // 官方行每步重渲染会丢弃注入节点（也可能被整体换掉），故每次渲染后重解析落点并重挂；
+  // 同引用时不 setState（React bail out，不会自激）；拿不到就置 null（不注入，fail-safe）。
   useEffect(() => {
     const holder = holderRef.current
     const dock = holder?.closest(DOCK_SELECTOR) ?? null
-    // 先认官方统计行自身的标记（官方 CSS 的 `:has([data-composer-stats])`
-    // 同款）；退化到 dock 首个子节点（本条目 order 1，官方在 order 0）。
+    // 无官方标记时退化到 dock 首个子节点（本条目 order 1，官方在 order 0）。
     const marked = dock?.querySelector(ROW_SELECTOR) ?? null
     const fallback = dock?.firstElementChild ?? null
     const host = marked ?? (fallback === holder ? null : fallback)
@@ -105,9 +91,8 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
     setRow(current => (current === next ? current : next))
   })
 
-  // 官方两颗胶囊按自身条件渲染，可能在我们注入之后才补上第二颗——React 新增末位
-  // 子节点用 appendChild，我们的节点就会停在中间而非行尾。每次渲染后重挂到行尾
-  // （与每轮积分胶囊同款自愈；只移动自有节点、幂等）。
+  // 官方两颗胶囊可能在我们注入之后才补上：React 新增子节点用 appendChild，我们的节点会停在
+  // 中间而非行尾，故每次渲染后重挂到行尾（只移动自有节点、幂等）。
   useEffect(() => {
     const pill = buttonRef.current
     if (pill === null) return
@@ -116,7 +101,6 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
     host.appendChild(pill)
   })
 
-  // 没有 CodeBuddy 调用：不注入，官方统计行保持原样。
   const active = row !== null && usage !== undefined && usage.calls > 0
 
   return (
@@ -169,40 +153,14 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
 
 let stylesInstalled = false
 
-/**
- * 胶囊圆角：**官方是全胶囊 `999px`**（`ui-chat/.../StatsPills.module.css:30` 的 `.pill`），
- * 不是一个固定 px 值。
- *
- * ⚠️ 历史（这正是 owner 报「输入框下面几个胶囊圆角不一样」的原因）：
- * 官方 `0.1.5-rc.2` 与 `0.1.7-rc.1` 用的确实是 `24px`，本插件当时按它对齐；
- * 官方在 **`0.1.7-rc.2`（commit `fdd14a0989`）改成了 `999px`**，我们没跟。
- * 于是同一个 dock 行里，官方两颗是全胶囊、我们这颗是 24px。
- */
+/** 官方 `.pill` 是全胶囊 `999px`（不是固定 px 值）；写死 px 会与同行官方胶囊不一致。 */
 const PILL_RADIUS = '999px'
 
-/**
- * 官方胶囊的**字号 / 行高不在 `.pill` 上，而在外层 `.root`**
- * （`StatsPills.module.css:11-12`）：
- *
- * ```
- * font-size: calc(var(--dsh-content-font-size-secondary, 13px) - 1px);
- * line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
- * ```
- *
- * 我们挂在 `conversation.composer.dock`，**不在那个 `.root` 里** —— `.dock` 自己
- * 不设字号行高（`ui-conversation/src/client/skeleton/InputBar.module.css:13-20`），
- * 所以 `font: inherit` 拿到的是外层更大的字。必须把这组值抄到胶囊上，
- * 否则胶囊比官方那两颗高一档、文字也大一档，看上去的「圆角角度」同样不一样。
- */
+/** 官方字号/行高设在外层 `.root`（`.pill` 上不设），我们不在其中、`font: inherit` 会大一档，故照抄。 */
 const PILL_FONT_SIZE = 'calc(var(--dsh-content-font-size-secondary, 13px) - 1px)'
 const PILL_LINE_HEIGHT = 'calc(20px + var(--dsh-content-font-delta-secondary, 0px))'
 
-/**
- * 注入胶囊的样式（逐条对齐官方 `StatsPills.module.css` 的 `.root` + `.pill`：
- * 12/20 字号行高、1px 8px 内边距、**全胶囊 999px** + `corner-shape: round`、
- * tertiary 文案、hover 提亮、14px 图标）。官方行自带 12px gap，胶囊不自留外边距；
- * 官方行与官方两颗胶囊的标签都自带 `min-width:0 + 省略号`，故窄屏下三颗一起收窄而非溢出。
- */
+/** 逐条对齐官方 `.root` + `.pill`（全胶囊、tertiary 文案、hover 提亮、14px 图标、不自留外边距）。 */
 export function ensureStatsStyles(): void {
   if (stylesInstalled || typeof document === 'undefined') return
   stylesInstalled = true

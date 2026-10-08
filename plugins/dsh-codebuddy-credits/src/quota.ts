@@ -1,26 +1,21 @@
 /**
  * 企业周期配额查询：POST {CODEBUDDY_ORIGIN}/v2/billing/meter/get-enterprise-user-usage。
- * 实测（2026-09-03）：仅 X-API-Key 即可（无登录态），响应含本期已消耗、
- * 周期额度、周期范围与重置时间。请求形态与官方 CLI 一致（统一请求头规矩）。
- * 端点常量与推理/目录同源（`CODEBUDDY_ORIGIN`），不另立字面量。
+ * 仅 X-API-Key 即可（无登录态）。
+ * 请求头与官方 CLI 一致（`requestHeaders`）；端点与推理/目录同源，不另立字面量。
  */
 
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import { requestHeaders } from './catalog.js'
 import { QUOTA_FETCH_TIMEOUT_MS, QUOTA_URL } from './constants.js'
 
-/** 配额快照（展示用）。 */
-export interface QuotaStatus {  /** 本期已消耗积分。 */
+export interface QuotaStatus {
   used: number
-  /** 周期额度上限。 */
   limit: number
-  /** 剩余积分（limit - used）。 */
+  /** 剩余积分（= limit - used，下限 0）。 */
   remaining: number
   /** 周期开始（服务端时区文案）。 */
   cycleStart?: string
-  /** 周期结束。 */
   cycleEnd?: string
-  /** 下次重置时间。 */
   resetAt?: string
 }
 
@@ -32,7 +27,7 @@ function textOr(raw: unknown): string | undefined {
   return typeof raw === 'string' && raw.length > 0 ? raw : undefined
 }
 
-/** 查询企业周期配额（用户给 Key 后才允许调用），带超时。 */
+/** 查询企业周期配额；仅在用户提供 Key 后调用。 */
 export async function fetchQuota(
   apiKey: string,
   account?: { userId?: string; enterpriseId?: string },

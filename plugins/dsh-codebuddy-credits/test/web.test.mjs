@@ -2,14 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { sessionViewOf, turnViewOf, foldSessionCredits } from '../lib/credits-ledger.js'
 
-/**
- * web 路由层的聚合视图口径。
- *
- * 原先这里测的是 web.ts 的 turnUsageOf（对进程内 usageLog 聚合）；记账改成
- * 「会话事件重放」（credits-ledger）后该函数已删除，故契约测试随之移到
- * sessionViewOf / turnViewOf —— 断言的是同一组用户可见口径：
- * 按会话/轮次合计、按模型聚合一行、调用次数不因缺 credit 而丢失。
- */
+/** web 路由层聚合视图口径：按会话/轮次合计、按模型聚合一行、缺 credit 也计调用次数。 */
 
 /** 造一条本 provider 的 assistant/message。 */
 function ev({ seq, turn, step, model = 'hy4-preview', credit, creditMissing = false }) {

@@ -1,15 +1,7 @@
 /**
- * CodeBuddy Credits 设置卡片：挂在官方 settings.models.provider-card 槽位
- * （key = 本插件命名空间），渲染在设置 → 模型页的 CodeBuddy Credits 行上。
- * 结构与视觉 1:1 复刻官方 ProviderEditor（ui-settings-models）：标题行
- * （显示名 + 路由 id）→「API Key」标签 + 密码输入 → 账号信息一行 →
- * 取消/应用 footer。端点固定、模型目录随 Key 自动获取，无可自定义项，
- * 故不渲染官方那格「自定义设置」折叠区。样式照抄官方 ModelsSection.module.css。
- *
- * 官方行头「编辑」按钮对本命名空间只弹占位提示，已被 CSS 隐藏（保留「移除」）；
- * 编辑入口完全由本卡承担：Key 已配置时折叠成一行（账号信息 + 编辑按钮），
- * 点按钮才展开输入区。
- * Key 只发给本机 host 路由存入 DSH 凭据库；企业策略错误原样透传展示。
+ * CodeBuddy Credits 设置卡片：挂官方 settings.models.provider-card 槽位（key = 本插件命名空间），结构与视觉 1:1 复刻官方
+ * ProviderEditor（ui-settings-models）、样式照抄 ModelsSection.module.css；端点固定、模型随 Key 自动获取，故无「自定义设置」折叠区。
+ * 官方行头「编辑」按钮点击由本卡捕获拦截（已配置时折叠成一行），官方占位编辑器仍由 CSS 隐藏；Key 只发本机 host 路由存凭据库。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -38,7 +30,7 @@ interface CardProps {
   keyConfigured?: boolean
 }
 
-/** 官方 editor 容器：填充模块面，圆角 12，内边距 14/16。 */
+/** 官方 editor 容器：填充模块面。 */
 const editorStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
@@ -93,7 +85,7 @@ const hintStyle: CSSProperties = {
   color: 'var(--dsw-alias-label-tertiary)',
 }
 
-/** 只读模型清单：一行一个模型（名称左、只读事实右）。 */
+/** 只读模型清单（一行一个模型）。 */
 const modelsBlockStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
@@ -134,7 +126,7 @@ const actionsStyle: CSSProperties = {
   gap: '8px',
 }
 
-/** 官方 footer 按钮：36px 胶囊。 */
+/** 官方 footer 按钮：胶囊。 */
 const buttonBase: CSSProperties = {
   boxSizing: 'border-box',
   display: 'inline-flex',
@@ -164,7 +156,7 @@ const secondaryButtonStyle: CSSProperties = {
   color: 'var(--dsw-alias-label-primary)',
 }
 
-/** 与取消/应用同款胶囊（描边 36px），文字用错误红。 */
+/** 与取消/应用同款胶囊，文字用错误红。 */
 const dangerButtonStyle: CSSProperties = {
   ...buttonBase,
   border: '0.5px solid var(--dsw-alias-border-l3)',
@@ -172,7 +164,7 @@ const dangerButtonStyle: CSSProperties = {
   color: 'var(--dsw-alias-state-error-primary)',
 }
 
-/** 只读清单右上角的「获取可用模型」按钮：官方同款紧凑行内（28px）。 */
+/** 只读清单右上角的「获取可用模型」按钮：官方同款紧凑行内。 */
 const refreshButtonStyle: CSSProperties = {
   ...buttonBase,
   height: '28px',
@@ -194,7 +186,7 @@ function keyFailure(draft: string): boolean {
   return !LEGAL_API_KEY.test(value)
 }
 
-/** 账号类型文案（/v2/accounts 的 type 字段实测为 ultimate/personal；未知值原样展示）。 */
+/** 账号类型文案（官方 type 为 enterprise/ultimate/personal；未知值原样展示）。 */
 function accountTypeLabel(t: CardProps['t'], raw: string | undefined): string | undefined {
   if (raw === undefined) return undefined
   if (raw === 'enterprise' || raw === 'ultimate') return t('account.enterprise')
@@ -212,8 +204,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | undefined>(undefined)
   const [messageKind, setMessageKind] = useState<'error' | 'info'>('info')
-  // 官方 savedProvider 同款：应用成功后关闭编辑器，行下显示绿色保存提示，
-  // 直到下一次编辑/取消。
+  // 官方 savedProvider 同款：应用成功即关闭编辑器并显示绿色保存提示，直到下次编辑/取消。
   const [savedNotice, setSavedNotice] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
 
@@ -233,10 +224,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     void load()
   }, [load])
 
-  /**
-   * 手动重新扫描可用模型（「获取可用模型」）：只走本插件 host 路由——host 只重拉本 provider 的
-   * 目录并重提自己的 route，不触碰其他 provider；结果就地更新只读清单。
-   */
+  /** 手动重新扫描可用模型：只走本插件 host 路由（只重拉本 provider 目录，不触碰其他 provider）。 */
   const refreshModels = useCallback(async () => {
     if (refreshing) return
     setRefreshing(true)
@@ -251,7 +239,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
         return
       }
       const list = Array.isArray(payload?.models) ? payload.models : []
-      // 手动刷新结果同步进共享事实表：选择器/额度卡不必等下一次 /status（审计 S4）。
+      // 手动刷新结果同步进共享事实表：选择器/额度卡不必等下一次 /status。
       syncModelFacts(list)
       setStatus(previous => previous === undefined ? previous : { ...previous, models: list })
       setRefreshNote(payload?.changed === true
@@ -264,9 +252,8 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     }
   }, [refreshing, t])
 
-  // 官方行头「编辑」按钮保持在官方原位：捕获阶段拦截其点击，改为展开我们
-  // 自己的编辑器（stopPropagation 阻断官方编辑器打开）。按钮位置/样式都是
-  // 官方的，行为归我们。setup 姿态没有行头，此监听自然不命中。
+  // 捕获阶段拦住官方行头「编辑」按钮（stopPropagation 阻断官方编辑器）；按钮位置/样式仍是官方的。
+  // setup 姿态没有行头，此监听自然不命中。
   useEffect(() => {
     const onClickCapture = (event: MouseEvent): void => {
       const target = event.target
@@ -295,8 +282,8 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     if (editing) setSavedNotice(false)
   }, [editing])
 
-  // 绿色保存提示插到 section 顶部（官方 savedProvider 位置）：位于 intro 与
-  // 列表之间；savedNotice 清除时卸载。DOM 插入（无对应公开槽位）——已记 seam。
+  // 绿色保存提示插到 section 顶部（官方 savedProvider 位置，intro 与列表之间）：
+  // 无对应公开槽位只能 DOM 插入；savedNotice 清除时卸载。
   useEffect(() => {
     if (!savedNotice) return
     const li = rootRef.current?.closest('li')
@@ -316,8 +303,8 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     return () => { notice.remove() }
   }, [savedNotice, t])
 
-  // 首装 setup 姿态没有行头「编辑」按钮（官方占位编辑器是 li 的首个子 div 且
-  // 无 span 子元素）：折叠会让卡片完全空掉，此姿态下自动展开一次。
+  // 首装 setup 姿态没有行头「编辑」按钮（官方占位编辑器无 span 子元素）：
+  // 折叠会让卡片完全空掉，此姿态自动展开一次。
   useEffect(() => {
     const li = rootRef.current?.closest('li')
     if (li === null || li === undefined) return
@@ -328,8 +315,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
 
   // 任一信号（页面 join / 状态接口）确认已配置即折叠。
   const configured = status?.keyConfigured === true || ownerKeyConfigured === true
-  // 状态未知（页面 join 尚未就绪、状态接口未返回）时不渲染任何内容——
-  // 避免「先闪出输入区再折叠」。
+  // 状态未知（页面 join 未就绪 / 状态接口未返回）时不渲染任何内容，避免先闪出输入区。
   const pending = status === undefined && ownerKeyConfigured !== true
   // 与官方一致：默认折叠（有无 Key 都一样），「编辑」展开、取消收起。
   const showEditor = editing
@@ -337,8 +323,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
 
   const save = async () => {
     const key = draft.trim()
-    // 已配置且未输入新 Key：幂等重配——服务端用已存 Key 重拉模型目录与
-    // 账号信息（key 传空串，服务端走 reapply）。
+    // 未输入新 Key 时传空串：服务端用已存 Key 重拉模型目录与账号信息（reapply）。
     if (key.length === 0 && !configured) {
       setMessageKind('error')
       setMessage(t('error.empty'))
@@ -354,18 +339,18 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
       }, CLIENT_ACTION_TIMEOUT_MS)
       const payload = await response.json().catch(() => ({})) as { error?: string }
       if (!response.ok) {
-        // 企业策略错误等原样透传（如 ip not in whitelist）
+        // 原样透传服务端错误（如企业策略 ip not in whitelist）。
         setMessageKind('error')
         setMessage(payload.error ?? t('error.saveFailed'))
         return
       }
       setDraft('')
-      // 官方语义：应用成功即关闭编辑器，行下显示绿色保存提示（持续到下次编辑）。
+      // 官方语义：应用成功即收起编辑器。
       setMessage(undefined)
       setSavedNotice(true)
       setEditing(false)
       await load()
-      // 通知对话页的额度卡联动刷新（出现/消失），无需刷新页面。
+      // 通知对话页额度卡联动刷新（出现/消失），无需刷新页面。
       window.dispatchEvent(new Event(STATUS_CHANGED_EVENT))
     } catch {
       setMessageKind('error')
@@ -399,7 +384,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
       setSavedNotice(false)
       setMessage(undefined)
       await load()
-      // 通知对话页的额度卡联动刷新（消失/出现），无需刷新页面。
+      // 通知对话页额度卡联动刷新（清空后积分胶囊消失），无需刷新页面。
       window.dispatchEvent(new Event(STATUS_CHANGED_EVENT))
     } catch {
       setMessageKind('error')
@@ -416,11 +401,8 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     account?.enterpriseName,
   ].filter((part): part is string => part !== undefined)
 
-  // 状态未知时渲染 0×0 隐藏锚点（不渲染 null）：拦截监听与 :has 锚点从首帧
-  // 起就位——否则这个窗口期点官方「编辑」会把官方编辑器打开，造成双标题。
-  // 折叠态只渲染隐藏锚点：行下不显示任何内容（与 DeepSeek 行一致，只有名称
-  // + 圆点 + 编辑按钮）。应用成功后的绿色保存提示经 DOM 插到 section 顶部
-  // （官方 savedProvider 位置），不落在行内。
+  // 状态未知与折叠态都渲染 0×0 隐藏锚点（不是 null）：拦截监听与 :has 锚点须从首帧起就位，
+  // 否则窗口期点官方「编辑」会打开官方编辑器、出现双标题；行下不显示任何内容。
   if (pending || !showEditor) {
     return <div ref={rootRef} className="ccb-card-root" style={{ display: 'none' }} />
   }
@@ -480,7 +462,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
               : models.length === 0
                 ? <p style={hintStyle}>{t('models.empty')}</p>
                 : models.map(model => (
-                // 名字 = 服务端原始名（不带系数/free）；右侧 = 只读事实（系数 · 上下文长度）。
+                // 名称用服务端原始名（不带系数/free）；右侧为只读事实（系数 · 上下文长度）。
                 <div key={model.id} style={modelRowStyle}>
                   <span style={modelNameStyle} title={model.id}>{model.name}</span>
                   <span style={modelFactStyle}>{formatModelFacts(model)}</span>
@@ -527,7 +509,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
 
 let cardStylesInstalled = false
 
-/** 官方 ModelsSection.module.css 的 input/customized/linkButton 照抄（:focus 等伪类只能走样式表）。 */
+/** 官方 .input / .customized / .linkButton 照抄（:focus 等伪类只能走样式表）。 */
 export function ensureCardStyles(): void {
   if (cardStylesInstalled || typeof document === 'undefined') return
   cardStylesInstalled = true
@@ -542,9 +524,7 @@ export function ensureCardStyles(): void {
     '.ccb-card-input:focus { outline: none; border-color: var(--dsw-alias-brand-primary); }',
     '.ccb-card-input::placeholder { color: var(--dsw-alias-label-dimmed); }',
     '.ccb-card-input:disabled { opacity: 0.6; cursor: default; }',
-    // 官方行头「编辑」按钮保留在官方原位（点击由本卡捕获阶段拦截，展开我们
-    // 自己的编辑器），不再 CSS 隐藏。首装 setup 姿态下官方渲染的占位编辑器
-    // 仍然隐藏：它是 li 的第一个 div 且无 rowActions 结构（span:last-child）。
+    // 只隐藏官方占位编辑器（li 首个 div 且无 rowActions 结构）；行头「编辑」按钮不隐藏。
     'li:has(.ccb-card-root) > div:first-child:not(:has(> span:last-child)) { display: none; }',
   ].join('\n')
   document.head.append(style)

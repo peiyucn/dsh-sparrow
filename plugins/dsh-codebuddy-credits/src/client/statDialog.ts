@@ -1,25 +1,21 @@
 /**
- * 积分弹层的触发件锚定座（官方 ui-chat 的 stat-dialog.ts 不在插件的 import
- * 面内，这里用同一套**公开** primitive 复刻同一语义）：
- * - 定位：`useAnchoredPosition`（side=top / gap 8 / margin 12，量到弹层真实
- *   尺寸后在视口内钳制；滚动与缩放跟随重定位）；
- * - 关闭：`useDismissOnOutsidePointer`（外点；触发件与弹层都算「内部」）+ Esc。
- * 弹层皮肤见 CreditDialog.tsx（材质对齐官方 stat-dialog.module.css）。
+ * 积分弹层触发件的锚定座（官方 ui-chat 的 stat-dialog 不在 import 面内，这里用同一套
+ * 公开 primitive 复刻其语义：`useAnchoredPosition` 定位 + `useDismissOnOutsidePointer`
+ * 外点关闭与 Esc；皮肤见 CreditDialog.tsx）。
  */
 
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, RefObject } from 'react'
 import { useAnchoredPosition, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
 
-/** 弹层与视口边缘的距离（官方 stat-dialog 的 PANEL_MARGIN）。 */
+/** 对齐官方 stat-dialog 的 PANEL_MARGIN。 */
 const PANEL_MARGIN = 12
-/** 弹层与触发件之间的距离（官方 stat-dialog 的 PANEL_GAP）。 */
+/** 对齐官方 stat-dialog 的 PANEL_GAP。 */
 const PANEL_GAP = 8
 
-/** 未定位的弹层：不可见但仍参与布局，让钳制量到真实尺寸（官方 MEASURE_STYLE）。 */
+/** 测尺寸前的兜底样式：不可见但仍参与布局（对齐官方 MEASURE_STYLE）。 */
 const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
 
-/** 一个触发件弹层的座位：开合状态与钳制定位。 */
 export interface CreditStatDialogSeat {
   open: boolean
   setOpen: (open: boolean) => void
@@ -30,11 +26,7 @@ export interface CreditStatDialogSeat {
   pos: CSSProperties | null
 }
 
-/**
- * 触发件锚定的弹层座（每轮积分胶囊与会话积分胶囊共用）。
- * @param anchorRef - 触发件元素（弹层锚点，也是外点关闭判定的「内部」）。
- * @returns 座位；把 `pos ?? MEASURE_STYLE` 铺到 portal 出去的弹层上。
- */
+/** 座位用法：把 `pos ?? MEASURE_STYLE` 铺到 portal 出去的弹层上，panelRef 挂该弹层。 */
 export function useCreditStatDialog(anchorRef: RefObject<HTMLElement | null>): CreditStatDialogSeat {
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement | null>(null)

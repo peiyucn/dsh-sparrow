@@ -1,10 +1,4 @@
-/**
- * 会话积分投影单元的单测。
- *
- * 这个单元替代了被官方废弃的同步历史读（`Session.snapshotEvents()`）。它的契约比旧实现
- * 更严：注册表按事件驱动，所以「无兴趣必须返回同一引用」与「状态必须是无损 JSON」两条
- * 都是**会被宿主实际校验**的硬约束，不是风格问题。下面逐条钉住。
- */
+/** 会话积分投影单测：注册表按事件驱动，「无关事件返回同一引用」与「状态须无损 JSON」是宿主实际校验的硬约束。 */
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -36,7 +30,6 @@ function ev({ seq, turn, step, model = 'deepseek-v4.1-flash', credit, provider =
   }
 }
 
-/** 把一串事件喂进单元（模拟注册表逐事件驱动）。 */
 function foldThroughUnit(events, from = emptyCreditsState()) {
   let state = from
   for (const event of events) state = def.apply(state, event)
@@ -93,9 +86,8 @@ test('⛔ 无关事件必须返回同一引用（Object.is）——注册表据�
   const unrelated = [
     { type: 'user/message', seq: 1, data: {} },
     { type: 'turn/start', seq: 2, data: { turn: 2 } },
-    // 其它 provider 的消息
     ev({ seq: 3, turn: 2, step: 1, credit: 999, provider: 'deepseek-official' }),
-    // 本 provider 但**没有 usage 帧**（流中断）：不计账
+    // 本 provider 但无 usage 帧（流中断）：不计账
     { type: 'assistant/message', seq: 4, data: { turn: 2, step: 2, message: { source: { provider: 'codebuddy-credits', model: 'm' } } } },
   ]
   for (const event of unrelated) {
@@ -108,7 +100,7 @@ test('⛔ 无关事件必须返回同一引用（Object.is）——注册表据�
 test('重试的每一次扣费都累加，不被覆盖（owner 口径：真实表达）', () => {
   const state = foldThroughUnit([
     ev({ seq: 0, turn: 1, step: 1, credit: 5 }),
-    ev({ seq: 1, turn: 1, step: 1, credit: 2 }), // 重试后的第二次扣费
+    ev({ seq: 1, turn: 1, step: 1, credit: 2 }),
   ])
   assert.equal(state.credit, 7, '两次扣费都要在：5 + 2')
   assert.equal(state.calls, 2, '两次调用都记')
@@ -130,7 +122,7 @@ test('有 usage 帧但 credit 非数字时仍计一次调用、credit 记 0；�
     const state = foldThroughUnit([ev({ seq: 0, turn: 1, step: 1, credit: bad })])
     assert.equal(state.calls, 1, `credit=${String(bad)} 仍应计一次调用`)
     assert.equal(state.credit, 0, `credit=${String(bad)} 不计积分`)
-    // 关键：NaN / Infinity 一旦进入状态，投影缓存落盘会整条拒绝（无损 JSON 校验）。
+    // NaN / Infinity 进状态会让投影缓存整条拒绝落盘（无损 JSON 校验）。
     assert.equal(Number.isFinite(state.credit), true, `credit=${String(bad)} 不得把非有限数写进状态`)
   }
 })
@@ -144,9 +136,8 @@ test('无 usage 帧（流中断）不计账', () => {
 })
 
 test('⛔ 状态必须是「无损 JSON」——投影缓存会 snapshotJsonValue 校验后落盘', () => {
-  // 官方 `session-projection-cache` 的 put() 调 `snapshotJsonValue(rows)`：
-  // 只要状态里有 Map / undefined / NaN / 函数 / 循环引用，**整条记录**写盘失败
-  //（抛 TypeError），退化为每次冷读都重折。所以这条得当成硬约束钉住。
+  // 官方 session-projection-cache 的 put() 调 snapshotJsonValue(rows)：状态含 Map / undefined /
+  // NaN / 函数 / 循环引用即整条写盘失败，退化为每次冷读重折。
   const state = foldThroughUnit([
     ev({ seq: 0, turn: 1, step: 1, credit: 1.5 }),
     ev({ seq: 1, turn: 2, step: 1, credit: 2.5 }),
@@ -165,20 +156,15 @@ test('stateSchema 校验合法状态，并**拒绝**损坏的缓存行（严格�
 
   // 多一个字段：旧版 schema 写的行必须被拒（否则会带病续算）
   assert.throws(() => creditsProjectionStateSchema.parse({ ...good, extra: 1 }))
-  // 类型错
   assert.throws(() => creditsProjectionStateSchema.parse({ ...good, credit: 'nope' }))
   assert.throws(() => creditsProjectionStateSchema.parse({ ...good, calls: -1 }))
-  // 缺字段
   assert.throws(() => creditsProjectionStateSchema.parse({ credit: 0, calls: 0, byModel: [] }))
-  // byTurn 里嵌了坏行
   assert.throws(() => creditsProjectionStateSchema.parse({ ...good, byTurn: { 1: { credit: 1 } } }))
-  // 非有限数
   assert.throws(() => creditsProjectionStateSchema.parse({ ...good, credit: Number.NaN }))
 })
 
 test('stateSchema 拒绝 Map 形状的 byTurn（必须是普通对象）', () => {
-  // 走 JSON 边界：Map 序列化成 {}，round-trip 后 byTurn 变空对象——schema 仍接受空对象，
-  // 但**不接受**数组 / null 这类形状。
+  // Map 经 JSON 边界序列化成 {}（schema 接受空对象），故这里只钉非对象形状被拒。
   for (const bad of [null, [], 'x', 3]) {
     assert.throws(() => creditsProjectionStateSchema.parse({
       credit: 0, calls: 0, byModel: [], byTurn: bad,
@@ -207,7 +193,7 @@ test('读面返回的引用不会被后续事件改写（调用方持有安全�
   const before = view.session()
   const beforeSnapshot = JSON.stringify(before)
   state = def.apply(state, ev({ seq: 1, turn: 1, step: 2, credit: 5 }))
-  // 旧引用指向的数组是上一版状态的数组：apply 走「复制后替换」，不改就数组
+  // apply 走「复制后替换」：旧引用指向的是上一版状态的数组，不得被改写。
   assert.equal(JSON.stringify(before), beforeSnapshot, 'apply 不得改动已发出的视图数据')
 })
 

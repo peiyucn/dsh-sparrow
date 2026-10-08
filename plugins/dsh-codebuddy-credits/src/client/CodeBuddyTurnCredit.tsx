@@ -1,14 +1,7 @@
 /**
- * 每轮积分胶囊：挂官方 conversation.chat.assistant-actions 槽位——该槽位渲染
- * 在复制与分支之间（官方顺序：复制 → 本槽位 → 分支 → Usage → 时间），我们
- * DOM 级把本插件自有节点移动到行动作行末尾（时间之后，真正的行尾），只移动
- * 自有节点，不包装/替换官方组件。材质与官方胶囊一致（transparent + 28px 圆角
- * + tertiary 文案，hover 提亮）；点击展开官方 Turn usage 弹窗同款材质的面板
- * （CreditDialog 共享件），内容精简为：本轮总积分、调用次数、每次调用（按模型
- * 聚合）的积分。
- * 数据走 host /turn-usage 路由（按 sessionId+turn 记账；host 端经 agent/request
- * 载荷的 signal 与 usage 帧精确关联轮次）。该轮没有 CodeBuddy 调用（calls=0）
- * 时不渲染，官方行动作行保持原样。
+ * 每轮积分胶囊：挂官方 conversation.chat.assistant-actions 槽位（官方渲染在复制与分支之间），我们 DOM 级把自有节点
+ * 移到行动作行末尾——只移动自有节点，不包装/替换官方组件；点击展开 CreditDialog 共享的官方同款材质面板。
+ * 数据走 host /turn-usage 路由（按 sessionId+turn 记账）；该轮没有 CodeBuddy 调用（calls=0）时不渲染。
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -55,9 +48,7 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const { open, toggle, panelRef, pos } = useCreditStatDialog(buttonRef)
 
-  // 槽位固定渲染在复制与分支之间（官方顺序）；用户要求胶囊放到行动作行末尾
-  // （时间之后）——DOM 级移动本插件自有节点到行尾（appendChild）。每次渲染后
-  // 重试（官方行可能因任何信号重渲染把我们移回原位），只移动自有节点、幂等。
+  // 每次渲染后重跑：官方行可能因任何信号重渲染把我们移回原位；只移动自有节点，幂等。
   useEffect(() => {
     const pill = buttonRef.current
     if (pill === null) return
@@ -90,7 +81,7 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
     return () => { alive = false }
   }, [sessionId, turn])
 
-  // 该轮没有 CodeBuddy 调用：不渲染，官方行动作行保持原样。
+  // 未取到用量或无 CodeBuddy 调用（calls=0）时不渲染。
   if (usage === undefined || usage.calls === 0) return null
 
   return (
@@ -135,7 +126,6 @@ export function ensureTurnCreditStyles(): void {
   stylesInstalled = true
   const style = document.createElement('style')
   style.textContent = [
-    // 官方 .trigger 配方：28px 高、圆角胶囊、tertiary 文案、hover 提亮。
     '.ccb-turn-credit-trigger {',
     '  display: inline-flex; align-items: center; gap: 6px; min-width: 0;',
     '  height: calc(28px + var(--dsh-content-font-delta, 0px));',

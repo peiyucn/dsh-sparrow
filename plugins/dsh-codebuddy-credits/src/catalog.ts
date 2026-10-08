@@ -1,14 +1,7 @@
 /**
- * CodeBuddy 模型目录解析：不预置任何模型信息。模型列表完全依赖用户给 Key
- * 的行为——保存 Key 后（及宿主重建模型目录时）才调 /v3/config 拉取，模型
- * 事实只存进程内、不落设置节（设置页不自建模型列表，模型列表随 Key 走）。
- * 无 Key 时本插件不发任何网络请求。
- *
- * /v3/config 的模型条目带积分消耗系数（credits，如 "x0.79 credits"）、多模态
- * 声明（supportsImages）与精确思考档位声明（reasoning.supportedEfforts /
- * canDisableThinking）。展示名一律是服务端原始模型名——系数/容量等事实由
- * 本插件 UI 自行渲染（选择器与额度卡同读 /status 的 models 事实表），不再
- * 往名字里附加任何标记；档位转成 reasoningEfforts 声明。
+ * CodeBuddy 模型目录解析：不预置模型，列表随用户 Key 走——保存 Key 后（及宿主重建目录时）
+ * 才调 /v3/config，事实只存进程内、不落设置节，无 Key 时零网络请求；展示名一律用服务端
+ * 原始模型名，credits / supportsImages / reasoning 档位声明直接转成模型事实。
  */
 
 import { LlmError } from '@deepseek-ai/dsh-llm'
@@ -80,8 +73,7 @@ export function factsFromEntries(entries: readonly CodeBuddyModelEntry[]): CodeB
   return entries.map(entry => {
     const declared = entry.reasoningEfforts
     const reasoning = declared !== undefined && declared !== false
-    // off 是否可用由 declaredEfforts 依据 canDisableThinking 决定，
-    // 这里只透传（不再无条件塞 off——hy4-preview 不可关思考、固定档位模型只有一档）。
+    // off 是否可用由 declaredEfforts 依据 canDisableThinking 决定，这里只透传（别无条件塞 off）。
     const thinkingLevelMap = declared !== undefined && declared !== false
       ? { ...declared }
       : undefined
@@ -100,10 +92,7 @@ export function factsFromEntries(entries: readonly CodeBuddyModelEntry[]): CodeB
   })
 }
 
-/**
- * 请求头：本插件身份标识 + 企业上下文（uid/enterpriseId 来自 /v2/accounts）。
- * 三个端点（/v2/chat/completions、/v3/config、/v2/accounts）共用此出口。
- */
+/** 请求头：本插件身份标识 + 企业上下文（企业字段来自 /v2/accounts）；三个端点共用此出口。 */
 export function requestHeaders(
   apiKey: string,
   account?: { userId?: string; enterpriseId?: string },
@@ -113,8 +102,7 @@ export function requestHeaders(
     'x-api-key': apiKey,
     'user-agent': REQUEST_USER_AGENT,
     'x-product': PRODUCT_HEADER,
-    // 企业用量后台的 client 字段取该头（实测唯一起作用的头）——如实上报本插件身份，
-    // 使 CodeBuddy 管理后台能区分我们与官方 IDE/CLI 的消耗。
+    // 企业用量后台按该头归属 client，也只认它：如实上报身份，使后台能区分我们与官方 IDE/CLI 的消耗。
     'x-ide-name': CLIENT_NAME,
     ...(account?.enterpriseId === undefined ? {} : {
       'x-enterprise-id': account.enterpriseId,
@@ -138,20 +126,14 @@ function text(...values: readonly unknown[]): string | undefined {
   return undefined
 }
 
-/** "x0.79 credits" / "x1.62" → 短系数 "x0.79" / "x1.62"。 */
+/** 服务端系数原串（"x0.79 credits"）→ 短系数 "x0.79"。 */
 function shortCredits(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return undefined
   const match = /x[\d.]+/i.exec(raw)
   return match?.[0]
 }
 
-/**
- * 实测 reasoning 有两种形态：
- * - 可选档位：supportedEfforts 数组 + canDisableThinking + defaultEffort
- *   （如 glm-5.3-flash / hy4-preview）；
- * - 固定档位：只有 effort 单字符串（如 deepseek-v4-pro=high、
- *   minimax-m3-pay=medium）——只有这一档、不可关。
- */
+/** reasoning 两种形态：可选档位（supportedEfforts + canDisableThinking，可关思考）与固定档位（仅 effort 单串，只有一档、不可关）。 */
 function declaredEfforts(raw: Record<string, unknown>): ReasoningEfforts {
   const supported = Array.isArray(raw.supportedEfforts) ? raw.supportedEfforts as unknown[] : undefined
   if (supported !== undefined && supported.length > 0) {
@@ -176,23 +158,12 @@ function declaredDefaultEffort(raw: Record<string, unknown>): string | undefined
   return typeof fixed === 'string' && fixed.length > 0 ? fixed : undefined
 }
 
-/**
- * 视觉判定（2026-09-04 修订）：/v3/config 的 supportsImages 就是权威声明——
- * CodeBuddy app 里 deepseek-v4-pro/flash 明确支持图片输入，supportsImages 也
- * 返回 true。早前「supportsImages=true 但可能是纯文本」的假设不成立（那是
- * 官方 DSH 目录的文本/视觉拆分，不适用于 CodeBuddy 自己托管的模型）。实测
- * disabledMultimodal 只作为冗余标注出现：true 只在 supportsImages=false 上、
- * false 只在 true 上，不改变结论，故直接以 supportsImages 为准。
- */
+/** 视觉判定以 /v3/config 的 supportsImages 为准；disabledMultimodal 只是冗余标注，不改变结论。 */
 function supportsNativeVision(raw: Record<string, unknown>): boolean {
   return raw.supportsImages === true
 }
 
-/**
- * /v3/config 响应 → 完整模型条目（纯函数，供单测）。
- * 结构：data.agents 中 name === 'cli' 的 models 是允许的模型 id 列表；
- * data.models 是模型详情（id/name/credits/容量/多模态/思考档位）。
- */
+/** /v3/config 响应 → 完整模型条目（纯函数，供单测）：允许列表取 data.agents 里 name === 'cli' 的 models，详情在 data.models。 */
 export function parseModelConfig(body: unknown): readonly CodeBuddyModelEntry[] {
   const data = (body as { data?: unknown })?.data as Record<string, unknown> | undefined
   const agents = Array.isArray(data?.agents) ? data.agents as Array<Record<string, unknown>> : (data?.agent as { agents?: unknown })?.agents as Array<Record<string, unknown>> | undefined

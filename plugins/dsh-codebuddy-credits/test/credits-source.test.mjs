@@ -12,7 +12,7 @@ function ev({ seq, turn, step, model = 'm', credit }) {
   }
 }
 
-/** 造一台假 host（0.1.7 迁移后：live 是投影状态读，insp​ect 是冷会话持久化前缀）。 */
+/** 造一台假 host（live＝投影状态读，insp​ect 是冷会话持久化前缀）。 */
 function fakeSources({ live = {}, cold = {}, inspectDelay = 0, inspectFails = false } = {}) {
   const calls = { live: 0, inspect: 0 }
   return {
@@ -60,7 +60,7 @@ test('inspect 抛错时退回缓存，不抛出', async () => {
   const { sources } = fakeSources({ live: { s1: [ev({ seq: 0, turn: 1, step: 1, credit: 4 })] }, inspectFails: true })
   const resolver = createLedgerResolver(sources)
   assert.equal((await resolver.for('s1')).session().credit, 4)
-  // 缓存里已有 s1；再对同一会话强制冷读（live 返回 undefined 的场景）
+  // 强制冷读路径（live 返回 undefined）
   const coldOnly = createLedgerResolver({
     live: () => undefined,
     inspect: async () => { throw new Error('backend down') },
@@ -69,11 +69,8 @@ test('inspect 抛错时退回缓存，不抛出', async () => {
 })
 
 test('⛔ 投影服务缺失 / 取状态抛错时安全降级（不得把异常抛给调用方）', async () => {
-  // 回归守卫：0.1.7 迁移后 live 路径读的是官方投影注册表
-  //（`ctx.sessionProjections.stateOf()`）。该服务在组合里可能缺席（非 web profile、
-  // 官方改名、或被裁剪），表现为「能拿到 ctx、但取服务/取状态抛错」——
-  // 按根规范《运行期不冒泡》，此时必须降级（当冷会话走 inspect），
-  // 不得把 TypeError 原样回给浏览器（历史事故：HTTP 400 带 `s.snapshotEvents is not a function`）。
+  // 投影服务（ctx.sessionProjections.stateOf()）缺席或抛错时必须降级走 inspect，
+  // 不得把 TypeError 抛给调用方（《运行期不冒泡》）。
   const boom = () => { throw new TypeError('cannot read properties of undefined (reading \'stateOf\')') }
   const resolver = createLedgerResolver({
     live: boom,
@@ -115,7 +112,6 @@ test('重复读取命中缓存（冷会话第二次结果一致）', async () =>
   const { sources, calls } = fakeSources({ cold: { s1: [ev({ seq: 0, turn: 1, step: 1, credit: 1 })] } })
   const resolver = createLedgerResolver(sources)
   await resolver.for('s1')
-  // 第二次：inspect 返回同一前缀，fold 增量后不变
   const again = await resolver.for('s1')
   assert.equal(again.session().credit, 1)
   assert.equal(calls.inspect, 2, '冷路径每次都读（live 不可用），但结果一致')

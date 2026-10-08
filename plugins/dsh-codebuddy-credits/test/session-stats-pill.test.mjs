@@ -3,23 +3,8 @@ import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 
 /**
- * 会话积分胶囊与官方 `StatsPills` 的**外观契约**
- * （`src/client/CodeBuddyCreditsStats.tsx` 的 `ensureStatsStyles()`）。
- *
- * 这里读源码而不是渲染：本插件没有 client 侧 DOM 测试环境，样式是一串字符串常量
- * ——与 `picker-sticky.test.mjs` 同一取舍（宁可啰嗦，也不要这类回归再溜过去）。
- *
- * **为什么专门为它写测试**：2026-09-29 owner 报「输入框下面几个胶囊，圆角角度居然
- * 不一样」。实测根因有两条，**都不是我们写错，而是我们停在旧官方口径上**：
- *
- * 1. **圆角**：官方 `0.1.5-rc.2` 与 `0.1.7-rc.1` 的 `.pill` 是 `24px`，本插件照它写；
- *    官方在 **`0.1.7-rc.2`（commit `fdd14a0989`）改成 `999px`**（全胶囊），我们没跟。
- * 2. **字号 / 行高**：官方胶囊自己不设字号行高，靠外层 `.root` 提供
- *    （`12/20`）。我们挂在 `conversation.composer.dock`、**不在那个 `.root` 里**
- *    （`.dock` 自己不设字号行高），`font: inherit` 拿到的是更大的字 ⇒
- *    胶囊比官方那两颗高一档，看上去的「圆角角度」也随之不同。
- *
- * 于是断言分两组：**圆角必须与官方同形**、**字号行高必须自己补齐且不得被简写重置**。
+ * 会话积分胶囊与官方 `StatsPills` 的外观契约（`src/client/CodeBuddyCreditsStats.tsx` 的
+ * `ensureStatsStyles()`）：无 client 侧 DOM 测试环境、样式是一串字符串常量，故读源码断言。
  */
 const SOURCE = new URL('../src/client/CodeBuddyCreditsStats.tsx', import.meta.url)
 const source = await readFile(SOURCE, 'utf8')
@@ -29,10 +14,7 @@ const constants = Object.fromEntries(
   [...source.matchAll(/const\s+(PILL_[A-Z_]+)\s*=\s*'([^']*)'/gu)].map(m => [m[1], m[2]]),
 )
 
-/**
- * 把 `ensureStatsStyles()` 里 `style.textContent = [...]` 那个数组**还原成一份 CSS 文本**
- * （逐项取字符串，单引号与模板字符串都认，并把 `${PILL_*}` 占位换成常量值）。
- */
+/** 把 `style.textContent = [...]` 数组还原成一份 CSS 文本（`${PILL_*}` 换成常量值）。 */
 function injectedCss() {
   const start = source.indexOf('style.textContent = [')
   assert.ok(start >= 0, '样式表数组不见了（ensureStatsStyles 被改写？）')
@@ -90,8 +72,7 @@ describe('会话积分胶囊：与官方 StatsPills 的外观契约', () => {
   })
 
   it('⛔ font 简写必须排在 font-size / line-height 之前（否则会被重置回 inherit）', () => {
-    // `font: inherit` 会重置 font-size 与 line-height —— 顺序反了这两条就静默失效，
-    // 又回到「胶囊比官方高一档」的老样子，而且没有任何视觉以外的东西能发现它。
+    // 顺序反了这两条就静默失效（font: inherit 会重置 font-size / line-height）。
     const shorthand = pill.indexOf('font: inherit')
     const size = pill.indexOf('font-size:')
     const line = pill.indexOf('line-height:')

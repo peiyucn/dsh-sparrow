@@ -2,14 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { installCodeBuddyWeb } from '../lib/web.js'
 
-/**
- * host 路由链路测试：用最小 mock ctx 走真实 installCodeBuddyWeb + webServer handler，
- * 覆盖「请求 → 入参校验 → shared 调用 → JSON 响应」整条链路（对照 vision-bridge 的 host-route 测试）。
- * 注意 cordis 的语义：ctx.inject 与 ctx.effect 都会**同步执行**回调注册副作用，mock 必须复现，
- * 否则 webServer.register 不会发生、路由测试就是空转。
- * @param overrides - shared 覆盖项。
- * @param webRuntime - mock 的官方 `webRuntime` 服务值（栅栏的额外信任面）；默认无该服务。
- */
+/** mock 必须复现 cordis ctx.inject / ctx.effect 的同步回调，否则 webServer.register 不发生、路由测试空转。 */
 function buildHarness(overrides = {}, webRuntime = undefined) {
   const calls = { refreshModels: 0 }
   let handler = null
@@ -40,10 +33,7 @@ function buildHarness(overrides = {}, webRuntime = undefined) {
   return { shared, calls, get handler() { return handler } }
 }
 
-/**
- * 最小 req/res：req 带 loopback remoteAddress 与同源 Host 头（路由的浏览器信任栅栏
- * 与 localOnly 网段检查都依赖它们）。默认 `host: '127.0.0.1:3080'` = DSH 页面同源请求。
- */
+/** 最小 req/res：栅栏与 localOnly 检查都依赖 remoteAddress 与 Host 头。 */
 async function request(handler, url, { method = 'POST', address = '127.0.0.1', headers = { host: '127.0.0.1:3080' } } = {}) {
   let statusCode = 0
   const chunks = []
@@ -115,9 +105,7 @@ describe('codebuddy host 路由：/refresh-models', () => {
 })
 
 describe('codebuddy host 路由：/session-usage 与 /turn-usage（异步积分面）', () => {
-  // 这两条路由是「积分改由事件重放」时唯一变 sync→async 的出口。此前**零覆盖**：
-  // 实测删掉整段 if、或去掉 await，148 个用例全绿 —— 而 `await` 一旦漏掉，
-  // `JSON.stringify(Promise)` 会静默变成 `{}` 发给客户端，积分面板永远空。
+  // `await` 一旦漏掉，JSON.stringify(Promise) 会静默变成 {} 发给客户端，积分面板永远空。
   it('GET /session-usage 应该 await 异步账本并原样回传', async () => {
     let asked = null
     const h = buildHarness({
@@ -174,14 +162,8 @@ describe('codebuddy host 路由：/session-usage 与 /turn-usage（异步积分�
   })
 })
 
-/**
- * 浏览器信任栅栏的**接线**用例（栅栏存在但从没被调用 = 零价值，故这里走真实 handler）。
- *
- * 回归背景（实测于 0.1.7-rc.2）：官方 Host/Origin 栅栏与浏览器令牌认证都注册在
- * `/api` 前缀路由上，而 webServer 是「精确表优先、前缀最长者胜」——本插件的
- * `/api/codebuddy-credits` 更长，请求根本走不到官方检查。实测无栅栏时
- * `GET /api/codebuddy-credits/status` 无凭据 200，而官方 `/api/sessions` 401。
- */
+/** 官方 Host/Origin 栅栏挂在 `/api` 前缀路由上，而 webServer 前缀最长者胜——本插件前缀更长，
+ * 不自己接线就走不到官方检查，故这里用真实 handler 钉住自家栅栏。 */
 describe('codebuddy host 路由：浏览器信任栅栏接线（DNS rebinding / CSRF）', () => {
   it('⛔ rebinding：Host 与 Origin 同为攻击者域名 应该 403 且不触达 shared', async () => {
     const h = buildHarness()
@@ -253,15 +235,14 @@ describe('codebuddy host 路由：浏览器信任栅栏接线（DNS rebinding / 
   })
 
   it('官方 webRuntime 列出的 LAN authority：同源 LAN 请求放行，未列的仍 403', async () => {
-    // 官方信任面在场（web-app 绑定 0.0.0.0 时采样出的 LAN 地址）：同源 LAN 请求应放行。
     const allowed = buildHarness({}, { lanAddresses: ['192.168.1.5'], trustedHosts: ['192.168.1.5'] })
     const ok = await request(allowed.handler, '/api/codebuddy-credits/status', {
       method: 'GET',
       headers: { host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' },
     })
     assert.equal(ok.statusCode, 200)
-    // 官方信任面缺席（老宿主 / 非 web 组合）→ 保守回退为只信回环。
-    // 注意 remoteAddress 仍是回环：localOnly 只认 socket 来源，栅栏才是 Host/Origin 那道。
+    // 官方信任面缺席（老宿主 / 非 web 组合）→ 保守回退只信回环；
+    // 注意 remoteAddress 仍是回环：localOnly 只认 socket 来源，Host/Origin 由栅栏把关。
     const other = buildHarness()
     const denied = await request(other.handler, '/api/codebuddy-credits/status', {
       method: 'GET',

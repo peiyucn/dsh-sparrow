@@ -1,10 +1,4 @@
-/**
- * 外部链接白名单测试。
- *
- * 用户徽章现在是可点击链接，指向 CodeBuddy 个人主页。风险点是「把 URL 交给
- * `<a href>`」——若 URL 能被改写成 `javascript:` / `data:`，点击就成了注入面。
- * 本插件用固定常量 + 协议白名单挡住，这里把策略钉住。
- */
+/** 外部链接白名单：交给 `<a href>` 的 URL 若混入 `javascript:` / `data:` 即注入面，按协议白名单放行。 */
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
