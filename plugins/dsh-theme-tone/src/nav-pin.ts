@@ -22,6 +22,7 @@
  */
 
 import { PLAIN_ATTR } from './constants.js'
+import { ANCHOR, anchorSelector } from './anchors.js'
 
 /** 官方轮次导航 nav 的 aria-label 文案（zh / en 两套；官方改文案需同步更新）。 */
 export const NAV_ARIA_LABELS: readonly string[] = ['Turn navigation', '轮次导航']
@@ -56,13 +57,18 @@ function escapeCssString(value: string): string {
 }
 
 /**
- * 轮次导航 slot 定位选择器：对话滚动体（公开 DOM 标记）内、轮次导航 nav 的直接父元素。
+ * 轮次导航 slot 定位选择器：对话滚动体内、轮次导航 nav 的直接父元素。
  * slot 是官方隐藏规则（display: none）作用的目标，本规则以更高特异性压过它。
- * @param label - 官方 nav 的 aria-label 文案（自动做 CSS 转义）。
+ *
+ * ⚠️ 2026-10-08：判据从 `div:has(> nav[aria-label="…"])` 改为**锚点属性**。
+ * `:has()` 的开销实测见 docs/spec/11（主表 19 条 `:has()` 贡献
+ * ~3.1 秒 / 100 帧的样式重算）；本函数原先**每个 label 各出一条**，是重复命中。
+ * 属性由 client half 维护（只认 {@link NAV_ARIA_LABELS} 里那两个文案）。
+ * @param _label - 保留参数以兼容既有调用（判据已不依赖它）。
  * @returns slot 元素的 CSS 选择器（**不带门**，由调用方加）。
  */
-export function slotSelector(label: string): string {
-  return `[data-conversation-scroll] div:has(> nav[aria-label="${escapeCssString(label)}"])`
+export function slotSelector(_label: string): string {
+  return `${anchorSelector(ANCHOR.turnNavHost)}`
 }
 
 /**
@@ -135,7 +141,7 @@ function hoverRevealBlock(labels: readonly string[], breakpointPx: number): stri
  * rc.1 上它自带该变量；0.1.5 上它从 `.root` 继承（自定义属性会继承，`var()` 照样解析得到值）。
  */
 function widthCapBlock(): string {
-  const body = `${GATE}[data-phase] > div:has(> [data-conversation-scroll])`
+  const body = `${GATE}[data-phase] > ${anchorSelector(ANCHOR.scrollWrap)}`
   return `${body} {
   --dsh-nav-pin-official-width: var(--dsh-chat-content-width);
 }

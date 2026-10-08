@@ -41,6 +41,7 @@
  */
 
 import { grainOverGradients } from './backdrop.js'
+import { ANCHOR, anchorSelector } from './anchors.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -132,8 +133,11 @@ export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
    *    本插件并不这么用它。
    *
    * 官方 `role='listbox'` 的生产者只有两处（commands / input-trigger），规模很小。
+   *
+   * ⚠️ 2026-10-08：判据改走**锚点属性**（`listboxHost`）—— `:has()` 的开销实测见
+   * docs/spec/11（主表 19 条 `:has()` 贡献 ~3.1 秒 / 100 帧的样式重算）。
    */
-  "body :has(> [role='listbox'])",
+  `body ${anchorSelector(ANCHOR.listboxHost)}`,
   "body [role='listbox']:not([data-trigger-menu] *)",
   /**
    * **模态弹窗**（设置 / 云端文件 / 归档 …）—— **实色**，不做玻璃。
@@ -189,7 +193,7 @@ export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
    * `JsonTree` / `WorkspaceBrowser` / `AnimatedRows` / 左侧栏会话列表都是**内联或常驻**组件
    * （不在 body 直下），与逐条锚点同一条口径：**收窄在 body 直下**，只命中 portal 出来的浮层。
    */
-  "body > :has(> [role='tree'])",
+  `body > ${anchorSelector(ANCHOR.treeHost)}`,
   /**
    * **后台任务列表**（`JobListAction`，头部那枚任务数按钮弹出的 `<ul>`）。
    *
@@ -322,7 +326,7 @@ export const STATIC_SURFACE_ANCHORS: readonly string[] = Object.freeze([
  * 反而**必须**补：不补就是把卡片那片颗粒挖掉一块，露出一条"平带"（owner ①：「有点突兀」）。
  * 判据不是"要不要给标题颗粒"，而是**标题上有没有不透明底**（上一版没有，所以那次该撤）。
  */
-export const GROUPED_MENU_SELECTOR = "body [role='menu']:has([role='group'])"
+export const GROUPED_MENU_SELECTOR = `body ${anchorSelector(ANCHOR.menuGrouped)}`
 
 /**
  * {@link GROUPED_MENU_SELECTOR} 的**无守卫写法**，专供「与后代锚点组合」的规则使用。
@@ -745,7 +749,7 @@ export const GROUP_TITLE_ATTACHMENT = 'scroll, scroll, fixed, fixed, fixed, fixe
  * 在**样式表**里没有上下文引用元素，按规范退化成 `:root` ⇒ 规则静默失效
  * （正是本文件反复记录的那类"规则一条都命不中"的坑）。
  */
-export const GROUPED_MENU_SCROLLER_SELECTOR = "> :has([role='group'])"
+export const GROUPED_MENU_SCROLLER_SELECTOR = `> ${anchorSelector(ANCHOR.menuChild)}`
 
 /**
  * 滚动容器**就是菜单锚点自己**时的**后缀片段**（无组合符，直接贴在菜单锚点后）。
@@ -779,7 +783,7 @@ export const GROUPED_MENU_SCROLLER_SELECTOR = "> :has([role='group'])"
  * ⚠️ rc.2 的 `root` / `effort` 面板卡片带 `role='menu'`（`pane !== 'model'`），
  * 那两屏没有 `[role='group']` ⇒ 两条腿都不命中，与改前一致。
  */
-export const GROUPED_MENU_SELF_SCROLLER_SUFFIX = ":has(> [role='group'])"
+export const GROUPED_MENU_SELF_SCROLLER_SUFFIX = anchorSelector(ANCHOR.menuSelfScroller)
 
 /**
  * 「分组菜单**内圈**圆角」的自定义属性名 —— {@link GROUPED_MENU_SCROLLER_RADIUS} 经它取值。

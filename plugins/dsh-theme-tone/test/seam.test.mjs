@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 import { buildSeamCss, SEAM_NOTCH_PX } from '../lib/glass.js'
 import { BACKDROP_GRADIENTS } from '../lib/backdrop.js'
 import { GRAIN_TILE_VARIABLE, PLAIN_ATTR } from '../lib/constants.js'
+import { ANCHOR, anchorSelector } from '../lib/anchors.js'
 
 const css = buildSeamCss()
 // 注释里也会出现 `{` / `::before` 这类结构字符，对全文做结构断言会误判，故先剥注释。
@@ -19,12 +20,16 @@ function bodyOf(needle) {
   return rules.slice(rules.indexOf('{', at) + 1, rules.indexOf('}', at))
 }
 
+/** 两条锚点选择器（原为 `:has()` 判据，现由 client half 在运行期打标 —— 见 docs/spec/11）。 */
+const ANCHOR_SEAT_DOCKED = anchorSelector(ANCHOR.seatDocked)
+const ANCHOR_HOST = anchorSelector(ANCHOR.composerHost)
+
 /** 三条缝的挡板选择器（与被测实现一一对应）。 */
 const GOAL_BAND = "[data-testid='todo-panel'] ~ [data-goal-bar]::before"
 const QUEUE_BAND = ":is([data-testid='todo-panel'], [data-goal-bar]) ~ [data-queue-dock]::before"
 // 最后一条**不挂在输入框卡自己身上** —— 卡片带 backdrop-filter、自成层叠上下文，
 // 挂它身上的伪元素（哪怕 z-index: -1）会画在停靠卡**之上**，补缺口那 16px 会把待办卡底边涂成背景色。
-const CARD_BAND = ':has(> [data-composer-card])::before'
+const CARD_BAND = `${ANCHOR_HOST}::before`
 
 describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () => {
   it('三条缝各有一条挡板：目标条 / 排队卡 / 输入框卡的父元素', () => {
@@ -110,9 +115,9 @@ describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () =
     assert.match(bodyOf('~ [data-goal-bar] {'), /position: relative/u, '目标条 wrapper 要 position: relative')
     assert.match(bodyOf('~ [data-queue-dock] {'), /position: relative/u, '排队卡 wrapper 要 position: relative')
     // 输入框卡那条挂在**卡的父元素**上 —— 卡自带 backdrop-filter，挂它身上会被抬到停靠卡之上
-    assert.match(bodyOf(':has(> [data-composer-card]) {'), /position: relative/u, '输入框卡的父元素要 position: relative')
+    assert.match(bodyOf(`${ANCHOR_HOST} {`), /position: relative/u, '输入框卡的父元素要 position: relative')
     // 无偏移 ⇒ 不改布局；也不能带 z-index（那会另开层叠上下文，把带子的 -1 关进小盒子）
-    for (const needle of ['~ [data-goal-bar] {', '~ [data-queue-dock] {', ':has(> [data-composer-card]) {']) {
+    for (const needle of ['~ [data-goal-bar] {', '~ [data-queue-dock] {', `${ANCHOR_HOST} {`]) {
       const body = bodyOf(needle)
       assert.ok(!/\btop\s*:/u.test(body) && !/\bleft\s*:/u.test(body), `${needle} 不得带偏移`)
       assert.ok(!/\bz-index\s*:/u.test(body), `${needle} 不得带 z-index`)
@@ -126,31 +131,33 @@ describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () =
       rules.includes(":is([data-testid='todo-panel'], [data-goal-bar]) ~ [data-queue-dock]::before"),
       '排队卡：必须要求前面有 todo / goal',
     )
-    // ② 完全没有停靠卡时，输入框卡上方根本没有缝 —— `:has()` 门。
+    // ② 完全没有停靠卡时，输入框卡上方根本没有缝 —— 走**座位锚点**门
+    //    （原为 `[data-composer-seat]:has([data-testid='todo-panel'], [data-goal-bar])`；
+    //      现由 client half 在运行期判定，见 docs/spec/11）。
     assert.ok(
-      rules.includes("[data-composer-seat]:has([data-testid='todo-panel'], [data-goal-bar])"),
-      '输入框卡：必须要求底座里有停靠卡',
+      rules.includes(`${ANCHOR_SEAT_DOCKED} ${ANCHOR_HOST}::before`),
+      '输入框卡：必须要求底座里有停靠卡（且宿主是卡父元素）',
     )
     // ③ 排队卡在场时它自带负边距塞进输入框卡下面（实测重叠 3px）—— 那条缝本来就不存在，
-    //    此时再画一条会**盖在排队卡自己身上**。
-    assert.ok(
-      rules.includes("not(:has([data-queue-dock])) :has(> [data-composer-card])::before"),
-      '输入框卡：排队卡在场时那条缝不存在，必须排除',
-    )
+    //    此时再画一条会**盖在排队卡自己身上**。该情形已并入 `seatDocked` 的判定
+    //    （client half 要求「有停靠卡且**无**队列坞」才打标），故这里守卫的是
+    //    「座位锚点里不得再出现 not(:has(…)) 那类运行时判据」。
+    assert.ok(!rules.includes('not(:has('), '运行时判据不得写回 CSS（那是 :has() 的开销来源）')
+    assert.ok(!rules.includes(':has('), '本表不得再用 :has()')
   })
 
   it('⛔ 输入框卡那条的「门」与「宿主」必须分开：门挂座位、宿主是座位里的卡父元素', () => {
-    // 踩过：把 `:has(> [data-composer-card])` 直接并进座位（`[data-composer-seat]:has(> […])`），
-    // 宿主就变成了**座位自己** —— 伪元素挂回底座、缝反而漏（实测缝区又回到 250+）。
+    // 踩过：把宿主判据直接并进座位（`座位:has(> 卡)`），宿主就变成了**座位自己** ——
+    // 伪元素挂回底座、缝反而漏（实测缝区又回到 250+）。
     assert.ok(
-      rules.includes("[data-composer-seat]:has([data-testid='todo-panel'], [data-goal-bar])"),
-      '门必须挂在座位上',
+      rules.includes(ANCHOR_SEAT_DOCKED),
+      '门必须挂在座位上（锚点由 client half 按「有停靠卡且无队列坞」打标）',
     )
     assert.ok(
-      !rules.includes('[data-composer-seat]:has(> [data-composer-card])'),
+      !rules.includes(`${ANCHOR_SEAT_DOCKED}${ANCHOR_HOST}`),
       '宿主不得并进座位自身（门与宿主之间必须有后代组合符）',
     )
-    assert.ok(rules.includes(' :has(> [data-composer-card]) {'), '宿主是座位里面的「卡的父元素」')
+    assert.ok(rules.includes(`${ANCHOR_HOST} {`), '宿主是座位里面的「卡的父元素」')
   })
 
   it('⛔ 底座本体不得挂伪元素（owner：「不是靠这个夹层」）', () => {

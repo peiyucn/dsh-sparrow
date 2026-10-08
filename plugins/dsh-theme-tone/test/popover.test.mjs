@@ -17,6 +17,7 @@ import { describe, it } from 'node:test'
 import { HEADER_ACTION_SCOPE, RIGHT_PANEL_OPEN_GATE, buildPopoverCss } from '../lib/popover.js'
 import { HEADER_HEIGHT_PX } from '../lib/glass.js'
 import { PLAIN_ATTR, RIGHT_PANEL_ATTR } from '../lib/constants.js'
+import { ANCHOR, anchorSelector } from '../lib/anchors.js'
 
 const css = buildPopoverCss()
 /** 剥注释：注释里会出现反引号、色值与选择器片段，直接扫全文会误判。 */
@@ -35,10 +36,13 @@ describe('popover：顶栏弹出层的列内夹取', () => {
     assert.match(bodyOf(clampRule), /left:\s*0/u, `第二条必须把左缘压回列左缘：${bodyOf(clampRule)}`)
   })
 
-  it('第一条 必须按结构命中弹框宿主，不得依赖官方哈希类名', () => {
+  it('第一条 必须命中弹框宿主，且走锚点属性、不依赖官方哈希类名', () => {
     const sel = selsOf(rules[0])
-    // :has(> ul) —— 按结构命中「里面装了弹框」的那个 wrapper；类名是 CSS-module 哈希，仓库红线。
-    assert.match(sel, /:has\(>\s*ul\)/u, `必须用 :has(> ul) 按结构命中宿主：${sel}`)
+    // ⚠️ 2026-10-08：原为 `:has(> ul)` 按结构命中；改走**锚点属性**（由 client half 打标），
+    // 理由是 `:has()` 的样式重算开销（受控实测见 docs/spec/11）。
+    assert.ok(sel.includes(anchorSelector(ANCHOR.panelActionsUl)),
+      `必须用锚点属性命中宿主（里面装了弹框的那个 wrapper）：${sel}`)
+    assert.ok(!sel.includes(':has('), `不得用 :has()（开销来源）：${sel}`)
     assert.ok(!/\[class[*^$|~]?=/u.test(sel), `不得依赖官方哈希类名（仓库红线）：${sel}`)
   })
 
@@ -71,17 +75,19 @@ describe('popover：顶栏弹出层的列内夹取', () => {
 
   it('门必须只挂在「右栏面板已打开」上', () => {
     for (const one of rules.map(selsOf)) {
-      assert.ok(one.includes(`[${RIGHT_PANEL_ATTR}][data-sidebar-right-open]`),
-        `每条规则都必须门在右栏面板打开上（面板关着时列右缘就是视口，不该改官方布局）：${one}`)
+      // ⚠️ 门改走锚点属性：原为 `body:has([panel][open])`（`:has()` 里最贵的一类，
+      // 锚在 body 上 ⇒ 任何 DOM 变动都重算整棵子树）。判据仍等价，见 docs/spec/11。
+      assert.ok(one.includes(anchorSelector(ANCHOR.rightPanelOpen)),
+        `每条规则都必须门在「右栏面板已打开」锚点上（面板关着时列右缘就是视口，不该改官方布局）：${one}`)
+      assert.ok(!one.includes(':has('), `门不得用 :has()：${one}`)
     }
     // 锚点必须是官方公开槽位属性，且**只收窄到那一个 ul**（不宽泛到 ul 全域）。
     for (const one of rules.map(selsOf)) {
       assert.ok(one.includes("[data-slot='conversation.session.header.actions']"),
         `必须锚在官方公开槽位属性上：${one}`)
-      // 两条各自收窄的方式不同：第一条用 `:has(> ul)` **按结构**找到装了弹框的宿主，
-      // 第二条直接打 `ul`。两者都必须落在那个槽位**之内**。
-      assert.ok(/:has\(>\s*ul\)$/u.test(one) || /\bul$/u.test(one),
-        `必须收窄到那个弹出列表（ul / :has(> ul) 结尾）：${one}`)
+      // 两条各自收窄的方式不同：第一条用锚点属性找到装了弹框的宿主，第二条直接打 `ul`。
+      assert.ok(one.includes(anchorSelector(ANCHOR.panelActionsUl)) || /\bul$/u.test(one),
+        `必须收窄到那个弹出列表（锚点属性 / ul 结尾）：${one}`)
       assert.ok(!one.includes('[class'), `不得依赖 hashed 类名：${one}`)
     }
   })

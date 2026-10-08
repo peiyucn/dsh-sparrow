@@ -36,6 +36,7 @@
  */
 
 import { ABOVE_CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_BAND_VARIABLE, PHASE_NOTCH_ATTR, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
+import { ANCHOR, anchorSelector } from './anchors.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, compensatedBackdropGradients, grainOverGradients } from './backdrop.js'
 
 /**
@@ -1899,19 +1900,23 @@ function buildCardNotchCss(): string {
    */
   const gate = `body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat]`
   /**
-   * 缺口补丁的宿主：**卡的父元素**。`:has()` 只能是它 —— 卡片本身带 `backdrop-filter`
-   * 自成层叠上下文，挂它身上的伪元素（哪怕 z-index 负）会画在停靠卡之上。
+   * 缺口补丁的宿主：**卡的父元素**。原本写 `:has(> [data-composer-card])` ——
+   * 那只能是它，因为卡片本身带 `backdrop-filter` 自成层叠上下文，
+   * 挂它身上的伪元素（哪怕 z-index 负）会画在停靠卡之上。
+   *
+   * ⚠️ 2026-10-08：判据改走**锚点属性**（`composerHost`，由 client half 维护）。
+   * `:has()` 的开销实测见 docs/spec/11。
    */
-  const host = `${gate} :has(> [data-composer-card])`
+  const host = `${gate} ${anchorSelector(ANCHOR.composerHost)}`
   /**
    * 缺口补丁的**性能档**选择器：在门上再加「运行期相位已就绪」。
    *
    * ⚠️ 比下面那条**多一个属性选择器** ⇒ 特异度更高，两处声明同时命中时**恒以本档为准**
-   *（不受书写次序影响）；几何没测到时本条不命中，自动退回下面那条 `fixed` 档。
-   * ⚠️ 必须**写在基础档之前**：缝表那边的守卫用「最后一条 `:has(...)::after`」取补丁本体
+   *（不受书写次序影响）；几何没测到时本条不命中，自动退回下面那条非性能档。
+   * ⚠️ 必须**写在基础档之前**：缝表那边的守卫用「最后一条缺口补丁本体」取它
    *（见 test/glass.test.mjs 的 lastRuleWith），本档写在后面会把那条守卫指到错规则上。
    */
-  const phaseHost = `body:not([${PLAIN_ATTR}])[${PHASE_NOTCH_ATTR}] [data-phase='active'] [data-composer-seat] :has(> [data-composer-card])`
+  const phaseHost = `body:not([${PLAIN_ATTR}])[${PHASE_NOTCH_ATTR}] [data-phase='active'] [data-composer-seat] ${anchorSelector(ANCHOR.composerHost)}`
   return `/* ===== 输入框卡上圆角缺口（卡片圆角弧外的三角露正文；详见 buildCardNotchCss 注释）===== */
 ${host} {
   /* 只补包含块，不改布局（无偏移、无 z-index）：父元素官方是 static，
@@ -2078,7 +2083,7 @@ export function buildSeamCss(): string {
 }`
   const goalBand = `${gate} [data-testid='todo-panel'] ~ [data-goal-bar]`
   const queueBand = `${gate} :is([data-testid='todo-panel'], [data-goal-bar]) ~ [data-queue-dock]`
-  const cardBand = `${gate}:has([data-testid='todo-panel'], [data-goal-bar]):not(:has([data-queue-dock])) :has(> [data-composer-card])`
+  const cardBand = `${gate}${anchorSelector(ANCHOR.seatDocked)} ${anchorSelector(ANCHOR.composerHost)}`
   return `/* ===== dsh-theme-tone 缝挡板（停靠卡与输入框卡之间的 6px 缝；详见本函数注释） ===== */
 ${host(goalBand)}
 ${band(goalBand, true)}

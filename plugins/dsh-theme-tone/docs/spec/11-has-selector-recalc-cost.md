@@ -97,21 +97,61 @@ spec 10 测得「相位档省 56% 绘制次数」是真的，但那笔钱在**�
 
 ⇒ 成本来自 **`:has()` 这个伪类的匹配求值**，与「命中后画什么」无关。
 
-## 4) 修法方向（待实现）
+## 4) 修法（**已实现**）
 
-**把 19 条 `:has()` 换成属性选择器**，属性由 client half 在运行期维护 ——
-与 spec 10 已建立的机制**同型**（`publishPhase` 那套：rAF 合并 + 收敛重测 + `ctx.effect` 清理）。
+把 19 条 `:has()` 换成**锚点属性**，属性由 client half 在运行期维护 ——
+与 spec 10 已建立的机制同型（rAF 合并 + 收敛重测 + `ctx.effect` 清理）。
 
-草案：
+### 4.1 落点
 
-1. client half 用 `MutationObserver` + rAF 维护若干锚点属性，例如
-   `data-tone-anchor='seat' | 'composer-host' | 'scroll-wrap' | 'turn-nav' |
-   'overlay-tree' | 'overlay-listbox' | 'dialog' | 'grouped-menu' | 'panel-actions'`；
-2. 主表里对应的 19 条选择器改成 `[data-tone-anchor='…']`（保留原有门与伪元素）；
-3. 维护逻辑**必须便宜**：只在「锚点集合的指纹」变化时才写属性，避免自己成为热路径
-   （实测：`getComputedStyle` 每帧调用次数在插件态与官方态同为 2.5/帧，不是问题）。
+* 新增 `src/anchors.ts`：属性名 `data-tone-anchor`、12 个角色 token、
+  `anchorSelector()` / `anchorValue()`（值按固定顺序排列 ⇒ 「集合没变就不写」才真的生效）。
+* `src/client/index.ts` 的 `maintainAnchors()`：由 `scheduleProbe` 在同帧合并后调用。
+  三条开销纪律 —— ① JS 里**绝不用 `:has()` 反查**（只用标签/属性 + 父子关系）；
+  ② **只在值变化时写属性**（用 `anchored` 记上一轮的值做集合差）；
+  ③ 扫描量有界。卸载时 `clearAnchors()` 逐个摘掉（只摘自己写过的元素）。
+* 消费侧：`glass.ts` / `surface.ts` / `nav-pin.ts` / `popover.ts` / `constants.ts`
+  的 19 条选择器全部改为锚点属性；**活着的 `:has()` 数量 = 0**（由测试钉住）。
 
-⚠️ **尚未实现**。本节只是把方向与判据固定下来；落地前须按 `08` 的 spec-before-code 走一遍评审。
+### 4.2 ⚠️ 踩过的坑：三条腿被合并成一条（**静默丢面**）
+
+分组菜单原本有**三条语义不同**的判据，我一度把它们合并到同一个 token：
+
+| 判据 | 语义 |
+| :--- | :--- |
+| `[role='menu']:has([role='group'])` | 分组在**任意深度** |
+| `[role='menu']:has(> [role='group'])` | 分组是**直接子** |
+| `[role='menu'] > :has([role='group'])` | 含分组的那个**直接子**元素 |
+
+后果：本仓库 codebuddy 菜单实测 `groupsDirect: 0 / groupsAny: 2`
+⇒ 用「直接子」判据标它，**它静默失去质感**（不报错、不崩，只是没有颗粒与光）。
+
+抓到它的是**等价性对拍**（`TEMP/verify-anchor-menu.mjs`：拿原选择器当基准，
+逐个 `isSameNode` 比命中集），**不是任何断言** —— 所以这类改动必须跑那个脚本。
+现已拆成 `menuGrouped` / `menuSelfScroller` / `menuChild` 三个 token，
+并补了单测（`test/anchors.test.mjs`）把这三条腿的**语义落点**钉死。
+
+### 4.3 等价性验收（真机）
+
+`TEMP/verify-anchor-equivalence.mjs` + `verify-anchor-stress.mjs` + `verify-anchor-menu.mjs`：
+在**多个真实 UI 状态**下（会话 / 命令面板 / 模型菜单 / 设置对话框 / 右栏打开 / codebuddy 菜单），
+对 12 个锚点逐个比对「原选择器命中集」与「锚点命中集」。
+
+* 已覆盖（两边计数 > 0 且完全一致）：`composer-host`、`listbox-host`、`dialog`、
+  `right-panel-open`（0→1 正确翻转）、`scroll-wrap`、`turn-nav-host`、
+  `menu-grouped`、`menu-child`
+* **未覆盖**（本轮没能稳定造出该状态，计数两边皆 0）：`seat-docked`、`tree-host`、
+  `menu-self-scroller`、`panel-actions-ul` —— **如实记为未验证**，不是「已验证」。
+
+### 4.4 收益（真机受控实测）
+
+| 指标 | 改前 | 改后 |
+| :--- | ---: | ---: |
+| 流式 + 滚动，`UpdateLayoutTree`（150 帧） | **11136.7 ms** | **2929.3 ms**（−74%） |
+| 静止滚动，插件 − 官方（成对中位） | **+1.79 ms**（符号一致性 80%） | **+0.003 ms**（一致性 53% = 噪声） |
+| 噪声底（同配置测两次） | −0.015 ms | −0.015 ms |
+
+⇒ 插件主题与官方默认在滚动帧间隔上**已无差别**（差值落在噪声底内）。
 
 ## 5) 复现方式
 
@@ -123,6 +163,11 @@ node TEMP/perf-match-vs-paint.mjs       # 「效果」vs「规则在场」
 node TEMP/perf-recalc-attribution.mjs   # 逐表归因
 node TEMP/perf-has-poc.mjs              # `:has()` → 属性选择器的等价性 PoC（决定性）
 node TEMP/perf-streaming.mjs            # 流式场景本身的对照
+
+# 等价性验收（改选择器判据后**必跑**）
+node TEMP/verify-anchor-equivalence.mjs # 三状态 × 全锚点
+node TEMP/verify-anchor-stress.mjs      # 造出命令面板 / 模型菜单 / 设置对话框 / 右栏打开
+node TEMP/verify-anchor-menu.mjs        # 分组菜单三条腿（抓到过真实 bug）
 ```
 
 > ⚠️ **必须用 `headless: false`**：headless 不做真实 GPU 合成，

@@ -5,6 +5,8 @@
  * 集中一处便于单测钉住，避免散落的魔术字符串。
  */
 
+import { ANCHOR, anchorSelector } from './anchors.js'
+
 /** 插件短名：cordis loader 条目 id 与日志前缀。 */
 export const name = 'dsh-theme-tone'
 
@@ -533,7 +535,7 @@ export const TOP_STOP_VARIABLE = '--dsh-theme-tone-top-stop'
  * 却**没有**它。将来若真要按「真模态 vs 小弹层」分流，判据是 `aria-modal`，
  * 不是很宽的 `role='dialog'`。**当前不需要**（两类都走实色）。
  */
-export const DIALOG_ANCHOR = "body [role='dialog']:not(:has(> img))"
+export const DIALOG_ANCHOR = `body ${anchorSelector(ANCHOR.dialog)}`
 
 /**
  * 浮层用的颗粒贴图：与背景层同一张 `feTurbulence` 噪声（逐字同参数），

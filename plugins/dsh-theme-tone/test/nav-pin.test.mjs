@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { buildNavPinCss, CONTENT_MAX_SIDE_CLEARANCE_PX, NAV_ARIA_LABELS, slotSelector } from '../lib/nav-pin.js'
+import { ANCHOR, anchorSelector } from '../lib/anchors.js'
 import { PLAIN_ATTR } from '../lib/constants.js'
 
 /** 去掉注释后的样式表文本（判据只看声明；注释里会引用反面教材）。 */
@@ -19,10 +20,10 @@ const GATE = `body:not([${PLAIN_ATTR}])`
 describe('dsh-theme-tone 轮次导航与宽度钳制（自 nav-pin 并入）', () => {
   describe('slotSelector', () => {
     it('给定官方标签 应该 生成 nav 直接父元素的定位选择器', () => {
-      assert.equal(
-        slotSelector('Turn navigation'),
-        '[data-conversation-scroll] div:has(> nav[aria-label="Turn navigation"])',
-      )
+      // ⚠️ 2026-10-08：判据从 `div:has(> nav[aria-label=…])` 改为**锚点属性**
+      //（`:has()` 的样式重算开销实测见 docs/spec/11）；标签匹配挪到 client half。
+      assert.equal(slotSelector('Turn navigation'), anchorSelector(ANCHOR.turnNavHost))
+      assert.ok(!slotSelector('Turn navigation').includes(':has('), '不得再用 :has()')
     })
   })
 
@@ -30,11 +31,9 @@ describe('dsh-theme-tone 轮次导航与宽度钳制（自 nav-pin 并入）', (
     const css = buildNavPinCss()
     const rules = stripped(css)
 
-    it('应该 同时覆盖 zh / en 两套官方标签', () => {
-      assert.deepEqual(NAV_ARIA_LABELS, ['Turn navigation', '轮次导航'])
-      for (const label of NAV_ARIA_LABELS) {
-        assert.ok(rules.includes(`nav[aria-label="${label}"]`), `缺少标签 ${label}`)
-      }
+    it('应该 定位到轮次导航的宿主（锚点属性），且不再用 :has()', () => {
+      assert.ok(rules.includes(anchorSelector(ANCHOR.turnNavHost)), '缺少轮次导航锚点')
+      assert.ok(!rules.includes(':has('), '本表不得再用 :has()')
     })
 
     it('应该 以 display: block 压过官方隐藏规则（断点外恒显）', () => {
@@ -95,7 +94,7 @@ describe('dsh-theme-tone 轮次导航与宽度钳制（自 nav-pin 并入）', (
       // 0.1.5-rc.2 里该变量定义在 .root（= [data-phase]），0.1.7-rc.1 起改到 .body
       // （[data-phase] 的子元素）。捕获写在 [data-phase] 上时，rc.1 下解析为空 →
       // min(空, …) 让整条自定义属性 invalid → 滚动体与拖拽条的宽度轴全失效。
-      const body = '[data-phase] > div:has(> [data-conversation-scroll])'
+      const body = `[data-phase] > ${anchorSelector(ANCHOR.scrollWrap)}`
       assert.ok(
         rules.includes(`${body} {\n  --dsh-nav-pin-official-width: var(--dsh-chat-content-width);`),
         '捕获必须写在那层「含滚动体的直接子元素」上（两版都成立）',
@@ -154,19 +153,19 @@ describe('dsh-theme-tone 轮次导航与宽度钳制（自 nav-pin 并入）', (
     })
   })
 
-  describe('slotSelector 转义', () => {
-    it('标签含双引号 应该 转义为选择器安全的字符串', () => {
-      assert.equal(
-        slotSelector('say "hi"'),
-        '[data-conversation-scroll] div:has(> nav[aria-label="say \\"hi\\""])',
-      )
-    })
-
-    it('标签含反斜杠 应该 转义为选择器安全的字符串', () => {
-      assert.equal(
-        slotSelector('a\\b'),
-        '[data-conversation-scroll] div:has(> nav[aria-label="a\\\\b"])',
-      )
+  describe('slotSelector 已无标签注入面', () => {
+    // ⚠️ 判据改走锚点属性后，**标签不再进选择器** ⇒ 原先那两条「引号 / 反斜杠转义」守卫
+    // 失去对象（那正是它们要防的注入面，现在结构性消失了）。改为守卫**这件事本身**：
+    // 选择器必须与传入的标签无关，且不得含引号 —— 否则说明有人把标签拼回了选择器。
+    it('选择器不得随标签变化，也不得含引号（标签不再进 CSS）', () => {
+      const base = slotSelector('Turn navigation')
+      for (const label of ['say "hi"', 'a\\b', '', '轮次导航']) {
+        assert.equal(slotSelector(label), base, `标签 ${JSON.stringify(label)} 不该影响选择器`)
+      }
+      // 锚点选择器本身**含 `=` 与引号**（`[attr~="x"]`），故只检查不含**标签内容**：
+      // 标签一旦进选择器，就不可能与「空标签」得到同一个结果。
+      assert.equal(slotSelector(''), slotSelector('轮次导航'), '空标签与非空标签必须给出同一选择器')
+      assert.ok(base.includes('~='), '锚点选择器应使用词匹配（`~=`）')
     })
   })
 

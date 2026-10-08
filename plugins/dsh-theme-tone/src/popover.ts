@@ -79,6 +79,7 @@
 
 import { HEADER_HEIGHT_PX } from './glass.js'
 import { PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
+import { ANCHOR, anchorSelector } from './anchors.js'
 
 /**
  * 顶栏动作槽位里那个弹出列表的宿主选择器（官方公开槽位属性，非 hashed 类名）。
@@ -88,12 +89,21 @@ import { PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
  */
 export const HEADER_ACTION_SCOPE = "body [data-slot='conversation.session.header.actions']"
 
+/** 官方槽位属性名（`HEADER_ACTION_SCOPE` 的单一真值来源）。 */
+export const HEADER_ACTION_SLOT = 'conversation.session.header.actions'
+
 /**
- * 「右栏面板已打开」的祖先门。
+ * 「右栏面板已打开」的祖先门 —— 走**锚点属性**，不用 `:has()`。
  *
- * 面板是顶栏的**兄弟**子树，故只能用 `:has()` 从 `body` 向下找；开销实测 0.00ms。
+ * ## 为什么改（实测，见 docs/spec/11）
+ * 原写法是 `body:has([data-sidebar-right-panel][data-sidebar-right-open])`。
+ * 那是 `:has()` 里**最贵的一类**：锚在 `body` 上 ⇒ 任何 DOM 变动都要重算整棵子树。
+ * 受控实测（有头 + 真实合成 + 模拟流式）：主表 19 条 `:has()` 贡献了
+ * **~3.1 秒 / 100 帧**的样式重算，换成同命中集的属性选择器可拿回约 100% 的收益。
+ *
+ * 属性由 client half 维护（`src/anchors.ts` 的 `rightPanelOpen`）。
  */
-export const RIGHT_PANEL_OPEN_GATE = `body:has([${RIGHT_PANEL_ATTR}][data-sidebar-right-open])`
+export const RIGHT_PANEL_OPEN_GATE = `body${anchorSelector(ANCHOR.rightPanelOpen)}`
 
 /**
  * 弹出层列内夹取的样式表文本。
@@ -118,8 +128,9 @@ export function buildPopoverCss(): string {
    触发器那个 wrapper 是官方 \`.root { position: relative }\`；改成 static 后它不再定位，
    绝对定位的包含块于是上移一层。触发器**按钮自身**的盒子逐像素不变（实测）。
    ⚠️ 不用 [class*=...] 匹配 —— 官方那个类名是 CSS-module 哈希，本仓库禁止依赖它；
-   :has(> ul) 按**结构**命中，稳定。 */
-${scope} :has(> ul) {
+   原先用 :has(> ul) 按**结构**命中，现改走**锚点属性**（同一批评选，
+   只是判据由 client half 在运行期算好 —— :has() 的开销实测见 docs/spec/11）。 */
+${scope} ${anchorSelector(ANCHOR.panelActionsUl)} {
   position: static;
 }
 /* ② 夹进列内：

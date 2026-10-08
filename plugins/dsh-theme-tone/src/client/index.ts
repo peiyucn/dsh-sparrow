@@ -20,9 +20,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { cssSupports, hasCapability, warnMissingCapabilities, warnUser } from '../compat.js'
+import { ANCHOR, ANCHOR_ATTR, anchorValue, type AnchorToken } from '../anchors.js'
 import {
   BACKDROP_CLASS,
   BOTTOM_VARIABLE,
+  CONTENT_ATTR,
   GRAIN_ATTR,
   LOCALE_NAMESPACE,
   LEFT_VARIABLE,
@@ -35,6 +37,7 @@ import {
   PHASE_NOTCH_TOP_VARIABLE,
   PHASE_NOTCH_VARIABLE,
   PHASE_SETTLE_FRAMES,
+  RIGHT_PANEL_ATTR,
   PLAIN_ATTR,
   ROW_ID,
   ROW_ORDER,
@@ -53,6 +56,8 @@ import {
 } from '../backdrop.js'
 import { buildCaptionCss } from '../caption.js'
 import { buildGlassCss, buildSeamCss } from '../glass.js'
+import { NAV_ARIA_LABELS } from '../nav-pin.js'
+import { HEADER_ACTION_SLOT } from '../popover.js'
 import { buildMaskCss } from '../mask.js'
 import { buildNavPinCss } from '../nav-pin.js'
 import { HANDLE_SELECTOR, applyGlow } from '../handle-glow.js'
@@ -270,6 +275,125 @@ function install(ctx: Context): void {
   }
 
   /**
+   * 维护 {@link ANCHOR_ATTR}——把原本写在 CSS 里的 `:has()` 判据搬到运行期。
+   *
+   * ## 为什么（有实测依据，见 docs/spec/11）
+   * 主表里原本 19 条含 `:has()` 的规则。受控实测（有头 + 真实合成 + 模拟流式）：
+   * 现状样式重算 **4622.8ms**，删掉这 19 条 → **1559.4ms**，
+   * **换成同命中集的属性选择器 → 1513.8ms**（拿回约 100% 的收益，效果一字不变）。
+   * 即：成本来自 `:has()` 的失效跟踪，与命中后画什么无关。
+   *
+   * ## 三条开销纪律（否则等于把省下的钱又花回去）
+   * 1. **JS 里绝不用 `:has()` 反查** —— 全部用「标签 / 属性选择器 + 父子关系」表达；
+   * 2. **只在值变化时写属性** —— 用 {@link anchored} 记着上一轮写了什么，做集合差
+   *    （属性写一次就引一次样式失效，流式时尤其不能每帧写）；
+   * 3. **扫描量有界** —— 每个角色都是「先查一批便宜锚点，再看它们的父子关系」，
+   *    不做全树遍历。
+   *
+   * ## 与 rAF 的关系
+   * 由 `scheduleProbe` 在同帧合并后调用，于是连续 DOM 变动只算一次。
+   */
+  const maintainAnchors = (): void => {
+    const root = markerHost
+    if (root === null) return
+    /** 本轮「希望」的锚点：元素 → token 列表。 */
+    const want = new Map<Element, AnchorToken[]>()
+    const add = (el: Element | null, token: AnchorToken): void => {
+      if (el === null) return
+      const list = want.get(el)
+      if (list === undefined) want.set(el, [token])
+      else if (!list.includes(token)) list.push(token)
+    }
+    /** 把「直接子元素满足 childSelector」的父元素统统打上 token。 */
+    const tagParentsOf = (childSelector: string, token: AnchorToken): void => {
+      for (const child of document.querySelectorAll(childSelector)) add(child.parentElement, token)
+    }
+    /** 元素是否有直接子元素满足 childSelector（**不用 `:has()`**，只走 children）。 */
+    const hasDirectChild = (el: Element, childSelector: string): boolean => {
+      for (const child of el.children) if (child.matches(childSelector)) return true
+      return false
+    }
+
+    try {
+      // ① 输入框卡片的父元素（缺口补丁的宿主）。
+      tagParentsOf('[data-composer-card]', ANCHOR.composerHost)
+
+      // ② 含停靠卡、且不含队列坞的会话座。
+      for (const seat of document.querySelectorAll('[data-composer-seat]')) {
+        const docked = seat.querySelector("[data-testid='todo-panel'], [data-goal-bar]") !== null
+        if (docked && seat.querySelector('[data-queue-dock]') === null) add(seat, ANCHOR.seatDocked)
+      }
+
+      // ③ 命令面板卡片的祖元素（背景长在祖先上、role 在内层视口上）。
+      tagParentsOf("[role='listbox']", ANCHOR.listboxHost)
+
+      // ④ 实色模态弹窗：`role='dialog'` 且**不是**图片灯箱（灯箱的直接子里有 img）。
+      for (const dialog of document.querySelectorAll("[role='dialog']")) {
+        if (!hasDirectChild(dialog, 'img')) add(dialog, ANCHOR.dialog)
+      }
+
+      // ⑤ 子代理血缘弹层的外层盒子：`body` 的直接子元素、且直接子里有 `[role='tree']`。
+      for (const child of root.children) {
+        if (hasDirectChild(child, "[role='tree']")) add(child, ANCHOR.treeHost)
+      }
+
+      // ⑥⑦⑧ 分组菜单三条腿（**判据各不相同，别合并**）：
+      //   * menuGrouped      —— 后代里有分组（给菜单本体上料）
+      //   * menuSelfScroller —— **直接子**里就有分组（rc.2 的滚动容器是菜单自己）
+      //   * menuChild        —— 含分组的那个直接子元素（rc.1 的滚动容器）
+      // 实测 codebuddy 菜单是 `groupsDirect: 0 / groupsAny: 2` ⇒ 前两条必须分开，
+      // 合并会让那个菜单静默失去质感（本轮真犯过，靠等价性对拍抓到）。
+      for (const menu of document.querySelectorAll("[role='menu']")) {
+        if (menu.querySelector("[role='group']") !== null) add(menu, ANCHOR.menuGrouped)
+        if (hasDirectChild(menu, "[role='group']")) add(menu, ANCHOR.menuSelfScroller)
+        for (const child of menu.children) {
+          if (child.querySelector("[role='group']") !== null) add(child, ANCHOR.menuChild)
+        }
+      }
+
+      const scroller = document.querySelector(`[${CONTENT_ATTR}]`)
+      if (scroller !== null) {
+        // ⑧ 轮次导航 nav 的直接父元素（只认官方那两个 aria-label，避免误标别的 nav）。
+        for (const nav of scroller.querySelectorAll('nav[aria-label]')) {
+          if (NAV_ARIA_LABELS.includes(nav.getAttribute('aria-label') ?? '')) add(nav.parentElement, ANCHOR.turnNavHost)
+        }
+        // ⑨ 对话滚动体的直接父元素（官方那个 wrapper，宽度钳制捕获变量的地方）。
+        if (scroller.parentElement?.parentElement?.hasAttribute('data-phase') === true) {
+          add(scroller.parentElement, ANCHOR.scrollWrap)
+        }
+      }
+
+      // ⑩ 头部操作区里、直接子元素是 ul 的那个容器。
+      for (const ul of document.querySelectorAll(`[data-slot='${HEADER_ACTION_SLOT}'] ul`)) {
+        add(ul.parentElement, ANCHOR.panelActionsUl)
+      }
+
+      // ⑪ 右栏面板已打开（标在 body 上；原写法是 `body:has(…)`，`:has()` 里最贵的一类）。
+      if (document.querySelector(`[${RIGHT_PANEL_ATTR}][data-sidebar-right-open]`) !== null) {
+        add(root, ANCHOR.rightPanelOpen)
+      }
+
+      // ── 集合差：只写变化的那些（写一次 = 一次样式失效） ──
+      for (const [el, tokens] of want) {
+        const value = anchorValue(tokens)
+        if (anchored.get(el) === value) continue
+        el.setAttribute(ANCHOR_ATTR, value)
+        anchored.set(el, value)
+      }
+      for (const [el] of [...anchored]) {
+        if (want.has(el)) continue
+        el.removeAttribute(ANCHOR_ATTR)
+        anchored.delete(el)
+      }
+    } catch {
+      // 运行期不冒泡（根 AGENTS）：标不上只是少了质感，绝不打扰宿主。
+    }
+  }
+
+  /** 上一轮写过的锚点（元素 → 已写入的值），用于「只在变化时写」。 */
+  const anchored = new Map<Element, string>()
+
+  /**
    * 摘掉两道相位门与四个几何变量（卸载 / 降级共用一处，避免漏摘）。
    *
    * ⚠️ **必须声明在清理 effect 之前**：清理体要调它，若声明在 effect 之后，
@@ -286,6 +410,17 @@ function install(ctx: Context): void {
       target.removeAttribute(attr)
       for (const v of vars) target.style.removeProperty(v)
     }
+  }
+
+  /**
+   * 摘掉全部锚点属性（卸载用）。
+   *
+   * 只摘 {@link anchored} 里记过的元素 —— 那是本插件写过的**全部**元素，
+   * 不做全树扫描（`querySelectorAll` 在卸载路径上没必要，也避免漏摘/误摘）。
+   */
+  const clearAnchors = (): void => {
+    for (const [el] of anchored) el.removeAttribute(ANCHOR_ATTR)
+    anchored.clear()
   }
 
   /**
@@ -314,6 +449,8 @@ function install(ctx: Context): void {
     paintPlain(false)
     markerHost?.removeAttribute(WORKSTART_ATTR)
     clearPhase()
+    // 锚点也一并收干净：它们写在**任意**元素上（不止 body），漏摘会留在用户 DOM 里。
+    clearAnchors()
   }, 'dsh-theme-tone: backdrop + token overrides')
 
   /**
@@ -594,6 +731,8 @@ function install(ctx: Context): void {
       probeScheduled = false
       probeFrame = 0
       probeWorkstart()
+      // 锚点与相位都在同帧合并后维护：连续 DOM 变动只算一次。
+      maintainAnchors()
       // 相位走**收敛式**重测：布局若还在动（右栏开合是动画）就继续测，直到稳定。
       startPhaseSettle()
     })

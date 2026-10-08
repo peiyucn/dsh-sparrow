@@ -29,6 +29,7 @@ import {
 } from '../lib/glass.js'
 /** 浅色轴暗边用的官方最深静态色 token。 */
 const SHADE_TOKEN = '--dsw-static-neutral-bluish-1000'
+import { ANCHOR, anchorSelector } from '../lib/anchors.js'
 import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_TILE_VARIABLE, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_NOTCH_ATTR, PHASE_BAND_VARIABLE, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, SIDE_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, compensatedBackdropGradients, dimmedBackdropGradients } from '../lib/backdrop.js'
 
@@ -549,7 +550,7 @@ describe('glass：输入框底座', () => {
     // 只要滚动容器里还留着一条 fixed，那笔按视口栅格化的开销就仍然要付。
     // 故两条必须同进同退，这条断言就是防「后人只改一条」。
     const seamCss = buildSeamCss()
-    const notchPhase = rulesFor(seamCss, `[${PHASE_NOTCH_ATTR}] [data-phase='active'] [data-composer-seat] :has(> [data-composer-card])::after`)
+    const notchPhase = rulesFor(seamCss, `[${PHASE_NOTCH_ATTR}] [data-phase='active'] [data-composer-seat] ${anchorSelector(ANCHOR.composerHost)}::after`)
     assert.equal(notchPhase.length, 1, `缺口性能档应恰好一条，实际 ${notchPhase.length}`)
     const body = notchPhase[0].slice(notchPhase[0].indexOf('{') + 1, notchPhase[0].lastIndexOf('}'))
     assert.match(body, /background-attachment:\s*scroll/u, '缺口性能档用 scroll')
@@ -1822,8 +1823,8 @@ describe('glass：输入框卡上圆角缺口补丁（owner 2026-09-30「其实�
   const seam = buildSeamCss()
   const seamRules = seam.replace(/\/\*[\s\S]*?\*\//gu, '')
   // 宿主 = 卡的父元素；补丁 = 它上面的 ::after（最后一条，因为缺口补丁追加在缝挡板之后）。
-  const HOST = ':has(> [data-composer-card]) {'
-  const PATCH = ':has(> [data-composer-card])::after'
+  const HOST = `${anchorSelector(ANCHOR.composerHost)} {`
+  const PATCH = `${anchorSelector(ANCHOR.composerHost)}::after`
   const host = lastRuleWith(seam, HOST)
   const patch = lastRuleWith(seam, PATCH)
 

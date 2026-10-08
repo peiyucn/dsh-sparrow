@@ -28,6 +28,7 @@ import {
   washFill,
 } from '../lib/tones.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
+import { ANCHOR, anchorSelector } from '../lib/anchors.js'
 import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELF_SCROLLER_SUFFIX, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, OWN_BACKGROUND_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, STATIC_SURFACE_ANCHORS, usesAfterLayer, usesOfficialBeforeLayer, usesOwnBackground } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
@@ -1119,7 +1120,7 @@ describe('抬升面：表面绘制', () => {
       // `::after` 上画「下面还有内容」的渐隐提示（`MenuView.tsx` 把两个属性打在同一个元素上），
       // 不收窄就会把官方提示顶掉（2026-09-27 审计，实测提示带 (109,162,229) → (43,43,50)）。
       'body [data-trigger-menu]:not([data-overflow-below])',
-      "body :has(> [role='listbox'])",
+      `body ${anchorSelector(ANCHOR.listboxHost)}`,
       "body [role='listbox']:not([data-trigger-menu] *)",
       DIALOG_ANCHOR,
       // 子代理会话弹层：`role='tree'` 在**内层**，外层盒子才画材质 —— 故用 :has 向上找。
@@ -1127,7 +1128,7 @@ describe('抬升面：表面绘制', () => {
       // ⚠️ 这里**只有**一条 tree 锚点：此前的 `body > [role='tree']` 经实测是**死锚点**
       // （官方 portal 层级是 body > div.menu > div.menuBody[role=tree]，role=tree 不在 body 直下，
       //   实测命中 0 个），已于 2026-09-27 删除。
-      "body > :has(> [role='tree'])",
+      `body > ${anchorSelector(ANCHOR.treeHost)}`,
       "body [data-slot='conversation.session.header.actions'] ul",
       "body [role='tooltip']:not([data-side])",
       // ⚠️ 2026-09-27 新增两条：**问答卡 / 计划审阅卡**（官方 ui-user-questions）。
@@ -1153,7 +1154,7 @@ describe('抬升面：表面绘制', () => {
     // 而 owner 真正指的**输入框**一动没动（owner 澄清：「**就是我输入对话的对话框啊**」）。
     // Apple HIG 也支持撤：「Don't put glass on lists, cards, or media content」——
     // 玻璃是给 navigation/control layer 的，不是给内容面的。
-    assert.equal(DIALOG_ANCHOR, "body [role='dialog']:not(:has(> img))", '模态弹窗回到普通实色锚点（含灯箱排除）')
+    assert.equal(DIALOG_ANCHOR, `body ${anchorSelector(ANCHOR.dialog)}`, '模态弹窗走锚点属性（灯箱排除由 client half 判定，见 docs/spec/11）')
     assert.ok(!DIALOG_ANCHOR.includes('aria-modal'), '不再按 aria-modal 分流（两类弹窗都走实色）')
     // 内容面必须**实色**：不得有模糊（这是与菜单族的分界 —— 见下一条用例）
     assert.ok(
@@ -1324,9 +1325,15 @@ describe('抬升面：表面绘制', () => {
       'rc.1 那条腿同样不得写进 :is()',
     )
     // 两条腿的意图必须可区分：一条以组合符开头（锚点的直接子），一条不以（锚点自己）。
+    // ⚠️ 2026-10-08：判据从 `:has(> [role='group'])` 改为**锚点属性**（`menuSelf`），
+    // 故「锚点自己」形态表现为**不带组合符**（而不是「以 :has( 开头」）。
     assert.ok(
-      GROUPED_MENU_SELF_SCROLLER_SUFFIX.startsWith(':has('),
+      !GROUPED_MENU_SELF_SCROLLER_SUFFIX.startsWith('>'),
       'rc.2 那条腿必须是「锚点自己」形态（不带组合符，直接贴在菜单锚点后）',
+    )
+    assert.ok(
+      GROUPED_MENU_SCROLLER_SELECTOR.startsWith('>'),
+      'rc.1 那条腿必须是「锚点的直接子」形态（带组合符）',
     )
     assert.notEqual(
       `${GROUPED_MENU_UNGUARDED_SELECTOR} ${GROUPED_MENU_SCROLLER_SELECTOR}`,
@@ -1511,7 +1518,7 @@ describe('抬升面：表面绘制', () => {
     // createPortal 直挂 body 的 `role='tree'`；但官方 JsonTree / WorkspaceBrowser 会话树 /
     // TrajectoryTable **也用** role='tree'，它们是内联组件 —— 无条件命中会把面板背景
     // 换成不透明填充 + 光 + 颗粒。`body >` 只留 portal 出来的那一个。
-    const tree = SURFACE_ANCHORS.find(a => a.includes("[role='tree']"))
+    const tree = SURFACE_ANCHORS.find(a => a.includes(anchorSelector(ANCHOR.treeHost)))
     assert.ok(tree !== undefined, '必须有 tree 锚点')
     assert.ok(tree.startsWith('body > '), `tree 必须收窄成 body 直接子元素：${tree}`)
   })
@@ -1567,15 +1574,20 @@ describe('抬升面：表面绘制', () => {
     assert.ok(!css.includes(`${gated}::after`), '不得同时保留 ::after（会画两遍）')
   })
 
-  it('灯箱排除条件应该 用 `> img`，不能用 `> [aria-hidden]`（会误伤 token 消耗弹层）', () => {
+  it('灯箱排除条件应该 按「直接子里有没有 img」，不能用 aria-hidden 当判据', () => {
     // 回归守卫：最初写成 `:not(:has(> [aria-hidden='true']))`，理由是灯箱遮罩是它的直接子元素。
     // 但 `StatsPills` / `TurnUsagePanel`（owner 说的「token 消耗那些」）的 `.panel` 里也有一个
     // `<div className={titleRule} aria-hidden>` 当直接子元素（标题下那条分隔线）
     // → **被一起排除**，表现为「对话框下面那三个胶囊没改」。
     // 灯箱真正的唯一特征是整屏的 `<img>`；`aria-hidden` 太常见，不能当判据。
+    //
+    // ⚠️ 2026-10-08：判据从 `:not(:has(> img))` 改为**锚点属性**（client half 判定
+    // 「直接子里有没有 img」，见 src/anchors.ts 的 ANCHOR.dialog）——
+    // `:has()` 的样式重算开销实测见 docs/spec/11。判据本身不变，只是换了计算时机。
     const dialog = DIALOG_ANCHOR
-    assert.ok(dialog.includes(':not(:has(> img))'), '应当用 `> img` 排除灯箱')
+    assert.ok(dialog.includes(anchorSelector(ANCHOR.dialog)), '应走弹窗锚点')
     assert.ok(!dialog.includes('aria-hidden'), '不得用 aria-hidden 当判据（会误伤带分隔线的弹层）')
+    assert.ok(!dialog.includes(':has('), '不得再用 :has()（开销来源）')
   })
 
   it('悬停卡应该 面与字**一起**掰回主题，且**两个档都修**（四条不带官方默认门的规则之一）', () => {
@@ -1762,38 +1774,28 @@ describe('抬升面：表面绘制', () => {
   })
 
 
-  it('⛔ 分组菜单的**组合**规则不得用带 :has() 的守卫锚点（性能，且冗余）', () => {
+  it('⛔ 整个表面表不得出现 :has()（性能：它是样式重算的主要来源）', () => {
     // 背景（owner：「咱们主题明显比官方的卡」）：真机消融实测（同 DOM、同色调档，
     // 只 styleEl.disabled 切换）—— 151 条规则里 12 条 :has() 吃掉约 62% 的样式重算；
-    // 151 条**平凡**规则 ≈ 空表 ⇒ **条数无关**。逐条定位后最贵的三条里两条是
-    // 「菜单守卫 + 后代锚点」这种**重复守卫**（+1.38s / +1.53s）。
-    // 去掉后：重算 4.443s → 3.633s（0.82×），且命中集合逐个 isSameNode 完全一致。
+    // 151 条**平凡**规则 ≈ 空表 ⇒ **条数无关**。
     //
-    // 本用例把这条**钉死**：组合规则（标题 / 滚动容器）一旦被改回带 `:has()` 的锚点，
-    // 性能就悄悄退回去 —— 而外观毫无变化，没有任何视觉回归能发现它。
+    // ⚠️ 2026-10-08 升级为**全表禁 `:has()`**：受控实测（有头 + 真实合成 + 模拟流式，
+    // 见 docs/spec/11）显示**主表 19 条 `:has()` 贡献 ~3.1 秒 / 100 帧**的样式重算，
+    // 而把它们换成**同命中集**的属性选择器可拿回约 100% 的收益（效果一字不变）。
+    // 故判据从「组合规则不带守卫」收紧为「本表一条都不许有」——
+    // 判据本身搬到了 client half（src/anchors.ts），本表只读锚点属性。
     const css = buildSurfaceCss()
-    const composed = [
-      `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`,
-      `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_SCROLLER_SELECTOR}`,
-    ]
-    for (const selector of composed) {
-      assert.notEqual(blockFor(css, selector), '', `组合规则要用无守卫锚点：${selector}`)
-      assert.ok(
-        !selector.includes(':has([role=\'group\']) ') || !selector.startsWith('body:not'),
-        '组合规则的**主体**不该再带 :has() 守卫',
-      )
-    }
-    // 守卫仍在的那条（给菜单本体上料、没有别的锚点可表达「带分组的菜单」）必须保留 :has()，
-    // 否则会把页面上**所有**菜单都染上 —— 这条是"别把冗余删除推广过头"的护栏。
-    assert.match(
-      GROUPED_MENU_SELECTOR,
-      /:has\(\[role='group'\]\)/u,
-      '单独使用的菜单锚点必须保留 :has()（去掉会命中所有菜单）',
+    const clean = css.replace(/\/\*[\s\S]*?\*\//gu, '')
+    assert.ok(!clean.includes(':has('), '表面表不得出现任何 :has()（开销实测见 docs/spec/11）')
+    // 分组菜单那条「带分组的菜单」判据仍在，只是换了载体：菜单本体走 menuSelf 锚点。
+    assert.ok(
+      GROUPED_MENU_SELECTOR.includes(anchorSelector(ANCHOR.menuGrouped)),
+      '单独使用的菜单锚点必须走 menuSelf 锚点（等价于原 :has([role=group])，去掉会命中所有菜单）',
     )
     assert.equal(
       GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\s+/u, ''),
       "[role='menu']",
-      '无守卫版只应去掉 :has()，锚点本体必须一致',
+      '无守卫版锚点本体保持裸 role（组合规则的后半段已保证有分组）',
     )
   })
 
