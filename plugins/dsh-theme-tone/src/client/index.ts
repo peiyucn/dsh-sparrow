@@ -51,11 +51,9 @@ import {
 import { buildCaptionCss } from '../caption.js'
 import { buildGlassCss, buildSeamCss } from '../glass.js'
 import { NAV_ARIA_LABELS } from '../nav-pin.js'
-import { HEADER_ACTION_SLOT } from '../popover.js'
 import { buildMaskCss } from '../mask.js'
 import { buildNavPinCss } from '../nav-pin.js'
 import { HANDLE_SELECTOR, applyGlow } from '../handle-glow.js'
-import { buildPopoverCss } from '../popover.js'
 import { buildSurfaceCss } from '../surface.js'
 import { buildSweepCss } from '../sweep.js'
 import { isWorkstartProbe } from '../workstart.js'
@@ -88,7 +86,7 @@ export const inject = ['theme', 'slots', 'locale']
  * 按标记属性去重，HMR / 重载不叠加）。⚠️ nav-pin 那两段并入**本表**、不再单开 `style[data-dsh-nav-pin]`。
  */
 function ensureStyles(): HTMLStyleElement {
-  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}${buildCaptionCss()}${buildPopoverCss()}`
+  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}${buildCaptionCss()}`
   const existing = document.querySelector<HTMLStyleElement>(STYLE_SELECTOR)
   if (existing !== null) {
     // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之。
@@ -281,12 +279,7 @@ function install(ctx: Context): void {
         }
       }
 
-      // ⑩ 头部操作区里、直接子元素是 ul 的那个容器。
-      for (const ul of document.querySelectorAll(`[data-slot='${HEADER_ACTION_SLOT}'] ul`)) {
-        add(ul.parentElement, ANCHOR.panelActionsUl)
-      }
-
-      // ⑪ 右栏面板已打开（状态标在 body 上）。
+      // ⑩ 右栏面板已打开（状态标在 body 上）。
       if (document.querySelector(`[${RIGHT_PANEL_ATTR}][data-sidebar-right-open]`) !== null) {
         add(root, ANCHOR.rightPanelOpen)
       }

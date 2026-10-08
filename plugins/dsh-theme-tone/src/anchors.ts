@@ -41,8 +41,6 @@ export const ANCHOR = Object.freeze({
   turnNavHost: 'turn-nav-host',
   /** **对话滚动体的直接父元素**（官方那个 wrapper）。原选择器 `[data-phase] > div:has(> [data-conversation-scroll])`。 */
   scrollWrap: 'scroll-wrap',
-  /** **头部操作区里、直接子元素是 `<ul>` 的那个容器**。原选择器 `[data-slot='conversation.session.header.actions'] :has(> ul)`。 */
-  panelActionsUl: 'panel-actions-ul',
   /**
    * **右栏面板已打开**（标记在 `document.body` 上，不是某个面板）。
    * 原选择器 `body:has([data-sidebar-right-panel][data-sidebar-right-open])` —— `:has()` 里最贵的一类（锚在 `body` 上）。

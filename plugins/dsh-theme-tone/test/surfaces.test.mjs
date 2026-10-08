@@ -1406,7 +1406,7 @@ describe('抬升面：表面绘制', () => {
     assert.equal(HOVER_CARD_ANCHOR, "body > [role='button']", '必须用子选择器，不能放宽成后代')
 
     // ③ **不带官方默认门** —— 两个档都要修，这是全插件四条刻意动官方默认外观的规则之一
-    //    （另三条：`src/mask.ts` 弹窗遮罩虚化、`src/handle-glow.ts` 拖拽条光带、`src/popover.ts` 顶栏弹出层；
+    //    （另两条：`src/mask.ts` 弹窗遮罩虚化、`src/handle-glow.ts` 拖拽条光带；
     //    计数口径以 `docs/private-seams.md` §B 为准）。
     //    判据看**选择器**（注释里会出现这个词当说明，所以只查拼接出来的那条选择器）。
     assert.ok(
