@@ -9,11 +9,8 @@ export interface LazyDirectorySource<S> {
 }
 
 /**
- * 目录 store 惰性读取面：首帧会话 scope 未就绪时 directoryFor 会抛错——
- * 不弃权，getSnapshot/subscribe 每次读取重试，解析成功后把等待中的订阅迁移到真实 store。
- * 迁移（而非仅通知后清空）是必要的：useSyncExternalStore 只会在 subscribe 身份变化时重订阅，
- * 本适配器的 subscribe 身份稳定，若解析后监听器仍留在未决集合里，此后真实 store 的
- * 模型变更不会触达订阅者，目录快照滞留到下一次无关重渲染（2026-09 审计修复）。
+ * 目录 store 惰性读取面：首帧会话 scope 未就绪时 directoryFor 会抛错，故 getSnapshot/subscribe 每次读取重试，解析成功后把等待中的订阅迁移到真实 store。
+ * 必须迁移而非仅通知后清空：本适配器 subscribe 身份稳定，useSyncExternalStore 只在身份变化时重订阅，留在未决集合里的监听器此后收不到真实 store 的变更。
  */
 export function createLazyDirectoryStore<S>(
   directoryFor: (sessionId: SessionId) => LazyDirectorySource<S> | undefined,

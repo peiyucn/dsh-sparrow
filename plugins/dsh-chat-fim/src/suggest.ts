@@ -10,7 +10,7 @@ export const DEFAULT_MAX_BODY_BYTES = 64 * 1024
 export const DEFAULT_MAX_PROMPT_CHARS = 32_768
 export const DEFAULT_MAX_TOKENS = 96
 export const DEFAULT_SUGGESTION_COUNT = 1
-/** 默认采样温度：0.3（2026-08-30 A/B：temp=1 漂移明显、会复读历史消息，0.3 聚焦稳定）。 */
+/** 默认采样温度 0.3：temp=1 漂移明显、会复读历史消息。 */
 export const DEFAULT_TEMPERATURE = 0.3
 /** 上游响应正文读取上限：防止异常上游超大 body 撑爆内存。 */
 export const MAX_UPSTREAM_BODY_BYTES = 64 * 1024
@@ -56,19 +56,12 @@ export interface CompleteRequest {
 /** FIM 提示词使用的语言（说话人标签 / 停止序列随之切换）。 */
 export type SuggestLanguage = 'zh' | 'en'
 
-/**
- * 续写语言跟随草稿内容（2026-08-31 实测：界面语言 en、草稿英文，历史以中文为主时模型仍续中文，
- * 语言框架必须与草稿一致——草稿含 CJK 用中文说话人标签，否则英文标签）。
- */
+/** 续写语言跟随草稿内容（界面语言不作准）：草稿含 CJK 用中文说话人标签，否则英文标签。 */
 export function detectDraftLanguage(draft: string): SuggestLanguage {
   return CJK_CHARS.test(draft) ? 'zh' : 'en'
 }
 
-/**
- * 语言一致性护栏（2026-08-31 实测：please 后跟空格，模型续出全新中文句且不被回声护栏命中）：
- * 草稿纯拉丁时建议不得含 CJK——英文草稿必须英文续写；
- * 反向不拦：中文草稿常夹英文术语，建议含英文是正常的。
- */
+/** 语言一致性护栏：草稿纯拉丁时建议不得含 CJK；反向不拦——中文草稿常夹英文术语。 */
 export function isLanguageConsistent(draft: string, suggestion: string): boolean {
   if (CJK_CHARS.test(draft)) return true
   return !CJK_CHARS.test(suggestion)
@@ -90,19 +83,14 @@ export function speakerStopSequences(language: SuggestLanguage): readonly string
   return ['user', 'assistant'].map(role => `\n${speakerText(language, role as 'user' | 'assistant')}`)
 }
 
-/** 说话人标签前缀变体：大小写、半/全角冒号（实测模型会输出 assistant：/User: 这类变体）。 */
+/** 说话人标签前缀变体：大小写、半/全角冒号（模型会输出 assistant：这类变体）。 */
 const SPEAKER_START = /^(?:用户|助手|user|assistant)\s*[:：]\s*/iu
 /** 文本中部出现的说话人标签变体（前面带换行）：截断用（无 g 标志，exec 只取首个匹配）。 */
 const SPEAKER_TURN_BREAK = /(?:\n)(?:用户|助手|user|assistant)\s*[:：]\s*/iu
 
 /**
- * 清洗一条上游补全（2026-08-30 实测驱动）：
- * 1. 按说话人标记截断——API 的 stop 序列不可靠（同构造有时生效、有时带出「\n助手：…」整段回复）；
- *    标签变体（大小写/全角冒号）同样截断（实测 assistant：）；
- * 2. 去前后空白；
- * 3. 以说话人标记开头视为「角色切换」——模型去回复而不是续写草稿，返回 null 丢弃
- *    （实测：新会话草稿 plea → 输出「助手：看起来你的消息好像没发完整…」）。
- * 正常续写原样返回；无法使用返回 null，由调用方丢弃该候选。
+ * 清洗一条上游补全：按说话人标记截断（API 的 stop 序列不可靠，标签变体也算），去前后空白；
+ * 以说话人标记开头视为「模型去回复而非续写草稿」，返回 null 丢弃。无法使用时返回 null。
  */
 export function cleanSuggestion(text: string, language: SuggestLanguage = 'zh'): string | null {
   let value = text
@@ -112,8 +100,7 @@ export function cleanSuggestion(text: string, language: SuggestLanguage = 'zh'):
   }
   const loose = SPEAKER_TURN_BREAK.exec(value)
   if (loose !== null && loose.index > 0) value = value.slice(0, loose.index)
-  // 原生 trim：同时覆盖 \s 与 \uFEFF（BOM），且为线性实现——原「尾部 \s+$ 替换」
-  // 属多项式回溯正则（CodeQL js/polynomial-redos 告警），已改用 trim。
+  // 用原生 trim：同时覆盖 \s 与 BOM 且为线性实现；原先的「尾部 \s+$ 替换」是多项式回溯正则（CodeQL js/polynomial-redos），别改回去。
   const trimmed = value.trim()
   if (trimmed === '') return null
   if (SPEAKER_START.test(trimmed)) return null
@@ -123,11 +110,7 @@ export function cleanSuggestion(text: string, language: SuggestLanguage = 'zh'):
 /** 中文句末标点（截断用）；分号不算——分号后面仍是同一句。 */
 const TRUNCATE_END_CJK = '。！？'
 
-/**
- * 建议只保留第一句（2026-08-31 用户拍板「续写不要太长」，连续续写靠 Tab 链）：
- * 在首个句末标点处截断（含标点）。中文 。！？ 直接截；英文 .!? 须后随空白/结尾、
- * 且前面 ≥ minLatinChars 字，避免把 e.g. / approx. 这类缩写当句末。无句末标点原样返回。
- */
+/** 建议只保留第一句：在首个句末标点处截断（含标点）。中文 。！？ 直接截；英文 .!? 须后随空白/结尾且前面 ≥ minLatinChars 字，避免把 e.g. / approx. 这类缩写当句末；无句末标点原样返回。 */
 export function truncateFirstSentence(text: string, minLatinChars = 8): string {
   const value = text.trim()
   for (let index = 0; index < value.length; index++) {
@@ -141,15 +124,10 @@ export function truncateFirstSentence(text: string, minLatinChars = 8): string {
   return value
 }
 
-/** 主模型路由：宿主折叠出的最近一次请求 header 的 provider/model。
- *
- * 改用官方 `session.requestHeader()`（增量折叠、无 TTL）替代原先遍历 `snapshotEvents()`：
- * 官方 agent-loop 每次 dispatch 前写入 header 后立即用它组装请求，故「日志最后一条
- * request/header 之后生效的 header」与事件遍历在 provider/model 上等价，但省掉每次建议请求
- * 的 O(总事件数) 全量快照拷贝（V3 日志更长，这一点更明显）。
- *
- * 守卫必须保留：live 追加只校验 header 是对象，provider/model 仅 seed 路径校验，
- * 折叠出的 config 可能缺字段。 */
+/**
+ * 主模型路由：宿主折叠出的最近一次请求 header 的 provider/model——用官方 `session.requestHeader()`（增量折叠、无 TTL）替代遍历 `snapshotEvents()`，省掉每次请求的 O(总事件数) 快照拷贝。
+ * 守卫必须保留：live 追加只校验 header 是对象，provider/model 仅 seed 路径校验，折叠出的 config 可能缺字段。
+ */
 export function mainRouteFromHeader(header: EpochHeader | undefined): { provider: string; model: string } | undefined {
   const config = header?.config
   if (typeof config?.provider === 'string' && typeof config.model === 'string') {
@@ -163,8 +141,7 @@ export function isDeepseekMainRoute(route: { provider: string } | undefined): bo
   return route === undefined || route.provider === 'deepseek-official'
 }
 
-/** 会话当前主模型：选中投影（pending ?? lastUsed，模型选择即生效、不依赖历史事件）→
- *  官方折叠出的最近请求 header → 共享默认模型；全都没有返回 undefined（调用方按「未知 = 放行」处理）。 */
+/** 会话当前主模型：选中投影（pending ?? lastUsed）→ 官方折叠出的最近请求 header → 共享默认模型；全都没有返回 undefined（调用方按「未知 = 放行」处理）。 */
 export function currentMainRoute(
   selection: { pending?: { provider: string; model: string } | null; lastUsed?: { provider: string; model: string } | null } | undefined,
   headerRoute: { provider: string; model: string } | undefined,
@@ -274,8 +251,7 @@ export interface HistoryTurn {
   readonly text: string
 }
 
-/** 取最近对话历史文本（倒序遍历、非空才计数、按条数与字符数裁剪；与 buildFimPrompt 同一窗口规则）。
- *  倒序走索引、不复制整段历史——deriveMessages() 本身已是全量数组，`[...history].reverse()` 是第二次 O(n) 拷贝。 */
+/** 取最近对话历史文本（倒序遍历、非空才计数、按条数与字符数裁剪，与 buildFimPrompt 同一窗口规则）；倒序走索引，不复制整段历史。 */
 export function recentHistoryTurns(
   history: readonly unknown[],
   maxMessages = MAX_HISTORY_MESSAGES,
@@ -296,11 +272,8 @@ export function recentHistoryTurns(
 }
 
 /**
- * 构造 FIM 补全 prompt（2026-08-31 三方案 A/B 后从对话前缀续写切回，实测依据见 AGENTS.md）：
- * 最近对话历史转成说话人文本（zh「用户：/助手：」、en「User:/Assistant:」），草稿作为最后一个
- * 用户说话人的开头。纯文本续写天然站在用户角度——正常上下文里 8/8 样本均为干净的用户口吻续写
- * （含 plea → es fix it），而前缀接口把「用户：草稿」塞进 assistant 消息逼模型装用户，
- * 结构性角色漂移。角色漂移/复读等短板由 cleanSuggestion 与护栏兜底。
+ * 构造 FIM 补全 prompt：最近对话历史转成说话人文本（zh「用户：/助手：」、en「User:/Assistant:」），草稿作为最后一个用户说话人的开头。
+ * 纯文本续写天然站在用户角度；而前缀接口把「用户：草稿」塞进 assistant 消息会逼模型装用户，造成结构性角色漂移。实测依据见 AGENTS.md。
  */
 export function buildFimPrompt(
   history: readonly unknown[],
@@ -316,9 +289,8 @@ export function buildFimPrompt(
 }
 
 /**
- * 检测退化复读：整段建议是同一短语（1..64 字）反复复制——≥ minRepeats 次完整重复、
- * 覆盖 ≥ minCoverage 的文本（尾部允许是不完整短语，上游常被 max_tokens 截断）。
- * 命中说明模型陷入循环复读（实测：历史含指令时输入 Please 复读「请用中文回复。」×N），建议不可用。
+ * 检测退化复读：整段建议是同一短语（1..64 字）反复复制——≥ minRepeats 次完整重复、覆盖 ≥ minCoverage 的文本（尾部允许是不完整短语，上游常被 max_tokens 截断）。
+ * 命中说明模型陷入循环复读，建议不可用。
  */
 export function hasDegenerateRepeat(text: string, minRepeats = 4, minCoverage = 0.85): boolean {
   const value = text.trim()
@@ -347,9 +319,7 @@ function normalizeForEcho(text: string): string {
 }
 
 /**
- * 检测历史回声（窗口模式）：建议（归一化后）任一 minOverlap 字窗口连续出现在给定历史文本里，
- * 说明模型在复读/转述历史而非续写草稿（实测：输入 ple 转述正在讨论的插件实现细节——
- * 「cleanSuggestion 按说话人标记处理」）。窗口匹配覆盖改写后复读。
+ * 检测历史回声（窗口模式）：建议（归一化后）任一 minOverlap 字窗口连续出现在历史文本里，说明模型在复读/转述历史而非续写草稿。
  * host 侧用于助手消息比对（阈值 15——10 字窗口误杀正常措辞复用，见 AGENTS.md）。
  */
 export function isHistoryEcho(suggestion: string, historyTexts: readonly string[], minOverlap = 10): boolean {
@@ -364,10 +334,8 @@ export function isHistoryEcho(suggestion: string, historyTexts: readonly string[
 }
 
 /**
- * 检测「开头回声」（前缀锚定）：建议开头（归一化后）的前 minOverlap 字连续出现在给定历史文本里。
- * host 侧用于用户消息比对（阈值 10）——模型整段复读用户刚说过的话时开头即重叠
- * （实测 ple 复述聊天区原句）；只锚定开头：正常续写中段复用用户措辞不误杀
- * （2026-08-31 实测窗口比对导致频繁空建议，改回前缀）。
+ * 检测「开头回声」（前缀锚定）：建议开头（归一化后）的前 minOverlap 字连续出现在历史文本里。
+ * host 侧用于用户消息比对（阈值 10）；只锚定开头——正常续写中段复用用户措辞不误杀（窗口比对会误杀，别改回去）。
  */
 export function startsWithHistoryEcho(suggestion: string, historyTexts: readonly string[], minOverlap = 10): boolean {
   const text = normalizeForEcho(suggestion)
@@ -419,15 +387,11 @@ export function extractSuggestions(data: unknown): string[] {
   return suggestions
 }
 
-/** FIM 端点实测可用的模型 id：2026-08-30 直连实测 v4-pro / v4-flash 可用（官方 schema 只列 v4-pro）；
- *  2026-09-10 复测 deepseek-flash（V4.1 Flash）同样 200，且旧的 deepseek-v4-flash 已被服务端路由到
- *  deepseek-flash。跟随解析只认在此集合内的主模型。 */
+/** FIM 端点上实测可用的模型 id；跟随解析只认在此集合内的主模型。 */
 export const SUGGEST_MODEL_IDS = ['deepseek-flash', 'deepseek-v4-pro', 'deepseek-v4-flash'] as const
 
 /**
- * 补全模型解析（见 docs/spec/04-sensitivity.md）：跟随官方主模型（在 SUGGEST_MODEL_IDS 内），
- * vision / 未知 / 非官方 provider 回退插件配置默认。
- * 2026-09-10：pro / flash 两档退役——客户端恒发 auto，两档早已不可达，且 V4 Pro 将于 09-14 下线。
+ * 补全模型解析（见 docs/spec/04-sensitivity.md）：跟随官方主模型（在 SUGGEST_MODEL_IDS 内）；vision / 未知 / 非官方 provider 回退插件配置默认。
  */
 export function resolveSuggestModel(main: { provider: string; model: string } | undefined, configuredModel: string): string {
   if (main !== undefined && main.provider === 'deepseek-official' && (SUGGEST_MODEL_IDS as readonly string[]).includes(main.model)) {
@@ -457,17 +421,17 @@ export function formatTokenCount(count: number): string {
   return String(safe).replace(/\B(?=(\d{3})+(?!\d))/gu, ',')
 }
 
-/** 触发形态门控：草稿最短长度（trim 后）。标准档 CJK 草稿 8 字（FIM 时代实测好值）；纯拉丁草稿 6 字符——完整单词才触发，半词建议已按用户拍板去掉（plea×4 实测全错为 es、ple→as，字母级补全不可靠）。 */
+/** 触发形态门控：CJK 草稿 8 字、纯拉丁草稿 6 字符（完整单词才触发；字母级补全不可靠，半词触发已去掉）。 */
 export const MIN_TRIGGER_DRAFT_CHARS = 8
 export const MIN_TRIGGER_DRAFT_CHARS_LATIN = 6
 
-/** 句末标点：草稿以这些字符结尾时句子已完整，FIM 会续出新一句而不是接话（实测质量差），不触发。 */
+/** 句末标点：草稿以这些字符结尾时句子已完整，FIM 会续出新一句而不是接话（质量差），不触发。 */
 export const SENTENCE_END_CHARS = '。！？.!?;；'
 
-/** CJK 字符检测：草稿含中日韩文字即按「中文语境」门控（2026-08-30 晚：不做 zh/en 硬切换，按内容自适应）。 */
+/** CJK 字符检测：草稿含中日韩文字即按「中文语境」门控（不做 zh/en 硬切换，按内容自适应）。 */
 const CJK_CHARS = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/u
 
-/** 触发灵敏度三档（2026-08-30 晚）：用户习惯不同，敏锐/钝化自己调。 */
+/** 触发灵敏度三档：用户习惯不同，敏锐/钝化自己调。 */
 export type TriggerSensitivity = 'eager' | 'standard' | 'conservative'
 export const DEFAULT_TRIGGER_SENSITIVITY: TriggerSensitivity = 'standard'
 
@@ -523,9 +487,7 @@ export type SuggestTriggerDecision =
   | { readonly ok: false; readonly reason: 'empty' | 'too-short' | 'sentence-end' | 'mid-word' | 'trailing-space' }
 
 /**
- * 依据草稿形态决定是否发起联想请求（2026-08-30 实测驱动，同日晚改为内容自适应 + 灵敏度可调）：
- * 句末标点 / 尾随空格 / 夹入英文半词 / 最短长度均按灵敏度参数伸缩，停顿阈值由客户端按同一参数取值。
- * 所有语言同一规则。
+ * 依据草稿形态决定是否发起联想请求：句末标点 / 尾随空格 / 夹入英文半词 / 最短长度均按灵敏度参数伸缩，停顿阈值由客户端按同一参数取值；所有语言同一规则。
  */
 export function shouldTriggerSuggest(draft: string, sensitivity: TriggerSensitivity = DEFAULT_TRIGGER_SENSITIVITY): SuggestTriggerDecision {
   const params = TRIGGER_SENSITIVITIES[sensitivity] ?? TRIGGER_SENSITIVITIES[DEFAULT_TRIGGER_SENSITIVITY]
@@ -563,17 +525,13 @@ export interface DraftOccurrenceLike {
 }
 
 /**
- * clipboard 坐标的草稿末端 → detect 坐标（TokenSpan 平面）：
- * 官方投影里每个 chip 在 detect 文本中只占 1 个字符（U+FFFC，ui-conversation
- * input/editor/projection.ts 的 ATOMIC_CHAR 口径），其 clipboard 展开多出的
- * length-1 个字符全部扣掉。无 chip 时两者相等，返回 draft.length。
+ * clipboard 坐标的草稿末端 → detect 坐标（TokenSpan 平面）：官方投影里每个 chip 在 detect 文本中只占 1 个字符（U+FFFC，ATOMIC_CHAR 口径），其 clipboard 展开多出的 length-1 个字符全部扣掉；无 chip 时返回 draft.length。
  * 建议只在草稿末端采纳，全部 occurrence 都位于末端之前，按总和扣除即正确。
  */
 export function detectEndOfDraft(draft: string, occurrences: readonly DraftOccurrenceLike[]): number {
   let detect = draft.length
   for (const occurrence of occurrences) {
-    // 异常输入钳制：length=0 的 occurrence 按 1 字符计（chip 在 detect 平面
-    // 恒占 1 字符，不因坏数据反向加长末端）。
+    // 异常输入钳制：length=0 的 occurrence 按 1 字符计（chip 在 detect 平面恒占 1 字符，不因坏数据反向加长末端）。
     detect -= Math.max(1, occurrence.length) - 1
   }
   return detect

@@ -15,7 +15,7 @@ import {
   hasDegenerateRepeat, isAbortTimeout, isDeepseekMainRoute, isHistoryEcho, isLanguageConsistent,
   mainRouteFromHeader, MAX_UPSTREAM_BODY_BYTES, normalizeConfig, parseCompleteBody, recentHistoryTurns,
   resolveSuggestModel, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence, upstreamStatusToError,
-  type ChatFimConfig, type ChatFimError, type CompleteRequest,
+  type ChatFimConfig, type ChatFimError,
 } from './suggest.js'
 
 export type { CompleteRequest } from './suggest.js'
@@ -111,12 +111,8 @@ function sendError(res: ServerResponse, status: number, error: ChatFimError): vo
 }
 
 /**
- * 是不是本插件自造的 `ChatFimError`。
- *
- * `code` 必须是**字符串**：`DOMException` 同样带 `code` / `message`，但它的 `code` 是数字
- * （`TimeoutError` = 23），且 `JSON.stringify` 对它是 `{}`（枚举属性为空）——形状像
- * ChatFimError，直接塞进 `{error}` 却会把 message 整个丢掉（实测落盘 body 就是 `{"error":{}}`）。
- * 故这里按「两个字段都是字符串」判，非本插件形状的一律走下面的归一分支拿可读 message。
+ * 是不是本插件自造的 `ChatFimError`：`code` 必须是**字符串**。
+ * `DOMException` 同样带 `code`/`message`，但它的 `code` 是数字（`TimeoutError` = 23）且 `JSON.stringify` 得到 `{}`——形状像 ChatFimError，直接塞进 `{error}` 却会把 message 整个丢掉。
  */
 function isChatFimError(value: unknown): value is ChatFimError {
   if (typeof value !== 'object' || value === null) return false
@@ -166,16 +162,8 @@ function requestSignal(res: ServerResponse, timeoutMs: number): { signal: AbortS
 
 /**
  * 把「本次上游请求为什么被中止」映射成可直接使用的出口动作。
- *
- * **为什么必须有它**：请求是经 `Promise.allSettled` 收口的（多建议要部分失败容错），
- * 于是超时 / 断开的拒绝**不会冒泡**到外层 `catch`，只留在 settled 结果里。若判定只写在
- * catch 里，那两条分支就是死代码——实测超时返回的是 502 + 空错误体、诊断计数恒 0。
- * 故判定必须**同时**放在 settled 结果这一侧（见 absorb 的 rejected 分支）。
- *
- * 语义与 catch 里的兜底分支逐字一致：超时（上游）→ 504；其余中止 → 客户端断开 → destroy。
- * 正常完成的请求 `aborted` 恒为 false，两条都不命中，返回 undefined。
- * @param signal - 本次请求的合并信号（客户端断开 + 超时）。
- * @returns 中止出口；未中止时 undefined。
+ * 请求经 `Promise.allSettled` 收口（多建议要部分失败容错），超时 / 断开的拒绝不冒泡到外层 `catch`，故判定必须**同时**放在 settled 结果这一侧（见 absorb 的 rejected 分支），只写在 catch 里就是死代码。
+ * 语义与 catch 里的兜底分支逐字一致：超时（上游）→ 504；其余中止 → 客户端断开 → destroy；正常完成恒返回 undefined。
  */
 function abortedOutcome(signal: AbortSignal): 'timeout' | 'aborted' | undefined {
   if (!signal.aborted) return undefined
