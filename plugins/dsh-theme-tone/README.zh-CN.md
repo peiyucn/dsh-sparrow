@@ -36,6 +36,10 @@ dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone
 * 只改外观：不会让界面卡住，也不改任何功能
 * 宿主或浏览器缺东西时它会自己让位：界面照常开、它什么都不画（另记一条面向用户的告警）
 
+## 已知限制
+
+* 右栏打开时，顶栏的「后台任务」弹框不会浮到右栏之上。DSH 把这个弹框渲染在对话列**内部**——它旁边的「智能体团队」弹框渲染在列外，所以那个能浮起来——因此它受对话列边界约束。我们把它改成右对齐以免被切掉，但它盖不到右栏上面。
+
 ## 截图
 
 ![新建会话页的深色主题](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png)

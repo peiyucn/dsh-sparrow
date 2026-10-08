@@ -36,6 +36,10 @@ It also fixes a drag-handle glitch (**no tone needed — active in both themes**
 * Appearance only: it never blocks the UI or changes how anything works
 * When the host or the browser is missing something it needs, the plugin steps aside: the UI opens normally and it draws nothing (it also logs a user-facing warning)
 
+## Known limitations
+
+* With the right sidebar open, the background-jobs popover in the header cannot float over the sidebar. DSH renders that popover inside the conversation column — the agent-team popover next to it is rendered outside the column, which is why that one floats — so the column bounds it. It is right-aligned so it stays whole, but it cannot overlap the sidebar.
+
 ## Screenshots
 
 ![Dark theme on the new-session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png)
