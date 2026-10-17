@@ -64,20 +64,51 @@ export function isTrustedBrowserRequest(
   }
 }
 
+/** 读一个官方服务值里的 `trustedHosts`：服务缺失 / 读取抛错 / 形状不对一律按空处理
+ * （`ctx.get` 可选读取，绝不因此让插件抛穿）。 */
+function trustedHostsOfService(ctx: { get(name: string): unknown }, serviceName: string): readonly string[] {
+  let service: unknown
+  try {
+    service = ctx.get(serviceName)
+  } catch {
+    // 宿主不认识该服务名（老版本 / 代理路径）时按「无额外信任」处理。
+    return []
+  }
+  if (typeof service !== 'object' || service === null) return []
+  const value = (service as { trustedHosts?: unknown }).trustedHosts
+  if (!Array.isArray(value)) return []
+  return value.filter((entry): entry is string => typeof entry === 'string')
+}
+
+/** webServer 的监听绑定地址作为一条 authority：IPv6 字面量加方括号、去掉 `%zone`（接口选择器，不是
+ * 地址文本）；服务缺失 / 读取抛错 / 形状不对时为空。 */
+function bindAddressAuthority(ctx: { get(name: string): unknown }): readonly string[] {
+  let server: unknown
+  try {
+    server = ctx.get('webServer')
+  } catch {
+    return []
+  }
+  if (typeof server !== 'object' || server === null) return []
+  const host = (server as { host?: unknown }).host
+  if (typeof host !== 'string' || host === '') return []
+  const zoneAt = host.indexOf('%')
+  const address = zoneAt === -1 ? host : host.slice(0, zoneAt)
+  return [address.includes(':') ? `[${address}]` : address]
+}
+
 /**
- * 读官方 `webRuntime.trustedHosts`（与官方 `/api` 栅栏同一份取值），而非自造白名单：语义一致、LAN 部署不被静默挡死、不留第二份真相。
+ * 读官方信任面 `webStartup.trustedHosts`（rc.2 起，与官方 `/api` 栅栏同一份取值；旧宿主回退
+ * `webRuntime`），两份合并去重，再把 webServer 的监听绑定地址纳入（官方 rc.2 栅栏同样接受绑定
+ * 地址本身）——而非自造白名单：语义一致、LAN 部署不被静默挡死、不留第二份真相。
  * 服务缺失（老宿主 / 非 web 部署）回退为空 = 只认回环；走 `ctx.get` 取可选服务，缺了不阻插件启动。
  */
 export function officialTrustedHosts(ctx: { get(name: string): unknown }): readonly string[] {
-  let runtime: unknown
-  try {
-    runtime = ctx.get('webRuntime')
-  } catch {
-    // ctx.get 对不认识的服务名会抛错，兜住以免抛穿插件。
-    return []
-  }
-  if (typeof runtime !== 'object' || runtime === null) return []
-  const value = (runtime as { trustedHosts?: unknown }).trustedHosts
-  if (!Array.isArray(value)) return []
-  return value.filter((entry): entry is string => typeof entry === 'string')
+  return [
+    ...new Set([
+      ...trustedHostsOfService(ctx, 'webStartup'),
+      ...trustedHostsOfService(ctx, 'webRuntime'),
+      ...bindAddressAuthority(ctx),
+    ]),
+  ]
 }

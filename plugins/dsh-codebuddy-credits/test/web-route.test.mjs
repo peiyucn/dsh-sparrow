@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import { installCodeBuddyWeb } from '../lib/web.js'
 
 /** mock 必须复现 cordis ctx.inject / ctx.effect 的同步回调，否则 webServer.register 不发生、路由测试空转。 */
-function buildHarness(overrides = {}, webRuntime = undefined) {
+function buildHarness(overrides = {}, webStartup = undefined) {
   const calls = { refreshModels: 0 }
   let handler = null
   const shared = {
@@ -27,7 +27,7 @@ function buildHarness(overrides = {}, webRuntime = undefined) {
   const ctx = {
     inject: (_names, cb) => { cb({ webServer: { register: (def) => { handler = def.handler; return () => {} } } }) },
     effect: (fn) => { const dispose = fn(); return typeof dispose === 'function' ? dispose : () => {} },
-    get: (name) => (name === 'webRuntime' ? webRuntime : undefined),
+    get: (name) => (name === 'webStartup' ? webStartup : undefined),
   }
   installCodeBuddyWeb(ctx, shared)
   return { shared, calls, get handler() { return handler } }
@@ -234,8 +234,8 @@ describe('codebuddy host 路由：浏览器信任栅栏接线（DNS rebinding / 
     assert.equal(result.statusCode, 200)
   })
 
-  it('官方 webRuntime 列出的 LAN authority：同源 LAN 请求放行，未列的仍 403', async () => {
-    const allowed = buildHarness({}, { lanAddresses: ['192.168.1.5'], trustedHosts: ['192.168.1.5'] })
+  it('官方 webStartup 列出的 LAN authority：同源 LAN 请求放行，未列的仍 403', async () => {
+    const allowed = buildHarness({}, { trustedHosts: ['192.168.1.5'] })
     const ok = await request(allowed.handler, '/api/codebuddy-credits/status', {
       method: 'GET',
       headers: { host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' },

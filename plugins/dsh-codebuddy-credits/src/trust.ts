@@ -94,23 +94,56 @@ export function isTrustedPluginRequest(headers: TrustHeaders | undefined, truste
   }
 }
 
-/**
- * 官方给出的额外信任面（回环之外的 authority）：**直接把官方那份取值喂给栅栏**，不自造第二份白名单
- * ——自造会与官方的 LAN 采样口径漂移，且会把 `--host 0.0.0.0` 用户的正常访问静默挡成 403。
- *
- * ⚠️ 必须在**请求期**读取而不是 `apply` 期定值：webRuntime 由 web-app 的 `apply` 提供，与本插件
- * 加载顺序不保证谁先，`apply` 期读会拿到空值并被永久冻结。服务缺失时回退空数组 = 只认回环。
- */
-export function officialTrustedHosts(ctx: { get(name: string): unknown }): readonly string[] {
-  let runtime: unknown
+/** 读一个官方服务值里的 `trustedHosts`：服务缺失 / 读取抛错 / 形状不对一律按空处理
+ * （`ctx.get` 可选读取，绝不因此让插件抛穿）。 */
+function trustedHostsOfService(ctx: { get(name: string): unknown }, serviceName: string): readonly string[] {
+  let service: unknown
   try {
-    runtime = ctx.get('webRuntime')
+    service = ctx.get(serviceName)
   } catch {
-    // 宿主不认识该服务名时按「无额外信任」处理，绝不因此让插件抛穿。
+    // 宿主不认识该服务名（老版本 / 代理路径）时按「无额外信任」处理。
     return []
   }
-  if (typeof runtime !== 'object' || runtime === null) return []
-  const value = (runtime as { trustedHosts?: unknown }).trustedHosts
+  if (typeof service !== 'object' || service === null) return []
+  const value = (service as { trustedHosts?: unknown }).trustedHosts
   if (!Array.isArray(value)) return []
   return value.filter((entry): entry is string => typeof entry === 'string')
+}
+
+/** webServer 的监听绑定地址作为一条 authority：IPv6 字面量加方括号、去掉 `%zone`（接口选择器，不是
+ * 地址文本）；服务缺失 / 读取抛错 / 形状不对时为空。 */
+function bindAddressAuthority(ctx: { get(name: string): unknown }): readonly string[] {
+  let server: unknown
+  try {
+    server = ctx.get('webServer')
+  } catch {
+    return []
+  }
+  if (typeof server !== 'object' || server === null) return []
+  const host = (server as { host?: unknown }).host
+  if (typeof host !== 'string' || host === '') return []
+  const zoneAt = host.indexOf('%')
+  const address = zoneAt === -1 ? host : host.slice(0, zoneAt)
+  return [address.includes(':') ? `[${address}]` : address]
+}
+
+/**
+ * 官方给出的额外信任面（回环之外的 authority）：**直接把官方那份取值喂给栅栏**，不自造第二份白名单
+ * ——自造会与官方的 LAN 采样口径漂移，且会把 LAN 用户正常访问静默挡成 403。
+ *
+ * 取值来源：`webStartup.trustedHosts`（rc.2 起；即 `--trusted-host` 声明的那份，与官方 `/api` 栅栏
+ * 同源），旧宿主回退 `webRuntime`，两份合并去重；再把 webServer 的**监听绑定地址**纳入（官方 rc.2
+ * 栅栏同样接受绑定地址本身，任意端口）。
+ *
+ * ⚠️ 必须在**请求期**读取而不是 `apply` 期定值：`webStartup` 由 web-app 的 startup 插件提供，
+ * 与本插件加载顺序不保证谁先，`apply` 期读会拿到空值并被永久冻结。服务缺失时回退空数组 = 只认回环。
+ */
+export function officialTrustedHosts(ctx: { get(name: string): unknown }): readonly string[] {
+  return [
+    ...new Set([
+      ...trustedHostsOfService(ctx, 'webStartup'),
+      ...trustedHostsOfService(ctx, 'webRuntime'),
+      ...bindAddressAuthority(ctx),
+    ]),
+  ]
 }

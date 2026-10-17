@@ -129,7 +129,7 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
         const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
         try {
           // 必须在本路由任何分发与读体之前：本前缀比官方 /api 长（「前缀最长者胜」），请求走不到官方栅栏。
-          // 信任面在请求期读官方 webRuntime.trustedHosts；localOnly 拦不住 rebinding，两道都留。
+          // 信任面在请求期读官方 webStartup.trustedHosts（rc.2 起；旧宿主回退 webRuntime）；localOnly 拦不住 rebinding，两道都留。
           if (!isTrustedPluginRequest(req.headers, officialTrustedHosts(ctx))) {
             sendJson(res, 403, { error: '拒绝跨站来源的请求' })
             return

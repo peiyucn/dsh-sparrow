@@ -1076,7 +1076,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
         // 信任栅栏（先于一切路由，含只读路由）：本插件的 `/api/archive-manage` 前缀比
         // 官方 `/api` 长 ⇒ 官方那道栅栏与鉴权都不会执行（见 trust.ts）。
         // 本插件含移动 / 删除会话文件的不可逆路由，故整条前缀一律先过门。
-        // 额外信任面直接复用官方 webRuntime.trustedHosts（LAN 部署与官方同一份口径）。
+        // 额外信任面直接复用官方 webStartup.trustedHosts（rc.2 起；旧宿主回退 webRuntime），LAN 部署与官方同一份口径。
         if (!isTrustedPluginRequest(req.headers, officialTrustedHosts(ctx))) {
           sendError(res, new ArchiveError('FORBIDDEN', '拒绝非本机同源的请求', 403))
           return

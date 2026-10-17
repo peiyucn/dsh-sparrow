@@ -112,7 +112,7 @@ describe('isTrustedPluginRequest 浏览器信任栅栏', () => {
   })
 })
 
-describe('isTrustedPluginRequest 的官方信任面（webRuntime.trustedHosts）', () => {
+describe('isTrustedPluginRequest 的官方信任面（webStartup.trustedHosts / 绑定地址）', () => {
   it('LAN IP 未配置时 应该 拒绝（默认只信回环）', () => {
     assert.equal(isTrustedPluginRequest({ host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' }), false)
     assert.equal(isTrustedPluginRequest({ host: '192.168.1.5:3080' }, []), false)
@@ -155,16 +155,54 @@ describe('isTrustedPluginRequest 的官方信任面（webRuntime.trustedHosts）
 })
 
 /**
- * 官方信任面读取：复用官方 `webRuntime.trustedHosts` 而不是自造第二份白名单。
- *
- * 官方 `@deepseek-ai/dsh-web-app` 的 `resolveLanTrust` + `apply` 在 webServer 绑定后
- * 采样一次 LAN 地址、`ctx.provide('webRuntime', ...)` 提供出来；那份 `trustedHosts`
- * 就是喂给官方 `/api` 栅栏的**同一份值**。本插件逐字复用，服务缺失时保守回退为空。
+ * 官方信任面读取：`webStartup.trustedHosts`（rc.2 起，即 `--trusted-host` 声明的那份，也就是喂给
+ * 官方 `/api` 栅栏的同一份值）优先、旧宿主回退 `webRuntime`；两份合并去重，再把 webServer 的
+ * 监听绑定地址纳入（官方 rc.2 栅栏同样接受绑定地址本身，任意端口）。服务缺失时保守回退为空。
  */
 describe('officialTrustedHosts 官方信任面读取（缺服务时保守回退）', () => {
-  it('服务在场 应该 逐字采纳官方取值', () => {
+  it('webStartup 服务在场 应该 逐字采纳官方取值', () => {
+    const ctx = { get: (name) => (name === 'webStartup' ? { trustedHosts: ['192.168.1.5', 'lab.internal:3080'] } : undefined) }
+    assert.deepEqual(officialTrustedHosts(ctx), ['192.168.1.5', 'lab.internal:3080'])
+  })
+
+  it('webRuntime 旧名回退仍工作（老宿主兼容）', () => {
     const ctx = { get: (name) => (name === 'webRuntime' ? { lanAddresses: ['192.168.1.5'], trustedHosts: ['192.168.1.5', 'lab.internal:3080'] } : undefined) }
     assert.deepEqual(officialTrustedHosts(ctx), ['192.168.1.5', 'lab.internal:3080'])
+  })
+
+  it('两服务同时在场 应该 合并去重（webStartup 在前，各保持原顺序）', () => {
+    const services = {
+      webStartup: { trustedHosts: ['startup.example', 'shared.example'] },
+      webRuntime: { trustedHosts: ['shared.example', 'runtime.example'] },
+    }
+    assert.deepEqual(officialTrustedHosts({ get: (name) => services[name] }), [
+      'startup.example', 'shared.example', 'runtime.example',
+    ])
+  })
+
+  it('webServer.host 监听绑定地址 应该 在任意端口放行（官方 rc.2 栅栏同口径）', () => {
+    const ctx = { get: (name) => (name === 'webServer' ? { host: '10.0.0.7' } : undefined) }
+    assert.deepEqual(officialTrustedHosts(ctx), ['10.0.0.7'])
+    assert.equal(isTrustedPluginRequest({ host: '10.0.0.7:3080' }, officialTrustedHosts(ctx)), true)
+    assert.equal(isTrustedPluginRequest({ host: '10.0.0.7:9999' }, officialTrustedHosts(ctx)), true)
+  })
+
+  it('IPv6 绑定地址 应该 加方括号并去掉 %zone（官方 isBindAddressAuthority 同口径）', () => {
+    const ipv6 = { get: (name) => (name === 'webServer' ? { host: 'fd00::1' } : undefined) }
+    assert.deepEqual(officialTrustedHosts(ipv6), ['[fd00::1]'])
+    assert.equal(isTrustedPluginRequest({ host: '[fd00::1]:3080' }, officialTrustedHosts(ipv6)), true)
+    // `%eth0` 是接口选择器、不是地址文本：Host 头里不会有，比较前必须去掉。
+    const zoned = { get: (name) => (name === 'webServer' ? { host: 'fe80::1%eth0' } : undefined) }
+    assert.deepEqual(officialTrustedHosts(zoned), ['[fe80::1]'])
+    assert.equal(isTrustedPluginRequest({ host: '[fe80::1]:3080' }, officialTrustedHosts(zoned)), true)
+  })
+
+  it('绑定地址与 declared 信任面重合时去重（同一 authority 只留一条）', () => {
+    const services = {
+      webStartup: { trustedHosts: ['10.0.0.7'] },
+      webServer: { host: '10.0.0.7' },
+    }
+    assert.deepEqual(officialTrustedHosts({ get: (name) => services[name] }), ['10.0.0.7'])
   })
 
   it('服务缺失（老宿主 / 非 web 组合）应该 回退空数组 = 只信回环', () => {
@@ -188,13 +226,18 @@ describe('officialTrustedHosts 官方信任面读取（缺服务时保守回退�
     assert.deepEqual(officialTrustedHosts(ctx), ['lab.internal'])
   })
 
+  it('webServer 形状不对 / host 非字符串 应该 忽略绑定地址且不抛穿', () => {
+    const badServer = { get: (name) => (name === 'webServer' ? { host: 42 } : undefined) }
+    assert.deepEqual(officialTrustedHosts(badServer), [])
+  })
+
   it('ctx.get 抛错（“without inject” 代理路径）应该 回退空数组且不抛穿', () => {
-    const ctx = { get: () => { throw new Error('cannot get property "webRuntime" without inject') } }
+    const ctx = { get: () => { throw new Error('cannot get property "webStartup" without inject') } }
     assert.deepEqual(officialTrustedHosts(ctx), [])
   })
 
   it('官方取值真的参与判定：LAN authority 只因为官方列了它才放行', () => {
-    const ctx = { get: () => ({ trustedHosts: ['192.168.1.5:3080'] }) }
+    const ctx = { get: (name) => (name === 'webStartup' ? { trustedHosts: ['192.168.1.5:3080'] } : undefined) }
     const headers = { host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' }
     assert.equal(isTrustedPluginRequest(headers, officialTrustedHosts(ctx)), true)
     // 同一请求、官方没列它（服务缺失）→ 拒绝：上面那条放行确实来自官方取值。

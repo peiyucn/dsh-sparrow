@@ -17,9 +17,9 @@ import { apply } from '../lib/host.js'
 
 /**
  * 用最小 mock ctx 跑真实 apply，拿回注册的 prefix handler。
- * @param webRuntime - mock 的官方 `webRuntime` 服务值（栅栏的额外信任面）；默认无该服务。
+ * @param webStartup - mock 的官方 `webStartup` 服务值（栅栏的额外信任面）；默认无该服务。
  */
-async function buildHarness(webRuntime = undefined) {
+async function buildHarness(webStartup = undefined) {
   let handler = null
   const warnings = []
   const ctx = {
@@ -28,7 +28,7 @@ async function buildHarness(webRuntime = undefined) {
     settings: { describe: () => [] },
     logger: { warn: (message) => { warnings.push(message) }, error: () => {}, info: () => {} },
     effect: (fn) => { const dispose = fn(); return typeof dispose === 'function' ? dispose : () => {} },
-    get: (name) => (name === 'webRuntime' ? webRuntime : undefined),
+    get: (name) => (name === 'webStartup' ? webStartup : undefined),
   }
   await apply(ctx)
   return { warnings, get handler() { return handler } }
@@ -117,8 +117,8 @@ describe('file-manage host 路由：浏览器信任栅栏接线（DNS rebinding 
     assert.equal(result.statusCode, 400, '过了栅栏才轮到 id 校验')
   })
 
-  it('官方 webRuntime 列出 LAN authority：同源 LAN 请求越过栅栏，未列的仍 403', async () => {
-    const allowed = await buildHarness({ lanAddresses: ['192.168.1.5'], trustedHosts: ['192.168.1.5'] })
+  it('官方 webStartup 列出 LAN authority：同源 LAN 请求越过栅栏，未列的仍 403', async () => {
+    const allowed = await buildHarness({ trustedHosts: ['192.168.1.5'] })
     const ok = await request(allowed.handler, '/api/file-manage/files?id=', {
       method: 'DELETE',
       headers: { host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' },

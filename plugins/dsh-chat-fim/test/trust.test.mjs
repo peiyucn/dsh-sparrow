@@ -99,9 +99,49 @@ describe('allowedHosts 额外信任面（对齐官方 trustedHosts 语义）', (
 })
 
 describe('officialTrustedHosts 复用官方信任面（不造第二份真相）', () => {
-  it('官方 webRuntime.trustedHosts 被原样采纳（LAN 部署与官方同口径）', () => {
+  it('webStartup.trustedHosts 被原样采纳（rc.2 起，LAN 部署与官方同口径）', () => {
+    const ctx = { get: (name) => (name === 'webStartup' ? { trustedHosts: ['192.168.1.5', 'lab.internal:8443'] } : undefined) }
+    assert.deepEqual(officialTrustedHosts(ctx), ['192.168.1.5', 'lab.internal:8443'])
+  })
+
+  it('webRuntime 旧名回退仍工作（老宿主兼容）', () => {
     const ctx = { get: (name) => (name === 'webRuntime' ? { lanAddresses: ['192.168.1.5'], trustedHosts: ['192.168.1.5', 'lab.internal:8443'] } : undefined) }
     assert.deepEqual(officialTrustedHosts(ctx), ['192.168.1.5', 'lab.internal:8443'])
+  })
+
+  it('两服务同时在场时合并去重（webStartup 在前，各保持原顺序）', () => {
+    const services = {
+      webStartup: { trustedHosts: ['startup.example', 'shared.example'] },
+      webRuntime: { trustedHosts: ['shared.example', 'runtime.example'] },
+    }
+    assert.deepEqual(officialTrustedHosts({ get: (name) => services[name] }), [
+      'startup.example', 'shared.example', 'runtime.example',
+    ])
+  })
+
+  it('webServer.host 监听绑定地址在任意端口被放行（官方 rc.2 栅栏同口径）', () => {
+    const ctx = { get: (name) => (name === 'webServer' ? { host: '10.0.0.7' } : undefined) }
+    assert.deepEqual(officialTrustedHosts(ctx), ['10.0.0.7'])
+    assert.equal(isTrustedBrowserRequest({ host: '10.0.0.7:3080' }, officialTrustedHosts(ctx)), true)
+    assert.equal(isTrustedBrowserRequest({ host: '10.0.0.7:9999' }, officialTrustedHosts(ctx)), true)
+  })
+
+  it('IPv6 绑定地址加方括号、去掉 %zone（官方 isBindAddressAuthority 同口径）', () => {
+    const ipv6 = { get: (name) => (name === 'webServer' ? { host: 'fd00::1' } : undefined) }
+    assert.deepEqual(officialTrustedHosts(ipv6), ['[fd00::1]'])
+    assert.equal(isTrustedBrowserRequest({ host: '[fd00::1]:3080' }, officialTrustedHosts(ipv6)), true)
+    // `%eth0` 是接口选择器、不是地址文本：Host 头里不会有，比较前必须去掉。
+    const zoned = { get: (name) => (name === 'webServer' ? { host: 'fe80::1%eth0' } : undefined) }
+    assert.deepEqual(officialTrustedHosts(zoned), ['[fe80::1]'])
+    assert.equal(isTrustedBrowserRequest({ host: '[fe80::1]:3080' }, officialTrustedHosts(zoned)), true)
+  })
+
+  it('绑定地址与 declared 信任面重合时去重（同一 authority 只留一条）', () => {
+    const services = {
+      webStartup: { trustedHosts: ['10.0.0.7'] },
+      webServer: { host: '10.0.0.7' },
+    }
+    assert.deepEqual(officialTrustedHosts({ get: (name) => services[name] }), ['10.0.0.7'])
   })
 
   it('服务缺失（老宿主 / 非 web 部署）应该回退为空 = 只认回环', () => {
@@ -113,6 +153,9 @@ describe('officialTrustedHosts 复用官方信任面（不造第二份真相）'
     assert.deepEqual(officialTrustedHosts({ get: () => 'nope' }), [])
     assert.deepEqual(officialTrustedHosts({ get: () => ({ trustedHosts: 'not-an-array' }) }), [])
     assert.deepEqual(officialTrustedHosts({ get: () => ({ trustedHosts: [42, 'ok.example', null] }) }), ['ok.example'])
+    // webServer 形状不对 / host 不是字符串：只忽略绑定地址，不抛穿。
+    const badServer = { get: (name) => (name === 'webServer' ? { host: 42 } : undefined) }
+    assert.deepEqual(officialTrustedHosts(badServer), [])
   })
 
   it('ctx.get 抛错时也不冒泡', () => {
@@ -120,7 +163,7 @@ describe('officialTrustedHosts 复用官方信任面（不造第二份真相）'
   })
 
   it('官方信任面确实参与判定（LAN authority 由官方取值放行）', () => {
-    const ctx = { get: () => ({ trustedHosts: ['192.168.1.5:3080'] }) }
+    const ctx = { get: (name) => (name === 'webStartup' ? { trustedHosts: ['192.168.1.5:3080'] } : undefined) }
     assert.equal(
       isTrustedBrowserRequest({ host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' }, officialTrustedHosts(ctx)),
       true,

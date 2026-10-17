@@ -53,22 +53,53 @@ export function assertTrustedAuthority(entry: string): void {
   throw new Error(`allowedHosts 条目 ${JSON.stringify(entry)} 不是裸 host[:port] authority`)
 }
 
-/**
- * 回环之外的补充信任面：`webRuntime.trustedHosts` 即喂给官方 `/api` 栅栏的同一份值，复用可免
- * 自造白名单把 LAN 部署静默挡死；服务缺失（老宿主 / 非 web）时为空 = 只认回环（`ctx.get` 可选读取）。
- */
-export function officialTrustedHosts(ctx: { get(name: string): unknown }): readonly string[] {
-  let runtime: unknown
+/** 读一个官方服务值里的 `trustedHosts`：服务缺失 / 读取抛错 / 形状不对一律按空处理
+ * （`ctx.get` 可选读取，绝不因此让插件抛穿）。 */
+function trustedHostsOfService(ctx: { get(name: string): unknown }, serviceName: string): readonly string[] {
+  let service: unknown
   try {
-    runtime = ctx.get('webRuntime')
+    service = ctx.get(serviceName)
   } catch {
-    // 宿主不认识该服务名（极端老版本）时按「无额外信任」处理，绝不因此让插件抛穿。
+    // 宿主不认识该服务名（老版本 / 代理路径）时按「无额外信任」处理。
     return []
   }
-  if (typeof runtime !== 'object' || runtime === null) return []
-  const value = (runtime as { trustedHosts?: unknown }).trustedHosts
+  if (typeof service !== 'object' || service === null) return []
+  const value = (service as { trustedHosts?: unknown }).trustedHosts
   if (!Array.isArray(value)) return []
   return value.filter((entry): entry is string => typeof entry === 'string')
+}
+
+/** webServer 的监听绑定地址作为一条 authority：IPv6 字面量加方括号、去掉 `%zone`（接口选择器，不是
+ * 地址文本）；服务缺失 / 读取抛错 / 形状不对时为空。 */
+function bindAddressAuthority(ctx: { get(name: string): unknown }): readonly string[] {
+  let server: unknown
+  try {
+    server = ctx.get('webServer')
+  } catch {
+    return []
+  }
+  if (typeof server !== 'object' || server === null) return []
+  const host = (server as { host?: unknown }).host
+  if (typeof host !== 'string' || host === '') return []
+  const zoneAt = host.indexOf('%')
+  const address = zoneAt === -1 ? host : host.slice(0, zoneAt)
+  return [address.includes(':') ? `[${address}]` : address]
+}
+
+/**
+ * 回环之外的补充信任面：`webStartup.trustedHosts`（rc.2 起即喂给官方 `/api` 栅栏的同一份值）优先，
+ * 旧宿主回退 `webRuntime`，两份合并去重 —— 复用可免自造白名单把 LAN 部署静默挡死；再把 webServer
+ * 的**监听绑定地址**纳入（官方 rc.2 栅栏同样接受绑定地址本身，任意端口）。服务缺失（老宿主 /
+ * 非 web 部署）时为空 = 只认回环（`ctx.get` 可选读取，绝不因此让插件抛穿）。
+ */
+export function officialTrustedHosts(ctx: { get(name: string): unknown }): readonly string[] {
+  return [
+    ...new Set([
+      ...trustedHostsOfService(ctx, 'webStartup'),
+      ...trustedHostsOfService(ctx, 'webRuntime'),
+      ...bindAddressAuthority(ctx),
+    ]),
+  ]
 }
 
 /** 与官方同口径的请求检查：Host 必须回环或命中信任面，且不得跨站 / 异源（Origin 与 Host 自洽

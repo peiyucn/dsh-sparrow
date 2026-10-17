@@ -279,7 +279,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
       // 信任栅栏（先于一切路由分发）：官方那道门只装在它自己的 `/api` 前缀路由上，
       // 本插件的 exact 路由不会经过它（见 trust.ts）。POST 会以服务端 API key 执行
       // **计费**上游请求，GET 会读出会话模型信息，故整条路由一律先过门。
-      // 额外信任面复用官方 webRuntime.trustedHosts（LAN 部署与官方同一份口径）。
+      // 额外信任面复用官方 webStartup.trustedHosts（rc.2 起；旧宿主回退 webRuntime），LAN 部署与官方同一份口径。
       if (!isTrustedBrowserRequest(req.headers, officialTrustedHosts(ctx))) {
         sendError(res, 403, { code: 'FORBIDDEN', message: '拒绝非本机同源的请求' })
         return

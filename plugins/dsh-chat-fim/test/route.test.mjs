@@ -58,7 +58,7 @@ async function buildHarness(options = {}) {
     },
     logger: { warn: (message) => { warnings.push(message) }, error: () => {}, info: () => {} },
     effect: (fn) => { const dispose = fn(); return typeof dispose === 'function' ? dispose : () => {} },
-    // 官方可选服务面（sessionProjections / agentDefaultModel / webRuntime）默认缺席。
+    // 官方可选服务面（sessionProjections / agentDefaultModel / webStartup）默认缺席。
     get: (name) => options.services?.[name],
   }
   await apply(ctx, config)
@@ -210,9 +210,9 @@ describe('chat-fim host 路由：信任栅栏（DNS rebinding / CSRF）', () => 
     }
   })
 
-  it('官方 webRuntime 列出 LAN authority：列了的放行，没列的仍 403', async () => {
+  it('官方 webStartup 列出 LAN authority：列了的放行，没列的仍 403', async () => {
     const lanHeaders = { host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' }
-    const allowed = await buildHarness({ services: { webRuntime: { trustedHosts: ['192.168.1.5'] } } })
+    const allowed = await buildHarness({ services: { webStartup: { trustedHosts: ['192.168.1.5'] } } })
     const ok = await dispatch(allowed.handler, { method: 'GET', url: `${ROUTE}?diagnostics=1`, headers: lanHeaders })
     assert.equal(ok.statusCode, 200, '官方信任面列出的 LAN authority 必须放行')
 
@@ -221,8 +221,18 @@ describe('chat-fim host 路由：信任栅栏（DNS rebinding / CSRF）', () => 
     assert.equal(bad.statusCode, 403, '官方信任面缺席时未列的 LAN authority 必须拒')
   })
 
+  it('老宿主只有 webRuntime 时：旧名回退仍列出 LAN authority（兼容）', async () => {
+    const h = await buildHarness({ services: { webRuntime: { trustedHosts: ['192.168.1.5'] } } })
+    const result = await dispatch(h.handler, {
+      method: 'GET',
+      url: `${ROUTE}?diagnostics=1`,
+      headers: { host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' },
+    })
+    assert.equal(result.statusCode, 200)
+  })
+
   it('官方信任面形状畸形（trustedHosts 非数组）应该 保守回退为只信回环，不抛穿', async () => {
-    const h = await buildHarness({ services: { webRuntime: { trustedHosts: 'not-an-array' } } })
+    const h = await buildHarness({ services: { webStartup: { trustedHosts: 'not-an-array' } } })
     const result = await dispatch(h.handler, { method: 'GET', url: `${ROUTE}?diagnostics=1`, headers: { host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' } })
     assert.equal(result.statusCode, 403)
   })

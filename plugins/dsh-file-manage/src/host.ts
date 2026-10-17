@@ -167,7 +167,7 @@ export async function apply(ctx: Context): Promise<void> {
       // 浏览器信任栅栏（官方 /api 栅栏同口径，见 trust.ts）：必须在本路由**任何**
       // 分发之前 —— 官方栅栏挂在 /api 前缀上，而本路由 /api/file-manage 更长，
       // 「前缀最长者胜」使请求根本走不到官方那道检查。
-      // 额外信任面复用官方 webRuntime.trustedHosts（故这里在**请求期**读取）。
+      // 额外信任面复用官方 webStartup.trustedHosts（rc.2 起；旧宿主回退 webRuntime），故这里在**请求期**读取。
       if (!isTrustedPluginRequest(req.headers, officialTrustedHosts(ctx))) {
         sendError(res, new FileManageError('FORBIDDEN', '拒绝跨站来源的请求', 403))
         return

@@ -80,22 +80,52 @@ export function isTrustedPluginRequest(headers: TrustHeaders | undefined, truste
   }
 }
 
+/** 读一个官方服务值里的 `trustedHosts`：服务缺失 / 读取抛错 / 形状不对一律按空处理
+ * （`ctx.get` 可选读取，绝不因此让插件抛穿）。 */
+function trustedHostsOfService(ctx: { get(name: string): unknown }, serviceName: string): readonly string[] {
+  let service: unknown
+  try {
+    service = ctx.get(serviceName)
+  } catch {
+    // 宿主不认识该服务名（老版本 / 代理路径）时按「无额外信任」处理。
+    return []
+  }
+  if (typeof service !== 'object' || service === null) return []
+  const value = (service as { trustedHosts?: unknown }).trustedHosts
+  if (!Array.isArray(value)) return []
+  return value.filter((entry): entry is string => typeof entry === 'string')
+}
+
+/** webServer 的监听绑定地址作为一条 authority：IPv6 字面量加方括号、去掉 `%zone`（接口选择器，不是
+ * 地址文本）；服务缺失 / 读取抛错 / 形状不对时为空。 */
+function bindAddressAuthority(ctx: { get(name: string): unknown }): readonly string[] {
+  let server: unknown
+  try {
+    server = ctx.get('webServer')
+  } catch {
+    return []
+  }
+  if (typeof server !== 'object' || server === null) return []
+  const host = (server as { host?: unknown }).host
+  if (typeof host !== 'string' || host === '') return []
+  const zoneAt = host.indexOf('%')
+  const address = zoneAt === -1 ? host : host.slice(0, zoneAt)
+  return [address.includes(':') ? `[${address}]` : address]
+}
+
 /**
- * 官方给出的额外信任面：`webRuntime.trustedHosts` 就是喂给官方 `/api` 栅栏的同一份值 ——
- * 自造白名单会语义漂移，还会把 `--host 0.0.0.0` 的 LAN 用户静默挡成 403；服务缺失时回退空
- * （只认回环，与官方默认同口径）。⚠️ 必须**请求期**读取：webRuntime 与本插件加载顺序不保证
+ * 官方给出的额外信任面：`webStartup.trustedHosts`（rc.2 起即喂给官方 `/api` 栅栏的同一份值；旧宿主
+ * 回退 `webRuntime`），两份合并去重，再把 webServer 的监听绑定地址纳入（官方 rc.2 栅栏同样接受
+ * 绑定地址本身）—— 自造白名单会语义漂移，还会把 LAN 用户静默挡成 403；服务缺失时回退空
+ * （只认回环，与官方默认同口径）。⚠️ 必须**请求期**读取：`webStartup` 与本插件加载顺序不保证
  * 谁先，apply 期读会拿到空值并永久冻结。
  */
 export function officialTrustedHosts(ctx: { get(name: string): unknown }): readonly string[] {
-  let runtime: unknown
-  try {
-    runtime = ctx.get('webRuntime')
-  } catch {
-    // 宿主不认识该服务名（老版本 / 代理路径）时按「无额外信任」处理，绝不抛穿。
-    return []
-  }
-  if (typeof runtime !== 'object' || runtime === null) return []
-  const value = (runtime as { trustedHosts?: unknown }).trustedHosts
-  if (!Array.isArray(value)) return []
-  return value.filter((entry): entry is string => typeof entry === 'string')
+  return [
+    ...new Set([
+      ...trustedHostsOfService(ctx, 'webStartup'),
+      ...trustedHostsOfService(ctx, 'webRuntime'),
+      ...bindAddressAuthority(ctx),
+    ]),
+  ]
 }
