@@ -11,9 +11,11 @@
 > （方法与口径见 [`docs/upstream/0.2.0-rc.1.md`](upstream/0.2.0-rc.1.md) §4.1）。
 > 理由：手工清单已证会漂——0.2.0-rc.1 审计时发现它漏列了三处一直在用的锚点。
 >
-> 最近一次核对：dsh `0.2.0-rc.2`（2026-10-03），本文件点名的例外逐条验存续。
-> ⚠️ rc.2 这一版**不是零回归**：`role='menu'` 换了承载元素，theme-tone 的分组菜单锚点踩中
-> （见 §D 旁注），已修并补守卫。
+> 最近一次核对：dsh `0.2.1-rc.2`（2026-10-17），本文件点名的例外逐条验存续。
+> 复核要点：`webRuntime` 服务在 rc.2 已不存在（4 个 trust.ts 改用 `webStartup` + `webServer.host`，不属本文件条目）；
+> `ui-model-selection` 在 rc.2 给模型名加了 `data-provider-id` / `data-model-id` 包装并新增 label 子槽，
+> 但 `role='menu'` 的承载元素与 `MenuGroup` 的直接子结构**均未变** ⇒ §D 旁注的两条腿仍各自命中。
+> ⚠️ rc.2 这一版**不是零回归**：`ConfigFormSnapshot.mode` 被删除，theme-tone 的「设置不可写」提示踩中，已修。
 
 ---
 

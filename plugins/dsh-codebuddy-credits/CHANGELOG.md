@@ -3,6 +3,14 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
+## 0.2.1-rc.2 (2026-10-17)
+
+- Now adapted to official dsh 0.2.1-rc.2 (web and desktop).
+- On LAN deployments the plugin's pages work again: requests from a non-loopback address are no longer rejected.
+- The session-credit pill now matches the official stats pills in shape and placement.
+- The model picker shows the official `1017` version badge on DeepSeek Flash again.
+- Reasoning levels are listed from lowest to highest.
+
 ## 0.2.0-rc.2 (2026-10-08)
 
 - Now adapted to official dsh 0.2.0-rc.2 (web and desktop).

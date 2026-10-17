@@ -2,6 +2,11 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.2.1-rc.2 (2026-10-17)
+
+- Now adapted to official dsh 0.2.1-rc.2 (web and desktop).
+- Suggestions work again on LAN deployments: requests from a non-loopback address are no longer rejected.
+
 ## 0.2.0-rc.2 (2026-10-08)
 
 - Now adapted to official dsh 0.2.0-rc.2 (web and desktop).

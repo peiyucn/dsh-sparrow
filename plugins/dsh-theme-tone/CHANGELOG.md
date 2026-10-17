@@ -2,6 +2,12 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.2.1-rc.2 (2026-10-17)
+
+- Now adapted to official dsh 0.2.1-rc.2 (web and desktop).
+- The "settings cannot be saved" warning now says the right reason on the new dsh (the old non-loopback wording no longer applies).
+- Scrolling and replies that are still generating (thinking) are smoother: streaming text no longer triggers the plugin's full re-measure on every update.
+
 ## 0.2.0-rc.2 (2026-10-08)
 
 - Now adapted to official dsh 0.2.0-rc.2 (web and desktop).

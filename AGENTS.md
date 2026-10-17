@@ -95,6 +95,8 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 
 * **组合行**：`cordis.patch.yml` insert 按官方 bundle patch 规范——`id` 用短名（供后续 patch 定位），`name` 用 scoped 包名（loader 按包名解析）
 
+* **版本门只认 peer，不写 `engines.dsh`**：官方 0.2.1-alpha.4 起，插件 `package.json` 一旦声明 `engines.dsh`，安装 / 启动的兼容性**只**按该 range 判定、`peerDependencies` 被忽略（`@deepseek-ai/dsh-app-boot` 的 `plugin-compatibility.ts`；`workspace:` 形式在该 range 里视为不兼容）。本仓库的单一真值守卫（`check:dsh-pin`）锚定的是 peer 声明 ⇒ **保持只声明 `peerDependencies`**。将来确要引入 `engines.dsh` 时，该 range 必须自己覆盖所有支持的 DSH 版本，并同步改守卫口径与本文档。
+
 * **seam 纪律（三档）**：① **正路**：只用公开 seam（`ctx.llm` / `ctx.webServer` / `ctx.tools` / slots / provide 等）② **包装**：公开 seam 不满足需求时包装它——保持原签名与 `this` 语义、可逆恢复，并记录适配的 dsh 版本 ③ **私有 seam 依赖**：官方无公开能力时允许调 private 方法 / 读写 private 状态；护栏是不替换 / 不包装 / 不覆写官方函数，优先复用官方自身写入路径（如 `enqueueOperation` + `setState`），启动时能力检查、surface 变化即 fail-fast，且须 owner 批准并记入 `docs/private-seams.md`
 
 * **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直读内部文件（确需直碰内部文件的特例须记入 `docs/private-seams.md` + owner 认可）
