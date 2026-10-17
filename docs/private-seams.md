@@ -164,6 +164,12 @@
   ⚠️ **这一条是「可以走公开路径却没走」**：官方 `ModelDirectoryState` 的写入口应由官方提供，
   目前没有 ⇒ 只能直写。**待办**：官方若给公开 setter 即换过去。
 
+* **`dsh-theme-tone`** —— 账号通知卡的锚点依赖官方公开 DOM 属性 `aside[data-front]`（rc.2 新增的
+  `AccountNoticeStack`：`createPortal` 直挂 body、`position: fixed; z-index: 40; isolation: isolate`）。
+  本插件把背景层 / 内容层 / 右栏抬到 80 / 81 / 82 ⇒ 官方 z 40 会被压住；故 client half 用该属性找到通知卡、
+  把锚点 token 打在**它的父元素（stack）**上，再抬到 83（card 在 stack 的层叠上下文内，抬 card 出不去）。
+  官方改掉这个属性即**不命中** —— 降级表现 = 通知退回 z 40、重新被主题层遮挡/染色（不崩、不抛错）。
+
 ### D-旁注：**不是** hashed 类名、但同样「官方改行为即静默失效」的一类
 
 * **`dsh-theme-tone` 的分组菜单锚点依赖「谁带 `role='menu'`」**（`src/surface.ts`）。
