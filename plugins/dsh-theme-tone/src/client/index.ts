@@ -57,6 +57,7 @@ import { HANDLE_SELECTOR, applyGlow } from '../handle-glow.js'
 import { buildPopoverCss } from '../popover.js'
 import { buildSurfaceCss } from '../surface.js'
 import { buildSweepCss } from '../sweep.js'
+import { isEmbeddedWindow } from '../perf-mode.js'
 import { isWorkstartProbe } from '../workstart.js'
 import { pseudoOrigin, solvePhaseOrigin } from '../phase.js'
 import {
@@ -85,9 +86,12 @@ export const inject = ['theme', 'slots', 'locale']
 /**
  * 注入样式表（背景层 + 设置行 + 玻璃 + 缝挡板 + 抬升面 + 遮罩模糊 + 扫光带 + 轮次导航/宽度钳制合成一张；
  * 按标记属性去重，HMR / 重载不叠加）。⚠️ nav-pin 那两段并入**本表**、不再单开 `style[data-dsh-nav-pin]`。
+ * 性能模式（嵌入式 webview）只注入设置行样式：其余表全是重特效，且在性能模式下被 PLAIN 门整表让路。
  */
-function ensureStyles(): HTMLStyleElement {
-  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}${buildCaptionCss()}${buildPopoverCss()}`
+function ensureStyles(performanceMode: boolean): HTMLStyleElement {
+  const css = performanceMode
+    ? buildRowCss()
+    : `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}${buildCaptionCss()}${buildPopoverCss()}`
   const existing = document.querySelector<HTMLStyleElement>(STYLE_SELECTOR)
   if (existing !== null) {
     // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之。
@@ -193,6 +197,14 @@ export function apply(ctx: Context): void {
 function install(ctx: Context): void {
 
   /**
+   * 嵌入式（iframe / webview）环境的**性能模式**：VS Code 内置浏览器等宿主里，本插件的重特效
+   * （全屏混合背景层 / 玻璃模糊 / 抬升面质感）在流式重绘下成本明显更高（owner 实测：同一会话切到
+   * 「官方默认」立刻变顺）。判定见 `../perf-mode.ts`；独立浏览器（顶层窗口）保持完整效果。
+   * 性能模式 = 保留色调颜色（token 叠加）+ 设置行，关掉其余全部视觉表与探测。
+   */
+  const performanceMode = isEmbeddedWindow(window)
+
+  /**
    * 标记属性的**唯一宿主** —— 所有 `PLAIN_ATTR` / `WORKSTART_ATTR` 的读写都用它，避免 set 与 remove 目标漂移
    * 把属性残留下来。⚠️ **不能退到 `documentElement`**：消费侧选择器全是 `body:not([PLAIN_ATTR])`，属性挂在
    * `<html>` 上时 `body:not([...])` 恒真、三张表的门全部 **fail-open**。`body` 为 null 时就**不打标记**。
@@ -208,7 +220,8 @@ function install(ctx: Context): void {
   const paintPlain = (plain: boolean): void => {
     const target = markerHost
     if (target === null) return
-    if (plain) target.setAttribute(PLAIN_ATTR, '')
+    // 性能模式：永远挂「让路」门（所有重特效表都带 PLAIN 门），只留 token 颜色与设置行。
+    if (plain || performanceMode) target.setAttribute(PLAIN_ATTR, '')
     else target.removeAttribute(PLAIN_ATTR)
   }
 
@@ -357,8 +370,12 @@ function install(ctx: Context): void {
    * 修法：初值取**最保守**的一侧（`plain = true` = 整层让路），宁可少画（官方外观），也绝不先画错。
    */
   paintPlain(true)
-  resources.style = ensureStyles()
+  resources.style = ensureStyles(performanceMode)
   resources.layer = ensureLayer()
+  if (performanceMode) {
+    // 只记一行、不打扰用户：这是按环境自动降级，不是错误。
+    console.info(`${name}: 嵌入式渲染环境 → 性能模式（保留色调颜色，关闭玻璃 / 背景层 / 抬升面质感）`)
+  }
   // 只留 layer 的局部别名（渲染计划要写它的 style）；style 仅由清理 effect 经 holder 回收，故不取名。
   const layer = resources.layer
   // 官方悬停光带修复：**不带色调门**，两档都生效。注册在 fork 的 ctx 上，卸载时随 fork 一起回收监听。
@@ -452,10 +469,12 @@ function install(ctx: Context): void {
     const settings = readSettings()
     const scheme: ColorScheme = snapshot.active.colorScheme
     const plan = backdropPlan(scheme, settings)
-    layer.hidden = plan.hidden
+    // 性能模式：背景层（全屏渐变 + 颗粒 + 混合）常隐，渲染计划不再接管它。
+    const hidden = performanceMode || plan.hidden
+    layer.hidden = hidden
     // 「这一轴选了官方默认」= 没有染色 = 整层隐藏；把这个事实挂到 body 上，让玻璃与抬升面两张表整表让路。
-    paintPlain(plan.hidden)
-    if (!plan.hidden) {
+    paintPlain(hidden)
+    if (!hidden) {
       layer.style.setProperty(TOP_VARIABLE, plan.top)
       layer.style.setProperty(BOTTOM_VARIABLE, plan.bottom)
       // 左侧金晕是可选层；纯色色调不给就移除变量，让样式表里的 transparent 兜底生效。
@@ -496,6 +515,8 @@ function install(ctx: Context): void {
    * 代价有界：只读 `[data-composer-card]` 一个元素的两个计算值，`getComputedStyle` 强制样式解析 ⇒ **同帧合并**、只在 DOM 变动时跑；observer 挂在 body 上，随 `ctx.effect` 断开。
    */
   const probeWorkstart = (): void => {
+    // 性能模式：玻璃表整表不注入 ⇒ 这个标记没人消费；跳过强制样式解析。
+    if (performanceMode) return
     const target = markerHost
     // body 缺失（理论上不会）就不打标记 —— 消费侧只认 body 上的属性。
     if (target === null) return
@@ -537,6 +558,8 @@ function install(ctx: Context): void {
     probeFrame = 0
     probeTimer = 0
     lastProbeAt = performance.now()
+    // 性能模式：锚点 / 待启动态都没有消费方（重特效表未注入），整段跳过。
+    if (performanceMode) return
     probeWorkstart()
     maintainAnchors()
   }
@@ -576,6 +599,8 @@ function install(ctx: Context): void {
    * 后者有「同帧只跑一次」的合并语义，而收敛需要**连续多帧**各测一次；共用会互相压制。
    */
   const startPhaseSettle = (): void => {
+    // 性能模式：玻璃/缝表未注入，相位量没有消费方 —— 不做任何布局测量。
+    if (performanceMode) return
     lastPhaseAt = performance.now()
     settleFrames = 0
     settlePrev = ''
@@ -710,7 +735,8 @@ function install(ctx: Context): void {
    * 右栏开合 / 左栏折叠会改 class，由上面的 MutationObserver 覆盖；即便漏掉一次，门在测到之前不挂，
    * 最坏情况只是暂时用慢档（正确）。
    */
-  publishPhase()
+  // 性能模式不测相位（消费方表未注入）；完整模式初跑一次。
+  if (!performanceMode) publishPhase()
   ctx.effect(() => {
     const onResize = (): void => { startPhaseSettle() }
     window.addEventListener('resize', onResize, { passive: true })

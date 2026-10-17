@@ -473,7 +473,7 @@ describe('dsh-theme-tone 结构', () => {
     const iGate = src.indexOf('warnMissingCapabilities(')
     const iReturn = src.indexOf('])) return')
     const iInstall = src.indexOf('function install(')
-    const iStyles = src.indexOf('resources.style = ensureStyles()')
+    const iStyles = src.indexOf('resources.style = ensureStyles(')
     assert.ok(iGate > 0 && iReturn > 0 && iInstall > 0 && iStyles > 0, '锚点缺失（实现改过？）')
     assert.ok(iGate < iReturn, '门不通过要直接 return（不继续装）')
     assert.ok(iReturn < iInstall && iInstall < iStyles, '惰性停用必须在创建 style / 背景层之前返回')
@@ -484,7 +484,7 @@ describe('dsh-theme-tone 结构', () => {
     // 中间任一环节抛错都会让 <style> 与背景层永久残留，且门属性从未置上 ⇒ 带门规则全部 fail-open。
     const src = await readCode('../src/client/index.ts')
     const iCleanup = src.indexOf('dsh-theme-tone: backdrop + token overrides')
-    const iStyles = src.indexOf('resources.style = ensureStyles()')
+    const iStyles = src.indexOf('resources.style = ensureStyles(')
     const iLayer = src.indexOf('resources.layer = ensureLayer()')
     assert.ok(iCleanup > 0 && iStyles > 0 && iLayer > 0, '锚点缺失（实现改过？）')
     assert.ok(iCleanup < iStyles, '清理 effect 必须注册在 ensureStyles() **之前**')
@@ -499,7 +499,7 @@ describe('dsh-theme-tone 结构', () => {
     // 「注入」到「宿主回值」之间存在窗口，门属性不存在 ⇒ 带门规则当场命中，选「官方默认」的用户先看到玻璃。
     const src = await readCode('../src/client/index.ts')
     const iClose = src.indexOf('paintPlain(true)')
-    const iStyles = src.indexOf('resources.style = ensureStyles()')
+    const iStyles = src.indexOf('resources.style = ensureStyles(')
     const iLayer = src.indexOf('resources.layer = ensureLayer()')
     assert.ok(iClose > 0, '注入样式表前必须先把门关成官方默认（缺 paintPlain(true)）')
     assert.ok(iClose < iStyles, 'paintPlain(true) 必须在 ensureStyles() **之前**')
