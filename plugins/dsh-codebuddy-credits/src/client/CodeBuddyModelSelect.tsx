@@ -2,6 +2,8 @@
  * CodeBuddy 模型选择器：vendored 自官方 ui-model-selection 的 ModelSelect（MIT License，© 2026 DeepSeek）。
  * 遮蔽官方 conversation.input.model 槽位；相对官方只多一列只读事实（积分系数 · 上下文长度，按模型 id 查
  * model-facts 共享表；模型名保持服务端原名，查不到只显示名字）；priority: -1 靠官方注册表「同 cell 最低者渲染」生效。
+ * 另按官方同条件自绘 1017 版本标（官方该标走 conversation.input.model.label 子槽，本插件遮蔽后
+ * 无法消费，只能镜像；见 model-label-1017.ts 的镜像说明）。
  */
 
 import {
@@ -11,11 +13,12 @@ import {
 import {
   // 图标名只标字形与字重（Regular = 1px 描边），渲染尺寸一律由显式 size prop 决定。
   IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular,
-  IconWarningOutlineRegular, Toast,
+  IconWarningOutlineRegular, Tag, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getMaxMode, subscribeMaxMode } from './maxMode.js'
 import { BusyDot } from './BusyDot.js'
 import { formatModelFacts } from './format.js'
+import { BADGE_1017_TEXT, shows1017Badge } from './model-label-1017.js'
 import {
   PROVIDER_ID, ensureModelFacts, getModelFacts, subscribeModelFacts,
 } from './model-facts.js'
@@ -71,6 +74,25 @@ function clsx(...parts: Array<string | false | undefined>): string {
   return parts.filter((part): part is string => typeof part === 'string' && part.length > 0).join(' ')
 }
 
+/**
+ * 模型名（含官方 1017 版本标的自绘镜像，见 model-label-1017.ts 的镜像说明）。
+ * 官方把标注入 `conversation.input.model.label` 子槽；本插件遮蔽整个选择器且无法声明该子槽，
+ * 故在 trigger / 当前模型行 / 选项行三处按官方同条件自绘 `<Tag tone="info">1017</Tag>`。
+ */
+function ModelNameLabel({ providerId, modelId, modelName }: {
+  providerId: string
+  modelId: string
+  modelName: string
+}) {
+  if (!shows1017Badge(providerId, modelId, modelName)) return <>{modelName}</>
+  return (
+    <span className="ccb-model-1017-label">
+      <span className="ccb-model-1017-name">{modelName}</span>{' '}
+      <Tag tone="info">{BADGE_1017_TEXT}</Tag>
+    </span>
+  )
+}
+
 /** 下拉当前层：root 为两行入口，其余为下钻列表。 */
 type Pane = 'root' | 'model' | 'effort'
 
@@ -118,6 +140,9 @@ export function ensurePickerStyles(): void {
     '.ccb-model-optionCopy { display: flex; flex: 1; flex-direction: column; min-width: 0; }',
     '.ccb-model-row { display: flex; align-items: baseline; gap: 10px; min-width: 0; }',
     '.ccb-model-name { flex: 1 1 auto; min-width: 0; overflow: hidden; color: inherit; font-size: 14px; line-height: 20px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }',
+    // 官方 1017 版本标的镜像排版（上游 ui-deepseek-model-label-1017 的 .label）：名字与 Tag 同一行、4px 间距。
+    '.ccb-model-1017-label { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; vertical-align: baseline; white-space: nowrap; }',
+    '.ccb-model-1017-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }',
     '.ccb-model-facts { flex: 0 0 auto; color: var(--dsw-alias-label-caption); font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums; }',
     '.ccb-model-check { display: grid; place-items: center; flex: 0 0 18px; color: var(--dsw-alias-label-primary); }',
     '.ccb-model-cell { box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: auto; min-width: 100%; height: 40px; padding: 0 10px; border: none; border-radius: 10px; background: transparent; color: var(--dsw-alias-label-primary); font-size: 14px; line-height: 22px; cursor: pointer; text-align: left; }',
@@ -328,7 +353,17 @@ export function CodeBuddyModelSelect(
           }
         }}
       >
-        <span className="ccb-model-triggerLabel">{modelLabel}</span>
+        <span className="ccb-model-triggerLabel">
+          {currentChoice === undefined
+            ? modelLabel
+            : (
+              <ModelNameLabel
+                providerId={currentChoice.group.id}
+                modelId={currentChoice.model.id}
+                modelName={currentChoice.model.name}
+              />
+            )}
+        </span>
         {effortLabel !== undefined && <span className="ccb-model-triggerEffort">{effortLabel}</span>}
         <IconChevronDownOutlineRegular size={14} className={clsx('ccb-model-chevron', open && 'ccb-model-chevronOpen')} />
       </button>
@@ -345,7 +380,17 @@ export function CodeBuddyModelSelect(
             <>
               <button ref={itemRef()} type="button" role="menuitem" className="ccb-model-cell" onClick={() => { setPane('model') }}>
                 <span className="ccb-model-cellLabel">{t('picker.menu.model')}</span>
-                <span className="ccb-model-cellValue">{modelLabel}</span>
+                <span className="ccb-model-cellValue">
+                  {currentChoice === undefined
+                    ? modelLabel
+                    : (
+                      <ModelNameLabel
+                        providerId={currentChoice.group.id}
+                        modelId={currentChoice.model.id}
+                        modelName={currentChoice.model.name}
+                      />
+                    )}
+                </span>
                 <IconChevronRightOutlineRegular size={14} className="ccb-model-cellChevron" />
               </button>
               {reasoning !== undefined && (
@@ -401,7 +446,9 @@ export function CodeBuddyModelSelect(
                           >
                             <span className="ccb-model-optionCopy">
                               <span className="ccb-model-row">
-                                <span className="ccb-model-name">{model.name}</span>
+                                <span className="ccb-model-name">
+                                  <ModelNameLabel providerId={group.id} modelId={model.id} modelName={model.name} />
+                                </span>
                                 {facts === undefined
                                   ? null
                                   : <span className="ccb-model-facts">{facts}</span>}

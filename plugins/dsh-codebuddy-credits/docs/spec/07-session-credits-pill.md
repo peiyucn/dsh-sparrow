@@ -1,5 +1,11 @@
 # 07 · 会话积分改官方同款胶囊 + 可展开明细（2026-09-11）
 
+> ⚠️ **0.2.1-rc.2 现状（2026-10-17 更新）**：官方统计胶囊已拆成 `conversation.composer.dock` 的两条
+> entry（`activity` order 0 / `usage` order 1），容器带 `data-composer-dock`，旧 `[data-composer-stats]`
+> 行已不存在；圆角由 `24px`/`999px` 改为 `var(--dsw-radius-sm)`（紧凑控件 R8）。本插件对应改成
+> **自渲染一条 dock entry（order 2）**，不再 portal 进官方行。本文其余内容保留 0.1.5-rc.2 当时的
+> 设计记录，行号/尺寸不再对应当前版本。
+
 > 需求由 owner 提出（「对话框下面那个当前对话积分消耗总结风格跑偏、放在整个界面里突兀」），
 > 三选一方向由 owner 当次选定为**对齐官方做成第三颗同款胶囊 + 点击展开会话明细面板**。
 > 官方契约按本机 checkout `dsh-v0.1.5-rc.2` 逐条核验（行号即核验位置）。

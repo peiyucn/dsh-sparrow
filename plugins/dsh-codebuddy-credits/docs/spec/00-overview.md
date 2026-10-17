@@ -23,7 +23,7 @@
 | 档位 | 信息 | 位置 | 数据源 |
 | :--- | :--- | :--- | :--- |
 | 用户级 | 账号/企业、周期额度、重置时间、当前模型 | 会话头部额度卡（`conversation.session.header.utilities`，order -10 在官方 session log 下载按钮左边；原侧栏位置会遮挡官方连接状态提示，2026-09-05 迁移） | `/status` + `/quota` |
-| 会话级 | 本会话累计积分 · 调用次数 | 输入框下方统计行（`conversation.composer.dock`，官方 StatsLine 同槽位 order 1） | `/session-usage` |
+| 会话级 | 本会话累计积分 · 调用次数 | 输入框下方统计行（`conversation.composer.dock`，官方 `activity`/`usage` 两条之后，order 2；0.2.1-rc.2 起由本插件自渲染，不再 portal 进官方行） | `/session-usage` |
 | 轮次级 | 该轮积分合计 + 每次调用明细 | 每轮「积分」胶囊（`conversation.chat.assistant-actions`，DOM 移到行尾时间前） | `/turn-usage`（按会话事件自带的 `turn`/`step` 重放，见 08） |
 | 对话级 | token 消耗、缓存命中、耗时 | 官方每轮 Usage/时间统计（不改动） | 官方 token-meter（数据来自本适配器 usage 帧） |
 

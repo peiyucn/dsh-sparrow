@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { effortName, factsFromEntries, parseModelConfig, toDiscovered } from '../lib/catalog.js'
-import { mapFinish, mapUsage, parseSseLine, toWireMessages } from '../lib/adapter.js'
+import { CodeBuddyAdapter, mapFinish, mapUsage, parseSseLine, toWireMessages } from '../lib/adapter.js'
 
 describe('factsFromEntries', () => {
   it('空目录返回空模型集（无预置目录）', () => {
@@ -85,6 +85,84 @@ describe('effortName', () => {
   })
   it('未知档位 id 原样返回', () => {
     assert.equal(effortName('turbo'), 'turbo')
+  })
+})
+
+/** 从 /v3/config 响应取首个模型的档位表键序（= 官方 efforts 数组顺序）。 */
+function effortKeys(reasoning) {
+  const body = {
+    data: {
+      agents: [{ name: 'cli', models: ['m'] }],
+      models: [{ id: 'm', name: 'M', maxInputTokens: 1_000, maxOutputTokens: 100, supportsReasoning: true, reasoning }],
+    },
+  }
+  const [model] = parseModelConfig(body)
+  assert.ok(model.reasoningEfforts, '测试夹具应当解析出 reasoningEfforts')
+  return Object.keys(model.reasoningEfforts)
+}
+
+describe('declaredEfforts：档位按官方 rank 升序（B）', () => {
+  // 官方契约：LlmModelReasoningInfo.efforts 必须从低到高（上游 llm/src/types.ts:399），
+  // 且 session-title-first-prompt-llm 取 efforts[0] 当最低档 —— 键序即 efforts 顺序。
+  it('服务端乱序 supportedEfforts 归一化为 off < minimal < low < medium < high < xhigh < max', () => {
+    assert.deepEqual(
+      effortKeys({ canDisableThinking: true, supportedEfforts: ['max', 'low', 'xhigh', 'high', 'medium', 'minimal'] }),
+      ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+    )
+  })
+
+  it('canDisableThinking:false 时不出 off，其余仍按 rank 升序', () => {
+    assert.deepEqual(
+      effortKeys({ canDisableThinking: false, supportedEfforts: ['high', 'medium', 'low'] }),
+      ['low', 'medium', 'high'],
+    )
+  })
+
+  it('未知档位 id 排在全部已知档位之后，并保持服务端相对次序', () => {
+    assert.deepEqual(
+      effortKeys({ canDisableThinking: true, supportedEfforts: ['turbo', 'high', 'alpha', 'minimal'] }),
+      ['off', 'minimal', 'high', 'turbo', 'alpha'],
+    )
+  })
+
+  it('同一档位只出现一次（重复声明不放大）', () => {
+    assert.deepEqual(
+      effortKeys({ canDisableThinking: true, supportedEfforts: ['high', 'high', 'low'] }),
+      ['off', 'low', 'high'],
+    )
+  })
+
+  it('固定档位形态只有一档（不改 effortName 语义，也不补 off）', () => {
+    assert.deepEqual(effortKeys({ effort: 'high' }), ['high'])
+  })
+
+  it('适配器 resolveModel 的 efforts 按升序产出（标题等消费方依赖 efforts[0] 为最低档）', async () => {
+    const body = {
+      data: {
+        agents: [{ name: 'cli', models: ['m'] }],
+        models: [{
+          id: 'm',
+          name: 'M',
+          maxInputTokens: 1_000,
+          maxOutputTokens: 100,
+          supportsReasoning: true,
+          reasoning: { canDisableThinking: false, supportedEfforts: ['max', 'high', 'minimal'] },
+        }],
+      },
+    }
+    const facts = factsFromEntries(parseModelConfig(body))
+    const adapter = new CodeBuddyAdapter({
+      models: () => facts,
+      resolveApiKey: async () => 'test-key',
+      account: () => undefined,
+      streamIdleTimeoutMs: 1_000,
+    })
+    const info = await adapter.resolveModel('codebuddy-credits', 'm')
+    assert.deepEqual(
+      info.reasoning.efforts.map(effort => effort.id),
+      ['minimal', 'high', 'max'],
+      'efforts 必须从低到高；efforts[0] 是最低档',
+    )
   })
 })
 

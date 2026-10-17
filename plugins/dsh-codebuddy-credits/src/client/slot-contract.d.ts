@@ -1,6 +1,13 @@
 /**
  * 类型扩充：下列槽位与词典命名空间尚未随 client 包发布，运行时由官方 web 端
  * 声明并提供，这里只补类型层；input.model 座本插件以 priority -1 遮蔽官方 ModelSelect。
+ *
+ * ⚠️ `conversation.input.model` 的子槽 `conversation.input.model.label`（single/session/inline，
+ * owner `{ provider, model, placement, selected }`）由官方 ui-model-selection 注册父槽时声明，
+ * 本插件必须在同一父槽上遮蔽时**不声明**它：ui-slots 规定一个子槽只有一个声明者
+ * （上游 `ui-slots/src/index.ts:1245-1250`，"already declared" 即抛），重复声明会让本注册
+ * 失败并退回官方选择器。因此本插件选择器不消费该子槽，其他 label 贡献不渲染；官方临时
+ * 1017 版本标改由 `model-label-1017.ts` 按官方同条件自绘镜像。
  */
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -37,7 +44,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       scope: 'session'
       owner: { messageId: string }
     }
-    /** 官方统计胶囊行在 order 0；本插件 order 1 挂会话积分胶囊，并把自有节点追加进官方行（按 [data-composer-stats] 寻址），形状对齐官方 .pill。 */
+    /**
+     * 官方两条统计胶囊 entry：activity order 0、usage order 1，各带 `data-composer-stat`，容器 `.dock`
+     * 带 `data-composer-dock`（上游 `ui-conversation/src/client/skeleton/InputBar.tsx:520`）。
+     * 本插件 order 2 挂会话积分胶囊，作为 `.dock` flex 行的第三个子项；形状对齐官方 `.pill`。
+     */
     'conversation.composer.dock': {
       kind: 'list'
       scope: 'session'

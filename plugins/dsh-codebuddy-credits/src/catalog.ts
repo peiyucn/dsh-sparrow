@@ -54,6 +54,35 @@ export interface CodeBuddyModelFacts {
   description?: string
 }
 
+/**
+ * 思考档位的规范次序：官方 `LlmModelReasoningInfo.efforts` 要求「from least to greatest」
+ * （上游 `packages/llm/llm/src/types.ts:399`），且官方 `session-title-first-prompt-llm` 取
+ * `efforts[0]` 当最低档（上游 `packages/session/session-title-first-prompt-llm/src/index.ts:76`）。
+ * 服务端 `supportedEfforts` 不保证升序，故这里以 rank 归一化。
+ */
+const EFFORT_RANK: Readonly<Record<string, number>> = {
+  off: 0,
+  minimal: 1,
+  low: 2,
+  medium: 3,
+  high: 4,
+  xhigh: 5,
+  max: 6,
+}
+
+/** 未知档位 id 的 rank：排在全部已知档位之后（稳定排序保留服务端相对次序）。 */
+const UNKNOWN_EFFORT_RANK = Number.MAX_SAFE_INTEGER
+
+/** 按官方 rank 升序排列档位 id；同 rank（含未知档位）保持原有相对次序。 */
+function sortEfforts(levels: readonly string[]): string[] {
+  return levels
+    .map((level, index) => ({ level, index }))
+    .sort((a, b) =>
+      (EFFORT_RANK[a.level] ?? UNKNOWN_EFFORT_RANK) - (EFFORT_RANK[b.level] ?? UNKNOWN_EFFORT_RANK)
+      || a.index - b.index)
+    .map(entry => entry.level)
+}
+
 /** 思考档位 id → 展示名（选择器推理等级面板用；未知 id 原样）。 */
 export function effortName(id: string): string {
   switch (id) {
@@ -137,10 +166,13 @@ function shortCredits(raw: unknown): string | undefined {
 function declaredEfforts(raw: Record<string, unknown>): ReasoningEfforts {
   const supported = Array.isArray(raw.supportedEfforts) ? raw.supportedEfforts as unknown[] : undefined
   if (supported !== undefined && supported.length > 0) {
+    const levels = supported.filter((level): level is string => typeof level === 'string' && level.length > 0)
+    // map 的键序即 thinkingLevelMap 的声明序（Object.keys → 官方 efforts 数组），故 off 在最前、
+    // 其余按 rank 升序；服务端乱序也在这里归一化。
     const map: Record<string, string | null> = {}
     if (raw.canDisableThinking !== false) map.off = null
-    for (const level of supported) {
-      if (typeof level === 'string' && level.length > 0) map[level] = level
+    for (const level of sortEfforts(levels)) {
+      map[level] = level
     }
     return map
   }

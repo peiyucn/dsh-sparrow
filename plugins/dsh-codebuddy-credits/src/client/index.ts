@@ -235,15 +235,22 @@ export function apply(ctx: ClientContext): void {
     locale: 'codebuddy-credits',
   }, CodeBuddyTurnCredit as unknown as (props: object) => ReactNode))
 
-  // 会话积分统计行：order 1 接在官方 StatsLine 之后（composer.dock 槽位）。
+  // 会话积分统计行：官方 activity order 0、usage order 1（ui-chat StatsPills），本条目 order 2
+  // 渲染在官方两颗胶囊之后（list 槽按 order 排，同 order 才需要 priority 决胜）。
   ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
     name: 'conversation.composer.dock',
     id: 'codebuddy-credits-stats',
-    order: 1,
+    order: 2,
     locale: 'codebuddy-credits',
   }, CodeBuddyCreditsStats as unknown as (props: object) => ReactNode))
 
   // priority -1 遮蔽官方条目（同 cell 最低者渲染）；注册不上则保留官方选择器。
+  // 不要补 `children: { 'conversation.input.model.label': … }`：官方 ui-model-selection 注册同一
+  // 槽位时已声明该子槽，ui-slots 的「一个子槽只能有一个声明者」校验（上游
+  // `ui-slots/src/index.ts:1245-1250` 抛 "already declared"）会让本注册失败并吞错退回官方，
+  // 加载顺序反过来时还会顶掉官方注册。遮蔽整个选择器的固有限制：其他第三方对该 label 子槽的
+  // 贡献在本插件遮蔽期间不渲染；官方临时 1017 版本标改由我们按官方同条件自绘
+  // （src/client/model-label-1017.ts）。
   // __ccbDiag 是给用户排查回退问题用的诊断快照，勿删。
   const diag: {
     attempts: number
