@@ -18,7 +18,7 @@ browser logins or installing the CodeBuddy CLI.
 
 ## Requirements
 
-- DSH 0.2.0-rc.2 (the exact official version line this release is built and verified against; newer lines, pre-releases in particular, are not covered)
+- DSH 0.2.1-rc.2 (the exact official version line this release is built and verified against; newer lines, pre-releases in particular, are not covered)
 - Node.js >= 22.19.0
 
 ## Install
