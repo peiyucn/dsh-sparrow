@@ -8,7 +8,6 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - The "settings cannot be saved" warning now says the right reason on the new dsh (the old non-loopback wording no longer applies).
 - Scrolling and replies that are still generating (thinking) are smoother: streaming text no longer triggers the plugin's full re-measure on every update.
 - The "model updated" notice card is no longer covered or tinted by the tone layers; it now matches the other floating panels.
-- In an embedded browser (for example the VS Code built-in Simple Browser) the plugin now switches itself to a performance mode: tone colours stay, while the glass blur, the background layer and the panel texture are turned off. Scrolling and thinking are much smoother there; a standalone browser keeps the full look.
 
 ## 0.2.0-rc.2 (2026-10-08)
 
