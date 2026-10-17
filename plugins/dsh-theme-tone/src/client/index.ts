@@ -508,12 +508,12 @@ function install(ctx: Context): void {
   }
 
   /**
-   * 结构探测（待启动态 + 锚点）的最小间隔。⚠️ **必须节流**：流式输出（thinking 时尤甚）每帧都在往
-   * 对话区插节点，`childList` 变动会以 ~60Hz 持续触发；不节流时每次都要跑 `probeWorkstart` 的
-   * `getComputedStyle(::after)`（强制样式解析）+ `maintainAnchors` 的多次全文档 `querySelectorAll`，
-   * 与官方渲染抢主线程 ⇒ 滚动/思考时掉帧。200ms 对「菜单弹出、待启动态切换」这类人类可感的变化足够跟手，
-   * 且流式结束后一定补跑一次（尾随），不会停在旧状态。
+   * 相位收敛重测的节流间隔（结构变动路径）。`childList` 在流式输出时每帧都有，但相位只在布局
+   * 变化时才变；若每帧都起一轮收敛重测，就等于「思考全程每帧测几何」。200ms 的节流既能把流式期间
+   * 的几何测量从 60Hz 压到 5Hz，又能在切会话 / 元素重建后 200ms 内重新挂上快档门（不落回慢档）。
+   * class 变动（右栏开合等动画）仍走**立即**重测，那是收敛重测存在的本来理由。
    */
+  const PHASE_SETTLE_MIN_INTERVAL_MS = 200
   const PROBE_MIN_INTERVAL_MS = 200
   /**
    * 同一帧内合并多次 DOM 变动，避免连续写属性触发无谓重排；并用 {@link PROBE_MIN_INTERVAL_MS} 节流
@@ -561,11 +561,15 @@ function install(ctx: Context): void {
    * 之后所有探测都被「同帧合并」静默吞掉 —— 观测彻底停摆。
    */
   let settleFrame = 0
+  /** 结构变动路径的节流（见 {@link PHASE_SETTLE_MIN_INTERVAL_MS}）：尾随定时器与上次重测时刻。 */
+  let phaseTimer = 0
+  let lastPhaseAt = 0
   /**
    * 起一轮收敛重测（可被任何触发源调用）。⚠️ 用 `requestAnimationFrame` **自己排队**，不借 `scheduleProbe` ——
    * 后者有「同帧只跑一次」的合并语义，而收敛需要**连续多帧**各测一次；共用会互相压制。
    */
   const startPhaseSettle = (): void => {
+    lastPhaseAt = performance.now()
     settleFrames = 0
     settlePrev = ''
     if (settleFrame !== 0) cancelAnimationFrame(settleFrame)
@@ -581,6 +585,21 @@ function install(ctx: Context): void {
       settleFrame = requestAnimationFrame(step)
     }
     settleFrame = requestAnimationFrame(step)
+  }
+
+  /**
+   * 结构变动（`childList`）用的**节流**入口：连续结构变动只按 {@link PHASE_SETTLE_MIN_INTERVAL_MS}
+   * 的节奏重测相位，且尾随一定会跑一次 —— 既不在流式输出时每帧测几何，又能在切会话 / 元素重建后
+   * 重新挂上快档门（不落回慢档）。
+   */
+  const schedulePhaseSettle = (): void => {
+    if (phaseTimer !== 0) return
+    const wait = PHASE_SETTLE_MIN_INTERVAL_MS - (performance.now() - lastPhaseAt)
+    if (wait <= 0) { startPhaseSettle(); return }
+    phaseTimer = window.setTimeout(() => {
+      phaseTimer = 0
+      startPhaseSettle()
+    }, wait)
   }
 
   /**
@@ -648,9 +667,8 @@ function install(ctx: Context): void {
 
   // 待启动态 / 锚点观测：初跑一次，随后只在 DOM 变动时重算（同帧合并 + 节流，见 scheduleProbe）。
   // `attributes` 必须过滤到 class —— 否则官方每次改任意属性都会触发全量回调节流。
-  // ⚠️ **相位重测只挂在 class 变动上**：`childList` 变动在流式输出时每帧都有，而相位只在布局变化
-  // （右栏开合 / 左栏折叠 = class 或内联 grid 变化 / resize）时才变；若也跟着 childList 跑收敛重测，
-  // 就等于「思考全程每帧都在测几何」—— 这是 think 时滚动卡的主因之一。
+  // ⚠️ **相位重测分两条路**：class 变动（右栏开合等布局动画）立即重测；`childList`（流式输出每帧都有、
+  // 也可能出现元素重建）走节流入口，既不在思考全程每帧测几何，又不会在切会话后停在慢档。
   probeWorkstart()
   ctx.effect(() => {
     const root = markerHost
@@ -658,9 +676,12 @@ function install(ctx: Context): void {
     if (root === null) return () => {}
     const observer = new MutationObserver((records) => {
       scheduleProbe()
+      let layoutChanged = false
       for (const record of records) {
-        if (record.type === 'attributes') { startPhaseSettle(); break }
+        if (record.type === 'attributes') { layoutChanged = true; break }
       }
+      if (layoutChanged) startPhaseSettle()
+      else schedulePhaseSettle()
     })
     observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
     return () => {
@@ -668,8 +689,10 @@ function install(ctx: Context): void {
       // 取消尚未触发的探测，见 scheduleProbe 的 ⚠️。
       if (probeFrame !== 0) cancelAnimationFrame(probeFrame)
       if (probeTimer !== 0) window.clearTimeout(probeTimer)
+      if (phaseTimer !== 0) window.clearTimeout(phaseTimer)
       probeFrame = 0
       probeTimer = 0
+      phaseTimer = 0
       probeScheduled = false
     }
   }, 'dsh-theme-tone: workstart probe')
