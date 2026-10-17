@@ -39,6 +39,7 @@ It also fixes a drag-handle glitch (**no tone needed — active in both themes**
 ## Known limitations
 
 * With the right sidebar open, the background-jobs popover in the header cannot float over the sidebar. DSH renders that popover inside the conversation column — the agent-team popover next to it is rendered outside the column, which is why that one floats — so the column bounds it. It is right-aligned so it stays whole, but it cannot overlap the sidebar.
+* Inside an embedded browser (for example the VS Code built-in Simple Browser, which hosts DSH in a webview iframe), the plugin switches to a performance mode by itself: your tone colours stay, but the glass blur, the background layer and the panel texture are disabled. A standalone browser window keeps the full look.
 
 ## Screenshots
 
