@@ -17,6 +17,7 @@ import {
   GRAIN_TILE_VARIABLE,
   LEFT_VARIABLE,
   MARKER_ATTR,
+  NOTICE_Z_INDEX,
   PLAIN_ATTR,
   RIGHT_PANEL_ATTR,
   SHELL_OVERLAY_ATTR,
@@ -26,6 +27,7 @@ import {
   TOP_VARIABLE,
   WIDTH_HANDLE_ATTR,
 } from './constants.js'
+import { ANCHOR, ANCHOR_ATTR } from './anchors.js'
 import { normalizeScheme, toneFor, toneIdOf, type ColorScheme, type ThemeToneSettings, type ToneId } from './tones.js'
 
 
@@ -193,6 +195,9 @@ body:not([${PLAIN_ATTR}]) [${SHELL_OVERLAY_ATTR}] {
 }
 body:not([${PLAIN_ATTR}]) [${DOCKKIT_MENU_ATTR}] {
   z-index: ${TAB_MENU_Z_INDEX};
+}
+body:not([${PLAIN_ATTR}]) [${ANCHOR_ATTR}~='${ANCHOR.noticeStack}'] {
+  z-index: ${NOTICE_Z_INDEX};
 }
 body:not([${PLAIN_ATTR}]) [${WIDTH_HANDLE_ATTR}],
 body:not([${PLAIN_ATTR}]) [${SIDE_ATTR}]:not([role='tooltip']) {

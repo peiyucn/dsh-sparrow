@@ -284,6 +284,13 @@ function install(ctx: Context): void {
       if (document.querySelector(`[${RIGHT_PANEL_ATTR}][data-sidebar-right-open]`) !== null) {
         add(root, ANCHOR.rightPanelOpen)
       }
+
+      // ⑪ 账号通知 stack（rc.2 新增）：前景卡是 `aside[data-front]`（官方公开 DOM 属性，全仓唯一使用者）。
+      //    抬 z-index 必须打在它的**父 stack** 上 —— card 在 stack 的层叠上下文里，抬 card 出不去。
+      const notice = document.querySelector('aside[data-front]')
+      if (notice?.parentElement !== null && notice?.parentElement !== undefined) {
+        add(notice.parentElement, ANCHOR.noticeStack)
+      }
       for (const [el, tokens] of want) {
         const value = anchorValue(tokens)
         if (anchored.get(el) === value) continue

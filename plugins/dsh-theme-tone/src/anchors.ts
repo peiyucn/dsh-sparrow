@@ -46,6 +46,14 @@ export const ANCHOR = Object.freeze({
    * 原选择器 `body:has([data-sidebar-right-panel][data-sidebar-right-open])` —— `:has()` 里最贵的一类（锚在 `body` 上）。
    */
   rightPanelOpen: 'right-panel-open',
+  /**
+   * **账号通知卡所在的固定层**（rc.2 新增 `AccountNoticeStack`：`createPortal` 直挂 body、
+   * `position: fixed; z-index: 40; isolation: isolate`，前景卡是 `<aside data-front>`）。
+   * 判据只有官方公开 DOM 属性 `aside[data-front]`（没有 role、类名是 hashed 不可写）⇒ 由 client half
+   * 把 token 打在它的**父元素（stack）**上 —— 抬 z-index 必须落在 stack 上：card 在 stack 的层叠上下文内，
+   * 抬 card 出不去。官方改这个属性 = 静默退回（登记在 private-seams §D）。
+   */
+  noticeStack: 'notice-stack',
 } as const)
 
 /** 锚点 token 的联合类型。 */

@@ -57,6 +57,12 @@ export const DOCKKIT_MENU_ATTR = 'data-dockkit-tab-menu'
  *  dockkit 自己的浮层档（默认 60）不抬（在面板的层叠上下文内）；菜单 / tooltip 取 100，本就高于 81。 */
 export const TAB_MENU_Z_INDEX = 83
 
+/** **账号通知 stack** 的 z-index：官方给 40（高于右栏面板 10、与全屏面板 40 同级），但本插件把背景层 /
+ *  内容层 / 右栏抬到 80 / 81 / 82 ⇒ 40 会被整层压住（表现为：通知被内容层遮挡、且被半透明背景层染色，
+ *  即「条本身能看出来、融不进背景」）。按官方「通知浮在应用之上」的意图抬到 83（与 dockkit 标签菜单同档，
+ *  仍低于菜单 / tooltip 的 100）。 */
+export const NOTICE_Z_INDEX = 83
+
 /** 官方容器属性：**列宽拖拽条**。官方有**两条**、必须分别命中：`AppFrame` 那条只有 `data-side`，
  *  `ConversationRoot` 那条独有 `data-width-handle`；两条都是 `absolute` + 低 z-index，会被 81 的内容层整条盖掉。 */
 export const WIDTH_HANDLE_ATTR = 'data-width-handle'

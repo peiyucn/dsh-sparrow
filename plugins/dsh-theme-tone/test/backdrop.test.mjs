@@ -27,6 +27,7 @@ import {
   CONTENT_ATTR,
   CONTENT_Z_INDEX,
   DOCKKIT_MENU_ATTR,
+  NOTICE_Z_INDEX,
   SIDE_ATTR,
   WIDTH_HANDLE_ATTR,
   PLAIN_ATTR,
@@ -34,6 +35,7 @@ import {
   SHELL_OVERLAY_ATTR,
   TAB_MENU_Z_INDEX,
 } from '../lib/constants.js'
+import { ANCHOR, ANCHOR_ATTR } from '../lib/anchors.js'
 import { buildRowCss } from '../lib/client/styles.js'
 import { buildGlassCss } from '../lib/glass.js'
 import { BACKDROP_CLASS, BACKDROP_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_ATTR, MARKER_ATTR } from '../lib/constants.js'
@@ -112,6 +114,20 @@ describe('背景层样式表', () => {
       css,
       new RegExp(`\\[${DOCKKIT_MENU_ATTR}\\] \\{\\s*z-index: ${TAB_MENU_Z_INDEX};`, 'u'),
       '标签菜单应取更高一档，而不是与面板同号',
+    )
+    // **账号通知 stack**（rc.2 新增）：官方给 z-index 40（高于右栏面板 10），本插件抬层后必须跟到面板之上，
+    // 否则通知会被半透明背景层 / 内容层压住（表现为遮挡 + 被染色，owner 报障）。
+    assert.ok(
+      NOTICE_Z_INDEX > ABOVE_CONTENT_Z_INDEX,
+      `通知层 ${NOTICE_Z_INDEX} 必须高于面板 / 内容层 ${ABOVE_CONTENT_Z_INDEX}`,
+    )
+    assert.match(
+      css,
+      new RegExp(
+        `body:not\\(\\[${PLAIN_ATTR}\\]\\) \\[${ANCHOR_ATTR}~='${ANCHOR.noticeStack}'\\] \\{\\s*z-index: ${NOTICE_Z_INDEX};`,
+        'u',
+      ),
+      '账号通知 stack 应抬到内容 / 面板之上，且带官方默认门',
     )
     // **拖拽条**：官方有两条，属性不同（本表须同时抬起两条）。
     assert.ok(css.includes(`[${WIDTH_HANDLE_ATTR}]`), '对话区拖拽条（有独有属性）应被抬起')

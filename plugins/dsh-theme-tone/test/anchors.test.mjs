@@ -37,6 +37,15 @@ describe('anchors：锚点属性的契约', () => {
     assert.equal(new Set(values).size, values.length, `token 有重复：${values.join(', ')}`)
   })
 
+  it('账号通知 stack：token 打在通知卡的**父元素**上（抬 z-index 只能落在 stack）', async () => {
+    // 官方 AccountNoticeStack（rc.2）：createPortal 直挂 body、z-index: 40、isolation: isolate；卡片是 aside[data-front]。
+    // card 在 stack 的层叠上下文内 ⇒ 抬 card 的 z-index 出不去，必须抬 stack。
+    const { readFile } = await import('node:fs/promises')
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(src, /document\.querySelector\('aside\[data-front\]'\)/u, '按官方公开属性 aside[data-front] 找通知卡')
+    assert.match(src, /add\(notice\.parentElement, ANCHOR\.noticeStack\)/u, 'token 必须打在父 stack 上')
+  })
+
   /**
    * ⚠️ 分组菜单三条腿语义不同，**必须**是三个 token：合并会让某些面静默失去质感。
    * menu-grouped = 分组在任意深度；menu-self-scroller = 分组是直接子；menu-child = 含分组的直接子。

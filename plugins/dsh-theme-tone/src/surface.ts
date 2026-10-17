@@ -69,6 +69,13 @@ export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
   /** **计划审阅卡**（`PlanReviewPanel`）—— 与问答卡**同族同形**，只是钩子属性不同（`data-plan-review-key`）；
    *  两条分开写而不是合并成 `:is(...)`，是为了让每条锚点**单一来源**可读（将来可能只改其中一个）。 */
   'body [data-plan-review-key] > section',
+  /**
+   * **账号通知卡**（rc.2 新增 `AccountNoticeStack`）—— 前景卡是 `body` 层 portal 的 `<aside data-front>`，
+   * 与其它抬升面同材质（只叠颗粒与光，底色走已染过的 `--dsw-specific-input-major`）。
+   * 锚点打在它的父 stack 上（client half 算好，理由见 anchors.ts 的 `noticeStack`）：z-index 抬在 stack 上。
+   * ⚠️ **只染前景卡**（`data-front='true'`）：更深层的卡是同一张卡的缩放副本，重复叠图层会把边缘压暗。
+   */
+  `body ${anchorSelector(ANCHOR.noticeStack)} > aside[data-front='true']`,
 ])
 
 /** **实测为 `position: static` 的锚点** —— 只有这些才需要补 `position: relative`：`::after { position: absolute; inset: 0 }` 需要一个**定位祖先**当包含块，锚点若 `static` 且祖先链上也没有 positioned 元素，包含块会退到**视口** ⇒ 纹理铺满全屏（问答卡实测：卡内红点 0、卡外几乎全屏）。

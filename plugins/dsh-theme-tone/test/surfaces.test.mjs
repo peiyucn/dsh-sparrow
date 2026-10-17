@@ -1021,6 +1021,8 @@ describe('抬升面：表面绘制', () => {
       // 故用官方的**非哈希数据属性 + 直接子元素**收窄；底色 token 我们早已染过 ⇒ 表现为「颜色对、质感没有」。
       'body [data-question-key] > section',
       'body [data-plan-review-key] > section',
+      // 账号通知卡（rc.2 新增）：前景卡是 body 层 portal 的 `aside[data-front]`，锚点打在父 stack 上（为了抬 z-index）。
+      `body ${anchorSelector(ANCHOR.noticeStack)} > aside[data-front='true']`,
     ])
     // 模态弹窗**不做玻璃**（它是内容面，Apple HIG：Don't put glass on lists/cards/content）
     // ⚠️ 0.1.7 起**菜单族**改用官方半透明 + 模糊材质（见 MENU_MATERIAL_ANCHORS），
@@ -1029,6 +1031,19 @@ describe('抬升面：表面绘制', () => {
       !blockFor(css, DIALOG_ANCHOR).includes('backdrop-filter'),
       `内容面（对话框）不该有 backdrop-filter：${DIALOG_ANCHOR}`,
     )
+  })
+
+  it('账号通知卡：只染前景卡、带官方默认门，并抬到内容层之上（rc.2 新增浮层）', () => {
+    // 官方 `AccountNoticeStack`（rc.2 起）：createPortal 直挂 body、`z-index: 40`，前景卡是 `aside[data-front]`。
+    // 本插件把背景层 / 内容层 / 右栏抬到 80 / 81 / 82 ⇒ 40 会被压住（遮挡 + 被半透明背景层染色）。
+    const notice = `body ${anchorSelector(ANCHOR.noticeStack)} > aside[data-front='true']`
+    assert.ok(SURFACE_ANCHORS.includes(notice), '通知前景卡应进抬升面表（只加质感，颜色已由 token 层染过）')
+    const gated = notice.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
+    const block = blockFor(css, `${gated}::after`)
+    assert.ok(block.includes('background-image:'), '通知卡应叠颗粒与光（否则就是一条纯色平带）')
+    assert.ok(block.includes('z-index: -1'), '图层应走负 z 的 ::after 载体')
+    // 更深的卡是同一张卡的缩放副本（data-front=false）：只染前景卡，避免边缘被重复图层压暗。
+    assert.ok(!css.includes(`[data-front='false']`), '不得给堆叠的深层卡重复叠图层')
   })
 
   it('模态弹窗（内容面）应该 仍是**实色** —— 玻璃只留给控制层（输入框 / 顶栏）', () => {
