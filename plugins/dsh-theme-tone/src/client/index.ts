@@ -368,9 +368,9 @@ function install(ctx: Context): void {
   let revision = 0
 
   /**
-   * 进程内兜底值 —— 宿主侧设置**不可用**时（非 loopback 的 memory 模式，或命名空间未暴露）用它承载本次
-   * 会话的选择。为什么必须有：`mode: 'memory'` 时 `writable` 恒为 false，`set()` 是**静默空操作**、
-   * `subscribe` 也不会因宿主推送而触发 —— 不做兜底则用户点色调屏幕毫无反应、也无任何日志。
+   * 进程内兜底值 —— 宿主侧设置**不可写**时（命名空间未暴露、或宿主拒绝写入）用它承载本次会话的选择。
+   * 为什么必须有：此时 `writable` 为 false，`set()` 不会落盘、`subscribe` 也不会因宿主推送而触发 ——
+   * 不做兜底则用户点色调屏幕毫无反应、也无任何日志。
    */
   let localSettings: ThemeToneSettings = DEFAULT_SETTINGS
   let warnedNoPersistence = false
@@ -410,8 +410,8 @@ function install(ctx: Context): void {
     warnedNoPersistence = true
     warnUser(
       ctx,
-      `${name}: 本次会话的设置无法写入宿主（${snapshot.mode === 'memory' ? '页面非本机回环地址' : '该设置项对当前客户端不可用'}）；`
-      + '色调仍会在本次会话内生效，但不会持久化。从本机回环地址访问 dsh 即可保存。',
+      `${name}: 本次会话的设置无法写入宿主（该设置项对当前客户端不可写）；`
+      + '色调仍会在本次会话内生效，但不会持久化。',
     )
   }
 
@@ -508,24 +508,43 @@ function install(ctx: Context): void {
   }
 
   /**
-   * 同一帧内合并多次 DOM 变动，避免连续写属性触发无谓重排。⚠️ rAF 句柄**必须存下来并在卸载时取消**：
-   * `ctx.effect` 只管它收集到的 disposer，不会替你取消已入队的帧 —— 否则「变动入队 → 卸载 → 帧才到」会把
+   * 结构探测（待启动态 + 锚点）的最小间隔。⚠️ **必须节流**：流式输出（thinking 时尤甚）每帧都在往
+   * 对话区插节点，`childList` 变动会以 ~60Hz 持续触发；不节流时每次都要跑 `probeWorkstart` 的
+   * `getComputedStyle(::after)`（强制样式解析）+ `maintainAnchors` 的多次全文档 `querySelectorAll`，
+   * 与官方渲染抢主线程 ⇒ 滚动/思考时掉帧。200ms 对「菜单弹出、待启动态切换」这类人类可感的变化足够跟手，
+   * 且流式结束后一定补跑一次（尾随），不会停在旧状态。
+   */
+  const PROBE_MIN_INTERVAL_MS = 200
+  /**
+   * 同一帧内合并多次 DOM 变动，避免连续写属性触发无谓重排；并用 {@link PROBE_MIN_INTERVAL_MS} 节流
+   * 高频率的 `childList` 变动（流式输出）。⚠️ 帧句柄与尾随定时器**都必须存下来并在卸载时取消**：
+   * `ctx.effect` 只管它收集到的 disposer，不会替你取消已入队的回调 —— 否则「变动入队 → 卸载 → 回调才到」会把
    * 刚摘掉的 {@link WORKSTART_ATTR} 重新写回 body，属性就永久残留了。
    */
   let probeScheduled = false
   let probeFrame = 0
+  let probeTimer = 0
+  let lastProbeAt = 0
+  const runProbe = (): void => {
+    probeScheduled = false
+    probeFrame = 0
+    probeTimer = 0
+    lastProbeAt = performance.now()
+    probeWorkstart()
+    maintainAnchors()
+  }
   const scheduleProbe = (): void => {
     if (probeScheduled) return
     probeScheduled = true
-    probeFrame = requestAnimationFrame(() => {
-      probeScheduled = false
-      probeFrame = 0
-      probeWorkstart()
-      // 锚点与相位都在同帧合并后维护：连续 DOM 变动只算一次。
-      maintainAnchors()
-      // 相位走**收敛式**重测：布局若还在动（右栏开合是动画）就继续测，直到稳定。
-      startPhaseSettle()
-    })
+    const wait = PROBE_MIN_INTERVAL_MS - (performance.now() - lastProbeAt)
+    if (wait <= 0) {
+      probeFrame = requestAnimationFrame(runProbe)
+      return
+    }
+    probeTimer = window.setTimeout(() => {
+      probeTimer = 0
+      probeFrame = requestAnimationFrame(runProbe)
+    }, wait)
   }
 
   /**
@@ -627,20 +646,30 @@ function install(ctx: Context): void {
   repaint()
   ctx.effect(() => scope.subscribe(() => { repaint() }), 'dsh-theme-tone: settings scope')
 
-  // 待启动态观测：初跑一次，随后只在 DOM 变动时重算（同帧合并，见 scheduleProbe）。
+  // 待启动态 / 锚点观测：初跑一次，随后只在 DOM 变动时重算（同帧合并 + 节流，见 scheduleProbe）。
   // `attributes` 必须过滤到 class —— 否则官方每次改任意属性都会触发全量回调节流。
+  // ⚠️ **相位重测只挂在 class 变动上**：`childList` 变动在流式输出时每帧都有，而相位只在布局变化
+  // （右栏开合 / 左栏折叠 = class 或内联 grid 变化 / resize）时才变；若也跟着 childList 跑收敛重测，
+  // 就等于「思考全程每帧都在测几何」—— 这是 think 时滚动卡的主因之一。
   probeWorkstart()
   ctx.effect(() => {
     const root = markerHost
     // body 缺失时没有可观察的宿主 —— 直接不装（probeWorkstart 也不会打标记）。
     if (root === null) return () => {}
-    const observer = new MutationObserver(scheduleProbe)
+    const observer = new MutationObserver((records) => {
+      scheduleProbe()
+      for (const record of records) {
+        if (record.type === 'attributes') { startPhaseSettle(); break }
+      }
+    })
     observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
     return () => {
       observer.disconnect()
       // 取消尚未触发的探测，见 scheduleProbe 的 ⚠️。
       if (probeFrame !== 0) cancelAnimationFrame(probeFrame)
+      if (probeTimer !== 0) window.clearTimeout(probeTimer)
       probeFrame = 0
+      probeTimer = 0
       probeScheduled = false
     }
   }, 'dsh-theme-tone: workstart probe')

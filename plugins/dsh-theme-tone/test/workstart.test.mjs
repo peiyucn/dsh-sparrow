@@ -73,4 +73,23 @@ describe('workstart：未选工作区待启动态的判定（纯函数）', () =
     assert.ok(cleanup.includes('observer.disconnect()'), '清理里要断开 observer')
     assert.ok(cleanup.includes('cancelAnimationFrame'), '同一个清理里要取消 rAF')
   })
+
+  it('⛔ 流式输出必须被节流：结构探测有最小间隔，尾随定时器也要取消', async () => {
+    // 官方在 thinking 时每帧都在往对话区插节点；不节流 = 每帧跑一次 getComputedStyle + 多次全文档扫描，
+    // 与官方渲染抢主线程 ⇒ 滚动掉帧。这条守卫钉住「节流常量 + setTimeout 尾随 + 清理时 clearTimeout」。
+    const { readFile } = await import('node:fs/promises')
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(src, /const PROBE_MIN_INTERVAL_MS = \d+/u, '结构探测的最小间隔必须是具名常量')
+    assert.match(src, /probeTimer = (window\.)?setTimeout\(/u, '未到最小间隔时要排尾随定时器而不是立刻跑')
+    assert.match(src, /clearTimeout\(probeTimer\)/u, '清理时必须取消尾随定时器（否则卸载后仍会写属性）')
+  })
+
+  it('⛔ 相位重测只挂在 class 变动上，不得跟着 childList（流式）每帧重测几何', async () => {
+    // childList 变动在流式输出时每帧都有，而相位只在布局变化（右栏开合 / resize）时才变。
+    // 若 observer 对任何变动都 startPhaseSettle，就等于「思考全程每帧测几何」—— 已在 0.2.1-rc.2 上复现为卡顿。
+    const { readFile } = await import('node:fs/promises')
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.ok(!/maintainAnchors\(\)\s*\n\s*startPhaseSettle\(\)/u.test(src), '结构探测回调里不得无条件重测相位')
+    assert.match(src, /record\.type === 'attributes'[\s\S]{0,120}startPhaseSettle\(\)/u, '相位重测必须由 attributes（class）变动触发')
+  })
 })
