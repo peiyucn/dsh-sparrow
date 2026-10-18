@@ -96,7 +96,29 @@ describe('workstart：未选工作区待启动态的判定（纯函数）', () =
     assert.match(src, /if \(layoutChanged\) startPhaseSettle\(\)\s*\n\s*else schedulePhaseSettle\(\)/u,
       'class 变动立即重测、childList 走节流入口')
     assert.ok(!/maintainAnchors\(\)\s*\n\s*startPhaseSettle\(\)/u.test(src), '结构探测回调里不得无条件重测相位')
-    const cleanup = src.slice(src.indexOf('dsh-theme-tone: workstart probe') - 1100, src.indexOf('dsh-theme-tone: workstart probe'))
+    const cleanup = src.slice(src.indexOf('dsh-theme-tone: workstart probe') - 1400, src.indexOf('dsh-theme-tone: workstart probe'))
     assert.ok(cleanup.includes('clearTimeout(phaseTimer)'), '清理时必须取消相位重测的尾随定时器')
+    assert.ok(cleanup.includes('clearTimeout(contentSettleTimer)'), '清理时必须取消内容静默去抖定时器')
+  })
+
+  it('⛔ 流式内容变动必须推迟探测：内容量越大扫描越贵，不能每批变动都跑', async () => {
+    // 实测：锚点扫描是**全文档** querySelectorAll，成本随会话 DOM 线性增长（3.4K 节点 ≈1.2ms、
+    // 23K 节点 ≈9.5ms）；相位收敛重测还会强制样式/布局并连测多帧。流式输出时每帧都有 childList 变动，
+    // 若照旧触发 ⇒ 长会话的 think 阶段把这两笔叠到每帧渲染上（owner 观察：内容一收起明显缓解）。
+    const { readFile } = await import('node:fs/promises')
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(src, /const CONTENT_SETTLE_QUIET_MS = \d+/u, '内容变动的静默去抖间隔必须是具名常量')
+    // 判定先于 scheduleProbe：纯内容变动直接走推迟路径并 return。
+    const churnGate = /if \(isContentChurn\(signalsOf\(records\)\)\) \{ armContentSettle\(\); return \}/u
+    assert.match(src, churnGate, 'observer 必须先用 isContentChurn 分类，内容变动走推迟路径')
+    const gateAt = src.search(churnGate)
+    const probeAt = src.indexOf('scheduleProbe()', src.indexOf('const observer = new MutationObserver'))
+    assert.ok(gateAt > 0 && probeAt > gateAt, '内容变动分支必须在 scheduleProbe 之前 return')
+    // 推迟路径：拿到变动只起定时器；定时器到点若仍在流式则重新计时，安静后才补探测 + 相位重测。
+    assert.match(src, /const armContentSettle = \(\): void => \{[\s\S]{0,400}?contentSettleTimer = window\.setTimeout\(contentSettleFlush, CONTENT_SETTLE_QUIET_MS\)/u,
+      '内容变动只能起静默去抖定时器（流式期间不扫描）')
+    assert.match(src, /const contentSettleFlush = \(\): void => \{[\s\S]{0,700}?scheduleProbe\(\)\s*\n\s*startPhaseSettle\(\)/u,
+      '真正安静下来后必须补一次探测 + 相位重测')
+    assert.ok(src.includes("const ANCHOR_LIKE_SELECTOR ="), '需要锚点相关节点特征表来收窄内容变动判定')
   })
 })

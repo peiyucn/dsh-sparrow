@@ -57,6 +57,7 @@ import { HANDLE_SELECTOR, applyGlow } from '../handle-glow.js'
 import { buildPopoverCss } from '../popover.js'
 import { buildSurfaceCss } from '../surface.js'
 import { buildSweepCss } from '../sweep.js'
+import { isContentChurn, type MutationSignal } from '../mutation-gate.js'
 import { isWorkstartProbe } from '../workstart.js'
 import { pseudoOrigin, solvePhaseOrigin } from '../phase.js'
 import {
@@ -523,6 +524,14 @@ function install(ctx: Context): void {
   const PHASE_SETTLE_MIN_INTERVAL_MS = 200
   const PROBE_MIN_INTERVAL_MS = 200
   /**
+   * 流式输出时「内容变动」的**静默去抖**：对话内容每帧都在变，若每批变动都触发锚点扫描（全文档
+   * `querySelectorAll`，成本随会话 DOM 线性增长：3.4K 节点约 1.2ms / 23K 节点约 9.5ms）与相位收敛重测
+   * （强制样式/布局、连测多帧），长会话里就等于把这两笔叠到每帧渲染上。内容变动不改变 UI chrome 的锚点、
+   * 也不改变相位几何（相位只随左右栏/窗口/吸顶行这类布局变化）⇒ 等变动**停下**这么久后再补测一次；
+   * 期间菜单/弹层/右栏这类**非内容**变动仍走立即路径。
+   */
+  const CONTENT_SETTLE_QUIET_MS = 400
+  /**
    * 同一帧内合并多次 DOM 变动，避免连续写属性触发无谓重排；并用 {@link PROBE_MIN_INTERVAL_MS} 节流
    * 高频率的 `childList` 变动（流式输出）。⚠️ 帧句柄与尾随定时器**都必须存下来并在卸载时取消**：
    * `ctx.effect` 只管它收集到的 disposer，不会替你取消已入队的回调 —— 否则「变动入队 → 卸载 → 回调才到」会把
@@ -609,6 +618,45 @@ function install(ctx: Context): void {
     }, wait)
   }
 
+
+  /** {@link CONTENT_SETTLE_QUIET_MS} 的静默去抖状态：定时器句柄 + 最近一次内容变动时刻。 */
+  let contentSettleTimer = 0
+  let lastContentMutationAt = 0
+  /**
+   * 内容变动里**仍可能改变锚点**的节点特征：只放运行期锚点真正依赖的 UI 元素。判定用 `matches` /
+   * 子树 `querySelector`；宁可少列（漏了有「静默后补测」兜住），也不要为求全而拖慢判定。
+   */
+  const ANCHOR_LIKE_SELECTOR = "nav,[role='menu'],[role='dialog'],[role='listbox'],[role='tree'],[data-composer-card],[data-composer-seat],[data-goal-bar],[data-testid='todo-panel'],[data-queue-dock],aside[data-front]"
+  /** 把一批变动映射成 {@link MutationSignal}。 */
+  const signalsOf = (records: readonly MutationRecord[]): MutationSignal[] => records.map((record) => {
+    const target = record.target instanceof Element ? record.target : record.target.parentElement
+    const insideContent = target !== null && target.closest(`[${CONTENT_ATTR}]`) !== null
+    let anchorLike = false
+    for (const node of [...record.addedNodes, ...record.removedNodes]) {
+      if (!(node instanceof Element)) continue
+      if (node.matches(ANCHOR_LIKE_SELECTOR) || node.querySelector(ANCHOR_LIKE_SELECTOR) !== null) { anchorLike = true; break }
+    }
+    return { insideContent, anchorLike }
+  })
+  /**
+   * 静默去抖到点：这期间又来了一批变动（仍在流式）就重新计时；真正安静下来才补一次探测 + 相位收敛重测，
+   * 保证「新轮次导航 / 吸顶行结构变化」这类内容侧布局变化最终仍被采到（最多晚 {@link CONTENT_SETTLE_QUIET_MS}ms）。
+   */
+  const contentSettleFlush = (): void => {
+    contentSettleTimer = 0
+    if (performance.now() - lastContentMutationAt < CONTENT_SETTLE_QUIET_MS) {
+      contentSettleTimer = window.setTimeout(contentSettleFlush, CONTENT_SETTLE_QUIET_MS)
+      return
+    }
+    scheduleProbe()
+    startPhaseSettle()
+  }
+  /** 内容变动入口：只记录时刻并起一个去抖定时器；流式期间不做任何扫描 / 几何测量。 */
+  const armContentSettle = (): void => {
+    lastContentMutationAt = performance.now()
+    if (contentSettleTimer !== 0) return
+    contentSettleTimer = window.setTimeout(contentSettleFlush, CONTENT_SETTLE_QUIET_MS)
+  }
   /**
    * 实测两个相载体的定位区原点，发布成 CSS 变量 + **两道**门属性。必须实测：相位要的是「定位区左上角在视口里的坐标」，右栏一开左栏偏移与右栏宽同时变、官方又没把右栏宽发布成变量 ⇒ 纯 CSS 推不出（详见 `../phase.ts`）。
    * 两个载体都走 {@link pseudoOrigin}（不依赖任何实测不变量），可见性各自独立 ⇒ **各测各的、各挂各的门**（合成一道门会让一个载体暂不可用连带拖回慢档）；取不到元素或几何不合理（见 {@link solvePhaseOrigin}）就**摘掉那道门** ⇒ 该规则落回 `fixed` 档（慢但一定正确）。
@@ -682,6 +730,8 @@ function install(ctx: Context): void {
     // body 缺失时没有可观察的宿主 —— 直接不装（probeWorkstart 也不会打标记）。
     if (root === null) return () => {}
     const observer = new MutationObserver((records) => {
+      // 纯内容流式变动：推迟到变动停下再探测/重测（理由见 CONTENT_SETTLE_QUIET_MS）。
+      if (isContentChurn(signalsOf(records))) { armContentSettle(); return }
       scheduleProbe()
       let layoutChanged = false
       for (const record of records) {
@@ -697,9 +747,11 @@ function install(ctx: Context): void {
       if (probeFrame !== 0) cancelAnimationFrame(probeFrame)
       if (probeTimer !== 0) window.clearTimeout(probeTimer)
       if (phaseTimer !== 0) window.clearTimeout(phaseTimer)
+      if (contentSettleTimer !== 0) window.clearTimeout(contentSettleTimer)
       probeFrame = 0
       probeTimer = 0
       phaseTimer = 0
+      contentSettleTimer = 0
       probeScheduled = false
     }
   }, 'dsh-theme-tone: workstart probe')
