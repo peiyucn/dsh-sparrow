@@ -23,7 +23,7 @@ Each plugin is published and installed independently; a plugin retires from the 
 You can also browse and install these from **Plugins → Discover** in DSH (custom plugin markets are experimental: turn on **Custom plugin markets** under **Plugins → Experimental plugins → More** first). Index URL:
 
 ```
-https://peiyucn.github.io/dsh-sparrow/market/index.json
+https://dsh.pyai.site/market/index.json
 ```
 
 Paste it into **Discover → Add index source**. The market marks which versions work with the DSH you are running — every plugin here only supports the exact version line its version number states, so the card usually shows the single installable version.

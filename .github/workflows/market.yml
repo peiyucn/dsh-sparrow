@@ -1,7 +1,7 @@
 name: Market index
 
 # 把仓库里的 market/index.json 发布到 GitHub Pages，得到稳定 URL：
-#   https://peiyucn.github.io/dsh-sparrow/market/index.json
+#   https://dsh.pyai.site/market/index.json
 #
 # 设计取舍：**本工作流不联网生成索引**。
 # 索引的真值是仓库里的 market/index.json（由 `pnpm run market:index` 从 npm registry 生成并提交），
