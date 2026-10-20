@@ -106,7 +106,10 @@ export function dshRangeOf(manifest) {
 
 /** 读 npm registry 的 packument（一个包的全部版本与元数据）。 */
 async function fetchPackument(name) {
-  const url = `${REGISTRY}${name.replace('/', '%2F')}`
+  // scoped 包名（`@scope/name`）整段编码成 `%40scope%2Fname`：一个 encodeURIComponent
+  // 就把所有需要转义的字符处理掉，不做手写的「替换某个字符」——那种写法只替换第一处，
+  // 且漏掉其它元字符（CodeQL js/incomplete-sanitization）。
+  const url = `${REGISTRY}${encodeURIComponent(name)}`
   const response = await fetch(url, { headers: { accept: 'application/json' } })
   if (!response.ok) throw new Error(`GET ${url} → HTTP ${response.status}`)
   return response.json()
