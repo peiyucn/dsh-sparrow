@@ -1,61 +1,153 @@
 <!doctype html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>dsh-sparrow · DSH 插件市场索引</title>
+<title>dsh-sparrow · DSH plugin market index</title>
+<!--
+  双语落地页：默认英文，点右上角切换。两种语言都在同一份 HTML 里（显示/隐藏切换），
+  不写 cookie、不重定向、不依赖 JS 才能读内容（JS 只负责切换）。
+  ⚠️ 这里引用的索引地址必须与 README / AGENTS 保持一致，改域名时一起改。
+-->
 <style>
-  :root { color-scheme: dark }
+  :root {
+    color-scheme: dark;
+    --bg: #0a0a10;
+    --fg: #d4d4d8;
+    --dim: #71717a;
+    --faint: #52525b;
+    --line: #27272a;
+    --panel: #18181b;
+    --accent: #ffd48a;
+    --head: #fafafa;
+  }
+  * { box-sizing: border-box }
   body {
-    margin: 0; padding: 3rem 1.25rem; min-height: 100vh; box-sizing: border-box;
-    background: #0a0a10; color: #d4d4d8;
+    margin: 0; padding: 3rem 1.25rem; min-height: 100vh;
+    background: var(--bg); color: var(--fg);
     font: 15px/1.7 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
     display: flex; justify-content: center; align-items: flex-start;
   }
   main { max-width: 40rem; width: 100% }
-  h1 { margin: 0 0 .25rem; font-size: 1.75rem; color: #fafafa; letter-spacing: -.02em }
-  .sub { margin: 0 0 2rem; color: #71717a; font-size: .9rem }
-  h2 { margin: 2rem 0 .5rem; font-size: .8rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #71717a }
-  code, a { word-break: break-all }
+
+  /* 语言切换：默认显示英文，html[data-lang="zh"] 时反过来 */
+  [data-lang-block] { display: none }
+  html[data-lang="en"] [data-lang-block="en"] { display: block }
+  html[data-lang="zh"] [data-lang-block="zh"] { display: block }
+
+  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem }
+  h1 { margin: 0 0 .25rem; font-size: 1.75rem; color: var(--head); letter-spacing: -.02em }
+  .sub { margin: 0 0 2rem; color: var(--dim); font-size: .9rem }
+  .switcher { display: flex; gap: .25rem; flex: none; margin-top: .25rem }
+  .switcher button {
+    font: inherit; font-size: .8rem; line-height: 1; padding: .4rem .6rem; cursor: pointer;
+    color: var(--dim); background: none; border: 1px solid var(--line); border-radius: .35rem;
+  }
+  .switcher button[aria-pressed="true"] { color: var(--accent); border-color: #3f3f46 }
+  .switcher button:hover { color: var(--fg) }
+
+  h2 { margin: 2rem 0 .5rem; font-size: .8rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim) }
+  code { word-break: break-all }
   .url {
     display: block; padding: .85rem 1rem; border-radius: .5rem;
-    background: #18181b; border: 1px solid #27272a;
-    font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .875rem; color: #ffd48a;
+    background: var(--panel); border: 1px solid var(--line);
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .875rem; color: var(--accent);
   }
   ol { margin: .5rem 0; padding-left: 1.25rem }
   li { margin: .35rem 0 }
-  li::marker { color: #52525b }
-  a { color: #ffd48a; text-decoration: none }
+  li::marker { color: var(--faint) }
+  a { color: var(--accent); text-decoration: none }
   a:hover { text-decoration: underline }
-  footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid #27272a; font-size: .8rem; color: #52525b }
+  footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--line); font-size: .8rem; color: var(--faint) }
+
+  /* 无 JS 时也保证能看到内容：默认英文已由 html[data-lang="en"] 决定 */
+  @media (prefers-reduced-motion: no-preference) {
+    body { animation: fade .25s ease-out }
+    @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+  }
 </style>
 </head>
 <body>
 <main>
-  <h1>dsh-sparrow</h1>
-  <p class="sub">DeepSeek Harness（DSH）Web 插件小合集的插件市场索引</p>
+  <div class="top">
+    <div>
+      <h1>dsh-sparrow</h1>
+      <p class="sub" data-lang-block="en">Plugin market index for a small collection of DeepSeek Harness plugins</p>
+      <p class="sub" data-lang-block="zh">DeepSeek Harness（DSH）Web 插件小合集的插件市场索引</p>
+    </div>
+    <div class="switcher" role="group" aria-label="Language / 语言">
+      <button type="button" data-lang-set="en" aria-pressed="true">EN</button>
+      <button type="button" data-lang-set="zh" aria-pressed="false">中</button>
+    </div>
+  </div>
 
-  <h2>索引地址</h2>
-  <code class="url">https://dsh.pyai.site/market/index.json</code>
+  <!-- ============ English ============ -->
+  <div data-lang-block="en">
+    <h2>Index URL</h2>
+    <code class="url">https://dsh.pyai.site/market/index.json</code>
 
-  <h2>在 DSH 里使用</h2>
-  <ol>
-    <li>先在 DSH 里打开实验性功能：<strong>插件 → 实验性插件 → 更多 → 自定义插件市场</strong></li>
-    <li>进入 <strong>插件 → 发现 → 添加索引源</strong></li>
-    <li>粘贴上面的索引地址</li>
-  </ol>
-  <p class="sub">市场会按你当前运行的 DSH 版本标出可用版本。每个插件只支持其版本号所标示的那一条 DSH 版本线。</p>
+    <h2>Use it in DSH</h2>
+    <ol>
+      <li>Enable the experimental feature: <strong>Plugins → Experimental plugins → More → Custom plugin markets</strong></li>
+      <li>Open <strong>Plugins → Discover → Add index source</strong></li>
+      <li>Paste the index URL above</li>
+    </ol>
+    <p class="sub">The market marks which versions work with the DSH you are running. Every plugin here supports only the exact DSH version line stated in its version number.</p>
 
-  <h2>相关</h2>
-  <ul>
-    <li><a href="https://github.com/peiyucn/dsh-sparrow">源码仓库</a></li>
-    <li><a href="https://www.npmjs.com/org/dsh-sparrow">npm 包（@dsh-sparrow）</a></li>
-  </ul>
+    <h2>Links</h2>
+    <ul>
+      <li><a href="https://github.com/peiyucn/dsh-sparrow" target="_blank" rel="noopener noreferrer">Source repository</a></li>
+      <li><a href="https://www.npmjs.com/org/dsh-sparrow" target="_blank" rel="noopener noreferrer">npm packages (@dsh-sparrow)</a></li>
+    </ul>
 
-  <footer>
-    索引内容由 <a href="https://github.com/peiyucn/dsh-sparrow">peiyucn/dsh-sparrow</a> 生成并发布。
-    市场内容是第三方声明，安装前请核对版本来源。
-  </footer>
+    <footer>
+      The index is generated and published from <a href="https://github.com/peiyucn/dsh-sparrow" target="_blank" rel="noopener noreferrer">peiyucn/dsh-sparrow</a>.
+      Market content is a third-party claim — check the source before installing.
+    </footer>
+  </div>
+
+  <!-- ============ 简体中文 ============ -->
+  <div data-lang-block="zh">
+    <h2>索引地址</h2>
+    <code class="url">https://dsh.pyai.site/market/index.json</code>
+
+    <h2>在 DSH 里使用</h2>
+    <ol>
+      <li>先打开实验性功能：<strong>插件 → 实验性插件 → 更多 → 自定义插件市场</strong></li>
+      <li>进入 <strong>插件 → 发现 → 添加索引源</strong></li>
+      <li>粘贴上面的索引地址</li>
+    </ol>
+    <p class="sub">市场会按你当前运行的 DSH 版本标出可用版本。每个插件只支持其版本号所标示的那一条 DSH 版本线。</p>
+
+    <h2>相关链接</h2>
+    <ul>
+      <li><a href="https://github.com/peiyucn/dsh-sparrow" target="_blank" rel="noopener noreferrer">源码仓库</a></li>
+      <li><a href="https://www.npmjs.com/org/dsh-sparrow" target="_blank" rel="noopener noreferrer">npm 包（@dsh-sparrow）</a></li>
+    </ul>
+
+    <footer>
+      索引内容由 <a href="https://github.com/peiyucn/dsh-sparrow" target="_blank" rel="noopener noreferrer">peiyucn/dsh-sparrow</a> 生成并发布。
+      市场内容是第三方声明，安装前请核对版本来源。
+    </footer>
+  </div>
 </main>
+
+<script>
+  // 语言切换：默认英文；choice 只放内存（不写 cookie / localStorage，不重定向）。
+  // 用 data-lang 属性驱动 CSS，切换时同步 aria-pressed 与 <html lang>。
+  (() => {
+    const root = document.documentElement
+    const buttons = [...document.querySelectorAll('[data-lang-set]')]
+    const apply = (lang) => {
+      root.dataset.lang = lang
+      root.lang = lang === 'zh' ? 'zh-CN' : 'en'
+      for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.langSet === lang))
+    }
+    for (const button of buttons) {
+      button.addEventListener('click', () => apply(button.dataset.langSet))
+    }
+    apply('en')
+  })()
+</script>
 </body>
 </html>
