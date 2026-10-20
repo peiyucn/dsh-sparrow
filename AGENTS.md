@@ -62,7 +62,7 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 
 * `ci.yml`（push dev/main 与 PR）：`typecheck` → `build` → `test`（JUnit artifact；测试依赖 lib/ 故 build 在前）→ `package`（`npm pack --dry-run` 校验 files 清单）
 * `publish.yml`（push `<插件名>-vX.Y.Z` tag 或 workflow_dispatch 指定插件）：解析插件 / 校验版本 / **跑根 `pnpm run check`（守卫 fail-closed，守卫红则不发）** / verify 后 `npm publish`；同文件含 promote 手动任务（`npm dist-tag add` 移通道，deprecate 归 owner 本机；三个输入（plugin/version/tag）缺任一即**非零退出**，不静默成功）；publish job 挂 `environment: npm-publish`，**无 release-control**
-* `market.yml`（push main 且 `market/**` 变动，或手动）：跑根 `pnpm run check` 后把 `market/index.json` 发布到 GitHub Pages（`environment: github-pages`）；只校验 + 发布，**不生成**（理由见《插件市场索引》）
+* `market.yml`（`Publish` 成功后 `workflow_run` / push main 且 `market/**` 或本文件变动 / 每日 03:47 UTC / 手动）：**从 npm 重生成 → 守卫 fail-closed → 有变化则 bot 提交 `market/` → 发布 Pages**（`environment: github-pages`）。索引无需手工重生成，详见《插件市场索引》
 * 鉴权双模式：有 `NPM_TOKEN` 走 Automation token（首发必需），无则走 npm Trusted Publishing（OIDC）
 
 ## GitHub 与网络
@@ -119,21 +119,19 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 
 > 对外发布站点：**<https://dsh.pyai.site/>**——根路径是一页双语说明（`market/landing.html`，**默认英文**、可切中文），索引本体在 `https://dsh.pyai.site/market/index.json`（DSH **插件 → 发现 → 添加索引源**）。官方声明没有官方市场，这是本仓库自己的源。
 
-* **真值在仓库里**：`market/index.json`（索引）+ `market/peer-snapshot.json`（各已发布版本的 dsh peer 声明快照，供守卫离线核对派生值）。两者**同一次生成、同一个 commit**，都由 `pnpm run market:index` 产出——**不手改**，守卫红就重跑生成。
+* **真值在仓库里**：`market/index.json`（索引）+ `market/peer-snapshot.json`（各已发布版本的 dsh peer 声明快照，供守卫离线核对派生值）。两者由同一次 `pnpm run market:index` 产出、随同一次提交落地——**不手改**，守卫红就重跑生成。仓库里这份既是线上那份的来源，也是 `git log` 里可审计的历史。
 * **数据只来自 npm registry 的 packument**：只读、不下载 tarball、不执行任何插件代码；版本清单 = 该包所有声明了 `dsh.bundle.patch` 的版本。
 * **`engines.dsh` 一律由 peer 派生**（规则见《DSH 插件契约 · 版本门》）；索引里能看到的只有派生结果，故来源单独存 `peer-snapshot.json`，否则守卫无法离线判断索引是否在说谎。
-* **守卫 `check:market-index`** 四条：① 包名集合 = `activePluginNames()`（退役插件不得进索引、活跃插件不得缺席）；② 每个插件有中英双语描述与至少一个能力标签；③ 每版 `engines.dsh` = 该版 peer 派生值；④ 版本合法 SemVer、按降序、且仓库内当前版本在列。
+* **守卫 `check:market-index`** 四条：① 包名集合 = `activePluginNames()`（退役插件不得进索引、活跃插件不得缺席）；② 每个插件有中英双语描述与至少一个能力标签；③ 每版 `engines.dsh` = 该版 peer 派生值；④ 版本合法 SemVer、按降序、且**已在 npm 发布过的**当前版本在列。
+  * 判据 ④ 的「已发布」以 `peer-snapshot.json` 有该版本记录为准——**不是**「仓库内 `package.json` 的当前版本必须已在索引里」：版本号 bump 到发布之间那段窗口里，npm 上还没有该版本，索引不可能包含它，反过来要求会让 dev 分支每次 bump 都误红。
   * 新增活跃插件要同时补 `scripts/market-index.mjs` 的 `ZH_DESCRIPTIONS` 与 `PLUGIN_LABELS`，否则判据 ② 会红
-* **发布**：`.github/workflows/market.yml` 在 `main` 上 `market/**` 变动时跑「守卫 → 发布 Pages」。**CI 不生成索引**——生成在本地，因为发布顺序是 tag → npm publish → 重生成索引 → 提交，CI 自己重算必然与刚提交的那份不一致。`market/.gitattributes` 固定 LF，避免 Windows 行尾让「重算后对比」恒脏。
-* **发版后必须重生成（不会自动发生）**：npm 上有了新版本而 `market/` 没跟，`check:market-index` 判据 ④ 会在下一次 CI/本地 verify 直接红（有意的 fail-closed，不是误报）。这一步**没有自动化**（CI 自动 commit 会绕过「逐项提交 + 人审」的口径，且 npm 已不可逆而索引生成可能失败），所以发版流程里固定加一条：
-
-  ```bash
-  pnpm run market:index      # 重生成 market/index.json + peer-snapshot.json
-  git add plugins/<插件>/package.json plugins/<插件>/CHANGELOG*.md market/
-  ```
-
-  索引与版本号、CHANGELOG **同一个 commit**；推上 `main` 后 `market.yml` 自动部署（约 1 分钟），叠加 Pages 的 `max-age=600` 与 DSH 的 `cacheTtlMs`，别人最坏约 20 分钟看到新版本。
+* **发布 = 全自动，不需要手工重生成**：`.github/workflows/market.yml` 在 `Publish` 成功后（`workflow_run`）自动跑「从 npm 重生成 → 守卫 fail-closed → 有变化则 bot 提交 `market/` → 发布 Pages」。另有三个触发源：`main` 上 `market/**` 或本文件变动、每日 03:47 UTC 兜底、手动 `workflow_dispatch`。
+  * **为什么允许 CI 写仓库**：索引是**纯派生数据**（内容完全由 npm registry 决定，不含人的判断）、bot 提交范围钉死 `market/`、守卫 fail-closed 挡住坏数据，且触发顺序是「先发布、后生成」——早期的「重算必然与刚提交的不一致」问题不再存在。
+  * **bot 提交用 `GITHUB_TOKEN` 推送，不触发其它 workflow**（GitHub 已知行为）。因此部署用的是本次 run 内已重生成的 artifact，不依赖 bot 提交再次触发；`ci.yml` 也不会因 bot 提交重跑。这是有意接受的行为，不为它引入 PAT。
+  * **本地仍可手动重生成**：改了 `ZH_DESCRIPTIONS` / `PLUGIN_LABELS` 等生成器输入时，跑 `pnpm run market:index` 并连同改动一起提交（`market/.gitattributes` 固定 LF，避免 Windows 行尾让 diff 恒脏）。
+  * **新鲜度**：bot 提交后部署约 1 分钟；叠加 Pages 的 `max-age=600` 与 DSH 的 `cacheTtlMs`，终端用户最坏约 20 分钟看到新版本。
 * **`title` 口径**：索引标题中英**都是 `dsh-sparrow`**（仓库名即品牌名，不写「DSH Sparrow」这类变体）。
+* **落地页**：`market/landing.html` → `https://dsh.pyai.site/`，**默认英文**、右上角可切中文（中英同在一份 HTML，`html[data-lang]` 驱动，无 JS 也能读英文）。改它推上 `main` 即自动部署（`market/**` 在触发路径内）。
 
 ### 发布（npm 包）
 
