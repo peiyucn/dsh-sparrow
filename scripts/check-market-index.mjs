@@ -77,10 +77,14 @@ for (const plugin of index.plugins) {
     }
   })
 
-  // 判据 4b：仓库内当前版本必须在索引里。
+  // 判据 4b：**已在 npm 上发布过的当前版本**必须在索引里。
+  // ⚠️ 不能反过来要求「仓库内当前版本必须在索引里」：版本号 bump 到发布之间有一段
+  // **尚未发布**的窗口，那时 npm registry 上还没有这个版本，索引自然也不可能包含它。
+  // 判据只能锚定「快照里有记录」= 「这个版本确实发布过」，否则 dev 分支每次 bump 都会误红。
   const current = readJson(join(repoRoot, 'plugins', dirName, 'package.json')).version
-  if (!versions.includes(current)) {
-    fail(`判据 4 失败：${plugin.name} 的当前版本 ${current} 不在索引里（重新跑生成脚本）`)
+  const publishedVersions = snapshot[plugin.name] ?? {}
+  if (Object.hasOwn(publishedVersions, current) && !versions.includes(current)) {
+    fail(`判据 4 失败：${plugin.name} 的当前版本 ${current} 已在 npm 发布，却不在索引里（重新跑生成脚本）`)
   }
 
   // 判据 3：engines.dsh == 该版本 peer 派生值。

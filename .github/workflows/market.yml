@@ -1,24 +1,41 @@
 name: Market index
 
-# 把仓库里的 market/ 发布到 GitHub Pages，得到稳定 URL：
-#   https://dsh.pyai.site/                     ← 给人看的使用说明（landing.html）
-#   https://dsh.pyai.site/market/index.json    ← 给 DSH 读的索引
+# 插件市场索引的**全自动**流水线：
+#   1. 从 npm registry 重生成 market/（index.json + peer-snapshot.json）
+#   2. 跑守卫链（索引与包一致才继续）
+#   3. 有变化就由 bot 提交并推回 main（让仓库里那份始终等于线上那份）
+#   4. 发布到 GitHub Pages
+#      https://dsh.pyai.site/                    ← 给人看的说明（landing.html）
+#      https://dsh.pyai.site/market/index.json   ← 给 DSH 读的索引
 #
-# 设计取舍：**本工作流不联网生成索引**。
-# 索引的真值是仓库里的 market/index.json（由 `pnpm run market:index` 从 npm registry 生成并提交），
-# CI 只负责「校验 + 发布」。理由：发布流程里 tag → npm publish 之后，索引必须在**那之后**重生成
-# 才能看到新版本；若 CI 自己从 registry 重算并和仓库里的对比，每次发布后都会红一次。
-# 漂移由 `check:market-index` 在本地与 ci.yml 里挡住（见该脚本判据 4）。
+# 触发：
+#   · Publish 完成后（tag → npm publish → 本工作流把新版本收进索引）
+#   · main 上 market/** 或本文件变动（手工改索引 / 落地页也自动发）
+#   · 每天定时兜底（npm 上有新版本但没人走发布流程时也能被发现并收录）
+#   · 手动 workflow_dispatch
+#
+# 为什么现在允许 CI 生成并提交（早期版本的取舍是「CI 不生成」）：
+#   · 索引是**纯派生数据**，内容完全由 npm registry 决定，不含人的判断；
+#   · bot 提交范围钉死在 `market/`，不碰源码 / 文档 / 版本号；
+#   · 守卫 fail-closed：生成结果与包声明不一致就红，不会把坏数据推上去。
+#   · 早期担心的「发布后重算必然不一致」已由「先发布、后生成」的顺序本身解决：
+#     本工作流在 Publish 成功**之后**才跑，此时 npm 上已有新版本。
 on:
+  workflow_run:
+    workflows: [Publish]
+    types: [completed]
   push:
     branches: [main]
     paths:
       - 'market/**'
       - '.github/workflows/market.yml'
+  schedule:
+    # 每天 03:47 UTC（11:47 UTC+8）兜底
+    - cron: '47 3 * * *'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # bot 提交 market/
   pages: write
   id-token: write
 
@@ -29,10 +46,16 @@ concurrency:
 jobs:
   build:
     name: build
+    # Publish 失败时没有新版本可收，直接跳过（避免用一次红 run 干扰判断）
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # 始终基于 main 最新提交：定时/并发触发时不能拿过期快照重生成
+          ref: main
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -48,12 +71,29 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # fail-closed：索引与包不一致就不许上线（判据见 scripts/check-market-index.mjs）
+      # 真值来源：npm registry。只读、不下载 tarball、不执行插件代码。
+      - name: Regenerate index from npm
+        run: pnpm run market:index
+
+      # fail-closed：索引与仓库内包声明不一致就不许上线（判据见 scripts/check-market-index.mjs）
       - name: Guard chain
         run: pnpm run check
 
+      # 只有 market/ 真变了才提交；无变化时空转，不制造空提交
+      - name: Commit regenerated index
+        run: |
+          if git diff --quiet -- market/; then
+            echo "market/ 无变化，跳过提交"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add market/
+          git commit -m 'chore(market): 按 npm 现状重生成插件市场索引'
+          git push origin main
+
       # Pages 站点布局：根 = 给人看的使用说明页，/market/index.json = 给 DSH 读的索引。
-      # 两者都来自仓库文件，CI 只搬运、不生成。
+      # 注意：artifact 用的是**本次已重生成**的文件，与上面是否有提交无关 —— 部署的永远是最新内容。
       - name: Assemble Pages artifact
         run: |
           mkdir -p _site/market
