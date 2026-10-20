@@ -1,0 +1,78 @@
+name: Market index
+
+# 把仓库里的 market/index.json 发布到 GitHub Pages，得到稳定 URL：
+#   https://peiyucn.github.io/dsh-sparrow/market/index.json
+#
+# 设计取舍：**本工作流不联网生成索引**。
+# 索引的真值是仓库里的 market/index.json（由 `pnpm run market:index` 从 npm registry 生成并提交），
+# CI 只负责「校验 + 发布」。理由：发布流程里 tag → npm publish 之后，索引必须在**那之后**重生成
+# 才能看到新版本；若 CI 自己从 registry 重算并和仓库里的对比，每次发布后都会红一次。
+# 漂移由 `check:market-index` 在本地与 ci.yml 里挡住（见该脚本判据 4）。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'market/**'
+      - '.github/workflows/market.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.22.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # fail-closed：索引与包不一致就不许上线（判据见 scripts/check-market-index.mjs）
+      - name: Guard chain
+        run: pnpm run check
+
+      # Pages 站点根目录只放索引本身：URL 即 /market/index.json
+      - name: Assemble Pages artifact
+        run: |
+          mkdir -p _site/market
+          cp market/index.json _site/market/index.json
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ./_site
+
+  deploy:
+    name: deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -18,6 +18,16 @@ Each plugin is published and installed independently; a plugin retires from the 
 
 > The packages are published on npm, but do **not** install them with `npm install @dsh-sparrow/...` directly — that only downloads them into a `node_modules` without registering them in the DSH web profile. Use the `dsh plugin` command below so each package lands in `$DSH_HOME/profiles/web` and its bundle layer is activated. Restart DSH after installing.
 
+## Install from the DSH plugin market
+
+You can also browse and install these from **Plugins → Discover** in DSH (custom plugin markets are experimental: turn on **Custom plugin markets** under **Plugins → Experimental plugins → More** first). Index URL:
+
+```
+https://peiyucn.github.io/dsh-sparrow/market/index.json
+```
+
+Paste it into **Discover → Add index source**. The market marks which versions work with the DSH you are running — every plugin here only supports the exact version line its version number states, so the card usually shows the single installable version.
+
 ## Plugins
 
 | Plugin | What it does | Install |

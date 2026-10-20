@@ -1,0 +1,633 @@
+{
+  "format": 1,
+  "title": {
+    "en": "DSH Sparrow",
+    "zh": "dsh-sparrow"
+  },
+  "description": {
+    "en": "Small DeepSeek Harness web plugins published under @dsh-sparrow.",
+    "zh": "@dsh-sparrow 下的 DeepSeek Harness Web 插件小合集。"
+  },
+  "metadata": {
+    "categories": {},
+    "labels": {
+      "network": {
+        "title": {
+          "en": "Network access",
+          "zh": "联网"
+        }
+      },
+      "llm": {
+        "title": {
+          "en": "Calls a model",
+          "zh": "调用模型"
+        }
+      },
+      "credentials": {
+        "title": {
+          "en": "Reads credentials",
+          "zh": "读取凭据"
+        }
+      },
+      "fs-write": {
+        "title": {
+          "en": "Writes files",
+          "zh": "写文件"
+        }
+      },
+      "session": {
+        "title": {
+          "en": "Reads sessions",
+          "zh": "读取会话"
+        }
+      },
+      "ui": {
+        "title": {
+          "en": "UI only",
+          "zh": "仅界面"
+        }
+      }
+    },
+    "sortKeys": {}
+  },
+  "plugins": [
+    {
+      "name": "@dsh-sparrow/dsh-archive-manage",
+      "description": {
+        "en": "Archived-session management — backup, delete and restore archived sessions from the sidebar",
+        "zh": "会话归档管理：取消归档、移入回收站、彻底删除、从回收站还原，父会话与子会话整体操作"
+      },
+      "author": "peiyucn",
+      "repository": {
+        "url": "https://github.com/peiyucn/dsh-sparrow",
+        "directory": "plugins/dsh-archive-manage"
+      },
+      "metadata": {
+        "keywords": [],
+        "labels": [
+          "session",
+          "fs-write"
+        ],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.2.1-rc.2",
+          "publishTimestamp": 1792297526,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.2"
+          }
+        },
+        {
+          "version": "0.2.0-rc.2",
+          "publishTimestamp": 1791449795,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.0-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2.4",
+          "publishTimestamp": 1790062748,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2.3",
+          "publishTimestamp": 1789289353,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2.2",
+          "publishTimestamp": 1789155382,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2.1",
+          "publishTimestamp": 1789142068,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2",
+          "publishTimestamp": 1789055608,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        },
+        {
+          "version": "0.1.2-rc.1.1",
+          "publishTimestamp": 1788914778,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-rc.1"
+          }
+        },
+        {
+          "version": "0.1.2-rc.1",
+          "publishTimestamp": 1788620522,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-rc.1"
+          }
+        },
+        {
+          "version": "0.1.1-alpha.1",
+          "publishTimestamp": 1788357397,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-alpha.4"
+          }
+        },
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1788342975,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-alpha.4"
+          }
+        },
+        {
+          "version": "0.1.0-alpha.3",
+          "publishTimestamp": 1788342256,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-alpha.4"
+          }
+        },
+        {
+          "version": "0.1.0-alpha.2",
+          "publishTimestamp": 1788273392,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.1-rc.2"
+          }
+        },
+        {
+          "version": "0.1.0-alpha.1",
+          "publishTimestamp": 1788239405,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.1-rc.2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "@dsh-sparrow/dsh-chat-fim",
+      "description": {
+        "en": "Chat input suggestions via DeepSeek FIM completion (Beta) — a card suggests what you may type next, Tab adopts, Esc dismisses; trigger sensitivity adjustable (high/medium/low)",
+        "zh": "输入框续写联想：停顿后浮现建议卡，Tab 采纳、Esc 关闭；触发灵敏度三档可调"
+      },
+      "author": "peiyucn",
+      "repository": {
+        "url": "https://github.com/peiyucn/dsh-sparrow",
+        "directory": "plugins/dsh-chat-fim"
+      },
+      "metadata": {
+        "keywords": [],
+        "labels": [
+          "network",
+          "llm",
+          "session"
+        ],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.2.1-rc.2",
+          "publishTimestamp": 1792297520,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.2"
+          }
+        },
+        {
+          "version": "0.2.0-rc.2",
+          "publishTimestamp": 1791449810,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.0-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2.1",
+          "publishTimestamp": 1790062746,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2",
+          "publishTimestamp": 1789055601,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        },
+        {
+          "version": "0.1.2-rc.1.1",
+          "publishTimestamp": 1788914782,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-rc.1"
+          }
+        },
+        {
+          "version": "0.1.2-rc.1",
+          "publishTimestamp": 1788620508,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-rc.1"
+          }
+        },
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1788342961,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-alpha.4"
+          }
+        },
+        {
+          "version": "0.1.0-alpha.3",
+          "publishTimestamp": 1788342245,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-alpha.4"
+          }
+        },
+        {
+          "version": "0.1.0-alpha.2",
+          "publishTimestamp": 1788273387,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.1-rc.2"
+          }
+        },
+        {
+          "version": "0.1.0-alpha.1",
+          "publishTimestamp": 1788239397,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.1-rc.2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "@dsh-sparrow/dsh-codebuddy-credits",
+      "description": {
+        "en": "Company CodeBuddy credits as a DeepSeek Harness LLM provider — official API key, models only, no agent harness",
+        "zh": "CodeBuddy 额度 LLM provider：用官方 API Key 直连，在 DSH 里选用 CodeBuddy 的模型额度"
+      },
+      "author": "peiyucn",
+      "repository": {
+        "url": "https://github.com/peiyucn/dsh-sparrow",
+        "directory": "plugins/dsh-codebuddy-credits"
+      },
+      "metadata": {
+        "keywords": [
+          "deepseek-harness",
+          "dsh",
+          "codebuddy",
+          "workbuddy",
+          "llm",
+          "provider",
+          "cordis",
+          "plugin"
+        ],
+        "labels": [
+          "network",
+          "llm",
+          "credentials"
+        ],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.2.1-rc.2",
+          "publishTimestamp": 1792297589,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.2"
+          }
+        },
+        {
+          "version": "0.2.0-rc.2",
+          "publishTimestamp": 1791449840,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.0-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2.2",
+          "publishTimestamp": 1790062670,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2.1",
+          "publishTimestamp": 1789142102,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2",
+          "publishTimestamp": 1789055615,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        },
+        {
+          "version": "0.1.2-rc.1.2",
+          "publishTimestamp": 1788914780,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-rc.1"
+          }
+        },
+        {
+          "version": "0.1.2-rc.1.1",
+          "publishTimestamp": 1788763787,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-rc.1"
+          }
+        },
+        {
+          "version": "0.1.2-rc.1",
+          "publishTimestamp": 1788621623,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-rc.1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "@dsh-sparrow/dsh-file-manage",
+      "description": {
+        "en": "Manage DeepSeek Files API cloud files from the sidebar — list with cursor pagination, delete, and copy file_id (reuses the official DeepSeekFilesClient, no extra credentials)",
+        "zh": "DeepSeek Files API 云端文件管理：分页列表、配额条、单条删除、一键复制 file_id"
+      },
+      "author": "peiyucn",
+      "repository": {
+        "url": "https://github.com/peiyucn/dsh-sparrow",
+        "directory": "plugins/dsh-file-manage"
+      },
+      "metadata": {
+        "keywords": [],
+        "labels": [
+          "network",
+          "credentials"
+        ],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.2.1-rc.2",
+          "publishTimestamp": 1792297503,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.2"
+          }
+        },
+        {
+          "version": "0.2.0-rc.2",
+          "publishTimestamp": 1791449934,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.0-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2.1",
+          "publishTimestamp": 1789142116,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2",
+          "publishTimestamp": 1789055612,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        },
+        {
+          "version": "0.1.2-rc.1.1",
+          "publishTimestamp": 1788914783,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-rc.1"
+          }
+        },
+        {
+          "version": "0.1.2-rc.1",
+          "publishTimestamp": 1788620522,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-rc.1"
+          }
+        },
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1788342990,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-alpha.4"
+          }
+        },
+        {
+          "version": "0.1.0-alpha.3",
+          "publishTimestamp": 1788342266,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.2-alpha.4"
+          }
+        },
+        {
+          "version": "0.1.0-alpha.2",
+          "publishTimestamp": 1788273403,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.1-rc.2"
+          }
+        },
+        {
+          "version": "0.1.0-alpha.1",
+          "publishTimestamp": 1788239413,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "^0.1.1-rc.2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "@dsh-sparrow/dsh-theme-tone",
+      "description": {
+        "en": "Tone skins for the official light and dark themes, plus conversation-area layout tuning once a tone is picked",
+        "zh": "明暗主题之下的色调层与对话区布局优化：每轴一款「官方默认」加若干色调，含顶栏与输入框玻璃效果"
+      },
+      "author": "peiyucn",
+      "repository": {
+        "url": "https://github.com/peiyucn/dsh-sparrow",
+        "directory": "plugins/dsh-theme-tone"
+      },
+      "metadata": {
+        "keywords": [
+          "deepseek-harness",
+          "dsh",
+          "theme",
+          "background",
+          "tone",
+          "cordis",
+          "plugin"
+        ],
+        "labels": [
+          "ui"
+        ],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.2.1-rc.2",
+          "publishTimestamp": 1792297519,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.2"
+          }
+        },
+        {
+          "version": "0.2.0-rc.2",
+          "publishTimestamp": 1791450657,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.0-rc.2"
+          }
+        },
+        {
+          "version": "0.1.5-rc.2",
+          "publishTimestamp": 1790062858,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.1.5-rc.2"
+          }
+        }
+      ]
+    }
+  ]
+}

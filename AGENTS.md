@@ -13,7 +13,7 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 * `plugins/dsh-theme-tone` — 明暗主题之下的色调层 + **对话区布局优化**（每轴各一款「官方默认」+ 若干色调；色调同时驱动抬升面的色相与质感，另含顶栏 / 输入框的玻璃效果；**选了非「默认」色调**时轮次导航窄屏不消失与内容宽度钳制一并生效，拖拽条悬停光带修复则两个档位都生效）
 * **口径：五个活跃插件 + 两个已退役插件**
 * 验证：插件目录 `npm run verify`；全量 = 根 `npm run verify`（**已退役插件不参与**，名单见 `scripts/plugin-set.mjs` 的 `RETIRED_PLUGINS`——**单一真值**，`verify-all.mjs` / `check-dsh-pin.mjs` / `check-plugin-docs.mjs` 共用）；分项 = 根 `pnpm run <step>:all`
-* 根 `verify` = `pnpm run check` + `verify:all`；`check` 是**守卫链**（本地与 CI **同一入口**）：`check:paths`（本机绝对路径 / 用户名，含 UNC 与大写不敏感匹配，二进制文件跳过）→ `check:dsh-pin`（官方版本 pin 单一真值；判据 4 按 README **环境要求行本身**校验、真值不唯一时不跳过）→ `check:plugin-docs`（文档一致性，见下）
+* 根 `verify` = `pnpm run check` + `verify:all`；`check` 是**守卫链**（本地与 CI **同一入口**）：`check:paths`（本机绝对路径 / 用户名，含 UNC 与大写不敏感匹配，二进制文件跳过）→ `check:dsh-pin`（官方版本 pin 单一真值；判据 4 按 README **环境要求行本身**校验、真值不唯一时不跳过）→ `check:plugin-docs`（文档一致性，见下）→ `check:market-index`（插件市场索引与包一致，见《插件市场索引》）
 * `check:plugin-docs` **守的八条**（只比结构与集合，**不比文案** —— 改措辞不该触发红灯）：① 根 README 中英双份的插件表 = 活跃集合；② 两份的《Retired / 已退役》点名全部退役插件；③ `SECURITY.md` 支持表只列活跃插件；④ `AGENTS.md` 点名全部插件且「口径：N 个活跃 + M 个已退役」的数字与实际一致；⑤ 每个活跃插件的 README / CHANGELOG **中英双份**各有 H1、顶部互链、`##` 数一致、**条目数一致**；⑥ `package.json` 的 version 在两份 CHANGELOG 里都有版本段，且中英版本段序列与每段条目数一致；⑦ `package.json` 的 `files` 点名的 `.md` 都存在；⑧ README 里 `plugins/…` 相对链接都存在
   * ⚠️ 判据 ⑤⑥ 的「条目数」口径 = **无序与有序、含缩进子条目**；结构统计**先剥掉围栏代码块与 HTML 注释（含跨行块）** —— 注释里的「条目」不算数，被注释吞掉的真条目也不算数
   * ⚠️ 判据 ⑤⑥ 是**双份文档**的核心：中英是两份文件，改一份不会提醒另一份 —— 漏译一条 / 漏一节即红
@@ -62,6 +62,7 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 
 * `ci.yml`（push dev/main 与 PR）：`typecheck` → `build` → `test`（JUnit artifact；测试依赖 lib/ 故 build 在前）→ `package`（`npm pack --dry-run` 校验 files 清单）
 * `publish.yml`（push `<插件名>-vX.Y.Z` tag 或 workflow_dispatch 指定插件）：解析插件 / 校验版本 / **跑根 `pnpm run check`（守卫 fail-closed，守卫红则不发）** / verify 后 `npm publish`；同文件含 promote 手动任务（`npm dist-tag add` 移通道，deprecate 归 owner 本机；三个输入（plugin/version/tag）缺任一即**非零退出**，不静默成功）；publish job 挂 `environment: npm-publish`，**无 release-control**
+* `market.yml`（push main 且 `market/**` 变动，或手动）：跑根 `pnpm run check` 后把 `market/index.json` 发布到 GitHub Pages（`environment: github-pages`）；只校验 + 发布，**不生成**（理由见《插件市场索引》）
 * 鉴权双模式：有 `NPM_TOKEN` 走 Automation token（首发必需），无则走 npm Trusted Publishing（OIDC）
 
 ## GitHub 与网络
@@ -113,6 +114,18 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 ### 插件私有 seam 特例
 
 > 逐插件明细见 [`docs/private-seams.md`](docs/private-seams.md)。
+
+### 插件市场索引（market/）
+
+> 对外发布的 format-1 索引：`https://peiyucn.github.io/dsh-sparrow/market/index.json`（DSH **插件 → 发现 → 添加索引源**）。官方声明没有官方市场，这是本仓库自己的源。
+
+* **真值在仓库里**：`market/index.json`（索引）+ `market/peer-snapshot.json`（各已发布版本的 dsh peer 声明快照，供守卫离线核对派生值）。两者**同一次生成、同一个 commit**，都由 `pnpm run market:index` 产出——**不手改**，守卫红就重跑生成。
+* **数据只来自 npm registry 的 packument**：只读、不下载 tarball、不执行任何插件代码；版本清单 = 该包所有声明了 `dsh.bundle.patch` 的版本。
+* **`engines.dsh` 一律由 peer 派生**（规则见《DSH 插件契约 · 版本门》）；索引里能看到的只有派生结果，故来源单独存 `peer-snapshot.json`，否则守卫无法离线判断索引是否在说谎。
+* **守卫 `check:market-index`** 四条：① 包名集合 = `activePluginNames()`（退役插件不得进索引、活跃插件不得缺席）；② 每个插件有中英双语描述与至少一个能力标签；③ 每版 `engines.dsh` = 该版 peer 派生值；④ 版本合法 SemVer、按降序、且仓库内当前版本在列。
+  * 新增活跃插件要同时补 `scripts/market-index.mjs` 的 `ZH_DESCRIPTIONS` 与 `PLUGIN_LABELS`，否则判据 ② 会红
+* **发布**：`.github/workflows/market.yml` 在 `main` 上 `market/**` 变动时跑「守卫 → 发布 Pages」。**CI 不生成索引**——生成在本地，因为发布顺序是 tag → npm publish → 重生成索引 → 提交，CI 自己重算必然与刚提交的那份不一致。`market/.gitattributes` 固定 LF，避免 Windows 行尾让「重算后对比」恒脏。
+* **发版后必须重生成**：npm 上有了新版本而 `market/` 没跟，`check:market-index` 判据 ④ 会在下一次 CI/本地 verify 直接红（这是有意的 fail-closed，不是误报）。
 
 ### 发布（npm 包）
 

@@ -6,10 +6,12 @@
   "packageManager": "pnpm@11.22.0",
   "scripts": {
     "verify": "pnpm run check && pnpm run verify:all",
-    "check": "pnpm run check:paths && pnpm run check:dsh-pin && pnpm run check:plugin-docs",
+    "check": "pnpm run check:paths && pnpm run check:dsh-pin && pnpm run check:plugin-docs && pnpm run check:market-index",
     "check:paths": "node scripts/check-no-local-paths.mjs",
     "check:dsh-pin": "node scripts/check-dsh-pin.mjs",
     "check:plugin-docs": "node scripts/check-plugin-docs.mjs",
+    "check:market-index": "node scripts/check-market-index.mjs",
+    "market:index": "node scripts/market-index.mjs",
     "verify:all": "node scripts/verify-all.mjs",
     "typecheck:all": "node scripts/verify-all.mjs --typecheck",
     "build:all": "node scripts/verify-all.mjs --build",
@@ -18,6 +20,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.25.12",
+    "semver": "^7.8.5",
     "typescript": "6.0.3"
   }
 }
