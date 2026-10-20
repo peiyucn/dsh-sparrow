@@ -182,7 +182,7 @@ export async function buildIndex() {
   return {
     index: {
       format: 1,
-      title: { en: 'DSH Sparrow', zh: 'dsh-sparrow' },
+      title: { en: 'dsh-sparrow', zh: 'dsh-sparrow' },
       description: {
         en: 'Small DeepSeek Harness web plugins published under @dsh-sparrow.',
         zh: '@dsh-sparrow 下的 DeepSeek Harness Web 插件小合集。',
