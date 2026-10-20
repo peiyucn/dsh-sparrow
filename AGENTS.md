@@ -125,7 +125,15 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 * **守卫 `check:market-index`** 四条：① 包名集合 = `activePluginNames()`（退役插件不得进索引、活跃插件不得缺席）；② 每个插件有中英双语描述与至少一个能力标签；③ 每版 `engines.dsh` = 该版 peer 派生值；④ 版本合法 SemVer、按降序、且仓库内当前版本在列。
   * 新增活跃插件要同时补 `scripts/market-index.mjs` 的 `ZH_DESCRIPTIONS` 与 `PLUGIN_LABELS`，否则判据 ② 会红
 * **发布**：`.github/workflows/market.yml` 在 `main` 上 `market/**` 变动时跑「守卫 → 发布 Pages」。**CI 不生成索引**——生成在本地，因为发布顺序是 tag → npm publish → 重生成索引 → 提交，CI 自己重算必然与刚提交的那份不一致。`market/.gitattributes` 固定 LF，避免 Windows 行尾让「重算后对比」恒脏。
-* **发版后必须重生成**：npm 上有了新版本而 `market/` 没跟，`check:market-index` 判据 ④ 会在下一次 CI/本地 verify 直接红（这是有意的 fail-closed，不是误报）。
+* **发版后必须重生成（不会自动发生）**：npm 上有了新版本而 `market/` 没跟，`check:market-index` 判据 ④ 会在下一次 CI/本地 verify 直接红（有意的 fail-closed，不是误报）。这一步**没有自动化**（CI 自动 commit 会绕过「逐项提交 + 人审」的口径，且 npm 已不可逆而索引生成可能失败），所以发版流程里固定加一条：
+
+  ```bash
+  pnpm run market:index      # 重生成 market/index.json + peer-snapshot.json
+  git add plugins/<插件>/package.json plugins/<插件>/CHANGELOG*.md market/
+  ```
+
+  索引与版本号、CHANGELOG **同一个 commit**；推上 `main` 后 `market.yml` 自动部署（约 1 分钟），叠加 Pages 的 `max-age=600` 与 DSH 的 `cacheTtlMs`，别人最坏约 20 分钟看到新版本。
+* **`title` 口径**：索引标题中英**都是 `dsh-sparrow`**（仓库名即品牌名，不写「DSH Sparrow」这类变体）。
 
 ### 发布（npm 包）
 
