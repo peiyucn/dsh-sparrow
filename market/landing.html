@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dsh-sparrow · DSH 插件市场索引</title>
+<style>
+  :root { color-scheme: dark }
+  body {
+    margin: 0; padding: 3rem 1.25rem; min-height: 100vh; box-sizing: border-box;
+    background: #0a0a10; color: #d4d4d8;
+    font: 15px/1.7 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    display: flex; justify-content: center; align-items: flex-start;
+  }
+  main { max-width: 40rem; width: 100% }
+  h1 { margin: 0 0 .25rem; font-size: 1.75rem; color: #fafafa; letter-spacing: -.02em }
+  .sub { margin: 0 0 2rem; color: #71717a; font-size: .9rem }
+  h2 { margin: 2rem 0 .5rem; font-size: .8rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #71717a }
+  code, a { word-break: break-all }
+  .url {
+    display: block; padding: .85rem 1rem; border-radius: .5rem;
+    background: #18181b; border: 1px solid #27272a;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .875rem; color: #ffd48a;
+  }
+  ol { margin: .5rem 0; padding-left: 1.25rem }
+  li { margin: .35rem 0 }
+  li::marker { color: #52525b }
+  a { color: #ffd48a; text-decoration: none }
+  a:hover { text-decoration: underline }
+  footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid #27272a; font-size: .8rem; color: #52525b }
+</style>
+</head>
+<body>
+<main>
+  <h1>dsh-sparrow</h1>
+  <p class="sub">DeepSeek Harness（DSH）Web 插件小合集的插件市场索引</p>
+
+  <h2>索引地址</h2>
+  <code class="url">https://dsh.pyai.site/market/index.json</code>
+
+  <h2>在 DSH 里使用</h2>
+  <ol>
+    <li>先在 DSH 里打开实验性功能：<strong>插件 → 实验性插件 → 更多 → 自定义插件市场</strong></li>
+    <li>进入 <strong>插件 → 发现 → 添加索引源</strong></li>
+    <li>粘贴上面的索引地址</li>
+  </ol>
+  <p class="sub">市场会按你当前运行的 DSH 版本标出可用版本。每个插件只支持其版本号所标示的那一条 DSH 版本线。</p>
+
+  <h2>相关</h2>
+  <ul>
+    <li><a href="https://github.com/peiyucn/dsh-sparrow">源码仓库</a></li>
+    <li><a href="https://www.npmjs.com/org/dsh-sparrow">npm 包（@dsh-sparrow）</a></li>
+  </ul>
+
+  <footer>
+    索引内容由 <a href="https://github.com/peiyucn/dsh-sparrow">peiyucn/dsh-sparrow</a> 生成并发布。
+    市场内容是第三方声明，安装前请核对版本来源。
+  </footer>
+</main>
+</body>
+</html>

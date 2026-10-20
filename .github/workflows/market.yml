@@ -1,7 +1,8 @@
 name: Market index
 
-# 把仓库里的 market/index.json 发布到 GitHub Pages，得到稳定 URL：
-#   https://dsh.pyai.site/market/index.json
+# 把仓库里的 market/ 发布到 GitHub Pages，得到稳定 URL：
+#   https://dsh.pyai.site/                     ← 给人看的使用说明（landing.html）
+#   https://dsh.pyai.site/market/index.json    ← 给 DSH 读的索引
 #
 # 设计取舍：**本工作流不联网生成索引**。
 # 索引的真值是仓库里的 market/index.json（由 `pnpm run market:index` 从 npm registry 生成并提交），
@@ -51,11 +52,13 @@ jobs:
       - name: Guard chain
         run: pnpm run check
 
-      # Pages 站点根目录只放索引本身：URL 即 /market/index.json
+      # Pages 站点布局：根 = 给人看的使用说明页，/market/index.json = 给 DSH 读的索引。
+      # 两者都来自仓库文件，CI 只搬运、不生成。
       - name: Assemble Pages artifact
         run: |
           mkdir -p _site/market
           cp market/index.json _site/market/index.json
+          cp market/landing.html _site/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
