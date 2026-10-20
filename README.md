@@ -20,7 +20,7 @@ Each plugin is published and installed independently; a plugin retires from the 
 
 ## Install from the DSH plugin market
 
-You can also browse and install these from **Plugins → Discover** in DSH (custom plugin markets are experimental: turn on **Custom plugin markets** under **Plugins → Experimental plugins → More** first). Index URL:
+You can also browse and install these from **Plugins → Discover** in DSH (custom plugin markets are experimental: turn on **Custom plugin markets** under **Plugins → Experimental plugins → More** first). Open <https://dsh.pyai.site/> for the index URL and steps; the index URL itself is:
 
 ```
 https://dsh.pyai.site/market/index.json

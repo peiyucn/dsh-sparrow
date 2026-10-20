@@ -117,7 +117,7 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件一个独立 npm 包�
 
 ### 插件市场索引（market/）
 
-> 对外发布的 format-1 索引：`https://dsh.pyai.site/market/index.json`（DSH **插件 → 发现 → 添加索引源**）。官方声明没有官方市场，这是本仓库自己的源。
+> 对外发布站点：**<https://dsh.pyai.site/>**——根路径是一页双语说明（`market/landing.html`，**默认英文**、可切中文），索引本体在 `https://dsh.pyai.site/market/index.json`（DSH **插件 → 发现 → 添加索引源**）。官方声明没有官方市场，这是本仓库自己的源。
 
 * **真值在仓库里**：`market/index.json`（索引）+ `market/peer-snapshot.json`（各已发布版本的 dsh peer 声明快照，供守卫离线核对派生值）。两者**同一次生成、同一个 commit**，都由 `pnpm run market:index` 产出——**不手改**，守卫红就重跑生成。
 * **数据只来自 npm registry 的 packument**：只读、不下载 tarball、不执行任何插件代码；版本清单 = 该包所有声明了 `dsh.bundle.patch` 的版本。
