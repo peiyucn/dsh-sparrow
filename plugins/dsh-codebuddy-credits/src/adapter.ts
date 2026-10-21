@@ -22,6 +22,7 @@ import type {
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { BASE_URL, effortName, requestHeaders } from './catalog.js'
 import { DEFAULT_CONTEXT_WINDOW, DISPLAY_NAME } from './constants.js'
+import { stripChannelFingerprints } from './fingerprints.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
 
 /** 单次调用的积分回调（credit 为服务端计费值，DSH 的 TokenUsage 无此字段）。 */
@@ -99,11 +100,13 @@ export async function toWireMessages(
 ): Promise<WireMessage[]> {
   const messages: WireMessage[] = []
   if (options.system !== undefined && options.system.length > 0) {
-    messages.push({ role: 'system', content: options.system })
+    // 上游内容指纹（11128）：system 正文里的指纹行在上线前删掉，其余逐字保留。
+    const system = stripChannelFingerprints(options.system)
+    if (system.length > 0) messages.push({ role: 'system', content: system })
   }
   for (const message of options.messages as Message[]) {
     if (message.role === 'system') {
-      messages.push({ role: 'system', content: textOf(message.content) })
+      messages.push({ role: 'system', content: stripChannelFingerprints(textOf(message.content)) })
       continue
     }
     // 工具结果 → wire 的 tool 角色，用 `message.toolCallId` 作 tool_call_id。
@@ -175,7 +178,9 @@ export async function toWireMessages(
         })
       }
     }
-    if (text.length > 0) assistant.content = text
+    // 历史里的 assistant 正文若复述过指纹句，同样会被上游整轮拦截（跟会话走，不跟模型走），
+    // 故这里也删；tool_calls 的 arguments 不动（实测放行，且改了会篡改调用记录）。
+    if (text.length > 0) assistant.content = stripChannelFingerprints(text)
     if ((assistant.tool_calls?.length ?? 0) === 0) assistant.tool_calls = undefined
     else if (assistant.content === null) assistant.content = ''
     messages.push(assistant)

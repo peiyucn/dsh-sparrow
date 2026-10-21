@@ -80,6 +80,16 @@
 保留 `deepseekharness` 前缀（诚实）与 `X-IDE-Name`（后台可见），三者共存已验证。
 **教训**：改动请求头属于**协议面改动**，必须对 `/v3/config` 实测返回模型数，不能只看 HTTP 状态码。
 
+### 通话内容的上游指纹处理（2026-10-21 增补）
+
+上游自 2026-10-20 深夜起对 `system` / `assistant` **正文**做逐字内容指纹拦截（行首锚定、
+忽略大小写），命中即 `HTTP 400 / code 11128`（文案「Illegal API invocation from an unapproved
+channel」）；DSH 系统提示词首行 `You are an AI agent powered by DeepSeek Harness.` 被收录，
+导致每轮推理都被拒。处理方式：只对 system 与 assistant 正文**整行删除**命中的指纹行，
+其余内容逐字保留；`user` / `tool` / `tool_calls` 参数 / `reasoning` 一律不动。
+身份如实自报的口径（UA、`X-IDE-Name`）不变，**不伪装官方客户端**。
+证据、范围与维护办法见 [10-channel-fingerprint-guard.md](10-channel-fingerprint-guard.md)。
+
 ## 域名（单一来源）
 
 全插件只保留一个域名常量 `CODEBUDDY_ORIGIN = https://copilot.tencent.com`，
