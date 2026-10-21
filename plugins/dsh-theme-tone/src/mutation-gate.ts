@@ -20,3 +20,30 @@ export interface MutationSignal {
 export function isContentChurn(signals: readonly MutationSignal[]): boolean {
   return signals.length > 0 && signals.every(signal => signal.insideContent && !signal.anchorLike)
 }
+
+/** 一条变动里与判定有关的最小信息（由调用方从 `MutationRecord` 与 DOM 查询里提取）。 */
+export interface RecordSignal {
+  /** 变动目标落在对话内容容器内。 */
+  readonly insideContent: boolean
+  /** 增 / 删的节点里出现锚点类元素。 */
+  readonly anchorLike: boolean
+}
+
+/**
+ * {@link isContentChurn} 的**流式版**：按批逐条判定，**一发现反例立即返回 false**。
+ *
+ * 为什么单独提供：切会话 / 长流式一轮能有上百条 `MutationRecord`，调用方若先把整批映射成
+ * `MutationSignal[]` 再 `every`，就会为「其实第二条就已经能定论」的批次白做完整映射
+ * （每项一次数组分配 + 一次 `closest()`）。两者**语义等价**：都是
+ * 「非空 且 每一条都 insideContent 且都不 anchorLike」。
+ *
+ * @param records 逐条信号；由调用方惰性提供（建议传生成器，避免预分配整批数组）。
+ */
+export function isContentChurnByRecords(records: Iterable<RecordSignal>): boolean {
+  let seen = false
+  for (const record of records) {
+    seen = true
+    if (!record.insideContent || record.anchorLike) return false
+  }
+  return seen
+}
