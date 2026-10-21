@@ -7,12 +7,21 @@
  * 数据只来自 npm registry 的 packument：**只读，不下载 tarball、不执行任何插件代码**。
  * 版本清单 = 该包在 registry 上声明了 `dsh.bundle.patch` 的全部版本。
  *
+ * ⚠️ **npm 传播延迟**：`npm publish` 返回成功时 registry 上可能还查不到该版本（官方提示
+ * "may take a few minutes"）。本仓库的 market 流水线由 Publish 完成后触发，若不等传播就生成，
+ * 索引会**静默漏收录**新版本且守卫全绿（快照与索引同源，一起缺，谁也发现不了）——该问题已实测
+ * 出现两次。故支持「等期待版本在 registry 可见再生成」：
+ *   `MARKET_INDEX_EXPECT=@scope/name@1.2.3`      显式指定一个版本
+ *   `MARKET_INDEX_EXPECT_REPO_VERSION=1`        取各活跃插件仓库内当前版本（CI 用这个）
+ *   `MARKET_INDEX_EXPECT_WAIT_MS=<毫秒>`        等待上限，默认 0 = 不等
+ * 超时即**非零退出**（fail-closed）：宁可这次不部署，也不把缺版本的索引推上线。
+ *
  * ⚠️ `engines.dsh` 必须写，且必须由 peer 派生（见 AGENTS《版本门》）：
  * 市场索引格式没有 peers 字段，而 DSH 判兼容时造的是「只含 engines.dsh」的合成 manifest，
  * 省略该字段等于宣称「任何 DSH 版本都兼容」——会把不兼容的版本标成可装。
  * 本仓库的包只声明 peerDependencies，故索引里的值一律从 peer 派生、不得手写。
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import semver from 'semver'
 import { activePluginNames, repoRoot } from './plugin-set.mjs'
@@ -31,6 +40,78 @@ const PEER_SNAPSHOT = join(repoRoot, 'market', 'peer-snapshot.json')
 
 /** 参与 `engines.dsh` 派生的官方包：`@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-*`。 */
 const isDshPackage = (name) => name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')
+
+/** 等 npm 传播时两次查询的间隔。 */
+const POLL_INTERVAL_MS = 5_000
+
+/**
+ * 解析「期待在 registry 可见」的包与版本，两种来源（都用于 CI 等 npm 传播）：
+ *
+ *  - `MARKET_INDEX_EXPECT=@scope/name@1.2.3`：显式指定（精确、便于手工重跑与测试）；
+ *  - `MARKET_INDEX_EXPECT_REPO_VERSION=1`：取**仓库内所有活跃插件**当前 `package.json` 版本。
+ *
+ * ⚠️ 为什么不在 CI 里解析触发的 tag：`workflow_run` 事件的 `head_branch` 对 tag 触发的
+ * upstream 返回的是 `main`（实测），拿不到 tag 名，故改为与 tag 无关的口径。
+ *
+ * @returns {{ name: string, version: string }[]} 期待项列表（可能为空）。
+ */
+export function expectationsFromEnv(env = process.env) {
+  const expectations = []
+  const explicit = env.MARKET_INDEX_EXPECT
+  if (typeof explicit === 'string' && explicit.trim() !== '') {
+    const at = explicit.trim().lastIndexOf('@')
+    if (at <= 0) {
+      throw new Error(`MARKET_INDEX_EXPECT 无法解析（应形如 @scope/name@1.2.3）：${JSON.stringify(explicit)}`)
+    }
+    const name = explicit.trim().slice(0, at)
+    const version = explicit.trim().slice(at + 1)
+    if (semver.valid(version) === null) {
+      throw new Error(`MARKET_INDEX_EXPECT 的版本不是合法 SemVer：${JSON.stringify(version)}`)
+    }
+    expectations.push({ name, version })
+  }
+  if (env.MARKET_INDEX_EXPECT_REPO_VERSION === '1') {
+    for (const dirName of activePluginNames()) {
+      const manifest = JSON.parse(readFileSync(join(repoRoot, 'plugins', dirName, 'package.json'), 'utf8'))
+      // 只等「仓库内版本」这一件事：它未必已发布（bump 到发布之间），调用方用 waitMs=0 查一次即可。
+      if (typeof manifest.name !== 'string' || semver.valid(manifest.version) === null) continue
+      expectations.push({ name: manifest.name, version: manifest.version })
+    }
+  }
+  return expectations
+}
+
+/**
+ * 等某个版本在 registry 上可见（npm 传播可能滞后）。
+ *
+ * 判定「可见」= 该版本出现在 packument 的 `versions` 里**且**有 `time` 记录——
+ * 与 `entryOf` 收录版本的条件一致，避免「查到了但生成时又被跳过」的空等。
+ *
+ * @param {string} name - 包名。
+ * @param {string} version - 版本号。
+ * @param {number} waitMs - 等待上限（0 = 不等待，只查一次）。
+ * @returns {Promise<object>} 含该版本的 packument。
+ */
+async function fetchPackumentWhenVisible(name, version, waitMs) {
+  const deadline = Date.now() + Math.max(0, waitMs)
+  for (let attempt = 1; ; attempt++) {
+    const packument = await fetchPackument(name)
+    const visible = packument.versions?.[version] !== undefined && typeof packument.time?.[version] === 'string'
+    if (visible) {
+      if (attempt > 1) console.log(`market-index: ${name}@${version} 已可见（第 ${attempt} 次查询）`)
+      return packument
+    }
+    if (Date.now() + POLL_INTERVAL_MS > deadline) {
+      throw new Error(
+        `${name}@${version} 在 registry 上不可见（已等待 ${Math.round(waitMs / 1000)}s，查询 ${attempt} 次）。`
+        + 'npm 传播未完成或发布失败——拒绝生成缺版本的索引，请稍后重跑本工作流。',
+      )
+    }
+    // 硬等：这是 CI 里等上游传播的确定性场景，不能用事件驱动（没有可等的事件源）。
+    console.log(`market-index: 等待 ${name}@${version} 出现在 registry（第 ${attempt} 次查询，未命中）`)
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+  }
+}
 
 /** `workspace:` 协议值表示「当前宿主版本」，不构成范围约束。 */
 const WORKSPACE_VALUES = new Set(['workspace:*', 'workspace:^', 'workspace:~'])
@@ -168,15 +249,29 @@ function entryOf(dirName, packument, peerSnapshot) {
   }
 }
 
-/** 生成整份索引（活跃插件 = `scripts/plugin-set.mjs` 的单一真值）。 */
-export async function buildIndex() {
+/**
+ * 生成整份索引（活跃插件 = `scripts/plugin-set.mjs` 的单一真值）。
+ *
+ * @param {{ waitMs?: number, expectations?: { name: string, version: string }[] }} [options]
+ *   `expectations` 里的包会先等到对应版本在 registry 可见再收录（见文件头的传播延迟说明）。
+ *   用「列表」而不是单个：一次 Publish 可能有多个包的目标版本需要等。
+ */
+export async function buildIndex(options = {}) {
+  const waitMs = options.waitMs ?? 0
+  const expectations = options.expectations ?? []
   const plugins = []
   /** @type {Record<string, Record<string, Record<string, string>>>} 包名 → 版本 → dsh peer 映射 */
   const peers = {}
   for (const dirName of activePluginNames()) {
     const manifestPath = join(repoRoot, 'plugins', dirName, 'package.json')
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-    const packument = await fetchPackument(manifest.name)
+    // 同一个包可能有多个期待版本（理论上不会有，但按列表处理更稳）：逐个等到可见。
+    const wanted = expectations.filter((expectation) => expectation.name === manifest.name)
+    let packument
+    for (const expectation of wanted) {
+      packument = await fetchPackumentWhenVisible(manifest.name, expectation.version, waitMs)
+    }
+    packument ??= await fetchPackument(manifest.name)
     const peerSnapshot = {}
     const entry = entryOf(dirName, packument, peerSnapshot)
     peers[entry.name] = peerSnapshot
@@ -198,8 +293,35 @@ export async function buildIndex() {
 }
 
 async function main() {
-  const { index, peers } = await buildIndex()
+  const expectations = expectationsFromEnv()
+  // 默认不等待：本地 / 定时 / 手动路径立刻生成（它们没有「刚 publish 完」的时序问题）。
+  const waitMs = Number(process.env.MARKET_INDEX_EXPECT_WAIT_MS ?? '0')
+  if (!Number.isFinite(waitMs) || waitMs < 0) {
+    throw new Error(`MARKET_INDEX_EXPECT_WAIT_MS 必须是 >= 0 的数字，收到 ${JSON.stringify(process.env.MARKET_INDEX_EXPECT_WAIT_MS)}`)
+  }
+  if (expectations.length > 0) {
+    console.log(
+      `market-index: 期待 ${expectations.map((expectation) => `${expectation.name}@${expectation.version}`).join('、')}`
+      + `（最多等 ${Math.round(waitMs / 1000)}s）`,
+    )
+  }
+  const { index, peers } = await buildIndex({ waitMs, expectations })
   mkdirSync(dirname(OUTPUT), { recursive: true })
+
+  // 后置自检（fail-closed）：期待的那些版本必须真的进了索引。
+  // 放这里而不是只靠等待，是因为「可见但被 entryOf 跳过」（如缺 dsh.bundle.patch）同样会静默漏收录。
+  const missing = expectations.filter((expectation) => {
+    const listed = index.plugins.find((plugin) => plugin.name === expectation.name)
+    return !(listed?.versions.some((version) => version.version === expectation.version) ?? false)
+  })
+  if (missing.length > 0) {
+    throw new Error(
+      `${missing.map((expectation) => `${expectation.name}@${expectation.version}`).join('、')} 没有进入索引`
+      + '（registry 上可见，但该版本未声明 dsh.bundle.patch 或缺失 time 记录）。'
+      + '拒绝写入缺版本的索引：请检查该版本是否按发布流程打包。',
+    )
+  }
+
   writeFileSync(OUTPUT, `${JSON.stringify(index, null, 2)}\n`)
   writeFileSync(PEER_SNAPSHOT, `${JSON.stringify(peers, null, 2)}\n`)
   const versionCount = index.plugins.reduce((total, plugin) => total + plugin.versions.length, 0)
