@@ -27,6 +27,25 @@ export const SWEEP_PLATE_LAYERS = grainOverGradients()
 export const SWEEP_SHAPE_MASK =
   `linear-gradient(90deg, transparent 0%, rgb(0 0 0 / ${Math.round(SWEEP_PLATE_ALPHA * 100)}%) ${SWEEP_PEAK_STOP}, transparent 100%)`
 
+/**
+ * 扫光带的**背景几何**：与背景层同尺寸（`100vw 100vh`）+ 不重复 + 相位写死 `0 0`。
+ *
+ * ⚠️ 为什么可以用 `scroll` 而不吃 `background-attachment: fixed`：
+ *  - `fixed` 让**定位区 = 视口**，于是每帧都要按视口重新栅格化——这是滚动掉帧的主因（spec 10 已实测，
+ *    且「缩小声明尺寸也不省」，成本只与 `fixed` 本身有关）。
+ *  - 这条带子的可见范围由 {@link SWEEP_SHAPE_MASK}（**横向** 0 → 55% → 100% 渐变）决定，
+ *    叠加的背景板是「颗粒 + 三层光」。换 `scroll` 后**竖直**相位不再恒等于视口原点，
+ *    但带子自身高度只有一行高（20–30px），竖直方向上光层的变化在掩膜内几乎不可见 ——
+ *    真机逐像素实测：**0.006% 像素改变 / 全屏 160 万点**（`docs/spec/13-running-sweep-cost.md`）。
+ *  - 这是「多会话同时工作就卡」的直接热源：**每个 running 行**都挂一层按视口栅格化的 `fixed`。
+ * ⚠️ 必须**逐层**给 `background-size`：第 1 层是颗粒瓦片（`auto` 才是固有尺寸），其余三层是 `100vw 100vh`；
+ *    值少于层数会按序循环补齐，把颗粒拉成粗块。
+ */
+export const SWEEP_BACKGROUND_GEOMETRY = `background-attachment: scroll;
+  background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px;`
+
 /** 给锚点挂上「官方默认」门 —— 与 `surface.ts` 的 `gatedAnchor` 同法：门并进锚点自己的 `body`。 */
 function gated(anchor: string): string {
   return anchor.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)
@@ -34,14 +53,17 @@ function gated(anchor: string): string {
 
 /**
  * 扫光带样式表文本 —— 底色 + 同源的光 + 颗粒，整块乘 60%。
- * ⚠️ `background-attachment` **必须写成单个 `fixed`，不能写 `scroll, fixed`**：本条 `background-image` 有 4 层，per-layer 值不足会被循环补齐、第 1 / 3 段渐变退回按元素自身盒子解析。
+ *
+ * ⚠️ 不要改回 `background-attachment: fixed`：那条让**每个 running 行**每帧按视口重新栅格化，
+ * 多会话并行时是主要掉帧来源；改用 {@link SWEEP_BACKGROUND_GEOMETRY} 的 `scroll` + 显式几何，
+ * 逐像素等价（实测 0.006%）。
  */
 export function buildSweepCss(): string {
   return `/* dsh-theme-tone 官方运行扫光带：照我们自己的背景画（底色 + 同源的光 + 颗粒，整块乘 60%）；锚点带 data-variant / data-tool 以收窄；选择器带 ${PLAIN_ATTR} 门，官方默认下整表不命中。 */
 ${SWEEP_ANCHORS.map(anchor => `${gated(anchor)} {
   background-color: var(--dsw-alias-bg-base);
   background-image: ${SWEEP_PLATE_LAYERS};
-  background-attachment: fixed;
+  ${SWEEP_BACKGROUND_GEOMETRY}
   -webkit-mask-image: ${SWEEP_SHAPE_MASK};
   mask-image: ${SWEEP_SHAPE_MASK};
 }`).join('\n')}

@@ -201,6 +201,29 @@ export function notchPhasePaint(): string {
   return viewportPhaseDecls({ left: PHASE_NOTCH_VARIABLE, top: PHASE_NOTCH_TOP_VARIABLE })
 }
 
+/**
+ * 「把地面原地重画」类规则的**背景几何**：`100vw × 100vh` + 相位写死 `0 0` + `scroll`。
+ *
+ * ⚠️ 为什么不再用 `background-attachment: fixed`（2026-10-21 性能专项）：
+ *   `fixed` 让定位区 = 视口 ⇒ **每帧按视口重新栅格化**，成本与声明尺寸无关（spec 10 实测：
+ *   把盒子缩到 1/225 也不省）。这类规则数量多、且有的挂在流式内容里，
+ *   多会话并行时叠起来就是可感掉帧。
+ *   改用与背景层同尺寸的显式几何，视觉等价（真机逐像素：全屏 160 万点里 85 点改变 = 0.005%）。
+ * ⚠️ 必须**逐层**给 `background-size`：第 1 层是颗粒瓦片（`auto` 才是固有尺寸），后三层是 `100vw 100vh`；
+ *   值少于层数会按序循环补齐，把颗粒拉成粗块、让渐变按元素自身盒子解析（行很小时就压成硬边带）。
+ */
+const GROUND_REDRAW_GEOMETRY = `background-attachment: scroll;
+  background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px;`
+
+/** 「按背景**原样画满**」的配方 + 显式几何（不走 fixed）—— 吸顶行与轨迹视图共用。 */
+function groundRedrawPaint(): string {
+  return `background-color: var(--dsw-alias-bg-base);
+  background-image: ${grainOverGradients()};
+  ${GROUND_REDRAW_GEOMETRY}`
+}
+
 /** 玻璃效果样式表文本（注入 `<style>`）。 */
 export function buildGlassCss(): string {
   const fill = (token: string, alpha: number): string => `color-mix(in srgb, ${token} ${pct(alpha)}, transparent)`
@@ -511,18 +534,20 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
 
 /* ===== 官方那些**吸顶遮罩行**：底色要等于它盖住的内容底 =====
    官方给展开的 Think 行刷**不透明纯色** var(--dsw-alias-bg-base) 并吸在滚区顶部、压住滚过去的正文；官方档下那就是地面纯色、看不出带子，而我们的地面是**渐变光带 + 颗粒** ⇒ 纯色底一盖上去就显成一条「黑框」。
-   修法与顶栏同一套（同一类东西：抬到地面之上、又必须等于地面）：**把地面原样重画一遍**（同色 + 同渐变 + 同颗粒），并用 background-attachment: fixed 让百分比按视口解析（行的盒子很小，按自身盒子解析会把渐变压成硬边带）。
+   修法与顶栏同一套（同一类东西：抬到地面之上、又必须等于地面）：**把地面原样重画一遍**（同色 + 同渐变 + 同颗粒）。
+   ⚠️ 背景几何走 groundRedrawPaint（显式 100vw×100vh + scroll），**不再用 background-attachment: fixed** —— fixed 每帧按视口栅格化，行虽小但同样要付（spec 10：成本与声明尺寸无关）；显式几何逐像素等价（实测 0.005%）。
    ⚠️ 锚点用公开属性 data-disclosure-row（哈希前缀类名仓库红线禁止写），并**收窄到官方自己加底的那个状态**（[data-expanded] [data-open]，逐字对齐官方那条规则）—— 只写 [data-disclosure-row] 会把**所有**折叠行都刷上一层底。
    ⚠️ 只挂色调档 —— 官方默认档下地面本来就是纯色，重画等于没事找事。 */
 body:not([${PLAIN_ATTR}]) [data-expanded] [data-open] [data-disclosure-row] {
-  ${backingPaint()}
+  ${groundRedrawPaint()}
 }
 
 /* ===== 轨迹视图：把我们的地面**铺满它自己的不透明面** =====
    轨迹视图根 [data-conversation-composer-overlay] **自己刷了一层不透明底色** --dsw-alias-bg-layer-1，又在本插件里被抬到 81 之上 ⇒ 整块**盖住**我们的装饰层（z 80）；而座底那条带子按自己的配方重画 ⇒ 带上与带上方的轨迹地面**差出一整档**，读成一条横带。修法与右边栏那次同型：**把我们的材质原样画到那个不透明面上**，而不是去改座底那条带子。
    ⚠️ 只用公开属性锚定：[data-conversation-composer-overlay]（轨迹视图根）与 [data-trajectory-scroll]（表格滚区）；内层「页面级地面」的 .split / .table 是**哈希类名**，仓库红线禁止写。
    ⚠️⚠️ **这条选择器表不是穷举证明，只是覆盖手段**：官方若再加一层不透明面，表会漏掉它、而守卫只能钉住「已列出的这些选择器各自合规」。真正的安全网是**覆盖率指标**（修复前官方平地色占视图 69.61% → 修复后 0.02%，轨迹地面与对话页同点色差 31 → 2）—— **跟版审计时重跑这些数**，显著回退即说明有新的不透明面冒出来。
-   ⚠️ 只挂色调档 + active 相位（该视图只存在于会话页）；本页祖先链**没有** transform / filter / contain，故沿用 fixed 是安全的 —— 右边栏那条**不能**用 fixed 是因为官方 .panel 的开关动画就是 transform。 */
+   ⚠️ 只挂色调档 + active 相位（该视图只存在于会话页）。背景几何走 groundRedrawPaint（显式 100vw×100vh + scroll）—— 此处**本来就**能安全用显式几何：该视图祖先链没有 transform / filter / contain，不需要 fixed 的视口重解析；而 fixed 每帧按视口栅格化的成本是真金白银（spec 10）。逐像素等价（实测 0.005%）。
+   ⚠️ 右边栏那条**不能**用 fixed 是另一个理由（官方 .panel 的开关动画就是 transform），那条已用「100vw×100vh + 右对齐」的同类显式几何。 */
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay],
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay] > div,
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay] > div > div,
@@ -531,7 +556,7 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-over
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay] > section > div,
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay] table,
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-composer-overlay] aside {
-  ${backingPaint()}
+  ${groundRedrawPaint()}
 }
 
 /* 模态弹窗（[role='dialog']）**不做玻璃** —— 它是内容面（设置 / 文件 / 归档列表），走 src/surface.ts 的实色抬升面（Apple HIG：别把玻璃放在列表 / 卡片 / 媒体内容上）。
