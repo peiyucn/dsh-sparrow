@@ -57,8 +57,8 @@ import { HANDLE_SELECTOR, applyGlow } from '../handle-glow.js'
 import { buildPopoverCss } from '../popover.js'
 import { buildSurfaceCss } from '../surface.js'
 import { buildSweepCss } from '../sweep.js'
-import { isContentChurn, type MutationSignal } from '../mutation-gate.js'
 import { isWorkstartProbe } from '../workstart.js'
+import { isContentChurnByRecords, type RecordSignal } from '../mutation-gate.js'
 import { pseudoOrigin, solvePhaseOrigin } from '../phase.js'
 import {
   DEFAULT_SETTINGS,
@@ -635,17 +635,34 @@ function install(ctx: Context): void {
    * 子树 `querySelector`；宁可少列（漏了有「静默后补测」兜住），也不要为求全而拖慢判定。
    */
   const ANCHOR_LIKE_SELECTOR = "nav,[role='menu'],[role='dialog'],[role='listbox'],[role='tree'],[data-composer-card],[data-composer-seat],[data-goal-bar],[data-testid='todo-panel'],[data-queue-dock],aside[data-front]"
-  /** 把一批变动映射成 {@link MutationSignal}。 */
-  const signalsOf = (records: readonly MutationRecord[]): MutationSignal[] => records.map((record) => {
-    const target = record.target instanceof Element ? record.target : record.target.parentElement
-    const insideContent = target !== null && target.closest(`[${CONTENT_ATTR}]`) !== null
-    let anchorLike = false
-    for (const node of [...record.addedNodes, ...record.removedNodes]) {
-      if (!(node instanceof Element)) continue
-      if (node.matches(ANCHOR_LIKE_SELECTOR) || node.querySelector(ANCHOR_LIKE_SELECTOR) !== null) { anchorLike = true; break }
-    }
-    return { insideContent, anchorLike }
-  })
+  /**
+   * 一批变动是否「只是对话内容在流式渲染」。
+   *
+   * 判定本身是 `mutation-gate.ts` 的**纯函数** `isContentChurnByRecords`（有单测）；
+   * 这里只负责把 `MutationRecord` **惰性**翻译成它要的最小信号 —— 惰性很关键：
+   * 切会话 / 长流式一轮能有上百条 record，而纯函数一旦发现反例就短路返回，
+   * 后面那些 record 的 `closest()` / `matches()` 根本不必做。
+   */
+  const isContentChurnFast = (records: readonly MutationRecord[]): boolean => isContentChurnByRecords(
+    (function* (): Generator<RecordSignal> {
+      for (const record of records) {
+        const target = record.target instanceof Element ? record.target : record.target.parentElement
+        const insideContent = target !== null && target.closest(`[${CONTENT_ATTR}]`) !== null
+        let anchorLike = false
+        if (insideContent) {
+          for (const node of record.addedNodes) {
+            if (node instanceof Element && (node.matches(ANCHOR_LIKE_SELECTOR) || node.querySelector(ANCHOR_LIKE_SELECTOR) !== null)) { anchorLike = true; break }
+          }
+          if (!anchorLike) {
+            for (const node of record.removedNodes) {
+              if (node instanceof Element && (node.matches(ANCHOR_LIKE_SELECTOR) || node.querySelector(ANCHOR_LIKE_SELECTOR) !== null)) { anchorLike = true; break }
+            }
+          }
+        }
+        yield { insideContent, anchorLike }
+      }
+    })(),
+  )
   /**
    * 静默去抖到点：只有**真的安静下来**才补一次探测 + 相位收敛重测。
    *
@@ -752,7 +769,7 @@ function install(ctx: Context): void {
     if (root === null) return () => {}
     const observer = new MutationObserver((records) => {
       // 纯内容流式变动：推迟到变动停下再探测/重测（理由见 CONTENT_SETTLE_QUIET_MS）。
-      if (isContentChurn(signalsOf(records))) { armContentSettle(); return }
+      if (isContentChurnFast(records)) { armContentSettle(); return }
       scheduleProbe()
       let layoutChanged = false
       for (const record of records) {

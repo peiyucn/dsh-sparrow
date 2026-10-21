@@ -110,11 +110,15 @@ describe('workstart：未选工作区待启动态的判定（纯函数）', () =
     const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
     assert.match(src, /const CONTENT_SETTLE_QUIET_MS = \d+/u, '内容变动的静默去抖间隔必须是具名常量')
     // 判定先于 scheduleProbe：纯内容变动直接走推迟路径并 return。
-    const churnGate = /if \(isContentChurn\(signalsOf\(records\)\)\) \{ armContentSettle\(\); return \}/u
-    assert.match(src, churnGate, 'observer 必须先用 isContentChurn 分类，内容变动走推迟路径')
+    // ⚠️ 断言「调用形状」而非具体实现名：2026-10-21 起判定改走 `mutation-gate.ts` 的纯函数
+    // （`isContentChurnByRecords`，带语义对拍与短路单测），调用点仍是「先分类、命中就 arm 并 return」。
+    const churnGate = /if \(isContentChurnFast\(records\)\) \{ armContentSettle\(\); return \}/u
+    assert.match(src, churnGate, 'observer 必须先用内容变动判定分类，内容变动走推迟路径')
     const gateAt = src.search(churnGate)
     const probeAt = src.indexOf('scheduleProbe()', src.indexOf('const observer = new MutationObserver'))
     assert.ok(gateAt > 0 && probeAt > gateAt, '内容变动分支必须在 scheduleProbe 之前 return')
+    // 判定本身必须落在可单测的纯模块里，而不是埋在 observer 回调里。
+    assert.match(src, /isContentChurnByRecords\(/u, '内容变动判定必须是纯函数（便于单测）')
     // 推迟路径：拿到变动只起 / 重排定时器；到点若仍在流式就不干活，安静后才补探测 + 相位重测。
     // ⚠️ 断言「语义」而不是某个字面量写法：2026-10-21 把轮询式去抖改成一次性重排，
     // 延时参数从常量变成计算值（quietAt 与上限取 min），语义没变、唤醒次数更少。
