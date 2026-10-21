@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
 import { countApi, deleteApi, invalidateCountCache, listApi, readCountCache } from '../lib/client/api.js'
@@ -5,6 +6,10 @@ import { countApi, deleteApi, invalidateCountCache, listApi, readCountCache } fr
 /** fetch 桩调用记录与可编程响应；用例按需替换 impl。
  * node:test 每个测试文件独立进程，直接替换 globalThis.fetch 即可，无需还原。 */
 const calls = []
+
+/** `impl` 的返回类型：响应桩被断言成 `Response`（只实现 ok / status / json 三项）。
+ * 不注解的话，初值 `async () => { throw }` 会被推成 `Promise<never>`，后续所有响应桩赋值都报 TS2322。 */
+/** @type {() => Promise<Response>} */
 let impl = async () => { throw new Error('fetch 桩未配置') }
 
 globalThis.fetch = async (url, init) => {
@@ -18,13 +23,18 @@ afterEach(() => {
   invalidateCountCache()
 })
 
-/** 构造可编程 Response 桩（body 传 Error 时 json() 抛错，模拟非 JSON 响应体）。 */
+/**
+ * 构造可编程 Response 桩（body 传 Error 时 json() 抛错，模拟非 JSON 响应体）。
+ * @param {number} status - HTTP 状态码。
+ * @param {unknown} body - `json()` 解析出的响应体。
+ * @returns {Response} - 只实现 handler 用到的 ok / status / json，断言收窄成 `Response`（桩不发给真实 fetch）。
+ */
 function responseStub(status, body) {
-  return {
+  return /** @type {Response} */ ({
     ok: status >= 200 && status < 300,
     status,
     json: async () => body,
-  }
+  })
 }
 
 describe('dsh-file-manage 客户端请求层', () => {

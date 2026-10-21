@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * dsh-theme-tone：轮次导航 + 宽度钳制（自 `dsh-nav-pin` 并入，见 `docs/spec/09-nav-pin-merge.md`）。
  * ⚠️ 与原版唯一的实质差异：四段规则现在**全部带色调门**，官方默认档下不产出。

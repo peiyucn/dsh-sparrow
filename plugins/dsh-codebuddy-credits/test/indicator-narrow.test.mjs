@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
@@ -48,7 +49,12 @@ describe('CodeBuddy 顶栏标记：窄化（容器查询）', () => {
     // React 的 style 是**内联**声明，优先级高于样式表 ⇒ 给这两个 span 写 display 会让
     // @container 里的 display:none 永远不生效（阈值到了、模式却不切）。
     const trig = source.slice(source.indexOf('const triggerButton'), source.indexOf('const trigger ='))
-    for (const [name, re] of [['宽档', /ccb-mark-wide[\s\S]{0,200}?\}\}/u], ['窄档', /ccb-mark-narrow[\s\S]{0,200}?\}\}/u]]) {
+    /** @type {Array<[string, RegExp]>} */
+    const patterns = [
+      ['宽档', /ccb-mark-wide[\s\S]{0,200}?\}\}/u],
+      ['窄档', /ccb-mark-narrow[\s\S]{0,200}?\}\}/u],
+    ]
+    for (const [name, re] of patterns) {
       const block = re.exec(trig)
       assert.ok(block, `没取到${name} span`)
       assert.ok(!/display\s*:/u.test(block[0]),

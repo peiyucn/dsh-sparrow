@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { apply } from '../lib/host.js'
@@ -125,7 +126,7 @@ function makeRes() {
  * 真调一次 handler。
  * @param handler - `apply` 注册的 exact handler。
  * @param init - 请求形态（method / url / headers / body）。
- * @param fetchImpl - 本次 dispatch 期间替换的 `globalThis.fetch` 桩。
+ * @param [fetchImpl] - 本次 dispatch 期间替换的 `globalThis.fetch` 桩（可省，省了就不换）。
  */
 async function dispatch(handler, init = {}, fetchImpl) {
   const { req, stats } = makeReq(init)

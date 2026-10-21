@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { pseudoOrigin, px, solvePhaseOrigin } from '../lib/phase.js'
@@ -32,6 +33,7 @@ describe('phase：视口相位几何解算', () => {
     const padLeft = 16
     const pseudoLeft = padLeft // 官方 CSS：伪元素 left = 宿主左内边距（卡片与宿主同左）
     const own = pseudoOrigin(hostLeft, 0, 0, 0, pseudoLeft, 0)
+    assert.ok(own, '入参全是有限数 ⇒ 必须解出原点（返回 null 说明判据被写坏了）')
     assert.equal(own.left, hostLeft + padLeft, '伪元素自身左缘 = 宿主左缘 + 左内边距')
     assert.notEqual(own.left, hostLeft, '不得等于宿主左缘（那样会偏一个内边距）')
   })
@@ -60,6 +62,7 @@ describe('phase：视口相位几何解算', () => {
     const closed = solvePhaseOrigin({ left: 280, top: 1300 }, VP)
     const open = solvePhaseOrigin({ left: 280, top: 1300 }, VP)
     assert.deepEqual(closed, open)
+    assert.ok(open, '视口装得下该原点 ⇒ 必须解出来')
     assert.equal(open.left, '280px')
   })
 

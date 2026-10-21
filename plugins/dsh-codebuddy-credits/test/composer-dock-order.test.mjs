@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
@@ -60,7 +61,9 @@ describe('D：conversation.composer.dock 我方 entry 次序', () => {
 
   it('按上游 list 渲染色序语义模拟：我方稳定排在官方两颗胶囊之后（与注册先后无关）', () => {
     // 上游语义：ledger 按 (priority, order) 稳定排序；list 行取赢家后按 order 稳定排序。
-    const ours = { id: 'codebuddy-credits-stats', order: Number(/order:\s*(\d+)/u.exec(dockCode)[1]), priority: 0 }
+    const orderMatch = /order:\s*(\d+)/u.exec(dockCode)
+    assert.ok(orderMatch, '注册必须写显式 order（别依赖注册先后）')
+    const ours = { id: 'codebuddy-credits-stats', order: Number(orderMatch[1]), priority: 0 }
     const official = [
       { id: 'activity', order: OFFICIAL_DOCK_ORDER.activity, priority: 0 },
       { id: 'usage', order: OFFICIAL_DOCK_ORDER.usage, priority: 0 },

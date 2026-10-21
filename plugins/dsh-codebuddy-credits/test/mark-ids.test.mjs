@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
@@ -36,7 +37,11 @@ describe('品牌标 SVG：实例作用域化', () => {
   it('两个实例 应该 得到互不相同的 id（同文档共存不撞车）', () => {
     const a = scopeMarkSvg(SAMPLE, 'r1')
     const b = scopeMarkSvg(SAMPLE, 'r2')
-    const idOf = (s) => /id="([^"]+)"/u.exec(s)[1]
+    const idOf = (s) => {
+      const match = /id="([^"]+)"/u.exec(s)
+      assert.ok(match, '取不到 id')
+      return match[1]
+    }
     assert.notEqual(idOf(a), idOf(b), '两个实例的 id 必须不同（否则又解析到文档序第一份）')
     assert.match(a, new RegExp(`url\\(#${idOf(a)}\\)`, 'u'))
     assert.match(b, new RegExp(`url\\(#${idOf(b)}\\)`, 'u'))
@@ -60,7 +65,9 @@ describe('品牌标 SVG：实例作用域化', () => {
 
   it('应该 把 id 里不安全的字符折成下划线（React useId 形如 `:r1:`）', () => {
     const scoped = scopeMarkSvg(SAMPLE, ':r7:')
-    const id = /id="([^"]+)"/u.exec(scoped)[1]
+    const idMatch = /id="([^"]+)"/u.exec(scoped)
+    assert.ok(idMatch, '作用域化后应仍有一个 id')
+    const id = idMatch[1]
     assert.match(id, /^_r7_-grad$/u, `id 里的冒号应折成下划线，实际 ${id}`)
     assert.match(scoped, new RegExp(`url\\(#${id.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}\\)`, 'u'),
       '引用必须与被折过的 id 完全一致')
@@ -78,7 +85,9 @@ describe('品牌标 SVG：实例作用域化', () => {
       assert.equal([...raw.matchAll(/\bid="/gu)].length, 1, `${name} 原串应只有一个 id`)
       assert.equal([...scoped.matchAll(/\bid="/gu)].length, 1, `${name} 作用域化后仍只有一个 id`)
       assert.equal([...scoped.matchAll(/url\(#/gu)].length, 1, `${name} 作用域化后仍只有一处 url 引用`)
-      const id = /\bid="([^"]+)"/u.exec(scoped)[1]
+      const idMatch = /\bid="([^"]+)"/u.exec(scoped)
+      assert.ok(idMatch, `${name} 作用域化后应仍有一个 id`)
+      const id = idMatch[1]
       assert.ok(id.startsWith('r9-'), `${name} 的 id 应带前缀，实际 ${id}`)
       assert.ok(scoped.includes(`url(#${id})`), `${name} 的引用必须指向自己这个 id`)
       assert.match(scoped, /stop-color="#2EA99D"/u, `${name} 渐变起点不得被动`)

@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { CLIENT_ACTION_TIMEOUT_MS, CLIENT_FETCH_TIMEOUT_MS, fetchLocal } from '../lib/client/fetch-timeout.js'

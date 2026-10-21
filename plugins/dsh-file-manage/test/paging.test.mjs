@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { FILE_PAGE_SIZE, hasLoadMore, renderedRowCount, RENDER_PAGE_SIZE } from '../lib/client/paging.js'

@@ -1,8 +1,13 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { installCodeBuddyWeb } from '../lib/web.js'
 
-/** mock 必须复现 cordis ctx.inject / ctx.effect 的同步回调，否则 webServer.register 不发生、路由测试空转。 */
+/**
+ * mock 必须复现 cordis ctx.inject / ctx.effect 的同步回调，否则 webServer.register 不发生、路由测试空转。
+ * @param {Record<string, any>} [overrides] - 覆盖 shared 服务的行为（键与 shared 同名）。
+ * @param {any} [webStartup] - 官方 webStartup 服务（信任面）；省略即宿主没有该服务。
+ */
 function buildHarness(overrides = {}, webStartup = undefined) {
   const calls = { refreshModels: 0 }
   let handler = null
@@ -33,7 +38,12 @@ function buildHarness(overrides = {}, webStartup = undefined) {
   return { shared, calls, get handler() { return handler } }
 }
 
-/** 最小 req/res：栅栏与 localOnly 检查都依赖 remoteAddress 与 Host 头。 */
+/**
+ * 最小 req/res：栅栏与 localOnly 检查都依赖 remoteAddress 与 Host 头。
+ * @param {any} handler - installCodeBuddyWeb 注册的路由 handler。
+ * @param {string} url - 请求 URL（含 query）。
+ * @param {{ method?: string, address?: string, headers?: Record<string, string> }} [options] - 请求形态。
+ */
 async function request(handler, url, { method = 'POST', address = '127.0.0.1', headers = { host: '127.0.0.1:3080' } } = {}) {
   let statusCode = 0
   const chunks = []

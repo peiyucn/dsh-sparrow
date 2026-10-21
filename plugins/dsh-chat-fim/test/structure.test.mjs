@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'

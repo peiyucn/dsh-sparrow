@@ -29,7 +29,7 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 
 * **开发**：日常改动在 `dev`；`main` 只接受发布合并；新功能先写 spec（`plugins/<插件>/docs/spec/NN-<主题>.md`），评审后才开工
 * **验证**：插件目录 `npm run verify`；全量 = 根 `npm run verify`（= `pnpm run check` + `verify:all`）；分项 = 根 `pnpm run <step>:all`；push 前必须通过
-* **守卫链**：`check`（本地与 CI **同一入口**）＝ `check:paths`（本机绝对路径 / 用户名）→ `check:dsh-pin`（官方 dsh 版本 pin 单一真值）→ `check:plugin-docs`（文档一致性）→ `check:market-index`（市场索引与包一致）。**新增守卫只需加进 `check`**，CI 自动覆盖；别在 workflow 里逐个列脚本
+* **守卫链**：`check`（本地与 CI **同一入口**）＝ `check:paths`（本机绝对路径 / 用户名）→ `check:dsh-pin`（官方 dsh 版本 pin 单一真值）→ `check:plugin-docs`（文档一致性）→ `check:market-index`（市场索引与包一致）→ `check:test-ts-check`（测试文件首行 `// @ts-check` 守卫）。**新增守卫只需加进 `check`**，CI 自动覆盖；别在 workflow 里逐个列脚本
 * **提交**：**逐项提交**，中文描述 + 英文类型前缀（feat:/fix:/refactor:/chore:/docs: 等）；禁止多个任务混在一个 commit
 * **推送**：日常目标 `dev`
 * **合并**：dev → main（fast-forward）
@@ -48,7 +48,7 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 * **鲁棒性**：外部调用（网络 / 文件）超时与容错；异常输入安全默认值；失败路径用户可见反馈
 * **性能**：重复重活缓存化 / 惰性化；热路径无 O(n²) / 重复计算；大批量渲染分页或虚拟化；高频事件防抖节流；并发扇出有上限
 * **并发与防御**：UI 入口连点防护（锁 / debounce / disabled / 幂等）；请求可被打断且状态一致
-* **测试与验证**：纯逻辑改动补 `test/*.test.mjs`；`verify` 通过 + `git diff --check` 干净
+* **测试与验证**：纯逻辑改动补 `test/*.test.mjs`；**测试文件首行必须 `// @ts-check`**（否则不进类型检查，`check:test-ts-check` 会红）；`verify` 通过 + `git diff --check` 干净
 
 其中「资源 / 内存泄漏」＝ timer / watcher / AbortController 等句柄在成功与失败路径都释放；缓存 / 集合与按会话、生命周期累积的状态有界（上限 / 淘汰 / TTL / 随生命周期释放）；监听 / 订阅 / DOM 引用不滞留。
 

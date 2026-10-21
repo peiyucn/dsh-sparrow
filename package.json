@@ -6,11 +6,12 @@
   "packageManager": "pnpm@11.22.0",
   "scripts": {
     "verify": "pnpm run check && pnpm run verify:all",
-    "check": "pnpm run check:paths && pnpm run check:dsh-pin && pnpm run check:plugin-docs && pnpm run check:market-index",
+    "check": "pnpm run check:paths && pnpm run check:dsh-pin && pnpm run check:plugin-docs && pnpm run check:market-index && pnpm run check:test-ts-check",
     "check:paths": "node scripts/check-no-local-paths.mjs",
     "check:dsh-pin": "node scripts/check-dsh-pin.mjs",
     "check:plugin-docs": "node scripts/check-plugin-docs.mjs",
     "check:market-index": "node scripts/check-market-index.mjs",
+    "check:test-ts-check": "node scripts/check-test-ts-check.mjs",
     "market:index": "node scripts/market-index.mjs",
     "verify:all": "node scripts/verify-all.mjs",
     "typecheck:all": "node scripts/verify-all.mjs --typecheck",

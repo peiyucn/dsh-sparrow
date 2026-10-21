@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
@@ -43,7 +44,17 @@ import { DARK_TONES, DEFAULT_SETTINGS, DEPTH_ALPHA, LIGHT_TONES } from '../lib/t
 
 const settings = (lightTone, darkTone) => ({ lightTone, darkTone })
 
-const alphaOf = color => Number(/,\s*([\d.]+)\)$/u.exec(color)[1])
+/**
+ * 取 `rgba(r, g, b, a)` 的 alpha 分量。
+ * **取不到就断言失败**（别退回 `exec()[1]` 的 TypeError —— 那会把「色值格式漂了」误报成实现崩了）。
+ * @param {string} color
+ * @returns {number}
+ */
+const alphaOf = color => {
+  const match = /,\s*([\d.]+)\)$/u.exec(color)
+  assert.ok(match, `不是可解析的 rgba() 色值：${color}`)
+  return Number(match[1])
+}
 
 describe('背景层样式表', () => {
   const css = buildBackdropCss()
@@ -276,7 +287,7 @@ describe('色调卡预览（完整展示色调）', () => {
   it('浅色轴的卡面纵深应该 **强于实况** —— 小卡需要更强才看得见（与深色轴同理）', () => {
     // 浅色与深色同一个道理：卡面必须比实况强（浅 `1.8×` / 深 `3×`）——
     // 小卡（135×83）面积小、渐变被压缩，需要更强的染色才读得出；浅色实况本就更显，故倍数更小。
-    const cardAlpha = Number(/,\s*([\d.]+)\)/u.exec(boostAlpha(LIGHT_TONES.blue.bottom, PREVIEW_ALPHA_SCALE.light.depth))[1])
+    const cardAlpha = alphaOf(boostAlpha(LIGHT_TONES.blue.bottom, PREVIEW_ALPHA_SCALE.light.depth))
     assert.ok(cardAlpha > DEPTH_ALPHA.light, '浅色卡面纵深应强于实况（小卡辅助）')
     assert.equal(cardAlpha, 0.54, '浅色卡面纵深落在 .54（= 结构改动前的观感）')
   })
@@ -284,7 +295,7 @@ describe('色调卡预览（完整展示色调）', () => {
   it('深色轴的卡面纵深仍然 ×3 —— 那是「小卡看得见」的辅助，不是不对称 bug', () => {
     // 深色轴**保留**卡面强于实况（卡 0.54 / 实况 0.18）：近黑底余量大，实况 0.18 已产生 Δ亮度 +9~12。
     // 别顺手把深色的 ×3 抹平 —— 抹平会让深色卡面变平、三款分不开。
-    const cardAlpha = Number(/,\s*([\d.]+)\)/u.exec(boostAlpha(DARK_TONES.violet.bottom, PREVIEW_ALPHA_SCALE.dark.depth))[1])
+    const cardAlpha = alphaOf(boostAlpha(DARK_TONES.violet.bottom, PREVIEW_ALPHA_SCALE.dark.depth))
     assert.ok(cardAlpha > DEPTH_ALPHA.dark, '深色卡面纵深应强于实况（辅助小卡）')
     assert.equal(cardAlpha, Number((DEPTH_ALPHA.dark * 3).toFixed(3)), '深色卡面倍数仍为 3')
   })
@@ -432,6 +443,11 @@ describe('DOM 选择器', () => {
 
 describe('浏览器特性门', () => {
   it('该门的三个特性应该 都在，且 backdrop-filter / :has() 有意不在', () => {
+    /**
+     * 特性名清单。**放宽成 `string[]`**：这里查的是「某个字面量在不在表里」，
+     * 而表的元素是字面联合 ⇒ 不收宽的话 `includes('…')` 在类型层就被判「无重叠」，运行期那条断言根本走不到。
+     * @type {string[]}
+     */
     const names = REQUIRED_CSS_FEATURES.map(f => f.name)
     // 三条「缺了插件就不成立」的：screen 合成（降级会压暗内容）、径向渐变（色调的载体）、
     // color-mix（**22/38 个 token 的染色值全靠它**，缺了等于插件没生效却还占着设置行）。

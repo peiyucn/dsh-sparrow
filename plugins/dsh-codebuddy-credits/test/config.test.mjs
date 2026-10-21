@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -40,7 +41,9 @@ describe('Config schema（0.1.7 的 volatile 配置面）', () => {
   it('两个字段都是 volatile（设置写入只认 volatile 路径，缺了就完全改不动设置）', () => {
     // volatile 标记在官方 schemastery 的 schema meta 上，设置面据此挑选可编辑字段；
     // toJSON() 是保留共享/递归引用的文档：uid 指根，dict 成员是 refs 下标。
-    const json = Config.toJSON()
+    // ⚠️ schemastery 的 .d.ts 把 toJSON() 声明为返回 Schema，运行期实际是纯 JSON 引用表
+    // （见其 Schema.prototype.toJSON），故按运行期形状取用。
+    const json = /** @type {any} */ (Config.toJSON())
     const root = json.refs[json.uid]
     const field = (key) => json.refs[root.dict[key]]
     assert.equal(field('maxMode').meta.volatile, true)

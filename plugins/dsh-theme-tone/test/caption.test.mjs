@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * 桌面端（Windows）标题栏 overlay 的守卫。
  * 官方 preload 探针读 `--dsw-specific-sidebar-fill` / `--dsw-alias-label-primary` 送给 WCO，

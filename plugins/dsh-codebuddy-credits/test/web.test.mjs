@@ -1,10 +1,14 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { sessionViewOf, turnViewOf, foldSessionCredits } from '../lib/credits-ledger.js'
 
 /** web 路由层聚合视图口径：按会话/轮次合计、按模型聚合一行、缺 credit 也计调用次数。 */
 
-/** 造一条本 provider 的 assistant/message。 */
+/**
+ * 造一条本 provider 的 assistant/message。
+ * @param {{ seq: number, turn: number, step: number, model?: string, credit?: number, creditMissing?: boolean }} init - 事件字段。
+ */
 function ev({ seq, turn, step, model = 'hy4-preview', credit, creditMissing = false }) {
   return {
     type: 'assistant/message',

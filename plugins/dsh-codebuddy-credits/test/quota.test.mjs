@@ -1,7 +1,12 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { fetchQuota } from '../lib/quota.js'
 import { QUOTA_URL } from '../lib/constants.js'
+
+/** Node 原生 fetch 存档：每个用例把 `globalThis.fetch` 换成桩，结束必须还原——写成 `undefined` 既
+ *  不符合 `typeof fetch` 的类型契约，也会把宿主全局真的抹掉。 */
+const originalFetch = globalThis.fetch
 
 describe('fetchQuota', () => {
   it('解析实测配额形状（credit/limitNum/周期时间，剩余 = 额度 - 已用）', async () => {
@@ -32,7 +37,7 @@ describe('fetchQuota', () => {
         resetAt: '2026-10-01 00:00:00',
       })
     } finally {
-      globalThis.fetch = undefined
+      globalThis.fetch = originalFetch
     }
   })
 
@@ -42,7 +47,7 @@ describe('fetchQuota', () => {
       const quota = await fetchQuota('k')
       assert.equal(quota.remaining, 0)
     } finally {
-      globalThis.fetch = undefined
+      globalThis.fetch = originalFetch
     }
   })
 
@@ -52,34 +57,40 @@ describe('fetchQuota', () => {
       const quota = await fetchQuota('k')
       assert.deepEqual(quota, { used: 0, limit: 0, remaining: 0 })
     } finally {
-      globalThis.fetch = undefined
+      globalThis.fetch = originalFetch
     }
   })
 
   it('服务端业务错误透传文案', async () => {
     globalThis.fetch = async () => new Response(JSON.stringify({ code: 400, msg: 'no permission' }), { status: 200 })
     try {
-      await assert.rejects(fetchQuota('k'), error => error.code === 'PROVIDER' && /no permission/.test(error.message))
+      await assert.rejects(
+        fetchQuota('k'),
+        /** @param {any} error */ (error) => error.code === 'PROVIDER' && /no permission/.test(error.message),
+      )
     } finally {
-      globalThis.fetch = undefined
+      globalThis.fetch = originalFetch
     }
   })
 
   it('HTTP 错误抛出 PROVIDER 错误', async () => {
     globalThis.fetch = async () => new Response('{}', { status: 403 })
     try {
-      await assert.rejects(fetchQuota('k'), error => error.code === 'PROVIDER' && /HTTP 403/.test(error.message))
+      await assert.rejects(
+        fetchQuota('k'),
+        /** @param {any} error */ (error) => error.code === 'PROVIDER' && /HTTP 403/.test(error.message),
+      )
     } finally {
-      globalThis.fetch = undefined
+      globalThis.fetch = originalFetch
     }
   })
 
   it('响应体无法解析时抛出 PROVIDER 错误', async () => {
     globalThis.fetch = async () => new Response('{broken', { status: 200 })
     try {
-      await assert.rejects(fetchQuota('k'), error => error.code === 'PROVIDER')
+      await assert.rejects(fetchQuota('k'), /** @param {any} error */ (error) => error.code === 'PROVIDER')
     } finally {
-      globalThis.fetch = undefined
+      globalThis.fetch = originalFetch
     }
   })
 
@@ -92,7 +103,7 @@ describe('fetchQuota', () => {
       await assert.rejects(fetchQuota('k', undefined, controller.signal), /cancelled/)
       assert.equal(called, false)
     } finally {
-      globalThis.fetch = undefined
+      globalThis.fetch = originalFetch
     }
   })
 
@@ -103,11 +114,13 @@ describe('fetchQuota', () => {
         init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true })
         queueMicrotask(() => controller.abort(new Error('user cancel')))
       })
+      // 桩只在 abort 时 settle：正常返回即行为回归，显式失败（也让返回值满足 fetch 的类型契约）。
+      throw new Error('fetch 桩不应正常返回')
     }
     try {
-      await assert.rejects(fetchQuota('k', undefined, controller.signal), error => error.code === 'ABORTED')
+      await assert.rejects(fetchQuota('k', undefined, controller.signal), /** @param {any} error */ (error) => error.code === 'ABORTED')
     } finally {
-      globalThis.fetch = undefined
+      globalThis.fetch = originalFetch
     }
   })
 })

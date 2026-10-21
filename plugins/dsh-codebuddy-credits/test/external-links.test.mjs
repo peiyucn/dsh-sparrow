@@ -1,3 +1,4 @@
+// @ts-check
 /** 外部链接白名单：交给 `<a href>` 的 URL 若混入 `javascript:` / `data:` 即注入面，按协议白名单放行。 */
 
 import { test } from 'node:test'

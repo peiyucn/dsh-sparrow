@@ -1,0 +1,22 @@
+{
+  "// 说明": "测试侧类型检查：检查 test/*.mjs 与 test/helpers/*.ts，不产出。",
+  "// 为什么 noImplicitAny: false": "测试里的桩大量是隐式 any 的对象字面量；强制注解要把 87 个文件写成 JSDoc 墙，收益远不抵成本。",
+  "// 为什么 import 用 .ts 后缀": "Node 24 原生剥类型，测试直接 import ./helpers/fake-ctx.ts；tsc 侧需 allowImportingTsExtensions。",
+  "// 为什么单独一份": "tsconfig.json 的 include 只有 src/；测试 import 的是 lib/ 产物，必须在 build 之后才有文件可查，故不能并进 typecheck 阶段。",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noImplicitAny": false,
+    "noUnusedLocals": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": false,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["test/**/*.mjs", "test/**/*.ts"]
+}

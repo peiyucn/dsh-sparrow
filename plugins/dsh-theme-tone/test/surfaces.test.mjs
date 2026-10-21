@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
@@ -54,17 +55,6 @@ import {
 import { buildGlassCss, GLASS_HEADER_ALPHA, GLASS_SPECULAR_RING } from '../lib/glass.js'
 
 /**
- * 取**某一条规则**的规则体：全表 `css.includes(x)` 会被**别处的巧合**喂饱（同一图层串可能被多条规则使用），
- * 故断言「某条规则的内容」时必须先把作用域收进那条规则。`selectorWithBrace` 要含结尾的 ` {`。
- */
-function bodyOfRule(css, selectorWithBrace) {
-  const at = css.indexOf(selectorWithBrace)
-  assert.ok(at >= 0, `缺规则：${selectorWithBrace}`)
-  const open = css.indexOf('{', at)
-  return css.slice(open + 1, css.indexOf('}', open))
-}
-
-/**
  * 官方抬升面 rung 的**数值真值** —— 从官方调色板逐字抄下来的契约快照（抄数值是为了能在测试里算
  * 「混合后还亮不亮」）；`SURFACE_RUNGS` 里传的是官方变量引用 ⇒ 两边对不上就是官方动了调色板。
  */
@@ -114,6 +104,27 @@ const tintChannels = tint => tint.split(',').map(part => Number.parseInt(part.tr
 const sum = rgb => rgb[0] + rgb[1] + rgb[2]
 /** CSS `color-mix(in srgb, A p%, B)` 的 sRGB 结果（分量线性插值）。 */
 const mix = (a, b, p) => a.map((value, i) => value * p + b[i] * (1 - p))
+
+/**
+ * 表里的 token 名清单。**故意放宽成 `string[]`**：反向哨兵要断言「某个 token 不在表里」，
+ * 而表的元素是字面联合 ⇒ 不收宽的话 `includes('…')` 在类型层就被判「无重叠」，运行期那条断言根本走不到
+ * （断言本身一字不改，只是别让类型系统提前短路）。
+ * @param {readonly { token: string }[]} table
+ * @returns {string[]}
+ */
+const tokenNames = table => table.map(entry => entry.token)
+
+/**
+ * 取 `rgba(r, g, b, a)` 的 alpha 分量。
+ * **取不到就断言失败**（不退回 `exec()[1]` 的 TypeError —— 那会把「色值格式漂了」误报成实现崩了）。
+ * @param {string} color
+ * @returns {number}
+ */
+const rgbaAlpha = color => {
+  const match = /,\s*([\d.]+)\)$/u.exec(color)
+  assert.ok(match, `不是可解析的 rgba() 色值：${color}`)
+  return Number(match[1])
+}
 
 describe('抬升面：本色单一来源', () => {
   it('底部辉光应该 就是「本色 @ 该轴共享 alpha」，不另立数值', () => {
@@ -225,7 +236,7 @@ describe('抬升面：rung 表', () => {
 })
 
 describe('抬升面：谁被染', () => {
-  const tokens = SURFACE_TOKENS.map(entry => entry.token)
+  const tokens = tokenNames(SURFACE_TOKENS)
 
   it('应该 覆盖「面」的三个 layer token', () => {
     for (const token of ['--dsw-alias-bg-layer-1', '--dsw-alias-bg-layer-2', '--dsw-alias-bg-layer-3']) {
@@ -239,6 +250,7 @@ describe('抬升面：谁被染', () => {
     // 归 `layer2`：官方把 input-major 与 layer-2 绑到同一个 static 变量（语义等价，染同档才不分叉）。
     assert.ok(tokens.includes('--dsw-specific-input-major'), '缺少 --dsw-specific-input-major —— 问询卡片会退回官方原色')
     const entry = SURFACE_TOKENS.find(e => e.token === '--dsw-specific-input-major')
+    assert.ok(entry, 'SURFACE_TOKENS 应含 --dsw-specific-input-major 那条')
     assert.equal(entry.rung, 'layer2', 'input-major 必须与 layer-2 同档（官方把两者绑在同一个 static 变量上）')
     // 逐色调验证两者**始终同值**，防止将来有人只改其中一个。
     // （`LIGHT_TONES` / `DARK_TONES` 是**对象**（id → ToneSpec），不是数组 —— 迭代用 `*_TONE_IDS`。）
@@ -287,7 +299,7 @@ describe('抬升面：谁被染', () => {
     // 不得与抬升面 / 菜单族重叠
     for (const { token } of INSET_TOKENS) {
       assert.ok(!tokens.includes(token), `${token} 不该同时在抬升面表里`)
-      assert.ok(!POPUP_TOKENS.some(e => e.token === token), `${token} 不该同时在菜单族里`)
+      assert.ok(!tokenNames(POPUP_TOKENS).includes(token), `${token} 不该同时在菜单族里`)
     }
     // 独立比例：必须与面板比例分开（目标相反）
     assert.notEqual(INSET_TINT.light, PANEL_TINT.light, '内嵌面比例必须与面板比例分开')
@@ -470,8 +482,7 @@ describe('抬升面：不变量', () => {
           `${token}.${scheme} 应是带 alpha 的 rgba 字面量`,
         )
         assert.ok(
-          Number(/,\s*([\d.]+)\)$/u.exec(overrides[token][scheme])[1])
-            === Number(/,\s*([\d.]+)\)$/u.exec(official[scheme])[1]),
+          rgbaAlpha(overrides[token][scheme]) === rgbaAlpha(official[scheme]),
           `${token}.${scheme} 的 alpha 必须等于官方值`,
         )
       }
@@ -745,7 +756,7 @@ describe('抬升面：交互态（选中 / hover / 按钮面）', () => {
   })
 
   it('应该 覆盖 owner 指着的那几处（导航选中 / 导航 hover / 模块面板 / 按钮面）', () => {
-    const tokens = STATE_TOKENS.map(entry => entry.token)
+    const tokens = tokenNames(STATE_TOKENS)
     for (const token of [
       '--dsw-specific-sidebar-nav-item-active',
       '--dsw-specific-sidebar-nav-item-hover',
@@ -758,7 +769,7 @@ describe('抬升面：交互态（选中 / hover / 按钮面）', () => {
   })
 
   it('不应该 染语义色（危险 / 品牌主按钮 / 成功错误警告 / 遮罩 / 代码块）', () => {
-    const tokens = [...STATE_TOKENS.map(e => e.token), ...WASH_TOKENS.map(e => e.token)]
+    const tokens = [...tokenNames(STATE_TOKENS), ...tokenNames(WASH_TOKENS)]
     for (const token of [
       '--dsw-alias-interactive-bg-hover-danger',
       '--dsw-alias-button-primary-fill',
@@ -901,7 +912,9 @@ describe('抬升面：框内元素（描边 / 分隔线 / 滚动条）', () => {
 
   it('描边应该 被本色推动，且仍然淡到只是一条线', () => {
     const overrides = tokenOverrides({ lightTone: 'official', darkTone: 'violet' })
-    assert.notEqual(overrides['--dsw-alias-border-l4'].dark, BORDER_TOKENS.at(-1).official.dark, '深轴最重那条描边应被紫推走')
+    const heaviest = BORDER_TOKENS.at(-1)
+    assert.ok(heaviest, 'BORDER_TOKENS 不得为空（最重那条 = l4）')
+    assert.notEqual(overrides['--dsw-alias-border-l4'].dark, heaviest.official.dark, '深轴最重那条描边应被紫推走')
     for (const { token } of BORDER_TOKENS) {
       assert.ok(Number(alphaOf(overrides[token].dark)) <= 0.2, `${token} 的 alpha 不该被抬高`)
     }
@@ -1461,6 +1474,7 @@ describe('抬升面：表面绘制', () => {
 
   it('listbox 锚点应该 排除 @ 菜单内部的视口（那一层已经被 data-trigger-menu 画过了）', () => {
     const listbox = SURFACE_ANCHORS.find(anchor => anchor.startsWith("body [role='listbox']"))
+    assert.ok(listbox, "SURFACE_ANCHORS 应含 body [role='listbox'] 那条")
     assert.ok(listbox.includes(':not([data-trigger-menu] *)'), '不排除就会在同一处叠两层渐变')
   })
 
@@ -1510,10 +1524,13 @@ describe('抬升面：表面绘制', () => {
     // wrapper 是整列的方框、没有圆角 —— 画在它上面会在圆角外露出直角。
     const queue = COMPOSER_CARD_ANCHORS.find(a => a.includes('data-queue-dock'))
     const goal = COMPOSER_CARD_ANCHORS.find(a => a.includes('data-goal-bar'))
+    assert.ok(queue, 'COMPOSER_CARD_ANCHORS 应含 data-queue-dock 那条')
+    assert.ok(goal, 'COMPOSER_CARD_ANCHORS 应含 data-goal-bar 那条')
     assert.ok(queue.endsWith('> :first-child'), 'QueueDock 要画在 .panel（wrapper 的第一个子元素）上')
     assert.ok(goal.endsWith('> :first-child'), 'GoalBar 要画在 .bar 上')
     // TodoPanel 的根元素自己就带底色与圆角，直接锚它，不要加 > :first-child
     const todo = COMPOSER_CARD_ANCHORS.find(a => a.includes('todo-panel'))
+    assert.ok(todo, 'COMPOSER_CARD_ANCHORS 应含 todo-panel 那条')
     assert.ok(!todo.includes('>'), 'TodoPanel 的底色在根元素上')
     // 不得用 hashed 类名（本插件红线）
     for (const anchor of COMPOSER_CARD_ANCHORS) {

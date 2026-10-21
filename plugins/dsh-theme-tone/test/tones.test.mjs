@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
@@ -22,6 +23,18 @@ import { en, zh } from '../lib/client/locales.js'
 const ALL_TONE_IDS = [...toneIdsFor('light'), ...toneIdsFor('dark')].filter(
   (id, index, list) => list.indexOf(id) === index,
 )
+
+/**
+ * 取 `rgba(r, g, b, a)` 的 alpha 分量。
+ * **取不到就断言失败**（不退回 `exec()[1]` 的 TypeError —— 那会把「色值格式漂了」误报成实现崩了）。
+ * @param {string} rgba
+ * @returns {number}
+ */
+const alphaOf = rgba => {
+  const match = /,\s*([\d.]+)\)$/u.exec(rgba)
+  assert.ok(match, `不是可解析的 rgba() 色值：${rgba}`)
+  return Number(match[1])
+}
 
 describe('色调表', () => {
   it('两轴都应该 含官方默认，且 id 顺序与 toneIdsFor 一致', () => {
@@ -295,19 +308,16 @@ describe('色调表', () => {
       }
     }
     // 底部 α = 共享常量（与色卡对齐，见 PREVIEW_ALPHA_SCALE）
-    const alpha = rgba => Number(/,\s*([\d.]+)\)$/u.exec(rgba)[1])
-    assert.equal(alpha(LIGHT_TONES.blue.bottom), DEPTH_ALPHA.light)
-    assert.ok(alpha(DARK_TONES.violet.top) < 0.15)
+    assert.equal(alphaOf(LIGHT_TONES.blue.bottom), DEPTH_ALPHA.light)
+    assert.ok(alphaOf(DARK_TONES.violet.top) < 0.15)
   })
 
   it('浅色轴的光层 α 应该 与深色轴同构（上 / 侧 / 底各一档，且底部守住共享常量）', () => {
-    /** rgba 的 alpha。 */
-    const alpha = rgba => Number(/,\s*([\d.]+)\)$/u.exec(rgba)[1])
     // 现在要守的是**结构**：三层各给一档 alpha，底部与 DEPTH_ALPHA 对齐。
-    assert.equal(alpha(LIGHT_TONES.blue.bottom), DEPTH_ALPHA.light, '底部 α 应与共享常量一致')
-    assert.equal(alpha(LIGHT_TONES.blue.top), LIGHT_GLOW_ALPHA.top, '顶部 α 应取自共享档')
-    assert.equal(alpha(LIGHT_TONES.blue.left), LIGHT_GLOW_ALPHA.left, '侧光 α 应取自共享档')
-    assert.ok(alpha(DARK_TONES.violet.top) < 0.15)
+    assert.equal(alphaOf(LIGHT_TONES.blue.bottom), DEPTH_ALPHA.light, '底部 α 应与共享常量一致')
+    assert.equal(alphaOf(LIGHT_TONES.blue.top), LIGHT_GLOW_ALPHA.top, '顶部 α 应取自共享档')
+    assert.equal(alphaOf(LIGHT_TONES.blue.left), LIGHT_GLOW_ALPHA.left, '侧光 α 应取自共享档')
+    assert.ok(alphaOf(DARK_TONES.violet.top) < 0.15)
   })
 
   it('官方默认应该 引用官方变量而不是硬编码色值，且不画染色', () => {
@@ -324,8 +334,6 @@ describe('色调表', () => {
   it('深空款应该 守住 pyai.site 的色相值（alpha 已按 owner 决定上调一档）', () => {
     /** 取 rgba 的前三通道，返回 "r,g,b"。 */
     const rgbOf = rgba => [...rgba.matchAll(/\d+/gu)].slice(0, 3).map(n => n[0]).join(',')
-    /** 取 rgba 的 alpha。 */
-    const alphaOf = rgba => Number(/,\s*([\d.]+)\)$/u.exec(rgba)[1])
     // 色相 / 底色仍是 pyai.site 原值（global.css:57、SpaceBackdrop.astro:29-39）
     assert.equal(DARK_TONES.violet.base, '#0a0a10')
     assert.equal(rgbOf(DARK_TONES.violet.top), '232,162,74')

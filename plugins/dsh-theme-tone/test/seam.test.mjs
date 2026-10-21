@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { buildSeamCss, SEAM_NOTCH_PX } from '../lib/glass.js'

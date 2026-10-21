@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { isDashedRing, isWorkstartProbe, rendersContent } from '../lib/workstart.js'

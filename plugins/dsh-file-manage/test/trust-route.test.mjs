@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { apply } from '../lib/host.js'
@@ -17,7 +18,7 @@ import { apply } from '../lib/host.js'
 
 /**
  * 用最小 mock ctx 跑真实 apply，拿回注册的 prefix handler。
- * @param webStartup - mock 的官方 `webStartup` 服务值（栅栏的额外信任面）；默认无该服务。
+ * @param {{ trustedHosts?: unknown }} [webStartup] - mock 的官方 `webStartup` 服务值（栅栏的额外信任面）；默认无该服务。
  */
 async function buildHarness(webStartup = undefined) {
   let handler = null
@@ -34,8 +35,14 @@ async function buildHarness(webStartup = undefined) {
   return { warnings, get handler() { return handler } }
 }
 
-/** 最小 req/res（handler 只用到 headers / method / url）。 */
-async function request(handler, url, { method = 'GET', headers = { host: '127.0.0.1:3080' } } = {}) {
+/**
+ * 最小 req/res（handler 只用到 headers / method / url）。
+ * @param {(...args: any[]) => any} handler - `apply` 注册的 prefix handler。
+ * @param {string} url - 请求路径（含查询串）。
+ * @param {{ method?: string, headers?: Record<string, string> }} [init] - 请求方法与请求头。
+ */
+async function request(handler, url, init = {}) {
+  const { method = 'GET', headers = { host: '127.0.0.1:3080' } } = init
   let statusCode = 0
   const chunks = []
   const res = {

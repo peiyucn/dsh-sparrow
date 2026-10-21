@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { effortName, factsFromEntries, parseModelConfig, toDiscovered } from '../lib/catalog.js'
@@ -157,7 +158,8 @@ describe('declaredEfforts：档位按官方 rank 升序（B）', () => {
       account: () => undefined,
       streamIdleTimeoutMs: 1_000,
     })
-    const info = await adapter.resolveModel('codebuddy-credits', 'm')
+    const info = /** @type {import('@deepseek-ai/dsh-llm').LlmResolvedModelInfo} */ (await adapter.resolveModel('codebuddy-credits', 'm'))
+    assert.ok(info.reasoning, '有推理能力的模型必须带 reasoning 档位（否则选择器无档可选）')
     assert.deepEqual(
       info.reasoning.efforts.map(effort => effort.id),
       ['minimal', 'high', 'max'],

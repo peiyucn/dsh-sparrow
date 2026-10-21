@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -63,11 +64,18 @@ const childHeader = (id, rootId) => header(id, { parentSession: rootId, origin: 
 /**
  * 用最小 mock ctx 跑真实 `apply`，拿回注册的 prefix handler。
  *
- * @param options.headers - `sessionPersistence.list()` 返回的 header 列表。
- * @param options.dirs - 会话 id → 磁盘目录（`locate` 的 path 落在该目录下）。
- * @param options.archivedIds - 归档集内容（含根会话即视为「已归档」）。
- * @param options.titles - 会话 id → 标题（`readTitleSnapshots` 的返回值）。
- * @param options.trashRoot - 回收站根目录。
+ * options：`headers` = `sessionPersistence.list()` 返回的 header 列表；`dirs` = 会话 id →
+ * 磁盘目录（`locate` 的 path 落在该目录下）；`archivedIds` = 归档集内容（含根会话即视为
+ * 「已归档」）；`titles` = 会话 id → 标题（`readTitleSnapshots` 的返回值）；
+ * `trashRoot` = 回收站根目录。
+ *
+ * @param {{
+ *   headers: any[],
+ *   dirs: Map<string, string>,
+ *   archivedIds: string[],
+ *   titles: Map<string, string>,
+ *   trashRoot: string,
+ * }} options
  */
 async function buildHarness({ headers, dirs, archivedIds, titles, trashRoot }) {
   let route = null
@@ -131,7 +139,12 @@ async function buildHarness({ headers, dirs, archivedIds, titles, trashRoot }) {
   return harness
 }
 
-/** 最小 req（handler 用到 headers / method / url，POST 还要能 async-iterate 出 body）。 */
+/**
+ * 最小 req（handler 用到 headers / method / url，POST 还要能 async-iterate 出 body）。
+ *
+ * @param {string} url
+ * @param {{ method?: string, headers?: Record<string, string>, body?: string }} [options]
+ */
 function makeRequest(url, { method = 'GET', headers = { host: '127.0.0.1:3080' }, body } = {}) {
   return {
     method,
@@ -157,7 +170,13 @@ function makeResponse() {
   return { res, status: () => statusCode, text: () => chunks.join('') }
 }
 
-/** 走一次真实 handler，回状态码与解析后的响应体。 */
+/**
+ * 走一次真实 handler，回状态码与解析后的响应体。
+ *
+ * @param {any} handler
+ * @param {string} url
+ * @param {{ method?: string, headers?: Record<string, string>, body?: string }} [options]
+ */
 async function request(handler, url, options = {}) {
   const { res, status, text } = makeResponse()
   await handler(makeRequest(url, options), res)

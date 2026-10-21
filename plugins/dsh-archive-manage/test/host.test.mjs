@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { resolve, sep } from 'node:path'
@@ -274,6 +275,11 @@ describe('archive-manage host 纯逻辑', () => {
   // 官方 projectMany 每次调用都要重跑一遍全量 listPersisted，逐 id 单条调用是 O(m·K)。
   describe('titlesFor 批量折叠', () => {
     const titleHeader = (id) => ({ id, createdAt: 1, isSeeded: false })
+    /**
+     * 标题兜底的最小 ctx 桩：`cacheRow` 只在「缓存命中」档用，可能缺省。
+     *
+     * @param {{ readTitleSnapshots: (ids: any[]) => Promise<any[]>, cacheRow?: any }} spec
+     */
     const titlesCtx = ({ readTitleSnapshots, cacheRow }) => ({
       sessions: { get: () => undefined },
       sessionQuery: { readTitleSnapshots },
@@ -469,6 +475,19 @@ describe('archive-manage host 纯逻辑', () => {
       return function cachedSnapshotRc2(meta, keys) { return viewWithKeys(row, keys) }
     }
 
+    /**
+     * 子会话标签三档读链的最小 ctx 桩。三档的输入互斥地出现在不同用例里
+     * （live 快照 / 缓存行 / 日志折叠），故三者都可缺省。
+     *
+     * @param {{
+     *   live?: any,
+     *   cacheRow?: any,
+     *   cacheThrows?: boolean,
+     *   cacheSignature?: 'rc2' | 'legacy',
+     *   observe?: any,
+     *   observeThrows?: boolean,
+     * }} spec
+     */
     const labelCtx = ({ live, cacheRow, cacheThrows = false, cacheSignature = 'rc2', observe, observeThrows = false }) => ({
       sessions: { get: () => live },
       get: (name) => {

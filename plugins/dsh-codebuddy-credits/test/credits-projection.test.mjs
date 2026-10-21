@@ -1,9 +1,9 @@
+// @ts-check
 /** 会话积分投影单测：注册表按事件驱动，「无关事件返回同一引用」与「状态须无损 JSON」是宿主实际校验的硬约束。 */
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  applyCreditsEvent,
   codebuddyCreditsProjectionDefinition as def,
   creditsProjectionStateSchema,
   emptyCreditsState,
@@ -48,7 +48,10 @@ test('init 返回空状态，且每次调用互不共享可变对象', () => {
   const a = def.init()
   const b = def.init()
   assert.deepEqual(a, { credit: 0, calls: 0, byModel: [], byTurn: {} })
-  a.byModel.push({ model: 'x', credit: 1, calls: 1 })
+  // lib/ 是 checkJs:false 的构建产物：init() 的空数组被推断成 never[]，而这里只验证
+  // 「a 与 b 不共享同一个数组」，故按 unknown[] 塞一个元素进去。
+  const mutableByModel = /** @type {unknown[]} */ (a.byModel)
+  mutableByModel.push({ model: 'x', credit: 1, calls: 1 })
   assert.deepEqual(b.byModel, [], 'init 的返回值不得共享可变状态')
 })
 

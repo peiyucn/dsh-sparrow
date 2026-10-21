@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { DeepSeekFilesClient, PUBLIC_BASE_URL } from '@deepseek-ai/dsh-llm-deepseek'
@@ -30,7 +31,8 @@ function capture(baseURL) {
       urls.push(`${method} ${String(url)}`)
       headers.push(Object.fromEntries(new Headers(init?.headers).entries()))
       if (method === 'DELETE') {
-        return json({ id: decodeURIComponent(String(url).split('/').pop()), type: 'file_deleted' })
+        // 路径最后一段就是文件 id；stub 里 URL 必带该段，缺失时回退空串（真 client 不会这么请求）。
+        return json({ id: decodeURIComponent(String(url).split('/').pop() ?? ''), type: 'file_deleted' })
       }
       return json({ data: [], has_more: false })
     },
@@ -53,7 +55,8 @@ describe('dsh-file-manage 端点（我方构造 + 官方归一化）', () => {
     assert.equal(baseURL, PUBLIC_BASE_URL)
     const { client, urls, headers } = capture(baseURL)
     await client.list({ limit: 20 })
-    await client.delete('file-api-x')
+    // 官方 delete 参数是 branded 的 `DeepSeekFileIdType`（运行期就是字符串），测试里用 JSDoc 断言构造假 id。
+    await client.delete(/** @type {import('@deepseek-ai/dsh-llm-deepseek').DeepSeekFileIdType} */ ('file-api-x'))
     assert.deepEqual(urls, [
       'GET https://api.deepseek.com/anthropic/v1/files?limit=20',
       'DELETE https://api.deepseek.com/anthropic/v1/files/file-api-x',

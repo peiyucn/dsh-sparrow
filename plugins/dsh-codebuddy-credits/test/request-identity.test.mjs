@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * 钉的契约：UA 必须同时含 `CLI/` 记号与 `CodeBuddy/<版本>` 段，`x-ide-name` 如实为本插件名。
  * 缺 `CLI/` 记号时服务端返回 200 却省略 `data.models`（插件侧只表现为模型目录为空）。

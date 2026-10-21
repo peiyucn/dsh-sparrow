@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
@@ -30,8 +31,8 @@ import {
 /** 浅色轴暗边用的官方最深静态色 token。 */
 const SHADE_TOKEN = '--dsw-static-neutral-bluish-1000'
 import { ANCHOR, anchorSelector } from '../lib/anchors.js'
-import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_TILE_VARIABLE, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_NOTCH_ATTR, PHASE_BAND_VARIABLE, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, SIDE_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
-import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, compensatedBackdropGradients, dimmedBackdropGradients } from '../lib/backdrop.js'
+import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_TILE_VARIABLE, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_NOTCH_ATTR, PHASE_BAND_VARIABLE, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
+import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, dimmedBackdropGradients } from '../lib/backdrop.js'
 
 /** 官方 GuideBody 根的属性（`GuideBody.tsx:80`）—— 只在右栏「开始」页出现，故可作状态锚点。 */
 const GUIDE_ATTR = '[data-sidebar-right-guide]'
@@ -41,6 +42,15 @@ const GUIDE_ATTR = '[data-sidebar-right-guide]'
  * 补偿后的玻璃面应当是它的 **2 倍**；断言比的是渲染出的 CSS 层数，把补偿改成退化单层必然红。
  */
 const LIGHT_LAYERS = (dimmedBackdropGradients(1).match(/radial-gradient\(/gu) ?? []).length
+
+/**
+ * 环上的 `key` 清单。**故意放宽成 `string[]`**：反向哨兵要断言「某个不该有的 key 不在环里」，
+ * 而环元素是字面联合 ⇒ 不收宽的话 `includes('left')` / `key === 'left'` 在类型层就被判「无重叠」，
+ * 运行期那条断言根本走不到（断言本身不削弱，只是让类型系统别提前短路）。
+ * @param {readonly { key: string }[]} ring
+ * @returns {string[]}
+ */
+const keysOf = ring => ring.map(entry => entry.key)
 
 const css = buildGlassCss()
 // 注释里也会出现 `{` 这类结构字符，对全文做结构断言会误判，故先剥注释。
@@ -598,7 +608,12 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
       `上缘柔化带 ${GLASS_EDGE_TOP.ry} 低于 0.03 —— 可见带只剩 ≤2px，会读成描边（owner 第①轮否过）`,
     )
     // 衰减停止点要留出过渡带（不是硬停止）
-    for (const [name, edge] of [['上缘', GLASS_EDGE_TOP], ['左缘', GLASS_EDGE_LEFT]]) {
+    /**
+     * 两条边光。`stop` 是两个对象共有的字段；不注成结构化类型的话，字面联合会把 `.stop` 判成不存在。
+     * @type {[string, { rx: number, ry: number, alpha: number, stop: number }][]}
+     */
+    const edges = [['上缘', GLASS_EDGE_TOP], ['左缘', GLASS_EDGE_LEFT]]
+    for (const [name, edge] of edges) {
       assert.ok(edge.stop >= 0.4 && edge.stop <= 0.9, `${name} 的衰减停止点 ${edge.stop} 应留出柔和过渡带`)
     }
   })
@@ -638,8 +653,8 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     // ⚠️ **光分两层**：`background-image` 的椭圆是**主光**（上缘 + 左缘），`inset` 环只是**底光**（上 / 下）。
     // 背光侧壁处在**自己的阴影**里（比背景更暗），那一侧不该有高光 —— 所以「左缘有光」要去**渐变层**里查，
     // 不能只查 ring（曾把左缘从 ring 撤掉后，这条断言就误报了）。
-    const shade = GLASS_SHADE_RING.map(e => e.key)
-    const ringLits = GLASS_SPECULAR_RING.map(e => e.key)
+    const shade = keysOf(GLASS_SHADE_RING)
+    const ringLits = keysOf(GLASS_SPECULAR_RING)
 
     // ① 右缘绝不能有任何高光（它是阴影）
     assert.ok(!ringLits.includes('right'), '右缘不该在底光里')
@@ -668,7 +683,7 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     assert.ok(GLASS_EDGE_LEFT.rx <= 0.03, `左缘横向半径 ${GLASS_EDGE_LEFT.rx} 太大 —— 会糊成一片`)
     // ③ **左缘不得再有 inset 底光** —— 与渐变层叠加会把收窄的左缘又拉宽回去
     assert.ok(
-      !GLASS_SPECULAR_RING.some(e => e.key === 'left'),
+      !keysOf(GLASS_SPECULAR_RING).includes('left'),
       '左边只能由渐变层负责，不能在 inset 环里再写一条（叠加会变宽）',
     )
     // ④ 左上角两层叠加不能过亮（叠加公式：1−(1−a)(1−b)）
@@ -678,11 +693,11 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
 
   it('不要照抄 iPhone 的**对称**（那是正上方光，我们是左上方）', () => {
     // 必须左右**不对称**（iPhone 是左右对称的）：左侧有光而右侧是阴影，否则光源方向就丢了。
-    const shade = GLASS_SHADE_RING.map(e => e.key)
+    const shade = keysOf(GLASS_SHADE_RING)
     assert.ok(GLASS_EDGE_LEFT.alpha > 0, '左缘有光（渐变层）')
     assert.ok(shade.includes('right'), '右缘是阴影')
     assert.ok(!shade.includes('left'), '左缘是迎光侧，不该有阴影')
-    assert.ok(!GLASS_SPECULAR_RING.some(e => e.key === 'right'), '右缘不该在底光里 —— 否则与左缘对称了')
+    assert.ok(!keysOf(GLASS_SPECULAR_RING).includes('right'), '右缘不该在底光里 —— 否则与左缘对称了')
   })
 
 

@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * dsh-theme-tone：拖拽条悬停光带跟随指针（自 `dsh-nav-pin` 并入，见 `docs/spec/09-nav-pin-merge.md`）。
  * ⚠️ 与原版的**实质差异**：本条**不带色调门**、两个档位都生效，故新增两类守卫：

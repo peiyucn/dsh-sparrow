@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { PROVIDER_ID, getModelFacts, subscribeModelFacts, syncModelFacts } from '../lib/client/model-facts.js'

@@ -88,6 +88,20 @@ if (runBuild) {
 }
 
 if (runTest) {
+  // 测试侧类型检查：必须在 build 之后（测试 import 的是 lib/ 产物）。
+  // 配置在 tsconfig.test.json（checkJs: false + 每个文件 `// @ts-check` 逐文件开启：
+  // 开全局 checkJs 会把 lib/*.js 构建产物一并检查，噪声 100+ 条）。
+  const testTsconfig = join(cwd, 'tsconfig.test.json')
+  if (existsSync(testTsconfig)) {
+    console.log(`verify: typecheck test ${cwd}`)
+    const testTypecheck = spawnSync(process.execPath, [tsc, '-p', testTsconfig], {
+      cwd,
+      stdio: 'inherit',
+      shell: false,
+    })
+    if (testTypecheck.status !== 0) process.exit(testTypecheck.status ?? 1)
+  }
+
   console.log('verify: node:test')
   // 注意：--test 的第一个位置参数起，后续 token 都会被当作测试模式，
   // reporter 参数必须放在 glob 前面（放后面会被静默吞掉，junit.xml 不产出）。

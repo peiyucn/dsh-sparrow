@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * 域名收敛守卫：规范域名是官方文档使用的国际通用入口 copilot.tencent.com，端点常量一律从
  * `CODEBUDDY_ORIGIN` 派生；`www.codebuddy.cn` 是同一套服务的未文档化区域别名，代码里不得再出现。

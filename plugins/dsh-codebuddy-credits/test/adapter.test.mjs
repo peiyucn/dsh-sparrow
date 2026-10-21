@@ -1,7 +1,12 @@
+// @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { CodeBuddyAdapter, effectiveReasoningEffort, mapFinish, mapUsage, parseSseLine, toWireMessages, toWireTools } from '../lib/adapter.js'
 import { BASE_URL } from '../lib/constants.js'
+
+/** Node 原生 fetch 存档：每个用例把 `globalThis.fetch` 换成桩，结束必须还原——写成 `undefined` 既
+ *  不符合 `typeof fetch` 的类型契约，也会把宿主全局真的抹掉。 */
+const originalFetch = globalThis.fetch
 
 describe('toWireTools', () => {
   it('DSH 工具 schema 包成 OpenAI function 信封（name/description/parameters 原位）', () => {
@@ -201,7 +206,7 @@ describe('CodeBuddyAdapter.stream', () => {
     ]
     const sse = frames.map(frame => 'data: ' + JSON.stringify(frame) + '\n\n').join('') + 'data: [DONE]\n\n'
 
-    let requestBody
+    /** @type {any} */ let requestBody
     globalThis.fetch = async (url, init) => {
       assert.equal(String(url), `${BASE_URL}/chat/completions`)
       requestBody = JSON.parse(init.body)
@@ -214,6 +219,10 @@ describe('CodeBuddyAdapter.stream', () => {
       account: () => undefined,
       streamIdleTimeoutMs: 10_000,
     })
+    // lib/ 是 checkJs:false 的构建产物：stream() 的返回类型由 JS 实现推断，块上的字面量
+    // discriminant（type）退化成 string，按 type 收窄失效（find / filter 之后拿到的仍是整条
+    // 联合）。这里按运行期形状收集，下面的断言只关心具体字段。
+    /** @type {any[]} */
     const chunks = []
     try {
       for await (const chunk of adapter.stream({
@@ -225,7 +234,7 @@ describe('CodeBuddyAdapter.stream', () => {
         chunks.push(chunk)
       }
     } finally {
-      globalThis.fetch = undefined
+      globalThis.fetch = originalFetch
     }
 
     assert.deepEqual(requestBody.tools, [{
@@ -281,7 +290,7 @@ describe('CodeBuddyAdapter.stream', () => {
         chunks.push(chunk)
       }
     } finally {
-      globalThis.fetch = undefined
+      globalThis.fetch = originalFetch
     }
     assert.equal(usages.length, 1)
     assert.equal(usages[0].credit, 0.01)
@@ -316,7 +325,7 @@ describe('CodeBuddyAdapter.stream', () => {
         chunks.push(chunk)
       }
     } finally {
-      globalThis.fetch = undefined
+      globalThis.fetch = originalFetch
     }
     assert.equal(usages.length, 1)
     assert.equal(usages[0].credit, 0.02)
@@ -354,7 +363,7 @@ describe('CodeBuddyAdapter Max 模式请求构造', () => {
   ].join('')
 
   async function captureBody({ maxMode, modelReasoning, effort }) {
-    let requestBody
+    /** @type {any} */ let requestBody
     globalThis.fetch = async (url, init) => {
       requestBody = JSON.parse(init.body)
       return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } })
@@ -379,7 +388,7 @@ describe('CodeBuddyAdapter Max 模式请求构造', () => {
         void chunk
       }
     } finally {
-      globalThis.fetch = undefined
+      globalThis.fetch = originalFetch
     }
     return requestBody
   }
