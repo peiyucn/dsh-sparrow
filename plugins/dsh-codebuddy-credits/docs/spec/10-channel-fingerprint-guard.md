@@ -73,16 +73,53 @@ DSH 真实 system 里**不存在**这两句，故本次不处理（见「维护�
 - 处理后该行以 `When the user refers to …` 开头；实测完整真实 system 返回 **200**（流式正常）。
 - 不动第 2 句及其后的内容：上游只拦「第 1 句 + 第 2 句」这个组合，删第 1 句即拆掉组合。
 
+## 第三波（2026-10-21 晚 · assistant 历史里的 Main branch）
+
+第二波修好后，**新会话**能正常推理；但**已有较长历史的会话**（本机这个排障会话）仍然 11128。
+用会话日志把失败请求原样重建（真实 system + 300 条历史 + 50 个工具定义）后逐项重放：
+
+- 只发 system → 200；system + 工具定义 → 200；**system + 完整历史 → 400 / 11128** ⇒ 触发点在历史里。
+- 按 user 消息边界做安全二分（避免切断 tool_call / tool 结构）：第一个失败前缀停在一条
+  **assistant** 消息上；再对该消息的 wire 文本做前缀二分，最小触发片段正是
+  `Main branch (you will usually use this for PRs)`——它出现在 markdown 表格里（**行中段**）。
+
+### 位置与角色矩阵（小请求实测）
+
+| 用例 | 结果 |
+| :--- | :--- |
+| assistant 行首 `Main branch (…)` | 400 / 11128 |
+| assistant **行中段** `Main branch (…)` | 400 / 11128（**位置无关**） |
+| assistant 行首 `You are Claude Code, Anthropic's official CLI for Claude` | 400 / 11128 |
+| assistant 行中段 `You are Claude Code …` | 200（**行首锚定**） |
+| assistant 行中段 身份句 | 200（行首锚定） |
+| assistant 行中段 Web GUI 单句 | 200 |
+| assistant **行中段 Web GUI 首句 + `When the user refers to "this page"`** | 400（**组合位置无关**） |
+| user 正文里同一句 | 200（不扫） |
+| tool 结果里同一句（结构合法） | 200（不扫） |
+| tool_calls 参数里同一句 | 200（不扫） |
+
+⇒ 上游只扫 **system / assistant 正文**；assistant 历史同样受约束。指纹有两种形态：
+**行首锚定**（身份句、Claude Code 句）与**位置无关**（Main branch、Web GUI 组合）。
+旧实现只做行首匹配，所以行中段的 `Main branch` 漏网——长历史会话里模型自己引用过它，整轮就 400。
+
+### 处理方式（第三波）
+
+- 指纹表拆成两档：`FINGERPRINT_LINE_PREFIXES`（行首锚定，删句首句）与
+  `FINGERPRINT_ANYWHERE`（位置无关，删出现处）。Web GUI 首句从行首档挪到位置无关档
+  （它的触发组合可以出现在行中段）。
+- 位置无关删除只删指纹本身，不额外改写上下文（可能留下多余空格；上游不关心排版）。
+- **仍然只动 system / assistant**：user / tool / tool_calls / reasoning 实测放行，不动。
+- 用「真实失败会话」重建请求复测：修复前 400/11128 → 修复后 **200**（流式正常）。
 
 ## 处理方式（实现）
 
-- 新模块 `src/fingerprints.ts`：`stripChannelFingerprints(text)` 纯函数，**删掉命中的指纹句**、
-  其余内容逐字保留（整行只有指纹句时才整行丢弃）；未命中时返回原字符串引用；幂等；CRLF 行尾不变。
-  当前指纹表两条：第一波的身份句、第二波的 Web 端运行时上下文行首句（见上节）。
+- 新模块 `src/fingerprints.ts`：`stripChannelFingerprints(text)` 纯函数，删掉命中的指纹
+  （行首档删句首句、位置无关档删出现处），其余内容逐字保留；未命中时返回原字符串；幂等；CRLF 行尾不变。
+  当前指纹表：行首档 = 身份句、Claude Code 句；位置无关档 = Main branch、Web GUI 首句。
 - 接线点（`src/adapter.ts` `toWireMessages`）：
-  - `options.system` → 删指纹行；删空则不发 system 消息；
+  - `options.system` → 删指纹；删空则不发 system 消息；
   - 历史上的 `system` 角色消息 → 同样处理；
-  - `assistant` 正文 → 同样处理（救「历史里复述过该句」的旧会话）；
+  - `assistant` 正文 → 同样处理（历史里复述过 / 引用过指纹同样整轮拦）；
   - **不动** `user` / `tool` 结果 / `tool_calls[].arguments` / `reasoning`（实测放行，
     改了就是篡改用户内容与会话证据）。
 - 选「删除」而不是「插 the / 零宽」：改动最少，不依赖上游是否做 Unicode 归一化；
@@ -92,23 +129,25 @@ DSH 真实 system 里**不存在**这两句，故本次不处理（见「维护�
 
 ## 测试
 
-`test/fingerprints.test.mjs`：删行/大小写/行首锚定/行中段不命中/幂等/CRLF/空串，以及
+`test/fingerprints.test.mjs`：行首/位置无关两档、大小写、CRLF、空串、幂等，以及
 `toWireMessages` 的范围守卫（system 与 assistant 处理、user 与 tool 原样、tool_calls 参数不动、
-system 只剩指纹时不再发空 system）。第二波补充：Web GUI 行只删首句、其余指令保留、大小写不敏感、
-行中段不命中、两条指纹同文同时生效、该行只剩指纹句时整行丢弃、wire 侧同样生效。
+system 只剩指纹时不再发空 system）。第二波补充：Web GUI 行只删首句、其余指令保留。第三波补充：
+Main branch 行中段删除、Claude Code 行中段不删、assistant 历史里的 Main branch 删除。
 
 ## 风险与维护（必须如实记录）
 
 1. **上游黑名单会继续扩张**：这是与上游风控的长期拉锯，不是一次性修复。新指纹出现时往
-   `FINGERPRINT_LINE_PREFIXES` 补一条正则 + 补测试；补完必须用**真实 system 提示词**实测一次推理
-   （不能只看 HTTP 状态码或单测）。
-2. **定位新指纹的方法（第二波教训）**：先「真实 system 原文 vs strip 后」复测，确认 strip 后又漏了；
-   再对真实 system **按行区间二分**找到命中行；**不要只逐句试**——跨句通配的指纹单句会全部放行，
-   要在命中行内试相邻句子组合与顺序；确认最小可删前缀后用完整真实 system 复测 200。
-3. **桌面端未实测**：本插件同时适配 dsh web / desktop。第二波指纹只出现在 Web 端的运行时上下文行，
-   桌面端是否有同形态的对应行**未验证**（本机只有 Web 会话的真实提示词）；若桌面端也报 11128，
-   按第 2 条方法抓桌面端真实 system 再补规则。
+   `FINGERPRINT_LINE_PREFIXES` / `FINGERPRINT_ANYWHERE` 补一条正则 + 补测试；补完必须用
+   **真实 system / assistant 文本**实测一次推理（不能只看 HTTP 状态码或单测）。
+2. **定位新指纹的方法（三波教训累积）**：
+   - 先确认「真实 system 原文 vs strip 后」是否仍 400（区分 system 漏网）；
+   - system 没问题就看历史：**先按角色分类**（本机实测 user / tool / tool_calls 放行，assistant 扫），
+     再把历史按 **user 消息边界**二分（直接按消息数切会切断 tool_call/tool 结构，得到的是 11148
+     「tool calls and tool results do not match」，不是内容指纹）；
+   - 锁定消息后，对它的 wire 文本做**前缀二分**找最小触发片段；最后用完整失败请求复测 200。
+3. **桌面端未实测**：本插件同时适配 dsh web / desktop。上述指纹均来自 Web 会话的真实提示词与历史，
+   桌面端是否有同形态内容**未验证**；若桌面端也报 11128，按第 2 条方法抓桌面端真实请求再补规则。
 4. **风险自担**：该处理是为绕开上游「未授权渠道」内容风控而删句；owner 已知悉并选择此方案。
    若上游把删除后的版本也纳入指纹，或改为语义检测，本改动即失效。
-5. **失效表现**：仍是 `400 / 11128`。看到该码先按本文方法复测真实 system，而不是先怀疑额度/封号。
+5. **失效表现**：仍是 `400 / 11128`。看到该码先按本文方法复测真实 system / assistant，而不是先怀疑额度/封号。
 6. **不扩大范围**：绝不改写 user 消息、工具结果与会话证据；否则会把排障污染带进用户会话。

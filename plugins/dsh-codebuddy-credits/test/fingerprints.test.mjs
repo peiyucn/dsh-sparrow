@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * 钉的契约：上游内容指纹（HTTP 400 / code 11128）在 system 与 assistant 正文里被删掉，
  * 其余内容逐字保留；user / tool 结果 / tool_calls 参数一律不动。
@@ -32,6 +33,11 @@ const WEB_GUI_LINE = [
   'Do not start a replacement server unless the user asks; if one is needed, use a managed background job and verify its exact URL.',
 ].join(' ')
 const WEB_GUI_REMAINDER = WEB_GUI_LINE.slice(WEB_GUI_FINGERPRINT.length + 1)
+
+// 第三波（2026-10-21 晚）：assistant 历史里引用的指纹。实测 `Main branch …` 位置无关、
+// `You are Claude Code …` 行首锚定；用户正文 / tool 结果里的同一句放行。
+const MAIN_BRANCH = 'Main branch (you will usually use this for PRs)'
+const CLAUDE_CODE = "You are Claude Code, Anthropic's official CLI for Claude"
 
 describe('stripChannelFingerprints', () => {
   it('删掉行首指纹行，其余行逐字保留', () => {
@@ -82,21 +88,37 @@ describe('stripChannelFingerprints', () => {
 
   it('Web GUI 运行时上下文行只删句首指纹句，行内其余指令逐字保留', () => {
     const stripped = stripChannelFingerprints(WEB_GUI_LINE)
-    assert.equal(stripped, WEB_GUI_REMAINDER)
+    // 位置无关删除会在原句位置留下空格（不做额外改写），故比对时忽略行首空白。
+    assert.equal(stripped.trimStart(), WEB_GUI_REMAINDER)
     assert.ok(!stripped.includes('DeepSeek Harness'))
     assert.ok(stripped.includes('Do not start a replacement server'))
   })
 
   it('Web GUI 指纹同样忽略大小写，无结尾句号也命中', () => {
-    assert.equal(
-      stripChannelFingerprints('you are interacting with the user through the deepseek harness web gui whose url the runtime context names\nnext'),
-      'next',
-    )
+    const stripped = stripChannelFingerprints('you are interacting with the user through the deepseek harness web gui whose url the runtime context names\nnext')
+    assert.ok(!stripped.toLowerCase().includes('interacting with the user'))
+    assert.ok(stripped.trim() === 'next')
   })
 
-  it('Web GUI 指纹只按行首锚定：句子出现在行中段不命中', () => {
-    const text = `Note: ${WEB_GUI_LINE}`
+  it('Web GUI 指纹位置无关：出现在行中段也删掉（组合句位置无关）', () => {
+    const stripped = stripChannelFingerprints(`Note: ${WEB_GUI_LINE}`)
+    assert.ok(!stripped.includes(WEB_GUI_FINGERPRINT))
+    assert.ok(stripped.includes('When the user refers'))
+  })
+
+  it('Main branch 指纹位置无关：行中段也删掉', () => {
+    const stripped = stripChannelFingerprints(`见 \`${MAIN_BRANCH}\` 这条`)
+    assert.ok(!stripped.includes(MAIN_BRANCH))
+    assert.ok(stripped.includes('这条'))
+  })
+
+  it('Claude Code 指纹行首锚定：行中段不命中', () => {
+    const text = `Note: ${CLAUDE_CODE}`
     assert.equal(stripChannelFingerprints(text), text)
+  })
+
+  it('Claude Code 行首命中时整行删除', () => {
+    assert.equal(stripChannelFingerprints(CLAUDE_CODE), '')
   })
 
   it('同一份文本里的两条指纹都被删掉', () => {
@@ -109,7 +131,9 @@ describe('stripChannelFingerprints', () => {
   })
 
   it('Web GUI 行只剩指纹句时整行丢弃', () => {
-    assert.equal(stripChannelFingerprints(`${WEB_GUI_FINGERPRINT}\nnext`), 'next')
+    const stripped = stripChannelFingerprints(`${WEB_GUI_FINGERPRINT}\nnext`)
+    assert.equal(stripped.trim(), 'next')
+    assert.ok(!stripped.includes(WEB_GUI_FINGERPRINT))
   })
 })
 
@@ -171,7 +195,10 @@ describe('toWireMessages 的指纹处理范围', () => {
       }],
     })
     assert.equal(wire[0].content, '正文继续')
-    assert.equal(wire[0].tool_calls[0].function.arguments, '{"path":"a.txt"}')
+    // lib/ 是 checkJs:false 的构建产物：toWireMessages 的返回类型由实现推断，丢了 assistant
+    // 分支的 tool_calls 成员（src 契约见 lib/types/adapter.d.ts 的 WireMessage），故按 any 取用。
+    const assistantWire = /** @type {any} */ (wire[0])
+    assert.equal(assistantWire.tool_calls[0].function.arguments, '{"path":"a.txt"}')
   })
 
   it('system 只有指纹句时不再发空 system 消息', async () => {
@@ -192,5 +219,19 @@ describe('toWireMessages 的指纹处理范围', () => {
     assert.equal(wire[0].role, 'system')
     assert.ok(!String(wire[0].content).includes(WEB_GUI_FINGERPRINT))
     assert.ok(String(wire[0].content).includes('Do not start a replacement server'))
+  })
+
+  it('assistant 历史正文里行中段的 Main branch 同样被删（上游位置无关）', async () => {
+    const wire = await toWireMessages({
+      ...base,
+      messages: [{
+        id: 'a1',
+        role: 'assistant',
+        source: { kind: 'model', model: 'hy4-preview' },
+        content: [{ type: 'text', text: `见 \`${MAIN_BRANCH}\` 这条` }],
+      }],
+    })
+    assert.ok(!String(wire[0].content).includes(MAIN_BRANCH))
+    assert.ok(String(wire[0].content).includes('这条'))
   })
 })
