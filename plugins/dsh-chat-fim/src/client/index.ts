@@ -170,7 +170,9 @@ export function apply(ctx: Context): void {
           },
         }
       },
-      adopt: (id: SessionId, text: string, span: TokenSpan): boolean =>
+      // `_sessionId` 是契约形参（`ChatFimDockInjected.adopt`），但 scope 已按会话闭包捕获，
+      // 实现里用不到它 —— 前缀下划线即 `noUnusedParameters` 认可的有意不用。
+      adopt: (_sessionId: SessionId, text: string, span: TokenSpan): boolean =>
         scope.bail(scope, 'slash/input-insert-text', { text, span }) === true,
     }
   }
