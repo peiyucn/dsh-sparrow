@@ -93,7 +93,41 @@ background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px;
 | 座底带 / 卡片缺口 | 已有**运行期相位**档（spec 10），已是 `scroll`；规则里的 `fixed` 是**慢档兜底**（相位测不到时用） |
 | 菜单分组行 | 盒子极扁，且只在菜单打开时存在 |
 
-## 6) 复现方式
+## 6) 本机量具的限制（必读，否则会得出错误结论）
+
+这台开发机的**渲染帧率被限制在约 2Hz**（`requestAnimationFrame` 间隔恒定 ~535ms，
+`visibilityState: 'visible'`、`hasFocus: true`、GPU 为 Intel Arc + D3D11 硬件加速均正常）。
+⇒ **任何「帧间隔 / 帧率 / 掉帧数」类指标在本机都不可用**，两臂测出来会「完全持平」，
+那不是「没有差异」，是量具没有分辨率。
+
+本专项因此只用两类判据：
+
+| 判据 | 为什么可信 |
+| :--- | :--- |
+| **逐像素截图比对** | 确定性、与调度无关；用来证明「无观感回退」 |
+| **产物静态结构计数**（去注释后数 `fixed` / `scroll` / 规则数 / 命中宿主数） | 确定性、可重复；用来证明「改到了什么」 |
+
+**不要**在本机报告「省了多少 ms / 帧率从 X 回到 Y」—— 已在 spec 10 §6 记过一次同类教训。
+
+## 7) 最终状态
+
+去注释后的产物统计（`glass` + `sweep` + `backdrop`）：
+
+| 项 | 改动前 | 改动后 |
+| :--- | ---: | ---: |
+| `background-attachment: fixed` | **13** | **2** |
+| `background-attachment: scroll` | 6 | 10 |
+
+剩下的 2 条是**有意保留**：
+
+1. **顶栏 `> header::before`**：它带 `backdrop-filter`，且必须让「76px 盒子不被重采样成硬边带」——
+   实测换成显式几何会有 **7.4% 像素差**（header 起于 x=280，而 `fixed` 让图片盒锚定视口），
+   故必须配运行期相位，暂不动。
+2. **座底不透带 `[data-composer-seat]::after`**：这是 `fixed` 的**慢档兜底**
+   —— 运行期相位门（`data-dsh-theme-tone-phase-band`）测到值时由 spec 10 那条 `scroll` 规则覆盖，
+   测不到才落回这一条（慢但一定正确）。
+
+## 8) 复现方式
 
 ```powershell
 # 需要 GUI 令牌（见 dsh web 启动日志里的 ?token=）
