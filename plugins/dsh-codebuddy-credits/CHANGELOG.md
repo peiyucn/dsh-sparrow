@@ -5,7 +5,8 @@ See [简体中文](./CHANGELOG.zh-CN.md).
 
 ## 0.2.1-rc.2.2 (2026-10-21)
 
-- Chat works again: a later upstream filter change no longer makes every request sent from the web app fail with an "unapproved channel" error.
+- Chat works again: requests sent from the web app no longer fail with an "unapproved channel" error after an upstream filter change.
+- Sessions that had already hit that error recover too — you can keep working in the same conversation instead of starting a new one.
 
 ## 0.2.1-rc.2.1 (2026-10-21)
 
