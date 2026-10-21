@@ -126,6 +126,17 @@ background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px;
 2. **座底不透带 `[data-composer-seat]::after`**：这是 `fixed` 的**慢档兜底**
    —— 运行期相位门（`data-dsh-theme-tone-phase-band`）测到值时由 spec 10 那条 `scroll` 规则覆盖，
    测不到才落回这一条（慢但一定正确）。
+3. **缝挡板 ×4**（`[data-testid='todo-panel'] ~ [data-goal-bar]::before`、
+   `:is(...) ~ [data-queue-dock]::before`、`[data-tone-anchor~='seat-docked'] … composer-host::before`、
+   `[data-tone-anchor~='composer-host']::after`）：
+   **实测不能裸换** —— 显式几何会带来 **1.1% 像素差 / 最大通道差 232**（比扫光带高两个数量级）。
+   原因是这几个载体的**位置各不相同**（叠在输入框卡上方不同高度），
+   `fixed` 让它们共享同一份视口相位；换成 `background-position: 0 0` 后相位随各自盒子漂移。
+   ⇒ 要改必须像座底带那样**逐载体实测运行期相位**，属于另一件工作，本轮不做。
+
+> 实测三条「不能裸换」的证据（都记在上面）：顶栏 7.4%、缝挡板 1.1%、
+> 而扫光带/吸顶行/轨迹视图 0.005~0.006%。判别标准很清晰：
+> **载体自身位置固定且盒高很小 ⇒ 显式几何等价；载体位置会动或盒高较大 ⇒ 必须运行期相位。**
 
 ## 8) 复现方式
 
@@ -134,8 +145,9 @@ background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px;
 $env:DSH_TOKEN='<token>'
 
 # 逐像素等价性：只切目标规则的 fixed↔scroll，比对全屏截图
-node TEMP/perf/sweep-isolate.mjs
-node TEMP/perf/ground-verify.mjs
+node TEMP/perf/sweep-isolate.mjs      # 扫光带（0.006%）
+node TEMP/perf/ground-verify.mjs      # 吸顶行 + 轨迹视图（0.005%）
+node TEMP/perf2/seam-verify.mjs       # 缝挡板（1.1% ⇒ 证明不能裸换）
 
 # 结构性计数：规则命中数 / 层相关属性命中数
 node TEMP/perf/audit-fixed2.mjs
