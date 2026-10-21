@@ -124,6 +124,12 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 * **全自动，不需要手工重生成**：`market.yml` 在 `Publish` 成功后（`workflow_run`）自动跑「从 npm 重生成 → 守卫 fail-closed → 有变化则 bot 提交 `market/` → 发布 Pages」。另有三个触发源：`main` 上 `market/**` 或本文件变动、每日 03:47 UTC 兜底、手动 `workflow_dispatch`
 * **真值在仓库里**：`market/index.json`（索引）+ `market/peer-snapshot.json`（各已发布版本的 dsh peer 声明快照，供守卫离线核对派生值），两者由同一次 `pnpm run market:index` 产出、随同一次提交落地——**不手改**。`market/.gitattributes` 固定 LF，避免 Windows 行尾让「重算后对比」恒脏
 * **数据只来自 npm registry 的 packument**：只读、不下载 tarball、不执行任何插件代码；版本清单 = 该包所有声明了 `dsh.bundle.patch` 的版本
+* **必须等 npm 传播再生成（已踩两次）**：`npm publish` 返回成功时 registry 上可能还查不到该版本（官方提示 "may take a few minutes"），而 `market.yml` 由 Publish 完成触发、实测只隔十几秒 ⇒ 直接生成会**静默漏收录**新版本，且守卫全绿（索引与 peer 快照同源、一起缺，判据 ④ 只在快照有记录时才要求它在索引里）。故 `market-index.mjs` 支持「等期待版本可见再生成」：
+  * `MARKET_INDEX_EXPECT=@scope/name@1.2.3`（显式一个，便于手工重跑 / 测试）
+  * `MARKET_INDEX_EXPECT_REPO_VERSION=1`（取各活跃插件**仓库内当前版本**，CI 用这个）
+  * `MARKET_INDEX_EXPECT_WAIT_MS`（等待上限，默认 0 = 不等）——判定「可见」= 版本在 `versions` 且有 `time` 记录（与收录条件一致），每 5s 轮询
+  * 生成后**再自检**期待版本是否真进了索引（防「可见但缺 `dsh.bundle.patch`」被跳过）；任一不满足即非零退出且**不写文件** ⇒ fail-closed，宁可这次不部署
+  * **只在 `workflow_run` 时等待**：其它触发源必须不等——`main` 在「已合并、tag 未推」的窗口里版本号领先 npm，等待会误红。不用触发 tag 是因为 `workflow_run` 的 `head_branch` 对 tag 触发的 upstream 返回 `main`（实测）
 * **守卫 `check:market-index`** 四条：① 包名集合 = `activePluginNames()`（退役插件不得进索引、活跃插件不得缺席）；② 每个插件有中英双语描述与至少一个能力标签；③ 每版 `engines.dsh` = 该版 peer 派生值；④ 版本合法 SemVer、按降序、且**已在 npm 发布过的**当前版本在列
   * 判据 ④ 的「已发布」以 `peer-snapshot.json` 有该版本记录为准——**不是**「仓库内 `package.json` 的当前版本必须已在索引里」：版本号 bump 到发布之间那段窗口里，npm 上还没有该版本，索引不可能包含它，反过来要求会让 dev 分支每次 bump 都误红
   * 新增活跃插件要同时补 `scripts/market-index.mjs` 的 `ZH_DESCRIPTIONS` 与 `PLUGIN_LABELS`，否则判据 ② 会红
