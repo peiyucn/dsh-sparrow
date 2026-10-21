@@ -8,9 +8,16 @@
  * 而本适配器把宿主 `options.system` 原样作为第一条 system 发出 ⇒ 每轮推理都被拒，表现为「推理接口
  * 突然用不了了」，与账号 / Key / UA / 请求头 / 模型全都无关（这些变体实测都是 200）。
  *
- * 处理方式：**整行删除**命中行，其余行逐字保留。删除后同一份真实 system 请求实测返回 200；
- * 模型仍能从下一句「You are a coding agent powered by …」知道自己是什么，只是不再复述那句会被拦的
- * 固定自我介绍。不选「插字符 / 插零宽」那类字面改写：改动越少越不容易被上游归一化处理，也更好解释。
+ * 2026-10-21 傍晚出现**第二波**：上游又把 DSH **Web 端**运行时上下文那一行的句首收进黑名单——
+ * `You are interacting with the user through the DeepSeek Harness Web GUI whose URL the runtime context
+ * names.`。这条的规则形态与本文件第一波不同：实测它不是单句字面量，而是「行首锚定 + 跨句通配」，
+ * 同一行里 `You are interacting … Web GUI` 与后面的 `When the user refers to "this page" …` 两句
+ * **同时出现**才拦（单句各自 200、两句合并 400、顺序反过来 200）；删掉第一句后整行放行。
+ *
+ * 处理方式：**删掉命中的指纹句，其余内容逐字保留**（整行只有指纹句时才整行丢弃）。删除后同一份
+ * 真实 system 请求实测返回 200；身份句删掉后模型仍能从下一句「You are a coding agent powered by …」
+ * 知道自己是什么。Web GUI 那一行**只删首句、不整行删**：后面的「不要起第二个 server / 改完重新构建」
+ * 等仍是需要的指令。不选「插字符 / 插零宽」那类字面改写：改动越少越不容易被上游归一化处理，也更好解释。
  *
  * 范围（按实测结论，别扩大也别缩小）：
  *  - ✅ `system` 消息（所有 system，不只第一条）
@@ -22,6 +29,8 @@
  * `You are Claude Code, Anthropic's official CLI for Claude` 同样返回 11128（DSH 提示词里没有这两句，
  * 故未处理）。若 DSH 系统提示词后续新增命中句，往 `FINGERPRINT_LINE_PREFIXES` 补一条正则即可；
  * 补完必须用真实 system 提示词实测一次推理（`docs/spec/10-channel-fingerprint-guard.md` 有探针方法）。
+ * 定位新指纹时注意第二波这种「跨句通配」形态：**单句逐个探可能全部 200**，要按行二分、
+ * 再在命中行内试相邻句子组合；确认能删掉的最小句首片段后，用完整真实 system 复测。
  */
 
 /**
@@ -30,7 +39,11 @@
  * 正文保留。
  */
 const FINGERPRINT_LINE_PREFIXES: readonly RegExp[] = [
+  // 第一波（2026-10-20 深夜）：DSH 身份句。
   /^\s*You are an AI agent powered by DeepSeek Harness\b\.?/iu,
+  // 第二波（2026-10-21 傍晚）：DSH Web 端运行时上下文行首句。上游这条带跨句通配（需与同行后面的
+  // `When the user refers to …` 同时出现才拦），删掉句首这一句即不再命中；保留该行其余指令。
+  /^\s*You are interacting with the user through the DeepSeek Harness Web GUI whose URL the runtime context names\.?/iu,
 ]
 
 /**

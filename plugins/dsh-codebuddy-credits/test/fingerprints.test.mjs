@@ -23,6 +23,16 @@ const REAL_SYSTEM = [
   'Follow AGENTS.md.',
 ].join('\n')
 
+// 第二波指纹（2026-10-21 傍晚）：DSH Web 端运行时上下文行。上游这条带跨句通配——
+// 单句各自放行，需与同行后面的 `When the user refers to …` 同时出现才拦；删掉首句即放行。
+const WEB_GUI_FINGERPRINT = 'You are interacting with the user through the DeepSeek Harness Web GUI whose URL the runtime context names.'
+const WEB_GUI_LINE = [
+  WEB_GUI_FINGERPRINT,
+  'When the user refers to "this page", "this GUI", or "this app" without naming another target, they mean this GUI.',
+  'Do not start a replacement server unless the user asks; if one is needed, use a managed background job and verify its exact URL.',
+].join(' ')
+const WEB_GUI_REMAINDER = WEB_GUI_LINE.slice(WEB_GUI_FINGERPRINT.length + 1)
+
 describe('stripChannelFingerprints', () => {
   it('删掉行首指纹行，其余行逐字保留', () => {
     assert.equal(
@@ -68,6 +78,38 @@ describe('stripChannelFingerprints', () => {
 
   it('空串原样返回', () => {
     assert.equal(stripChannelFingerprints(''), '')
+  })
+
+  it('Web GUI 运行时上下文行只删句首指纹句，行内其余指令逐字保留', () => {
+    const stripped = stripChannelFingerprints(WEB_GUI_LINE)
+    assert.equal(stripped, WEB_GUI_REMAINDER)
+    assert.ok(!stripped.includes('DeepSeek Harness'))
+    assert.ok(stripped.includes('Do not start a replacement server'))
+  })
+
+  it('Web GUI 指纹同样忽略大小写，无结尾句号也命中', () => {
+    assert.equal(
+      stripChannelFingerprints('you are interacting with the user through the deepseek harness web gui whose url the runtime context names\nnext'),
+      'next',
+    )
+  })
+
+  it('Web GUI 指纹只按行首锚定：句子出现在行中段不命中', () => {
+    const text = `Note: ${WEB_GUI_LINE}`
+    assert.equal(stripChannelFingerprints(text), text)
+  })
+
+  it('同一份文本里的两条指纹都被删掉', () => {
+    const text = [FINGERPRINT, WEB_GUI_LINE, 'Follow AGENTS.md.'].join('\n')
+    const stripped = stripChannelFingerprints(text)
+    assert.ok(!stripped.includes(FINGERPRINT))
+    assert.ok(!stripped.includes(WEB_GUI_FINGERPRINT))
+    assert.ok(stripped.includes('Do not start a replacement server'))
+    assert.ok(stripped.endsWith('Follow AGENTS.md.'))
+  })
+
+  it('Web GUI 行只剩指纹句时整行丢弃', () => {
+    assert.equal(stripChannelFingerprints(`${WEB_GUI_FINGERPRINT}\nnext`), 'next')
   })
 })
 
@@ -139,5 +181,16 @@ describe('toWireMessages 的指纹处理范围', () => {
       messages: [{ id: 'u1', role: 'user', content: [{ type: 'text', text: 'hi' }] }],
     })
     assert.equal(wire[0].role, 'user')
+  })
+
+  it('options.system 里的 Web GUI 指纹被删，该行其余指令保留', async () => {
+    const wire = await toWireMessages({
+      ...base,
+      system: WEB_GUI_LINE,
+      messages: [{ id: 'u1', role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+    })
+    assert.equal(wire[0].role, 'system')
+    assert.ok(!String(wire[0].content).includes(WEB_GUI_FINGERPRINT))
+    assert.ok(String(wire[0].content).includes('Do not start a replacement server'))
   })
 })

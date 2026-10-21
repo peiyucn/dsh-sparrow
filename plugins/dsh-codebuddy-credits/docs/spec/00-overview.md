@@ -85,10 +85,14 @@
 上游自 2026-10-20 深夜起对 `system` / `assistant` **正文**做逐字内容指纹拦截（行首锚定、
 忽略大小写），命中即 `HTTP 400 / code 11128`（文案「Illegal API invocation from an unapproved
 channel」）；DSH 系统提示词首行 `You are an AI agent powered by DeepSeek Harness.` 被收录，
-导致每轮推理都被拒。处理方式：只对 system 与 assistant 正文**整行删除**命中的指纹行，
+导致每轮推理都被拒。处理方式：只对 system 与 assistant 正文**删掉命中的指纹句**，
 其余内容逐字保留；`user` / `tool` / `tool_calls` 参数 / `reasoning` 一律不动。
 身份如实自报的口径（UA、`X-IDE-Name`）不变，**不伪装官方客户端**。
-证据、范围与维护办法见 [10-channel-fingerprint-guard.md](10-channel-fingerprint-guard.md)。
+
+同日傍晚出现第二波：上游把 **Web 端运行时上下文行**的首句也列入黑名单，且形态是
+「行首锚定 + 跨句通配」（单句各自放行、需与同行后面的句子同时出现才拦）。处理方式同为删掉
+命中的句首指纹、保留该行其余指令。证据、范围与维护办法见
+[10-channel-fingerprint-guard.md](10-channel-fingerprint-guard.md)。
 
 ## 域名（单一来源）
 
