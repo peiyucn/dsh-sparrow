@@ -532,6 +532,12 @@ function install(ctx: Context): void {
    */
   const CONTENT_SETTLE_QUIET_MS = 400
   /**
+   * 静默去抖的**最长等待**：持续流式时「最后一次变动 + 静默窗口」会一直推后，
+   * 没有上限就永远等不到探测 —— 那会让切会话后相位停在慢档（正确但更慢）。
+   * 1s ≈ 两个多静默窗口，足以让绝大多数流式间隙落到「安静」那一支，又不至于让门迟迟不挂。
+   */
+  const CONTENT_SETTLE_MAX_WAIT_MS = 1000
+  /**
    * 同一帧内合并多次 DOM 变动，避免连续写属性触发无谓重排；并用 {@link PROBE_MIN_INTERVAL_MS} 节流
    * 高频率的 `childList` 变动（流式输出）。⚠️ 帧句柄与尾随定时器**都必须存下来并在卸载时取消**：
    * `ctx.effect` 只管它收集到的 disposer，不会替你取消已入队的回调 —— 否则「变动入队 → 卸载 → 回调才到」会把
@@ -619,9 +625,11 @@ function install(ctx: Context): void {
   }
 
 
-  /** {@link CONTENT_SETTLE_QUIET_MS} 的静默去抖状态：定时器句柄 + 最近一次内容变动时刻。 */
+  /** {@link CONTENT_SETTLE_QUIET_MS} 的静默去抖状态：定时器句柄 + 最近一次内容变动时刻 + 本轮起算时刻。 */
   let contentSettleTimer = 0
   let lastContentMutationAt = 0
+  /** 本轮去抖**第一次**排定时器的时刻：给 {@link CONTENT_SETTLE_MAX_WAIT_MS} 当起算点。 */
+  let contentSettleArmAt = 0
   /**
    * 内容变动里**仍可能改变锚点**的节点特征：只放运行期锚点真正依赖的 UI 元素。判定用 `matches` /
    * 子树 `querySelector`；宁可少列（漏了有「静默后补测」兜住），也不要为求全而拖慢判定。
@@ -639,23 +647,36 @@ function install(ctx: Context): void {
     return { insideContent, anchorLike }
   })
   /**
-   * 静默去抖到点：这期间又来了一批变动（仍在流式）就重新计时；真正安静下来才补一次探测 + 相位收敛重测，
-   * 保证「新轮次导航 / 吸顶行结构变化」这类内容侧布局变化最终仍被采到（最多晚 {@link CONTENT_SETTLE_QUIET_MS}ms）。
+   * 静默去抖到点：只有**真的安静下来**才补一次探测 + 相位收敛重测。
+   *
+   * ⚠️ 不要写成「每 `CONTENT_SETTLE_QUIET_MS` 醒一次、还吵就再排一次」的轮询：
+   * 切换会话 / 长流式期间内容一直在变，那个写法会让定时器每 400ms 醒一次、直到变动停下——
+   * 切换本身就是几百毫秒的变动，于是白白多唤醒若干次，而每次唤醒都落在最忙的合成窗口里。
+   * 现在改成**一次性定时器**（`armContentSettle` 在变动到来时按「距上次变动满
+   * `CONTENT_SETTLE_QUIET_MS` 还有多久」重新排），醒来即代表窗口已静默，直接干活。
    */
   const contentSettleFlush = (): void => {
     contentSettleTimer = 0
-    if (performance.now() - lastContentMutationAt < CONTENT_SETTLE_QUIET_MS) {
-      contentSettleTimer = window.setTimeout(contentSettleFlush, CONTENT_SETTLE_QUIET_MS)
-      return
-    }
+    // 本轮结束：下一次变动要重新起算 {@link CONTENT_SETTLE_MAX_WAIT_MS}，否则上限会用着上一轮的起点、
+    // 让后续的探测被过早或过晚触发。
+    contentSettleArmAt = 0
+    if (performance.now() - lastContentMutationAt < CONTENT_SETTLE_QUIET_MS) return
     scheduleProbe()
     startPhaseSettle()
   }
-  /** 内容变动入口：只记录时刻并起一个去抖定时器；流式期间不做任何扫描 / 几何测量。 */
+  /** 内容变动入口：只记录时刻并（重）排一次性去抖定时器；流式期间不做任何扫描 / 几何测量。 */
   const armContentSettle = (): void => {
-    lastContentMutationAt = performance.now()
-    if (contentSettleTimer !== 0) return
-    contentSettleTimer = window.setTimeout(contentSettleFlush, CONTENT_SETTLE_QUIET_MS)
+    const now = performance.now()
+    if (contentSettleArmAt === 0) contentSettleArmAt = now
+    lastContentMutationAt = now
+    if (contentSettleTimer !== 0) window.clearTimeout(contentSettleTimer)
+    // 目标 = 「最后一次变动之后满静默窗口」。
+    // ⚠️ **必须有上限**（{@link CONTENT_SETTLE_MAX_WAIT_MS}）：持续流式时最后变动一直在推后，
+    // 只按静默窗口排会让探测**永不发生** —— 那样切会话后相位会一直停在慢档，比多唤醒几次糟得多。
+    const quietAt = now + CONTENT_SETTLE_QUIET_MS
+    const capAt = contentSettleArmAt + CONTENT_SETTLE_MAX_WAIT_MS
+    const fireAt = Math.min(quietAt, capAt)
+    contentSettleTimer = window.setTimeout(contentSettleFlush, Math.max(0, fireAt - now))
   }
   /**
    * 实测两个相载体的定位区原点，发布成 CSS 变量 + **两道**门属性。必须实测：相位要的是「定位区左上角在视口里的坐标」，右栏一开左栏偏移与右栏宽同时变、官方又没把右栏宽发布成变量 ⇒ 纯 CSS 推不出（详见 `../phase.ts`）。

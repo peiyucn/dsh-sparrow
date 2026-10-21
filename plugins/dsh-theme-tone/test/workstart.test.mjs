@@ -115,11 +115,20 @@ describe('workstart：未选工作区待启动态的判定（纯函数）', () =
     const gateAt = src.search(churnGate)
     const probeAt = src.indexOf('scheduleProbe()', src.indexOf('const observer = new MutationObserver'))
     assert.ok(gateAt > 0 && probeAt > gateAt, '内容变动分支必须在 scheduleProbe 之前 return')
-    // 推迟路径：拿到变动只起定时器；定时器到点若仍在流式则重新计时，安静后才补探测 + 相位重测。
-    assert.match(src, /const armContentSettle = \(\): void => \{[\s\S]{0,400}?contentSettleTimer = window\.setTimeout\(contentSettleFlush, CONTENT_SETTLE_QUIET_MS\)/u,
+    // 推迟路径：拿到变动只起 / 重排定时器；到点若仍在流式就不干活，安静后才补探测 + 相位重测。
+    // ⚠️ 断言「语义」而不是某个字面量写法：2026-10-21 把轮询式去抖改成一次性重排，
+    // 延时参数从常量变成计算值（quietAt 与上限取 min），语义没变、唤醒次数更少。
+    assert.match(src, /const armContentSettle = \(\): void => \{[\s\S]{0,900}?contentSettleTimer = window\.setTimeout\(contentSettleFlush,/u,
       '内容变动只能起静默去抖定时器（流式期间不扫描）')
     assert.match(src, /const contentSettleFlush = \(\): void => \{[\s\S]{0,700}?scheduleProbe\(\)\s*\n\s*startPhaseSettle\(\)/u,
       '真正安静下来后必须补一次探测 + 相位重测')
+    // 到点仍然吵 ⇒ 必须直接返回（不许退回「每批变动都探测」那条老路）。
+    assert.match(src, /if \(performance\.now\(\) - lastContentMutationAt < CONTENT_SETTLE_QUIET_MS\) return/u,
+      '到点仍在流式时必须直接返回，不得扫描')
+    // 上限不可省：只按「最后变动 + 静默窗口」重排的话，持续流式时探测永不发生，
+    // 切会话后相位会一直停在慢档（正确但更慢）。
+    assert.match(src, /const CONTENT_SETTLE_MAX_WAIT_MS = \d+/u, '静默去抖必须有最长等待上限')
+    assert.match(src, /Math\.min\(quietAt, capAt\)/u, '到点时刻必须取静默窗口与最长等待的较小值')
     assert.ok(src.includes("const ANCHOR_LIKE_SELECTOR ="), '需要锚点相关节点特征表来收窄内容变动判定')
   })
 })
