@@ -4,14 +4,11 @@ import {
   assertCapabilities, assertHostCompatible, hostSessionFormatVersion,
   missingCapabilities, SUPPORTED_SESSION_FORMAT_VERSIONS, unsupportedSessionFormatReason, unsupportedStoredFormatReason,
 } from '../lib/compat.js'
+import { fakeHostCtx } from './helpers/fake-ctx.ts'
 
 // 根 AGENTS《插件与宿主兼容》：宿主契约不认识时插件必须自停用（抛错 → cordis 标 inactive），
 // 而不是带病运行。本文件覆盖纯判定与接线；容器行为由 cordis 保证（lib/index.js:1350-1362）。
 describe('compat 宿主兼容自检（会话版）', () => {
-  const fakeCtx = () => {
-    const warns = []
-    return { ctx: { logger: { warn: (message) => { warns.push(message) } } }, warns }
-  }
 
   it('支持的会话格式版本 应该 返回 undefined（不拦）', () => {
     for (const version of SUPPORTED_SESSION_FORMAT_VERSIONS) {
@@ -42,13 +39,13 @@ describe('compat 宿主兼容自检（会话版）', () => {
   })
 
   it('兼容时 应该 不抛不告警', () => {
-    const { ctx, warns } = fakeCtx()
+    const { ctx, warns } = fakeHostCtx()
     assert.doesNotThrow(() => { assertHostCompatible(ctx, 'dsh-x', 0) })
     assert.equal(warns.length, 0)
   })
 
   it('不兼容时 应该 告警并抛错（停用）', () => {
-    const { ctx, warns } = fakeCtx()
+    const { ctx, warns } = fakeHostCtx()
     assert.throws(() => { assertHostCompatible(ctx, 'dsh-x', 5) }, /dsh-x: .*v5/u)
     assert.equal(warns.length, 1)
     assert.match(warns[0], /已停用插件以免影响 dsh/u)
@@ -84,13 +81,13 @@ describe('compat 宿主兼容自检（会话版）', () => {
     })
 
     it('能力齐备 应该 不抛不告警', () => {
-      const { ctx, warns } = fakeCtx()
+      const { ctx, warns } = fakeHostCtx()
       assert.doesNotThrow(() => { assertCapabilities(ctx, 'dsh-x', [{ name: 'llm', ok: true }]) })
       assert.equal(warns.length, 0)
     })
 
     it('能力缺失 应该 告警并抛错（停用）', () => {
-      const { ctx, warns } = fakeCtx()
+      const { ctx, warns } = fakeHostCtx()
       assert.throws(() => { assertCapabilities(ctx, 'dsh-x', [{ name: 'llm.registerAdapter', ok: false }]) }, /llm\.registerAdapter/u)
       assert.equal(warns.length, 1)
       assert.match(warns[0], /已停用插件以免影响 dsh/u)

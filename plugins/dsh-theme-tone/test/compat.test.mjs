@@ -1,14 +1,11 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { cssSupports, hasCapability, missingCapabilities, warnMissingCapabilities, warnUser } from '../lib/compat.js'
+import { fakeHostCtx } from './helpers/fake-ctx.ts'
 
 // 根 AGENTS《插件与宿主兼容》：宿主契约不认识时自停用，不带病运行。
 // 本插件的门在 client half，语义是「惰性停用」——告警后直接 return，绝不抛错。
 describe('compat 宿主兼容自检（纯能力版，客户端惰性停用）', () => {
-  const fakeCtx = () => {
-    const warns = []
-    return { ctx: { logger: { warn: message => { warns.push(message) } } }, warns }
-  }
 
   it('missingCapabilities 应该 按声明顺序返回未满足项', () => {
     assert.deepEqual(missingCapabilities([
@@ -22,7 +19,7 @@ describe('compat 宿主兼容自检（纯能力版，客户端惰性停用）', 
 
   it('能力齐备 应该 返回 true 且不告警', (t) => {
     const printed = t.mock.method(console, 'warn', () => {})
-    const { ctx, warns } = fakeCtx()
+    const { ctx, warns } = fakeHostCtx()
     assert.equal(warnMissingCapabilities(ctx, 'dsh-x', [{ name: 'theme.overrideTokens', ok: true }]), true)
     assert.equal(warns.length, 0)
     assert.equal(printed.mock.callCount(), 0)
@@ -32,7 +29,7 @@ describe('compat 宿主兼容自检（纯能力版，客户端惰性停用）', 
     // 两条通道都要写：抛错宿主整页起不来，只写 logger 用户看不到（浏览器侧无 console 出口）。
     const printed = []
     t.mock.method(console, 'warn', message => { printed.push(message) })
-    const { ctx, warns } = fakeCtx()
+    const { ctx, warns } = fakeHostCtx()
     let ok
     assert.doesNotThrow(() => {
       ok = warnMissingCapabilities(ctx, 'dsh-x', [{ name: 'ctx.settingsScope.bind', ok: false }])

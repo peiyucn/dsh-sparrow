@@ -1,13 +1,10 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { assertCapabilities, hostSessionFormatVersion, missingCapabilities, SUPPORTED_SESSION_FORMAT_VERSIONS, unsupportedSessionFormatReason } from '../lib/compat.js'
+import { fakeHostCtx } from './helpers/fake-ctx.ts'
 
 // 宿主契约不认识时插件必须自停用（抛错 → cordis 标 inactive）；本文件只覆盖纯判定与接线。
 describe('compat 宿主兼容自检（纯能力版）', () => {
-  const fakeCtx = () => {
-    const warns = []
-    return { ctx: { logger: { warn: (message) => { warns.push(message) } } }, warns }
-  }
 
   it('missingCapabilities 应该 按声明顺序返回未满足项', () => {
     assert.deepEqual(missingCapabilities([
@@ -20,13 +17,13 @@ describe('compat 宿主兼容自检（纯能力版）', () => {
   })
 
   it('能力齐备 应该 不抛不告警', () => {
-    const { ctx, warns } = fakeCtx()
+    const { ctx, warns } = fakeHostCtx()
     assert.doesNotThrow(() => { assertCapabilities(ctx, 'dsh-x', [{ name: 'webServer.register', ok: true }]) })
     assert.equal(warns.length, 0)
   })
 
   it('能力缺失 应该 告警并抛错（停用）', () => {
-    const { ctx, warns } = fakeCtx()
+    const { ctx, warns } = fakeHostCtx()
     assert.throws(() => { assertCapabilities(ctx, 'dsh-x', [{ name: 'webServer.register', ok: false }]) }, /webServer\.register/u)
     assert.equal(warns.length, 1)
     assert.match(warns[0], /已停用插件以免影响 dsh/u)
