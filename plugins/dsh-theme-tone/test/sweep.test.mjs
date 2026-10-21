@@ -74,11 +74,25 @@ describe('官方运行扫光带：照我们自己的背景画（A 方案）', ()
     assert.ok(SWEEP_PLATE_LAYERS.includes(GRAIN_TILE_VARIABLE), '**颗粒必须在**')
     assert.ok(SWEEP_PLATE_LAYERS.includes(BACKDROP_GRADIENTS), '光必须与背景层同源（不复制数值）')
     assert.ok(rules.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), '颗粒瓦片要进 background-image')
-    // ⚠️ 必须**单个** fixed：4 层 background-image 写 `scroll, fixed` 会被循环补齐，
-    // 第 1、3 段渐变退回按元素自身盒子解析。
+
+    // ⚠️ **不得再用 `background-attachment: fixed`**（2026-10-21 性能专项）：
+    //   `fixed` 让定位区=视口 ⇒ **每个 running 行**每帧都要按视口重新栅格化；
+    //   多会话并行时这就是可感的掉帧。改用与背景层同尺寸的显式几何 + `scroll`：
+    //   真机逐像素实测全屏 160 万点里仅 91 点改变（0.006%），肉眼不可见。
     assert.ok(
-      rules.includes('background-attachment: fixed;'),
-      '必须是单个 fixed（应用到全部层），不能写 scroll, fixed',
+      !rules.includes('background-attachment: fixed'),
+      '不得用 fixed（每个 running 行每帧按视口栅格化，多会话并行时掉帧）',
+    )
+    assert.ok(rules.includes('background-attachment: scroll'), '必须显式写 scroll')
+    // 逐层给尺寸：第 1 层颗粒是 auto，其余三层与背景层同为 100vw×100vh。
+    // 值少于层数会按序循环补齐 —— 那会把颗粒拉成粗块、渐变按自身盒子解析。
+    assert.ok(
+      rules.includes('background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh'),
+      '必须逐层给 background-size（层数不足会被循环补齐）',
+    )
+    assert.ok(
+      rules.includes('background-repeat: repeat, no-repeat, no-repeat, no-repeat'),
+      '颗粒要 repeat、三层光不重复',
     )
     assert.ok(!rules.includes('scroll, fixed'), '不得写 scroll, fixed（层数不足会被循环补齐）')
   })

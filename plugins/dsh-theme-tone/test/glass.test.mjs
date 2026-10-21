@@ -1042,7 +1042,16 @@ describe('glass：边界与纪律', () => {
       assert.match(body, /background-color: var\(--dsw-alias-bg-base\)/u, `轨迹地面必须不透明（原样 token）：${selector}`)
       assert.ok(body.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), `轨迹地面必须带颗粒：${selector}`)
       assert.ok(body.includes(BACKDROP_GRADIENTS), `轨迹地面必须与背景层同源的光：${selector}`)
-      assert.match(body, /background-attachment: fixed;/u, `轨迹地面必须用 fixed 让百分比按视口解析：${selector}`)
+      // ⚠️ 2026-10-21 性能专项：不再用 background-attachment: fixed（每帧按视口栅格化，
+      // 成本与声明尺寸无关 ⇒ 多会话并行时是掉帧来源）。改用「100vw×100vh + scroll + 0 0 相位」，
+      // 真机逐像素实测 0.005% 差异（肉眼不可见）。
+      assert.match(body, /background-attachment: scroll;/u, `轨迹地面必须用 scroll（不得回退 fixed）：${selector}`)
+      assert.match(
+        body,
+        /background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh/u,
+        `轨迹地面必须逐层给 background-size：${selector}`,
+      )
+      assert.ok(!body.includes('background-attachment: fixed'), `不得再用 fixed：${selector}`)
       assert.ok(!body.includes('scroll, fixed'), `不得写 scroll, fixed（层数不足会被循环补齐）：${selector}`)
       assert.ok(!body.includes('backdrop-filter'), `地面不模糊，只是重画：${selector}`)
       // 不得出现 hashed 类名 / 不得碰几何
