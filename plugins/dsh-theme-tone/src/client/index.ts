@@ -708,8 +708,11 @@ function install(ctx: Context): void {
     const parts: string[] = []
     /** 摘掉一道门连同它的几何变量（绝不留下「门开着但变量是旧的」这种组合）。 */
     const clearOne = (attr: string, ...vars: readonly string[]): void => {
-      target.removeAttribute(attr)
-      for (const v of vars) target.style.removeProperty(v)
+      // 与 applyOne 同一条纪律：**只在真的要摘时动属性 / 变量**。
+      // `removeProperty` 即使属性不存在也会让样式失效，而这条路径在收敛循环里会被反复调到
+      // （hero 相位没有座位、卡片暂不渲染时 host 为 null），白付失效很不划算。
+      if (target.hasAttribute(attr)) target.removeAttribute(attr)
+      for (const v of vars) if (target.style.getPropertyValue(v) !== '') target.style.removeProperty(v)
     }
     /** 一个载体的通用处理：求伪元素原点 → 解算 → 写变量并挂门（或摘门）。 */
     const applyOne = (host: Element | null, attr: string, leftVar: string, topVar: string): void => {
@@ -726,10 +729,13 @@ function install(ctx: Context): void {
       const origin = pseudoOrigin(r.left, r.top, borderLeft, borderTop, pseudoLeft, pseudoTop)
       const solved = solvePhaseOrigin(origin, { width: window.innerWidth, height: window.innerHeight })
       if (solved === null) { clearOne(attr, leftVar, topVar); return }
-      target.style.setProperty(leftVar, solved.left)
-      target.style.setProperty(topVar, solved.top)
+      // ⚠️ **只在值变化时写**：`setProperty` 无论值是否相同都会让该元素样式失效，
+      // 而本函数在收敛循环里最多跑 PHASE_SETTLE_FRAMES 帧 —— 每帧白写两个变量，
+      // 就等于每帧多一次样式重算。相位稳定时（绝大多数帧）这里应该什么都不做。
+      if (target.style.getPropertyValue(leftVar) !== solved.left) target.style.setProperty(leftVar, solved.left)
+      if (target.style.getPropertyValue(topVar) !== solved.top) target.style.setProperty(topVar, solved.top)
       // 门**最后**挂：两个变量都已就位，消费侧才是「开即有效」。
-      target.setAttribute(attr, '')
+      if (!target.hasAttribute(attr)) target.setAttribute(attr, '')
     }
 
     try {

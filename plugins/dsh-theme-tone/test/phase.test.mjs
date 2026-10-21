@@ -101,3 +101,38 @@ describe('phase：视口相位几何解算', () => {
     assert.equal(px(7.0004), '7px')
   })
 })
+
+/**
+ * 收敛循环里的写入纪律（源码守卫）。
+ *
+ * `publishPhase` 最多跑 `PHASE_SETTLE_FRAMES` 帧，每帧都会经过 `applyOne` / `clearOne`。
+ * `setProperty` / `removeProperty` **无论值是否相同都会让该元素样式失效** ⇒ 相位稳定时
+ * （绝大多数帧）必须什么都不写，否则等于每帧白付一次样式重算。
+ */
+describe('phase：写入必须幂等（值未变则不动样式）', () => {
+  it('applyOne 必须比较后再写变量，且门已挂则不重复 setAttribute', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(
+      src,
+      /getPropertyValue\(leftVar\) !== solved\.left/u,
+      'left 相位变量必须比较后再写',
+    )
+    assert.match(
+      src,
+      /getPropertyValue\(topVar\) !== solved\.top/u,
+      'top 相位变量必须比较后再写',
+    )
+    assert.match(src, /if \(!target\.hasAttribute\(attr\)\) target\.setAttribute/u, '门已挂则不得重复写')
+  })
+
+  it('clearOne 必须只在真的要摘时才 removeAttribute / removeProperty', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    const clearBody = src.slice(src.indexOf('const clearOne ='), src.indexOf('const applyOne ='))
+    assert.match(clearBody, /if \(target\.hasAttribute\(attr\)\) target\.removeAttribute\(attr\)/u,
+      '摘门也要先判存在（removeAttribute 对不存在的属性虽无害，但要与变量一致地幂等）')
+    assert.match(clearBody, /getPropertyValue\(v\) !== ''/u,
+      'removeProperty 必须先判非空（否则同样触发样式失效）')
+  })
+})
