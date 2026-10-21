@@ -72,7 +72,21 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # 真值来源：npm registry。只读、不下载 tarball、不执行插件代码。
+      #
+      # ⚠️ 等 npm 传播：本工作流由 Publish 完成后触发（实测只隔十几秒），而 `npm publish`
+      # 返回成功时 registry 上可能还查不到该版本（官方提示 "may take a few minutes"）。
+      # 不等就会**静默漏收录**新版本，且守卫全绿（索引与快照同源，一起缺）——该问题已出现两次。
+      #
+      # 口径：等「仓库内各活跃插件的当前版本」在 registry 可见。不用触发 tag，是因为
+      # `workflow_run` 的 head_branch 对 tag 触发的 upstream 返回 main（实测），拿不到 tag 名。
+      #
+      # 只在 workflow_run（刚 Publish 完）时才等：其它触发源没有这个时序问题，且**必须不等**——
+      # main 在「dev→main 合并已完成、tag 还没推」的窗口里版本号领先 npm，此时若等待就会误判失败
+      # （定时任务正好落在窗口内的话）。超时即本步骤失败（fail-closed），需稍后重跑本工作流。
       - name: Regenerate index from npm
+        env:
+          MARKET_INDEX_EXPECT_REPO_VERSION: ${{ github.event_name == 'workflow_run' && '1' || '' }}
+          MARKET_INDEX_EXPECT_WAIT_MS: '300000'
         run: pnpm run market:index
 
       # fail-closed：索引与仓库内包声明不一致就不许上线（判据见 scripts/check-market-index.mjs）
