@@ -79,7 +79,9 @@ function versionSections(text) {
   const out = []
   let current = null
   for (const line of unfenced(text)) {
-    const heading = /^##\s+([0-9][^\s（(]*)/u.exec(line)
+    // Keep a Changelog 格式：`## [x.y.z] - YYYY-MM-DD`（方括号包版本）。
+    // 同时接受无方括号的旧写法，避免历史文件一次性全红。
+    const heading = /^##\s+\[?([0-9][^\s\]]*)\]?/u.exec(line)
     if (heading) {
       current = { version: heading[1], items: 0 }
       out.push(current)
