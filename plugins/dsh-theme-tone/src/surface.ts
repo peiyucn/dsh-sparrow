@@ -4,7 +4,7 @@
  * ⚠️ **图层不能塞进 token**：官方把同一个 `--dsw-specific-menu` 也用在 `position: sticky` 的分组标题小条上，而百分比渐变按元素盒子缩放 —— 一条 24px 的横条会把 `ellipse 120% 42%` 压成一道硬边金带。
  */
 
-import { grainOverGradients } from './backdrop.js'
+import { backdropGradients } from './backdrop.js'
 import { ANCHOR, anchorSelector } from './anchors.js'
 import {
   BOTTOM_VARIABLE,
@@ -196,7 +196,7 @@ export function menuSurfaceLayers(): string {
 const MENU_FILL = `var(--dsw-menu-surface-fill, var(--dsw-specific-menu))`
 
 /** 粘性分组标题条的 `background-image`，**从上到下**：① **卡片填充**（与卡片同一个 token、同一个 alpha）
- *  ② **地面原样重画**（{@link grainOverGradients}：三段光，`fixed` 对齐视口）—— 卡片是玻璃，
+ *  ② **地面原样重画**（{@link backdropGradients}：三段光，`fixed` 对齐视口）—— 卡片是玻璃，
  *  它看到的就是「地面」这几层，标题另有不透明底，不重画就丢了「地面长什么样」。
  *  合成结果 = 填充 叠在 地面 上 —— 与卡片**逐层同源**（实测两轴都在 1 级以内）。
  *  ⚠️ 2026-10-22 起没有颗粒层（原先是第 0 层）。
@@ -204,7 +204,7 @@ const MENU_FILL = `var(--dsw-menu-surface-fill, var(--dsw-specific-menu))`
 export function groupTitleLayers(): string {
   return [
     `linear-gradient(${MENU_FILL}, ${MENU_FILL})`,
-    grainOverGradients(),
+    backdropGradients(),
   ].join(',\n    ')
 }
 

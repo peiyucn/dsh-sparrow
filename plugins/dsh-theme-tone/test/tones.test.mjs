@@ -82,7 +82,7 @@ describe('色调表', () => {
       assert.equal(typeof spec.available, 'boolean', `${id}.available`)
       assert.ok(spec.base.length > 0, `${id}.base 非空`)
       assert.ok(spec.sidebarFill.length > 0, `${id}.sidebarFill 非空`)
-      assert.equal(typeof spec.grain, 'boolean', `${id}.grain`)
+
       assert.equal(
         spec.top === '', spec.bottom === '',
         `${id} 的 top / bottom 必须同时为空或同时给出`,
@@ -100,7 +100,7 @@ describe('色调表', () => {
     for (const id of ['violet', 'crimson', 'forest']) {
       assert.equal(DARK_TONES[id].top, GOLD, `${id}.top 应共享金色光源`)
       assert.equal(DARK_TONES[id].left, GOLD_LEFT, `${id}.left 应共享金色光源`)
-      assert.equal(DARK_TONES[id].grain, true, `${id} 深色轴应叠颗粒`)
+
     }
     // 三款**逐字相同**（不只是「各自等于常量」）：防有人给某一款单独写别的 alpha。
     const tops = new Set(['violet', 'crimson', 'forest'].map(id => DARK_TONES[id].top))
@@ -183,7 +183,7 @@ describe('色调表', () => {
       const spec = LIGHT_TONES[id]
       assert.equal(spec.base, OFFICIAL_BASE, `${id}.base 应是官方底色（引用变量，不是写死）`)
       assert.equal(spec.sidebarFill, OFFICIAL_SIDE, `${id}.sidebarFill 应是官方左栏色`)
-      assert.equal(spec.grain, true, `${id} 浅色轴也叠颗粒（两轴质感对等）`)
+
       // 三款**唯一**的差别就是本色与三层光 —— 那才是「打光用主色」
       assert.ok(spec.tint !== '', `${id} 必须有自己的本色（打光要用它）`)
       for (const layer of ['top', 'bottom', 'left']) {
@@ -327,7 +327,7 @@ describe('色调表', () => {
       assert.equal(spec.top, '')
       assert.equal(spec.bottom, '')
       assert.equal(spec.left, '')
-      assert.equal(spec.grain, false)
+
     }
   })
 
@@ -339,7 +339,7 @@ describe('色调表', () => {
     assert.equal(rgbOf(DARK_TONES.violet.top), '232,162,74')
     assert.equal(rgbOf(DARK_TONES.violet.bottom), '96,78,168')
     assert.equal(rgbOf(DARK_TONES.violet.left), '232,162,74')
-    assert.equal(DARK_TONES.violet.grain, true)
+
     // 底部辉光的 alpha 是**有意上调**的（pyai.site 原值 .08 → 现 .18，实况偏保守），
     // 这条断言是为了防止它被误当「抄错」而改回去。
     assert.equal(alphaOf(DARK_TONES.violet.bottom), 0.18)

@@ -181,7 +181,7 @@ describe('背景层渲染计划', () => {
   it('深色轴默认（深空）应该 显示染色、带上左侧金晕并叠颗粒', () => {
     const plan = backdropPlan('dark', DEFAULT_SETTINGS)
     assert.equal(plan.hidden, false)
-    assert.equal(plan.grain, true)
+
     assert.equal(plan.top, DARK_TONES.violet.top)
     assert.equal(plan.bottom, DARK_TONES.violet.bottom)
     assert.equal(plan.left, DARK_TONES.violet.left)
@@ -209,13 +209,13 @@ describe('背景层渲染计划', () => {
   it('深色轴选官方默认应该 整层隐藏', () => {
     const plan = backdropPlan('dark', settings('official', 'official'))
     assert.equal(plan.hidden, true)
-    assert.equal(plan.grain, false)
+
   })
 
   it('浅色轴默认（官方）应该 整层隐藏 —— 没装插件等价', () => {
     const plan = backdropPlan('light', DEFAULT_SETTINGS)
     assert.equal(plan.hidden, true)
-    assert.equal(plan.grain, false)
+
   })
 
   it('跨轴脏值被写入时应该 回落到该轴默认（绝不画出不属于该轴的色）', () => {
@@ -229,7 +229,7 @@ describe('背景层渲染计划', () => {
   it('浅色轴选到带染色的色调时应该 **也叠颗粒**（owner：「和深色版有相同的渐变质感」）', () => {
     const plan = backdropPlan('light', settings('blue', 'violet'))
     assert.equal(plan.hidden, false)
-    assert.equal(plan.grain, true, '浅色轴现在也叠颗粒（两轴质感对等）')
+
     assert.equal(plan.top, LIGHT_TONES.blue.top)
   })
 })

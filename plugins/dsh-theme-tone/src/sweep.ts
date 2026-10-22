@@ -4,7 +4,7 @@
  * 官方 rc.2 只剩 2 处在画带子，前两条锚点当前静默失效（保留以防官方改回容器级画法）。 */
 
 import { PLAIN_ATTR } from './constants.js'
-import { faceLayerGeometry, grainOverGradients } from './backdrop.js'
+import { faceLayerGeometry, backdropGradients } from './backdrop.js'
 
 /** 扫光带的锚点 —— 官方那几处 `::after`，**只覆盖它们**；每条都要求 `data-state='running'` **加上** `data-variant` / `data-tool`。 */
 export const SWEEP_ANCHORS: readonly string[] = Object.freeze([
@@ -21,7 +21,7 @@ export const SWEEP_PLATE_ALPHA = 0.6
 export const SWEEP_PEAK_STOP = '55%'
 
 /** 背景板要画的图层（从上到下）：**颗粒瓦片** + **同源的光**（`BACKDROP_GRADIENTS`，不复制数值）；底色走 `background-color`，整块再被 {@link SWEEP_SHAPE_MASK} 乘 0.6。 */
-export const SWEEP_PLATE_LAYERS = grainOverGradients()
+export const SWEEP_PLATE_LAYERS = backdropGradients()
 
 /** 一块 mask 干两件事：**形状**（停点与官方一致，见 {@link SWEEP_PEAK_STOP}）与**强度**（峰值 60%，大了显形、小了洗不动字）。 */
 export const SWEEP_SHAPE_MASK =
@@ -38,7 +38,7 @@ export const SWEEP_SHAPE_MASK =
  *    但带子自身高度只有一行高（20–30px），竖直方向上光层的变化在掩膜内几乎不可见 ——
  *    真机逐像素实测：**0.006% 像素改变 / 全屏 160 万点**（`docs/spec/13-running-sweep-cost.md`）。
  *  - 这是「多会话同时工作就卡」的直接热源：**每个 running 行**都挂一层按视口栅格化的 `fixed`。
- * ⚠️ 必须**逐层**给 size / repeat / position，且层数要跟 `grainOverGradients()` 一致 ——
+ * ⚠️ 必须**逐层**给 size / repeat / position，且层数要跟 `backdropGradients()` 一致 ——
  *    颗粒总开关会改变层数，故由 `faceLayerGeometry` 统一产出，不要手写 4 个值。
  */
 export const SWEEP_BACKGROUND_GEOMETRY = (() => {

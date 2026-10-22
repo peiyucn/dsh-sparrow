@@ -102,10 +102,10 @@ export const BACKDROP_GRADIENTS = `radial-gradient(${DARK_RADIAL_SHAPE}, var(${T
     radial-gradient(${BOTTOM_RADIAL_SHAPE}, var(${BOTTOM_VARIABLE}, transparent), ${BOTTOM_RADIAL_STOP}),
     radial-gradient(${LEFT_RADIAL_SHAPE}, var(${LEFT_VARIABLE}, transparent), ${LEFT_RADIAL_STOP})`
 
-/** 把背景原样重画一遍时用的那串光 —— 凡把背景重画的地方都用它（底座 / 右边栏 / 扫光带 / 浮层）；
- *  抽出来只为「光必须同源」不被漏抄。（2026-10-22 起不再叠颗粒，故它就是 {@link BACKDROP_GRADIENTS}；
- *  保留这个函数名是为了让调用点读起来仍是「重画背景」这件事，而不是「引用一串渐变」。） */
-export function grainOverGradients(): string {
+/** 把背景**原样重画一遍**时用的那串光 —— 凡把背景重画的地方都用它（底座 / 右边栏 / 扫光带 / 浮层）。
+ *  抽成函数只为让「光必须同源、不复制数值」这件事有个名字；2026-10-22 起不再叠颗粒，
+ *  故它就是 {@link BACKDROP_GRADIENTS} 本身。 */
+export function backdropGradients(): string {
   return BACKDROP_GRADIENTS
 }
 
@@ -197,7 +197,7 @@ export interface BackdropPlan {
   top: string
   bottom: string
   left: string
-  grain: boolean
+
 }
 
 /** 由当前轴与设置节算出渲染计划。该轴的色调没有染色色值（`official` 或留位色被脏写入）时隐藏整层。 */
@@ -211,13 +211,13 @@ export function backdropPlan(scheme: ColorScheme, settings: ThemeToneSettings): 
     top: tone.top,
     bottom: tone.bottom,
     left: painted ? tone.left : '',
-    grain: painted && tone.grain,
+
   }
 }
 
 /**
- * 色调卡的**所见即所得预览**：同一套色值与构成，按卡片尺度换几何（见 {@link PREVIEW_TOP_SHAPE}）、共享光层不放大而各款纵深放大
- * （判据见 {@link PREVIEW_ALPHA_SCALE}）；颗粒由样式表的 `.cube::after` 承担，组件只需按 `tone.grain` 打 `data-grain`。
+ * 色调卡的**所见即所得**预览：同一套色值与构成，按卡片尺度换几何（见 {@link PREVIEW_TOP_SHAPE}）、共享光层不放大而各款纵深放大
+ * （判据见 {@link PREVIEW_ALPHA_SCALE}）。2026-10-22 起没有颗粒层，预览与实况一致。
  */
 export function tonePreview(scheme: ColorScheme, id: ToneId): { backgroundColor: string; backgroundImage: string } {
   const axis = normalizeScheme(scheme)

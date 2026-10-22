@@ -44,8 +44,8 @@ export interface ToneSpec {
   bottom: string
   /** **左侧金色过渡**（额外一层，可选）：锚在视口左上角的暖色洗染，让左边栏也吃到金色并在左栏与对话列的接缝一带形成渐变。`''` = 不画（默认）。 */
   left: string
-  /** 是否叠颗粒星尘。 */
-  grain: boolean
+
+
 }
 
 /** 底部辉光（纵深）的**共享 alpha**：两轴各一档，改浓度只改这一个数字。浅色轴取 `.30` 而非深色的 `.18` —— 白底对浅色主色的通道余量只有深底对金的一半，观感等重需约 1.8 倍 alpha。 */
@@ -334,7 +334,7 @@ export const LIGHT_TONES: Readonly<Record<LightToneId, ToneSpec>> = Object.freez
     top: '',
     bottom: '',
     left: '',
-    grain: false,
+
   }),
   sakura: Object.freeze({
     available: true,
@@ -347,7 +347,7 @@ export const LIGHT_TONES: Readonly<Record<LightToneId, ToneSpec>> = Object.freez
     top: toneGlow('248, 198, 214', LIGHT_GLOW_ALPHA.top),
     bottom: depthGlow('248, 198, 214', 'light'),
     left: toneGlow('248, 198, 214', LIGHT_GLOW_ALPHA.left),
-    grain: true,
+
   }),
   blue: Object.freeze({
     available: true,
@@ -357,7 +357,7 @@ export const LIGHT_TONES: Readonly<Record<LightToneId, ToneSpec>> = Object.freez
     top: toneGlow('145, 215, 235', LIGHT_GLOW_ALPHA.top),
     bottom: depthGlow('145, 215, 235', 'light'),
     left: toneGlow('145, 215, 235', LIGHT_GLOW_ALPHA.left),
-    grain: true,
+
   }),
   green: Object.freeze({
     available: true,
@@ -367,7 +367,7 @@ export const LIGHT_TONES: Readonly<Record<LightToneId, ToneSpec>> = Object.freez
     top: toneGlow('176, 226, 186', LIGHT_GLOW_ALPHA.top),
     bottom: depthGlow('176, 226, 186', 'light'),
     left: toneGlow('176, 226, 186', LIGHT_GLOW_ALPHA.left),
-    grain: true,
+
   }),
 })
 
@@ -384,7 +384,7 @@ export const DARK_TONES: Readonly<Record<DarkToneId, ToneSpec>> = Object.freeze(
     top: '',
     bottom: '',
     left: '',
-    grain: false,
+
   }),
   violet: Object.freeze({
     available: true,
@@ -397,7 +397,7 @@ export const DARK_TONES: Readonly<Record<DarkToneId, ToneSpec>> = Object.freeze(
     // 本色仍是 pyai.site 原值；浓度按满屏 UI 上调（pyai.site 是留白为主的博客），alpha 见 {@link DEPTH_ALPHA}。
     bottom: depthGlow('96, 78, 168', 'dark'),
     left: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.left),
-    grain: true,
+
   }),
   crimson: Object.freeze({
     available: true,
@@ -409,7 +409,7 @@ export const DARK_TONES: Readonly<Record<DarkToneId, ToneSpec>> = Object.freeze(
     top: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.top),
     bottom: depthGlow('144, 58, 86', 'dark'),
     left: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.left),
-    grain: true,
+
   }),
   forest: Object.freeze({
     available: true,
@@ -419,7 +419,7 @@ export const DARK_TONES: Readonly<Record<DarkToneId, ToneSpec>> = Object.freeze(
     top: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.top),
     bottom: depthGlow('55, 118, 92', 'dark'),
     left: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.left),
-    grain: true,
+
   }),
 })
 
