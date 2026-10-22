@@ -106,53 +106,25 @@ export const LEFT_VARIABLE = '--dsh-theme-tone-left'
 
 /** **浮层面板底色**的 CSS 变量名 —— 所有弹出来的框共用的那一档填充，必须**只有一处事实来源**：
  *  走 token 的弹层与自带硬编码底色的弹层（`surface.ts` 的选择器）都读它，颜色才不会分叉。
- *  它是**纯色**（颗粒 / 三道光由 `surface.ts` 单独叠 —— 渐变按元素盒子缩放，小条会被压成金带）。 */
+ *  它是**纯色**（三道光由 `surface.ts` 单独叠 —— 渐变按元素盒子缩放，小条会被压成金带）。 */
 export const PANEL_VARIABLE = '--dsh-theme-tone-panel'
 
-/** 浮层颗粒贴图的 CSS 变量名 —— 与 {@link GRAIN_ATTR}（「要不要叠」的开关属性）不是一回事，
- *  这个是「叠哪张图」：浮层用 `background-image` 承载颗粒、图层没有独立 `opacity`，强度只能烘进
- *  贴图里，故需要**另一张**贴图（{@link POPUP_GRAIN_DATA_URI}），由色调的 `grain` 开关切换。 */
-export const GRAIN_TILE_VARIABLE = '--dsh-theme-tone-grain-tile'
-
-/**
- * **颗粒总开关**（2026-10-22 性能专项，owner 要求逐项验证时引入）。
+/*
+ * ===== 颗粒（tone grain）已于 2026-10-22 移除 =====
  *
- * `false` = 全插件不再画任何颗粒：背景层 `::after`、glass 的各个面、`surface.ts` 的浮层、
- * 扫光带背景板、设置行的色卡预览 —— 全部一起关。
+ * 原先每个色调可叠一层噪声纹理（`::after` + SVG feTurbulence 贴图 + `mix-blend-mode`）。
+ * 移除理由（owner 实机确认）：
+ *  ① 性能：颗粒层是全插件 4 处 `mix-blend-mode: screen` 的载体之一，滚动时参与每帧合成；
+ *     去掉后 owner 反馈「有明显改善」。
+ *  ② 观感：owner 反馈「没有颗粒似乎视觉效果更好」—— 暗色底上那层噪声反而让大面积留白显脏。
  *
- * 为什么做成**一个常量**而不是散着改：颗粒有 5 处注入点，且强度是「一处定、两路派生」
- * （{@link GRAIN_ALPHA} 同时喂运行期变量与浮层预乘贴图）。散着改极容易漏一处、或让两路强度不同源，
- * 于是「去掉颗粒」这件事就变成了「去掉大部分颗粒 + 留下一处看不见的」—— 那种状态下测出来的
- * 性能与观感都不作数。
- *
- * ⚠️ 置 `false` 时 `GRAIN_ALPHA` 由 {@link grainAlpha} 统一返回 0，两路同时归零；
- * 贴图本身仍是合法 data URI（`alpha=0` 的贴图），故不需要在 5 处各加分支。
+ * ⇒ 不再有开关：这些标识符**整族删除**（`GRAIN_ALPHA` / `GRAIN_TILE_VARIABLE` /
+ *   `GRAIN_ALPHA_VARIABLE` / `GRAIN_ATTR` / `POPUP_GRAIN_*` / `grainTileUri`）。
+ *   若将来要加回纹理，**不要**照抄旧的「贴图 + opacity + screen」那一套：
+ *   先读 `docs/spec/13-running-sweep-cost.md` 里关于全屏混合与滚动合成的实测结论。
  */
-export const GRAIN_ENABLED = false
 
-/** **颗粒强度** —— 全插件**唯一来源**（每轴一档）：运行期变量 {@link GRAIN_ALPHA_VARIABLE} 与浮层贴图里
- *  烘的 alpha 都由它派生。两轴取值不同是因为颗粒**方向相反**：深色轴 `screen` 加亮（白点在暗底 = 星光），
- *  浅色轴只能 `multiply` 压暗、近白底余量很小。
- *  ⚠️ 深色轴降强度会**同时压暗底色**（`screen` 加法混合的物理必然）；要「纹理变淡但底色不变」得另配底色补偿。 */
-const GRAIN_ALPHA_BASE: Readonly<Record<'light' | 'dark', number>> = Object.freeze({ light: 0.16, dark: 0.0975 })
-
-/**
- * 实际生效的颗粒强度（受 {@link GRAIN_ENABLED} 总开关控制）。
- * 所有消费方都必须读**这个函数**，不要直接读 `GRAIN_ALPHA_BASE` —— 否则总开关会漏掉那一处。
- */
-export function grainAlpha(scheme: 'light' | 'dark'): number {
-  return GRAIN_ENABLED ? GRAIN_ALPHA_BASE[scheme] : 0
-}
-
-/** 兼容导出：形状与旧的 `GRAIN_ALPHA` 一致，值受总开关控制。 */
-export const GRAIN_ALPHA: Readonly<Record<'light' | 'dark', number>> = Object.freeze({
-  get light() { return grainAlpha('light') },
-  get dark() { return grainAlpha('dark') },
-})
-
-/** 颗粒强度的**运行期变量**（由色调层写到 `body` 上）：伪元素层直接读它，贴图预乘那一路由
- *  {@link GRAIN_ALPHA} 派生 —— **两路同源**，所以 `GRAIN_ALPHA` 仍是唯一旋钮。 */
-export const GRAIN_ALPHA_VARIABLE = '--dsh-theme-tone-grain-alpha'
+/** **视口相位的定位区原点**（由 client half 实测后写到 `body` 上）—— 座底不透带与卡片缺口两条规则用它替代
 
 /** **视口相位的定位区原点**（由 client half 实测后写到 `body` 上）—— 座底不透带与卡片缺口两条规则用它替代
  *  `background-attachment: fixed`（`fixed` 每帧按视口栅格化，是滚动卡顿的主因，见 docs/spec/10）：每个载体两个量（定位区左缘 / 上缘距视口），相位声明当**长度**用（`calc(0px - var(…))`）把图片左上角钉回**视口左上角**（正是 `fixed` 的语义，且与元素自身宽高无关，CSS 侧不必改任何盒子几何）。
@@ -224,32 +196,8 @@ export const TOP_STOP_VARIABLE = '--dsh-theme-tone-top-stop'
  *  将来要按「真模态 vs 小弹层」分流，判据是 `aria-modal` 而非 `role='dialog'`。） */
 export const DIALOG_ANCHOR = `body ${anchorSelector(ANCHOR.dialog)}`
 
-/** **浮层颗粒强度相对「地面」的补偿系数** —— 浮层不能用 `GRAIN_ALPHA` 原值：地面走
- *  `mix-blend-mode: screen`（把噪声**提亮**），而浮层是普通合成（`normal`），同样的名义 alpha 在浮层上
- *  显得更淡，实测需要**更强**才读起来同档（同一屏幕位置定标：浮层 5.006 / 地面 8.794 ⇒ k* ≈ 1.23）。
- *  写成系数而不是直接改 `GRAIN_ALPHA`，是为了背景强度再调时两处**一起动且保持同档**；两轴共用一个系数。 */
-export const POPUP_GRAIN_COMPENSATION = 1.23
-
-/** 该轴烘进浮层贴图的 alpha（见 {@link POPUP_GRAIN_COMPENSATION}）。
- *  ⚠️ 结果**四舍五入到 4 位小数**：否则浮点尾数（`0.06824999999999999`）会被**逐字烘进 data URI**，
- *  既难看、也让「贴图里的值 == 常量」这类断言变脆。 */
-export function popupGrainAlpha(scheme: 'light' | 'dark'): number {
-  return Math.round(GRAIN_ALPHA[scheme] * POPUP_GRAIN_COMPENSATION * 1e4) / 1e4
-}
-
-/** 构造浮层颗粒贴图 —— 把强度烘进 SVG 的 `<rect opacity>`（`background-image` 图层没有独立
- *  `opacity`，只能预乘）；噪声与背景层同一张 `feTurbulence`、逐字同参数。 */
-export function grainTileUri(alpha: number): string {
-  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='${alpha}' filter='url(%23n)'/%3E%3C/svg%3E")`
-}
-
-/** 浮层颗粒贴图（深色轴）—— 由 {@link GRAIN_ALPHA} × {@link POPUP_GRAIN_COMPENSATION} 派生。 */
-export const POPUP_GRAIN_DATA_URI = grainTileUri(popupGrainAlpha('dark'))
 
 /** **浮层三道光相对「地面」的强度补偿**，取 0.7 —— 「统一」的判据是**同一屏幕位置上浮层的 alpha
  *  等于地面的 alpha**：两道光的配方都是锁定常量，可解析解出 k\* ≈ 0.69（峰值口径实测交叉验证吻合）。
- *  与顶栏那条路的 {@link GLASS_HEADER_ALPHA} 同值但理由不同，将来调一处时能立刻想到另一处。 */
+ *  与顶栏那条路的 `GLASS_HEADER_ALPHA` 同值但理由不同，将来调一处时能立刻想到另一处。 */
 export const POPUP_LIGHT_COMPENSATION = 0.7
-
-/** 颗粒开关的 DOM 属性（`off` 时 `::after` 不渲染）。 */
-export const GRAIN_ATTR = 'data-grain'

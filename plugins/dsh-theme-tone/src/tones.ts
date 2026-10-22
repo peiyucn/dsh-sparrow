@@ -5,15 +5,10 @@
 
 import {
   BOTTOM_VARIABLE,
-  GRAIN_ALPHA,
-  GRAIN_ALPHA_VARIABLE,
-  GRAIN_TILE_VARIABLE,
   LEFT_VARIABLE,
   PANEL_VARIABLE,
   TOP_STOP_VARIABLE,
   TOP_VARIABLE,
-  grainTileUri,
-  popupGrainAlpha,
 } from './constants.js'
 
 /** **顶光收束点**（两轴同值）：浅色轴的几何一律照深色轴那束金（两轴严格镜像），三层光都是淡光、收束点那道边看不出来，故共用一个值。 */
@@ -450,18 +445,7 @@ export const LIGHT_TOKENS: readonly Readonly<{
     token: LEFT_VARIABLE,
     pick: (tone: ToneSpec) => tone.left === '' ? 'transparent' : tone.left,
   }),
-  Object.freeze({
-    token: GRAIN_TILE_VARIABLE,
-    // 贴图里烘的 alpha = `GRAIN_ALPHA` × `POPUP_GRAIN_COMPENSATION`（唯一来源在 constants.ts）。
-    // ⚠️ **不能直接用 GRAIN_ALPHA**：浮层那条路没有 `mix-blend-mode: screen`，同一 alpha 会比背景层重约 43%。
-    pick: (tone: ToneSpec, scheme: ColorScheme) =>
-      tone.grain ? grainTileUri(popupGrainAlpha(scheme)) : 'none',
-  }),
-  /** **颗粒强度的运行期变量**（伪元素那种「贴图 + 独立 `opacity`」的颗粒层读它）—— 与上面那张贴图同源：两路都从 {@link GRAIN_ALPHA} 派生，减弱 = 改这一个对象。 */
-  Object.freeze({
-    token: GRAIN_ALPHA_VARIABLE,
-    pick: (_tone: ToneSpec, scheme: ColorScheme) => String(GRAIN_ALPHA[scheme]),
-  }),
+  // 2026-10-22 起**不再发颗粒变量**（颗粒已整族移除；理由见 constants.ts 里那段说明）。
 ])
 
 /** 某一轴的完整色调表。 */

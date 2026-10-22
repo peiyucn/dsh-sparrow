@@ -8,9 +8,8 @@
 import type { ReactNode } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-import { GRAIN_ATTR } from '../constants.js'
 import { tonePreview } from '../backdrop.js'
-import { availableToneIds, toneFor, type ColorScheme, type ToneId } from '../tones.js'
+import { availableToneIds, type ColorScheme, type ToneId } from '../tones.js'
 import type { createThemeToneRowStore } from './store.js'
 import { ROW_CLASS } from './styles.js'
 
@@ -42,8 +41,6 @@ export function ThemeToneRow({ t, useStore, setTone }: ThemeToneRowComponentProp
             className={id === tone ? `${ROW_CLASS.cube} ${ROW_CLASS.selected}` : ROW_CLASS.cube}
             /* 所见即所得：卡片底色 + 顶部/底部染色 = 这个色调铺满整屏的样子 */
             style={tonePreview(colorScheme, id)}
-            /* 颗粒开关读色调自己的 grain；样式表按这个属性决定 ::after 显不显 */
-            {...{ [GRAIN_ATTR]: toneFor(colorScheme, id).grain ? 'on' : 'off' }}
             aria-pressed={id === tone}
             onClick={() => { setTone(id, colorScheme) }}
           >

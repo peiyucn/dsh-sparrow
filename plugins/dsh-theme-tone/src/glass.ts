@@ -4,9 +4,9 @@
  * ⚠️ `buildGlassCss` / `buildCardNotchCss` / `buildSeamCss` 的模板字符串里的注释**不能出现反引号**（会截断字符串）。
  */
 
-import { ABOVE_CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_ENABLED, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_BAND_VARIABLE, PHASE_NOTCH_ATTR, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
+import { ABOVE_CONTENT_Z_INDEX, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_BAND_VARIABLE, PHASE_NOTCH_ATTR, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
 import { ANCHOR, anchorSelector } from './anchors.js'
-import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, compensatedBackdropGradients, faceLayerGeometry, grainOverGradients } from './backdrop.js'
+import { BACKDROP_GRADIENTS, compensatedBackdropGradients, faceLayerGeometry, grainOverGradients } from './backdrop.js'
 
 /** 顶栏高度（px）：官方钉死 76px（= 左栏两条 38px 带之和），本模块的补高 / 滚条偏移 / 拖拽条裁切都按它算。 */
 export const HEADER_HEIGHT_PX = 76
@@ -397,25 +397,9 @@ body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-pane],
 body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
   background-blend-mode: screen, screen, screen;
 }
-${GRAIN_ENABLED ? `body:not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
-body:not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: ${GRAIN_DATA_URI};
-  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY});
-}
-body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
-body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
-  mix-blend-mode: screen;
-}
-body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
-body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
-  mix-blend-mode: multiply;
-  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT});
-}` : '/* 颗粒总开关关闭（GRAIN_ENABLED=false）：右栏 dockkit 宿主的颗粒层整条不生成。 */'}
-
+/* ⚠️ 右栏 dockkit 宿主**不额外画背景层**（2026-10-22 起没有颗粒层）：
+   它靠上面那条 background-image（三道光）+ background-blend-mode 与背景层同构，
+   不再需要 ::after 那一层 —— 少一层就少一次合成。 */
 /* ===== 右栏顶部的两条 38px 带（dockkit 条 + 文件面板头行）：补上顶栏那份**玻璃**（同 blur、同 0.7 alpha、同光层）=====
    官方面板 0..76 里，条的颗粒是**生的**（没被 blur 糊过）、也没有那层半透明填充把它压到与顶栏同一档 ⇒ 右栏顶部看起来和别处不是一个材质。
    ⚠️ 面挂在**各标签自己的头行**的 ::before 上、并**向上铺满 0..76** —— blur 的采样区是**边框盒**，只有两个面的盒子完全重合、y=38 两侧算出的颜色才一致（分两个盒子必出缝）；⚠️ 面只能锚在**确有 38px 头行**的标签上：终端（data-sidebar-terminal）没有头行、正文正落在 38..76，盖上去等于糊住内容 —— 不许图省事锚在公共祖先 [data-dockkit-pane] 上；⚠️ 高度用 bottom: 0（止于内边距盒底）而不是写死 76px —— 否则会把官方头行那 1px 下边框压在自己那层填充之下、细线被洗掉。

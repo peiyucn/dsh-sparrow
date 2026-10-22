@@ -2,8 +2,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  GRAIN_DATA_URI,
-  GRAIN_OPACITY,
   LAYER_SELECTOR,
   STYLE_SELECTOR,
   backdropPlan,
@@ -39,7 +37,7 @@ import {
 import { ANCHOR, ANCHOR_ATTR } from '../lib/anchors.js'
 import { buildRowCss } from '../lib/client/styles.js'
 import { buildGlassCss } from '../lib/glass.js'
-import { BACKDROP_CLASS, BACKDROP_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_ATTR, GRAIN_ENABLED, MARKER_ATTR } from '../lib/constants.js'
+import { BACKDROP_CLASS, BACKDROP_Z_INDEX, MARKER_ATTR } from '../lib/constants.js'
 import { DARK_TONES, DEFAULT_SETTINGS, DEPTH_ALPHA, LIGHT_TONES } from '../lib/tones.js'
 
 const settings = (lightTone, darkTone) => ({ lightTone, darkTone })
@@ -82,26 +80,15 @@ describe('背景层样式表', () => {
     assert.match(css, /\[hidden\] \{\s*display: none;/u)
   })
 
-  it('颗粒层应该 带上 pyai.site 同款 data URI 与**统一来源的**不透明度', () => {
-    // 2026-10-22 起「画不画颗粒」是总开关（GRAIN_ENABLED）。两档都要守：
-    //  - 启用：贴图 + 统一来源的 opacity + data-grain 开关，一项不少；
-    //  - 关闭：**一处都不得有**（漏一处就是「大部分没颗粒、某处还有」的诡异状态）。
-    if (!GRAIN_ENABLED) {
-      assert.ok(!css.includes(GRAIN_DATA_URI), '总开关关闭时不得出现颗粒贴图')
-      assert.ok(!css.includes(GRAIN_ALPHA_VARIABLE), '总开关关闭时不得引用颗粒强度变量')
-      assert.ok(!css.includes('feTurbulence'), '总开关关闭时不得生成噪声贴图')
-      return
-    }
-    assert.ok(css.includes(GRAIN_DATA_URI))
-    assert.match(
-      css,
-      new RegExp(`opacity: var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY}\\)`, 'u'),
-      `颗粒层 opacity 应读 ${GRAIN_ALPHA_VARIABLE}（回落 ${GRAIN_OPACITY}）`,
-    )
-    assert.match(css, /\[data-grain='off'\]::after \{\s*display: none;/u)
+  it('背景层不得有任何颗粒层（2026-10-22 起颗粒整族移除）', () => {
+    // owner 在真机确认：去掉颗粒后滚动明显改善、观感也更好 ⇒ 不再是「开关关掉」，而是这些符号不存在。
+    // 旧实现在这里画过 ::after（feTurbulence 贴图 + opacity + screen 混合）：
+    // 那是全屏固定层上的第二个伪元素层，滚动时每帧都要参与合成。
+    assert.ok(!css.includes('feTurbulence'), '不得生成噪声贴图')
+    assert.ok(!css.includes('dsh-theme-tone-grain'), '不得引用颗粒变量')
   })
 
-  it('用户内容应该 被抬到背景层之上（图片不该被染色 / 上颗粒）', () => {
+  it('用户内容应该 被抬到背景层之上（图片不该被染色）', () => {
     // 背景层是覆盖全屏的 fixed 层，必须抬**整个对话容器**而不是单个 img ——
     // img 会同时高过没有 z-index 的输入框，整体抬升才保住内部前后序。
     assert.ok(
@@ -418,34 +405,14 @@ describe('色调卡样式', () => {
     assert.equal(Number(minHeight[1]), OFFICIAL_CUBE_HEIGHT, '应钉在与官方卡等高的 83px')
   })
 
-  it('卡面应该 带颗粒质感（与实况同一条纹理、同一不透明度来源、同一 screen 混合）', () => {
-    if (!GRAIN_ENABLED) {
-      assert.ok(!css.includes(GRAIN_DATA_URI), '总开关关闭时卡面也不得画颗粒')
-      return
-    }
-    assert.ok(css.includes(GRAIN_DATA_URI), '卡面要用与实况同一条颗粒纹理')
-    assert.match(
-      css,
-      new RegExp(`opacity: var\\(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY}\\)`, 'u'),
-      '不透明度与实况同源（同一个统一变量）',
-    )
-    assert.match(css, /mix-blend-mode: screen/u, 'screen 混合才只加亮、不发脏')
-  })
-
-  it('颗粒应该 只在深色轴显示（官方默认与浅色轴按 data-grain=off 关掉）', () => {
-    if (!GRAIN_ENABLED) {
-      assert.ok(!css.includes(GRAIN_DATA_URI), '总开关关闭时不存在这个开关属性')
-      return
-    }
-    assert.match(css, new RegExp(`\\[${GRAIN_ATTR}='off'\\]::after \\{\\s*display: none;`, 'u'))
-  })
-
-  it('卡片应该 把颗粒关在卡内（overflow 裁剪 + isolate 隔离混合）', () => {
-    assert.match(css, /overflow: hidden/u, '颗粒不得溢出圆角')
-    assert.match(css, /isolation: isolate/u, '混合只在卡内发生，不渗到卡片外的页面')
-    assert.match(css, /position: relative/u, '颗粒层要相对卡片定位')
+  it('卡面不得再画颗粒（2026-10-22 起整族移除）', () => {
+    // 旧实现在卡面叠过 ::after 颗粒（贴图 + opacity + screen）—— 那是「一个变量两条管线」的来源，
+    // 也是暗色底上大面积留白显脏的原因。owner 确认去掉后观感更好，故连开关一起删。
+    assert.ok(!css.includes('feTurbulence'), '卡面不得出现噪声贴图')
+    assert.ok(!css.includes('mix-blend-mode: screen'), '卡面不得再用 screen 混合叠纹理')
   })
 })
+
 
 describe('DOM 选择器', () => {
   it('层与样式表选择器应该 互不命中（重载去重不能抓错元素）', () => {

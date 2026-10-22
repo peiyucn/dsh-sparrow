@@ -11,10 +11,6 @@ import {
   CONTENT_ATTR,
   CONTENT_Z_INDEX,
   DOCKKIT_MENU_ATTR,
-  GRAIN_ALPHA,
-  GRAIN_ALPHA_VARIABLE,
-  GRAIN_ATTR,
-  GRAIN_TILE_VARIABLE,
   LEFT_VARIABLE,
   MARKER_ATTR,
   NOTICE_Z_INDEX,
@@ -28,25 +24,9 @@ import {
   WIDTH_HANDLE_ATTR,
 } from './constants.js'
 import { ANCHOR, ANCHOR_ATTR } from './anchors.js'
-import { GRAIN_ENABLED } from './constants.js'
 import { normalizeScheme, toneFor, toneIdOf, type ColorScheme, type ThemeToneSettings, type ToneId } from './tones.js'
 
 
-/**
- * 颗粒叠加层不透明度（**深色轴**）。**唯一来源是 constants.ts 的 {@link GRAIN_ALPHA}**（这里保留名字只为兼容既有引用），
- * **不要再在这里改数字**；浅色轴见 {@link GRAIN_OPACITY_LIGHT}。
- */
-export const GRAIN_OPACITY = GRAIN_ALPHA.dark
-
-/**
- * 颗粒不透明度（**浅色轴**）—— 取值 `.16`：两轴颗粒方向相反（深色轴 `screen` 加亮、浅色轴只能 `multiply` 压暗），
- * 近白底往上只剩几级余量 ⇒ 纹理与亮度是**线性权衡**：`.13` 太弱、`.28` 会全屏压暗一档。
- */
-export const GRAIN_OPACITY_LIGHT = GRAIN_ALPHA.light
-
-/** 颗粒纹理：200×200 `feTurbulence`，逐字取自 pyai.site `global.css`；data URI 可行是因为应用外壳未设 CSP。 */
-export const GRAIN_DATA_URI
-  = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")"
 
 /**
  * 深色轴径向染色的形状（与 pyai.site 同参数）。**几何一律用 `vw` / `vh` 不用 `%`**：顶栏（76px 高）复用同一串
@@ -122,29 +102,25 @@ export const BACKDROP_GRADIENTS = `radial-gradient(${DARK_RADIAL_SHAPE}, var(${T
     radial-gradient(${BOTTOM_RADIAL_SHAPE}, var(${BOTTOM_VARIABLE}, transparent), ${BOTTOM_RADIAL_STOP}),
     radial-gradient(${LEFT_RADIAL_SHAPE}, var(${LEFT_VARIABLE}, transparent), ${LEFT_RADIAL_STOP})`
 
-/** 「**颗粒 + 背景层那串光**」两行 —— 凡把背景原样重画一遍的地方都用它（底座 / 右边栏 / 扫光带）；
- * 共用的是这两行、不是整条规则（三处外围各异），抽出来只为「颗粒与光必须同源」不被漏抄。
- *
- * ⚠️ `GRAIN_ENABLED === false` 时**不再把颗粒瓦片写进 background-image**（而不是让它指到
- * 一张 alpha=0 的贴图）：多一个 `background-image` 层，每次重绘该面都要多解析/栅格化一层，
- * 而它画出来是全透明的 —— 纯浪费。总开关要真的**少一层**，不只是「看不见」。
- */
+/** 把背景原样重画一遍时用的那串光 —— 凡把背景重画的地方都用它（底座 / 右边栏 / 扫光带 / 浮层）；
+ *  抽出来只为「光必须同源」不被漏抄。（2026-10-22 起不再叠颗粒，故它就是 {@link BACKDROP_GRADIENTS}；
+ *  保留这个函数名是为了让调用点读起来仍是「重画背景」这件事，而不是「引用一串渐变」。） */
 export function grainOverGradients(): string {
-  if (!GRAIN_ENABLED) return BACKDROP_GRADIENTS
-  return `var(${GRAIN_TILE_VARIABLE}, none),\n    ${BACKDROP_GRADIENTS}`
+  return BACKDROP_GRADIENTS
 }
 
 /**
  * 面层的 `background-size` / `-repeat` / `-position` 逐层值。
- * ⚠️ 颗粒层存在与否会改变层数，而这三个属性**必须先给够层数**（不足会按序循环补齐、
- * 把颗粒拉成粗块或让渐变按元素自身盒子解析）。故统一由本函数按总开关产出，不要各处手写。
+ * ⚠️ 这三个属性**必须先给够层数**（不足会按序循环补齐、让渐变按元素自身盒子解析、把光压成硬边带）。
+ * 层数就是三道光，故统一由本函数产出，不要各处手写 —— 将来若再加/减一层，改这里一处即可。
  */
 export function faceLayerGeometry(perGradient: string): { size: string; repeat: string; position: string } {
   const gradients = [perGradient, perGradient, perGradient]
-  const sizes = GRAIN_ENABLED ? ['auto', ...gradients] : gradients
-  const repeats = GRAIN_ENABLED ? ['repeat', ...gradients.map(() => 'no-repeat')] : gradients.map(() => 'no-repeat')
-  const positions = GRAIN_ENABLED ? ['0px 0px', ...gradients.map(() => '0px 0px')] : gradients.map(() => '0px 0px')
-  return { size: sizes.join(', '), repeat: repeats.join(', '), position: positions.join(', ') }
+  return {
+    size: gradients.join(', '),
+    repeat: gradients.map(() => 'no-repeat').join(', '),
+    position: gradients.map(() => '0px 0px').join(', '),
+  }
 }
 
 /*
@@ -184,27 +160,15 @@ export function buildBackdropCss(): string {
 .${BACKDROP_CLASS}[hidden] {
   display: none;
 }
-${GRAIN_ENABLED ? `.${BACKDROP_CLASS}::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY});
-  background-image: ${GRAIN_DATA_URI};
-}
-.${BACKDROP_CLASS}[${GRAIN_ATTR}='off']::after {
-  display: none;
-}` : `/* 颗粒总开关关闭（GRAIN_ENABLED=false）：**整条 ::after 不生成** —— 不画一个 alpha=0 的层，
-   而是根本没有这一层。少一层就少一次合成。 */`}
-body[data-ds-dark-theme] .${BACKDROP_CLASS}${GRAIN_ENABLED ? `,\nbody[data-ds-dark-theme] .${BACKDROP_CLASS}::after` : ''} {
+/* ⚠️ 背景层**只有一层**（三道光画在元素自己身上），2026-10-22 起不再有 ::after 颗粒层。
+   少一层就是少一次合成 —— 滚动时这层是全屏固定的，任何多余的层都会摊到每一帧上。
+   别为了「质感」把它加回来，先读 docs/spec/13-running-sweep-cost.md 的实测结论。 */
+body[data-ds-dark-theme] .${BACKDROP_CLASS} {
   mix-blend-mode: screen;
 }
 body:not([data-ds-dark-theme]) .${BACKDROP_CLASS} {
   mix-blend-mode: normal;
-}${GRAIN_ENABLED ? `
-body:not([data-ds-dark-theme]) .${BACKDROP_CLASS}::after {
-  mix-blend-mode: multiply;
-  opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT});
-}` : ''}
+}
 body:not([${PLAIN_ATTR}]) [${CONTENT_ATTR}] {
   position: relative;
   z-index: ${CONTENT_Z_INDEX};
