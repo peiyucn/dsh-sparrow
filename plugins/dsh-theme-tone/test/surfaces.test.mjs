@@ -27,7 +27,7 @@ import {
   tokenOverrides,
   washFill,
 } from '../lib/tones.js'
-import { BACKDROP_GRADIENTS, grainOverGradients } from '../lib/backdrop.js'
+import { BACKDROP_GRADIENTS, backdropGradients } from '../lib/backdrop.js'
 import { ANCHOR, anchorSelector } from '../lib/anchors.js'
 import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELF_SCROLLER_SUFFIX, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, OWN_BACKGROUND_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, STATIC_SURFACE_ANCHORS, usesAfterLayer, usesOfficialBeforeLayer, usesOwnBackground } from '../lib/surface.js'
 import {
@@ -1031,10 +1031,10 @@ describe('抬升面：表面绘制', () => {
     const layers = splitLayers(image)
     assert.ok(layers.length >= 2, `标题必须是多层合成（实测 ${layers.length} 层）`)
     assert.ok(layers[0].startsWith('linear-gradient('), `第一层必须是菜单填充：${layers[0]}`)
-    // 地面那几层必须**逐字**来自 grainOverGradients()（三段光，同源不许手抄）
+    // 地面那几层必须**逐字**来自 backdropGradients()（三段光，同源不许手抄）
     assert.ok(
-      image.includes(grainOverGradients()),
-      '不透明底之上必须原样重画地面（grainOverGradients：三段光）',
+      image.includes(backdropGradients()),
+      '不透明底之上必须原样重画地面（backdropGradients：三段光）',
     )
     // ⑥ 逐层 attachment / blend 的**值数必须等于层数**：CSS 在值少于层数时是整串重复，
     //    少写一个就会让第 4、5 层退回 `scroll`、光层被压扁（05-surfaces §8.2 的坑）。
@@ -1159,12 +1159,12 @@ describe('抬升面：表面绘制', () => {
     const offset = 0
     void 0
     assert.ok(layers[0 + offset].includes('linear-gradient('), '层序：填充在颗粒之下')
-    // 地面那几层 = 函数返回串的后半段，**逐字**等于 grainOverGradients()（只差排版空白）
+    // 地面那几层 = 函数返回串的后半段，**逐字**等于 backdropGradients()（只差排版空白）
     const ground = layers.slice(1 + offset).join(', ').replace(/\s+/gu, ' ')
     assert.equal(
       ground,
-      grainOverGradients().replace(/\s+/gu, ' '),
-      '层序：地面在最下，且必须原样重画（grainOverGradients：三段光）',
+      backdropGradients().replace(/\s+/gu, ' '),
+      '层序：地面在最下，且必须原样重画（backdropGradients：三段光）',
     )
     // 两个 token 都要在覆盖层里，且**每个轴上取值必须完全相同**。
     assert.deepEqual(

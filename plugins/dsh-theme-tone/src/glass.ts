@@ -6,7 +6,7 @@
 
 import { ABOVE_CONTENT_Z_INDEX, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_BAND_VARIABLE, PHASE_NOTCH_ATTR, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
 import { ANCHOR, anchorSelector } from './anchors.js'
-import { BACKDROP_GRADIENTS, compensatedBackdropGradients, faceLayerGeometry, grainOverGradients } from './backdrop.js'
+import { BACKDROP_GRADIENTS, compensatedBackdropGradients, faceLayerGeometry, backdropGradients } from './backdrop.js'
 
 /** 顶栏高度（px）：官方钉死 76px（= 左栏两条 38px 带之和），本模块的补高 / 滚条偏移 / 拖拽条裁切都按它算。 */
 export const HEADER_HEIGHT_PX = 76
@@ -172,7 +172,7 @@ function pct(alpha: number): string {
 // ⚠️ 默认走 `background-attachment: fixed`（百分比按视口解析、与元素几何无关），滚动在场地两条另有性能档（{@link bandPhasePaint} / {@link notchPhasePaint}）。
 function backingPaint(): string {
   return `background-color: var(--dsw-alias-bg-base);
-  background-image: ${grainOverGradients()};
+  background-image: ${backdropGradients()};
   background-attachment: fixed;`
 }
 
@@ -182,7 +182,7 @@ function backingPaint(): string {
 function viewportPhaseDecls(vars: { readonly left: string; readonly top: string }): string {
   const L = `var(${vars.left})`
   const T = `var(${vars.top})`
-  // ⚠️ 层数与 `grainOverGradients()` 必须一致（颗粒总开关会改变它）：故几何由 faceLayerGeometry 产出，
+  // ⚠️ 层数与 `backdropGradients()` 必须一致（颗粒总开关会改变它）：故几何由 faceLayerGeometry 产出，
   // 这里只把**位置**换成本载体自己的视口相位（每层同一配方）。
   const g = faceLayerGeometry('100vw 100vh')
   const layers = g.size.split(', ').length
@@ -211,7 +211,7 @@ export function notchPhasePaint(): string {
  *   把盒子缩到 1/225 也不省）。这类规则数量多、且有的挂在流式内容里，
  *   多会话并行时叠起来就是可感掉帧。
  *   改用与背景层同尺寸的显式几何，视觉等价（真机逐像素：全屏 160 万点里 85 点改变 = 0.005%）。
- * ⚠️ 必须**逐层**给 size / repeat / position，且**层数要跟 `grainOverGradients()` 一致**：
+ * ⚠️ 必须**逐层**给 size / repeat / position，且**层数要跟 `backdropGradients()` 一致**：
  *   少给会按序循环补齐（把颗粒拉成粗块、让渐变按元素自身盒子解析）；
  *   多给则多出来的值被丢弃 —— 但更要紧的是「颗粒总开关」关掉时，图层数从 4 变 3，
  *   这里必须跟着变，否则等于给 3 层写了 4 个值。故统一由 `faceLayerGeometry` 产出。
@@ -227,7 +227,7 @@ const GROUND_REDRAW_GEOMETRY = (() => {
 /** 「按背景**原样画满**」的配方 + 显式几何（不走 fixed）—— 吸顶行与轨迹视图共用。 */
 function groundRedrawPaint(): string {
   return `background-color: var(--dsw-alias-bg-base);
-  background-image: ${grainOverGradients()};
+  background-image: ${backdropGradients()};
   ${GROUND_REDRAW_GEOMETRY}`
 }
 
@@ -367,9 +367,9 @@ body:not([${PLAIN_ATTR}])[${WORKSTART_ATTR}] ${phaseGate(GLASS_CARD_PHASES)} [da
 }
 
 /* ===== 右边栏：自己画一遍背景层的光与颗粒 =====
-   右边栏为了不被抬到 81 的内容层盖住而被抬到 82（见 backdrop.ts 的不变式），而背景层在 80 ⇒ 吃不到那层色调的光与颗粒；底色已被 token 染对，缺的只是质感，把背景层那套渐变与颗粒**叠上去**即可（用 background-image 与 background-color 分层，不碰官方底色）；⚠️ 0.1.7 起真正刷底色的是 dockkit 的**内容宿主** [data-dockkit-pane]（不透明，且是 .panel 的**后代**），不一起画就被它整个盖掉、右边栏看着是一块没有任何色调质感的纯色板 —— .panel 那条保留（它仍负责面板本体、浮动面板与空态）。
+   右边栏为了不被抬到 81 的内容层盖住而被抬到 82（见 backdrop.ts 的不变式），而背景层在 80 ⇒ 吃不到那层色调的光；底色已被 token 染对，缺的只是那几道光，把背景层那套渐变**叠上去**即可（用 background-image 与 background-color 分层，不碰官方底色）；⚠️ 0.1.7 起真正刷底色的是 dockkit 的**内容宿主** [data-dockkit-pane]（不透明，且是 .panel 的**后代**），不一起画就被它整个盖掉、右边栏看着是一块没有任何色调质感的纯色板 —— .panel 那条保留（它仍负责面板本体、浮动面板与空态）。
    ⚠️ **不能再用 background-attachment: fixed**：只要元素或任一祖先带非 none 的 transform，fixed 就会**静默**把定位区改判成元素自己的盒子（任意深度、静态与动态 transform 都算），而官方 .panel 的开关动画恰恰就是 translateX ⇒ 动画中顶光 / 底光会灌进面板；故改成「显式 100vw x 100vh 背景盒 + 右对齐」：.panel 是 absolute + right: 0、承载它的 frame 又是全窗宽 ⇒ **面板右缘恒等于视口右缘**，两种 regime 同解。
-   ⚠️ **颗粒必须与背景层「同构」**：背景层是「3 层渐变写在自己身上 + 颗粒走 ::after + opacity + 深色轴 mix-blend-mode: screen」，把颗粒当成**第 4 个背景层**正常合成 ⇒ 深色轴上 screen 是纯加法、正常合成还会压暗黑像素 ⇒ 会话区交界处一条**竖直分界线**；故这里也是「3 层渐变 + ::after 颗粒」，opacity 与混合模式**逐字对齐背景层**（直引 GRAIN_OPACITY / GRAIN_OPACITY_LIGHT / GRAIN_DATA_URI，不复制数值）；⚠️ background-size / -position / -repeat 现在是 **3 层**，**必须给足 3 个值** —— 值少于层数时会**按顺序循环补齐**。
+   ⚠️ **光的合成方式必须与背景层「同构」**：背景层深色轴整层是 mix-blend-mode: screen，而面板这里是正常合成 ⇒ 同样的渐变在两边亮度不同，交界处是一条**竖直分界线**；故这里用 background-blend-mode: screen 对齐（见下面那条）。2026-10-22 起不再有颗粒层，故本面就是「三道光」。⚠️ background-size / -position / -repeat 现在是 **3 层**，**必须给足 3 个值** —— 值少于层数时会**按顺序循环补齐**。
    ⚠️⚠️ **[data-sidebar-right-panel] 本体绝不能写 position**：它靠官方 .panel 的 absolute + top: 0 / bottom: 0 拉满可视高，内部的 .paneBody{overflow:auto} 才有一个**有界**的滚动区；写成 relative 后 bottom: 0 从「拉满高度」退化成「相对偏移」，面板高度改由内容撑开、内层滚动条因没有可滚余量而**彻底失效**（实测长文件预览 panel 高 11842px、视口 720px）—— 故定位上下文只在官方 static 的 dockkit 宿主上补。⚠️⚠️ **面板那条必须门在 [data-sidebar-right-open] 上**：官方 .panel 是常驻元素，**收起时并不消失、也不变窄**（宽度来自持久化的 --dsh-sidebar-width），收起时官方只把里面的 dockkit 宿主移走 + visibility:hidden ⇒ 我们这片 100vw x 100vh 的渐变会以 screen 压在会话区右侧（「打开过一次，背景就花了」）；官方在滑动开始前就置该属性，故动画期间照常生效。 */
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open],
 body:not([${PLAIN_ATTR}]) [data-dockkit-pane],
