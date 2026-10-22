@@ -24,19 +24,18 @@ import {
   WASH_TINT,
   WASH_TOKENS,
   panelFill,
-  toneFieldFor,
   tokenOverrides,
   washFill,
 } from '../lib/tones.js'
-import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, grainOverGradients } from '../lib/backdrop.js'
+import { BACKDROP_GRADIENTS, grainOverGradients } from '../lib/backdrop.js'
 import { ANCHOR, anchorSelector } from '../lib/anchors.js'
 import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELF_SCROLLER_SUFFIX, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, OWN_BACKGROUND_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, STATIC_SURFACE_ANCHORS, usesAfterLayer, usesOfficialBeforeLayer, usesOwnBackground } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
-  GRAIN_ALPHA,
-  GRAIN_ALPHA_VARIABLE,
-  GRAIN_TILE_VARIABLE,
+
+
+
   HOVER_CARD_ANCHOR,
   HOVER_CARD_TEXT_TOKENS,
   PANEL_VARIABLE,
@@ -48,10 +47,10 @@ import {
   POPUP_TOP_SHAPE,
   TOP_VARIABLE,
   LEFT_VARIABLE,
-  grainTileUri,
-  popupGrainAlpha,
-  POPUP_GRAIN_COMPENSATION,
-  GRAIN_ENABLED,
+
+
+
+
 } from '../lib/constants.js'
 import { buildGlassCss, GLASS_HEADER_ALPHA, GLASS_SPECULAR_RING } from '../lib/glass.js'
 
@@ -505,18 +504,18 @@ describe('抬升面：不变量', () => {
     // `LEFT_VARIABLE` 在 surface.ts 里一次都没出现过（tones 早已发到 body，继承得到，只是没用）。
     // 补上后浮层与背景层同为三道光。
     const layers = surfaceLayers().split(',\n    ')
-    // ⚠️ 2026-10-22 起「画不画颗粒」是总开关：关闭时颗粒那一层**整条不加**，层数由 4 变 3。
-    const offset = GRAIN_ENABLED ? 1 : 0
-    assert.equal(layers.length, 3 + offset, GRAIN_ENABLED ? '颗粒 + 顶光 + 底光 + 左光' : '顶光 + 底光 + 左光')
-    if (GRAIN_ENABLED) {
-      assert.equal(layers[0], `var(${GRAIN_TILE_VARIABLE}, none)`, '颗粒压在最上面才像砂面')
-    }
-    assert.ok(layers[0 + offset].includes(POPUP_TOP_SHAPE), '顶光')
-    assert.ok(layers[1 + offset].includes(POPUP_BOTTOM_SHAPE), '底光')
-    assert.ok(layers[2 + offset].includes(POPUP_LEFT_SHAPE), '左光（与背景层对齐）')
-    for (const layer of layers.slice(offset)) {
+    // 2026-10-22 起没有颗粒层：浮层就是三道光。
+    assert.equal(layers.length, 3, '顶光 + 底光 + 左光')
+    assert.ok(layers[0].includes(POPUP_TOP_SHAPE), '顶光')
+    assert.ok(layers[1].includes(POPUP_BOTTOM_SHAPE), '底光')
+    assert.ok(layers[2].includes(POPUP_LEFT_SHAPE), '左光（与背景层对齐）')
+    for (const layer of layers) {
       assert.ok(layer.includes(POPUP_STOP), `每层都以同一个收束点结束：${POPUP_STOP}`)
     }
+
+
+
+
     // 三条光必须**都**引用各自的运行期变量，且都带 transparent 兜底
     // （官方默认档下这些变量是 transparent ⇒ 等于什么都不画）。
     for (const [shape, variable] of [[POPUP_TOP_SHAPE, TOP_VARIABLE], [POPUP_BOTTOM_SHAPE, BOTTOM_VARIABLE], [POPUP_LEFT_SHAPE, LEFT_VARIABLE]]) {
@@ -532,8 +531,8 @@ describe('抬升面：不变量', () => {
     // ⚠️ 曾定成 0.33，依据是一条**错误**的扫描（只覆盖元素级、且三道光比单道顶光）—— 稳定的读数不等于正确的读数。
     const layers = surfaceLayers().split(',\n    ')
     // 第 0 层是颗粒（若总开关开着），三道光永远在最后三层。
-    const lightLayers = GRAIN_ENABLED ? layers.slice(1) : layers
-    assert.equal(lightLayers.length, 3, '三道光')
+    // 2026-10-22 起没有颗粒层：整串就是三道光。
+    const lightLayers = layers
     for (const layer of lightLayers) {
       assert.ok(
         layer.includes('color-mix(in srgb, var(--dsh-theme-tone-'),
@@ -638,20 +637,20 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
       assert.ok(overrides[token].light.length > 0 && overrides[token].dark.length > 0, `${token} 两模式都要给`)
     }
     // 回归守卫：**left 曾经漏在这里**（只写在背景层元素的内联样式上）⇒ 浮层读不到、所有弹层的左光一直是缺的。
-    // 2026-09-24 追加 GRAIN_ALPHA_VARIABLE（颗粒强度的统一旋钮）。
+    // （2026-10-22 起颗粒的那两个变量随颗粒一起移除，故这里只剩三道光。）
     assert.deepEqual(
       LIGHT_TOKENS.map(entry => entry.token),
-      [TOP_VARIABLE, BOTTOM_VARIABLE, LEFT_VARIABLE, GRAIN_TILE_VARIABLE, GRAIN_ALPHA_VARIABLE],
+      [TOP_VARIABLE, BOTTOM_VARIABLE, LEFT_VARIABLE],
     )
   })
 
   it('空串应该 一律翻成 CSS 字面量（空串在自定义属性里非法）', () => {
-    // 官方默认款没有 top / bottom，也没有颗粒。
+    // 官方默认款没有 top / bottom。
     const overrides = tokenOverrides({ lightTone: 'official', darkTone: 'official' })
     assert.equal(overrides[TOP_VARIABLE].light, 'transparent')
     assert.equal(overrides[BOTTOM_VARIABLE].dark, 'transparent')
-    assert.equal(overrides[GRAIN_TILE_VARIABLE].light, 'none')
-    assert.equal(overrides[GRAIN_TILE_VARIABLE].dark, 'none')
+
+
     for (const { token } of LIGHT_TOKENS) {
       for (const scheme of SCHEMES) {
         assert.notEqual(overrides[token][scheme], '', `${token}.${scheme} 不得为空串`)
@@ -665,102 +664,6 @@ describe('抬升面：光色变量（插件自己的 token）', () => {
     assert.equal(overrides[BOTTOM_VARIABLE].light, LIGHT_TONES.blue.bottom)
     assert.equal(overrides[TOP_VARIABLE].dark, DARK_TONES.crimson.top)
     assert.equal(overrides[BOTTOM_VARIABLE].dark, DARK_TONES.crimson.bottom)
-  })
-
-  it('颗粒贴图应该 跟着色调的 grain 开关走（**两轴六款都开**，只有官方默认关）', () => {
-    const on = tokenOverrides({ lightTone: 'sakura', darkTone: 'violet' })
-    // 贴图里烘的 alpha 由 `GRAIN_ALPHA × POPUP_GRAIN_COMPENSATION` 派生（唯一来源见下一条）。
-    // ⚠️ **不是** GRAIN_ALPHA 原值：浮层那条路没有 screen 混合，同 alpha 会重约 43%。
-    assert.equal(on[GRAIN_TILE_VARIABLE].dark, grainTileUri(popupGrainAlpha('dark')))
-    // 浅色版也要和深色版有相同的渐变质感 ⇒ 浅色轴也开颗粒
-    assert.equal(on[GRAIN_TILE_VARIABLE].light, grainTileUri(popupGrainAlpha('light')), '浅色轴现在也叠颗粒')
-    for (const scheme of SCHEMES) {
-      for (const id of NON_OFFICIAL[scheme]) {
-        const spec = TONES[scheme][id]
-        const expected = spec.grain ? grainTileUri(popupGrainAlpha(scheme)) : 'none'
-        // 注意：键名必须是 settings 的真实字段名（`lightTone` / `darkTone`）。
-        // 这里曾误写成 `{ light, dark }` → `toneIdOf` 读不到 → 回落 official（grain off），
-        // 而当时浅色轴本就 expected='none'，于是**测试一直假通过**；改成 grain:true 后才暴露。
-        const modes = { lightTone: 'sakura', darkTone: 'violet' }
-        modes[toneFieldFor(scheme)] = id
-        assert.equal(
-          tokenOverrides(modes)[GRAIN_TILE_VARIABLE][scheme],
-          expected,
-          `${scheme}.${id}（spec.grain=${spec.grain}）`,
-        )
-      }
-    }
-  })
-
-  it('浮层颗粒贴图应该 与背景层同一张噪声，只差烘进去的强度', () => {
-    // `background-image` 的图层没有独立 opacity，所以浮层那张把 `<rect opacity>` 烘进了 SVG；
-    // 背景层那张靠 `::after { opacity: … }`。
-    const strip = uri => uri.replace(/ opacity='[\d.]+'/u, '')
-    assert.equal(
-      strip(grainTileUri(popupGrainAlpha('dark'))),
-      GRAIN_DATA_URI,
-      '两张贴图除 opacity 外必须逐字一致（噪声参数同源）',
-    )
-    assert.ok(grainTileUri(popupGrainAlpha('dark')).includes(`opacity='${popupGrainAlpha('dark')}'`), '浮层那张烘深色轴的值')
-    assert.ok(grainTileUri(popupGrainAlpha('light')).includes(`opacity='${popupGrainAlpha('light')}'`), '浅色轴那张烘浅色轴的值')
-    assert.ok(GRAIN_DATA_URI.includes("baseFrequency='0.8'"), '同一套 feTurbulence 参数')
-  })
-
-  it('颗粒强度必须**只有一个来源**（owner：「噪点值统一变量，方便后续我们减弱」）', () => {
-    // 改 GRAIN_ALPHA 一个对象 ⇒ 两处**一起变**：① 背景层的运行期 opacity；② 浮层贴图预乘的 alpha
-    //（= GRAIN_ALPHA × POPUP_GRAIN_COMPENSATION）。「唯一来源」= 只有一个可调旋钮、两处由它派生且同档，
-    // 不是「两处字面相等」（弹出层颗粒确实更重，因为 screen 在深色轴上把地面提亮了）。
-    // ⚠️ 必须用**非官方**的两轴（官方默认档 grain 关着，贴图是 'none'，断言会假过）。
-    const overrides = tokenOverrides({ lightTone: 'sakura', darkTone: 'violet' })
-    for (const scheme of SCHEMES) {
-      assert.equal(
-        Number(overrides[GRAIN_ALPHA_VARIABLE][scheme]),
-        GRAIN_ALPHA[scheme],
-        `${scheme} 的运行期颗粒强度应等于 GRAIN_ALPHA`,
-      )
-      assert.ok(
-        overrides[GRAIN_TILE_VARIABLE][scheme].includes(`opacity='${popupGrainAlpha(scheme)}'`),
-        `${scheme} 的贴图预乘 alpha 应等于 GRAIN_ALPHA × 补偿系数`,
-      )
-    }
-    // 范围 (0.4, 1.6)：上一版断言「浮层要比背景**弱**」—— 那个理由方向是反的：screen 在深色轴上把噪声提亮，
-    // 地面颗粒比名义 alpha 更显眼，浮层是普通合成、同 alpha 反而更淡 ⇒ 浮层要比地面**强**才对得上（k* ≈ 1.23）。
-    // 上界防「系数被误改成离谱值」，下界防「几乎看不见」；alpha 实际安全的前提是 GRAIN_ALPHA × k ≤ 1（另有断言）。
-    assert.ok(
-      POPUP_GRAIN_COMPENSATION > 0.4 && POPUP_GRAIN_COMPENSATION < 1.6,
-      `补偿系数应在 (0.4, 1.6) 内，实际 ${POPUP_GRAIN_COMPENSATION}`,
-    )
-    // 关键物理约束：预乘 alpha 不得超过 1（超过就是无效值，观感会完全不同）。
-    for (const scheme of SCHEMES) {
-      assert.ok(
-        GRAIN_ALPHA[scheme] * POPUP_GRAIN_COMPENSATION <= 1,
-        `${scheme}：GRAIN_ALPHA × 补偿系数 = ${GRAIN_ALPHA[scheme]} × ${POPUP_GRAIN_COMPENSATION} 超过 1`,
-      )
-    }
-    // 派生关系必须是**乘法**：GRAIN_ALPHA 变了，浮层贴图跟着成比例变（不是写死的常数）。
-    // 这是「一个旋钮」的真正含义 —— 用「两轴比值 == 系数」来钉。
-    // ⚠️ 容差要容纳 `popupGrainAlpha` 的 4 位小数舍入（见该函数注释），故用 1e-3 而非 1e-4。
-    // ⚠️ 总开关关闭时 GRAIN_ALPHA 全为 0，**比值无意义**（0/0 = NaN）——
-    //    那种情况下该守的性质变成「派生值也必须是 0」，而不是「比值等于系数」。
-    for (const scheme of SCHEMES) {
-      if (!GRAIN_ENABLED) {
-        assert.equal(popupGrainAlpha(scheme), 0, `${scheme}: 总开关关闭时浮层预乘 alpha 必须为 0`)
-        assert.equal(GRAIN_ALPHA[scheme], 0, `${scheme}: 总开关关闭时颗粒强度必须为 0`)
-        continue
-      }
-      assert.ok(
-        Math.abs(popupGrainAlpha(scheme) / GRAIN_ALPHA[scheme] - POPUP_GRAIN_COMPENSATION) < 1e-3,
-        `${scheme}: popupGrainAlpha 必须是 GRAIN_ALPHA × ${POPUP_GRAIN_COMPENSATION}（实际比值 ${popupGrainAlpha(scheme) / GRAIN_ALPHA[scheme]}）`,
-      )
-    }
-    // 两轴取值不同是物理原因（screen 加亮 vs multiply 压暗），不是没调好 —— 钉住这个事实。
-    // ⚠️ 总开关关闭时两轴都是 0（「都不画」当然相同），这条只在启用时才有意义。
-    if (GRAIN_ENABLED) {
-      assert.notEqual(GRAIN_ALPHA.light, GRAIN_ALPHA.dark, '两轴不该相同（浅色轴需更大的值才有等值质感）')
-    } else {
-      assert.equal(GRAIN_ALPHA.light, 0, '总开关关闭时浅色轴颗粒强度为 0')
-      assert.equal(GRAIN_ALPHA.dark, 0, '总开关关闭时深色轴颗粒强度为 0')
-    }
   })
 })
 
@@ -1110,19 +1013,11 @@ describe('抬升面：表面绘制', () => {
       block.includes('linear-gradient(var(--dsw-menu-surface-fill, var(--dsw-specific-menu))'),
       `菜单填充要作为图层叠在不透明底之上，且读卡片自己的 token：${block.slice(0, 220)}`,
     )
-    // ③ 颗粒必须一起重画（若总开关开着），否则等于把卡片那片颗粒挖掉、露出「平带」；
-    //    强度只引用 GRAIN_TILE_VARIABLE，不写死。
-    if (GRAIN_ENABLED) {
-      assert.ok(
-        block.includes(`var(${GRAIN_TILE_VARIABLE}`) || block.includes(GRAIN_TILE_VARIABLE),
-        '标题必须重画颗粒 —— 否则比菜单主体少一层质感，就是 owner 说的「突兀」',
-      )
-    } else {
-      assert.ok(!block.includes('feTurbulence'), '总开关关闭时标题规则里不得出现噪声贴图')
-    }
+    // ③ 2026-10-22 起没有颗粒层（原先是标题规则里的第 0 层）—— 一处都不得有。
+    assert.ok(!block.includes('feTurbulence'), '标题不得画颗粒')
     assert.ok(
-      !block.includes('/9j/') && !block.includes('feTurbulence') && !/opacity='?\d/u.test(block),
-      '颗粒强度不得在标题规则里写字面量（唯一旋钮是 GRAIN_ALPHA，owner：噪点值统一变量）',
+      !block.includes('/9j/') && !/opacity='?\d/u.test(block),
+      '颗粒强度不得在标题规则里写字面量',
     )
     // ④ 不得声明模糊 —— 标题在菜单内部，菜单自己已是 backdrop root，
     //    再声明只会采样子树里滚动的行（实测 31.719/px，比不写更脏）。
@@ -1130,20 +1025,16 @@ describe('抬升面：表面绘制', () => {
       !block.includes('backdrop-filter'),
       '标题不得声明 backdrop-filter（会采样到滚动的行，反而更脏）',
     )
-    // ⑤ **层序**：颗粒在最上、填充其次、地面在下 —— 与卡片的合成顺序逐层一致。
+    // ⑤ **层序**：填充在上、地面在下 —— 与卡片的合成顺序逐层一致。
     //    这条是第四轮那个 bug 的**唯一守卫**：上一版断言的恰恰是反的（"填充在上"）。
     const image = declFor(block, 'background-image')
     const layers = splitLayers(image)
-    const offset = GRAIN_ENABLED ? 1 : 0
-    assert.ok(layers.length >= 2 + offset, `标题必须是多层合成（实测 ${layers.length} 层）`)
-    if (GRAIN_ENABLED) {
-      assert.ok(layers[0].includes(GRAIN_TILE_VARIABLE), `第一层（最上）必须是颗粒：${layers[0]}`)
-    }
-    assert.ok(layers[0 + offset].startsWith('linear-gradient('), `填充层必须在颗粒之下：${layers[0 + offset]}`)
-    // 地面那几层必须**逐字**来自 grainOverGradients()（颗粒 + 三段光，同源不许手抄）
+    assert.ok(layers.length >= 2, `标题必须是多层合成（实测 ${layers.length} 层）`)
+    assert.ok(layers[0].startsWith('linear-gradient('), `第一层必须是菜单填充：${layers[0]}`)
+    // 地面那几层必须**逐字**来自 grainOverGradients()（三段光，同源不许手抄）
     assert.ok(
       image.includes(grainOverGradients()),
-      '不透明底之上必须原样重画地面（grainOverGradients：颗粒 + 三段光）',
+      '不透明底之上必须原样重画地面（grainOverGradients：三段光）',
     )
     // ⑥ 逐层 attachment / blend 的**值数必须等于层数**：CSS 在值少于层数时是整串重复，
     //    少写一个就会让第 4、5 层退回 `scroll`、光层被压扁（05-surfaces §8.2 的坑）。
@@ -1153,7 +1044,7 @@ describe('抬升面：表面绘制', () => {
     }
     assert.equal(declFor(block, 'background-attachment'), GROUP_TITLE_ATTACHMENT, '地面那几层必须 fixed')
     // 最上面那几层（颗粒[若开] + 卡片填充）按元素盒子，与卡片一致。
-    const topScrollLayers = GRAIN_ENABLED ? 2 : 1
+    const topScrollLayers = 1
     assert.ok(
       splitLayers(declFor(block, 'background-attachment')).slice(0, topScrollLayers).every(v => v === 'scroll'),
       `最上面 ${topScrollLayers} 层（颗粒/填充）按元素盒子，与卡片一致`,
@@ -1265,15 +1156,15 @@ describe('抬升面：表面绘制', () => {
     // `.groupTitle` 读 `--dsw-specific-menu`，两者同源，只染一个就分叉成色差带）。
     const layers = splitLayers(groupTitleLayers())
     // 层序：颗粒（若开着）→ 填充 → 地面。
-    const offset = GRAIN_ENABLED ? 1 : 0
-    if (GRAIN_ENABLED) assert.ok(layers[0].includes(GRAIN_TILE_VARIABLE), '层序：颗粒在最上')
+    const offset = 0
+    void 0
     assert.ok(layers[0 + offset].includes('linear-gradient('), '层序：填充在颗粒之下')
     // 地面那几层 = 函数返回串的后半段，**逐字**等于 grainOverGradients()（只差排版空白）
     const ground = layers.slice(1 + offset).join(', ').replace(/\s+/gu, ' ')
     assert.equal(
       ground,
       grainOverGradients().replace(/\s+/gu, ' '),
-      '层序：地面在最下，且必须原样重画（grainOverGradients：颗粒 + 三段光）',
+      '层序：地面在最下，且必须原样重画（grainOverGradients：三段光）',
     )
     // 两个 token 都要在覆盖层里，且**每个轴上取值必须完全相同**。
     assert.deepEqual(
@@ -1539,14 +1430,9 @@ describe('抬升面：表面绘制', () => {
         `${anchor} 不得写 background-color —— 写死面板变量会盖掉 --dsw-specific-tip 的染色`,
       )
       assert.ok(body.includes(surfaceLayers()), `${anchor} 要画**完整**配方（M3 起与菜单/对话框同一配方）`)
-      // ⚠️ 2026-09-27（M3）：此前断言用的是 menuSurfaceLayers()（只有颗粒 + 底光）。
+      // ⚠️ 2026-09-27（M3）：此前断言用的是 menuSurfaceLayers()（只有底光一层）。
       // todo 列表原本没有打光 —— 根因就是这几张卡拿的是**另一份配方**。
-      // 现在统一 surfaceLayers()（颗粒[若开] + 顶/底/左三道光），故这里钉死不含旧配方。
-      // ⚠️ 颗粒总开关关闭时两个配方都不含颗粒层，此时**不能**用「包含旧配方串」判 ——
-      //    改判「必须有三道光」这个真正的区别（旧配方缺顶光与左光）。
-      if (GRAIN_ENABLED) {
-        assert.ok(!body.includes(menuSurfaceLayers()), `${anchor} 不得再用 2 层的旧配方（会缺顶光与左光）`)
-      }
+      // 现在统一 surfaceLayers()（顶/底/左三道光）；2026-10-22 起两者都不含颗粒层。
       assert.ok(body.includes(TOP_VARIABLE), `${anchor} 必须有顶光（owner 报过「todo 没有打光」）`)
       assert.ok(body.includes(LEFT_VARIABLE), `${anchor} 必须有左光`)
       assert.ok(!body.includes('backdrop-filter'), `${anchor} 是内容面，不做玻璃`)
@@ -1578,7 +1464,7 @@ describe('抬升面：表面绘制', () => {
     // 与「分组标题横带」是同一个坑（见 GROUPED_MENU_SELECTOR 的表）。
     const layers = menuSurfaceLayers()
     assert.ok(!layers.includes(TOP_VARIABLE), '停靠卡用的图层串里不得有顶光')
-    if (GRAIN_ENABLED) assert.ok(layers.includes(GRAIN_TILE_VARIABLE), '颗粒要留（质感来源）')
+    void 0
     assert.ok(layers.includes(POPUP_BOTTOM_SHAPE), '底光要留（锚盒子底部，纵深来源）')
   })
 
@@ -1727,11 +1613,9 @@ describe('抬升面：表面绘制', () => {
     )
   })
 
-  it('图层顺序应该 是「颗粒 / 顶光 / 底光」（颗粒压在最上面才像砂面）', () => {
-    // 颗粒那层随总开关存在与否；光层的相对顺序永远成立。
-    const order = GRAIN_ENABLED
-      ? [GRAIN_TILE_VARIABLE, TOP_VARIABLE, BOTTOM_VARIABLE]
-      : [TOP_VARIABLE, BOTTOM_VARIABLE]
+  it('图层顺序应该 是「顶光 / 底光」（2026-10-22 起没有颗粒层）', () => {
+    // 光层的相对顺序永远成立。
+    const order = [TOP_VARIABLE, BOTTOM_VARIABLE]
     const at = order.map(name => layers.indexOf(`var(${name}`))
     assert.ok(at.every(index => index >= 0), `这些变量都要在：${order.join(' / ')}`)
     assert.deepEqual([...at].sort((a, b) => a - b), at, `图层顺序不对：${layers}`)
@@ -1908,7 +1792,7 @@ describe('抬升面：表面绘制', () => {
   })
 
   it('颜色应该 全部走变量（换色调 / 切轴时自动跟随，不由本模块重写）', () => {
-    const requiredVars = GRAIN_ENABLED ? [GRAIN_TILE_VARIABLE, TOP_VARIABLE, BOTTOM_VARIABLE, PANEL_VARIABLE] : [TOP_VARIABLE, BOTTOM_VARIABLE, PANEL_VARIABLE]
+    const requiredVars = [TOP_VARIABLE, BOTTOM_VARIABLE, PANEL_VARIABLE]
     for (const name of requiredVars) {
       assert.ok(css.includes(`var(${name}`), `缺变量 ${name}`)
     }

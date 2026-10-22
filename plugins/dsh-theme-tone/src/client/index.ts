@@ -19,7 +19,6 @@ import {
   BACKDROP_CLASS,
   BOTTOM_VARIABLE,
   CONTENT_ATTR,
-  GRAIN_ATTR,
   LOCALE_NAMESPACE,
   LEFT_VARIABLE,
   MARKER_ATTR,
@@ -475,7 +474,6 @@ function install(ctx: Context): void {
       if (plan.left === '') layer.style.removeProperty(LEFT_VARIABLE)
       else layer.style.setProperty(LEFT_VARIABLE, plan.left)
     }
-    layer.setAttribute(GRAIN_ATTR, plan.grain ? 'on' : 'off')
   }
 
   /**

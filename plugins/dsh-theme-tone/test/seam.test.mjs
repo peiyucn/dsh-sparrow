@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { buildSeamCss, SEAM_NOTCH_PX } from '../lib/glass.js'
 import { BACKDROP_GRADIENTS } from '../lib/backdrop.js'
-import { GRAIN_ENABLED, GRAIN_TILE_VARIABLE, PLAIN_ATTR } from '../lib/constants.js'
+import { PLAIN_ATTR } from '../lib/constants.js'
 import { ANCHOR, anchorSelector } from '../lib/anchors.js'
 
 const css = buildSeamCss()
@@ -52,11 +52,7 @@ describe('seam：缝挡板（停靠卡与输入框卡之间的 6px 缝）', () =
     for (const needle of [GOAL_BAND, QUEUE_BAND, CARD_BAND]) {
       const body = bodyOf(needle)
       assert.match(body, /background-color: var\(--dsw-alias-bg-base\)/u, `${needle} 必须不透明（原样 token）`)
-      if (GRAIN_ENABLED) {
-        assert.ok(body.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), `${needle} 颗粒必须在`)
-      } else {
-        assert.ok(!body.includes('feTurbulence'), `${needle} 总开关关闭时不得画颗粒`)
-      }
+      assert.ok(!body.includes('feTurbulence'), `${needle} 不得画颗粒（2026-10-22 起整族移除）`)
       assert.ok(body.includes(BACKDROP_GRADIENTS), `${needle} 光必须与背景层**同源**（直引，不复制数值）`)
       assert.ok(!/\bbackground:\s/u.test(body), `${needle} 不得用简写（会重置其它 background-*）`)
     }
