@@ -12,12 +12,14 @@
 
 import { ANCHOR, anchorSelector } from './anchors.js'
 
-/** 顶栏动作槽位里那个弹出列表的宿主选择器（官方公开槽位属性，非 hashed 类名）——
- *  官方 `JobListAction` 渲染进该槽位，那个没有 role 的 `<ul>` 就长在它里面。 */
-export const HEADER_ACTION_SCOPE = "body [data-slot='conversation.session.header.actions']"
-
 /** 官方槽位属性名（`HEADER_ACTION_SCOPE` 的单一真值来源）。 */
-export const HEADER_ACTION_SLOT = 'conversation.session.header.actions'
+const HEADER_ACTION_SLOT = 'conversation.session.header.actions'
+
+/** 顶栏动作槽位里那个弹出列表的宿主选择器（官方公开槽位属性，非 hashed 类名）——
+ *  官方 `JobListAction` 渲染进该槽位，那个没有 role 的 `<ul>` 就长在它里面。
+ *  ⚠️ 槽位名**只从这里取**：写第二份字面量就会和 {@link HEADER_ACTION_SLOT} 漂。
+ */
+export const HEADER_ACTION_SCOPE = `body [data-slot='${HEADER_ACTION_SLOT}']`
 
 /** 「右栏面板已打开」的祖先门，走**锚点属性**而非 `:has()`。属性由 client half 维护。 */
 export const RIGHT_PANEL_OPEN_GATE = `body${anchorSelector(ANCHOR.rightPanelOpen)}`
