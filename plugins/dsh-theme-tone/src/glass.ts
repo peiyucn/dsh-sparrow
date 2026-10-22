@@ -4,9 +4,9 @@
  * ⚠️ `buildGlassCss` / `buildCardNotchCss` / `buildSeamCss` 的模板字符串里的注释**不能出现反引号**（会截断字符串）。
  */
 
-import { ABOVE_CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_BAND_VARIABLE, PHASE_NOTCH_ATTR, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
+import { ABOVE_CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_ENABLED, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_BAND_VARIABLE, PHASE_NOTCH_ATTR, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
 import { ANCHOR, anchorSelector } from './anchors.js'
-import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, compensatedBackdropGradients, grainOverGradients } from './backdrop.js'
+import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, compensatedBackdropGradients, faceLayerGeometry, grainOverGradients } from './backdrop.js'
 
 /** 顶栏高度（px）：官方钉死 76px（= 左栏两条 38px 带之和），本模块的补高 / 滚条偏移 / 拖拽条裁切都按它算。 */
 export const HEADER_HEIGHT_PX = 76
@@ -182,13 +182,15 @@ function backingPaint(): string {
 function viewportPhaseDecls(vars: { readonly left: string; readonly top: string }): string {
   const L = `var(${vars.left})`
   const T = `var(${vars.top})`
+  // ⚠️ 层数与 `grainOverGradients()` 必须一致（颗粒总开关会改变它）：故几何由 faceLayerGeometry 产出，
+  // 这里只把**位置**换成本载体自己的视口相位（每层同一配方）。
+  const g = faceLayerGeometry('100vw 100vh')
+  const layers = g.size.split(', ').length
+  const pos = Array.from({ length: layers }, () => `calc(0px - ${L}) calc(0px - ${T})`).join(',\n    ')
   return `background-attachment: scroll;
-  background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;
-  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
-  background-position: calc(0px - ${L}) calc(0px - ${T}),
-    calc(0px - ${L}) calc(0px - ${T}),
-    calc(0px - ${L}) calc(0px - ${T}),
-    calc(0px - ${L}) calc(0px - ${T});`
+  background-size: ${g.size};
+  background-repeat: ${g.repeat};
+  background-position: ${pos};`
 }
 
 /** 座底不透带的相位声明（定位区 = 座位自身）。 */
@@ -209,13 +211,18 @@ export function notchPhasePaint(): string {
  *   把盒子缩到 1/225 也不省）。这类规则数量多、且有的挂在流式内容里，
  *   多会话并行时叠起来就是可感掉帧。
  *   改用与背景层同尺寸的显式几何，视觉等价（真机逐像素：全屏 160 万点里 85 点改变 = 0.005%）。
- * ⚠️ 必须**逐层**给 `background-size`：第 1 层是颗粒瓦片（`auto` 才是固有尺寸），后三层是 `100vw 100vh`；
- *   值少于层数会按序循环补齐，把颗粒拉成粗块、让渐变按元素自身盒子解析（行很小时就压成硬边带）。
+ * ⚠️ 必须**逐层**给 size / repeat / position，且**层数要跟 `grainOverGradients()` 一致**：
+ *   少给会按序循环补齐（把颗粒拉成粗块、让渐变按元素自身盒子解析）；
+ *   多给则多出来的值被丢弃 —— 但更要紧的是「颗粒总开关」关掉时，图层数从 4 变 3，
+ *   这里必须跟着变，否则等于给 3 层写了 4 个值。故统一由 `faceLayerGeometry` 产出。
  */
-const GROUND_REDRAW_GEOMETRY = `background-attachment: scroll;
-  background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;
-  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
-  background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px;`
+const GROUND_REDRAW_GEOMETRY = (() => {
+  const g = faceLayerGeometry('100vw 100vh')
+  return `background-attachment: scroll;
+  background-size: ${g.size};
+  background-repeat: ${g.repeat};
+  background-position: ${g.position};`
+})()
 
 /** 「按背景**原样画满**」的配方 + 显式几何（不走 fixed）—— 吸顶行与轨迹视图共用。 */
 function groundRedrawPaint(): string {
@@ -390,7 +397,7 @@ body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-pane],
 body[data-ds-dark-theme]:not([${PLAIN_ATTR}]) [data-dockkit-empty] {
   background-blend-mode: screen, screen, screen;
 }
-body:not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
+${GRAIN_ENABLED ? `body:not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
 body:not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
   content: '';
   position: absolute;
@@ -407,7 +414,7 @@ body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-pane]::after,
 body:not([data-ds-dark-theme]):not([${PLAIN_ATTR}]) [data-dockkit-empty]::after {
   mix-blend-mode: multiply;
   opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT});
-}
+}` : '/* 颗粒总开关关闭（GRAIN_ENABLED=false）：右栏 dockkit 宿主的颗粒层整条不生成。 */'}
 
 /* ===== 右栏顶部的两条 38px 带（dockkit 条 + 文件面板头行）：补上顶栏那份**玻璃**（同 blur、同 0.7 alpha、同光层）=====
    官方面板 0..76 里，条的颗粒是**生的**（没被 blur 糊过）、也没有那层半透明填充把它压到与顶栏同一档 ⇒ 右栏顶部看起来和别处不是一个材质。

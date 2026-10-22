@@ -9,7 +9,7 @@ import {
   buildSweepCss,
 } from '../lib/sweep.js'
 import { BACKDROP_GRADIENTS } from '../lib/backdrop.js'
-import { GRAIN_TILE_VARIABLE, PLAIN_ATTR } from '../lib/constants.js'
+import { GRAIN_ENABLED, GRAIN_TILE_VARIABLE, PLAIN_ATTR } from '../lib/constants.js'
 
 const css = buildSweepCss()
 // 注释里会引用官方那条 `width: 300px` 做反面说明，结构断言必须先剥注释。
@@ -68,12 +68,17 @@ describe('官方运行扫光带：照我们自己的背景画（A 方案）', ()
     assert.ok(!css.includes('body [data-state'), '不得出现不带门的选择器')
   })
 
-  it('背景板必须**画全**：底色 + 同源的光 + 颗粒，一项都不许少', () => {
-    // 官方按自己的纯 bg-base 画脉冲条；我们的背景多了光与颗粒 ⇒ 三项都要在。
+  it('背景板必须**画全**：底色 + 同源的光 + 颗粒（若总开关开着），一项都不许少', () => {
+    // 官方按自己的纯 bg-base 画脉冲条；我们的背景多了光（与颗粒）⇒ 这些都要在。
     assert.ok(rules.includes('background-color: var(--dsw-alias-bg-base)'), '底色用同一个 token')
-    assert.ok(SWEEP_PLATE_LAYERS.includes(GRAIN_TILE_VARIABLE), '**颗粒必须在**')
+    if (GRAIN_ENABLED) {
+      assert.ok(SWEEP_PLATE_LAYERS.includes(GRAIN_TILE_VARIABLE), '**颗粒必须在**')
+      assert.ok(rules.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), '颗粒瓦片要进 background-image')
+    } else {
+      assert.ok(!SWEEP_PLATE_LAYERS.includes('feTurbulence'), '总开关关闭时背景板不得画颗粒')
+      assert.ok(!rules.includes('feTurbulence'), '总开关关闭时整表不得出现噪声贴图')
+    }
     assert.ok(SWEEP_PLATE_LAYERS.includes(BACKDROP_GRADIENTS), '光必须与背景层同源（不复制数值）')
-    assert.ok(rules.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), '颗粒瓦片要进 background-image')
 
     // ⚠️ **不得再用 `background-attachment: fixed`**（2026-10-21 性能专项）：
     //   `fixed` 让定位区=视口 ⇒ **每个 running 行**每帧都要按视口重新栅格化；
@@ -84,16 +89,18 @@ describe('官方运行扫光带：照我们自己的背景画（A 方案）', ()
       '不得用 fixed（每个 running 行每帧按视口栅格化，多会话并行时掉帧）',
     )
     assert.ok(rules.includes('background-attachment: scroll'), '必须显式写 scroll')
-    // 逐层给尺寸：第 1 层颗粒是 auto，其余三层与背景层同为 100vw×100vh。
+    // 逐层给尺寸，且**层数随颗粒总开关变化**（启用 4 层、关闭 3 层）。
     // 值少于层数会按序循环补齐 —— 那会把颗粒拉成粗块、渐变按自身盒子解析。
-    assert.ok(
-      rules.includes('background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh'),
-      '必须逐层给 background-size（层数不足会被循环补齐）',
-    )
-    assert.ok(
-      rules.includes('background-repeat: repeat, no-repeat, no-repeat, no-repeat'),
-      '颗粒要 repeat、三层光不重复',
-    )
+    const expectedSizeDecl = GRAIN_ENABLED
+      ? 'background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh'
+      : 'background-size: 100vw 100vh, 100vw 100vh, 100vw 100vh'
+    assert.ok(rules.includes(expectedSizeDecl), `必须逐层给 background-size（GRAIN_ENABLED=${GRAIN_ENABLED}）`)
+    const expectedRepeatDecl = GRAIN_ENABLED
+      ? 'background-repeat: repeat, no-repeat, no-repeat, no-repeat'
+      : 'background-repeat: no-repeat, no-repeat, no-repeat'
+    assert.ok(rules.includes(expectedRepeatDecl), '必须逐层给 background-repeat（层数一致）')
+
+
     assert.ok(!rules.includes('scroll, fixed'), '不得写 scroll, fixed（层数不足会被循环补齐）')
   })
 

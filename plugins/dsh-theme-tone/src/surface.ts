@@ -10,6 +10,7 @@ import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
   GRAIN_TILE_VARIABLE,
+  GRAIN_ENABLED,
   HOVER_CARD_ANCHOR,
   HOVER_CARD_TEXT_TOKENS,
   LEFT_VARIABLE,
@@ -161,12 +162,14 @@ export const COMPOSER_ICON_BUTTON_SCOPE = 'body [data-composer-card]'
  *  ⚠️ **必须是三道光**（背景层就是三道，同一个配方）：漏掉左光会让浮层与背景层「打光不一样」；⚠️ **每道光的强度都乘 {@link POPUP_LIGHT_COMPENSATION}**（压的是强度，几何与收束点不动）。全部走变量：缺变量时落到 `transparent` / `none` —— 即「官方默认」下等于什么都不画。
  */
 export function surfaceLayers(): string {
-  return [
-    `var(${GRAIN_TILE_VARIABLE}, none)`,
+  const layers = [
     `radial-gradient(${POPUP_TOP_SHAPE}, ${popupLight(TOP_VARIABLE)}, ${POPUP_STOP})`,
     `radial-gradient(${POPUP_BOTTOM_SHAPE}, ${popupLight(BOTTOM_VARIABLE)}, ${POPUP_STOP})`,
     `radial-gradient(${POPUP_LEFT_SHAPE}, ${popupLight(LEFT_VARIABLE)}, ${POPUP_STOP})`,
-  ].join(',\n    ')
+  ]
+  // ⚠️ 颗粒关掉时**不写这一层**（而不是写一个指向 `none` 的层）：少一层就少一次背景图层解析。
+  if (GRAIN_ENABLED) layers.unshift(`var(${GRAIN_TILE_VARIABLE}, none)`)
+  return layers.join(',\n    ')
 }
 
 /** 把一道光的运行期变量按 {@link POPUP_LIGHT_COMPENSATION} 压暗，供浮层图层串使用。
@@ -183,10 +186,9 @@ function popupLight(variable: string): string {
  *  @deprecated 用 {@link surfaceLayers} —— 每类表面都拿同样的 4 层。
  */
 export function menuSurfaceLayers(): string {
-  return [
-    `var(${GRAIN_TILE_VARIABLE}, none)`,
-    `radial-gradient(${POPUP_BOTTOM_SHAPE}, ${popupLight(BOTTOM_VARIABLE)}, ${POPUP_STOP})`,
-  ].join(',\n    ')
+  const layers = [`radial-gradient(${POPUP_BOTTOM_SHAPE}, ${popupLight(BOTTOM_VARIABLE)}, ${POPUP_STOP})`]
+  if (GRAIN_ENABLED) layers.unshift(`var(${GRAIN_TILE_VARIABLE}, none)`)
+  return layers.join(',\n    ')
 }
 
 /** 菜单填充色变量 —— 标题条与卡片**必须读同一个**，否则标题就是一条色差带。
@@ -200,18 +202,41 @@ const MENU_FILL = `var(--dsw-menu-surface-fill, var(--dsw-specific-menu))`
  *  不重画就丢了「地面长什么样」。
  *  合成结果 = 颗粒 叠在（填充 叠在 地面 上）—— 与卡片**逐层同源**（实测两轴都在 1 级以内）。 */
 export function groupTitleLayers(): string {
-  return [
-    `var(${GRAIN_TILE_VARIABLE}, none)`,
+  const layers = [
     `linear-gradient(${MENU_FILL}, ${MENU_FILL})`,
     grainOverGradients(),
-  ].join(',\n    ')
+  ]
+  if (GRAIN_ENABLED) layers.unshift(`var(${GRAIN_TILE_VARIABLE}, none)`)
+  return layers.join(',\n    ')
 }
 
-/** {@link groupTitleLayers} 的**逐层 `background-attachment`**：最上面两层（标题自己的颗粒、卡片填充）
- *  按元素盒子，地面那四层 `fixed` —— 地面是整屏 `position: fixed` 层、百分比按**视口**解析；少了 `fixed`，
+/**
+ * 分组标题的 `background-blend-mode` 逐层值：填充那层用给定模式，其余 `normal`。
+ *
+ * 层数（= 颗粒[若开] + 填充 + 地面三层/四层）随颗粒总开关变化，故不能写字面量 —— 写死了就会在
+ * 关闭颗粒后少一个值，CSS 把整串重复补齐、模式落错层（填充层不再是 multiply/screen ⇒ 与卡片色差一档）。
+ * @param fillMode 填充层要用的混合模式（浅色轴 multiply、深色轴 screen）。
+ */
+function GROUP_TITLE_BLEND(fillMode: 'multiply' | 'screen'): string {
+  // 索引 = 填充层所在位置：颗粒开着时它在第 2 层（0=颗粒），关闭时在第 1 层。
+  const total = GRAIN_ENABLED ? 5 : 4
+  const fillIndex = GRAIN_ENABLED ? 1 : 0
+  return Array.from({ length: total }, (_, i) => (i === fillIndex ? fillMode : 'normal')).join(', ')
+}
+
+/**
+ * {@link groupTitleLayers} 的**逐层 `background-attachment`**：最上面那几层（标题自己的颗粒[若开]、卡片填充）
+ *  按元素盒子，地面那三层 `fixed` —— 地面是整屏 `position: fixed` 层、百分比按**视口**解析；少了 `fixed`，
  *  一条 26px 的横条会把 `ellipse 80vw 45vh` 压成硬边带。
- *  ⚠️ **值必须逐层给足**：CSS 在值少于层数时是**整串重复**，只写三个会让第 4、5 层回到 `scroll`、光层被压扁。 */
-export const GROUP_TITLE_ATTACHMENT = 'scroll, scroll, fixed, fixed, fixed, fixed'
+ *  ⚠️ **值必须逐层给足**：CSS 在值少于层数时是**整串重复**，只写三个会让后几层回到 `scroll`、光层被压扁。
+ *  ⚠️ 层数**随颗粒总开关变化**（关闭时少一层），故不能用字面量常量 —— 由 `grainOverGradients()` 的层数派生。
+ */
+export const GROUP_TITLE_ATTACHMENT = (() => {
+  const top = GRAIN_ENABLED ? ['scroll', 'scroll'] : ['scroll']
+  // 地面 = `grainOverGradients()`：颗粒[若开] + 三层光，全部 fixed。
+  const groundLayers = GRAIN_ENABLED ? 4 : 3
+  return [...top, ...Array.from({ length: groundLayers }, () => 'fixed')].join(', ')
+})()
 
 /** 分组菜单的**滚动容器**（分组标题的吸顶上下文）—— 菜单卡片里那个装着全部 `[role='group']` 的盒子，用**结构**锚定：官方 `ModelSelect` 是 `div.groups`、本仓库 codebuddy 是 `div.ccb-model-groups`，两者都是菜单卡片的直接子元素（不碰 hashed 类名）。
  *  ⚠️ 本常量是**后代片段**（以组合符开头，与 {@link GROUPED_MENU_TITLE_SELECTOR} 同类），使用时拼在菜单锚点之后 —— **不能**写成 `:scope > …`：`:scope` 在**样式表**里没有上下文引用元素、按规范退化成 `:root` ⇒ 规则静默失效。官方改版后 `role='menu'` 搬到了内层滚动容器上，故本常量只覆盖「卡片还是菜单锚点」的那一半，另一半见 {@link GROUPED_MENU_SELF_SCROLLER_SUFFIX}。
@@ -299,13 +324,13 @@ ${groupTitleRule(`body:not([${PLAIN_ATTR}])`)} {
   background-color: var(--dsw-alias-bg-base) !important;
   background-image: ${groupTitleLayers()} !important;
   background-attachment: ${GROUP_TITLE_ATTACHMENT} !important;
-  background-blend-mode: normal, normal, multiply, normal, normal, normal !important;
+  background-blend-mode: ${GROUP_TITLE_BLEND('multiply')} !important;
   /* 圆角**不写在标题条上**（写在条上会漏：缺口里露出滚动的行），改由下面的滚动容器承担；
      这里显式归零是为了盖住优先级更低的旧写法（codebuddy 兜底样式 / 缓存里的旧 CSS）。 */
   border-radius: ${GROUP_TITLE_RADIUS} !important;
 }
 ${groupTitleRule(`body[data-ds-dark-theme]:not([${PLAIN_ATTR}])`)} {
-  background-blend-mode: normal, normal, screen, normal, normal, normal !important;
+  background-blend-mode: ${GROUP_TITLE_BLEND('screen')} !important;
 }
 /* --- 圆角交给**滚动容器**（顶角裁剪同时作用于条与行 ⇒ 缺口里露出的是菜单自己的玻璃；条自己方角 ⇒ 结构上不可能漏）---
    半径走 GROUPED_MENU_INNER_RADIUS_VARIABLE（默认官方菜单的同心值）；只圆**上两角**（下两角若也圆，滚到底时最后一行会被啃掉）。

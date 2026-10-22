@@ -4,7 +4,7 @@
  * 官方 rc.2 只剩 2 处在画带子，前两条锚点当前静默失效（保留以防官方改回容器级画法）。 */
 
 import { PLAIN_ATTR } from './constants.js'
-import { grainOverGradients } from './backdrop.js'
+import { faceLayerGeometry, grainOverGradients } from './backdrop.js'
 
 /** 扫光带的锚点 —— 官方那几处 `::after`，**只覆盖它们**；每条都要求 `data-state='running'` **加上** `data-variant` / `data-tool`。 */
 export const SWEEP_ANCHORS: readonly string[] = Object.freeze([
@@ -38,13 +38,16 @@ export const SWEEP_SHAPE_MASK =
  *    但带子自身高度只有一行高（20–30px），竖直方向上光层的变化在掩膜内几乎不可见 ——
  *    真机逐像素实测：**0.006% 像素改变 / 全屏 160 万点**（`docs/spec/13-running-sweep-cost.md`）。
  *  - 这是「多会话同时工作就卡」的直接热源：**每个 running 行**都挂一层按视口栅格化的 `fixed`。
- * ⚠️ 必须**逐层**给 `background-size`：第 1 层是颗粒瓦片（`auto` 才是固有尺寸），其余三层是 `100vw 100vh`；
- *    值少于层数会按序循环补齐，把颗粒拉成粗块。
+ * ⚠️ 必须**逐层**给 size / repeat / position，且层数要跟 `grainOverGradients()` 一致 ——
+ *    颗粒总开关会改变层数，故由 `faceLayerGeometry` 统一产出，不要手写 4 个值。
  */
-export const SWEEP_BACKGROUND_GEOMETRY = `background-attachment: scroll;
-  background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh;
-  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
-  background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px;`
+export const SWEEP_BACKGROUND_GEOMETRY = (() => {
+  const g = faceLayerGeometry('100vw 100vh')
+  return `background-attachment: scroll;
+  background-size: ${g.size};
+  background-repeat: ${g.repeat};
+  background-position: ${g.position};`
+})()
 
 /** 给锚点挂上「官方默认」门 —— 与 `surface.ts` 的 `gatedAnchor` 同法：门并进锚点自己的 `body`。 */
 function gated(anchor: string): string {

@@ -114,11 +114,41 @@ export const PANEL_VARIABLE = '--dsh-theme-tone-panel'
  *  贴图里，故需要**另一张**贴图（{@link POPUP_GRAIN_DATA_URI}），由色调的 `grain` 开关切换。 */
 export const GRAIN_TILE_VARIABLE = '--dsh-theme-tone-grain-tile'
 
+/**
+ * **颗粒总开关**（2026-10-22 性能专项，owner 要求逐项验证时引入）。
+ *
+ * `false` = 全插件不再画任何颗粒：背景层 `::after`、glass 的各个面、`surface.ts` 的浮层、
+ * 扫光带背景板、设置行的色卡预览 —— 全部一起关。
+ *
+ * 为什么做成**一个常量**而不是散着改：颗粒有 5 处注入点，且强度是「一处定、两路派生」
+ * （{@link GRAIN_ALPHA} 同时喂运行期变量与浮层预乘贴图）。散着改极容易漏一处、或让两路强度不同源，
+ * 于是「去掉颗粒」这件事就变成了「去掉大部分颗粒 + 留下一处看不见的」—— 那种状态下测出来的
+ * 性能与观感都不作数。
+ *
+ * ⚠️ 置 `false` 时 `GRAIN_ALPHA` 由 {@link grainAlpha} 统一返回 0，两路同时归零；
+ * 贴图本身仍是合法 data URI（`alpha=0` 的贴图），故不需要在 5 处各加分支。
+ */
+export const GRAIN_ENABLED = false
+
 /** **颗粒强度** —— 全插件**唯一来源**（每轴一档）：运行期变量 {@link GRAIN_ALPHA_VARIABLE} 与浮层贴图里
  *  烘的 alpha 都由它派生。两轴取值不同是因为颗粒**方向相反**：深色轴 `screen` 加亮（白点在暗底 = 星光），
  *  浅色轴只能 `multiply` 压暗、近白底余量很小。
  *  ⚠️ 深色轴降强度会**同时压暗底色**（`screen` 加法混合的物理必然）；要「纹理变淡但底色不变」得另配底色补偿。 */
-export const GRAIN_ALPHA: Readonly<Record<'light' | 'dark', number>> = Object.freeze({ light: 0.16, dark: 0.0975 })
+const GRAIN_ALPHA_BASE: Readonly<Record<'light' | 'dark', number>> = Object.freeze({ light: 0.16, dark: 0.0975 })
+
+/**
+ * 实际生效的颗粒强度（受 {@link GRAIN_ENABLED} 总开关控制）。
+ * 所有消费方都必须读**这个函数**，不要直接读 `GRAIN_ALPHA_BASE` —— 否则总开关会漏掉那一处。
+ */
+export function grainAlpha(scheme: 'light' | 'dark'): number {
+  return GRAIN_ENABLED ? GRAIN_ALPHA_BASE[scheme] : 0
+}
+
+/** 兼容导出：形状与旧的 `GRAIN_ALPHA` 一致，值受总开关控制。 */
+export const GRAIN_ALPHA: Readonly<Record<'light' | 'dark', number>> = Object.freeze({
+  get light() { return grainAlpha('light') },
+  get dark() { return grainAlpha('dark') },
+})
 
 /** 颗粒强度的**运行期变量**（由色调层写到 `body` 上）：伪元素层直接读它，贴图预乘那一路由
  *  {@link GRAIN_ALPHA} 派生 —— **两路同源**，所以 `GRAIN_ALPHA` 仍是唯一旋钮。 */
