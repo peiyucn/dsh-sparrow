@@ -39,7 +39,7 @@ import {
 import { ANCHOR, ANCHOR_ATTR } from '../lib/anchors.js'
 import { buildRowCss } from '../lib/client/styles.js'
 import { buildGlassCss } from '../lib/glass.js'
-import { BACKDROP_CLASS, BACKDROP_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_ATTR, MARKER_ATTR } from '../lib/constants.js'
+import { BACKDROP_CLASS, BACKDROP_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_ATTR, GRAIN_ENABLED, MARKER_ATTR } from '../lib/constants.js'
 import { DARK_TONES, DEFAULT_SETTINGS, DEPTH_ALPHA, LIGHT_TONES } from '../lib/tones.js'
 
 const settings = (lightTone, darkTone) => ({ lightTone, darkTone })
@@ -83,6 +83,15 @@ describe('背景层样式表', () => {
   })
 
   it('颗粒层应该 带上 pyai.site 同款 data URI 与**统一来源的**不透明度', () => {
+    // 2026-10-22 起「画不画颗粒」是总开关（GRAIN_ENABLED）。两档都要守：
+    //  - 启用：贴图 + 统一来源的 opacity + data-grain 开关，一项不少；
+    //  - 关闭：**一处都不得有**（漏一处就是「大部分没颗粒、某处还有」的诡异状态）。
+    if (!GRAIN_ENABLED) {
+      assert.ok(!css.includes(GRAIN_DATA_URI), '总开关关闭时不得出现颗粒贴图')
+      assert.ok(!css.includes(GRAIN_ALPHA_VARIABLE), '总开关关闭时不得引用颗粒强度变量')
+      assert.ok(!css.includes('feTurbulence'), '总开关关闭时不得生成噪声贴图')
+      return
+    }
     assert.ok(css.includes(GRAIN_DATA_URI))
     assert.match(
       css,
@@ -410,6 +419,10 @@ describe('色调卡样式', () => {
   })
 
   it('卡面应该 带颗粒质感（与实况同一条纹理、同一不透明度来源、同一 screen 混合）', () => {
+    if (!GRAIN_ENABLED) {
+      assert.ok(!css.includes(GRAIN_DATA_URI), '总开关关闭时卡面也不得画颗粒')
+      return
+    }
     assert.ok(css.includes(GRAIN_DATA_URI), '卡面要用与实况同一条颗粒纹理')
     assert.match(
       css,
@@ -420,6 +433,10 @@ describe('色调卡样式', () => {
   })
 
   it('颗粒应该 只在深色轴显示（官方默认与浅色轴按 data-grain=off 关掉）', () => {
+    if (!GRAIN_ENABLED) {
+      assert.ok(!css.includes(GRAIN_DATA_URI), '总开关关闭时不存在这个开关属性')
+      return
+    }
     assert.match(css, new RegExp(`\\[${GRAIN_ATTR}='off'\\]::after \\{\\s*display: none;`, 'u'))
   })
 

@@ -3,7 +3,7 @@
  * 不复刻官方 hashed 类名、不依赖官方 DOM 结构。
  */
 
-import { BACKDROP_CLASS, GRAIN_ALPHA_VARIABLE, GRAIN_ATTR } from '../constants.js'
+import { BACKDROP_CLASS, GRAIN_ALPHA_VARIABLE, GRAIN_ATTR, GRAIN_ENABLED } from '../constants.js'
 import { GRAIN_DATA_URI, GRAIN_OPACITY } from '../backdrop.js'
 
 /** 行的类名（对外导出给组件用，避免两处各写一遍字符串）。 */
@@ -68,8 +68,10 @@ export function buildRowCss(): string {
   line-height: 22px;
   cursor: pointer;
 }
-/* 卡面颗粒：与实况背景层同一条纹理、同一不透明度、同一 screen 混合 —— 深色轴的「质感」就是这一层。 */
-.${cube}::after {
+/* 卡面颗粒：与实况背景层同一条纹理、同一不透明度、同一 screen 混合 —— 深色轴的「质感」就是这一层。
+   ⚠️ 受颗粒总开关（GRAIN_ENABLED）控制：关掉时**整条不生成**，与实况保持一致
+   （实况不画颗粒、预览却画，会比「都没颗粒」更容易误导）。 */
+${GRAIN_ENABLED ? `.${cube}::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -81,7 +83,7 @@ export function buildRowCss(): string {
 /* 官方默认与浅色轴不叠颗粒（与实况一致：grain 只对深色轴开） */
 .${cube}[${GRAIN_ATTR}='off']::after {
   display: none;
-}
+}` : '/* 颗粒总开关关闭：卡面预览也不画颗粒。 */'}
 .${cube}:hover:not(.${selected}) {
   border-color: var(--dsw-alias-label-secondary);
 }

@@ -31,7 +31,7 @@ import {
 /** 浅色轴暗边用的官方最深静态色 token。 */
 const SHADE_TOKEN = '--dsw-static-neutral-bluish-1000'
 import { ANCHOR, anchorSelector } from '../lib/anchors.js'
-import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_TILE_VARIABLE, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_NOTCH_ATTR, PHASE_BAND_VARIABLE, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
+import { ABOVE_CONTENT_Z_INDEX, CONTENT_Z_INDEX, GRAIN_ALPHA_VARIABLE, GRAIN_ENABLED, GRAIN_TILE_VARIABLE, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_NOTCH_ATTR, PHASE_BAND_VARIABLE, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WIDTH_HANDLE_ATTR, WORKSTART_ATTR } from '../lib/constants.js'
 import { BACKDROP_GRADIENTS, GRAIN_DATA_URI, GRAIN_OPACITY, GRAIN_OPACITY_LIGHT, dimmedBackdropGradients } from '../lib/backdrop.js'
 
 /** 官方 GuideBody 根的属性（`GuideBody.tsx:80`）—— 只在右栏「开始」页出现，故可作状态锚点。 */
@@ -370,12 +370,16 @@ describe('glass：输入框底座', () => {
     assert.match(body, /left: 0/u, '横向铺满（那一小条是全宽的无妨，高度已限死在卡片下沿）')
     // 不透明：底色是**原样** token（不是 color-mix 出来的半透明）
     assert.match(body, /background-color: var\(--dsw-alias-bg-base\)/u, '带体必须不透明')
-    // 按背景底部的样子重画：同源的光 + 颗粒
-    assert.ok(body.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), '颗粒必须在（漏了它就是唯一「干净」的平块）')
+    // 按背景底部的样子重画：同源的光（+ 颗粒，若总开关开着）
+    if (GRAIN_ENABLED) {
+      assert.ok(body.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), '颗粒必须在（漏了它就是唯一「干净」的平块）')
+    } else {
+      assert.ok(!body.includes('feTurbulence'), '总开关关闭时不得再画颗粒')
+    }
     assert.ok(body.includes(BACKDROP_GRADIENTS), '光必须与背景层**同源**（直引，不复制数值）')
-    // ⚠️ 单个 fixed：本规则 4 层 background-image，`scroll, fixed` 会被循环补齐成 scroll/fixed/scroll/fixed，
-    // 第 1、3 段渐变退回按元素自身盒子解析。（这是**退回档**：相位前提不成立的状态走它 —— 慢但绝不位移。）
-    assert.match(body, /background-attachment: fixed;/u, '必须单个 fixed（覆盖全部 4 层）')
+    // ⚠️ 单个 fixed：本规则 background-image 有 3~4 层，`scroll, fixed` 会被循环补齐成 scroll/fixed/scroll/fixed，
+    // 渐变退回按元素自身盒子解析。（这是**退回档**：相位前提不成立的状态走它 —— 慢但绝不位移。）
+    assert.match(body, /background-attachment: fixed;/u, '必须单个 fixed（覆盖全部层）')
     assert.ok(!body.includes('scroll, fixed'), '不得写 scroll, fixed（层数不足会被循环补齐）')
     // 遮盖强度（那条带子是**不透明**的，所以不留 !important 的必要，但也不该被官方简写压掉）
     assert.ok(!body.includes('backdrop-filter'), '不透带不模糊')
@@ -399,11 +403,21 @@ describe('glass：输入框底座', () => {
     // 不得再用 fixed（否则那条开销原封不动）
     assert.ok(!/background-attachment:\s*fixed/u.test(pBody), '性能档不得再用 fixed')
     assert.match(pBody, /background-attachment:\s*scroll/u, '性能档用 scroll')
-    // 逐层给值：少一层就会被循环补齐、颗粒被拉成 14 倍粗
-    assert.match(pBody, /background-size:\s*auto,\s*100vw 100vh,\s*100vw 100vh,\s*100vw 100vh/u,
-      '必须逐层给 background-size（第 1 层颗粒要保持 auto）')
-    assert.match(pBody, /background-repeat:\s*repeat,\s*no-repeat,\s*no-repeat,\s*no-repeat/u,
-      '必须逐层给 background-repeat')
+    // 逐层给值，且**层数随颗粒总开关变化**：少一层就会被循环补齐（颗粒被拉成 14 倍粗 / 渐变按自身盒子解析）。
+    // 与其把「4 层」写死（开关一关就误红），不如按开关推导出期望层数 —— 这样两档都真的被守住。
+    const expectedLayers = GRAIN_ENABLED ? ['auto', '100vw 100vh', '100vw 100vh', '100vw 100vh'] : ['100vw 100vh', '100vw 100vh', '100vw 100vh']
+    const sizeDecl = (/background-size:\s*([^;]+);/u.exec(pBody) ?? ['', ''])[1]
+    assert.deepEqual(
+      sizeDecl.split(',').map(s => s.trim()).filter(Boolean),
+      expectedLayers,
+      `background-size 必须逐层给、且层数与颗粒开关一致（GRAIN_ENABLED=${GRAIN_ENABLED}）`,
+    )
+    const repeatDecl = (/background-repeat:\s*([^;]+);/u.exec(pBody) ?? ['', ''])[1]
+    assert.equal(
+      repeatDecl.split(',').map(s => s.trim()).filter(Boolean).length,
+      expectedLayers.length,
+      'background-repeat 的层数必须与 size 一致',
+    )
     // 相位：两个方向都用**长度**读运行期实测的原点（`calc(0px - var(…))`）
     assert.ok(pBody.includes(`var(${PHASE_BAND_VARIABLE})`), 'x 必须读运行期实测的左缘量')
     assert.ok(pBody.includes(`var(${PHASE_BAND_TOP_VARIABLE})`), 'y 必须读运行期实测的上缘量')
@@ -431,11 +445,16 @@ describe('glass：输入框底座', () => {
     const pos = (/background-position:\s*([^;]+);/u.exec(decl) ?? ['', ''])[1]
     const layer = `calc(0px - var(${PHASE_BAND_VARIABLE})) calc(0px - var(${PHASE_BAND_TOP_VARIABLE}))`
     const layers = pos.split(',').map((s) => s.trim().replace(/\s+/gu, ' ')).filter(Boolean)
-    assert.equal(layers.length, 4, `应逐层给四个位置，实际 ${layers.length}：${pos}`)
+    // 层数随颗粒总开关变化：启用 = 颗粒 + 三道光（4 层）；关闭 = 三道光（3 层）。
+    const expectedLayers = GRAIN_ENABLED ? 4 : 3
+    assert.equal(layers.length, expectedLayers, `应逐层给位置，期望 ${expectedLayers} 层、实际 ${layers.length}：${pos}`)
     for (const l of layers) assert.equal(l, layer, `每一层都必须是同一个视口原点配方，实际：${l}`)
-    // 逐层三个属性都要给足（4 层）
-    assert.match(decl, /background-size:\s*auto, 100vw 100vh, 100vw 100vh, 100vw 100vh/u, 'size 逐层')
-    assert.match(decl, /background-repeat:\s*repeat, no-repeat, no-repeat, no-repeat/u, 'repeat 逐层')
+    // 逐层三个属性都要给足（层数与上面一致）
+    const expectedSize = GRAIN_ENABLED
+      ? ['auto', '100vw 100vh', '100vw 100vh', '100vw 100vh']
+      : ['100vw 100vh', '100vw 100vh', '100vw 100vh']
+    const sizeDecl = (/background-size:\s*([^;]+);/u.exec(decl) ?? ['', ''])[1]
+    assert.deepEqual(sizeDecl.split(',').map(s => s.trim()).filter(Boolean), expectedSize, 'size 逐层且层数正确')
     // 不许出现任何写死的几何数字
     assert.ok(!/\b(7|280)px\b/u.test(decl), '不得写死几何数字（须读运行期变量）')
     // 两个载体必须各读**自己**那份量：套用对方的会偏一个内边距
@@ -463,9 +482,15 @@ describe('glass：输入框底座', () => {
       assert.ok(!new RegExp(`(?:^|[;{\\s])${prop}\\s*:`, 'mu').test(body),
         `本档不得重声明 ${prop}（盒子与遮罩须完全继承基础档，否则遮罩基准会漂）`)
     }
-    // 但 background-* 必须给足四条（否则 fixed 的开销原封不动）
-    assert.match(body, /background-size:\s*auto,/u, 'size 逐层')
-    assert.match(body, /background-repeat:\s*repeat,/u, 'repeat 逐层')
+    // 但 background-* 必须给足层数（否则 fixed 的开销原封不动）。
+    // 首值随颗粒总开关变：启用时第 1 层是颗粒（`auto` / `repeat`），关闭时第 1 层就是渐变（`100vw 100vh` / `no-repeat`）。
+    if (GRAIN_ENABLED) {
+      assert.match(body, /background-size:\s*auto,/u, 'size 逐层（第 1 层颗粒为 auto）')
+      assert.match(body, /background-repeat:\s*repeat,/u, 'repeat 逐层（颗粒要 repeat）')
+    } else {
+      assert.match(body, /background-size:\s*100vw 100vh,/u, 'size 逐层（无颗粒层时第 1 层是渐变）')
+      assert.match(body, /background-repeat:\s*no-repeat,/u, 'repeat 逐层（渐变不重复）')
+    }
     assert.match(body, /background-position:/u, 'position 必须有')
     // 成对性：座底带与缺口**各自**的门都必须在（合成一道门会让一个载体不可用拖累另一个）
     const seatPhase = rulesFor(css, `[${PHASE_BAND_ATTR}] [data-phase='active'] [data-composer-seat]::after`)
@@ -879,7 +904,13 @@ describe('glass：边界与纪律', () => {
   it('右边栏的颗粒必须与背景层**同构**（::after + opacity + 同混合模式）', () => {
     // 根因：背景层颗粒 = ::after + opacity +（深色轴）mix-blend-mode: screen（纯加法，只加亮），而本模块曾把颗粒当
     // **第 4 个背景层正常合成**（会同时压暗黑像素）⇒ 两侧质感差一档。修法：面板侧也改成 ::after，并与背景层**逐项对齐**。
+    // ⚠️ 2026-10-22 起「画不画颗粒」是总开关：关闭时这一层**整条不生成**，契约翻转成「一处都不得有」。
     const afterStart = rules.indexOf('[data-dockkit-pane]::after')
+    if (!GRAIN_ENABLED) {
+      assert.equal(afterStart, -1, '总开关关闭时不得生成右栏颗粒层')
+      assert.ok(!rules.includes(GRAIN_DATA_URI), '总开关关闭时不得出现颗粒贴图')
+      return
+    }
     assert.ok(afterStart > 0, '应有一条 [data-dockkit-pane]::after 的颗粒规则')
     const block = rules.slice(afterStart, rules.indexOf('}', afterStart))
     assert.ok(block.includes('content:'), '颗粒伪元素要有 content')
@@ -1038,18 +1069,27 @@ describe('glass：边界与纪律', () => {
         `轨迹地面规则必须带官方默认门：${selector}`,
       )
       assert.ok(selector.includes("[data-phase='active']"), `轨迹地面规则只该覆盖 active：${selector}`)
-      // 必须是「原样重画地面」：不透明底色 + 同源的光 + 颗粒（漏任一项就与座底带子不同源）
+      // 必须是「原样重画地面」：不透明底色 + 同源的光（+ 颗粒，若总开关开着）
       assert.match(body, /background-color: var\(--dsw-alias-bg-base\)/u, `轨迹地面必须不透明（原样 token）：${selector}`)
-      assert.ok(body.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), `轨迹地面必须带颗粒：${selector}`)
+      if (GRAIN_ENABLED) {
+        assert.ok(body.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), `轨迹地面必须带颗粒：${selector}`)
+      } else {
+        assert.ok(!body.includes('feTurbulence'), `总开关关闭时轨迹地面不得画颗粒：${selector}`)
+      }
       assert.ok(body.includes(BACKDROP_GRADIENTS), `轨迹地面必须与背景层同源的光：${selector}`)
       // ⚠️ 2026-10-21 性能专项：不再用 background-attachment: fixed（每帧按视口栅格化，
       // 成本与声明尺寸无关 ⇒ 多会话并行时是掉帧来源）。改用「100vw×100vh + scroll + 0 0 相位」，
       // 真机逐像素实测 0.005% 差异（肉眼不可见）。
       assert.match(body, /background-attachment: scroll;/u, `轨迹地面必须用 scroll（不得回退 fixed）：${selector}`)
-      assert.match(
-        body,
-        /background-size: auto, 100vw 100vh, 100vw 100vh, 100vw 100vh/u,
-        `轨迹地面必须逐层给 background-size：${selector}`,
+      const expectedSize = GRAIN_ENABLED
+        ? ['auto', '100vw 100vh', '100vw 100vh', '100vw 100vh']
+        : ['100vw 100vh', '100vw 100vh', '100vw 100vh']
+      const sizeDecl = (/background-size:\s*([^;]+);/u.exec(body) ?? ['', ''])[1]
+      assert.deepEqual(
+        sizeDecl.split(',').map(s => s.trim()).filter(Boolean),
+        expectedSize,
+
+        `轨迹地面必须逐层给 background-size（层数与颗粒开关一致）：${selector}`,
       )
       assert.ok(!body.includes('background-attachment: fixed'), `不得再用 fixed：${selector}`)
       assert.ok(!body.includes('scroll, fixed'), `不得写 scroll, fixed（层数不足会被循环补齐）：${selector}`)
@@ -1624,11 +1664,15 @@ describe('glass：输入框卡上圆角缺口补丁（owner 2026-09-30「其实�
   })
 
   it('补丁的漆必须与座底那条**同源**：不透明 bg-base + 同源光 + 颗粒 + 单个 fixed', () => {
-    // 复用的是同一个 backingPaint()：不透明 ⇒ 逐像素等于背景（C = P 精确成立），看不出补丁边界。
+    // 复用的是同一个 backingPaint() / groundRedrawPaint()：不透明 ⇒ 逐像素等于背景（C = P 精确成立），看不出补丁边界。
     assert.match(patch, /background-color: var\(--dsw-alias-bg-base\)/u, '必须不透明（原样 token）')
-    assert.ok(patch.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), '颗粒必须在（漏了它就是一块干净平色）')
+    if (GRAIN_ENABLED) {
+      assert.ok(patch.includes(`var(${GRAIN_TILE_VARIABLE}, none)`), '颗粒必须在（漏了它就是一块干净平色）')
+    } else {
+      assert.ok(!patch.includes('feTurbulence'), '总开关关闭时不得画颗粒')
+    }
     assert.ok(patch.includes(BACKDROP_GRADIENTS), '光必须与背景层**同源**（直引，不复制数值）')
-    assert.match(patch, /background-attachment: fixed;/u, '必须单个 fixed（4 层 background-image）')
+    assert.match(patch, /background-attachment: fixed;/u, '必须单个 fixed（覆盖全部 background-image 层）')
     assert.ok(!patch.includes('scroll, fixed'), '不得写 scroll, fixed（层数不足会被循环补齐）')
     assert.ok(!/\bbackground:\s/u.test(patch), '不得用 background 简写（会重置其它 background-*）')
   })

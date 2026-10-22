@@ -28,6 +28,7 @@ import {
   WIDTH_HANDLE_ATTR,
 } from './constants.js'
 import { ANCHOR, ANCHOR_ATTR } from './anchors.js'
+import { GRAIN_ENABLED } from './constants.js'
 import { normalizeScheme, toneFor, toneIdOf, type ColorScheme, type ThemeToneSettings, type ToneId } from './tones.js'
 
 
@@ -122,9 +123,28 @@ export const BACKDROP_GRADIENTS = `radial-gradient(${DARK_RADIAL_SHAPE}, var(${T
     radial-gradient(${LEFT_RADIAL_SHAPE}, var(${LEFT_VARIABLE}, transparent), ${LEFT_RADIAL_STOP})`
 
 /** 「**颗粒 + 背景层那串光**」两行 —— 凡把背景原样重画一遍的地方都用它（底座 / 右边栏 / 扫光带）；
- * 共用的是这两行、不是整条规则（三处外围各异），抽出来只为「颗粒与光必须同源」不被漏抄。 */
+ * 共用的是这两行、不是整条规则（三处外围各异），抽出来只为「颗粒与光必须同源」不被漏抄。
+ *
+ * ⚠️ `GRAIN_ENABLED === false` 时**不再把颗粒瓦片写进 background-image**（而不是让它指到
+ * 一张 alpha=0 的贴图）：多一个 `background-image` 层，每次重绘该面都要多解析/栅格化一层，
+ * 而它画出来是全透明的 —— 纯浪费。总开关要真的**少一层**，不只是「看不见」。
+ */
 export function grainOverGradients(): string {
+  if (!GRAIN_ENABLED) return BACKDROP_GRADIENTS
   return `var(${GRAIN_TILE_VARIABLE}, none),\n    ${BACKDROP_GRADIENTS}`
+}
+
+/**
+ * 面层的 `background-size` / `-repeat` / `-position` 逐层值。
+ * ⚠️ 颗粒层存在与否会改变层数，而这三个属性**必须先给够层数**（不足会按序循环补齐、
+ * 把颗粒拉成粗块或让渐变按元素自身盒子解析）。故统一由本函数按总开关产出，不要各处手写。
+ */
+export function faceLayerGeometry(perGradient: string): { size: string; repeat: string; position: string } {
+  const gradients = [perGradient, perGradient, perGradient]
+  const sizes = GRAIN_ENABLED ? ['auto', ...gradients] : gradients
+  const repeats = GRAIN_ENABLED ? ['repeat', ...gradients.map(() => 'no-repeat')] : gradients.map(() => 'no-repeat')
+  const positions = GRAIN_ENABLED ? ['0px 0px', ...gradients.map(() => '0px 0px')] : gradients.map(() => '0px 0px')
+  return { size: sizes.join(', '), repeat: repeats.join(', '), position: positions.join(', ') }
 }
 
 /*
@@ -164,7 +184,7 @@ export function buildBackdropCss(): string {
 .${BACKDROP_CLASS}[hidden] {
   display: none;
 }
-.${BACKDROP_CLASS}::after {
+${GRAIN_ENABLED ? `.${BACKDROP_CLASS}::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -173,18 +193,18 @@ export function buildBackdropCss(): string {
 }
 .${BACKDROP_CLASS}[${GRAIN_ATTR}='off']::after {
   display: none;
-}
-body[data-ds-dark-theme] .${BACKDROP_CLASS},
-body[data-ds-dark-theme] .${BACKDROP_CLASS}::after {
+}` : `/* 颗粒总开关关闭（GRAIN_ENABLED=false）：**整条 ::after 不生成** —— 不画一个 alpha=0 的层，
+   而是根本没有这一层。少一层就少一次合成。 */`}
+body[data-ds-dark-theme] .${BACKDROP_CLASS}${GRAIN_ENABLED ? `,\nbody[data-ds-dark-theme] .${BACKDROP_CLASS}::after` : ''} {
   mix-blend-mode: screen;
 }
 body:not([data-ds-dark-theme]) .${BACKDROP_CLASS} {
   mix-blend-mode: normal;
-}
+}${GRAIN_ENABLED ? `
 body:not([data-ds-dark-theme]) .${BACKDROP_CLASS}::after {
   mix-blend-mode: multiply;
   opacity: var(${GRAIN_ALPHA_VARIABLE}, ${GRAIN_OPACITY_LIGHT});
-}
+}` : ''}
 body:not([${PLAIN_ATTR}]) [${CONTENT_ATTR}] {
   position: relative;
   z-index: ${CONTENT_Z_INDEX};
