@@ -6,20 +6,20 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 - Merged into **`dsh-theme-tone`**; this package is no longer maintained. Uninstall it (`dsh plugin --profile web remove @dsh-sparrow/dsh-nav-pin`) and pick any tone in theme-tone to keep the behavior — the drag-handle glow fix needs no tone, the navigation and width clamping do.
 
-## 0.1.5-rc.2 (2026-09-10)
+## [0.1.5-rc.2] - 2026-09-10
 
 - Version-line alignment with official dsh 0.1.5-rc.2.
 
-## 0.1.2-rc.1.1 (2026-09-09)
+## [0.1.2-rc.1.1] - 2026-09-09
 
 - If the browser running dsh lacks a CSS feature this plugin needs, the plugin now disables itself instead of injecting rules that cannot work (dsh and other plugins are unaffected).
 
-## 0.1.2-rc.1 (2026-09-05)
+## [0.1.2-rc.1] - 2026-09-05
 
 - Version-line alignment with official dsh 0.1.2-rc.1 (stability line).
 - Fix the hover hit area on narrow conversations: the rail's extended hit zone now actually extends 16px to the left (previously it landed inside the rail), so hover reveal triggers across the intended area.
 
-## 0.1.0 (2026-09-02)
+## [0.1.0] - 2026-09-02
 
 - Promoted 0.1.0 (identical to 0.1.0-alpha.3).
 

@@ -2,31 +2,31 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.2.1-rc.2 (2026-10-17)
+## [0.2.1-rc.2] - 2026-10-18
 
 - Now adapted to official dsh 0.2.1-rc.2 (web and desktop).
 - Opening Cloud Files from another machine on the LAN works again: requests from a non-loopback address are no longer rejected.
 
-## 0.2.0-rc.2 (2026-10-08)
+## [0.2.0-rc.2] - 2026-10-08
 
 - Now adapted to official dsh 0.2.0-rc.2 (web and desktop).
 - The Cloud Files entry moved to the top of the sidebar, beside Plugins and Automations, and now opens as a page in the main area instead of a dialog.
 
-## 0.1.5-rc.2.1 (2026-09-11)
+## [0.1.5-rc.2.1] - 2026-09-11
 
 - "Load more" now loads 20 more files per click instead of 100.
 
-## 0.1.5-rc.2 (2026-09-10)
+## [0.1.5-rc.2] - 2026-09-10
 
 - Version-line alignment with official dsh 0.1.5-rc.2.
 - The loading indicator now matches the rest of the dsh interface.
 - Escape now closes the delete confirmation first, so it no longer stays on screen after the panel closes.
 
-## 0.1.2-rc.1.1 (2026-09-09)
+## [0.1.2-rc.1.1] - 2026-09-09
 
 - On a dsh version this plugin does not support, it turns itself off and leaves dsh working.
 
-## 0.1.2-rc.1 (2026-09-05)
+## [0.1.2-rc.1] - 2026-09-05
 
 - Version-line alignment with official dsh 0.1.2-rc.1 (stability line).
 - Fixed the file list going wrong after quickly reopening the panel or tapping Retry.
@@ -35,7 +35,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - "Load more" now sits at the end of the file list, and the list scrolls to the bottom after each page loads.
 - A small 🐦 dsh-sparrow brand line closes the panel.
 
-## 0.1.0 (2026-09-02)
+## [0.1.0] - 2026-09-02
 
 - First stable release.
 

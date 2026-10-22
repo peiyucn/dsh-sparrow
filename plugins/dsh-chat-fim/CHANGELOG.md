@@ -2,34 +2,34 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.2.1-rc.2 (2026-10-17)
+## [0.2.1-rc.2] - 2026-10-18
 
 - Now adapted to official dsh 0.2.1-rc.2 (web and desktop).
 - Suggestions work again on LAN deployments: requests from a non-loopback address are no longer rejected.
 
-## 0.2.0-rc.2 (2026-10-08)
+## [0.2.0-rc.2] - 2026-10-08
 
 - Now adapted to official dsh 0.2.0-rc.2 (web and desktop).
 
-## 0.1.5-rc.2.1 (2026-09-21)
+## [0.1.5-rc.2.1] - 2026-09-22
 
 - Fixed the suggestion switch ignoring the selected model right after DSH starts.
 
-## 0.1.5-rc.2 (2026-09-10)
+## [0.1.5-rc.2] - 2026-09-10
 
 - Version-line alignment with official dsh 0.1.5-rc.2.
 - The suggestion switch and the candidate menu are visible again on dsh 0.1.5.
 - Suggestions stay responsive in very long sessions.
 - Suggestions now follow the current main model, and default to deepseek-flash.
 
-## 0.1.2-rc.1.1 (2026-09-09)
+## [0.1.2-rc.1.1] - 2026-09-09
 
 - A suggestion is now shown only in the session it belongs to.
 - On a dsh version this plugin does not support, it turns itself off and leaves dsh working.
 - The suggestion card now blurs together with the background when a dialog opens.
 - No suggestion request is sent for a session this plugin does not recognize.
 
-## 0.1.2-rc.1 (2026-09-05)
+## [0.1.2-rc.1] - 2026-09-05
 
 - Version-line alignment with official dsh 0.1.2-rc.1 (stability line).
 - The FIM switch now follows the selected model as soon as you switch models.
@@ -38,7 +38,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Tab adoption now also works when the draft contains files or prompts mentioned with @.
 - A small 🐦 dsh-sparrow brand line sits in the bottom-left corner of the suggestion card.
 
-## 0.1.0 (2026-09-02)
+## [0.1.0] - 2026-09-02
 
 - First stable release.
 

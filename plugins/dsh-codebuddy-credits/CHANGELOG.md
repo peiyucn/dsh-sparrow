@@ -3,16 +3,16 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
-## 0.2.1-rc.2.2 (2026-10-21)
+## [0.2.1-rc.2.2] - 2026-10-21
 
 - Chat works again: requests sent from the web app no longer fail with an "unapproved channel" error after an upstream filter change.
 - Sessions that had already hit that error recover too — you can keep working in the same conversation instead of starting a new one.
 
-## 0.2.1-rc.2.1 (2026-10-21)
+## [0.2.1-rc.2.1] - 2026-10-21
 
 - Chat works again: requests no longer fail with an "unapproved channel" error on every model.
 
-## 0.2.1-rc.2 (2026-10-17)
+## [0.2.1-rc.2] - 2026-10-18
 
 - Now adapted to official dsh 0.2.1-rc.2 (web and desktop).
 - On LAN deployments the plugin's pages work again: requests from a non-loopback address are no longer rejected.
@@ -20,18 +20,18 @@ See [简体中文](./CHANGELOG.zh-CN.md).
 - The model picker shows the official `1017` version badge on DeepSeek Flash again.
 - Reasoning levels are listed from lowest to highest.
 
-## 0.2.0-rc.2 (2026-10-08)
+## [0.2.0-rc.2] - 2026-10-08
 
 - Now adapted to official dsh 0.2.0-rc.2 (web and desktop).
 - The CodeBuddy entry shrinks to an icon-only logo on narrow layouts.
 
-## 0.1.5-rc.2.2 (2026-09-21)
+## [0.1.5-rc.2.2] - 2026-09-22
 
 - Credits no longer reset after a restart, and older sessions keep their full totals.
 - The credit dialog is narrower.
 - Clicking the user name in the credit dialog opens your CodeBuddy profile.
 
-## 0.1.5-rc.2.1 (2026-09-11)
+## [0.1.5-rc.2.1] - 2026-09-11
 
 - Session credits now appear in the composer's stats row; clicking shows the per-model breakdown.
 - **Fetch available models** now updates the settings card, credits panel and model picker together.
@@ -40,24 +40,24 @@ See [简体中文](./CHANGELOG.zh-CN.md).
 - Requests no longer hang; they time out instead of waiting forever.
 - Changing or clearing the key no longer brings back the old account or model list.
 
-## 0.1.5-rc.2 (2026-09-10)
+## [0.1.5-rc.2] - 2026-09-10
 
 - Version-line alignment with official dsh 0.1.5-rc.2.
 - Fixed session credit totals sometimes missing the last part of a reply.
 - The settings card now lists the models your key can use, with a **Fetch available models** button.
 - Model names no longer carry a credit-rate suffix; the rate and context window now appear separately.
 
-## 0.1.2-rc.1.2 (2026-09-09)
+## [0.1.2-rc.1.2] - 2026-09-09
 
 - The plugin now disables itself on dsh versions it does not support.
 - Fixed images not reaching vision-capable models.
 
-## 0.1.2-rc.1.1 (2026-09-07)
+## [0.1.2-rc.1.1] - 2026-09-07
 
 - **Max mode**: a switch in the credits panel locks all reasoning models to Max effort.
 - The lock does not affect models from other providers.
 
-## 0.1.2-rc.1 (2026-09-05)
+## [0.1.2-rc.1] - 2026-09-05
 
 - Initial release: use your company CodeBuddy credits as an LLM provider in DSH.
 - Configure it on the **CodeBuddy Credits** row in Settings → Models; clearing the key disables the provider.

@@ -2,26 +2,26 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.2.1-rc.2 (2026-10-17)
+## [0.2.1-rc.2] - 2026-10-18
 
 - Now adapted to official dsh 0.2.1-rc.2 (web and desktop).
 - Opening the archive panel from another machine on the LAN works again: requests from a non-loopback address are no longer rejected.
 
-## 0.2.0-rc.2 (2026-10-08)
+## [0.2.0-rc.2] - 2026-10-08
 
 - Now adapted to official dsh 0.2.0-rc.2 (web and desktop).
 - The Archive entry moved to the top of the sidebar, beside Plugins and Automations, and now opens as a page instead of a dialog.
 
-## 0.1.5-rc.2.4 (2026-09-21)
+## [0.1.5-rc.2.4] - 2026-09-22
 
 - Fixed the sub-session connector lines in the session tree.
 
-## 0.1.5-rc.2.3 (2026-09-13)
+## [0.1.5-rc.2.3] - 2026-09-13
 
 - Subagent trees in the archive area and the trash are collapsed by default; a parent row shows its subagent count.
 - When a parent session is locked because one of its subagents is still in use by dsh, the row says so.
 
-## 0.1.5-rc.2.2 (2026-09-12)
+## [0.1.5-rc.2.2] - 2026-09-12
 
 - Moving to trash or deleting a session now takes its whole subagent tree, however deep; nothing is left behind to clean up.
 - Trash entries now expand as a parent/child tree like the archive area; entries moved by earlier versions stay flat.
@@ -29,18 +29,18 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - Restoring a session no longer leaves an extra file inside the session folder.
 - A session folder already missing from disk no longer fails the action; the rest still moves and deletion goes through.
 
-## 0.1.5-rc.2.1 (2026-09-11)
+## [0.1.5-rc.2.1] - 2026-09-11
 
 - Permanently deleting a session now clears the archived mark only from the subagents that were really deleted, so a failed one can be retried.
 
-## 0.1.5-rc.2 (2026-09-10)
+## [0.1.5-rc.2] - 2026-09-10
 
 - Version-line alignment with official dsh 0.1.5-rc.2.
 - Moving a session to trash and permanent deletion work again on dsh 0.1.5.
 - The archive panel's loading animation now matches the rest of the interface.
 - Moving to trash, permanent deletion, unarchiving and deleting trash entries remove the entry right away instead of reloading the whole list.
 
-## 0.1.2-rc.1.1 (2026-09-09)
+## [0.1.2-rc.1.1] - 2026-09-09
 
 - If dsh is upgraded to a version this plugin does not support yet, the plugin disables itself; dsh and other plugins are unaffected.
 - The archive panel opens faster on sessions with subagents.
@@ -48,7 +48,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - The panel no longer flickers after an action; the list and its buttons update in place.
 - Sessions this plugin cannot safely handle are no longer moved or deleted; the action is refused instead.
 
-## 0.1.2-rc.1 (2026-09-05)
+## [0.1.2-rc.1] - 2026-09-05
 
 - Version-line alignment with official dsh 0.1.2-rc.1.
 - Archived sessions now show as a parent/child tree; a parent row carries its subagent count.
@@ -66,7 +66,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 - Works with dsh versions released after 0.1.2-alpha.5.
 
-## 0.1.0 (2026-09-02)
+## [0.1.0] - 2026-09-02
 
 - Promoted 0.1.0 (identical to 0.1.0-alpha.3).
 

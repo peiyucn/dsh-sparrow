@@ -2,12 +2,12 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## 0.1.2-rc.1.1 (2026-09-09)
+## [0.1.2-rc.1.1] - 2026-09-09
 
 - If dsh is upgraded to a version this plugin does not support yet, the plugin now disables itself instead of running against an unknown contract (dsh and other plugins are unaffected).
 - Reads are refused for a session stored in a format this plugin does not recognize.
 
-## 0.1.2-rc.1 (2026-09-05)
+## [0.1.2-rc.1] - 2026-09-05
 
 - Version-line alignment with official dsh 0.1.2-rc.1 (stability line).
 - The vision status icon now shares the model seat's directory: it appears as soon as the page loads and no longer waits for the session history to load.
@@ -15,7 +15,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - The icon state now matches actual availability: DeepSeek text models that are not configured for the vision bridge show "no vision" instead of promising a read that would be rejected, and the state re-checks itself after the model directory or credentials change.
 - A subtle 🐦 dsh-sparrow brand line closes the popover.
 
-## 0.1.0 (2026-09-02)
+## [0.1.0] - 2026-09-02
 
 - Promoted 0.1.0 (identical to 0.1.0-alpha.3).
 
