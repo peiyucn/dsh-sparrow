@@ -3,6 +3,10 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
+## [0.2.1-rc.3] - 2026-10-24
+
+- Now adapted to official dsh 0.2.1-rc.3 (web and desktop).
+
 ## [0.2.1-rc.2.2] - 2026-10-21
 
 - Chat works again: requests sent from the web app no longer fail with an "unapproved channel" error after an upstream filter change.

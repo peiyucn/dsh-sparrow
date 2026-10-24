@@ -2,6 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## [0.2.1-rc.3] - 2026-10-24
+
+- Now adapted to official dsh 0.2.1-rc.3 (web and desktop).
+
 ## [0.2.1-rc.2.1] - 2026-10-22
 
 - The tone skins no longer draw the noise/grain texture over the background. It is a visible change: surfaces read cleaner, especially over large empty areas in dark mode.
