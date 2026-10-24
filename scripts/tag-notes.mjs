@@ -21,12 +21,20 @@ const read = (file) => readFileSync(join(root, 'plugins', plugin, file), 'utf8')
 
 const section = (text) => {
   const lines = text.split(/\r?\n/)
-  // 版本标题的日期括号中英文不一致（英文 "(2026-09-07)"、中文 "（2026-09-07）"）：
+  // 版本标题有两种写法，都要认：
+  //   旧：`## 0.2.1-rc.2.1 (2026-10-22)` / `（2026-10-22）`
+  //   新（Keep a Changelog）：`## [0.2.1-rc.3] - 2026-10-24`
   // 纯字符串匹配（不用正则——版本号来自命令行参数，CodeQL js/regex-injection）。
-  const prefix = '## ' + version
+  const bracketPrefix = '## [' + version + ']'
+  const plainPrefix = '## ' + version
   const isHeading = (line) => {
-    if (!line.startsWith(prefix)) return false
-    const rest = line.slice(prefix.length).trim()
+    if (line.startsWith(bracketPrefix)) {
+      const rest = line.slice(bracketPrefix.length).trim()
+      return rest.startsWith('-') || (rest.startsWith('(') && rest.endsWith(')'))
+        || (rest.startsWith('（') && rest.endsWith('）'))
+    }
+    if (!line.startsWith(plainPrefix)) return false
+    const rest = line.slice(plainPrefix.length).trim()
     return (rest.startsWith('(') && rest.endsWith(')'))
       || (rest.startsWith('（') && rest.endsWith('）'))
   }
