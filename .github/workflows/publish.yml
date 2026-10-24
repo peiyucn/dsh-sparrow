@@ -56,14 +56,30 @@ jobs:
             PLUGIN="${{ inputs.plugin }}"
             VERSION="$(node -p "require('./plugins/${PLUGIN}/package.json').version")"
           fi
-          # 双通道（官方 0.1.2-rc.1 落地后生效）：alpha/beta 预发布发 next，
-          # rc 与纯数字稳定版发 latest——版本线镜像官方 dsh，稳定版带 rc 标记
-          # （0.1.2-rc.1 即稳定线，目标 dist-tag 是 latest）。
-          if [[ "$VERSION" == *-alpha.* || "$VERSION" == *-beta.* ]]; then
+          # 通道跟随官方宿主：本插件钉住的官方 dsh 版本在 npm 的哪个 dist-tag 上，
+          # 就发到哪个通道（官方 latest = 稳定线；rc 也可能只存在于 next）。
+          # 两个 tag 都不是该版本（或查询失败）时回退到版本后缀规则：
+          # alpha/beta → next，rc 与纯数字稳定版 → latest。
+          PIN="$(node -e "
+            const peers = require('./plugins/' + process.argv[1] + '/package.json').peerDependencies ?? {};
+            const pin = Object.entries(peers)
+              .filter(([name]) => name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-'))
+              .map(([, version]) => version)
+              .find(version => /^[0-9]+\.[0-9]+\.[0-9]+/.test(version));
+            process.stdout.write(pin ?? '');
+          " "${PLUGIN}")"
+          OFFICIAL_LATEST="$(npm view @deepseek-ai/dsh dist-tags.latest 2>/dev/null || true)"
+          OFFICIAL_NEXT="$(npm view @deepseek-ai/dsh dist-tags.next 2>/dev/null || true)"
+          if [[ -n "${PIN}" && "${PIN}" == "${OFFICIAL_LATEST}" ]]; then
+            NPM_TAG="latest"
+          elif [[ -n "${PIN}" && "${PIN}" == "${OFFICIAL_NEXT}" ]]; then
+            NPM_TAG="next"
+          elif [[ "${VERSION}" == *-alpha.* || "${VERSION}" == *-beta.* ]]; then
             NPM_TAG="next"
           else
             NPM_TAG="latest"
           fi
+          echo "official dsh latest=${OFFICIAL_LATEST:-?} next=${OFFICIAL_NEXT:-?}; pinned=${PIN:-?} -> npm-tag=${NPM_TAG}"
           echo "plugin=${PLUGIN}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "npm-tag=${NPM_TAG}" >> "$GITHUB_OUTPUT"
