@@ -14,7 +14,7 @@ import { createPortal } from 'react-dom'
 import {
   // 图标名只标字形与字重（Regular = 1px 描边），渲染尺寸一律由显式 size prop 决定。
   IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular,
-  IconWarningOutlineRegular, MenuGroup, observeStickyMenuGroups, Tag, Toast,
+  IconWarningOutlineRegular, MenuGroup, MenuSurface, observeStickyMenuGroups, Tag, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getMaxMode, subscribeMaxMode } from './maxMode.js'
 import { BusyDot } from './BusyDot.js'
@@ -121,12 +121,11 @@ export function ensurePickerStyles(): void {
     '.ccb-model-triggerEffort { flex: 0 0 auto; color: var(--dsw-alias-label-caption); }',
     '.ccb-model-chevron { flex: 0 0 auto; color: var(--dsw-alias-label-caption); transition: transform 120ms ease; }',
     '.ccb-model-chevronOpen { transform: rotate(180deg); }',
-    // ⚠️ **回归官方磨砂配方**（2026-10-26 第二轮）：上一版为了躲「hover 闪出的亮框」改成实心配方，
-    //    后来定位到亮框来自 **theme-tone 给所有 `[role='menu']` 叠的那层 `::after` 打光**（三个菜单形状
-    //    各异 ⇒ 各自的伪元素盒），theme-tone 已把菜单族整条移出表面表 ⇒ 这里可以恢复官方同款：
-    //    `background: var(--dsw-specific-menu)`（45% 半透明，已被 theme-tone 染色）+ `backdrop-filter`。
-    //    ⚠️ 若亮框再现，先查是不是又有人往菜单上叠图层/背景，再考虑回实心配方。
-    '.ccb-model-menu { position: fixed; z-index: 100; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
+    // ⚠️ **材质（填充 + backdrop-filter）交给官方 `MenuSurface` 的 `.material` 子层**，本类只负责几何 /
+    //    描边 / 阴影 —— 官方原语的结构就是「外层 isolation + 内层材质」，容器里再叠别的 `backdrop-filter`
+    //    （色调档下输入框卡片的玻璃）也不会让模糊快照错位成一块偏移淡框。别把 background / backdrop-filter
+    //    写回这条。
+    '.ccb-model-menu { position: fixed; z-index: 100; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
     '.ccb-model-status, .ccb-model-empty { padding: 10px; color: var(--dsw-alias-label-tertiary); font-size: 13px; line-height: 20px; }',
     '.ccb-model-error, .ccb-model-warning { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; padding: 7px 8px; border-radius: 8px; background: var(--dsw-alias-interactive-bg-hover-danger); color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; }',
     '.ccb-model-warning { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-state-warn-label); }',
@@ -424,11 +423,14 @@ export function CodeBuddyModelSelect(
       </button>
 
       {open && anchor !== null && createPortal(
-        // ⚠️ **菜单必须 portal 到 body**（与官方 `MenuSelect` 一致）：留在 `.ccb-model-root` 里就是
-        //    输入框卡片的**后代**，而色调档下那张卡片被我们加了 `isolation` / 玻璃材质 —— 于是菜单自己的
-        //    `backdrop-filter` 会采样到隔离组的快照，画出一块**比菜单大、向左下偏移的淡框**（owner 截图那个）。
-        //    官方默认档没有这层玻璃/隔离，所以没有这个框（也解释了「官方默认没问题」）。
-        <div
+        // ⚠️ **用官方 `MenuSurface` 原语 + portal 到 body**（与官方 `MenuSelect` 逐字同构）：
+        //    容器里还有别的 `backdrop-filter`（色调档下输入框卡片自己的玻璃 `::before`）；手写「卡片自己带
+        //    backdrop-filter」时 Chromium 会把模糊快照画成一块比卡片大的偏移淡框（owner 反复看到的那个；
+        //    官方默认档没有我们那层玻璃，所以「官方默认下不出现」）。
+        //    官方原语正是为这种共存设计的：外层 `.surface` 只做 `isolation` / 圆角 / 裁切，填充与模糊放在
+        //    内部 `.material` 子层（`inset:0; z-index:-1`）⇒ 每个浮层只有一层自己的模糊。
+        //    ⚠️ 别再改回手写 div + 卡片级 `backdrop-filter`。
+        <MenuSurface
           ref={menuRef}
           id={id + '-menu'}
           className="ccb-model-menu"
@@ -592,7 +594,7 @@ export function CodeBuddyModelSelect(
                   ))}
             </>
           )}
-        </div>,
+        </MenuSurface>,
         document.body,
       )}
       {toast !== null && (

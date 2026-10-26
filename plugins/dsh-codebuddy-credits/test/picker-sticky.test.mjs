@@ -42,25 +42,20 @@ describe('模型选择器：分组标题（交给官方 MenuGroup 原语）', ()
     assert.ok(!/role="group"/u.test(source), '不得手写 role="group" 的分组容器')
   })
 
-  it('⛔ 菜单必须 portal 到 body（否则色调档下模糊采样错位、画出淡框）', () => {
-    // 2026-10-26（owner 截图）：菜单留在 `.ccb-model-root` 里 ⇒ 是输入框卡片的**后代**；色调档下那张卡片
-    // 被 theme-tone 加了 isolation / 玻璃材质，菜单自己的 `backdrop-filter` 会采样到隔离组的快照，画出
-    // 一块比菜单大、向左下偏移的**淡框**（官方默认档没有这层玻璃 ⇒ 不出现；官方菜单本来就 portal 到 body）。
+  it('⛔ 菜单必须用官方 `MenuSurface` + portal 到 body（材质在子层，才不会出偏移淡框）', () => {
+    // 2026-10-26（owner 反复报障的那块「比菜单大、偏移的淡框」）：容器里还有别的 backdrop-filter
+    // （色调档下输入框卡片自己的玻璃 `::before`）；手写「卡片自己带 backdrop-filter」时 Chromium 会把
+    // 模糊快照画到偏移位置。官方 MenuSurface 的结构是「外层 .surface 只做 isolation / 圆角 / 裁切 +
+    // 内层 .material 承担填充与模糊」⇒ 每层浮层只有一层自己的模糊，和别的滤镜共存也不出错。
+    assert.match(source, /<MenuSurface\b/u, '菜单根必须用官方 MenuSurface 原语')
     assert.match(source, /createPortal\(/u, '菜单要用 createPortal 挂到 body')
     assert.match(source, /document\.body,\s*\)/u, 'portal 目标必须是 body')
     assert.match(source, /menuRef/u, '菜单要自己的 ref：点外部判定必须放行菜单子树')
     const menu = ruleFor('ccb-model-menu')
     assert.match(menu.body, /position:\s*fixed/u, 'portal 后菜单是固定定位（坐标由触发器矩形算）')
-  })
-
-  it('菜单 应该 是官方同款磨砂（半透明填充 + backdrop-filter），形状/底色交回官方', () => {
-    // 2026-10-26：上一版为躲亮框改过实心配方；定位到亮框其实是 theme-tone 给 `[role='menu']` 叠的
-    // `::after` 打光（已整条移出表面表）⇒ 恢复官方同款磨砂，与权限菜单 / FIM 档位菜单观感一致。
-    const menu = ruleFor('ccb-model-menu')
-    assert.match(menu.body, /background:\s*var\(--dsw-specific-menu\)/u, '半透明填充走官方菜单 token（可被 theme-tone 染色）')
-    assert.match(menu.body, /backdrop-filter:\s*var\(--dsw-menu-backdrop-filter\)/u, '模糊走官方 token')
-    // 禁止再出现「本地不透明底色 + 渐变叠加」那套实心替代（会把菜单染成另一块色）。
-    assert.ok(!/background-color:\s*var\(--dsw-alias-bg-base\)/u.test(menu.body), '不得改用本地不透明底色')
+    // 材质必须交给原语的 .material 子层：卡片自己写 background / backdrop-filter 就是出块的那版写法。
+    assert.ok(!/backdrop-filter/u.test(menu.body), '卡片不得自己声明 backdrop-filter（材质在 .material 子层）')
+    assert.ok(!/(?:^|;)\s*background(?:-color|-image)?\s*:/u.test(menu.body), '卡片不得自己声明填充（材质在 .material 子层）')
   })
 
   it('菜单 不得再声明同心内圆角钩子变量（该族规则已随做减法删除）', () => {
