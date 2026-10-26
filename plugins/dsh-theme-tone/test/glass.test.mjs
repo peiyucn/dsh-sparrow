@@ -807,10 +807,10 @@ describe('glass：边界与纪律', () => {
     // **例外二**：卡片那两条走 `:is(active, hero)` —— 首页也要玻璃（见下一条用例）。
     // 这里断言其余规则**逐个**都是**单** active 相位，别顺手放宽了别的。
     const CARD = '[data-composer-card]'
-    // **例外三**：官方那些**吸顶遮罩行**（`[data-disclosure-row]`，展开的 Think 行）——
+    // **例外三**：官方那些**吸顶遮罩行**（[data-disclosure-header]，展开的 Think 行的标题条）——
     // 它们在**滚区内部**，与顶栏相位无关（hero 下也能展开），所以不带 active 门。
     // 它们要的是「底色等于它盖住的内容底」，而地面在任何相位都着色。
-    const DISCLOSURE = '[data-disclosure-row]'
+    const DISCLOSURE = '[data-disclosure-header]'
     const blocks = rules.split('}').filter(block => block.includes('{'))
     for (const block of blocks) {
       const selector = block.slice(0, block.indexOf('{')).trim()
