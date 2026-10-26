@@ -91,6 +91,9 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
   包含块；不改其尺寸。
 * 设置弹窗：打光按弹窗自身盒子缩放（弹窗居中、位置不固定，不能按视口相位画）。
 * 官方 rc.3 的挂靠卡（Queue/Todo/Goal）本身是半透明 + blur；插件不碰它们（token 染色会顺带跟随）。
+* **覆盖官方菜单材质一处**：`[data-menu-material] { backdrop-filter: none !important }` —— 只关菜单的
+  实时模糊、保留半透明填充。理由：残影只在菜单打开时出现，官方菜单 blur 与本插件玻璃层在合成器里
+  重叠，是 Chromium 复用错位快照的触发条件（已列为残影的最后一个结构性假设）。
 * 悬浮卡（功能 8）是唯一私有 seam：`body > [role="button"][aria-label]` 定位 portal 卡、
   字色按官方 CSS-module 类名后缀命中（`_hoverTitle` 等）。官方改后缀即静默失效（回退成官方写死配色，
   不会崩）；已登记 `docs/private-seams.md`。
