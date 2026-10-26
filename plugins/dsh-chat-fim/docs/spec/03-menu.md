@@ -13,10 +13,11 @@
 
 * 触发/作废状态机：停顿 ≥ 400ms（客户端常量 `PAUSE_MS`）、IME 组合态压制、`draftRev` CAS 防陈旧、同一草稿单在飞请求、phase 非 plain 不展示；**草稿形态门控**（2026-08-30 新增，见 01-design：最短 8 字符、句末标点/尾随空白/单词中间不触发）；
 * 展示：建议到达且开关开启且主模型支持 → 菜单卡出现在输入框上方：
-  * 卡：官方 MenuDropdown 视觉 token（12px 圆角、`--dsw-specific-menu` 底、`--dsw-shadow-lv3`、内边距 4px；行 40px 高、10px 圆角、高亮 `--dsw-alias-interactive-bg-hover`）；**边框为开关 on 态同款紫色（`--dsw-alias-button-info-fill`）**，与官方 @ 列表做视觉区分（2026-08-30 用户要求）；
-  * 行尾键位提示：官方 drillHint 同款布局与 token（caption 色文字 + 键盘帽，行尾右对齐）——「采用 Tab · 丢弃 Esc」；键盘帽与官方 @ 列表 Tab 键帽**逐项一致**（`--dsw-alias-interactive-bg-hover` 底、4px 圆角、`padding: 0 5px`、caption 字色，2026-08-30 用户对照官方后要求统一）；与建议文字保持 24px 间距；
-  * 建议长句：行内 **2 行 line-clamp**（超出省略），悬停 `title` 给全文；
-  * 高度：`useAnchoredMaxHeight` 钳在 composer 上方可用空间；
+  * 卡：**官方 `MenuSurface`**（rc.3 菜单族统一材质：`.surface` 只做 `isolation` / 圆角 16 / 裁切，填充 + 模糊在 `.material` 子层）+ 官方 `ui-input-trigger/MenuView.module.css .menu` 的几何逐项一致（`box-sizing:border-box`、`padding:4px`、`bottom:calc(100%+4px)`、`left:0/right:0`、描边 `--dsw-elevation-stroke-color: var(--dsw-alias-border-l1)`、`box-shadow: var(--dsw-elevation-prominent)`）；**不再自维护旧版材质**（`--dsw-specific-menu` 底、自写 `backdrop-filter`、紫色描边都删）——2026-10-27 owner：「官方后来统一过样式」，旧版紫色边框原为区分官方 @ 列表，现由底部品牌行承担区分；
+  * 行：官方 `MenuView .item` 的几何与 token 逐项一致（`min-height:34px`、`padding:6px 8px`、`border-radius: var(--dsw-radius-md)` 12px、`13px/20px`、悬停 `--dsw-alias-interactive-bg-hover`）；行尾键位提示与官方 drillHint 逐项一致（10px/16px caption 文字 + 16px 高键盘帽、`border-radius: var(--dsw-radius-xs)`、`padding: 0 4px`、`--dsw-alias-interactive-bg-hover` 底）；与建议文字保持 24px 间距；
+  * 建议长句：行内 **2 行 line-clamp**（超出省略），悬停 `title` 给全文——只影响内容折行，行框样式仍与官方一致；
+  * 高度：`useAnchoredMaxHeight` 钳在 composer 上方可用空间，设计上限 400px（同官方 `MenuView`）；
+  * 注入样式表**花括号必须平衡**：Chromium 会把紧跟在多余 `}` 之后的那条规则整条丢弃（2026-10-27 实测：候选行规则被吞 ⇒ 行退回浏览器默认按钮样式）。`test/menu-styles.test.mjs` 钉住这条；
 * 采用：Tab（capture 监听，焦点保持在输入框）或 mousedown 点选（preventDefault 防焦点抢夺）→ `slash/input-insert-text` bail 事件追加草稿（span 取自共享快照的 draft/draftRev，CAS 判定）；Esc 丢弃；继续输入/发送/切会话清空；
 * 开关（input.left）：火花图标 + 「FIM」标签（2026-09-01 中英统一，原「Suggest/续写」），关闭态标签**灰字**（2026-08-30 起不用删除线，颜色区分已足够）、开启态紫色；**窄行折叠为纯图标**——官方 PermissionSelect 同款匿名 `@container (max-width: 460px)` 规则（容器为 InputBar `.row`，查证见 InputBar.module.css:214 / PermissionSelect.module.css:68）（2026-08-30 用户要求）；
 * 联想中指示：开关胶囊显示 busy；紫色旋转光环保留在 composer 卡片外圈（dock 组件渲染，portal 到 body）。

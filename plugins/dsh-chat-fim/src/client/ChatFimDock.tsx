@@ -56,8 +56,10 @@ export type ChatFimMenuProps = PropsRuntime<'conversation.input.overlay'> & Chat
 
 const ENABLED_STORAGE_KEY = 'dsh-chat-fim:enabled'
 const SENSITIVITY_STORAGE_KEY = 'dsh-chat-fim:sensitivity'
-/** 菜单高度设计上限（同官方 MenuDropdown）。 */
-const MENU_MAX_HEIGHT = 320
+/** 菜单高度设计上限（同官方 @ 候选列表 ui-input-trigger/MenuView 的 400px）。 */
+const MENU_MAX_HEIGHT = 400
+/** 灵敏度弹层预宽：左缘对齐后向窗内钳制时用的宽度上界。 */
+const PICKER_MAX_WIDTH = 360
 /** 旋转光环的卡片矩形自愈测量周期。 */
 const RING_MEASURE_INTERVAL_MS = 300
 
@@ -434,43 +436,40 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   inset: 0 0 auto;
   height: 0;
 }
-/* 菜单卡：官方 MenuDropdown 视觉 token（见 ui-input-trigger/MenuView.module.css）；
-   紫色边框与开关 on 态同款，与官方 @ 列表做视觉区分。 */
+/* 菜单卡：逐项对齐官方 @ 候选列表（ui-input-trigger/MenuView.module.css .menu）的几何与立起方式；
+   材质交给官方 MenuSurface（.surface 只做 isolation / 圆角 / 裁切，.material 子层承担填充 + 模糊）。 */
 .dsh-chat-fim-menu {
   position: absolute;
   bottom: calc(100% + 4px);
   left: 0;
   right: 0;
   z-index: 100;
-  max-height: 320px;
+  box-sizing: border-box;
+  max-height: 400px;
   overflow: hidden;
   padding: 4px;
   display: flex;
   flex-direction: column;
-  /* 材质交给官方 MenuSurface（.surface 只做 isolation / 圆角 / 裁切，.material 子层承担填充 + 模糊），
-     与官方菜单同构 ⇒ 观感随官方统一升级，不再自己维护一套旧版样式。
-     紫色强调走官方描边通道 --dsw-elevation-stroke-color（与官方 @ 列表做区分）。 */
-  border-radius: var(--dsw-radius-lg, 16px);
-  --dsw-elevation-stroke-color: var(--dsw-alias-button-info-fill, #4d6bfe);
-  /* 与官方菜单同一套立起方式（ModelSelect.module.css:107-108）：描边走 elevation-stroke-color，阴影走 elevation-prominent。 */
+  border: 0;
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent);
 }
-}
+/* 行：官方 MenuView .item 的几何与 token 逐项一致（34 高 / 6×8 内边距 / 12 圆角 / 13-20 字）。 */
 .dsh-chat-fim-menu-row {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  min-height: 40px;
-  padding: 8px 10px;
+  min-height: 34px;
+  padding: 6px 8px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--dsw-radius-md);
   background: transparent;
   cursor: pointer;
   font-family: inherit;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 13px;
+  line-height: 20px;
   color: var(--dsw-alias-label-primary);
   text-align: left;
 }
@@ -498,65 +497,66 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
 }
 .dsh-chat-fim-menu-hint {
   color: var(--dsw-alias-label-caption);
-  font-size: 11px;
-  line-height: 18px;
+  font-size: 10px;
+  line-height: 16px;
   white-space: nowrap;
 }
 /* 键盘帽与官方 @ 列表 drillHint 完全同款（token 逐项一致：底色/圆角/内边距/字色）。 */
 .dsh-chat-fim-menu-kbd {
-  padding: 0 5px;
-  border-radius: 4px;
+  padding: 0 4px;
+  border-radius: var(--dsw-radius-xs);
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-caption);
   font-family: inherit;
-  font-size: 11px;
-  line-height: 18px;
+  font-size: 10px;
+  line-height: 16px;
 }
-/* 菜单底部：左下角品牌行（🐦 dsh-sparrow），右下角展示 token 数与实际模型。 */
+/* 菜单底部：左下角品牌行（🐦 dsh-sparrow），右下角展示 token 数与实际模型。
+   分隔线走官方菜单 footer 的 l2 发丝线（l1 在菜单面上近不可见）。 */
 .dsh-chat-fim-menu-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 2px;
-  padding: 2px 4px 0;
-  border-top: 1px solid var(--dsw-alias-border-inverted);
+  margin-top: 3px;
+  padding: 3px 4px 0;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
 }
 .dsh-chat-fim-menu-brand {
   font-size: 11px;
   line-height: 18px;
   color: var(--dsw-alias-label-tertiary);
 }
-/* 触发灵敏度弹层：官方 MenuDropdown 同款 token，锚定胶囊右下，空间不足自动向上。 */
+/* 触发灵敏度弹层：与官方菜单同构（MenuSurface 承载材质，几何对齐官方 Menu 卡），
+   左缘对齐开关胶囊、空间不足自动向上（官方 Menu 的 start 对齐）。 */
 .dsh-chat-fim-sensitivity-popover {
   position: fixed;
-  z-index: 2100;
+  z-index: 1100;
   display: flex;
   flex-direction: column;
-  gap: 2px;
   min-width: 240px;
   padding: 4px;
-  border: 1px solid var(--dsw-alias-border-inverted);
-  border-radius: 12px;
-  /* 同上：半透明菜单面必须配对 backdrop-filter（官方 docs/web-styling.zh.md:25）。 */
-  background: var(--dsw-specific-menu);
-  backdrop-filter: var(--dsw-menu-backdrop-filter);
-  box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
+  border: 0;
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
+  box-shadow: var(--dsw-elevation-prominent);
 }
 .dsh-chat-fim-menu-usage {
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
-  line-height: 18px;
+  line-height: 16px;
   white-space: nowrap;
 }
+/* 选项行：官方 MenuView .item 的几何与 token（与候选菜单行同一套尺寸）。 */
 .dsh-chat-fim-sensitivity-option {
+  box-sizing: border-box;
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-height: 32px;
-  padding: 6px 10px;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--dsw-radius-md);
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font-family: inherit;
@@ -568,9 +568,6 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
 .dsh-chat-fim-sensitivity-option:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
-.dsh-chat-fim-sensitivity-option-on {
-  color: var(--dsw-alias-button-info-fill, #4d6bfe);
-}
 .dsh-chat-fim-sensitivity-option-check {
   width: 14px;
   flex: none;
@@ -580,7 +577,7 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   margin-left: auto;
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
-  line-height: 18px;
+  line-height: 16px;
   white-space: nowrap;
 }
 /* 灵敏度竖点：恒显 3 个方点，自下而上点亮 3/2/1 个 = 高/中/低；未点亮为更浅的淡色占位。
@@ -622,13 +619,14 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
   /** 档位显示名（locale）。 */
   const label = t(`sensitivity.${sensitivity}`)
 
-  /** 依据开关胶囊矩形计算弹层锚点；空间不够时向上弹出（官方下拉惯例）。 */
+  /** 依据开关胶囊矩形计算弹层锚点：左缘对齐开关（官方 Menu 的 start 对齐），贴右窗缘时向内钳制；空间不够向上弹出。 */
   const computePickerPoint = (): { x: number; y: number; up: boolean } | null => {
     const rect = switchRef.current?.getBoundingClientRect()
     if (rect === undefined) return null
     const estimate = 128 + 8
     const up = rect.bottom + estimate > window.innerHeight
-    return { x: rect.right, y: up ? rect.top - 4 : rect.bottom + 4, up }
+    const x = Math.max(8, Math.min(rect.left, window.innerWidth - 8 - PICKER_MAX_WIDTH))
+    return { x, y: up ? rect.top - 4 : rect.bottom + 4, up }
   }
 
   const openPicker = (): void => {
@@ -729,14 +727,14 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
       ) : null}
       {pickerOpen && pickerPoint !== null
         ? createPortal(
-          <div
+          <MenuSurface
             className="dsh-chat-fim-sensitivity-popover"
             role="listbox"
             aria-label={t('sensitivity.aria', { label: '' })}
             style={{
               left: pickerPoint.x,
               top: pickerPoint.y,
-              transform: pickerPoint.up ? 'translateX(-100%) translateY(-100%)' : 'translateX(-100%)',
+              transform: pickerPoint.up ? 'translateY(-100%)' : undefined,
             }}
             onMouseDown={(event) => {
               // 防止点按把焦点从输入框夺走（combobox 惯例）。
@@ -749,7 +747,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
                 type="button"
                 role="option"
                 aria-selected={level === sensitivity}
-                className={level === sensitivity ? 'dsh-chat-fim-sensitivity-option dsh-chat-fim-sensitivity-option-on' : 'dsh-chat-fim-sensitivity-option'}
+                className="dsh-chat-fim-sensitivity-option"
                 onClick={() => {
                   setTriggerSensitivity(level)
                   setPickerOpen(false)
@@ -760,7 +758,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
                 <span className="dsh-chat-fim-sensitivity-option-rule">{t(`sensitivity.${level}.rule`)}</span>
               </button>
             ))}
-          </div>,
+          </MenuSurface>,
           document.body,
         )
         : null}

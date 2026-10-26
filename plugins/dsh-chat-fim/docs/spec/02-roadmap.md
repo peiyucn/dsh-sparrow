@@ -30,6 +30,7 @@
 * [x] 菜单紫色边框（同开关 on 态）+ 行尾 Tab/Esc 键位提示；开关改版（图标 + Suggest 删除线，@container 460px 折叠为纯图标）
 * [x] 触发形态门控 `shouldTriggerSuggest`（句末/单词中间/尾随空白/过短不触发）
 * [x] 续写模型三档可选（自动/Pro/Flash，见 04-sensitivity.md）+ 菜单用量展示（token 数 + 实际模型）
+* [x] 菜单族对齐官方 rc.3 原语（2026-10-27）：候选卡换 `MenuSurface`、行/键位提示/底部发丝线按官方 `MenuView` 逐项对齐；灵敏度弹层同一套原语、改为左缘对齐；修掉注入样式表里多余的 `}`（它吞掉了候选行规则，行退回浏览器默认样式）；`test/menu-styles.test.mjs` 钉住上述契约
 
 ## M4 · 打磨（可选）
 
