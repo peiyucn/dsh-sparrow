@@ -1,5 +1,6 @@
 import { buildBackdropCss, backdropPlan, LAYER_SELECTOR, REQUIRED_CSS_FEATURES, STYLE_SELECTOR } from '../backdrop.js'
 import { buildGlassCss } from '../glass.js'
+import { buildNavPinCss } from '../nav-pin.js'
 import { buildSurfaceCss } from '../surfaces.js'
 import {
   BACKDROP_CLASS,
@@ -39,7 +40,7 @@ interface Scope {
   set(field: string, value: unknown): Promise<boolean>
 }
 
-const DEBUG_GROUPS = ['backdrop', 'glass', 'surfaces'] as const
+const DEBUG_GROUPS = ['backdrop', 'glass', 'navpin', 'surfaces'] as const
 type DebugGroup = typeof DEBUG_GROUPS[number]
 
 function offGroups(): ReadonlySet<DebugGroup> {
@@ -81,6 +82,7 @@ function install(ctx: never): void {
     style.textContent = [
       part('backdrop', buildBackdropCss),
       part('glass', buildGlassCss),
+      part('navpin', buildNavPinCss),
       part('surfaces', buildSurfaceCss),
       buildRowCss(),
     ].join('\n')
