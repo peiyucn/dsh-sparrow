@@ -6,6 +6,7 @@ import { buildBackdropCss } from '../lib/backdrop.js'
 import { PLAIN_ATTR } from '../lib/constants.js'
 import {
   CARD_GLASS_ALPHA,
+  CARD_MENU_OPEN_ALPHA,
   HEADER_GLASS_ALPHA,
   HEADER_HEIGHT_PX,
   SEAT_BAND_PX,
@@ -41,6 +42,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(glass.includes('backdrop-filter: var(--dsw-menu-backdrop-filter)'), '玻璃层用官方模糊 token')
     assert.ok(glass.includes('border-radius: inherit'), '玻璃层跟随卡片圆角')
     assert.ok(glass.includes('box-shadow: inset'), '玻璃边缘要有固定高光（与旧版观感一致）')
+    assert.ok(glass.includes('inset 1px 0 2px'), '高光要分边（上/左亮、右/下暗），不能四边同亮成一圈描边')
     assert.ok(glass.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%`), '玻璃层填充比例')
   })
 
@@ -50,13 +52,14 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(band.includes('background-size: 100vw 100vh'), '背景盒显式给视口尺寸')
     assert.ok(band.includes('background-position: 100% 100%'), '右下对齐 = 视口对齐（sticky 座底贴着视口底）')
     assert.ok(!band.includes('fixed'), '不得再用 background-attachment: fixed')
-    assert.ok(band.includes('mask-image'), '上缘过渡，避免硬切')
+    assert.ok(!band.includes('mask-image'), '带顶被卡片盖住，不再需要 mask（少一层合成风险）')
     assert.match(band, new RegExp(`height: ${SEAT_BAND_PX}px`))
   })
 
   it('右栏：顶栏 76px 玻璃 + 内容区同款打光（76px 以下重画地面）', () => {
     assert.match(code, /\[data-dockkit-pane\] \{[^}]*linear-gradient\(180deg, transparent 0px, transparent 76px/u)
-    assert.match(code, /\[data-dockkit-pane\] \{[^}]*isolation: isolate/u)
+    assert.match(code, /\[data-dockkit-pane\] \{[^}]*z-index: 0/u)
+    assert.ok(!/\[data-dockkit-pane\] \{[^}]*isolation: isolate/u.test(code), 'pane 不能用 isolation：它会让 pane 成为 backdrop root，顶栏玻璃采样不到背后的对话区')
     const face = /\[data-dockkit-pane\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(face.includes('backdrop-filter: var(--dsw-menu-backdrop-filter)'))
     assert.match(face, new RegExp(`height: ${HEADER_HEIGHT_PX}px`))
@@ -70,19 +73,35 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
 
   it('颜色轴：深色 / 浅色两套边缘高光都覆盖到', () => {
     assert.match(code, /body:not\(\[data-ds-dark-theme\]\)[^{]*::before \{[^}]*box-shadow: inset/u)
-    assert.ok(code.includes('rgba(255, 255, 255, 0.55)'), '浅色轴高光更亮')
+    assert.ok(code.includes('rgba(255, 255, 255, 0.72)'), '浅色轴高光更亮')
   })
 
   it('除浅色轴高光外，所有玻璃规则都带「官方默认」门，且没有 fixed / 手写 blur 数值', () => {
     for (const line of code.split('\n')) {
       if (!line.trim().endsWith('{')) continue
-      assert.ok(
-        line.startsWith('body:not([') && (line.includes(PLAIN_ATTR) || line.includes('data-ds-dark-theme')),
-        `规则必须带门：${line.trim()}`,
-      )
+      const gated = line.startsWith('body:not([') && (line.includes(PLAIN_ATTR) || line.includes('data-ds-dark-theme'))
+      const menuDegrade = line.includes('body:has(> [data-menu-material])')
+      assert.ok(gated || menuDegrade, `规则必须带门：${line.trim()}`)
     }
     assert.ok(!/background-attachment/u.test(code), '不得出现 background-attachment')
     assert.ok(!/blur\(/u.test(code), '不得手写 blur 数值（统一走官方 token）')
+  })
+
+  it('输入框里的「+」等 selector 型图标按钮在卡片作用域内让出底色', () => {
+    const card = /\[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(card.includes('--dsw-specific-selector: transparent'), '+ 按钮的实心底色清掉，和其他透明按钮一致')
+  })
+
+  it('设置弹窗有打光（按弹窗自身盒子缩放的光层）', () => {
+    const settings = /\[data-shortcut-modal='settings'\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(settings.includes('background-image: radial-gradient('), '设置弹窗要叠地面光')
+    assert.ok(settings.includes('background-size: 100% 100%'), '居中弹窗按自身盒子缩放')
+  })
+
+  it('官方菜单打开时撤掉常驻 blur（避免 blur 采样 blur 的残影）并提高卡片填充', () => {
+    assert.ok(code.includes(":has(> [data-menu-material])"), '用 body 直接子元素的 :has 限定菜单打开')
+    assert.match(code, /:has\(> \[data-menu-material\]\)[^{]*::before[^{]*\{[^}]*backdrop-filter: none;/u)
+    assert.ok(code.includes(`var(--dsw-specific-input-major) ${CARD_MENU_OPEN_ALPHA * 100}%`), '菜单打开时卡片填充更实')
   })
 
   it('地面层仍是唯一常驻绘制层，且不随内容刷新', () => {

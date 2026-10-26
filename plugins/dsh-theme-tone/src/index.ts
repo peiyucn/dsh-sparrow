@@ -31,6 +31,7 @@ export {
   ABOVE_CONTENT_Z_INDEX,
 } from './constants.js'
 export { buildGlassCss, CARD_GLASS_ALPHA, HEADER_GLASS_ALPHA, HEADER_HEIGHT_PX, SEAT_BAND_PX } from './glass.js'
+export { buildSurfaceCss } from './surfaces.js'
 export {
   DARK_TONE_IDS,
   LIGHT_TONE_IDS,
