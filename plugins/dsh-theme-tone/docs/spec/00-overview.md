@@ -3,24 +3,43 @@
 > 2026-10-27 重写。旧 spec（00–13，约 1.3 万行）已全部删除：它们记录的是被删掉的机制（相位测量、锚点扫描、
 > 抬升面光层、扫光带、遮罩恢复……），继续保留只会误导。本文是新的唯一事实来源。
 
-## 功能（只有四件事）
+## 功能（当前清单）
 
 1. **颜色**：通过官方 `ctx.theme.overrideTokens` 覆盖 alias token（`{light, dark}` 成对），给整个界面重新着色。
 2. **地面光**：插件自有的 `position: fixed` 装饰层（`.dsh-theme-tone`），三道光（顶 / 底 / 左），
    位置与方向按色调固定。
 3. **对话区顶栏玻璃**：顶栏浮层化（`position: absolute` + 滚动区 `padding-top: 76px` + 滚动条 track 下推
    + 拖拽条上沿裁到 76px），玻璃放在顶栏的 `::before`（`z-index: -1`），模糊复用官方
-   `var(--dsw-menu-backdrop-filter)`，填充 = `bg-base` × 70% 半透明。
+   `var(--dsw-menu-backdrop-filter)`，填充 = `bg-base` × 70% 半透明，并**自绘同源三道光**。
 4. **输入框玻璃**：座位撤掉官方 36px 实色渐隐（`background: none`），卡片 `background` 透明、
-   玻璃放卡片 `::before`（`border-radius: inherit`）；座位底部再用 `::after` 重画一小段地面（44px、
-   视口对齐、上缘 mask 过渡）挡住卡片下方滚过的正文 —— **纯 CSS、零测量、零 fixed**。
+   玻璃放卡片 `::before`（`border-radius: inherit`）；卡片自成层叠上下文（`position: relative; z-index: 0`，
+   否则 `::before` 的 `z-index: -1` 会逃出卡片 = 「淡色框」）；座位底部再用 `::after` 重画一小段
+   地面（44px、视口对齐、上缘 mask 过渡）挡住卡片下方滚过的正文 —— **纯 CSS、零测量、零 fixed**。
+   * 边缘高光是**有方向**的：上缘亮、左缘弱亮、右缘暗、下缘暗（光源左上），深/浅轴两套值。
+   * 卡片作用域内把 `--dsw-specific-selector` 置透明：官方给「+」这类 selector 型图标按钮的是不透明
+     中性底色，在玻璃卡片上会读成一块实心（与旁边的透明按钮不一致）。
 5. **右栏顶栏玻璃**：官方右栏顶部两条 38px 带（合计 76px）所在的 `[data-dockkit-pane]`，背景改为
-   「顶部 76px 透明 → 以下 `bg-base`」，透明段用 `::before` 做同样的模糊 + 70% 填充。
-6. **右栏内容区与对话区同款打光**（owner 2026-10-27 追加，先入 spec 再实现）：右栏 76px 以下的内容区
-   不能是官方那块纯色 `bg-base`，要与对话区一样看得见地面光 —— 用 `pane::after` 在内容区重画一层
-   「`bg-base` + 三道光」：`background-size: 100vw 100vh`、`background-position: 100% -76px`
-   （右栏贴视口右侧、内容区从视口 y=76 开始 ⇒ 与对话区逐像素同源），层序 `-2`（在顶栏玻璃 `-1` 之下、
-   内容之上）。**这是外观层，不改官方内容容器尺寸 / 定位。**
+   「顶部 76px 透明 → 以下 `bg-base`」，透明段用 `::before` 做同样的模糊 + 70% 填充 + 同源光。
+   ⚠️ pane 用 `position: relative; z-index: 0` 约束 `::before`，**不能用 `isolation`**：isolation 会让
+   pane 成为 backdrop root，玻璃只采样 pane 内部（空的）⇒ 只剩实色；去掉后玻璃采样的是**面板背后的
+   对话区**（会滚动 ⇒ 真模糊）。
+6. **右栏内容区与对话区同款打光**（owner 2026-10-27 追加）：右栏 76px 以下的内容区不能是官方那块纯色
+   `bg-base`，要与对话区一样看得见地面光 —— 用 `pane::after` 在内容区重画一层「`bg-base` + 三道光」：
+   `background-size: 100vw 100vh`、`background-position: 100% -76px`（右栏贴视口右侧、内容区从视口 y=76
+   开始 ⇒ 与对话区逐像素同源），层序 `-2`（在顶栏玻璃 `-1` 之下、内容之上）。**外观层，不改容器尺寸/定位。**
+7. **设置弹窗打光**（owner 2026-10-27 追加）：官方设置弹窗根元素带公开属性
+   `[data-shortcut-modal='settings']`；在它上面叠同源三道光，**按弹窗自身盒子缩放**（`background-size:
+   100% 100%`；弹窗居中、位置不固定，不能按视口相位画）。
+8. **悬浮卡适配主题**（owner 2026-10-27 追加）：左边栏 Workspace 行 hover 卡、对话轮次导航 hover 弹窗
+   与官方大多数浮层不同 —— 官方把这两处的面与字都写死了（深底 + 白字，两轴同值），不跟随主题。
+   修法：面用本插件 `--dsh-theme-tone-panel`（官方默认档下正是官方 layer3），字色换成官方
+   `--dsw-alias-label-*` 四级 token（标题最亮 → 路径/时间次之 → 状态最暗），保持官方原来的层次关系。
+9. **轮次导航功能恢复**（owner 2026-10-27 追加，自 `dsh-nav-pin` 并入；要功能、不要旧实现）：
+   纯 CSS，无运行期探测。官方把 `display: none` 直接写在 `<nav aria-label="Turn navigation">` 上 ⇒
+   用公开 aria-label（中 / 英两套文案）即可压过官方类名特异性；≤700px 默认隐身、hover / 键盘 focus
+   淡入（只做 opacity，不加框与底色）。会话内容宽度钳制：宽列每侧至少留 120px、窄列地板 640px
+   （官方公式 `clamp(680px, column×0.64, 920px)` 上加 `min()` 夹紧），滚动体 / 拖拽条共用，
+   卡片宽度同步重算。**布局功能，不带色调门（官方默认档同样生效）。**
 
 「官方默认」档：整张玻璃表不命中、地面层隐藏、token 不覆盖 ⇒ 与没装插件一致。
 
@@ -30,7 +49,8 @@
 | :--- | :--- |
 | `src/tones.ts` | 调色板数据 + `tokenOverrides()`（颜色，唯一的颜色事实来源） |
 | `src/backdrop.ts` | 地面光层 CSS、渲染计划、设置行色卡预览、CSS 特性门 |
-| `src/glass.ts` | 三块玻璃的 CSS（唯一一处 `backdrop-filter`，全部放在 `::before` 上） |
+| `src/glass.ts` | 玻璃与打光的 CSS（`backdrop-filter` 全部放在 `::before` 上） |
+| `src/nav-pin.ts` | 轮次导航恒显 + 内容宽度钳制（纯 CSS，布局功能，不带色调门） |
 | `src/constants.ts` | 选择器锚点 / z-index / 标记属性 / 设置命名空间 |
 | `src/compat.ts` | 能力门（缺失即惰性停用，不抛错） |
 | `src/host.ts` + `src/settings-schema.ts` | host half：配置 schema、关掉自动配置页 |
@@ -46,10 +66,13 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 2. 不得出现 `background-attachment: fixed`，不得手写 `blur()` 数值（统一 `var(--dsw-menu-backdrop-filter)`）。
 3. `backdrop-filter` 只允许出现在 `::before` 上（不挂 header / 卡片 / 面板本体，避免 backdrop root
    与 fixed 包含块影响官方弹层）。
-4. 不改官方容器的 `position` / `overflow` / `transform` / `contain`（pane 的 `position: relative` 是
-   已知例外，见「已知偏离」）。
+4. 不改官方容器的 `position` / `overflow` / `transform` / `contain`（pane 补 `position: relative;`
+   `z-index: 0` 作 `::before` 的包含块是已知例外；**不得**改用 `isolation` —— 它会让 pane 成为
+   backdrop root，顶栏玻璃就采样不到背后的对话区）。
 5. 颜色只走 `ctx.theme` token 通道；玻璃与地面光必须写 CSS（官方无对应 token）。
 6. 官方默认牌面（菜单 / 弹窗 / 挂靠卡）材质由官方自己负责，插件不重画、不覆盖。
+   例外：官方**写死**面与字的悬浮卡（左边栏 Workspace hover 卡，见功能 8）是修官方牌面，
+   规则**不带**「官方默认」门。
 
 ## 已知偏离（明示取舍，不当成「和官方一致」）
 
@@ -57,8 +80,17 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 * 输入框常驻 blur：官方自己只在菜单 / 浮层这类短生命周期表面用 blur（长期面全部不透明）。本插件按 owner
   要求保留常驻玻璃。性能**不以本插件的自动化基准对外断言**：owner 2026-10-27 明示「以我的体感为准」，
   代码侧只保证「没有逐帧 JS、没有 fixed 重栅格化路径、没有运行期测量」这些结构性成本为零。
-* 右栏 `[data-dockkit-pane]` 加了 `position: relative`（原本 static）作为 `::before` 的包含块；不改其尺寸。
+* 右栏 `[data-dockkit-pane]` 加了 `position: relative; z-index: 0`（原本 static）作为 `::before` 的
+  包含块；不改其尺寸。
+* 设置弹窗：打光按弹窗自身盒子缩放（弹窗居中、位置不固定，不能按视口相位画）。
 * 官方 rc.3 的挂靠卡（Queue/Todo/Goal）本身是半透明 + blur；插件不碰它们（token 染色会顺带跟随）。
+* 悬浮卡（功能 8）是唯一私有 seam：`body > [role="button"][aria-label]` 定位 portal 卡、
+  字色按官方 CSS-module 类名后缀命中（`_hoverTitle` 等）。官方改后缀即静默失效（回退成官方写死配色，
+  不会崩）；已登记 `docs/private-seams.md`。
+* 官方菜单（`[data-menu-material]`，body 直接子元素）打开期间，本插件**撤掉**三处常驻 blur 并把输入框
+  填充提高到 90%：官方菜单自带 backdrop-filter，两个 blur 层在合成器里重叠会复用到错位的背景快照
+  （owner 截图：模型菜单打开后输入框上沿闪出菜单碎片）。撤 blur 是暂时的、菜单关闭即恢复；
+  这是为消除残影付的明确取舍。
 
 ## 验证
 

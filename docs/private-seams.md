@@ -4,7 +4,10 @@
 > 旧实现里的私有 seam 与破例**全部退出**：`src/mask.ts`（遮罩模糊恢复）、`src/popover.ts`（弹层列内夹取）、
 > `src/handle-glow.ts`（拖拽条光带跟随）、`src/sweep.ts`（扫光带）、`src/caption.ts`（桌面标题栏 overlay）、
 > `src/surface.ts`（浮层光层与悬停卡字色）、`src/anchors.ts`（运行期锚点扫描）、`src/phase.ts`（视口相位测量）
-> 均已删除。当前 theme-tone 只使用 `ctx.theme` 的 token 覆盖通道与官方公开 data 属性，**无私有 seam**；
+> 均已删除。当前 theme-tone 只剩**一处**私有 seam：左边栏 Workspace hover 卡的牌面修复（2026-10-27 新增）
+> —— portal 卡用 `body > [role="button"][aria-label]` 定位，字色按官方 CSS-module 类名后缀
+> （`_hoverTitle` / `_hoverPath` / `_hoverTime` / `_hoverStatus` / `_copied`）命中；官方改后缀即静默失效
+> （回退成官方写死的白系字，不崩）。其余仍只用 `ctx.theme` 的 token 覆盖通道与官方公开 data 属性。
 > 下文涉及 theme-tone 的 §A/§B/§C/§D 条目保留为历史记录，不再对应当前代码。
 
 > 本文件**只登记"欠官方的债"**——需要 owner 认可的例外。三类：
