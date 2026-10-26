@@ -382,18 +382,30 @@ function install(ctx: Context): void {
    * 不做兜底则用户点色调屏幕毫无反应、也无任何日志。
    */
   let localSettings: ThemeToneSettings = DEFAULT_SETTINGS
+  /** 用户是否在本会话里**主动选过**色调（{@link chooseTone} 的落值路径置位）—— 判据见 {@link shouldPaint}。 */
+  let hasLocalChoice = false
+  /** 最后一次从设置面读到的**持久值**。⚠️ 见 {@link readSettings}：它就是「不知道时该信谁」的答案。 */
+  let lastReadySettings: ThemeToneSettings | null = null
   let warnedNoPersistence = false
 
   /** 在途乐观值的记账器（见 `./pending.ts`）。⚠️ 按**字段**分别记账 —— 两轴各写各的字段，切轴选色不该顶掉另一轴在途的那一笔。 */
   const pendingTones = createPendingToneTracker()
 
   /**
-   * 当前该用哪份设置。⚠️ **不能**写成 `value ?? DEFAULT_SETTINGS`：`status === 'loading'` 时 `value` 也是 `undefined` ⇒ 会在宿主回第一帧之前先按默认值上色、等真值到达再纠正（改过色调的用户每次冷加载都会看到一次可见跳变）；就绪前一律用进程内兜底值，并由 {@link shouldPaint} 决定先不上色。
+   * 当前该用哪份设置。⚠️ **不能**写成 `value ?? DEFAULT_SETTINGS`：`status === 'loading'` 时 `value` 也是 `undefined` ⇒ 会在宿主回第一帧之前先按默认值上色、等真值到达再纠正（改过色调的用户每次冷加载都会看到一次可见跳变）。
+   *
+   * ⚠️ **兜底必须是「最后一次已知的持久值」，不是 `DEFAULT_SETTINGS`**（2026-10-26 owner 报障：官方默认档下模型列表 /
+   * 权限菜单 / FIM 档位菜单会**闪出形状各异的亮框**）。`DEFAULT_SETTINGS` 的深轴是 `violet`：只要设置面某一瞬间
+   * 不是 `ready`（写入在途、回读失败、`unavailable` 的会话），旧写法就退回 violet ⇒ `backdropPlan().hidden = false`
+   * ⇒ **门被打开**，我们整套染色 / 覆盖层闪一帧；每个弹层尺寸不同，所以「形状都不一样」。
+   * 现在：就绪一次就记住（{@link lastReadySettings}），之后任何非 ready 状态都沿用那个持久值 —— 官方默认档下门
+   * **一直关着**，不会再因为一次瞬时状态闪开。
    * **乐观更新**：{@link pendingTones} 里那一笔（用户刚点、还在跨宿主往返中）优先于宿主快照 —— 否则点下去要等一个 RTT 才变色；该笔由**它自己那次写入的结算**收回，见 {@link settlePending}。
    */
   const readSettings = (): ThemeToneSettings => {
     const snapshot = scope.getSnapshot()
-    const base = snapshot.status === 'ready' && snapshot.value !== undefined ? snapshot.value : localSettings
+    if (snapshot.status === 'ready' && snapshot.value !== undefined) lastReadySettings = snapshot.value
+    const base = lastReadySettings ?? localSettings
     return pendingTones.over(base)
   }
 
@@ -407,8 +419,19 @@ function install(ctx: Context): void {
     repaint()
   }
 
-  /** 现在能不能上色：`loading`（宿主还没回第一帧，没有任何权威值）→ 不上色；`unavailable` → 用进程内兜底值上色（选择仍生效，只是不持久化）。 */
-  const shouldPaint = (): boolean => scope.getSnapshot().status !== 'loading'
+  /**
+   * 现在能不能上色：`loading`（宿主还没回第一帧，没有任何权威值）→ 不上色；`unavailable` → 用进程内兜底值上色（选择仍生效，只是不持久化）。
+   *
+   * ⚠️ **另外两条「还不知道该画什么」的路径也必须不上色**（2026-10-26）：既没有读到过持久值、用户也没主动选过 ⇒
+   * 按官方默认（不画）处理。否则瞬时 `error` / `unavailable` 会拿 `DEFAULT_SETTINGS`（深轴 violet）去上色 ——
+   * 那正是「官方默认档下闪框」的根因（见 {@link readSettings}）。
+   */
+  const shouldPaint = (): boolean => {
+    const status = scope.getSnapshot().status
+    if (status === 'loading') return false
+    if (status === 'unavailable') return true
+    return lastReadySettings !== null || hasLocalChoice
+  }
 
   /** 宿主不可写时记**一条**告警（不重复刷）。 */
   const warnIfNotPersistable = (): void => {
@@ -928,6 +951,8 @@ function install(ctx: Context): void {
            * 宿主不可写（memory 模式 / 命名空间未暴露）时这是**唯一**的落值途径，故同一条路同时承担「不可持久化时也要在本次会话内生效」—— 那种情形没有写入可结算，由 `localSettings` 兜底。
            */
           localSettings = { ...localSettings, [field]: id }
+          // 用户主动选过 ⇒ 之后即便设置面瞬时读不到，也按这份选择上色（见 shouldPaint）。
+          hasLocalChoice = true
           const pending = pendingTones.begin(field, id)
           repaint()
           if (snapshot.status !== 'ready' || !snapshot.writable) {

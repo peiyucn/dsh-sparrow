@@ -368,8 +368,21 @@ describe('dsh-theme-tone 结构', () => {
       !/\.value \?\? DEFAULT_SETTINGS/u.test(src),
       '不得用 `value ?? DEFAULT_SETTINGS` —— 未就绪时会画默认值',
     )
-    assert.match(src, /status !== 'loading'/u, '必须有「loading 不上色」的门')
+    assert.match(src, /if \(status === 'loading'\) return false/u, '必须有「loading 不上色」的门')
     assert.match(src, /shouldPaint/u, 'repaint 要经过 shouldPaint 门')
+  })
+
+  it('⛔ 非 ready 时兜底必须是「最后一次持久值」，不知道就不画', async () => {
+    // 2026-10-26 owner 报障：官方默认档下模型列表 / 权限菜单 / FIM 档位菜单会闪出形状各异的亮框。
+    // 根因：设置面某一瞬间不是 ready 时，`readSettings()` 退回 `DEFAULT_SETTINGS`（深轴 violet）⇒
+    // `backdropPlan().hidden = false` ⇒ 门被打开、整套染色闪一帧；每个弹层尺寸不同所以「形状都不一样」。
+    const src = await readCode('../src/client/index.ts')
+    assert.match(src, /lastReadySettings \?\? localSettings/u,
+      '兜底必须优先「最后一次已知持久值」，而不是 DEFAULT_SETTINGS')
+    assert.match(src, /if \(snapshot\.status === 'ready' && snapshot\.value !== undefined\) lastReadySettings = snapshot\.value/u,
+      '每次 ready 都要记住持久值')
+    assert.match(src, /return lastReadySettings !== null \|\| hasLocalChoice/u,
+      '既没读到过持久值、用户也没选过 ⇒ 不上色（按官方默认处理）')
   })
 
   it('⛔ 宿主不可写时必须落到进程内兜底并告警（不得静默空操作）', async () => {
