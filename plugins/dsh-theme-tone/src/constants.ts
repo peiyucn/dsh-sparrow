@@ -5,8 +5,6 @@
  * 集中一处便于单测钉住，避免散落的魔术字符串。
  */
 
-import { ANCHOR, anchorSelector } from './anchors.js'
-
 /** 插件短名：cordis loader 条目 id 与日志前缀。 */
 export const name = 'dsh-theme-tone'
 
@@ -169,35 +167,10 @@ export const HOVER_CARD_TEXT_TOKENS: readonly { suffix: string; token: string }[
   Object.freeze({ suffix: '_hoverStatus', token: '--dsw-alias-label-tertiary' }),
 ])
 
-/** 浮层（菜单 / 对话框）表面的染色形状：浮层尺寸在「整屏」与「83px 的色调卡」之间，故几何取中间档
- *  （比整屏铺得开、比色调卡收一档）；与 `backdrop.ts` 的 `PREVIEW_*` 是同一套配方的另一个尺度，改一处要想另一处。
- *  住在 constants 是因为 token 层（`tones.ts`）也要用它拼浮层底色，而 `backdrop.ts` 依赖 `tones.ts`（反向会成环）。
- *  ⚠️ 顶光半径 42% 是按**覆盖面积**定的：55% 会盖住浮层顶部约 30%（整屏只有约 18%），整块面成暖洗。 */
-export const POPUP_TOP_SHAPE = 'ellipse 120% 42% at 50% -12%'
-/** 浮层表面底部染色形状（覆盖底部约 27%，与整屏的 ~31% 同量级，未动过）。 */
-export const POPUP_BOTTOM_SHAPE = 'ellipse 110% 52% at 50% 112%'
-
-/** 浮层表面**左侧金晕**的形状 —— 对应整屏的 {@link LEFT_RADIAL_SHAPE}：浮层与背景层必须**同为三道光**
- *  （少一道左光就会「打光不一样」）。几何按浮层尺度用**百分比**（锚盒子左上角，横向约 42% / 竖向约 58%，
- *  与顶光 42%、底光 52% 同量级）—— 照抄 `vw/vh` 会让椭圆远大于盒子、整块面变成均匀色浆。 */
-export const POPUP_LEFT_SHAPE = 'ellipse 42% 58% at 0% 0%'
-
-/** 浮层染色的收束位置（比整屏 `62%` 晚、比色调卡 `71%` 还晚一档，小面才读得出渐变）。 */
-export const POPUP_STOP = 'transparent 76%'
-
 /** **顶光收束位置的变量名**：值由 `tones.ts` 的 `TOP_STOP` 发出、**两轴同值**（两轴严格镜像）。
  *  仍走 CSS 变量而非写死：与其余几何常量同一处事实来源，且背景层 CSS 能 `var(…, fallback)` 兜底。 */
 export const TOP_STOP_VARIABLE = '--dsh-theme-tone-top-stop'
 
-/** **模态弹窗**锚点 —— 走**实色**抬升面，**不做玻璃**：设置 / 云端文件 / 归档都是**内容面**（列表、
- *  卡片、表格），Apple HIG 明确「别把玻璃放在列表、卡片、媒体内容上，玻璃只属于浮在内容之上的
- *  导航 / 控制层」—— 故弹窗与菜单同一套实色面，玻璃只留给**控制层**（输入框 / 顶栏）。
- *  （附带事实：官方带 `aria-modal="true"` 的只有 `Modal` 原语 / `SettingsRoot` / `ImageLightbox` 三处，
- *  将来要按「真模态 vs 小弹层」分流，判据是 `aria-modal` 而非 `role='dialog'`。） */
-export const DIALOG_ANCHOR = `body ${anchorSelector(ANCHOR.dialog)}`
+/** **模态弹窗**不再由本插件处理（2026-10-27：浮层整族不再叠我们的光层，只吃 token 颜色；见 surface.ts）。
+ *  保留本注释是因为 05-surfaces 的「弹窗是内容面、不做玻璃」结论仍然成立 —— 那是官方的材质选择，不归我们。 */
 
-
-/** **浮层三道光相对「地面」的强度补偿**，取 0.7 —— 「统一」的判据是**同一屏幕位置上浮层的 alpha
- *  等于地面的 alpha**：两道光的配方都是锁定常量，可解析解出 k\* ≈ 0.69（峰值口径实测交叉验证吻合）。
- *  与顶栏那条路的 `GLASS_HEADER_ALPHA` 同值但理由不同，将来调一处时能立刻想到另一处。 */
-export const POPUP_LIGHT_COMPENSATION = 0.7

@@ -15,11 +15,6 @@ import {
   PREVIEW_TOP_SHAPE,
   REQUIRED_CSS_FEATURES,
   tonePreview,
-  LEFT_RADIAL_STOP,
-  BOTTOM_RADIAL_STOP,
-  RADIAL_STOP,
-  dimmedBackdropGradients,
-  compensatedBackdropGradients,
 } from '../lib/backdrop.js'
 import {
   ABOVE_CONTENT_Z_INDEX,
@@ -453,43 +448,3 @@ describe('浏览器特性门', () => {
 })
 
 
-/**
- * 顶栏那束光的**亮度补偿**（`compensatedBackdropGradients`）—— 纯函数单测。
- * 背景层是整层 `mix-blend-mode: screen`（纯加法），而顶栏 / 右栏那些面是「深色填充 + 普通合成」，
- * 同一档 alpha 读出来的亮度只有一半；补偿 = **再叠一层**压过的同形光，见 docs/spec/04-glass.md §9.
- */
-it('补偿应该 叠成两层：第一层满档、第二层按 boost 压过', () => {
-  const once = dimmedBackdropGradients(1)
-  const comp = compensatedBackdropGradients(1, 0.25)
-  assert.equal((once.match(/radial-gradient\(/gu) ?? []).length, 3, '单层是三道光')
-  assert.equal((comp.match(/radial-gradient\(/gu) ?? []).length, 6, '补偿后是两层共六道')
-  assert.ok(comp.startsWith(once), '补偿串的第一层必须逐字等于满档那串')
-})
-
-it('补偿应该 只改强度、不改形状 / 中心 / stop', () => {
-  const comp = compensatedBackdropGradients(1, 0.25)
-  const once = dimmedBackdropGradients(1)
-  for (const shape of [DARK_RADIAL_SHAPE, BOTTOM_RADIAL_SHAPE, LEFT_RADIAL_SHAPE]) {
-    assert.equal(
-      (comp.match(new RegExp(shape.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'gu')) ?? []).length, 2,
-      `两层都必须用同一个几何（${shape}）—— 形状变了就不是"同一束光更亮"`,
-    )
-  }
-  // stop 也逐字不变：两层里各出现一次 ⇒ 计数应是单层的 2 倍。
-  for (const stop of [RADIAL_STOP, BOTTOM_RADIAL_STOP, LEFT_RADIAL_STOP]) {
-    assert.equal(
-      (comp.match(new RegExp(stop.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'gu')) ?? []).length,
-      (once.match(new RegExp(stop.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'gu')) ?? []).length * 2,
-      `两层的 stop 必须与单层逐字一致（${stop}）`,
-    )
-  }
-})
-
-it('补偿档应该 只作用在第二层，且 <= 0 时退化成单层（不叠空白层）', () => {
-  const comp = compensatedBackdropGradients(1, 0.25)
-  assert.ok(comp.includes('100%, transparent)'), '第一层必须是满档，不得被 boost 一起压')
-  assert.ok(comp.includes('25%, transparent)'), '第二层必须按 boost 压到 25%')
-  // boost <= 0 ⇒ 逐字等于单层（避免多出一层全透明的空层）。
-  assert.equal(compensatedBackdropGradients(1, 0), dimmedBackdropGradients(1))
-  assert.equal(compensatedBackdropGradients(1, -1), dimmedBackdropGradients(1))
-})

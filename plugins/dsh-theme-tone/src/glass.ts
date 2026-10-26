@@ -1,12 +1,18 @@
 /**
- * 玻璃效果（`backdrop-filter`）：对话顶栏 + 输入框。只有「压在滚动内容之上」的元素才配做玻璃（背后是纯色，模糊纯色 = 肉眼零变化）；浮层走 `src/surface.ts` 的实色 + 颗粒，两件事正交。
- * 本表每条规则都带 `body:not([PLAIN_ATTR])` 前缀：选「官方默认」轴时整表不命中，外观与没装插件逐像素一致。
- * ⚠️ `buildGlassCss` / `buildCardNotchCss` / `buildSeamCss` 的模板字符串里的注释**不能出现反引号**（会截断字符串）。
+ * 面板 / 顶栏的**静态面**（**没有** `backdrop-filter`）。
+ *
+ * 2026-10-27 收敛：本模块原先给顶栏 / 右栏头行做实时模糊（`backdrop-filter`）并按帧重栅格化
+ * （`background-attachment: fixed`）—— 两样都是合成器每帧成本，而它们压在会滚动、每帧都在变的对话内容上；
+ * owner 反复报「卡」与「跟着 think/edit/write 节奏闪的淡框」后，整族撤掉，只留**接近不透明的静态填充**：
+ * 颜色仍由色调 token 决定，内容从下面滚过时只剩极淡的流动感。输入框卡片同理（见下方卡片那段）。
+ *
+ * 本表每条规则都带 `body:not([PLAIN_ATTR])` 前缀：官方默认档整表不命中，外观与没装插件逐像素一致。
+ * ⚠️ 模板字符串里的注释**不能出现反引号**（会截断字符串）。
  */
 
 import { ABOVE_CONTENT_Z_INDEX, PHASE_BAND_ATTR, PHASE_BAND_TOP_VARIABLE, PHASE_BAND_VARIABLE, PHASE_NOTCH_ATTR, PHASE_NOTCH_TOP_VARIABLE, PHASE_NOTCH_VARIABLE, PLAIN_ATTR, RIGHT_PANEL_ATTR, WORKSTART_ATTR } from './constants.js'
 import { ANCHOR, anchorSelector } from './anchors.js'
-import { BACKDROP_GRADIENTS, compensatedBackdropGradients, faceLayerGeometry, backdropGradients } from './backdrop.js'
+import { BACKDROP_GRADIENTS, faceLayerGeometry, backdropGradients } from './backdrop.js'
 
 /** 顶栏高度（px）：官方钉死 76px（= 左栏两条 38px 带之和），本模块的补高 / 滚条偏移 / 拖拽条裁切都按它算。 */
 export const HEADER_HEIGHT_PX = 76
@@ -21,11 +27,8 @@ export const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 // ⚠️ 只许锚座底、只许很矮 —— 曾经做成覆盖**整个底座**的 `::before { inset: 0 }`，两侧留白被糊成两块竖直暗矩形且跟着输入框变高，已撤，别再加回来。
 export const SEAT_SOLID_PX = 36
 
-/** 上面那条实色带**顶端**的过渡高度（px）：硬切会在带顶留一道边；这段过渡**落在卡片背后**（卡片不透明到哪里，过渡就藏到哪里），故既不产生缝、也不抢卡片的玻璃。 */
+/** 上面那条实色带**顶端**的过渡高度（px）：硬切会在带顶留一道边；这段过渡**落在卡片背后**（卡片不透明到哪里，过渡就藏到哪里），故既不产生缝、也不抢卡片的质感。 */
 export const SEAT_SOLID_RAMP_PX = 10
-
-/** **顶栏 / 输入框底座**的模糊：只提饱和不加亮度，避免玻璃面在深色底上发灰；大模糊会**抹掉背后内容的形状**、只剩一团平均色（读起来像磨砂塑料），故收到 `12px`（仍化得开文字与图标，又保留可辨的形状与流动感）。 */
-export const GLASS_BLUR = 'blur(12px) saturate(1.15)'
 
 /** **镜面高光的四条边**（从上开始顺时针）—— 液态玻璃的「玻璃厚度」：高光沿玻璃**整圈边缘**、随主光方向强弱不同（四条等亮的边是塑料描边，不是玻璃）；按主光来自左上分配为上 `30%` / 左 `20%` / 右 `12%`（背光）/ 下 `8%`（地面反射）。 */
 // ⚠️ 只用在**输入框卡片**上 —— 模态弹窗是内容面（列表 / 卡片 / 媒体内容），不做玻璃。
@@ -134,14 +137,9 @@ export const edgeFadeLayers = (scheme: 'light' | 'dark'): string => {
   ].join(',\n    ')
 }
 
-/** 顶栏底的透出比例（只覆盖一层，无叠加问题）。 */
-export const GLASS_HEADER_ALPHA = 0.7
-
-/** 顶栏**光层**的强度比例 —— 与底色的 {@link GLASS_HEADER_ALPHA} **分离**：光必须**足额**画出来（×1.0），不能跟着填充 alpha 一起压，否则整条带比下方暗一档、观感就是「一条暗带把顶光挡住了」；⚠️ 与 {@link POPUP_LIGHT_COMPENSATION}（浮层那条「压下去的系数」）不是同一件事。 */
-export const HEADER_LIGHT_SCALE = 1
-
-/** 顶栏 / 右栏那些**玻璃面**重画的光要不要再补一档（见 {@link compensatedBackdropGradients}）：这些面是「深色填充 + 普通合成」，同档 alpha 读出的**亮度**天然低于背景层的 `screen` 加法，故补 `0.25`；⚠️ 上限是**台阶必须保持为正**（顶栏仍是一块略暗的玻璃），三个面同参共用本值。 */
-export const HEADER_LIGHT_BOOST = 0.25
+/** 顶栏 / 右栏头行**静态面**的填充比例（接近不透明：没有模糊，太透会把滚过的正文显出重影）。
+ *  ⚠️ 2026-10-27 前这里是 `0.7` + 实时模糊；**不要再调回半透明** —— 没有模糊兜底时 0.7 会透出正文。 */
+export const GLASS_HEADER_ALPHA = 0.92
 
 /** **输入框卡片的悬浮投影** —— 叠在官方 `--dsw-elevation-soft` 之上（逗号并列，**不替换、不用 `!important`**），做出「浮在背景上」的托起感（官方那条只有 3% 黑，在这套带色调光的背景上读不出抬升）。
  *  ⚠️ 2026-10-27 起卡片是**静态面**（没有 `backdrop-filter`，见下方卡片那段注释）；本投影是它唯一的「浮起」语言，别为了省性能删掉 —— 删了卡片会与座底粘成一块。
@@ -248,8 +246,11 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'
   /* ⚠️ 本体**不承担玻璃**（刻意不写 background-color / background-image / backdrop-filter）—— 理由见下面 ::before 那条；本体只负责「浮起来」。 */
 }
 
-/* 玻璃（填充 + 渐变 + 模糊）挂在顶栏的 **::before** 上，不挂本体，并自己画一遍背景层的渐变栈（顶栏抬到背景层之上就吃不到那层光）。
-   ⚠️ 不能挂本体：带 backdrop-filter 的元素会成为**后代的 backdrop root**、fixed 后代的**包含块**，而官方弹层大量渲染在顶栏子树里 —— 挂本体就把它们的模糊关进子树（读成全透明 / 串色）。伪元素没有后代，z-index: -1 正好落在内容之下、页面内容之上。 */
+/* 顶栏的「面」挂在 **::before** 上（不挂本体：带 backdrop-filter 的元素会成为后代的 backdrop root / fixed 包含块，
+   而官方弹层大量渲染在顶栏子树里）。⚠️ **2026-10-27 起这里不再有实时模糊与视口重栅格化**：
+   实时 blur + background-attachment: fixed 会让顶栏在内容滚动 / 流式时每帧重新采样 + 按帧重栅格化
+   （与输入框卡片同一条判据，owner 报「还是很卡」后收敛）。现在只剩一层**接近不透明的静态填充**：
+   颜色仍由色调 token（--dsw-alias-bg-base）决定，内容从下面滚过时只剩极淡的流动感。 */
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'] > header::before {
   content: '';
   position: absolute;
@@ -257,9 +258,6 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'
   z-index: -1;
   pointer-events: none;
   background-color: ${fill('var(--dsw-alias-bg-base)', GLASS_HEADER_ALPHA)};
-  background-image: ${compensatedBackdropGradients(HEADER_LIGHT_SCALE, HEADER_LIGHT_BOOST)};
-  background-attachment: fixed;
-  backdrop-filter: ${GLASS_BLUR};
 }
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-scroll] {
   /* ③ 滚区顶部补出顶栏高度（与浮层是一对，少一个正文首行会被盖住）。⚠️ 必须用 **padding-top**：padding box 才从 y=0 起、正文能滚到顶栏下面去（玻璃有东西可透）；
@@ -479,18 +477,9 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
   height: auto;
   z-index: -1;
   pointer-events: none;
+  /* ⚠️ **2026-10-27 起不再做实时模糊与光层重绘**（与对话区顶栏同一条判据：owner 报「还是很卡」后收敛）：
+     只留接近不透明的静态填充 —— 颜色由色调 token 决定；面板正文从下面滚过时只剩极淡的流动感。 */
   background-color: ${fill('var(--dsw-alias-bg-base)', GLASS_HEADER_ALPHA)};
-  backdrop-filter: ${GLASS_BLUR};
-  /* ⚠️ 这里**不能**用 background-attachment: fixed（顶栏那条用了，是因为它自己就是 absolute 浮层、祖先无 transform）：
-     右栏面板在开关 / 全屏切换时会被官方 translate，fixed 会被重解析到 transform 后的坐标系；改用与右栏材质那几条**同一套** 100vw x 100vh + 右对齐相位（那套本就是为「面板会被 transform」设计的）。 */
-  background-image: ${compensatedBackdropGradients(HEADER_LIGHT_SCALE, HEADER_LIGHT_BOOST)};
-  background-attachment: scroll;
-  background-size: 100vw 100vh, 100vw 100vh, 100vw 100vh;
-  background-position:
-    right calc(0px - var(--dsh-windows-titlebar-height, 0px)),
-    right calc(0px - var(--dsh-windows-titlebar-height, 0px)),
-    right calc(0px - var(--dsh-windows-titlebar-height, 0px));
-  background-repeat: no-repeat, no-repeat, no-repeat;
 }
 
 /* ===== 右栏「开始」页：一个**没有 38px 头行**的标签，面要单独挂 =====
@@ -509,16 +498,8 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
   height: ${HEADER_HEIGHT_PX}px;
   z-index: 2;
   pointer-events: none;
+  /* 同上面那条：2026-10-27 起只留静态填充（无模糊、无光层重绘）。 */
   background-color: ${fill('var(--dsw-alias-bg-base)', GLASS_HEADER_ALPHA)};
-  backdrop-filter: ${GLASS_BLUR};
-  background-image: ${compensatedBackdropGradients(HEADER_LIGHT_SCALE, HEADER_LIGHT_BOOST)};
-  background-attachment: scroll;
-  background-size: 100vw 100vh, 100vw 100vh, 100vw 100vh;
-  background-position:
-    right calc(0px - var(--dsh-windows-titlebar-height, 0px)),
-    right calc(0px - var(--dsh-windows-titlebar-height, 0px)),
-    right calc(0px - var(--dsh-windows-titlebar-height, 0px));
-  background-repeat: no-repeat, no-repeat, no-repeat;
 }
 
 /* ===== 官方那些**吸顶遮罩行**：底色要等于它盖住的内容底 =====

@@ -18,10 +18,6 @@ export {
   MARKER_ATTR,
   PANEL_VARIABLE,
   PLAIN_ATTR,
-  POPUP_BOTTOM_SHAPE,
-  POPUP_LEFT_SHAPE,
-  POPUP_STOP,
-  POPUP_TOP_SHAPE,
   TOP_VARIABLE,
 } from './constants.js'
 export {
@@ -65,7 +61,6 @@ export {
   buildPopoverCss,
 } from './popover.js'
 export {
-  GLASS_BLUR,
   GLASS_CARD_LIFT,
   GLASS_CARD_PHASES,
   GLASS_HEADER_ALPHA,
@@ -78,12 +73,8 @@ export {
   phaseGate,
 } from './glass.js'
 export {
-  COMPOSER_CARD_ANCHORS,
   COMPOSER_ICON_BUTTON_SCOPE,
-  SURFACE_ANCHORS,
   buildSurfaceCss,
-  menuSurfaceLayers,
-  surfaceLayers,
 } from './surface.js'
 export {
   SWEEP_ANCHORS,

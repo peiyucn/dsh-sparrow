@@ -124,27 +124,6 @@ export function faceLayerGeometry(perGradient: string): { size: string; repeat: 
 }
 
 /*
- * 把上面这串渐变**按比例压强度**（形状与几何一字不改）：重画背景的面必须**按该面自己的填充 alpha 同步压光**，否则画出来是
- * 「淡的底色 + 满的光」、比周围亮一截（数学：面画 alpha `a` 时 `C = a·底 + a·光` ⇒ 底色与光都要乘 `a`，本函数负责光那一半）。
- */
-export function dimmedBackdropGradients(scale: number): string {
-  const dim = (token: string): string =>
-    `color-mix(in srgb, var(${token}, transparent) ${Math.round(scale * 100)}%, transparent)`
-  return `radial-gradient(${DARK_RADIAL_SHAPE}, ${dim(TOP_VARIABLE)}, transparent var(${TOP_STOP_VARIABLE}, ${RADIAL_STOP})),
-    radial-gradient(${BOTTOM_RADIAL_SHAPE}, ${dim(BOTTOM_VARIABLE)}, ${BOTTOM_RADIAL_STOP}),
-    radial-gradient(${LEFT_RADIAL_SHAPE}, ${dim(LEFT_VARIABLE)}, ${LEFT_RADIAL_STOP})`
-}
-
-/**
- * 把 {@link dimmedBackdropGradients} 那束光**叠成两层**（第二层按 `boost` 压过）—— 形状 / 中心 / stop 不动，只抬有效 alpha。
- * ⚠️ `scale` 拧不过 1（`color-mix` 百分比超 100% 会被钳到 100%），想画强一档只能**再叠一层**；补偿有上限（台阶翻负即过）。
- */
-export function compensatedBackdropGradients(base: number, boost: number): string {
-  if (boost <= 0) return dimmedBackdropGradients(base)
-  return `${dimmedBackdropGradients(base)},\n    ${dimmedBackdropGradients(boost)}`
-}
-
-/**
  * 背景层的样式表文本（z-index 与标记属性都来自常量，便于单测钉住契约）。⚠️ 表内**不写注释**（会随发布产物出货）：
  * 层级不变式见 constants.ts 的 ABOVE_CONTENT_Z_INDEX 与 WIDTH_HANDLE_ATTR（`data-side` 三处消费 ⇒ 必须排除 `role='tooltip'`）。
  */
