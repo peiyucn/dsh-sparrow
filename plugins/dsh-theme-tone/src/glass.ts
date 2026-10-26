@@ -4,6 +4,7 @@ import { BACKDROP_GRADIENTS } from './backdrop.js'
 export const HEADER_HEIGHT_PX = 76
 export const HEADER_GLASS_ALPHA = 0.7
 export const CARD_GLASS_ALPHA = 0.58
+export const SEAT_BAND_PX = 44
 
 /** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
 export const PANEL_BAND_PX = 38
@@ -81,47 +82,40 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框：卡片玻璃 + 座位光墙 =====
-   座位画一层「底色 + 地面光」的不透光墙（上缘 36px 渐隐，复刻官方让正文淡出的观感），卡片玻璃糊的是
-   这面静态光墙 —— **正文不再从玻璃下滚过**。这是为消除合成器残影做的根因级取舍：玻璃背后只要还有
-   高频重绘的正文，Chromium 就可能复用错位的背景快照（表现为菜单碎片闪进卡片）。卡片本体透明、玻璃与
-   边缘光在 ::before（伪元素没有后代，不会成为官方弹层的 backdrop root）。 */
+/* ===== 输入框：玻璃挂在卡片本体上（不用 ::before 层）+ 座位底带 =====
+   旧的实现把玻璃放在卡片 ::before（z-index:-1）上：Chromium 在「卡片的负层 backdrop-filter」与
+   官方菜单（body 层的 backdrop-filter）重叠时会把菜单碎片快照画进卡片（owner 截图）。
+   改为卡片的 backdrop-filter 直接挂在**卡片本体**上（不再产生额外负层/伪元素层）：卡片自带
+   isolation 自成 backdrop root；官方菜单已 createPortal 到 body，不在卡片子树内，因此不受影响。
+   座位恢复透明 + 底部一小段地面同源带，正文重新从玻璃下滚过（功能不放掉）。 */
 ${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] {
   background: none !important;
 }
-${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat]::before {
+${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card] {
+  position: relative;
+  isolation: isolate;
+  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%, transparent);
+  box-shadow: var(--dsw-elevation-soft), ${RIM_DARK};
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
+  /* 「+」等 selector 型图标按钮：官方给的是不透明中性底，在玻璃卡片上会读成一块实心。 */
+  --dsw-specific-selector: transparent;
+}
+body:not([data-ds-dark-theme]) :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card] {
+  box-shadow: var(--dsw-elevation-soft), ${RIM_LIGHT};
+}
+/* 卡片下方滚过的正文用「地面同源」的一小段盖住；带顶被卡片盖住，不需要 mask。 */
+${P} [data-phase='active'] [data-composer-seat]::after {
   content: '';
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: ${SEAT_BAND_PX}px;
   z-index: -1;
   pointer-events: none;
   background-color: var(--dsw-alias-bg-base);
 ${viewportLight('100% 100%')}
-  -webkit-mask-image: linear-gradient(180deg, transparent 0px, black 36px);
-  mask-image: linear-gradient(180deg, transparent 0px, black 36px);
 }
-${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card] {
-  position: relative;
-  z-index: 0;
-  background-color: transparent;
-  /* 「+」等 selector 型图标按钮：官方给的是不透明中性底，在玻璃卡片上会读成一块实心。 */
-  --dsw-specific-selector: transparent;
-}
-${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card]::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
-  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%, transparent);
-  box-shadow: ${RIM_DARK};
-  backdrop-filter: var(--dsw-menu-backdrop-filter);
-}
-body:not([data-ds-dark-theme]) :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card]::before {
-  box-shadow: ${RIM_LIGHT};
-}
-
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
 ${P} ${RP} {
