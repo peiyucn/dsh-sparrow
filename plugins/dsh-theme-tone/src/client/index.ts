@@ -452,6 +452,47 @@ function install(ctx: Context): void {
    * scope 驱动，与本插件 settings 的就绪**没有先后保证**。不过门就会用进程内兜底值算出 `hidden = false`
    * → `paintPlain(false)` **把门打开**，让实际选了「官方默认」的用户照样吃到玻璃与染色。
    */
+  /**
+   * 「本插件此刻是否真的在画东西」= 当前轴**不是**官方默认。
+   *
+   * ⚠️ **这比 CSS 的 `PLAIN_ATTR` 门多管一件事：JS**。观测 / 探针 / 相位收敛这三套机制此前**完全不看门** ——
+   * 用户选「官方默认」时 CSS 一条规则都不命中，但这些机制照样在每次 DOM 变动（含 hover 改 class）后跑
+   * `querySelectorAll` + `getComputedStyle`（**强制样式重算/布局**），流式输出时等于每帧都跑。
+   * 实测后果两条：① 合成层被反复逼着重绘 ⇒ 挂靠卡（todo / 待发）在场时菜单 hover 会闪亮块；
+   * ② 一直是本插件性能问题的来源之一（官方默认档本应零成本）。
+   * 故「门」必须同时管 CSS 与 JS：{@link applyPainting} 在切换时启停全部观测。
+   */
+  let isPainting = false
+
+  /**
+   * 按 {@link isPainting} 启停全部观测/探针/收敛。
+   * 切回官方默认时：取消所有待跑帧与定时器、清掉相位门与快照变量、摘掉待启动标记 ——
+   * 让「官方默认 = 零成本」成为硬契约（不再有每帧的强制样式重算）。
+   */
+  function applyPainting(): void {
+    if (isPainting) {
+      // 刚切到某个色调：补一次探针 + 相位收敛，把门与变量补齐。
+      probeWorkstart()
+      startPhaseSettle()
+      return
+    }
+    if (probeFrame !== 0) cancelAnimationFrame(probeFrame)
+    if (probeTimer !== 0) window.clearTimeout(probeTimer)
+    if (settleFrame !== 0) cancelAnimationFrame(settleFrame)
+    if (phaseTimer !== 0) window.clearTimeout(phaseTimer)
+    if (contentSettleTimer !== 0) window.clearTimeout(contentSettleTimer)
+    probeFrame = 0
+    probeTimer = 0
+    settleFrame = 0
+    phaseTimer = 0
+    contentSettleTimer = 0
+    probeScheduled = false
+    settleFrames = 0
+    settlePrev = ''
+    clearPhase()
+    markerHost?.removeAttribute(WORKSTART_ATTR)
+  }
+
   const paintLayer = (snapshot: ThemeSnapshot): void => {
     // ⚠️ **行同步必须排在 `shouldPaint()` 那道门之前**：门是给**上色**用的（未就绪不上色，避免闪变），
     // 而**行渲染哪一轴的卡片**纯由当前主题决定，与设置是否就绪无关 —— 排在门后会让浅色页面显示深色轴
@@ -464,6 +505,10 @@ function install(ctx: Context): void {
     layer.hidden = plan.hidden
     // 「这一轴选了官方默认」= 没有染色 = 整层隐藏；把这个事实挂到 body 上，让玻璃与抬升面两张表整表让路。
     paintPlain(plan.hidden)
+    // ⚠️ **CSS 门与 JS 观测必须同步**：官方默认档下 CSS 一条不画，观测/探针/收敛也必须停，
+    // 否则每帧仍在 querySelectorAll + getComputedStyle（强制样式重算）—— 见 isPainting 的 ⚠️。
+    const nextPainting = !plan.hidden
+    if (nextPainting !== isPainting) { isPainting = nextPainting; applyPainting() }
     if (!plan.hidden) {
       layer.style.setProperty(TOP_VARIABLE, plan.top)
       layer.style.setProperty(BOTTOM_VARIABLE, plan.bottom)
@@ -555,6 +600,8 @@ function install(ctx: Context): void {
   let probeTimer = 0
   let lastProbeAt = 0
   const runProbe = (): void => {
+    // 官方默认档：观测已停（见 isPainting）—— 这里再挡一道，防定时器在停用瞬间漏进来。
+    if (!isPainting) { probeScheduled = false; probeFrame = 0; probeTimer = 0; return }
     probeScheduled = false
     probeFrame = 0
     probeTimer = 0
@@ -563,7 +610,7 @@ function install(ctx: Context): void {
     maintainAnchors()
   }
   const scheduleProbe = (): void => {
-    if (probeScheduled) return
+    if (!isPainting || probeScheduled) return
     probeScheduled = true
     const wait = PROBE_MIN_INTERVAL_MS - (performance.now() - lastProbeAt)
     if (wait <= 0) {
@@ -598,6 +645,7 @@ function install(ctx: Context): void {
    * 后者有「同帧只跑一次」的合并语义，而收敛需要**连续多帧**各测一次；共用会互相压制。
    */
   const startPhaseSettle = (): void => {
+    if (!isPainting) return
     lastPhaseAt = performance.now()
     settleFrames = 0
     settlePrev = ''
@@ -622,7 +670,7 @@ function install(ctx: Context): void {
    * 重新挂上快档门（不落回慢档）。
    */
   const schedulePhaseSettle = (): void => {
-    if (phaseTimer !== 0) return
+    if (!isPainting || phaseTimer !== 0) return
     const wait = PHASE_SETTLE_MIN_INTERVAL_MS - (performance.now() - lastPhaseAt)
     if (wait <= 0) { startPhaseSettle(); return }
     phaseTimer = window.setTimeout(() => {
@@ -690,6 +738,7 @@ function install(ctx: Context): void {
   }
   /** 内容变动入口：只记录时刻并（重）排一次性去抖定时器；流式期间不做任何扫描 / 几何测量。 */
   const armContentSettle = (): void => {
+    if (!isPainting) return
     const now = performance.now()
     if (contentSettleArmAt === 0) contentSettleArmAt = now
     lastContentMutationAt = now
@@ -775,12 +824,14 @@ function install(ctx: Context): void {
   // `attributes` 必须过滤到 class —— 否则官方每次改任意属性都会触发全量回调节流。
   // ⚠️ **相位重测分两条路**：class 变动（右栏开合等布局动画）立即重测；`childList`（流式输出每帧都有、
   // 也可能出现元素重建）走节流入口，既不在思考全程每帧测几何，又不会在切会话后停在慢档。
-  probeWorkstart()
+  if (isPainting) probeWorkstart()
   ctx.effect(() => {
     const root = markerHost
     // body 缺失时没有可观察的宿主 —— 直接不装（probeWorkstart 也不会打标记）。
     if (root === null) return () => {}
     const observer = new MutationObserver((records) => {
+      // 官方默认档：整表 CSS 已让路 ⇒ 观测必须停摆（否则每帧仍在强制样式重算，见 isPainting 的 ⚠️）。
+      if (!isPainting) return
       // 纯内容流式变动：推迟到变动停下再探测/重测（理由见 CONTENT_SETTLE_QUIET_MS）。
       if (isContentChurnFast(records)) { armContentSettle(); return }
       scheduleProbe()
@@ -813,9 +864,9 @@ function install(ctx: Context): void {
    * 右栏开合 / 左栏折叠会改 class，由上面的 MutationObserver 覆盖；即便漏掉一次，门在测到之前不挂，
    * 最坏情况只是暂时用慢档（正确）。
    */
-  publishPhase()
+  if (isPainting) publishPhase()
   ctx.effect(() => {
-    const onResize = (): void => { startPhaseSettle() }
+    const onResize = (): void => { if (isPainting) startPhaseSettle() }
     window.addEventListener('resize', onResize, { passive: true })
 
     /**
@@ -830,7 +881,7 @@ function install(ctx: Context): void {
     ].filter((el): el is Element => el !== null)
     const resizeObserver = targets.length === 0
       ? null
-      : new ResizeObserver(() => { startPhaseSettle() })
+      : new ResizeObserver(() => { if (isPainting) startPhaseSettle() })
     for (const el of targets) resizeObserver?.observe(el)
 
     return () => {
