@@ -902,3 +902,14 @@ GUI 本体（`http://127.0.0.1:3080`）需要 launcher 的鉴权；带 token 的
 * `dsh-codebuddy-credits`：模型选择器的分组渲染改为官方 `MenuGroup` 原语 + `observeStickyMenuGroups(滚动容器)`，删掉自绘标题样式 —— 与官方 rc.3 ModelSelect 同一套观感（吸顶才上色）。
 
 **顺手**：nav-pin（轮次导航 / 宽度钳制）**取消色调门**，两个档位都生效（spec 09 §1.1）。
+
+**2026-10-26 追加：做减法，分组标题与内圈圆角整族删除。**
+
+owner 复看官方 rc.3 的模型列表后定案：「官方非吸顶状态的分组背景条比我们的好，既然官方已经做好，那我们做减法」。据此删除：
+
+* `GROUPED_MENU_SELECTOR` / `GROUPED_MENU_UNGUARDED_SELECTOR` / `GROUPED_MENU_TITLE_SELECTOR` / `groupTitleLayers()` / `GROUP_TITLE_ATTACHMENT` / `GROUP_TITLE_BLEND()` / `GROUP_TITLE_RADIUS`（标题条整族）；
+* `GROUPED_MENU_SCROLLER_SELECTOR` / `GROUPED_MENU_SELF_SCROLLER_SUFFIX` / `GROUPED_MENU_SCROLLER_RADIUS` / `GROUPED_MENU_INNER_RADIUS_VARIABLE`（内圈圆角整族）；
+* `ANCHOR.menuGrouped` / `menuSelfScroller` / `menuChild` 三个运行期锚点及其扫描（client half 不再扫菜单分组结构，少一次 DOM 遍历）；
+* `dsh-codebuddy-credits` 模型菜单上的 `--dsh-theme-tone-menu-inner-radius` 声明。
+
+理由：分组标题的「透明 → 吸顶才上色」由官方 `MenuGroup` 负责（`data-stuck` + `--dsw-alias-menu-group-header-fill`），内圈圆角由官方卡片自己的 `overflow + border-radius` 负责 —— 我们那套是**官方没做好时的补丁**，官方做好后继续自己画只会：① 与官方观感分叉（永远不透明、被 owner 点名）；② 多留一层按帧重栅格化的 `background-attachment: fixed`；③ 多一次 DOM 扫描。**减法同时也是性能与观感的回归修复。**

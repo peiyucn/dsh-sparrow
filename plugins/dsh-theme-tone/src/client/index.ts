@@ -258,16 +258,6 @@ function install(ctx: Context): void {
         if (hasDirectChild(child, "[role='tree']")) add(child, ANCHOR.treeHost)
       }
 
-      // ⑥⑦⑧ 分组菜单三条腿（**判据各不相同，别合并**）：菜单本体 / 直接子里的滚动容器 / 含分组的直接子元素。
-      // 前两条必须分开 —— 实测 codebuddy 菜单是 `groupsDirect: 0 / groupsAny: 2`，合并会让那个菜单静默失去质感。
-      for (const menu of document.querySelectorAll("[role='menu']")) {
-        if (menu.querySelector("[role='group']") !== null) add(menu, ANCHOR.menuGrouped)
-        if (hasDirectChild(menu, "[role='group']")) add(menu, ANCHOR.menuSelfScroller)
-        for (const child of menu.children) {
-          if (child.querySelector("[role='group']") !== null) add(child, ANCHOR.menuChild)
-        }
-      }
-
       const scroller = document.querySelector(`[${CONTENT_ATTR}]`)
       if (scroller !== null) {
         // ⑧ 轮次导航 nav 的直接父元素（只认官方那两个 aria-label，避免误标别的 nav）。

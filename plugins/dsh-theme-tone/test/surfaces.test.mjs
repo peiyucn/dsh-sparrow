@@ -27,9 +27,9 @@ import {
   tokenOverrides,
   washFill,
 } from '../lib/tones.js'
-import { BACKDROP_GRADIENTS, backdropGradients } from '../lib/backdrop.js'
+import { BACKDROP_GRADIENTS } from '../lib/backdrop.js'
 import { ANCHOR, anchorSelector } from '../lib/anchors.js'
-import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELF_SCROLLER_SUFFIX, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, LIGHT_MIN_BOX_PX, OFFICIAL_BEFORE_LAYER_ANCHORS, OWN_BACKGROUND_ANCHORS, SURFACE_ANCHORS, SURFACE_LIGHT_GEOMETRY, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, STATIC_SURFACE_ANCHORS, usesAfterLayer, usesOfficialBeforeLayer, usesOwnBackground } from '../lib/surface.js'
+import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, LIGHT_MIN_BOX_PX, OFFICIAL_BEFORE_LAYER_ANCHORS, OWN_BACKGROUND_ANCHORS, SURFACE_ANCHORS, SURFACE_LIGHT_GEOMETRY, buildSurfaceCss, menuSurfaceLayers, surfaceLayers, STATIC_SURFACE_ANCHORS, usesAfterLayer, usesOfficialBeforeLayer, usesOwnBackground } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -923,43 +923,6 @@ function blocksFor(source, selector) {
   return out
 }
 
-/** 取规则体里某个声明的值（已去掉 `!important`）；缺声明时空串。 */
-function declFor(block, prop) {
-  const match = new RegExp(`(?:^|;)\\s*${prop}\\s*:([^;]*)`, 'u').exec(block)
-  return match === null ? '' : match[1].replace(/!important/u, '').trim()
-}
-
-/**
- * 按**顶层**逗号切分逐层列表：`radial-gradient(ellipse 80vw 45vh at 50% -10vh, …)` 里全是逗号，
- * 朴素 `split(',')` 会把一层切成四五层，「值数 == 层数」这条判据当场失真。
- */
-function splitLayers(value) {
-  const out = []
-  let depth = 0
-  let current = ''
-  for (const char of value) {
-    if (char === '(') depth += 1
-    if (char === ')') depth -= 1
-    if (char === ',' && depth === 0) {
-      out.push(current.trim())
-      current = ''
-      continue
-    }
-    current += char
-  }
-  if (current.trim() !== '') out.push(current.trim())
-  return out
-}
-
-/**
- * 官方菜单填充的**当前**字面量（真机实测 `getComputedStyle(body)` 的 `--dsw-menu-surface-fill`）。
- * 写死一份是因为本插件的染色以官方原值为基，抄旧了连「官方默认」那一档都会发过期色；官方升级时复核它即可。
- */
-const OFFICIAL_MENU_FILL = Object.freeze({
-  light: 'rgba(248, 249, 250, 0.58)',
-  dark: 'rgba(67, 69, 74, 0.45)',
-})
-
 describe('抬升面：表面绘制', () => {
   const css = buildSurfaceCss()
   const layers = surfaceLayers()
@@ -1021,203 +984,7 @@ describe('抬升面：表面绘制', () => {
     assert.ok(buildGlassCss().includes(`inset ${GLASS_SPECULAR_RING[0].x}px ${GLASS_SPECULAR_RING[0].y}px`), '输入框卡片应带镜面高光')
   })
 
-  it('粘性分组标题：**不透明底 + 卡片那一摞层（颗粒在上）+ 地面**，且不得有模糊', () => {
-    // 约束：底色必须挡住滚过去的行（不能透明），但合成出来必须**等于卡片**。
-    // 弯路：只刷半透明 token（多叠一层）、刷纯白底（纯色平带）、什么都不写（行透上来）、层序写反（浅轴偏亮 5 级 / 深轴偏暗 10 级）。
-    // 正解 = 把卡片那一摞层**逐层同源**地重画，只把最下面的「页面内容」换成不透明的「地面」；⚠️ 锚点用**无守卫**版（`:has()` 冗余且最贵）。
-    const titleSelector = `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`
-    const block = blockFor(css, titleSelector)
-    assert.notEqual(block, '', '必须为分组标题生成规则 —— 不写就是行透上来（owner ③）')
-    // ① 不透明打底：这是"挡住行"的唯一保证，**不得**是半透明色。
-    assert.match(
-      block,
-      /background-color:\s*var\(--dsw-alias-bg-base\)/u,
-      '标题要有**不透明**打底（挡住滚过去的行，owner ③）',
-    )
-    // ② 菜单填充走**图层**（保住官方半透明 alpha 与色调跟随），且必须读**卡片自己那个 token**：
-    //    官方 `.material` 读 `--dsw-menu-surface-fill`，别名 `--dsw-specific-menu` 是 `.groupTitle` / codebuddy 菜单读的（两者同源）。
-    assert.ok(
-      block.includes('linear-gradient(var(--dsw-menu-surface-fill, var(--dsw-specific-menu))'),
-      `菜单填充要作为图层叠在不透明底之上，且读卡片自己的 token：${block.slice(0, 220)}`,
-    )
-    // ③ 2026-10-22 起没有颗粒层（原先是标题规则里的第 0 层）—— 一处都不得有。
-    assert.ok(!block.includes('feTurbulence'), '标题不得画颗粒')
-    assert.ok(
-      !block.includes('/9j/') && !/opacity='?\d/u.test(block),
-      '颗粒强度不得在标题规则里写字面量',
-    )
-    // ④ 不得声明模糊 —— 标题在菜单内部，菜单自己已是 backdrop root，
-    //    再声明只会采样子树里滚动的行（实测 31.719/px，比不写更脏）。
-    assert.ok(
-      !block.includes('backdrop-filter'),
-      '标题不得声明 backdrop-filter（会采样到滚动的行，反而更脏）',
-    )
-    // ⑤ **层序**：填充在上、地面在下 —— 与卡片的合成顺序逐层一致。
-    //    这条是第四轮那个 bug 的**唯一守卫**：上一版断言的恰恰是反的（"填充在上"）。
-    const image = declFor(block, 'background-image')
-    const layers = splitLayers(image)
-    assert.ok(layers.length >= 2, `标题必须是多层合成（实测 ${layers.length} 层）`)
-    assert.ok(layers[0].startsWith('linear-gradient('), `第一层必须是菜单填充：${layers[0]}`)
-    // 地面那几层必须**逐字**来自 backdropGradients()（三段光，同源不许手抄）
-    assert.ok(
-      image.includes(backdropGradients()),
-      '不透明底之上必须原样重画地面（backdropGradients：三段光）',
-    )
-    // ⑥ 逐层 attachment / blend 的**值数必须等于层数**：CSS 在值少于层数时是整串重复，
-    //    少写一个就会让第 4、5 层退回 `scroll`、光层被压扁（05-surfaces §8.2 的坑）。
-    for (const prop of ['background-attachment', 'background-blend-mode']) {
-      const values = splitLayers(declFor(block, prop))
-      assert.equal(values.length, layers.length, `${prop} 必须逐层给足（${layers.length} 层）`)
-    }
-    assert.equal(declFor(block, 'background-attachment'), GROUP_TITLE_ATTACHMENT, '地面那几层必须 fixed')
-    // 最上面那几层（颗粒[若开] + 卡片填充）按元素盒子，与卡片一致。
-    const topScrollLayers = 1
-    assert.ok(
-      splitLayers(declFor(block, 'background-attachment')).slice(0, topScrollLayers).every(v => v === 'scroll'),
-      `最上面 ${topScrollLayers} 层（颗粒/填充）按元素盒子，与卡片一致`,
-    )
-    // ⑦ 圆角：标题自己带圆角 ⇒「标题矩形 − 圆角」那块缺口真的没画，而缺口里正好是滚动的行 ⇒ 行透出来（漏量随半径增长）。
-    //    ⇒ 圆角改由**滚动容器**承担（容器顶角的裁剪同时作用于标题与行），标题回到方角。
-    assert.equal(GROUP_TITLE_RADIUS, '0', '标题必须方角（有圆角就有缺口，缺口就漏行）')
-    assert.equal(
-      declFor(block, 'border-radius'),
-      GROUP_TITLE_RADIUS,
-      '标题的圆角必须显式归零 —— 要盖住优先级更低的旧写法（codebuddy 兜底 / 缓存旧 CSS）',
-    )
-    // 圆角落在滚动容器上。半径**走变量**（不是写死值）—— 该规则的选择器同时命中
-    // 官方菜单与 codebuddy 菜单，两个菜单的同心值不同（官方 16−4=12；codebuddy 20−4=16），
-    // 写死一个必然让另一个错掉（实测踩过一次）。变量默认给官方菜单的同心值，
-    // 菜单所有者可在自己菜单元素上覆盖（自定义属性沿继承树向下传）。
-    assert.ok(
-      GROUPED_MENU_SCROLLER_RADIUS.includes(GROUPED_MENU_INNER_RADIUS_VARIABLE),
-      '容器圆角必须经变量取值 —— 两个菜单的同心值不同，写死会让其中一个错掉',
-    )
-    assert.ok(
-      GROUPED_MENU_SCROLLER_RADIUS.includes('--dsw-radius-md'),
-      '变量默认值是官方菜单的同心值（官方 MenuSurface 16 − 内边距 4 = 12 = --dsw-radius-md）',
-    )
-    assert.match(
-      GROUPED_MENU_INNER_RADIUS_VARIABLE,
-      /^--dsh-theme-tone-/u,
-      '热变量要带插件前缀（明确谁写的、谁能覆盖，也不与官方未来同名变量撞车）',
-    )
-    assert.ok(
-      GROUPED_MENU_SCROLLER_RADIUS.includes('--dsh-scrollbar-width'),
-      '容器右上角补一个滚动条宽（否则左圆右方）',
-    )
-    assert.match(
-      GROUPED_MENU_SCROLLER_RADIUS,
-      /\)\s+0\s+0$/u,
-      '容器只圆上两角 —— 下两角会让滚到底时的最后一行被啃掉',
-    )
-    const scrollerSelector = `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_SCROLLER_SELECTOR}`
-    const scrollerBlock = blockFor(css, scrollerSelector)
-    assert.notEqual(scrollerBlock, '', '必须为滚动容器生成圆角规则')
-    assert.equal(declFor(scrollerBlock, 'border-radius'), GROUPED_MENU_SCROLLER_RADIUS, '容器圆角值')
-    // ⚠️ 选择器不得用 `:scope`：它是给 querySelector 用的，在样式表里退化成 `:root`
-    //    ⇒ 规则静默失效（本文件反复记录的那类"一条都命不中"的坑）。
-    assert.ok(
-      !scrollerSelector.includes(':scope'),
-      '样式表选择器不得用 :scope（会退化成 :root，规则静默失效）',
-    )
-    assert.ok(
-      GROUPED_MENU_SCROLLER_SELECTOR.startsWith('>'),
-      '滚动容器锚点是后代片段，必须以组合符开头（拼在菜单锚点之后才有效）',
-    )
-    // ⚠️ rc.2 把 `role='menu'` 从菜单**卡片**搬到了内层**滚动容器**上 ⇒「锚点的直接子」这个关系整体上移一层，
-    //    只写 `> :has(...)` 在 rc.2 上**一条也命不中**。故必须**第二条腿**：滚动容器就是菜单锚点自己时的那条规则。
-    const selfScrollerSelector =
-      `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)}${GROUPED_MENU_SELF_SCROLLER_SUFFIX}`
-    const selfScrollerBlock = blockFor(css, selfScrollerSelector)
-    assert.notEqual(
-      selfScrollerBlock, '',
-      '必须为「滚动容器就是菜单锚点自己」（rc.2 官方结构）生成圆角规则 —— 否则内圈圆角在 rc.2 上静默失效',
-    )
-    assert.equal(
-      declFor(selfScrollerBlock, 'border-radius'), GROUPED_MENU_SCROLLER_RADIUS,
-      'rc.2 那条腿必须与 rc.1 那条腿共用同一份半径配方',
-    )
-    // 两条腿必须**各是一条独立规则**：相对选择器（以 `>` 开头）在 `:is()` 里按规范非法，
-    // 浏览器不报错、也不整条丢弃 —— 实测 `:is(:has(x), > :has(x))` 被判成 `:is(:has(x))`，
-    // 相对那一支被**静默删掉**。合并会直接把 rc.2 那一半再弄丢。
-    assert.ok(
-      !GROUPED_MENU_SELF_SCROLLER_SUFFIX.includes(':is('),
-      'rc.2 那条腿不得写进 :is() —— 相对选择器在 :is() 里会被静默删除',
-    )
-    assert.ok(
-      !GROUPED_MENU_SCROLLER_SELECTOR.includes(':is('),
-      'rc.1 那条腿同样不得写进 :is()',
-    )
-    // 两条腿的意图必须可区分：一条以组合符开头（锚点的直接子），一条不以（锚点自己）。
-    // ⚠️ 2026-10-08：判据从 `:has(> [role='group'])` 改为**锚点属性**（`menuSelf`），
-    // 故「锚点自己」形态表现为**不带组合符**（而不是「以 :has( 开头」）。
-    assert.ok(
-      !GROUPED_MENU_SELF_SCROLLER_SUFFIX.startsWith('>'),
-      'rc.2 那条腿必须是「锚点自己」形态（不带组合符，直接贴在菜单锚点后）',
-    )
-    assert.ok(
-      GROUPED_MENU_SCROLLER_SELECTOR.startsWith('>'),
-      'rc.1 那条腿必须是「锚点的直接子」形态（带组合符）',
-    )
-    assert.notEqual(
-      `${GROUPED_MENU_UNGUARDED_SELECTOR} ${GROUPED_MENU_SCROLLER_SELECTOR}`,
-      `${GROUPED_MENU_UNGUARDED_SELECTOR}${GROUPED_MENU_SELF_SCROLLER_SUFFIX}`,
-      '两条腿必须产出不同的选择器（否则其中一条是死规则）',
-    )
-    // ⑧ 地面颗粒的混合模式跟着轴走（地面深色轴 screen / 浅色轴 multiply）：
-    //    第二条规则只改 background-blend-mode，其余声明继续由第一条承担（配方只有一份）。
-    const darkTitleSelector = `${GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\b/u, `body[data-ds-dark-theme]:not([${PLAIN_ATTR}])`)} ${GROUPED_MENU_TITLE_SELECTOR}`
-    const darkBlock = blockFor(css, darkTitleSelector)
-    assert.notEqual(darkBlock, '', '深色轴必须有一条只改混合模式的规则')
-    assert.match(darkBlock, /background-blend-mode:\s*[^;]*screen/u, '深色轴地面颗粒走 screen（与背景层一致）')
-    assert.match(block, /background-blend-mode:\s*[^;]*multiply/u, '浅色轴地面颗粒走 multiply（与背景层一致）')
-    assert.ok(
-      !darkBlock.includes('background-color') && !darkBlock.includes('background-image') && !darkBlock.includes('border-radius'),
-      '第二条规则只改混合模式 —— 避免两处各写一份配方（改一处漏一处）',
-    )
-  })
 
-  it('⛔ 分组标题的合成必须逐层等于卡片（层序 + 地面同源 + 两个 token 不分叉）', () => {
-    // 把「看起来像一条带」的成因钉成三条纯逻辑判据：① 层序（颗粒在填充之上）；② 地面（不透明底之上必须重画地面）；
-    // ③ token 不分叉（标题读的填充 token 与卡片读的必须**同值** —— 官方 `.material` 读 `--dsw-menu-surface-fill`、
-    // `.groupTitle` 读 `--dsw-specific-menu`，两者同源，只染一个就分叉成色差带）。
-    const layers = splitLayers(groupTitleLayers())
-    // 层序：颗粒（若开着）→ 填充 → 地面。
-    const offset = 0
-    void 0
-    assert.ok(layers[0 + offset].includes('linear-gradient('), '层序：填充在颗粒之下')
-    // 地面那几层 = 函数返回串的后半段，**逐字**等于 backdropGradients()（只差排版空白）
-    const ground = layers.slice(1 + offset).join(', ').replace(/\s+/gu, ' ')
-    assert.equal(
-      ground,
-      backdropGradients().replace(/\s+/gu, ' '),
-      '层序：地面在最下，且必须原样重画（backdropGradients：三段光）',
-    )
-    // 两个 token 都要在覆盖层里，且**每个轴上取值必须完全相同**。
-    assert.deepEqual(
-      POPUP_TOKENS.map(entry => entry.token),
-      ['--dsw-menu-surface-fill', '--dsw-specific-menu'],
-      '菜单填充的两个名字都要染',
-    )
-    for (const settings of [
-      { lightTone: 'official', darkTone: 'official' },
-      { lightTone: 'blue', darkTone: 'crimson' },
-      { lightTone: 'sakura', darkTone: 'forest' },
-    ]) {
-      const overrides = tokenOverrides(settings)
-      for (const scheme of SCHEMES) {
-        assert.equal(
-          overrides['--dsw-menu-surface-fill'][scheme],
-          overrides['--dsw-specific-menu'][scheme],
-          `${scheme}：两个填充 token 必须同值（否则标题与卡片各读一个 → 色差带）`,
-        )
-      }
-      if (settings.lightTone === 'official') {
-        assert.equal(overrides['--dsw-menu-surface-fill'].light, OFFICIAL_MENU_FILL.light, '浅色轴官方档直通')
-        assert.equal(overrides['--dsw-menu-surface-fill'].dark, OFFICIAL_MENU_FILL.dark, '深色轴官方档直通')
-      }
-    }
-  })
 
   it('⛔ 菜单族材质必须**完全交回官方** —— 我们不声明填充与模糊', () => {
     // 口径「透明和模糊和官方默认一样」⇒ 本表**一个材质声明都不写**，官方的半透明与模糊原样生效。
@@ -1253,70 +1020,6 @@ describe('抬升面：表面绘制', () => {
     )
   })
 
-  it('带分组标题的菜单应该 与普通菜单**同一配方**（不再有「去顶光」特例）', () => {
-    // ⚠️ 此前断言「分组菜单必须有一条**去顶光**的专用规则」—— 那个办法从未真正对齐过份数：元素级那条反而与通用
-    // `[role='menu']::after`（4 层：颗粒 + 三道光）叠成双层，颗粒 2 份、底光 2 份、顶光/左光各 1 份，横带照旧。
-    // 现在：专用规则**整条删除**，分组菜单由通用 `[role='menu']::after` 承担、与普通菜单逐层相同；横带的正解在粘性标题那条。
-    assert.ok(
-      !css.includes(`${GROUPED_MENU_SELECTOR} {`) && !css.includes(`${GROUPED_MENU_SELECTOR}::after {`),
-      'M3：分组菜单不得再有专用图层规则 —— 它会与通用 [role=menu]::after 叠成双层、份数不齐',
-    )
-    // 通用菜单锚点仍必须全量收录（排除 = 纯色），分组菜单靠它拿到与普通菜单相同的配方。
-    const menu = SURFACE_ANCHORS.find(a => a.includes("[role='menu']"))
-    assert.equal(menu, "body [role='menu']", '菜单族必须全量收录（排除 = 纯色）')
-    // 而这条通用规则的配方必须是**完整 4 层**（含顶光）—— 分组菜单因此也有顶光。
-    const menuBody = blockFor(css, `${menu.replace(/^body\b/u, `body:not([${PLAIN_ATTR}])`)}::after`)
-    assert.ok(menuBody.includes(surfaceLayers()), '通用菜单 ::after 必须画完整 4 层配方')
-    assert.ok(menuBody.includes(TOP_VARIABLE), '含顶光（分组菜单也走这条 ⇒ 三道光齐备）')
-    assert.ok(menuBody.includes(LEFT_VARIABLE), '含左光')
-
-    // 标题条本身：**本插件一个声明都不写**（见上面那条用例的完整说明）。
-    const titleSelector = `${GROUPED_MENU_SELECTOR} ${GROUPED_MENU_TITLE_SELECTOR}`
-    assert.equal(blockFor(css, titleSelector), '', '标题必须完全交回官方默认')
-    // 结构锚点，不碰 hashed 类名（codebuddy 那个类还是非哈希的 ccb-model-groupTitle）
-    assert.ok(GROUPED_MENU_TITLE_SELECTOR.includes("role='group'"), '标题用 role=group 的结构锚定')
-    assert.ok(!/class\*?=/.test(GROUPED_MENU_TITLE_SELECTOR), '不得用类名匹配标题')
-
-    // ⛔ rc.2 回归守卫：官方 0.2.0-rc.2 把分组菜单抽成 MenuGroup 原语，它在标题**前面**
-    // 插了一个 1×1 隐形哨兵 `<span data-menu-group-start>`（供 observeStickyMenuGroups
-    // 观测吸顶）⇒ 标题不再是 `:first-child`。只写 `:first-child` 会命中那个哨兵，
-    // 真标题拿不到图层，官方吸顶填充（--dsw-alias-menu-group-header-fill，94% 不透明）
-    // 就压在我们染过色的菜单上 —— 正是这条规则当初要治的「横带」。
-    assert.ok(
-      GROUPED_MENU_TITLE_SELECTOR.includes('[data-menu-group-heading]'),
-      '必须同时锚 0.2.0-rc.2 MenuGroup 的公开属性 data-menu-group-heading',
-    )
-
-    // ⛔ 2026-10-26（owner 报障）：官方 rc.3 的分组标题是「**非吸顶透明、吸顶（data-stuck）才上色**」。
-    // 我们此前对**所有**标题永远上色（不透明底 + 地面重画）⇒ 官方默认档下看着就是「被改过的一条实心横条」。
-    // 现在新结构只在 `[data-stuck]` 上色。
-    assert.match(
-      GROUPED_MENU_TITLE_SELECTOR,
-      /\[data-menu-group-heading\]\[data-stuck\]/u,
-      '新结构标题必须收窄到吸顶态（data-stuck）—— 否则非吸顶时也是一条实心横条',
-    )
-    assert.ok(
-      GROUPED_MENU_TITLE_SELECTOR.includes(':not([data-menu-group-start])'),
-      '必须排除 1×1 观测哨兵 data-menu-group-start（它在旧结构分支里是 first-child）',
-    )
-
-    // ⛔ 本常量是**后代片段**，由 groupTitleRule 拼在菜单锚点之后。若写成**顶层**逗号列表，
-    // 拼接处会把整条规则切开：后半段丢掉 body 前缀与色调门，静默生效到全站。
-    // （`:is()` 内部的逗号是嵌套的、不切分外层，故只查括号外的逗号。）
-    const topLevelComma = (selector) => {
-      let depth = 0
-      for (const ch of selector) {
-        if (ch === '(') depth += 1
-        else if (ch === ')') depth -= 1
-        else if (ch === ',' && depth === 0) return true
-      }
-      return false
-    }
-    assert.ok(
-      !topLevelComma(GROUPED_MENU_TITLE_SELECTOR),
-      'GROUPED_MENU_TITLE_SELECTOR 必须是单个复合选择器（顶层逗号会切断后代拼接）',
-    )
-  })
 
   it('血缘树应该 用 `body >` 收窄（官方有四处 role=tree，只有子代理那个是 portal）', () => {
     // 子代理血缘弹层是 createPortal 直挂 body 的 `role='tree'`；但官方 JsonTree / WorkspaceBrowser 会话树 /
@@ -1501,7 +1204,7 @@ describe('抬升面：表面绘制', () => {
 
   it('停靠卡必须**去掉顶光** —— 它们很矮，顶光会造出一道与主体对不上的亮带', () => {
     // GoalBar 只有 36px 高，而顶光锚在盒子顶部（ellipse 120% 42% at 50% -12%）——
-    // 与「分组标题横带」是同一个坑（见 GROUPED_MENU_SELECTOR 的表）。
+    // 与「矮面板顶光被压成硬边」是同一个坑（几何按元素盒子缩放，见 docs/spec/07 §8.1）。
     const layers = menuSurfaceLayers()
     assert.ok(!layers.includes(TOP_VARIABLE), '停靠卡用的图层串里不得有顶光')
     void 0
@@ -1558,16 +1261,8 @@ describe('抬升面：表面绘制', () => {
     const css = buildSurfaceCss()
     const clean = css.replace(/\/\*[\s\S]*?\*\//gu, '')
     assert.ok(!clean.includes(':has('), '表面表不得出现任何 :has()（开销实测见 docs/spec/11）')
-    // 分组菜单那条「带分组的菜单」判据仍在，只是换了载体：菜单本体走 menuSelf 锚点。
-    assert.ok(
-      GROUPED_MENU_SELECTOR.includes(anchorSelector(ANCHOR.menuGrouped)),
-      '单独使用的菜单锚点必须走 menuSelf 锚点（等价于原 :has([role=group])，去掉会命中所有菜单）',
-    )
-    assert.equal(
-      GROUPED_MENU_UNGUARDED_SELECTOR.replace(/^body\s+/u, ''),
-      "[role='menu']",
-      '无守卫版锚点本体保持裸 role（组合规则的后半段已保证有分组）',
-    )
+    // ⚠️ 2026-10-26 做减法：分组菜单的标题条 / 内圈圆角整族交回官方 `MenuGroup`，
+    // 对应的锚点与选择器已删除（本表因此更短）。
   })
 
   it('锚点必须带 body 前缀 —— 官方写的是 background 简写，裸属性选择器会被反压', () => {    for (const anchor of SURFACE_ANCHORS) {
@@ -1628,29 +1323,17 @@ describe('抬升面：表面绘制', () => {
     }
   })
 
-  it('⛔ **所有**会被 gatedAnchor 处理的常量都必须带 body 前缀（不只是一张表）', () => {
-    // 为什么单独钉这三条：`gatedAnchor()` 用 `anchor.replace(/^body\b/, …)` —— 锚点一旦
+  it('⛔ 会被 gatedAnchor 处理的常量都必须带 body 前缀（不只是一张表）', () => {
+    // 为什么单独钉它：`gatedAnchor()` 用 `anchor.replace(/^body\b/, …)` —— 锚点一旦
     // 丢了 `body ` 前缀，`replace` **静默不替换**，产物里就是一条**完全不带门**的规则，
     // 而「复算期望值」式的断言会与产物一起错（自己同意自己）。上面那条循环只走了
-    // SURFACE_ANCHORS，另外两处（输入框图标按钮 / 分组菜单）**当时无人守**。
-    // 实测（审计 M30/M31）：这两处去掉 `body ` 前缀后，产物里出现裸 `[data-composer-card]`
-    // 与裸 `[role='menu']:has([role='group'])`，而 225 个用例**全绿**。
+    // SURFACE_ANCHORS，这一处**当时无人守**。
+    // 实测（审计 M30/M31）：去掉 `body ` 前缀后，产物里出现裸 `[data-composer-card]`，而 225 个用例**全绿**。
     for (const [label, constant] of [
       ['COMPOSER_ICON_BUTTON_SCOPE', COMPOSER_ICON_BUTTON_SCOPE],
-      ['GROUPED_MENU_SELECTOR', GROUPED_MENU_SELECTOR],
-      // 无守卫版同样会被 gatedAnchor 处理（标题 / 滚动容器两条规则都改用了它）。
-      ['GROUPED_MENU_UNGUARDED_SELECTOR', GROUPED_MENU_UNGUARDED_SELECTOR],
     ]) {
       assert.match(constant, /^body /u, `${label} 要有 body 前缀，否则 gatedAnchor 静默失门：${constant}`)
     }
-    // GROUPED_MENU_TITLE_SELECTOR **故意不带** body 前缀：它永远作为上面那条的**后代**
-    // 拼在后面（`gatedAnchor(GROUPED_MENU_SELECTOR) ${GROUPED_MENU_TITLE_SELECTOR}`），
-    // 自己不是规则起点，加了反而会拼出非法选择器。
-    assert.doesNotMatch(
-      GROUPED_MENU_TITLE_SELECTOR,
-      /^body\b/u,
-      'GROUPED_MENU_TITLE_SELECTOR 是后代片段，不该自带 body 前缀',
-    )
   })
 
   it('图层顺序应该 是「顶光 / 底光」（2026-10-22 起没有颗粒层）', () => {

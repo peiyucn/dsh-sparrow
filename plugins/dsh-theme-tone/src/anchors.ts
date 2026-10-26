@@ -28,15 +28,9 @@ export const ANCHOR = Object.freeze({
   dialog: 'dialog',
   /** **子代理血缘弹层的外层盒子**（`body` 直接子元素，内含 `[role='tree']`）。原选择器 `body > :has(> [role='tree'])`。 */
   treeHost: 'tree-host',
-  /**
-   * **含分组子元素的菜单本体**（分组在**任意深度**）。原选择器 `[role='menu']:has([role='group'])`。
-   * ⚠️ **不能与 `menuSelfScroller` 合并**：那条是「直接子就是分组」，官方菜单的分组可能在更深一层。
-   */
-  menuGrouped: 'menu-grouped',
-  /** **带分组菜单里、直接子元素就是分组的那个元素**（rc.2 的滚动容器）。原选择器 `[role='menu']:has(> [role='group'])`。 */
-  menuSelfScroller: 'menu-self-scroller',
-  /** **带分组菜单里、含分组的那个直接子元素**（rc.1 的滚动容器）。原选择器 `[role='menu'] > :has([role='group'])`。 */
-  menuChild: 'menu-child',
+  // ⚠️ 2026-10-26 删除 `menuGrouped` / `menuSelfScroller` / `menuChild` 三个锚点：分组菜单的标题条
+  // 与内圈圆角整族交回官方 `MenuGroup`（rc.3 起：非吸顶透明、吸顶才上色；卡片自带 overflow+radius），
+  // 本插件不再需要"这是不是带分组的菜单 / 哪个盒子在滚"的判据。
   /** **轮次导航 nav 的直接父元素**（官方隐藏规则作用的目标）。原选择器 `[data-conversation-scroll] div:has(> nav[aria-label="…"])`。 */
   turnNavHost: 'turn-nav-host',
   /** **对话滚动体的直接父元素**（官方那个 wrapper）。原选择器 `[data-phase] > div:has(> [data-conversation-scroll])`。 */
