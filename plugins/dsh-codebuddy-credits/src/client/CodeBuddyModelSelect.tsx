@@ -13,7 +13,7 @@ import {
 import {
   // 图标名只标字形与字重（Regular = 1px 描边），渲染尺寸一律由显式 size prop 决定。
   IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular,
-  IconWarningOutlineRegular, Tag, Toast,
+  IconWarningOutlineRegular, MenuGroup, observeStickyMenuGroups, Tag, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getMaxMode, subscribeMaxMode } from './maxMode.js'
 import { BusyDot } from './BusyDot.js'
@@ -128,12 +128,9 @@ export function ensurePickerStyles(): void {
     '.ccb-model-retry { flex: 0 0 auto; padding: 0; border: none; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }',
     // ⚠️ 滚动容器圆角由 theme-tone 统一施加（它同时管官方菜单与本菜单），本插件不自己写——两条都带 !important，重复声明会互相打架。
     '.ccb-model-groups { min-height: 0; overflow-y: auto; overflow-x: hidden; }',
-    // ⚠️ 吸顶的是分类标题，不是 `<section>`：sticky 的包含块是最近的滚动祖先（section 只是滑动边界），
-    // 挂到 section 上会让相邻两条标题同时吸顶、互相压住 —— 别再改回去。
-    '.ccb-model-group + .ccb-model-group { margin-top: 4px; }',
-    // ⚠️ 标题底必须不透明且与卡片同配方（`--dsw-alias-bg-base` + 一层 `--dsw-specific-menu` 渐变）：改半透明，滚动的行会从标题下透上来。
-    // 不用 background 简写（会重置主题层加的 background-image）、不写 backdrop-filter（会采样子树里正在滚动的行）。
-    '.ccb-model-groupTitle { position: sticky; top: 0; z-index: 1; padding: 5px 8px 3px; border-radius: 0; background-color: var(--dsw-alias-bg-base); background-image: linear-gradient(var(--dsw-specific-menu), var(--dsw-specific-menu)); color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; font-weight: 500; }',
+    // ⚠️ 分组标题与分组间距**交给官方 `MenuGroup` 原语**（渲染 `section[role=group]` + 1×1 观测哨兵 + `data-menu-group-heading`，
+    // 标题在非吸顶态**透明**、吸顶（`data-stuck`）才上官方底色）—— 与官方 rc.3 ModelSelect 同一套观感。
+    // 别再自己写标题底色：旧实现是「永远不透明 + 一层 --dsw-specific-menu 渐变」，在官方默认档下看着就像被改过的实心横条。
     '.ccb-model-option { box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: auto; min-width: 100%; min-height: 38px; padding: 6px 8px; border: none; border-radius: 10px; outline: none; background: transparent; color: inherit; text-align: left; cursor: pointer; }',
     '.ccb-model-option:hover:not(:disabled), .ccb-model-option:focus-visible { background: var(--dsw-alias-interactive-bg-hover); }',
     '.ccb-model-option:disabled { color: var(--dsw-alias-label-dimmed); cursor: default; }',
@@ -170,6 +167,8 @@ export function CodeBuddyModelSelect(
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+  /** 分组列表的滚动容器（官方 `observeStickyMenuGroups` 的 root：标题只在它里面吸顶）。 */
+  const groupsRef = useRef<HTMLDivElement | null>(null)
   const id = useId()
 
   // Max 模式（推理档位锁）：只影响展示与请求（host 侧强制 max），
@@ -224,6 +223,17 @@ export function CodeBuddyModelSelect(
     document.addEventListener('mousedown', closeOutside)
     return () => { document.removeEventListener('mousedown', closeOutside) }
   }, [open])
+
+  /**
+   * 分组标题吸顶观测（官方 `MenuGroup` 契约）：标题默认透明，**只有被滚到容器顶部时才上官方底色**。
+   * ⚠️ 必须先有滚动容器再看：`observeStickyMenuGroups` 只认 `:scope > [data-menu-group]` 的直接结构；
+   * 分组变化（加载完成 / 搜索过滤）后要重新观测，旧观测随 cleanup 断开。
+   */
+  useEffect(() => {
+    const viewport = groupsRef.current
+    if (viewport === null || !open || pane !== 'model') return
+    return observeStickyMenuGroups(viewport)
+  }, [open, pane, state.groups])
 
   if (!available) return null
 
@@ -420,12 +430,10 @@ export function CodeBuddyModelSelect(
                   <button type="button" className="ccb-model-retry" onClick={reload}>{t('picker.action.reload')}</button>
                 </div>
               ))}
-              <div className={clsx('ccb-model-groups', 'scrollable')}>
+              <div className={clsx('ccb-model-groups', 'scrollable')} ref={groupsRef}>
                 {state.groups.map((group) => {
-                  const headingId = id + '-' + group.id
                   return (
-                    <section role="group" aria-labelledby={headingId} className="ccb-model-group" key={group.id}>
-                      <div className="ccb-model-groupTitle" id={headingId}>{group.name}</div>
+                    <MenuGroup key={group.id} label={group.name}>
                       {group.models.map((model) => {
                         const selected = state.current?.provider === group.id && state.current.model === model.id
                         // 只读事实只套用本 provider 的行：其他 provider 的条目即使 id 相同也不查表。
@@ -460,7 +468,7 @@ export function CodeBuddyModelSelect(
                           </button>
                         )
                       })}
-                    </section>
+                    </MenuGroup>
                   )
                 })}
               </div>
