@@ -10,8 +10,10 @@ import {
   PLAIN_ATTR,
   RIGHT_PANEL_ATTR,
   SHELL_OVERLAY_ATTR,
+  SIDE_ATTR,
   TOP_STOP_VARIABLE,
   TOP_VARIABLE,
+  WIDTH_HANDLE_ATTR,
 } from './constants.js'
 import { normalizeScheme, toneFor, toneIdOf, type ColorScheme, type ThemeToneSettings, type ToneId } from './tones.js'
 
@@ -53,6 +55,13 @@ export function buildBackdropCss(): string {
 body:not([${PLAIN_ATTR}]) [${CONTENT_ATTR}] { position: relative; z-index: ${CONTENT_Z_INDEX}; }
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
 body:not([${PLAIN_ATTR}]) [${SHELL_OVERLAY_ATTR}] { z-index: ${ABOVE_CONTENT_Z_INDEX}; }
+/* 官方两条「调整对话宽度」拖拽条（AppFrame 的 data-side、ConversationRoot 的 data-width-handle）：
+   官方给低 z-index，会被抬到 81 的内容层整条盖掉（表现为拖拽条消失、拖不动）。抬到内容层之上。
+   [data-side] 官方还挂在 Tooltip 的 placement 上，必须排除 role=tooltip，否则把 tooltip 一起抬起来。 */
+body:not([${PLAIN_ATTR}]) [${WIDTH_HANDLE_ATTR}],
+body:not([${PLAIN_ATTR}]) [${SIDE_ATTR}]:not([role='tooltip']) {
+  z-index: ${ABOVE_CONTENT_Z_INDEX};
+}
 `
 }
 
