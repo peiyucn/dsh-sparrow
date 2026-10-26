@@ -29,7 +29,7 @@ import {
 } from '../lib/tones.js'
 import { BACKDROP_GRADIENTS, backdropGradients } from '../lib/backdrop.js'
 import { ANCHOR, anchorSelector } from '../lib/anchors.js'
-import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELF_SCROLLER_SUFFIX, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, OFFICIAL_BEFORE_LAYER_ANCHORS, OWN_BACKGROUND_ANCHORS, SURFACE_ANCHORS, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, STATIC_SURFACE_ANCHORS, usesAfterLayer, usesOfficialBeforeLayer, usesOwnBackground } from '../lib/surface.js'
+import { AFTER_LAYER_EXCLUDED_ANCHORS, COMPOSER_CARD_ANCHORS, COMPOSER_ICON_BUTTON_SCOPE, GROUPED_MENU_SCROLLER_RADIUS, GROUPED_MENU_INNER_RADIUS_VARIABLE, GROUPED_MENU_SCROLLER_SELECTOR, GROUPED_MENU_SELF_SCROLLER_SUFFIX, GROUPED_MENU_SELECTOR, GROUPED_MENU_TITLE_SELECTOR, GROUPED_MENU_UNGUARDED_SELECTOR, GROUP_TITLE_ATTACHMENT, GROUP_TITLE_RADIUS, LIGHT_MIN_BOX_PX, OFFICIAL_BEFORE_LAYER_ANCHORS, OWN_BACKGROUND_ANCHORS, SURFACE_ANCHORS, SURFACE_LIGHT_GEOMETRY, buildSurfaceCss, groupTitleLayers, menuSurfaceLayers, surfaceLayers, STATIC_SURFACE_ANCHORS, usesAfterLayer, usesOfficialBeforeLayer, usesOwnBackground } from '../lib/surface.js'
 import {
   BOTTOM_VARIABLE,
   DIALOG_ANCHOR,
@@ -556,6 +556,33 @@ describe('抬升面：不变量', () => {
       menuSurfaceLayers().includes(`${Math.round(POPUP_LIGHT_COMPENSATION * 100)}%, transparent)`),
       'menuSurfaceLayers 的底光必须用同一个补偿系数',
     )
+  })
+
+  it('三道光必须带「矮面板几何兜底」—— 否则顶光被压成贴着上缘的亮条', () => {
+    // 真机实测（0.2.1-rc.3，710×36 的 todo 停靠卡，见 docs/spec/07 §矮面板）：
+    // 只有百分比几何时上缘 49.7 / 中部 44.3（Δ5.4），下缘同样有一条 ⇒ 观感是「面板上沿一条亮带」；
+    // 且面板高度一变（菜单加载分组 / todo 更新条目）整条光重算 ⇒ 看起来在变、在闪。
+    // 做法：每层渐变盒子给下限 max(100%, 120px) 并锚回各自那条边；盒子不低于下限时与 auto 逐层等价（高面板零变化）。
+    const floors = [...SURFACE_LIGHT_GEOMETRY.matchAll(/max\(100%,\s*(\d+)px\)/gu)].map(m => Number(m[1]))
+    assert.equal(floors.length, 4, '三层都要给下限：顶/底各一个宽度列 + 左光的宽高两列')
+    for (const floor of floors) assert.equal(floor, LIGHT_MIN_BOX_PX, '三层必须共用同一个下限常量')
+    assert.ok(LIGHT_MIN_BOX_PX >= 96, `下限太小压不住矮面板（36px 的卡片至少要 3 倍高），实际 ${LIGHT_MIN_BOX_PX}`)
+    assert.match(SURFACE_LIGHT_GEOMETRY, /background-repeat: no-repeat/u, '盒子大于元素时默认 repeat 会平铺出接缝')
+    // 位置必须把每层锚回它自己那条边，否则下限一放大就把光挪出元素
+    assert.match(SURFACE_LIGHT_GEOMETRY, /background-position: 50% 0%, 50% 100%, 0% 50%/u, '顶光贴顶 / 底光贴底 / 左光贴左')
+    // 每一处**我们自己定几何**的画光载体都必须带上这组声明 —— 漏一处那里就还是硬边。
+    // ⚠️ `usesOfficialBeforeLayer`（QueueDock 补官方 ::before）只补 background-image、几何归官方，不在本断言内。
+    const css = buildSurfaceCss()
+    // 只看三道光（排除分组标题那条固定层），并跳过官方 ::before（只补图、不碰几何）
+    const lightBlocks = [...css.matchAll(/[^{}]*\{[^}]*radial-gradient[^}]*\}/gu)]
+      .map(match => match[0])
+      .filter(block => block.includes('color-mix(in srgb, var(--dsh-theme-tone-'))
+      .filter(block => !block.includes('::before'))
+    assert.ok(lightBlocks.length >= 3, '表面锚点 / 停靠卡 / 悬停卡等处都要画三道光')
+    for (const block of lightBlocks) {
+      assert.ok(block.includes('background-repeat: no-repeat'), `画光的规则必须带几何兜底：${block.slice(0, 90)}`)
+      assert.ok(block.includes(`max(100%, ${LIGHT_MIN_BOX_PX}px)`), `画光的规则必须带下限 ${LIGHT_MIN_BOX_PX}px`)
+    }
   })
 
   it('浮层的补偿系数应与顶栏的系数一致 —— 两处理由不同但落到同一个数', () => {
@@ -1258,6 +1285,19 @@ describe('抬升面：表面绘制', () => {
     assert.ok(
       GROUPED_MENU_TITLE_SELECTOR.includes('[data-menu-group-heading]'),
       '必须同时锚 0.2.0-rc.2 MenuGroup 的公开属性 data-menu-group-heading',
+    )
+
+    // ⛔ 2026-10-26（owner 报障）：官方 rc.3 的分组标题是「**非吸顶透明、吸顶（data-stuck）才上色**」。
+    // 我们此前对**所有**标题永远上色（不透明底 + 地面重画）⇒ 官方默认档下看着就是「被改过的一条实心横条」。
+    // 现在新结构只在 `[data-stuck]` 上色。
+    assert.match(
+      GROUPED_MENU_TITLE_SELECTOR,
+      /\[data-menu-group-heading\]\[data-stuck\]/u,
+      '新结构标题必须收窄到吸顶态（data-stuck）—— 否则非吸顶时也是一条实心横条',
+    )
+    assert.ok(
+      GROUPED_MENU_TITLE_SELECTOR.includes(':not([data-menu-group-start])'),
+      '必须排除 1×1 观测哨兵 data-menu-group-start（它在旧结构分支里是 first-child）',
     )
 
     // ⛔ 本常量是**后代片段**，由 groupTitleRule 拼在菜单锚点之后。若写成**顶层**逗号列表，

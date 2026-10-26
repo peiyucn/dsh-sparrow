@@ -885,3 +885,20 @@ CSS 仍静态注入（可测、不重解析），只是选择器不命中。三�
 
 GUI 本体（`http://127.0.0.1:3080`）需要 launcher 的鉴权；带 token 的 URL 由 launcher 写进
 `~/.dsh-launcher-panel/logs/server.log`，**该 URL 含口令、只在会话内使用，不进仓库任何文件**。
+
+## 12) 2026-10-26 修订：分组标题只在**吸顶时**上色（+ 不再对官方标题"永远上色"）
+
+**触发**：owner 报障——「官方默认档下，模型列表的分组标题一看就是我们动过的：官方原版是**没有背景色**的（或者背景色与列表同底、看不出来）」。
+
+**原因（三处叠加）**：
+
+1. 官方 0.2.0-rc.2 起把分组菜单抽成 `MenuGroup` 原语，标题的契约变成「**非吸顶透明、吸顶（`data-stuck`）才上官方底色**」（`--dsw-alias-menu-group-header-fill`）；
+2. 本插件的 `GROUPED_MENU_TITLE_SELECTOR` 此前对**所有**标题永远上色（不透明 `--dsw-alias-bg-base` + 地面重画），等于把官方契约整个盖掉；
+3. 本仓库的 `dsh-codebuddy-credits` 模型选择器是**vendored 旧版**、自绘 `.ccb-model-groupTitle`（永远不透明 + 一层 `--dsw-specific-menu` 渐变），**在官方默认档下同样生效** ⇒ 那就是 owner 看到的那条实心横条。
+
+**修法**：
+
+* `dsh-theme-tone`：`GROUPED_MENU_TITLE_SELECTOR` 收窄为 `[role='group'] > :is([data-menu-group-heading][data-stuck], :first-child:not([data-menu-group-heading]):not([data-menu-group-start]))` —— 新结构**只在吸顶时**上色，非吸顶保持官方透明；旧结构（自绘标题）仍作兼容兜底。
+* `dsh-codebuddy-credits`：模型选择器的分组渲染改为官方 `MenuGroup` 原语 + `observeStickyMenuGroups(滚动容器)`，删掉自绘标题样式 —— 与官方 rc.3 ModelSelect 同一套观感（吸顶才上色）。
+
+**顺手**：nav-pin（轮次导航 / 宽度钳制）**取消色调门**，两个档位都生效（spec 09 §1.1）。

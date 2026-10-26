@@ -95,12 +95,18 @@ export const GROUPED_MENU_SELECTOR = `body ${anchorSelector(ANCHOR.menuGrouped)}
  */
 export const GROUPED_MENU_UNGUARDED_SELECTOR = "body [role='menu']"
 
-/** 分组标题条：`<section role='group'>` 里的**标题元素**，用**结构 / 公开锚点**定位、不碰 hashed 类名（`[class*='_groupTitle']` 还得额外照顾 codebuddy 那个非哈希类名，且官方一改名就失效）。
- *  ⚠️ **两种结构都要覆盖**：旧结构（官方 `ModelSelect` / codebuddy）标题是 `[role='group']` 的**第一个子元素**；新结构（官方抽出的 `MenuGroup` 原语）标题带公开属性 **`data-menu-group-heading`**，且标题**前面**插了一个 1×1 隐形哨兵 `data-menu-group-start`（供观测吸顶）—— 只写 `:first-child` 会打在那个哨兵上，真正的标题条拿不到图层、官方吸顶色会直接压在我们染过色的菜单上（横带回来）。
- *  ⚠️ **必须是单个复合选择器，不能写成逗号列表**：本常量是**后代片段**，由 {@link groupTitleRule} 拼在 {@link GROUPED_MENU_UNGUARDED_SELECTOR} 之后 —— 逗号会在拼接处切开整条规则，后半段丢掉 body 前缀与色调门、静默生效到全站；故两个结构用 `:is()` 合并（两参数特异度同为 (0,1,0)，取最大值 ⇒ 与改前一致）。
+/** 分组标题条：`<section role='group'>` 里的**标题元素**，用**结构 / 公开锚点**定位、不碰 hashed 类名。
+ *  ⚠️ **2026-10-26 起只在「吸顶」时上色**（owner 报障：官方默认档下模型列表的分组标题是一条实心横条，
+ *  官方原版是**非吸顶透明、吸顶（`data-stuck`）才上色**）—— 新结构（`MenuGroup` 原语）按 `[data-stuck]` 收窄；
+ *  旧结构（没有该属性的自绘标题，仅作兼容）仍按 `:first-child` 兜住。
+ *  ⚠️ **两种结构都要覆盖**：新结构的标题带 `data-menu-group-heading`，且标题**前面**插了一个 1×1 隐形哨兵
+ *  `data-menu-group-start`（供观测吸顶）—— 只写 `:first-child` 会打在那个哨兵上（它必须排除）。
+ *  ⚠️ **必须是单个复合选择器，不能写成逗号列表**：本常量是**后代片段**，由 {@link groupTitleRule} 拼在
+ *  {@link GROUPED_MENU_UNGUARDED_SELECTOR} 之后 —— 逗号会在拼接处切开整条规则，后半段丢掉 body 前缀与色调门、
+ *  静默生效到全站；故两个结构用 `:is()` 合并（参数特异度取最大值 ⇒ 与容器规则不冲突）。
  */
 export const GROUPED_MENU_TITLE_SELECTOR =
-  "[role='group'] > :is(:first-child, [data-menu-group-heading])"
+  "[role='group'] > :is([data-menu-group-heading][data-stuck], :first-child:not([data-menu-group-heading]):not([data-menu-group-start]))"
 
 /** **输入框上方那三张停靠卡**（排队 / 目标 / 待办）—— 它们**不是浮层**，故单列一张表：三张卡与菜单族共享 `--dsw-specific-tip`，但按本模块的设计 **token 只给颜色**，而它们既没有 `role='menu'` 也没有 `role='dialog'` ⇒ 图形必须靠选择器。
  *  **画在带底色的那一层**（三张卡都是「外层 wrapper 无底色 + 内层自己带底色的面」）：`[data-queue-dock] > :first-child`（`.panel`）/ `[data-goal-bar] > :first-child`（`.bar`）/ `[data-testid='todo-panel']`（根元素自己）—— 都是官方公开属性，后者是那个 `<section>` 上唯一**非本地化**的稳定钩子（它的 `aria-label` 是 `t('todo.title')`，不能当选择器）；⚠️ **不能直接画在 wrapper 上**：wrapper 是整个停靠列的方框，会在面板圆角外露出直角。
@@ -167,6 +173,23 @@ export function surfaceLayers(): string {
     `radial-gradient(${POPUP_LEFT_SHAPE}, ${popupLight(LEFT_VARIABLE)}, ${POPUP_STOP})`,
   ].join(',\n    ')
 }
+
+/** 三道光在**矮 / 窄面板**上的渐变盒子下限（px）—— 见 {@link SURFACE_LIGHT_GEOMETRY}。 */
+export const LIGHT_MIN_BOX_PX = 120
+
+/**
+ * 三道光在**矮 / 窄面板**上的几何兜底：{:@link surfaceLayers} 用的是**百分比几何**（`ellipse 120% 42% at 50% -12%` 之类），
+ * 按元素自身的盒子缩放 —— 这是设计（浮层的光随浮层尺度缩，见 spec 07）。但元素**矮到几十像素**时，顶光的纵向半径
+ * 只有 `0.42 × 36 ≈ 15px`，"从上方来的光"会读成**贴着上缘的一条硬边亮带**：真机实测 710×36 的停靠卡，
+ * 上缘 49.7 / 中部 44.3（Δ5.4），下缘同样有一条（Δ4.7）；而且面板高度一变（菜单加载分组、todo 更新条目）整条光重算，
+ * 观感是「亮条在变/在闪」。
+ *  做法：给每层渐变**盒子**一个下限（`max(100%, 120px)`）并把它锚回自己那条边（顶光贴顶 / 底光贴底 / 左光贴左）。
+ *  ⚠️ 盒子不低于下限时（高面板）解析结果与 `auto` **逐层相同** —— 所以正常浮层零变化，只有矮/窄面板不被压成硬边。
+ *  ⚠️ 逐层给值、且层数必须与 {@link surfaceLayers} 一致；`no-repeat` 不可省（盒子大于元素时默认 repeat 会平铺出接缝）。
+ */
+export const SURFACE_LIGHT_GEOMETRY = `background-size: 100% max(100%, ${LIGHT_MIN_BOX_PX}px), 100% max(100%, ${LIGHT_MIN_BOX_PX}px), max(100%, ${LIGHT_MIN_BOX_PX}px) max(100%, ${LIGHT_MIN_BOX_PX}px) !important;
+  background-position: 50% 0%, 50% 100%, 0% 50% !important;
+  background-repeat: no-repeat !important;`
 
 /** 把一道光的运行期变量按 {@link POPUP_LIGHT_COMPENSATION} 压暗，供浮层图层串使用。
  *  用 `color-mix` 而不是改 alpha 数值：变量里是**任意合法颜色**（可能是 `rgba()` 也可能是 `transparent`），
@@ -287,11 +310,13 @@ ${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)}::
   z-index: -1;
   border-radius: inherit;
   background-image: ${surfaceLayers()} !important;
+  ${SURFACE_LIGHT_GEOMETRY}
   pointer-events: none;
 }`).join('\n')}
 /* --- 自身是滚动容器的锚点：图层改画在**元素级**（::after 会随内容滚走，滚出来的部分没有质感；只换载体、不保留 ::after）--- */
 ${SURFACE_ANCHORS.filter(usesOwnBackground).map(anchor => `${gatedAnchor(anchor)} {
   background-image: ${surfaceLayers()} !important;
+  ${SURFACE_LIGHT_GEOMETRY}
 }`).join('\n')}
 /* --- 让锚点自己**形成层叠上下文**：否则 ::after 的 z-index:-1 会逃逸到父层、被元素自身的不透明背景盖住 --- */
 ${SURFACE_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anchor)} {
@@ -344,6 +369,7 @@ ${COMPOSER_CARD_ANCHORS.filter(usesAfterLayer).map(anchor => `${gatedAnchor(anch
   z-index: -1;
   border-radius: inherit;
   background-image: ${surfaceLayers()} !important;
+  ${SURFACE_LIGHT_GEOMETRY}
   pointer-events: none;
 }`).join('\n')}
 /* 同 SURFACE_ANCHORS：让这几张卡也**自己成层叠上下文**，否则 ::after 的 z-index:-1 会逃逸到父层、被卡片自己的背景盖住。 */
@@ -365,6 +391,7 @@ ${HOVER_CARD_ANCHOR} {
      兜底取官方 layer-3 —— 正是「这个档下本来该有的那个面」。（本段不能出现反引号与色值字面量。） */
   background-color: var(${PANEL_VARIABLE}, var(--dsw-alias-bg-layer-3)) !important;
   background-image: ${surfaceLayers()} !important;
+  ${SURFACE_LIGHT_GEOMETRY}
 }
 /* 字色：官方写死的浅字必须一起换成**主题感知**的 label token（否则浅卡配浅字仍是白底白字），按稳定后缀匹配。 */
 ${HOVER_CARD_TEXT_TOKENS.map(({ suffix, token }) => `${HOVER_CARD_ANCHOR} [class*='${suffix}'] {
