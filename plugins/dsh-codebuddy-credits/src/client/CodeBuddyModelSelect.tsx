@@ -10,6 +10,7 @@ import {
   useEffect, useId, useMemo, useRef, useState, useSyncExternalStore,
   type FocusEvent, type KeyboardEvent,
 } from 'react'
+import { createPortal } from 'react-dom'
 import {
   // 图标名只标字形与字重（Regular = 1px 描边），渲染尺寸一律由显式 size prop 决定。
   IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular,
@@ -125,7 +126,7 @@ export function ensurePickerStyles(): void {
     //    各异 ⇒ 各自的伪元素盒），theme-tone 已把菜单族整条移出表面表 ⇒ 这里可以恢复官方同款：
     //    `background: var(--dsw-specific-menu)`（45% 半透明，已被 theme-tone 染色）+ `backdrop-filter`。
     //    ⚠️ 若亮框再现，先查是不是又有人往菜单上叠图层/背景，再考虑回实心配方。
-    '.ccb-model-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
+    '.ccb-model-menu { position: fixed; z-index: 100; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
     '.ccb-model-status, .ccb-model-empty { padding: 10px; color: var(--dsw-alias-label-tertiary); font-size: 13px; line-height: 20px; }',
     '.ccb-model-error, .ccb-model-warning { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; padding: 7px 8px; border-radius: 8px; background: var(--dsw-alias-interactive-bg-hover-danger); color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; }',
     '.ccb-model-warning { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-state-warn-label); }',
@@ -173,6 +174,10 @@ export function CodeBuddyModelSelect(
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   /** 分组列表的滚动容器（官方 `observeStickyMenuGroups` 的 root：标题只在它里面吸顶）。 */
   const groupsRef = useRef<HTMLDivElement | null>(null)
+  /** portal 出去的菜单根（点外部判定要单独放行，见 closeOutside）。 */
+  const menuRef = useRef<HTMLDivElement | null>(null)
+  /** 菜单的视口锚点（菜单 portal 到 body 后自己定位，见 sync 那段 effect）。 */
+  const [anchor, setAnchor] = useState<{ right: number; bottom: number } | null>(null)
   const id = useId()
 
   // Max 模式（推理档位锁）：只影响展示与请求（host 侧强制 max），
@@ -222,10 +227,40 @@ export function CodeBuddyModelSelect(
   useEffect(() => {
     if (!open) return
     const closeOutside = (event: MouseEvent): void => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+      const target = event.target as Node
+      // ⚠️ 菜单已 **portal 到 body**（见渲染处注释）：它不在 rootRef 子树里，必须单独放行，
+      // 否则点菜单里的任意按钮都会被判「点外部」而关掉。
+      if (rootRef.current?.contains(target) === true) return
+      if (menuRef.current?.contains(target) === true) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', closeOutside)
     return () => { document.removeEventListener('mousedown', closeOutside) }
+  }, [open])
+
+  /**
+   * 菜单的视口锚点：菜单 **portal 到 body** 后不再受 `.ccb-model-root` 的定位约束，必须自己算
+   * 「贴着触发器右上、往上弹」的固定坐标（与原来的 `right: 0; bottom: calc(100% + 8px)` 等价）。
+   * 窗口尺寸变化 / 任意滚动容器滚动都会让锚点失效 —— 监听并重算（被动监听，成本可忽略）。
+   */
+  useEffect(() => {
+    if (!open) return
+    const sync = (): void => {
+      const trigger = triggerRef.current
+      if (trigger === null) return
+      const rect = trigger.getBoundingClientRect()
+      setAnchor({
+        right: Math.max(8, Math.round(window.innerWidth - rect.right)),
+        bottom: Math.max(8, Math.round(window.innerHeight - rect.top + 8)),
+      })
+    }
+    sync()
+    window.addEventListener('resize', sync, { passive: true })
+    window.addEventListener('scroll', sync, { passive: true, capture: true })
+    return () => {
+      window.removeEventListener('resize', sync)
+      window.removeEventListener('scroll', sync, true)
+    }
   }, [open])
 
   /**
@@ -278,7 +313,13 @@ export function CodeBuddyModelSelect(
   }
 
   const onBlur = (event: FocusEvent<HTMLDivElement>): void => {
-    if (event.relatedTarget instanceof Node && rootRef.current?.contains(event.relatedTarget)) return
+    const next = event.relatedTarget
+    if (next instanceof Node) {
+      if (rootRef.current?.contains(next) === true) return
+      // ⚠️ 菜单已 portal 到 body（不在 rootRef 子树里）：焦点移进菜单**不算离开**，否则键盘用户
+      // 一按 Tab / 方向键进菜单就被判「失焦」关掉。
+      if (menuRef.current?.contains(next) === true) return
+    }
     close()
   }
 
@@ -382,13 +423,19 @@ export function CodeBuddyModelSelect(
         <IconChevronDownOutlineRegular size={14} className={clsx('ccb-model-chevron', open && 'ccb-model-chevronOpen')} />
       </button>
 
-      {open && (
+      {open && anchor !== null && createPortal(
+        // ⚠️ **菜单必须 portal 到 body**（与官方 `MenuSelect` 一致）：留在 `.ccb-model-root` 里就是
+        //    输入框卡片的**后代**，而色调档下那张卡片被我们加了 `isolation` / 玻璃材质 —— 于是菜单自己的
+        //    `backdrop-filter` 会采样到隔离组的快照，画出一块**比菜单大、向左下偏移的淡框**（owner 截图那个）。
+        //    官方默认档没有这层玻璃/隔离，所以没有这个框（也解释了「官方默认没问题」）。
         <div
+          ref={menuRef}
           id={id + '-menu'}
           className="ccb-model-menu"
           role="menu"
           aria-label={t('picker.menu.aria')}
           aria-busy={state.status === 'loading' || busy}
+          style={{ right: anchor.right, bottom: anchor.bottom }}
         >
           {pane === 'root' && (
             <>
@@ -545,7 +592,8 @@ export function CodeBuddyModelSelect(
                   ))}
             </>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
       {toast !== null && (
         <Toast
