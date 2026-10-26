@@ -25,7 +25,7 @@ describe('backdrop: 地面光层', () => {
   it('固定全屏、z-index 在内容之下、深色轴 screen 混合', () => {
     assert.match(css, new RegExp(`\\.${BACKDROP_CLASS} \\{[^}]*position: fixed`, 'u'))
     assert.match(css, new RegExp(`\\.${BACKDROP_CLASS} \\{[^}]*z-index: 80`, 'u'))
-    assert.match(css, /body\[data-ds-dark-theme\] \.dsh-theme-tone \{ mix-blend-mode: screen/u)
+    assert.ok(!css.includes('mix-blend-mode'), '地面层不用混合模式（性能基准显示全屏 screen 混合是最大结构性成本）')
   })
 
   it('内容层 / 右栏的层序不变式仍在', () => {
@@ -37,7 +37,7 @@ describe('backdrop: 地面光层', () => {
 
   it('特性门覆盖本插件真正依赖的三项能力', () => {
     const probes = REQUIRED_CSS_FEATURES.map(feature => feature.probe).join(' ')
-    for (const probe of ['mix-blend-mode: screen', 'radial-gradient(', 'color-mix(']) assert.ok(probes.includes(probe))
+    for (const probe of ['radial-gradient(', 'color-mix(']) assert.ok(probes.includes(probe))
   })
 })
 

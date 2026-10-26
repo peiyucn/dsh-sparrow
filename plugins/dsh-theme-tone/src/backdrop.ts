@@ -33,7 +33,6 @@ export const PREVIEW_ALPHA_SCALE: Readonly<Record<ColorScheme, Readonly<Record<'
 })
 
 export const REQUIRED_CSS_FEATURES: readonly { name: string; probe: string }[] = Object.freeze([
-  Object.freeze({ name: 'mix-blend-mode: screen', probe: 'mix-blend-mode: screen' }),
   Object.freeze({ name: 'radial-gradient()', probe: 'background: radial-gradient(red, blue)' }),
   Object.freeze({ name: 'color-mix()', probe: 'color: color-mix(in srgb, red 50%, blue)' }),
 ])
@@ -51,8 +50,6 @@ export function buildBackdropCss(): string {
   background-image: ${BACKDROP_GRADIENTS};
 }
 .${BACKDROP_CLASS}[hidden] { display: none; }
-body[data-ds-dark-theme] .${BACKDROP_CLASS} { mix-blend-mode: screen; }
-body:not([data-ds-dark-theme]) .${BACKDROP_CLASS} { mix-blend-mode: normal; }
 body:not([${PLAIN_ATTR}]) [${CONTENT_ATTR}] { position: relative; z-index: ${CONTENT_Z_INDEX}; }
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
 body:not([${PLAIN_ATTR}]) [${SHELL_OVERLAY_ATTR}] { z-index: ${ABOVE_CONTENT_Z_INDEX}; }
