@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { useAnchoredMaxHeight, IconSparkleRegular, IconChevronDownOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useAnchoredMaxHeight, IconSparkleRegular, IconChevronDownOutlineRegular, MenuSurface } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -447,13 +447,12 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   padding: 4px;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--dsw-alias-button-info-fill, #4d6bfe);
-  border-radius: 12px;
-  /* 0.1.7 起 --dsw-specific-menu 是**半透明**玻璃色，官方要求同规则内配对 backdrop-filter
-     （见官方 docs/web-styling.zh.md:25），否则背后文字会透出来。 */
-  background: var(--dsw-specific-menu);
-  backdrop-filter: var(--dsw-menu-backdrop-filter);
-  box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0,0,0,0.22));
+  /* 材质交给官方 MenuSurface（.surface 只做 isolation / 圆角 / 裁切，.material 子层承担填充 + 模糊），
+     与官方菜单同构 ⇒ 观感随官方统一升级，不再自己维护一套旧版样式。
+     紫色强调走官方描边通道 --dsw-elevation-stroke-color（与官方 @ 列表做区分）。 */
+  border-radius: var(--dsw-radius-lg, 16px);
+  --dsw-elevation-stroke-color: var(--dsw-alias-button-info-fill, #4d6bfe);
+}
 }
 .dsh-chat-fim-menu-row {
   display: flex;
@@ -1069,7 +1068,7 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
   return (
     <div ref={rootRef} className="dsh-chat-fim-menu-anchor">
       {visible && suggestion !== null ? (
-        <div
+        <MenuSurface
           ref={cardRef}
           className="dsh-chat-fim-menu"
           style={{ maxHeight }}
@@ -1106,7 +1105,7 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
               })}
             </span>
           </div>
-        </div>
+        </MenuSurface>
       ) : null}
     </div>
   )
