@@ -22,6 +22,7 @@ import {
 } from './CodeBuddyCreditsIndicator.js'
 import { CodeBuddyTurnCredit, ensureTurnCreditStyles } from './CodeBuddyTurnCredit.js'
 import { CodeBuddyCreditsStats, ensureStatsStyles } from './CodeBuddyCreditsStats.js'
+import { CodeBuddyModelLabel, ensureModelLabelStyles } from './CodeBuddyModelLabel.js'
 
 export const inject = ['slots', 'locale']
 
@@ -140,6 +141,7 @@ export function apply(ctx: ClientContext): void {
   ensureCardStyles()
   ensureTurnCreditStyles()
   ensureStatsStyles()
+  ensureModelLabelStyles()
   const disposeDictionaries = ctx.locale.register('codebuddy-credits', {
     zh: LOCALE_DICTS.zh,
     en: LOCALE_DICTS.en,
@@ -151,6 +153,23 @@ export function apply(ctx: ClientContext): void {
     key: 'llm-codebuddy-credits',
     locale: 'codebuddy-credits',
   }, CodeBuddyCreditsCard as unknown as (props: object) => ReactNode))
+
+  /**
+   * 模型行的只读事实（倍率 · 上下文）：官方 `conversation.input.model.label` 扩展槽的贡献者。
+   *
+   * ⚠️ 该槽是 **single**（官方 `ui-model-selection/src/client/slots.ts` 声明 `{ kind: 'single', scope: 'session', inline: true }`）：
+   * 同一时刻只有一个贡献者渲染整条标签，官方自己的「1017 临时版本标」插件也是贡献者之一。所以：
+   *  - 必须**同时保留官方的 1017 标**（按官方同条件镜像，`model-label-1017.ts`），并对其他 provider
+   *    渲染与官方一致的「名字（+ 标）」；漏了就是弄丢官方功能；
+   *  - `priority: -1` 是为了**稳定拿到渲染权**（否则谁注册得早谁赢，行为随加载顺序漂）；
+   *  - 事实串只对本插件 provider 生效（`PROVIDER_ID`），且不显示在触发器上（`placement === 'trigger'`）。
+   * ⚠️ 不注册父槽 `conversation.input.model`：选择控件仍归官方（见文件头注释）。
+   */
+  ctx.slots.inject('conversation.input.model.label', () => ctx.slots.register({
+    name: 'conversation.input.model.label',
+    locale: 'codebuddy-credits',
+    priority: -1,
+  }, CodeBuddyModelLabel as unknown as (props: object) => ReactNode))
 
   // 读官方 ctx.modelDirectories（与模型选择器同一 store）；缺该服务时捕获返回 undefined。
   const directoryFor = (sessionId: string): DirectoryStoreLike | undefined => {
