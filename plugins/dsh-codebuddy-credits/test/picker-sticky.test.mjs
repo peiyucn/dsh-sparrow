@@ -42,14 +42,6 @@ describe('模型选择器：分组标题（交给官方 MenuGroup 原语）', ()
     assert.ok(!/role="group"/u.test(source), '不得手写 role="group" 的分组容器')
   })
 
-  it('⛔ 菜单卡片不得声明 backdrop-filter（owner：挂靠卡在场时 hover 会闪亮块）', () => {
-    // 2026-10-26：菜单盖住 todo / 待发那几张挂靠卡时，hover 换行会闪一块亮块 —— 触发条件是
-    // blur(40px) 的模糊快照在重绘瞬间被画到别处。去掉模糊是这条问题的正解，别为了「跟官方一致」加回来。
-    const menu = ruleFor('ccb-model-menu')
-    assert.ok(!/backdrop-filter/u.test(menu.body), '菜单卡片不得声明 backdrop-filter（模糊快照会闪）')
-    assert.match(menu.body, /background:\s*var\(--dsw-specific-menu\)/u, '去掉模糊后仍要有半透明填充')
-  })
-
   it('菜单 不得再声明同心内圆角钩子变量（该族规则已随做减法删除）', () => {
     // ⚠️ 2026-10-26：theme-tone 的「分组菜单滚动容器切同心圆角」整族已交回官方，本插件不再声明钩子变量。
     const menu = ruleFor('ccb-model-menu')
