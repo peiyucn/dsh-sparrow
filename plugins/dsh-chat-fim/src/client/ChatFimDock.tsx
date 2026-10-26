@@ -452,6 +452,8 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
      紫色强调走官方描边通道 --dsw-elevation-stroke-color（与官方 @ 列表做区分）。 */
   border-radius: var(--dsw-radius-lg, 16px);
   --dsw-elevation-stroke-color: var(--dsw-alias-button-info-fill, #4d6bfe);
+  /* 与官方菜单同一套立起方式（ModelSelect.module.css:107-108）：描边走 elevation-stroke-color，阴影走 elevation-prominent。 */
+  box-shadow: var(--dsw-elevation-prominent);
 }
 }
 .dsh-chat-fim-menu-row {
