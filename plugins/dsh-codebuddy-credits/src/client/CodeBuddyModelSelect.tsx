@@ -13,7 +13,7 @@ import {
 import {
   // 图标名只标字形与字重（Regular = 1px 描边），渲染尺寸一律由显式 size prop 决定。
   IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular,
-  IconWarningOutlineRegular, MenuGroup, observeStickyMenuGroups, Tag, Toast,
+  IconWarningOutlineRegular, MenuGroup, MenuSurface, observeStickyMenuGroups, Tag, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getMaxMode, subscribeMaxMode } from './maxMode.js'
 import { BusyDot } from './BusyDot.js'
@@ -120,8 +120,9 @@ export function ensurePickerStyles(): void {
     '.ccb-model-triggerEffort { flex: 0 0 auto; color: var(--dsw-alias-label-caption); }',
     '.ccb-model-chevron { flex: 0 0 auto; color: var(--dsw-alias-label-caption); transition: transform 120ms ease; }',
     '.ccb-model-chevronOpen { transform: rotate(180deg); }',
-    // ⚠️ `--dsh-theme-tone-menu-inner-radius` = 本菜单同心内圆角（外圆角 20 − 内边距 4 = 16 = --dsw-radius-lg），供 theme-tone 的滚动容器圆角规则读取。
-    '.ccb-model-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); --dsh-theme-tone-menu-inner-radius: var(--dsw-radius-lg, 16px); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
+    // ⚠️ 半透明填充 + `backdrop-filter` **不在这里写**：由官方 `MenuSurface` 内部的 `div.material` 承担
+    // （见渲染处注释）。直接写在卡片上会在真实页面里把模糊快照画成一块偏移的半透明圆角矩形。
+    '.ccb-model-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); --dsh-theme-tone-menu-inner-radius: var(--dsw-radius-lg, 16px); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
     '.ccb-model-status, .ccb-model-empty { padding: 10px; color: var(--dsw-alias-label-tertiary); font-size: 13px; line-height: 20px; }',
     '.ccb-model-error, .ccb-model-warning { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; padding: 7px 8px; border-radius: 8px; background: var(--dsw-alias-interactive-bg-hover-danger); color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; }',
     '.ccb-model-warning { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-state-warn-label); }',
@@ -379,7 +380,11 @@ export function CodeBuddyModelSelect(
       </button>
 
       {open && (
-        <div
+        // ⚠️ 必须用官方 `MenuSurface` 而不是裸 div（与官方 ModelSelect 同一结构）：半透明填充 + `backdrop-filter`
+        // 由它内部那层 `div.material`（`position: absolute; inset: 0; z-index: -1; border-radius: inherit`）承担。
+        // 旧实现把 `background` + `backdrop-filter` 直接写在卡片上 ⇒ 在真实页面里模糊快照会画成一块**比卡片大、
+        // 向左下偏移的半透明圆角矩形**（owner 截图里的「方块虚影」，官方默认档也在）。别再改回裸 div。
+        <MenuSurface
           id={id + '-menu'}
           className="ccb-model-menu"
           role="menu"
@@ -541,7 +546,7 @@ export function CodeBuddyModelSelect(
                   ))}
             </>
           )}
-        </div>
+        </MenuSurface>
       )}
       {toast !== null && (
         <Toast

@@ -42,6 +42,20 @@ describe('模型选择器：分组标题（交给官方 MenuGroup 原语）', ()
     assert.ok(!/role="group"/u.test(source), '不得手写 role="group" 的分组容器')
   })
 
+  it('菜单 应该 用官方 MenuSurface 承载材质（填充 + backdrop-filter 在子层）', () => {
+    // ⚠️ 2026-10-26（owner 截图）：旧实现把 `background: var(--dsw-specific-menu)` + `backdrop-filter`
+    // 直接写在 `.ccb-model-menu` 卡片上 ⇒ 真机上模糊快照会画成一块**比卡片大、向左下偏移的半透明圆角矩形**
+    // （「方块虚影」，官方默认档也在）。官方结构是 `MenuSurface` = 卡片 + `div.material`（inset:0; z-index:-1;
+    // border-radius:inherit; background: var(--dsw-menu-surface-fill); backdrop-filter: var(--dsw-menu-backdrop-filter)）。
+    assert.match(source, /<MenuSurface\b/u, '菜单必须用官方 MenuSurface（材质在子层，模糊才不会错位）')
+    const menu = ruleFor('ccb-model-menu')
+    assert.ok(!/backdrop-filter/u.test(menu.body), '卡片上不得再写 backdrop-filter（会画成偏移的模糊快照）')
+    assert.ok(!/(?:^|;)\s*background(?:-color|-image)?\s*:/u.test(menu.body), '卡片上不得再写填充（由 MenuSurface 的 material 承担）')
+    // 卡片自己仍负责几何与描边/阴影。
+    assert.match(menu.body, /position:\s*absolute/u, '卡片保持绝对定位（锚在触发器上方）')
+    assert.match(menu.body, /box-shadow:\s*var\(--dsw-elevation-prominent\)/u, '外投影仍在卡片上')
+  })
+
   it('菜单 应该 声明同心内圆角变量，供 theme-tone 的容器圆角规则读取', () => {
     // 外圆角 20 − 内边距 4 = 16 = --dsw-radius-lg；容器圆角由 theme-tone 那条同时管官方与本菜单的规则施加。
     const menu = ruleFor('ccb-model-menu')
