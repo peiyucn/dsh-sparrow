@@ -363,12 +363,15 @@ describe('dsh-theme-tone 结构', () => {
   it('⛔ 设置「未就绪」时不得用默认值上色（否则每次冷加载都闪一下默认配色）', async () => {
     // 回归守卫：`status === 'loading'` 时 `value` 也是 undefined，写成 `value ?? DEFAULT_SETTINGS` 会先按
     // 默认画一遍（浅 official / 深 violet），等宿主回值再纠正 ⇒ 改过色调的用户每次冷加载都看到跳变。
+    // ⚠️ 2026-10-27：loading 分支从「一律不画」改为「有 localStorage 副本就按副本画」——
+    // 宿主 describe 首读失败会让镜像长时间 idle/loading，一律不画就会整段退回官方外观（owner 报障）。
     const src = await readCode('../src/client/index.ts')
     assert.ok(
       !/\.value \?\? DEFAULT_SETTINGS/u.test(src),
       '不得用 `value ?? DEFAULT_SETTINGS` —— 未就绪时会画默认值',
     )
-    assert.match(src, /if \(status === 'loading'\) return false/u, '必须有「loading 不上色」的门')
+    assert.match(src, /if \(status === 'loading'\) return knownSettings !== null/u,
+      'loading 分支只允许「有已知设置副本」时才上色')
     assert.match(src, /shouldPaint/u, 'repaint 要经过 shouldPaint 门')
   })
 
@@ -376,13 +379,16 @@ describe('dsh-theme-tone 结构', () => {
     // 2026-10-26 owner 报障：官方默认档下模型列表 / 权限菜单 / FIM 档位菜单会闪出形状各异的亮框。
     // 根因：设置面某一瞬间不是 ready 时，`readSettings()` 退回 `DEFAULT_SETTINGS`（深轴 violet）⇒
     // `backdropPlan().hidden = false` ⇒ 门被打开、整套染色闪一帧；每个弹层尺寸不同所以「形状都不一样」。
+    // 2026-10-27 再补一层：权威值同时写 localStorage 副本，冷加载首帧按副本上色（见 known-settings.ts）。
     const src = await readCode('../src/client/index.ts')
-    assert.match(src, /lastReadySettings \?\? localSettings/u,
-      '兜底必须优先「最后一次已知持久值」，而不是 DEFAULT_SETTINGS')
-    assert.match(src, /if \(snapshot\.status === 'ready' && snapshot\.value !== undefined\) lastReadySettings = snapshot\.value/u,
+    assert.match(src, /lastReadySettings \?\? knownSettings \?\? localSettings/u,
+      '兜底链必须依次是「最后一次持久值 → localStorage 副本 → 进程内兜底」，而不是 DEFAULT_SETTINGS')
+    assert.match(src, /if \(snapshot\.status === 'ready' && snapshot\.value !== undefined\) \{/u,
       '每次 ready 都要记住持久值')
-    assert.match(src, /return lastReadySettings !== null \|\| hasLocalChoice/u,
-      '既没读到过持久值、用户也没选过 ⇒ 不上色（按官方默认处理）')
+    assert.match(src, /rememberSettings\(snapshot\.value\)/u,
+      '每次 ready 都要把权威值写进客户副本')
+    assert.match(src, /return lastReadySettings !== null \|\| knownSettings !== null \|\| hasLocalChoice/u,
+      '既没读到过持久值、没有副本、用户也没选过 ⇒ 不上色（按官方默认处理）')
   })
 
   it('⛔ 宿主不可写时必须落到进程内兜底并告警（不得静默空操作）', async () => {

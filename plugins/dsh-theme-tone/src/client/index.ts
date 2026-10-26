@@ -69,6 +69,7 @@ import {
   type ToneId,
 } from '../tones.js'
 import { ThemeToneRow, type ThemeToneRowInjected } from './ThemeToneRow.js'
+import { readKnownSettings, rememberKnownSettings } from './known-settings.js'
 import { en, zh } from './locales.js'
 import { createPendingToneTracker, type PendingToneWrite } from './pending.js'
 import { buildRowCss } from './styles.js'
@@ -416,7 +417,22 @@ function install(ctx: Context): void {
   let hasLocalChoice = false
   /** 最后一次从设置面读到的**持久值**。⚠️ 见 {@link readSettings}：它就是「不知道时该信谁」的答案。 */
   let lastReadySettings: ThemeToneSettings | null = null
+  /**
+   * **已知设置的客户端副本**（localStorage，见 `./known-settings.ts`）—— 冷加载兜底。
+   * 背景（2026-10-27 owner 报障）：「样式总自己变回官方样式，但设置里仍显示选中的咱们的主题，同时还会变回来」。
+   * 根因是宿主 `configForms` 的 describe 镜像可能长时间停在 idle/loading（首读失败后只由 document-updated /
+   * 重连触发重试），此前 loading 一律不画 ⇒ 观感退回官方；而设置行用进程内兜底值渲染，仍显示选中。
+   * 现在冷加载首帧就按这份副本上色，权威值到达后覆盖 —— 「官方默认 = 不画」的契约仍由副本内容保证。
+   */
+  let knownSettings: ThemeToneSettings | null = readKnownSettings(window.localStorage)
   let warnedNoPersistence = false
+
+  /** 记住一份**来自宿主**的持久值（只在真变化时写，避免每次 repaint 都动 localStorage）。 */
+  const rememberSettings = (settings: ThemeToneSettings): void => {
+    if (knownSettings !== null && knownSettings.lightTone === settings.lightTone && knownSettings.darkTone === settings.darkTone) return
+    knownSettings = { lightTone: settings.lightTone, darkTone: settings.darkTone }
+    rememberKnownSettings(window.localStorage, knownSettings)
+  }
 
   /** 在途乐观值的记账器（见 `./pending.ts`）。⚠️ 按**字段**分别记账 —— 两轴各写各的字段，切轴选色不该顶掉另一轴在途的那一笔。 */
   const pendingTones = createPendingToneTracker()
@@ -430,12 +446,19 @@ function install(ctx: Context): void {
    * ⇒ **门被打开**，我们整套染色 / 覆盖层闪一帧；每个弹层尺寸不同，所以「形状都不一样」。
    * 现在：就绪一次就记住（{@link lastReadySettings}），之后任何非 ready 状态都沿用那个持久值 —— 官方默认档下门
    * **一直关着**，不会再因为一次瞬时状态闪开。
+   * **再兜一层**（2026-10-27）：把权威值同步进 localStorage（{@link knownSettings}）。宿主 describe 镜像可能
+   * 长时间停在 idle/loading（首读失败后只由 document-updated / 重连触发重试），只靠 `lastReadySettings` 的话
+   * 冷加载期间仍然「未就绪 ⇒ 不画」⇒ 观感退回官方、设置行却仍显示选中（owner 报障）。有了副本，首帧就按
+   * 用户上次的选择画，权威值到达后覆盖。
    * **乐观更新**：{@link pendingTones} 里那一笔（用户刚点、还在跨宿主往返中）优先于宿主快照 —— 否则点下去要等一个 RTT 才变色；该笔由**它自己那次写入的结算**收回，见 {@link settlePending}。
    */
   const readSettings = (): ThemeToneSettings => {
     const snapshot = scope.getSnapshot()
-    if (snapshot.status === 'ready' && snapshot.value !== undefined) lastReadySettings = snapshot.value
-    const base = lastReadySettings ?? localSettings
+    if (snapshot.status === 'ready' && snapshot.value !== undefined) {
+      lastReadySettings = snapshot.value
+      rememberSettings(snapshot.value)
+    }
+    const base = lastReadySettings ?? knownSettings ?? localSettings
     return pendingTones.over(base)
   }
 
@@ -450,17 +473,21 @@ function install(ctx: Context): void {
   }
 
   /**
-   * 现在能不能上色：`loading`（宿主还没回第一帧，没有任何权威值）→ 不上色；`unavailable` → 用进程内兜底值上色（选择仍生效，只是不持久化）。
+   * 现在能不能上色：`loading`（宿主还没回第一帧，没有任何权威值）→ **有 localStorage 副本就按副本画**，
+   * 没有就不画；`unavailable` → 用进程内兜底值上色（选择仍生效，只是不持久化）。
    *
    * ⚠️ **另外两条「还不知道该画什么」的路径也必须不上色**（2026-10-26）：既没有读到过持久值、用户也没主动选过 ⇒
    * 按官方默认（不画）处理。否则瞬时 `error` / `unavailable` 会拿 `DEFAULT_SETTINGS`（深轴 violet）去上色 ——
    * 那正是「官方默认档下闪框」的根因（见 {@link readSettings}）。
+   * ⚠️ 2026-10-27：`loading` 且**有副本**时要画 —— 否则宿主 describe 首读失败会让样式整段退回官方
+   * （而设置行仍显示选中），见 {@link knownSettings}。副本内容是「用户上次的持久值」，官方默认档下
+   * 记的就是 official，画出来仍是官方外观，故不会破坏该契约。
    */
   const shouldPaint = (): boolean => {
     const status = scope.getSnapshot().status
-    if (status === 'loading') return false
+    if (status === 'loading') return knownSettings !== null
     if (status === 'unavailable') return true
-    return lastReadySettings !== null || hasLocalChoice
+    return lastReadySettings !== null || knownSettings !== null || hasLocalChoice
   }
 
   /** 宿主不可写时记**一条**告警（不重复刷）。 */
@@ -983,6 +1010,15 @@ function install(ctx: Context): void {
           localSettings = { ...localSettings, [field]: id }
           // 用户主动选过 ⇒ 之后即便设置面瞬时读不到，也按这份选择上色（见 shouldPaint）。
           hasLocalChoice = true
+          /**
+           * 同步更新**客户端副本**（2026-10-27）：`scope.set` 是一次跨宿主往返，而 describe 镜像可能整段
+           * 不刷新（首读失败后只由 document-updated / 重连重试）。只靠「ready 时写副本」的话，用户在
+           * 「镜像未就绪」期间改色调会出现：点下去变色（乐观值）→ 结算后回到旧副本色 → 观感就是
+           * 「选完又变回去」。用户这次选择本身就是最强信号，先落副本；若宿主拒绝，下一次 ready 会覆盖它。
+           */
+          const chosen: ThemeToneSettings = { ...(knownSettings ?? localSettings), [field]: id }
+          knownSettings = chosen
+          rememberKnownSettings(window.localStorage, chosen)
           const pending = pendingTones.begin(field, id)
           repaint()
           if (snapshot.status !== 'ready' || !snapshot.writable) {
