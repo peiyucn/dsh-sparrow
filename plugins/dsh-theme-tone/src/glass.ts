@@ -3,7 +3,7 @@ import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
 export const HEADER_GLASS_ALPHA = 0.7
-export const CARD_GLASS_ALPHA = 0.58
+export const CARD_GLASS_ALPHA = 0.88
 export const SEAT_BAND_PX = 44
 
 /** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
@@ -82,21 +82,25 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框：玻璃挂在卡片本体上（不用 ::before 层）+ 座位底带 =====
-   旧的实现把玻璃放在卡片 ::before（z-index:-1）上：Chromium 在「卡片的负层 backdrop-filter」与
-   官方菜单（body 层的 backdrop-filter）重叠时会把菜单碎片快照画进卡片（owner 截图）。
-   改为卡片的 backdrop-filter 直接挂在**卡片本体**上（不再产生额外负层/伪元素层）：卡片自带
-   isolation 自成 backdrop root；官方菜单已 createPortal 到 body，不在卡片子树内，因此不受影响。
-   座位恢复透明 + 底部一小段地面同源带，正文重新从玻璃下滚过（功能不放掉）。 */
+/* ===== 输入框：玻璃卡片（不做 live blur —— 合成器 bug 的唯一稳定解） =====
+   证据链（一天里逐步排除出来的）：
+   ① 只要输入框这边**有任何 live backdrop-filter**，模型菜单一开、工具输出一更新，Chromium 就把
+      菜单碎片的错位快照画进卡片（owner 多版截图一致）；
+   ② 把座位改成静态光墙（backdrop 不再含重绘正文）→ 残影仍在 ⇒ 与采样内容无关；
+   ③ 关掉官方菜单自己的 blur → 仍在 ⇒ 与「两层 blur 重叠」也无关；
+   ④ 早期版本「整页无 blur」时残影消失 ⇒ 触发条件就是**本插件在输入框区域的 backdrop-filter 层**。
+   结论：当前 Chromium 上「输入框 live blur + 菜单浮层」不可共存。取舍：
+   - 输入框保住**透明 + 有方向边缘光 + 同源光**的玻璃观感，去掉 live blur，填充提到 88%（正文从下面
+     滚过时只剩极淡的流动感，不再是锐利文字穿帮）；
+   - 对话区顶栏 / 右栏顶栏的 live blur **保留**（它们不与菜单浮层重叠，未出现残影）。
+   不再有任何「菜单打开才切换」的运行时开关。 */
 ${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] {
   background: none !important;
 }
 ${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card] {
   position: relative;
-  isolation: isolate;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%, transparent);
   box-shadow: var(--dsw-elevation-soft), ${RIM_DARK};
-  backdrop-filter: var(--dsw-menu-backdrop-filter);
   /* 「+」等 selector 型图标按钮：官方给的是不透明中性底，在玻璃卡片上会读成一块实心。 */
   --dsw-specific-selector: transparent;
 }

@@ -29,18 +29,17 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(header.includes('background-position: 100% 0'), '顶栏贴视口右上 ⇒ 与地面光同源')
   })
 
-  it('输入框：玻璃挂在卡片本体（无 ::before 负层）+ 座位透明让正文滚过 + 有方向边缘光', () => {
+  it('输入框：不做 live blur（合成器 bug 唯一稳定解）+ 透明填充 + 有方向边缘光', () => {
     const seat = /\[data-composer-seat\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(seat.includes('background: none'), '底座撤掉官方遮罩，正文才能从玻璃下滚过')
-    assert.ok(!code.includes('[data-composer-card]::before'), '不再用卡片的 ::before 负层放玻璃（残影来源）')
+    assert.ok(seat.includes('background: none'), '底座撤掉官方遮罩，正文仍从卡片下滚过（填充更实，不再锐利穿帮）')
+    assert.ok(!code.includes('[data-composer-card]::before'), '不再用 ::before 负层')
     const card = /\[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(card.includes('isolation: isolate'), '卡片自成 backdrop root（官方菜单位于 body，不在子树内）')
-    assert.ok(card.includes('backdrop-filter: var(--dsw-menu-backdrop-filter)'), '模糊直接挂在卡片本体')
+    assert.ok(!card.includes('backdrop-filter'), '输入框卡片不得带 live blur（与菜单浮层共存会触发合成器残影）')
+    assert.ok(card.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%`), '保留半透明填充')
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色')
     assert.ok(card.includes('box-shadow: var(--dsw-elevation-soft)'), '保留官方 elevation，再叠边缘光')
     assert.ok(card.includes('inset 0 1px 2px'), '上缘高光')
     assert.ok(card.includes('inset -1px 0 3px rgba(0, 0, 0'), '右缘暗边（有方向，不是一圈均匀描边）')
-    assert.ok(card.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%`), '玻璃填充比例')
     assert.ok(!code.includes('data-menu-material'), '不得有「菜单打开就关模糊」的降级')
   })
 
