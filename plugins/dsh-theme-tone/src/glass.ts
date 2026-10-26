@@ -4,8 +4,11 @@ import { BACKDROP_GRADIENTS } from './backdrop.js'
 export const HEADER_HEIGHT_PX = 76
 export const HEADER_GLASS_ALPHA = 0.7
 export const CARD_GLASS_ALPHA = 0.58
-export const CARD_MENU_OPEN_ALPHA = 0.9
 export const SEAT_BAND_PX = 44
+
+/** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
+export const PANEL_BAND_PX = 38
+const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 
 /**
  * 玻璃边缘的固定高光：光是**有方向**的（光源在左上）——上缘亮、左缘弱亮、右缘暗、下缘暗。
@@ -29,17 +32,36 @@ function glassFill(alpha: number): string {
 
 const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
 
+const P = `body:not([${PLAIN_ATTR}])`
+const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
+
+/** 右栏 76px 下有「可流式滚动的正文」的标签：只有它们上提滚区，正文才会真的从两条带下滚过。 */
+const LIFTED_SCROLLS = [
+  `${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body]`,
+  `${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body]`,
+  `${P} ${RP} [data-files-state='tree'] [data-files-body]`,
+].join(',\n')
+
+/** 各标签自己的 38px 头行（玻璃面挂在它们的 ::before 上，向上铺满 0..76）。 */
+const PANEL_HEADERS = [
+  `${P} ${RP} [data-files-state='tree'] > *:first-child`,
+  `${P} ${RP} [data-textpreview-state='unsupported'] > *:first-child`,
+  `${P} ${RP} [data-textpreview-state='text'] > *:first-child:not([data-textpreview-changed]):not([data-textpreview-meta-failed])`,
+  `${P} ${RP} [data-textpreview-state='text'] > [data-textpreview-changed] + *`,
+  `${P} ${RP} [data-textpreview-state='text'] > [data-textpreview-meta-failed] + *`,
+].join(',\n')
+
 export function buildGlassCss(): string {
   return `/* ===== 对话区顶栏：浮层化 + 玻璃 ===== */
-body:not([${PLAIN_ATTR}]) [data-phase='active'] { position: relative; }
-body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'] > header {
+${P} [data-phase='active'] { position: relative; }
+${P} [data-phase='active'] [data-slot='conversation.header'] > header {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   z-index: ${ABOVE_CONTENT_Z_INDEX};
 }
-body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-slot='conversation.header'] > header::before {
+${P} [data-phase='active'] [data-slot='conversation.header'] > header::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -50,29 +72,32 @@ ${glassFill(HEADER_GLASS_ALPHA)}
 ${viewportLight('100% 0')}
   backdrop-filter: var(--dsw-menu-backdrop-filter);
 }
-body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-scroll] {
+${P} [data-phase='active'] [data-conversation-scroll] {
   padding-top: ${HEADER_HEIGHT_PX}px;
 }
-body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-conversation-scroll]::-webkit-scrollbar-track {
+${P} [data-phase='active'] [data-conversation-scroll]::-webkit-scrollbar-track {
   margin: calc(${HEADER_HEIGHT_PX}px + 2px) 2px 2px;
 }
-body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-width-handle] {
+${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框：卡片玻璃 + 座位底带 ===== */
-body:not([${PLAIN_ATTR}]) :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] {
+/* ===== 输入框：卡片玻璃 + 座位底带 =====
+   座位撤掉官方 36px 实色渐隐，正文才会从玻璃下滚过；卡片本体透明、玻璃与边缘光在 ::before
+   （伪元素没有后代，不会成为官方弹层的 backdrop root）。卡片自成层叠上下文，::before 的 z-index:-1
+   才留得住。座位提独立合成层 + 玻璃层 will-change：减少内容高频重绘时合成器复用旧背景快照的闪动。 */
+${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] {
   background: none !important;
+  transform: translateZ(0);
 }
-body:not([${PLAIN_ATTR}]) :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card] {
+${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card] {
   position: relative;
   z-index: 0;
   background-color: transparent;
-  /* 卡片里的「+」等 selector 型图标按钮：官方给的是不透明的中性底色，在玻璃卡片上会读成一块实心；
-     卡片作用域内把这枚 token 放透明，按钮只剩图标（hover 仍走官方的 interactive-bg-hover）。 */
+  /* 「+」等 selector 型图标按钮：官方给的是不透明中性底，在玻璃卡片上会读成一块实心。 */
   --dsw-specific-selector: transparent;
 }
-body:not([${PLAIN_ATTR}]) :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card]::before {
+${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card]::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -82,12 +107,13 @@ body:not([${PLAIN_ATTR}]) :is([data-phase='active'], [data-phase='hero']) [data-
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%, transparent);
   box-shadow: ${RIM_DARK};
   backdrop-filter: var(--dsw-menu-backdrop-filter);
+  will-change: backdrop-filter;
 }
 body:not([data-ds-dark-theme]) :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card]::before {
   box-shadow: ${RIM_LIGHT};
 }
-/* 座位底带：卡片下方滚过的正文用「地面同源」的一小段盖住；带顶被卡片盖住，不需要 mask（少一层合成）。 */
-body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat]::after {
+/* 卡片下方滚过的正文用「地面同源」的一小段盖住；带顶被卡片盖住，不需要 mask。 */
+${P} [data-phase='active'] [data-composer-seat]::after {
   content: '';
   position: absolute;
   left: 0;
@@ -100,57 +126,70 @@ body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat]::after {
 ${viewportLight('100% 100%')}
 }
 
-/* ===== 右边栏：顶栏玻璃（背面是对话区，真模糊）+ 内容区同款打光 =====
-   pane 用 z-index: 0 自成层叠上下文（约束 ::before 的 z-index:-1），**不能**用 isolation：
-   isolation 会让 pane 成为 backdrop root，顶栏玻璃就只采样到 pane 内部（空的）⇒ 只剩一层实色。 */
-body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane] {
-  position: relative;
-  z-index: 0;
-  background: linear-gradient(180deg, transparent 0px, transparent ${HEADER_HEIGHT_PX}px, var(--dsw-alias-bg-base) ${HEADER_HEIGHT_PX}px);
+/* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
+${P} ${RP} {
+  background-color: var(--dsw-alias-bg-base);
+${viewportLight('100% 0')}
 }
-body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]::before {
+
+/* 真磨砂的前提：正文必须从两条 38px 带下面滚过去。官方把「带 0..76」与「滚区 76..底」排成上下
+   相邻的两个盒子 ⇒ 带背后永远只有面板纯色。把可流式滚动的正文上提 76px、内容下移 76px（只改视觉
+   位置），头部在流内占的高度再用负底距还回去 —— 正文于是真的从玻璃带下滚过，模糊才有内容可糊。 */
+${LIFTED_SCROLLS} {
+  /* !important：官方的滚动条轨道规则（::-webkit-scrollbar-track）在 Chromium 里会以更高的
+     伪元素特异性参与元素自身 margin 的竞争，把上提量顶回 78px；这里必须压过去。 */
+  margin-top: -${PANEL_SCROLLER_LIFT_PX}px !important;
+}
+${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body] > * > *,
+${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body] > * > *,
+${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body] > [data-document-loading],
+${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body] > [data-textpreview-failed],
+${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body] > [data-textpreview-more],
+${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body] > [data-document-loading],
+${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body] > [data-textpreview-failed],
+${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body] > [data-textpreview-more],
+${P} ${RP} [data-files-state='tree'] [data-files-body] > * {
+  transform: translateY(${PANEL_SCROLLER_LIFT_PX}px);
+}
+${P} ${RP} > *:first-child {
+  margin-bottom: -${PANEL_BAND_PX}px;
+}
+${P} ${RP} > *:last-child > [data-sidebar-right-tab] {
+  padding-top: ${PANEL_BAND_PX}px;
+  box-sizing: border-box;
+}
+${LIFTED_SCROLLS}::-webkit-scrollbar-track {
+  margin: calc(${HEADER_HEIGHT_PX}px + 2px) 2px 2px;
+}
+
+/* 每条带的玻璃面：挂在各标签自己的 38px 头行上，向上铺满 0..76（两个面盒子重合，y=38 不出缝）；
+   top 用负 38px、bottom 用 0（止于内边距盒底）—— 写死 76px 会把官方头行的 1px 下边框一起洗掉。 */
+${PANEL_HEADERS} {
+  position: relative;
+  z-index: 2;
+}
+${PANEL_HEADERS.split(',\n').map(selector => `${selector}::before`).join(',\n')} {
   content: '';
   position: absolute;
-  top: 0;
+  top: -${PANEL_BAND_PX}px;
+  bottom: 0;
   left: 0;
   right: 0;
-  height: ${HEADER_HEIGHT_PX}px;
   z-index: -1;
   pointer-events: none;
 ${glassFill(HEADER_GLASS_ALPHA)}
 ${viewportLight('100% 0')}
   backdrop-filter: var(--dsw-menu-backdrop-filter);
 }
-body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]::after {
-  content: '';
-  position: absolute;
-  top: ${HEADER_HEIGHT_PX}px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: -2;
-  pointer-events: none;
-  background-color: var(--dsw-alias-bg-base);
-${viewportLight(`100% -${HEADER_HEIGHT_PX}px`)}
+/* dockkit 条要压在头行的面上：否则条内标签 / 加号 / 关闭按钮被那层填充压暗。 */
+${P} [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip] {
+  position: relative;
+  z-index: 3;
 }
 
 /* ===== 设置弹窗：打光（按弹窗自身盒子缩放，窗口在视口中间，不按视口相位画） ===== */
-body:not([${PLAIN_ATTR}]) [data-shortcut-modal='settings'] {
+${P} [data-shortcut-modal='settings'] {
 ${OBJECT_FIT_LIGHT}
-}
-
-/* ===== 菜单打开时：撤掉常驻 blur，避免「blur 采样 blur」的合成快照残影 =====
-   官方 MenuSurface 自己带 backdrop-filter；与输入框 / 顶栏 / 右栏的常驻 blur 重叠时，Chromium 会短时
-   复用错位的背景快照（owner 截图：模型菜单打开后输入框上沿闪出菜单碎片，频率跟随工具输出）。菜单是
-   body 直接子元素，has(> …) 的失效跟踪只落在 body 的子节点列表上，开销可忽略。撤 blur 的同时把卡片
-   填充提高到接近不透明，避免下面正文突然变清晰。 */
-body:not([${PLAIN_ATTR}]):has(> [data-menu-material]) :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card]::before,
-body:not([${PLAIN_ATTR}]):has(> [data-menu-material]) [data-phase='active'] [data-slot='conversation.header'] > header::before,
-body:not([${PLAIN_ATTR}]):has(> [data-menu-material]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]::before {
-  backdrop-filter: none;
-}
-body:not([${PLAIN_ATTR}]):has(> [data-menu-material]) :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card]::before {
-  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_MENU_OPEN_ALPHA * 100}%, transparent);
 }
 `
 }

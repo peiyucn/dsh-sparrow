@@ -18,11 +18,15 @@
    * 边缘高光是**有方向**的：上缘亮、左缘弱亮、右缘暗、下缘暗（光源左上），深/浅轴两套值。
    * 卡片作用域内把 `--dsw-specific-selector` 置透明：官方给「+」这类 selector 型图标按钮的是不透明
      中性底色，在玻璃卡片上会读成一块实心（与旁边的透明按钮不一致）。
-5. **右栏顶栏玻璃**：官方右栏顶部两条 38px 带（合计 76px）所在的 `[data-dockkit-pane]`，背景改为
-   「顶部 76px 透明 → 以下 `bg-base`」，透明段用 `::before` 做同样的模糊 + 70% 填充 + 同源光。
-   ⚠️ pane 用 `position: relative; z-index: 0` 约束 `::before`，**不能用 `isolation`**：isolation 会让
-   pane 成为 backdrop root，玻璃只采样 pane 内部（空的）⇒ 只剩实色；去掉后玻璃采样的是**面板背后的
-   对话区**（会滚动 ⇒ 真模糊）。
+5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的
+   两个盒子 ⇒ 带背后永远只有面板纯色，直接加 blur 只能糊一块均匀色（读起来是实心板）。做法：
+   * 把**可流式滚动的正文**（markdown / text 文档预览、文件树）上提 76px、内容下移 76px（只改视觉位置，
+     滚动几何不变），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；
+   * 玻璃面挂在各标签自己的 38px **头行** `::before` 上，向上铺满 0..76（两个面盒子重合，y=38 不出缝），
+     头行抬 z=2、dockkit 条抬 z=3；blur 复用官方 token；
+   * pane 本体只画底色 + 同源光，**不挂 blur**（会采样到自己的子内容）；不改 pane 定位。
+   上提的 margin 必须 `!important`：官方的 `::-webkit-scrollbar-track` 规则会以伪元素特异性参与元素自身
+   margin 竞争，把上提量顶回去。
 6. **右栏内容区与对话区同款打光**（owner 2026-10-27 追加）：右栏 76px 以下的内容区不能是官方那块纯色
    `bg-base`，要与对话区一样看得见地面光 —— 用 `pane::after` 在内容区重画一层「`bg-base` + 三道光」：
    `background-size: 100vw 100vh`、`background-position: 100% -76px`（右栏贴视口右侧、内容区从视口 y=76
@@ -34,6 +38,9 @@
    与官方大多数浮层不同 —— 官方把这两处的面与字都写死了（深底 + 白字，两轴同值），不跟随主题。
    修法：面用本插件 `--dsh-theme-tone-panel`（官方默认档下正是官方 layer3），字色换成官方
    `--dsw-alias-label-*` 四级 token（标题最亮 → 路径/时间次之 → 状态最暗），保持官方原来的层次关系。
+8.5 **对话宽度拖拽条修复**：官方两条「调整对话宽度」拖拽条（`data-side` / `data-width-handle`）z-index
+   很低，会被本插件抬到 81 的内容层整条盖住（表现为拖拽条消失、拖不动）。抬到 82；`[data-side]` 还挂在
+   Tooltip 的 placement 上，必须排除 `role=tooltip`。
 9. **轮次导航功能恢复**（owner 2026-10-27 追加，自 `dsh-nav-pin` 并入；要功能、不要旧实现）：
    纯 CSS，无运行期探测。官方把 `display: none` 直接写在 `<nav aria-label="Turn navigation">` 上 ⇒
    用公开 aria-label（中 / 英两套文案）即可压过官方类名特异性；≤700px 默认隐身、hover / 键盘 focus
@@ -87,10 +94,11 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 * 悬浮卡（功能 8）是唯一私有 seam：`body > [role="button"][aria-label]` 定位 portal 卡、
   字色按官方 CSS-module 类名后缀命中（`_hoverTitle` 等）。官方改后缀即静默失效（回退成官方写死配色，
   不会崩）；已登记 `docs/private-seams.md`。
-* 官方菜单（`[data-menu-material]`，body 直接子元素）打开期间，本插件**撤掉**三处常驻 blur 并把输入框
-  填充提高到 90%：官方菜单自带 backdrop-filter，两个 blur 层在合成器里重叠会复用到错位的背景快照
-  （owner 截图：模型菜单打开后输入框上沿闪出菜单碎片）。撤 blur 是暂时的、菜单关闭即恢复；
-  这是为消除残影付的明确取舍。
+* 右栏「正文上提 76px」是对官方滚动盒的**视觉位置改写**（margin + transform，不改 DOM 结构）：
+  官方若改渲染器结构 / data 属性，lift 会静默不命中，退回「带是半透明实心板」的降级观感。
+* 输入框残影：**不再用「菜单打开就撤 blur」的降级**（owner 明确否定：模糊不能消失）。改为
+  座位 `transform: translateZ(0)` + 玻璃层 `will-change: backdrop-filter` 把两层提成独立合成层，
+  减少合成器复用错位快照的概率。**这条属推测性缓解，真机是否仍闪需 owner 复看。**
 
 ## 验证
 
