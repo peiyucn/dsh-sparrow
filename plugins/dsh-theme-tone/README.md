@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
-Tone skins for DSH's built-in light and dark themes, plus conversation-area layout tuning once a tone is picked — a DeepSeek Harness (DSH) web plugin (dsh-sparrow collection member).
+Tone skins for DSH's built-in light and dark themes — a DeepSeek Harness (DSH) web plugin (dsh-sparrow collection member).
 
 ## Install
 
@@ -10,35 +10,32 @@ Tone skins for DSH's built-in light and dark themes, plus conversation-area layo
 dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone
 ```
 
-Requires dsh 0.2.1-rc.3 — the exact official version line this release is built and verified against (newer lines, pre-releases in particular, are not covered) — and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
+Requires dsh 0.2.1-rc.3 — the exact official version line this release is built and verified against. Also requires a working `pnpm` (`dsh plugin` forwards installation to pnpm).
 
 > Do **not** run `npm install @dsh-sparrow/dsh-theme-tone` directly: that only downloads the package into some `node_modules` and does not register it with the DSH web profile. Use the `dsh plugin` command above, then restart DSH.
 
 ## Usage
 
-Open **Settings → General** — a **Tone** row sits directly under the **Appearance** row. Light and dark each get four skins, plus a **Default**:
+Open **Settings → General** — a **Tone** row sits directly under the **Appearance** row. Light and dark each get four skins plus a **Default**:
 
 | Appearance | Skins |
 | :--- | :--- |
 | Dark | Default, Space, Ember, Glade |
 | Light | Default, Frost, Sakura, Moss |
 
-Picking any tone other than **Default** also tunes the conversation layout (on **Default** everything stays as it is):
+Each tone paints:
 
-* Turn navigation (**both modes**, tone or not): the rail stays available on narrower conversation columns than on **Default**; at the narrowest widths it is hidden by default and fades in on hover over the right edge (or keyboard focus) — no frame, no background
-* Conversation content clearance: the conversation keeps wider side margins on wide columns; on narrow columns the content no longer runs under the right drag handle
+* **Colors** — the whole app (background, raised surfaces, labels, borders, scrollbars) is re-tinted through the official theme token layer.
+* **Ground light** — a fixed decorative layer with three soft lights (top, bottom, left), with the light's position and direction fixed per tone.
+* **Glass** — translucent frosted glass on the conversation header, the composer card, and the right sidebar's top bar, so the background light shows through them and content scrolls, blurred, underneath.
 
-It also fixes a drag-handle glitch (**no tone needed — active in both themes**): hovering either "resize conversation" drag handle used to leave the highlight sitting low, only snapping to the pointer once you held the button down; the highlight now follows the pointer on hover too.
+**Default** leaves the official theme completely untouched.
 
 ## Compatibility
 
 * Targets dsh 0.2.1-rc.3 — the exact official version line this release is built and verified against (other lines are not covered)
-* Appearance only: it never blocks the UI or changes how anything works
+* Appearance only: it never blocks the UI or changes how anything works; menus, dialogs and docked cards keep the official material
 * When the host or the browser is missing something it needs, the plugin steps aside: the UI opens normally and it draws nothing (it also logs a user-facing warning)
-
-## Known limitations
-
-* With the right sidebar open, the background-jobs popover in the header cannot float over the sidebar. DSH renders that popover inside the conversation column — the agent-team popover next to it is rendered outside the column, which is why that one floats — so the column bounds it. It is right-aligned so it stays whole, but it cannot overlap the sidebar.
 
 ## Screenshots
 

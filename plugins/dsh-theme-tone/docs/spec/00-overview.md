@@ -1,150 +1,63 @@
-# 00 · 插件概览 — dsh-theme-tone
+# 00 · 架构总览 — dsh-theme-tone
 
-> dsh-sparrow 合集成员。本文是需求范围与验收边界；详细设计见 01-design.md，路线图见 02-roadmap.md。
->
-> **规范索引（按主题，冲突时以专用篇为准）**
->
-> | 主题 | 篇 |
-> | :--- | :--- |
-> | 表面模型（颗粒 / 三道光 / 强度 / 性能预算）—— **一切抬升面的唯一规范** | [`07-surface-model.md`](07-surface-model.md) |
-> | **统一重构执行计划**（含「恢复弹窗遮罩模糊」）| [`08-refactor-plan.md`](08-refactor-plan.md) |
-> | **`dsh-nav-pin` 合并方案**（已实施，nav-pin 已退役）| [`09-nav-pin-merge.md`](09-nav-pin-merge.md) |
-> | 色调取值与几何 | `03-palette.md` |
-> | 玻璃（顶栏 / 输入卡的模糊与通透） | `04-glass.md` |
-> | 抬升面的**机制记述**（历史成因与实证，规范已移交 07） | `05-surfaces.md` |
-> | 官方运行扫光带 | `06-run-sweep.md` |
-> | 官方上游变更存档（含 `--dsw-mask-blur` 变更史） | `../../../../docs/upstream/` |
+> 2026-10-27 重写。旧 spec（00–13，约 1.3 万行）已全部删除：它们记录的是被删掉的机制（相位测量、锚点扫描、
+> 抬升面光层、扫光带、遮罩恢复……），继续保留只会误导。本文是新的唯一事实来源。
 
-## 定位
+## 功能（只有四件事）
 
-在官方「明暗主题」之下再挂**一层色调**：用户在「设置 → 常规」的外观区里，为**浅色轴**和**深色轴**各选一款色调。选中即改底色与背景光晕，浅色/深色各自记住自己的选择。
+1. **颜色**：通过官方 `ctx.theme.overrideTokens` 覆盖 alias token（`{light, dark}` 成对），给整个界面重新着色。
+2. **地面光**：插件自有的 `position: fixed` 装饰层（`.dsh-theme-tone`），三道光（顶 / 底 / 左），
+   位置与方向按色调固定。
+3. **对话区顶栏玻璃**：顶栏浮层化（`position: absolute` + 滚动区 `padding-top: 76px` + 滚动条 track 下推
+   + 拖拽条上沿裁到 76px），玻璃放在顶栏的 `::before`（`z-index: -1`），模糊复用官方
+   `var(--dsw-menu-backdrop-filter)`，填充 = `bg-base` × 70% 半透明。
+4. **输入框玻璃**：座位撤掉官方 36px 实色渐隐（`background: none`），卡片 `background` 透明、
+   玻璃放卡片 `::before`（`border-radius: inherit`）；座位底部再用 `::after` 重画一小段地面（44px、
+   视口对齐、上缘 mask 过渡）挡住卡片下方滚过的正文 —— **纯 CSS、零测量、零 fixed**。
+5. **右栏顶栏玻璃**：官方右栏顶部两条 38px 带（合计 76px）所在的 `[data-dockkit-pane]`，背景改为
+   「顶部 76px 透明 → 以下 `bg-base`」，透明段用 `::before` 做同样的模糊 + 70% 填充。
 
-| 轴 | 可选色调 | 默认 |
-| :--- | :--- | :--- |
-| 深色 | **默认**、**深空**（蓝紫，= pyai.site 现款）、**余烬**（红）、**幽林**（绿） | 深空 |
-| 浅色 | **默认**、**霜蓝**、**樱花**（粉）、**苔青**（绿） | 默认 |
+「官方默认」档：整张玻璃表不命中、地面层隐藏、token 不覆盖 ⇒ 与没装插件一致。
 
-* 「默认」（`official`）= 完全不改官方外观（token 传官方原值、不画背景层）。两轴都有，用户随时可切回官方。
-* `available` 字段是**留位 / 下架开关**：把某款翻成 `false` 即可先藏起来而不删色值，设置行自动不渲染。
+## 代码布局
 
-## 素材来源
+| 文件 | 职责 |
+| :--- | :--- |
+| `src/tones.ts` | 调色板数据 + `tokenOverrides()`（颜色，唯一的颜色事实来源） |
+| `src/backdrop.ts` | 地面光层 CSS、渲染计划、设置行色卡预览、CSS 特性门 |
+| `src/glass.ts` | 三块玻璃的 CSS（唯一一处 `backdrop-filter`，全部放在 `::before` 上） |
+| `src/constants.ts` | 选择器锚点 / z-index / 标记属性 / 设置命名空间 |
+| `src/compat.ts` | 能力门（缺失即惰性停用，不抛错） |
+| `src/host.ts` + `src/settings-schema.ts` | host half：配置 schema、关掉自动配置页 |
+| `src/client/index.ts` | 注入样式与地面层、写 token、设置行、写入与结算 |
+| `src/client/{ThemeToneRow,styles,store,pending,known-settings,locales}` | 设置行 UI 与持久化辅助 |
 
-* **蓝紫**色调的**色相值**来自 pyai.site，已核对源码与 `dist` 产物：
-  * 底色 `#0a0a10` —— `pyai.site/src/styles/global.css:57`
-  * 顶部金色光晕 `rgb(232, 162, 74)` / 底部蓝紫辉光 `rgb(96, 78, 168)`，均为 `radial-gradient(ellipse …, transparent 62%)` —— `pyai.site/src/components/SpaceBackdrop.astro:29-39`
-  * 颗粒星尘 `opacity: .13` + `mix-blend-mode: screen` + `feTurbulence` data URI —— `pyai.site/src/styles/global.css:69-78`（**我方实况已降到 `.0975`**，见 03-palette）
-  * 三色在 `pyai.site/dist/_astro/Base.Bmz1AN8R.css` 中已复核
-* **与 pyai.site 的两处有意偏离**（都在深色轴的底部辉光那一层；pyai.site 是留白为主的博客，同浓度放到 DSW 这种满屏 UI 上会显得太淡）：
-  * alpha `.08` → **`.18`**（三款深色同步）
-  * 收束 `62%` → **`95%`**（独立常量 `BOTTOM_RADIAL_STOP`）：覆盖从约 16% 屏高扩到约 31%
+**没有**：MutationObserver / ResizeObserver / rAF 循环 / `getComputedStyle` 探测 / 锚点扫描 / 相位变量 / 私有类名。
+client half 只在「安装、设置变化、主题变化、用户点选」时跑一次，其余时间零 JS 活动。
 
-  色相 / 底色 / 深色轴的金光仍逐字是原值。**浅色轴与 pyai.site 无关**（那是深色轴的素材），见 03-palette。
-* **其余五款色调是新设计**，pyai.site 无对应；取值见 03-palette.md。
-* **不搬**：pyai.site 的星点层（`SpaceBackdrop.astro:13-19` + `:75-115` 滚动视差）、`html { font-size: 125% }`、`scrollbar-gutter: stable`、像素字体、`CursorAtom` 光标。
+## 硬约束（守卫里钉住）
 
-## 色调一览
+1. 所有玻璃规则带 `body:not([data-dsh-theme-tone-plain])` 门。
+2. 不得出现 `background-attachment: fixed`，不得手写 `blur()` 数值（统一 `var(--dsw-menu-backdrop-filter)`）。
+3. `backdrop-filter` 只允许出现在 `::before` 上（不挂 header / 卡片 / 面板本体，避免 backdrop root
+   与 fixed 包含块影响官方弹层）。
+4. 不改官方容器的 `position` / `overflow` / `transform` / `contain`（pane 的 `position: relative` 是
+   已知例外，见「已知偏离」）。
+5. 颜色只走 `ctx.theme` token 通道；玻璃与地面光必须写 CSS（官方无对应 token）。
+6. 官方默认牌面（菜单 / 弹窗 / 挂靠卡）材质由官方自己负责，插件不重画、不覆盖。
 
-> **完整取值（底色 / 左栏填充 / 三层染色 / alpha）与生成规则见 [03-palette.md](03-palette.md)** —— 那是所有色调取值的唯一事实来源，本节只记范围与状态。
+## 已知偏离（明示取舍，不当成「和官方一致」）
 
-| 轴 | 顺序 | id / 显示名（zh / en） |
-| :--- | :--- | :--- |
-| 深色 | 1 | `official` 默认 / Default |
-| 深色 | 2 | `violet` 深空 / Space |
-| 深色 | 3 | `crimson` 余烬 / Ember |
-| 深色 | 4 | `forest` 幽林 / Glade |
-| 浅色 | 1 | `official` 默认 / Default |
-| 浅色 | 2 | `blue` 霜蓝 / Frost |
-| 浅色 | 3 | `sakura` 樱花 / Sakura |
-| 浅色 | 4 | `green` 苔青 / Moss |
+* 顶栏浮层化是**布局改动**（官方注释写明顶栏在流内）。这是顶栏玻璃的前提；静止几何保持 76px 不变量。
+* 输入框常驻 blur：官方自己只在菜单 / 浮层这类短生命周期表面用 blur（长期面全部不透明）。本插件按 owner
+  要求保留常驻玻璃；性能口径见下。
+* 右栏 `[data-dockkit-pane]` 加了 `position: relative`（原本 static）作为 `::before` 的包含块；不改其尺寸。
+* 官方 rc.3 的挂靠卡（Queue/Todo/Goal）本身是半透明 + blur；插件不碰它们（token 染色会顺带跟随）。
 
-8 款全部可选（深色 4 + 浅色 4）。**两轴按位一一对应**：位 2 是冷（蓝紫 ↔ 霜蓝）、位 3 是**暖**（余烬 ↔ 樱花）、位 4 是绿（幽林 ↔ 苔青）。顺序由 `LIGHT_TONE_IDS` / `DARK_TONE_IDS` 的插入顺序决定，有测试钉住对应关系。
+## 验证
 
-结构性事实（规划其余色调时不需要动）：
-
-* **渐变位置全色调统一**：形状与收束位置住在 `src/backdrop.ts` 的 `*_SHAPE` / `*_STOP` 常量里，色调表**没有任何几何字段** —— 新增一款色调只填颜色。
-* 深色轴染色走 `mix-blend-mode: screen`（只加亮）；浅色轴走**正常合成**（白底上 screen 饱和失效）。**颗粒**另一套：深色 `screen`、浅色 `multiply`。
-* **两个轴严格镜像**：**空间用官方底色**、一束光当光源（`top` / `left` / `bottom`），
-  几何（方向、位置、收束点 `62%`）两轴逐字相同。深色轴那束光是**金**（三款共享）；
-  浅色轴是**本色**（三款各用自己的主色）。**浅色轴的底色不染色**（三款共用官方白），
-  色调只由打光表达。见 03-palette。
-* 三层染色的角色固定：`top` = 上方光源、`bottom` = 下方纵深、`left` = 左上方光晕（左栏与接缝）。「左侧光晕」锚在视口左上角而不是按接缝定位 —— 官方没把左栏宽度暴露成 CSS 变量（`SidebarRoot` 是 inline width + hashed 类名），锚左上角在左栏 264–420px 之间变化时观感都成立。
-* 「官方默认」的 token 值用 `var(--dsw-static-neutral-*)` **引用官方变量**而不是硬编码色值 —— 官方换色我们自动跟随，且语义上就是「官方原值」；三层染色为空 → 背景层整层隐藏。
-* 颗粒星尘：两轴都开。深色轴 `screen` / `.0975`（只加亮）；浅色轴 `multiply` / `.16`（白底上往下刻纹理）。
-
-## 痛点与根因（已查证，dsh 0.1.5-rc.2）
-
-1. **官方只有一条颜色轴**：`light` / `dark` / `system` 三选一（`ui-theme/src/theme-settings.ts:4`），底色由 `--dsw-alias-bg-base` 决定（暗 = `--dsw-static-neutral-bluish-950` = `rgb(21,21,23)`，`design-platform.css:250`；亮 = `--dsw-static-neutral-bluish-00` = `#fff`，`:157`）。官方**没有**「同轴多色调」概念，也没有背景设置项、没有用户 CSS 机制（`dsh-nav-pin` 已查证同结论）。
-2. **三方主题的官方入口只有 token 覆盖**（`ctx.theme.overrideTokens`，`ui-theme/src/client/index.ts:308`）——它能覆盖颜色，但**承载不了渐变与纹理**（见 01）。
-3. **底色由多个各自不透明的面分别绘制**：`body`（`client/web/src/base.css:30`）、AppFrame `.frame`（`ui-layout/.../AppFrame.module.css:7`）、`ConversationRoot`（`ui-conversation/.../ConversationRoot.module.css:7`）、`SidebarRight`（`ui-sidebar-right/.../SidebarRight.module.css:34`）；左栏另有不透明的 `--dsw-specific-sidebar-fill`（暗 = `#1b1b1c`，`design-platform.css:335`；亮 = `--dsw-static-neutral-bluish-50`）。→ 渐变画在 `html` / `body` 上会被盖住。
-4. **`--dsw-alias-bg-base` 被当作不透明填充色广泛复用**（约 20 处，含 `CodeBlock.module.css:28`、`MarkdownText.module.css:296`、`ToolRow.module.css:180`、`AskQuestionCard.module.css:11`、`GoalBar.module.css:81`、`QueueDock.module.css:149/181/208`），并被 5 处 `color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent)` 消费（`ToolRow.module.css:33` 等）→ 把它改成 `transparent` 会让卡片/代码块失去面、滚动渐隐 mask 失效（详见 01「已否决方案」1）。
-
-## 需求范围（做什么 / 不做什么）
-
-**做**：
-
-* 「设置 → 常规」外观区新增**一条**「色调」行，**紧挨官方「外观」下方**。官方「外观」占 order 10、「字号」占 11，两个整数都被占了 —— 本行取 `10.5` 插在两者之间（列表槽按数值升序渲染）。
-* 色调卡**完整展示色调**：卡面 = 底色 + 顶部/底部染色 + 左侧光晕（同一套色值与构成），几何换成卡片尺度 —— 整屏形状在卡上会把染色全落在盒外，卡片就退化成一块纯色。**卡高与官方「外观」卡等高（83px）**。卡面是**示意而非 1:1**：几何铺得更开，且**按层决定放大倍数**（判据 = 卡面需要多少 ÷ 实况已有多少）。颗粒由 `.cube::after` 承担。详见 03-palette.md。
-* 该行**只显示当前明暗轴的可用色调**；用户切浅/深时行内容随之刷新。当前：深色 = 默认 + 深空 / 余烬 / 幽林；浅色 = 默认 + 霜蓝 / 樱花 / 苔青。
-* **两轴的排列逐位对应**（蓝 / 暖 / 绿）：蓝紫 ↔ 霜蓝、**余烬 ↔ 樱花**（两轴这一位都是暖色）、幽林 ↔ 苔青。顺序由 `LIGHT_TONE_IDS` / `DARK_TONE_IDS` 的**插入顺序**决定，有测试钉住对应关系。
-* 两轴都有「官方默认」——选它即完全不改官方外观（token 传官方变量、不画背景层），用户随时可切回。
-* 明暗**各存一份**选择（`lightTone` / `darkTone`）——切到浅色再切回深色，深色的选择不丢。
-* 选择持久化在本插件的 profile 条目配置里（0.1.7 起设置命名空间 = 条目 id `dsh-theme-tone`；0.1.5 线是 `ui-theme-tone`）。
-* `available` 作为「留位 / 下架」开关保留：把某款翻成 `false` 即可先藏起来而不删色值，设置行自动不渲染。
-* 底色与左栏填充经官方 `ctx.theme.overrideTokens` 公开 seam 落地；光晕与颗粒由一层插件自有的固定背景层承载。
-* **抬升面（弹出来的框）继承色调**：菜单 / 模态 / 浮动提示条 / 抬升卡片共用的官方 alias token 覆成
-  「本色按比例混进官方中性 rung」，本色仍是色调表里那一处定义。面板用 `PANEL_TINT`、交互态与滚动条用
-  `SURFACE_TINT`（浅色轴两者已分离，见 05）。
-* 卸载 / 停用插件后外观回到官方（token 回收、背景层与样式表移除、设置行消失；已写的设置留在 `settings.yaml` 但不生效）。
-
-**不做**：
-
-* 不做星点层与滚动视差。
-* 不改官方 DOM 结构、不碰官方 React 组件、**不依赖官方 hashed CSS-module 类名**。
-* **不染输入框**（归玻璃那套，见 04）与**反色面**（工具提示 / 轻提示 / 轻提示按钮填充）。
-  抬升面（菜单 / 模态 / 抬升卡片）、**浅灰内嵌面**（代码块 / 三张停靠卡）**要染** ——
-  见 05-surfaces.md（内嵌面走独立通道，比例与抬升面不同：前者要「比地面重」、后者要「与地面同深」）。
-* **刻意改官方默认的破例共四处**（其余一律让路）。判据：**「修官方无意的 bug / 复原」不带门；
-  「改变官方有意的设计选择」带门**（完整判据表见 `09-nav-pin-merge.md` §3.1）：
-  1. **悬停卡** —— 官方把它的面和字写成了组件内字面量（只能按稳定类名后缀匹配）；
-  2. **弹窗遮罩模糊** —— 官方 0.1.7-rc.2 把 `--dsw-mask-blur` 改成 `none`（有意为之），
-     owner 要求恢复 0.1.5 的 `blur(2px)`，两个档位都恢复（见 `08-refactor-plan.md` §4）；
-  3. **拖拽条悬停光带跟随指针**（`src/handle-glow.ts`，2026-09-29 随 nav-pin 并入）——
-     官方那个变量只在拖拽中被写，悬停时光带固定偏下 38px，属**无意的 bug**；两个档位都修。
-  4. **顶栏弹出层的列内夹取**（`src/popover.ts`，2026-10-02 加）—— 官方那个「后台任务」
-     弹框向右伸出会话列、被列自身的 `overflow: hidden` 裁掉右半，**官方默认档下同样裁**
-     ⇒ 属**无意的 bug**；两个档位都修（**第四条**，计数以 `docs/private-seams.md` §B 为准）。
-  理由与取舍见 05-surfaces.md「悬停卡」一节、`docs/upstream/0.1.7-rc.2-mask-blur.md`、
-  `09-nav-pin-merge.md` §3.1/§3.3、`04-glass.md` §8。
-* 不做「自定义颜色 / 取色器」（只给预设色板）。
-* 不注册三方主题 id（UI 选不中，见 01）。
-
-## 验收标准
-
-* **位置**：设置 → 常规，在官方「外观」正下方、「字号」上方出现「色调」行（order 10.5）；间距与官方行一致。
-* **所见即所得**：卡面完整呈现该色调 —— 底色 + 顶部/底部染色 + 左侧光晕，与实况**同色值**。几何换成卡片尺度形状（整屏形状在 83px 高的卡上会把染色整个落在盒外）。**卡面 alpha = 实况 alpha × `PREVIEW_ALPHA_SCALE`**（判据「卡面需要多少 ÷ 实况已有多少」；深色纵深 ×3、浅色 light ×3 / depth ×1.8）。**卡高与官方「外观」卡等高（83px）**。「默认」本身就是纯色，卡面自然也是纯色。
-* **左侧光晕**：深空款在左边栏上明显吃到金色，左栏与对话列的接缝一带呈金色渐变；在左栏 264–420px 宽度范围内观感都成立（锚视口左上角，不依赖接缝像素位置）。
-* **标签**：中文走意境名（深空 / 余烬 / 幽林 / 霜蓝 / 樱花 / 苔青），**一律两个字**；颜色由卡面表达；`official` 保持功能性命名，卡面文字是**「默认」**。英文**一律单个单词**（`Space` / `Ember` / `Glade` / `Frost` / `Sakura` / `Moss`）。
-* **内容**：深色轴选中时该行显示「默认」+「深空」+「余烬」+「幽林」四张卡；浅色轴显示「默认」+「霜蓝」+「樱花」+「苔青」四张。**四张恒排一行、等宽等分**（不换行、不把落单的卡拉满整行）。切明暗后行内容立即刷新（无需重开设置页）。
-* **官方默认档**：选「默认」后底色 / 左栏 / 无染色与无颗粒状态与**停用插件时逐像素一致**（token 传官方变量，背景层隐藏）。
-* **选中态**：卡面已被色调占用，选中用描边环表达 —— 在任一色调卡上都清晰可辨。
-* **生效**：点选任一款后，应用底与左栏填充立即变色、背景光晕立即出现 —— 无需刷新页面。
-* **持久化**：重启 dsh 后选择保留；设置文档里出现本插件条目（`dsh-theme-tone`）的两个字段。
-* **明暗独立**：深色选「深空」→ 切浅色 → 切回深色，仍是「深空」。深色选「默认」→ 切浅再切回，仍是「默认」。
-* **可读性**：8 款色调下，正文 `--dsw-alias-label-primary` / 二级 / 三级文字、链接、错误/成功/警告色在染后的底上对比度不劣于官方（目视核验）。
-* **不干扰交互**：菜单、tooltip、弹窗、拖拽条、输入框、按钮照常可点可读；层级切分按 01 定案。
-* **浮层继承色调**：选中任一色调后，下拉菜单 / 模态对话框 / 抬升卡片带该色调的色相；
-  选「默认」时与官方原值逐字符一致（`test/surfaces.test.mjs`）。
-* **浅灰内嵌面可辨**：选中任一色调后，**代码块**与**三张停靠卡**（todo / goal / queue）的面
-  **比页面背景重**（浅色轴实测：代码块低 9.7–10.7 阶、停靠卡低 12.8–14.6 阶），一眼读得出边界；
-  选「默认」时逐字符回官方。
-* **零布局影响**：开关插件前后 `document.body.scrollHeight` 不变，不新增滚动条。
-* **卸载即还原**：停用插件后 token 回收、背景层与样式表移除、设置行消失，外观与官方一致。
-* **低常驻开销**：无常驻定时器；只在 `theme/change`、settings 变更、点选时做同步 DOM/样式写入。
-  另有一个 `MutationObserver`（只观察 `class` 变动）服务于「未选工作区」待启动态的行为探针，
-  经**同一帧内合并**（`requestAnimationFrame` 去抖）后只读一个元素的两个计算值（见 04-glass §5）。
-* **语言无关性**：行文案走 `ctx.locale.register` 的 zh / en 双份字典，两套界面语言都正确。
-* **兼容自检**：宿主缺 `ctx.theme.overrideTokens` / `ctx.slots` / `ctx.locale` 任一稳定面时，插件**惰性停用**（告警 + 不做任何事，不抛错）；设置面（`configForms`）走可选依赖 fork，缺了只是不装。
-
-## 退役条件
-
-官方在「设置 → 外观」提供色调 / 用户自定义 CSS 后，本插件退役。
+* `npm run verify`：typecheck → build → test → package。
+* 单测覆盖：三块玻璃的 CSS 契约（含「无 fixed / 无手写 blur / 全部带门」）、地面光层三道光与层序、
+  token 计划与官方默认档、client half 无逐帧探测。
+* 真机验收（无头 + owner 复看）：三条玻璃面的 `backdrop-filter` 计算值、顶栏浮层化后 y=76 不变量、
+  输入框下方遮罩与地面连续、右栏 76px 让位。

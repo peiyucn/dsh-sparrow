@@ -126,13 +126,11 @@ export const POPUP_TOKENS: readonly Readonly<{
     token: '--dsw-menu-surface-fill',
     official: Object.freeze({ light: 'rgba(248, 249, 250, 0.58)', dark: 'rgba(67, 69, 74, 0.45)' }),
   }),
-  // 别名那一半：大量消费方直接读它（官方 .groupTitle、自家 codebuddy 模型菜单），macOS 分支还会单独改写。
   Object.freeze({
     token: '--dsw-specific-menu',
     official: Object.freeze({ light: 'rgba(248, 249, 250, 0.58)', dark: 'rgba(67, 69, 74, 0.45)' }),
   }),
 ])
-// `--dsw-specific-tip` 不在此表：它的消费方是三张停靠卡（不是菜单），且要「比地面重」（与菜单族目标相反）⇒ 归 {@link INSET_TOKENS}。
 
 /**
  * **浅灰内嵌面**（inset surface）的染色比例 —— 独立通道：它们**嵌在地面之内**、需要**比地面重**才读得出（与抬升面目标相反）。
@@ -190,9 +188,7 @@ function toneGlow(tint: string, alpha: number): string {
 
 /** 抬升面（浮层）色值：把本色按该轴的比例混进官方中性 rung。 */
 function surfaceFill(tint: string, scheme: ColorScheme, rung: SurfaceRung): string {
-  // 「默认」逐条回官方绑定（不是我们选的档），否则官方默认下 layer-3 会被我们改深。
   if (tint === '') return `var(${OFFICIAL_RUNGS[scheme][rung]})`
-  // 面板走**专用**的 {@link PANEL_TINT}（地面已回官方无色，面板太艳会与地面「两张皮」）；交互态 / 滚动条仍用 SURFACE_TINT。
   return rungFill(tint, SURFACE_RUNGS[scheme][rung], PANEL_TINT[scheme])
 }
 
@@ -200,7 +196,6 @@ function surfaceFill(tint: string, scheme: ColorScheme, rung: SurfaceRung): stri
  * 比例由调用方按轴给出，本函数**不感知明暗轴**。 */
 function rungFill(tint: string, rung: string, scale: number): string {
   const reference = `var(${rung})`
-  // 比例为 0 时直通官方引用 —— 不产出 `color-mix(… 0%, …)` 那种恒等包装，「官方底色不动」在产物里逐字符可见。
   if (tint === '' || scale === 0) return reference
   return `color-mix(in srgb, rgb(${tint}) ${Math.round(scale * 100)}%, ${reference})`
 }
@@ -254,7 +249,6 @@ export const BORDER_TOKENS: readonly Readonly<{
     official: Object.freeze({ light: 'rgba(0, 0, 0, 0.04)', dark: 'rgba(255, 255, 255, 0.06)' }),
   }),
   Object.freeze({
-    // 深色轴的「细一档」变体（浅色轴与 l2 同值）。
     token: '--dsw-alias-border-l2-darkmode-thin',
     official: Object.freeze({ light: 'rgba(0, 0, 0, 0.1)', dark: 'rgba(255, 255, 255, 0.06)' }),
   }),
@@ -338,7 +332,6 @@ export const LIGHT_TONES: Readonly<Record<LightToneId, ToneSpec>> = Object.freez
   }),
   sakura: Object.freeze({
     available: true,
-    // 底色 = **官方配置**（三款相同，不再按本色染）—— 色调的差异只在光上。
     base: 'var(--dsw-static-neutral-bluish-00)',
     sidebarFill: 'var(--dsw-static-neutral-bluish-50)',
     /** **樱花粉**本色。色度取到 50：本色只以 `.16 ~ .30` 的 alpha 出现，叠在官方白底上后**色度会被压掉约 3 倍**
@@ -390,21 +383,16 @@ export const DARK_TONES: Readonly<Record<DarkToneId, ToneSpec>> = Object.freeze(
     available: true,
     base: '#0a0a10',
     sidebarFill: '#14141c',
-    // 本色 = pyai.site 的蓝紫（底色与纵深都以它为基准）。
     tint: '96, 78, 168',
-    // 顶上两道**共享金光**（顶部居中 + 左上角金晕），alpha 由 DARK_GOLD_ALPHA 一处定，三款同步。
     top: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.top),
-    // 本色仍是 pyai.site 原值；浓度按满屏 UI 上调（pyai.site 是留白为主的博客），alpha 见 {@link DEPTH_ALPHA}。
     bottom: depthGlow('96, 78, 168', 'dark'),
     left: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.left),
 
   }),
   crimson: Object.freeze({
     available: true,
-    // 底色色相跨度 5（violet 是 6）；三通道和仍是 36 ⇒ 亮度与 violet 严格相等，正文对比度不变。
     base: '#0f0a0b',
     sidebarFill: '#191415',
-    // 本色：饱和度 S≈.43（原值 .49 偏夸张、压到 .37 又过头，取中间），只保留 crimson 的色相。
     tint: '144, 58, 86',
     top: toneGlow(DARK_GOLD_TINT, DARK_GOLD_ALPHA.top),
     bottom: depthGlow('144, 58, 86', 'dark'),
@@ -445,7 +433,6 @@ export const LIGHT_TOKENS: readonly Readonly<{
     token: LEFT_VARIABLE,
     pick: (tone: ToneSpec) => tone.left === '' ? 'transparent' : tone.left,
   }),
-  // 2026-10-22 起**不再发颗粒变量**（颗粒已整族移除；理由见 constants.ts 里那段说明）。
 ])
 
 /** 某一轴的完整色调表。 */
@@ -521,32 +508,26 @@ export function tokenOverrides(settings: ThemeToneSettings): TokenOverrides {
       dark: surfaceFill(dark.tint, 'dark', rung),
     }
   }
-  // 菜单族：只给颜色，且保住官方 alpha（涂不透明会吃掉官方 backdrop-filter）；比例用 PANEL_TINT（浅色轴 0 → 直通官方）。
   for (const { token, official } of POPUP_TOKENS) {
     overrides[token] = {
       light: washFill(light.tint, 'light', official.light, PANEL_TINT.light),
       dark: washFill(dark.tint, 'dark', official.dark, PANEL_TINT.dark),
     }
   }
-  // 浅灰内嵌面（代码块 / 三张停靠卡）：**独立通道、独立比例**，取官方自己那一档。
   for (const { token, official } of INSET_TOKENS) {
     overrides[token] = {
       light: rungFill(light.tint, official.light, INSET_TINT.light),
       dark: rungFill(dark.tint, official.dark, INSET_TINT.dark),
     }
   }
-  // 浮层面板底色：单独发一份，给「自带硬编码底色」的弹层兜底（surface.ts 的选择器读它）。
   overrides[PANEL_VARIABLE] = {
     light: panelFill(light, 'light', 'layer3'),
     dark: panelFill(dark, 'dark', 'layer3'),
   }
-  // 插件自己的光色：空串在 CSS 里非法，统一换成「什么都不画」的字面量。
   for (const { token, pick } of LIGHT_TOKENS) {
     overrides[token] = { light: pick(light, 'light'), dark: pick(dark, 'dark') }
   }
-  // 顶光收束点：两轴同值（见 TOP_STOP）。
   overrides[TOP_STOP_VARIABLE] = { light: TOP_STOP, dark: TOP_STOP }
-  // 交互态：无 alpha 的面走 color-mix，低 alpha 的洗染只换 RGB、保住 alpha。
   for (const entry of STATE_TOKENS) {
     overrides[entry.token] = {
       light: rungFill(light.tint, entry.light, SURFACE_TINT.light),
@@ -559,7 +540,6 @@ export function tokenOverrides(settings: ThemeToneSettings): TokenOverrides {
       dark: washFill(dark.tint, 'dark', official.dark),
     }
   }
-  // 滚动条：实心变量引用，走 color-mix（与抬升面同一个比例）。
   for (const { token, light: lightRung, dark: darkRung } of SCROLLBAR_TOKENS) {
     overrides[token] = {
       light: rungFill(light.tint, lightRung, SURFACE_TINT.light),

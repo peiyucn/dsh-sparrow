@@ -1,6 +1,6 @@
 {
   "name": "@dsh-sparrow/dsh-theme-tone",
-  "description": "Tone skins for the official light and dark themes, plus conversation-area layout tuning once a tone is picked",
+  "description": "Tone skins for the official light and dark themes: token colors, ground light, and frosted glass on the conversation header, composer and right sidebar",
   "version": "0.2.1-rc.3",
   "license": "MIT",
   "repository": {
@@ -68,13 +68,9 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.5",
-    "@deepseek-ai/dsh-client-locale": "0.2.1-rc.3",
     "@deepseek-ai/dsh-client-store": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-client-ui-primitives": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-rc.3",
     "@deepseek-ai/dsh-client-ui-settings": "0.2.1-rc.3",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-client-ui-theme": "0.2.1-rc.3",
     "@deepseek-ai/dsh-settings": "0.2.1-rc.3",
     "@types/node": "^22.20.0",
     "@types/react": "~18.3.1",
