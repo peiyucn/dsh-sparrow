@@ -41,7 +41,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(card.includes('inset 0 1px 2px'), '上缘高光')
     assert.ok(card.includes('inset -1px 0 3px rgba(0, 0, 0'), '右缘暗边（有方向，不是一圈均匀描边）')
     assert.ok(card.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%`), '玻璃填充比例')
-    assert.ok(!/:has\(> \[data-menu-material\]\)/u.test(code), '不得有「菜单打开才切换」的降级（菜单材质那条只是常驻关 blur）')
+    assert.ok(!code.includes('data-menu-material'), '不得有「菜单打开就关模糊」的降级')
   })
 
   it('输入框下方遮罩：纯 CSS 视口对齐重画地面，零 JS、零 fixed', () => {
@@ -71,11 +71,6 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
 
-  it('官方菜单材质：只关 blur（消除重叠 backdrop-filter），保留半透明填充', () => {
-    assert.match(code, /\[data-menu-material\] \{\s*backdrop-filter: none !important;/u)
-    assert.ok(!/\[data-menu-material\][^}]*background/u.test(code), '不覆盖菜单填充（保留官方半透明材质）')
-  })
-
   it('设置弹窗：打光（按弹窗自身盒子缩放）', () => {
     const settings = /\[data-shortcut-modal='settings'\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(settings.includes('background-image: radial-gradient('))
@@ -86,8 +81,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     for (const line of code.split('\n')) {
       if (!line.trim().endsWith('{')) continue
       const gated = line.startsWith('body:not([') && (line.includes(PLAIN_ATTR) || line.includes('data-ds-dark-theme'))
-      const officialMaterial = line.startsWith('[data-menu-material]') // 覆盖官方菜单材质：改的是官方牌面，不带色调门
-      assert.ok(gated || officialMaterial, `规则必须带门：${line.trim()}`)
+      assert.ok(gated, `规则必须带门：${line.trim()}`)
     }
     assert.ok(!/background-attachment/u.test(code))
     assert.ok(!/blur\(/u.test(code), '不手写 blur 数值（统一官方 token）')

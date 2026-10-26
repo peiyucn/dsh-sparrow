@@ -178,16 +178,6 @@ ${P} [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip] {
   z-index: 3;
 }
 
-/* ===== 官方菜单材质：只关 blur，保留半透明填充 =====
-   残影只在菜单打开时出现：官方菜单（[data-menu-material]，createPortal 到 body）自带 backdrop-filter，
-   与本插件的常驻玻璃层在合成器里是两层重叠的 backdrop-filter —— Chromium 在这条路径上会复用错位的
-   背景快照（owner 截图：菜单碎片闪进输入框）。关掉菜单这一层的 blur，保留它的半透明填充（视觉上仍是
-   磨砂面板，只是不再实时模糊背景），让全页只剩本插件三块玻璃，消除重叠 blur 的触发条件。
-   这是对官方材质的一次明确覆盖，登记在 spec「已知偏离」。 */
-[data-menu-material] {
-  backdrop-filter: none !important;
-}
-
 /* ===== 设置弹窗：打光（按弹窗自身盒子缩放，窗口在视口中间，不按视口相位画） ===== */
 ${P} [data-shortcut-modal='settings'] {
 ${OBJECT_FIT_LIGHT}
