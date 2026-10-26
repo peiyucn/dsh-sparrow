@@ -96,6 +96,24 @@ describe('chat-fim 菜单样式契约（对齐官方 rc.3 菜单原语）', () =
     assert.ok(hover.includes('background: var(--dsw-alias-interactive-bg-hover)'), '悬停底必须用官方高亮 token')
   })
 
+  it('FIM 开关胶囊与官方 PermissionSelect / ModelSelect 触发器同几何（hover 底形状一致）', async () => {
+    // owner 报障：「fim 按钮的 hover 背景框和官方的不一样」—— 官方触发器圆角走 --dsw-radius-sm（8px），
+    // 我们曾写 24px 胶囊 ⇒ hover 底色被裁成「椭圆」。正文字由官方 trigger CSS 逐项对照钉住。
+    const { css } = await readInjectedCss()
+    const sw = ruleOf(css, '.dsh-chat-fim-switch')
+    expectDeclarations(sw, [
+      'height: 28px',
+      'padding: 0 4px 0 8px',
+      'border-radius: var(--dsw-radius-sm)',
+      'gap: 4px',
+      'font-size: 13px',
+      'line-height: 20px',
+    ], 'FIM 开关胶囊')
+    assert.ok(!sw.includes('border-radius: 24px'), '不得再用 24px 胶囊圆角（hover 底会被裁成椭圆）')
+    const hover = ruleOf(css, '.dsh-chat-fim-switch:hover:not(:disabled)')
+    assert.ok(hover.includes('background: var(--dsw-alias-interactive-bg-hover)'), '悬停底必须与官方触发器同 token')
+  })
+
   it('菜单底部沿用官方菜单 footer 的 l2 发丝线', async () => {
     const { css } = await readInjectedCss()
     const footer = ruleOf(css, '.dsh-chat-fim-menu-footer')

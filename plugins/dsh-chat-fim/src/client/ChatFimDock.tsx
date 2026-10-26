@@ -314,7 +314,9 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   const style = document.createElement('style')
   style.dataset.dshChatFimBusy = ''
   style.textContent = `
-/* 开关胶囊：官方下拉按钮同款（PermissionSelect trigger）——无边框、透明底、悬停亮底、省空间。 */
+/* 开关胶囊：官方 PermissionSelect / ModelSelect 触发器**逐项几何一致**
+   （height 28 / padding 0 4px 0 8px / 圆角 --dsw-radius-sm / gap 4 / 13-20 字、悬停底同 token）——
+   此前圆角写 24px（胶囊），hover 底色因此被裁成「椭圆」，和官方其他触发器明显不同。 */
 .dsh-chat-fim-switch {
   display: inline-flex;
   align-items: center;
@@ -323,7 +325,7 @@ export function ensureSuggestBusyStyles(): HTMLStyleElement {
   height: 28px;
   padding: 0 4px 0 8px;
   border: none;
-  border-radius: 24px;
+  border-radius: var(--dsw-radius-sm);
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   font-size: 13px;
