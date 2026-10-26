@@ -42,16 +42,14 @@ describe('模型选择器：分组标题（交给官方 MenuGroup 原语）', ()
     assert.ok(!/role="group"/u.test(source), '不得手写 role="group" 的分组容器')
   })
 
-  it('⛔ 菜单必须是**实心配方**且不得声明 backdrop-filter（模糊快照会画成偏移亮块）', () => {
-    // 2026-10-26（owner 反复报障）：卡片自己的 `backdrop-filter` 在部分合成路径下会把「模糊快照」
-    // 画成一块比卡片更大、位置偏移的亮块（hover 换行时尤其明显；菜单越高块越大）。正解是**不产生快照**：
-    // 不透明 bg-base + 一层色调渐变 ⇒ 实心面板（不透明、跟随色调），结构上没有快照可画。
+  it('菜单 应该 是官方同款磨砂（半透明填充 + backdrop-filter），形状/底色交回官方', () => {
+    // 2026-10-26：上一版为躲亮框改过实心配方；定位到亮框其实是 theme-tone 给 `[role='menu']` 叠的
+    // `::after` 打光（已整条移出表面表）⇒ 恢复官方同款磨砂，与权限菜单 / FIM 档位菜单观感一致。
     const menu = ruleFor('ccb-model-menu')
-    assert.ok(!/backdrop-filter/u.test(menu.body), '不得声明 backdrop-filter（快照块就是它画的）')
-    assert.match(menu.body, /background-color:\s*var\(--dsw-alias-bg-base\)/u, '必须有不透明底（否则菜单透明/透字）')
-    assert.match(menu.body, /background-image:\s*linear-gradient\(var\(--dsw-specific-menu\)/u, '色调要叠在不透明底之上（跟随主题色调）')
-    // 不得用 background 简写：它会重置 background-image（色调层当场消失）。
-    assert.ok(!/(?:^|;)\s*background:\s/u.test(menu.body), '不得用 background 简写（会重置色调渐变层）')
+    assert.match(menu.body, /background:\s*var\(--dsw-specific-menu\)/u, '半透明填充走官方菜单 token（可被 theme-tone 染色）')
+    assert.match(menu.body, /backdrop-filter:\s*var\(--dsw-menu-backdrop-filter\)/u, '模糊走官方 token')
+    // 禁止再出现「本地不透明底色 + 渐变叠加」那套实心替代（会把菜单染成另一块色）。
+    assert.ok(!/background-color:\s*var\(--dsw-alias-bg-base\)/u.test(menu.body), '不得改用本地不透明底色')
   })
 
   it('菜单 不得再声明同心内圆角钩子变量（该族规则已随做减法删除）', () => {

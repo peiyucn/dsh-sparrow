@@ -120,13 +120,12 @@ export function ensurePickerStyles(): void {
     '.ccb-model-triggerEffort { flex: 0 0 auto; color: var(--dsw-alias-label-caption); }',
     '.ccb-model-chevron { flex: 0 0 auto; color: var(--dsw-alias-label-caption); transition: transform 120ms ease; }',
     '.ccb-model-chevronOpen { transform: rotate(180deg); }',
-    // ⚠️ **实心配方，不用 `backdrop-filter`**（2026-10-26）：卡片自己的模糊会在某些合成路径下把
-    //    「模糊快照」画成一块比卡片更大的偏移亮块（owner 反复看到的那块），hover 换行时尤其明显。
-    //    这里改成「不透明 bg-base + 一层色调渐变」：合成结果是**完全不透明**的实心面板（不是透明），
-    //    跟随主题色调（`--dsw-specific-menu` 已被 theme-tone 染色），且没有模糊 ⇒ 结构上不可能再出快照块。
-    //    ⚠️ 别改回 `background: var(--dsw-specific-menu)` + `backdrop-filter`：那份 45% 半透明 + 模糊
-    //    在拿不到模糊时会直接变成「透明菜单」（owner 已报过一次）。
-    '.ccb-model-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; background-color: var(--dsw-alias-bg-base); background-image: linear-gradient(var(--dsw-specific-menu), var(--dsw-specific-menu)); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
+    // ⚠️ **回归官方磨砂配方**（2026-10-26 第二轮）：上一版为了躲「hover 闪出的亮框」改成实心配方，
+    //    后来定位到亮框来自 **theme-tone 给所有 `[role='menu']` 叠的那层 `::after` 打光**（三个菜单形状
+    //    各异 ⇒ 各自的伪元素盒），theme-tone 已把菜单族整条移出表面表 ⇒ 这里可以恢复官方同款：
+    //    `background: var(--dsw-specific-menu)`（45% 半透明，已被 theme-tone 染色）+ `backdrop-filter`。
+    //    ⚠️ 若亮框再现，先查是不是又有人往菜单上叠图层/背景，再考虑回实心配方。
+    '.ccb-model-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20; display: flex; flex-direction: column; width: max-content; min-width: min(280px, calc(100vw - 32px)); max-width: min(460px, calc(100vw - 32px)); max-height: min(360px, calc(100vh - 96px)); overflow: hidden; padding: 4px; border: 0; border-radius: 20px; background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); box-shadow: var(--dsw-elevation-prominent); color: var(--dsw-alias-label-primary); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }',
     '.ccb-model-status, .ccb-model-empty { padding: 10px; color: var(--dsw-alias-label-tertiary); font-size: 13px; line-height: 20px; }',
     '.ccb-model-error, .ccb-model-warning { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; padding: 7px 8px; border-radius: 8px; background: var(--dsw-alias-interactive-bg-hover-danger); color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; }',
     '.ccb-model-warning { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-state-warn-label); }',
