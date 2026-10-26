@@ -447,6 +447,13 @@ function install(ctx: Context): void {
     // 成功之后才认账
     lastTokenKey = key
     disposeTokens = dispose
+    /**
+     * ⚠️ **门与 token 必须由同一次读取派生**：门（`PLAIN_ATTR`）决定「官方默认档整表让路」，
+     * 而它此前只在 `paintLayer` 里写；两条路径（`repaint` / `theme/change`）与设置就绪的先后没有保证 ⇒
+     * 真机出现过「token 已是官方值、门却还开着」的混合态（官方默认档下我们的玻璃 / 分组标题 / z-index
+     * 仍生效，看起来就是"官方被我们动过"）。把门写在这里，token 一落地门就跟着落地，两者不可能分叉。
+     */
+    paintPlain(backdropPlan(ctx.theme.getTheme().active.colorScheme, settings).hidden)
   }
 
   /**
