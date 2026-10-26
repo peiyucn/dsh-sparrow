@@ -820,6 +820,15 @@ describe('glass：边界与纪律', () => {
           selector.includes('[data-expanded]') && selector.includes('[data-open]'),
           `吸顶遮罩行必须收窄到官方加底的那个状态：${selector}`,
         )
+        // ⚠️ 背景几何必须是**视口对齐**（backingPaint 里的 background-attachment: fixed）：
+        // 显式 100vw×100vh + 位置 0 0 只对「钉在视口原点」的元素等价，标题条在滚区里会滚动 ⇒
+        // 切错渐变换片、与周围地面差一档（2026-10-27 实测就是「展开 Think 后出现一条」）。
+        const disclosureBody = block.slice(block.indexOf('{') + 1, block.lastIndexOf('}')).trim()
+        assert.match(
+          disclosureBody,
+          /background-attachment:\s*fixed/u,
+          '吸顶遮罩行必须用视口对齐（background-attachment: fixed），别改回显式几何',
+        )
         continue
       }
       assert.match(selector, /\[data-phase='active'\]/u, `规则「${selector}」必须限定 active 相位`)

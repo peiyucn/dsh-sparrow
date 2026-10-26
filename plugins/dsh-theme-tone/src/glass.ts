@@ -526,14 +526,18 @@ body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-d
 /* ===== 官方那些**吸顶遮罩行**：底色要等于它盖住的内容底 =====
    官方给展开的 Think 行刷**不透明纯色** var(--dsw-alias-bg-base) 并吸在滚区顶部、压住滚过去的正文；官方档下那就是地面纯色、看不出带子，而我们的地面是**渐变光带 + 颗粒** ⇒ 纯色底一盖上去就显成一条「黑框」。
    修法与顶栏同一套（同一类东西：抬到地面之上、又必须等于地面）：**把地面原样重画一遍**（同色 + 同渐变 + 同颗粒）。
-   ⚠️ 背景几何走 groundRedrawPaint（显式 100vw×100vh + scroll），**不再用 background-attachment: fixed** —— fixed 每帧按视口栅格化，行虽小但同样要付（spec 10：成本与声明尺寸无关）；显式几何逐像素等价（实测 0.005%）。
+   ⚠️ 背景几何**必须用 background-attachment: fixed（视口对齐）**，不能用「显式 100vw×100vh + 位置 0 0」那套：
+      那套只在**元素本身钉在视口原点**时等价（整屏地面 / 轨迹视图用它是对的）；标题条在滚区里**会滚动**，
+      0 0 会把渐变的左上角切给它、与周围地面差一档 —— 2026-10-27「展开 Think 后出现一条」就是这条几何错位
+      （**属性名与几何是两处独立的错**，都已修）。
+      代价：sticky 标题条每帧按视口栅格化 —— 只在**有展开的 Think** 时存在，可接受；别为省这点改回显式几何。
    ⚠️ **锚点必须是真正加底的那个元素**：官方 rc.3 起吸顶加底的是 [data-disclosure-header]（DisclosureRow.tsx:88 的 .header），
       而 [data-disclosure-row] 是**行内容**（同文件 :91）—— 写在 row 上等于给错误的元素刷底，header 那条纯色底照样露出来
       （owner 报障：「展开 think 后出现一条」）。2026-10-27 按官方 ReasoningRow.module.css:17 的规则逐字对齐。
    ⚠️ 同时收窄到官方自己加底的那个状态（[data-expanded] [data-open]）—— 只写属性会把**所有**折叠行都刷上一层底。
    ⚠️ 只挂色调档 —— 官方默认档下地面本来就是纯色，重画等于没事找事。 */
 body:not([${PLAIN_ATTR}]) [data-expanded] [data-open] [data-disclosure-header] {
-  ${groundRedrawPaint()}
+  ${backingPaint()}
 }
 
 /* ===== 轨迹视图：把我们的地面**铺满它自己的不透明面** =====
