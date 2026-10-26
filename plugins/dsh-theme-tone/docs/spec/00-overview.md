@@ -11,12 +11,12 @@
 3. **对话区顶栏玻璃**：顶栏浮层化（`position: absolute` + 滚动区 `padding-top: 76px` + 滚动条 track 下推
    + 拖拽条上沿裁到 76px），玻璃放在顶栏的 `::before`（`z-index: -1`），模糊复用官方
    `var(--dsw-menu-backdrop-filter)`，填充 = `bg-base` × 70% 半透明，并**自绘同源三道光**。
-4. **输入框玻璃**：座位恢复透明（正文重新从卡片玻璃下滚过），底部一小段「地面同源」带挡住
-   卡片下方滚出的正文；**模糊与半透明填充直接挂在卡片本体上**（不再用卡片 ::before 负层）+ 卡片
-   `isolation: isolate` 自成 backdrop root；边缘光是**有方向**的（上亮/左弱亮/右暗/下暗，深浅两套）。
-   改用卡片本体承载 blur 的原因：旧实现的「卡片负层 backdrop-filter」与官方菜单（body 层的
-   backdrop-filter）重叠时，Chromium 会把菜单碎片快照画进卡片（owner 截图）；官方菜单已 createPortal
-   到 body，不在卡片子树内，卡片作为 backdrop root 不会波及它们。**残影是否根治需 owner 真机复看**。
+4. **输入框玻璃（不做 live blur）**：座位恢复透明（正文仍从卡片下滚过），底部一小段「地面同源」带
+   挡住卡片下方滚出的正文；卡片本体半透明（88%）+ 官方 elevation + **有方向**边缘光（上亮/左弱亮/
+   右暗/下暗，深浅两套）+ 卡片作用域内 `--dsw-specific-selector: transparent`（「+」按钮让出实心底色）。
+   **不带 `backdrop-filter`** —— 见「已知偏离」里的一天证据链：当前 Chromium 上「输入框 live blur +
+   官方菜单浮层」不可共存，只能二选一；这里选「无残影」，把 live blur 留在顶栏与右栏（它们不与菜单
+   浮层重叠）。
 
 5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的
    两个盒子 ⇒ 带背后永远只有面板纯色，直接加 blur 只能糊一块均匀色（读起来是实心板）。做法：
@@ -96,17 +96,10 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
   不会崩）；已登记 `docs/private-seams.md`。
 * 右栏「正文上提 76px」是对官方滚动盒的**视觉位置改写**（margin + transform，不改 DOM 结构）：
   官方若改渲染器结构 / data 属性，lift 会静默不命中，退回「带是半透明实心板」的降级观感。
-* 输入框残影（2026-10-27 现状）：**不用「菜单打开就撤 blur」的降级**（owner 明确否定：模糊不能消失），
-  也**不再**用「座位光墙 + 静态 backdrop」（owner 实测：bug 没消失且功能被砍，已回退）。当前假设是
-  「两个 backdrop-filter 层重叠（卡片的负层 + body 层菜单）」触发的 Chromium 合成快照错位 ⇒ 改为
-  卡片本体承载 blur（去掉负层，改由卡片 isolation 自成 backdrop root）。**属结构性尝试，真机是否
-  仍闪未验证**；若仍闪，剩余选项只有：① 关掉官方菜单材质的 blur（改官方材质）、② 接受偶发残影、
-  ③ 放弃输入框 live blur。
-
-## 验证
-
-* `npm run verify`：typecheck → build → test → package。
-* 单测覆盖：三块玻璃的 CSS 契约（含「无 fixed / 无手写 blur / 全部带门」）、地面光层三道光与层序、
-  token 计划与官方默认档、client half 无逐帧探测。
-* 真机验收（无头 + owner 复看）：三条玻璃面的 `backdrop-filter` 计算值、顶栏浮层化后 y=76 不变量、
-  输入框下方遮罩与地面连续、右栏 76px 让位。
+* 输入框残影（2026-10-27 结论，一天逐项排除）：证据链 —— ① 输入框区域只要有 **live backdrop-filter**，
+  模型菜单一开、工具输出一更新，Chromium 就把菜单碎片的错位快照画进卡片；② 把座位改成静态光墙
+  （backdrop 不再含重绘正文）→ 残影仍在（与采样内容无关）；③ 关掉官方菜单自己的 blur → 仍在
+  （与「两层 blur 重叠」无关）；④ 早期「整页无 blur」版本残影消失。⇒ 触发条件就是**本插件在输入框
+  区域的 backdrop-filter 层**，当前 Chromium 无解。取舍：输入框去掉 live blur（保留透明 + 同源光 +
+  有方向边缘光），顶栏 / 右栏保留 live blur（不与菜单重叠）。**这是与 owner 的明确取舍，不是疏漏**；
+  等 Chromium / 官方修复合成路径后可恢复输入框 blur。
