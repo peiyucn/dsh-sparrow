@@ -83,11 +83,44 @@ import { createThemeToneRowStore } from './store.js'
 export const inject = ['theme', 'slots', 'locale']
 
 /**
+ * 诊断开关（**只做减法、只影响本次页面加载**）：`?dshtone-off=glass,seam,surface,docked,backdrop,sweep,navpin`
+ * 关掉对应那组样式表，用来二分「某个异常是哪组绘制画的」。
+ *
+ * 背景：合成层类问题（偏移淡框 / 亮条）依赖具体 GPU 合成路径，无头环境复现不出来，靠猜改代码只会来回翻饼。
+ * 有了它，用户刷新一次带不同参数的 URL 就能定位到组，再回到代码里改那一组 —— 上线路径不受影响
+ * （不带参数时行为与原来逐字一致）。
+ */
+const DEBUG_OFF_GROUPS = ['backdrop', 'glass', 'seam', 'surface', 'sweep', 'navpin'] as const
+type DebugOffGroup = typeof DEBUG_OFF_GROUPS[number]
+function debugOffGroups(): ReadonlySet<DebugOffGroup> {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('dshtone-off') ?? ''
+    const wanted = new Set(raw.split(',').map(s => s.trim()).filter(Boolean))
+    return new Set(DEBUG_OFF_GROUPS.filter(group => wanted.has(group)))
+  } catch {
+    return new Set()
+  }
+}
+
+/**
  * 注入样式表（背景层 + 设置行 + 玻璃 + 缝挡板 + 抬升面 + 遮罩模糊 + 扫光带 + 轮次导航/宽度钳制合成一张；
  * 按标记属性去重，HMR / 重载不叠加）。⚠️ nav-pin 那两段并入**本表**、不再单开 `style[data-dsh-nav-pin]`。
  */
 function ensureStyles(): HTMLStyleElement {
-  const css = `${buildBackdropCss()}${buildRowCss()}${buildGlassCss()}${buildSeamCss()}${buildSurfaceCss()}${buildMaskCss()}${buildSweepCss()}${buildNavPinCss()}${buildCaptionCss()}${buildPopoverCss()}`
+  const off = debugOffGroups()
+  const part = (group: DebugOffGroup, build: () => string): string => off.has(group) ? '' : build()
+  const css = [
+    part('backdrop', buildBackdropCss),
+    buildRowCss(),
+    part('glass', buildGlassCss),
+    part('seam', buildSeamCss),
+    part('surface', buildSurfaceCss),
+    buildMaskCss(),
+    part('sweep', buildSweepCss),
+    part('navpin', buildNavPinCss),
+    buildCaptionCss(),
+    buildPopoverCss(),
+  ].join('')
   const existing = document.querySelector<HTMLStyleElement>(STYLE_SELECTOR)
   if (existing !== null) {
     // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之。
