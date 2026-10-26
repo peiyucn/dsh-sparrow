@@ -42,6 +42,18 @@ describe('模型选择器：分组标题（交给官方 MenuGroup 原语）', ()
     assert.ok(!/role="group"/u.test(source), '不得手写 role="group" 的分组容器')
   })
 
+  it('⛔ 菜单必须是**实心配方**且不得声明 backdrop-filter（模糊快照会画成偏移亮块）', () => {
+    // 2026-10-26（owner 反复报障）：卡片自己的 `backdrop-filter` 在部分合成路径下会把「模糊快照」
+    // 画成一块比卡片更大、位置偏移的亮块（hover 换行时尤其明显；菜单越高块越大）。正解是**不产生快照**：
+    // 不透明 bg-base + 一层色调渐变 ⇒ 实心面板（不透明、跟随色调），结构上没有快照可画。
+    const menu = ruleFor('ccb-model-menu')
+    assert.ok(!/backdrop-filter/u.test(menu.body), '不得声明 backdrop-filter（快照块就是它画的）')
+    assert.match(menu.body, /background-color:\s*var\(--dsw-alias-bg-base\)/u, '必须有不透明底（否则菜单透明/透字）')
+    assert.match(menu.body, /background-image:\s*linear-gradient\(var\(--dsw-specific-menu\)/u, '色调要叠在不透明底之上（跟随主题色调）')
+    // 不得用 background 简写：它会重置 background-image（色调层当场消失）。
+    assert.ok(!/(?:^|;)\s*background:\s/u.test(menu.body), '不得用 background 简写（会重置色调渐变层）')
+  })
+
   it('菜单 不得再声明同心内圆角钩子变量（该族规则已随做减法删除）', () => {
     // ⚠️ 2026-10-26：theme-tone 的「分组菜单滚动容器切同心圆角」整族已交回官方，本插件不再声明钩子变量。
     const menu = ruleFor('ccb-model-menu')
