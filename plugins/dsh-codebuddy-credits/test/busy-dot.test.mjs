@@ -14,7 +14,6 @@ const read = (name) => readFile(new URL(name, CLIENT), 'utf8')
 const TEXT_LOADING_SITES = [
   ['CodeBuddyCreditsCard.tsx', '\'picker.trigger.loading\''],
   ['CodeBuddyCreditsIndicator.tsx', '\'indicator.loading\''],
-  ['CodeBuddyModelSelect.tsx', '\'picker.status.loading\''],
 ]
 
 describe('codebuddy-credits：加载态只给转圈、不给纯文字', () => {

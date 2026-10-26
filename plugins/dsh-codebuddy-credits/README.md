@@ -49,9 +49,9 @@ Open **Settings → Models** and paste your key on the **CodeBuddy Credits** row
   plain name + `x0.00 · 1M` credit rate · context window) with a **Fetch
   available models** button, so you can refresh after an administrator changes
   the list. Refreshing only affects this provider.
-- The models then appear in the model picker. Each model row shows the plain
-  model name with its credit rate and context window on the right
-  (`x0.00 · 1M`), and the available reasoning levels come from the server.
+- The models then appear in the **official** model picker (grouped under this
+  provider). The plugin does not customize the picker; credit rate and context
+  window are shown on the settings card and in the session header panel.
 - Without a key the plugin makes no network requests at all and the provider
   does not appear in the model picker.
 - Removing the key deactivates the provider.

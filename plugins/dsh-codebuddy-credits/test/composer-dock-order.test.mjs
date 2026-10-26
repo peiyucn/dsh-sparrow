@@ -13,15 +13,12 @@ import { describe, it } from 'node:test'
  * `ui-slots/src/index.ts:1282-1288`）。本插件 order 2 ⇒ 无论注册先后都排在官方 usage 之后，
  * 不需要 priority 决胜。
  *
- * C：`conversation.input.model` 不得声明子槽 `conversation.input.model.label` —— 官方
- * ui-model-selection 注册同一父槽时已声明（上游 `ui-model-selection/src/client/index.ts:172-177`），
- * ui-slots 规定「一个子槽只有一个声明者」（上游 `ui-slots/src/index.ts:1245-1250` 抛
- * "already declared"），重复声明会让本注册失败并退回官方。
+ * ⚠️ 2026-10-27 架构调整：本插件**不再注册 `conversation.input.model`**（旧做法是 priority -1 遮蔽官方
+ * ModelSelect）。模型选择器 = 官方 ui-model-selection，本插件的模型经 host 侧 `ctx.llm.registerAdapter`
+ * 进官方目录 ⇒ 官方菜单原生列出。遮蔽会让插件重复承担材质 / portal / `backdrop-filter` 的坑。
  */
 const INDEX_SOURCE = new URL('../src/client/index.ts', import.meta.url)
-const CONTRACT_SOURCE = new URL('../src/client/slot-contract.d.ts', import.meta.url)
 const index = await readFile(INDEX_SOURCE, 'utf8')
-const contract = await readFile(CONTRACT_SOURCE, 'utf8')
 
 /** 官方 composer.dock 两条 entry 的 order（上游 ui-chat StatsPills / README:71）。 */
 const OFFICIAL_DOCK_ORDER = { activity: 0, usage: 1 }
@@ -85,29 +82,3 @@ describe('D：conversation.composer.dock 我方 entry 次序', () => {
   })
 })
 
-describe('C：conversation.input.model 不得重复声明 label 子槽', () => {
-  it('注册选项显式用 priority -1 遮蔽官方，且不声明 children', () => {
-    const modelBlock = blockOf(index, "scopeCtx.slots.inject('conversation.input.model'", 'CodeBuddyModelSelect as unknown as')
-    const code = stripComments(modelBlock)
-    assert.match(code, /priority:\s*-1/u, '必须以 priority -1 遮蔽官方 ModelSelect')
-    assert.ok(
-      !/\bchildren\s*:/u.test(code),
-      '不得声明 children：官方 ui-model-selection 已声明 conversation.input.model.label，'
-        + '重复声明会被 ui-slots 的「一个子槽一个声明者」校验抛错（上游 ui-slots/src/index.ts:1245-1250），'
-        + '轻则本插件注册失败退回官方，重则顶掉官方注册。',
-    )
-    assert.ok(
-      !/'conversation\.input\.model\.label'/u.test(code),
-      '注册代码里不得出现 conversation.input.model.label（那是官方声明的子槽）',
-    )
-  })
-
-  it('类型层只补父槽，不重复声明官方已发布的 label 子槽', () => {
-    assert.match(contract, /'conversation\.input\.model':\s*\{/u, '父槽类型要在 slot-contract.d.ts 里声明')
-    assert.ok(
-      !/'conversation\.input\.model\.label'\s*:/u.test(contract),
-      'label 子槽由官方 ui-model-selection 的 slots.d.ts 声明（经 /client 类型入口加载），'
-        + '此处重复声明会与官方类型冲突',
-    )
-  })
-})
