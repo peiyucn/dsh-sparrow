@@ -25,7 +25,7 @@ Open **Settings → General** — a **Tone** row sits directly under the **Appea
 
 Picking any tone other than **Default** also tunes the conversation layout (on **Default** everything stays as it is):
 
-* Turn navigation: with a tone picked, the rail stays available on narrower conversation columns than on **Default**; at the narrowest widths it is hidden by default and fades in on hover over the right edge (or keyboard focus) — no frame, no background
+* Turn navigation (**both modes**, tone or not): the rail stays available on narrower conversation columns than on **Default**; at the narrowest widths it is hidden by default and fades in on hover over the right edge (or keyboard focus) — no frame, no background
 * Conversation content clearance: the conversation keeps wider side margins on wide columns; on narrow columns the content no longer runs under the right drag handle
 
 It also fixes a drag-handle glitch (**no tone needed — active in both themes**): hovering either "resize conversation" drag handle used to leave the highlight sitting low, only snapping to the pointer once you held the button down; the highlight now follows the pointer on hover too.

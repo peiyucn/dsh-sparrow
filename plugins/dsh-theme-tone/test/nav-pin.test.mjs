@@ -1,7 +1,8 @@
 // @ts-check
 /**
  * dsh-theme-tone：轮次导航 + 宽度钳制（自 `dsh-nav-pin` 并入，见 `docs/spec/09-nav-pin-merge.md`）。
- * ⚠️ 与原版唯一的实质差异：四段规则现在**全部带色调门**，官方默认档下不产出。
+ * ⚠️ 2026-10-26 起**取消色调门**：nav-pin 是布局功能（原独立插件的能力），与色调无关，
+ * 官方默认档下同样生效（owner 报障「官方默认下 nav-pin 不生效」后调整）。
  * 原版那几条断言（选择器形状、断点、命中区、宽度钳制公式）钉的是同一批契约，逐条保留。
  */
 import assert from 'node:assert/strict'
@@ -12,9 +13,6 @@ import { PLAIN_ATTR } from '../lib/constants.js'
 
 /** 去掉注释后的样式表文本（判据只看声明；注释里会引用反面教材）。 */
 const stripped = (text) => text.replace(/\/\*[\s\S]*?\*\//gu, '')
-
-/** 色调门前缀（与实现同源，防止两边各写一份）。 */
-const GATE = `body:not([${PLAIN_ATTR}])`
 
 describe('dsh-theme-tone 轮次导航与宽度钳制（自 nav-pin 并入）', () => {
   describe('slotSelector', () => {
@@ -164,54 +162,28 @@ describe('dsh-theme-tone 轮次导航与宽度钳制（自 nav-pin 并入）', (
   })
 
   /**
-   * 判据：**改官方有意设计选择（断点、留白）必须带门**；官方默认档（body 带 PLAIN_ATTR）下一条都不许命中。
+   * 判据（2026-10-26 起，owner 决定）：nav-pin 是**布局功能**（原独立插件的能力），与色调选择无关，
+   * 官方默认档下也必须生效 —— 与 `handle-glow` / `mask` 同类。⚠️ 此前四段全部带 `PLAIN_ATTR` 门，
+   * 导致「切到官方默认后轮次导航/宽度钳制整块失效」（owner 报障）。
    */
-  describe('色调门（方案 §3.1 决策 3 —— 四段全部带门）', () => {
+  describe('不带色调门（布局功能，两个档位都生效）', () => {
     const css = buildNavPinCss()
     const rules = stripped(css)
 
-    it('⛔ display: block 那条也必须带门（它是"改官方断点"的核心动作，漏了契约当场作废）', () => {
-      // 单独钉它：漏了这条，官方默认档下导航也不再按 900px 消失。
-      const at = rules.indexOf('display: block')
-      assert.ok(at > 0, '应产出一条 display: block')
-      const open = rules.lastIndexOf('{', at)
-      const prevClose = rules.lastIndexOf('}', open)
-      const sel = rules.slice(prevClose + 1, open)
-      assert.ok(sel.includes(GATE), `display: block 那条缺少色调门：${sel.trim().slice(-120)}`)
+    it('⛔ 任何规则都不得再带 PLAIN_ATTR 门', () => {
+      assert.ok(!rules.includes(`[${PLAIN_ATTR}]`), '不得出现官方默认门（否则官方档整块失效）')
+      assert.ok(!css.includes(`body:not([${PLAIN_ATTR}])`), '不得出现 body:not([plain]) 前缀')
     })
 
-    it('四段（恒显 / 浮现 / 命中区 / 宽度钳制 / reduced-motion）全部带门', () => {
-      // 逐段定点取样：全文数一遍的话漏一段也照样通过。
-      const probes = [
-        ['恒显 display:block', 'display: block'],
-        ['浮现 opacity:0', 'opacity: 0'],
-        ['命中区 ::before', 'nav::before'],
-        ['宽度钳制 min()', '--dsh-chat-content-width: min('],
-        ['卡片宽度重算', '--dsh-composer-card-max-width:'],
-        ['reduced-motion 过渡', 'transition: none'],
-      ]
-      for (const [label, needle] of probes) {
-        const at = rules.indexOf(needle)
-        assert.ok(at > 0, `缺少「${label}」`)
-        const open = rules.lastIndexOf('{', at)
-        const prevClose = rules.lastIndexOf('}', open)
-        // 选择器可能跨多行，取到上一个规则结束为止。
-        const sel = rules.slice(prevClose + 1, open)
-        assert.ok(sel.includes(GATE), `「${label}」缺少色调门：${sel.trim().slice(-120)}`)
+    it('display: block / 浮现 / 命中区 / 宽度钳制 四段都在', () => {
+      for (const needle of ['display: block', 'opacity: 0', 'nav::before', '--dsh-chat-content-width: min(', '--dsh-composer-card-max-width:', 'transition: none']) {
+        assert.ok(rules.includes(needle), `缺少：${needle}`)
       }
     })
 
-    it('⛔ 官方默认档语义：门上写的是 body:not([plain])，故 plain 生效时整段不命中', () => {
-      // 钉的是「门的形式」：与 backdrop / glass 两张表同形（同一 PLAIN_ATTR、同一 GATE 写法）。
-      assert.ok(css.includes(GATE), '产出必须带门')
-      assert.ok(!/^\s*\[data-conversation-scroll\][^{]*\{/mu.test(rules.replace(/^.*?display: block/mu, '')), '不得存在不带门的选择器块')
-      // 任何以 [data-conversation-scroll] / [data-phase] 打头的规则块都要含门。
-      const blocks = rules.split('}').filter(b => b.includes('{'))
-      for (const block of blocks) {
-        const sel = block.slice(0, block.indexOf('{'))
-        if (!/\[data-(conversation-scroll|phase|width-handle)\]/u.test(sel)) continue
-        assert.ok(sel.includes(GATE), `不带门的选择器块：${sel.trim().slice(-120)}`)
-      }
+    it('选择器仍以锚点属性定位（不回到官方 tag/类名）', () => {
+      assert.ok(rules.includes(anchorSelector(ANCHOR.turnNavHost)), '轮次导航锚点')
+      assert.ok(rules.includes(anchorSelector(ANCHOR.scrollWrap)), '滚动体包裹层锚点')
     })
 
     it('返回文本里不得出现旧的 nav-pin 自有标记（已并入 theme-tone 单表）', () => {
@@ -219,3 +191,6 @@ describe('dsh-theme-tone 轮次导航与宽度钳制（自 nav-pin 并入）', (
     })
   })
 })
+
+// PLAIN_ATTR 仍用于断言「不得出现」，保留 import。
+void PLAIN_ATTR

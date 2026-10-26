@@ -1,9 +1,8 @@
 /**
- * dsh-theme-tone：轮次导航窄屏不消失 + 会话宽度钳制。**四段规则全部带色调门**（`body:not([PLAIN_ATTR])`）：它们改的是官方有意的设计选择（断点、留白）—— 判据是「恢复官方本该有的行为」不带门、「改变官方有意的设计选择」带门（反例见 `handle-glow.ts`）。
+ * dsh-theme-tone：轮次导航窄屏不消失 + 会话宽度钳制（自 `dsh-nav-pin` 并入，见 `docs/spec/09-nav-pin-merge.md`）。**四段规则不带色调门**：它们是**布局功能**（原独立插件的能力），与色调选择无关，官方默认档下同样生效 —— 与 `handle-glow.ts` / `mask.ts` 同类（改的是布局取舍，不是给官方外观上色）。
  * ⚠️ `display: block` 那条**也必须带门**：它是「改官方断点」的核心动作，漏掉等于官方默认档也被改了，对外契约（官方档 = 逐像素一致）当场作废。
  */
 
-import { PLAIN_ATTR } from './constants.js'
 import { ANCHOR, anchorSelector } from './anchors.js'
 
 /** 官方轮次导航 nav 的 aria-label 文案（zh / en 两套；官方改文案需同步更新）。 */
@@ -27,9 +26,6 @@ export const CONTENT_MIN_FLOOR_PX = 640
 /** 官方输入卡片比内容宽的固定增量（--dsh-composer-card-max-width = 内容宽 + 32px）。 */
 const CARD_EXTRA_WIDTH_PX = 32
 
-/** 色调门前缀：与 `backdrop.ts` / `glass.ts` 同一套写法；官方默认档下 body 带 PLAIN_ATTR ⇒ 下列规则都不命中。 */
-const GATE = `body:not([${PLAIN_ATTR}]) `
-
 /**
  * 轮次导航 slot 定位选择器：对话滚动体内、轮次导航 nav 的**直接父元素**（slot 是官方 `display: none`
  * 的作用目标，本规则以更高特异性压过它）。判据走**锚点属性** `ANCHOR.turnNavHost`（由 client half 维护、
@@ -45,7 +41,7 @@ export function slotSelector(_label: string): string {
  * ⚠️ 必须打到 **nav** 上（`.frame` 就是那个 `<nav aria-label=…>`）—— 打在外层 slot 上是空操作。
  */
 function alwaysVisibleRule(labels: readonly string[]): string {
-  const navs = labels.map(label => `${GATE}${slotSelector(label)} > nav`).join(',\n')
+  const navs = labels.map(label => `${slotSelector(label)} > nav`).join(',\n')
   return `${navs} {
   display: block;
 }`
@@ -53,11 +49,11 @@ function alwaysVisibleRule(labels: readonly string[]): string {
 
 /** ≤断点：默认隐身（保留指针命中），hover / 键盘 focus 淡入浮现；只做 opacity，不加框 / 底色 / 阴影。 */
 function hoverRevealBlock(labels: readonly string[], breakpointPx: number): string {
-  const navs = labels.map(label => `${GATE}${slotSelector(label)} > nav`).join(',\n')
-  const hitAreas = labels.map(label => `${GATE}${slotSelector(label)} > nav::before`).join(',\n')
+  const navs = labels.map(label => `${slotSelector(label)} > nav`).join(',\n')
+  const hitAreas = labels.map(label => `${slotSelector(label)} > nav::before`).join(',\n')
   const reveals = labels.flatMap(label => [
-    `${GATE}${slotSelector(label)} > nav:hover`,
-    `${GATE}${slotSelector(label)} > nav:focus-within`,
+    `${slotSelector(label)} > nav:hover`,
+    `${slotSelector(label)} > nav:focus-within`,
   ]).join(',\n')
   return `@container (max-width: ${breakpointPx}px) {
   ${navs} {
@@ -86,7 +82,7 @@ function hoverRevealBlock(labels: readonly string[], breakpointPx: number): stri
  * 写在外层 `[data-phase]` 自身上时该变量解析为空 → 下游 `min(空, …)` 让整条自定义属性 invalid → 滚动体与拖拽条的宽度轴**全部失效**。
  */
 function widthCapBlock(): string {
-  const body = `${GATE}[data-phase] > ${anchorSelector(ANCHOR.scrollWrap)}`
+  const body = `[data-phase] > ${anchorSelector(ANCHOR.scrollWrap)}`
   return `${body} {
   --dsh-nav-pin-official-width: var(--dsh-chat-content-width);
 }
@@ -104,7 +100,7 @@ ${body} > [data-conversation-scroll] {
 
 /** reduced-motion：关闭 opacity 过渡。 */
 function reducedMotionBlock(labels: readonly string[], breakpointPx: number): string {
-  const navs = labels.map(label => `${GATE}${slotSelector(label)} > nav`).join(',\n')
+  const navs = labels.map(label => `${slotSelector(label)} > nav`).join(',\n')
   return `@media (prefers-reduced-motion: reduce) {
   @container (max-width: ${breakpointPx}px) {
     ${navs} {
@@ -115,7 +111,7 @@ function reducedMotionBlock(labels: readonly string[], breakpointPx: number): st
 }
 
 /**
- * 生成注入样式表：恒显 + hover 浮层 + 宽度钳制 + reduced-motion 四段拼接（**四段全带色调门**）。
+ * 生成注入样式表：恒显 + hover 浮层 + 宽度钳制 + reduced-motion 四段拼接（**不带色调门**：布局功能，两个档位都生效）。
  * 异常输入取安全默认：空标签集 → 空串（无目标不注入任何规则）；非正断点 → 回退默认断点。
  */
 export function buildNavPinCss(
@@ -125,7 +121,7 @@ export function buildNavPinCss(
   if (labels.length === 0) return ''
   const breakpoint = Number.isFinite(breakpointPx) && breakpointPx > 0 ? breakpointPx : HOVER_HIDE_BREAKPOINT_PX
   return `/* dsh-theme-tone：轮次导航窄屏不消失（官方 900px 断点提到 ${breakpoint}px；更窄时 hover 浮现为浮层）——
- * 四组规则全部带色调门 body:not([${PLAIN_ATTR}])，官方默认档下一条都不命中。 */
+ * 四段规则**不带色调门**（布局功能，两个档位都生效）。 */
 
 /* 1) 恒显：压过官方 @container (max-width: 900px) 的 display: none（特异性更高，无需 !important）。 */
 ${alwaysVisibleRule(labels)}
