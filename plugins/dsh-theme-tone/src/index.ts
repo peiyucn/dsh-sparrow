@@ -66,8 +66,6 @@ export {
 } from './popover.js'
 export {
   GLASS_BLUR,
-  GLASS_CARD_ALPHA,
-  GLASS_CARD_BLUR,
   GLASS_CARD_LIFT,
   GLASS_CARD_PHASES,
   GLASS_HEADER_ALPHA,

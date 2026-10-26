@@ -472,24 +472,38 @@ owner 同时问了「右边栏顶部和对话区顶部的透明模糊规格一�
 > 轨道 margin 是 WebKit 滚动条伪元素的原生能力，且**官方自己就在用**
 > （`.scrollBody::-webkit-scrollbar-track { margin: 2px }`）；dsh Web 只跑 Chromium，口径一致。
 
-## 3) 输入框：玻璃**只做在卡片上**
+## 3) 输入框：**静态质感面**（2026-10-27 起，不再做 `backdrop-filter`）
+
+> ⚠️ **2026-10-27 重大修订（owner 观察 + 本插件的判断）**：
+> owner 报「模型列表 / 输入框上方那块淡框的**闪动节奏与对话区 think / edit / write 的更新频率一致**，
+> 同时长期性能问题改了几版都没彻底解决」。
+> 分析：卡片压在**会滚动、且每帧都在变**的对话内容之上，`backdrop-filter` 会在内容每次变化时重新采样并
+> 模糊**整块卡片区域**（合成器每帧开销）；而本插件自己又在这棵子树里做探针 / 相位写入，两个重绘源叠在同一块
+> 区域。这与「一块跟着刷新节奏闪的淡框」和「滚动/流式卡顿」都吻合 —— 且它是全插件**唯一**还压在动态内容
+> 之上的 blur（顶栏那条已因浮层化而不像卡片这样直接压内容）。
+> **处置**：输入框卡片改为**静态面** —— 官方不透明底色（已被 token 染成色调）+ 两条静态边光 + inset 环 +
+> 悬浮投影，**删除 `backdrop-filter` 与自绘半透明填充**（`GLASS_CARD_ALPHA` / `GLASS_CARD_BLUR` 两个常量
+> 一并删除）。观感差异只在「背后内容是否被糊掉」，而那部分本来就被卡片遮住 90%+；换来的是**零按帧重采样**。
+> 顶栏与右栏顶条的玻璃**暂不动**（它们已不在卡片这条路径上）；若后续仍觉卡顿，再按同一判据收敛。
 
 输入框是**底座**（`.composerSeat`）套**卡片**（`[data-composer-card]`，卡片在 `InputBar.tsx` 的 `data-composer-card` 属性处）。
-官方两层都是**不透明**的，所以玻璃只做在**卡片**这一层：
+官方两层都是**不透明**的，现在只在**卡片**上叠静态边光：
 
 | 层 | 官方 | 现在 | 理由 |
 | :--- | :--- | :--- | :--- |
 | 底座 | `bg-base` 到 36px 的**实色**渐隐带 | **不画**（`background: none`） | 在本插件的色调背景上它读成一条纯色带 |
-| 卡片 | `--dsw-specific-input-major` **实色** | **58%** + `backdrop-filter` | **它才是**用户盯着的玻璃面，形状天然等于卡片 |
+| 卡片 | `--dsw-specific-input-major` **实色** | **保留官方底色**（token 已染色） + **静态边光 / inset 环 / 悬浮投影** | 形状天然等于卡片；没有 blur ⇒ 无按帧重采样 |
 | 卡片下沿→座底 | 同上（实色渐隐带的下半段） | **不透明**、按背景底部的样子重画（`::after`，见 §3.1） | 挡住从卡片下方滚过去的正文 |
 
 ```css
 [data-phase='active'] [data-composer-seat] {          /* 底座本体：不画 */
   background: none !important; backdrop-filter: none;   /* ⚠️ 绝不写 position —— 会顶掉官方 sticky */
 }
-[data-phase='active'] [data-composer-seat] [data-composer-card] {   /* 卡片：唯一的玻璃面 */
-  background: color-mix(in srgb, var(--dsw-specific-input-major) 58%, transparent);
-  backdrop-filter: blur(10px) saturate(1.45);
+/* 卡片：保留官方不透明底色（token 染过），::before 只画边光 + inset 环（无填充、无 blur） */
+[data-phase='active'] [data-composer-seat] [data-composer-card] { box-shadow: <官方 soft + 我们的悬浮> }
+[data-phase='active'] [data-composer-seat] [data-composer-card]::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+  background-image: <两条边光>; box-shadow: <inset 环>;
 }
 ```
 

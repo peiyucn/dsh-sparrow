@@ -134,9 +134,6 @@ export const edgeFadeLayers = (scheme: 'light' | 'dark'): string => {
   ].join(',\n    ')
 }
 
-/** **输入框卡片**的模糊：`10px`（**刻意不与顶栏的 12px 同档** —— 两者在版面上永不相邻、没有交界可露，通透感由卡片自己定）；通透靠**提饱和**（`1.45`）补，模糊与填充都在压通透、同向调会叠加，`10px` 是「变化看得见、又不至于化不开」的一档。 */
-export const GLASS_CARD_BLUR = 'blur(10px) saturate(1.45)'
-
 /** 顶栏底的透出比例（只覆盖一层，无叠加问题）。 */
 export const GLASS_HEADER_ALPHA = 0.7
 
@@ -146,11 +143,9 @@ export const HEADER_LIGHT_SCALE = 1
 /** 顶栏 / 右栏那些**玻璃面**重画的光要不要再补一档（见 {@link compensatedBackdropGradients}）：这些面是「深色填充 + 普通合成」，同档 alpha 读出的**亮度**天然低于背景层的 `screen` 加法，故补 `0.25`；⚠️ 上限是**台阶必须保持为正**（顶栏仍是一块略暗的玻璃），三个面同参共用本值。 */
 export const HEADER_LIGHT_BOOST = 0.25
 
-/** 输入框**卡片**的填充比例：底座那个夹层撤掉后**卡片这一层就是最终不透明度**（不再与谁合成）；与模糊**同向** —— 填充越淡、背后内容越亮，两处一起收通透感才出得来。 */
-export const GLASS_CARD_ALPHA = 0.58
-
-/** **输入框卡片的悬浮投影** —— 叠在官方 `--dsw-elevation-soft` 之上（逗号并列，**不替换、不用 `!important`**），做出「浮在背景上」的托起感（官方那条只有 3% 黑，在这套带色调光的背景上读不出抬升）。 */
-// ⚠️ 调整时**三项一起收**（alpha / blur / y）：只降 alpha 会「淡但远处糊一片」、只减 blur 会「小而硬」；测试把下限钉在 alpha ≥ 0.15，且**只许动本常量**（`GLASS_SPECULAR_RING` 那几条 `inset` 是边光，另一件事）。
+/** **输入框卡片的悬浮投影** —— 叠在官方 `--dsw-elevation-soft` 之上（逗号并列，**不替换、不用 `!important`**），做出「浮在背景上」的托起感（官方那条只有 3% 黑，在这套带色调光的背景上读不出抬升）。
+ *  ⚠️ 2026-10-27 起卡片是**静态面**（没有 `backdrop-filter`，见下方卡片那段注释）；本投影是它唯一的「浮起」语言，别为了省性能删掉 —— 删了卡片会与座底粘成一块。
+ *  ⚠️ 调整时**三项一起收**（alpha / blur / y）：只降 alpha 会「淡但远处糊一片」、只减 blur 会「小而硬」；测试把下限钉在 alpha ≥ 0.15。 */
 export const GLASS_CARD_LIFT = '0 7px 20px rgba(0, 0, 0, 0.21),\n    0 2px 5px rgba(0, 0, 0, 0.17)'
 
 /** 玻璃卡片要覆盖的**相位**：`active`（对话中）+ `hero`（新建会话首页，否则那张卡留着官方的不透明实色；`settling` 官方已把底座设成 `visibility: hidden`，不入列）。 */
@@ -319,22 +314,27 @@ body:not([${PLAIN_ATTR}])[${PHASE_BAND_ATTR}] [data-phase='active'] [data-compos
 }
 
 /* --- 输入框卡片：用户盯着的那个面（数据锚点 data-composer-card）---
+   ⚠️ **2026-10-27：卡片不再做 backdrop-filter 玻璃**（owner 观察：淡框的闪动节奏与对话区 think / edit / write
+   的更新频率一致；同时长期性能问题改了几版都没根治）。根因判断：卡片压在**会滚动的对话内容**上，内容每变一次
+   （流式 token、工具行展开/收起、EDITED/ WRITE 卡刷新）Chromium 就要为它重新采样并模糊**整块卡片区域** —— 这是
+   每帧的合成器开销，也是「一块跟着重绘的淡框」最像的来源；而我们自己也在这棵子树里不停改 DOM（探针/相位），
+   两个重绘源叠在同一块区域。故改为**静态面**：卡片保留官方的不透明底色（已被 token 染成色调）+ 两条静态边光 +
+   inset 环 + 悬浮投影 —— 没有 backdrop-filter 就没有「按帧重采样的模糊层」，观感差异仅在「背后内容是否被糊掉」，
+   而那部分本来就被卡片 90%+ 遮住。
    边光两层：background-image 的两条细长椭圆（锚左上角，沿边衰减 + 往内柔化）+ inset 环（绕得过圆角的**底光**）；官方那条外投影 --dsw-elevation-soft **要保留**，写成「官方 + 我们」并列、不用 !important。
-   ⚠️ 相位用 GLASS_CARD_PHASES（active + hero）—— 首页（hero）也要玻璃，否则那张卡会留着官方的**不透明实色**；**只有这两条卡片规则**放宽相位，底座 ::after 等仍死守 active。 */
+   ⚠️ 相位用 GLASS_CARD_PHASES（active + hero）—— 首页（hero）也要这层质感；**只有这两条卡片规则**放宽相位，底座 ::after 等仍死守 active。 */
 body:not([${PLAIN_ATTR}]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card] {
-  /* ⚠️ 卡片本体不承担玻璃（不写 background-color / background-image / backdrop-filter）—— 与顶栏同一条理由：卡片的子树里也渲染官方弹层（输入触发器菜单以 closest('[data-composer-card]') 为锚），本体一带就把它们的模糊关进子树。
-     position: relative 官方 .card 本来就有（给 ::before 包含块）；z-index: 0 是为了**自成层叠上下文**、好让 ::before 的 z-index: -1 留在卡内；background-color: transparent 必须写 —— 官方 .card 自己刷的是不透明 --dsw-specific-input-major。 */
+  /* ⚠️ 卡片本体仍然不写 backdrop-filter（会成后代的 backdrop root，把官方弹层的模糊关进子树）；但现在也**不再**
+     把官方底色置透明 —— 卡片面 = 官方不透明底（已染色调），亮度与官方默认档逐像素一致，只是上面多一层边光。 */
   position: relative;
   z-index: 0;
-  background-color: transparent;
-  background-image: none;
   /* ⚠️ 本体只留**外**投影：官方那条抬升（--dsw-elevation-soft）+ 我们的悬浮（GLASS_CARD_LIFT）。
-     **inset 边光（rimFor）不能写在这里** —— 绘制顺序是「元素自己的背景/边框/box-shadow」先画、**负 z-index 子层随后盖上去**，::before 那道玻璃会把本体的 inset 环整个埋掉。 */
+     **inset 边光（rimFor）不能写在这里** —— 绘制顺序是「元素自己的背景/边框/box-shadow」先画、**负 z-index 子层随后盖上去**，::before 那道边光会把本体的 inset 环整个埋掉。 */
   box-shadow: var(--dsw-elevation-soft),
     ${GLASS_CARD_LIFT};
 }
-/* 卡片玻璃本体（填充 + 边光渐变 + **inset 边光** + 模糊）—— 挂 ::before，理由见上面卡片规则内。
-   border-radius: inherit 必须写（官方 .card 走 --dsw-radius-panel，伪元素不继承就画成方角）；pointer-events: none 让玻璃层不参与命中测试；⚠️ inset 环必须与填充在**同一层**（放本体就会被这层玻璃埋掉）。 */
+/* 卡片质感层（**只有**边光渐变 + inset 边光，没有填充、没有模糊）—— 挂 ::before，理由见上面卡片规则内。
+   border-radius: inherit 必须写（官方 .card 走 --dsw-radius-panel，伪元素不继承就画成方角）；pointer-events: none 让质感层不参与命中测试；⚠️ inset 环必须与边光在**同一层**（放本体就会被这层埋掉）。 */
 body:not([${PLAIN_ATTR}]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [data-composer-card]::before {
   content: '';
   position: absolute;
@@ -342,10 +342,8 @@ body:not([${PLAIN_ATTR}]) ${phaseGate(GLASS_CARD_PHASES)} [data-composer-seat] [
   z-index: -1;
   pointer-events: none;
   border-radius: inherit;
-  background-color: ${fill('var(--dsw-specific-input-major)', GLASS_CARD_ALPHA)};
   background-image: ${edgeFadeLayers('dark')};
   box-shadow: ${rimFor('dark')};
-  backdrop-filter: ${GLASS_CARD_BLUR};
 }
 /* 浅色轴：同样的光路，只有**阴影浓度**不同（近白底上阴影要更明显才立得住形）。
    ⚠️ 官方默认门（body:not([PLAIN])）必须写在**最前** —— 有一条守卫按前缀认它。 */

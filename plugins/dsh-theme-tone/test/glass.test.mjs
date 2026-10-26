@@ -3,8 +3,6 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   GLASS_BLUR,
-  GLASS_CARD_ALPHA,
-  GLASS_CARD_BLUR,
   GLASS_CARD_LIFT,
   GLASS_CARD_PHASES,
   GLASS_EDGE_LEFT,
@@ -243,9 +241,9 @@ describe('glass：顶栏浮层', () => {
     const cardElement = cardElementRule(css)
     assert.ok(cardElement.length > 0, '卡片本体规则应存在')
     assert.ok(!cardElement.includes('backdrop-filter'), '卡片本体不得带 backdrop-filter（backdrop root）')
-    // 而玻璃本身必须还在（只是换了挂载点）
+    // 顶栏的玻璃仍在（只是换了挂载点）；卡片**整体不做 backdrop-filter**（2026-10-27 性能 + 淡框，见卡片那段）。
     assert.ok(rulesFor(css, "[data-slot='conversation.header'] > header::before").join('').includes('backdrop-filter'))
-    assert.ok(cardGlassRule(css).includes('backdrop-filter'))
+    assert.ok(!cardGlassRule(css).includes('backdrop-filter'), '卡片质感层不得再有 backdrop-filter（静态面）')
   })
 
   it('⛔ 右边栏**不得**用 background-attachment: fixed —— transform 会让它静默改判定位区', () => {
@@ -524,23 +522,23 @@ describe('glass：输入框底座', () => {
 })
 
 describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
-  it('卡片必须自己是玻璃 —— 底座已不画，卡片是唯一的玻璃面', () => {
-    // 数据锚点来自官方 InputBar.tsx:429 的 data-composer-card
+  it('卡片是**静态面**：官方不透明底（token 染色）+ 静态边光 + inset 环，不做 backdrop-filter', () => {
+    // 数据锚点来自官方 InputBar.tsx:429 的 data-composer-card。
+    // ⚠️ 2026-10-27 owner 观察：淡框的闪动节奏与对话区 think / edit / write 的更新频率一致，
+    // 且长期性能问题改了几版都没根治 ⇒ 卡片压在会滚动/刷新的内容上，`backdrop-filter` 每变一次就要
+    // 重新采样模糊整块卡片区域。改为静态面：官方底色（已染色调）+ 两条静态边光 + inset 环。
     assert.match(css, /\[data-composer-seat\] \[data-composer-card\]/u)
-    // ⚠️ 必须 round —— 直接 `0.58 * 100` 会得到 `57.99999999999999`，与 CSS 里的 `58%` 对不上
-    // （实现侧的 `pct()` 是 `Math.round(alpha * 100)`，两边得用同一种取整）。
-    assert.match(css, new RegExp(`${Math.round(GLASS_CARD_ALPHA * 100)}%, transparent`, 'u'))
-    // 玻璃的**形状**必须等于卡片 —— 靠卡片自己那条 ::before 的 backdrop-filter
-    //（不是底座上的夹层；2026-09-24 起也从卡片**本体**挪到伪元素，理由见上面的 backdrop root 守护）。
     const card = cardGlassRule(css)
-    assert.match(card, /backdrop-filter/u, '卡片自己的玻璃层承担模糊（不是底座夹层、也不挂本体）')
-    assert.match(card, /border-radius: inherit/u, '伪元素必须继承卡片的 22px 圆角，否则玻璃画成方角')
-  })
-
-  it('卡片的不透明度必须留出可辨的透出量（太高就等于实色，模糊看不见）', () => {
-    // 早先底座上还压着一层 40% 填充，故当时按「合成不透明度」设上限；
-    // 夹层撤掉后，**卡片这一层就是最终不透明度**，判据随之简化。
-    assert.ok(GLASS_CARD_ALPHA <= 0.82, `卡片不透明度 ${(GLASS_CARD_ALPHA * 100).toFixed(0)}% 太高，玻璃看不出来`)
+    // 质感层只画**光**：background-image（两条边光）+ inset 环；没有填充、没有模糊。
+    assert.match(card, /background-image:/u, '质感层应有边光渐变（background-image）')
+    assert.match(card, /box-shadow:/u, '质感层应有 inset 边光（rimFor）')
+    assert.match(card, /border-radius: inherit/u, '伪元素必须继承卡片圆角，否则光画成方角')
+    assert.ok(!card.includes('backdrop-filter'), '质感层不得有 backdrop-filter（静态面）')
+    assert.ok(!/background-color\s*:/u.test(card), '质感层不得再画填充（官方底色才是卡片面）')
+    // 本体也不得把官方不透明底色置透明 —— 否则没有模糊时背后正文会透上来。
+    const element = cardElementRule(css)
+    assert.ok(!/background-color\s*:\s*transparent/u.test(element), '本体必须保留官方不透明底色（已染色调）')
+    assert.ok(!/\bbackground\s*:/u.test(element), '本体不得用 background 简写（会重置官方其他层）')
   })
 
   it('未选工作区（待启动态）应该 撤掉我们的边光，把边界让回官方虚线框', () => {
@@ -731,32 +729,19 @@ describe('glass：输入框卡片本身（用户盯着的那个面）', () => {
     assert.ok(SHADE_ALPHA.dark < SHADE_ALPHA.light, '深色轴的阴影应轻于浅色轴')
   })
 
-  it('卡片填充必须用 longhand —— background 简写会重置其他背景层', () => {
-    // 填充/模糊都在卡片的 ::before（玻璃层）上；**本体**另有一条「background-color: transparent」
-    // 用来给官方那条不透明实色让位 —— 两处都只许 longhand。
+  it('卡片质感层不得用 background 简写（会重置边光那几层）', () => {
     const glass = cardGlassRule(css)
-    assert.match(glass, /background-color:/u, '填充应写成 background-color')
+    assert.match(glass, /background-image:/u, '边光应写成 background-image')
     assert.ok(!/\bbackground:/u.test(glass), '不得用 background 简写')
-    assert.ok(glass.includes(`backdrop-filter: ${GLASS_CARD_BLUR}`), '玻璃层应带自己的模糊档')
-    const element = cardElementRule(css)
-    assert.ok(!/\bbackground:/u.test(element), '本体让位也不得用 background 简写')
-    assert.match(element, /background-color: transparent/u, '本体必须让出底色（官方那条是不透明实色）')
+    assert.ok(!/background-color\s*:/u.test(glass), '质感层不再画填充（底色归官方）')
   })
 
   it('模糊应该 收到「通透」那一档（太大 → 抹掉背后形状，像磨砂塑料而非玻璃）', () => {
     // 玻璃的「通透」来自**还能认出背后有东西在动**；大模糊只剩一团平均色（曾用 18px / 24px，后都收到 12px）。
+    // ⚠️ 2026-10-27 起只剩顶栏（与右栏顶条）在做模糊；输入框卡片已改静态面，不再有模糊档。
     const px = (s) => Number(/blur\((\d+(?:\.\d+)?)px\)/u.exec(s)?.[1])
     assert.ok(px(GLASS_BLUR) <= 14, `chrome 模糊 ${px(GLASS_BLUR)}px 偏大，会降低通透感`)
-    assert.ok(px(GLASS_CARD_BLUR) <= 14, `卡片模糊 ${px(GLASS_CARD_BLUR)}px 偏大，会降低通透感`)
-    // ⚠️ **卡片允许比顶栏更轻**：顶栏在**顶部**、输入框在**底部**，两者永不相邻，不存在「交界处露断层」；
-    // 真正相邻的是底座那条带子与卡片（同一个视觉组），那条约束另行守住。
-    assert.ok(
-      px(GLASS_CARD_BLUR) <= px(GLASS_BLUR),
-      '卡片的模糊不得**重于**顶栏（通透是卡片的诉求；顶栏不在其中）',
-    )
-    // 卡片仍靠**提饱和**补回质感（不靠加大模糊）
-    const sat = (s) => Number(/saturate\(([\d.]+)\)/u.exec(s)?.[1])
-    assert.ok(sat(GLASS_CARD_BLUR) > sat(GLASS_BLUR), '卡片应比 chrome 更饱和（通透靠饱和补，不靠模糊）')
+    assert.ok(!cardGlassRule(css).includes('blur('), '卡片不得再带模糊（静态面）')
   })
 
   it('卡片必须带**悬浮投影** —— 官方那条只有 3% 黑，读不出抬升', () => {
