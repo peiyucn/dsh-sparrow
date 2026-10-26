@@ -56,10 +56,12 @@ describe('模型选择器：分组标题（交给官方 MenuGroup 原语）', ()
     assert.match(menu.body, /box-shadow:\s*var\(--dsw-elevation-prominent\)/u, '外投影仍在卡片上')
   })
 
-  it('菜单 应该 声明同心内圆角变量，供 theme-tone 的容器圆角规则读取', () => {
-    // 外圆角 20 − 内边距 4 = 16 = --dsw-radius-lg；容器圆角由 theme-tone 那条同时管官方与本菜单的规则施加。
+  it('菜单 不得再声明同心内圆角变量（滚动容器圆角整族已交回官方）', () => {
+    // ⚠️ 2026-10-26 做减法：官方 MenuGroup/MenuSurface 已把「卡片圆角 + 吸顶标题」做好，
+    // theme-tone 那条「给滚动容器切同心圆角」的规则已删除 ⇒ 本插件也不再声明这个钩子变量。
     const menu = ruleFor('ccb-model-menu')
-    assert.match(menu.body, /--dsh-theme-tone-menu-inner-radius:\s*var\(--dsw-radius-lg/u, '声明同心内圆角变量')
+    assert.ok(!/--dsh-theme-tone-menu-inner-radius/u.test(menu.body), '不得再声明已废弃的同心灵圆角变量')
+    assert.match(menu.body, /border-radius:\s*20px/u, '卡片自己的外圆角仍由本插件声明')
   })
 
   it('滚动容器 不得自己写 border-radius（会与 theme-tone 那条撞车）', () => {
