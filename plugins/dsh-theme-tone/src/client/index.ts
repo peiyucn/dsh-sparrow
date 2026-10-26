@@ -835,12 +835,12 @@ function install(ctx: Context): void {
       // 纯内容流式变动：推迟到变动停下再探测/重测（理由见 CONTENT_SETTLE_QUIET_MS）。
       if (isContentChurnFast(records)) { armContentSettle(); return }
       scheduleProbe()
-      let layoutChanged = false
-      for (const record of records) {
-        if (record.type === 'attributes') { layoutChanged = true; break }
-      }
-      if (layoutChanged) startPhaseSettle()
-      else schedulePhaseSettle()
+      // ⚠️ **两类变动都走节流**（2026-10-26 性能修正）：`attributes: ['class']` 会在**每次 hover**（菜单行高亮、
+      //     按钮悬停、面板展开）时触发，而 hover 改的 class 几乎从不改变相位几何 —— 此前 `attributes`
+      //     走「立即」分支等于每 hover 一次就起一轮最多 {@link PHASE_SETTLE_FRAMES} 帧的测量 + 写变量
+      //     （既有可见重绘，也让流式期间的主线程更紧）。真正的布局动画（右栏开合）由 {@link ResizeObserver}
+      //     那条覆盖，且节流**保证尾随一定跑一次** ⇒ 相位不会停在错值上。
+      schedulePhaseSettle()
     })
     observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
     return () => {

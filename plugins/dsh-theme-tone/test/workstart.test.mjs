@@ -85,17 +85,22 @@ describe('workstart：未选工作区待启动态的判定（纯函数）', () =
     assert.match(src, /clearTimeout\(probeTimer\)/u, '清理时必须取消尾随定时器（否则卸载后仍会写属性）')
   })
 
-  it('⛔ 相位重测必须分两条路：class 立即、childList（流式）走节流', async () => {
+  it('⛔ 相位重测必须节流（class / childList 都不得每帧立即重测）', async () => {
     // childList 变动在流式输出时每帧都有，而相位只在布局变化时才变；若 observer 对任何变动都
     // 立即 startPhaseSettle，就等于「思考全程每帧测几何」（0.2.1-rc.2 上的卡顿来源之一）。
-    // 但也不能完全不管 childList（切会话会重建座位/卡片元素），所以它走节流入口做尾随重测。
+    // ⚠️ 2026-10-26 追加：`attributes: ['class']` 同样**不能**走立即分支 —— 每次 hover（菜单行高亮、
+    // 按钮悬停）都会改 class，而 hover 几乎从不改变相位几何，立即重测等于每 hover 一次起一轮最多
+    // PHASE_SETTLE_FRAMES 帧的测量 + 写变量（可见重绘）。真正的布局动画由 ResizeObserver 覆盖，
+    // 节流保证尾随跑一次 ⇒ 两类变动合并成同一条节流路径。
     const { readFile } = await import('node:fs/promises')
     const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
     assert.match(src, /const PHASE_SETTLE_MIN_INTERVAL_MS = \d+/u, '相位节流间隔必须是具名常量')
     assert.match(src, /const schedulePhaseSettle = \(\): void => \{[\s\S]{0,600}?phaseTimer = window\.setTimeout\(/u,
-      'childList 路径要用尾随定时器节流，而不是每帧立即重测')
-    assert.match(src, /if \(layoutChanged\) startPhaseSettle\(\)\s*\n\s*else schedulePhaseSettle\(\)/u,
-      'class 变动立即重测、childList 走节流入口')
+      '重测路径要用尾随定时器节流，而不是每帧立即重测')
+    assert.ok(!/if \(layoutChanged\) startPhaseSettle\(\)/u.test(src),
+      'class 变动不得再走立即重测（hover 会把它变成每 hover 一轮）')
+    assert.match(src, /if \(isContentChurnFast\(records\)\) \{ armContentSettle\(\); return \}[\s\S]{0,900}?schedulePhaseSettle\(\)/u,
+      'observer 里唯一的重测入口必须是节流的 schedulePhaseSettle')
     assert.ok(!/maintainAnchors\(\)\s*\n\s*startPhaseSettle\(\)/u.test(src), '结构探测回调里不得无条件重测相位')
     const cleanup = src.slice(src.indexOf('dsh-theme-tone: workstart probe') - 1400, src.indexOf('dsh-theme-tone: workstart probe'))
     assert.ok(cleanup.includes('clearTimeout(phaseTimer)'), '清理时必须取消相位重测的尾随定时器')
