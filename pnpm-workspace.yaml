@@ -200,3 +200,9 @@ overrides:
   # 它是官方 dsh-host-webserver 的传递依赖，只落进本仓库的 dev 闭包 ——
   # 本仓库插件只声明 peerDependencies，产物不带它。
   compression: "1.8.2"
+  # 2026-10-27 Dependabot 5 条（4× fast-uri、1× zod）：
+  # - fast-uri < 3.1.9：经 ajv ← 官方 dsh 包传入，只落 dev 闭包（产物不带）。
+  # - zod < 4.6.6（high，超大集合校验耗尽内存）：官方 dsh 包与本仓库
+  #   dsh-codebuddy-credits 的**运行时**依赖（host 侧 crdits 投影校验），故该插件需单独发补丁版。
+  fast-uri: "3.1.9"
+  zod: "4.6.6"
