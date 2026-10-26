@@ -265,15 +265,12 @@
 > 「子代理卡片好像没有透明模糊吧？」。故本表**撤掉全部材质声明**。
 
 ```css
-/* 带门的锚点（逐条见 SURFACE_ANCHORS；[role='dialog'] 那条带 :not(:has(> img))）*/
-body:not([data-dsh-theme-tone-plain]) [role='menu'],
-body:not([data-dsh-theme-tone-plain]) [data-trigger-menu],
-body:not([data-dsh-theme-tone-plain]) :has(> [role='listbox']),
-body:not([data-dsh-theme-tone-plain]) [role='listbox']:not([data-trigger-menu] *),
+/* 带门的锚点（逐条见 SURFACE_ANCHORS；[role='dialog'] 那条带 :not(:has(> img))）
+   ⚠️ 2026-10-27 起**菜单族整族不在本表**（role='menu' / data-trigger-menu / 命令面板卡片 / role='listbox'）：
+   官方 rc.3 已把它们统一到 MenuSurface（自带填充 + 模糊），再叠一层光就是双层，见 §6.1.2。 */
 body:not([data-dsh-theme-tone-plain]) [role='dialog']:not(:has(> img)) {
   /* 只有图层 —— 没有 background-color，也没有 backdrop-filter（两者都归官方） */
   background-image:
-    var(--dsh-theme-tone-grain-tile, none),
     radial-gradient(ellipse 120% 42% at 50% -12%, var(--dsh-theme-tone-top, transparent), transparent 76%),
     radial-gradient(ellipse 110% 52% at 50% 112%, var(--dsh-theme-tone-bottom, transparent), transparent 76%) !important;
 }
@@ -285,6 +282,20 @@ body:not([data-dsh-theme-tone-plain]) [role='dialog']:not(:has(> img)) {
 不带 `content` 不生成盒子（空转），`::before` 在树序上早于官方材质（被盖）。
 **本文没有 §6.4 那一节**（§6.4 是「几何」）—— 这条的完整依据只在上游那份报告里，
 本文 §6.1.1 给出摘要。
+
+#### 6.1.2) ⛔ 菜单族整族不进本表（2026-10-27，owner 报障）
+
+菜单曾按「覆盖必须全覆盖」收录四条锚点（`role='menu'` / `[data-trigger-menu]` / 命令面板卡片 / `[role='listbox']`）。
+owner 报「咱们主题下**模型列表 hover 时出现淡框**」，复核后确认这层光就是来源：
+
+* 官方 rc.3 菜单族已统一到 `MenuSurface`（`.material` 子层自带填充 + 模糊）⇒ 我们再叠一层光 = **同一面画两份**；
+* 菜单**外壳**（`role='menu'`）与**内层列表**（`role='listbox'`）**各命中一条** ⇒ 同一个菜单里内外两套光，
+  内层盒子比外壳小一圈（4px 内边距），hover 行底色一变就读成「菜单里套着一个淡框」；
+* 菜单底色已由 token 层（`POPUP_TOKENS` / `--dsw-menu-surface-fill`）染成色调，观感不靠这层光。
+
+**处置**：菜单族**整族**退出 `SURFACE_ANCHORS`（含 `listboxHost` 锚点与其运行期标记，一并删除），
+交回官方材质；不做「有的菜单打光、有的不打」的挑拣。守卫：`test/surfaces.test.mjs`
+断言锚点表**不得含** `role=` / `listbox` / `data-trigger-menu`，且不得复活。
 
 #### 6.1.1) `::after` 覆盖层的**排除名单**：官方也在用同一个伪元素时不许接管
 
@@ -380,10 +391,7 @@ body:not([data-dsh-theme-tone-plain]) [role='dialog']:not(:has(> img)) {
 
 | 锚点 | 谁长这样 |
 | :--- | :--- |
-| `[role='menu']` | `Menu` 原语 `.list` / `.submenu`、`ModelSelect`、dockkit `TabMenu`、`dsh-codebuddy-credits` 的模型菜单 |
-| `[data-trigger-menu]` | 输入框上方的 `@` / `/` 菜单卡片（官方自己也拿它当 `:has()` 锚点） |
-| `:has(> [role='listbox'])` | 命令面板**卡片**（`PopupSelectView` 的背景长在祖先上、`role` 在内层视口上，只能反向够祖先） |
-| `[role='listbox']:not([data-trigger-menu] *)` | **自带背景的 listbox 弹层** —— 本仓库插件 portal 出来的那些（`dsh-chat-fim` 的候选菜单与敏感度弹层） |
+| ⛔ 菜单族（`[role='menu']` / `[data-trigger-menu]` / 命令面板卡片 / `[role='listbox']`） | **2026-10-27 起整族不进本表**：官方 rc.3 统一到 `MenuSurface`，我们不再叠光（缘由见 §6.1.2）；菜单底色仍由 token 层染。 |
 | `[role='dialog']:not(:has(> img))` | 各对话框：官方 Modal / 设置面板 / 上下文用量 / 轮次用量，以及 archive / file-manage / codebuddy 三家的对话框 |
 | `body > [role='button']` | **悬停卡**（`HoverCard`）—— `createPortal` 直挂 `body` 的固定层 |
 | ⛔ 图片灯箱 | 被 `:not(:has(> img))` **排除**：它的 `role='dialog'` 长在**整屏容器**上，染它 = 全屏糊一层金光 |
@@ -448,13 +456,12 @@ body > [role='button'] [class*='_hoverStatus'] { color: var(--dsw-alias-label-te
 
 
 **「其余插件也跟着变」不用各插件适配**：查过 dsh-sparrow 全部活跃插件，它们的弹层**都用了 `role=`**
-（archive / file-manage / codebuddy 用 `role='dialog'`，codebuddy 另有 `role='menu'`，chat-fim 用两个 `role='listbox'`），
+（archive / file-manage / codebuddy 用 `role='dialog'`，codebuddy 的模型菜单已交回官方控件，chat-fim 的两个弹层已改用官方 `MenuSurface`），
 所以上面这份清单已经把它们的浮层一并覆盖 —— 这正是不写组件选择器、只认语义属性的好处。
 
-**已知的一处重叠**：命令面板（`PopupSelectView`）的卡片被 `:has(> [role='listbox'])` 画一次、
-它内部的滚动视口又被 listbox 那条画一次 → 列表区是**两层渐变叠着**（顶部搜索框区是一层）。
-排不掉：那个卡片除了 hashed 类名没有别的可判属性。alpha 低（金 `.09` / 本色 `.18`），叠起来仍在同色系内，
-判为可接受；若真机上看着偏亮，**去掉 `[role='listbox']` 那条锚点**（代价是 chat-fim 的弹层失去质感）。
+**曾经的「已知重叠」已随菜单族退表消失**（2026-10-27）：此前命令面板卡片（`:has(> [role='listbox'])`）与内层滚区
+（`[role='listbox']`）各画一次 ⇒ 列表区两层渐变叠着。现在菜单族整族不进本表（§6.1.2），那处重叠与
+「chat-fim 弹层失去质感」的取舍一起作废 —— 它们的材质由官方 `MenuSurface` 承担。
 
 **覆盖范围**：工具提示（两轴反色）不覆盖；
 `ui-jobs` 那个**没有 role** 的 `<ul>` 任务列表、子代理血缘弹层、轮次预览卡必须覆盖。
@@ -913,3 +920,15 @@ owner 复看官方 rc.3 的模型列表后定案：「官方非吸顶状态的�
 * `dsh-codebuddy-credits` 模型菜单上的 `--dsh-theme-tone-menu-inner-radius` 声明。
 
 理由：分组标题的「透明 → 吸顶才上色」由官方 `MenuGroup` 负责（`data-stuck` + `--dsw-alias-menu-group-header-fill`），内圈圆角由官方卡片自己的 `overflow + border-radius` 负责 —— 我们那套是**官方没做好时的补丁**，官方做好后继续自己画只会：① 与官方观感分叉（永远不透明、被 owner 点名）；② 多留一层按帧重栅格化的 `background-attachment: fixed`；③ 多一次 DOM 扫描。**减法同时也是性能与观感的回归修复。**
+
+**2026-10-27 追加：菜单族整族退出抬升面表（做减法，修 owner 报的「模型列表 hover 淡框」）。**
+
+owner 复看后报障：「咱们主题下模型列表 hover 时出现淡框没有变化」。复核结论：那层光是我们自己画的 ——
+官方 rc.3 菜单族（`MenuSurface` 系）自带填充 + 模糊，我们再给 `::after` 叠三道光就是**同一面画两份**；
+更糟的是菜单**外壳**（`role='menu'`）与**内层列表**（`role='listbox'`）各命中一条 ⇒ 同一个菜单里
+内外两套光，内层盒子比外壳小一圈（4px 内边距），hover 行底色一变就读成「菜单里套着一个淡框」。
+
+处置：`SURFACE_ANCHORS` 删除菜单族四条锚点（`role='menu'` / `[data-trigger-menu]`（含 `:not([data-overflow-below])` 收窄）/
+命令面板卡片 / `role='listbox'`），并删除随之失效的 `ANCHOR.listboxHost` 锚点与其运行期标记；
+守卫改为断言「锚点表**不得含** `role=` / `listbox` / `data-trigger-menu`」。菜单颜色仍走 token 层
+（`POPUP_TOKENS` / `--dsw-menu-surface-fill`），观感与官方一致。§6.1.2 记录判据。

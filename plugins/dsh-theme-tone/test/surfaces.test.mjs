@@ -927,17 +927,13 @@ describe('抬升面：表面绘制', () => {
   const css = buildSurfaceCss()
   const layers = surfaceLayers()
 
-  it('锚点应该 覆盖菜单族 / listbox / 模态弹窗 / tree 弹层 / 任务列表 / 提示条，并排除图片灯箱', () => {
-    // ⚠️ 2026-10-26 教训：菜单族曾被单独摘出本表 ⇒「有的弹层有光、有的没有」。覆盖必须**全覆盖、不许挑**：
-    // 本表是 token 覆盖不到的浮层的兜底通道，挑着收录就是观感不一致。
+  it('锚点应该 覆盖模态弹窗 / tree 弹层 / 任务列表 / 提示条 / 问答卡，且菜单族整族排除', () => {
+    // ⚠️ 2026-10-27：菜单族（`role='menu'` / `[data-trigger-menu]` / 命令面板卡片 / `role='listbox'`）**整族**退出本表。
+    // 官方 rc.3 菜单族已统一到 `MenuSurface`（自带填充 + 模糊）；我方再叠一层 `::after` 光会「同一面画两份」，
+    // 且菜单外壳与内层列表各命中一条 ⇒ 内层小一圈的盒子读成「菜单里的淡框」，hover 行底色一变就显形（owner 报障）。
+    // token 层（POPUP_TOKENS）已经把菜单底色染成色调，菜单不需要这层光。
+    // ⚠️ 判据是「**全族一致**」：不许挑几个菜单收录、几个不收录（2026-10-26 的老教训）。
     assert.deepEqual([...SURFACE_ANCHORS], [
-      "body [role='menu']",
-      // ⚠️ trigger-menu 必须收窄排除 `[data-overflow-below]`：那个状态下官方在**同一个**
-      // `::after` 上画「下面还有内容」的渐隐提示（`MenuView.tsx` 把两个属性打在同一个元素上），
-      // 不收窄就会把官方提示顶掉（2026-09-27 审计，实测提示带 (109,162,229) → (43,43,50)）。
-      'body [data-trigger-menu]:not([data-overflow-below])',
-      `body ${anchorSelector(ANCHOR.listboxHost)}`,
-      "body [role='listbox']:not([data-trigger-menu] *)",
       DIALOG_ANCHOR,
       // 子代理会话弹层：`role='tree'` 在**内层**，外层盒子才画材质 —— 故向上找宿主。
       // ⚠️ 只有一条 tree 锚点：`body > [role='tree']` 实测是**死锚点**（role 不在 body 直下），已删。
@@ -951,6 +947,12 @@ describe('抬升面：表面绘制', () => {
       // 账号通知卡（rc.2 新增）：前景卡是 body 层 portal 的 `aside[data-front]`，锚点打在父 stack 上（为了抬 z-index）。
       `body ${anchorSelector(ANCHOR.noticeStack)} > aside[data-front='true']`,
     ])
+    // 菜单族一条都不许回来（含 listbox / trigger-menu / role=menu 三种写法）。
+    for (const anchor of SURFACE_ANCHORS) {
+      assert.ok(!/role='menu'/u.test(anchor), `菜单外壳不得进抬升面表：${anchor}`)
+      assert.ok(!/data-trigger-menu/u.test(anchor), `触发菜单不得进抬升面表：${anchor}`)
+      assert.ok(!/role='listbox'/u.test(anchor), `listbox 弹层不得进抬升面表：${anchor}`)
+    }
     // 模态弹窗**不做玻璃**（它是内容面，Apple HIG：Don't put glass on lists/cards/content）
     // ⚠️ 0.1.7 起**菜单族**改用官方半透明 + 模糊材质（见 MENU_MATERIAL_ANCHORS），
     // 所以「表面表整体不许有 backdrop-filter」这条旧口径已不成立 —— 改为**只对内容面**断言。
@@ -1139,10 +1141,16 @@ describe('抬升面：表面绘制', () => {
     }
   })
 
-  it('listbox 锚点应该 排除 @ 菜单内部的视口（那一层已经被 data-trigger-menu 画过了）', () => {
-    const listbox = SURFACE_ANCHORS.find(anchor => anchor.startsWith("body [role='listbox']"))
-    assert.ok(listbox, "SURFACE_ANCHORS 应含 body [role='listbox'] 那条")
-    assert.ok(listbox.includes(':not([data-trigger-menu] *)'), '不排除就会在同一处叠两层渐变')
+  it('菜单族 / listbox 锚点必须整族排除（官方 MenuSurface 自带材质，再叠一层就是双层光）', () => {
+    // 2026-10-27：菜单外壳（role=menu）与内层列表（role=listbox）各自命中一条 ⇒ 同一个菜单里内外两套光，
+    // 内层盒子比外壳小 4px 内边距一圈，hover 行底色一变就读成「菜单里套着一个淡框」（owner 报障）。
+    // ⚠️ 只禁菜单族的三种写法：`role='tooltip'` 等非菜单浮层仍在本表（它没有官方材质）。
+    for (const anchor of SURFACE_ANCHORS) {
+      assert.ok(!anchor.includes("[role='menu']"), `菜单外壳不得进抬升面表：${anchor}`)
+      assert.ok(!anchor.includes("[role='listbox']"), `listbox 弹层不得进抬升面表：${anchor}`)
+      assert.ok(!anchor.includes('data-trigger-menu'), `触发菜单不得进抬升面表：${anchor}`)
+      assert.ok(!anchor.includes('listbox-host'), `命令面板卡片锚点已删除，不得复活：${anchor}`)
+    }
   })
 
   it('输入框上方三张停靠卡应该 各自有一条图层规则（此前只有 token 的颜色 = 纯色）', () => {
@@ -1455,9 +1463,8 @@ describe('抬升面：表面绘制', () => {
 
   it('⛔ 官方在同一伪元素上有装饰的锚点**必须排除**在 ::after 覆盖层之外', () => {
     // 覆盖层用 `::after`，若官方**自己**也在这个元素的 `::after` 上画东西就会互相顶掉：
-    // ① `[data-queue-dock] > :first-child`（官方 `QueueDock` 的 `.panel`）的 `::after` 是 **0.5px 描边**，
-    //    我方把同伪元素 z-index 压到 -1 ⇒ 描边进负 z 带被盖掉（⚠️ 顶边仍在，**只抽样顶边发现不了**，初版正是这样漏掉的）；
-    // ② `[data-trigger-menu][data-overflow-below]` 是官方的「下面还有内容」渐隐提示，锚点必须收窄让官方提示留下。
+    // `[data-queue-dock] > :first-child`（官方 `QueueDock` 的 `.panel`）的 `::after` 是 **0.5px 描边**，
+    // 我方把同伪元素 z-index 压到 -1 ⇒ 描边进负 z 带被盖掉（⚠️ 顶边仍在，**只抽样顶边发现不了**，初版正是这样漏掉的）。
     assert.ok(
       AFTER_LAYER_EXCLUDED_ANCHORS.includes('body [data-queue-dock] > :first-child'),
       'QueueDock 面板必须排除在 ::after 覆盖层之外（否则官方 0.5px 描边被盖）',
@@ -1466,13 +1473,9 @@ describe('抬升面：表面绘制', () => {
       !/\bbody \[data-queue-dock\][^{]*::after/u.test(css),
       '不得给 QueueDock 面板发 ::after 规则（官方那条是它的描边）',
     )
-    assert.ok(
-      SURFACE_ANCHORS.some(a => a.includes('data-trigger-menu') && a.includes(':not([data-overflow-below])')),
-      'trigger-menu 锚点必须收窄排除 [data-overflow-below]（该状态下官方在同一个 ::after 上画渐隐提示）',
-    )
     // 排除是**有意**的例外，不能变成"整张表都不叠"：多数锚点仍必须有覆盖层。
     const overlay = [...css.matchAll(/::after\s*\{/gu)].length
-    assert.ok(overlay >= 10, `覆盖层规则太少（${overlay}）—— 排除表是不是被写宽了？`)
+    assert.ok(overlay >= 8, `覆盖层规则太少（${overlay}）—— 排除表是不是被写宽了？`)
     // ⚠️ **2026-09-27（M2）本条改判**：此前断言「元素级那条仍要在（材质画在自己身上时靠它）」。
     // 单载体收口后元素级那条**已按设计删除** —— 它在没有材质子元素的组件上造成双倍，
     // 而在 QueueDock 上又会被官方 ::before 盖住（实测 std 0.229 ≈ 纯色，等于没用）。

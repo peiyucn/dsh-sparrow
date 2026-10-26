@@ -22,8 +22,6 @@ export const ANCHOR = Object.freeze({
    * 原选择器 `[data-composer-seat]:has([data-testid='todo-panel'], [data-goal-bar]):not(:has([data-queue-dock]))`。
    */
   seatDocked: 'seat-docked',
-  /** **命令面板卡片的祖元素**（背景长在祖先上、`role` 在内层视口上）。原选择器 `body :has(> [role='listbox'])`。 */
-  listboxHost: 'listbox-host',
   /** **实色模态弹窗**（`role='dialog'` 且**不是**图片灯箱）。原选择器 `[role='dialog']:not(:has(> img))`。 */
   dialog: 'dialog',
   /** **子代理血缘弹层的外层盒子**（`body` 直接子元素，内含 `[role='tree']`）。原选择器 `body > :has(> [role='tree'])`。 */

@@ -24,8 +24,8 @@ describe('anchors：锚点属性的契约', () => {
     assert.equal(anchorValue([]), '')
     assert.equal(anchorValue([ANCHOR.dialog]), ANCHOR.dialog)
     // 顺序无关：否则每轮都要重写属性，白引一次样式失效。
-    const a = anchorValue([ANCHOR.dialog, ANCHOR.listboxHost])
-    const b = anchorValue([ANCHOR.listboxHost, ANCHOR.dialog])
+    const a = anchorValue([ANCHOR.dialog, ANCHOR.treeHost])
+    const b = anchorValue([ANCHOR.treeHost, ANCHOR.dialog])
     assert.equal(a, b, '集合相同则值必须相同（与传入顺序无关）')
     assert.equal(anchorValue([ANCHOR.dialog, ANCHOR.dialog]), ANCHOR.dialog)
   })

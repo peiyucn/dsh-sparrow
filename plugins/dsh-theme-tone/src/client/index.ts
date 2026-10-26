@@ -278,9 +278,6 @@ function install(ctx: Context): void {
         if (docked && seat.querySelector('[data-queue-dock]') === null) add(seat, ANCHOR.seatDocked)
       }
 
-      // ③ 命令面板卡片：背景长在祖元素上、role 在内层视口上。
-      tagParentsOf("[role='listbox']", ANCHOR.listboxHost)
-
       // ④ 实色模态弹窗：`role='dialog'` 且直接子里没有 `img`（图片灯箱除外）。
       for (const dialog of document.querySelectorAll("[role='dialog']")) {
         if (!hasDirectChild(dialog, 'img')) add(dialog, ANCHOR.dialog)

@@ -25,29 +25,17 @@ import { POPUP_BOTTOM_SHAPE, POPUP_LEFT_SHAPE, POPUP_STOP, POPUP_TOP_SHAPE } fro
  */
 export const SURFACE_ANCHORS: readonly string[] = Object.freeze([
   /**
-   * **菜单族**（含模型列表 / 权限菜单 / FIM 档位菜单）。
+   * ⛔ **菜单族整族不进本表**（2026-10-27，owner 报障 + 实测复核）。
    *
-   * ⚠️ **2026-10-26 教训：菜单曾经被单独摘出本表，结果「有的弹层有光、有的没有」——覆盖必须全覆盖，不许挑。**
-   * 本表是 **token 覆盖不到的浮层的兜底通道**（官方把这些组件的面写成组件内字面量，只染 token 不生效）；
-   * 挑着收录 = 观感不一致，比多画一条规则更糟。若某个菜单出现合成异常，要在**结构层**治（例如菜单组件自身
-   * portal 到 body + 用官方 `MenuSurface` 的 `.material` 子层承载模糊），**不要用「从表里删掉」来躲**。
-   * 分组标题仍交回官方 `MenuGroup`（非吸顶透明、吸顶才上色）—— 那是**标题**，不在本表的绘制范围。
+   * 此前收录过 `[role='menu']` / `[data-trigger-menu]` / 命令面板卡片（`listboxHost`）/ `[role='listbox']` 四条，
+   * 用 `::after` 给菜单叠三道光。后果：
+   * ① 官方 rc.3 菜单族已统一到 `MenuSurface`（`.material` 子层自带填充 + 模糊），我们再叠一层光就是**同一面画两份**；
+   * ② 菜单**外壳**（`role='menu'`）与**内层列表**（`role='listbox'`）各自命中一条 ⇒ 同一个菜单里**内外两套光**，
+   *    内层盒子比外壳小一圈（4px 内边距），正好读成「菜单里套着一个**淡框**」，hover 行底色一变就显形；
+   * ③ token 层（`POPUP_TOKENS`）已经把官方菜单底色染成色调，观感不靠这层光。
+   * 故菜单族**整族**交回官方材质 —— 不做「有的菜单打光、有的不打」的挑拣（那正是 2026-10-26 的老教训），
+   * 而是**全族一致**。新增菜单类浮层时默认**不要**加进本表；只有「官方没给材质、又不带 role」的面才走这里。
    */
-  "body [role='menu']",
-  /**
-   * **命令面板 / 输入触发菜单**。
-   * ⚠️ **必须排除 `[data-overflow-below]`**：该状态下官方**自己**用同一个 `::after` 画「下面还有内容」
-   * 的渐隐提示，而两个属性打在**同一个元素**上 —— 我方那条 `::after` 会把官方提示**整个顶掉**。
-   * 代价明确：该状态下这一处没有我们的质感（官方提示优先）。
-   */
-  "body [data-trigger-menu]:not([data-overflow-below])",
-  /**
-   * **命令面板的卡片** —— 背景长在**祖先**上、`role` 在内层视口上，所以判据是「谁的直接子元素是 listbox」，
-   * 由 client half 算好写成**锚点属性**（`listboxHost`；不用 `:has()`，开销见 docs/spec/11）。
-   * ⚠️ **不给它加宿主收窄**：那个祖先是官方自建的卡片、不带任何标记，加前缀会漏掉真正要染的那张卡。
-   */
-  `body ${anchorSelector(ANCHOR.listboxHost)}`,
-  "body [role='listbox']:not([data-trigger-menu] *)",
   /** **模态弹窗**（设置 / 云端文件 / 归档 …）—— **实色**，不做玻璃（缘由见 constants.ts 的 {@link DIALOG_ANCHOR}）。 */
   DIALOG_ANCHOR,
   /**
@@ -102,8 +90,8 @@ export const COMPOSER_CARD_ANCHORS: readonly string[] = Object.freeze([
   "body [data-testid='todo-panel']",
 ])
 
-/** **不参与 `::after` 覆盖层**的锚点 —— 理由只有一条：**官方自己在同一个元素的 `::after` 上画了装饰**，我方再用同款伪元素就会把它顶掉或拽坏：QueueDock 的 `.panel::after` 是官方那条 `0.5px` 描边（我方把伪元素 `z-index` 压到 `-1` 会让描边进负 z 带、**被整行宽的悬停行底盖掉** —— ⚠️ 顶边仍在，**只抽样顶边的检查发现不了**）；`[data-trigger-menu][data-overflow-below]` 的 `::after` 是「下面还有内容」的渐隐提示（我方 `background-image` 会把它整个顶掉，该锚点已用 `:not([data-overflow-below])` 收窄）。
- *  ⚠️ **覆盖官方装饰必须记明**，故单列本表（一处是发丝线、一处是提示带，不算「完全失效」）。@see usesAfterLayer
+/** **不参与 `::after` 覆盖层**的锚点 —— 理由只有一条：**官方自己在同一个元素的 `::after` 上画了装饰**，我方再用同款伪元素就会把它顶掉或拽坏：QueueDock 的 `.panel::after` 是官方那条 `0.5px` 描边（我方把伪元素 `z-index` 压到 `-1` 会让描边进负 z 带、**被整行宽的悬停行底盖掉** —— ⚠️ 顶边仍在，**只抽样顶边的检查发现不了**）。
+ *  ⚠️ **覆盖官方装饰必须记明**，故单列本表（一处是发丝线，不算「完全失效」）。@see usesAfterLayer
  */
 export const AFTER_LAYER_EXCLUDED_ANCHORS: readonly string[] = Object.freeze([
   'body [data-queue-dock] > :first-child',
