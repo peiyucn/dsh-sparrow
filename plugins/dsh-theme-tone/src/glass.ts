@@ -19,6 +19,10 @@ const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.16), inset 1px 0 2px rgba(255, 255, 255, 0.06), inset -1px 0 3px rgba(0, 0, 0, 0.18), inset 0 -1px 3px rgba(0, 0, 0, 0.12)'
 const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.72), inset 1px 0 2px rgba(255, 255, 255, 0.4), inset -1px 0 3px rgba(0, 0, 0, 0.05), inset 0 -1px 3px rgba(0, 0, 0, 0.04)'
 
+/** 输入框卡片的悬浮阴影（投影方向朝下，读作离开页面）。 */
+const CARD_SHADOW_DARK = '0 12px 32px -12px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25)'
+const CARD_SHADOW_LIGHT = '0 12px 32px -12px rgba(31, 35, 60, 0.18), 0 2px 8px rgba(31, 35, 60, 0.08)'
+
 /** 与地面层同源的光：显式视口尺寸 + 定位，禁止 `background-attachment: fixed`。 */
 function viewportLight(position: string, size = '100vw 100vh'): string {
   return `  background-image: ${BACKDROP_GRADIENTS};
@@ -106,8 +110,12 @@ ${P} ${SEAT} [data-composer-card] {
   position: relative;
   z-index: 0;
   background-color: transparent;
+  box-shadow: ${CARD_SHADOW_DARK};
   /* 「+」等 selector 型图标按钮：官方给的是不透明中性底，在玻璃卡片上会读成一块实心。 */
   --dsw-specific-selector: transparent;
+}
+body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card] {
+  box-shadow: ${CARD_SHADOW_LIGHT};
 }
 ${P} ${SEAT} [data-composer-card]::before {
   content: '';

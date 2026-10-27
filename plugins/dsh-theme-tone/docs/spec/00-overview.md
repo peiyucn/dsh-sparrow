@@ -14,6 +14,8 @@
    放卡片 `::before`；卡片 `position: relative; z-index: 0` 自成层叠上下文（否则 `::before` 的
    `z-index:-1` 会逃出卡片 = 淡色框）；座位底部一小段「地面同源」带挡住卡片下方滚出的正文；卡片作用域内
    `--dsw-specific-selector: transparent`（「+」按钮让出实心底色）。
+   卡片带**悬浮投影**（朝下的柔和阴影，深 / 浅两套；不位移、不加 transform —— 位移会破坏与地面光、
+   补缝层的像素对齐）。
    **停靠卡补缝**：停靠卡之间 / 与输入框之间的 stack 缝、以及卡片底部圆角后面都会透出正文，
    用「底色 + 打光」重绘盖住（`background-attachment: fixed`，与地面层逐像素同源；只在有停靠卡时生效）。
    queue / goal 用 `::after` 覆盖上下余量，todo 用 `::before` + 16px 圆角遮罩只填圆角缺口。

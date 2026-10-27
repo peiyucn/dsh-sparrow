@@ -37,7 +37,10 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(header.includes('background-position: 100% 0'), '顶栏贴视口右上 ⇒ 与地面光同源')
   })
 
-  it('输入框：完整玻璃模糊（::before，无负层逃逸）+ 座位透明 + 有方向边缘光', () => {
+  it('输入框：完整玻璃模糊（::before，无负层逃逸）+ 座位透明 + 有方向边缘光 + 悬浮阴影', () => {
+    assert.match(code, /\[data-composer-card\] \{[^}]*box-shadow:/u)
+    assert.ok(code.includes('box-shadow: 0 12px 32px -12px'), '卡片有悬浮投影')
+    assert.match(code, /body:not\(\[data-ds-dark-theme\]\)[^{]*\[data-composer-card\] \{[^}]*box-shadow: 0 12px 32px -12px rgba\(31, 35, 60/u)
     const seat = /\[data-composer-seat\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(seat.includes('background: none'), '底座撤掉官方遮罩，正文从玻璃下滚过')
     const card = /\[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
