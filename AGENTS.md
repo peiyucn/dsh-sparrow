@@ -9,10 +9,8 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 * `plugins/dsh-file-manage` — DeepSeek Files API 云端文件管理（无本地持久化）
 * `plugins/dsh-codebuddy-credits` — CodeBuddy 额度 LLM provider（官方 API Key 直连）
 * `plugins/dsh-theme-tone` — 明暗主题之下的色调层 + **对话区布局优化**（每轴各一款「官方默认」+ 若干色调；色调同时驱动抬升面的色相与质感，另含顶栏 / 输入框的玻璃效果）
-* `plugins/dsh-vision-bridge` — **已退役（2026-09-10）**，代码原地保留不删不移
-* `plugins/dsh-nav-pin` — **已退役（2026-09-29，并入 dsh-theme-tone）**，代码原地保留不删不移
-* **口径：五个活跃插件 + 两个已退役插件**
-* 活跃 / 退役名单的单一真值是 `scripts/plugin-set.mjs` 的 `RETIRED_PLUGINS`，`verify-all.mjs` / `check-dsh-pin.mjs` / `check-plugin-docs.mjs` 共用；退役插件不参与全量验证与版本线
+* **口径：五个活跃插件 + 0 个已退役**（两个退役插件已于 2026-10-27 彻底删除）
+* 活跃插件名单的单一真值是 `scripts/plugin-set.mjs`（`RETIRED_PLUGINS` 为空名单，保留结构供守卫复用）
 
 ## 文档规范
 

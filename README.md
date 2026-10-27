@@ -38,11 +38,6 @@ Paste it into **Discover → Add index source**. The market marks which versions
 | [dsh-codebuddy-credits](plugins/dsh-codebuddy-credits/README.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-codebuddy-credits&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-codebuddy-credits) | ![Credits entry and quota panel on the session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-codebuddy-credits.png "ratio:0.25")<br>Company CodeBuddy credits as a DSH LLM provider: each model's credit rate in the model picker, a quota panel in the header, and per-turn credits.             | `dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits` |
 | [dsh-theme-tone](plugins/dsh-theme-tone/README.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-theme-tone&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-theme-tone)                                     | ![Dark theme](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png "ratio:0.5") ![Light theme](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png "ratio:0.5")<br>Tone skins for DSH's built-in light and dark themes (dark on the left, light on the right), plus conversation-area layout tuning once a tone is picked. | `dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone`        |
 
-## Retired
-
-- **[~~dsh-nav-pin~~](plugins/dsh-nav-pin/README.md)** — turn navigation that stays on narrow conversations. Merged into **`dsh-theme-tone`** (2026-09-29): with a non-Default tone picked, the same behaviour is built in. Do not install it on new setups. Uninstall with `dsh plugin --profile web remove @dsh-sparrow/dsh-nav-pin`.
-- **[~~dsh-vision-bridge~~](plugins/dsh-vision-bridge/README.md)** — a vision channel for text-only main models: the `vision_read` tool reads pasted images with the official DeepSeek vision model and returns a structured text report. DeepSeek main models are natively multimodal now — use `deepseek-flash` instead. Uninstall with `dsh plugin --profile web remove @dsh-sparrow/dsh-vision-bridge`.
-
-## License
+## Retired`n`nNone — both retired plugins were deleted on 2026-10-27.`n`n## License
 
 MIT

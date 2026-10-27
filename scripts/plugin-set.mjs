@@ -5,8 +5,8 @@ import { join, resolve } from 'node:path'
 
 export const repoRoot = resolve(import.meta.dirname, '..')
 
-/** 已退役插件（代码原地保留作历史，不删不移）：**不参与全量验证**、也**不跟随官方 dsh 版本线升级** —— 留在流水线里只会制造与发布无关的红灯。 */
-export const RETIRED_PLUGINS = new Set(['dsh-vision-bridge', 'dsh-nav-pin'])
+/** 退役插件名单：两个退役插件已于 2026-10-27 彻底删除，名单保留为空供守卫结构稳定。 */
+export const RETIRED_PLUGINS = new Set([])
 
 /** 活跃插件名（目录名，按名排序）：只算**已脚手架化**的插件（有 `package.json`），纯文档目录（spec 阶段）跳过。 */
 export function activePluginNames(root = repoRoot) {

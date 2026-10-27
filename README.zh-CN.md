@@ -38,11 +38,6 @@ https://dsh.pyai.site/market/index.json
 | [dsh-codebuddy-credits](plugins/dsh-codebuddy-credits/README.zh-CN.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-codebuddy-credits&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-codebuddy-credits) | ![会话页额度入口与面板](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-codebuddy-credits.png "ratio:0.25")<br>公司 CodeBuddy 额度接成 DSH LLM provider：模型选择器里显示各模型的积分倍率、顶栏有额度面板、每轮显示消耗的积分。                                                                                    | `dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits` |
 | [dsh-theme-tone](plugins/dsh-theme-tone/README.zh-CN.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-theme-tone&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-theme-tone)                             | ![深色主题](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png "ratio:0.5") ![浅色主题](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png "ratio:0.5")<br>在 DSH 内置的浅色与深色主题上各加几款色调皮肤（左深右浅），选了色调后还会一并优化对话区布局。 | `dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone`        |
 
-## 已退役
-
-* **[~~dsh-nav-pin~~](plugins/dsh-nav-pin/README.zh-CN.md)**——轮次导航窄屏不消失。已并入 **`dsh-theme-tone`**（2026-09-29）：选了非「默认」色调即内置同款行为。新装请勿安装它。卸载：`dsh plugin --profile web remove @dsh-sparrow/dsh-nav-pin`。
-* **[~~dsh-vision-bridge~~](plugins/dsh-vision-bridge/README.zh-CN.md)**——纯文本主模型的视觉通道：`vision_read` 工具用官方 DeepSeek 视觉模型读图并回传结构化文字报告。DeepSeek 主模型已原生多模态，请直接用 `deepseek-flash`；卸载：`dsh plugin --profile web remove @dsh-sparrow/dsh-vision-bridge`。
-
-## License
+## 已退役`n`n无 —— 两个退役插件已于 2026-10-27 彻底删除。`n`n## License
 
 MIT

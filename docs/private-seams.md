@@ -197,5 +197,4 @@
 
 ## E. 已退役（历史，不再维护）
 
-* **`dsh-vision-bridge`**（2026-09-10 退役）：曾可逆包装 `ctx.llm.resolveModelInfo` 抹除文本路由的
-  image 门禁，并直读 `snapshotEvents()`。代码原地保留，本节仅作历史。
+* **`dsh-vision-bridge`**（2026-09-10 退役，2026-10-27 插件目录已彻底删除）：历史记录，见 git 历史。
