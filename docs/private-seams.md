@@ -166,13 +166,6 @@
 
 * **`dsh-codebuddy-credits`** —— 捕获阶段拦截官方行头「编辑」按钮（`stopPropagation` 阻断官方编辑器打开，
   改为展开本插件自建编辑器）：按钮保留官方原位与样式，但**官方改这个按钮即静默失效**。
-* **`dsh-codebuddy-credits`** —— 把 current **乐观回写进官方共享模型目录 store**
-  （`src/client/index.ts` 的 `directory.store.update(s => { s.current = selection })`）：
-  官方 `ModelDirectory` 只公开 `select()`，而空白会话的投影不下发，`syncInputs` 读不到 `current`，
-  座位 / 眼睛 / 信息卡就都看不到选择（表现为「点击没反应」）。**这是对官方 store 私有状态的写**，
-  官方改 store 形状即静默失效。
-  ⚠️ **这一条是「可以走公开路径却没走」**：官方 `ModelDirectoryState` 的写入口应由官方提供，
-  目前没有 ⇒ 只能直写。**待办**：官方若给公开 setter 即换过去。
 
 * **`dsh-theme-tone`** —— 账号通知卡的锚点依赖官方公开 DOM 属性 `aside[data-front]`（rc.2 新增的
   `AccountNoticeStack`：`createPortal` 直挂 body、`position: fixed; z-index: 40; isolation: isolate`）。

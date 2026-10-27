@@ -52,6 +52,12 @@ Open **Settings → Models** and paste your key on the **CodeBuddy Credits** row
 - The models then appear in the **official** model picker (grouped under this
   provider). The plugin does not customize the picker; credit rate and context
   window are shown on the settings card and in the session header panel.
+- The plugin renders the model-row label so it can show that read-only credit
+  rate / context info for its own models. That label slot is single-occupant,
+  so the plugin also mirrors the official `1017` version badge on DeepSeek
+  Flash and keeps other providers' labels looking like the official ones.
+  If the official picker changes again, the label may fall back to plain names
+  until the plugin is updated.
 - Without a key the plugin makes no network requests at all and the provider
   does not appear in the model picker.
 - Removing the key deactivates the provider.
@@ -79,6 +85,10 @@ conversation UI:
 - **Per-turn credits**: credits spent for one assistant turn (at the end
   of its action row), with a popup breaking the total down per call and per
   model.
+- **Max mode**: a switch in the credits panel forces every reasoning model
+  from this provider to the `max` effort level, overriding the per-model
+  effort for as long as it is on. It never affects models from other
+  providers, and turning it off restores your per-model choices.
 
 Session and per-turn figures are kept from the session's own history, so
 they survive a DSH restart and stay correct when you reopen an older session;
@@ -101,6 +111,13 @@ the quota panel always reads the latest number from the server.
   enterprise plans, minimax-m3-pay is billed. Policies change without notice.
 - Requests made through your key appear in your account's usage records
   (including prompt text in the enterprise usage console).
+- The upstream service rejects some phrases in **system / assistant** message
+  bodies with an "unapproved channel" error. To keep chat working, the plugin
+  removes only the rejected phrases from the request copy of those bodies
+  (your local session history is unchanged); the rest of the text is sent
+  verbatim. `user`, tool results and tool-call arguments are never modified.
+  If the upstream list changes, requests may fail again until the plugin is
+  updated.
 
 ## License
 
