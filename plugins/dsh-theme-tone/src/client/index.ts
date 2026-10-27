@@ -49,6 +49,8 @@ interface Scope {
  *   （Electron 43.7.7 / Chromium 150）在流式输出 + 浮层时会把菜单碎片错位画进输入框。
  * - Electron 的 webview（OOPIF）对 backdrop-filter 的支持与独立浏览器不同，Electron 34 起还有
  *   「webview 内 backdrop-filter 失效」等已知问题 ⇒ 这不是用户设置问题，是内核/嵌入方式差异。
+ * - 时间线佐证（owner 环境）：VS Code 安装目录时间戳显示 2026-10-23 更新到 1.143.1（Chromium 150）；
+ *   主题的输入框玻璃在这之前早就存在且从未出现残影 ⇒ 是 Chromium ~150 的回归。
  * - 因此只对「Electron 且 Chromium 主版本低于 156」的宿主启用菜单期冻结；VS Code 将来升到
  *   Chromium ≥ 156 时该判定自动失效（若仍有残影，再下调阈值即可）。
  */

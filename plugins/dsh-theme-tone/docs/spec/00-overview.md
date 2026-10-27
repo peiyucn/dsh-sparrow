@@ -102,7 +102,9 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
   webview）会闪**。已排除用户设置假设：把 VS Code 缩放从 103%（`window.zoomLevel: 0.17`）重置到
   100% 后残影**更严重**（出现额外方块）⇒ 与缩放 / DPI 无关。Electron 的 webview（OOPIF）对
   backdrop-filter 的支持与独立浏览器不同（Electron 34 起就有「webview 内 backdrop-filter 失效」的
-  已知问题），这是宿主内核版本与嵌入方式造成的差异。
+  已知问题），这是宿主内核版本与嵌入方式造成的差异。**时间线佐证**：本机 VS Code 安装目录时间戳
+  显示 2026-10-23 才更新到 1.143.1（Chromium 150），而输入框玻璃早已存在、此前从未出现残影 ⇒
+  判定为 Chromium ~150 的回归，而不是本插件近期改动或用户设置。
   修法：**内嵌 Electron 且 Chromium ≤ 155 时**，菜单存在期间冻结输入框（去 blur + 实心 + 座位光墙），
   菜单关闭恢复；正常浏览器（Chromium 156+ / 非 Electron）始终完整玻璃、零切换。判定在安装时做一次
   UA 解析（`Electron` + `Chrome/主版本`），不引入运行时探测循环；VS Code 将来升到 Chromium ≥ 156
