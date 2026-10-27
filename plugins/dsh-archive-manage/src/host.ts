@@ -25,36 +25,22 @@ import {
   type SessionTreeHeader, type SessionTreeNode, type SubagentIdentityValue,
 } from './archive.js'
 import { assertCapabilities, assertHostCompatible, unsupportedStoredFormatReason } from './compat.js'
+import {
+  ENOENT, FOLDED_LABEL_CACHE_MAX_ENTRIES, HEADER_CACHE_TTL_MS, LABEL_FOLD_TIMEOUT_MS, MAX_BODY_BYTES, PACKAGE_NAME,
+  PREFIX, PROJECTION_CACHE_DOMAIN_FALLBACK, PROJECTION_CACHE_DOMAIN_SPEC_PACKAGE, PROJECTION_CACHE_INVALIDATE_ATTEMPTS,
+  ROUTES, SIDECAR_VERSION, STARTUP_SCAN_DELAY_MS, TITLE_FOLD_BUDGET_MS, TITLE_FOLD_CONCURRENCY,
+  projectionCacheDomainOf, type ProjectionCacheDomain,
+} from './constants.js'
+import type {
+  ArchiveRequest, ArchiveTreeNode, DeleteRequest, RestoreRequest, TrashDeleteAllRequest, TrashDeleteRequest,
+  TrashEntry, TrashRequest, TrashRestoreAllRequest, UnarchiveRequest,
+} from './contract.js'
 import { isTrustedPluginRequest, officialTrustedHosts } from './trust.js'
 
-export const name = 'dsh-archive-manage'
+export const name = PACKAGE_NAME
 export const inject = ['webServer', 'sessions', 'agents', 'workspaceRegistry', 'sessionPersistence', 'sessionQuery', 'storageDomain']
 
 export type { ArchiveConfig }
-
-const PREFIX = '/api/archive-manage'
-const MAX_BODY_BYTES = 64 * 1024
-/** header 事实缓存 TTL（spec 09）：写穿失效之外的兜底，防没有事件的边界路径留陈旧成员表。 */
-const HEADER_CACHE_TTL_MS = 30_000
-/** 冷会话整份日志折叠的有界并发（spec 09）：同一时间至多 N 个冷会话在做折叠。
- *  现由子会话标签折叠使用；标题折叠整批交给官方 readTitleSnapshots（其内部并发同为 4）。 */
-const TITLE_FOLD_CONCURRENCY = 4
-/** 标题折叠兜底的整体预算（spec 09）：超时后未完成的折叠按失败处理、回退会话 id。 */
-const TITLE_FOLD_BUDGET_MS = 8_000
-
-/**
- * 启动三项扫描的兜底延迟（2026-09-29，owner 报「重启后会话列表要等几十秒」）。
- *
- * 三项启动读取（幽灵归档 id 清扫 / 投影缓存清扫 / 父子归档对齐）都经
- * `headerFacts` → `sessionPersistence.list()`，而官方的会话列表接口
- * （`session/list` → `sessionQuery.listSessions()`）走的是同一条全量扫盘。
- * 以前它们在 `apply` 里立刻发起，等于**与官方抢同一次全量列举**，正好压住用户
- * 打开页面后等列表的那一个窗口（真机实测该窗口 40–90 s）。
- *
- * 故改为惰性：首次打开归档面板时立即补跑（用户要看的就是这份数据，必须最新）；
- * 另有本延迟作为「用户一直不开面板」的兜底，保证幽灵清扫最终会发生。
- */
-const STARTUP_SCAN_DELAY_MS = 30_000
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -65,7 +51,7 @@ declare module '@deepseek-ai/cordis' {
      */
     'api-session/removed'(sessionId: SessionId): void
     /** 官方公开事件：会话回到列表（载荷形状对齐官方 SessionSummary 的插件可用子集，见 dsh-api-session-controller types.ts）。 */
-    'api-session/added'(summary: { sessionId: SessionId; updatedAt: number; running: boolean; blank: boolean; parentSessionId?: SessionId; origin?: 'subagent'; cwd?: string }): void
+    'api-session/added'(summary: { sessionId: SessionId; updatedAt: number; running: boolean; blank: boolean; parentSessionId?: SessionId; origin?: 'subagent'; cwd?: string; agentAvailable: boolean }): void
   }
 }
 
@@ -97,17 +83,20 @@ function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   res.end(body)
 }
 
-function sendError(res: ServerResponse, error: unknown): void {
+function sendError(ctx: Context, res: ServerResponse, error: unknown): void {
   if (error instanceof ArchiveError) {
     sendJson(res, error.status, { error: { code: error.code, message: error.message } })
     return
   }
-  // 原生 fs 错误消息可能含绝对路径：掩码 home 前缀，与 /trash-dir 的展示口径一致。
+  // 500 是没有专门归类的意外路径：留一条 warn 供宿主日志定位，响应仍掩码 home 前缀
+  // （原生 fs 错误消息可能含绝对路径，与 /trash-dir 的展示口径一致）。
   const raw = error instanceof Error ? error.message : String(error)
+  ctx.logger.warn(`dsh-archive-manage: 未预期的路由错误：${raw}`)
   sendJson(res, 500, { error: { code: 'IO_ERROR', message: maskHomePath(raw, homedir()) } })
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<unknown | ArchiveError> {
+/** 读并解析 JSON 请求体；超限 / 读取失败 / 非法 JSON 一律抛 {@link ArchiveError}，由路由的 catch 收口。 */
+async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = []
   let size = 0
   try {
@@ -115,25 +104,27 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown | ArchiveErro
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
       size += buffer.byteLength
       if (size > MAX_BODY_BYTES) {
-        return new ArchiveError('BAD_BODY', `请求体超过 ${MAX_BODY_BYTES} 字节上限`)
+        throw new ArchiveError('BAD_BODY', `请求体超过 ${MAX_BODY_BYTES} 字节上限`)
       }
       chunks.push(buffer)
     }
-  } catch {
-    return new ArchiveError('BAD_BODY', '读取请求体失败')
+  } catch (error) {
+    if (error instanceof ArchiveError) throw error
+    throw new ArchiveError('BAD_BODY', '读取请求体失败')
   }
   try {
     return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
   } catch {
-    return new ArchiveError('BAD_BODY', '请求体不是合法 JSON')
+    throw new ArchiveError('BAD_BODY', '请求体不是合法 JSON')
   }
 }
 
-function bodyObject(value: unknown, message: string): Record<string, unknown> {
+/** 断言请求体是 JSON 对象；具体字段由各路由按 contract.ts 的请求类型读取。 */
+function bodyObject<T extends object>(value: unknown, message: string): T {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new ArchiveError('BAD_BODY', message)
   }
-  return value as Record<string, unknown>
+  return value as T
 }
 
 function titleFromObservation(result: SessionTitleObservationResult | undefined, fallback: string): string {
@@ -181,12 +172,23 @@ function ensureSessionNotLive(ctx: Context, sessionId: SessionId): void {
   }
 }
 
-/** 官方投影缓存域（session_projcache）：移入回收站/删除移走目录后失效对应行，@ 列表不再读到。 */
-const PROJCACHE_DOMAIN_NAME = 'session_projcache'
-const PROJCACHE_SESSIONS_TABLE = 'sessions'
+/**
+ * 官方投影缓存域：移入回收站/删除移走目录后失效对应行，@ 列表不再读到。域名与表名优先
+ * 取自官方 `projectionCacheDomainSpec`（官方改名后不需要跟版改代码），取不到才用回退字面量。
+ */
+let projectionCacheDomain: ProjectionCacheDomain = PROJECTION_CACHE_DOMAIN_FALLBACK
+
+async function resolveProjectionCacheDomain(): Promise<void> {
+  try {
+    const surface = await import(PROJECTION_CACHE_DOMAIN_SPEC_PACKAGE)
+    projectionCacheDomain = projectionCacheDomainOf((surface as { projectionCacheDomainSpec?: unknown }).projectionCacheDomainSpec)
+  } catch {
+    // 官方包不在本插件的依赖面内（只存在于宿主安装树），读不到不是错误。
+  }
+}
 
 /**
- * 标题投影缓存读取（spec 09，官方 title 单元 stateSchema = string|null、latest-wins）：
+ * 标题投影缓存读取（官方 title 单元 stateSchema = string|null、latest-wins）：
  * live 会话走投影注册表快照；冷会话走 sessionProjectionCache 行（官方 @ 列表同款，
  * list.ts:335 口径）。行值防御性解析（直接字符串或 {title} 对象都接受），无/空返回 undefined。
  */
@@ -255,7 +257,7 @@ function cachedTitle(ctx: Context, header: SessionHeader, live: unknown): string
 }
 
 /**
- * 批量标题三档（spec 09）：live 投影 → 冷缓存 → 折叠兜底。
+ * 批量标题三档：live 投影 → 冷缓存 → 折叠兜底。
  * 折叠共享一个整体预算信号（超时后未完成项按失败处理），最终取不到的 id 落 fallback（默认会话 id）。
  * 返回值包含全部输入 id 的键。
  *
@@ -283,7 +285,7 @@ export async function titlesFor(
     misses.push(header)
   }
   if (misses.length === 0) return out
-  // 预算信号自建（spec 09 审计）：批结束（成功或失败）即 release，定时器不滞留到死线。
+  // 预算信号自建：批结束（成功或失败）即 release，定时器不滞留到死线。
   const budget = createBudgetSignal(TITLE_FOLD_BUDGET_MS)
   try {
     const missingIds = [...new Set(misses.map(header => String(header.id)))]
@@ -358,20 +360,16 @@ export function assertRegistryMutationApi(registry: unknown): RegistryMutationSu
   return registry as unknown as RegistryMutationSurface
 }
 
+/** header 事实缓存承载类型：全量 header + 快照 size 映射。 */
+type HeaderFacts = { headers: SessionHeader[]; sizes: Map<string, number> }
+
 /**
  * sessionPersistence.list() 双形状兼容读取：
  * - npm 0.1.2-alpha.5 及更早：直接返回 SessionHeader[]；
  * - alpha.5 发布后的 master（2026-09-02 会话持久化重构）：返回 Snapshot[]（{ header, revision, ... }）。
- * 按元素是否携带 header 字段分流，统一返回 SessionHeader[]（见 AGENTS 插件私有 seam 特例）。
+ * 按元素是否携带 header 字段分流，统一返回 SessionHeader[]（见 AGENTS 插件私有 seam 特例），
+ * 并顺带收集快照形状才有的 sizeBytes。
  */
-export async function storedHeaders(ctx: Context): Promise<SessionHeader[]> {
-  return (await storedHeaderFacts(ctx)).headers
-}
-
-/** header 事实缓存承载类型（spec 09）：全量 header + 快照 size 映射。 */
-type HeaderFacts = { headers: SessionHeader[]; sizes: Map<string, number> }
-
-/** list() 双形状兼容读取 + 快照附加信息（sizeBytes，仅 master 快照形状有）。 */
 export async function storedHeaderFacts(ctx: Context): Promise<HeaderFacts> {
   const entries = await ctx.sessionPersistence.list() as readonly unknown[]
   const headers: SessionHeader[] = []
@@ -393,9 +391,9 @@ export async function storedHeaderFacts(ctx: Context): Promise<HeaderFacts> {
 /** 会话统计/列表元数据（projcache 行，缺失返回 undefined）。 */
 function sessionFacts(ctx: Context, sessionId: string): SessionFacts | undefined {
   try {
-    const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
+    const domain = ctx.storageDomain.get(projectionCacheDomain.name)
     if (domain === undefined) return undefined
-    return parseSessionFacts(domain.table(PROJCACHE_SESSIONS_TABLE).get(sessionId))
+    return parseSessionFacts(domain.table(projectionCacheDomain.table).get(sessionId))
   } catch {
     return undefined
   }
@@ -458,7 +456,7 @@ export function addedSummaryFor(header: SessionHeader, blank: boolean): {
  * unarchive 后补发官方 api-session/added：客户端 handleSessionAdded 即时并入会话列表，
  * 用户无需刷新页面。不发出则用户必须刷新——刷新会触发 dsh 把会话加载进 live store，
  * 之后「再归档 → 进回收站」会被 hold 守卫（ensureSessionNotLive）拦下。
- * spec 09 审计：headers 经 header 事实缓存取，与 /list /strays 共享单飞，不单独扫盘。
+ * headers 经 header 事实缓存取，与 /list /strays 共享单飞，不单独扫盘。
  */
 async function emitSessionAdded(ctx: Context, sessionId: SessionId, headerFacts: HeaderFactsStore<HeaderFacts>): Promise<void> {
   try {
@@ -476,7 +474,7 @@ async function emitSessionAdded(ctx: Context, sessionId: SessionId, headerFacts:
   }
 }
 
-/** SessionHeader → 纯逻辑树结构（spec 08）。 */
+/** SessionHeader → 纯逻辑树结构。 */
 function treeHeaderOf(header: SessionHeader): SessionTreeHeader {
   return {
     id: String(header.id),
@@ -495,12 +493,6 @@ function treeIds(nodes: readonly SessionTreeNode[]): string[] {
   }
   return out
 }
-
-/** 第三档（冷、未种子）从日志重新折叠投影的单次观察超时。 */
-const LABEL_FOLD_TIMEOUT_MS = 15_000
-
-/** 折叠标签记忆上限（spec 09 审计）：记忆随观察过的会话数增长，设 LRU 上限防无界累积。 */
-export const FOLDED_LABEL_CACHE_MAX_ENTRIES = 256
 
 /**
  * 日志折叠的 subagent 标签结论记忆：描述符事件一旦写入即不可变（官方注释 "a descriptor is
@@ -539,7 +531,7 @@ function ownSeqOf(value: number | undefined): SessionSeq | undefined {
  *      而不是禁用整条正路；观察是租约，用后 dispose，15s 超时防悬挂。
  * 均做能力检查 + 结构断言，失败返回 undefined，调用方回退标题单元结果。
  *
- * spec 10：第二档的判定从「取到 label 才算命中」改为「identity 非 null 即权威」——
+ * 第二档的判定从「取到 label 才算命中」改为「identity 非 null 即权威」——
  * one-shot 子会话的 label 官方定义为可选（projection-types.ts:30-33），此前这类会话
  * 每个都掉进第三档，把整份 zstd 日志解出来重折一遍（本机 10 个子会话 ≈ 8MB 压缩日志
  * ≈ 1s/次打开，且因折不出 label 永不进记忆 → 每次打开都重来）。
@@ -555,7 +547,7 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
       try {
         const identity = registry.snapshot(live, ['subagent']).values.subagent
         if (identity === null || typeof identity !== 'object') return undefined
-        // 自有后缀门（spec 10 审计，对齐官方 list-children.ts:224-225）：identity 必须折自
+        // 自有后缀门（对齐官方 list-children.ts:224-225）：identity 必须折自
         // 子会话**自有**事件。fork 子会话在「自己的描述符写入前」的创建窗口里，快照带的是
         // seed 继承的祖先描述符——不挡就会把祖先标签显示成这个子会话的标签（官方此时不出行）。
         // seq 畸形 / 缺官方 isOwnSeq（不支持的 dsh）一律按「无法验证自有性」保守不出行。
@@ -606,7 +598,7 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
     } | undefined
     if (query !== undefined && typeof query.observeSession === 'function') {
       let observation: FoldObservation | undefined
-      // 预算信号自建（spec 09 审计）：成功与失败路径都 release，定时器不滞留到死线。
+      // 预算信号自建：成功与失败路径都 release，定时器不滞留到死线。
       const budget = createBudgetSignal(LABEL_FOLD_TIMEOUT_MS)
       try {
         observation = await query.observeSession(sessionId, { signal: budget.signal })
@@ -639,7 +631,7 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
   return undefined
 }
 
-/** 批量子会话标签（spec 09：有界并发折叠，与标题兜底同一并发上限；header.id → label，取不到的 id 不在映射中）。 */
+/** 批量子会话标签（有界并发折叠，与标题兜底同一并发上限；header.id → label，取不到的 id 不在映射中）。 */
 async function subagentLabels(ctx: Context, headers: readonly SessionHeader[]): Promise<Map<string, string>> {
   const out = new Map<string, string>()
   const results = await runBounded(headers, TITLE_FOLD_CONCURRENCY, header => subagentLabel(ctx, header))
@@ -651,10 +643,10 @@ async function subagentLabels(ctx: Context, headers: readonly SessionHeader[]): 
 }
 
 /**
- * 父子归档对齐（spec 08 状态不变量：子镜像父）：
+ * 父子归档对齐（状态不变量：子镜像父）：
  * - 「父已归档而子未归档」→ 子补进归档集；「父未归档而子已归档」→ 子移出。
  * - 触发：启动 + 官方 workspace 域写入事件（domain/changed）+ 面板打开惰性兜底；幂等。
- * - spec 09 审计：headers 经 header 事实缓存取（缓存层单飞/TTL/写穿失效），
+ * - headers 经 header 事实缓存取（缓存层单飞/TTL/写穿失效），
  *   面板打开不再为对齐做全量扫盘（此前每次 /list 都直接 list() 一次）。
  */
 export async function alignChildArchives(
@@ -726,7 +718,7 @@ async function addArchivedId(surface: RegistryMutationSurface, sessionId: Sessio
 /**
  * 启动清扫：归档集里不在持久化中的幽灵 id 清理掉（历史遗留防御——旧版本直写时代可能已
  * 产生幽灵条目；通道迁移后不再产生新幽灵，保留一次性防御）。
- * spec 09 审计：headers 经 header 事实缓存取，与其余启动读取共享同一次扫盘。
+ * headers 经 header 事实缓存取，与其余启动读取共享同一次扫盘。
  */
 async function sweepGhostArchivedIds(
   ctx: Context,
@@ -749,34 +741,34 @@ async function sweepGhostArchivedIds(
 /** 失效官方投影缓存行（派生数据，可安全删除；官方服务常驻打开该域，走 get）。 */
 async function invalidateProjectionCache(ctx: Context, sessionId: SessionId): Promise<void> {
   try {
-    const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
+    const domain = ctx.storageDomain.get(projectionCacheDomain.name)
     if (domain === undefined) return
-    await domain.table(PROJCACHE_SESSIONS_TABLE).delete(String(sessionId))
+    await domain.table(projectionCacheDomain.table).delete(String(sessionId))
   } catch (error) {
     ctx.logger.warn(`dsh-archive-manage: 投影缓存失效失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
   }
 }
 /** 移入回收站/删除后校验投影缓存是否已删除；未删除时重试一次并告警，供启动清扫兜底。 */
 async function invalidateProjectionCacheGuarded(ctx: Context, sessionId: SessionId): Promise<void> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < PROJECTION_CACHE_INVALIDATE_ATTEMPTS; attempt++) {
     await invalidateProjectionCache(ctx, sessionId)
     try {
-      const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
-      if (domain === undefined || domain.table(PROJCACHE_SESSIONS_TABLE).get(String(sessionId)) === undefined) return
+      const domain = ctx.storageDomain.get(projectionCacheDomain.name)
+      if (domain === undefined || domain.table(projectionCacheDomain.table).get(String(sessionId)) === undefined) return
     } catch (error) {
       ctx.logger.warn(`dsh-archive-manage: 投影缓存校验失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
       return
     }
-    if (attempt === 1) ctx.logger.warn(`dsh-archive-manage: 移入回收站/删除后投影缓存仍残留 ${String(sessionId)}，重启后启动清扫会再次清理`)
+    if (attempt === PROJECTION_CACHE_INVALIDATE_ATTEMPTS - 1) ctx.logger.warn(`dsh-archive-manage: 移入回收站/删除后投影缓存仍残留 ${String(sessionId)}，重启后启动清扫会再次清理`)
   }
 }
 
 /** 游离会话的「空白」判定：只读官方投影行（与失效投影行同域，见 AGENTS seam 特例）；读失败按非空白保守处理。 */
 async function readStrayBlankness(ctx: Context, sessionId: SessionId): Promise<boolean> {
   try {
-    const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
+    const domain = ctx.storageDomain.get(projectionCacheDomain.name)
     if (domain === undefined) return false
-    const row = domain.table(PROJCACHE_SESSIONS_TABLE).get(String(sessionId))
+    const row = domain.table(projectionCacheDomain.table).get(String(sessionId))
     return parseBlankProjection(row)?.blank === true
   } catch {
     return false
@@ -786,11 +778,11 @@ async function readStrayBlankness(ctx: Context, sessionId: SessionId): Promise<b
 /** 启动清扫：投影缓存中不在 sessionPersistence.list() 里的会话行删除，@ 列表与真实持久化保持一致。 */
 async function sweepStaleProjectionCache(ctx: Context, headerFacts: HeaderFactsStore<HeaderFacts>): Promise<void> {
   try {
-    const domain = ctx.storageDomain.get(PROJCACHE_DOMAIN_NAME)
+    const domain = ctx.storageDomain.get(projectionCacheDomain.name)
     if (domain === undefined) return
     const { headers } = await headerFacts.get()
     const known = new Set(headers.map(header => String(header.id)))
-    const table = domain.table(PROJCACHE_SESSIONS_TABLE)
+    const table = domain.table(projectionCacheDomain.table)
     let removed = 0
     for (const key of [...table.keys()]) {
       if (known.has(String(key))) continue
@@ -831,7 +823,7 @@ function assertHeaderFormatSupported(header: SessionHeader): void {
  *  子代理自身也能再派子代理（官方 header 有 `delegationDepth`，subagent 工具可嵌套），故不能只取
  *  直接子会话：深度 ≥2 的后代目录留在磁盘上，父已缺位后它们要么以孤儿根浮现在归档区根级、
  *  要么落进游离区（2026-09-12 实测：两个孙会话在其祖父会话入回收站后掉出来，用户只能逐个再操作）。
- *  spec 09 审计：headers 经 header 事实缓存取，与同请求的主 header 查表口径一致。 */
+ *  headers 经 header 事实缓存取，与同请求的主 header 查表口径一致。 */
 async function listSubagentTargets(
   ctx: Context,
   parentSessionId: SessionId,
@@ -877,9 +869,9 @@ export function resolveTrashDir(trashRoot: string, trashId: string): string {
   return candidate
 }
 
-async function listTrashItems(trashRoot: string): Promise<unknown[]> {
+async function listTrashItems(trashRoot: string): Promise<TrashEntry[]> {
   const names = await trashDirNames(trashRoot)
-  const items: unknown[] = []
+  const items: TrashEntry[] = []
   for (const name of names) {
     const dir = resolveTrashDir(trashRoot, name)
     try {
@@ -976,7 +968,7 @@ async function restoreTrashDir(ctx: Context, surface: RegistryMutationSurface, t
     await rm(sidecar.originalPath, { recursive: true, force: false })
   }
   await rename(trashDir, sidecar.originalPath)
-  // 记账 sidecar 在回收站目录里，上面这次 rename 会把它一起带回会话目录（spec 13）：它是回收站元数据
+  // 记账 sidecar 在回收站目录里，上面这次 rename 会把它一起带回会话目录：它是回收站元数据
   // （含标题与原工作区记账 id），留在用户数据目录里只会被官方日志导出/打包捎带。**紧跟 rename 清理**：
   // 排在 subagent 移回之前，因为那条路径失败会直接抛出，放在末尾的清理就再也不会执行（审计 S2）；
   // 此刻条目已被 rename 走，删它不会把回收站条目退化成「无 sidecar 的旧格式条目」。删不掉只告警。
@@ -1025,7 +1017,7 @@ async function restoreTrashDir(ctx: Context, surface: RegistryMutationSurface, t
  * @param ctx - DSH 插件上下文。
  * @param config - 插件配置（cordis.patch.yml 注入）。
  */
-export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {}): void {
+export async function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {}): Promise<void> {
   // 宿主兼容自检（根 AGENTS《插件与宿主兼容》，先于一切注册）：会话格式不认识就整个停用。
   // 本插件按目录移动/删除会话文件——宁可停用，也不要在不认识的格式上执行不可逆操作。
   assertHostCompatible(ctx, name)
@@ -1043,13 +1035,14 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
   const surface = assertRegistryMutationApi(ctx.workspaceRegistry)
   // 私有 seam 依赖：sessionPersistence.locate（2026-09-02 起公开契约降为后端私有方法，运行时仍在）。
   assertSessionLocationApi(ctx.sessionPersistence)
+  await resolveProjectionCacheDomain()
 
-  // spec 09：header 事实缓存（单飞 + TTL）。写穿失效见下方事件监听与写路由；
+  // header 事实缓存（单飞 + TTL）。写穿失效见下方事件监听与写路由；
   // jsonl header 物化后不可变，按 id 缓存安全，成员增减由事件与自身写操作失效。
   const headerFacts = createHeaderFactsStore(() => storedHeaderFacts(ctx), HEADER_CACHE_TTL_MS)
 
   // 启动清扫（均不影响加载）：归档集幽灵 id（历史遗留）、投影缓存陈旧行。
-  // spec 09 审计：三项启动读取（清扫 ×2 + 对齐）共享 header 事实缓存单飞，启动只扫一次盘。
+  // 三项启动读取（清扫 ×2 + 对齐）共享 header 事实缓存单飞，启动只扫一次盘。
   // 2026-09-29：**不再在 apply 里立刻发起**——它们与官方会话列表接口抢同一次全量扫盘，
   // 会压住用户打开页面后等列表的窗口（真机实测 40–90 s）。改为「首次打开归档面板时补跑」
   // + 一条延迟兜底，见 runStartupScans 的说明。
@@ -1064,15 +1057,15 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
   const startupScanTimer = setTimeout(runStartupScans, STARTUP_SCAN_DELAY_MS)
   ctx.effect(() => () => clearTimeout(startupScanTimer), 'dsh-archive-manage: 启动清扫兜底定时器')
 
-  // spec 08 父子联动：官方 workspace 域写入事件驱动实时对齐（幂等，官方 feed 同款监听）。
-  // spec 09：同事件写穿失效 header 缓存（官方菜单归档等外部写不经过本插件路由）。
+  // 父子联动：官方 workspace 域写入事件驱动实时对齐（幂等，官方 feed 同款监听）。
+  // 同事件写穿失效 header 缓存（官方菜单归档等外部写不经过本插件路由）。
   ctx.effect(() => ctx.on('domain/changed', (change) => {
     if (change.domain !== 'workspace' || change.operation !== 'put') return
     headerFacts.invalidate()
     void alignChildArchives(ctx, surface, headerFacts)
   }), 'dsh-archive-manage: 父子归档对齐')
 
-  // spec 09：会话进出事件写穿失效 header 缓存（自身写操作补发的 removed/added 亦经此路径）。
+  // 会话进出事件写穿失效 header 缓存（自身写操作补发的 removed/added 亦经此路径）。
   ctx.effect(() => ctx.on('api-session/added', () => headerFacts.invalidate()), 'dsh-archive-manage: header 缓存失效（added）')
   ctx.effect(() => ctx.on('api-session/removed', () => headerFacts.invalidate()), 'dsh-archive-manage: header 缓存失效（removed）')
 
@@ -1087,11 +1080,11 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
         // 本插件含移动 / 删除会话文件的不可逆路由，故整条前缀一律先过门。
         // 额外信任面直接复用官方 webStartup.trustedHosts（rc.2 起；旧宿主回退 webRuntime），LAN 部署与官方同一份口径。
         if (!isTrustedPluginRequest(req.headers, officialTrustedHosts(ctx))) {
-          sendError(res, new ArchiveError('FORBIDDEN', '拒绝非本机同源的请求', 403))
+          sendError(ctx, res, new ArchiveError('FORBIDDEN', '拒绝非本机同源的请求', 403))
           return
         }
-        if (req.method === 'GET' && pathname === `${PREFIX}/list`) {
-          // spec 08：归档区 = 已归档会话的父子树；先惰性对齐再构建（事件驱动之外的兜底）。
+        if (req.method === 'GET' && pathname === ROUTES.list) {
+          // 归档区 = 已归档会话的父子树；先惰性对齐再构建（事件驱动之外的兜底）。
           // 2026-09-29：用户打开面板 = 明确要看归档数据，故这里先补跑启动三项扫描
           // （幽灵清扫 + 陈旧投影清扫 + 父子对齐），保证首屏就是清扫后的结果。
           runStartupScans()
@@ -1103,7 +1096,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           const tree = buildSessionTree(archivedHeaders.map(treeHeaderOf))
           const ids = treeIds(tree)
           const workspaceIds = workspaceIndexFor(ctx.workspaceRegistry.list())
-          // spec 09：标题三档（live 投影 → 冷缓存 → 有界折叠兜底），不再整树全日志折叠。
+          // 标题三档（live 投影 → 冷缓存 → 有界折叠兜底），不再整树全日志折叠。
           const treeHeaders = ids
             .map(id => byId.get(id))
             .filter((header): header is SessionHeader => header !== undefined)
@@ -1113,7 +1106,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           const childLabels = childHeaders.length > 0
             ? await subagentLabels(ctx, childHeaders)
             : new Map<string, string>()
-          const nodeOf = (node: SessionTreeNode): Record<string, unknown> => {
+          const nodeOf = (node: SessionTreeNode): ArchiveTreeNode => {
             const header = byId.get(node.header.id)
             const sessionId = SessionId(node.header.id)
             const liveSession = ctx.sessions.get(sessionId)
@@ -1143,18 +1136,18 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
-        if (req.method === 'GET' && pathname === `${PREFIX}/strays`) {
+        if (req.method === 'GET' && pathname === ROUTES.strays) {
           const { headers, sizes } = await headerFacts.get()
           const archivedIds = await readArchivedIds(ctx)
           const attachedIds = ctx.workspaceRegistry.list().flatMap(workspace => workspace.sessionIds.map(id => String(id)))
-          // spec 08：有父的子会话跟随父、不单独出现在游离区；孤儿子会话（父不在）按顶层对待并打 orphan 标。
+          // 有父的子会话跟随父、不单独出现在游离区；孤儿子会话（父不在）按顶层对待并打 orphan 标。
           const children = livingChildIds(headers.map(treeHeaderOf))
           const strayIds = straySessionIds(
             headers.map(header => String(header.id)),
             archivedIds.map(id => String(id)),
             attachedIds,
           ).filter(id => !children.has(id))
-          // spec 09：先取游离 header 集，标题/子标签批量三档（缓存优先 + 有界折叠），不再逐会话串行全日志折叠。
+          // 先取游离 header 集，标题/子标签批量三档（缓存优先 + 有界折叠），不再逐会话串行全日志折叠。
           // 审计（host.ts 旧 :1013 的 O(K·S)）：成员判定先建一次 Set，避免逐 header 对 strayIds 做线性 includes。
           const strayIdSet = new Set(strayIds)
           const strayHeaders = headers.filter(header => strayIdSet.has(String(header.id)))
@@ -1188,12 +1181,12 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
-        if (req.method === 'GET' && pathname === `${PREFIX}/trash`) {
+        if (req.method === 'GET' && pathname === ROUTES.trash) {
           sendJson(res, 200, { items: await listTrashItems(settings.trashRoot) })
           return
         }
 
-        if (req.method === 'GET' && pathname === `${PREFIX}/trash-dir`) {
+        if (req.method === 'GET' && pathname === ROUTES.trashDir) {
           // 面板提示信息用：明示回收站实际存放位置（卸载影响可见化）；displayPath 掩码 home 前缀（~）。
           sendJson(res, 200, {
             path: settings.trashRoot,
@@ -1202,10 +1195,10 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
-        if (req.method === 'POST' && pathname === `${PREFIX}/unarchive`) {
+        if (req.method === 'POST' && pathname === ROUTES.unarchive) {
           // 取消归档：官方归档标记的会话回到会话列表原位置（2026-09-01 新增）。
           // 只动归档集、不碰文件——live 会话（被 dsh hold）同样可取消归档；幂等。
-          const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
+          const parsed = bodyObject<UnarchiveRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
           if (typeof parsed.sessionId !== 'string' || parsed.sessionId.trim() === '') {
             throw new ArchiveError('BAD_BODY', 'sessionId 必须是非空字符串')
           }
@@ -1217,10 +1210,10 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
-        if (req.method === 'POST' && pathname === `${PREFIX}/archive`) {
-          // spec 08：归档以父为单位——父 + 全部有父的子会话一并进归档集（单写链原子）。
+        if (req.method === 'POST' && pathname === ROUTES.archive) {
+          // 归档以父为单位——父 + 全部有父的子会话一并进归档集（单写链原子）。
           // 只服务游离/孤儿子会话（官方菜单覆盖不到）；官方归档的父由 domain/changed 对齐补子。
-          const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
+          const parsed = bodyObject<ArchiveRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
           if (typeof parsed.sessionId !== 'string' || parsed.sessionId.trim() === '') {
             throw new ArchiveError('BAD_BODY', 'sessionId 必须是非空字符串')
           }
@@ -1239,8 +1232,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
-        if (req.method === 'POST' && (pathname === `${PREFIX}/trash` || pathname === `${PREFIX}/delete`)) {
-          const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
+        if (req.method === 'POST' && (pathname === ROUTES.trash || pathname === ROUTES.delete)) {
+          const parsed = bodyObject<TrashRequest & DeleteRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
           if (typeof parsed.sessionId !== 'string' || parsed.sessionId.trim() === '') {
             throw new ArchiveError('BAD_BODY', 'sessionId 必须是非空字符串')
           }
@@ -1308,7 +1301,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               // 根目录缺失（陈旧 header 缓存 / 已被别的操作搬走或手工删过）：没有东西可搬进回收站。
               // 有意**不**像后代那样静默跳过——回收站条目一旦只有 sidecar 没有日志，还原就会造出一个
               // 空会话目录，比直接报错更糟。给一条人能看懂的提示，用户可改用「彻底删除」（它宽容 ENOENT）。
-              if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+              if ((error as NodeJS.ErrnoException)?.code === ENOENT) {
                 throw new ArchiveError('UNKNOWN_SESSION', '会话目录不在磁盘上（可能已被移走或删除）：没有可移入回收站的内容，请刷新面板', 404)
               }
               throw new ArchiveError('IO_ERROR', `移动父会话目录失败：${error instanceof Error ? error.message : String(error)}`, 500)
@@ -1329,7 +1322,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
                     // 跳过并继续——与 delete 分支的 ENOENT 口径一致（审计 F2），不让一个幽灵条目把
                     // 整单拖回滚、把用户永久卡在「这个树移不进回收站」。它仍留在响应/归档集清理清单里
                     // （磁盘上已无该会话，标记不该留）。其余错误照旧整单回滚。
-                    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+                    if ((error as NodeJS.ErrnoException)?.code === ENOENT) {
                       ctx.logger.warn(`dsh-archive-manage: subagent 会话目录不在磁盘上（${String(child.sessionId)}），已跳过搬运：${error instanceof Error ? error.message : String(error)}`)
                       continue
                     }
@@ -1341,7 +1334,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
                     title: await readTitle(ctx, child.header, child.header.id),
                     originalPath: child.dir,
                     workspaceIds: workspaceIds.get(String(child.sessionId)) ?? [],
-                    // 记父子链：回收站区据此还原任意深度的层级（spec 14）。深度 ≥2 的后代父是
+                    // 记父子链：回收站区据此还原任意深度的层级。深度 ≥2 的后代父是
                     // 中间层子会话，不记就只能平铺展示（2026-09-12 owner 实测「回收站里显示不了 >2 的树」）。
                     ...child.header.parentSession === undefined ? {} : { parentSessionId: String(child.header.parentSession) },
                   })
@@ -1354,7 +1347,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               }
             }
             const sidecar = {
-              version: 2,
+              version: SIDECAR_VERSION,
               sessionId: String(sessionId),
               title,
               originalPath: sessionDir,
@@ -1389,7 +1382,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
               ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
             }
             // 移入回收站不失效投影行：会话身份未变，还原后标题投影依然有效（否则子会话标题退化为
-            // 冷读首条用户消息 = 委派指令文本；2026-09-02 实测，spec 08 §2.6）。
+            // 冷读首条用户消息 = 委派指令文本；2026-09-02 实测。
             // 通知会话列表消费者移除条目（官方公开事件；会话目录已移走）。
             ctx.emit('api-session/removed', sessionId)
             for (const child of subagents) {
@@ -1456,8 +1449,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
-        if (req.method === 'POST' && pathname === `${PREFIX}/trash-delete`) {
-          const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
+        if (req.method === 'POST' && pathname === ROUTES.trashDelete) {
+          const parsed = bodyObject<TrashDeleteRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
           if (typeof parsed.trashId !== 'string' || parsed.trashId.trim() === '') {
             throw new ArchiveError('BAD_BODY', 'trashId 必须是非空字符串')
           }
@@ -1479,8 +1472,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
-        if (req.method === 'POST' && pathname === `${PREFIX}/restore`) {
-          const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
+        if (req.method === 'POST' && pathname === ROUTES.restore) {
+          const parsed = bodyObject<RestoreRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
           if (typeof parsed.trashId !== 'string' || parsed.trashId.trim() === '') {
             throw new ArchiveError('BAD_BODY', 'trashId 必须是非空字符串')
           }
@@ -1492,8 +1485,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
-        if (req.method === 'POST' && pathname === `${PREFIX}/trash-restore-all`) {
-          const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
+        if (req.method === 'POST' && pathname === ROUTES.trashRestoreAll) {
+          const parsed = bodyObject<TrashRestoreAllRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
           if (parsed.confirm !== true) {
             throw new ArchiveError('CONFIRMATION_FAILED', '还原全部回收站条目需要二次确认')
           }
@@ -1519,8 +1512,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
           return
         }
 
-        if (req.method === 'POST' && pathname === `${PREFIX}/trash-delete-all`) {
-          const parsed = bodyObject(await readJsonBody(req), '请求体必须是 JSON 对象')
+        if (req.method === 'POST' && pathname === ROUTES.trashDeleteAll) {
+          const parsed = bodyObject<TrashDeleteAllRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
           if (parsed.confirm !== true) {
             throw new ArchiveError('CONFIRMATION_FAILED', '彻底删除全部回收站条目需要二次确认')
           }
@@ -1545,7 +1538,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
 
         sendJson(res, 404, { error: { code: 'BAD_BODY', message: `未知的 archive-manage 路由：${pathname}` } })
       } catch (error) {
-        sendError(res, error)
+        sendError(ctx, res, error)
       }
     },
   }), 'dsh-archive-manage: REST routes')

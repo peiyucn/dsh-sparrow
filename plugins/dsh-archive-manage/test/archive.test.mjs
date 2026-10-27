@@ -9,7 +9,7 @@ import {
 } from '../lib/archive.js'
 
 describe('archive-manage 纯逻辑', () => {
-  describe('createHeaderFactsStore（spec 09）', () => {
+  describe('createHeaderFactsStore', () => {
     it('TTL 内命中缓存，不重复 load', async () => {
       let loads = 0
       let now = 1000
@@ -93,7 +93,7 @@ describe('archive-manage 纯逻辑', () => {
     })
   })
 
-  describe('createLruCache（spec 09 审计）', () => {
+  describe('createLruCache', () => {
     it('超过上限 应该 淘汰最久未使用条目', () => {
       const cache = createLruCache(3)
       cache.set('a', 1)
@@ -119,7 +119,7 @@ describe('archive-manage 纯逻辑', () => {
     })
   })
 
-  describe('createBudgetSignal（spec 09 审计）', () => {
+  describe('createBudgetSignal', () => {
     it('未 release 应该 到点中止', async () => {
       const budget = createBudgetSignal(20)
       await new Promise(resolve => setTimeout(resolve, 70))
@@ -134,7 +134,7 @@ describe('archive-manage 纯逻辑', () => {
     })
   })
 
-  describe('runBounded（spec 09）', () => {
+  describe('runBounded', () => {
     it('结果与输入对齐，单任务失败只在该位置 undefined', async () => {
       const results = await runBounded([1, 2, 3, 4], 2, async n => {
         if (n === 2) throw new Error('boom')
@@ -589,11 +589,11 @@ describe('archive-manage 纯逻辑', () => {
       assert.equal(sidecar?.subagents?.length, 2)
       assert.equal(sidecar?.subagents?.[1].title, 'c2')
       assert.deepEqual(sidecar?.subagents?.[0].workspaceIds, ['w'])
-      // 旧条目没有 parentSessionId（spec 14 之前落的盘）→ 字段缺失，展示层回落平铺。
+      // 旧条目没有 parentSessionId（之前落的盘）→ 字段缺失，展示层回落平铺。
       assert.equal(sidecar?.subagents?.[0].parentSessionId, undefined)
     })
 
-    // spec 14：parentSessionId 只服务展示层级，形状不对就丢该字段，不把整条判成不可还原。
+    // parentSessionId 只服务展示层级，形状不对就丢该字段，不把整条判成不可还原。
     it('subagent 的 parentSessionId 应该 透出；畸形值只丢字段不废条目', () => {
       const withParent = parseTrashSidecar({
         version: 2,
@@ -673,7 +673,7 @@ describe('archive-manage 纯逻辑', () => {
       assert.deepEqual(view.subagents, [{ sessionId: 'c1', title: 'child1' }, { sessionId: 'c2', title: 'child2' }])
     })
 
-    // spec 14：视图要带出 parentSessionId，回收站区才能画出 >2 层的树；旧条目没有该字段。
+    // 视图要带出 parentSessionId，回收站区才能画出 >2 层的树；旧条目没有该字段。
     it('带 parentSessionId 的 sidecar 应该 逐条透出层级字段', () => {
       const view = trashItemView('trash-3', {
         version: 2,

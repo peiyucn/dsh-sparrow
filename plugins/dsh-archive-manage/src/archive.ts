@@ -1,8 +1,10 @@
 /** dsh-archive-manage 纯逻辑：配置、确认强度、回收站目录、sidecar 解析。 */
 
 import { join } from 'node:path'
+import { SIDECAR_VERSION, TRASH_SIDECAR } from './constants.js'
+import type { LegacyTrashItem as ContractLegacyTrashItem, TrashItem as ContractTrashItem } from './contract.js'
 
-export const TRASH_SIDECAR = 'dsh-archive-manage.json'
+export { TRASH_SIDECAR }
 /** 回收站目录名（. 前缀与 DSH 官方目录区分）。 */
 export const DEFAULT_TRASH_DIR = '.sessions-trash'
 
@@ -15,7 +17,7 @@ export interface ArchiveSubagentSidecar {
   readonly title: string
   readonly originalPath: string
   readonly workspaceIds: readonly string[]
-  /** 该子会话的父会话 id（回收站区据此还原父子层级，spec 14）；旧条目无此字段 → 平铺展示。 */
+  /** 该子会话的父会话 id（回收站区据此还原父子层级）；旧条目无此字段 → 平铺展示。 */
   readonly parentSessionId?: string
 }
 
@@ -89,13 +91,13 @@ export function maskHomePath(path: string, homeDir: string): string {
 export function parseTrashSidecar(value: unknown): ArchiveSidecar | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
   const sidecar = value as Record<string, unknown>
-  if (sidecar.version !== 1 && sidecar.version !== 2) return undefined
+  if (sidecar.version !== 1 && sidecar.version !== SIDECAR_VERSION) return undefined
   if (typeof sidecar.sessionId !== 'string' || sidecar.sessionId.trim() === '') return undefined
   if (typeof sidecar.originalPath !== 'string' || sidecar.originalPath.trim() === '') return undefined
   if (typeof sidecar.archivedAt !== 'string') return undefined
   if (!Array.isArray(sidecar.workspaceIds) || !sidecar.workspaceIds.every(id => typeof id === 'string')) return undefined
   let subagents: ArchiveSubagentSidecar[] | undefined
-  if (sidecar.version === 2 && sidecar.subagents !== undefined) {
+  if (sidecar.version === SIDECAR_VERSION && sidecar.subagents !== undefined) {
     if (!Array.isArray(sidecar.subagents)) return undefined
     subagents = sidecar.subagents.map((item): ArchiveSubagentSidecar | undefined => {
       if (typeof item !== 'object' || item === null || Array.isArray(item)) return undefined
@@ -109,7 +111,7 @@ export function parseTrashSidecar(value: unknown): ArchiveSidecar | undefined {
         originalPath: child.originalPath,
         workspaceIds: child.workspaceIds,
         // 层级字段只影响展示：形状不对就丢掉该字段（回落平铺），不让一个畸形字段把整条
-        // 回收站条目判成不可还原（§还原只依赖 originalPath）。
+        // 回收站条目判成不可还原（还原只依赖 originalPath）。
         ...typeof child.parentSessionId === 'string' && child.parentSessionId.trim() !== ''
           ? { parentSessionId: child.parentSessionId }
           : {},
@@ -129,26 +131,11 @@ export function parseTrashSidecar(value: unknown): ArchiveSidecar | undefined {
 }
 
 /** 旧格式条目（无 sidecar）：目录名即会话 id；只可列出/彻底删除，不可还原。 */
-export interface LegacyTrashItem {
-  readonly trashId: string
-  readonly sessionId: string
-  readonly title: string
-  readonly archivedAt: string
-  readonly workspaceIds: readonly []
-  readonly legacy: true
-}
+export type LegacyTrashItem = ContractLegacyTrashItem
 
 /** 回收站条目视图（列表接口返回形状）：子会话仅展示用（父子联动），
- *  还原/删除整棵走 sidecar 原样。parentSessionId 供回收站区还原层级（spec 14）。 */
-export interface TrashItemView {
-  readonly trashId: string
-  readonly sessionId: string
-  readonly title: string
-  readonly archivedAt: string
-  readonly workspaceIds: readonly string[]
-  readonly legacy: false
-  readonly subagents: ReadonlyArray<{ sessionId: string; title: string; parentSessionId?: string }>
-}
+ *  还原/删除整棵走 sidecar 原样。parentSessionId 供回收站区还原层级。 */
+export type TrashItemView = ContractTrashItem
 
 /** sidecar → 列表条目视图；v1 无子会话记录时 subagents 为空数组。 */
 export function trashItemView(trashId: string, sidecar: ArchiveSidecar): TrashItemView {
@@ -271,7 +258,7 @@ export interface SessionTreeNode {
  * 由全量会话 header 构建父子树：
  * - 子会话（origin === 'subagent' 且父在清单内）挂到父节点下，同级按 createdAt 升序；
  * - 顶层会话与孤儿子会话（父不在清单内）为根节点，按 createdAt 降序；
- * - 孤儿按顶层会话对待（无父可随，面板手动操作；spec 08）。
+ * - 孤儿按顶层会话对待（无父可随，面板手动操作；）。
  */
 export function buildSessionTree(headers: readonly SessionTreeHeader[]): SessionTreeNode[] {
   const byId = new Map(headers.map(header => [header.id, header]))
@@ -301,7 +288,7 @@ export interface ArchiveAlignment {
 }
 
 /**
- * 计算父子归档对齐差异（spec 08 状态不变量：子镜像父）：
+ * 计算父子归档对齐差异（状态不变量：子镜像父）：
  * - 父已归档而子未归档 → 加入 add；
  * - 父未归档而子已归档 → 加入 remove；
  * - 孤儿子会话（父不在清单）与顶层会话不参与。
@@ -359,7 +346,7 @@ export function archiveAlignmentForChildren(
   return { add, remove }
 }
 
-/** 有父（父在清单内）的子会话 id 集合——这些子会话跟随父，不单独出现在游离区（spec 08）。 */
+/** 有父（父在清单内）的子会话 id 集合——这些子会话跟随父，不单独出现在游离区。 */
 export function livingChildIds(headers: readonly SessionTreeHeader[]): Set<string> {
   const byId = new Set(headers.map(header => header.id))
   const out = new Set<string>()
@@ -421,11 +408,11 @@ export function archivedIdsToRemove(rootId: string, subagentIds: readonly string
 }
 
 /**
- * header 事实缓存存储（spec 09，纯逻辑供单测）：TTL 内直接返回缓存；过期后
+ * header 事实缓存存储（纯逻辑供单测）：TTL 内直接返回缓存；过期后
  * 单飞填充（并发调用共享同一 promise）；invalidate 清缓存让下一次 get 重扫。
  * 安全依据：jsonl header 物化后不可变，按 id 缓存只需处理成员增减（写穿失效）。
  *
- * 失效代际（spec 09 审计）：invalidate 作废进行中的 load——失效前启动的扫描
+ * 失效代际：invalidate 作废进行中的 load——失效前启动的扫描
  * 结果不许写回缓存，否则写穿失效会被「旧成员表重新填满缓存」抵消（TTL 内持续
  * 陈旧）；作废的 promise 仍会正常落定给当时在等的调用方（快照语义），只是不缓存。
  */
@@ -487,7 +474,7 @@ export interface SubagentIdentityValue {
 }
 
 /**
- * 权威 identity → 标签结论（spec 10）。
+ * 权威 identity → 标签结论。
  *
  * `identity` 非 null 表示官方已在这份日志上折到 subagent 描述符（官方
  * `subagent` 单元的 view = `state.identity ?? null`，projection.ts:178）；描述符
@@ -506,7 +493,7 @@ export function labelFromSubagentIdentity(identity: SubagentIdentityValue | null
 }
 
 /**
- * 有上限的 LRU 缓存（spec 09 审计，纯逻辑供单测）：Map 插入序即访问序，
+ * 有上限的 LRU 缓存（纯逻辑供单测）：Map 插入序即访问序，
  * get 命中删后重插 = 移到最新；set 超上限淘汰最久未使用条目。
  * 值域不含 undefined（缺键与「值为 undefined」不可区分）；可存 null（「权威无标签」这类
  * 结论同样要被记住，否则每次都要重折日志），调用方需保证不存 undefined 值。
@@ -543,7 +530,7 @@ export function createLruCache<K, V>(maxEntries: number): LruCache<K, V> {
 }
 
 /**
- * 可提前释放的预算信号（spec 09 审计，纯逻辑供单测）：AbortSignal.timeout 的
+ * 可提前释放的预算信号（纯逻辑供单测）：AbortSignal.timeout 的
  * 定时器在批结束后仍活到死线（成功路径不释放）；这里改为自建 AbortController +
  * 定时器，release() 在成功与失败路径都清 timer，句柄不滞留。
  */
@@ -561,7 +548,7 @@ export function createBudgetSignal(timeoutMs: number): { signal: AbortSignal; re
 }
 
 /**
- * 有界并发执行（spec 09，纯逻辑供单测）：至多 limit 个 worker 顺序取任务；
+ * 有界并发执行（纯逻辑供单测）：至多 limit 个 worker 顺序取任务；
  * 单任务失败只在该位置记 undefined，不中断其余任务；结果与输入对齐。
  */
 export async function runBounded<T, R>(

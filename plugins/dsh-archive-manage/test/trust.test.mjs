@@ -217,6 +217,23 @@ describe('officialTrustedHosts 复用官方信任面（不造第二份真相）'
     assert.deepEqual(officialTrustedHosts({ get: () => { throw new Error('boom') } }), [])
   })
 
+  // 官方信任面是外部数据：非法条目（带 scheme / user@ / 补零端口）会被静默改写 → 悄悄放宽授权。
+  // 加载时丢弃 + 告警，但绝不抛错 —— 官方数据异常不得让整个插件停用。
+  it('⛔ 非法条目 应该 丢弃并各告警一条，合法条目保留（不抛错）', () => {
+    const warns = []
+    const ctx = {
+      get: (name) => (name === 'webStartup'
+        ? { trustedHosts: ['ok.example:8443', 'https://bad.example', 'user@evil.example', 'harness.internal:080'] }
+        : undefined),
+      logger: { warn: (message) => { warns.push(message) } },
+    }
+    assert.deepEqual(officialTrustedHosts(ctx), ['ok.example:8443'])
+    assert.equal(warns.length, 3, `应各有一条丢弃告警，实际：${JSON.stringify(warns)}`)
+    for (const message of warns) assert.match(message, /丢弃非法的官方 allowedHosts 条目/u)
+    // 丢弃后不得参与判定（坏条目的主机名不会被授权）。
+    assert.equal(isTrustedPluginRequest({ host: 'evil.example:8443' }, officialTrustedHosts(ctx)), false)
+  })
+
   it('官方信任面确实参与判定（LAN authority 由官方取值放行）', () => {
     const ctx = { get: (name) => (name === 'webStartup' ? { trustedHosts: ['192.168.1.5:3080'] } : undefined) }
     assert.equal(
@@ -232,7 +249,7 @@ describe('接线：栅栏必须真正挡在路由前面', () => {
     const source = readFileSync(new URL('../src/host.ts', import.meta.url), 'utf8')
     const fenceAt = source.indexOf('isTrustedPluginRequest(req.headers, officialTrustedHosts(ctx))')
     assert.ok(fenceAt > 0, '处理器里必须调用 isTrustedPluginRequest（带官方信任面）')
-    const firstRouteAt = source.indexOf('pathname === `${PREFIX}/list`')
+    const firstRouteAt = source.indexOf('pathname === ROUTES.list')
     assert.ok(firstRouteAt > 0, '应当能找到第一个路由分支')
     assert.ok(fenceAt < firstRouteAt, '栅栏必须排在所有路由分支之前')
     // 栅栏必须在读取请求体之前 —— 否则恶意请求仍会驱动一次 body 读取。

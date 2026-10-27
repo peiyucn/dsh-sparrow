@@ -59,7 +59,7 @@ describe('subtreeIdsOf（取消归档时即时摘除整棵子树）', () => {
   })
 })
 
-describe('subtreeLive（spec 08：父级操作锁定看整棵子树）', () => {
+describe('subtreeLive（父级操作锁定看整棵子树）', () => {
   /** 自身 live 的节点（纯逻辑只读 sessionId / live / children）。 */
   const live = (sessionId, children = []) => ({ sessionId, live: true, children })
 
@@ -80,7 +80,7 @@ describe('subtreeLive（spec 08：父级操作锁定看整棵子树）', () => {
   })
 })
 
-describe('descendantLive（spec 15：锁定来源是不是后代）', () => {
+describe('descendantLive（锁定来源是不是后代）', () => {
   const live = (sessionId, children = []) => ({ sessionId, live: true, children })
 
   // 自身 live 的行已显示「未释放」，不再重复提示——这个判据只认后代。
@@ -101,7 +101,7 @@ describe('descendantLive（spec 15：锁定来源是不是后代）', () => {
   })
 })
 
-describe('isCollapsed（spec 15：默认收起）', () => {
+describe('isCollapsed（默认收起）', () => {
   it('空集（面板刚打开）应该 判为收起', () => {
     assert.equal(isCollapsed(ids(), 'p'), true)
   })
@@ -117,7 +117,7 @@ describe('isCollapsed（spec 15：默认收起）', () => {
   })
 })
 
-describe('trashSubagentTree（spec 14：回收站条目按 sidecar 父子链还原层级）', () => {
+describe('trashSubagentTree（回收站条目按 sidecar 父子链还原层级）', () => {
   const sub = (sessionId, parentSessionId) => ({ sessionId, title: sessionId, ...parentSessionId === undefined ? {} : { parentSessionId } })
   const shape = nodes => nodes.map(node => ({ id: node.item.sessionId, children: shape(node.children) }))
 

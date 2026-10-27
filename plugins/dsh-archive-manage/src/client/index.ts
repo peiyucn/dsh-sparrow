@@ -1,35 +1,19 @@
 /**
  * dsh-archive-manage client half：官方「主面板」入口（左栏上面的图标行 + 中央列的页面）。
  *
- * 形态对齐官方 `ui-plugin-manager`（插件）与 `ui-schedule`（自动化任务），见 spec 16：
- * `main` keyed 槽与 `sidebar.panellist` list 槽**共用同一个 id**。
+ * 形态对齐官方 `ui-plugin-manager`（插件）与 `ui-schedule`（自动化任务），见 * `main` keyed 槽与 `sidebar.panellist` list 槽**共用同一个 id**。
  * 所有写操作都走 host 自有路由；客户端不直接碰文件。
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-// Type-only：拉入 ui-renderer 的 SlotRegistry 服务合并（ctx.slots），
-// 以及 remote / sessions 两个客户端服务的声明（官方 0.1.7 起分散在各包）。
-import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-import type {} from '@deepseek-ai/dsh-api-remotes/client'
-import type {} from '@deepseek-ai/dsh-api-session-controller/client'
-import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
-import { ArchivePanel, ensureArchiveStyles } from './ArchivePage.js'
-import type { ArchivedSessionItem, DeleteMutationResult, StraySessionItem, TrashDeleteResult, TrashMutationResult } from './ArchivePage.js'
+import { ArchivePanel } from './ArchivePage.js'
 import { ArchivePanelIcon } from './ArchivePanelIcon.js'
-import { attachMainPanel } from './panel.js'
+import { installArchiveClient, passesClientGate } from './install.js'
 
-// remote：官方 Remote 事件载体（api-session/* 桥接，spec 08 §2.5）；硬依赖，缺失时本插件客户端不启动。
+// remote：官方 Remote 事件载体（api-session/* 桥接）；硬依赖，缺失时 install 里的能力门会惰性停用。
 // ⚠️ `layout` **不在这里** —— client half 的 inject 缺服务会让 entry 永远 pending，
 // 而客户端 boot 审计把非 active 的 entry 当致命失败；它走 panel.ts 里的可选依赖 fork。
 export const inject = ['slots', 'locale', 'remote']
-
-/** 入口 id：同时是左栏面板行的 id 与中央列 `main` 槽的 key（官方 `MainPanelId`）。 */
-export const PANEL_ID = 'archive-manage' as MainPanelId
-
-/** 左栏行序：官方 plugins = 0、schedules = 10，本插件沿用原 footer 的 20 号段。 */
-const PANEL_ORDER = 20
 
 /** 本插件的 locale 字典（zh/en）。 */
 const LOCALE_DICTS = {
@@ -153,106 +137,12 @@ const LOCALE_DICTS = {
   },
 } as const
 
-interface ApiEnvelope<T> {
-  readonly items?: T[]
-  readonly error?: { readonly code?: string; readonly message?: string }
-}
-
-/** 面板请求超时：host 挂起时不让面板永久 loading（根 AGENTS 网络约定）。
- * 30s：/list 首开要串行做对齐 + 全量扫描 + 冷观察 + 标签梯子，重启后冷启动曾误触 15s（2026-09-03）。 */
-const REQUEST_TIMEOUT_MS = 30_000
-
-async function readApi<T>(path: string, init?: RequestInit): Promise<T[]> {
-  const response = await fetch(path, { ...init, signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
-  const payload = await response.json() as ApiEnvelope<T>
-  if (!response.ok) {
-    throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
-  }
-  return payload.items ?? []
-}
-
-/** 树形载荷读取（spec 08：/list 返回 tree）。 */
-async function readTree<T>(path: string, init?: RequestInit): Promise<T[]> {
-  const response = await fetch(path, { ...init, signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
-  const payload = await response.json() as { tree?: T[]; error?: { readonly code?: string; readonly message?: string } }
-  if (!response.ok) {
-    throw new Error(payload.error?.message ?? '请求失败（HTTP ' + response.status + '）')
-  }
-  return payload.tree ?? []
-}
-
-async function postApi<T = { ok?: boolean }>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(path, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  const payload = await response.json() as T & { error?: { message?: string } }
-  if (!response.ok) {
-    throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
-  }
-  return payload
-}
-
 /**
- * client half 入口：locale 字典 + 实时刷新桥 + 官方主面板两处注册。
+ * client half 入口：先跑能力门（缺失只告警并返回），再把浏览器侧件交给 install。
  * @param ctx - 浏览器侧 Cordis 上下文。
  */
 export function apply(ctx: ClientContext): void {
-  ensureArchiveStyles()
-  const disposeDictionaries = ctx.locale.register('archive-manage', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
-  ctx.effect(() => disposeDictionaries, 'dsh-archive-manage: locale dictionaries')
-  // 官方「会话离开 live store」（fiber 销毁，session-controller 转发的 api-session/removed）
-  // → 广播窗口事件，页面在屏时据此实时刷新 hold 标记（spec 08 §2.5）。
-  // 事件名在 cordis Events 与 TypertRemoteEventSelection 均已声明，但 npm 中间态包的
-  // Remote 签名推导拼不出该事件（运行时桥接按名称转发，与类型无关），此处做局部结构断言。
-  const remote = ctx.remote as unknown as { $on(event: string, handler: () => void): () => void }
-  const disposeRemoved = remote.$on('api-session/removed', () => {
-    window.dispatchEvent(new CustomEvent('dsh-archive-sessions-changed'))
-  })
-  ctx.effect(() => disposeRemoved, 'dsh-archive-manage: live 状态实时刷新')
-  // 官方主面板两处注册（`main` 页面 + `sidebar.panellist` 图标行）走可选依赖 fork：
-  // 官方布局服务不在位时整条不注册（惰性停用、不抛错），宿主照常启动。
-  attachMainPanel(ctx, {
-    id: PANEL_ID,
-    order: PANEL_ORDER,
-    locale: 'archive-manage',
-    label: () => ctx.locale.bind('archive-manage')('button.label'),
-    inject: () => ({
-      listArchived: () => readTree<ArchivedSessionItem>('/api/archive-manage/list'),
-      listStrays: () => readApi<StraySessionItem>('/api/archive-manage/strays'),
-      listTrashItems: () => readApi<{
-        trashId: string
-        sessionId: string
-        title: string
-        archivedAt: string
-        legacy: boolean
-        subagents?: Array<{ sessionId: string; title: string }>
-      }>('/api/archive-manage/trash'),
-      trashDirPath: async () => {
-        const response = await fetch('/api/archive-manage/trash-dir', { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
-        const payload = await response.json() as { path?: string; displayPath?: string; error?: { message?: string } }
-        if (!response.ok) {
-          throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
-        }
-        return { path: payload.path ?? '', displayPath: payload.displayPath ?? payload.path ?? '' }
-      },
-      moveToTrash: (sessionId: string) => postApi<TrashMutationResult>('/api/archive-manage/trash', { sessionId, confirm: true }),
-      unarchiveSession: (sessionId: string) => postApi('/api/archive-manage/unarchive', { sessionId }),
-      archiveSession: (sessionId: string) => postApi('/api/archive-manage/archive', { sessionId }),
-      deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => postApi<DeleteMutationResult>('/api/archive-manage/delete', simple ? { sessionId, confirm: true } : { sessionId, confirmTitle }),
-      restoreTrashItem: (trashId: string) => postApi('/api/archive-manage/restore', { trashId }),
-      deleteTrashItem: (trashId: string) => postApi<TrashDeleteResult>('/api/archive-manage/trash-delete', { trashId, confirm: true }),
-      restoreAllTrash: () => postApi<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ trashId: string; message: string }> }>('/api/archive-manage/trash-restore-all', { confirm: true }),
-      deleteAllTrash: () => postApi<{ deleted?: number; failed?: string[] }>('/api/archive-manage/trash-delete-all', { confirm: true }),
-    }),
-    page: ArchivePanel,
-    icon: ArchivePanelIcon,
-  })
+  // 首步自检：不通过就不注册任何槽位 / 样式 / 监听，也不抛错（抛错会让整页 boot 失败）。
+  if (!passesClientGate(ctx)) return
+  installArchiveClient(ctx, { page: ArchivePanel, icon: ArchivePanelIcon, locales: LOCALE_DICTS })
 }
-
-export { ArchivePanel, ensureArchiveStyles } from './ArchivePage.js'
-export type { ArchivePanelInjected, ArchivePanelProps, ArchivedSessionItem, TrashItem } from './ArchivePage.js'
-export { ArchivePanelIcon } from './ArchivePanelIcon.js'
-export { attachMainPanel } from './panel.js'

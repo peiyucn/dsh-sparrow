@@ -91,15 +91,32 @@ function bindAddressAuthority(ctx: { get(name: string): unknown }): readonly str
  * 旧宿主回退 `webRuntime`，两份合并去重 —— 复用可免自造白名单把 LAN 部署静默挡死；再把 webServer
  * 的**监听绑定地址**纳入（官方 rc.2 栅栏同样接受绑定地址本身，任意端口）。服务缺失（老宿主 /
  * 非 web 部署）时为空 = 只认回环（`ctx.get` 可选读取，绝不因此让插件抛穿）。
+ *
+ * 官方数据里的条目先过 {@link assertTrustedAuthority}：形状非法的条目（带 scheme / 路径 / user@ /
+ * 补零端口）会被 `isTrustedAuthority` 静默改写 → 悄悄放宽授权，故加载时丢弃并告警；**不抛错** ——
+ * 官方信任面异常不应让整个插件停用，丢掉坏条目后退回回环仍可安全服务。
  */
-export function officialTrustedHosts(ctx: { get(name: string): unknown }): readonly string[] {
-  return [
+export function officialTrustedHosts(ctx: {
+  get(name: string): unknown
+  logger?: { warn(message: string): void }
+}): readonly string[] {
+  const entries = [
     ...new Set([
       ...trustedHostsOfService(ctx, 'webStartup'),
       ...trustedHostsOfService(ctx, 'webRuntime'),
       ...bindAddressAuthority(ctx),
     ]),
   ]
+  const trusted: string[] = []
+  for (const entry of entries) {
+    try {
+      assertTrustedAuthority(entry)
+      trusted.push(entry)
+    } catch {
+      ctx.logger?.warn(`dsh-archive-manage: 丢弃非法的官方 allowedHosts 条目 ${JSON.stringify(entry)}，只用其余信任面`)
+    }
+  }
+  return trusted
 }
 
 /** 与官方同口径的请求检查：Host 必须回环或命中信任面，且不得跨站 / 异源（Origin 与 Host 自洽

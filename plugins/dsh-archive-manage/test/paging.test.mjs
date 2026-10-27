@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { countVisibleRows } from '../lib/client/paging.js'
 
-describe('countVisibleRows（spec 09）', () => {
+describe('countVisibleRows', () => {
   const tree = [
     { id: 'a', children: [{ id: 'a1', children: [] }, { id: 'a2', children: [{ id: 'a2x', children: [] }] }] },
     { id: 'b', children: [] },

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { resolve, sep } from 'node:path'
 import { archivedIdsToRemove, createHeaderFactsStore, labelFromSubagentIdentity } from '../lib/archive.js'
-import { addedSummaryFor, alignChildArchives, assertRegistryMutationApi, assertSessionLocationApi, FOLDED_LABEL_CACHE_MAX_ENTRIES, mutateArchivedSet, removeArchivedIds, resolveTrashDir, sessionDirectoryFor, storedHeaders, subagentLabel, titlesFor, workspaceIndexFor } from '../lib/host.js'
+import { FOLDED_LABEL_CACHE_MAX_ENTRIES } from '../lib/constants.js'
+import { addedSummaryFor, alignChildArchives, assertRegistryMutationApi, assertSessionLocationApi, mutateArchivedSet, removeArchivedIds, resolveTrashDir, sessionDirectoryFor, subagentLabel, titlesFor, workspaceIndexFor } from '../lib/host.js'
 
 // 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
 // 测试夹具按当前平台构造——CI 跑 Ubuntu、本机跑 Windows，两边都必须绿。
@@ -132,25 +133,6 @@ describe('archive-manage host 纯逻辑', () => {
     })
   })
 
-  describe('storedHeaders', () => {
-    const ctxWithList = (list) => ({ sessionPersistence: { list } })
-
-    it('master 快照形状 应该 映射为 header', async () => {
-      const ctx = ctxWithList(async () => [
-        { header: { id: 'a', createdAt: 1, isSeeded: false }, revision: 'r1' },
-        { header: { id: 'b', createdAt: 2, isSeeded: false }, revision: 'r2' },
-      ])
-      const headers = await storedHeaders(ctx)
-      assert.deepEqual(headers.map(h => String(h.id)), ['a', 'b'])
-    })
-
-    it('旧 header 形状 应该 原样通过', async () => {
-      const ctx = ctxWithList(async () => [{ id: 'c', createdAt: 3, isSeeded: false }])
-      const headers = await storedHeaders(ctx)
-      assert.deepEqual(headers.map(h => String(h.id)), ['c'])
-    })
-  })
-
   describe('mutateArchivedSet', () => {
     function fakeRegistry(initialIds) {
       const calls = []
@@ -230,7 +212,7 @@ describe('archive-manage host 纯逻辑', () => {
     })
   })
 
-  describe('alignChildArchives（spec 09 审计）', () => {
+  describe('alignChildArchives', () => {
     const headerOf = (id, extra = {}) => ({ id, createdAt: 1, isSeeded: false, ...extra })
     const alignCtx = (archivedIds) => ({
       workspaceRegistry: { archivedSessionIds: archivedIds },
@@ -399,7 +381,7 @@ describe('archive-manage host 纯逻辑', () => {
     })
   })
 
-  describe('labelFromSubagentIdentity（spec 10 权威判定）', () => {
+  describe('labelFromSubagentIdentity（权威判定）', () => {
     it('identity 带 label 应该 返回该标签', () => {
       assert.equal(labelFromSubagentIdentity({ mode: 'continuable', label: '审查卸载残留', seq: 7 }), '审查卸载残留')
     })
@@ -511,7 +493,7 @@ describe('archive-manage host 纯逻辑', () => {
       assert.equal(await subagentLabel(ctx, labelHeader('live-1')), 'live-label')
     })
 
-    // spec 10 审计：对齐官方 list-children.ts:224-225 的自有后缀门。
+    // 对齐官方 list-children.ts:224-225 的自有后缀门。
     it('live 快照 identity 非自有（fork seed 祖先描述符）应该 不出标签', async () => {
       const ctx = {
         sessions: { get: () => ({ isOwnSeq: () => false }) },
@@ -729,7 +711,7 @@ describe('archive-manage host 纯逻辑', () => {
       assert.equal(disposed, 1)
     })
 
-    // spec 10：one-shot 子会话的 label 官方定义为可选，此前「取不到 label 就重折整份日志」，
+    // one-shot 子会话的 label 官方定义为可选，此前「取不到 label 就重折整份日志」，
     // 导致每次打开面板都为这批会话解一遍 zstd 日志。缓存行给出 identity 即为权威结论。
     it('缓存行 identity 存在但无 label 应该 直接结束（不再折叠日志）', async () => {
       let observed = 0

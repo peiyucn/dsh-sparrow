@@ -75,9 +75,10 @@ const childHeader = (id, rootId) => header(id, { parentSession: rootId, origin: 
  *   archivedIds: string[],
  *   titles: Map<string, string>,
  *   trashRoot: string,
+ *   listError?: boolean,
  * }} options
  */
-async function buildHarness({ headers, dirs, archivedIds, titles, trashRoot }) {
+async function buildHarness({ headers, dirs, archivedIds, titles, trashRoot, listError = false }) {
   let route = null
   const warnings = []
   const emitted = []
@@ -104,7 +105,10 @@ async function buildHarness({ headers, dirs, archivedIds, titles, trashRoot }) {
       setState: async (state) => { archived.length = 0; archived.push(...state.archivedSessionIds) },
     },
     sessionPersistence: {
-      list: async () => headers,
+      list: async () => {
+        if (listError) throw new Error('disk boom')
+        return headers
+      },
       locate: (candidate) => {
         const dir = dirs.get(String(candidate.id))
         return dir === undefined ? undefined : { kind: 'jsonl', path: join(dir, 'session.jsonl') }
@@ -406,5 +410,62 @@ describe('archive-manage host 路由：真实 handler 行为', () => {
     assert.equal(existsSync(ghostRoot), false)
     // 归档集必须被摘掉（否则归档面板里永远清不掉的幽灵条目）。
     assert.ok(h.emitted.some(e => e.event === 'api-session/removed' && String(e.payload) === 'gone-root'))
+  })
+
+  /**
+   * 请求体错误必须是 **400 + 指向请求体** 的错误，而不是被当成合法 body 后误报
+   * 「sessionId 必须非空」——那会把「请求太大 / JSON 坏了」诊断成「你没传 id」。
+   */
+  describe('请求体语义（readJsonBody 抛错而非返回错误对象）', () => {
+    /** 一个普通 harness（只需路由已注册；请求体在进业务前就被拒）。 */
+    async function routeHarness() {
+      const layout = await makeLayout()
+      const h = await buildHarness({
+        headers: [], dirs: new Map(), archivedIds: [], titles: new Map(), trashRoot: layout.trash,
+      })
+      return h
+    }
+
+    it('⛔ 超过 64KB 的请求体 应该 400 且 message 指向请求体上限', async () => {
+      const h = await routeHarness()
+      const body = JSON.stringify({ sessionId: 'root', confirm: true, pad: 'x'.repeat(70 * 1024) })
+      const result = await request(h.route.handler, `${PREFIX}/trash`, { method: 'POST', body })
+      assert.equal(result.statusCode, 400)
+      assert.equal(result.body.error.code, 'BAD_BODY')
+      assert.match(result.body.error.message, /请求体/u)
+      assert.match(result.body.error.message, /字节上限/u)
+      assert.doesNotMatch(result.body.error.message, /sessionId 必须/u)
+    })
+
+    it('⛔ 非法 JSON 应该 400 且 message 指向请求体', async () => {
+      const h = await routeHarness()
+      const result = await request(h.route.handler, `${PREFIX}/trash`, { method: 'POST', body: '{"sessionId":' })
+      assert.equal(result.statusCode, 400)
+      assert.equal(result.body.error.code, 'BAD_BODY')
+      assert.match(result.body.error.message, /请求体不是合法 JSON/u)
+    })
+
+    it('⛔ 数组 body 应该 400 且 message 指向「必须是 JSON 对象」', async () => {
+      const h = await routeHarness()
+      const result = await request(h.route.handler, `${PREFIX}/trash`, { method: 'POST', body: '[]' })
+      assert.equal(result.statusCode, 400)
+      assert.equal(result.body.error.code, 'BAD_BODY')
+      assert.match(result.body.error.message, /请求体必须是 JSON 对象/u)
+    })
+
+    it('未预期异常 应该 500 且 logger 收到一条 warn（非 ArchiveError 路径）', async () => {
+      const layout = await makeLayout()
+      const h = await buildHarness({
+        headers: [], dirs: new Map(), archivedIds: [], titles: new Map(), trashRoot: layout.trash, listError: true,
+      })
+      const result = await request(h.route.handler, `${PREFIX}/list`)
+      assert.equal(result.statusCode, 500)
+      assert.equal(result.body.error.code, 'IO_ERROR')
+      assert.equal(
+        h.warnings.filter(message => message.includes('未预期的路由错误')).length,
+        1,
+        `500 路径应记一条 logger.warn，实际：${JSON.stringify(h.warnings)}`,
+      )
+    })
   })
 })

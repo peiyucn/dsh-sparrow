@@ -85,14 +85,14 @@ describe('dsh-archive-manage 结构', () => {
 
   it('子会话树的竖线应该 由每个节点自画，不得用「实色遮盖」补末节点残段', async () => {
     // 实色遮盖只在「与父面逐像素同色」时成立 —— 叠了颗粒与光的主题会让遮盖带露成一条白线。
-    const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
+    const src = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
     const children = /\.dsh-archive-tree-children \{([^}]*)\}/u.exec(src)
     assert.ok(children !== null, '缺 .dsh-archive-tree-children 规则')
     assert.ok(
       !/border-left/u.test(children[1]),
       '子区容器不该画 border-left —— 竖线要由每个节点自画，否则末节点残段又需要遮盖',
     )
-    const treeRules = src.slice(src.indexOf('.dsh-archive-tree-children'), src.indexOf('.dsh-archive-trigger'))
+    const treeRules = src.slice(src.indexOf('.dsh-archive-tree-children'), src.indexOf('.dsh-archive-btn'))
     assert.ok(
       !/background:\s*var\(--dsw-alias-bg-layer/u.test(treeRules),
       '树里不得用背景色遮盖残段 —— 那个手法依赖「与父面同色」，叠了颗粒就会露成白线',
@@ -105,17 +105,19 @@ describe('dsh-archive-manage 结构', () => {
   })
 
   /**
-   * spec 16：入口迁到官方「主面板」形态；本组守卫钉住**迁走的东西不许回来** ——
+   * 入口迁到官方「主面板」形态；本组守卫钉住**迁走的东西不许回来** ——
    * client half 只注册官方两处槽位，自建遮罩 / dialog 语义 / 焦点陷阱全部消失。
    */
   it('client half 应该 只注册官方 main + sidebar.panellist，不再挂 sidebar.footer.action', async () => {
     const index = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
-    assert.match(index, /attachMainPanel\(/u, '入口必须经 attachMainPanel 装配')
+    const install = await readFile(new URL('../src/client/install.ts', import.meta.url), 'utf8')
+    assert.match(install, /attachMainPanel\(/u, '入口必须经 attachMainPanel 装配')
+    assert.match(index, /installArchiveClient\(/u, 'client 入口应把安装流程交给 install.ts')
     assert.ok(!/sidebar\.footer\.action/u.test(index), '不得再注册左栏 footer action（已迁到上面）')
     assert.ok(!/role=['"]dialog['"]/u.test(index), 'client half 不得出现自建 dialog 语义')
   })
 
-  it('⛔ 页面不得自建遮罩 / dialog 语义 / 焦点陷阱（spec 16 决策点 1）', async () => {
+  it('⛔ 页面不得自建遮罩 / dialog 语义 / 焦点陷阱（决策点 1）', async () => {
     const page = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
     // 剥注释再判：本文件的注释里**故意**写着「没有 role='dialog'」这类说明，不剥会命中自己的文档。
     const code = page
@@ -137,10 +139,11 @@ describe('dsh-archive-manage 结构', () => {
 
   it('页面顶部应该 自带窗口拖拽标记与官方顶带内边距（无遮罩后顶端就是窗口边缘）', async () => {
     const page = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
+    const styles = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
     assert.match(page, /data-window-drag/u, '标题行必须自带 data-window-drag（官方入口型页面同款）')
     assert.match(page, /dsh-archive-page-head/u)
     // 顶带让位（macOS 下标题行不能被红绿灯压住）。
-    assert.match(page, /--dsh-frame-top-clearance/u, '标题行必须让出官方顶带')
+    assert.match(styles, /--dsh-frame-top-clearance/u, '标题行必须让出官方顶带')
   })
 
   it('旧入口组件 应该 已删除（不留死代码）', () => {
@@ -155,7 +158,7 @@ describe('dsh-archive-manage 结构', () => {
    * 故钉两件事：① 页面根自带 14px 基准；② 行标题显式给字号与行高（只给基准则行高仍是 normal）。
    */
   it('⛔ 页面根必须自带 14px 基准字号（迁到中央列后不再继承左栏的 14px）', async () => {
-    const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
+    const src = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
     const root = /\.dsh-archive-page \{([^}]*)\}/u.exec(src)
     assert.ok(root !== null, '缺 .dsh-archive-page 规则')
     // ⚠️ 必须**剥注释**再判：上面那段注释里自己写着「font-size: 14px」，不剥会把「声明被删」的变异放过去。
@@ -189,7 +192,7 @@ describe('dsh-archive-manage 结构', () => {
    * （本页 48px 下内边距 ⇒ 署名中心「视口底 −56.5px」vs 设置行「−31.5px」），故同时钉住 48px。
    */
   it('⛔ 品牌署名必须与侧边栏「设置」行对齐（左下角 / 左对齐 / 无分割线）', async () => {
-    const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
+    const src = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
     const footer = /\.dsh-archive-page-footer \{([^}]*)\}/u.exec(src)
     assert.ok(footer !== null, '缺 .dsh-archive-page-footer 规则')
     // 剥注释，否则注释里的声明会把「真声明被删」的变异放过去。
@@ -245,5 +248,40 @@ describe('dsh-archive-manage 结构', () => {
       en.filter(key => !zh.includes(key)), [],
       'en 有而 zh 没有的键（中文界面会显示键名）',
     )
+  })
+
+  it('文档应该 只剩单一现状 spec（00-overview）', async () => {
+    const fs = await import('node:fs/promises')
+    const specs = await fs.readdir(new URL('../docs/spec', import.meta.url))
+    assert.deepEqual(specs, ['00-overview.md'])
+  })
+
+  it('src 应该 按关注点拆分（constants / contract / trust / compat / host）', async () => {
+    const fs = await import('node:fs/promises')
+    const files = await fs.readdir(new URL('../src', import.meta.url))
+    for (const file of ['constants.ts', 'contract.ts', 'host.ts', 'archive.ts', 'trust.ts', 'compat.ts']) {
+      assert.ok(files.includes(file), `缺 ${file}`)
+    }
+  })
+
+  it('⛔ client half 入口必须走不抛错的能力门，样式登记 effect 清理', async () => {
+    const install = await readFile(new URL('../src/client/install.ts', import.meta.url), 'utf8')
+    const index = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(install, /warnMissingCapabilities\(/u, 'client half 必须先跑 warnMissingCapabilities')
+    assert.match(install, /ctx\.effect\(\(\) => \(\) => \{ style\.remove\(\) \}/u, '样式表必须在 effect 里移除')
+    assert.ok(!/assertCapabilities\(/u.test(install), 'client half 不得用抛错版能力门')
+    const gateAt = index.indexOf('passesClientGate(ctx)')
+    const installAt = index.indexOf('installArchiveClient(ctx')
+    assert.ok(gateAt > 0, 'client 入口 apply 必须先跑能力门')
+    assert.ok(installAt > gateAt, '能力门必须排在安装之前')
+  })
+
+  it('死代码 应该 已清理（data-archive-panel / 仅测试使用的 storedHeaders / 入口 re-export）', async () => {
+    const page = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
+    const host = await readFile(new URL('../src/host.ts', import.meta.url), 'utf8')
+    const index = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.ok(!page.includes('data-archive-panel'), 'data-archive-panel 没有消费者，应删除')
+    assert.ok(!/export async function storedHeaders/u.test(host), 'storedHeaders 无运行时调用方，应删除')
+    assert.ok(!/^export \{/mu.test(index), 'client/index.ts 末尾无消费者的 re-export 应删除')
   })
 })

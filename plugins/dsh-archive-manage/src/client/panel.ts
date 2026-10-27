@@ -1,5 +1,5 @@
 /**
- * 官方「主面板」入口装配（spec 16，对齐 `ui-plugin-manager` / `ui-schedule`）：`main` keyed 槽与
+ * 官方「主面板」入口装配（对齐 `ui-plugin-manager` / `ui-schedule`）：`main` keyed 槽与
  * `sidebar.panellist` list 槽**共用同一个 id**；本模块零运行时依赖，故 `node:test` 可直接导入。
  * `layout` 不写进 `inject`（缺服务会让 fiber 永远 pending、触发 boot 审计的致命失败），改走
  * `ctx.inject(['layout'], cb)` 的可选依赖 fork：服务不在位就什么都不做，绝不抛错（fork 是子 fiber，

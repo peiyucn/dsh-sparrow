@@ -1,5 +1,5 @@
 /**
- * 归档会话管理**页面**（spec 16）：注册进官方 `main` keyed 槽，渲染在**中央列**
+ * 归档会话管理**页面**：注册进官方 `main` keyed 槽，渲染在**中央列**
  * （对话区那块位置），与官方「插件」/「自动化任务」同形。
  *
  * ⚠️ 本视图**不再是弹窗**：没有遮罩、没有 `role='dialog'` / `aria-modal`、
@@ -12,391 +12,39 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactEle
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { Modal, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  ARCHIVE_PAGE_SIZE, COPIED_FEEDBACK_MS, DAY_MS, SESSIONS_CHANGED_DEBOUNCE_MS, SESSIONS_CHANGED_EVENT,
+} from '../constants.js'
+import type {
+  ArchiveResponse, DeleteMutationResponse, RestoreResponse, StraySessionItem, TrashDeleteAllResponse,
+  TrashDeleteResponse, TrashEntry, TrashMutationResponse, TrashRestoreAllResponse, TrashSubagentItem, UnarchiveResponse,
+} from '../contract.js'
 import { descendantLive, dropArchivedIds, isCollapsed, subtreeIdsOf, subtreeLive, trashSubagentTree, type ArchivedSessionItem, type TrashSubagentNode } from './archivedTree.js'
 import { countVisibleRows } from './paging.js'
 
-/** 分页窗口大小（spec 09）：每区每次渲染的行数上限，「加载更多」按此递增。 */
-const ARCHIVE_PAGE_SIZE = 100
-/** 会话进出事件的刷新防抖（spec 09）：多个会话释放事件合并成一次全量刷新。 */
-const SESSIONS_CHANGED_DEBOUNCE_MS = 300
-
-/** 归档树节点与本地变更纯逻辑：见 archivedTree.ts（零依赖纯模块，node:test 可直接导入）。 */
-export type { ArchivedSessionItem } from './archivedTree.js'
-
-export interface TrashItem {
-  readonly trashId: string
-  readonly sessionId: string
-  readonly title: string
-  readonly archivedAt: string
-  readonly legacy: boolean
-  /** 随父一起进回收站的子会话（sidecar v2 记账，展示用父子联动；还原/删除整棵走父条目）。
-   *  parentSessionId 用于还原层级（spec 14）；旧条目没有该字段时按顶层平铺。 */
-  readonly subagents?: ReadonlyArray<{ sessionId: string; title: string; parentSessionId?: string }>
-}
-
-export interface StraySessionItem {
-  readonly sessionId: string
-  readonly title: string
-  readonly createdAt: number
-  readonly blank: boolean
-  /** 父会话已不存在的孤儿子会话（spec 08：按顶层对待）。 */
-  readonly orphan: boolean
-  readonly live: boolean
-  readonly running: boolean
-  readonly backendSupported: boolean
-  readonly project?: string
-  readonly turns?: number
-  readonly tokens?: number
-  readonly lastActiveAt?: number
-  readonly sizeBytes?: number
-}
-
-/**
- * 写路由响应形状（与 host.ts 的路由契约一一对应）：
- * 变更成功后客户端靠响应里的 id 立刻本地摘掉受影响的行，不再等整页刷新落定。
- */
-export interface TrashMutationResult {
-  readonly ok?: boolean
-  /** 本次回收站条目 id（回收站列表重载前用于对账）。 */
-  readonly trashId?: string
-  /** 随父会话一起进回收站的子会话 id（本地移除必须连带它们的行）。 */
-  readonly subagentIds?: readonly string[]
-}
-
-export interface DeleteMutationResult {
-  readonly ok?: boolean
-  readonly deleted?: boolean
-  /** 随父会话一起删除的子会话 id（本地移除必须连带它们的行）。 */
-  readonly subagentIds?: readonly string[]
-}
-
-export interface TrashDeleteResult {
-  readonly ok?: boolean
-  readonly trashId?: string
-}
-
-/** 页面的注入面（业务动作；与旧入口逐项一致，只换了承载的槽位）。 */
+/** 页面的注入面（业务动作；响应形状统一取 contract.ts，避免与本文件内联类型漂移）。 */
 export interface ArchivePanelInjected {
   listArchived: () => Promise<ArchivedSessionItem[]>
   listStrays: () => Promise<StraySessionItem[]>
-  listTrashItems: () => Promise<TrashItem[]>
+  listTrashItems: () => Promise<TrashEntry[]>
   /** 回收站实际存放目录（绝对路径 + 掩码后的展示路径），面板提示信息里明示卸载影响。 */
   trashDirPath: () => Promise<{ path: string; displayPath: string }>
-  moveToTrash: (sessionId: string) => Promise<TrashMutationResult>
-  unarchiveSession: (sessionId: string) => Promise<unknown>
-  archiveSession: (sessionId: string) => Promise<unknown>
-  deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => Promise<DeleteMutationResult>
-  restoreTrashItem: (trashId: string) => Promise<unknown>
-  deleteTrashItem: (trashId: string) => Promise<TrashDeleteResult>
-  restoreAllTrash: () => Promise<{ restored?: string[]; skippedLegacy?: number; failed?: Array<{ trashId: string; message: string }> }>
-  deleteAllTrash: () => Promise<{ deleted?: number; failed?: string[] }>
+  moveToTrash: (sessionId: string) => Promise<TrashMutationResponse>
+  unarchiveSession: (sessionId: string) => Promise<UnarchiveResponse>
+  archiveSession: (sessionId: string) => Promise<ArchiveResponse>
+  deleteSession: (sessionId: string, confirmTitle: string, simple: boolean) => Promise<DeleteMutationResponse>
+  restoreTrashItem: (trashId: string) => Promise<RestoreResponse>
+  deleteTrashItem: (trashId: string) => Promise<TrashDeleteResponse>
+  restoreAllTrash: () => Promise<TrashRestoreAllResponse>
+  deleteAllTrash: () => Promise<TrashDeleteAllResponse>
 }
 
 /** 页面组件 props：主面板 owner share + 注入动作 + locale 座位（框架组装）。 */
 export type ArchivePanelProps = PropsRuntime<'main'> & InjectFace<ArchivePanelInjected> & PropsLocale<'archive-manage'>
 
-/** 注入归档页面样式：官方入口型页面的居中内容列 + 归档树 + 按钮，按 data 属性去重。 */
-export function ensureArchiveStyles(): void {
-  const css = `
-/* 主面板页面：官方入口型页面同款（居中内容列，整页滚动；标题行自带 28px 顶内边距，
-   macOS 下再让出窗口顶带，故行自己的盒子就是窗口的拖拽几何）。 */
-.dsh-archive-page {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-  overflow: auto;
-  padding: 0 clamp(24px, 4vw, 48px) 48px;
-  color: var(--dsw-alias-label-primary);
-  /* ⚠️ 基准字号必须自己给：中央列（.centerCol）**没有** font-size，官方入口型页面
-     靠「每个文字元素各自写 font-size」立住；而本页原来挂在 sidebar.footer.action 槽里
-     （DOM 在 SidebarRoot .root 内，那份 .root 有 font-size: 14px），改主面板后搬进中央列，
-     没写字号的行就退回浏览器默认 **16px** —— owner 看到的就是「字变大了」。
-     这里补回旧弹窗本来继承到的 14px 基准（官方 chrome 基准同为 14px），
-     已显式声明字号的元素不受影响。 */
-  font-size: 14px;
-  /* 基底面上的滚动条用 l1 一族（原浮层版重绑过 l2，页面上不再需要）。 */
-}
-.dsh-archive-page > * {
-  width: 100%;
-  max-width: 960px;
-}
-.dsh-archive-page-head {
-  box-sizing: border-box;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding-top: 28px;
-  margin-bottom: 20px;
-}
-html[data-platform='darwin'] .dsh-archive-page-head {
-  padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
-}
-.dsh-archive-page-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 500;
-  line-height: 28px;
-}
-/* spec 08 归档树：父行折叠按钮 + 树状连接线。 */
-.dsh-archive-tree-toggle {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 12px;
-  line-height: 1;
-}
-.dsh-archive-tree-toggle:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-}
-.dsh-archive-tree-toggle-spacer {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  font-size: 12px;
-  line-height: 1;
-  user-select: none;
-}
-/* 分组线：父会话与其全部子会话视为一个整体块，分割线画在整块底部（父行自身不再画线）。
-   组内用 L 形连接线：竖线**由每个子节点自己画一段**（见 .dsh-archive-tree-node::after），
-   每个子节点一根 14px 横连钉在标题行中线（子行 padding-top 4px + 行高 22px → 15px）。
-
-   ⚠️ 竖线**不能**画成子区容器的 border-left：那样它在**末节点底部**仍会往下拖出一截，
-   于是需要一个「用面板底色盖掉残段」的补丁（.dsh-archive-tree-node-last::after）。
-   那个补丁只在「与父面**逐像素**同色」时成立 —— 而 dsh-theme-tone 会给抬升面
-   叠一层**颗粒与光**，父面不再是纯色：一条纯色的遮盖带盖在带颗粒的面上，
-   就露成**一条白线**（owner 2026-09-20 报「看见蓝框里那个白线了么…官方纯白色调因为同色所以看不见」）。
-   改成每节点自画竖段后，**没有任何一处依赖「与父面同色」**，色调插件怎么给质感都不会破。
-   （本段在模板字符串里，注释中不能出现反引号。） */
-.dsh-archive-tree-children {
-  margin-left: 10px;
-  padding-left: 14px;
-}
-.dsh-archive-tree-group {
-  border-bottom: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-}
-.dsh-archive-tree-node {
-  position: relative;
-}
-/* 横连：从竖线右侧 14px，钉在标题行中线。 */
-.dsh-archive-tree-node::before {
-  content: '';
-  position: absolute;
-  left: -14px;
-  top: 15px;
-  width: 14px;
-  height: 0;
-  border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-}
-/* 竖段：每个节点自己画一段，从节点顶接续到**下一个**节点的肘部。
-   非末节点 ⇒ 贯通整行（bottom: 0），线才能接到下一个孩子；
-   末节点 ⇒ 只画到自己的肘部（见下一条），于是竖线在此**自然收口**，无需任何遮盖。
-   横坐标 left: -15px 与原先子区容器 border-left 的位置逐像素一致。 */
-.dsh-archive-tree-node::after {
-  content: '';
-  position: absolute;
-  left: -15px;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--dsw-alias-border-l1, #e2e5ea);
-}
-/* 末节点：竖线止于肘部（横连在 top:15px，故画到 16px 正好接上）。 */
-.dsh-archive-tree-node-last::after {
-  bottom: auto;
-  height: 16px;
-}
-.dsh-archive-btn {
-  /* 官方 Button.sm 同款几何：h28 + r14 胶囊（超椭圆角随官方全局规则自动生效）。 */
-  height: 28px;
-  padding: 0 10px;
-  border: 0.5px solid var(--dsw-alias-border-l3, #d4d8e0);
-  border-radius: 14px;
-  outline: none;
-  background: transparent;
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 12px;
-  line-height: 18px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.dsh-archive-btn:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.dsh-archive-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.dsh-archive-btn-danger {
-  color: var(--dsw-alias-state-error-primary, #c62828);
-}
-.dsh-archive-section {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  height: 40px;
-  /* 官方 settings 导航单元规格：pad (9,16,9,12)、字重 400。 */
-  padding: 9px 16px 9px 12px;
-  margin: 0 0 4px -12px;
-  box-sizing: border-box;
-  border: none;
-  outline: none;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--dsw-alias-label-primary);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 22px;
-  text-align: left;
-  cursor: pointer;
-}
-/* 区块标题行（归档区 / 回收站）不做 hover 底色：它只是折叠开关，泛底色会被读成
-   "这一行被选中/可选"。owner 2026-09-29 口径。 */
-/* 区块卡：官方 settings 内容卡同款 token（ModelsSection .rowCard：border-l2 + r12），
-   归档区 / 回收站各包一块，视觉上分割两组列表；应用无全局 border-box，须显式声明。 */
-.dsh-archive-section-card {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  margin: 0 0 12px;
-  padding: 8px 12px 12px;
-  border: 0.5px solid var(--dsw-alias-border-l4, #e2e5ea);
-  border-radius: 16px;
-}
-/* 分组头横贯卡内两侧、文字与行内容左对齐（卡内边距 12px）。 */
-.dsh-archive-section-card .dsh-archive-section {
-  width: calc(100% + 24px);
-  margin: 0 -12px 4px -12px;
-}
-/* 二次确认框：官方 Modal 原语提供遮罩 / 卡片 / Esc / 焦点回收，这里只保留
-   本插件既有的正文排版与几何（不自己造遮罩与对话框语义）。 */
-.dsh-archive-confirm-dialog {
-  width: min(480px, 100%);
-  max-height: calc(100dvh - 48px);
-}
-.dsh-archive-confirm-desc {
-  margin: 0;
-  font-size: 14px;
-  line-height: 22px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  white-space: pre-line;
-}
-.dsh-archive-confirm-input {
-  box-sizing: border-box;
-  width: 100%;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--dsw-alias-border-l1, #d4d8e0);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 13px;
-  line-height: 20px;
-  outline: none;
-}
-.dsh-archive-confirm-input:focus {
-  border-color: var(--dsw-alias-button-info-fill, #4d6bfe);
-}
-.dsh-archive-confirm-hint {
-  margin: 8px 0 0;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsw-alias-state-error-primary, #c62828);
-}
-/* 回收站路径按钮：掩码展示，点击复制完整路径（悬停 title 给全文）。 */
-.dsh-archive-trash-dir {
-  display: inline;
-  padding: 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--dsw-alias-button-info-fill, #4d6bfe);
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 22px;
-  cursor: pointer;
-  word-break: break-all;
-}
-.dsh-archive-trash-dir:hover {
-  text-decoration: underline;
-}
-.dsh-archive-confirm-status {
-  margin: 8px 0 0;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-}
-/* 合集品牌 footer：署名行，钉在页面左下角、与侧边栏底部「设置」入口对齐
-   （owner 2026-10-07：「有点太高了，最好和左边栏下面的设置按钮对齐」）。
-   * margin-top: auto —— 本页是 flex 纵列（.dsh-archive-page）且 height: 100%，
-     故**内容不满一屏时署名被推到页面底部**、内容超高时它自然跟在内容之后。
-   * text-align: left —— 与页标题、区块卡共用同一个左边缘。
-   * **无分割线**：那条 1px 通栏线比 11px 的署名重得多，先被看到的是线而不是字。
-   * padding-top: 24px —— 内容超高（署名跟在内容之后）时的**最小**净空，
-     以及紧邻卡片的自带卡间距（12px）之外再留的呼吸。
-     不能用 margin-top 顶替：margin-top: auto 与固定 margin 不能共存。
-   ⚠️ 本页是 flex 纵列、**外边距不合并** ⇒ 紧邻 footer 的那张卡要归零，否则 12+24=36。
-   * **margin-bottom: -25px —— 与侧边栏「设置」行对齐的那一段**。本页沿用官方入口型页面
-     的 padding-bottom: 48px；不抵消的话署名中心落在「视口底部 −56.5px」，而侧边栏设置行
-     的文字中心在「视口底部 −31.5px」（实测 720/800/900/1080 四种窗口高度下都是这个值 ——
-     设置行贴着窗口底排，与窗口高度无关）⇒ 差值 25px 就是把署名往下拉的距离。
-     ⚠️ 这个 −25 不是随手写的：**它依赖「本页 padding-bottom 48px」+「侧边栏设置行文字中心
-     距底 31.5px」两个外部事实**。任一改变（官方给入口页换下内边距、设置行改高、或本页
-     自己改 padding-bottom）都要重算，否则署名会重新错位。改前先量，别按感觉调。 */
-.dsh-archive-section-card:has(+ .dsh-archive-page-footer) {
-  margin-bottom: 0;
-}
-.dsh-archive-page-footer {
-  box-sizing: border-box;
-  margin-top: auto;
-  margin-bottom: -25px;
-  padding-top: 24px;
-  text-align: left;
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-}
-/* 整页 loading：四个初始请求（归档/游离/回收站/回收站目录）都落定前占满内容区，
-   避免「打开后加载闪动」。
-   ⚠️ 转动动画 / 配色 / 减动效兜底**全部来自官方 StateDot**（沿用原实现的做法），
-   这里没有任何 keyframes 或点阵几何。
-   ⚠️ **只留转圈，不给可见文案**。官方 StateDot(state=ongoing) 基本都是光秃秃一个转圈
-   （替换图标那种用法）。文案改挂在 role="status" 的 aria-label 上，读屏器仍能念出来。 */
-.dsh-archive-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 240px;
-  /* 只作 StateDot 自带着色失效时的继承兜底（转圈本身用官方 tertiary 中性色） */
-  color: var(--dsw-alias-label-secondary, #6b7280);
-}
-`
-  const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-archive-trigger]')
-  if (existing !== null) {
-    // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之（与 nav-pin 同款，审计建议）。
-    if (existing.textContent !== css) existing.textContent = css
-    return
-  }
-  const style = document.createElement('style')
-  style.dataset.dshArchiveTrigger = ''
-  style.textContent = css
-  document.head.appendChild(style)
+/** 回收站条目的子会话（旧格式条目没有 sidecar，按空处理）。 */
+function trashSubagentsOf(item: TrashEntry): readonly TrashSubagentItem[] {
+  return item.legacy ? [] : item.subagents
 }
 
 const styles = {
@@ -447,7 +95,7 @@ type PendingConfirm =
   | { readonly kind: 'delete'; readonly item: ArchivedSessionItem }
   | { readonly kind: 'trashStray'; readonly item: StraySessionItem }
   | { readonly kind: 'deleteStray'; readonly item: StraySessionItem }
-  | { readonly kind: 'deleteTrashItem'; readonly item: TrashItem }
+  | { readonly kind: 'deleteTrashItem'; readonly item: TrashEntry }
   | { readonly kind: 'restoreAll'; readonly restorable: number; readonly legacy: number }
   | { readonly kind: 'deleteAll'; readonly count: number }
 
@@ -558,11 +206,6 @@ function ArchiveConfirm(props: ArchiveConfirmProps) {
   )
 }
 
-/** 创建龄文案的「一天」毫秒数。 */
-const DAY_MS = 86_400_000
-/** 复制成功反馈的展示时长。 */
-const COPIED_FEEDBACK_MS = 2_000
-
 /**
  * 主面板页面：中央列列出归档会话与回收站，进入时先显示加载态。
  * @param props - 主面板 owner share + 注入动作 + locale 座位。
@@ -574,7 +217,7 @@ export function ArchivePanel(props: ArchivePanelProps) {
   const [loading, setLoading] = useState(true)
   const [archived, setArchived] = useState<ArchivedSessionItem[]>([])
   const [strays, setStrays] = useState<StraySessionItem[]>([])
-  const [trashItems, setTrashItems] = useState<TrashItem[]>([])
+  const [trashItems, setTrashItems] = useState<TrashEntry[]>([])
   const [trashDir, setTrashDir] = useState<{ path: string; displayPath: string } | null>(null)
   const [archivedOpen, setArchivedOpen] = useState(true)
   const [straysOpen, setStraysOpen] = useState(true)
@@ -586,14 +229,14 @@ export function ArchivePanel(props: ArchivePanelProps) {
   const [copied, setCopied] = useState(false)
   /** 单会话还原进行中锁：连点会并发还原同一 trashId（2026-08-30 审计）。 */
   const [restoringId, setRestoringId] = useState<string | null>(null)
-  /** 游离/孤儿会话归档进行中锁（spec 08）。 */
+  /** 游离/孤儿会话归档进行中锁。 */
   const [archivingId, setArchivingId] = useState<string | null>(null)
-  /** 归档树里被用户**显式展开**的父节点 id（spec 15：默认收起——空集即全部收起，
+  /** 归档树里被用户**显式展开**的父节点 id（默认收起——空集即全部收起，
    *  与「跟踪折叠集合」相比默认值由数据结构表达，不靠初值预置）。 */
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set())
   /** 回收站树被显式展开的父条目集合（键 = trashId，与归档树分开：两区互不干扰）。 */
   const [expandedTrashIds, setExpandedTrashIds] = useState<ReadonlySet<string>>(new Set())
-  /** 三区分页窗口（spec 09）：数据刷新时复位，加载更多按页递增。 */
+  /** 三区分页窗口：数据刷新时复位，加载更多按页递增。 */
   const [archivedLimit, setArchivedLimit] = useState(ARCHIVE_PAGE_SIZE)
   const [straysLimit, setStraysLimit] = useState(ARCHIVE_PAGE_SIZE)
   const [trashLimit, setTrashLimit] = useState(ARCHIVE_PAGE_SIZE)
@@ -620,7 +263,7 @@ export function ArchivePanel(props: ArchivePanelProps) {
       setStrays(nextStrays)
       setTrashItems(nextTrashItems)
       setTrashDir(nextTrashDir)
-      // spec 09：新数据重置分页窗口（避免刷新后停在深层分页位）。
+      // 新数据重置分页窗口（避免刷新后停在深层分页位）。
       setArchivedLimit(ARCHIVE_PAGE_SIZE)
       setStraysLimit(ARCHIVE_PAGE_SIZE)
       setTrashLimit(ARCHIVE_PAGE_SIZE)
@@ -659,17 +302,17 @@ export function ArchivePanel(props: ArchivePanelProps) {
   refreshRef.current = refresh
   useEffect(() => { void refreshRef.current() }, [])
 
-  // 官方会话释放（fiber 销毁）→ 页面在屏时实时刷新，hold 标记即时清除（spec 08 §2.5）。
-  // spec 09：300ms 防抖——批量释放会话时合并成一次全量刷新。
+  // 官方会话释放（fiber 销毁）→ 页面在屏时实时刷新，hold 标记即时清除。
+  // 300ms 防抖——批量释放会话时合并成一次全量刷新。
   useEffect(() => {
     let timer: number | null = null
     const onSessionsChanged = (): void => {
       if (timer !== null) window.clearTimeout(timer)
       timer = window.setTimeout(() => { void refreshRef.current() }, SESSIONS_CHANGED_DEBOUNCE_MS)
     }
-    window.addEventListener('dsh-archive-sessions-changed', onSessionsChanged)
+    window.addEventListener(SESSIONS_CHANGED_EVENT, onSessionsChanged)
     return () => {
-      window.removeEventListener('dsh-archive-sessions-changed', onSessionsChanged)
+      window.removeEventListener(SESSIONS_CHANGED_EVENT, onSessionsChanged)
       if (timer !== null) window.clearTimeout(timer)
     }
   }, [])
@@ -694,7 +337,7 @@ export function ArchivePanel(props: ArchivePanelProps) {
     setPending({ kind: 'deleteStray', item })
   }
 
-  /** 游离/孤儿会话归档：父+子树一并归档（可逆操作，无二次确认；spec 08）。 */
+  /** 游离/孤儿会话归档：父+子树一并归档（可逆操作，无二次确认；）。 */
   const archiveStray = async (item: StraySessionItem): Promise<void> => {
     if (loading || refreshing || archivingId !== null) return
     setArchivingId(item.sessionId)
@@ -741,7 +384,7 @@ export function ArchivePanel(props: ArchivePanelProps) {
     return parts.join(' · ')
   }
 
-  /** 游离会话行：与归档行同构；空白会话带角标、删除走简化确认；孤儿打标；「归档」以父为单位（spec 08）。 */
+  /** 游离会话行：与归档行同构；空白会话带角标、删除走简化确认；孤儿打标；「归档」以父为单位。 */
   const renderStrayRow = (item: StraySessionItem) => {
     const locked = item.live
     const busy = archivingId === item.sessionId
@@ -794,25 +437,25 @@ export function ArchivePanel(props: ArchivePanelProps) {
     )
   }
 
-  const confirmDeleteTrashItem = (item: TrashItem): void => {
+  const confirmDeleteTrashItem = (item: TrashEntry): void => {
     setPending({ kind: 'deleteTrashItem', item })
   }
 
   const restorableCount = trashItems.filter(item => !item.legacy).length
   const legacyCount = trashItems.length - restorableCount
 
-  /** 回收站区父子层级（spec 14）：sidecar 的扁平清单 → 嵌套树，一次构建供全部行复用。 */
+  /** 回收站区父子层级：sidecar 的扁平清单 → 嵌套树，一次构建供全部行复用。 */
   const trashTrees = useMemo(
-    () => new Map(trashItems.map(item => [item.trashId, trashSubagentTree(item.subagents ?? [])])),
+    () => new Map(trashItems.map(item => [item.trashId, trashSubagentTree(trashSubagentsOf(item))])),
     [trashItems],
   )
 
   // 未释放（本次 dsh 运行中驻留）的会话在归档区内分组前置；父级锁定看整棵子树
-  // （subtreeLive 已下沉到 archivedTree.ts，判定有单测覆盖，spec 15）。
+  // （subtreeLive 已下沉到 archivedTree.ts，判定有单测覆盖）。
   const liveItems = archived.filter(item => subtreeLive(item))
   const coldItems = archived.filter(item => !subtreeLive(item))
 
-  /** 展开/收起某父节点的子树（spec 15：集合里存的是「显式展开过」的 id）。 */
+  /** 展开/收起某父节点的子树（集合里存的是「显式展开过」的 id）。 */
   const toggleExpanded = (sessionId: string): void => {
     setExpandedIds(prev => {
       const next = new Set(prev)
@@ -832,8 +475,8 @@ export function ArchivePanel(props: ArchivePanelProps) {
     })
   }
 
-  /** 归档树行：父行（深度 0）带操作按钮与折叠切换；子行缩进只读并带树状连接线（spec 08）。
-   *  spec 09 分页预算：超出窗口的行返回 null，由父层 children 容器跳过空行渲染。 */
+  /** 归档树行：父行（深度 0）带操作按钮与折叠切换；子行缩进只读并带树状连接线。
+   *  分页预算：超出窗口的行返回 null，由父层 children 容器跳过空行渲染。 */
   const renderArchivedRow = (item: ArchivedSessionItem, depth = 0): ReactElement | null => {
     if (archivedRowsRendered >= archivedLimit) return null
     archivedRowsRendered += 1
@@ -949,8 +592,8 @@ export function ArchivePanel(props: ArchivePanelProps) {
     )
   }
 
-  /** 回收站子行：任意深度缩进（父行由 sidecar 的 parentSessionId 还原，spec 14）。
-   *  spec 09 分页预算：超出窗口的行返回 null。 */
+  /** 回收站子行：任意深度缩进（父行由 sidecar 的 parentSessionId 还原）。
+   *  分页预算：超出窗口的行返回 null。 */
   const renderTrashChildRow = (node: TrashSubagentNode): ReactElement | null => {
     if (trashRowsRendered >= trashLimit) return null
     trashRowsRendered += 1
@@ -997,8 +640,8 @@ export function ArchivePanel(props: ArchivePanelProps) {
 
   /** 回收站树行：父行带恢复/彻底删除与折叠切换，子行缩进只读（任意深度）
    *  （与归档树同款交互；还原/删除整棵走父条目的 sidecar）。
-   *  spec 09 分页预算：超出窗口的行返回 null。 */
-  const renderTrashRow = (item: TrashItem): ReactElement | null => {
+   *  分页预算：超出窗口的行返回 null。 */
+  const renderTrashRow = (item: TrashEntry): ReactElement | null => {
     if (trashRowsRendered >= trashLimit) return null
     trashRowsRendered += 1
     const children = trashTrees.get(item.trashId) ?? []
@@ -1113,7 +756,7 @@ export function ArchivePanel(props: ArchivePanelProps) {
    * 单条分支不等整页刷新：写操作必然打穿 host 的 header 缓存，紧随其后的刷新要走冷扫描
    * （列表越大越慢），此前条目与确认框都干等它落定。改为变更成功后立即按响应里的 id 本地摘掉
    * 受影响的行并关闭确认框，refresh() 退到后台对账。摘除集合与 host 完全一致——响应里的 subagentIds
-   * 就是随父一起搬走/删掉的**全部后代**子会话（任意深度，见 spec 12），由 refresh 落定。
+   * 就是随父一起搬走/删掉的**全部后代**子会话（任意深度，见 ），由 refresh 落定。
    * 失败路径语义不变：变更 reject 时本地状态一律不动，错误仍回确认框展示。
    */
   const submitConfirm = async (typed: string): Promise<void> => {
@@ -1189,20 +832,20 @@ export function ArchivePanel(props: ArchivePanelProps) {
     setPending(null)
   }
 
-  // spec 09 分页预算：每次渲染复位（renderArchivedRow/renderTrashRow 超出窗口返回 null）；
+  // 分页预算：每次渲染复位（renderArchivedRow/renderTrashRow 超出窗口返回 null）；
   // 总数用于「加载更多」显隐。树结构不变，分页只裁剪渲染窗口。
-  // spec 15：默认可视行只剩父行，窗口预算不再被未展开的子行吃掉。
+  // 默认可视行只剩父行，窗口预算不再被未展开的子行吃掉。
   let archivedRowsRendered = 0
   let trashRowsRendered = 0
   const archivedTotal = countVisibleRows(liveItems, item => item.children, item => isCollapsed(expandedIds, item.sessionId))
     + countVisibleRows(coldItems, item => item.children, item => isCollapsed(expandedIds, item.sessionId))
   const trashTotal = trashItems.reduce((total, item) => {
-    const children = item.subagents?.length ?? 0
+    const children = trashSubagentsOf(item).length
     return total + 1 + (isCollapsed(expandedTrashIds, item.trashId) ? 0 : children)
   }, 0)
 
   return (
-    <section className="dsh-archive-page" data-archive-panel aria-busy={refreshing}>
+    <section className="dsh-archive-page" aria-busy={refreshing}>
       {/* 标题行自带 28px 顶内边距并打上窗口拖拽标记：内容不再有遮罩，页面顶端就是窗口边缘。 */}
       <header className="dsh-archive-page-head" data-window-drag>
         <h1 className="dsh-archive-page-title">{t('dialog.title')}</h1>
