@@ -35,7 +35,6 @@ const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
 const P = `body:not([${PLAIN_ATTR}])`
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
 const SEAT = `:is([data-phase='active'], [data-phase='hero']) [data-composer-seat]`
-const MENU_OPEN = `body:not([${PLAIN_ATTR}]):has(> [data-menu-material])`
 
 /** 右栏 76px 下有「可流式滚动的正文」的标签：只有它们上提滚区，正文才会真的从两条带下滚过。 */
 const LIFTED_SCROLLS = [
@@ -87,8 +86,7 @@ ${P} [data-phase='active'] [data-width-handle] {
 /* ===== 输入框：完整玻璃模糊 + 座位透明 =====
    座位撤掉官方 36px 实色渐隐，正文从玻璃下滚过；卡片本体透明、玻璃与边缘光在 ::before（伪元素没有
    后代，不会成为官方弹层的 backdrop root）；卡片自成层叠上下文，::before 的 z-index:-1 才留得住。
-   残影的触发条件（一天排除 + owner 复看）：上面出现新的合成浮层时，输入框这一层 backdrop-filter
-   会被 Chromium 复用错位快照。所以**不改任何官方菜单材质**，只在菜单存在期间冻结玻璃（见文件末尾）。 */
+   官方菜单材质完全保持原样。 */
 ${P} ${SEAT} {
   background: none !important;
 }
@@ -191,31 +189,6 @@ ${P} [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip] {
 /* ===== 设置弹窗：打光（按弹窗自身盒子缩放，窗口在视口中间，不按视口相位画） ===== */
 ${P} [data-shortcut-modal='settings'] {
 ${OBJECT_FIT_LIGHT}
-}
-
-/* ===== 菜单打开期间：输入框去模糊 + 变实心（唯一能保住「无残影 + 平时完整玻璃」的做法） =====
-   owner 实测：模型菜单「不透明实心」也照样闪 ⇒ 和菜单材质无关，是「上面出现新的合成浮层」时输入框的
-   backdrop-filter 层被 Chromium 复用错位快照。所以官方菜单材质全部保持原样；只在菜单存在期间把输入框
-   玻璃冻结：撤掉 backdrop-filter 并改用实心底色，同时座位铺不透光光墙（否则正文会从卡片下透出来、看着乱）。光墙画的
-   也是「光」，和正常态观感接近；菜单关闭立即恢复完整玻璃模糊。 */
-${MENU_OPEN} ${SEAT}::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-color: var(--dsw-alias-bg-base);
-${viewportLight('100% 100%')}
-  -webkit-mask-image: linear-gradient(180deg, transparent 0px, black 36px);
-  mask-image: linear-gradient(180deg, transparent 0px, black 36px);
-}
-${MENU_OPEN} ${SEAT} [data-composer-card]::before {
-  backdrop-filter: none;
-  /* owner 定案：菜单打开期间输入框「去模糊 + 变实心」——直接用官方输入面 token 做实心底。 */
-  background-color: var(--dsw-specific-input-major);
-}
-${MENU_OPEN} [data-phase='active'] [data-composer-seat]::after {
-  display: none;
 }
 `
 }
