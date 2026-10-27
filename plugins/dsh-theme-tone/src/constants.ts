@@ -8,6 +8,8 @@ export const ROW_ORDER = 10.5
 
 export const MARKER_ATTR = 'data-dsh-theme-tone'
 export const PLAIN_ATTR = 'data-dsh-theme-tone-plain'
+/** 内嵌浏览器（Electron / VS Code webview）标记：只有它们需要「菜单期间冻结输入框」的兼容处理。 */
+export const EMBED_ATTR = 'data-dsh-theme-tone-embed'
 export const BACKDROP_CLASS = 'dsh-theme-tone'
 
 export const BACKDROP_Z_INDEX = 80

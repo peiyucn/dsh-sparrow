@@ -4,6 +4,7 @@ import { buildNavPinCss } from '../nav-pin.js'
 import { buildSurfaceCss } from '../surfaces.js'
 import {
   BACKDROP_CLASS,
+  EMBED_ATTR,
   LOCALE_NAMESPACE,
   MARKER_ATTR,
   name,
@@ -38,6 +39,15 @@ interface Scope {
   getSnapshot(): { status: 'loading' | 'ready' | 'unavailable'; value?: ThemeToneSettings; writable: boolean }
   subscribe(listener: () => void): () => void
   set(field: string, value: unknown): Promise<boolean>
+}
+
+/** 内嵌浏览器（Electron / VS Code webview）判定：只有它们会触发 Chromium 的合成残影。 */
+function isEmbeddedBrowser(): boolean {
+  try {
+    return /Electron|vscode/i.test(navigator.userAgent)
+  } catch {
+    return false
+  }
 }
 
 const DEBUG_GROUPS = ['backdrop', 'glass', 'navpin', 'surfaces'] as const
@@ -108,6 +118,7 @@ function install(ctx: never): void {
 
   const resources: { style?: HTMLStyleElement; layer?: HTMLDivElement } = {}
   paintPlain(true)
+  if (isEmbeddedBrowser()) markerHost?.setAttribute(EMBED_ATTR, '')
   resources.style = ensureStyles()
   resources.layer = ensureLayer()
   const layer = resources.layer
@@ -131,6 +142,7 @@ function install(ctx: never): void {
     resources.style?.remove()
     disposeTokens?.()
     paintPlain(false)
+    markerHost?.removeAttribute(EMBED_ATTR)
   }, `${name}: resources`)
 
   const readSettings = (): ThemeToneSettings => {
