@@ -123,16 +123,20 @@ body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
 ${P} ${SEAT} :is([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]) {
   position: relative;
   z-index: 0;
+  /* 停靠卡根元素带 border-radius + overflow: hidden（官方用它裁材质），会把「卡下方的补缝层」一起
+     裁掉 —— 必须放开裁剪，补缝层才画得出来。卡自己的圆角材质由它内部元素负责，不受影响。 */
+  overflow: visible;
 }
 ${P} ${SEAT} :is([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar])::after {
   content: '';
   position: absolute;
   top: 100%;
-  /* 停靠卡比输入框窄（各自 inset 不同），两侧各外扩一个 side-clearance 才能盖住
-     「卡与输入框等宽差」留下的 16px 侧边漏条。 */
-  left: calc(-1 * var(--dsh-composer-side-clearance, 16px));
-  right: calc(-1 * var(--dsh-composer-side-clearance, 16px));
-  height: var(--dsh-composer-stack-gap, 6px);
+  /* owner 定案：这条是「背景 + 打光」的重绘层，放大不影响任何东西，索性放大到把两侧与上下
+     的圆角缺口一起盖住：左右各外扩 side-clearance + 32px，高度 = 官方 gap + 32px（向下延伸的部分
+     被后画的输入框卡片盖住，只会填掉卡片顶部圆角的缺口）。 */
+  left: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 32px));
+  right: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 32px));
+  height: calc(var(--dsh-composer-stack-gap, 6px) + 32px);
   z-index: -1;
   pointer-events: none;
   background-color: var(--dsw-alias-bg-base);
