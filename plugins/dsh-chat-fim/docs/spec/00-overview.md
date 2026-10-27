@@ -77,6 +77,10 @@
 
 数据面不用 `conversation.composer.dock`：shell 在新会话页（hero）不渲染它，新会话第一条草稿会永远没有联想。
 
+**能力门**：入口先跑 `warnMissingCapabilities` 探测 `slots.inject` / `slots.register` / `locale.register` /
+`locale.bind` / `sessions.scope`；缺任一即告警并直接 `return`，**不注册任何槽位 / 样式 / 监听、也不抛错** ——
+客户端 boot 审计把任一非 active entry 当致命失败（抛错会让整页只渲染 "Failed to load plugins"）。
+
 **localStorage**（只这两个键，无用户内容）：`dsh-chat-fim:enabled`（存 `'1'` 才算开启）、
 `dsh-chat-fim:sensitivity`（`eager` / `standard` / `conservative`，非法回退 `standard`）。
 
@@ -110,7 +114,8 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `src/constants.ts` | 包名 / locale 命名空间 / 路由 / 槽位与 order / 本地键 / 超时 / 上限 / z-index / 回声窗口 / 补查退避 |
-| `src/compat.ts` | 两档能力门（host 抛错 / client 只告警）、惰性探针、会话格式门与停用文案 |
+| `src/compat.ts` | 两档能力门（host 抛错 / client 只告警）、惰性探针、会话格式判定与停用文案（不 import 官方包，client 也能用） |
+| `src/session-format.ts` | host 专用：官方 `SESSION_FORMAT_VERSION` 的常量探针（官方包带 Node 依赖，不能进 client 图） |
 | `src/host.ts` | 组合根：能力门 → 路由注册（信任栅栏 → GET 支持 / 诊断 / POST 转发与护栏 → 诊断收口） |
 | `src/suggest.ts` | 纯逻辑：配置归一化、请求校验、prompt 构造、护栏（说话人清洗 / 复读 / 回声 / 语言 / 单句）、模型解析、触发门控 |
 | `src/trust.ts` | Host / Origin / `sec-fetch-site` 信任栅栏（复用官方 trustedHosts 与绑定地址） |
@@ -147,7 +152,7 @@ host half 不 import 浏览器 API，client half 不 import Node 模块（`parse
 | `test/host.test.mjs` | 诊断 `bySession` 上限与 FIFO 淘汰 |
 | `test/suggest.test.mjs` | 配置归一化、prompt 构造、说话人清洗、复读 / 回声 / 语言 / 单句截断、模型解析、灵敏度门控、`detectEnd` |
 | `test/trust.test.mjs` | 栅栏纯判定 + 接线 |
-| `test/compat.test.mjs` | 两档能力门、惰性探针、会话格式门、client 门接线 |
+| `test/compat.test.mjs` | 两档能力门、惰性探针、会话格式门、client 门接线（缺任一能力只告警不注册） |
 | `test/fim-support-machine.test.mjs` | 状态机迁移、补查预算、旧地址作废、不退避出 NaN |
 | `test/menu-styles.test.mjs` | `buildChatFimCss()` 的花括号平衡与菜单 / 开关 / 弹层几何 |
 | `test/structure.test.mjs` | 包清单与 patch、样式不得回流组件、能力门与 effect 接线、spec 只剩本文 |

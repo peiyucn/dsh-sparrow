@@ -19,9 +19,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import {
-  COMPLETE_ROUTE_PATH, DOCK_SLOT_ID, LOCALE_NAMESPACE, MENU_SLOT_ID, SLOT_INPUT_DOCK, SLOT_INPUT_LEFT,
+  COMPLETE_ROUTE_PATH, DOCK_SLOT_ID, LOCALE_NAMESPACE, MENU_SLOT_ID, PACKAGE_NAME, SLOT_INPUT_DOCK, SLOT_INPUT_LEFT,
   SLOT_INPUT_OVERLAY, SLOT_ORDER, SUPPORT_CHECK_TIMEOUT_MS, SWITCH_SLOT_ID, name,
 } from '../constants.js'
+import { warnMissingCapabilities } from '../compat.js'
+import { clientCapabilities } from './capabilities.js'
 import { ChatFimDock, ChatFimMenu, ChatFimSwitch, type FimDirectoryStore } from './ChatFimDock.js'
 import { parseJsonOrNull } from './parse.js'
 import { ensureChatFimStyles } from './styles.js'
@@ -86,10 +88,13 @@ interface ClientAgentScope extends Context {
 }
 
 /**
- * client half 入口：注册 locale 字典 + 两个槽位（开关 / 建议条）。
+ * client half 入口：先跑不抛错的能力门（缺任一服务即惰性停用），再注册样式 / locale 字典与三个槽位。
  * @param ctx - 浏览器侧 Cordis 上下文。
  */
 export function apply(ctx: Context): void {
+  // 客户端 boot 审计把「任一 entry 非 active」当致命失败，故这里只告警 + return，绝不抛错。
+  const c = ctx as unknown as Record<string, any>
+  if (!warnMissingCapabilities(c, PACKAGE_NAME, clientCapabilities(c))) return
   const sessions = ctx.sessions as unknown as ClientSessionScope
   const styles = ensureChatFimStyles()
   ctx.effect(() => () => { styles.remove() }, `${name}: styles`)

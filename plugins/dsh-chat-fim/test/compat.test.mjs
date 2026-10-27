@@ -2,10 +2,46 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  assertCapabilities, assertHostCompatible, hostSessionFormatVersion,
+  assertCapabilities, assertHostCompatible, hasCapability,
   missingCapabilities, SUPPORTED_SESSION_FORMAT_VERSIONS, unsupportedSessionFormatReason, unsupportedStoredFormatReason,
+  warnMissingCapabilities,
 } from '../lib/compat.js'
+import { hostSessionFormatVersion } from '../lib/session-format.js'
+import { clientCapabilities } from '../lib/client/capabilities.js'
 import { fakeHostCtx } from './helpers/fake-ctx.ts'
+
+/** 临时静音 console.warn（client 门的第二条告警通道），返回还原函数。 */
+function silenceConsoleWarn() {
+  const original = console.warn
+  console.warn = () => {}
+  return () => { console.warn = original }
+}
+
+/**
+ * 造一个「能力齐备」的假客户端宿主；服务方法只记录是否被**调用**——门只该探测存在性。
+ * @param {string} omit - 要摘掉的能力（`slots.inject` 这类写法），缺省表示全给。
+ * @param {string[]} calls - 调用记录（被门调用即证明门越过了探测边界）。
+ */
+function fakeClientHost(omit = '', calls = []) {
+  const host = {
+    slots: {
+      inject: () => { calls.push('slots.inject') },
+      register: () => { calls.push('slots.register') },
+    },
+    locale: {
+      register: () => { calls.push('locale.register'); return () => {} },
+      bind: () => { calls.push('locale.bind'); return () => '' },
+    },
+    sessions: {
+      scope: () => { calls.push('sessions.scope'); return undefined },
+    },
+  }
+  if (omit !== '') {
+    const [group, method] = omit.split('.')
+    delete host[group][method]
+  }
+  return host
+}
 
 // 根 AGENTS《插件与宿主兼容》：宿主契约不认识时插件必须自停用（抛错 → cordis 标 inactive），
 // 而不是带病运行。本文件覆盖纯判定与接线；容器行为由 cordis 保证（lib/index.js:1350-1362）。
@@ -93,5 +129,50 @@ describe('compat 宿主兼容自检（会话版）', () => {
       assert.equal(warns.length, 1)
       assert.match(warns[0], /已停用插件以免影响 dsh/u)
     })
+  })
+})
+
+// client half 的硬约束：**绝不抛错**。宿主 boot 审计把任一非 active entry 当致命失败，
+// 抛错会让整页只渲染 "Failed to load plugins"；故缺能力只告警并返回 false，调用方直接 return。
+describe('client half 能力门（不抛错的惰性停用）', () => {
+  it('能力齐备 应该 返回 true、不告警，且不调用任何服务', () => {
+    const { ctx, warns } = fakeHostCtx()
+    const calls = []
+    assert.equal(warnMissingCapabilities(ctx, 'dsh-x', clientCapabilities(fakeClientHost('', calls))), true)
+    assert.equal(warns.length, 0)
+    assert.deepEqual(calls, [], '门只探测方法存在性，不得调用服务')
+  })
+
+  it('缺任一能力 应该 只告警并返回 false —— 不抛错、不注册任何槽位 / 样式', () => {
+    for (const missing of ['slots.inject', 'slots.register', 'locale.register', 'locale.bind', 'sessions.scope']) {
+      const restore = silenceConsoleWarn()
+      try {
+        const { ctx, warns } = fakeHostCtx()
+        const calls = []
+        const capabilities = clientCapabilities(fakeClientHost(missing, calls))
+        let passed
+        assert.doesNotThrow(() => { passed = warnMissingCapabilities(ctx, 'dsh-x', capabilities) })
+        assert.equal(passed, false, missing)
+        assert.equal(warns.length, 1, missing)
+        assert.match(warns[0], /已停用插件以免影响 dsh/u)
+        assert.ok(warns[0].includes(`ctx.${missing}`), `告警必须点名缺的那一项：${warns[0]}`)
+        assert.deepEqual(calls, [], `${missing}：门不得注册任何东西`)
+      } finally {
+        restore()
+      }
+    }
+  })
+
+  it('能力表 应该 覆盖本插件实际用到的五项服务面', () => {
+    assert.deepEqual(clientCapabilities(fakeClientHost()).map(capability => capability.name), [
+      'ctx.slots.inject', 'ctx.slots.register', 'ctx.locale.register', 'ctx.locale.bind', 'ctx.sessions.scope',
+    ])
+  })
+
+  it('hasCapability 应该 把缺失 / 抛错的探针都判为缺能力', () => {
+    assert.equal(hasCapability(() => () => {}), true)
+    assert.equal(hasCapability(() => undefined), false)
+    assert.equal(hasCapability(() => { throw new Error('boom') }), false)
+    assert.equal(hasCapability(() => 'text', 'function'), false)
   })
 })

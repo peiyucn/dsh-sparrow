@@ -110,4 +110,19 @@ describe('dsh-chat-fim 架构不变量（重构成 theme-tone 形）', () => {
       assert.ok(!source.includes('ensureSuggestBusyStyles'), `${file} 不得再用 busy 时代的注入函数名`)
     }
   })
+
+  /**
+   * client half 的门必须**不抛错**且先于一切注册：宿主 boot 审计把任一非 active entry 当致命失败，
+   * 抛错会让整页只渲染 "Failed to load plugins"。缺能力时什么都不装。
+   */
+  it('client 入口 应该 先跑不抛错的能力门，再注册样式与槽位', async () => {
+    const index = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(index, /warnMissingCapabilities\(/u, 'client half 必须先跑 warnMissingCapabilities')
+    assert.ok(!/assertCapabilities\(/u.test(index), 'client half 不得用抛错版能力门')
+    const gate = index.indexOf('warnMissingCapabilities(')
+    for (const later of ['ensureChatFimStyles()', 'ctx.effect(', 'ctx.slots.inject(']) {
+      const at = index.indexOf(later)
+      assert.ok(at > gate, `${later} 必须排能力门之后（缺能力时连样式都不装）`)
+    }
+  })
 })

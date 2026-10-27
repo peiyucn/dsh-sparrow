@@ -12,6 +12,7 @@ import { assertCapabilities, assertHostCompatible, unsupportedStoredFormatReason
 import {
   COMPLETE_ROUTE_PATH, ECHO_ASSISTANT_WINDOW_CHARS, ECHO_USER_PREFIX_CHARS, MAX_DIAGNOSTIC_SESSIONS, name,
 } from './constants.js'
+import { hostSessionFormatVersion } from './session-format.js'
 import { isTrustedBrowserRequest, officialTrustedHosts } from './trust.js'
 import {
   buildFimPrompt, cleanSuggestion, currentMainRoute, detectDraftLanguage, extractSuggestions, extractUsage, speakerStopSequences,
@@ -264,7 +265,7 @@ function currentSessionModel(
  */
 export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {}): void {
   // 宿主兼容自检（根 AGENTS《插件与宿主兼容》，先于一切注册）：能力面与会话格式缺任一即整个停用。
-  assertHostCompatible(ctx, name)
+  assertHostCompatible(ctx, name, hostSessionFormatVersion())
   assertCapabilities(ctx, name, [
     { name: 'webServer.register', ok: typeof ctx.webServer?.register === 'function' },
     { name: 'sessions.get', ok: typeof ctx.sessions?.get === 'function' },
