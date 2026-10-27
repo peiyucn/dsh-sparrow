@@ -131,12 +131,12 @@ ${P} ${SEAT} :is([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar])
   content: '';
   position: absolute;
   top: 100%;
-  /* owner 定案：这条是「背景 + 打光」的重绘层，放大不影响任何东西，索性放大到把两侧与上下
-     的圆角缺口一起盖住：左右各外扩 side-clearance + 32px，高度 = 官方 gap + 32px（向下延伸的部分
-     被后画的输入框卡片盖住，只会填掉卡片顶部圆角的缺口）。 */
-  left: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 32px));
-  right: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 32px));
-  height: calc(var(--dsh-composer-stack-gap, 6px) + 32px);
+  /* owner 定案：这条是「背景 + 打光」的重绘层，放大不影响任何东西，唯一作用是挡住后面透出来的
+     文字。左右各外扩 side-clearance + 128px、高度 = 官方 gap + 128px，把两侧与下方的圆角缺口一起盖住
+     （向下延伸的部分会被后画的输入框卡片 / 状态栏盖住）。 */
+  left: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 128px));
+  right: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 128px));
+  height: calc(var(--dsh-composer-stack-gap, 6px) + 128px);
   z-index: -1;
   pointer-events: none;
   background-color: var(--dsw-alias-bg-base);

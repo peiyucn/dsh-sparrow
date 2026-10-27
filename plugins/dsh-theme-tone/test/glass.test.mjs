@@ -76,8 +76,8 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     const rule = /:is\(\[data-testid='todo-panel'\][^{]*\{\s*content: '';\s*position: absolute;\s*top: 100%;[^}]*\}/u.exec(code)?.[0] ?? ''
     assert.ok(code.includes('overflow: visible;'), '放开停靠卡根元素的裁剪，否则补缝层被 overflow:hidden 裁掉')
     assert.ok(rule.includes('var(--dsh-composer-stack-gap'), '高度跟随官方堆栈间隙')
-    assert.ok(rule.includes('calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 32px))'), '左右外扩盖住侧边漏条')
-    assert.ok(rule.includes('var(--dsh-composer-stack-gap, 6px) + 32px'), '向下放大盖住圆角缺口')
+    assert.ok(rule.includes('calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 128px))'), '左右大幅外扩盖住侧边漏条')
+    assert.ok(rule.includes('var(--dsh-composer-stack-gap, 6px) + 128px'), '向下大幅放大盖住圆角缺口')
     assert.ok(rule.includes('background-image:'), '重画背景光')
     assert.ok(rule.includes('background-attachment: fixed'), '固定背景 = 视口解析，与地面层同源')
     assert.ok(!code.includes('[data-composer-card]::before {\n  top: calc'), '不延伸卡片玻璃（不动官方几何）')
