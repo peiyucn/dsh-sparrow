@@ -3,7 +3,73 @@
  * 拆成独立模块：node:test 可脱离 React 组件直接验证注入 / 复用 / 移除。
  */
 
+import type { CSSProperties } from 'react'
 import { STYLE_SELECTOR } from '../constants.js'
+
+/**
+ * 页面内的静态 inline style（动态值仍留在组件里）。
+ * 集中一处，避免同一几何 / 字号在页面与行渲染器各写一份后漂移。
+ */
+const rowStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 8,
+  alignItems: 'center',
+  padding: '8px 0',
+  borderBottom: '1px solid var(--dsw-alias-border-l1, #e2e5ea)',
+} satisfies CSSProperties
+
+const titleStyle = {
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap' as const,
+  /* ⚠️ 字号与行高都要**显式**给：本页已补 14px 基准，但行高若留 `normal`
+     行盒只有约 16.8px，比官方同位置（会话行标题 14px/20px）矮一档、
+     行间距读起来发挤。官方列表标题的行高是 20px，这里对齐。 */
+  fontSize: 14,
+  lineHeight: '20px',
+} satisfies CSSProperties
+
+const secondarySmallStyle = {
+  color: 'var(--dsw-alias-label-secondary, #6b7280)',
+  fontSize: 12,
+  /* ⚠️ 行高也要给：留 `normal` 时行盒只有约 16px，比官方次级文字（12px/18px）
+     与云端文件页同款样式都矮 2px，两页并排看会不一致（实测过）。 */
+  lineHeight: '18px',
+} satisfies CSSProperties
+
+export const pageStyles = {
+  row: rowStyle,
+  /** 树内行：分组分割线画在整块底部，行自身不再画线。 */
+  treeRow: { ...rowStyle, borderBottom: 'none', padding: '4px 0' },
+  actions: { display: 'flex', gap: 6, alignItems: 'center' },
+  title: titleStyle,
+  treeTitle: { ...titleStyle, minWidth: 0 },
+  secondarySmall: secondarySmallStyle,
+  /** 子分组小标题（未释放）：官方面板分组标签同款（12px 次级色）。 */
+  groupHeading: {
+    margin: '10px 0 2px',
+    fontSize: 12,
+    lineHeight: '18px',
+    fontWeight: 500,
+    color: 'var(--dsw-alias-label-secondary, #6b7280)',
+  },
+  shrink: { minWidth: 0 },
+  treeTitleRow: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 },
+  treeFactLine: { ...secondarySmallStyle, paddingLeft: 20, marginTop: 2 },
+  warnText: { color: 'var(--dsw-alias-state-warn-primary, #d9822b)' },
+  errorText: { color: 'var(--dsw-alias-state-error-primary, #c62828)', margin: '0 0 12px' },
+  loadMore: { marginTop: 8 },
+  confirmActions: { display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end', marginTop: 20 },
+  confirmInput: { marginTop: 12 },
+  trashBulkActions: { display: 'flex', gap: 6, alignItems: 'center', padding: '4px 0 8px' },
+  trashUninstallHint: {
+    color: 'var(--dsw-alias-state-warn-primary, #d9822b)',
+    fontSize: 12,
+    lineHeight: '18px',
+    margin: '0 0 4px',
+  },
+} as const satisfies Record<string, CSSProperties>
 
 /** 注入样式表并返回 style 元素；调用方负责在卸载时移除。 */
 export function ensureArchiveStyles(): HTMLStyleElement {

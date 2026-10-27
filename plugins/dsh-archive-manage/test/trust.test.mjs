@@ -246,12 +246,12 @@ describe('officialTrustedHosts 复用官方信任面（不造第二份真相）'
 describe('接线：栅栏必须真正挡在路由前面', () => {
   it('前缀处理器先过栅栏，再进入任何路由分发（含只读路由）', () => {
     // 判定正确但没被调用 = 漏洞仍在。故这里直接钉住源码里的调用顺序。
-    const source = readFileSync(new URL('../src/host.ts', import.meta.url), 'utf8')
-    const fenceAt = source.indexOf('isTrustedPluginRequest(req.headers, officialTrustedHosts(ctx))')
+    const source = readFileSync(new URL('../src/host/routes.ts', import.meta.url), 'utf8')
+    const fenceAt = source.indexOf('isTrustedPluginRequest(req.headers, officialTrustedHosts(route.ctx))')
     assert.ok(fenceAt > 0, '处理器里必须调用 isTrustedPluginRequest（带官方信任面）')
-    const firstRouteAt = source.indexOf('pathname === ROUTES.list')
-    assert.ok(firstRouteAt > 0, '应当能找到第一个路由分支')
-    assert.ok(fenceAt < firstRouteAt, '栅栏必须排在所有路由分支之前')
+    const dispatchAt = source.indexOf('match.handle(')
+    assert.ok(dispatchAt > 0, '应当能找到表驱动的路由分发调用')
+    assert.ok(fenceAt < dispatchAt, '栅栏必须排在路由分发之前')
     // 栅栏必须在读取请求体之前 —— 否则恶意请求仍会驱动一次 body 读取。
     const bodyReadAt = source.indexOf('readJsonBody(req)')
     assert.ok(bodyReadAt < 0 || fenceAt < bodyReadAt, '栅栏必须排在读取请求体之前')

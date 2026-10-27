@@ -4,7 +4,13 @@ import { describe, it } from 'node:test'
 import { resolve, sep } from 'node:path'
 import { archivedIdsToRemove, createHeaderFactsStore, labelFromSubagentIdentity } from '../lib/archive.js'
 import { FOLDED_LABEL_CACHE_MAX_ENTRIES } from '../lib/constants.js'
-import { addedSummaryFor, alignChildArchives, assertRegistryMutationApi, assertSessionLocationApi, mutateArchivedSet, removeArchivedIds, resolveTrashDir, sessionDirectoryFor, subagentLabel, titlesFor, workspaceIndexFor } from '../lib/host.js'
+import {
+  addedSummaryFor, alignChildArchives, mutateArchivedSet, removeArchivedIds, workspaceIndexFor,
+} from '../lib/host/archive-set.js'
+import { assertRegistryMutationApi, assertSessionLocationApi } from '../lib/host/gates.js'
+import { sessionDirectoryFor } from '../lib/host/session-files.js'
+import { subagentLabel, titlesFor } from '../lib/host/titles.js'
+import { resolveTrashDir } from '../lib/host/trash.js'
 
 // 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
 // 测试夹具按当前平台构造——CI 跑 Ubuntu、本机跑 Windows，两边都必须绿。

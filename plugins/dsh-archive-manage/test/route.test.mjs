@@ -12,13 +12,13 @@ import { apply } from '../lib/host.js'
  * 归档路由的**真行为**用例：走真实的 `apply` → `webServer.register` → handler，
  * 断言 HTTP 状态码与响应体。本插件的 handler 含**不可逆**的目录移动 / 删除
  * （`POST /trash` 把会话目录移进回收站、`POST /delete` 直接 rm 掉），
- * 在此之前整个 handler（src/host.ts 的 webServer handler）**零覆盖** ——
+ * 在此之前整个 handler（src/host/routes.ts 的 webServer handler）**零覆盖** ——
  * 而「栅栏/宽恕分支写在源码里但没被调用」是零价值，故这里全部调真实 handler。
  *
  * 重点覆盖三条 **ENOENT 宽恕**分支（陈旧 header 缓存 / 手工删过的「幽灵」子目录）：
- * ① trash：子会话目录不在磁盘上 → 跳过搬运并继续，不让整单回滚（src/host.ts:1323-1326）
- * ② delete：子会话目录已消失 → force:true 只吞 ENOENT，仍算「已消失」并摘归档标记（:1409）
- * ③ delete：**根**目录本就不在磁盘上 → force:true 同样吞掉，返回 200 而不是 500（:1400）
+ * ① trash：子会话目录不在磁盘上 → 跳过搬运并继续，不让整单回滚（host/session-files.ts 的 moveSessionToTrash）
+ * ② delete：子会话目录已消失 → force:true 只吞 ENOENT，仍算「已消失」并摘归档标记（deleteSessionTree）
+ * ③ delete：**根**目录本就不在磁盘上 → force:true 同样吞掉，返回 200 而不是 500（deleteSessionTree）
  *
  * 所有文件操作都在 `mkdtemp` 出来的临时目录里，绝不碰真实 ~/.dsh 数据。
  */
@@ -296,7 +296,7 @@ describe('archive-manage host 路由：真实 handler 行为', () => {
   })
 
   /**
-   * ① trash 跳过幽灵子目录（src/host.ts:1323-1326）。
+   * ① trash 跳过幽灵子目录（host/session-files.ts 的 moveSessionToTrash）。
    *
    * 场景：父目录在磁盘上，一个子会话目录真实存在、另一个已不在磁盘上
    * （陈旧 header 缓存 / 用户手工删过）。`rename` 对幽灵目录抛 ENOENT ——
@@ -342,7 +342,7 @@ describe('archive-manage host 路由：真实 handler 行为', () => {
   })
 
   /**
-   * ② delete 跳过幽灵子目录（src/host.ts:1409）。
+   * ② delete 跳过幽灵子目录（host/session-files.ts 的 deleteSessionTree）。
    *
    * `rm(child.dir, { recursive: true, force: true })` 的 `force` **只吞 ENOENT**：
    * 目录本就不在磁盘上同样算「已消失」，必须进 `deletedSubagentIds` ——
@@ -380,7 +380,7 @@ describe('archive-manage host 路由：真实 handler 行为', () => {
   })
 
   /**
-   * ③ delete 根目录 force:true（src/host.ts:1400）。
+   * ③ delete 根目录 force:true（host/session-files.ts 的 deleteSessionTree）。
    *
    * 根会话目录本就不在磁盘上（陈旧 header 缓存 / 已被别的操作搬走）：
    * `force: true` 必须吞掉 ENOENT 并返回 200 —— 否则幽灵会话会永久留在归档面板里，

@@ -119,22 +119,25 @@ describe('dsh-archive-manage 结构', () => {
 
   it('⛔ 页面不得自建遮罩 / dialog 语义 / 焦点陷阱（决策点 1）', async () => {
     const page = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
+    const modal = await readFile(new URL('../src/client/ConfirmModal.tsx', import.meta.url), 'utf8')
     // 剥注释再判：本文件的注释里**故意**写着「没有 role='dialog'」这类说明，不剥会命中自己的文档。
-    const code = page
+    const stripComments = (source) => source
       .replace(/\/\*[\s\S]*?\*\//gu, '')
       .replace(/^\s*\/\/.*$/gmu, '')
-    for (const forbidden of [
-      "role=\"dialog\"", "role='dialog'",
-      'aria-modal',
-      "role=\"alertdialog\"", "role='alertdialog'",
-      'position: fixed',
-      'backdrop-filter',
-      'dsh-archive-confirm-overlay',
-    ]) {
-      assert.ok(!code.includes(forbidden), `页面源码里不该再有 ${forbidden}（主面板是正常流，不是弹窗）`)
+    for (const code of [stripComments(page), stripComments(modal)]) {
+      for (const forbidden of [
+        "role=\"dialog\"", "role='dialog'",
+        'aria-modal',
+        "role=\"alertdialog\"", "role='alertdialog'",
+        'position: fixed',
+        'backdrop-filter',
+        'dsh-archive-confirm-overlay',
+      ]) {
+        assert.ok(!code.includes(forbidden), `页面源码里不该再有 ${forbidden}（主面板是正常流，不是弹窗）`)
+      }
     }
-    assert.match(code, /from '@deepseek-ai\/dsh-client-ui-primitives'/u)
-    assert.match(code, /<Modal\b/u, '二次确认必须走官方 Modal 原语')
+    assert.match(stripComments(modal), /from '@deepseek-ai\/dsh-client-ui-primitives'/u)
+    assert.match(stripComments(modal), /<Modal\b/u, '二次确认必须走官方 Modal 原语')
   })
 
   it('页面顶部应该 自带窗口拖拽标记与官方顶带内边距（无遮罩后顶端就是窗口边缘）', async () => {
@@ -168,23 +171,23 @@ describe('dsh-archive-manage 结构', () => {
   })
 
   it('⛔ 行标题必须显式给字号与行高（不得只靠继承）', async () => {
-    const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
-    const title = /title:\s*\{([^}]*)\}/u.exec(src)
-    assert.ok(title !== null, '缺 styles.title')
+    const src = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
+    const title = /const titleStyle = \{([^}]*)\}/u.exec(src)
+    assert.ok(title !== null, '缺 titleStyle')
     const decl = title[1].replace(/\/\*[\s\S]*?\*\//gu, '')
-    assert.match(decl, /fontSize:\s*14/u, 'styles.title 必须显式 fontSize: 14')
+    assert.match(decl, /fontSize:\s*14/u, 'titleStyle 必须显式 fontSize: 14')
     assert.match(decl, /lineHeight:\s*'20px'/u,
-      "styles.title 必须显式 lineHeight: '20px'（留 normal 行盒偏矮、行距发挤）")
+      "titleStyle 必须显式 lineHeight: '20px'（留 normal 行盒偏矮、行距发挤）")
   })
 
   it('⛔ 次级文字必须显式给行高（与云端文件页 / 官方次级文字同为 12px/18px）', async () => {
-    const src = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
-    const sec = /secondarySmall:\s*\{([^}]*)\}/u.exec(src)
-    assert.ok(sec !== null, '缺 styles.secondarySmall')
+    const src = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
+    const sec = /const secondarySmallStyle = \{([^}]*)\}/u.exec(src)
+    assert.ok(sec !== null, '缺 secondarySmallStyle')
     const decl = sec[1].replace(/\/\*[\s\S]*?\*\//gu, '')
-    assert.match(decl, /fontSize:\s*12/u, 'secondarySmall 必须显式 fontSize: 12')
+    assert.match(decl, /fontSize:\s*12/u, 'secondarySmallStyle 必须显式 fontSize: 12')
     assert.match(decl, /lineHeight:\s*'18px'/u,
-      "secondarySmall 必须显式 lineHeight: '18px'（留 normal 行盒只有约 16px，与另一页不一致）")
+      "secondarySmallStyle 必须显式 lineHeight: '18px'（留 normal 行盒只有约 16px，与另一页不一致）")
   })
 
   /**
@@ -220,7 +223,7 @@ describe('dsh-archive-manage 结构', () => {
    * 防再次被顺手缩成「归档」—— 那读起来像动作而不是页面。
    */
   it('侧边栏入口中文 应该是「归档管理」（名词性入口，与同排「插件」等一致）', async () => {
-    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    const src = await readFile(new URL('../src/client/i18n.ts', import.meta.url), 'utf8')
     assert.match(src, /'button\.label':\s*'归档管理'/u,
       '侧边栏入口中文必须是「归档管理」（不是「归档」——那读成动作，同排入口都是名词）')
     // 英文保持 "Archive"，本约束只管中文。
@@ -229,7 +232,7 @@ describe('dsh-archive-manage 结构', () => {
 
   /** locale 字典中英**键集必须一一对应**：漏键只会静默显示键名，不报错、不崩。 */
   it('locale 字典 应该 中英键集一一对应（漏键只会静默显示键名）', async () => {
-    const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    const src = await readFile(new URL('../src/client/i18n.ts', import.meta.url), 'utf8')
     const keysOf = (lang) => {
       const start = src.indexOf(`  ${lang}: {`)
       assert.ok(start >= 0, `找不到 ${lang} 字典块`)
@@ -256,11 +259,22 @@ describe('dsh-archive-manage 结构', () => {
     assert.deepEqual(specs, ['00-overview.md'])
   })
 
-  it('src 应该 按关注点拆分（constants / contract / trust / compat / host）', async () => {
+  it('src 应该 按关注点拆分（host 组合根 + host/ 域模块 + client/ 子模块）', async () => {
     const fs = await import('node:fs/promises')
     const files = await fs.readdir(new URL('../src', import.meta.url))
     for (const file of ['constants.ts', 'contract.ts', 'host.ts', 'archive.ts', 'trust.ts', 'compat.ts']) {
       assert.ok(files.includes(file), `缺 ${file}`)
+    }
+    const hostFiles = await fs.readdir(new URL('../src/host', import.meta.url))
+    for (const file of [
+      'http.ts', 'gates.ts', 'headers.ts', 'projection.ts', 'titles.ts', 'archive-set.ts',
+      'trash.ts', 'session-files.ts', 'views.ts', 'routes.ts', 'startup.ts',
+    ]) {
+      assert.ok(hostFiles.includes(file), `缺 src/host/${file}`)
+    }
+    const clientFiles = await fs.readdir(new URL('../src/client', import.meta.url))
+    for (const file of ['format.ts', 'window.ts', 'ConfirmModal.tsx', 'rows.tsx', 'i18n.ts']) {
+      assert.ok(clientFiles.includes(file), `缺 src/client/${file}`)
     }
   })
 
@@ -278,10 +292,10 @@ describe('dsh-archive-manage 结构', () => {
 
   it('死代码 应该 已清理（data-archive-panel / 仅测试使用的 storedHeaders / 入口 re-export）', async () => {
     const page = await readFile(new URL('../src/client/ArchivePage.tsx', import.meta.url), 'utf8')
-    const host = await readFile(new URL('../src/host.ts', import.meta.url), 'utf8')
+    const headers = await readFile(new URL('../src/host/headers.ts', import.meta.url), 'utf8')
     const index = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
     assert.ok(!page.includes('data-archive-panel'), 'data-archive-panel 没有消费者，应删除')
-    assert.ok(!/export async function storedHeaders/u.test(host), 'storedHeaders 无运行时调用方，应删除')
+    assert.ok(!/export async function storedHeaders/u.test(headers), 'storedHeaders 无运行时调用方，应删除')
     assert.ok(!/^export \{/mu.test(index), 'client/index.ts 末尾无消费者的 re-export 应删除')
   })
 })

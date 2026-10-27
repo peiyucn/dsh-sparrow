@@ -116,15 +116,32 @@
 | `src/constants.ts` | 路由前缀 / 路由表 / sidecar 版本 / 请求体上限 / 缓存 TTL / LRU 上限 / 分页 / 防抖 / 投影域名 |
 | `src/contract.ts` | 12 条路由的请求 / 响应 DTO（host 与 client 共用，零运行时依赖） |
 | `src/archive.ts` | 纯逻辑：配置、sidecar 解析、回收站条目视图、会话树、归档对齐、LRU / 预算 / 有界并发 |
-| `src/host.ts` | host half：能力门、投影标题 / 标签、路由分发、回收站搬移与还原 |
+| `src/host.ts` | host half 组合根：能力门 → 装配路由 → 启动清扫接线 |
+| `src/host/http.ts` | JSON 收发、请求体读取、统一错误类型 |
+| `src/host/gates.ts` | host 能力 / 会话格式门与两处私有 seam 的启动自检 |
+| `src/host/headers.ts` | header 事实缓存 store、双形状读取、树结构投影 |
+| `src/host/projection.ts` | 官方投影缓存域解析、行读取、失效与启动清扫 |
+| `src/host/titles.ts` | 标题三档 + subagent 标签三档（含形参自适应缓存读取） |
+| `src/host/archive-set.ts` | 归档集读改写、工作区记账、父子对齐、幽灵清扫、unarchive 通知 |
+| `src/host/trash.ts` | 回收站目录 / 清单 / 还原 / 删除 |
+| `src/host/session-files.ts` | 会话目录定位、占用守卫、子会话目标收集、移入回收站 / 彻底删除 |
+| `src/host/views.ts` | `GET /list` 归档树与 `GET /strays` 游离清单的 DTO 组装 |
+| `src/host/routes.ts` | 12 条路由的信任栅栏、请求校验与表驱动分发 |
+| `src/host/startup.ts` | 启动三项清扫的延迟兜底与事件接线（缓存失效 / 父子对齐） |
+| `src/host/events.ts` | 官方 `api-session/*` 事件的类型补充 |
 | `src/trust.ts` | Host / Origin / sec-fetch-site 栅栏与官方信任面复用 |
 | `src/compat.ts` | host 两档门（能力 / 会话格式）与惰性探针 |
-| `src/client/index.ts` | client 入口：locale 字典 + 委托安装 |
+| `src/client/index.ts` | client 入口：注入 locale 字典 + 委托安装 |
+| `src/client/i18n.ts` | client locale 字典（zh / en） |
 | `src/client/install.ts` | 能力门 → 样式（effect 清理）→ locale → remote 桥 → 主面板两处注册 |
 | `src/client/compat.ts` | client 不抛错能力门（`warnMissingCapabilities` / `hasCapability`） |
-| `src/client/styles.ts` | 归档页样式表（注入 / 复用 / 返回 style 元素） |
-| `src/client/ArchivePage.tsx` | 页面组件：状态、请求编排、列表 / 树 / 确认框 |
-| `src/client/{archivedTree,paging,panel}.ts` | 本地树变更、可见行计数、主面板入口装配 |
+| `src/client/styles.ts` | 归档页样式表（注入 / 复用 / 返回 style 元素）+ 页面静态 inline style |
+| `src/client/ArchivePage.tsx` | 页面容器：状态、数据加载、事件与动作编排 |
+| `src/client/ConfirmModal.tsx` | 二次确认框（官方 `Modal` 原语） |
+| `src/client/rows.tsx` | 归档 / 游离 / 回收站行渲染器（含分页预算） |
+| `src/client/format.ts` | 字节 / token / 创建龄 / 会话事实行格式化 |
+| `src/client/window.ts` | 可见行计数与回收站树预算 |
+| `src/client/{archivedTree,panel}.ts` | 本地树变更 / 展示判定、主面板入口装配 |
 
 ## 已知偏离 / 已知问题
 
@@ -132,9 +149,8 @@
 * **两处私有 seam**（登记在 `docs/private-seams.md`）：① `WorkspaceRegistry` 的
   `enqueueOperation / requireState / setState`；② `sessionPersistence.locate`。两者启动即检查，
   官方移除即 fail-fast，不影响 dsh 与其余插件。
-* **回收站分页计数少算（本轮未修）**：`trashTotal` 只计父条目 + **直接**子会话，而渲染会递归
-  全部后代。父条目含深度 ≥2 的子孙时，「加载更多」的剩余数偏小，极端情况下窗口外仍有行却不显示
-  按钮。修复需要与归档区同款的递归可见行计数；本轮不改变分页行为，仅记录。
+* **回收站分页计数**：`trashTotal` = 父条目 + sidecar 的**全部** subagent 条目；sidecar v2 记的
+  就是随父搬走的整棵后代（扁平清单），与渲染行数一致，不存在深度 ≥2 的少算。
 * **held 会话语义**：本次 dsh 运行中仍被进程占用（`ctx.sessions.get` / `ctx.agents.get` 命中）的
   会话不能移动文件 —— 归档区内分组置灰、host 兜底拒绝（409）。「取消归档」只改归档集、不动文件，
   可立即执行；**关闭该会话（或停止生成）后即可立即重试**，不要求下次启动。
@@ -156,5 +172,5 @@
 * `test/compat.test.mjs` —— 会话格式门与 host 能力门。
 * `test/client-install.test.mjs` —— client 能力门（缺任一不注册 / 不抛 / 告警一条）与样式生命周期。
 * `test/panel.test.mjs` —— `attachMainPanel` 的可选 fork 与两处注册形状。
-* `test/archived-tree.test.mjs` / `test/paging.test.mjs` —— 本地树摘除与可见行计数。
+* `test/archived-tree.test.mjs` / `test/window.test.mjs` —— 本地树摘除与可见行计数 / 回收站分页预算。
 * `test/structure.test.mjs` —— 文档单一 spec、包清单 / 出口、主面板形态、样式规则与死代码守卫。
