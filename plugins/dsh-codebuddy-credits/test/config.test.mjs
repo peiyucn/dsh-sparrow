@@ -5,7 +5,7 @@ import path from 'node:path'
 import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { Config, keyRefs } from '../lib/config.js'
-import { NS } from '../lib/constants.js'
+import { SETTINGS_NAMESPACE } from '../lib/constants.js'
 
 const DIR = path.dirname(fileURLToPath(import.meta.url))
 
@@ -54,11 +54,11 @@ describe('Config schema（0.1.7 的 volatile 配置面）', () => {
 })
 
 describe('设置命名空间 = profile 条目 id', () => {
-  it('NS 必须等于自带 cordis.patch.yml 的 insert id（否则设置读写找不到条目）', () => {
+  it('SETTINGS_NAMESPACE 必须等于自带 cordis.patch.yml 的 insert id（否则设置读写找不到条目）', () => {
     // 设置命名空间即 profile 条目 id（SettingsForms 按它查条目），条目 id 由本包
     // dsh.bundle.patch 的 insert 决定；漏改即运行期「No configurable plugin entry」。
     const text = fs.readFileSync(path.join(DIR, '..', 'cordis.patch.yml'), 'utf8')
     const id = /^\s*-\s*id:\s*(\S+)\s*$/m.exec(text)?.[1]
-    assert.equal(id, NS)
+    assert.equal(id, SETTINGS_NAMESPACE)
   })
 })

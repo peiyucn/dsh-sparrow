@@ -14,15 +14,14 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import { CodeBuddyCreditsCard, ensureCardStyles } from './CodeBuddyCreditsCard.js'
-import {
-  CodeBuddyCreditsHeroAnchor,
-  CodeBuddyCreditsIndicator,
-  ensureIndicatorStyles,
-} from './CodeBuddyCreditsIndicator.js'
-import { CodeBuddyTurnCredit, ensureTurnCreditStyles } from './CodeBuddyTurnCredit.js'
-import { CodeBuddyCreditsStats, ensureStatsStyles } from './CodeBuddyCreditsStats.js'
-import { CodeBuddyModelLabel, ensureModelLabelStyles } from './CodeBuddyModelLabel.js'
+import { hasCapability, warnMissingCapabilities } from '../compat.js'
+import { LOCALE_NAMESPACE, SETTINGS_NAMESPACE } from '../constants.js'
+import { CodeBuddyCreditsCard } from './CodeBuddyCreditsCard.js'
+import { CodeBuddyCreditsHeroAnchor, CodeBuddyCreditsIndicator } from './CodeBuddyCreditsIndicator.js'
+import { CodeBuddyTurnCredit } from './CodeBuddyTurnCredit.js'
+import { CodeBuddyCreditsStats } from './CodeBuddyCreditsStats.js'
+import { CodeBuddyModelLabel } from './CodeBuddyModelLabel.js'
+import { injectCodeBuddyStyles } from './styles.js'
 
 export const inject = ['slots', 'locale']
 
@@ -38,8 +37,6 @@ const LOCALE_DICTS = {
     'action.clearKey': '清空 Key',
     'error.clearFailed': '清空失败',
     'state.configured': '已配置 · {account}',
-    'state.configuredShort': '已配置',
-    'action.edit': '编辑',
     'saved.provider': '已保存 CodeBuddy Credits。',
     'error.empty': '请输入 API Key',
     'error.saveFailed': '保存失败：请确认 Key 有效（保存时已尝试获取模型目录）',
@@ -89,8 +86,6 @@ const LOCALE_DICTS = {
     'action.clearKey': 'Clear key',
     'error.clearFailed': 'Clear failed',
     'state.configured': 'Configured · {account}',
-    'state.configuredShort': 'Configured',
-    'action.edit': 'Edit',
     'saved.provider': 'Saved CodeBuddy Credits.',
     'error.empty': 'Enter an API key',
     'error.saveFailed': 'Save failed: check the key (catalog fetch runs on save)',
@@ -137,21 +132,29 @@ interface DirectoryStoreLike {
 }
 
 export function apply(ctx: ClientContext): void {
-  ensureIndicatorStyles()
-  ensureCardStyles()
-  ensureTurnCreditStyles()
-  ensureStatsStyles()
-  ensureModelLabelStyles()
-  const disposeDictionaries = ctx.locale.register('codebuddy-credits', {
+  const c = ctx as unknown as Record<string, any>
+  // 首行能力门（**绝不抛错**）：client entry 非 active 会让宿主整页 boot 失败。
+  // 缺失即直接 return，不注册任何样式 / 槽位 / 监听。
+  if (!warnMissingCapabilities(c, SETTINGS_NAMESPACE, [
+    { name: 'ctx.slots.inject', ok: hasCapability(() => c.slots?.inject) },
+    { name: 'ctx.slots.register', ok: hasCapability(() => c.slots?.register) },
+    { name: 'ctx.locale.register', ok: hasCapability(() => c.locale?.register) },
+    { name: 'ctx.locale.bind', ok: hasCapability(() => c.locale?.bind) },
+  ])) return
+
+  // 样式表统一在这里注入一次（marker + HMR 复用）；卸载时移除。
+  const style = injectCodeBuddyStyles()
+  ctx.effect(() => () => { style.remove() }, `${SETTINGS_NAMESPACE}: styles`)
+  const disposeDictionaries = ctx.locale.register(LOCALE_NAMESPACE, {
     zh: LOCALE_DICTS.zh,
     en: LOCALE_DICTS.en,
   })
-  ctx.effect(() => disposeDictionaries, 'llm-codebuddy-credits: locale dictionaries')
+  ctx.effect(() => disposeDictionaries, `${SETTINGS_NAMESPACE}: locale dictionaries`)
 
   ctx.slots.inject('settings.models.provider-card', () => ctx.slots.register({
     name: 'settings.models.provider-card',
-    key: 'llm-codebuddy-credits',
-    locale: 'codebuddy-credits',
+    key: SETTINGS_NAMESPACE,
+    locale: LOCALE_NAMESPACE,
   }, CodeBuddyCreditsCard as unknown as (props: object) => ReactNode))
 
   /**
@@ -167,7 +170,7 @@ export function apply(ctx: ClientContext): void {
    */
   ctx.slots.inject('conversation.input.model.label', () => ctx.slots.register({
     name: 'conversation.input.model.label',
-    locale: 'codebuddy-credits',
+    locale: LOCALE_NAMESPACE,
     priority: -1,
   }, CodeBuddyModelLabel as unknown as (props: object) => ReactNode))
 
@@ -190,7 +193,7 @@ export function apply(ctx: ClientContext): void {
     name: 'conversation.session.header.utilities',
     id: 'codebuddy-credits',
     order: -10,
-    locale: 'codebuddy-credits',
+    locale: LOCALE_NAMESPACE,
     inject: () => ({ directoryFor }),
   }, CodeBuddyCreditsIndicator as unknown as (props: object) => ReactNode))
 
@@ -200,7 +203,7 @@ export function apply(ctx: ClientContext): void {
     name: 'conversation.input.dock',
     id: 'codebuddy-credits-hero',
     order: 30,
-    locale: 'codebuddy-credits',
+    locale: LOCALE_NAMESPACE,
     inject: () => ({ directoryFor }),
   }, CodeBuddyCreditsHeroAnchor as unknown as (props: object) => ReactNode))
 
@@ -208,7 +211,7 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('conversation.chat.assistant-actions', () => ctx.slots.register({
     name: 'conversation.chat.assistant-actions',
     id: 'codebuddy-credits-turn-credit',
-    locale: 'codebuddy-credits',
+    locale: LOCALE_NAMESPACE,
   }, CodeBuddyTurnCredit as unknown as (props: object) => ReactNode))
 
   // 会话积分统计行：官方 activity order 0、usage order 1（ui-chat StatsPills），本条目 order 2
@@ -217,7 +220,7 @@ export function apply(ctx: ClientContext): void {
     name: 'conversation.composer.dock',
     id: 'codebuddy-credits-stats',
     order: 2,
-    locale: 'codebuddy-credits',
+    locale: LOCALE_NAMESPACE,
   }, CodeBuddyCreditsStats as unknown as (props: object) => ReactNode))
 
 }

@@ -5,16 +5,17 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { formatModelFacts } from './format.js'
 import { BusyDot } from './BusyDot.js'
 import { CLIENT_ACTION_TIMEOUT_MS, fetchLocal } from './fetch-timeout.js'
 import { syncModelFacts, type ModelFactView } from './model-facts.js'
+import { API_PREFIX } from '../constants.js'
+import { CCB_CLASS } from './styles.js'
 
-const STATUS_URL = '/api/codebuddy-credits/status'
-const KEY_URL = '/api/codebuddy-credits/key'
-const REMOVE_URL = '/api/codebuddy-credits/remove-key'
-const REFRESH_URL = '/api/codebuddy-credits/refresh-models'
+const STATUS_URL = `${API_PREFIX}/status`
+const KEY_URL = `${API_PREFIX}/key`
+const REMOVE_URL = `${API_PREFIX}/remove-key`
+const REFRESH_URL = `${API_PREFIX}/refresh-models`
 /** 保存/清空 Key 后广播的窗口事件（对话页额度卡据此联动刷新）。 */
 const STATUS_CHANGED_EVENT = 'codebuddy-credits-status-changed'
 
@@ -28,152 +29,6 @@ interface CardProps {
   t: (key: string, vars?: Record<string, string>) => string
   /** 官方页面 owner 共享：行头凭据 join 结果（初始渲染即可用，无需等状态接口）。 */
   keyConfigured?: boolean
-}
-
-/** 官方 editor 容器：填充模块面。 */
-const editorStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '14px',
-  padding: '14px 16px',
-  borderRadius: '12px',
-  background: 'var(--dsw-alias-bg-module-platform)',
-  width: '100%',
-  boxSizing: 'border-box',
-}
-
-const headerStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'baseline',
-  gap: '8px',
-}
-
-const titleStyle: CSSProperties = {
-  fontSize: '14px',
-  lineHeight: '22px',
-  fontWeight: 500,
-  color: 'var(--dsw-alias-label-primary)',
-}
-
-const fieldStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '6px',
-}
-
-const labelStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '10px',
-  fontSize: '12px',
-  lineHeight: '18px',
-  fontWeight: 500,
-  color: 'var(--dsw-alias-label-secondary)',
-}
-
-const errorStyle: CSSProperties = {
-  margin: 0,
-  fontSize: '12px',
-  lineHeight: '18px',
-  color: 'var(--dsw-alias-state-error-primary)',
-}
-
-const hintStyle: CSSProperties = {
-  margin: 0,
-  fontSize: '12px',
-  lineHeight: '18px',
-  color: 'var(--dsw-alias-label-tertiary)',
-}
-
-/** 只读模型清单（一行一个模型）。 */
-const modelsBlockStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '6px',
-}
-
-const modelsHeaderStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '8px',
-}
-
-const modelRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'baseline',
-  justifyContent: 'space-between',
-  gap: '12px',
-  fontSize: '12px',
-  lineHeight: '18px',
-}
-
-const modelNameStyle: CSSProperties = {
-  color: 'var(--dsw-alias-label-primary)',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-}
-
-const modelFactStyle: CSSProperties = {
-  flex: 'none',
-  color: 'var(--dsw-alias-label-tertiary)',
-}
-
-const actionsStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: '8px',
-}
-
-/** 官方 footer 按钮：胶囊。 */
-const buttonBase: CSSProperties = {
-  boxSizing: 'border-box',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '4px',
-  height: '36px',
-  padding: '0 14px',
-  border: 'none',
-  borderRadius: '18px',
-  font: 'inherit',
-  fontSize: '14px',
-  lineHeight: '22px',
-  cursor: 'pointer',
-}
-
-const primaryButtonStyle: CSSProperties = {
-  ...buttonBase,
-  background: 'var(--dsw-alias-button-primary-fill)',
-  color: 'var(--dsw-alias-label-primary-foreground)',
-}
-
-const secondaryButtonStyle: CSSProperties = {
-  ...buttonBase,
-  border: '0.5px solid var(--dsw-alias-border-l3)',
-  background: 'transparent',
-  color: 'var(--dsw-alias-label-primary)',
-}
-
-/** 与取消/应用同款胶囊，文字用错误红。 */
-const dangerButtonStyle: CSSProperties = {
-  ...buttonBase,
-  border: '0.5px solid var(--dsw-alias-border-l3)',
-  background: 'transparent',
-  color: 'var(--dsw-alias-state-error-primary)',
-}
-
-/** 只读清单右上角的「获取可用模型」按钮：官方同款紧凑行内。 */
-const refreshButtonStyle: CSSProperties = {
-  ...buttonBase,
-  height: '28px',
-  padding: '0 10px',
-  fontSize: '12px',
-  lineHeight: '18px',
-  border: '0.5px solid var(--dsw-alias-border-l3)',
-  background: 'transparent',
-  color: 'var(--dsw-alias-label-primary)',
 }
 
 /** 官方 apiKeyFailure 的轻量镜像：可打印 ASCII（空格除外）。 */
@@ -295,10 +150,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
     notice.textContent = t('saved.provider')
     notice.setAttribute('role', 'status')
     notice.setAttribute('aria-live', 'polite')
-    notice.style.margin = '0'
-    notice.style.fontSize = '12px'
-    notice.style.lineHeight = '18px'
-    notice.style.color = 'var(--dsw-alias-state-success-primary)'
+    notice.className = CCB_CLASS.cardNotice
     section.insertBefore(notice, rows)
     return () => { notice.remove() }
   }, [savedNotice, t])
@@ -404,19 +256,19 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
   // 状态未知与折叠态都渲染 0×0 隐藏锚点（不是 null）：拦截监听与 :has 锚点须从首帧起就位，
   // 否则窗口期点官方「编辑」会打开官方编辑器、出现双标题；行下不显示任何内容。
   if (pending || !showEditor) {
-    return <div ref={rootRef} className="ccb-card-root" style={{ display: 'none' }} />
+    return <div ref={rootRef} className={`${CCB_CLASS.cardRoot} ${CCB_CLASS.cardRootHidden}`} />
   }
 
   return (
-    <div ref={rootRef} className="ccb-card-root" style={editorStyle}>
-      <div style={headerStyle}>
-        <span style={titleStyle}>CodeBuddy Credits</span>
+    <div ref={rootRef} className={`${CCB_CLASS.cardRoot} ${CCB_CLASS.cardEditor}`}>
+      <div className={CCB_CLASS.cardHeader}>
+        <span className={CCB_CLASS.cardTitle}>CodeBuddy Credits</span>
       </div>
-      <div style={fieldStyle}>
-        <span style={labelStyle}>{t('key.label')}</span>
+      <div className={CCB_CLASS.cardField}>
+        <span className={CCB_CLASS.cardLabel}>{t('key.label')}</span>
         <input
           aria-label="CodeBuddy API Key"
-          className="ccb-card-input"
+          className={CCB_CLASS.cardInput}
           type="password"
           placeholder={configured ? t('key.stored') : t('key.placeholder')}
           value={draft}
@@ -426,61 +278,61 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
           aria-invalid={illegal}
         />
         {illegal
-          ? <p style={errorStyle}>{t('key.illegal')}</p>
+          ? <p className={CCB_CLASS.cardError}>{t('key.illegal')}</p>
           : null}
       </div>
       {configured && accountParts.length > 0
         ? (
-          <p style={hintStyle}>
+          <p className={CCB_CLASS.cardHint}>
             {t('state.configured', { account: accountParts.join(' · ') })}
           </p>
         )
         : null}
       {message !== undefined
         ? (
-          <p style={messageKind === 'error' ? errorStyle : hintStyle}>
+          <p className={messageKind === 'error' ? CCB_CLASS.cardError : CCB_CLASS.cardHint}>
             {message}
           </p>
         )
         : null}
       {configured
         ? (
-          <div style={modelsBlockStyle}>
-            <div style={modelsHeaderStyle}>
-              <span style={labelStyle}>{t('models.title')}</span>
+          <div className={CCB_CLASS.cardModels}>
+            <div className={CCB_CLASS.cardModelsHeader}>
+              <span className={CCB_CLASS.cardLabel}>{t('models.title')}</span>
               <button
                 type="button"
                 onClick={() => void refreshModels()}
                 disabled={refreshing}
-                style={refreshButtonStyle}
+                className={`${CCB_CLASS.cardButton} ${CCB_CLASS.cardButtonRefresh}`}
               >
                 {refreshing ? t('models.fetching') : t('models.fetch')}
               </button>
             </div>
             {status === undefined
-              ? <BusyDot label={t('picker.trigger.loading')} style={hintStyle} />
+              ? <BusyDot label={t('picker.trigger.loading')} className={CCB_CLASS.cardHint} />
               : models.length === 0
-                ? <p style={hintStyle}>{t('models.empty')}</p>
+                ? <p className={CCB_CLASS.cardHint}>{t('models.empty')}</p>
                 : models.map(model => (
                 // 名称用服务端原始名（不带系数/free）；右侧为只读事实（系数 · 上下文长度）。
-                <div key={model.id} style={modelRowStyle}>
-                  <span style={modelNameStyle} title={model.id}>{model.name}</span>
-                  <span style={modelFactStyle}>{formatModelFacts(model)}</span>
+                <div key={model.id} className={CCB_CLASS.cardModelRow}>
+                  <span className={CCB_CLASS.cardModelName} title={model.id}>{model.name}</span>
+                  <span className={CCB_CLASS.cardModelFact}>{formatModelFacts(model)}</span>
                 </div>
               ))}
-            {refreshNote === undefined ? null : <p style={hintStyle}>{refreshNote}</p>}
-            {refreshError === undefined ? null : <p style={errorStyle}>{refreshError}</p>}
+            {refreshNote === undefined ? null : <p className={CCB_CLASS.cardHint}>{refreshNote}</p>}
+            {refreshError === undefined ? null : <p className={CCB_CLASS.cardError}>{refreshError}</p>}
           </div>
         )
         : null}
-      <div style={actionsStyle}>
+      <div className={CCB_CLASS.cardActions}>
         {configured
           ? (
             <button
               type="button"
               onClick={() => void clearKey()}
               disabled={busy}
-              style={{ ...dangerButtonStyle, marginRight: 'auto' }}
+              className={`${CCB_CLASS.cardButton} ${CCB_CLASS.cardButtonDanger} ${CCB_CLASS.cardButtonClear}`}
             >
               {t('action.clearKey')}
             </button>
@@ -490,7 +342,7 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
           type="button"
           onClick={cancel}
           disabled={busy}
-          style={secondaryButtonStyle}
+          className={`${CCB_CLASS.cardButton} ${CCB_CLASS.cardButtonSecondary}`}
         >
           {t('action.cancel')}
         </button>
@@ -498,34 +350,11 @@ export function CodeBuddyCreditsCard({ t, keyConfigured: ownerKeyConfigured }: C
           type="button"
           onClick={() => void save()}
           disabled={busy || illegal}
-          style={primaryButtonStyle}
+          className={`${CCB_CLASS.cardButton} ${CCB_CLASS.cardButtonPrimary}`}
         >
           {busy ? t('action.applying') : t('action.apply')}
         </button>
       </div>
     </div>
   )
-}
-
-let cardStylesInstalled = false
-
-/** 官方 .input / .customized / .linkButton 照抄（:focus 等伪类只能走样式表）。 */
-export function ensureCardStyles(): void {
-  if (cardStylesInstalled || typeof document === 'undefined') return
-  cardStylesInstalled = true
-  const style = document.createElement('style')
-  style.textContent = [
-    '.ccb-card-input {',
-    '  box-sizing: border-box; width: 100%; height: 32px; padding: 0 10px;',
-    '  border: 0.5px solid var(--dsw-alias-border-l4); border-radius: 8px;',
-    '  font: inherit; font-size: 14px; line-height: 22px;',
-    '  background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary);',
-    '}',
-    '.ccb-card-input:focus { outline: none; border-color: var(--dsw-alias-brand-primary); }',
-    '.ccb-card-input::placeholder { color: var(--dsw-alias-label-dimmed); }',
-    '.ccb-card-input:disabled { opacity: 0.6; cursor: default; }',
-    // 只隐藏官方占位编辑器（li 首个 div 且无 rowActions 结构）；行头「编辑」按钮不隐藏。
-    'li:has(.ccb-card-root) > div:first-child:not(:has(> span:last-child)) { display: none; }',
-  ].join('\n')
-  document.head.append(style)
 }

@@ -14,9 +14,11 @@
  */
 import { useSyncExternalStore } from 'react'
 import { Tag } from '@deepseek-ai/dsh-client-ui-primitives'
+import { PROVIDER_ID } from '../constants.js'
 import { BADGE_1017_TEXT, shows1017Badge } from './model-label-1017.js'
-import { getModelFacts, PROVIDER_ID, subscribeModelFacts } from './model-facts.js'
+import { getModelFacts, subscribeModelFacts } from './model-facts.js'
 import { formatModelFacts } from './format.js'
+import { CCB_CLASS } from './styles.js'
 
 /** 官方 label 扩展槽传给贡献者的 owner 字段（只声明用到的部分，其余忽略）。 */
 export interface CodeBuddyModelLabelProps {
@@ -24,21 +26,6 @@ export interface CodeBuddyModelLabelProps {
   readonly model?: { readonly id: string; readonly name: string }
   readonly placement?: 'trigger' | 'menu' | 'option'
   readonly selected?: boolean
-}
-
-let labelStylesInstalled = false
-
-/** 注入 label 的样式（幂等；插件卸载随样式表由宿主回收，本插件不单独管理）。 */
-export function ensureModelLabelStyles(): void {
-  if (labelStylesInstalled || typeof document === 'undefined') return
-  labelStylesInstalled = true
-  const style = document.createElement('style')
-  style.textContent = [
-    '.ccb-model-label { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }',
-    '.ccb-model-labelName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
-    '.ccb-model-labelFacts { flex: none; color: var(--dsw-alias-label-caption); font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; }',
-  ].join('\n')
-  document.head.appendChild(style)
 }
 
 /**
@@ -56,12 +43,12 @@ export function CodeBuddyModelLabel(props: CodeBuddyModelLabelProps): React.Reac
     ? formatModelFacts(factsByModel.get(modelId))
     : undefined
   return (
-    <span className="ccb-model-label">
-      <span className="ccb-model-labelName">{name}</span>
+    <span className={CCB_CLASS.modelLabel}>
+      <span className={CCB_CLASS.modelLabelName}>{name}</span>
       {shows1017Badge(providerId, modelId, name)
         ? <Tag tone="info">{BADGE_1017_TEXT}</Tag>
         : null}
-      {facts === undefined ? null : <span className="ccb-model-labelFacts">{facts}</span>}
+      {facts === undefined ? null : <span className={CCB_CLASS.modelLabelFacts}>{facts}</span>}
     </span>
   )
 }

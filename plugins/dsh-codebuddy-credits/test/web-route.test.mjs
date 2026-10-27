@@ -39,12 +39,12 @@ function buildHarness(overrides = {}, webStartup = undefined) {
 }
 
 /**
- * 最小 req/res：栅栏与 localOnly 检查都依赖 remoteAddress 与 Host 头。
+ * 最小 req/res：栅栏依赖 Host / Origin / socket 来源；读体路径需要 async iterable（`body` 才提供）。
  * @param {any} handler - installCodeBuddyWeb 注册的路由 handler。
  * @param {string} url - 请求 URL（含 query）。
- * @param {{ method?: string, address?: string, headers?: Record<string, string> }} [options] - 请求形态。
+ * @param {{ method?: string, address?: string, headers?: Record<string, string>, body?: string }} [options] - 请求形态。
  */
-async function request(handler, url, { method = 'POST', address = '127.0.0.1', headers = { host: '127.0.0.1:3080' } } = {}) {
+async function request(handler, url, { method = 'POST', address = '127.0.0.1', headers = { host: '127.0.0.1:3080' }, body } = {}) {
   let statusCode = 0
   const chunks = []
   const res = {
@@ -53,7 +53,16 @@ async function request(handler, url, { method = 'POST', address = '127.0.0.1', h
     end: (chunk) => { chunks.push(chunk ?? '') },
   }
   Object.defineProperty(res, 'statusCode', { set: (value) => { statusCode = value }, get: () => statusCode })
-  await handler({ method, url, headers, socket: { remoteAddress: address } }, res)
+  const req = { method, url, headers, socket: { remoteAddress: address } }
+  if (body !== undefined) {
+    req[Symbol.asyncIterator] = async function* () {
+      // 分两块喂：覆盖「跨 chunk 累计」分支（readBody 逐块累加字节）。
+      const half = Math.ceil(body.length / 2)
+      yield Buffer.from(body.slice(0, half))
+      if (half < body.length) yield Buffer.from(body.slice(half))
+    }
+  }
+  await handler(req, res)
   const text = chunks.join('')
   return { statusCode, body: text === '' ? undefined : JSON.parse(text) }
 }
@@ -99,11 +108,36 @@ describe('codebuddy host 路由：/refresh-models', () => {
     assert.equal(h.calls.refreshModels, 0)
   })
 
-  it('非回环来源 应该 403（localOnly 栅栏）', async () => {
+  it('受信 LAN 来源 应该 放行（CHANGELOG 0.2.1-rc.2：非回环不再拒绝）', async () => {
+    const h = buildHarness({}, { trustedHosts: ['192.168.1.5'] })
+    const result = await request(h.handler, '/api/codebuddy-credits/refresh-models', {
+      address: '192.168.1.5',
+      headers: { host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' },
+    })
+    assert.equal(result.statusCode, 200)
+    assert.equal(h.calls.refreshModels, 1)
+  })
+
+  it('未受信 LAN 来源 应该 403（信任栅栏兜底，不靠 source-address 白名单）', async () => {
     const h = buildHarness()
-    const result = await request(h.handler, '/api/codebuddy-credits/refresh-models', { address: '10.0.0.7' })
+    const result = await request(h.handler, '/api/codebuddy-credits/refresh-models', {
+      address: '10.0.0.7',
+      headers: { host: '10.0.0.7:3080', origin: 'http://10.0.0.7:3080' },
+    })
     assert.equal(result.statusCode, 403)
     assert.equal(h.calls.refreshModels, 0)
+  })
+
+  it('请求体按**字节**限流：多字节正文超过 16KB 应该 400（字符串长度仍在上限内）', async () => {
+    const h = buildHarness()
+    // 6000 个汉字 = 18 000 字节 > 16 384；而 JS 字符串长度 6000 未超限。
+    const key = '中'.repeat(6000)
+    const result = await request(h.handler, '/api/codebuddy-credits/key', {
+      headers: { host: '127.0.0.1:3080' },
+      body: JSON.stringify({ key }),
+    })
+    assert.equal(result.statusCode, 400)
+    assert.match(result.body.error, /请求体过大/u)
   })
 
   it('上游失败 应该 透传错误消息为 400（路由统一 catch）', async () => {
@@ -252,7 +286,7 @@ describe('codebuddy host 路由：浏览器信任栅栏接线（DNS rebinding / 
     })
     assert.equal(ok.statusCode, 200)
     // 官方信任面缺席（老宿主 / 非 web 组合）→ 保守回退只信回环；
-    // 注意 remoteAddress 仍是回环：localOnly 只认 socket 来源，Host/Origin 由栅栏把关。
+    // LAN 是否放行由 Host/Origin 栅栏决定（不再看 socket source address）。
     const other = buildHarness()
     const denied = await request(other.handler, '/api/codebuddy-credits/status', {
       method: 'GET',

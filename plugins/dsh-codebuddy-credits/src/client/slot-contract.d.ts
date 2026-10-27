@@ -58,8 +58,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'action.clearKey'
       | 'error.clearFailed'
       | 'state.configured'
-      | 'state.configuredShort'
-      | 'action.edit'
       | 'saved.provider'
       | 'error.empty'
       | 'error.saveFailed'

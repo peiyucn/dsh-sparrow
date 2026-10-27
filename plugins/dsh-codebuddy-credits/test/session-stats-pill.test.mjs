@@ -2,11 +2,12 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
+import { buildStatsCss } from '../lib/client/styles.js'
 
 /**
- * 会话积分胶囊的外观 / 落点契约（`src/client/CodeBuddyCreditsStats.tsx`）：无 client 侧 DOM 测试环境、
- * 样式是一串字符串常量，故读源码断言。外观对齐官方 rc.2 `StatsPills.module.css`；落点由
- * `conversation.composer.dock` 的 list order 决定（本组件根节点直接是 `.dock` flex 子项），
+ * 会话积分胶囊的外观 / 落点契约（`src/client/CodeBuddyCreditsStats.tsx`）：
+ * 外观读 styles.ts 的构建函数（静态 CSS 已从组件收走），落点由
+ * `conversation.composer.dock` 的 list order 决定（组件根节点直接是 `.dock` flex 子项），
  * 不再对官方统计行做 DOM portal / 重挂。
  */
 const SOURCE = new URL('../src/client/CodeBuddyCreditsStats.tsx', import.meta.url)
@@ -15,24 +16,7 @@ const source = await readFile(SOURCE, 'utf8')
 /** 去掉注释后的源码：注释里会引用官方旧锚点名称用于说明，不能当作代码断言对象。 */
 const code = source.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/^\s*\/\/.*$/gmu, '')
 
-/** 源码里 `const PILL_X = '...'` 形式的样式常量（本文件用单引号）。 */
-const constants = Object.fromEntries(
-  [...source.matchAll(/const\s+(PILL_[A-Z_]+)\s*=\s*'([^']*)'/gu)].map(m => [m[1], m[2]]),
-)
-
-/** 把 `style.textContent = [...]` 数组还原成一份 CSS 文本（`${PILL_*}` 换成常量值）。 */
-function injectedCss() {
-  const start = source.indexOf('style.textContent = [')
-  assert.ok(start >= 0, '样式表数组不见了（ensureStatsStyles 被改写？）')
-  const end = source.indexOf('].join(', start)
-  assert.ok(end > start, '样式表数组的 ].join 不见了')
-  const block = source.slice(start, end)
-  return [...block.matchAll(/['`]([^'`]*)['`]/gu)]
-    .map(m => m[1].replace(/\$\{(\w+)\}/gu, (_, name) => constants[name] ?? `\${${name}}`))
-    .join('\n')
-}
-
-/** 取某选择器的规则体（本文件的选择器都没有嵌套块）。 */
+/** 取某选择器的规则体（本组选择器都没有嵌套块）。 */
 function ruleBody(css, selector) {
   const at = css.indexOf(`${selector} {`)
   assert.ok(at >= 0, `注入的 CSS 里找不到 "${selector}" 规则`)
@@ -41,7 +25,7 @@ function ruleBody(css, selector) {
   return css.slice(open + 1, close)
 }
 
-const css = injectedCss()
+const css = buildStatsCss()
 const declaration = (body, property) => {
   const m = new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`, 'u').exec(body)
   return m ? m[1].trim() : null
@@ -80,10 +64,6 @@ describe('会话积分胶囊：与官方 StatsPills 的外观契约', () => {
       'calc(20px + var(--dsh-content-font-delta-secondary, 0px))',
       '行高要抄官方 .anchor 的 calc',
     )
-    assert.ok(
-      !/外层 \.root/u.test(source),
-      '过期注释要同步：官方外层类名已从 .root 改为 .anchor，别再写 .root',
-    )
   })
 
   it('⛔ font 简写必须排在 font-size / line-height 之前（否则会被重置回 inherit）', () => {
@@ -114,7 +94,7 @@ describe('会话积分胶囊：落点契约（rc.2 槽位 list entry，不再 DO
   it('组件根节点就是胶囊本身（`.dock` 的 flex 子项），顺序交给槽位 order', () => {
     assert.match(
       code,
-      /className="ccb-session-stats-pill"/u,
+      /className=\{CCB_CLASS\.statsPill\}/u,
       '胶囊按钮必须是组件自己的根节点，才能作为 .dock 的 flex 子项渲染',
     )
     assert.ok(

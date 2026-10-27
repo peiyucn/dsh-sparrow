@@ -11,8 +11,10 @@ import { CreditDialog } from './CreditDialog.js'
 import { MEASURE_STYLE, useCreditStatDialog } from './statDialog.js'
 import { fetchLocal } from './fetch-timeout.js'
 import { formatCredits } from './format.js'
+import { API_PREFIX } from '../constants.js'
+import { CCB_CLASS } from './styles.js'
 
-const TURN_USAGE_URL = '/api/codebuddy-credits/turn-usage'
+const TURN_USAGE_URL = `${API_PREFIX}/turn-usage`
 
 /** 每轮积分视图（host /turn-usage 响应）。 */
 export interface TurnUsageView {
@@ -89,14 +91,14 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
       <button
         ref={buttonRef}
         type="button"
-        className="ccb-turn-credit-trigger"
+        className={CCB_CLASS.turnTrigger}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={t('turnCredit.aria', { credit: formatCredits(usage.credit) })}
         onClick={toggle}
       >
         <CodeBuddyMark />
-        <span className="ccb-turn-credit-label">{t('turnCredit.label', { credit: formatCredits(usage.credit) })}</span>
+        <span className={CCB_CLASS.turnLabel}>{t('turnCredit.label', { credit: formatCredits(usage.credit) })}</span>
       </button>
       {open
         ? createPortal(
@@ -116,37 +118,4 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
         : null}
     </>
   )
-}
-
-let stylesInstalled = false
-
-/** 胶囊样式（对齐官方 TurnUsagePanel.module.css 的 .trigger 配方）。 */
-export function ensureTurnCreditStyles(): void {
-  if (stylesInstalled || typeof document === 'undefined') return
-  stylesInstalled = true
-  const style = document.createElement('style')
-  style.textContent = [
-    '.ccb-turn-credit-trigger {',
-    '  display: inline-flex; align-items: center; gap: 6px; min-width: 0;',
-    '  height: calc(28px + var(--dsh-content-font-delta, 0px));',
-    '  padding: 6px 8px; border: none; border-radius: 28px;',
-    '  background: transparent; color: var(--dsw-alias-label-tertiary);',
-    '  font-size: var(--dsh-content-font-size-secondary, 13px);',
-    '  font-variant-numeric: tabular-nums;',
-    '  line-height: calc(24px + var(--dsh-content-font-delta, 0px));',
-    '  white-space: nowrap; cursor: pointer;',
-    '}',
-    '.ccb-turn-credit-trigger svg {',
-    '  width: calc(15px + var(--dsh-content-font-delta, 0px)); height: calc(15px + var(--dsh-content-font-delta, 0px)); flex: none;',
-    '}',
-    '.ccb-turn-credit-trigger:hover, .ccb-turn-credit-trigger[aria-expanded="true"] {',
-    '  background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary);',
-    '}',
-    '.ccb-turn-credit-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }',
-    '@media (max-width: 480px) {',
-    '  .ccb-turn-credit-trigger { justify-content: center; width: calc(28px + var(--dsh-content-font-delta, 0px)); padding: 6px; }',
-    '  .ccb-turn-credit-label { display: none; }',
-    '}',
-  ].join('\n')
-  document.head.append(style)
 }

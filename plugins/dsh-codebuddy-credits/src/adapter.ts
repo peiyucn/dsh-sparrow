@@ -20,19 +20,10 @@ import type {
   ToolSchema,
 } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import { BASE_URL, effortName, requestHeaders } from './catalog.js'
-import { DEFAULT_CONTEXT_WINDOW, DISPLAY_NAME } from './constants.js'
+import { effortName, requestHeaders } from './catalog.js'
+import { BASE_URL, DEFAULT_CONTEXT_WINDOW, DISPLAY_NAME } from './constants.js'
 import { stripChannelFingerprints } from './fingerprints.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
-
-/** 单次调用的积分回调（credit 为服务端计费值，DSH 的 TokenUsage 无此字段）。 */
-export interface CodeBuddyUsage {
-  tokens: TokenUsage
-  credit?: number
-  model: string
-  sessionId?: string
-  signal?: AbortSignal
-}
 
 /** 图片字节读取回调（附件 seam）：返回媒体类型与原始字节，供 data URL 序列化。 */
 export type CodeBuddyReadImage = (
@@ -48,7 +39,6 @@ export interface CodeBuddyAdapterOptions {
   account(): { userId?: string; enterpriseId?: string } | undefined
   /** 流式读取空闲超时（毫秒）。 */
   streamIdleTimeoutMs: number
-  onUsage?: (usage: CodeBuddyUsage) => void
   /** 宿主读取本适配器模型目录时的回调（模型选择器建目录触发），插件侧在此做节流后台刷新。 */
   onCatalogRead?: () => void
   /** 图片字节读取（官方附件 seam）；未配置时带图请求以明确错误失败。 */
@@ -411,7 +401,6 @@ export class CodeBuddyAdapter extends LlmAdapter {
     const toolNameByIndex = new Map<number, string>()
     const toolArgsByIndex = new Map<number, string>()
     let usageSent = false
-    let usageReported = false
     let finishSent = false
 
     const openBlock = (index: number, blockType: 'reasoning' | 'text' | 'tool-call'): void => {
@@ -504,22 +493,10 @@ export class CodeBuddyAdapter extends LlmAdapter {
               })
             }
             if (frame.usage !== null && typeof frame.usage === 'object' && frame.usage !== undefined) {
-              const { tokens, credit } = mapUsage(frame.usage as Record<string, unknown>)
+              const { tokens } = mapUsage(frame.usage as Record<string, unknown>)
               if (!usageSent) {
                 chunks.push({ type: 'usage', usage: tokens })
                 usageSent = true
-              }
-              // usage 帧可能先于终帧单独到达（终帧又带一份）：记账回调只发一次，
-              // 避免同一调用重复计入积分。
-              if (!usageReported) {
-                usageReported = true
-                this.config.onUsage?.({
-                  tokens,
-                  ...(credit === undefined ? {} : { credit }),
-                  model: options.model,
-                  ...(typeof options.sessionId === 'string' ? { sessionId: options.sessionId } : {}),
-                  ...(options.signal === undefined ? {} : { signal: options.signal }),
-                })
               }
             }
             const finish = mapFinish(reason)
@@ -533,22 +510,12 @@ export class CodeBuddyAdapter extends LlmAdapter {
             })
             finishSent = true
           } else if (frame.usage !== null && typeof frame.usage === 'object' && frame.usage !== undefined) {
-            // 尾随 usage 帧（终帧之后到达）：块已收尾，只补记账，不再向流里补发 usage
-            // 块——finish 之后再推块违反消费端契约。
-            const { tokens, credit } = mapUsage(frame.usage as Record<string, unknown>)
+            // 尾随 usage 帧（终帧之后到达）：块已收尾，不再向流里补发 usage 块——
+            // finish 之后再推块违反消费端契约。
+            const { tokens } = mapUsage(frame.usage as Record<string, unknown>)
             if (!usageSent && !finishSent) {
               chunks.push({ type: 'usage', usage: tokens })
               usageSent = true
-            }
-            if (!usageReported) {
-              usageReported = true
-              this.config.onUsage?.({
-                tokens,
-                ...(credit === undefined ? {} : { credit }),
-                model: options.model,
-                ...(typeof options.sessionId === 'string' ? { sessionId: options.sessionId } : {}),
-                ...(options.signal === undefined ? {} : { signal: options.signal }),
-              })
             }
           }
           for (const chunk of chunks.splice(0)) yield chunk

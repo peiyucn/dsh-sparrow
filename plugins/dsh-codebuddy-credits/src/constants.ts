@@ -5,11 +5,23 @@
  * 与插件 `name`、客户端 provider 卡片槽位 key 必须**三者一致**（卡片按 provider 行的 settingsNs 匹配、
  * 模型发现按同一 key 注册），`test/config.test.mjs` 有对应守卫。
  */
-export const NS = 'llm-codebuddy-credits'
-/** DSH provider 路由 key，也是模型条目与凭据配置的锚点（client 端 model-facts.ts 的 PROVIDER_ID 必须与此一致）。 */
-export const PROVIDER = 'codebuddy-credits'
+export const SETTINGS_NAMESPACE = 'llm-codebuddy-credits'
+/** DSH provider 路由 key，也是模型条目与凭据配置的锚点（host / client 两半共用这一份）。 */
+export const PROVIDER_ID = 'codebuddy-credits'
 /** 模型选择器与设置页显示的 provider 名（内部 ID 保持小写连字符，仅展示名品牌化）。 */
 export const DISPLAY_NAME = 'CodeBuddy Credits'
+/** 客户端词典命名空间（各槽位注册时引用）。 */
+export const LOCALE_NAMESPACE = 'codebuddy-credits'
+/** 插件自有 HTTP 路由前缀；比官方 `/api` 长，故本插件必须自带信任栅栏（见 src/trust.ts）。 */
+export const API_PREFIX = `/api/${PROVIDER_ID}`
+/** 会话积分投影单元的 key（host-only；形状一变必须同步 bump stateVersion）。 */
+export const CREDIT_PROJECTION_KEY = 'codebuddyCredits'
+/** 客户端样式表的标记选择器：统一注入一次，HMR / 重载时复用同一 <style>。 */
+export const STYLE_SELECTOR = 'style[data-dsh-codebuddy-credits]'
+/** 顶栏品牌标字号（px）：两种形态共用，样式表里的宽度也由它派生。 */
+export const MARK_FONT_PX = 18
+/** 顶栏窄化阈值（容器宽 px）：容器 ≤ 它时只剩方标；656 为实测定值，改它必须重跑量测。 */
+export const MARK_COLLAPSE_PX = 656
 /**
  * 凭据环境变量名；API key 只经 ctx.credentials 解析，绝不落盘到设置文件。
  * 必须等于官方派生名 deriveKeyRef('codebuddy-credits')，否则行头凭据圆点与官方「移除」流程失效。

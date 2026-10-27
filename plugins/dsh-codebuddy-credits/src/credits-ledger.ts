@@ -5,6 +5,7 @@
  */
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { PROVIDER_ID } from './constants.js'
 
 export interface CreditEntry {
   turn: number
@@ -36,9 +37,6 @@ export interface CreditLedger {
   /** 条目表（键 = 事件 seq；调用方不应依赖其顺序）。 */
   readonly entries: ReadonlyMap<string, CreditEntry>
 }
-
-/** 本 provider 的路由 id —— 与 constants.PROVIDER 一致（内联避免循环依赖）。 */
-const PROVIDER_ID = 'codebuddy-credits'
 
 /** 事件里 credit 的取数形状（只声明用到的字段，不耦合上游完整类型）。 */
 interface SourceLike {

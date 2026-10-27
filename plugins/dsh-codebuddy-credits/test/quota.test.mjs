@@ -9,7 +9,7 @@ import { QUOTA_URL } from '../lib/constants.js'
 const originalFetch = globalThis.fetch
 
 describe('fetchQuota', () => {
-  it('解析实测配额形状（credit/limitNum/周期时间，剩余 = 额度 - 已用）', async () => {
+  it('解析实测配额形状（credit/limitNum/重置时间，剩余 = 额度 - 已用）', async () => {
     globalThis.fetch = async (url, init) => {
       assert.equal(String(url), QUOTA_URL)
       assert.equal(init.method, 'POST')
@@ -32,8 +32,6 @@ describe('fetchQuota', () => {
         used: 123.5,
         limit: 2000,
         remaining: 1876.5,
-        cycleStart: '2026-09-01 00:00:00',
-        cycleEnd: '2026-09-30 23:59:59',
         resetAt: '2026-10-01 00:00:00',
       })
     } finally {

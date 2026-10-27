@@ -16,8 +16,10 @@ import { CreditDialog } from './CreditDialog.js'
 import { MEASURE_STYLE, useCreditStatDialog } from './statDialog.js'
 import { fetchLocal } from './fetch-timeout.js'
 import { formatCredits } from './format.js'
+import { API_PREFIX } from '../constants.js'
+import { CCB_CLASS } from './styles.js'
 
-const SESSION_USAGE_URL = '/api/codebuddy-credits/session-usage'
+const SESSION_USAGE_URL = `${API_PREFIX}/session-usage`
 /** 流式每步都变，去抖合并成一次本地查询。 */
 const REFRESH_DEBOUNCE_MS = 800
 
@@ -85,7 +87,7 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
           <button
             ref={buttonRef}
             type="button"
-            className="ccb-session-stats-pill"
+            className={CCB_CLASS.statsPill}
             aria-haspopup="dialog"
             aria-expanded={open}
             aria-label={t('stats.sessionCreditsAria', {
@@ -95,7 +97,7 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
             onClick={toggle}
           >
             <CodeBuddyMark />
-            <span className="ccb-session-stats-label">
+            <span className={CCB_CLASS.statsLabel}>
               {t('stats.sessionCredits', {
                 credit: formatCredits(usage.credit),
                 calls: String(usage.calls),
@@ -122,43 +124,4 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
         : null}
     </>
   )
-}
-
-let stylesInstalled = false
-
-/** 官方 `.pill` 圆角是紧凑控件档 R8（上游 `ui-chat/src/client/chat/StatsPills.module.css:21`；999px 是旧口径）。 */
-const PILL_RADIUS = 'var(--dsw-radius-sm)'
-
-/** 官方字号/行高设在外层 `.anchor`（`.pill` 上不设），我们不在其中、`font: inherit` 会大一档，故照抄。 */
-const PILL_FONT_SIZE = 'calc(var(--dsh-content-font-size-secondary, 13px) - 1px)'
-const PILL_LINE_HEIGHT = 'calc(20px + var(--dsh-content-font-delta-secondary, 0px))'
-
-/** 逐条对齐官方 `.anchor` + `.pill`（紧凑控件圆角、tertiary 文案、hover 提亮、14px 图标、不自留外边距）。 */
-export function ensureStatsStyles(): void {
-  if (stylesInstalled || typeof document === 'undefined') return
-  stylesInstalled = true
-  const style = document.createElement('style')
-  style.textContent = [
-    '.ccb-session-stats-pill {',
-    '  display: inline-flex; align-items: center; gap: 6px;',
-    '  box-sizing: border-box; max-width: 100%;',
-    '  padding: 1px 8px; border: none;',
-    `  border-radius: ${PILL_RADIUS};`,
-    '  background: transparent; color: var(--dsw-alias-label-tertiary);',
-    '  font: inherit; font-variant-numeric: tabular-nums;',
-    `  font-size: ${PILL_FONT_SIZE};`,
-    `  line-height: ${PILL_LINE_HEIGHT};`,
-    '  white-space: nowrap; cursor: pointer;',
-    '}',
-    '.ccb-session-stats-pill svg {',
-    '  width: 14px; height: 14px; flex: none;',
-    '}',
-    '.ccb-session-stats-pill:hover, .ccb-session-stats-pill[aria-expanded="true"] {',
-    '  background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary);',
-    '}',
-    '.ccb-session-stats-label {',
-    '  min-width: 0; overflow: hidden; text-overflow: ellipsis;',
-    '}',
-  ].join('\n')
-  document.head.append(style)
 }

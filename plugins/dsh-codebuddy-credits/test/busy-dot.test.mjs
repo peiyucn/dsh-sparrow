@@ -5,12 +5,13 @@ import { describe, it } from 'node:test'
 
 /**
  * 钉的契约：加载态一律走官方转圈（`StateDot state="ongoing"`），loading 文案只作
- * `aria-label`，不得再当可见文本渲染。本插件无 client 侧 DOM 测试环境，故按源码结构断言。
+ * `aria-label`，不得再当可见文本渲染。本插件无 client 侧 DOM 测试环境，故按源码结构断言；
+ * 样式已收进 styles.ts（`.ccb-busy-dot`）。
  */
 const CLIENT = new URL('../src/client/', import.meta.url)
 const read = (name) => readFile(new URL(name, CLIENT), 'utf8')
 
-/** 三处 loading 文案的调用点（文件 → 文案键）。 */
+/** 两处 loading 文案的调用点（文件 → 文案键）。 */
 const TEXT_LOADING_SITES = [
   ['CodeBuddyCreditsCard.tsx', '\'picker.trigger.loading\''],
   ['CodeBuddyCreditsIndicator.tsx', '\'indicator.loading\''],
@@ -26,23 +27,25 @@ describe('codebuddy-credits：加载态只给转圈、不给纯文字', () => {
     assert.match(src, /aria-label=\{label\}/u, '文案挂在 aria-label 上（读屏器仍会念）')
   })
 
-  it('⛔ 三处 loading 不得再作为可见文本渲染（必须包在 BusyDot 里）', async () => {
+  it('⛔ 两处 loading 不得再作为可见文本渲染（必须包在 BusyDot 里）', async () => {
     for (const [file, key] of TEXT_LOADING_SITES) {
       const src = await read(file)
       // 允许文案键作 label 参数，但不得出现在标签体（`>…{t(…loading)}…<`）当可见文本
       const asVisibleText = new RegExp(`>[^<]*\\{\\s*t\\(\\s*${key.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}\\s*\\)`, 'u')
       assert.ok(!asVisibleText.test(src), `${file} 里 ${key} 又被当成可见文字渲染了（应改为 <BusyDot label={…} />）`)
-      assert.ok(src.includes(`<BusyDot label={t(${key})}`) || src.includes(`<BusyDot label={t(${key})}`),
+      assert.ok(src.includes(`<BusyDot label={t(${key})}`),
         `${file} 应该用 <BusyDot label={t(${key})} /> 呈现加载态`)
     }
   })
 
   it('⛔ 不得为了转圈去覆盖官方配色（官方 .spinner 自带中性灰）', async () => {
     const src = await read('BusyDot.tsx')
-    // style 只许传布局，不得覆盖 color / background
-    const styleBlock = /style=\{\{([\s\S]*?)\}\}/u.exec(src)
-    assert.ok(styleBlock !== null, 'BusyDot 的 style 找不到')
-    assert.ok(!/\bcolor\s*:/u.test(styleBlock[1]), 'BusyDot 不应覆盖 color（官方 .spinner 自带 --dsw-alias-label-tertiary）')
-    assert.ok(!/\bbackground/u.test(styleBlock[1]), 'BusyDot 不应加背景')
+    // BusyDot 只接 className，静态样式只许布局，不得覆盖 color / background
+    assert.ok(!/style=/u.test(src), 'BusyDot 不得再接 inline style（静态样式进 styles.ts）')
+    const styles = await read('styles.ts')
+    const block = /\.ccb-busy-dot \{([^}]*)\}/u.exec(styles)
+    assert.ok(block !== null, 'styles.ts 里缺 .ccb-busy-dot 规则')
+    assert.ok(!/\bcolor\s*:/u.test(block[1]), '不得给加载态覆盖 color（官方 .spinner 自带 --dsw-alias-label-tertiary）')
+    assert.ok(!/\bbackground/u.test(block[1]), '不得给加载态加背景')
   })
 })

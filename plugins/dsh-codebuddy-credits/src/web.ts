@@ -8,9 +8,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { CodeBuddyModelFacts } from './catalog.js'
 import type { QuotaStatus } from './quota.js'
+import { API_PREFIX, SETTINGS_NAMESPACE } from './constants.js'
 import { isTrustedPluginRequest, officialTrustedHosts } from './trust.js'
 
-const PREFIX = '/api/codebuddy-credits'
+const PREFIX = API_PREFIX
 const MAX_BODY_BYTES = 16 * 1024
 
 /** 账号快照（展示用）；enterpriseUserName / nickname 来自 /v2/accounts。 */
@@ -31,7 +32,6 @@ export interface ModelFactView {
   /** 原生视觉（supportsImages）。 */
   vision: boolean
   contextWindow: number
-  maxTokens: number
   /** 服务端模型描述（descriptionZh ?? descriptionEn）。 */
   description?: string
   /** 思考档位 id（含 off），无推理能力时缺省。 */
@@ -84,7 +84,6 @@ export function toModelFactView(model: CodeBuddyModelFacts): ModelFactView {
     ...(model.credits === undefined ? {} : { credits: model.credits }),
     vision: model.input.includes('image'),
     contextWindow: model.contextWindow,
-    maxTokens: model.maxTokens,
     ...(model.description === undefined ? {} : { description: model.description }),
     ...(model.reasoning && model.thinkingLevelMap !== undefined
       ? { efforts: Object.keys(model.thinkingLevelMap) }
@@ -101,23 +100,24 @@ function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   res.end(body)
 }
 
+/**
+ * 读并解析 JSON 请求体；上限按**字节**而不是字符串长度算 —— `Content-Length` 与内存占用都是字节，
+ * 多字节正文按 `.length` 判会把「已超限的请求」当成合法。
+ */
 async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   let raw = ''
+  let bytes = 0
   for await (const chunk of req) {
-    raw += String(chunk)
-    if (raw.length > MAX_BODY_BYTES) throw new Error('请求体过大')
+    const text = String(chunk)
+    raw += text
+    bytes += Buffer.byteLength(text)
+    if (bytes > MAX_BODY_BYTES) throw new Error('请求体过大')
   }
   if (!raw.trim()) return {}
   const parsed = JSON.parse(raw) as unknown
   return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
     ? parsed as Record<string, unknown>
     : {}
-}
-
-/** 仅接受本机回环来源（DSH 页面与宿主同源）。 */
-function localOnly(req: IncomingMessage): boolean {
-  const address = req.socket.remoteAddress
-  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1'
 }
 
 export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared): void {
@@ -129,13 +129,10 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
         const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
         try {
           // 必须在本路由任何分发与读体之前：本前缀比官方 /api 长（「前缀最长者胜」），请求走不到官方栅栏。
-          // 信任面在请求期读官方 webStartup.trustedHosts（rc.2 起；旧宿主回退 webRuntime）；localOnly 拦不住 rebinding，两道都留。
+          // 信任栅栏已覆盖回环与官方 LAN 信任面（webStartup.trustedHosts + webServer 绑定地址），
+          // 故不再额外拒绝非回环 socket —— LAN 部署与 CHANGELOG 0.2.1-rc.2 的承诺一致。
           if (!isTrustedPluginRequest(req.headers, officialTrustedHosts(ctx))) {
             sendJson(res, 403, { error: '拒绝跨站来源的请求' })
-            return
-          }
-          if (!localOnly(req)) {
-            sendJson(res, 403, { error: '只允许从本机 DSH 页面访问' })
             return
           }
           // 状态接口保持本地毫秒级：不夹带配额请求（额度卡图标依赖它），配额走 /quota。
@@ -239,6 +236,6 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
           sendJson(res, 400, { error: error instanceof Error ? error.message : '请求处理失败' })
         }
       },
-    }), 'llm-codebuddy-credits: web routes')
+    }), `${SETTINGS_NAMESPACE}: web routes`)
   })
 }

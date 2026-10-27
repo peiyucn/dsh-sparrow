@@ -4,8 +4,9 @@
  * （乐观更新 + 广播），选择器另订阅 MAX_MODE_CHANGED_EVENT 跨组件联动。
  */
 
+import { API_PREFIX } from '../constants.js'
 import { fetchLocal } from './fetch-timeout.js'
-const MAX_MODE_URL = '/api/codebuddy-credits/max-mode'
+const MAX_MODE_URL = `${API_PREFIX}/max-mode`
 /** Max 模式变化的窗口事件：选择器跨组件树联动用。 */
 export const MAX_MODE_CHANGED_EVENT = 'codebuddy-credits-max-mode-changed'
 

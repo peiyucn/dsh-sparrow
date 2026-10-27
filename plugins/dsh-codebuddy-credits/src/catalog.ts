@@ -7,14 +7,12 @@
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-llm'
 import {
-  BASE_URL,
   CLIENT_NAME,
   CONFIG_URL,
   DEFAULT_CONTEXT_WINDOW,
   DEFAULT_MAX_TOKENS,
   MODEL_DISCOVERY_TIMEOUT_MS,
   PRODUCT_HEADER,
-  PROVIDER,
   REQUEST_USER_AGENT,
 } from './constants.js'
 
@@ -284,5 +282,3 @@ export async function discoverCodeBuddyModels(
 ): Promise<readonly LlmDiscoveredModel[]> {
   return toDiscovered(await fetchCodeBuddyModels(apiKey, account, signal))
 }
-
-export { BASE_URL, PROVIDER }

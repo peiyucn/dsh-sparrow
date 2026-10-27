@@ -2,18 +2,16 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
+import { MARK_COLLAPSE_PX, MARK_FONT_PX } from '../lib/constants.js'
+import { buildIndicatorCss } from '../lib/client/styles.js'
 
 /**
- * 顶栏 CodeBuddy 标记的**窄化契约**：读源码断言（本插件无 client DOM 测试环境）。
+ * 顶栏 CodeBuddy 标记的**窄化契约**：组件结构读源码、CSS 读 styles.ts 的构建函数
+ * （本插件无 client DOM 测试环境）。
  */
 const SOURCE = new URL('../src/client/CodeBuddyCreditsIndicator.tsx', import.meta.url)
 const source = await readFile(SOURCE, 'utf8')
-
-function numberConst(name) {
-  const m = new RegExp(`const\\s+${name}\\s*=\\s*([\\d.]+)`, 'u').exec(source)
-  assert.ok(m, `找不到常量 ${name}`)
-  return Number(m[1])
-}
+const styles = buildIndicatorCss()
 
 function svgConst(name) {
   const line = source.split(/\r?\n/u).find(l => l.includes(`const ${name} =`))
@@ -24,18 +22,10 @@ function svgConst(name) {
   return line.slice(start + 1, end)
 }
 
-function styleArrayText() {
-  const at = source.indexOf('style.textContent = [')
-  assert.ok(at >= 0, '找不到 style.textContent 数组')
-  const end = source.indexOf("].join('\\n')", at)
-  assert.ok(end > at, '找不到 .join 收尾')
-  return source.slice(at, end)
-}
-
 describe('CodeBuddy 顶栏标记：窄化（容器查询）', () => {
   it('两个形态 应该 都渲染（少一个 ⇒ 切过去是空白）', () => {
-    assert.match(source, /className="ccb-mark-wide"/u, '缺少宽档 span（ccb-mark-wide）')
-    assert.match(source, /className="ccb-mark-narrow"/u, '缺少窄档 span（ccb-mark-narrow）')
+    assert.match(source, /className=\{CCB_CLASS\.markWide\}/u, '缺少宽档 span（CCB_CLASS.markWide）')
+    assert.match(source, /className=\{CCB_CLASS\.markNarrow\}/u, '缺少窄档 span（CCB_CLASS.markNarrow）')
     // 必须注入**逐注入点作用域化**后的 svg（mark-ids.ts 的 scopeMarkSvg）：同文档多份标
     // 若共用写死的渐变 id，不可见那份先被解析 ⇒ 渐变方底不画（浅色下像「logo 没反色」）。
     const trig = source.slice(source.indexOf('const triggerButton'), source.indexOf('const trigger ='))
@@ -45,14 +35,14 @@ describe('CodeBuddy 顶栏标记：窄化（容器查询）', () => {
       '不得直接注入未作用域化的原始 SVG 常量（多份同 id ⇒ 渐变解析到不可见定义 ⇒ 浅色下不出图）')
   })
 
-  it('⛔ JSX 里 不得 写内联 display —— 会压死 @container 的 display:none', () => {
+  it('⛔ JSX 里 不得 给两个形态写内联 display —— 会压死 @container 的 display:none', () => {
     // React 的 style 是**内联**声明，优先级高于样式表 ⇒ 给这两个 span 写 display 会让
     // @container 里的 display:none 永远不生效（阈值到了、模式却不切）。
     const trig = source.slice(source.indexOf('const triggerButton'), source.indexOf('const trigger ='))
     /** @type {Array<[string, RegExp]>} */
     const patterns = [
-      ['宽档', /ccb-mark-wide[\s\S]{0,200}?\}\}/u],
-      ['窄档', /ccb-mark-narrow[\s\S]{0,200}?\}\}/u],
+      ['宽档', /CCB_CLASS\.markWide[\s\S]{0,200}?\}\}/u],
+      ['窄档', /CCB_CLASS\.markNarrow[\s\S]{0,200}?\}\}/u],
     ]
     for (const [name, re] of patterns) {
       const block = re.exec(trig)
@@ -63,8 +53,7 @@ describe('CodeBuddy 顶栏标记：窄化（容器查询）', () => {
   })
 
   it('机制 必须是 @container，且锚在**匿名**容器上（对齐官方 team 按钮）', () => {
-    const styles = styleArrayText()
-    assert.match(styles, /@container \(max-width: \$\{MARK_COLLAPSE_PX\}px\)/u,
+    assert.ok(styles.includes(`@container (max-width: ${MARK_COLLAPSE_PX}px)`),
       '必须用容器查询、阈值取 MARK_COLLAPSE_PX（与官方 TeamAction 同款机制）')
     // 匿名容器：不得写 container-name（官方 .titleRow 是匿名的，写名字会解析不到）。
     assert.ok(!/container-name/u.test(styles), '不得给容器起名（官方 .titleRow 是匿名容器）')
@@ -79,7 +68,6 @@ describe('CodeBuddy 顶栏标记：窄化（容器查询）', () => {
 
   it('窄档应该 顺带收内边距（方标是方形，8px 占比偏大）', () => {
     // 方标是方形，8px 内边距占比偏大 ⇒ 窄档收到 5px。
-    const styles = styleArrayText()
     const at = styles.indexOf('@container')
     const containerBlock = styles.slice(at)
     assert.match(containerBlock, /\.ccb-indicator-button \{ padding: 0 5px; \}/u,
@@ -122,14 +110,17 @@ describe('CodeBuddy 顶栏标记：窄化（容器查询）', () => {
       '必须 import scopeMarkSvg（纯函数与用途分离，便于单测）')
   })
 
-  it('阈值 应该 落在实测定出的区间里，且两个形态共用一个数', () => {
-    const collapse = numberConst('MARK_COLLAPSE_PX')
+  it('阈值 / 字号 应该 来自 constants 单一真值，且两个形态共用一个数', () => {
     // 阈值须落在「≥656 不重叠 / ≤616 起被压」这条缝里：低于 616 会漏掉已被压的档，过高则过早丢字样。
-    assert.ok(collapse >= 616 && collapse <= 700,
-      `阈值应在实测定出的 616..700 之间，实际 ${collapse}`)
-    assert.equal(collapse, 656, '阈值锁定为实测定值 656（改它必须重跑 TEMP/cb10.mjs 那类量测）')
-    const styles = styleArrayText()
-    assert.ok(!/font-size:\s*\d+px/u.test(styles), '字号应由 MARK_FONT_PX 一处给出，不写死在样式表里')
+    assert.ok(MARK_COLLAPSE_PX >= 616 && MARK_COLLAPSE_PX <= 700,
+      `阈值应在实测定出的 616..700 之间，实际 ${MARK_COLLAPSE_PX}`)
+    assert.equal(MARK_COLLAPSE_PX, 656, '阈值锁定为实测定值 656（改它必须重跑量测）')
+    assert.equal(MARK_FONT_PX, 18, '顶栏品牌标字号锁定为 18px')
+    // 两个 span 都从同一个常量取字号；样式表不再写死商标字号。
+    const occurrences = [...source.matchAll(/fontSize: MARK_FONT_PX/gu)]
+    assert.equal(occurrences.length, 2, '宽档与窄档都应从 MARK_FONT_PX 取字号')
+    assert.ok(!/ccb-mark-(?:wide|narrow)\s*\{[^}]*font-size/u.test(styles),
+      '商标字号由 MARK_FONT_PX 一处给出，样式表不得写死')
   })
 
   it('⛔ hero 入口的 portal 容器 必须 落在 @container 上下文内（否则窄化恒不命中）', () => {

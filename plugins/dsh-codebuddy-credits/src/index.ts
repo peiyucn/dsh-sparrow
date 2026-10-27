@@ -19,16 +19,18 @@ import type {} from '@deepseek-ai/dsh-settings'
 import { CodeBuddyAdapter } from './adapter.js'
 import { discoverCodeBuddyModels, factsFromEntries, fetchCodeBuddyModels, requestHeaders } from './catalog.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
-import { assertCapabilities, hostSessionFormatVersion, unsupportedSessionFormatReason } from './compat.js'
+import { assertCapabilities, warnRegistrationFailure } from './compat.js'
+import { hostSessionFormatVersion, unsupportedSessionFormatReason } from './session-format.js'
 import { Config, keyRefs } from './config.js'
 import {
   ACCOUNT_FETCH_TIMEOUT_MS,
   ACCOUNTS_URL,
+  CREDIT_PROJECTION_KEY,
   DISPLAY_NAME,
   IMAGE_REQUEST_POLICY,
   MODEL_REFRESH_COOLDOWN_MS,
-  NS,
-  PROVIDER,
+  PROVIDER_ID,
+  SETTINGS_NAMESPACE,
   STREAM_IDLE_TIMEOUT_MS,
 } from './constants.js'
 import { fetchQuota } from './quota.js'
@@ -41,7 +43,7 @@ import {
 import type { CreditsProjectionState } from './credits-projection.js'
 import { createLedgerResolver } from './credits-source.js'
 
-export const name = 'llm-codebuddy-credits'
+export const name = SETTINGS_NAMESPACE
 /**
  * 硬依赖服务。`sessions` 是积分账本的数据源；漏在宿主侧声明会让 `ctx.sessions` 直接抛
  * 「cannot get property "sessions" without inject」（cordis 服务须经 inject 绑定到本插件 fiber）。
@@ -67,9 +69,11 @@ export interface CodeBuddyAccount {
 
 export function apply(ctx: Context, config: Config): void {
   // 宿主兼容自检（先于一切注册）：宿主缺这些面即自停用，而不是带病注册半个 provider。
+  // 探针只列**实际调用**的方法（registerConfigurableProviders / registerModelDiscovery 都是本插件的必需面）。
   assertCapabilities(ctx, name, [
     { name: 'llm.registerAdapter', ok: typeof (ctx.llm as { registerAdapter?: unknown } | undefined)?.registerAdapter === 'function' },
-    { name: 'llm.resolveModelInfo', ok: typeof (ctx.llm as { resolveModelInfo?: unknown } | undefined)?.resolveModelInfo === 'function' },
+    { name: 'llm.registerConfigurableProviders', ok: typeof (ctx.llm as { registerConfigurableProviders?: unknown } | undefined)?.registerConfigurableProviders === 'function' },
+    { name: 'llm.registerModelDiscovery', ok: typeof (ctx.llm as { registerModelDiscovery?: unknown } | undefined)?.registerModelDiscovery === 'function' },
     { name: 'sessions.get', ok: typeof (ctx.sessions as { get?: unknown } | undefined)?.get === 'function' },
   ])
   // 会话格式**软判定**：这是数据格式门而不是能力门（格式换代不改 API 形状，能力探测发现不了），
@@ -129,7 +133,7 @@ export function apply(ctx: Context, config: Config): void {
       if (registry === undefined) return undefined
       const session = ctx.sessions.get(SessionId(sessionId))
       if (session === undefined) return undefined
-      const state = registry.stateOf(session, 'codebuddyCredits')
+      const state = registry.stateOf(session, CREDIT_PROJECTION_KEY)
       // 未注册（或状态类型不认识）时降级：交给冷路径。
       if (state === undefined || state === null || typeof state !== 'object') return undefined
       return viewOfCreditsState(state as CreditsProjectionState)
@@ -156,8 +160,8 @@ export function apply(ctx: Context, config: Config): void {
   const ensureRoutes = (want: boolean): void => {
     if (want === registered) return
     if (want) {
-      if (registration === undefined) registration = ctx.llm.registerAdapter([PROVIDER], adapter)
-      else registration.replace([PROVIDER])
+      if (registration === undefined) registration = ctx.llm.registerAdapter([PROVIDER_ID], adapter)
+      else registration.replace([PROVIDER_ID])
       registered = true
     } else {
       if (registration !== undefined) {
@@ -219,8 +223,8 @@ export function apply(ctx: Context, config: Config): void {
     account: () => account,
     streamIdleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,
     maxMode: () => config.maxMode.get() === true,
-    // 不挂 onUsage：记账改由会话事件重放承担（credits-ledger）——适配器已把 credit 写进 finish 块，
-    // 这里再存一份只会重复且重启即失。
+    // 不在这里记账：credit 由适配器写进 finish 块的 replayState，积分从会话事件重放
+    // （credits-ledger）；这里再存一份只会重复且重启即失。
     onCatalogRead: () => {
       kickModelRefresh()
     },
@@ -287,7 +291,7 @@ export function apply(ctx: Context, config: Config): void {
       facts = next
       if (changed && registered && registration !== undefined) {
         // 同一 route 集重提交 = 一次 llm/adapters-updated：宿主重建模型目录、打开中的选择器拿到新列表。
-        registration.replace([PROVIDER])
+        registration.replace([PROVIDER_ID])
       }
     } catch (error) {
       ctx.logger.warn(`${name}: 后台模型目录刷新失败`)
@@ -310,7 +314,7 @@ export function apply(ctx: Context, config: Config): void {
     const changed = !sameFacts(facts, next)
     facts = next
     lastRefreshAttemptAt = Date.now()
-    if (changed && registered && registration !== undefined) registration.replace([PROVIDER])
+    if (changed && registered && registration !== undefined) registration.replace([PROVIDER_ID])
     if (!registered) ensureRoutes(true)
     return { changed, models: next }
   }
@@ -326,12 +330,21 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   // 目录条目始终注册：设置页 provider 行是 Key 的配置入口（client 在行上挂输入卡）。
-  ctx.llm.registerConfigurableProviders([
-    { provider: PROVIDER, displayName: DISPLAY_NAME, settingsNs: NS, settingsPath: [] },
-  ])
+  // 冲突（DUPLICATE_DIRECTORY）只告警跳过，不清理他插件；其余失败同样只记日志——apply 不得裸抛。
+  try {
+    ctx.llm.registerConfigurableProviders([
+      { provider: PROVIDER_ID, displayName: DISPLAY_NAME, settingsNs: SETTINGS_NAMESPACE, settingsPath: [] },
+    ])
+  } catch (error) {
+    warnRegistrationFailure(ctx, name, '设置页 provider 目录', error)
+  }
 
   // 启动：环境变量可见立即注册；凭据库的 Key 在异步检查命中后注册，并补拉账号与模型目录（best-effort）。
-  ensureRoutes(ambientKey())
+  try {
+    ensureRoutes(ambientKey())
+  } catch (error) {
+    warnRegistrationFailure(ctx, name, 'provider 路由', error)
+  }
   void (async () => {
     let key: string
     try {
@@ -367,19 +380,23 @@ export function apply(ctx: Context, config: Config): void {
     try {
       ensureRoutes(true)
     } catch (error) {
-      ctx.logger.warn(`${name}: route 注册失败`)
-      ctx.logger.warn(error)
+      warnRegistrationFailure(ctx, name, 'provider 路由', error)
     }
     void kickModelRefresh()
   })()
 
   // 模型发现：draft 请求自带凭据时直接用；否则回退到已配置的凭据。
-  ctx.llm.registerModelDiscovery(NS, async (request, signal) => {
-    const apiKey = typeof request.apiKey === 'string' && request.apiKey.length > 0
-      ? request.apiKey
-      : await resolveApiKey()
-    return discoverCodeBuddyModels(apiKey, account, signal)
-  })
+  // 冲突（DUPLICATE_DISCOVERY）只告警跳过；其余失败同样不裸抛。
+  try {
+    ctx.llm.registerModelDiscovery(SETTINGS_NAMESPACE, async (request, signal) => {
+      const apiKey = typeof request.apiKey === 'string' && request.apiKey.length > 0
+        ? request.apiKey
+        : await resolveApiKey()
+      return discoverCodeBuddyModels(apiKey, account, signal)
+    })
+  } catch (error) {
+    warnRegistrationFailure(ctx, name, '模型发现', error)
+  }
 
   // 设置卡片路由：Key 的保存、配额查询、状态。整节型 provider 的 settingsPath 为空，官方页面本就
   // 不提供「移除」，凭据清理由本插件的「清空 Key」承担（见 /remove-key）。
@@ -413,7 +430,7 @@ export function apply(ctx: Context, config: Config): void {
       }
       // 官方页面的凭据 join 按节根 apiKeyEnv 解析：把用户当前生效的引用物化到用户层
       // （apiKeyEnv 是 volatile 字段，设置写入只认 volatile 路径）。旧版遗留的 providers 子树不清理（见 boot 段）。
-      await settings.mutate(NS, [{ op: 'set', path: ['apiKeyEnv'], value: primary }])
+      await settings.mutate(SETTINGS_NAMESPACE, [{ op: 'set', path: ['apiKeyEnv'], value: primary }])
       ensureRoutes(true)
     },
     async reapply() {
@@ -502,8 +519,8 @@ export function apply(ctx: Context, config: Config): void {
       if (settings === undefined) {
         throw new LlmError(`${name}: 本组合没有设置服务，无法保存 Max 模式`, 'NO_SETTINGS_STORE')
       }
-      // maxMode 是 Config 里的 volatile 字段（命名空间 = 条目 id NS）；设置写入只认 volatile 路径。
-      await settings.mutate(NS, [{ op: 'set', path: ['maxMode'], value: enabled }])
+      // maxMode 是 Config 里的 volatile 字段（命名空间 = 条目 id SETTINGS_NAMESPACE）；设置写入只认 volatile 路径。
+      await settings.mutate(SETTINGS_NAMESPACE, [{ op: 'set', path: ['maxMode'], value: enabled }])
     },
   })
 

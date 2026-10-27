@@ -10,6 +10,7 @@ import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-session-projection/types'
 import { creditSampleOf } from './credits-ledger.js'
 import type { CreditEntry, CreditsView } from './credits-ledger.js'
+import { CREDIT_PROJECTION_KEY } from './constants.js'
 
 /** 按模型聚合的一行；独立于 `credits-ledger.ts` 的 `readonly` 形状——投影 state 必须可 `structuredClone`。 */
 export interface CreditsModelRow {
@@ -112,9 +113,9 @@ export function viewOfCreditsState(state: CreditsProjectionState): CreditsView {
 /** 注册到 `ctx.sessionProjections` 的单元定义。**host-only**（不带 `wire`）：积分只由本插件自己的 HTTP 路由读，
  * 不给客户端投影表新增跨包契约键；host-only 单元同样会被官方投影缓存 checkpoint。 */
 export const codebuddyCreditsProjectionDefinition = {
-  key: 'codebuddyCredits',
+  key: CREDIT_PROJECTION_KEY,
   stateVersion: 1,
   stateSchema: creditsProjectionStateSchema,
   init: () => emptyCreditsState(),
   apply: applyCreditsEvent,
-} satisfies ProjectionDefinition<'codebuddyCredits', CreditsProjectionState>
+} satisfies ProjectionDefinition<typeof CREDIT_PROJECTION_KEY, CreditsProjectionState>

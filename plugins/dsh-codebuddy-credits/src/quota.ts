@@ -13,9 +13,7 @@ export interface QuotaStatus {
   limit: number
   /** 剩余积分（= limit - used，下限 0）。 */
   remaining: number
-  /** 周期开始（服务端时区文案）。 */
-  cycleStart?: string
-  cycleEnd?: string
+  /** 周期重置时间（服务端时区文案；额度面板只展示到日）。 */
   resetAt?: string
 }
 
@@ -67,8 +65,6 @@ export async function fetchQuota(
     used,
     limit,
     remaining: Math.max(0, limit - used),
-    ...(textOr(data.cycleStartTime) === undefined ? {} : { cycleStart: textOr(data.cycleStartTime) as string }),
-    ...(textOr(data.cycleEndTime) === undefined ? {} : { cycleEnd: textOr(data.cycleEndTime) as string }),
     ...(textOr(data.cycleResetTime) === undefined ? {} : { resetAt: textOr(data.cycleResetTime) as string }),
   }
 }
