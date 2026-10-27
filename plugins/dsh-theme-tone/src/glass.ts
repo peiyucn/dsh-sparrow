@@ -139,7 +139,9 @@ ${P} ${SEAT} :is([data-queue-dock], [data-goal-bar])::after {
   /* 只外扩一个 side-clearance（停靠卡比输入框窄的那点差），不做出屏的大外扩 */
   left: calc(-1 * var(--dsh-composer-side-clearance, 16px));
   right: calc(-1 * var(--dsh-composer-side-clearance, 16px));
-  height: calc(var(--dsh-composer-stack-gap, 6px) + 20px);
+  /* 向上 20px 填本卡底部圆角；向下再延 24px，藏到下一张卡 / 输入框材质之下，
+     只从它们顶部圆角缺口透出来填住（owner 反复确认的「边缘漏一点点文字」）。 */
+  height: calc(var(--dsh-composer-stack-gap, 6px) + 20px + 24px);
   z-index: -1;
   pointer-events: none;
   background-color: var(--dsw-alias-bg-base);
@@ -181,7 +183,8 @@ ${P} ${SEAT} [data-testid='todo-panel']::after {
   top: 100%;
   left: calc(-1 * var(--dsh-composer-side-clearance, 16px));
   right: calc(-1 * var(--dsh-composer-side-clearance, 16px));
-  height: var(--dsh-composer-stack-gap, 6px);
+  /* 一个 gap + 向下 24px（藏到下一张卡材质下，填它顶部圆角缺口） */
+  height: calc(var(--dsh-composer-stack-gap, 6px) + 24px);
   z-index: -1;
   pointer-events: none;
   background-color: var(--dsw-alias-bg-base);
