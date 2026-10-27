@@ -24,7 +24,7 @@ import {
   type ArchiveConfig, type ArchiveSidecar, type ArchiveSubagentSidecar, type HeaderFactsStore, type SessionFacts,
   type SessionTreeHeader, type SessionTreeNode, type SubagentIdentityValue,
 } from './archive.js'
-import { assertHostCompatible, unsupportedStoredFormatReason } from './compat.js'
+import { assertCapabilities, assertHostCompatible, unsupportedStoredFormatReason } from './compat.js'
 import { isTrustedPluginRequest, officialTrustedHosts } from './trust.js'
 
 export const name = 'dsh-archive-manage'
@@ -1029,6 +1029,15 @@ export function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig>> = {
   // 宿主兼容自检（根 AGENTS《插件与宿主兼容》，先于一切注册）：会话格式不认识就整个停用。
   // 本插件按目录移动/删除会话文件——宁可停用，也不要在不认识的格式上执行不可逆操作。
   assertHostCompatible(ctx, name)
+  assertCapabilities(ctx, name, [
+    { name: 'webServer.register', ok: typeof ctx.webServer?.register === 'function' },
+    { name: 'sessions', ok: ctx.sessions !== undefined },
+    { name: 'agents', ok: ctx.agents !== undefined },
+    { name: 'workspaceRegistry', ok: ctx.workspaceRegistry !== undefined },
+    { name: 'sessionPersistence.locate', ok: typeof (ctx.sessionPersistence as unknown as { locate?: unknown }).locate === 'function' },
+    { name: 'sessionQuery', ok: ctx.sessionQuery !== undefined },
+    { name: 'storageDomain', ok: ctx.storageDomain !== undefined },
+  ])
   const settings = normalizeArchiveConfig(config)
   // 私有 seam 依赖：官方 WorkspaceRegistry 的 enqueueOperation/requireState/setState（AGENTS 三档特例，2026-09-01）。
   const surface = assertRegistryMutationApi(ctx.workspaceRegistry)
