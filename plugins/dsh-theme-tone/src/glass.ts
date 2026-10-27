@@ -111,29 +111,69 @@ ${P} ${SEAT} [data-composer-card]::before {
 body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   box-shadow: ${RIM_LIGHT};
 }
-/* 停靠卡（todo / queue / goal）与输入框之间、以及多张停靠卡之间，都是 composerStack 的
-   --dsh-composer-stack-gap 缝隙。做法（owner 定案）：**在每个停靠卡下方画一条与「底色 + 打光」完全
-   一样的材质**，把透出来的正文盖住 —— 看起来就是背景本身，不加玻璃层、不动官方任何位置/尺寸。
-   * 画在每张停靠卡**下方**（top:100%）：覆盖「该卡与下一张卡 / 输入框之间」的所有缝，且不会在
-     第一张卡上方多画一条（那里是对话正文）。
-   * 精确对齐靠 background-attachment: fixed：固定背景的定位区就是视口,渐变里的 % 按视口解析，
-     与 .dsh-theme-tone 地面层逐像素同源。
-   * 各卡伪元素可用性：TodoPanel 根无伪元素；GoalBar / QueueDock 的材质在各自内容元素上，卡片根
-     的 ::after 空闲。 */
-${P} ${SEAT} :is([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]) {
+/* 停靠卡（todo / queue / goal）的缝隙分两类：
+   ① composerStack 里「卡与卡 / 卡与输入框」之间的 --dsh-composer-stack-gap 缝；
+   ② 每张卡自己的**底部圆角**：卡片盒内、圆角外是透明的，后面的正文会从这两个角漏出来
+      （owner 指出的「左下和右下」）。
+   做法（owner 定案，不改官方几何）：在停靠卡处/下方画「底色 + 打光」的重绘层挡住透出的正文，
+   放大不影响任何东西。
+   * queue / goal：卡片根（[data-queue-dock] / [data-goal-bar]）的 ::after 画大带子，向上延伸
+     20px 藏到卡片材质之下（只从底部圆角缺口透出来填住），向下覆盖所有 stack 缝隙；左右外扩。
+   * todo：卡片根自己就是材质（[data-testid='todo-panel']，自带 overflow:hidden + 16px 圆角），
+     用 ::before + 两个底部圆角遮罩只填圆角缺口；::after 覆盖它下方的缝隙。
+   * 精确对齐靠 background-attachment: fixed：固定背景定位区 = 视口，与 .dsh-theme-tone 地面层同源。 */
+${P} ${SEAT} :is([data-queue-dock], [data-goal-bar]) {
   position: relative;
   z-index: 0;
-  /* 停靠卡根元素带 border-radius + overflow: hidden（官方用它裁材质），会把「卡下方的补缝层」一起
-     裁掉 —— 必须放开裁剪，补缝层才画得出来。卡自己的圆角材质由它内部元素负责，不受影响。 */
+  /* 卡根带 overflow:hidden（官方裁材质），会连补缝层一起裁掉，必须放开 */
   overflow: visible;
 }
-${P} ${SEAT} :is([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar])::after {
+${P} ${SEAT} :is([data-queue-dock], [data-goal-bar])::after {
+  content: '';
+  position: absolute;
+  top: calc(100% - 20px);
+  left: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 128px));
+  right: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 128px));
+  height: calc(var(--dsh-composer-stack-gap, 6px) + 20px + 128px);
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--dsw-alias-bg-base);
+  background-image: ${BACKDROP_GRADIENTS};
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+${P} ${SEAT} [data-testid='todo-panel'] {
+  position: relative;
+  z-index: 0;
+  overflow: visible;
+}
+${P} ${SEAT} [data-testid='todo-panel']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--dsw-alias-bg-base);
+  background-image: ${BACKDROP_GRADIENTS};
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  -webkit-mask-image:
+    radial-gradient(circle 16px at 100% 0, transparent 15px, black 16px),
+    radial-gradient(circle 16px at 0 0, transparent 15px, black 16px);
+  -webkit-mask-size: 16px 16px, 16px 16px;
+  -webkit-mask-position: left bottom, right bottom;
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  mask-image:
+    radial-gradient(circle 16px at 100% 0, transparent 15px, black 16px),
+    radial-gradient(circle 16px at 0 0, transparent 15px, black 16px);
+  mask-size: 16px 16px, 16px 16px;
+  mask-position: left bottom, right bottom;
+  mask-repeat: no-repeat, no-repeat;
+}
+${P} ${SEAT} [data-testid='todo-panel']::after {
   content: '';
   position: absolute;
   top: 100%;
-  /* owner 定案：这条是「背景 + 打光」的重绘层，放大不影响任何东西，唯一作用是挡住后面透出来的
-     文字。左右各外扩 side-clearance + 128px、高度 = 官方 gap + 128px，把两侧与下方的圆角缺口一起盖住
-     （向下延伸的部分会被后画的输入框卡片 / 状态栏盖住）。 */
   left: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 128px));
   right: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 128px));
   height: calc(var(--dsh-composer-stack-gap, 6px) + 128px);

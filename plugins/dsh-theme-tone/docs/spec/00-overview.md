@@ -14,14 +14,17 @@
    放卡片 `::before`；卡片 `position: relative; z-index: 0` 自成层叠上下文（否则 `::before` 的
    `z-index:-1` 会逃出卡片 = 淡色框）；座位底部一小段「地面同源」带挡住卡片下方滚出的正文；卡片作用域内
    `--dsw-specific-selector: transparent`（「+」按钮让出实心底色）。
-   **停靠卡缝隙**：composerStack 里「停靠卡之间」「停靠卡与输入框之间」都是
-   `--dsh-composer-stack-gap`（当前 6px）的缝。做法（owner 定案）：**每张停靠卡（todo / queue / goal）
-   下方画一条与「底色 + 打光」完全一样的材质**，把透出来的正文盖住 —— 不加玻璃层、不动官方位置/尺寸。
-   条 = 各卡根元素的 `::after`（top: 100%，高度跟官方 gap）；左右各外扩一个 `--dsh-composer-side-clearance`
-   以盖住「停靠卡比输入框窄」留下的侧边漏条；精确对齐靠 `background-attachment: fixed`（固定背景
-   定位区 = 视口，渐变里的 % 按视口解析，与 `.dsh-theme-tone` 地面层逐像素同源）。
-   实测（无头）：todo 卡底 669 → 输入框顶 675，`::after` computed = top 36px / height 6px / 左右外扩 /
-   三段 fixed 渐变，缝隙读作背景。
+   **停靠卡缝隙 + 底部圆角缺口**：composerStack 里「卡与卡 / 卡与输入框」之间是
+   `--dsh-composer-stack-gap`；另外每张停靠卡自己的**底部圆角**在卡片盒内、圆角外透明，正文会从
+   「左下 / 右下」两个角漏出来。做法（owner 定案，不改官方几何）：在停靠卡处/下方画「底色 + 打光」的
+   重绘层把透出的正文挡住，放大不影响任何东西。
+   * queue / goal：卡根（`[data-queue-dock]` / `[data-goal-bar]`）的 `::after` 画大带子，向上延伸
+     20px 藏到卡片材质之下（只从底部圆角缺口透出来填住），向下覆盖所有 stack 缝隙；卡根放开
+     `overflow: visible`（官方用它裁材质，会连补缝层一起裁掉）。
+   * todo：卡根自己就是材质（`[data-testid='todo-panel']`，自带 `overflow:hidden` + 16px 圆角），
+     用 `::before` + 两个底部圆角**遮罩**只填圆角缺口；`::after` 覆盖它下方的缝隙。
+   * 精确对齐靠 `background-attachment: fixed`（固定背景定位区 = 视口，与 `.dsh-theme-tone` 地面层
+     逐像素同源）；左右各外扩 `--dsh-composer-side-clearance` + 128px、向下 128px。
 5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的两个
    盒子 ⇒ 带背后永远只有面板纯色。做法：可流式滚动的正文（markdown/text 文档预览、文件树）上提 76px、
    内容下移 76px（只改视觉位置），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；玻璃面挂在
@@ -96,6 +99,8 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 * 悬浮卡修复是唯一私有 seam（见 `docs/private-seams.md`），官方改类名后缀即静默失效（回退官方配色，不崩）。
 * 停靠卡缝隙补丁用 `[data-testid='todo-panel']` 识别 Todo 卡（官方无 data 语义锚点，只有 testid）；
   官方改 testid 时该补丁静默不命中，降级表现 = 缝隙回到无材质状态（不崩、不影响布局）。
+* Todo 卡根用 `overflow: visible` 覆盖官方 `overflow: hidden`（官方用它裁材质）：只为了让补缝层画得
+  出来，卡的圆角材质由自身 border-radius 维持，实测观感不变。
 * 停靠卡缝隙那层用了 `background-attachment: fixed`：**只在「有停靠卡」时存在、面积仅 6px 高**，
   是当前唯一能在任意位置的元素上精确复刻「底色 + 打光」的办法。代价是滚动/流式输出时这一小条会随
   视口重新栅格化；若实测有卡顿，再换回「运行期测量相位 + 显式 background-position」（旧方案的成熟做法）。

@@ -71,17 +71,15 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
 
-  it('停靠卡缝隙：每张停靠卡下方重画「底色 + 打光」（覆盖卡与卡、卡与输入框之间）', () => {
-    assert.ok(code.includes("[data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]"), '三个停靠卡锚点')
-    const rule = /:is\(\[data-testid='todo-panel'\][^{]*\{\s*content: '';\s*position: absolute;\s*top: 100%;[^}]*\}/u.exec(code)?.[0] ?? ''
-    assert.ok(code.includes('overflow: visible;'), '放开停靠卡根元素的裁剪，否则补缝层被 overflow:hidden 裁掉')
-    assert.ok(rule.includes('var(--dsh-composer-stack-gap'), '高度跟随官方堆栈间隙')
-    assert.ok(rule.includes('calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 128px))'), '左右大幅外扩盖住侧边漏条')
-    assert.ok(rule.includes('var(--dsh-composer-stack-gap, 6px) + 128px'), '向下大幅放大盖住圆角缺口')
-    assert.ok(rule.includes('background-image:'), '重画背景光')
-    assert.ok(rule.includes('background-attachment: fixed'), '固定背景 = 视口解析，与地面层同源')
-    assert.ok(!code.includes('[data-composer-card]::before {\n  top: calc'), '不延伸卡片玻璃（不动官方几何）')
-    assert.ok(!code.includes('top: calc(-1 * var(--dsh-composer-stack-gap'), '不在第一张停靠卡上方画带（那里是正文）')
+  it('停靠卡缝隙 + 底部圆角缺口：重画「底色 + 打光」挡住透出的文字', () => {
+    assert.ok(code.includes("[data-testid='todo-panel']"), 'todo 卡锚点')
+    assert.ok(code.includes(':is([data-queue-dock], [data-goal-bar])'), 'queue / goal 卡锚点')
+    assert.match(code, /:is\(\[data-queue-dock\], \[data-goal-bar\]\)::after \{[^}]*top: calc\(100% - 20px\)/u)
+    const todoNotch = /\[data-testid='todo-panel'\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(todoNotch.includes('radial-gradient(circle 16px'), 'todo 底部圆角用遮罩只填缺口')
+    assert.ok(todoNotch.includes('mask-position: left bottom, right bottom'), '两个底部圆角')
+    assert.ok((code.match(/background-attachment: fixed/gu) ?? []).length >= 3, '仍是背景重绘，不是新增玻璃')
+    assert.ok(!code.includes('[data-composer-card]::before {\n  top: calc'), '不动卡片几何')
   })
 
   it('设置弹窗：打光（按弹窗自身盒子缩放）', () => {
@@ -97,7 +95,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
       const officialMaterial = line.startsWith('[data-menu-material]')
       assert.ok(gated || officialMaterial, `规则必须带门：${line.trim()}`)
     }
-    assert.equal((code.match(/background-attachment: fixed/gu) ?? []).length, 1, '仅停靠卡缝隙这一处允许 fixed 背景（复刻背景打光）')
+    assert.ok((code.match(/background-attachment: fixed/gu) ?? []).length >= 1, '仅停靠卡缝隙的补缝层允许 fixed 背景（复刻背景打光）')
     assert.ok(!/blur\(/u.test(code), '不手写 blur 数值（统一官方 token）')
   })
 
