@@ -193,10 +193,10 @@ ${P} [data-shortcut-modal='settings'] {
 ${OBJECT_FIT_LIGHT}
 }
 
-/* ===== 菜单打开期间：冻结输入框玻璃（唯一能保住「无残影 + 平时完整玻璃」的做法） =====
+/* ===== 菜单打开期间：输入框去模糊 + 变实心（唯一能保住「无残影 + 平时完整玻璃」的做法） =====
    owner 实测：模型菜单「不透明实心」也照样闪 ⇒ 和菜单材质无关，是「上面出现新的合成浮层」时输入框的
    backdrop-filter 层被 Chromium 复用错位快照。所以官方菜单材质全部保持原样；只在菜单存在期间把输入框
-   玻璃冻结：撤掉 backdrop-filter，同时座位铺不透光光墙（否则正文会从卡片下透出来、看着乱）。光墙画的
+   玻璃冻结：撤掉 backdrop-filter 并改用实心底色，同时座位铺不透光光墙（否则正文会从卡片下透出来、看着乱）。光墙画的
    也是「光」，和正常态观感接近；菜单关闭立即恢复完整玻璃模糊。 */
 ${MENU_OPEN} ${SEAT}::before {
   content: '';
@@ -211,6 +211,8 @@ ${viewportLight('100% 100%')}
 }
 ${MENU_OPEN} ${SEAT} [data-composer-card]::before {
   backdrop-filter: none;
+  /* owner 定案：菜单打开期间输入框「去模糊 + 变实心」——直接用官方输入面 token 做实心底。 */
+  background-color: var(--dsw-specific-input-major);
 }
 ${MENU_OPEN} [data-phase='active'] [data-composer-seat]::after {
   display: none;

@@ -68,7 +68,9 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
 
   it('菜单打开期间冻结输入框玻璃（撤 blur + 座位光墙），菜单材质全部保持官方', () => {
     assert.ok(!/^\[data-menu-material\] \{/mu.test(code), '不改任何官方菜单材质')
-    assert.match(code, /:has\(> \[data-menu-material\]\)[^{]*\[data-composer-card\]::before \{[^}]*backdrop-filter: none;/u)
+    const frozen = /:has\(> \[data-menu-material\]\)[^{]*\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(frozen.includes('backdrop-filter: none'), '菜单打开期间去掉模糊')
+    assert.ok(frozen.includes('background-color: var(--dsw-specific-input-major)'), '菜单打开期间卡片变实心')
     assert.match(code, /:has\(> \[data-menu-material\]\)[^{]*\[data-composer-seat\]::before \{[^}]*background-image: radial-gradient\(/u)
     assert.match(code, /:has\(> \[data-menu-material\]\)[^{]*\[data-composer-seat\]::after \{\s*display: none;/u)
   })
