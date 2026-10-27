@@ -5,6 +5,7 @@ import { describe, it } from 'node:test'
 import { buildBackdropCss } from '../lib/backdrop.js'
 import { PLAIN_ATTR } from '../lib/constants.js'
 import {
+  GLASS_BLUR,
   GLASS_FILL_ALPHA,
   HEADER_HEIGHT_PX,
   SEAT_BAND_PX,
@@ -16,9 +17,11 @@ const backdropCss = buildBackdropCss()
 const code = css.replace(/\/\*[\s\S]*?\*\//gu, '')
 
 describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
-  it('三处玻璃共用同一个填充参数、同一个官方模糊 token（统一 + 通透）', () => {
+  it('三处玻璃共用同一个填充参数与同一个模糊参数（统一）', () => {
     assert.ok(GLASS_FILL_ALPHA < 0.5, '通透：填充不透明度低于一半')
-    assert.ok((code.match(/var\(--dsw-menu-backdrop-filter\)/gu) ?? []).length >= 3, '三处玻璃都用官方模糊 token')
+    const blurPx = Number(/blur\((\d+)px\)/u.exec(GLASS_BLUR)?.[1] ?? 0)
+    assert.ok(blurPx > 0 && blurPx < 40, '模糊低于官方 40px（降低模糊程度）')
+    assert.equal(code.split('backdrop-filter: ' + GLASS_BLUR).length - 1, 3, '三处玻璃都用同一个模糊参数')
     assert.ok((code.match(new RegExp(String(GLASS_FILL_ALPHA * 100) + '%', 'gu')) ?? []).length >= 3, '三处填充都引用同一个常量')
   })
 
@@ -28,7 +31,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.match(code, new RegExp(`margin: calc\\(${HEADER_HEIGHT_PX}px \\+ 2px\\)`, 'u'))
     assert.match(code, new RegExp(`\\[data-width-handle\\] \\{[^}]*top: ${HEADER_HEIGHT_PX}px`, 'u'))
     const header = new RegExp(`\\[data-slot='conversation\\.header'\\] > header::before \\{([^}]*)\\}`, 'u').exec(code)?.[1] ?? ''
-    assert.ok(header.includes('backdrop-filter: var(--dsw-menu-backdrop-filter)'), '顶栏玻璃用官方模糊 token')
+    assert.ok(header.includes('backdrop-filter: blur(20px) saturate(150%)'), '顶栏玻璃用统一模糊参数')
     assert.ok(header.includes(`color-mix(in srgb, var(--dsw-alias-bg-base) ${GLASS_FILL_ALPHA * 100}%`), '顶栏填充比例')
     assert.ok(header.includes('background-image: radial-gradient('), '顶栏必须自己画一遍地面光')
     assert.ok(header.includes('background-position: 100% 0'), '顶栏贴视口右上 ⇒ 与地面光同源')
@@ -43,7 +46,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色')
     assert.ok(!card.includes('backdrop-filter'), '卡片本体不得带模糊')
     const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(glass.includes('backdrop-filter: var(--dsw-menu-backdrop-filter)'), '输入框保留完整玻璃模糊')
+    assert.ok(glass.includes('backdrop-filter: blur(20px) saturate(150%)'), '输入框保留完整玻璃模糊')
     assert.ok(glass.includes('border-radius: inherit'))
     assert.ok(glass.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%`), '玻璃填充比例')
     assert.ok(glass.includes('box-shadow: inset 0 1px 2px'), '上缘高光')
@@ -66,7 +69,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(code.includes("[data-files-body] > *"), '文件树正文下移')
     const faces = [...code.matchAll(/::before \{\n  content: '';\n  position: absolute;\n  top: -38px;[\s\S]*?\n\}/gu)]
     assert.equal(faces.length, 1, '头行玻璃面（::before，top:-38 铺满 0..76）')
-    assert.ok((faces[0]?.[0] ?? '').includes('backdrop-filter: var(--dsw-menu-backdrop-filter)'))
+    assert.ok((faces[0]?.[0] ?? '').includes('backdrop-filter: blur(20px) saturate(150%)'))
     assert.ok((faces[0]?.[0] ?? '').includes('background-image: radial-gradient('), '玻璃面自带同源光')
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
@@ -88,7 +91,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(settings.includes('background-size: 100% 100%'))
   })
 
-  it('所有规则都带「官方默认」门（浅色轴高光 / 官方菜单材质两条除外），无 fixed / 无手写 blur 数值', () => {
+  it('所有规则都带「官方默认」门（浅色轴高光 / 官方菜单材质两条除外），模糊统一为 GLASS_BLUR', () => {
     for (const line of code.split('\n')) {
       if (!line.trim().endsWith('{')) continue
       const gated = line.startsWith('body:not([') && (line.includes(PLAIN_ATTR) || line.includes('data-ds-dark-theme'))
@@ -98,7 +101,9 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok((code.match(/background-attachment: fixed/gu) ?? []).length >= 1, '仅停靠卡缝隙的补缝层允许 fixed 背景（复刻背景打光）')
     assert.ok(!code.includes('+ 128px'), '补缝层不再外扩（避免横向超屏/盖住统计胶囊）')
     assert.ok(code.includes('+ 20px + 24px'), '向下延伸 24px 填下一张卡顶部圆角缺口')
-    assert.ok(!/blur\(/u.test(code), '不手写 blur 数值（统一官方 token）')
+    const blurValues = [...code.matchAll(/blur\((\d+)px\)/gu)].map(match => Number(match[1]))
+    const expectedBlur = Number(/blur\((\d+)px\)/u.exec(GLASS_BLUR)?.[1] ?? 0)
+    assert.ok(blurValues.length > 0 && blurValues.every(value => value === expectedBlur), '模糊统一为 GLASS_BLUR')
   })
 
   it('地面层仍是唯一常驻绘制层；对话宽度拖拽条抬到内容层之上', () => {

@@ -4,6 +4,8 @@ import { BACKDROP_GRADIENTS } from './backdrop.js'
 export const HEADER_HEIGHT_PX = 76
 /** 所有磨砂玻璃面共用的填充不透明度（统一参数；越小白越通透，模糊参数统一走官方 token）。 */
 export const GLASS_FILL_ALPHA = 0.45
+/** 三处玻璃共用的模糊参数（统一；2026-10-27 从官方 40px 调低，原值观感过糊）。 */
+export const GLASS_BLUR = 'blur(20px) saturate(150%)'
 export const SEAT_BAND_PX = 44
 
 /** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
@@ -81,7 +83,7 @@ ${P} [data-phase='active'] [data-slot='conversation.header'] > header::before {
   border-radius: inherit;
 ${glassFill(GLASS_FILL_ALPHA)}
 ${viewportLight('100% 0')}
-  backdrop-filter: var(--dsw-menu-backdrop-filter);
+  backdrop-filter: ${GLASS_BLUR};
 }
 ${P} [data-phase='active'] [data-conversation-scroll] {
   padding-top: ${HEADER_HEIGHT_PX}px;
@@ -116,7 +118,7 @@ ${P} ${SEAT} [data-composer-card]::before {
   pointer-events: none;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%, transparent);
   box-shadow: ${RIM_DARK};
-  backdrop-filter: var(--dsw-menu-backdrop-filter);
+  backdrop-filter: ${GLASS_BLUR};
 }
 body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   box-shadow: ${RIM_LIGHT};
@@ -238,7 +240,7 @@ ${PANEL_HEADERS.split(',\n').map(selector => `${selector}::before`).join(',\n')}
   pointer-events: none;
 ${glassFill(GLASS_FILL_ALPHA)}
 ${viewportLight('100% 0')}
-  backdrop-filter: var(--dsw-menu-backdrop-filter);
+  backdrop-filter: ${GLASS_BLUR};
 }
 /* dockkit 条要压在头行的面上：否则条内标签 / 加号 / 关闭按钮被那层填充压暗。 */
 ${P} [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip] {

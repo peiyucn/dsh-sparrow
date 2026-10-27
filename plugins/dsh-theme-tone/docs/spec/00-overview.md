@@ -41,7 +41,7 @@
 
 | 参数 | 值 | 说明 |
 | :--- | :--- | :--- |
-| 模糊 | `var(--dsw-menu-backdrop-filter)`（官方，当前值 `blur(40px) saturate(150%)`） | 三处玻璃共用同一个官方 token，不手写数值（测试钉住） |
+| 模糊 | `GLASS_BLUR = blur(20px) saturate(150%)` | 三处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊），测试钉住「三处同一值」 |
 | 填充不透明度 | `GLASS_FILL_ALPHA = 0.45` | **三处统一同一个常量**，越小白越通透；填充色各自取官方面 token（顶栏/右栏 = `bg-base`，输入框 = `--dsw-specific-input-major`） |
 | 边缘光 | `RIM_DARK` / `RIM_LIGHT` | 有方向：上亮、左弱亮、右暗、下暗；深/浅两套 |
 
@@ -66,9 +66,8 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 ## 硬约束（守卫里钉住）
 
 1. 除「官方默认档下也生效」的修牌面规则外，所有样式规则带 `body:not([data-dsh-theme-tone-plain])` 门。
-2. 不得出现 `background-attachment: fixed`（**唯一例外**：停靠卡缝隙那一层「底色 + 打光」重绘，见功能 4；
-   固定背景定位区 = 视口，是唯一能让任意位置的 6px 条与地面层逐像素对齐的纯 CSS 办法）；不得手写
-   `blur()` 数值（统一官方 token）。
+2. 不得出现 `background-attachment: fixed`（**唯一例外**：停靠卡补缝层「底色 + 打光」重绘，见功能 4；
+   固定背景定位区 = 视口）；模糊只能取 `GLASS_BLUR` 一个常量，三处玻璃不得各写各的。
 3. `backdrop-filter` 只出现在 `::before` / 独立玻璃层上，不挂在 header / 卡片 / pane 本体。
 4. 不改官方容器的 `position` / `overflow` / `transform` / `contain`（右栏 pane 的 `position: relative;
    z-index: 0` 是已知例外，见「已知偏离」）。
