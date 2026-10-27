@@ -11,10 +11,10 @@ import { describe, it } from 'node:test'
 const CLIENT = new URL('../src/client/', import.meta.url)
 const read = (name) => readFile(new URL(name, CLIENT), 'utf8')
 
-/** 两处 loading 文案的调用点（文件 → 文案键）。 */
+/** 两处 loading 文案的调用点（文件 → 文案键）：设置卡表单与额度面板主体。 */
 const TEXT_LOADING_SITES = [
-  ['CodeBuddyCreditsCard.tsx', '\'picker.trigger.loading\''],
-  ['CodeBuddyCreditsIndicator.tsx', '\'indicator.loading\''],
+  ['CodeBuddyProviderCard.tsx', '\'picker.trigger.loading\''],
+  ['credits-panel.tsx', '\'indicator.loading\''],
 ]
 
 describe('codebuddy-credits：加载态只给转圈、不给纯文字', () => {

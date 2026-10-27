@@ -3,6 +3,29 @@
 > 2026-10-27 重写。旧 spec（01–10）已全部删除，本文是唯一现状文档；契约与实现不一致时以本文为准并同步修代码。
 > 代码入口：`src/index.ts`（host half）/ `src/client/index.ts`（client half）。
 
+## 代码布局
+
+| 层 | 文件 | 职责 |
+| :--- | :--- | :--- |
+| host 组合根 | `src/index.ts` | `name` / `inject` / `apply`：能力门 → 装配 → HTTP 路由接线 |
+| host | `src/host/credentials.ts` | Key 解析 / 旧引用迁移 / save / reapply / remove |
+| host | `src/host/account.ts` | `/v2/accounts` 账号快照（企业上下文头与额度卡用户徽章） |
+| host | `src/host/models.ts` | 模型事实缓存、后台刷新节流、上游单飞、手动重扫 |
+| host | `src/host/provider.ts` | provider 目录 / adapter route / 模型发现注册与 `DUPLICATE_*` 处理 |
+| host | `src/host/ledger.ts` | 会话积分投影注册与 live / 冷会话账本接线 |
+| 协议 | `src/adapter.ts` | 请求编排（body、fetch、错误透传、空闲超时、取消） |
+| 协议 | `src/adapter/wire.ts` | DSH 消息 / 工具 schema → CodeBuddy wire |
+| 协议 | `src/adapter/sse.ts` | SSE 数据行 → 帧 |
+| 协议 | `src/adapter/stream.ts` | 流状态机（块索引、终块、usage / finish） |
+| client 入口 | `src/client/index.ts` | 官方槽位注册、词典与样式统一注入 |
+| 额度入口 | `src/client/CodeBuddyCreditsIndicator.tsx` | 入口与槽位接线（trigger / hero portal / 面板挂载） |
+| 额度入口 | `src/client/hero.tsx` | hero portal 目标与几何测量 |
+| 额度入口 | `src/client/use-credits-status.ts` | `/status`、`/quota` 请求与序号丢弃、刷新 |
+| 额度入口 | `src/client/credits-panel.tsx` | 面板主体、定位与关闭行为 |
+| 设置卡 | `src/client/CodeBuddyCreditsCard.tsx` | 槽位导出名 re-export（表单在 `CodeBuddyProviderCard.tsx`） |
+| 设置卡 | `src/client/CodeBuddyProviderCard.tsx` | 表单 UI、保存 / 清空 / 手动重扫 |
+| 设置卡 | `src/client/settings-row.ts` | 官方 provider 行头的私有 DOM seam（点击捕获 / 结构判定 / 提示插入） |
+
 ## 定位
 
 把企业发放的 CodeBuddy 额度接成 DSH 的一个 LLM provider：官方 API Key 直连（模型目录 + 流式推理），

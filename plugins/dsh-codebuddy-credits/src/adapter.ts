@@ -1,35 +1,30 @@
 /**
- * CodeBuddy 自建适配器：不走 pi-ai 协议层，直接按 CodeBuddy 方言发请求、解析 SSE。
- * 别改的方言行为：stream: true 恒定（非流式服务端 11101）；SSE delta 的 content 与
- * reasoning_content 分离；usage 帧含 credit（DSH 无此字段，另走回调 + replayState）；
- * 企业策略错误（如 10081 ip not in whitelist）原样透传服务端文案。
+ * CodeBuddy 自建适配器：不走 pi-ai 协议层，直接按 CodeBuddy 方言发请求。
+ * 本文件只做**请求编排**（构造 body / 发请求 / 错误透传 / 空闲超时 / 取消），
+ * 消息转 wire 见 `adapter/wire.ts`，SSE 解析见 `adapter/sse.ts`，流状态机与 usage 见 `adapter/stream.ts`。
+ * 别改的方言行为：stream: true 恒定（非流式服务端 11101）；usage 帧含 credit
+ * （DSH 无此字段，随 replayState 持久化）；企业策略错误（如 10081 ip not in whitelist）原样透传服务端文案。
  */
 
 import { LlmAdapter, LlmError } from '@deepseek-ai/dsh-llm'
 import type {
-  ContentBlock,
-  FinishReason,
   GenerateOptions,
   LlmModelInfo,
   LlmResolvedModelInfo,
-  Message,
   PreparedAdapterCall,
   StreamChunk,
-  TokenUsage,
-  ToolCallBlock,
-  ToolSchema,
 } from '@deepseek-ai/dsh-llm'
-import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { effortName, requestHeaders } from './catalog.js'
-import { BASE_URL, DEFAULT_CONTEXT_WINDOW, DISPLAY_NAME } from './constants.js'
-import { stripChannelFingerprints } from './fingerprints.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
+import { BASE_URL, DEFAULT_CONTEXT_WINDOW, DISPLAY_NAME } from './constants.js'
+import { effectiveReasoningEffort, streamFrames } from './adapter/stream.js'
+import type { CodeBuddyReadImage } from './adapter/wire.js'
+import { toWireMessages, toWireTools } from './adapter/wire.js'
 
-/** 图片字节读取回调（附件 seam）：返回媒体类型与原始字节，供 data URL 序列化。 */
-export type CodeBuddyReadImage = (
-  ref: ImageAttachmentRef,
-  signal?: AbortSignal,
-) => Promise<{ mediaType: string; data: Uint8Array }>
+export type { CodeBuddyReadImage } from './adapter/wire.js'
+export { parseSseLine } from './adapter/sse.js'
+export { effectiveReasoningEffort, mapFinish, mapUsage } from './adapter/stream.js'
+export { toWireMessages, toWireTools } from './adapter/wire.js'
 
 export interface CodeBuddyAdapterOptions {
   /** 当前生效的模型事实（设置节驱动，每次调用现读）。 */
@@ -44,205 +39,6 @@ export interface CodeBuddyAdapterOptions {
   /** 图片字节读取（官方附件 seam）；未配置时带图请求以明确错误失败。 */
   readImage?: CodeBuddyReadImage
   maxMode?: () => boolean
-}
-
-interface WireToolCall {
-  id: string
-  type: 'function'
-  function: { name: string; arguments: string }
-}
-
-interface WireTool {
-  type: 'function'
-  function: { name: string; description: string; parameters: Record<string, unknown> }
-}
-
-interface WireMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool'
-  content?: string | unknown[] | null
-  tool_calls?: WireToolCall[]
-  tool_call_id?: string
-}
-
-/** 文本块合并（工具结果是独立的 tool 角色消息，`ContentBlockMap` 里没有
- *  `tool-result` 块，故工具结果不经此函数）。 */
-function textOf(blocks: readonly ContentBlock[]): string {
-  let text = ''
-  for (const block of blocks) {
-    if (block.type === 'text') text += block.text
-  }
-  return text
-}
-
-/** 图片附件 → OpenAI 方言 image_url data URL；媒体类型以读取回调返回为准
- *  （附件字节可能被重新编码），不要从 ref 自己推断。 */
-async function imageDataUrl(ref: ImageAttachmentRef, readImage: CodeBuddyReadImage, signal?: AbortSignal): Promise<string> {
-  const stored = await readImage(ref, signal)
-  return `data:${stored.mediaType};base64,${Buffer.from(stored.data).toString('base64')}`
-}
-
-/** DSH Message → CodeBuddy 线格式（OpenAI 方言）。三条非显然约束：reasoning 块不进历史；
- *  工具结果是独立的 `tool` 角色消息（`ToolResultMessage.toolCallId`），不是 user 消息里的
- *  `tool-result` 内容块；`developer` 消息与工具增删块无对应线格式，官方两个适配器同口径拒绝。 */
-export async function toWireMessages(
-  options: GenerateOptions,
-  readImage?: CodeBuddyReadImage,
-): Promise<WireMessage[]> {
-  const messages: WireMessage[] = []
-  if (options.system !== undefined && options.system.length > 0) {
-    // 上游内容指纹（11128）：system 正文里的指纹行在上线前删掉，其余逐字保留。
-    const system = stripChannelFingerprints(options.system)
-    if (system.length > 0) messages.push({ role: 'system', content: system })
-  }
-  for (const message of options.messages as Message[]) {
-    if (message.role === 'system') {
-      messages.push({ role: 'system', content: stripChannelFingerprints(textOf(message.content)) })
-      continue
-    }
-    // 工具结果 → wire 的 tool 角色，用 `message.toolCallId` 作 tool_call_id。
-    if (message.role === 'tool') {
-      messages.push({
-        role: 'tool',
-        tool_call_id: String(message.toolCallId),
-        content: textOf(message.content),
-      })
-      continue
-    }
-    // developer 消息没有 CodeBuddy 线格式可映射：宁可明确失败，也不能落进 assistant
-    // 分支变成空 assistant 消息（静默改写历史）。
-    if (message.role === 'developer') {
-      throw new LlmError('CodeBuddy 适配器无法表示 developer 消息', 'UNSUPPORTED_CONTENT')
-    }
-    if (message.role === 'user') {
-      // 文本优先；图片块经附件 seam 读字节，转 OpenAI 方言 image_url。
-      const parts: unknown[] = []
-      let text = ''
-      for (const block of message.content) {
-        if (block.type === 'text') {
-          text += block.text
-        } else if (block.type === 'image') {
-          if (readImage === undefined) {
-            throw new LlmError('CodeBuddy 适配器未接入附件服务，无法发送图片', 'UNSUPPORTED_CONTENT')
-          }
-          let url: string
-          try {
-            url = await imageDataUrl(block.attachment, readImage, options.signal)
-          } catch (error) {
-            if (options.signal?.aborted) throw error
-            throw new LlmError('CodeBuddy 图片读取失败', 'TRANSPORT', { cause: error })
-          }
-          parts.push({ type: 'image_url', image_url: { url } })
-        }
-      }
-      // 连续 user 消息必须合并：上游网关只认最后一条 user 消息里的图片，更早的图片会被
-      // 静默丢弃；而 DSH 会把 system-reminder / 技能目录等以 user 消息追加在真实用户消息
-      // 之后，不合并的话带图消息永远不是最后一条。
-      const previous = messages.at(-1)
-      if (previous !== undefined && previous.role === 'user') {
-        const merged: unknown[] = typeof previous.content === 'string'
-          ? (previous.content === '' ? [] : [{ type: 'text', text: previous.content }])
-          : [...(previous.content ?? []) as unknown[]]
-        if (text !== '') merged.push({ type: 'text', text })
-        merged.push(...parts)
-        previous.content = merged.length === 0 ? '' : merged
-        continue
-      }
-      if (parts.length === 0) {
-        messages.push({ role: 'user', content: text })
-      } else {
-        messages.push({ role: 'user', content: [{ type: 'text', text }, ...parts] })
-      }
-      continue
-    }
-    // assistant：text 合并 + tool-call 块转 wire tool_calls
-    const assistant: WireMessage = { role: 'assistant', content: null, tool_calls: [] }
-    let text = ''
-    for (const block of message.content) {
-      if (block.type === 'text') text += block.text
-      else if (block.type === 'tool-call') {
-        const call = block as ToolCallBlock
-        assistant.tool_calls?.push({
-          id: String(call.id),
-          type: 'function',
-          function: { name: call.name, arguments: call.arguments },
-        })
-      }
-    }
-    // 历史里的 assistant 正文若复述过指纹句，同样会被上游整轮拦截（跟会话走，不跟模型走），
-    // 故这里也删；tool_calls 的 arguments 不动（实测放行，且改了会篡改调用记录）。
-    if (text.length > 0) assistant.content = stripChannelFingerprints(text)
-    if ((assistant.tool_calls?.length ?? 0) === 0) assistant.tool_calls = undefined
-    else if (assistant.content === null) assistant.content = ''
-    messages.push(assistant)
-  }
-  return messages
-}
-
-/** 思考档位 → 线格式。wire 拼写按档位名直发（待公司网络实测确认）。 */
-function wireReasoningEffort(effort: GenerateOptions['reasoningEffort']): string | undefined {
-  return effort === undefined ? undefined : String(effort)
-}
-
-/** Max 模式（推理档位锁）的最终生效档位（纯函数，供单测）：锁开且模型有推理能力即强制
- *  "max"，服务端宽容接受未声明的 max，别改成先校验档位白名单。 */
-export function effectiveReasoningEffort(
-  maxMode: boolean,
-  modelReasoning: boolean,
-  effort: GenerateOptions['reasoningEffort'],
-): string | undefined {
-  if (maxMode && modelReasoning) return 'max'
-  return wireReasoningEffort(effort)
-}
-
-/** 服务端 finish_reason → DSH 契约。 */
-export function mapFinish(reason: string): FinishReason | undefined {
-  switch (reason) {
-    case 'stop': return { kind: 'stop' }
-    case 'length': return { kind: 'max-tokens' }
-    case 'tool_calls':
-    case 'function_call': return { kind: 'tool-calls' }
-    default: return undefined
-  }
-}
-
-/** CodeBuddy usage 帧 → DSH TokenUsage（credit 单独提取）。 */
-export function mapUsage(raw: Record<string, unknown>): { tokens: TokenUsage; credit?: number } {
-  const prompt = typeof raw.prompt_tokens === 'number' ? raw.prompt_tokens : 0
-  const completion = typeof raw.completion_tokens === 'number' ? raw.completion_tokens : 0
-  const total = typeof raw.total_tokens === 'number' ? raw.total_tokens : undefined
-  const cacheHit = typeof raw.prompt_cache_hit_tokens === 'number' ? raw.prompt_cache_hit_tokens : 0
-  const details = raw.completion_tokens_details as Record<string, unknown> | undefined
-  const reasoning = details !== undefined && typeof details.reasoning_tokens === 'number'
-    ? details.reasoning_tokens
-    : 0
-  const credit = typeof raw.credit === 'number' ? raw.credit : undefined
-  return {
-    tokens: {
-      inputTokens: Math.max(0, prompt - cacheHit),
-      outputTokens: completion,
-      ...(total === undefined ? {} : { totalTokens: total }),
-      ...(cacheHit > 0 ? { cacheReadTokens: cacheHit } : {}),
-      ...(reasoning > 0 ? { reasoningTokens: reasoning } : {}),
-    },
-    ...(credit === undefined ? {} : { credit }),
-  }
-}
-
-/** SSE 数据行 → 可解析帧（纯函数，供单测）。非 data: 行、[DONE] 与无效 JSON 一律
- *  返回 undefined：流解析跳过而不中断。 */
-export function parseSseLine(line: string): Record<string, unknown> | undefined {
-  const trimmed = line.trim()
-  if (!trimmed.startsWith('data:')) return undefined
-  const data = trimmed.slice(5).trim()
-  if (data.length === 0 || data === '[DONE]') return undefined
-  try {
-    const parsed = JSON.parse(data) as unknown
-    return parsed !== null && typeof parsed === 'object'
-      ? parsed as Record<string, unknown>
-      : undefined
-  } catch {
-    return undefined
-  }
 }
 
 /** 非 2xx 响应 → LlmError（服务端 code/msg 原样透传，如 10081 ip whitelist）。 */
@@ -261,7 +57,7 @@ async function providerError(response: Response): Promise<never> {
   throw new LlmError(message, 'PROVIDER', { status: response.status })
 }
 
-/** CodeBuddy 推理适配器：协议层完全自建（请求构造、SSE 解析、块组装、usage/credit 提取）。 */
+/** CodeBuddy 推理适配器：请求编排、流取消/超时、模型事实投影。 */
 export class CodeBuddyAdapter extends LlmAdapter {
   constructor(private readonly config: CodeBuddyAdapterOptions) {
     super()
@@ -383,181 +179,6 @@ export class CodeBuddyAdapter extends LlmAdapter {
     if (!response.ok) await providerError(response)
     if (response.body === null) throw new LlmError('CodeBuddy 返回了空响应流', 'TRANSPORT')
 
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    // 块索引：reasoning=0、text=1、tool 调用从 2 起
-    const TOOL_BASE = 2
-    /** wire 工具 index（0 起）→ 块索引（≥TOOL_BASE）。 */
-    const toolIndexByWire = new Map<number, number>()
-    /** 无 wire index 的方言：工具 id → 块索引。 */
-    const toolIndexById = new Map<string, number>()
-    let nextToolIndex = TOOL_BASE
-    const opened = new Set<number>()
-    const finished = new Set<number>()
-    // block-end 必须带累计全量（DSH 以终块组装最终消息）。
-    const textByIndex = new Map<number, string>()
-    const toolIdByIndex = new Map<number, string>()
-    const toolNameByIndex = new Map<number, string>()
-    const toolArgsByIndex = new Map<number, string>()
-    let usageSent = false
-    let finishSent = false
-
-    const openBlock = (index: number, blockType: 'reasoning' | 'text' | 'tool-call'): void => {
-      if (opened.has(index)) return
-      opened.add(index)
-      chunks.push({ type: 'block-start', index, blockType })
-    }
-    const chunks: StreamChunk[] = []
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        onActivity()
-        buffer += decoder.decode(value, { stream: true })
-        let lineEnd
-        while ((lineEnd = buffer.indexOf('\n')) >= 0) {
-          const line = buffer.slice(0, lineEnd)
-          buffer = buffer.slice(lineEnd + 1)
-          const frame = parseSseLine(line)
-          if (frame === undefined) continue
-          const choices = Array.isArray(frame.choices) ? frame.choices as Array<Record<string, unknown>> : []
-          const choice = choices[0]
-          const delta = choice !== undefined && typeof choice.delta === 'object' && choice.delta !== null
-            ? choice.delta as Record<string, unknown>
-            : undefined
-          if (delta !== undefined) {
-            if (typeof delta.reasoning_content === 'string' && delta.reasoning_content.length > 0) {
-              openBlock(0, 'reasoning')
-              textByIndex.set(0, (textByIndex.get(0) ?? '') + delta.reasoning_content)
-              chunks.push({ type: 'reasoning-delta', index: 0, text: delta.reasoning_content })
-            }
-            if (typeof delta.content === 'string' && delta.content.length > 0) {
-              openBlock(1, 'text')
-              textByIndex.set(1, (textByIndex.get(1) ?? '') + delta.content)
-              chunks.push({ type: 'text-delta', index: 1, text: delta.content })
-            }
-            const calls = Array.isArray(delta.tool_calls) ? delta.tool_calls as Array<Record<string, unknown>> : []
-            for (const call of calls) {
-              // wire 工具 index 是 0 起（同消息内编号），块索引空间是 0=reasoning、
-              // 1=text、工具 ≥TOOL_BASE——必须映射，不能直用。
-              const wireIndex = typeof call.index === 'number' ? call.index : undefined
-              let index: number | undefined
-              if (wireIndex !== undefined) {
-                index = toolIndexByWire.get(wireIndex)
-                if (index === undefined) {
-                  index = nextToolIndex
-                  nextToolIndex += 1
-                  toolIndexByWire.set(wireIndex, index)
-                }
-              } else {
-                // 无 index 的方言：按 id 兜底映射。
-                let callId = typeof call.id === 'string' ? call.id : ''
-                if (callId === '') callId = 'call-unknown'
-                index = toolIndexById.get(callId)
-                if (index === undefined) {
-                  index = nextToolIndex
-                  nextToolIndex += 1
-                  toolIndexById.set(callId, index)
-                }
-              }
-              const callId = typeof call.id === 'string' ? call.id : ''
-              if (callId !== '') toolIdByIndex.set(index, callId)
-              else if (!toolIdByIndex.has(index)) toolIdByIndex.set(index, 'call-' + String(index))
-              openBlock(index, 'tool-call')
-              const fn = call.function as Record<string, unknown> | undefined
-              const name = typeof fn?.name === 'string' ? fn.name : ''
-              const args = typeof fn?.arguments === 'string' ? fn.arguments : ''
-              const firstNamed = name.length > 0 && !toolNameByIndex.has(index)
-              if (firstNamed) toolNameByIndex.set(index, name)
-              toolArgsByIndex.set(index, (toolArgsByIndex.get(index) ?? '') + args)
-              chunks.push({
-                type: 'tool-call-delta',
-                index,
-                id: (toolIdByIndex.get(index) ?? '') as never,
-                ...(firstNamed ? { name } : {}),
-                argumentsDelta: args,
-              })
-            }
-          }
-          const reason = choice !== undefined && typeof choice.finish_reason === 'string' ? choice.finish_reason : ''
-          if (reason.length > 0 && !finishSent) {
-            // 终帧：按官方顺序先收尾所有已开块（携带累计全量内容）→ usage → finish。
-            for (const index of [...opened].filter(i => !finished.has(i))) {
-              finished.add(index)
-              chunks.push({
-                type: 'block-end',
-                index,
-                block: blockFor(index, textByIndex, toolIdByIndex, toolNameByIndex, toolArgsByIndex),
-              })
-            }
-            if (frame.usage !== null && typeof frame.usage === 'object' && frame.usage !== undefined) {
-              const { tokens } = mapUsage(frame.usage as Record<string, unknown>)
-              if (!usageSent) {
-                chunks.push({ type: 'usage', usage: tokens })
-                usageSent = true
-              }
-            }
-            const finish = mapFinish(reason)
-            if (finish === undefined) {
-              throw new LlmError('CodeBuddy 返回了未知的结束原因：' + reason, 'PROVIDER')
-            }
-            chunks.push({
-              type: 'finish',
-              reason: finish,
-              replayState: { response: { model: options.model, usage: frame.usage ?? null } },
-            })
-            finishSent = true
-          } else if (frame.usage !== null && typeof frame.usage === 'object' && frame.usage !== undefined) {
-            // 尾随 usage 帧（终帧之后到达）：块已收尾，不再向流里补发 usage 块——
-            // finish 之后再推块违反消费端契约。
-            const { tokens } = mapUsage(frame.usage as Record<string, unknown>)
-            if (!usageSent && !finishSent) {
-              chunks.push({ type: 'usage', usage: tokens })
-              usageSent = true
-            }
-          }
-          for (const chunk of chunks.splice(0)) yield chunk
-        }
-      }
-      if (!finishSent) {
-        throw new LlmError('CodeBuddy 流在结束前中断', 'TRANSPORT')
-      }
-    } finally {
-      reader.cancel().catch(() => {})
-    }
-  }
-}
-
-/** DSH 工具 schema → CodeBuddy（OpenAI 方言）tools 数组：wire 上必须包 function 信封，
- *  原样直发会被服务端以「Invalid request parameters」拒绝。 */
-export function toWireTools(tools: readonly ToolSchema[]): WireTool[] {
-  return tools.map(tool => ({
-    type: 'function',
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters,
-    },
-  }))
-}
-
-/** 已开块的最终 ContentBlock 组装（block-end 携带）——必须带累计的完整内容：空内容终块
- *  会让流式过程可见、结果消失，工具调用变成「unknown tool ""」。 */
-function blockFor(
-  index: number,
-  textByIndex: ReadonlyMap<number, string>,
-  toolIdByIndex: ReadonlyMap<number, string>,
-  toolNameByIndex: ReadonlyMap<number, string>,
-  toolArgsByIndex: ReadonlyMap<number, string>,
-): ContentBlock {
-  if (index === 0) return { type: 'reasoning', text: textByIndex.get(0) ?? '' }
-  if (index === 1) return { type: 'text', text: textByIndex.get(1) ?? '' }
-  return {
-    type: 'tool-call',
-    id: (toolIdByIndex.get(index) ?? '') as never,
-    name: toolNameByIndex.get(index) ?? '',
-    arguments: toolArgsByIndex.get(index) ?? '',
+    yield* streamFrames(response.body, options.model, onActivity)
   }
 }

@@ -77,14 +77,22 @@ describe('dsh-codebuddy-credits 结构：常量不再手写字面量', () => {
     assert.ok(!/key: 'codebuddyCredits'/u.test(projection), '不得再手写投影 key')
   })
 
-  it('host index.ts 应该 用常量组装 provider / settings / 投影读取', async () => {
-    const src = stripComments(await readSrc('index.ts'))
-    assert.match(src, /export const name = SETTINGS_NAMESPACE/u)
-    assert.match(src, /import \{[^}]*PROVIDER_ID[^}]*SETTINGS_NAMESPACE[^}]*\} from '\.\/constants\.js'/u,
-      'provider id / settings NS 必须从 constants import')
-    assert.ok(!/'llm-codebuddy-credits'/u.test(src), '插件名不得手写（= SETTINGS_NAMESPACE）')
-    assert.ok(!/'codebuddy-credits'/u.test(src), 'provider id 不得手写（= PROVIDER_ID）')
-    assert.match(src, /stateOf\(session, CREDIT_PROJECTION_KEY\)/u)
+  it('host 组合根与子模块 应该 用常量组装 provider / settings / 投影读取', async () => {
+    const index = stripComments(await readSrc('index.ts'))
+    assert.match(index, /export const name = SETTINGS_NAMESPACE/u)
+    assert.match(index, /import \{[^}]*SETTINGS_NAMESPACE[^}]*\} from '\.\/constants\.js'/u,
+      'settings NS 必须从 constants import（= 插件 name）')
+    const provider = stripComments(await readSrc('host/provider.ts'))
+    assert.match(provider, /import \{[^}]*PROVIDER_ID[^}]*\} from '\.\.\/constants\.js'/u,
+      'provider id 必须从 constants import')
+    assert.match(provider, /displayName: DISPLAY_NAME/u, 'provider 显示名必须来自 constants')
+    const ledger = stripComments(await readSrc('host/ledger.ts'))
+    assert.match(ledger, /stateOf\(session, CREDIT_PROJECTION_KEY\)/u)
+    for (const file of ['index.ts', 'host/provider.ts', 'host/credentials.ts', 'host/ledger.ts']) {
+      const src = stripComments(await readSrc(file))
+      assert.ok(!/'llm-codebuddy-credits'/u.test(src), `${file}: 插件名不得手写（= SETTINGS_NAMESPACE）`)
+      assert.ok(!/'codebuddy-credits'/u.test(src), `${file}: provider id 不得手写（= PROVIDER_ID）`)
+    }
   })
 
   it('adapter 的 provider 展示名 应该 来自 constants', async () => {
@@ -113,16 +121,17 @@ describe('dsh-codebuddy-credits 结构：能力门与注册冲突', () => {
   })
 
   it('三处注册 / ensureRoutes 必须包 try-catch，DUPLICATE_* 走统一告警', async () => {
-    const src = await readSrc('index.ts')
-    assert.match(src, /warnRegistrationFailure\(/u)
+    const provider = await readSrc('host/provider.ts')
+    assert.match(provider, /warnRegistrationFailure\(/u)
     /** @type {Array<[string, RegExp]>} */
     const calls = [
-      ['设置页 provider 目录', /warnRegistrationFailure\(ctx, name, '设置页 provider 目录', error\)/u],
-      ['provider 路由', /warnRegistrationFailure\(ctx, name, 'provider 路由', error\)/u],
-      ['模型发现', /warnRegistrationFailure\(ctx, name, '模型发现', error\)/u],
+      ['设置页 provider 目录', /warnRegistrationFailure\(ctx, SETTINGS_NAMESPACE, '设置页 provider 目录', error\)/u],
+      ['provider 路由', /warnRegistrationFailure\(ctx, SETTINGS_NAMESPACE, 'provider 路由', error\)/u],
+      ['模型发现', /warnRegistrationFailure\(ctx, SETTINGS_NAMESPACE, '模型发现', error\)/u],
     ]
-    for (const [label, re] of calls) assert.match(src, re, `${label} 的注册失败必须走 warnRegistrationFailure`)
-    assert.match(src, /try \{\s*ensureRoutes\(ambientKey\(\)\)\s*\}/u, 'ensureRoutes(ambientKey()) 必须包 try-catch')
+    for (const [label, re] of calls) assert.match(provider, re, `${label} 的注册失败必须走 warnRegistrationFailure`)
+    assert.match(provider, /try \{\s*ensure\(deps\.credentials\.ambientKey\(\)\)\s*\}/u,
+      '启动时的 ensureRoutes(ambientKey()) 必须包 try-catch')
   })
 
   it('client half 应该 先跑不抛错的惰性门（slots.inject/register + locale.register/bind）', async () => {
@@ -163,10 +172,11 @@ describe('dsh-codebuddy-credits 结构：样式统一注入', () => {
   })
 
   it('⛔ 组件内不得 createElement(\'style\') / 直接 append head', async () => {
-    const entries = await readdir(CLIENT, { withFileTypes: true })
+    const root = fileURLToPath(CLIENT)
+    const entries = await readdir(root, { recursive: true, withFileTypes: true })
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.endsWith('.tsx')) continue
-      const src = await readClient(entry.name)
+      const src = await readFile(join(entry.parentPath ?? root, entry.name), 'utf8')
       assert.ok(!/createElement\('style'\)/u.test(src), `${entry.name} 不得自建 <style>（统一由 styles.ts 注入）`)
       assert.ok(!/document\.head/u.test(src), `${entry.name} 不得直接 append document.head`)
       assert.ok(!/ensure[A-Z]\w*Styles/u.test(src), `${entry.name} 不得再导出 ensure*Styles`)
@@ -175,12 +185,62 @@ describe('dsh-codebuddy-credits 结构：样式统一注入', () => {
 
   it('组件静态样式应该 走类名表，只有定位 / 宽度等动态值保留 inline style', async () => {
     for (const file of [
-      'CodeBuddyCreditsIndicator.tsx', 'CodeBuddyCreditsCard.tsx', 'CodeBuddyCreditsStats.tsx',
-      'CodeBuddyTurnCredit.tsx', 'CodeBuddyModelLabel.tsx', 'CreditDialog.tsx', 'BusyDot.tsx',
+      'CodeBuddyCreditsIndicator.tsx', 'credits-panel.tsx', 'CodeBuddyProviderCard.tsx',
+      'CodeBuddyCreditsStats.tsx', 'CodeBuddyTurnCredit.tsx', 'CodeBuddyModelLabel.tsx',
+      'CreditDialog.tsx', 'BusyDot.tsx',
     ]) {
       const src = await readClient(file)
       assert.match(src, /CCB_CLASS/u, `${file} 必须用 styles.ts 的类名表`)
       assert.ok(!/const \w+Style: CSSProperties/u.test(src), `${file} 不得再定义静态样式对象`)
+    }
+  })
+})
+
+describe('dsh-codebuddy-credits 结构：第二阶段拆分布局', () => {
+  const MODULES = [
+    'host/account.ts', 'host/credentials.ts', 'host/ledger.ts', 'host/models.ts', 'host/provider.ts',
+    'adapter/sse.ts', 'adapter/stream.ts', 'adapter/wire.ts',
+    'client/use-credits-status.ts', 'client/hero.tsx', 'client/credits-panel.tsx',
+    'client/settings-row.ts', 'client/CodeBuddyProviderCard.tsx',
+  ]
+
+  it('host / adapter / client 的职责模块 应该 全部在位', async () => {
+    for (const file of MODULES) {
+      const src = await readSrc(file)
+      assert.ok(src.trim().length > 0, `缺少拆分模块 ${file}`)
+    }
+  })
+
+  it('CodeBuddyCreditsCard 应该 只做导出名 re-export（表单在 ProviderCard）', async () => {
+    const src = await readClient('CodeBuddyCreditsCard.tsx')
+    assert.match(src, /export \{ CodeBuddyProviderCard as CodeBuddyCreditsCard \} from '\.\/CodeBuddyProviderCard\.js'/u)
+  })
+
+  it('组合根只管装配：index.ts 不得直接注册 / 建适配器', async () => {
+    const src = stripComments(await readSrc('index.ts'))
+    for (const forbidden of ['new CodeBuddyAdapter', 'ctx.llm.register', 'createLedgerResolver', 'codebuddyCreditsProjectionDefinition']) {
+      assert.ok(!src.includes(forbidden), `index.ts 不得直接出现 ${forbidden}（应留在 host/ 子模块）`)
+    }
+  })
+
+  it('拆分目标行数不得回涨（组合根 <120 / Indicator <220 / adapter <250）', async () => {
+    /** @type {Array<[string, number]>} */
+    const limits = [
+      ['index.ts', 120],
+      ['client/CodeBuddyCreditsIndicator.tsx', 220],
+      ['adapter.ts', 250],
+    ]
+    for (const [file, limit] of limits) {
+      const text = await readSrc(file)
+      const lines = text.split(/\r?\n/u).filter(line => line.trim().length > 0).length
+      assert.ok(lines < limit, `${file} 应有 ${limit} 行以内（当前 ${lines}）`)
+    }
+  })
+
+  it('⛔ 新组件不得 createElement(\'style\')（统一由 styles.ts 注入）', async () => {
+    for (const file of ['credits-panel.tsx', 'hero.tsx', 'CodeBuddyProviderCard.tsx']) {
+      const src = await readClient(file)
+      assert.ok(!/createElement\('style'\)/u.test(src), `${file} 不得自建 <style>`)
     }
   })
 })

@@ -13,6 +13,17 @@ import { fileURLToPath } from 'node:url'
 
 const DIR = path.dirname(fileURLToPath(import.meta.url))
 const SRC = path.join(DIR, '..', 'src')
+const HOST = path.join(SRC, 'host')
+
+/** 宿主实现分散在 index.ts + host/*.ts：服务访问与可选 fork 必须一起纳管，不能只扫组合根。 */
+function hostSources() {
+  const files = [path.join(SRC, 'index.ts')]
+  for (const name of fs.readdirSync(HOST)) {
+    if (name.endsWith('.ts')) files.push(path.join(HOST, name))
+  }
+  return files.map((file) => fs.readFileSync(file, 'utf8')).join('\n')
+}
+const HOST_TEXT = hostSources()
 
 /** 不经 inject 绑定的 cordis 内建上下文成员。 */
 const BUILTINS = new Set([
@@ -63,17 +74,16 @@ function usedServices(text) {
 }
 
 test('宿主侧访问的每个 ctx 服务都在 inject 里声明（或为内建 / 可选依赖 fork）', () => {
-  const file = path.join(SRC, 'index.ts')
-  const text = fs.readFileSync(file, 'utf8')
-  const declared = declaredInject(text)
-  const optional = optionalInjectServices(text)
-  const missing = [...usedServices(text)]
+  const indexText = fs.readFileSync(path.join(SRC, 'index.ts'), 'utf8')
+  const declared = declaredInject(indexText)
+  const optional = optionalInjectServices(HOST_TEXT)
+  const missing = [...usedServices(HOST_TEXT)]
     .filter((s) => !BUILTINS.has(s) && !declared.has(s) && !optional.has(s))
 
   assert.deepEqual(
     missing,
     [],
-    `src/index.ts 访问了未在 inject 声明的服务：${missing.join(', ')}。`
+    `host half 访问了未在 inject 声明的服务：${missing.join(', ')}。`
       + 'cordis 要求服务经 inject 绑定，否则运行期抛 "cannot get property ... without inject"；'
       + `请在 export const inject 中补上（硬依赖），或经 ctx.inject([...], cb) 起可选 fork（可选依赖）。`
       + `当前硬依赖：${[...declared].join(', ')}；可选 fork：${[...optional].join(', ')}。`,
@@ -91,8 +101,8 @@ test('sessions 已声明为硬依赖（2026-09-18 事故的回归守卫）', () 
 })
 
 test('sessionProjections 是**可选** fork，不得进硬 inject（2026-09-26 迁移）', () => {
-  const text = fs.readFileSync(path.join(SRC, 'index.ts'), 'utf8')
-  const declared = declaredInject(text)
+  const indexText = fs.readFileSync(path.join(SRC, 'index.ts'), 'utf8')
+  const declared = declaredInject(indexText)
   assert.equal(
     declared.has('sessionProjections'),
     false,
@@ -100,11 +110,11 @@ test('sessionProjections 是**可选** fork，不得进硬 inject（2026-09-26 �
       + '故它必须是 ctx.inject([...], cb) 起的可选 fork，而不是硬依赖。',
   )
   assert.ok(
-    optionalInjectServices(text).has('sessionProjections'),
+    optionalInjectServices(HOST_TEXT).has('sessionProjections'),
     '可选 fork 必须真的声明 sessionProjections（否则注册表永远拿不到，积分静默只剩冷路径）。',
   )
   assert.ok(
-    /sessionProjections\.register\(/.test(stripComments(text)),
+    /sessionProjections\.register\(/.test(stripComments(HOST_TEXT)),
     'fork 里必须注册投影单元。',
   )
 })
@@ -140,8 +150,7 @@ test('inject 只列真实存在的服务名（无笔误）', () => {
 })
 
 test('可选 fork 只列真实存在的服务名（无笔误）', () => {
-  const text = fs.readFileSync(path.join(SRC, 'index.ts'), 'utf8')
-  const optional = optionalInjectServices(text)
+  const optional = optionalInjectServices(HOST_TEXT)
   const KNOWN = new Set(['sessionProjections', 'settings'])
   const unknown = [...optional].filter((s) => !KNOWN.has(s))
   assert.deepEqual(unknown, [], `可选 fork 里出现未登记的服务名：${unknown.join(', ')}`)

@@ -10,7 +10,11 @@ import { buildIndicatorCss } from '../lib/client/styles.js'
  * （本插件无 client DOM 测试环境）。
  */
 const SOURCE = new URL('../src/client/CodeBuddyCreditsIndicator.tsx', import.meta.url)
+const HERO_SOURCE = new URL('../src/client/hero.tsx', import.meta.url)
+const PANEL_SOURCE = new URL('../src/client/credits-panel.tsx', import.meta.url)
 const source = await readFile(SOURCE, 'utf8')
+const heroSource = await readFile(HERO_SOURCE, 'utf8')
+const panelSource = await readFile(PANEL_SOURCE, 'utf8')
 const styles = buildIndicatorCss()
 
 function svgConst(name) {
@@ -132,7 +136,8 @@ describe('CodeBuddy 顶栏标记：窄化（容器查询）', () => {
     assert.match(code, /createPortal\(trigger,\s*heroPortalTarget\(hero\.rootEl\)\)/u,
       'hero 入口必须 portal 到 heroPortalTarget(hero.rootEl)')
     // 解析器必须**限定在本会话根内**找角按钮：多会话根并存时 document.querySelector 会取错树。
-    const fn = /function heroPortalTarget[\s\S]*?\n\}/u.exec(code)
+    const heroCode = heroSource.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/^\s*\/\/.*$/gmu, '')
+    const fn = /function heroPortalTarget[\s\S]*?\n\}/u.exec(heroCode)
     assert.ok(fn, '找不到 heroPortalTarget 的定义')
     assert.match(fn[0], /rootEl\.querySelector\(HEADER_CORNER_SELECTOR\)/u,
       'heroPortalTarget 必须在传入的会话根内找角按钮（不得用 document.querySelector）')
@@ -144,8 +149,8 @@ describe('CodeBuddy 顶栏标记：窄化（容器查询）', () => {
 describe('CodeBuddy 顶栏标记：面板不得先在旧位置画一帧', () => {
   /** 面板不得先在旧位置画一帧：定位放被动 `useEffect` 时首帧已按旧坐标画出。 */
   it('打开时的定位 必须用 useLayoutEffect（被动效果会先画一帧旧坐标）', () => {
-    // 先剥注释再断言，否则注释里提到的 useLayoutEffect 会把断言喂饱。
-    const code = source.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/^\s*\/\/.*$/gmu, '')
+    // 先剥注释再断言，否则注释里提到的 useLayoutEffect 会把断言喂饱。定位 hook 在面板模块里。
+    const code = panelSource.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/^\s*\/\/.*$/gmu, '')
     const layoutCall = /useLayoutEffect\(\(\) => \{\s*if \(!open\) return\s*position\(\)\s*\}, \[open, position\]\)/u
     assert.match(code, layoutCall,
       '「打开时定位」必须放在 useLayoutEffect 里（否则会先在旧坐标画一帧）')
@@ -157,7 +162,8 @@ describe('CodeBuddy 顶栏标记：面板不得先在旧位置画一帧', () => 
   it('point 不得在渲染判据里「先信旧值」（要么首帧即正确，要么不渲染）', () => {
     // 只需钉住判据不被改写（上一条已确保绘制前定位），如不得用「上次位置」的 ref 供首帧渲染。
     assert.match(source, /open && point !== null/u, '面板渲染判据应是 open && point !== null')
-    assert.ok(!/pointRef|lastPoint|prevPoint/u.test(source.replace(/\/\*[\s\S]*?\*\//gu, '')),
+    const all = source + panelSource + heroSource
+    assert.ok(!/pointRef|lastPoint|prevPoint/u.test(all.replace(/\/\*[\s\S]*?\*\//gu, '')),
       '不得缓存「上一次坐标」用于首帧渲染（会重新引入旧位置闪现）')
   })
 })
