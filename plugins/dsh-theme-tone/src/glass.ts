@@ -186,15 +186,14 @@ ${P} [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip] {
   z-index: 3;
 }
 
-/* ===== 模型列表菜单：实心（owner 定案） =====
-   owner 实测：只关模型菜单的 blur、保留其半透明填充，输入框仍会闪 ⇒ 触发条件不只是 blur 层重叠，
-   还和「半透明菜单盖在模糊卡片区域上」有关。owner 定案：模型列表直接做**实心**（不透明底面），
-   彻底退出这套合成；其余菜单（权限 / FIM / @ 等）保留官方 blur + 半透明材质不变。
-   底色取官方抬升面 token（本身就是不透明的主题色）；圆角 / 阴影 / 行 hover 全部保持官方。 */
+/* ===== 模型列表菜单：只关它的 blur、保留半透明填充 =====
+   输入框的完整玻璃模糊与菜单的 blur 同时存在时，Chromium 会把菜单碎片的错位快照画进输入框
+   （owner 观察确认：两个模糊重叠就出问题）。owner 定案先只在**模型列表**上试：用它的实时模糊
+   换输入框的完整玻璃，其余菜单（权限 / FIM / @ 等）保留官方 blur。
+   菜单锚点 = 官方 i18n 文案 menu.aria（中 / 英两套）；半透明填充 / 圆角 / 阴影保持官方。 */
 [data-menu-material][aria-label='Model and reasoning effort'],
 [data-menu-material][aria-label='模型与推理等级'] {
   backdrop-filter: none !important;
-  background-color: var(--dsw-alias-bg-layer-3) !important;
 }
 
 /* ===== 设置弹窗：打光（按弹窗自身盒子缩放，窗口在视口中间，不按视口相位画） ===== */

@@ -67,12 +67,11 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
 
-  it('模型列表菜单：实心（去 blur + 不透明底色），其余菜单保留官方材质', () => {
-    const rule = /\[data-menu-material\]\[aria-label='Model and reasoning effort'\][^{]*\{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(rule.includes('backdrop-filter: none !important'), '模型列表不做实时模糊')
-    assert.ok(rule.includes('background-color: var(--dsw-alias-bg-layer-3) !important'), '模型列表实心（官方抬升面）')
+  it('模型列表菜单：只关它的 blur（其余菜单保留官方材质）', () => {
+    assert.match(code, /\[data-menu-material\]\[aria-label='Model and reasoning effort'\][^{]*\{[^}]*backdrop-filter: none !important;/u)
     assert.match(code, /\[data-menu-material\]\[aria-label='模型与推理等级'\]/u)
-    assert.ok(!/^\[data-menu-material\] \{/mu.test(code), '不得全局改掉所有菜单')
+    assert.ok(!/^\[data-menu-material\] \{/mu.test(code), '不得全局关掉所有菜单的 blur')
+    assert.ok(!/\[data-menu-material\][^}]*background/u.test(code), '不覆盖菜单填充')
   })
 
   it('设置弹窗：打光（按弹窗自身盒子缩放）', () => {
