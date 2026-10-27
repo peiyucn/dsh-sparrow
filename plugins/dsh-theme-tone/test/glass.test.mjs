@@ -96,6 +96,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
       assert.ok(gated || officialMaterial, `规则必须带门：${line.trim()}`)
     }
     assert.ok((code.match(/background-attachment: fixed/gu) ?? []).length >= 1, '仅停靠卡缝隙的补缝层允许 fixed 背景（复刻背景打光）')
+    assert.ok(!code.includes('+ 128px'), '补缝层不再外扩（避免横向超屏/盖住统计胶囊）')
     assert.ok(!/blur\(/u.test(code), '不手写 blur 数值（统一官方 token）')
   })
 

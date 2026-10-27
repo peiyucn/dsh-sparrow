@@ -121,6 +121,8 @@ body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
      20px 藏到卡片材质之下（只从底部圆角缺口透出来填住），向下覆盖所有 stack 缝隙；左右外扩。
    * todo：卡片根自己就是材质（[data-testid='todo-panel']，自带 overflow:hidden + 16px 圆角），
      用 ::before + 两个底部圆角遮罩只填圆角缺口；::after 覆盖它下方的缝隙。
+   * 尺寸只覆盖「缝隙 + 卡片底部圆角」所需：宽度 = 卡片自身宽度（不外扩，避免横向超出屏幕），
+     queue / goal 向上 20px + gap，todo 的缝带只一个 gap —— 不向下延伸，避免盖住统计胶囊。
    * 精确对齐靠 background-attachment: fixed：固定背景定位区 = 视口，与 .dsh-theme-tone 地面层同源。 */
 ${P} ${SEAT} :is([data-queue-dock], [data-goal-bar]) {
   position: relative;
@@ -131,10 +133,13 @@ ${P} ${SEAT} :is([data-queue-dock], [data-goal-bar]) {
 ${P} ${SEAT} :is([data-queue-dock], [data-goal-bar])::after {
   content: '';
   position: absolute;
+  /* 只向上 20px（藏在卡片材质下填圆角缺口）+ 一个 gap；不再向下/左右外扩，
+     否则会盖住下面的统计胶囊、横向超出屏幕。 */
   top: calc(100% - 20px);
-  left: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 128px));
-  right: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 128px));
-  height: calc(var(--dsh-composer-stack-gap, 6px) + 20px + 128px);
+  /* 只外扩一个 side-clearance（停靠卡比输入框窄的那点差），不做出屏的大外扩 */
+  left: calc(-1 * var(--dsh-composer-side-clearance, 16px));
+  right: calc(-1 * var(--dsh-composer-side-clearance, 16px));
+  height: calc(var(--dsh-composer-stack-gap, 6px) + 20px);
   z-index: -1;
   pointer-events: none;
   background-color: var(--dsw-alias-bg-base);
@@ -174,9 +179,9 @@ ${P} ${SEAT} [data-testid='todo-panel']::after {
   content: '';
   position: absolute;
   top: 100%;
-  left: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 128px));
-  right: calc(-1 * (var(--dsh-composer-side-clearance, 16px) + 128px));
-  height: calc(var(--dsh-composer-stack-gap, 6px) + 128px);
+  left: calc(-1 * var(--dsh-composer-side-clearance, 16px));
+  right: calc(-1 * var(--dsh-composer-side-clearance, 16px));
+  height: var(--dsh-composer-stack-gap, 6px);
   z-index: -1;
   pointer-events: none;
   background-color: var(--dsw-alias-bg-base);
