@@ -4,7 +4,6 @@ import { BACKDROP_GRADIENTS } from './backdrop.js'
 export const HEADER_HEIGHT_PX = 76
 export const HEADER_GLASS_ALPHA = 0.7
 export const CARD_GLASS_ALPHA = 0.88
-export const SEAT_BAND_PX = 44
 
 /** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
 export const PANEL_BAND_PX = 38
@@ -82,20 +81,26 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框：玻璃卡片（不做 live blur —— 合成器 bug 的唯一稳定解） =====
-   证据链（一天里逐步排除出来的）：
-   ① 只要输入框这边**有任何 live backdrop-filter**，模型菜单一开、工具输出一更新，Chromium 就把
-      菜单碎片的错位快照画进卡片（owner 多版截图一致）；
-   ② 把座位改成静态光墙（backdrop 不再含重绘正文）→ 残影仍在 ⇒ 与采样内容无关；
-   ③ 关掉官方菜单自己的 blur → 仍在 ⇒ 与「两层 blur 重叠」也无关；
-   ④ 早期版本「整页无 blur」时残影消失 ⇒ 触发条件就是**本插件在输入框区域的 backdrop-filter 层**。
-   结论：当前 Chromium 上「输入框 live blur + 菜单浮层」不可共存。取舍：
-   - 输入框保住**透明 + 有方向边缘光 + 同源光**的玻璃观感，去掉 live blur，填充提到 88%（正文从下面
-     滚过时只剩极淡的流动感，不再是锐利文字穿帮）；
-   - 对话区顶栏 / 右栏顶栏的 live blur **保留**（它们不与菜单浮层重叠，未出现残影）。
-   不再有任何「菜单打开才切换」的运行时开关。 */
+/* ===== 输入框：玻璃卡片（不做 live blur）+ 座位光墙 =====
+   一天逐项排除后的结论：输入框区域只要有 live backdrop-filter，模型菜单一开就会触发 Chromium 的
+   快照错位（与采样内容无关、与「两层 blur 重叠」也无关；整页无 blur 时残影消失）。
+   所以输入框去掉 live blur；同时因为不再有模糊去"糊掉"滚动内容，座位必须重新挡住正文，否则文字会
+   互相叠在一起（owner 反馈）。做法：座位画一层「底色 + 地面光」的不透光墙（上缘 36px 渐隐，复刻
+   官方让正文淡出的观感），卡片用高比例半透明填充 + 官方 elevation + 有方向边缘光，贴着光墙读作
+   玻璃卡片。顶栏 / 右栏的 live blur 保留（不与菜单浮层重叠，未出现残影）。 */
 ${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] {
   background: none !important;
+}
+${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--dsw-alias-bg-base);
+${viewportLight('100% 100%')}
+  -webkit-mask-image: linear-gradient(180deg, transparent 0px, black 36px);
+  mask-image: linear-gradient(180deg, transparent 0px, black 36px);
 }
 ${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card] {
   position: relative;
@@ -106,19 +111,6 @@ ${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-
 }
 body:not([data-ds-dark-theme]) :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card] {
   box-shadow: var(--dsw-elevation-soft), ${RIM_LIGHT};
-}
-/* 卡片下方滚过的正文用「地面同源」的一小段盖住；带顶被卡片盖住，不需要 mask。 */
-${P} [data-phase='active'] [data-composer-seat]::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: ${SEAT_BAND_PX}px;
-  z-index: -1;
-  pointer-events: none;
-  background-color: var(--dsw-alias-bg-base);
-${viewportLight('100% 100%')}
 }
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */

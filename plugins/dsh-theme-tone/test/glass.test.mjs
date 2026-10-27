@@ -7,8 +7,7 @@ import { PLAIN_ATTR } from '../lib/constants.js'
 import {
   CARD_GLASS_ALPHA,
   HEADER_GLASS_ALPHA,
-  HEADER_HEIGHT_PX,
-  SEAT_BAND_PX,
+  HEADER_HEIGHT_PX,
   buildGlassCss,
 } from '../lib/glass.js'
 
@@ -29,28 +28,24 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(header.includes('background-position: 100% 0'), '顶栏贴视口右上 ⇒ 与地面光同源')
   })
 
-  it('输入框：不做 live blur（合成器 bug 唯一稳定解）+ 透明填充 + 有方向边缘光', () => {
+  it('输入框：不做 live blur + 座位光墙挡正文 + 半透明填充 + 有方向边缘光', () => {
     const seat = /\[data-composer-seat\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(seat.includes('background: none'), '底座撤掉官方遮罩，正文仍从卡片下滚过（填充更实，不再锐利穿帮）')
-    assert.ok(!code.includes('[data-composer-card]::before'), '不再用 ::before 负层')
+    assert.ok(seat.includes('background: none'), '底座改由自己的光墙铺底')
+    const wall = /\[data-composer-seat\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(wall.includes('background-image: radial-gradient('), '光墙画地面光')
+    assert.ok(wall.includes('background-size: 100vw 100vh'))
+    assert.ok(wall.includes('background-position: 100% 100%'), '贴视口右下 ⇒ 与地面光同源')
+    assert.ok(wall.includes('mask-image'), '上缘 36px 渐隐（正文淡出，不叠字）')
+    assert.ok(!code.includes('[data-composer-card]::before'), '卡片不再用 ::before 负层')
     const card = /\[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(!card.includes('backdrop-filter'), '输入框卡片不得带 live blur（与菜单浮层共存会触发合成器残影）')
-    assert.ok(card.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%`), '保留半透明填充')
+    assert.ok(!card.includes('backdrop-filter'), '输入框不做 live blur（与菜单浮层共存会触发合成器残影）')
+    assert.ok(card.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%`), '半透明填充')
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色')
     assert.ok(card.includes('box-shadow: var(--dsw-elevation-soft)'), '保留官方 elevation，再叠边缘光')
     assert.ok(card.includes('inset 0 1px 2px'), '上缘高光')
     assert.ok(card.includes('inset -1px 0 3px rgba(0, 0, 0'), '右缘暗边（有方向，不是一圈均匀描边）')
     assert.ok(!code.includes('data-menu-material'), '不得有「菜单打开就关模糊」的降级')
-  })
-
-  it('输入框下方遮罩：纯 CSS 视口对齐重画地面，零 JS、零 fixed', () => {
-    const band = /\[data-composer-seat\]::after \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(band.includes('background-image:'), '遮罩重画地面光')
-    assert.ok(band.includes('background-size: 100vw 100vh'))
-    assert.ok(band.includes('background-position: 100% 100%'), '右下对齐 = 视口对齐（sticky 座底贴着视口底）')
-    assert.ok(!band.includes('fixed'))
-    assert.ok(!band.includes('mask-image'), '带顶被卡片盖住，不需要 mask')
-    assert.match(band, new RegExp(`height: ${SEAT_BAND_PX}px`))
+    assert.ok(!code.includes('[data-composer-seat]::after'), '不再需要垫底带')
   })
 
   it('右栏：底色/打光 + 正文上提 76px 从两条带下滚过 + 头行玻璃（真模糊）', () => {
