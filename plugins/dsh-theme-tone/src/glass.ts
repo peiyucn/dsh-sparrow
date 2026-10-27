@@ -111,21 +111,27 @@ ${P} ${SEAT} [data-composer-card]::before {
 body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   box-shadow: ${RIM_LIGHT};
 }
-/* 停靠卡（todo / queue / goal）与输入框之间是 composerStack 的 --dsh-composer-stack-gap 缝隙。
-   做法（owner 定案）：在那个区域**画一层与「底色 + 打光」完全一样的材质**，把透出来的正文盖住，
-   看起来就是背景本身，既不加玻璃层也不动官方任何位置/尺寸。
-   精确对齐靠 background-attachment: fixed：固定背景的定位区就是视口，渐变里的 % 按视口解析，
-   与 .dsh-theme-tone 地面层（同样按视口铺）逐像素同源。只在座位里确有停靠卡时生效。 */
-${P} ${SEAT}:has([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]) *:has(> [data-composer-card]) {
+/* 停靠卡（todo / queue / goal）与输入框之间、以及多张停靠卡之间，都是 composerStack 的
+   --dsh-composer-stack-gap 缝隙。做法（owner 定案）：**在每个停靠卡下方画一条与「底色 + 打光」完全
+   一样的材质**，把透出来的正文盖住 —— 看起来就是背景本身，不加玻璃层、不动官方任何位置/尺寸。
+   * 画在每张停靠卡**下方**（top:100%）：覆盖「该卡与下一张卡 / 输入框之间」的所有缝，且不会在
+     第一张卡上方多画一条（那里是对话正文）。
+   * 精确对齐靠 background-attachment: fixed：固定背景的定位区就是视口,渐变里的 % 按视口解析，
+     与 .dsh-theme-tone 地面层逐像素同源。
+   * 各卡伪元素可用性：TodoPanel 根无伪元素；GoalBar / QueueDock 的材质在各自内容元素上，卡片根
+     的 ::after 空闲。 */
+${P} ${SEAT} :is([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]) {
   position: relative;
   z-index: 0;
 }
-${P} ${SEAT}:has([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]) *:has(> [data-composer-card])::before {
+${P} ${SEAT} :is([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar])::after {
   content: '';
   position: absolute;
-  top: calc(-1 * var(--dsh-composer-stack-gap, 6px));
-  left: 0;
-  right: 0;
+  top: 100%;
+  /* 停靠卡比输入框窄（各自 inset 不同），两侧各外扩一个 side-clearance 才能盖住
+     「卡与输入框等宽差」留下的 16px 侧边漏条。 */
+  left: calc(-1 * var(--dsh-composer-side-clearance, 16px));
+  right: calc(-1 * var(--dsh-composer-side-clearance, 16px));
   height: var(--dsh-composer-stack-gap, 6px);
   z-index: -1;
   pointer-events: none;

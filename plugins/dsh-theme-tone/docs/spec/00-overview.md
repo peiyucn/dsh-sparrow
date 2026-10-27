@@ -14,12 +14,14 @@
    放卡片 `::before`；卡片 `position: relative; z-index: 0` 自成层叠上下文（否则 `::before` 的
    `z-index:-1` 会逃出卡片 = 淡色框）；座位底部一小段「地面同源」带挡住卡片下方滚出的正文；卡片作用域内
    `--dsw-specific-selector: transparent`（「+」按钮让出实心底色）。
-   **停靠卡缝隙**：todo / queue / goal 停靠卡与输入框之间是官方 composerStack 的 6px 间隙
-   （`--dsh-composer-stack-gap`）。做法（owner 定案）：在那个区域**画一层与「底色 + 打光」完全一样的
-   材质**把透出的正文盖住，看起来就是背景本身 —— **不加玻璃层、不动官方任何位置/尺寸**。精确对齐靠
-   `background-attachment: fixed`（固定背景的定位区就是视口，渐变里的 % 按视口解析，与
-   `.dsh-theme-tone` 地面层逐像素同源）。只在座位里确有停靠卡时生效（`:has([data-testid='todo-panel'],
-   [data-queue-dock], [data-goal-bar])`）。
+   **停靠卡缝隙**：composerStack 里「停靠卡之间」「停靠卡与输入框之间」都是
+   `--dsh-composer-stack-gap`（当前 6px）的缝。做法（owner 定案）：**每张停靠卡（todo / queue / goal）
+   下方画一条与「底色 + 打光」完全一样的材质**，把透出来的正文盖住 —— 不加玻璃层、不动官方位置/尺寸。
+   条 = 各卡根元素的 `::after`（top: 100%，高度跟官方 gap）；左右各外扩一个 `--dsh-composer-side-clearance`
+   以盖住「停靠卡比输入框窄」留下的侧边漏条；精确对齐靠 `background-attachment: fixed`（固定背景
+   定位区 = 视口，渐变里的 % 按视口解析，与 `.dsh-theme-tone` 地面层逐像素同源）。
+   实测（无头）：todo 卡底 669 → 输入框顶 675，`::after` computed = top 36px / height 6px / 左右外扩 /
+   三段 fixed 渐变，缝隙读作背景。
 5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的两个
    盒子 ⇒ 带背后永远只有面板纯色。做法：可流式滚动的正文（markdown/text 文档预览、文件树）上提 76px、
    内容下移 76px（只改视觉位置），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；玻璃面挂在

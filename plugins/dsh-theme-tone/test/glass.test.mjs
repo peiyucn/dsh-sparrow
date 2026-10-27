@@ -71,13 +71,15 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
 
-  it('停靠卡与输入框之间的缝隙：重画「底色 + 打光」盖住透出的正文（不动官方位置）', () => {
-    assert.ok(code.includes("[data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]"), '只在确有停靠卡时生效')
-    const rule = /:has\(> \[data-composer-card\]\)::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+  it('停靠卡缝隙：每张停靠卡下方重画「底色 + 打光」（覆盖卡与卡、卡与输入框之间）', () => {
+    assert.ok(code.includes("[data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]"), '三个停靠卡锚点')
+    const rule = /:is\(\[data-testid='todo-panel'\][^{]*\{\s*content: '';\s*position: absolute;\s*top: 100%;[^}]*\}/u.exec(code)?.[0] ?? ''
     assert.ok(rule.includes('var(--dsh-composer-stack-gap'), '高度跟随官方堆栈间隙')
+    assert.ok(rule.includes('calc(-1 * var(--dsh-composer-side-clearance'), '两侧外扩盖住侧边漏条')
     assert.ok(rule.includes('background-image:'), '重画背景光')
-    assert.ok(rule.includes('background-attachment: fixed'), '固定背景 = 视口解析，与地面层逐像素同源')
-    assert.ok(!code.includes('[data-composer-card]::before {\n  top: calc'), '不再延伸卡片玻璃（不动官方几何）')
+    assert.ok(rule.includes('background-attachment: fixed'), '固定背景 = 视口解析，与地面层同源')
+    assert.ok(!code.includes('[data-composer-card]::before {\n  top: calc'), '不延伸卡片玻璃（不动官方几何）')
+    assert.ok(!code.includes('top: calc(-1 * var(--dsh-composer-stack-gap'), '不在第一张停靠卡上方画带（那里是正文）')
   })
 
   it('设置弹窗：打光（按弹窗自身盒子缩放）', () => {
