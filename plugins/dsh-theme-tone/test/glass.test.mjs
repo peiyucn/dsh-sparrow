@@ -67,8 +67,10 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
 
-  it('官方菜单材质：只关 blur（用菜单的非高频模糊换输入框完整玻璃）', () => {
-    assert.match(code, /\[data-menu-material\] \{\s*backdrop-filter: none !important;/u)
+  it('模型列表菜单：只关它的 blur（其余菜单保留官方材质）', () => {
+    assert.match(code, /\[data-menu-material\]\[aria-label='Model and reasoning effort'\][^{]*\{[^}]*backdrop-filter: none !important;/u)
+    assert.match(code, /\[data-menu-material\]\[aria-label='模型与推理等级'\]/u)
+    assert.ok(!/^\[data-menu-material\] \{/mu.test(code), '不得全局关掉所有菜单的 blur')
     assert.ok(!/\[data-menu-material\][^}]*background/u.test(code), '不覆盖菜单填充')
   })
 

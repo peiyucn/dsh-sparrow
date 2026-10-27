@@ -186,11 +186,13 @@ ${P} [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip] {
   z-index: 3;
 }
 
-/* ===== 官方菜单材质：只关 blur、保留半透明填充 =====
+/* ===== 模型列表菜单：只关它的 blur、保留半透明填充 =====
    输入框的完整玻璃模糊与菜单的 blur 同时存在时，Chromium 会把菜单碎片的错位快照画进输入框
-   （owner 观察确认：两个模糊重叠就出问题）。菜单不是高频操作 ⇒ 用它的实时模糊换输入框的完整玻璃；
-   半透明填充 / 圆角 / 阴影保持官方。 */
-[data-menu-material] {
+   （owner 观察确认：两个模糊重叠就出问题）。owner 定案先只在**模型列表**上试：用它的实时模糊
+   换输入框的完整玻璃，其余菜单（权限 / FIM / @ 等）保留官方 blur。
+   菜单锚点 = 官方 i18n 文案 menu.aria（中 / 英两套）；半透明填充 / 圆角 / 阴影保持官方。 */
+[data-menu-material][aria-label='Model and reasoning effort'],
+[data-menu-material][aria-label='模型与推理等级'] {
   backdrop-filter: none !important;
 }
 
