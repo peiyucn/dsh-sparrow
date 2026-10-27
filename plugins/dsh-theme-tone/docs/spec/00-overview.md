@@ -15,10 +15,10 @@
    `z-index:-1` 会逃出卡片 = 淡色框）；座位底部一小段「地面同源」带挡住卡片下方滚出的正文；卡片作用域内
    `--dsw-specific-selector: transparent`（「+」按钮让出实心底色）。
    **停靠卡缝隙**：todo / queue / goal 停靠卡与输入框之间是官方 composerStack 的 6px 间隙
-   （`--dsh-composer-stack-gap`）；座位透明后这条缝会露出无材质的透明缝，用卡片同款玻璃补一层
-   （宽度用 `--dsh-composer-side-clearance` 对齐两侧留白，同模糊 token 同填充值），且**只在座位里
-   确有停靠卡时生效**（`:has([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar])`），
-   避免 hero / 无停靠卡时卡片上方多出一条玻璃唇边。
+   （`--dsh-composer-stack-gap`）。做法：把输入框卡片**自己的玻璃层向上延伸一个 gap**（同一层、同一宽度、
+   同一材质），卡片看起来从缝隙里长到停靠卡下面；**不新增独立缝条**（独立层会因宽度/模糊不一致显成一条
+   暗带）。只在座位里确有停靠卡时生效（`:has([data-testid='todo-panel'], [data-queue-dock],
+   [data-goal-bar])`），避免 hero / 无停靠卡时卡片上方多出一条玻璃唇边。
 5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的两个
    盒子 ⇒ 带背后永远只有面板纯色。做法：可流式滚动的正文（markdown/text 文档预览、文件树）上提 76px、
    内容下移 76px（只改视觉位置），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；玻璃面挂在

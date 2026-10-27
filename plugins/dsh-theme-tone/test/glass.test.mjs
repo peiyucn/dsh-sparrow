@@ -71,13 +71,10 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
 
-  it('停靠卡与输入框之间的缝隙用同款玻璃补上（跟随官方向隙/留白变量）', () => {
-    const rule = /:has\(\[data-testid='todo-panel'\], \[data-queue-dock\], \[data-goal-bar\]\)[^{]*:has\(> \[data-composer-card\]\)::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(code.includes(":has([data-testid='todo-panel']"), '只在确有停靠卡时补缝（hero/无卡不加唇边）')
-    assert.ok(rule.includes('var(--dsh-composer-stack-gap'), '用官方堆栈间隙变量')
-    assert.ok(rule.includes('var(--dsh-composer-side-clearance'), '用官方侧留白变量')
-    assert.ok(rule.includes('backdrop-filter: var(--dsw-menu-backdrop-filter)'), '同款玻璃模糊')
-    assert.ok(rule.includes(`var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%`), '同款填充')
+  it('停靠卡与输入框之间的缝隙：把卡片玻璃向上延伸一个 gap（不新增独立缝条）', () => {
+    assert.ok(code.includes("[data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]"), '只在确有停靠卡时生效')
+    assert.match(code, /:has\(\[data-testid='todo-panel'\][^{]*\[data-composer-card\]::before \{[^}]*top: calc\(-1 \* var\(--dsh-composer-stack-gap/u)
+    assert.ok(!code.includes(':has(> [data-composer-card])::before'), '不再使用独立的缝隙条（会显成暗带）')
   })
 
   it('设置弹窗：打光（按弹窗自身盒子缩放）', () => {
