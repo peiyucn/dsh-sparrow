@@ -112,11 +112,27 @@ body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   box-shadow: ${RIM_LIGHT};
 }
 /* 停靠卡（todo / queue / goal）与输入框之间是 composerStack 的 --dsh-composer-stack-gap 缝隙。
-   做法：把输入框卡片自己的玻璃层向上延伸一个 gap（同一层、同一宽度、同一材质），卡片看起来从缝隙
-   里长到停靠卡下面，而不是插入一条独立的缝条（独立层会因宽度/模糊不一致而显成一条暗带）。
-   只在座位里确有停靠卡时生效（避免 hero / 无停靠卡时卡片上方多出一条玻璃唇边）。 */
-${P} ${SEAT}:has([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]) [data-composer-card]::before {
+   做法（owner 定案）：在那个区域**画一层与「底色 + 打光」完全一样的材质**，把透出来的正文盖住，
+   看起来就是背景本身，既不加玻璃层也不动官方任何位置/尺寸。
+   精确对齐靠 background-attachment: fixed：固定背景的定位区就是视口，渐变里的 % 按视口解析，
+   与 .dsh-theme-tone 地面层（同样按视口铺）逐像素同源。只在座位里确有停靠卡时生效。 */
+${P} ${SEAT}:has([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]) *:has(> [data-composer-card]) {
+  position: relative;
+  z-index: 0;
+}
+${P} ${SEAT}:has([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]) *:has(> [data-composer-card])::before {
+  content: '';
+  position: absolute;
   top: calc(-1 * var(--dsh-composer-stack-gap, 6px));
+  left: 0;
+  right: 0;
+  height: var(--dsh-composer-stack-gap, 6px);
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--dsw-alias-bg-base);
+  background-image: ${BACKDROP_GRADIENTS};
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 /* 卡片下方滚过的正文用「地面同源」的一小段盖住；带顶被卡片盖住，不需要 mask。 */

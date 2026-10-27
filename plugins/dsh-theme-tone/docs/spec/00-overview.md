@@ -15,10 +15,11 @@
    `z-index:-1` 会逃出卡片 = 淡色框）；座位底部一小段「地面同源」带挡住卡片下方滚出的正文；卡片作用域内
    `--dsw-specific-selector: transparent`（「+」按钮让出实心底色）。
    **停靠卡缝隙**：todo / queue / goal 停靠卡与输入框之间是官方 composerStack 的 6px 间隙
-   （`--dsh-composer-stack-gap`）。做法：把输入框卡片**自己的玻璃层向上延伸一个 gap**（同一层、同一宽度、
-   同一材质），卡片看起来从缝隙里长到停靠卡下面；**不新增独立缝条**（独立层会因宽度/模糊不一致显成一条
-   暗带）。只在座位里确有停靠卡时生效（`:has([data-testid='todo-panel'], [data-queue-dock],
-   [data-goal-bar])`），避免 hero / 无停靠卡时卡片上方多出一条玻璃唇边。
+   （`--dsh-composer-stack-gap`）。做法（owner 定案）：在那个区域**画一层与「底色 + 打光」完全一样的
+   材质**把透出的正文盖住，看起来就是背景本身 —— **不加玻璃层、不动官方任何位置/尺寸**。精确对齐靠
+   `background-attachment: fixed`（固定背景的定位区就是视口，渐变里的 % 按视口解析，与
+   `.dsh-theme-tone` 地面层逐像素同源）。只在座位里确有停靠卡时生效（`:has([data-testid='todo-panel'],
+   [data-queue-dock], [data-goal-bar])`）。
 5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的两个
    盒子 ⇒ 带背后永远只有面板纯色。做法：可流式滚动的正文（markdown/text 文档预览、文件树）上提 76px、
    内容下移 76px（只改视觉位置），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；玻璃面挂在
@@ -67,7 +68,9 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 ## 硬约束（守卫里钉住）
 
 1. 除「官方默认档下也生效」的修牌面规则外，所有样式规则带 `body:not([data-dsh-theme-tone-plain])` 门。
-2. 不得出现 `background-attachment: fixed`；不得手写 `blur()` 数值（统一官方 token）。
+2. 不得出现 `background-attachment: fixed`（**唯一例外**：停靠卡缝隙那一层「底色 + 打光」重绘，见功能 4；
+   固定背景定位区 = 视口，是唯一能让任意位置的 6px 条与地面层逐像素对齐的纯 CSS 办法）；不得手写
+   `blur()` 数值（统一官方 token）。
 3. `backdrop-filter` 只出现在 `::before` / 独立玻璃层上，不挂在 header / 卡片 / pane 本体。
 4. 不改官方容器的 `position` / `overflow` / `transform` / `contain`（右栏 pane 的 `position: relative;
    z-index: 0` 是已知例外，见「已知偏离」）。
@@ -91,6 +94,9 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 * 悬浮卡修复是唯一私有 seam（见 `docs/private-seams.md`），官方改类名后缀即静默失效（回退官方配色，不崩）。
 * 停靠卡缝隙补丁用 `[data-testid='todo-panel']` 识别 Todo 卡（官方无 data 语义锚点，只有 testid）；
   官方改 testid 时该补丁静默不命中，降级表现 = 缝隙回到无材质状态（不崩、不影响布局）。
+* 停靠卡缝隙那层用了 `background-attachment: fixed`：**只在「有停靠卡」时存在、面积仅 6px 高**，
+  是当前唯一能在任意位置的元素上精确复刻「底色 + 打光」的办法。代价是滚动/流式输出时这一小条会随
+  视口重新栅格化；若实测有卡顿，再换回「运行期测量相位 + 显式 background-position」（旧方案的成熟做法）。
 
 ## 验证
 
