@@ -97,7 +97,17 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
   不会崩）；已登记 `docs/private-seams.md`。
 * 右栏「正文上提 76px」是对官方滚动盒的**视觉位置改写**（margin + transform，不改 DOM 结构）：
   官方若改渲染器结构 / data 属性，lift 会静默不命中，退回「带是半透明实心板」的降级观感。
-* 输入框残影（2026-10-27 结案，环境特异）：owner 对照实测 —— **正常 Edge 完全没有残影**；
+* 输入框残影（2026-10-27 结案，内核/嵌入方式差异）：对照实测 —— 同一页面同一主题，**正常 Edge
+  （Chromium 156）完全没有残影**；**VS Code 内置浏览器（1.143.1：Electron 43.7.7 / Chromium 150 的
+  webview）会闪**。已排除用户设置假设：把 VS Code 缩放从 103%（`window.zoomLevel: 0.17`）重置到
+  100% 后残影**更严重**（出现额外方块）⇒ 与缩放 / DPI 无关。Electron 的 webview（OOPIF）对
+  backdrop-filter 的支持与独立浏览器不同（Electron 34 起就有「webview 内 backdrop-filter 失效」的
+  已知问题），这是宿主内核版本与嵌入方式造成的差异。
+  修法：**内嵌 Electron 且 Chromium ≤ 155 时**，菜单存在期间冻结输入框（去 blur + 实心 + 座位光墙），
+  菜单关闭恢复；正常浏览器（Chromium 156+ / 非 Electron）始终完整玻璃、零切换。判定在安装时做一次
+  UA 解析（`Electron` + `Chrome/主版本`），不引入运行时探测循环；VS Code 将来升到 Chromium ≥ 156
+  时该 workaround 自动失效（若仍有残影，再下调阈值即可）。
+
   **VS Code 内置浏览器（Electron webview）会闪**（有 think / 工具输出时按输出频率闪）。触发条件是该
   Chromium 合成路径下「输入框 backdrop-filter 层上方出现新的合成浮层」，与菜单材质、透明度无关
   （实心菜单同样触发）。故按环境分档：正常浏览器保留完整玻璃、零切换；内嵌浏览器在菜单存在期间冻结

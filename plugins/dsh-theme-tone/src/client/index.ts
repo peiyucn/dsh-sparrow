@@ -41,13 +41,25 @@ interface Scope {
   set(field: string, value: unknown): Promise<boolean>
 }
 
-/** 内嵌浏览器（Electron / VS Code webview）判定：只有它们会触发 Chromium 的合成残影。
- *  临时：owner 正在 VS Code 内置浏览器验证「缩放 / DPI 假设」，先关掉判定（回到完整玻璃）；
- *  验证完再恢复下方 return 的第二个条件。 */
+/**
+ * 内嵌浏览器（Electron / VS Code webview）判定 + 内核版本门。
+ *
+ * 依据（2026-10-27 实测核对）：
+ * - 同一页面、同一主题，正常 Edge（Chromium 156）无残影；VS Code 1.143.1 内置浏览器
+ *   （Electron 43.7.7 / Chromium 150）在流式输出 + 浮层时会把菜单碎片错位画进输入框。
+ * - Electron 的 webview（OOPIF）对 backdrop-filter 的支持与独立浏览器不同，Electron 34 起还有
+ *   「webview 内 backdrop-filter 失效」等已知问题 ⇒ 这不是用户设置问题，是内核/嵌入方式差异。
+ * - 因此只对「Electron 且 Chromium 主版本低于 156」的宿主启用菜单期冻结；VS Code 将来升到
+ *   Chromium ≥ 156 时该判定自动失效（若仍有残影，再下调阈值即可）。
+ */
+const GLASS_BUG_MAX_CHROMIUM_MAJOR = 155
+
 function isEmbeddedBrowser(): boolean {
   try {
-    const looksEmbedded = /Electron|vscode/i.test(navigator.userAgent)
-    return false && looksEmbedded
+    const ua = navigator.userAgent
+    if (!/Electron/i.test(ua)) return false
+    const major = /Chrome\/(\d+)/u.exec(ua)?.[1]
+    return major !== undefined && Number(major) <= GLASS_BUG_MAX_CHROMIUM_MAJOR
   } catch {
     return false
   }
