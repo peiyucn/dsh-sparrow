@@ -41,10 +41,13 @@ interface Scope {
   set(field: string, value: unknown): Promise<boolean>
 }
 
-/** 内嵌浏览器（Electron / VS Code webview）判定：只有它们会触发 Chromium 的合成残影。 */
+/** 内嵌浏览器（Electron / VS Code webview）判定：只有它们会触发 Chromium 的合成残影。
+ *  临时：owner 正在 VS Code 内置浏览器验证「缩放 / DPI 假设」，先关掉判定（回到完整玻璃）；
+ *  验证完再恢复下方 return 的第二个条件。 */
 function isEmbeddedBrowser(): boolean {
   try {
-    return /Electron|vscode/i.test(navigator.userAgent)
+    const looksEmbedded = /Electron|vscode/i.test(navigator.userAgent)
+    return false && looksEmbedded
   } catch {
     return false
   }
