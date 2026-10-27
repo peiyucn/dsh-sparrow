@@ -2,29 +2,13 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
+import { CHAT_FIM_CLASS, buildChatFimCss } from '../lib/client/styles.js'
 
-/**
- * 取出 `ensureSuggestBusyStyles()` 注入的 CSS 文本。
- * @returns {Promise<{ css: string, source: string }>} CSS 文本与整个源文件文本。
- */
-async function readInjectedCss() {
-  const source = await readFile(new URL('../src/client/ChatFimDock.tsx', import.meta.url), 'utf8')
-  const marker = 'style.textContent = `'
-  const start = source.indexOf(marker)
-  const tail = source.indexOf('document.head.appendChild(style)')
-  assert.ok(start >= 0 && tail > start, '应当能在源注册处找到注入样式模板')
-  const end = source.lastIndexOf('`', tail)
-  assert.ok(end > start, '应当能找到注入样式模板的结束反引号')
-  return { css: source.slice(start + marker.length, end), source }
-}
+/** 注入的样式表文本（直接取构建产物，不再从 TSX 源码里切）。 */
+const css = buildChatFimCss()
 
-/**
- * 取某个类选择器规则的声明块文本（只处理本文件的平铺规则，不含嵌套）。
- * @param {string} css - 注入的 CSS 文本。
- * @param {string} selector - 选择器（如 `.dsh-chat-fim-menu-row`）。
- * @returns {string} 规则内容。
- */
-function ruleOf(css, selector) {
+/** 取某个类选择器规则的声明块文本（只处理平铺规则，不含嵌套）。 */
+function ruleOf(selector) {
   const escaped = selector.replaceAll(/[.*+?^${}()|[\]\\]/gu, '\\$&')
   const match = new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 'u').exec(css)
   assert.ok(match !== null, `应当存在 ${selector} 规则`)
@@ -43,9 +27,11 @@ function expectDeclarations(block, snippets, where) {
   }
 }
 
+/** 组件源码（只用来钉「由官方原语渲染」这类 JSX 事实，不从这里取 CSS）。 */
+const domSource = () => readFile(new URL('../src/client/ChatFimDock.tsx', import.meta.url), 'utf8')
+
 describe('chat-fim 菜单样式契约（对齐官方 rc.3 菜单原语）', () => {
-  it('注入样式表的花括号必须平衡（多余的 } 会吞掉下一条规则）', async () => {
-    const { css } = await readInjectedCss()
+  it('注入样式表的花括号必须平衡（多余的 } 会吞掉下一条规则）', () => {
     let depth = 0
     let minDepth = 0
     for (const char of css) {
@@ -60,9 +46,8 @@ describe('chat-fim 菜单样式契约（对齐官方 rc.3 菜单原语）', () =
   })
 
   it('候选菜单卡由官方 MenuSurface 承担材质，卡片规则只留几何与立起方式', async () => {
-    const { css, source } = await readInjectedCss()
-    assert.match(source, /<MenuSurface\s/u, '候选菜单卡必须由官方 MenuSurface 渲染')
-    const card = ruleOf(css, '.dsh-chat-fim-menu')
+    assert.match(await domSource(), /<MenuSurface\s/u, '候选菜单卡必须由官方 MenuSurface 渲染')
+    const card = ruleOf(`.${CHAT_FIM_CLASS.menu}`)
     expectDeclarations(card, [
       'position: absolute',
       'bottom: calc(100% + 4px)',
@@ -79,9 +64,8 @@ describe('chat-fim 菜单样式契约（对齐官方 rc.3 菜单原语）', () =
     assert.ok(!card.includes('button-info-fill'), '卡片不得再用旧版紫色描边，统一走官方描边通道')
   })
 
-  it('候选行与官方 MenuView .item 同几何：34 高 / 6×8 内边距 / md 圆角 / 13-20 字', async () => {
-    const { css } = await readInjectedCss()
-    const row = ruleOf(css, '.dsh-chat-fim-menu-row')
+  it('候选行与官方 MenuView .item 同几何：34 高 / 6×8 内边距 / md 圆角 / 13-20 字', () => {
+    const row = ruleOf(`.${CHAT_FIM_CLASS.menuRow}`)
     expectDeclarations(row, [
       'box-sizing: border-box',
       'width: 100%',
@@ -92,15 +76,14 @@ describe('chat-fim 菜单样式契约（对齐官方 rc.3 菜单原语）', () =
       'line-height: 20px',
       'background: transparent',
     ], '候选行')
-    const hover = ruleOf(css, '.dsh-chat-fim-menu-row:hover')
+    const hover = ruleOf(`.${CHAT_FIM_CLASS.menuRow}:hover`)
     assert.ok(hover.includes('background: var(--dsw-alias-interactive-bg-hover)'), '悬停底必须用官方高亮 token')
   })
 
-  it('FIM 开关胶囊与官方 PermissionSelect / ModelSelect 触发器同几何（hover 底形状一致）', async () => {
+  it('FIM 开关胶囊与官方 PermissionSelect / ModelSelect 触发器同几何（hover 底形状一致）', () => {
     // owner 报障：「fim 按钮的 hover 背景框和官方的不一样」—— 官方触发器圆角走 --dsw-radius-sm（8px），
     // 我们曾写 24px 胶囊 ⇒ hover 底色被裁成「椭圆」。正文字由官方 trigger CSS 逐项对照钉住。
-    const { css } = await readInjectedCss()
-    const sw = ruleOf(css, '.dsh-chat-fim-switch')
+    const sw = ruleOf(`.${CHAT_FIM_CLASS.switch}`)
     expectDeclarations(sw, [
       'height: 28px',
       'padding: 0 4px 0 8px',
@@ -110,20 +93,19 @@ describe('chat-fim 菜单样式契约（对齐官方 rc.3 菜单原语）', () =
       'line-height: 20px',
     ], 'FIM 开关胶囊')
     assert.ok(!sw.includes('border-radius: 24px'), '不得再用 24px 胶囊圆角（hover 底会被裁成椭圆）')
-    const hover = ruleOf(css, '.dsh-chat-fim-switch:hover:not(:disabled)')
+    const hover = ruleOf(`.${CHAT_FIM_CLASS.switch}:hover:not(:disabled)`)
     assert.ok(hover.includes('background: var(--dsw-alias-interactive-bg-hover)'), '悬停底必须与官方触发器同 token')
   })
 
-  it('菜单底部沿用官方菜单 footer 的 l2 发丝线', async () => {
-    const { css } = await readInjectedCss()
-    const footer = ruleOf(css, '.dsh-chat-fim-menu-footer')
+  it('菜单底部沿用官方菜单 footer 的 l2 发丝线', () => {
+    const footer = ruleOf(`.${CHAT_FIM_CLASS.menuFooter}`)
     assert.ok(footer.includes('border-top: 0.5px solid var(--dsw-alias-border-l2)'), '底部发丝线用 l2')
   })
 
   it('灵敏度弹层同样走官方 MenuSurface + 官方行几何，左缘对齐开关', async () => {
-    const { css, source } = await readInjectedCss()
-    assert.match(source, /<MenuSurface[\s\S]*?dsh-chat-fim-sensitivity-popover/u, '灵敏度弹层必须由官方 MenuSurface 渲染')
-    const popover = ruleOf(css, '.dsh-chat-fim-sensitivity-popover')
+    const source = await domSource()
+    assert.match(source, /className=\{cls\.sensitivityPopover\}/u, '灵敏度弹层必须由官方 MenuSurface 渲染')
+    const popover = ruleOf(`.${CHAT_FIM_CLASS.sensitivityPopover}`)
     expectDeclarations(popover, [
       'position: fixed',
       'z-index: 1100',
@@ -133,7 +115,7 @@ describe('chat-fim 菜单样式契约（对齐官方 rc.3 菜单原语）', () =
       'box-shadow: var(--dsw-elevation-prominent)',
     ], '灵敏度弹层卡')
     assert.ok(!popover.includes('backdrop-filter'), '弹层不得自写 backdrop-filter')
-    const option = ruleOf(css, '.dsh-chat-fim-sensitivity-option')
+    const option = ruleOf(`.${CHAT_FIM_CLASS.sensitivityOption}`)
     expectDeclarations(option, [
       'min-height: 34px',
       'padding: 6px 8px',
@@ -142,6 +124,6 @@ describe('chat-fim 菜单样式契约（对齐官方 rc.3 菜单原语）', () =
       'line-height: 20px',
     ], '灵敏度选项行')
     assert.match(source, /const x = Math\.max\(8, Math\.min\(rect\.left,/u, '弹层左缘对齐开关并做窗内钳制')
-    assert.ok(!source.includes("translateX(-100%)"), '弹层不得再右缘对齐')
+    assert.ok(!source.includes('translateX(-100%)'), '弹层不得再右缘对齐')
   })
 })

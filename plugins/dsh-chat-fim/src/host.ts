@@ -9,6 +9,9 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
 import { assertCapabilities, assertHostCompatible, unsupportedStoredFormatReason } from './compat.js'
+import {
+  COMPLETE_ROUTE_PATH, ECHO_ASSISTANT_WINDOW_CHARS, ECHO_USER_PREFIX_CHARS, MAX_DIAGNOSTIC_SESSIONS, name,
+} from './constants.js'
 import { isTrustedBrowserRequest, officialTrustedHosts } from './trust.js'
 import {
   buildFimPrompt, cleanSuggestion, currentMainRoute, detectDraftLanguage, extractSuggestions, extractUsage, speakerStopSequences,
@@ -20,12 +23,12 @@ import {
 
 export type { CompleteRequest } from './suggest.js'
 
-export const name = 'dsh-chat-fim'
-export const inject = ['webServer', 'sessions', 'credentials']
-
+export { name }
+export { MAX_DIAGNOSTIC_SESSIONS }
 export type { ChatFimConfig, ChatFimError }
 
-const ROUTE_PATH = '/api/chat-fim/complete'
+export const inject = ['webServer', 'sessions', 'credentials']
+
 /** 候选全被复读/回声护栏过滤时的重试温度：0.5——比 0.3 更易跳出复读循环，比 0.7 噪声小（0.7 实测相关性弱）。 */
 const ECHO_RETRY_TEMPERATURE = 0.5
 /** 并行请求温度错开步长（suggestionCount > 1 时生效，步长 0.4 实测多样性足够）。 */
@@ -34,9 +37,6 @@ const TEMPERATURE_SPREAD_STEP = 0.4
 const MAX_TEMPERATURE = 2
 
 export type DiagnosticKey = 'requests' | 'fulfilled' | 'retries' | 'shown' | 'empty' | 'filteredSpeaker' | 'filteredRepeat' | 'filteredEcho' | 'filteredLanguage' | 'aborted' | 'timeout' | 'upstreamError'
-
-/** 按会话诊断条目上限：host 进程长期存活，bySession 表必须随会话数有界——超限淘汰最早写入条目（FIFO）。 */
-export const MAX_DIAGNOSTIC_SESSIONS = 256
 
 /** 一个会话（或全局）的诊断计数行；`elapsed*` 只在全局行维护。 */
 type DiagnosticCounts = Record<DiagnosticKey, number>
@@ -274,7 +274,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
-    path: ROUTE_PATH,
+    path: COMPLETE_ROUTE_PATH,
     handler: async (req, res) => {
       // 信任栅栏（先于一切路由分发）：官方那道门只装在它自己的 `/api` 前缀路由上，
       // 本插件的 exact 路由不会经过它（见 trust.ts）。POST 会以服务端 API key 执行
@@ -317,7 +317,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
       }
 
       if (req.method !== 'POST') {
-        sendError(res, 405, { code: 'BAD_BODY', message: '只接受 POST /api/chat-fim/complete' })
+        sendError(res, 405, { code: 'BAD_BODY', message: `只接受 POST ${COMPLETE_ROUTE_PATH}` })
         return
       }
 
@@ -392,8 +392,8 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
       // FIM 转写体 prompt：最近历史转说话人文本 + 「用户：草稿」结尾（见 suggest.ts buildFimPrompt）。
       const prompt = buildFimPrompt(history, parsed.prompt, language)
       // 回声判定的历史文本集（与 prompt 同一窗口）：
-      // 用户消息按「开头 10 字前缀」比对（整段复读用户原话时开头即重叠；中段复用措辞不误杀），
-      // 助手消息按「15 字窗口」比对（转述讨论内容如 cleanSuggestion 仍拦得住，正常措辞复用放行）。
+      // 用户消息按「开头 ECHO_USER_PREFIX_CHARS 字前缀」比对（整段复读用户原话时开头即重叠；中段复用措辞不误杀），
+      // 助手消息按「ECHO_ASSISTANT_WINDOW_CHARS 字窗口」比对（转述讨论内容如 cleanSuggestion 仍拦得住，正常措辞复用放行）。
       const historyTurns = recentHistoryTurns(history)
       const userEchoTexts = historyTurns.filter(turn => turn.role === 'user').map(turn => turn.text)
       const assistantEchoTexts = historyTurns.filter(turn => turn.role === 'assistant').map(turn => turn.text)
@@ -468,7 +468,7 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
                   bumpDiagnostics('filteredRepeat', sessionKey)
                   continue
                 }
-                if (startsWithHistoryEcho(clean, userEchoTexts, 10) || isHistoryEcho(clean, assistantEchoTexts, 15)) {
+                if (startsWithHistoryEcho(clean, userEchoTexts, ECHO_USER_PREFIX_CHARS) || isHistoryEcho(clean, assistantEchoTexts, ECHO_ASSISTANT_WINDOW_CHARS)) {
                   bumpDiagnostics('filteredEcho', sessionKey)
                   continue
                 }
@@ -572,5 +572,5 @@ export function apply(ctx: Context, config: Readonly<Partial<ChatFimConfig>> = {
         signal.dispose()
       }
     },
-  }), 'dsh-chat-fim: /api/chat-fim/complete route')
+  }), `${name}: ${COMPLETE_ROUTE_PATH} route`)
 }

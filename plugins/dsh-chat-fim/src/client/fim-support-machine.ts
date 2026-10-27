@@ -4,6 +4,13 @@
  * 未知 ≠ 支持：host 对「判不了」与「判为不支持」给两种回答，故未知单独成相并做有界补查，补查耗尽才 fail-open 显示。
  */
 
+import {
+  FIM_SUPPORT_UNKNOWN_RETRY_FACTOR, FIM_SUPPORT_UNKNOWN_RETRY_MS, FIM_SUPPORT_UNKNOWN_RETRIES,
+} from '../constants.js'
+
+/** 补查策略的数值见 constants.ts（重导出以保证状态机的调用方与单测只有一个来源）。 */
+export { FIM_SUPPORT_UNKNOWN_RETRY_FACTOR, FIM_SUPPORT_UNKNOWN_RETRY_MS, FIM_SUPPORT_UNKNOWN_RETRIES }
+
 export interface FimSupportAddress {
   readonly sessionId: string
   /** 当前选中模型的 provider:model；'' = 模型未解析（默认兜底窗口）。 */
@@ -26,11 +33,6 @@ export type FimSupportEvent =
   | { readonly type: 'checked'; readonly address: FimSupportAddress; readonly supported: boolean }
   | { readonly type: 'unknown'; readonly address: FimSupportAddress }
   | { readonly type: 'retry-tick'; readonly address: FimSupportAddress }
-
-/** 未知答案（host 判不了：会话尚未激活 / 路由不可达）的补查策略：首次间隔取小以便定论尽快到位，其后按倍数退避覆盖大日志会话的慢激活；总次数有界 → 定时器不会无限重排。 */
-export const FIM_SUPPORT_UNKNOWN_RETRY_MS = 500
-export const FIM_SUPPORT_UNKNOWN_RETRY_FACTOR = 2
-export const FIM_SUPPORT_UNKNOWN_RETRIES = 5
 
 /**
  * 第 n 次补查前的等待毫秒（n 从 1 起）：500 / 1000 / 2000 / 4000 / 8000，合计 15.5s。

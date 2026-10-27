@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 import { DEFAULT_MODEL } from '../lib/suggest.js'
 import { globToRegExp, isPacked } from './helpers/pack-glob.mjs'
@@ -80,5 +80,34 @@ describe('dsh-chat-fim 结构', () => {
     assert.equal(isPacked('lib/types/x.d.ts', files), true, 'lib/types 下的 .d.ts 在清单内')
     assert.equal(isPacked('lib/types/x.js', files), true, '`lib/**/*.js` 同样覆盖 types 下的 js')
     assert.ok(globToRegExp('lib/**/*.js').test('lib/host.js'), '双星后接斜杠时连零层目录都算')
+  })
+})
+
+describe('dsh-chat-fim 架构不变量（重构成 theme-tone 形）', () => {
+  it('文档应该 只剩单一现状 spec', async () => {
+    const specs = await readdir(new URL('../docs/spec', import.meta.url))
+    assert.deepEqual(specs, ['00-overview.md'])
+  })
+
+  it('⛔ 组件不得内联样式表 / 自建 style 标签（CSS 只在 client/styles.ts）', async () => {
+    const dock = await readFile(new URL('../src/client/ChatFimDock.tsx', import.meta.url), 'utf8')
+    assert.ok(!dock.includes("createElement('style')"), '组件不得自建 style 标签')
+    assert.ok(!/textContent\s*=\s*`/u.test(dock), '组件不得内联 CSS 模板串')
+    // 类名一律从 styles.ts 的类名表取：组件里出现 `dsh-chat-fim-` 字样就是又手写了一份。
+    assert.ok(!dock.includes('dsh-chat-fim-'), '组件不得手写类名 / 选择器字符串')
+  })
+
+  it('样式表应该 由 client/styles.ts 注入，并在 ctx.effect 的清理里移除', async () => {
+    const index = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(index, /ensureChatFimStyles\(\)/u, 'client 入口必须从 styles.ts 注入口取样式')
+    assert.match(index, /ctx\.effect\(\(\) => \(\) => \{ styles\.remove\(\) \}/u, '样式表必须在 effect 里移除')
+  })
+
+  it('样式命名应该 统一为 chat-fim（不再有 busy 时代的标记与函数名）', async () => {
+    for (const file of ['../src/client/index.ts', '../src/client/ChatFimDock.tsx', '../src/client/styles.ts']) {
+      const source = await readFile(new URL(file, import.meta.url), 'utf8')
+      assert.ok(!source.includes('data-dsh-chat-fim-busy'), `${file} 不得再用 busy 标记`)
+      assert.ok(!source.includes('ensureSuggestBusyStyles'), `${file} 不得再用 busy 时代的注入函数名`)
+    }
   })
 })

@@ -8,13 +8,21 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { TRIGGER_SENSITIVITIES, detectEndOfDraft, formatTokenCount, shouldTriggerSuggest, type TriggerSensitivity } from '../suggest.js'
+import { ENABLED_STORAGE_KEY, MENU_MAX_HEIGHT, RING_MEASURE_INTERVAL_MS, SENSITIVITY_STORAGE_KEY } from '../constants.js'
+import {
+  TRIGGER_SENSITIVITIES, detectEndOfDraft, formatTokenCount, normalizeTriggerSensitivity, shouldTriggerSuggest,
+  type TriggerSensitivity,
+} from '../suggest.js'
 import { anchorPointsEqual, rectsEqual } from './geometry.js'
 import { createLazyDirectoryStore } from './lazy-directory-store.js'
+import { CHAT_FIM_CLASS } from './styles.js'
 import {
   fimSupportReducer, fimSupportRetryDelayMs, fimSupportShown, initialFimSupportState,
   type FimSupportEvent, type FimSupportState,
 } from './fim-support-machine.js'
+
+/** 类名表别名：JSX 与事件里的选择器都走它，不手写字符串。 */
+const cls = CHAT_FIM_CLASS
 
 export interface SuggestCompleteResult {
   readonly suggestions: readonly string[]
@@ -54,14 +62,8 @@ export type ChatFimDockProps = PropsRuntime<'conversation.input.dock'> & ChatFim
 export type ChatFimSwitchProps = PropsRuntime<'conversation.input.left'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
 export type ChatFimMenuProps = PropsRuntime<'conversation.input.overlay'> & ChatFimDockInjected & { t: TranslateNS<'chat-fim'> }
 
-const ENABLED_STORAGE_KEY = 'dsh-chat-fim:enabled'
-const SENSITIVITY_STORAGE_KEY = 'dsh-chat-fim:sensitivity'
-/** 菜单高度设计上限（同官方 @ 候选列表 ui-input-trigger/MenuView 的 400px）。 */
-const MENU_MAX_HEIGHT = 400
 /** 灵敏度弹层预宽：左缘对齐后向窗内钳制时用的宽度上界。 */
 const PICKER_MAX_WIDTH = 360
-/** 旋转光环的卡片矩形自愈测量周期。 */
-const RING_MEASURE_INTERVAL_MS = 300
 
 /** 读取本地开关状态：默认关闭，仅显式存过 '1' 才开启；非法值回退关闭。 */
 export function readEnabled(storage: { getItem(key: string): string | null }, key = ENABLED_STORAGE_KEY): boolean {
@@ -251,16 +253,11 @@ export function peekSuggestAdoption(): { sessionId: SessionId; draft: string; te
   return lastAdoption
 }
 
-/** 读取本地触发灵敏度：eager/standard/conservative，非法值回退 standard。 */
-export function readTriggerSensitivity(storage: { getItem(key: string): string | null }, key = SENSITIVITY_STORAGE_KEY): TriggerSensitivity {
-  const value = storage.getItem(key)
-  return value === 'eager' || value === 'standard' || value === 'conservative' ? value : 'standard'
-}
-
 // 模块级共享触发灵敏度（开关胶囊 ▾ 选择器写入，dock 触发与请求时读取）。
+// 非法值 / 读不到：都与 suggest.ts 的 normalizeTriggerSensitivity 同一套回退（standard），故不另写一份规则。
 let sharedSensitivity: TriggerSensitivity = 'standard'
 try {
-  sharedSensitivity = readTriggerSensitivity(window.localStorage)
+  sharedSensitivity = normalizeTriggerSensitivity(window.localStorage.getItem(SENSITIVITY_STORAGE_KEY))
 } catch {
   sharedSensitivity = 'standard'
 }
@@ -307,303 +304,6 @@ function composerCardRect(anchor: HTMLElement | null): { x: number; y: number; w
   return { x: rect.left, y: rect.top, width: rect.width, height: rect.height }
 }
 
-/** 注入开关样式、联想中脉冲 keyframes 与候选菜单样式（按 data 属性去重）；返回 style 元素供卸载清理。 */
-export function ensureSuggestBusyStyles(): HTMLStyleElement {
-  const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-chat-fim-busy]')
-  if (existing !== null) return existing
-  const style = document.createElement('style')
-  style.dataset.dshChatFimBusy = ''
-  style.textContent = `
-/* 开关胶囊：官方 PermissionSelect / ModelSelect 触发器**逐项几何一致**
-   （height 28 / padding 0 4px 0 8px / 圆角 --dsw-radius-sm / gap 4 / 13-20 字、悬停底同 token）——
-   此前圆角写 24px（胶囊），hover 底色因此被裁成「椭圆」，和官方其他触发器明显不同。 */
-.dsh-chat-fim-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  height: 28px;
-  padding: 0 4px 0 8px;
-  border: none;
-  border-radius: var(--dsw-radius-sm);
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 13px;
-  line-height: 20px;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.dsh-chat-fim-switch:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.dsh-chat-fim-switch-icon {
-  display: inline-flex;
-  flex: 0 0 auto;
-  color: var(--dsw-alias-label-caption);
-}
-.dsh-chat-fim-switch-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dsh-chat-fim-switch-on {
-  color: var(--dsw-alias-button-info-fill, #4d6bfe);
-}
-.dsh-chat-fim-switch-on .dsh-chat-fim-switch-icon {
-  color: var(--dsw-alias-button-info-fill, #4d6bfe);
-}
-/* 关闭态：灰字区分（开启态紫色），不再用删除线。 */
-.dsh-chat-fim-switch-off .dsh-chat-fim-switch-label {
-  color: var(--dsw-alias-label-tertiary, #9aa0a6);
-}
-/* 胶囊内灵敏度触发区（开关主体右侧：三点 + ▾）：整区可点，只开合灵敏度菜单、不切换开关。
-   不单独做悬停底色——按钮主体已有悬停底色，叠加会成嵌套椭圆。
-   命中区铺满：负 margin 顶掉按钮右侧 padding 与标签左侧 gap，视觉间距由 padding 补回
-   （左 6px 呼吸间距，右侧 9px 保持按钮右缘观感）。 */
-.dsh-chat-fim-switch-picker {
-  display: inline-flex;
-  align-items: center;
-  align-self: stretch;
-  gap: 3px;
-  margin: 0 -4px 0 -4px;
-  padding: 0 9px 0 6px;
-  cursor: pointer;
-}
-.dsh-chat-fim-switch-on .dsh-chat-fim-switch-picker {
-  color: var(--dsw-alias-button-info-fill, #4d6bfe);
-}
-/* ▾：打开时旋转 180°。 */
-.dsh-chat-fim-switch-arrow {
-  display: inline-flex;
-  align-items: center;
-  flex: none;
-  color: var(--dsw-alias-label-caption);
-  transition: transform 120ms ease;
-}
-.dsh-chat-fim-switch-on .dsh-chat-fim-switch-arrow {
-  color: var(--dsw-alias-button-info-fill, #4d6bfe);
-}
-.dsh-chat-fim-switch-arrow-open {
-  transform: rotate(180deg);
-}
-/* 窄行折叠为纯图标：官方 PermissionSelect 同款匿名 @container 规则，
-   容器是 InputBar .row（container-type: inline-size），阈值同官方 460px。 */
-@container (max-width: 460px) {
-  .dsh-chat-fim-switch .dsh-chat-fim-switch-label {
-    display: none;
-  }
-  .dsh-chat-fim-switch {
-    padding: 0 6px;
-  }
-  .dsh-chat-fim-switch-picker {
-    margin: 0 -6px 0 -4px;
-    padding: 0 11px 0 9px;
-  }
-}
-@property --dsh-chat-fim-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
-/* 转动环：钉在 composer 上沿的装饰层。
-   z-index 必须**低于**遮罩层（官方 Modal/Settings 1000、归档面板与确认框 1000/1100）——
-   否则弹窗打开时环会浮在遮罩之上，不随背景一起虚化（2026-09-08 修）。
-   取值 900：仍高于普通内容与菜单层（官方 MenuView/PopupSelect 100、本插件菜单 100），
-   又低于一切遮罩，因此弹窗一出环即被 backdrop-filter 模糊。 */
-.dsh-chat-fim-ring {
-  position: fixed;
-  z-index: 900;
-  pointer-events: none;
-  box-sizing: border-box;
-  padding: 2px;
-  border-radius: 24px;
-  background: conic-gradient(
-    from var(--dsh-chat-fim-angle),
-    transparent 0deg,
-    transparent 300deg,
-    color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 85%, transparent) 340deg,
-    color-mix(in srgb, var(--dsw-alias-button-info-fill, #4d6bfe) 30%, transparent) 355deg,
-    transparent 360deg
-  );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  animation: dsh-chat-fim-ring-spin 1.6s linear infinite;
-}
-@keyframes dsh-chat-fim-ring-spin {
-  to { --dsh-chat-fim-angle: 360deg; }
-}
-/* 候选菜单锚点：镜像官方 overlayAnchor（绝对定位、零高、钉在 composer 卡片上沿）。 */
-.dsh-chat-fim-menu-anchor {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 0;
-}
-/* 菜单卡：逐项对齐官方 @ 候选列表（ui-input-trigger/MenuView.module.css .menu）的几何与立起方式；
-   材质交给官方 MenuSurface（.surface 只做 isolation / 圆角 / 裁切，.material 子层承担填充 + 模糊）。 */
-.dsh-chat-fim-menu {
-  position: absolute;
-  bottom: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 100;
-  box-sizing: border-box;
-  max-height: 400px;
-  overflow: hidden;
-  padding: 4px;
-  display: flex;
-  flex-direction: column;
-  border: 0;
-  --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
-  box-shadow: var(--dsw-elevation-prominent);
-}
-/* 行：官方 MenuView .item 的几何与 token 逐项一致（34 高 / 6×8 内边距 / 12 圆角 / 13-20 字）。 */
-.dsh-chat-fim-menu-row {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  min-height: 34px;
-  padding: 6px 8px;
-  border: none;
-  border-radius: var(--dsw-radius-md);
-  background: transparent;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--dsw-alias-label-primary);
-  text-align: left;
-}
-.dsh-chat-fim-menu-row:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-/* 建议长句 2 行截断（超出省略），全文经 title 提示。 */
-.dsh-chat-fim-menu-text {
-  flex: 1;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  min-width: 0;
-}
-/* 行尾键位提示：官方 @ 列表 drillHint 同款（caption 色文字 + 键盘帽，右对齐）。 */
-.dsh-chat-fim-menu-trailing {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  /* 与建议文字保持呼吸间距（文字 flex:1 顶满后 auto 边距为 0，靠这里拉开）。 */
-  padding-left: 24px;
-}
-.dsh-chat-fim-menu-hint {
-  color: var(--dsw-alias-label-caption);
-  font-size: 10px;
-  line-height: 16px;
-  white-space: nowrap;
-}
-/* 键盘帽与官方 @ 列表 drillHint 完全同款（token 逐项一致：底色/圆角/内边距/字色）。 */
-.dsh-chat-fim-menu-kbd {
-  padding: 0 4px;
-  border-radius: var(--dsw-radius-xs);
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-caption);
-  font-family: inherit;
-  font-size: 10px;
-  line-height: 16px;
-}
-/* 菜单底部：左下角品牌行（🐦 dsh-sparrow），右下角展示 token 数与实际模型。
-   分隔线走官方菜单 footer 的 l2 发丝线（l1 在菜单面上近不可见）。 */
-.dsh-chat-fim-menu-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 3px;
-  padding: 3px 4px 0;
-  border-top: 0.5px solid var(--dsw-alias-border-l2);
-}
-.dsh-chat-fim-menu-brand {
-  font-size: 11px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-tertiary);
-}
-/* 触发灵敏度弹层：与官方菜单同构（MenuSurface 承载材质，几何对齐官方 Menu 卡），
-   左缘对齐开关胶囊、空间不足自动向上（官方 Menu 的 start 对齐）。 */
-.dsh-chat-fim-sensitivity-popover {
-  position: fixed;
-  z-index: 1100;
-  display: flex;
-  flex-direction: column;
-  min-width: 240px;
-  padding: 4px;
-  border: 0;
-  --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
-  box-shadow: var(--dsw-elevation-prominent);
-}
-.dsh-chat-fim-menu-usage {
-  color: var(--dsw-alias-label-caption);
-  font-size: 11px;
-  line-height: 16px;
-  white-space: nowrap;
-}
-/* 选项行：官方 MenuView .item 的几何与 token（与候选菜单行同一套尺寸）。 */
-.dsh-chat-fim-sensitivity-option {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  min-height: 34px;
-  padding: 6px 8px;
-  border: none;
-  border-radius: var(--dsw-radius-md);
-  background: transparent;
-  color: var(--dsw-alias-label-primary);
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 20px;
-  text-align: left;
-  cursor: pointer;
-}
-.dsh-chat-fim-sensitivity-option:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.dsh-chat-fim-sensitivity-option-check {
-  width: 14px;
-  flex: none;
-  font-size: 12px;
-}
-.dsh-chat-fim-sensitivity-option-rule {
-  margin-left: auto;
-  color: var(--dsw-alias-label-caption);
-  font-size: 11px;
-  line-height: 16px;
-  white-space: nowrap;
-}
-/* 灵敏度竖点：恒显 3 个方点，自下而上点亮 3/2/1 个 = 高/中/低；未点亮为更浅的淡色占位。
-   与 ▾ 同在灵敏度触发区内（分割线左侧是开关主体）；点 3px、方角（owner 拍板：档位用方点）。 */
-.dsh-chat-fim-dots {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-.dsh-chat-fim-dot {
-  width: 3px;
-  height: 3px;
-  border-radius: 0;
-  background: color-mix(in srgb, currentColor 30%, transparent);
-}
-.dsh-chat-fim-dot-on {
-  background: currentColor;
-}
-`
-  document.head.appendChild(style)
-  return style
-}
-
 /** 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）：点击切换开关，右侧 ▾ 弹出触发灵敏度三档。 */
 export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const { t } = props
@@ -642,7 +342,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
     if (!pickerOpen) return
     const onPointerDown = (event: PointerEvent): void => {
       if (!(event.target instanceof Element)) return
-      if (event.target.closest('.dsh-chat-fim-sensitivity-popover') !== null) return
+      if (event.target.closest(`.${cls.sensitivityPopover}`) !== null) return
       if (switchRef.current !== null && switchRef.current.contains(event.target)) return
       setPickerOpen(false)
     }
@@ -673,7 +373,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
       <button
         ref={switchRef}
         type="button"
-        className={enabled ? 'dsh-chat-fim-switch dsh-chat-fim-switch-on' : 'dsh-chat-fim-switch dsh-chat-fim-switch-off'}
+        className={enabled ? `${cls.switch} ${cls.switchOn}` : `${cls.switch} ${cls.switchOff}`}
         title={busy ? t('dock.busy') : error ?? (enabled ? t('sensitivity.hint', { label }) : t('switch.offHint'))}
         aria-pressed={enabled}
         aria-busy={busy}
@@ -683,10 +383,10 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
           setSuggestEnabled(!enabled)
         }}
       >
-        <span className="dsh-chat-fim-switch-icon" aria-hidden><IconSparkleRegular size={14} /></span>
-        <span className="dsh-chat-fim-switch-label">{t('switch.label')}</span>
+        <span className={cls.switchIcon} aria-hidden><IconSparkleRegular size={14} /></span>
+        <span className={cls.switchLabel}>{t('switch.label')}</span>
         <span
-          className="dsh-chat-fim-switch-picker"
+          className={cls.switchPicker}
           role="button"
           tabIndex={0}
           aria-haspopup="listbox"
@@ -708,16 +408,16 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
             }
           }}
         >
-          <span className="dsh-chat-fim-dots" aria-hidden>
+          <span className={cls.dots} aria-hidden>
             {(['eager', 'standard', 'conservative'] as const).map((level, index) => (
               <span
                 key={level}
-                className={DOT_LIT_COUNT[sensitivity] > 2 - index ? 'dsh-chat-fim-dot dsh-chat-fim-dot-on' : 'dsh-chat-fim-dot'}
+                className={DOT_LIT_COUNT[sensitivity] > 2 - index ? `${cls.dot} ${cls.dotOn}` : cls.dot}
               />
             ))}
           </span>
           <span
-            className={pickerOpen ? 'dsh-chat-fim-switch-arrow dsh-chat-fim-switch-arrow-open' : 'dsh-chat-fim-switch-arrow'}
+            className={pickerOpen ? `${cls.switchArrow} ${cls.switchArrowOpen}` : cls.switchArrow}
             aria-hidden
           >
             <IconChevronDownOutlineRegular size={12} />
@@ -725,12 +425,12 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
         </span>
       </button>
       {error !== null ? (
-        <span style={{ color: 'var(--dsw-alias-state-warn-primary, #d9822b)', fontSize: 12 }} title={error}>⚠</span>
+        <span className={cls.error} title={error}>⚠</span>
       ) : null}
       {pickerOpen && pickerPoint !== null
         ? createPortal(
           <MenuSurface
-            className="dsh-chat-fim-sensitivity-popover"
+            className={cls.sensitivityPopover}
             role="listbox"
             aria-label={t('sensitivity.aria', { label: '' })}
             style={{
@@ -749,15 +449,15 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
                 type="button"
                 role="option"
                 aria-selected={level === sensitivity}
-                className="dsh-chat-fim-sensitivity-option"
+                className={cls.sensitivityOption}
                 onClick={() => {
                   setTriggerSensitivity(level)
                   setPickerOpen(false)
                 }}
               >
-                <span className="dsh-chat-fim-sensitivity-option-check" aria-hidden>{level === sensitivity ? '✓' : ''}</span>
+                <span className={cls.sensitivityOptionCheck} aria-hidden>{level === sensitivity ? '✓' : ''}</span>
                 <span>{t(`sensitivity.${level}`)}</span>
-                <span className="dsh-chat-fim-sensitivity-option-rule">{t(`sensitivity.${level}.rule`)}</span>
+                <span className={cls.sensitivityOptionRule}>{t(`sensitivity.${level}.rule`)}</span>
               </button>
             ))}
           </MenuSurface>,
@@ -957,11 +657,11 @@ export function ChatFimDock(props: ChatFimDockProps) {
   return (
     <>
       {/* 隐藏锚点：把环的测量范围限定在本会话（composerCardRect 从它向上找会话根）。 */}
-      <span ref={anchorRef} style={{ display: 'none' }} aria-hidden />
+      <span ref={anchorRef} className={cls.anchor} aria-hidden />
       {busy && ring !== null
         ? createPortal(
           <div
-            className="dsh-chat-fim-ring"
+            className={cls.ring}
             style={{ left: ring.x - 2, top: ring.y - 2, width: ring.width + 4, height: ring.height + 4 }}
             aria-hidden
           />,
@@ -1043,15 +743,15 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
       if (!(event.target instanceof Element)) return
       // 卡内任意位置（含底栏/空白）与开关/灵敏度弹层的 mousedown 都阻止默认焦点转移：
       // 否则点一下输入框就失焦到 body，后续 Tab 的焦点检查失败表现为「Tab 失灵」（2026-09-03）。
-      if (event.target.closest('.dsh-chat-fim-menu') !== null) {
+      if (event.target.closest(`.${cls.menu}`) !== null) {
         event.preventDefault()
         return
       }
-      if (event.target.closest('.dsh-chat-fim-switch') !== null) {
+      if (event.target.closest(`.${cls.switch}`) !== null) {
         event.preventDefault()
         return
       }
-      if (event.target.closest('.dsh-chat-fim-sensitivity-popover') !== null) {
+      if (event.target.closest(`.${cls.sensitivityPopover}`) !== null) {
         event.preventDefault()
         return
       }
@@ -1068,11 +768,11 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
   const maxHeight = useAnchoredMaxHeight(cardRef, MENU_MAX_HEIGHT, visible ? suggestion : null)
 
   return (
-    <div ref={rootRef} className="dsh-chat-fim-menu-anchor">
+    <div ref={rootRef} className={cls.menuAnchor}>
       {visible && suggestion !== null ? (
         <MenuSurface
           ref={cardRef}
-          className="dsh-chat-fim-menu"
+          className={cls.menu}
           style={{ maxHeight }}
           role="listbox"
           aria-label={t('dock.aria')}
@@ -1081,7 +781,7 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
             type="button"
             role="option"
             aria-selected="true"
-            className="dsh-chat-fim-menu-row"
+            className={cls.menuRow}
             title={suggestion.text}
             // mousedown，不是 click：焦点保持在输入框（官方菜单同款 combobox 模式）。
             onMouseDown={(event) => {
@@ -1089,17 +789,17 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
               adoptSuggestion()
             }}
           >
-            <span className="dsh-chat-fim-menu-text">{suggestion.text}</span>
-            <span className="dsh-chat-fim-menu-trailing" aria-hidden>
-              <span className="dsh-chat-fim-menu-hint">{t('menu.adopt')}</span>
-              <kbd className="dsh-chat-fim-menu-kbd">Tab</kbd>
-              <span className="dsh-chat-fim-menu-hint">{t('menu.dismiss')}</span>
-              <kbd className="dsh-chat-fim-menu-kbd">Esc</kbd>
+            <span className={cls.menuText}>{suggestion.text}</span>
+            <span className={cls.menuTrailing} aria-hidden>
+              <span className={cls.menuHint}>{t('menu.adopt')}</span>
+              <kbd className={cls.menuKbd}>Tab</kbd>
+              <span className={cls.menuHint}>{t('menu.dismiss')}</span>
+              <kbd className={cls.menuKbd}>Esc</kbd>
             </span>
           </button>
-          <div className="dsh-chat-fim-menu-footer">
-            <span className="dsh-chat-fim-menu-brand">🐦 dsh-sparrow</span>
-            <span className="dsh-chat-fim-menu-usage">
+          <div className={cls.menuFooter}>
+            <span className={cls.menuBrand}>🐦 dsh-sparrow</span>
+            <span className={cls.menuUsage}>
               {t('menu.tokens', {
                 tokens: formatTokenCount(suggestion.totalTokens),
                 model: suggestion.model,

@@ -1,12 +1,18 @@
-/** dsh-chat-fim 纯逻辑：配置归一化、请求校验、错误映射、候选提取。 */
+/**
+ * dsh-chat-fim 纯逻辑：配置归一化、请求校验、错误映射、候选提取。
+ *
+ * `parseCompleteBody` 按字节数校验请求体，依赖 Node 的 `Buffer` —— 它留在 host 侧；client half 只从这里取
+ * 与 Node 无关的纯函数（打包时 tree-shaking 掉未用导出，产物里不会出现 `Buffer`）。
+ */
 
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
+import { DEFAULT_MAX_BODY_BYTES, DEFAULT_REQUEST_TIMEOUT_MS, ECHO_USER_PREFIX_CHARS } from './constants.js'
+
+export { DEFAULT_MAX_BODY_BYTES, DEFAULT_REQUEST_TIMEOUT_MS }
 
 export const DEFAULT_BASE_URL = 'https://api.deepseek.com/beta'
 export const DEFAULT_MODEL = 'deepseek-flash'
 export const DEFAULT_API_KEY_ENV = 'DEEPSEEK_API_KEY'
-export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
-export const DEFAULT_MAX_BODY_BYTES = 64 * 1024
 export const DEFAULT_MAX_PROMPT_CHARS = 32_768
 export const DEFAULT_MAX_TOKENS = 96
 export const DEFAULT_SUGGESTION_COUNT = 1
@@ -320,9 +326,9 @@ function normalizeForEcho(text: string): string {
 
 /**
  * 检测历史回声（窗口模式）：建议（归一化后）任一 minOverlap 字窗口连续出现在历史文本里，说明模型在复读/转述历史而非续写草稿。
- * host 侧用于助手消息比对（阈值 15——10 字窗口误杀正常措辞复用，见 AGENTS.md）。
+ * host 侧用于助手消息比对（传 ECHO_ASSISTANT_WINDOW_CHARS——10 字窗口误杀正常措辞复用，见 AGENTS.md）。
  */
-export function isHistoryEcho(suggestion: string, historyTexts: readonly string[], minOverlap = 10): boolean {
+export function isHistoryEcho(suggestion: string, historyTexts: readonly string[], minOverlap = ECHO_USER_PREFIX_CHARS): boolean {
   const text = normalizeForEcho(suggestion)
   if (text.length < minOverlap) return false
   const normalizedHistory = historyTexts.map(entry => normalizeForEcho(entry))
@@ -335,9 +341,9 @@ export function isHistoryEcho(suggestion: string, historyTexts: readonly string[
 
 /**
  * 检测「开头回声」（前缀锚定）：建议开头（归一化后）的前 minOverlap 字连续出现在历史文本里。
- * host 侧用于用户消息比对（阈值 10）；只锚定开头——正常续写中段复用用户措辞不误杀（窗口比对会误杀，别改回去）。
+ * host 侧用于用户消息比对（传 ECHO_USER_PREFIX_CHARS）；只锚定开头——正常续写中段复用用户措辞不误杀（窗口比对会误杀，别改回去）。
  */
-export function startsWithHistoryEcho(suggestion: string, historyTexts: readonly string[], minOverlap = 10): boolean {
+export function startsWithHistoryEcho(suggestion: string, historyTexts: readonly string[], minOverlap = ECHO_USER_PREFIX_CHARS): boolean {
   const text = normalizeForEcho(suggestion)
   if (text.length < minOverlap) return false
   const prefix = text.slice(0, minOverlap)
@@ -415,7 +421,7 @@ export function extractUsage(data: unknown): { promptTokens: number; completionT
   }
 }
 
-/** token 数展示格式化：千分位逗号（1234 → 1,234）。 */
+/** token 数展示格式化：千分位逗号（1234 → 1,234）。候选菜单用；纯格式化、无 Node 依赖，故留在本模块（单测也钉着它）。 */
 export function formatTokenCount(count: number): string {
   const safe = Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0
   return String(safe).replace(/\B(?=(\d{3})+(?!\d))/gu, ',')

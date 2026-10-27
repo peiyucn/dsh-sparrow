@@ -18,16 +18,15 @@ import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
-import { ChatFimDock, ChatFimMenu, ChatFimSwitch, ensureSuggestBusyStyles, type FimDirectoryStore } from './ChatFimDock.js'
+import {
+  COMPLETE_ROUTE_PATH, DOCK_SLOT_ID, LOCALE_NAMESPACE, MENU_SLOT_ID, SLOT_INPUT_DOCK, SLOT_INPUT_LEFT,
+  SLOT_INPUT_OVERLAY, SLOT_ORDER, SUPPORT_CHECK_TIMEOUT_MS, SWITCH_SLOT_ID, name,
+} from '../constants.js'
+import { ChatFimDock, ChatFimMenu, ChatFimSwitch, type FimDirectoryStore } from './ChatFimDock.js'
 import { parseJsonOrNull } from './parse.js'
+import { ensureChatFimStyles } from './styles.js'
 
 export const inject = ['slots', 'sessions', 'locale']
-
-/**
- * 单次支持性查询超时（毫秒）：到点按「判不了」处理（状态机据此补查），不留悬挂 Promise。
- * 走本地回环、正常毫秒级，5s 只兜住挂死的宿主。
- */
-const SUPPORT_CHECK_TIMEOUT_MS = 5_000
 
 export interface ChatFimResponse {
   readonly suggestions?: readonly string[]
@@ -92,10 +91,10 @@ interface ClientAgentScope extends Context {
  */
 export function apply(ctx: Context): void {
   const sessions = ctx.sessions as unknown as ClientSessionScope
-  const busyStyles = ensureSuggestBusyStyles()
-  ctx.effect(() => () => { busyStyles.remove() }, 'dsh-chat-fim: busy styles')
-  const disposeDictionaries = ctx.locale.register('chat-fim', { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
-  ctx.effect(() => disposeDictionaries, 'dsh-chat-fim: locale dictionaries')
+  const styles = ensureChatFimStyles()
+  ctx.effect(() => () => { styles.remove() }, `${name}: styles`)
+  const disposeDictionaries = ctx.locale.register(LOCALE_NAMESPACE, { zh: LOCALE_DICTS.zh, en: LOCALE_DICTS.en })
+  ctx.effect(() => disposeDictionaries, `${name}: locale dictionaries`)
 
   const injectedFace = (rawSessionId: string) => {
     // 官方 slot 的 `inject` 工厂签名是 `(sessionId: string) => …`（rc.1 契约）；
@@ -129,7 +128,7 @@ export function apply(ctx: Context): void {
       checkSupport: async (id: SessionId): Promise<boolean | null> => {
         let response: Response
         try {
-          response = await fetch(`/api/chat-fim/complete?sessionId=${encodeURIComponent(String(id))}`, {
+          response = await fetch(`${COMPLETE_ROUTE_PATH}?sessionId=${encodeURIComponent(String(id))}`, {
             signal: AbortSignal.timeout(SUPPORT_CHECK_TIMEOUT_MS),
           })
         } catch {
@@ -143,7 +142,7 @@ export function apply(ctx: Context): void {
         return payload.supported
       },
       requestComplete: async (id: SessionId, prompt: string, signal: AbortSignal) => {
-        const response = await fetch('/api/chat-fim/complete', {
+        const response = await fetch(COMPLETE_ROUTE_PATH, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           // 续写模型跟随主模型（2026-08-31 用户拍板：用户选什么模型，suggest 就用什么模型；
@@ -177,33 +176,33 @@ export function apply(ctx: Context): void {
     }
   }
 
-  ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
-    name: 'conversation.input.left',
-    id: 'chat-fim-switch',
-    order: 30,
-    locale: 'chat-fim',
+  ctx.slots.inject(SLOT_INPUT_LEFT, () => ctx.slots.register({
+    name: SLOT_INPUT_LEFT,
+    id: SWITCH_SLOT_ID,
+    order: SLOT_ORDER,
+    locale: LOCALE_NAMESPACE,
     inject: injectedFace,
   }, ChatFimSwitch))
 
-  ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
-    name: 'conversation.input.dock',
-    id: 'chat-fim',
-    order: 30,
-    locale: 'chat-fim',
+  ctx.slots.inject(SLOT_INPUT_DOCK, () => ctx.slots.register({
+    name: SLOT_INPUT_DOCK,
+    id: DOCK_SLOT_ID,
+    order: SLOT_ORDER,
+    locale: LOCALE_NAMESPACE,
     inject: injectedFace,
   }, ChatFimDock))
 
-  ctx.slots.inject('conversation.input.overlay', () => ctx.slots.register({
-    name: 'conversation.input.overlay',
-    id: 'chat-fim-menu',
-    order: 30,
-    locale: 'chat-fim',
+  ctx.slots.inject(SLOT_INPUT_OVERLAY, () => ctx.slots.register({
+    name: SLOT_INPUT_OVERLAY,
+    id: MENU_SLOT_ID,
+    order: SLOT_ORDER,
+    locale: LOCALE_NAMESPACE,
     inject: injectedFace,
   }, ChatFimMenu))
 }
 
-export { ChatFimDock, ChatFimMenu, ChatFimSwitch, ensureSuggestBusyStyles } from './ChatFimDock.js'
+export { ChatFimDock, ChatFimMenu, ChatFimSwitch } from './ChatFimDock.js'
 export type { ChatFimDockInjected, ChatFimDockProps, ChatFimMenuProps, ChatFimSwitchProps, SuggestionRecord } from './ChatFimDock.js'
-export { readEnabled, readTriggerSensitivity, setSuggestBusy, setSuggestEnabled, setSuggestError, setTriggerSensitivity, setSuggestion, dispatchSupportEvent, useSuggestBusy, useSuggestEnabled, useSuggestError, useTriggerSensitivity, useSuggestion, useSuggestSupported, useSuggestSupportState } from './ChatFimDock.js'
+export { readEnabled, setSuggestBusy, setSuggestEnabled, setSuggestError, setTriggerSensitivity, setSuggestion, dispatchSupportEvent, useSuggestBusy, useSuggestEnabled, useSuggestError, useTriggerSensitivity, useSuggestion, useSuggestSupported, useSuggestSupportState } from './ChatFimDock.js'
 export { fimSupportReducer, fimSupportShown, initialFimSupportState } from './fim-support-machine.js'
 export type { FimSupportAddress, FimSupportEvent, FimSupportPhase, FimSupportState } from './fim-support-machine.js'
