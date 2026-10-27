@@ -8,6 +8,7 @@ import {
   CARD_GLASS_ALPHA,
   HEADER_GLASS_ALPHA,
   HEADER_HEIGHT_PX,
+  SEAT_BAND_PX,
   buildGlassCss,
 } from '../lib/glass.js'
 
@@ -28,24 +29,25 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(header.includes('background-position: 100% 0'), '顶栏贴视口右上 ⇒ 与地面光同源')
   })
 
-  it('输入框：不做 live blur + 座位光墙挡正文 + 半透明填充 + 有方向边缘光', () => {
+  it('输入框：完整玻璃模糊（::before，无负层逃逸）+ 座位透明 + 有方向边缘光', () => {
     const seat = /\[data-composer-seat\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(seat.includes('background: none'), '底座改由自己的光墙铺底')
-    const wall = /\[data-composer-seat\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(wall.includes('background-image: radial-gradient('), '光墙画地面光')
-    assert.ok(wall.includes('background-size: 100vw 100vh'))
-    assert.ok(wall.includes('background-position: 100% 100%'), '贴视口右下 ⇒ 与地面光同源')
-    assert.ok(wall.includes('mask-image'), '上缘 36px 渐隐（正文淡出，不叠字）')
-    assert.ok(!code.includes('[data-composer-card]::before'), '卡片不再用 ::before 负层')
+    assert.ok(seat.includes('background: none'), '底座撤掉官方遮罩，正文从玻璃下滚过')
     const card = /\[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(!card.includes('backdrop-filter'), '输入框不做 live blur（与菜单浮层共存会触发合成器残影）')
-    assert.ok(card.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%`), '半透明填充')
+    assert.ok(card.includes('background-color: transparent'), '卡片本体让出底色')
+    assert.ok(card.includes('z-index: 0'), '卡片自成层叠上下文（否则 ::before 的 -1 会逃出卡片 = 淡色框）')
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色')
-    assert.ok(card.includes('box-shadow: var(--dsw-elevation-soft)'), '保留官方 elevation，再叠边缘光')
-    assert.ok(card.includes('inset 0 1px 2px'), '上缘高光')
-    assert.ok(card.includes('inset -1px 0 3px rgba(0, 0, 0'), '右缘暗边（有方向，不是一圈均匀描边）')
-    assert.ok(!code.includes('data-menu-material'), '不得有「菜单打开就关模糊」的降级')
-    assert.ok(!code.includes('[data-composer-seat]::after'), '不再需要垫底带')
+    assert.ok(!card.includes('backdrop-filter'), '卡片本体不得带模糊')
+    const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(glass.includes('backdrop-filter: var(--dsw-menu-backdrop-filter)'), '输入框保留完整玻璃模糊')
+    assert.ok(glass.includes('border-radius: inherit'))
+    assert.ok(glass.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%`), '玻璃填充比例')
+    assert.ok(glass.includes('box-shadow: inset 0 1px 2px'), '上缘高光')
+    assert.ok(glass.includes('inset -1px 0 3px rgba(0, 0, 0'), '右缘暗边（有方向）')
+    const band = /\[data-composer-seat\]::after \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(band.includes('background-image:'), '座位底带重画地面光')
+    assert.ok(band.includes('background-position: 100% 100%'))
+    assert.match(band, new RegExp(`height: ${SEAT_BAND_PX}px`))
+    assert.ok(!code.includes(':has(> [data-menu-material])'), '不得有「菜单打开才切换」的降级')
   })
 
   it('右栏：底色/打光 + 正文上提 76px 从两条带下滚过 + 头行玻璃（真模糊）', () => {
@@ -65,17 +67,23 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
 
+  it('官方菜单材质：只关 blur（用菜单的非高频模糊换输入框完整玻璃）', () => {
+    assert.match(code, /\[data-menu-material\] \{\s*backdrop-filter: none !important;/u)
+    assert.ok(!/\[data-menu-material\][^}]*background/u.test(code), '不覆盖菜单填充')
+  })
+
   it('设置弹窗：打光（按弹窗自身盒子缩放）', () => {
     const settings = /\[data-shortcut-modal='settings'\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(settings.includes('background-image: radial-gradient('))
     assert.ok(settings.includes('background-size: 100% 100%'))
   })
 
-  it('所有规则都带「官方默认」门（浅色轴高光那条除外），无 fixed / 无手写 blur 数值', () => {
+  it('所有规则都带「官方默认」门（浅色轴高光 / 官方菜单材质两条除外），无 fixed / 无手写 blur 数值', () => {
     for (const line of code.split('\n')) {
       if (!line.trim().endsWith('{')) continue
       const gated = line.startsWith('body:not([') && (line.includes(PLAIN_ATTR) || line.includes('data-ds-dark-theme'))
-      assert.ok(gated, `规则必须带门：${line.trim()}`)
+      const officialMaterial = line.startsWith('[data-menu-material]')
+      assert.ok(gated || officialMaterial, `规则必须带门：${line.trim()}`)
     }
     assert.ok(!/background-attachment/u.test(code))
     assert.ok(!/blur\(/u.test(code), '不手写 blur 数值（统一官方 token）')

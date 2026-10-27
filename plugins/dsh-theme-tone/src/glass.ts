@@ -3,7 +3,8 @@ import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
 export const HEADER_GLASS_ALPHA = 0.7
-export const CARD_GLASS_ALPHA = 0.88
+export const CARD_GLASS_ALPHA = 0.58
+export const SEAT_BAND_PX = 44
 
 /** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
 export const PANEL_BAND_PX = 38
@@ -81,36 +82,47 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框：玻璃卡片（不做 live blur）+ 座位光墙 =====
-   一天逐项排除后的结论：输入框区域只要有 live backdrop-filter，模型菜单一开就会触发 Chromium 的
-   快照错位（与采样内容无关、与「两层 blur 重叠」也无关；整页无 blur 时残影消失）。
-   所以输入框去掉 live blur；同时因为不再有模糊去"糊掉"滚动内容，座位必须重新挡住正文，否则文字会
-   互相叠在一起（owner 反馈）。做法：座位画一层「底色 + 地面光」的不透光墙（上缘 36px 渐隐，复刻
-   官方让正文淡出的观感），卡片用高比例半透明填充 + 官方 elevation + 有方向边缘光，贴着光墙读作
-   玻璃卡片。顶栏 / 右栏的 live blur 保留（不与菜单浮层重叠，未出现残影）。 */
+/* ===== 输入框：完整玻璃模糊（owner 定案：模型菜单放弃模糊，换输入框的完整玻璃） =====
+   座位撤掉官方 36px 实色渐隐，正文从玻璃下滚过；卡片本体透明、玻璃与边缘光在 ::before（伪元素没有
+   后代，不会成为官方弹层的 backdrop root）；卡片自成层叠上下文，::before 的 z-index:-1 才留得住。
+   重叠模糊是本 bug 的根因（owner 观察确认）：模型菜单的 blur 见下方「官方菜单材质只关 blur」——
+   菜单不是高频操作，用它的模糊换输入框的完整玻璃。 */
 ${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] {
   background: none !important;
 }
-${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat]::before {
+${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card] {
+  position: relative;
+  z-index: 0;
+  background-color: transparent;
+  /* 「+」等 selector 型图标按钮：官方给的是不透明中性底，在玻璃卡片上会读成一块实心。 */
+  --dsw-specific-selector: transparent;
+}
+${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card]::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%, transparent);
+  box-shadow: ${RIM_DARK};
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
+}
+body:not([data-ds-dark-theme]) :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card]::before {
+  box-shadow: ${RIM_LIGHT};
+}
+/* 卡片下方滚过的正文用「地面同源」的一小段盖住；带顶被卡片盖住，不需要 mask。 */
+${P} [data-phase='active'] [data-composer-seat]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: ${SEAT_BAND_PX}px;
+  z-index: -1;
   pointer-events: none;
   background-color: var(--dsw-alias-bg-base);
 ${viewportLight('100% 100%')}
-  -webkit-mask-image: linear-gradient(180deg, transparent 0px, black 36px);
-  mask-image: linear-gradient(180deg, transparent 0px, black 36px);
-}
-${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card] {
-  position: relative;
-  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%, transparent);
-  box-shadow: var(--dsw-elevation-soft), ${RIM_DARK};
-  /* 「+」等 selector 型图标按钮：官方给的是不透明中性底，在玻璃卡片上会读成一块实心。 */
-  --dsw-specific-selector: transparent;
-}
-body:not([data-ds-dark-theme]) :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card] {
-  box-shadow: var(--dsw-elevation-soft), ${RIM_LIGHT};
 }
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
@@ -172,6 +184,14 @@ ${viewportLight('100% 0')}
 ${P} [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip] {
   position: relative;
   z-index: 3;
+}
+
+/* ===== 官方菜单材质：只关 blur、保留半透明填充 =====
+   输入框的完整玻璃模糊与菜单的 blur 同时存在时，Chromium 会把菜单碎片的错位快照画进输入框
+   （owner 观察确认：两个模糊重叠就出问题）。菜单不是高频操作 ⇒ 用它的实时模糊换输入框的完整玻璃；
+   半透明填充 / 圆角 / 阴影保持官方。 */
+[data-menu-material] {
+  backdrop-filter: none !important;
 }
 
 /* ===== 设置弹窗：打光（按弹窗自身盒子缩放，窗口在视口中间，不按视口相位画） ===== */

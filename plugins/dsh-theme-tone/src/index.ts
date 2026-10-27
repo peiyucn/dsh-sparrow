@@ -30,7 +30,7 @@ export {
   CONTENT_Z_INDEX,
   ABOVE_CONTENT_Z_INDEX,
 } from './constants.js'
-export { buildGlassCss, CARD_GLASS_ALPHA, HEADER_GLASS_ALPHA, HEADER_HEIGHT_PX } from './glass.js'
+export { buildGlassCss, CARD_GLASS_ALPHA, HEADER_GLASS_ALPHA, HEADER_HEIGHT_PX, SEAT_BAND_PX } from './glass.js'
 export { CONTENT_MAX_SIDE_CLEARANCE_PX, CONTENT_MIN_FLOOR_PX, HOVER_HIDE_BREAKPOINT_PX, NAV_ARIA_LABELS, buildNavPinCss } from './nav-pin.js'
 export { buildSurfaceCss } from './surfaces.js'
 export {
