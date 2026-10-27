@@ -131,12 +131,24 @@ ${P} ${SEAT} [data-composer-card]::before {
 body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   box-shadow: ${RIM_LIGHT};
 }
-/* 停靠卡补缝：卡与卡/输入框之间的 stack 缝、以及卡片底部圆角后面会透出正文，
+/* 停靠卡补缝：卡与卡/输入框之间的 stack 缝、以及卡片上下圆角后面会透出正文，
    用「底色 + 打光」重绘盖住；只覆盖所需尺寸，不动官方几何。 */
 ${P} ${SEAT} :is(${DOCK}, ${TODO}) {
   position: relative;
   z-index: 0;
   overflow: visible;
+}
+/* 顶部：补上方 stack 缝 + 卡片顶部两个圆角缺口（20px 藏进卡片材质之下）。 */
+${P} ${SEAT} :is(${DOCK}, ${TODO})::before {
+  content: '';
+  position: absolute;
+  top: calc(-1 * ${STACK_GAP});
+  left: calc(-1 * ${SIDE_CLEARANCE});
+  right: calc(-1 * ${SIDE_CLEARANCE});
+  height: calc(${STACK_GAP} + 20px);
+  z-index: -1;
+  pointer-events: none;
+${GROUND_REPAINT}
 }
 ${P} ${SEAT} :is(${DOCK})::after {
   content: '';

@@ -77,11 +77,15 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
 
-  it('停靠卡缝隙 + 底部圆角缺口：重画「底色 + 打光」挡住透出的文字', () => {
+  it('停靠卡缝隙 + 上下圆角缺口：重画「底色 + 打光」挡住透出的文字', () => {
     assert.ok(code.includes("[data-testid='todo-panel']"), 'todo 卡锚点')
     assert.ok(code.includes(':is([data-queue-dock], [data-goal-bar])') || code.includes('::after'), 'queue / goal 卡锚点')
     assert.match(code, /:is\(\[data-queue-dock\], \[data-goal-bar\]\)::after \{[^}]*top: calc\(100% - 20px\)/u)
-    assert.ok((code.match(/background-attachment: fixed/gu) ?? []).length >= 2, '仍是背景重绘，不是新增玻璃')
+    assert.match(code, /:is\(\[data-queue-dock\], \[data-goal-bar\], \[data-testid='todo-panel'\]\)::before \{[^}]*top: calc\(-1 \* var\(--dsh-composer-stack-gap, 6px\)\)/u,
+      '顶部补缝带必须从卡片上方的 stack 缝开始')
+    assert.match(code, /:is\(\[data-queue-dock\], \[data-goal-bar\], \[data-testid='todo-panel'\]\)::before \{[^}]*height: calc\(var\(--dsh-composer-stack-gap, 6px\) \+ 20px\)/u,
+      '顶部带向下藏 20px 覆盖卡片顶部圆角缺口')
+    assert.ok((code.match(/background-attachment: fixed/gu) ?? []).length >= 3, '仍是背景重绘，不是新增玻璃')
     assert.ok(!code.includes('[data-composer-card]::before {\n  top: calc'), '不动卡片几何')
   })
 
