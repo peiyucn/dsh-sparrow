@@ -188,7 +188,8 @@ describe('parseAuthority 规范化', () => {
 describe('接线：栅栏必须真正挡在路由前面', () => {
   it('处理器先过栅栏，再进入任何路由分发（GET 与 POST 都在其后）', () => {
     // 判定正确但没被调用 = 漏洞仍在。故这里直接钉住源码里的调用顺序。
-    const source = readFileSync(new URL('../src/host.ts', import.meta.url), 'utf8')
+    // 拆分后 handler 在 host/routes.ts（host.ts 只剩组合根）。
+    const source = readFileSync(new URL('../src/host/routes.ts', import.meta.url), 'utf8')
     const fenceAt = source.indexOf('isTrustedBrowserRequest(req.headers, officialTrustedHosts(ctx))')
     assert.ok(fenceAt > 0, '处理器里必须调用 isTrustedBrowserRequest（带官方信任面）')
     const getBranchAt = source.indexOf("if (req.method === 'GET')")

@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 import { CHAT_FIM_CLASS, buildChatFimCss } from '../lib/client/styles.js'
 
@@ -27,8 +27,13 @@ function expectDeclarations(block, snippets, where) {
   }
 }
 
-/** 组件源码（只用来钉「由官方原语渲染」这类 JSX 事实，不从这里取 CSS）。 */
-const domSource = () => readFile(new URL('../src/client/ChatFimDock.tsx', import.meta.url), 'utf8')
+/** 组件源码合订（只用来钉「由官方原语渲染」这类 JSX 事实，不从这里取 CSS）。 */
+const domSource = async () => {
+  const dir = new URL('../src/client/', import.meta.url)
+  const files = (await readdir(dir)).filter(name => name.endsWith('.tsx')).sort()
+  const sources = await Promise.all(files.map(name => readFile(new URL(name, dir), 'utf8')))
+  return sources.join('\n')
+}
 
 describe('chat-fim 菜单样式契约（对齐官方 rc.3 菜单原语）', () => {
   it('注入样式表的花括号必须平衡（多余的 } 会吞掉下一条规则）', () => {

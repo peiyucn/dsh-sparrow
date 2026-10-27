@@ -24,7 +24,10 @@ import {
 } from '../constants.js'
 import { warnMissingCapabilities } from '../compat.js'
 import { clientCapabilities } from './capabilities.js'
-import { ChatFimDock, ChatFimMenu, ChatFimSwitch, type FimDirectoryStore } from './ChatFimDock.js'
+import { ChatFimDock } from './ChatFimDock.js'
+import { ChatFimMenu } from './ChatFimMenu.js'
+import { ChatFimSwitch } from './ChatFimSwitch.js'
+import type { FimDirectoryStore } from './contracts.js'
 import { parseJsonOrNull } from './parse.js'
 import { ensureChatFimStyles } from './styles.js'
 
@@ -206,8 +209,10 @@ export function apply(ctx: Context): void {
   }, ChatFimMenu))
 }
 
-export { ChatFimDock, ChatFimMenu, ChatFimSwitch } from './ChatFimDock.js'
-export type { ChatFimDockInjected, ChatFimDockProps, ChatFimMenuProps, ChatFimSwitchProps, SuggestionRecord } from './ChatFimDock.js'
-export { readEnabled, setSuggestBusy, setSuggestEnabled, setSuggestError, setTriggerSensitivity, setSuggestion, dispatchSupportEvent, useSuggestBusy, useSuggestEnabled, useSuggestError, useTriggerSensitivity, useSuggestion, useSuggestSupported, useSuggestSupportState } from './ChatFimDock.js'
+export { ChatFimDock } from './ChatFimDock.js'
+export { ChatFimMenu } from './ChatFimMenu.js'
+export { ChatFimSwitch } from './ChatFimSwitch.js'
+export type { ChatFimDockInjected, ChatFimDockProps, ChatFimMenuProps, ChatFimSwitchProps, SuggestionRecord } from './contracts.js'
+export { dispatchSupportEvent, readEnabled, setSuggestBusy, setSuggestEnabled, setSuggestError, setSuggestion, setTriggerSensitivity, useSuggestBusy, useSuggestEnabled, useSuggestError, useSuggestSupported, useSuggestSupportState, useSuggestion, useTriggerSensitivity } from './store.js'
 export { fimSupportReducer, fimSupportShown, initialFimSupportState } from './fim-support-machine.js'
 export type { FimSupportAddress, FimSupportEvent, FimSupportPhase, FimSupportState } from './fim-support-machine.js'

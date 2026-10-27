@@ -116,13 +116,29 @@
 | `src/constants.ts` | 包名 / locale 命名空间 / 路由 / 槽位与 order / 本地键 / 超时 / 上限 / z-index / 回声窗口 / 补查退避 |
 | `src/compat.ts` | 两档能力门（host 抛错 / client 只告警）、惰性探针、会话格式判定与停用文案（不 import 官方包，client 也能用） |
 | `src/session-format.ts` | host 专用：官方 `SESSION_FORMAT_VERSION` 的常量探针（官方包带 Node 依赖，不能进 client 图） |
-| `src/host.ts` | 组合根：能力门 → 路由注册（信任栅栏 → GET 支持 / 诊断 / POST 转发与护栏 → 诊断收口） |
-| `src/suggest.ts` | 纯逻辑：配置归一化、请求校验、prompt 构造、护栏（说话人清洗 / 复读 / 回声 / 语言 / 单句）、模型解析、触发门控 |
+| `src/host.ts` | 组合根（<100 行）：能力门 → `normalizeConfig` → 注册 exact 路由；不含 handler 内部逻辑 |
+| `src/host/http.ts` | host 收发：`sendJson` / `sendError`、请求体读取与 `parseCompleteBody`（`Buffer`，host-only）、`readBoundedText`、`requestSignal`、`abortedOutcome` |
+| `src/host/routes.ts` | 信任栅栏 → 方法分发 → GET 支持 / 诊断查询、POST 校验与各道门 → 上游编排 → 200 / 502 / 504 出口 |
+| `src/host/upstream.ts` | 上游单次请求、并行温度扇出、候选护栏清洗（说话人 / 语言 / 复读 / 回声 / 单句）、升温度重试 |
+| `src/host/diagnostics.ts` | 进程级诊断计数、按会话有界表（FIFO 淘汰）与耗时记账 |
+| `src/host/session.ts` | 会话取用、宿主真值格式门、会话实例能力探测、当前主模型解析 |
+| `src/config.ts` | 配置默认值与归一化（纯逻辑，加载期拒绝非法值） |
+| `src/prompt.ts` | 说话人文本与停止序列、历史窗口、候选清洗与单句截断 |
+| `src/guards.ts` | 请求体形状校验、复读 / 回声 / 语言一致性护栏 |
+| `src/upstream.ts` | 错误码与映射、候选 / usage 解析、主路由与补全模型解析（纯逻辑） |
+| `src/trigger.ts` | 三档灵敏度参数、草稿形态门控、草稿末端坐标换算 |
+| `src/format.ts` | token 数等展示格式化 |
+| `src/suggest.ts` | 纯逻辑 facade：按原路径 re-export 上述纯模块的公开符号（`parseCompleteBody` 不在其中） |
 | `src/trust.ts` | Host / Origin / `sec-fetch-site` 信任栅栏（复用官方 trustedHosts 与绑定地址） |
 | `src/index.ts` | host 包 API 的静态 re-export |
 | `src/client/index.ts` | client 安装：能力门 → 样式（effect 清理）→ locale → 三槽注册；`checkSupport` / `requestComplete` / `adopt` |
 | `src/client/capabilities.ts` | client half 必需能力表（纯逻辑，供门与单测） |
-| `src/client/ChatFimDock.tsx` | 三个组件与模块级共享 store（开关 / 忙碌会话 / 错误 / 支持态 / 建议 / 采纳标记） |
+| `src/client/contracts.ts` | 三个组件的注入面与共享数据类型（`ChatFimDockInjected`、各 props、`SuggestionRecord`） |
+| `src/client/ChatFimDock.tsx` | 数据面组件（<250 行）：草稿快照 → 触发 → 请求 → 写 store；隐藏锚点与环的 DOM 挂载 |
+| `src/client/ChatFimSwitch.tsx` | 工具行开关胶囊 + 灵敏度三档弹层（官方 `MenuSurface`） |
+| `src/client/ChatFimMenu.tsx` | 候选菜单视图：Tab / mousedown 采用、Esc 丢弃、与官方触发菜单互斥 |
+| `src/client/store.ts` | 模块级共享 store（开关 / 忙碌会话 / 错误 / 支持态 / 建议 / 灵敏度）与采纳标记、localStorage 读写 |
+| `src/client/ring.ts` | composer 卡片矩形测量（`composerCardRect` / `useRingRect` / 300ms 节拍） |
 | `src/client/styles.ts` | 类名表 + `buildChatFimCss()` + 注入口（HMR 命中旧标签则刷新内容） |
 | `src/client/fim-support-machine.ts` | 支持状态机纯 reducer 与补查退避 |
 | `src/client/geometry.ts` | 矩形 / 锚点数值比较（高频测量去重） |

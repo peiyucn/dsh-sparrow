@@ -4,10 +4,12 @@ import { describe, it } from 'node:test'
 import {
   buildFimPrompt, detectDraftLanguage, isLanguageConsistent, DEFAULT_MAX_BODY_BYTES, extractSuggestions, extractUsage, speakerStopSequences,
   formatTokenCount, hasDegenerateRepeat, isDeepseekMainRoute, isHistoryEcho, mainRouteFromHeader, currentMainRoute,
-  normalizeConfig, normalizeTriggerSensitivity, parseCompleteBody, recentHistoryTurns,
+  normalizeConfig, normalizeTriggerSensitivity, recentHistoryTurns,
   resolveSuggestModel, shouldTriggerSuggest, cleanSuggestion, startsWithHistoryEcho, summarizeUpstreamBody, truncateFirstSentence,
   upstreamStatusToError, validateCompletePayload, detectEndOfDraft,
 } from '../lib/suggest.js'
+// `parseCompleteBody` 按字节数校验、依赖 Node 的 Buffer，拆分后只在 host 侧（client 图之外）。
+import { parseCompleteBody } from '../lib/host/http.js'
 
 describe('chat-fim 纯逻辑', () => {
   describe('normalizeConfig', () => {

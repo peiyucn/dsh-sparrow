@@ -387,7 +387,8 @@ describe('chat-fim host 路由：POST 错误路径', () => {
    * 历史上这里是红的：请求入口用 `Promise.allSettled` 吸收 `requestOnce` 的拒绝，
    * 超时的拒绝**不冒泡**到外层 `catch`，于是 `catch` 里的 504/TIMEOUT 分支成了死代码——
    * 实测（真 `fetch` + 指向一个永不响应的本机 server）返回的是 502 + body `{"error":{}}`，
-   * 诊断 timeout 恒 0。修法见 `src/host.ts` 的 `abortedOutcome` 短路（先于正常出口判定）。
+   * 诊断 timeout 恒 0。修法见 `src/host/routes.ts` 的 `abortedOutcome` 短路（先于正常出口判定；
+   * 判定函数在 `src/host/http.ts`）。
    *
    * 这条用例的价值在于**只有真跑 handler 才测得到**：源码里 504/TIMEOUT 的字样一直都在，
    * 任何「源码字符串断言」都看不出它不可达。
