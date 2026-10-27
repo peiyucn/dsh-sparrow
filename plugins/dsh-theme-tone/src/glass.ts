@@ -32,6 +32,16 @@ function glassFill(alpha: number): string {
 
 const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
 
+/** 停靠卡补缝：与地面层同源的背景重绘（fixed 背景定位区 = 视口，% 按视口解析）。 */
+const GROUND_REPAINT = `  background-color: var(--dsw-alias-bg-base);
+  background-image: ${BACKDROP_GRADIENTS};
+  background-attachment: fixed;
+  background-repeat: no-repeat;`
+const DOCK = `[data-queue-dock], [data-goal-bar]`
+const TODO = `[data-testid='todo-panel']`
+const STACK_GAP = 'var(--dsh-composer-stack-gap, 6px)'
+const SIDE_CLEARANCE = 'var(--dsh-composer-side-clearance, 16px)'
+
 const P = `body:not([${PLAIN_ATTR}])`
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
 const SEAT = `:is([data-phase='active'], [data-phase='hero']) [data-composer-seat]`
@@ -111,59 +121,31 @@ ${P} ${SEAT} [data-composer-card]::before {
 body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   box-shadow: ${RIM_LIGHT};
 }
-/* 停靠卡（todo / queue / goal）的缝隙分两类：
-   ① composerStack 里「卡与卡 / 卡与输入框」之间的 --dsh-composer-stack-gap 缝；
-   ② 每张卡自己的**底部圆角**：卡片盒内、圆角外是透明的，后面的正文会从这两个角漏出来
-      （owner 指出的「左下和右下」）。
-   做法（owner 定案，不改官方几何）：在停靠卡处/下方画「底色 + 打光」的重绘层挡住透出的正文，
-   放大不影响任何东西。
-   * queue / goal：卡片根（[data-queue-dock] / [data-goal-bar]）的 ::after 画大带子，向上延伸
-     20px 藏到卡片材质之下（只从底部圆角缺口透出来填住），向下覆盖所有 stack 缝隙；左右外扩。
-   * todo：卡片根自己就是材质（[data-testid='todo-panel']，自带 overflow:hidden + 16px 圆角），
-     用 ::before + 两个底部圆角遮罩只填圆角缺口；::after 覆盖它下方的缝隙。
-   * 尺寸只覆盖「缝隙 + 卡片底部圆角」所需：宽度 = 卡片自身宽度（不外扩，避免横向超出屏幕），
-     queue / goal 向上 20px + gap，todo 的缝带只一个 gap —— 不向下延伸，避免盖住统计胶囊。
-   * 精确对齐靠 background-attachment: fixed：固定背景定位区 = 视口，与 .dsh-theme-tone 地面层同源。 */
-${P} ${SEAT} :is([data-queue-dock], [data-goal-bar]) {
+/* 停靠卡补缝：卡与卡/输入框之间的 stack 缝、以及卡片底部圆角后面会透出正文，
+   用「底色 + 打光」重绘盖住；只覆盖所需尺寸，不动官方几何。 */
+${P} ${SEAT} :is(${DOCK}, ${TODO}) {
   position: relative;
   z-index: 0;
-  /* 卡根带 overflow:hidden（官方裁材质），会连补缝层一起裁掉，必须放开 */
   overflow: visible;
 }
-${P} ${SEAT} :is([data-queue-dock], [data-goal-bar])::after {
+${P} ${SEAT} :is(${DOCK})::after {
   content: '';
   position: absolute;
-  /* 只向上 20px（藏在卡片材质下填圆角缺口）+ 一个 gap；不再向下/左右外扩，
-     否则会盖住下面的统计胶囊、横向超出屏幕。 */
   top: calc(100% - 20px);
-  /* 只外扩一个 side-clearance（停靠卡比输入框窄的那点差），不做出屏的大外扩 */
-  left: calc(-1 * var(--dsh-composer-side-clearance, 16px));
-  right: calc(-1 * var(--dsh-composer-side-clearance, 16px));
-  /* 向上 20px 填本卡底部圆角；向下再延 24px，藏到下一张卡 / 输入框材质之下，
-     只从它们顶部圆角缺口透出来填住（owner 反复确认的「边缘漏一点点文字」）。 */
-  height: calc(var(--dsh-composer-stack-gap, 6px) + 20px + 24px);
+  left: calc(-1 * ${SIDE_CLEARANCE});
+  right: calc(-1 * ${SIDE_CLEARANCE});
+  height: calc(${STACK_GAP} + 20px + 24px);
   z-index: -1;
   pointer-events: none;
-  background-color: var(--dsw-alias-bg-base);
-  background-image: ${BACKDROP_GRADIENTS};
-  background-attachment: fixed;
-  background-repeat: no-repeat;
+${GROUND_REPAINT}
 }
-${P} ${SEAT} [data-testid='todo-panel'] {
-  position: relative;
-  z-index: 0;
-  overflow: visible;
-}
-${P} ${SEAT} [data-testid='todo-panel']::before {
+${P} ${SEAT} ${TODO}::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-color: var(--dsw-alias-bg-base);
-  background-image: ${BACKDROP_GRADIENTS};
-  background-attachment: fixed;
-  background-repeat: no-repeat;
+${GROUND_REPAINT}
   -webkit-mask-image:
     radial-gradient(circle 16px at 100% 0, transparent 15px, black 16px),
     radial-gradient(circle 16px at 0 0, transparent 15px, black 16px);
@@ -177,20 +159,16 @@ ${P} ${SEAT} [data-testid='todo-panel']::before {
   mask-position: left bottom, right bottom;
   mask-repeat: no-repeat, no-repeat;
 }
-${P} ${SEAT} [data-testid='todo-panel']::after {
+${P} ${SEAT} ${TODO}::after {
   content: '';
   position: absolute;
   top: 100%;
-  left: calc(-1 * var(--dsh-composer-side-clearance, 16px));
-  right: calc(-1 * var(--dsh-composer-side-clearance, 16px));
-  /* 一个 gap + 向下 24px（藏到下一张卡材质下，填它顶部圆角缺口） */
-  height: calc(var(--dsh-composer-stack-gap, 6px) + 24px);
+  left: calc(-1 * ${SIDE_CLEARANCE});
+  right: calc(-1 * ${SIDE_CLEARANCE});
+  height: calc(${STACK_GAP} + 24px);
   z-index: -1;
   pointer-events: none;
-  background-color: var(--dsw-alias-bg-base);
-  background-image: ${BACKDROP_GRADIENTS};
-  background-attachment: fixed;
-  background-repeat: no-repeat;
+${GROUND_REPAINT}
 }
 
 /* 卡片下方滚过的正文用「地面同源」的一小段盖住；带顶被卡片盖住，不需要 mask。 */

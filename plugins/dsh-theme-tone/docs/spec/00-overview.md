@@ -14,17 +14,10 @@
    放卡片 `::before`；卡片 `position: relative; z-index: 0` 自成层叠上下文（否则 `::before` 的
    `z-index:-1` 会逃出卡片 = 淡色框）；座位底部一小段「地面同源」带挡住卡片下方滚出的正文；卡片作用域内
    `--dsw-specific-selector: transparent`（「+」按钮让出实心底色）。
-   **停靠卡缝隙 + 底部圆角缺口**：composerStack 里「卡与卡 / 卡与输入框」之间是
-   `--dsh-composer-stack-gap`；另外每张停靠卡自己的**底部圆角**在卡片盒内、圆角外透明，正文会从
-   「左下 / 右下」两个角漏出来。做法（owner 定案，不改官方几何）：在停靠卡处/下方画「底色 + 打光」的
-   重绘层把透出的正文挡住，放大不影响任何东西。
-   * queue / goal：卡根（`[data-queue-dock]` / `[data-goal-bar]`）的 `::after` 画大带子，向上延伸
-     20px 藏到卡片材质之下（只从底部圆角缺口透出来填住），向下覆盖所有 stack 缝隙；卡根放开
-     `overflow: visible`（官方用它裁材质，会连补缝层一起裁掉）。
-   * todo：卡根自己就是材质（`[data-testid='todo-panel']`，自带 `overflow:hidden` + 16px 圆角），
-     用 `::before` + 两个底部圆角**遮罩**只填圆角缺口；`::after` 覆盖它下方的缝隙。
-   * 精确对齐靠 `background-attachment: fixed`（固定背景定位区 = 视口，与 `.dsh-theme-tone` 地面层
-     逐像素同源）；左右各外扩 `--dsh-composer-side-clearance` + 128px、向下 128px。
+   **停靠卡补缝**：停靠卡之间 / 与输入框之间的 stack 缝、以及卡片底部圆角后面都会透出正文，
+   用「底色 + 打光」重绘盖住（`background-attachment: fixed`，与地面层逐像素同源；只在有停靠卡时生效）。
+   queue / goal 用 `::after` 覆盖上下余量，todo 用 `::before` + 16px 圆角遮罩只填圆角缺口。
+   **不改官方几何**；卡根放开 `overflow: visible`（否则补缝层被官方裁剪吃掉）。
 5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的两个
    盒子 ⇒ 带背后永远只有面板纯色。做法：可流式滚动的正文（markdown/text 文档预览、文件树）上提 76px、
    内容下移 76px（只改视觉位置），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；玻璃面挂在

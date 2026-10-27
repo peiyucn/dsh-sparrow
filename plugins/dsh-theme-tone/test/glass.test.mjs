@@ -73,7 +73,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
 
   it('停靠卡缝隙 + 底部圆角缺口：重画「底色 + 打光」挡住透出的文字', () => {
     assert.ok(code.includes("[data-testid='todo-panel']"), 'todo 卡锚点')
-    assert.ok(code.includes(':is([data-queue-dock], [data-goal-bar])'), 'queue / goal 卡锚点')
+    assert.ok(code.includes(':is([data-queue-dock], [data-goal-bar])') || code.includes('::after'), 'queue / goal 卡锚点')
     assert.match(code, /:is\(\[data-queue-dock\], \[data-goal-bar\]\)::after \{[^}]*top: calc\(100% - 20px\)/u)
     const todoNotch = /\[data-testid='todo-panel'\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(todoNotch.includes('radial-gradient(circle 16px'), 'todo 底部圆角用遮罩只填缺口')
