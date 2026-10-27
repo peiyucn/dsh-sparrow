@@ -111,6 +111,26 @@ ${P} ${SEAT} [data-composer-card]::before {
 body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   box-shadow: ${RIM_LIGHT};
 }
+/* 停靠卡（todo / goal / queue）与输入框之间是 composerStack 的 --dsh-composer-stack-gap 缝隙：
+   本插件把座位做成透明后，这条缝隙会露出没有材质的透明缝。用卡片同款玻璃把它补上（宽度与卡片对齐，
+   用官方 --dsh-composer-side-clearance 对齐两侧留白），缝隙与卡片读作同一块玻璃。 */
+${P} ${SEAT}:has([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]) *:has(> [data-composer-card]) {
+  position: relative;
+  z-index: 0;
+}
+${P} ${SEAT}:has([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]) *:has(> [data-composer-card])::before {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--dsh-composer-stack-gap, 6px));
+  left: var(--dsh-composer-side-clearance, 16px);
+  right: var(--dsh-composer-side-clearance, 16px);
+  height: var(--dsh-composer-stack-gap, 6px);
+  z-index: -1;
+  pointer-events: none;
+  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%, transparent);
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
+}
+
 /* 卡片下方滚过的正文用「地面同源」的一小段盖住；带顶被卡片盖住，不需要 mask。 */
 ${P} [data-phase='active'] [data-composer-seat]::after {
   content: '';

@@ -14,6 +14,11 @@
    放卡片 `::before`；卡片 `position: relative; z-index: 0` 自成层叠上下文（否则 `::before` 的
    `z-index:-1` 会逃出卡片 = 淡色框）；座位底部一小段「地面同源」带挡住卡片下方滚出的正文；卡片作用域内
    `--dsw-specific-selector: transparent`（「+」按钮让出实心底色）。
+   **停靠卡缝隙**：todo / queue / goal 停靠卡与输入框之间是官方 composerStack 的 6px 间隙
+   （`--dsh-composer-stack-gap`）；座位透明后这条缝会露出无材质的透明缝，用卡片同款玻璃补一层
+   （宽度用 `--dsh-composer-side-clearance` 对齐两侧留白，同模糊 token 同填充值），且**只在座位里
+   确有停靠卡时生效**（`:has([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar])`），
+   避免 hero / 无停靠卡时卡片上方多出一条玻璃唇边。
 5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的两个
    盒子 ⇒ 带背后永远只有面板纯色。做法：可流式滚动的正文（markdown/text 文档预览、文件树）上提 76px、
    内容下移 76px（只改视觉位置），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；玻璃面挂在
@@ -84,6 +89,8 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
   留档（未实施）：若将来需要，可在「Electron + Chromium ≤155」宿主里，菜单存在期间把输入框冻结为
   「去 blur + 实心 + 座位光墙」，菜单关闭恢复 —— 实测可消除残影。
 * 悬浮卡修复是唯一私有 seam（见 `docs/private-seams.md`），官方改类名后缀即静默失效（回退官方配色，不崩）。
+* 停靠卡缝隙补丁用 `[data-testid='todo-panel']` 识别 Todo 卡（官方无 data 语义锚点，只有 testid）；
+  官方改 testid 时该补丁静默不命中，降级表现 = 缝隙回到无材质状态（不崩、不影响布局）。
 
 ## 验证
 
