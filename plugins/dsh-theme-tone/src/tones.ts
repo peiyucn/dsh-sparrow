@@ -283,17 +283,19 @@ export const STATE_TOKENS: readonly Readonly<{
   token: string
   light: string
   dark: string
+  /** hover 类交互态：染色比例取 {@link WASH_TINT}（比面高），否则取 {@link SURFACE_TINT}。 */
+  wash?: true
 }>[] = Object.freeze([
   Object.freeze({ token: '--dsw-specific-sidebar-nav-item-active', light: '--dsw-static-neutral-bluish-100', dark: '--dsw-static-neutral-bluish-750' }),
-  Object.freeze({ token: '--dsw-specific-sidebar-nav-item-hover', light: '--dsw-static-neutral-bluish-75', dark: '--dsw-static-neutral-bluish-850' }),
+  Object.freeze({ token: '--dsw-specific-sidebar-nav-item-hover', light: '--dsw-static-neutral-bluish-75', dark: '--dsw-static-neutral-bluish-850', wash: true }),
   Object.freeze({ token: '--dsw-specific-sidebar-nav-item-active-accent', light: '--dsw-static-deepseek-100', dark: '--dsw-static-neutral-bluish-800' }),
   Object.freeze({ token: '--dsw-alias-bg-module-platform', light: '--dsw-static-neutral-bluish-60', dark: '--dsw-static-neutral-bluish-800' }),
-  Object.freeze({ token: '--dsw-alias-interactive-bg-hover-solid', light: '--dsw-static-neutral-bluish-75', dark: '--dsw-static-neutral-bluish-800' }),
+  Object.freeze({ token: '--dsw-alias-interactive-bg-hover-solid', light: '--dsw-static-neutral-bluish-75', dark: '--dsw-static-neutral-bluish-800', wash: true }),
   Object.freeze({ token: '--dsw-alias-button-elevated-fill', light: '--dsw-static-neutral-bluish-00', dark: '--dsw-static-neutral-bluish-750' }),
   Object.freeze({ token: '--dsw-alias-button-floating-fill', light: '--dsw-static-neutral-bluish-00', dark: '--dsw-static-neutral-bluish-850' }),
-  Object.freeze({ token: '--dsw-alias-button-floating-hover', light: '--dsw-static-neutral-bluish-75', dark: '--dsw-static-neutral-bluish-800' }),
+  Object.freeze({ token: '--dsw-alias-button-floating-hover', light: '--dsw-static-neutral-bluish-75', dark: '--dsw-static-neutral-bluish-800', wash: true }),
   Object.freeze({ token: '--dsw-alias-button-ghost-active-fill', light: '--dsw-static-neutral-bluish-100', dark: '--dsw-static-neutral-bluish-750' }),
-  Object.freeze({ token: '--dsw-alias-button-ghost-active-hover', light: '--dsw-static-neutral-bluish-150', dark: '--dsw-static-neutral-bluish-700' }),
+  Object.freeze({ token: '--dsw-alias-button-ghost-active-hover', light: '--dsw-static-neutral-bluish-150', dark: '--dsw-static-neutral-bluish-700', wash: true }),
 ])
 
 /** 洗染色值：**只换 RGB，alpha 一字不动**（不匹配 `rgba()` 形式时**原样返回**官方字面量，安全默认）；`scale` 省略时取 {@link WASH_TINT}，菜单族传 `PANEL_TINT`。 */
@@ -529,9 +531,11 @@ export function tokenOverrides(settings: ThemeToneSettings): TokenOverrides {
   }
   overrides[TOP_STOP_VARIABLE] = { light: TOP_STOP, dark: TOP_STOP }
   for (const entry of STATE_TOKENS) {
+    const lightScale = entry.wash ? WASH_TINT.light : SURFACE_TINT.light
+    const darkScale = entry.wash ? WASH_TINT.dark : SURFACE_TINT.dark
     overrides[entry.token] = {
-      light: rungFill(light.tint, entry.light, SURFACE_TINT.light),
-      dark: rungFill(dark.tint, entry.dark, SURFACE_TINT.dark),
+      light: rungFill(light.tint, entry.light, lightScale),
+      dark: rungFill(dark.tint, entry.dark, darkScale),
     }
   }
   for (const { token, official } of [...WASH_TOKENS, ...BORDER_TOKENS]) {
