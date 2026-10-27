@@ -47,7 +47,6 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(band.includes('background-image:'), '座位底带重画地面光')
     assert.ok(band.includes('background-position: 100% 100%'))
     assert.match(band, new RegExp(`height: ${SEAT_BAND_PX}px`))
-    assert.ok(!code.includes(':has(> [data-menu-material])'), '不得有「菜单打开才切换」的降级')
   })
 
   it('右栏：底色/打光 + 正文上提 76px 从两条带下滚过 + 头行玻璃（真模糊）', () => {
@@ -67,9 +66,11 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
 
-  it('官方菜单材质：只关 blur（用菜单的非高频模糊换输入框完整玻璃）', () => {
-    assert.match(code, /\[data-menu-material\] \{\s*backdrop-filter: none !important;/u)
-    assert.ok(!/\[data-menu-material\][^}]*background/u.test(code), '不覆盖菜单填充')
+  it('菜单打开期间冻结输入框玻璃（撤 blur + 座位光墙），菜单材质全部保持官方', () => {
+    assert.ok(!/^\[data-menu-material\] \{/mu.test(code), '不改任何官方菜单材质')
+    assert.match(code, /:has\(> \[data-menu-material\]\)[^{]*\[data-composer-card\]::before \{[^}]*backdrop-filter: none;/u)
+    assert.match(code, /:has\(> \[data-menu-material\]\)[^{]*\[data-composer-seat\]::before \{[^}]*background-image: radial-gradient\(/u)
+    assert.match(code, /:has\(> \[data-menu-material\]\)[^{]*\[data-composer-seat\]::after \{\s*display: none;/u)
   })
 
   it('设置弹窗：打光（按弹窗自身盒子缩放）', () => {

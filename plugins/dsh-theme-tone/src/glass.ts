@@ -34,6 +34,8 @@ const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
 
 const P = `body:not([${PLAIN_ATTR}])`
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
+const SEAT = `:is([data-phase='active'], [data-phase='hero']) [data-composer-seat]`
+const MENU_OPEN = `body:not([${PLAIN_ATTR}]):has(> [data-menu-material])`
 
 /** 右栏 76px 下有「可流式滚动的正文」的标签：只有它们上提滚区，正文才会真的从两条带下滚过。 */
 const LIFTED_SCROLLS = [
@@ -82,22 +84,22 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框：完整玻璃模糊（owner 定案：模型菜单放弃模糊，换输入框的完整玻璃） =====
+/* ===== 输入框：完整玻璃模糊 + 座位透明 =====
    座位撤掉官方 36px 实色渐隐，正文从玻璃下滚过；卡片本体透明、玻璃与边缘光在 ::before（伪元素没有
    后代，不会成为官方弹层的 backdrop root）；卡片自成层叠上下文，::before 的 z-index:-1 才留得住。
-   重叠模糊是本 bug 的根因（owner 观察确认）：模型菜单的 blur 见下方「官方菜单材质只关 blur」——
-   菜单不是高频操作，用它的模糊换输入框的完整玻璃。 */
-${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] {
+   残影的触发条件（一天排除 + owner 复看）：上面出现新的合成浮层时，输入框这一层 backdrop-filter
+   会被 Chromium 复用错位快照。所以**不改任何官方菜单材质**，只在菜单存在期间冻结玻璃（见文件末尾）。 */
+${P} ${SEAT} {
   background: none !important;
 }
-${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card] {
+${P} ${SEAT} [data-composer-card] {
   position: relative;
   z-index: 0;
   background-color: transparent;
   /* 「+」等 selector 型图标按钮：官方给的是不透明中性底，在玻璃卡片上会读成一块实心。 */
   --dsw-specific-selector: transparent;
 }
-${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card]::before {
+${P} ${SEAT} [data-composer-card]::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -108,7 +110,7 @@ ${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-
   box-shadow: ${RIM_DARK};
   backdrop-filter: var(--dsw-menu-backdrop-filter);
 }
-body:not([data-ds-dark-theme]) :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] [data-composer-card]::before {
+body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   box-shadow: ${RIM_LIGHT};
 }
 /* 卡片下方滚过的正文用「地面同源」的一小段盖住；带顶被卡片盖住，不需要 mask。 */
@@ -186,17 +188,32 @@ ${P} [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip] {
   z-index: 3;
 }
 
-/* ===== 官方菜单材质：只关 blur、保留半透明填充 =====
-   输入框的完整玻璃模糊与菜单的 blur 同时存在时，Chromium 会把菜单碎片的错位快照画进输入框
-   （owner 观察确认：两个模糊重叠就出问题）。菜单不是高频操作 ⇒ 用它的实时模糊换输入框的完整玻璃；
-   半透明填充 / 圆角 / 阴影保持官方。 */
-[data-menu-material] {
-  backdrop-filter: none !important;
-}
-
 /* ===== 设置弹窗：打光（按弹窗自身盒子缩放，窗口在视口中间，不按视口相位画） ===== */
 ${P} [data-shortcut-modal='settings'] {
 ${OBJECT_FIT_LIGHT}
+}
+
+/* ===== 菜单打开期间：冻结输入框玻璃（唯一能保住「无残影 + 平时完整玻璃」的做法） =====
+   owner 实测：模型菜单「不透明实心」也照样闪 ⇒ 和菜单材质无关，是「上面出现新的合成浮层」时输入框的
+   backdrop-filter 层被 Chromium 复用错位快照。所以官方菜单材质全部保持原样；只在菜单存在期间把输入框
+   玻璃冻结：撤掉 backdrop-filter，同时座位铺不透光光墙（否则正文会从卡片下透出来、看着乱）。光墙画的
+   也是「光」，和正常态观感接近；菜单关闭立即恢复完整玻璃模糊。 */
+${MENU_OPEN} ${SEAT}::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--dsw-alias-bg-base);
+${viewportLight('100% 100%')}
+  -webkit-mask-image: linear-gradient(180deg, transparent 0px, black 36px);
+  mask-image: linear-gradient(180deg, transparent 0px, black 36px);
+}
+${MENU_OPEN} ${SEAT} [data-composer-card]::before {
+  backdrop-filter: none;
+}
+${MENU_OPEN} [data-phase='active'] [data-composer-seat]::after {
+  display: none;
 }
 `
 }
