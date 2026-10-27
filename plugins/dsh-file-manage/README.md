@@ -21,7 +21,7 @@ Requires dsh 0.2.1-rc.3 — the exact official version line this release is buil
 * **Entry**: the "Cloud Files" icon at the top of the sidebar, opening the page in the main area
 * **Getting back**: The cloud files page is a normal main-area page, not a dialog — it does not dim or block the interface. Return to a conversation the usual way: pick a session in the sidebar, or use New Session
 * **List**: in the order the service returns (this plugin does not re-sort) with "Load more" at the bottom (20 more files per click); each row shows filename / size / upload time / expiry time (when present)
-* **Quota**: the page header shows the total count and a quota bar (used storage / the 25 GiB limit)
+* **Quota**: the top of the page shows the total count and a usage bar (used storage / the 25 GiB limit)
 * **Delete**: per-row delete with confirmation; "DSH auto-uploaded" files (`dsh-` prefix) get an extra note — sessions referencing them will transparently re-upload on next use (may be slower)
 * **Copy file_id**: one-click copy per row
 * **Errors**: classified messages for auth failures / rate limits / server errors, with retry
