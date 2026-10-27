@@ -81,9 +81,6 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(code.includes("[data-testid='todo-panel']"), 'todo 卡锚点')
     assert.ok(code.includes(':is([data-queue-dock], [data-goal-bar])') || code.includes('::after'), 'queue / goal 卡锚点')
     assert.match(code, /:is\(\[data-queue-dock\], \[data-goal-bar\]\)::after \{[^}]*top: calc\(100% - 20px\)/u)
-    const todoNotch = /\[data-testid='todo-panel'\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(todoNotch.includes('radial-gradient(circle 16px'), 'todo 底部圆角用遮罩只填缺口')
-    assert.ok(todoNotch.includes('mask-position: left bottom, right bottom'), '两个底部圆角')
     assert.ok((code.match(/background-attachment: fixed/gu) ?? []).length >= 3, '仍是背景重绘，不是新增玻璃')
     assert.ok(!code.includes('[data-composer-card]::before {\n  top: calc'), '不动卡片几何')
   })

@@ -149,26 +149,6 @@ ${P} ${SEAT} :is(${DOCK})::after {
   pointer-events: none;
 ${GROUND_REPAINT}
 }
-${P} ${SEAT} ${TODO}::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-${GROUND_REPAINT}
-  -webkit-mask-image:
-    radial-gradient(circle 16px at 100% 0, transparent 15px, black 16px),
-    radial-gradient(circle 16px at 0 0, transparent 15px, black 16px);
-  -webkit-mask-size: 16px 16px, 16px 16px;
-  -webkit-mask-position: left bottom, right bottom;
-  -webkit-mask-repeat: no-repeat, no-repeat;
-  mask-image:
-    radial-gradient(circle 16px at 100% 0, transparent 15px, black 16px),
-    radial-gradient(circle 16px at 0 0, transparent 15px, black 16px);
-  mask-size: 16px 16px, 16px 16px;
-  mask-position: left bottom, right bottom;
-  mask-repeat: no-repeat, no-repeat;
-}
 ${P} ${SEAT} ${TODO}::after {
   content: '';
   position: absolute;
