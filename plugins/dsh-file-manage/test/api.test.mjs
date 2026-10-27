@@ -33,7 +33,10 @@ function responseStub(status, body) {
   return /** @type {Response} */ ({
     ok: status >= 200 && status < 300,
     status,
-    json: async () => body,
+    json: async () => {
+      if (body instanceof Error) throw body
+      return body
+    },
   })
 }
 
@@ -65,12 +68,9 @@ describe('dsh-file-manage 客户端请求层', () => {
       await assert.rejects(listApi(), /请求失败（HTTP 500）/u)
     })
 
-    it('成功但响应体非 JSON 应该 返回安全默认值（空列表）', async () => {
+    it('成功但响应体非 JSON（代理页 / 截断）应该 明确报错，而不是当空列表', async () => {
       impl = async () => responseStub(200, new SyntaxError('not json'))
-      const page = await listApi()
-      assert.deepEqual(page.rows, [])
-      assert.equal(page.hasMore, false)
-      assert.equal(page.lastId, undefined)
+      await assert.rejects(listApi(), /无法解析的响应/u)
     })
 
     it('fetch 中止 应该 转为用户可读超时文案', async () => {

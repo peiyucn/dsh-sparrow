@@ -1,9 +1,9 @@
 /** dsh-file-manage 客户端样式层：注入样式表 + 页面内联样式（官方设计 token；按 data 属性去重）。 @module dsh-file-manage/client/styles */
 
-import type { CSSProperties } from 'react'
+import { STYLE_SELECTOR } from '../constants.js'
 
-/** 注入页面 / 列表 / 确认框样式；HMR / 重载按 data 属性去重不叠加。 */
-export function ensureFileManageStyles(): void {
+/** 注入页面 / 列表 / 确认框样式并返回 style 元素；调用方负责在卸载时移除。 */
+export function ensureFileManageStyles(): HTMLStyleElement {
   const css = `/* 主面板页面：官方入口型页面同款（居中内容列，整页滚动；标题行自带 28px 顶内边距，
    macOS 下再让出窗口顶带，故行自己的盒子就是窗口的拖拽几何）。 */
 .dsh-file-manage-page {
@@ -133,6 +133,7 @@ html[data-platform='darwin'] .dsh-file-manage-page-head {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  margin-top: 20px;
 }
 /* 用量/进度条固定区：标题行下方、不随列表滚动。 */
 .dsh-file-manage-summary {
@@ -193,54 +194,66 @@ html[data-platform='darwin'] .dsh-file-manage-page-head {
   background: var(--dsw-alias-state-business-primary);
   transition: width 220ms ease-out;
 }
+.dsh-file-manage-body {
+  /* 页面自身滚动，这里只做行内容器（滚动条占位避免卡片右缘漂移）。 */
+  flex: none;
+  min-height: 0;
+  scrollbar-gutter: stable;
+}
+.dsh-file-manage-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+}
+.dsh-file-manage-row-main,
+.dsh-file-manage-row-head {
+  min-width: 0;
+}
+.dsh-file-manage-row-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* 字号与行高都显式给：本页基准 14px，行高留 normal 会矮一档、行距发挤（官方列表标题 14/20）。 */
+.dsh-file-manage-row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 20px;
+}
+.dsh-file-manage-row-meta {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+  line-height: 18px;
+}
+.dsh-file-manage-row-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.dsh-file-manage-error {
+  margin: 0 0 12px;
+  color: var(--dsw-alias-state-error-primary, #c62828);
+}
+.dsh-file-manage-loadmore {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+}
 `
-  const existing = document.querySelector<HTMLStyleElement>('style[data-dsh-file-manage]')
+  const existing = document.querySelector<HTMLStyleElement>(STYLE_SELECTOR)
   if (existing !== null) {
-    // 同名去重命中时校验内容：HMR 升级后旧 style 可能残留过期规则，刷新之（与 archive 同款）。
+    // HMR / 重载命中旧 style：内容过期就刷新，不叠加第二个标签。
     if (existing.textContent !== css) existing.textContent = css
-    return
+    return existing
   }
   const style = document.createElement('style')
   style.dataset.dshFileManage = ''
   style.textContent = css
   document.head.appendChild(style)
+  return style
 }
-
-/** 页面与行内联样式（对齐官方 Settings / Archive 的页面几何）。 */
-export const styles = {
-  body: {
-    // 页面自身滚动（外层 .dsh-file-manage-page 已 overflow:auto），此处只做行内容器。
-    flex: 'none',
-    minHeight: 0,
-    // 滚动条固定占位：卡片右缘不因滚动条出现/消失而左右漂移（与顶部进度条对齐）。
-    scrollbarGutter: 'stable',
-  } satisfies CSSProperties,
-  row: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 8,
-    alignItems: 'center',
-    padding: '8px 0',
-    borderBottom: '1px solid var(--dsw-alias-border-l1, #e2e5ea)',
-  } satisfies CSSProperties,
-  actions: {
-    display: 'flex',
-    gap: 6,
-    alignItems: 'center',
-  } satisfies CSSProperties,
-  title: {
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap' as const,
-    /* ⚠️ 字号与行高都要**显式**给：本页已补 14px 基准，但行高若留 `normal`
-       行盒只有约 16.8px，比官方同位置（列表标题 14px/20px）矮一档、
-       行间距读起来发挤。官方列表标题的行高是 20px，这里对齐。 */
-    fontSize: 14,
-    lineHeight: '20px',
-  } satisfies CSSProperties,
-  secondarySmall: {
-    color: 'var(--dsw-alias-label-secondary, #6b7280)',
-    fontSize: 12,
-    lineHeight: '18px',
-  } satisfies CSSProperties,
-} as const

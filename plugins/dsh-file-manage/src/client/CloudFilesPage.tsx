@@ -12,13 +12,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { Modal, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FileRow } from '../files.js'
+import { COPIED_RESET_MS, RENDER_PAGE_SIZE } from '../constants.js'
 import type { FileCountSummary } from './api.js'
-import { hasLoadMore, renderedRowCount, RENDER_PAGE_SIZE } from './paging.js'
+import { hasLoadMore, renderedRowCount } from './paging.js'
 import { formatUsagePercent, storageUsageRatio } from './quota.js'
-import { styles } from './styles.js'
-
-/** 「已复制」反馈复位时长（archive 同款）。 */
-const COPIED_RESET_MS = 2_000
 
 /** 页面的注入面（业务动作；与旧入口逐项一致，只换了承载的槽位）。 */
 export interface CloudFilesPanelInjected {
@@ -69,9 +66,13 @@ export function CloudFilesPanel({ listFiles, deleteFile, countFiles, t }: CloudF
   const copiedTimerRef = useRef<number | null>(null)
   /** 渲染窗口上限：行数随「加载更多」递增，超出窗口的行不进 DOM（配额 10000 下 DOM 有界）。 */
   const [renderLimit, setRenderLimit] = useState(RENDER_PAGE_SIZE)
+  /** 刷新进行中：重试按钮在 loading 揭晓前仍是可点的，用同步锁挡住双击并发两轮全量扫描。 */
+  const reloadingRef = useRef(false)
 
   /** 首屏 / 重试共用：列表与总数统计并发拉取，两者都落定才揭开内容（整页 loading 防闪动）。 */
   const reload = useCallback(() => {
+    if (reloadingRef.current) return
+    reloadingRef.current = true
     const seq = ++refreshSeqRef.current
     setLoading(true)
     setSummaryPending(true)
@@ -117,6 +118,11 @@ export function CloudFilesPanel({ listFiles, deleteFile, countFiles, t }: CloudF
   const reloadRef = useRef(reload)
   reloadRef.current = reload
   useEffect(() => { reloadRef.current() }, [])
+
+  // 两个首屏请求都落定后释放刷新锁；中途卸载也随组件一起丢弃。
+  useEffect(() => {
+    if (!loading && !summaryPending) reloadingRef.current = false
+  }, [loading, summaryPending])
 
   useEffect(() => () => {
     if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current)
@@ -213,7 +219,7 @@ export function CloudFilesPanel({ listFiles, deleteFile, countFiles, t }: CloudF
   }, [busyDelete, confirming, deleteFile, countFiles])
 
   return (
-    <section className="dsh-file-manage-page" data-file-manage-panel aria-busy={loading}>
+    <section className="dsh-file-manage-page" aria-busy={loading}>
       {/* 标题行自带 28px 顶内边距并打上窗口拖拽标记：内容不再有遮罩，页面顶端就是窗口边缘。 */}
       <header className="dsh-file-manage-page-head" data-window-drag>
         <h1 className="dsh-file-manage-page-title">{t('dialog.title')}</h1>
@@ -241,7 +247,7 @@ export function CloudFilesPanel({ listFiles, deleteFile, countFiles, t }: CloudF
         ) : null}
       </div>
 
-      <div ref={bodyRef} style={styles.body} className="dsh-file-manage-body">
+      <div ref={bodyRef} className="dsh-file-manage-body">
         {initialLoading ? (
           <div className="dsh-file-manage-loading" role="status" aria-label={t('loading')}>
             <StateDot state="ongoing" />
@@ -249,29 +255,29 @@ export function CloudFilesPanel({ listFiles, deleteFile, countFiles, t }: CloudF
         ) : (
           <>
             {error !== null ? (
-              <p role="alert" style={{ ...styles.secondarySmall, margin: '0 0 12px', color: 'var(--dsw-alias-state-error-primary, #c62828)' }}>
+              <p role="alert" className="dsh-file-manage-row-meta dsh-file-manage-error">
                 {error}
                 {' '}
-                <button type="button" className="dsh-file-manage-btn" onClick={() => { reload() }}>{t('retry')}</button>
+                <button type="button" className="dsh-file-manage-btn" disabled={initialLoading} onClick={() => { reload() }}>{t('retry')}</button>
               </p>
             ) : null}
-            {error === null && rows.length === 0 ? <p style={styles.secondarySmall}>{t('empty')}</p> : null}
+            {error === null && rows.length === 0 ? <p className="dsh-file-manage-row-meta">{t('empty')}</p> : null}
             {rows.length > 0 ? (
               <div className="dsh-file-manage-card">
                 {/* 只渲染窗口内行：预算裁剪 DOM（超出窗口靠「加载更多」延伸，配额 10000 不无界进 DOM）。 */}
                 {rows.slice(0, renderLimit).map(row => (
-                  <div key={row.id} style={styles.row}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                        <span style={styles.title} title={row.filename}>{row.filename}</span>
+                  <div key={row.id} className="dsh-file-manage-row">
+                    <div className="dsh-file-manage-row-main">
+                      <div className="dsh-file-manage-row-head">
+                        <span className="dsh-file-manage-row-title" title={row.filename}>{row.filename}</span>
                         {row.dshOwned ? <span className="dsh-file-manage-badge">{t('dshBadge')}</span> : null}
                       </div>
-                      <div style={styles.secondarySmall}>
+                      <div className="dsh-file-manage-row-meta">
                         {row.sizeLabel} · {row.createdAtLabel}
                         {row.expiresAtLabel !== undefined ? ` · ${t('expires', { time: row.expiresAtLabel })}` : ''}
                       </div>
                     </div>
-                    <div style={styles.actions}>
+                    <div className="dsh-file-manage-row-actions">
                       <button
                         type="button"
                         className="dsh-file-manage-btn"
@@ -291,9 +297,9 @@ export function CloudFilesPanel({ listFiles, deleteFile, countFiles, t }: CloudF
                 ))}
               </div>
             ) : null}
-            {/* 加载更多随列表滚动：放在当前列表最下面。 */}
-            {hasLoadMore(rows.length, renderLimit, hasMore) && !initialLoading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12 }}>
+            {/* 加载更多随列表滚动：放在当前列表最下面。无 lastId 时没有下一页可拉，不显示按钮。 */}
+            {hasLoadMore(rows.length, renderLimit, hasMore) && !initialLoading && (renderLimit < rows.length || lastId !== undefined) ? (
+              <div className="dsh-file-manage-loadmore">
                 <button
                   type="button"
                   className="dsh-file-manage-btn"
@@ -326,7 +332,7 @@ export function CloudFilesPanel({ listFiles, deleteFile, countFiles, t }: CloudF
                 ? t('confirm.deleteDsh', { name: confirming.filename })
                 : t('confirm.delete', { name: confirming.filename })}
             </p>
-            <div className="dsh-file-manage-confirm-actions" style={{ marginTop: 20 }}>
+            <div className="dsh-file-manage-confirm-actions">
               <button
                 type="button"
                 className="dsh-file-manage-btn"

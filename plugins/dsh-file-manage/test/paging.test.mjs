@@ -1,13 +1,14 @@
 // @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { FILE_PAGE_SIZE, hasLoadMore, renderedRowCount, RENDER_PAGE_SIZE } from '../lib/client/paging.js'
+import { LIST_PAGE_SIZE, RENDER_PAGE_SIZE } from '../lib/constants.js'
+import { hasLoadMore, renderedRowCount } from '../lib/client/paging.js'
 
 describe('dsh-file-manage 渲染窗口纯逻辑', () => {
   it('常量 应该 可见分页 20 条/次，数据页大于渲染窗口', () => {
     assert.equal(RENDER_PAGE_SIZE, 20)
-    assert.equal(FILE_PAGE_SIZE, 200)
-    assert.ok(FILE_PAGE_SIZE > RENDER_PAGE_SIZE)
+    assert.equal(LIST_PAGE_SIZE, 200)
+    assert.ok(LIST_PAGE_SIZE > RENDER_PAGE_SIZE)
   })
 
   it('renderedRowCount 应该 返回已加载行数与窗口上限的较小值', () => {

@@ -2,20 +2,21 @@
 
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { DeepSeekFileObject } from '@deepseek-ai/dsh-llm-deepseek'
+import { COUNT_PAGE_HARD_CAP, COUNT_PAGE_LIMIT, LIST_PAGE_SIZE } from './constants.js'
 
 /** 官方自动上传文件名的前缀（llm-deepseek file-store.ts 的 OWNED_FILE_PREFIX）。 */
 export const DSH_OWNED_FILE_PREFIX = 'dsh-'
 
-/** 列表页大小（官方上限 1000）。 */
-export const PAGE_SIZE = 20
-
-/** 总数统计每页拉取上限（官方 list 上限 1000）。 */
-export const COUNT_PAGE_LIMIT = 1000
-
-/** 总数统计最多翻页数：官方配额 10000 个文件 ÷ 每页 1000 = 10 页，12 页兜底防配额口径变化。 */
-export const MAX_COUNT_PAGES = 12
-
-export const COUNT_PAGE_TIMEOUT_MS = 15_000
+/**
+ * count 的翻页预算：官方配额 / 每页上限 + 2 页余量（官方配额上调时自动跟上），硬上限防死循环。
+ * 配额不可用时退化为单页。
+ */
+export function countPageBudget(quotaCount: number): number {
+  const derived = Number.isFinite(quotaCount) && quotaCount > 0
+    ? Math.ceil(quotaCount / COUNT_PAGE_LIMIT) + 2
+    : 1
+  return Math.min(COUNT_PAGE_HARD_CAP, Math.max(1, derived))
+}
 
 /**
  * 交给官方 `DeepSeekFilesClient` 的 baseURL：只解析根、**不在这里拼 `/v1`** —— 官方 client
@@ -92,7 +93,7 @@ export interface PageQuery {
 }
 
 /**
- * 分页参数归一化：limit 钳到 [1, 1000]（非法回退 PAGE_SIZE）；空 after 省略；异常输入返回安全默认值，不抛。
+ * 分页参数归一化：limit 钳到 [1, 1000]（非法回退 LIST_PAGE_SIZE）；空 after 省略；异常输入返回安全默认值，不抛。
  * 没有 `order`：官方 Files API 已无可用的排序查询（官方 client 的 `list()` 只接受 `after` / `limit` / `signal`，
  * 传了也不生效），排序改由调用方本地做。
  */
@@ -100,7 +101,7 @@ export function normalizePageQuery(query: { after?: string; limit?: string }): P
   // 只接受纯数字串（Number('') === 0 会把空串误判为 0，需先拦）。
   const limitText = query.limit
   const limitRaw = limitText !== undefined && /^\d+$/u.test(limitText) ? Number(limitText) : Number.NaN
-  const limit = Number.isInteger(limitRaw) ? Math.min(1000, Math.max(1, limitRaw)) : PAGE_SIZE
+  const limit = Number.isInteger(limitRaw) ? Math.min(1000, Math.max(1, limitRaw)) : LIST_PAGE_SIZE
   const after = query.after !== undefined && query.after !== '' ? query.after : undefined
   return { ...after === undefined ? {} : { after }, limit }
 }

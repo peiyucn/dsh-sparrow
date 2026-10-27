@@ -57,7 +57,7 @@ describe('dsh-file-manage 结构', () => {
   })
 
   /**
-   * spec 03：入口迁到官方「主面板」形态；本组守卫钉住**迁走的东西不许回来** ——
+   * 入口迁到官方「主面板」形态；本组守卫钉住**迁走的东西不许回来** ——
    * client half 只注册官方两处槽位，自建遮罩 / dialog 语义 / 焦点陷阱全部消失。
    */
   it('client half 应该 只注册官方 main + sidebar.panellist，不再挂 sidebar.footer.action', async () => {
@@ -67,7 +67,7 @@ describe('dsh-file-manage 结构', () => {
     assert.ok(!/role=['"]dialog['"]/u.test(index), 'client half 不得出现自建 dialog 语义')
   })
 
-  it('⛔ 页面不得自建遮罩 / dialog 语义 / 焦点陷阱（spec 03 决策点）', async () => {
+  it('⛔ 页面不得自建遮罩 / dialog 语义 / 焦点陷阱', async () => {
     const page = await readFile(new URL('../src/client/CloudFilesPage.tsx', import.meta.url), 'utf8')
     // 剥注释再判：本文件的注释里**故意**写着「没有 role='dialog'」这类说明，不剥会命中自己的文档。
     const code = page
@@ -129,12 +129,12 @@ describe('dsh-file-manage 结构', () => {
 
   it('⛔ 行标题必须显式给字号与行高（不得只靠继承）', async () => {
     const styles = await readFile(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
-    const title = /title:\s*\{([^}]*)\}/u.exec(styles)
-    assert.ok(title !== null, '缺 styles.title')
+    const title = /\.dsh-file-manage-row-title \{([^}]*)\}/u.exec(styles)
+    assert.ok(title !== null, '缺 .dsh-file-manage-row-title 规则')
     const decl = title[1].replace(/\/\*[\s\S]*?\*\//gu, '')
-    assert.match(decl, /fontSize:\s*14/u, 'styles.title 必须显式 fontSize: 14')
-    assert.match(decl, /lineHeight:\s*'20px'/u,
-      "styles.title 必须显式 lineHeight: '20px'（留 normal 行盒偏矮、行距发挤）")
+    assert.match(decl, /font-size:\s*14px/u, '行标题必须显式 font-size: 14px')
+    assert.match(decl, /line-height:\s*20px/u,
+      '行标题必须显式 line-height: 20px（留 normal 行盒偏矮、行距发挤）')
   })
 
   /**
@@ -182,5 +182,47 @@ describe('dsh-file-manage 结构', () => {
     assert.equal(legacyGuard('types/x.d.ts'), true, '（对照）旧写法对清单没声明的扩展名恒真')
     assert.equal(isPacked('lib/types/x.d.ts', files), true, 'lib/types 下的 .d.ts 在清单内')
     assert.ok(globToRegExp('lib/**/*.js').test('lib/host.js'), '双星后接斜杠时连零层目录都算')
+  })
+})
+
+describe('dsh-file-manage 架构不变量（重构成 theme-tone 形）', () => {
+  it('文档应该 只剩单一现状 spec', async () => {
+    const fs = await import('node:fs/promises')
+    const specs = await fs.readdir(new URL('../docs/spec', import.meta.url))
+    assert.deepEqual(specs, ['00-overview.md'])
+  })
+
+  it('src 应该 按关注点拆 file-manage（constants / host / routes / connection / surface / http）', async () => {
+    const fs = await import('node:fs/promises')
+    const files = await fs.readdir(new URL('../src', import.meta.url))
+    for (const file of ['constants.ts', 'host.ts', 'routes.ts', 'connection.ts', 'surface.ts', 'http.ts', 'files.ts', 'trust.ts', 'compat.ts']) {
+      assert.ok(files.includes(file), `缺 ${file}`)
+    }
+  })
+
+  it('host.ts 应该 只做组合根（不出现路由分发）', async () => {
+    const host = await readFile(new URL('../src/host.ts', import.meta.url), 'utf8')
+    assert.ok(!/req\.method/u.test(host), 'host.ts 不得内联路由分发（应在 routes.ts）')
+    assert.match(host, /createRouteHandler\(/u, 'host.ts 必须装配 routes.ts 的 handler')
+  })
+
+  it('client/index.ts 应该 走不抛错的 client 能力门并登记样式清理', async () => {
+    const index = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(index, /warnMissingCapabilities\(/u, 'client half 必须先跑 warnMissingCapabilities')
+    assert.match(index, /ctx\.effect\(\(\) => \(\) => \{ style\.remove\(\) \}/u, '样式表必须在 effect 里移除')
+    assert.ok(!/assertCapabilities\(/u.test(index), 'client half 不得用抛错版能力门')
+  })
+
+  it('组件 应该 不再内联静态样式（只有配额条宽度是动态值）', async () => {
+    const page = (await readFile(new URL('../src/client/CloudFilesPage.tsx', import.meta.url), 'utf8')).replace(/\/\*[\s\S]*?\*\//gu, '')
+    assert.ok(!/styles\./u.test(page), '组件不得再引用 styles 对象（静态样式已进 styles.ts）')
+    const inline = [...page.matchAll(/style=\{\{/gu)]
+    assert.equal(inline.length, 1, '只允许配额条宽度这一处内联 style')
+  })
+
+  it('client/index.ts 的 re-export 面 应该 收敛（不再转发整组内部符号）', async () => {
+    const index = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.ok(!/export \{ CloudFilesPanel \}/u.test(index), '内部组件不再作为包 API 转发')
+    assert.match(index, /export function apply/u)
   })
 })

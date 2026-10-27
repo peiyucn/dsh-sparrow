@@ -1,10 +1,4 @@
-/** 文件面板渲染窗口纯逻辑（对齐 archive-manage spec 09）：数据分页与 DOM 渲染窗口分离。 @module dsh-file-manage/client/paging */
-
-/** 渲染窗口大小：每次「加载更多」多显示的行数。 */
-export const RENDER_PAGE_SIZE = 20
-
-/** 数据分页大小：每次 list 拉取的行数；大于渲染窗口（200 > 20），一次游标请求覆盖多次「加载更多」。 */
-export const FILE_PAGE_SIZE = 200
+/** 文件面板渲染窗口纯逻辑：数据分页与 DOM 渲染窗口分离。 @module dsh-file-manage/client/paging */
 
 /** 窗口内可见行数：min(已加载行数, 窗口上限)；负数/小数钳到安全值（不抛）。 */
 export function renderedRowCount(totalRows: number, renderLimit: number): number {

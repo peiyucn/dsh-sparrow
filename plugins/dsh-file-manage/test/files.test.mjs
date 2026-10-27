@@ -2,20 +2,21 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { LlmError } from '@deepseek-ai/dsh-llm'
+import { LIST_PAGE_SIZE } from '../lib/constants.js'
 import {
-  classifyUpstreamError, decodeFileIdParam, DSH_OWNED_FILE_PREFIX, formatBytes, formatTimestamp,
-  normalizePageQuery, PAGE_SIZE, toFileRow,
+  classifyUpstreamError, countPageBudget, decodeFileIdParam, DSH_OWNED_FILE_PREFIX, formatBytes, formatTimestamp,
+  normalizePageQuery, toFileRow,
 } from '../lib/files.js'
 
 describe('dsh-file-manage 纯逻辑', () => {
   describe('normalizePageQuery', () => {
-    it('空参数 应该 返回默认分页（20 条）', () => {
-      assert.deepEqual(normalizePageQuery({}), { limit: PAGE_SIZE })
+    it('空参数 应该 返回默认分页（数据页大小）', () => {
+      assert.deepEqual(normalizePageQuery({}), { limit: LIST_PAGE_SIZE })
     })
 
-    it('非法 limit（非整数 / 空 / 小数）应该 回退默认 20', () => {
+    it('非法 limit（非整数 / 空 / 小数）应该 回退默认数据页', () => {
       for (const bad of ['abc', '', '-3.5', '3.7', '1.5']) {
-        assert.deepEqual(normalizePageQuery({ limit: bad }), { limit: PAGE_SIZE })
+        assert.deepEqual(normalizePageQuery({ limit: bad }), { limit: LIST_PAGE_SIZE })
       }
     })
 
@@ -27,10 +28,30 @@ describe('dsh-file-manage 纯逻辑', () => {
     })
 
     it('空 after 应该 省略、非空保留（官方 list 已无 order 参数，我方不再透传）', () => {
-      assert.deepEqual(normalizePageQuery({ after: '' }), { limit: PAGE_SIZE })
-      assert.deepEqual(normalizePageQuery({ after: 'file-api-x' }), { after: 'file-api-x', limit: PAGE_SIZE })
+      assert.deepEqual(normalizePageQuery({ after: '' }), { limit: LIST_PAGE_SIZE })
+      assert.deepEqual(normalizePageQuery({ after: 'file-api-x' }), { after: 'file-api-x', limit: LIST_PAGE_SIZE })
       // 传了 order 也不进结果：官方 rc.1 的 list() 只接受 after / limit / signal。
-      assert.deepEqual(normalizePageQuery({ order: 'asc' }), { limit: PAGE_SIZE })
+      assert.deepEqual(normalizePageQuery({ order: 'asc' }), { limit: LIST_PAGE_SIZE })
+    })
+  })
+
+  describe('countPageBudget', () => {
+    it('官方配额 10000 应该 派生 12 页（10 页 + 2 页余量）', () => {
+      assert.equal(countPageBudget(10000), 12)
+    })
+
+    it('官方配额上调 应该 自动跟随（20000 → 22 页）', () => {
+      assert.equal(countPageBudget(20000), 22)
+    })
+
+    it('配额不可用 应该 退化为单页', () => {
+      assert.equal(countPageBudget(0), 1)
+      assert.equal(countPageBudget(-1), 1)
+      assert.equal(countPageBudget(Number.NaN), 1)
+    })
+
+    it('异常大配额 应该 受硬上限保护', () => {
+      assert.equal(countPageBudget(1e9), 100)
     })
   })
 

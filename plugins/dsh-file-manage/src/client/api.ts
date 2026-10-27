@@ -1,7 +1,13 @@
 /** dsh-file-manage 客户端请求封装：host 路由的 fetch 层（超时 + 错误提取）。 @module dsh-file-manage/client/api */
 
 import type { FileRow } from '../files.js'
-import { FILE_PAGE_SIZE } from './paging.js'
+import {
+  COUNT_CACHE_TTL_MS,
+  COUNT_TOTAL_TIMEOUT_MS,
+  LIST_PAGE_SIZE,
+  REQUEST_TIMEOUT_MS,
+  ROUTES,
+} from '../constants.js'
 
 /** 总数统计（含配额，供网盘式进度条）。 */
 export interface FileCountSummary {
@@ -12,9 +18,6 @@ export interface FileCountSummary {
   quotaBytesLabel: string
   quotaCount: number
 }
-
-/** 总数统计 TTL 缓存时长：面板快速重开/重试不重复 count 全量翻页（count 要翻到底，配额内最多 10 页）。 */
-export const COUNT_CACHE_TTL_MS = 30_000
 
 /** TTL 缓存条目（api.ts 模块级单例：面板单实例，随 client bundle 生命周期，有界一条）。 */
 export interface CountCacheEntry {
@@ -40,10 +43,11 @@ interface ListEnvelope {
   readonly lastId?: string
 }
 
-/** 面板请求超时：host 挂起时不让面板永久 loading（根 AGENTS 网络约定）。 */
-const REQUEST_TIMEOUT_MS = 15_000
-/** 总数统计超时：host 侧要游标翻到底（配额内最多 10 页），放宽到 60s。 */
-const COUNT_TIMEOUT_MS = 60_000
+/**
+ * 总数统计的整体超时：host 侧整次扫描的预算 + 一个请求预算的余量，
+ * 让 host 的 deadline 先触发（用户看到的是「服务端扫描超时」而不是客户端先断开）。
+ */
+const COUNT_TIMEOUT_MS = COUNT_TOTAL_TIMEOUT_MS + REQUEST_TIMEOUT_MS
 
 /** 带超时的 fetch：超时中止转换为用户可读文案（浏览器原生 AbortError 文案不友好）。 */
 async function fetchWithTimeout(path: string, init: RequestInit, timeoutMs: number): Promise<Response> {
@@ -57,28 +61,35 @@ async function fetchWithTimeout(path: string, init: RequestInit, timeoutMs: numb
   }
 }
 
-/** 解析 JSON 响应体：非 JSON 回退空对象（代理错误页等异常输入返回安全默认值，不抛）。 */
-async function readJson<T>(response: Response): Promise<T> {
+/** 解析 JSON 响应体：失败返回 null（错误文案路径回退 HTTP 状态，成功路径必须显式报错）。 */
+async function readJson<T>(response: Response): Promise<T | null> {
   try {
     return await response.json() as T
   } catch {
-    return {} as T
+    return null
   }
 }
 
 /** 非 2xx 的用户可读错误：优先 payload.error.message，回退 HTTP 状态文案。 */
 async function readErrorMessage(response: Response): Promise<string> {
   const payload = await readJson<{ error?: { message?: string } }>(response)
-  return payload.error?.message ?? `请求失败（HTTP ${response.status}）`
+  return payload?.error?.message ?? `请求失败（HTTP ${response.status}）`
+}
+
+/** 2xx 但响应体不是 JSON（代理错误页 / 截断响应）：明确报错，不能当空列表。 */
+async function readPayload<T>(response: Response): Promise<T> {
+  const payload = await readJson<T>(response)
+  if (payload === null) throw new Error('服务端返回了无法解析的响应')
+  return payload
 }
 
 export async function listApi(after?: string): Promise<{ rows: FileRow[]; hasMore: boolean; lastId?: string }> {
-  // limit 固定 FILE_PAGE_SIZE：数据页大于渲染窗口，窗口才真正裁剪 DOM（见 paging.ts）。
-  const params = new URLSearchParams({ limit: String(FILE_PAGE_SIZE) })
+  // 数据页大于渲染窗口（200 > 20），一次游标请求覆盖多次「加载更多」。
+  const params = new URLSearchParams({ limit: String(LIST_PAGE_SIZE) })
   if (after !== undefined) params.set('after', after)
-  const response = await fetchWithTimeout(`/api/file-manage/list?${params.toString()}`, {}, REQUEST_TIMEOUT_MS)
+  const response = await fetchWithTimeout(`${ROUTES.list}?${params.toString()}`, {}, REQUEST_TIMEOUT_MS)
   if (!response.ok) throw new Error(await readErrorMessage(response))
-  const payload = await readJson<ListEnvelope>(response)
+  const payload = await readPayload<ListEnvelope>(response)
   return {
     rows: payload.items ?? [],
     hasMore: payload.hasMore ?? false,
@@ -91,9 +102,9 @@ export async function countApi(): Promise<FileCountSummary> {
   // 命中缓存直接返回快照，过期才重扫（删除成功后由 deleteApi 失效）。
   const cached = readCountCache(countCache, Date.now())
   if (cached !== null) return cached
-  const response = await fetchWithTimeout('/api/file-manage/count', {}, COUNT_TIMEOUT_MS)
+  const response = await fetchWithTimeout(ROUTES.count, {}, COUNT_TIMEOUT_MS)
   if (!response.ok) throw new Error(await readErrorMessage(response))
-  const payload = await readJson<Partial<FileCountSummary>>(response)
+  const payload = await readPayload<Partial<FileCountSummary>>(response)
   const summary: FileCountSummary = {
     count: payload.count ?? 0,
     totalBytes: payload.totalBytes ?? 0,
@@ -108,7 +119,7 @@ export async function countApi(): Promise<FileCountSummary> {
 
 export async function deleteApi(id: string): Promise<void> {
   const params = new URLSearchParams({ id })
-  const response = await fetchWithTimeout(`/api/file-manage/files?${params.toString()}`, { method: 'DELETE' }, REQUEST_TIMEOUT_MS)
+  const response = await fetchWithTimeout(`${ROUTES.files}?${params.toString()}`, { method: 'DELETE' }, REQUEST_TIMEOUT_MS)
   if (!response.ok) throw new Error(await readErrorMessage(response))
   // 删除落定后失效计数缓存：下一轮 count（含删除后的总数刷新）拿到包含本次删除的新数字。
   invalidateCountCache()
