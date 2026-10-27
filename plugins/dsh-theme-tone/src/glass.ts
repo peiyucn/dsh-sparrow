@@ -2,8 +2,8 @@ import { ABOVE_CONTENT_Z_INDEX, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants
 import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
-export const HEADER_GLASS_ALPHA = 0.7
-export const CARD_GLASS_ALPHA = 0.58
+/** 所有磨砂玻璃面共用的填充不透明度（统一参数；越小白越通透，模糊参数统一走官方 token）。 */
+export const GLASS_FILL_ALPHA = 0.45
 export const SEAT_BAND_PX = 44
 
 /** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
@@ -69,7 +69,7 @@ ${P} [data-phase='active'] [data-slot='conversation.header'] > header::before {
   z-index: -1;
   pointer-events: none;
   border-radius: inherit;
-${glassFill(HEADER_GLASS_ALPHA)}
+${glassFill(GLASS_FILL_ALPHA)}
 ${viewportLight('100% 0')}
   backdrop-filter: var(--dsw-menu-backdrop-filter);
 }
@@ -104,7 +104,7 @@ ${P} ${SEAT} [data-composer-card]::before {
   z-index: -1;
   border-radius: inherit;
   pointer-events: none;
-  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${CARD_GLASS_ALPHA * 100}%, transparent);
+  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%, transparent);
   box-shadow: ${RIM_DARK};
   backdrop-filter: var(--dsw-menu-backdrop-filter);
 }
@@ -176,7 +176,7 @@ ${PANEL_HEADERS.split(',\n').map(selector => `${selector}::before`).join(',\n')}
   right: 0;
   z-index: -1;
   pointer-events: none;
-${glassFill(HEADER_GLASS_ALPHA)}
+${glassFill(GLASS_FILL_ALPHA)}
 ${viewportLight('100% 0')}
   backdrop-filter: var(--dsw-menu-backdrop-filter);
 }

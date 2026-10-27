@@ -1,146 +1,94 @@
 # 00 · 架构总览 — dsh-theme-tone
 
-> 2026-10-27 重写。旧 spec（00–13，约 1.3 万行）已全部删除：它们记录的是被删掉的机制（相位测量、锚点扫描、
-> 抬升面光层、扫光带、遮罩恢复……），继续保留只会误导。本文是新的唯一事实来源。
+> 2026-10-27 重写。旧 spec（00–13）已全部删除。本文是唯一事实来源；「已知偏离/已知问题」按最终决定记录，
+> 不再保留过程中的临时方案。
 
-## 功能（当前清单）
+## 功能清单
 
 1. **颜色**：通过官方 `ctx.theme.overrideTokens` 覆盖 alias token（`{light, dark}` 成对），给整个界面重新着色。
-2. **地面光**：插件自有的 `position: fixed` 装饰层（`.dsh-theme-tone`），三道光（顶 / 底 / 左），
-   位置与方向按色调固定。
+2. **地面光**：插件自有的 `position: fixed` 装饰层（`.dsh-theme-tone`），三道光（顶 / 底 / 左），位置与方向
+   按色调固定；**不使用 `mix-blend-mode`**（normal 合成，颜色与 screen 的差 ≤1/255）。
 3. **对话区顶栏玻璃**：顶栏浮层化（`position: absolute` + 滚动区 `padding-top: 76px` + 滚动条 track 下推
-   + 拖拽条上沿裁到 76px），玻璃放在顶栏的 `::before`（`z-index: -1`），模糊复用官方
-   `var(--dsw-menu-backdrop-filter)`，填充 = `bg-base` × 70% 半透明，并**自绘同源三道光**。
-4. **输入框玻璃（全平台统一 live blur）**：座位撤掉官方 36px 实色渐隐（正文从卡片玻璃下滚过），
-   卡片本体透明、玻璃与有方向边缘光放 `::before`；卡片 `position: relative; z-index: 0` 自成层叠上下文
-   （否则 `::before` 的 `z-index:-1` 会逃出卡片）；座位底部一小段「地面同源」带；「+」按钮透明。
-   **不按环境分档、不加任何门**（2026-10-27 owner 决定：接受 Chromium ~150 webview 的极端场景残影，
-   见「已知偏离」）。
+   + 拖拽条上沿 76px），玻璃放顶栏 `::before`（`z-index: -1`），并自绘同源三道光。
+4. **输入框玻璃**：座位撤掉官方 36px 实色渐隐（正文从卡片玻璃下滚过），卡片本体透明、玻璃与有方向边缘光
+   放卡片 `::before`；卡片 `position: relative; z-index: 0` 自成层叠上下文（否则 `::before` 的
+   `z-index:-1` 会逃出卡片 = 淡色框）；座位底部一小段「地面同源」带挡住卡片下方滚出的正文；卡片作用域内
+   `--dsw-specific-selector: transparent`（「+」按钮让出实心底色）。
+5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的两个
+   盒子 ⇒ 带背后永远只有面板纯色。做法：可流式滚动的正文（markdown/text 文档预览、文件树）上提 76px、
+   内容下移 76px（只改视觉位置），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；玻璃面挂在
+   各标签自己的 38px **头行** `::before` 上、向上铺满 0..76（两盒重合，y=38 不出缝），头行 z=2、dockkit
+   条 z=3；pane 本体只画底色 + 同源光，不挂 blur；不改 pane 定位。上提的 margin 必须 `!important`
+   （官方 `::-webkit-scrollbar-track` 规则会以伪元素特异性把上提量顶回 78px）。
+6. **右栏内容区同款打光**：pane 用视口对齐（`100vw 100vh` + `right/top`）的「底色 + 三道光」重画。
+7. **设置弹窗打光**：官方弹窗根 `[data-shortcut-modal='settings']` 叠同源光，**按弹窗自身盒子缩放**
+   （`background-size: 100% 100%`；弹窗居中、位置不固定，不能按视口相位画）。
+8. **悬浮卡适配主题**：左边栏 Workspace 行 hover 卡（官方写死深底 + 白系字）。面换 `--dsw-alias-bg-layer-3`，
+   字换官方 `--dsw-alias-label-*`（层次保持）。锚点 `body > [role='button'][aria-label]`，字色按官方类名
+   后缀命中 —— 唯一私有 seam，登记在 `docs/private-seams.md`。
+9. **轮次导航功能（自 dsh-nav-pin 并入）**：纯 CSS、无锚点扫描。官方把 `display: none` 写在
+   `<nav aria-label="Turn navigation">` 上 ⇒ 用公开 aria-label 压过官方类名；≤700px 默认隐身、hover /
+   键盘 focus 淡入（只做 opacity）。会话内容宽度钳制：官方公式 `clamp(680px, column×0.64, 920px)` 上加
+   `min()` 夹到「每侧 ≥120px / 地板 640px」，滚动体与拖拽条共用，卡片宽度同步重算。布局功能，不带色调门。
+10. **对话宽度拖拽条**：官方两条拖拽条 z-index 很低，被本插件抬到 81 的内容层盖掉 ⇒ 抬到 82；
+    `[data-side]` 还挂在 Tooltip 的 placement 上，排除 `role=tooltip`。
 
-5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的
-   两个盒子 ⇒ 带背后永远只有面板纯色，直接加 blur 只能糊一块均匀色（读起来是实心板）。做法：
-   * 把**可流式滚动的正文**（markdown / text 文档预览、文件树）上提 76px、内容下移 76px（只改视觉位置，
-     滚动几何不变），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；
-   * 玻璃面挂在各标签自己的 38px **头行** `::before` 上，向上铺满 0..76（两个面盒子重合，y=38 不出缝），
-     头行抬 z=2、dockkit 条抬 z=3；blur 复用官方 token；
-   * pane 本体只画底色 + 同源光，**不挂 blur**（会采样到自己的子内容）；不改 pane 定位。
-   上提的 margin 必须 `!important`：官方的 `::-webkit-scrollbar-track` 规则会以伪元素特异性参与元素自身
-   margin 竞争，把上提量顶回去。
-6. **右栏内容区与对话区同款打光**（owner 2026-10-27 追加）：右栏 76px 以下的内容区不能是官方那块纯色
-   `bg-base`，要与对话区一样看得见地面光 —— 用 `pane::after` 在内容区重画一层「`bg-base` + 三道光」：
-   `background-size: 100vw 100vh`、`background-position: 100% -76px`（右栏贴视口右侧、内容区从视口 y=76
-   开始 ⇒ 与对话区逐像素同源），层序 `-2`（在顶栏玻璃 `-1` 之下、内容之上）。**外观层，不改容器尺寸/定位。**
-7. **设置弹窗打光**（owner 2026-10-27 追加）：官方设置弹窗根元素带公开属性
-   `[data-shortcut-modal='settings']`；在它上面叠同源三道光，**按弹窗自身盒子缩放**（`background-size:
-   100% 100%`；弹窗居中、位置不固定，不能按视口相位画）。
-8. **悬浮卡适配主题**（owner 2026-10-27 追加）：左边栏 Workspace 行 hover 卡、对话轮次导航 hover 弹窗
-   与官方大多数浮层不同 —— 官方把这两处的面与字都写死了（深底 + 白字，两轴同值），不跟随主题。
-   修法：面用本插件 `--dsh-theme-tone-panel`（官方默认档下正是官方 layer3），字色换成官方
-   `--dsw-alias-label-*` 四级 token（标题最亮 → 路径/时间次之 → 状态最暗），保持官方原来的层次关系。
-8.5 **对话宽度拖拽条修复**：官方两条「调整对话宽度」拖拽条（`data-side` / `data-width-handle`）z-index
-   很低，会被本插件抬到 81 的内容层整条盖住（表现为拖拽条消失、拖不动）。抬到 82；`[data-side]` 还挂在
-   Tooltip 的 placement 上，必须排除 `role=tooltip`。
-9. **轮次导航功能恢复**（owner 2026-10-27 追加，自 `dsh-nav-pin` 并入；要功能、不要旧实现）：
-   纯 CSS，无运行期探测。官方把 `display: none` 直接写在 `<nav aria-label="Turn navigation">` 上 ⇒
-   用公开 aria-label（中 / 英两套文案）即可压过官方类名特异性；≤700px 默认隐身、hover / 键盘 focus
-   淡入（只做 opacity，不加框与底色）。会话内容宽度钳制：宽列每侧至少留 120px、窄列地板 640px
-   （官方公式 `clamp(680px, column×0.64, 920px)` 上加 `min()` 夹紧），滚动体 / 拖拽条共用，
-   卡片宽度同步重算。**布局功能，不带色调门（官方默认档同样生效）。**
+## 玻璃参数（统一）
 
-「官方默认」档：整张玻璃表不命中、地面层隐藏、token 不覆盖 ⇒ 与没装插件一致。
+| 参数 | 值 | 说明 |
+| :--- | :--- | :--- |
+| 模糊 | `var(--dsw-menu-backdrop-filter)`（官方，当前值 `blur(40px) saturate(150%)`） | 三处玻璃共用同一个官方 token，不手写数值（测试钉住） |
+| 填充不透明度 | `GLASS_FILL_ALPHA = 0.45` | **三处统一同一个常量**，越小白越通透；填充色各自取官方面 token（顶栏/右栏 = `bg-base`，输入框 = `--dsw-specific-input-major`） |
+| 边缘光 | `RIM_DARK` / `RIM_LIGHT` | 有方向：上亮、左弱亮、右暗、下暗；深/浅两套 |
 
 ## 代码布局
 
 | 文件 | 职责 |
 | :--- | :--- |
-| `src/tones.ts` | 调色板数据 + `tokenOverrides()`（颜色，唯一的颜色事实来源） |
-| `src/backdrop.ts` | 地面光层 CSS、渲染计划、设置行色卡预览、CSS 特性门 |
-| `src/glass.ts` | 玻璃与打光的 CSS（`backdrop-filter` 全部放在 `::before` 上） |
-| `src/nav-pin.ts` | 轮次导航恒显 + 内容宽度钳制（纯 CSS，布局功能，不带色调门） |
+| `src/tones.ts` | 调色板数据 + `tokenOverrides()`（唯一的颜色事实来源） |
+| `src/backdrop.ts` | 地面光层 CSS、渲染计划、设置行色卡预览、CSS 特性门、层序不变式 |
+| `src/glass.ts` | 三处玻璃 + 打光 + 右栏提拉（唯一一处 `backdrop-filter` 来源） |
+| `src/surfaces.ts` | 官方写死牌面的浮层修复（Workspace hover 卡） |
+| `src/nav-pin.ts` | 轮次导航恒显 + 内容宽度钳制（纯 CSS，布局功能） |
 | `src/constants.ts` | 选择器锚点 / z-index / 标记属性 / 设置命名空间 |
 | `src/compat.ts` | 能力门（缺失即惰性停用，不抛错） |
 | `src/host.ts` + `src/settings-schema.ts` | host half：配置 schema、关掉自动配置页 |
 | `src/client/index.ts` | 注入样式与地面层、写 token、设置行、写入与结算 |
 | `src/client/{ThemeToneRow,styles,store,pending,known-settings,locales}` | 设置行 UI 与持久化辅助 |
 
-**没有**：MutationObserver / ResizeObserver / rAF 循环 / `getComputedStyle` 探测 / 锚点扫描 / 相位变量 / 私有类名。
+**没有**：MutationObserver / ResizeObserver / rAF 循环 / `getComputedStyle` 探测 / 锚点扫描 / 相位变量。
 client half 只在「安装、设置变化、主题变化、用户点选」时跑一次，其余时间零 JS 活动。
 
 ## 硬约束（守卫里钉住）
 
-1. 所有玻璃规则带 `body:not([data-dsh-theme-tone-plain])` 门。
-2. 不得出现 `background-attachment: fixed`，不得手写 `blur()` 数值（统一 `var(--dsw-menu-backdrop-filter)`）。
-3. `backdrop-filter` 只允许出现在 `::before` 上（不挂 header / 卡片 / 面板本体，避免 backdrop root
-   与 fixed 包含块影响官方弹层）。
-4. 不改官方容器的 `position` / `overflow` / `transform` / `contain`（pane 补 `position: relative;`
-   `z-index: 0` 作 `::before` 的包含块是已知例外；**不得**改用 `isolation` —— 它会让 pane 成为
-   backdrop root，顶栏玻璃就采样不到背后的对话区）。
+1. 除「官方默认档下也生效」的修牌面规则外，所有样式规则带 `body:not([data-dsh-theme-tone-plain])` 门。
+2. 不得出现 `background-attachment: fixed`；不得手写 `blur()` 数值（统一官方 token）。
+3. `backdrop-filter` 只出现在 `::before` / 独立玻璃层上，不挂在 header / 卡片 / pane 本体。
+4. 不改官方容器的 `position` / `overflow` / `transform` / `contain`（右栏 pane 的 `position: relative;
+   z-index: 0` 是已知例外，见「已知偏离」）。
 5. 颜色只走 `ctx.theme` token 通道；玻璃与地面光必须写 CSS（官方无对应 token）。
-6. 官方默认牌面（菜单 / 弹窗 / 挂靠卡）材质由官方自己负责，插件不重画、不覆盖。
-   例外：官方**写死**面与字的悬浮卡（左边栏 Workspace hover 卡，见功能 8）是修官方牌面，
-   规则**不带**「官方默认」门。
+6. 官方菜单 / 弹窗 / 挂靠卡材质一律保持原样，插件不覆盖。
 
-## 已知偏离（明示取舍，不当成「和官方一致」）
+## 已知偏离 / 已知问题
 
-* 顶栏浮层化是**布局改动**（官方注释写明顶栏在流内）。这是顶栏玻璃的前提；静止几何保持 76px 不变量。
-* 输入框常驻 blur：官方自己只在菜单 / 浮层这类短生命周期表面用 blur（长期面全部不透明）。本插件按 owner
-  要求保留常驻玻璃。性能**不以本插件的自动化基准对外断言**：owner 2026-10-27 明示「以我的体感为准」，
-  代码侧只保证「没有逐帧 JS、没有 fixed 重栅格化路径、没有运行期测量」这些结构性成本为零。
-* 右栏 `[data-dockkit-pane]` 加了 `position: relative; z-index: 0`（原本 static）作为 `::before` 的
-  包含块；不改其尺寸。
-* 设置弹窗：打光按弹窗自身盒子缩放（弹窗居中、位置不固定，不能按视口相位画）。
-* 官方 rc.3 的挂靠卡（Queue/Todo/Goal）本身是半透明 + blur；插件不碰它们（token 染色会顺带跟随）。
-* 悬浮卡（功能 8）是唯一私有 seam：`body > [role="button"][aria-label]` 定位 portal 卡、
-  字色按官方 CSS-module 类名后缀命中（`_hoverTitle` 等）。官方改后缀即静默失效（回退成官方写死配色，
-  不会崩）；已登记 `docs/private-seams.md`。
-* 右栏「正文上提 76px」是对官方滚动盒的**视觉位置改写**（margin + transform，不改 DOM 结构）：
-  官方若改渲染器结构 / data 属性，lift 会静默不命中，退回「带是半透明实心板」的降级观感。
-* 已知问题（2026-10-27 结案，不修）：输入框玻璃在 **VS Code 内置浏览器**（1.143.1 = Electron 43.7.7
-  / Chromium 150 的 webview）里，遇到「菜单打开 + 流式输出」这种极端场景会偶发把菜单碎片错位画进
-  输入框；**正常 Edge（Chromium 156）无此问题**。时间线佐证：VS Code 安装目录时间戳显示 2026-10-23
-  才更新到 1.143.1，而本插件输入框玻璃早已存在、此前从未出现残影 ⇒ 判定为 Chromium ~150 的回归
-  （Electron webview 对 backdrop-filter 的合成路径问题），非本插件近期改动 / 用户设置；缩放假设已被
-  实测证伪（重置到 100% 后更严重）。
-  **处理决定（owner）：不加环境门、不牺牲磨砂玻璃，接受该极端场景的偶发残影**，等 VS Code 升级内核
-  （Chromium ≥ 156）自然消失。可选未来方案（未实施，留档）：在 Electron + Chromium ≤155 宿主里，菜单
-  存在期间把输入框冻结为「去 blur + 实心 + 座位光墙」，菜单关闭恢复 —— 验证过可消除残影。
+* **顶栏浮层化**是布局改动（官方注释写明顶栏在流内），这是顶栏玻璃的前提；静止几何保持 76px 不变量。
+* **右栏提拉**（正文上提 76px + 内容下移 + 负底距）是对官方滚动盒的视觉位置改写；官方改渲染器结构 /
+  data 属性时 lift 会静默不命中，退回「带是半透明实心板」的降级观感。pane 补
+  `position: relative; z-index: 0` 作 `::before` 包含块（不改变尺寸）。
+* **输入框残影（Chromium ~150 回归，不修）**：VS Code 内置浏览器（1.143.1 = Electron 43.7.7 /
+  Chromium 150 webview）在「菜单打开 + 流式输出」的极端场景会偶发把菜单碎片错位画进输入框；
+  **正常 Edge（Chromium 156）无此问题**。时间线：VS Code 于 2026-10-23 更新到该版本，而输入框玻璃早已存在、
+  此前从未出现残影 ⇒ 判定为 Chromium ~150 回归（Electron webview 的 backdrop-filter 合成路径问题），
+  非本插件近期改动 / 用户设置；缩放假设已实测证伪（重置 100% 后更严重）。
+  **owner 决定：不加环境门、不牺牲磨砂玻璃，接受该极端场景的偶发残影**，等 VS Code 升级内核自然消失。
+  留档（未实施）：若将来需要，可在「Electron + Chromium ≤155」宿主里，菜单存在期间把输入框冻结为
+  「去 blur + 实心 + 座位光墙」，菜单关闭恢复 —— 实测可消除残影。
+* 悬浮卡修复是唯一私有 seam（见 `docs/private-seams.md`），官方改类名后缀即静默失效（回退官方配色，不崩）。
 
-  （Chromium 156）完全没有残影**；**VS Code 内置浏览器（1.143.1：Electron 43.7.7 / Chromium 150 的
-  webview）会闪**。已排除用户设置假设：把 VS Code 缩放从 103%（`window.zoomLevel: 0.17`）重置到
-  100% 后残影**更严重**（出现额外方块）⇒ 与缩放 / DPI 无关。Electron 的 webview（OOPIF）对
-  backdrop-filter 的支持与独立浏览器不同（Electron 34 起就有「webview 内 backdrop-filter 失效」的
-  已知问题），这是宿主内核版本与嵌入方式造成的差异。**时间线佐证**：本机 VS Code 安装目录时间戳
-  显示 2026-10-23 才更新到 1.143.1（Chromium 150），而输入框玻璃早已存在、此前从未出现残影 ⇒
-  判定为 Chromium ~150 的回归，而不是本插件近期改动或用户设置。
-  修法：**内嵌 Electron 且 Chromium ≤ 155 时**，菜单存在期间冻结输入框（去 blur + 实心 + 座位光墙），
-  菜单关闭恢复；正常浏览器（Chromium 156+ / 非 Electron）始终完整玻璃、零切换。判定在安装时做一次
-  UA 解析（`Electron` + `Chrome/主版本`），不引入运行时探测循环；VS Code 将来升到 Chromium ≥ 156
-  时该 workaround 自动失效（若仍有残影，再下调阈值即可）。
+## 验证
 
-  **VS Code 内置浏览器（Electron webview）会闪**（有 think / 工具输出时按输出频率闪）。触发条件是该
-  Chromium 合成路径下「输入框 backdrop-filter 层上方出现新的合成浮层」，与菜单材质、透明度无关
-  （实心菜单同样触发）。故按环境分档：正常浏览器保留完整玻璃、零切换；内嵌浏览器在菜单存在期间冻结
-  输入框（去 blur + 实心 + 座位光墙）。判定走 UA（`Electron|vscode`），不引入任何运行时探测循环。
-  若 Electron 内核修复该合成 bug，删掉冻结规则即可恢复全平台统一玻璃。
-
-  触发 Chromium 快照错位（与菜单材质、透明度无关；实心菜单同样触发）。曾用「菜单期间冻结输入框（去
-  blur + 实心 + 座位光墙）」验证有效（owner 确认不闪）。现临时移除该冻结，用于验证残影是否只在
-  DSH 内嵌浏览器出现（正常 Edge 是否复现）；若正常 Edge 不复现 ⇒ 可按环境区分策略；若同样复现 ⇒
-  恢复冻结方案或接受永久不做 live blur。
-  ② 静态 backdrop 仍闪；③ 只关菜单 blur 仍闪；④ 模型菜单**改成不透明实心**仍闪 ⇒ 触发条件和菜单材质
-  无关，是「上面出现新的合成浮层时，输入框的 backdrop-filter 层被 Chromium 复用错位快照」。当前
-  Chromium 无法在「常驻 live blur + 任意浮层」下稳定，故取折中：**官方菜单材质全部恢复原样**，只在
-  菜单存在期间把输入框做成「去 blur + 实心 + 座位光墙」，菜单关闭立即恢复 —— 正常使用时是完整玻璃，闪的窗口
-  （菜单打开期）被完全消除。若将来仍观察到冻结期的观感突变不可接受，剩余选项只有「永久不做 live blur」。
-
-  背景快照，把菜单碎片画进输入框（逐项排除记录：静态 backdrop 仍闪、只关菜单 blur 仍闪、整页无 blur 才
-  不闪）。取舍由 owner 拍板：**保留输入框的完整玻璃模糊，放弃官方菜单材质的实时模糊**
-  （`[data-menu-material] { backdrop-filter: none !important }`，半透明填充 / 圆角 / 阴影保持官方）。
-  菜单不是高频操作，这是最小代价；等 Chromium 或官方修复重叠合成后可恢复菜单 blur。
-  模型菜单一开、工具输出一更新，Chromium 就把菜单碎片的错位快照画进卡片；② 把座位改成静态光墙
-  （backdrop 不再含重绘正文）→ 残影仍在（与采样内容无关）；③ 关掉官方菜单自己的 blur → 仍在
-  （与「两层 blur 重叠」无关）；④ 早期「整页无 blur」版本残影消失。⇒ 触发条件就是**本插件在输入框
-  区域的 backdrop-filter 层**，当前 Chromium 无解。取舍：输入框去掉 live blur（保留透明 + 同源光 +
-  有方向边缘光），顶栏 / 右栏保留 live blur（不与菜单重叠）。**这是与 owner 的明确取舍，不是疏漏**；
-  等 Chromium / 官方修复合成路径后可恢复输入框 blur。座位光墙是「没有 blur」的必要配套（否则正文
-  从卡片下穿过会叠字），恢复输入框 blur 时可一并恢复「正文从玻璃下滚过」。
+* `npm run verify`：typecheck → build → test → package。
+* 单测覆盖：三处玻璃共用同一填充常量与官方模糊 token、方向边缘光、右栏提拉与头行玻璃、地面光层三道光与
+  层序、token 计划与官方默认档、nav-pin 纯 CSS、悬浮卡锚点、client half 无逐帧探测。
+* 真机验收（无头 + owner 复看）：三处玻璃 `backdrop-filter` 计算值、顶栏 y=76 不变量、输入框底带与地面连续、
+  右栏 76px 让位与提拉、设置弹窗打光。
