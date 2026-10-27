@@ -14,7 +14,6 @@ export {
 } from './backdrop.js'
 export {
   BACKDROP_CLASS,
-  EMBED_ATTR,
   MARKER_ATTR,
   PLAIN_ATTR,
   TOP_VARIABLE,

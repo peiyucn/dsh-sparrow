@@ -66,15 +66,6 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
 
-  it('菜单期冻结只在内嵌浏览器命中（正常浏览器始终完整玻璃，无切换）', () => {
-    const freezeSel = /:has\(> \[data-menu-material\]\)/u.exec(code)?.[0] ?? ''
-    assert.ok(freezeSel !== '', '存在菜单期冻结规则')
-    const frozen = code.split('\n').filter(line => line.includes(':has(> [data-menu-material])'))
-    for (const line of frozen) assert.ok(line.includes('[data-dsh-theme-tone-embed]'), `冻结规则必须限定内嵌浏览器：${line.trim()}`)
-    assert.match(code, /:has\(> \[data-menu-material\]\)[^{]*\[data-composer-card\]::before \{[^}]*backdrop-filter: none;/u)
-    assert.match(code, /:has\(> \[data-menu-material\]\)[^{]*\[data-composer-card\]::before \{[^}]*background-color: var\(--dsw-specific-input-major\)/u)
-  })
-
   it('设置弹窗：打光（按弹窗自身盒子缩放）', () => {
     const settings = /\[data-shortcut-modal='settings'\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(settings.includes('background-image: radial-gradient('))
@@ -104,7 +95,6 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
 describe('glass: 客户端不得有逐帧 DOM 探测', () => {
   it('client half 不出现 MutationObserver / ResizeObserver / querySelectorAll / getComputedStyle / rAF', async () => {
     const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
-    assert.ok(src.includes('navigator.userAgent') && src.includes('Electron'), 'client half 用 UA 判定内嵌浏览器')
     for (const forbidden of ['MutationObserver', 'ResizeObserver', 'querySelectorAll', 'getComputedStyle', 'requestAnimationFrame', 'setInterval']) {
       assert.ok(!src.includes(forbidden), `client half 不得使用 ${forbidden}`)
     }

@@ -1,4 +1,4 @@
-import { ABOVE_CONTENT_Z_INDEX, EMBED_ATTR, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
+import { ABOVE_CONTENT_Z_INDEX, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
 import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
@@ -35,8 +35,6 @@ const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
 const P = `body:not([${PLAIN_ATTR}])`
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
 const SEAT = `:is([data-phase='active'], [data-phase='hero']) [data-composer-seat]`
-/** 内嵌浏览器（Electron / VS Code webview）且存在菜单时：冻结输入框玻璃（正常浏览器不命中）。 */
-const MENU_OPEN = `body:not([${PLAIN_ATTR}])[${EMBED_ATTR}]:has(> [data-menu-material])`
 
 /** 右栏 76px 下有「可流式滚动的正文」的标签：只有它们上提滚区，正文才会真的从两条带下滚过。 */
 const LIFTED_SCROLLS = [
@@ -193,29 +191,5 @@ ${P} [data-shortcut-modal='settings'] {
 ${OBJECT_FIT_LIGHT}
 }
 
-/* ===== 菜单打开期间：输入框去模糊 + 变实心（仅内嵌浏览器） =====
-   环境结论（2026-10-27 owner 实测）：正常 Edge 完全没有残影；只有 VS Code 内置浏览器（Electron webview）
-   会闪。所以这套冻结**只在内嵌浏览器命中**（body[data-dsh-theme-tone-embed]），正常浏览器始终完整玻璃、
-   没有任何切换。机制：菜单打开时上面出现新的合成浮层，输入框的 backdrop-filter 层会被 Chromium 复用
-   错位快照；冻结后没有 live blur 层可失效。菜单关闭立即恢复。 */
-${MENU_OPEN} ${SEAT}::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-color: var(--dsw-alias-bg-base);
-${viewportLight('100% 100%')}
-  -webkit-mask-image: linear-gradient(180deg, transparent 0px, black 36px);
-  mask-image: linear-gradient(180deg, transparent 0px, black 36px);
-}
-${MENU_OPEN} ${SEAT} [data-composer-card]::before {
-  backdrop-filter: none;
-  /* 菜单打开期间输入框「去模糊 + 变实心」——直接用官方输入面 token 做实心底。 */
-  background-color: var(--dsw-specific-input-major);
-}
-${MENU_OPEN} [data-phase='active'] [data-composer-seat]::after {
-  display: none;
-}
 `
 }
