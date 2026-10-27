@@ -391,7 +391,7 @@ export function extractSuggestions(data: unknown): string[] {
 export const SUGGEST_MODEL_IDS = ['deepseek-flash', 'deepseek-v4-pro', 'deepseek-v4-flash'] as const
 
 /**
- * 补全模型解析（见 docs/spec/04-sensitivity.md）：跟随官方主模型（在 SUGGEST_MODEL_IDS 内）；vision / 未知 / 非官方 provider 回退插件配置默认。
+ * 补全模型解析：跟随官方主模型（须在 SUGGEST_MODEL_IDS 内，即 FIM 端点实测可用的 id）；vision / 未知 / 非官方 provider 回退插件配置默认。
  */
 export function resolveSuggestModel(main: { provider: string; model: string } | undefined, configuredModel: string): string {
   if (main !== undefined && main.provider === 'deepseek-official' && (SUGGEST_MODEL_IDS as readonly string[]).includes(main.model)) {

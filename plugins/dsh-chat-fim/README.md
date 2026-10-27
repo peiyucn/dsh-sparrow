@@ -30,6 +30,7 @@ Requires dsh 0.2.1-rc.3 — the exact official version line this release is buil
   | Low | 800ms | CJK 12 / Latin 8 chars | no | no | no |
 
 * The whole switch is hidden when the current session's main model is not a DeepSeek model
+* **Limitation**: when dsh cannot decide whether the main model is supported (for example right after a cold start, before the session is activated), the switch falls back to visible after at most about 15.5s — a non-DeepSeek model can show the switch during that window
 * **Credentials**: Requests reuse the DeepSeek API key configured in dsh (FIM completion Beta) — no extra credentials, the key never reaches the browser; token usage bills to your DeepSeek account
 
 ## Screenshots

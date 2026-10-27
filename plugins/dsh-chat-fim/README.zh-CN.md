@@ -30,6 +30,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim
   | 低 | 800ms | 中文 12 字 / 英文 8 字符 | 不联想 | 不联想 | 不联想 |
 
 * 当前会话主模型不是 DeepSeek 系列时，开关整体隐藏
+* **限制**：dsh 判不了主模型是否受支持时（例如刚启动、会话尚未激活），开关最晚约 15.5s 后按可见兜底——这期间非 DeepSeek 模型也可能显示开关
 * **凭据**：续写请求复用你在 dsh 中配置的 DeepSeek API key（FIM 补全 Beta），不新增凭据、key 不进浏览器；产生的 token 计入你的 DeepSeek 账户
 
 ## 截图

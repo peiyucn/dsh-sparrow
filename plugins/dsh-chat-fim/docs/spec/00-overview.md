@@ -1,42 +1,156 @@
-# 00 · 插件概览 — dsh-chat-fim
+# 00 · 现状总览 — dsh-chat-fim
 
-> dsh-sparrow 合集成员。本文是需求范围与验收边界；详细设计见 01-design.md，路线图见 02-roadmap.md。
+> 本文是**唯一**现状文档（2026-10-27 重写）：旧 `01-design` … `07-support-unknown-retry` 已删除。
+> 只记录当前实现、契约与已知偏离，不保留提案、路线图与实施过程。
 
-## 定位
+## 功能清单
 
-给 DeepSeek Harness Web 的**聊天输入框**加「续写联想」：用户打字停顿片刻，插件给出「接下来可能写的文字」建议；点击采用即追加进草稿。补全由 DeepSeek 官方 [FIM 补全（Beta）](https://api-docs.deepseek.com/zh-cn/guides/fim_completion) 接口生成：host 把最近对话历史转成「用户：/助手：」说话人文本、草稿作为最后一个用户说话人的开头，纯文本续写天然站在用户角度——2026-08-31 三方案直连 A/B（FIM 转写体 / 「用户：」伪前缀 / 官方语义前缀）8/8 样本 FIM 全胜（见 AGENTS.md）；曾短暂使用对话前缀续写（`prefix: true`），因「续写 assistant 自己的消息」的官方语义与「续写用户的话」冲突（结构性角色漂移）而弃用。
+* **开关**（`conversation.input.left`）：工具行左侧「✦ FIM」胶囊，点击开 / 关。默认**关闭**，只认本地显式存过的开启；
+  右侧「三点 + ▾」是灵敏度触发区，点它只开合选档弹层、不切换开关；窄行（容器 ≤460px）折叠为纯图标。
+* **三档灵敏度**（高 / 中 / 低）：停顿阈值、最短草稿、夹入英文半词、词后空格、句末标点五项一起伸缩；
+  选档持久化，非法值回退「中」。
+* **候选菜单**（`conversation.input.overlay`）：官方 `MenuSurface` 材质的悬浮卡，锚点由 shell 承载（零定位 JS）；
+  建议 2 行截断、行尾 Tab / Esc 键位提示、底部品牌行 + token / 模型 / 温度。
+* **联想中转动环**：`busy` 时在**本会话** composer 卡片外圈画一圈旋转紫光，portal 到 `document.body`。
+* **支持性状态机**：主模型是否 DeepSeek 系列未知时进入 `checking ⇄ retrying`，未定论前不显示任何 UI；
+  「判不了」不与「判为不支持」混同，补查预算耗尽才 fail-open。
+* **模型门**：主模型非 deepseek-official 时开关 / 菜单整体隐藏（像没装插件）；补全模型跟随主模型。
+* **信任栅栏**：自有 exact 路由不经过官方 `/api` 栅栏，故整条路由先过 Host / Origin / `sec-fetch-site` 门。
+* **GET 诊断**：`?diagnostics=1` 返回进程内计数（无用户内容），用于「转完圈没出卡片」定位。
 
-## 需求范围（做什么 / 不做什么）
+## host 契约
 
-**做**：
+| 路由 | 方法 | 请求 | 响应 |
+| :--- | :--- | :--- | :--- |
+| `/api/chat-fim/complete` | GET | `sessionId` | `200 { supported: boolean }` |
+| `/api/chat-fim/complete` | GET | `diagnostics=1` | `200` 诊断计数（见下） |
+| `/api/chat-fim/complete` | POST | `{ sessionId, prompt }` | `200 { suggestions, model, temperature, usage { promptTokens, completionTokens } }` |
+| 同上 | 其它方法 | — | `405 BAD_BODY` |
 
-* host half：注册自有路由 `POST /api/chat-fim/complete`，把（会话、最近对话历史转说话人文本、草稿）转发到 DeepSeek FIM 补全（Beta），返回候选建议；
-* client half（M2）：输入框旁的 dock 建议条——触发、展示、作废、采用；
-* 触发/作废/采用的交互规则与错误降级。
+**错误码**（响应体恒为 `{ error: { code, message } }`）：
 
-**不做**：
+| 状态 | code | 触发条件 |
+| ---: | :--- | :--- |
+| 403 | `FORBIDDEN` | 信任栅栏不通过（非本机同源） |
+| 404 | `UNKNOWN_SESSION` | `sessions.get` 未命中（会话不在本进程内存里 / 未激活） |
+| 405 | `BAD_BODY` | 非 GET / POST |
+| 400 | `BAD_BODY` | 请求体超上限、非 JSON、字段形状不对 |
+| 400 | `INVALID_PROMPT` | prompt 为空或超 `maxPromptChars` |
+| 500 | `INVALID_CONFIG` | `apiKeyEnv` 不是合法凭据引用 |
+| 401 | `MISSING_CREDENTIAL` | 凭据解析为 `undefined` |
+| 403 | `MODEL_UNSUPPORTED` | 主模型非 deepseek-official |
+| 501 | `UNSUPPORTED_HOST_FORMAT` | 宿主会话 `header.version` 不在支持集合内 |
+| 501 | `UNSUPPORTED_HOST` | 会话实例缺 `requestHeader` / `deriveMessages` |
+| 502 | `MISSING_CREDENTIAL` / `RATE_LIMITED` / `TIMEOUT`* / `UPSTREAM_ERROR` | 上游非 2xx 或非法 JSON（状态码统一 502，code 保留上游语义） |
+| 504 | `TIMEOUT` | 全部上游请求超时、无任何可用候选 |
 
-* 不做通用代码补全引擎（只做聊天输入框，模型与提示词交给官方接口）；
-* 不接管会话、不替换会话模型、不动 dsh 内部文件布局；
-* 不缓存/不落 API key（凭据只经 `ctx.credentials` 解析）；
-* 不把草稿内容写入日志（用户输入视为敏感）。
+\* 上游 408 / 504 映射出的 `TIMEOUT` 走 502；只有「本次请求被判为超时且无候选」才走 504。
 
-## 验收标准
+**超时与限额**（均可经 patch 覆盖，括号内为默认值）：
 
-### M1 · host half（转发路由）
+* 上游请求超时 `requestTimeoutMs` 30s（客户端断开也 abort，两路共用同一个 `AbortController`）；
+* 请求体 `maxBodyBytes` 64KB（逐块累计与 JSON 解析前各判一次）；prompt `maxPromptChars` 32768 字符；
+* `maxTokens` 96、`suggestionCount` 1–4（>4 加载期即失败）、`temperature` 0–2（非法即失败）；
+* 上游响应正文读取上限 64KB；历史窗口 12 条 / 6000 字符；
+* 诊断表 `bySession` 上限 256 个会话（超限淘汰最早写入的）。
 
-* `POST /api/chat-fim/complete` 返回结构化的候选建议；非法请求按错误码拒绝（见 01 错误映射表）；
-* 上游超时/断连可取消，不悬挂、不泄漏 AbortController；
-* 配置（baseURL / model / maxTokens / apiKeyEnv）从插件设置分节读取，无明文 key；
-* `npm run verify` 全绿，纯逻辑（请求校验、错误映射）有单测。
+**回声窗口**：建议（归一化去空白标点后）与历史的比对阈值 —— 用户消息按**开头 10 字前缀**、
+助手消息按**15 字整窗**（10 字整窗会误杀正常措辞复用）。
 
-### M2 · client half（dock 建议条）
+**补全模型**：`resolveSuggestModel` 跟随主模型（`deepseek-official` 且 id 属于
+`deepseek-flash` / `deepseek-v4-pro` / `deepseek-v4-flash`），vision / 未知 / 非官方 provider 回退配置 `model`。
+多个建议用并行请求 + 温度错开（步长 0.4，封顶 2）实现；候选全被护栏过滤时按 0.5 重试一次。
 
-* 停顿触发建议条；继续输入/光标移动/发送/采纳后旧建议作废；
-* 中文输入法组合态（composition）期间不触发、不闪断；
-* 点击/键盘采用后文本追加进草稿，行为可预期；
-* 客户端不接触 API key，所有请求经 host 路由。
+**诊断计数**（进程内、不持久化、不含任何用户内容）：`requests` / `fulfilled` / `retries` / `shown` / `empty` /
+`filteredSpeaker` / `filteredRepeat` / `filteredEcho` / `filteredLanguage` / `aborted` / `timeout` /
+`upstreamError`，外加 `bySession`（键为会话 id，值同形）与 `elapsedTotalMs` / `elapsedMaxMs`。
 
-## 退役条件
+## client 契约
 
-官方在输入框原生支持续写联想后，本插件从合集中退役。
+**槽位**（三处 id 不同、order 相同，均声明 `locale: 'chat-fim'`）：
+
+| 槽位 | id | order | 作用 |
+| :--- | :--- | ---: | :--- |
+| `conversation.input.left` | `chat-fim-switch` | 30 | 开关胶囊 + 灵敏度选档 |
+| `conversation.input.dock` | `chat-fim` | 30 | 数据面：读草稿快照 → 请求 → 写共享 store；渲染环 |
+| `conversation.input.overlay` | `chat-fim-menu` | 30 | 候选菜单视图 |
+
+数据面不用 `conversation.composer.dock`：shell 在新会话页（hero）不渲染它，新会话第一条草稿会永远没有联想。
+
+**localStorage**（只这两个键，无用户内容）：`dsh-chat-fim:enabled`（存 `'1'` 才算开启）、
+`dsh-chat-fim:sensitivity`（`eager` / `standard` / `conservative`，非法回退 `standard`）。
+
+**缓存与上限**：无结果缓存 —— 每次触发都发一次请求；模块级共享状态共 5 个（开关 / 联想中会话 / 错误 /
+支持态 / 建议），不按会话累积；目录 store 适配器的未决订阅表随监听器卸载清空；在飞请求同一草稿至多一个，
+草稿修订号变化即作废（`draftRev` CAS）。
+
+**三档参数**：
+
+| 档位 | `pauseMs` | 最短草稿（CJK / Latin） | 夹入英文半词 | 词后空格 | 句末标点 |
+| :--- | ---: | :--- | :--- | :--- | :--- |
+| `eager`（高） | 250 | 4 / 2 | 放行 | 放行 | 放行 |
+| `standard`（中） | 400 | 8 / 6 | 抑制 | 放行 | 抑制 |
+| `conservative`（低） | 800 | 12 / 8 | 抑制 | 抑制 | 抑制 |
+
+句末字符集 `。！？.!?;；`；所有语言同一套规则（按草稿内容自适应，不做界面语言切换）；IME 组合态一律不触发。
+
+**@ 菜单互斥**：官方触发菜单打开时渲染 `[data-trigger-menu]`；本菜单据此整体不渲染、Tab 不采用
+（Tab 归官方下钻），并以 `MutationObserver` 观察 overlay 锚点子树实时刷新。官方列表打开期间请求不中断，
+结果照常写 store，列表关闭后按状态机恢复显示。
+
+**支持性查询**：`checkSupport` 三态 —— `true` / `false` 为宿主定论，`null` 为「现在判不了」
+（404、非 2xx、fetch 抛错或 5s 超时、响应不是 JSON）。`null` 交给状态机补查（500/1000/2000/4000/8000ms，
+共 5 次、合计 15.5s），耗尽才落 `failed` 并 fail-open 显示。
+
+**采用**：Tab（焦点须在 composer 卡内）或 mousedown 点选 → `slash/input-insert-text` bail，span 取 detect 坐标
+（`detectEnd`：chip 在 detect 平面只占 1 字符）；Esc 丢弃；卡外 pointerdown 丢弃。
+
+## 代码布局
+
+| 文件 | 职责 |
+| :--- | :--- |
+| `src/constants.ts` | 包名 / locale 命名空间 / 路由 / 槽位与 order / 本地键 / 超时 / 上限 / z-index / 回声窗口 / 补查退避 |
+| `src/compat.ts` | 两档能力门（host 抛错 / client 只告警）、惰性探针、会话格式门与停用文案 |
+| `src/host.ts` | 组合根：能力门 → 路由注册（信任栅栏 → GET 支持 / 诊断 / POST 转发与护栏 → 诊断收口） |
+| `src/suggest.ts` | 纯逻辑：配置归一化、请求校验、prompt 构造、护栏（说话人清洗 / 复读 / 回声 / 语言 / 单句）、模型解析、触发门控 |
+| `src/trust.ts` | Host / Origin / `sec-fetch-site` 信任栅栏（复用官方 trustedHosts 与绑定地址） |
+| `src/index.ts` | host 包 API 的静态 re-export |
+| `src/client/index.ts` | client 安装：能力门 → 样式（effect 清理）→ locale → 三槽注册；`checkSupport` / `requestComplete` / `adopt` |
+| `src/client/capabilities.ts` | client half 必需能力表（纯逻辑，供门与单测） |
+| `src/client/ChatFimDock.tsx` | 三个组件与模块级共享 store（开关 / 忙碌会话 / 错误 / 支持态 / 建议 / 采纳标记） |
+| `src/client/styles.ts` | 类名表 + `buildChatFimCss()` + 注入口（HMR 命中旧标签则刷新内容） |
+| `src/client/fim-support-machine.ts` | 支持状态机纯 reducer 与补查退避 |
+| `src/client/geometry.ts` | 矩形 / 锚点数值比较（高频测量去重） |
+| `src/client/parse.ts` | 响应 JSON 解析的安全默认值 |
+| `src/client/lazy-directory-store.ts` | 目录 store 惰性订阅与订阅迁移 |
+
+host half 不 import 浏览器 API，client half 不 import Node 模块（`parseCompleteBody` 的 `Buffer` 依赖留在 host 侧）。
+
+## 已知偏离
+
+* **环的层级依赖官方遮罩**：`z-index: 900` 必须低于官方遮罩（1000）才能随背景一起虚化；官方改遮罩层级时环会浮在弹窗之上。
+* **依赖三个官方 DOM 标记**：`[data-phase]`（会话根）、`[data-composer-card]`（卡片矩形与焦点判定）、
+  `[data-trigger-menu]`（官方 @/斜杠菜单）。失效降级：`data-phase` 缺失 ⇒ 退回全局首张卡片（可能画到别的会话）；
+  `data-composer-card` 缺失 ⇒ 无矩形、不画环；`data-trigger-menu` 改名 ⇒ 本菜单不再让位，Tab 与官方下钻冲突。
+* **环是 300ms 轮询测量**：不订阅官方布局事件，靠周期测量 + resize/scroll（capture）自愈；矩形不变时不写状态。
+* **未知支持 fail-open ≤15.5s**：host 判不了时（冷启动会话未激活等）按有界补查，耗尽后显示；
+  非 DeepSeek 模型在这段窗口里可能短暂看到开关。
+* **无设置 UI**：配置只经 `cordis.patch.yml`（`baseURL` / `model` / `apiKeyEnv` / `maxTokens` /
+  `requestTimeoutMs` / `maxBodyBytes` / `maxPromptChars` / `suggestionCount` / `temperature`），界面里没有设置项。
+* **诊断只在进程内**：重启清零，不落盘；`bySession` 按 FIFO 淘汰，不含对话内容。
+
+## 测试地图
+
+| 文件 | 覆盖 |
+| :--- | :--- |
+| `test/route.test.mjs` | 真跑 handler：信任栅栏 403、请求校验、各错误码、超时 504、护栏过滤、诊断计数 |
+| `test/host.test.mjs` | 诊断 `bySession` 上限与 FIFO 淘汰 |
+| `test/suggest.test.mjs` | 配置归一化、prompt 构造、说话人清洗、复读 / 回声 / 语言 / 单句截断、模型解析、灵敏度门控、`detectEnd` |
+| `test/trust.test.mjs` | 栅栏纯判定 + 接线 |
+| `test/compat.test.mjs` | 两档能力门、惰性探针、会话格式门、client 门接线 |
+| `test/fim-support-machine.test.mjs` | 状态机迁移、补查预算、旧地址作废、不退避出 NaN |
+| `test/menu-styles.test.mjs` | `buildChatFimCss()` 的花括号平衡与菜单 / 开关 / 弹层几何 |
+| `test/structure.test.mjs` | 包清单与 patch、样式不得回流组件、能力门与 effect 接线、spec 只剩本文 |
+| `test/geometry.test.mjs` / `test/parse.test.mjs` / `test/lazy-directory-store.test.mjs` | 小件纯逻辑 |
+
+验证：插件目录 `npm run verify`（typecheck → build + client bundle → 测试侧 typecheck → `node:test` → `npm pack --dry-run`）。

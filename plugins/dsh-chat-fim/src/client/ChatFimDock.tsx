@@ -104,7 +104,7 @@ export function setSuggestEnabled(next: boolean): void {
 }
 
 // 模块级共享「联想中」状态：记录**哪个会话**在联想——环只由该会话的 dock 渲染，
-// 后台会话的在途请求不会把环画到当前会话上（会话隔离，见 spec 06）。
+// 后台会话的在途请求不会把环画到当前会话上（按会话隔离）。
 let sharedBusySessionId: string | null = null
 const busyListeners = new Set<() => void>()
 
@@ -294,7 +294,7 @@ export function setTriggerSensitivity(next: TriggerSensitivity): void {
  *
  * 从**本会话根**（`[data-phase]`，官方公开 DOM 标记）里取卡片，而不是全局
  * `document.querySelector`——多会话并存时全局查询会取到别的会话的卡片，
- * 把环画到当前会话上（spec 06 修）。后台会话的卡片不可见时矩形为 0 → 不画环。
+ * 把环画到当前会话上。后台会话的卡片不可见时矩形为 0 → 不画环。
  * @param anchor - 本 dock 渲染的隐藏锚点（用于定位自己所在的会话根）。
  * @returns 视口矩形；取不到或不可见时 undefined。
  */
