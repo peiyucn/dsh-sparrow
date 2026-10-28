@@ -11,18 +11,6 @@ export const GLASS_BLUR = 'blur(20px) saturate(150%)'
 export const PANEL_BAND_PX = 38
 const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 
-/** 输入框玻璃（第 1 步：材质）：半透明底 + 背景模糊，先保证可读、变高不闪。 */
-export const COMPOSER_FILL_ALPHA = 0.55
-export const COMPOSER_BLUR = 'blur(12px) saturate(140%)'
-/**
- * 输入框第 2 步：边缘高光。全周 1px 内描边（inset box-shadow 会自动跟圆角走）+ 上下柔光；
- * 不用径向渐变，所以四个角不会出现断光。
- */
-export const COMPOSER_RIM_DARK = 'inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 1px 0 0 rgba(255, 255, 255, 0.035), inset -1px 0 0 rgba(255, 255, 255, 0.035), inset 0 -1px 0 rgba(255, 255, 255, 0.035)'
-export const COMPOSER_RIM_LIGHT = 'inset 0 1px 0 rgba(255, 255, 255, 0.36), inset 1px 0 0 rgba(255, 255, 255, 0.13), inset -1px 0 0 rgba(255, 255, 255, 0.13), inset 0 -1px 0 rgba(0, 0, 0, 0.04)'
-export const COMPOSER_SHEEN_DARK = 'linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.012) 6%, transparent 16%, transparent 84%, rgba(255, 255, 255, 0.025) 94%, rgba(255, 255, 255, 0.03) 100%)'
-export const COMPOSER_SHEEN_LIGHT = 'linear-gradient(180deg, rgba(255, 255, 255, 0.19) 0%, transparent 18%, transparent 82%, rgba(255, 255, 255, 0.09) 100%)'
-
 /** 与地面层同源的光：显式视口尺寸 + 定位，禁止 `background-attachment: fixed`。 */
 function viewportLight(position: string, size = '100vw 100vh'): string {
   return `  background-image: ${BACKDROP_GRADIENTS};
@@ -40,7 +28,6 @@ const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
 
 const P = `body:not([${PLAIN_ATTR}])`
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
-const SEAT = `:is([data-phase='active'], [data-phase='hero']) [data-composer-seat]`
 
 /** 右栏 76px 下有「可流式滚动的正文」的标签：只有它们上提滚区，正文才会真的从两条带下滚过。 */
 const LIFTED_SCROLLS = [
@@ -89,49 +76,7 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框玻璃 · 第 1+2 步：材质 + 边缘高光 =====
-   材质：座位透明、卡片半透明底（跟官方圆角 / 动态高度）、::before 只做 backdrop-filter。
-   高光：全周 1px 内描边 + 上下柔光（inset box-shadow / 线性渐变，自动跟圆角），不画径向断光，
-   也还没有折射（留到第 3 步单独做）。 */
-${P} ${SEAT} {
-  background: none !important;
-}
-${P} ${SEAT} [data-composer-card] {
-  position: relative;
-  z-index: 0;
-  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%, transparent);
-  /* 形状保持官方原样（圆角走 --dsw-radius-panel），只换材质与高光。 */
-  /* 「+」等 selector 型按钮：官方给的是不透明中性底，在玻璃上会读成一块实心，跟着玻璃让出底色。 */
-  --dsw-specific-selector: transparent;
-}
-${P} ${SEAT} [data-composer-card]::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
-  background-image: ${COMPOSER_SHEEN_DARK};
-  box-shadow: ${COMPOSER_RIM_DARK};
-  backdrop-filter: ${COMPOSER_BLUR};
-}
-body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
-  background-image: ${COMPOSER_SHEEN_LIGHT};
-  box-shadow: ${COMPOSER_RIM_LIGHT};
-}
-/* 座位撤掉官方 36px 实色渐隐后，卡片下方的统计胶囊行没有遮罩；给 dock 行本身垫「地面同源」
-   的底色 + 打光。宽度必须与输入框一致（官方 dock 是 flex 子项，宽 auto 只有胶囊宽度，两侧必漏），
-   所以显式 width:100% + 卡片同款 max-width；向下多垫 4px 座位内边距，不向上进入卡片。
-   fixed 背景定位区 = 视口，与地面层逐像素同源；这里面积只有胶囊一行，是唯一允许的 fixed 例外。 */
-${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
-  width: 100%;
-  max-width: var(--dsh-composer-card-max-width);
-  margin-bottom: -4px;
-  padding: 4px 0;
-  background-color: var(--dsw-alias-bg-base);
-  background-image: ${BACKDROP_GRADIENTS};
-  background-attachment: fixed;
-}
+/* ===== 输入框：保持官方原样（此版先不定制，作为重做 Apple 液态玻璃的干净基线） ===== */
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
 ${P} ${RP} {

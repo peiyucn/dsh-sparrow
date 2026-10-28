@@ -5,12 +5,6 @@ import { describe, it } from 'node:test'
 import { buildBackdropCss } from '../lib/backdrop.js'
 import { PLAIN_ATTR } from '../lib/constants.js'
 import {
-  COMPOSER_BLUR,
-  COMPOSER_FILL_ALPHA,
-  COMPOSER_RIM_DARK,
-  COMPOSER_RIM_LIGHT,
-  COMPOSER_SHEEN_DARK,
-  COMPOSER_SHEEN_LIGHT,
   GLASS_BLUR,
   GLASS_FILL_ALPHA,
   HEADER_HEIGHT_PX,
@@ -21,7 +15,7 @@ const css = buildGlassCss()
 const backdropCss = buildBackdropCss()
 const code = css.replace(/\/\*[\s\S]*?\*\//gu, '')
 
-describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
+describe('glass: 顶栏与右栏（输入框保持官方原样）', () => {
   it('两处玻璃共用同一个填充参数与同一个模糊参数（统一）', () => {
     assert.ok(GLASS_FILL_ALPHA < 0.5, '通透：填充不透明度低于一半')
     const blurPx = Number(/blur\((\d+)px\)/u.exec(GLASS_BLUR)?.[1] ?? 0)
@@ -30,37 +24,9 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok((code.match(new RegExp(String(GLASS_FILL_ALPHA * 100) + '%', 'gu')) ?? []).length >= 2, '两处填充都引用同一个常量')
   })
 
-  it('输入框第 1 步材质：半透明底 + 背景模糊，不做折射 / 补缝', () => {
-    const seat = /\[data-composer-seat\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(seat.includes('background: none'), '座位撤掉官方遮罩，正文从玻璃下滚过')
-    const card = /\[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(card.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%`),
-      '卡片本体承担半透明底色（跟官方圆角 / 高度）')
-    assert.ok(card.includes('position: relative') && card.includes('z-index: 0'), '卡片自成层叠上下文')
-    assert.ok(!card.includes('border-radius'), '不覆盖圆角，输入框形状保持官方原样')
-    const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(glass.includes('backdrop-filter: ' + COMPOSER_BLUR), '输入框使用独立的材质模糊参数')
-    assert.ok(glass.includes('border-radius: inherit'))
-    assert.ok(!glass.includes('url(#'), '第 1 步不做折射')
-    const dock = /\[data-phase='active'\] \[data-composer-seat\] \[data-composer-dock\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(dock.includes('background-color: var(--dsw-alias-bg-base)'), '胶囊行垫地面色，不再透出正文')
-    assert.ok(dock.includes('background-image: radial-gradient('), '胶囊行保留地面打光')
-    assert.ok(dock.includes('background-attachment: fixed'), '打光用 fixed 定位区与地面层逐像素同源')
-    assert.ok(dock.includes('width: 100%'), '胶囊行宽度与输入框一致，两侧不再漏')
-    assert.ok(dock.includes('max-width: var(--dsh-composer-card-max-width)'), '与卡片同款宽度上限')
-    assert.ok(!code.includes('[data-composer-seat]::after'), '不往整条座位底部盖（会压到卡片下沿）')
-    assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色，跟随玻璃')
-  })
-
-  it('输入框第 2 步边缘高光：全周 1px 内描边 + 上下柔光，随圆角连续', () => {
-    const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(glass.includes(`box-shadow: ${COMPOSER_RIM_DARK}`), '全周内描边（inset shadow 自动跟圆角）')
-    assert.ok(glass.includes(`background-image: ${COMPOSER_SHEEN_DARK}`), '上下柔光用线性渐变，四角不断光')
-    assert.ok(!glass.includes('radial-gradient'), '不得用径向渐变画边缘（会在角上断光）')
-    assert.ok(!glass.includes('url(#'), '仍不做折射')
-    const light = /body:not\(\[data-ds-dark-theme\]\)[^{]*\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(light.includes(`box-shadow: ${COMPOSER_RIM_LIGHT}`), '浅色轴有对应高光')
-    assert.ok(light.includes(`background-image: ${COMPOSER_SHEEN_LIGHT}`))
+  it('输入框不做任何定制：没有 composer 选择器与玻璃层（干净基线）', () => {
+    assert.ok(!code.includes('[data-composer'), '干净基线阶段不得出现输入框定制规则')
+    assert.ok(!code.includes('data-specific-input'), '不得覆盖输入框底色')
   })
 
   it('顶栏：浮层化 + 内容上移 + 半透明填充 + 官方模糊 token + 自绘地面光', () => {
@@ -98,19 +64,16 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok(settings.includes('background-size: 100% 100%'))
   })
 
-  it('所有规则都带「官方默认」门（浅色轴高光 / 官方菜单材质两条除外）；顶栏 / 右栏共用 GLASS_BLUR', () => {
+  it('所有规则都带「官方默认」门（浅色轴高光 / 官方菜单材质两条除外），模糊统一为 GLASS_BLUR', () => {
     for (const line of code.split('\n')) {
       if (!line.trim().endsWith('{')) continue
       const gated = line.startsWith('body:not([') && (line.includes(PLAIN_ATTR) || line.includes('data-ds-dark-theme'))
       const officialMaterial = line.startsWith('[data-menu-material]')
       assert.ok(gated || officialMaterial, `规则必须带门：${line.trim()}`)
     }
-    const blur24 = Number(/blur\((\d+)px\)/u.exec(GLASS_BLUR)?.[1] ?? 0)
-    const composer = Number(/blur\((\d+)px\)/u.exec(COMPOSER_BLUR)?.[1] ?? 0)
     const blurValues = [...code.matchAll(/blur\((\d+)px\)/gu)].map(match => Number(match[1]))
-    assert.ok(blurValues.every(value => value === blur24 || value === composer), '只允许两档模糊：顶栏/右栏 与 输入框')
-    assert.equal(blurValues.filter(value => value === blur24).length, 2, '顶栏 / 右栏共用 GLASS_BLUR')
-    assert.equal(blurValues.filter(value => value === composer).length, 1, '输入框单独一档材质模糊')
+    const expectedBlur = Number(/blur\((\d+)px\)/u.exec(GLASS_BLUR)?.[1] ?? 0)
+    assert.ok(blurValues.length > 0 && blurValues.every(value => value === expectedBlur), '模糊统一为 GLASS_BLUR')
   })
 
   it('地面层仍是唯一常驻绘制层；对话宽度拖拽条抬到内容层之上', () => {
