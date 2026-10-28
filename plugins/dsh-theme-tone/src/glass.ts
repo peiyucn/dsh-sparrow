@@ -13,7 +13,7 @@ export const PANEL_BAND_PX = 38
 const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 
 /**
- * 玻璃边缘的固定高光：四边同构造 —— 极淡基线 + 2px 柔光，都从边中点向两端衰减。
+ * 玻璃边缘的固定高光：四边同构造 —— 极淡基线 + 4px 柔光，都从边中点向两端衰减。
  * 上 / 下缘是主光：峰值 0.12、基线只留 0.03，两端更暗、明暗落差更大；
  * 左缘次之，右缘是背光侧、峰值最低。
  */
@@ -21,7 +21,7 @@ const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.03), inset 1px 0 2px rgb
 const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.06), inset 1px 0 2px rgba(255, 255, 255, 0.1), inset -1px 0 3px rgba(0, 0, 0, 0.03), inset -1px 0 2px rgba(255, 255, 255, 0.06), inset 0 -1px 2px rgba(255, 255, 255, 0.06)'
 
 /**
- * 四缘柔光：2px，峰值 + 基线。上 / 下缘是主光（0.12 + 0.03，横向 42% 衰减），
+ * 四缘柔光：4px，峰值 + 基线。上 / 下缘是主光（0.12 + 0.03，横向 42% 衰减），
  * 左缘 0.08、右缘 0.06（+0.04，纵向 42% 衰减）；四边都在中点最亮、向两端渐暗。
  */
 const TOP_GLOW_DARK = 'radial-gradient(42% 100% at 50% 0%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 40%, transparent 75%)'
@@ -140,7 +140,7 @@ ${P} ${SEAT} [data-composer-card]::before {
   pointer-events: none;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%, transparent);
   background-image: ${TOP_GLOW_DARK}, ${BOTTOM_GLOW_DARK}, ${LEFT_GLOW_DARK}, ${RIGHT_GLOW_DARK};
-  background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%;
+  background-size: 100% 4px, 100% 4px, 4px 100%, 4px 100%;
   background-position: 0 0, 0 100%, 0 0, 100% 0;
   background-repeat: no-repeat;
   box-shadow: ${RIM_DARK};

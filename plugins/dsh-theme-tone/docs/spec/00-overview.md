@@ -48,7 +48,7 @@
 | 模糊 | `GLASS_BLUR = blur(20px) saturate(150%)` | 三处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊），测试钉住「三处同一值」 |
 | 填充不透明度 | `GLASS_FILL_ALPHA = 0.45` | **三处统一同一个常量**，越小白越通透；填充色各自取官方面 token（顶栏/右栏 = `bg-base`，输入框 = `--dsw-specific-input-major`） |
 | 边缘光 | `RIM_DARK` / `RIM_LIGHT` | 四边各留极淡基线（右缘另叠一点暗边），连成一圈；深/浅两套 |
-| 四缘光 | `TOP_GLOW_*` / `BOTTOM_GLOW_*` / `LEFT_GLOW_*` / `RIGHT_GLOW_*` | 2px 径向柔光；上/下 0.12 + 0.03 基线（42% 横向），左 0.08 / 右 0.06 + 0.04 基线（42% 纵向） |
+| 四缘光 | `TOP_GLOW_*` / `BOTTOM_GLOW_*` / `LEFT_GLOW_*` / `RIGHT_GLOW_*` | 4px 径向柔光；上/下 0.12 + 0.03 基线（42% 横向），左 0.08 / 右 0.06 + 0.04 基线（42% 纵向） |
 
 ## 代码布局
 
