@@ -14,8 +14,6 @@ const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 /** 输入框玻璃（第 1 步：材质）：半透明底 + 背景模糊，先保证可读、变高不闪。 */
 export const COMPOSER_FILL_ALPHA = 0.55
 export const COMPOSER_BLUR = 'blur(12px) saturate(140%)'
-/** 输入框圆角（owner 指定 25px；官方 panel 为 28px）。 */
-export const COMPOSER_RADIUS_PX = 25
 /**
  * 输入框第 2 步：边缘高光。全周 1px 内描边（inset box-shadow 会自动跟圆角走）+ 上下柔光；
  * 不用径向渐变，所以四个角不会出现断光。
@@ -24,9 +22,6 @@ export const COMPOSER_RIM_DARK = 'inset 0 1px 0 rgba(255, 255, 255, 0.10), inset
 export const COMPOSER_RIM_LIGHT = 'inset 0 1px 0 rgba(255, 255, 255, 0.36), inset 1px 0 0 rgba(255, 255, 255, 0.13), inset -1px 0 0 rgba(255, 255, 255, 0.13), inset 0 -1px 0 rgba(0, 0, 0, 0.04)'
 export const COMPOSER_SHEEN_DARK = 'linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.012) 6%, transparent 16%, transparent 84%, rgba(255, 255, 255, 0.025) 94%, rgba(255, 255, 255, 0.03) 100%)'
 export const COMPOSER_SHEEN_LIGHT = 'linear-gradient(180deg, rgba(255, 255, 255, 0.19) 0%, transparent 18%, transparent 82%, rgba(255, 255, 255, 0.09) 100%)'
-/** 相邻停靠面板之间的 1px 分割线颜色（用 border-top：材质在 ::before 上，inset 阴影会被盖住）。 */
-export const DOCK_DIVIDER_DARK = 'rgba(255, 255, 255, 0.08)'
-export const DOCK_DIVIDER_LIGHT = 'rgba(0, 0, 0, 0.07)'
 
 /** 与地面层同源的光：显式视口尺寸 + 定位，禁止 `background-attachment: fixed`。 */
 function viewportLight(position: string, size = '100vw 100vh'): string {
@@ -105,8 +100,7 @@ ${P} ${SEAT} [data-composer-card] {
   position: relative;
   z-index: 0;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%, transparent);
-  /* 圆角按 owner 指定收到 25px（官方 panel 28px），::before 继承。 */
-  border-radius: ${COMPOSER_RADIUS_PX}px;
+  /* 形状保持官方原样（圆角走 --dsw-radius-panel），只换材质与高光。 */
   /* 「+」等 selector 型按钮：官方给的是不透明中性底，在玻璃上会读成一块实心，跟着玻璃让出底色。 */
   --dsw-specific-selector: transparent;
 }
@@ -137,51 +131,6 @@ ${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
   background-color: var(--dsw-alias-bg-base);
   background-image: ${BACKDROP_GRADIENTS};
   background-attachment: fixed;
-}
-
-/* ===== 停靠区（todo / goal / queue）统一规格 =====
-   三者用同一套：不透明浮层底铺在元素本身、默认上圆下直、负边距刚好抵消 stack 缝；
-   叠多个时非最上面的面板顶角切直角，并在顶部画 1px 分割线（inset 阴影：底色在元素上，
-   不会被伪元素盖住，也不占布局 / 不改变面板高度）。
-   只保留各自的图标 / 标题专属色。 */
-${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock] > *, [data-goal-bar] > div, [data-testid='todo-panel']) {
-  border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
-  background-color: var(--dsw-alias-bg-layer-2);
-  box-shadow: none;
-  --dsw-elevation-stroke-color: transparent;
-}
-${P} [data-phase='active'] [data-composer-seat] :is([data-goal-bar], [data-queue-dock]):not(:first-child) > *,
-${P} [data-phase='active'] [data-composer-seat] [data-testid='todo-panel']:not(:first-child) {
-  border-radius: 0;
-  box-shadow: ${DOCK_DIVIDER_DARK};
-}
-${P} [data-phase='active'] [data-composer-seat] :is([data-testid='todo-panel'], [data-goal-bar], [data-queue-dock]) {
-  margin-bottom: calc(0px - var(--dsh-composer-stack-gap));
-}
-body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-phase='active'] [data-composer-seat] :is([data-goal-bar], [data-queue-dock]):not(:first-child) > *,
-body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-phase='active'] [data-composer-seat] [data-testid='todo-panel']:not(:first-child) {
-  box-shadow: ${DOCK_DIVIDER_LIGHT};
-}
-/* 官方材质 / 描边画在伪元素上：停靠区统一后直接关掉，底由元素自身的 background-color 承担。
-   queue 的 panel::after 原本是 0.5px 描边，也一并去掉（消息列表不再有框）。 */
-${P} [data-phase='active'] [data-queue-dock] > *::before,
-${P} [data-phase='active'] [data-queue-dock] > *::after,
-${P} [data-phase='active'] [data-goal-bar] > div::before {
-  content: none;
-}
-/* 不透明材质：todo 根节点背景已由统一规则铺底，这里只需撤掉它自己的 backdrop-filter。 */
-${P} [data-phase='active'] [data-testid='todo-panel'] {
-  background: var(--dsw-alias-bg-layer-2);
-  backdrop-filter: none;
-}
-/* 专属色：只涂图标 + 标题，正文与右侧按钮保持官方色。 */
-${P} [data-phase='active'] [data-testid='todo-panel'] > div > button > span:first-child,
-${P} [data-phase='active'] [data-testid='todo-panel'] > div > button > span:nth-child(2) {
-  color: var(--dsw-alias-state-success-primary);
-}
-${P} [data-phase='active'] [data-goal-bar] > div > span:first-child,
-${P} [data-phase='active'] [data-goal-bar] > div > span:nth-child(2) {
-  color: var(--dsw-alias-state-warn-primary);
 }
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */

@@ -7,13 +7,10 @@ import { PLAIN_ATTR } from '../lib/constants.js'
 import {
   COMPOSER_BLUR,
   COMPOSER_FILL_ALPHA,
-  COMPOSER_RADIUS_PX,
   COMPOSER_RIM_DARK,
   COMPOSER_RIM_LIGHT,
   COMPOSER_SHEEN_DARK,
   COMPOSER_SHEEN_LIGHT,
-  DOCK_DIVIDER_DARK,
-  DOCK_DIVIDER_LIGHT,
   GLASS_BLUR,
   GLASS_FILL_ALPHA,
   HEADER_HEIGHT_PX,
@@ -40,7 +37,7 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok(card.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%`),
       '卡片本体承担半透明底色（跟官方圆角 / 高度）')
     assert.ok(card.includes('position: relative') && card.includes('z-index: 0'), '卡片自成层叠上下文')
-    assert.ok(card.includes(`border-radius: ${COMPOSER_RADIUS_PX}px`), '输入框圆角按 owner 指定收到 25px')
+    assert.ok(!card.includes('border-radius'), '不覆盖圆角，输入框形状保持官方原样')
     const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(glass.includes('backdrop-filter: ' + COMPOSER_BLUR), '输入框使用独立的材质模糊参数')
     assert.ok(glass.includes('border-radius: inherit'))
@@ -52,31 +49,7 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok(dock.includes('width: 100%'), '胶囊行宽度与输入框一致，两侧不再漏')
     assert.ok(dock.includes('max-width: var(--dsh-composer-card-max-width)'), '与卡片同款宽度上限')
     assert.ok(!code.includes('[data-composer-seat]::after'), '不往整条座位底部盖（会压到卡片下沿）')
-    assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色')
-  })
-
-  it('停靠区（todo / goal / queue）统一规格：直角接缝 + 分割线 + 图标/标题专属色', () => {
-    const surface = /:is\(\[data-queue-dock\] > \*, \[data-goal-bar\] > div, \[data-testid='todo-panel'\]\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(surface.includes('border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0'), '三者统一：上圆下直')
-    assert.ok(surface.includes('background-color: var(--dsw-alias-bg-layer-2)'), '分割线下方有不透明底，不漏正文')
-    assert.ok(surface.includes('box-shadow: none'), '去掉官方面板投影')
-    assert.ok(surface.includes('--dsw-elevation-stroke-color: transparent'), '去掉官方面板描边')
-    const margins = /:is\(\[data-testid='todo-panel'\], \[data-goal-bar\], \[data-queue-dock\]\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(margins.includes('margin-bottom: calc(0px - var(--dsh-composer-stack-gap))'), '三者统一：刚好抵消 stack 缝，不重叠')
-    const nonFirst = /:is\(\[data-goal-bar\], \[data-queue-dock\]\):not\(:first-child\) > \*,\n[^{]*\[data-testid='todo-panel'\]:not\(:first-child\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(nonFirst.includes('border-radius: 0'), '非最上层顶角切直角')
-    assert.ok(nonFirst.includes(`box-shadow: ${DOCK_DIVIDER_DARK}`), '叠在一起时中间有 1px 分割线')
-    assert.ok(code.includes(`box-shadow: ${DOCK_DIVIDER_LIGHT}`), '浅色轴有对应分割线')
-    const officialPseudo = /\[data-queue-dock\] > \*::before,\n[^{]*\[data-queue-dock\] > \*::after,\n[^{]*\[data-goal-bar\] > div::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(officialPseudo.includes('content: none'), '关掉官方伪元素材质与 queue 的 0.5px 描边（消息列表不再有框）')
-    const todoIcon = /\[data-testid='todo-panel'\] > div > button > span:first-child,\n[^{]*span:nth-child\(2\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(todoIcon.includes('color: var(--dsw-alias-state-success-primary)'), 'todo 图标与标题用绿色')
-    const goalIcon = /\[data-goal-bar\] > div > span:first-child,\n[^{]*span:nth-child\(2\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(goalIcon.includes('color: var(--dsw-alias-state-warn-primary)'), 'goal 图标与标题用橘红')
-    assert.ok(!code.includes('--dsw-alias-label-primary: var(--dsw-alias-state-'), '不整体改正文/按钮颜色')
-    assert.ok(/\[data-testid='todo-panel'\] \{\n  background: var\(--dsw-alias-bg-layer-2\);\n  backdrop-filter: none;\n\}/u.test(code), 'todo 材质改为不透明')
-    assert.ok(!/\[data-testid='todo-panel'\] \{\n  width:/u.test(code), 'todo 不改官方宽度')
-    assert.ok(!/\[data-goal-bar\] \{\n  width:/u.test(code), 'goal 不改官方宽度')
+    assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色，跟随玻璃')
   })
 
   it('输入框第 2 步边缘高光：全周 1px 内描边 + 上下柔光，随圆角连续', () => {

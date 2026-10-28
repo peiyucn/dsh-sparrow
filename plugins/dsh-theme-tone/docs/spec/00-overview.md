@@ -10,18 +10,13 @@
    按色调固定；**不使用 `mix-blend-mode`**（normal 合成，颜色与 screen 的差 ≤1/255）。
 3. **对话区顶栏玻璃**：顶栏浮层化（`position: absolute` + 滚动区 `padding-top: 76px` + 滚动条 track 下推
    + 拖拽条上沿 76px），玻璃放顶栏 `::before`（`z-index: -1`），并自绘同源三道光。
-4. **输入框玻璃**：座位撤掉官方 36px 实色渐隐（正文从玻璃下滚过）；卡片本体承担半透明底色
-   （圆角 25px、`::before` inherit），`::before` 做 `backdrop-filter` 并画 specular 高光；
-   卡片作用域内 `--dsw-specific-selector: transparent`，让官方「+」等 selector 型按钮不读成实心块。
-   **停靠区（todo / goal / queue）统一规格**：宽度保持官方、不覆盖；三者都改上圆下直，
-   用负边距**刚好抵消** stack 缝（不重叠）；材质统一为**不透明**（`--dsw-alias-bg-layer-2`），
-   材质铺在元素自身（不是 `::before`），官方伪元素材质 / 描边一律关掉（含 queue `panel::after` 的 0.5px 边框，消息列表不再有框）；叠多个时非最上面的面板顶角切直角，
-   并在顶部画 1px 分割线（`inset` 阴影，不占布局、不改变面板高度）。专属色只作用于图标与标题
-   （todo = 绿 `state-success-primary`，goal = 橘红 `state-warn-primary`），正文与右侧按钮保持官方色。
+4. **输入框玻璃 · 第 1+2 步（材质 + 边缘高光）**：座位撤掉官方 36px 实色渐隐（正文从玻璃下滚过）；
+   卡片本体承担半透明底色（跟官方圆角 / 动态高度走），`::before` 做 `backdrop-filter`，并用
+   **全周 1px inset 内描边 + 上下线性柔光**画 specular 高光（自动跟圆角、四角不断光）；
+   卡片作用域内 `--dsw-specific-selector: transparent`，让官方「+」等 selector 型按钮不读成实心块；
    卡片下方统计胶囊行（`[data-composer-dock]`）显式 `width:100%` + 卡片同款 max-width，
    自身重绘**底色 + 同源打光**（fixed 定位区 = 视口），向下盖住座位 4px 内边距，
    但不向上进入卡片（避免挡住玻璃下沿的模糊内容）。
-5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的两个
    盒子 ⇒ 带背后永远只有面板纯色。做法：可流式滚动的正文（markdown/text 文档预览、文件树）上提 76px、
    内容下移 76px（只改视觉位置），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；玻璃面挂在
    各标签自己的 38px **头行** `::before` 上、向上铺满 0..76（两盒重合，y=38 不出缝），头行 z=2、dockkit
@@ -46,7 +41,7 @@
 | :--- | :--- | :--- |
 | 模糊 | `GLASS_BLUR = blur(20px) saturate(150%)` | 顶栏 + 右栏两处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊） |
 | 填充不透明度 | `GLASS_FILL_ALPHA = 0.45` | **顶栏 / 右栏共用同一个常量**，填充色取官方 `bg-base` |
-| 输入框材质 / 高光 | `COMPOSER_FILL_ALPHA = 0.55` / `COMPOSER_BLUR = blur(12px) saturate(140%)` / `COMPOSER_RIM_*` / `COMPOSER_SHEEN_*` / `COMPOSER_RADIUS_PX = 25` | 半透明底 + 背景模糊；均匀 1px 内描边 + 上下柔光；圆角 25px；todo / goal 上圆下直、负边距刚好抵消 stack 缝（不重叠） |
+| 输入框材质 / 高光 | `COMPOSER_FILL_ALPHA = 0.55` / `COMPOSER_BLUR = blur(12px) saturate(140%)` / `COMPOSER_RIM_*` / `COMPOSER_SHEEN_*` | 第 1 步：半透明底 + 背景模糊；第 2 步：全周 1px 内描边 + 上下线性柔光；**圆角保持官方 `--dsw-radius-panel`（28px）不变** |
 
 ## 代码布局
 
@@ -54,7 +49,7 @@
 | :--- | :--- |
 | `src/tones.ts` | 调色板数据 + `tokenOverrides()`（唯一的颜色事实来源） |
 | `src/backdrop.ts` | 地面光层 CSS、渲染计划、设置行色卡预览、CSS 特性门、层序不变式 |
-| `src/glass.ts` | 顶栏 / 右栏玻璃 + 打光 + 右栏提拉；输入框材质 / 高光 / 圆角；todo·goal 接入与停靠区不透明材质 |
+| `src/glass.ts` | 顶栏 / 右栏玻璃 + 打光 + 右栏提拉；输入框第 1+2 步（材质 + 边缘高光） |
 | `src/surfaces.ts` | 官方写死牌面的浮层修复（Workspace hover 卡） |
 | `src/nav-pin.ts` | 轮次导航恒显 + 内容宽度钳制（纯 CSS，布局功能） |
 | `src/constants.ts` | 选择器锚点 / z-index / 标记属性 / 设置命名空间 |
@@ -74,10 +69,9 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 4. 不改官方容器的 `position` / `overflow` / `transform` / `contain`（右栏 pane 的 `position: relative;
    z-index: 0` 是已知例外，见「已知偏离」）。
 5. 颜色只走 `ctx.theme` token 通道；玻璃与地面光必须写 CSS（官方无对应 token）。
-6. 官方菜单 / 弹窗 / 挂靠卡材质一律保持原样，插件不覆盖（例外：对话区停靠区按功能 4 统一为不透明材质）。
-7. **输入框玻璃只做材质与高光**：允许座位透明、卡片半透明底、`::before` 模糊、均匀 inset 内描边 +
-   线性 sheen；**不得**出现径向渐变边缘光 / 折射 `url()` / 停靠卡补缝规则。todo / goal 停靠区只做
-   接缝（直角 + 刚好抵消 stack 缝）、专属色与不透明材质，不改官方宽度。
+6. 官方菜单 / 弹窗 / 挂靠卡材质一律保持原样，插件不覆盖。
+7. **输入框玻璃第 1+2 步只做材质与高光**：允许座位透明、卡片半透明底、::before 模糊、
+   全周 inset 内描边 + 线性 sheen；**不得**出现径向渐变边缘光 / 折射 url() / 停靠卡补缝规则。
 
 ## 已知偏离 / 已知问题
 
@@ -85,17 +79,14 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 * **右栏提拉**（正文上提 76px + 内容下移 + 负底距）是对官方滚动盒的视觉位置改写；官方改渲染器结构 /
   data 属性时 lift 会静默不命中，退回「带是半透明实心板」的降级观感。pane 补
   `position: relative; z-index: 0` 作 `::before` 包含块（不改变尺寸）。
-* **输入框玻璃**：当前是半透明材质 + 均匀内描边 + 上下 sheen，圆角 25px；折射 / 液态玻璃形变仍未做。
-* **停靠区接缝**：用「下边直角 + 负边距刚好抵消 stack 缝」「非最上层顶角切直角」实现；官方改 stack 结构或
-  `--dsh-composer-stack-gap` 语义时接缝会失效（退回原官方留缝，不崩）。
+* **输入框玻璃重做中**：旧实现（径向四缘光、边缘折射、停靠卡补缝）已全部删除；第 1 步
+  恢复半透明材质与模糊，第 2 步加全周内描边 + 线性高光；折射留待第 3 步。
 * 悬浮卡修复是唯一私有 seam（见 `docs/private-seams.md`），官方改类名后缀即静默失效（回退官方配色，不崩）。
 
 ## 验证
 
 * `npm run verify`：typecheck → build → test → package。
-* 单测覆盖：顶栏 / 右栏两处玻璃共用同一填充常量与官方模糊 token、输入框材质 / 高光守卫、
-  todo·goal 接缝与专属色、停靠区不透明材质、地面光层三道光与层序、token 计划与官方默认档、
-  nav-pin 纯 CSS、悬浮卡锚点、client half 无逐帧探测。
+  头行玻璃、输入框材质 / 高光守卫、地面光层三道光与层序、token 计划与官方默认档、nav-pin 纯 CSS、
+  悬浮卡锚点、client half 无逐帧探测。
 * 真机验收（无头 + owner 复看）：顶栏 / 右栏 `backdrop-filter` 计算值、顶栏 y=76 不变量、
-  输入框材质与高光（可读、变高不闪、四角连续、25px 圆角）、todo / goal 接缝与专属色、
-  右栏 76px 让位与提拉、设置弹窗打光。
+  输入框第 1+2 步材质与高光（可读、变高不闪、四角连续）、右栏 76px 让位与提拉、设置弹窗打光。
