@@ -48,7 +48,37 @@ function composerMaterial(): string {
     inset 0 -2px 8px -6px rgba(255, 255, 255, 0.04);`
 }
 
+/**
+ * 座位底部「地面重画带」高度：输入框下沿圆角（官方 `--dsw-radius-panel` 28px）距座位底 30px
+ * （下方统计胶囊行 26px + 4px 底距），30 + 28 = 58，取 60 留 2px。带顶落在输入框工具行背后，
+ * 玻璃下沿不出现一条可辨的分界。
+ */
+export const SEAT_BAND_PX = 60
+/** 官方 composerStack 的堆栈缝（读官方参数，回落当前官方值）。 */
+const STACK_GAP = 'var(--dsh-composer-stack-gap, 6px)'
+/** 官方输入卡两侧让位（读官方参数，回落当前官方值）。 */
+const SIDE_CLEARANCE = 'var(--dsh-composer-side-clearance, 16px)'
+/** 停靠卡（todo / goal / queue）的官方锚点；没有类名可依赖，只用语义 data 属性。 */
+const DOCK_CARDS = `:is([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar])`
+/** 补缝层左右外扩量：这些层与地面逐像素同源，铺到旁边也读作背景本身，大一点更保险。 */
+const REPAINT_BLEED = `calc(-1 * (${SIDE_CLEARANCE} + 128px))`
+
 const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
+
+/**
+ * 「地面原地重画」：与地面层同一张视口渐变。`background-attachment: fixed` 让定位区 = 视口 ⇒
+ * 与 `.dsh-theme-tone` 地面层逐像素同源，画在哪都读作背景本身。
+ *
+ * 这是本表**唯一**允许 `background-attachment: fixed` 的地方：只挂在座位内静态补缝层上
+ * （座位 sticky 在视口底部、滚动时自身不动），不是逐消息行；单帧 ≤4 条。若实测有滚动卡顿，
+ * 再换运行期相位（显式 `background-size/position` + 量出的视口相位）。
+ */
+function groundRepaint(): string {
+  return `  background-color: var(--dsw-alias-bg-base);
+  background-image: ${BACKDROP_GRADIENTS};
+  background-attachment: fixed;
+  background-repeat: no-repeat;`
+}
 
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
 
@@ -125,6 +155,78 @@ body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-composer-card]::before
     inset 3px 2px 8px -5px rgba(255, 255, 255, 0.60),
     inset -2px 0 8px -6px rgba(120, 130, 150, 0.10),
     inset 0 -2px 8px -6px rgba(120, 130, 150, 0.08);
+}
+
+/* ===== 输入框区漏字补缝：地面原地重画 =====
+   座位透明（页面底光真实透出）后，座位里的空白区会漏出滚动的正文。这些区域本来就该是背景，
+   所以画一层与地面逐像素同源的「底色 + 打光」——看起来就是背景本身，不改任何官方材质 / 几何：
+   ① 输入框下沿：卡片底部圆角缺口 + 下方统计胶囊行（座位底部一条带）；
+   ② 停靠卡下方的 stack 缝与卡底圆角缺口：todo / goal / queue 各自补。 */
+
+/* ① 座位底部一条带：带顶落在输入框工具行背后，玻璃下沿不出现可辨分界，带内正文全部盖住。 */
+${P} [data-phase='active'] [data-composer-seat]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: ${SEAT_BAND_PX}px;
+  z-index: -1;
+  pointer-events: none;
+${groundRepaint()}
+}
+
+/* ② 停靠卡：卡根不建层叠上下文（不写 z-index）——补缝层用 z-index:-1 落到座位层叠上下文的
+   负层，才在卡面材质之下、滚动正文之上。todo 卡根自带 backdrop-filter（本身就是层叠上下文），
+   它的补缝只能画在卡面之上，用两个底部圆角遮罩只填缺口。
+   - goal / queue：卡根 ::after 从「卡底往上 20px」起，向上藏进卡面圆角、向下盖满 stack 缝。
+   - todo：卡根 ::before 用圆角遮罩只填两个底角；::after 盖它下方的 stack 缝。
+   - 卡根官方用 overflow:hidden 裁圆角材质，补缝层会被一起裁掉，故放开。 */
+${P} [data-phase='active'] [data-composer-seat] ${DOCK_CARDS} {
+  position: relative;
+  overflow: visible;
+}
+${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock], [data-goal-bar])::after {
+  content: '';
+  position: absolute;
+  top: calc(100% - 20px);
+  left: ${REPAINT_BLEED};
+  right: ${REPAINT_BLEED};
+  height: calc(${STACK_GAP} + 20px + 24px);
+  z-index: -1;
+  pointer-events: none;
+${groundRepaint()}
+}
+${P} [data-phase='active'] [data-composer-seat] [data-testid='todo-panel']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+${groundRepaint()}
+  -webkit-mask-image:
+    radial-gradient(circle 16px at 100% 0, transparent 15px, black 16px),
+    radial-gradient(circle 16px at 0 0, transparent 15px, black 16px);
+  -webkit-mask-size: 16px 16px, 16px 16px;
+  -webkit-mask-position: left bottom, right bottom;
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  mask-image:
+    radial-gradient(circle 16px at 100% 0, transparent 15px, black 16px),
+    radial-gradient(circle 16px at 0 0, transparent 15px, black 16px);
+  mask-size: 16px 16px, 16px 16px;
+  mask-position: left bottom, right bottom;
+  mask-repeat: no-repeat, no-repeat;
+}
+${P} [data-phase='active'] [data-composer-seat] [data-testid='todo-panel']::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: ${REPAINT_BLEED};
+  right: ${REPAINT_BLEED};
+  height: calc(${STACK_GAP} + 24px);
+  z-index: -1;
+  pointer-events: none;
+${groundRepaint()}
 }
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */

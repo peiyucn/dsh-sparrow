@@ -10,6 +10,7 @@ import {
   GLASS_BLUR,
   GLASS_FILL_ALPHA,
   HEADER_HEIGHT_PX,
+  SEAT_BAND_PX,
   buildGlassCss,
 } from '../lib/glass.js'
 
@@ -49,6 +50,27 @@ describe('glass: 三处液态玻璃', () => {
     assert.ok(!optics.includes('url(#'), '纯 CSS，不使用位移图 / 动态滤镜')
     assert.ok(!code.includes('[data-composer-card]::after'),
       '⛔ 不得占用 ::after：官方 cardWorkspaceTrigger::after 用它画「未选工作区」虚线框')
+  })
+
+  it('输入框区漏字补缝：座位底带 + 停靠卡缝隙 / 圆角缺口用「地面原地重画」盖住', () => {
+    const seatBand = new RegExp(`\\[data-composer-seat\\]::after \\{([^}]*)\\}`, 'u').exec(code)?.[1] ?? ''
+    assert.ok(seatBand.includes(`height: ${SEAT_BAND_PX}px`), '座位底带盖住卡片下沿圆角与统计胶囊行')
+    assert.ok(seatBand.includes('background-color: var(--dsw-alias-bg-base)'), '底带先铺底色')
+    assert.ok(seatBand.includes('background-image: radial-gradient('), '底带重画地面打光，不是黑块')
+    assert.ok(seatBand.includes('background-attachment: fixed'), 'fixed = 定位区视口，与地面层逐像素同源')
+    assert.ok(seatBand.includes('z-index: -1'), '补缝层在座位内、卡片材质之下')
+
+    assert.ok(code.includes("[data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]"), '三张停靠卡锚点')
+    assert.match(code, /:is\(\[data-queue-dock\], \[data-goal-bar\]\)::after \{[^}]*top: calc\(100% - 20px\)/u,
+      'queue / goal 底带向上藏进卡面圆角、向下盖满 stack 缝')
+    const todoNotch = /\[data-testid='todo-panel'\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(todoNotch.includes('radial-gradient(circle 16px'), 'todo 底角用遮罩只填缺口（卡根自身已建层叠上下文）')
+    assert.ok(todoNotch.includes('mask-position: left bottom, right bottom'), '两个底部圆角')
+    assert.match(code, /var\(--dsh-composer-stack-gap, 6px\)/u, '缝隙高度跟随官方堆栈间隙')
+    assert.ok(code.includes('overflow: visible'), '放开停靠卡根裁剪，补缝层才画得出来')
+    assert.equal((code.match(/background-attachment: fixed/gu) ?? []).length, 4,
+      '只有四处补缝层允许 fixed 背景（座位底带 / goal+queue 底带 / todo 底角 / todo 底带）')
+    assert.ok(!code.includes('[data-composer-card]::after'), '仍不占用官方卡片的 ::after')
   })
 
   it('顶栏：浮层化 + 内容上移 + 液态玻璃 + 自绘地面光', () => {
@@ -98,14 +120,14 @@ describe('glass: 三处液态玻璃', () => {
     assert.ok(blurValues.length > 0 && blurValues.every(value => value === expectedBlur), '模糊统一为 GLASS_BLUR')
   })
 
-  it('地面层仍是唯一常驻绘制层；座位官方实色底已在 backdrop 清掉', () => {
+  it('地面层仍是唯一常驻绘制层；座位官方实色底已在 backdrop 清掉，玻璃层只加补缝伪元素', () => {
     assert.ok(backdropCss.includes('position: fixed'))
     assert.ok(!backdropCss.includes('backdrop-filter'))
     assert.ok(!backdropCss.includes('mix-blend-mode'))
     assert.match(backdropCss, /\[data-width-handle\][^}]*\{[^}]*z-index: 82/u)
     assert.match(backdropCss, /\[data-side\]:not\(\[role='tooltip'\]\)[^}]*\{[^}]*z-index: 82/u)
     assert.match(backdropCss, /\[data-composer-seat\] \{[^}]*background: transparent/u, '座位不得保留官方黑底')
-    assert.ok(!code.includes('[data-composer-seat]'), '玻璃层不得覆盖座位')
+    assert.ok(!/\[data-composer-seat\] \{/u.test(code), '玻璃层不得改座位自身背景（只加伪元素补缝层）')
   })
 })
 

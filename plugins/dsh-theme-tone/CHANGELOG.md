@@ -8,6 +8,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 - The conversation header, composer and right sidebar top bar now share one translucent liquid-glass material; top-bar borders stay untouched.
 - The composer now uses a light neutral veil: it stays translucent but no longer picks up a blue cast.
 - The solid strip under the composer is removed, so the page ground light shows through instead.
+- Scrolled conversation no longer shows through below the composer, under its status capsule row, or between the to-do / goal / queued-message cards; the page ground light still shows.
 
 ## [0.2.1-rc.3] - 2026-10-24
 
