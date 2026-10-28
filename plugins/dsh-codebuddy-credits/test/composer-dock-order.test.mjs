@@ -81,4 +81,3 @@ describe('D：conversation.composer.dock 我方 entry 次序', () => {
     )
   })
 })
-
