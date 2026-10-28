@@ -7,10 +7,8 @@ import { PLAIN_ATTR } from '../lib/constants.js'
 import {
   COMPOSER_BLUR,
   COMPOSER_FILL_ALPHA,
-  COMPOSER_RIM_DARK,
-  COMPOSER_RIM_LIGHT,
-  COMPOSER_SHEEN_DARK,
-  COMPOSER_SHEEN_LIGHT,
+  COMPOSER_EDGE_DARK,
+  COMPOSER_EDGE_LIGHT,
   GLASS_BLUR,
   GLASS_FILL_ALPHA,
   HEADER_HEIGHT_PX,
@@ -52,15 +50,15 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色，跟随玻璃')
   })
 
-  it('输入框第 2 步边缘高光：全周 1px 内描边 + 上下柔光，随圆角连续', () => {
+  it('输入框第 2 步边缘光：四边中间亮、两端暗的 1px 过渡', () => {
     const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(glass.includes(`box-shadow: ${COMPOSER_RIM_DARK}`), '全周内描边（inset shadow 自动跟圆角）')
-    assert.ok(glass.includes(`background-image: ${COMPOSER_SHEEN_DARK}`), '上下柔光用线性渐变，四角不断光')
-    assert.ok(!glass.includes('radial-gradient'), '不得用径向渐变画边缘（会在角上断光）')
+    assert.ok(glass.includes(`background-image: ${COMPOSER_EDGE_DARK}`), '四条边都是中亮两端暗的线性渐变')
+    assert.ok(glass.includes('background-size: 100% 1px, 100% 1px, 1px 100%, 1px 100%'), '每条边 1px 厚')
+    assert.ok(glass.includes('background-position: 0 0, 0 100%, 0 0, 100% 0'), '上 / 下 / 左 / 右分别贴边')
+    assert.ok(!glass.includes('radial-gradient'), '不得用径向渐变（两端会断光）')
     assert.ok(!glass.includes('url(#'), '仍不做折射')
     const light = /body:not\(\[data-ds-dark-theme\]\)[^{]*\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(light.includes(`box-shadow: ${COMPOSER_RIM_LIGHT}`), '浅色轴有对应高光')
-    assert.ok(light.includes(`background-image: ${COMPOSER_SHEEN_LIGHT}`))
+    assert.ok(light.includes(`background-image: ${COMPOSER_EDGE_LIGHT}`), '浅色轴有对应过渡光')
   })
 
   it('顶栏：浮层化 + 内容上移 + 半透明填充 + 官方模糊 token + 自绘地面光', () => {
