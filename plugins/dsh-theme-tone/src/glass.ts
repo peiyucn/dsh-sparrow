@@ -10,6 +10,8 @@ export const HEADER_HEIGHT_PX = 76
 export const GLASS_FILL_ALPHA = 0.4
 /** 两处顶栏液态玻璃共用的模糊：冷调提亮，模拟 Liquid Glass 的 regular variant。 */
 export const GLASS_BLUR = 'blur(24px) saturate(170%) brightness(1.04)'
+/** 输入框单独用低饱和模糊：透明玻璃会直接透出主题底色，过饱和会把底色放大成明显的蓝。 */
+export const COMPOSER_BLUR = 'blur(24px) saturate(110%) brightness(1.04)'
 
 const P = `body:not([${PLAIN_ATTR}])`
 
@@ -34,7 +36,7 @@ function glassMaterial(fill: string, alpha: number): string {
 /** 输入框：纯透明 + 背景模糊 + 固定光源的边缘高光 + 悬浮投影（全部纯 CSS）。 */
 function composerMaterial(): string {
   return `  background-color: transparent;
-  backdrop-filter: ${GLASS_BLUR};
+  backdrop-filter: ${COMPOSER_BLUR};
   box-shadow:
     0 24px 50px -24px rgba(0, 0, 0, 0.55),
     0 8px 20px -12px rgba(0, 0, 0, 0.30),

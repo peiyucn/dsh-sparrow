@@ -5,6 +5,7 @@ import { describe, it } from 'node:test'
 import { buildBackdropCss } from '../lib/backdrop.js'
 import { PLAIN_ATTR } from '../lib/constants.js'
 import {
+  COMPOSER_BLUR,
   GLASS_BLUR,
   GLASS_FILL_ALPHA,
   HEADER_HEIGHT_PX,
@@ -20,7 +21,8 @@ describe('glass: 三处液态玻璃', () => {
     assert.ok(GLASS_FILL_ALPHA < 0.5, '顶栏 / 右栏通透')
     const blurPx = Number(/blur\((\d+)px\)/u.exec(GLASS_BLUR)?.[1] ?? 0)
     assert.ok(blurPx > 0 && blurPx < 40, '模糊低于官方 40px（降低模糊程度）')
-    assert.equal(code.split('backdrop-filter: ' + GLASS_BLUR + ';').length - 1, 3, '顶栏 + 右栏 + 输入框三处默认玻璃')
+    assert.equal(code.split('backdrop-filter: ' + GLASS_BLUR + ';').length - 1, 2, '顶栏 + 右栏共用 GLASS_BLUR')
+    assert.equal(code.split('backdrop-filter: ' + COMPOSER_BLUR + ';').length - 1, 1, '输入框单独用低饱和模糊')
     assert.equal((code.match(new RegExp(String(GLASS_FILL_ALPHA * 100) + '%', 'gu')) ?? []).length, 2, '顶栏 / 右栏共用填充常量')
     const header = new RegExp(`\\[data-slot='conversation\\.header'\\] > header::before \\{([^}]*)\\}`, 'u').exec(code)?.[1] ?? ''
     assert.ok(!header.includes('box-shadow'), '顶栏不新增边框 / inset')
@@ -35,7 +37,7 @@ describe('glass: 三处液态玻璃', () => {
     const optics = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(optics.includes('background-color: transparent'), '输入框纯透明，不染官方蓝色')
     assert.ok(!optics.includes('background-image:'), '不在整面加偏光 / 渐变')
-    assert.ok(optics.includes('backdrop-filter: ' + GLASS_BLUR), '背景模糊')
+    assert.ok(optics.includes('backdrop-filter: ' + COMPOSER_BLUR), '低饱和背景模糊')
     assert.ok(optics.includes('border-radius: inherit'), '跟官方圆角')
     assert.ok(optics.includes('0 24px 50px -24px'), '外层悬浮投影')
     assert.ok(optics.includes('inset 3px 2px 8px -5px'), '左上方向的边缘主光')
