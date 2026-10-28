@@ -44,14 +44,15 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     const seat = /\[data-composer-seat\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(seat.includes('background: none'), '底座撤掉官方遮罩，正文从玻璃下滚过')
     const card = /\[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(card.includes('background-color: transparent'), '卡片本体让出底色')
+    assert.ok(card.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%`),
+      '卡片本体承担玻璃底色（跟随官方圆角 / 动态高度，不是覆盖层）')
     assert.ok(card.includes('z-index: 0'), '卡片自成层叠上下文（否则 ::before 的 -1 会逃出卡片 = 淡色框）')
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色')
     assert.ok(!card.includes('backdrop-filter'), '卡片本体不得带模糊')
     const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(glass.includes('backdrop-filter: ' + GLASS_BLUR), '输入框保留完整玻璃模糊')
     assert.ok(glass.includes('border-radius: inherit'))
-    assert.ok(glass.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%`), '玻璃填充比例')
+    assert.ok(!glass.includes('background-color:'), '伪元素只负责模糊 / 边缘光，不铺底色')
     assert.ok(glass.includes('box-shadow: inset 0 1px 2px'), '上缘保留极淡基线')
     assert.ok(glass.includes('inset -1px 0 3px rgba(0, 0, 0'), '右缘暗边（有方向）')
     assert.ok(glass.includes('inset 0 -1px 2px rgba(255, 255, 255, 0.04)'), '下缘保留极淡基线，四边连成一圈')

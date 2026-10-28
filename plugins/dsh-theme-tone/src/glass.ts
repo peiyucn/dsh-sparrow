@@ -114,8 +114,9 @@ ${P} [data-phase='active'] [data-width-handle] {
 }
 
 /* ===== 输入框：完整玻璃模糊 + 座位透明 =====
-   座位撤掉官方 36px 实色渐隐，正文从玻璃下滚过；卡片本体透明、玻璃与边缘光在 ::before（伪元素没有
-   后代，不会成为官方弹层的 backdrop root）；卡片自成层叠上下文，::before 的 z-index:-1 才留得住。
+   座位撤掉官方 36px 实色渐隐，正文从玻璃下滚过；**卡片本体承担底色**（跟着官方圆角/高度走，
+   不会出现覆盖层的接缝），模糊与边缘光在 ::before（伪元素没有后代，不会成为官方弹层的
+   backdrop root）；卡片自成层叠上下文，::before 的 z-index:-1 才留得住。
    官方菜单材质完全保持原样。 */
 ${P} ${SEAT} {
   background: none !important;
@@ -123,7 +124,7 @@ ${P} ${SEAT} {
 ${P} ${SEAT} [data-composer-card] {
   position: relative;
   z-index: 0;
-  background-color: transparent;
+  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%, transparent);
   box-shadow: ${CARD_SHADOW_DARK};
   /* 「+」等 selector 型图标按钮：官方给的是不透明中性底，在玻璃卡片上会读成一块实心。 */
   --dsw-specific-selector: transparent;
@@ -138,7 +139,6 @@ ${P} ${SEAT} [data-composer-card]::before {
   z-index: -1;
   border-radius: inherit;
   pointer-events: none;
-  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%, transparent);
   background-image: ${TOP_GLOW_DARK}, ${BOTTOM_GLOW_DARK}, ${LEFT_GLOW_DARK}, ${RIGHT_GLOW_DARK};
   background-size: 100% 4px, 100% 4px, 4px 100%, 4px 100%;
   background-position: 0 0, 0 100%, 0 0, 100% 0;
