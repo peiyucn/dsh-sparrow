@@ -56,7 +56,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(glass.includes('inset -1px 0 3px rgba(0, 0, 0'), '右缘暗边（有方向）')
     assert.ok(glass.includes('inset 0 -1px 2px rgba(255, 255, 255, 0.05)'), '下缘保留极淡基线，四边连成一圈')
     assert.ok(!glass.includes('inset 0 -1px 2px rgba(0, 0, 0'), '下缘不再压暗')
-    assert.ok(glass.includes('background-image: radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.08) 55%, transparent 100%)'),
+    assert.ok(glass.includes('background-image: radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.05) 55%, transparent 100%)'),
       '底边是中间亮、两边弱的柔光，不是硬线')
     assert.ok(!glass.includes('background-image: linear-gradient(90deg'), '底边不得再画横向硬线')
     assert.ok(glass.includes('background-size: 100% 4px'), '柔光垂直 4px 衰减')

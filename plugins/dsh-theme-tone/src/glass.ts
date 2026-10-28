@@ -15,18 +15,18 @@ const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 /**
  * 玻璃边缘的固定高光：光是**有方向**的（光源在左上）——上缘最亮、左缘次之、右缘压暗。
  * 下缘也保留一条极淡的基线，让四边连成一圈、不在底角断掉；底边中央再叠一道
- * 中间亮、两边弱的反射光（见 BOTTOM_EDGE / BOTTOM_GLOW）。四边同亮会读成描边，不是玻璃。
+ * 中间亮、两边弱的反射光（见 BOTTOM_GLOW）。四边同亮会读成描边，不是玻璃。
  */
-const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.2), inset 1px 0 2px rgba(255, 255, 255, 0.1), inset -1px 0 3px rgba(0, 0, 0, 0.16), inset 0 -1px 2px rgba(255, 255, 255, 0.05)'
-const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.68), inset 1px 0 2px rgba(255, 255, 255, 0.38), inset -1px 0 3px rgba(0, 0, 0, 0.05), inset 0 -1px 2px rgba(255, 255, 255, 0.12)'
+const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.26), inset 1px 0 2px rgba(255, 255, 255, 0.12), inset -1px 0 3px rgba(0, 0, 0, 0.15), inset 0 -1px 2px rgba(255, 255, 255, 0.05)'
+const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.72), inset 1px 0 2px rgba(255, 255, 255, 0.4), inset -1px 0 3px rgba(0, 0, 0, 0.05), inset 0 -1px 2px rgba(255, 255, 255, 0.1)'
 
 /**
  * 底边光：不再画 1px 线。上缘的柔和来自「1px 偏移 + 2px 模糊」，底边改用同量级的
  * 4px 径向光：贴着底边、中心亮、两边弱，垂直方向均匀衰减，没有硬边。
- * 下缘的极淡基线留在 RIM 里，保证四边连成一圈。
+ * 峰值略低于上缘（主光在上），下缘的极淡基线留在 RIM 里，保证四边连成一圈。
  */
-const BOTTOM_GLOW_DARK = 'radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.08) 55%, transparent 100%)'
-const BOTTOM_GLOW_LIGHT = 'radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.16) 55%, transparent 100%)'
+const BOTTOM_GLOW_DARK = 'radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.05) 55%, transparent 100%)'
+const BOTTOM_GLOW_LIGHT = 'radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.1) 55%, transparent 100%)'
 
 /** 输入框卡片的悬浮阴影（投影方向朝下，读作离开页面）。 */
 const CARD_SHADOW_DARK = '0 12px 32px -12px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25)'
