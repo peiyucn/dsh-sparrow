@@ -172,7 +172,12 @@ describe('installArchiveClient 能力门（client half 不抛错）', () => {
       delete ctx[service][method]
       assert.doesNotThrow(() => { installArchiveClient(ctx, deps) })
       assert.equal(warnings.length, 1, `应只有一条停用告警，实际：${JSON.stringify(warnings)}`)
-      assert.match(warnings[0], new RegExp(`ctx\\.${service.replace('$', '\\$')}\\.${method.replace('$', '\\$')}`, 'u'))
+      // 用 includes 做子串断言：动态 RegExp 要手工转义（`$` 还会被 replace 只替首个，
+      // CodeQL js/incomplete-sanitization 因此报警）；能力名是固定字面量，不需要正则。
+      assert.ok(
+        warnings[0].includes(`ctx.${service}.${method}`),
+        `告警应点名 ctx.${service}.${method}，实际：${warnings[0]}`,
+      )
       assert.deepEqual(registrations, [], '缺能力时不得注册任何槽位')
       assert.equal(locales.length, 0)
       assert.equal(remoteHandlers.length, 0)
