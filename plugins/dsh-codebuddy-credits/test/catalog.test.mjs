@@ -366,8 +366,9 @@ describe('toWireMessages', () => {
         },
       ],
     })
-    assert.equal(messages.length, 1)
-    assert.deepEqual(messages[0], {
+    assert.equal(messages.length, 2, '首条是无 system 时的最小占位')
+    assert.equal(messages[0]?.role, 'system')
+    assert.deepEqual(messages[1], {
       role: 'assistant',
       content: '',
       tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'Bash', arguments: '{"cmd":"ls"}' } }],
@@ -387,7 +388,8 @@ describe('toWireMessages', () => {
         },
       ],
     })
-    assert.equal(messages.length, 1)
-    assert.deepEqual(messages[0], { role: 'tool', tool_call_id: 'call-1', content: 'ok' })
+    assert.equal(messages.length, 2, '首条是无 system 时的最小占位')
+    assert.equal(messages[0]?.role, 'system')
+    assert.deepEqual(messages[1], { role: 'tool', tool_call_id: 'call-1', content: 'ok' })
   })
 })

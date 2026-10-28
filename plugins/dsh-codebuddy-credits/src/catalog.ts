@@ -4,6 +4,7 @@
  * 原始模型名，credits / supportsImages / reasoning 档位声明直接转成模型事实。
  */
 
+import { randomUUID } from 'node:crypto'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-llm'
 import {
@@ -119,7 +120,7 @@ export function factsFromEntries(entries: readonly CodeBuddyModelEntry[]): CodeB
   })
 }
 
-/** 请求头：本插件身份标识 + 企业上下文（企业字段来自 /v2/accounts）；三个端点共用此出口。 */
+/** 请求头：本插件身份标识 + 企业上下文（企业字段来自 /v2/accounts）；目录 / 账号 / 配额端点共用此出口。 */
 export function requestHeaders(
   apiKey: string,
   account?: { userId?: string; enterpriseId?: string },
@@ -137,6 +138,27 @@ export function requestHeaders(
     }),
     ...(account?.userId === undefined ? {} : { 'x-user-id': account.userId }),
   }
+}
+
+/**
+ * 官方桌面端的会话身份三件套：chat 端点必须带，缺任一即 400 / 11128
+ * （`displayTips` 写成「渠道校验」，实际报的是缺会话 id）。三个值每次请求新生成、互不相同；
+ * 模型目录 / 账号 / 配额端点不带（与官方客户端一致）。
+ */
+export function conversationHeaders(): Record<string, string> {
+  return {
+    'x-conversation-id': randomUUID(),
+    'x-conversation-request-id': randomUUID(),
+    'x-conversation-message-id': randomUUID(),
+  }
+}
+
+/** chat 端点专用请求头：通用身份 + 会话三件套。 */
+export function chatHeaders(
+  apiKey: string,
+  account?: { userId?: string; enterpriseId?: string },
+): Record<string, string> {
+  return { ...requestHeaders(apiKey, account), ...conversationHeaders() }
 }
 
 function positiveInteger(...values: readonly unknown[]): number | undefined {

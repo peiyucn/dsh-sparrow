@@ -14,7 +14,7 @@ import type {
   PreparedAdapterCall,
   StreamChunk,
 } from '@deepseek-ai/dsh-llm'
-import { effortName, requestHeaders } from './catalog.js'
+import { chatHeaders, effortName } from './catalog.js'
 import type { CodeBuddyModelFacts } from './catalog.js'
 import { BASE_URL, DEFAULT_CONTEXT_WINDOW, DISPLAY_NAME } from './constants.js'
 import { effectiveReasoningEffort, streamFrames } from './adapter/stream.js'
@@ -170,7 +170,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
     const response = await fetch(BASE_URL + '/chat/completions', {
       method: 'POST',
       headers: {
-        ...requestHeaders(apiKey, account),
+        ...chatHeaders(apiKey, account),
         'content-type': 'application/json',
       },
       body: JSON.stringify(body),

@@ -59,6 +59,8 @@ export const CLI_UA_MARKER = 'CLI/unknown'
 export const CODEBUDDY_CLI_VERSION = '2.137.1'
 /** 请求 UA：`<本插件名> CLI/unknown CodeBuddy/<官方版本>`；不带本插件版本号，避免每次发版都要改这里。 */
 export const REQUEST_USER_AGENT = `${CLIENT_NAME.replace(/ /g, '')} ${CLI_UA_MARKER} CodeBuddy/${CODEBUDDY_CLI_VERSION}`
+/** 网关要求首条消息必须是 system；宿主确实没给 system 时用它兜底（极短，不改人格与行为）。 */
+export const FALLBACK_SYSTEM_PROMPT = 'You are a helpful assistant.'
 /** 产品部署类型标识，随请求发送。 */
 export const PRODUCT_HEADER = 'SaaS'
 

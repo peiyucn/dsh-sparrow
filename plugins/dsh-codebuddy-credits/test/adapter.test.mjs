@@ -31,6 +31,9 @@ describe('toWireTools', () => {
 })
 
 describe('toWireMessages', () => {
+  /** 首条 system 头由独立用例覆盖（网关要求），本组只断言消息体。 */
+  const body = (wire) => wire[0]?.role === 'system' ? wire.slice(1) : wire
+
   it('assistant 工具调用回放保留 name 与 arguments', async () => {
     const wire = await toWireMessages({
       provider: 'codebuddy-credits',
@@ -42,7 +45,7 @@ describe('toWireMessages', () => {
         content: [{ type: 'tool-call', id: 'call_1', name: 'read_file', arguments: '{"path":"a.txt"}' }],
       }],
     })
-    assert.deepEqual(wire, [{
+    assert.deepEqual(body(wire), [{
       role: 'assistant',
       content: '',
       tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'read_file', arguments: '{"path":"a.txt"}' } }],
@@ -67,7 +70,7 @@ describe('toWireMessages', () => {
       assert.equal(got.attachmentId, 'sha256:abc')
       return { mediaType: 'image/png', data: new Uint8Array([1, 2, 3, 4]) }
     })
-    assert.deepEqual(wire, [{
+    assert.deepEqual(body(wire), [{
       role: 'user',
       content: [
         { type: 'text', text: '看这张图' },
@@ -102,7 +105,7 @@ describe('toWireMessages', () => {
         { id: 'm2', role: 'user', source: { kind: 'plugin' }, content: [{ type: 'text', text: '<system-reminder>工作区规范</system-reminder>' }] },
       ],
     })
-    assert.deepEqual(wire, [{
+    assert.deepEqual(body(wire), [{
       role: 'user',
       content: [
         { type: 'text', text: '这是啥？' },
@@ -128,9 +131,9 @@ describe('toWireMessages', () => {
         { id: 'm2', role: 'user', source: { kind: 'skill-catalog' }, content: [{ type: 'text', text: '技能目录' }] },
       ],
     }, async () => ({ mediaType: 'image/png', data: new Uint8Array([1, 2, 3, 4]) }))
-    assert.equal(wire.length, 1)
-    assert.equal(wire[0].role, 'user')
-    assert.deepEqual(wire[0].content, [
+    assert.equal(body(wire).length, 1)
+    assert.equal(body(wire)[0].role, 'user')
+    assert.deepEqual(body(wire)[0].content, [
       { type: 'text', text: '这是啥？' },
       { type: 'image_url', image_url: { url: 'data:image/png;base64,AQIDBA==' } },
       { type: 'text', text: '技能目录' },
@@ -154,7 +157,7 @@ describe('toWireMessages', () => {
         { id: 'm3', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '继续' }] },
       ],
     })
-    assert.deepEqual(wire, [
+    assert.deepEqual(body(wire), [
       { role: 'user', content: '跑一下' },
       { role: 'tool', tool_call_id: 'call_1', content: '结果' },
       { role: 'user', content: '继续' },
@@ -187,7 +190,7 @@ describe('toWireMessages', () => {
         { id: 'm3', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '第二问' }] },
       ],
     })
-    assert.deepEqual(wire, [
+    assert.deepEqual(body(wire), [
       { role: 'user', content: '第一问' },
       { role: 'assistant', content: '第一答', tool_calls: undefined },
       { role: 'user', content: '第二问' },

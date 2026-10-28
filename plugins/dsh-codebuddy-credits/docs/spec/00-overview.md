@@ -151,18 +151,26 @@ host 投影 / 事件重放、Max 模式以设置节为真值。`test/structure.t
 2. **模型目录**：事实只存内存（`facts`），不落设置节。宿主建目录（适配器 `listModels` 被调用）触发节流后台刷新；
    手动 `/refresh-models` 绕过冷却、共用上游单飞；事实有变化才 `registration.replace([PROVIDER_ID])`
    （同一 route 集重提交 = 一次 `llm/adapters-updated`，不触碰其他 provider）。
-3. **推理**：适配器把 DSH 消息转 wire（连续 user 合并、图片走附件 seam、system/assistant 做指纹清洗），
+3. **推理**：适配器把 DSH 消息转 wire（连续 user 合并、图片走附件 seam、system/assistant 做指纹中和），
    SSE 逐帧解析；`finish` 块的 `replayState.response.usage` 写入原始 usage（含 `credit`），供积分重放。
 4. **积分**：live 读 `sessionProjections.stateOf(session, 'codebuddyCredits')`；冷会话走
    `sessionController.inspect` + `foldSessionCredits`；两条路径统一归约为 `CreditsView`。
 
-## 上游内容指纹（11128）
+## 上游渠道校验（11128）
 
-上游对 **system / assistant 正文**做内容指纹拦截（HTTP 400 / `code:11128`），命中就删掉指纹句、其余逐字保留；
-`user` / `tool` / `tool_calls` 参数 / `reasoning` 一律不动（实测放行，改了即篡改用户内容与会话证据）。
-只改要发给上游的 wire 文本，本机会话历史原样保留；身份如实自报口径不变。指纹表与定位方法见
-`src/fingerprints.ts` 顶部注释与 `test/fingerprints.test.mjs`。上游黑名单会继续扩张，补指纹后必须用真实
-system / assistant 文本实测一次推理。
+同一个业务码有两类触发，现在是两层独立处理：
+
+1. **会话身份（结构层）**：chat 端点必须带官方桌面端的 `X-Conversation-ID` /
+   `X-Conversation-Request-ID` / `X-Conversation-Message-ID` 三件套（每次请求新生成、互不相同），
+   且首条消息必须是 `system`；模型目录 / 账号 / 配额端点不带三件套。缺头或 user 打头都会被判
+   「渠道校验失败」。实现见 `catalog.ts` 的 `chatHeaders()` 与 `adapter/wire.ts` 的 system 头兜底。
+2. **内容指纹（正文层）**：上游对 system / assistant 正文做身份句匹配。处理方式从「逐句删除」改为
+   **无损中和**——在命中词内插入零宽空格（U+200B），可见文案与语义不变、围栏/行内代码原样保留；
+   `user` / `tool` 请求参数 / `reasoning` 一律不动。实现见 `src/fingerprints.ts`，测试见
+   `test/fingerprints.test.mjs`。
+
+只改要发给上游的 wire 文本，本机会话历史原样保留；UA / `X-IDE-Name` 仍如实自报，不伪装官方客户端。
+若上游改为语义检测，正文层会再次失效（表现仍是 400 / 11128），需重新评估。
 
 ## 能力门 / 注册冲突
 
@@ -196,8 +204,8 @@ system / assistant 文本实测一次推理。
   `test/web-route.test.mjs` 用「受信 LAN 放行 / 未受信 LAN 403」钉住。
 - **模型行接管 single 槽**：`conversation.input.model.label` 只有一个贡献者，本插件注册 `priority: -1`
   稳定拿渲染权；因此必须持续镜像官方 `1017` 标（官方新增/改名时需跟版）。
-- **指纹清洗会删改 system / assistant 正文**：这是为绕开上游未公开内容风控的主动取舍（owner 已知悉）；
-  若上游改为语义检测，本处理即失效（表现仍是 400 / 11128）。
+- **正文指纹中和会插入零宽字符**（命中词内，可见文案不变）：这是为绕开上游未公开内容风控的主动取舍
+  （owner 已知悉）；若上游改为语义检测，正文层即失效（表现仍是 400 / 11128）。
 - **图片只认最后一条 user 消息**：DSH 把运行上下文 / 技能目录追加在真实用户消息之后，故适配器合并连续
   user 消息；多轮对话里更早轮次的图片上游仍会丢弃（无法在插件侧消除）。
 - **手动刷新绕过 60s 冷却但复用上游单飞**：`loadFactsOnce` / `sameFacts` 是 `apply` 内闭包，路由测试只 mock
@@ -207,5 +215,5 @@ system / assistant 文本实测一次推理。
 
 - 插件目录 `npm run verify`：typecheck → build（tsc + client bundle）→ test → pack。
 - 测试覆盖：契约常量单一来源、能力门 / DUPLICATE 文案、client 惰性门接线、样式统一注入与
-  「组件内不得自建 style」、LAN 信任栅栏、指纹清洗、积分重放 / 投影、路由与请求体字节限流。
+  「组件内不得自建 style」、LAN 信任栅栏、正文指纹中和、积分重放 / 投影、路由与请求体字节限流。
 - 真机验收：保存 / 清空 Key、模型选择器分组与 `1017` 标、额度面板、会话 / 每轮积分胶囊与弹层。

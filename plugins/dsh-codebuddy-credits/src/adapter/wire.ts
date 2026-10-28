@@ -10,7 +10,8 @@
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, GenerateOptions, Message, ToolCallBlock, ToolSchema } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import { stripChannelFingerprints } from '../fingerprints.js'
+import { FALLBACK_SYSTEM_PROMPT } from '../constants.js'
+import { neutralizeChannelFingerprints } from '../fingerprints.js'
 
 /** 图片字节读取回调（附件 seam）：返回媒体类型与原始字节，供 data URL 序列化。 */
 export type CodeBuddyReadImage = (
@@ -59,14 +60,25 @@ export async function toWireMessages(
   readImage?: CodeBuddyReadImage,
 ): Promise<WireMessage[]> {
   const messages: WireMessage[] = []
-  if (options.system !== undefined && options.system.length > 0) {
-    // 上游内容指纹（11128）：system 正文里的指纹行在上线前删掉，其余逐字保留。
-    const system = stripChannelFingerprints(options.system)
-    if (system.length > 0) messages.push({ role: 'system', content: system })
+  const source = options.messages as Message[]
+  // 网关要求会话以 system 开头（空 system 会被判成 first message is not system prompt）。
+  // 宿主把 system 放在 options.system；万一没有、而 messages 首条就是 system，就把它救回来；
+  // 两者都没有才用最小占位。正文只做无损中和。
+  let start = 0
+  let systemText = options.system ?? ''
+  if (systemText.trim().length === 0 && source[0]?.role === 'system') {
+    systemText = textOf(source[0].content)
+    start = 1
   }
-  for (const message of options.messages as Message[]) {
+  const system = neutralizeChannelFingerprints(systemText)
+  messages.push({
+    role: 'system',
+    content: system.trim().length === 0 ? FALLBACK_SYSTEM_PROMPT : system,
+  })
+  for (let index = start; index < source.length; index += 1) {
+    const message = source[index] as Message
     if (message.role === 'system') {
-      messages.push({ role: 'system', content: stripChannelFingerprints(textOf(message.content)) })
+      messages.push({ role: 'system', content: neutralizeChannelFingerprints(textOf(message.content)) })
       continue
     }
     // 工具结果 → wire 的 tool 角色，用 `message.toolCallId` 作 tool_call_id。
@@ -139,8 +151,8 @@ export async function toWireMessages(
       }
     }
     // 历史里的 assistant 正文若复述过指纹句，同样会被上游整轮拦截（跟会话走，不跟模型走），
-    // 故这里也删；tool_calls 的 arguments 不动（实测放行，且改了会篡改调用记录）。
-    if (text.length > 0) assistant.content = stripChannelFingerprints(text)
+    // 故这里也做无损中和（代码块保持原样）；tool_calls 的 arguments 不动。
+    if (text.length > 0) assistant.content = neutralizeChannelFingerprints(text)
     if ((assistant.tool_calls?.length ?? 0) === 0) assistant.tool_calls = undefined
     else if (assistant.content === null) assistant.content = ''
     messages.push(assistant)

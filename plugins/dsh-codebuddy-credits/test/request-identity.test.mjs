@@ -12,7 +12,7 @@ import {
   CODEBUDDY_CLI_VERSION,
   REQUEST_USER_AGENT,
 } from '../lib/constants.js'
-import { requestHeaders } from '../lib/catalog.js'
+import { chatHeaders, conversationHeaders, requestHeaders } from '../lib/catalog.js'
 
 test('UA 含 CLI/ 记号（否则 /v3/config 静默不返回模型列表）', () => {
   assert.ok(
@@ -64,4 +64,40 @@ test('三个端点共用同一出口：企业上下文头按账号有无裁剪',
   assert.equal(full['x-tenant-id'], 'e1')
   assert.equal(full['x-user-id'], 'u1')
   assert.equal(full['user-agent'], REQUEST_USER_AGENT)
+})
+
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+
+test('chat 端点带官方会话三件套：三个合法 UUID 且互不相同', () => {
+  const headers = chatHeaders('dummy-key')
+  const ids = [
+    headers['x-conversation-id'],
+    headers['x-conversation-request-id'],
+    headers['x-conversation-message-id'],
+  ]
+  for (const id of ids) assert.match(String(id), UUID_V4)
+  assert.equal(new Set(ids).size, 3, '三个值必须互不相同')
+})
+
+test('会话三件套每次请求新生成，不是模块级常量', () => {
+  const first = conversationHeaders()
+  const second = conversationHeaders()
+  assert.notEqual(first['x-conversation-id'], second['x-conversation-id'])
+  assert.notEqual(first['x-conversation-request-id'], second['x-conversation-request-id'])
+  assert.notEqual(first['x-conversation-message-id'], second['x-conversation-message-id'])
+})
+
+test('目录 / 账号 / 配额端点不带会话三件套（与官方客户端一致）', () => {
+  const headers = requestHeaders('dummy-key')
+  assert.equal(headers['x-conversation-id'], undefined)
+  assert.equal(headers['x-conversation-request-id'], undefined)
+  assert.equal(headers['x-conversation-message-id'], undefined)
+})
+
+test('chat 头保留通用身份与企业上下文', () => {
+  const headers = chatHeaders('dummy-key', { userId: 'u1', enterpriseId: 'e1' })
+  assert.equal(headers['x-api-key'], 'dummy-key')
+  assert.equal(headers['x-ide-name'], CLIENT_NAME)
+  assert.equal(headers['x-enterprise-id'], 'e1')
+  assert.equal(headers['x-user-id'], 'u1')
 })
