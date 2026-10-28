@@ -24,9 +24,9 @@ export const COMPOSER_RIM_DARK = 'inset 0 1px 0 rgba(255, 255, 255, 0.10), inset
 export const COMPOSER_RIM_LIGHT = 'inset 0 1px 0 rgba(255, 255, 255, 0.36), inset 1px 0 0 rgba(255, 255, 255, 0.13), inset -1px 0 0 rgba(255, 255, 255, 0.13), inset 0 -1px 0 rgba(0, 0, 0, 0.04)'
 export const COMPOSER_SHEEN_DARK = 'linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.012) 6%, transparent 16%, transparent 84%, rgba(255, 255, 255, 0.025) 94%, rgba(255, 255, 255, 0.03) 100%)'
 export const COMPOSER_SHEEN_LIGHT = 'linear-gradient(180deg, rgba(255, 255, 255, 0.19) 0%, transparent 18%, transparent 82%, rgba(255, 255, 255, 0.09) 100%)'
-/** 相邻停靠面板之间的 1px 分割线（inset shadow，不占布局、不改变面板高度）。 */
-export const DOCK_DIVIDER_DARK = 'inset 0 1px 0 rgba(255, 255, 255, 0.08)'
-export const DOCK_DIVIDER_LIGHT = 'inset 0 1px 0 rgba(0, 0, 0, 0.07)'
+/** 相邻停靠面板之间的 1px 分割线颜色（用 border-top：材质在 ::before 上，inset 阴影会被盖住）。 */
+export const DOCK_DIVIDER_DARK = 'rgba(255, 255, 255, 0.08)'
+export const DOCK_DIVIDER_LIGHT = 'rgba(0, 0, 0, 0.07)'
 
 /** 与地面层同源的光：显式视口尺寸 + 定位，禁止 `background-attachment: fixed`。 */
 function viewportLight(position: string, size = '100vw 100vh'): string {
@@ -141,7 +141,8 @@ ${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
 
 /* ===== 停靠区（todo / goal / queue）统一规格 =====
    三者用同一套：不透明浮层底、默认上圆下直、负边距刚好抵消 stack 缝；
-   叠多个时非最上面的面板顶角切直角，并在顶部画 1px 分割线（inset，不占布局）。
+   叠多个时非最上面的面板顶角切直角，并在顶部画 1px 分割线（border-top，材质在 ::before
+   上，inset 阴影会被盖住；1px 边框不改变可视对齐）。
    只保留各自的图标 / 标题专属色。 */
 ${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock] > *, [data-goal-bar] > div, [data-testid='todo-panel']) {
   border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
@@ -151,14 +152,18 @@ ${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock] > *, [data
 ${P} [data-phase='active'] [data-composer-seat] :is([data-goal-bar], [data-queue-dock]):not(:first-child) > *,
 ${P} [data-phase='active'] [data-composer-seat] [data-testid='todo-panel']:not(:first-child) {
   border-radius: 0;
-  box-shadow: ${DOCK_DIVIDER_DARK};
+  border-top: 1px solid ${DOCK_DIVIDER_DARK};
 }
 ${P} [data-phase='active'] [data-composer-seat] :is([data-testid='todo-panel'], [data-goal-bar], [data-queue-dock]) {
   margin-bottom: calc(0px - var(--dsh-composer-stack-gap));
 }
 body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-phase='active'] [data-composer-seat] :is([data-goal-bar], [data-queue-dock]):not(:first-child) > *,
 body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-phase='active'] [data-composer-seat] [data-testid='todo-panel']:not(:first-child) {
-  box-shadow: ${DOCK_DIVIDER_LIGHT};
+  border-top-color: ${DOCK_DIVIDER_LIGHT};
+}
+/* queue 官方在 panel::after 上画 0.5px 描边；停靠区统一后去掉，避免消息列表看起来有边框。 */
+${P} [data-phase='active'] [data-queue-dock] > *::after {
+  border: 0;
 }
 /* 不透明材质：todo 根节点 / queue 的 panel::before / goal 的 bar::before。 */
 ${P} [data-phase='active'] [data-testid='todo-panel'] {

@@ -64,8 +64,9 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok(margins.includes('margin-bottom: calc(0px - var(--dsh-composer-stack-gap))'), '三者统一：刚好抵消 stack 缝，不重叠')
     const nonFirst = /:is\(\[data-goal-bar\], \[data-queue-dock\]\):not\(:first-child\) > \*,\n[^{]*\[data-testid='todo-panel'\]:not\(:first-child\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(nonFirst.includes('border-radius: 0'), '非最上层顶角切直角')
-    assert.ok(nonFirst.includes(`box-shadow: ${DOCK_DIVIDER_DARK}`), '叠在一起时中间有 1px 分割线')
-    assert.ok(code.includes(`box-shadow: ${DOCK_DIVIDER_LIGHT}`), '浅色轴有对应分割线')
+    assert.ok(nonFirst.includes(`border-top: 1px solid ${DOCK_DIVIDER_DARK}`), '叠在一起时中间有 1px 分割线')
+    assert.ok(code.includes(`border-top-color: ${DOCK_DIVIDER_LIGHT}`), '浅色轴有对应分割线')
+    assert.ok(/\[data-queue-dock\] > \*::after \{\n  border: 0;\n\}/u.test(code), '去掉 queue 消息列表的官方描边')
     const todoIcon = /\[data-testid='todo-panel'\] > div > button > span:first-child,\n[^{]*span:nth-child\(2\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(todoIcon.includes('color: var(--dsw-alias-state-success-primary)'), 'todo 图标与标题用绿色')
     const goalIcon = /\[data-goal-bar\] > div > span:first-child,\n[^{]*span:nth-child\(2\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
