@@ -21,7 +21,7 @@
    `feDisplacementMap scale="255"` 把 128±dx 编码还原成像素位移；位移图方向朝卡片中心，
    四条边因此各自向外放大（上 / 下 / 左 / 右四个方向），中心不动、且不依赖卡外内容。隐藏 SVG 的
    width/height 必须跟随卡片尺寸（feImage 的 100% 按 SVG 视口解析；留 0×0 会退化成黑图）。
-   尺寸 / 圆角变化由 ResizeObserver 重建。
+   尺寸 / 圆角变化做 160ms 防抖，停稳后只换 feImage 与 SVG 视口，不重建滤镜图（避免换行瞬间效果闪没）。
    CSS 用 `backdrop-filter: … url(#dsh-theme-tone-lens)` 引用；滤镜未注入
    （`body` 无 `data-dsh-theme-tone-lens`）或浏览器不支持时，保留纯 blur 声明回退。
    卡片带**悬浮投影**（朝下的柔和阴影，深 / 浅两套；不位移、不加 transform —— 位移会破坏与地面光、
@@ -77,7 +77,7 @@
 
 **没有**：MutationObserver / 常驻 rAF 循环 / `getComputedStyle` 探测 / 锚点扫描 / 相位变量。
 唯一例外是输入框 bezel 透镜的位移图：安装后一次性 rAF 轮询找卡（≤120 帧），找到后用一个
-ResizeObserver 在卡片尺寸 / 圆角变化时重建位移图，卸载时 disconnect；其余时间只被动等尺寸变化。
+ResizeObserver 在卡片尺寸 / 圆角变化时防抖重建位移图（只换 feImage），卸载时 disconnect；其余时间被动等尺寸变化。
 
 ## 硬约束（守卫里钉住）
 

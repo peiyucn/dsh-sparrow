@@ -28,13 +28,6 @@ export const TOP_STOP_VARIABLE = '--dsh-theme-tone-top-stop'
 
 /** 输入框 bezel 透镜：body 标记 + 滤镜 / 位移图 id。 */
 export const LENS_ATTR = 'data-dsh-theme-tone-lens'
-/**
- * 尺寸变化时在两种等价 filter 值之间切换的属性值：Chromium 会复用旧尺寸的 backdrop
- * 快照，输入框变高后残留一条旧高度的带；切换计算值强制重新采集。
- */
-export const LENS_REPAINT_VALUE = 'repaint'
-/** 尺寸变化时让 ::before 的 backdrop-filter 停一帧的属性：强制丢掉旧尺寸的 backdrop 快照。 */
-export const LENS_REPAINT_ATTR = 'data-dsh-theme-tone-repaint'
 export const LENS_FILTER_ID = 'dsh-theme-tone-lens'
 export const LENS_IMAGE_ID = 'dsh-theme-tone-lens-map'
 /** 斜面宽度（px）。 */

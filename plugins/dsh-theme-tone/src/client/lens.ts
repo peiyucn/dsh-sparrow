@@ -8,8 +8,9 @@
  * - 位移图按「朝卡片中心」取样（scale 为正）：四条边各自把卡内内容向外放大，
  *   上 / 下 / 左 / 右是四个独立方向；中心不动，也不依赖卡外内容。
  *
- * 卡片可能晚于插件挂载出现：rAF 轮询有上限，找到后挂 ResizeObserver，尺寸 / 圆角
- * 变化经 rAF 合并重建。不支持 `backdrop-filter: url()` 或找不到卡片时静默走纯 blur。
+ * 输入框高度随换行变化：ResizeObserver 只做防抖，等高度停稳后再换位移图，且**只改 feImage
+ * 的 href 与 SVG 视口，不重建滤镜图** —— 重建会让 backdrop-filter 短暂失效（换行瞬间闪没）。
+ * 不支持 `backdrop-filter: url()` 或找不到卡片时静默走纯 blur。
  */
 
 import { cssSupports } from '../compat.js'
@@ -20,8 +21,6 @@ import {
   LENS_FILTER_ID,
   LENS_IMAGE_ID,
   LENS_MAP_SCALE,
-  LENS_REPAINT_ATTR,
-  LENS_REPAINT_VALUE,
 } from '../constants.js'
 import { buildLensMap } from './lens-map.js'
 
@@ -29,6 +28,8 @@ const SVG_NS = 'http://www.w3.org/2000/svg'
 const CARD_SELECTOR = '[data-composer-card]'
 /** 卡片未渲染时的 rAF 轮询上限（≈2s @60fps），到顶即安静降级。 */
 export const LENS_ATTACH_MAX_FRAMES = 120
+/** 输入框高度变化的防抖：连续换行停稳后再重建，避免每行都重画一遍。 */
+export const LENS_RESIZE_SETTLE_MS = 160
 /** 探测引擎是否支持 `backdrop-filter` 引用 SVG 滤镜。 */
 const SUPPORT_PROBE = `backdrop-filter: blur(1px) url(#${LENS_FILTER_ID})`
 /** 读不到计算圆角时的缺省值（只影响位移图，不改布局）。 */
@@ -80,26 +81,15 @@ export function attachLensFilter(): LensController | null {
 
   let disposed = false
   let frame = 0
+  let settleTimer = 0
   let pollFrames = 0
   let observer: ResizeObserver | null = null
-  let repaintFrame = 0
   let svg: SVGSVGElement | null = null
+  let image: SVGImageElement | null = null
   let card: Element | null = null
   let lastKey = ''
 
-  /** 让 ::before 的 backdrop-filter 停两帧再挂回，销毁 Chromium 旧尺寸的 backdrop 图层。 */
-  const forceBackdropRepaint = (): void => {
-    body.setAttribute(LENS_REPAINT_ATTR, '')
-    if (repaintFrame !== 0) cancelAnimationFrame(repaintFrame)
-    repaintFrame = requestAnimationFrame(() => {
-      repaintFrame = requestAnimationFrame(() => {
-        repaintFrame = 0
-        if (!disposed) body.removeAttribute(LENS_REPAINT_ATTR)
-      })
-    })
-  }
-
-  /** 按当前几何重建位移图；尺寸 / 圆角没变就跳过（ResizeObserver 常走这条）。 */
+  /** 按当前几何重建位移图；尺寸 / 圆角没变就跳过（防抖后常走这条）。 */
   const paint = (): void => {
     if (disposed || card === null) return
     const box = card.getBoundingClientRect()
@@ -131,26 +121,31 @@ export function attachLensFilter(): LensController | null {
     }
     if (svg === null) {
       svg = mountSvg(body, href, width, height)
-    } else {
-      // 重建滤镜图而非只改 feImage href：Chromium 对 backdrop-filter 里动态换图不一定重绘。
-      svg.innerHTML = buildLensFilterMarkup(href)
+      image = svg.querySelector<SVGImageElement>(`#${LENS_IMAGE_ID}`)
+      if (image === null) {
+        svg.remove()
+        svg = null
+        return
+      }
+    } else if (image !== null) {
+      // 只换位移图与 SVG 视口，不重建滤镜图：重建会让 backdrop-filter 短暂失效（换行闪没）。
+      image.setAttribute('href', href)
       svg.setAttribute('width', String(width))
       svg.setAttribute('height', String(height))
     }
     // 位移图就绪后才启用 CSS 增强声明；之前 / 失败时只走纯 blur。
-    // 每次尺寸变化切换计算值，并短暂停掉 backdrop-filter，强制重新采集（见 glass.ts）。
-    body.setAttribute(LENS_ATTR, body.getAttribute(LENS_ATTR) === LENS_REPAINT_VALUE ? '' : LENS_REPAINT_VALUE)
-    forceBackdropRepaint()
+    body.setAttribute(LENS_ATTR, '')
     lastKey = key
   }
 
-  /** rAF 合并：一轮 ResizeObserver 风暴只重建一次。 */
+  /** 尺寸变化防抖：连续换行 / 拖拽窗口时只在停稳后重建一次。 */
   const schedule = (): void => {
-    if (disposed || frame !== 0) return
-    frame = requestAnimationFrame(() => {
-      frame = 0
+    if (disposed) return
+    if (settleTimer !== 0) clearTimeout(settleTimer)
+    settleTimer = window.setTimeout(() => {
+      settleTimer = 0
       paint()
-    })
+    }, LENS_RESIZE_SETTLE_MS)
   }
 
   const watch = (found: Element): void => {
@@ -184,16 +179,16 @@ export function attachLensFilter(): LensController | null {
       cancelAnimationFrame(frame)
       frame = 0
     }
-    if (repaintFrame !== 0) {
-      cancelAnimationFrame(repaintFrame)
-      repaintFrame = 0
+    if (settleTimer !== 0) {
+      clearTimeout(settleTimer)
+      settleTimer = 0
     }
     observer?.disconnect()
     observer = null
     card = null
+    image = null
     svg?.remove()
     svg = null
-    body.removeAttribute(LENS_REPAINT_ATTR)
     body.removeAttribute(LENS_ATTR)
   }
 
