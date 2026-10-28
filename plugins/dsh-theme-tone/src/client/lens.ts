@@ -20,6 +20,7 @@ import {
   LENS_FILTER_ID,
   LENS_IMAGE_ID,
   LENS_MAP_SCALE,
+  LENS_REPAINT_ATTR,
   LENS_REPAINT_VALUE,
 } from '../constants.js'
 import { buildLensMap } from './lens-map.js'
@@ -81,9 +82,22 @@ export function attachLensFilter(): LensController | null {
   let frame = 0
   let pollFrames = 0
   let observer: ResizeObserver | null = null
+  let repaintFrame = 0
   let svg: SVGSVGElement | null = null
   let card: Element | null = null
   let lastKey = ''
+
+  /** 让 ::before 的 backdrop-filter 停两帧再挂回，销毁 Chromium 旧尺寸的 backdrop 图层。 */
+  const forceBackdropRepaint = (): void => {
+    body.setAttribute(LENS_REPAINT_ATTR, '')
+    if (repaintFrame !== 0) cancelAnimationFrame(repaintFrame)
+    repaintFrame = requestAnimationFrame(() => {
+      repaintFrame = requestAnimationFrame(() => {
+        repaintFrame = 0
+        if (!disposed) body.removeAttribute(LENS_REPAINT_ATTR)
+      })
+    })
+  }
 
   /** 按当前几何重建位移图；尺寸 / 圆角没变就跳过（ResizeObserver 常走这条）。 */
   const paint = (): void => {
@@ -124,8 +138,9 @@ export function attachLensFilter(): LensController | null {
       svg.setAttribute('height', String(height))
     }
     // 位移图就绪后才启用 CSS 增强声明；之前 / 失败时只走纯 blur。
-    // 每次尺寸变化切换计算值，强制 Chromium 重新采集 backdrop（见 glass.ts 的 REPAINT 规则）。
+    // 每次尺寸变化切换计算值，并短暂停掉 backdrop-filter，强制重新采集（见 glass.ts）。
     body.setAttribute(LENS_ATTR, body.getAttribute(LENS_ATTR) === LENS_REPAINT_VALUE ? '' : LENS_REPAINT_VALUE)
+    forceBackdropRepaint()
     lastKey = key
   }
 
@@ -169,11 +184,16 @@ export function attachLensFilter(): LensController | null {
       cancelAnimationFrame(frame)
       frame = 0
     }
+    if (repaintFrame !== 0) {
+      cancelAnimationFrame(repaintFrame)
+      repaintFrame = 0
+    }
     observer?.disconnect()
     observer = null
     card = null
     svg?.remove()
     svg = null
+    body.removeAttribute(LENS_REPAINT_ATTR)
     body.removeAttribute(LENS_ATTR)
   }
 

@@ -51,6 +51,7 @@ describe('dsh-theme-tone 结构', () => {
     assert.match(lens, /svg\.setAttribute\('width'/u, '隐藏 SVG 视口必须跟随卡片尺寸（否则 feImage 百分比解析成黑图）')
     assert.match(lens, /svg\?\.remove\(\)/u, '卸载时必须移除滤镜 SVG')
     assert.match(lens, /removeAttribute\(LENS_ATTR\)/u, '卸载时必须摘掉 body 标记')
+    assert.match(lens, /removeAttribute\(LENS_REPAINT_ATTR\)/u, '卸载时必须摘掉重采集标记')
     assert.match(lens, /LENS_ATTACH_MAX_FRAMES = 120/u, '卡片轮询有上限（找不到就安静降级）')
     assert.match(lens, /cssSupports\(SUPPORT_PROBE\)/u, '浏览器不支持 backdrop-filter url() 时不注入增强')
   })

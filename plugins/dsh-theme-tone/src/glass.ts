@@ -1,4 +1,4 @@
-import { ABOVE_CONTENT_Z_INDEX, LENS_ATTR, LENS_FILTER_ID, LENS_REPAINT_VALUE, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
+import { ABOVE_CONTENT_Z_INDEX, LENS_ATTR, LENS_FILTER_ID, LENS_REPAINT_ATTR, LENS_REPAINT_VALUE, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
 import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
@@ -158,6 +158,11 @@ ${P}[${LENS_ATTR}] ${SEAT} [data-composer-card]::before {
    不切的话新高度会残留一条旧高度的带。brightness(1) 是视觉 no-op，只用于改变计算值。 */
 ${P}[${LENS_ATTR}="${LENS_REPAINT_VALUE}"] ${SEAT} [data-composer-card]::before {
   backdrop-filter: ${GLASS_BLUR} url(#${LENS_FILTER_ID}) brightness(1);
+}
+/* 尺寸变化的下一帧短暂停掉 backdrop-filter（见 lens.ts 的双 rAF 恢复），
+   让 Chromium 丢掉旧尺寸的 backdrop 图层，新高度重新采集。 */
+${P}[${LENS_REPAINT_ATTR}] ${SEAT} [data-composer-card]::before {
+  backdrop-filter: none;
 }
 /* 停靠卡补缝：卡与卡/输入框之间的 stack 缝、以及卡片上下圆角后面会透出正文，
    用「底色 + 打光」重绘盖住；只覆盖所需尺寸，不动官方几何。 */
