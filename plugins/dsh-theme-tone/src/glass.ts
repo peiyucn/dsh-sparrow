@@ -11,6 +11,10 @@ export const GLASS_BLUR = 'blur(20px) saturate(150%)'
 export const PANEL_BAND_PX = 38
 const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 
+/** 输入框玻璃（第 1 步：材质）：半透明底 + 背景模糊，先保证可读、变高不闪。 */
+export const COMPOSER_FILL_ALPHA = 0.55
+export const COMPOSER_BLUR = 'blur(12px) saturate(140%)'
+
 /** 与地面层同源的光：显式视口尺寸 + 定位，禁止 `background-attachment: fixed`。 */
 function viewportLight(position: string, size = '100vw 100vh'): string {
   return `  background-image: ${BACKDROP_GRADIENTS};
@@ -28,6 +32,7 @@ const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
 
 const P = `body:not([${PLAIN_ATTR}])`
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
+const SEAT = `:is([data-phase='active'], [data-phase='hero']) [data-composer-seat]`
 
 /** 右栏 76px 下有「可流式滚动的正文」的标签：只有它们上提滚区，正文才会真的从两条带下滚过。 */
 const LIFTED_SCROLLS = [
@@ -76,7 +81,26 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框：保持官方原样（此版先不定制，作为重做 Apple 液态玻璃的干净基线） ===== */
+/* ===== 输入框玻璃 · 第 1 步：材质 =====
+   只做「半透明底 + 背景模糊」，不画边缘光、不做折射；底色放在官方卡片本体上，
+   圆角与动态高度都跟官方盒子走，::before 只负责 backdrop-filter。 */
+${P} ${SEAT} {
+  background: none !important;
+}
+${P} ${SEAT} [data-composer-card] {
+  position: relative;
+  z-index: 0;
+  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%, transparent);
+}
+${P} ${SEAT} [data-composer-card]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  backdrop-filter: ${COMPOSER_BLUR};
+}
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
 ${P} ${RP} {
