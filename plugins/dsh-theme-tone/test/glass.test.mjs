@@ -58,6 +58,7 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
   it('停靠区（todo / goal / queue）统一规格：直角接缝 + 分割线 + 图标/标题专属色', () => {
     const surface = /:is\(\[data-queue-dock\] > \*, \[data-goal-bar\] > div, \[data-testid='todo-panel'\]\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(surface.includes('border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0'), '三者统一：上圆下直')
+    assert.ok(surface.includes('background-color: var(--dsw-alias-bg-layer-2)'), '分割线下方有不透明底，不漏正文')
     assert.ok(surface.includes('box-shadow: none'), '去掉官方面板投影')
     assert.ok(surface.includes('--dsw-elevation-stroke-color: transparent'), '去掉官方面板描边')
     const margins = /:is\(\[data-testid='todo-panel'\], \[data-goal-bar\], \[data-queue-dock\]\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''

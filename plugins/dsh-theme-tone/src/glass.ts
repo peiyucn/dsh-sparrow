@@ -146,6 +146,8 @@ ${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
    只保留各自的图标 / 标题专属色。 */
 ${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock] > *, [data-goal-bar] > div, [data-testid='todo-panel']) {
   border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
+  /* 底色也铺在元素本身：分割线是半透明 border-top，border 区若没有不透明底会透出滚动的正文。 */
+  background-color: var(--dsw-alias-bg-layer-2);
   box-shadow: none;
   --dsw-elevation-stroke-color: transparent;
 }
