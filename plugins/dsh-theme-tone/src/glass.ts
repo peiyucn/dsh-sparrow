@@ -13,21 +13,21 @@ export const PANEL_BAND_PX = 38
 const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 
 /**
- * 玻璃边缘的固定高光：光是**有方向**的（光源在左上）——上缘亮、左缘弱亮、右缘暗。
- * 下缘不在这里：底边单独一条中间亮、两边弱的渐变（见 BOTTOM_EDGE / BOTTOM_GLOW）。
- * 四边同亮会读成一圈描边，不是玻璃。
+ * 玻璃边缘的固定高光：光是**有方向**的（光源在左上）——上缘最亮、左缘次之、右缘压暗。
+ * 下缘也保留一条极淡的基线，让四边连成一圈、不在底角断掉；底边中央再叠一道
+ * 中间亮、两边弱的反射光（见 BOTTOM_EDGE / BOTTOM_GLOW）。四边同亮会读成描边，不是玻璃。
  */
-const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.16), inset 1px 0 2px rgba(255, 255, 255, 0.06), inset -1px 0 3px rgba(0, 0, 0, 0.18)'
-const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.72), inset 1px 0 2px rgba(255, 255, 255, 0.4), inset -1px 0 3px rgba(0, 0, 0, 0.05)'
+const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.2), inset 1px 0 2px rgba(255, 255, 255, 0.1), inset -1px 0 3px rgba(0, 0, 0, 0.16), inset 0 -1px 2px rgba(255, 255, 255, 0.05)'
+const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.68), inset 1px 0 2px rgba(255, 255, 255, 0.38), inset -1px 0 3px rgba(0, 0, 0, 0.05), inset 0 -1px 2px rgba(255, 255, 255, 0.12)'
 
 /**
- * 底边光：一条只在中央段出现的细线（中间亮、两边弱），线上垫一层极窄的同色微光。
- * 不铺满整条底边 —— 满铺会读成边框；两侧在 28% / 72% 前就衰减到不可见。
+ * 底边光：一条贯穿底边的极淡基线（0% / 100% 就有值，与左右边框接上）+ 中央段的反射高光；
+ * 亮线中间亮、两边弱，先落到基线再收进底角，不会读成一条硬边框。
  */
-const BOTTOM_EDGE_DARK = 'linear-gradient(90deg, transparent 28%, rgba(255, 255, 255, 0.18) 50%, transparent 72%)'
-const BOTTOM_EDGE_LIGHT = 'linear-gradient(90deg, transparent 28%, rgba(255, 255, 255, 0.5) 50%, transparent 72%)'
-const BOTTOM_GLOW_DARK = 'radial-gradient(30% 130% at 50% 100%, rgba(255, 255, 255, 0.08) 0%, transparent 70%)'
-const BOTTOM_GLOW_LIGHT = 'radial-gradient(30% 130% at 50% 100%, rgba(255, 255, 255, 0.18) 0%, transparent 70%)'
+const BOTTOM_EDGE_DARK = 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.05) 18%, rgba(255, 255, 255, 0.16) 50%, rgba(255, 255, 255, 0.05) 82%, rgba(255, 255, 255, 0.05) 100%)'
+const BOTTOM_EDGE_LIGHT = 'linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.12) 18%, rgba(255, 255, 255, 0.45) 50%, rgba(255, 255, 255, 0.12) 82%, rgba(255, 255, 255, 0.12) 100%)'
+const BOTTOM_GLOW_DARK = 'radial-gradient(30% 130% at 50% 100%, rgba(255, 255, 255, 0.06) 0%, transparent 70%)'
+const BOTTOM_GLOW_LIGHT = 'radial-gradient(30% 130% at 50% 100%, rgba(255, 255, 255, 0.14) 0%, transparent 70%)'
 
 /** 输入框卡片的悬浮阴影（投影方向朝下，读作离开页面）。 */
 const CARD_SHADOW_DARK = '0 12px 32px -12px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25)'
