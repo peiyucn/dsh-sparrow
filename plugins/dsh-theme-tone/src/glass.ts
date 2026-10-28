@@ -40,7 +40,6 @@ const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
 
 const P = `body:not([${PLAIN_ATTR}])`
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
-const SEAT = `:is([data-phase='active'], [data-phase='hero']) [data-composer-seat]`
 
 /** 右栏 76px 下有「可流式滚动的正文」的标签：只有它们上提滚区，正文才会真的从两条带下滚过。 */
 const LIFTED_SCROLLS = [
@@ -89,21 +88,69 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框玻璃 · 第 1+2 步：材质 + 边缘高光 =====
-   材质：座位透明、卡片半透明底（跟官方圆角 / 动态高度）、::before 只做 backdrop-filter。
-   高光：全周 1px 内描边 + 上下柔光（inset box-shadow / 线性渐变，自动跟圆角），不画径向断光，
-   也还没有折射（留到第 3 步单独做）。 */
-${P} ${SEAT} {
+/* ===== 输入框玻璃 =====
+   active：整块「液态玻璃板」—— 从 composer stack 顶部贯通到视口底，唯一一层 backdrop-filter；
+   顶部圆角、底部直角；dock 卡 / 输入区 / 统计胶囊全部透明化，成为板内行。
+   hero：保持居中悬浮的输入玻璃卡（材质 + 边缘高光），不贯通。 */
+${P} [data-phase='active'] [data-composer-seat] {
   background: none !important;
 }
-${P} ${SEAT} [data-composer-card] {
+${P} [data-phase='active'] [data-composer-seat]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100% - 2 * var(--dsh-composer-side-clearance, 16px)), var(--dsh-composer-card-max-width));
+  z-index: -1;
+  pointer-events: none;
+  border-radius: var(--dsw-radius-panel) var(--dsw-radius-panel) 0 0;
+  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%, transparent);
+  backdrop-filter: ${COMPOSER_BLUR};
+}
+${P} [data-phase='active'] [data-composer-card] {
+  position: relative;
+  z-index: 0;
+  background-color: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  /* 「+」等 selector 型按钮：官方给的是不透明中性底，在玻璃上会读成一块实心。 */
+  --dsw-specific-selector: transparent;
+}
+${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
+  width: 100%;
+  max-width: var(--dsh-composer-card-max-width);
+}
+/* dock 卡（todo / goal / queue）去材质、去圆角，成为板内行；交互全部保留。 */
+${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock], [data-goal-bar], [data-testid='todo-panel']) {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  backdrop-filter: none;
+}
+${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock], [data-goal-bar], [data-testid='todo-panel']) > * {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  backdrop-filter: none;
+}
+${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock], [data-goal-bar]) > *::before,
+${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock], [data-goal-bar]) > *::after {
+  content: none;
+}
+
+/* hero：保持悬浮输入卡（材质 + 边缘高光） */
+${P} [data-phase='hero'] [data-composer-seat] {
+  background: none !important;
+}
+${P} [data-phase='hero'] [data-composer-card] {
   position: relative;
   z-index: 0;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%, transparent);
-  /* 「+」等 selector 型按钮：官方给的是不透明中性底，在玻璃上会读成一块实心，跟着玻璃让出底色。 */
   --dsw-specific-selector: transparent;
 }
-${P} ${SEAT} [data-composer-card]::before {
+${P} [data-phase='hero'] [data-composer-card]::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -114,22 +161,9 @@ ${P} ${SEAT} [data-composer-card]::before {
   box-shadow: ${COMPOSER_RIM_DARK};
   backdrop-filter: ${COMPOSER_BLUR};
 }
-body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
+body:not([data-ds-dark-theme]) [data-phase='hero'] [data-composer-card]::before {
   background-image: ${COMPOSER_SHEEN_LIGHT};
   box-shadow: ${COMPOSER_RIM_LIGHT};
-}
-/* 座位撤掉官方 36px 实色渐隐后，卡片下方的统计胶囊行没有遮罩；给 dock 行本身垫「地面同源」
-   的底色 + 打光。宽度必须与输入框一致（官方 dock 是 flex 子项，宽 auto 只有胶囊宽度，两侧必漏），
-   所以显式 width:100% + 卡片同款 max-width；向下多垫 4px 座位内边距，不向上进入卡片。
-   fixed 背景定位区 = 视口，与地面层逐像素同源；这里面积只有胶囊一行，是唯一允许的 fixed 例外。 */
-${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
-  width: 100%;
-  max-width: var(--dsh-composer-card-max-width);
-  margin-bottom: -4px;
-  padding: 4px 0;
-  background-color: var(--dsw-alias-bg-base);
-  background-image: ${BACKDROP_GRADIENTS};
-  background-attachment: fixed;
 }
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
