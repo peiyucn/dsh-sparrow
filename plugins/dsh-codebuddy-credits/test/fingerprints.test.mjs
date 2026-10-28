@@ -30,6 +30,18 @@ const WEB_GUI_LINE = [
 const MAIN_BRANCH = 'Main branch (you will usually use this for PRs)'
 const CLAUDE_CODE = "You are Claude Code, Anthropic's official CLI for Claude"
 
+/**
+ * DSH 0.2.1-rc.3 Web 的 system prompt 原段（实测 2026-10-28：与下一句相邻时上游 400 / 11128；
+ * 把 `@` 换掉后同样的文字放行）。这里保留完整原文，钉住「不删字、只插零宽空格」的契约。
+ */
+const AT_PATH_PARAGRAPH = [
+  'Tokens prefixed with @ are paths the user explicitly referenced.',
+  'Relative paths resolve from the workspace root; absolute paths identify files or directories on the host.',
+  'A trailing slash marks a directory: list it when its contents matter.',
+  'Anything else is a file: use the read tool when its contents are needed, and do not claim to have inspected it before reading.',
+  '@"..." quotes a path containing spaces.',
+].join(' ')
+
 describe('neutralizeChannelFingerprints（无损中和）', () => {
   it('身份句可见内容不变，但不再含原始串', () => {
     const out = neutralizeChannelFingerprints(REAL_SYSTEM)
@@ -54,6 +66,35 @@ describe('neutralizeChannelFingerprints（无损中和）', () => {
     assert.ok(!out.includes(MAIN_BRANCH))
     assert.ok(!out.includes('Claude Code'))
     assert.ok(!out.includes("Anthropic's official CLI"))
+  })
+
+  it('@ 路径引用段落：每个 @ 后插零宽空格，可见文字不变', () => {
+    const out = neutralizeChannelFingerprints(AT_PATH_PARAGRAPH)
+    assert.equal(visibleText(out), AT_PATH_PARAGRAPH)
+    assert.ok(out.includes('@\u200B'), '@ 之后应插入零宽空格')
+    assert.ok(!/(@)(?!\u200B)/u.test(out), '原文的每个 @ 都被处理')
+    // 逐字符位置校验：去掉零宽空格必须回到原文（不删字、不加可见字符）。
+    assert.equal(out.split('').filter(c => c !== '\u200B').join(''), AT_PATH_PARAGRAPH)
+  })
+
+  it('代码里的 @ 原样保留（不能污染用户代码）', () => {
+    const text = [
+      '正文说明：Tokens prefixed with @ are paths.',
+      '`--flag @file` 在行内代码里原样。',
+      '```sh',
+      'curl -H "x" @payload.json',
+      '```',
+    ].join('\n')
+    const out = neutralizeChannelFingerprints(text)
+    assert.ok(out.includes('`--flag @file`'), '行内代码不动')
+    assert.ok(out.includes('curl -H "x" @payload.json'), '围栏代码不动')
+    assert.ok(out.includes('Tokens prefixed with @\u200B'), '正文被中和')
+    assert.equal(visibleText(out), text)
+  })
+
+  it('@ 段落二次处理不再变化（幂等）', () => {
+    const once = neutralizeChannelFingerprints(AT_PATH_PARAGRAPH)
+    assert.equal(neutralizeChannelFingerprints(once), once)
   })
 
   it('围栏代码块与行内代码原样保留（不能污染用户代码）', () => {
@@ -166,5 +207,18 @@ describe('toWireMessages 的指纹处理范围与 system 头', () => {
     assert.ok(!String(assistant?.content).includes('DeepSeek Harness'))
     assert.ok(String(assistant?.content).includes('正文继续'))
     assert.equal(/** @type {any} */ (assistant).tool_calls[0].function.arguments, '{"path":"a.txt"}')
+  })
+
+  it('系统提示里的 @ 段落被中和，其余正文逐字保留', async () => {
+    const system = `${REAL_SYSTEM}\n\n${AT_PATH_PARAGRAPH}\n\nKeep this line verbatim.`
+    const wire = await toWireMessages({
+      ...base,
+      system,
+      messages: [{ id: 'u1', role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+    })
+    const sent = String(wire[0]?.content)
+    assert.equal(visibleText(sent), system)
+    assert.ok(!/(@)(?!\u200B)/u.test(sent), '发给上游的 system 里不再有裸 @')
+    assert.ok(sent.includes('Keep this line verbatim.'))
   })
 })

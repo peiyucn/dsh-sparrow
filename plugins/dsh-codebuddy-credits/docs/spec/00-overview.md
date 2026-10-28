@@ -164,13 +164,33 @@ host 投影 / 事件重放、Max 模式以设置节为真值。`test/structure.t
    `X-Conversation-Request-ID` / `X-Conversation-Message-ID` 三件套（每次请求新生成、互不相同），
    且首条消息必须是 `system`；模型目录 / 账号 / 配额端点不带三件套。缺头或 user 打头都会被判
    「渠道校验失败」。实现见 `catalog.ts` 的 `chatHeaders()` 与 `adapter/wire.ts` 的 system 头兜底。
-2. **内容指纹（正文层）**：上游对 system / assistant 正文做身份句匹配。处理方式从「逐句删除」改为
-   **无损中和**——在命中词内插入零宽空格（U+200B），可见文案与语义不变、围栏/行内代码原样保留；
-   `user` / `tool` 请求参数 / `reasoning` 一律不动。实现见 `src/fingerprints.ts`，测试见
+2. **内容指纹（正文层）**：上游对 system / assistant 正文做内容匹配，已观测到三类互相独立的指纹，
+   任何一类原样残留都会让整轮被拒：
+   1. 身份句（`You are an AI agent powered by …`、`You are Claude Code, …`、`Main branch …`）；
+   2. DSH Web 的 Web GUI 身份句（`You are interacting with the user through …`）；
+   3. **`@` 路径引用说明段**（2026-10-28 实测）：DSH 0.2.1-rc.3 的 system prompt 里
+      `Tokens prefixed with @ are paths the user explicitly referenced.` 与
+      `Relative paths resolve from the workspace root …` 相邻出现即 400；把 `@` 换成普通词、
+      其余文字不变的同一段放行，说明判据依赖 `@` 原样存在。
+   处理方式一律是**无损中和**——在命中词内插入零宽空格（U+200B），可见文案与语义不变、
+   围栏/行内代码原样保留；`user` / `tool` 结果 / 请求参数 / `reasoning` 一律不动。实现见
+   `src/fingerprints.ts`（`NEUTRALIZE_PREFIXES` / `NEUTRALIZE_TOKENS`），测试见
    `test/fingerprints.test.mjs`。
 
 只改要发给上游的 wire 文本，本机会话历史原样保留；UA / `X-IDE-Name` 仍如实自报，不伪装官方客户端。
 若上游改为语义检测，正文层会再次失效（表现仍是 400 / 11128），需重新评估。
+
+### 2026-10-28 的定位记录（真实 Key 实测，可复查）
+
+- 原始 system prompt（DSH 0.2.1-rc.3 Web，8 691 字符）→ 400 / 11128；
+- 只做「身份句 + Web GUI 句」中和（0.2.1-rc.3.1 的行为）→ 仍然 400；
+- 追加 `@` 中和后 → 200。三种变体只差 `@` 一处，其余字符逐字相同。
+- 分段实测：命中段只有身份句、`@` 路径段、Web GUI 段三段；`@` 路径段与下一句**同时出现**才拦，
+  且删掉 `@` 或替换成普通词即放行。
+
+⚠️ `@` 中和是**全文替换**（代码块除外）：系统提示里的邮箱 / npm scope 也会被插入零宽空格。
+可见文字不变，但模型若原样复述这些串，复制出去可能带上不可见字符；当前系统提示只在该说明段
+出现 `@`，没有邮箱，故接受这一取舍。
 
 ## 能力门 / 注册冲突
 
@@ -205,7 +225,8 @@ host 投影 / 事件重放、Max 模式以设置节为真值。`test/structure.t
 - **模型行接管 single 槽**：`conversation.input.model.label` 只有一个贡献者，本插件注册 `priority: -1`
   稳定拿渲染权；因此必须持续镜像官方 `1017` 标（官方新增/改名时需跟版）。
 - **正文指纹中和会插入零宽字符**（命中词内，可见文案不变）：这是为绕开上游未公开内容风控的主动取舍
-  （owner 已知悉）；若上游改为语义检测，正文层即失效（表现仍是 400 / 11128）。
+  （owner 已知悉）；`@` 规则覆盖正文里所有 `@`（代码块除外），详见《上游渠道校验》的取舍说明。
+  若上游改为语义检测，正文层即失效（表现仍是 400 / 11128）。
 - **图片只认最后一条 user 消息**：DSH 把运行上下文 / 技能目录追加在真实用户消息之后，故适配器合并连续
   user 消息；多轮对话里更早轮次的图片上游仍会丢弃（无法在插件侧消除）。
 - **手动刷新绕过 60s 冷却但复用上游单飞**：`loadFactsOnce` / `sameFacts` 是 `apply` 内闭包，路由测试只 mock

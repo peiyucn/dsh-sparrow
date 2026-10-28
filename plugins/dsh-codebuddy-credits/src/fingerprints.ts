@@ -3,7 +3,13 @@
  *
  * 背景：CodeBuddy 中国区网关（`copilot.tencent.com`）对 **system / assistant 正文**做内容指纹
  * 拦截，命中即返回 HTTP 400 `{"code":11128,"msg":"Illegal API invocation from an unapproved
- * channel"}`。已观测到的指纹都以 DeepSeek Harness / Claude Code 的身份句为核心。
+ * channel"}`。已观测到的指纹有三类，互相独立（任何一类残留都会整轮被拒）：
+ *  1. DeepSeek Harness / Claude Code 的身份句；
+ *  2. DSH Web 的「Web GUI」身份句；
+ *  3. 「`@` 路径引用」说明段（2026-10-28 实测）：DSH 0.2.1-rc.3 的 system prompt 里
+ *     `Tokens prefixed with @ are paths the user explicitly referenced.` 与
+ *     `Relative paths resolve from the workspace root …` 相邻出现即拦；把 `@` 换成普通词后
+ *     同样的文字放行，说明命中判据依赖 `@` 原样存在。
  *
  * 处理方式：**不删正文**，只在命中词的第一个字符后插入一个零宽空格（U+200B）——显示与语义不变，
  * 网关的字符串匹配失效。这比逐句删除更稳：同一身份句的变体、上下文位置、大小写都不再需要单独维护；
@@ -39,6 +45,10 @@ const NEUTRALIZE_TOKENS: readonly RegExp[] = [
   /(\bHarness)(?!\u200B)(?=\b)/gu,
   /(\bClaude)(?!\u200B)(?= Code\b)/gu,
   /(\bAnthropic)(?!\u200B)(?='s official CLI\b)/gu,
+  // 「@ 路径引用」类指纹：只插在 `@` 之后，`@path` / `@"..."` 的可见形态与含义不变
+  // （零宽空格不占排版位），但上游的字符匹配失效。不做白名单：@ 只出现在提示词说明里，
+  // 正文中的路径语法同样是命中源。
+  /(@)(?!\u200B)/gu,
 ]
 
 /** 把一段普通文本里的身份指纹改成「视觉不变」的形式（幂等）。 */

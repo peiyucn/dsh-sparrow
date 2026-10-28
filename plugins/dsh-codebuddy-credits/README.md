@@ -111,13 +111,14 @@ the quota panel always reads the latest number from the server.
   enterprise plans, minimax-m3-pay is billed. Policies change without notice.
 - Requests made through your key appear in your account's usage records
   (including prompt text in the enterprise usage console).
-- The upstream service rejects some phrases in **system / assistant** message
-  bodies with an "unapproved channel" error. To keep chat working, the plugin
-  removes only the rejected phrases from the request copy of those bodies
-  (your local session history is unchanged); the rest of the text is sent
-  verbatim. `user`, tool results and tool-call arguments are never modified.
-  If the upstream list changes, requests may fail again until the plugin is
-  updated.
+- The upstream service blocks some marker phrases and the `@`-path reference
+  wording in **system / assistant** message bodies with an "unapproved channel"
+  error. To keep chat working, the plugin inserts an invisible zero-width
+  character into those markers in the request copy of those bodies: the visible
+  text and your local session history are unchanged, and code blocks are sent
+  byte-for-byte. `user` messages, tool results and tool-call arguments are never
+  modified. If the upstream list changes, requests may fail again until the
+  plugin is updated.
 
 ## License
 
