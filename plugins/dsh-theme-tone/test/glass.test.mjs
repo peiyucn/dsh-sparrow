@@ -14,7 +14,6 @@ import {
   GLASS_BLUR,
   GLASS_FILL_ALPHA,
   HEADER_HEIGHT_PX,
-  SEAT_BAND_PX,
   buildGlassCss,
 } from '../lib/glass.js'
 
@@ -42,9 +41,9 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok(glass.includes('backdrop-filter: ' + COMPOSER_BLUR), '输入框使用独立的材质模糊参数')
     assert.ok(glass.includes('border-radius: inherit'))
     assert.ok(!glass.includes('url(#'), '第 1 步不做折射')
-    const band = /\[data-phase='active'\] \[data-composer-seat\]::after \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(band.includes('background-color: var(--dsw-alias-bg-base)'), '座位底带盖住统计胶囊区透出的正文')
-    assert.match(band, new RegExp(`height: ${SEAT_BAND_PX}px`))
+    const dock = /\[data-phase='active'\] \[data-composer-seat\] \[data-composer-dock\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(dock.includes('background-color: var(--dsw-alias-bg-base)'), '胶囊行垫地面色，不再透出正文')
+    assert.ok(!code.includes('[data-composer-seat]::after'), '不往整条座位底部盖（会压到卡片下沿）')
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色，跟随玻璃')
   })
 

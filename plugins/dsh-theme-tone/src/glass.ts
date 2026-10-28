@@ -14,8 +14,6 @@ const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 /** 输入框玻璃（第 1 步：材质）：半透明底 + 背景模糊，先保证可读、变高不闪。 */
 export const COMPOSER_FILL_ALPHA = 0.55
 export const COMPOSER_BLUR = 'blur(12px) saturate(140%)'
-/** 座位底部垫带高度：盖住卡片下方统计胶囊区透出的正文（颜色与地面层同源）。 */
-export const SEAT_BAND_PX = 48
 /**
  * 输入框第 2 步：边缘高光。全周 1px 内描边（inset box-shadow 会自动跟圆角走）+ 上下柔光；
  * 不用径向渐变，所以四个角不会出现断光。
@@ -120,19 +118,13 @@ body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   background-image: ${COMPOSER_SHEEN_LIGHT};
   box-shadow: ${COMPOSER_RIM_LIGHT};
 }
-/* 座位撤掉官方 36px 实色渐隐后，卡片下方的统计胶囊区会透出正文；
-   垫一小段「地面同源」带盖住（只在 active 相位；hero 居中时背后没有正文）。 */
-${P} [data-phase='active'] [data-composer-seat]::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: ${SEAT_BAND_PX}px;
-  z-index: -1;
-  pointer-events: none;
+/* 座位撤掉官方 36px 实色渐隐后，卡片下方的统计胶囊行没有遮罩；给 dock 行本身垫地面色，
+   并向两侧 / 下方延伸盖住座位内边距（不向上进入卡片，避免挡住玻璃下沿的模糊内容）。 */
+${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
   background-color: var(--dsw-alias-bg-base);
-${viewportLight('100% 100%')}
+  margin: 0 calc(-1 * var(--dsh-composer-side-clearance, 16px));
+  padding: 0 var(--dsh-composer-side-clearance, 16px);
+  box-shadow: 0 4px 0 var(--dsw-alias-bg-base);
 }
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
