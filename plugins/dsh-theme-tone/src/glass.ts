@@ -13,11 +13,18 @@ export const PANEL_BAND_PX = 38
 const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 
 /**
- * 玻璃边缘的固定高光：光是**有方向**的（光源在左上）——上缘亮、左缘弱亮、右缘暗、下缘暗。
+ * 玻璃边缘的固定高光：光是**有方向**的（光源在左上）——上缘亮、左缘弱亮、右缘暗。
+ * 下缘不在这里：底边单独一条中间亮、两边弱的渐变（见 BOTTOM_EDGE / BOTTOM_GLOW）。
  * 四边同亮会读成一圈描边，不是玻璃。
  */
-const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.16), inset 1px 0 2px rgba(255, 255, 255, 0.06), inset -1px 0 3px rgba(0, 0, 0, 0.18), inset 0 -1px 3px rgba(0, 0, 0, 0.12)'
-const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.72), inset 1px 0 2px rgba(255, 255, 255, 0.4), inset -1px 0 3px rgba(0, 0, 0, 0.05), inset 0 -1px 3px rgba(0, 0, 0, 0.04)'
+const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.16), inset 1px 0 2px rgba(255, 255, 255, 0.06), inset -1px 0 3px rgba(0, 0, 0, 0.18)'
+const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.72), inset 1px 0 2px rgba(255, 255, 255, 0.4), inset -1px 0 3px rgba(0, 0, 0, 0.05)'
+
+/** 底边光：中间亮、两边弱；下面再垫一层同色柔光，避免 1px 硬线。 */
+const BOTTOM_EDGE_DARK = 'linear-gradient(90deg, transparent 6%, rgba(255, 255, 255, 0.5) 50%, transparent 94%)'
+const BOTTOM_EDGE_LIGHT = 'linear-gradient(90deg, transparent 6%, rgba(255, 255, 255, 0.9) 50%, transparent 94%)'
+const BOTTOM_GLOW_DARK = 'radial-gradient(65% 160% at 50% 100%, rgba(255, 255, 255, 0.16), transparent 72%)'
+const BOTTOM_GLOW_LIGHT = 'radial-gradient(65% 160% at 50% 100%, rgba(255, 255, 255, 0.4), transparent 72%)'
 
 /** 输入框卡片的悬浮阴影（投影方向朝下，读作离开页面）。 */
 const CARD_SHADOW_DARK = '0 12px 32px -12px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25)'
@@ -125,10 +132,15 @@ ${P} ${SEAT} [data-composer-card]::before {
   border-radius: inherit;
   pointer-events: none;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%, transparent);
+  background-image: ${BOTTOM_EDGE_DARK}, ${BOTTOM_GLOW_DARK};
+  background-size: 100% 1px, 100% 8px;
+  background-position: 0 100%, 0 100%;
+  background-repeat: no-repeat;
   box-shadow: ${RIM_DARK};
   backdrop-filter: ${GLASS_BLUR};
 }
 body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
+  background-image: ${BOTTOM_EDGE_LIGHT}, ${BOTTOM_GLOW_LIGHT};
   box-shadow: ${RIM_LIGHT};
 }
 /* 停靠卡补缝：卡与卡/输入框之间的 stack 缝、以及卡片上下圆角后面会透出正文，
