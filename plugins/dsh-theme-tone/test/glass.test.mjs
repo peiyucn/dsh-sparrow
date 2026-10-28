@@ -60,17 +60,17 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
       '上缘中间突出、两端衰减到基线')
     assert.ok(glass.includes('radial-gradient(45% 100% at 50% 100%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)'),
       '下缘与上缘同档')
-    assert.ok(glass.includes('radial-gradient(100% 42% at 0% 50%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)'),
-      '左缘同样是中间突出、上下渐暗')
-    assert.ok(glass.includes('radial-gradient(100% 42% at 100% 50%, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.03) 50%, transparent 100%)'),
-      '右缘也加光，峰值比左缘低（背光）')
+    assert.ok(glass.includes('linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, transparent 32%, transparent 68%, rgba(255, 255, 255, 0.08) 100%)'),
+      '左缘反过来：上下两头亮、中段暗')
+    assert.ok(glass.includes('linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, transparent 32%, transparent 68%, rgba(255, 255, 255, 0.06) 100%)'),
+      '右缘同样两头亮，峰值比左缘低（背光）')
     assert.ok(!glass.includes('background-image: linear-gradient(90deg'), '上下缘都不得再画横向硬线')
     assert.ok(glass.includes('background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%'), '四边柔光都按 2px 厚度衰减')
     assert.ok(glass.includes('background-position: 0 0, 0 100%, 0 0, 100% 0'), '上 / 下 / 左 / 右分别贴边')
     const lightGlass = /body:not\(\[data-ds-dark-theme\]\)[^{]*\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(lightGlass.includes('background-image: radial-gradient(45% 100% at 50% 0%'), '浅色轴也有上缘柔光')
-    assert.ok(lightGlass.includes('radial-gradient(100% 42% at 0% 50%'), '浅色轴左缘同样中间突出')
-    assert.ok(lightGlass.includes('radial-gradient(100% 42% at 100% 50%'), '浅色轴右缘也有光')
+    assert.ok(lightGlass.includes('linear-gradient(180deg'), '浅色轴左缘上下两头亮')
+    assert.ok(lightGlass.includes('linear-gradient(180deg'), '浅色轴右缘也有光')
     const band = /\[data-composer-seat\]::after \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(band.includes('background-image:'), '座位底带重画地面光')
     assert.ok(band.includes('background-position: 100% 100%'))
