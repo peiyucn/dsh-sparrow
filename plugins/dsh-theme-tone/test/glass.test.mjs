@@ -55,9 +55,9 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(glass.includes('box-shadow: inset 0 1px 2px'), '上缘高光')
     assert.ok(glass.includes('inset -1px 0 3px rgba(0, 0, 0'), '右缘暗边（有方向）')
     assert.ok(!glass.includes('inset 0 -1px'), '下缘不再压暗（改由底边光负责）')
-    assert.ok(glass.includes('background-image: linear-gradient(90deg, transparent 18%, rgba(255, 255, 255, 0.1) 50%, transparent 82%)'),
-      '底边光中间亮、两边弱')
-    assert.ok(glass.includes('background-size: 100% 1px, 100% 10px'), '底边细线 + 10px 柔光')
+    assert.ok(glass.includes('background-image: linear-gradient(90deg, transparent 28%, rgba(255, 255, 255, 0.18) 50%, transparent 72%)'),
+      '底边光只出现在中央段，中间亮、两边弱')
+    assert.ok(glass.includes('background-size: 100% 1px, 100% 4px'), '底边细线 + 4px 微光')
     assert.ok(glass.includes('background-position: 0 100%, 0 100%'), '两层都贴底')
     const lightGlass = /body:not\(\[data-ds-dark-theme\]\)[^{]*\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(lightGlass.includes('background-image: linear-gradient(90deg'), '浅色轴也有底边光')

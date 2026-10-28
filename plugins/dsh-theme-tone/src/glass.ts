@@ -21,13 +21,13 @@ const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.16), inset 1px 0 2px rgb
 const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.72), inset 1px 0 2px rgba(255, 255, 255, 0.4), inset -1px 0 3px rgba(0, 0, 0, 0.05)'
 
 /**
- * 底边光：中间亮、两边弱。主体是贴着底边的**柔光**（不画硬线），窄范围衰减；
- * 另加一条几乎不可见的细线只负责勾出玻璃边缘，避免整段读成灰色带状。
+ * 底边光：一条只在中央段出现的细线（中间亮、两边弱），线上垫一层极窄的同色微光。
+ * 不铺满整条底边 —— 满铺会读成边框；两侧在 28% / 72% 前就衰减到不可见。
  */
-const BOTTOM_EDGE_DARK = 'linear-gradient(90deg, transparent 18%, rgba(255, 255, 255, 0.1) 50%, transparent 82%)'
-const BOTTOM_EDGE_LIGHT = 'linear-gradient(90deg, transparent 18%, rgba(255, 255, 255, 0.35) 50%, transparent 82%)'
-const BOTTOM_GLOW_DARK = 'radial-gradient(38% 130% at 50% 100%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.1) 45%, transparent 78%)'
-const BOTTOM_GLOW_LIGHT = 'radial-gradient(38% 130% at 50% 100%, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.18) 45%, transparent 78%)'
+const BOTTOM_EDGE_DARK = 'linear-gradient(90deg, transparent 28%, rgba(255, 255, 255, 0.18) 50%, transparent 72%)'
+const BOTTOM_EDGE_LIGHT = 'linear-gradient(90deg, transparent 28%, rgba(255, 255, 255, 0.5) 50%, transparent 72%)'
+const BOTTOM_GLOW_DARK = 'radial-gradient(30% 130% at 50% 100%, rgba(255, 255, 255, 0.08) 0%, transparent 70%)'
+const BOTTOM_GLOW_LIGHT = 'radial-gradient(30% 130% at 50% 100%, rgba(255, 255, 255, 0.18) 0%, transparent 70%)'
 
 /** 输入框卡片的悬浮阴影（投影方向朝下，读作离开页面）。 */
 const CARD_SHADOW_DARK = '0 12px 32px -12px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25)'
@@ -136,7 +136,7 @@ ${P} ${SEAT} [data-composer-card]::before {
   pointer-events: none;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%, transparent);
   background-image: ${BOTTOM_EDGE_DARK}, ${BOTTOM_GLOW_DARK};
-  background-size: 100% 1px, 100% 10px;
+  background-size: 100% 1px, 100% 4px;
   background-position: 0 100%, 0 100%;
   background-repeat: no-repeat;
   box-shadow: ${RIM_DARK};
