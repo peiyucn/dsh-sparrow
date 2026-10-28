@@ -109,8 +109,7 @@ function install(ctx: never): void {
 
   const resources: { style?: HTMLStyleElement; layer?: HTMLDivElement; lens?: LensController } = {}
   paintPlain(true)
-  // 透镜控制器自己异步找卡片、按实际几何生成位移图；就绪前 body 上没有 LENS_ATTR，
-  // CSS 保持纯 blur —— 找不到卡片 / 浏览器不支持时也就永久停在纯 blur（安静降级）。
+  // 透镜异步等卡片、按实际几何生成；就绪前没有 LENS_ATTR，CSS 只有纯 blur，失败即永久回退。
   resources.lens = attachLensFilter() ?? undefined
   resources.style = ensureStyles()
   resources.layer = ensureLayer()
@@ -131,7 +130,6 @@ function install(ctx: never): void {
   let warned = false
 
   c.effect(() => () => {
-    // dispose 内部：取消待执行的帧回调、断开尺寸观测、移除滤镜 SVG 与 body 标记。
     resources.lens?.dispose()
     resources.layer?.remove()
     resources.style?.remove()

@@ -10,7 +10,8 @@ import { LENS_FILTER_ID, LENS_IMAGE_ID, LENS_MAP_SCALE } from '../lib/constants.
 import { buildLensFilterMarkup } from '../lib/client/lens.js'
 
 describe('lens filter', () => {
-  const markup = buildLensFilterMarkup()
+  const href = 'data:image/png;base64,AA'
+  const markup = buildLensFilterMarkup(href)
 
   it('应该 用固定 id 暴露滤镜，供 CSS url(#id) 引用', () => {
     assert.ok(markup.includes(`<filter id="${LENS_FILTER_ID}"`))
@@ -21,7 +22,8 @@ describe('lens filter', () => {
     const maps = [...markup.matchAll(/<feImage\b[^>]*\/>/gu)].map(match => match[0])
     assert.equal(maps.length, 1, '位移图只允许一张（不再用两张线性渐变合成）')
     const [map] = maps
-    assert.ok(map.includes(`id="${LENS_IMAGE_ID}"`), 'feImage 有固定 id，供运行期更新 href')
+    assert.ok(map.includes(`id="${LENS_IMAGE_ID}"`), 'feImage 有固定 id')
+    assert.ok(map.includes(`href="${href}"`), 'feImage 使用当前卡片的位移图')
     assert.ok(map.includes('preserveAspectRatio="none"'), '位移图必须拉伸到整张卡')
     assert.ok(map.includes('width="100%"') && map.includes('height="100%"'))
   })

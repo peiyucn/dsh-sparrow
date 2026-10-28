@@ -1,32 +1,29 @@
 /**
- * 输入框玻璃的 bezel 透镜位移图（纯函数，不碰 DOM / canvas，供单测直接跑）。
+ * bezel 透镜位移图（纯函数，不碰 DOM / canvas，Node 单测直接跑）。
  *
- * 按卡片的**实际尺寸与圆角**逐像素生成 `feDisplacementMap` 的位置图：
+ * 每像素算到圆角矩形边界的**内侧距离** d：d < bezel 时属于斜面，
+ * t = d / bezel，幅值 = depth * (1 - t)^2（边缘最大、以内沿归零）。
+ * 方向取 SDF 外法线的反向（直边轴向、圆角径向，默认指向卡内）；
+ * flipTop / flipBottom 把上下边的 y 分量转 180°（向外取内容会拉没，见 lens.ts）。
  *
- * - 圆角矩形边界用标准 SDF 求「像素到边界的内侧距离」`d`；
- * - 只在 `d < bezel` 的斜面内位移，`t = d / bezel`，`magnitude = depth * (1 - t)^2`
- *   —— 边缘（t=0）最大、向内到 bezel 处（t=1）平滑归零；
- * - 方向取「最近边界点指向卡片内部」：直边取轴向，圆角取径向（指向角圆心）；
- * - 编码 R = G = 128 为中性，R = 128 + dx、G = 128 + dy（单位 CSS px），B=0、A=255。
- *
- * 图里编码的是**采样偏移**；滤镜用负 scale 反向消费，让采样点落在卡外，形成边缘放大。
+ * 编码 R = 128 + dx、G = 128 + dy（CSS px），B = 0、A = 255；
+ * 滤镜侧用 scale ±255 还原成像素位移，128 即中性。
  */
+
 export interface LensMapOptions {
   /** 卡片宽（CSS px）。 */
   readonly width: number
   /** 卡片高（CSS px）。 */
   readonly height: number
-  /** 圆角半径（CSS px，内部钳到 min(width, height) / 2）。 */
+  /** 圆角半径（CSS px）；内部钳到短边一半。 */
   readonly radius: number
-  /** 透镜斜面宽度（CSS px，内部钳到 (0, min(width, height) / 2]）。 */
+  /** 斜面宽度（CSS px）；内部钳到 (0, 短边一半]。 */
   readonly bezel: number
-  /** 边缘处最大位移（CSS px）。 */
+  /** 边缘处最大位移（CSS px，须 < 128）。 */
   readonly depth: number
-  /**
-   * 顶 / 底边反向取样：上下方是实色地面带 / 空背景，向外取样会把内容拉没 / 读成压缩；
-   * 打开后这两边改为向卡内取样（滤镜侧是负 scale，编码取反后实际方向朝内），视觉上拉长。
-   */
+  /** 顶边 y 方向反转（实际改为向卡内取样）。 */
   readonly flipTop?: boolean
+  /** 底边 y 方向反转。 */
   readonly flipBottom?: boolean
 }
 
@@ -37,47 +34,39 @@ export interface LensMap {
   readonly data: Uint8ClampedArray
 }
 
-/** 位移图中性值（R / G 通道）；0 位移时两个通道都是 128。 */
-const NEUTRAL_CHANNEL = 128
+const NEUTRAL = 128
 
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min
-  return value < min ? min : value > max ? max : value
+  return Math.min(Math.max(value, min), max)
 }
 
-/**
- * 生成一张圆角矩形卡片的 bezel 位移图。
- * `width / height` 取整（与 canvas 像素对齐），其余参数按卡片几何钳制。
- */
 export function buildLensMap(options: LensMapOptions): LensMap {
   const width = Math.max(1, Math.round(options.width))
   const height = Math.max(1, Math.round(options.height))
   const maxRadius = Math.min(width, height) / 2
   const radius = clamp(options.radius, 0, maxRadius)
   const bezel = clamp(options.bezel, 1, maxRadius)
-  // 编码是 128 ± depth，深度 > 127 会被 Uint8ClampedArray 钳掉，直接限死在上限内。
   const depth = clamp(options.depth, 0, 127)
   const cx = width / 2
   const cy = height / 2
-  // 圆角内缩后的直边半长；|px| 超过它即落进圆角的四分之一圆区域。
-  const innerHalfWidth = width / 2 - radius
-  const innerHalfHeight = height / 2 - radius
+  // 圆角内缩后的直边半长：|px| 超过它即落进四分之一圆区域。
+  const straightX = width / 2 - radius
+  const straightY = height / 2 - radius
   const data = new Uint8ClampedArray(width * height * 4)
 
   for (let y = 0; y < height; y += 1) {
     const py = y + 0.5 - cy
-    const qy = Math.abs(py) - innerHalfHeight
+    const qy = Math.abs(py) - straightY
     const signY = py < 0 ? -1 : 1
     for (let x = 0; x < width; x += 1) {
       const index = (y * width + x) * 4
       const px = x + 0.5 - cx
-      const qx = Math.abs(px) - innerHalfWidth
+      const qx = Math.abs(px) - straightX
       const signX = px < 0 ? -1 : 1
 
-      // 标准圆角矩形 SDF：负值在形内；`distance` 是到边界的内侧距离。
-      const overX = qx > 0 ? qx : 0
-      const overY = qy > 0 ? qy : 0
-      const outside = overX === 0 ? overY : overY === 0 ? overX : Math.hypot(overX, overY)
+      // 标准圆角矩形 SDF（负值在形内）；distance 即到边界的内侧距离。
+      const outside = qx > 0 && qy > 0 ? Math.hypot(qx, qy) : Math.max(qx, qy)
       const distance = radius - outside - Math.min(Math.max(qx, qy), 0)
 
       let dx = 0
@@ -85,25 +74,20 @@ export function buildLensMap(options: LensMapOptions): LensMap {
       if (distance > 0 && distance < bezel) {
         const remaining = 1 - distance / bezel
         const magnitude = depth * remaining * remaining
-        if (qx > 0 && qy > 0) {
-          // 圆角段：最近边界点在角圆心方向上，朝角圆心即朝卡内。
-          const length = Math.hypot(qx, qy)
-          if (length > 0) {
-            dx = (-magnitude * (signX * qx)) / length
-            dy = (-magnitude * (signY * qy)) / length
-          }
-        } else if (qx > qy) {
-          // 左右直边：位移沿 x 轴指向卡内。
-          dx = -signX * magnitude
-        } else {
-          // 上下直边：位移沿 y 轴指向卡内。
-          dy = -signY * magnitude
+        // 外法线（指向形外）；取反即默认朝卡内。
+        const nx = qx > 0 ? signX * qx : 0
+        const ny = qy > 0 ? signY * qy : 0
+        const length = Math.hypot(nx, ny)
+        if (length > 0) {
+          dx = (-magnitude * nx) / length
+          dy = (-magnitude * ny) / length
         }
       }
 
-      const flippedY = signY < 0 ? options.flipTop === true : options.flipBottom === true
-      data[index] = NEUTRAL_CHANNEL + dx
-      data[index + 1] = NEUTRAL_CHANNEL + (flippedY ? -dy : dy)
+      if (signY < 0 ? options.flipTop === true : options.flipBottom === true) dy = -dy
+
+      data[index] = NEUTRAL + dx
+      data[index + 1] = NEUTRAL + dy
       data[index + 2] = 0
       data[index + 3] = 255
     }

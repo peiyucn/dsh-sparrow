@@ -150,7 +150,7 @@ body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   background-image: ${TOP_GLOW_LIGHT}, ${BOTTOM_GLOW_LIGHT}, ${LEFT_GLOW_LIGHT}, ${RIGHT_GLOW_LIGHT};
   box-shadow: ${RIM_LIGHT};
 }
-/* 边缘折射：滤镜注入后 body 才有 LENS_ATTR；不支持 url() 的浏览器会忽略这一条，保留上面的纯 blur。 */
+/* 透镜就绪（body 带 LENS_ATTR）才追加滤镜；不支持的引擎忽略本行、保留上面的纯 blur。 */
 ${P}[${LENS_ATTR}] ${SEAT} [data-composer-card]::before {
   backdrop-filter: ${GLASS_BLUR} url(#${LENS_FILTER_ID});
 }
