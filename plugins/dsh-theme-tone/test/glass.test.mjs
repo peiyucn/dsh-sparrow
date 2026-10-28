@@ -53,17 +53,28 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色')
   })
 
-  it('todo / goal 接进输入框：下圆角直角 + tuck 缝 + 专属色', () => {
+  it('todo / goal 接进输入框：不改宽度 + 直角接缝 + 图标/标题专属色', () => {
     const todo = /\[data-phase='active'\] \[data-testid='todo-panel'\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(!todo.includes('width: 100%') && !todo.includes('max-width:'), '宽度保持官方，不做对齐')
     assert.ok(todo.includes('border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0'), 'todo 下边直角')
     assert.ok(todo.includes('margin-bottom: calc(0px - var(--dsh-composer-stack-gap) - 3px)'), 'todo tuck 进下方 stack 缝')
-    const todoHeader = /\[data-phase='active'\] \[data-testid='todo-panel'\] button \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(todoHeader.includes('--dsw-alias-label-primary: var(--dsw-alias-state-success-primary)'), 'todo 标题用绿色')
+    assert.ok(todo.includes('box-shadow: none'), '去掉面板投影，避免接缝处出现阴影线')
+    assert.ok(todo.includes('--dsw-elevation-stroke-color: transparent'), '去掉接缝处的描边线')
+    const todoIcon = /\[data-testid='todo-panel'\] > div > button > span:first-child,\n[^{]*span:nth-child\(2\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(todoIcon.includes('color: var(--dsw-alias-state-success-primary)'), 'todo 图标与标题用绿色')
     const goal = /\[data-phase='active'\] \[data-goal-bar\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(!goal.includes('width: 100%') && !goal.includes('max-width:'), 'goal 宽度保持官方')
     assert.ok(goal.includes('margin-bottom: calc(0px - var(--dsh-composer-stack-gap) - 3px)'), 'goal tuck 进下方 stack 缝')
     const goalBar = /\[data-phase='active'\] \[data-goal-bar\] > div \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(goalBar.includes('border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0'), 'goal 下边直角')
-    assert.ok(goalBar.includes('--dsw-alias-label-primary: var(--dsw-alias-state-warn-primary)'), 'goal 标题用橘红')
+    assert.ok(goalBar.includes('box-shadow: none'), '去掉 bar 投影')
+    assert.ok(goalBar.includes('--dsw-elevation-stroke-color: transparent'), '去掉 bar 描边')
+    assert.ok(/\[data-testid='todo-panel'\]:not\(:first-child\) \{([^}]*)\}/u.test(code), '非最上层面板顶角切直角')
+    assert.ok(/\[data-goal-bar\]:not\(:first-child\) > div/u.test(code), 'goal 非最上层也切直角顶角')
+    assert.ok(/\[data-queue-dock\]:not\(:first-child\) > \*/u.test(code), 'queue 非最上层也切直角顶角')
+    const goalIcon = /\[data-goal-bar\] > div > span:first-child,\n[^{]*span:nth-child\(2\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(goalIcon.includes('color: var(--dsw-alias-state-warn-primary)'), 'goal 图标与标题用橘红')
+    assert.ok(!code.includes('--dsw-alias-label-primary: var(--dsw-alias-state-'), '不整体改正文/按钮颜色')
   })
 
   it('输入框第 2 步边缘高光：全周 1px 内描边 + 上下柔光，随圆角连续', () => {

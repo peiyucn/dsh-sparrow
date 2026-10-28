@@ -13,8 +13,9 @@
 4. **输入框玻璃**：座位撤掉官方 36px 实色渐隐（正文从玻璃下滚过）；卡片本体承担半透明底色
    （圆角 25px、`::before` inherit），`::before` 做 `backdrop-filter` 并画 specular 高光；
    卡片作用域内 `--dsw-specific-selector: transparent`，让官方「+」等 selector 型按钮不读成实心块。
-   **todo / goal 接进输入框**：两者都按 queue dock 的方式做「上圆下直 + 负边距 tuck 进下方 stack 缝」，
-   标题 / 图标用专属色区分（todo = 绿 `state-success-primary`，goal = 橘红 `state-warn-primary`）。
+   **todo / goal 接进输入框**：不改宽度；两者下边直角、用负边距 tuck 进下方 stack 缝；多个停靠面板
+   叠在一起时，除最上面那个外，其余面板顶角也切直角，避免直角底与圆角顶在接缝处错位；
+   只有图标与标题用专属色（todo = 绿 `state-success-primary`，goal = 橘红 `state-warn-primary`），正文与按钮保持官方色。
    卡片下方统计胶囊行（`[data-composer-dock]`）显式 `width:100%` + 卡片同款 max-width，
    自身重绘**底色 + 同源打光**（fixed 定位区 = 视口），向下盖住座位 4px 内边距，
    但不向上进入卡片（避免挡住玻璃下沿的模糊内容）。

@@ -136,24 +136,41 @@ ${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
   background-attachment: fixed;
 }
 
-/* ===== todo / goal：和待发信息列表（queue dock）一样接进输入框 =====
-   下边圆角改直角，用与 queue 相同的负边距 tuck 进下方元素的 stack 缝；
-   标题 / 图标用专属色区分（todo 绿、goal 橘红），避免同时出现时混在一起。 */
+/* ===== todo / goal：接进输入框（不改宽度） =====
+   下边直角 + 负边距 tuck 进下方 stack 缝；去掉官方面板描边 / 投影，接缝处不再多一条线。
+   多个停靠面板叠在一起时，除最上面那个，其余面板顶角也切直角，否则上一个的直角底会和
+   下一个的圆角顶错位（就是多处接缝看着没连上的原因）。
+   只有图标与标题用专属色（todo 绿 / goal 橘红），正文与右侧按钮保持官方色。 */
 ${P} [data-phase='active'] [data-testid='todo-panel'] {
   border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
   margin-bottom: calc(0px - var(--dsh-composer-stack-gap) - 3px);
+  box-shadow: none;
+  --dsw-elevation-stroke-color: transparent;
 }
-${P} [data-phase='active'] [data-testid='todo-panel'] button {
-  --dsw-alias-label-primary: var(--dsw-alias-state-success-primary);
-  --dsw-alias-label-tertiary: var(--dsw-alias-state-success-primary);
+${P} [data-phase='active'] [data-composer-seat] [data-testid='todo-panel']:not(:first-child) {
+  border-radius: 0;
+}
+${P} [data-phase='active'] [data-testid='todo-panel'] > div > button > span:first-child,
+${P} [data-phase='active'] [data-testid='todo-panel'] > div > button > span:nth-child(2) {
+  color: var(--dsw-alias-state-success-primary);
 }
 ${P} [data-phase='active'] [data-goal-bar] {
   margin-bottom: calc(0px - var(--dsh-composer-stack-gap) - 3px);
 }
 ${P} [data-phase='active'] [data-goal-bar] > div {
   border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
-  --dsw-alias-label-primary: var(--dsw-alias-state-warn-primary);
-  --dsw-alias-label-tertiary: var(--dsw-alias-state-warn-primary);
+  box-shadow: none;
+  --dsw-elevation-stroke-color: transparent;
+}
+${P} [data-phase='active'] [data-composer-seat] [data-goal-bar]:not(:first-child) > div {
+  border-radius: 0;
+}
+${P} [data-phase='active'] [data-composer-seat] [data-queue-dock]:not(:first-child) > * {
+  border-radius: 0;
+}
+${P} [data-phase='active'] [data-goal-bar] > div > span:first-child,
+${P} [data-phase='active'] [data-goal-bar] > div > span:nth-child(2) {
+  color: var(--dsw-alias-state-warn-primary);
 }
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
