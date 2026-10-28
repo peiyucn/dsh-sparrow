@@ -24,10 +24,10 @@ const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.12), inset 1px 0 2px rg
  * 上下缘的中央柔光：2px 径向光，中心亮、向两侧和向内同时衰减，没有硬边。
  * 上缘是主光，峰值高；下缘是反射光，峰值明显更低。
  */
-const TOP_GLOW_DARK = 'radial-gradient(46% 100% at 50% 0%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.07) 55%, transparent 100%)'
-const TOP_GLOW_LIGHT = 'radial-gradient(46% 100% at 50% 0%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.16) 55%, transparent 100%)'
-const BOTTOM_GLOW_DARK = 'radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 55%, transparent 100%)'
-const BOTTOM_GLOW_LIGHT = 'radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.06) 55%, transparent 100%)'
+const TOP_GLOW_DARK = 'radial-gradient(34% 100% at 50% 0%, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.1) 32%, transparent 68%)'
+const TOP_GLOW_LIGHT = 'radial-gradient(34% 100% at 50% 0%, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.2) 32%, transparent 68%)'
+const BOTTOM_GLOW_DARK = 'radial-gradient(34% 100% at 50% 100%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 32%, transparent 68%)'
+const BOTTOM_GLOW_LIGHT = 'radial-gradient(34% 100% at 50% 100%, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.08) 32%, transparent 68%)'
 
 /** 输入框卡片的悬浮阴影（投影方向朝下，读作离开页面）。 */
 const CARD_SHADOW_DARK = '0 12px 32px -12px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25)'
