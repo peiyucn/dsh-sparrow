@@ -15,8 +15,8 @@
    卡片作用域内 `--dsw-specific-selector: transparent`，让官方「+」等 selector 型按钮不读成实心块。
    **停靠区（todo / goal / queue）统一规格**：宽度保持官方、不覆盖；三者都改上圆下直，
    用负边距**刚好抵消** stack 缝（不重叠）；材质统一为**不透明**（`--dsw-alias-bg-layer-2`），
-   撤掉各自的 `backdrop-filter` 与官方描边 / 投影（含 queue `panel::after` 的 0.5px 边框，消息列表不再有框）；叠多个时非最上面的面板顶角切直角，
-   并在顶部画 1px 分割线（`border-top`；材质在 `::before` 上，`inset` 阴影会被盖住）。专属色只作用于图标与标题
+   材质铺在元素自身（不是 `::before`），官方伪元素材质 / 描边一律关掉（含 queue `panel::after` 的 0.5px 边框，消息列表不再有框）；叠多个时非最上面的面板顶角切直角，
+   并在顶部画 1px 分割线（`inset` 阴影，不占布局、不改变面板高度）。专属色只作用于图标与标题
    （todo = 绿 `state-success-primary`，goal = 橘红 `state-warn-primary`），正文与右侧按钮保持官方色。
    卡片下方统计胶囊行（`[data-composer-dock]`）显式 `width:100%` + 卡片同款 max-width，
    自身重绘**底色 + 同源打光**（fixed 定位区 = 视口），向下盖住座位 4px 内边距，

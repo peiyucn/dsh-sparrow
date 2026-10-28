@@ -140,13 +140,12 @@ ${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
 }
 
 /* ===== 停靠区（todo / goal / queue）统一规格 =====
-   三者用同一套：不透明浮层底、默认上圆下直、负边距刚好抵消 stack 缝；
-   叠多个时非最上面的面板顶角切直角，并在顶部画 1px 分割线（border-top，材质在 ::before
-   上，inset 阴影会被盖住；1px 边框不改变可视对齐）。
+   三者用同一套：不透明浮层底铺在元素本身、默认上圆下直、负边距刚好抵消 stack 缝；
+   叠多个时非最上面的面板顶角切直角，并在顶部画 1px 分割线（inset 阴影：底色在元素上，
+   不会被伪元素盖住，也不占布局 / 不改变面板高度）。
    只保留各自的图标 / 标题专属色。 */
 ${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock] > *, [data-goal-bar] > div, [data-testid='todo-panel']) {
   border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
-  /* 底色也铺在元素本身：分割线是半透明 border-top，border 区若没有不透明底会透出滚动的正文。 */
   background-color: var(--dsw-alias-bg-layer-2);
   box-shadow: none;
   --dsw-elevation-stroke-color: transparent;
@@ -154,26 +153,24 @@ ${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock] > *, [data
 ${P} [data-phase='active'] [data-composer-seat] :is([data-goal-bar], [data-queue-dock]):not(:first-child) > *,
 ${P} [data-phase='active'] [data-composer-seat] [data-testid='todo-panel']:not(:first-child) {
   border-radius: 0;
-  border-top: 1px solid ${DOCK_DIVIDER_DARK};
+  box-shadow: ${DOCK_DIVIDER_DARK};
 }
 ${P} [data-phase='active'] [data-composer-seat] :is([data-testid='todo-panel'], [data-goal-bar], [data-queue-dock]) {
   margin-bottom: calc(0px - var(--dsh-composer-stack-gap));
 }
 body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-phase='active'] [data-composer-seat] :is([data-goal-bar], [data-queue-dock]):not(:first-child) > *,
 body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-phase='active'] [data-composer-seat] [data-testid='todo-panel']:not(:first-child) {
-  border-top-color: ${DOCK_DIVIDER_LIGHT};
+  box-shadow: ${DOCK_DIVIDER_LIGHT};
 }
-/* queue 官方在 panel::after 上画 0.5px 描边；停靠区统一后去掉，避免消息列表看起来有边框。 */
-${P} [data-phase='active'] [data-queue-dock] > *::after {
-  border: 0;
-}
-/* 不透明材质：todo 根节点 / queue 的 panel::before / goal 的 bar::before。 */
-${P} [data-phase='active'] [data-testid='todo-panel'] {
-  background: var(--dsw-alias-bg-layer-2);
-  backdrop-filter: none;
-}
+/* 官方材质 / 描边画在伪元素上：停靠区统一后直接关掉，底由元素自身的 background-color 承担。
+   queue 的 panel::after 原本是 0.5px 描边，也一并去掉（消息列表不再有框）。 */
 ${P} [data-phase='active'] [data-queue-dock] > *::before,
+${P} [data-phase='active'] [data-queue-dock] > *::after,
 ${P} [data-phase='active'] [data-goal-bar] > div::before {
+  content: none;
+}
+/* 不透明材质：todo 根节点背景已由统一规则铺底，这里只需撤掉它自己的 backdrop-filter。 */
+${P} [data-phase='active'] [data-testid='todo-panel'] {
   background: var(--dsw-alias-bg-layer-2);
   backdrop-filter: none;
 }
