@@ -11,12 +11,6 @@ import {
   COMPOSER_RIM_LIGHT,
   COMPOSER_SHEEN_DARK,
   COMPOSER_SHEEN_LIGHT,
-  GROUP_LINE_DARK,
-  GROUP_LINE_LIGHT,
-  SLAB_RIM_DARK,
-  SLAB_RIM_LIGHT,
-  SLAB_SHEEN_DARK,
-  SLAB_SHEEN_LIGHT,
   GLASS_BLUR,
   GLASS_FILL_ALPHA,
   HEADER_HEIGHT_PX,
@@ -27,7 +21,7 @@ const css = buildGlassCss()
 const backdropCss = buildBackdropCss()
 const code = css.replace(/\/\*[\s\S]*?\*\//gu, '')
 
-describe('glass: 顶栏 / 右栏 / 输入框（active 单板 / hero 悬浮卡）', () => {
+describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
   it('两处玻璃共用同一个填充参数与同一个模糊参数（统一）', () => {
     assert.ok(GLASS_FILL_ALPHA < 0.5, '通透：填充不透明度低于一半')
     const blurPx = Number(/blur\((\d+)px\)/u.exec(GLASS_BLUR)?.[1] ?? 0)
@@ -36,55 +30,34 @@ describe('glass: 顶栏 / 右栏 / 输入框（active 单板 / hero 悬浮卡）
     assert.ok((code.match(new RegExp(String(GLASS_FILL_ALPHA * 100) + '%', 'gu')) ?? []).length >= 2, '两处填充都引用同一个常量')
   })
 
-  it('active 输入框是单块贯通玻璃板：座位 ::before、顶圆角底直角、直达视口底', () => {
-    const seat = /\[data-phase='active'\] \[data-composer-seat\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(seat.includes('background: none'), '座位撤掉官方遮罩')
-    const slab = /\[data-phase='active'\] \[data-composer-seat\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(slab.includes('backdrop-filter: ' + COMPOSER_BLUR), '整块板只做一次 backdrop-filter')
-    assert.ok(slab.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%`),
-      '板的半透明底色取输入面 token')
-    assert.ok(slab.includes('border-radius: var(--dsw-radius-panel) var(--dsw-radius-panel) 0 0'),
-      '顶部圆角、底部直角，垂直贯到页面下缘')
-    assert.ok(slab.includes('width: min(calc(100% - 2 * var(--dsh-composer-side-clearance, 16px)), var(--dsh-composer-card-max-width))'),
-      '板宽与输入框一致')
-    assert.ok(slab.includes('top: 0') && slab.includes('bottom: 0'), '板从 stack 顶部贯到底')
-    assert.ok(slab.includes(`background-image: ${SLAB_SHEEN_DARK}`), '顶部 sheen')
-    assert.ok(slab.includes(`box-shadow: ${SLAB_RIM_DARK}`), '顶部 / 两侧 specular，底部不加光')
-    assert.ok(code.includes(`background-image: ${SLAB_SHEEN_LIGHT}`) && code.includes(`box-shadow: ${SLAB_RIM_LIGHT}`),
-      '浅色轴有对应单板高光')
-    assert.ok(!slab.includes('url(#'), '仍不做折射')
-  })
-
-  it('active 子区域全部透明：卡片 / 胶囊行 / dock 卡都成为板内行', () => {
-    const card = /\[data-phase='active'\] \[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(card.includes('background-color: transparent'), '输入卡让出底色，由整块板承担')
-    assert.ok(card.includes(`box-shadow: ${GROUP_LINE_DARK}`) && card.includes('border-radius: 0'),
-      '去掉自身阴影与圆角，只留分组高光线')
-    assert.ok(code.includes(`box-shadow: ${GROUP_LINE_LIGHT}`), '浅色轴有对应分组线')
-    assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色')
-    const dock = /\[data-phase='active'\] \[data-composer-seat\] \[data-composer-dock\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(dock.includes('width: 100%') && dock.includes('max-width: var(--dsh-composer-card-max-width)'),
-      '胶囊行宽度与输入框一致')
-    assert.ok(!dock.includes('background'), '胶囊行不再自己垫底 / 重绘打光')
-    assert.ok(dock.includes(`box-shadow: ${GROUP_LINE_DARK}`), '胶囊行与输入区之间有分组线')
-    const dockCards = /\[data-phase='active'\] \[data-composer-seat\] :is\(\[data-queue-dock\], \[data-goal-bar\], \[data-testid='todo-panel'\]\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(dockCards.includes('background: transparent'), 'dock 卡去材质')
-    assert.ok(dockCards.includes(`box-shadow: ${GROUP_LINE_DARK}`), 'dock 卡之间有分组线')
-    assert.ok(dockCards.includes('backdrop-filter: none'), 'dock 卡不再各带模糊')
-    assert.ok(code.includes('content: none'), 'dock 卡的材质 / 描边伪元素一并关掉')
-    assert.ok(!code.includes('[data-composer-seat]::after'), '不再有座位底带')
-    assert.ok(!code.includes('background-attachment: fixed'), '不再需要地面光重绘补丁')
-  })
-
-  it('hero 输入框保持悬浮卡：材质 + 全周内描边 + 上下柔光', () => {
-    const card = /\[data-phase='hero'\] \[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+  it('输入框第 1 步材质：半透明底 + 背景模糊，不做折射 / 补缝', () => {
+    const seat = /\[data-composer-seat\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(seat.includes('background: none'), '座位撤掉官方遮罩，正文从玻璃下滚过')
+    const card = /\[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(card.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%`),
-      'hero 卡片本体承担半透明底')
-    const glass = /\[data-phase='hero'\] \[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(glass.includes('backdrop-filter: ' + COMPOSER_BLUR))
-    assert.ok(glass.includes(`box-shadow: ${COMPOSER_RIM_DARK}`))
-    assert.ok(glass.includes(`background-image: ${COMPOSER_SHEEN_DARK}`))
-    const light = /body:not\(\[data-ds-dark-theme\]\) \[data-phase='hero'\] \[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+      '卡片本体承担半透明底色（跟官方圆角 / 高度）')
+    assert.ok(card.includes('position: relative') && card.includes('z-index: 0'), '卡片自成层叠上下文')
+    const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(glass.includes('backdrop-filter: ' + COMPOSER_BLUR), '输入框使用独立的材质模糊参数')
+    assert.ok(glass.includes('border-radius: inherit'))
+    assert.ok(!glass.includes('url(#'), '第 1 步不做折射')
+    const dock = /\[data-phase='active'\] \[data-composer-seat\] \[data-composer-dock\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(dock.includes('background-color: var(--dsw-alias-bg-base)'), '胶囊行垫地面色，不再透出正文')
+    assert.ok(dock.includes('background-image: radial-gradient('), '胶囊行保留地面打光')
+    assert.ok(dock.includes('background-attachment: fixed'), '打光用 fixed 定位区与地面层逐像素同源')
+    assert.ok(dock.includes('width: 100%'), '胶囊行宽度与输入框一致，两侧不再漏')
+    assert.ok(dock.includes('max-width: var(--dsh-composer-card-max-width)'), '与卡片同款宽度上限')
+    assert.ok(!code.includes('[data-composer-seat]::after'), '不往整条座位底部盖（会压到卡片下沿）')
+    assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色，跟随玻璃')
+  })
+
+  it('输入框第 2 步边缘高光：全周 1px 内描边 + 上下柔光，随圆角连续', () => {
+    const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(glass.includes(`box-shadow: ${COMPOSER_RIM_DARK}`), '全周内描边（inset shadow 自动跟圆角）')
+    assert.ok(glass.includes(`background-image: ${COMPOSER_SHEEN_DARK}`), '上下柔光用线性渐变，四角不断光')
+    assert.ok(!glass.includes('radial-gradient'), '不得用径向渐变画边缘（会在角上断光）')
+    assert.ok(!glass.includes('url(#'), '仍不做折射')
+    const light = /body:not\(\[data-ds-dark-theme\]\)[^{]*\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(light.includes(`box-shadow: ${COMPOSER_RIM_LIGHT}`), '浅色轴有对应高光')
     assert.ok(light.includes(`background-image: ${COMPOSER_SHEEN_LIGHT}`))
   })
@@ -136,7 +109,7 @@ describe('glass: 顶栏 / 右栏 / 输入框（active 单板 / hero 悬浮卡）
     const blurValues = [...code.matchAll(/blur\((\d+)px\)/gu)].map(match => Number(match[1]))
     assert.ok(blurValues.every(value => value === blur24 || value === composer), '只允许两档模糊：顶栏/右栏 与 输入框')
     assert.equal(blurValues.filter(value => value === blur24).length, 2, '顶栏 / 右栏共用 GLASS_BLUR')
-    assert.equal(blurValues.filter(value => value === composer).length, 2, 'active 单板 + hero 悬浮卡共用输入框材质模糊')
+    assert.equal(blurValues.filter(value => value === composer).length, 1, '输入框单独一档材质模糊')
   })
 
   it('地面层仍是唯一常驻绘制层；对话宽度拖拽条抬到内容层之上', () => {

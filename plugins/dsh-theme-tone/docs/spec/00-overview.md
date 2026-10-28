@@ -10,14 +10,13 @@
    按色调固定；**不使用 `mix-blend-mode`**（normal 合成，颜色与 screen 的差 ≤1/255）。
 3. **对话区顶栏玻璃**：顶栏浮层化（`position: absolute` + 滚动区 `padding-top: 76px` + 滚动条 track 下推
    + 拖拽条上沿 76px），玻璃放顶栏 `::before`（`z-index: -1`），并自绘同源三道光。
-4. **输入框玻璃（active 单板 / hero 悬浮卡）**：
-   - **active**：整块「液态玻璃板」——`[data-composer-seat]` 的 `::before` 是唯一一层
-     `backdrop-filter`，从 composer stack 顶部（dock 区）贯通到视口底；顶部圆角、底部直角，
-     宽度与输入框一致。dock 卡（todo / goal / queue）、输入框卡、统计胶囊行全部透明化，
-     成为板内行（功能与交互不变）；因此不再需要任何「盖住 / 补缝」类规则。
-     板顶 / 两侧各一条 1px specular + 顶部 sheen，**底边到底不加光**；板内每组用 1px 顶部
-     高光线分隔（`box-shadow`，不占布局、不改变官方几何）。
-5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的两个
+4. **输入框玻璃 · 第 1+2 步（材质 + 边缘高光）**：座位撤掉官方 36px 实色渐隐（正文从玻璃下滚过）；
+   卡片本体承担半透明底色（跟官方圆角 / 动态高度走），`::before` 做 `backdrop-filter`，并用
+   **全周 1px inset 内描边 + 上下线性柔光**画 specular 高光（自动跟圆角、四角不断光）；
+   卡片作用域内 `--dsw-specific-selector: transparent`，让官方「+」等 selector 型按钮不读成实心块；
+   卡片下方统计胶囊行（`[data-composer-dock]`）显式 `width:100%` + 卡片同款 max-width，
+   自身重绘**底色 + 同源打光**（fixed 定位区 = 视口），向下盖住座位 4px 内边距，
+   但不向上进入卡片（避免挡住玻璃下沿的模糊内容）。
    盒子 ⇒ 带背后永远只有面板纯色。做法：可流式滚动的正文（markdown/text 文档预览、文件树）上提 76px、
    内容下移 76px（只改视觉位置），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；玻璃面挂在
    各标签自己的 38px **头行** `::before` 上、向上铺满 0..76（两盒重合，y=38 不出缝），头行 z=2、dockkit
@@ -42,7 +41,7 @@
 | :--- | :--- | :--- |
 | 模糊 | `GLASS_BLUR = blur(20px) saturate(150%)` | 顶栏 + 右栏两处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊） |
 | 填充不透明度 | `GLASS_FILL_ALPHA = 0.45` | **顶栏 / 右栏共用同一个常量**，填充色取官方 `bg-base` |
-| 输入框玻璃 | `COMPOSER_FILL_ALPHA = 0.58` / `COMPOSER_BLUR = blur(14px) saturate(140%)` / `SLAB_RIM_*` / `SLAB_SHEEN_*` / `GROUP_LINE_*` / hero `COMPOSER_RIM_*` | active：单块贯通板（顶部 / 两侧 specular、底边无光、组间高光线）；hero：悬浮卡材质 + 内描边 / 上下柔光 |
+| 输入框材质 / 高光 | `COMPOSER_FILL_ALPHA = 0.55` / `COMPOSER_BLUR = blur(12px) saturate(140%)` / `COMPOSER_RIM_*` / `COMPOSER_SHEEN_*` | 第 1 步：半透明底 + 背景模糊；第 2 步：全周 1px 内描边 + 上下线性柔光（随圆角连续，无径向断光） |
 
 ## 代码布局
 
@@ -65,14 +64,14 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 ## 硬约束（守卫里钉住）
 
 1. 除「官方默认档下也生效」的修牌面规则外，所有样式规则带 `body:not([data-dsh-theme-tone-plain])` 门。
-2. 不得出现 `background-attachment: fixed`；模糊只能取 `GLASS_BLUR` / `COMPOSER_BLUR` 两个常量，不得各写各的。
+2. `background-attachment: fixed` **只允许统计胶囊行的地面光重绘**（fixed 定位区 = 视口、与地面层逐像素同源，面积仅胶囊一行）；模糊只能取 `GLASS_BLUR` / `COMPOSER_BLUR` 两个常量，不得各写各的。
 3. `backdrop-filter` 只出现在 `::before` / 独立玻璃层上，不挂在 header / 卡片 / pane 本体。
 4. 不改官方容器的 `position` / `overflow` / `transform` / `contain`（右栏 pane 的 `position: relative;
    z-index: 0` 是已知例外，见「已知偏离」）。
 5. 颜色只走 `ctx.theme` token 通道；玻璃与地面光必须写 CSS（官方无对应 token）。
 6. 官方菜单 / 弹窗 / 挂靠卡材质一律保持原样，插件不覆盖。
-7. **active 输入框只有一层板材质**：`[data-composer-seat]::before` 是唯一 `backdrop-filter`；
-   卡片 / 胶囊行 / dock 卡不得再自带底色、阴影、模糊或补缝规则；hero 悬浮卡独立保留。
+7. **输入框玻璃第 1+2 步只做材质与高光**：允许座位透明、卡片半透明底、::before 模糊、
+   全周 inset 内描边 + 线性 sheen；**不得**出现径向渐变边缘光 / 折射 url() / 停靠卡补缝规则。
 
 ## 已知偏离 / 已知问题
 
@@ -80,14 +79,14 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 * **右栏提拉**（正文上提 76px + 内容下移 + 负底距）是对官方滚动盒的视觉位置改写；官方改渲染器结构 /
   data 属性时 lift 会静默不命中，退回「带是半透明实心板」的降级观感。pane 补
   `position: relative; z-index: 0` 作 `::before` 包含块（不改变尺寸）。
-* **输入框玻璃（重做中）**：旧实现（径向四缘光、边缘折射、停靠卡补缝）已删除；当前 active 为
-  单块贯通玻璃板（dock 区 → 输入区 → 统计胶囊行），hero 仍为悬浮玻璃卡；后续只在此基础上加边缘高光。
+* **输入框玻璃重做中**：旧实现（径向四缘光、边缘折射、停靠卡补缝）已全部删除；第 1 步
+  恢复半透明材质与模糊，第 2 步加全周内描边 + 线性高光；折射留待第 3 步。
 * 悬浮卡修复是唯一私有 seam（见 `docs/private-seams.md`），官方改类名后缀即静默失效（回退官方配色，不崩）。
 
 ## 验证
+
 * `npm run verify`：typecheck → build → test → package。
-* 单测覆盖：顶栏 / 右栏两处玻璃共用同一填充常量与官方模糊 token、active 单板与 hero 悬浮卡守卫、
-  右栏提拉与头行玻璃、地面光层三道光与层序、token 计划与官方默认档、nav-pin 纯 CSS、悬浮卡锚点、
-  client half 无逐帧探测。
+  头行玻璃、输入框材质 / 高光守卫、地面光层三道光与层序、token 计划与官方默认档、nav-pin 纯 CSS、
+  悬浮卡锚点、client half 无逐帧探测。
 * 真机验收（无头 + owner 复看）：顶栏 / 右栏 `backdrop-filter` 计算值、顶栏 y=76 不变量、
-  active 单板（无漏字、贯通到底、子区域透明）与 hero 悬浮卡、右栏 76px 让位与提拉、设置弹窗打光。
+  输入框第 1+2 步材质与高光（可读、变高不闪、四角连续）、右栏 76px 让位与提拉、设置弹窗打光。
