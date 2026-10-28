@@ -14,8 +14,6 @@ const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 /** 输入框玻璃（第 1 步：材质）：半透明底 + 背景模糊，先保证可读、变高不闪。 */
 export const COMPOSER_FILL_ALPHA = 0.55
 export const COMPOSER_BLUR = 'blur(12px) saturate(140%)'
-/** 输入框圆角相对官方 panel 半径的缩减量（px）。 */
-export const COMPOSER_RADIUS_DELTA_PX = 2
 /**
  * 输入框第 2 步：边缘高光。全周 1px 内描边（inset box-shadow 会自动跟圆角走）+ 上下柔光；
  * 不用径向渐变，所以四个角不会出现断光。
@@ -102,8 +100,7 @@ ${P} ${SEAT} [data-composer-card] {
   position: relative;
   z-index: 0;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%, transparent);
-  /* 输入框圆角比官方 panel 半径略小一点（owner 指定），::before 通过 inherit 跟随。 */
-  border-radius: calc(var(--dsw-radius-panel) - ${COMPOSER_RADIUS_DELTA_PX}px);
+  /* 形状保持官方原样（圆角走 --dsw-radius-panel），只换材质与高光。 */
   /* 「+」等 selector 型按钮：官方给的是不透明中性底，在玻璃上会读成一块实心，跟着玻璃让出底色。 */
   --dsw-specific-selector: transparent;
 }

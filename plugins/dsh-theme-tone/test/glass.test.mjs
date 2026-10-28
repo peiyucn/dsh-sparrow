@@ -7,7 +7,6 @@ import { PLAIN_ATTR } from '../lib/constants.js'
 import {
   COMPOSER_BLUR,
   COMPOSER_FILL_ALPHA,
-  COMPOSER_RADIUS_DELTA_PX,
   COMPOSER_RIM_DARK,
   COMPOSER_RIM_LIGHT,
   COMPOSER_SHEEN_DARK,
@@ -38,8 +37,7 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok(card.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%`),
       '卡片本体承担半透明底色（跟官方圆角 / 高度）')
     assert.ok(card.includes('position: relative') && card.includes('z-index: 0'), '卡片自成层叠上下文')
-    assert.ok(card.includes(`border-radius: calc(var(--dsw-radius-panel) - ${COMPOSER_RADIUS_DELTA_PX}px)`),
-      '输入框圆角比官方 panel 略小，::before 继承')
+    assert.ok(!card.includes('border-radius'), '不覆盖圆角，输入框形状保持官方原样')
     const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(glass.includes('backdrop-filter: ' + COMPOSER_BLUR), '输入框使用独立的材质模糊参数')
     assert.ok(glass.includes('border-radius: inherit'))
