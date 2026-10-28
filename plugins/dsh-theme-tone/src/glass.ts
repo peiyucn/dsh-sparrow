@@ -21,7 +21,7 @@ const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.06), inset 1px 0 2px rgb
 const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.12), inset 1px 0 2px rgba(255, 255, 255, 0.38), inset -1px 0 3px rgba(0, 0, 0, 0.05), inset 0 -1px 2px rgba(255, 255, 255, 0.08)'
 
 /**
- * 上下缘的中央柔光：4px 径向光，中心亮、向两侧和向内同时衰减，没有硬边。
+ * 上下缘的中央柔光：2px 径向光，中心亮、向两侧和向内同时衰减，没有硬边。
  * 上缘是主光，峰值高；下缘是反射光，峰值明显更低。
  */
 const TOP_GLOW_DARK = 'radial-gradient(46% 100% at 50% 0%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.07) 55%, transparent 100%)'
@@ -136,7 +136,7 @@ ${P} ${SEAT} [data-composer-card]::before {
   pointer-events: none;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%, transparent);
   background-image: ${TOP_GLOW_DARK}, ${BOTTOM_GLOW_DARK};
-  background-size: 100% 4px, 100% 4px;
+  background-size: 100% 2px, 100% 2px;
   background-position: 0 0, 0 100%;
   background-repeat: no-repeat;
   box-shadow: ${RIM_DARK};

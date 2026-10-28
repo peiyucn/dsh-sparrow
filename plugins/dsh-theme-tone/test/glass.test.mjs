@@ -61,7 +61,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(glass.includes('radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 55%, transparent 100%)'),
       '底边是中间亮、两边弱的柔光，不是硬线')
     assert.ok(!glass.includes('background-image: linear-gradient(90deg'), '上下缘都不得再画横向硬线')
-    assert.ok(glass.includes('background-size: 100% 4px, 100% 4px'), '两层都垂直 4px 衰减')
+    assert.ok(glass.includes('background-size: 100% 2px, 100% 2px'), '两层都垂直 2px 衰减')
     assert.ok(glass.includes('background-position: 0 0, 0 100%'), '分别贴上缘 / 下缘')
     const lightGlass = /body:not\(\[data-ds-dark-theme\]\)[^{]*\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(lightGlass.includes('background-image: radial-gradient(46% 100% at 50% 0%'), '浅色轴也有上缘柔光')
