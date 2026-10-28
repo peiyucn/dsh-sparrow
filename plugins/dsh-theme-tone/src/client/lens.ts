@@ -6,6 +6,7 @@
  * `<feImage>`；`feDisplacementMap scale="-255"` 把 128±dx 编码还原成像素位移，负号让边缘
  * 向卡片**外侧**取样 —— 卡外内容被凸透镜折射/放大进来（Apple 式 bezel lens），中心不动。
  * 边缘处位移最大、向内 bezel 宽度按平方曲线归零，四边与圆角同构。
+ * 底边例外：卡下方是实色座位地面带 / 空背景，向外取样会把内容拉没，故 `flipBottom` 改为向卡内取样。
  *
  * 关键：`<feImage>` 的 100% 百分比按 **SVG 视口**解析，所以隐藏 SVG 的 width/height 必须
  * 跟随卡片尺寸；若留 0×0，位移图在 backdrop-filter 里会退化成黑图（整块内容被常量位移）。
@@ -116,7 +117,7 @@ export function attachLensFilter(): LensController | null {
     const radius = readRadiusPx(card, Math.min(width, height) / 2)
     const key = `${width}x${height}r${Math.round(radius)}`
     if (key === lastKey) return
-    const map = buildLensMap({ width, height, radius, bezel: LENS_BEZEL_PX, depth: LENS_DEPTH_PX })
+    const map = buildLensMap({ width, height, radius, bezel: LENS_BEZEL_PX, depth: LENS_DEPTH_PX, flipBottom: true })
     canvas.width = map.width
     canvas.height = map.height
     const pixels = context.createImageData(map.width, map.height)

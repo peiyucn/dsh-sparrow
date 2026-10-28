@@ -22,6 +22,11 @@ export interface LensMapOptions {
   readonly bezel: number
   /** 边缘处最大位移（CSS px）。 */
   readonly depth: number
+  /**
+   * 底边反向取样：卡片下方是实色座位地面带 / 空背景，向外取样会把内容拉没；
+   * 打开后底边改为向卡内取样（滤镜侧是负 scale，编码取反后实际方向朝内）。
+   */
+  readonly flipBottom?: boolean
 }
 
 export interface LensMap {
@@ -96,7 +101,7 @@ export function buildLensMap(options: LensMapOptions): LensMap {
       }
 
       data[index] = NEUTRAL_CHANNEL + dx
-      data[index + 1] = NEUTRAL_CHANNEL + dy
+      data[index + 1] = NEUTRAL_CHANNEL + (options.flipBottom === true && signY > 0 ? -dy : dy)
       data[index + 2] = 0
       data[index + 3] = 255
     }
