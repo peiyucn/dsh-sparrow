@@ -1,11 +1,11 @@
-import { ABOVE_CONTENT_Z_INDEX, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
+import { ABOVE_CONTENT_Z_INDEX, LENS_ATTR, LENS_FILTER_ID, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
 import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
 /** 所有磨砂玻璃面共用的填充不透明度（统一参数；越小白越通透，模糊参数统一走官方 token）。 */
 export const GLASS_FILL_ALPHA = 0.45
 /** 三处玻璃共用的模糊参数（统一；2026-10-27 从官方 40px 调低，原值观感过糊）。 */
-export const GLASS_BLUR = 'blur(20px) saturate(150%)'
+export const GLASS_BLUR = 'blur(16px) saturate(150%)'
 export const SEAT_BAND_PX = 44
 
 /** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
@@ -17,17 +17,17 @@ const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
  * 上 / 下缘是主光：峰值 0.12、基线只留 0.03，两端更暗、明暗落差更大；
  * 左缘次之，右缘是背光侧、峰值最低。
  */
-const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.03), inset 1px 0 2px rgba(255, 255, 255, 0.04), inset -1px 0 3px rgba(0, 0, 0, 0.08), inset -1px 0 2px rgba(255, 255, 255, 0.04), inset 0 -1px 2px rgba(255, 255, 255, 0.03)'
-const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.06), inset 1px 0 2px rgba(255, 255, 255, 0.1), inset -1px 0 3px rgba(0, 0, 0, 0.03), inset -1px 0 2px rgba(255, 255, 255, 0.06), inset 0 -1px 2px rgba(255, 255, 255, 0.06)'
+const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.04), inset 1px 0 2px rgba(255, 255, 255, 0.04), inset -1px 0 3px rgba(0, 0, 0, 0.08), inset -1px 0 2px rgba(255, 255, 255, 0.04), inset 0 -1px 2px rgba(255, 255, 255, 0.04)'
+const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.07), inset 1px 0 2px rgba(255, 255, 255, 0.1), inset -1px 0 3px rgba(0, 0, 0, 0.03), inset -1px 0 2px rgba(255, 255, 255, 0.06), inset 0 -1px 2px rgba(255, 255, 255, 0.07)'
 
 /**
  * 四缘柔光：4px，峰值 + 基线。上 / 下缘是主光（0.12 + 0.03，横向 42% 衰减），
  * 左缘 0.08、右缘 0.06（+0.04，纵向 42% 衰减）；四边都在中点最亮、向两端渐暗。
  */
-const TOP_GLOW_DARK = 'radial-gradient(42% 100% at 50% 0%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 40%, transparent 75%)'
-const TOP_GLOW_LIGHT = 'radial-gradient(42% 100% at 50% 0%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.1) 40%, transparent 75%)'
-const BOTTOM_GLOW_DARK = 'radial-gradient(42% 100% at 50% 100%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 40%, transparent 75%)'
-const BOTTOM_GLOW_LIGHT = 'radial-gradient(42% 100% at 50% 100%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.1) 40%, transparent 75%)'
+const TOP_GLOW_DARK = 'radial-gradient(45% 100% at 50% 0%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.05) 45%, transparent 100%)'
+const TOP_GLOW_LIGHT = 'radial-gradient(45% 100% at 50% 0%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.12) 45%, transparent 100%)'
+const BOTTOM_GLOW_DARK = 'radial-gradient(45% 100% at 50% 100%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.05) 45%, transparent 100%)'
+const BOTTOM_GLOW_LIGHT = 'radial-gradient(45% 100% at 50% 100%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.12) 45%, transparent 100%)'
 const LEFT_GLOW_DARK = 'radial-gradient(100% 42% at 0% 50%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)'
 const LEFT_GLOW_LIGHT = 'radial-gradient(100% 42% at 0% 50%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%)'
 const RIGHT_GLOW_DARK = 'radial-gradient(100% 42% at 100% 50%, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.03) 50%, transparent 100%)'
@@ -149,6 +149,10 @@ ${P} ${SEAT} [data-composer-card]::before {
 body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   background-image: ${TOP_GLOW_LIGHT}, ${BOTTOM_GLOW_LIGHT}, ${LEFT_GLOW_LIGHT}, ${RIGHT_GLOW_LIGHT};
   box-shadow: ${RIM_LIGHT};
+}
+/* 边缘折射：滤镜注入后 body 才有 LENS_ATTR；不支持 url() 的浏览器会忽略这一条，保留上面的纯 blur。 */
+${P}[${LENS_ATTR}] ${SEAT} [data-composer-card]::before {
+  backdrop-filter: ${GLASS_BLUR} url(#${LENS_FILTER_ID});
 }
 /* 停靠卡补缝：卡与卡/输入框之间的 stack 缝、以及卡片上下圆角后面会透出正文，
    用「底色 + 打光」重绘盖住；只覆盖所需尺寸，不动官方几何。 */

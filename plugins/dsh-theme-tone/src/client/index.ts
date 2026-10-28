@@ -4,6 +4,7 @@ import { buildNavPinCss } from '../nav-pin.js'
 import { buildSurfaceCss } from '../surfaces.js'
 import {
   BACKDROP_CLASS,
+  LENS_ATTR,
   LOCALE_NAMESPACE,
   MARKER_ATTR,
   name,
@@ -29,6 +30,7 @@ import {
 } from '../tones.js'
 import { ThemeToneRow, type ThemeToneRowInjected } from './ThemeToneRow.js'
 import { readKnownSettings, rememberKnownSettings } from './known-settings.js'
+import { installLensFilter } from './lens.js'
 import { en, zh } from './locales.js'
 import { createPendingToneTracker, type PendingToneWrite } from './pending.js'
 import { buildRowCss } from './styles.js'
@@ -106,8 +108,11 @@ function install(ctx: never): void {
     else markerHost.removeAttribute(PLAIN_ATTR)
   }
 
-  const resources: { style?: HTMLStyleElement; layer?: HTMLDivElement } = {}
+  const resources: { style?: HTMLStyleElement; layer?: HTMLDivElement; lens?: SVGSVGElement } = {}
   paintPlain(true)
+  // 先装滤镜再挂标记：body 上没有 LENS_ATTR 时 CSS 不会引用 url(#id)，纯 blur 回退始终有效。
+  resources.lens = installLensFilter() ?? undefined
+  if (resources.lens !== undefined) markerHost?.setAttribute(LENS_ATTR, '')
   resources.style = ensureStyles()
   resources.layer = ensureLayer()
   const layer = resources.layer
@@ -129,6 +134,8 @@ function install(ctx: never): void {
   c.effect(() => () => {
     resources.layer?.remove()
     resources.style?.remove()
+    resources.lens?.remove()
+    markerHost?.removeAttribute(LENS_ATTR)
     disposeTokens?.()
     paintPlain(false)
   }, `${name}: resources`)

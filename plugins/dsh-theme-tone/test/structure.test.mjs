@@ -37,4 +37,13 @@ describe('dsh-theme-tone 结构', () => {
       assert.ok(existsSync(new URL(`../src/${file}`, import.meta.url)), `${file} 应存在`)
     }
   })
+
+  it('client 应注入边缘折射滤镜，并在卸载时移除（含 body 标记）', async () => {
+    assert.ok(existsSync(new URL('../src/client/lens.ts', import.meta.url)), '缺 lens.ts')
+    const index = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+    assert.match(index, /installLensFilter\(\)/u)
+    assert.match(index, /setAttribute\(LENS_ATTR/u)
+    assert.match(index, /removeAttribute\(LENS_ATTR\)/u)
+    assert.match(index, /resources\.lens\?\.remove\(\)/u)
+  })
 })

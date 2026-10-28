@@ -25,3 +25,9 @@ export const BOTTOM_VARIABLE = '--dsh-theme-tone-bottom'
 export const LEFT_VARIABLE = '--dsh-theme-tone-left'
 export const PANEL_VARIABLE = '--dsh-theme-tone-panel'
 export const TOP_STOP_VARIABLE = '--dsh-theme-tone-top-stop'
+
+/** 边缘折射滤镜（输入框玻璃）：注入一次，CSS 通过 url(#id) 引用。 */
+export const LENS_ATTR = 'data-dsh-theme-tone-lens'
+export const LENS_FILTER_ID = 'dsh-theme-tone-lens'
+/** 位移强度（负值 = 向卡片内部取样，边缘向内折射，不把卡片外内容拉进来）。 */
+export const LENS_SCALE = -12
