@@ -1,6 +1,6 @@
 {
   "name": "@dsh-sparrow/dsh-theme-tone",
-  "description": "Tone skins for the official light and dark themes: token colors, ground light, and frosted glass on the conversation header and right sidebar",
+  "description": "Tone skins for the official light and dark themes: token colors, ground light, and liquid glass on the conversation header and right sidebar",
   "version": "0.2.1-rc.4",
   "license": "MIT",
   "repository": {

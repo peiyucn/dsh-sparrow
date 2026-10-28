@@ -52,6 +52,11 @@ export function buildBackdropCss(): string {
   background-image: ${BACKDROP_GRADIENTS};
 }
 .${BACKDROP_CLASS}[hidden] { display: none; }
+/* 官方座位（composerSeat）默认铺一块 bg-base 渐隐板，会在对话底部形成一大块实色背景。
+   这里直接清掉它：不保留黑块，也不再重绘 / 补光；页面底光从透明的座位后自然透出。 */
+body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat] {
+  background: transparent;
+}
 body:not([${PLAIN_ATTR}]) [${CONTENT_ATTR}] { position: relative; z-index: ${CONTENT_Z_INDEX}; }
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
 body:not([${PLAIN_ATTR}]) [${SHELL_OVERLAY_ATTR}] { z-index: ${ABOVE_CONTENT_Z_INDEX}; }

@@ -2,10 +2,12 @@ import { ABOVE_CONTENT_Z_INDEX, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants
 import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
-/** 玻璃面共用的填充不透明度（统一参数；越小白越通透）。 */
-export const GLASS_FILL_ALPHA = 0.45
-/** 玻璃面共用的模糊参数（统一；2026-10-27 从官方 40px 调低，原值观感过糊）。 */
-export const GLASS_BLUR = 'blur(20px) saturate(150%)'
+/** 顶栏 / 右栏的玻璃填充；不碰官方边框，只做半透明材质。 */
+export const GLASS_FILL_ALPHA = 0.4
+/** 两处液态玻璃共用的模糊：冷调提亮，模拟 Liquid Glass 的 regular variant。 */
+export const GLASS_BLUR = 'blur(24px) saturate(170%) brightness(1.04)'
+
+const P = `body:not([${PLAIN_ATTR}])`
 
 /** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
 export const PANEL_BAND_PX = 38
@@ -19,14 +21,14 @@ function viewportLight(position: string, size = '100vw 100vh'): string {
   background-repeat: no-repeat;`
 }
 
-/** 玻璃面的填充：底色 × 给定不透明度。 */
-function glassFill(alpha: number): string {
-  return `  background-color: color-mix(in srgb, var(--dsw-alias-bg-base) ${alpha * 100}%, transparent);`
+/** 顶栏 / 右栏两处液态玻璃共用的材质：只做半透明填充与冷调模糊，不碰官方边框、不加描边 / inset 阴影。 */
+function glassMaterial(fill: string, alpha: number): string {
+  return `  background-color: color-mix(in srgb, ${fill} ${alpha * 100}%, transparent);
+  backdrop-filter: ${GLASS_BLUR};`
 }
 
 const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
 
-const P = `body:not([${PLAIN_ATTR}])`
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
 
 /** 右栏 76px 下有「可流式滚动的正文」的标签：只有它们上提滚区，正文才会真的从两条带下滚过。 */
@@ -46,7 +48,7 @@ const PANEL_HEADERS = [
 ].join(',\n')
 
 export function buildGlassCss(): string {
-  return `/* ===== 对话区顶栏：浮层化 + 玻璃 ===== */
+  return `/* ===== 对话区顶栏：浮层化 + 液态玻璃 ===== */
 ${P} [data-phase='active'] { position: relative; }
 ${P} [data-phase='active'] [data-slot='conversation.header'] > header {
   position: absolute;
@@ -62,9 +64,8 @@ ${P} [data-phase='active'] [data-slot='conversation.header'] > header::before {
   z-index: -1;
   pointer-events: none;
   border-radius: inherit;
-${glassFill(GLASS_FILL_ALPHA)}
+${glassMaterial('var(--dsw-alias-bg-base)', GLASS_FILL_ALPHA)}
 ${viewportLight('100% 0')}
-  backdrop-filter: ${GLASS_BLUR};
 }
 ${P} [data-phase='active'] [data-conversation-scroll] {
   padding-top: ${HEADER_HEIGHT_PX}px;
@@ -76,7 +77,7 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框：保持官方原样（不做任何定制；后续若重做，另起方案并独立提交） ===== */
+/* ===== 输入框：保持官方原样（不做任何定制） ===== */
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
 ${P} ${RP} {
@@ -129,9 +130,9 @@ ${PANEL_HEADERS.split(',\n').map(selector => `${selector}::before`).join(',\n')}
   right: 0;
   z-index: -1;
   pointer-events: none;
-${glassFill(GLASS_FILL_ALPHA)}
+  border-radius: inherit;
+${glassMaterial('var(--dsw-alias-bg-base)', GLASS_FILL_ALPHA)}
 ${viewportLight('100% 0')}
-  backdrop-filter: ${GLASS_BLUR};
 }
 /* dockkit 条要压在头行的面上：否则条内标签 / 加号 / 关闭按钮被那层填充压暗。 */
 ${P} [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip] {

@@ -15,33 +15,35 @@ const css = buildGlassCss()
 const backdropCss = buildBackdropCss()
 const code = css.replace(/\/\*[\s\S]*?\*\//gu, '')
 
-describe('glass: 顶栏与右栏（输入框保持官方原样）', () => {
-  it('两处玻璃共用同一个填充参数与同一个模糊参数（统一）', () => {
-    assert.ok(GLASS_FILL_ALPHA < 0.5, '通透：填充不透明度低于一半')
+describe('glass: 两处液态玻璃', () => {
+  it('两处共用同一个模糊与填充；不新增任何边框', () => {
+    assert.ok(GLASS_FILL_ALPHA < 0.5, '顶栏 / 右栏通透')
     const blurPx = Number(/blur\((\d+)px\)/u.exec(GLASS_BLUR)?.[1] ?? 0)
     assert.ok(blurPx > 0 && blurPx < 40, '模糊低于官方 40px（降低模糊程度）')
     assert.equal(code.split('backdrop-filter: ' + GLASS_BLUR).length - 1, 2, '顶栏 + 右栏两处玻璃')
-    assert.ok((code.match(new RegExp(String(GLASS_FILL_ALPHA * 100) + '%', 'gu')) ?? []).length >= 2, '两处填充都引用同一个常量')
+    assert.equal((code.match(new RegExp(String(GLASS_FILL_ALPHA * 100) + '%', 'gu')) ?? []).length, 2, '两处共用填充常量')
+    assert.ok(!code.includes('box-shadow'), '⛔ 不新增边框 / inset 阴影，保持官方原有边框')
+    assert.ok(!code.includes('inset '), '⛔ 不新增任何 inset 高光')
   })
 
-  it('输入框不做任何定制：没有 composer 选择器与玻璃层（干净基线）', () => {
-    assert.ok(!code.includes('[data-composer'), '干净基线阶段不得出现输入框定制规则')
-    assert.ok(!code.includes('data-specific-input'), '不得覆盖输入框底色')
+  it('输入框不做任何定制：没有 composer 选择器与玻璃层', () => {
+    assert.ok(!code.includes('[data-composer'), '输入框保持官方原样')
+    assert.ok(!code.includes('data-specific-input'), '不覆盖输入框底色')
   })
 
-  it('顶栏：浮层化 + 内容上移 + 半透明填充 + 官方模糊 token + 自绘地面光', () => {
+  it('顶栏：浮层化 + 内容上移 + 液态玻璃 + 自绘地面光', () => {
     assert.match(code, /\[data-slot='conversation\.header'\] > header \{[^}]*position: absolute/u)
     assert.match(code, new RegExp(`padding-top: ${HEADER_HEIGHT_PX}px`, 'u'))
     assert.match(code, new RegExp(`margin: calc\\(${HEADER_HEIGHT_PX}px \\+ 2px\\)`, 'u'))
     assert.match(code, new RegExp(`\\[data-width-handle\\] \\{[^}]*top: ${HEADER_HEIGHT_PX}px`, 'u'))
     const header = new RegExp(`\\[data-slot='conversation\\.header'\\] > header::before \\{([^}]*)\\}`, 'u').exec(code)?.[1] ?? ''
-    assert.ok(header.includes('backdrop-filter: blur(20px) saturate(150%)'), '顶栏玻璃用统一模糊参数')
+    assert.ok(header.includes('backdrop-filter: ' + GLASS_BLUR), '顶栏玻璃用统一模糊参数')
     assert.ok(header.includes(`color-mix(in srgb, var(--dsw-alias-bg-base) ${GLASS_FILL_ALPHA * 100}%`), '顶栏填充比例')
     assert.ok(header.includes('background-image: radial-gradient('), '顶栏必须自己画一遍地面光')
     assert.ok(header.includes('background-position: 100% 0'), '顶栏贴视口右上 ⇒ 与地面光同源')
   })
 
-  it('右栏：底色/打光 + 正文上提 76px 从两条带下滚过 + 头行玻璃（真模糊）', () => {
+  it('右栏：底色/打光 + 正文上提 76px 从两条带下滚过 + 头行液态玻璃', () => {
     const pane = /\[data-dockkit-pane\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(pane.includes('background-image: radial-gradient('), 'pane 画地面光')
     assert.ok(!pane.includes('backdrop-filter'), '玻璃不挂 pane 本体（会采样到自己的子内容）')
@@ -53,7 +55,7 @@ describe('glass: 顶栏与右栏（输入框保持官方原样）', () => {
     assert.ok(code.includes('[data-files-body] > *'), '文件树正文下移')
     const faces = [...code.matchAll(/::before \{\n  content: '';\n  position: absolute;\n  top: -38px;[\s\S]*?\n\}/gu)]
     assert.equal(faces.length, 1, '头行玻璃面（::before，top:-38 铺满 0..76）')
-    assert.ok((faces[0]?.[0] ?? '').includes('backdrop-filter: blur(20px) saturate(150%)'))
+    assert.ok((faces[0]?.[0] ?? '').includes('backdrop-filter: ' + GLASS_BLUR))
     assert.ok((faces[0]?.[0] ?? '').includes('background-image: radial-gradient('), '玻璃面自带同源光')
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
@@ -76,12 +78,14 @@ describe('glass: 顶栏与右栏（输入框保持官方原样）', () => {
     assert.ok(blurValues.length > 0 && blurValues.every(value => value === expectedBlur), '模糊统一为 GLASS_BLUR')
   })
 
-  it('地面层仍是唯一常驻绘制层；对话宽度拖拽条抬到内容层之上', () => {
+  it('地面层仍是唯一常驻绘制层；座位官方实色底已在 backdrop 清掉', () => {
     assert.ok(backdropCss.includes('position: fixed'))
     assert.ok(!backdropCss.includes('backdrop-filter'))
     assert.ok(!backdropCss.includes('mix-blend-mode'))
     assert.match(backdropCss, /\[data-width-handle\][^}]*\{[^}]*z-index: 82/u)
     assert.match(backdropCss, /\[data-side\]:not\(\[role='tooltip'\]\)[^}]*\{[^}]*z-index: 82/u)
+    assert.match(backdropCss, /\[data-composer-seat\] \{[^}]*background: transparent/u, '座位不得保留官方黑底')
+    assert.ok(!code.includes('[data-composer-seat]'), '玻璃层不得覆盖座位')
   })
 })
 

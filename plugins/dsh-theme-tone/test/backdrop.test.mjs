@@ -16,10 +16,17 @@ describe('backdrop: 地面光层', () => {
   const css = buildBackdropCss()
 
   it('三道光都在、位置/方向原样（形状常量不变）', () => {
-    assert.equal((css.match(/radial-gradient\(/gu) ?? []).length, 3)
+    assert.equal((css.match(/radial-gradient\(/gu) ?? []).length, 3, '地面层三道光')
     assert.match(css, /ellipse 80vw 45vh at 50% -10vh/u)
     assert.match(css, /ellipse 70vw 45vh at 50% 112vh/u)
     assert.match(css, /ellipse 38vw 58vh at 0% -6vh/u)
+  })
+
+  it('座位：清掉官方实色底，不再有黑块 / wash / 额外打光', () => {
+    const seat = /body:not\(\[[^\]]+\]\) \[data-phase='active'\] \[data-composer-seat\] \{([^}]*)\}/u.exec(css)?.[1] ?? ''
+    assert.ok(seat.includes('background: transparent'), '座位完全透明，让页面底光透出')
+    assert.ok(!seat.includes('background-image'), '不重绘座位的背景光')
+    assert.ok(!seat.includes('box-shadow'), '不补 inset 打光')
   })
 
   it('固定全屏、z-index 在内容之下、深色轴 screen 混合', () => {

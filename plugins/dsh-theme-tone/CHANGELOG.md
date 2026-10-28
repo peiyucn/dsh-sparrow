@@ -5,7 +5,8 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 ## [0.2.1-rc.4] - 2026-10-28
 
 - Now adapted to official dsh 0.2.1-rc.4 (web and desktop).
-- The composer goes back to the official look: all custom input styling has been removed.
+- The conversation header and right sidebar top bar now share one translucent liquid-glass material; official borders stay untouched.
+- The solid strip under the composer is removed, so the page ground light shows through instead.
 
 ## [0.2.1-rc.3] - 2026-10-24
 
