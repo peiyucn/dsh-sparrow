@@ -31,8 +31,8 @@ export const LENS_ATTR = 'data-dsh-theme-tone-lens'
 export const LENS_FILTER_ID = 'dsh-theme-tone-lens'
 export const LENS_IMAGE_ID = 'dsh-theme-tone-lens-map'
 /** 斜面宽度（px）。 */
-export const LENS_BEZEL_PX = 24
+export const LENS_BEZEL_PX = 28
 /** 边缘最大位移（px；必须 < 128，编码 128±值会撞到通道上下限）。 */
-export const LENS_DEPTH_PX = 24
+export const LENS_DEPTH_PX = 32
 /** 通道 → 采样偏移：255 对应 1px；正值 = 按位移图朝卡片中心取样（四边向外放大）。 */
 export const LENS_MAP_SCALE = 255

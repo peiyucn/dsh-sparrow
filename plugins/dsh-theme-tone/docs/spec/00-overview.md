@@ -16,7 +16,7 @@
    `--dsw-specific-selector: transparent`（「+」按钮让出实心底色）。
    **四缘光**：都不画均匀线；四边都在中点最亮、向两端衰减。上 / 下缘是主光、落差更大（0.12 + 0.04 基线，横向 45%）；左缘 0.08、右缘 0.06（背光），纵向 42%。
    **边缘折射（Apple Liquid Glass 式 bezel 透镜）**：按卡片**实际尺寸与圆角**用 canvas 逐像素
-   生成位移图（圆角矩形 SDF；bezel 24px 内位移最大 24px、按 `(1-t)^2` 归零），写进 `<feImage>`，
+   生成位移图（圆角矩形 SDF；bezel 28px 内位移最大 32px、按 `(1-t)^2` 归零），写进 `<feImage>`，
    `feDisplacementMap scale="255"` 把 128±dx 编码还原成像素位移；位移图方向朝卡片中心，
    四条边因此各自向外放大（上 / 下 / 左 / 右四个方向），中心不动、且不依赖卡外内容。隐藏 SVG 的
    width/height 必须跟随卡片尺寸（feImage 的 100% 按 SVG 视口解析；留 0×0 会退化成黑图）。
@@ -53,11 +53,11 @@
 
 | 参数 | 值 | 说明 |
 | :--- | :--- | :--- |
-| 模糊 | `GLASS_BLUR = blur(2px) saturate(150%)`（临时压低以观察边缘折射，确认后回调） | 三处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊），测试钉住「三处同一值」 |
-| 填充不透明度 | `GLASS_FILL_ALPHA = 0.6` | **三处统一同一个常量**，越小白越通透；填充色各自取官方面 token（顶栏/右栏 = `bg-base`，输入框 = `--dsw-specific-input-major`） |
+| 模糊 | `GLASS_BLUR = blur(8px) saturate(150%)`（效果优先档） | 三处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊），测试钉住「三处同一值」 |
+| 填充不透明度 | `GLASS_FILL_ALPHA = 0.55` | **三处统一同一个常量**，越小白越通透；填充色各自取官方面 token（顶栏/右栏 = `bg-base`，输入框 = `--dsw-specific-input-major`） |
 | 边缘光 | `RIM_DARK` / `RIM_LIGHT` | 四边各留极淡基线（右缘另叠一点暗边），连成一圈；深/浅两套 |
 | 四缘光 | `TOP_GLOW_*` / `BOTTOM_GLOW_*` / `LEFT_GLOW_*` / `RIGHT_GLOW_*` | 4px 径向柔光；上/下 0.12 + 0.04 基线（45% 横向），左 0.08 / 右 0.06 + 0.04 基线（42% 纵向） |
-| 透镜斜面 | `LENS_BEZEL_PX = 24` / `LENS_DEPTH_PX = 24` / `LENS_MAP_SCALE = 255` | bezel 内边缘位移最大、按平方归零；正 scale = 朝卡内取样、四边向外放大；隐藏 SVG 视口 = 卡片尺寸 |
+| 透镜斜面 | `LENS_BEZEL_PX = 28` / `LENS_DEPTH_PX = 32` / `LENS_MAP_SCALE = 255` | bezel 内边缘位移最大、按平方归零；正 scale = 朝卡内取样、四边向外放大；隐藏 SVG 视口 = 卡片尺寸 |
 
 ## 代码布局
 
