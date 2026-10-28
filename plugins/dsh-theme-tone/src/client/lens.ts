@@ -20,6 +20,7 @@ import {
   LENS_FILTER_ID,
   LENS_IMAGE_ID,
   LENS_MAP_SCALE,
+  LENS_REPAINT_VALUE,
 } from '../constants.js'
 import { buildLensMap } from './lens-map.js'
 
@@ -123,7 +124,8 @@ export function attachLensFilter(): LensController | null {
       svg.setAttribute('height', String(height))
     }
     // 位移图就绪后才启用 CSS 增强声明；之前 / 失败时只走纯 blur。
-    body.setAttribute(LENS_ATTR, '')
+    // 每次尺寸变化切换计算值，强制 Chromium 重新采集 backdrop（见 glass.ts 的 REPAINT 规则）。
+    body.setAttribute(LENS_ATTR, body.getAttribute(LENS_ATTR) === LENS_REPAINT_VALUE ? '' : LENS_REPAINT_VALUE)
     lastKey = key
   }
 

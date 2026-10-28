@@ -1,4 +1,4 @@
-import { ABOVE_CONTENT_Z_INDEX, LENS_ATTR, LENS_FILTER_ID, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
+import { ABOVE_CONTENT_Z_INDEX, LENS_ATTR, LENS_FILTER_ID, LENS_REPAINT_VALUE, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
 import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
@@ -153,6 +153,11 @@ body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
 /* 透镜就绪（body 带 LENS_ATTR）才追加滤镜；不支持的引擎忽略本行、保留上面的纯 blur。 */
 ${P}[${LENS_ATTR}] ${SEAT} [data-composer-card]::before {
   backdrop-filter: ${GLASS_BLUR} url(#${LENS_FILTER_ID});
+}
+/* 输入框高度变化时在两种等价 filter 值间切换：Chromium 会复用旧尺寸的 backdrop 快照，
+   不切的话新高度会残留一条旧高度的带。brightness(1) 是视觉 no-op，只用于改变计算值。 */
+${P}[${LENS_ATTR}="${LENS_REPAINT_VALUE}"] ${SEAT} [data-composer-card]::before {
+  backdrop-filter: ${GLASS_BLUR} url(#${LENS_FILTER_ID}) brightness(1);
 }
 /* 停靠卡补缝：卡与卡/输入框之间的 stack 缝、以及卡片上下圆角后面会透出正文，
    用「底色 + 打光」重绘盖住；只覆盖所需尺寸，不动官方几何。 */

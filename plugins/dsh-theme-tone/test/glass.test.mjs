@@ -21,7 +21,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(GLASS_FILL_ALPHA >= 0.4 && GLASS_FILL_ALPHA < 0.6, '半透明：背景轮廓可见，但不盖掉折射')
     const blurPx = Number(/blur\((\d+)px\)/u.exec(GLASS_BLUR)?.[1] ?? 0)
     assert.ok(blurPx > 0 && blurPx < 40, '模糊低于官方 40px（降低模糊程度）')
-    assert.equal(code.split('backdrop-filter: ' + GLASS_BLUR).length - 1, 4, '三处玻璃 + 边缘折射增强各一处')
+    assert.equal(code.split('backdrop-filter: ' + GLASS_BLUR).length - 1, 5, '三处玻璃 + 透镜 + 重采集等价值各一处')
     assert.ok((code.match(new RegExp(String(GLASS_FILL_ALPHA * 100) + '%', 'gu')) ?? []).length >= 3, '三处填充都引用同一个常量')
   })
 
