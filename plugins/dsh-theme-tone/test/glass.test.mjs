@@ -52,17 +52,19 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(glass.includes('backdrop-filter: blur(20px) saturate(150%)'), '输入框保留完整玻璃模糊')
     assert.ok(glass.includes('border-radius: inherit'))
     assert.ok(glass.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%`), '玻璃填充比例')
-    assert.ok(glass.includes('box-shadow: inset 0 1px 2px'), '上缘高光')
+    assert.ok(glass.includes('box-shadow: inset 0 1px 2px'), '上缘保留极淡基线')
     assert.ok(glass.includes('inset -1px 0 3px rgba(0, 0, 0'), '右缘暗边（有方向）')
     assert.ok(glass.includes('inset 0 -1px 2px rgba(255, 255, 255, 0.05)'), '下缘保留极淡基线，四边连成一圈')
     assert.ok(!glass.includes('inset 0 -1px 2px rgba(0, 0, 0'), '下缘不再压暗')
-    assert.ok(glass.includes('background-image: radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.05) 55%, transparent 100%)'),
+    assert.ok(glass.includes('background-image: radial-gradient(46% 100% at 50% 0%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.07) 55%, transparent 100%)'),
+      '上缘中央主光，不是均匀边')
+    assert.ok(glass.includes('radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 55%, transparent 100%)'),
       '底边是中间亮、两边弱的柔光，不是硬线')
-    assert.ok(!glass.includes('background-image: linear-gradient(90deg'), '底边不得再画横向硬线')
-    assert.ok(glass.includes('background-size: 100% 4px'), '柔光垂直 4px 衰减')
-    assert.ok(glass.includes('background-position: 0 100%'), '柔光贴底')
+    assert.ok(!glass.includes('background-image: linear-gradient(90deg'), '上下缘都不得再画横向硬线')
+    assert.ok(glass.includes('background-size: 100% 4px, 100% 4px'), '两层都垂直 4px 衰减')
+    assert.ok(glass.includes('background-position: 0 0, 0 100%'), '分别贴上缘 / 下缘')
     const lightGlass = /body:not\(\[data-ds-dark-theme\]\)[^{]*\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(lightGlass.includes('background-image: radial-gradient(46% 100%'), '浅色轴也有底边柔光')
+    assert.ok(lightGlass.includes('background-image: radial-gradient(46% 100% at 50% 0%'), '浅色轴也有上缘柔光')
     const band = /\[data-composer-seat\]::after \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(band.includes('background-image:'), '座位底带重画地面光')
     assert.ok(band.includes('background-position: 100% 100%'))

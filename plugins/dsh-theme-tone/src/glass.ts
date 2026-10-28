@@ -14,19 +14,20 @@ const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 
 /**
  * 玻璃边缘的固定高光：光是**有方向**的（光源在左上）——上缘最亮、左缘次之、右缘压暗。
- * 下缘也保留一条极淡的基线，让四边连成一圈、不在底角断掉；底边中央再叠一道
- * 中间亮、两边弱的反射光（见 BOTTOM_GLOW）。四边同亮会读成描边，不是玻璃。
+ * 上下缘都不画均匀线：各保留一条极淡基线维持「一圈」连续，再由中央的柔光做
+ * 中间亮、两边弱的过渡（见 TOP_GLOW / BOTTOM_GLOW）。四边同亮会读成描边，不是玻璃。
  */
-const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.26), inset 1px 0 2px rgba(255, 255, 255, 0.12), inset -1px 0 3px rgba(0, 0, 0, 0.15), inset 0 -1px 2px rgba(255, 255, 255, 0.05)'
-const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.72), inset 1px 0 2px rgba(255, 255, 255, 0.4), inset -1px 0 3px rgba(0, 0, 0, 0.05), inset 0 -1px 2px rgba(255, 255, 255, 0.1)'
+const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.06), inset 1px 0 2px rgba(255, 255, 255, 0.12), inset -1px 0 3px rgba(0, 0, 0, 0.15), inset 0 -1px 2px rgba(255, 255, 255, 0.05)'
+const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.12), inset 1px 0 2px rgba(255, 255, 255, 0.38), inset -1px 0 3px rgba(0, 0, 0, 0.05), inset 0 -1px 2px rgba(255, 255, 255, 0.08)'
 
 /**
- * 底边光：不再画 1px 线。上缘的柔和来自「1px 偏移 + 2px 模糊」，底边改用同量级的
- * 4px 径向光：贴着底边、中心亮、两边弱，垂直方向均匀衰减，没有硬边。
- * 峰值略低于上缘（主光在上），下缘的极淡基线留在 RIM 里，保证四边连成一圈。
+ * 上下缘的中央柔光：4px 径向光，中心亮、向两侧和向内同时衰减，没有硬边。
+ * 上缘是主光，峰值高；下缘是反射光，峰值明显更低。
  */
-const BOTTOM_GLOW_DARK = 'radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.05) 55%, transparent 100%)'
-const BOTTOM_GLOW_LIGHT = 'radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.1) 55%, transparent 100%)'
+const TOP_GLOW_DARK = 'radial-gradient(46% 100% at 50% 0%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.07) 55%, transparent 100%)'
+const TOP_GLOW_LIGHT = 'radial-gradient(46% 100% at 50% 0%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.16) 55%, transparent 100%)'
+const BOTTOM_GLOW_DARK = 'radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 55%, transparent 100%)'
+const BOTTOM_GLOW_LIGHT = 'radial-gradient(46% 100% at 50% 100%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.06) 55%, transparent 100%)'
 
 /** 输入框卡片的悬浮阴影（投影方向朝下，读作离开页面）。 */
 const CARD_SHADOW_DARK = '0 12px 32px -12px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25)'
@@ -134,15 +135,15 @@ ${P} ${SEAT} [data-composer-card]::before {
   border-radius: inherit;
   pointer-events: none;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%, transparent);
-  background-image: ${BOTTOM_GLOW_DARK};
-  background-size: 100% 4px;
-  background-position: 0 100%;
+  background-image: ${TOP_GLOW_DARK}, ${BOTTOM_GLOW_DARK};
+  background-size: 100% 4px, 100% 4px;
+  background-position: 0 0, 0 100%;
   background-repeat: no-repeat;
   box-shadow: ${RIM_DARK};
   backdrop-filter: ${GLASS_BLUR};
 }
 body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
-  background-image: ${BOTTOM_GLOW_LIGHT};
+  background-image: ${TOP_GLOW_LIGHT}, ${BOTTOM_GLOW_LIGHT};
   box-shadow: ${RIM_LIGHT};
 }
 /* 停靠卡补缝：卡与卡/输入框之间的 stack 缝、以及卡片上下圆角后面会透出正文，
