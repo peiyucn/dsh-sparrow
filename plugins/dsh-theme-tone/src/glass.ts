@@ -12,6 +12,8 @@ export const GLASS_FILL_ALPHA = 0.4
 export const GLASS_BLUR = 'blur(24px) saturate(170%) brightness(1.04)'
 /** 输入框单独用低饱和模糊：透明玻璃会直接透出主题底色，过饱和会把底色放大成明显的蓝。 */
 export const COMPOSER_BLUR = 'blur(24px) saturate(110%) brightness(1.04)'
+/** 输入框中性遮罩比例；越大越不透明、越不显背景色。 */
+export const COMPOSER_VEIL_PERCENT = 7
 
 const P = `body:not([${PLAIN_ATTR}])`
 
@@ -33,9 +35,9 @@ function glassMaterial(fill: string, alpha: number): string {
   backdrop-filter: ${GLASS_BLUR};`
 }
 
-/** 输入框：纯透明 + 背景模糊 + 固定光源的边缘高光 + 悬浮投影（全部纯 CSS）。 */
+/** 输入框：很轻的中性遮罩 + 背景模糊 + 固定光源的边缘高光 + 悬浮投影（全部纯 CSS）。 */
 function composerMaterial(): string {
-  return `  background-color: transparent;
+  return `  background-color: color-mix(in srgb, var(--dsw-alias-label-primary) ${COMPOSER_VEIL_PERCENT}%, transparent);
   backdrop-filter: ${COMPOSER_BLUR};
   box-shadow:
     0 24px 50px -24px rgba(0, 0, 0, 0.55),

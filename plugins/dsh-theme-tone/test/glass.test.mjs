@@ -6,6 +6,7 @@ import { buildBackdropCss } from '../lib/backdrop.js'
 import { PLAIN_ATTR } from '../lib/constants.js'
 import {
   COMPOSER_BLUR,
+  COMPOSER_VEIL_PERCENT,
   GLASS_BLUR,
   GLASS_FILL_ALPHA,
   HEADER_HEIGHT_PX,
@@ -35,7 +36,9 @@ describe('glass: 三处液态玻璃', () => {
     assert.ok(card.includes('position: relative') && card.includes('z-index: 0'), '卡片自成层叠上下文')
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底')
     const optics = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(optics.includes('background-color: transparent'), '输入框纯透明，不染官方蓝色')
+    assert.ok(optics.includes(`background-color: color-mix(in srgb, var(--dsw-alias-label-primary) ${COMPOSER_VEIL_PERCENT}%`),
+      '轻量中性遮罩降低透明度，不用官方蓝色输入底')
+    assert.ok(!optics.includes('--dsw-specific-input-major'), '不染官方输入底色')
     assert.ok(!optics.includes('background-image:'), '不在整面加偏光 / 渐变')
     assert.ok(optics.includes('backdrop-filter: ' + COMPOSER_BLUR), '低饱和背景模糊')
     assert.ok(optics.includes('border-radius: inherit'), '跟官方圆角')
