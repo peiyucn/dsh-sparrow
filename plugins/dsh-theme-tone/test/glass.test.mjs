@@ -54,11 +54,11 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(glass.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%`), '玻璃填充比例')
     assert.ok(glass.includes('box-shadow: inset 0 1px 2px'), '上缘保留极淡基线')
     assert.ok(glass.includes('inset -1px 0 3px rgba(0, 0, 0'), '右缘暗边（有方向）')
-    assert.ok(glass.includes('inset 0 -1px 2px rgba(255, 255, 255, 0.05)'), '下缘保留极淡基线，四边连成一圈')
+    assert.ok(glass.includes('inset 0 -1px 2px rgba(255, 255, 255, 0.03)'), '下缘保留极淡基线，四边连成一圈')
     assert.ok(!glass.includes('inset 0 -1px 2px rgba(0, 0, 0'), '下缘不再压暗')
-    assert.ok(glass.includes('background-image: radial-gradient(50% 100% at 50% 0%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 50%, transparent 100%)'),
+    assert.ok(glass.includes('background-image: radial-gradient(42% 100% at 50% 0%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 40%, transparent 75%)'),
       '上缘中间突出、两端衰减到基线')
-    assert.ok(glass.includes('radial-gradient(50% 100% at 50% 100%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 50%, transparent 100%)'),
+    assert.ok(glass.includes('radial-gradient(42% 100% at 50% 100%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 40%, transparent 75%)'),
       '下缘与上缘同档')
     assert.ok(glass.includes('radial-gradient(100% 42% at 0% 50%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)'),
       '左缘中点最亮、上下渐暗')
@@ -68,7 +68,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(glass.includes('background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%'), '四边柔光都按 2px 厚度衰减')
     assert.ok(glass.includes('background-position: 0 0, 0 100%, 0 0, 100% 0'), '上 / 下 / 左 / 右分别贴边')
     const lightGlass = /body:not\(\[data-ds-dark-theme\]\)[^{]*\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(lightGlass.includes('background-image: radial-gradient(50% 100% at 50% 0%'), '浅色轴也有上缘柔光')
+    assert.ok(lightGlass.includes('background-image: radial-gradient(42% 100% at 50% 0%'), '浅色轴也有上缘柔光')
     assert.ok(lightGlass.includes('radial-gradient(100% 42%'), '浅色轴左缘上下两头亮')
     assert.ok(lightGlass.includes('radial-gradient(100% 42%'), '浅色轴右缘也有光')
     const band = /\[data-composer-seat\]::after \{([^}]*)\}/u.exec(code)?.[1] ?? ''
