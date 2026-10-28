@@ -20,11 +20,14 @@ const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.16), inset 1px 0 2px rgba(255, 255, 255, 0.06), inset -1px 0 3px rgba(0, 0, 0, 0.18)'
 const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.72), inset 1px 0 2px rgba(255, 255, 255, 0.4), inset -1px 0 3px rgba(0, 0, 0, 0.05)'
 
-/** 底边光：中间亮、两边弱；下面再垫一层同色柔光，避免 1px 硬线。 */
-const BOTTOM_EDGE_DARK = 'linear-gradient(90deg, transparent 6%, rgba(255, 255, 255, 0.5) 50%, transparent 94%)'
-const BOTTOM_EDGE_LIGHT = 'linear-gradient(90deg, transparent 6%, rgba(255, 255, 255, 0.9) 50%, transparent 94%)'
-const BOTTOM_GLOW_DARK = 'radial-gradient(65% 160% at 50% 100%, rgba(255, 255, 255, 0.16), transparent 72%)'
-const BOTTOM_GLOW_LIGHT = 'radial-gradient(65% 160% at 50% 100%, rgba(255, 255, 255, 0.4), transparent 72%)'
+/**
+ * 底边光：中间亮、两边弱。主体是贴着底边的**柔光**（不画硬线），窄范围衰减；
+ * 另加一条几乎不可见的细线只负责勾出玻璃边缘，避免整段读成灰色带状。
+ */
+const BOTTOM_EDGE_DARK = 'linear-gradient(90deg, transparent 18%, rgba(255, 255, 255, 0.1) 50%, transparent 82%)'
+const BOTTOM_EDGE_LIGHT = 'linear-gradient(90deg, transparent 18%, rgba(255, 255, 255, 0.35) 50%, transparent 82%)'
+const BOTTOM_GLOW_DARK = 'radial-gradient(38% 130% at 50% 100%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.1) 45%, transparent 78%)'
+const BOTTOM_GLOW_LIGHT = 'radial-gradient(38% 130% at 50% 100%, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.18) 45%, transparent 78%)'
 
 /** 输入框卡片的悬浮阴影（投影方向朝下，读作离开页面）。 */
 const CARD_SHADOW_DARK = '0 12px 32px -12px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25)'
@@ -133,7 +136,7 @@ ${P} ${SEAT} [data-composer-card]::before {
   pointer-events: none;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%, transparent);
   background-image: ${BOTTOM_EDGE_DARK}, ${BOTTOM_GLOW_DARK};
-  background-size: 100% 1px, 100% 8px;
+  background-size: 100% 1px, 100% 10px;
   background-position: 0 100%, 0 100%;
   background-repeat: no-repeat;
   box-shadow: ${RIM_DARK};
