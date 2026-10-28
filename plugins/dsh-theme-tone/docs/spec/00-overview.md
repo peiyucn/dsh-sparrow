@@ -13,7 +13,7 @@
 4. **输入框玻璃**：座位撤掉官方 36px 实色渐隐（正文从玻璃下滚过）；卡片本体承担半透明底色
    （圆角 25px、`::before` inherit），`::before` 做 `backdrop-filter` 并画 specular 高光；
    卡片作用域内 `--dsw-specific-selector: transparent`，让官方「+」等 selector 型按钮不读成实心块。
-   **todo / goal 接进输入框**：宽度保持官方、不覆盖；两者下边直角、用负边距 tuck 进下方 stack 缝；
+   两者下边直角；用负边距**刚好抵消** stack 缝（不重叠，官方原来的 gap+3px 重叠一并改掉）；多停靠面板
    多个停靠面板叠在一起时，除最上面那个外，其余面板顶角也切直角，避免直角底与圆角顶在接缝处错位。
    专属色只作用于图标与标题（todo = 绿 `state-success-primary`，goal = 橘红 `state-warn-primary`），
    正文与右侧按钮保持官方色。停靠区材质统一为**不透明**（对齐官方现值）：todo 根节点 /
@@ -47,7 +47,7 @@
 | :--- | :--- | :--- |
 | 模糊 | `GLASS_BLUR = blur(20px) saturate(150%)` | 顶栏 + 右栏两处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊） |
 | 填充不透明度 | `GLASS_FILL_ALPHA = 0.45` | **顶栏 / 右栏共用同一个常量**，填充色取官方 `bg-base` |
-| 输入框材质 / 高光 | `COMPOSER_FILL_ALPHA = 0.55` / `COMPOSER_BLUR = blur(12px) saturate(140%)` / `COMPOSER_RIM_*` / `COMPOSER_SHEEN_*` / `COMPOSER_RADIUS_PX = 25` | 半透明底 + 背景模糊；均匀 1px 内描边 + 上下柔光；圆角 25px；todo / goal 上圆下直并 tuck 进 stack 缝 |
+| 输入框材质 / 高光 | `COMPOSER_FILL_ALPHA = 0.55` / `COMPOSER_BLUR = blur(12px) saturate(140%)` / `COMPOSER_RIM_*` / `COMPOSER_SHEEN_*` / `COMPOSER_RADIUS_PX = 25` | 半透明底 + 背景模糊；均匀 1px 内描边 + 上下柔光；圆角 25px；todo / goal 上圆下直、负边距刚好抵消 stack 缝（不重叠） |
 
 ## 代码布局
 
@@ -78,7 +78,7 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 6. 官方菜单 / 弹窗 / 挂靠卡材质一律保持原样，插件不覆盖（例外：对话区停靠区按功能 4 统一为不透明材质）。
 7. **输入框玻璃只做材质与高光**：允许座位透明、卡片半透明底、`::before` 模糊、均匀 inset 内描边 +
    线性 sheen；**不得**出现径向渐变边缘光 / 折射 `url()` / 停靠卡补缝规则。todo / goal 停靠区只做
-   接缝（直角 + tuck）、专属色与不透明材质，不改官方宽度。
+   接缝（直角 + 刚好抵消 stack 缝）、专属色与不透明材质，不改官方宽度。
 
 ## 已知偏离 / 已知问题
 
@@ -87,7 +87,7 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
   data 属性时 lift 会静默不命中，退回「带是半透明实心板」的降级观感。pane 补
   `position: relative; z-index: 0` 作 `::before` 包含块（不改变尺寸）。
 * **输入框玻璃**：当前是半透明材质 + 均匀内描边 + 上下 sheen，圆角 25px；折射 / 液态玻璃形变仍未做。
-* **停靠区接缝**：用「下边直角 + 负边距 tuck」和「非最上层顶角切直角」实现；官方改 stack 结构或
+* **停靠区接缝**：用「下边直角 + 负边距刚好抵消 stack 缝」「非最上层顶角切直角」实现；官方改 stack 结构或
   `--dsh-composer-stack-gap` 语义时接缝会失效（退回原官方留缝，不崩）。
 * 悬浮卡修复是唯一私有 seam（见 `docs/private-seams.md`），官方改类名后缀即静默失效（回退官方配色，不崩）。
 

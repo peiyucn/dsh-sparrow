@@ -143,7 +143,7 @@ ${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
    只有图标与标题用专属色（todo 绿 / goal 橘红），正文与右侧按钮保持官方色。 */
 ${P} [data-phase='active'] [data-testid='todo-panel'] {
   border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
-  margin-bottom: calc(0px - var(--dsh-composer-stack-gap) - 3px);
+  margin-bottom: calc(0px - var(--dsh-composer-stack-gap));
   box-shadow: none;
   --dsw-elevation-stroke-color: transparent;
 }
@@ -155,7 +155,7 @@ ${P} [data-phase='active'] [data-testid='todo-panel'] > div > button > span:nth-
   color: var(--dsw-alias-state-success-primary);
 }
 ${P} [data-phase='active'] [data-goal-bar] {
-  margin-bottom: calc(0px - var(--dsh-composer-stack-gap) - 3px);
+  margin-bottom: calc(0px - var(--dsh-composer-stack-gap));
 }
 ${P} [data-phase='active'] [data-goal-bar] > div {
   border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
@@ -167,6 +167,10 @@ ${P} [data-phase='active'] [data-composer-seat] [data-goal-bar]:not(:first-child
 }
 ${P} [data-phase='active'] [data-composer-seat] [data-queue-dock]:not(:first-child) > * {
   border-radius: 0;
+}
+/* queue 官方用「gap + 3px」做重叠；停靠区已不透明，改成刚好抵消 gap，避免看到重叠带。 */
+${P} [data-phase='active'] [data-queue-dock] {
+  margin-bottom: calc(0px - var(--dsh-composer-stack-gap));
 }
 ${P} [data-phase='active'] [data-goal-bar] > div > span:first-child,
 ${P} [data-phase='active'] [data-goal-bar] > div > span:nth-child(2) {

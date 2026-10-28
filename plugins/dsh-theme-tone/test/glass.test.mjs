@@ -57,14 +57,15 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     const todo = /\[data-phase='active'\] \[data-testid='todo-panel'\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(!todo.includes('width: 100%') && !todo.includes('max-width:'), '宽度保持官方，不做对齐')
     assert.ok(todo.includes('border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0'), 'todo 下边直角')
-    assert.ok(todo.includes('margin-bottom: calc(0px - var(--dsh-composer-stack-gap) - 3px)'), 'todo tuck 进下方 stack 缝')
+    assert.ok(todo.includes('margin-bottom: calc(0px - var(--dsh-composer-stack-gap))'), 'todo 刚好抵消 stack 缝，不重叠')
     assert.ok(todo.includes('box-shadow: none'), '去掉面板投影，避免接缝处出现阴影线')
     assert.ok(todo.includes('--dsw-elevation-stroke-color: transparent'), '去掉接缝处的描边线')
     const todoIcon = /\[data-testid='todo-panel'\] > div > button > span:first-child,\n[^{]*span:nth-child\(2\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(todoIcon.includes('color: var(--dsw-alias-state-success-primary)'), 'todo 图标与标题用绿色')
     const goal = /\[data-phase='active'\] \[data-goal-bar\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(!goal.includes('width: 100%') && !goal.includes('max-width:'), 'goal 宽度保持官方')
-    assert.ok(goal.includes('margin-bottom: calc(0px - var(--dsh-composer-stack-gap) - 3px)'), 'goal tuck 进下方 stack 缝')
+    assert.ok(goal.includes('margin-bottom: calc(0px - var(--dsh-composer-stack-gap))'), 'goal 刚好抵消 stack 缝')
+    assert.ok(/\[data-queue-dock\] \{\n  margin-bottom: calc\(0px - var\(--dsh-composer-stack-gap\)\);\n\}/u.test(code), 'queue 也改成刚好抵消，不再 3px 重叠')
     const goalBar = /\[data-phase='active'\] \[data-goal-bar\] > div \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(goalBar.includes('border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0'), 'goal 下边直角')
     assert.ok(goalBar.includes('box-shadow: none'), '去掉 bar 投影')
