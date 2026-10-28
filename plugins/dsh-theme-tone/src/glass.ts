@@ -20,8 +20,8 @@ export const COMPOSER_RADIUS_DELTA_PX = 2
  * 输入框第 2 步：边缘高光。全周 1px 内描边（inset box-shadow 会自动跟圆角走）+ 上下柔光；
  * 不用径向渐变，所以四个角不会出现断光。
  */
-export const COMPOSER_RIM_DARK = 'inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 1px 0 0 rgba(255, 255, 255, 0.05), inset -1px 0 0 rgba(255, 255, 255, 0.03), inset 0 -1px 0 rgba(255, 255, 255, 0.04)'
-export const COMPOSER_RIM_LIGHT = 'inset 0 1px 0 rgba(255, 255, 255, 0.40), inset 1px 0 0 rgba(255, 255, 255, 0.16), inset -1px 0 0 rgba(0, 0, 0, 0.04), inset 0 -1px 0 rgba(0, 0, 0, 0.04)'
+export const COMPOSER_RIM_DARK = 'inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 1px 0 0 rgba(255, 255, 255, 0.04), inset -1px 0 0 rgba(255, 255, 255, 0.04), inset 0 -1px 0 rgba(255, 255, 255, 0.04)'
+export const COMPOSER_RIM_LIGHT = 'inset 0 1px 0 rgba(255, 255, 255, 0.40), inset 1px 0 0 rgba(255, 255, 255, 0.16), inset -1px 0 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.04)'
 export const COMPOSER_SHEEN_DARK = 'linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 6%, transparent 16%, transparent 84%, rgba(255, 255, 255, 0.03) 94%, rgba(255, 255, 255, 0.04) 100%)'
 export const COMPOSER_SHEEN_LIGHT = 'linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, transparent 18%, transparent 82%, rgba(255, 255, 255, 0.12) 100%)'
 
