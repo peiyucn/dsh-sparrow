@@ -57,7 +57,11 @@ function installLensFilter(): SVGSVGElement | null {
   svg.setAttribute('height', '0')
   svg.setAttribute('aria-hidden', 'true')
   svg.setAttribute('focusable', 'false')
-  svg.style.position = 'absolute'
+  // 必须 fixed：绝对定位会以 body 末尾为静态位置，把 SVG 高度算进文档滚动高度（页面变长）。
+  svg.style.position = 'fixed'
+  svg.style.top = '0'
+  svg.style.left = '0'
+  svg.style.pointerEvents = 'none'
   svg.innerHTML = buildLensFilterMarkup()
   document.body.appendChild(svg)
   return svg
