@@ -33,7 +33,7 @@ describe('lens filter', () => {
     assert.ok(markup.includes('xChannelSelector="R"'))
     assert.ok(markup.includes('yChannelSelector="G"'))
     assert.ok(LENS_SCALE < 0, '负 scale：四边向卡片内部取样，不产生外缘接缝')
-    assert.ok(markup.includes("offset='.06'"), '边缘处中性、6% 处位移最大、12% 回中性')
+    assert.ok(markup.includes("offset='.08'"), '边缘处中性、8%/12% 处位移最大、16%/24% 回中性')
     assert.ok(markup.includes('%23800000'), '中间段 R=128（无位移）')
   })
 })

@@ -30,4 +30,4 @@ export const TOP_STOP_VARIABLE = '--dsh-theme-tone-top-stop'
 export const LENS_ATTR = 'data-dsh-theme-tone-lens'
 export const LENS_FILTER_ID = 'dsh-theme-tone-lens'
 /** 位移强度（负值 = 向卡片内部取样，边缘向内折射，不把卡片外内容拉进来）。 */
-export const LENS_SCALE = -24
+export const LENS_SCALE = -36
