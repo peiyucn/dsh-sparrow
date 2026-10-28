@@ -13,12 +13,11 @@
 4. **输入框玻璃**：座位撤掉官方 36px 实色渐隐（正文从玻璃下滚过）；卡片本体承担半透明底色
    （圆角 25px、`::before` inherit），`::before` 做 `backdrop-filter` 并画 specular 高光；
    卡片作用域内 `--dsw-specific-selector: transparent`，让官方「+」等 selector 型按钮不读成实心块。
-   两者下边直角；用负边距**刚好抵消** stack 缝（不重叠，官方原来的 gap+3px 重叠一并改掉）；多停靠面板
-   多个停靠面板叠在一起时，除最上面那个外，其余面板顶角也切直角，避免直角底与圆角顶在接缝处错位。
-   专属色只作用于图标与标题（todo = 绿 `state-success-primary`，goal = 橘红 `state-warn-primary`），
-   正文与右侧按钮保持官方色。停靠区材质统一为**不透明**（对齐官方现值）：todo 根节点 /
-   queue 的 `panel::before` / goal 的 `bar::before` 都换成 `--dsw-alias-bg-layer-2` 不透明底并撤掉
-   各自的 `backdrop-filter`。
+   **停靠区（todo / goal / queue）统一规格**：宽度保持官方、不覆盖；三者都改上圆下直，
+   用负边距**刚好抵消** stack 缝（不重叠）；材质统一为**不透明**（`--dsw-alias-bg-layer-2`），
+   撤掉各自的 `backdrop-filter` 与官方描边 / 投影；叠多个时非最上面的面板顶角切直角，
+   并在顶部画 1px 分割线（`inset` shadow，不占布局）。专属色只作用于图标与标题
+   （todo = 绿 `state-success-primary`，goal = 橘红 `state-warn-primary`），正文与右侧按钮保持官方色。
    卡片下方统计胶囊行（`[data-composer-dock]`）显式 `width:100%` + 卡片同款 max-width，
    自身重绘**底色 + 同源打光**（fixed 定位区 = 视口），向下盖住座位 4px 内边距，
    但不向上进入卡片（避免挡住玻璃下沿的模糊内容）。

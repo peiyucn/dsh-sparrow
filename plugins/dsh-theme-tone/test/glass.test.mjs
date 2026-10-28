@@ -12,6 +12,8 @@ import {
   COMPOSER_RIM_LIGHT,
   COMPOSER_SHEEN_DARK,
   COMPOSER_SHEEN_LIGHT,
+  DOCK_DIVIDER_DARK,
+  DOCK_DIVIDER_LIGHT,
   GLASS_BLUR,
   GLASS_FILL_ALPHA,
   HEADER_HEIGHT_PX,
@@ -53,32 +55,27 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色')
   })
 
-  it('todo / goal 接进输入框：不改宽度 + 直角接缝 + 图标/标题专属色', () => {
-    const todo = /\[data-phase='active'\] \[data-testid='todo-panel'\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(!todo.includes('width: 100%') && !todo.includes('max-width:'), '宽度保持官方，不做对齐')
-    assert.ok(todo.includes('border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0'), 'todo 下边直角')
-    assert.ok(todo.includes('margin-bottom: calc(0px - var(--dsh-composer-stack-gap))'), 'todo 刚好抵消 stack 缝，不重叠')
-    assert.ok(todo.includes('box-shadow: none'), '去掉面板投影，避免接缝处出现阴影线')
-    assert.ok(todo.includes('--dsw-elevation-stroke-color: transparent'), '去掉接缝处的描边线')
+  it('停靠区（todo / goal / queue）统一规格：直角接缝 + 分割线 + 图标/标题专属色', () => {
+    const surface = /:is\(\[data-queue-dock\] > \*, \[data-goal-bar\] > div, \[data-testid='todo-panel'\]\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(surface.includes('border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0'), '三者统一：上圆下直')
+    assert.ok(surface.includes('box-shadow: none'), '去掉官方面板投影')
+    assert.ok(surface.includes('--dsw-elevation-stroke-color: transparent'), '去掉官方面板描边')
+    const margins = /:is\(\[data-testid='todo-panel'\], \[data-goal-bar\], \[data-queue-dock\]\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(margins.includes('margin-bottom: calc(0px - var(--dsh-composer-stack-gap))'), '三者统一：刚好抵消 stack 缝，不重叠')
+    const nonFirst = /:is\(\[data-goal-bar\], \[data-queue-dock\]\):not\(:first-child\) > \*,\n[^{]*\[data-testid='todo-panel'\]:not\(:first-child\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(nonFirst.includes('border-radius: 0'), '非最上层顶角切直角')
+    assert.ok(nonFirst.includes(`box-shadow: ${DOCK_DIVIDER_DARK}`), '叠在一起时中间有 1px 分割线')
+    assert.ok(code.includes(`box-shadow: ${DOCK_DIVIDER_LIGHT}`), '浅色轴有对应分割线')
     const todoIcon = /\[data-testid='todo-panel'\] > div > button > span:first-child,\n[^{]*span:nth-child\(2\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(todoIcon.includes('color: var(--dsw-alias-state-success-primary)'), 'todo 图标与标题用绿色')
-    const goal = /\[data-phase='active'\] \[data-goal-bar\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(!goal.includes('width: 100%') && !goal.includes('max-width:'), 'goal 宽度保持官方')
-    assert.ok(goal.includes('margin-bottom: calc(0px - var(--dsh-composer-stack-gap))'), 'goal 刚好抵消 stack 缝')
-    assert.ok(/\[data-queue-dock\] \{\n  margin-bottom: calc\(0px - var\(--dsh-composer-stack-gap\)\);\n\}/u.test(code), 'queue 也改成刚好抵消，不再 3px 重叠')
-    const goalBar = /\[data-phase='active'\] \[data-goal-bar\] > div \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(goalBar.includes('border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0'), 'goal 下边直角')
-    assert.ok(goalBar.includes('box-shadow: none'), '去掉 bar 投影')
-    assert.ok(goalBar.includes('--dsw-elevation-stroke-color: transparent'), '去掉 bar 描边')
-    assert.ok(/\[data-testid='todo-panel'\]:not\(:first-child\) \{([^}]*)\}/u.test(code), '非最上层面板顶角切直角')
-    assert.ok(/\[data-goal-bar\]:not\(:first-child\) > div/u.test(code), 'goal 非最上层也切直角顶角')
-    assert.ok(/\[data-queue-dock\]:not\(:first-child\) > \*/u.test(code), 'queue 非最上层也切直角顶角')
     const goalIcon = /\[data-goal-bar\] > div > span:first-child,\n[^{]*span:nth-child\(2\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(goalIcon.includes('color: var(--dsw-alias-state-warn-primary)'), 'goal 图标与标题用橘红')
     assert.ok(!code.includes('--dsw-alias-label-primary: var(--dsw-alias-state-'), '不整体改正文/按钮颜色')
     const opaque = /\[data-queue-dock\] > \*::before,\n[^{]*\[data-goal-bar\] > div::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(opaque.includes('background: var(--dsw-alias-bg-layer-2)') && opaque.includes('backdrop-filter: none'), 'queue / goal 材质改为不透明');
+    assert.ok(opaque.includes('background: var(--dsw-alias-bg-layer-2)') && opaque.includes('backdrop-filter: none'), 'queue / goal 材质改为不透明')
     assert.ok(/\[data-testid='todo-panel'\] \{\n  background: var\(--dsw-alias-bg-layer-2\);\n  backdrop-filter: none;\n\}/u.test(code), 'todo 材质改为不透明')
+    assert.ok(!/\[data-testid='todo-panel'\] \{\n  width:/u.test(code), 'todo 不改官方宽度')
+    assert.ok(!/\[data-goal-bar\] \{\n  width:/u.test(code), 'goal 不改官方宽度')
   })
 
   it('输入框第 2 步边缘高光：全周 1px 内描边 + 上下柔光，随圆角连续', () => {

@@ -24,6 +24,9 @@ export const COMPOSER_RIM_DARK = 'inset 0 1px 0 rgba(255, 255, 255, 0.10), inset
 export const COMPOSER_RIM_LIGHT = 'inset 0 1px 0 rgba(255, 255, 255, 0.36), inset 1px 0 0 rgba(255, 255, 255, 0.13), inset -1px 0 0 rgba(255, 255, 255, 0.13), inset 0 -1px 0 rgba(0, 0, 0, 0.04)'
 export const COMPOSER_SHEEN_DARK = 'linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.012) 6%, transparent 16%, transparent 84%, rgba(255, 255, 255, 0.025) 94%, rgba(255, 255, 255, 0.03) 100%)'
 export const COMPOSER_SHEEN_LIGHT = 'linear-gradient(180deg, rgba(255, 255, 255, 0.19) 0%, transparent 18%, transparent 82%, rgba(255, 255, 255, 0.09) 100%)'
+/** 相邻停靠面板之间的 1px 分割线（inset shadow，不占布局、不改变面板高度）。 */
+export const DOCK_DIVIDER_DARK = 'inset 0 1px 0 rgba(255, 255, 255, 0.08)'
+export const DOCK_DIVIDER_LIGHT = 'inset 0 1px 0 rgba(0, 0, 0, 0.07)'
 
 /** 与地面层同源的光：显式视口尺寸 + 定位，禁止 `background-attachment: fixed`。 */
 function viewportLight(position: string, size = '100vw 100vh'): string {
@@ -136,48 +139,28 @@ ${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
   background-attachment: fixed;
 }
 
-/* ===== todo / goal：接进输入框（不改宽度） =====
-   下边直角 + 负边距 tuck 进下方 stack 缝；去掉官方面板描边 / 投影，接缝处不再多一条线。
-   多个停靠面板叠在一起时，除最上面那个，其余面板顶角也切直角，否则上一个的直角底会和
-   下一个的圆角顶错位（就是多处接缝看着没连上的原因）。
-   只有图标与标题用专属色（todo 绿 / goal 橘红），正文与右侧按钮保持官方色。 */
-${P} [data-phase='active'] [data-testid='todo-panel'] {
+/* ===== 停靠区（todo / goal / queue）统一规格 =====
+   三者用同一套：不透明浮层底、默认上圆下直、负边距刚好抵消 stack 缝；
+   叠多个时非最上面的面板顶角切直角，并在顶部画 1px 分割线（inset，不占布局）。
+   只保留各自的图标 / 标题专属色。 */
+${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock] > *, [data-goal-bar] > div, [data-testid='todo-panel']) {
   border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
-  margin-bottom: calc(0px - var(--dsh-composer-stack-gap));
   box-shadow: none;
   --dsw-elevation-stroke-color: transparent;
 }
+${P} [data-phase='active'] [data-composer-seat] :is([data-goal-bar], [data-queue-dock]):not(:first-child) > *,
 ${P} [data-phase='active'] [data-composer-seat] [data-testid='todo-panel']:not(:first-child) {
   border-radius: 0;
+  box-shadow: ${DOCK_DIVIDER_DARK};
 }
-${P} [data-phase='active'] [data-testid='todo-panel'] > div > button > span:first-child,
-${P} [data-phase='active'] [data-testid='todo-panel'] > div > button > span:nth-child(2) {
-  color: var(--dsw-alias-state-success-primary);
-}
-${P} [data-phase='active'] [data-goal-bar] {
+${P} [data-phase='active'] [data-composer-seat] :is([data-testid='todo-panel'], [data-goal-bar], [data-queue-dock]) {
   margin-bottom: calc(0px - var(--dsh-composer-stack-gap));
 }
-${P} [data-phase='active'] [data-goal-bar] > div {
-  border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
-  box-shadow: none;
-  --dsw-elevation-stroke-color: transparent;
+body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-phase='active'] [data-composer-seat] :is([data-goal-bar], [data-queue-dock]):not(:first-child) > *,
+body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-phase='active'] [data-composer-seat] [data-testid='todo-panel']:not(:first-child) {
+  box-shadow: ${DOCK_DIVIDER_LIGHT};
 }
-${P} [data-phase='active'] [data-composer-seat] [data-goal-bar]:not(:first-child) > div {
-  border-radius: 0;
-}
-${P} [data-phase='active'] [data-composer-seat] [data-queue-dock]:not(:first-child) > * {
-  border-radius: 0;
-}
-/* queue 官方用「gap + 3px」做重叠；停靠区已不透明，改成刚好抵消 gap，避免看到重叠带。 */
-${P} [data-phase='active'] [data-queue-dock] {
-  margin-bottom: calc(0px - var(--dsh-composer-stack-gap));
-}
-${P} [data-phase='active'] [data-goal-bar] > div > span:first-child,
-${P} [data-phase='active'] [data-goal-bar] > div > span:nth-child(2) {
-  color: var(--dsw-alias-state-warn-primary);
-}
-/* 官方停靠区现在是不透明的，我们也统一：todo 根节点 / queue 的 panel::before / goal 的 bar::before
-   都换成不透明的浮层底，并撤掉各自的 backdrop-filter。 */
+/* 不透明材质：todo 根节点 / queue 的 panel::before / goal 的 bar::before。 */
 ${P} [data-phase='active'] [data-testid='todo-panel'] {
   background: var(--dsw-alias-bg-layer-2);
   backdrop-filter: none;
@@ -186,6 +169,15 @@ ${P} [data-phase='active'] [data-queue-dock] > *::before,
 ${P} [data-phase='active'] [data-goal-bar] > div::before {
   background: var(--dsw-alias-bg-layer-2);
   backdrop-filter: none;
+}
+/* 专属色：只涂图标 + 标题，正文与右侧按钮保持官方色。 */
+${P} [data-phase='active'] [data-testid='todo-panel'] > div > button > span:first-child,
+${P} [data-phase='active'] [data-testid='todo-panel'] > div > button > span:nth-child(2) {
+  color: var(--dsw-alias-state-success-primary);
+}
+${P} [data-phase='active'] [data-goal-bar] > div > span:first-child,
+${P} [data-phase='active'] [data-goal-bar] > div > span:nth-child(2) {
+  color: var(--dsw-alias-state-warn-primary);
 }
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
