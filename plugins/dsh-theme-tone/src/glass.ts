@@ -1,4 +1,4 @@
-import { ABOVE_CONTENT_Z_INDEX, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
+import { ABOVE_CONTENT_Z_INDEX, LENS_ATTR, LENS_FILTER_ID, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
 import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
@@ -6,6 +6,12 @@ export const HEADER_HEIGHT_PX = 76
 export const GLASS_FILL_ALPHA = 0.45
 /** 玻璃面共用的模糊参数（统一；2026-10-27 从官方 40px 调低，原值观感过糊）。 */
 export const GLASS_BLUR = 'blur(20px) saturate(150%)'
+
+/** 输入框液态玻璃：材质（填充 / 模糊）与透镜滤镜。 */
+export const COMPOSER_FILL_ALPHA = 0.45
+export const COMPOSER_BLUR = 'blur(10px) saturate(160%)'
+/** 位移图就绪后叠加 `url(#id)`，边缘按位移图弯折；不支持时保持纯 blur。 */
+export const COMPOSER_LENS_FILTER = `${COMPOSER_BLUR} url(#${LENS_FILTER_ID})`
 
 /** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
 export const PANEL_BAND_PX = 38
@@ -76,7 +82,39 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框：保持官方原样（此版先不定制，作为重做 Apple 液态玻璃的干净基线） ===== */
+/* ===== 输入框液态玻璃（active / hero 通用） =====
+   座位透明 ⇒ 玻璃采样的是页面与地面光；卡片让出底色，玻璃材质放在 ::before（z-index:-1，
+   在文字之下）；填充 + 模糊 + 饱和度，位移图就绪后再叠加 url(#lens) 做边缘折射。
+   边缘高光用 inset 阴影模拟 bezel 的 specular，不另加覆盖层。 */
+${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] {
+  background: none !important;
+}
+${P} [data-composer-card] {
+  position: relative;
+  z-index: 0;
+  background-color: transparent;
+  /* 「+」等 selector 型按钮：官方给的是不透明中性底，在玻璃上会读成一块实心。 */
+  --dsw-specific-selector: transparent;
+}
+${P} [data-composer-card]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%, transparent);
+  backdrop-filter: ${COMPOSER_BLUR};
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(255, 255, 255, 0.10),
+    inset 1px 0 0 rgba(255, 255, 255, 0.12), inset -1px 0 0 rgba(255, 255, 255, 0.12);
+}
+body:not([${PLAIN_ATTR}])[${LENS_ATTR}] [data-composer-card]::before {
+  backdrop-filter: ${COMPOSER_LENS_FILTER};
+}
+body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-composer-card]::before {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -1px 0 rgba(0, 0, 0, 0.06),
+    inset 1px 0 0 rgba(255, 255, 255, 0.30), inset -1px 0 0 rgba(255, 255, 255, 0.30);
+}
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
 ${P} ${RP} {
