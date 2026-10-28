@@ -5,8 +5,8 @@
  * 两个必须守住的事实：
  * - `feImage` 的 100% 按 **SVG 视口**解析 ⇒ SVG 的 width/height 必须等于卡片尺寸；
  *   留 0×0 会退化成黑图，整块内容被常量位移（表现为错位 / 镜像）。
- * - 滤镜用负 scale 向卡外取样，边缘才是凸透镜放大；但上下边外是实色地面带，
- *   向外取会把内容拉没，所以上 / 下边反转为向卡内取样，视觉上仍是「拉长」。
+ * - 滤镜负 scale 会把位移图的方向翻成「向卡外取样」。卡外常是实色地面带 / 空白，
+ *   向外取会把内容拉没 / 读成压缩，所以四边统一 `inward: true` 改为向卡内取样，视觉一致「拉长」。
  *
  * 卡片可能晚于插件挂载出现：rAF 轮询有上限，找到后挂 ResizeObserver，尺寸 / 圆角
  * 变化经 rAF 合并重建。不支持 `backdrop-filter: url()` 或找不到卡片时静默走纯 blur。
@@ -101,8 +101,7 @@ export function attachLensFilter(): LensController | null {
       radius,
       bezel: LENS_BEZEL_PX,
       depth: LENS_DEPTH_PX,
-      flipTop: true,
-      flipBottom: true,
+      inward: true,
     })
     canvas.width = map.width
     canvas.height = map.height

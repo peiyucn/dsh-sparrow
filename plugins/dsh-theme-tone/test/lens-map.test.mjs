@@ -136,34 +136,25 @@ describe('lens-map: bezel 透镜位移图', () => {
     }
   })
 
-  it('flipBottom 只把底边编码反向（实际改为向卡内取样），顶 / 左 / 右不变', () => {
-    const flipped = buildLensMap({ width: WIDTH, height: HEIGHT, radius: RADIUS, bezel: BEZEL, depth: DEPTH, flipBottom: true })
+  it('inward 时四边编码统一取反（实际都向卡内取样，视觉一致拉长）', () => {
+    const flipped = buildLensMap({ width: WIDTH, height: HEIGHT, radius: RADIUS, bezel: BEZEL, depth: DEPTH, inward: true })
     /**
-     * @param {{ width: number, height: number, data: Uint8ClampedArray }} target
      * @param {number} x
      * @param {number} y
-     * @returns {number}
+     * @returns {{ dx: number, dy: number }}
      */
-    const gy = (target, x, y) => target.data[(y * target.width + x) * 4 + 1] - NEUTRAL
-    const bottom = gy(flipped, WIDTH / 2, HEIGHT - 2)
-    const top = gy(flipped, WIDTH / 2, 1)
-    assert.ok(bottom > 0, '底边编码反向后为正（负 scale 后实际朝上 = 卡内）')
-    assert.ok(top > 0 && Math.abs(top) === Math.abs(bottom), '顶边保持原方向与幅值')
-    assert.equal(gy(flipped, WIDTH / 2, HEIGHT / 2), 0, '中心仍中性')
-  })
-
-  it('flipTop 只把顶边编码反向，底 / 左 / 右不变', () => {
-    const flipped = buildLensMap({ width: WIDTH, height: HEIGHT, radius: RADIUS, bezel: BEZEL, depth: DEPTH, flipTop: true })
-    /**
-     * @param {{ width: number, height: number, data: Uint8ClampedArray }} target
-     * @param {number} x
-     * @param {number} y
-     * @returns {number}
-     */
-    const gy = (target, x, y) => target.data[(y * target.width + x) * 4 + 1] - NEUTRAL
-    const top = gy(flipped, WIDTH / 2, 1)
-    const bottom = gy(flipped, WIDTH / 2, HEIGHT - 2)
-    assert.ok(top < 0, '顶边编码反向后为负（负 scale 后实际朝下 = 卡内）')
-    assert.ok(bottom < 0 && Math.abs(bottom) === Math.abs(top), '底边保持原方向与幅值')
+    const at = (x, y) => {
+      const index = (y * flipped.width + x) * 4
+      return { dx: flipped.data[index] - NEUTRAL, dy: flipped.data[index + 1] - NEUTRAL }
+    }
+    const left = at(1, HEIGHT / 2)
+    const right = at(WIDTH - 2, HEIGHT / 2)
+    const top = at(WIDTH / 2, 1)
+    const bottom = at(WIDTH / 2, HEIGHT - 2)
+    assert.ok(left.dx < 0 && right.dx > 0, '左右编码取反')
+    assert.ok(top.dy < 0 && bottom.dy > 0, '上下编码取反')
+    const magnitudes = [left.dx, right.dx, top.dy, bottom.dy].map(Math.abs)
+    for (const magnitude of magnitudes) assert.ok(Math.abs(magnitude - magnitudes[0]) <= 1, '四边幅值一致')
+    assert.equal(at(WIDTH / 2, HEIGHT / 2).dx, 0, '中心仍中性')
   })
 })
