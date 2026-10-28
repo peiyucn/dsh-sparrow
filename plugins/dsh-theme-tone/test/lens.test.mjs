@@ -23,8 +23,8 @@ describe('lens filter', () => {
       assert.ok(map.includes('preserveAspectRatio="none"'), '位移图必须拉伸到整张卡')
       assert.ok(map.includes('width="100%"') && map.includes('height="100%"'))
     }
-    assert.ok(maps[0]?.includes('%23f00'), '横向图 R 通道')
-    assert.ok(maps[1]?.includes('%230f0'), '纵向图 G 通道')
+    assert.ok(maps[0]?.includes('%230f0'), '横向位置图驱动 G（y 位移）')
+    assert.ok(maps[1]?.includes('%23f00'), '纵向位置图驱动 R（x 位移）')
   })
 
   it('应该 用 screen 合成位移图，再交给 feDisplacementMap', () => {
