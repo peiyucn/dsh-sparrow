@@ -7,6 +7,10 @@ import { PLAIN_ATTR } from '../lib/constants.js'
 import {
   COMPOSER_BLUR,
   COMPOSER_FILL_ALPHA,
+  COMPOSER_RIM_DARK,
+  COMPOSER_RIM_LIGHT,
+  COMPOSER_SHEEN_DARK,
+  COMPOSER_SHEEN_LIGHT,
   GLASS_BLUR,
   GLASS_FILL_ALPHA,
   HEADER_HEIGHT_PX,
@@ -26,7 +30,7 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok((code.match(new RegExp(String(GLASS_FILL_ALPHA * 100) + '%', 'gu')) ?? []).length >= 2, '两处填充都引用同一个常量')
   })
 
-  it('输入框第 1 步只做材质：半透明底 + 背景模糊，无边缘光 / 折射 / 补缝', () => {
+  it('输入框第 1 步材质：半透明底 + 背景模糊，不做折射 / 补缝', () => {
     const seat = /\[data-composer-seat\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(seat.includes('background: none'), '座位撤掉官方遮罩，正文从玻璃下滚过')
     const card = /\[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
@@ -36,11 +40,20 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(glass.includes('backdrop-filter: ' + COMPOSER_BLUR), '输入框使用独立的材质模糊参数')
     assert.ok(glass.includes('border-radius: inherit'))
-    assert.ok(!glass.includes('background-image:'), '第 1 步不画边缘光')
-    assert.ok(!glass.includes('box-shadow:'), '第 1 步不画边缘光')
     assert.ok(!glass.includes('url(#'), '第 1 步不做折射')
     assert.ok(!code.includes('[data-composer-seat]::after'), '第 1 步不补座位底带')
     assert.ok(!code.includes('--dsw-specific-selector'), '第 1 步不动「+」按钮底色')
+  })
+
+  it('输入框第 2 步边缘高光：全周 1px 内描边 + 上下柔光，随圆角连续', () => {
+    const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(glass.includes(`box-shadow: ${COMPOSER_RIM_DARK}`), '全周内描边（inset shadow 自动跟圆角）')
+    assert.ok(glass.includes(`background-image: ${COMPOSER_SHEEN_DARK}`), '上下柔光用线性渐变，四角不断光')
+    assert.ok(!glass.includes('radial-gradient'), '不得用径向渐变画边缘（会在角上断光）')
+    assert.ok(!glass.includes('url(#'), '仍不做折射')
+    const light = /body:not\(\[data-ds-dark-theme\]\)[^{]*\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(light.includes(`box-shadow: ${COMPOSER_RIM_LIGHT}`), '浅色轴有对应高光')
+    assert.ok(light.includes(`background-image: ${COMPOSER_SHEEN_LIGHT}`))
   })
 
   it('顶栏：浮层化 + 内容上移 + 半透明填充 + 官方模糊 token + 自绘地面光', () => {

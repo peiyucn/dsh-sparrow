@@ -14,6 +14,14 @@ const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 /** 输入框玻璃（第 1 步：材质）：半透明底 + 背景模糊，先保证可读、变高不闪。 */
 export const COMPOSER_FILL_ALPHA = 0.55
 export const COMPOSER_BLUR = 'blur(12px) saturate(140%)'
+/**
+ * 输入框第 2 步：边缘高光。全周 1px 内描边（inset box-shadow 会自动跟圆角走）+ 上下柔光；
+ * 不用径向渐变，所以四个角不会出现断光。
+ */
+export const COMPOSER_RIM_DARK = 'inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 1px 0 0 rgba(255, 255, 255, 0.07), inset -1px 0 0 rgba(255, 255, 255, 0.04), inset 0 -1px 0 rgba(255, 255, 255, 0.05)'
+export const COMPOSER_RIM_LIGHT = 'inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 1px 0 0 rgba(255, 255, 255, 0.22), inset -1px 0 0 rgba(0, 0, 0, 0.04), inset 0 -1px 0 rgba(0, 0, 0, 0.05)'
+export const COMPOSER_SHEEN_DARK = 'linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 6%, transparent 16%, transparent 84%, rgba(255, 255, 255, 0.04) 94%, rgba(255, 255, 255, 0.06) 100%)'
+export const COMPOSER_SHEEN_LIGHT = 'linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, transparent 18%, transparent 82%, rgba(255, 255, 255, 0.18) 100%)'
 
 /** 与地面层同源的光：显式视口尺寸 + 定位，禁止 `background-attachment: fixed`。 */
 function viewportLight(position: string, size = '100vw 100vh'): string {
@@ -81,9 +89,10 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框玻璃 · 第 1 步：材质 =====
-   只做「半透明底 + 背景模糊」，不画边缘光、不做折射；底色放在官方卡片本体上，
-   圆角与动态高度都跟官方盒子走，::before 只负责 backdrop-filter。 */
+/* ===== 输入框玻璃 · 第 1+2 步：材质 + 边缘高光 =====
+   材质：座位透明、卡片半透明底（跟官方圆角 / 动态高度）、::before 只做 backdrop-filter。
+   高光：全周 1px 内描边 + 上下柔光（inset box-shadow / 线性渐变，自动跟圆角），不画径向断光，
+   也还没有折射（留到第 3 步单独做）。 */
 ${P} ${SEAT} {
   background: none !important;
 }
@@ -99,7 +108,13 @@ ${P} ${SEAT} [data-composer-card]::before {
   z-index: -1;
   border-radius: inherit;
   pointer-events: none;
+  background-image: ${COMPOSER_SHEEN_DARK};
+  box-shadow: ${COMPOSER_RIM_DARK};
   backdrop-filter: ${COMPOSER_BLUR};
+}
+body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
+  background-image: ${COMPOSER_SHEEN_LIGHT};
+  box-shadow: ${COMPOSER_RIM_LIGHT};
 }
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
