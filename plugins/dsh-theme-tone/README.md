@@ -10,7 +10,7 @@ Tone skins for DSH's built-in light and dark themes — a DeepSeek Harness (DSH)
 dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone
 ```
 
-Requires dsh 0.2.1-rc.3 — the exact official version line this release is built and verified against. Also requires a working `pnpm` (`dsh plugin` forwards installation to pnpm).
+Requires dsh 0.2.1-rc.4 — the exact official version line this release is built and verified against. Also requires a working `pnpm` (`dsh plugin` forwards installation to pnpm).
 
 > Do **not** run `npm install @dsh-sparrow/dsh-theme-tone` directly: that only downloads the package into some `node_modules` and does not register it with the DSH web profile. Use the `dsh plugin` command above, then restart DSH.
 
@@ -33,7 +33,7 @@ Each tone paints:
 
 ## Compatibility
 
-* Targets dsh 0.2.1-rc.3 — the exact official version line this release is built and verified against (other lines are not covered)
+* Targets dsh 0.2.1-rc.4 — the exact official version line this release is built and verified against (other lines are not covered)
 * Appearance only: it never blocks the UI or changes how anything works; menus, dialogs and docked cards keep the official material
 * When the host or the browser is missing something it needs, the plugin steps aside: the UI opens normally and it draws nothing (it also logs a user-facing warning)
 

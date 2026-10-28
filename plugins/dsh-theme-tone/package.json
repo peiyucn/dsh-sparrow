@@ -1,7 +1,7 @@
 {
   "name": "@dsh-sparrow/dsh-theme-tone",
   "description": "Tone skins for the official light and dark themes: token colors, ground light, and frosted glass on the conversation header, composer and right sidebar",
-  "version": "0.2.1-rc.3",
+  "version": "0.2.1-rc.4",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -61,17 +61,17 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.5",
-    "@deepseek-ai/dsh-settings": "0.2.1-rc.3"
+    "@deepseek-ai/dsh-settings": "0.2.1-rc.4"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.5"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.5",
-    "@deepseek-ai/dsh-client-store": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-client-ui-settings": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-client-ui-slots": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-settings": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-client-store": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-client-ui-settings": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-settings": "0.2.1-rc.4",
     "@types/node": "^22.20.0",
     "@types/react": "~18.3.1",
     "react": "^18.2.0"
