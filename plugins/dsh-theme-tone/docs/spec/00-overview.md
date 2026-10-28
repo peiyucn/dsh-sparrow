@@ -15,9 +15,9 @@
    `z-index:-1` 会逃出卡片 = 淡色框）；座位底部一小段「地面同源」带挡住卡片下方滚出的正文；卡片作用域内
    `--dsw-specific-selector: transparent`（「+」按钮让出实心底色）。
    **四缘光**：都不画均匀线；四边都在中点最亮、向两端衰减。上 / 下缘是主光、落差更大（0.12 + 0.04 基线，横向 45%）；左缘 0.08、右缘 0.06（背光），纵向 42%。
-   **边缘折射**：一次注入 SVG 位移滤镜（两张线性位移图 screen 合成 + `feDisplacementMap`，
-   负 scale 向卡片内部取样），CSS 用 `backdrop-filter: … url(#dsh-theme-tone-lens)` 引用；
-   滤镜未注入（`body` 无 `data-dsh-theme-tone-lens`）或浏览器不支持时，保留纯 blur 声明回退。
+   **边缘折射**：一次注入 SVG 位移滤镜 —— 两张线性位移图 screen 合成（边缘中性、6% 处位移最大、12% 回中性），交给 `feDisplacementMap`（scale -24，向卡片内部取样）；
+   CSS 用 `backdrop-filter: … url(#dsh-theme-tone-lens)` 引用；滤镜未注入
+   （`body` 无 `data-dsh-theme-tone-lens`）或浏览器不支持时，保留纯 blur 声明回退。
    卡片带**悬浮投影**（朝下的柔和阴影，深 / 浅两套；不位移、不加 transform —— 位移会破坏与地面光、
    补缝层的像素对齐）。
    **停靠卡补缝**：停靠卡之间 / 与输入框之间的 stack 缝、以及卡片上下圆角后面都会透出正文，
@@ -49,7 +49,7 @@
 | 参数 | 值 | 说明 |
 | :--- | :--- | :--- |
 | 模糊 | `GLASS_BLUR = blur(2px) saturate(150%)`（临时压低以观察边缘折射，确认后回调） | 三处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊），测试钉住「三处同一值」 |
-| 填充不透明度 | `GLASS_FILL_ALPHA = 0.45` | **三处统一同一个常量**，越小白越通透；填充色各自取官方面 token（顶栏/右栏 = `bg-base`，输入框 = `--dsw-specific-input-major`） |
+| 填充不透明度 | `GLASS_FILL_ALPHA = 0.6` | **三处统一同一个常量**，越小白越通透；填充色各自取官方面 token（顶栏/右栏 = `bg-base`，输入框 = `--dsw-specific-input-major`） |
 | 边缘光 | `RIM_DARK` / `RIM_LIGHT` | 四边各留极淡基线（右缘另叠一点暗边），连成一圈；深/浅两套 |
 | 四缘光 | `TOP_GLOW_*` / `BOTTOM_GLOW_*` / `LEFT_GLOW_*` / `RIGHT_GLOW_*` | 4px 径向柔光；上/下 0.12 + 0.04 基线（45% 横向），左 0.08 / 右 0.06 + 0.04 基线（42% 纵向） |
 
