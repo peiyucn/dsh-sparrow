@@ -119,12 +119,14 @@ body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   box-shadow: ${COMPOSER_RIM_LIGHT};
 }
 /* 座位撤掉官方 36px 实色渐隐后，卡片下方的统计胶囊行没有遮罩；给 dock 行本身垫「地面同源」
-   的底色 + 打光，并向两侧 / 下方延伸盖住座位内边距（不向上进入卡片，避免挡住玻璃下沿的模糊内容）。
+   的底色 + 打光。宽度必须与输入框一致（官方 dock 是 flex 子项，宽 auto 只有胶囊宽度，两侧必漏），
+   所以显式 width:100% + 卡片同款 max-width；向下多垫 4px 座位内边距，不向上进入卡片。
    fixed 背景定位区 = 视口，与地面层逐像素同源；这里面积只有胶囊一行，是唯一允许的 fixed 例外。 */
 ${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
-  max-width: none;
-  margin: 0 calc(-1 * var(--dsh-composer-side-clearance, 16px)) -4px;
-  padding: 4px var(--dsh-composer-side-clearance, 16px) 4px;
+  width: 100%;
+  max-width: var(--dsh-composer-card-max-width);
+  margin-bottom: -4px;
+  padding: 4px 0;
   background-color: var(--dsw-alias-bg-base);
   background-image: ${BACKDROP_GRADIENTS};
   background-attachment: fixed;
