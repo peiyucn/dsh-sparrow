@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 import { buildBackdropCss } from '../lib/backdrop.js'
-import { LENS_ATTR, LENS_FILTER_ID, PLAIN_ATTR } from '../lib/constants.js'
+import { PLAIN_ATTR } from '../lib/constants.js'
 import {
   GLASS_BLUR,
   GLASS_FILL_ALPHA,
@@ -18,10 +18,10 @@ const code = css.replace(/\/\*[\s\S]*?\*\//gu, '')
 
 describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
   it('三处玻璃共用同一个填充参数与同一个模糊参数（统一）', () => {
-    assert.ok(GLASS_FILL_ALPHA >= 0.4 && GLASS_FILL_ALPHA < 0.6, '半透明：背景轮廓可见，但不盖掉折射')
+    assert.ok(GLASS_FILL_ALPHA < 0.5, '通透：填充不透明度低于一半')
     const blurPx = Number(/blur\((\d+)px\)/u.exec(GLASS_BLUR)?.[1] ?? 0)
     assert.ok(blurPx > 0 && blurPx < 40, '模糊低于官方 40px（降低模糊程度）')
-    assert.equal(code.split('backdrop-filter: ' + GLASS_BLUR).length - 1, 4, '三处玻璃 + 边缘折射增强各一处')
+    assert.equal(code.split('backdrop-filter: ' + GLASS_BLUR).length - 1, 3, '三处玻璃都用同一个模糊参数')
     assert.ok((code.match(new RegExp(String(GLASS_FILL_ALPHA * 100) + '%', 'gu')) ?? []).length >= 3, '三处填充都引用同一个常量')
   })
 
@@ -31,7 +31,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.match(code, new RegExp(`margin: calc\\(${HEADER_HEIGHT_PX}px \\+ 2px\\)`, 'u'))
     assert.match(code, new RegExp(`\\[data-width-handle\\] \\{[^}]*top: ${HEADER_HEIGHT_PX}px`, 'u'))
     const header = new RegExp(`\\[data-slot='conversation\\.header'\\] > header::before \\{([^}]*)\\}`, 'u').exec(code)?.[1] ?? ''
-    assert.ok(header.includes('backdrop-filter: ' + GLASS_BLUR), '顶栏玻璃用统一模糊参数')
+    assert.ok(header.includes('backdrop-filter: blur(20px) saturate(150%)'), '顶栏玻璃用统一模糊参数')
     assert.ok(header.includes(`color-mix(in srgb, var(--dsw-alias-bg-base) ${GLASS_FILL_ALPHA * 100}%`), '顶栏填充比例')
     assert.ok(header.includes('background-image: radial-gradient('), '顶栏必须自己画一遍地面光')
     assert.ok(header.includes('background-position: 100% 0'), '顶栏贴视口右上 ⇒ 与地面光同源')
@@ -44,22 +44,21 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     const seat = /\[data-composer-seat\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(seat.includes('background: none'), '底座撤掉官方遮罩，正文从玻璃下滚过')
     const card = /\[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(card.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%`),
-      '卡片本体承担玻璃底色（跟随官方圆角 / 动态高度，不是覆盖层）')
+    assert.ok(card.includes('background-color: transparent'), '卡片本体让出底色')
     assert.ok(card.includes('z-index: 0'), '卡片自成层叠上下文（否则 ::before 的 -1 会逃出卡片 = 淡色框）')
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色')
     assert.ok(!card.includes('backdrop-filter'), '卡片本体不得带模糊')
     const glass = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(glass.includes('backdrop-filter: ' + GLASS_BLUR), '输入框保留完整玻璃模糊')
+    assert.ok(glass.includes('backdrop-filter: blur(20px) saturate(150%)'), '输入框保留完整玻璃模糊')
     assert.ok(glass.includes('border-radius: inherit'))
-    assert.ok(!glass.includes('background-color:'), '伪元素只负责模糊 / 边缘光，不铺底色')
+    assert.ok(glass.includes(`color-mix(in srgb, var(--dsw-specific-input-major) ${GLASS_FILL_ALPHA * 100}%`), '玻璃填充比例')
     assert.ok(glass.includes('box-shadow: inset 0 1px 2px'), '上缘保留极淡基线')
     assert.ok(glass.includes('inset -1px 0 3px rgba(0, 0, 0'), '右缘暗边（有方向）')
-    assert.ok(glass.includes('inset 0 -1px 2px rgba(255, 255, 255, 0.04)'), '下缘保留极淡基线，四边连成一圈')
+    assert.ok(glass.includes('inset 0 -1px 2px rgba(255, 255, 255, 0.03)'), '下缘保留极淡基线，四边连成一圈')
     assert.ok(!glass.includes('inset 0 -1px 2px rgba(0, 0, 0'), '下缘不再压暗')
-    assert.ok(glass.includes('background-image: radial-gradient(45% 100% at 50% 0%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.05) 45%, transparent 100%)'),
+    assert.ok(glass.includes('background-image: radial-gradient(42% 100% at 50% 0%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 40%, transparent 75%)'),
       '上缘中间突出、两端衰减到基线')
-    assert.ok(glass.includes('radial-gradient(45% 100% at 50% 100%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.05) 45%, transparent 100%)'),
+    assert.ok(glass.includes('radial-gradient(42% 100% at 50% 100%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 40%, transparent 75%)'),
       '下缘与上缘同档')
     assert.ok(glass.includes('radial-gradient(100% 42% at 0% 50%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)'),
       '左缘中点最亮、上下渐暗')
@@ -69,9 +68,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(glass.includes('background-size: 100% 4px, 100% 4px, 4px 100%, 4px 100%'), '四边柔光都按 4px 厚度衰减')
     assert.ok(glass.includes('background-position: 0 0, 0 100%, 0 0, 100% 0'), '上 / 下 / 左 / 右分别贴边')
     const lightGlass = /body:not\(\[data-ds-dark-theme\]\)[^{]*\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
-    assert.ok(lightGlass.includes('background-image: radial-gradient(45% 100% at 50% 0%'), '浅色轴也有上缘柔光')
-    assert.ok(code.includes(`[${LENS_ATTR}]`) && code.includes(`url(#${LENS_FILTER_ID})`),
-      '边缘折射只在滤镜注入后启用，且保留纯 blur 回退')
+    assert.ok(lightGlass.includes('background-image: radial-gradient(42% 100% at 50% 0%'), '浅色轴也有上缘柔光')
     assert.ok(lightGlass.includes('radial-gradient(100% 42%'), '浅色轴左缘上下两头亮')
     assert.ok(lightGlass.includes('radial-gradient(100% 42%'), '浅色轴右缘也有光')
     const band = /\[data-composer-seat\]::after \{([^}]*)\}/u.exec(code)?.[1] ?? ''
@@ -92,7 +89,7 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(code.includes("[data-files-body] > *"), '文件树正文下移')
     const faces = [...code.matchAll(/::before \{\n  content: '';\n  position: absolute;\n  top: -38px;[\s\S]*?\n\}/gu)]
     assert.equal(faces.length, 1, '头行玻璃面（::before，top:-38 铺满 0..76）')
-    assert.ok((faces[0]?.[0] ?? '').includes('backdrop-filter: ' + GLASS_BLUR))
+    assert.ok((faces[0]?.[0] ?? '').includes('backdrop-filter: blur(20px) saturate(150%)'))
     assert.ok((faces[0]?.[0] ?? '').includes('background-image: radial-gradient('), '玻璃面自带同源光')
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
@@ -139,13 +136,11 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
   })
 })
 
-describe('glass: 安装路径不得有逐帧 DOM 探测', () => {
-  it('client/index.ts 不做探测（透镜的一次性轮询 + ResizeObserver 收敛在 lens.ts）', async () => {
+describe('glass: 客户端不得有逐帧 DOM 探测', () => {
+  it('client half 不出现 MutationObserver / ResizeObserver / querySelectorAll / getComputedStyle / rAF', async () => {
     const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
     for (const forbidden of ['MutationObserver', 'ResizeObserver', 'querySelectorAll', 'getComputedStyle', 'requestAnimationFrame', 'setInterval']) {
-      assert.ok(!src.includes(forbidden), `client/index.ts 不得使用 ${forbidden}`)
+      assert.ok(!src.includes(forbidden), `client half 不得使用 ${forbidden}`)
     }
-    const lens = await readFile(new URL('../src/client/lens.ts', import.meta.url), 'utf8')
-    assert.match(lens, /LENS_ATTACH_MAX_FRAMES = 120/u, 'lens 的卡片轮询有帧数上限')
   })
 })

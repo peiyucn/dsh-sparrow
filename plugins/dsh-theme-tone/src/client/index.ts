@@ -29,7 +29,6 @@ import {
 } from '../tones.js'
 import { ThemeToneRow, type ThemeToneRowInjected } from './ThemeToneRow.js'
 import { readKnownSettings, rememberKnownSettings } from './known-settings.js'
-import { attachLensFilter, type LensController } from './lens.js'
 import { en, zh } from './locales.js'
 import { createPendingToneTracker, type PendingToneWrite } from './pending.js'
 import { buildRowCss } from './styles.js'
@@ -107,10 +106,8 @@ function install(ctx: never): void {
     else markerHost.removeAttribute(PLAIN_ATTR)
   }
 
-  const resources: { style?: HTMLStyleElement; layer?: HTMLDivElement; lens?: LensController } = {}
+  const resources: { style?: HTMLStyleElement; layer?: HTMLDivElement } = {}
   paintPlain(true)
-  // 透镜异步等卡片、按实际几何生成；就绪前没有 LENS_ATTR，CSS 只有纯 blur，失败即永久回退。
-  resources.lens = attachLensFilter() ?? undefined
   resources.style = ensureStyles()
   resources.layer = ensureLayer()
   const layer = resources.layer
@@ -130,7 +127,6 @@ function install(ctx: never): void {
   let warned = false
 
   c.effect(() => () => {
-    resources.lens?.dispose()
     resources.layer?.remove()
     resources.style?.remove()
     disposeTokens?.()
