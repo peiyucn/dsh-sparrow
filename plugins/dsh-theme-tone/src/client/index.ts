@@ -4,7 +4,6 @@ import { buildNavPinCss } from '../nav-pin.js'
 import { buildSurfaceCss } from '../surfaces.js'
 import {
   BACKDROP_CLASS,
-  LENS_ATTR,
   LOCALE_NAMESPACE,
   MARKER_ATTR,
   name,
@@ -30,7 +29,7 @@ import {
 } from '../tones.js'
 import { ThemeToneRow, type ThemeToneRowInjected } from './ThemeToneRow.js'
 import { readKnownSettings, rememberKnownSettings } from './known-settings.js'
-import { installLensFilter } from './lens.js'
+import { attachLensFilter, type LensController } from './lens.js'
 import { en, zh } from './locales.js'
 import { createPendingToneTracker, type PendingToneWrite } from './pending.js'
 import { buildRowCss } from './styles.js'
@@ -108,11 +107,11 @@ function install(ctx: never): void {
     else markerHost.removeAttribute(PLAIN_ATTR)
   }
 
-  const resources: { style?: HTMLStyleElement; layer?: HTMLDivElement; lens?: SVGSVGElement } = {}
+  const resources: { style?: HTMLStyleElement; layer?: HTMLDivElement; lens?: LensController } = {}
   paintPlain(true)
-  // 先装滤镜再挂标记：body 上没有 LENS_ATTR 时 CSS 不会引用 url(#id)，纯 blur 回退始终有效。
-  resources.lens = installLensFilter() ?? undefined
-  if (resources.lens !== undefined) markerHost?.setAttribute(LENS_ATTR, '')
+  // 透镜控制器自己异步找卡片、按实际几何生成位移图；就绪前 body 上没有 LENS_ATTR，
+  // CSS 保持纯 blur —— 找不到卡片 / 浏览器不支持时也就永久停在纯 blur（安静降级）。
+  resources.lens = attachLensFilter() ?? undefined
   resources.style = ensureStyles()
   resources.layer = ensureLayer()
   const layer = resources.layer
@@ -132,10 +131,10 @@ function install(ctx: never): void {
   let warned = false
 
   c.effect(() => () => {
+    // dispose 内部：取消待执行的帧回调、断开尺寸观测、移除滤镜 SVG 与 body 标记。
+    resources.lens?.dispose()
     resources.layer?.remove()
     resources.style?.remove()
-    resources.lens?.remove()
-    markerHost?.removeAttribute(LENS_ATTR)
     disposeTokens?.()
     paintPlain(false)
   }, `${name}: resources`)

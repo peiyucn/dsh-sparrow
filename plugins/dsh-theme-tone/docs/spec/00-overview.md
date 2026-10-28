@@ -15,7 +15,11 @@
    `z-index:-1` 会逃出卡片 = 淡色框）；座位底部一小段「地面同源」带挡住卡片下方滚出的正文；卡片作用域内
    `--dsw-specific-selector: transparent`（「+」按钮让出实心底色）。
    **四缘光**：都不画均匀线；四边都在中点最亮、向两端衰减。上 / 下缘是主光、落差更大（0.12 + 0.04 基线，横向 45%）；左缘 0.08、右缘 0.06（背光），纵向 42%。
-   **边缘折射**：一次注入 SVG 位移滤镜 —— 两张线性位置图 screen 合成：横向位置图驱动 y 位移（左右边缘上下流动），纵向位置图驱动 x 位移（上下边缘左右流动）；每边在**边缘处位移最大**、向内 8%（左右）或 12%（上下）归零，四边同向绕边流动，`feDisplacementMap` scale -36；
+   **边缘折射（Apple Liquid Glass 式 bezel 透镜）**：按卡片**实际尺寸与圆角**用 canvas 逐像素
+   生成位移图（圆角矩形 SDF；bezel 20px 内位移最大 14px、向内按 `(1-t)^2` 归零），写进 `<feImage>`，
+   `feDisplacementMap scale="-255"` 把 128±dx 编码还原成像素位移并**向卡外取样** —— 卡外内容被
+   凸透镜式折射/放大进来，中心不动。隐藏 SVG 的 width/height 必须跟随卡片尺寸（feImage 的
+   100% 按 SVG 视口解析；留 0×0 会退化成黑图）。尺寸 / 圆角变化由 ResizeObserver 重建。
    CSS 用 `backdrop-filter: … url(#dsh-theme-tone-lens)` 引用；滤镜未注入
    （`body` 无 `data-dsh-theme-tone-lens`）或浏览器不支持时，保留纯 blur 声明回退。
    卡片带**悬浮投影**（朝下的柔和阴影，深 / 浅两套；不位移、不加 transform —— 位移会破坏与地面光、
@@ -52,6 +56,7 @@
 | 填充不透明度 | `GLASS_FILL_ALPHA = 0.6` | **三处统一同一个常量**，越小白越通透；填充色各自取官方面 token（顶栏/右栏 = `bg-base`，输入框 = `--dsw-specific-input-major`） |
 | 边缘光 | `RIM_DARK` / `RIM_LIGHT` | 四边各留极淡基线（右缘另叠一点暗边），连成一圈；深/浅两套 |
 | 四缘光 | `TOP_GLOW_*` / `BOTTOM_GLOW_*` / `LEFT_GLOW_*` / `RIGHT_GLOW_*` | 4px 径向柔光；上/下 0.12 + 0.04 基线（45% 横向），左 0.08 / 右 0.06 + 0.04 基线（42% 纵向） |
+| 透镜斜面 | `LENS_BEZEL_PX = 20` / `LENS_DEPTH_PX = 14` / `LENS_MAP_SCALE = -255` | bezel 内边缘位移最大、向内平方归零；负 scale 向卡外取样（凸透镜放大），隐藏 SVG 视口 = 卡片尺寸 |
 
 ## 代码布局
 
@@ -68,8 +73,9 @@
 | `src/client/index.ts` | 注入样式与地面层、写 token、设置行、写入与结算 |
 | `src/client/{ThemeToneRow,styles,store,pending,known-settings,locales}` | 设置行 UI 与持久化辅助 |
 
-**没有**：MutationObserver / ResizeObserver / rAF 循环 / `getComputedStyle` 探测 / 锚点扫描 / 相位变量。
-client half 只在「安装、设置变化、主题变化、用户点选」时跑一次，其余时间零 JS 活动。
+**没有**：MutationObserver / 常驻 rAF 循环 / `getComputedStyle` 探测 / 锚点扫描 / 相位变量。
+唯一例外是输入框 bezel 透镜的位移图：安装后一次性 rAF 轮询找卡（≤120 帧），找到后用一个
+ResizeObserver 在卡片尺寸 / 圆角变化时重建位移图，卸载时 disconnect；其余时间只被动等尺寸变化。
 
 ## 硬约束（守卫里钉住）
 
@@ -85,7 +91,9 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 ## 已知偏离 / 已知问题
 
 * **边缘折射是 Chromium 的 `backdrop-filter: url(#svg)`**：不支持 SVG 滤镜的引擎会忽略增强声明、
-  退回纯 blur；滤镜本身多一层 GPU 位移采样，属于输入框玻璃的额外开销（只在 Composer 上启用）。
+  退回纯 blur；滤镜多一层 GPU 位移采样，位移图还按卡片尺寸在 canvas 上逐像素生成（仅安装后与
+  尺寸变化时各一次），属于输入框玻璃的额外开销（只在 Composer 上启用）。`ResizeObserver`
+  只观察输入框卡片本身，不观察整页 DOM。
 * **顶栏浮层化**是布局改动（官方注释写明顶栏在流内），这是顶栏玻璃的前提；静止几何保持 76px 不变量。
 * **右栏提拉**（正文上提 76px + 内容下移 + 负底距）是对官方滚动盒的视觉位置改写；官方改渲染器结构 /
   data 属性时 lift 会静默不命中，退回「带是半透明实心板」的降级观感。pane 补
@@ -111,6 +119,6 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 
 * `npm run verify`：typecheck → build → test → package。
 * 单测覆盖：三处玻璃共用同一填充常量与官方模糊 token、方向边缘光、右栏提拉与头行玻璃、地面光层三道光与
-  层序、token 计划与官方默认档、边缘折射滤镜、nav-pin 纯 CSS、悬浮卡锚点、client half 无逐帧探测。
+  层序、token 计划与官方默认档、边缘折射滤镜与位移图几何、nav-pin 纯 CSS、悬浮卡锚点、client half 的 rAF 轮询有上限。
 * 真机验收（无头 + owner 复看）：三处玻璃 `backdrop-filter` 计算值、顶栏 y=76 不变量、输入框底带与地面连续、
   右栏 76px 让位与提拉、设置弹窗打光。

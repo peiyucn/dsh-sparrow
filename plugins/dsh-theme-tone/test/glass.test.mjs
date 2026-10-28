@@ -138,11 +138,13 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
   })
 })
 
-describe('glass: 客户端不得有逐帧 DOM 探测', () => {
-  it('client half 不出现 MutationObserver / ResizeObserver / querySelectorAll / getComputedStyle / rAF', async () => {
+describe('glass: 安装路径不得有逐帧 DOM 探测', () => {
+  it('client/index.ts 不做探测（透镜的一次性轮询 + ResizeObserver 收敛在 lens.ts）', async () => {
     const src = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
     for (const forbidden of ['MutationObserver', 'ResizeObserver', 'querySelectorAll', 'getComputedStyle', 'requestAnimationFrame', 'setInterval']) {
-      assert.ok(!src.includes(forbidden), `client half 不得使用 ${forbidden}`)
+      assert.ok(!src.includes(forbidden), `client/index.ts 不得使用 ${forbidden}`)
     }
+    const lens = await readFile(new URL('../src/client/lens.ts', import.meta.url), 'utf8')
+    assert.match(lens, /LENS_ATTACH_MAX_FRAMES = 120/u, 'lens 的卡片轮询有帧数上限')
   })
 })
