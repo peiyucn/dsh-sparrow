@@ -118,13 +118,16 @@ body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
   background-image: ${COMPOSER_SHEEN_LIGHT};
   box-shadow: ${COMPOSER_RIM_LIGHT};
 }
-/* 座位撤掉官方 36px 实色渐隐后，卡片下方的统计胶囊行没有遮罩；给 dock 行本身垫地面色，
-   并向两侧 / 下方延伸盖住座位内边距（不向上进入卡片，避免挡住玻璃下沿的模糊内容）。 */
+/* 座位撤掉官方 36px 实色渐隐后，卡片下方的统计胶囊行没有遮罩；给 dock 行本身垫「地面同源」
+   的底色 + 打光，并向两侧 / 下方延伸盖住座位内边距（不向上进入卡片，避免挡住玻璃下沿的模糊内容）。
+   fixed 背景定位区 = 视口，与地面层逐像素同源；这里面积只有胶囊一行，是唯一允许的 fixed 例外。 */
 ${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
+  max-width: none;
+  margin: 0 calc(-1 * var(--dsh-composer-side-clearance, 16px)) -4px;
+  padding: 4px var(--dsh-composer-side-clearance, 16px) 4px;
   background-color: var(--dsw-alias-bg-base);
-  margin: 0 calc(-1 * var(--dsh-composer-side-clearance, 16px));
-  padding: 0 var(--dsh-composer-side-clearance, 16px);
-  box-shadow: 0 4px 0 var(--dsw-alias-bg-base);
+  background-image: ${BACKDROP_GRADIENTS};
+  background-attachment: fixed;
 }
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */

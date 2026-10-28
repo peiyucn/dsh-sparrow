@@ -43,6 +43,9 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok(!glass.includes('url(#'), '第 1 步不做折射')
     const dock = /\[data-phase='active'\] \[data-composer-seat\] \[data-composer-dock\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(dock.includes('background-color: var(--dsw-alias-bg-base)'), '胶囊行垫地面色，不再透出正文')
+    assert.ok(dock.includes('background-image: radial-gradient('), '胶囊行保留地面打光')
+    assert.ok(dock.includes('background-attachment: fixed'), '打光用 fixed 定位区与地面层逐像素同源')
+    assert.ok(dock.includes('max-width: none'), '抵消官方 max-width，让底色盖满两侧')
     assert.ok(!code.includes('[data-composer-seat]::after'), '不往整条座位底部盖（会压到卡片下沿）')
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色，跟随玻璃')
   })

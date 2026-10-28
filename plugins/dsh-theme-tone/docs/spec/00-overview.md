@@ -14,8 +14,8 @@
    卡片本体承担半透明底色（跟官方圆角 / 动态高度走），`::before` 做 `backdrop-filter`，并用
    **全周 1px inset 内描边 + 上下线性柔光**画 specular 高光（自动跟圆角、四角不断光）；
    卡片作用域内 `--dsw-specific-selector: transparent`，让官方「+」等 selector 型按钮不读成实心块；
-   卡片下方统计胶囊行（`[data-composer-dock]`）自身垫地面色并向两侧/下方延伸，盖住透出的正文，
-   但不向上进入卡片（避免挡住玻璃下沿的模糊内容）。
+   卡片下方统计胶囊行（`[data-composer-dock]`）自身重绘**底色 + 同源打光**（fixed 定位区 = 视口），
+   并向两侧 / 下方延伸盖住座位内边距，盖住透出的正文，但不向上进入卡片（避免挡住玻璃下沿的模糊内容）。
 5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的两个
    盒子 ⇒ 带背后永远只有面板纯色。做法：可流式滚动的正文（markdown/text 文档预览、文件树）上提 76px、
    内容下移 76px（只改视觉位置），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；玻璃面挂在
@@ -64,7 +64,7 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 ## 硬约束（守卫里钉住）
 
 1. 除「官方默认档下也生效」的修牌面规则外，所有样式规则带 `body:not([data-dsh-theme-tone-plain])` 门。
-2. 不得出现 `background-attachment: fixed`；模糊只能取 `GLASS_BLUR` 一个常量，顶栏 / 右栏不得各写各的。
+2. `background-attachment: fixed` **只允许统计胶囊行的地面光重绘**（fixed 定位区 = 视口、与地面层逐像素同源，面积仅胶囊一行）；模糊只能取 `GLASS_BLUR` / `COMPOSER_BLUR` 两个常量，不得各写各的。
 3. `backdrop-filter` 只出现在 `::before` / 独立玻璃层上，不挂在 header / 卡片 / pane 本体。
 4. 不改官方容器的 `position` / `overflow` / `transform` / `contain`（右栏 pane 的 `position: relative;
    z-index: 0` 是已知例外，见「已知偏离」）。
