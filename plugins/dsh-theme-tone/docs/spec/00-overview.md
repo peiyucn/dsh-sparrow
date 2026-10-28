@@ -15,8 +15,8 @@
      `backdrop-filter`，从 composer stack 顶部（dock 区）贯通到视口底；顶部圆角、底部直角，
      宽度与输入框一致。dock 卡（todo / goal / queue）、输入框卡、统计胶囊行全部透明化，
      成为板内行（功能与交互不变）；因此不再需要任何「盖住 / 补缝」类规则。
-   - **hero**：保持居中悬浮的输入玻璃卡：卡片本体半透明底 + `::before` 做 `backdrop-filter`、
-     全周 1px inset 内描边 + 上下线性柔光；卡片作用域内 `--dsw-specific-selector: transparent`。
+     板顶 / 两侧各一条 1px specular + 顶部 sheen，**底边到底不加光**；板内每组用 1px 顶部
+     高光线分隔（`box-shadow`，不占布局、不改变官方几何）。
 5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的两个
    盒子 ⇒ 带背后永远只有面板纯色。做法：可流式滚动的正文（markdown/text 文档预览、文件树）上提 76px、
    内容下移 76px（只改视觉位置），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；玻璃面挂在
@@ -42,7 +42,7 @@
 | :--- | :--- | :--- |
 | 模糊 | `GLASS_BLUR = blur(20px) saturate(150%)` | 顶栏 + 右栏两处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊） |
 | 填充不透明度 | `GLASS_FILL_ALPHA = 0.45` | **顶栏 / 右栏共用同一个常量**，填充色取官方 `bg-base` |
-| 输入框玻璃 | `COMPOSER_FILL_ALPHA = 0.55` / `COMPOSER_BLUR = blur(12px) saturate(140%)` / hero 额外 `COMPOSER_RIM_*` / `COMPOSER_SHEEN_*` | active：整块贯通板（唯一 backdrop-filter，顶圆角底直角）；hero：悬浮卡材质 + 内描边 / 上下柔光 |
+| 输入框玻璃 | `COMPOSER_FILL_ALPHA = 0.58` / `COMPOSER_BLUR = blur(14px) saturate(140%)` / `SLAB_RIM_*` / `SLAB_SHEEN_*` / `GROUP_LINE_*` / hero `COMPOSER_RIM_*` | active：单块贯通板（顶部 / 两侧 specular、底边无光、组间高光线）；hero：悬浮卡材质 + 内描边 / 上下柔光 |
 
 ## 代码布局
 

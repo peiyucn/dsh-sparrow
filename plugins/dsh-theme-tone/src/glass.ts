@@ -11,17 +11,27 @@ export const GLASS_BLUR = 'blur(20px) saturate(150%)'
 export const PANEL_BAND_PX = 38
 const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 
-/** 输入框玻璃（第 1 步：材质）：半透明底 + 背景模糊，先保证可读、变高不闪。 */
-export const COMPOSER_FILL_ALPHA = 0.55
-export const COMPOSER_BLUR = 'blur(12px) saturate(140%)'
+/** 输入框玻璃：active 单板 / hero 悬浮卡共用的材质。 */
+export const COMPOSER_FILL_ALPHA = 0.58
+export const COMPOSER_BLUR = 'blur(14px) saturate(140%)'
 /**
- * 输入框第 2 步：边缘高光。全周 1px 内描边（inset box-shadow 会自动跟圆角走）+ 上下柔光；
- * 不用径向渐变，所以四个角不会出现断光。
+ * hero 悬浮卡的边缘高光：全周 1px 内描边 + 上下柔光（不用径向渐变，四角不断光）。
  */
 export const COMPOSER_RIM_DARK = 'inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 1px 0 0 rgba(255, 255, 255, 0.05), inset -1px 0 0 rgba(255, 255, 255, 0.03), inset 0 -1px 0 rgba(255, 255, 255, 0.04)'
 export const COMPOSER_RIM_LIGHT = 'inset 0 1px 0 rgba(255, 255, 255, 0.40), inset 1px 0 0 rgba(255, 255, 255, 0.16), inset -1px 0 0 rgba(0, 0, 0, 0.04), inset 0 -1px 0 rgba(0, 0, 0, 0.04)'
 export const COMPOSER_SHEEN_DARK = 'linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 6%, transparent 16%, transparent 84%, rgba(255, 255, 255, 0.03) 94%, rgba(255, 255, 255, 0.04) 100%)'
 export const COMPOSER_SHEEN_LIGHT = 'linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, transparent 18%, transparent 82%, rgba(255, 255, 255, 0.12) 100%)'
+
+/**
+ * active 单板：顶部 / 两侧 specular，底部到底边不加光；外加一层向上的柔和投影。
+ * 板内分组用 1px 顶部高光线分隔（box-shadow 不占布局）。
+ */
+export const SLAB_RIM_DARK = 'inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 1px 0 0 rgba(255, 255, 255, 0.06), inset -1px 0 0 rgba(255, 255, 255, 0.05), 0 -10px 30px -18px rgba(0, 0, 0, 0.6)'
+export const SLAB_RIM_LIGHT = 'inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 1px 0 0 rgba(255, 255, 255, 0.25), inset -1px 0 0 rgba(0, 0, 0, 0.04), 0 -10px 30px -18px rgba(31, 35, 60, 0.18)'
+export const SLAB_SHEEN_DARK = 'linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 12%, transparent 26%)'
+export const SLAB_SHEEN_LIGHT = 'linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, transparent 30%)'
+export const GROUP_LINE_DARK = '0 -1px 0 rgba(255, 255, 255, 0.07)'
+export const GROUP_LINE_LIGHT = '0 -1px 0 rgba(0, 0, 0, 0.06)'
 
 /** 与地面层同源的光：显式视口尺寸 + 定位，禁止 `background-attachment: fixed`。 */
 function viewportLight(position: string, size = '100vw 100vh'): string {
@@ -107,13 +117,19 @@ ${P} [data-phase='active'] [data-composer-seat]::before {
   pointer-events: none;
   border-radius: var(--dsw-radius-panel) var(--dsw-radius-panel) 0 0;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%, transparent);
+  background-image: ${SLAB_SHEEN_DARK};
+  box-shadow: ${SLAB_RIM_DARK};
   backdrop-filter: ${COMPOSER_BLUR};
+}
+body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-phase='active'] [data-composer-seat]::before {
+  background-image: ${SLAB_SHEEN_LIGHT};
+  box-shadow: ${SLAB_RIM_LIGHT};
 }
 ${P} [data-phase='active'] [data-composer-card] {
   position: relative;
   z-index: 0;
   background-color: transparent;
-  box-shadow: none;
+  box-shadow: ${GROUP_LINE_DARK};
   border-radius: 0;
   /* 「+」等 selector 型按钮：官方给的是不透明中性底，在玻璃上会读成一块实心。 */
   --dsw-specific-selector: transparent;
@@ -121,13 +137,19 @@ ${P} [data-phase='active'] [data-composer-card] {
 ${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
   width: 100%;
   max-width: var(--dsh-composer-card-max-width);
+  box-shadow: ${GROUP_LINE_DARK};
 }
 /* dock 卡（todo / goal / queue）去材质、去圆角，成为板内行；交互全部保留。 */
 ${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock], [data-goal-bar], [data-testid='todo-panel']) {
   background: transparent;
-  box-shadow: none;
+  box-shadow: ${GROUP_LINE_DARK};
   border-radius: 0;
   backdrop-filter: none;
+}
+/* 浅色轴：同一条分组线换成深色低透明度。 */
+body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-phase='active'] [data-composer-card],
+body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-phase='active'] [data-composer-seat] :is([data-queue-dock], [data-goal-bar], [data-testid='todo-panel'], [data-composer-dock]) {
+  box-shadow: ${GROUP_LINE_LIGHT};
 }
 ${P} [data-phase='active'] [data-composer-seat] :is([data-queue-dock], [data-goal-bar], [data-testid='todo-panel']) > * {
   background: transparent;

@@ -11,6 +11,12 @@ import {
   COMPOSER_RIM_LIGHT,
   COMPOSER_SHEEN_DARK,
   COMPOSER_SHEEN_LIGHT,
+  GROUP_LINE_DARK,
+  GROUP_LINE_LIGHT,
+  SLAB_RIM_DARK,
+  SLAB_RIM_LIGHT,
+  SLAB_SHEEN_DARK,
+  SLAB_SHEEN_LIGHT,
   GLASS_BLUR,
   GLASS_FILL_ALPHA,
   HEADER_HEIGHT_PX,
@@ -42,20 +48,28 @@ describe('glass: 顶栏 / 右栏 / 输入框（active 单板 / hero 悬浮卡）
     assert.ok(slab.includes('width: min(calc(100% - 2 * var(--dsh-composer-side-clearance, 16px)), var(--dsh-composer-card-max-width))'),
       '板宽与输入框一致')
     assert.ok(slab.includes('top: 0') && slab.includes('bottom: 0'), '板从 stack 顶部贯到底')
+    assert.ok(slab.includes(`background-image: ${SLAB_SHEEN_DARK}`), '顶部 sheen')
+    assert.ok(slab.includes(`box-shadow: ${SLAB_RIM_DARK}`), '顶部 / 两侧 specular，底部不加光')
+    assert.ok(code.includes(`background-image: ${SLAB_SHEEN_LIGHT}`) && code.includes(`box-shadow: ${SLAB_RIM_LIGHT}`),
+      '浅色轴有对应单板高光')
     assert.ok(!slab.includes('url(#'), '仍不做折射')
   })
 
   it('active 子区域全部透明：卡片 / 胶囊行 / dock 卡都成为板内行', () => {
     const card = /\[data-phase='active'\] \[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(card.includes('background-color: transparent'), '输入卡让出底色，由整块板承担')
-    assert.ok(card.includes('box-shadow: none') && card.includes('border-radius: 0'), '去掉自身阴影与圆角')
+    assert.ok(card.includes(`box-shadow: ${GROUP_LINE_DARK}`) && card.includes('border-radius: 0'),
+      '去掉自身阴影与圆角，只留分组高光线')
+    assert.ok(code.includes(`box-shadow: ${GROUP_LINE_LIGHT}`), '浅色轴有对应分组线')
     assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色')
     const dock = /\[data-phase='active'\] \[data-composer-seat\] \[data-composer-dock\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(dock.includes('width: 100%') && dock.includes('max-width: var(--dsh-composer-card-max-width)'),
       '胶囊行宽度与输入框一致')
     assert.ok(!dock.includes('background'), '胶囊行不再自己垫底 / 重绘打光')
+    assert.ok(dock.includes(`box-shadow: ${GROUP_LINE_DARK}`), '胶囊行与输入区之间有分组线')
     const dockCards = /\[data-phase='active'\] \[data-composer-seat\] :is\(\[data-queue-dock\], \[data-goal-bar\], \[data-testid='todo-panel'\]\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(dockCards.includes('background: transparent'), 'dock 卡去材质')
+    assert.ok(dockCards.includes(`box-shadow: ${GROUP_LINE_DARK}`), 'dock 卡之间有分组线')
     assert.ok(dockCards.includes('backdrop-filter: none'), 'dock 卡不再各带模糊')
     assert.ok(code.includes('content: none'), 'dock 卡的材质 / 描边伪元素一并关掉')
     assert.ok(!code.includes('[data-composer-seat]::after'), '不再有座位底带')
