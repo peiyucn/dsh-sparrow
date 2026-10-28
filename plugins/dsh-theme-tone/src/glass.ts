@@ -15,11 +15,14 @@ const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 export const COMPOSER_FILL_ALPHA = 0.55
 export const COMPOSER_BLUR = 'blur(12px) saturate(140%)'
 /**
- * 四边过渡光：每条边都是「中间亮、两端暗」的 1px 渐变（横向两条 + 纵向两条），
- * 四角自然归零；不再画均匀内描边，也不再叠整面 sheen。
+ * 输入框第 2 步：边缘高光。全周 1px 内描边（inset box-shadow 会自动跟圆角走）+ 上下柔光；
+ * 不用径向渐变，所以四个角不会出现断光。
  */
-export const COMPOSER_EDGE_DARK = 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.10) 50%, transparent 100%), linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.10) 50%, transparent 100%), linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%), linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%)'
-export const COMPOSER_EDGE_LIGHT = 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.30) 50%, transparent 100%), linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.30) 50%, transparent 100%), linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.22) 50%, transparent 100%), linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.22) 50%, transparent 100%)'
+export const COMPOSER_RIM_DARK = 'inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 1px 0 0 rgba(255, 255, 255, 0.025), inset -1px 0 0 rgba(255, 255, 255, 0.025), inset 0 -1px 0 rgba(255, 255, 255, 0.025)'
+export const COMPOSER_RIM_LIGHT = 'inset 0 1px 0 rgba(255, 255, 255, 0.30), inset 1px 0 0 rgba(255, 255, 255, 0.10), inset -1px 0 0 rgba(255, 255, 255, 0.10), inset 0 -1px 0 rgba(0, 0, 0, 0.03)'
+export const COMPOSER_SHEEN_DARK = 'linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 6%, transparent 16%, transparent 84%, rgba(255, 255, 255, 0.02) 94%, rgba(255, 255, 255, 0.025) 100%)'
+export const COMPOSER_SHEEN_LIGHT = 'linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, transparent 18%, transparent 82%, rgba(255, 255, 255, 0.08) 100%)'
+
 /** 与地面层同源的光：显式视口尺寸 + 定位，禁止 `background-attachment: fixed`。 */
 function viewportLight(position: string, size = '100vw 100vh'): string {
   return `  background-image: ${BACKDROP_GRADIENTS};
@@ -108,14 +111,13 @@ ${P} ${SEAT} [data-composer-card]::before {
   z-index: -1;
   border-radius: inherit;
   pointer-events: none;
-  background-image: ${COMPOSER_EDGE_DARK};
-  background-size: 100% 1px, 100% 1px, 1px 100%, 1px 100%;
-  background-position: 0 0, 0 100%, 0 0, 100% 0;
-  background-repeat: no-repeat;
+  background-image: ${COMPOSER_SHEEN_DARK};
+  box-shadow: ${COMPOSER_RIM_DARK};
   backdrop-filter: ${COMPOSER_BLUR};
 }
 body:not([data-ds-dark-theme]) ${SEAT} [data-composer-card]::before {
-  background-image: ${COMPOSER_EDGE_LIGHT};
+  background-image: ${COMPOSER_SHEEN_LIGHT};
+  box-shadow: ${COMPOSER_RIM_LIGHT};
 }
 /* 座位撤掉官方 36px 实色渐隐后，卡片下方的统计胶囊行没有遮罩；给 dock 行本身垫「地面同源」
    的底色 + 打光。宽度必须与输入框一致（官方 dock 是 flex 子项，宽 auto 只有胶囊宽度，两侧必漏），

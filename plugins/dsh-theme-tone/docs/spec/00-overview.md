@@ -41,7 +41,7 @@
 | :--- | :--- | :--- |
 | 模糊 | `GLASS_BLUR = blur(20px) saturate(150%)` | 顶栏 + 右栏两处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊） |
 | 填充不透明度 | `GLASS_FILL_ALPHA = 0.45` | **顶栏 / 右栏共用同一个常量**，填充色取官方 `bg-base` |
-| 输入框材质 / 高光 | `COMPOSER_FILL_ALPHA = 0.55` / `COMPOSER_BLUR = blur(12px) saturate(140%)` / `COMPOSER_EDGE_*` | 半透明底 + 背景模糊；四边各一条 1px 线性过渡光（中间亮、两端暗，四角自然归零）；圆角保持官方 `--dsw-radius-panel`（28px） |
+| 输入框材质 / 高光 | `COMPOSER_FILL_ALPHA = 0.55` / `COMPOSER_BLUR = blur(12px) saturate(140%)` / `COMPOSER_RIM_*` / `COMPOSER_SHEEN_*` | 第 1 步：半透明底 + 背景模糊；第 2 步：全周 1px 内描边 + 上下线性柔光；**圆角保持官方 `--dsw-radius-panel`（28px）不变** |
 
 ## 代码布局
 
