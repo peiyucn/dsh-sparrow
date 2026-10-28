@@ -5,7 +5,7 @@ export const HEADER_HEIGHT_PX = 76
 /** 所有磨砂玻璃面共用的填充不透明度（统一参数；越小白越通透，模糊参数统一走官方 token）。 */
 export const GLASS_FILL_ALPHA = 0.45
 /** 三处玻璃共用的模糊参数（统一；2026-10-27 从官方 40px 调低，原值观感过糊）。 */
-export const GLASS_BLUR = 'blur(16px) saturate(150%)'
+export const GLASS_BLUR = 'blur(2px) saturate(150%)'
 export const SEAT_BAND_PX = 44
 
 /** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
