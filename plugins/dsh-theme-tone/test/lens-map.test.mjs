@@ -135,26 +135,4 @@ describe('lens-map: bezel 透镜位移图', () => {
       assert.equal(at(flat, x, y), 0, 'depth=0 时没有位移')
     }
   })
-
-  it('inward 时四边编码统一取反（实际都向卡内取样，视觉一致拉长）', () => {
-    const flipped = buildLensMap({ width: WIDTH, height: HEIGHT, radius: RADIUS, bezel: BEZEL, depth: DEPTH, inward: true })
-    /**
-     * @param {number} x
-     * @param {number} y
-     * @returns {{ dx: number, dy: number }}
-     */
-    const at = (x, y) => {
-      const index = (y * flipped.width + x) * 4
-      return { dx: flipped.data[index] - NEUTRAL, dy: flipped.data[index + 1] - NEUTRAL }
-    }
-    const left = at(1, HEIGHT / 2)
-    const right = at(WIDTH - 2, HEIGHT / 2)
-    const top = at(WIDTH / 2, 1)
-    const bottom = at(WIDTH / 2, HEIGHT - 2)
-    assert.ok(left.dx < 0 && right.dx > 0, '左右编码取反')
-    assert.ok(top.dy < 0 && bottom.dy > 0, '上下编码取反')
-    const magnitudes = [left.dx, right.dx, top.dy, bottom.dy].map(Math.abs)
-    for (const magnitude of magnitudes) assert.ok(Math.abs(magnitude - magnitudes[0]) <= 1, '四边幅值一致')
-    assert.equal(at(WIDTH / 2, HEIGHT / 2).dx, 0, '中心仍中性')
-  })
 })

@@ -34,5 +34,5 @@ export const LENS_IMAGE_ID = 'dsh-theme-tone-lens-map'
 export const LENS_BEZEL_PX = 24
 /** 边缘最大位移（px；必须 < 128，编码 128±值会撞到通道上下限）。 */
 export const LENS_DEPTH_PX = 24
-/** 通道 → 采样偏移：255 对应 1px，负号 = 向卡外取样（凸透镜）。 */
-export const LENS_MAP_SCALE = -255
+/** 通道 → 采样偏移：255 对应 1px；正值 = 按位移图朝卡片中心取样（四边向外放大）。 */
+export const LENS_MAP_SCALE = 255

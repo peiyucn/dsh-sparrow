@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * 边缘折射滤镜的契约：一个 `<feImage>` 逐像素位移图（R = 128+dx / G = 128+dy）
- * + `feDisplacementMap` 负 scale（向卡外取样）；滤镜 id 与位移图 id 由常量单源提供。
+ * + `feDisplacementMap` 正 scale（朝卡内取样，四边向外放大）；滤镜 id 与位移图 id 由常量单源提供。
  */
 
 import assert from 'node:assert/strict'
@@ -28,8 +28,8 @@ describe('lens filter', () => {
     assert.ok(map.includes('width="100%"') && map.includes('height="100%"'))
   })
 
-  it('应该 用负 scale 反向消费 128+dx / 128+dy 编码，让边缘向卡外取样', () => {
-    assert.ok(LENS_MAP_SCALE < 0, '负 scale = 向卡外取样（凸透镜放大边缘）')
+  it('应该 用正 scale 消费 128+dx / 128+dy 编码，四边朝卡片中心取样', () => {
+    assert.ok(LENS_MAP_SCALE > 0, '正 scale = 朝卡内取样（四边向外放大）')
     assert.ok(markup.includes(`<feDisplacementMap in="SourceGraphic" in2="map" scale="${LENS_MAP_SCALE}" xChannelSelector="R" yChannelSelector="G"/>`))
     assert.ok(!markup.includes('feBlend'), '不再做双图 screen 合成')
     assert.ok(!markup.includes('linearGradient'), '不再用固定线性渐变图')
