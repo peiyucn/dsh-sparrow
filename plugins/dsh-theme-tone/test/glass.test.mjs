@@ -75,6 +75,9 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     const goalIcon = /\[data-goal-bar\] > div > span:first-child,\n[^{]*span:nth-child\(2\) \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(goalIcon.includes('color: var(--dsw-alias-state-warn-primary)'), 'goal 图标与标题用橘红')
     assert.ok(!code.includes('--dsw-alias-label-primary: var(--dsw-alias-state-'), '不整体改正文/按钮颜色')
+    const opaque = /\[data-queue-dock\] > \*::before,\n[^{]*\[data-goal-bar\] > div::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(opaque.includes('background: var(--dsw-alias-bg-layer-2)') && opaque.includes('backdrop-filter: none'), 'queue / goal 材质改为不透明');
+    assert.ok(/\[data-testid='todo-panel'\] \{\n  background: var\(--dsw-alias-bg-layer-2\);\n  backdrop-filter: none;\n\}/u.test(code), 'todo 材质改为不透明')
   })
 
   it('输入框第 2 步边缘高光：全周 1px 内描边 + 上下柔光，随圆角连续', () => {

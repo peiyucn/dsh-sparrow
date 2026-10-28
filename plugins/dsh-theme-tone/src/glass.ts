@@ -172,6 +172,17 @@ ${P} [data-phase='active'] [data-goal-bar] > div > span:first-child,
 ${P} [data-phase='active'] [data-goal-bar] > div > span:nth-child(2) {
   color: var(--dsw-alias-state-warn-primary);
 }
+/* 官方停靠区现在是不透明的，我们也统一：todo 根节点 / queue 的 panel::before / goal 的 bar::before
+   都换成不透明的浮层底，并撤掉各自的 backdrop-filter。 */
+${P} [data-phase='active'] [data-testid='todo-panel'] {
+  background: var(--dsw-alias-bg-layer-2);
+  backdrop-filter: none;
+}
+${P} [data-phase='active'] [data-queue-dock] > *::before,
+${P} [data-phase='active'] [data-goal-bar] > div::before {
+  background: var(--dsw-alias-bg-layer-2);
+  backdrop-filter: none;
+}
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
 ${P} ${RP} {
