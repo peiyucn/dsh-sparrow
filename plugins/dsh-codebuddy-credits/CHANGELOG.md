@@ -3,12 +3,9 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
-## [0.2.1-rc.3.3] - 2026-10-28
+## [0.2.1-rc.3.1] - 2026-10-28
 
 - Chat works again: after another upstream filter change (this time targeting the `@`-path wording in the system prompt), requests from the web app no longer fail with an "unapproved channel" error.
-
-## [0.2.1-rc.3.1] - 2026-10-27
-
 - No user-perceivable changes: the runtime `zod` dependency is upgraded to a patched release (security fix).
 
 ## [0.2.1-rc.3] - 2026-10-24
