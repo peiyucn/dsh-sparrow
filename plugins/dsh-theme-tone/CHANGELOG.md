@@ -5,8 +5,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 ## [0.2.1-rc.4] - 2026-10-28
 
 - Now adapted to official dsh 0.2.1-rc.4 (web and desktop).
-- The composer is now a more translucent liquid-glass surface with subtle edge refraction and soft Fresnel highlights.
-- Fixed the area below the composer losing the page ground light, and the "no workspace" dashed outline being overwritten.
+- The composer goes back to the official look: all custom input styling has been removed.
 
 ## [0.2.1-rc.3] - 2026-10-24
 

@@ -27,12 +27,12 @@ describe('dsh-theme-tone 结构', () => {
   })
 
   it('已删除机制的模块不得复活', async () => {
-    for (const removed of ['anchors.ts', 'phase.ts', 'mutation-gate.ts', 'workstart.ts', 'caption.ts', 'popover.ts', 'mask.ts', 'sweep.ts', 'handle-glow.ts', 'surface.ts']) {
+    for (const removed of ['anchors.ts', 'phase.ts', 'mutation-gate.ts', 'workstart.ts', 'caption.ts', 'popover.ts', 'mask.ts', 'sweep.ts', 'handle-glow.ts', 'surface.ts', 'client/lens.ts', 'client/lens-map.ts']) {
       assert.ok(!existsSync(new URL(`../src/${removed}`, import.meta.url)), `${removed} 已删除，不得复活`)
     }
   })
 
-  it('src 只剩「颜色 + 地面光 + 三块玻璃 + 设置行」这几件事', async () => {
+  it('src 只剩「颜色 + 地面光 + 两处玻璃 + 设置行」这几件事', async () => {
     for (const file of ['constants.ts', 'backdrop.ts', 'glass.ts', 'nav-pin.ts', 'tones.ts', 'host.ts', 'compat.ts', 'settings-schema.ts', 'index.ts']) {
       assert.ok(existsSync(new URL(`../src/${file}`, import.meta.url)), `${file} 应存在`)
     }

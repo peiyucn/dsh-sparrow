@@ -52,14 +52,6 @@ export function buildBackdropCss(): string {
   background-image: ${BACKDROP_GRADIENTS};
 }
 .${BACKDROP_CLASS}[hidden] { display: none; }
-/* 官方座位（composerSeat）在底部铺满 bg-base，会把页面底光一起盖掉。按视口对齐（fixed 定位区）
-   重绘同一份地面光，叠在官方 36px 渐隐之上：正文照旧淡出，页面底光重新露出来。 */
-body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat] {
-  background-image: ${BACKDROP_GRADIENTS},
-    linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px, var(--dsw-alias-bg-base) 36px);
-  background-attachment: fixed, scroll;
-  background-repeat: no-repeat, no-repeat;
-}
 body:not([${PLAIN_ATTR}]) [${CONTENT_ATTR}] { position: relative; z-index: ${CONTENT_Z_INDEX}; }
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
 body:not([${PLAIN_ATTR}]) [${SHELL_OVERLAY_ATTR}] { z-index: ${ABOVE_CONTENT_Z_INDEX}; }

@@ -1,4 +1,4 @@
-import { ABOVE_CONTENT_Z_INDEX, LENS_ATTR, LENS_FILTER_ID, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
+import { ABOVE_CONTENT_Z_INDEX, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
 import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
@@ -6,15 +6,6 @@ export const HEADER_HEIGHT_PX = 76
 export const GLASS_FILL_ALPHA = 0.45
 /** 玻璃面共用的模糊参数（统一；2026-10-27 从官方 40px 调低，原值观感过糊）。 */
 export const GLASS_BLUR = 'blur(20px) saturate(150%)'
-
-/** 输入框液态玻璃（Apple Liquid Glass 三层结构）。
- *  光学层：有位移图时 blur 必须小（大 blur 会把折射盖掉）；无位移图时退回可读的磨砂。
- *  色层：中性 tint，透明度高，背景要看得见。 */
-export const COMPOSER_FILL_ALPHA = 0.30
-export const COMPOSER_BLUR = 'blur(12px) saturate(160%)'
-export const COMPOSER_OPTICS = 'blur(2px) saturate(180%) brightness(1.06) contrast(1.04)'
-/** 位移图就绪后叠加 `url(#id)`，边缘按位移图弯折；不支持时保持纯 blur。 */
-export const COMPOSER_LENS_FILTER = `${COMPOSER_OPTICS} url(#${LENS_FILTER_ID})`
 
 /** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
 export const PANEL_BAND_PX = 38
@@ -85,58 +76,7 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框液态玻璃（active / hero 通用，Apple Liquid Glass 三层结构） =====
-   ① 光学层 + 色层 ::before：位移图 + 小 blur + saturate/brightness，叠中性 tint；
-      座位透明所以采样的是页面与地面光。
-   ② Fresnel 高光：全部用 ::before 的 inset 阴影（左上亮、右下暗）模拟 bezel 反光；
-      **不得占用 ::after**——官方 .cardWorkspaceTrigger::after 用它画「未选工作区」的虚线框，
-      我们的选择器特异性更高，会把它覆盖掉。
-   ③ 内容：官方卡片里的文字和按钮，始终在玻璃层之上。
-   不用径向断光、不加覆盖层、不改官方圆角。 */
-/* 只让出官方的底色，不得用 background 简写：backdrop.ts 在这个座位上重绘了
-   同一份地面光和官方 36px 渐隐，简写会把那两层背景一并清掉，座位变全透明。 */
-${P} :is([data-phase='active'], [data-phase='hero']) [data-composer-seat] {
-  background-color: transparent !important;
-}
-${P} [data-composer-card] {
-  position: relative;
-  z-index: 0;
-  background-color: transparent;
-  /* 「+」等 selector 型按钮：官方给的是不透明中性底，在玻璃上会读成一块实心。 */
-  --dsw-specific-selector: transparent;
-}
-${P} [data-composer-card]::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
-  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%, transparent);
-  backdrop-filter: ${COMPOSER_BLUR};
-  box-shadow:
-    0 10px 26px -14px rgba(0, 0, 0, 0.55),
-    inset 0 1px 1px rgba(255, 255, 255, 0.80),
-    inset 1px 0 2px rgba(255, 255, 255, 0.55),
-    inset -1px -1px 2px rgba(255, 255, 255, 0.45),
-    inset 4px 5px 7px rgba(255, 255, 255, 0.16),
-    inset -4px -4px 6px rgba(255, 255, 255, 0.10),
-    inset 0 0 0 5px rgba(255, 255, 255, 0.05);
-}
-body:not([${PLAIN_ATTR}])[${LENS_ATTR}] [data-composer-card]::before {
-  backdrop-filter: ${COMPOSER_LENS_FILTER};
-}
-body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-composer-card]::before {
-  background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%, transparent);
-  box-shadow:
-    0 10px 26px -14px rgba(31, 35, 60, 0.30),
-    inset 0 1px 1px rgba(255, 255, 255, 0.95),
-    inset 1px 0 2px rgba(255, 255, 255, 0.80),
-    inset -1px -1px 2px rgba(255, 255, 255, 0.65),
-    inset 4px 5px 7px rgba(255, 255, 255, 0.45),
-    inset -4px -4px 6px rgba(255, 255, 255, 0.30),
-    inset 0 0 0 5px rgba(255, 255, 255, 0.10);
-}
+/* ===== 输入框：保持官方原样（不做任何定制；后续若重做，另起方案并独立提交） ===== */
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
 ${P} ${RP} {

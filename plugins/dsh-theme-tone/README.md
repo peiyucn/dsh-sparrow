@@ -27,7 +27,7 @@ Each tone paints:
 
 * **Colors** — the whole app (background, raised surfaces, labels, borders, scrollbars) is re-tinted through the official theme token layer.
 * **Ground light** — a fixed decorative layer with three soft lights (top, bottom, left), with the light's position and direction fixed per tone.
-* **Glass** — translucent frosted glass on the conversation header, the composer card, and the right sidebar's top bar, so the background light shows through them and content scrolls, blurred, underneath.
+* **Glass** — translucent frosted glass on the conversation header and the right sidebar's top bar, so the background light shows through them and content scrolls, blurred, underneath.
 
 **Default** leaves the official theme completely untouched.
 
