@@ -151,4 +151,19 @@ describe('lens-map: bezel 透镜位移图', () => {
     assert.ok(top > 0 && Math.abs(top) === Math.abs(bottom), '顶边保持原方向与幅值')
     assert.equal(gy(flipped, WIDTH / 2, HEIGHT / 2), 0, '中心仍中性')
   })
+
+  it('flipTop 只把顶边编码反向，底 / 左 / 右不变', () => {
+    const flipped = buildLensMap({ width: WIDTH, height: HEIGHT, radius: RADIUS, bezel: BEZEL, depth: DEPTH, flipTop: true })
+    /**
+     * @param {{ width: number, height: number, data: Uint8ClampedArray }} target
+     * @param {number} x
+     * @param {number} y
+     * @returns {number}
+     */
+    const gy = (target, x, y) => target.data[(y * target.width + x) * 4 + 1] - NEUTRAL
+    const top = gy(flipped, WIDTH / 2, 1)
+    const bottom = gy(flipped, WIDTH / 2, HEIGHT - 2)
+    assert.ok(top < 0, '顶边编码反向后为负（负 scale 后实际朝下 = 卡内）')
+    assert.ok(bottom < 0 && Math.abs(bottom) === Math.abs(top), '底边保持原方向与幅值')
+  })
 })
