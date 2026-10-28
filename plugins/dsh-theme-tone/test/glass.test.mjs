@@ -24,8 +24,8 @@ describe('glass: 顶栏与右栏（输入框保持官方原样）', () => {
     assert.ok((code.match(new RegExp(String(GLASS_FILL_ALPHA * 100) + '%', 'gu')) ?? []).length >= 2, '两处填充都引用同一个常量')
   })
 
-  it('输入框不做任何定制：没有 composer 选择器与玻璃层（干净基线）', () => {
-    assert.ok(!code.includes('[data-composer'), '干净基线阶段不得出现输入框定制规则')
+  it('输入框区保持官方：没有任何 composer 定制（座位底光归 backdrop 层）', () => {
+    assert.ok(!code.includes('[data-composer'), 'glass.ts 不得出现输入框 / 座位定制')
     assert.ok(!code.includes('data-specific-input'), '不得覆盖输入框底色')
   })
 

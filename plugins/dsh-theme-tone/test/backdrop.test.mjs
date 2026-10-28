@@ -16,10 +16,18 @@ describe('backdrop: 地面光层', () => {
   const css = buildBackdropCss()
 
   it('三道光都在、位置/方向原样（形状常量不变）', () => {
-    assert.equal((css.match(/radial-gradient\(/gu) ?? []).length, 3)
-    assert.match(css, /ellipse 80vw 45vh at 50% -10vh/u)
-    assert.match(css, /ellipse 70vw 45vh at 50% 112vh/u)
-    assert.match(css, /ellipse 38vw 58vh at 0% -6vh/u)
+    const layer = new RegExp(`\\.${BACKDROP_CLASS} \\{[^}]*\\}`, 'u').exec(css)?.[0] ?? ''
+    assert.equal((layer.match(/radial-gradient\(/gu) ?? []).length, 3, '地面层本体三道')
+    assert.match(layer, /ellipse 80vw 45vh at 50% -10vh/u)
+    assert.match(layer, /ellipse 70vw 45vh at 50% 112vh/u)
+    assert.match(layer, /ellipse 38vw 58vh at 0% -6vh/u)
+  })
+
+  it('座位底光重绘：同一份地面光按视口对齐（fixed），叠在官方 36px 渐隐上', () => {
+    const seat = /body:not\(\[[^\]]+\]\) \[data-phase='active'\] \[data-composer-seat\] \{([^}]*)\}/u.exec(css)?.[1] ?? ''
+    assert.equal((seat.match(/radial-gradient\(/gu) ?? []).length, 3, '重绘三道地面光')
+    assert.ok(seat.includes('background-attachment: fixed, scroll'), '光固定视口、官方渐隐仍随座位')
+    assert.ok(seat.includes('var(--dsw-alias-bg-base) 36px'), '保留官方 36px 正文淡出')
   })
 
   it('固定全屏、z-index 在内容之下、深色轴 screen 混合', () => {

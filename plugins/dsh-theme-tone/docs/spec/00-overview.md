@@ -8,6 +8,9 @@
 1. **颜色**：通过官方 `ctx.theme.overrideTokens` 覆盖 alias token（`{light, dark}` 成对），给整个界面重新着色。
 2. **地面光**：插件自有的 `position: fixed` 装饰层（`.dsh-theme-tone`），三道光（顶 / 底 / 左），位置与方向
    按色调固定；**不使用 `mix-blend-mode`**（normal 合成，颜色与 screen 的差 ≤1/255）。
+   官方座位（`[data-composer-seat]`）底部铺满 `bg-base` 会盖掉底光 ⇒ 在座位上按视口对齐
+   （`background-attachment: fixed`）**重绘同一份地面光**，叠在官方 36px 渐隐之上：正文照旧淡出，
+   页面底光重新露出来。这是「地面光」职责的一部分，放在 `backdrop.ts`。
 3. **对话区顶栏玻璃**：顶栏浮层化（`position: absolute` + 滚动区 `padding-top: 76px` + 滚动条 track 下推
    + 拖拽条上沿 76px），玻璃放顶栏 `::before`（`z-index: -1`），并自绘同源三道光。
 4. **输入框：保持官方原样**。本版把此前所有输入框定制（座位渐隐、卡片玻璃、四缘光、悬浮投影、
@@ -44,7 +47,7 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `src/tones.ts` | 调色板数据 + `tokenOverrides()`（唯一的颜色事实来源） |
-| `src/backdrop.ts` | 地面光层 CSS、渲染计划、设置行色卡预览、CSS 特性门、层序不变式 |
+| `src/backdrop.ts` | 地面光层 CSS、**座位底光重绘**、渲染计划、设置行色卡预览、CSS 特性门、层序不变式 |
 | `src/glass.ts` | 顶栏 / 右栏玻璃 + 打光 + 右栏提拉（唯一一处 `backdrop-filter` 来源；输入框不定制） |
 | `src/surfaces.ts` | 官方写死牌面的浮层修复（Workspace hover 卡） |
 | `src/nav-pin.ts` | 轮次导航恒显 + 内容宽度钳制（纯 CSS，布局功能） |
@@ -60,7 +63,7 @@ client half 只在「安装、设置变化、主题变化、用户点选」时�
 ## 硬约束（守卫里钉住）
 
 1. 除「官方默认档下也生效」的修牌面规则外，所有样式规则带 `body:not([data-dsh-theme-tone-plain])` 门。
-2. 不得出现 `background-attachment: fixed`；模糊只能取 `GLASS_BLUR` 一个常量，顶栏 / 右栏不得各写各的。
+2. `background-attachment: fixed` **只允许座位底光重绘**（fixed 定位区 = 视口、与地面层逐像素同源，面积仅 composer seat）；模糊只能取 `GLASS_BLUR` 一个常量，顶栏 / 右栏不得各写各的。
 3. `backdrop-filter` 只出现在 `::before` / 独立玻璃层上，不挂在 header / 卡片 / pane 本体。
 4. 不改官方容器的 `position` / `overflow` / `transform` / `contain`（右栏 pane 的 `position: relative;
    z-index: 0` 是已知例外，见「已知偏离」）。
