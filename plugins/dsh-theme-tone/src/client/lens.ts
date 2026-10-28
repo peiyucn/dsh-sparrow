@@ -12,15 +12,15 @@ import { LENS_ATTR, LENS_FILTER_ID, LENS_SCALE } from '../constants.js'
 const NS = 'http://www.w3.org/2000/svg'
 
 /**
- * 横向位置图（驱动 **y 位移**，G 通道）：在左右边缘 8% 处最大、16% 回中性。
- * 左右边缘的内容因此沿边上下流动，边缘本身不位移。
+ * 左右边（驱动 **y 位移**，G 通道）：边缘处位移最大，向内 8% 归零。
+ * 左边内容向下、右边向上 —— 物体经过边缘时被沿边拖开，形成绕边的流动。
  */
-const MAP_H = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23008000'/%3E%3Cstop offset='.08' stop-color='%23000'/%3E%3Cstop offset='.16' stop-color='%23008000'/%3E%3Cstop offset='.84' stop-color='%23008000'/%3E%3Cstop offset='.92' stop-color='%230f0'/%3E%3Cstop offset='1' stop-color='%23008000'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='8' height='8' fill='url(%23g)'/%3E%3C/svg%3E"
+const MAP_H = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23000'/%3E%3Cstop offset='.08' stop-color='%23008000'/%3E%3Cstop offset='.92' stop-color='%23008000'/%3E%3Cstop offset='1' stop-color='%230f0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='8' height='8' fill='url(%23g)'/%3E%3C/svg%3E"
 /**
- * 纵向位置图（驱动 **x 位移**，R 通道）：在上下边缘 12% 处最大、24% 回中性。
- * 上下边缘的内容因此沿边左右流动。
+ * 上下边（驱动 **x 位移**，R 通道）：边缘处位移最大，向内 12% 归零。
+ * 上边内容向右、下边向左 —— 与左右边共同形成绕边一圈的流动。
  */
-const MAP_V = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23800000'/%3E%3Cstop offset='.12' stop-color='%23000'/%3E%3Cstop offset='.24' stop-color='%23800000'/%3E%3Cstop offset='.76' stop-color='%23800000'/%3E%3Cstop offset='.88' stop-color='%23f00'/%3E%3Cstop offset='1' stop-color='%23800000'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='8' height='8' fill='url(%23g)'/%3E%3C/svg%3E"
+const MAP_V = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23000'/%3E%3Cstop offset='.12' stop-color='%23800000'/%3E%3Cstop offset='.88' stop-color='%23800000'/%3E%3Cstop offset='1' stop-color='%23f00'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='8' height='8' fill='url(%23g)'/%3E%3C/svg%3E"
 
 /** 滤镜定义（纯静态字符串，供 `<svg>` 的 innerHTML 使用）。 */
 export function buildLensFilterMarkup(): string {
