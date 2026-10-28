@@ -57,14 +57,17 @@ describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
     assert.ok(glass.includes('inset 0 -1px 2px rgba(255, 255, 255, 0.04)'), '下缘保留极淡基线，四边连成一圈')
     assert.ok(!glass.includes('inset 0 -1px 2px rgba(0, 0, 0'), '下缘不再压暗')
     assert.ok(glass.includes('background-image: radial-gradient(45% 100% at 50% 0%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)'),
-      '上缘柔光与左缘同档，两侧衰减到基线')
+      '上缘中间突出、两端衰减到基线')
     assert.ok(glass.includes('radial-gradient(45% 100% at 50% 100%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)'),
-      '下缘与上缘同档，两侧衰减到基线')
+      '下缘与上缘同档')
+    assert.ok(glass.includes('radial-gradient(100% 42% at 0% 50%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)'),
+      '左缘同样是中间突出、上下渐暗')
     assert.ok(!glass.includes('background-image: linear-gradient(90deg'), '上下缘都不得再画横向硬线')
-    assert.ok(glass.includes('background-size: 100% 2px, 100% 2px'), '两层都垂直 2px 衰减')
-    assert.ok(glass.includes('background-position: 0 0, 0 100%'), '分别贴上缘 / 下缘')
+    assert.ok(glass.includes('background-size: 100% 2px, 100% 2px, 2px 100%'), '三边柔光都按 2px 厚度衰减')
+    assert.ok(glass.includes('background-position: 0 0, 0 100%, 0 0'), '上 / 下 / 左分别贴边')
     const lightGlass = /body:not\(\[data-ds-dark-theme\]\)[^{]*\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(lightGlass.includes('background-image: radial-gradient(45% 100% at 50% 0%'), '浅色轴也有上缘柔光')
+    assert.ok(lightGlass.includes('radial-gradient(100% 42% at 0% 50%'), '浅色轴左缘同样中间突出')
     const band = /\[data-composer-seat\]::after \{([^}]*)\}/u.exec(code)?.[1] ?? ''
     assert.ok(band.includes('background-image:'), '座位底带重画地面光')
     assert.ok(band.includes('background-position: 100% 100%'))
