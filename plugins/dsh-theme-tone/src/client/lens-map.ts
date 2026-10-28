@@ -66,7 +66,10 @@ export function buildLensMap(options: LensMapOptions): LensMap {
 
       let dx = 0
       let dy = 0
-      if (distance > 0 && distance < bezel) {
+      // 只让四条直边折射；圆角区保持中性 —— 角落的斜向取样会把卡外暗部拉进来，
+      // 形成一圈像「底下还有一层输入框」的暗弧。
+      const onStraightEdge = qx <= 0 || qy <= 0
+      if (onStraightEdge && distance > 0 && distance < bezel) {
         const remaining = 1 - distance / bezel
         const magnitude = depth * remaining * remaining
         // 外法线（指向形外）；取反即默认朝卡内。

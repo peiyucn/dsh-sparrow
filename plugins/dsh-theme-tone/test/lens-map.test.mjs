@@ -97,13 +97,15 @@ describe('lens-map: bezel 透镜位移图', () => {
     assert.equal(displacement(30, HEIGHT / 2).dx, 0, 'bezel 外无位移')
   })
 
-  it('应该 在圆角处沿径向指向卡内（角圆心）', () => {
-    const { dx, dy } = displacement(8, 8)
-    assert.ok(dx > 1 && dy > 1, '左上圆角处位移朝右、朝下（卡内）')
-    assert.ok(Math.abs(dx - dy) <= 1, '45° 圆角处 x / y 分量相等')
-    // 与「指向卡片中心」的方向点积为正 ⇒ 整体朝内。
-    const towardCenter = { x: WIDTH / 2 - 8.5, y: HEIGHT / 2 - 8.5 }
-    assert.ok(dx * towardCenter.x + dy * towardCenter.y > 0, '圆角位移方向指向卡片内部')
+  it('应该 让圆角区保持中性，只有直边折射（避免角落拉出暗弧）', () => {
+    for (const [x, y] of [[8, 8], [WIDTH - 9, 8], [8, HEIGHT - 9], [WIDTH - 9, HEIGHT - 9]]) {
+      const { dx, dy } = displacement(x, y)
+      assert.equal(dx, 0, `(${x},${y}) 圆角 x 方向不应位移`)
+      assert.equal(dy, 0, `(${x},${y}) 圆角 y 方向不应位移`)
+    }
+    // 直边靠近圆角切点处仍然有折射，证明只砍掉了圆角。
+    assert.ok(displacement(WIDTH / 2, 2).dy !== 0, '直边中段仍有折射')
+    assert.ok(displacement(2, HEIGHT / 2).dx !== 0, '直边中段仍有折射')
   })
 
   it('应该 让 bezel 内每个位移像素都指向卡片内部，且不越出 depth 上限', () => {

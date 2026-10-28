@@ -19,7 +19,8 @@
    **边缘折射（Apple Liquid Glass 式 bezel 透镜）**：按卡片**实际尺寸与圆角**用 canvas 逐像素
    生成位移图（圆角矩形 SDF；bezel 28px 内位移最大 32px、按 `(1-t)^2` 归零），写进 `<feImage>`，
    `feDisplacementMap scale="255"` 把 128±dx 编码还原成像素位移；位移图方向朝卡片中心，
-   四条边因此各自向外放大（上 / 下 / 左 / 右四个方向），中心不动、且不依赖卡外内容。隐藏 SVG 的
+   四条边因此各自向外放大（上 / 下 / 左 / 右四个方向），中心不动、且不依赖卡外内容；
+   **圆角区保持中性**（只折射直边，避免角落斜向取样拉出暗弧）。隐藏 SVG 的
    width/height 必须跟随卡片尺寸（feImage 的 100% 按 SVG 视口解析；留 0×0 会退化成黑图）。
    尺寸 / 圆角变化做 160ms 防抖，停稳后只换 feImage 与 SVG 视口，不重建滤镜图（避免换行瞬间效果闪没）。
    CSS 用 `backdrop-filter: … url(#dsh-theme-tone-lens)` 引用；滤镜未注入
