@@ -13,25 +13,24 @@ export const PANEL_BAND_PX = 38
 const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 
 /**
- * 玻璃边缘的固定高光：四边同构造 —— 极淡基线 + 2px 柔光。
- * 上 / 下缘是**中间亮、两端暗**；左 / 右缘反过来：**上下两头亮、中段暗**，
- * 让四条边在四个角上自然接上，边中段留空。右缘是背光侧，峰值更低。
+ * 玻璃边缘的固定高光：四边同构造 —— 极淡基线 + 2px 柔光，都从边中点向两端衰减。
+ * 上 / 下缘是主光，整体加强一档；左缘次之，右缘是背光侧、峰值最低。
  */
-const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.04), inset 1px 0 2px rgba(255, 255, 255, 0.04), inset -1px 0 3px rgba(0, 0, 0, 0.08), inset -1px 0 2px rgba(255, 255, 255, 0.04), inset 0 -1px 2px rgba(255, 255, 255, 0.04)'
-const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.08), inset 1px 0 2px rgba(255, 255, 255, 0.1), inset -1px 0 3px rgba(0, 0, 0, 0.03), inset -1px 0 2px rgba(255, 255, 255, 0.06), inset 0 -1px 2px rgba(255, 255, 255, 0.08)'
+const RIM_DARK = 'inset 0 1px 2px rgba(255, 255, 255, 0.05), inset 1px 0 2px rgba(255, 255, 255, 0.04), inset -1px 0 3px rgba(0, 0, 0, 0.08), inset -1px 0 2px rgba(255, 255, 255, 0.04), inset 0 -1px 2px rgba(255, 255, 255, 0.05)'
+const RIM_LIGHT = 'inset 0 1px 2px rgba(255, 255, 255, 0.1), inset 1px 0 2px rgba(255, 255, 255, 0.1), inset -1px 0 3px rgba(0, 0, 0, 0.03), inset -1px 0 2px rgba(255, 255, 255, 0.06), inset 0 -1px 2px rgba(255, 255, 255, 0.1)'
 
 /**
- * 四缘柔光：2px，峰值 + 0.04 基线。上 / 下缘横向 45% 衰减；左 / 右缘纵向
- * 两头亮、中段归零，与上 / 下缘在四角衔接。
+ * 四缘柔光：2px，峰值 + 基线。上 / 下缘是主光（0.10 + 0.05，横向 50% 衰减），
+ * 左缘 0.08、右缘 0.06（+0.04，纵向 42% 衰减）；四边都在中点最亮、向两端渐暗。
  */
-const TOP_GLOW_DARK = 'radial-gradient(45% 100% at 50% 0%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)'
-const TOP_GLOW_LIGHT = 'radial-gradient(45% 100% at 50% 0%, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%)'
-const BOTTOM_GLOW_DARK = 'radial-gradient(45% 100% at 50% 100%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)'
-const BOTTOM_GLOW_LIGHT = 'radial-gradient(45% 100% at 50% 100%, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%)'
-const LEFT_GLOW_DARK = 'linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, transparent 32%, transparent 68%, rgba(255, 255, 255, 0.08) 100%)'
-const LEFT_GLOW_LIGHT = 'linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, transparent 32%, transparent 68%, rgba(255, 255, 255, 0.28) 100%)'
-const RIGHT_GLOW_DARK = 'linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, transparent 32%, transparent 68%, rgba(255, 255, 255, 0.06) 100%)'
-const RIGHT_GLOW_LIGHT = 'linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 32%, transparent 68%, rgba(255, 255, 255, 0.2) 100%)'
+const TOP_GLOW_DARK = 'radial-gradient(50% 100% at 50% 0%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 50%, transparent 100%)'
+const TOP_GLOW_LIGHT = 'radial-gradient(50% 100% at 50% 0%, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.12) 50%, transparent 100%)'
+const BOTTOM_GLOW_DARK = 'radial-gradient(50% 100% at 50% 100%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 50%, transparent 100%)'
+const BOTTOM_GLOW_LIGHT = 'radial-gradient(50% 100% at 50% 100%, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.12) 50%, transparent 100%)'
+const LEFT_GLOW_DARK = 'radial-gradient(100% 42% at 0% 50%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)'
+const LEFT_GLOW_LIGHT = 'radial-gradient(100% 42% at 0% 50%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%)'
+const RIGHT_GLOW_DARK = 'radial-gradient(100% 42% at 100% 50%, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.03) 50%, transparent 100%)'
+const RIGHT_GLOW_LIGHT = 'radial-gradient(100% 42% at 100% 50%, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%)'
 
 /** 输入框卡片的悬浮阴影（投影方向朝下，读作离开页面）。 */
 const CARD_SHADOW_DARK = '0 12px 32px -12px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25)'
