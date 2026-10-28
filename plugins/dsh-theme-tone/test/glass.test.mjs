@@ -18,7 +18,7 @@ const code = css.replace(/\/\*[\s\S]*?\*\//gu, '')
 
 describe('glass: 三块玻璃（输入框 / 对话顶栏 / 右栏）', () => {
   it('三处玻璃共用同一个填充参数与同一个模糊参数（统一）', () => {
-    assert.ok(GLASS_FILL_ALPHA >= 0.5 && GLASS_FILL_ALPHA < 0.75, '填充更实：透明度降低，但保留玻璃感')
+    assert.ok(GLASS_FILL_ALPHA >= 0.4 && GLASS_FILL_ALPHA < 0.6, '半透明：背景轮廓可见，但不盖掉折射')
     const blurPx = Number(/blur\((\d+)px\)/u.exec(GLASS_BLUR)?.[1] ?? 0)
     assert.ok(blurPx > 0 && blurPx < 40, '模糊低于官方 40px（降低模糊程度）')
     assert.equal(code.split('backdrop-filter: ' + GLASS_BLUR).length - 1, 4, '三处玻璃 + 边缘折射增强各一处')

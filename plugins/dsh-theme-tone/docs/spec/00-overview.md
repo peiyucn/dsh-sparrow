@@ -53,8 +53,8 @@
 
 | 参数 | 值 | 说明 |
 | :--- | :--- | :--- |
-| 模糊 | `GLASS_BLUR = blur(8px) saturate(150%)`（效果优先档） | 三处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊），测试钉住「三处同一值」 |
-| 填充不透明度 | `GLASS_FILL_ALPHA = 0.55` | **三处统一同一个常量**，越小白越通透；填充色各自取官方面 token（顶栏/右栏 = `bg-base`，输入框 = `--dsw-specific-input-major`） |
+| 模糊 | `GLASS_BLUR = blur(8px) saturate(150%) contrast(1.06) brightness(0.95)`（效果优先档：轻微压暗/提对比，背景轮廓更可读） | 三处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊），测试钉住「三处同一值」 |
+| 填充不透明度 | `GLASS_FILL_ALPHA = 0.45` | **三处统一同一个常量**，越小白越通透；填充色各自取官方面 token（顶栏/右栏 = `bg-base`，输入框 = `--dsw-specific-input-major`） |
 | 边缘光 | `RIM_DARK` / `RIM_LIGHT` | 四边各留极淡基线（右缘另叠一点暗边），连成一圈；深/浅两套 |
 | 四缘光 | `TOP_GLOW_*` / `BOTTOM_GLOW_*` / `LEFT_GLOW_*` / `RIGHT_GLOW_*` | 4px 径向柔光；上/下 0.12 + 0.04 基线（45% 横向），左 0.08 / 右 0.06 + 0.04 基线（42% 纵向） |
 | 透镜斜面 | `LENS_BEZEL_PX = 28` / `LENS_DEPTH_PX = 32` / `LENS_MAP_SCALE = 255` | bezel 内边缘位移最大、按平方归零；正 scale = 朝卡内取样、四边向外放大；隐藏 SVG 视口 = 卡片尺寸 |
