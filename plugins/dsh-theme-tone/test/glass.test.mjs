@@ -42,7 +42,7 @@ describe('glass: 顶栏 / 右栏 / 输入框第 1 步材质', () => {
     assert.ok(glass.includes('border-radius: inherit'))
     assert.ok(!glass.includes('url(#'), '第 1 步不做折射')
     assert.ok(!code.includes('[data-composer-seat]::after'), '第 1 步不补座位底带')
-    assert.ok(!code.includes('--dsw-specific-selector'), '第 1 步不动「+」按钮底色')
+    assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底色，跟随玻璃')
   })
 
   it('输入框第 2 步边缘高光：全周 1px 内描边 + 上下柔光，随圆角连续', () => {
