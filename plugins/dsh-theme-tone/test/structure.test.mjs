@@ -32,7 +32,7 @@ describe('dsh-theme-tone 结构', () => {
     }
   })
 
-  it('src 只剩「颜色 + 地面光 + 两处玻璃 + 设置行」这几件事', async () => {
+  it('src 只剩「颜色 + 地面光 + 三处玻璃 + 设置行」这几件事', async () => {
     for (const file of ['constants.ts', 'backdrop.ts', 'glass.ts', 'nav-pin.ts', 'tones.ts', 'host.ts', 'compat.ts', 'settings-schema.ts', 'index.ts']) {
       assert.ok(existsSync(new URL(`../src/${file}`, import.meta.url)), `${file} 应存在`)
     }

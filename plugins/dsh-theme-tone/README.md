@@ -27,7 +27,7 @@ Each tone paints:
 
 * **Colors** — the whole app (background, raised surfaces, labels, borders, scrollbars) is re-tinted through the official theme token layer.
 * **Ground light** — a fixed decorative layer with three soft lights (top, bottom, left), with the light's position and direction fixed per tone.
-* **Liquid glass** — the conversation header and the right sidebar's top bar share one translucent material with a cool luminance lift. The official borders stay untouched; the background light shows through and content scrolls, blurred, underneath.
+* **Liquid glass** — the conversation header, the composer and the right sidebar's top bar share one translucent material with a cool luminance lift. The top bars keep their official borders; the composer is transparent, floats on a soft shadow and catches light from the upper-left.
 * **No opaque footer band** — the solid strip the composer used to sit on is removed, so the page ground light shows through instead.
 
 **Default** leaves the official theme completely untouched.

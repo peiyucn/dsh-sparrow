@@ -15,20 +15,35 @@ const css = buildGlassCss()
 const backdropCss = buildBackdropCss()
 const code = css.replace(/\/\*[\s\S]*?\*\//gu, '')
 
-describe('glass: 两处液态玻璃', () => {
-  it('两处共用同一个模糊与填充；不新增任何边框', () => {
+describe('glass: 三处液态玻璃', () => {
+  it('三处共用同一个模糊；填充分层，顶栏 / 右栏不加任何边框', () => {
     assert.ok(GLASS_FILL_ALPHA < 0.5, '顶栏 / 右栏通透')
     const blurPx = Number(/blur\((\d+)px\)/u.exec(GLASS_BLUR)?.[1] ?? 0)
     assert.ok(blurPx > 0 && blurPx < 40, '模糊低于官方 40px（降低模糊程度）')
-    assert.equal(code.split('backdrop-filter: ' + GLASS_BLUR).length - 1, 2, '顶栏 + 右栏两处玻璃')
-    assert.equal((code.match(new RegExp(String(GLASS_FILL_ALPHA * 100) + '%', 'gu')) ?? []).length, 2, '两处共用填充常量')
-    assert.ok(!code.includes('box-shadow'), '⛔ 不新增边框 / inset 阴影，保持官方原有边框')
-    assert.ok(!code.includes('inset '), '⛔ 不新增任何 inset 高光')
+    assert.equal(code.split('backdrop-filter: ' + GLASS_BLUR + ';').length - 1, 3, '顶栏 + 右栏 + 输入框三处默认玻璃')
+    assert.equal((code.match(new RegExp(String(GLASS_FILL_ALPHA * 100) + '%', 'gu')) ?? []).length, 2, '顶栏 / 右栏共用填充常量')
+    const header = new RegExp(`\\[data-slot='conversation\\.header'\\] > header::before \\{([^}]*)\\}`, 'u').exec(code)?.[1] ?? ''
+    assert.ok(!header.includes('box-shadow'), '顶栏不新增边框 / inset')
   })
 
-  it('输入框不做任何定制：没有 composer 选择器与玻璃层', () => {
-    assert.ok(!code.includes('[data-composer'), '输入框保持官方原样')
-    assert.ok(!code.includes('data-specific-input'), '不覆盖输入框底色')
+  it('输入框：透明 + 背景模糊 + 非均匀边缘光 + 悬浮投影（纯 CSS）', () => {
+    const card = /\[data-composer-card\] \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(card.includes('background-color: transparent'), '卡片让出官方底色')
+    assert.ok(card.includes('box-shadow: none'), '移除官方卡片阴影，由玻璃层负责悬浮')
+    assert.ok(card.includes('position: relative') && card.includes('z-index: 0'), '卡片自成层叠上下文')
+    assert.ok(card.includes('--dsw-specific-selector: transparent'), '「+」按钮让出实心底')
+    const optics = /\[data-composer-card\]::before \{([^}]*)\}/u.exec(code)?.[1] ?? ''
+    assert.ok(optics.includes('background-color: transparent'), '输入框纯透明，不染官方蓝色')
+    assert.ok(!optics.includes('background-image:'), '不在整面加偏光 / 渐变')
+    assert.ok(optics.includes('backdrop-filter: ' + GLASS_BLUR), '背景模糊')
+    assert.ok(optics.includes('border-radius: inherit'), '跟官方圆角')
+    assert.ok(optics.includes('0 24px 50px -24px'), '外层悬浮投影')
+    assert.ok(optics.includes('inset 3px 2px 8px -5px'), '左上方向的边缘主光')
+    assert.ok(optics.includes('inset -2px 0 8px -6px') && optics.includes('inset 0 -2px 8px -6px'), '右侧 / 底部弱回光')
+    assert.ok(!optics.includes('inset 1px 0 1px') && !optics.includes('inset -1px 0 1px'), '不是四条等亮边')
+    assert.ok(!optics.includes('url(#'), '纯 CSS，不使用位移图 / 动态滤镜')
+    assert.ok(!code.includes('[data-composer-card]::after'),
+      '⛔ 不得占用 ::after：官方 cardWorkspaceTrigger::after 用它画「未选工作区」虚线框')
   })
 
   it('顶栏：浮层化 + 内容上移 + 液态玻璃 + 自绘地面光', () => {

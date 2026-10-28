@@ -1,10 +1,14 @@
-import { ABOVE_CONTENT_Z_INDEX, PLAIN_ATTR, RIGHT_PANEL_ATTR } from './constants.js'
+import {
+  ABOVE_CONTENT_Z_INDEX,
+  PLAIN_ATTR,
+  RIGHT_PANEL_ATTR,
+} from './constants.js'
 import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
 /** 顶栏 / 右栏的玻璃填充；不碰官方边框，只做半透明材质。 */
 export const GLASS_FILL_ALPHA = 0.4
-/** 两处液态玻璃共用的模糊：冷调提亮，模拟 Liquid Glass 的 regular variant。 */
+/** 两处顶栏液态玻璃共用的模糊：冷调提亮，模拟 Liquid Glass 的 regular variant。 */
 export const GLASS_BLUR = 'blur(24px) saturate(170%) brightness(1.04)'
 
 const P = `body:not([${PLAIN_ATTR}])`
@@ -25,6 +29,19 @@ function viewportLight(position: string, size = '100vw 100vh'): string {
 function glassMaterial(fill: string, alpha: number): string {
   return `  background-color: color-mix(in srgb, ${fill} ${alpha * 100}%, transparent);
   backdrop-filter: ${GLASS_BLUR};`
+}
+
+/** 输入框：纯透明 + 背景模糊 + 固定光源的边缘高光 + 悬浮投影（全部纯 CSS）。 */
+function composerMaterial(): string {
+  return `  background-color: transparent;
+  backdrop-filter: ${GLASS_BLUR};
+  box-shadow:
+    0 24px 50px -24px rgba(0, 0, 0, 0.55),
+    0 8px 20px -12px rgba(0, 0, 0, 0.30),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.24),
+    inset 3px 2px 8px -5px rgba(255, 255, 255, 0.22),
+    inset -2px 0 8px -6px rgba(255, 255, 255, 0.06),
+    inset 0 -2px 8px -6px rgba(255, 255, 255, 0.04);`
 }
 
 const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
@@ -77,7 +94,34 @@ ${P} [data-phase='active'] [data-width-handle] {
   top: ${HEADER_HEIGHT_PX}px;
 }
 
-/* ===== 输入框：保持官方原样（不做任何定制） ===== */
+/* ===== 输入框：液态玻璃（薄填充 + 背景模糊 + 四边灯光 + 悬浮） =====
+   材质放在 ::before（文字之下）：填充与模糊让背景透出来；四边 inset 只做低不透明度
+   定向高光，避免大边框；外侧两层软阴影制造悬浮。透镜滤镜只在位移图就绪后叠加。 */
+${P} [data-composer-card] {
+  position: relative;
+  z-index: 0;
+  background-color: transparent;
+  box-shadow: none;
+  --dsw-specific-selector: transparent;
+}
+${P} [data-composer-card]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+${composerMaterial()}
+}
+body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-composer-card]::before {
+  box-shadow:
+    0 24px 50px -24px rgba(31, 35, 60, 0.25),
+    0 8px 20px -12px rgba(31, 35, 60, 0.14),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.80),
+    inset 3px 2px 8px -5px rgba(255, 255, 255, 0.60),
+    inset -2px 0 8px -6px rgba(120, 130, 150, 0.10),
+    inset 0 -2px 8px -6px rgba(120, 130, 150, 0.08);
+}
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
 ${P} ${RP} {
