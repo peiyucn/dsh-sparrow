@@ -14,6 +14,8 @@ const PANEL_SCROLLER_LIFT_PX = PANEL_BAND_PX * 2
 /** 输入框玻璃（第 1 步：材质）：半透明底 + 背景模糊，先保证可读、变高不闪。 */
 export const COMPOSER_FILL_ALPHA = 0.55
 export const COMPOSER_BLUR = 'blur(12px) saturate(140%)'
+/** 输入框圆角（owner 指定 25px；官方 panel 为 28px）。 */
+export const COMPOSER_RADIUS_PX = 25
 /**
  * 输入框第 2 步：边缘高光。全周 1px 内描边（inset box-shadow 会自动跟圆角走）+ 上下柔光；
  * 不用径向渐变，所以四个角不会出现断光。
@@ -100,7 +102,8 @@ ${P} ${SEAT} [data-composer-card] {
   position: relative;
   z-index: 0;
   background-color: color-mix(in srgb, var(--dsw-specific-input-major) ${COMPOSER_FILL_ALPHA * 100}%, transparent);
-  /* 形状保持官方原样（圆角走 --dsw-radius-panel），只换材质与高光。 */
+  /* 圆角按 owner 指定收到 25px（官方 panel 28px），::before 继承。 */
+  border-radius: ${COMPOSER_RADIUS_PX}px;
   /* 「+」等 selector 型按钮：官方给的是不透明中性底，在玻璃上会读成一块实心，跟着玻璃让出底色。 */
   --dsw-specific-selector: transparent;
 }
@@ -131,6 +134,26 @@ ${P} [data-phase='active'] [data-composer-seat] [data-composer-dock] {
   background-color: var(--dsw-alias-bg-base);
   background-image: ${BACKDROP_GRADIENTS};
   background-attachment: fixed;
+}
+
+/* ===== todo / goal：和待发信息列表（queue dock）一样接进输入框 =====
+   下边圆角改直角，用与 queue 相同的负边距 tuck 进下方元素的 stack 缝；
+   标题 / 图标用专属色区分（todo 绿、goal 橘红），避免同时出现时混在一起。 */
+${P} [data-phase='active'] [data-testid='todo-panel'] {
+  border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
+  margin-bottom: calc(0px - var(--dsh-composer-stack-gap) - 3px);
+}
+${P} [data-phase='active'] [data-testid='todo-panel'] button {
+  --dsw-alias-label-primary: var(--dsw-alias-state-success-primary);
+  --dsw-alias-label-tertiary: var(--dsw-alias-state-success-primary);
+}
+${P} [data-phase='active'] [data-goal-bar] {
+  margin-bottom: calc(0px - var(--dsh-composer-stack-gap) - 3px);
+}
+${P} [data-phase='active'] [data-goal-bar] > div {
+  border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
+  --dsw-alias-label-primary: var(--dsw-alias-state-warn-primary);
+  --dsw-alias-label-tertiary: var(--dsw-alias-state-warn-primary);
 }
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */

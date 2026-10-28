@@ -10,13 +10,15 @@
    按色调固定；**不使用 `mix-blend-mode`**（normal 合成，颜色与 screen 的差 ≤1/255）。
 3. **对话区顶栏玻璃**：顶栏浮层化（`position: absolute` + 滚动区 `padding-top: 76px` + 滚动条 track 下推
    + 拖拽条上沿 76px），玻璃放顶栏 `::before`（`z-index: -1`），并自绘同源三道光。
-4. **输入框玻璃 · 第 1+2 步（材质 + 边缘高光）**：座位撤掉官方 36px 实色渐隐（正文从玻璃下滚过）；
-   卡片本体承担半透明底色（跟官方圆角 / 动态高度走），`::before` 做 `backdrop-filter`，并用
-   **全周 1px inset 内描边 + 上下线性柔光**画 specular 高光（自动跟圆角、四角不断光）；
-   卡片作用域内 `--dsw-specific-selector: transparent`，让官方「+」等 selector 型按钮不读成实心块；
+4. **输入框玻璃**：座位撤掉官方 36px 实色渐隐（正文从玻璃下滚过）；卡片本体承担半透明底色
+   （圆角 25px、`::before` inherit），`::before` 做 `backdrop-filter` 并画 specular 高光；
+   卡片作用域内 `--dsw-specific-selector: transparent`，让官方「+」等 selector 型按钮不读成实心块。
+   **todo / goal 接进输入框**：两者都按 queue dock 的方式做「上圆下直 + 负边距 tuck 进下方 stack 缝」，
+   标题 / 图标用专属色区分（todo = 绿 `state-success-primary`，goal = 橘红 `state-warn-primary`）。
    卡片下方统计胶囊行（`[data-composer-dock]`）显式 `width:100%` + 卡片同款 max-width，
    自身重绘**底色 + 同源打光**（fixed 定位区 = 视口），向下盖住座位 4px 内边距，
    但不向上进入卡片（避免挡住玻璃下沿的模糊内容）。
+5. **右栏顶栏玻璃（真模糊）**：官方把「两条 38px 带（0..76）」与「滚区（76..底）」排成上下相邻的两个
    盒子 ⇒ 带背后永远只有面板纯色。做法：可流式滚动的正文（markdown/text 文档预览、文件树）上提 76px、
    内容下移 76px（只改视觉位置），头部在流内占的高度用负底距还回去 ⇒ 正文真的从两条带下滚过；玻璃面挂在
    各标签自己的 38px **头行** `::before` 上、向上铺满 0..76（两盒重合，y=38 不出缝），头行 z=2、dockkit
@@ -41,7 +43,7 @@
 | :--- | :--- | :--- |
 | 模糊 | `GLASS_BLUR = blur(20px) saturate(150%)` | 顶栏 + 右栏两处玻璃共用同一个常量；2026-10-27 从官方 `blur(40px)` 调低（原值观感过糊） |
 | 填充不透明度 | `GLASS_FILL_ALPHA = 0.45` | **顶栏 / 右栏共用同一个常量**，填充色取官方 `bg-base` |
-| 输入框材质 / 高光 | `COMPOSER_FILL_ALPHA = 0.55` / `COMPOSER_BLUR = blur(12px) saturate(140%)` / `COMPOSER_RIM_*` / `COMPOSER_SHEEN_*` | 第 1 步：半透明底 + 背景模糊；第 2 步：全周 1px 内描边 + 上下线性柔光；**圆角保持官方 `--dsw-radius-panel`（28px）不变** |
+| 输入框材质 / 高光 | `COMPOSER_FILL_ALPHA = 0.55` / `COMPOSER_BLUR = blur(12px) saturate(140%)` / `COMPOSER_RIM_*` / `COMPOSER_SHEEN_*` / `COMPOSER_RADIUS_PX = 25` | 半透明底 + 背景模糊；均匀 1px 内描边 + 上下柔光；圆角 25px；todo / goal 用 `radius-lg` 上圆下直并 tuck 进 stack 缝 |
 
 ## 代码布局
 
