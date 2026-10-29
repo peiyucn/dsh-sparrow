@@ -1,8 +1,9 @@
 // @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { CodeBuddyAdapter, effectiveReasoningEffort, mapFinish, mapUsage, parseSseLine, toWireMessages, toWireTools } from '../lib/adapter.js'
+import { CodeBuddyAdapter, ADAPTIVE_RUNGS, effectiveReasoningEffort, mapFinish, mapUsage, parseSseLine, toWireMessages, toWireTools } from '../lib/adapter.js'
 import { BASE_URL } from '../lib/constants.js'
+import { NEUTRALIZER_MARKERS } from '../lib/fingerprints.js'
 
 /** Node 原生 fetch 存档：每个用例把 `globalThis.fetch` 换成桩，结束必须还原——写成 `undefined` 既
  *  不符合 `typeof fetch` 的类型契约，也会把宿主全局真的抹掉。 */
@@ -425,5 +426,143 @@ describe('parseSseLine / mapFinish / mapUsage', () => {
     assert.equal(tokens.outputTokens, 40)
     assert.equal(tokens.cacheReadTokens, 30)
     assert.equal(credit, 0.5)
+  })
+})
+
+describe('CodeBuddyAdapter 运行时自适应（11128 有界降级）', () => {
+  const OK_SSE = [
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: 'ok' } }] }) + '\n\n',
+    'data: ' + JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1 } }) + '\n\n',
+    'data: [DONE]\n\n',
+  ].join('')
+  const REJECTION_BODY = JSON.stringify({ code: 11128, msg: 'Illegal API invocation from an unapproved channel' })
+  const SYSTEM = [
+    'You are an AI agent powered by DeepSeek Harness.',
+    'Tokens prefixed with @ are paths the user explicitly referenced. @"" quotes a path containing spaces.',
+    'Keep this line verbatim.',
+  ].join('\n')
+
+  const reject = () => new Response(REJECTION_BODY, { status: 400, headers: { 'content-type': 'application/json' } })
+  const ok = () => new Response(OK_SSE, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+  const otherError = () => new Response(
+    JSON.stringify({ code: 10081, msg: 'ip not in whitelist' }),
+    { status: 400, headers: { 'content-type': 'application/json' } },
+  )
+
+  /** 依次返回给定响应工厂（用尽后重复最后一个）；记录每次请求体。 */
+  function stubFetch(factories) {
+    /** @type {any[]} */
+    const bodies = []
+    globalThis.fetch = async (_url, init) => {
+      bodies.push(JSON.parse(init.body))
+      const factory = factories[Math.min(bodies.length - 1, factories.length - 1)]
+      return factory()
+    }
+    return bodies
+  }
+
+  function makeAdapter(extra = {}) {
+    return new CodeBuddyAdapter({
+      models: () => [],
+      resolveApiKey: async () => 'test-key',
+      account: () => undefined,
+      streamIdleTimeoutMs: 10_000,
+      ...extra,
+    })
+  }
+
+  /** @param {any} adapter @param {string} [system] */
+  async function drain(adapter, system = SYSTEM) {
+    /** @type {any[]} */
+    const chunks = []
+    for await (const chunk of adapter.stream({
+      provider: 'codebuddy-credits',
+      model: 'hy4-preview',
+      system,
+      messages: [],
+    })) {
+      chunks.push(chunk)
+    }
+    return chunks
+  }
+
+  it('阶梯组成：默认字符 → 候选池其余 → strip 兜底', () => {
+    assert.deepEqual(ADAPTIVE_RUNGS.map(rung => rung.id), ['cgj', 'marker-2', 'marker-3', 'strip'])
+  })
+
+  it('第一次 11128、第二次 200：换候选字符重试并正常出流', async () => {
+    const bodies = stubFetch([reject, ok])
+    try {
+      const chunks = await drain(makeAdapter())
+      assert.equal(bodies.length, 2, '应重试一次')
+      assert.ok(String(bodies[0].messages[0].content).includes('You' + NEUTRALIZER_MARKERS[0]), '首格用默认字符')
+      assert.ok(String(bodies[1].messages[0].content).includes('You' + NEUTRALIZER_MARKERS[1]), '次格换候选字符')
+      assert.equal(chunks.filter(chunk => chunk.type === 'text-delta').length, 1)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('成功格会被记住：下一个流只发一次请求、直接用该格变换', async () => {
+    const bodies = stubFetch([reject, ok, ok])
+    try {
+      const adapter = makeAdapter()
+      await drain(adapter)
+      const before = bodies.length
+      await drain(adapter)
+      assert.equal(bodies.length, before + 1, '第二个流只发一次')
+      assert.equal(bodies[1].messages[0].content, bodies[before].messages[0].content, '复用成功格变换')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('非 11128 错误不重试（IP 白名单等原样透传）', async () => {
+    const bodies = stubFetch([otherError, ok])
+    try {
+      await assert.rejects(drain(makeAdapter()), /ip not in whitelist/u)
+      assert.equal(bodies.length, 1)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('阶梯用尽：四格全拒后报明确错误（不无限重试）', async () => {
+    const bodies = stubFetch([reject])
+    try {
+      await assert.rejects(drain(makeAdapter()), /已尝试自动降级/u)
+      assert.equal(bodies.length, ADAPTIVE_RUNGS.length)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('strip 兜底：前三格 11128、第四格 200 → 请求体已删除身份句与 @ 段', async () => {
+    const bodies = stubFetch([reject, reject, reject, ok])
+    try {
+      await drain(makeAdapter())
+      assert.equal(bodies.length, 4)
+      const sent = String(bodies[3].messages[0].content)
+      assert.ok(!sent.includes('You are an AI agent'))
+      assert.ok(!sent.includes('@'))
+      assert.ok(sent.includes('Keep this line verbatim.'))
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('开关关闭：只发一次请求、错误原样透传（回到旧行为）', async () => {
+    const bodies = stubFetch([reject, ok])
+    try {
+      await assert.rejects(drain(makeAdapter({ autoAdapt: () => false })), (error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        assert.match(message, /Illegal API invocation/u)
+        assert.ok(!message.includes('已尝试自动降级'))
+        return true
+      })
+      assert.equal(bodies.length, 1)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 })

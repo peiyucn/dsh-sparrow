@@ -55,6 +55,7 @@ export function installProvider(ctx: Context, config: Config, deps: ProviderDeps
     account: () => deps.account.current(),
     streamIdleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,
     maxMode: () => config.maxMode.get() === true,
+    autoAdapt: () => config.autoAdapt.get() === true,
     // 不在这里记账：credit 由适配器写进 finish 块的 replayState，积分从会话事件重放
     // （credits-ledger）；这里再存一份只会重复且重启即失。
     onCatalogRead: deps.onCatalogRead,

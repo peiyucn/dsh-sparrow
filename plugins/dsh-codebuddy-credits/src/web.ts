@@ -67,6 +67,10 @@ export interface CodeBuddyCreditsShared {
   maxMode(): boolean
   /** 设置 Max 模式（写设置节）。 */
   setMaxMode(enabled: boolean): Promise<void>
+  /** 上游渠道校验（11128）运行时自适应开关当前状态（设置节）。 */
+  autoAdapt(): boolean
+  /** 设置运行时自适应开关（写设置节）。 */
+  setAutoAdapt(enabled: boolean): Promise<void>
 }
 
 /** 积分聚合视图（供轮次 / 会话面板）。 */
@@ -149,6 +153,7 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
               account: shared.account(),
               models: shared.models().map(model => toModelFactView(model)),
               maxMode: shared.maxMode(),
+              autoAdapt: shared.autoAdapt(),
             })
             return
           }
@@ -160,6 +165,16 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
             }
             await shared.setMaxMode(body.enabled)
             sendJson(res, 200, { ok: true, maxMode: shared.maxMode() })
+            return
+          }
+          if (req.method === 'POST' && pathname === PREFIX + '/auto-adapt') {
+            const body = await readBody(req)
+            if (typeof body.enabled !== 'boolean') {
+              sendJson(res, 400, { error: 'enabled 必须是布尔值' })
+              return
+            }
+            await shared.setAutoAdapt(body.enabled)
+            sendJson(res, 200, { ok: true, autoAdapt: shared.autoAdapt() })
             return
           }
           if (req.method === 'POST' && pathname === PREFIX + '/quota') {

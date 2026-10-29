@@ -13,6 +13,7 @@ const STATUS_URL = `${API_PREFIX}/status`
 const KEY_URL = `${API_PREFIX}/key`
 const REMOVE_URL = `${API_PREFIX}/remove-key`
 const REFRESH_URL = `${API_PREFIX}/refresh-models`
+const AUTO_ADAPT_URL = `${API_PREFIX}/auto-adapt`
 /** 保存/清空 Key 后广播的窗口事件（对话页额度卡据此联动刷新）。 */
 const STATUS_CHANGED_EVENT = 'codebuddy-credits-status-changed'
 
@@ -20,6 +21,7 @@ interface CardStatus {
   keyConfigured: boolean
   account?: { enterpriseName?: string; accountType?: string }
   models?: ModelFactView[]
+  autoAdapt?: boolean
 }
 
 interface CardProps {
@@ -54,6 +56,8 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
   const [refreshNote, setRefreshNote] = useState<string | undefined>(undefined)
   const [refreshError, setRefreshError] = useState<string | undefined>(undefined)
   const [busy, setBusy] = useState(false)
+  const [adaptBusy, setAdaptBusy] = useState(false)
+  const [autoAdapt, setAutoAdapt] = useState(true)
   const [message, setMessage] = useState<string | undefined>(undefined)
   const [messageKind, setMessageKind] = useState<'error' | 'info'>('info')
   // 官方 savedProvider 同款：应用成功即关闭编辑器并显示绿色保存提示，直到下次编辑/取消。
@@ -66,6 +70,7 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
       if (!response.ok) return
       const payload = await response.json() as CardStatus
       setStatus(payload)
+      if (payload.autoAdapt !== undefined) setAutoAdapt(payload.autoAdapt)
       // 设置卡读到的模型事实同样回写共享表（与额度卡/选择器同源）。
       syncModelFacts(payload.models ?? [])
     } catch {
@@ -103,6 +108,28 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
       setRefreshing(false)
     }
   }, [refreshing, t])
+
+  /** 自动适配上游风控开关：乐观更新，失败回滚并给可见错误。 */
+  const toggleAutoAdapt = useCallback(async (enabled: boolean) => {
+    if (adaptBusy) return
+    setAdaptBusy(true)
+    setAutoAdapt(enabled)
+    setMessage(undefined)
+    try {
+      const response = await fetchLocal(AUTO_ADAPT_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      if (!response.ok) throw new Error('toggle failed')
+    } catch {
+      setAutoAdapt(!enabled)
+      setMessageKind('error')
+      setMessage(t('autoAdapt.failed'))
+    } finally {
+      setAdaptBusy(false)
+    }
+  }, [adaptBusy, t])
 
   // 捕获阶段拦住官方行头「编辑」按钮（stopPropagation 阻断官方编辑器）；官方改结构时由 settings-row.ts 静默降级。
   useEffect(() => {
@@ -250,6 +277,22 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
           <p className={CCB_CLASS.cardHint}>
             {t('state.configured', { account: accountParts.join(' · ') })}
           </p>
+        )
+        : null}
+      {configured
+        ? (
+          <div className={CCB_CLASS.cardField}>
+            <label className={CCB_CLASS.cardLabel}>
+              <input
+                type="checkbox"
+                checked={autoAdapt}
+                disabled={adaptBusy || busy}
+                onChange={event => void toggleAutoAdapt(event.target.checked)}
+              />
+              {t('autoAdapt.label')}
+            </label>
+            <span className={CCB_CLASS.cardHint}>{t('autoAdapt.hint')}</span>
+          </div>
         )
         : null}
       {message !== undefined

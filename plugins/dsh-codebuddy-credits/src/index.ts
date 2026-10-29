@@ -99,6 +99,15 @@ export function apply(ctx: Context, config: Config): void {
       // maxMode 是 Config 里的 volatile 字段（命名空间 = 条目 id SETTINGS_NAMESPACE）；设置写入只认 volatile 路径。
       await settings.mutate(SETTINGS_NAMESPACE, [{ op: 'set', path: ['maxMode'], value: enabled }])
     },
+    autoAdapt: () => config.autoAdapt.get() === true,
+    async setAutoAdapt(enabled) {
+      const settings = ctx.get('settings')
+      if (settings === undefined) {
+        throw new LlmError(`${name}: 本组合没有设置服务，无法保存自动适配开关`, 'NO_SETTINGS_STORE')
+      }
+      // autoAdapt 同 maxMode：Config volatile 字段，设置写入只认 volatile 路径。
+      await settings.mutate(SETTINGS_NAMESPACE, [{ op: 'set', path: ['autoAdapt'], value: enabled }])
+    },
   })
 
   // 设置面接线：表单由本插件导出的 `Config` 投影；`settings` 仍是**可选服务**——它缺席时这个子级

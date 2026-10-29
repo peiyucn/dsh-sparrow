@@ -19,6 +19,9 @@ export type CodeBuddyReadImage = (
   signal?: AbortSignal,
 ) => Promise<{ mediaType: string; data: Uint8Array }>
 
+/** 正文变换（运行时自适应阶梯注入）：只换变换，不换消息映射；默认 = 当前默认中和符。 */
+export type NeutralizeText = (text: string) => string
+
 interface WireToolCall {
   id: string
   type: 'function'
@@ -58,6 +61,7 @@ async function imageDataUrl(ref: ImageAttachmentRef, readImage: CodeBuddyReadIma
 export async function toWireMessages(
   options: GenerateOptions,
   readImage?: CodeBuddyReadImage,
+  neutralize: NeutralizeText = neutralizeChannelFingerprints,
 ): Promise<WireMessage[]> {
   const messages: WireMessage[] = []
   const source = options.messages as Message[]
@@ -70,7 +74,7 @@ export async function toWireMessages(
     systemText = textOf(source[0].content)
     start = 1
   }
-  const system = neutralizeChannelFingerprints(systemText)
+  const system = neutralize(systemText)
   messages.push({
     role: 'system',
     content: system.trim().length === 0 ? FALLBACK_SYSTEM_PROMPT : system,
@@ -78,7 +82,7 @@ export async function toWireMessages(
   for (let index = start; index < source.length; index += 1) {
     const message = source[index] as Message
     if (message.role === 'system') {
-      messages.push({ role: 'system', content: neutralizeChannelFingerprints(textOf(message.content)) })
+      messages.push({ role: 'system', content: neutralize(textOf(message.content)) })
       continue
     }
     // 工具结果 → wire 的 tool 角色，用 `message.toolCallId` 作 tool_call_id。
@@ -152,7 +156,7 @@ export async function toWireMessages(
     }
     // 历史里的 assistant 正文若复述过指纹句，同样会被上游整轮拦截（跟会话走，不跟模型走），
     // 故这里也做无损中和（代码块保持原样）；tool_calls 的 arguments 不动。
-    if (text.length > 0) assistant.content = neutralizeChannelFingerprints(text)
+    if (text.length > 0) assistant.content = neutralize(text)
     if ((assistant.tool_calls?.length ?? 0) === 0) assistant.tool_calls = undefined
     else if (assistant.content === null) assistant.content = ''
     messages.push(assistant)

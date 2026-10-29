@@ -21,11 +21,17 @@ export interface Config {
    * 接受未声明的 max）；选择器档位面板呈现锁定态，逐模型偏好保留不覆盖，关闭后原样恢复。
    */
   maxMode: Volatile<boolean>
+  /**
+   * 上游渠道校验（11128）的运行时自适应：开时按阶梯自动降级重试（见
+   * `docs/spec/01-runtime-adaptation.md`），关时回到「单次请求、失败原样报错」。
+   */
+  autoAdapt: Volatile<boolean>
 }
 
 export const Config = z.object({
   apiKeyEnv: z.string().role('credential-ref').default(API_KEY_ENV).volatile(),
   maxMode: z.boolean().default(false).volatile(),
+  autoAdapt: z.boolean().default(true).volatile(),
 })
 
 /**

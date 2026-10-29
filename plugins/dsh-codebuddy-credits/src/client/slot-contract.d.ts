@@ -95,6 +95,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'models.latest'
       | 'models.empty'
       | 'models.failed'
+      | 'autoAdapt.label'
+      | 'autoAdapt.hint'
+      | 'autoAdapt.failed'
   }
 }
 

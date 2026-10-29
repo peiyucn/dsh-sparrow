@@ -27,6 +27,8 @@ function buildHarness(overrides = {}, webStartup = undefined) {
     models: () => [],
     maxMode: () => false,
     setMaxMode: async () => {},
+    autoAdapt: () => true,
+    setAutoAdapt: async () => {},
     ...overrides,
   }
   const ctx = {
@@ -293,5 +295,40 @@ describe('codebuddy host 路由：浏览器信任栅栏接线（DNS rebinding / 
       headers: { host: '192.168.1.5:3080', origin: 'http://192.168.1.5:3080' },
     })
     assert.equal(denied.statusCode, 403, '官方信任面缺席时未列的 LAN authority 必须拒')
+  })
+})
+
+describe('codebuddy host 路由：/auto-adapt（运行时自适应开关）', () => {
+  it('GET /status 回 autoAdapt 字段（设置卡据此渲染开关）', async () => {
+    const h = buildHarness({ autoAdapt: () => true })
+    const result = await request(h.handler, '/api/codebuddy-credits/status', { method: 'GET' })
+    assert.equal(result.statusCode, 200)
+    assert.equal(result.body.autoAdapt, true)
+  })
+
+  it('POST /auto-adapt 写设置并回显当前值', async () => {
+    /** @type {boolean[]} */
+    const seen = []
+    const h = buildHarness({
+      setAutoAdapt: async (enabled) => { seen.push(enabled) },
+      autoAdapt: () => seen.at(-1) ?? true,
+    })
+    const result = await request(h.handler, '/api/codebuddy-credits/auto-adapt', {
+      body: JSON.stringify({ enabled: false }),
+    })
+    assert.equal(result.statusCode, 200)
+    assert.deepEqual(seen, [false])
+    assert.equal(result.body.autoAdapt, false)
+  })
+
+  it('POST /auto-adapt 非布尔 enabled 应该 400 且不写设置', async () => {
+    /** @type {boolean[]} */
+    const seen = []
+    const h = buildHarness({ setAutoAdapt: async (enabled) => { seen.push(enabled) } })
+    const result = await request(h.handler, '/api/codebuddy-credits/auto-adapt', {
+      body: JSON.stringify({ enabled: 'yes' }),
+    })
+    assert.equal(result.statusCode, 400)
+    assert.equal(seen.length, 0)
   })
 })

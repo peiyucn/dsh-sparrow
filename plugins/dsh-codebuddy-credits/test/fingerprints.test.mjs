@@ -8,7 +8,13 @@
 
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { neutralizeChannelFingerprints, visibleText } from '../lib/fingerprints.js'
+import {
+  NEUTRALIZER_MARKERS,
+  neutralizeChannelFingerprints,
+  neutralizeWithMarker,
+  stripChannelFingerprints,
+  visibleText,
+} from '../lib/fingerprints.js'
 import { FALLBACK_SYSTEM_PROMPT } from '../lib/constants.js'
 import { toWireMessages } from '../lib/adapter.js'
 
@@ -267,5 +273,60 @@ describe('toWireMessages 的指纹处理范围与 system 头', () => {
     assert.equal(visibleText(sent), system)
     assertAllAtFollowedBy(sent, CGJ)
     assert.ok(sent.includes('Keep this line verbatim.'))
+  })
+})
+
+describe('候选池与 strip 降级（运行时自适应，见 docs/spec/01-runtime-adaptation.md）', () => {
+  it('候选池首个就是默认中和符，且至少三格', () => {
+    assert.ok(NEUTRALIZER_MARKERS.length >= 3)
+    assert.equal(
+      neutralizeChannelFingerprints(REAL_SYSTEM),
+      neutralizeWithMarker(NEUTRALIZER_MARKERS[0])(REAL_SYSTEM),
+    )
+  })
+
+  it('池内每个候选字符都能中和三类指纹，可见文本不变', () => {
+    const text = [REAL_SYSTEM, WEB_GUI_LINE, AT_PATH_PARAGRAPH].join('\n\n')
+    for (const marker of NEUTRALIZER_MARKERS) {
+      const out = neutralizeWithMarker(marker)(text)
+      assert.equal(visibleText(out), text)
+      assert.ok(!out.includes('DeepSeek Harness'), '身份句被中和')
+      assert.ok(!out.includes(WEB_GUI_FINGERPRINT), 'Web GUI 句被中和')
+      assertAllAtFollowedBy(out, marker)
+    }
+  })
+
+  it('换候选字符重打：旧候选字符被剥掉，不叠加两种插入符', () => {
+    const first = neutralizeWithMarker(NEUTRALIZER_MARKERS[0])(REAL_SYSTEM)
+    const second = neutralizeWithMarker(NEUTRALIZER_MARKERS[1])(first)
+    assert.ok(!second.includes(NEUTRALIZER_MARKERS[0]), '旧候选字符应先剥掉')
+    assert.equal(visibleText(second), REAL_SYSTEM)
+  })
+
+  it('strip 降级：删身份句 / Web GUI 句 / @ 段，无关正文与代码块保留', () => {
+    const text = [
+      'You are an AI agent powered by DeepSeek Harness.',
+      'You are interacting with the user through the DeepSeek Harness Web GUI whose URL the runtime context names.',
+      'Tokens prefixed with @ are paths the user explicitly referenced. @"" quotes a path containing spaces.',
+      'Keep this line verbatim.',
+      '```sh',
+      'echo "DeepSeek Harness"',
+      '```',
+    ].join('\n')
+    const out = stripChannelFingerprints(text)
+    assert.ok(!out.includes('You are an AI agent'))
+    assert.ok(!out.includes('You are interacting with the user'))
+    assert.ok(!out.includes('Tokens prefixed with @'))
+    assert.ok(!out.includes('@'), '含 @ 的行一律删除')
+    assert.ok(out.includes('Keep this line verbatim.'), '无关正文保留')
+    assert.ok(out.includes('echo "DeepSeek Harness"'), '代码块逐字保留')
+  })
+
+  it('strip 对已被中和过的历史正文同样有效（先剥插入符再按可见原文匹配）', () => {
+    const neutralized = neutralizeChannelFingerprints(REAL_SYSTEM)
+    const out = stripChannelFingerprints(neutralized)
+    assert.ok(!out.includes('You are an AI agent'))
+    assert.ok(!out.includes('DeepSeek Harness'))
+    assert.ok(out.includes('Follow AGENTS.md.'), '无关正文保留')
   })
 })

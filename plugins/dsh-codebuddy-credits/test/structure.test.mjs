@@ -25,9 +25,12 @@ const readClient = (name) => readFile(new URL(name, CLIENT), 'utf8')
 const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/^\s*\/\/.*$/gmu, '')
 
 describe('dsh-codebuddy-credits 结构：文档与契约常量', () => {
-  it('docs/spec 应该 只剩单一的 00-overview（01–10 已删）', async () => {
+  it('docs/spec 每个文件遵循 NN-<主题>.md，且 00-overview 必须存在', async () => {
     const specs = await readdir(new URL('../docs/spec', import.meta.url))
-    assert.deepEqual(specs, ['00-overview.md'])
+    assert.ok(specs.includes('00-overview.md'), '00-overview 必须存在')
+    for (const name of specs) {
+      assert.match(name, /^\d{2}-[a-z0-9-]+\.md$/u, `spec 文件名不符合约定：${name}`)
+    }
   })
 
   it('provider id / settings NS / display name / locale ns / 投影 key 应该 全部来自 constants', () => {

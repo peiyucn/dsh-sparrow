@@ -30,6 +30,14 @@ describe('Config schema（0.1.7 的 volatile 配置面）', () => {
     assert.equal(parsed.maxMode.get(), false)
   })
 
+  it('autoAdapt 缺省默认 true（旧设置节无该字段时开启运行时自适应）', () => {
+    assert.equal(parsed.autoAdapt.get(), true)
+  })
+
+  it('autoAdapt 显式 false 保留（用户可关掉降级重试）', () => {
+    assert.equal(Config({ autoAdapt: false }).autoAdapt.get(), false)
+  })
+
   it('显式 true 保留', () => {
     assert.equal(Config({ maxMode: true }).maxMode.get(), true)
   })
@@ -47,8 +55,10 @@ describe('Config schema（0.1.7 的 volatile 配置面）', () => {
     const root = json.refs[json.uid]
     const field = (key) => json.refs[root.dict[key]]
     assert.equal(field('maxMode').meta.volatile, true)
+    assert.equal(field('autoAdapt').meta.volatile, true)
     assert.equal(field('apiKeyEnv').meta.volatile, true)
     assert.equal(typeof parsed.maxMode.get, 'function')
+    assert.equal(typeof parsed.autoAdapt.get, 'function')
     assert.equal(typeof parsed.apiKeyEnv.get, 'function')
   })
 })
