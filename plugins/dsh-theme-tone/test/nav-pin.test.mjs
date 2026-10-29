@@ -25,9 +25,11 @@ describe('nav-pin: 轮次导航恒显 + 宽度钳制（纯 CSS）', () => {
     assert.ok(!/(background|border|box-shadow):/u.test(css.replace(/\/\*[\s\S]*?\*\//gu, '')), '只做透明度，不加框 / 底色 / 阴影')
   })
 
-  it('宽度钳制：每侧 ≥120px、地板 640px、卡片宽度同步重算', () => {
-    assert.ok(css.includes(`max(${CONTENT_MIN_FLOOR_PX}px, calc(var(--dsh-conversation-column-width, 0px) - ${CONTENT_MAX_SIDE_CLEARANCE_PX * 2}px))`))
-    assert.ok(css.includes('--dsh-chat-content-width:'))
+  it('宽度钳制：有官方用户宽度偏好时原样交给官方，没有时才用「每侧 ≥120px、地板 640px」的自适应值', () => {
+    assert.ok(css.includes('--dsh-chat-content-width: var(--dsh-chat-user-width,'),
+      '必须保留官方 --dsh-chat-user-width 优先级，否则官方宽度拖拽失效')
+    assert.ok(css.includes(`max(${CONTENT_MIN_FLOOR_PX}px, calc(var(--dsh-conversation-column-width, 0px) - ${CONTENT_MAX_SIDE_CLEARANCE_PX * 2}px))`),
+      '无偏好时的自适应钳制仍在 var() 的兜底里')
     assert.ok(css.includes('--dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px)'))
     for (const target of ['[data-conversation-scroll]', '[data-width-handle]']) assert.ok(css.includes(target))
   })

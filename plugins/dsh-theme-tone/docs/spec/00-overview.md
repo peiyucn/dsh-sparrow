@@ -54,8 +54,12 @@
    属性、渐隐自动消失，提示语义保留且更直观。
 9. **轮次导航功能（自 dsh-nav-pin 并入）**：纯 CSS、无锚点扫描。官方把 `display: none` 写在
    `<nav aria-label="Turn navigation">` 上 ⇒ 用公开 aria-label 压过官方类名；≤700px 默认隐身、hover /
-   键盘 focus 淡入（只做 opacity）。会话内容宽度钳制：官方公式 `clamp(680px, column×0.64, 920px)` 上加
-   `min()` 夹到「每侧 ≥120px / 地板 640px」，滚动体与拖拽条共用，卡片宽度同步重算。布局功能，不带色调门。
+   键盘 focus 淡入（只做 opacity）。会话内容宽度：官方 `.body` 的语义是
+   `--dsh-chat-content-width: var(--dsh-chat-user-width, clamp(680px, column×0.64, 920px))`，官方拖拽条只写
+   `--dsh-chat-user-width`（拖动中实时写、松手后写 localStorage 偏好）⇒ 本插件**只把钳制放进 var() 的兜底**
+   （无偏好时 `min(官方公式, max(640px, column−240px))`，即每侧至少留 120px / 地板 640px），滚动体与拖拽条
+   共用同一宽度轴、卡片宽度同步重算；**有用户偏好时原样交给官方**，不得覆盖（否则官方 0.2.1 的宽度拖拽失效）。
+   布局功能，不带色调门。
 10. **对话宽度拖拽条**：官方两条拖拽条 z-index 很低，被本插件抬到 81 的内容层盖掉 ⇒ 抬到 82；
     `[data-side]` 还挂在 Tooltip 的 placement 上，排除 `role=tooltip`。
 

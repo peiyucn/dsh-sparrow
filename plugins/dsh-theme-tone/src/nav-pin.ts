@@ -24,10 +24,16 @@ function navSelector(): string {
   return NAV_ARIA_LABELS.map(label => `nav[aria-label=${JSON.stringify(label)}]`).join(',\n')
 }
 
-/** 官方内容宽度公式（`clamp(680px, column × 0.64, 920px)`）加本插件的两侧留白钳制。 */
+/**
+ * 内容宽度轴：官方 `.body` 的语义是 `--dsh-chat-content-width: var(--dsh-chat-user-width, clamp(680px, column×0.64, 920px))`，
+ * 官方拖拽条只写 `--dsh-chat-user-width`（拖动中实时写、松手后写 localStorage 偏好）。所以这里必须
+ * **保留官方 var 的优先级**：有用户偏好（或正在拖）时原样交给官方，没有偏好时才用本插件的
+ * 「每侧至少留 120px / 地板 640px」钳制版自适应宽度。直接写死派生值会把拖拽结果盖掉（官方 0.2.1 的宽度拖拽因此失效）。
+ */
 function clampedContentWidth(): string {
   const derived = 'clamp(680px, calc(var(--dsh-conversation-column-width, 0px) * 0.64), 920px)'
-  return `min(${derived}, max(${CONTENT_MIN_FLOOR_PX}px, calc(var(--dsh-conversation-column-width, 0px) - ${CONTENT_MAX_SIDE_CLEARANCE_PX * 2}px)))`
+  const adaptive = `min(${derived}, max(${CONTENT_MIN_FLOOR_PX}px, calc(var(--dsh-conversation-column-width, 0px) - ${CONTENT_MAX_SIDE_CLEARANCE_PX * 2}px)))`
+  return `var(--dsh-chat-user-width, ${adaptive})`
 }
 
 export function buildNavPinCss(): string {
