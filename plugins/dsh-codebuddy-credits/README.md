@@ -111,28 +111,16 @@ the quota panel always reads the latest number from the server.
   enterprise plans, minimax-m3-pay is billed. Policies change without notice.
 - Requests made through your key appear in your account's usage records
   (including prompt text in the enterprise usage console).
-- The upstream service blocks some marker phrases and the `@`-path reference
-  wording in **system / assistant** message bodies with an "unapproved channel"
-  error. To keep chat working, the plugin inserts an invisible character into
-  those markers in the request copy of those bodies: the visible text and your
-  local session history are unchanged, and code blocks are sent byte-for-byte.
-  `user` messages, tool results and tool-call arguments are never modified.
-- When the upstream check changes, the plugin retries automatically with
-  fallback transformations ("Auto-adapt upstream checks" in the provider card,
-  on by default). This has a cost you should know about: **each adaptation can
-  send up to 3 extra requests** before a fallback works. The gateway rejects
-  them before generation (no reply is produced), but they are recorded in your
-  account's request log, and the first reply after a change is slower by those
-  extra round trips. Adaptation state is kept in memory only, so a restart may
-  trigger it again. If every fallback fails, requests fail until the plugin is
-  updated; turning the toggle off restores single-attempt behavior.
-- If every invisible-character fallback fails, the last resort **rewrites the
-  outgoing system prompt**: identity paragraphs and the `@`-path instructions
-  are removed, and remaining brand names are replaced with neutral wording. The
-  model then knows less about its host and about `@` references, so replies may
-  shift slightly (fallback level only; your local session history, user
-  messages and code blocks are untouched). Disable "Auto-adapt upstream checks"
-  to get a plain error instead of this fallback.
+- The upstream service may reject requests from this adapter ("unapproved
+  channel"). By default the plugin tries to recover automatically; if every
+  attempt fails, requests fail until the plugin is updated.
+- Automatic recovery has costs: up to 3 extra requests per event, all recorded
+  in your account's request log; the first reply after recovery is slower; the
+  recovered state lives in memory only, so a restart may trigger it again.
+- In the worst case recovery slightly changes model behavior (reply style or
+  tool-use habits may differ). Your local session history, user messages and
+  code blocks are never affected. Turn "Auto-adapt upstream checks" off to get a
+  plain error instead.
 
 ## License
 
