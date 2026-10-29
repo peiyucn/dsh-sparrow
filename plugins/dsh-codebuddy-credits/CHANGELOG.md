@@ -3,9 +3,9 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
-## [0.2.1-rc.4] - 2026-10-28
+## [0.2.1-rc.5] - 2026-10-30
 
-- Now adapted to official dsh 0.2.1-rc.4 (web and desktop).
+- Now adapted to official dsh 0.2.1-rc.5 (web and desktop).
 - Chat works again: after another upstream filter change, requests from the web app no longer fail with an "unapproved channel" error.
 - New "Adaptive API interception": when the upstream check changes, the plugin retries automatically (up to 3 extra requests, recorded in your account's request log); if every attempt fails, requests fail until the plugin is updated. You can turn it off in the provider card; the extreme fallback may slightly change model behavior.
 

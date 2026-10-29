@@ -2,9 +2,9 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## [0.2.1-rc.4] - 2026-10-28
+## [0.2.1-rc.5] - 2026-10-30
 
-- Now adapted to official dsh 0.2.1-rc.4 (web and desktop).
+- Now adapted to official dsh 0.2.1-rc.5 (web and desktop).
 - Reworked the frosted-glass look: the composer is brighter with symmetric edge light and a softer float, and the top bars now carry the same warm page light as the rest of the page.
 - Cleaned up the accompanying details: no more see-through or stray bars around the composer and the docked cards, the right sidebar scrollbar starts below its top bar, and the @ / slash suggestion list now fades its items instead of showing an extra bar.
 

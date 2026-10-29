@@ -2,9 +2,9 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## [0.2.1-rc.4] - 2026-10-28
+## [0.2.1-rc.5] - 2026-10-30
 
-- Now adapted to official dsh 0.2.1-rc.4 (web and desktop).
+- Now adapted to official dsh 0.2.1-rc.5 (web and desktop).
 
 ## [0.2.1-rc.3] - 2026-10-24
 
