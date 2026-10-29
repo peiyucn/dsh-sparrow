@@ -30,7 +30,14 @@ export {
   CONTENT_Z_INDEX,
   ABOVE_CONTENT_Z_INDEX,
 } from './constants.js'
-export { buildGlassCss, GLASS_BLUR, GLASS_FILL_ALPHA, HEADER_HEIGHT_PX } from './glass.js'
+export {
+  buildGlassCss,
+  COMPOSER_BLUR,
+  COMPOSER_LIFT_PERCENT,
+  COMPOSER_VEIL_PERCENT,
+  GLASS_BLUR,
+  HEADER_HEIGHT_PX,
+} from './glass.js'
 export { CONTENT_MAX_SIDE_CLEARANCE_PX, CONTENT_MIN_FLOOR_PX, HOVER_HIDE_BREAKPOINT_PX, NAV_ARIA_LABELS, buildNavPinCss } from './nav-pin.js'
 export { buildSurfaceCss } from './surfaces.js'
 export {

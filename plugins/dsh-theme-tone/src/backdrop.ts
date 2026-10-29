@@ -43,13 +43,26 @@ export const BACKDROP_GRADIENTS = `radial-gradient(${TOP_SHAPE}, var(${TOP_VARIA
     radial-gradient(${BOTTOM_SHAPE}, var(${BOTTOM_VARIABLE}, transparent), ${BOTTOM_STOP}),
     radial-gradient(${LEFT_SHAPE}, var(${LEFT_VARIABLE}, transparent), ${LEFT_STOP})`
 
+/**
+ * 1 LSB 有序抖动（2×2 棋盘，半像素 +1/255 白）：地面光是低对比大面积径向渐变，
+ * 8-bit 量化后会出现「老显示器色带」（水波纹）；铺一层 1 LSB 抖动把量化台阶打散。
+ * 幅度只有 1/255，正常观看不可见。
+ */
+export const DITHER_TILE = `repeating-conic-gradient(rgba(255, 255, 255, 0.0086) 0% 25%, transparent 25% 50%)`
+/** 抖动层的平铺尺寸与重复：三者必须与 {@link BACKDROP_GRADIENTS} 的层数对齐（3 渐变 + 1 抖动）。 */
+export const DITHER_SIZE = '2px 2px'
+export const BACKDROP_SIZE = `100% 100%, 100% 100%, 100% 100%, ${DITHER_SIZE}`
+export const BACKDROP_REPEAT = 'no-repeat, no-repeat, no-repeat, repeat'
+
 export function buildBackdropCss(): string {
   return `.${BACKDROP_CLASS} {
   position: fixed;
   inset: 0;
   z-index: ${BACKDROP_Z_INDEX};
   pointer-events: none;
-  background-image: ${BACKDROP_GRADIENTS};
+  background-image: ${BACKDROP_GRADIENTS}, ${DITHER_TILE};
+  background-size: ${BACKDROP_SIZE};
+  background-repeat: ${BACKDROP_REPEAT};
 }
 .${BACKDROP_CLASS}[hidden] { display: none; }
 /* 官方座位（composerSeat）默认铺一块 bg-base 渐隐板，会在对话底部形成一大块实色背景。
