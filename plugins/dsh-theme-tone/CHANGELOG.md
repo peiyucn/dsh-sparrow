@@ -5,10 +5,14 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 ## [0.2.1-rc.4] - 2026-10-28
 
 - Now adapted to official dsh 0.2.1-rc.4 (web and desktop).
-- The conversation header, composer and right sidebar top bar now share one translucent liquid-glass material; top-bar borders stay untouched.
-- The composer now uses a light neutral veil: it stays translucent but no longer picks up a blue cast.
-- The solid strip under the composer is removed, so the page ground light shows through instead.
-- Scrolled conversation no longer shows through below the composer, under its status capsule row, or between the to-do / goal / queued-message cards; the page ground light still shows.
+- The composer, the conversation header and the right sidebar top bar are now translucent frosted glass; the top bars keep their official borders.
+- The composer glass is brighter and its edge light is symmetric (brightest along the middle of each edge); it floats on a softer shadow, so it no longer leaves a dark band at the bottom of the window.
+- Both top bars carry the same warm page light as the left sidebar; their fill is pressed slightly darker so the light reads as reflected light rather than a border.
+- The solid strip under the composer is removed, so the page ground light shows through instead; scrolled conversation no longer shows through below the composer, under its status capsule row, between the docked cards, or at the bottom of the window when the right sidebar is open.
+- The to-do / goal / queued-message cards now use an opaque raised surface, so stacked cards look consistent instead of only the topmost one reading as frosted.
+- The model picker's group headings now have a solid background, so list items no longer show through while scrolling.
+- In the right sidebar, the scrollbar starts below the top bar for markdown and plain-text previews and for the file tree, and content scrolls beneath the top bar.
+- The @ / slash suggestion list now fades its own items at the edge while more results remain (the extra highlight bar is gone); the fade disappears at the end of the list.
 
 ## [0.2.1-rc.3] - 2026-10-24
 
