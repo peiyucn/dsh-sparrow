@@ -72,6 +72,16 @@
       },
       "versions": [
         {
+          "version": "0.2.1-rc.5",
+          "publishTimestamp": 1793295606,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.5"
+          }
+        },
+        {
           "version": "0.2.1-rc.3",
           "publishTimestamp": 1792839051,
           "source": {
@@ -245,6 +255,16 @@
       },
       "versions": [
         {
+          "version": "0.2.1-rc.5",
+          "publishTimestamp": 1793295578,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.5"
+          }
+        },
+        {
           "version": "0.2.1-rc.3",
           "publishTimestamp": 1792839082,
           "source": {
@@ -386,6 +406,16 @@
         "sortKeys": {}
       },
       "versions": [
+        {
+          "version": "0.2.1-rc.5",
+          "publishTimestamp": 1793295589,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.5"
+          }
+        },
         {
           "version": "0.2.1-rc.3.1",
           "publishTimestamp": 1793169637,
@@ -529,6 +559,16 @@
       },
       "versions": [
         {
+          "version": "0.2.1-rc.5",
+          "publishTimestamp": 1793295592,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.5"
+          }
+        },
+        {
           "version": "0.2.1-rc.3",
           "publishTimestamp": 1792839075,
           "source": {
@@ -643,7 +683,7 @@
     {
       "name": "@dsh-sparrow/dsh-theme-tone",
       "description": {
-        "en": "Tone skins for the official light and dark themes, plus conversation-area layout tuning once a tone is picked",
+        "en": "Tone skins for the official light and dark themes: token colors, ground light, and liquid glass on the conversation header, composer and right sidebar",
         "zh": "明暗主题之下的色调层与对话区布局优化：每轴一款「官方默认」加若干色调，含顶栏与输入框玻璃效果"
       },
       "author": "peiyucn",
@@ -667,6 +707,16 @@
         "sortKeys": {}
       },
       "versions": [
+        {
+          "version": "0.2.1-rc.5",
+          "publishTimestamp": 1793295600,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.5"
+          }
+        },
         {
           "version": "0.2.1-rc.3",
           "publishTimestamp": 1792839099,
