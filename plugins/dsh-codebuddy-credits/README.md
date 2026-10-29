@@ -102,24 +102,21 @@ the quota panel always reads the latest number from the server.
 
 ## Honest limitations
 
-- The inference endpoint is the one the official CodeBuddy CLI uses. The key
-  is officially issued and the authentication method is documented in the
-  official IAM docs, but **the chat endpoint itself has no public stability
+- The key is officially issued and the authentication method is documented in
+  the official IAM docs, but **the chat endpoint itself has no public stability
   promise**. This plugin is a third-party adapter, not an official product.
-- The endpoint serves **streaming only**; non-streaming requests are rejected.
-- Model pricing follows your account: hy models are currently free on many
-  enterprise plans, minimax-m3-pay is billed. Policies change without notice.
 - Requests made through your key appear in your account's usage records
   (including prompt text in the enterprise usage console).
 - The upstream service may reject requests from this adapter ("unapproved
-  channel"). By default the plugin tries to recover automatically; if every
-  attempt fails, requests fail until the plugin is updated.
-- Automatic recovery has costs: up to 3 extra requests per event, all recorded
-  in your account's request log; the first reply after recovery is slower; the
+  channel"). "Adaptive API interception" is on by default and tries to recover
+  automatically; if every attempt fails, requests fail until the plugin is
+  updated.
+- This mechanism has costs: up to 3 extra requests per event, all recorded in
+  your account's request log; the first reply after recovery is slower; the
   recovered state lives in memory only, so a restart may trigger it again.
 - In the worst case recovery slightly changes model behavior (reply style or
   tool-use habits may differ). Your local session history, user messages and
-  code blocks are never affected. Turn "Auto-adapt upstream checks" off to get a
+  code blocks are never affected. Turn "Adaptive API interception" off to get a
   plain error instead.
 
 ## License

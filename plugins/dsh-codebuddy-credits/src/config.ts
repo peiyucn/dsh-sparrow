@@ -22,7 +22,7 @@ export interface Config {
    */
   maxMode: Volatile<boolean>
   /**
-   * 上游渠道校验（11128）的运行时自适应：开时按阶梯自动降级重试（见
+   * 「自适应 API 拦截」：上游渠道校验（11128）变化时按阶梯自动降级重试（见
    * `docs/spec/01-runtime-adaptation.md`），关时回到「单次请求、失败原样报错」。
    */
   autoAdapt: Volatile<boolean>

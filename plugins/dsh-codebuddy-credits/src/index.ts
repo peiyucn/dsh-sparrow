@@ -103,7 +103,7 @@ export function apply(ctx: Context, config: Config): void {
     async setAutoAdapt(enabled) {
       const settings = ctx.get('settings')
       if (settings === undefined) {
-        throw new LlmError(`${name}: 本组合没有设置服务，无法保存自动适配开关`, 'NO_SETTINGS_STORE')
+        throw new LlmError(`${name}: 本组合没有设置服务，无法保存「自适应 API 拦截」开关`, 'NO_SETTINGS_STORE')
       }
       // autoAdapt 同 maxMode：Config volatile 字段，设置写入只认 volatile 路径。
       await settings.mutate(SETTINGS_NAMESPACE, [{ op: 'set', path: ['autoAdapt'], value: enabled }])

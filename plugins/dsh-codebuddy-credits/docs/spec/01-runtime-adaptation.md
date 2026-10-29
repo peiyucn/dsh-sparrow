@@ -1,4 +1,4 @@
-# 01 · 运行时自适应（11128 有界降级）
+# 01 · 自适应 API 拦截（11128 有界降级）
 
 > 2026-10-29 立项。owner 已确认形态：失败触发的有界阶梯，不做二分探测，不主动打探测流量。
 > 现状背景见 `00-overview.md`《上游渠道校验（11128）》与 2026-10-29 定位记录。
@@ -12,7 +12,7 @@
 | 归一化扩容（当前中和符被上游洗掉） | 随时，服务端行为 | ❌ 现方案整层失效，只能等发版 |
 | 指纹内容新增（DSH 提示词改版出现新命中句） | 随 DSH 版本，版本由我们 pin | 部分（前缀规则覆盖整类句子） |
 
-本 spec 只给第一个维度做**运行时自适应**；第二个维度继续走「升级 DSH 时离线比对提示词 + 发版」的既有流程。
+本 spec 只给第一个维度做**自适应 API 拦截**；第二个维度继续走「升级 DSH 时离线比对提示词 + 发版」的既有流程。
 
 ## 2. 非目标
 
@@ -62,7 +62,7 @@
 | `src/config.ts` | 新设置字段 `autoAdapt: boolean`（volatile，默认 true） |
 | `src/host/provider.ts` | 把 `config.autoAdapt` 接进适配器 |
 | `src/web.ts` + `src/index.ts` | `POST /auto-adapt`；`/status` 增加 `autoAdapt` 字段 |
-| client | 设置卡新增「自动适配上游风控」开关（中英词典各一条 title + hint） |
+| client | 设置卡新增「自适应 API 拦截」开关（中英词典各一条 title + hint） |
 
 路由数 8 → 9；`/auto-adapt` 与 `/max-mode` 同构（body `{enabled: boolean}`）。
 

@@ -19,7 +19,7 @@ export type CodeBuddyReadImage = (
   signal?: AbortSignal,
 ) => Promise<{ mediaType: string; data: Uint8Array }>
 
-/** 正文变换（运行时自适应阶梯注入）：只换变换，不换消息映射；默认 = 当前默认中和符。 */
+/** 正文变换（自适应 API 拦截阶梯注入）：只换变换，不换消息映射；默认 = 当前默认中和符。 */
 export type NeutralizeText = (text: string) => string
 
 interface WireToolCall {

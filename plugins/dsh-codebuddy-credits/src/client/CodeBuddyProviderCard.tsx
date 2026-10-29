@@ -109,7 +109,7 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
     }
   }, [refreshing, t])
 
-  /** 自动适配上游风控开关：乐观更新，失败回滚并给可见错误。 */
+  /** 「自适应 API 拦截」开关：乐观更新，失败回滚并给可见错误。 */
   const toggleAutoAdapt = useCallback(async (enabled: boolean) => {
     if (adaptBusy) return
     setAdaptBusy(true)

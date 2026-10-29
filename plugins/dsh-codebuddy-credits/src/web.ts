@@ -67,9 +67,9 @@ export interface CodeBuddyCreditsShared {
   maxMode(): boolean
   /** 设置 Max 模式（写设置节）。 */
   setMaxMode(enabled: boolean): Promise<void>
-  /** 上游渠道校验（11128）运行时自适应开关当前状态（设置节）。 */
+  /** 「自适应 API 拦截」开关当前状态（设置节）。 */
   autoAdapt(): boolean
-  /** 设置运行时自适应开关（写设置节）。 */
+  /** 设置「自适应 API 拦截」开关（写设置节）。 */
   setAutoAdapt(enabled: boolean): Promise<void>
 }
 

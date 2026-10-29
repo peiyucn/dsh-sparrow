@@ -1,7 +1,7 @@
 # 00 · 架构总览 — dsh-codebuddy-credits
 
 > 2026-10-27 重写。旧 spec（01–10 初版）已全部删除；本文是唯一现状总览，按主题拆出的设计文档见同目录
-> `01-runtime-adaptation.md`（11128 运行时自适应）。契约与实现不一致时以文档为准并同步修代码。
+> `01-runtime-adaptation.md`（自适应 API 拦截，11128）。契约与实现不一致时以文档为准并同步修代码。
 > 代码入口：`src/index.ts`（host half）/ `src/client/index.ts`（client half）。
 
 ## 代码布局
@@ -58,7 +58,7 @@ DSH 跑 agent 循环，CodeBuddy 只出模型。不做令牌逆向、不用它�
 | :--- | :--- | :--- |
 | GET | `/status` | Key 是否配置、route 是否 active、账号快照、模型事实、Max 模式；读取时顺带补拉账号 / 目录（自愈） |
 | POST | `/max-mode` | 写 `maxMode` 设置（body `{enabled: boolean}`） |
-| POST | `/auto-adapt` | 写 `autoAdapt` 设置（body `{enabled: boolean}`；11128 运行时自适应开关） |
+| POST | `/auto-adapt` | 写 `autoAdapt` 设置（body `{enabled: boolean}`；「自适应 API 拦截」开关） |
 | POST | `/quota` | 查企业周期配额（无 Key 400） |
 | GET | `/session-usage?sessionId=` | 会话累计积分 / 调用次数（live 投影或冷会话重放） |
 | GET | `/turn-usage?sessionId=&turn=` | 单轮积分 / 调用次数 |
@@ -181,8 +181,8 @@ host 投影 / 事件重放、Max 模式以设置节为真值。`test/structure.t
    `test/fingerprints.test.mjs`。
 
 只改要发给上游的 wire 文本，本机会话历史原样保留；UA / `X-IDE-Name` 仍如实自报，不伪装官方客户端。
-正文层带**运行时自适应**（`01-runtime-adaptation.md`）：撞 11128 时按阶梯换中和符 / 删段重试，
-成功后记住该格；设置卡「自动适配上游风控」开关（`autoAdapt`）可关掉。若上游改为语义检测，
+正文层带**自适应 API 拦截**（`01-runtime-adaptation.md`）：撞 11128 时按阶梯换中和符 / 删段重试，
+成功后记住该格；设置卡同名开关（`autoAdapt`）可关掉。若上游改为语义检测，
 正文层会再次失效（表现仍是 400 / 11128），需重新评估。
 
 ### 2026-10-28 的定位记录（真实 Key 实测，可复查）
@@ -255,6 +255,6 @@ host 投影 / 事件重放、Max 模式以设置节为真值。`test/structure.t
 
 - 插件目录 `npm run verify`：typecheck → build（tsc + client bundle）→ test → pack。
 - 测试覆盖：契约常量单一来源、能力门 / DUPLICATE 文案、client 惰性门接线、样式统一注入与
-  「组件内不得自建 style」、LAN 信任栅栏、正文指纹中和与运行时自适应阶梯（11128 重试 / 成功格记忆 /
+  「组件内不得自建 style」、LAN 信任栅栏、正文指纹中和与自适应 API 拦截阶梯（11128 重试 / 成功格记忆 /
   开关 / strip 兜底）、积分重放 / 投影、路由与请求体字节限流。
 - 真机验收：保存 / 清空 Key、模型选择器分组与 `1017` 标、额度面板、会话 / 每轮积分胶囊与弹层。

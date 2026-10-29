@@ -68,7 +68,7 @@ export interface CodeBuddyAdapterOptions {
   /** 图片字节读取（官方附件 seam）；未配置时带图请求以明确错误失败。 */
   readImage?: CodeBuddyReadImage
   maxMode?: () => boolean
-  /** 上游渠道校验（11128）的运行时自适应开关（设置节驱动，缺省开）。 */
+  /** 「自适应 API 拦截」开关（设置节驱动，缺省开）。 */
   autoAdapt?: () => boolean
 }
 
