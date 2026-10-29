@@ -1,5 +1,8 @@
 # 项目指令 — dsh-sparrow
 
+> 全量档。本文件按根仓库 `AGENTS.md`《工程总规范》I1 的九章顺序组织；通用章原样复用根规范对应段落（I2/I3 自含），项目专属内容写在各章内。
+> 规则标题末尾的〔…〕是约束级别：〔constructor〕接入时的一次性动作；〔final〕只能加严、不能放松；〔overridable〕项目填值、但必须在项目 AGENTS 显式声明；〔interface〕项目必须实现，验收方式写在该项目 AGENTS 的工程管线章。
+
 ## 项目概况
 
 DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独立发布，统一挂在 `@dsh-sparrow` 组织下；功能被官方原生支持后对应插件退役。
@@ -14,6 +17,24 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 
 ## 文档规范
 
+以下规则针对该项目实际存在的文档；不存在的文档不适用。
+
+### H1｜AGENTS.md〔final〕
+
+中文一份。面向开发 agent，只写规则、契约与做法。
+
+### H2｜README〔final〕
+
+中英双份，英文为默认，顶部互链。面向用户，写安装、使用、配置方式。有已知限制或安全隐患时一并写明。
+
+### H3｜CHANGELOG〔final〕
+
+中英双份，英文为默认，顶部互链。面向用户，每条一项可感知变化。
+
+格式遵循 Keep a Changelog：标题 `## [x.y.z] - YYYY-MM-DD`，从新到旧；日期取发版当日。依赖不进入产物时写明「无用户可感知的变化」。
+
+本项目补充：
+
 > AGENTS 给开发 agent、README 给用户、CHANGELOG 给用户——写错读者是文档事故。
 
 * `AGENTS.md`：**中文一份**（面向开发 agent；**唯一 agent 指令文件**，不保留 CLAUDE.md 等其它厂商指令文件）
@@ -23,7 +44,9 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 
 本项目实际文档：根 `README.md` + `README.zh-CN.md`、`SECURITY.md`、`docs/private-seams.md` + `docs/upstream/`；每个活跃插件 `README.md` / `README.zh-CN.md` / `CHANGELOG.md` / `CHANGELOG.zh-CN.md`（双份、顶部互链）+ `docs/spec/`。无 CONTRIBUTING，无根 CHANGELOG。
 
-## 工程管线（本仓库自含）
+## 工程管线
+
+### 本项目取值
 
 * **开发**：日常改动在 `dev`；`main` 只接受发布合并；新功能先写 spec（`plugins/<插件>/docs/spec/NN-<主题>.md`），评审后才开工
 * **验证**：插件目录 `npm run verify`；全量 = 根 `npm run verify`（= `pnpm run check` + `verify:all`）；分项 = 根 `pnpm run <step>:all`；push 前必须通过
@@ -35,7 +58,135 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 * **运维**：依赖升级 / 修复统一手动（security updates 与 dependabot.yml 全部关闭）；收到警报 → 手动升级 → **一律按发布流程走补丁版**；依赖不进产物时 CHANGELOG 如实写「无用户可感知的变化」
 * **收尾**：发布后切回 `dev`
 
-## 代码审计（发布前 / 全面检查时）
+以下 E7–E23 通用条款原样复用根规范《工程管线》段：
+
+### E7｜分支约定〔overridable〕
+
+日常改动在 `dev` 分支，默认分支统一为 `main`。例外：B1「开发分支」列为 `main` 的单分支项目直接在 `main` 开发；GitLab 仓库沿用现有分支名。
+
+### E8｜本地一键验证〔interface〕
+
+每个软件项目须提供本地 `verify`，覆盖该项目全部检查项。无构建的仓库以文档自查清单替代，清单写在其 AGENTS。
+
+### E9｜打包产物〔overridable〕
+
+可分发的产物统一放仓库根的 `releases/`，写入 `.gitignore`，确认不进发布包。
+
+输出目录不存在时，打包工具会把目录名当文件名。干净 clone 的仓库没有该目录，须先创建。
+
+不产出可分发包的项目不受本条约束。
+
+### E10｜提交粒度〔final〕
+
+一个 commit 只做一件事。描述用中文，保留英文类型前缀。
+
+### E11｜推送前置条件〔final〕
+
+push 前须 `verify` 通过，推送到开发分支（见 E7）。
+
+### E12｜push 后核查安全告警〔final〕
+
+push 后立即查询一次未处理的 Dependabot 告警，确认清零才继续。存在告警的，先修复再进入发版流程。
+
+### E13｜代码扫描须按扫描周期核查〔final〕
+
+`verify` 通过、CI 全绿，不代表安全扫描无问题。CodeQL 依赖扫描周期，未出结果不得视为通过，须等本轮扫描完成后再查。
+
+依赖类告警按 E22 处理；代码类告警修复后，须等下一轮扫描确认状态变为已修复再发版。
+
+### E14｜发布前审计〔final〕
+
+按 G 段逐条过一遍。
+
+### E15｜准备发布内容〔final〕
+
+两份 CHANGELOG 加新版本条目，改版本号文件，README 有功能变更则同步。多包仓库按包各自维护。
+
+### E16｜合并并推送〔final〕
+
+把开发分支合并到默认分支；单分支项目无需合并。
+
+**tag 触发的项目**：合并后直接推送，进入 E17。
+
+**push 默认分支即部署的项目**：暂不推送，等 E17 批准后再推。
+
+### E17｜发布前须征得 owner 同意〔final〕
+
+发布不可逆，每次执行前都须 owner 明确同意。此前的批准不适用于本次。
+
+### E18｜有告警不得发版（发布硬门禁）〔interface〕
+
+只要存在任一未处理告警（Dependabot / CodeQL / secret scanning），一律不得发版。不得以「告警不在本次改动里」「在测试代码里」「不进发布产物」「与本版无关」为由豁免。
+
+该门禁须由发布工作流 fail-closed 执行（查询告警数，非 0 即中止发布），不得只靠人工核对。告警修复后须等下一轮扫描确认关闭，才算清零。依赖类告警按 E22 处理。
+
+### E19｜打 tag 并推送〔interface〕
+
+一律用 annotated tag 并附说明。push 默认分支即部署、不使用版本号的站点不适用本条。
+
+单次推送不超过 3 个 tag，超过时 GitHub 不生成 push 事件。多包仓库逐个推送，推送后确认 workflow 真的启动。
+
+### E20｜发布凭据〔final〕
+
+发布凭据一律放环境级 secret，仓库级不保留。
+
+### E21｜发布后收尾〔final〕
+
+已发布的版本与 tag 不得覆盖、不得移动。出错只能发新版本修正，且须重新执行 E17 的确认。
+
+发布完成后切回 `dev` 继续开发。单分支项目不适用。
+
+### E22｜依赖维护〔final〕
+
+依赖升级一律手动执行，自动升级按 F3 保持关闭。
+
+运行时依赖或产物依赖单独发补丁版，不与其他改动合并；纯 devDependencies 可并入下个版本。依赖不进产物时 CHANGELOG 写明「无用户可感知的变化」。
+
+### E23｜坏版本处理〔final〕
+
+用 deprecate，不得 unpublish，由 owner 在本机手动执行。无 deprecate 能力的市场只在 README 与 Release 说明里标注已知问题，指向修复版本。
+
+## 代码审计
+
+发布前与全面检查时，按以下逐条过一遍。
+
+### G1｜文档对齐〔final〕
+
+文档与实现、声明一一对应。CHANGELOG 覆盖本版本全部可感知改动。
+
+### G2｜死代码〔final〕
+
+导出符号与常量须确认调用方。清理未使用的 import、变量、类型字段、CSS 类。
+
+### G3｜高危缺陷〔final〕
+
+检查状态一致性、竞态、路径与引号处理、资源与内存泄漏、部分失败、环境边界。
+
+「内存泄漏」指：句柄在成功与失败路径均释放；累积状态有界；监听与引用不滞留。
+
+### G4｜安全热点〔final〕
+
+凭据不进日志与 HTML；CSP 与转义；host/client 边界；外部请求带超时；外部 URL 走白名单。
+
+### G5｜代码质量〔final〕
+
+单一职责；状态经函数封装；命名达意；同类对称；不写超长函数与重复逻辑；不散落魔术字符串。
+
+### G6｜容错与性能〔final〕
+
+外部调用带超时与重试；异常输入返回安全默认值；失败路径有用户可见反馈。
+
+重活缓存化或惰性化；热路径不做 O(n²)；大批量渲染分页或虚拟化；高频事件防抖节流；并发扇出有上限。
+
+### G7｜并发与防御〔final〕
+
+UI 入口防连点；请求可被打断且状态保持一致。
+
+### G8｜测试与验证〔final〕
+
+纯逻辑改动须补测试。`verify` 通过，工作区无未提交改动。
+
+### 本项目补充热点
 
 * **文档对齐**：文档与实现 / 声明一一对应，CHANGELOG 覆盖本版用户可感知改动；插件 README 与 `package.json` 的 dsh 声明（bundle patch / exports / peerDependencies）对齐
 * **死代码**：导出符号 / 常量确认调用方，清未使用 import / 变量 / 类型字段 / CSS 类
@@ -50,7 +201,43 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 
 其中「资源 / 内存泄漏」＝ timer / watcher / AbortController 等句柄在成功与失败路径都释放；缓存 / 集合与按会话、生命周期累积的状态有界（上限 / 淘汰 / TTL / 随生命周期释放）；监听 / 订阅 / DOM 引用不滞留。
 
-## 安全基线（本仓库自含要点）
+## 安全基线
+
+所有 GitHub 仓库共用。新建仓库照此配置，修改基线须同步至所有仓库。非 GitHub 托管仓库不适用本段。
+
+### F1｜公开仓库全部开启〔final〕
+
+Dependabot alerts（仅报警）、CodeQL default setup、secret scanning 与 push protection、private vulnerability reporting、根目录 `SECURITY.md`。
+
+### F2｜私有仓库仅开启 Dependabot alerts〔final〕
+
+免费计划下其余开关、分支保护与 ruleset 均不可用，记「不可用」不算违规。
+
+### F3｜统一保持关闭〔final〕
+
+secret scanning 的非提供商模式、validity checks、Dependabot 自动升级。
+
+### F4｜逐项核验〔final〕
+
+配置完成与每次变更后逐项核验，结果记录在案；套用 I1 的项目记入其 AGENTS 的安全基线章。
+
+核验项：安全开关各项状态、未处理告警数、CodeQL 状态、私有漏洞报告、`SECURITY.md`、ruleset 清单与规则、合并设置、默认分支的经典保护。私有仓库的分支保护相关项按 F2 记「不可用」。
+
+### F5｜分支保护三层〔final〕
+
+三层指：经典分支保护、ruleset 轻量保护、仓库合并设置。
+
+- **经典保护**：只在此层设「要求对话解决」与「不允许绕过」。不设 required status checks，因会挡住 owner 直推。
+- **ruleset**：固定为禁删除、禁强推、禁重建，绕过名单留空。公开仓库的默认分支与 `dev`（如有）各一条。
+- **合并设置**：仅开 squash，关闭 merge commit 与 rebase。该项不在 ruleset 也不在安全开关里，最易漏查。
+
+### F6｜直推权限与外部交互〔final〕
+
+owner 保留 fast-forward 直推能力。公开仓库的外部 PR 与 Issue 一律开放，不设交互限制；不接受的直接关闭。
+
+单仓库可按其 AGENTS 登记例外。
+
+### 本项目核验记录（按 F4）
 
 * **已开启**（2026-09 逐项核验）：Dependabot alerts（仅报警）、CodeQL default setup（weekly，JS/TS + actions）、secret scanning + push protection、Private vulnerability reporting、根 `SECURITY.md`
 * **保持关闭**：Dependabot 自动升级（security updates）、secret scanning 非提供商模式、validity checks
@@ -59,17 +246,112 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 
 ## CI 与自动发布
 
+### 工作流
+
 * `ci.yml`（push dev/main 与 PR）：`typecheck` → `build` → `test`（JUnit artifact；测试依赖 lib/ 故 build 在前）→ `package`（`npm pack --dry-run` 校验 files 清单）
 * `publish.yml`（push `<插件名>-vX.Y.Z` tag 或 workflow_dispatch 指定插件）：解析插件 / 校验版本 / **跑根 `pnpm run check`（守卫 fail-closed，守卫红则不发）** / verify 后 `npm publish`；同文件含 promote 手动任务（`npm dist-tag add`；三个输入缺任一即**非零退出**，不静默成功）；publish job 挂 `environment: npm-publish`，**无 release-control**
 * `market.yml`（`Publish` 成功后 / `main` 上 `market/**` 变动 / 每日 03:47 UTC / 手动）：见《插件市场索引》
 * 鉴权双模式：有 `NPM_TOKEN` 走 Automation token（首发必需），无则走 npm Trusted Publishing（OIDC）
 
-## GitHub 与网络
+### CI 环节名称（根规范 E24）
+
+以下名称是规定，不得自创：
+
+| 环节 | 职责 |
+|---|---|
+| `typecheck` | 类型检查 |
+| `test` | 单元测试 |
+| `build` | 构建可运行产物 |
+| `package` | 打成发布形态 |
+| `publish` | 发布到市场或 registry（不可逆，须 owner 当次确认） |
+| `deploy` | 部署上线（对外可见，须 owner 当次确认） |
+| `sync` | 数据同步 |
+
+每个项目只放真实存在的环节，同型项目顺序保持一致。
+
+### 本项目管线登记（根规范 E25）
+
+| 项目 | CI | 发布 | 部署 / 同步 |
+|---|---|---|---|
+| dsh-sparrow | `typecheck` → `build` → `test` → `package` | `publish`（npm；不建 Release） | `deploy`（`market.yml`，发布 `dsh.pyai.site`） |
+
+## 工具与网络
+
+### D1｜浏览器操作〔final〕
+
+查看自有 GUI、登录态、多步交互、截图，须先在 profile 中挂载 browser use，方可使用浏览器工具。默认未挂载，引擎用本机 Edge。
+
+禁止下载浏览器，本机 Edge 已可用。例外仅限导出 PDF 的脚本自行安装 playwright 依赖。
+
+浏览器产物目录落在调用时的工作目录，已配置全局忽略，无需逐仓库添加。
+
+### D2｜GitHub 操作统一使用 `gh` CLI〔final〕
+
+GitLab 仓库用 `git` 或 `glab`。
+
+### D3｜代理配置〔final〕
+
+git 与 agent 宿主进程均不读取系统代理。需要走代理时须显式指定：git 用一次性参数，宿主进程设环境变量并开启环境代理支持。不写入配置文件。
+
+### 本项目取值
 
 * 一律 `gh` CLI（已登录 peiyucn）——不手拼 git URL、不写明文凭据；GitLab（evo_time）走 `git` / `glab`
 * 仓库 <https://github.com/peiyucn/dsh-sparrow>
 
+## 工作约定
+
+本段约束 agent 的工作方式，不涉及代码本身。模型在「完成任务」的压力下容易编造、猜测、跳过验证、掩盖失败。
+
+### C1｜用中文表述〔final〕
+
+与 owner 交流、编写 commit 描述一律用中文，commit 保留英文类型前缀。代码注释以英文为主，写明「为什么」而非复述代码。
+
+### C2｜未知须明示，禁止编造〔final〕
+
+未查到的须标明「未查到」，未验证的须标明「未验证」。禁止编造任何具体信息，不得以确定语气描述未执行的操作。
+
+### C3｜结论须有依据〔final〕
+
+关于当前状态的判断必须取自命令输出或文件内容。推断只能用于提出假设。
+
+### C4｜不用取巧写法〔final〕
+
+禁止用取巧手法让代码跑通。找不到正当解法时停下来说明，不硬过。
+
+### C5｜不隐瞒错误与异常〔final〕
+
+禁止为通过检查而造假，禁止隐瞒缺陷或验证失败。无法修复时如实说明，发现此前结论有误时主动更正。
+
+### C6｜如实说明当前状态〔final〕
+
+进展须区分已实现、已提交、已推送、已发布、已上线验证五级。不得用「完成」笼统概括。
+
+「已上线验证」指 owner 已确认线上正常，agent 无法自行判定。
+
+### C7｜不可逆操作须先经 owner 同意〔final〕
+
+判断标准：执行后能否无损回滚。不能的即为不可逆操作。无法判定时按不可逆处理。
+
+可逆操作直接执行，无需报批。
+
+### C8｜完成后须自检〔final〕
+
+挪动代码后确认旧位置真的没了；说「完成」前逐项核对哪些真做了、哪些没做。
+
+### C9｜修改 AGENTS 须经 owner 许可〔final〕
+
+适用范围：本文件与各项目的 `AGENTS.md`。未经 owner 要求或明确许可，不得修改。
+
+发现需要调整时先提建议，等答复后动手，不擅自扩大范围。
+
+规范须具备约束力：被约束方能随时改动它，约束即不存在。
+
+### C10｜新功能完成后先讨论重构方案〔final〕
+
+功能跑通只是可用，不等于完成。新功能可用后立刻整理一轮重构方案（收敛实现、去重、删死代码、重写命名与注释），**先与 owner 讨论、确认后再执行**；重构行为保持不变，`verify` 保持全绿，且与功能分开提交。未重构的新功能不算完成。
+
 ## 项目专属章节
+
 
 ### 适配范围
 
