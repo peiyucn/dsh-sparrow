@@ -114,9 +114,9 @@ the quota panel always reads the latest number from the server.
 - The upstream service blocks some marker phrases and the `@`-path reference
   wording in **system / assistant** message bodies with an "unapproved channel"
   error. To keep chat working, the plugin inserts an invisible character into
-  those markers in the request copy of those bodies: the visible text and your local session history are unchanged, and code blocks are sent
-  byte-for-byte. `user` messages, tool results and tool-call arguments are never
-  modified.
+  those markers in the request copy of those bodies: the visible text and your
+  local session history are unchanged, and code blocks are sent byte-for-byte.
+  `user` messages, tool results and tool-call arguments are never modified.
 - When the upstream check changes, the plugin retries automatically with
   fallback transformations ("Auto-adapt upstream checks" in the provider card,
   on by default). This has a cost you should know about: **each adaptation can
@@ -126,6 +126,13 @@ the quota panel always reads the latest number from the server.
   extra round trips. Adaptation state is kept in memory only, so a restart may
   trigger it again. If every fallback fails, requests fail until the plugin is
   updated; turning the toggle off restores single-attempt behavior.
+- If every invisible-character fallback fails, the last resort **rewrites the
+  outgoing system prompt**: identity paragraphs and the `@`-path instructions
+  are removed, and remaining brand names are replaced with neutral wording. The
+  model then knows less about its host and about `@` references, so replies may
+  shift slightly (fallback level only; your local session history, user
+  messages and code blocks are untouched). Disable "Auto-adapt upstream checks"
+  to get a plain error instead of this fallback.
 
 ## License
 
