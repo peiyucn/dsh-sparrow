@@ -116,10 +116,16 @@ the quota panel always reads the latest number from the server.
   error. To keep chat working, the plugin inserts an invisible character into
   those markers in the request copy of those bodies: the visible text and your local session history are unchanged, and code blocks are sent
   byte-for-byte. `user` messages, tool results and tool-call arguments are never
-  modified. When the upstream check changes, the plugin retries automatically
-  with fallback transformations (toggle "Auto-adapt upstream checks" in the
-  provider card); if every fallback fails, requests fail until the plugin is
-  updated.
+  modified.
+- When the upstream check changes, the plugin retries automatically with
+  fallback transformations ("Auto-adapt upstream checks" in the provider card,
+  on by default). This has a cost you should know about: **each adaptation can
+  send up to 3 extra requests** before a fallback works. The gateway rejects
+  them before generation (no reply is produced), but they are recorded in your
+  account's request log, and the first reply after a change is slower by those
+  extra round trips. Adaptation state is kept in memory only, so a restart may
+  trigger it again. If every fallback fails, requests fail until the plugin is
+  updated; turning the toggle off restores single-attempt behavior.
 
 ## License
 
