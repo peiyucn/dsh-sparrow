@@ -70,6 +70,18 @@ export function apply(ctx: Context, config: Config): void {
   // 启动：环境变量可见立即注册；凭据库的 Key 在异步检查命中后迁移、补拉账号与模型目录并注册 route。
   provider.start()
 
+  /**
+   * 写本插件的 volatile 设置字段：命名空间 = profile 条目 id（SETTINGS_NAMESPACE），
+   * 设置写入只认 volatile 路径。`label` 只用于「本组合没有设置服务」时的用户可见错误文案。
+   */
+  const writeSetting = async (path: 'maxMode' | 'autoAdapt', value: boolean, label: string): Promise<void> => {
+    const settings = ctx.get('settings')
+    if (settings === undefined) {
+      throw new LlmError(`${name}: 本组合没有设置服务，无法保存${label}`, 'NO_SETTINGS_STORE')
+    }
+    await settings.mutate(SETTINGS_NAMESPACE, [{ op: 'set', path: [path], value }])
+  }
+
   // 设置卡片路由：Key 的保存、配额查询、状态。整节型 provider 的 settingsPath 为空，官方页面本就
   // 不提供「移除」，凭据清理由本插件的「清空 Key」承担（见 /remove-key）。
   installCodeBuddyWeb(ctx, {
@@ -92,21 +104,11 @@ export function apply(ctx: Context, config: Config): void {
     refreshModels: () => models.refreshManually(),
     maxMode: () => config.maxMode.get() === true,
     async setMaxMode(enabled) {
-      const settings = ctx.get('settings')
-      if (settings === undefined) {
-        throw new LlmError(`${name}: 本组合没有设置服务，无法保存 Max 模式`, 'NO_SETTINGS_STORE')
-      }
-      // maxMode 是 Config 里的 volatile 字段（命名空间 = 条目 id SETTINGS_NAMESPACE）；设置写入只认 volatile 路径。
-      await settings.mutate(SETTINGS_NAMESPACE, [{ op: 'set', path: ['maxMode'], value: enabled }])
+      await writeSetting('maxMode', enabled, ' Max 模式')
     },
     autoAdapt: () => config.autoAdapt.get() === true,
     async setAutoAdapt(enabled) {
-      const settings = ctx.get('settings')
-      if (settings === undefined) {
-        throw new LlmError(`${name}: 本组合没有设置服务，无法保存「自适应 API 拦截」开关`, 'NO_SETTINGS_STORE')
-      }
-      // autoAdapt 同 maxMode：Config volatile 字段，设置写入只认 volatile 路径。
-      await settings.mutate(SETTINGS_NAMESPACE, [{ op: 'set', path: ['autoAdapt'], value: enabled }])
+      await writeSetting('autoAdapt', enabled, '「自适应 API 拦截」开关')
     },
   })
 

@@ -429,7 +429,7 @@ describe('parseSseLine / mapFinish / mapUsage', () => {
   })
 })
 
-describe('CodeBuddyAdapter 运行时自适应（11128 有界降级）', () => {
+describe('CodeBuddyAdapter「自适应 API 拦截」阶梯（11128 有界降级）', () => {
   const OK_SSE = [
     'data: ' + JSON.stringify({ choices: [{ delta: { content: 'ok' } }] }) + '\n\n',
     'data: ' + JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1 } }) + '\n\n',
@@ -487,7 +487,7 @@ describe('CodeBuddyAdapter 运行时自适应（11128 有界降级）', () => {
   }
 
   it('阶梯组成：默认字符 → 候选池其余 → strip 兜底', () => {
-    assert.deepEqual(ADAPTIVE_RUNGS.map(rung => rung.id), ['cgj', 'marker-2', 'marker-3', 'strip'])
+    assert.deepEqual(ADAPTIVE_RUNGS.map(rung => rung.id), ['cgj', 'marker-180B', 'marker-180D', 'strip'])
   })
 
   it('第一次 11128、第二次 200：换候选字符重试并正常出流', async () => {

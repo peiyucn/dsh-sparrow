@@ -276,7 +276,7 @@ describe('toWireMessages 的指纹处理范围与 system 头', () => {
   })
 })
 
-describe('候选池与 strip 降级（运行时自适应，见 docs/spec/01-runtime-adaptation.md）', () => {
+describe('候选池与 strip 降级（「自适应 API 拦截」，见 docs/spec/01-runtime-adaptation.md）', () => {
   it('候选池首个就是默认中和符，且至少三格', () => {
     assert.ok(NEUTRALIZER_MARKERS.length >= 3)
     assert.equal(

@@ -124,6 +124,19 @@ async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> 
     : {}
 }
 
+/**
+ * 读 `{enabled: boolean}` 请求体（/max-mode 与 /auto-adapt 同形）：非法时回 400 并返回 undefined。
+ * 返回 undefined 即响应已发出，调用方直接 return。
+ */
+async function readEnabled(req: IncomingMessage, res: ServerResponse): Promise<boolean | undefined> {
+  const body = await readBody(req)
+  if (typeof body.enabled !== 'boolean') {
+    sendJson(res, 400, { error: 'enabled 必须是布尔值' })
+    return undefined
+  }
+  return body.enabled
+}
+
 export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared): void {
   ctx.inject(['webServer'], (webCtx) => {
     ctx.effect(() => webCtx.webServer.register({
@@ -158,22 +171,16 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
             return
           }
           if (req.method === 'POST' && pathname === PREFIX + '/max-mode') {
-            const body = await readBody(req)
-            if (typeof body.enabled !== 'boolean') {
-              sendJson(res, 400, { error: 'enabled 必须是布尔值' })
-              return
-            }
-            await shared.setMaxMode(body.enabled)
+            const enabled = await readEnabled(req, res)
+            if (enabled === undefined) return
+            await shared.setMaxMode(enabled)
             sendJson(res, 200, { ok: true, maxMode: shared.maxMode() })
             return
           }
           if (req.method === 'POST' && pathname === PREFIX + '/auto-adapt') {
-            const body = await readBody(req)
-            if (typeof body.enabled !== 'boolean') {
-              sendJson(res, 400, { error: 'enabled 必须是布尔值' })
-              return
-            }
-            await shared.setAutoAdapt(body.enabled)
+            const enabled = await readEnabled(req, res)
+            if (enabled === undefined) return
+            await shared.setAutoAdapt(enabled)
             sendJson(res, 200, { ok: true, autoAdapt: shared.autoAdapt() })
             return
           }

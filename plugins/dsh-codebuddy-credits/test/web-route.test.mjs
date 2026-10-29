@@ -298,7 +298,7 @@ describe('codebuddy host 路由：浏览器信任栅栏接线（DNS rebinding / 
   })
 })
 
-describe('codebuddy host 路由：/auto-adapt（运行时自适应开关）', () => {
+describe('codebuddy host 路由：/auto-adapt（「自适应 API 拦截」开关）', () => {
   it('GET /status 回 autoAdapt 字段（设置卡据此渲染开关）', async () => {
     const h = buildHarness({ autoAdapt: () => true })
     const result = await request(h.handler, '/api/codebuddy-credits/status', { method: 'GET' })

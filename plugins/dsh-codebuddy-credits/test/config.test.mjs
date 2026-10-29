@@ -30,7 +30,7 @@ describe('Config schema（0.1.7 的 volatile 配置面）', () => {
     assert.equal(parsed.maxMode.get(), false)
   })
 
-  it('autoAdapt 缺省默认 true（旧设置节无该字段时开启运行时自适应）', () => {
+  it('autoAdapt 缺省默认 true（旧设置节无该字段时开启「自适应 API 拦截」）', () => {
     assert.equal(parsed.autoAdapt.get(), true)
   })
 

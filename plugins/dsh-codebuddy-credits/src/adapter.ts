@@ -45,10 +45,11 @@ export interface AdaptiveRung {
  */
 export const ADAPTIVE_RUNGS: readonly AdaptiveRung[] = [
   { id: 'cgj', transform: neutralizeChannelFingerprints },
-  ...NEUTRALIZER_MARKERS.slice(1).map((marker, index) => ({
-    id: `marker-${String(index + 2)}`,
-    transform: neutralizeWithMarker(marker),
-  })),
+  ...NEUTRALIZER_MARKERS.slice(1).map(marker => {
+    // id 带码位（marker-180B），日志里不用再猜是哪一级。
+    const codePoint = (marker.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')
+    return { id: `marker-${codePoint}`, transform: neutralizeWithMarker(marker) }
+  }),
   { id: 'strip', transform: stripChannelFingerprints },
 ]
 
@@ -72,8 +73,14 @@ export interface CodeBuddyAdapterOptions {
   autoAdapt?: () => boolean
 }
 
+/** 服务端错误体解析结果：code 供 11128 判定，msg 供错误透传。 */
+interface ErrorDetail {
+  code?: unknown
+  msg?: string
+}
+
 /** 400 错误体只解析一次：code 供 11128 判定，msg 供错误透传（避免二次读体）。 */
-async function readErrorDetail(response: Response): Promise<{ code?: unknown; msg?: string }> {
+async function readErrorDetail(response: Response): Promise<ErrorDetail> {
   try {
     const body = await response.json() as { code?: unknown; msg?: unknown }
     return {
@@ -87,7 +94,7 @@ async function readErrorDetail(response: Response): Promise<{ code?: unknown; ms
 }
 
 /** 非 2xx 响应 → LlmError（服务端 code/msg 原样透传，如 10081 ip whitelist）。 */
-function rejectionError(status: number, detail: { code?: unknown; msg?: string }, hint?: string): never {
+function rejectionError(status: number, detail: ErrorDetail, hint?: string): never {
   const text = detail.msg ?? (detail.code === undefined ? '' : 'code ' + String(detail.code))
   const base = text.length > 0
     ? 'CodeBuddy 请求被拒（HTTP ' + String(status) + '）：' + text
@@ -216,9 +223,9 @@ export class CodeBuddyAdapter extends LlmAdapter {
     const rungs = adaptEnabled ? ADAPTIVE_RUNGS : ADAPTIVE_RUNGS.slice(0, 1)
     // 记住的成功位置可能超出本次可用阶梯（开关被关过）：夹到范围内。
     const start = Math.min(this.rungIndex, rungs.length - 1)
-    let exhausted: { status: number; detail: { code?: unknown; msg?: string } } | undefined
-    for (let index = start; index < rungs.length; index += 1) {
-      const rung = rungs[index] as AdaptiveRung
+    let exhausted: { status: number; detail: ErrorDetail } | undefined
+    for (const [offset, rung] of rungs.slice(start).entries()) {
+      const index = start + offset
       const body = await this.buildBody(options, rung.transform)
       const response = await fetch(BASE_URL + '/chat/completions', {
         method: 'POST',
