@@ -1,7 +1,8 @@
 // @ts-check
 /**
  * 钉的契约：上游内容指纹（HTTP 400 / code 11128）在 system 与 assistant 正文里被**无损中和**
- * （零宽空格），可见文案与语义不变；围栏 / 行内代码逐字保留；user / tool 结果 / tool_calls 参数不动。
+ * （组合字符 CGJ，U+034F），可见文案与语义不变；围栏 / 行内代码逐字保留；
+ * user / tool 结果 / tool_calls 参数不动；旧版 ZWSP（U+200B）残留会被剥掉后按当前规则重打。
  * 另外：wire 的第一条永远是 system（缺省用最小占位），否则网关直接 11128。
  */
 
@@ -10,6 +11,10 @@ import { describe, it } from 'node:test'
 import { neutralizeChannelFingerprints, visibleText } from '../lib/fingerprints.js'
 import { FALLBACK_SYSTEM_PROMPT } from '../lib/constants.js'
 import { toWireMessages } from '../lib/adapter.js'
+
+/** 当前插入符与旧版插入符（集中成常量，断言里不再散落不可见字面量）。 */
+const CGJ = '\u034F'
+const LEGACY_ZWSP = '\u200B'
 
 const FINGERPRINT = 'You are an AI agent powered by DeepSeek Harness.'
 const REAL_SYSTEM = [
@@ -32,7 +37,7 @@ const CLAUDE_CODE = "You are Claude Code, Anthropic's official CLI for Claude"
 
 /**
  * DSH 0.2.1-rc.3 Web 的 system prompt 原段（实测 2026-10-28：与下一句相邻时上游 400 / 11128；
- * 把 `@` 换掉后同样的文字放行）。这里保留完整原文，钉住「不删字、只插零宽空格」的契约。
+ * 把 `@` 换掉后同样的文字放行）。这里保留完整原文，钉住「不删字、只插组合字符」的契约。
  */
 const AT_PATH_PARAGRAPH = [
   'Tokens prefixed with @ are paths the user explicitly referenced.',
@@ -41,6 +46,13 @@ const AT_PATH_PARAGRAPH = [
   'Anything else is a file: use the read tool when its contents are needed, and do not claim to have inspected it before reading.',
   '@"..." quotes a path containing spaces.',
 ].join(' ')
+
+/** 每个 `@` 后面都必须紧跟插入符（用计数断言，避免为正则转义手写易错模式）。 */
+function assertAllAtFollowedBy(text, marker) {
+  const atCount = text.split('@').length - 1
+  const followed = text.split('@' + marker).length - 1
+  assert.equal(followed, atCount, '每个 @ 后都应紧跟插入符')
+}
 
 describe('neutralizeChannelFingerprints（无损中和）', () => {
   it('身份句可见内容不变，但不再含原始串', () => {
@@ -68,13 +80,13 @@ describe('neutralizeChannelFingerprints（无损中和）', () => {
     assert.ok(!out.includes("Anthropic's official CLI"))
   })
 
-  it('@ 路径引用段落：每个 @ 后插零宽空格，可见文字不变', () => {
+  it('@ 路径引用段落：每个 @ 后插组合字符，可见文字不变', () => {
     const out = neutralizeChannelFingerprints(AT_PATH_PARAGRAPH)
     assert.equal(visibleText(out), AT_PATH_PARAGRAPH)
-    assert.ok(out.includes('@\u200B'), '@ 之后应插入零宽空格')
-    assert.ok(!/(@)(?!\u200B)/u.test(out), '原文的每个 @ 都被处理')
-    // 逐字符位置校验：去掉零宽空格必须回到原文（不删字、不加可见字符）。
-    assert.equal(out.split('').filter(c => c !== '\u200B').join(''), AT_PATH_PARAGRAPH)
+    assert.ok(out.includes('@' + CGJ), '@ 之后应插入组合字符')
+    assertAllAtFollowedBy(out, CGJ)
+    // 逐字符位置校验：去掉插入符必须回到原文（不删字、不加可见字符）。
+    assert.equal(out.split('').filter(c => c !== CGJ).join(''), AT_PATH_PARAGRAPH)
   })
 
   it('代码里的 @ 原样保留（不能污染用户代码）', () => {
@@ -88,13 +100,31 @@ describe('neutralizeChannelFingerprints（无损中和）', () => {
     const out = neutralizeChannelFingerprints(text)
     assert.ok(out.includes('`--flag @file`'), '行内代码不动')
     assert.ok(out.includes('curl -H "x" @payload.json'), '围栏代码不动')
-    assert.ok(out.includes('Tokens prefixed with @\u200B'), '正文被中和')
+    assert.ok(out.includes('Tokens prefixed with @' + CGJ), '正文被中和')
     assert.equal(visibleText(out), text)
   })
 
   it('@ 段落二次处理不再变化（幂等）', () => {
     const once = neutralizeChannelFingerprints(AT_PATH_PARAGRAPH)
     assert.equal(neutralizeChannelFingerprints(once), once)
+  })
+
+  it('旧版 ZWSP 残留被剥掉后按当前规则重打', () => {
+    // 旧版（2026-10-28 及更早）用 U+200B 中和；上游把它归一化后等于没中和，
+    // assistant 历史里可能带着这种文本，必须剥掉 ZWSP 再按当前规则插 CGJ。
+    const original = `${REAL_SYSTEM}\n${AT_PATH_PARAGRAPH}`
+    const legacy = original.split('Deep').join('Deep' + LEGACY_ZWSP).split('@').join('@' + LEGACY_ZWSP)
+    const out = neutralizeChannelFingerprints(legacy)
+    assert.ok(!out.includes(LEGACY_ZWSP), '旧 ZWSP 必须被剥掉')
+    assert.equal(visibleText(out), original)
+    assert.ok(!out.includes('DeepSeek Harness'), '重打后不再含原始指纹串')
+    assertAllAtFollowedBy(out, CGJ)
+    assert.equal(neutralizeChannelFingerprints(out), out, '重打结果幂等')
+  })
+
+  it('代码块里的旧版 ZWSP 同样原样保留', () => {
+    const text = '```ts\nconst s = "Deep' + LEGACY_ZWSP + 'Seek"\n```'
+    assert.equal(neutralizeChannelFingerprints(text), text, '代码段不做任何处理')
   })
 
   it('围栏代码块与行内代码原样保留（不能污染用户代码）', () => {
@@ -209,6 +239,23 @@ describe('toWireMessages 的指纹处理范围与 system 头', () => {
     assert.equal(/** @type {any} */ (assistant).tool_calls[0].function.arguments, '{"path":"a.txt"}')
   })
 
+  it('assistant 历史里旧版 ZWSP 中和的正文会被重打为 CGJ', async () => {
+    const legacy = FINGERPRINT.split('Deep').join('Deep' + LEGACY_ZWSP)
+    const wire = await toWireMessages({
+      ...base,
+      messages: [{
+        id: 'a1',
+        role: 'assistant',
+        source: { kind: 'model', model: 'hy4-preview' },
+        content: [{ type: 'text', text: legacy }],
+      }],
+    })
+    const sent = String(wire[1]?.content)
+    assert.ok(!sent.includes(LEGACY_ZWSP), '旧 ZWSP 必须被剥掉')
+    assert.ok(!sent.includes('DeepSeek Harness'), '重打后不再含原始指纹串')
+    assert.equal(visibleText(sent), FINGERPRINT)
+  })
+
   it('系统提示里的 @ 段落被中和，其余正文逐字保留', async () => {
     const system = `${REAL_SYSTEM}\n\n${AT_PATH_PARAGRAPH}\n\nKeep this line verbatim.`
     const wire = await toWireMessages({
@@ -218,7 +265,7 @@ describe('toWireMessages 的指纹处理范围与 system 头', () => {
     })
     const sent = String(wire[0]?.content)
     assert.equal(visibleText(sent), system)
-    assert.ok(!/(@)(?!\u200B)/u.test(sent), '发给上游的 system 里不再有裸 @')
+    assertAllAtFollowedBy(sent, CGJ)
     assert.ok(sent.includes('Keep this line verbatim.'))
   })
 })
