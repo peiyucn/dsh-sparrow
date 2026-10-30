@@ -19,25 +19,28 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-      - name: whoami
+      - name: raw PUT body
         continue-on-error: true
         run: |
-          echo "--- npm whoami"
-          npm whoami || true
-          echo "--- npm config (masked)"
-          npm config get registry || true
-      - name: profile
+          echo "--- raw PUT dist-tag response body"
+          curl -sS -X PUT \
+            -H "Authorization: Bearer ${NODE_AUTH_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"next":"0.2.1-rc.5"}' \
+            -w '\nHTTP_CODE:%{http_code}\n' \
+            "https://registry.npmjs.org/-/package/@dsh-sparrow%2Fdsh-theme-tone/dist-tags/next" || true
+      - name: wrong-otp probe
         continue-on-error: true
         run: |
-          echo "--- npm profile get (tfa/account state)"
-          npm profile get --json || true
-      - name: read dist-tags
+          echo "--- dist-tag add with bogus OTP (probe whether 2FA gate exists)"
+          npm dist-tag add @dsh-sparrow/dsh-theme-tone@0.2.1-rc.5 next --otp=000000 2>&1 | tail -15 || true
+      - name: package metadata
         continue-on-error: true
         run: |
-          echo "--- npm dist-tag ls (read path)"
-          npm dist-tag ls @dsh-sparrow/dsh-theme-tone || true
-      - name: write dist-tag (diagnose 403 body)
-        continue-on-error: true
-        run: |
-          echo "--- npm dist-tag add (write path, verbose)"
-          npm dist-tag add @dsh-sparrow/dsh-theme-tone@0.2.1-rc.5 next --loglevel=verbose 2>&1 | tail -40 || true
+          echo "--- packument maintainers / publish config"
+          curl -sS "https://registry.npmjs.org/@dsh-sparrow%2Fdsh-theme-tone" | head -c 1200 || true
+          echo
+          echo "--- package access settings (auth)"
+          curl -sS -H "Authorization: Bearer ${NODE_AUTH_TOKEN}" \
+            -w '\nHTTP_CODE:%{http_code}\n' \
+            "https://registry.npmjs.org/-/package/@dsh-sparrow%2Fdsh-theme-tone/access" || true
