@@ -133,7 +133,6 @@ const LABELS = {
 const PLUGIN_LABELS = {
   'dsh-chat-fim': ['network', 'llm', 'session'],
   'dsh-archive-manage': ['session', 'fs-write'],
-  'dsh-file-manage': ['network', 'credentials'],
   'dsh-codebuddy-credits': ['network', 'llm', 'credentials'],
   'dsh-theme-tone': ['ui'],
 }
@@ -145,7 +144,6 @@ const PLUGIN_LABELS = {
 const ZH_DESCRIPTIONS = {
   'dsh-chat-fim': '输入框续写联想：停顿后浮现建议卡，Tab 采纳、Esc 关闭；触发灵敏度三档可调',
   'dsh-archive-manage': '会话归档管理：取消归档、移入回收站、彻底删除、从回收站还原，父会话与子会话整体操作',
-  'dsh-file-manage': 'DeepSeek Files API 云端文件管理：分页列表、配额条、单条删除、一键复制 file_id',
   'dsh-codebuddy-credits': 'CodeBuddy 额度 LLM provider：用官方 API Key 直连，在 DSH 里选用 CodeBuddy 的模型额度',
   'dsh-theme-tone': '明暗主题之下的色调层与对话区布局优化：每轴一款「官方默认」加若干色调，含顶栏与输入框玻璃效果',
 }

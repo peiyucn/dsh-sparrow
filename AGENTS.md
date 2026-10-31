@@ -5,14 +5,13 @@
 
 ## 项目概况
 
-DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独立发布，统一挂在 `@dsh-sparrow` 组织下；功能被官方原生支持后对应插件退役。
+DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独立发布，统一挂在 `@dsh-sparrow` 组织下；功能被官方原生支持、或不再值得维护时，对应插件退役。
 
 * `plugins/dsh-chat-fim` — 输入框续写联想（FIM Beta 转发 + 官方同款候选菜单）
 * `plugins/dsh-archive-manage` — 归档会话管理（备份 / 删除 / 恢复）
-* `plugins/dsh-file-manage` — DeepSeek Files API 云端文件管理（无本地持久化）
 * `plugins/dsh-codebuddy-credits` — CodeBuddy 额度 LLM provider（官方 API Key 直连）
 * `plugins/dsh-theme-tone` — 明暗主题之下的色调层 + **对话区布局优化**（每轴各一款「官方默认」+ 若干色调；色调同时驱动抬升面的色相与质感，另含顶栏 / 输入框的玻璃效果）
-* **口径：五个活跃插件 + 0 个已退役**（两个退役插件已于 2026-10-27 彻底删除）
+* **口径：四个活跃插件 + 0 个已退役**（三个退役插件已于 2026-10-27 与 2026-10-31 彻底删除）
 * 活跃插件名单的单一真值是 `scripts/plugin-set.mjs`（`RETIRED_PLUGINS` 为空名单，保留结构供守卫复用）
 
 ## 文档规范
@@ -364,7 +363,7 @@ git 与 agent 宿主进程均不读取系统代理。需要走代理时须显式
 
 * **生命周期**：一切副作用在 `apply` 内注册并配 `ctx.effect` 清理；不泄漏定时器 / watcher / 监听
 
-* **宿主兼容自检**（五个活跃插件全有）：`apply` 开头先跑本插件 `src/compat.ts` 的门，不通过即**自停用**——cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响（`@deepseek-ai/cordis` 的 `lib/index.js:1349-1363`）。用户只升级 dsh、不升级插件时，插件必须自己让位。两档门：
+* **宿主兼容自检**（四个活跃插件全有）：`apply` 开头先跑本插件 `src/compat.ts` 的门，不通过即**自停用**——cordis 逐插件捕获 `apply` 异常并把该插件标为 inactive，dsh 与其余插件不受影响（`@deepseek-ai/cordis` 的 `lib/index.js:1349-1363`）。用户只升级 dsh、不升级插件时，插件必须自己让位。两档门：
 
   * **能力门**（全部插件）：`assertCapabilities(ctx, name, [{ name, ok }])`——宿主服务 / 方法 / 导出、运行环境特性缺任一即停用；探针用**命名空间访问或惰性 import**，不产生链接期失败
   * **会话格式门**（读会话数据的 archive / chat-fim）：常量探针 `assertHostCompatible(ctx, name)`（官方 `SESSION_FORMAT_VERSION` 须在支持集合内）+ **宿主真值** `unsupportedStoredFormatReason(headers)`——常量探针在 `link:` / peer 副本场景会读到插件自己的旧版官方包，故以宿主给出的会话 `header.version` 为准

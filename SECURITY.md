@@ -4,7 +4,7 @@
 
 | 插件 / Plugin | 支持 / Supported |
 | :--- | :--- |
-| `plugins/*` 活跃插件（dsh-theme-tone、dsh-archive-manage、dsh-file-manage、dsh-chat-fim、dsh-codebuddy-credits） | 仅最新发布版 / Latest release only |
+| `plugins/*` 活跃插件（dsh-theme-tone、dsh-archive-manage、dsh-chat-fim、dsh-codebuddy-credits） | 仅最新发布版 / Latest release only |
 
 ## 报告漏洞 / Reporting a Vulnerability
 

@@ -6,7 +6,7 @@
 
 **DeepSeek Harness（DSH）Web 插件小合集。**
 
-每个插件独立发布、独立安装；某功能被官方原生支持后，对应插件从合集中退役。上方版本徽章跟踪合集对齐版本线（镜像官方 dsh），点击进入 npm org 页可看各包自己的版本。
+每个插件独立发布、独立安装；某功能被官方原生支持、或插件不再值得维护时，对应插件从合集中退役。上方版本徽章跟踪合集对齐版本线（镜像官方 dsh），点击进入 npm org 页可看各包自己的版本。
 
 ## 环境要求
 
@@ -34,10 +34,13 @@ https://dsh.pyai.site/market/index.json
 | :--- | :--- | :--- |
 | [dsh-chat-fim](plugins/dsh-chat-fim/README.zh-CN.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-chat-fim&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-chat-fim)                                     | ![续写联想建议卡](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-chat-fim.png "ratio:0.18")<br>输入框续写联想：停顿后浮现一张建议卡、Tab 采纳；DeepSeek FIM（Beta）驱动，触发灵敏度三档，续写模型跟随主模型。                                                                                                             | `dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim`          |
 | [dsh-archive-manage](plugins/dsh-archive-manage/README.zh-CN.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-archive-manage&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-archive-manage)             | ![归档面板（归档区 / 回收站）](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-archive-manage.png "ratio:0.15")<br>归档会话管理：取消归档 / 移入回收站 / 彻底删除 / 回收站还原，父会话与子会话整体操作。                                                                                                                  | `dsh plugin --profile web add @dsh-sparrow/dsh-archive-manage`    |
-| [dsh-file-manage](plugins/dsh-file-manage/README.zh-CN.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-file-manage&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-file-manage)                         | ![云端文件面板](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-file-manage.png "ratio:0.15")<br>DeepSeek Files API 云端文件：分页列表、配额条、单条删除、一键复制 file_id。                                                                                                                        | `dsh plugin --profile web add @dsh-sparrow/dsh-file-manage`       |
 | [dsh-codebuddy-credits](plugins/dsh-codebuddy-credits/README.zh-CN.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-codebuddy-credits&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-codebuddy-credits) | ![会话页额度入口与面板](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-codebuddy-credits.png "ratio:0.25")<br>公司 CodeBuddy 额度接成 DSH LLM provider：模型选择器里显示各模型的积分倍率、顶栏有额度面板、每轮显示消耗的积分。                                                                                    | `dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits` |
 | [dsh-theme-tone](plugins/dsh-theme-tone/README.zh-CN.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-theme-tone&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-theme-tone)                             | ![深色主题](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png "ratio:0.5") ![浅色主题](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png "ratio:0.5")<br>在 DSH 内置的浅色与深色主题上各加几款色调皮肤（左深右浅），选了色调后还会一并优化对话区布局。 | `dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone`        |
 
-## 已退役`n`n无 —— 两个退役插件已于 2026-10-27 彻底删除。`n`n## License
+## 已退役
+
+本仓库已无退役插件：`dsh-nav-pin` 与 `dsh-vision-bridge` 已于 2026-10-27 删除，`dsh-file-manage` 已于 2026-10-31 删除。`@dsh-sparrow/dsh-file-manage` 的 npm 历史版本保留（不作 unpublish），但不再维护；已安装的可用 `dsh plugin --profile web remove @dsh-sparrow/dsh-file-manage` 卸载。
+
+## License
 
 MIT
