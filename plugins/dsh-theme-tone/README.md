@@ -49,7 +49,7 @@ The docked cards, model-picker group headings and the @ / slash suggestion list 
 
 ## Known limitations
 
-* On dsh 0.2.2-rc.1 the composer glass may occasionally flash while the session is thinking or streaming (Chromium's backdrop sampling of continuously repainting transcript content); this version keeps the original look rather than working around it.
+* Inside the **VS Code built-in browser (Simple Browser / Electron webview, older Chromium)**, the composer glass may occasionally flash while the session is thinking or streaming; **external Edge / Chrome does not show this**. It is a webview compositing limitation, and this version keeps the original look rather than working around it.
 
 ## Uninstall & leftovers
 
