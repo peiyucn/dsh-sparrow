@@ -33,7 +33,7 @@ const P = `body:not([${PLAIN_ATTR}])`
 /** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
 export const PANEL_BAND_PX = 38
 
-/** 与地面层同源的光：显式视口尺寸 + 定位，禁止 `background-attachment: fixed`。 */
+/** 把地面三光按指定视口尺寸 / 位置铺开（顶栏、右栏、补缝层共用同一份光）。 */
 function viewportLight(position: string, size = '100vw 100vh'): string {
   return `  background-image: ${BACKDROP_GRADIENTS};
   background-size: ${size};
@@ -231,7 +231,8 @@ body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-composer-card]::before
 /* ===== 输入框：卡片玻璃 + 座位内地面重画补缝（上一版 0.2.1 的最终形态） =====
    座位透明（页面底光真实透出，正文从卡片玻璃下滚过），空白区用与地面层逐像素同源的
    「底色 + 打光 + 抖动」补缝：① 座位底部 48px 带（卡片下沿圆角 / 统计行）；② 停靠卡缝隙与
-   卡底圆角。座位保留官方 will-change，补缝带用显式视口尺寸/定位（见 groundRepaint），不依赖 fixed。 */
+   卡底圆角。座位 will-change 被覆盖成 auto，补缝带用 background-attachment: fixed 让相位 = 视口，
+   与地面层逐像素同源。 */
 ${P} [data-phase='active'] [data-composer-seat]::after {
   content: '';
   position: absolute;
