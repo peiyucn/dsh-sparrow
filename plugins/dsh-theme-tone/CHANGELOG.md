@@ -4,9 +4,11 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## [0.2.2-rc.1] - 2026-11-05
 
-- The model picker menu is now solid: opening it no longer flashes a block over the input area (the same solid-menu recipe already decided earlier, applied to this menu only).
-- The input area keeps the previous version's behaviour (the transcript still scrolls under the composer glass) and the dark plate behind it is gone; the new dsh 0.2.2 compositing hint on the composer seat is neutralised so the glass keeps the same conditions as the previous version.
-- The footer cover strip behind the input area is back to a light-blended ground repaint instead of a flat black bar; the right sidebar header is again one continuous frosted bar (not two) and the page content scrolls underneath it, so the blur and transparency match the conversation header; the file page keeps its real header (path, reload and file actions) with the file tree no longer shifted down.
+- Fixes the occasional block flash over the input area while the session is thinking or streaming: the composer takes a light 2px blur with a slightly stronger veil, keeping its transparency and edge light (the flash scales with blur radius and is no longer visible at 2px in testing).
+- The composer seat only drops the official input mask and keeps the official compositing hint (will-change no longer overridden); the footer cover strips use explicit viewport positioning, blending with the page light instead of a dark bar.
+- Menus keep the official translucent material and open/close animations (no solid conversion, no blur removal, no animation disable), staying consistent with other menus.
+- The right sidebar header is one continuous frosted bar again with the page content scrolling underneath it; the file page keeps its real header (path, reload and file actions) with the file tree no longer shifted down.
+- Keeps the previous version's behaviour: the transcript still scrolls under the composer glass, and the 1017 badge next to the model falls back to the legacy condition when the server listing provides no badge.
 - Now adapted to official dsh 0.2.2-rc.1 (web and desktop).
 
 ## [0.2.1-rc.5] - 2026-10-30
