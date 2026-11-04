@@ -1,6 +1,6 @@
 /**
- * 会话账本取数器：live 走官方投影（同步读，无需缓存）+ 冷会话走 `sessionController.inspect()` 与
- * `foldSessionCredits()` 一次性重放（客户端流式期间反复拉取且要读盘，故缓存 + 单飞）；
+ * 会话账本取数器：live 走官方投影（同步读，无需缓存）+ 冷会话走官方持久化重放
+ * （`credits-ledger.ts` 的 `foldSessionCredits()`；客户端流式期间反复拉取且要读盘，故缓存 + 单飞）；
  * 两条路径统一输出 `CreditsView`。依赖可注入以便单测，不能只靠人工重启验证冷会话路径。
  */
 
@@ -11,7 +11,7 @@ import type { CreditLedger, CreditsView } from './credits-ledger.js'
 export interface LedgerSources {
   /** live 会话：同步读投影状态；非 live（冷会话 / 投影服务缺失）返回 undefined。 */
   live(sessionId: string): CreditsView | undefined
-  /** 冷会话：读持久化事件前缀；返回 undefined 表示该来源不可用（如非 web profile 下 `sessionController` 缺失）。 */
+  /** 冷会话：读持久化事件前缀；返回 undefined 表示该来源不可用（如宿主没有 sessionPersistence 服务）。 */
   inspect(sessionId: string): Promise<readonly SessionEvent[] | undefined>
 }
 

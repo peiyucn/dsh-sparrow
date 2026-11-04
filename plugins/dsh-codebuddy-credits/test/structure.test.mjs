@@ -90,7 +90,9 @@ describe('dsh-codebuddy-credits 结构：常量不再手写字面量', () => {
       'provider id 必须从 constants import')
     assert.match(provider, /displayName: DISPLAY_NAME/u, 'provider 显示名必须来自 constants')
     const ledger = stripComments(await readSrc('host/ledger.ts'))
-    assert.match(ledger, /stateOf\(session, CREDIT_PROJECTION_KEY\)/u)
+    assert.match(ledger, /\.stateOf\(session\)/u, '0.2.2 起 live 读用 ProjectionHandle.stateOf')
+    assert.match(ledger, /ctx\.get\('sessionPersistence'\)/u, '冷路径必须软获取官方 sessionPersistence')
+    assert.match(ledger, /persistence\.open\(SessionId\(sessionId\), 'read'\)/u, '冷会话必须走官方持久化只读句柄')
     for (const file of ['index.ts', 'host/provider.ts', 'host/credentials.ts', 'host/ledger.ts']) {
       const src = stripComments(await readSrc(file))
       assert.ok(!/'llm-codebuddy-credits'/u.test(src), `${file}: 插件名不得手写（= SETTINGS_NAMESPACE）`)

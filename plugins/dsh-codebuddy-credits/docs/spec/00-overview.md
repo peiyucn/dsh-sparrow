@@ -73,15 +73,15 @@ DSH 跑 agent 循环，CodeBuddy 只出模型。不做令牌逆向、不用它�
 | 槽位 | id / key | order / priority | 作用 |
 | :--- | :--- | :--- | :--- |
 | `settings.models.provider-card` | key = `llm-codebuddy-credits` | — | Key 配置卡 / 模型只读清单 / 手动刷新 |
-| `conversation.input.model.label` | — | `priority: -1` | 模型行只读事实；**接管 single 槽**并镜像官方 `1017` 标 |
+| `conversation.input.model.label` | — | `priority: -1` | 模型行只读事实；**接管 single 槽**并按官方 fallback 渲染目录角标 `model.badge` |
 | `conversation.session.header.utilities` | `codebuddy-credits` | `order: -10` | 会话头部额度入口（session log 按钮左侧） |
 | `conversation.input.dock` | `codebuddy-credits-hero` | `order: 30` | blank 会话 hero 态的额度入口锚点 |
 | `conversation.chat.assistant-actions` | `codebuddy-credits-turn-credit` | `order: 0`（默认） | 每轮积分胶囊（渲染后把自有节点移到行动作行末尾） |
 | `conversation.composer.dock` | `codebuddy-credits-stats` | `order: 2` | 输入框下方会话积分胶囊（官方 activity 0 / usage 1 之后） |
 
-`conversation.input.model.label` 是 single 槽：为保留官方功能，本插件按官方同条件镜像
-「DeepSeek Flash 的 `1017` 临时版本标」（`src/client/model-label-1017.ts`），并对其余 provider 渲染与官方一致的
-「名字（+ 标）」；事实串只对本 provider 显示，且不显示在触发器上。
+`conversation.input.model.label` 是 single 槽：dsh 0.2.2 起官方 fallback 渲染「名称 + 目录角标 `model.badge`」
+（触发按钮角标在名称前、菜单/选项在后）。本插件接管后必须按官方位置保留该角标，语言文字经注入的
+`ctx.locale.resolveText` 解析、语言切换时重渲染；事实串只对本 provider 显示，且不显示在触发器上。
 
 ### 窗口事件（2 个自定义事件）
 
@@ -101,7 +101,8 @@ DSH 跑 agent 循环，CodeBuddy 只出模型。不做令牌逆向、不用它�
 | 状态形状 | `{ credit, calls, byModel[], byTurn: { [String(turn)]: { credit, calls, byModel[] } } }`（无损 JSON，禁用 `Map` / `NaN`） |
 | 注册方式 | `ctx.inject(['sessionProjections'], cb)` 可选 fork；服务缺席时降级为**仅冷路径**，provider 照常工作 |
 
-取数两层：live 读投影状态（O(1)）；冷会话 / 投影缺席走 `sessionController.inspect()` + 一次性重放
+取数两层：live 读投影状态（O(1)；dsh 0.2.2 起 `register()` 异步返回 `ProjectionHandle`，用 `handle.stateOf`）；
+冷会话 / 投影缺席走官方 `ctx.sessionPersistence.open(id, 'read')` + 一次性重放
 （`credits-ledger.ts` 的纯函数，按事件 `seq` 键控、重复折叠幂等）。冷路径 LRU 缓存 64 个会话、同一会话并发单飞。
 
 ### 外部端点
@@ -155,8 +156,8 @@ host 投影 / 事件重放、Max 模式以设置节为真值。`test/structure.t
    （同一 route 集重提交 = 一次 `llm/adapters-updated`，不触碰其他 provider）。
 3. **推理**：适配器把 DSH 消息转 wire（连续 user 合并、图片走附件 seam、system/assistant 做指纹中和），
    SSE 逐帧解析；`finish` 块的 `replayState.response.usage` 写入原始 usage（含 `credit`），供积分重放。
-4. **积分**：live 读 `sessionProjections.stateOf(session, 'codebuddyCredits')`；冷会话走
-   `sessionController.inspect` + `foldSessionCredits`；两条路径统一归约为 `CreditsView`。
+4. **积分**：live 读投影句柄 `handle.stateOf(session)`；冷会话读官方持久化
+   `sessionPersistence.open(id, 'read')` + `foldSessionCredits`；两条路径统一归约为 `CreditsView`。
 
 ## 上游渠道校验（11128）
 
@@ -241,7 +242,7 @@ host 投影 / 事件重放、Max 模式以设置节为真值。`test/structure.t
   + `webServer` 绑定地址 + Origin / Fetch-Metadata）；受信 LAN 放行、未受信 LAN 仍 403。测试
   `test/web-route.test.mjs` 用「受信 LAN 放行 / 未受信 LAN 403」钉住。
 - **模型行接管 single 槽**：`conversation.input.model.label` 只有一个贡献者，本插件注册 `priority: -1`
-  稳定拿渲染权；因此必须持续镜像官方 `1017` 标（官方新增/改名时需跟版）。
+  稳定拿渲染权；因此必须按官方 fallback 保留目录角标 `model.badge`（dsh 0.2.2 起取代已删除的 1017 标包）。
 - **正文指纹中和会插入不可见字符**（命中词内，可见文案不变）：这是为绕开上游未公开内容风控的主动取舍
   （owner 已知悉）；`@` 规则覆盖正文里所有 `@`（代码块除外），详见《上游渠道校验》的取舍说明。
   2026-10-29 上游开始归一化常见零宽字符，中和符已从 ZWSP 换为 CGJ；若 CGJ 也被归一化，正文层即失效
@@ -257,4 +258,4 @@ host 投影 / 事件重放、Max 模式以设置节为真值。`test/structure.t
 - 测试覆盖：契约常量单一来源、能力门 / DUPLICATE 文案、client 惰性门接线、样式统一注入与
   「组件内不得自建 style」、LAN 信任栅栏、正文指纹中和与自适应 API 拦截阶梯（11128 重试 / 成功格记忆 /
   开关 / strip 兜底）、积分重放 / 投影、路由与请求体字节限流。
-- 真机验收：保存 / 清空 Key、模型选择器分组与 `1017` 标、额度面板、会话 / 每轮积分胶囊与弹层。
+- 真机验收：保存 / 清空 Key、模型选择器分组与目录角标、额度面板、会话 / 每轮积分胶囊与弹层。

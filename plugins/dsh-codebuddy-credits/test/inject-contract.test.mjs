@@ -136,7 +136,8 @@ test('⛔ 不得再调用被官方废弃的同步会话读（2026-09-26 迁移�
     offenders,
     [],
     `宿主侧不得调用被废弃的同步会话读：${offenders.join(', ')}。`
-      + 'live 路径请读 ctx.sessionProjections 的投影状态，冷路径走 sessionController.inspect()。',
+      + 'live 路径请读 ctx.sessionProjections 的投影状态（dsh 0.2.2 起用 ProjectionHandle.stateOf），'
+      + '冷路径走官方 ctx.sessionPersistence.open(id, \'read\')。',
   )
 })
 

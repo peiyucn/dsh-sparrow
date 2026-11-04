@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 
 /**
@@ -16,8 +16,8 @@ import { describe, it } from 'node:test'
  *
  * 允许且只用官方**扩展点**：
  *  - `conversation.input.model.label`（官方 `inline` label 扩展槽，single）—— 用来给模型行加只读事实
- *    （倍率 · 上下文）。它是**标签**扩展，不接管控件；但 single 意味着必须同时保留官方的 1017 版本标
- *    （镜像见 `model-label-1017.ts`）。
+ *    （倍率 · 上下文）。它是**标签**扩展，不接管控件；single 意味着接管后必须按官方 fallback 同时
+ *    渲染目录角标 `model.badge`（dsh 0.2.2 起官方把 1017 临时标包改成目录角标；镜像文件已删除）。
  */
 const CLIENT = new URL('../src/client/', import.meta.url)
 const read = (name) => readFile(new URL(name, CLIENT), 'utf8')
@@ -44,11 +44,13 @@ describe('codebuddy-credits：不接管官方模型选择控件', () => {
     assert.ok(!/priority:\s*-1/u.test(outside), '除 label 扩展槽外，不得再用 priority -1 遮蔽官方控件')
   })
 
-  it('⛔ 仓库里不得再有 vendored 模型选择器', async () => {
-    const { readdir } = await import('node:fs/promises')
+  it('⛔ 仓库里不得再有 vendored 模型选择器或 1017 镜像', async () => {
     const files = await readdir(CLIENT)
     assert.ok(!files.includes('CodeBuddyModelSelect.tsx'), '自绘模型选择器必须保持删除状态')
-    // 1017 版本标镜像**允许存在**：label 扩展槽是 single，接管后必须保留官方标。
-    assert.ok(files.includes('model-label-1017.ts'), '1017 版本标镜像需要保留（label 槽 single）')
+    // dsh 0.2.2 删除了官方 1017 标包，改由目录 `model.badge` 下发：镜像文件与自绘标必须删除。
+    assert.ok(!files.includes('model-label-1017.ts'), '1017 镜像已随官方目录角标取消，不得保留')
+    const label = stripComments(await read('CodeBuddyModelLabel.tsx'))
+    assert.match(label, /\.badge/u, 'label 扩展必须渲染官方目录角标 model.badge')
+    assert.match(label, /resolveText/u, '角标文字必须经官方 locale resolveText 解析（多语言）')
   })
 })

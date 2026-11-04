@@ -3,6 +3,11 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
+## [0.2.2-rc.1] - 2026-11-05
+
+- Now adapted to official dsh 0.2.2-rc.1 (web and desktop).
+- Model badges in the model picker now follow the official catalog badge: the model name is shown with dsh's own badge (before the name in the trigger, after it in menus), using your interface language. The plugin no longer draws a private copy of the retired "1017" badge.
+
 ## [0.2.1-rc.5] - 2026-10-30
 
 - Now adapted to official dsh 0.2.1-rc.5 (web and desktop).

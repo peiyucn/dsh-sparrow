@@ -64,12 +64,6 @@ export const creditsProjectionStateSchema = z.object({
   byTurn: z.record(z.string(), turnCreditsSchema.strict()),
 }).strict()
 
-declare module '@deepseek-ai/dsh-session-projection/types' {
-  interface SessionProjectionStateMap {
-    codebuddyCredits: CreditsProjectionState
-  }
-}
-
 /** 返回新数组（不改入参）。 */
 function addModelRow(rows: readonly CreditsModelRow[], sample: CreditEntry): CreditsModelRow[] {
   const index = rows.findIndex(row => row.model === sample.model)
@@ -111,7 +105,10 @@ export function viewOfCreditsState(state: CreditsProjectionState): CreditsView {
 }
 
 /** 注册到 `ctx.sessionProjections` 的单元定义。**host-only**（不带 `wire`）：积分只由本插件自己的 HTTP 路由读，
- * 不给客户端投影表新增跨包契约键；host-only 单元同样会被官方投影缓存 checkpoint。 */
+ * 不给客户端投影表新增跨包契约键；host-only 单元同样会被官方投影缓存 checkpoint。
+ * dsh 0.2.2 起 `ProjectionDefinition` 不再经 `SessionProjectionStateMap` 约束（该表已删除），
+ * host-only 定义直接用 `<key, state>` 两个泛型参数即可。
+ */
 export const codebuddyCreditsProjectionDefinition = {
   key: CREDIT_PROJECTION_KEY,
   stateVersion: 1,
