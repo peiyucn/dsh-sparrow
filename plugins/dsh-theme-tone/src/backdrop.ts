@@ -65,14 +65,12 @@ export function buildBackdropCss(): string {
   background-repeat: ${BACKDROP_REPEAT};
 }
 .${BACKDROP_CLASS}[hidden] { display: none; }
-/* 官方座位（composerSeat）在 0.2.2 铺一块「顶部 36px 渐隐 + 下方实心 bg-base」的输入遮罩，且带
-   will-change: transform。前者会在窗口底部形成一块没有底光的实色板（深色轴上读作一条黑色遮挡条）；
-   后者让座位成为固定定位 / 固定背景后代的包含块，会把玻璃层的「地面重画补缝」相位改成按座位算
-   （补缝带颜色与地面光对不上）。两处一起处理：座位清成透明、让页面底光真实透出，will-change 撤成
-   auto 让补缝带的 fixed 相位回到视口。补缝带本身见 glass.ts 的输入框区补缝。 */
+/* 官方座位（composerSeat）在 0.2.2 自带输入遮罩（顶部 36px 渐隐 → 实心 bg-base）。本插件清掉它，
+   让座位透明：页面底光与正文真实透出（输入框玻璃才有东西可采样）。**保留官方 will-change:
+   transform 不动**——官方注释写明它用来让后代的 backdrop blur 稳定采样正文；2026-11-05 按 owner
+   提示做对照：座位不再覆盖合成提示，补缝带改用显式视口尺寸/定位（不依赖 fixed，避免包含块相位问题）。 */
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat] {
   background: transparent;
-  will-change: auto;
 }
 body:not([${PLAIN_ATTR}]) [${CONTENT_ATTR}] { position: relative; z-index: ${CONTENT_Z_INDEX}; }
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],

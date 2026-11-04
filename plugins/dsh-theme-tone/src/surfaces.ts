@@ -16,8 +16,9 @@ const SECONDARY = "body > [class*='_portal'] [role='button'][aria-label] [class*
 const TERTIARY = "body > [class*='_portal'] [role='button'][aria-label] [class*='_hoverStatus']"
 const COPIED = "body > [class*='_portal'] [role='button'][aria-label] [class*='_copied']"
 
-/** 菜单分组标题（模型选择列表等）：官方给了 sticky 却没给背景，列表滚动时条目从标题下面穿过。 */
+/** 菜单分组标题（模型选择列表等）：官方给了 sticky 却没给背景，列表标题滚动时条目从标题下面穿过。 */
 const MENU_GROUP_HEADING = '[data-menu-group-heading]'
+/* 菜单材质与相位动画交回官方：2px 弱模糊下嵌套 backdrop 闪块不再复现，保留官方半透明观感。 */
 /** 停靠卡（todo / goal / queue）：官方材质是半透明菜单玻璃，几张叠在一起互相透，只有最上面一张看得出磨砂。 */
 const DOCK_TODO = "[data-composer-seat] [data-testid='todo-panel']"
 const DOCK_CHILD_GLASS = "[data-composer-seat] :is([data-goal-bar], [data-queue-dock]) > *::before"
@@ -73,6 +74,8 @@ ${MENU_GROUP_HEADING} {
   background-color: var(--dsw-alias-bg-base) !important;
   background-image: linear-gradient(var(--dsw-specific-menu), var(--dsw-specific-menu)) !important;
 }
+
+/* 菜单材质 / 相位动画交回官方（2px 弱模糊下嵌套闪块不再复现）。 */
 
 /* 输入框触发菜单「下面还有内容」提示：官方那条色块渐隐条在深色玻璃上会读成多余的长方形，
    改成淡出列表内容本身 —— 仅在菜单确实还能继续滚（data-overflow-below / -above）时生效，

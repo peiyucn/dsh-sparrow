@@ -22,11 +22,11 @@ describe('backdrop: 地面光层', () => {
     assert.match(css, /ellipse 38vw 58vh at 0% -6vh/u)
   })
 
-  it('座位让位：清掉官方输入遮罩让底光透出，并撤销 will-change: transform（补缝相位回到视口）', () => {
+  it('座位：清掉官方遮罩、保留官方 will-change（让后代 backdrop blur 稳定采样）', () => {
     const seat = /body:not\(\[[^\]]+\]\) \[data-phase='active'\] \[data-composer-seat\] \{([^}]*)\}/u.exec(css)?.[1] ?? ''
-    assert.ok(seat.includes('background: transparent'), '座位透明，让页面底光透出')
-    assert.ok(seat.includes('will-change: auto'), '撤销官方 will-change: transform，固定背景相位回到视口')
-    assert.ok(!seat.includes('background-image'), '不重绘座位的背景光')
+    assert.ok(seat.includes('background: transparent'), '座位透明：底光/正文透出，玻璃才有东西可采样')
+    assert.ok(!seat.includes('will-change'), '保留官方 will-change: transform（官方用它稳定 blur 采样）')
+    assert.ok(!seat.includes('linear-gradient('), '不再保留官方实心遮罩')
   })
 
   it('固定全屏、z-index 在内容之下、深色轴 screen 混合', () => {

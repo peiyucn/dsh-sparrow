@@ -4,6 +4,8 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## [0.2.2-rc.1] - 2026-11-05
 
+- The model picker menu is now solid: opening it no longer flashes a block over the input area (the same solid-menu recipe already decided earlier, applied to this menu only).
+- The input area keeps the previous version's behaviour (the transcript still scrolls under the composer glass) and the dark plate behind it is gone; the new dsh 0.2.2 compositing hint on the composer seat is neutralised so the glass keeps the same conditions as the previous version.
 - The footer cover strip behind the input area is back to a light-blended ground repaint instead of a flat black bar; the right sidebar header is again one continuous frosted bar (not two) and the page content scrolls underneath it, so the blur and transparency match the conversation header; the file page keeps its real header (path, reload and file actions) with the file tree no longer shifted down.
 - Now adapted to official dsh 0.2.2-rc.1 (web and desktop).
 

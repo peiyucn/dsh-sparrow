@@ -3,11 +3,11 @@ import {
   PLAIN_ATTR,
   RIGHT_PANEL_ATTR,
 } from './constants.js'
-import { BACKDROP_GRADIENTS, DITHER_SIZE, DITHER_TILE } from './backdrop.js'
+import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
 /** 输入框的背景模糊：低饱和、略提亮，保留磨砂感又不把背后的正文糊成色块。 */
-export const COMPOSER_BLUR = 'blur(16px) saturate(105%) brightness(1.14)'
+export const COMPOSER_BLUR = 'blur(2px) saturate(105%) brightness(1.14)'
 /** 顶栏 / 右栏两条带的背景模糊（沿用调整前的冷调提亮配方）。 */
 export const GLASS_BLUR = 'blur(24px) saturate(170%) brightness(1.04)'
 /** 顶栏填充浓度：调整前是 40%，压亮度后为 54%（不压到输入框的 62%，金色光仍保留）。 */
@@ -15,7 +15,7 @@ export const BAR_FILL_ALPHA = 0.54
 /** 顶栏金光叠加强度：相对地面层光 alpha 的百分比（85% 实测金光可见且与左栏同色）。 */
 export const BAR_GOLD_PERCENT = 85
 /** 输入框遮罩比例；越大越不透明、越不显背景色。 */
-export const COMPOSER_VEIL_PERCENT = 62
+export const COMPOSER_VEIL_PERCENT = 74
 /** 暗色玻璃的「抬亮」比例：底色里掺入抬升面（bg-layer-3）的颜色，避免整块死黑；0 = 纯黑。 */
 export const COMPOSER_LIFT_PERCENT = 40
 /** 浅色轴的遮罩用接近底色的乳白：`label-primary` 在浅色轴是深色，叠出来会发灰。 */
@@ -120,10 +120,7 @@ function composerMaterial(): string {
 
 const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
 
-/**
- * 座位底部「地面重画带」高度：48px（带顶落在输入框工具行背后，盖住卡片下沿圆角 / 统计胶囊行，
- * 又不遮住输入框底部的悬浮阴影）。
- */
+/** 座位底部「地面重画带」高度：48px（0.2.1 最终形态的取值：盖住卡片下沿圆角 / 统计行，不遮悬浮阴影）。 */
 export const SEAT_BAND_PX = 48
 /** 官方 composerStack 的堆栈缝（读官方参数，回落当前官方值）。 */
 const STACK_GAP = 'var(--dsh-composer-stack-gap, 6px)'
@@ -131,17 +128,13 @@ const STACK_GAP = 'var(--dsh-composer-stack-gap, 6px)'
 const DOCK_CARDS = `:is([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar])`
 
 /**
- * 座位内的「地面原地重画」：与地面层同一张视口渐变（含 1 LSB 抖动层），fixed 让定位区 = 视口 ⇒
- * 与 `.dsh-theme-tone` 地面层逐像素同源。dsh 0.2.2 的座位带 `will-change: transform` 会把 fixed
- * 相位改成按座位算（颜色对不上），所以 backdrop.ts 同时把座位的 will-change 撤成 auto；两处必须
- * 同进同退，否则这些补缝带会显示成颜色不对的条。
+ * 座位内「地面原地重画」：与地面层同源的底色 + 地面光。座位保留官方 will-change: transform 后，
+ * `background-attachment: fixed` 会被座位包含块改写相位，改用显式 `100vw 100vh` + 右下锚点
+ * （座位底 = 视口底，纵向相位准确；横向以座位右缘为锚，右栏开合时会有一点水平偏差）。
  */
 function groundRepaint(): string {
   return `  background-color: var(--dsw-alias-bg-base);
-  background-image: ${BACKDROP_GRADIENTS}, ${DITHER_TILE};
-  background-size: auto, auto, auto, ${DITHER_SIZE};
-  background-attachment: fixed;
-  background-repeat: no-repeat, no-repeat, no-repeat, repeat;`
+${viewportLight('100% 100%')}`
 }
 
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
@@ -230,14 +223,11 @@ body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-composer-card]::before
     ${composerEdgeWash(0.12)};
 }
 
-/* ===== 输入框区漏字补缝：地面原地重画 =====
-   座位被 backdrop.ts 清成透明后（dsh 0.2.2 官方输入遮罩让位），座位里的空白区会漏出滚动的正文。
-   这些区域本来就该是背景，所以画一层与地面逐像素同源的「底色 + 打光」——看起来就是背景本身，
-   不改任何官方材质 / 几何：① 输入框下沿：卡片底部圆角缺口 + 下方统计胶囊行；② 停靠卡下方的
-   stack 缝与卡底圆角缺口。相位正确的两个前提（都在 backdrop.ts 同一条座位规则里）：清座位背景、
-   撤掉座位的 will-change: transform。 */
 
-/* ① 座位底部一条带：带顶落在输入框工具行背后，玻璃下沿不出现可辨分界，带内正文全部盖住。 */
+/* ===== 输入框：卡片玻璃 + 座位内地面重画补缝（上一版 0.2.1 的最终形态） =====
+   座位透明（页面底光真实透出，正文从卡片玻璃下滚过），空白区用与地面层逐像素同源的
+   「底色 + 打光 + 抖动」补缝：① 座位底部 48px 带（卡片下沿圆角 / 统计行）；② 停靠卡缝隙与
+   卡底圆角。座位保留官方 will-change，补缝带用显式视口尺寸/定位（见 groundRepaint），不依赖 fixed。 */
 ${P} [data-phase='active'] [data-composer-seat]::after {
   content: '';
   position: absolute;
@@ -249,12 +239,6 @@ ${P} [data-phase='active'] [data-composer-seat]::after {
   pointer-events: none;
 ${groundRepaint()}
 }
-
-/* ② 停靠卡（todo / goal / queue）：材质在 surfaces 表里统一改成不透明抬升面（见 buildSurfaceCss），
-   这里只负责补缝。卡根不建层叠上下文：补缝层用 z-index:-1 落到座位层叠上下文的负层，才在卡面材质
-   之下、滚动正文之上 —— 圆角缺口由补缝层从卡面**底下**补齐，不会像遮罩那样把圆角压出缺口。
-   补缝层宽度 = 卡根宽度（等于或大于正文列宽），不再向两侧外扩，避免撑出水平滚动条；
-   卡根官方用 overflow:hidden 裁圆角材质，补缝层会被一起裁掉，故放开。 */
 ${P} [data-phase='active'] [data-composer-seat] ${DOCK_CARDS} {
   position: relative;
   overflow: visible;
@@ -282,8 +266,8 @@ ${viewportLight('100% 0')}
    面板顶开始，否则 0.2.2 的 tab 体从 y=38 开始，::before 会被裁掉一段、视觉上裂成「两条」
    （dockkit 条一条实色 + 头行一条玻璃）。做法：dockkit 条负底距 38 把标签体上提，标签体再补
    38px 顶距 —— 净布局与官方一致（头行仍在 38..76、正文仍在 76 以下），只是把裁剪盒上沿挪到 0。
-   注意别再动正文滚区（0.2.2 的 [data-files-state='tree'] 是常驻目录树 aside，误命中会盖住文件页
-   头行、把文件树下移 76px）。 */
+   注意正文滚区的 lift 在下方单独处理，且文件树选择器必须限定文件页根（0.2.2 预览里的常驻目录树
+   aside 也带 [data-files-body]，误命中会把预览目录树盖住 / 下移）。 */
 ${P} ${RP} > *:first-child {
   margin-bottom: -${PANEL_BAND_PX}px;
 }
