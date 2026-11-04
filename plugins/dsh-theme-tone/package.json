@@ -1,7 +1,7 @@
 {
   "name": "@dsh-sparrow/dsh-theme-tone",
   "description": "Tone skins for the official light and dark themes: token colors, ground light, and liquid glass on the conversation header, composer and right sidebar",
-  "version": "0.2.1-rc.5",
+  "version": "0.2.2-rc.1",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -60,18 +60,18 @@
     "verify": "node ../../scripts/verify.mjs"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.5",
-    "@deepseek-ai/dsh-settings": "0.2.1-rc.5"
+    "@deepseek-ai/cordis": "^4.1.0",
+    "@deepseek-ai/dsh-settings": "0.2.2-rc.1"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "^3.18.5"
+    "@deepseek-ai/schemastery": "^3.19.0"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.5",
-    "@deepseek-ai/dsh-client-store": "0.2.1-rc.5",
-    "@deepseek-ai/dsh-client-ui-settings": "0.2.1-rc.5",
-    "@deepseek-ai/dsh-client-ui-slots": "0.2.1-rc.5",
-    "@deepseek-ai/dsh-settings": "0.2.1-rc.5",
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/dsh-client-store": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-settings": "0.2.2-rc.1",
     "@types/node": "^22.20.0",
     "@types/react": "~18.3.1",
     "react": "^18.2.0"
@@ -80,6 +80,6 @@
     "access": "public"
   },
   "engines": {
-    "node": "^22.19.0 || >=24.0.0"
+    "node": ">=24.9.0"
   }
 }

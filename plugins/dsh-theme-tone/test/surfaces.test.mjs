@@ -6,8 +6,9 @@ import { buildSurfaceCss } from '../lib/surfaces.js'
 const css = buildSurfaceCss()
 
 describe('surfaces: 官方写死牌面的浮层（左边栏 Workspace hover 卡）', () => {
-  it('锚点 = body 直接子级、role=button 的 portal 卡片', () => {
-    assert.ok(css.includes("body > [role='button'][aria-label]"))
+  it('锚点 = body 下 portal 包装节点内、role=button 的卡片（dsh 0.2.2 起多一层 display:contents 包装）', () => {
+    assert.ok(css.includes("body > [class*='_portal'] [role='button'][aria-label]"))
+    assert.ok(!css.includes("body > [role='button'][aria-label]"), '0.2.2 的卡不再是 body 直接子节点')
   })
 
   it('面：官方固定深底换成官方抬升面 token（跟随色调）', () => {

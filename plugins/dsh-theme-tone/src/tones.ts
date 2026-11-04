@@ -285,7 +285,6 @@ export const STATE_TOKENS: readonly Readonly<{
   dark: string
 }>[] = Object.freeze([
   Object.freeze({ token: '--dsw-specific-sidebar-nav-item-active', light: '--dsw-static-neutral-bluish-100', dark: '--dsw-static-neutral-bluish-750' }),
-  Object.freeze({ token: '--dsw-specific-sidebar-nav-item-hover', light: '--dsw-static-neutral-bluish-75', dark: '--dsw-static-neutral-bluish-850' }),
   Object.freeze({ token: '--dsw-specific-sidebar-nav-item-active-accent', light: '--dsw-static-deepseek-100', dark: '--dsw-static-neutral-bluish-800' }),
   Object.freeze({ token: '--dsw-alias-bg-module-platform', light: '--dsw-static-neutral-bluish-60', dark: '--dsw-static-neutral-bluish-800' }),
   Object.freeze({ token: '--dsw-alias-button-elevated-fill', light: '--dsw-static-neutral-bluish-00', dark: '--dsw-static-neutral-bluish-750' }),

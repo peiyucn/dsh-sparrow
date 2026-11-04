@@ -4,15 +4,17 @@
  *
  * ① 左边栏 Workspace 行 hover 卡（HoverCard 的 compact/copyable 变体）：官方给它固定的深底与白系
  *    字色（两轴同值），这里把面换成官方抬升面 token、字换成官方 label token（标题最亮 → 路径/时间
- *    次之 → 状态最暗）。锚点：卡根是 `body > [role="button"][aria-label]`；字色按官方 CSS-module
- *    类名的稳定后缀命中（`[class*='_hoverTitle']` 等），已登记 docs/private-seams.md 的静默失效风险。
+ *    次之 → 状态最暗）。锚点：dsh 0.2.2 起 HoverCard 用 `display: contents` 的 portal 包装节点再挂卡
+ *    （卡不再是 body 直接子节点），故从 `body > [class*='_portal']` 下的可复制卡根命中；字色仍按
+ *    官方 CSS-module 类名的稳定后缀命中（`[class*='_hoverTitle']` 等），已登记 docs/private-seams.md
+ *    的静默失效风险。
  * ② 停靠卡 / ③ 菜单分组标题 / ④ 输入框触发菜单：见各自常量上的注释。
  */
-const CARD = "body > [role='button'][aria-label]"
-const TITLE = "body > [role='button'][aria-label] [class*='_hoverTitle']"
-const SECONDARY = "body > [role='button'][aria-label] [class*='_hoverPath'],\nbody > [role='button'][aria-label] [class*='_hoverTime']"
-const TERTIARY = "body > [role='button'][aria-label] [class*='_hoverStatus']"
-const COPIED = "body > [role='button'][aria-label] [class*='_copied']"
+const CARD = "body > [class*='_portal'] [role='button'][aria-label]"
+const TITLE = "body > [class*='_portal'] [role='button'][aria-label] [class*='_hoverTitle']"
+const SECONDARY = "body > [class*='_portal'] [role='button'][aria-label] [class*='_hoverPath'],\nbody > [class*='_portal'] [role='button'][aria-label] [class*='_hoverTime']"
+const TERTIARY = "body > [class*='_portal'] [role='button'][aria-label] [class*='_hoverStatus']"
+const COPIED = "body > [class*='_portal'] [role='button'][aria-label] [class*='_copied']"
 
 /** 菜单分组标题（模型选择列表等）：官方给了 sticky 却没给背景，列表滚动时条目从标题下面穿过。 */
 const MENU_GROUP_HEADING = '[data-menu-group-heading]'
