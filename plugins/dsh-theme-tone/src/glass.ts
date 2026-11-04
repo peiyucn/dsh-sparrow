@@ -3,11 +3,11 @@ import {
   PLAIN_ATTR,
   RIGHT_PANEL_ATTR,
 } from './constants.js'
-import { BACKDROP_GRADIENTS } from './backdrop.js'
+import { BACKDROP_GRADIENTS, DITHER_SIZE, DITHER_TILE } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
 /** 输入框的背景模糊：低饱和、略提亮，保留磨砂感又不把背后的正文糊成色块。 */
-export const COMPOSER_BLUR = 'blur(2px) saturate(105%) brightness(1.14)'
+export const COMPOSER_BLUR = 'blur(16px) saturate(105%) brightness(1.14)'
 /** 顶栏 / 右栏两条带的背景模糊（沿用调整前的冷调提亮配方）。 */
 export const GLASS_BLUR = 'blur(24px) saturate(170%) brightness(1.04)'
 /** 顶栏填充浓度：调整前是 40%，压亮度后为 54%（不压到输入框的 62%，金色光仍保留）。 */
@@ -15,7 +15,7 @@ export const BAR_FILL_ALPHA = 0.54
 /** 顶栏金光叠加强度：相对地面层光 alpha 的百分比（85% 实测金光可见且与左栏同色）。 */
 export const BAR_GOLD_PERCENT = 85
 /** 输入框遮罩比例；越大越不透明、越不显背景色。 */
-export const COMPOSER_VEIL_PERCENT = 74
+export const COMPOSER_VEIL_PERCENT = 62
 /** 暗色玻璃的「抬亮」比例：底色里掺入抬升面（bg-layer-3）的颜色，避免整块死黑；0 = 纯黑。 */
 export const COMPOSER_LIFT_PERCENT = 40
 /** 浅色轴的遮罩用接近底色的乳白：`label-primary` 在浅色轴是深色，叠出来会发灰。 */
@@ -134,7 +134,10 @@ const DOCK_CARDS = `:is([data-testid='todo-panel'], [data-queue-dock], [data-goa
  */
 function groundRepaint(): string {
   return `  background-color: var(--dsw-alias-bg-base);
-${viewportLight('100% 100%')}`
+  background-image: ${BACKDROP_GRADIENTS}, ${DITHER_TILE};
+  background-size: auto, auto, auto, ${DITHER_SIZE};
+  background-attachment: fixed;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;`
 }
 
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
@@ -222,6 +225,7 @@ body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-composer-card]::before
     0 1px 2px rgba(31, 35, 60, 0.10),
     ${composerEdgeWash(0.12)};
 }
+
 
 
 /* ===== 输入框：卡片玻璃 + 座位内地面重画补缝（上一版 0.2.1 的最终形态） =====

@@ -22,10 +22,10 @@ describe('backdrop: 地面光层', () => {
     assert.match(css, /ellipse 38vw 58vh at 0% -6vh/u)
   })
 
-  it('座位：清掉官方遮罩、保留官方 will-change（让后代 backdrop blur 稳定采样）', () => {
+  it('座位：清掉官方遮罩、把 will-change 覆盖成 auto（回到 0.2.1 合成条件）', () => {
     const seat = /body:not\(\[[^\]]+\]\) \[data-phase='active'\] \[data-composer-seat\] \{([^}]*)\}/u.exec(css)?.[1] ?? ''
     assert.ok(seat.includes('background: transparent'), '座位透明：底光/正文透出，玻璃才有东西可采样')
-    assert.ok(!seat.includes('will-change'), '保留官方 will-change: transform（官方用它稳定 blur 采样）')
+    assert.ok(seat.includes('will-change: auto'), '0.2.2 新增的座位 will-change 被覆盖成 auto（fixed 补缝带相位前提）')
     assert.ok(!seat.includes('linear-gradient('), '不再保留官方实心遮罩')
   })
 

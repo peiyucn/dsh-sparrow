@@ -65,12 +65,15 @@ export function buildBackdropCss(): string {
   background-repeat: ${BACKDROP_REPEAT};
 }
 .${BACKDROP_CLASS}[hidden] { display: none; }
-/* 官方座位（composerSeat）在 0.2.2 自带输入遮罩（顶部 36px 渐隐 → 实心 bg-base）。本插件清掉它，
-   让座位透明：页面底光与正文真实透出（输入框玻璃才有东西可采样）。**保留官方 will-change:
-   transform 不动**——官方注释写明它用来让后代的 backdrop blur 稳定采样正文；2026-11-05 按 owner
-   提示做对照：座位不再覆盖合成提示，补缝带改用显式视口尺寸/定位（不依赖 fixed，避免包含块相位问题）。 */
+/* 官方座位（composerSeat）在 0.2.2 自带输入遮罩（顶部 36px 渐隐 → 实心 bg-base）与
+   will-change: transform。0.2.1 的座位既没有遮罩也没有这条合成提示；按 owner 定案回到 0.2.1
+   方案：清掉遮罩、把 will-change 覆盖成 auto，座位透明（正文与底光真实透出），补缝带重新使用
+   background-attachment: fixed（定位区回到视口，与地面层同相位）。
+   注：0.2.2 下玻璃 blur 采样滚动正文时的闪块在覆盖 / 不覆盖该提示时都出现过，属 Chromium 合成器
+   行为；本版按 0.2.1 观感优先，不再为它改写模糊。 */
 body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat] {
   background: transparent;
+  will-change: auto;
 }
 body:not([${PLAIN_ATTR}]) [${CONTENT_ATTR}] { position: relative; z-index: ${CONTENT_Z_INDEX}; }
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],

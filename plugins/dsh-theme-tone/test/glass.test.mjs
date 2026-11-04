@@ -33,10 +33,10 @@ describe('glass: 参数常量', () => {
     assert.equal(HEADER_HEIGHT_PX, 76, '对话区顶栏总高')
     assert.equal(PANEL_BAND_PX, 38, '右栏单条带高')
     assert.match(GLASS_BLUR, /blur\(24px\) saturate\(170%\) brightness\(1\.04\)/u, '顶栏 / 右栏：冷调提亮模糊')
-    assert.match(COMPOSER_BLUR, /blur\(2px\) saturate\(105%\) brightness\(1\.14\)/u, '输入框：2px 弱模糊')
+    assert.match(COMPOSER_BLUR, /blur\(16px\) saturate\(105%\) brightness\(1\.14\)/u, '输入框：原 16px 模糊')
     assert.equal(BAR_FILL_ALPHA, 0.54, '顶栏 / 右栏填充 54%')
     assert.equal(BAR_GOLD_PERCENT, 85, '顶栏金光 85%')
-    assert.equal(COMPOSER_VEIL_PERCENT, 74, '输入框遮罩 74%（弱模糊）')
+    assert.equal(COMPOSER_VEIL_PERCENT, 62, '输入框遮罩 62%')
     assert.equal(COMPOSER_VEIL_PERCENT_LIGHT, 60, '浅色轴遮罩 60%')
     assert.equal(COMPOSER_LIFT_PERCENT, 40, '暗色玻璃抬升面 40%')
   })
@@ -120,15 +120,14 @@ describe('glass: 输入框', () => {
   })
 })
 
-describe('glass: 输入框区补缝（座位内地面重画，保留官方 will-change）', () => {
-  it('座位底部补缝带：48px、底色 + 地面光（显式视口尺寸/右下锚点）', () => {
+describe('glass: 输入框区补缝（0.2.1 方案：座位透明 + 地面重画带 fixed 相位）', () => {
+  it('座位底部补缝带：48px、地面层原地重画、与视口同相位', () => {
     const band = block(`\\[data-composer-seat\\]::after \\{([^}]*)\\}`)
     assert.ok(band.includes(`height: ${SEAT_BAND_PX}px`), '带高 48px')
     assert.ok(band.includes('background-color: var(--dsw-alias-bg-base)'), '先铺底色')
     assert.ok(band.includes('background-image: radial-gradient('), '重画地面打光，不是黑色实色条')
-    assert.ok(band.includes('background-size: 100vw 100vh'), '显式视口尺寸（不依赖 fixed）')
-    assert.ok(band.includes('background-position: 100% 100%'), '贴座位右下（座位底 = 视口底）')
-    assert.ok(!band.includes('background-attachment: fixed'), '座位保留 will-change 时不能用 fixed')
+    assert.ok(band.includes('repeating-conic-gradient'), '带 1 LSB 抖动层，打散色带')
+    assert.ok(band.includes('background-attachment: fixed'), 'fixed = 定位区视口，与地面层逐像素同源')
     assert.ok(band.includes('z-index: -1'), '补缝层在座位内、卡片材质之下')
   })
 
@@ -140,20 +139,22 @@ describe('glass: 输入框区补缝（座位内地面重画，保留官方 will-
     assert.ok(patch.includes('top: calc(100% - 20px)'), '向上藏进卡面圆角')
     assert.ok(patch.includes('height: calc(var(--dsh-composer-stack-gap, 6px) + 20px + 24px)'),
       '向下盖满 stack 缝 + 24px')
-    assert.ok(patch.includes('background-size: 100vw 100vh'), '同样用显式视口尺寸')
+    assert.ok(patch.includes('background-attachment: fixed'), '同样与地面层同源')
     assert.ok(code.includes('overflow: visible'), '放开停靠卡根裁剪，补缝层才画得出来')
   })
 
-  it('座位保留官方 will-change（官方用它稳定后代 backdrop blur 采样）', () => {
+  it('相位前提：0.2.2 座位的 will-change 被覆盖成 auto（回到 0.2.1 合成条件）', () => {
     const backdrop = readFileSync(new URL('../src/backdrop.ts', import.meta.url), 'utf8')
-    assert.ok(!backdrop.includes('will-change: auto'), '不覆盖官方 will-change')
+    assert.ok(backdrop.includes('will-change: auto'),
+      '把 0.2.2 新增的座位合成提示退掉，fixed 相位才按视口算、玻璃才回到 0.2.1 条件')
     assert.ok(backdrop.includes('background: transparent'), '座位透明：正文仍从玻璃下滚过、底光透出')
   })
 
-  it('补缝带不再用 fixed 背景（座位含 will-change，改成显式视口尺寸/定位）', () => {
-    assert.equal((code.match(/background-attachment: fixed;/gu) ?? []).length, 0, '没有 fixed 补缝层')
+  it('只有与地面层同源的两条补缝带允许 fixed 背景', () => {
+    assert.equal((code.match(/background-attachment: fixed;/gu) ?? []).length, 2,
+      '座位底带 + 停靠卡补缝带各一处')
     assert.equal((code.match(/background-attachment: fixed, fixed/gu) ?? []).length, 2,
-      '顶栏材质（两处 = 顶栏 + 右栏头行）的金光仍按视口坐标画')
+      '顶栏材质（两处 = 顶栏 + 右栏头行）的金光也按视口坐标画')
   })
 })
 
@@ -210,7 +211,7 @@ describe('glass: 规则门禁', () => {
 
   it('模糊只有两个来源：顶栏 / 右栏 GLASS_BLUR、输入框 COMPOSER_BLUR', () => {
     const blurs = [...code.matchAll(/blur\((\d+)px\)/gu)].map(match => Number(match[1]))
-    assert.deepEqual([...new Set(blurs)].sort((a, b) => a - b), [2, 24], '输入框 2px + 顶栏/右栏 24px')
+    assert.deepEqual([...new Set(blurs)].sort((a, b) => a - b), [16, 24], '输入框 16px + 顶栏/右栏 24px')
   })
 })
 
@@ -225,7 +226,7 @@ describe('glass: 地面层不变式', () => {
     assert.match(backdropCss, /\[data-side\]:not\(\[role='tooltip'\]\)[^}]*\{[^}]*z-index: 82/u)
     assert.match(backdropCss,
       /\[data-phase='active'\] \[data-composer-seat\] \{[^}]*background: transparent/u, '座位透明')
-    assert.ok(!/will-change:\s*auto/u.test(backdropCss), '不覆盖官方 will-change（官方用它稳定 blur 采样）')
+    assert.ok(/will-change:\s*auto/u.test(backdropCss), '覆盖官方 will-change：fixed 补缝带按视口算相位（0.2.1 方案）')
     assert.ok(code.includes('[data-composer-seat]::after'), '座位内补缝带保留')
   })
 })

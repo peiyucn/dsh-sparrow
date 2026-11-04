@@ -4,9 +4,9 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## [0.2.2-rc.1] - 2026-11-05
 
-- Fixes the occasional block flash over the input area while the session is thinking or streaming: the composer takes a light 2px blur with a slightly stronger veil, keeping its transparency and edge light (the flash scales with blur radius and is no longer visible at 2px in testing).
-- The composer seat only drops the official input mask and keeps the official compositing hint (will-change no longer overridden); the footer cover strips use explicit viewport positioning, blending with the page light instead of a dark bar.
-- Menus keep the official translucent material and open/close animations (no solid conversion, no blur removal, no animation disable), staying consistent with other menus.
+- The composer glass keeps the previous version's look (16px frost, 62% veil, edge light, transcript scrolling underneath); on dsh 0.2.2 an occasional block flash may appear over the input area while the session is thinking or streaming — a known limitation kept as-is in favour of the original look.
+- The composer seat only drops the official input mask and returns to the previous version's compositing conditions; the footer cover strips and docked-card gaps now blend with the page light instead of showing a dark bar.
+- Menus keep the official translucent material and open/close animations, staying consistent with other menus.
 - The right sidebar header is one continuous frosted bar again with the page content scrolling underneath it; the file page keeps its real header (path, reload and file actions) with the file tree no longer shifted down.
 - Keeps the previous version's behaviour: the transcript still scrolls under the composer glass, and the 1017 badge next to the model falls back to the legacy condition when the server listing provides no badge.
 - Now adapted to official dsh 0.2.2-rc.1 (web and desktop).

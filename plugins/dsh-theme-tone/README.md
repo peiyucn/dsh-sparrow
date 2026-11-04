@@ -47,6 +47,10 @@ The docked cards, model-picker group headings and the @ / slash suggestion list 
 
 ![Light theme on the new-session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png)
 
+## Known limitations
+
+* On dsh 0.2.2-rc.1 the composer glass may occasionally flash while the session is thinking or streaming (Chromium's backdrop sampling of continuously repainting transcript content); this version keeps the original look rather than working around it.
+
 ## Uninstall & leftovers
 
 * Uninstalling removes everything the plugin added; the settings row disappears and the look returns to the default one

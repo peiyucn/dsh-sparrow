@@ -47,6 +47,10 @@ dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone
 
 ![新建会话页的浅色主题](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png)
 
+## 已知限制
+
+* dsh 0.2.2-rc.1 下，思考 / 流式输出期间输入框玻璃上方可能偶发闪块（Chromium 对持续重绘正文的 backdrop 采样行为）；本版按原观感优先，未做规避。
+
 ## 卸载与残留
 
 * 卸载即移除插件加的一切；设置行消失，外观回到官方
