@@ -128,9 +128,9 @@ const STACK_GAP = 'var(--dsh-composer-stack-gap, 6px)'
 const DOCK_CARDS = `:is([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar])`
 
 /**
- * 座位内「地面原地重画」：与地面层同源的底色 + 地面光。座位保留官方 will-change: transform 后，
- * `background-attachment: fixed` 会被座位包含块改写相位，改用显式 `100vw 100vh` + 右下锚点
- * （座位底 = 视口底，纵向相位准确；横向以座位右缘为锚，右栏开合时会有一点水平偏差）。
+ * 座位内「地面原地重画」（0.2.1 最终形态）：与地面层同一张视口渐变（含 1 LSB 抖动层）。
+ * `background-attachment: fixed` 让定位区 = 视口 ⇒ 与 `.dsh-theme-tone` 地面层逐像素同源；
+ * 前提是 backdrop.ts 把 0.2.2 座位新增的 `will-change` 覆盖成 `auto`（0.2.1 的座位没有这条合成提示）。
  */
 function groundRepaint(): string {
   return `  background-color: var(--dsw-alias-bg-base);
