@@ -22,9 +22,11 @@ describe('backdrop: 地面光层', () => {
     assert.match(css, /ellipse 38vw 58vh at 0% -6vh/u)
   })
 
-  it('座位不再由地面层清背景（0.2.2 官方自带输入遮罩，读被本插件覆盖的 bg-base token）', () => {
-    assert.ok(!css.includes('[data-composer-seat]'), '地面层不碰座位背景')
-    assert.ok(!css.includes('background: transparent'), '不再清座位遮罩')
+  it('座位让位：清掉官方输入遮罩让底光透出，并撤销 will-change: transform（补缝相位回到视口）', () => {
+    const seat = /body:not\(\[[^\]]+\]\) \[data-phase='active'\] \[data-composer-seat\] \{([^}]*)\}/u.exec(css)?.[1] ?? ''
+    assert.ok(seat.includes('background: transparent'), '座位透明，让页面底光透出')
+    assert.ok(seat.includes('will-change: auto'), '撤销官方 will-change: transform，固定背景相位回到视口')
+    assert.ok(!seat.includes('background-image'), '不重绘座位的背景光')
   })
 
   it('固定全屏、z-index 在内容之下、深色轴 screen 混合', () => {

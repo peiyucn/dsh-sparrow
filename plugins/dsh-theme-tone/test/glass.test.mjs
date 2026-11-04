@@ -15,6 +15,7 @@ import {
   GLASS_BLUR,
   HEADER_HEIGHT_PX,
   PANEL_BAND_PX,
+  SEAT_BAND_PX,
   buildGlassCss,
 } from '../lib/glass.js'
 
@@ -26,6 +27,8 @@ const block = (pattern) => new RegExp(pattern, 'u').exec(code)?.[1] ?? ''
 const headerGlass = block(`\\[data-slot='conversation\\.header'\\] > header::before \\{([^}]*)\\}`)
 const composerCard = block(`\\[data-composer-card\\] \\{([^}]*)\\}`)
 const composerGlass = block(`\\[data-composer-card\\]::before \\{([^}]*)\\}`)
+const seatBand = block(`\\[data-composer-seat\\]::after \\{([^}]*)\\}`)
+const dockPatch = block(`\\[data-testid='todo-panel'\\], [^}]*?::after \\{([^}]*)\\}`)
 
 describe('glass: 参数常量', () => {
   it('顶栏 / 输入框的材质参数各自独立，不再共用一套', () => {
@@ -38,6 +41,7 @@ describe('glass: 参数常量', () => {
     assert.equal(COMPOSER_VEIL_PERCENT, 62, '输入框遮罩 62%')
     assert.equal(COMPOSER_VEIL_PERCENT_LIGHT, 60, '浅色轴遮罩 60%')
     assert.equal(COMPOSER_LIFT_PERCENT, 40, '暗色玻璃抬升面 40%')
+    assert.equal(SEAT_BAND_PX, 48, '座位底部补缝带 48px')
   })
 })
 
@@ -119,23 +123,37 @@ describe('glass: 输入框', () => {
   })
 })
 
-describe('glass: 输入框区（0.2.2 官方输入遮罩，不再补缝）', () => {
-  it('不再清座位背景、不再画地面重画补缝带', () => {
-    assert.ok(!code.includes('[data-composer-seat]'), '玻璃层不碰座位（官方输入遮罩负责底部渐隐/实心）')
-    assert.ok(!code.includes('background-attachment: fixed;'), '不再有固定背景补缝带')
-    assert.ok(!code.includes('repeating-conic-gradient'), '不再重画地面抖动层')
-    assert.ok(!code.includes('overflow: visible'), '不再放开停靠卡根裁剪（补缝层已移除）')
+describe('glass: 输入框区补缝（0.2.2 座位相位修正）', () => {
+  it('座位底部补缝带：48px、地面层原地重画、与视口同相位', () => {
+    assert.ok(seatBand.includes(`height: ${SEAT_BAND_PX}px`), '带高 48px')
+    assert.ok(seatBand.includes('background-color: var(--dsw-alias-bg-base)'), '先铺底色')
+    assert.ok(seatBand.includes('background-image: radial-gradient('), '重画地面打光，不是黑色实色条')
+    assert.ok(seatBand.includes('repeating-conic-gradient'), '带 1 LSB 抖动层，打散色带')
+    assert.ok(seatBand.includes('background-attachment: fixed'), 'fixed = 定位区视口，与地面层逐像素同源')
+    assert.ok(seatBand.includes('z-index: -1'), '补缝层在座位内、卡片材质之下')
   })
 
-  it('停靠卡材质仍由 surfaces 表统一改成不透明抬升面', () => {
-    const surfaces = readFileSync(new URL('../src/surfaces.ts', import.meta.url), 'utf8')
-    assert.ok(surfaces.includes("[data-composer-seat] [data-testid='todo-panel']"), '三张停靠卡锚点')
-    assert.ok(surfaces.includes('background: var(--dsw-alias-bg-layer-1) !important'), '不透明抬升面')
+  it('停靠卡缝隙 / 圆角缺口：统一用卡片 ::after 从卡面底下补，宽度不外扩', () => {
+    assert.ok(code.includes("[data-testid='todo-panel'], [data-queue-dock], [data-goal-bar]"), '三张停靠卡锚点')
+    assert.match(code, /:is\(\[data-testid='todo-panel'\], \[data-queue-dock\], \[data-goal-bar\]\)::after \{/u,
+      '补缝层统一挂在卡片 ::after 上')
+    assert.ok(dockPatch.includes('top: calc(100% - 20px)'), '向上藏进卡面圆角')
+    assert.ok(dockPatch.includes('height: calc(var(--dsh-composer-stack-gap, 6px) + 20px + 24px)'),
+      '向下盖满 stack 缝 + 24px')
+    assert.ok(dockPatch.includes('background-attachment: fixed'), '同样与地面层同源')
+    assert.ok(code.includes('overflow: visible'), '放开停靠卡根裁剪，补缝层才画得出来')
+    assert.ok(!code.includes('mask-position'), '不再用遮罩填 todo 圆角（曾把圆角削出缺口）')
   })
 
-  it('顶栏材质的金光仍按视口坐标画（两处 = 顶栏 + 右栏头行）', () => {
+  it('只有与地面层同源的两条补缝带允许 fixed 背景；相位依赖 backdrop 的座位 will-change 撤销', () => {
+    assert.equal((code.match(/background-attachment: fixed;/gu) ?? []).length, 2,
+      '座位底带 + 停靠卡补缝带各一处')
     assert.equal((code.match(/background-attachment: fixed, fixed/gu) ?? []).length, 2,
       '顶栏材质（两处 = 顶栏 + 右栏头行）的金光也按视口坐标画')
+    const backdrop = readFileSync(new URL('../src/backdrop.ts', import.meta.url), 'utf8')
+    assert.ok(backdrop.includes('will-change: auto'),
+      '座位 will-change 必须撤成 auto：否则 fixed 补缝相位按座位算，颜色与地面光对不上')
+    assert.ok(backdrop.includes('background: transparent'), '座位官方输入遮罩让位，页面底光透出')
   })
 })
 
@@ -150,16 +168,17 @@ describe('glass: 右栏', () => {
     assert.ok(!/(^|\n)\s*position:/u.test(pane), '不改 pane 定位')
   })
 
-  it('0.2.2 官方布局：头行在 dockkit 条下自然排列，不再做滚区上提 / 内容下移', () => {
+  it('0.2.2 官方布局：只挪「玻璃裁剪盒」，不挪正文（无滚区上提 / 内容下移）', () => {
     assert.ok(!code.includes('margin-top: -76px !important'), '旧版滚区上提已移除')
     assert.ok(!code.includes('margin-block-start: 78px !important'), '旧版轨道起点已移除')
     assert.ok(!code.includes('transform: translateY(76px)'), '旧版内容下移已移除')
-    assert.ok(!code.includes('margin-bottom: -38px'), '旧版负底距已移除')
-    assert.ok(!code.includes('padding-top: 38px'), '旧版标签体补白已移除')
+    assert.ok(code.includes('margin-bottom: -38px'), 'dockkit 条负底距把标签体上提（玻璃裁剪盒起点）')
+    assert.ok(code.includes('padding-top: 38px'), '标签体补回 38px 顶距（头行仍落在 38..76）')
+    assert.ok(code.includes("> *:last-child > [data-sidebar-right-tab]"),
+      '标签体补白只命中标签体（tabBody），不得命中 dockkit chip 标题')
     assert.ok(!code.includes("[data-files-state='tree']"),
       '文件树导航器（常驻目录树 aside）不再是文件页根，不得再被旧 lift 选择器命中')
     assert.ok(code.includes('[data-files-page] > *:first-child'), '文件页头行用 0.2.2 的新锚点')
-    assert.ok(!code.includes('margin-block-start: 78px'), '旧版右栏轨道起点已移除')
     assert.ok(!code.includes("[data-files-body]::-webkit-scrollbar-track"), '文件树不再单独摆轨道起点')
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
@@ -195,7 +214,7 @@ describe('glass: 规则门禁', () => {
 })
 
 describe('glass: 地面层不变式', () => {
-  it('地面层仍是唯一常驻绘制层，含 1 LSB 抖动层；座位输入遮罩交还官方', () => {
+  it('地面层仍是唯一常驻绘制层，含 1 LSB 抖动层；座位让位 + 相位依赖 will-change 撤销', () => {
     assert.ok(backdropCss.includes('position: fixed'))
     assert.ok(backdropCss.includes('repeating-conic-gradient'), '地面层带 1 LSB 抖动，压住 8-bit 色带')
     assert.ok(backdropCss.includes('background-size: 100% 100%, 100% 100%, 100% 100%, 2px 2px'))
@@ -203,9 +222,10 @@ describe('glass: 地面层不变式', () => {
     assert.ok(!backdropCss.includes('mix-blend-mode'))
     assert.match(backdropCss, /\[data-width-handle\][^}]*\{[^}]*z-index: 82/u)
     assert.match(backdropCss, /\[data-side\]:not\(\[role='tooltip'\]\)[^}]*\{[^}]*z-index: 82/u)
-    assert.ok(!backdropCss.includes('[data-composer-seat]'),
-      'dsh 0.2.2 座位自带输入遮罩（读被覆盖的 bg-base token），地面层不得再清/改座位背景')
-    assert.ok(!code.includes('[data-composer-seat]'), '玻璃层不碰座位（官方遮罩负责底部渐隐/实心）')
+    assert.match(backdropCss,
+      /\[data-phase='active'\] \[data-composer-seat\] \{[^}]*background: transparent[^}]*will-change: auto/u,
+      '座位清背景让底光透出，且撤掉 will-change: transform 让补缝 fixed 相位回到视口')
+    assert.ok(code.includes('[data-composer-seat]::after'), '玻璃层补缝带挂在座位上（见输入框区补缝）')
   })
 })
 
