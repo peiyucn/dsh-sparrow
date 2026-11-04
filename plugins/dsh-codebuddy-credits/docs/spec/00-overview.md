@@ -82,6 +82,10 @@ DSH 跑 agent 循环，CodeBuddy 只出模型。不做令牌逆向、不用它�
 `conversation.input.model.label` 是 single 槽：dsh 0.2.2 起官方 fallback 渲染「名称 + 目录角标 `model.badge`」
 （触发按钮角标在名称前、菜单/选项在后）。本插件接管后必须按官方位置保留该角标，语言文字经注入的
 `ctx.locale.resolveText` 解析、语言切换时重渲染；事实串只对本 provider 显示，且不显示在触发器上。
+目录角标缺失时，按旧版客户端包的条件回退显示蓝色 `1017`（`legacy-1017-badge.ts`：provider
+`deepseek-official` / `deepseek-account` + `deepseek-flash` + `DeepSeek-V4.1-Flash`）。原因是 0.2.2 删除了
+硬编码 1017 的官方客户端包、改为服务端 listing 下发，而 DeepSeek 官方列表当前不带 `client_metadata`；
+服务端一旦下发 `model.badge`，回退自动让位（不双标）。
 
 ### 窗口事件（2 个自定义事件）
 
@@ -243,6 +247,8 @@ host 投影 / 事件重放、Max 模式以设置节为真值。`test/structure.t
   `test/web-route.test.mjs` 用「受信 LAN 放行 / 未受信 LAN 403」钉住。
 - **模型行接管 single 槽**：`conversation.input.model.label` 只有一个贡献者，本插件注册 `priority: -1`
   稳定拿渲染权；因此必须按官方 fallback 保留目录角标 `model.badge`（dsh 0.2.2 起取代已删除的 1017 标包）。
+  目录角标缺失时按旧版条件回退显示 `1017`（display-only；服务端下发 badge 时让位）。若官方把 1017 改为
+  其他文案 / 其他模型，本回退静默不命中（退化为不显示，不崩）。
 - **正文指纹中和会插入不可见字符**（命中词内，可见文案不变）：这是为绕开上游未公开内容风控的主动取舍
   （owner 已知悉）；`@` 规则覆盖正文里所有 `@`（代码块除外），详见《上游渠道校验》的取舍说明。
   2026-10-29 上游开始归一化常见零宽字符，中和符已从 ZWSP 换为 CGJ；若 CGJ 也被归一化，正文层即失效

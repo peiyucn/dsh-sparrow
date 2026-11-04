@@ -15,6 +15,7 @@
 import { useSyncExternalStore } from 'react'
 import { Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import { PROVIDER_ID } from '../constants.js'
+import { LEGACY_1017_TEXT, showsLegacy1017Badge } from './legacy-1017-badge.js'
 import { getModelFacts, subscribeModelFacts } from './model-facts.js'
 import { formatModelFacts } from './format.js'
 import { CCB_CLASS } from './styles.js'
@@ -65,12 +66,16 @@ export function CodeBuddyModelLabel(props: CodeBuddyModelLabelProps): React.Reac
   const name = props.model?.name ?? ''
   if (name === '') return null
   const badge = props.model?.badge
-  const badgeText = badge === undefined
-    ? undefined
-    : (props.resolveText ?? fallbackText)(badge.text)
-  const tag = badge === undefined || badgeText === undefined
+  // 目录角标优先；0.2.2 起官方把 1017 从客户端硬编码改为服务端 listing 下发，而当前 DeepSeek
+  // 官方列表不带 client_metadata ⇒ 目录角标缺失时按旧版条件回退显示「1017」，保住用户可感知的
+  // 旧观感（见 legacy-1017-badge.ts；服务端一旦下发 badge 即自动让位）。
+  const badgeText = badge !== undefined
+    ? (props.resolveText ?? fallbackText)(badge.text)
+    : (showsLegacy1017Badge(providerId, modelId, name) ? LEGACY_1017_TEXT : undefined)
+  const badgeTone = badge === undefined ? 'info' as const : badge.tone
+  const tag = badgeText === undefined
     ? null
-    : <Tag tone={badge.tone}>{badgeText}</Tag>
+    : <Tag tone={badgeTone}>{badgeText}</Tag>
   // 官方 fallback：触发按钮把角标放在名称前，菜单 / 选项放在名称后。
   const badgeBeforeName = props.placement === 'trigger'
   const facts = providerId === PROVIDER_ID && props.placement !== 'trigger'
