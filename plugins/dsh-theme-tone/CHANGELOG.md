@@ -4,7 +4,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## [0.2.2-rc.1] - 2026-11-05
 
-- The footer cover strip behind the input area is back to a light-blended ground repaint instead of a flat black bar, and the right sidebar header is again one continuous frosted bar (not two); the file page keeps its real header (path, reload and file actions) with the file tree no longer shifted down.
+- The footer cover strip behind the input area is back to a light-blended ground repaint instead of a flat black bar; the right sidebar header is again one continuous frosted bar (not two) and the page content scrolls underneath it, so the blur and transparency match the conversation header; the file page keeps its real header (path, reload and file actions) with the file tree no longer shifted down.
 - Now adapted to official dsh 0.2.2-rc.1 (web and desktop).
 
 ## [0.2.1-rc.5] - 2026-10-30

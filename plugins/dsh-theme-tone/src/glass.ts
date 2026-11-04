@@ -154,6 +154,20 @@ const PANEL_HEADERS = [
   `${P} ${RP} [data-textpreview-state='text'] > [data-textpreview-meta-failed] + *`,
 ].join(',\n')
 
+/**
+ * 右栏 76px 下有「可流式滚动的正文」的标签：正文上提 76px，从两条带下滚过（磨砂玻璃才真的在糊东西，
+ * 与对话区顶栏同观感）。0.2.2 的文件页正文在常驻目录树 aside 里；预览里的目录树也带
+ * `[data-files-body]`，所以文件树选择器必须限定在文件页根 `[data-files-page]` 之下。
+ * `:has([data-code-preview])` 的预览体官方改成不滚动，排除掉避免内容被抬错位置。
+ */
+const LIFTED_SCROLLS = [
+  `${P} ${RP} [data-files-page] [data-files-body]`,
+  `${P} ${RP} [data-textpreview-state='text'] [data-textpreview-body]:not(:has([data-code-preview]))`,
+  `${P} ${RP} [data-textpreview-state='unsupported'] [data-textpreview-body]`,
+].join(',\n')
+/** 滚动条轨道规则要把伪元素加在每条选择器上（整串逗号列表末尾追加只命中最后一条）。 */
+const LIFTED_TRACKS = LIFTED_SCROLLS.split(',\n').map(selector => `${selector}::-webkit-scrollbar-track`).join(',\n')
+
 export function buildGlassCss(): string {
   return `/* ===== 对话区顶栏：浮层化 + 顶栏玻璃（材质见 surface 表 / barGlass） ===== */
 ${P} [data-phase='active'] { position: relative; }
@@ -295,6 +309,16 @@ ${PANEL_HEADERS.split(',\n').map(selector => `${selector}::before`).join(',\n')}
   pointer-events: none;
   border-radius: inherit;
 ${barGlass()}
+}
+/* 正文上提 76px 从两条带下滚过：滚动盒起点落到玻璃后面，内容用 76px 顶距留在带下（视觉位置不变），
+   滚动条轨道从 78px 起（76 + 2），不会伸到玻璃后面。margin-top + padding-top 的组合在 flex 尺寸下
+   box top = 带顶、box bottom = 面板底，滚动到底时最后一行仍能贴底。 */
+${LIFTED_TRACKS} {
+  margin-block-start: ${PANEL_BAND_PX * 2 + 2}px !important;
+}
+${LIFTED_SCROLLS} {
+  margin-top: -${PANEL_BAND_PX * 2}px !important;
+  padding-top: ${PANEL_BAND_PX * 2}px;
 }
 /* dockkit 条要压在头行的面上：否则条内标签 / 加号 / 关闭按钮被那层填充压暗。 */
 ${P} [${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-strip] {
