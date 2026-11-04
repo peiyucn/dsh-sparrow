@@ -43,7 +43,7 @@ function viewportLight(position: string, size = '100vw 100vh'): string {
 
 /**
  * 暗色玻璃材质：底色 + 抬升面按比例混成深色膜，再按遮罩浓度半透明铺开，配低饱和模糊。
- * 输入框、对话顶栏、右栏两条带共用同一套填充与遮罩。
+ * 输入框专用（顶栏 / 右栏两条带走 barGlass）。
  */
 function darkGlassFilm(): string {
   return `  background-color: color-mix(in srgb,
