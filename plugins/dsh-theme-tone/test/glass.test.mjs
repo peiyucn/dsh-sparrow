@@ -163,21 +163,17 @@ describe('glass: 右栏', () => {
     assert.ok(!/(^|\n)\s*position:/u.test(pane), '不改 pane 定位')
   })
 
-  it('正文上提 76px 从两条带下滚过，滚动条轨道从顶栏下沿开始', () => {
-    assert.ok(code.includes('html ') && code.includes('margin-top: -76px !important'),
-      '滚区上提 76px（需更高特异性压过官方轨道规则）')
-    assert.ok(code.includes('margin-block-start: 78px !important'), '轨道起点 = 76 + 2')
-    for (const part of [
-      "[data-document-preview$='/markdown'] [data-textpreview-body]::-webkit-scrollbar-track",
-      "[data-document-preview$='/text'] [data-textpreview-body]::-webkit-scrollbar-track",
-      '[data-files-body]::-webkit-scrollbar-track',
-    ]) {
-      assert.ok(code.includes(part), `轨道规则覆盖：${part}`)
-    }
-    assert.ok(code.includes('transform: translateY(76px)'), '内容下移 76px（视觉位置不变）')
-    assert.ok(code.includes('margin-bottom: -38px'), '头部在流内占的高度还回去')
-    assert.ok(code.includes('padding-top: 38px'), '标签体补回 38px')
-    assert.ok(code.includes('[data-files-body] > *'), '文件树正文下移')
+  it('0.2.2 官方布局：头行在 dockkit 条下自然排列，不再做滚区上提 / 内容下移', () => {
+    assert.ok(!code.includes('margin-top: -76px !important'), '旧版滚区上提已移除')
+    assert.ok(!code.includes('margin-block-start: 78px !important'), '旧版轨道起点已移除')
+    assert.ok(!code.includes('transform: translateY(76px)'), '旧版内容下移已移除')
+    assert.ok(!code.includes('margin-bottom: -38px'), '旧版负底距已移除')
+    assert.ok(!code.includes('padding-top: 38px'), '旧版标签体补白已移除')
+    assert.ok(!code.includes("[data-files-state='tree']"),
+      '文件树导航器（常驻目录树 aside）不再是文件页根，不得再被旧 lift 选择器命中')
+    assert.ok(code.includes('[data-files-page] > *:first-child'), '文件页头行用 0.2.2 的新锚点')
+    assert.ok(!code.includes('margin-block-start: 78px'), '旧版右栏轨道起点已移除')
+    assert.ok(!code.includes("[data-files-body]::-webkit-scrollbar-track"), '文件树不再单独摆轨道起点')
     assert.match(code, /\[data-dockkit-strip\] \{[^}]*z-index: 3/u)
   })
 

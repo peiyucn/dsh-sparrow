@@ -145,20 +145,9 @@ function groundRepaint(): string {
 }
 
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
-/** 右栏顶栏总高（dockkit 条 + 标签自己的头行），两条 38px 带。 */
-const PANEL_HEAD_PX = PANEL_BAND_PX * 2
-/** 右栏 76px 下有「可流式滚动的正文」的标签：只有它们上提滚区，正文才会真的从两条带下滚过。 */
-const LIFTED_SCROLLS = [
-  `${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body]`,
-  `${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body]`,
-  `${P} ${RP} [data-files-state='tree'] [data-files-body]`,
-].join(',\n')
-/** 滚动条轨道规则要把伪元素加在**每条选择器**上（整串逗号列表末尾追加只会命中最后一条）。 */
-const LIFTED_TRACKS = LIFTED_SCROLLS.split(',\n').map(selector => `${selector}::-webkit-scrollbar-track`).join(',\n')
-
 /** 各标签自己的 38px 头行（玻璃面挂在它们的 ::before 上，向上铺满 0..76）。 */
 const PANEL_HEADERS = [
-  `${P} ${RP} [data-files-state='tree'] > *:first-child`,
+  `${P} ${RP} [data-files-page] > *:first-child`,
   `${P} ${RP} [data-textpreview-state='unsupported'] > *:first-child`,
   `${P} ${RP} [data-textpreview-state='text'] > *:first-child:not([data-textpreview-changed]):not([data-textpreview-meta-failed])`,
   `${P} ${RP} [data-textpreview-state='text'] > [data-textpreview-changed] + *`,
@@ -276,35 +265,10 @@ ${P} ${RP} {
 ${viewportLight('100% 0')}
 }
 
-/* 与主对话区一致：正文从顶栏下滚（顶栏玻璃才有内容可糊），滚动条从顶栏下沿开始。
-   做法：把可流式滚动的正文上提「顶栏总高」，内容再下移同样的量（只改视觉位置），顶栏在流内占的
-   高度用负底距还回去，滚动条轨道再让回「顶栏总高 + 2px」。
-   顺序很重要：轨道规则放在「上提」之前 —— Chromium 里轨道伪元素的 margin 会参与元素自身 margin
-   的竞争，轨道规则带 !important（必须压过官方的 .body 模块规则），靠后用 html 提特异性让上提仍然赢。 */
-${LIFTED_TRACKS} {
-  margin-block-start: ${PANEL_HEAD_PX + 2}px !important;
-}
-html ${LIFTED_SCROLLS} {
-  margin-top: -${PANEL_HEAD_PX}px !important;
-}
-${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body] > * > *,
-${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body] > * > *,
-${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body] > [data-document-loading],
-${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body] > [data-textpreview-failed],
-${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/markdown'] [data-textpreview-body] > [data-textpreview-more],
-${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body] > [data-document-loading],
-${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body] > [data-textpreview-failed],
-${P} ${RP} [data-textpreview-state='text'][data-document-preview$='/text'] [data-textpreview-body] > [data-textpreview-more],
-${P} ${RP} [data-files-state='tree'] [data-files-body] > * {
-  transform: translateY(${PANEL_HEAD_PX}px);
-}
-${P} ${RP} > *:first-child {
-  margin-bottom: -${PANEL_BAND_PX}px;
-}
-${P} ${RP} > *:last-child > [data-sidebar-right-tab] {
-  padding-top: ${PANEL_BAND_PX}px;
-  box-sizing: border-box;
-}
+/* dsh 0.2.2 起右栏官方布局已是「dockkit tab 条（38） + 标签自己的头行（38） + 正文」上下相邻排列，
+  旧版「滚区上提 76 / 内容下移 76 / 负底距 / 轨道起点 78」的 lift hack 不再需要，且其选择器
+  会误命中文件树导航器（[data-files-state='tree'] 现在是常驻目录树 aside 而非文件页根），
+   把头行盖住、正文整体下移。这里只保留「头行玻璃面 + dockkit 条层序」，正文交给官方布局。 */
 
 /* 每条带的玻璃面：挂在各标签自己的 38px 头行上，向上铺满 0..76（两个面盒子重合，y=38 不出缝）；
    top 用负 38px、bottom 用 0（止于内边距盒底）—— 写死 76px 会把官方头行的 1px 下边框一起洗掉。 */
