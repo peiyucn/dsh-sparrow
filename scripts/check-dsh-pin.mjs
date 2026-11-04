@@ -101,12 +101,12 @@ if (overrides.length === 0) fail('判据 3 失败：pnpm-workspace.yaml 的 over
 // 「环境要求行」= 一行同时提到 `dsh`（词边界、大小写不敏感）且含精确 semver。两处不能放宽：
 // ① 真值不唯一时**不跳过**判据 4，改为逐份报告所有不一致的版本串（否则最该全量报警的场景反而静默）；
 // ② **按行核要求行本身**，不用全文 `includes(truth)`（否则文件别处出现真值就能让写错的要求行照样绿）。
+const readmes = [
+  'README.md',
+  'README.zh-CN.md',
+  ...plugins.flatMap(name => [`plugins/${name}/README.md`, `plugins/${name}/README.zh-CN.md`]),
+]
 {
-  const readmes = [
-    'README.md',
-    'README.zh-CN.md',
-    ...plugins.flatMap(name => [`plugins/${name}/README.md`, `plugins/${name}/README.zh-CN.md`]),
-  ]
   const SEMVER_ANY = /\b\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?/gu
 
   for (const rel of readmes) {
@@ -181,7 +181,7 @@ if (violations.length > 0) {
   console.error('\n修法：')
   console.error('  · 跟版时把真值**一次性**改遍：plugins/*/package.json 的 peer + devDependencies')
   console.error('  · pnpm-workspace.yaml 的 overrides 闭包 + minimumReleaseAgeExclude → 再 pnpm install 重算 lockfile')
-  console.error('  · 12 份 README 的环境要求行（根 + 每个活跃插件，中英双份）')
+  console.error('  · README 环境要求行（根 README 中英各 1 行 + 每个活跃插件中英各 1 行；当前 4 个插件 = 10 份文件）')
   console.error('  · 已删除的退役插件不在仓库内；RETIRED_PLUGINS 名单保持为空')
   process.exit(1)
 }
@@ -189,5 +189,5 @@ if (violations.length > 0) {
 const declarations = [...declared.values()].reduce((n, places) => n + places.length, 0)
 console.error(
   `check-dsh-pin: ✅ ${plugins.length} 个活跃插件的官方 dsh pin 一致为 "${truth}"`
-  + `（声明 ${declarations} 处 / overrides ${overrides.length} 条 / 发布年龄放行 ${releaseAgeExclude.length} 条 / README 12 份）`,
+  + `（声明 ${declarations} 处 / overrides ${overrides.length} 条 / 发布年龄放行 ${releaseAgeExclude.length} 条 / README ${readmes.length} 份）`,
 )

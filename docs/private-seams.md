@@ -5,10 +5,11 @@
 > `src/handle-glow.ts`（拖拽条光带跟随）、`src/sweep.ts`（扫光带）、`src/caption.ts`（桌面标题栏 overlay）、
 > `src/surface.ts`（浮层光层与悬停卡字色）、`src/anchors.ts`（运行期锚点扫描）、`src/phase.ts`（视口相位测量）
 > 均已删除。当前 theme-tone 只剩**一处**私有 seam：左边栏 Workspace hover 卡的牌面修复（2026-10-27 新增）
-> —— portal 卡用 `body > [role="button"][aria-label]` 定位，字色按官方 CSS-module 类名后缀
-> （`_hoverTitle` / `_hoverPath` / `_hoverTime` / `_hoverStatus` / `_copied`）命中；官方改后缀即静默失效
-> （回退成官方写死的白系字，不崩）。其余仍只用 `ctx.theme` 的 token 覆盖通道与官方公开 data 属性。
-> 下文涉及 theme-tone 的 §A/§B/§C/§D 条目保留为历史记录，不再对应当前代码。
+> —— dsh 0.2.2 起 HoverCard 先挂一个 `display: contents` 的 portal 包装节点再 portal 卡（卡不再是 body
+> 直接子节点），锚点改为 `body > [class*='_portal'] [role="button"][aria-label]`；字色按官方 CSS-module
+> 类名后缀（`_hoverTitle` / `_hoverPath` / `_hoverTime` / `_hoverStatus` / `_copied`）命中；官方改包装或改后缀
+> 即静默失效（回退成官方写死的白系字，不崩）。其余仍只用 `ctx.theme` 的 token 覆盖通道与官方公开 data 属性。
+> 下文涉及 theme-tone 的旧条目保留为历史记录，不再对应当前代码。
 
 > 本文件**只登记"欠官方的债"**——需要 owner 认可的例外。三类：
 > **A 私有 seam**（官方无公开能力）、**B 刻意改官方默认外观**、**C 无门可拦的静默失效风险**。
@@ -21,11 +22,9 @@
 > （方法与口径见 [`docs/upstream/0.2.0-rc.1.md`](upstream/0.2.0-rc.1.md) §4.1）。
 > 理由：手工清单已证会漂——0.2.0-rc.1 审计时发现它漏列了三处一直在用的锚点。
 >
-> 最近一次核对：dsh `0.2.1-rc.2`（2026-10-17），本文件点名的例外逐条验存续。
-> 复核要点：`webRuntime` 服务在 rc.2 已不存在（4 个 trust.ts 改用 `webStartup` + `webServer.host`，不属本文件条目）；
-> `ui-model-selection` 在 rc.2 给模型名加了 `data-provider-id` / `data-model-id` 包装并新增 label 子槽，
-> 但 `role='menu'` 的承载元素与 `MenuGroup` 的直接子结构**均未变** ⇒ §D 旁注的两条腿仍各自命中。
-> ⚠️ rc.2 这一版**不是零回归**：`ConfigFormSnapshot.mode` 被删除，theme-tone 的「设置不可写」提示踩中，已修。
+> 最近一次跟版复核：dsh `0.2.2-rc.1`（2026-11-05）。本次复核了 theme-tone 悬停卡锚点（HoverCard 改为
+> portal 包装节点）与 theme-tone 的 token 删除（`--dsw-specific-sidebar-nav-item-hover` 在 0.2.2 移除）；
+> 其余条目的“存续”以各插件源码为准，证据与边界见 [`docs/upstream/0.2.2-rc.1.md`](upstream/0.2.2-rc.1.md)。
 
 ---
 
@@ -135,7 +134,7 @@
 ## D. 静默失效风险（官方改名 / 改行为即失效，没有任何门能拦）
 
 * **`dsh-theme-tone`** —— 仓库规矩是「不依赖 hashed CSS-module 类名」，以下四处**例外**，
-  且测试**抓不到官方重命名后缀**：  1. **悬停卡字色**（`HOVER_CARD_TEXT_TOKENS`，`src/constants.ts`）：`[class*='_hoverTitle'|'_hoverPath'|'_hoverTime'|'_hoverStatus']`
+  且测试**抓不到官方重命名后缀**：  1. **悬停卡字色**（`src/surfaces.ts` 的 `TITLE` / `SECONDARY` / `TERTIARY` / `COPIED`）：`body > [class*='_portal'] [role='button'][aria-label] [class*='_hoverTitle'|'_hoverPath'|'_hoverTime'|'_hoverStatus'|'_copied']`（0.2.2 起多一层 portal 包装节点）
   2. **扫光带**（`SWEEP_ANCHORS`，`src/sweep.ts`）：`[class*='_row']::after` —— **已收窄**：必须同时带
      `data-variant` / `data-tool` 才命中（`test/sweep.test.mjs` 钉住不得回退）
   3. **弹窗遮罩**（`MASK_SELECTOR`，`src/mask.ts`）：`[class*='_mask']`（官方三个遮罩 `Modal` /
