@@ -4,6 +4,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## [0.2.2-rc.1] - 2026-11-05
 
+- The input area now follows dsh 0.2.2's own footer mask, and the right sidebar's file page keeps its real header (path, reload and file actions) with the file tree no longer shifted down; the old custom cover strips are gone because they picked up the wrong colors under the new layout.
 - Now adapted to official dsh 0.2.2-rc.1 (web and desktop).
 
 ## [0.2.1-rc.5] - 2026-10-30

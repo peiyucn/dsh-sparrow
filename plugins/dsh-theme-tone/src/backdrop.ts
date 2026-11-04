@@ -65,11 +65,10 @@ export function buildBackdropCss(): string {
   background-repeat: ${BACKDROP_REPEAT};
 }
 .${BACKDROP_CLASS}[hidden] { display: none; }
-/* 官方座位（composerSeat）默认铺一块 bg-base 渐隐板，会在对话底部形成一大块实色背景。
-   这里直接清掉它：不保留黑块，也不再重绘 / 补光；页面底光从透明的座位后自然透出。 */
-body:not([${PLAIN_ATTR}]) [data-phase='active'] [data-composer-seat] {
-  background: transparent;
-}
+/* dsh 0.2.2 起官方座位（composerSeat）自带「输入遮罩」：顶部 36px 渐隐带 + 下方实心 bg-base，
+   且座位有 will-change: transform（固定定位后代的包含块）。本插件不再清它的背景、也不再自己补缝——
+   让官方遮罩正常生效（它读的就是被本插件覆盖的 bg-base token，天然跟色调一致）。
+   旧版「座位透明 + 地面重画补缝」在 0.2.2 会失效并产生颜色不对的遮挡条（固定背景相位被座位包含块改写）。 */
 body:not([${PLAIN_ATTR}]) [${CONTENT_ATTR}] { position: relative; z-index: ${CONTENT_Z_INDEX}; }
 body:not([${PLAIN_ATTR}]) [${RIGHT_PANEL_ATTR}],
 body:not([${PLAIN_ATTR}]) [${SHELL_OVERLAY_ATTR}] { z-index: ${ABOVE_CONTENT_Z_INDEX}; }

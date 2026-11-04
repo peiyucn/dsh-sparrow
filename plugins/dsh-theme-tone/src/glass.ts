@@ -3,7 +3,7 @@ import {
   PLAIN_ATTR,
   RIGHT_PANEL_ATTR,
 } from './constants.js'
-import { BACKDROP_GRADIENTS, DITHER_SIZE, DITHER_TILE } from './backdrop.js'
+import { BACKDROP_GRADIENTS } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
 /** 输入框的背景模糊：低饱和、略提亮，保留磨砂感又不把背后的正文糊成色块。 */
@@ -118,31 +118,7 @@ function composerMaterial(): string {
     ${composerEdgeWash(0.08)};`
 }
 
-/**
- * 座位底部「地面重画带」高度：原先取 60（输入框下沿圆角 28 + 距座位底 30 = 58，再留 2px）。
- * 现在收窄到 48：带顶落在输入框工具行背后仍能盖住漏出的正文，又不会遮住输入框底部的悬浮阴影。
- */
-export const SEAT_BAND_PX = 48
-/** 官方 composerStack 的堆栈缝（读官方参数，回落当前官方值）。 */
-const STACK_GAP = 'var(--dsh-composer-stack-gap, 6px)'
-/** 停靠卡（todo / goal / queue）的官方锚点；没有类名可依赖，只用语义 data 属性。 */
-const DOCK_CARDS = `:is([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar])`
-
 const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
-
-/**
- * 停靠卡缝隙 / 圆角缺口 / 座位底部的「地面原地重画」：与地面层同一张视口渐变（含 1 LSB 抖动层）。
- * `background-attachment: fixed` 让背景定位区 = 视口 ⇒ 与 `.dsh-theme-tone` 地面层逐像素同源，
- * 右栏开合导致正文列变窄时也不会出现横向相位差（那会在窗口底部显出颜色略异的长方条）。
- * 该写法只挂在座位内的静态补缝层上（座位 sticky 在视口底部、滚动时自身不动），不是逐消息行。
- */
-function groundRepaint(): string {
-  return `  background-color: var(--dsw-alias-bg-base);
-  background-image: ${BACKDROP_GRADIENTS}, ${DITHER_TILE};
-  background-size: auto, auto, auto, ${DITHER_SIZE};
-  background-attachment: fixed;
-  background-repeat: no-repeat, no-repeat, no-repeat, repeat;`
-}
 
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
 /** 各标签自己的 38px 头行（玻璃面挂在它们的 ::before 上，向上铺满 0..76）。 */
@@ -216,48 +192,10 @@ body:not([${PLAIN_ATTR}]):not([data-ds-dark-theme]) [data-composer-card]::before
     ${composerEdgeWash(0.12)};
 }
 
-/* ===== 输入框区漏字补缝：地面原地重画 =====
-   座位透明（页面底光真实透出）后，座位里的空白区会漏出滚动的正文。这些区域本来就该是背景，
-   所以画一层与地面逐像素同源的「底色 + 打光」——看起来就是背景本身，不改任何官方材质 / 几何：
-   ① 输入框下沿：卡片底部圆角缺口 + 下方统计胶囊行（座位底部一条带）；
-   ② 停靠卡下方的 stack 缝与卡底圆角缺口：todo / goal / queue 各自补。 */
-
-/* ① 座位底部一条带：带顶落在输入框工具行背后，玻璃下沿不出现可辨分界，带内正文全部盖住。
-   这条与地面层**逐像素同源**：background-attachment: fixed 让背景定位区 = 视口，三张渐变
-   与地面层（.dsh-theme-tone 也是视口坐标）完全同相位；若按元素自身右边对齐（旧写法），
-   右栏打开、正文列变窄时横向相位会偏，窗口底部会看出一条颜色略不同的长方条。 */
-${P} [data-phase='active'] [data-composer-seat]::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: ${SEAT_BAND_PX}px;
-  z-index: -1;
-  pointer-events: none;
-${groundRepaint()}
-}
-
-/* ② 停靠卡（todo / goal / queue）：材质在 surfaces 表里统一改成不透明抬升面（见 buildSurfaceCss），
-   这里只负责补缝。卡根不建层叠上下文：补缝层用 z-index:-1 落到座位层叠上下文的负层，才在卡面材质
-   之下、滚动正文之上 —— 圆角缺口由补缝层从卡面**底下**补齐，不会像遮罩那样把圆角压出缺口。
-   补缝层宽度 = 卡根宽度（等于或大于正文列宽），不再向两侧外扩，避免撑出水平滚动条；
-   卡根官方用 overflow:hidden 裁圆角材质，补缝层会被一起裁掉，故放开。 */
-${P} [data-phase='active'] [data-composer-seat] ${DOCK_CARDS} {
-  position: relative;
-  overflow: visible;
-}
-${P} [data-phase='active'] [data-composer-seat] ${DOCK_CARDS}::after {
-  content: '';
-  position: absolute;
-  top: calc(100% - 20px);
-  left: 0;
-  right: 0;
-  height: calc(${STACK_GAP} + 20px + 24px);
-  z-index: -1;
-  pointer-events: none;
-${groundRepaint()}
-}
+/* dsh 0.2.2 起官方座位（composerSeat）自带输入遮罩（顶部 36px 渐隐带 + 下方实心 bg-base），
+   且座位有 will-change: transform ⇒ 座位成为固定定位/固定背景后代的包含块。旧版「座位透明 + 地面重画
+   补缝带」在这套结构下会算错相位、显示成颜色不对的遮挡条；官方遮罩本身读的是被本插件覆盖的 bg-base
+   token，天然跟色调一致，因此这里不再补缝、也不再清座位背景。 */
 
 /* ===== 右边栏：底色 + 打光（玻璃面不挂 pane 本体，避免采样到自己的子内容） ===== */
 ${P} ${RP} {
