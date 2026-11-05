@@ -5,9 +5,8 @@ See [简体中文](./CHANGELOG.zh-CN.md).
 
 ## [0.2.2-rc.1] - 2026-11-05
 
-- The blue "1017" badge beside DeepSeek-V4.1-Flash is back: dsh 0.2.2 removed the official client-side badge but the model listing does not provide one yet, so the plugin falls back to the same badge it used to mirror (the catalog badge takes over automatically once the server supplies it).
-- Now adapted to official dsh 0.2.2-rc.1 (web and desktop).
-- Model badges in the model picker now use the official catalog badge when the model listing provides one: the model name is shown with dsh's own badge (before the name in the trigger, after it in menus), using your interface language.
+- Restored the blue "1017" badge beside DeepSeek-V4.1-Flash (it yields automatically once the server provides a catalog badge).
+- Adapted to official dsh 0.2.2-rc.1 (web and desktop).
 
 ## [0.2.1-rc.5] - 2026-10-30
 

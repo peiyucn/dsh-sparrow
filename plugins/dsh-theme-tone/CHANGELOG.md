@@ -4,12 +4,8 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 ## [0.2.2-rc.1] - 2026-11-05
 
-- The composer glass keeps the previous version's look (16px frost, 62% veil, edge light, transcript scrolling underneath); inside the VS Code built-in browser (Electron webview, older Chromium) an occasional block flash may appear over the input area while the session is thinking or streaming, while external Edge / Chrome is unaffected — a webview limitation kept as-is in favour of the original look.
-- The composer seat only drops the official input mask and returns to the previous version's compositing conditions; the footer cover strips and docked-card gaps now blend with the page light instead of showing a dark bar.
-- Menus keep the official translucent material and open/close animations, staying consistent with other menus.
-- The right sidebar header is one continuous frosted bar again with the page content scrolling underneath it; the file page keeps its real header (path, reload and file actions) with the file tree no longer shifted down.
-- Keeps the previous version's behaviour: the transcript still scrolls under the composer glass, and the 1017 badge next to the model falls back to the legacy condition when the server listing provides no badge.
-- Now adapted to official dsh 0.2.2-rc.1 (web and desktop).
+- Adapted to official dsh 0.2.2-rc.1 (web and desktop): no new features; the look stays as before (composer frosted glass, transcript scrolling underneath, footer cover strips blending with the page light, one continuous right-sidebar header).
+- Known limitation: inside the VS Code built-in browser (Electron webview, older Chromium) the composer may occasionally flash while the session is thinking or streaming; external Edge / Chrome is unaffected.
 
 ## [0.2.1-rc.5] - 2026-10-30
 
