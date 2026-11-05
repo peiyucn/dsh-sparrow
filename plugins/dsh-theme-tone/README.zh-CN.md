@@ -49,7 +49,7 @@ dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone
 
 ## 已知限制
 
-* 在 **VS Code 内置浏览器（Simple Browser / Electron webview，Chromium 内核较旧）** 里，思考 / 流式输出期间输入框玻璃上方可能偶发闪块；**外部 Edge / Chrome 无此问题**。这是 webview 合成器的已知限制，本版按原观感优先，未做规避。
+* 在 **VS Code 内置浏览器（Simple Browser / Electron webview，Chromium 内核较旧）** 里，**思考 / 流式输出期间同时打开菜单**（模型 / 权限 / FIM 列表）时，输入框上方可能偶发闪块；**外部 Edge / Chrome 无此问题**。这是 webview 合成器的已知限制，本版按原观感优先，未做规避。
 
 ## 卸载与残留
 

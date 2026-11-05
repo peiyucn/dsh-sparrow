@@ -5,7 +5,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 ## [0.2.2-rc.1] - 2026-11-05
 
 - Adapted to official dsh 0.2.2-rc.1 (web and desktop): no new features; the look stays as before (composer frosted glass, transcript scrolling underneath, footer cover strips blending with the page light, one continuous right-sidebar header).
-- Known limitation: inside the VS Code built-in browser (Electron webview, older Chromium) the composer may occasionally flash while the session is thinking or streaming; external Edge / Chrome is unaffected.
+- Known limitation: inside the VS Code built-in browser (Electron webview, older Chromium) the composer may occasionally flash while the session is thinking or streaming **with a menu open** (model / permission / FIM list); external Edge / Chrome is unaffected.
 
 ## [0.2.1-rc.5] - 2026-10-30
 

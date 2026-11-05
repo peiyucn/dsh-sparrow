@@ -49,7 +49,7 @@ The docked cards, model-picker group headings and the @ / slash suggestion list 
 
 ## Known limitations
 
-* Inside the **VS Code built-in browser (Simple Browser / Electron webview, older Chromium)**, the composer glass may occasionally flash while the session is thinking or streaming; **external Edge / Chrome does not show this**. It is a webview compositing limitation, and this version keeps the original look rather than working around it.
+* Inside the **VS Code built-in browser (Simple Browser / Electron webview, older Chromium)**, the composer may occasionally flash while the session is thinking or streaming **with a menu open** (model / permission / FIM list); **external Edge / Chrome does not show this**. It is a webview compositing limitation, and this version keeps the original look rather than working around it.
 
 ## Uninstall & leftovers
 

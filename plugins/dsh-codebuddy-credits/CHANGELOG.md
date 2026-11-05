@@ -5,8 +5,7 @@ See [简体中文](./CHANGELOG.zh-CN.md).
 
 ## [0.2.2-rc.1] - 2026-11-05
 
-- Restored the blue "1017" badge beside DeepSeek-V4.1-Flash (it yields automatically once the server provides a catalog badge).
-- Adapted to official dsh 0.2.2-rc.1 (web and desktop).
+- Adapted to official dsh 0.2.2-rc.1 (web and desktop); no user-perceivable changes.
 
 ## [0.2.1-rc.5] - 2026-10-30
 
