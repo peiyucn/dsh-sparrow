@@ -22,6 +22,9 @@ export interface DeskNote {
   readonly color: NoteColor
   readonly pinned: boolean
   readonly archived: boolean
+  /** 便签墙自由位置（px，相对墙面画布）；缺省时界面按序号级联摆放。 */
+  readonly x?: number
+  readonly y?: number
   readonly createdAt: string
   readonly updatedAt: string
   readonly revision: number
@@ -53,6 +56,8 @@ export interface CreateNoteRequest {
   readonly title?: string
   readonly body?: string
   readonly color?: string
+  readonly x?: number
+  readonly y?: number
 }
 
 export interface NotePatchRequest {
@@ -61,6 +66,8 @@ export interface NotePatchRequest {
   readonly color?: string
   readonly pinned?: boolean
   readonly archived?: boolean
+  readonly x?: number
+  readonly y?: number
 }
 
 export interface UpdateNoteRequest {

@@ -30,12 +30,11 @@ describe('desk 对象模型：入参归一化', () => {
     assert.equal(input.color, 'default')
   })
 
-  it('标题与正文都为空 应该 拒绝（INVALID_NOTE）', () => {
-    assert.throws(() => normalizeNoteInput({ title: '  ', body: ' ' }), (error) => {
-      assert.ok(error instanceof DeskModelError)
-      assert.equal(error.code, 'INVALID_NOTE')
-      return true
-    })
+  it('标题与正文都为空 应该 允许（便签墙先「+」再打字）', () => {
+    const input = normalizeNoteInput({})
+    assert.equal(input.title, '')
+    assert.equal(input.body, '')
+    assert.equal(input.color, 'default')
   })
 
   it('未知颜色 应该 拒绝', () => {
@@ -92,11 +91,22 @@ describe('desk 对象模型：创建与补丁', () => {
     )
   })
 
-  it('补丁把标题清空 应该 拒绝', () => {
-    assert.throws(
-      () => patchNoteRecord(note(), { title: '   ' }, { expectedRevision: 1, now: 'now' }),
-      /标题不能为空/u,
-    )
+  it('补丁改正文 应该 让 title 跟随正文首行（便签墙只展示正文）', () => {
+    const next = patchNoteRecord(note({ title: '', body: '' }), { body: '第一行\n第二行' }, {
+      expectedRevision: 1,
+      now: '2026-01-02T00:00:00.000Z',
+    })
+    assert.equal(next.body, '第一行\n第二行')
+    assert.equal(next.title, '第一行')
+  })
+
+  it('补丁可以保存便签墙坐标（取整，非法值忽略）', () => {
+    const next = patchNoteRecord(note(), { x: 120.6, y: -5 }, {
+      expectedRevision: 1,
+      now: '2026-01-02T00:00:00.000Z',
+    })
+    assert.equal(next.x, 121)
+    assert.equal(next.y, undefined, '负数坐标按非法值忽略')
   })
 
   it('补丁的 pinned 非布尔 应该 拒绝', () => {

@@ -2,13 +2,13 @@
 
 English | [简体中文](README.zh-CN.md)
 
-A personal desk inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. S0 ships the skeleton and the notes wall; tasks, boards and calendars land in later versions on the same model.
+A personal desk inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. S0 ships the skeleton and the notes wall — a sticky wall you fill with "＋", drag around and write on directly.
 
 ## What it is
 
-* One left-sidebar entry named **Desk**; the panel hosts tabs instead of scattering features across the UI.
-* The **Today** tab is the hub: it is where notes, tasks and calendar events will be aggregated and linked.
-* The **Notes** tab is the first shipped feature: create, edit, pin, color, search and delete notes.
+* One left-sidebar entry named **Desk**; functions live in tabs inside the panel instead of scattering across the UI.
+* **Today** is the main tab and the future aggregation hub for tasks and calendar events.
+* **Notes** is the first shipped feature: a free-form sticky wall, not an input form.
 
 ## Requirements
 
@@ -24,22 +24,23 @@ A personal desk inside the DSH web UI: one sidebar entry, one panel, and one sha
 
 ## Use
 
-* Switch between **Today** and **Notes** with the tab bar at the top of the panel.
-* In **Notes**, type a title or a body and press **Save**; an empty title falls back to the first body line.
-* Hover a note card to reveal **Pin**, **Edit** and **Delete**; **Delete** asks for a second click on the same card.
-* Use the search box to filter notes by a case-insensitive keyword over title and body.
+* In **Notes**, tap the floating **＋** at the bottom right; a fresh sticky appears and takes the keyboard focus.
+* Type straight onto the sticky; leaving it saves the text, and an emptied sticky is removed instead of kept as clutter.
+* Drag a sticky by its body to place it anywhere on the wall; positions are saved per note.
+* Hover a sticky to reveal its color dots and the **×** delete button.
+* Use the **Today** tab for the summary; it becomes the hub once tasks and calendars land.
 
 ## Data and privacy
 
 * Notes live in a DSH storage domain (`desk_one`) managed by the official storage service; nothing leaves the machine.
 * The panel talks to the plugin's own host routes under `/api/desk-one`; the client never touches storage directly.
-* Agent tools (`desk_note_*`) read and write the same notes, so the model and the panel always see one dataset.
+* Agent tools (`desk_note_*`) read and write the same notes, so the model and the wall always see one dataset.
 
 ## Known limitations
 
-* S0 only implements notes; tasks, boards, focus sessions and calendars are planned in the repository spec.
+* S0 implements notes only; tasks, boards, focus sessions and calendars are planned in the repository spec.
 * Notes are not synced to any external service yet; Outlook and WeCom calendar sync arrives in a later step.
-* The plugin has no settings page and no import/export screen yet.
+* Notes created by agent tools get an automatic wall position until you drag them yourself.
 
 ## Development
 

@@ -63,13 +63,29 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(installAt > gateAt, '能力门必须排在安装之前')
   })
 
-  it('页面 应该 是「一个面板 + 标签页」而不是弹窗', async () => {
+  it('便签标签 应该是「满墙贴纸」而非登记表：墙面 + 悬浮「+」+ 可拖动贴纸', async () => {
+    const page = await read('src/client/DeskOnePage.tsx')
+    const styles = await read('src/client/styles.ts')
+    // 墙面容器与悬浮「+」按钮（不是工具栏里的「新建」表单）。
+    assert.match(page, /dsh-desk-wall/u)
+    assert.match(page, /dsh-desk-add/u)
+    assert.match(page, /onPointerDown/u, '贴纸必须支持指针拖拽')
+    const addRule = /\.dsh-desk-add \{([^}]*)\}/u.exec(styles)
+    assert.ok(addRule !== null, '缺 .dsh-desk-add 规则')
+    assert.match(addRule[1], /position:\s*absolute/u, '「+」必须悬浮在墙面右下角')
+    // 贴纸直接在墙上写字（textarea），不搞标题/保存按钮的登记表。
+    assert.match(page, /dsh-desk-note-body/u)
+    assert.ok(!/action\.save/u.test(page), '便签墙不得再有「保存」按钮（失焦即保存）')
+    assert.ok(!/placeholder\.title/u.test(page), '便签墙不得再有标题输入框')
+    assert.ok(!/dsh-desk-composer/u.test(styles), '登记表式编辑器样式应已删除')
+  })
+
+  it('页面 应该 用一个面板承载标签页，而不是弹窗', async () => {
     const page = await read('src/client/DeskOnePage.tsx')
     assert.match(page, /dsh-desk-tabs/u)
     assert.match(page, /data-window-drag/u)
     assert.match(page, /'today'/u)
     assert.match(page, /'notes'/u)
-    // 主面板是正常流：不得自建遮罩 / dialog 语义 / 焦点陷阱。
     for (const forbidden of ['role="dialog"', 'aria-modal', 'position: fixed', 'backdrop-filter']) {
       assert.ok(!page.includes(forbidden), `页面源码里不该有 ${forbidden}`)
     }

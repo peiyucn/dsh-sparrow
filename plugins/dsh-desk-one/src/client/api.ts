@@ -25,7 +25,13 @@ export function listNotes(query?: string): Promise<readonly DeskNote[]> {
   return fetchJson<NoteListResponse>(`${ROUTES.notes}${suffix}`).then(payload => payload.notes)
 }
 
-export function createNote(input: { readonly title?: string; readonly body?: string; readonly color?: string }): Promise<DeskNote> {
+export function createNote(input: {
+  readonly title?: string
+  readonly body?: string
+  readonly color?: string
+  readonly x?: number
+  readonly y?: number
+}): Promise<DeskNote> {
   return postJson<NoteMutationResponse>(ROUTES.notes, input).then(payload => payload.note)
 }
 
@@ -38,6 +44,8 @@ export function updateNote(input: {
     readonly color?: string
     readonly pinned?: boolean
     readonly archived?: boolean
+    readonly x?: number
+    readonly y?: number
   }
 }): Promise<DeskNote> {
   return postJson<NoteMutationResponse>(ROUTES.noteUpdate, input).then(payload => payload.note)

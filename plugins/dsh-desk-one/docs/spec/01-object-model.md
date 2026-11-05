@@ -64,6 +64,9 @@ interface NotePayload {
   pinned: boolean
   color?: string
   archived: boolean
+  /** 便签墙自由位置（px）：x/y 缺省时由界面按序号兜底摆放，用户拖动后才落库。 */
+  x?: number
+  y?: number
 }
 
 interface EventPayload {

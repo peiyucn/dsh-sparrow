@@ -1,7 +1,7 @@
 /**
  * 统一对象模型的纯逻辑（不 import Node / 浏览器 API，`node:test` 可直接驱动）：
  * 输入归一化、对象创建、补丁与乐观并发、排序与过滤。
- * 这里只做 S0 的 note kind；后续 kind 加同构函数，不改已有语义。
+ * 便签墙形态下 body 是唯一内容；title 由正文首行派生，保留给 agent 工具与列表展示。
  */
 
 import { MAX_BODY_CHARS, MAX_TITLE_CHARS, NOTE_COLORS } from './constants.js'
@@ -29,10 +29,13 @@ export interface NotePatch {
   readonly color?: string
   readonly pinned?: boolean
   readonly archived?: boolean
+  /** 便签墙自由位置（px，相对墙面画布）。 */
+  readonly x?: number
+  readonly y?: number
 }
 
-/** 未给标题时从正文首行取一个标题（与面板卡片展示一致）。 */
-function titleFromBody(body: string): string {
+/** 由正文首行派生标题（便签墙不展示 title，但 agent 工具与检索需要它）。 */
+export function titleFromBody(body: string): string {
   const firstLine = body.split(/\r?\n/u).map(line => line.trim()).find(line => line !== '')
   return (firstLine ?? '').slice(0, 60)
 }
@@ -41,7 +44,7 @@ function isNoteColor(value: unknown): value is NoteColor {
   return typeof value === 'string' && (NOTE_COLORS as readonly string[]).includes(value)
 }
 
-/** 校验并归一化创建入参：标题可为空（由正文首行补），标题与正文至少有一个。 */
+/** 校验并归一化创建入参：便签墙允许空白便签（先「+」再打字）。 */
 export function normalizeNoteInput(raw: { readonly title?: unknown; readonly body?: unknown; readonly color?: unknown }): NoteInput {
   const body = typeof raw.body === 'string' ? raw.body : ''
   const explicitTitle = typeof raw.title === 'string' ? raw.title.trim() : ''
@@ -53,13 +56,21 @@ export function normalizeNoteInput(raw: { readonly title?: unknown; readonly bod
   if (explicitTitle.length > MAX_TITLE_CHARS) {
     throw new DeskModelError('INVALID_NOTE', `便签标题超过 ${MAX_TITLE_CHARS} 字符上限`)
   }
-  const title = explicitTitle === '' ? titleFromBody(body) : explicitTitle
-  if (title === '') throw new DeskModelError('INVALID_NOTE', '便签需要标题或正文')
-  return { title, body, color }
+  return { title: explicitTitle === '' ? titleFromBody(body) : explicitTitle, body, color }
 }
 
-/** 创建一条便签对象（id 与时间由调用方提供，保持本函数纯净）。 */
-export function createNoteRecord(input: NoteInput, meta: { readonly id: string; readonly now: string }): DeskNote {
+/** 合法坐标：有限非负数；非法一律忽略（位置只是展示属性，坏值不该挡住整条便签）。 */
+export function normalizeCoordinate(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.round(value) : undefined
+}
+
+/** 创建一条便签对象（id / 时间 / 坐标由调用方提供，保持本函数纯净）。 */
+export function createNoteRecord(
+  input: NoteInput,
+  meta: { readonly id: string; readonly now: string; readonly x?: number; readonly y?: number },
+): DeskNote {
+  const x = normalizeCoordinate(meta.x)
+  const y = normalizeCoordinate(meta.y)
   return {
     id: meta.id,
     kind: 'note',
@@ -70,6 +81,8 @@ export function createNoteRecord(input: NoteInput, meta: { readonly id: string; 
     color: input.color,
     pinned: false,
     archived: false,
+    ...(x === undefined ? {} : { x }),
+    ...(y === undefined ? {} : { y }),
     createdAt: meta.now,
     updatedAt: meta.now,
     revision: 1,
@@ -98,6 +111,8 @@ export function patchNoteRecord(
     color: NoteColor
     pinned: boolean
     archived: boolean
+    x?: number
+    y?: number
     createdAt: string
     updatedAt: string
     revision: number
@@ -105,7 +120,6 @@ export function patchNoteRecord(
 
   if (patch.title !== undefined) {
     const title = patch.title.trim()
-    if (title === '') throw new DeskModelError('INVALID_NOTE', '便签标题不能为空')
     if (title.length > MAX_TITLE_CHARS) {
       throw new DeskModelError('INVALID_NOTE', `便签标题超过 ${MAX_TITLE_CHARS} 字符上限`)
     }
@@ -116,6 +130,8 @@ export function patchNoteRecord(
       throw new DeskModelError('INVALID_NOTE', `便签正文超过 ${MAX_BODY_CHARS} 字符上限`)
     }
     next.body = patch.body
+    // 正文变化且调用方没显式给标题时，标题跟随正文首行（保持两者一致）。
+    if (patch.title === undefined) next.title = titleFromBody(patch.body)
   }
   if (patch.color !== undefined) {
     if (!isNoteColor(patch.color)) throw new DeskModelError('INVALID_NOTE', `未知的便签颜色：${patch.color}`)
@@ -129,6 +145,10 @@ export function patchNoteRecord(
     if (typeof patch.archived !== 'boolean') throw new DeskModelError('INVALID_NOTE', 'archived 必须是布尔值')
     next.archived = patch.archived
   }
+  const x = normalizeCoordinate(patch.x)
+  const y = normalizeCoordinate(patch.y)
+  if (x !== undefined) next.x = x
+  if (y !== undefined) next.y = y
   return next
 }
 

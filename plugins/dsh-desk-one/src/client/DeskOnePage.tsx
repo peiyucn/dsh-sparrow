@@ -1,8 +1,7 @@
 /**
  * dsh-desk-one 主面板页（S0）：一个面板、两个标签。
- * 「今天」是主标签（后续任务 / 日程的联动聚合面），S0 先展示置顶便签与统计；
- * 「便签」是第一个落地功能：新建 / 编辑 / 置顶 / 改色 / 删除 / 搜索。
- * 后续版本在这里追加标签，不改动宿主契约。
+ * 「便签」是便签墙：右下角「+」随手加一张，便签在墙上自由拖动摆放、直接在贴纸上写字；
+ * 「今天」是主标签，给后续任务 / 日程的联动聚合预留。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -14,265 +13,235 @@ import type { DeskPanelInjected } from './install.js'
 
 type Tab = 'today' | 'notes'
 
+/** 便签几何（px）：墙面上的自由摆放单位。 */
+const NOTE_WIDTH = 208
+const NOTE_MIN_HEIGHT = 168
+const WALL_PADDING = 24
+const CASCADE_OFFSET = 18
+/** 新便签的颜色循环：便签墙优先彩色（默认色留给用户自己改）。 */
+const STICKY_COLORS: readonly NoteColor[] = ['yellow', 'green', 'blue', 'pink']
+
 /** 页面 props：主面板 owner share + 注入动作 + locale 座位（框架组装）。 */
 export type DeskPanelProps = PropsRuntime<'main'> & InjectFace<DeskPanelInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
 
-interface ComposerState {
-  readonly id: string | null
-  readonly title: string
-  readonly body: string
-  readonly color: NoteColor
-  readonly revision: number
-}
+const messageOf = (reason: unknown): string => reason instanceof Error ? reason.message : String(reason)
 
-const EMPTY_COMPOSER: ComposerState = { id: null, title: '', body: '', color: 'default', revision: 0 }
-
-/** 卡片正文预览：最多 160 字符，超出省略。 */
-function previewOf(note: DeskNote): string {
-  const text = note.body.trim()
-  return text.length > 160 ? `${text.slice(0, 160)}…` : text
-}
-
-/** 时间的本地短格式（面板只展示，不做精确业务计算）。 */
-function formatTime(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return date.toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function messageOf(reason: unknown): string {
-  return reason instanceof Error ? reason.message : String(reason)
+/** 无坐标记录（agent 建的便签）的兜底摆放：每行 5 张的网格 + 轻微错位。 */
+function fallbackPosition(index: number): { x: number; y: number } {
+  return {
+    x: WALL_PADDING + (index % 5) * (NOTE_WIDTH + 16) + (index % 2) * CASCADE_OFFSET,
+    y: WALL_PADDING + Math.floor(index / 5) * 190 + (index % 2) * CASCADE_OFFSET,
+  }
 }
 
 /**
- * 主面板页面：标签切换 + 便签数据面。
+ * 主面板页面：标签切换 + 便签墙。
  * @param props - 主面板 owner share + 注入动作 + locale 座位。
  */
 export function DeskOnePage(props: DeskPanelProps) {
   const { listNotes, createNote, updateNote, deleteNote, t } = props
-  const [tab, setTab] = useState<Tab>('today')
+  const [tab, setTab] = useState<Tab>('notes')
   const [notes, setNotes] = useState<readonly DeskNote[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
-  const [composer, setComposer] = useState<ComposerState>(EMPTY_COMPOSER)
-  const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-  /** 刷新代际：并发刷新时只让最新一次结果落地。 */
-  const loadSeqRef = useRef(0)
+  const [creating, setCreating] = useState(false)
+  const wallRef = useRef<HTMLDivElement | null>(null)
+  const textareas = useRef(new Map<string, HTMLTextAreaElement>())
+  const loadSeq = useRef(0)
 
   const load = useCallback(async (): Promise<void> => {
-    const seq = ++loadSeqRef.current
+    const seq = ++loadSeq.current
     setLoading(true)
     try {
       const next = await listNotes()
-      if (seq !== loadSeqRef.current) return
+      if (seq !== loadSeq.current) return
       setNotes(next)
       setError(null)
     } catch (reason) {
-      if (seq !== loadSeqRef.current) return
+      if (seq !== loadSeq.current) return
       setError(messageOf(reason))
     } finally {
-      if (seq === loadSeqRef.current) setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
   }, [listNotes])
 
   useEffect(() => { void load() }, [load])
 
-  /** 搜索在客户端过滤：今天标签始终拿到全量数据，不因搜索词缺条目。 */
-  const visibleNotes = useMemo(() => {
-    const keyword = query.trim().toLowerCase()
-    if (keyword === '') return notes
-    return notes.filter(note => `${note.title}\n${note.body}`.toLowerCase().includes(keyword))
-  }, [notes, query])
+  /** 坐标视图：缺坐标的记录按序号兜底（不写回，用户拖动时才落库）。 */
+  const placed = useMemo(() => notes.map((note, index) => {
+    const fallback = fallbackPosition(index)
+    return { note, x: note.x ?? fallback.x, y: note.y ?? fallback.y }
+  }), [notes])
 
-  const pinnedNotes = useMemo(() => notes.filter(note => note.pinned), [notes])
+  const canvasSize = useMemo(() => {
+    let right = 0
+    let bottom = 0
+    for (const item of placed) {
+      right = Math.max(right, item.x + NOTE_WIDTH)
+      bottom = Math.max(bottom, item.y + NOTE_MIN_HEIGHT)
+    }
+    return { width: right + WALL_PADDING * 2, height: bottom + WALL_PADDING * 2 }
+  }, [placed])
 
-  const replaceNote = useCallback((next: DeskNote): void => {
-    setNotes(current => current.map(note => note.id === next.id ? next : note))
+  const replaceNote = useCallback((updated: DeskNote): void => {
+    setNotes(current => current.map(note => note.id === updated.id ? updated : note))
+  }, [])
+  const removeNote = useCallback((id: string): void => {
+    setNotes(current => current.filter(note => note.id !== id))
   }, [])
 
-  const resetComposer = useCallback((): void => {
-    setComposer(EMPTY_COMPOSER)
-    setActionError(null)
-  }, [])
+  /** 统一的补丁落库：乐观更新已在本地完成，失败时提示并重拉对齐。 */
+  const savePatch = useCallback(async (note: DeskNote, patch: Parameters<DeskPanelInjected['updateNote']>[0]['patch']): Promise<void> => {
+    try {
+      const updated = await updateNote({ id: note.id, expectedRevision: note.revision, patch })
+      replaceNote(updated)
+      setActionError(null)
+    } catch (reason) {
+      setActionError(t('state.saveFailed', { message: messageOf(reason) }))
+      void load()
+    }
+  }, [load, replaceNote, t, updateNote])
 
-  const startEdit = useCallback((note: DeskNote): void => {
-    setComposer({ id: note.id, title: note.title, body: note.body, color: note.color, revision: note.revision })
-    setActionError(null)
-    setTab('notes')
-  }, [])
+  const removeWithFeedback = useCallback(async (id: string): Promise<void> => {
+    try {
+      await deleteNote(id)
+      removeNote(id)
+      setActionError(null)
+    } catch (reason) {
+      setActionError(t('state.saveFailed', { message: messageOf(reason) }))
+    }
+  }, [deleteNote, removeNote, t])
 
-  const save = useCallback(async (): Promise<void> => {
-    if (saving) return
-    setSaving(true)
+  /** 「+」：在当前视口中间新建一张空便签，并立刻把焦点交给它。 */
+  const addNote = useCallback(async (): Promise<void> => {
+    if (creating) return
+    setCreating(true)
     setActionError(null)
     try {
-      if (composer.id === null) {
-        const created = await createNote({ title: composer.title, body: composer.body, color: composer.color })
-        setNotes(current => [created, ...current])
-      } else {
-        const updated = await updateNote({
-          id: composer.id,
-          expectedRevision: composer.revision,
-          patch: { title: composer.title, body: composer.body, color: composer.color },
-        })
-        replaceNote(updated)
-      }
-      setComposer(EMPTY_COMPOSER)
+      const wall = wallRef.current
+      const anchorX = WALL_PADDING + (wall?.scrollLeft ?? 0) + ((wall?.clientWidth ?? 800) - NOTE_WIDTH) / 2
+      const anchorY = WALL_PADDING + (wall?.scrollTop ?? 0) + 48
+      const offset = (notes.length % 6) * CASCADE_OFFSET
+      const note = await createNote({
+        body: '',
+        color: STICKY_COLORS[notes.length % STICKY_COLORS.length] ?? 'yellow',
+        x: Math.max(WALL_PADDING, Math.round(anchorX + offset)),
+        y: Math.max(WALL_PADDING, Math.round(anchorY + offset)),
+      })
+      setNotes(current => [...current, note])
+      setTab('notes')
+      requestAnimationFrame(() => { textareas.current.get(note.id)?.focus() })
     } catch (reason) {
       setActionError(t('state.saveFailed', { message: messageOf(reason) }))
     } finally {
-      setSaving(false)
+      setCreating(false)
     }
-  }, [composer, createNote, replaceNote, saving, t, updateNote])
+  }, [createNote, creating, notes.length, t])
 
-  const togglePin = useCallback(async (note: DeskNote): Promise<void> => {
-    setActionError(null)
-    try {
-      const updated = await updateNote({
-        id: note.id,
-        expectedRevision: note.revision,
-        patch: { pinned: !note.pinned },
-      })
-      replaceNote(updated)
-    } catch (reason) {
-      setActionError(t('state.saveFailed', { message: messageOf(reason) }))
+  /**
+   * 卡片拖拽：在非输入区按下开始移动，抬起时把最终坐标落库。
+   * 本地先移动（跟手），落库失败由 savePatch 提示并重拉。
+   */
+  const startDrag = useCallback((
+    event: React.PointerEvent<HTMLElement>,
+    note: DeskNote,
+    originX: number,
+    originY: number,
+  ): void => {
+    const target = event.target as HTMLElement
+    if (event.button !== 0 || target.closest('textarea,button')) return
+    event.preventDefault()
+    const startX = event.clientX
+    const startY = event.clientY
+    let currentX = originX
+    let currentY = originY
+    let moved = false
+    const onMove = (moveEvent: PointerEvent): void => {
+      if (moveEvent.pointerId !== event.pointerId) return
+      const dx = moveEvent.clientX - startX
+      const dy = moveEvent.clientY - startY
+      if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return
+      moved = true
+      currentX = Math.max(0, Math.round(originX + dx))
+      currentY = Math.max(0, Math.round(originY + dy))
+      setNotes(current => current.map(item => item.id === note.id ? { ...item, x: currentX, y: currentY } : item))
     }
-  }, [replaceNote, t, updateNote])
+    const finish = (): void => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', finish)
+      window.removeEventListener('pointercancel', finish)
+      if (!moved) return
+      void savePatch(note, { x: currentX, y: currentY })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', finish)
+    window.addEventListener('pointercancel', finish)
+  }, [savePatch])
 
-  const remove = useCallback(async (note: DeskNote): Promise<void> => {
-    if (pendingDeleteId !== note.id) {
-      setPendingDeleteId(note.id)
+  /** 正文失焦落库；空白便签失焦即删除（墙上不留空贴纸）。 */
+  const commitBody = useCallback((note: DeskNote, element: HTMLTextAreaElement): void => {
+    const body = element.value
+    if (body === note.body) return
+    if (body.trim() === '' && note.body.trim() === '') {
+      void removeWithFeedback(note.id)
       return
     }
-    setPendingDeleteId(null)
-    setActionError(null)
-    try {
-      await deleteNote(note.id)
-      setNotes(current => current.filter(item => item.id !== note.id))
-      setComposer(current => current.id === note.id ? EMPTY_COMPOSER : current)
-    } catch (reason) {
-      setActionError(t('state.deleteFailed', { message: messageOf(reason) }))
-    }
-  }, [deleteNote, pendingDeleteId, t])
+    void savePatch(note, { body })
+  }, [removeWithFeedback, savePatch])
 
-  const canSave = !saving && (composer.title.trim() !== '' || composer.body.trim() !== '')
-
-  const renderCard = (note: DeskNote): ReactElement => (
-    <article key={note.id} className="dsh-desk-card" data-color={note.color}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+  const renderNote = (item: { note: DeskNote; x: number; y: number }): ReactElement => (
+    <article
+      key={item.note.id}
+      className="dsh-desk-note"
+      data-color={item.note.color}
+      style={{ left: item.x, top: item.y }}
+      onPointerDown={event => startDrag(event, item.note, item.x, item.y)}
+    >
+      <div className="dsh-desk-note-bar">
+        <div className="dsh-desk-note-colors">
+          {NOTE_COLORS.map(color => (
+            <button
+              key={color}
+              type="button"
+              className="dsh-desk-dot"
+              data-color={color}
+              data-active={item.note.color === color}
+              aria-label={t(`color.${color}`)}
+              title={t(`color.${color}`)}
+              onClick={() => { void savePatch(item.note, { color }) }}
+            />
+          ))}
+        </div>
         <button
           type="button"
-          className="dsh-desk-pin"
-          data-active={note.pinned}
-          aria-label={note.pinned ? t('action.unpin') : t('action.pin')}
-          title={note.pinned ? t('action.unpin') : t('action.pin')}
-          onClick={() => { void togglePin(note) }}
+          className="dsh-desk-note-close"
+          aria-label={t('action.delete')}
+          title={t('action.delete')}
+          onClick={() => { void removeWithFeedback(item.note.id) }}
         >
-          {note.pinned ? '★' : '☆'}
+          ×
         </button>
-        <h3 className="dsh-desk-card-title" style={{ flex: 1, minWidth: 0 }}>{note.title}</h3>
       </div>
-      {previewOf(note) === '' ? null : <p className="dsh-desk-card-body">{previewOf(note)}</p>}
-      <div className="dsh-desk-card-foot">
-        <span className="dsh-desk-meta">{t('meta.updatedAt', { time: formatTime(note.updatedAt) })}</span>
-        <div className="dsh-desk-card-actions">
-          <button type="button" className="dsh-desk-link" onClick={() => startEdit(note)}>{t('action.edit')}</button>
-          <button type="button" className="dsh-desk-link dsh-desk-link-danger" onClick={() => { void remove(note) }}>
-            {pendingDeleteId === note.id ? t('action.confirmDelete') : t('action.delete')}
-          </button>
-        </div>
-      </div>
+      <textarea
+        key={`${item.note.id}:${item.note.revision}`}
+        ref={element => {
+          if (element === null) textareas.current.delete(item.note.id)
+          else textareas.current.set(item.note.id, element)
+        }}
+        className="dsh-desk-note-body"
+        defaultValue={item.note.body}
+        placeholder={t('note.placeholder')}
+        spellCheck={false}
+        onBlur={event => commitBody(item.note, event.currentTarget)}
+      />
     </article>
   )
 
   const renderToday = (): ReactElement => (
     <div className="dsh-desk-today">
-      <p className="dsh-desk-stats">
-        {t('today.counts', { notes: notes.length, pinned: pinnedNotes.length })}
-      </p>
-      <h2 className="dsh-desk-section-title">{t('today.pinned')}</h2>
-      {pinnedNotes.length === 0
-        ? <p className="dsh-desk-hint">{t('state.empty')}</p>
-        : <div className="dsh-desk-grid">{pinnedNotes.map(renderCard)}</div>}
+      <p className="dsh-desk-stats">{t('today.counts', { notes: notes.length })}</p>
       <p className="dsh-desk-hint">{t('today.hint')}</p>
-    </div>
-  )
-
-  const renderNotes = (): ReactElement => (
-    <div>
-      <div className="dsh-desk-toolbar">
-        <input
-          className="dsh-desk-search"
-          type="search"
-          value={query}
-          placeholder={t('placeholder.search')}
-          onChange={event => setQuery(event.target.value)}
-        />
-        <button
-          type="button"
-          className="dsh-desk-btn"
-          onClick={() => { resetComposer(); setTab('notes') }}
-        >
-          {t('action.newNote')}
-        </button>
-      </div>
-
-      <div className="dsh-desk-composer">
-        <input
-          className="dsh-desk-input"
-          type="text"
-          value={composer.title}
-          placeholder={t('placeholder.title')}
-          onChange={event => setComposer(current => ({ ...current, title: event.target.value }))}
-        />
-        <textarea
-          className="dsh-desk-textarea"
-          value={composer.body}
-          placeholder={t('placeholder.body')}
-          onChange={event => setComposer(current => ({ ...current, body: event.target.value }))}
-        />
-        <div className="dsh-desk-composer-foot">
-          <div className="dsh-desk-swatches">
-            {NOTE_COLORS.map(color => (
-              <button
-                key={color}
-                type="button"
-                className="dsh-desk-swatch"
-                data-color={color}
-                data-active={composer.color === color}
-                aria-label={t(`color.${color}`)}
-                title={t(`color.${color}`)}
-                onClick={() => setComposer(current => ({ ...current, color }))}
-              />
-            ))}
-          </div>
-          <button
-            type="button"
-            className="dsh-desk-btn"
-            onClick={() => { resetComposer() }}
-            disabled={saving}
-          >
-            {t('action.cancel')}
-          </button>
-          <button
-            type="button"
-            className="dsh-desk-btn dsh-desk-btn-primary"
-            onClick={() => { void save() }}
-            disabled={!canSave}
-          >
-            {saving ? t('state.saving') : t('action.save')}
-          </button>
-        </div>
-      </div>
-
-      {loading
-        ? <p className="dsh-desk-empty">{t('state.loading')}</p>
-        : visibleNotes.length === 0
-          ? <p className="dsh-desk-empty">{query.trim() === '' ? t('state.empty') : t('state.searchEmpty')}</p>
-          : <div className="dsh-desk-grid">{visibleNotes.map(renderCard)}</div>}
     </div>
   )
 
@@ -299,7 +268,34 @@ export function DeskOnePage(props: DeskPanelProps) {
         </div>
       )}
       {actionError === null ? null : <p className="dsh-desk-error">{actionError}</p>}
-      {tab === 'today' ? renderToday() : renderNotes()}
+      {tab === 'today' ? renderToday() : (
+        <div className="dsh-desk-wall" ref={wallRef}>
+          <div
+            className="dsh-desk-canvas"
+            style={{ width: Math.max(canvasSize.width, 640), height: Math.max(canvasSize.height, 360) }}
+          >
+            {loading && notes.length === 0
+              ? <p className="dsh-desk-wall-hint">{t('state.loading')}</p>
+              : notes.length === 0
+                ? <p className="dsh-desk-wall-hint">{t('state.empty')}</p>
+                : placed.map(renderNote)}
+          </div>
+        </div>
+      )}
+      {tab === 'notes'
+        ? (
+          <button
+            type="button"
+            className="dsh-desk-add"
+            disabled={creating}
+            aria-label={t('action.newNote')}
+            title={t('action.newNote')}
+            onClick={() => { void addNote() }}
+          >
+            +
+          </button>
+        )
+        : null}
     </div>
   )
 }

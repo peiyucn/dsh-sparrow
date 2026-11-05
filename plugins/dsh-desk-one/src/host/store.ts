@@ -9,8 +9,8 @@ import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
 import { NODES_TABLE, PACKAGE_NAME } from '../constants.js'
 import {
-  DeskModelError, createNoteRecord, filterNotes, normalizeNoteInput, patchNoteRecord, sortNotes,
-  type NotePatch,
+  DeskModelError, createNoteRecord, filterNotes, normalizeCoordinate, normalizeNoteInput, patchNoteRecord,
+  sortNotes, type NotePatch,
 } from '../model.js'
 import type { DeskNote } from '../contract.js'
 
@@ -44,9 +44,20 @@ export class DeskStore {
   }
 
   /** 新建便签；入参归一化与校验在模型层完成。 */
-  async createNote(raw: { readonly title?: unknown; readonly body?: unknown; readonly color?: unknown }): Promise<DeskNote> {
+  async createNote(raw: {
+    readonly title?: unknown
+    readonly body?: unknown
+    readonly color?: unknown
+    readonly x?: unknown
+    readonly y?: unknown
+  }): Promise<DeskNote> {
     const input = normalizeNoteInput(raw)
-    const note = createNoteRecord(input, { id: `note_${randomUUID()}`, now: new Date().toISOString() })
+    const note = createNoteRecord(input, {
+      id: `note_${randomUUID()}`,
+      now: new Date().toISOString(),
+      x: normalizeCoordinate(raw.x),
+      y: normalizeCoordinate(raw.y),
+    })
     await this.nodes.put(note.id, note)
     return note
   }

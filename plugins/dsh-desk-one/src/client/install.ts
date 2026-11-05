@@ -19,7 +19,13 @@ import { ensureDeskStyles } from './styles.js'
 /** 面板的注入面：数据动作由 host REST 路由提供，页面只持有这几个函数。 */
 export interface DeskPanelInjected {
   readonly listNotes: (query?: string) => Promise<readonly DeskNote[]>
-  readonly createNote: (input: { readonly title?: string; readonly body?: string; readonly color?: string }) => Promise<DeskNote>
+  readonly createNote: (input: {
+    readonly title?: string
+    readonly body?: string
+    readonly color?: string
+    readonly x?: number
+    readonly y?: number
+  }) => Promise<DeskNote>
   readonly updateNote: (input: {
     readonly id: string
     readonly expectedRevision: number
@@ -29,6 +35,8 @@ export interface DeskPanelInjected {
       readonly color?: string
       readonly pinned?: boolean
       readonly archived?: boolean
+      readonly x?: number
+      readonly y?: number
     }
   }) => Promise<DeskNote>
   readonly deleteNote: (id: string) => Promise<void>
