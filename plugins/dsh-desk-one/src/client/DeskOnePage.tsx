@@ -230,7 +230,8 @@ export function DeskOnePage(props: DeskPanelProps) {
           else textareas.current.set(item.note.id, element)
         }}
         className="dsh-desk-note-body"
-        defaultValue={item.note.body}
+        // 兼容旧数据：早期版本允许「只有标题」的便签，墙上把标题原文当正文显示，避免显示成空贴纸。
+        defaultValue={item.note.body === '' ? item.note.title : item.note.body}
         placeholder={t('note.placeholder')}
         spellCheck={false}
         onBlur={event => commitBody(item.note, event.currentTarget)}
