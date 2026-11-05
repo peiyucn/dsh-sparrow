@@ -1,0 +1,47 @@
+/**
+ * 插件共用常量（host / client 两半都可 import，不得引入运行时依赖）。
+ * 跨请求 / 跨渲染的数值收在这里，避免同一语义在 host 与 client 各写一份后漂移。
+ */
+
+export const PACKAGE_NAME = 'dsh-desk-one'
+
+/** 路由前缀：长于官方 `/api` 栅栏，故本插件自己做信任检查（同 dsh-archive-manage 口径）。 */
+export const PREFIX = '/api/desk-one'
+
+/** REST 路由；S0 只有便签（后续任务 / 日程在此追加，不改已有路径）。 */
+export const ROUTES = Object.freeze({
+  notes: `${PREFIX}/notes`,
+  noteUpdate: `${PREFIX}/notes/update`,
+  noteDelete: `${PREFIX}/notes/delete`,
+})
+
+/** 入口 id：同时是左栏面板行的 id 与中央列 `main` 槽的 key（官方 `MainPanelId`）。 */
+export const PANEL_ID = 'desk-one'
+/** 左栏行序：官方 plugins = 0、schedules = 10、archive-manage = 20，本插件排在其后。 */
+export const PANEL_ORDER = 30
+export const LOCALE_NAMESPACE = 'desk-one' as const
+
+/** 存储域：域名与表名都必须匹配官方 `UNIT_NAME_RE`（`^[a-z][a-z0-9_]*$`）。 */
+export const DOMAIN_NAME = 'desk_one'
+export const DOMAIN_VERSION = 1
+export const NOTES_TABLE = 'notes'
+/** 边表先声明后使用：S0 不写边，但域描述一旦发布就不宜再加表（加表等于改后端布局）。 */
+export const EDGES_TABLE = 'edges'
+
+/** 对象级 schema 版本（单个对象，迁移用）。 */
+export const DESK_NODE_SCHEMA = 1
+
+/** 写路由请求体上限；超过即 400，而不是把整段内容读进内存再判。 */
+export const MAX_BODY_BYTES = 64 * 1024
+export const MAX_TITLE_CHARS = 200
+export const MAX_BODY_CHARS = 20_000
+export const MAX_QUERY_CHARS = 100
+
+/** 便签颜色：未知值一律拒绝（客户端色板与存储校验共用这一份真值）。 */
+export const NOTE_COLORS = ['default', 'yellow', 'green', 'blue', 'pink'] as const
+
+/** 面板请求超时：host 挂起时不让面板永久 loading。 */
+export const REQUEST_TIMEOUT_MS = 10_000
+
+/** 样式表标记属性对应的选择器（HMR / 重复安装时据此复用同一元素）。 */
+export const STYLE_SELECTOR = 'style[data-dsh-desk-one]'

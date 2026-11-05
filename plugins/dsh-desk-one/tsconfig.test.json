@@ -1,0 +1,19 @@
+{
+  "// 说明": "测试侧类型检查：检查 test/*.mjs，不产出（与仓库其它插件同口径）。",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noImplicitAny": false,
+    "noUnusedLocals": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": false,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["test/**/*.mjs", "test/**/*.ts"]
+}
