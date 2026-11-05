@@ -11,7 +11,8 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 * `plugins/dsh-archive-manage` — 归档会话管理（备份 / 删除 / 恢复）
 * `plugins/dsh-codebuddy-credits` — CodeBuddy 额度 LLM provider（官方 API Key 直连）
 * `plugins/dsh-theme-tone` — 明暗主题之下的色调层 + **对话区布局优化**（每轴各一款「官方默认」+ 若干色调；色调同时驱动抬升面的色相与质感，另含顶栏 / 输入框的玻璃效果）
-* **口径：四个活跃插件 + 0 个已退役**（三个退役插件已于 2026-10-27 与 2026-10-31 彻底删除）
+* `plugins/dsh-desk-one` — 个人桌面：一个侧栏面板 + 标签页（S0：今天主标签 + 便签墙），统一对象模型，后续扩展任务 / 看板 / 日程
+* **口径：五个活跃插件 + 0 个已退役**（三个退役插件已于 2026-10-27 与 2026-10-31 彻底删除）
 * 活跃插件名单的单一真值是 `scripts/plugin-set.mjs`（`RETIRED_PLUGINS` 为空名单，保留结构供守卫复用）
 
 ## 文档规范
