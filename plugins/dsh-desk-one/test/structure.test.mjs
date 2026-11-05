@@ -115,6 +115,12 @@ describe('dsh-desk-one 结构', () => {
     }
   })
 
+  it('client bundle 应该 保留 main 与 sidebar.panellist 两处槽位注册', async () => {
+    const bundle = await read('lib/client.js')
+    assert.ok(bundle.includes('sidebar.panellist'), 'bundle 缺 sidebar.panellist 槽位注册')
+    assert.ok(bundle.includes("'main'") || bundle.includes('"main"'), 'bundle 缺 main 槽位注册')
+  })
+
   it('spec 应该 保持交付的三份设计文档', async () => {
     const specs = await readdir(new URL('../docs/spec', import.meta.url))
     assert.deepEqual(specs.sort(), ['00-overview.md', '01-object-model.md', '02-modules.md'])
