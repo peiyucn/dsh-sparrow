@@ -6,7 +6,7 @@
 import { z } from 'zod'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import {
-  DESK_NODE_SCHEMA, DOMAIN_NAME, DOMAIN_VERSION, EDGES_TABLE, NOTES_TABLE, NOTE_COLORS,
+  DESK_NODE_SCHEMA, DOMAIN_NAME, DOMAIN_VERSION, EDGES_TABLE, NODES_TABLE, NOTE_COLORS,
 } from './constants.js'
 import type { DeskEdge, DeskNote } from './contract.js'
 
@@ -39,7 +39,7 @@ export const DESK_DOMAIN = defineDomain({
   version: DOMAIN_VERSION,
   layout: 'per-record',
   tables: {
-    [NOTES_TABLE]: domainTable<string, DeskNote>(noteSchema),
+    [NODES_TABLE]: domainTable<string, DeskNote>(noteSchema),
     [EDGES_TABLE]: domainTable<string, DeskEdge>(edgeSchema),
   },
 })

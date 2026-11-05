@@ -24,7 +24,11 @@ export const LOCALE_NAMESPACE = 'desk-one' as const
 /** 存储域：域名与表名都必须匹配官方 `UNIT_NAME_RE`（`^[a-z][a-z0-9_]*$`）。 */
 export const DOMAIN_NAME = 'desk_one'
 export const DOMAIN_VERSION = 1
-export const NOTES_TABLE = 'notes'
+/**
+ * 统一对象表：所有 kind（S0 只有 note）共用一张表，按记录形状校验。
+ * 后续加 kind 只扩 schema，不改域描述——加表会改后端布局，已发布的域不宜再改。
+ */
+export const NODES_TABLE = 'nodes'
 /** 边表先声明后使用：S0 不写边，但域描述一旦发布就不宜再加表（加表等于改后端布局）。 */
 export const EDGES_TABLE = 'edges'
 

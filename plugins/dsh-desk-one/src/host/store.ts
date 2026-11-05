@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
-import { NOTES_TABLE, PACKAGE_NAME } from '../constants.js'
+import { NODES_TABLE, PACKAGE_NAME } from '../constants.js'
 import {
   DeskModelError, createNoteRecord, filterNotes, normalizeNoteInput, patchNoteRecord, sortNotes,
   type NotePatch,
@@ -32,14 +32,14 @@ export class DeskStore {
     }
   }
 
-  /** 便签表句柄。 */
-  private get notes() {
-    return this.domain.table(NOTES_TABLE)
+  /** 统一对象表句柄（S0 里只有便签记录）。 */
+  private get nodes() {
+    return this.domain.table(NODES_TABLE)
   }
 
   /** 列出便签：置顶优先、最近更新在前，可按关键词过滤。 */
   listNotes(query?: string): DeskNote[] {
-    const all = [...this.notes.entries()].map(([, note]) => note)
+    const all = [...this.nodes.entries()].map(([, note]) => note)
     return filterNotes(sortNotes(all), query)
   }
 
@@ -47,7 +47,7 @@ export class DeskStore {
   async createNote(raw: { readonly title?: unknown; readonly body?: unknown; readonly color?: unknown }): Promise<DeskNote> {
     const input = normalizeNoteInput(raw)
     const note = createNoteRecord(input, { id: `note_${randomUUID()}`, now: new Date().toISOString() })
-    await this.notes.put(note.id, note)
+    await this.nodes.put(note.id, note)
     return note
   }
 
@@ -55,7 +55,7 @@ export class DeskStore {
   async updateNote(id: string, expectedRevision: number, patch: NotePatch): Promise<DeskNote> {
     const now = new Date().toISOString()
     try {
-      return await this.notes.update(id, current => patchNoteRecord(current, patch, { expectedRevision, now }))
+      return await this.nodes.update(id, current => patchNoteRecord(current, patch, { expectedRevision, now }))
     } catch (error) {
       if (error instanceof DomainError && error.code === 'missing-key') {
         throw new DeskModelError('UNKNOWN_NOTE', `便签不存在：${id}`)
@@ -66,7 +66,7 @@ export class DeskStore {
 
   /** 删除便签；不存在时报 UNKNOWN_NOTE（与界面「已删除」反馈一致）。 */
   async deleteNote(id: string): Promise<boolean> {
-    const deleted = await this.notes.delete(id)
+    const deleted = await this.nodes.delete(id)
     if (!deleted) throw new DeskModelError('UNKNOWN_NOTE', `便签不存在：${id}`)
     return true
   }

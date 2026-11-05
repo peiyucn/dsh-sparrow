@@ -43,11 +43,11 @@ describe('dsh-desk-one 结构', () => {
     assert.match(patch, /name: '@dsh-sparrow\/dsh-desk-one'/u)
   })
 
-  it('存储域 应该 声明 notes / edges 两张表且布局是 per-record', async () => {
+  it('存储域 应该 声明 nodes / edges 两张表且布局是 per-record', async () => {
     const { DESK_DOMAIN } = await import('../lib/domain.js')
     assert.equal(DESK_DOMAIN.name, 'desk_one')
     assert.equal(DESK_DOMAIN.layout, 'per-record')
-    assert.deepEqual(Object.keys(DESK_DOMAIN.tables).sort(), ['edges', 'notes'])
+    assert.deepEqual(Object.keys(DESK_DOMAIN.tables).sort(), ['edges', 'nodes'])
   })
 
   it('client half 应该 只注册官方 main + sidebar.panellist，且用不抛错的能力门', async () => {
