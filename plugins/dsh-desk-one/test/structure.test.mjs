@@ -343,6 +343,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(board, /flyBack/u, '拖到无效位置要弹回原位')
     assert.match(column, /onDoubleClick/u, '泳道双击可新建卡片')
     assert.match(column, /data-group-drop/u, '分组是拖拽落点')
+    assert.match(column, /countText/u, '计数要显示成「3 项 / 3 tasks」而不是裸数字')
     assert.match(column, /dsh-task-group/u, '一层分组渲染')
     assert.match(card, /canArchive = task\.status === 'done'/u, '只有完成列可存档')
     assert.match(card, /dsh-task-body/u, '卡片有正文输入')

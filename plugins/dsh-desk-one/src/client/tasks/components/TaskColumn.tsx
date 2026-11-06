@@ -96,6 +96,8 @@ export function TaskColumn({
   const laneOver = dropTarget?.status === status && dropTarget.group === undefined
   const draftIn = (group?: string): boolean => draft !== null && draft.status === status && draft.group === group
   const total = lane.ungrouped.length + lane.groups.reduce((sum, group) => sum + group.tasks.length, 0)
+  /** Counts read as labels ("3 tasks") instead of bare numbers — singular handled separately. */
+  const countText = (count: number): string => count === 1 ? t('task.countOne') : t('task.count', { count })
 
   /** Double-click on empty lane / group body adds a card in that place (cards keep their gestures). */
   const handleDoubleClick = (event: React.MouseEvent<HTMLElement>): void => {
@@ -122,7 +124,7 @@ export function TaskColumn({
   const header = (
     <header className="dsh-task-lane-head">
       <span className="dsh-task-lane-title">{title}</span>
-      <span className="dsh-task-count">{total}</span>
+      <span className="dsh-task-count">{countText(total)}</span>
       {compact ? null : (
         <>
           <button
@@ -175,13 +177,13 @@ export function TaskColumn({
           {lane.ungrouped.length === 0 ? null : (
             <div className="dsh-task-compact-row">
               <span className="dsh-task-compact-name">{t('task.ungrouped')}</span>
-              <span className="dsh-task-compact-count">{lane.ungrouped.length}</span>
+              <span className="dsh-task-compact-count">{countText(lane.ungrouped.length)}</span>
             </div>
           )}
           {lane.groups.map(group => (
             <div key={group.name} className="dsh-task-compact-row">
               <span className="dsh-task-compact-name">{group.name}</span>
-              <span className="dsh-task-compact-count">{group.tasks.length}</span>
+              <span className="dsh-task-compact-count">{countText(group.tasks.length)}</span>
             </div>
           ))}
           {total === 0 ? <p className="dsh-task-empty">{t('task.emptyLane')}</p> : null}
@@ -289,7 +291,7 @@ export function TaskColumn({
                         {group.name}
                       </button>
                     )}
-                <span className="dsh-task-count">{group.tasks.length}</span>
+                <span className="dsh-task-count">{countText(group.tasks.length)}</span>
                 <div className="dsh-task-group-actions">
                   <button
                     type="button"
