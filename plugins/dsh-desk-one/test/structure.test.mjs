@@ -73,6 +73,21 @@ describe('dsh-desk-one 结构', () => {
     const addRule = /\.dsh-desk-add \{([^}]*)\}/u.exec(styles)
     assert.ok(addRule !== null, '缺 .dsh-desk-add 规则')
     assert.match(addRule[1], /position:\s*absolute/u, '「+」必须悬浮在墙面右下角')
+    // 贴纸不出屏：墙面不滚动，不得再有可滚动画布。
+    const wallRule = /\.dsh-desk-wall \{([^}]*)\}/u.exec(styles)
+    assert.ok(wallRule !== null, '缺 .dsh-desk-wall 规则')
+    assert.match(wallRule[1], /overflow:\s*hidden/u, '墙面必须裁切不滚动（贴纸一律夹在可见区域内）')
+    assert.ok(!/dsh-desk-canvas/u.test(page), '不得再有可滚动的画布容器')
+    // 真实便签是方角纸片，不是大圆角卡片。
+    const noteRule = /\.dsh-desk-note \{([^}]*)\}/u.exec(styles)
+    assert.ok(noteRule !== null, '缺 .dsh-desk-note 规则')
+    assert.match(noteRule[1], /border-radius:\s*2px/u, '便签必须是方角纸片（2px）')
+    assert.ok(!/border-radius:\s*10px/u.test(noteRule[1]), '便签不得回到 10px 大圆角')
+    // 改大小手柄 + 层级置顶 + 标签页记忆都在页面里。
+    assert.match(page, /dsh-desk-note-resize/u, '便签必须有右下角改大小手柄')
+    assert.match(page, /zIndex/u, '点/拖哪张就置顶需要 zIndex')
+    assert.match(page, /TAB_STORAGE_KEY/u, '上次停留的标签页要记住')
+    assert.match(page, /localStorage/u)
     // 贴纸直接在墙上写字（textarea），不搞标题/保存按钮的登记表。
     assert.match(page, /dsh-desk-note-body/u)
     assert.ok(!/action\.save/u.test(page), '便签墙不得再有「保存」按钮（失焦即保存）')

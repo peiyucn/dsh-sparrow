@@ -44,6 +44,16 @@ export const MAX_QUERY_CHARS = 100
 /** 便签颜色：未知值一律拒绝（客户端色板与存储校验共用这一份真值）。 */
 export const NOTE_COLORS = ['default', 'yellow', 'green', 'blue', 'pink'] as const
 
+/** 便签几何（px）：默认尺寸与拖拽改大小的上下限，模型层与界面共用这一份真值。 */
+export const NOTE_DEFAULT_WIDTH = 208
+export const NOTE_DEFAULT_HEIGHT = 168
+export const NOTE_MIN_WIDTH = 120
+export const NOTE_MIN_HEIGHT = 100
+export const NOTE_MAX_SIZE = 2000
+
+/** 上次停留的标签页（纯界面偏好，不含用户内容）；切走再回来停在原标签。 */
+export const TAB_STORAGE_KEY = 'dsh-desk-one:tab'
+
 /** 面板请求超时：host 挂起时不让面板永久 loading。 */
 export const REQUEST_TIMEOUT_MS = 10_000
 

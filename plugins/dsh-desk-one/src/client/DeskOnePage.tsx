@@ -1,54 +1,94 @@
 /**
  * dsh-desk-one 主面板页（S0）：一个面板、两个标签。
- * 「便签」是便签墙：右下角「+」随手加一张，便签在墙上自由拖动摆放、直接在贴纸上写字；
- * 「总览」是主标签：先汇总便签，后续接入任务 / 日程。
+ * 「便签墙」是满墙贴纸：右下角「＋」随手加，贴纸不出屏、自由拖动 / 拖拽改大小、
+ * 拿起即置顶、方角纸片；「总览」汇总便签并给后续任务 / 日程的联动聚合预留。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { LOCALE_NAMESPACE, NOTE_COLORS } from '../constants.js'
+import {
+  LOCALE_NAMESPACE, NOTE_COLORS, NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH, NOTE_MAX_SIZE,
+  NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH, TAB_STORAGE_KEY,
+} from '../constants.js'
 import type { DeskNote, NoteColor } from '../contract.js'
 import type { DeskPanelInjected } from './install.js'
 
 type Tab = 'overview' | 'notes'
 
-/** 便签几何（px）：墙面上的自由摆放单位。 */
-const NOTE_WIDTH = 208
-const NOTE_MIN_HEIGHT = 168
-const WALL_PADDING = 24
-const CASCADE_OFFSET = 18
 /** 新便签的颜色循环：便签墙优先彩色（默认色留给用户自己改）。 */
 const STICKY_COLORS: readonly NoteColor[] = ['yellow', 'green', 'blue', 'pink']
+/** 新便签在视口中心的级联错位（避免叠成一摞）。 */
+const CASCADE_OFFSET = 18
+
+interface WallSize {
+  readonly width: number
+  readonly height: number
+}
+
+interface PlacedNote {
+  readonly note: DeskNote
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly zIndex: number
+}
 
 /** 页面 props：主面板 owner share + 注入动作 + locale 座位（框架组装）。 */
 export type DeskPanelProps = PropsRuntime<'main'> & InjectFace<DeskPanelInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
 
 const messageOf = (reason: unknown): string => reason instanceof Error ? reason.message : String(reason)
 
+const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), Math.max(min, max))
+
+/** 记住上次停留的标签页：切走再回来不重置到总览。隐私模式下 localStorage 不可用时静默回退。 */
+function readInitialTab(): Tab {
+  try {
+    const value = window.localStorage.getItem(TAB_STORAGE_KEY)
+    if (value === 'overview' || value === 'notes') return value
+  } catch {
+    // 隐私模式 / 存储被禁用：按默认标签走。
+  }
+  return 'overview'
+}
+
 /** 无坐标记录（agent 建的便签）的兜底摆放：每行 5 张的网格 + 轻微错位。 */
 function fallbackPosition(index: number): { x: number; y: number } {
   return {
-    x: WALL_PADDING + (index % 5) * (NOTE_WIDTH + 16) + (index % 2) * CASCADE_OFFSET,
-    y: WALL_PADDING + Math.floor(index / 5) * 190 + (index % 2) * CASCADE_OFFSET,
+    x: 24 + (index % 5) * (NOTE_DEFAULT_WIDTH + 16) + (index % 2) * CASCADE_OFFSET,
+    y: 24 + Math.floor(index / 5) * 190 + (index % 2) * CASCADE_OFFSET,
   }
 }
 
 /**
- * 主面板页面：标签切换 + 便签墙。
+ * 主面板页面：标签切换 + 便签墙 + 总览摘要。
  * @param props - 主面板 owner share + 注入动作 + locale 座位。
  */
 export function DeskOnePage(props: DeskPanelProps) {
   const { listNotes, createNote, updateNote, deleteNote, t } = props
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTab] = useState<Tab>(readInitialTab)
   const [notes, setNotes] = useState<readonly DeskNote[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [wallSize, setWallSize] = useState<WallSize>({ width: 0, height: 0 })
+  /** 贴纸层级：点过 / 拖过哪张，哪张就置顶。键会在便签删除后清理。 */
+  const [zMap, setZMap] = useState<Readonly<Record<string, number>>>({})
   const wallRef = useRef<HTMLDivElement | null>(null)
   const textareas = useRef(new Map<string, HTMLTextAreaElement>())
   const loadSeq = useRef(0)
+  const zTopRef = useRef(0)
+
+  const selectTab = useCallback((next: Tab): void => {
+    setTab(next)
+    try {
+      window.localStorage.setItem(TAB_STORAGE_KEY, next)
+    } catch {
+      // 存不了就只在本会话里记住，不影响使用。
+    }
+  }, [])
 
   const load = useCallback(async (): Promise<void> => {
     const seq = ++loadSeq.current
@@ -68,21 +108,44 @@ export function DeskOnePage(props: DeskPanelProps) {
 
   useEffect(() => { void load() }, [load])
 
-  /** 坐标视图：缺坐标的记录按序号兜底（不写回，用户拖动时才落库）。 */
-  const placed = useMemo(() => notes.map((note, index) => {
-    const fallback = fallbackPosition(index)
-    return { note, x: note.x ?? fallback.x, y: note.y ?? fallback.y }
-  }), [notes])
+  /** 墙面尺寸：拖拽与初始摆放都必须在可见区域内（墙面不滚动）。 */
+  useEffect(() => {
+    if (tab !== 'notes') return
+    const element = wallRef.current
+    if (element === null) return
+    const update = (): void => { setWallSize({ width: element.clientWidth, height: element.clientHeight }) }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    return () => { observer.disconnect() }
+  }, [tab])
 
-  const canvasSize = useMemo(() => {
-    let right = 0
-    let bottom = 0
-    for (const item of placed) {
-      right = Math.max(right, item.x + NOTE_WIDTH)
-      bottom = Math.max(bottom, item.y + NOTE_MIN_HEIGHT)
-    }
-    return { width: right + WALL_PADDING * 2, height: bottom + WALL_PADDING * 2 }
-  }, [placed])
+  /** 删掉已不存在的便签的层级记录（累积状态有界）。 */
+  useEffect(() => {
+    setZMap((current) => {
+      const ids = new Set(notes.map(note => note.id))
+      const entries = Object.entries(current).filter(([id]) => ids.has(id))
+      return entries.length === Object.keys(current).length ? current : Object.fromEntries(entries)
+    })
+  }, [notes])
+
+  const raise = useCallback((id: string): void => {
+    zTopRef.current += 1
+    const next = zTopRef.current
+    setZMap(current => ({ ...current, [id]: next }))
+  }, [])
+
+  /** 坐标视图：缺位置/尺寸的记录用默认值，且一律夹进可见墙面（不产生滚动条）。 */
+  const placed = useMemo<PlacedNote[]>(() => notes.map((note, index) => {
+    const width = note.width ?? NOTE_DEFAULT_WIDTH
+    const height = note.height ?? NOTE_DEFAULT_HEIGHT
+    const fallback = fallbackPosition(index)
+    const rawX = note.x ?? fallback.x
+    const rawY = note.y ?? fallback.y
+    const x = wallSize.width === 0 ? rawX : clamp(rawX, 0, wallSize.width - width)
+    const y = wallSize.height === 0 ? rawY : clamp(rawY, 0, wallSize.height - height)
+    return { note, x, y, width, height, zIndex: zMap[note.id] ?? index + 1 }
+  }), [notes, wallSize.height, wallSize.width, zMap])
 
   const replaceNote = useCallback((updated: DeskNote): void => {
     setNotes(current => current.map(note => note.id === updated.id ? updated : note))
@@ -91,8 +154,10 @@ export function DeskOnePage(props: DeskPanelProps) {
     setNotes(current => current.filter(note => note.id !== id))
   }, [])
 
+  type Patch = Parameters<DeskPanelInjected['updateNote']>[0]['patch']
+
   /** 统一的补丁落库：乐观更新已在本地完成，失败时提示并重拉对齐。 */
-  const savePatch = useCallback(async (note: DeskNote, patch: Parameters<DeskPanelInjected['updateNote']>[0]['patch']): Promise<void> => {
+  const savePatch = useCallback(async (note: DeskNote, patch: Patch): Promise<void> => {
     try {
       const updated = await updateNote({ id: note.id, expectedRevision: note.revision, patch })
       replaceNote(updated)
@@ -113,49 +178,42 @@ export function DeskOnePage(props: DeskPanelProps) {
     }
   }, [deleteNote, removeNote, t])
 
-  /** 「+」：在当前视口中间新建一张空便签，并立刻把焦点交给它。 */
+  /** 「＋」：在当前视口中间新建一张空便签，并立刻把焦点交给它。 */
   const addNote = useCallback(async (): Promise<void> => {
     if (creating) return
     setCreating(true)
     setActionError(null)
     try {
-      const wall = wallRef.current
-      const anchorX = WALL_PADDING + (wall?.scrollLeft ?? 0) + ((wall?.clientWidth ?? 800) - NOTE_WIDTH) / 2
-      const anchorY = WALL_PADDING + (wall?.scrollTop ?? 0) + 48
       const offset = (notes.length % 6) * CASCADE_OFFSET
+      const anchorX = Math.max(0, (wallSize.width - NOTE_DEFAULT_WIDTH) / 2) + offset
+      const anchorY = Math.max(0, (wallSize.height - NOTE_DEFAULT_HEIGHT) / 2) + offset
       const note = await createNote({
         body: '',
         color: STICKY_COLORS[notes.length % STICKY_COLORS.length] ?? 'yellow',
-        x: Math.max(WALL_PADDING, Math.round(anchorX + offset)),
-        y: Math.max(WALL_PADDING, Math.round(anchorY + offset)),
+        x: clamp(Math.round(anchorX), 0, Math.max(0, wallSize.width - NOTE_DEFAULT_WIDTH)),
+        y: clamp(Math.round(anchorY), 0, Math.max(0, wallSize.height - NOTE_DEFAULT_HEIGHT)),
       })
       setNotes(current => [...current, note])
-      setTab('notes')
+      selectTab('notes')
       requestAnimationFrame(() => { textareas.current.get(note.id)?.focus() })
     } catch (reason) {
       setActionError(t('state.saveFailed', { message: messageOf(reason) }))
     } finally {
       setCreating(false)
     }
-  }, [createNote, creating, notes.length, t])
+  }, [createNote, creating, notes.length, selectTab, t, wallSize.height, wallSize.width])
 
-  /**
-   * 卡片拖拽：在非输入区按下开始移动，抬起时把最终坐标落库。
-   * 本地先移动（跟手），落库失败由 savePatch 提示并重拉。
-   */
-  const startDrag = useCallback((
-    event: React.PointerEvent<HTMLElement>,
-    note: DeskNote,
-    originX: number,
-    originY: number,
-  ): void => {
+  /** 卡片拖拽：不出屏（坐标夹在墙内），抬起时落库。 */
+  const startDrag = useCallback((event: React.PointerEvent<HTMLElement>, item: PlacedNote): void => {
     const target = event.target as HTMLElement
-    if (event.button !== 0 || target.closest('textarea,button')) return
+    if (event.button !== 0 || target.closest('textarea,button,.dsh-desk-note-resize')) return
     event.preventDefault()
     const startX = event.clientX
     const startY = event.clientY
-    let currentX = originX
-    let currentY = originY
+    const maxX = Math.max(0, wallSize.width - item.width)
+    const maxY = Math.max(0, wallSize.height - item.height)
+    let currentX = item.x
+    let currentY = item.y
     let moved = false
     const onMove = (moveEvent: PointerEvent): void => {
       if (moveEvent.pointerId !== event.pointerId) return
@@ -163,21 +221,56 @@ export function DeskOnePage(props: DeskPanelProps) {
       const dy = moveEvent.clientY - startY
       if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return
       moved = true
-      currentX = Math.max(0, Math.round(originX + dx))
-      currentY = Math.max(0, Math.round(originY + dy))
-      setNotes(current => current.map(item => item.id === note.id ? { ...item, x: currentX, y: currentY } : item))
+      currentX = clamp(Math.round(item.x + dx), 0, maxX)
+      currentY = clamp(Math.round(item.y + dy), 0, maxY)
+      setNotes(current => current.map(note => note.id === item.note.id
+        ? { ...note, x: currentX, y: currentY }
+        : note))
     }
     const finish = (): void => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', finish)
       window.removeEventListener('pointercancel', finish)
       if (!moved) return
-      void savePatch(note, { x: currentX, y: currentY })
+      void savePatch(item.note, { x: currentX, y: currentY })
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', finish)
     window.addEventListener('pointercancel', finish)
-  }, [savePatch])
+  }, [savePatch, wallSize.height, wallSize.width])
+
+  /** 右下角改大小：同样夹在墙内，抬手落库。 */
+  const startResize = useCallback((event: React.PointerEvent<HTMLElement>, item: PlacedNote): void => {
+    if (event.button !== 0) return
+    event.preventDefault()
+    event.stopPropagation()
+    const startX = event.clientX
+    const startY = event.clientY
+    const maxWidth = Math.max(NOTE_MIN_WIDTH, wallSize.width - item.x)
+    const maxHeight = Math.max(NOTE_MIN_HEIGHT, wallSize.height - item.y)
+    let currentWidth = item.width
+    let currentHeight = item.height
+    let moved = false
+    const onMove = (moveEvent: PointerEvent): void => {
+      if (moveEvent.pointerId !== event.pointerId) return
+      moved = true
+      currentWidth = clamp(Math.round(item.width + moveEvent.clientX - startX), NOTE_MIN_WIDTH, Math.min(maxWidth, NOTE_MAX_SIZE))
+      currentHeight = clamp(Math.round(item.height + moveEvent.clientY - startY), NOTE_MIN_HEIGHT, Math.min(maxHeight, NOTE_MAX_SIZE))
+      setNotes(current => current.map(note => note.id === item.note.id
+        ? { ...note, width: currentWidth, height: currentHeight }
+        : note))
+    }
+    const finish = (): void => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', finish)
+      window.removeEventListener('pointercancel', finish)
+      if (!moved) return
+      void savePatch(item.note, { width: currentWidth, height: currentHeight })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', finish)
+    window.addEventListener('pointercancel', finish)
+  }, [savePatch, wallSize.height, wallSize.width])
 
   /** 正文失焦落库；空白便签失焦即删除（墙上不留空贴纸）。 */
   const commitBody = useCallback((note: DeskNote, element: HTMLTextAreaElement): void => {
@@ -190,13 +283,17 @@ export function DeskOnePage(props: DeskPanelProps) {
     void savePatch(note, { body })
   }, [removeWithFeedback, savePatch])
 
-  const renderNote = (item: { note: DeskNote; x: number; y: number }): ReactElement => (
+  const renderNote = (item: PlacedNote): ReactElement => (
     <article
       key={item.note.id}
       className="dsh-desk-note"
       data-color={item.note.color}
-      style={{ left: item.x, top: item.y }}
-      onPointerDown={event => startDrag(event, item.note, item.x, item.y)}
+      style={{ left: item.x, top: item.y, width: item.width, height: item.height, zIndex: item.zIndex }}
+      onPointerDown={(event) => {
+        // 点/拖哪张，哪张就置顶。
+        raise(item.note.id)
+        startDrag(event, item)
+      }}
     >
       <div className="dsh-desk-note-bar">
         <div className="dsh-desk-note-colors">
@@ -225,7 +322,7 @@ export function DeskOnePage(props: DeskPanelProps) {
       </div>
       <textarea
         key={`${item.note.id}:${item.note.revision}`}
-        ref={element => {
+        ref={(element) => {
           if (element === null) textareas.current.delete(item.note.id)
           else textareas.current.set(item.note.id, element)
         }}
@@ -235,6 +332,14 @@ export function DeskOnePage(props: DeskPanelProps) {
         placeholder={t('note.placeholder')}
         spellCheck={false}
         onBlur={event => commitBody(item.note, event.currentTarget)}
+      />
+      <span
+        className="dsh-desk-note-resize"
+        aria-hidden="true"
+        onPointerDown={(event) => {
+          raise(item.note.id)
+          startResize(event, item)
+        }}
       />
     </article>
   )
@@ -251,7 +356,7 @@ export function DeskOnePage(props: DeskPanelProps) {
               <ul className="dsh-desk-recent">
                 {recent.map(note => (
                   <li key={note.id}>
-                    <button type="button" className="dsh-desk-recent-item" onClick={() => setTab('notes')}>
+                    <button type="button" className="dsh-desk-recent-item" onClick={() => selectTab('notes')}>
                       <span className="dsh-desk-recent-dot" data-color={note.color} />
                       <span className="dsh-desk-recent-text">{note.title === '' ? t('note.placeholder') : note.title}</span>
                     </button>
@@ -273,10 +378,10 @@ export function DeskOnePage(props: DeskPanelProps) {
         </div>
       </header>
       <nav className="dsh-desk-tabs" role="tablist">
-        <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => setTab('overview')}>
+        <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
           {t('tab.overview')}
         </button>
-        <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => setTab('notes')}>
+        <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
           {t('tab.notes')}
         </button>
       </nav>
@@ -289,16 +394,11 @@ export function DeskOnePage(props: DeskPanelProps) {
       {actionError === null ? null : <p className="dsh-desk-error">{actionError}</p>}
       {tab === 'overview' ? renderOverview() : (
         <div className="dsh-desk-wall" ref={wallRef}>
-          <div
-            className="dsh-desk-canvas"
-            style={{ width: Math.max(canvasSize.width, 640), height: Math.max(canvasSize.height, 360) }}
-          >
-            {loading && notes.length === 0
-              ? <p className="dsh-desk-wall-hint">{t('state.loading')}</p>
-              : notes.length === 0
-                ? <p className="dsh-desk-wall-hint">{t('state.empty')}</p>
-                : placed.map(renderNote)}
-          </div>
+          {loading && notes.length === 0
+            ? <p className="dsh-desk-wall-hint">{t('state.loading')}</p>
+            : notes.length === 0
+              ? <p className="dsh-desk-wall-hint">{t('state.empty')}</p>
+              : placed.map(renderNote)}
         </div>
       )}
       {tab === 'notes'

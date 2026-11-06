@@ -79,19 +79,13 @@ html[data-platform='darwin'] .dsh-desk-head {
   border-bottom-color: var(--dsw-alias-label-primary, #1f2329);
   font-weight: 500;
 }
-/* 墙面：占满剩余高度、可滚动；贴纸在 canvas 内绝对定位。 */
+/* 墙面：正好占满剩余高度、**不滚动**；贴纸坐标一律夹在可见区域内。 */
 .dsh-desk-wall {
   position: relative;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   margin-bottom: 40px;
-  border-radius: 14px;
-}
-.dsh-desk-canvas {
-  position: relative;
-  min-width: 100%;
-  min-height: 100%;
 }
 .dsh-desk-wall-hint {
   position: absolute;
@@ -106,25 +100,24 @@ html[data-platform='darwin'] .dsh-desk-head {
   color: var(--dsw-alias-label-tertiary, #8a919f);
   pointer-events: none;
 }
-/* 贴纸：便签墙的基本单位。 */
+/* 贴纸：便签墙的基本单位。真实便签是方角纸片，不做大圆角；尺寸由用户拖动改，内联 style 给宽高。 */
 .dsh-desk-note {
   position: absolute;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  width: 208px;
-  min-height: 168px;
-  padding: 6px 10px 10px;
-  border-radius: 10px;
+  padding: 6px 10px 10px 12px;
+  border-radius: 2px;
   background: #f5f5f2;
   color: #2d2b26;
-  box-shadow: 0 6px 16px rgba(25, 30, 45, 0.14);
+  box-shadow: 0 3px 8px rgba(25, 30, 45, 0.18), 0 1px 2px rgba(25, 30, 45, 0.12);
   cursor: grab;
   user-select: none;
+  touch-action: none;
   transition: box-shadow 0.12s ease;
 }
 .dsh-desk-note:hover {
-  box-shadow: 0 10px 22px rgba(25, 30, 45, 0.2);
+  box-shadow: 0 6px 16px rgba(25, 30, 45, 0.22), 0 1px 2px rgba(25, 30, 45, 0.12);
 }
 .dsh-desk-note:active {
   cursor: grabbing;
@@ -190,17 +183,42 @@ html[data-platform='darwin'] .dsh-desk-head {
   box-sizing: border-box;
   flex: 1;
   width: 100%;
-  min-height: 120px;
+  min-height: 0;
   padding: 0;
   border: none;
   outline: none;
   resize: none;
+  overflow: auto;
   background: transparent;
   color: inherit;
   font: inherit;
   font-size: 14px;
   line-height: 21px;
   cursor: text;
+}
+/* 右下角改大小手柄（悬停 / 聚焦时才显示，避免墙上到处是角标）。 */
+.dsh-desk-note-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  background: linear-gradient(
+    135deg,
+    transparent 0 55%,
+    rgba(45, 43, 38, 0.35) 55% 62%,
+    transparent 62% 70%,
+    rgba(45, 43, 38, 0.35) 70% 77%,
+    transparent 77%
+  );
+  touch-action: none;
+}
+.dsh-desk-note:hover .dsh-desk-note-resize,
+.dsh-desk-note:focus-within .dsh-desk-note-resize {
+  opacity: 1;
 }
 /* 「+」：悬浮在右下角，页面级固定（不随墙面滚动）。 */
 .dsh-desk-add {

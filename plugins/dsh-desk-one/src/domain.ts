@@ -23,6 +23,9 @@ const noteSchema = z.object({
   // 便签墙自由位置：老记录没有这两个字段也能通过校验（向后兼容，无需迁移）。
   x: z.number().optional(),
   y: z.number().optional(),
+  // 便签尺寸：同上，缺省即默认尺寸。
+  width: z.number().optional(),
+  height: z.number().optional(),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   revision: z.number().int().positive(),

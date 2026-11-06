@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 import {
   DeskModelError, createNoteRecord, filterNotes, normalizeNoteInput, patchNoteRecord, sortNotes,
 } from '../lib/model.js'
+import { NOTE_MAX_SIZE, NOTE_MIN_WIDTH } from '../lib/constants.js'
 
 /** 造一条合法便签记录（时间可覆盖，便于排序断言）。 */
 const note = (over = {}) => ({
@@ -107,6 +108,22 @@ describe('desk 对象模型：创建与补丁', () => {
     })
     assert.equal(next.x, 121)
     assert.equal(next.y, undefined, '负数坐标按非法值忽略')
+  })
+
+  it('补丁可以保存便签尺寸（夹到上下限，非法值忽略）', () => {
+    const next = patchNoteRecord(note(), { width: 10, height: 99_999 }, {
+      expectedRevision: 1,
+      now: '2026-01-02T00:00:00.000Z',
+    })
+    assert.equal(next.width, NOTE_MIN_WIDTH, '过小的宽度夹到下限')
+    assert.equal(next.height, NOTE_MAX_SIZE, '过大的高度夹到上限')
+
+    const ignored = patchNoteRecord(note(), { width: -5, height: Number.NaN }, {
+      expectedRevision: 1,
+      now: '2026-01-02T00:00:00.000Z',
+    })
+    assert.equal(ignored.width, undefined)
+    assert.equal(ignored.height, undefined)
   })
 
   it('补丁的 pinned 非布尔 应该 拒绝', () => {

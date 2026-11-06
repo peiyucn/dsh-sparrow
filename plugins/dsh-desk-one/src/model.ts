@@ -4,7 +4,9 @@
  * 便签墙形态下 body 是唯一内容；title 由正文首行派生，保留给 agent 工具与列表展示。
  */
 
-import { MAX_BODY_CHARS, MAX_TITLE_CHARS, NOTE_COLORS } from './constants.js'
+import {
+  MAX_BODY_CHARS, MAX_TITLE_CHARS, NOTE_COLORS, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH,
+} from './constants.js'
 import type { DeskNote, NoteColor } from './contract.js'
 
 export type DeskModelErrorCode = 'INVALID_NOTE' | 'REVISION_CONFLICT' | 'UNKNOWN_NOTE'
@@ -32,6 +34,9 @@ export interface NotePatch {
   /** 便签墙自由位置（px，相对墙面画布）。 */
   readonly x?: number
   readonly y?: number
+  /** 便签尺寸（px）：用户拖右下角改大小后写回。 */
+  readonly width?: number
+  readonly height?: number
 }
 
 /** 由正文首行派生标题（便签墙不展示 title，但 agent 工具与检索需要它）。 */
@@ -62,6 +67,12 @@ export function normalizeNoteInput(raw: { readonly title?: unknown; readonly bod
 /** 合法坐标：有限非负数；非法一律忽略（位置只是展示属性，坏值不该挡住整条便签）。 */
 export function normalizeCoordinate(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.round(value) : undefined
+}
+
+/** 合法尺寸：夹到 [min, NOTE_MAX_SIZE]；非法一律忽略（沿用当前/默认尺寸）。 */
+export function normalizeSize(value: unknown, min: number): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return undefined
+  return Math.round(Math.min(Math.max(value, min), NOTE_MAX_SIZE))
 }
 
 /** 创建一条便签对象（id / 时间 / 坐标由调用方提供，保持本函数纯净）。 */
@@ -113,6 +124,8 @@ export function patchNoteRecord(
     archived: boolean
     x?: number
     y?: number
+    width?: number
+    height?: number
     createdAt: string
     updatedAt: string
     revision: number
@@ -149,6 +162,10 @@ export function patchNoteRecord(
   const y = normalizeCoordinate(patch.y)
   if (x !== undefined) next.x = x
   if (y !== undefined) next.y = y
+  const width = normalizeSize(patch.width, NOTE_MIN_WIDTH)
+  const height = normalizeSize(patch.height, NOTE_MIN_HEIGHT)
+  if (width !== undefined) next.width = width
+  if (height !== undefined) next.height = height
   return next
 }
 

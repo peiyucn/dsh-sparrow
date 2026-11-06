@@ -67,6 +67,9 @@ interface NotePayload {
   /** 便签墙自由位置（px）：x/y 缺省时由界面按序号兜底摆放，用户拖动后才落库。 */
   x?: number
   y?: number
+  /** 便签尺寸（px）：缺省用默认尺寸，用户拖右下角改过的才写回。 */
+  width?: number
+  height?: number
 }
 
 interface EventPayload {

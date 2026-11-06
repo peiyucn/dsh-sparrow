@@ -25,6 +25,9 @@ export interface DeskNote {
   /** 便签墙自由位置（px，相对墙面画布）；缺省时界面按序号级联摆放。 */
   readonly x?: number
   readonly y?: number
+  /** 便签尺寸（px）；缺省用默认尺寸，用户拖右下角改过的才写回。 */
+  readonly width?: number
+  readonly height?: number
   readonly createdAt: string
   readonly updatedAt: string
   readonly revision: number
@@ -68,6 +71,8 @@ export interface NotePatchRequest {
   readonly archived?: boolean
   readonly x?: number
   readonly y?: number
+  readonly width?: number
+  readonly height?: number
 }
 
 export interface UpdateNoteRequest {

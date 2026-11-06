@@ -37,6 +37,8 @@ export interface DeskPanelInjected {
       readonly archived?: boolean
       readonly x?: number
       readonly y?: number
+      readonly width?: number
+      readonly height?: number
     }
   }) => Promise<DeskNote>
   readonly deleteNote: (id: string) => Promise<void>
