@@ -109,6 +109,17 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(fabRule !== null, '缺 .dsh-desk-fab-secondary 规则')
     assert.match(fabRule[1], /width:\s*48px/u, '垃圾桶与「＋」同尺寸')
     assert.match(fabRule[1], /--dsw-radius-lg/u, '两者圆角 token 一致')
+    // 悬浮组不能被内容列限宽规则套上 width:100%（否则右定位会被推到左边）。
+    assert.match(styles, /\.dsh-desk-page > :not\(\.dsh-desk-fabstack\)/u, '内容列限宽要排除悬浮操作组')
+    // owner 2026-11-06：＋ 在左、垃圾桶在右。
+    assert.ok(
+      page.indexOf('className="dsh-desk-add"') < page.indexOf('className="dsh-desk-fab-secondary"'),
+      '「＋」应排在垃圾桶前面（视觉上在左）',
+    )
+    // 贴纸图标用深墨色，不依赖主题的前景色（light 主题下也清晰）。
+    const actionRule = /\.dsh-desk-note-action \{([^}]*)\}/u.exec(styles)
+    assert.ok(actionRule !== null, '缺 .dsh-desk-note-action 规则')
+    assert.match(actionRule[1], /color:\s*rgba\(55, 53, 47/u, '贴纸图标要用纸面墨色（不随主题变白）')
     // 贴纸不出屏：墙面不滚动，不得再有可滚动画布。
     const wallRule = /\.dsh-desk-wall \{([^}]*)\}/u.exec(styles)
     assert.ok(wallRule !== null, '缺 .dsh-desk-wall 规则')

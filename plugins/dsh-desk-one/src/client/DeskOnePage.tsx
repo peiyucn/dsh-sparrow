@@ -499,6 +499,22 @@ export function DeskOnePage(props: DeskPanelProps) {
       {tab === 'notes'
         ? (
           <div className="dsh-desk-fabstack">
+            {showTrash
+              ? null
+              : (
+                  <button
+                    type="button"
+                    className="dsh-desk-add"
+                    disabled={creating}
+                    aria-label={t('action.newNote')}
+                    title={t('action.newNote')}
+                    onClick={() => { void addNote() }}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  </button>
+                )}
             <button
               type="button"
               className="dsh-desk-fab-secondary"
@@ -524,22 +540,6 @@ export function DeskOnePage(props: DeskPanelProps) {
                 ? <span className="dsh-desk-fab-count">{trashedNotes.length}</span>
                 : null}
             </button>
-            {showTrash
-              ? null
-              : (
-                  <button
-                    type="button"
-                    className="dsh-desk-add"
-                    disabled={creating}
-                    aria-label={t('action.newNote')}
-                    title={t('action.newNote')}
-                    onClick={() => { void addNote() }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  </button>
-                )}
           </div>
         )
         : null}

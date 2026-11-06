@@ -21,7 +21,8 @@ const DESK_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 14px;
 }
-.dsh-desk-page > * {
+/* 内容列统一限宽居中；悬浮操作组例外（不能吃 100% 宽，否则右定位会被推去左边）。 */
+.dsh-desk-page > :not(.dsh-desk-fabstack) {
   width: 100%;
   max-width: 960px;
   margin-left: auto;
@@ -142,8 +143,8 @@ html[data-platform='darwin'] .dsh-desk-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 20px;
-  margin-bottom: 4px;
+  height: 22px;
+  margin-bottom: 3px;
 }
 /* 拖动提示：紧凑的六点抓握纹（2 列 × 3 行、2px 点、2px 间距），低对比度常驻、悬停略清楚。
    不用文字、不用背景块；整个正文以外的区域都能拖，它只是「这里能抓」的提示。 */
@@ -234,22 +235,27 @@ html[data-platform='darwin'] .dsh-desk-head {
   color: var(--dsw-alias-state-error-primary, #c62828);
 }
 /* 墙栏入口：图标 + 计数，宽度按内容自适应。 */
-/* 贴纸上的小号图标（归档 / 关闭）：悬停才出现。 */
+/* 贴纸上的小号图标（垃圾桶）：深墨色常驻，light / dark 主题下都看得清。 */
 .dsh-desk-iconbtn-sm {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 .dsh-desk-iconbtn-sm svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 .dsh-desk-note-action {
+  color: rgba(55, 53, 47, 0.55);
   opacity: 0;
   transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
 .dsh-desk-note:hover .dsh-desk-note-action,
 .dsh-desk-note:focus-within .dsh-desk-note-action {
   opacity: 1;
+}
+.dsh-desk-note-action:hover {
+  background: rgba(55, 53, 47, 0.08);
+  color: rgba(55, 53, 47, 0.92);
 }
 .dsh-desk-note-body {
   box-sizing: border-box;
@@ -326,7 +332,7 @@ html[data-platform='darwin'] .dsh-desk-head {
   opacity: 0.6;
   cursor: default;
 }
-/* 右下角操作组：垃圾桶与「＋」同一排、同一尺寸与圆角，风格一致。 */
+/* 右下角操作组：同一排、同尺寸、同圆角；＋ 在左，垃圾桶在右。 */
 .dsh-desk-fabstack {
   position: absolute;
   right: 28px;
@@ -336,6 +342,9 @@ html[data-platform='darwin'] .dsh-desk-head {
   flex-direction: row;
   align-items: center;
   gap: 10px;
+  width: auto;
+  max-width: none;
+  margin: 0;
 }
 .dsh-desk-fab-secondary {
   position: relative;
