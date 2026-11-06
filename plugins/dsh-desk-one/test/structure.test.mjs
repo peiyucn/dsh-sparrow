@@ -84,7 +84,7 @@ describe('dsh-desk-one 结构', () => {
     const page = await read('src/client/DeskOnePage.tsx')
     assert.match(page, /dsh-desk-tabs/u)
     assert.match(page, /data-window-drag/u)
-    assert.match(page, /'today'/u)
+    assert.match(page, /'overview'/u)
     assert.match(page, /'notes'/u)
     for (const forbidden of ['role="dialog"', 'aria-modal', 'position: fixed', 'backdrop-filter']) {
       assert.ok(!page.includes(forbidden), `页面源码里不该有 ${forbidden}`)

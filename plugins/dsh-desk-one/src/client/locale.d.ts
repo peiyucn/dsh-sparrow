@@ -5,7 +5,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'button.label'
       | 'page.title'
       | 'page.subtitle'
-      | 'tab.today'
+      | 'tab.overview'
       | 'tab.notes'
       | 'action.newNote'
       | 'action.delete'
@@ -20,8 +20,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'state.empty'
       | 'state.loadFailed'
       | 'state.saveFailed'
-      | 'today.counts'
-      | 'today.hint'
+      | 'overview.counts'
+      | 'overview.recent'
+      | 'overview.recentEmpty'
+      | 'overview.hint'
   }
 }
 

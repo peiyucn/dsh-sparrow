@@ -1,5 +1,5 @@
 /**
- * 桌面页样式表（纯 CSS 文本，由 client half 注入）：页头、标签栏、便签墙、贴纸与「+」按钮。
+ * 办公桌页样式表（纯 CSS 文本，由 client half 注入）：页头、标签栏、便签墙、贴纸与「+」按钮。
  * 拆成独立模块：node:test 可脱离 React 组件直接验证注入 / 复用 / 移除。
  */
 
@@ -52,7 +52,7 @@ html[data-platform='darwin'] .dsh-desk-head {
   line-height: 18px;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
-/* 标签栏：今天 / 便签 /（后续：任务 / 日程）。 */
+/* 标签栏：总览 / 便签墙 /（后续：任务板 / 日程 / 专注）。 */
 .dsh-desk-tabs {
   display: flex;
   gap: 4px;
@@ -244,6 +244,59 @@ html[data-platform='darwin'] .dsh-desk-head {
   font-size: 14px;
   line-height: 20px;
   color: var(--dsw-alias-label-secondary, #6b7280);
+}
+/* 总览页：最近便签列表。 */
+.dsh-desk-section-title {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-desk-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dsh-desk-recent-item {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+}
+.dsh-desk-recent-item:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  border-color: var(--dsw-alias-border-l1, #e2e5ea);
+}
+.dsh-desk-recent-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d9d9d4;
+}
+.dsh-desk-recent-dot[data-color='yellow'] { background: #f2d35a; }
+.dsh-desk-recent-dot[data-color='green'] { background: #7fc98c; }
+.dsh-desk-recent-dot[data-color='blue'] { background: #7ba6ea; }
+.dsh-desk-recent-dot[data-color='pink'] { background: #ec9cb8; }
+.dsh-desk-recent-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dsh-desk-hint {
   margin: 0;

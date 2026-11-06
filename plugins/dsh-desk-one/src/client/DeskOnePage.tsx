@@ -1,7 +1,7 @@
 /**
  * dsh-desk-one 主面板页（S0）：一个面板、两个标签。
  * 「便签」是便签墙：右下角「+」随手加一张，便签在墙上自由拖动摆放、直接在贴纸上写字；
- * 「今天」是主标签，给后续任务 / 日程的联动聚合预留。
+ * 「总览」是主标签：先汇总便签，后续接入任务 / 日程。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -11,7 +11,7 @@ import { LOCALE_NAMESPACE, NOTE_COLORS } from '../constants.js'
 import type { DeskNote, NoteColor } from '../contract.js'
 import type { DeskPanelInjected } from './install.js'
 
-type Tab = 'today' | 'notes'
+type Tab = 'overview' | 'notes'
 
 /** 便签几何（px）：墙面上的自由摆放单位。 */
 const NOTE_WIDTH = 208
@@ -40,7 +40,7 @@ function fallbackPosition(index: number): { x: number; y: number } {
  */
 export function DeskOnePage(props: DeskPanelProps) {
   const { listNotes, createNote, updateNote, deleteNote, t } = props
-  const [tab, setTab] = useState<Tab>('notes')
+  const [tab, setTab] = useState<Tab>('overview')
   const [notes, setNotes] = useState<readonly DeskNote[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -239,12 +239,30 @@ export function DeskOnePage(props: DeskPanelProps) {
     </article>
   )
 
-  const renderToday = (): ReactElement => (
-    <div className="dsh-desk-today">
-      <p className="dsh-desk-stats">{t('today.counts', { notes: notes.length })}</p>
-      <p className="dsh-desk-hint">{t('today.hint')}</p>
-    </div>
-  )
+  const renderOverview = (): ReactElement => {
+    const recent = notes.slice(0, 5)
+    return (
+      <div className="dsh-desk-today">
+        <p className="dsh-desk-stats">{t('overview.counts', { notes: notes.length })}</p>
+        <h2 className="dsh-desk-section-title">{t('overview.recent')}</h2>
+        {recent.length === 0
+          ? <p className="dsh-desk-hint">{t('overview.recentEmpty')}</p>
+          : (
+              <ul className="dsh-desk-recent">
+                {recent.map(note => (
+                  <li key={note.id}>
+                    <button type="button" className="dsh-desk-recent-item" onClick={() => setTab('notes')}>
+                      <span className="dsh-desk-recent-dot" data-color={note.color} />
+                      <span className="dsh-desk-recent-text">{note.title === '' ? t('note.placeholder') : note.title}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+        <p className="dsh-desk-hint">{t('overview.hint')}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="dsh-desk-page">
@@ -255,8 +273,8 @@ export function DeskOnePage(props: DeskPanelProps) {
         </div>
       </header>
       <nav className="dsh-desk-tabs" role="tablist">
-        <button type="button" className="dsh-desk-tab" data-active={tab === 'today'} onClick={() => setTab('today')}>
-          {t('tab.today')}
+        <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => setTab('overview')}>
+          {t('tab.overview')}
         </button>
         <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => setTab('notes')}>
           {t('tab.notes')}
@@ -269,7 +287,7 @@ export function DeskOnePage(props: DeskPanelProps) {
         </div>
       )}
       {actionError === null ? null : <p className="dsh-desk-error">{actionError}</p>}
-      {tab === 'today' ? renderToday() : (
+      {tab === 'overview' ? renderOverview() : (
         <div className="dsh-desk-wall" ref={wallRef}>
           <div
             className="dsh-desk-canvas"

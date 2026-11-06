@@ -17,7 +17,7 @@
 | :--- | :--- |
 | **Node（对象）** | 一切可被引用、查询、链接的东西：任务、便签、日程、专注、项目。 |
 | **Edge（关系）** | 类型化有向边，独立存储；关系不污染对象字段。 |
-| **View（视图）** | Node + Edge 的查询投影：今天、看板、便签墙、搜索。视图不落库。 |
+| **View（视图）** | Node + Edge 的查询投影：总览、任务板、便签墙、搜索。视图不落库。 |
 | **Provider（来源）** | 生成镜像 Node 的外部通道：Outlook Graph / 企业微信 CalDAV / 本地。 |
 | **Store（仓库）** | 单一持久化层 + 内存索引；所有写入走它，保证一致性与事件广播。 |
 
@@ -180,7 +180,7 @@ interface SourceRef {
 
 | 视图 | 查询定义 |
 | :--- | :--- |
-| 今天 | 本地日期区间内 `event`；到期/逾期或 `doing` 的 `task`；`running` 的 `focus`；置顶 `note` |
+| 总览 | `note` 最近项与条数；后续接入本地日期区间内 `event`、到期/逾期 `task`、`running` 的 `focus` |
 | 待办 | 按 `status` 与 `due` 分组；收集箱 = `inbox` |
 | 日程 | 时间区间内的 `event`，按开始时间排序 |
 | 看板 | 指定 `project` 的 `task`，按 `status` 分组 |
@@ -223,7 +223,7 @@ interface DeskApi {
 | 工具 | 作用 | 风险 |
 | :--- | :--- | :--- |
 | `desk_task_add` / `desk_task_list` / `desk_task_update` / `desk_task_complete` | 待办增查改完成 | 低 |
-| `desk_today` | 今天聚合 | 低 |
+| `desk_overview` | 总览摘要 | 低 |
 | `desk_calendar_list` | 区间日程（本地 + 镜像） | 低 |
 | `desk_calendar_add` | 新建本地事件；写回外部需确认 | 中（v2） |
 | `desk_focus_start` / `desk_focus_stop` / `desk_focus_status` | 专注计时 | 低（v2） |
@@ -242,7 +242,7 @@ interface DeskApi {
 * Node 校验（字段、kind/payload 匹配、时间区间合法性）。
 * 状态机迁移（task / focus）。
 * 边唯一性与级联删除。
-* 视图查询（今天/看板/搜索的定义）。
+* 视图查询（总览/任务板/搜索的定义）。
 * 冲突判定（半开区间、时区、全天事件）。
 * schema 迁移与未知字段保留。
 * 同步 upsert 的唯一键与冲突策略。

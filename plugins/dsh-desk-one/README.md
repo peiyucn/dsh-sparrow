@@ -2,12 +2,12 @@
 
 English | [简体中文](README.zh-CN.md)
 
-A personal desk inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. S0 ships the skeleton and the notes wall — a sticky wall you fill with "＋", drag around and write on directly.
+**Desk One** — a personal office desk inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. S0 ships the skeleton and the notes wall — a sticky wall you fill with "＋", drag around and write on directly.
 
 ## What it is
 
-* One left-sidebar entry named **Desk**; functions live in tabs inside the panel instead of scattering across the UI.
-* **Today** is the main tab and the future aggregation hub for tasks and calendar events.
+* One left-sidebar entry named **Desk One**; functions live in tabs inside the panel instead of scattering across the UI.
+* **Overview** is the main tab: it gathers what is on the desk (notes today; tasks and calendars later).
 * **Notes** is the first shipped feature: a free-form sticky wall, not an input form.
 
 ## Requirements
@@ -20,15 +20,15 @@ A personal desk inside the DSH web UI: one sidebar entry, one panel, and one sha
 
 * `dsh plugin --profile web add @dsh-sparrow/dsh-desk-one`
 * Restart dsh web after installing; a browser refresh alone is not enough for the client bundle.
-* Then open the whale sidebar and pick **Desk**.
+* Then open the whale sidebar and pick **Desk One**.
 
 ## Use
 
+* **Overview** shows how many notes are on the wall and the five most recent ones; click a row to jump to the notes wall.
 * In **Notes**, tap the floating **＋** at the bottom right; a fresh sticky appears and takes the keyboard focus.
 * Type straight onto the sticky; leaving it saves the text, and an emptied sticky is removed instead of kept as clutter.
 * Drag a sticky by its body to place it anywhere on the wall; positions are saved per note.
 * Hover a sticky to reveal its color dots and the **×** delete button.
-* Use the **Today** tab for the summary; it becomes the hub once tasks and calendars land.
 
 ## Data and privacy
 

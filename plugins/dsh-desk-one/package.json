@@ -1,6 +1,6 @@
 {
   "name": "@dsh-sparrow/dsh-desk-one",
-  "description": "Personal desk in the DSH web UI — one sidebar panel with tabs for notes, tasks and calendars, all built on one shared object model",
+  "description": "Desk One — a personal office desk in the DSH web UI: one sidebar panel with tabs for notes, tasks and calendars on one shared object model",
   "version": "0.2.2-rc.1",
   "license": "MIT",
   "repository": {
