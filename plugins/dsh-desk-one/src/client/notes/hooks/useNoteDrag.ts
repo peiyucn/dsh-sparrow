@@ -18,6 +18,8 @@ type Patch = Parameters<DeskPanelInjected['updateNote']>[0]['patch']
 
 interface DragDeps {
   readonly wallSize: WallSize
+  /** Live node ref: gestures read the real size at start so stale state cannot clamp to 0. */
+  readonly wallRef: { current: HTMLDivElement | null }
   readonly setNotes: Dispatch<SetStateAction<readonly DeskNote[]>>
   readonly savePatch: (note: DeskNote, patch: Patch) => void
 }
@@ -27,7 +29,14 @@ export interface NoteDrag {
   readonly startResize: (event: ReactPointerEvent<HTMLElement>, item: PlacedNote) => void
 }
 
-export function useNoteDrag({ wallSize, setNotes, savePatch }: DragDeps): NoteDrag {
+export function useNoteDrag({ wallSize, wallRef, setNotes, savePatch }: DragDeps): NoteDrag {
+  /** Prefer the live box (gesture-time) over the possibly stale measured state. */
+  const liveSize = useCallback((): WallSize => {
+    const node = wallRef.current
+    if (node === null) return wallSize
+    return { width: node.clientWidth || wallSize.width, height: node.clientHeight || wallSize.height }
+  }, [wallRef, wallSize])
+
   const startDrag = useCallback((event: ReactPointerEvent<HTMLElement>, item: PlacedNote): void => {
     const target = event.target as HTMLElement
     // Textarea / buttons / resize grip own their gestures; only the paper itself drags.
@@ -35,8 +44,9 @@ export function useNoteDrag({ wallSize, setNotes, savePatch }: DragDeps): NoteDr
     event.preventDefault()
     const startX = event.clientX
     const startY = event.clientY
-    const maxX = Math.max(0, wallSize.width - item.width)
-    const maxY = Math.max(0, wallSize.height - item.height)
+    const size = liveSize()
+    const maxX = Math.max(0, size.width - item.width)
+    const maxY = Math.max(0, size.height - item.height)
     const element = event.currentTarget
     let currentX = item.x
     let currentY = item.y
@@ -65,7 +75,7 @@ export function useNoteDrag({ wallSize, setNotes, savePatch }: DragDeps): NoteDr
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', finish)
     window.addEventListener('pointercancel', finish)
-  }, [savePatch, setNotes, wallSize.height, wallSize.width])
+  }, [liveSize, savePatch, setNotes])
 
   const startResize = useCallback((event: ReactPointerEvent<HTMLElement>, item: PlacedNote): void => {
     if (event.button !== 0) return
@@ -73,8 +83,9 @@ export function useNoteDrag({ wallSize, setNotes, savePatch }: DragDeps): NoteDr
     event.stopPropagation()
     const startX = event.clientX
     const startY = event.clientY
-    const maxWidth = Math.max(NOTE_MIN_WIDTH, wallSize.width - item.x)
-    const maxHeight = Math.max(NOTE_MIN_HEIGHT, wallSize.height - item.y)
+    const size = liveSize()
+    const maxWidth = Math.max(NOTE_MIN_WIDTH, size.width - item.x)
+    const maxHeight = Math.max(NOTE_MIN_HEIGHT, size.height - item.y)
     const element = event.currentTarget.closest('.dsh-desk-note') as HTMLElement | null
     let currentWidth = item.width
     let currentHeight = item.height
@@ -102,7 +113,7 @@ export function useNoteDrag({ wallSize, setNotes, savePatch }: DragDeps): NoteDr
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', finish)
     window.addEventListener('pointercancel', finish)
-  }, [savePatch, setNotes, wallSize.height, wallSize.width])
+  }, [liveSize, savePatch, setNotes])
 
   return { startDrag, startResize }
 }

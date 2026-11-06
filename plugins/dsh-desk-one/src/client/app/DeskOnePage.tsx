@@ -55,8 +55,8 @@ export function DeskOnePage(props: DeskPanelProps) {
     setActionError: data.setActionError,
     t,
   })
-  const { wallRef, wallSize, placed } = useWallLayout(tab === 'notes', trash.activeNotes)
-  const drag = useNoteDrag({ wallSize, setNotes: data.setNotes, savePatch: data.savePatch })
+  const { wallRef, setWallRef, wallSize, placed } = useWallLayout(tab === 'notes', trash.activeNotes)
+  const drag = useNoteDrag({ wallSize, wallRef, setNotes: data.setNotes, savePatch: data.savePatch })
 
   /** Click / drag / resize raises one note to the top; skip the write when it already is. */
   const raise = useCallback((noteId: string): void => {
@@ -120,7 +120,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   const renderWall = (): ReactElement => (
     <div
       className="dsh-desk-wall"
-      ref={(node) => { wallRef.current = node }}
+      ref={setWallRef}
       onDoubleClick={(event) => {
         // Only empty wall space creates a note; double-clicking a sticker or control is ignored.
         if (event.target !== event.currentTarget) return

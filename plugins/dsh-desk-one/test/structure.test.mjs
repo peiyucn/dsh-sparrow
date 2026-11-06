@@ -174,6 +174,19 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(!spec.includes('命名待定'), '命名已定为「存档」')
   })
 
+  it('墙面尺寸 应该 挂载即测 + 手势时读实时尺寸（防止便签被夹到左上角）', async () => {
+    const layout = await read('src/client/notes/hooks/useWallLayout.ts')
+    const drag = await read('src/client/notes/hooks/useNoteDrag.ts')
+    const page = await readClientSurface()
+    assert.match(layout, /const setWallRef = useCallback/u, '要用 callback ref 在挂载时立即测量')
+    assert.match(layout, /setWallSize\(measureWall\(node\)\)/u, '挂载后立刻记录尺寸')
+    assert.match(layout, /new ResizeObserver/u, 'ResizeObserver 继续跟进窗口 / 面板尺寸')
+    assert.match(layout, /wallSize\.width === 0 \? rawX/u, '未测量时保留原坐标，不夹到 0')
+    assert.match(drag, /const liveSize = useCallback/u, '拖拽要读实时尺寸')
+    assert.match(drag, /const size = liveSize\(\)/u)
+    assert.match(page, /ref=\{setWallRef\}/u, '墙面要挂到 callback ref 上')
+  })
+
   it('总览 应该 保持空白占位（内容未设计前不堆放功能）', async () => {
     const page = await readClientSurface()
     assert.match(page, /dsh-desk-overview/u, '总览要有空白占位容器')
