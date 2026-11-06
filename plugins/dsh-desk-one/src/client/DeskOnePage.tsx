@@ -243,16 +243,29 @@ export function DeskOnePage(props: DeskPanelProps) {
         y: clamp(Math.round(anchorY), 0, Math.max(0, wallSize.height - NOTE_DEFAULT_HEIGHT)),
         z: layer,
       })
-      setNotes(current => [...current, note])
+      // 新建即置顶：即便宿主暂时不认创建时的 z，也先在本地按最大层级 + 1 显示。
+      const placedNote = note.z === layer ? note : { ...note, z: layer }
+      setNotes(current => [...current, placedNote])
       selectTab('notes')
       setShowTrash(false)
+      if (note.z !== layer) {
+        // 补一次 z 补丁把层级真正落库（老宿主的 patch 已支持 z，不依赖重启）。
+        enqueueWrite(note.id, async () => {
+          try {
+            const updated = await updateNote({ id: note.id, expectedRevision: note.revision, patch: { z: layer } })
+            replaceNote({ ...updated, z: updated.z ?? layer })
+          } catch {
+            // 落库失败不影响本地显示，下次拖动/点击会再次尝试。
+          }
+        })
+      }
       requestAnimationFrame(() => { textareas.current.get(note.id)?.focus() })
     } catch (reason) {
       setActionError(t('state.saveFailed', { message: messageOf(reason) }))
     } finally {
       setCreating(false)
     }
-  }, [activeNotes.length, createNote, creating, notes, selectTab, t, wallSize.height, wallSize.width])
+  }, [activeNotes.length, createNote, creating, enqueueWrite, notes, replaceNote, selectTab, t, updateNote, wallSize.height, wallSize.width])
 
   /** 卡片拖拽：不出屏（坐标夹在墙内），抬起时落库。 */
   const startDrag = useCallback((event: React.PointerEvent<HTMLElement>, item: PlacedNote): void => {

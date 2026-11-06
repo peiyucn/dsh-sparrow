@@ -137,6 +137,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /onDoubleClick/u, '便签墙要支持双击空白处新建')
     assert.match(page, /wall\.tip/u, '空墙中央要有双击新建提示')
     assert.match(page, /z:\s*layer/u, '新建便签要带层级（默认置顶）')
+    assert.match(page, /note\.z !== layer/u, '新建便签要对不认创建 z 的宿主做兜底（本地置顶 + 补丁落库）')
     const tipRule = /\.dsh-desk-wall-tip-main \{([^}]*)\}/u.exec(styles)
     assert.ok(tipRule !== null, '缺提示主文案样式')
     assert.match(tipRule[1], /letter-spacing/u, '提示文案要有排版设计（字距）')
