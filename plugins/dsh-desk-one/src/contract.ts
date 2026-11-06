@@ -64,10 +64,10 @@ export interface DeskTask {
     readonly date: string
     readonly timezone?: string
   }
-  /** 列内手动顺序：越大越靠后；拖拽即重排。 */
+  /** 容器内手动顺序：越大越靠后。容器 = 未分组区或某个分组。 */
   readonly order: number
-  /** 一层分组名；缺省表示未分组（S1 只支持一层）。 */
-  readonly group?: string
+  /** 所属分组 id；缺省表示未分组（分组属于泳道，跨列移动卡片会移出分组）。 */
+  readonly groupId?: string
   /** 存档后从板上消失，进任务板存档视图（命名避开宿主「会话归档」）。 */
   readonly archived: boolean
   /** 预留：多板 / 自定义泳道后启用，S1 不写。 */
@@ -78,8 +78,24 @@ export interface DeskTask {
   readonly revision: number
 }
 
+/**
+ * 任务分组（S1 一层）：分组是实体，不是卡片上的标签。分组属于某个泳道，可以为空；
+ * `order` 是组在所属泳道内的顺序。成员关系存于 `DeskTask.groupId`，删除分组时成员回未分组。
+ */
+export interface DeskTaskGroup {
+  readonly id: string
+  readonly kind: 'group'
+  readonly schema: number
+  readonly name: string
+  readonly status: TaskStatus
+  readonly order: number
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
+
 /** 统一对象：存储域一张 nodes 表按 kind 判别（加 kind 只扩 schema，不改表）。 */
-export type DeskNode = DeskNote | DeskTask
+export type DeskNode = DeskNote | DeskTask | DeskTaskGroup
 
 export interface NoteListResponse {
   readonly notes: readonly DeskNote[]
@@ -146,8 +162,8 @@ export interface CreateTaskRequest {
   readonly dueDate?: string
   readonly dueTimezone?: string
   readonly order?: number
-  /** 一层分组名；缺省不分组。 */
-  readonly group?: string
+  /** 所属分组 id；缺省不分组。 */
+  readonly groupId?: string
 }
 
 export interface TaskPatchRequest {
@@ -160,7 +176,53 @@ export interface TaskPatchRequest {
   readonly order?: number
   readonly archived?: boolean
   /** `null` 表示移出分组；缺省表示不改。 */
-  readonly group?: string | null
+  readonly groupId?: string | null
+}
+
+export interface TaskGroupListResponse {
+  readonly groups: readonly DeskTaskGroup[]
+}
+
+export interface TaskGroupMutationResponse {
+  readonly group: DeskTaskGroup
+}
+
+export interface TaskGroupMoveResponse {
+  readonly group: DeskTaskGroup
+  /** 整组跨列时被一起改状态的成员任务（同列排序时为空数组）。 */
+  readonly tasks: readonly DeskTask[]
+}
+
+export interface TaskGroupDeleteResponse {
+  readonly deleted: boolean
+}
+
+export interface CreateTaskGroupRequest {
+  readonly name?: string
+  readonly status?: string
+  readonly order?: number
+}
+
+export interface TaskGroupPatchRequest {
+  readonly name?: string
+  readonly order?: number
+}
+
+export interface UpdateTaskGroupRequest {
+  readonly id: string
+  readonly expectedRevision: number
+  readonly patch: TaskGroupPatchRequest
+}
+
+export interface MoveTaskGroupRequest {
+  readonly id: string
+  readonly expectedRevision: number
+  readonly status: string
+  readonly order?: number
+}
+
+export interface DeleteTaskGroupRequest {
+  readonly id: string
 }
 
 export interface UpdateTaskRequest {

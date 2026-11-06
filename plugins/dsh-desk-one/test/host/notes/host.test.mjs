@@ -90,6 +90,7 @@ describe('host 装配（apply 接线）', () => {
     assert.deepEqual(
       collected.tools.map(tool => tool.name).sort(),
       [
+        'desk_group_add', 'desk_group_delete', 'desk_group_list', 'desk_group_move', 'desk_group_update',
         'desk_note_add', 'desk_note_delete', 'desk_note_list', 'desk_note_update',
         'desk_task_add', 'desk_task_archive', 'desk_task_complete', 'desk_task_list', 'desk_task_update',
       ],
@@ -160,14 +161,14 @@ describe('host 装配（apply 接线）', () => {
     const created = await callRoute(handler, {
       method: 'POST',
       url: ROUTES.tasks,
-      body: JSON.stringify({ title: '任务一', dueDate: '2026-11-30', status: 'todo', group: '需求池' }),
+      body: JSON.stringify({ title: '任务一', dueDate: '2026-11-30', status: 'todo' }),
       headers: host,
     })
     assert.equal(created.status, 201)
     assert.equal(created.json.task.title, '任务一')
     assert.equal(created.json.task.status, 'todo')
     assert.equal(created.json.task.archived, false)
-    assert.equal(created.json.task.group, '需求池')
+    assert.equal(created.json.task.groupId, undefined)
     assert.deepEqual(created.json.task.due, { date: '2026-11-30' })
     const id = created.json.task.id
     assert.match(id, /^task_/u)
@@ -209,6 +210,96 @@ describe('host 装配（apply 接线）', () => {
     })
     assert.equal(deleted.status, 200)
     assert.equal(deleted.json.deleted, true)
+  })
+
+  it('分组 REST 全链路 应该 能建 / 查 / 改名 / 整组跨列 / 删除并解绑任务', async () => {
+    const { ctx, collected } = fakeHost()
+    await apply(ctx)
+    const handler = collected.routes[0].handler
+    const host = { host: '127.0.0.1:3080' }
+
+    const groupCreated = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.groups,
+      body: JSON.stringify({ name: '需求池', status: 'todo' }),
+      headers: host,
+    })
+    assert.equal(groupCreated.status, 201)
+    assert.equal(groupCreated.json.group.name, '需求池')
+    assert.equal(groupCreated.json.group.status, 'todo')
+    assert.equal(groupCreated.json.group.order, 0)
+    assert.equal(groupCreated.json.group.revision, 1)
+    const groupId = groupCreated.json.group.id
+    assert.match(groupId, /^group_/u)
+
+    const duplicate = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.groups,
+      body: JSON.stringify({ name: '需求池', status: 'todo' }),
+      headers: host,
+    })
+    assert.equal(duplicate.status, 400)
+
+    const taskCreated = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.tasks,
+      body: JSON.stringify({ title: '组内任务', groupId }),
+      headers: host,
+    })
+    assert.equal(taskCreated.status, 201)
+    assert.equal(taskCreated.json.task.groupId, groupId)
+    assert.equal(taskCreated.json.task.status, 'todo')
+    const taskId = taskCreated.json.task.id
+
+    const wrongLane = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.tasks,
+      body: JSON.stringify({ title: '错泳道任务', status: 'done', groupId }),
+      headers: host,
+    })
+    assert.equal(wrongLane.status, 400, '任务不能挂到其它泳道的分组')
+
+    const groupsListed = await callRoute(handler, { method: 'GET', url: ROUTES.groups, headers: host })
+    assert.equal(groupsListed.status, 200)
+    assert.equal(groupsListed.json.groups.length, 1)
+
+    const renamed = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.groupUpdate,
+      body: JSON.stringify({ id: groupId, expectedRevision: 1, patch: { name: '需求池 v2', order: 0 } }),
+      headers: host,
+    })
+    assert.equal(renamed.status, 200)
+    assert.equal(renamed.json.group.name, '需求池 v2')
+    assert.equal(renamed.json.group.revision, 2)
+
+    const moved = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.groupMove,
+      body: JSON.stringify({ id: groupId, expectedRevision: 2, status: 'doing', order: 0 }),
+      headers: host,
+    })
+    assert.equal(moved.status, 200)
+    assert.equal(moved.json.group.status, 'doing')
+    assert.equal(moved.json.tasks.length, 1)
+    assert.equal(moved.json.tasks[0].id, taskId)
+    assert.equal(moved.json.tasks[0].status, 'doing')
+
+    const doingTasks = await callRoute(handler, { method: 'GET', url: `${ROUTES.tasks}?status=doing`, headers: host })
+    assert.equal(doingTasks.json.tasks.length, 1)
+    assert.equal(doingTasks.json.tasks[0].groupId, groupId)
+
+    const deleted = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.groupDelete,
+      body: JSON.stringify({ id: groupId }),
+      headers: host,
+    })
+    assert.equal(deleted.status, 200)
+
+    const afterDelete = await callRoute(handler, { method: 'GET', url: `${ROUTES.tasks}?include_archived=1`, headers: host })
+    assert.equal(afterDelete.json.tasks.length, 1)
+    assert.equal(afterDelete.json.tasks[0].groupId, undefined, '删除分组后任务回到未分组')
   })
 
   it('agent 工具 应该 与 REST 共用同一份数据（工具建 → 路由查）', async () => {

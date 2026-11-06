@@ -9,6 +9,7 @@ import { assertHostGates } from './host/gates.js'
 import { createDeskRequestHandler } from './host/router.js'
 import { DeskStore } from './host/store.js'
 import { registerDeskTools } from './host/notes/tools.js'
+import { registerGroupTools } from './host/tasks/group-tools.js'
 import { registerTaskTools } from './host/tasks/tools.js'
 
 export const name = 'dsh-desk-one'
@@ -34,4 +35,5 @@ export async function apply(ctx: Context): Promise<void> {
 
   registerDeskTools(ctx, store)
   registerTaskTools(ctx, store)
+  registerGroupTools(ctx, store)
 }

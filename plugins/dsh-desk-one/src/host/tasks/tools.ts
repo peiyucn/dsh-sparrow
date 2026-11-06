@@ -34,12 +34,13 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
       due_date: { type: 'string', description: 'Due date, YYYY-MM-DD.' },
       due_timezone: { type: 'string', description: 'IANA timezone for the due date (optional).' },
       order: { type: 'number', description: 'Manual order inside the lane (larger = later).' },
-      group: { type: 'string', description: 'Optional one-level group name (blank = ungrouped).' },
+      group_id: { type: 'string', description: 'Optional group id (see desk_group_list); must belong to the same lane.' },
     },
     output: textOutput,
     async execute(args) {
       try {
-        const task = await store.createTask(args)
+        const { group_id, ...rest } = args
+        const task = await store.createTask({ ...rest, groupId: group_id })
         return JSON.stringify({ ok: true, task, summary: `已添加任务「${task.title}」` })
       } catch (error) {
         toolError(error)
@@ -53,18 +54,18 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
     parameters: {
       status: { type: 'string', enum: TASK_STATUSES, description: 'Only tasks in this lane.' },
       query: { type: 'string', description: 'Case-insensitive keyword over title and body.' },
-      group: { type: 'string', description: 'Only tasks in this one-level group; pass an empty string for ungrouped tasks.' },
+      group_id: { type: 'string', description: 'Only tasks in this group (desk_group_list gives ids); empty string = ungrouped.' },
       limit: { type: 'number', description: 'Maximum tasks to return (default 50, max 200).' },
       include_archived: { type: 'boolean', description: 'Include archived tasks (default false).' },
     },
     output: textOutput,
     execute(args) {
       const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(Math.floor(args.limit), 200) : 50
-      const group = typeof args.group === 'string' ? args.group.trim() : undefined
+      const groupId = typeof args.group_id === 'string' ? args.group_id.trim() : undefined
       const tasks = store.listTasks(args.query)
         .filter(task => (args.status === undefined || task.status === args.status)
           && (args.include_archived === true || !task.archived)
-          && (group === undefined || (group === '' ? task.group === undefined : task.group === group)))
+          && (groupId === undefined || (groupId === '' ? task.groupId === undefined : task.groupId === groupId)))
         .slice(0, limit)
       return Promise.resolve(JSON.stringify({
         ok: true,
@@ -89,7 +90,7 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
       due_timezone: { type: 'string', description: 'IANA timezone for the due date.' },
       clear_due: { type: 'boolean', description: 'Clear the due date instead of setting it.' },
       order: { type: 'number', description: 'New manual order in the lane.' },
-      group: { type: 'string', description: 'Move the task into this one-level group.' },
+      group_id: { type: 'string', description: 'Move the task into this group (must be in the target lane).' },
       clear_group: { type: 'boolean', description: 'Move the task out of its group.' },
     },
     output: textOutput,
@@ -98,7 +99,7 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
         const due = args.clear_due === true
           ? null
           : args.due_date === undefined ? undefined : { date: args.due_date, timezone: args.due_timezone }
-        const group = args.clear_group === true ? null : args.group
+        const groupId = args.clear_group === true ? null : args.group_id
         const task = await store.updateTask(args.id, args.expected_revision, {
           ...args.title === undefined ? {} : { title: args.title },
           ...args.body === undefined ? {} : { body: args.body },
@@ -106,7 +107,7 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
           ...args.color === undefined ? {} : { color: args.color },
           ...due === undefined ? {} : { due },
           ...args.order === undefined ? {} : { order: args.order },
-          ...group === undefined ? {} : { group },
+          ...groupId === undefined ? {} : { groupId },
         })
         return JSON.stringify({ ok: true, task, summary: `已更新任务「${task.title}」` })
       } catch (error) {

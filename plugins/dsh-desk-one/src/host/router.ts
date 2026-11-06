@@ -10,6 +10,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { isTrustedPluginRequest, officialTrustedHosts } from '../trust.js'
 import { DeskError, sendError, sendJson } from './http.js'
 import { NOTE_ROUTES } from './notes/routes.js'
+import { GROUP_ROUTES } from './tasks/group-routes.js'
 import { TASK_ROUTES } from './tasks/routes.js'
 import type { DeskStore } from './store.js'
 
@@ -28,7 +29,7 @@ export interface DeskRouteEntry {
 }
 
 /** All HTTP routes of the plugin; feature modules append their tables here. */
-const ROUTE_TABLE: readonly DeskRouteEntry[] = [...NOTE_ROUTES, ...TASK_ROUTES]
+const ROUTE_TABLE: readonly DeskRouteEntry[] = [...NOTE_ROUTES, ...TASK_ROUTES, ...GROUP_ROUTES]
 
 /** Build the prefix handler: fence -> exact match -> feature handler, with unified error mapping. */
 export function createDeskRequestHandler(route: DeskRouteContext): (req: IncomingMessage, res: ServerResponse) => Promise<void> {

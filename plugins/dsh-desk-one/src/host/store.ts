@@ -10,13 +10,14 @@ import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
-import { MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NODES_TABLE, PACKAGE_NAME } from '../constants.js'
+import { MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NODES_TABLE, PACKAGE_NAME, TASK_STATUSES } from '../constants.js'
 import {
-  DeskModelError, createNoteRecord, createTaskRecord, filterNotes, filterTasks, normalizeCoordinate,
-  normalizeLayer, normalizeNoteInput, normalizeTaskInput, patchNoteRecord, patchTaskRecord, sortNotes, sortTasks,
-  type NotePatch, type TaskPatch,
+  DeskModelError, createGroupRecord, createNoteRecord, createTaskRecord, filterGroups, filterNotes, filterTasks,
+  normalizeCoordinate, normalizeGroupInput, normalizeLayer, normalizeNoteInput, normalizeTaskInput, patchGroupRecord,
+  patchNoteRecord, patchTaskRecord, sortGroups, sortNotes, sortTasks,
+  type GroupPatch, type NotePatch, type TaskPatch,
 } from '../model.js'
-import type { DeskNode, DeskNote, DeskTask } from '../contract.js'
+import type { DeskNode, DeskNote, DeskTask, DeskTaskGroup, TaskStatus } from '../contract.js'
 
 type DeskDomain = Domain<typeof DESK_DOMAIN>
 
@@ -43,6 +44,15 @@ export class DeskStore {
 
   private allNodes(): DeskNode[] {
     return [...this.nodes.entries()].map(([, node]) => node)
+  }
+
+  private allTasks(): DeskTask[] {
+    return this.allNodes().filter((node): node is DeskTask => node.kind === 'task')
+  }
+
+  private groupById(id: string): DeskTaskGroup | undefined {
+    const node = this.nodes.get(id)
+    return node !== undefined && node.kind === 'group' ? node : undefined
   }
 
   /* ------------------------------- notes ------------------------------- */
@@ -138,11 +148,35 @@ export class DeskStore {
     readonly dueDate?: unknown
     readonly dueTimezone?: unknown
     readonly order?: unknown
+    readonly groupId?: unknown
   }): Promise<DeskTask> {
     const input = normalizeTaskInput(raw)
+    if (input.groupId !== undefined) {
+      const group = this.groupById(input.groupId)
+      if (group === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${input.groupId}`)
+      if (group.status !== input.status) {
+        throw new DeskModelError('INVALID_GROUP', '任务状态与所属分组的泳道不一致')
+      }
+    }
     const task = createTaskRecord(input, { id: `task_${randomUUID()}`, now: new Date().toISOString() })
     await this.nodes.put(task.id, task)
     return task
+  }
+
+  /**
+   * Membership invariant: a task may only belong to a group in its own lane. A cross-lane status
+   * move that leaves `groupId` untouched clears the membership (the group stays in its lane).
+   */
+  private reconcileTaskGroup(task: DeskTask, patch: TaskPatch): DeskTask {
+    if (task.groupId === undefined) return task
+    const group = this.groupById(task.groupId)
+    if (group === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${task.groupId}`)
+    if (group.status === task.status) return task
+    if (patch.groupId === undefined && patch.status !== undefined) {
+      const { groupId: _cleared, ...rest } = task
+      return rest
+    }
+    throw new DeskModelError('INVALID_GROUP', '任务状态与所属分组的泳道不一致')
   }
 
   /** Patch one task; revision mismatch -> REVISION_CONFLICT, missing -> UNKNOWN_TASK. */
@@ -151,7 +185,7 @@ export class DeskStore {
     try {
       const updated = await this.nodes.update(id, (current) => {
         if (current.kind !== 'task') throw new DeskModelError('UNKNOWN_TASK', `任务不存在：${id}`)
-        return patchTaskRecord(current, patch, { expectedRevision, now })
+        return this.reconcileTaskGroup(patchTaskRecord(current, patch, { expectedRevision, now }), patch)
       })
       if (updated.kind !== 'task') throw new DeskModelError('UNKNOWN_TASK', `任务不存在：${id}`)
       return updated
@@ -170,8 +204,139 @@ export class DeskStore {
     return true
   }
 
+  /* ------------------------------- groups ------------------------------- */
+
+  /** List groups in board order (all lanes unless the caller filters). */
+  listGroups(query?: string, limit?: number): DeskTaskGroup[] {
+    const groups = this.allNodes().filter((node): node is DeskTaskGroup => node.kind === 'group')
+    const filtered = filterGroups(sortGroups(groups), query)
+    if (limit === undefined) return filtered
+    const bounded = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 500) : 0
+    return bounded === 0 ? filtered : filtered.slice(0, bounded)
+  }
+
+  /** Groups of one lane in manual order (used to keep group order dense after edits). */
+  private laneGroups(status: TaskStatus): DeskTaskGroup[] {
+    return sortGroups(this.allNodes().filter(
+      (node): node is DeskTaskGroup => node.kind === 'group' && node.status === status,
+    ))
+  }
+
+  async createGroup(raw: { readonly name?: unknown; readonly status?: unknown; readonly order?: unknown }): Promise<DeskTaskGroup> {
+    const input = normalizeGroupInput(raw)
+    if (this.laneGroups(input.status).some(group => group.name === input.name)) {
+      throw new DeskModelError('INVALID_GROUP', `分组已存在：${input.name}`)
+    }
+    const order = raw.order === undefined ? this.laneGroups(input.status).length : input.order
+    const group = createGroupRecord({ ...input, order }, { id: `group_${randomUUID()}`, now: new Date().toISOString() })
+    await this.nodes.put(group.id, group)
+    return group
+  }
+
+  /** Rename / reorder one group; lane moves go through `moveGroup` because they cascade to tasks. */
+  async updateGroup(id: string, expectedRevision: number, patch: GroupPatch): Promise<DeskTaskGroup> {
+    const now = new Date().toISOString()
+    try {
+      const updated = await this.nodes.update(id, (current) => {
+        if (current.kind !== 'group') throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
+        const patched = patchGroupRecord(current, patch, { expectedRevision, now })
+        if (patch.name !== undefined && this.laneGroups(current.status).some(
+          group => group.id !== id && group.name === patched.name,
+        )) {
+          throw new DeskModelError('INVALID_GROUP', `分组已存在：${patched.name}`)
+        }
+        return patched
+      })
+      if (updated.kind !== 'group') throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
+      return updated
+    } catch (error) {
+      throw this.mapMissing(error, 'UNKNOWN_GROUP', `分组不存在：${id}`)
+    }
+  }
+
+  /** Write dense 0..n-1 group orders; only records whose order actually changed are rewritten. */
+  private async applyGroupOrders(ordered: readonly DeskTaskGroup[], now: string): Promise<DeskTaskGroup[]> {
+    const updated: DeskTaskGroup[] = []
+    for (const [index, group] of ordered.entries()) {
+      if (group.order === index) {
+        updated.push(group)
+        continue
+      }
+      const next = await this.nodes.update(group.id, (current) => current.kind === 'group'
+        ? { ...current, order: index, revision: current.revision + 1, updatedAt: now }
+        : current)
+      if (next.kind === 'group') updated.push(next)
+    }
+    return updated
+  }
+
+  /**
+   * Move a group to a lane / position. Same-lane moves only reorder groups; cross-lane moves
+   * cascade the new status to every member task (the group remains their container).
+   */
+  async moveGroup(
+    id: string,
+    expectedRevision: number,
+    toStatus: string,
+    toOrder?: number,
+  ): Promise<{ group: DeskTaskGroup; tasks: DeskTask[] }> {
+    const current = this.groupById(id)
+    if (current === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
+    if (!Number.isInteger(expectedRevision) || current.revision !== expectedRevision) {
+      throw new DeskModelError(
+        'REVISION_CONFLICT',
+        `分组已被修改（当前 revision ${current.revision}，请求 ${expectedRevision}）`,
+      )
+    }
+    if (!(TASK_STATUSES as readonly string[]).includes(toStatus)) {
+      throw new DeskModelError('INVALID_GROUP', `未知的泳道：${toStatus}`)
+    }
+    const status = toStatus as TaskStatus
+    const now = new Date().toISOString()
+    let movedGroup = current
+    const updatedTasks: DeskTask[] = []
+
+    if (current.status !== status) {
+      const moved = await this.nodes.update(id, (node) => node.kind === 'group'
+        ? { ...node, status, revision: node.revision + 1, updatedAt: now }
+        : node)
+      if (moved.kind === 'group') movedGroup = moved
+      for (const task of this.allTasks().filter(task => task.groupId === id)) {
+        const next = await this.nodes.update(task.id, (node) => node.kind === 'task'
+          ? { ...node, status, revision: node.revision + 1, updatedAt: now }
+          : node)
+        if (next.kind === 'task') updatedTasks.push(next)
+      }
+      // Close the gap the group left behind in its old lane.
+      await this.applyGroupOrders(this.laneGroups(current.status), now)
+    }
+
+    const target = this.laneGroups(status).filter(group => group.id !== id)
+    const index = toOrder === undefined ? target.length : Math.max(0, Math.min(Math.round(toOrder), target.length))
+    target.splice(index, 0, movedGroup)
+    const ordered = await this.applyGroupOrders(target, now)
+    return { group: ordered.find(group => group.id === id) ?? movedGroup, tasks: updatedTasks }
+  }
+
+  /** Delete a group; its cards become ungrouped (explicit delete only — empty groups persist). */
+  async deleteGroup(id: string): Promise<boolean> {
+    const current = this.groupById(id)
+    if (current === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
+    const now = new Date().toISOString()
+    for (const task of this.allTasks().filter(task => task.groupId === id)) {
+      await this.nodes.update(task.id, (node) => {
+        if (node.kind !== 'task') return node
+        const { groupId: _cleared, ...rest } = node
+        return { ...rest, revision: node.revision + 1, updatedAt: now }
+      })
+    }
+    await this.nodes.delete(id)
+    await this.applyGroupOrders(this.laneGroups(current.status), now)
+    return true
+  }
+
   /** Translate the domain's missing-key error into the feature-specific 404. */
-  private mapMissing(error: unknown, code: 'UNKNOWN_NOTE' | 'UNKNOWN_TASK', message: string): unknown {
+  private mapMissing(error: unknown, code: 'UNKNOWN_NOTE' | 'UNKNOWN_TASK' | 'UNKNOWN_GROUP', message: string): unknown {
     if (error instanceof DomainError && error.code === 'missing-key') return new DeskModelError(code, message)
     return error
   }

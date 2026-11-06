@@ -8,7 +8,7 @@ import {
   MAX_BODY_CHARS, MAX_GROUP_CHARS, MAX_TITLE_CHARS, NOTE_COLORS, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH,
   TASK_STATUSES,
 } from './constants.js'
-import type { DeskNote, DeskTask, NoteColor, TaskStatus } from './contract.js'
+import type { DeskNote, DeskTask, DeskTaskGroup, NoteColor, TaskStatus } from './contract.js'
 
 export type DeskModelErrorCode =
   | 'INVALID_NOTE'
@@ -20,6 +20,8 @@ export type DeskModelErrorCode =
   | 'TRASH_FULL'
   | 'INVALID_TASK'
   | 'UNKNOWN_TASK'
+  | 'INVALID_GROUP'
+  | 'UNKNOWN_GROUP'
 
 /** 模型层错误：路由据此映射 HTTP 状态（400 / 409 / 404）。 */
 export class DeskModelError extends Error {
@@ -219,7 +221,7 @@ export interface TaskInput {
   readonly color: NoteColor
   readonly due?: { readonly date: string; readonly timezone?: string }
   readonly order: number
-  readonly group?: string
+  readonly groupId?: string
 }
 
 export interface TaskPatch {
@@ -231,8 +233,8 @@ export interface TaskPatch {
   readonly due?: { readonly date: string; readonly timezone?: string } | null
   readonly order?: number
   readonly archived?: boolean
-  /** `null` (or blank) removes the task from its group; `undefined` leaves it unchanged. */
-  readonly group?: string | null
+  /** `null` removes the task from its group; `undefined` leaves membership unchanged. */
+  readonly groupId?: string | null
 }
 
 function isTaskStatus(value: unknown): value is TaskStatus {
@@ -260,15 +262,22 @@ export function normalizeOrder(value: unknown): number | undefined {
   return Math.round(value)
 }
 
-/** One-level group name: trimmed, blank means "no group", overlength is rejected. */
+/** One-level group name: trimmed, blank means "no name", overlength is rejected. */
 export function normalizeGroupName(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const name = value.trim()
   if (name === '') return undefined
   if (name.length > MAX_GROUP_CHARS) {
-    throw new DeskModelError('INVALID_TASK', `分组名超过 ${MAX_GROUP_CHARS} 字符上限`)
+    throw new DeskModelError('INVALID_GROUP', `分组名超过 ${MAX_GROUP_CHARS} 字符上限`)
   }
   return name
+}
+
+/** Membership id: non-empty trimmed string (the group record itself is validated by the store). */
+export function normalizeGroupId(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const id = value.trim()
+  return id === '' ? undefined : id
 }
 
 /**
@@ -283,7 +292,7 @@ export function normalizeTaskInput(raw: {
   readonly dueDate?: unknown
   readonly dueTimezone?: unknown
   readonly order?: unknown
-  readonly group?: unknown
+  readonly groupId?: unknown
 }): TaskInput {
   const title = typeof raw.title === 'string' ? raw.title.trim() : ''
   if (title === '') throw new DeskModelError('INVALID_TASK', '任务需要标题')
@@ -301,7 +310,7 @@ export function normalizeTaskInput(raw: {
   const due = raw.dueDate === undefined
     ? undefined
     : normalizeDue({ date: raw.dueDate, timezone: raw.dueTimezone })
-  const group = normalizeGroupName(raw.group)
+  const groupId = normalizeGroupId(raw.groupId)
   return {
     title,
     body,
@@ -309,7 +318,7 @@ export function normalizeTaskInput(raw: {
     color,
     ...(due === undefined ? {} : { due }),
     order: normalizeOrder(raw.order) ?? 0,
-    ...(group === undefined ? {} : { group }),
+    ...(groupId === undefined ? {} : { groupId }),
   }
 }
 
@@ -329,7 +338,7 @@ export function createTaskRecord(
     color: input.color,
     ...(input.due === undefined ? {} : { due: input.due }),
     order: input.order,
-    ...(input.group === undefined ? {} : { group: input.group }),
+    ...(input.groupId === undefined ? {} : { groupId: input.groupId }),
     archived: false,
     createdAt: meta.now,
     updatedAt: meta.now,
@@ -361,7 +370,7 @@ export function patchTaskRecord(
     due?: { date: string; timezone?: string }
     order: number
     archived: boolean
-    group?: string
+    groupId?: string
     projectId?: string
     laneId?: string
     createdAt: string
@@ -402,12 +411,12 @@ export function patchTaskRecord(
     if (typeof patch.archived !== 'boolean') throw new DeskModelError('INVALID_TASK', 'archived 必须是布尔值')
     next.archived = patch.archived
   }
-  if (patch.group === null) {
-    delete next.group
-  } else if (patch.group !== undefined) {
-    const group = normalizeGroupName(patch.group)
-    if (group === undefined) delete next.group
-    else next.group = group
+  if (patch.groupId === null) {
+    delete next.groupId
+  } else if (patch.groupId !== undefined) {
+    const groupId = normalizeGroupId(patch.groupId)
+    if (groupId === undefined) delete next.groupId
+    else next.groupId = groupId
   }
   return next
 }
@@ -425,4 +434,98 @@ export function filterTasks(tasks: readonly DeskTask[], query: string | undefine
   const text = (query ?? '').trim().toLowerCase()
   if (text === '') return [...tasks]
   return tasks.filter(task => `${task.title}\n${task.body}`.toLowerCase().includes(text))
+}
+
+/* ------------------------------------------------------------------ */
+/* Task groups: first-class entities, one level, owned by a lane      */
+/* ------------------------------------------------------------------ */
+
+export interface GroupInput {
+  readonly name: string
+  readonly status: TaskStatus
+  readonly order: number
+}
+
+export interface GroupPatch {
+  readonly name?: string
+  readonly order?: number
+}
+
+/** Normalize a group creation request; groups always live in exactly one lane. */
+export function normalizeGroupInput(raw: {
+  readonly name?: unknown
+  readonly status?: unknown
+  readonly order?: unknown
+}): GroupInput {
+  const name = normalizeGroupName(raw.name)
+  if (name === undefined) throw new DeskModelError('INVALID_GROUP', '分组需要名字')
+  const status = raw.status === undefined || raw.status === '' ? 'todo' : raw.status
+  if (!isTaskStatus(status)) throw new DeskModelError('INVALID_GROUP', `未知的泳道：${String(raw.status)}`)
+  return { name, status, order: normalizeOrder(raw.order) ?? 0 }
+}
+
+/** Create a group record (pure: id / time come from the caller). */
+export function createGroupRecord(
+  input: GroupInput,
+  meta: { readonly id: string; readonly now: string },
+): DeskTaskGroup {
+  return {
+    id: meta.id,
+    kind: 'group',
+    schema: 1,
+    name: input.name,
+    status: input.status,
+    order: input.order,
+    createdAt: meta.now,
+    updatedAt: meta.now,
+    revision: 1,
+  }
+}
+
+/** Apply a name / order patch; lane moves go through the store (they cascade to member tasks). */
+export function patchGroupRecord(
+  current: DeskTaskGroup,
+  patch: GroupPatch,
+  meta: { readonly expectedRevision: number; readonly now: string },
+): DeskTaskGroup {
+  if (!Number.isInteger(meta.expectedRevision) || current.revision !== meta.expectedRevision) {
+    throw new DeskModelError(
+      'REVISION_CONFLICT',
+      `分组已被修改（当前 revision ${current.revision}，请求 ${meta.expectedRevision}）`,
+    )
+  }
+  const next: {
+    id: string
+    kind: 'group'
+    schema: number
+    name: string
+    status: TaskStatus
+    order: number
+    createdAt: string
+    updatedAt: string
+    revision: number
+  } = { ...current, revision: current.revision + 1, updatedAt: meta.now }
+  if (patch.name !== undefined) {
+    const name = normalizeGroupName(patch.name)
+    if (name === undefined) throw new DeskModelError('INVALID_GROUP', '分组名不能为空')
+    next.name = name
+  }
+  const order = normalizeOrder(patch.order)
+  if (order !== undefined) next.order = order
+  return next
+}
+
+/** Group order inside a lane: manual order, then creation time, then id (stable fallback). */
+export function sortGroups(groups: readonly DeskTaskGroup[]): DeskTaskGroup[] {
+  return [...groups].sort((left, right) =>
+    left.order - right.order
+    || left.createdAt.localeCompare(right.createdAt)
+    || left.id.localeCompare(right.id))
+}
+
+/** Keyword filter over group names (case-insensitive); empty query returns all. */
+export function filterGroups(groups: readonly DeskTaskGroup[], query: string | undefined): DeskTaskGroup[] {
+  const text = (query ?? '').trim().toLowerCase()
+  if (text === '') return [...groups]
+  return groups.filter(group => group.name.toLowerCase().includes(text))
 }

@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  DeskModelError, createTaskRecord, filterTasks, normalizeTaskInput, patchTaskRecord, sortTasks,
+  DeskModelError, createGroupRecord, createTaskRecord, filterGroups, filterTasks, normalizeGroupInput,
+  normalizeTaskInput, patchGroupRecord, patchTaskRecord, sortGroups, sortTasks,
 } from '../../lib/model.js'
 
 /** Build a valid task record for patch/sort tests. */
@@ -68,18 +69,46 @@ describe('task 模型：创建 / 补丁 / 排序', () => {
     )
   })
 
-  it('分组 应该 支持创建 / 重命名补丁 / 移出（null）', () => {
-    const grouped = normalizeTaskInput({ title: 'x', group: '  需求池  ' })
-    assert.equal(grouped.group, '需求池')
+  it('任务分组 应该 记录 groupId / 变更 / 移出（null）', () => {
+    const grouped = normalizeTaskInput({ title: 'x', groupId: '  group_1  ' })
+    assert.equal(grouped.groupId, 'group_1')
     const record = createTaskRecord(grouped, { id: 'task_x', now: 'now' })
-    assert.equal(record.group, '需求池')
-    const renamed = patchTaskRecord(record, { group: '本季度' }, { expectedRevision: 1, now: 'later' })
-    assert.equal(renamed.group, '本季度')
-    const cleared = patchTaskRecord(record, { group: null }, { expectedRevision: 1, now: 'later' })
-    assert.equal(cleared.group, undefined)
-    const blank = patchTaskRecord(record, { group: '   ' }, { expectedRevision: 1, now: 'later' })
-    assert.equal(blank.group, undefined)
-    assert.throws(() => normalizeTaskInput({ title: 'x', group: 'g'.repeat(81) }), (error) => error instanceof DeskModelError)
+    assert.equal(record.groupId, 'group_1')
+    const moved = patchTaskRecord(record, { groupId: 'group_2' }, { expectedRevision: 1, now: 'later' })
+    assert.equal(moved.groupId, 'group_2')
+    const cleared = patchTaskRecord(record, { groupId: null }, { expectedRevision: 1, now: 'later' })
+    assert.equal(cleared.groupId, undefined)
+    const blank = patchTaskRecord(record, { groupId: '   ' }, { expectedRevision: 1, now: 'later' })
+    assert.equal(blank.groupId, undefined)
+  })
+
+  it('分组实体 应该 归一化 / 创建 / 改名 / 排序', () => {
+    const input = normalizeGroupInput({ name: '  需求池  ', status: 'doing', order: 2 })
+    assert.deepEqual(input, { name: '需求池', status: 'doing', order: 2 })
+    assert.throws(() => normalizeGroupInput({ name: '   ' }), (error) => error instanceof DeskModelError && error.code === 'INVALID_GROUP')
+    assert.throws(() => normalizeGroupInput({ name: 'g', status: 'blocked' }), (error) => error instanceof DeskModelError)
+
+    const record = createGroupRecord(input, { id: 'group_a', now: '2026-01-01T00:00:00.000Z' })
+    assert.equal(record.kind, 'group')
+    assert.equal(record.revision, 1)
+    assert.equal(record.status, 'doing')
+
+    const renamed = patchGroupRecord(record, { name: ' 本季度 ', order: 5 }, { expectedRevision: 1, now: 'later' })
+    assert.equal(renamed.name, '本季度')
+    assert.equal(renamed.order, 5)
+    assert.equal(renamed.revision, 2)
+    assert.throws(
+      () => patchGroupRecord(record, { name: 'x' }, { expectedRevision: 9, now: 'later' }),
+      (error) => error instanceof DeskModelError && error.code === 'REVISION_CONFLICT',
+    )
+
+    const groups = [
+      { ...record, id: 'b', order: 2, createdAt: 'b' },
+      { ...record, id: 'a', order: 1, createdAt: 'a' },
+    ]
+    assert.deepEqual(sortGroups(groups).map(group => group.id), ['a', 'b'])
+    assert.equal(filterGroups(groups, '需求池').length, 2)
+    assert.equal(filterGroups(groups, '不存在').length, 0)
   })
 
   it('排序 应该 按 order → createdAt → id；过滤 标题 + 正文', () => {

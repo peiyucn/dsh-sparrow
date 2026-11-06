@@ -51,8 +51,8 @@ const taskSchema = z.object({
     timezone: z.string().optional(),
   }).optional(),
   order: z.number().int().nonnegative(),
-  /** One-level grouping: the group name itself is the key; absent means ungrouped. */
-  group: z.string().optional(),
+  /** Membership is a group id; the group entity owns name / lane / order. */
+  groupId: z.string().optional(),
   // "存档" (archive) is a task-board concept; naming chosen to avoid the host's session archive.
   archived: z.boolean().default(false),
   projectId: z.string().optional(),
@@ -62,8 +62,20 @@ const taskSchema = z.object({
   revision: z.number().int().positive(),
 })
 
-const nodeSchema = z.discriminatedUnion('kind', [noteSchema, taskSchema])
+/** One-level task group: a real entity (can be empty, renamed, reordered) owned by a lane. */
+const groupSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('group'),
+  schema: z.number().int().positive(),
+  name: z.string().min(1),
+  status: z.enum(TASK_STATUSES),
+  order: z.number().int().nonnegative(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  revision: z.number().int().positive(),
+})
 
+const nodeSchema = z.discriminatedUnion('kind', [noteSchema, taskSchema, groupSchema])
 const edgeSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),

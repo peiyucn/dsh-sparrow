@@ -16,6 +16,10 @@ export const ROUTES = Object.freeze({
   tasks: `${PREFIX}/tasks`,
   taskUpdate: `${PREFIX}/tasks/update`,
   taskDelete: `${PREFIX}/tasks/delete`,
+  groups: `${PREFIX}/groups`,
+  groupUpdate: `${PREFIX}/groups/update`,
+  groupMove: `${PREFIX}/groups/move`,
+  groupDelete: `${PREFIX}/groups/delete`,
 })
 
 /** 入口 id：同时是左栏面板行的 id 与中央列 `main` 槽的 key（官方 `MainPanelId`）。 */
