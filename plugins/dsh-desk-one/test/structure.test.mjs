@@ -85,8 +85,21 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(!/border-radius:\s*10px/u.test(noteRule[1]), '便签不得回到 10px 大圆角')
     // 改大小手柄 + 层级置顶 + 标签页记忆都在页面里。
     assert.match(page, /dsh-desk-note-resize/u, '便签必须有右下角改大小手柄')
-    assert.match(page, /dsh-desk-note-drag/u, '便签必须有可见的拖动提示（文字标签，不用图标）')
-    assert.match(page, /action\.drag/u, '拖动提示要带可访问文案')
+    assert.match(page, /dsh-desk-note-grip/u, '便签必须有紧凑的六点抓握纹')
+    assert.match(page, /action\.drag/u, '抓握纹要带可访问文案')
+    const gripRule = /\.dsh-desk-note-grip \{([^}]*)\}/u.exec(styles)
+    assert.ok(gripRule !== null, '缺 .dsh-desk-note-grip 规则')
+    assert.match(gripRule[1], /grid-template-columns:\s*repeat\(2,\s*2px\)/u, '六点纹要紧凑（2px 点 / 2px 间距）')
+    assert.match(gripRule[1], /gap:\s*2px/u)
+    // 色板圆点必须与便签纸面同色（owner 2026-11-06：色标深度要和便签一致）。
+    const notePalette = new Map([...styles.matchAll(/\.dsh-desk-note\[data-color='([a-z]+)'\] \{ background-color: (#[0-9a-f]{6}); \}/gu)].map(match => [match[1], match[2]]))
+    const dotPalette = new Map([...styles.matchAll(/\.dsh-desk-dot\[data-color='([a-z]+)'\] \{ background: (#[0-9a-f]{6}); \}/gu)].map(match => [match[1], match[2]]))
+    const recentPalette = new Map([...styles.matchAll(/\.dsh-desk-recent-dot\[data-color='([a-z]+)'\] \{ background: (#[0-9a-f]{6}); \}/gu)].map(match => [match[1], match[2]]))
+    assert.equal(notePalette.size, 5, '便签色板应有 5 个色位')
+    for (const [color, hex] of notePalette) {
+      assert.equal(dotPalette.get(color), hex, `色板圆点 ${color} 必须与便签纸面同色`)
+      assert.equal(recentPalette.get(color), hex, `总览色点 ${color} 必须与便签纸面同色`)
+    }
     // 真实便签是平涂纸面：不得有渐变（owner 2026-11-06 明确否掉）。
     assert.ok(!/gradient/u.test(noteRule[1]), '便签纸面不得有渐变')
     // 改大小角标是极简角标，不是斜线花纹。

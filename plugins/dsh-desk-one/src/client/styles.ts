@@ -125,6 +125,7 @@ html[data-platform='darwin'] .dsh-desk-head {
   cursor: grabbing;
 }
 /* Notion 浅色模式背景色板（微调偏暖后用于纸面）。 */
+.dsh-desk-note[data-color='default'] { background-color: #f4f1ea; }
 .dsh-desk-note[data-color='yellow'] { background-color: #faf3dd; }
 .dsh-desk-note[data-color='green'] { background-color: #eef3ed; }
 .dsh-desk-note[data-color='blue'] { background-color: #e9f3f7; }
@@ -136,22 +137,29 @@ html[data-platform='darwin'] .dsh-desk-head {
   height: 20px;
   margin-bottom: 4px;
 }
-/* 拖动提示：不用图标，直接一枚极小的「拖动」字样（平时淡、悬停变清楚）；
-   整个贴纸正文以外的区域都能拖，字样只是让人知道这里可以抓。 */
-.dsh-desk-note-drag {
+/* 拖动提示：紧凑的六点抓握纹（2 列 × 3 行、2px 点、2px 间距），低对比度常驻、悬停略清楚。
+   不用文字、不用背景块；整个正文以外的区域都能拖，它只是「这里能抓」的提示。 */
+.dsh-desk-note-grip {
   flex: none;
-  font-size: 11px;
-  line-height: 14px;
-  letter-spacing: 0.06em;
-  color: rgba(55, 53, 47, 0.32);
+  display: grid;
+  grid-template-columns: repeat(2, 2px);
+  grid-template-rows: repeat(3, 2px);
+  gap: 2px;
+  color: rgba(55, 53, 47, 0.26);
   cursor: grab;
-  user-select: none;
   transition: color 0.12s ease;
 }
-.dsh-desk-note:hover .dsh-desk-note-drag {
-  color: rgba(55, 53, 47, 0.62);
+.dsh-desk-note-grip i {
+  display: block;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: currentColor;
 }
-.dsh-desk-note:active .dsh-desk-note-drag {
+.dsh-desk-note:hover .dsh-desk-note-grip {
+  color: rgba(55, 53, 47, 0.5);
+}
+.dsh-desk-note:active .dsh-desk-note-grip {
   cursor: grabbing;
 }
 .dsh-desk-note-colors {
@@ -165,13 +173,13 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-note:focus-within .dsh-desk-note-colors {
   opacity: 1;
 }
-/* 色板：小圆点用 Notion 的深色文字色（一眼区分色相），选中态用墨色细环。 */
+/* 色板：圆点与便签纸面**同色**（不靠加深颜色制造可见性，用细环区分），选中态再加一圈墨色细环。 */
 .dsh-desk-dot {
   appearance: none;
   width: 12px;
   height: 12px;
   padding: 0;
-  border: none;
+  border: 1px solid rgba(55, 53, 47, 0.2);
   border-radius: 50%;
   cursor: pointer;
   transition: transform 0.1s ease, box-shadow 0.1s ease;
@@ -179,11 +187,11 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-dot:hover {
   transform: scale(1.12);
 }
-.dsh-desk-dot[data-color='default'] { background: #787774; }
-.dsh-desk-dot[data-color='yellow'] { background: #c29343; }
-.dsh-desk-dot[data-color='green'] { background: #548164; }
-.dsh-desk-dot[data-color='blue'] { background: #487ca5; }
-.dsh-desk-dot[data-color='pink'] { background: #b35488; }
+.dsh-desk-dot[data-color='default'] { background: #f4f1ea; }
+.dsh-desk-dot[data-color='yellow'] { background: #faf3dd; }
+.dsh-desk-dot[data-color='green'] { background: #eef3ed; }
+.dsh-desk-dot[data-color='blue'] { background: #e9f3f7; }
+.dsh-desk-dot[data-color='pink'] { background: #f9f2f5; }
 .dsh-desk-dot[data-active='true'] {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 3px rgba(55, 53, 47, 0.55);
 }
@@ -328,17 +336,20 @@ html[data-platform='darwin'] .dsh-desk-head {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
   border-color: var(--dsw-alias-border-l1, #e2e5ea);
 }
+/* 总览最近便签的色点：与便签纸面同色 + 细环（与色板同一口径）。 */
 .dsh-desk-recent-dot {
   flex: none;
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #787774;
+  border: 1px solid rgba(55, 53, 47, 0.16);
+  background: #f4f1ea;
 }
-.dsh-desk-recent-dot[data-color='yellow'] { background: #c29343; }
-.dsh-desk-recent-dot[data-color='green'] { background: #548164; }
-.dsh-desk-recent-dot[data-color='blue'] { background: #487ca5; }
-.dsh-desk-recent-dot[data-color='pink'] { background: #b35488; }
+.dsh-desk-recent-dot[data-color='default'] { background: #f4f1ea; }
+.dsh-desk-recent-dot[data-color='yellow'] { background: #faf3dd; }
+.dsh-desk-recent-dot[data-color='green'] { background: #eef3ed; }
+.dsh-desk-recent-dot[data-color='blue'] { background: #e9f3f7; }
+.dsh-desk-recent-dot[data-color='pink'] { background: #f9f2f5; }
 .dsh-desk-recent-text {
   overflow: hidden;
   text-overflow: ellipsis;
