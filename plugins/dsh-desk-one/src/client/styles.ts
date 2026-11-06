@@ -79,13 +79,26 @@ html[data-platform='darwin'] .dsh-desk-head {
   border-bottom-color: var(--dsw-alias-label-primary, #1f2329);
   font-weight: 500;
 }
+/* 便签标签内部：上方墙栏（归档入口）+ 墙面 / 归档区。 */
+.dsh-desk-notesview {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.dsh-desk-wallbar {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
 /* 墙面：正好占满剩余高度、**不滚动**；贴纸坐标一律夹在可见区域内。 */
 .dsh-desk-wall {
   position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  margin-bottom: 40px;
+  margin-bottom: 64px;
 }
 .dsh-desk-wall-hint {
   position: absolute;
@@ -197,6 +210,26 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-dot[data-active='true'] {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 3px rgba(55, 53, 47, 0.55);
 }
+/* 贴纸上的「归档」：无边框文字按钮，悬停才出现，紧挨删除。 */
+.dsh-desk-note-archive {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 16px;
+  color: rgba(55, 53, 47, 0.42);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.dsh-desk-note:hover .dsh-desk-note-archive,
+.dsh-desk-note:focus-within .dsh-desk-note-archive {
+  opacity: 1;
+}
+.dsh-desk-note-archive:hover {
+  color: rgba(55, 53, 47, 0.78);
+}
 .dsh-desk-note-close {
   appearance: none;
   border: none;
@@ -258,35 +291,109 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-note-resize:hover {
   border-color: rgba(55, 53, 47, 0.6);
 }
-/* 「+」：悬浮在右下角，页面级固定（不随墙面滚动）。 */
+/* 「随手记」：与 DSH 原生按钮同语言（细边 + 抬升面 + hover 底色），悬浮在右下角。 */
 .dsh-desk-add {
   position: absolute;
   right: 28px;
   bottom: 28px;
   z-index: 2;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--dsw-alias-label-primary, #1f2329);
-  color: var(--dsw-alias-bg-layer-1, #ffffff);
-  font-size: 28px;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px 0 12px;
+  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font-size: 13px;
+  font-weight: 500;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(20, 25, 40, 0.28);
-  transition: transform 0.12s ease;
+  box-shadow: 0 2px 10px rgba(20, 25, 40, 0.12);
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+.dsh-desk-add svg {
+  display: block;
+  flex: none;
+  width: 14px;
+  height: 14px;
 }
 .dsh-desk-add:hover {
-  transform: translateY(-1px);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
 }
 .dsh-desk-add:disabled {
   opacity: 0.6;
   cursor: default;
 }
+/* 归档区：便签墙内的第二视图（上方墙栏按钮进入 / 返回）。 */
+.dsh-desk-archive {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin-bottom: 64px;
+}
+.dsh-desk-archive-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dsh-desk-archive-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+}
+.dsh-desk-archive-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #787774;
+}
+.dsh-desk-archive-dot[data-color='default'] { background: #787774; }
+.dsh-desk-archive-dot[data-color='yellow'] { background: #c29343; }
+.dsh-desk-archive-dot[data-color='green'] { background: #548164; }
+.dsh-desk-archive-dot[data-color='blue'] { background: #487ca5; }
+.dsh-desk-archive-dot[data-color='pink'] { background: #b35488; }
+.dsh-desk-archive-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 20px;
+}
+.dsh-desk-archive-meta {
+  flex: none;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
+/* 文本按钮（归档区里的恢复 / 删除）。 */
+.dsh-desk-link {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  cursor: pointer;
+}
+.dsh-desk-link:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-desk-link-danger:hover {
+  color: var(--dsw-alias-state-error-primary, #c62828);
+}
+
 /* 总览：内容尚未设计，S0 保持空白占位（owner 2026-11-06：先不投入）。 */
 .dsh-desk-overview {
   flex: 1;

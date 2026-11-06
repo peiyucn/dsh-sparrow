@@ -63,6 +63,15 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(installAt > gateAt, '能力门必须排在安装之前')
   })
 
+  it('便签墙 应该 有归档区：卡片可归档，墙上方有入口，归档区可恢复 / 删除', async () => {
+    const page = await read('src/client/DeskOnePage.tsx')
+    assert.match(page, /dsh-desk-note-archive/u, '贴纸要有归档入口')
+    assert.match(page, /dsh-desk-wallbar/u, '便签标签要有墙栏承载归档入口')
+    assert.match(page, /dsh-desk-archive/u, '要有归档视图容器')
+    assert.match(page, /action\.restore/u, '归档区要能恢复')
+    assert.match(page, /archive\.empty/u, '归档区要有空态文案')
+  })
+
   it('总览 应该 保持空白占位（内容未设计前不堆放功能）', async () => {
     const page = await read('src/client/DeskOnePage.tsx')
     assert.match(page, /dsh-desk-overview/u, '总览要有空白占位容器')
@@ -79,6 +88,9 @@ describe('dsh-desk-one 结构', () => {
     const addRule = /\.dsh-desk-add \{([^}]*)\}/u.exec(styles)
     assert.ok(addRule !== null, '缺 .dsh-desk-add 规则')
     assert.match(addRule[1], /position:\s*absolute/u, '「+」必须悬浮在墙面右下角')
+    assert.match(addRule[1], /border-radius:\s*999px/u, '随手记按钮要与原生按钮同语言（胶囊）')
+    assert.match(addRule[1], /--dsw-alias-bg-layer-1/u, '按钮底色用宿主抬升面 token')
+    assert.ok(!/--dsw-alias-label-primary,\s*#1f2329\);\s*color:\s*var\(--dsw-alias-bg-layer-1/u.test(addRule[1]), '不得回到黑底白字的自造按钮')
     // 贴纸不出屏：墙面不滚动，不得再有可滚动画布。
     const wallRule = /\.dsh-desk-wall \{([^}]*)\}/u.exec(styles)
     assert.ok(wallRule !== null, '缺 .dsh-desk-wall 规则')

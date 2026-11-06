@@ -61,6 +61,13 @@ function fallbackPosition(index: number): { x: number; y: number } {
   }
 }
 
+/** 归档区里的日期展示（只到天）。 */
+function formatDate(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso.slice(0, 10)
+  return date.toLocaleDateString()
+}
+
 /**
  * 主面板页面：标签切换 + 便签墙 + 总览摘要。
  * @param props - 主面板 owner share + 注入动作 + locale 座位。
@@ -68,6 +75,8 @@ function fallbackPosition(index: number): { x: number; y: number } {
 export function DeskOnePage(props: DeskPanelProps) {
   const { listNotes, createNote, updateNote, deleteNote, t } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
+  /** 便签墙内的视图：便签墙 / 归档区（只影响便签标签，不影响标签页选择）。 */
+  const [showArchive, setShowArchive] = useState(false)
   const [notes, setNotes] = useState<readonly DeskNote[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -134,8 +143,12 @@ export function DeskOnePage(props: DeskPanelProps) {
     }
   }, [notes])
 
+  /** 墙上只摆未归档的便签；归档区的记录单独列出。 */
+  const activeNotes = useMemo(() => notes.filter(note => !note.archived), [notes])
+  const archivedNotes = useMemo(() => notes.filter(note => note.archived), [notes])
+
   /** 坐标视图：缺位置/尺寸的记录用默认值，且一律夹进可见墙面（不产生滚动条）。 */
-  const placed = useMemo<PlacedNote[]>(() => notes.map((note, index) => {
+  const placed = useMemo<PlacedNote[]>(() => activeNotes.map((note, index) => {
     const width = note.width ?? NOTE_DEFAULT_WIDTH
     const height = note.height ?? NOTE_DEFAULT_HEIGHT
     const fallback = fallbackPosition(index)
@@ -144,7 +157,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     const x = wallSize.width === 0 ? rawX : clamp(rawX, 0, wallSize.width - width)
     const y = wallSize.height === 0 ? rawY : clamp(rawY, 0, wallSize.height - height)
     return { note, x, y, width, height, zIndex: note.z ?? index + 1 }
-  }), [notes, wallSize.height, wallSize.width])
+  }), [activeNotes, wallSize.height, wallSize.width])
 
   const replaceNote = useCallback((updated: DeskNote): void => {
     setNotes(current => current.map(note => note.id === updated.id ? updated : note))
@@ -211,24 +224,25 @@ export function DeskOnePage(props: DeskPanelProps) {
     setCreating(true)
     setActionError(null)
     try {
-      const offset = (notes.length % 6) * CASCADE_OFFSET
+      const offset = (activeNotes.length % 6) * CASCADE_OFFSET
       const anchorX = Math.max(0, (wallSize.width - NOTE_DEFAULT_WIDTH) / 2) + offset
       const anchorY = Math.max(0, (wallSize.height - NOTE_DEFAULT_HEIGHT) / 2) + offset
       const note = await createNote({
         body: '',
-        color: STICKY_COLORS[notes.length % STICKY_COLORS.length] ?? 'yellow',
+        color: STICKY_COLORS[activeNotes.length % STICKY_COLORS.length] ?? 'yellow',
         x: clamp(Math.round(anchorX), 0, Math.max(0, wallSize.width - NOTE_DEFAULT_WIDTH)),
         y: clamp(Math.round(anchorY), 0, Math.max(0, wallSize.height - NOTE_DEFAULT_HEIGHT)),
       })
       setNotes(current => [...current, note])
       selectTab('notes')
+      setShowArchive(false)
       requestAnimationFrame(() => { textareas.current.get(note.id)?.focus() })
     } catch (reason) {
       setActionError(t('state.saveFailed', { message: messageOf(reason) }))
     } finally {
       setCreating(false)
     }
-  }, [createNote, creating, notes.length, selectTab, t, wallSize.height, wallSize.width])
+  }, [activeNotes.length, createNote, creating, selectTab, t, wallSize.height, wallSize.width])
 
   /** 卡片拖拽：不出屏（坐标夹在墙内），抬起时落库。 */
   const startDrag = useCallback((event: React.PointerEvent<HTMLElement>, item: PlacedNote): void => {
@@ -342,6 +356,15 @@ export function DeskOnePage(props: DeskPanelProps) {
         </div>
         <button
           type="button"
+          className="dsh-desk-note-archive"
+          aria-label={t('action.archive')}
+          title={t('action.archive')}
+          onClick={() => { void savePatch(item.note, { archived: true }) }}
+        >
+          {t('action.archive')}
+        </button>
+        <button
+          type="button"
           className="dsh-desk-note-close"
           aria-label={t('action.delete')}
           title={t('action.delete')}
@@ -374,6 +397,39 @@ export function DeskOnePage(props: DeskPanelProps) {
     </article>
   )
 
+  /** 归档区：列出已归档的便签，可恢复或彻底删除（入口在便签标签的墙上方）。 */
+  const renderArchive = (): ReactElement => (
+    <div className="dsh-desk-archive">
+      {archivedNotes.length === 0
+        ? <p className="dsh-desk-wall-hint">{t('archive.empty')}</p>
+        : (
+            <ul className="dsh-desk-archive-list">
+              {archivedNotes.map(note => (
+                <li key={note.id} className="dsh-desk-archive-row">
+                  <span className="dsh-desk-archive-dot" data-color={note.color} />
+                  <span className="dsh-desk-archive-text">{note.title === '' ? t('note.placeholder') : note.title}</span>
+                  <span className="dsh-desk-archive-meta">{formatDate(note.updatedAt)}</span>
+                  <button
+                    type="button"
+                    className="dsh-desk-link"
+                    onClick={() => { void savePatch(note, { archived: false }) }}
+                  >
+                    {t('action.restore')}
+                  </button>
+                  <button
+                    type="button"
+                    className="dsh-desk-link dsh-desk-link-danger"
+                    onClick={() => { void removeWithFeedback(note.id) }}
+                  >
+                    {t('action.delete')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+    </div>
+  )
+
   const renderOverview = (): ReactElement => (
     // 总览内容尚未设计：S0 保持空白占位，不往里堆功能（owner 2026-11-06）。
     <div className="dsh-desk-overview" />
@@ -403,15 +459,32 @@ export function DeskOnePage(props: DeskPanelProps) {
       )}
       {actionError === null ? null : <p className="dsh-desk-error">{actionError}</p>}
       {tab === 'overview' ? renderOverview() : (
-        <div className="dsh-desk-wall" ref={wallRef}>
-          {loading && notes.length === 0
-            ? <p className="dsh-desk-wall-hint">{t('state.loading')}</p>
-            : notes.length === 0
-              ? <p className="dsh-desk-wall-hint">{t('state.empty')}</p>
-              : placed.map(renderNote)}
+        <div className="dsh-desk-notesview">
+          <div className="dsh-desk-wallbar">
+            <button
+              type="button"
+              className="dsh-desk-btn"
+              onClick={() => setShowArchive(current => !current)}
+            >
+              {showArchive
+                ? t('action.backToWall')
+                : `${t('action.archive')}${archivedNotes.length === 0 ? '' : ` (${archivedNotes.length})`}`}
+            </button>
+          </div>
+          {showArchive
+            ? renderArchive()
+            : (
+                <div className="dsh-desk-wall" ref={wallRef}>
+                  {loading && activeNotes.length === 0
+                    ? <p className="dsh-desk-wall-hint">{t('state.loading')}</p>
+                    : activeNotes.length === 0
+                      ? <p className="dsh-desk-wall-hint">{t('state.empty')}</p>
+                      : placed.map(renderNote)}
+                </div>
+              )}
         </div>
       )}
-      {tab === 'notes'
+      {tab === 'notes' && !showArchive
         ? (
           <button
             type="button"
@@ -421,7 +494,10 @@ export function DeskOnePage(props: DeskPanelProps) {
             title={t('action.newNote')}
             onClick={() => { void addNote() }}
           >
-            +
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+              <path d="M8 3.5v9M3.5 8h9" />
+            </svg>
+            <span>{t('action.newNote')}</span>
           </button>
         )
         : null}

@@ -31,6 +31,7 @@ English | [简体中文](README.zh-CN.md)
 * Drag a sticky by its body; a compact six-dot grip at the top-left marks the grab area. Whichever sticky you click or drag comes to the front, and that layer order is saved too.
 * Drag the bottom-right corner of a sticky to change its size; position and size are saved per note.
 * Hover a sticky to reveal its color dots and the **×** delete button. The tab you were on is remembered when you come back to Desk One.
+* **Archive** hides a sticky from the wall without deleting it; the Archive button above the wall opens the archive view, where a note can be restored or deleted permanently.
 
 ## Data and privacy
 
