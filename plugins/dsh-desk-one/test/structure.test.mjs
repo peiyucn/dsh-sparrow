@@ -7,6 +7,18 @@ import { describe, it } from 'node:test'
 const read = (relative) => readFile(new URL(`../${relative}`, import.meta.url), 'utf8')
 const json = async (relative) => JSON.parse(await read(relative))
 
+/** All client TS/TSX sources joined: structure guards survive component/hook splits. */
+const CLIENT_DIR = new URL('../src/client/', import.meta.url)
+const readClientSurface = async () => {
+  const entries = await readdir(CLIENT_DIR, { recursive: true })
+  // styles.ts is asserted separately (it is the only file allowed to carry raw CSS values).
+  const files = entries
+    .filter(entry => /\.(ts|tsx)$/u.test(entry) && !/(^|[\\/])styles\.ts$/u.test(entry))
+    .sort()
+  const parts = await Promise.all(files.map(file => readFile(new URL(file.replaceAll('\\', '/'), CLIENT_DIR), 'utf8')))
+  return parts.join('\n')
+}
+
 describe('dsh-desk-one 结构', () => {
   it('package.json 应该 声明 bundle / client / exports 三件套', async () => {
     const pkg = await json('package.json')
@@ -64,7 +76,7 @@ describe('dsh-desk-one 结构', () => {
   })
 
   it('便签墙 应该 有垃圾桶：卡片可丢进垃圾桶，入口与「＋」成组，可恢复 / 永久删除', async () => {
-    const page = await read('src/client/DeskOnePage.tsx')
+    const page = await readClientSurface()
     const styles = await read('src/client/styles.ts')
     assert.match(page, /dsh-desk-trash/u, '要有垃圾桶视图容器')
     assert.match(page, /action\.restore/u, '垃圾桶要能恢复')
@@ -83,7 +95,7 @@ describe('dsh-desk-one 结构', () => {
   })
 
   it('容量与止损：墙上限 100 / 垃圾桶限 200 / 分页 20 / Smash / 无角标', async () => {
-    const page = await read('src/client/DeskOnePage.tsx')
+    const page = await readClientSurface()
     const styles = await read('src/client/styles.ts')
     const constants = await read('src/constants.ts')
     const store = await read('src/host/store.ts')
@@ -116,13 +128,13 @@ describe('dsh-desk-one 结构', () => {
   })
 
   it('总览 应该 保持空白占位（内容未设计前不堆放功能）', async () => {
-    const page = await read('src/client/DeskOnePage.tsx')
+    const page = await readClientSurface()
     assert.match(page, /dsh-desk-overview/u, '总览要有空白占位容器')
     assert.ok(!/overview\.(counts|recent|recentEmpty|hint)/u.test(page), '总览不得出现未定稿的内容区块')
   })
 
   it('便签标签 应该是「满墙贴纸」而非登记表：墙面 + 悬浮「+」+ 可拖动贴纸', async () => {
-    const page = await read('src/client/DeskOnePage.tsx')
+    const page = await readClientSurface()
     const styles = await read('src/client/styles.ts')
     // 墙面容器与悬浮「+」按钮（不是工具栏里的「新建」表单）。
     assert.match(page, /dsh-desk-wall/u)
@@ -246,7 +258,7 @@ describe('dsh-desk-one 结构', () => {
   })
 
   it('页面 应该 用一个面板承载标签页，而不是弹窗', async () => {
-    const page = await read('src/client/DeskOnePage.tsx')
+    const page = await readClientSurface()
     assert.match(page, /dsh-desk-tabs/u)
     assert.match(page, /data-window-drag/u)
     assert.match(page, /'overview'/u)
