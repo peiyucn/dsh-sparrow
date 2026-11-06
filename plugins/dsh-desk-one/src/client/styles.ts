@@ -124,12 +124,13 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-note:active {
   cursor: grabbing;
 }
-/* Notion 浅色模式背景色板（微调偏暖后用于纸面）。 */
-.dsh-desk-note[data-color='default'] { background-color: #f4f1ea; }
-.dsh-desk-note[data-color='yellow'] { background-color: #faf3dd; }
-.dsh-desk-note[data-color='green'] { background-color: #eef3ed; }
-.dsh-desk-note[data-color='blue'] { background-color: #e9f3f7; }
-.dsh-desk-note[data-color='pink'] { background-color: #f9f2f5; }
+/* 纸色取 Notion 深色色标的同色相中等深度（比色标浅一档、比旧版纸色深一档）：
+   纸面负责“这是一张便签”，色标负责“这是哪个色”。 */
+.dsh-desk-note[data-color='default'] { background-color: #e4e0d9; }
+.dsh-desk-note[data-color='yellow'] { background-color: #e9d3a3; }
+.dsh-desk-note[data-color='green'] { background-color: #bccebb; }
+.dsh-desk-note[data-color='blue'] { background-color: #b8cad8; }
+.dsh-desk-note[data-color='pink'] { background-color: #e0c0ce; }
 .dsh-desk-note-bar {
   display: flex;
   align-items: center;
@@ -173,13 +174,14 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-note:focus-within .dsh-desk-note-colors {
   opacity: 1;
 }
-/* 色板：圆点与便签纸面**同色**（不靠加深颜色制造可见性，用细环区分），选中态再加一圈墨色细环。 */
+/* 色板：用 Notion 的深色文字色（#C29343 / #548164 / #487CA5 / #B35488 / #787774），
+   小尺寸下色相清晰；与纸面同色相、深一档，形成「纸面 + 色标」的分层。 */
 .dsh-desk-dot {
   appearance: none;
   width: 12px;
   height: 12px;
   padding: 0;
-  border: 1px solid rgba(55, 53, 47, 0.2);
+  border: none;
   border-radius: 50%;
   cursor: pointer;
   transition: transform 0.1s ease, box-shadow 0.1s ease;
@@ -187,11 +189,11 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-dot:hover {
   transform: scale(1.12);
 }
-.dsh-desk-dot[data-color='default'] { background: #f4f1ea; }
-.dsh-desk-dot[data-color='yellow'] { background: #faf3dd; }
-.dsh-desk-dot[data-color='green'] { background: #eef3ed; }
-.dsh-desk-dot[data-color='blue'] { background: #e9f3f7; }
-.dsh-desk-dot[data-color='pink'] { background: #f9f2f5; }
+.dsh-desk-dot[data-color='default'] { background: #787774; }
+.dsh-desk-dot[data-color='yellow'] { background: #c29343; }
+.dsh-desk-dot[data-color='green'] { background: #548164; }
+.dsh-desk-dot[data-color='blue'] { background: #487ca5; }
+.dsh-desk-dot[data-color='pink'] { background: #b35488; }
 .dsh-desk-dot[data-active='true'] {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 3px rgba(55, 53, 47, 0.55);
 }
@@ -336,20 +338,19 @@ html[data-platform='darwin'] .dsh-desk-head {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
   border-color: var(--dsw-alias-border-l1, #e2e5ea);
 }
-/* 总览最近便签的色点：与便签纸面同色 + 细环（与色板同一口径）。 */
+/* 总览最近便签的色点：与色板同一套深色相。 */
 .dsh-desk-recent-dot {
   flex: none;
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  border: 1px solid rgba(55, 53, 47, 0.16);
-  background: #f4f1ea;
+  background: #787774;
 }
-.dsh-desk-recent-dot[data-color='default'] { background: #f4f1ea; }
-.dsh-desk-recent-dot[data-color='yellow'] { background: #faf3dd; }
-.dsh-desk-recent-dot[data-color='green'] { background: #eef3ed; }
-.dsh-desk-recent-dot[data-color='blue'] { background: #e9f3f7; }
-.dsh-desk-recent-dot[data-color='pink'] { background: #f9f2f5; }
+.dsh-desk-recent-dot[data-color='default'] { background: #787774; }
+.dsh-desk-recent-dot[data-color='yellow'] { background: #c29343; }
+.dsh-desk-recent-dot[data-color='green'] { background: #548164; }
+.dsh-desk-recent-dot[data-color='blue'] { background: #487ca5; }
+.dsh-desk-recent-dot[data-color='pink'] { background: #b35488; }
 .dsh-desk-recent-text {
   overflow: hidden;
   text-overflow: ellipsis;

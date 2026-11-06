@@ -91,14 +91,26 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(gripRule !== null, '缺 .dsh-desk-note-grip 规则')
     assert.match(gripRule[1], /grid-template-columns:\s*repeat\(2,\s*2px\)/u, '六点纹要紧凑（2px 点 / 2px 间距）')
     assert.match(gripRule[1], /gap:\s*2px/u)
-    // 色板圆点必须与便签纸面同色（owner 2026-11-06：色标深度要和便签一致）。
+    // 配色分层（owner 2026-11-06）：深色小色标负责色相，纸面取同色相但浅一档的中等深度。
+    const linearChannel = (channel) => {
+      const value = channel / 255
+      return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+    }
+    const luminance = (hex) => {
+      const red = linearChannel(parseInt(hex.slice(1, 3), 16))
+      const green = linearChannel(parseInt(hex.slice(3, 5), 16))
+      const blue = linearChannel(parseInt(hex.slice(5, 7), 16))
+      return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+    }
     const notePalette = new Map([...styles.matchAll(/\.dsh-desk-note\[data-color='([a-z]+)'\] \{ background-color: (#[0-9a-f]{6}); \}/gu)].map(match => [match[1], match[2]]))
     const dotPalette = new Map([...styles.matchAll(/\.dsh-desk-dot\[data-color='([a-z]+)'\] \{ background: (#[0-9a-f]{6}); \}/gu)].map(match => [match[1], match[2]]))
     const recentPalette = new Map([...styles.matchAll(/\.dsh-desk-recent-dot\[data-color='([a-z]+)'\] \{ background: (#[0-9a-f]{6}); \}/gu)].map(match => [match[1], match[2]]))
     assert.equal(notePalette.size, 5, '便签色板应有 5 个色位')
-    for (const [color, hex] of notePalette) {
-      assert.equal(dotPalette.get(color), hex, `色板圆点 ${color} 必须与便签纸面同色`)
-      assert.equal(recentPalette.get(color), hex, `总览色点 ${color} 必须与便签纸面同色`)
+    for (const [color, paper] of notePalette) {
+      assert.ok(dotPalette.has(color), `色板缺 ${color}`)
+      assert.equal(recentPalette.get(color), dotPalette.get(color), `总览色点 ${color} 应与色板同色`)
+      assert.ok(luminance(paper) < 0.85, `纸面 ${color} 不能太浅（要向色标靠拢）`)
+      assert.ok(luminance(paper) > luminance(dotPalette.get(color)), `纸面 ${color} 应比色标浅一档`)
     }
     // 真实便签是平涂纸面：不得有渐变（owner 2026-11-06 明确否掉）。
     assert.ok(!/gradient/u.test(noteRule[1]), '便签纸面不得有渐变')
