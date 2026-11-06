@@ -160,13 +160,14 @@ describe('host 装配（apply 接线）', () => {
     const created = await callRoute(handler, {
       method: 'POST',
       url: ROUTES.tasks,
-      body: JSON.stringify({ title: '任务一', dueDate: '2026-11-30', status: 'todo' }),
+      body: JSON.stringify({ title: '任务一', dueDate: '2026-11-30', status: 'todo', group: '需求池' }),
       headers: host,
     })
     assert.equal(created.status, 201)
     assert.equal(created.json.task.title, '任务一')
     assert.equal(created.json.task.status, 'todo')
     assert.equal(created.json.task.archived, false)
+    assert.equal(created.json.task.group, '需求池')
     assert.deepEqual(created.json.task.due, { date: '2026-11-30' })
     const id = created.json.task.id
     assert.match(id, /^task_/u)

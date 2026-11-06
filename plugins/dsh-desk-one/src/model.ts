@@ -5,7 +5,8 @@
  */
 
 import {
-  MAX_BODY_CHARS, MAX_TITLE_CHARS, NOTE_COLORS, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH, TASK_STATUSES,
+  MAX_BODY_CHARS, MAX_GROUP_CHARS, MAX_TITLE_CHARS, NOTE_COLORS, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH,
+  TASK_STATUSES,
 } from './constants.js'
 import type { DeskNote, DeskTask, NoteColor, TaskStatus } from './contract.js'
 
@@ -218,6 +219,7 @@ export interface TaskInput {
   readonly color: NoteColor
   readonly due?: { readonly date: string; readonly timezone?: string }
   readonly order: number
+  readonly group?: string
 }
 
 export interface TaskPatch {
@@ -229,6 +231,8 @@ export interface TaskPatch {
   readonly due?: { readonly date: string; readonly timezone?: string } | null
   readonly order?: number
   readonly archived?: boolean
+  /** `null` (or blank) removes the task from its group; `undefined` leaves it unchanged. */
+  readonly group?: string | null
 }
 
 function isTaskStatus(value: unknown): value is TaskStatus {
@@ -256,6 +260,17 @@ export function normalizeOrder(value: unknown): number | undefined {
   return Math.round(value)
 }
 
+/** One-level group name: trimmed, blank means "no group", overlength is rejected. */
+export function normalizeGroupName(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const name = value.trim()
+  if (name === '') return undefined
+  if (name.length > MAX_GROUP_CHARS) {
+    throw new DeskModelError('INVALID_TASK', `分组名超过 ${MAX_GROUP_CHARS} 字符上限`)
+  }
+  return name
+}
+
 /**
  * Task titles are required: unlike notes (where the body is the content), a task without a title
  * has no meaningful card. The rest mirrors the note validator's "reject bad enum, clamp text" style.
@@ -268,6 +283,7 @@ export function normalizeTaskInput(raw: {
   readonly dueDate?: unknown
   readonly dueTimezone?: unknown
   readonly order?: unknown
+  readonly group?: unknown
 }): TaskInput {
   const title = typeof raw.title === 'string' ? raw.title.trim() : ''
   if (title === '') throw new DeskModelError('INVALID_TASK', '任务需要标题')
@@ -285,6 +301,7 @@ export function normalizeTaskInput(raw: {
   const due = raw.dueDate === undefined
     ? undefined
     : normalizeDue({ date: raw.dueDate, timezone: raw.dueTimezone })
+  const group = normalizeGroupName(raw.group)
   return {
     title,
     body,
@@ -292,6 +309,7 @@ export function normalizeTaskInput(raw: {
     color,
     ...(due === undefined ? {} : { due }),
     order: normalizeOrder(raw.order) ?? 0,
+    ...(group === undefined ? {} : { group }),
   }
 }
 
@@ -311,6 +329,7 @@ export function createTaskRecord(
     color: input.color,
     ...(input.due === undefined ? {} : { due: input.due }),
     order: input.order,
+    ...(input.group === undefined ? {} : { group: input.group }),
     archived: false,
     createdAt: meta.now,
     updatedAt: meta.now,
@@ -342,6 +361,7 @@ export function patchTaskRecord(
     due?: { date: string; timezone?: string }
     order: number
     archived: boolean
+    group?: string
     projectId?: string
     laneId?: string
     createdAt: string
@@ -381,6 +401,13 @@ export function patchTaskRecord(
   if (patch.archived !== undefined) {
     if (typeof patch.archived !== 'boolean') throw new DeskModelError('INVALID_TASK', 'archived 必须是布尔值')
     next.archived = patch.archived
+  }
+  if (patch.group === null) {
+    delete next.group
+  } else if (patch.group !== undefined) {
+    const group = normalizeGroupName(patch.group)
+    if (group === undefined) delete next.group
+    else next.group = group
   }
   return next
 }

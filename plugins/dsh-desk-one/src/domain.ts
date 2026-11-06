@@ -51,6 +51,8 @@ const taskSchema = z.object({
     timezone: z.string().optional(),
   }).optional(),
   order: z.number().int().nonnegative(),
+  /** One-level grouping: the group name itself is the key; absent means ungrouped. */
+  group: z.string().optional(),
   // "存档" (archive) is a task-board concept; naming chosen to avoid the host's session archive.
   archived: z.boolean().default(false),
   projectId: z.string().optional(),

@@ -66,6 +66,8 @@ export interface DeskTask {
   }
   /** 列内手动顺序：越大越靠后；拖拽即重排。 */
   readonly order: number
+  /** 一层分组名；缺省表示未分组（S1 只支持一层）。 */
+  readonly group?: string
   /** 存档后从板上消失，进任务板存档视图（命名避开宿主「会话归档」）。 */
   readonly archived: boolean
   /** 预留：多板 / 自定义泳道后启用，S1 不写。 */
@@ -144,6 +146,8 @@ export interface CreateTaskRequest {
   readonly dueDate?: string
   readonly dueTimezone?: string
   readonly order?: number
+  /** 一层分组名；缺省不分组。 */
+  readonly group?: string
 }
 
 export interface TaskPatchRequest {
@@ -155,6 +159,8 @@ export interface TaskPatchRequest {
   readonly due?: { readonly date: string; readonly timezone?: string } | null
   readonly order?: number
   readonly archived?: boolean
+  /** `null` 表示移出分组；缺省表示不改。 */
+  readonly group?: string | null
 }
 
 export interface UpdateTaskRequest {

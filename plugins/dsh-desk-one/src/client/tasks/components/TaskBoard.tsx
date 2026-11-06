@@ -1,14 +1,14 @@
 /**
- * Task board: toolbar (sort view, archive), three fixed lanes, pointer drag to move/reorder,
- * and the archive view. Drag uses window pointer events + `elementFromPoint`, matching the
- * notes wall's gesture model instead of introducing a second DnD system.
+ * Task board: toolbar (sort view, archive), three fixed lanes with one-level groups, pointer
+ * drag with a card-shaped ghost that follows the cursor (and flies back on an invalid drop),
+ * double-click-to-add, and the archive view.
  */
 
 import { useCallback, useMemo, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import type { CreateTaskRequest, DeskTask, TaskPatchRequest, TaskStatus } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
-import { TaskColumn } from './TaskColumn.js'
+import { TaskColumn, type DropTarget } from './TaskColumn.js'
 import { useTaskBoard } from '../hooks/useTaskBoard.js'
 import { useTasksData } from '../hooks/useTasksData.js'
 import { TASK_LANE_ORDER, type TaskSortMode } from '../types.js'
@@ -75,6 +75,20 @@ function ArchiveRow({
   )
 }
 
+/** Build a pointer-following ghost from the real card (values copied; original stays dimmed). */
+function createGhost(card: HTMLElement): HTMLElement {
+  const ghost = card.cloneNode(true) as HTMLElement
+  ghost.classList.add('dsh-task-ghost')
+  ghost.removeAttribute('data-task-id')
+  const sources = card.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input,textarea')
+  const copies = ghost.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input,textarea')
+  sources.forEach((source, index) => {
+    const copy = copies[index]
+    if (copy !== undefined) copy.value = source.value
+  })
+  return ghost
+}
+
 export function TaskBoard(props: TaskBoardProps): ReactElement {
   const { t, listTasks, createTask, updateTask, deleteTask } = props
   const data = useTasksData(t, { listTasks, createTask, updateTask, deleteTask })
@@ -85,10 +99,9 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     addTask: data.addTask,
     removeWithFeedback: data.removeWithFeedback,
     setActionError: data.setActionError,
-    t,
   })
   const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dropLane, setDropLane] = useState<TaskStatus | null>(null)
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
 
   const sortOptions = useMemo<readonly { mode: TaskSortMode; label: string }[]>(() => [
     { mode: 'manual', label: t('task.sort.manual') },
@@ -96,43 +109,99 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     { mode: 'due', label: t('task.sort.due') },
   ], [t])
 
-  /** Pointer drag: window listeners + elementFromPoint keeps lane/index lookup independent of DOM nesting. */
+  /** Resolve the lane/group under the pointer plus the insertion index within that zone. */
+  const resolveDrop = useCallback((x: number, y: number): { target: DropTarget; index: number } | null => {
+    const element = document.elementFromPoint(x, y) as HTMLElement | null
+    const lane = element?.closest<HTMLElement>('[data-lane]')
+    if (lane === null || lane === undefined) return null
+    const status = lane.dataset.lane as TaskStatus | undefined
+    if (status === undefined) return null
+    const zone = element?.closest<HTMLElement>('[data-group-drop]')
+    const group = zone?.dataset.groupDrop === undefined || zone.dataset.groupDrop === ''
+      ? undefined
+      : zone.dataset.groupDrop
+    const scope = zone ?? lane.querySelector<HTMLElement>('.dsh-task-ungrouped')
+    const cards = scope === null ? [] : [...scope.querySelectorAll<HTMLElement>('.dsh-task-card')]
+    let index = cards.length
+    for (const [position, card] of cards.entries()) {
+      const rect = card.getBoundingClientRect()
+      if (y < rect.top + rect.height / 2) {
+        index = position
+        break
+      }
+    }
+    return { target: { status, ...group === undefined ? {} : { group } }, index }
+  }, [])
+
+  /** Whole-card pointer drag: ghost follows the pointer, invalid drops fly back to the card. */
   const startDrag = useCallback((task: DeskTask, event: ReactPointerEvent<HTMLElement>): void => {
     const target = event.target as HTMLElement
-    if (event.button !== 0 || target.closest('input,button,textarea,select')) return
+    if (event.button !== 0 || target.closest('input,textarea,button,select')) return
+    const card = event.currentTarget
+    const rect = card.getBoundingClientRect()
+    const offsetX = event.clientX - rect.left
+    const offsetY = event.clientY - rect.top
     event.preventDefault()
+
+    const ghost = createGhost(card)
+    ghost.style.position = 'fixed'
+    ghost.style.left = `${rect.left}px`
+    ghost.style.top = `${rect.top}px`
+    ghost.style.width = `${rect.width}px`
+    ghost.style.pointerEvents = 'none'
+    ghost.style.zIndex = '9999'
+    document.body.appendChild(ghost)
+    card.style.visibility = 'hidden'
     setDraggingId(task.id)
+
+    let latest = resolveDrop(event.clientX, event.clientY)
+    setDropTarget(latest?.target ?? null)
+
     const onMove = (moveEvent: PointerEvent): void => {
-      const lane = (document.elementFromPoint(moveEvent.clientX, moveEvent.clientY) as Element | null)
-        ?.closest('[data-lane]') as HTMLElement | null
-      setDropLane(lane?.dataset.lane as TaskStatus | undefined ?? null)
+      ghost.style.left = `${moveEvent.clientX - offsetX}px`
+      ghost.style.top = `${moveEvent.clientY - offsetY}px`
+      latest = resolveDrop(moveEvent.clientX, moveEvent.clientY)
+      setDropTarget(latest?.target ?? null)
     }
-    const finish = (moveEvent: PointerEvent): void => {
+    const cleanup = (): void => {
       window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', finish)
-      window.removeEventListener('pointercancel', finish)
+      window.removeEventListener('pointerup', onFinish)
+      window.removeEventListener('pointercancel', onCancel)
+      window.removeEventListener('keydown', onKey)
       setDraggingId(null)
-      setDropLane(null)
-      const lane = (document.elementFromPoint(moveEvent.clientX, moveEvent.clientY) as Element | null)
-        ?.closest('[data-lane]') as HTMLElement | null
-      if (lane === null) return
-      const status = lane.dataset.lane as TaskStatus | undefined
-      if (status === undefined) return
-      const cards = [...lane.querySelectorAll<HTMLElement>('[data-task-id]')]
-      let index = cards.length
-      for (const [position, card] of cards.entries()) {
-        const rect = card.getBoundingClientRect()
-        if (moveEvent.clientY < rect.top + rect.height / 2) {
-          index = position
-          break
-        }
+      setDropTarget(null)
+    }
+    const flyBack = (): void => {
+      ghost.style.transition = 'left 180ms ease, top 180ms ease'
+      ghost.style.left = `${rect.left}px`
+      ghost.style.top = `${rect.top}px`
+      window.setTimeout(() => {
+        ghost.remove()
+        card.style.visibility = ''
+      }, 200)
+    }
+    const onFinish = (): void => {
+      cleanup()
+      if (latest === null) {
+        flyBack()
+        return
       }
-      board.moveTask(task.id, status, index)
+      ghost.remove()
+      card.style.visibility = ''
+      board.moveTask(task.id, latest.target.status, latest.target.group, latest.index)
+    }
+    const onCancel = (): void => {
+      cleanup()
+      flyBack()
+    }
+    const onKey = (keyEvent: KeyboardEvent): void => {
+      if (keyEvent.key === 'Escape') onCancel()
     }
     window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', finish)
-    window.addEventListener('pointercancel', finish)
-  }, [board])
+    window.addEventListener('pointerup', onFinish)
+    window.addEventListener('pointercancel', onCancel)
+    window.addEventListener('keydown', onKey)
+  }, [board, resolveDrop])
 
   if (data.loadError !== null) {
     return (
@@ -201,10 +270,10 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
                   key={status}
                   status={status}
                   title={t(LANE_LABEL_KEY[status])}
-                  tasks={board.lanes[status]}
+                  lane={board.lanes[status]}
                   collapsed={status === 'done' && board.doneCollapsed}
-                  draft={board.draftLane === status}
-                  dragOver={dropLane === status && draggingId !== null}
+                  draft={board.draft}
+                  dropTarget={dropTarget}
                   draggingId={draggingId}
                   t={t}
                   onAdd={board.beginDraft}
@@ -215,6 +284,11 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
                   onPatch={data.savePatch}
                   onArchive={board.archiveTask}
                   onDelete={board.deleteTask}
+                  isGroupCollapsed={board.isGroupCollapsed}
+                  onToggleGroup={board.toggleGroup}
+                  onCreateGroup={board.createGroup}
+                  onRenameGroup={board.renameGroup}
+                  onRemoveGroup={board.removeGroup}
                 />
               ))}
             </div>

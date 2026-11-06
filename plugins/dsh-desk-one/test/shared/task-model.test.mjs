@@ -68,6 +68,20 @@ describe('task 模型：创建 / 补丁 / 排序', () => {
     )
   })
 
+  it('分组 应该 支持创建 / 重命名补丁 / 移出（null）', () => {
+    const grouped = normalizeTaskInput({ title: 'x', group: '  需求池  ' })
+    assert.equal(grouped.group, '需求池')
+    const record = createTaskRecord(grouped, { id: 'task_x', now: 'now' })
+    assert.equal(record.group, '需求池')
+    const renamed = patchTaskRecord(record, { group: '本季度' }, { expectedRevision: 1, now: 'later' })
+    assert.equal(renamed.group, '本季度')
+    const cleared = patchTaskRecord(record, { group: null }, { expectedRevision: 1, now: 'later' })
+    assert.equal(cleared.group, undefined)
+    const blank = patchTaskRecord(record, { group: '   ' }, { expectedRevision: 1, now: 'later' })
+    assert.equal(blank.group, undefined)
+    assert.throws(() => normalizeTaskInput({ title: 'x', group: 'g'.repeat(81) }), (error) => error instanceof DeskModelError)
+  })
+
   it('排序 应该 按 order → createdAt → id；过滤 标题 + 正文', () => {
     const sorted = sortTasks([
       task({ id: 'b', order: 2, createdAt: '2026-01-02T00:00:00.000Z' }),

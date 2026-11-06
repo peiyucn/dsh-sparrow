@@ -43,6 +43,8 @@ export const MAX_BODY_BYTES = 64 * 1024
 export const MAX_TITLE_CHARS = 200
 export const MAX_BODY_CHARS = 20_000
 export const MAX_QUERY_CHARS = 100
+/** 任务分组名长度上限（一层分组，名字即分组键）。 */
+export const MAX_GROUP_CHARS = 80
 
 /**
  * 产品容量上限（owner 2026-11-06）：便签墙是轻笔记，100 张已超出人的注意力上限；
@@ -70,6 +72,10 @@ export const NOTE_MAX_SIZE = 2000
 export const TAB_STORAGE_KEY = 'dsh-desk-one:tab'
 /** 任务板排序视图偏好（manual / created / due），纯界面状态。 */
 export const TASK_SORT_STORAGE_KEY = 'dsh-desk-one:task-sort'
+/** 任务板分组名（每泳道一组名字；分组只是任务的 group 字段，列表是纯界面状态）。 */
+export const TASK_GROUPS_STORAGE_KEY = 'dsh-desk-one:task-groups'
+/** 任务板分组折叠状态（key = `${status}:${group}`，纯界面状态）。 */
+export const TASK_GROUP_COLLAPSE_STORAGE_KEY = 'dsh-desk-one:task-group-collapsed'
 
 /** 面板请求超时：host 挂起时不让面板永久 loading。 */
 export const REQUEST_TIMEOUT_MS = 10_000
