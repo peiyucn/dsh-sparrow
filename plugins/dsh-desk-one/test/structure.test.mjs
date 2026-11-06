@@ -117,6 +117,16 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /trashingIds/u, '单张贴纸删除也要播同一段飞散动画')
     assert.match(page, /ids\.has\(item\.id\)/u, 'Smash 要先乐观清墙再落库（修闪回）')
     assert.match(styles, /dsh-desk-note-smashing/u, 'Smash 要有飞散动画')
+    // 入口分组与语义（owner 2026-11-06）：＋ / Smash 是墙面操作，垃圾桶入口用分隔线隔开并说明是“打开”。
+    assert.match(page, /dsh-desk-fab-divider/u, '墙面操作与垃圾桶导航之间要有分隔线')
+    assert.match(page, /action\.openTrash/u, '垃圾桶入口提示要是“打开垃圾桶”')
+    assert.ok(
+      page.indexOf('dsh-desk-smash dsh-desk-fabglass') < page.indexOf('dsh-desk-fab-secondary dsh-desk-fabglass'),
+      '＋ / Smash 属于墙面操作，应排在垃圾桶入口之前',
+    )
+    assert.match(page, /closest\('\.dsh-desk-smash'\)/u, 'Smash 确认态点击旁边要恢复（排除按钮自身）')
+    assert.match(page, /addEventListener\('pointerdown', onPointerDown, true\)/u, '要用捕获阶段的 pointerdown 监听取消')
+    assert.match(page, /Escape/u, 'Esc 也要能取消 Smash 确认')
     // 角标只留给未读：垃圾桶计数不再挂 badge。
     assert.ok(!/fab-count/u.test(page), '垃圾桶不得再挂角标')
     assert.ok(!/dsh-desk-fab-count/u.test(styles), '角标样式要删干净')

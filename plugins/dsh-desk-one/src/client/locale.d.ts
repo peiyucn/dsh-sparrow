@@ -12,6 +12,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'action.trash'
       | 'action.restore'
       | 'action.backToWall'
+      | 'action.openTrash'
       | 'action.delete'
       | 'trash.title'
       | 'trash.empty'

@@ -64,6 +64,26 @@ export function useTrash({
     trashTimers.current.clear()
   }, [])
 
+  // An armed Smash is a modal-ish intent: clicking anywhere else or pressing Esc must cancel it,
+  // otherwise the button stays red until the component remounts.
+  useEffect(() => {
+    if (!confirmSmash) return
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target as Element | null
+      if (target?.closest('.dsh-desk-smash') != null) return
+      setConfirmSmash(false)
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setConfirmSmash(false)
+    }
+    window.addEventListener('pointerdown', onPointerDown, true)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [confirmSmash])
+
   const activeNotes = useMemo(() => notes.filter(note => !note.trashed), [notes])
   const trashedNotes = useMemo(() => notes.filter(note => note.trashed), [notes])
   const visibleTrashed = useMemo(() => trashedNotes.slice(0, trashVisible), [trashedNotes, trashVisible])

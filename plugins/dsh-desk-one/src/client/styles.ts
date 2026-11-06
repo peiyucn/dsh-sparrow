@@ -434,6 +434,12 @@ html[data-platform='darwin'] .dsh-desk-head {
   align-items: center;
   gap: 10px;
 }
+/* Divider: the left side acts on the wall (＋ / Smash), the right side navigates to the trash. */
+.dsh-desk-fab-divider {
+  width: 1px;
+  height: 22px;
+  background: color-mix(in srgb, var(--dsw-alias-border-l1, #e2e5ea) 75%, transparent);
+}
 /* Smash：与另外两个悬浮按钮同款玻璃、同尺寸，图标常驻；二次确认时转危险色。 */
 .dsh-desk-smash svg {
   width: 20px;

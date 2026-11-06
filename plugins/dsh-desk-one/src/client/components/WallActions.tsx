@@ -1,8 +1,9 @@
 /**
- * Bottom action row: capture, trash view and Smash.
+ * Bottom action row.
  *
- * Note: during the refactor this keeps the original order and tooltips; a follow-up commit
- * separates "wall actions" from "navigate to trash" and fixes the Smash confirm reset.
+ * The left group acts on the wall (capture, Smash); a hairline divider separates it from the
+ * trash entry, which only navigates to the trash view. Keeping the two meanings visually apart
+ * stops the bin icon from reading as "dump this wall".
  */
 
 import type { ReactElement } from 'react'
@@ -41,25 +42,6 @@ export function WallActions({
                 </svg>
               </button>
             )}
-        <button
-          type="button"
-          className="dsh-desk-fab-secondary dsh-desk-fabglass"
-          aria-label={showTrash ? t('action.backToWall') : t('action.trash')}
-          title={showTrash ? t('action.backToWall') : t('action.trash')}
-          onClick={onToggleTrash}
-        >
-          {showTrash
-            ? (
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                <path d="M11.5 5.5L7 10l4.5 4.5M7.5 10h7" />
-              </svg>
-            )
-            : (
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
-              </svg>
-            )}
-        </button>
         {showTrash
           ? null
           : (
@@ -78,6 +60,26 @@ export function WallActions({
                 </svg>
               </button>
             )}
+        {showTrash ? null : <span className="dsh-desk-fab-divider" aria-hidden="true" />}
+        <button
+          type="button"
+          className="dsh-desk-fab-secondary dsh-desk-fabglass"
+          aria-label={showTrash ? t('action.backToWall') : t('action.openTrash')}
+          title={showTrash ? t('action.backToWall') : t('action.openTrash')}
+          onClick={onToggleTrash}
+        >
+          {showTrash
+            ? (
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                <path d="M11.5 5.5L7 10l4.5 4.5M7.5 10h7" />
+              </svg>
+            )
+            : (
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+              </svg>
+            )}
+        </button>
       </div>
     </div>
   )
