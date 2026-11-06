@@ -28,6 +28,8 @@ export interface DeskNote {
   /** 便签尺寸（px）；缺省用默认尺寸，用户拖右下角改过的才写回。 */
   readonly width?: number
   readonly height?: number
+  /** 贴纸层级（越大越靠上）；缺省按列表顺序兜底，点/拖过才写回。 */
+  readonly z?: number
   readonly createdAt: string
   readonly updatedAt: string
   readonly revision: number
@@ -73,6 +75,7 @@ export interface NotePatchRequest {
   readonly y?: number
   readonly width?: number
   readonly height?: number
+  readonly z?: number
 }
 
 export interface UpdateNoteRequest {

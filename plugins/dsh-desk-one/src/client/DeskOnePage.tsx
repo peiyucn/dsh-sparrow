@@ -74,12 +74,16 @@ export function DeskOnePage(props: DeskPanelProps) {
   const [actionError, setActionError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [wallSize, setWallSize] = useState<WallSize>({ width: 0, height: 0 })
-  /** 贴纸层级：点过 / 拖过哪张，哪张就置顶。键会在便签删除后清理。 */
-  const [zMap, setZMap] = useState<Readonly<Record<string, number>>>({})
   const wallRef = useRef<HTMLDivElement | null>(null)
   const textareas = useRef(new Map<string, HTMLTextAreaElement>())
   const loadSeq = useRef(0)
+  /** 层级游标：取当前最大 z 再 +1，抬到最上后持久化的数值仍单调。 */
   const zTopRef = useRef(0)
+  /** 最新便签状态：写队列按执行时的 revision 落库，避免层级/位置/正文并发写打架。 */
+  const notesRef = useRef<readonly DeskNote[]>(notes)
+  notesRef.current = notes
+  /** 每张便签一条写队列（z / 位置 / 尺寸 / 正文按顺序保存）。 */
+  const writeChains = useRef(new Map<string, Promise<void>>())
 
   const selectTab = useCallback((next: Tab): void => {
     setTab(next)
@@ -120,20 +124,15 @@ export function DeskOnePage(props: DeskPanelProps) {
     return () => { observer.disconnect() }
   }, [tab])
 
-  /** 删掉已不存在的便签的层级记录（累积状态有界）。 */
+  /** 外部（agent / 重拉）改了正文时，同步到未聚焦的 textarea 里。 */
   useEffect(() => {
-    setZMap((current) => {
-      const ids = new Set(notes.map(note => note.id))
-      const entries = Object.entries(current).filter(([id]) => ids.has(id))
-      return entries.length === Object.keys(current).length ? current : Object.fromEntries(entries)
-    })
+    for (const [id, element] of textareas.current) {
+      const note = notes.find(item => item.id === id)
+      if (note === undefined) continue
+      const display = note.body === '' ? note.title : note.body
+      if (document.activeElement !== element && element.value !== display) element.value = display
+    }
   }, [notes])
-
-  const raise = useCallback((id: string): void => {
-    zTopRef.current += 1
-    const next = zTopRef.current
-    setZMap(current => ({ ...current, [id]: next }))
-  }, [])
 
   /** 坐标视图：缺位置/尺寸的记录用默认值，且一律夹进可见墙面（不产生滚动条）。 */
   const placed = useMemo<PlacedNote[]>(() => notes.map((note, index) => {
@@ -144,8 +143,8 @@ export function DeskOnePage(props: DeskPanelProps) {
     const rawY = note.y ?? fallback.y
     const x = wallSize.width === 0 ? rawX : clamp(rawX, 0, wallSize.width - width)
     const y = wallSize.height === 0 ? rawY : clamp(rawY, 0, wallSize.height - height)
-    return { note, x, y, width, height, zIndex: zMap[note.id] ?? index + 1 }
-  }), [notes, wallSize.height, wallSize.width, zMap])
+    return { note, x, y, width, height, zIndex: note.z ?? index + 1 }
+  }), [notes, wallSize.height, wallSize.width])
 
   const replaceNote = useCallback((updated: DeskNote): void => {
     setNotes(current => current.map(note => note.id === updated.id ? updated : note))
@@ -156,27 +155,55 @@ export function DeskOnePage(props: DeskPanelProps) {
 
   type Patch = Parameters<DeskPanelInjected['updateNote']>[0]['patch']
 
-  /** 统一的补丁落库：乐观更新已在本地完成，失败时提示并重拉对齐。 */
-  const savePatch = useCallback(async (note: DeskNote, patch: Patch): Promise<void> => {
-    try {
-      const updated = await updateNote({ id: note.id, expectedRevision: note.revision, patch })
-      replaceNote(updated)
-      setActionError(null)
-    } catch (reason) {
-      setActionError(t('state.saveFailed', { message: messageOf(reason) }))
-      void load()
-    }
-  }, [load, replaceNote, t, updateNote])
+  /** 写队列：同一张便签的保存串行，且每次按执行时的最新 revision 落库。 */
+  const enqueueWrite = useCallback((noteId: string, task: () => Promise<void>): void => {
+    const previous = writeChains.current.get(noteId) ?? Promise.resolve()
+    const next = previous.then(task, task)
+    writeChains.current.set(noteId, next)
+    void next.finally(() => {
+      if (writeChains.current.get(noteId) === next) writeChains.current.delete(noteId)
+    })
+  }, [])
 
-  const removeWithFeedback = useCallback(async (id: string): Promise<void> => {
-    try {
-      await deleteNote(id)
-      removeNote(id)
-      setActionError(null)
-    } catch (reason) {
-      setActionError(t('state.saveFailed', { message: messageOf(reason) }))
-    }
-  }, [deleteNote, removeNote, t])
+  /** 统一的补丁落库：乐观更新已在本地完成，失败时提示并重拉对齐。 */
+  const savePatch = useCallback((note: DeskNote, patch: Patch): void => {
+    enqueueWrite(note.id, async () => {
+      const current = notesRef.current.find(item => item.id === note.id)
+      if (current === undefined) return
+      try {
+        const updated = await updateNote({ id: note.id, expectedRevision: current.revision, patch })
+        replaceNote(updated)
+        setActionError(null)
+      } catch (reason) {
+        setActionError(t('state.saveFailed', { message: messageOf(reason) }))
+        void load()
+      }
+    })
+  }, [enqueueWrite, load, replaceNote, t, updateNote])
+
+  /** 点 / 拖 / 改大小把这张便签抬到最上层，并把层级持久化（刷新/重启后顺序不丢）。 */
+  const raise = useCallback((noteId: string): void => {
+    const current = notesRef.current.find(item => item.id === noteId)
+    if (current === undefined) return
+    const maxZ = notesRef.current.reduce((max, item) => Math.max(max, item.z ?? 0), zTopRef.current)
+    zTopRef.current = maxZ + 1
+    const layer = zTopRef.current
+    setNotes(list => list.map(item => item.id === noteId ? { ...item, z: layer } : item))
+    savePatch(current, { z: layer })
+  }, [savePatch])
+
+  /** 删除便签；排在同便签的写队列之后，避免「先删后写」造成 404 噪声。 */
+  const removeWithFeedback = useCallback((id: string): void => {
+    enqueueWrite(id, async () => {
+      try {
+        await deleteNote(id)
+        removeNote(id)
+        setActionError(null)
+      } catch (reason) {
+        setActionError(t('state.saveFailed', { message: messageOf(reason) }))
+      }
+    })
+  }, [deleteNote, enqueueWrite, removeNote, t])
 
   /** 「＋」：在当前视口中间新建一张空便签，并立刻把焦点交给它。 */
   const addNote = useCallback(async (): Promise<void> => {
@@ -321,7 +348,7 @@ export function DeskOnePage(props: DeskPanelProps) {
         </button>
       </div>
       <textarea
-        key={`${item.note.id}:${item.note.revision}`}
+        key={item.note.id}
         ref={(element) => {
           if (element === null) textareas.current.delete(item.note.id)
           else textareas.current.set(item.note.id, element)

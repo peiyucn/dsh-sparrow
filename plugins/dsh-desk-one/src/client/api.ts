@@ -48,6 +48,7 @@ export function updateNote(input: {
     readonly y?: number
     readonly width?: number
     readonly height?: number
+    readonly z?: number
   }
 }): Promise<DeskNote> {
   return postJson<NoteMutationResponse>(ROUTES.noteUpdate, input).then(payload => payload.note)

@@ -70,6 +70,8 @@ interface NotePayload {
   /** 便签尺寸（px）：缺省用默认尺寸，用户拖右下角改过的才写回。 */
   width?: number
   height?: number
+  /** 贴纸层级（越大越靠上）：点/拖后抬到最大 + 1 并写回；缺省按列表顺序兜底。 */
+  z?: number
 }
 
 interface EventPayload {

@@ -26,6 +26,8 @@ const noteSchema = z.object({
   // 便签尺寸：同上，缺省即默认尺寸。
   width: z.number().optional(),
   height: z.number().optional(),
+  // 贴纸层级：越大越靠上，同属可选字段（老记录按列表顺序兜底）。
+  z: z.number().optional(),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   revision: z.number().int().positive(),

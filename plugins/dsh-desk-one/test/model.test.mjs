@@ -110,6 +110,20 @@ describe('desk 对象模型：创建与补丁', () => {
     assert.equal(next.y, undefined, '负数坐标按非法值忽略')
   })
 
+  it('补丁可以保存贴纸层级（取整，非法忽略）', () => {
+    const next = patchNoteRecord(note(), { z: 12.6 }, {
+      expectedRevision: 1,
+      now: '2026-01-02T00:00:00.000Z',
+    })
+    assert.equal(next.z, 13)
+
+    const ignored = patchNoteRecord(note(), { z: -1 }, {
+      expectedRevision: 1,
+      now: '2026-01-02T00:00:00.000Z',
+    })
+    assert.equal(ignored.z, undefined)
+  })
+
   it('补丁可以保存便签尺寸（夹到上下限，非法值忽略）', () => {
     const next = patchNoteRecord(note(), { width: 10, height: 99_999 }, {
       expectedRevision: 1,

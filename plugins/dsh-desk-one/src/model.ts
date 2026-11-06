@@ -37,6 +37,8 @@ export interface NotePatch {
   /** 便签尺寸（px）：用户拖右下角改大小后写回。 */
   readonly width?: number
   readonly height?: number
+  /** 贴纸层级：点/拖后抬到最大 + 1，并持久化。 */
+  readonly z?: number
 }
 
 /** 由正文首行派生标题（便签墙不展示 title，但 agent 工具与检索需要它）。 */
@@ -74,6 +76,13 @@ export function normalizeSize(value: unknown, min: number): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return undefined
   return Math.round(Math.min(Math.max(value, min), NOTE_MAX_SIZE))
 }
+
+/** 合法层级：非负整数；非法一律忽略。 */
+export function normalizeLayer(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined
+  return Math.round(value)
+}
+
 
 /** 创建一条便签对象（id / 时间 / 坐标由调用方提供，保持本函数纯净）。 */
 export function createNoteRecord(
@@ -126,6 +135,7 @@ export function patchNoteRecord(
     y?: number
     width?: number
     height?: number
+    z?: number
     createdAt: string
     updatedAt: string
     revision: number
@@ -166,6 +176,8 @@ export function patchNoteRecord(
   const height = normalizeSize(patch.height, NOTE_MIN_HEIGHT)
   if (width !== undefined) next.width = width
   if (height !== undefined) next.height = height
+  const layer = normalizeLayer(patch.z)
+  if (layer !== undefined) next.z = layer
   return next
 }
 
