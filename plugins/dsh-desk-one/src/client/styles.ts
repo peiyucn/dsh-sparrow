@@ -307,26 +307,34 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-note-body::placeholder {
   color: rgba(55, 53, 47, 0.3);
 }
-/* 右下角改大小：一条极简的角标（右边 + 下边各一像素），悬停才出现，不做斜线花纹。 */
+/* 右下角改大小：热区放大到 26px（好抓），可见角标仍是极简的两条细线（画在伪元素上）。 */
 .dsh-desk-note-resize {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
+  right: 0;
+  bottom: 0;
+  width: 26px;
+  height: 26px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.dsh-desk-note-resize::after {
+  content: '';
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
   width: 8px;
   height: 8px;
   border-right: 1.5px solid rgba(55, 53, 47, 0.32);
   border-bottom: 1.5px solid rgba(55, 53, 47, 0.32);
   border-bottom-right-radius: 1px;
-  cursor: nwse-resize;
   opacity: 0;
   transition: opacity 0.12s ease, border-color 0.12s ease;
-  touch-action: none;
 }
-.dsh-desk-note:hover .dsh-desk-note-resize,
-.dsh-desk-note:focus-within .dsh-desk-note-resize {
+.dsh-desk-note:hover .dsh-desk-note-resize::after,
+.dsh-desk-note:focus-within .dsh-desk-note-resize::after {
   opacity: 1;
 }
-.dsh-desk-note-resize:hover {
+.dsh-desk-note-resize:hover::after {
   border-color: rgba(55, 53, 47, 0.6);
 }
 /* 「＋」：保留原来的悬浮按钮形态，只对齐宿主语言 ——
