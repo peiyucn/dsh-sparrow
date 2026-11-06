@@ -494,10 +494,9 @@ export function DeskOnePage(props: DeskPanelProps) {
             title={t('action.newNote')}
             onClick={() => { void addNote() }}
           >
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-              <path d="M8 3.5v9M3.5 8h9" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
             </svg>
-            <span>{t('action.newNote')}</span>
           </button>
         )
         : null}

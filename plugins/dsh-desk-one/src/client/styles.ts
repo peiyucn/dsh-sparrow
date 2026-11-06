@@ -98,7 +98,7 @@ html[data-platform='darwin'] .dsh-desk-head {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  margin-bottom: 64px;
+  margin-bottom: 88px;
 }
 .dsh-desk-wall-hint {
   position: absolute;
@@ -291,37 +291,38 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-note-resize:hover {
   border-color: rgba(55, 53, 47, 0.6);
 }
-/* 「随手记」：与 DSH 原生按钮同语言（细边 + 抬升面 + hover 底色），悬浮在右下角。 */
+/* 「＋」：保留原来的悬浮按钮形态，只对齐宿主语言 ——
+   圆角用官方控制圆角 token，颜色用官方蓝紫品牌色（浅色 rgb(65,118,230)、深色走 deepseek-450）。 */
 .dsh-desk-add {
   position: absolute;
   right: 28px;
   bottom: 28px;
   z-index: 2;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 14px 0 12px;
-  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: 999px;
-  background: var(--dsw-alias-bg-layer-1, #ffffff);
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: none;
+  border-radius: var(--dsw-radius-lg, 16px);
+  background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+  color: #ffffff;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(20, 25, 40, 0.12);
-  transition: background 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 8px 20px -8px rgba(20, 25, 40, 0.35);
+  transition: filter 0.12s ease, transform 0.12s ease;
 }
 .dsh-desk-add svg {
   display: block;
   flex: none;
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
 }
 .dsh-desk-add:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  filter: brightness(0.94);
+}
+.dsh-desk-add:active {
+  transform: scale(0.97);
 }
 .dsh-desk-add:disabled {
   opacity: 0.6;

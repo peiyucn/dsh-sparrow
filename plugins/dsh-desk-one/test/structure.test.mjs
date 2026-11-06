@@ -88,9 +88,9 @@ describe('dsh-desk-one 结构', () => {
     const addRule = /\.dsh-desk-add \{([^}]*)\}/u.exec(styles)
     assert.ok(addRule !== null, '缺 .dsh-desk-add 规则')
     assert.match(addRule[1], /position:\s*absolute/u, '「+」必须悬浮在墙面右下角')
-    assert.match(addRule[1], /border-radius:\s*999px/u, '随手记按钮要与原生按钮同语言（胶囊）')
-    assert.match(addRule[1], /--dsw-alias-bg-layer-1/u, '按钮底色用宿主抬升面 token')
-    assert.ok(!/--dsw-alias-label-primary,\s*#1f2329\);\s*color:\s*var\(--dsw-alias-bg-layer-1/u.test(addRule[1]), '不得回到黑底白字的自造按钮')
+    assert.match(addRule[1], /border-radius:\s*var\(--dsw-radius-lg/u, '圆角用宿主控制圆角 token')
+    assert.match(addRule[1], /--dsw-alias-brand-primary-new-colorprimary-new-color/u, '底色用宿主官方蓝紫品牌色')
+    assert.ok(!/background:\s*var\(--dsw-alias-bg-layer-1/u.test(addRule[1]), '不得退回白底按钮')
     // 贴纸不出屏：墙面不滚动，不得再有可滚动画布。
     const wallRule = /\.dsh-desk-wall \{([^}]*)\}/u.exec(styles)
     assert.ok(wallRule !== null, '缺 .dsh-desk-wall 规则')
