@@ -440,17 +440,21 @@ html[data-platform='darwin'] .dsh-desk-head {
   height: 22px;
   background: color-mix(in srgb, var(--dsw-alias-border-l1, #e2e5ea) 75%, transparent);
 }
-/* Smash：与另外两个悬浮按钮同款玻璃、同尺寸，图标常驻；二次确认时转危险色。 */
+/* Smash：与另外两个悬浮按钮同款玻璃、同尺寸；图标常驻危险色，和 ＋ 的蓝、垃圾桶的中性色区分开。 */
+.dsh-desk-smash {
+  color: var(--dsw-alias-state-error-primary, #c62828);
+}
 .dsh-desk-smash svg {
   width: 20px;
   height: 20px;
 }
 .dsh-desk-smash:hover {
   color: var(--dsw-alias-state-error-primary, #c62828);
+  background-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c62828) 8%, transparent);
 }
 .dsh-desk-smash[data-confirm='true'] {
   color: var(--dsw-alias-state-error-primary, #c62828);
-  background-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c62828) 10%, transparent);
+  background-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c62828) 14%, transparent);
 }
 .dsh-desk-smash:disabled {
   opacity: 0.4;

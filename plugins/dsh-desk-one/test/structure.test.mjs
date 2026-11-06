@@ -127,6 +127,10 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /closest\('\.dsh-desk-smash'\)/u, 'Smash 确认态点击旁边要恢复（排除按钮自身）')
     assert.match(page, /addEventListener\('pointerdown', onPointerDown, true\)/u, '要用捕获阶段的 pointerdown 监听取消')
     assert.match(page, /Escape/u, 'Esc 也要能取消 Smash 确认')
+    // owner 2026-11-06：Smash 图标常驻红色，＋ 是蓝色、垃圾桶是中性色，靠颜色 + 分隔线区分。
+    const smashColorRule = /\.dsh-desk-smash \{[^}]*\}/u.exec(styles)
+    assert.ok(smashColorRule !== null, '缺 .dsh-desk-smash 颜色规则')
+    assert.match(smashColorRule[0], /--dsw-alias-state-error-primary/u, 'Smash 图标要常驻危险色')
     // 角标只留给未读：垃圾桶计数不再挂 badge。
     assert.ok(!/fab-count/u.test(page), '垃圾桶不得再挂角标')
     assert.ok(!/dsh-desk-fab-count/u.test(styles), '角标样式要删干净')
