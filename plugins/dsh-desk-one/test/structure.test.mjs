@@ -65,11 +65,19 @@ describe('dsh-desk-one 结构', () => {
 
   it('便签墙 应该 有归档区：卡片可归档，墙上方有入口，归档区可恢复 / 删除', async () => {
     const page = await read('src/client/DeskOnePage.tsx')
-    assert.match(page, /dsh-desk-note-archive/u, '贴纸要有归档入口')
+    const styles = await read('src/client/styles.ts')
     assert.match(page, /dsh-desk-wallbar/u, '便签标签要有墙栏承载归档入口')
     assert.match(page, /dsh-desk-archive/u, '要有归档视图容器')
     assert.match(page, /action\.restore/u, '归档区要能恢复')
     assert.match(page, /archive\.empty/u, '归档区要有空态文案')
+    // owner 2026-11-06：归档相关操作一律用图标，不写文字按钮。
+    const iconButtons = page.match(/dsh-desk-iconbtn/gu) ?? []
+    assert.ok(iconButtons.length >= 5, '归档 / 恢复 / 删除 / 关闭都应是图标按钮')
+    assert.ok(!/dsh-desk-note-archive/u.test(page), '贴纸归档不得再用文字按钮')
+    assert.ok(!/dsh-desk-link/u.test(page), '归档区不得再用文字链接按钮')
+    const iconRule = /\.dsh-desk-iconbtn \{([^}]*)\}/u.exec(styles)
+    assert.ok(iconRule !== null, '缺 .dsh-desk-iconbtn 规则')
+    assert.match(iconRule[1], /--dsw-radius-sm/u, '图标按钮圆角用宿主 token')
   })
 
   it('总览 应该 保持空白占位（内容未设计前不堆放功能）', async () => {

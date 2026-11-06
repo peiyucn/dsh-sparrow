@@ -356,21 +356,25 @@ export function DeskOnePage(props: DeskPanelProps) {
         </div>
         <button
           type="button"
-          className="dsh-desk-note-archive"
+          className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-note-action"
           aria-label={t('action.archive')}
           title={t('action.archive')}
           onClick={() => { void savePatch(item.note, { archived: true }) }}
         >
-          {t('action.archive')}
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="M3.5 5h13M4.5 5v9.5h11V5M8 9h4" />
+          </svg>
         </button>
         <button
           type="button"
-          className="dsh-desk-note-close"
+          className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-note-action"
           aria-label={t('action.delete')}
           title={t('action.delete')}
           onClick={() => { void removeWithFeedback(item.note.id) }}
         >
-          ×
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="M6 6l8 8M14 6l-8 8" />
+          </svg>
         </button>
       </div>
       <textarea
@@ -411,17 +415,26 @@ export function DeskOnePage(props: DeskPanelProps) {
                   <span className="dsh-desk-archive-meta">{formatDate(note.updatedAt)}</span>
                   <button
                     type="button"
-                    className="dsh-desk-link"
+                    className="dsh-desk-iconbtn"
+                    aria-label={t('action.restore')}
+                    title={t('action.restore')}
                     onClick={() => { void savePatch(note, { archived: false }) }}
                   >
-                    {t('action.restore')}
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                      <path d="M4.5 6.5v4h4" />
+                      <path d="M5 10.3A5.2 5.2 0 1 1 6.6 13.2" />
+                    </svg>
                   </button>
                   <button
                     type="button"
-                    className="dsh-desk-link dsh-desk-link-danger"
+                    className="dsh-desk-iconbtn dsh-desk-iconbtn-danger"
+                    aria-label={t('action.delete')}
+                    title={t('action.delete')}
                     onClick={() => { void removeWithFeedback(note.id) }}
                   >
-                    {t('action.delete')}
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                      <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+                    </svg>
                   </button>
                 </li>
               ))}
@@ -463,12 +476,25 @@ export function DeskOnePage(props: DeskPanelProps) {
           <div className="dsh-desk-wallbar">
             <button
               type="button"
-              className="dsh-desk-btn"
+              className="dsh-desk-iconbtn dsh-desk-iconbtn-wide"
+              aria-label={showArchive ? t('action.backToWall') : t('action.archive')}
+              title={showArchive ? t('action.backToWall') : t('action.archive')}
               onClick={() => setShowArchive(current => !current)}
             >
               {showArchive
-                ? t('action.backToWall')
-                : `${t('action.archive')}${archivedNotes.length === 0 ? '' : ` (${archivedNotes.length})`}`}
+                ? (
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                    <path d="M11.5 5.5L7 10l4.5 4.5M7.5 10h7" />
+                  </svg>
+                )
+                : (
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                    <path d="M3.5 5h13M4.5 5v9.5h11V5M8 9h4" />
+                  </svg>
+                )}
+              {!showArchive && archivedNotes.length > 0
+                ? <span className="dsh-desk-count">{archivedNotes.length}</span>
+                : null}
             </button>
           </div>
           {showArchive

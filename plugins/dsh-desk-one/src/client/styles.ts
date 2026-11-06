@@ -210,44 +210,57 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-dot[data-active='true'] {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 3px rgba(55, 53, 47, 0.55);
 }
-/* 贴纸上的「归档」：无边框文字按钮，悬停才出现，紧挨删除。 */
-.dsh-desk-note-archive {
+/* 图标按钮：归档 / 恢复 / 删除等操作一律用图标，文字只留 aria/title。 */
+.dsh-desk-iconbtn {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border: none;
+  border-radius: var(--dsw-radius-sm, 8px);
   background: transparent;
-  padding: 0 4px;
-  font-size: 11px;
-  line-height: 16px;
   color: rgba(55, 53, 47, 0.42);
   cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.dsh-desk-iconbtn svg {
+  display: block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.dsh-desk-iconbtn:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-desk-iconbtn-danger:hover {
+  color: var(--dsw-alias-state-error-primary, #c62828);
+}
+/* 墙栏入口：图标 + 计数，宽度按内容自适应。 */
+.dsh-desk-iconbtn-wide {
+  width: auto;
+  padding: 0 6px;
+  gap: 2px;
+}
+/* 贴纸上的小号图标（归档 / 关闭）：悬停才出现。 */
+.dsh-desk-iconbtn-sm {
+  width: 18px;
+  height: 18px;
+}
+.dsh-desk-iconbtn-sm svg {
+  width: 14px;
+  height: 14px;
+}
+.dsh-desk-note-action {
   opacity: 0;
-  transition: opacity 0.12s ease, color 0.12s ease;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
-.dsh-desk-note:hover .dsh-desk-note-archive,
-.dsh-desk-note:focus-within .dsh-desk-note-archive {
+.dsh-desk-note:hover .dsh-desk-note-action,
+.dsh-desk-note:focus-within .dsh-desk-note-action {
   opacity: 1;
-}
-.dsh-desk-note-archive:hover {
-  color: rgba(55, 53, 47, 0.78);
-}
-.dsh-desk-note-close {
-  appearance: none;
-  border: none;
-  background: transparent;
-  padding: 0 2px;
-  font-size: 16px;
-  line-height: 1;
-  color: rgba(43, 41, 38, 0.4);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.12s ease, color 0.12s ease;
-}
-.dsh-desk-note:hover .dsh-desk-note-close,
-.dsh-desk-note:focus-within .dsh-desk-note-close {
-  opacity: 1;
-}
-.dsh-desk-note-close:hover {
-  color: #a33b35;
 }
 .dsh-desk-note-body {
   box-sizing: border-box;
@@ -375,24 +388,12 @@ html[data-platform='darwin'] .dsh-desk-head {
   line-height: 18px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
-/* 文本按钮（归档区里的恢复 / 删除）。 */
-.dsh-desk-link {
-  appearance: none;
-  border: none;
-  background: transparent;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 12px;
-  line-height: 18px;
+/* 墙栏图标按钮上的归档计数（图标是主入口，数字只作提示）。 */
+.dsh-desk-count {
+  margin-left: 2px;
+  font-size: 11px;
+  line-height: 14px;
   color: var(--dsw-alias-label-secondary, #6b7280);
-  cursor: pointer;
-}
-.dsh-desk-link:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--dsw-alias-label-primary, #1f2329);
-}
-.dsh-desk-link-danger:hover {
-  color: var(--dsw-alias-state-error-primary, #c62828);
 }
 
 /* 总览：内容尚未设计，S0 保持空白占位（owner 2026-11-06：先不投入）。 */
