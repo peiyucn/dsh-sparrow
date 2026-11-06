@@ -349,19 +349,13 @@ export const TASKS_CSS = `
 .dsh-task-group-grip:active {
   cursor: grabbing;
 }
-/* Drag image for a whole-group drag: a floating copy of the group header. */
-.dsh-task-group-dragimage {
+/* Whole-group drag: the cloned group block follows the pointer, exactly like a card ghost. */
+.dsh-task-group-ghost {
   position: fixed;
-  top: -1000px;
-  left: -1000px;
   box-sizing: border-box;
-  padding: 4px 8px;
-  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: var(--dsw-radius-md, 12px);
-  background: var(--dsw-alias-bg-layer-1, #ffffff);
-  box-shadow: 0 12px 28px -16px rgba(20, 25, 40, 0.5);
-  color: var(--dsw-alias-label-primary, #1f2329);
+  opacity: 0.96;
   pointer-events: none;
+  box-shadow: 0 18px 40px -20px rgba(20, 25, 40, 0.55);
 }
 .dsh-task-group-grip svg {
   display: block;
@@ -501,26 +495,17 @@ export const TASKS_CSS = `
   font-size: 12px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
-/* Cross-lane group move: an explicit confirmation bar, plus an undo bar after the move. */
-.dsh-task-movebar {
+/* Insertion line while a group is dragged (per-index marker; the lane itself highlights too). */
+.dsh-task-group-dropmark {
   flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: var(--dsw-radius-md, 12px);
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 86%, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6));
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  font-size: 12px;
-  line-height: 18px;
+  height: 2px;
+  margin: 0 2px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background 0.1s ease;
 }
-.dsh-task-movebar-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.dsh-task-group-dropmark[data-active='true'] {
+  background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
 }
 /* Cards-drag feedback for the ungrouped drop zone (always present so ungrouping is discoverable). */
 .dsh-task-ungrouped-hint {

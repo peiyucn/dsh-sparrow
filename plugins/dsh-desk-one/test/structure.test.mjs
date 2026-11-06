@@ -363,7 +363,6 @@ describe('dsh-desk-one 结构', () => {
   it('任务板 应该 无横向滚动条：窄宽度收成计数模式，分组可拖动排序', async () => {
     const board = await read('src/client/tasks/components/TaskBoard.tsx')
     const column = await read('src/client/tasks/components/TaskColumn.tsx')
-    const hook = await read('src/client/tasks/hooks/useTaskBoard.ts')
     const styles = await readStyles()
     const notesStyles = await read('src/client/notes/styles.ts')
     const notesDrag = await read('src/client/notes/hooks/useNoteDrag.ts')
@@ -375,12 +374,11 @@ describe('dsh-desk-one 结构', () => {
     assert.match(column, /data-compact="true"/u, '紧凑泳道只显示计数')
     assert.match(column, /dsh-task-compact-row/u)
     assert.match(styles, /\.dsh-task-compact-row \{/u)
-    // Group headers reorder by drag.
+    // Group headers drag with the same pointer gesture as cards.
+    assert.match(column, /onGroupStartDrag/u, '整组拖拽走指针手势')
     assert.match(column, /dsh-task-group-grip/u, '分组要有拖动手柄')
-    assert.match(column, /draggable/u)
-    assert.match(column, /onGroupDrop/u)
-    assert.match(hook, /const reorderGroup = useCallback/u)
-    assert.match(hook, /const moveGroupWhole = useCallback/u)
+    assert.match(board, /dsh-task-group-ghost/u, '整组拖动有跟随鼠标的整组幽灵')
+    assert.match(board, /resolveGroupDrop/u, '整组落点按泳道 + 分组序号解析')
     // Task ghost is straight; the sticky-note drag gets the paper tilt instead.
     assert.ok(!/\.dsh-task-ghost \{[^}]*rotate/su.test(styles), '任务幽灵卡不要倾斜')
     assert.match(notesStyles, /\.dsh-desk-note\[data-dragging='true'\] \{[^}]*rotate/su)
@@ -398,7 +396,6 @@ describe('dsh-desk-one 结构', () => {
     const groupsHook = await read('src/client/tasks/hooks/useGroupsData.ts')
     const boardHook = await read('src/client/tasks/hooks/useTaskBoard.ts')
     const board = await read('src/client/tasks/components/TaskBoard.tsx')
-    const column = await read('src/client/tasks/components/TaskColumn.tsx')
     const styles = await readStyles()
     assert.match(contract, /export interface DeskTaskGroup/u, '分组是独立对象')
     assert.match(contract, /groupId\?: string/u, '任务用 groupId 记录成员关系')
@@ -412,13 +409,13 @@ describe('dsh-desk-one 结构', () => {
     assert.match(groupsHook, /useGroupsData/u)
     assert.match(boardHook, /removeItem\(TASK_GROUPS_STORAGE_KEY\)/u, '旧的 localStorage 分组列表要清掉')
     assert.match(boardHook, /task\.status === toStatus/u, '拖拽只重排目标容器')
-    assert.match(board, /task\.group\.moveConfirm/u, '整组跨列要二次确认')
-    assert.match(board, /undoGroupMove/u, '整组跨列可撤销')
-    assert.match(board, /onGroupDragEnd=\{\(\) => setGroupDrag\(null\)\}/u, 'dragend 不能清掉待确认状态（浏览器 drop 后紧跟 dragend）')
-    assert.match(column, /setDragImage/u, '整组拖动要有整组拖影')
-    assert.match(column, /dsh-task-group-dragimage/u)
-    assert.match(column, /laneOver \|\| groupDragOver/u, '跨列时目标泳道要高亮')
-    assert.match(styles, /\.dsh-task-movebar \{/u)
+    assert.match(board, /resolveGroupDrop/u, '整组落点按泳道 + 分组序号解析')
+    assert.match(board, /onGroupStartDrag/u, '整组拖拽和卡片一样走指针手势')
+    assert.match(board, /moveGroupWhole/u, '跨泳道直接移动整组，不再有确认条')
+    assert.match(boardHook, /const moveGroupWhole = useCallback/u)
+    assert.match(boardHook, /const reorderGroup = useCallback/u)
+    assert.ok(!styles.includes('.dsh-task-movebar'), '整组移动不需要确认条 / 撤销条')
+    assert.ok(!styles.includes('.dsh-task-group-dragimage'), '不再使用 HTML5 拖影')
   })
 
   it('页面 应该 用一个面板承载标签页，而不是弹窗', async () => {

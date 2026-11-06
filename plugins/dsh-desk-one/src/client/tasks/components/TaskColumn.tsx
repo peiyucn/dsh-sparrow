@@ -1,11 +1,11 @@
 /**
- * One board lane: header, ungrouped cards, first-class groups (collapsible, drag-reorderable,
- * and — after confirmation — movable to another lane), draft card and the double-click-to-add
- * surface. The lane collapses to a count-only column below the compact threshold.
+ * One board lane: header, ungrouped cards, first-class groups (collapsible, draggable as a unit)
+ * plus the double-click-to-add surface. Below the compact threshold the lane collapses to a
+ * count-only column.
  */
 
-import { useEffect, useRef, useState } from 'react'
-import type { DragEvent as ReactDragEvent, PointerEvent as ReactPointerEvent, ReactElement } from 'react'
+import { useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import type { DeskTask, DeskTaskGroup, TaskPatchRequest, TaskStatus } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
 import type { LaneView } from '../types.js'
@@ -17,6 +17,12 @@ export interface DropTarget {
   readonly groupId?: string
 }
 
+/** Group drag target: which lane, and the insertion position among that lane's groups. */
+export interface GroupDropTarget {
+  readonly status: TaskStatus
+  readonly index: number
+}
+
 interface TaskColumnProps {
   readonly status: TaskStatus
   readonly title: string
@@ -25,6 +31,7 @@ interface TaskColumnProps {
   readonly collapsed: boolean
   readonly draft: TaskDraft | null
   readonly dropTarget: DropTarget | null
+  readonly groupDrop: GroupDropTarget | null
   readonly draggingId: string | null
   readonly groupDrag: DeskTaskGroup | null
   readonly t: DeskTranslator
@@ -33,6 +40,7 @@ interface TaskColumnProps {
   readonly onCommitDraft: (title: string) => void
   readonly onCancelDraft: () => void
   readonly onStartDrag: (task: DeskTask, event: ReactPointerEvent<HTMLElement>) => void
+  readonly onGroupStartDrag: (group: DeskTaskGroup, event: ReactPointerEvent<HTMLElement>) => void
   readonly onPatch: (task: DeskTask, patch: TaskPatchRequest) => void
   readonly onArchive: (task: DeskTask) => void
   readonly onDelete: (id: string) => void
@@ -41,9 +49,6 @@ interface TaskColumnProps {
   readonly onCreateGroup: (status: TaskStatus, name: string) => void
   readonly onRenameGroup: (group: DeskTaskGroup, name: string) => void
   readonly onRemoveGroup: (group: DeskTaskGroup) => void
-  readonly onGroupDragStart: (group: DeskTaskGroup) => void
-  readonly onGroupDragEnd: () => void
-  readonly onGroupDrop: (status: TaskStatus, toIndex: number) => void
 }
 
 /** Inline draft: an empty title cancels instead of creating an empty task (titles are required). */
@@ -83,38 +88,16 @@ function DraftCard({ t, onCommit, onCancel }: {
 }
 
 export function TaskColumn({
-  status, title, lane, compact, collapsed, draft, dropTarget, draggingId, groupDrag, t,
-  onAdd, onToggleCollapse, onCommitDraft, onCancelDraft, onStartDrag, onPatch, onArchive, onDelete,
+  status, title, lane, compact, collapsed, draft, dropTarget, groupDrop, draggingId, groupDrag, t,
+  onAdd, onToggleCollapse, onCommitDraft, onCancelDraft, onStartDrag, onGroupStartDrag,
+  onPatch, onArchive, onDelete,
   isGroupCollapsed, onToggleGroup, onCreateGroup, onRenameGroup, onRemoveGroup,
-  onGroupDragStart, onGroupDragEnd, onGroupDrop,
 }: TaskColumnProps): ReactElement {
   const [addingGroup, setAddingGroup] = useState(false)
   const [editingGroup, setEditingGroup] = useState<string | null>(null)
   const [confirmGroup, setConfirmGroup] = useState<string | null>(null)
-  const [dropIndex, setDropIndex] = useState<number | null>(null)
-  const [groupDragOver, setGroupDragOver] = useState(false)
   const laneOver = dropTarget?.status === status && dropTarget.groupId === undefined
-
-  // The drag source clears groupDrag on dragend; the target lane must stop highlighting then.
-  useEffect(() => {
-    if (groupDrag === null) setGroupDragOver(false)
-  }, [groupDrag])
-
-  /** Drag the whole group as one unit: the drag image is the group header (name + count). */
-  const startGroupDrag = (event: ReactDragEvent<HTMLElement>, group: DeskTaskGroup): void => {
-    const transfer = event.dataTransfer
-    transfer?.setData('text/plain', group.id)
-    const head = (event.currentTarget as HTMLElement).closest<HTMLElement>('.dsh-task-group-head')
-    if (head !== null && transfer !== undefined && transfer !== null && typeof transfer.setDragImage === 'function') {
-      const ghost = head.cloneNode(true) as HTMLElement
-      ghost.classList.add('dsh-task-group-dragimage')
-      ghost.style.width = `${head.getBoundingClientRect().width}px`
-      document.body.appendChild(ghost)
-      transfer.setDragImage(ghost, 14, 12)
-      window.setTimeout(() => ghost.remove(), 0)
-    }
-    onGroupDragStart(group)
-  }
+  const groupLaneOver = groupDrop?.status === status
   const draftIn = (groupId?: string): boolean => draft !== null && draft.status === status && draft.groupId === groupId
   const total = lane.ungrouped.length + lane.groups.reduce((sum, group) => sum + group.tasks.length, 0)
   /** Counts read as labels ("3 tasks") instead of bare numbers — singular handled separately. */
@@ -141,15 +124,6 @@ export function TaskColumn({
       onDelete={onDelete}
     />
   ))
-
-  /** Group headers accept drops from any lane; the board decides reorder vs confirmed move. */
-  const handleGroupDragOver = (event: ReactDragEvent<HTMLElement>, index: number): void => {
-    if (groupDrag === null) return
-    // Stop the lane-level handlers: a drop on a group must not also append to the lane end.
-    event.preventDefault()
-    event.stopPropagation()
-    setDropIndex(index)
-  }
 
   const header = (
     <header className="dsh-task-lane-head">
@@ -226,43 +200,11 @@ export function TaskColumn({
     <section
       className="dsh-task-lane"
       data-lane={status}
-      data-over={laneOver || groupDragOver}
+      data-over={laneOver || groupLaneOver}
       data-collapsed={collapsed}
-      onDragOver={(event) => {
-        if (groupDrag === null) return
-        event.preventDefault()
-        setGroupDragOver(true)
-      }}
-      onDragLeave={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setGroupDragOver(false)
-      }}
-      onDrop={(event) => {
-        // Lane header / empty compact area: append at the end. Drops inside the list are handled
-        // by the list/group handlers (which stop propagation), so this is only a fallback.
-        if (groupDrag === null) return
-        const target = event.target as HTMLElement
-        if (target.closest('.dsh-task-list') !== null) return
-        event.preventDefault()
-        setGroupDragOver(false)
-        onGroupDrop(status, lane.groups.length)
-      }}
     >
       {header}
-      <div
-        className="dsh-task-list"
-        onDoubleClick={handleDoubleClick}
-        onDragOver={(event) => {
-          if (groupDrag === null) return
-          event.preventDefault()
-          setDropIndex(lane.groups.length)
-        }}
-        onDrop={(event) => {
-          if (groupDrag === null) return
-          event.preventDefault()
-          onGroupDrop(status, lane.groups.length)
-          setDropIndex(null)
-        }}
-      >
+      <div className="dsh-task-list" onDoubleClick={handleDoubleClick}>
         <div className="dsh-task-ungrouped" data-group-id="">
           {cards(lane.ungrouped)}
           {draftIn(undefined) ? <DraftCard t={t} onCommit={onCommitDraft} onCancel={onCancelDraft} /> : null}
@@ -272,36 +214,21 @@ export function TaskColumn({
         </div>
         {lane.groups.map(({ group, tasks }, index) => {
           const groupCollapsed = isGroupCollapsed(group.id)
-          const over = dropTarget?.status === status && dropTarget.groupId === group.id
           const draggingThis = groupDrag?.id === group.id
           return (
             <div
               key={group.id}
               className="dsh-task-group"
-              data-over={over}
-              data-drop={dropIndex === index}
+              data-drop={groupLaneOver && groupDrop?.index === index}
               data-dragging={draggingThis}
-              onDragOver={(event) => handleGroupDragOver(event, index)}
-              onDragLeave={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropIndex(null)
-              }}
-              onDrop={(event) => {
-                if (groupDrag === null) return
-                event.preventDefault()
-                event.stopPropagation()
-                onGroupDrop(status, index)
-                setDropIndex(null)
-              }}
             >
-              <div className="dsh-task-group-head" data-group-id={group.id}>
-                <span
-                  className="dsh-task-group-grip"
-                  draggable
-                  title={t('task.group.drag')}
-                  onDragStart={(event) => startGroupDrag(event, group)}
-                  onDragEnd={onGroupDragEnd}
-                >
-                  <svg viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
+              <div
+                className="dsh-task-group-head"
+                data-group-id={group.id}
+                onPointerDown={(event) => onGroupStartDrag(group, event)}
+              >
+                <span className="dsh-task-group-grip" title={t('task.group.drag')} aria-hidden="true">
+                  <svg viewBox="0 0 10 16" fill="currentColor">
                     <circle cx="3" cy="3" r="1" /><circle cx="7" cy="3" r="1" />
                     <circle cx="3" cy="8" r="1" /><circle cx="7" cy="8" r="1" />
                     <circle cx="3" cy="13" r="1" /><circle cx="7" cy="13" r="1" />
@@ -324,6 +251,7 @@ export function TaskColumn({
                         className="dsh-task-group-input"
                         defaultValue={group.name}
                         autoFocus
+                        onPointerDown={event => event.stopPropagation()}
                         onBlur={(event) => {
                           setEditingGroup(null)
                           onRenameGroup(group, event.currentTarget.value)
@@ -392,6 +320,7 @@ export function TaskColumn({
             </div>
           )
         })}
+        <div className="dsh-task-group-dropmark" data-active={groupLaneOver && groupDrop?.index === lane.groups.length} />
         {addingGroup
           ? (
               <div className="dsh-task-group-new">
