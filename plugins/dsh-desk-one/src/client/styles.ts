@@ -341,7 +341,7 @@ html[data-platform='darwin'] .dsh-desk-head {
 /* 「＋」：保留原来的悬浮按钮形态，只对齐宿主语言 ——
    圆角用官方控制圆角 token，颜色用官方蓝紫品牌色（浅色 rgb(65,118,230)、深色走 deepseek-450）。 */
 /* 右下角悬浮按钮：与 theme-tone 的输入框同一套磨砂玻璃材质 ——
-   半透明底 + backdrop blur/saturate + 顶部边缘光 + 软浮起阴影；＋ 用品牌蓝图标做主动作。 */
+   半透明底 + backdrop blur + 四边中段对称亮芯 + 左上定向边光（往右下衰减）+ 软浮起阴影。 */
 .dsh-desk-fabglass {
   position: relative;
   display: flex;
@@ -352,31 +352,43 @@ html[data-platform='darwin'] .dsh-desk-head {
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 52%, var(--dsw-alias-border-l1, #e2e5ea));
   border-radius: var(--dsw-radius-lg, 16px);
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 64%, transparent);
+  background-color: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 64%, transparent);
   color: var(--dsw-alias-label-secondary, #6b7280);
   cursor: pointer;
+  background-image:
+    radial-gradient(ellipse 52% 5px at 50% 0, rgba(255, 255, 255, 0.07), transparent),
+    radial-gradient(ellipse 52% 5px at 50% 100%, rgba(255, 255, 255, 0.07), transparent),
+    radial-gradient(ellipse 5px 52% at 0 50%, rgba(255, 255, 255, 0.07), transparent),
+    radial-gradient(ellipse 5px 52% at 100% 50%, rgba(255, 255, 255, 0.07), transparent);
+  background-repeat: no-repeat;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 8px 24px -14px rgba(20, 25, 40, 0.35);
+    0 8px 24px -14px rgba(20, 25, 40, 0.35),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.1),
+    inset 3px 2px 9px -5px rgba(255, 255, 255, 0.09),
+    inset -2px 0 9px -6px rgba(255, 255, 255, 0.028),
+    inset 0 -2px 9px -6px rgba(255, 255, 255, 0.018);
   backdrop-filter: blur(16px) saturate(115%) brightness(1.04);
   -webkit-backdrop-filter: blur(16px) saturate(115%) brightness(1.04);
-  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+  transition: background-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 .dsh-desk-fabglass svg {
   display: block;
   flex: none;
 }
 .dsh-desk-fabglass:hover {
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 78%, transparent);
+  background-color: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 78%, transparent);
   color: var(--dsw-alias-label-primary, #1f2329);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.34),
-    0 10px 28px -14px rgba(20, 25, 40, 0.42);
+    0 10px 28px -14px rgba(20, 25, 40, 0.42),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.14),
+    inset 3px 2px 9px -5px rgba(255, 255, 255, 0.12),
+    inset -2px 0 9px -6px rgba(255, 255, 255, 0.04),
+    inset 0 -2px 9px -6px rgba(255, 255, 255, 0.026);
 }
 /* 浏览器不支持背景模糊时退回更实的半透明底，保证按钮可读。 */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .dsh-desk-fabglass {
-    background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 90%, transparent);
+    background-color: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 90%, transparent);
   }
 }
 /* 「＋」：主动作，玻璃面 + 品牌蓝图标。 */
@@ -402,11 +414,13 @@ html[data-platform='darwin'] .dsh-desk-head {
   width: 22px;
   height: 22px;
 }
-/* 右下角操作组：同一排、同尺寸；＋ 在左，垃圾桶在右。 */
+/* 底部悬浮操作组：底部居中并排；＋ 在左，垃圾桶在右。 */
 .dsh-desk-fabstack {
   position: absolute;
-  right: 28px;
+  left: 50%;
+  right: auto;
   bottom: 28px;
+  transform: translateX(-50%);
   z-index: 2; /* 高于墙面的层级上下文：按钮永远在最上面，贴纸拖过来就压在按钮下面。 */
   display: flex;
   flex-direction: row;
