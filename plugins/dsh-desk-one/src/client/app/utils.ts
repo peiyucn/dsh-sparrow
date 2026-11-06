@@ -15,7 +15,7 @@ export const clamp = (value: number, min: number, max: number): number =>
 export function readInitialTab(): Tab {
   try {
     const value = window.localStorage.getItem(TAB_STORAGE_KEY)
-    if (value === 'overview' || value === 'notes') return value
+    if (value === 'overview' || value === 'notes' || value === 'tasks') return value
   } catch {
     // Private mode / storage disabled: use the default tab.
   }

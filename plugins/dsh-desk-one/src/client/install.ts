@@ -12,7 +12,7 @@ import type { InjectFace, LocaleDictOf, PropsLocale, PropsRuntime, SlotComponent
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { hasCapability, warnMissingCapabilities } from './compat.js'
 import { LOCALE_NAMESPACE, PACKAGE_NAME, PANEL_ID, PANEL_ORDER } from '../constants.js'
-import type { DeskNote } from '../contract.js'
+import type { DeskNote, DeskTask, CreateTaskRequest, TaskPatchRequest } from '../contract.js'
 import { attachMainPanel } from './panel.js'
 import { ensureDeskStyles } from './styles.js'
 
@@ -44,6 +44,14 @@ export interface DeskPanelInjected {
     }
   }) => Promise<DeskNote>
   readonly deleteNote: (id: string) => Promise<void>
+  readonly listTasks: () => Promise<readonly DeskTask[]>
+  readonly createTask: (input: CreateTaskRequest) => Promise<DeskTask>
+  readonly updateTask: (input: {
+    readonly id: string
+    readonly expectedRevision: number
+    readonly patch: TaskPatchRequest
+  }) => Promise<DeskTask>
+  readonly deleteTask: (id: string) => Promise<void>
 }
 
 /** 入口注入的浏览器侧件（由 index.ts 提供；测试可传桩）。 */

@@ -68,6 +68,8 @@ export const NOTE_MAX_SIZE = 2000
 
 /** 上次停留的标签页（纯界面偏好，不含用户内容）；切走再回来停在原标签。 */
 export const TAB_STORAGE_KEY = 'dsh-desk-one:tab'
+/** 任务板排序视图偏好（manual / created / due），纯界面状态。 */
+export const TASK_SORT_STORAGE_KEY = 'dsh-desk-one:task-sort'
 
 /** 面板请求超时：host 挂起时不让面板永久 loading。 */
 export const REQUEST_TIMEOUT_MS = 10_000

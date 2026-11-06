@@ -55,6 +55,7 @@ src/
     i18n.ts locale.d.ts                                   # 共享文案（键按功能命名空间）
     app/{DeskOnePage.tsx,types.ts,utils.ts,styles.ts}      # 面板外壳：页头 / 标签 / 空态 / 外壳样式
     notes/{api.ts,components/*,hooks/*,styles.ts}          # 便签功能的 client 半
+    tasks/{api.ts,types.ts,components/*,hooks/*,styles.ts}  # 任务板功能的 client 半（S1）
     styles.ts                                             # 聚合注入：app + 各功能 CSS
 test/
   shared/{model,task-model,trust}.test.mjs

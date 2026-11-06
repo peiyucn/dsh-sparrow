@@ -6,6 +6,7 @@
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import * as api from './notes/api.js'
+import * as taskApi from './tasks/api.js'
 import { DeskOnePage } from './app/DeskOnePage.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { DeskPanelIcon } from './icon.js'
@@ -27,6 +28,10 @@ export function apply(ctx: ClientContext): void {
       createNote: api.createNote,
       updateNote: api.updateNote,
       deleteNote: api.deleteNote,
+      listTasks: taskApi.listTasks,
+      createTask: taskApi.createTask,
+      updateTask: taskApi.updateTask,
+      deleteTask: taskApi.deleteTask,
     },
   })
 }

@@ -16,6 +16,7 @@ import type { DeskNote, NoteColor } from '../../contract.js'
 import { NoteCard } from '../notes/components/NoteCard.js'
 import { TrashPanel } from '../notes/components/TrashPanel.js'
 import { WallActions } from '../notes/components/WallActions.js'
+import { TaskBoard } from '../tasks/components/TaskBoard.js'
 import { useNoteDrag } from '../notes/hooks/useNoteDrag.js'
 import { useNotesData } from '../notes/hooks/useNotesData.js'
 import { useTrash } from '../notes/hooks/useTrash.js'
@@ -31,7 +32,10 @@ export type DeskPanelProps = PropsRuntime<'main'> & InjectFace<DeskPanelInjected
 const STICKY_COLORS: readonly NoteColor[] = ['yellow', 'green', 'blue', 'pink']
 
 export function DeskOnePage(props: DeskPanelProps) {
-  const { listNotes, updateNote, deleteNote, createNote, t } = props
+  const {
+    listNotes, updateNote, deleteNote, createNote, t,
+    listTasks, createTask, updateTask, deleteTask,
+  } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
   /** Guards double-click / double-tap while one create request is in flight. */
   const [creating, setCreating] = useState(false)
@@ -179,6 +183,9 @@ export function DeskOnePage(props: DeskPanelProps) {
         <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
           {t('tab.notes')}
         </button>
+        <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
+          {t('tab.tasks')}
+        </button>
       </nav>
       {data.loadError === null ? null : (
         <div>
@@ -187,7 +194,7 @@ export function DeskOnePage(props: DeskPanelProps) {
         </div>
       )}
       {data.actionError === null ? null : <p className="dsh-desk-error">{data.actionError}</p>}
-      {tab === 'overview' ? renderOverview() : (
+      {tab === 'overview' ? renderOverview() : tab === 'notes' ? (
         <div className="dsh-desk-notesview">
           {trash.showTrash
             ? (
@@ -205,6 +212,14 @@ export function DeskOnePage(props: DeskPanelProps) {
               )
             : renderWall()}
         </div>
+      ) : (
+        <TaskBoard
+          t={t}
+          listTasks={listTasks}
+          createTask={createTask}
+          updateTask={updateTask}
+          deleteTask={deleteTask}
+        />
       )}
       {tab === 'notes'
         ? (

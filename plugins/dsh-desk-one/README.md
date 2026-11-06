@@ -9,6 +9,7 @@ English | [简体中文](README.zh-CN.md)
 * One left-sidebar entry named **Desk One**; functions live in tabs inside the panel instead of scattering across the UI.
 * **Overview** is the main tab in the long run, but its content is not designed yet — it stays intentionally blank in this release.
 * **Notes** is the first shipped feature: a free-form sticky wall, not an input form.
+* **Tasks** is the second shipped feature: a three-lane board (To do / Doing / Done) with colour tags, day-granular due dates, drag-to-move and an archive.
 
 ## Requirements
 
@@ -33,16 +34,19 @@ English | [简体中文](README.zh-CN.md)
 * Hover a sticky to reveal its color dots and the small icon actions. The tab you were on is remembered when you come back to Desk One.
 * The small **trash icon** on a sticky drops it into the trash without deleting it (with the same short fly-away animation as Smash); the trash button — separated from the wall actions by a hairline divider — opens the trash view, where a note can be restored or deleted permanently. The wall holds at most **100** notes and the trash at most **200**; the trash view shows the total and renders 10 rows at a time with **Load more**. No badge sits on the trash button — only genuinely unread things deserve that attention.
 * **Smash!** is the red frosted-glass icon button next to **＋**: after a two-step confirmation it moves every sticky on the wall into the trash with a short fly-away animation. It is always visible and simply does nothing when the wall is empty; clicking anywhere else or pressing **Esc** cancels the confirmation. It is blocked when the trash cannot hold them all.
+* Open **Tasks** for the fixed three-lane board: add a card with a lane's **＋**, type the title, click the date chip to set a day-granular deadline (overdue shows in red). Hover a card for its colour palette, archive and delete (delete asks for a second click).
+* Drag a card between lanes to change its status, or within a lane to reorder it — the lane under the pointer highlights. The toolbar switches between **manual order**, **creation time** and **due date**; the **Done** lane can be collapsed, and **Archive** lists archived tasks where they can be restored or deleted permanently.
 
 ## Data and privacy
 
 * Notes live in a DSH storage domain (`desk_one`) managed by the official storage service; nothing leaves the machine.
 * The panel talks to the plugin's own host routes under `/api/desk-one`; the client never touches storage directly.
-* Agent tools (`desk_note_*`) read and write the same notes, so the model and the wall always see one dataset.
+* Agent tools (`desk_note_*`, `desk_task_*`) read and write the same notes and tasks, so the model and the UI always see one dataset.
 
 ## Known limitations
 
-* S0 implements notes only; tasks, boards, focus sessions and calendars are planned in the repository spec.
+* S1 ships notes and the task board; focus sessions, calendars and richer task fields (priority, estimates, labels) are planned in the repository spec.
+* Task drag is pointer-only; there is no keyboard reorder yet.
 * Notes are not synced to any external service yet; Outlook and WeCom calendar sync arrives in a later step.
 * Notes created by agent tools get an automatic wall position until you drag them yourself.
 * Saved positions are re-clamped on screen while the window is small, and return to their saved spots once there is room again.

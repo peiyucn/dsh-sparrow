@@ -10,7 +10,11 @@ const json = async (relative) => JSON.parse(await read(relative))
 /** All client TS/TSX sources joined: structure guards survive component/hook splits. */
 const CLIENT_DIR = new URL('../src/client/', import.meta.url)
 /** Shell + notes feature styles concatenated (CSS is split by feature module). */
-const readStyles = async () => `${await read('src/client/app/styles.ts')}\n${await read('src/client/notes/styles.ts')}`
+const readStyles = async () => [
+  await read('src/client/app/styles.ts'),
+  await read('src/client/notes/styles.ts'),
+  await read('src/client/tasks/styles.ts'),
+].join('\n')
 
 const readClientSurface = async () => {
   const entries = await readdir(CLIENT_DIR, { recursive: true })
@@ -317,12 +321,41 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(!/dsh-desk-composer/u.test(styles), '登记表式编辑器样式应已删除')
   })
 
+  it('任务板客户端 应该 三泳道 + 卡片交互 + 拖拽 + 排序视图 + 存档', async () => {
+    const page = await readClientSurface()
+    const board = await read('src/client/tasks/components/TaskBoard.tsx')
+    const column = await read('src/client/tasks/components/TaskColumn.tsx')
+    const card = await read('src/client/tasks/components/TaskCard.tsx')
+    const types = await read('src/client/tasks/types.ts')
+    const index = await read('src/client/index.ts')
+    const install = await read('src/client/install.ts')
+    const styles = await readStyles()
+    assert.match(page, /tab\.tasks/u)
+    assert.match(page, /TaskBoard/u, '页面要挂任务板')
+    assert.match(board, /TASK_LANE_ORDER\.map/u, '固定三泳道')
+    assert.match(types, /groupLanes/u)
+    assert.match(types, /'created'/u, '排序视图：创建时间')
+    assert.match(types, /'due'/u, '排序视图：截止日期')
+    assert.match(board, /data-lane/u, '拖拽落点用 data-lane')
+    assert.match(board, /elementFromPoint/u, '指针拖拽按落点判定泳道')
+    assert.match(board, /board\.moveTask/u, '拖拽要触发 moveTask')
+    assert.match(board, /ArchiveRow/u, '存档视图')
+    assert.match(column, /data-collapsed/u, '完成列可折叠')
+    assert.match(card, /type="date"/u, '卡片可编辑截止日期')
+    assert.match(card, /data-confirm/u, '删除二次确认')
+    assert.match(index, /taskApi\.listTasks/u, '客户端要注入任务数据面')
+    assert.match(install, /listTasks/u)
+    assert.match(styles, /\.dsh-task-lane \{/u)
+    assert.match(styles, /\.dsh-task-card \{/u)
+  })
+
   it('页面 应该 用一个面板承载标签页，而不是弹窗', async () => {
     const page = await readClientSurface()
     assert.match(page, /dsh-desk-tabs/u)
     assert.match(page, /data-window-drag/u)
     assert.match(page, /'overview'/u)
     assert.match(page, /'notes'/u)
+    assert.match(page, /'tasks'/u)
     for (const forbidden of ['role="dialog"', 'aria-modal', 'position: fixed', 'backdrop-filter']) {
       assert.ok(!page.includes(forbidden), `页面源码里不该有 ${forbidden}`)
     }

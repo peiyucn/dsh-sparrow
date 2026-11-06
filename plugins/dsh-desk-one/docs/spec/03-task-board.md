@@ -1,6 +1,6 @@
 # 03 · 任务板 — dsh-desk-one
 
-> 状态：**设计稿**（2026-11-06），评审通过后开工。配套：`01-object-model.md`（对象模型）、`02-modules.md`（模块需求）。
+> 状态：**已实施（S1，2026-11-07）**。数据层 / host 与客户端看板均已落地；实施记录见文末。配套：`01-object-model.md`（对象模型）、`02-modules.md`（模块需求）。
 > 任务板与便签墙是同一套对象模型、两种组织形态：便签是自由坐标的墙面，任务是**列 + 列内顺序**的板。
 
 ## 已确认决策
@@ -101,3 +101,11 @@ interface TaskPayload {
 3. host：REST 路由 + 工具 + 写队列复用。
 4. client：三列板 + 卡片 + 拖拽 + 排序视图 + 存档视图。
 5. 文档 / 测试 / 守卫；宿主侧改动攒一批后请 owner 重启验收。
+
+## 实施记录（S1）
+
+* 数据：`src/model.ts` 的任务归一化 / 创建 / 补丁 / 排序 / 过滤；`src/domain.ts` 的 nodes 表扩为 kind 判别联合；共享存储 `src/host/store.ts`。
+* host：`src/host/tasks/{routes,tools}.ts`（4 条 REST + 5 个 agent 工具）；`src/host/router.ts` 统一挂载。
+* 客户端：`src/client/tasks/{api,types,styles}.ts`、`hooks/{useTasksData,useTaskBoard}.ts`、`components/{TaskBoard,TaskColumn,TaskCard}.tsx`；页面标签 `总览 | 便签墙 | 任务板`。
+* 排序视图：手动 / 创建时间 / 截止日期；视图偏好存 `localStorage`（`dsh-desk-one:task-sort`）。
+* 命名：完成列的归档统一叫「存档」（工具名 `desk_task_archive` 保持英文 API 命名）。
