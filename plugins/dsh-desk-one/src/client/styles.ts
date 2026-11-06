@@ -340,8 +340,8 @@ html[data-platform='darwin'] .dsh-desk-head {
 }
 /* 「＋」：保留原来的悬浮按钮形态，只对齐宿主语言 ——
    圆角用官方控制圆角 token，颜色用官方蓝紫品牌色（浅色 rgb(65,118,230)、深色走 deepseek-450）。 */
-/* 右下角悬浮按钮：与 theme-tone 的输入框同一套磨砂玻璃材质 ——
-   半透明底 + backdrop blur + 四边中段对称亮芯 + 左上定向边光（往右下衰减）+ 软浮起阴影。 */
+/* 底部悬浮按钮：与 theme-tone 输入框同一套磨砂玻璃 + 同一打光方向；
+   48px 的小玻璃把光晕厚度按面积等比收细（软晕 2px、模糊 10px），否则会糊成一块、不通透。 */
 .dsh-desk-fabglass {
   position: relative;
   display: flex;
@@ -352,23 +352,23 @@ html[data-platform='darwin'] .dsh-desk-head {
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 52%, var(--dsw-alias-border-l1, #e2e5ea));
   border-radius: var(--dsw-radius-lg, 16px);
-  background-color: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 64%, transparent);
+  background-color: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 54%, transparent);
   color: var(--dsw-alias-label-secondary, #6b7280);
   cursor: pointer;
   background-image:
-    radial-gradient(ellipse 52% 5px at 50% 0, rgba(255, 255, 255, 0.07), transparent),
-    radial-gradient(ellipse 52% 5px at 50% 100%, rgba(255, 255, 255, 0.07), transparent),
-    radial-gradient(ellipse 5px 52% at 0 50%, rgba(255, 255, 255, 0.07), transparent),
-    radial-gradient(ellipse 5px 52% at 100% 50%, rgba(255, 255, 255, 0.07), transparent);
+    radial-gradient(ellipse 52% 2px at 50% 0, rgba(255, 255, 255, 0.08), transparent),
+    radial-gradient(ellipse 52% 2px at 50% 100%, rgba(255, 255, 255, 0.08), transparent),
+    radial-gradient(ellipse 2px 52% at 0 50%, rgba(255, 255, 255, 0.08), transparent),
+    radial-gradient(ellipse 2px 52% at 100% 50%, rgba(255, 255, 255, 0.08), transparent);
   background-repeat: no-repeat;
   box-shadow:
-    0 8px 24px -14px rgba(20, 25, 40, 0.35),
-    inset 1px 1px 2px rgba(255, 255, 255, 0.1),
-    inset 3px 2px 9px -5px rgba(255, 255, 255, 0.09),
-    inset -2px 0 9px -6px rgba(255, 255, 255, 0.028),
-    inset 0 -2px 9px -6px rgba(255, 255, 255, 0.018);
-  backdrop-filter: blur(16px) saturate(115%) brightness(1.04);
-  -webkit-backdrop-filter: blur(16px) saturate(115%) brightness(1.04);
+    0 6px 18px -10px rgba(20, 25, 40, 0.3),
+    inset 1px 1px 1.5px rgba(255, 255, 255, 0.09),
+    inset 2px 1px 5px -3px rgba(255, 255, 255, 0.07),
+    inset -1px 0 5px -3px rgba(255, 255, 255, 0.02),
+    inset 0 -1px 5px -3px rgba(255, 255, 255, 0.015);
+  backdrop-filter: blur(10px) saturate(110%) brightness(1.06);
+  -webkit-backdrop-filter: blur(10px) saturate(110%) brightness(1.06);
   transition: background-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 .dsh-desk-fabglass svg {
@@ -376,14 +376,14 @@ html[data-platform='darwin'] .dsh-desk-head {
   flex: none;
 }
 .dsh-desk-fabglass:hover {
-  background-color: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 78%, transparent);
+  background-color: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 68%, transparent);
   color: var(--dsw-alias-label-primary, #1f2329);
   box-shadow:
-    0 10px 28px -14px rgba(20, 25, 40, 0.42),
-    inset 1px 1px 2px rgba(255, 255, 255, 0.14),
-    inset 3px 2px 9px -5px rgba(255, 255, 255, 0.12),
-    inset -2px 0 9px -6px rgba(255, 255, 255, 0.04),
-    inset 0 -2px 9px -6px rgba(255, 255, 255, 0.026);
+    0 8px 22px -12px rgba(20, 25, 40, 0.36),
+    inset 1px 1px 1.5px rgba(255, 255, 255, 0.12),
+    inset 2px 1px 5px -3px rgba(255, 255, 255, 0.09),
+    inset -1px 0 5px -3px rgba(255, 255, 255, 0.03),
+    inset 0 -1px 5px -3px rgba(255, 255, 255, 0.02);
 }
 /* 浏览器不支持背景模糊时退回更实的半透明底，保证按钮可读。 */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {

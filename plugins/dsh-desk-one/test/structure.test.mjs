@@ -100,12 +100,13 @@ describe('dsh-desk-one 结构', () => {
     assert.match(addRule[1], /--dsw-alias-brand-primary-new-colorprimary-new-color/u, '＋ 图标用宿主官方蓝紫品牌色')
     const glassRule = /\.dsh-desk-fabglass \{([^}]*)\}/u.exec(styles)
     assert.ok(glassRule !== null, '缺 .dsh-desk-fabglass 规则')
-    assert.match(glassRule[1], /backdrop-filter:\s*blur\(16px\)/u, '悬浮按钮用磨砂玻璃（与 theme-tone 输入框同材质）')
+    assert.match(glassRule[1], /backdrop-filter:\s*blur\(10px\)/u, '小玻璃的模糊半径要按面积收小（10px）')
     assert.match(glassRule[1], /-webkit-backdrop-filter/u, '玻璃要补 WebKit 前缀')
     assert.match(glassRule[1], /background-color:\s*color-mix\(/u, '玻璃底是半透明 color-mix')
-    // owner 2026-11-06：打光方向要和 theme-tone 输入框一致（左上定向边光 + 四边中段亮芯）。
-    assert.match(glassRule[1], /inset 1px 1px 2px/u, '定向边光要从左上打过来（与输入框一致）')
-    assert.match(glassRule[1], /radial-gradient\(ellipse 52% 5px at 50% 0/u, '四边中段要有对称亮芯')
+    // owner 2026-11-06：打光方向要和 theme-tone 输入框一致，且厚度按小面积收细。
+    assert.match(glassRule[1], /inset 1px 1px 1.5px/u, '定向边光要从左上打过来（与输入框一致）')
+    assert.match(glassRule[1], /inset 2px 1px 5px -3px/u, '定向光晕厚度要收细（5px，不是大卡片的 9px）')
+    assert.match(glassRule[1], /radial-gradient\(ellipse 52% 2px at 50% 0/u, '四边中段亮芯厚度要收细（2px）')
     assert.match(glassRule[1], /width:\s*48px/u, '「＋」与垃圾桶同尺寸')
     assert.match(glassRule[1], /--dsw-radius-lg/u, '两者圆角 token 一致')
     assert.ok(!/background-color:\s*var\(--dsw-alias-bg-layer-1/u.test(addRule[1]), '不得退回实底按钮')
