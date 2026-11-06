@@ -75,8 +75,10 @@ function formatDate(iso: string): string {
 export function DeskOnePage(props: DeskPanelProps) {
   const { listNotes, createNote, updateNote, deleteNote, t } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
-  /** 便签墙内的视图：便签墙 / 归档区（只影响便签标签，不影响标签页选择）。 */
+  /** 便签墙内的视图：便签墙 / 垃圾桶（只影响便签标签，不影响标签页选择）。 */
   const [showTrash, setShowTrash] = useState(false)
+  /** 「清空垃圾桶」是显式二次确认操作，绝不自动清空。 */
+  const [confirmClearTrash, setConfirmClearTrash] = useState(false)
   const [notes, setNotes] = useState<readonly DeskNote[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -362,7 +364,7 @@ export function DeskOnePage(props: DeskPanelProps) {
           onClick={() => { void savePatch(item.note, { trashed: true }) }}
         >
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-            <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+            <path d="M6 6l8 8M14 6l-8 8" />
           </svg>
         </button>
       </div>
@@ -391,9 +393,27 @@ export function DeskOnePage(props: DeskPanelProps) {
   )
 
   /** 垃圾桶：轻便签的删除先进这里，可恢复或永久删除（入口在右下角「＋」旁边）。 */
+  const clearTrash = useCallback((): void => {
+    if (!confirmClearTrash) {
+      setConfirmClearTrash(true)
+      return
+    }
+    setConfirmClearTrash(false)
+    for (const note of trashedNotes) removeWithFeedback(note.id)
+  }, [confirmClearTrash, removeWithFeedback, trashedNotes])
+
   const renderTrash = (): ReactElement => (
     <div className="dsh-desk-trash">
-      <h2 className="dsh-desk-trash-title">{t('trash.title')}</h2>
+      <div className="dsh-desk-trash-head">
+        <h2 className="dsh-desk-trash-title">{t('trash.title')}</h2>
+        {trashedNotes.length === 0
+          ? null
+          : (
+              <button type="button" className="dsh-desk-trash-clear" onClick={clearTrash}>
+                {confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
+              </button>
+            )}
+      </div>
       {trashedNotes.length === 0
         ? <p className="dsh-desk-wall-hint">{t('trash.empty')}</p>
         : (
@@ -484,7 +504,10 @@ export function DeskOnePage(props: DeskPanelProps) {
               className="dsh-desk-fab-secondary"
               aria-label={showTrash ? t('action.backToWall') : t('action.trash')}
               title={showTrash ? t('action.backToWall') : t('action.trash')}
-              onClick={() => setShowTrash(current => !current)}
+              onClick={() => {
+                setConfirmClearTrash(false)
+                setShowTrash(current => !current)
+              }}
             >
               {showTrash
                 ? (

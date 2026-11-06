@@ -68,6 +68,7 @@ describe('dsh-desk-one 结构', () => {
     const styles = await read('src/client/styles.ts')
     assert.match(page, /dsh-desk-trash/u, '要有垃圾桶视图容器')
     assert.match(page, /action\.restore/u, '垃圾桶要能恢复')
+    assert.match(page, /action\.clearTrash/u, '垃圾桶要能由用户显式清空')
     assert.match(page, /trash\.empty/u, '垃圾桶要有空态文案')
     assert.match(page, /dsh-desk-fabstack/u, '垃圾桶入口与「＋」成组')
     assert.match(page, /dsh-desk-fab-secondary/u)

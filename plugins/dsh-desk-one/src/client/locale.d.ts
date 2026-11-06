@@ -15,6 +15,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'action.delete'
       | 'trash.title'
       | 'trash.empty'
+      | 'action.clearTrash'
+      | 'action.clearTrashConfirm'
       | 'action.retry'
       | 'color.default'
       | 'color.yellow'

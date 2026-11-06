@@ -31,7 +31,7 @@ English | [简体中文](README.zh-CN.md)
 * Drag a sticky by its body; a compact six-dot grip at the top-left marks the grab area. Whichever sticky you click or drag comes to the front, and that layer order is saved too.
 * Drag the bottom-right corner of a sticky to change its size; position and size are saved per note.
 * Hover a sticky to reveal its color dots and the small icon actions. The tab you were on is remembered when you come back to Desk One.
-* The **trash icon** on a sticky drops it into the trash without deleting it; the trash icon next to **＋** opens the trash view (with a count badge), where a note can be restored or deleted permanently with the row icons.
+* The **×** on a sticky drops it into the trash without deleting it; the trash icon next to **＋** opens the trash view (with a count badge), where a note can be restored or deleted permanently. Emptying the trash is an explicit two-step action — nothing is purged automatically.
 
 ## Data and privacy
 
