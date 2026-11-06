@@ -21,10 +21,6 @@ export const LOCALE_DICTS = {
     'state.empty': '墙上还没有便签，点右下角「＋」随手记一张',
     'state.loadFailed': '加载失败：{message}',
     'state.saveFailed': '保存失败：{message}',
-    'overview.counts': '便签墙上 {notes} 条便签',
-    'overview.recent': '最近便签',
-    'overview.recentEmpty': '还没有便签，去便签墙随手记一张吧',
-    'overview.hint': '任务与日程接入后，这里会汇总办公桌上的一切。',
   },
   en: {
     'button.label': 'Desk One',
@@ -46,9 +42,5 @@ export const LOCALE_DICTS = {
     'state.empty': 'The wall is empty — tap "＋" to capture something',
     'state.loadFailed': 'Failed to load: {message}',
     'state.saveFailed': 'Failed to save: {message}',
-    'overview.counts': '{notes} notes on the wall',
-    'overview.recent': 'Recent notes',
-    'overview.recentEmpty': 'No notes yet — head to the notes wall and capture one',
-    'overview.hint': 'Once tasks and calendars land, everything on the desk gathers here.',
   },
 } as const

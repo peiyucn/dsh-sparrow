@@ -50,7 +50,7 @@ function readInitialTab(): Tab {
   } catch {
     // 隐私模式 / 存储被禁用：按默认标签走。
   }
-  return 'overview'
+  return 'notes'
 }
 
 /** 无坐标记录（agent 建的便签）的兜底摆放：每行 5 张的网格 + 轻微错位。 */
@@ -374,30 +374,10 @@ export function DeskOnePage(props: DeskPanelProps) {
     </article>
   )
 
-  const renderOverview = (): ReactElement => {
-    const recent = notes.slice(0, 5)
-    return (
-      <div className="dsh-desk-today">
-        <p className="dsh-desk-stats">{t('overview.counts', { notes: notes.length })}</p>
-        <h2 className="dsh-desk-section-title">{t('overview.recent')}</h2>
-        {recent.length === 0
-          ? <p className="dsh-desk-hint">{t('overview.recentEmpty')}</p>
-          : (
-              <ul className="dsh-desk-recent">
-                {recent.map(note => (
-                  <li key={note.id}>
-                    <button type="button" className="dsh-desk-recent-item" onClick={() => selectTab('notes')}>
-                      <span className="dsh-desk-recent-dot" data-color={note.color} />
-                      <span className="dsh-desk-recent-text">{note.title === '' ? t('note.placeholder') : note.title}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-        <p className="dsh-desk-hint">{t('overview.hint')}</p>
-      </div>
-    )
-  }
+  const renderOverview = (): ReactElement => (
+    // 总览内容尚未设计：S0 保持空白占位，不往里堆功能（owner 2026-11-06）。
+    <div className="dsh-desk-overview" />
+  )
 
   return (
     <div className="dsh-desk-page">

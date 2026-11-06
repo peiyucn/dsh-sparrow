@@ -63,6 +63,12 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(installAt > gateAt, '能力门必须排在安装之前')
   })
 
+  it('总览 应该 保持空白占位（内容未设计前不堆放功能）', async () => {
+    const page = await read('src/client/DeskOnePage.tsx')
+    assert.match(page, /dsh-desk-overview/u, '总览要有空白占位容器')
+    assert.ok(!/overview\.(counts|recent|recentEmpty|hint)/u.test(page), '总览不得出现未定稿的内容区块')
+  })
+
   it('便签标签 应该是「满墙贴纸」而非登记表：墙面 + 悬浮「+」+ 可拖动贴纸', async () => {
     const page = await read('src/client/DeskOnePage.tsx')
     const styles = await read('src/client/styles.ts')
@@ -104,11 +110,9 @@ describe('dsh-desk-one 结构', () => {
     }
     const notePalette = new Map([...styles.matchAll(/\.dsh-desk-note\[data-color='([a-z]+)'\] \{ background-color: (#[0-9a-f]{6}); \}/gu)].map(match => [match[1], match[2]]))
     const dotPalette = new Map([...styles.matchAll(/\.dsh-desk-dot\[data-color='([a-z]+)'\] \{ background: (#[0-9a-f]{6}); \}/gu)].map(match => [match[1], match[2]]))
-    const recentPalette = new Map([...styles.matchAll(/\.dsh-desk-recent-dot\[data-color='([a-z]+)'\] \{ background: (#[0-9a-f]{6}); \}/gu)].map(match => [match[1], match[2]]))
     assert.equal(notePalette.size, 5, '便签色板应有 5 个色位')
     for (const [color, paper] of notePalette) {
       assert.ok(dotPalette.has(color), `色板缺 ${color}`)
-      assert.equal(recentPalette.get(color), dotPalette.get(color), `总览色点 ${color} 应与色板同色`)
       assert.ok(luminance(paper) < 0.85, `纸面 ${color} 不能太浅（要向色标靠拢）`)
       assert.ok(luminance(paper) > luminance(dotPalette.get(color)), `纸面 ${color} 应比色标浅一档`)
     }

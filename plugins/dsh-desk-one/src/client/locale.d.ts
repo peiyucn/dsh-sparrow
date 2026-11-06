@@ -21,10 +21,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'state.empty'
       | 'state.loadFailed'
       | 'state.saveFailed'
-      | 'overview.counts'
-      | 'overview.recent'
-      | 'overview.recentEmpty'
-      | 'overview.hint'
   }
 }
 

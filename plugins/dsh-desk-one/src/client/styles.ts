@@ -287,83 +287,10 @@ html[data-platform='darwin'] .dsh-desk-head {
   opacity: 0.6;
   cursor: default;
 }
-.dsh-desk-today {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* 总览：内容尚未设计，S0 保持空白占位（owner 2026-11-06：先不投入）。 */
+.dsh-desk-overview {
   flex: 1;
   min-height: 0;
-  overflow: auto;
-}
-.dsh-desk-stats {
-  margin: 0;
-  font-size: 14px;
-  line-height: 20px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-}
-/* 总览页：最近便签列表。 */
-.dsh-desk-section-title {
-  margin: 8px 0 0;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 20px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-}
-.dsh-desk-recent {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.dsh-desk-recent-item {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 14px;
-  line-height: 20px;
-  text-align: left;
-  cursor: pointer;
-}
-.dsh-desk-recent-item:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  border-color: var(--dsw-alias-border-l1, #e2e5ea);
-}
-/* 总览最近便签的色点：与色板同一套深色相。 */
-.dsh-desk-recent-dot {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #787774;
-}
-.dsh-desk-recent-dot[data-color='default'] { background: #787774; }
-.dsh-desk-recent-dot[data-color='yellow'] { background: #c29343; }
-.dsh-desk-recent-dot[data-color='green'] { background: #548164; }
-.dsh-desk-recent-dot[data-color='blue'] { background: #487ca5; }
-.dsh-desk-recent-dot[data-color='pink'] { background: #b35488; }
-.dsh-desk-recent-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dsh-desk-hint {
-  margin: 0;
-  padding: 16px;
-  border: 1px dashed var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: 12px;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
 }
 .dsh-desk-error {
   flex: none;
