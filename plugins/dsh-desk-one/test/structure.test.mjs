@@ -138,6 +138,11 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /wall\.tip/u, '空墙中央要有双击新建提示')
     assert.match(page, /z:\s*layer/u, '新建便签要带层级（默认置顶）')
     assert.match(page, /note\.z !== layer/u, '新建便签要对不认创建 z 的宿主做兜底（本地置顶 + 补丁落库）')
+    // owner 2026-11-06：不必为悬浮按钮预留空白，贴纸可铺满；按钮永远在贴纸之上。
+    const notesviewRule = /\.dsh-desk-notesview \{([^}]*)\}/u.exec(styles)
+    assert.ok(notesviewRule !== null, '缺 .dsh-desk-notesview 规则')
+    assert.ok(!/padding-bottom/u.test(notesviewRule[1]), '不得为悬浮按钮预留空白（贴纸要能铺满）')
+    assert.match(wallRule[1], /z-index:\s*0/u, '墙面要建立层级上下文，按钮才能永远盖住贴纸')
     const tipRule = /\.dsh-desk-wall-tip-main \{([^}]*)\}/u.exec(styles)
     assert.ok(tipRule !== null, '缺提示主文案样式')
     assert.match(tipRule[1], /letter-spacing/u, '提示文案要有排版设计（字距）')

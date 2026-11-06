@@ -81,17 +81,18 @@ html[data-platform='darwin'] .dsh-desk-head {
   font-weight: 500;
 }
 /* 便签标签内部：墙面 / 垃圾桶；右下角留给悬浮操作组。 */
+/* 便签标签内部：墙面 / 垃圾桶，铺满整个可用区域（不再为悬浮按钮预留空白）。 */
 .dsh-desk-notesview {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  padding-bottom: 96px;
 }
 /* 墙面：正好占满剩余高度、**不滚动**；贴纸坐标一律夹在可见区域内。
    不加背板（owner 2026-11-06：背板显脏且缩小操作面积），沿用页面本身的干净底。 */
 .dsh-desk-wall {
   position: relative;
+  z-index: 0; /* 建立层级上下文：贴纸的 z 再大也只在墙内比较，按钮永远盖在它们上面。 */
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -375,7 +376,7 @@ html[data-platform='darwin'] .dsh-desk-head {
   position: absolute;
   right: 28px;
   bottom: 28px;
-  z-index: 2;
+  z-index: 2; /* 高于墙面的层级上下文：按钮永远在最上面，贴纸拖过来就压在按钮下面。 */
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -431,6 +432,8 @@ html[data-platform='darwin'] .dsh-desk-head {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  /* 列表滚到底时留出悬浮按钮的高度，最后一行不被按钮盖住。 */
+  padding-bottom: 88px;
 }
 .dsh-desk-trash-head {
   display: flex;
