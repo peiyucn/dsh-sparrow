@@ -34,7 +34,7 @@ export function sendError(ctx: Context, res: ServerResponse, error: unknown): vo
   if (error instanceof DeskModelError) {
     const status = error.code === 'REVISION_CONFLICT'
       ? 409
-      : error.code === 'UNKNOWN_NOTE' ? 404 : 400
+      : error.code === 'UNKNOWN_NOTE' || error.code === 'UNKNOWN_TASK' ? 404 : 400
     sendJson(res, status, { error: { code: error.code, message: error.message } })
     return
   }

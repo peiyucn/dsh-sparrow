@@ -5,9 +5,9 @@
  */
 
 import {
-  MAX_BODY_CHARS, MAX_TITLE_CHARS, NOTE_COLORS, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH,
+  MAX_BODY_CHARS, MAX_TITLE_CHARS, NOTE_COLORS, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH, TASK_STATUSES,
 } from './constants.js'
-import type { DeskNote, NoteColor } from './contract.js'
+import type { DeskNote, DeskTask, NoteColor, TaskStatus } from './contract.js'
 
 export type DeskModelErrorCode =
   | 'INVALID_NOTE'
@@ -17,6 +17,8 @@ export type DeskModelErrorCode =
   | 'NOTE_LIMIT'
   /** 垃圾桶已达 200 张上限，必须先清空（见 constants.MAX_TRASH_NOTES）。 */
   | 'TRASH_FULL'
+  | 'INVALID_TASK'
+  | 'UNKNOWN_TASK'
 
 /** 模型层错误：路由据此映射 HTTP 状态（400 / 409 / 404）。 */
 export class DeskModelError extends Error {
@@ -203,4 +205,197 @@ export function filterNotes(notes: readonly DeskNote[], query: string | undefine
   const text = (query ?? '').trim().toLowerCase()
   if (text === '') return [...notes]
   return notes.filter(note => `${note.title}\n${note.body}`.toLowerCase().includes(text))
+}
+
+/* ------------------------------------------------------------------ */
+/* Tasks: fixed three lanes, manual order, due date, archive           */
+/* ------------------------------------------------------------------ */
+
+export interface TaskInput {
+  readonly title: string
+  readonly body: string
+  readonly status: TaskStatus
+  readonly color: NoteColor
+  readonly due?: { readonly date: string; readonly timezone?: string }
+  readonly order: number
+}
+
+export interface TaskPatch {
+  readonly title?: string
+  readonly body?: string
+  readonly status?: string
+  readonly color?: string
+  /** `null` clears the due date; `undefined` leaves it unchanged. */
+  readonly due?: { readonly date: string; readonly timezone?: string } | null
+  readonly order?: number
+  readonly archived?: boolean
+}
+
+function isTaskStatus(value: unknown): value is TaskStatus {
+  return typeof value === 'string' && (TASK_STATUSES as readonly string[]).includes(value)
+}
+
+/** Accept only real calendar days in `YYYY-MM-DD` (2026-02-31 must not silently roll over). */
+function isValidDueDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false
+  const parsed = new Date(`${value}T00:00:00.000Z`)
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+}
+
+function normalizeDue(raw: { readonly date?: unknown; readonly timezone?: unknown }): { date: string; timezone?: string } {
+  if (typeof raw.date !== 'string' || !isValidDueDate(raw.date)) {
+    throw new DeskModelError('INVALID_TASK', '截止日期必须是合法的 YYYY-MM-DD')
+  }
+  const timezone = typeof raw.timezone === 'string' ? raw.timezone.trim() : ''
+  return { date: raw.date, ...(timezone === '' ? {} : { timezone }) }
+}
+
+/** Non-negative integer order; invalid values are ignored (display order falls back to creation). */
+export function normalizeOrder(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined
+  return Math.round(value)
+}
+
+/**
+ * Task titles are required: unlike notes (where the body is the content), a task without a title
+ * has no meaningful card. The rest mirrors the note validator's "reject bad enum, clamp text" style.
+ */
+export function normalizeTaskInput(raw: {
+  readonly title?: unknown
+  readonly body?: unknown
+  readonly status?: unknown
+  readonly color?: unknown
+  readonly dueDate?: unknown
+  readonly dueTimezone?: unknown
+  readonly order?: unknown
+}): TaskInput {
+  const title = typeof raw.title === 'string' ? raw.title.trim() : ''
+  if (title === '') throw new DeskModelError('INVALID_TASK', '任务需要标题')
+  if (title.length > MAX_TITLE_CHARS) {
+    throw new DeskModelError('INVALID_TASK', `任务标题超过 ${MAX_TITLE_CHARS} 字符上限`)
+  }
+  const body = typeof raw.body === 'string' ? raw.body : ''
+  if (body.length > MAX_BODY_CHARS) {
+    throw new DeskModelError('INVALID_TASK', `任务描述超过 ${MAX_BODY_CHARS} 字符上限`)
+  }
+  const status = raw.status === undefined || raw.status === '' ? 'todo' : raw.status
+  if (!isTaskStatus(status)) throw new DeskModelError('INVALID_TASK', `未知的任务状态：${String(raw.status)}`)
+  const color = raw.color === undefined || raw.color === '' ? 'default' : raw.color
+  if (!isNoteColor(color)) throw new DeskModelError('INVALID_TASK', `未知的任务颜色：${String(raw.color)}`)
+  const due = raw.dueDate === undefined
+    ? undefined
+    : normalizeDue({ date: raw.dueDate, timezone: raw.dueTimezone })
+  return {
+    title,
+    body,
+    status,
+    color,
+    ...(due === undefined ? {} : { due }),
+    order: normalizeOrder(raw.order) ?? 0,
+  }
+}
+
+/** Create a task record (pure: id / time come from the caller). */
+export function createTaskRecord(
+  input: TaskInput,
+  meta: { readonly id: string; readonly now: string },
+): DeskTask {
+  return {
+    id: meta.id,
+    kind: 'task',
+    schema: 1,
+    title: input.title,
+    body: input.body,
+    tags: [],
+    status: input.status,
+    color: input.color,
+    ...(input.due === undefined ? {} : { due: input.due }),
+    order: input.order,
+    archived: false,
+    createdAt: meta.now,
+    updatedAt: meta.now,
+    revision: 1,
+  }
+}
+
+/** Apply a task patch; revision mismatch -> REVISION_CONFLICT (optimistic concurrency). */
+export function patchTaskRecord(
+  current: DeskTask,
+  patch: TaskPatch,
+  meta: { readonly expectedRevision: number; readonly now: string },
+): DeskTask {
+  if (!Number.isInteger(meta.expectedRevision) || current.revision !== meta.expectedRevision) {
+    throw new DeskModelError(
+      'REVISION_CONFLICT',
+      `任务已被修改（当前 revision ${current.revision}，请求 ${meta.expectedRevision}）`,
+    )
+  }
+  const next: {
+    id: string
+    kind: 'task'
+    schema: number
+    title: string
+    body: string
+    tags: readonly string[]
+    status: TaskStatus
+    color: NoteColor
+    due?: { date: string; timezone?: string }
+    order: number
+    archived: boolean
+    projectId?: string
+    laneId?: string
+    createdAt: string
+    updatedAt: string
+    revision: number
+  } = { ...current, revision: current.revision + 1, updatedAt: meta.now }
+
+  if (patch.title !== undefined) {
+    const title = patch.title.trim()
+    if (title === '') throw new DeskModelError('INVALID_TASK', '任务标题不能为空')
+    if (title.length > MAX_TITLE_CHARS) {
+      throw new DeskModelError('INVALID_TASK', `任务标题超过 ${MAX_TITLE_CHARS} 字符上限`)
+    }
+    next.title = title
+  }
+  if (patch.body !== undefined) {
+    if (patch.body.length > MAX_BODY_CHARS) {
+      throw new DeskModelError('INVALID_TASK', `任务描述超过 ${MAX_BODY_CHARS} 字符上限`)
+    }
+    next.body = patch.body
+  }
+  if (patch.status !== undefined) {
+    if (!isTaskStatus(patch.status)) throw new DeskModelError('INVALID_TASK', `未知的任务状态：${patch.status}`)
+    next.status = patch.status
+  }
+  if (patch.color !== undefined) {
+    if (!isNoteColor(patch.color)) throw new DeskModelError('INVALID_TASK', `未知的任务颜色：${patch.color}`)
+    next.color = patch.color
+  }
+  if (patch.due === null) {
+    delete next.due
+  } else if (patch.due !== undefined) {
+    next.due = normalizeDue(patch.due)
+  }
+  const order = normalizeOrder(patch.order)
+  if (order !== undefined) next.order = order
+  if (patch.archived !== undefined) {
+    if (typeof patch.archived !== 'boolean') throw new DeskModelError('INVALID_TASK', 'archived 必须是布尔值')
+    next.archived = patch.archived
+  }
+  return next
+}
+
+/** Board order: manual order first, then creation time, then id (stable fallback). */
+export function sortTasks(tasks: readonly DeskTask[]): DeskTask[] {
+  return [...tasks].sort((left, right) =>
+    left.order - right.order
+    || left.createdAt.localeCompare(right.createdAt)
+    || left.id.localeCompare(right.id))
+}
+
+/** Keyword filter over title + body (case-insensitive); empty query returns all. */
+export function filterTasks(tasks: readonly DeskTask[], query: string | undefined): DeskTask[] {
+  const text = (query ?? '').trim().toLowerCase()
+  if (text === '') return [...tasks]
+  return tasks.filter(task => `${task.title}\n${task.body}`.toLowerCase().includes(text))
 }

@@ -3,9 +3,10 @@
  * S0 的落地对象是便签；任务 / 日程的字段按 `01-object-model.md` 逐步扩展。
  */
 
-import type { NOTE_COLORS } from './constants.js'
+import type { NOTE_COLORS, TASK_STATUSES } from './constants.js'
 
 export type NoteColor = (typeof NOTE_COLORS)[number]
+export type TaskStatus = (typeof TASK_STATUSES)[number]
 
 /**
  * 便签对象（S0 唯一的 DeskNode kind）。字段与 spec 的 Node 基础字段对齐：
@@ -45,6 +46,38 @@ export interface DeskEdge {
   readonly createdAt: string
   readonly meta?: Readonly<Record<string, unknown>>
 }
+
+/** 任务对象（S1）：固定三泳道 + 列内手动顺序，完成列可折叠、可存档。 */
+export interface DeskTask {
+  readonly id: string
+  readonly kind: 'task'
+  readonly schema: number
+  /** 必填标题；任务没有一个可脱离标题的存在（详情 / 正文只是补充）。 */
+  readonly title: string
+  readonly body: string
+  readonly tags: readonly string[]
+  readonly status: TaskStatus
+  /** 卡片颜色条；复用便签五色板。 */
+  readonly color: NoteColor
+  /** 截止日期（只到天）；缺省表示没有截止。 */
+  readonly due?: {
+    readonly date: string
+    readonly timezone?: string
+  }
+  /** 列内手动顺序：越大越靠后；拖拽即重排。 */
+  readonly order: number
+  /** 存档后从板上消失，进任务板存档视图（命名避开宿主「会话归档」）。 */
+  readonly archived: boolean
+  /** 预留：多板 / 自定义泳道后启用，S1 不写。 */
+  readonly projectId?: string
+  readonly laneId?: string
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
+
+/** 统一对象：存储域一张 nodes 表按 kind 判别（加 kind 只扩 schema，不改表）。 */
+export type DeskNode = DeskNote | DeskTask
 
 export interface NoteListResponse {
   readonly notes: readonly DeskNote[]
@@ -88,6 +121,49 @@ export interface UpdateNoteRequest {
 }
 
 export interface DeleteNoteRequest {
+  readonly id: string
+}
+
+export interface TaskListResponse {
+  readonly tasks: readonly DeskTask[]
+}
+
+export interface TaskMutationResponse {
+  readonly task: DeskTask
+}
+
+export interface TaskDeleteResponse {
+  readonly deleted: boolean
+}
+
+export interface CreateTaskRequest {
+  readonly title?: string
+  readonly body?: string
+  readonly status?: string
+  readonly color?: string
+  readonly dueDate?: string
+  readonly dueTimezone?: string
+  readonly order?: number
+}
+
+export interface TaskPatchRequest {
+  readonly title?: string
+  readonly body?: string
+  readonly status?: string
+  readonly color?: string
+  /** `null` 表示清除截止日期；缺省表示不改。 */
+  readonly due?: { readonly date: string; readonly timezone?: string } | null
+  readonly order?: number
+  readonly archived?: boolean
+}
+
+export interface UpdateTaskRequest {
+  readonly id: string
+  readonly expectedRevision: number
+  readonly patch: TaskPatchRequest
+}
+
+export interface DeleteTaskRequest {
   readonly id: string
 }
 

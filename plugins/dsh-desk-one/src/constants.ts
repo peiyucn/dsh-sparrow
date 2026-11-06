@@ -8,11 +8,14 @@ export const PACKAGE_NAME = 'dsh-desk-one'
 /** 路由前缀：长于官方 `/api` 栅栏，故本插件自己做信任检查（同 dsh-archive-manage 口径）。 */
 export const PREFIX = '/api/desk-one'
 
-/** REST 路由；S0 只有便签（后续任务 / 日程在此追加，不改已有路径）。 */
+/** REST 路由；S0 只有便签，S1 追加任务（后续日程 / 专注在此追加，不改已有路径）。 */
 export const ROUTES = Object.freeze({
   notes: `${PREFIX}/notes`,
   noteUpdate: `${PREFIX}/notes/update`,
   noteDelete: `${PREFIX}/notes/delete`,
+  tasks: `${PREFIX}/tasks`,
+  taskUpdate: `${PREFIX}/tasks/update`,
+  taskDelete: `${PREFIX}/tasks/delete`,
 })
 
 /** 入口 id：同时是左栏面板行的 id 与中央列 `main` 槽的 key（官方 `MainPanelId`）。 */
@@ -52,6 +55,9 @@ export const TRASH_PAGE_SIZE = 10
 
 /** 便签颜色：未知值一律拒绝（客户端色板与存储校验共用这一份真值）。 */
 export const NOTE_COLORS = ['default', 'yellow', 'green', 'blue', 'pink'] as const
+
+/** 任务状态：固定三泳道，与 board 的三列一一对应（自定义泳道后置，见 spec 03）。 */
+export const TASK_STATUSES = ['todo', 'doing', 'done'] as const
 
 /** 便签几何（px）：默认尺寸与拖拽改大小的上下限，模型层与界面共用这一份真值。 */
 export const NOTE_DEFAULT_WIDTH = 208

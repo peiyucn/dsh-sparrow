@@ -52,12 +52,13 @@ interface DeskNode {
 
 ```ts
 interface TaskPayload {
-  status: 'inbox' | 'todo' | 'doing' | 'done' | 'cancelled'
-  priority: 'none' | 'low' | 'normal' | 'high' | 'urgent'
-  due?: { date?: string; at?: string; timezone?: string }   // 日期或时刻，二者取一
-  estimateMin?: number
-  projectId?: string        // 指向 project Node，v2 看板使用
-  order?: number            // 同一视图内的手工排序
+  status: 'todo' | 'doing' | 'done'        // S1 固定三泳道；inbox / cancelled 后置
+  due?: { date: string; timezone?: string } // S1 只到天（date 必填，YYYY-MM-DD）
+  order: number                            // 同一泳道内手工排序
+  color?: string                           // 卡片颜色条，复用便签五色板
+  archived: boolean                        // 存档（避开宿主「会话归档」命名）
+  projectId?: string                       // 预留：多板后启用
+  laneId?: string                          // 预留：自定义泳道后启用
 }
 
 interface NotePayload {
@@ -101,6 +102,7 @@ interface ProjectPayload {
 }
 ```
 
+> S1 实现范围以 `03-task-board.md` 为准；`priority` / `estimateMin` / 时刻级 `at` / 多板 / 自定义泳道后置。
 > 关系一律走 Edge，不在 payload 里重复存 id；`FocusPayload.taskId` 只作渲染快照，权威关系是 `workedOn` 边。
 
 ## Edge（关系）

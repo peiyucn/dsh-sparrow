@@ -81,7 +81,7 @@ describe('host 装配（apply 接线）', () => {
     assert.deepEqual(inject, ['webServer', 'storageDomain', 'tools'])
   })
 
-  it('apply 应该 打开存储域、挂前缀路由、注册 4 个 agent 工具', async () => {
+  it('apply 应该 打开存储域、挂前缀路由、注册便签 + 任务工具', async () => {
     const { ctx, collected } = fakeHost()
     await apply(ctx)
     assert.equal(collected.routes.length, 1)
@@ -89,7 +89,10 @@ describe('host 装配（apply 接线）', () => {
     assert.equal(collected.routes[0].path, '/api/desk-one')
     assert.deepEqual(
       collected.tools.map(tool => tool.name).sort(),
-      ['desk_note_add', 'desk_note_delete', 'desk_note_list', 'desk_note_update'],
+      [
+        'desk_note_add', 'desk_note_delete', 'desk_note_list', 'desk_note_update',
+        'desk_task_add', 'desk_task_archive', 'desk_task_complete', 'desk_task_list', 'desk_task_update',
+      ],
     )
     assert.ok(collected.effects.length >= 2, '存储域与路由都要有 effect 清理')
   })
@@ -148,6 +151,65 @@ describe('host 装配（apply 接线）', () => {
     assert.equal(empty.json.notes.length, 0)
   })
 
+  it('任务 REST 全链路 应该 能建 / 查 / 改状态 / 存档 / 删', async () => {
+    const { ctx, collected } = fakeHost()
+    await apply(ctx)
+    const handler = collected.routes[0].handler
+    const host = { host: '127.0.0.1:3080' }
+
+    const created = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.tasks,
+      body: JSON.stringify({ title: '任务一', dueDate: '2026-11-30', status: 'todo' }),
+      headers: host,
+    })
+    assert.equal(created.status, 201)
+    assert.equal(created.json.task.title, '任务一')
+    assert.equal(created.json.task.status, 'todo')
+    assert.equal(created.json.task.archived, false)
+    assert.deepEqual(created.json.task.due, { date: '2026-11-30' })
+    const id = created.json.task.id
+    assert.match(id, /^task_/u)
+
+    const listed = await callRoute(handler, { method: 'GET', url: `${ROUTES.tasks}?status=todo`, headers: host })
+    assert.equal(listed.status, 200)
+    assert.equal(listed.json.tasks.length, 1)
+
+    const moved = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.taskUpdate,
+      body: JSON.stringify({ id, expectedRevision: 1, patch: { status: 'doing', order: 4 } }),
+      headers: host,
+    })
+    assert.equal(moved.status, 200)
+    assert.equal(moved.json.task.status, 'doing')
+    assert.equal(moved.json.task.order, 4)
+    assert.equal(moved.json.task.revision, 2)
+
+    const archived = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.taskUpdate,
+      body: JSON.stringify({ id, expectedRevision: 2, patch: { archived: true } }),
+      headers: host,
+    })
+    assert.equal(archived.status, 200)
+    assert.equal(archived.json.task.archived, true)
+
+    const boardOnly = await callRoute(handler, { method: 'GET', url: ROUTES.tasks, headers: host })
+    assert.equal(boardOnly.json.tasks.length, 0, '默认不返回存档任务')
+    const withArchive = await callRoute(handler, { method: 'GET', url: `${ROUTES.tasks}?include_archived=1`, headers: host })
+    assert.equal(withArchive.json.tasks.length, 1)
+
+    const deleted = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.taskDelete,
+      body: JSON.stringify({ id }),
+      headers: host,
+    })
+    assert.equal(deleted.status, 200)
+    assert.equal(deleted.json.deleted, true)
+  })
+
   it('agent 工具 应该 与 REST 共用同一份数据（工具建 → 路由查）', async () => {
     const { ctx, collected } = fakeHost()
     await apply(ctx)
@@ -165,5 +227,24 @@ describe('host 装配（apply 接线）', () => {
     })
     assert.equal(listed.json.notes.length, 1)
     assert.equal(listed.json.notes[0].title, '来自工具的一条便签')
+  })
+
+  it('任务工具 应该 与 REST 共用同一份数据（工具建任务 → 路由查）', async () => {
+    const { ctx, collected } = fakeHost()
+    await apply(ctx)
+    const addTool = collected.tools.find(tool => tool.name === 'desk_task_add')
+    assert.ok(addTool)
+    const exec = { signal: AbortSignal.timeout(1_000) }
+    const output = await addTool.execute({ title: '来自工具的任务', status: 'doing' }, exec)
+    assert.equal(typeof output, 'string')
+    assert.equal(JSON.parse(output).ok, true)
+
+    const listed = await callRoute(collected.routes[0].handler, {
+      method: 'GET',
+      url: `${ROUTES.tasks}?status=doing`,
+      headers: { host: '127.0.0.1:3080' },
+    })
+    assert.equal(listed.json.tasks.length, 1)
+    assert.equal(listed.json.tasks[0].title, '来自工具的任务')
   })
 })

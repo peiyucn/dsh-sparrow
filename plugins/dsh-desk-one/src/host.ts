@@ -1,14 +1,15 @@
 /**
- * dsh-desk-one host half 的组合根：启动门 → 打开存储域 → 注册 REST 路由与 agent 工具。
- * 具体对象逻辑在 model.ts，存储读取在 host/store.ts，HTTP 形状在 host/routes.ts。
+ * dsh-desk-one host half composition root: gates -> open storage -> REST + agent tools.
+ * Object logic lives in model.ts; storage in host/store.ts; HTTP shapes in host/router.ts.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
 import { PREFIX } from './constants.js'
 import { assertHostGates } from './host/gates.js'
 import { createDeskRequestHandler } from './host/router.js'
-import { DeskStore } from './host/notes/store.js'
+import { DeskStore } from './host/store.js'
 import { registerDeskTools } from './host/notes/tools.js'
+import { registerTaskTools } from './host/tasks/tools.js'
 
 export const name = 'dsh-desk-one'
 export const inject = ['webServer', 'storageDomain', 'tools']
@@ -32,4 +33,5 @@ export async function apply(ctx: Context): Promise<void> {
   }), 'dsh-desk-one: REST routes')
 
   registerDeskTools(ctx, store)
+  registerTaskTools(ctx, store)
 }

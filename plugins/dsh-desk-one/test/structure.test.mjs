@@ -101,7 +101,7 @@ describe('dsh-desk-one 结构', () => {
     const page = await readClientSurface()
     const styles = await readStyles()
     const constants = await read('src/constants.ts')
-    const store = await read('src/host/notes/store.ts')
+    const store = await read('src/host/store.ts')
     const tools = await read('src/host/notes/tools.ts')
     const i18n = await read('src/client/i18n.ts')
     // 产品硬上限（owner 2026-11-06）：便签墙是轻笔记，100 张已超出注意力上限。
@@ -142,6 +142,36 @@ describe('dsh-desk-one 结构', () => {
     assert.match(store, /MAX_TRASH_NOTES/u, 'host 侧也要挡垃圾桶上限')
     assert.match(tools, /default 50/u, '列表工具默认限 50 条')
     assert.match(tools, /include_trashed/u, '列表工具要能选择是否包含垃圾桶')
+  })
+
+  it('任务板数据层 应该 与便签共享 nodes 表，并挂到 router / tools', async () => {
+    const constants = await read('src/constants.ts')
+    const contract = await read('src/contract.ts')
+    const domain = await read('src/domain.ts')
+    const router = await read('src/host/router.ts')
+    const store = await read('src/host/store.ts')
+    const taskRoutes = await read('src/host/tasks/routes.ts')
+    const taskTools = await read('src/host/tasks/tools.ts')
+    const index = await read('src/index.ts')
+    assert.match(constants, /TASK_STATUSES = \['todo', 'doing', 'done'\]/u, '任务固定三泳道')
+    assert.match(constants, /tasks: `\$\{PREFIX\}\/tasks`/u, '任务路由前缀')
+    assert.match(contract, /interface DeskTask/u)
+    assert.match(contract, /export type DeskNode = DeskNote \| DeskTask/u, '统一对象是 kind 判别联合')
+    assert.match(domain, /z\.literal\('task'\)/u, 'nodes 表 schema 扩 task')
+    assert.match(domain, /z\.discriminatedUnion\('kind'/u, '按 kind 判别读取')
+    assert.match(router, /TASK_ROUTES/u, 'router 要挂任务路由')
+    assert.match(store, /async createTask/u)
+    assert.match(store, /async updateTask/u)
+    assert.match(store, /listTasks/u)
+    assert.match(taskRoutes, /TASK_ROUTES/u)
+    for (const name of ['desk_task_add', 'desk_task_list', 'desk_task_update', 'desk_task_complete', 'desk_task_archive']) {
+      assert.match(taskTools, new RegExp(name, 'u'), `缺工具 ${name}`)
+    }
+    assert.match(index, /createTaskRecord/u, '任务纯逻辑要从包入口导出')
+    const spec = await read('docs/spec/03-task-board.md')
+    assert.match(spec, /存档/u, '完成列的语义叫「存档」')
+    assert.ok(!spec.includes('「归档」'), '不得再叫「归档」')
+    assert.ok(!spec.includes('命名待定'), '命名已定为「存档」')
   })
 
   it('总览 应该 保持空白占位（内容未设计前不堆放功能）', async () => {

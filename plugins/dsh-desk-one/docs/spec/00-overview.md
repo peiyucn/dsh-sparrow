@@ -47,7 +47,9 @@ src/
   host.ts index.ts                                        # host 入口 / 公共再导出
   host/
     gates.ts http.ts router.ts                            # 装配：能力门 / HTTP 基础 / 前缀路由（含信任栅栏）
-    notes/{store,routes,tools}.ts                          # 便签功能的 host 半（路由表由 router 挂载）
+    store.ts                                              # 共享对象存储（nodes 表按 kind 判别）
+    notes/{routes,tools}.ts                                # 便签功能的 host 半（路由表由 router 挂载）
+    tasks/{routes,tools}.ts                                # 任务板功能的 host 半（S1）
   client/
     index.ts install.ts panel.ts icon.tsx compat.ts       # 入口与客户端装配
     i18n.ts locale.d.ts                                   # 共享文案（键按功能命名空间）
@@ -55,7 +57,7 @@ src/
     notes/{api.ts,components/*,hooks/*,styles.ts}          # 便签功能的 client 半
     styles.ts                                             # 聚合注入：app + 各功能 CSS
 test/
-  shared/{model,trust}.test.mjs
+  shared/{model,task-model,trust}.test.mjs
   host/notes/{host,routes}.test.mjs
   client/compat.test.mjs
   structure.test.mjs                                      # 结构守卫（拼接全部 client 源码）
