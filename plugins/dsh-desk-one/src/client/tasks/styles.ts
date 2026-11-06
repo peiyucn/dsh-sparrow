@@ -457,6 +457,34 @@ export const TASKS_CSS = `
   opacity: 0;
   transition: opacity 0.12s ease;
 }
+/* Compact group header icons: match each other and stay quieter than the lane buttons. */
+.dsh-task-iconbtn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--dsw-radius-xs, 4px);
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  cursor: pointer;
+}
+.dsh-task-iconbtn svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+.dsh-task-iconbtn:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-task-iconbtn-danger[data-confirm='true'] {
+  color: var(--dsw-alias-state-error-primary, #c62828);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c62828) 10%, transparent);
+}
 .dsh-task-group-head:hover .dsh-task-group-actions {
   opacity: 1;
 }
@@ -464,8 +492,7 @@ export const TASKS_CSS = `
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 2px 0 2px 12px;
-  border-left: 2px solid color-mix(in srgb, var(--dsw-alias-border-l1, #e2e5ea) 85%, transparent);
+  padding: 0;
 }
 .dsh-task-group-empty {
   margin: 4px 2px;
@@ -553,6 +580,26 @@ export const TASKS_CSS = `
   flex: none;
   font-size: 12px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
+}
+.dsh-task-archive-count {
+  flex: none;
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-variant-numeric: tabular-nums;
+}
+.dsh-task-archive-group-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-task-archive-group-icon svg {
+  display: block;
+  width: 14px;
+  height: 14px;
 }
 /* Insertion line while a group is dragged (per-index marker; the lane itself highlights too). */
 .dsh-task-group-dropmark {

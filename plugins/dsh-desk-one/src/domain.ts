@@ -70,6 +70,8 @@ const groupSchema = z.object({
   name: z.string().min(1),
   status: z.enum(TASK_STATUSES),
   order: z.number().int().nonnegative(),
+  // Groups can be archived as a unit; old records default to false without migration.
+  archived: z.boolean().default(false),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   revision: z.number().int().positive(),

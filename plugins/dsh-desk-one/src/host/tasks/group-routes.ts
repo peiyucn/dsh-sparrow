@@ -3,7 +3,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { MAX_QUERY_CHARS, ROUTES, TASK_STATUSES } from '../../constants.js'
 import type {
-  CreateTaskGroupRequest, DeleteTaskGroupRequest, MoveTaskGroupRequest, TaskGroupDeleteResponse,
+  ArchiveTaskGroupRequest, CreateTaskGroupRequest, DeleteTaskGroupRequest, MoveTaskGroupRequest, TaskGroupDeleteResponse,
   TaskGroupListResponse, TaskGroupMoveResponse, TaskGroupMutationResponse, TaskGroupPatchRequest, UpdateTaskGroupRequest,
 } from '../../contract.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
@@ -57,10 +57,20 @@ async function deleteGroupRoute(route: DeskRouteContext, req: IncomingMessage, r
   sendJson(res, 200, { deleted: true } satisfies TaskGroupDeleteResponse)
 }
 
+async function archiveGroupRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = bodyObject<ArchiveTaskGroupRequest>(await readJsonBody(req), '请求体必须是对象')
+  if (typeof body.id !== 'string' || body.id.trim() === '') throw new DeskError('BAD_BODY', '缺少分组 id')
+  if (!Number.isInteger(body.expectedRevision)) throw new DeskError('BAD_BODY', '缺少 expectedRevision')
+  if (typeof body.archived !== 'boolean') throw new DeskError('BAD_BODY', 'archived 必须是布尔值')
+  const result = await route.store.archiveGroup(body.id, body.expectedRevision, body.archived)
+  sendJson(res, 200, { group: result.group, tasks: result.tasks } satisfies TaskGroupMoveResponse)
+}
+
 export const GROUP_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.groups, handle: listGroupsRoute },
   { method: 'POST', path: ROUTES.groups, handle: createGroupRoute },
   { method: 'POST', path: ROUTES.groupUpdate, handle: updateGroupRoute },
   { method: 'POST', path: ROUTES.groupMove, handle: moveGroupRoute },
+  { method: 'POST', path: ROUTES.groupArchive, handle: archiveGroupRoute },
   { method: 'POST', path: ROUTES.groupDelete, handle: deleteGroupRoute },
 ]

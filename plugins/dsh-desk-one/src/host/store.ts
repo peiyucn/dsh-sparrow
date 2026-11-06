@@ -154,6 +154,7 @@ export class DeskStore {
     if (input.groupId !== undefined) {
       const group = this.groupById(input.groupId)
       if (group === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${input.groupId}`)
+      if (group.archived) throw new DeskModelError('INVALID_GROUP', '不能把任务放进已存档的分组')
       if (group.status !== input.status) {
         throw new DeskModelError('INVALID_GROUP', '任务状态与所属分组的泳道不一致')
       }
@@ -171,6 +172,9 @@ export class DeskStore {
     if (task.groupId === undefined) return task
     const group = this.groupById(task.groupId)
     if (group === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${task.groupId}`)
+    if (group.archived && patch.groupId !== undefined) {
+      throw new DeskModelError('INVALID_GROUP', '已存档的分组不能再收任务')
+    }
     if (group.status === task.status) return task
     if (patch.groupId === undefined && patch.status !== undefined) {
       const { groupId: _cleared, ...rest } = task
@@ -224,10 +228,11 @@ export class DeskStore {
 
   async createGroup(raw: { readonly name?: unknown; readonly status?: unknown; readonly order?: unknown }): Promise<DeskTaskGroup> {
     const input = normalizeGroupInput(raw)
-    if (this.laneGroups(input.status).some(group => group.name === input.name)) {
+    if (this.laneGroups(input.status).some(group => !group.archived && group.name === input.name)) {
       throw new DeskModelError('INVALID_GROUP', `分组已存在：${input.name}`)
     }
-    const order = raw.order === undefined ? this.laneGroups(input.status).length : input.order
+    const active = this.laneGroups(input.status).filter(group => !group.archived)
+    const order = raw.order === undefined ? active.length : input.order
     const group = createGroupRecord({ ...input, order }, { id: `group_${randomUUID()}`, now: new Date().toISOString() })
     await this.nodes.put(group.id, group)
     return group
@@ -241,7 +246,7 @@ export class DeskStore {
         if (current.kind !== 'group') throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
         const patched = patchGroupRecord(current, patch, { expectedRevision, now })
         if (patch.name !== undefined && this.laneGroups(current.status).some(
-          group => group.id !== id && group.name === patched.name,
+          group => group.id !== id && !group.archived && group.name === patched.name,
         )) {
           throw new DeskModelError('INVALID_GROUP', `分组已存在：${patched.name}`)
         }
@@ -288,6 +293,7 @@ export class DeskStore {
         `分组已被修改（当前 revision ${current.revision}，请求 ${expectedRevision}）`,
       )
     }
+    if (current.archived) throw new DeskModelError('INVALID_GROUP', '已存档的分组不能移动，请先恢复')
     if (!(TASK_STATUSES as readonly string[]).includes(toStatus)) {
       throw new DeskModelError('INVALID_GROUP', `未知的泳道：${toStatus}`)
     }
@@ -318,17 +324,50 @@ export class DeskStore {
     return { group: ordered.find(group => group.id === id) ?? movedGroup, tasks: updatedTasks }
   }
 
+  /** Archive / restore a group together with every card in it (archive is Done-lane only). */
+  async archiveGroup(
+    id: string,
+    expectedRevision: number,
+    archived: boolean,
+  ): Promise<{ group: DeskTaskGroup; tasks: DeskTask[] }> {
+    const current = this.groupById(id)
+    if (current === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
+    if (archived && current.status !== 'done') {
+      throw new DeskModelError('INVALID_GROUP', '只有完成列的分组可以存档')
+    }
+    const now = new Date().toISOString()
+    const updated = await this.nodes.update(id, (node) => node.kind === 'group'
+      ? patchGroupRecord(node, { archived }, { expectedRevision, now })
+      : node)
+    if (updated.kind !== 'group') throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
+    const tasks: DeskTask[] = []
+    for (const task of this.allTasks().filter(task => task.groupId === id)) {
+      const next = await this.nodes.update(task.id, (node) => node.kind === 'task'
+        ? { ...node, archived, revision: node.revision + 1, updatedAt: now }
+        : node)
+      if (next.kind === 'task') tasks.push(next)
+    }
+    return { group: updated, tasks }
+  }
+
   /** Delete a group; its cards become ungrouped (explicit delete only — empty groups persist). */
   async deleteGroup(id: string): Promise<boolean> {
     const current = this.groupById(id)
     if (current === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
     const now = new Date().toISOString()
-    for (const task of this.allTasks().filter(task => task.groupId === id)) {
-      await this.nodes.update(task.id, (node) => {
-        if (node.kind !== 'task') return node
-        const { groupId: _cleared, ...rest } = node
-        return { ...rest, revision: node.revision + 1, updatedAt: now }
-      })
+    if (current.archived) {
+      // Archived groups own archived cards: permanent delete removes them too.
+      for (const task of this.allTasks().filter(task => task.groupId === id)) {
+        await this.nodes.delete(task.id)
+      }
+    } else {
+      for (const task of this.allTasks().filter(task => task.groupId === id)) {
+        await this.nodes.update(task.id, (node) => {
+          if (node.kind !== 'task') return node
+          const { groupId: _cleared, ...rest } = node
+          return { ...rest, revision: node.revision + 1, updatedAt: now }
+        })
+      }
     }
     await this.nodes.delete(id)
     await this.applyGroupOrders(this.laneGroups(current.status), now)

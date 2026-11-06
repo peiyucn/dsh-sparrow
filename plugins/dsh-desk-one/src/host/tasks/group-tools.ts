@@ -42,10 +42,11 @@ export function registerGroupTools(ctx: Context, store: DeskStore): void {
 
   ctx.tools.register(defineTool({
     name: 'desk_group_list',
-    description: 'List desk task groups (all lanes by default), including empty ones, in board order.',
+    description: 'List desk task groups (all lanes by default), including empty ones, in board order. Archived groups are excluded unless include_archived is set.',
     parameters: {
       status: { type: 'string', enum: TASK_STATUSES, description: 'Only groups in this lane.' },
       query: { type: 'string', description: 'Case-insensitive keyword over group names.' },
+      include_archived: { type: 'boolean', description: 'Include archived groups (default false).' },
       limit: { type: 'number', description: 'Maximum groups to return (default 100, max 500).' },
     },
     output: textOutput,
@@ -53,6 +54,7 @@ export function registerGroupTools(ctx: Context, store: DeskStore): void {
       const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(Math.floor(args.limit), 500) : 100
       const groups = store.listGroups(args.query)
         .filter(group => args.status === undefined || group.status === args.status)
+        .filter(group => args.include_archived === true || !group.archived)
         .slice(0, limit)
       return Promise.resolve(JSON.stringify({
         ok: true,
@@ -113,8 +115,34 @@ export function registerGroupTools(ctx: Context, store: DeskStore): void {
   }))
 
   ctx.tools.register(defineTool({
+    name: 'desk_group_archive',
+    description: 'Archive or restore a whole group. Only groups in the done lane can be archived; archiving also archives every card in the group. Deleting an archived group permanently removes its cards.',
+    parameters: {
+      id: { type: 'string', required: true, description: 'Group id from desk_group_list.' },
+      expected_revision: { type: 'number', required: true, description: 'Revision returned by desk_group_list.' },
+      archived: { type: 'boolean', description: 'true archives (default), false restores.' },
+    },
+    output: textOutput,
+    async execute(args) {
+      try {
+        const result = await store.archiveGroup(args.id, args.expected_revision, args.archived !== false)
+        return JSON.stringify({
+          ok: true,
+          group: result.group,
+          tasks: result.tasks,
+          summary: result.group.archived
+            ? `已存档分组「${result.group.name}」（${result.tasks.length} 个任务）`
+            : `已恢复分组「${result.group.name}」（${result.tasks.length} 个任务）`,
+        })
+      } catch (error) {
+        toolError(error)
+      }
+    },
+  }))
+
+  ctx.tools.register(defineTool({
     name: 'desk_group_delete',
-    description: 'Delete one group permanently. Cards in it are kept and become ungrouped.',
+    description: 'Delete one group permanently. Cards in an active group are kept and become ungrouped; deleting an archived group also deletes its archived cards.',
     parameters: {
       id: { type: 'string', required: true, description: 'Group id from desk_group_list.' },
     },
@@ -122,10 +150,10 @@ export function registerGroupTools(ctx: Context, store: DeskStore): void {
     execute(args) {
       return store.deleteGroup(args.id).then(() => JSON.stringify({
         ok: true,
-        summary: '已删除分组，组内任务回到未分组',
+        summary: '已删除分组',
       }))
     },
   }))
 
-  ctx.logger.info?.(`${PACKAGE_NAME}: registered 5 desk group tools`)
+  ctx.logger.info?.(`${PACKAGE_NAME}: registered 6 desk group tools`)
 }

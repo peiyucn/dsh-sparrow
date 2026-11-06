@@ -63,6 +63,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'task.countOne'
       | 'task.count'
       | 'task.group.drag'
+      | 'task.group.archive'
+      | 'task.group.restore'
       | 'task.group.add'
       | 'task.group.expand'
       | 'task.group.collapse'

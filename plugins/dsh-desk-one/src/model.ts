@@ -449,6 +449,7 @@ export interface GroupInput {
 export interface GroupPatch {
   readonly name?: string
   readonly order?: number
+  readonly archived?: boolean
 }
 
 /** Normalize a group creation request; groups always live in exactly one lane. */
@@ -476,6 +477,7 @@ export function createGroupRecord(
     name: input.name,
     status: input.status,
     order: input.order,
+    archived: false,
     createdAt: meta.now,
     updatedAt: meta.now,
     revision: 1,
@@ -501,6 +503,7 @@ export function patchGroupRecord(
     name: string
     status: TaskStatus
     order: number
+    archived: boolean
     createdAt: string
     updatedAt: string
     revision: number
@@ -512,6 +515,10 @@ export function patchGroupRecord(
   }
   const order = normalizeOrder(patch.order)
   if (order !== undefined) next.order = order
+  if (patch.archived !== undefined) {
+    if (typeof patch.archived !== 'boolean') throw new DeskModelError('INVALID_GROUP', 'archived 必须是布尔值')
+    next.archived = patch.archived
+  }
   return next
 }
 

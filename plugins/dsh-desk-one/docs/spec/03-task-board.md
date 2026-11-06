@@ -35,7 +35,7 @@ interface TaskPayload {
 
 * 顶层字段沿用 Node 基础字段：`title`（必填）、`body`（描述，v1 不在卡片上展示）、`tags`、`createdAt`、`updatedAt`、`revision`、`source`。
 * 关系：`belongsTo` 边（task → project）预留；v1 不写边。
-* 存储：同一 `desk_one` 域的 `nodes` 表，按 `kind` 判别；组是独立记录：`{ kind: 'group', name, status, order, revision }`。改名 / 排序是单条 group patch，删组时 host 把成员任务的 `groupId` 解绑。
+* 存储：同一 `desk_one` 域的 `nodes` 表，按 `kind` 判别；组是独立记录：`{ kind: 'group', name, status, order, archived, revision }`。改名 / 排序是单条 group patch，删组时 host 把成员任务的 `groupId` 解绑。
 * 一致性：任务只能属于**同一泳道**的分组；跨列移动卡片且未指定目标组时自动移出分组。
 
 ## 视图与交互
@@ -66,8 +66,8 @@ interface TaskPayload {
 ### 分组（一层）
 
 * 每个泳道内可建一层分组：列出「未分组」卡片，再按存储顺序列出分组；组卡片缩进并带分组名。
-* 分组头：六点拖动手柄（调整分组顺序，顺序持久化在宿主）、折叠箭头（状态存 localStorage）、双击名称改名、计数、组内「＋新建」、删除分组（二次确认，组内任务回未分组）。
-* 分组容器有明确边框 / 底色 / 内边距，与未分组卡片区分；组内卡片左侧有竖线缩进。
+* 分组头：六点拖动手柄（调整分组顺序，顺序持久化在宿主）、折叠箭头（状态存 localStorage）、双击名称改名、计数；操作统一为小图标：组内「＋新建」、完成列多一个**整组存档**、垃圾桶删除（二次确认，组内任务回未分组）。
+* 分组容器有明确边框 / 底色 / 内边距，与未分组卡片区分；组内不再画缩进竖线 / 留空，卡片直接铺满。
 * 深色 / 浅色主题都使用宿主 token；空分组显示「拖到这里或双击新建」的落点，并一直保留到显式删除。
 * 成员关系以任务 `groupId` 为唯一真值；分组名 / 泳道 / 顺序存宿主，折叠状态是纯界面偏好。
 * 整组拖动与卡片同一套指针手势：按住分组头（输入框 / 按钮除外）生成整组幽灵（头 + 卡片）跟手；同泳道放下调整分组顺序，拖到其它泳道直接连同卡片级联新状态，无确认条与撤销条；无效落点飞回原处。
@@ -79,8 +79,8 @@ interface TaskPayload {
 
 ### 存档
 
-* 只有**完成列**的卡片可以存档；存后从板上消失（`archived: true`），进任务板存档视图。
-* 存档入口与便签墙同构：板顶部右侧「存档（N）」按钮，进入存档视图；列表显示标题、颜色点、存档日期，可**恢复**（回到「完成」列）或**彻底删除**。
+* 只有**完成列**的卡片 / 分组可以存档；存后从板上消失（`archived: true`），进任务板存档视图。
+* 存档入口与便签墙同构：板顶部右侧「存档（N）」按钮，进入存档视图；任务条目可恢复（回到「完成」列）或彻底删除；**分组条目**显示组名 / 条数 / 泳道，恢复会把整组与卡片一起拉回，彻底删除则连卡片一起删除（二次确认）。
 * `archived` 状态持久化，刷新 / 重启后保持。
 
 ### REST 与 Agent 工具
@@ -95,9 +95,10 @@ interface TaskPayload {
 | `/api/desk-one/groups` | POST | 新建分组 |
 | `/api/desk-one/groups/update` | POST | 改名 / 改组顺序 |
 | `/api/desk-one/groups/move` | POST | 整组移动（跨泳道时级联成员状态） |
+| `/api/desk-one/groups/archive` | POST | 整组存档 / 恢复（级联组内卡片） |
 | `/api/desk-one/groups/delete` | POST | 删除分组（成员回未分组） |
 
-工具：`desk_task_add`、`desk_task_list`、`desk_task_update`（含状态与排序）、`desk_task_complete`、`desk_task_archive`；分组：`desk_group_add`、`desk_group_list`、`desk_group_update`、`desk_group_move`、`desk_group_delete`。
+工具：`desk_task_add`、`desk_task_list`、`desk_task_update`（含状态与排序）、`desk_task_complete`、`desk_task_archive`；分组：`desk_group_add`、`desk_group_list`、`desk_group_update`、`desk_group_move`、`desk_group_archive`、`desk_group_delete`。
 
 ## 验收标准
 
@@ -105,7 +106,7 @@ interface TaskPayload {
 * 整卡拖拽带**直立**跟手幽灵卡；跨列改状态、列内 / 分组内改顺序、拖入 / 拖出分组，刷新 / 重启后保持；无效落点飞回原位；失败有提示。
 * 窄窗口（< 720px）下三列收成计数列，不出现横向滚动条；分组可拖动手柄调整顺序且刷新后保持。
 * 标题 / 描述自动换行，卡片随内容变高；只剩一天截止的卡片有琥珀色描边。
-* 分组可新建 / 改名 / 折叠 / 拖动排序 / 删除；空分组刷新后仍存在；删除分组后组内卡片回到未分组；整组拖动跟手、跨列直接移动。
+* 分组可新建 / 改名 / 折叠 / 拖动排序 / 删除；空分组刷新后仍存在；删除分组后组内卡片回到未分组；整组拖动跟手、跨列直接移动；完成列分组可整组存档，存档视图出现分组条目，恢复 / 彻底删除均按组级联卡片。
 * 按创建时间 / 截止日期排序视图正确；切回手动排序恢复手排顺序。
 * 完成列可折叠；只有完成列卡片有存档入口；存档后从板上消失、出现在存档视图，恢复后回到完成列。
 * 颜色、截止日期（含逾期标记）正确显示与保存。

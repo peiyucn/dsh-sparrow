@@ -19,6 +19,7 @@ export const ROUTES = Object.freeze({
   groups: `${PREFIX}/groups`,
   groupUpdate: `${PREFIX}/groups/update`,
   groupMove: `${PREFIX}/groups/move`,
+  groupArchive: `${PREFIX}/groups/archive`,
   groupDelete: `${PREFIX}/groups/delete`,
 })
 

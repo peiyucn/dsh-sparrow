@@ -23,6 +23,11 @@ interface Actions {
     order?: number
   }) => Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }>
   readonly deleteGroup: (id: string) => Promise<void>
+  readonly archiveGroup: (input: {
+    id: string
+    expectedRevision: number
+    archived: boolean
+  }) => Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }>
 }
 
 export interface GroupsData {
@@ -42,10 +47,15 @@ export interface GroupsData {
     group: DeskTaskGroup
     tasks: readonly DeskTask[]
   } | null>
+  /** Archive / restore the group together with its cards. */
+  readonly archiveGroup: (group: DeskTaskGroup, archived: boolean) => Promise<{
+    group: DeskTaskGroup
+    tasks: readonly DeskTask[]
+  } | null>
 }
 
 export function useGroupsData(t: DeskTranslator, actions: Actions): GroupsData {
-  const { listGroups, createGroup, updateGroup, moveGroup, deleteGroup } = actions
+  const { listGroups, createGroup, updateGroup, moveGroup, deleteGroup, archiveGroup } = actions
   const [groups, setGroups] = useState<readonly DeskTaskGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -155,8 +165,22 @@ export function useGroupsData(t: DeskTranslator, actions: Actions): GroupsData {
     }
   }, [moveGroup, reload, replace, t])
 
+  const archiveGroupAction = useCallback(async (group: DeskTaskGroup, archived: boolean) => {
+    try {
+      const result = await archiveGroup({ id: group.id, expectedRevision: group.revision, archived })
+      replace(result.group)
+      setActionError(null)
+      return result
+    } catch (reason) {
+      setActionError(t('state.saveFailed', { message: messageOf(reason) }))
+      void reload()
+      return null
+    }
+  }, [archiveGroup, reload, replace, t])
+
   return {
     groups, loading, loadError, actionError, setActionError,
-    reload, createGroup: createGroupAction, renameGroup, reorderGroups, removeGroup, moveGroupToLane,
+    reload, createGroup: createGroupAction, renameGroup, reorderGroups, removeGroup,
+    moveGroupToLane, archiveGroup: archiveGroupAction,
   }
 }

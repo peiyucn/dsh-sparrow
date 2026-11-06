@@ -90,7 +90,8 @@ describe('host 装配（apply 接线）', () => {
     assert.deepEqual(
       collected.tools.map(tool => tool.name).sort(),
       [
-        'desk_group_add', 'desk_group_delete', 'desk_group_list', 'desk_group_move', 'desk_group_update',
+        'desk_group_add', 'desk_group_archive', 'desk_group_delete', 'desk_group_list', 'desk_group_move',
+        'desk_group_update',
         'desk_note_add', 'desk_note_delete', 'desk_note_list', 'desk_note_update',
         'desk_task_add', 'desk_task_archive', 'desk_task_complete', 'desk_task_list', 'desk_task_update',
       ],
@@ -289,6 +290,47 @@ describe('host 装配（apply 接线）', () => {
     assert.equal(doingTasks.json.tasks.length, 1)
     assert.equal(doingTasks.json.tasks[0].groupId, groupId)
 
+    const movedToDone = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.groupMove,
+      body: JSON.stringify({ id: groupId, expectedRevision: moved.json.group.revision, status: 'done', order: 0 }),
+      headers: host,
+    })
+    assert.equal(movedToDone.status, 200)
+    assert.equal(movedToDone.json.group.status, 'done')
+
+    const archived = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.groupArchive,
+      body: JSON.stringify({ id: groupId, expectedRevision: movedToDone.json.group.revision, archived: true }),
+      headers: host,
+    })
+    assert.equal(archived.status, 200)
+    assert.equal(archived.json.group.archived, true)
+    assert.equal(archived.json.tasks.length, 1)
+    assert.equal(archived.json.tasks[0].archived, true)
+
+    const boardAfterArchive = await callRoute(handler, { method: 'GET', url: ROUTES.tasks, headers: host })
+    assert.equal(boardAfterArchive.json.tasks.length, 0, '整组存档后卡片也离开板面')
+
+    const restored = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.groupArchive,
+      body: JSON.stringify({ id: groupId, expectedRevision: archived.json.group.revision, archived: false }),
+      headers: host,
+    })
+    assert.equal(restored.status, 200)
+    assert.equal(restored.json.group.archived, false)
+    assert.equal(restored.json.tasks[0].archived, false)
+
+    const archivedAgain = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.groupArchive,
+      body: JSON.stringify({ id: groupId, expectedRevision: restored.json.group.revision, archived: true }),
+      headers: host,
+    })
+    assert.equal(archivedAgain.status, 200)
+
     const deleted = await callRoute(handler, {
       method: 'POST',
       url: ROUTES.groupDelete,
@@ -298,8 +340,7 @@ describe('host 装配（apply 接线）', () => {
     assert.equal(deleted.status, 200)
 
     const afterDelete = await callRoute(handler, { method: 'GET', url: `${ROUTES.tasks}?include_archived=1`, headers: host })
-    assert.equal(afterDelete.json.tasks.length, 1)
-    assert.equal(afterDelete.json.tasks[0].groupId, undefined, '删除分组后任务回到未分组')
+    assert.equal(afterDelete.json.tasks.length, 0, '删除存档分组时连卡片一起删除')
   })
 
   it('agent 工具 应该 与 REST 共用同一份数据（工具建 → 路由查）', async () => {

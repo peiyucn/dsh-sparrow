@@ -51,6 +51,7 @@ interface TaskColumnProps {
   readonly onCreateGroup: (status: TaskStatus, name: string) => void
   readonly onRenameGroup: (group: DeskTaskGroup, name: string) => void
   readonly onRemoveGroup: (group: DeskTaskGroup) => void
+  readonly onArchiveGroup: (group: DeskTaskGroup) => void
 }
 
 /** Inline draft: an empty title cancels instead of creating an empty task (titles are required). */
@@ -93,7 +94,7 @@ export function TaskColumn({
   status, title, lane, compact, collapsed, draft, dropTarget, groupDrop, draggingId, groupDrag, t,
   onAdd, onToggleCollapse, onCommitDraft, onCancelDraft, onStartDrag, onGroupStartDrag,
   onPatch, onArchive, onDelete,
-  isGroupCollapsed, onToggleGroup, onCreateGroup, onRenameGroup, onRemoveGroup,
+  isGroupCollapsed, onToggleGroup, onCreateGroup, onRenameGroup, onRemoveGroup, onArchiveGroup,
 }: TaskColumnProps): ReactElement {
   const [addingGroup, setAddingGroup] = useState(false)
   const [editingGroup, setEditingGroup] = useState<string | null>(null)
@@ -292,18 +293,33 @@ export function TaskColumn({
                 <div className="dsh-task-group-actions">
                   <button
                     type="button"
-                    className="dsh-desk-iconbtn dsh-desk-iconbtn-sm"
+                    className="dsh-task-iconbtn"
                     aria-label={t('task.add')}
                     title={t('task.add')}
                     onClick={() => onAdd(status, group.id)}
                   >
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
                       <path d="M10 4.5v11M4.5 10h11" />
                     </svg>
                   </button>
+                  {status === 'done'
+                    ? (
+                        <button
+                          type="button"
+                          className="dsh-task-iconbtn"
+                          aria-label={t('task.group.archive')}
+                          title={t('task.group.archive')}
+                          onClick={() => onArchiveGroup(group)}
+                        >
+                          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                            <path d="M4 5.5h12v11H4zM3 3.5h14v2H3zM8 9h4" />
+                          </svg>
+                        </button>
+                      )
+                    : null}
                   <button
                     type="button"
-                    className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-iconbtn-danger"
+                    className="dsh-task-iconbtn dsh-task-iconbtn-danger"
                     data-confirm={confirmGroup === group.id}
                     aria-label={confirmGroup === group.id ? t('task.group.removeConfirm') : t('task.group.remove')}
                     title={confirmGroup === group.id ? t('task.group.removeConfirm') : t('task.group.remove')}
@@ -314,7 +330,7 @@ export function TaskColumn({
                     onBlur={() => setConfirmGroup(null)}
                   >
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                      <path d="M5 5l10 10M15 5L5 15" />
+                      <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
                     </svg>
                   </button>
                 </div>

@@ -92,11 +92,14 @@ describe('task 模型：创建 / 补丁 / 排序', () => {
     assert.equal(record.kind, 'group')
     assert.equal(record.revision, 1)
     assert.equal(record.status, 'doing')
+    assert.equal(record.archived, false)
 
     const renamed = patchGroupRecord(record, { name: ' 本季度 ', order: 5 }, { expectedRevision: 1, now: 'later' })
     assert.equal(renamed.name, '本季度')
     assert.equal(renamed.order, 5)
     assert.equal(renamed.revision, 2)
+    const archived = patchGroupRecord(record, { archived: true }, { expectedRevision: 1, now: 'later' })
+    assert.equal(archived.archived, true)
     assert.throws(
       () => patchGroupRecord(record, { name: 'x' }, { expectedRevision: 9, now: 'later' }),
       (error) => error instanceof DeskModelError && error.code === 'REVISION_CONFLICT',

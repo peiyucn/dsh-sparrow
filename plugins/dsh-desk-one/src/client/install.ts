@@ -67,6 +67,11 @@ export interface DeskPanelInjected {
     readonly status: string
     readonly order?: number
   }) => Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }>
+  readonly archiveGroup: (input: {
+    readonly id: string
+    readonly expectedRevision: number
+    readonly archived: boolean
+  }) => Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }>
   readonly deleteGroup: (id: string) => Promise<void>
 }
 

@@ -75,3 +75,15 @@ export function moveGroup(input: {
 export function deleteGroup(id: string): Promise<void> {
   return postJson<TaskGroupDeleteResponse>(ROUTES.groupDelete, { id }).then(() => undefined)
 }
+
+/** Archive / restore a whole group (host archives its cards too). */
+export function archiveGroup(input: {
+  readonly id: string
+  readonly expectedRevision: number
+  readonly archived: boolean
+}): Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }> {
+  return postJson<TaskGroupMoveResponse>(ROUTES.groupArchive, input).then(payload => ({
+    group: payload.group,
+    tasks: payload.tasks,
+  }))
+}

@@ -89,6 +89,8 @@ export interface DeskTaskGroup {
   readonly name: string
   readonly status: TaskStatus
   readonly order: number
+  /** 分组可整组存档（仅完成列）；存档时组内卡片一起存档。 */
+  readonly archived: boolean
   readonly createdAt: string
   readonly updatedAt: string
   readonly revision: number
@@ -223,6 +225,13 @@ export interface MoveTaskGroupRequest {
 
 export interface DeleteTaskGroupRequest {
   readonly id: string
+}
+
+export interface ArchiveTaskGroupRequest {
+  readonly id: string
+  readonly expectedRevision: number
+  /** true = 存档（组 + 组内卡片），false = 恢复。 */
+  readonly archived: boolean
 }
 
 export interface UpdateTaskRequest {

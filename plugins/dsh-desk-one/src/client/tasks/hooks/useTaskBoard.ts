@@ -29,6 +29,10 @@ interface BoardDeps {
     group: DeskTaskGroup
     tasks: readonly DeskTask[]
   } | null>
+  readonly archiveGroup: (group: DeskTaskGroup, archived: boolean) => Promise<{
+    group: DeskTaskGroup
+    tasks: readonly DeskTask[]
+  } | null>
   readonly reloadGroups: () => Promise<void>
 }
 
@@ -66,6 +70,9 @@ export interface TaskBoardApi {
   readonly removeGroup: (group: DeskTaskGroup) => void
   readonly reorderGroup: (status: TaskStatus, groupId: string, toIndex: number) => void
   readonly moveGroupWhole: (group: DeskTaskGroup, status: TaskStatus, order?: number) => Promise<GroupMoveResult | null>
+  /** Archive / restore a group and update its cards' archived flag from the host result. */
+  readonly archiveGroup: (group: DeskTaskGroup, archived: boolean) => Promise<GroupMoveResult | null>
+  readonly archivedGroups: readonly DeskTaskGroup[]
 }
 
 function readSortMode(): TaskSortMode {
@@ -101,7 +108,7 @@ function persist(key: string, value: unknown): void {
 
 export function useTaskBoard({
   tasks, setTasks, savePatch, addTask, removeWithFeedback, setActionError,
-  groups, createGroup, renameGroup, reorderGroups, removeGroup, moveGroupToLane, reloadGroups,
+  groups, createGroup, renameGroup, reorderGroups, removeGroup, moveGroupToLane, archiveGroup, reloadGroups,
 }: BoardDeps): TaskBoardApi {
   const [sortMode, setSortModeState] = useState<TaskSortMode>(readSortMode)
   const [doneCollapsed, setDoneCollapsed] = useState(false)
@@ -118,8 +125,11 @@ export function useTaskBoard({
     }
   }, [])
 
-  const lanes = useMemo(() => groupLanes(tasks, groups, sortMode), [tasks, groups, sortMode])
+  const activeGroups = useMemo(() => groups.filter(group => !group.archived), [groups])
+  const lanes = useMemo(() => groupLanes(tasks, activeGroups, sortMode), [activeGroups, tasks, sortMode])
   const archivedTasks = useMemo(() => tasks.filter(task => task.archived), [tasks])
+  const archivedGroups = useMemo(() => [...groups.filter(group => group.archived)].sort((left, right) =>
+    right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id)), [groups])
 
   const setSortMode = useCallback((mode: TaskSortMode): void => {
     setSortModeState(mode)
@@ -178,7 +188,7 @@ export function useTaskBoard({
   const createGroupAction = useCallback((status: TaskStatus, name: string): Promise<DeskTaskGroup | null> => {
     const trimmed = name.trim()
     if (trimmed === '') return Promise.resolve(null)
-    const order = groups.filter(group => group.status === status).length
+    const order = groups.filter(group => group.status === status && !group.archived).length
     return createGroup({ name: trimmed, status, order })
   }, [createGroup, groups])
 
@@ -190,9 +200,9 @@ export function useTaskBoard({
     removeGroup(group)
   }, [removeGroup, setTasks])
 
-  /** Same-lane group reorder: compute the new list and let the groups hook persist dense order. */
+  /** Same-lane group reorder: only active groups participate in the visible ordering. */
   const reorderGroup = useCallback((status: TaskStatus, groupId: string, toIndex: number): void => {
-    const laneGroups = sortGroups(groups.filter(group => group.status === status))
+    const laneGroups = sortGroups(groups.filter(group => group.status === status && !group.archived))
     const from = laneGroups.findIndex(group => group.id === groupId)
     if (from === -1) return
     const [moved] = laneGroups.splice(from, 1)
@@ -261,12 +271,23 @@ export function useTaskBoard({
     setActionError(null)
   }, [savePatch, setActionError, setTasks, tasks])
 
+  const archiveGroupAction = useCallback(async (
+    group: DeskTaskGroup,
+    archived: boolean,
+  ): Promise<GroupMoveResult | null> => {
+    const result = await archiveGroup(group, archived)
+    if (result === null) return null
+    const byId = new Map(result.tasks.map(task => [task.id, task]))
+    setTasks(current => current.map(task => byId.get(task.id) ?? task))
+    return result
+  }, [archiveGroup, setTasks])
+
   return {
-    lanes, archivedTasks, sortMode, setSortMode, doneCollapsed, toggleDone,
+    lanes, archivedTasks, archivedGroups, sortMode, setSortMode, doneCollapsed, toggleDone,
     showArchive, toggleArchive, draft, beginDraft, cancelDraft, commitDraft,
     moveTask, archiveTask, restoreTask, deleteTask,
     isGroupCollapsed, toggleGroup,
     createGroup: createGroupAction, renameGroup, removeGroup: removeGroupAction,
-    reorderGroup, moveGroupWhole,
+    reorderGroup, moveGroupWhole, archiveGroup: archiveGroupAction,
   }
 }

@@ -36,6 +36,11 @@ export interface TaskBoardInjected {
     status: string
     order?: number
   }) => Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }>
+  readonly archiveGroup: (input: {
+    id: string
+    expectedRevision: number
+    archived: boolean
+  }) => Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }>
   readonly deleteGroup: (id: string) => Promise<void>
 }
 
@@ -49,6 +54,56 @@ const LANE_LABEL_KEY = {
   doing: 'task.lane.doing',
   done: 'task.lane.done',
 } as const
+
+/** Two-step delete row for an archived group (deleting it also deletes its cards). */
+function GroupArchiveRow({
+  group, countLabel, t, onRestore, onDelete,
+}: {
+  readonly group: DeskTaskGroup
+  readonly countLabel: string
+  readonly t: DeskTranslator
+  readonly onRestore: (group: DeskTaskGroup) => void
+  readonly onDelete: (group: DeskTaskGroup) => void
+}): ReactElement {
+  const [confirm, setConfirm] = useState(false)
+  return (
+    <li className="dsh-task-archive-row">
+      <span className="dsh-task-archive-group-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <path d="M2.8 6.2h5l1.4 1.6h8v7.4H2.8zM2.8 6.2V4.8h5" />
+        </svg>
+      </span>
+      <span className="dsh-task-archive-title">{group.name}</span>
+      <span className="dsh-task-archive-count">{countLabel}</span>
+      <span className="dsh-task-archive-lane">{t(LANE_LABEL_KEY[group.status])}</span>
+      <button
+        type="button"
+        className="dsh-desk-iconbtn"
+        aria-label={t('task.group.restore')}
+        title={t('task.group.restore')}
+        onClick={() => onRestore(group)}
+      >
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+          <path d="M4.5 6.5v4h4" />
+          <path d="M5 10.3A5.2 5.2 0 1 1 6.6 13.2" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        className="dsh-desk-iconbtn dsh-desk-iconbtn-danger"
+        data-confirm={confirm}
+        aria-label={confirm ? t('task.deleteConfirm') : t('task.delete')}
+        title={confirm ? t('task.deleteConfirm') : t('task.delete')}
+        onClick={() => { if (confirm) onDelete(group); else setConfirm(true) }}
+        onBlur={() => setConfirm(false)}
+      >
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+          <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+        </svg>
+      </button>
+    </li>
+  )
+}
 
 /** Two-step delete row for the archive list (same pattern as the cards). */
 function ArchiveRow({
@@ -135,7 +190,7 @@ function placeGhost(ghost: HTMLElement, left: number, top: number, width: number
 export function TaskBoard(props: TaskBoardProps): ReactElement {
   const {
     t, listTasks, createTask, updateTask, deleteTask,
-    listGroups, createGroup: createGroupApi, updateGroup, moveGroup, deleteGroup,
+    listGroups, createGroup: createGroupApi, updateGroup, moveGroup, archiveGroup: archiveGroupApi, deleteGroup,
   } = props
   const data = useTasksData(t, { listTasks, createTask, updateTask, deleteTask })
   const groupsData = useGroupsData(t, {
@@ -144,6 +199,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     updateGroup,
     moveGroup,
     deleteGroup,
+    archiveGroup: archiveGroupApi,
   })
   const board = useTaskBoard({
     tasks: data.tasks,
@@ -158,6 +214,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     reorderGroups: groupsData.reorderGroups,
     removeGroup: groupsData.removeGroup,
     moveGroupToLane: groupsData.moveGroupToLane,
+    archiveGroup: groupsData.archiveGroup,
     reloadGroups: groupsData.reload,
   })
   const [draggingId, setDraggingId] = useState<string | null>(null)
@@ -393,6 +450,13 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
   const loading = data.loading || groupsData.loading
   const loadError = data.loadError ?? groupsData.loadError
   const actionError = data.actionError ?? groupsData.actionError
+  const countText = (count: number): string => count === 1 ? t('task.countOne') : t('task.count', { count })
+
+  /** Archived groups own archived cards: deleting the group also deletes those cards host-side. */
+  const deleteArchivedGroup = (group: DeskTaskGroup): void => {
+    data.setTasks(current => current.filter(task => task.groupId !== group.id))
+    groupsData.removeGroup(group)
+  }
 
   if (loadError !== null) {
     return (
@@ -443,10 +507,20 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
       {board.showArchive
         ? (
             <div className="dsh-task-archive">
-              {board.archivedTasks.length === 0
+              {board.archivedGroups.length === 0 && board.archivedTasks.length === 0
                 ? <p className="dsh-desk-wall-hint">{t('task.archiveEmpty')}</p>
                 : (
                     <ul className="dsh-task-archive-list">
+                      {board.archivedGroups.map(group => (
+                        <GroupArchiveRow
+                          key={group.id}
+                          group={group}
+                          countLabel={countText(data.tasks.filter(task => task.groupId === group.id && task.archived).length)}
+                          t={t}
+                          onRestore={archived => { void board.archiveGroup(archived, false) }}
+                          onDelete={deleteArchivedGroup}
+                        />
+                      ))}
                       {board.archivedTasks.map(task => (
                         <ArchiveRow
                           key={task.id}
@@ -490,6 +564,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
                   onCreateGroup={board.createGroup}
                   onRenameGroup={board.renameGroup}
                   onRemoveGroup={board.removeGroup}
+                  onArchiveGroup={(group) => { void board.archiveGroup(group, true) }}
                 />
               ))}
             </div>

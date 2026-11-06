@@ -55,6 +55,7 @@ interface GroupPayload {
   name: string                             // 组名；同一泳道内唯一
   status: 'todo' | 'doing' | 'done'        // 分组属于某个泳道
   order: number                            // 组在该泳道内的顺序
+  archived: boolean                        // 整组存档（仅完成列）；存档时组内卡片一起归档
 }
 
 interface TaskPayload {

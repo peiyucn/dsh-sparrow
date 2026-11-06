@@ -35,7 +35,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   const {
     listNotes, updateNote, deleteNote, createNote, t,
     listTasks, createTask, updateTask, deleteTask,
-    listGroups, createGroup, updateGroup, moveGroup, deleteGroup,
+    listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup,
   } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
   /** Guards double-click / double-tap while one create request is in flight. */
@@ -224,6 +224,7 @@ export function DeskOnePage(props: DeskPanelProps) {
           createGroup={createGroup}
           updateGroup={updateGroup}
           moveGroup={moveGroup}
+          archiveGroup={archiveGroup}
           deleteGroup={deleteGroup}
         />
       )}

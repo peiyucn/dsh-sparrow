@@ -36,6 +36,7 @@ export function apply(ctx: ClientContext): void {
       createGroup: taskApi.createGroup,
       updateGroup: taskApi.updateGroup,
       moveGroup: taskApi.moveGroup,
+      archiveGroup: taskApi.archiveGroup,
       deleteGroup: taskApi.deleteGroup,
     },
   })
