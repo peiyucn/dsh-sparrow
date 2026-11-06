@@ -1,14 +1,12 @@
 /**
- * One board lane: header, ungrouped cards, one-level groups (collapsible, drag-reorderable),
- * draft card and the double-click-to-add surface.
- *
- * When the board is narrower than the compact threshold the lane collapses to a count-only
- * column (title + per-group counts) instead of introducing a horizontal scrollbar.
+ * One board lane: header, ungrouped cards, first-class groups (collapsible, drag-reorderable,
+ * and — after confirmation — movable to another lane), draft card and the double-click-to-add
+ * surface. The lane collapses to a count-only column below the compact threshold.
  */
 
 import { useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
-import type { DeskTask, TaskPatchRequest, TaskStatus } from '../../../contract.js'
+import type { DragEvent as ReactDragEvent, PointerEvent as ReactPointerEvent, ReactElement } from 'react'
+import type { DeskTask, DeskTaskGroup, TaskPatchRequest, TaskStatus } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
 import type { LaneView } from '../types.js'
 import type { TaskDraft } from '../hooks/useTaskBoard.js'
@@ -16,7 +14,7 @@ import { TaskCard } from './TaskCard.js'
 
 export interface DropTarget {
   readonly status: TaskStatus
-  readonly group?: string
+  readonly groupId?: string
 }
 
 interface TaskColumnProps {
@@ -28,9 +26,9 @@ interface TaskColumnProps {
   readonly draft: TaskDraft | null
   readonly dropTarget: DropTarget | null
   readonly draggingId: string | null
-  readonly groupDrag: { readonly status: TaskStatus; readonly name: string } | null
+  readonly groupDrag: DeskTaskGroup | null
   readonly t: DeskTranslator
-  readonly onAdd: (status: TaskStatus, group?: string) => void
+  readonly onAdd: (status: TaskStatus, groupId?: string) => void
   readonly onToggleCollapse: () => void
   readonly onCommitDraft: (title: string) => void
   readonly onCancelDraft: () => void
@@ -38,12 +36,12 @@ interface TaskColumnProps {
   readonly onPatch: (task: DeskTask, patch: TaskPatchRequest) => void
   readonly onArchive: (task: DeskTask) => void
   readonly onDelete: (id: string) => void
-  readonly isGroupCollapsed: (status: TaskStatus, name: string) => boolean
-  readonly onToggleGroup: (status: TaskStatus, name: string) => void
+  readonly isGroupCollapsed: (groupId: string) => boolean
+  readonly onToggleGroup: (groupId: string) => void
   readonly onCreateGroup: (status: TaskStatus, name: string) => void
-  readonly onRenameGroup: (status: TaskStatus, from: string, to: string) => void
-  readonly onRemoveGroup: (status: TaskStatus, name: string) => void
-  readonly onGroupDragStart: (status: TaskStatus, name: string) => void
+  readonly onRenameGroup: (group: DeskTaskGroup, name: string) => void
+  readonly onRemoveGroup: (group: DeskTaskGroup) => void
+  readonly onGroupDragStart: (group: DeskTaskGroup) => void
   readonly onGroupDragEnd: () => void
   readonly onGroupDrop: (status: TaskStatus, toIndex: number) => void
 }
@@ -92,9 +90,10 @@ export function TaskColumn({
 }: TaskColumnProps): ReactElement {
   const [addingGroup, setAddingGroup] = useState(false)
   const [editingGroup, setEditingGroup] = useState<string | null>(null)
+  const [confirmGroup, setConfirmGroup] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
-  const laneOver = dropTarget?.status === status && dropTarget.group === undefined
-  const draftIn = (group?: string): boolean => draft !== null && draft.status === status && draft.group === group
+  const laneOver = dropTarget?.status === status && dropTarget.groupId === undefined
+  const draftIn = (groupId?: string): boolean => draft !== null && draft.status === status && draft.groupId === groupId
   const total = lane.ungrouped.length + lane.groups.reduce((sum, group) => sum + group.tasks.length, 0)
   /** Counts read as labels ("3 tasks") instead of bare numbers — singular handled separately. */
   const countText = (count: number): string => count === 1 ? t('task.countOne') : t('task.count', { count })
@@ -103,9 +102,9 @@ export function TaskColumn({
   const handleDoubleClick = (event: React.MouseEvent<HTMLElement>): void => {
     const target = event.target as HTMLElement
     if (target.closest('[data-task-id],input,textarea,button')) return
-    const groupZone = target.closest<HTMLElement>('[data-group-drop]')
-    const groupName = groupZone?.dataset.groupDrop
-    onAdd(status, groupName === undefined || groupName === '' ? undefined : groupName)
+    const groupZone = target.closest<HTMLElement>('[data-group-id]')
+    const groupId = groupZone?.dataset.groupId
+    onAdd(status, groupId === undefined || groupId === '' ? undefined : groupId)
   }
 
   const cards = (tasks: readonly DeskTask[]): ReactElement[] => tasks.map(task => (
@@ -120,6 +119,15 @@ export function TaskColumn({
       onDelete={onDelete}
     />
   ))
+
+  /** Group headers accept drops from any lane; the board decides reorder vs confirmed move. */
+  const handleGroupDragOver = (event: ReactDragEvent<HTMLElement>, index: number): void => {
+    if (groupDrag === null) return
+    // Stop the lane-level handlers: a drop on a group must not also append to the lane end.
+    event.preventDefault()
+    event.stopPropagation()
+    setDropIndex(index)
+  }
 
   const header = (
     <header className="dsh-task-lane-head">
@@ -180,10 +188,10 @@ export function TaskColumn({
               <span className="dsh-task-compact-count">{countText(lane.ungrouped.length)}</span>
             </div>
           )}
-          {lane.groups.map(group => (
-            <div key={group.name} className="dsh-task-compact-row">
+          {lane.groups.map(({ group, tasks }) => (
+            <div key={group.id} className="dsh-task-compact-row">
               <span className="dsh-task-compact-name">{group.name}</span>
-              <span className="dsh-task-compact-count">{countText(group.tasks.length)}</span>
+              <span className="dsh-task-compact-count">{countText(tasks.length)}</span>
             </div>
           ))}
           {total === 0 ? <p className="dsh-task-empty">{t('task.emptyLane')}</p> : null}
@@ -200,50 +208,61 @@ export function TaskColumn({
       data-collapsed={collapsed}
     >
       {header}
-      <div className="dsh-task-list" onDoubleClick={handleDoubleClick}>
-        <div className="dsh-task-ungrouped" data-group-drop="">
+      <div
+        className="dsh-task-list"
+        onDoubleClick={handleDoubleClick}
+        onDragOver={(event) => {
+          if (groupDrag === null) return
+          event.preventDefault()
+          setDropIndex(lane.groups.length)
+        }}
+        onDrop={(event) => {
+          if (groupDrag === null) return
+          event.preventDefault()
+          onGroupDrop(status, lane.groups.length)
+          setDropIndex(null)
+        }}
+      >
+        <div className="dsh-task-ungrouped" data-group-id="">
           {cards(lane.ungrouped)}
           {draftIn(undefined) ? <DraftCard t={t} onCommit={onCommitDraft} onCancel={onCancelDraft} /> : null}
+          {lane.ungrouped.length === 0 && lane.groups.length > 0 && dropTarget?.status === status && dropTarget.groupId === undefined
+            ? <p className="dsh-task-ungrouped-hint">{t('task.group.ungroupedHint')}</p>
+            : null}
         </div>
-        {lane.groups.map((group, index) => {
-          const groupCollapsed = isGroupCollapsed(status, group.name)
-          const over = dropTarget?.status === status && dropTarget.group === group.name
-          const draggingThis = groupDrag !== null && groupDrag.status === status && groupDrag.name === group.name
+        {lane.groups.map(({ group, tasks }, index) => {
+          const groupCollapsed = isGroupCollapsed(group.id)
+          const over = dropTarget?.status === status && dropTarget.groupId === group.id
+          const draggingThis = groupDrag?.id === group.id
           return (
             <div
-              key={group.name}
+              key={group.id}
               className="dsh-task-group"
               data-over={over}
               data-drop={dropIndex === index}
               data-dragging={draggingThis}
-              onDragOver={(event) => {
-                if (groupDrag === null || groupDrag.status !== status) return
-                event.preventDefault()
-                setDropIndex(index)
-              }}
+              onDragOver={(event) => handleGroupDragOver(event, index)}
               onDragLeave={(event) => {
-                // Only clear when the pointer really leaves this group (not when it enters a child).
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropIndex(null)
               }}
               onDrop={(event) => {
+                if (groupDrag === null) return
                 event.preventDefault()
+                event.stopPropagation()
                 onGroupDrop(status, index)
                 setDropIndex(null)
               }}
             >
-              <div className="dsh-task-group-head" data-group-drop={group.name}>
+              <div className="dsh-task-group-head" data-group-id={group.id}>
                 <span
                   className="dsh-task-group-grip"
                   draggable
                   title={t('task.group.drag')}
                   onDragStart={(event) => {
-                    event.dataTransfer?.setData('text/plain', group.name)
-                    onGroupDragStart(status, group.name)
+                    event.dataTransfer?.setData('text/plain', group.id)
+                    onGroupDragStart(group)
                   }}
-                  onDragEnd={() => {
-                    onGroupDragEnd()
-                    setDropIndex(null)
-                  }}
+                  onDragEnd={onGroupDragEnd}
                 >
                   <svg viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
                     <circle cx="3" cy="3" r="1" /><circle cx="7" cy="3" r="1" />
@@ -256,13 +275,13 @@ export function TaskColumn({
                   className="dsh-task-add"
                   aria-label={groupCollapsed ? t('task.group.expand') : t('task.group.collapse')}
                   title={groupCollapsed ? t('task.group.expand') : t('task.group.collapse')}
-                  onClick={() => onToggleGroup(status, group.name)}
+                  onClick={() => onToggleGroup(group.id)}
                 >
                   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
                     {groupCollapsed ? <path d="M7 8l3 3 3-3" /> : <path d="M7 11l3-3 3 3" />}
                   </svg>
                 </button>
-                {editingGroup === group.name
+                {editingGroup === group.id
                   ? (
                       <input
                         className="dsh-task-group-input"
@@ -270,7 +289,7 @@ export function TaskColumn({
                         autoFocus
                         onBlur={(event) => {
                           setEditingGroup(null)
-                          onRenameGroup(status, group.name, event.currentTarget.value)
+                          onRenameGroup(group, event.currentTarget.value)
                         }}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter') event.currentTarget.blur()
@@ -286,19 +305,19 @@ export function TaskColumn({
                         type="button"
                         className="dsh-task-group-name"
                         title={t('task.group.rename')}
-                        onDoubleClick={() => setEditingGroup(group.name)}
+                        onDoubleClick={() => setEditingGroup(group.id)}
                       >
                         {group.name}
                       </button>
                     )}
-                <span className="dsh-task-count">{countText(group.tasks.length)}</span>
+                <span className="dsh-task-count">{countText(tasks.length)}</span>
                 <div className="dsh-task-group-actions">
                   <button
                     type="button"
                     className="dsh-desk-iconbtn dsh-desk-iconbtn-sm"
                     aria-label={t('task.add')}
                     title={t('task.add')}
-                    onClick={() => onAdd(status, group.name)}
+                    onClick={() => onAdd(status, group.id)}
                   >
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
                       <path d="M10 4.5v11M4.5 10h11" />
@@ -306,10 +325,15 @@ export function TaskColumn({
                   </button>
                   <button
                     type="button"
-                    className="dsh-desk-iconbtn dsh-desk-iconbtn-sm"
-                    aria-label={t('task.group.remove')}
-                    title={t('task.group.remove')}
-                    onClick={() => onRemoveGroup(status, group.name)}
+                    className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-iconbtn-danger"
+                    data-confirm={confirmGroup === group.id}
+                    aria-label={confirmGroup === group.id ? t('task.group.removeConfirm') : t('task.group.remove')}
+                    title={confirmGroup === group.id ? t('task.group.removeConfirm') : t('task.group.remove')}
+                    onClick={() => {
+                      if (confirmGroup === group.id) onRemoveGroup(group)
+                      else setConfirmGroup(group.id)
+                    }}
+                    onBlur={() => setConfirmGroup(null)}
                   >
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
                       <path d="M5 5l10 10M15 5L5 15" />
@@ -320,10 +344,10 @@ export function TaskColumn({
               {groupCollapsed
                 ? null
                 : (
-                    <div className="dsh-task-group-body" data-group-drop={group.name}>
-                      {cards(group.tasks)}
-                      {draftIn(group.name) ? <DraftCard t={t} onCommit={onCommitDraft} onCancel={onCancelDraft} /> : null}
-                      {group.tasks.length === 0 && !draftIn(group.name)
+                    <div className="dsh-task-group-body" data-group-id={group.id}>
+                      {cards(tasks)}
+                      {draftIn(group.id) ? <DraftCard t={t} onCommit={onCommitDraft} onCancel={onCancelDraft} /> : null}
+                      {tasks.length === 0 && !draftIn(group.id)
                         ? <p className="dsh-task-group-empty">{t('task.group.dropHint')}</p>
                         : null}
                     </div>

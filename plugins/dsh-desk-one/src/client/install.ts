@@ -12,7 +12,9 @@ import type { InjectFace, LocaleDictOf, PropsLocale, PropsRuntime, SlotComponent
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { hasCapability, warnMissingCapabilities } from './compat.js'
 import { LOCALE_NAMESPACE, PACKAGE_NAME, PANEL_ID, PANEL_ORDER } from '../constants.js'
-import type { DeskNote, DeskTask, CreateTaskRequest, TaskPatchRequest } from '../contract.js'
+import type {
+  DeskNote, DeskTask, DeskTaskGroup, CreateTaskRequest, TaskGroupPatchRequest, TaskPatchRequest,
+} from '../contract.js'
 import { attachMainPanel } from './panel.js'
 import { ensureDeskStyles } from './styles.js'
 
@@ -52,6 +54,20 @@ export interface DeskPanelInjected {
     readonly patch: TaskPatchRequest
   }) => Promise<DeskTask>
   readonly deleteTask: (id: string) => Promise<void>
+  readonly listGroups: () => Promise<readonly DeskTaskGroup[]>
+  readonly createGroup: (input: { readonly name?: string; readonly status?: string; readonly order?: number }) => Promise<DeskTaskGroup>
+  readonly updateGroup: (input: {
+    readonly id: string
+    readonly expectedRevision: number
+    readonly patch: TaskGroupPatchRequest
+  }) => Promise<DeskTaskGroup>
+  readonly moveGroup: (input: {
+    readonly id: string
+    readonly expectedRevision: number
+    readonly status: string
+    readonly order?: number
+  }) => Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }>
+  readonly deleteGroup: (id: string) => Promise<void>
 }
 
 /** 入口注入的浏览器侧件（由 index.ts 提供；测试可传桩）。 */

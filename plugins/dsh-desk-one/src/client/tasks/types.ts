@@ -1,31 +1,30 @@
-/** Board-only view types, lane ordering and one-level grouping. */
+/** Board-only view types: lanes contain ungrouped cards plus first-class groups. */
 
-import type { DeskTask, TaskStatus } from '../../contract.js'
-import { sortTasks } from '../../model.js'
+import type { DeskTask, DeskTaskGroup, TaskStatus } from '../../contract.js'
+import { sortGroups, sortTasks } from '../../model.js'
 
 export const TASK_LANE_ORDER: readonly TaskStatus[] = ['todo', 'doing', 'done']
 
 export type TaskSortMode = 'manual' | 'created' | 'due'
 
 export interface LaneGroup {
-  readonly name: string
+  readonly group: DeskTaskGroup
   readonly tasks: readonly DeskTask[]
 }
 
-/** One lane as rendered: ungrouped cards first, then the named groups in their stored order. */
+/** One lane as rendered: ungrouped cards first, then groups in their persisted order. */
 export interface LaneView {
   readonly ungrouped: readonly DeskTask[]
   readonly groups: readonly LaneGroup[]
 }
 
 export type LaneViews = Readonly<Record<TaskStatus, LaneView>>
-export type GroupOrder = Readonly<Record<TaskStatus, readonly string[]>>
 
 /**
- * Lane order for a view mode. Manual is the persisted order; the other modes are view-only
- * overrides (they never write back to the tasks' `order`).
+ * Ordering inside one container. Manual is the persisted `order`; the other modes are view-only
+ * overrides that never write back.
  */
-export function sortLane(tasks: readonly DeskTask[], mode: TaskSortMode): DeskTask[] {
+export function sortContainer(tasks: readonly DeskTask[], mode: TaskSortMode): DeskTask[] {
   if (mode === 'manual') return sortTasks(tasks)
   if (mode === 'created') return [...tasks].sort((left, right) =>
     left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id))
@@ -36,37 +35,32 @@ export function sortLane(tasks: readonly DeskTask[], mode: TaskSortMode): DeskTa
   })
 }
 
-/** Group one lane's tasks: ungrouped first, then groups in the stored order (unknown names last). */
-function buildLane(tasks: readonly DeskTask[], mode: TaskSortMode, groups: readonly string[]): LaneView {
-  const sorted = sortLane(tasks, mode)
-  const ungrouped = sorted.filter(task => task.group === undefined)
-  const names = [...groups]
-  for (const task of sorted) {
-    if (task.group !== undefined && !names.includes(task.group)) names.push(task.group)
-  }
-  return {
-    ungrouped,
-    groups: names
-      .map(name => ({ name, tasks: sorted.filter(task => task.group === name) }))
-      .filter(group => group.tasks.length > 0 || groups.includes(group.name)),
-  }
-}
-
-/** Group all non-archived tasks into the three fixed lanes, applying the per-lane group order. */
+/**
+ * Group every non-archived task into its lane/group container. Groups are a host-side list, so
+ * empty groups render too; unknown membership (stale id) falls back to the ungrouped area.
+ */
 export function groupLanes(
   tasks: readonly DeskTask[],
+  groups: readonly DeskTaskGroup[],
   mode: TaskSortMode,
-  groupOrder: GroupOrder,
 ): LaneViews {
   const active = tasks.filter(task => !task.archived)
-  return {
-    todo: buildLane(active.filter(task => task.status === 'todo'), mode, groupOrder.todo),
-    doing: buildLane(active.filter(task => task.status === 'doing'), mode, groupOrder.doing),
-    done: buildLane(active.filter(task => task.status === 'done'), mode, groupOrder.done),
+  const known = new Set(groups.map(group => group.id))
+  const build = (status: TaskStatus): LaneView => {
+    const laneTasks = active.filter(task => task.status === status)
+    const orderedGroups = sortGroups(groups.filter(group => group.status === status))
+    return {
+      ungrouped: sortContainer(laneTasks.filter(task => task.groupId === undefined || !known.has(task.groupId)), mode),
+      groups: orderedGroups.map(group => ({
+        group,
+        tasks: sortContainer(laneTasks.filter(task => task.groupId === group.id), mode),
+      })),
+    }
   }
+  return { todo: build('todo'), doing: build('doing'), done: build('done') }
 }
 
-/** Flatten a lane into its rendered card sequence (used to recompute `order` after a move). */
+/** Flatten one rendered lane into the order used for manual renumbering. */
 export function laneSequence(lane: LaneView): DeskTask[] {
   return [...lane.ungrouped, ...lane.groups.flatMap(group => [...group.tasks])]
 }

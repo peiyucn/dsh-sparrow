@@ -483,4 +483,36 @@ export const TASKS_CSS = `
   font-size: 12px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
+/* Cross-lane group move: an explicit confirmation bar, plus an undo bar after the move. */
+.dsh-task-movebar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  border-radius: var(--dsw-radius-md, 12px);
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 86%, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6));
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+  line-height: 18px;
+}
+.dsh-task-movebar-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Cards-drag feedback for the ungrouped drop zone (always present so ungrouping is discoverable). */
+.dsh-task-ungrouped-hint {
+  margin: 2px 4px;
+  padding: 6px 8px;
+  border: 1px dashed var(--dsw-alias-border-l2, #cfd4dc);
+  border-radius: var(--dsw-radius-sm, 8px);
+  text-align: center;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
 `

@@ -1,15 +1,19 @@
 /**
- * Task board: toolbar (sort view, archive), three fixed lanes with one-level groups, pointer
- * drag with a card-shaped ghost that follows the cursor (and flies back on an invalid drop),
- * double-click-to-add, and the archive view.
+ * Task board: toolbar, three lanes with first-class groups, pointer card drag (straight ghost),
+ * HTML5 group drag (reorder within a lane; cross-lane asks for confirmation and can be undone),
+ * double-click-to-add and the archive view.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { TASK_BOARD_COMPACT_WIDTH } from '../../../constants.js'
-import type { CreateTaskRequest, DeskTask, TaskPatchRequest, TaskStatus } from '../../../contract.js'
+import type {
+  CreateTaskGroupRequest, CreateTaskRequest, DeskTask, DeskTaskGroup, TaskGroupPatchRequest, TaskPatchRequest,
+  TaskStatus,
+} from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
 import { TaskColumn, type DropTarget } from './TaskColumn.js'
+import { useGroupsData } from '../hooks/useGroupsData.js'
 import { useTaskBoard } from '../hooks/useTaskBoard.js'
 import { useTasksData } from '../hooks/useTasksData.js'
 import { TASK_LANE_ORDER, type TaskSortMode } from '../types.js'
@@ -19,6 +23,20 @@ export interface TaskBoardInjected {
   readonly createTask: (input: CreateTaskRequest) => Promise<DeskTask>
   readonly updateTask: (input: { id: string; expectedRevision: number; patch: TaskPatchRequest }) => Promise<DeskTask>
   readonly deleteTask: (id: string) => Promise<void>
+  readonly listGroups: () => Promise<readonly DeskTaskGroup[]>
+  readonly createGroup: (input: CreateTaskGroupRequest) => Promise<DeskTaskGroup>
+  readonly updateGroup: (input: {
+    id: string
+    expectedRevision: number
+    patch: TaskGroupPatchRequest
+  }) => Promise<DeskTaskGroup>
+  readonly moveGroup: (input: {
+    id: string
+    expectedRevision: number
+    status: string
+    order?: number
+  }) => Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }>
+  readonly deleteGroup: (id: string) => Promise<void>
 }
 
 interface TaskBoardProps extends TaskBoardInjected {
@@ -90,9 +108,35 @@ function createGhost(card: HTMLElement): HTMLElement {
   return ghost
 }
 
+interface PendingGroupMove {
+  readonly group: DeskTaskGroup
+  readonly status: TaskStatus
+  readonly order: number
+  readonly count: number
+}
+
+interface LastGroupMove {
+  readonly group: DeskTaskGroup
+  readonly name: string
+  readonly fromStatus: TaskStatus
+  readonly fromOrder: number
+  readonly toStatus: TaskStatus
+  readonly count: number
+}
+
 export function TaskBoard(props: TaskBoardProps): ReactElement {
-  const { t, listTasks, createTask, updateTask, deleteTask } = props
+  const {
+    t, listTasks, createTask, updateTask, deleteTask,
+    listGroups, createGroup: createGroupApi, updateGroup, moveGroup, deleteGroup,
+  } = props
   const data = useTasksData(t, { listTasks, createTask, updateTask, deleteTask })
+  const groupsData = useGroupsData(t, {
+    listGroups,
+    createGroup: createGroupApi,
+    updateGroup,
+    moveGroup,
+    deleteGroup,
+  })
   const board = useTaskBoard({
     tasks: data.tasks,
     setTasks: data.setTasks,
@@ -100,14 +144,22 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     addTask: data.addTask,
     removeWithFeedback: data.removeWithFeedback,
     setActionError: data.setActionError,
+    groups: groupsData.groups,
+    createGroup: groupsData.createGroup,
+    renameGroup: groupsData.renameGroup,
+    reorderGroups: groupsData.reorderGroups,
+    removeGroup: groupsData.removeGroup,
+    moveGroupToLane: groupsData.moveGroupToLane,
+    reloadGroups: groupsData.reload,
   })
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
+  const [groupDrag, setGroupDrag] = useState<DeskTaskGroup | null>(null)
+  const [pendingMove, setPendingMove] = useState<PendingGroupMove | null>(null)
+  const [lastMove, setLastMove] = useState<LastGroupMove | null>(null)
   /** Below the threshold the three lanes collapse into count-only columns (no horizontal scroll). */
   const [compact, setCompact] = useState(false)
   const lanesRef = useRef<HTMLDivElement | null>(null)
-  /** Group header being dragged for reordering. */
-  const [groupDrag, setGroupDrag] = useState<{ status: TaskStatus; name: string } | null>(null)
 
   useEffect(() => {
     const element = lanesRef.current
@@ -117,7 +169,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     const observer = new ResizeObserver(update)
     observer.observe(element)
     return () => { observer.disconnect() }
-  }, [data.loading])
+  }, [data.loading, groupsData.loading])
 
   const sortOptions = useMemo<readonly { mode: TaskSortMode; label: string }[]>(() => [
     { mode: 'manual', label: t('task.sort.manual') },
@@ -125,17 +177,17 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     { mode: 'due', label: t('task.sort.due') },
   ], [t])
 
-  /** Resolve the lane/group under the pointer plus the insertion index within that zone. */
+  /** Resolve the lane/group under the pointer plus the insertion index within that container. */
   const resolveDrop = useCallback((x: number, y: number): { target: DropTarget; index: number } | null => {
     const element = document.elementFromPoint(x, y) as HTMLElement | null
     const lane = element?.closest<HTMLElement>('[data-lane]')
     if (lane === null || lane === undefined) return null
     const status = lane.dataset.lane as TaskStatus | undefined
     if (status === undefined) return null
-    const zone = element?.closest<HTMLElement>('[data-group-drop]')
-    const group = zone?.dataset.groupDrop === undefined || zone.dataset.groupDrop === ''
+    const zone = element?.closest<HTMLElement>('[data-group-id]')
+    const groupId = zone?.dataset.groupId === undefined || zone.dataset.groupId === ''
       ? undefined
-      : zone.dataset.groupDrop
+      : zone.dataset.groupId
     const scope = zone ?? lane.querySelector<HTMLElement>('.dsh-task-ungrouped')
     const cards = scope === null ? [] : [...scope.querySelectorAll<HTMLElement>('.dsh-task-card')]
     let index = cards.length
@@ -146,7 +198,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
         break
       }
     }
-    return { target: { status, ...group === undefined ? {} : { group } }, index }
+    return { target: { status, ...groupId === undefined ? {} : { groupId } }, index }
   }, [])
 
   /** Whole-card pointer drag: ghost follows the pointer, invalid drops fly back to the card. */
@@ -204,7 +256,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
       }
       ghost.remove()
       card.style.visibility = ''
-      board.moveTask(task.id, latest.target.status, latest.target.group, latest.index)
+      board.moveTask(task.id, latest.target.status, latest.target.groupId, latest.index)
     }
     const onCancel = (): void => {
       cleanup()
@@ -219,18 +271,69 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     window.addEventListener('keydown', onKey)
   }, [board, resolveDrop])
 
-  if (data.loadError !== null) {
+  const groupCardCount = useCallback(
+    (group: DeskTaskGroup): number => data.tasks.filter(task => task.groupId === group.id && !task.archived).length,
+    [data.tasks],
+  )
+
+  /** Group drop: same lane reorders immediately; another lane asks for confirmation first. */
+  const handleGroupDrop = useCallback((status: TaskStatus, toIndex: number): void => {
+    const group = groupDrag
+    setGroupDrag(null)
+    if (group === null) return
+    if (group.status === status) {
+      board.reorderGroup(status, group.id, toIndex)
+      return
+    }
+    setPendingMove({ group, status, order: toIndex, count: groupCardCount(group) })
+  }, [board, groupCardCount, groupDrag])
+
+  const confirmGroupMove = useCallback(async (): Promise<void> => {
+    const pending = pendingMove
+    if (pending === null) return
+    setPendingMove(null)
+    const result = await board.moveGroupWhole(pending.group, pending.status, pending.order)
+    if (result === null) return
+    setLastMove({
+      group: result.group,
+      name: pending.group.name,
+      fromStatus: pending.group.status,
+      fromOrder: pending.group.order,
+      toStatus: pending.status,
+      count: pending.count,
+    })
+  }, [board, pendingMove])
+
+  const undoGroupMove = useCallback(async (): Promise<void> => {
+    const move = lastMove
+    if (move === null) return
+    setLastMove(null)
+    const latest = groupsData.groups.find(group => group.id === move.group.id) ?? move.group
+    await board.moveGroupWhole(latest, move.fromStatus, move.fromOrder)
+  }, [board, groupsData.groups, lastMove])
+
+  const loading = data.loading || groupsData.loading
+  const loadError = data.loadError ?? groupsData.loadError
+  const actionError = data.actionError ?? groupsData.actionError
+
+  if (loadError !== null) {
     return (
       <div className="dsh-desk-tasksview">
-        <p className="dsh-desk-error">{t('state.loadFailed', { message: data.loadError })}</p>
-        <button type="button" className="dsh-desk-btn" onClick={() => { void data.reload() }}>{t('action.retry')}</button>
+        <p className="dsh-desk-error">{t('state.loadFailed', { message: loadError })}</p>
+        <button
+          type="button"
+          className="dsh-desk-btn"
+          onClick={() => { void data.reload(); void groupsData.reload() }}
+        >
+          {t('action.retry')}
+        </button>
       </div>
     )
   }
 
   return (
     <div className="dsh-desk-tasksview">
-      {data.actionError === null ? null : <p className="dsh-desk-error">{data.actionError}</p>}
+      {actionError === null ? null : <p className="dsh-desk-error">{actionError}</p>}
       <div className="dsh-task-toolbar">
         {board.showArchive
           ? (
@@ -280,42 +383,72 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
             </div>
           )
         : (
-            <div className="dsh-task-lanes" data-loading={data.loading} data-compact={compact} ref={lanesRef}>
-              {TASK_LANE_ORDER.map(status => (
-                <TaskColumn
-                  key={status}
-                  status={status}
-                  title={t(LANE_LABEL_KEY[status])}
-                  lane={board.lanes[status]}
-                  compact={compact}
-                  collapsed={status === 'done' && board.doneCollapsed}
-                  draft={board.draft}
-                  dropTarget={dropTarget}
-                  draggingId={draggingId}
-                  groupDrag={groupDrag}
-                  t={t}
-                  onAdd={board.beginDraft}
-                  onToggleCollapse={board.toggleDone}
-                  onCommitDraft={board.commitDraft}
-                  onCancelDraft={board.cancelDraft}
-                  onStartDrag={startDrag}
-                  onPatch={data.savePatch}
-                  onArchive={board.archiveTask}
-                  onDelete={board.deleteTask}
-                  isGroupCollapsed={board.isGroupCollapsed}
-                  onToggleGroup={board.toggleGroup}
-                  onCreateGroup={board.createGroup}
-                  onRenameGroup={board.renameGroup}
-                  onRemoveGroup={board.removeGroup}
-                  onGroupDragStart={(status, name) => setGroupDrag({ status, name })}
-                  onGroupDragEnd={() => setGroupDrag(null)}
-                  onGroupDrop={(status, toIndex) => {
-                    if (groupDrag !== null && groupDrag.status === status) board.moveGroup(status, groupDrag.name, toIndex)
-                    setGroupDrag(null)
-                  }}
-                />
-              ))}
-            </div>
+            <>
+              {pendingMove === null ? null : (
+                <div className="dsh-task-movebar" role="alertdialog" aria-label={t('task.group.moveTitle')}>
+                  <span className="dsh-task-movebar-text">
+                    {t('task.group.moveConfirm', {
+                      name: pendingMove.group.name,
+                      count: pendingMove.count,
+                      status: t(LANE_LABEL_KEY[pendingMove.status]),
+                    })}
+                  </span>
+                  <button type="button" className="dsh-task-tool" onClick={() => { void confirmGroupMove() }}>
+                    {t('task.group.moveAction')}
+                  </button>
+                  <button type="button" className="dsh-task-tool" onClick={() => setPendingMove(null)}>
+                    {t('action.cancel')}
+                  </button>
+                </div>
+              )}
+              {lastMove === null ? null : (
+                <div className="dsh-task-movebar">
+                  <span className="dsh-task-movebar-text">
+                    {t('task.group.moved', {
+                      name: lastMove.name,
+                      count: lastMove.count,
+                      status: t(LANE_LABEL_KEY[lastMove.toStatus]),
+                    })}
+                  </span>
+                  <button type="button" className="dsh-task-tool" onClick={() => { void undoGroupMove() }}>
+                    {t('task.group.undo')}
+                  </button>
+                </div>
+              )}
+              <div className="dsh-task-lanes" data-loading={loading} data-compact={compact} ref={lanesRef}>
+                {TASK_LANE_ORDER.map(status => (
+                  <TaskColumn
+                    key={status}
+                    status={status}
+                    title={t(LANE_LABEL_KEY[status])}
+                    lane={board.lanes[status]}
+                    compact={compact}
+                    collapsed={status === 'done' && board.doneCollapsed}
+                    draft={board.draft}
+                    dropTarget={dropTarget}
+                    draggingId={draggingId}
+                    groupDrag={groupDrag}
+                    t={t}
+                    onAdd={board.beginDraft}
+                    onToggleCollapse={board.toggleDone}
+                    onCommitDraft={board.commitDraft}
+                    onCancelDraft={board.cancelDraft}
+                    onStartDrag={startDrag}
+                    onPatch={data.savePatch}
+                    onArchive={board.archiveTask}
+                    onDelete={board.deleteTask}
+                    isGroupCollapsed={board.isGroupCollapsed}
+                    onToggleGroup={board.toggleGroup}
+                    onCreateGroup={board.createGroup}
+                    onRenameGroup={board.renameGroup}
+                    onRemoveGroup={board.removeGroup}
+                    onGroupDragStart={setGroupDrag}
+                    onGroupDragEnd={() => { setGroupDrag(null); setPendingMove(null) }}
+                    onGroupDrop={handleGroupDrop}
+                  />
+                ))}
+              </div>
+            </>
           )}
     </div>
   )
