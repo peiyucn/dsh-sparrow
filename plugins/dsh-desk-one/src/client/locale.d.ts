@@ -26,6 +26,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'note.placeholder'
       | 'state.loading'
       | 'wall.tip'
+      | 'wall.tipAlt'
       | 'state.loadFailed'
       | 'state.saveFailed'
   }

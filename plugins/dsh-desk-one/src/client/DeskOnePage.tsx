@@ -509,7 +509,14 @@ export function DeskOnePage(props: DeskPanelProps) {
                 >
                   {loading
                     ? <p className="dsh-desk-wall-hint">{t('state.loading')}</p>
-                    : <p className="dsh-desk-wall-tip">{t('wall.tip')}</p>}
+                    : activeNotes.length === 0
+                      ? (
+                          <p className="dsh-desk-wall-tip">
+                            <span className="dsh-desk-wall-tip-main">{t('wall.tip')}</span>
+                            <span className="dsh-desk-wall-tip-sub">{t('wall.tipAlt')}</span>
+                          </p>
+                        )
+                      : null}
                   {placed.map(renderNote)}
                 </div>
               )}

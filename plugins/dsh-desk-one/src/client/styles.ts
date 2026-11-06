@@ -88,32 +88,42 @@ html[data-platform='darwin'] .dsh-desk-head {
   min-height: 0;
   padding-bottom: 96px;
 }
-/* 墙面：一块可见的背板（细边 + 宿主圆角 + 主题自适应淡色底面），贴纸不再飘在虚空里。
-   正好占满剩余高度、**不滚动**；贴纸坐标一律夹在背板内。 */
+/* 墙面：正好占满剩余高度、**不滚动**；贴纸坐标一律夹在可见区域内。
+   不加背板（owner 2026-11-06：背板显脏且缩小操作面积），沿用页面本身的干净底。 */
 .dsh-desk-wall {
   position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: var(--dsw-radius-xl, 20px);
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 94%, var(--dsw-alias-label-primary, #1f2329));
 }
-/* 背板中央的轻提示：双击新建；不拦截鼠标事件。 */
+/* 空墙中央的轻提示：双层排版（主提示 + 次提示），颜色压到很浅，不抢贴纸。 */
 .dsh-desk-wall-tip {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   margin: 0;
   padding: 0 16px;
   text-align: center;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  opacity: 0.7;
   pointer-events: none;
   user-select: none;
+}
+.dsh-desk-wall-tip-main {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 26%, transparent);
+}
+.dsh-desk-wall-tip-sub {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 16%, transparent);
 }
 .dsh-desk-wall-hint {
   position: absolute;

@@ -25,7 +25,7 @@ English | [简体中文](README.zh-CN.md)
 ## Use
 
 * **Overview** is a blank placeholder for now; the app opens on the notes wall instead of an empty page.
-* Notes are pinned onto a visible board. Tap the floating **＋** or double-click empty space on the board: a fresh sticky appears at that spot, lands on top of the pile and takes the keyboard focus. The board centre shows a faint hint for this.
+* Tap the floating **＋** or double-click empty space on the wall: a fresh sticky appears at that spot, lands on top of the pile and takes the keyboard focus. The empty wall shows a faint two-line hint for this.
 * The wall never scrolls: notes are always kept inside the visible area, even after you resize the window.
 * Type straight onto the sticky; leaving it saves the text, and an emptied sticky is removed instead of kept as clutter.
 * Drag a sticky by its body; a compact six-dot grip at the top-left marks the grab area. Whichever sticky you click or drag comes to the front, and that layer order is saved too.

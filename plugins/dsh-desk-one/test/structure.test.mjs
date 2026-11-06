@@ -131,12 +131,16 @@ describe('dsh-desk-one 结构', () => {
     const wallRule = /\.dsh-desk-wall \{([^}]*)\}/u.exec(styles)
     assert.ok(wallRule !== null, '缺 .dsh-desk-wall 规则')
     assert.match(wallRule[1], /overflow:\s*hidden/u, '墙面必须裁切不滚动（贴纸一律夹在可见区域内）')
-    // owner 2026-11-06：便签墙要有可见背板，贴纸不能飘在虚空里；空白处双击新建。
-    assert.match(wallRule[1], /border:\s*1px solid/u, '便签墙要有可见背板（细边）')
-    assert.match(wallRule[1], /--dsw-radius-xl/u, '背板用宿主大圆角')
+    // owner 2026-11-06：不要背板（显脏且缩小操作面积）；双击空白新建 + 淡提示保留。
+    assert.ok(!/border:\s*1px/u.test(wallRule[1]), '墙面不得再加背板边框')
+    assert.ok(!/background:/u.test(wallRule[1]), '墙面不得再加背板底色')
     assert.match(page, /onDoubleClick/u, '便签墙要支持双击空白处新建')
-    assert.match(page, /wall\.tip/u, '背板中央要有双击新建提示')
+    assert.match(page, /wall\.tip/u, '空墙中央要有双击新建提示')
     assert.match(page, /z:\s*layer/u, '新建便签要带层级（默认置顶）')
+    const tipRule = /\.dsh-desk-wall-tip-main \{([^}]*)\}/u.exec(styles)
+    assert.ok(tipRule !== null, '缺提示主文案样式')
+    assert.match(tipRule[1], /letter-spacing/u, '提示文案要有排版设计（字距）')
+    assert.match(tipRule[1], /color-mix\(/u, '提示颜色要压到很浅（color-mix 透明度）')
     assert.ok(!/dsh-desk-canvas/u.test(page), '不得再有可滚动的画布容器')
     // 真实便签是方角纸片，不是大圆角卡片。
     const noteRule = /\.dsh-desk-note \{([^}]*)\}/u.exec(styles)
