@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   DeskModelError, createNoteRecord, filterNotes, normalizeNoteInput, patchNoteRecord, sortNotes,
-} from '../lib/model.js'
-import { NOTE_MAX_SIZE, NOTE_MIN_WIDTH } from '../lib/constants.js'
+} from '../../lib/model.js'
+import { NOTE_MAX_SIZE, NOTE_MIN_WIDTH } from '../../lib/constants.js'
 
 /** 造一条合法便签记录（时间可覆盖，便于排序断言）。 */
 const note = (over = {}) => ({

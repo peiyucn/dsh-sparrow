@@ -8,10 +8,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import type { DeskNote } from '../../contract.js'
-import type { DeskPanelInjected } from '../install.js'
-import type { DeskTranslator } from '../types.js'
-import { messageOf } from '../utils.js'
+import type { DeskNote } from '../../../contract.js'
+import type { DeskPanelInjected } from '../../install.js'
+import type { DeskTranslator } from '../../app/types.js'
+import { messageOf } from '../../app/utils.js'
 
 type Patch = Parameters<DeskPanelInjected['updateNote']>[0]['patch']
 type Actions = Pick<DeskPanelInjected, 'listNotes' | 'updateNote' | 'deleteNote'>

@@ -5,10 +5,10 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH } from '../../constants.js'
-import type { DeskNote } from '../../contract.js'
-import type { PlacedNote, WallSize } from '../types.js'
-import { clamp, fallbackPosition } from '../utils.js'
+import { NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH } from '../../../constants.js'
+import type { DeskNote } from '../../../contract.js'
+import type { PlacedNote, WallSize } from '../../app/types.js'
+import { clamp, fallbackPosition } from '../../app/utils.js'
 
 export interface WallLayout {
   /** Mutable ref: the page attaches it with a callback ref so both React 18/19 type shapes work. */

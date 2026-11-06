@@ -7,7 +7,7 @@
  */
 
 import type { ReactElement } from 'react'
-import type { DeskTranslator } from '../types.js'
+import type { DeskTranslator } from '../../app/types.js'
 
 interface WallActionsProps {
   readonly showTrash: boolean

@@ -106,8 +106,8 @@ if (runTest) {
   // 注意：--test 的第一个位置参数起，后续 token 都会被当作测试模式，
   // reporter 参数必须放在 glob 前面（放后面会被静默吞掉，junit.xml 不产出）。
   const testArgs = process.env.CI
-    ? ['--test', '--test-reporter=junit', '--test-reporter-destination=junit.xml', 'test/*.test.mjs']
-    : ['--test', 'test/*.test.mjs']
+    ? ['--test', '--test-reporter=junit', '--test-reporter-destination=junit.xml', 'test/**/*.test.mjs']
+    : ['--test', 'test/**/*.test.mjs']
   const test = spawnSync(process.execPath, testArgs, {
     cwd,
     stdio: 'inherit',

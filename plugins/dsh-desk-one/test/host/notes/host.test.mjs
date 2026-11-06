@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import { Readable } from 'node:stream'
 import { describe, it } from 'node:test'
 import { DomainError } from '@deepseek-ai/dsh-storage-domain'
-import { apply, inject, name } from '../lib/host.js'
-import { ROUTES } from '../lib/constants.js'
+import { apply, inject, name } from '../../../lib/host.js'
+import { ROUTES } from '../../../lib/constants.js'
 
 /**
  * 官方存储域的 KV 桩：只实现 DeskStore 用到的 handle（get/entries/keys/size/put/delete/update）。

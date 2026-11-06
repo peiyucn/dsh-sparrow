@@ -7,9 +7,9 @@
 
 import { useEffect, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
-import { NOTE_COLORS } from '../../constants.js'
-import type { DeskNote, NoteColor } from '../../contract.js'
-import type { DeskTranslator, PlacedNote } from '../types.js'
+import { NOTE_COLORS } from '../../../constants.js'
+import type { DeskNote, NoteColor } from '../../../contract.js'
+import type { DeskTranslator, PlacedNote } from '../../app/types.js'
 
 interface NoteCardProps {
   readonly item: PlacedNote

@@ -10,9 +10,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import { MAX_TRASH_NOTES, TRASH_PAGE_SIZE } from '../../constants.js'
-import type { DeskNote } from '../../contract.js'
-import type { DeskTranslator } from '../types.js'
+import { MAX_TRASH_NOTES, TRASH_PAGE_SIZE } from '../../../constants.js'
+import type { DeskNote } from '../../../contract.js'
+import type { DeskTranslator } from '../../app/types.js'
 
 /** Whole-wall animation window: enough for the 260ms keyframes plus the stagger. */
 const SMASH_ANIMATION_MS = 480

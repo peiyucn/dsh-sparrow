@@ -6,13 +6,13 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
-import { DESK_DOMAIN } from '../domain.js'
-import { MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NODES_TABLE, PACKAGE_NAME } from '../constants.js'
+import { DESK_DOMAIN } from '../../domain.js'
+import { MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NODES_TABLE, PACKAGE_NAME } from '../../constants.js'
 import {
   DeskModelError, createNoteRecord, filterNotes, normalizeCoordinate, normalizeLayer, normalizeNoteInput, patchNoteRecord,
   sortNotes, type NotePatch,
-} from '../model.js'
-import type { DeskNote } from '../contract.js'
+} from '../../model.js'
+import type { DeskNote } from '../../contract.js'
 
 type DeskDomain = Domain<typeof DESK_DOMAIN>
 

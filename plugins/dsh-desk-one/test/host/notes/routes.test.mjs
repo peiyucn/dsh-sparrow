@@ -2,9 +2,9 @@
 import assert from 'node:assert/strict'
 import { Readable } from 'node:stream'
 import { describe, it } from 'node:test'
-import { DeskModelError } from '../lib/model.js'
-import { createDeskRequestHandler } from '../lib/host/routes.js'
-import { ROUTES } from '../lib/constants.js'
+import { DeskModelError } from '../../../lib/model.js'
+import { createDeskRequestHandler } from '../../../lib/host/router.js'
+import { ROUTES } from '../../../lib/constants.js'
 
 /** 最小 Context 桩：路由只用到 logger 与可选服务读取。 */
 const fakeContext = () => ({

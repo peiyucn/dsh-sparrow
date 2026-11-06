@@ -5,7 +5,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { PACKAGE_NAME, NOTE_COLORS } from '../constants.js'
+import { PACKAGE_NAME, NOTE_COLORS } from '../../constants.js'
 import type { DeskStore } from './store.js'
 
 /** 工具输出统一用字符串（JSON 文本），render 原样交给对话区。 */

@@ -4,9 +4,9 @@
  */
 
 import type { ReactElement } from 'react'
-import type { DeskNote } from '../../contract.js'
-import type { DeskTranslator } from '../types.js'
-import { formatDate } from '../utils.js'
+import type { DeskNote } from '../../../contract.js'
+import type { DeskTranslator } from '../../app/types.js'
+import { formatDate } from '../../app/utils.js'
 
 interface TrashPanelProps {
   readonly trashedNotes: readonly DeskNote[]

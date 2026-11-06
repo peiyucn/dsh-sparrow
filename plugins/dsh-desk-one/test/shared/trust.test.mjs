@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   assertTrustedAuthority, isLoopbackHostname, isTrustedAuthority, isTrustedPluginRequest, parseAuthority,
-} from '../lib/trust.js'
+} from '../../lib/trust.js'
 
 describe('信任栅栏：Host / Origin / sec-fetch-site', () => {
   it('parseAuthority 应该 拒绝不可解析的 authority', () => {

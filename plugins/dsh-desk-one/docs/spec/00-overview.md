@@ -37,6 +37,34 @@ DSH Web 里的个人「办公桌」（Desk One）套件：一个侧栏入口、�
 | 10 | 设置 Settings | 连接配置、同步状态、导入导出、关于 | — | S0（连接卡 S2 补） |
 | 11 | Agent 工具层 | 跨模块工具，读写同一套对象 | 全部 | S0 起随模块 |
 
+## 代码结构（按功能模块）
+
+共享一套对象模型，功能按目录隔离；新功能（任务板 / 日程 / 专注）照此扩展，不往便签目录里堆。
+
+```text
+src/
+  constants.ts contract.ts domain.ts model.ts trust.ts   # 共享：统一对象模型与安全基线
+  host.ts index.ts                                        # host 入口 / 公共再导出
+  host/
+    gates.ts http.ts router.ts                            # 装配：能力门 / HTTP 基础 / 前缀路由（含信任栅栏）
+    notes/{store,routes,tools}.ts                          # 便签功能的 host 半（路由表由 router 挂载）
+  client/
+    index.ts install.ts panel.ts icon.tsx compat.ts       # 入口与客户端装配
+    i18n.ts locale.d.ts                                   # 共享文案（键按功能命名空间）
+    app/{DeskOnePage.tsx,types.ts,utils.ts,styles.ts}      # 面板外壳：页头 / 标签 / 空态 / 外壳样式
+    notes/{api.ts,components/*,hooks/*,styles.ts}          # 便签功能的 client 半
+    styles.ts                                             # 聚合注入：app + 各功能 CSS
+test/
+  shared/{model,trust}.test.mjs
+  host/notes/{host,routes}.test.mjs
+  client/compat.test.mjs
+  structure.test.mjs                                      # 结构守卫（拼接全部 client 源码）
+```
+
+* 约定：**新功能 = `src/client/<feature>/` + `src/host/<feature>/` + `test/<layer>/<feature>/`**；只有真正跨功能的东西才放在 `src/` 根或 `client/app/`。
+* CSS：外壳在 `client/app/styles.ts`、功能在 `client/<feature>/styles.ts`，由 `client/styles.ts` 聚合；结构测试按功能文件读取。
+* 测试发现：仓库 `scripts/verify.mjs` 使用 `test/**/*.test.mjs`，支持按功能分子目录。
+
 ## 模块协同（关键路径）
 
 * **便签 → 任务**：`derivedFrom` 边；转任务后原便签保留可回溯。

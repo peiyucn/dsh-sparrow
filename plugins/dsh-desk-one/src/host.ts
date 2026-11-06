@@ -6,9 +6,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { PREFIX } from './constants.js'
 import { assertHostGates } from './host/gates.js'
-import { createDeskRequestHandler } from './host/routes.js'
-import { DeskStore } from './host/store.js'
-import { registerDeskTools } from './host/tools.js'
+import { createDeskRequestHandler } from './host/router.js'
+import { DeskStore } from './host/notes/store.js'
+import { registerDeskTools } from './host/notes/tools.js'
 
 export const name = 'dsh-desk-one'
 export const inject = ['webServer', 'storageDomain', 'tools']

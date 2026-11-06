@@ -1,6 +1,6 @@
 /** Small pure helpers shared by the wall page, hooks and components. */
 
-import { TAB_STORAGE_KEY } from '../constants.js'
+import { TAB_STORAGE_KEY } from '../../constants.js'
 import type { Tab } from './types.js'
 
 export const messageOf = (reason: unknown): string => reason instanceof Error ? reason.message : String(reason)

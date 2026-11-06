@@ -1,8 +1,8 @@
 // @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { assertCapabilities, missingCapabilities } from '../lib/compat.js'
-import { hasCapability, missingCapabilities as missingClientCapabilities, warnMissingCapabilities } from '../lib/client/compat.js'
+import { assertCapabilities, missingCapabilities } from '../../lib/compat.js'
+import { hasCapability, missingCapabilities as missingClientCapabilities, warnMissingCapabilities } from '../../lib/client/compat.js'
 
 /** 收集告警的最小 ctx 桩。 */
 const fakeCtx = () => {

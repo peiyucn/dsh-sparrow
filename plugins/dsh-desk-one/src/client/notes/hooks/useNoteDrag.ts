@@ -8,11 +8,11 @@
 
 import { useCallback } from 'react'
 import type { Dispatch, PointerEvent as ReactPointerEvent, SetStateAction } from 'react'
-import { NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH } from '../../constants.js'
-import type { DeskNote } from '../../contract.js'
-import type { DeskPanelInjected } from '../install.js'
-import type { PlacedNote, WallSize } from '../types.js'
-import { clamp } from '../utils.js'
+import { NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH } from '../../../constants.js'
+import type { DeskNote } from '../../../contract.js'
+import type { DeskPanelInjected } from '../../install.js'
+import type { PlacedNote, WallSize } from '../../app/types.js'
+import { clamp } from '../../app/utils.js'
 
 type Patch = Parameters<DeskPanelInjected['updateNote']>[0]['patch']
 

@@ -1,7 +1,7 @@
 /** 浏览器侧数据面：只走 host 自有 REST 路由（客户端不直接碰存储）。 */
 
-import { REQUEST_TIMEOUT_MS, ROUTES } from '../constants.js'
-import type { ApiErrorPayload, DeskNote, NoteDeleteResponse, NoteListResponse, NoteMutationResponse } from '../contract.js'
+import { REQUEST_TIMEOUT_MS, ROUTES } from '../../constants.js'
+import type { ApiErrorPayload, DeskNote, NoteDeleteResponse, NoteListResponse, NoteMutationResponse } from '../../contract.js'
 
 /** 带超时的 JSON 请求；非 2xx 抛带服务端 message 的错误（失败路径用户可见）。 */
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
