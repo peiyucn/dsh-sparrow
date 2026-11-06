@@ -53,6 +53,7 @@ export function TaskCard({
   const [editing, setEditing] = useState<EditableField | null>(null)
   const [editingDue, setEditingDue] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
 
   const remaining = task.due === undefined ? undefined : daysUntil(task.due.date)
   const overdue = remaining !== undefined && remaining < 0
@@ -64,6 +65,26 @@ export function TaskCard({
     if (editing === 'title') autoGrow(titleRef.current)
     if (editing === 'body') autoGrow(bodyRef.current)
   }, [editing])
+
+  // Colour palette: close on outside press / Esc (same dismissal rule as other popovers).
+  useEffect(() => {
+    if (!paletteOpen) return
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target
+      if (target instanceof Element
+        && (target.closest('.dsh-task-color-pop') !== null || target.closest('[data-color-anchor]') !== null)) return
+      setPaletteOpen(false)
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setPaletteOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [paletteOpen])
 
   return (
     <article
@@ -144,13 +165,36 @@ export function TaskCard({
           type="button"
           className="dsh-task-color"
           data-color={task.color}
-          aria-label={t(`color.${task.color}`)}
-          title={t(`color.${task.color}`)}
-          onClick={() => {
-            const index = NOTE_COLORS.indexOf(task.color)
-            onPatch(task, { color: NOTE_COLORS[(index + 1) % NOTE_COLORS.length] })
-          }}
+          data-color-anchor="true"
+          aria-label={t('task.color')}
+          aria-haspopup="true"
+          aria-expanded={paletteOpen}
+          title={t('task.color')}
+          onClick={() => setPaletteOpen(open => !open)}
         />
+        {paletteOpen
+          ? (
+              <div className="dsh-task-color-pop" role="listbox" aria-label={t('task.color')}>
+                {NOTE_COLORS.map(color => (
+                  <button
+                    key={color}
+                    type="button"
+                    role="option"
+                    aria-selected={task.color === color}
+                    className="dsh-task-color-swatch"
+                    data-color={color}
+                    data-active={task.color === color}
+                    aria-label={t(`color.${color}`)}
+                    title={t(`color.${color}`)}
+                    onClick={() => {
+                      setPaletteOpen(false)
+                      if (color !== task.color) onPatch(task, { color })
+                    }}
+                  />
+                ))}
+              </div>
+            )
+          : null}
         {editingDue
           ? (
               <input

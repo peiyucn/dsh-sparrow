@@ -215,11 +215,7 @@ export function TaskColumn({
     >
       {header}
       <div className="dsh-task-list" onDoubleClick={handleDoubleClick}>
-        <div
-          className="dsh-task-ungrouped"
-          data-group-id=""
-          data-over={dropTarget?.status === status && dropTarget.groupId === undefined}
-        >
+        <div className="dsh-task-ungrouped" data-group-id="">
           {cards(lane.ungrouped, dropTarget?.status === status && dropTarget.groupId === undefined ? dropTarget.index : null)}
           {draftIn(undefined) ? <DraftCard t={t} onCommit={onCommitDraft} onCancel={onCancelDraft} /> : null}
           {lane.ungrouped.length === 0 && lane.groups.length > 0 && dropTarget?.status === status && dropTarget.groupId === undefined

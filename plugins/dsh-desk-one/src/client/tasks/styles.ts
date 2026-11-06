@@ -137,15 +137,6 @@ export const TASKS_CSS = `
   flex-direction: column;
   gap: 6px;
   min-height: 4px;
-  border-radius: var(--dsw-radius-md, 12px);
-  transition: outline-color 0.12s ease;
-  outline: 1px solid transparent;
-}
-/* Card drag hovering the ungrouped area: make "will land here" unmistakable. */
-.dsh-task-ungrouped[data-over='true'] {
-  outline-color: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 60%, transparent);
-  outline-style: dashed;
-  outline-offset: 2px;
 }
 /* Precise insertion line for card drags (before a card / after the last one). */
 .dsh-task-card-dropmark {
@@ -246,11 +237,42 @@ export const TASKS_CSS = `
   opacity: 0.65;
 }
 .dsh-task-foot {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
   min-height: 20px;
   margin-top: 2px;
+}
+.dsh-task-color-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: -4px;
+  z-index: 20;
+  display: flex;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  border-radius: var(--dsw-radius-md, 12px);
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+  box-shadow: 0 10px 26px -14px rgba(20, 25, 40, 0.45);
+}
+.dsh-task-color-swatch {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.dsh-task-color-swatch[data-color='default'] { background: #787774; }
+.dsh-task-color-swatch[data-color='yellow'] { background: #c29343; }
+.dsh-task-color-swatch[data-color='green'] { background: #548164; }
+.dsh-task-color-swatch[data-color='blue'] { background: #487ca5; }
+.dsh-task-color-swatch[data-color='pink'] { background: #b35488; }
+.dsh-task-color-swatch[data-active='true'] {
+  box-shadow: 0 0 0 2px var(--dsw-alias-bg-layer-1, #ffffff), 0 0 0 3.5px rgba(55, 53, 47, 0.55);
 }
 .dsh-task-color {
   appearance: none;
