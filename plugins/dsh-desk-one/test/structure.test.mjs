@@ -85,6 +85,8 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(!/border-radius:\s*10px/u.test(noteRule[1]), '便签不得回到 10px 大圆角')
     // 改大小手柄 + 层级置顶 + 标签页记忆都在页面里。
     assert.match(page, /dsh-desk-note-resize/u, '便签必须有右下角改大小手柄')
+    assert.match(page, /dsh-desk-note-grip/u, '便签必须有可见的抓取提示（六点抓握纹）')
+    assert.match(page, /action\.drag/u, '抓取提示要带「拖动摆放」的可访问名')
     assert.match(page, /zIndex/u, '点/拖哪张就置顶需要 zIndex')
     assert.match(page, /TAB_STORAGE_KEY/u, '上次停留的标签页要记住')
     assert.match(page, /localStorage/u)

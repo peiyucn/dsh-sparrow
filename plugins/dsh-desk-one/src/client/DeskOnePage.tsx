@@ -323,6 +323,7 @@ export function DeskOnePage(props: DeskPanelProps) {
       }}
     >
       <div className="dsh-desk-note-bar">
+        <span className="dsh-desk-note-grip" role="img" aria-label={t('action.drag')} title={t('action.drag')} />
         <div className="dsh-desk-note-colors">
           {NOTE_COLORS.map(color => (
             <button

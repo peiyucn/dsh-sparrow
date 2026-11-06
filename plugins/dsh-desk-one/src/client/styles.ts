@@ -100,42 +100,67 @@ html[data-platform='darwin'] .dsh-desk-head {
   color: var(--dsw-alias-label-tertiary, #8a919f);
   pointer-events: none;
 }
-/* 贴纸：便签墙的基本单位。真实便签是方角纸片，不做大圆角；尺寸由用户拖动改，内联 style 给宽高。 */
+/* 贴纸：便签墙的基本单位。真实便签是方角纸片，不做大圆角；尺寸由用户拖动改，内联 style 给宽高。
+   配色走低饱和纸色调（暖纸白 / 奶油黄 / 鼠尾草绿 / 雾蓝 / 藕粉），叠加顶部纸光与细边，避免高饱和塑料感。 */
 .dsh-desk-note {
   position: absolute;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   padding: 6px 10px 10px 12px;
+  border: 1px solid rgba(35, 39, 51, 0.07);
   border-radius: 2px;
-  background: #f5f5f2;
-  color: #2d2b26;
-  box-shadow: 0 3px 8px rgba(25, 30, 45, 0.18), 0 1px 2px rgba(25, 30, 45, 0.12);
+  background-color: #f3f1ec;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 58%);
+  color: #2b2926;
+  box-shadow: 0 1px 2px rgba(24, 28, 40, 0.08), 0 10px 20px -12px rgba(24, 28, 40, 0.35);
   cursor: grab;
   user-select: none;
   touch-action: none;
-  transition: box-shadow 0.12s ease;
+  transition: box-shadow 0.14s ease;
 }
 .dsh-desk-note:hover {
-  box-shadow: 0 6px 16px rgba(25, 30, 45, 0.22), 0 1px 2px rgba(25, 30, 45, 0.12);
+  box-shadow: 0 2px 4px rgba(24, 28, 40, 0.1), 0 16px 28px -16px rgba(24, 28, 40, 0.45);
 }
 .dsh-desk-note:active {
   cursor: grabbing;
 }
-.dsh-desk-note[data-color='yellow'] { background: #fff0a8; }
-.dsh-desk-note[data-color='green'] { background: #d8f0cf; }
-.dsh-desk-note[data-color='blue'] { background: #d7e6fb; }
-.dsh-desk-note[data-color='pink'] { background: #fbdce6; }
+.dsh-desk-note[data-color='yellow'] { background-color: #f2e4bd; }
+.dsh-desk-note[data-color='green'] { background-color: #dce8d8; }
+.dsh-desk-note[data-color='blue'] { background-color: #d9e3ef; }
+.dsh-desk-note[data-color='pink'] { background-color: #efdde2; }
 .dsh-desk-note-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 20px;
+  gap: 8px;
+  height: 22px;
   margin-bottom: 2px;
+}
+/* 抓取提示：左上角六点抓握纹 + grab 光标，一眼看出「抓这里拖」。
+   始终可见（低透明度），悬停变清楚；它本身也在拖拽命中范围内。 */
+.dsh-desk-note-grip {
+  flex: none;
+  width: 22px;
+  height: 14px;
+  border-radius: 4px;
+  cursor: grab;
+  opacity: 0.4;
+  background-image: radial-gradient(circle, rgba(43, 41, 38, 0.6) 1px, transparent 1.2px);
+  background-size: 7px 7px;
+  background-position: 1px 1px;
+  transition: opacity 0.12s ease, background-color 0.12s ease;
+}
+.dsh-desk-note:hover .dsh-desk-note-grip {
+  opacity: 0.75;
+  background-color: rgba(43, 41, 38, 0.06);
+}
+.dsh-desk-note:active .dsh-desk-note-grip {
+  cursor: grabbing;
 }
 .dsh-desk-note-colors {
   display: flex;
-  gap: 4px;
+  gap: 5px;
+  margin-left: auto;
   opacity: 0;
   transition: opacity 0.12s ease;
 }
@@ -145,20 +170,24 @@ html[data-platform='darwin'] .dsh-desk-head {
 }
 .dsh-desk-dot {
   appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   padding: 0;
   border-radius: 50%;
-  border: 2px solid transparent;
+  border: 1px solid rgba(35, 39, 51, 0.12);
   cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
-.dsh-desk-dot[data-color='default'] { background: #d9d9d4; }
-.dsh-desk-dot[data-color='yellow'] { background: #f2d35a; }
-.dsh-desk-dot[data-color='green'] { background: #7fc98c; }
-.dsh-desk-dot[data-color='blue'] { background: #7ba6ea; }
-.dsh-desk-dot[data-color='pink'] { background: #ec9cb8; }
+.dsh-desk-dot:hover {
+  transform: scale(1.12);
+}
+.dsh-desk-dot[data-color='default'] { background: #cfcabe; }
+.dsh-desk-dot[data-color='yellow'] { background: #e6cf8f; }
+.dsh-desk-dot[data-color='green'] { background: #a9c8a6; }
+.dsh-desk-dot[data-color='blue'] { background: #a8bfdc; }
+.dsh-desk-dot[data-color='pink'] { background: #dcb2c0; }
 .dsh-desk-dot[data-active='true'] {
-  border-color: rgba(30, 30, 30, 0.5);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 0 0 3px rgba(43, 41, 38, 0.45);
 }
 .dsh-desk-note-close {
   appearance: none;
@@ -167,17 +196,17 @@ html[data-platform='darwin'] .dsh-desk-head {
   padding: 0 2px;
   font-size: 16px;
   line-height: 1;
-  color: rgba(45, 43, 38, 0.45);
+  color: rgba(43, 41, 38, 0.4);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity 0.12s ease, color 0.12s ease;
 }
 .dsh-desk-note:hover .dsh-desk-note-close,
 .dsh-desk-note:focus-within .dsh-desk-note-close {
   opacity: 1;
 }
 .dsh-desk-note-close:hover {
-  color: var(--dsw-alias-state-error-primary, #c62828);
+  color: #a33b35;
 }
 .dsh-desk-note-body {
   box-sizing: border-box;
@@ -195,6 +224,9 @@ html[data-platform='darwin'] .dsh-desk-head {
   font-size: 14px;
   line-height: 21px;
   cursor: text;
+}
+.dsh-desk-note-body::placeholder {
+  color: rgba(43, 41, 38, 0.32);
 }
 /* 右下角改大小手柄（悬停 / 聚焦时才显示，避免墙上到处是角标）。 */
 .dsh-desk-note-resize {
@@ -305,12 +337,13 @@ html[data-platform='darwin'] .dsh-desk-head {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #d9d9d4;
+  background: #cfcabe;
+  border: 1px solid rgba(35, 39, 51, 0.1);
 }
-.dsh-desk-recent-dot[data-color='yellow'] { background: #f2d35a; }
-.dsh-desk-recent-dot[data-color='green'] { background: #7fc98c; }
-.dsh-desk-recent-dot[data-color='blue'] { background: #7ba6ea; }
-.dsh-desk-recent-dot[data-color='pink'] { background: #ec9cb8; }
+.dsh-desk-recent-dot[data-color='yellow'] { background: #e6cf8f; }
+.dsh-desk-recent-dot[data-color='green'] { background: #a9c8a6; }
+.dsh-desk-recent-dot[data-color='blue'] { background: #a8bfdc; }
+.dsh-desk-recent-dot[data-color='pink'] { background: #dcb2c0; }
 .dsh-desk-recent-text {
   overflow: hidden;
   text-overflow: ellipsis;

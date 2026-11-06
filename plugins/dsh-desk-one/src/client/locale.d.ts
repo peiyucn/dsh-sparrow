@@ -9,6 +9,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'tab.notes'
       | 'action.newNote'
       | 'action.delete'
+      | 'action.drag'
       | 'action.retry'
       | 'color.default'
       | 'color.yellow'
