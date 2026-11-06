@@ -103,6 +103,12 @@ describe('dsh-desk-one 结构', () => {
     const stackRule = /\.dsh-desk-fabstack \{([^}]*)\}/u.exec(styles)
     assert.ok(stackRule !== null, '缺 .dsh-desk-fabstack 规则')
     assert.match(stackRule[1], /position:\s*absolute/u, '悬浮操作组固定在右下角')
+    assert.match(stackRule[1], /flex-direction:\s*row/u, '垃圾桶与「＋」必须同一排')
+    assert.match(addRule[1], /width:\s*48px/u, '「＋」与垃圾桶同尺寸')
+    const fabRule = /\.dsh-desk-fab-secondary \{([^}]*)\}/u.exec(styles)
+    assert.ok(fabRule !== null, '缺 .dsh-desk-fab-secondary 规则')
+    assert.match(fabRule[1], /width:\s*48px/u, '垃圾桶与「＋」同尺寸')
+    assert.match(fabRule[1], /--dsw-radius-lg/u, '两者圆角 token 一致')
     // 贴纸不出屏：墙面不滚动，不得再有可滚动画布。
     const wallRule = /\.dsh-desk-wall \{([^}]*)\}/u.exec(styles)
     assert.ok(wallRule !== null, '缺 .dsh-desk-wall 规则')

@@ -85,7 +85,7 @@ html[data-platform='darwin'] .dsh-desk-head {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  padding-bottom: 140px;
+  padding-bottom: 96px;
 }
 /* 墙面：正好占满剩余高度、**不滚动**；贴纸坐标一律夹在可见区域内。 */
 .dsh-desk-wall {
@@ -299,8 +299,8 @@ html[data-platform='darwin'] .dsh-desk-head {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   padding: 0;
   border: none;
   border-radius: var(--dsw-radius-lg, 16px);
@@ -313,8 +313,8 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-add svg {
   display: block;
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 .dsh-desk-add:hover {
   filter: brightness(0.94);
@@ -326,14 +326,14 @@ html[data-platform='darwin'] .dsh-desk-head {
   opacity: 0.6;
   cursor: default;
 }
-/* 右下角操作组：垃圾桶入口与「＋」贴在一起，不再各飘各的。 */
+/* 右下角操作组：垃圾桶与「＋」同一排、同一尺寸与圆角，风格一致。 */
 .dsh-desk-fabstack {
   position: absolute;
   right: 28px;
   bottom: 28px;
   z-index: 2;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: 10px;
 }
@@ -342,15 +342,15 @@ html[data-platform='darwin'] .dsh-desk-head {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   padding: 0;
   border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
   border-radius: var(--dsw-radius-lg, 16px);
   background: var(--dsw-alias-bg-layer-1, #ffffff);
   color: var(--dsw-alias-label-secondary, #6b7280);
   cursor: pointer;
-  box-shadow: 0 4px 12px -6px rgba(20, 25, 40, 0.25);
+  box-shadow: 0 8px 20px -12px rgba(20, 25, 40, 0.3);
   transition: background 0.12s ease, color 0.12s ease;
 }
 .dsh-desk-fab-secondary svg {
