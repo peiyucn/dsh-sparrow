@@ -4,7 +4,7 @@
  * surface. The lane collapses to a count-only column below the compact threshold.
  */
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent, PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import type { DeskTask, DeskTaskGroup, TaskPatchRequest, TaskStatus } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
@@ -92,7 +92,29 @@ export function TaskColumn({
   const [editingGroup, setEditingGroup] = useState<string | null>(null)
   const [confirmGroup, setConfirmGroup] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const [groupDragOver, setGroupDragOver] = useState(false)
   const laneOver = dropTarget?.status === status && dropTarget.groupId === undefined
+
+  // The drag source clears groupDrag on dragend; the target lane must stop highlighting then.
+  useEffect(() => {
+    if (groupDrag === null) setGroupDragOver(false)
+  }, [groupDrag])
+
+  /** Drag the whole group as one unit: the drag image is the group header (name + count). */
+  const startGroupDrag = (event: ReactDragEvent<HTMLElement>, group: DeskTaskGroup): void => {
+    const transfer = event.dataTransfer
+    transfer?.setData('text/plain', group.id)
+    const head = (event.currentTarget as HTMLElement).closest<HTMLElement>('.dsh-task-group-head')
+    if (head !== null && transfer !== undefined && transfer !== null && typeof transfer.setDragImage === 'function') {
+      const ghost = head.cloneNode(true) as HTMLElement
+      ghost.classList.add('dsh-task-group-dragimage')
+      ghost.style.width = `${head.getBoundingClientRect().width}px`
+      document.body.appendChild(ghost)
+      transfer.setDragImage(ghost, 14, 12)
+      window.setTimeout(() => ghost.remove(), 0)
+    }
+    onGroupDragStart(group)
+  }
   const draftIn = (groupId?: string): boolean => draft !== null && draft.status === status && draft.groupId === groupId
   const total = lane.ungrouped.length + lane.groups.reduce((sum, group) => sum + group.tasks.length, 0)
   /** Counts read as labels ("3 tasks") instead of bare numbers — singular handled separately. */
@@ -204,8 +226,26 @@ export function TaskColumn({
     <section
       className="dsh-task-lane"
       data-lane={status}
-      data-over={laneOver}
+      data-over={laneOver || groupDragOver}
       data-collapsed={collapsed}
+      onDragOver={(event) => {
+        if (groupDrag === null) return
+        event.preventDefault()
+        setGroupDragOver(true)
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setGroupDragOver(false)
+      }}
+      onDrop={(event) => {
+        // Lane header / empty compact area: append at the end. Drops inside the list are handled
+        // by the list/group handlers (which stop propagation), so this is only a fallback.
+        if (groupDrag === null) return
+        const target = event.target as HTMLElement
+        if (target.closest('.dsh-task-list') !== null) return
+        event.preventDefault()
+        setGroupDragOver(false)
+        onGroupDrop(status, lane.groups.length)
+      }}
     >
       {header}
       <div
@@ -258,10 +298,7 @@ export function TaskColumn({
                   className="dsh-task-group-grip"
                   draggable
                   title={t('task.group.drag')}
-                  onDragStart={(event) => {
-                    event.dataTransfer?.setData('text/plain', group.id)
-                    onGroupDragStart(group)
-                  }}
+                  onDragStart={(event) => startGroupDrag(event, group)}
                   onDragEnd={onGroupDragEnd}
                 >
                   <svg viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">

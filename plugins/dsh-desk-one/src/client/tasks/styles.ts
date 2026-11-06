@@ -335,15 +335,33 @@ export const TASKS_CSS = `
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 14px;
-  height: 20px;
+  width: 16px;
+  height: 22px;
+  margin-left: -2px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
   cursor: grab;
-  opacity: 0;
+  opacity: 0.45;
   transition: opacity 0.12s ease;
 }
 .dsh-task-group-head:hover .dsh-task-group-grip {
-  opacity: 0.8;
+  opacity: 0.95;
+}
+.dsh-task-group-grip:active {
+  cursor: grabbing;
+}
+/* Drag image for a whole-group drag: a floating copy of the group header. */
+.dsh-task-group-dragimage {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  border-radius: var(--dsw-radius-md, 12px);
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+  box-shadow: 0 12px 28px -16px rgba(20, 25, 40, 0.5);
+  color: var(--dsw-alias-label-primary, #1f2329);
+  pointer-events: none;
 }
 .dsh-task-group-grip svg {
   display: block;

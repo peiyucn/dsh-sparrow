@@ -398,6 +398,7 @@ describe('dsh-desk-one 结构', () => {
     const groupsHook = await read('src/client/tasks/hooks/useGroupsData.ts')
     const boardHook = await read('src/client/tasks/hooks/useTaskBoard.ts')
     const board = await read('src/client/tasks/components/TaskBoard.tsx')
+    const column = await read('src/client/tasks/components/TaskColumn.tsx')
     const styles = await readStyles()
     assert.match(contract, /export interface DeskTaskGroup/u, '分组是独立对象')
     assert.match(contract, /groupId\?: string/u, '任务用 groupId 记录成员关系')
@@ -413,6 +414,10 @@ describe('dsh-desk-one 结构', () => {
     assert.match(boardHook, /task\.status === toStatus/u, '拖拽只重排目标容器')
     assert.match(board, /task\.group\.moveConfirm/u, '整组跨列要二次确认')
     assert.match(board, /undoGroupMove/u, '整组跨列可撤销')
+    assert.match(board, /onGroupDragEnd=\{\(\) => setGroupDrag\(null\)\}/u, 'dragend 不能清掉待确认状态（浏览器 drop 后紧跟 dragend）')
+    assert.match(column, /setDragImage/u, '整组拖动要有整组拖影')
+    assert.match(column, /dsh-task-group-dragimage/u)
+    assert.match(column, /laneOver \|\| groupDragOver/u, '跨列时目标泳道要高亮')
     assert.match(styles, /\.dsh-task-movebar \{/u)
   })
 

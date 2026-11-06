@@ -442,8 +442,8 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
                     onCreateGroup={board.createGroup}
                     onRenameGroup={board.renameGroup}
                     onRemoveGroup={board.removeGroup}
-                    onGroupDragStart={setGroupDrag}
-                    onGroupDragEnd={() => { setGroupDrag(null); setPendingMove(null) }}
+                    onGroupDragStart={(group) => { setGroupDrag(group); setPendingMove(null) }}
+                    onGroupDragEnd={() => setGroupDrag(null)}
                     onGroupDrop={handleGroupDrop}
                   />
                 ))}
