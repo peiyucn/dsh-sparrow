@@ -50,6 +50,7 @@ export interface TaskBoardApi {
   readonly createGroup: (status: TaskStatus, name: string) => void
   readonly renameGroup: (status: TaskStatus, from: string, to: string) => void
   readonly removeGroup: (status: TaskStatus, name: string) => void
+  readonly moveGroup: (status: TaskStatus, name: string, toIndex: number) => void
 }
 
 const emptyGroupOrder = (): GroupOrder => ({ todo: [], doing: [], done: [] })
@@ -227,6 +228,22 @@ export function useTaskBoard({
     }
   }, [savePatch, tasks])
 
+  /** Reorder a lane's groups (drag a group header up/down). Membership lives on tasks, so this is UI-only. */
+  const moveGroup = useCallback((status: TaskStatus, name: string, toIndex: number): void => {
+    setGroups((current) => {
+      const list = [...current[status]]
+      const from = list.indexOf(name)
+      if (from === -1) return current
+      list.splice(from, 1)
+      const index = Math.max(0, Math.min(toIndex, list.length))
+      if (index === from) return current
+      list.splice(index, 0, name)
+      const next = { ...current, [status]: list }
+      persist(TASK_GROUPS_STORAGE_KEY, next)
+      return next
+    })
+  }, [])
+
   /**
    * Move a task to (lane, group, index). Rebuilds the affected lanes' rendered sequence, assigns
    * sequential `order` values and patches only tasks whose order / status / group changed.
@@ -297,6 +314,6 @@ export function useTaskBoard({
     lanes, archivedTasks, sortMode, setSortMode, doneCollapsed, toggleDone,
     showArchive, toggleArchive, draft, beginDraft, cancelDraft, commitDraft,
     moveTask, archiveTask, restoreTask, deleteTask,
-    isGroupCollapsed, toggleGroup, createGroup, renameGroup, removeGroup,
+    isGroupCollapsed, toggleGroup, createGroup, renameGroup, removeGroup, moveGroup,
   }
 }

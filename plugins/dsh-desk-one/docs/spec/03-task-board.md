@@ -41,7 +41,8 @@ interface TaskPayload {
 
 ### 布局
 
-* 三列等宽横向排列；窄屏横向滚动（列布局的标准行为，与便签墙「不出屏」不同）。
+* 三列等宽横向排列，**不出横向滚动条**；容器宽度低于阈值（720px）时三列收成「计数列」——只显示列名与各分组条数，避免把面板挤成横向滚动。
+* 列内 / 存档列表可纵向滚动，但滚动条视觉隐藏（`scrollbar-width: none`）。
 * 列头：列名 + 计数 + 该列「＋」；点击在**该列**新建卡片并直接进入标题编辑。
 * 完成列支持**折叠**（折叠后只显示列头与计数）。
 
@@ -62,7 +63,8 @@ interface TaskPayload {
 ### 分组（一层）
 
 * 每个泳道内可建一层分组：列出「未分组」卡片，再按存储顺序列出分组；组卡片缩进并带分组名。
-* 分组头：折叠箭头（状态存 localStorage）、双击名称改名、计数、组内「＋新建」、删除分组（组内任务移回未分组）。
+* 分组头：六点拖动手柄（调整分组顺序，顺序存 localStorage）、折叠箭头（状态存 localStorage）、双击名称改名、计数、组内「＋新建」、删除分组（组内任务移回未分组）。
+* 分组容器有明确边框 / 底色 / 内边距，与未分组卡片区分；组内卡片左侧有竖线缩进。
 * 深色 / 浅色主题都使用宿主 token；空分组显示「拖到这里或双击新建」的落点。
 * 成员关系以任务 `group` 字段为唯一真值；分组名列表 / 折叠状态是纯界面偏好。
 
@@ -91,7 +93,8 @@ interface TaskPayload {
 ## 验收标准
 
 * 三列可见；列头「＋」或泳道空白处双击新建卡片，草稿可直接输入标题；列头计数正确。
-* 整卡拖拽带跟手幽灵卡；跨列改状态、列内 / 分组内改顺序、拖入 / 拖出分组，刷新 / 重启后保持；无效落点飞回原位；失败有提示。
+* 整卡拖拽带**直立**跟手幽灵卡；跨列改状态、列内 / 分组内改顺序、拖入 / 拖出分组，刷新 / 重启后保持；无效落点飞回原位；失败有提示。
+* 窄窗口（< 720px）下三列收成计数列，不出现横向滚动条；分组可拖动手柄调整顺序且刷新后保持。
 * 标题 / 描述自动换行，卡片随内容变高；只剩一天截止的卡片有琥珀色描边。
 * 分组可新建 / 改名 / 折叠 / 删除；删除分组后组内卡片回到未分组；分组状态刷新后保持。
 * 按创建时间 / 截止日期排序视图正确；切回手动排序恢复手排顺序。
@@ -117,6 +120,6 @@ interface TaskPayload {
 
 * 数据：`src/model.ts` 的任务归一化 / 创建 / 补丁 / 排序 / 过滤；`src/domain.ts` 的 nodes 表扩为 kind 判别联合；共享存储 `src/host/store.ts`。
 * host：`src/host/tasks/{routes,tools}.ts`（4 条 REST + 5 个 agent 工具）；`src/host/router.ts` 统一挂载。
-* 客户端：`src/client/tasks/{api,types,styles}.ts`、`hooks/{useTasksData,useTaskBoard}.ts`、`components/{TaskBoard,TaskColumn,TaskCard}.tsx`；页面标签 `总览 | 便签墙 | 任务板`。卡片为自动换行 textarea、整卡幽灵拖拽、完成列才可存档；分组为任务 `group` 字段 + localStorage 分组名 / 折叠状态。
+* 客户端：`src/client/tasks/{api,types,styles}.ts`、`hooks/{useTasksData,useTaskBoard}.ts`、`components/{TaskBoard,TaskColumn,TaskCard}.tsx`；页面标签 `总览 | 便签墙 | 任务板`。卡片为自动换行 textarea、整卡直立幽灵拖拽（便签拖动才做纸张倾斜）、完成列才可存档；分组为任务 `group` 字段 + localStorage 分组名 / 折叠状态 / 顺序；窄容器切换计数列。
 * 排序视图：手动 / 创建时间 / 截止日期；视图偏好存 `localStorage`（`dsh-desk-one:task-sort`）。
 * 命名：完成列的归档统一叫「存档」（工具名 `desk_task_archive` 保持英文 API 命名）。

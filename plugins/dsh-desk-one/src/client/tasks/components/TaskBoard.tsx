@@ -4,8 +4,9 @@
  * double-click-to-add, and the archive view.
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
+import { TASK_BOARD_COMPACT_WIDTH } from '../../../constants.js'
 import type { CreateTaskRequest, DeskTask, TaskPatchRequest, TaskStatus } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
 import { TaskColumn, type DropTarget } from './TaskColumn.js'
@@ -102,6 +103,21 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
   })
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
+  /** Below the threshold the three lanes collapse into count-only columns (no horizontal scroll). */
+  const [compact, setCompact] = useState(false)
+  const lanesRef = useRef<HTMLDivElement | null>(null)
+  /** Group header being dragged for reordering. */
+  const [groupDrag, setGroupDrag] = useState<{ status: TaskStatus; name: string } | null>(null)
+
+  useEffect(() => {
+    const element = lanesRef.current
+    if (element === null) return
+    const update = (): void => setCompact(element.clientWidth > 0 && element.clientWidth < TASK_BOARD_COMPACT_WIDTH)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    return () => { observer.disconnect() }
+  }, [data.loading])
 
   const sortOptions = useMemo<readonly { mode: TaskSortMode; label: string }[]>(() => [
     { mode: 'manual', label: t('task.sort.manual') },
@@ -264,17 +280,19 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
             </div>
           )
         : (
-            <div className="dsh-task-lanes" data-loading={data.loading}>
+            <div className="dsh-task-lanes" data-loading={data.loading} data-compact={compact} ref={lanesRef}>
               {TASK_LANE_ORDER.map(status => (
                 <TaskColumn
                   key={status}
                   status={status}
                   title={t(LANE_LABEL_KEY[status])}
                   lane={board.lanes[status]}
+                  compact={compact}
                   collapsed={status === 'done' && board.doneCollapsed}
                   draft={board.draft}
                   dropTarget={dropTarget}
                   draggingId={draggingId}
+                  groupDrag={groupDrag}
                   t={t}
                   onAdd={board.beginDraft}
                   onToggleCollapse={board.toggleDone}
@@ -289,6 +307,12 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
                   onCreateGroup={board.createGroup}
                   onRenameGroup={board.renameGroup}
                   onRemoveGroup={board.removeGroup}
+                  onGroupDragStart={(status, name) => setGroupDrag({ status, name })}
+                  onGroupDragEnd={() => setGroupDrag(null)}
+                  onGroupDrop={(status, toIndex) => {
+                    if (groupDrag !== null && groupDrag.status === status) board.moveGroup(status, groupDrag.name, toIndex)
+                    setGroupDrag(null)
+                  }}
                 />
               ))}
             </div>

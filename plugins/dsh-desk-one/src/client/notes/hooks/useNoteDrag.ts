@@ -48,6 +48,8 @@ export function useNoteDrag({ wallSize, wallRef, setNotes, savePatch }: DragDeps
     const maxX = Math.max(0, size.width - item.width)
     const maxY = Math.max(0, size.height - item.height)
     const element = event.currentTarget
+    // A slight tilt while dragging sells the "paper" metaphor; removed on drop/cancel.
+    element.dataset.dragging = 'true'
     let currentX = item.x
     let currentY = item.y
     let moved = false
@@ -66,6 +68,7 @@ export function useNoteDrag({ wallSize, wallRef, setNotes, savePatch }: DragDeps
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', finish)
       window.removeEventListener('pointercancel', finish)
+      delete element.dataset.dragging
       if (!moved) return
       setNotes(current => current.map(note => note.id === item.note.id
         ? { ...note, x: currentX, y: currentY }

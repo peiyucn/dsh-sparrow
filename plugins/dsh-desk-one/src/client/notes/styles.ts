@@ -84,6 +84,13 @@ export const NOTES_CSS = `
 .dsh-desk-note:active {
   cursor: grabbing;
 }
+/* Dragging a sticky tilts it slightly — the physical-paper cue the task board deliberately lacks. */
+.dsh-desk-note[data-dragging='true'] {
+  transform: rotate(-1.4deg);
+  box-shadow: 0 10px 26px -12px rgba(24, 28, 40, 0.45);
+  cursor: grabbing;
+  z-index: 100000;
+}
 /* 纸色取 Notion 深色色标的同色相中等深度（比色标浅一档、比旧版纸色深一档）：
    纸面负责“这是一张便签”，色标负责“这是哪个色”。 */
 .dsh-desk-note[data-color='default'] { background-color: #e4e0d9; }

@@ -359,6 +359,32 @@ describe('dsh-desk-one 结构', () => {
     assert.match(styles, /\.dsh-task-group-head \{/u)
   })
 
+  it('任务板 应该 无横向滚动条：窄宽度收成计数模式，分组可拖动排序', async () => {
+    const board = await read('src/client/tasks/components/TaskBoard.tsx')
+    const column = await read('src/client/tasks/components/TaskColumn.tsx')
+    const hook = await read('src/client/tasks/hooks/useTaskBoard.ts')
+    const styles = await readStyles()
+    const notesStyles = await read('src/client/notes/styles.ts')
+    const notesDrag = await read('src/client/notes/hooks/useNoteDrag.ts')
+    // No horizontal scrollbar; the compact threshold takes over instead.
+    assert.match(styles, /\.dsh-task-lanes \{[^}]*overflow: hidden/su)
+    assert.match(styles, /\.dsh-task-list \{[^}]*scrollbar-width: none/su, '内部滚动条隐藏但可滚动')
+    assert.match(board, /TASK_BOARD_COMPACT_WIDTH/u)
+    assert.match(board, /data-compact=\{compact\}/u)
+    assert.match(column, /data-compact="true"/u, '紧凑泳道只显示计数')
+    assert.match(column, /dsh-task-compact-row/u)
+    assert.match(styles, /\.dsh-task-compact-row \{/u)
+    // Group headers reorder by drag.
+    assert.match(column, /dsh-task-group-grip/u, '分组要有拖动手柄')
+    assert.match(column, /draggable/u)
+    assert.match(column, /onGroupDrop/u)
+    assert.match(hook, /const moveGroup = useCallback/u)
+    // Task ghost is straight; the sticky-note drag gets the paper tilt instead.
+    assert.ok(!/\.dsh-task-ghost \{[^}]*rotate/su.test(styles), '任务幽灵卡不要倾斜')
+    assert.match(notesStyles, /\.dsh-desk-note\[data-dragging='true'\] \{[^}]*rotate/su)
+    assert.match(notesDrag, /dataset\.dragging = 'true'/u)
+  })
+
   it('页面 应该 用一个面板承载标签页，而不是弹窗', async () => {
     const page = await readClientSurface()
     assert.match(page, /dsh-desk-tabs/u)

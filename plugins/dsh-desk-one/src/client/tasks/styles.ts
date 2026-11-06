@@ -46,17 +46,17 @@ export const TASKS_CSS = `
   min-height: 0;
   display: flex;
   gap: 12px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  /* No horizontal scrollbar: below the threshold the lanes switch to their compact form. */
+  overflow: hidden;
 }
-/* Lanes are equal columns; the header stays put while the card list scrolls. */
+/* Lanes are equal columns; the header stays put while the card list scrolls (scrollbars hidden). */
 .dsh-task-lane {
   flex: 1 1 0;
-  min-width: 260px;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 8px;
+  padding: 10px 10px 8px;
   border-radius: var(--dsw-radius-lg, 16px);
   background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 90%, var(--dsw-alias-label-primary, #1f2329));
 }
@@ -111,8 +111,23 @@ export const TASKS_CSS = `
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding: 2px;
+  scrollbar-width: none;
+}
+.dsh-task-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.dsh-task-archive {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.dsh-task-archive::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 .dsh-task-lane[data-collapsed='true'] .dsh-task-list {
   flex: none;
@@ -271,7 +286,7 @@ export const TASKS_CSS = `
 .dsh-task-ghost {
   box-sizing: border-box;
   opacity: 0.94;
-  transform: rotate(-1.5deg) scale(1.02);
+  transform: scale(1.02);
   box-shadow: 0 14px 32px -16px rgba(20, 25, 40, 0.5);
   cursor: grabbing;
 }
@@ -283,39 +298,70 @@ export const TASKS_CSS = `
   border-radius: var(--dsw-radius-md, 12px);
   background: transparent;
 }
-/* One-level groups inside a lane. */
+/* One-level groups inside a lane: a bordered container so a group reads as a real block. */
 .dsh-task-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 6px 8px 8px;
+  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
   border-radius: var(--dsw-radius-md, 12px);
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 82%, var(--dsw-alias-label-primary, #1f2329));
+  transition: border-color 0.12s ease, background 0.12s ease;
 }
 .dsh-task-group[data-over='true'] {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 45%, transparent);
+  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 55%, transparent);
+}
+.dsh-task-group[data-drop='true'] {
+  box-shadow: inset 0 2px 0 0 var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+}
+.dsh-task-group[data-dragging='true'] {
+  opacity: 0.45;
 }
 .dsh-task-group-head {
   display: flex;
   align-items: center;
   gap: 4px;
-  min-height: 22px;
-  padding: 0 2px;
+  min-height: 24px;
+  padding: 0 2px 2px;
   border-radius: var(--dsw-radius-sm, 8px);
 }
 .dsh-task-group-head:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.04));
 }
+.dsh-task-group-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 14px;
+  height: 20px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.dsh-task-group-head:hover .dsh-task-group-grip {
+  opacity: 0.8;
+}
+.dsh-task-group-grip svg {
+  display: block;
+  width: 8px;
+  height: 14px;
+}
 .dsh-task-group-name {
   appearance: none;
   border: none;
   background: transparent;
-  padding: 0 2px;
+  padding: 0 4px;
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font: inherit;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 18px;
   color: var(--dsw-alias-label-secondary, #6b7280);
   cursor: text;
@@ -346,18 +392,52 @@ export const TASKS_CSS = `
 .dsh-task-group-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-left: 10px;
+  gap: 8px;
+  padding: 2px 0 2px 12px;
   border-left: 2px solid color-mix(in srgb, var(--dsw-alias-border-l1, #e2e5ea) 85%, transparent);
 }
 .dsh-task-group-empty {
-  margin: 2px 4px;
+  margin: 4px 2px;
   font-size: 11px;
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
 .dsh-task-group-new {
-  padding: 2px;
+  padding: 2px 2px 0;
+}
+/* Compact lanes: count-only columns for narrow panels (replaces a horizontal scrollbar). */
+.dsh-task-lane[data-compact='true'] {
+  padding: 8px;
+}
+.dsh-task-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+.dsh-task-compact-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: var(--dsw-radius-xs, 4px);
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-task-compact-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dsh-task-compact-count {
+  flex: none;
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-variant-numeric: tabular-nums;
 }
 /* Archive view: same row anatomy as the notes trash. */
 .dsh-task-archive {

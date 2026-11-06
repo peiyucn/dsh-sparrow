@@ -76,6 +76,8 @@ export const TASK_SORT_STORAGE_KEY = 'dsh-desk-one:task-sort'
 export const TASK_GROUPS_STORAGE_KEY = 'dsh-desk-one:task-groups'
 /** 任务板分组折叠状态（key = `${status}:${group}`，纯界面状态）。 */
 export const TASK_GROUP_COLLAPSE_STORAGE_KEY = 'dsh-desk-one:task-group-collapsed'
+/** 任务板容器宽度低于该值时，三泳道收窄成「计数模式」（只显示条数，避免横向滚动条）。 */
+export const TASK_BOARD_COMPACT_WIDTH = 720
 
 /** 面板请求超时：host 挂起时不让面板永久 loading。 */
 export const REQUEST_TIMEOUT_MS = 10_000
