@@ -100,61 +100,58 @@ html[data-platform='darwin'] .dsh-desk-head {
   color: var(--dsw-alias-label-tertiary, #8a919f);
   pointer-events: none;
 }
-/* 贴纸：便签墙的基本单位。真实便签是方角纸片，不做大圆角；尺寸由用户拖动改，内联 style 给宽高。
-   配色走低饱和纸色调（暖纸白 / 奶油黄 / 鼠尾草绿 / 雾蓝 / 藕粉），叠加顶部纸光与细边，避免高饱和塑料感。 */
+/* 贴纸：便签墙的基本单位。真实便签是方角纸片，不做大圆角、不做渐变。
+   配色参考 Notion 浅色模式的背景色板（低饱和、偏暖中性），文字用 Notion 墨色 #37352F。 */
 .dsh-desk-note {
   position: absolute;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  padding: 6px 10px 10px 12px;
-  border: 1px solid rgba(35, 39, 51, 0.07);
+  padding: 8px 12px 12px;
+  border: 1px solid rgba(55, 53, 47, 0.08);
   border-radius: 2px;
-  background-color: #f3f1ec;
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 58%);
-  color: #2b2926;
-  box-shadow: 0 1px 2px rgba(24, 28, 40, 0.08), 0 10px 20px -12px rgba(24, 28, 40, 0.35);
+  background-color: #f4f1ea;
+  color: #37352f;
+  box-shadow: 0 1px 1px rgba(24, 28, 40, 0.05), 0 6px 16px -10px rgba(24, 28, 40, 0.28);
   cursor: grab;
   user-select: none;
   touch-action: none;
   transition: box-shadow 0.14s ease;
 }
 .dsh-desk-note:hover {
-  box-shadow: 0 2px 4px rgba(24, 28, 40, 0.1), 0 16px 28px -16px rgba(24, 28, 40, 0.45);
+  box-shadow: 0 2px 4px rgba(24, 28, 40, 0.07), 0 14px 26px -16px rgba(24, 28, 40, 0.4);
 }
 .dsh-desk-note:active {
   cursor: grabbing;
 }
-.dsh-desk-note[data-color='yellow'] { background-color: #f2e4bd; }
-.dsh-desk-note[data-color='green'] { background-color: #dce8d8; }
-.dsh-desk-note[data-color='blue'] { background-color: #d9e3ef; }
-.dsh-desk-note[data-color='pink'] { background-color: #efdde2; }
+/* Notion 浅色模式背景色板（微调偏暖后用于纸面）。 */
+.dsh-desk-note[data-color='yellow'] { background-color: #faf3dd; }
+.dsh-desk-note[data-color='green'] { background-color: #eef3ed; }
+.dsh-desk-note[data-color='blue'] { background-color: #e9f3f7; }
+.dsh-desk-note[data-color='pink'] { background-color: #f9f2f5; }
 .dsh-desk-note-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 22px;
-  margin-bottom: 2px;
+  height: 20px;
+  margin-bottom: 4px;
 }
-/* 抓取提示：左上角六点抓握纹 + grab 光标，一眼看出「抓这里拖」。
-   始终可见（低透明度），悬停变清楚；它本身也在拖拽命中范围内。 */
-.dsh-desk-note-grip {
+/* 拖动提示：不用图标，直接一枚极小的「拖动」字样（平时淡、悬停变清楚）；
+   整个贴纸正文以外的区域都能拖，字样只是让人知道这里可以抓。 */
+.dsh-desk-note-drag {
   flex: none;
-  width: 22px;
-  height: 14px;
-  border-radius: 4px;
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  color: rgba(55, 53, 47, 0.32);
   cursor: grab;
-  opacity: 0.4;
-  background-image: radial-gradient(circle, rgba(43, 41, 38, 0.6) 1px, transparent 1.2px);
-  background-size: 7px 7px;
-  background-position: 1px 1px;
-  transition: opacity 0.12s ease, background-color 0.12s ease;
+  user-select: none;
+  transition: color 0.12s ease;
 }
-.dsh-desk-note:hover .dsh-desk-note-grip {
-  opacity: 0.75;
-  background-color: rgba(43, 41, 38, 0.06);
+.dsh-desk-note:hover .dsh-desk-note-drag {
+  color: rgba(55, 53, 47, 0.62);
 }
-.dsh-desk-note:active .dsh-desk-note-grip {
+.dsh-desk-note:active .dsh-desk-note-drag {
   cursor: grabbing;
 }
 .dsh-desk-note-colors {
@@ -168,26 +165,27 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-note:focus-within .dsh-desk-note-colors {
   opacity: 1;
 }
+/* 色板：小圆点用 Notion 的深色文字色（一眼区分色相），选中态用墨色细环。 */
 .dsh-desk-dot {
   appearance: none;
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
   padding: 0;
+  border: none;
   border-radius: 50%;
-  border: 1px solid rgba(35, 39, 51, 0.12);
   cursor: pointer;
   transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 .dsh-desk-dot:hover {
   transform: scale(1.12);
 }
-.dsh-desk-dot[data-color='default'] { background: #cfcabe; }
-.dsh-desk-dot[data-color='yellow'] { background: #e6cf8f; }
-.dsh-desk-dot[data-color='green'] { background: #a9c8a6; }
-.dsh-desk-dot[data-color='blue'] { background: #a8bfdc; }
-.dsh-desk-dot[data-color='pink'] { background: #dcb2c0; }
+.dsh-desk-dot[data-color='default'] { background: #787774; }
+.dsh-desk-dot[data-color='yellow'] { background: #c29343; }
+.dsh-desk-dot[data-color='green'] { background: #548164; }
+.dsh-desk-dot[data-color='blue'] { background: #487ca5; }
+.dsh-desk-dot[data-color='pink'] { background: #b35488; }
 .dsh-desk-dot[data-active='true'] {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 0 0 3px rgba(43, 41, 38, 0.45);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 3px rgba(55, 53, 47, 0.55);
 }
 .dsh-desk-note-close {
   appearance: none;
@@ -226,31 +224,29 @@ html[data-platform='darwin'] .dsh-desk-head {
   cursor: text;
 }
 .dsh-desk-note-body::placeholder {
-  color: rgba(43, 41, 38, 0.32);
+  color: rgba(55, 53, 47, 0.3);
 }
-/* 右下角改大小手柄（悬停 / 聚焦时才显示，避免墙上到处是角标）。 */
+/* 右下角改大小：一条极简的角标（右边 + 下边各一像素），悬停才出现，不做斜线花纹。 */
 .dsh-desk-note-resize {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 18px;
-  height: 18px;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid rgba(55, 53, 47, 0.32);
+  border-bottom: 1.5px solid rgba(55, 53, 47, 0.32);
+  border-bottom-right-radius: 1px;
   cursor: nwse-resize;
   opacity: 0;
-  transition: opacity 0.12s ease;
-  background: linear-gradient(
-    135deg,
-    transparent 0 55%,
-    rgba(45, 43, 38, 0.35) 55% 62%,
-    transparent 62% 70%,
-    rgba(45, 43, 38, 0.35) 70% 77%,
-    transparent 77%
-  );
+  transition: opacity 0.12s ease, border-color 0.12s ease;
   touch-action: none;
 }
 .dsh-desk-note:hover .dsh-desk-note-resize,
 .dsh-desk-note:focus-within .dsh-desk-note-resize {
   opacity: 1;
+}
+.dsh-desk-note-resize:hover {
+  border-color: rgba(55, 53, 47, 0.6);
 }
 /* 「+」：悬浮在右下角，页面级固定（不随墙面滚动）。 */
 .dsh-desk-add {
@@ -337,13 +333,12 @@ html[data-platform='darwin'] .dsh-desk-head {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #cfcabe;
-  border: 1px solid rgba(35, 39, 51, 0.1);
+  background: #787774;
 }
-.dsh-desk-recent-dot[data-color='yellow'] { background: #e6cf8f; }
-.dsh-desk-recent-dot[data-color='green'] { background: #a9c8a6; }
-.dsh-desk-recent-dot[data-color='blue'] { background: #a8bfdc; }
-.dsh-desk-recent-dot[data-color='pink'] { background: #dcb2c0; }
+.dsh-desk-recent-dot[data-color='yellow'] { background: #c29343; }
+.dsh-desk-recent-dot[data-color='green'] { background: #548164; }
+.dsh-desk-recent-dot[data-color='blue'] { background: #487ca5; }
+.dsh-desk-recent-dot[data-color='pink'] { background: #b35488; }
 .dsh-desk-recent-text {
   overflow: hidden;
   text-overflow: ellipsis;

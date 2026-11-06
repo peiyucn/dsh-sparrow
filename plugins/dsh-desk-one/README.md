@@ -28,7 +28,7 @@ English | [简体中文](README.zh-CN.md)
 * Open **Notes** and tap the floating **＋**; a fresh sticky appears in the middle of the wall and takes the keyboard focus.
 * The wall never scrolls: notes are always kept inside the visible area, even after you resize the window.
 * Type straight onto the sticky; leaving it saves the text, and an emptied sticky is removed instead of kept as clutter.
-* Drag a sticky by its top-left grip (the six dots) or its body; whichever sticky you click or drag comes to the front, and that layer order is saved too.
+* Drag a sticky by its body; a small **Drag** hint at the top-left marks the grab area. Whichever sticky you click or drag comes to the front, and that layer order is saved too.
 * Drag the bottom-right corner of a sticky to change its size; position and size are saved per note.
 * Hover a sticky to reveal its color dots and the **×** delete button. The tab you were on is remembered when you come back to Desk One.
 
