@@ -49,7 +49,7 @@ src/
     gates.ts http.ts router.ts                            # 装配：能力门 / HTTP 基础 / 前缀路由（含信任栅栏）
     store.ts                                              # 共享对象存储（nodes 表按 kind 判别）
     notes/{routes,tools}.ts                                # 便签功能的 host 半（路由表由 router 挂载）
-    tasks/{routes,tools}.ts                                # 任务板功能的 host 半（S1）
+    tasks/{routes,tools,group-routes,group-tools}.ts       # 任务板功能的 host 半（含分组实体，S1）
   client/
     index.ts install.ts panel.ts icon.tsx compat.ts       # 入口与客户端装配
     i18n.ts locale.d.ts                                   # 共享文案（键按功能命名空间）

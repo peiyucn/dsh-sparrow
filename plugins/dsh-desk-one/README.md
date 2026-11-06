@@ -36,14 +36,14 @@ English | [简体中文](README.zh-CN.md)
 * **Smash!** is the red frosted-glass icon button next to **＋**: after a two-step confirmation it moves every sticky on the wall into the trash with a short fly-away animation. It is always visible and simply does nothing when the wall is empty; clicking anywhere else or pressing **Esc** cancels the confirmation. It is blocked when the trash cannot hold them all.
 * Open **Tasks** for the fixed three-lane board. Add a card with a lane's **＋** or by double-clicking empty space in a lane; the card has a wrapping title and description, a colour dot (click to cycle the palette), and a date chip for a day-granular deadline. Cards due within a day get an amber outline, overdue dates show in red, and only cards in **Done** can be archived.
 * Press anywhere on a card to drag it: a copy follows the pointer, lanes highlight, and dropping it on an invalid spot flies the card back. Drop a card into a lane to change status or onto another card to reorder; delete asks for a second click.
-* The toolbar switches between **manual order**, **creation time** and **due date**, and the **Done** lane can be collapsed. **＋ group** creates a one-level group inside a lane — drag cards into it, double-click its name to rename, use its chevron to collapse, drag the six-dot grip to reorder groups, and deleting a group moves its cards back to ungrouped. **Archive** lists archived tasks where they can be restored or deleted permanently.
+* The toolbar switches between **manual order**, **creation time** and **due date**, and the **Done** lane can be collapsed. **＋ group** creates a real one-level group inside a lane: cards can be dragged in or out, the group can stay empty, its name can be edited in place, and the six-dot grip reorders groups. Dragging a group into another lane asks for confirmation first, moves every card with it, and offers **Undo**; deleting a group keeps its cards and makes them ungrouped. **Archive** lists archived tasks where they can be restored or deleted permanently.
 * Nothing scrolls sideways: when the panel gets too narrow the three lanes collapse into count-only columns (lane name plus per-group counts), and inner scrollbars stay invisible while still scrolling.
 
 ## Data and privacy
 
 * Notes live in a DSH storage domain (`desk_one`) managed by the official storage service; nothing leaves the machine.
 * The panel talks to the plugin's own host routes under `/api/desk-one`; the client never touches storage directly.
-* Agent tools (`desk_note_*`, `desk_task_*`) read and write the same notes and tasks, so the model and the UI always see one dataset.
+* Agent tools (`desk_note_*`, `desk_task_*`, `desk_group_*`) read and write the same notes, tasks and groups, so the model and the UI always see one dataset.
 
 ## Known limitations
 

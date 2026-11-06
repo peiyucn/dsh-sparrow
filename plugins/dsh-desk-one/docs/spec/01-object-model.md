@@ -24,7 +24,7 @@
 ## Node 基础字段
 
 ```ts
-type DeskKind = 'task' | 'note' | 'event' | 'focus' | 'project'
+type DeskKind = 'task' | 'note' | 'event' | 'focus' | 'project' | 'group'
 
 interface DeskNode {
   id: string                 // `${kind}_${ulid}`，创建后不可变
@@ -51,10 +51,17 @@ interface DeskNode {
 ### 各 kind 的 payload
 
 ```ts
+interface GroupPayload {
+  name: string                             // 组名；同一泳道内唯一
+  status: 'todo' | 'doing' | 'done'        // 分组属于某个泳道
+  order: number                            // 组在该泳道内的顺序
+}
+
 interface TaskPayload {
   status: 'todo' | 'doing' | 'done'        // S1 固定三泳道；inbox / cancelled 后置
   due?: { date: string; timezone?: string } // S1 只到天（date 必填，YYYY-MM-DD）
-  order: number                            // 同一泳道内手工排序
+  order: number                            // 同一容器（未分组区或某个分组）内手工排序
+  groupId?: string                         // 一层分组 id；缺省未分组
   color?: string                           // 卡片颜色条，复用便签五色板
   archived: boolean                        // 存档（避开宿主「会话归档」命名）
   projectId?: string                       // 预留：多板后启用
@@ -103,6 +110,7 @@ interface ProjectPayload {
 ```
 
 > S1 实现范围以 `03-task-board.md` 为准；`priority` / `estimateMin` / 时刻级 `at` / 多板 / 自定义泳道后置。
+> `group` 是独立 Node（kind `group`），分组名 / 泳道 / 顺序持久化在 `payload` 里；任务只存 `groupId`，改名是单条 group patch，空分组也能存在。
 > 关系一律走 Edge，不在 payload 里重复存 id；`FocusPayload.taskId` 只作渲染快照，权威关系是 `workedOn` 边。
 
 ## Edge（关系）

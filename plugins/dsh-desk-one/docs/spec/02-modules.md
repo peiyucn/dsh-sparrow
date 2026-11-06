@@ -65,7 +65,7 @@
 * 列头：列名 + 计数 + 「＋」新建、新建分组（草稿卡提交标题；空标题取消）；泳道空白处双击也可新建；完成列可折叠。
 * 卡片：自动换行的标题与描述、颜色圆点（点击循环换色）、按天截止日期（逾期红字，只剩一天时琥珀色描边）；整卡可拖；悬停显示存档（仅完成列）/ 删除（二次确认）。
 * 拖拽：按住卡片任意位置生成跟手幽灵卡，跨列改 `status`、列内 / 分组内改 `order`、拖入 / 拖出分组改 `group`；落点泳道 / 分组高亮，无效落点飞回原位。
-* 分组：每个泳道支持一层分组（新建 / 双击改名 / 折叠 / 删除），组内任务缩进展示；成员以任务 `group` 字段为准，分组名与折叠状态存 localStorage。
+* 分组：每个泳道支持一层**持久化分组实体**（可为空 / 就地改名 / 折叠 / 拖手柄排序 / 删除后卡片回未分组），成员以任务 `groupId` 为准；折叠是视图偏好。整组拖到其它泳道需二次确认、整组卡片改状态、可撤销。
 * 排序视图：手动（默认）/ 创建时间 / 截止日期；视图切换不写回 `order`，偏好存 localStorage。
 * 存档：工具栏「存档 (N)」进入存档视图，可恢复回原泳道或永久删除；命名统一「存档」，避免与宿主会话归档撞词。
 * 加载 / 保存失败可见；revision 冲突时重新拉取。
@@ -88,7 +88,7 @@
 * 完成列可折叠；存档后从板上消失，存档视图可恢复 / 永久删除。
 * agent 工具与界面读写同一批任务（工具建的任务出现在板上）。
 
-**Agent 工具**：`desk_task_add`、`desk_task_list`、`desk_task_update`、`desk_task_complete`、`desk_task_archive`。
+**Agent 工具**：`desk_task_add`、`desk_task_list`、`desk_task_update`、`desk_task_complete`、`desk_task_archive`；分组：`desk_group_add`、`desk_group_list`、`desk_group_update`、`desk_group_move`、`desk_group_delete`。
 
 ## 4. 日程 Calendar（v1 读 / v2 写）
 
