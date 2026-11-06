@@ -137,6 +137,24 @@ export const TASKS_CSS = `
   flex-direction: column;
   gap: 6px;
   min-height: 4px;
+  border-radius: var(--dsw-radius-md, 12px);
+  transition: outline-color 0.12s ease;
+  outline: 1px solid transparent;
+}
+/* Card drag hovering the ungrouped area: make "will land here" unmistakable. */
+.dsh-task-ungrouped[data-over='true'] {
+  outline-color: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 60%, transparent);
+  outline-style: dashed;
+  outline-offset: 2px;
+}
+/* Precise insertion line for card drags (before a card / after the last one). */
+.dsh-task-card-dropmark {
+  flex: none;
+  height: 2px;
+  margin: 1px 2px;
+  border-radius: 2px;
+  background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 16%, transparent);
 }
 .dsh-task-empty {
   margin: 12px 4px;
@@ -176,6 +194,23 @@ export const TASKS_CSS = `
 .dsh-task-card[data-color='green'] { border-left-color: #548164; }
 .dsh-task-card[data-color='blue'] { border-left-color: #487ca5; }
 .dsh-task-card[data-color='pink'] { border-left-color: #b35488; }
+/* View mode: card text is plain, non-selectable text so the whole card stays a grab surface.
+   Textareas/inputs only exist while editing and re-enable selection. */
+.dsh-task-card {
+  user-select: none;
+}
+.dsh-task-card textarea,
+.dsh-task-card input {
+  user-select: text;
+}
+.dsh-task-text {
+  cursor: text;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dsh-task-body-empty {
+  opacity: 0.6;
+}
 /* Auto-growing textareas: wrapping text, never a scrollbar inside the card. */
 .dsh-task-title {
   box-sizing: border-box;
@@ -311,7 +346,9 @@ export const TASKS_CSS = `
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 .dsh-task-group[data-over='true'] {
-  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 55%, transparent);
+  border-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 74%, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 35%, transparent);
 }
 .dsh-task-group[data-drop='true'] {
   box-shadow: inset 0 2px 0 0 var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);

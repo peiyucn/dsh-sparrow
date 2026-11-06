@@ -1,13 +1,13 @@
 /**
- * One task card on the board.
+ * One task card.
  *
- * The whole card is the drag handle (no tiny grip): pointerdown starts the board-level ghost
- * drag, while inputs/buttons keep their own gestures. Title and body are auto-growing textareas
- * so long text wraps instead of being clipped. The footer keeps the card metadata in one row:
- * colour, due date, and (on hover) archive / delete. Only Done cards can be archived.
+ * The card has two modes: view (default) and edit (one field at a time). In view mode the whole
+ * card is a drag surface and title/body are plain text — clicking a field switches it to a
+ * textarea. That removes the old ambiguity where most of the card was a textarea and therefore
+ * not grabbable; the board distinguishes click vs drag by a movement threshold.
  */
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { NOTE_COLORS } from '../../../constants.js'
 import type { DeskTask, TaskPatchRequest } from '../../../contract.js'
@@ -22,6 +22,8 @@ interface TaskCardProps {
   readonly onArchive: (task: DeskTask) => void
   readonly onDelete: (id: string) => void
 }
+
+type EditableField = 'title' | 'body'
 
 /** Local YYYY-MM-DD (due dates are day-granular, so "due soon" is a local-calendar question). */
 function localToday(): Date {
@@ -48,6 +50,7 @@ export function TaskCard({
 }: TaskCardProps): ReactElement {
   const titleRef = useRef<HTMLTextAreaElement | null>(null)
   const bodyRef = useRef<HTMLTextAreaElement | null>(null)
+  const [editing, setEditing] = useState<EditableField | null>(null)
   const [editingDue, setEditingDue] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -56,22 +59,11 @@ export function TaskCard({
   const dueSoon = remaining !== undefined && remaining >= 0 && remaining <= 1
   const canArchive = task.status === 'done'
 
-  // Keep the uncontrolled fields in sync with external updates and keep heights fitting content.
-  useLayoutEffect(() => {
-    if (titleRef.current !== null) titleRef.current.value = task.title
-    if (bodyRef.current !== null) bodyRef.current.value = task.body
-    autoGrow(titleRef.current)
-    autoGrow(bodyRef.current)
-  }, [task.title, task.body])
-
-  const commitTitle = (element: HTMLTextAreaElement): void => {
-    const title = element.value.trim()
-    if (title === '') {
-      element.value = task.title
-      return
-    }
-    if (title !== task.title) onPatch(task, { title })
-  }
+  // Keep edit-mode textareas sized to their content when a field is opened.
+  useEffect(() => {
+    if (editing === 'title') autoGrow(titleRef.current)
+    if (editing === 'body') autoGrow(bodyRef.current)
+  }, [editing])
 
   return (
     <article
@@ -83,39 +75,70 @@ export function TaskCard({
       data-due-soon={dueSoon}
       onPointerDown={(event) => onStartDrag(task, event)}
     >
-      <textarea
-        ref={titleRef}
-        className="dsh-task-title"
-        rows={1}
-        defaultValue={task.title}
-        aria-label={t('task.title')}
-        spellCheck={false}
-        onInput={event => autoGrow(event.currentTarget)}
-        onBlur={event => commitTitle(event.currentTarget)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault()
-            event.currentTarget.blur()
-          }
-          if (event.key === 'Escape') {
-            event.currentTarget.value = task.title
-            event.currentTarget.blur()
-          }
-        }}
-      />
-      <textarea
-        ref={bodyRef}
-        className="dsh-task-body"
-        rows={1}
-        defaultValue={task.body}
-        placeholder={t('task.bodyPlaceholder')}
-        spellCheck={false}
-        onInput={event => autoGrow(event.currentTarget)}
-        onBlur={(event) => {
-          const body = event.currentTarget.value
-          if (body !== task.body) onPatch(task, { body })
-        }}
-      />
+      {editing === 'title'
+        ? (
+            <textarea
+              ref={titleRef}
+              className="dsh-task-title"
+              rows={1}
+              defaultValue={task.title}
+              autoFocus
+              aria-label={t('task.title')}
+              spellCheck={false}
+              onFocus={event => autoGrow(event.currentTarget)}
+              onInput={event => autoGrow(event.currentTarget)}
+              onBlur={(event) => {
+                setEditing(null)
+                const title = event.currentTarget.value.trim()
+                if (title === '' || title === task.title) return
+                onPatch(task, { title })
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  event.currentTarget.blur()
+                }
+                if (event.key === 'Escape') {
+                  event.currentTarget.value = task.title
+                  event.currentTarget.blur()
+                }
+              }}
+            />
+          )
+        : (
+            <div
+              className="dsh-task-title dsh-task-text"
+              onClick={() => setEditing('title')}
+            >
+              {task.title}
+            </div>
+          )}
+      {editing === 'body'
+        ? (
+            <textarea
+              ref={bodyRef}
+              className="dsh-task-body"
+              rows={1}
+              defaultValue={task.body}
+              autoFocus
+              placeholder={t('task.bodyPlaceholder')}
+              spellCheck={false}
+              onFocus={event => autoGrow(event.currentTarget)}
+              onInput={event => autoGrow(event.currentTarget)}
+              onBlur={(event) => {
+                setEditing(null)
+                if (event.currentTarget.value !== task.body) onPatch(task, { body: event.currentTarget.value })
+              }}
+            />
+          )
+        : (
+            <div
+              className={task.body === '' ? 'dsh-task-body dsh-task-text dsh-task-body-empty' : 'dsh-task-body dsh-task-text'}
+              onClick={() => setEditing('body')}
+            >
+              {task.body === '' ? t('task.bodyPlaceholder') : task.body}
+            </div>
+          )}
       <div className="dsh-task-foot">
         <button
           type="button"

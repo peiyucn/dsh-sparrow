@@ -15,6 +15,8 @@ import { TaskCard } from './TaskCard.js'
 export interface DropTarget {
   readonly status: TaskStatus
   readonly groupId?: string
+  /** Insertion position inside the target container (0..n). */
+  readonly index: number
 }
 
 /** Group drag target: which lane, and the insertion position among that lane's groups. */
@@ -112,18 +114,26 @@ export function TaskColumn({
     onAdd(status, groupId === undefined || groupId === '' ? undefined : groupId)
   }
 
-  const cards = (tasks: readonly DeskTask[]): ReactElement[] => tasks.map(task => (
-    <TaskCard
-      key={task.id}
-      task={task}
-      dragging={draggingId === task.id}
-      t={t}
-      onStartDrag={onStartDrag}
-      onPatch={onPatch}
-      onArchive={onArchive}
-      onDelete={onDelete}
-    />
-  ))
+  const cards = (tasks: readonly DeskTask[], dropIndex: number | null): ReactElement[] => {
+    const nodes: ReactElement[] = []
+    tasks.forEach((task, position) => {
+      if (dropIndex === position) nodes.push(<div key={`drop-${position}`} className="dsh-task-card-dropmark" data-active="true" />)
+      nodes.push(
+        <TaskCard
+          key={task.id}
+          task={task}
+          dragging={draggingId === task.id}
+          t={t}
+          onStartDrag={onStartDrag}
+          onPatch={onPatch}
+          onArchive={onArchive}
+          onDelete={onDelete}
+        />,
+      )
+    })
+    if (dropIndex === tasks.length) nodes.push(<div key="drop-end" className="dsh-task-card-dropmark" data-active="true" />)
+    return nodes
+  }
 
   const header = (
     <header className="dsh-task-lane-head">
@@ -205,8 +215,12 @@ export function TaskColumn({
     >
       {header}
       <div className="dsh-task-list" onDoubleClick={handleDoubleClick}>
-        <div className="dsh-task-ungrouped" data-group-id="">
-          {cards(lane.ungrouped)}
+        <div
+          className="dsh-task-ungrouped"
+          data-group-id=""
+          data-over={dropTarget?.status === status && dropTarget.groupId === undefined}
+        >
+          {cards(lane.ungrouped, dropTarget?.status === status && dropTarget.groupId === undefined ? dropTarget.index : null)}
           {draftIn(undefined) ? <DraftCard t={t} onCommit={onCommitDraft} onCancel={onCancelDraft} /> : null}
           {lane.ungrouped.length === 0 && lane.groups.length > 0 && dropTarget?.status === status && dropTarget.groupId === undefined
             ? <p className="dsh-task-ungrouped-hint">{t('task.group.ungroupedHint')}</p>
@@ -215,10 +229,12 @@ export function TaskColumn({
         {lane.groups.map(({ group, tasks }, index) => {
           const groupCollapsed = isGroupCollapsed(group.id)
           const draggingThis = groupDrag?.id === group.id
+          const groupOver = dropTarget?.status === status && dropTarget.groupId === group.id
           return (
             <div
               key={group.id}
               className="dsh-task-group"
+              data-over={groupOver}
               data-drop={groupLaneOver && groupDrop?.index === index}
               data-dragging={draggingThis}
             >
@@ -266,14 +282,15 @@ export function TaskColumn({
                       />
                     )
                   : (
-                      <button
-                        type="button"
+                      <span
                         className="dsh-task-group-name"
+                        role="button"
+                        tabIndex={0}
                         title={t('task.group.rename')}
                         onDoubleClick={() => setEditingGroup(group.id)}
                       >
                         {group.name}
-                      </button>
+                      </span>
                     )}
                 <span className="dsh-task-count">{countText(tasks.length)}</span>
                 <div className="dsh-task-group-actions">
@@ -310,7 +327,7 @@ export function TaskColumn({
                 ? null
                 : (
                     <div className="dsh-task-group-body" data-group-id={group.id}>
-                      {cards(tasks)}
+                      {cards(tasks, groupOver ? dropTarget.index : null)}
                       {draftIn(group.id) ? <DraftCard t={t} onCommit={onCommitDraft} onCancel={onCancelDraft} /> : null}
                       {tasks.length === 0 && !draftIn(group.id)
                         ? <p className="dsh-task-group-empty">{t('task.group.dropHint')}</p>

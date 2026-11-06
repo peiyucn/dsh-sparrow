@@ -185,7 +185,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
   ], [t])
 
   /** Resolve the lane/group under the pointer plus the insertion index within that container. */
-  const resolveDrop = useCallback((x: number, y: number): { target: DropTarget; index: number } | null => {
+  const resolveDrop = useCallback((x: number, y: number): DropTarget | null => {
     const element = document.elementFromPoint(x, y) as HTMLElement | null
     const lane = element?.closest<HTMLElement>('[data-lane]')
     if (lane === null || lane === undefined) return null
@@ -205,7 +205,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
         break
       }
     }
-    return { target: { status, ...groupId === undefined ? {} : { groupId } }, index }
+    return { status, index, ...groupId === undefined ? {} : { groupId } }
   }, [])
 
   /** Resolve the lane plus group insertion position under the pointer (group drag). */
@@ -224,7 +224,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     return { status, index }
   }, [])
 
-  /** Whole-card pointer drag: ghost follows the pointer, invalid drops fly back to the card. */
+  /** Whole-card pointer drag: a 5px threshold separates a click (edit) from a drag (move). */
   const startDrag = useCallback((task: DeskTask, event: ReactPointerEvent<HTMLElement>): void => {
     const target = event.target as HTMLElement
     if (event.button !== 0 || target.closest('input,textarea,button,select')) return
@@ -232,22 +232,30 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     const rect = card.getBoundingClientRect()
     const offsetX = event.clientX - rect.left
     const offsetY = event.clientY - rect.top
-    event.preventDefault()
+    const startX = event.clientX
+    const startY = event.clientY
+    let ghost: HTMLElement | null = null
+    let moved = false
+    let latest: DropTarget | null = null
 
-    const ghost = createCardGhost(card)
-    placeGhost(ghost, rect.left, rect.top, rect.width)
-    document.body.appendChild(ghost)
-    card.style.visibility = 'hidden'
-    setDraggingId(task.id)
-
-    let latest = resolveDrop(event.clientX, event.clientY)
-    setDropTarget(latest?.target ?? null)
-
+    const begin = (): void => {
+      ghost = createCardGhost(card)
+      placeGhost(ghost, rect.left, rect.top, rect.width)
+      document.body.appendChild(ghost)
+      card.style.visibility = 'hidden'
+      setDraggingId(task.id)
+    }
     const onMove = (moveEvent: PointerEvent): void => {
+      if (!moved) {
+        if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < 5) return
+        moved = true
+        begin()
+      }
+      if (ghost === null) return
       ghost.style.left = `${moveEvent.clientX - offsetX}px`
       ghost.style.top = `${moveEvent.clientY - offsetY}px`
       latest = resolveDrop(moveEvent.clientX, moveEvent.clientY)
-      setDropTarget(latest?.target ?? null)
+      setDropTarget(latest)
     }
     const cleanup = (): void => {
       window.removeEventListener('pointermove', onMove)
@@ -257,24 +265,37 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
       setDraggingId(null)
       setDropTarget(null)
     }
+    /** A real drag must not leak into a click that would open a field for editing. */
+    const suppressNextClick = (): void => {
+      const blocker = (clickEvent: MouseEvent): void => {
+        clickEvent.stopPropagation()
+        clickEvent.preventDefault()
+      }
+      window.addEventListener('click', blocker, { capture: true, once: true })
+    }
     const flyBack = (): void => {
-      ghost.style.transition = 'left 180ms ease, top 180ms ease'
-      ghost.style.left = `${rect.left}px`
-      ghost.style.top = `${rect.top}px`
+      if (ghost === null) return
+      const element = ghost
+      element.style.transition = 'left 180ms ease, top 180ms ease'
+      element.style.left = `${rect.left}px`
+      element.style.top = `${rect.top}px`
       window.setTimeout(() => {
-        ghost.remove()
+        element.remove()
         card.style.visibility = ''
       }, 200)
     }
     const onFinish = (): void => {
       cleanup()
+      // No threshold crossed: this was a click, so TaskCard opens the clicked field for editing.
+      if (!moved || ghost === null) return
+      suppressNextClick()
       if (latest === null) {
         flyBack()
         return
       }
       ghost.remove()
       card.style.visibility = ''
-      board.moveTask(task.id, latest.target.status, latest.target.groupId, latest.index)
+      board.moveTask(task.id, latest.status, latest.groupId, latest.index)
     }
     const onCancel = (): void => {
       cleanup()
@@ -290,29 +311,36 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
   }, [board, resolveDrop])
 
   /**
-   * Whole-group drag: same gesture model as a card. The ghost is the entire group block (header +
-   * cards); dropping on another lane moves the group and cascades its cards' status immediately —
-   * no confirmation, because moving back is just as cheap.
+   * Whole-group drag: same 5px threshold and ghost model as a card. Drop on the same lane
+   * reorders groups; another lane moves the whole group and cascades its cards' status immediately.
    */
   const startGroupDrag = useCallback((group: DeskTaskGroup, event: ReactPointerEvent<HTMLElement>): void => {
     const target = event.target as HTMLElement
     if (event.button !== 0 || target.closest('input,textarea,button')) return
-    const header = event.currentTarget
-    const block = header.closest<HTMLElement>('.dsh-task-group')
+    const block = event.currentTarget.closest<HTMLElement>('.dsh-task-group')
     if (block === null) return
     const rect = block.getBoundingClientRect()
     const offsetX = event.clientX - rect.left
     const offsetY = event.clientY - rect.top
-    event.preventDefault()
+    const startX = event.clientX
+    const startY = event.clientY
+    let ghost: HTMLElement | null = null
+    let moved = false
+    let latest: GroupDropTarget | null = null
 
-    const ghost = createGroupGhost(block)
-    placeGhost(ghost, rect.left, rect.top, rect.width)
-    document.body.appendChild(ghost)
-    setGroupDrag(group)
-    let latest = resolveGroupDrop(event.clientX, event.clientY)
-    setGroupDrop(latest)
-
+    const begin = (): void => {
+      ghost = createGroupGhost(block)
+      placeGhost(ghost, rect.left, rect.top, rect.width)
+      document.body.appendChild(ghost)
+      setGroupDrag(group)
+    }
     const onMove = (moveEvent: PointerEvent): void => {
+      if (!moved) {
+        if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < 5) return
+        moved = true
+        begin()
+      }
+      if (ghost === null) return
       ghost.style.left = `${moveEvent.clientX - offsetX}px`
       ghost.style.top = `${moveEvent.clientY - offsetY}px`
       latest = resolveGroupDrop(moveEvent.clientX, moveEvent.clientY)
@@ -327,13 +355,17 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
       setGroupDrop(null)
     }
     const flyBack = (): void => {
-      ghost.style.transition = 'left 180ms ease, top 180ms ease'
-      ghost.style.left = `${rect.left}px`
-      ghost.style.top = `${rect.top}px`
-      window.setTimeout(() => ghost.remove(), 200)
+      if (ghost === null) return
+      const element = ghost
+      element.style.transition = 'left 180ms ease, top 180ms ease'
+      element.style.left = `${rect.left}px`
+      element.style.top = `${rect.top}px`
+      window.setTimeout(() => element.remove(), 200)
     }
     const onFinish = (): void => {
       cleanup()
+      // Below the threshold this was a click (group name double-click renames, buttons click).
+      if (!moved || ghost === null) return
       if (latest === null) {
         flyBack()
         return
