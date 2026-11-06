@@ -22,6 +22,8 @@ const STICKY_COLORS: readonly NoteColor[] = ['yellow', 'green', 'blue', 'pink']
 const CASCADE_OFFSET = 18
 /** Smash 动画时长：贴纸按顺序飞走后统一落库（动画 + 落库都在这个窗口内完成）。 */
 const SMASH_ANIMATION_MS = 480
+/** 单张便签丢进垃圾桶的动画时长（与 Smash 同一段飞散效果）。 */
+const NOTE_TRASH_ANIMATION_MS = 300
 
 interface WallSize {
   readonly width: number
@@ -84,7 +86,9 @@ export function DeskOnePage(props: DeskPanelProps) {
   /** 「Smash!」一键把墙上便签全丢进垃圾桶，同样需要二次确认。 */
   const [confirmSmash, setConfirmSmash] = useState(false)
   const [smashing, setSmashing] = useState(false)
-  /** 垃圾桶一次渲染 20 行，点「加载更多」再加载。 */
+  /** 正在播放飞散动画的单张便签（与 Smash 共用同一段动画）。 */
+  const [trashingIds, setTrashingIds] = useState<ReadonlySet<string>>(() => new Set())
+  /** 垃圾桶一次渲染 10 行，点「加载更多」再加载。 */
   const [trashVisible, setTrashVisible] = useState(TRASH_PAGE_SIZE)
   const [notes, setNotes] = useState<readonly DeskNote[]>([])
   const [loading, setLoading] = useState(true)
@@ -104,9 +108,13 @@ export function DeskOnePage(props: DeskPanelProps) {
   const writeChains = useRef(new Map<string, Promise<void>>())
   /** Smash 动画的定时器：卸载时清掉，避免动画后写已卸载组件的状态。 */
   const smashTimer = useRef<number | null>(null)
+  /** 单张便签删除动画的定时器（按 id 记，卸载时统一清）。 */
+  const trashTimers = useRef(new Map<string, number>())
 
   useEffect(() => () => {
     if (smashTimer.current !== null) window.clearTimeout(smashTimer.current)
+    for (const timer of trashTimers.current.values()) window.clearTimeout(timer)
+    trashTimers.current.clear()
   }, [])
 
   const selectTab = useCallback((next: Tab): void => {
@@ -222,24 +230,39 @@ export function DeskOnePage(props: DeskPanelProps) {
     savePatch(current, { z: layer })
   }, [savePatch])
 
-  /** 把一张便签丢进垃圾桶；垃圾桶满了就提示并带用户去清空。 */
+  /** 把一张便签丢进垃圾桶：先播飞散动画，动画结束再本地移除并落库（与 Smash 同一段效果）。 */
   const trashNote = useCallback((note: DeskNote): void => {
+    if (trashingIds.has(note.id)) return
     if (trashedNotes.length >= MAX_TRASH_NOTES) {
       setActionError(t('trash.full'))
       setShowTrash(true)
       return
     }
     setActionError(null)
-    void savePatch(note, { trashed: true })
-  }, [savePatch, t, trashedNotes.length])
+    setTrashingIds(current => {
+      const next = new Set(current)
+      next.add(note.id)
+      return next
+    })
+    const timer = window.setTimeout(() => {
+      trashTimers.current.delete(note.id)
+      setTrashingIds(current => {
+        const next = new Set(current)
+        next.delete(note.id)
+        return next
+      })
+      // 先本地移除再落库：避免「动画结束 → 状态回弹 → 再消失」的闪回。
+      setNotes(current => current.map(item => item.id === note.id ? { ...item, trashed: true } : item))
+      void savePatch(note, { trashed: true })
+    }, NOTE_TRASH_ANIMATION_MS)
+    trashTimers.current.set(note.id, timer)
+  }, [savePatch, t, trashedNotes.length, trashingIds])
 
-  /** Smash!：二次确认后把墙上所有便签一把丢进垃圾桶（先播动画，再统一落库）。 */
+  /** Smash!：二次确认后把墙上所有便签一把丢进垃圾桶（先播动画，再乐观清墙并落库）。 */
   const smashWall = useCallback((): void => {
     if (smashing) return
-    if (activeNotes.length === 0) {
-      setActionError(t('wall.empty'))
-      return
-    }
+    // 常驻按钮：墙上没有便签时点了没反应（不提示、不弹错误）。
+    if (activeNotes.length === 0) return
     if (!confirmSmash) {
       setConfirmSmash(true)
       setActionError(null)
@@ -255,8 +278,11 @@ export function DeskOnePage(props: DeskPanelProps) {
     const targets = activeNotes
     smashTimer.current = window.setTimeout(() => {
       smashTimer.current = null
-      for (const note of targets) void savePatch(note, { trashed: true })
+      const ids = new Set(targets.map(note => note.id))
+      // 先乐观更新 state（墙面立刻收走），再落库：否则动画结束到服务端返回之间会整墙闪回一次。
+      setNotes(current => current.map(item => ids.has(item.id) ? { ...item, trashed: true } : item))
       setSmashing(false)
+      for (const note of targets) void savePatch(note, { trashed: true })
     }, SMASH_ANIMATION_MS)
   }, [activeNotes, confirmSmash, savePatch, smashing, t, trashedNotes.length])
 
@@ -415,10 +441,12 @@ export function DeskOnePage(props: DeskPanelProps) {
     void savePatch(note, { body })
   }, [removeWithFeedback, savePatch])
 
-  const renderNote = (item: PlacedNote, index: number): ReactElement => (
+  const renderNote = (item: PlacedNote, index: number): ReactElement => {
+    const animating = smashing || trashingIds.has(item.note.id)
+    return (
     <article
       key={item.note.id}
-      className={smashing ? 'dsh-desk-note dsh-desk-note-smashing' : 'dsh-desk-note'}
+      className={animating ? 'dsh-desk-note dsh-desk-note-smashing' : 'dsh-desk-note'}
       data-color={item.note.color}
       style={{
         left: item.x,
@@ -486,9 +514,10 @@ export function DeskOnePage(props: DeskPanelProps) {
         }}
       />
     </article>
-  )
+    )
+  }
 
-  /** 垃圾桶：轻便签的删除先进这里，可恢复或永久删除（入口在右下角「＋」旁边）。 */
+  /** 垃圾桶：轻便签的删除先进这里，可恢复或永久删除（入口在底部「＋」旁边）。 */
   const clearTrash = useCallback((): void => {
     if (!confirmClearTrash) {
       setConfirmClearTrash(true)
@@ -673,20 +702,25 @@ export function DeskOnePage(props: DeskPanelProps) {
                     </svg>
                   )}
               </button>
+              {showTrash
+                ? null
+                : (
+                    <button
+                      type="button"
+                      className="dsh-desk-smash dsh-desk-fabglass"
+                      data-confirm={confirmSmash}
+                      disabled={smashing}
+                      aria-label={confirmSmash ? t('action.smashConfirm') : t('action.smash')}
+                      title={confirmSmash ? t('action.smashConfirm') : t('action.smash')}
+                      onClick={smashWall}
+                    >
+                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                        <path d="M10 2.6v3.1M10 14.3v3.1M2.6 10h3.1M14.3 10h3.1M4.8 4.8l2.2 2.2M13 13l2.2 2.2M15.2 4.8L13 7M7 13l-2.2 2.2" />
+                        <circle cx="10" cy="10" r="2.1" />
+                      </svg>
+                    </button>
+                  )}
             </div>
-            {!showTrash && activeNotes.length > 0
-              ? (
-                  <button
-                    type="button"
-                    className="dsh-desk-smash"
-                    data-confirm={confirmSmash}
-                    disabled={smashing}
-                    onClick={smashWall}
-                  >
-                    {confirmSmash ? t('action.smashConfirm') : t('action.smash')}
-                  </button>
-                )
-              : null}
           </div>
         )
         : null}

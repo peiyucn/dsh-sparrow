@@ -412,7 +412,7 @@ html[data-platform='darwin'] .dsh-desk-head {
   width: 22px;
   height: 22px;
 }
-/* 底部悬浮操作组：按钮一排居中，下方是 Smash!；＋ 在左，垃圾桶在右。 */
+/* 底部悬浮操作组：＋ / 垃圾桶 / Smash 三个玻璃按钮同排居中。 */
 .dsh-desk-fabstack {
   position: absolute;
   left: 50%;
@@ -434,33 +434,20 @@ html[data-platform='darwin'] .dsh-desk-head {
   align-items: center;
   gap: 10px;
 }
-/* Smash!：平时很淡，确认时转危险色；点击后整墙贴纸飞进垃圾桶。 */
-.dsh-desk-smash {
-  appearance: none;
-  border: none;
-  background: transparent;
-  padding: 2px 8px;
-  border-radius: var(--dsw-radius-sm, 8px);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 16px;
-  letter-spacing: 0.06em;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  opacity: 0.6;
-  cursor: pointer;
-  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+/* Smash：与另外两个悬浮按钮同款玻璃、同尺寸，图标常驻；二次确认时转危险色。 */
+.dsh-desk-smash svg {
+  width: 20px;
+  height: 20px;
 }
 .dsh-desk-smash:hover {
-  opacity: 0.95;
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-state-error-primary, #c62828);
 }
 .dsh-desk-smash[data-confirm='true'] {
-  opacity: 1;
   color: var(--dsw-alias-state-error-primary, #c62828);
-  font-weight: 600;
+  background-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c62828) 10%, transparent);
 }
 .dsh-desk-smash:disabled {
-  opacity: 0.3;
+  opacity: 0.4;
   cursor: default;
 }
 /* Smash 动画：贴纸依次向上飞散、淡出；落库在动画结束后统一进行。 */

@@ -47,8 +47,8 @@ export const MAX_QUERY_CHARS = 100
  */
 export const MAX_ACTIVE_NOTES = 100
 export const MAX_TRASH_NOTES = 200
-/** 垃圾桶视图分页：一次渲染 20 行，其余按需加载。 */
-export const TRASH_PAGE_SIZE = 20
+/** 垃圾桶视图分页：一次渲染 10 行，其余按需加载（渲染越少越轻）。 */
+export const TRASH_PAGE_SIZE = 10
 
 /** 便签颜色：未知值一律拒绝（客户端色板与存储校验共用这一份真值）。 */
 export const NOTE_COLORS = ['default', 'yellow', 'green', 'blue', 'pink'] as const

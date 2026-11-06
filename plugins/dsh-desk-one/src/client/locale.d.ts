@@ -33,7 +33,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'wall.tip'
       | 'wall.tipAlt'
       | 'wall.full'
-      | 'wall.empty'
       | 'state.loadFailed'
       | 'state.saveFailed'
   }
