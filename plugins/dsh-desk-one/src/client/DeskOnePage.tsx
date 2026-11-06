@@ -543,7 +543,7 @@ export function DeskOnePage(props: DeskPanelProps) {
               : (
                   <button
                     type="button"
-                    className="dsh-desk-add"
+                    className="dsh-desk-add dsh-desk-fabglass"
                     disabled={creating}
                     aria-label={t('action.newNote')}
                     title={t('action.newNote')}
@@ -556,7 +556,7 @@ export function DeskOnePage(props: DeskPanelProps) {
                 )}
             <button
               type="button"
-              className="dsh-desk-fab-secondary"
+              className="dsh-desk-fab-secondary dsh-desk-fabglass"
               aria-label={showTrash ? t('action.backToWall') : t('action.trash')}
               title={showTrash ? t('action.backToWall') : t('action.trash')}
               onClick={() => {

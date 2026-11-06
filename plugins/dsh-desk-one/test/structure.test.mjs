@@ -97,23 +97,24 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /onPointerDown/u, '贴纸必须支持指针拖拽')
     const addRule = /\.dsh-desk-add \{([^}]*)\}/u.exec(styles)
     assert.ok(addRule !== null, '缺 .dsh-desk-add 规则')
-    assert.match(addRule[1], /border-radius:\s*var\(--dsw-radius-lg/u, '圆角用宿主控制圆角 token')
-    assert.match(addRule[1], /--dsw-alias-brand-primary-new-colorprimary-new-color/u, '底色用宿主官方蓝紫品牌色')
-    assert.ok(!/background:\s*var\(--dsw-alias-bg-layer-1/u.test(addRule[1]), '不得退回白底按钮')
+    assert.match(addRule[1], /--dsw-alias-brand-primary-new-colorprimary-new-color/u, '＋ 图标用宿主官方蓝紫品牌色')
+    const glassRule = /\.dsh-desk-fabglass \{([^}]*)\}/u.exec(styles)
+    assert.ok(glassRule !== null, '缺 .dsh-desk-fabglass 规则')
+    assert.match(glassRule[1], /backdrop-filter:\s*blur\(16px\)/u, '悬浮按钮用磨砂玻璃（与 theme-tone 输入框同材质）')
+    assert.match(glassRule[1], /-webkit-backdrop-filter/u, '玻璃要补 WebKit 前缀')
+    assert.match(glassRule[1], /background:\s*color-mix\(/u, '玻璃底是半透明 color-mix')
+    assert.match(glassRule[1], /width:\s*48px/u, '「＋」与垃圾桶同尺寸')
+    assert.match(glassRule[1], /--dsw-radius-lg/u, '两者圆角 token 一致')
+    assert.ok(!/background:\s*var\(--dsw-alias-bg-layer-1/u.test(addRule[1]), '不得退回实底按钮')
     const stackRule = /\.dsh-desk-fabstack \{([^}]*)\}/u.exec(styles)
     assert.ok(stackRule !== null, '缺 .dsh-desk-fabstack 规则')
     assert.match(stackRule[1], /position:\s*absolute/u, '悬浮操作组固定在右下角')
     assert.match(stackRule[1], /flex-direction:\s*row/u, '垃圾桶与「＋」必须同一排')
-    assert.match(addRule[1], /width:\s*48px/u, '「＋」与垃圾桶同尺寸')
-    const fabRule = /\.dsh-desk-fab-secondary \{([^}]*)\}/u.exec(styles)
-    assert.ok(fabRule !== null, '缺 .dsh-desk-fab-secondary 规则')
-    assert.match(fabRule[1], /width:\s*48px/u, '垃圾桶与「＋」同尺寸')
-    assert.match(fabRule[1], /--dsw-radius-lg/u, '两者圆角 token 一致')
     // 悬浮组不能被内容列限宽规则套上 width:100%（否则右定位会被推到左边）。
     assert.match(styles, /\.dsh-desk-page > :not\(\.dsh-desk-fabstack\)/u, '内容列限宽要排除悬浮操作组')
     // owner 2026-11-06：＋ 在左、垃圾桶在右。
     assert.ok(
-      page.indexOf('className="dsh-desk-add"') < page.indexOf('className="dsh-desk-fab-secondary"'),
+      page.indexOf('dsh-desk-add dsh-desk-fabglass') < page.indexOf('dsh-desk-fab-secondary dsh-desk-fabglass'),
       '「＋」应排在垃圾桶前面（视觉上在左）',
     )
     // 贴纸图标用深墨色，不依赖主题的前景色（light 主题下也清晰）。

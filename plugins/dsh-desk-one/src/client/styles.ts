@@ -340,29 +340,55 @@ html[data-platform='darwin'] .dsh-desk-head {
 }
 /* 「＋」：保留原来的悬浮按钮形态，只对齐宿主语言 ——
    圆角用官方控制圆角 token，颜色用官方蓝紫品牌色（浅色 rgb(65,118,230)、深色走 deepseek-450）。 */
-.dsh-desk-add {
+/* 右下角悬浮按钮：与 theme-tone 的输入框同一套磨砂玻璃材质 ——
+   半透明底 + backdrop blur/saturate + 顶部边缘光 + 软浮起阴影；＋ 用品牌蓝图标做主动作。 */
+.dsh-desk-fabglass {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 48px;
   height: 48px;
   padding: 0;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 52%, var(--dsw-alias-border-l1, #e2e5ea));
   border-radius: var(--dsw-radius-lg, 16px);
-  background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
-  color: #ffffff;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 64%, transparent);
+  color: var(--dsw-alias-label-secondary, #6b7280);
   cursor: pointer;
-  box-shadow: 0 8px 20px -8px rgba(20, 25, 40, 0.35);
-  transition: filter 0.12s ease, transform 0.12s ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 8px 24px -14px rgba(20, 25, 40, 0.35);
+  backdrop-filter: blur(16px) saturate(115%) brightness(1.04);
+  -webkit-backdrop-filter: blur(16px) saturate(115%) brightness(1.04);
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
-.dsh-desk-add svg {
+.dsh-desk-fabglass svg {
   display: block;
   flex: none;
+}
+.dsh-desk-fabglass:hover {
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 78%, transparent);
+  color: var(--dsw-alias-label-primary, #1f2329);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 10px 28px -14px rgba(20, 25, 40, 0.42);
+}
+/* 浏览器不支持背景模糊时退回更实的半透明底，保证按钮可读。 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .dsh-desk-fabglass {
+    background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 90%, transparent);
+  }
+}
+/* 「＋」：主动作，玻璃面 + 品牌蓝图标。 */
+.dsh-desk-add {
+  color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+}
+.dsh-desk-add svg {
   width: 20px;
   height: 20px;
 }
 .dsh-desk-add:hover {
-  filter: brightness(0.94);
+  color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
 }
 .dsh-desk-add:active {
   transform: scale(0.97);
@@ -371,7 +397,12 @@ html[data-platform='darwin'] .dsh-desk-head {
   opacity: 0.6;
   cursor: default;
 }
-/* 右下角操作组：同一排、同尺寸、同圆角；＋ 在左，垃圾桶在右。 */
+/* 垃圾桶：玻璃面 + 主题前景色图标。 */
+.dsh-desk-fab-secondary svg {
+  width: 22px;
+  height: 22px;
+}
+/* 右下角操作组：同一排、同尺寸；＋ 在左，垃圾桶在右。 */
 .dsh-desk-fabstack {
   position: absolute;
   right: 28px;
@@ -384,32 +415,6 @@ html[data-platform='darwin'] .dsh-desk-head {
   width: auto;
   max-width: none;
   margin: 0;
-}
-.dsh-desk-fab-secondary {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: var(--dsw-radius-lg, 16px);
-  background: var(--dsw-alias-bg-layer-1, #ffffff);
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  cursor: pointer;
-  box-shadow: 0 8px 20px -12px rgba(20, 25, 40, 0.3);
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.dsh-desk-fab-secondary svg {
-  display: block;
-  flex: none;
-  width: 22px;
-  height: 22px;
-}
-.dsh-desk-fab-secondary:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--dsw-alias-label-primary, #1f2329);
 }
 /* 垃圾桶计数：叠在图标按钮右上角的小徽标。 */
 .dsh-desk-fab-count {
