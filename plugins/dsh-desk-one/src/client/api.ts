@@ -43,7 +43,7 @@ export function updateNote(input: {
     readonly body?: string
     readonly color?: string
     readonly pinned?: boolean
-    readonly archived?: boolean
+    readonly trashed?: boolean
     readonly x?: number
     readonly y?: number
     readonly width?: number

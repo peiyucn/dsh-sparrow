@@ -63,7 +63,7 @@ interface TaskPayload {
 interface NotePayload {
   pinned: boolean
   color?: string
-  archived: boolean
+  trashed: boolean
   /** 便签墙自由位置（px）：x/y 缺省时由界面按序号兜底摆放，用户拖动后才落库。 */
   x?: number
   y?: number
@@ -142,7 +142,7 @@ interface DeskEdge {
 
 **focus**：`running ⇄ paused`，任一状态可 `done` / `cancelled`；同一时刻全局只允许一个 `running` 或 `paused` 会话。
 
-**note / event / project**：note 用 `archived` 布尔；event 无状态（镜像同步状态在 `source.syncState`）；project 用 `archived`。
+**note / event / project**：note 用 `trashed` 布尔（垃圾桶）；event 无状态（镜像同步状态在 `source.syncState`）；project 用 `archived`（命名待定）。
 
 ## 时间模型
 

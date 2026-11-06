@@ -30,7 +30,7 @@ export interface NotePatch {
   readonly body?: string
   readonly color?: string
   readonly pinned?: boolean
-  readonly archived?: boolean
+  readonly trashed?: boolean
   /** 便签墙自由位置（px，相对墙面画布）。 */
   readonly x?: number
   readonly y?: number
@@ -100,7 +100,7 @@ export function createNoteRecord(
     tags: [],
     color: input.color,
     pinned: false,
-    archived: false,
+    trashed: false,
     ...(x === undefined ? {} : { x }),
     ...(y === undefined ? {} : { y }),
     createdAt: meta.now,
@@ -130,7 +130,7 @@ export function patchNoteRecord(
     tags: readonly string[]
     color: NoteColor
     pinned: boolean
-    archived: boolean
+    trashed: boolean
     x?: number
     y?: number
     width?: number
@@ -164,9 +164,9 @@ export function patchNoteRecord(
     if (typeof patch.pinned !== 'boolean') throw new DeskModelError('INVALID_NOTE', 'pinned 必须是布尔值')
     next.pinned = patch.pinned
   }
-  if (patch.archived !== undefined) {
-    if (typeof patch.archived !== 'boolean') throw new DeskModelError('INVALID_NOTE', 'archived 必须是布尔值')
-    next.archived = patch.archived
+  if (patch.trashed !== undefined) {
+    if (typeof patch.trashed !== 'boolean') throw new DeskModelError('INVALID_NOTE', 'trashed 必须是布尔值')
+    next.trashed = patch.trashed
   }
   const x = normalizeCoordinate(patch.x)
   const y = normalizeCoordinate(patch.y)

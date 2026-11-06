@@ -63,18 +63,19 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(installAt > gateAt, '能力门必须排在安装之前')
   })
 
-  it('便签墙 应该 有归档区：卡片可归档，墙上方有入口，归档区可恢复 / 删除', async () => {
+  it('便签墙 应该 有垃圾桶：卡片可丢进垃圾桶，入口与「＋」成组，可恢复 / 永久删除', async () => {
     const page = await read('src/client/DeskOnePage.tsx')
     const styles = await read('src/client/styles.ts')
-    assert.match(page, /dsh-desk-wallbar/u, '便签标签要有墙栏承载归档入口')
-    assert.match(page, /dsh-desk-archive/u, '要有归档视图容器')
-    assert.match(page, /action\.restore/u, '归档区要能恢复')
-    assert.match(page, /archive\.empty/u, '归档区要有空态文案')
-    // owner 2026-11-06：归档相关操作一律用图标，不写文字按钮。
+    assert.match(page, /dsh-desk-trash/u, '要有垃圾桶视图容器')
+    assert.match(page, /action\.restore/u, '垃圾桶要能恢复')
+    assert.match(page, /trash\.empty/u, '垃圾桶要有空态文案')
+    assert.match(page, /dsh-desk-fabstack/u, '垃圾桶入口与「＋」成组')
+    assert.match(page, /dsh-desk-fab-secondary/u)
+    // owner 2026-11-06：垃圾桶相关操作一律用图标，不写文字按钮。
     const iconButtons = page.match(/dsh-desk-iconbtn/gu) ?? []
-    assert.ok(iconButtons.length >= 5, '归档 / 恢复 / 删除 / 关闭都应是图标按钮')
-    assert.ok(!/dsh-desk-note-archive/u.test(page), '贴纸归档不得再用文字按钮')
-    assert.ok(!/dsh-desk-link/u.test(page), '归档区不得再用文字链接按钮')
+    assert.ok(iconButtons.length >= 3, '贴纸删除 / 恢复 / 永久删除都应是图标按钮')
+    assert.ok(!/dsh-desk-wallbar/u.test(page), '不再有右上角单独的文字入口')
+    assert.ok(!/dsh-desk-archive|dsh-desk-note-archive|dsh-desk-link/u.test(page), '不得残留归档语义或文字按钮')
     const iconRule = /\.dsh-desk-iconbtn \{([^}]*)\}/u.exec(styles)
     assert.ok(iconRule !== null, '缺 .dsh-desk-iconbtn 规则')
     assert.match(iconRule[1], /--dsw-radius-sm/u, '图标按钮圆角用宿主 token')
@@ -95,10 +96,12 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /onPointerDown/u, '贴纸必须支持指针拖拽')
     const addRule = /\.dsh-desk-add \{([^}]*)\}/u.exec(styles)
     assert.ok(addRule !== null, '缺 .dsh-desk-add 规则')
-    assert.match(addRule[1], /position:\s*absolute/u, '「+」必须悬浮在墙面右下角')
     assert.match(addRule[1], /border-radius:\s*var\(--dsw-radius-lg/u, '圆角用宿主控制圆角 token')
     assert.match(addRule[1], /--dsw-alias-brand-primary-new-colorprimary-new-color/u, '底色用宿主官方蓝紫品牌色')
     assert.ok(!/background:\s*var\(--dsw-alias-bg-layer-1/u.test(addRule[1]), '不得退回白底按钮')
+    const stackRule = /\.dsh-desk-fabstack \{([^}]*)\}/u.exec(styles)
+    assert.ok(stackRule !== null, '缺 .dsh-desk-fabstack 规则')
+    assert.match(stackRule[1], /position:\s*absolute/u, '悬浮操作组固定在右下角')
     // 贴纸不出屏：墙面不滚动，不得再有可滚动画布。
     const wallRule = /\.dsh-desk-wall \{([^}]*)\}/u.exec(styles)
     assert.ok(wallRule !== null, '缺 .dsh-desk-wall 规则')

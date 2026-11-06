@@ -76,7 +76,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   const { listNotes, createNote, updateNote, deleteNote, t } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
   /** 便签墙内的视图：便签墙 / 归档区（只影响便签标签，不影响标签页选择）。 */
-  const [showArchive, setShowArchive] = useState(false)
+  const [showTrash, setShowTrash] = useState(false)
   const [notes, setNotes] = useState<readonly DeskNote[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -143,9 +143,9 @@ export function DeskOnePage(props: DeskPanelProps) {
     }
   }, [notes])
 
-  /** 墙上只摆未归档的便签；归档区的记录单独列出。 */
-  const activeNotes = useMemo(() => notes.filter(note => !note.archived), [notes])
-  const archivedNotes = useMemo(() => notes.filter(note => note.archived), [notes])
+  /** 墙上只摆不在垃圾桶里的便签；垃圾桶的记录单独列出。 */
+  const activeNotes = useMemo(() => notes.filter(note => !note.trashed), [notes])
+  const trashedNotes = useMemo(() => notes.filter(note => note.trashed), [notes])
 
   /** 坐标视图：缺位置/尺寸的记录用默认值，且一律夹进可见墙面（不产生滚动条）。 */
   const placed = useMemo<PlacedNote[]>(() => activeNotes.map((note, index) => {
@@ -235,7 +235,7 @@ export function DeskOnePage(props: DeskPanelProps) {
       })
       setNotes(current => [...current, note])
       selectTab('notes')
-      setShowArchive(false)
+      setShowTrash(false)
       requestAnimationFrame(() => { textareas.current.get(note.id)?.focus() })
     } catch (reason) {
       setActionError(t('state.saveFailed', { message: messageOf(reason) }))
@@ -357,23 +357,12 @@ export function DeskOnePage(props: DeskPanelProps) {
         <button
           type="button"
           className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-note-action"
-          aria-label={t('action.archive')}
-          title={t('action.archive')}
-          onClick={() => { void savePatch(item.note, { archived: true }) }}
+          aria-label={t('action.trash')}
+          title={t('action.trash')}
+          onClick={() => { void savePatch(item.note, { trashed: true }) }}
         >
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-            <path d="M3.5 5h13M4.5 5v9.5h11V5M8 9h4" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-note-action"
-          aria-label={t('action.delete')}
-          title={t('action.delete')}
-          onClick={() => { void removeWithFeedback(item.note.id) }}
-        >
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-            <path d="M6 6l8 8M14 6l-8 8" />
+            <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
           </svg>
         </button>
       </div>
@@ -401,24 +390,25 @@ export function DeskOnePage(props: DeskPanelProps) {
     </article>
   )
 
-  /** 归档区：列出已归档的便签，可恢复或彻底删除（入口在便签标签的墙上方）。 */
-  const renderArchive = (): ReactElement => (
-    <div className="dsh-desk-archive">
-      {archivedNotes.length === 0
-        ? <p className="dsh-desk-wall-hint">{t('archive.empty')}</p>
+  /** 垃圾桶：轻便签的删除先进这里，可恢复或永久删除（入口在右下角「＋」旁边）。 */
+  const renderTrash = (): ReactElement => (
+    <div className="dsh-desk-trash">
+      <h2 className="dsh-desk-trash-title">{t('trash.title')}</h2>
+      {trashedNotes.length === 0
+        ? <p className="dsh-desk-wall-hint">{t('trash.empty')}</p>
         : (
-            <ul className="dsh-desk-archive-list">
-              {archivedNotes.map(note => (
-                <li key={note.id} className="dsh-desk-archive-row">
-                  <span className="dsh-desk-archive-dot" data-color={note.color} />
-                  <span className="dsh-desk-archive-text">{note.title === '' ? t('note.placeholder') : note.title}</span>
-                  <span className="dsh-desk-archive-meta">{formatDate(note.updatedAt)}</span>
+            <ul className="dsh-desk-trash-list">
+              {trashedNotes.map(note => (
+                <li key={note.id} className="dsh-desk-trash-row">
+                  <span className="dsh-desk-trash-dot" data-color={note.color} />
+                  <span className="dsh-desk-trash-text">{note.title === '' ? t('note.placeholder') : note.title}</span>
+                  <span className="dsh-desk-trash-meta">{formatDate(note.updatedAt)}</span>
                   <button
                     type="button"
                     className="dsh-desk-iconbtn"
                     aria-label={t('action.restore')}
                     title={t('action.restore')}
-                    onClick={() => { void savePatch(note, { archived: false }) }}
+                    onClick={() => { void savePatch(note, { trashed: false }) }}
                   >
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
                       <path d="M4.5 6.5v4h4" />
@@ -473,32 +463,8 @@ export function DeskOnePage(props: DeskPanelProps) {
       {actionError === null ? null : <p className="dsh-desk-error">{actionError}</p>}
       {tab === 'overview' ? renderOverview() : (
         <div className="dsh-desk-notesview">
-          <div className="dsh-desk-wallbar">
-            <button
-              type="button"
-              className="dsh-desk-iconbtn dsh-desk-iconbtn-wide"
-              aria-label={showArchive ? t('action.backToWall') : t('action.archive')}
-              title={showArchive ? t('action.backToWall') : t('action.archive')}
-              onClick={() => setShowArchive(current => !current)}
-            >
-              {showArchive
-                ? (
-                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                    <path d="M11.5 5.5L7 10l4.5 4.5M7.5 10h7" />
-                  </svg>
-                )
-                : (
-                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                    <path d="M3.5 5h13M4.5 5v9.5h11V5M8 9h4" />
-                  </svg>
-                )}
-              {!showArchive && archivedNotes.length > 0
-                ? <span className="dsh-desk-count">{archivedNotes.length}</span>
-                : null}
-            </button>
-          </div>
-          {showArchive
-            ? renderArchive()
+          {showTrash
+            ? renderTrash()
             : (
                 <div className="dsh-desk-wall" ref={wallRef}>
                   {loading && activeNotes.length === 0
@@ -510,20 +476,48 @@ export function DeskOnePage(props: DeskPanelProps) {
               )}
         </div>
       )}
-      {tab === 'notes' && !showArchive
+      {tab === 'notes'
         ? (
-          <button
-            type="button"
-            className="dsh-desk-add"
-            disabled={creating}
-            aria-label={t('action.newNote')}
-            title={t('action.newNote')}
-            onClick={() => { void addNote() }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
+          <div className="dsh-desk-fabstack">
+            <button
+              type="button"
+              className="dsh-desk-fab-secondary"
+              aria-label={showTrash ? t('action.backToWall') : t('action.trash')}
+              title={showTrash ? t('action.backToWall') : t('action.trash')}
+              onClick={() => setShowTrash(current => !current)}
+            >
+              {showTrash
+                ? (
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                    <path d="M11.5 5.5L7 10l4.5 4.5M7.5 10h7" />
+                  </svg>
+                )
+                : (
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                    <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+                  </svg>
+                )}
+              {!showTrash && trashedNotes.length > 0
+                ? <span className="dsh-desk-fab-count">{trashedNotes.length}</span>
+                : null}
+            </button>
+            {showTrash
+              ? null
+              : (
+                  <button
+                    type="button"
+                    className="dsh-desk-add"
+                    disabled={creating}
+                    aria-label={t('action.newNote')}
+                    title={t('action.newNote')}
+                    onClick={() => { void addNote() }}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  </button>
+                )}
+          </div>
         )
         : null}
     </div>

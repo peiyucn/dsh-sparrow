@@ -68,7 +68,7 @@ export function registerDeskTools(ctx: Context, store: DeskStore): void {
       body: { type: 'string', description: 'New body.' },
       color: { type: 'string', enum: NOTE_COLORS, description: 'New color tag.' },
       pinned: { type: 'boolean', description: 'Pin or unpin the note.' },
-      archived: { type: 'boolean', description: 'Archive or restore the note.' },
+      trashed: { type: 'boolean', description: 'Move the note to the trash (true) or restore it (false).' },
     },
     output: textOutput,
     async execute(args) {
@@ -78,7 +78,7 @@ export function registerDeskTools(ctx: Context, store: DeskStore): void {
           ...args.body === undefined ? {} : { body: args.body },
           ...args.color === undefined ? {} : { color: args.color },
           ...args.pinned === undefined ? {} : { pinned: args.pinned },
-          ...args.archived === undefined ? {} : { archived: args.archived },
+          ...args.trashed === undefined ? {} : { trashed: args.trashed },
         })
         return JSON.stringify({ ok: true, note, summary: `已更新便签「${note.title}」` })
       } catch (error) {

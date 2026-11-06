@@ -19,7 +19,8 @@ const noteSchema = z.object({
   tags: z.array(z.string()),
   color: z.enum(NOTE_COLORS),
   pinned: z.boolean(),
-  archived: z.boolean(),
+  // 垃圾桶：老记录没有该字段，解析时补默认 false（存档语义已废弃，旧字段被 zod 丢弃）。
+  trashed: z.boolean().default(false),
   // 便签墙自由位置：老记录没有这两个字段也能通过校验（向后兼容，无需迁移）。
   x: z.number().optional(),
   y: z.number().optional(),

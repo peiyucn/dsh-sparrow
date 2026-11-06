@@ -10,7 +10,7 @@ export type NoteColor = (typeof NOTE_COLORS)[number]
 /**
  * 便签对象（S0 唯一的 DeskNode kind）。字段与 spec 的 Node 基础字段对齐：
  * `id / kind / schema / title / body / tags / createdAt / updatedAt / revision` 是核心，
- * 便签特有字段（color / pinned / archived）在 S0 直接放对象上；后续引入 payload 分层时随迁移补。
+ * 便签特有字段（color / pinned / trashed）在 S0 直接放对象上；后续引入 payload 分层时随迁移补。
  */
 export interface DeskNote {
   readonly id: string
@@ -21,7 +21,8 @@ export interface DeskNote {
   readonly tags: readonly string[]
   readonly color: NoteColor
   readonly pinned: boolean
-  readonly archived: boolean
+  /** 是否在垃圾桶里（轻便签的删除是先进垃圾桶，可恢复）。 */
+  readonly trashed: boolean
   /** 便签墙自由位置（px，相对墙面画布）；缺省时界面按序号级联摆放。 */
   readonly x?: number
   readonly y?: number
@@ -70,7 +71,7 @@ export interface NotePatchRequest {
   readonly body?: string
   readonly color?: string
   readonly pinned?: boolean
-  readonly archived?: boolean
+  readonly trashed?: boolean
   readonly x?: number
   readonly y?: number
   readonly width?: number
