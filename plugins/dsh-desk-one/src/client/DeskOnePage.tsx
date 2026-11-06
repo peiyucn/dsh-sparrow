@@ -8,8 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  LOCALE_NAMESPACE, NOTE_COLORS, NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH, NOTE_MAX_SIZE,
-  NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH, TAB_STORAGE_KEY,
+  LOCALE_NAMESPACE, MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTE_COLORS, NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH,
+  NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH, TAB_STORAGE_KEY, TRASH_PAGE_SIZE,
 } from '../constants.js'
 import type { DeskNote, NoteColor } from '../contract.js'
 import type { DeskPanelInjected } from './install.js'
@@ -20,6 +20,8 @@ type Tab = 'overview' | 'notes'
 const STICKY_COLORS: readonly NoteColor[] = ['yellow', 'green', 'blue', 'pink']
 /** 新便签在视口中心的级联错位（避免叠成一摞）。 */
 const CASCADE_OFFSET = 18
+/** Smash 动画时长：贴纸按顺序飞走后统一落库（动画 + 落库都在这个窗口内完成）。 */
+const SMASH_ANIMATION_MS = 480
 
 interface WallSize {
   readonly width: number
@@ -79,6 +81,11 @@ export function DeskOnePage(props: DeskPanelProps) {
   const [showTrash, setShowTrash] = useState(false)
   /** 「清空垃圾桶」是显式二次确认操作，绝不自动清空。 */
   const [confirmClearTrash, setConfirmClearTrash] = useState(false)
+  /** 「Smash!」一键把墙上便签全丢进垃圾桶，同样需要二次确认。 */
+  const [confirmSmash, setConfirmSmash] = useState(false)
+  const [smashing, setSmashing] = useState(false)
+  /** 垃圾桶一次渲染 20 行，点「加载更多」再加载。 */
+  const [trashVisible, setTrashVisible] = useState(TRASH_PAGE_SIZE)
   const [notes, setNotes] = useState<readonly DeskNote[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -95,6 +102,12 @@ export function DeskOnePage(props: DeskPanelProps) {
   notesRef.current = notes
   /** 每张便签一条写队列（z / 位置 / 尺寸 / 正文按顺序保存）。 */
   const writeChains = useRef(new Map<string, Promise<void>>())
+  /** Smash 动画的定时器：卸载时清掉，避免动画后写已卸载组件的状态。 */
+  const smashTimer = useRef<number | null>(null)
+
+  useEffect(() => () => {
+    if (smashTimer.current !== null) window.clearTimeout(smashTimer.current)
+  }, [])
 
   const selectTab = useCallback((next: Tab): void => {
     setTab(next)
@@ -145,9 +158,10 @@ export function DeskOnePage(props: DeskPanelProps) {
     }
   }, [notes])
 
-  /** 墙上只摆不在垃圾桶里的便签；垃圾桶的记录单独列出。 */
+  /** 墙上只摆不在垃圾桶里的便签；垃圾桶的记录单独列出（一次只渲染前 20 行）。 */
   const activeNotes = useMemo(() => notes.filter(note => !note.trashed), [notes])
   const trashedNotes = useMemo(() => notes.filter(note => note.trashed), [notes])
+  const visibleTrashed = useMemo(() => trashedNotes.slice(0, trashVisible), [trashedNotes, trashVisible])
 
   /** 坐标视图：缺位置/尺寸的记录用默认值，且一律夹进可见墙面（不产生滚动条）。 */
   const placed = useMemo<PlacedNote[]>(() => activeNotes.map((note, index) => {
@@ -196,16 +210,55 @@ export function DeskOnePage(props: DeskPanelProps) {
     })
   }, [enqueueWrite, load, replaceNote, t, updateNote])
 
-  /** 点 / 拖 / 改大小把这张便签抬到最上层，并把层级持久化（刷新/重启后顺序不丢）。 */
+  /** 点 / 拖 / 改大小把这张便签抬到最上层；已在最上层时跳过写库（省掉一次性 z 写）。 */
   const raise = useCallback((noteId: string): void => {
     const current = notesRef.current.find(item => item.id === noteId)
     if (current === undefined) return
     const maxZ = notesRef.current.reduce((max, item) => Math.max(max, item.z ?? 0), zTopRef.current)
+    if (current.z !== undefined && current.z === maxZ) return
     zTopRef.current = maxZ + 1
     const layer = zTopRef.current
     setNotes(list => list.map(item => item.id === noteId ? { ...item, z: layer } : item))
     savePatch(current, { z: layer })
   }, [savePatch])
+
+  /** 把一张便签丢进垃圾桶；垃圾桶满了就提示并带用户去清空。 */
+  const trashNote = useCallback((note: DeskNote): void => {
+    if (trashedNotes.length >= MAX_TRASH_NOTES) {
+      setActionError(t('trash.full'))
+      setShowTrash(true)
+      return
+    }
+    setActionError(null)
+    void savePatch(note, { trashed: true })
+  }, [savePatch, t, trashedNotes.length])
+
+  /** Smash!：二次确认后把墙上所有便签一把丢进垃圾桶（先播动画，再统一落库）。 */
+  const smashWall = useCallback((): void => {
+    if (smashing) return
+    if (activeNotes.length === 0) {
+      setActionError(t('wall.empty'))
+      return
+    }
+    if (!confirmSmash) {
+      setConfirmSmash(true)
+      setActionError(null)
+      return
+    }
+    setConfirmSmash(false)
+    if (trashedNotes.length + activeNotes.length > MAX_TRASH_NOTES) {
+      setActionError(t('trash.full'))
+      setShowTrash(true)
+      return
+    }
+    setSmashing(true)
+    const targets = activeNotes
+    smashTimer.current = window.setTimeout(() => {
+      smashTimer.current = null
+      for (const note of targets) void savePatch(note, { trashed: true })
+      setSmashing(false)
+    }, SMASH_ANIMATION_MS)
+  }, [activeNotes, confirmSmash, savePatch, smashing, t, trashedNotes.length])
 
   /** 删除便签；排在同便签的写队列之后，避免「先删后写」造成 404 噪声。 */
   const removeWithFeedback = useCallback((id: string): void => {
@@ -223,6 +276,11 @@ export function DeskOnePage(props: DeskPanelProps) {
   /** 「＋」/ 双击空白处：新建一张便签，落在当前视口中间或双击点附近，并立刻置顶 + 聚焦。 */
   const addNote = useCallback(async (point?: { x: number; y: number }): Promise<void> => {
     if (creating) return
+    // 产品硬上限：墙上最多 100 张（host 侧同样校验，工具也绕不过去）。
+    if (activeNotes.length >= MAX_ACTIVE_NOTES) {
+      setActionError(t('wall.full'))
+      return
+    }
     setCreating(true)
     setActionError(null)
     try {
@@ -279,6 +337,8 @@ export function DeskOnePage(props: DeskPanelProps) {
     let currentX = item.x
     let currentY = item.y
     let moved = false
+    // 拖动过程直接改 DOM 位置（O(1)），抬手才写回 state + 落库：墙上张数多也不掉帧。
+    const element = event.currentTarget as HTMLElement
     const onMove = (moveEvent: PointerEvent): void => {
       if (moveEvent.pointerId !== event.pointerId) return
       const dx = moveEvent.clientX - startX
@@ -287,15 +347,17 @@ export function DeskOnePage(props: DeskPanelProps) {
       moved = true
       currentX = clamp(Math.round(item.x + dx), 0, maxX)
       currentY = clamp(Math.round(item.y + dy), 0, maxY)
-      setNotes(current => current.map(note => note.id === item.note.id
-        ? { ...note, x: currentX, y: currentY }
-        : note))
+      element.style.left = `${currentX}px`
+      element.style.top = `${currentY}px`
     }
     const finish = (): void => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', finish)
       window.removeEventListener('pointercancel', finish)
       if (!moved) return
+      setNotes(current => current.map(note => note.id === item.note.id
+        ? { ...note, x: currentX, y: currentY }
+        : note))
       void savePatch(item.note, { x: currentX, y: currentY })
     }
     window.addEventListener('pointermove', onMove)
@@ -315,20 +377,26 @@ export function DeskOnePage(props: DeskPanelProps) {
     let currentWidth = item.width
     let currentHeight = item.height
     let moved = false
+    // 同样直接改 DOM 尺寸（O(1)），抬手才写回 state + 落库。
+    const element = (event.currentTarget as HTMLElement).closest('.dsh-desk-note') as HTMLElement | null
     const onMove = (moveEvent: PointerEvent): void => {
       if (moveEvent.pointerId !== event.pointerId) return
       moved = true
       currentWidth = clamp(Math.round(item.width + moveEvent.clientX - startX), NOTE_MIN_WIDTH, Math.min(maxWidth, NOTE_MAX_SIZE))
       currentHeight = clamp(Math.round(item.height + moveEvent.clientY - startY), NOTE_MIN_HEIGHT, Math.min(maxHeight, NOTE_MAX_SIZE))
-      setNotes(current => current.map(note => note.id === item.note.id
-        ? { ...note, width: currentWidth, height: currentHeight }
-        : note))
+      if (element !== null) {
+        element.style.width = `${currentWidth}px`
+        element.style.height = `${currentHeight}px`
+      }
     }
     const finish = (): void => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', finish)
       window.removeEventListener('pointercancel', finish)
       if (!moved) return
+      setNotes(current => current.map(note => note.id === item.note.id
+        ? { ...note, width: currentWidth, height: currentHeight }
+        : note))
       void savePatch(item.note, { width: currentWidth, height: currentHeight })
     }
     window.addEventListener('pointermove', onMove)
@@ -347,12 +415,19 @@ export function DeskOnePage(props: DeskPanelProps) {
     void savePatch(note, { body })
   }, [removeWithFeedback, savePatch])
 
-  const renderNote = (item: PlacedNote): ReactElement => (
+  const renderNote = (item: PlacedNote, index: number): ReactElement => (
     <article
       key={item.note.id}
-      className="dsh-desk-note"
+      className={smashing ? 'dsh-desk-note dsh-desk-note-smashing' : 'dsh-desk-note'}
       data-color={item.note.color}
-      style={{ left: item.x, top: item.y, width: item.width, height: item.height, zIndex: item.zIndex }}
+      style={{
+        left: item.x,
+        top: item.y,
+        width: item.width,
+        height: item.height,
+        zIndex: item.zIndex,
+        animationDelay: smashing ? `${Math.min(index, 8) * 18}ms` : undefined,
+      }}
       onPointerDown={(event) => {
         // 点/拖哪张，哪张就置顶。
         raise(item.note.id)
@@ -382,7 +457,7 @@ export function DeskOnePage(props: DeskPanelProps) {
           className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-note-action"
           aria-label={t('action.trash')}
           title={t('action.trash')}
-          onClick={() => { void savePatch(item.note, { trashed: true }) }}
+          onClick={() => { trashNote(item.note) }}
         >
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
             <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
@@ -420,26 +495,45 @@ export function DeskOnePage(props: DeskPanelProps) {
       return
     }
     setConfirmClearTrash(false)
+    setTrashVisible(TRASH_PAGE_SIZE)
     for (const note of trashedNotes) removeWithFeedback(note.id)
   }, [confirmClearTrash, removeWithFeedback, trashedNotes])
 
   const renderTrash = (): ReactElement => (
     <div className="dsh-desk-trash">
       <div className="dsh-desk-trash-head">
-        <h2 className="dsh-desk-trash-title">{t('trash.title')}</h2>
+        <h2 className="dsh-desk-trash-title">
+          {t('trash.title')}
+          {trashedNotes.length > 0
+            ? <span className="dsh-desk-trash-count">{t('trash.total', { count: trashedNotes.length })}</span>
+            : null}
+        </h2>
         {trashedNotes.length === 0
           ? null
           : (
-              <button type="button" className="dsh-desk-trash-clear" onClick={clearTrash}>
-                {confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
-              </button>
+              <div className="dsh-desk-trash-actions">
+                {trashVisible < trashedNotes.length
+                  ? (
+                      <button
+                        type="button"
+                        className="dsh-desk-trash-clear"
+                        onClick={() => setTrashVisible(current => current + TRASH_PAGE_SIZE)}
+                      >
+                        {t('action.loadMore')}
+                      </button>
+                    )
+                  : null}
+                <button type="button" className="dsh-desk-trash-clear" onClick={clearTrash}>
+                  {confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
+                </button>
+              </div>
             )}
       </div>
       {trashedNotes.length === 0
         ? <p className="dsh-desk-wall-hint">{t('trash.empty')}</p>
         : (
             <ul className="dsh-desk-trash-list">
-              {trashedNotes.map(note => (
+              {visibleTrashed.map(note => (
                 <li key={note.id} className="dsh-desk-trash-row">
                   <span className="dsh-desk-trash-dot" data-color={note.color} />
                   <span className="dsh-desk-trash-text">{note.title === '' ? t('note.placeholder') : note.title}</span>
@@ -538,47 +632,61 @@ export function DeskOnePage(props: DeskPanelProps) {
       {tab === 'notes'
         ? (
           <div className="dsh-desk-fabstack">
-            {showTrash
-              ? null
-              : (
+            <div className="dsh-desk-fabrow">
+              {showTrash
+                ? null
+                : (
+                    <button
+                      type="button"
+                      className="dsh-desk-add dsh-desk-fabglass"
+                      disabled={creating || smashing}
+                      aria-label={t('action.newNote')}
+                      title={t('action.newNote')}
+                      onClick={() => { void addNote() }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                    </button>
+                  )}
+              <button
+                type="button"
+                className="dsh-desk-fab-secondary dsh-desk-fabglass"
+                aria-label={showTrash ? t('action.backToWall') : t('action.trash')}
+                title={showTrash ? t('action.backToWall') : t('action.trash')}
+                onClick={() => {
+                  setConfirmClearTrash(false)
+                  setConfirmSmash(false)
+                  setTrashVisible(TRASH_PAGE_SIZE)
+                  setShowTrash(current => !current)
+                }}
+              >
+                {showTrash
+                  ? (
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                      <path d="M11.5 5.5L7 10l4.5 4.5M7.5 10h7" />
+                    </svg>
+                  )
+                  : (
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                      <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+                    </svg>
+                  )}
+              </button>
+            </div>
+            {!showTrash && activeNotes.length > 0
+              ? (
                   <button
                     type="button"
-                    className="dsh-desk-add dsh-desk-fabglass"
-                    disabled={creating}
-                    aria-label={t('action.newNote')}
-                    title={t('action.newNote')}
-                    onClick={() => { void addNote() }}
+                    className="dsh-desk-smash"
+                    data-confirm={confirmSmash}
+                    disabled={smashing}
+                    onClick={smashWall}
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
+                    {confirmSmash ? t('action.smashConfirm') : t('action.smash')}
                   </button>
-                )}
-            <button
-              type="button"
-              className="dsh-desk-fab-secondary dsh-desk-fabglass"
-              aria-label={showTrash ? t('action.backToWall') : t('action.trash')}
-              title={showTrash ? t('action.backToWall') : t('action.trash')}
-              onClick={() => {
-                setConfirmClearTrash(false)
-                setShowTrash(current => !current)
-              }}
-            >
-              {showTrash
-                ? (
-                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                    <path d="M11.5 5.5L7 10l4.5 4.5M7.5 10h7" />
-                  </svg>
                 )
-                : (
-                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                    <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
-                  </svg>
-                )}
-              {!showTrash && trashedNotes.length > 0
-                ? <span className="dsh-desk-fab-count">{trashedNotes.length}</span>
-                : null}
-            </button>
+              : null}
           </div>
         )
         : null}

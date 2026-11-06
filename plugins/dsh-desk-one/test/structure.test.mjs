@@ -82,6 +82,33 @@ describe('dsh-desk-one 结构', () => {
     assert.match(iconRule[1], /--dsw-radius-sm/u, '图标按钮圆角用宿主 token')
   })
 
+  it('容量与止损：墙上限 100 / 垃圾桶限 200 / 分页 20 / Smash / 无角标', async () => {
+    const page = await read('src/client/DeskOnePage.tsx')
+    const styles = await read('src/client/styles.ts')
+    const constants = await read('src/constants.ts')
+    const store = await read('src/host/store.ts')
+    const tools = await read('src/host/tools.ts')
+    // 产品硬上限（owner 2026-11-06）：便签墙是轻笔记，100 张已超出注意力上限。
+    assert.match(constants, /MAX_ACTIVE_NOTES = 100/u, '墙上限 100')
+    assert.match(constants, /MAX_TRASH_NOTES = 200/u, '垃圾桶上限 200')
+    assert.match(constants, /TRASH_PAGE_SIZE = 20/u, '垃圾桶分页 20')
+    assert.match(page, /MAX_ACTIVE_NOTES/u, '客户端要挡墙上限')
+    assert.match(page, /wall\.full/u, '墙上限要有友好提示')
+    assert.match(page, /trash\.full/u, '垃圾桶满了要提示先清空')
+    assert.match(page, /action\.loadMore/u, '垃圾桶要能加载更多')
+    assert.match(page, /dsh-desk-smash/u, '底部要有 Smash!')
+    assert.match(page, /action\.smashConfirm/u, 'Smash 要二次确认')
+    assert.match(styles, /dsh-desk-note-smashing/u, 'Smash 要有飞散动画')
+    // 角标只留给未读：垃圾桶计数不再挂 badge。
+    assert.ok(!/fab-count/u.test(page), '垃圾桶不得再挂角标')
+    assert.ok(!/dsh-desk-fab-count/u.test(styles), '角标样式要删干净')
+    // host 侧同样校验，agent 工具也绕不过容量上限；列表工具要限流。
+    assert.match(store, /MAX_ACTIVE_NOTES/u, 'host 侧也要挡墙上限')
+    assert.match(store, /MAX_TRASH_NOTES/u, 'host 侧也要挡垃圾桶上限')
+    assert.match(tools, /default 50/u, '列表工具默认限 50 条')
+    assert.match(tools, /include_trashed/u, '列表工具要能选择是否包含垃圾桶')
+  })
+
   it('总览 应该 保持空白占位（内容未设计前不堆放功能）', async () => {
     const page = await read('src/client/DeskOnePage.tsx')
     assert.match(page, /dsh-desk-overview/u, '总览要有空白占位容器')
@@ -116,7 +143,10 @@ describe('dsh-desk-one 结构', () => {
     assert.match(stackRule[1], /position:\s*absolute/u, '悬浮操作组固定在底部')
     assert.match(stackRule[1], /left:\s*50%/u, '悬浮操作组放到底部中央')
     assert.match(stackRule[1], /transform:\s*translateX\(-50%\)/u, '底部居中要水平回拉一半')
-    assert.match(stackRule[1], /flex-direction:\s*row/u, '垃圾桶与「＋」必须同一排')
+    assert.match(stackRule[1], /flex-direction:\s*column/u, '按钮一排 + Smash 在下方，纵向排列')
+    const fabRowRule = /\.dsh-desk-fabrow \{([^}]*)\}/u.exec(styles)
+    assert.ok(fabRowRule !== null, '缺 .dsh-desk-fabrow 规则')
+    assert.match(fabRowRule[1], /flex-direction:\s*row/u, '垃圾桶与「＋」必须同一排')
     // 悬浮组不能被内容列限宽规则套上 width:100%（否则右定位会被推到左边）。
     assert.match(styles, /\.dsh-desk-page > :not\(\.dsh-desk-fabstack\)/u, '内容列限宽要排除悬浮操作组')
     // owner 2026-11-06：＋ 在左、垃圾桶在右。

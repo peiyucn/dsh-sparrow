@@ -9,7 +9,14 @@ import {
 } from './constants.js'
 import type { DeskNote, NoteColor } from './contract.js'
 
-export type DeskModelErrorCode = 'INVALID_NOTE' | 'REVISION_CONFLICT' | 'UNKNOWN_NOTE'
+export type DeskModelErrorCode =
+  | 'INVALID_NOTE'
+  | 'REVISION_CONFLICT'
+  | 'UNKNOWN_NOTE'
+  /** 便签墙已达 100 张上限（产品约束，见 constants.MAX_ACTIVE_NOTES）。 */
+  | 'NOTE_LIMIT'
+  /** 垃圾桶已达 200 张上限，必须先清空（见 constants.MAX_TRASH_NOTES）。 */
+  | 'TRASH_FULL'
 
 /** 模型层错误：路由据此映射 HTTP 状态（400 / 409 / 404）。 */
 export class DeskModelError extends Error {

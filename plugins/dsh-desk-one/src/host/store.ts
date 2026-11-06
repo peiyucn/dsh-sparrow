@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
-import { NODES_TABLE, PACKAGE_NAME } from '../constants.js'
+import { MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NODES_TABLE, PACKAGE_NAME } from '../constants.js'
 import {
   DeskModelError, createNoteRecord, filterNotes, normalizeCoordinate, normalizeLayer, normalizeNoteInput, patchNoteRecord,
   sortNotes, type NotePatch,
@@ -38,9 +38,22 @@ export class DeskStore {
   }
 
   /** 列出便签：置顶优先、最近更新在前，可按关键词过滤。 */
-  listNotes(query?: string): DeskNote[] {
+  /** 列表：默认全量（客户端墙面最多 100 张，够用）；工具面传 limit 限流，避免撑爆上下文。 */
+  listNotes(query?: string, limit?: number): DeskNote[] {
     const all = [...this.nodes.entries()].map(([, note]) => note)
-    return filterNotes(sortNotes(all), query)
+    const filtered = filterNotes(sortNotes(all), query)
+    if (limit === undefined) return filtered
+    const bounded = Number.isInteger(limit) && limit > 0 ? Math.min(limit, MAX_ACTIVE_NOTES + MAX_TRASH_NOTES) : 0
+    return bounded === 0 ? filtered : filtered.slice(0, bounded)
+  }
+
+  /** 按垃圾桶状态计数（容量上限校验用，O(n) 只在写入口跑，n ≤ 300）。 */
+  private countByTrashed(trashed: boolean): number {
+    let count = 0
+    for (const [, note] of this.nodes.entries()) {
+      if (note.trashed === trashed) count += 1
+    }
+    return count
   }
 
   /** 新建便签；入参归一化与校验在模型层完成。 */
@@ -52,6 +65,10 @@ export class DeskStore {
     readonly y?: unknown
     readonly z?: unknown
   }): Promise<DeskNote> {
+    // 产品硬上限（owner 2026-11-06）：墙上最多 100 张，客户端与 host 双重校验，工具也绕不过去。
+    if (this.countByTrashed(false) >= MAX_ACTIVE_NOTES) {
+      throw new DeskModelError('NOTE_LIMIT', `便签墙最多放 ${MAX_ACTIVE_NOTES} 张便签`)
+    }
     const input = normalizeNoteInput(raw)
     const note = createNoteRecord(input, {
       id: `note_${randomUUID()}`,
@@ -66,6 +83,10 @@ export class DeskStore {
 
   /** 应用补丁；revision 不匹配 → REVISION_CONFLICT，记录不存在 → UNKNOWN_NOTE。 */
   async updateNote(id: string, expectedRevision: number, patch: NotePatch): Promise<DeskNote> {
+    // 垃圾桶容量硬上限（owner 2026-11-06）：满了必须先清空，不允许无限堆积。
+    if (patch.trashed === true && this.countByTrashed(true) >= MAX_TRASH_NOTES) {
+      throw new DeskModelError('TRASH_FULL', `垃圾桶最多放 ${MAX_TRASH_NOTES} 张便签，请先清空垃圾桶`)
+    }
     const now = new Date().toISOString()
     try {
       return await this.nodes.update(id, current => patchNoteRecord(current, patch, { expectedRevision, now }))

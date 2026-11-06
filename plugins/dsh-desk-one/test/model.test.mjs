@@ -105,6 +105,20 @@ describe('desk 对象模型：创建与补丁', () => {
     )
   })
 
+  it('2000 条便签的排序 + 过滤 应该 在性能预算内（容量被 100/200 卡死前的余量检查）', () => {
+    const notes = Array.from({ length: 2000 }, (_, index) => createNoteRecord(
+      { title: `标题${index}`, body: `内容第${index}条`, color: 'default' },
+      { id: `note_${index}`, now: new Date(1700000000000 + index * 1000).toISOString() },
+    ))
+    const start = performance.now()
+    const sorted = sortNotes(notes)
+    const filtered = filterNotes(sorted, '标题1')
+    const elapsed = performance.now() - start
+    assert.equal(sorted.length, 2000)
+    assert.ok(filtered.length > 0)
+    assert.ok(elapsed < 200, `2000 条排序 + 过滤耗时 ${elapsed.toFixed(1)}ms，超过 200ms 预算`)
+  })
+
   it('补丁改正文 应该 让 title 跟随正文首行（便签墙只展示正文）', () => {
     const next = patchNoteRecord(note({ title: '', body: '' }), { body: '第一行\n第二行' }, {
       expectedRevision: 1,

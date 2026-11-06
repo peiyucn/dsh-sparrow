@@ -412,36 +412,65 @@ html[data-platform='darwin'] .dsh-desk-head {
   width: 22px;
   height: 22px;
 }
-/* 底部悬浮操作组：底部居中并排；＋ 在左，垃圾桶在右。 */
+/* 底部悬浮操作组：按钮一排居中，下方是 Smash!；＋ 在左，垃圾桶在右。 */
 .dsh-desk-fabstack {
   position: absolute;
   left: 50%;
   right: auto;
-  bottom: 28px;
+  bottom: 20px;
   transform: translateX(-50%);
   z-index: 2; /* 高于墙面的层级上下文：按钮永远在最上面，贴纸拖过来就压在按钮下面。 */
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   width: auto;
   max-width: none;
   margin: 0;
 }
-/* 垃圾桶计数：叠在图标按钮右上角的小徽标。 */
-.dsh-desk-fab-count {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
-  background: var(--dsw-alias-label-primary, #1f2329);
-  color: var(--dsw-alias-bg-layer-1, #ffffff);
+.dsh-desk-fabrow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+/* Smash!：平时很淡，确认时转危险色；点击后整墙贴纸飞进垃圾桶。 */
+.dsh-desk-smash {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 2px 8px;
+  border-radius: var(--dsw-radius-sm, 8px);
   font-size: 11px;
-  line-height: 18px;
-  text-align: center;
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.dsh-desk-smash:hover {
+  opacity: 0.95;
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+}
+.dsh-desk-smash[data-confirm='true'] {
+  opacity: 1;
+  color: var(--dsw-alias-state-error-primary, #c62828);
+  font-weight: 600;
+}
+.dsh-desk-smash:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+/* Smash 动画：贴纸依次向上飞散、淡出；落库在动画结束后统一进行。 */
+@keyframes dsh-desk-smash-out {
+  from { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+  to { opacity: 0; transform: translateY(-16px) rotate(-4deg) scale(0.94); }
+}
+.dsh-desk-note-smashing {
+  animation: dsh-desk-smash-out 260ms ease-in forwards;
+  pointer-events: none;
 }
 /* 垃圾桶：便签墙内的第二视图（右下角图标进入 / 返回）。 */
 .dsh-desk-trash {
@@ -458,6 +487,18 @@ html[data-platform='darwin'] .dsh-desk-head {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 8px;
+}
+.dsh-desk-trash-count {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
+.dsh-desk-trash-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .dsh-desk-trash-title {
   margin: 0;

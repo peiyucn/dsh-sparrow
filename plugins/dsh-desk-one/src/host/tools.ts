@@ -45,15 +45,19 @@ export function registerDeskTools(ctx: Context, store: DeskStore): void {
     description: 'List the user\'s desk notes, pinned first and newest first within the same pin state. Optionally filter by a case-insensitive keyword over title and body.',
     parameters: {
       query: { type: 'string', description: 'Case-insensitive keyword to match against title and body.' },
+      limit: { type: 'number', description: 'Maximum notes to return (default 50, max 200).' },
+      include_trashed: { type: 'boolean', description: 'Include notes currently in the trash (default false).' },
     },
     output: textOutput,
     execute(args) {
-      const notes = store.listNotes(args.query)
+      const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(Math.floor(args.limit), 200) : 50
+      const all = store.listNotes(args.query)
+      const notes = (args.include_trashed === true ? all : all.filter(note => !note.trashed)).slice(0, limit)
       return Promise.resolve(JSON.stringify({
         ok: true,
         total: notes.length,
         notes,
-        summary: notes.length === 0 ? '没有匹配的便签' : `共 ${notes.length} 条便签`,
+        summary: notes.length === 0 ? '没有匹配的便签' : `返回 ${notes.length} 条便签（默认不含垃圾桶）`,
       }))
     },
   }))

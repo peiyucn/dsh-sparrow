@@ -41,6 +41,15 @@ export const MAX_TITLE_CHARS = 200
 export const MAX_BODY_CHARS = 20_000
 export const MAX_QUERY_CHARS = 100
 
+/**
+ * 产品容量上限（owner 2026-11-06）：便签墙是轻笔记，100 张已超出人的注意力上限；
+ * 垃圾桶最多 200 张，满了必须先清空。两端（host / client）共用这份真值。
+ */
+export const MAX_ACTIVE_NOTES = 100
+export const MAX_TRASH_NOTES = 200
+/** 垃圾桶视图分页：一次渲染 20 行，其余按需加载。 */
+export const TRASH_PAGE_SIZE = 20
+
 /** 便签颜色：未知值一律拒绝（客户端色板与存储校验共用这一份真值）。 */
 export const NOTE_COLORS = ['default', 'yellow', 'green', 'blue', 'pink'] as const
 
