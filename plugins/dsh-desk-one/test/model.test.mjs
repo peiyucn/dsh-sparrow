@@ -73,6 +73,19 @@ describe('desk 对象模型：创建与补丁', () => {
     })
   })
 
+  it('创建 应该 接受初始层级（新建便签默认置顶）', () => {
+    const record = createNoteRecord(
+      { title: 'a', body: 'b', color: 'default' },
+      { id: 'note_x', now: '2026-01-01T00:00:00.000Z', z: 42 },
+    )
+    assert.equal(record.z, 42)
+    const invalid = createNoteRecord(
+      { title: 'a', body: 'b', color: 'default' },
+      { id: 'note_x', now: '2026-01-01T00:00:00.000Z', z: -1 },
+    )
+    assert.equal(invalid.z, undefined)
+  })
+
   it('补丁 应该 递增 revision 并合并字段', () => {
     const next = patchNoteRecord(note(), { title: '  新标题 ', pinned: true }, {
       expectedRevision: 1,

@@ -120,10 +120,23 @@ describe('dsh-desk-one 结构', () => {
     const actionRule = /\.dsh-desk-note-action \{([^}]*)\}/u.exec(styles)
     assert.ok(actionRule !== null, '缺 .dsh-desk-note-action 规则')
     assert.match(actionRule[1], /color:\s*rgba\(55, 53, 47/u, '贴纸图标要用纸面墨色（不随主题变白）')
+    // owner 2026-11-06：垃圾桶图标要够大，不要缩成黑疙瘩。
+    const smIconRule = /\.dsh-desk-iconbtn-sm svg \{([^}]*)\}/u.exec(styles)
+    assert.ok(smIconRule !== null, '缺贴纸小图标尺寸规则')
+    assert.match(smIconRule[1], /width:\s*20px/u, '贴纸垃圾桶图标至少 20px')
+    const fabIconRule = /\.dsh-desk-fab-secondary svg \{([^}]*)\}/u.exec(styles)
+    assert.ok(fabIconRule !== null, '缺底部垃圾桶图标尺寸规则')
+    assert.match(fabIconRule[1], /width:\s*22px/u, '底部垃圾桶图标至少 22px')
     // 贴纸不出屏：墙面不滚动，不得再有可滚动画布。
     const wallRule = /\.dsh-desk-wall \{([^}]*)\}/u.exec(styles)
     assert.ok(wallRule !== null, '缺 .dsh-desk-wall 规则')
     assert.match(wallRule[1], /overflow:\s*hidden/u, '墙面必须裁切不滚动（贴纸一律夹在可见区域内）')
+    // owner 2026-11-06：便签墙要有可见背板，贴纸不能飘在虚空里；空白处双击新建。
+    assert.match(wallRule[1], /border:\s*1px solid/u, '便签墙要有可见背板（细边）')
+    assert.match(wallRule[1], /--dsw-radius-xl/u, '背板用宿主大圆角')
+    assert.match(page, /onDoubleClick/u, '便签墙要支持双击空白处新建')
+    assert.match(page, /wall\.tip/u, '背板中央要有双击新建提示')
+    assert.match(page, /z:\s*layer/u, '新建便签要带层级（默认置顶）')
     assert.ok(!/dsh-desk-canvas/u.test(page), '不得再有可滚动的画布容器')
     // 真实便签是方角纸片，不是大圆角卡片。
     const noteRule = /\.dsh-desk-note \{([^}]*)\}/u.exec(styles)

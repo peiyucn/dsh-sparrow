@@ -31,6 +31,7 @@ export function createNote(input: {
   readonly color?: string
   readonly x?: number
   readonly y?: number
+  readonly z?: number
 }): Promise<DeskNote> {
   return postJson<NoteMutationResponse>(ROUTES.notes, input).then(payload => payload.note)
 }

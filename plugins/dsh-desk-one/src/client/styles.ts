@@ -88,12 +88,32 @@ html[data-platform='darwin'] .dsh-desk-head {
   min-height: 0;
   padding-bottom: 96px;
 }
-/* 墙面：正好占满剩余高度、**不滚动**；贴纸坐标一律夹在可见区域内。 */
+/* 墙面：一块可见的背板（细边 + 宿主圆角 + 主题自适应淡色底面），贴纸不再飘在虚空里。
+   正好占满剩余高度、**不滚动**；贴纸坐标一律夹在背板内。 */
 .dsh-desk-wall {
   position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  border-radius: var(--dsw-radius-xl, 20px);
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 94%, var(--dsw-alias-label-primary, #1f2329));
+}
+/* 背板中央的轻提示：双击新建；不拦截鼠标事件。 */
+.dsh-desk-wall-tip {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  padding: 0 16px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  opacity: 0.7;
+  pointer-events: none;
+  user-select: none;
 }
 .dsh-desk-wall-hint {
   position: absolute;
@@ -143,8 +163,8 @@ html[data-platform='darwin'] .dsh-desk-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 22px;
-  margin-bottom: 3px;
+  height: 26px;
+  margin-bottom: 2px;
 }
 /* 拖动提示：紧凑的六点抓握纹（2 列 × 3 行、2px 点、2px 间距），低对比度常驻、悬停略清楚。
    不用文字、不用背景块；整个正文以外的区域都能拖，它只是「这里能抓」的提示。 */
@@ -237,12 +257,12 @@ html[data-platform='darwin'] .dsh-desk-head {
 /* 墙栏入口：图标 + 计数，宽度按内容自适应。 */
 /* 贴纸上的小号图标（垃圾桶）：深墨色常驻，light / dark 主题下都看得清。 */
 .dsh-desk-iconbtn-sm {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
 }
 .dsh-desk-iconbtn-sm svg {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
 }
 .dsh-desk-note-action {
   color: rgba(55, 53, 47, 0.55);
@@ -319,8 +339,8 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-add svg {
   display: block;
   flex: none;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 .dsh-desk-add:hover {
   filter: brightness(0.94);
@@ -365,8 +385,8 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-fab-secondary svg {
   display: block;
   flex: none;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 .dsh-desk-fab-secondary:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));

@@ -25,6 +25,7 @@ export interface DeskPanelInjected {
     readonly color?: string
     readonly x?: number
     readonly y?: number
+    readonly z?: number
   }) => Promise<DeskNote>
   readonly updateNote: (input: {
     readonly id: string

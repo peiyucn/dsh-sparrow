@@ -9,7 +9,7 @@ import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
 import { NODES_TABLE, PACKAGE_NAME } from '../constants.js'
 import {
-  DeskModelError, createNoteRecord, filterNotes, normalizeCoordinate, normalizeNoteInput, patchNoteRecord,
+  DeskModelError, createNoteRecord, filterNotes, normalizeCoordinate, normalizeLayer, normalizeNoteInput, patchNoteRecord,
   sortNotes, type NotePatch,
 } from '../model.js'
 import type { DeskNote } from '../contract.js'
@@ -50,6 +50,7 @@ export class DeskStore {
     readonly color?: unknown
     readonly x?: unknown
     readonly y?: unknown
+    readonly z?: unknown
   }): Promise<DeskNote> {
     const input = normalizeNoteInput(raw)
     const note = createNoteRecord(input, {
@@ -57,6 +58,7 @@ export class DeskStore {
       now: new Date().toISOString(),
       x: normalizeCoordinate(raw.x),
       y: normalizeCoordinate(raw.y),
+      z: normalizeLayer(raw.z),
     })
     await this.nodes.put(note.id, note)
     return note

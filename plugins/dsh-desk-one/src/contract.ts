@@ -64,6 +64,8 @@ export interface CreateNoteRequest {
   readonly color?: string
   readonly x?: number
   readonly y?: number
+  /** 新建时直接置顶：层级由客户端按当前最大 z + 1 计算并落库。 */
+  readonly z?: number
 }
 
 export interface NotePatchRequest {

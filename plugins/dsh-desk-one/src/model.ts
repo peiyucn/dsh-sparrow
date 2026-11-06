@@ -84,13 +84,14 @@ export function normalizeLayer(value: unknown): number | undefined {
 }
 
 
-/** 创建一条便签对象（id / 时间 / 坐标由调用方提供，保持本函数纯净）。 */
+/** 创建一条便签对象（id / 时间 / 坐标 / 层级由调用方提供，保持本函数纯净）。 */
 export function createNoteRecord(
   input: NoteInput,
-  meta: { readonly id: string; readonly now: string; readonly x?: number; readonly y?: number },
+  meta: { readonly id: string; readonly now: string; readonly x?: number; readonly y?: number; readonly z?: number },
 ): DeskNote {
   const x = normalizeCoordinate(meta.x)
   const y = normalizeCoordinate(meta.y)
+  const z = normalizeLayer(meta.z)
   return {
     id: meta.id,
     kind: 'note',
@@ -103,6 +104,7 @@ export function createNoteRecord(
     trashed: false,
     ...(x === undefined ? {} : { x }),
     ...(y === undefined ? {} : { y }),
+    ...(z === undefined ? {} : { z }),
     createdAt: meta.now,
     updatedAt: meta.now,
     revision: 1,

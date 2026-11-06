@@ -220,20 +220,28 @@ export function DeskOnePage(props: DeskPanelProps) {
     })
   }, [deleteNote, enqueueWrite, removeNote, t])
 
-  /** 「＋」：在当前视口中间新建一张空便签，并立刻把焦点交给它。 */
-  const addNote = useCallback(async (): Promise<void> => {
+  /** 「＋」/ 双击空白处：新建一张便签，落在当前视口中间或双击点附近，并立刻置顶 + 聚焦。 */
+  const addNote = useCallback(async (point?: { x: number; y: number }): Promise<void> => {
     if (creating) return
     setCreating(true)
     setActionError(null)
     try {
       const offset = (activeNotes.length % 6) * CASCADE_OFFSET
-      const anchorX = Math.max(0, (wallSize.width - NOTE_DEFAULT_WIDTH) / 2) + offset
-      const anchorY = Math.max(0, (wallSize.height - NOTE_DEFAULT_HEIGHT) / 2) + offset
+      const anchorX = point === undefined
+        ? Math.max(0, (wallSize.width - NOTE_DEFAULT_WIDTH) / 2) + offset
+        : point.x
+      const anchorY = point === undefined
+        ? Math.max(0, (wallSize.height - NOTE_DEFAULT_HEIGHT) / 2) + offset
+        : point.y
+      // 新建的便签置顶：比现有最大层级还高一层，并把层级写进记录（重启后顺序不变）。
+      const layer = notes.reduce((max, item) => Math.max(max, item.z ?? 0), zTopRef.current) + 1
+      zTopRef.current = layer
       const note = await createNote({
         body: '',
         color: STICKY_COLORS[activeNotes.length % STICKY_COLORS.length] ?? 'yellow',
         x: clamp(Math.round(anchorX), 0, Math.max(0, wallSize.width - NOTE_DEFAULT_WIDTH)),
         y: clamp(Math.round(anchorY), 0, Math.max(0, wallSize.height - NOTE_DEFAULT_HEIGHT)),
+        z: layer,
       })
       setNotes(current => [...current, note])
       selectTab('notes')
@@ -244,7 +252,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     } finally {
       setCreating(false)
     }
-  }, [activeNotes.length, createNote, creating, selectTab, t, wallSize.height, wallSize.width])
+  }, [activeNotes.length, createNote, creating, notes, selectTab, t, wallSize.height, wallSize.width])
 
   /** 卡片拖拽：不出屏（坐标夹在墙内），抬起时落库。 */
   const startDrag = useCallback((event: React.PointerEvent<HTMLElement>, item: PlacedNote): void => {
@@ -486,12 +494,23 @@ export function DeskOnePage(props: DeskPanelProps) {
           {showTrash
             ? renderTrash()
             : (
-                <div className="dsh-desk-wall" ref={wallRef}>
-                  {loading && activeNotes.length === 0
+                <div
+                  className="dsh-desk-wall"
+                  ref={wallRef}
+                  onDoubleClick={(event) => {
+                    // 只在背板空白处生效；双击贴纸/控件不新建。
+                    if (event.target !== event.currentTarget) return
+                    const rect = event.currentTarget.getBoundingClientRect()
+                    void addNote({
+                      x: event.clientX - rect.left - NOTE_DEFAULT_WIDTH / 2,
+                      y: event.clientY - rect.top - NOTE_DEFAULT_HEIGHT / 2,
+                    })
+                  }}
+                >
+                  {loading
                     ? <p className="dsh-desk-wall-hint">{t('state.loading')}</p>
-                    : activeNotes.length === 0
-                      ? <p className="dsh-desk-wall-hint">{t('state.empty')}</p>
-                      : placed.map(renderNote)}
+                    : <p className="dsh-desk-wall-tip">{t('wall.tip')}</p>}
+                  {placed.map(renderNote)}
                 </div>
               )}
         </div>
