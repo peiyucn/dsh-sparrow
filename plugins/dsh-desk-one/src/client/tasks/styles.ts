@@ -917,6 +917,16 @@ export const TASKS_CSS = `
 .dsh-task-group-dropmark[data-active='true'] {
   background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
 }
+.dsh-task-group-dropend {
+  flex: none;
+  height: 2px;
+  margin: 0 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+.dsh-task-group-dropend[data-active='true'] {
+  background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+}
 /* Cards-drag feedback for the ungrouped drop zone (always present so ungrouping is discoverable). */
 .dsh-task-ungrouped-hint {
   margin: 2px 4px;

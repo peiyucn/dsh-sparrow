@@ -239,12 +239,17 @@ export function TaskColumn({
           const groupCollapsed = isGroupCollapsed(group.id)
           const draggingThis = groupDrag?.id === group.id
           const groupOver = dropTarget?.status === status && dropTarget.groupId === group.id
+          // Insertion line ignores the dragged group so the marker matches the corrected index.
+          const markerIndex = lane.groups
+            .slice(0, index)
+            .filter(item => item.group.id !== groupDrag?.id).length
           return (
             <div
               key={group.id}
               className="dsh-task-group"
+              data-group-id={group.id}
               data-over={groupOver}
-              data-drop={groupLaneOver && groupDrop?.index === index}
+              data-drop={groupLaneOver && groupDrop !== null && groupDrop.index === markerIndex}
               data-dragging={draggingThis}
             >
               <div
@@ -368,6 +373,11 @@ export function TaskColumn({
           )
         })}
         <div className="dsh-task-group-dropmark" data-active={groupLaneOver && groupDrop?.index === lane.groups.length} />
+        <div
+          className="dsh-task-group-dropend"
+          data-active={groupLaneOver && groupDrop !== null
+            && groupDrop.index === lane.groups.filter(item => item.group.id !== groupDrag?.id).length}
+        />
         {addingGroup
           ? (
               <div className="dsh-task-group-new">

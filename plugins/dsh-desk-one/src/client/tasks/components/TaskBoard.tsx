@@ -191,6 +191,22 @@ function placeGhost(ghost: HTMLElement, left: number, top: number, width: number
   ghost.style.zIndex = '9999'
 }
 
+/**
+ * Suppress native text selection while a pointer drag is possible. Because clicks must still
+ * work (field editing / double-click rename), this is applied per gesture and always restored.
+ */
+function lockSelection(): () => void {
+  const previous = document.body.style.userSelect
+  document.body.style.userSelect = 'none'
+  window.getSelection()?.removeAllRanges()
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    document.body.style.userSelect = previous
+  }
+}
+
 export function TaskBoard(props: TaskBoardProps): ReactElement {
   const {
     t, listTasks, createTask, updateTask, deleteTask,
@@ -271,7 +287,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
   }, [])
 
   /** Resolve the lane plus group insertion position under the pointer (group drag). */
-  const resolveGroupDrop = useCallback((x: number, y: number): GroupDropTarget | null => {
+  const resolveGroupDrop = useCallback((x: number, y: number, excludeGroupId: string): GroupDropTarget | null => {
     const element = document.elementFromPoint(x, y) as HTMLElement | null
     const lane = element?.closest<HTMLElement>('[data-lane]')
     if (lane === null || lane === undefined) return null
@@ -279,6 +295,9 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     if (status === undefined) return null
     let index = 0
     for (const section of lane.querySelectorAll<HTMLElement>('.dsh-task-group')) {
+      // The dragged group keeps its layout slot while the ghost is out; skip it so the index is
+      // an insertion position into the *remaining* list (otherwise downward drags are off by one).
+      if (section.dataset.groupId === excludeGroupId) continue
       const rect = section.getBoundingClientRect()
       if (y < rect.top + rect.height / 2) break
       index += 1
@@ -296,6 +315,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     const offsetY = event.clientY - rect.top
     const startX = event.clientX
     const startY = event.clientY
+    const releaseSelection = lockSelection()
     let ghost: HTMLElement | null = null
     let moved = false
     let latest: DropTarget | null = null
@@ -324,6 +344,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
       window.removeEventListener('pointerup', onFinish)
       window.removeEventListener('pointercancel', onCancel)
       window.removeEventListener('keydown', onKey)
+      releaseSelection()
       setDraggingId(null)
       setDropTarget(null)
     }
@@ -386,6 +407,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     const offsetY = event.clientY - rect.top
     const startX = event.clientX
     const startY = event.clientY
+    const releaseSelection = lockSelection()
     let ghost: HTMLElement | null = null
     let moved = false
     let latest: GroupDropTarget | null = null
@@ -405,7 +427,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
       if (ghost === null) return
       ghost.style.left = `${moveEvent.clientX - offsetX}px`
       ghost.style.top = `${moveEvent.clientY - offsetY}px`
-      latest = resolveGroupDrop(moveEvent.clientX, moveEvent.clientY)
+      latest = resolveGroupDrop(moveEvent.clientX, moveEvent.clientY, group.id)
       setGroupDrop(latest)
     }
     const cleanup = (): void => {
@@ -413,6 +435,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
       window.removeEventListener('pointerup', onFinish)
       window.removeEventListener('pointercancel', onCancel)
       window.removeEventListener('keydown', onKey)
+      releaseSelection()
       setGroupDrag(null)
       setGroupDrop(null)
     }
