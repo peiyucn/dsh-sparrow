@@ -15,6 +15,8 @@ export interface SessionChipInfo {
   readonly availability: SessionAvailability
   readonly updatedAt: number
   readonly cwd?: string
+  /** Parent session id for subagent/fork lineage; absent for roots. */
+  readonly parentId?: string
   readonly subagent: boolean
 }
 

@@ -10,7 +10,7 @@ function fakeServices(initial = { archived: [] }) {
   let archived = [...initial.archived]
   const rows = {
     titled: { id: 'titled', title: '标题会话', displayTitle: 'display 标题会话', running: true, updatedAt: 3 },
-    child: { id: 'child', title: '你是负责……', displayTitle: '你是负责……', origin: 'subagent', updatedAt: 2, projectionValues: { subagent: { mode: 'continuable', label: '子代理标签', seq: 0 } } },
+    child: { id: 'child', title: '你是负责……', displayTitle: '你是负责……', origin: 'subagent', parentId: 'titled', updatedAt: 2, projectionValues: { subagent: { mode: 'continuable', label: '子代理标签', seq: 0 } } },
     cold: { id: 'cold', displayTitle: 'pyai-meta-repo', updatedAt: 1 },
   }
   return {
@@ -46,6 +46,7 @@ describe('desk-one 会话桥接', () => {
     const byId = new Map(bridge.api.list().sessions.map(session => [session.id, session]))
     assert.equal(byId.get('titled')?.title, '标题会话')
     assert.equal(byId.get('child')?.title, '子代理标签', '子代理优先取 subagent label（与 composer displayTitle 一致）')
+    assert.equal(byId.get('child')?.parentId, 'titled', '父子关系透传给 Sessions 树')
     assert.equal(byId.get('cold')?.title, 'cold', '冷会话没有 title 时不把 cwd 目录名当标题')
   })
 

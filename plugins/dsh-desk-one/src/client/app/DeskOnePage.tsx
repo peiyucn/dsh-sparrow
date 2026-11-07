@@ -16,6 +16,8 @@ import type { DeskNote, NoteColor } from '../../contract.js'
 import { NoteCard } from '../notes/components/NoteCard.js'
 import { TrashPanel } from '../notes/components/TrashPanel.js'
 import { TaskBoard } from '../tasks/components/TaskBoard.js'
+import { SessionsView } from '../sessions/SessionsView.js'
+import { useSessionLinks } from '../tasks/hooks/useSessionLinks.js'
 import { useGroupsData } from '../tasks/hooks/useGroupsData.js'
 import { useTaskBoard } from '../tasks/hooks/useTaskBoard.js'
 import { useTasksData } from '../tasks/hooks/useTasksData.js'
@@ -70,6 +72,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   // actions: new task, sort mode and the archive toggle.
   const taskData = useTasksData(t, { listTasks, createTask, updateTask, deleteTask })
   const groupsData = useGroupsData(t, { listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup })
+  const sessionSnapshot = useSessionLinks(sessionLink)
   const board = useTaskBoard({
     tasks: taskData.tasks,
     setTasks: taskData.setTasks,
@@ -289,6 +292,7 @@ export function DeskOnePage(props: DeskPanelProps) {
         </>
       )
     }
+    if (tab === 'sessions') return null
     if (tab === 'tasks') {
       if (board.showArchive) {
         return (
@@ -354,6 +358,9 @@ export function DeskOnePage(props: DeskPanelProps) {
           <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
             {t('tab.tasks')}
           </button>
+          <button type="button" className="dsh-desk-tab" data-active={tab === 'sessions'} onClick={() => selectTab('sessions')}>
+            {t('tab.sessions')}
+          </button>
         </nav>
         <div className="dsh-desk-global-slot" data-window-drag-recall aria-hidden="true" />
       </header>
@@ -381,6 +388,8 @@ export function DeskOnePage(props: DeskPanelProps) {
               )
             : renderWall()}
         </div>
+      ) : tab === 'sessions' ? (
+        <SessionsView snapshot={sessionSnapshot} t={t} onOpen={sessionLink.open} />
       ) : (
         <TaskBoard
           t={t}

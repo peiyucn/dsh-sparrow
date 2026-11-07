@@ -386,6 +386,33 @@ describe('dsh-desk-one 结构', () => {
     assert.match(notesDrag, /dataset\.dragging = 'true'/u)
   })
 
+  it('Sessions 标签 应该 只读合并归档目录（活跃按工作区分组 + 归档树）', async () => {
+    const page = await readClientSurface()
+    const view = await read('src/client/sessions/SessionsView.tsx')
+    const catalog = await read('src/client/sessions/catalog.ts')
+    const contract = await read('src/client/sessions/contract.ts')
+    const bridge = await read('src/client/sessions/bridge.ts')
+    const styles = await readStyles()
+    const spec = await read('docs/spec/04-sessions.md')
+    assert.match(page, /tab\.sessions/u, '新增会话标签')
+    assert.match(page, /SessionsView/u, '页面挂载 Sessions 视图')
+    assert.match(page, /useSessionLinks\(sessionLink\)/u, 'Sessions 复用可选会话服务')
+    assert.match(view, /activeSessionGroups/u)
+    assert.match(view, /archivedSessionTree/u)
+    assert.match(view, /sessions\.archivedHint/u)
+    assert.match(catalog, /export function activeSessionGroups/u)
+    assert.match(catalog, /export function archivedSessionTree/u)
+    assert.match(catalog, /parentId/u, '归档树用父会话关系')
+    assert.match(contract, /parentId\?: string/u)
+    assert.match(bridge, /parentId/u)
+    assert.match(styles, /\.dsh-desk-sessionsview \{/u)
+    assert.match(styles, /\.dsh-desk-session-row \{/u)
+    // Phase 1 is read-only: no archive/trash mutations in the view.
+    assert.ok(!/archiveSession|unarchiveSession|moveSessionToTrash|deleteSession|restoreTrash/u.test(view), 'Sessions 视图 Phase 1 只读')
+    assert.match(spec, /Phase 1：只读目录/u)
+    assert.match(spec, /Phase 2：迁移归档 host 能力/u)
+  })
+
   it('任务会话关联 应该 多对多、实时状态与可选依赖降级', async () => {
     const contract = await read('src/contract.ts')
     const domain = await read('src/domain.ts')
@@ -557,6 +584,6 @@ describe('dsh-desk-one 结构', () => {
 
   it('spec 应该 包含已交付的设计文档', async () => {
     const specs = await readdir(new URL('../docs/spec', import.meta.url))
-    assert.deepEqual(specs.sort(), ['00-overview.md', '01-object-model.md', '02-modules.md', '03-task-board.md'])
+    assert.deepEqual(specs.sort(), ['00-overview.md', '01-object-model.md', '02-modules.md', '03-task-board.md', '04-sessions.md'])
   })
 })

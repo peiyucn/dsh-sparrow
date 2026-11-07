@@ -21,6 +21,7 @@ interface SessionRowLike {
   readonly updatedAt?: number
   readonly cwd?: string
   readonly origin?: string
+  readonly parentId?: string
   readonly projectionValues?: SessionProjectionValuesLike
 }
 
@@ -104,6 +105,7 @@ function resolveSnapshot(services: SessionServices | null): SessionLinkSnapshot 
       availability,
       updatedAt: row?.updatedAt ?? 0,
       ...row?.cwd === undefined ? {} : { cwd: row.cwd },
+      ...row?.parentId === undefined ? {} : { parentId: row.parentId },
       subagent: row?.origin === 'subagent',
     }
   })
