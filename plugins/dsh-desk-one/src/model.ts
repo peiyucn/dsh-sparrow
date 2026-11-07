@@ -5,8 +5,8 @@
  */
 
 import {
-  MAX_BODY_CHARS, MAX_GROUP_CHARS, MAX_TITLE_CHARS, NOTE_COLORS, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH,
-  TASK_STATUSES,
+  MAX_BODY_CHARS, MAX_GROUP_CHARS, MAX_TASK_SESSIONS, MAX_TITLE_CHARS, NOTE_COLORS, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT,
+  NOTE_MIN_WIDTH, TASK_STATUSES,
 } from './constants.js'
 import type { DeskNote, DeskTask, DeskTaskGroup, NoteColor, TaskStatus } from './contract.js'
 
@@ -222,6 +222,7 @@ export interface TaskInput {
   readonly due?: { readonly date: string; readonly timezone?: string }
   readonly order: number
   readonly groupId?: string
+  readonly sessionIds: readonly string[]
 }
 
 export interface TaskPatch {
@@ -235,6 +236,8 @@ export interface TaskPatch {
   readonly archived?: boolean
   /** `null` removes the task from its group; `undefined` leaves membership unchanged. */
   readonly groupId?: string | null
+  /** Replaces the whole linked-session list; `undefined` leaves it unchanged. */
+  readonly sessionIds?: readonly string[]
 }
 
 function isTaskStatus(value: unknown): value is TaskStatus {
@@ -280,6 +283,25 @@ export function normalizeGroupId(value: unknown): string | undefined {
   return id === '' ? undefined : id
 }
 
+/** Linked session ids: opaque strings, deduplicated in order, bounded so a card stays readable. */
+export function normalizeSessionIds(value: unknown): readonly string[] {
+  if (value === undefined || value === null) return []
+  if (!Array.isArray(value)) throw new DeskModelError('INVALID_TASK', 'sessionIds 必须是字符串数组')
+  const seen = new Set<string>()
+  const ids: string[] = []
+  for (const item of value) {
+    if (typeof item !== 'string') throw new DeskModelError('INVALID_TASK', 'sessionIds 必须是字符串数组')
+    const id = item.trim()
+    if (id === '' || seen.has(id)) continue
+    seen.add(id)
+    ids.push(id)
+  }
+  if (ids.length > MAX_TASK_SESSIONS) {
+    throw new DeskModelError('INVALID_TASK', `一张任务卡最多关联 ${MAX_TASK_SESSIONS} 个会话`)
+  }
+  return ids
+}
+
 /**
  * Task titles are required: unlike notes (where the body is the content), a task without a title
  * has no meaningful card. The rest mirrors the note validator's "reject bad enum, clamp text" style.
@@ -293,6 +315,7 @@ export function normalizeTaskInput(raw: {
   readonly dueTimezone?: unknown
   readonly order?: unknown
   readonly groupId?: unknown
+  readonly sessionIds?: unknown
 }): TaskInput {
   const title = typeof raw.title === 'string' ? raw.title.trim() : ''
   if (title === '') throw new DeskModelError('INVALID_TASK', '任务需要标题')
@@ -319,6 +342,7 @@ export function normalizeTaskInput(raw: {
     ...(due === undefined ? {} : { due }),
     order: normalizeOrder(raw.order) ?? 0,
     ...(groupId === undefined ? {} : { groupId }),
+    sessionIds: normalizeSessionIds(raw.sessionIds),
   }
 }
 
@@ -339,6 +363,7 @@ export function createTaskRecord(
     ...(input.due === undefined ? {} : { due: input.due }),
     order: input.order,
     ...(input.groupId === undefined ? {} : { groupId: input.groupId }),
+    sessionIds: input.sessionIds,
     archived: false,
     createdAt: meta.now,
     updatedAt: meta.now,
@@ -371,6 +396,7 @@ export function patchTaskRecord(
     order: number
     archived: boolean
     groupId?: string
+    sessionIds: readonly string[]
     projectId?: string
     laneId?: string
     createdAt: string
@@ -418,6 +444,7 @@ export function patchTaskRecord(
     if (groupId === undefined) delete next.groupId
     else next.groupId = groupId
   }
+  if (patch.sessionIds !== undefined) next.sessionIds = normalizeSessionIds(patch.sessionIds)
   return next
 }
 

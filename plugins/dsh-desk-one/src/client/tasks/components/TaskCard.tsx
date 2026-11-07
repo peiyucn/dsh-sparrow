@@ -9,9 +9,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
-import { NOTE_COLORS } from '../../../constants.js'
+import { MAX_TASK_SESSIONS, NOTE_COLORS } from '../../../constants.js'
 import type { DeskTask, TaskPatchRequest } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
+import type { SessionChipInfo } from '../../sessions/contract.js'
 
 interface TaskCardProps {
   readonly task: DeskTask
@@ -21,6 +22,14 @@ interface TaskCardProps {
   readonly onPatch: (task: DeskTask, patch: TaskPatchRequest) => void
   readonly onArchive: (task: DeskTask) => void
   readonly onDelete: (id: string) => void
+  /** False when the host lacks the optional session services — the @ entry stays hidden. */
+  readonly sessionEnabled: boolean
+  /** Linkable sessions (subagent sessions already filtered out by the board). */
+  readonly sessionOptions: readonly SessionChipInfo[]
+  /** This card's linked sessions, resolved live (unavailable ids keep a fallback chip). */
+  readonly sessionChips: readonly SessionChipInfo[]
+  readonly onLinkSessions: (sessionIds: readonly string[]) => void
+  readonly onOpenSession: (sessionId: string) => void
 }
 
 type EditableField = 'title' | 'body'
@@ -47,6 +56,7 @@ function autoGrow(element: HTMLTextAreaElement | null): void {
 
 export function TaskCard({
   task, dragging, t, onStartDrag, onPatch, onArchive, onDelete,
+  sessionEnabled, sessionOptions, sessionChips, onLinkSessions, onOpenSession,
 }: TaskCardProps): ReactElement {
   const titleRef = useRef<HTMLTextAreaElement | null>(null)
   const bodyRef = useRef<HTMLTextAreaElement | null>(null)
@@ -54,6 +64,8 @@ export function TaskCard({
   const [editingDue, setEditingDue] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [sessionPickerOpen, setSessionPickerOpen] = useState(false)
+  const [sessionQuery, setSessionQuery] = useState('')
 
   const remaining = task.due === undefined ? undefined : daysUntil(task.due.date)
   const overdue = remaining !== undefined && remaining < 0
@@ -85,6 +97,46 @@ export function TaskCard({
       document.removeEventListener('keydown', onKey)
     }
   }, [paletteOpen])
+
+  // Session picker: same dismissal rules as the colour palette.
+  useEffect(() => {
+    if (!sessionPickerOpen) return
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target
+      if (target instanceof Element
+        && (target.closest('.dsh-task-session-pop') !== null || target.closest('[data-session-anchor]') !== null)) return
+      setSessionPickerOpen(false)
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setSessionPickerOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [sessionPickerOpen])
+
+  const sessionStatusText = (chip: SessionChipInfo): string => {
+    if (chip.availability === 'available') return chip.running ? t('task.session.running') : t('task.session.idle')
+    if (chip.availability === 'loading') return t('task.session.loading')
+    if (chip.availability === 'archived') return t('task.session.archived')
+    return t('task.session.unavailable')
+  }
+
+  const toggleSession = (chip: SessionChipInfo): void => {
+    const linked = task.sessionIds.includes(chip.id)
+    if (!linked && chip.availability !== 'available') return
+    if (!linked && task.sessionIds.length >= MAX_TASK_SESSIONS) return
+    onLinkSessions(linked
+      ? task.sessionIds.filter(id => id !== chip.id)
+      : [...task.sessionIds, chip.id])
+  }
+
+  const sessionSearch = sessionQuery.trim().toLowerCase()
+  const visibleSessionOptions = sessionOptions.filter(option =>
+    sessionSearch === '' || option.title.toLowerCase().includes(sessionSearch))
 
   return (
     <article
@@ -160,6 +212,98 @@ export function TaskCard({
               {task.body === '' ? t('task.bodyPlaceholder') : task.body}
             </div>
           )}
+      {(sessionEnabled || sessionChips.length > 0)
+        ? (
+            <div className="dsh-task-sessions">
+              {sessionChips.map(chip => (
+                <span
+                  key={chip.id}
+                  className="dsh-task-session"
+                  data-state={chip.availability === 'available' ? (chip.running ? 'running' : 'idle') : chip.availability}
+                >
+                  <span className="dsh-task-session-dot" aria-hidden="true" />
+                  <button
+                    type="button"
+                    className="dsh-task-session-title"
+                    title={`${chip.title} · ${sessionStatusText(chip)}`}
+                    onClick={() => onOpenSession(chip.id)}
+                  >
+                    {chip.title}
+                  </button>
+                  <button
+                    type="button"
+                    className="dsh-task-session-remove"
+                    aria-label={t('task.session.remove')}
+                    title={t('task.session.remove')}
+                    onClick={() => onLinkSessions(task.sessionIds.filter(id => id !== chip.id))}
+                  >
+                    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+                      <path d="M3 3l6 6M9 3L3 9" />
+                    </svg>
+                  </button>
+                </span>
+              ))}
+              {sessionEnabled
+                ? (
+                    <button
+                      type="button"
+                      className="dsh-task-session-add"
+                      data-session-anchor="true"
+                      aria-label={t('task.session.add')}
+                      aria-expanded={sessionPickerOpen}
+                      title={t('task.session.add')}
+                      onClick={() => {
+                        setSessionPickerOpen(open => !open)
+                        setSessionQuery('')
+                      }}
+                    >
+                      @
+                    </button>
+                  )
+                : null}
+              {sessionPickerOpen && sessionEnabled
+                ? (
+                    <div className="dsh-task-session-pop" aria-label={t('task.session.add')}>
+                      <input
+                        autoFocus
+                        className="dsh-task-session-search"
+                        placeholder={t('task.session.search')}
+                        value={sessionQuery}
+                        onChange={event => setSessionQuery(event.currentTarget.value)}
+                      />
+                      {visibleSessionOptions.length === 0
+                        ? <p className="dsh-task-session-empty">{t('task.session.empty')}</p>
+                        : (
+                            <ul className="dsh-task-session-list">
+                              {visibleSessionOptions.map(option => {
+                                const linked = task.sessionIds.includes(option.id)
+                                const disabled = !linked
+                                  && (option.availability !== 'available' || task.sessionIds.length >= MAX_TASK_SESSIONS)
+                                return (
+                                  <li key={option.id}>
+                                    <button
+                                      type="button"
+                                      className="dsh-task-session-option"
+                                      aria-pressed={linked}
+                                      disabled={disabled}
+                                      data-state={option.availability === 'available' ? (option.running ? 'running' : 'idle') : option.availability}
+                                      onClick={() => toggleSession(option)}
+                                    >
+                                      <span className="dsh-task-session-dot" aria-hidden="true" />
+                                      <span className="dsh-task-session-option-title">{option.title}</span>
+                                      <span className="dsh-task-session-option-state">{sessionStatusText(option)}</span>
+                                    </button>
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          )}
+                    </div>
+                  )
+                : null}
+            </div>
+          )
+        : null}
       <div className="dsh-task-foot">
         <button
           type="button"

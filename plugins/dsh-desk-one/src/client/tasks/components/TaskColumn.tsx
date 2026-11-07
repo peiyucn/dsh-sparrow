@@ -8,6 +8,7 @@ import { useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import type { DeskTask, DeskTaskGroup, TaskPatchRequest, TaskStatus } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
+import type { SessionChipInfo } from '../../sessions/contract.js'
 import type { LaneView } from '../types.js'
 import type { TaskDraft } from '../hooks/useTaskBoard.js'
 import { TaskCard } from './TaskCard.js'
@@ -52,6 +53,11 @@ interface TaskColumnProps {
   readonly onRenameGroup: (group: DeskTaskGroup, name: string) => void
   readonly onRemoveGroup: (group: DeskTaskGroup) => void
   readonly onArchiveGroup: (group: DeskTaskGroup) => void
+  readonly sessionEnabled: boolean
+  readonly sessionOptions: readonly SessionChipInfo[]
+  readonly sessionsFor: (ids: readonly string[]) => readonly SessionChipInfo[]
+  readonly onLinkSessions: (task: DeskTask, sessionIds: readonly string[]) => void
+  readonly onOpenSession: (sessionId: string) => void
 }
 
 /** Inline draft: an empty title cancels instead of creating an empty task (titles are required). */
@@ -95,6 +101,7 @@ export function TaskColumn({
   onAdd, onToggleCollapse, onCommitDraft, onCancelDraft, onStartDrag, onGroupStartDrag,
   onPatch, onArchive, onDelete,
   isGroupCollapsed, onToggleGroup, onCreateGroup, onRenameGroup, onRemoveGroup, onArchiveGroup,
+  sessionEnabled, sessionOptions, sessionsFor, onLinkSessions, onOpenSession,
 }: TaskColumnProps): ReactElement {
   const [addingGroup, setAddingGroup] = useState(false)
   const [editingGroup, setEditingGroup] = useState<string | null>(null)
@@ -129,6 +136,11 @@ export function TaskColumn({
           onPatch={onPatch}
           onArchive={onArchive}
           onDelete={onDelete}
+          sessionEnabled={sessionEnabled}
+          sessionOptions={sessionOptions}
+          sessionChips={sessionsFor(task.sessionIds)}
+          onLinkSessions={(sessionIds) => onLinkSessions(task, sessionIds)}
+          onOpenSession={onOpenSession}
         />,
       )
     })

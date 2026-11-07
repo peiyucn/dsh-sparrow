@@ -5,9 +5,11 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import { PACKAGE_NAME } from '../constants.js'
 import * as api from './notes/api.js'
 import * as taskApi from './tasks/api.js'
 import { DeskOnePage } from './app/DeskOnePage.js'
+import { createSessionLinkBridge, type SessionServices } from './sessions/bridge.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { DeskPanelIcon } from './icon.js'
 import { installDeskClient, passesClientGate } from './install.js'
@@ -19,6 +21,15 @@ export const inject = ['slots', 'locale']
 /** client half 入口：先跑能力门（缺失只告警并返回），再把浏览器侧件交给 install。 */
 export function apply(ctx: ClientContext): void {
   if (!passesClientGate(ctx)) return
+
+  // Session linkage is optional: attach only when the host exposes all three public services.
+  // Missing services leave the facade disabled, so the task board renders without session chips.
+  const sessionLink = createSessionLinkBridge()
+  ctx.inject(['sessions', 'workspaces', 'uiWorkspace'], (sessionCtx) => {
+    const detach = sessionLink.attach(sessionCtx as unknown as SessionServices)
+    sessionCtx.effect(() => detach, `${PACKAGE_NAME}: session link`)
+  })
+
   installDeskClient(ctx, {
     page: DeskOnePage,
     icon: DeskPanelIcon,
@@ -38,6 +49,7 @@ export function apply(ctx: ClientContext): void {
       moveGroup: taskApi.moveGroup,
       archiveGroup: taskApi.archiveGroup,
       deleteGroup: taskApi.deleteGroup,
+      sessionLink: sessionLink.api,
     },
   })
 }

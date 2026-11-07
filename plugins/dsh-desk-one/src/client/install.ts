@@ -15,6 +15,7 @@ import { LOCALE_NAMESPACE, PACKAGE_NAME, PANEL_ID, PANEL_ORDER } from '../consta
 import type {
   DeskNote, DeskTask, DeskTaskGroup, CreateTaskRequest, TaskGroupPatchRequest, TaskPatchRequest,
 } from '../contract.js'
+import type { SessionLinkApi } from './sessions/contract.js'
 import { attachMainPanel } from './panel.js'
 import { ensureDeskStyles } from './styles.js'
 
@@ -73,6 +74,8 @@ export interface DeskPanelInjected {
     readonly archived: boolean
   }) => Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }>
   readonly deleteGroup: (id: string) => Promise<void>
+  /** Session linkage facade (disabled when the host does not expose the optional services). */
+  readonly sessionLink: SessionLinkApi
 }
 
 /** 入口注入的浏览器侧件（由 index.ts 提供；测试可传桩）。 */

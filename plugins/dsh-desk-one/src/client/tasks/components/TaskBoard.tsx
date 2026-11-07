@@ -14,9 +14,11 @@ import type {
 import type { DeskTranslator } from '../../app/types.js'
 import { TaskColumn, type DropTarget, type GroupDropTarget } from './TaskColumn.js'
 import { useGroupsData } from '../hooks/useGroupsData.js'
+import { useSessionLinks } from '../hooks/useSessionLinks.js'
 import { useTaskBoard } from '../hooks/useTaskBoard.js'
 import { useTasksData } from '../hooks/useTasksData.js'
 import { TASK_LANE_ORDER, type TaskSortMode } from '../types.js'
+import type { SessionChipInfo, SessionLinkApi } from '../../sessions/contract.js'
 
 export interface TaskBoardInjected {
   readonly listTasks: () => Promise<readonly DeskTask[]>
@@ -46,6 +48,8 @@ export interface TaskBoardInjected {
 
 interface TaskBoardProps extends TaskBoardInjected {
   readonly t: DeskTranslator
+  /** Optional session services facade; disabled when the host doesn't expose them. */
+  readonly sessionLink: SessionLinkApi
 }
 
 /** Static locale keys per lane (the dictionary key type is a closed union). */
@@ -191,6 +195,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
   const {
     t, listTasks, createTask, updateTask, deleteTask,
     listGroups, createGroup: createGroupApi, updateGroup, moveGroup, archiveGroup: archiveGroupApi, deleteGroup,
+    sessionLink,
   } = props
   const data = useTasksData(t, { listTasks, createTask, updateTask, deleteTask })
   const groupsData = useGroupsData(t, {
@@ -452,6 +457,30 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
   const actionError = data.actionError ?? groupsData.actionError
   const countText = (count: number): string => count === 1 ? t('task.countOne') : t('task.count', { count })
 
+  // Session links resolve live; a linked id that the host list no longer knows stays visible as
+  // "unavailable" instead of being silently dropped from the card.
+  const sessionSnapshot = useSessionLinks(sessionLink)
+  const sessionById = useMemo(
+    () => new Map(sessionSnapshot.sessions.map(session => [session.id, session])),
+    [sessionSnapshot.sessions],
+  )
+  const sessionOptions = useMemo(
+    () => sessionSnapshot.sessions.filter(session => !session.subagent),
+    [sessionSnapshot.sessions],
+  )
+  const sessionsFor = useCallback((ids: readonly string[]): readonly SessionChipInfo[] => ids.map(id =>
+    sessionById.get(id) ?? {
+      id,
+      title: t('task.session.unavailable'),
+      running: false,
+      availability: 'unavailable' as const,
+      updatedAt: 0,
+      subagent: false,
+    }), [sessionById, t])
+  const linkSessions = useCallback((task: DeskTask, sessionIds: readonly string[]): void => {
+    data.savePatch(task, { sessionIds })
+  }, [data.savePatch])
+
   /** Archived groups own archived cards: deleting the group also deletes those cards host-side. */
   const deleteArchivedGroup = (group: DeskTaskGroup): void => {
     data.setTasks(current => current.filter(task => task.groupId !== group.id))
@@ -565,6 +594,11 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
                   onRenameGroup={board.renameGroup}
                   onRemoveGroup={board.removeGroup}
                   onArchiveGroup={(group) => { void board.archiveGroup(group, true) }}
+                  sessionEnabled={sessionSnapshot.enabled}
+                  sessionOptions={sessionOptions}
+                  sessionsFor={sessionsFor}
+                  onLinkSessions={linkSessions}
+                  onOpenSession={sessionLink.open}
                 />
               ))}
             </div>

@@ -114,6 +114,22 @@ describe('task 模型：创建 / 补丁 / 排序', () => {
     assert.equal(filterGroups(groups, '不存在').length, 0)
   })
 
+  it('关联会话 应该 去重 / 保序 / 有上限', () => {
+    const input = normalizeTaskInput({ title: 'x', sessionIds: [' s1 ', 's2', 's1', ''] })
+    assert.deepEqual(input.sessionIds, ['s1', 's2'])
+    const record = createTaskRecord(input, { id: 'task_x', now: 'now' })
+    assert.deepEqual(record.sessionIds, ['s1', 's2'])
+    const replaced = patchTaskRecord(record, { sessionIds: ['s3'] }, { expectedRevision: 1, now: 'later' })
+    assert.deepEqual(replaced.sessionIds, ['s3'])
+    const cleared = patchTaskRecord(record, { sessionIds: [] }, { expectedRevision: 1, now: 'later' })
+    assert.deepEqual(cleared.sessionIds, [])
+    assert.throws(
+      () => normalizeTaskInput({ title: 'x', sessionIds: ['s'] .concat(Array.from({ length: 10 }, (_, i) => `s${i + 2}`)) }),
+      (error) => error instanceof DeskModelError && error.code === 'INVALID_TASK',
+    )
+    assert.throws(() => normalizeTaskInput({ title: 'x', sessionIds: 'nope' }), (error) => error instanceof DeskModelError)
+  })
+
   it('排序 应该 按 order → createdAt → id；过滤 标题 + 正文', () => {
     const sorted = sortTasks([
       task({ id: 'b', order: 2, createdAt: '2026-01-02T00:00:00.000Z' }),

@@ -274,6 +274,202 @@ export const TASKS_CSS = `
 .dsh-task-color-swatch[data-active='true'] {
   box-shadow: 0 0 0 2px var(--dsw-alias-bg-layer-1, #ffffff), 0 0 0 3.5px rgba(55, 53, 47, 0.55);
 }
+/* Linked sessions: chips with a live status dot; "@" opens a multi-select picker. */
+.dsh-task-sessions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+.dsh-task-session {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 1px 2px 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 86%, var(--dsw-alias-label-primary, #1f2329));
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-task-session-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #9aa0a8;
+}
+.dsh-task-session[data-state='running'] .dsh-task-session-dot,
+.dsh-task-session-option[data-state='running'] .dsh-task-session-dot {
+  background: #2e9e5b;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #2e9e5b 22%, transparent);
+}
+.dsh-task-session[data-state='idle'] .dsh-task-session-dot,
+.dsh-task-session-option[data-state='idle'] .dsh-task-session-dot {
+  background: #9aa0a8;
+}
+.dsh-task-session[data-state='loading'] .dsh-task-session-dot,
+.dsh-task-session-option[data-state='loading'] .dsh-task-session-dot {
+  background: #d9a441;
+}
+.dsh-task-session[data-state='archived'] .dsh-task-session-dot,
+.dsh-task-session[data-state='unavailable'] .dsh-task-session-dot,
+.dsh-task-session-option[data-state='archived'] .dsh-task-session-dot,
+.dsh-task-session-option[data-state='unavailable'] .dsh-task-session-dot {
+  background: transparent;
+  border: 1px solid #9aa0a8;
+}
+.dsh-task-session-title {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.dsh-task-session-title:hover {
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-task-session-remove {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  cursor: pointer;
+  opacity: 0.55;
+}
+.dsh-task-session-remove:hover {
+  opacity: 1;
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+}
+.dsh-task-session-remove svg {
+  width: 9px;
+  height: 9px;
+}
+.dsh-task-session-add {
+  appearance: none;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  cursor: pointer;
+}
+.dsh-task-session-add:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-task-session-pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  z-index: 30;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  border-radius: var(--dsw-radius-md, 12px);
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+  box-shadow: 0 12px 30px -16px rgba(20, 25, 40, 0.5);
+}
+.dsh-task-session-search {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  outline: none;
+}
+.dsh-task-session-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.dsh-task-session-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.dsh-task-session-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+.dsh-task-session-option:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+}
+.dsh-task-session-option[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 10%, transparent);
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-task-session-option:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.dsh-task-session-option-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dsh-task-session-option-state {
+  flex: none;
+  font-size: 10px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
+.dsh-task-session-empty {
+  margin: 4px 2px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
 .dsh-task-color {
   appearance: none;
   flex: none;

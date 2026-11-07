@@ -68,6 +68,11 @@ export interface DeskTask {
   readonly order: number
   /** 所属分组 id；缺省表示未分组（分组属于泳道，跨列移动卡片会移出分组）。 */
   readonly groupId?: string
+  /**
+   * 关联的 DSH 会话 id（不透明引用，可多个；一个会话也可被多张卡关联）。
+   * 会话标题 / 运行状态在客户端实时解析，不落库（避免快照过期）。
+   */
+  readonly sessionIds: readonly string[]
   /** 存档后从板上消失，进任务板存档视图（命名避开宿主「会话归档」）。 */
   readonly archived: boolean
   /** 预留：多板 / 自定义泳道后启用，S1 不写。 */
@@ -166,6 +171,8 @@ export interface CreateTaskRequest {
   readonly order?: number
   /** 所属分组 id；缺省不分组。 */
   readonly groupId?: string
+  /** 关联会话 id 列表（可多个）。 */
+  readonly sessionIds?: readonly string[]
 }
 
 export interface TaskPatchRequest {
@@ -179,6 +186,8 @@ export interface TaskPatchRequest {
   readonly archived?: boolean
   /** `null` 表示移出分组；缺省表示不改。 */
   readonly groupId?: string | null
+  /** 替换整份关联会话列表；缺省表示不改。 */
+  readonly sessionIds?: readonly string[]
 }
 
 export interface TaskGroupListResponse {

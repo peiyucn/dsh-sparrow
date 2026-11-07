@@ -10,7 +10,8 @@
 import { z } from 'zod'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import {
-  DESK_NODE_SCHEMA, DOMAIN_NAME, DOMAIN_VERSION, EDGES_TABLE, NODES_TABLE, NOTE_COLORS, TASK_STATUSES,
+  DESK_NODE_SCHEMA, DOMAIN_NAME, DOMAIN_VERSION, EDGES_TABLE, MAX_TASK_SESSIONS, NODES_TABLE, NOTE_COLORS,
+  TASK_STATUSES,
 } from './constants.js'
 import type { DeskEdge, DeskNode } from './contract.js'
 
@@ -53,6 +54,8 @@ const taskSchema = z.object({
   order: z.number().int().nonnegative(),
   /** Membership is a group id; the group entity owns name / lane / order. */
   groupId: z.string().optional(),
+  // Linked DSH sessions (opaque ids). Old records default to [] without migration.
+  sessionIds: z.array(z.string().min(1)).max(MAX_TASK_SESSIONS).default([]),
   // "存档" (archive) is a task-board concept; naming chosen to avoid the host's session archive.
   archived: z.boolean().default(false),
   projectId: z.string().optional(),

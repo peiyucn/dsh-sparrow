@@ -400,6 +400,39 @@ describe('dsh-desk-one 结构', () => {
     assert.match(notesDrag, /dataset\.dragging = 'true'/u)
   })
 
+  it('任务会话关联 应该 多对多、实时状态与可选依赖降级', async () => {
+    const contract = await read('src/contract.ts')
+    const domain = await read('src/domain.ts')
+    const sessionContract = await read('src/client/sessions/contract.ts')
+    const bridge = await read('src/client/sessions/bridge.ts')
+    const index = await read('src/client/index.ts')
+    const card = await read('src/client/tasks/components/TaskCard.tsx')
+    const board = await read('src/client/tasks/components/TaskBoard.tsx')
+    const column = await read('src/client/tasks/components/TaskColumn.tsx')
+    const styles = await readStyles()
+    // Data: a card owns an opaque list of session ids; live titles/status are never persisted.
+    assert.match(contract, /sessionIds: readonly string\[\]/u)
+    assert.match(domain, /sessionIds: z\.array/u)
+    // Bridge: optional dependency fork, archived detection, open via uiWorkspace.
+    assert.match(sessionContract, /enabled: boolean/u, '缺少服务时功能要能禁用')
+    assert.match(bridge, /archivedSessionIds/u)
+    assert.match(bridge, /uiWorkspace\.openSession/u)
+    assert.match(index, /ctx\.inject\(\['sessions', 'workspaces', 'uiWorkspace'\]/u, '会话服务走可选 fork')
+    assert.match(index, /sessionLink: sessionLink\.api/u)
+    // UI: chips with status dot, multi-select picker with search, unlink, click-to-open.
+    assert.match(board, /useSessionLinks/u)
+    assert.match(column, /sessionsFor/u)
+    assert.match(card, /dsh-task-session-pop/u)
+    assert.match(card, /task\.session\.search/u)
+    assert.match(card, /task\.session\.remove/u)
+    assert.match(card, /onOpenSession/u)
+    assert.ok(!/task\.title\s*=/u.test(card) || !/session/iu.test(card.split('task.title =')[1] ?? ''), '会话不覆盖卡片标题')
+    assert.match(styles, /\.dsh-task-session\[data-state='running'\]/u, '绿色运行点')
+    assert.match(styles, /\.dsh-task-session\[data-state='idle'\]/u, '灰色空闲点')
+    assert.match(styles, /\.dsh-task-session\[data-state='archived'\]/u, '失效态')
+    assert.match(styles, /\.dsh-task-session-pop \{/u)
+  })
+
   it('分组 应该 是宿主实体（REST + 工具 + 客户端），不是 localStorage 标签', async () => {
     const contract = await read('src/contract.ts')
     const domain = await read('src/domain.ts')

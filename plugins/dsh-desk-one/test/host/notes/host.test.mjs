@@ -162,7 +162,7 @@ describe('host 装配（apply 接线）', () => {
     const created = await callRoute(handler, {
       method: 'POST',
       url: ROUTES.tasks,
-      body: JSON.stringify({ title: '任务一', dueDate: '2026-11-30', status: 'todo' }),
+      body: JSON.stringify({ title: '任务一', dueDate: '2026-11-30', status: 'todo', sessionIds: ['session-a', 'session-b'] }),
       headers: host,
     })
     assert.equal(created.status, 201)
@@ -170,6 +170,7 @@ describe('host 装配（apply 接线）', () => {
     assert.equal(created.json.task.status, 'todo')
     assert.equal(created.json.task.archived, false)
     assert.equal(created.json.task.groupId, undefined)
+    assert.deepEqual(created.json.task.sessionIds, ['session-a', 'session-b'])
     assert.deepEqual(created.json.task.due, { date: '2026-11-30' })
     const id = created.json.task.id
     assert.match(id, /^task_/u)
@@ -181,12 +182,17 @@ describe('host 装配（apply 接线）', () => {
     const moved = await callRoute(handler, {
       method: 'POST',
       url: ROUTES.taskUpdate,
-      body: JSON.stringify({ id, expectedRevision: 1, patch: { status: 'doing', order: 4 } }),
+      body: JSON.stringify({
+        id,
+        expectedRevision: 1,
+        patch: { status: 'doing', order: 4, sessionIds: ['session-c'] },
+      }),
       headers: host,
     })
     assert.equal(moved.status, 200)
     assert.equal(moved.json.task.status, 'doing')
     assert.equal(moved.json.task.order, 4)
+    assert.deepEqual(moved.json.task.sessionIds, ['session-c'])
     assert.equal(moved.json.task.revision, 2)
 
     const archived = await callRoute(handler, {

@@ -50,6 +50,8 @@ export const MAX_BODY_CHARS = 20_000
 export const MAX_QUERY_CHARS = 100
 /** 任务分组名长度上限（一层分组，名字即分组键）。 */
 export const MAX_GROUP_CHARS = 80
+/** 一张任务卡最多关联的会话数（UI 是 chips 行，限制避免卡片被挂满）。 */
+export const MAX_TASK_SESSIONS = 10
 
 /**
  * 产品容量上限（owner 2026-11-06）：便签墙是轻笔记，100 张已超出人的注意力上限；
