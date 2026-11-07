@@ -270,38 +270,44 @@ export function TaskColumn({
                     {groupCollapsed ? <path d="M7 8l3 3 3-3" /> : <path d="M7 11l3-3 3 3" />}
                   </svg>
                 </button>
-                {editingGroup === group.id
-                  ? (
-                      <input
-                        className="dsh-task-group-input"
-                        defaultValue={group.name}
-                        autoFocus
-                        onPointerDown={event => event.stopPropagation()}
-                        onBlur={(event) => {
-                          setEditingGroup(null)
-                          onRenameGroup(group, event.currentTarget.value)
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') event.currentTarget.blur()
-                          if (event.key === 'Escape') {
-                            event.currentTarget.value = group.name
-                            event.currentTarget.blur()
-                          }
-                        }}
-                      />
-                    )
-                  : (
-                      <span
-                        className="dsh-task-group-name"
-                        role="button"
-                        tabIndex={0}
-                        title={t('task.group.rename')}
-                        onDoubleClick={() => setEditingGroup(group.id)}
-                      >
-                        {group.name}
-                      </span>
-                    )}
-                <span className="dsh-task-count">{countText(tasks.length)}</span>
+                <div className="dsh-task-group-main">
+                  <div className="dsh-task-group-title">
+                    {editingGroup === group.id
+                      ? (
+                          <input
+                            className="dsh-task-group-input"
+                            defaultValue={group.name}
+                            autoFocus
+                            onPointerDown={event => event.stopPropagation()}
+                            onBlur={(event) => {
+                              setEditingGroup(null)
+                              onRenameGroup(group, event.currentTarget.value)
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') event.currentTarget.blur()
+                              if (event.key === 'Escape') {
+                                event.currentTarget.value = group.name
+                                event.currentTarget.blur()
+                              }
+                            }}
+                          />
+                        )
+                      : (
+                          <span
+                            className="dsh-task-group-name"
+                            role="button"
+                            tabIndex={0}
+                            title={t('task.group.rename')}
+                            onDoubleClick={() => setEditingGroup(group.id)}
+                          >
+                            {group.name}
+                          </span>
+                        )}
+                  </div>
+                  <div className="dsh-task-group-meta">
+                    <span className="dsh-task-count">{countText(tasks.length)}</span>
+                  </div>
+                </div>
                 <div className="dsh-task-group-actions">
                   <button
                     type="button"

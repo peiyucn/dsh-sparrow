@@ -56,6 +56,7 @@ export const TASKS_CSS = `
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   padding: 10px 10px 8px;
   border-radius: var(--dsw-radius-lg, 16px);
   background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 90%, var(--dsw-alias-label-primary, #1f2329));
@@ -113,26 +114,46 @@ export const TASKS_CSS = `
   flex-direction: column;
   gap: 8px;
   padding: 2px;
-  scrollbar-width: none;
+  /* Visible thin scrollbar when a lane overflows a screen, so content scrolls instead of squeezing. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 24%, transparent) transparent;
+  scrollbar-gutter: stable;
 }
 .dsh-task-list::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  width: 8px;
+  height: 8px;
+}
+.dsh-task-list::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 24%, transparent);
+  background-clip: content-box;
+}
+.dsh-task-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 .dsh-task-archive {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 24%, transparent) transparent;
 }
 .dsh-task-archive::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  width: 8px;
+  height: 8px;
+}
+.dsh-task-archive::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 24%, transparent);
+  background-clip: content-box;
 }
 .dsh-task-lane[data-collapsed='true'] .dsh-task-list {
   flex: none;
 }
 .dsh-task-ungrouped {
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -603,6 +624,7 @@ export const TASKS_CSS = `
 }
 /* One-level groups inside a lane: a bordered container so a group reads as a real block. */
 .dsh-task-group {
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -625,15 +647,53 @@ export const TASKS_CSS = `
   opacity: 0.45;
 }
 .dsh-task-group-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: 16px 18px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: 4px;
+  row-gap: 1px;
   align-items: center;
-  gap: 4px;
-  min-height: 24px;
-  padding: 0 2px 2px;
+  min-height: 28px;
+  padding: 2px;
   border-radius: var(--dsw-radius-sm, 8px);
 }
 .dsh-task-group-head:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.04));
+}
+/* Two-row header: row 1 = name, row 2 = count; grip / chevron / actions span both rows. */
+.dsh-task-group-head > .dsh-task-group-grip {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+.dsh-task-group-head > .dsh-task-add {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+.dsh-task-group-main {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dsh-task-group-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.dsh-task-group-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 14px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
+.dsh-task-group-meta .dsh-task-count {
+  margin-left: 0;
+  font-size: 11px;
+  white-space: nowrap;
 }
 .dsh-task-group-grip {
   display: inline-flex;
@@ -671,8 +731,9 @@ export const TASKS_CSS = `
   appearance: none;
   border: none;
   background: transparent;
-  padding: 0 4px;
-  max-width: 160px;
+  padding: 0 2px;
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -685,7 +746,8 @@ export const TASKS_CSS = `
 }
 .dsh-task-group-input {
   box-sizing: border-box;
-  width: 120px;
+  width: 100%;
+  min-width: 0;
   padding: 1px 4px;
   border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
   border-radius: var(--dsw-radius-xs, 4px);
@@ -697,7 +759,8 @@ export const TASKS_CSS = `
   outline: none;
 }
 .dsh-task-group-actions {
-  margin-left: auto;
+  grid-column: 4;
+  grid-row: 1 / span 2;
   display: flex;
   gap: 2px;
   opacity: 0;
@@ -784,11 +847,6 @@ export const TASKS_CSS = `
   font-variant-numeric: tabular-nums;
 }
 /* Archive view: same row anatomy as the notes trash. */
-.dsh-task-archive {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
 .dsh-task-archive-list {
   margin: 0;
   padding: 0;
