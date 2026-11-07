@@ -7,7 +7,7 @@ import { basename, join } from 'node:path'
 import { after, describe, it } from 'node:test'
 import { TRASH_SIDECAR } from '../lib/archive.js'
 import { apply } from '../lib/host.js'
-import { trashProjectionIds } from '../lib/host/trash.js'
+import { trashedSessionIds } from '../lib/host/trash.js'
 
 /**
  * 归档路由的**真行为**用例：走真实的 `apply` → `webServer.register` → handler，
@@ -590,7 +590,7 @@ describe('archive-manage host 路由：真实 handler 行为', () => {
       assert.deepEqual([...deleted].sort(), ['c1', 'r1'])
     })
 
-    it('trashProjectionIds 应该 收集父 + 子会话 id，并跳过无 sidecar 的旧格式目录', async () => {
+    it('trashedSessionIds 应该 收集父 + 子会话 id，并跳过无 sidecar 的旧格式目录', async () => {
       const layout = await makeLayout()
       await makeTrashEntry(layout, {
         trashId: 'ids-1',
@@ -602,7 +602,7 @@ describe('archive-manage host 路由：真实 handler 行为', () => {
       // 旧格式（无 sidecar）不可还原：它的会话 id 无从得知，不属于「要保留投影行」的集合。
       await mkdir(join(layout.trash, 'legacy-entry'), { recursive: true })
 
-      const ids = await trashProjectionIds(layout.trash)
+      const ids = await trashedSessionIds(layout.trash)
       assert.deepEqual([...ids].sort(), ['c1', 'r1', 'r2'])
     })
 
@@ -691,3 +691,4 @@ describe('archive-manage host 路由：真实 handler 行为', () => {
     })
   })
 })
+

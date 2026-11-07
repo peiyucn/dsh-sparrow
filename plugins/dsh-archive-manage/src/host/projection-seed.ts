@@ -24,8 +24,8 @@ import { emitSessionAdded } from './archive-set.js'
 import type { HeaderFacts } from './headers.js'
 import { cachedSnapshotOf, canWriteProjectionCache, coldSnapshotOf, readStrayBlankness, summaryBlockOf, type ProjectionBlock } from './projection.js'
 
-/** 一条会话回填后 immediate 可用的事实（added 通知载荷来源）。 */
-export interface SessionProjectionFacts {
+/** 一条会话回填后立即可用的事实（added 通知载荷来源）。 */
+interface SessionProjectionFacts {
   readonly header: SessionHeader
   readonly blank: boolean
   /** 官方 cached 投影块；缺省表示缓存服务不可用 / 回填失败，added 通知只能补条目、补不了标题。 */
@@ -55,8 +55,8 @@ function blankOf(ctx: Context, sessionId: string, block: ProjectionBlock | undef
 }
 
 /** 回填失败时的降级：保留已有缓存块（可能为空），不因为派生数据失败影响还原主流程。 */
-function degraded(header: SessionHeader, cached: ProjectionBlock | undefined, blank: boolean): SessionProjectionFacts {
-  return { header, blank, ...cached === undefined ? {} : { projections: cached } }
+function degraded(header: SessionHeader, projections: ProjectionBlock | undefined, blank: boolean): SessionProjectionFacts {
+  return { header, blank, ...projections === undefined ? {} : { projections } }
 }
 
 /**
@@ -85,13 +85,14 @@ async function seedOneSession(
     return undefined
   }
   const cached = cachedSnapshotOf(ctx, header)
+  const cachedProjections = summaryBlockOf(ctx, cached)
   if (!needsProjectionSeed(header, cached)) {
-    return { header, blank: blankOf(ctx, id, cached), projections: summaryBlockOf(ctx, cached) }
+    return { header, blank: blankOf(ctx, id, cached), projections: cachedProjections }
   }
   // 缓存服务连写回面都没有：读日志也写不进去，直接降级——避免为每个会话白折一篇大日志。
   if (!canWriteProjectionCache(ctx)) {
     ctx.logger.warn(`dsh-archive-manage: 宿主未提供可识别的 coldSnapshot，跳过投影行回填（${id}）`)
-    return degraded(header, summaryBlockOf(ctx, cached), blankOf(ctx, id, cached))
+    return degraded(header, cachedProjections, blankOf(ctx, id, cached))
   }
   let log
   try {
@@ -100,12 +101,12 @@ async function seedOneSession(
     if (!signal.aborted) {
       ctx.logger.warn(`dsh-archive-manage: 回填投影行读取冷日志失败（${id}）：${error instanceof Error ? error.message : String(error)}`)
     }
-    return degraded(header, summaryBlockOf(ctx, cached), blankOf(ctx, id, cached))
+    return degraded(header, cachedProjections, blankOf(ctx, id, cached))
   }
   const seeded = coldSnapshotOf(ctx, log.header, log.inheritedEventCount, log.events)
   if (seeded === undefined) {
     ctx.logger.warn(`dsh-archive-manage: 投影行回填不可用（${id}）：宿主未提供可识别的 coldSnapshot`)
-    return degraded(header, summaryBlockOf(ctx, cached), blankOf(ctx, id, cached))
+    return degraded(header, cachedProjections, blankOf(ctx, id, cached))
   }
   return { header: log.header, blank: blankOf(ctx, id, seeded), projections: summaryBlockOf(ctx, seeded) }
 }

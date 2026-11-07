@@ -209,24 +209,13 @@ export function emitSessionAdded(
 }
 
 /**
- * unarchive 后补发官方 api-session/added：客户端 handleSessionAdded 即时并入会话列表，
- * 用户无需刷新页面。不发出则用户必须刷新——刷新会触发 dsh 把会话加载进 live store，
- * 之后「再归档 → 进回收站」会被 hold 守卫（ensureSessionNotLive）拦下。
- * headers 经 header 事实缓存取，与 /list /strays 共享单飞，不单独扫盘。
- * 顺手带上 cached 投影块：回填过投影行的会话（回收站还原 / 启动修复）取消归档后标题立即可见。
+ * 取消归档：只动归档集、不碰文件（live 会话同样可取消）；随后补发「回到列表」通知。
+ *
+ * 补发 added 的动机：客户端 `handleSessionAdded` 即时并入会话列表，用户无需刷新页面；
+ * 不发出则必须刷新——刷新会触发 dsh 把会话加载进 live store，之后「再归档 → 进回收站」会被
+ * hold 守卫（ensureSessionNotLive）拦下。headers 经 header 事实缓存取，与 /list /strays 共享
+ * 单飞，不单独扫盘；顺手带上 cached 投影块，回填过投影行的会话取消归档后标题立即可见。
  */
-async function emitSessionAddedForId(ctx: Context, sessionId: SessionId, headerFacts: HeaderFactsStore<HeaderFacts>): Promise<void> {
-  try {
-    const { headers } = await headerFacts.get()
-    const header = headers.find(candidate => String(candidate.id) === String(sessionId))
-    if (header === undefined) return
-    emitSessionAdded(ctx, header, readStrayBlankness(ctx, String(sessionId)), summaryBlockOf(ctx, cachedSnapshotOf(ctx, header)))
-  } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: api-session/added 通知失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
-  }
-}
-
-/** 取消归档：只动归档集、不碰文件（live 会话同样可取消）；随后补发「回到列表」通知。 */
 export async function unarchiveSession(
   ctx: Context,
   surface: RegistryMutationSurface,
@@ -234,7 +223,20 @@ export async function unarchiveSession(
   sessionId: SessionId,
 ): Promise<UnarchiveResponse> {
   await removeArchivedId(surface, sessionId)
-  await emitSessionAddedForId(ctx, sessionId, headerFacts)
+  try {
+    const { headers } = await headerFacts.get()
+    const header = headers.find(candidate => String(candidate.id) === String(sessionId))
+    if (header !== undefined) {
+      emitSessionAdded(
+        ctx,
+        header,
+        readStrayBlankness(ctx, String(sessionId)),
+        summaryBlockOf(ctx, cachedSnapshotOf(ctx, header)),
+      )
+    }
+  } catch (error) {
+    ctx.logger.warn(`dsh-archive-manage: api-session/added 通知失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+  }
   return { ok: true }
 }
 
