@@ -24,14 +24,15 @@ export const APP_CSS = `
   margin-left: auto;
   margin-right: auto;
 }
-/* Command row: title + tabs + the active view's actions share one line. */
+/* Navigation row: title + tabs, with a reserved slot on the right for cross-feature content
+   (calendar / to-do hints); the row stays two-tier even while that slot is empty. */
 .dsh-desk-head {
   box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 14px;
   padding-top: 28px;
-  margin-bottom: 10px;
+  margin-bottom: 4px;
   flex: none;
   min-height: 32px;
 }
@@ -45,6 +46,15 @@ html[data-platform='darwin'] .dsh-desk-head {
   font-weight: 600;
   line-height: 28px;
   white-space: nowrap;
+}
+/* Intentionally empty for now: future cross-feature widgets live in this reserved slot. */
+.dsh-desk-global-slot {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 28px;
 }
 .dsh-desk-subtitle {
   margin: 0;
@@ -87,15 +97,18 @@ html[data-platform='darwin'] .dsh-desk-head {
   font-weight: 600;
   box-shadow: 0 1px 2px rgba(20, 25, 40, 0.08);
 }
-/* Contextual actions for the active tab: one shared button primitive for both views. */
-.dsh-desk-head-actions {
-  margin-left: auto;
+/* Action row: contextual view actions. It keeps its height even when empty so the two-tier
+   structure never jumps between tabs. */
+.dsh-desk-viewbar {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
   flex-wrap: wrap;
-  min-width: 0;
+  min-height: 32px;
+  margin-bottom: 10px;
+  flex: none;
 }
 .dsh-desk-action {
   appearance: none;

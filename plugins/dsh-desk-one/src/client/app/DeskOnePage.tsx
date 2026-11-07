@@ -327,6 +327,8 @@ export function DeskOnePage(props: DeskPanelProps) {
     return null
   }
 
+  const actions = topbarActions()
+
   return (
     <div className="dsh-desk-page">
       <header className="dsh-desk-head" data-window-drag>
@@ -342,8 +344,9 @@ export function DeskOnePage(props: DeskPanelProps) {
             {t('tab.tasks')}
           </button>
         </nav>
-        <div className="dsh-desk-head-actions" data-window-drag-recall>{topbarActions()}</div>
+        <div className="dsh-desk-global-slot" data-window-drag-recall aria-hidden="true" />
       </header>
+      <div className="dsh-desk-viewbar" data-window-drag-recall>{actions}</div>
       {data.loadError === null ? null : (
         <div>
           <p className="dsh-desk-error">{t('state.loadFailed', { message: data.loadError })}</p>
