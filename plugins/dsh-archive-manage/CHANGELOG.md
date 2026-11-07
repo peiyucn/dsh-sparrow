@@ -2,11 +2,6 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## [0.2.2-rc.1.1] - 2026-11-08
-
-- Sessions restored from the trash again show their real titles and subagent labels in the composer `@` list and the task board `@` list instead of session ids, project folder names, or mismatched text.
-- Restoring all trash entries restores titles as well, with no page refresh needed.
-
 ## [0.2.2-rc.1] - 2026-11-05
 
 - Now adapted to official dsh 0.2.2-rc.1 (web and desktop).
