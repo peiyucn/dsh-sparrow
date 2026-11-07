@@ -166,7 +166,18 @@ export function TaskGroupBlock({
       {collapsed
         ? null
         : (
-            <div className="dsh-task-group-body" data-group-id={group.id}>
+            <div
+              className="dsh-task-group-body"
+              data-group-id={group.id}
+              onDoubleClick={(event) => {
+                const target = event.target as HTMLElement
+                if (target.closest('[data-task-id],input,textarea,button')) return
+                // The lane-level double-click handler ignores block descendants; handle the group
+                // body here so "double-click to add" creates a card inside THIS group.
+                event.stopPropagation()
+                onAdd(status, group.id)
+              }}
+            >
               {cardNodes}
               {draft ? <TaskDraftCard t={t} onCommit={onCommitDraft} onCancel={onCancelDraft} /> : null}
               {tasks.length === 0 && !draft
