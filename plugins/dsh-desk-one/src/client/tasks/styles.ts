@@ -319,7 +319,7 @@ export const TASKS_CSS = `
 .dsh-task-color-swatch[data-active='true'] {
   box-shadow: 0 0 0 2px var(--dsw-alias-bg-layer-1, #ffffff), 0 0 0 3.5px rgba(55, 53, 47, 0.55);
 }
-/* Linked sessions: chips with a live status dot; "@" opens a multi-select picker. */
+/* Linked sessions: chips carry their state as tint + border (no separate status dot). */
 .dsh-task-sessions {
   position: relative;
   display: flex;
@@ -347,38 +347,34 @@ export const TASKS_CSS = `
   min-width: 0;
   max-width: 100%;
   padding: 1px 2px 1px 6px;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 86%, var(--dsw-alias-label-primary, #1f2329));
   font-size: 11px;
   line-height: 16px;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
-.dsh-task-session-dot {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #9aa0a8;
+.dsh-task-session[data-state='running'] {
+  border-color: color-mix(in srgb, #2e9e5b 45%, transparent);
+  background: color-mix(in srgb, #2e9e5b 12%, var(--dsw-alias-bg-layer-1, #ffffff));
+  color: color-mix(in srgb, #1d6b3f 72%, var(--dsw-alias-label-secondary, #6b7280));
 }
-.dsh-task-session[data-state='running'] .dsh-task-session-dot,
-.dsh-task-session-option[data-state='running'] .dsh-task-session-dot {
-  background: #2e9e5b;
-  box-shadow: 0 0 0 2px color-mix(in srgb, #2e9e5b 22%, transparent);
+.dsh-task-session[data-state='idle'] {
+  border-color: color-mix(in srgb, var(--dsw-alias-label-secondary, #6b7280) 18%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 88%, var(--dsw-alias-label-primary, #1f2329));
 }
-.dsh-task-session[data-state='idle'] .dsh-task-session-dot,
-.dsh-task-session-option[data-state='idle'] .dsh-task-session-dot {
-  background: #9aa0a8;
+.dsh-task-session[data-state='loading'] {
+  border-color: color-mix(in srgb, #d9a441 45%, transparent);
+  background: color-mix(in srgb, #d9a441 12%, var(--dsw-alias-bg-layer-1, #ffffff));
 }
-.dsh-task-session[data-state='loading'] .dsh-task-session-dot,
-.dsh-task-session-option[data-state='loading'] .dsh-task-session-dot {
-  background: #d9a441;
-}
-.dsh-task-session[data-state='archived'] .dsh-task-session-dot,
-.dsh-task-session[data-state='unavailable'] .dsh-task-session-dot,
-.dsh-task-session-option[data-state='archived'] .dsh-task-session-dot,
-.dsh-task-session-option[data-state='unavailable'] .dsh-task-session-dot {
+.dsh-task-session[data-state='archived'],
+.dsh-task-session[data-state='unavailable'] {
+  border-color: color-mix(in srgb, var(--dsw-alias-label-tertiary, #8a919f) 28%, transparent);
+  border-style: dashed;
   background: transparent;
-  border: 1px solid #9aa0a8;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
+.dsh-task-session[data-state='unavailable'] {
+  opacity: 0.65;
 }
 .dsh-task-session-title {
   appearance: none;
@@ -487,7 +483,7 @@ export const TASKS_CSS = `
   gap: 6px;
   width: 100%;
   padding: 3px 4px;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-secondary, #6b7280);
@@ -497,10 +493,24 @@ export const TASKS_CSS = `
   text-align: left;
   cursor: pointer;
 }
-.dsh-task-session-option:hover {
+.dsh-task-session-option[data-state='running'] {
+  border-color: color-mix(in srgb, #2e9e5b 34%, transparent);
+  background: color-mix(in srgb, #2e9e5b 9%, transparent);
+}
+.dsh-task-session-option[data-state='loading'] {
+  border-color: color-mix(in srgb, #d9a441 34%, transparent);
+  background: color-mix(in srgb, #d9a441 9%, transparent);
+}
+.dsh-task-session-option[data-state='archived'],
+.dsh-task-session-option[data-state='unavailable'] {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--dsw-alias-label-tertiary, #8a919f) 26%, transparent);
+}
+.dsh-task-session-option:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
 }
 .dsh-task-session-option[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 45%, transparent);
   background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 10%, transparent);
   color: var(--dsw-alias-label-primary, #1f2329);
 }

@@ -238,8 +238,7 @@ export function TaskCard({
                   className="dsh-task-session"
                   data-state={chip.availability === 'available' ? (chip.running ? 'running' : 'idle') : chip.availability}
                 >
-                  <span className="dsh-task-session-dot" aria-hidden="true" />
-                  <button
+                        <button
                     type="button"
                     className="dsh-task-session-title"
                     title={`${chip.title} · ${sessionStatusText(chip)}`}
@@ -321,8 +320,7 @@ export function TaskCard({
                               data-state={option.availability === 'available' ? (option.running ? 'running' : 'idle') : option.availability}
                               onClick={() => toggleSession(option)}
                             >
-                              <span className="dsh-task-session-dot" aria-hidden="true" />
-                              <span className="dsh-task-session-option-title">{option.title}</span>
+                                                <span className="dsh-task-session-option-title">{option.title}</span>
                               <span className="dsh-task-session-option-state">{sessionStatusText(option)}</span>
                             </button>
                           </li>
