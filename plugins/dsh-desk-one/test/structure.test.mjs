@@ -426,6 +426,11 @@ describe('dsh-desk-one 结构', () => {
     assert.match(card, /task\.session\.search/u)
     assert.match(card, /task\.session\.remove/u)
     assert.match(card, /onOpenSession/u)
+    // Linked chips and the @ entry live on separate rows: @ must never read as a chip.
+    assert.match(card, /dsh-task-session-chips/u)
+    assert.match(card, /dsh-task-session-addrow/u)
+    assert.match(styles, /\.dsh-task-session-addrow \{/u)
+    assert.match(styles, /\.dsh-task-sessions \{[^}]*flex-direction: column/su)
     // The picker must escape the card/lane scroll container: body portal + fixed placement.
     assert.match(card, /import \{ createPortal \} from 'react-dom'/u)
     assert.match(card, /document\.body/u)

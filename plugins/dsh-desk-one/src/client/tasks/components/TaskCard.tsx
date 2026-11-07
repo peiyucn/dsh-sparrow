@@ -224,7 +224,11 @@ export function TaskCard({
       {(sessionEnabled || sessionChips.length > 0)
         ? (
             <div className="dsh-task-sessions">
-              {sessionChips.map(chip => (
+              {sessionChips.length === 0
+                ? null
+                : (
+                    <div className="dsh-task-session-chips">
+                      {sessionChips.map(chip => (
                 <span
                   key={chip.id}
                   className="dsh-task-session"
@@ -251,10 +255,13 @@ export function TaskCard({
                     </svg>
                   </button>
                 </span>
-              ))}
+                      ))}
+                    </div>
+                  )}
               {sessionEnabled
                 ? (
-                    <button
+                    <div className="dsh-task-session-addrow">
+                      <button
                       ref={sessionAnchorRef}
                       type="button"
                       className="dsh-task-session-add"
@@ -269,6 +276,7 @@ export function TaskCard({
                     >
                       @
                     </button>
+                    </div>
                   )
                 : null}
             </div>

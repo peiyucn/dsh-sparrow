@@ -278,10 +278,22 @@ export const TASKS_CSS = `
 .dsh-task-sessions {
   position: relative;
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  margin-top: 2px;
+}
+.dsh-task-session-chips {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
-  margin-top: 2px;
+}
+/* The @ entry starts its own line so it never reads as another chip of the linked row. */
+.dsh-task-session-addrow {
+  display: flex;
+  align-items: center;
+  min-height: 16px;
 }
 .dsh-task-session {
   display: inline-flex;
