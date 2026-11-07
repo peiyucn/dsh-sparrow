@@ -26,6 +26,7 @@ interface TaskPayload {
   due?: { date?: string; timezone?: string }  // 只到天，v1 不做时刻
   order: number                               // 容器内手动顺序（未分组区 / 某个分组；拖拽只重排目标容器）
   groupId?: string                            // 所属分组 id；缺省未分组
+  sessionIds: string[]                        // 关联的 DSH 会话 id（可多个；会话标题/状态实时解析）
   color?: NoteColor                           // 卡片颜色条，复用便签的 5 色板
   archived: boolean                           // 存档后从板上消失，进存档视图
   projectId?: string                          // 预留：多板后启用
@@ -72,6 +73,14 @@ interface TaskPayload {
 * 成员关系以任务 `groupId` 为唯一真值；分组名 / 泳道 / 顺序存宿主，折叠状态是纯界面偏好。
 * 整组拖动与卡片同一套指针手势：按住分组头（输入框 / 按钮除外）生成整组幽灵（头 + 卡片）跟手；同泳道放下调整分组顺序，拖到其它泳道直接连同卡片级联新状态，无确认条与撤销条；无效落点飞回原处。
 
+### 会话关联（S1.5，多对多）
+
+* 卡片可关联 0..N 个 DSH 会话；同一会话可服务多张卡。只存不透明 `sessionId`，标题 / 运行状态由客户端从宿主 `sessions` + `workspaces` 服务实时解析，**不落库**。
+* 卡片会话行：每个 chip = 状态点 + 会话标题（点击打开会话）+ 移除；`@` 打开多选选择器（搜索、运行中优先、隐藏 `origin: 'subagent'`、已归档 / 不可用会话禁用）。
+* 状态点：绿 = 运行中（`running`）、灰 = 空闲；已归档 / 列表已移除 = 空心灰 + tooltip。会话标题 / 描述**不覆盖**卡片自身文字。
+* 三个客户端服务（`sessions` / `workspaces` / `uiWorkspace`）走可选依赖 fork：缺任一服务时整块功能隐藏，卡片仍正常可用。
+* 边界：会话删除 / 归档后关联保留并以不可用态展示，不自动清空；宿主列表尚未就绪时显示 loading 态。
+
 ### 排序视图
 
 * 列头右侧菜单：**手动排序**（默认，拖拽顺序）/ **按创建时间** / **按截止日期**。
@@ -110,6 +119,7 @@ interface TaskPayload {
 * 按创建时间 / 截止日期排序视图正确；切回手动排序恢复手排顺序。
 * 完成列可折叠；只有完成列卡片有存档入口；存档后从板上消失、出现在存档视图，恢复后回到完成列。
 * 颜色、截止日期（含逾期标记）正确显示与保存。
+* 会话关联支持多对多；绿 / 灰点随会话运行状态实时变化；点击 chip 打开对应会话；已归档 / 不可用会话以空心点降级；宿主缺会话服务时不报错、不显示 @ 入口。
 * agent 工具与界面读写同一批任务（工具建的任务出现在板上）。
 * `npm run verify` 全绿；文档与守卫同步。
 
@@ -130,6 +140,6 @@ interface TaskPayload {
 
 * 数据：`src/model.ts` 的任务归一化 / 创建 / 补丁 / 排序 / 过滤；`src/domain.ts` 的 nodes 表扩为 kind 判别联合；共享存储 `src/host/store.ts`。
 * host：`src/host/tasks/{routes,tools}.ts`（4 条 REST + 5 个 agent 工具）；`src/host/router.ts` 统一挂载。
-* 客户端：`src/client/tasks/{api,types,styles}.ts`、`hooks/{useTasksData,useTaskBoard}.ts`、`components/{TaskBoard,TaskColumn,TaskCard}.tsx`；页面标签 `总览 | 便签墙 | 任务板`。卡片为自动换行 textarea、整卡直立幽灵拖拽（便签拖动才做纸张倾斜）、完成列才可存档；分组为任务 `group` 字段 + localStorage 分组名 / 折叠状态 / 顺序；窄容器切换计数列。
+* 客户端：`src/client/sessions/{contract,bridge}.ts`（可选服务桥）+ `src/client/tasks/hooks/useSessionLinks.ts`（订阅快照）；`src/client/tasks/{api,types,styles}.ts`、`hooks/{useTasksData,useTaskBoard}.ts`、`components/{TaskBoard,TaskColumn,TaskCard}.tsx`；页面标签 `总览 | 便签墙 | 任务板`。卡片为自动换行 textarea、整卡直立幽灵拖拽（便签拖动才做纸张倾斜）、完成列才可存档；分组为任务 `group` 字段 + localStorage 分组名 / 折叠状态 / 顺序；窄容器切换计数列。
 * 排序视图：手动 / 创建时间 / 截止日期；视图偏好存 `localStorage`（`dsh-desk-one:task-sort`）。
 * 命名：完成列的归档统一叫「存档」（工具名 `desk_task_archive` 保持英文 API 命名）。

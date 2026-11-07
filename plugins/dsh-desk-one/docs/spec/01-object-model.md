@@ -63,6 +63,7 @@ interface TaskPayload {
   due?: { date: string; timezone?: string } // S1 只到天（date 必填，YYYY-MM-DD）
   order: number                            // 同一容器（未分组区或某个分组）内手工排序
   groupId?: string                         // 一层分组 id；缺省未分组
+  sessionIds?: string[]                    // 关联的 DSH 会话 id（多对多；标题/状态实时解析，不落库）
   color?: string                           // 卡片颜色条，复用便签五色板
   archived: boolean                        // 存档（避开宿主「会话归档」命名）
   projectId?: string                       // 预留：多板后启用
