@@ -193,11 +193,8 @@ export function DeskOnePage(props: DeskPanelProps) {
   )
 
   const renderOverview = (): ReactElement => (
-    // Overview content is not designed yet; the page subtitle moves here so the command row
-    // stays a clean title + tabs + actions strip.
-    <div className="dsh-desk-overview">
-      <p className="dsh-desk-subtitle">{t('page.subtitle')}</p>
-    </div>
+    // Overview content is not designed yet; keep it blank rather than piling unvalidated features.
+    <div className="dsh-desk-overview" />
   )
 
   const plusIcon = (
@@ -233,13 +230,15 @@ export function DeskOnePage(props: DeskPanelProps) {
       if (trash.showTrash) {
         return (
           <>
-            <button type="button" className="dsh-desk-action" onClick={trash.toggleTrash}>
+            <button type="button" className="dsh-desk-action" aria-label={t('action.backToWall')} title={t('action.backToWall')} onClick={trash.toggleTrash}>
               {backIcon}
               <span className="dsh-desk-action-label">{t('action.backToWall')}</span>
             </button>
             <button
               type="button"
               className="dsh-desk-action"
+              aria-label={trash.confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
+              title={trash.confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
               data-danger={trash.confirmClearTrash ? 'true' : undefined}
               disabled={trash.trashedNotes.length === 0 || trash.smashing}
               onClick={trash.clearTrash}
@@ -257,6 +256,8 @@ export function DeskOnePage(props: DeskPanelProps) {
           <button
             type="button"
             className="dsh-desk-action dsh-desk-action-primary"
+            aria-label={t('action.newNote')}
+            title={t('action.newNote')}
             disabled={creating || trash.smashing}
             onClick={() => { void addNote() }}
           >
@@ -267,6 +268,8 @@ export function DeskOnePage(props: DeskPanelProps) {
             type="button"
             className="dsh-desk-action"
             data-smash-confirm="true"
+            aria-label={trash.confirmSmash ? t('action.smashConfirm') : t('action.smash')}
+            title={trash.confirmSmash ? t('action.smashConfirm') : t('action.smash')}
             data-danger={trash.confirmSmash ? 'true' : undefined}
             disabled={trash.smashing}
             onClick={trash.smashWall}
@@ -276,7 +279,7 @@ export function DeskOnePage(props: DeskPanelProps) {
               {trash.confirmSmash ? t('action.smashConfirm') : t('action.smash')}
             </span>
           </button>
-          <button type="button" className="dsh-desk-action" onClick={trash.toggleTrash}>
+          <button type="button" className="dsh-desk-action" aria-label={t('trash.title')} title={t('trash.title')} onClick={trash.toggleTrash}>
             {trashIcon}
             <span className="dsh-desk-action-label">{t('trash.title')}</span>
           </button>
@@ -286,7 +289,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     if (tab === 'tasks') {
       if (board.showArchive) {
         return (
-          <button type="button" className="dsh-desk-action" onClick={board.toggleArchive}>
+          <button type="button" className="dsh-desk-action" aria-label={t('task.backToBoard')} title={t('task.backToBoard')} onClick={board.toggleArchive}>
             {backIcon}
             <span className="dsh-desk-action-label">{t('task.backToBoard')}</span>
           </button>
@@ -297,6 +300,8 @@ export function DeskOnePage(props: DeskPanelProps) {
           <button
             type="button"
             className="dsh-desk-action dsh-desk-action-primary"
+            aria-label={t('task.add')}
+            title={t('task.add')}
             onClick={() => board.beginDraft('todo')}
           >
             {plusIcon}
@@ -309,13 +314,14 @@ export function DeskOnePage(props: DeskPanelProps) {
                 type="button"
                 className="dsh-desk-segment"
                 data-active={board.sortMode === option.mode}
+                aria-pressed={board.sortMode === option.mode}
                 onClick={() => board.setSortMode(option.mode)}
               >
                 {option.label}
               </button>
             ))}
           </div>
-          <button type="button" className="dsh-desk-action" onClick={board.toggleArchive}>
+          <button type="button" className="dsh-desk-action" aria-label={t('task.archive')} title={t('task.archive')} onClick={board.toggleArchive}>
             {archiveIcon}
             <span className="dsh-desk-action-label">
               {t('task.archive')}{board.archivedTasks.length === 0 ? '' : ` (${board.archivedTasks.length})`}
@@ -332,21 +338,26 @@ export function DeskOnePage(props: DeskPanelProps) {
   return (
     <div className="dsh-desk-page">
       <header className="dsh-desk-head" data-window-drag>
-        <h1 className="dsh-desk-title">{t('page.title')}</h1>
-        <nav className="dsh-desk-tabs" role="tablist" data-window-drag-recall>
-          <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
-            {t('tab.overview')}
-          </button>
-          <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
-            {t('tab.notes')}
-          </button>
-          <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
-            {t('tab.tasks')}
-          </button>
-        </nav>
+        <div className="dsh-desk-heading">
+          <h1 className="dsh-desk-title">{t('page.title')}</h1>
+          <p className="dsh-desk-subtitle">{t('page.subtitle')}</p>
+        </div>
         <div className="dsh-desk-global-slot" data-window-drag-recall aria-hidden="true" />
+        <div className="dsh-desk-toolbar" data-window-drag-recall>{actions}</div>
+        <div className="dsh-desk-tabs-row" data-window-drag-recall>
+          <nav className="dsh-desk-tabs" role="tablist">
+            <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
+              {t('tab.overview')}
+            </button>
+            <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
+              {t('tab.notes')}
+            </button>
+            <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
+              {t('tab.tasks')}
+            </button>
+          </nav>
+        </div>
       </header>
-      <div className="dsh-desk-viewbar" data-window-drag-recall>{actions}</div>
       {data.loadError === null ? null : (
         <div>
           <p className="dsh-desk-error">{t('state.loadFailed', { message: data.loadError })}</p>
