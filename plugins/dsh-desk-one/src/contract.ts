@@ -202,6 +202,8 @@ export interface TaskGroupMoveResponse {
   readonly group: DeskTaskGroup
   /** 整组跨列时被一起改状态的成员任务（同列排序时为空数组）。 */
   readonly tasks: readonly DeskTask[]
+  /** 移动后整表的权威分组列表（供客户端统一块序列重编号，避免额外 GET）。 */
+  readonly groups: readonly DeskTaskGroup[]
 }
 
 export interface TaskGroupDeleteResponse {

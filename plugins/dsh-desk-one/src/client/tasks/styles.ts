@@ -915,26 +915,4 @@ export const TASKS_CSS = `
   width: 14px;
   height: 14px;
 }
-/* Insertion line while a group is dragged (per-index marker; the lane itself highlights too). */
-.dsh-task-group-dropend {
-  flex: none;
-  height: 2px;
-  margin: 0 2px;
-  border-radius: 1px;
-  background: transparent;
-}
-.dsh-task-group-dropend[data-active='true'] {
-  background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
-}
-/* Cards-drag feedback for the ungrouped drop zone (always present so ungrouping is discoverable). */
-.dsh-task-ungrouped-hint {
-  margin: 2px 4px;
-  padding: 6px 8px;
-  border: 1px dashed var(--dsw-alias-border-l2, #cfd4dc);
-  border-radius: var(--dsw-radius-sm, 8px);
-  text-align: center;
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-}
 `

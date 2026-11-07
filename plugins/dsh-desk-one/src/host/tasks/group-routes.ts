@@ -47,7 +47,7 @@ async function moveGroupRoute(route: DeskRouteContext, req: IncomingMessage, res
     throw new DeskError('BAD_BODY', `未知的任务状态：${String(body.status)}`)
   }
   const result = await route.store.moveGroup(body.id, body.expectedRevision, body.status, body.order)
-  sendJson(res, 200, { group: result.group, tasks: result.tasks } satisfies TaskGroupMoveResponse)
+  sendJson(res, 200, { group: result.group, tasks: result.tasks, groups: await route.store.listGroups() } satisfies TaskGroupMoveResponse)
 }
 
 async function deleteGroupRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -63,7 +63,7 @@ async function archiveGroupRoute(route: DeskRouteContext, req: IncomingMessage, 
   if (!Number.isInteger(body.expectedRevision)) throw new DeskError('BAD_BODY', '缺少 expectedRevision')
   if (typeof body.archived !== 'boolean') throw new DeskError('BAD_BODY', 'archived 必须是布尔值')
   const result = await route.store.archiveGroup(body.id, body.expectedRevision, body.archived)
-  sendJson(res, 200, { group: result.group, tasks: result.tasks } satisfies TaskGroupMoveResponse)
+  sendJson(res, 200, { group: result.group, tasks: result.tasks, groups: await route.store.listGroups() } satisfies TaskGroupMoveResponse)
 }
 
 export const GROUP_ROUTES: readonly DeskRouteEntry[] = [

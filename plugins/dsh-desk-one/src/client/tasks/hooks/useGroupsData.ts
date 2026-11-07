@@ -160,17 +160,19 @@ export function useGroupsData(t: DeskTranslator, actions: Actions): GroupsData {
   const moveGroupToLane = useCallback(async (group: DeskTaskGroup, status: TaskStatus, order?: number) => {
     try {
       const result = await moveGroup({ id: group.id, expectedRevision: group.revision, status, order })
-      // The host renumbered group orders in both lanes while moving: read the authoritative list
-      // back so the caller can renumber the unified block sequence with fresh revisions.
-      let latestGroups: readonly DeskTaskGroup[] | null = null
-      try {
-        latestGroups = await listGroups()
-        setGroups(latestGroups)
-      } catch {
-        replace(result.group)
+      // The route returns the authoritative group list after the move; old hosts without that
+      // field fall back to one GET so this client also works before the host restart.
+      let latestGroups = (result as { groups?: readonly DeskTaskGroup[] }).groups
+      if (latestGroups === undefined) {
+        try {
+          latestGroups = await listGroups()
+        } catch {
+          latestGroups = groupsRef.current
+        }
       }
+      setGroups(latestGroups)
       setActionError(null)
-      return { group: result.group, tasks: result.tasks, groups: latestGroups ?? groupsRef.current }
+      return { group: result.group, tasks: result.tasks, groups: latestGroups }
     } catch (reason) {
       setActionError(t('state.saveFailed', { message: messageOf(reason) }))
       void reload()

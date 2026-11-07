@@ -291,6 +291,8 @@ describe('host 装配（apply 接线）', () => {
     assert.equal(moved.json.tasks.length, 1)
     assert.equal(moved.json.tasks[0].id, taskId)
     assert.equal(moved.json.tasks[0].status, 'doing')
+    assert.equal(moved.json.groups.length, 1, '移动响应带回权威分组列表')
+    assert.equal(moved.json.groups[0].status, 'doing')
 
     const doingTasks = await callRoute(handler, { method: 'GET', url: `${ROUTES.tasks}?status=doing`, headers: host })
     assert.equal(doingTasks.json.tasks.length, 1)

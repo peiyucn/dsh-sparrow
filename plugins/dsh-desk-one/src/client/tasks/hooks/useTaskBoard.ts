@@ -135,12 +135,24 @@ export function useTaskBoard({
   const blocksFor = useCallback((status: TaskStatus): LaneBlock[] =>
     manualBlocks(tasks, activeGroups, status), [activeGroups, tasks])
 
+  /** One optimistic task patch path for reorder / renumber / move operations. */
+  const applyTaskPatches = useCallback((entries: readonly { source: DeskTask; patch: TaskPatchRequest }[]): void => {
+    if (entries.length === 0) return
+    const byId = new Map(entries.map(entry => [entry.source.id, entry.patch]))
+    setTasks(current => current.map(task => {
+      const patch = byId.get(task.id)
+      return patch === undefined ? task : { ...task, ...patch } as DeskTask
+    }))
+    for (const entry of entries) savePatch(entry.source, entry.patch)
+    setActionError(null)
+  }, [savePatch, setActionError, setTasks])
+
   /** Persist a lane's block sequence: ungrouped cards and groups share the block index. */
   const applyBlockOrders = useCallback((
     blocks: readonly LaneBlock[],
     moving?: { readonly task: DeskTask; readonly patch: TaskPatchRequest },
   ): void => {
-    const patchById = new Map<string, TaskPatchRequest>()
+    const taskEntries: Array<{ source: DeskTask; patch: TaskPatchRequest }> = []
     const groupOrders: Array<{ group: DeskTaskGroup; order: number }> = []
     blocks.forEach((block, index) => {
       if (block.kind === 'task') {
@@ -149,27 +161,15 @@ export function useTaskBoard({
           ...block.task.order === index ? {} : { order: index },
           ...isMoving ? moving.patch : {},
         }
-        if (Object.keys(patch).length > 0) patchById.set(block.task.id, patch)
+        if (Object.keys(patch).length > 0) taskEntries.push({ source: block.task, patch })
         return
       }
       if (block.group.order !== index) groupOrders.push({ group: block.group, order: index })
     })
-    if (patchById.size === 0 && groupOrders.length === 0) return
-    if (patchById.size > 0) {
-      setTasks(current => current.map(task => {
-        const patch = patchById.get(task.id)
-        return patch === undefined ? task : { ...task, ...patch } as DeskTask
-      }))
-      const sourceById = new Map<string, DeskTask>()
-      for (const block of blocks) if (block.kind === 'task') sourceById.set(block.task.id, block.task)
-      for (const [id, patch] of patchById) {
-        const source = sourceById.get(id)
-        if (source !== undefined) savePatch(source, patch)
-      }
-    }
+    if (taskEntries.length === 0 && groupOrders.length === 0) return
+    applyTaskPatches(taskEntries)
     if (groupOrders.length > 0) setGroupOrders(groupOrders)
-    setActionError(null)
-  }, [savePatch, setActionError, setGroupOrders, setTasks])
+  }, [applyTaskPatches, setGroupOrders])
 
   const setSortMode = useCallback((mode: TaskSortMode): void => {
     setSortModeState(mode)
@@ -255,8 +255,7 @@ export function useTaskBoard({
         && task.groupId === toGroupId))
       const index = Math.max(0, Math.min(toIndex, target.length))
       target.splice(index, 0, moving)
-      const patchById = new Map<string, TaskPatchRequest>()
-      const sourceById = new Map<string, DeskTask>()
+      const taskEntries: Array<{ source: DeskTask; patch: TaskPatchRequest }> = []
       target.forEach((task, position) => {
         const isMoving = task.id === taskId
         const patch: TaskPatchRequest = {
@@ -265,19 +264,9 @@ export function useTaskBoard({
           ...isMoving && task.groupId !== toGroupId ? { groupId: toGroupId } : {},
         }
         if (Object.keys(patch).length === 0) return
-        patchById.set(task.id, patch)
-        sourceById.set(task.id, task)
+        taskEntries.push({ source: task, patch })
       })
-      if (patchById.size === 0) return
-      setTasks(current => current.map(task => {
-        const patch = patchById.get(task.id)
-        return patch === undefined ? task : { ...task, ...patch } as DeskTask
-      }))
-      for (const [id, patch] of patchById) {
-        const source = sourceById.get(id)
-        if (source !== undefined) savePatch(source, patch)
-      }
-      setActionError(null)
+      applyTaskPatches(taskEntries)
       return
     }
 

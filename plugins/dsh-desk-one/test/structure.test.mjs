@@ -16,6 +16,13 @@ const readStyles = async () => [
   await read('src/client/tasks/styles.ts'),
 ].join('\n')
 
+/** Task board components joined: guards survive the TaskColumn / group / draft split. */
+const readTaskColumn = async () => (await Promise.all([
+  read('src/client/tasks/components/TaskColumn.tsx'),
+  read('src/client/tasks/components/TaskGroupBlock.tsx'),
+  read('src/client/tasks/components/LaneHeader.tsx'),
+  read('src/client/tasks/components/TaskDraftCard.tsx'),
+])).join('\n')
 const readClientSurface = async () => {
   const entries = await readdir(CLIENT_DIR, { recursive: true })
   // Styles are asserted separately (they are the only files allowed to carry raw CSS values).
@@ -324,7 +331,7 @@ describe('dsh-desk-one 结构', () => {
   it('任务板客户端 应该 三泳道 + 卡片交互 + 拖拽 + 排序视图 + 存档', async () => {
     const page = await readClientSurface()
     const board = await read('src/client/tasks/components/TaskBoard.tsx')
-    const column = await read('src/client/tasks/components/TaskColumn.tsx')
+    const column = await readTaskColumn()
     const card = await read('src/client/tasks/components/TaskCard.tsx')
     const types = await read('src/client/tasks/types.ts')
     const index = await read('src/client/index.ts')
@@ -360,7 +367,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(board, /Math\.hypot/u, '拖拽用位移阈值区分点击 / 拖动')
     assert.match(board, /suppressNextClick/u, '拖动结束不能误触发进入编辑')
     assert.match(column, /dsh-task-card-dropmark/u, '拖入容器要显示精确插入线')
-    assert.match(column, /data-over=\{groupOver\}/u, '拖到分组上要整组高亮')
+    assert.match(column, /data-over=\{over\}/u, '拖到分组上要整组高亮')
     assert.match(styles, /\.dsh-task-card-dropmark \{/u)
     assert.match(styles, /\.dsh-task-group\[data-over='true'\]/u)
     assert.match(card, /dsh-task-color-pop/u, '颜色用色板直接选，不是单点循环')
@@ -390,7 +397,7 @@ describe('dsh-desk-one 结构', () => {
 
   it('任务板 应该 无横向滚动条：窄宽度收成计数模式，分组可拖动排序', async () => {
     const board = await read('src/client/tasks/components/TaskBoard.tsx')
-    const column = await read('src/client/tasks/components/TaskColumn.tsx')
+    const column = await readTaskColumn()
     const styles = await readStyles()
     const notesStyles = await read('src/client/notes/styles.ts')
     const notesDrag = await read('src/client/notes/hooks/useNoteDrag.ts')
@@ -437,7 +444,7 @@ describe('dsh-desk-one 结构', () => {
     const index = await read('src/client/index.ts')
     const card = await read('src/client/tasks/components/TaskCard.tsx')
     const board = await read('src/client/tasks/components/TaskBoard.tsx')
-    const column = await read('src/client/tasks/components/TaskColumn.tsx')
+    const column = await readTaskColumn()
     const styles = await readStyles()
     // Data: a card owns an opaque list of session ids; live titles/status are never persisted.
     assert.match(contract, /sessionIds: readonly string\[\]/u)
@@ -489,7 +496,7 @@ describe('dsh-desk-one 结构', () => {
     const groupsHook = await read('src/client/tasks/hooks/useGroupsData.ts')
     const boardHook = await read('src/client/tasks/hooks/useTaskBoard.ts')
     const board = await read('src/client/tasks/components/TaskBoard.tsx')
-    const column = await read('src/client/tasks/components/TaskColumn.tsx')
+    const column = await readTaskColumn()
     const styles = await readStyles()
     assert.match(contract, /export interface DeskTaskGroup/u, '分组是独立对象')
     assert.match(contract, /groupId\?: string/u, '任务用 groupId 记录成员关系')
