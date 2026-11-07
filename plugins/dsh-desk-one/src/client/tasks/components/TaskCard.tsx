@@ -9,10 +9,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
+import { createPortal } from 'react-dom'
 import { MAX_TASK_SESSIONS, NOTE_COLORS } from '../../../constants.js'
 import type { DeskTask, TaskPatchRequest } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
 import type { SessionChipInfo } from '../../sessions/contract.js'
+import { useAnchoredPanel } from '../hooks/useAnchoredPanel.js'
 
 interface TaskCardProps {
   readonly task: DeskTask
@@ -66,6 +68,13 @@ export function TaskCard({
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false)
   const [sessionQuery, setSessionQuery] = useState('')
+  const sessionAnchorRef = useRef<HTMLButtonElement | null>(null)
+  const sessionPanelRef = useRef<HTMLDivElement | null>(null)
+  const sessionPanelStyle = useAnchoredPanel({
+    open: sessionPickerOpen && sessionEnabled,
+    anchorRef: sessionAnchorRef,
+    panelRef: sessionPanelRef,
+  })
 
   const remaining = task.due === undefined ? undefined : daysUntil(task.due.date)
   const overdue = remaining !== undefined && remaining < 0
@@ -127,7 +136,7 @@ export function TaskCard({
 
   const toggleSession = (chip: SessionChipInfo): void => {
     const linked = task.sessionIds.includes(chip.id)
-    if (!linked && chip.availability !== 'available') return
+    if (!linked && chip.availability === 'unavailable') return
     if (!linked && task.sessionIds.length >= MAX_TASK_SESSIONS) return
     onLinkSessions(linked
       ? task.sessionIds.filter(id => id !== chip.id)
@@ -246,6 +255,7 @@ export function TaskCard({
               {sessionEnabled
                 ? (
                     <button
+                      ref={sessionAnchorRef}
                       type="button"
                       className="dsh-task-session-add"
                       data-session-anchor="true"
@@ -261,47 +271,55 @@ export function TaskCard({
                     </button>
                   )
                 : null}
-              {sessionPickerOpen && sessionEnabled
-                ? (
-                    <div className="dsh-task-session-pop" aria-label={t('task.session.add')}>
-                      <input
-                        autoFocus
-                        className="dsh-task-session-search"
-                        placeholder={t('task.session.search')}
-                        value={sessionQuery}
-                        onChange={event => setSessionQuery(event.currentTarget.value)}
-                      />
-                      {visibleSessionOptions.length === 0
-                        ? <p className="dsh-task-session-empty">{t('task.session.empty')}</p>
-                        : (
-                            <ul className="dsh-task-session-list">
-                              {visibleSessionOptions.map(option => {
-                                const linked = task.sessionIds.includes(option.id)
-                                const disabled = !linked
-                                  && (option.availability !== 'available' || task.sessionIds.length >= MAX_TASK_SESSIONS)
-                                return (
-                                  <li key={option.id}>
-                                    <button
-                                      type="button"
-                                      className="dsh-task-session-option"
-                                      aria-pressed={linked}
-                                      disabled={disabled}
-                                      data-state={option.availability === 'available' ? (option.running ? 'running' : 'idle') : option.availability}
-                                      onClick={() => toggleSession(option)}
-                                    >
-                                      <span className="dsh-task-session-dot" aria-hidden="true" />
-                                      <span className="dsh-task-session-option-title">{option.title}</span>
-                                      <span className="dsh-task-session-option-state">{sessionStatusText(option)}</span>
-                                    </button>
-                                  </li>
-                                )
-                              })}
-                            </ul>
-                          )}
-                    </div>
-                  )
-                : null}
             </div>
+          )
+        : null}
+      {sessionPickerOpen && sessionEnabled
+        ? createPortal(
+            // Body portal: the lane is a scroll container, so an in-card popover would be
+            // clipped and squeezed; the picker needs the full viewport.
+            <div
+              ref={sessionPanelRef}
+              className="dsh-task-session-pop"
+              style={sessionPanelStyle ?? { visibility: 'hidden' }}
+              aria-label={t('task.session.add')}
+            >
+              <input
+                autoFocus
+                className="dsh-task-session-search"
+                placeholder={t('task.session.search')}
+                value={sessionQuery}
+                onChange={event => setSessionQuery(event.currentTarget.value)}
+              />
+              {visibleSessionOptions.length === 0
+                ? <p className="dsh-task-session-empty">{t('task.session.empty')}</p>
+                : (
+                    <ul className="dsh-task-session-list">
+                      {visibleSessionOptions.map(option => {
+                        const linked = task.sessionIds.includes(option.id)
+                        const disabled = !linked
+                          && (option.availability === 'unavailable' || task.sessionIds.length >= MAX_TASK_SESSIONS)
+                        return (
+                          <li key={option.id}>
+                            <button
+                              type="button"
+                              className="dsh-task-session-option"
+                              aria-pressed={linked}
+                              disabled={disabled}
+                              data-state={option.availability === 'available' ? (option.running ? 'running' : 'idle') : option.availability}
+                              onClick={() => toggleSession(option)}
+                            >
+                              <span className="dsh-task-session-dot" aria-hidden="true" />
+                              <span className="dsh-task-session-option-title">{option.title}</span>
+                              <span className="dsh-task-session-option-state">{sessionStatusText(option)}</span>
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+            </div>,
+            document.body,
           )
         : null}
       <div className="dsh-task-foot">

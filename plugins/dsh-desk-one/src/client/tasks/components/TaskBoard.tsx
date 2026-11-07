@@ -464,10 +464,9 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     () => new Map(sessionSnapshot.sessions.map(session => [session.id, session])),
     [sessionSnapshot.sessions],
   )
-  const sessionOptions = useMemo(
-    () => sessionSnapshot.sessions.filter(session => !session.subagent),
-    [sessionSnapshot.sessions],
-  )
+  // Same session universe as the composer's `@` source (the host session list): subagent
+  // sessions are included too, and archived ones stay selectable with a hollow status dot.
+  const sessionOptions = sessionSnapshot.sessions
   const sessionsFor = useCallback((ids: readonly string[]): readonly SessionChipInfo[] => ids.map(id =>
     sessionById.get(id) ?? {
       id,

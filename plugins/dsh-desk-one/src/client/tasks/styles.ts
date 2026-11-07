@@ -383,11 +383,9 @@ export const TASKS_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
 }
 .dsh-task-session-pop {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + 6px);
-  z-index: 30;
-  width: 240px;
+  /* Body portal: left/top/width/max-height come from useAnchoredPanel. */
+  position: fixed;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -414,10 +412,11 @@ export const TASKS_CSS = `
   margin: 0;
   padding: 0;
   list-style: none;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;
-  max-height: 200px;
   overflow-y: auto;
   scrollbar-width: none;
 }
