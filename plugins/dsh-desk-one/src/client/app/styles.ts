@@ -175,52 +175,69 @@ html[data-platform='darwin'] .dsh-desk-head {
 .dsh-desk-action[data-danger='true']:hover:not(:disabled) {
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c62828) 8%, transparent);
 }
-/* Official SegmentedControl parity: hover-tinted track with a raised selected pill. */
-.dsh-desk-segmented {
-  display: inline-grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
-  gap: 2px;
-  padding: 4px;
-  border-radius: var(--dsw-radius-md, 12px);
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+/* Sort dropdown: one compact trigger; options follow the official Menu card semantics. */
+.dsh-desk-sort-trigger {
+  white-space: nowrap;
 }
-.dsh-desk-segment {
+.dsh-desk-sort-chevron {
+  width: 12px !important;
+  height: 12px !important;
+  opacity: 0.7;
+}
+.dsh-desk-sort-menu {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--dsw-radius-md, 12px);
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+  box-shadow: var(--dsw-elevation-prominent, 0 10px 30px -12px rgba(20, 25, 40, 0.45));
+  outline: 0.5px solid var(--dsw-alias-border-l1, #e2e5ea);
+  outline-offset: -0.5px;
+}
+.dsh-desk-sort-option {
   appearance: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
   height: 28px;
-  padding: 0 16px;
+  padding: 0 8px;
   border: none;
   border-radius: var(--dsw-radius-sm, 8px);
   background: transparent;
-  color: var(--dsw-alias-label-secondary, #6b7280);
+  color: var(--dsw-alias-label-primary, #1f2329);
   font: inherit;
   font-size: 13px;
-  font-weight: 500;
-  line-height: 20px;
+  line-height: 18px;
+  text-align: left;
   white-space: nowrap;
   cursor: pointer;
-  transition: color 120ms ease, background 120ms ease;
 }
-.dsh-desk-segment:hover {
-  color: var(--dsw-alias-label-primary, #1f2329);
+.dsh-desk-sort-option:hover,
+.dsh-desk-sort-option:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  outline: none;
 }
-.dsh-desk-segment[data-active='true'] {
-  background: var(--dsw-alias-bg-layer-1, #ffffff);
-  box-shadow: var(--dsw-elevation-soft, 0 1px 2px rgba(20, 25, 40, 0.08));
-  color: var(--dsw-alias-label-primary, #1f2329);
+.dsh-desk-sort-option[data-active='true'] {
+  font-weight: 500;
 }
-@media (max-width: 640px) {
-  .dsh-desk-title {
-    display: none;
-  }
-  .dsh-desk-action-label {
-    display: none;
-  }
-  .dsh-desk-action {
-    padding: 0 7px;
-  }
+.dsh-desk-sort-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
 }
-/* Unified object-level icon button (task cards, group headers, note cards and trash rows). */
+.dsh-desk-sort-check svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}/* Unified object-level icon button (task cards, group headers, note cards and trash rows). */
 .dsh-desk-iconbtn {
   appearance: none;
   display: inline-flex;

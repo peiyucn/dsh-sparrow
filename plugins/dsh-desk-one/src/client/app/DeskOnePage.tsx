@@ -17,11 +17,11 @@ import { NoteCard } from '../notes/components/NoteCard.js'
 import { TrashPanel } from '../notes/components/TrashPanel.js'
 import { TaskBoard } from '../tasks/components/TaskBoard.js'
 import { SessionsView } from '../sessions/SessionsView.js'
+import { SortMenu } from '../tasks/components/SortMenu.js'
 import { useSessionLinks } from '../tasks/hooks/useSessionLinks.js'
 import { useGroupsData } from '../tasks/hooks/useGroupsData.js'
 import { useTaskBoard } from '../tasks/hooks/useTaskBoard.js'
 import { useTasksData } from '../tasks/hooks/useTasksData.js'
-import type { TaskSortMode } from '../tasks/types.js'
 import { useNoteDrag } from '../notes/hooks/useNoteDrag.js'
 import { useNotesData } from '../notes/hooks/useNotesData.js'
 import { useTrash } from '../notes/hooks/useTrash.js'
@@ -88,11 +88,6 @@ export function DeskOnePage(props: DeskPanelProps) {
     moveGroupToLane: groupsData.moveGroupToLane,
     archiveGroup: groupsData.archiveGroup,
   })
-  const sortOptions: readonly { mode: TaskSortMode; label: string }[] = [
-    { mode: 'manual', label: t('task.sort.manual') },
-    { mode: 'created', label: t('task.sort.created') },
-    { mode: 'due', label: t('task.sort.due') },
-  ]
 
   /** Click / drag / resize raises one note to the top; skip the write when it already is. */
   const raise = useCallback((noteId: string): void => {
@@ -314,20 +309,7 @@ export function DeskOnePage(props: DeskPanelProps) {
             {plusIcon}
             <span className="dsh-desk-action-label">{t('task.add')}</span>
           </button>
-          <div className="dsh-desk-segmented" role="group" aria-label={t('task.sort.label')}>
-            {sortOptions.map(option => (
-              <button
-                key={option.mode}
-                type="button"
-                className="dsh-desk-segment"
-                data-active={board.sortMode === option.mode}
-                aria-pressed={board.sortMode === option.mode}
-                onClick={() => board.setSortMode(option.mode)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <SortMenu t={t} mode={board.sortMode} onChange={board.setSortMode} />
           <button type="button" className="dsh-desk-action" aria-label={t('task.archive')} title={t('task.archive')} onClick={board.toggleArchive}>
             {archiveIcon}
             <span className="dsh-desk-action-label">
