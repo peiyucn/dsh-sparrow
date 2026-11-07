@@ -90,12 +90,23 @@ export function expectationsFromEnv(env = process.env) {
  * @param {string} name - 包名。
  * @param {string} version - 版本号。
  * @param {number} waitMs - 等待上限（0 = 不等待，只查一次）。
- * @returns {Promise<object>} 含该版本的 packument。
+ * @returns {Promise<object | undefined>} 含该版本的 packument；包在 registry 上还不存在（首次发布前）时 undefined。
  */
 async function fetchPackumentWhenVisible(name, version, waitMs) {
   const deadline = Date.now() + Math.max(0, waitMs)
   for (let attempt = 1; ; attempt++) {
-    const packument = await fetchPackument(name)
+    let packument
+    try {
+      packument = await fetchPackument(name)
+    } catch (error) {
+      if (isPackageNotFound(error)) {
+        // 仓库里刚登记、尚未首发的新插件：registry 上连包都没有，等版本可见没有意义，
+        // 交给生成阶段按「从未发布」跳过；首发成功后同一脚本自然收录。
+        console.warn(`market-index: ${name} 尚未在 registry 上发布（404），跳过等待 @${version}`)
+        return undefined
+      }
+      throw error
+    }
     const visible = packument.versions?.[version] !== undefined && typeof packument.time?.[version] === 'string'
     if (visible) {
       if (attempt > 1) console.log(`market-index: ${name}@${version} 已可见（第 ${attempt} 次查询）`)
@@ -190,8 +201,18 @@ async function fetchPackument(name) {
   // 且漏掉其它元字符（CodeQL js/incomplete-sanitization）。
   const url = `${REGISTRY}${encodeURIComponent(name)}`
   const response = await fetch(url, { headers: { accept: 'application/json' } })
-  if (!response.ok) throw new Error(`GET ${url} → HTTP ${response.status}`)
+  if (!response.ok) {
+    // 带上 HTTP 状态：只有 404（包从未发布）可以按「跳过」处理，其它错误必须 fail-closed。
+    const error = new Error(`GET ${url} → HTTP ${response.status}`)
+    error.status = response.status
+    throw error
+  }
   return response.json()
+}
+
+/** registry 上「包不存在」的判定：只认 404（首次发布前）；网络/权限等其它错误继续 fail-closed。 */
+function isPackageNotFound(error) {
+  return typeof error === 'object' && error !== null && error.status === 404
 }
 
 /** 取一个 manifest 里参与派生的 dsh peer 映射（供快照留档）。 */
@@ -253,11 +274,15 @@ function entryOf(dirName, packument, peerSnapshot) {
  * @param {{ waitMs?: number, expectations?: { name: string, version: string }[] }} [options]
  *   `expectations` 里的包会先等到对应版本在 registry 可见再收录（见文件头的传播延迟说明）。
  *   用「列表」而不是单个：一次 Publish 可能有多个包的目标版本需要等。
+ * @returns {{ index: object, peers: object, skippedPackages: string[] }} 索引、peer 快照，
+ *   以及「从未发布（registry 404）而跳过收录」的包名（`check:market-index` 对它们有首发例外）。
  */
 export async function buildIndex(options = {}) {
   const waitMs = options.waitMs ?? 0
   const expectations = options.expectations ?? []
   const plugins = []
+  /** 从未发布（registry 404）而跳过的活跃插件包名。 */
+  const skippedPackages = []
   /** @type {Record<string, Record<string, Record<string, string>>>} 包名 → 版本 → dsh peer 映射 */
   const peers = {}
   for (const dirName of activePluginNames()) {
@@ -268,8 +293,22 @@ export async function buildIndex(options = {}) {
     let packument
     for (const expectation of wanted) {
       packument = await fetchPackumentWhenVisible(manifest.name, expectation.version, waitMs)
+      // 包还不存在（首次发布前）：等不到，也不该让本次生成失败——按「从未发布」跳过。
+      if (packument === undefined) break
     }
-    packument ??= await fetchPackument(manifest.name)
+    if (packument === undefined) {
+      try {
+        packument = await fetchPackument(manifest.name)
+      } catch (error) {
+        if (isPackageNotFound(error)) {
+          // 索引只收录 npm 上已发布的版本；活跃但从未发布的新插件跳过，首发成功后自动收录。
+          console.warn(`market-index: ${manifest.name} 从未发布（registry 404），本次索引跳过；首次发布成功后自动收录`)
+          skippedPackages.push(manifest.name)
+          continue
+        }
+        throw error
+      }
+    }
     const peerSnapshot = {}
     const entry = entryOf(dirName, packument, peerSnapshot)
     peers[entry.name] = peerSnapshot
@@ -287,6 +326,7 @@ export async function buildIndex(options = {}) {
       plugins,
     },
     peers,
+    skippedPackages,
   }
 }
 
@@ -303,12 +343,14 @@ async function main() {
       + `（最多等 ${Math.round(waitMs / 1000)}s）`,
     )
   }
-  const { index, peers } = await buildIndex({ waitMs, expectations })
+  const { index, peers, skippedPackages } = await buildIndex({ waitMs, expectations })
   mkdirSync(dirname(OUTPUT), { recursive: true })
 
-  // 后置自检（fail-closed）：期待的那些版本必须真的进了索引。
+  // 后置自检（fail-closed）：期待的那些**已存在**的包，版本必须真的进了索引。
   // 放这里而不是只靠等待，是因为「可见但被 entryOf 跳过」（如缺 dsh.bundle.patch）同样会静默漏收录。
+  // 从未发布（registry 404）的包按首次发布例外跳过：它们首发成功后由下一次生成自动收录。
   const missing = expectations.filter((expectation) => {
+    if (skippedPackages.includes(expectation.name)) return false
     const listed = index.plugins.find((plugin) => plugin.name === expectation.name)
     return !(listed?.versions.some((version) => version.version === expectation.version) ?? false)
   })

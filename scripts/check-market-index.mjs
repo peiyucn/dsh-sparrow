@@ -7,7 +7,9 @@
  * 而**没有任何测试会红**：这与 `check:dsh-pin` 防的是同一类事故，只是换了产物。
  *
  * 判据（全部只在本地算，**不联网** —— 版本清单与 peer 都取自仓库内 manifest + 已发布版本快照）：
- *   1. 索引里的包名集合 = `activePluginNames()`（退役插件不得出现、活跃插件不得缺席）；
+ *   1. 索引里的包名集合 = `activePluginNames()`（退役插件不得出现、活跃插件不得缺席；
+ *      **例外**：从未发布过的活跃插件——它缺席索引且 `peer-snapshot.json` 无记录时只告警，
+ *      因为索引只能来自 npm 已发布版本，否则新插件首发时发布 workflow 的根 check 会死锁）；
  *   2. 每个插件都有中英双语 title/description 与至少一个能力标签；
  *   3. 每个版本的 `engines.dsh` = 该版本 manifest 的 peer 派生结果（同 `market-index.mjs` 的 `dshRangeOf`）；
  *   4. 版本集合覆盖「索引生成时 registry 上所有声明了 `dsh.bundle.patch` 的版本」——
@@ -47,7 +49,16 @@ const expected = new Map(active.map((dirName) => {
 const listed = new Map(index.plugins.map((plugin) => [plugin.name, plugin]))
 
 for (const [name, dirName] of expected) {
-  if (!listed.has(name)) fail(`判据 1 失败：活跃插件 ${dirName}（${name}）不在索引里`)
+  if (listed.has(name)) continue
+  // 判据 1 的「首次发布例外」：索引只由 npm 已发布版本生成，从未发布过的活跃插件不可能在里面；
+  // 而发布 workflow 在 publish 前要跑根 check ⇒ 不给例外就是首发死锁（新插件永远发不出去）。
+  // 离线判断「从未发布」只能看 peer-snapshot：有记录 = 发布过；没有记录 = 从未发布。
+  // 首次发布成功后 market 工作流会把索引补上，之后判据恢复严格。
+  if (snapshot[name] === undefined) {
+    console.warn(`check-market-index: ⚠️ 活跃插件 ${dirName}（${name}）从未发布，暂不在索引里；首次发布成功后由 market 工作流自动收录`)
+    continue
+  }
+  fail(`判据 1 失败：活跃插件 ${dirName}（${name}）不在索引里`)
 }
 for (const name of listed.keys()) {
   if (!expected.has(name)) fail(`判据 1 失败：索引里有 ${name}，但它不是活跃插件（退役插件不得进索引）`)
