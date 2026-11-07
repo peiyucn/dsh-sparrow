@@ -24,31 +24,34 @@ export const APP_CSS = `
   margin-left: auto;
   margin-right: auto;
 }
-/* Official plugin-page header pattern: title + intro on the left, reserved cross-feature
-   slot and view actions on the right, tabs on their own full-width row below. */
+/* DeskOne's own hierarchy (not the official page's order): row 1 is identity + primary
+   navigation, with the whole right side reserved for cross-feature time/todo widgets;
+   row 2 holds the active view's secondary actions. Official button/tab specs are reused. */
 .dsh-desk-head {
   box-sizing: border-box;
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: center;
+  gap: 14px;
   padding-top: 28px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   flex: none;
+  min-height: 32px;
 }
 html[data-platform='darwin'] .dsh-desk-head {
   padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
 }
 .dsh-desk-heading {
+  display: flex;
+  align-items: center;
   min-width: 0;
-  max-width: 100%;
-  order: 1;
+  flex: none;
 }
 .dsh-desk-title {
   margin: 0;
   font-size: 20px;
   font-weight: 500;
   line-height: 28px;
+  white-space: nowrap;
 }
 .dsh-desk-subtitle {
   margin: 4px 0 0;
@@ -56,33 +59,18 @@ html[data-platform='darwin'] .dsh-desk-head {
   line-height: 20px;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
-/* Intentionally empty for now: future cross-feature widgets live in this reserved slot. */
+/* Intentionally empty for now: future time management / to-do widgets live top-right. */
 .dsh-desk-global-slot {
-  order: 2;
   margin-left: auto;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  min-height: 28px;
-}
-/* View actions follow the official toolbar pattern: right-aligned, wrapping, compact sm buttons. */
-.dsh-desk-toolbar {
-  order: 2;
-  display: flex;
-  flex: 0 1 auto;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px 16px;
-  min-width: 0;
-  white-space: nowrap;
-}
-.dsh-desk-tabs-row {
-  order: 3;
-  flex: 1 1 100%;
+  min-height: 30px;
   min-width: 0;
 }
+/* Tabs are primary navigation: they share the identity row with the title and keep the
+   official SegmentedTabs (sm) visual spec. */
 .dsh-desk-tabs {
   display: inline-grid;
   grid-auto-flow: column;
@@ -90,6 +78,7 @@ html[data-platform='darwin'] .dsh-desk-head {
   padding: 2px;
   border-radius: calc(var(--dsw-radius-md, 12px) + 2px);
   background: var(--dsw-alias-bg-module-platform, var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05)));
+  flex: none;
 }
 .dsh-desk-tab {
   appearance: none;
@@ -115,6 +104,19 @@ html[data-platform='darwin'] .dsh-desk-head {
   background: var(--dsw-alias-bg-layer-3, #ffffff);
   color: var(--dsw-alias-label-primary, #1f2329);
   font-weight: 500;
+}
+/* Contextual action row: official toolbar interaction spec, but below navigation. */
+.dsh-desk-toolbar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 16px;
+  min-height: 32px;
+  min-width: 0;
+  margin-bottom: 10px;
+  white-space: nowrap;
 }
 /* Official Button (sm) parity: outlined by default, primary for the single main action. */
 .dsh-desk-action {

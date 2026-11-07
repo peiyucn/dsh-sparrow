@@ -193,8 +193,11 @@ export function DeskOnePage(props: DeskPanelProps) {
   )
 
   const renderOverview = (): ReactElement => (
-    // Overview content is not designed yet; keep it blank rather than piling unvalidated features.
-    <div className="dsh-desk-overview" />
+    // Overview content is not designed yet; keep the page subtitle here rather than in the
+    // navigation row, which must stay tight for the reserved time-management slot.
+    <div className="dsh-desk-overview">
+      <p className="dsh-desk-subtitle">{t('page.subtitle')}</p>
+    </div>
   )
 
   const plusIcon = (
@@ -340,24 +343,21 @@ export function DeskOnePage(props: DeskPanelProps) {
       <header className="dsh-desk-head" data-window-drag>
         <div className="dsh-desk-heading">
           <h1 className="dsh-desk-title">{t('page.title')}</h1>
-          <p className="dsh-desk-subtitle">{t('page.subtitle')}</p>
         </div>
+        <nav className="dsh-desk-tabs" role="tablist" data-window-drag-recall>
+          <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
+            {t('tab.overview')}
+          </button>
+          <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
+            {t('tab.notes')}
+          </button>
+          <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
+            {t('tab.tasks')}
+          </button>
+        </nav>
         <div className="dsh-desk-global-slot" data-window-drag-recall aria-hidden="true" />
-        <div className="dsh-desk-toolbar" data-window-drag-recall>{actions}</div>
-        <div className="dsh-desk-tabs-row" data-window-drag-recall>
-          <nav className="dsh-desk-tabs" role="tablist">
-            <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
-              {t('tab.overview')}
-            </button>
-            <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
-              {t('tab.notes')}
-            </button>
-            <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
-              {t('tab.tasks')}
-            </button>
-          </nav>
-        </div>
       </header>
+      <div className="dsh-desk-toolbar" data-window-drag-recall>{actions}</div>
       {data.loadError === null ? null : (
         <div>
           <p className="dsh-desk-error">{t('state.loadFailed', { message: data.loadError })}</p>
