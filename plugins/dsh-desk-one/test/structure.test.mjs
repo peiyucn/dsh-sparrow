@@ -405,6 +405,9 @@ describe('dsh-desk-one 结构', () => {
     assert.match(catalog, /parentId/u, '归档树用父会话关系')
     assert.match(contract, /parentId\?: string/u)
     assert.match(bridge, /parentId/u)
+    assert.match(bridge, /sessionIds/u, '工作区成员关系来自 workspaces.items')
+    assert.match(catalog, /SessionWorkspaceGroupInfo/u, '分组输入包含工作区桶')
+    assert.match(view, /snapshot\.workspaces/u, '视图把工作区桶传给分组函数')
     assert.match(styles, /\.dsh-desk-sessionsview \{/u)
     assert.match(styles, /\.dsh-desk-session-row \{/u)
     // Phase 1 is read-only: no archive/trash mutations in the view.

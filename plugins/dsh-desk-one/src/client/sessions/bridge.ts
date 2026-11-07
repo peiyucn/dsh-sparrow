@@ -38,10 +38,18 @@ interface SessionsServiceLike {
   }
 }
 
+interface WorkspaceRowLike {
+  readonly workspaceId?: string
+  readonly title?: string
+  readonly path?: string
+  readonly sessionIds?: readonly string[]
+}
+
 interface WorkspaceStateLike {
   readonly phase?: string
   readonly state?: string
   readonly archivedSessionIds?: readonly string[]
+  readonly items?: readonly WorkspaceRowLike[]
 }
 
 interface WorkspacesServiceLike {
@@ -88,7 +96,7 @@ function chipTitle(row: SessionRowLike | undefined, id: string): string {
 }
 
 function resolveSnapshot(services: SessionServices | null): SessionLinkSnapshot {
-  if (services === null) return { enabled: false, sessions: [] }
+  if (services === null) return { enabled: false, sessions: [], workspaces: [] }
   const list = services.sessions.list.getSnapshot()
   const workspaces = services.workspaces.list.getSnapshot()
   const archived = new Set(workspaces.archivedSessionIds ?? [])
@@ -114,7 +122,13 @@ function resolveSnapshot(services: SessionServices | null): SessionLinkSnapshot 
     Number(right.running) - Number(left.running)
     || right.updatedAt - left.updatedAt
     || left.title.localeCompare(right.title))
-  return { enabled: true, sessions }
+  const workspaceGroups = (workspaces.items ?? []).map(workspace => ({
+    id: String(workspace.workspaceId ?? ''),
+    title: workspace.title ?? workspace.path ?? '',
+    path: workspace.path ?? '',
+    sessionIds: workspace.sessionIds ?? [],
+  }))
+  return { enabled: true, sessions, workspaces: workspaceGroups }
 }
 
 export function createSessionLinkBridge(): SessionLinkBridge {

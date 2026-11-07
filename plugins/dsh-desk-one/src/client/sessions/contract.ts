@@ -20,10 +20,19 @@ export interface SessionChipInfo {
   readonly subagent: boolean
 }
 
+/** One workspace bucket from the host client snapshot (title is user-visible). */
+export interface SessionWorkspaceGroupInfo {
+  readonly id: string
+  readonly title: string
+  readonly path: string
+  readonly sessionIds: readonly string[]
+}
+
 export interface SessionLinkSnapshot {
   /** False when the host does not expose the session/workspace services (feature hidden). */
   readonly enabled: boolean
   readonly sessions: readonly SessionChipInfo[]
+  readonly workspaces: readonly SessionWorkspaceGroupInfo[]
 }
 
 /** Thin facade injected into the page: snapshot + subscription + navigation. */
@@ -37,7 +46,7 @@ export interface SessionLinkApi {
 /** Build a disabled facade for hosts without the optional client services. */
 export function disabledSessionLink(): SessionLinkApi {
   return {
-    list: () => ({ enabled: false, sessions: [] }),
+    list: () => ({ enabled: false, sessions: [], workspaces: [] }),
     subscribe: () => () => {},
     open: () => {},
   }

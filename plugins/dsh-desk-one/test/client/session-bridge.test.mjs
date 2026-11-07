@@ -23,7 +23,7 @@ function fakeServices(initial = { archived: [] }) {
       },
       workspaces: {
         list: {
-          getSnapshot: () => ({ phase: 'ready', state: 'idle', archivedSessionIds: archived }),
+          getSnapshot: () => ({ phase: 'ready', state: 'idle', archivedSessionIds: archived, items: [{ workspaceId: 'w1', title: 'Repo A', path: 'C:\\\\work\\\\repo-a', sessionIds: ['titled'] }] }),
           subscribe: (listener) => { workspaceListeners.add(listener); return () => workspaceListeners.delete(listener) },
         },
       },
@@ -47,6 +47,7 @@ describe('desk-one 会话桥接', () => {
     assert.equal(byId.get('titled')?.title, '标题会话')
     assert.equal(byId.get('child')?.title, '子代理标签', '子代理优先取 subagent label（与 composer displayTitle 一致）')
     assert.equal(byId.get('child')?.parentId, 'titled', '父子关系透传给 Sessions 树')
+    assert.deepEqual(bridge.api.list().workspaces.map(workspace => [workspace.id, workspace.title]), [['w1', 'Repo A']])
     assert.equal(byId.get('cold')?.title, 'cold', '冷会话没有 title 时不把 cwd 目录名当标题')
   })
 

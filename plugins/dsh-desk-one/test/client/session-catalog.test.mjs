@@ -21,9 +21,11 @@ describe('Sessions 目录分组', () => {
       session('b', { cwd: 'C:\\work\\repo-a', updatedAt: 1 }),
       session('c', { cwd: '/work/repo-b', updatedAt: 2 }),
       session('d', { cwd: 'C:\\work\\repo-a', availability: 'archived' }),
-    ])
-    assert.deepEqual(groups.map(group => group.label).sort(), ['repo-a', 'repo-b'])
-    const repoA = groups.find(group => group.label === 'repo-a')
+    ], [{ id: 'w-a', title: 'Repo A', path: 'C:\\work\\repo-a', sessionIds: ['a', 'b'] }])
+    assert.deepEqual(groups.map(group => group.label).sort(), ['Repo A', 'repo-b'])
+    assert.ok(groups.some(group => group.key === 'ws:w-a'), '工作区成员优先用 registry 分组')
+    assert.ok(groups.some(group => group.key === 'cwd:/work/repo-b'), '无工作区记录时回退 cwd')
+    const repoA = groups.find(group => group.label === 'Repo A')
     assert.deepEqual(repoA?.sessions.map(item => item.id), ['a', 'b'], '运行中优先')
     assert.ok(!groups.some(group => group.sessions.some(item => item.id === 'd')))
   })

@@ -42,7 +42,7 @@ DeskOne 的定位是"人与 agent 共享的工作台"，会话是工作台里的
 |---|---|
 | 会话列表 / 标题 / running / parentId | `ctx.sessions.list` 客户端快照（经 bridge） |
 | 归档集 | `ctx.workspaces.list.archivedSessionIds` |
-| 工作区分组 | 会话 `cwd` 的最后一段路径；未记录 cwd 的会话归入"未记录工作区" |
+| 工作区分组 | `workspaces.list.items` 的 `title` / `sessionIds`；不在任何工作区的会话回退到 `cwd` 最后一段路径，仍没有则归入未记录工作区 |
 | 打开会话 | `uiWorkspace.openSession`，仅可用会话生效 |
 
 **非目标（Phase 1）**：归档 / 取消归档、回收站、永久删除、备份、跨工作区移动、agent 工具。

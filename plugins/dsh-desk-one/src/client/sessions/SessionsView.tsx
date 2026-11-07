@@ -57,7 +57,7 @@ export function SessionsView({ snapshot, t, onOpen }: SessionsViewProps): ReactE
   if (!snapshot.enabled) {
     return <p className="dsh-desk-wall-hint">{t('sessions.disabled')}</p>
   }
-  const groups = activeSessionGroups(snapshot.sessions)
+  const groups = activeSessionGroups(snapshot.sessions, snapshot.workspaces)
   const archived = archivedSessionTree(snapshot.sessions)
   const activeCount = groups.reduce((sum, group) => sum + group.sessions.length, 0)
   return (

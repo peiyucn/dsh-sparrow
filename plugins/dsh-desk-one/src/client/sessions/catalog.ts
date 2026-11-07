@@ -1,11 +1,11 @@
 /** Pure grouping/tree helpers for the Sessions view (no React, unit-tested separately). */
 
-import type { SessionChipInfo } from './contract.js'
+import type { SessionChipInfo, SessionWorkspaceGroupInfo } from './contract.js'
 
 export interface SessionWorkspaceGroup {
-  /** Stable key: the workspace cwd, or '' for sessions without one. */
+  /** Stable key: workspace id, cwd fallback, or '' for sessions without both. */
   readonly key: string
-  /** Display label: the last path segment; empty means "no workspace". */
+  /** Display label: workspace title, then last path segment; empty means "no workspace". */
   readonly label: string
   readonly sessions: readonly SessionChipInfo[]
 }
@@ -30,20 +30,30 @@ function byActivity(left: SessionChipInfo, right: SessionChipInfo): number {
 }
 
 /**
- * Active catalog grouped by workspace (cwd). Archived rows are handled by the archive tree;
- * subagent rows stay in their workspace list and are tagged in the UI.
+ * Active catalog grouped by host Workspace first (the registry's title/sessionIds), falling back
+ * to the session's cwd basename for sessions outside any workspace. Archived rows are handled by
+ * the archive tree; subagent rows stay in their group and are tagged in the UI.
  */
-export function activeSessionGroups(sessions: readonly SessionChipInfo[]): SessionWorkspaceGroup[] {
-  const groups = new Map<string, SessionChipInfo[]>()
+export function activeSessionGroups(
+  sessions: readonly SessionChipInfo[],
+  workspaces: readonly SessionWorkspaceGroupInfo[] = [],
+): SessionWorkspaceGroup[] {
+  const workspaceBySession = new Map<string, SessionWorkspaceGroupInfo>()
+  for (const workspace of workspaces) {
+    for (const sessionId of workspace.sessionIds) workspaceBySession.set(sessionId, workspace)
+  }
+  const groups = new Map<string, { label: string; sessions: SessionChipInfo[] }>()
   for (const session of sessions) {
     if (session.availability === 'archived') continue
-    const key = session.cwd ?? ''
-    const list = groups.get(key)
-    if (list === undefined) groups.set(key, [session])
-    else list.push(session)
+    const workspace = workspaceBySession.get(session.id)
+    const key = workspace === undefined ? (session.cwd === undefined ? '' : `cwd:${session.cwd}`) : `ws:${workspace.id}`
+    const label = workspace?.title ?? workspaceLabel(session.cwd)
+    const group = groups.get(key)
+    if (group === undefined) groups.set(key, { label, sessions: [session] })
+    else group.sessions.push(session)
   }
   return [...groups.entries()]
-    .map(([key, list]) => ({ key, label: workspaceLabel(key), sessions: [...list].sort(byActivity) }))
+    .map(([key, group]) => ({ key, label: group.label, sessions: [...group.sessions].sort(byActivity) }))
     .sort((left, right) => left.label.localeCompare(right.label) || left.key.localeCompare(right.key))
 }
 
