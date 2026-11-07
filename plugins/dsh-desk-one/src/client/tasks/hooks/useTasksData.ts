@@ -16,7 +16,7 @@ type Actions = {
   readonly deleteTask: (id: string) => Promise<void>
 }
 
-interface TasksData {
+export interface TasksData {
   readonly tasks: readonly DeskTask[]
   readonly setTasks: Dispatch<SetStateAction<readonly DeskTask[]>>
   readonly loading: boolean

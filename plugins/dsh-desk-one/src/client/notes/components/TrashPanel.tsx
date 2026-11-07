@@ -12,16 +12,14 @@ interface TrashPanelProps {
   readonly trashedNotes: readonly DeskNote[]
   readonly visibleTrashed: readonly DeskNote[]
   readonly trashVisible: number
-  readonly confirmClearTrash: boolean
   readonly t: DeskTranslator
   readonly onLoadMore: () => void
-  readonly onClearTrash: () => void
   readonly onRestore: (note: DeskNote) => void
   readonly onDelete: (id: string) => void
 }
 
 export function TrashPanel({
-  trashedNotes, visibleTrashed, trashVisible, confirmClearTrash, t, onLoadMore, onClearTrash, onRestore, onDelete,
+  trashedNotes, visibleTrashed, trashVisible, t, onLoadMore, onRestore, onDelete,
 }: TrashPanelProps): ReactElement {
   return (
     <div className="dsh-desk-trash">
@@ -43,9 +41,6 @@ export function TrashPanel({
                       </button>
                     )
                   : null}
-                <button type="button" className="dsh-desk-trash-clear" onClick={onClearTrash}>
-                  {confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
-                </button>
               </div>
             )}
       </div>

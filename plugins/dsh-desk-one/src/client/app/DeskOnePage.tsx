@@ -15,8 +15,11 @@ import {
 import type { DeskNote, NoteColor } from '../../contract.js'
 import { NoteCard } from '../notes/components/NoteCard.js'
 import { TrashPanel } from '../notes/components/TrashPanel.js'
-import { WallActions } from '../notes/components/WallActions.js'
 import { TaskBoard } from '../tasks/components/TaskBoard.js'
+import { useGroupsData } from '../tasks/hooks/useGroupsData.js'
+import { useTaskBoard } from '../tasks/hooks/useTaskBoard.js'
+import { useTasksData } from '../tasks/hooks/useTasksData.js'
+import type { TaskSortMode } from '../tasks/types.js'
 import { useNoteDrag } from '../notes/hooks/useNoteDrag.js'
 import { useNotesData } from '../notes/hooks/useNotesData.js'
 import { useTrash } from '../notes/hooks/useTrash.js'
@@ -62,6 +65,31 @@ export function DeskOnePage(props: DeskPanelProps) {
   })
   const { wallRef, setWallRef, wallSize, placed } = useWallLayout(tab === 'notes', trash.activeNotes)
   const drag = useNoteDrag({ wallSize, wallRef, setNotes: data.setNotes, savePatch: data.savePatch })
+
+  // Task board data + state live here (not inside TaskBoard) so the top bar can own its view
+  // actions: new task, sort mode and the archive toggle.
+  const taskData = useTasksData(t, { listTasks, createTask, updateTask, deleteTask })
+  const groupsData = useGroupsData(t, { listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup })
+  const board = useTaskBoard({
+    tasks: taskData.tasks,
+    setTasks: taskData.setTasks,
+    savePatch: taskData.savePatch,
+    addTask: taskData.addTask,
+    removeWithFeedback: taskData.removeWithFeedback,
+    setActionError: taskData.setActionError,
+    groups: groupsData.groups,
+    createGroup: groupsData.createGroup,
+    renameGroup: groupsData.renameGroup,
+    setGroupOrders: groupsData.setGroupOrders,
+    removeGroup: groupsData.removeGroup,
+    moveGroupToLane: groupsData.moveGroupToLane,
+    archiveGroup: groupsData.archiveGroup,
+  })
+  const sortOptions: readonly { mode: TaskSortMode; label: string }[] = [
+    { mode: 'manual', label: t('task.sort.manual') },
+    { mode: 'created', label: t('task.sort.created') },
+    { mode: 'due', label: t('task.sort.due') },
+  ]
 
   /** Click / drag / resize raises one note to the top; skip the write when it already is. */
   const raise = useCallback((noteId: string): void => {
@@ -165,29 +193,157 @@ export function DeskOnePage(props: DeskPanelProps) {
   )
 
   const renderOverview = (): ReactElement => (
-    // Overview content is not designed yet; keep it blank rather than piling unvalidated features.
-    <div className="dsh-desk-overview" />
+    // Overview content is not designed yet; the page subtitle moves here so the command row
+    // stays a clean title + tabs + actions strip.
+    <div className="dsh-desk-overview">
+      <p className="dsh-desk-subtitle">{t('page.subtitle')}</p>
+    </div>
   )
+
+  const plusIcon = (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+      <path d="M10 4.5v11M4.5 10h11" />
+    </svg>
+  )
+  const backIcon = (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <path d="M11.5 5.5L7 10l4.5 4.5M7.5 10h7" />
+    </svg>
+  )
+  const trashIcon = (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+    </svg>
+  )
+  const archiveIcon = (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <path d="M4 5.5h12v11H4zM3 3.5h14v2H3zM8 9h4" />
+    </svg>
+  )
+  const smashIcon = (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <path d="M10 2.6v3.1M10 14.3v3.1M2.6 10h3.1M14.3 10h3.1M4.8 4.8l2.2 2.2M13 13l2.2 2.2M15.2 4.8L13 7M7 13l-2.2 2.2" />
+      <circle cx="10" cy="10" r="2.1" />
+    </svg>
+  )
+
+  /** Per-tab view actions, rendered in the command row so both tabs share one button language. */
+  const topbarActions = (): ReactElement | null => {
+    if (tab === 'notes') {
+      if (trash.showTrash) {
+        return (
+          <>
+            <button type="button" className="dsh-desk-action" onClick={trash.toggleTrash}>
+              {backIcon}
+              <span className="dsh-desk-action-label">{t('action.backToWall')}</span>
+            </button>
+            <button
+              type="button"
+              className="dsh-desk-action"
+              data-danger={trash.confirmClearTrash ? 'true' : undefined}
+              disabled={trash.trashedNotes.length === 0 || trash.smashing}
+              onClick={trash.clearTrash}
+            >
+              {trashIcon}
+              <span className="dsh-desk-action-label">
+                {trash.confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
+              </span>
+            </button>
+          </>
+        )
+      }
+      return (
+        <>
+          <button
+            type="button"
+            className="dsh-desk-action dsh-desk-action-primary"
+            disabled={creating || trash.smashing}
+            onClick={() => { void addNote() }}
+          >
+            {plusIcon}
+            <span className="dsh-desk-action-label">{t('action.newNote')}</span>
+          </button>
+          <button
+            type="button"
+            className="dsh-desk-action"
+            data-smash-confirm="true"
+            data-danger={trash.confirmSmash ? 'true' : undefined}
+            disabled={trash.smashing}
+            onClick={trash.smashWall}
+          >
+            {smashIcon}
+            <span className="dsh-desk-action-label">
+              {trash.confirmSmash ? t('action.smashConfirm') : t('action.smash')}
+            </span>
+          </button>
+          <button type="button" className="dsh-desk-action" onClick={trash.toggleTrash}>
+            {trashIcon}
+            <span className="dsh-desk-action-label">{t('trash.title')}</span>
+          </button>
+        </>
+      )
+    }
+    if (tab === 'tasks') {
+      if (board.showArchive) {
+        return (
+          <button type="button" className="dsh-desk-action" onClick={board.toggleArchive}>
+            {backIcon}
+            <span className="dsh-desk-action-label">{t('task.backToBoard')}</span>
+          </button>
+        )
+      }
+      return (
+        <>
+          <button
+            type="button"
+            className="dsh-desk-action dsh-desk-action-primary"
+            onClick={() => board.beginDraft('todo')}
+          >
+            {plusIcon}
+            <span className="dsh-desk-action-label">{t('task.add')}</span>
+          </button>
+          <div className="dsh-desk-segmented" role="group" aria-label={t('task.sort.label')}>
+            {sortOptions.map(option => (
+              <button
+                key={option.mode}
+                type="button"
+                className="dsh-desk-segment"
+                data-active={board.sortMode === option.mode}
+                onClick={() => board.setSortMode(option.mode)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="dsh-desk-action" onClick={board.toggleArchive}>
+            {archiveIcon}
+            <span className="dsh-desk-action-label">
+              {t('task.archive')}{board.archivedTasks.length === 0 ? '' : ` (${board.archivedTasks.length})`}
+            </span>
+          </button>
+        </>
+      )
+    }
+    return null
+  }
 
   return (
     <div className="dsh-desk-page">
       <header className="dsh-desk-head" data-window-drag>
-        <div>
-          <h1 className="dsh-desk-title">{t('page.title')}</h1>
-          <p className="dsh-desk-subtitle">{t('page.subtitle')}</p>
-        </div>
+        <h1 className="dsh-desk-title">{t('page.title')}</h1>
+        <nav className="dsh-desk-tabs" role="tablist" data-window-drag-recall>
+          <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
+            {t('tab.overview')}
+          </button>
+          <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
+            {t('tab.notes')}
+          </button>
+          <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
+            {t('tab.tasks')}
+          </button>
+        </nav>
+        <div className="dsh-desk-head-actions" data-window-drag-recall>{topbarActions()}</div>
       </header>
-      <nav className="dsh-desk-tabs" role="tablist">
-        <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
-          {t('tab.overview')}
-        </button>
-        <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
-          {t('tab.notes')}
-        </button>
-        <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
-          {t('tab.tasks')}
-        </button>
-      </nav>
       {data.loadError === null ? null : (
         <div>
           <p className="dsh-desk-error">{t('state.loadFailed', { message: data.loadError })}</p>
@@ -203,10 +359,8 @@ export function DeskOnePage(props: DeskPanelProps) {
                   trashedNotes={trash.trashedNotes}
                   visibleTrashed={trash.visibleTrashed}
                   trashVisible={trash.trashVisible}
-                  confirmClearTrash={trash.confirmClearTrash}
                   t={t}
                   onLoadMore={trash.loadMoreTrash}
-                  onClearTrash={trash.clearTrash}
                   onRestore={note => data.savePatch(note, { trashed: false })}
                   onDelete={data.removeWithFeedback}
                 />
@@ -216,33 +370,12 @@ export function DeskOnePage(props: DeskPanelProps) {
       ) : (
         <TaskBoard
           t={t}
-          listTasks={listTasks}
-          createTask={createTask}
-          updateTask={updateTask}
-          deleteTask={deleteTask}
-          listGroups={listGroups}
-          createGroup={createGroup}
-          updateGroup={updateGroup}
-          moveGroup={moveGroup}
-          archiveGroup={archiveGroup}
-          deleteGroup={deleteGroup}
+          data={taskData}
+          groupsData={groupsData}
+          board={board}
           sessionLink={sessionLink}
         />
       )}
-      {tab === 'notes'
-        ? (
-            <WallActions
-              showTrash={trash.showTrash}
-              creating={creating}
-              smashing={trash.smashing}
-              confirmSmash={trash.confirmSmash}
-              t={t}
-              onAdd={() => { void addNote() }}
-              onToggleTrash={trash.toggleTrash}
-              onSmash={trash.smashWall}
-            />
-          )
-        : null}
     </div>
   )
 }

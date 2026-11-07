@@ -96,16 +96,18 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(installAt > gateAt, '能力门必须排在安装之前')
   })
 
-  it('便签墙 应该 有垃圾桶：卡片可丢进垃圾桶，入口与「＋」成组，可恢复 / 永久删除', async () => {
+  it('便签墙 应该 有垃圾桶：顶栏入口 + 恢复 / 永久删除', async () => {
     const page = await readClientSurface()
     const styles = await readStyles()
     assert.match(page, /dsh-desk-trash/u, '要有垃圾桶视图容器')
     assert.match(page, /action\.restore/u, '垃圾桶要能恢复')
     assert.match(page, /action\.clearTrash/u, '垃圾桶要能由用户显式清空')
     assert.match(page, /trash\.empty/u, '垃圾桶要有空态文案')
-    assert.match(page, /dsh-desk-fabstack/u, '垃圾桶入口与「＋」成组')
-    assert.match(page, /dsh-desk-fab-secondary/u)
-    // owner 2026-11-06：垃圾桶相关操作一律用图标，不写文字按钮。
+    assert.match(page, /dsh-desk-head-actions/u, '顶栏承载视图动作')
+    assert.match(page, /dsh-desk-action-primary/u, '新建动作用主按钮')
+    assert.match(page, /action\.newNote/u)
+    assert.match(page, /action\.backToWall/u)
+    assert.match(page, /trash\.title/u, '顶栏垃圾分类入口')
     const iconButtons = page.match(/dsh-desk-iconbtn/gu) ?? []
     assert.ok(iconButtons.length >= 3, '贴纸删除 / 恢复 / 永久删除都应是图标按钮')
     assert.ok(!/dsh-desk-wallbar/u.test(page), '不再有右上角单独的文字入口')
@@ -131,27 +133,18 @@ describe('dsh-desk-one 结构', () => {
     assert.match(i18n, /便签太多了，请先清理一下吧/u, '墙上限提示文案按 owner 口径')
     assert.match(page, /trash\.full/u, '垃圾桶满了要提示先清空')
     assert.match(page, /action\.loadMore/u, '垃圾桶要能加载更多')
-    // Smash：与另外两个悬浮按钮同排、同款玻璃、图标常驻（无文字）。
-    assert.match(page, /dsh-desk-smash dsh-desk-fabglass/u, 'Smash 要和其他悬浮按钮同款玻璃')
-    assert.match(page, /dsh-desk-smash dsh-desk-fabglass[\s\S]{0,400}<svg/u, 'Smash 用图标而不是文字')
-    assert.ok(!/!\s*showTrash\s*&&\s*activeNotes\.length > 0/u.test(page), 'Smash 要常驻，不随墙上是否有便签显隐')
+    // Smash stays in the command bar with the shared two-step confirm and danger tint.
+    assert.match(page, /dsh-desk-action/u, '视图动作统一走顶栏按钮')
+    assert.match(page, /trash\.smashWall/u, 'Smash 仍由页面动作触发')
+    assert.match(page, /data-smash-confirm="true"/u, 'Smash 按钮要能被确认态排除')
+    assert.match(page, /data-danger=\{trash\.confirmSmash \? 'true' : undefined\}/u, 'Smash 确认态用危险色')
+    assert.ok(!/!\s*showTrash\s*&&\s*activeNotes\.length > 0/u.test(page), 'Smash 要常驻')
     assert.match(page, /trashingIds/u, '单张贴纸删除也要播同一段飞散动画')
-    assert.match(page, /ids\.has\(item\.id\)/u, 'Smash 要先乐观清墙再落库（修闪回）')
+    assert.match(page, /ids\.has\(item\.id\)/u, 'Smash 要先乐观清墙再落库')
     assert.match(styles, /dsh-desk-note-smashing/u, 'Smash 要有飞散动画')
-    // 入口分组与语义（owner 2026-11-06）：＋ / Smash 是墙面操作，垃圾桶入口用分隔线隔开并说明是“打开”。
-    assert.match(page, /dsh-desk-fab-divider/u, '墙面操作与垃圾桶导航之间要有分隔线')
-    assert.match(page, /action\.openTrash/u, '垃圾桶入口提示要是“打开垃圾桶”')
-    assert.ok(
-      page.indexOf('dsh-desk-smash dsh-desk-fabglass') < page.indexOf('dsh-desk-fab-secondary dsh-desk-fabglass'),
-      '＋ / Smash 属于墙面操作，应排在垃圾桶入口之前',
-    )
-    assert.match(page, /closest\('\.dsh-desk-smash'\)/u, 'Smash 确认态点击旁边要恢复（排除按钮自身）')
+    assert.match(styles, /\.dsh-desk-action\[data-danger='true'\][^{]*\{[^}]*state-error-primary/su, '危险动作要有统一红色样式')
     assert.match(page, /addEventListener\('pointerdown', onPointerDown, true\)/u, '要用捕获阶段的 pointerdown 监听取消')
     assert.match(page, /Escape/u, 'Esc 也要能取消 Smash 确认')
-    // owner 2026-11-06：Smash 图标常驻红色，＋ 是蓝色、垃圾桶是中性色，靠颜色 + 分隔线区分。
-    const smashColorRule = /\.dsh-desk-smash \{[^}]*\}/u.exec(styles)
-    assert.ok(smashColorRule !== null, '缺 .dsh-desk-smash 颜色规则')
-    assert.match(smashColorRule[0], /--dsw-alias-state-error-primary/u, 'Smash 图标要常驻危险色')
     // 角标只留给未读：垃圾桶计数不再挂 badge。
     assert.ok(!/fab-count/u.test(page), '垃圾桶不得再挂角标')
     assert.ok(!/dsh-desk-fab-count/u.test(styles), '角标样式要删干净')
@@ -211,128 +204,59 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(!/overview\.(counts|recent|recentEmpty|hint)/u.test(page), '总览不得出现未定稿的内容区块')
   })
 
-  it('便签标签 应该是「满墙贴纸」而非登记表：墙面 + 悬浮「+」+ 可拖动贴纸', async () => {
+  it('便签标签 应该是「满墙贴纸」：顶栏统一动作 + 可拖动贴纸', async () => {
     const page = await readClientSurface()
     const styles = await readStyles()
-    // 墙面容器与悬浮「+」按钮（不是工具栏里的「新建」表单）。
     assert.match(page, /dsh-desk-wall/u)
-    assert.match(page, /dsh-desk-add/u)
+    assert.match(page, /action\.newNote/u, '新建便签在顶栏')
+    assert.match(page, /dsh-desk-action-primary/u, '新建是主按钮')
     assert.match(page, /onPointerDown/u, '贴纸必须支持指针拖拽')
-    const addRule = /\.dsh-desk-add \{([^}]*)\}/u.exec(styles)
-    assert.ok(addRule !== null, '缺 .dsh-desk-add 规则')
-    assert.match(addRule[1], /--dsw-alias-brand-primary-new-colorprimary-new-color/u, '＋ 图标用宿主官方蓝紫品牌色')
-    const glassRule = /\.dsh-desk-fabglass \{([^}]*)\}/u.exec(styles)
-    assert.ok(glassRule !== null, '缺 .dsh-desk-fabglass 规则')
-    assert.match(glassRule[1], /backdrop-filter:\s*blur\(8px\)/u, '小玻璃的模糊半径要继续收小（8px）')
-    assert.match(glassRule[1], /-webkit-backdrop-filter/u, '玻璃要补 WebKit 前缀')
-    assert.match(glassRule[1], /background-color:\s*color-mix\(/u, '玻璃底是半透明 color-mix')
-    // owner 2026-11-06：打光方向要和 theme-tone 输入框一致，但厚度按小面积继续收细，且不要实边。
-    assert.match(glassRule[1], /border:\s*none/u, '不要 1px 实边（会显厚），改用发丝边')
-    assert.match(glassRule[1], /inset 0 0 0 var\(--dsh-hairline-width/u, '发丝边用宿主的 0.5px token')
-    assert.match(glassRule[1], /inset 1px 1px 1px/u, '定向边光要从左上打过来（与输入框一致）')
-    assert.match(glassRule[1], /radial-gradient\(ellipse 52% 1\.5px at 50% 0/u, '四边中段亮芯厚度要收细（1.5px）')
-    assert.match(glassRule[1], /width:\s*48px/u, '「＋」与垃圾桶同尺寸')
-    assert.match(glassRule[1], /--dsw-radius-lg/u, '两者圆角 token 一致')
-    assert.ok(!/background-color:\s*var\(--dsw-alias-bg-layer-1/u.test(addRule[1]), '不得退回实底按钮')
-    const stackRule = /\.dsh-desk-fabstack \{([^}]*)\}/u.exec(styles)
-    assert.ok(stackRule !== null, '缺 .dsh-desk-fabstack 规则')
-    assert.match(stackRule[1], /position:\s*absolute/u, '悬浮操作组固定在底部')
-    assert.match(stackRule[1], /left:\s*50%/u, '悬浮操作组放到底部中央')
-    assert.match(stackRule[1], /transform:\s*translateX\(-50%\)/u, '底部居中要水平回拉一半')
-    assert.match(stackRule[1], /flex-direction:\s*column/u, '按钮一排 + Smash 在下方，纵向排列')
-    const fabRowRule = /\.dsh-desk-fabrow \{([^}]*)\}/u.exec(styles)
-    assert.ok(fabRowRule !== null, '缺 .dsh-desk-fabrow 规则')
-    assert.match(fabRowRule[1], /flex-direction:\s*row/u, '垃圾桶与「＋」必须同一排')
-    // 悬浮组不能被内容列限宽规则套上 width:100%（否则右定位会被推到左边）。
-    assert.match(styles, /\.dsh-desk-page > :not\(\.dsh-desk-fabstack\)/u, '内容列限宽要排除悬浮操作组')
-    // owner 2026-11-06：＋ 在左、垃圾桶在右。
-    assert.ok(
-      page.indexOf('dsh-desk-add dsh-desk-fabglass') < page.indexOf('dsh-desk-fab-secondary dsh-desk-fabglass'),
-      '「＋」应排在垃圾桶前面（视觉上在左）',
-    )
-    // 贴纸图标用深墨色，不依赖主题的前景色（light 主题下也清晰）。
-    const actionRule = /\.dsh-desk-note-action \{([^}]*)\}/u.exec(styles)
-    assert.ok(actionRule !== null, '缺 .dsh-desk-note-action 规则')
-    assert.match(actionRule[1], /color:\s*rgba\(55, 53, 47/u, '贴纸图标要用纸面墨色（不随主题变白）')
-    // owner 2026-11-06：垃圾桶图标要够大，不要缩成黑疙瘩。
+    const actionRule = /\.dsh-desk-action \{([^}]*)\}/u.exec(styles)
+    assert.ok(actionRule !== null, '缺 .dsh-desk-action 规则')
+    assert.match(actionRule[1], /height:\s*28px/u, '顶栏按钮统一 28px 高')
+    assert.match(actionRule[1], /font-size:\s*13px/u, '顶栏按钮统一 13px 字号')
+    const primaryRule = /\.dsh-desk-action-primary \{([^}]*)\}/u.exec(styles)
+    assert.ok(primaryRule !== null, '缺主按钮规则')
+    assert.match(primaryRule[1], /brand-primary-new-color/u, '主按钮用官方蓝紫')
+    assert.match(styles, /\.dsh-desk-head \{[^}]*align-items: center/su, '顶栏单行居中对齐')
+    assert.match(styles, /\.dsh-desk-tabs \{[^}]*border-radius: 8px/su, '标签是分段控件')
+    assert.match(styles, /\.dsh-desk-head-actions \{/u, '顶栏动作区')
+    assert.match(styles, /\.dsh-desk-page > \* \{/u, '内容列统一限宽')
+    const noteActionRule = /\.dsh-desk-note-action \{([^}]*)\}/u.exec(styles)
+    assert.ok(noteActionRule !== null, '缺 .dsh-desk-note-action 规则')
+    assert.match(noteActionRule[1], /color:\s*rgba\(55, 53, 47/u, '贴纸图标要用纸面墨色')
     const smIconRule = /\.dsh-desk-iconbtn-sm svg \{([^}]*)\}/u.exec(styles)
-    assert.ok(smIconRule !== null, '缺贴纸小图标尺寸规则')
-    assert.match(smIconRule[1], /width:\s*20px/u, '贴纸垃圾桶图标至少 20px')
-    const fabIconRule = /\.dsh-desk-fab-secondary svg \{([^}]*)\}/u.exec(styles)
-    assert.ok(fabIconRule !== null, '缺底部垃圾桶图标尺寸规则')
-    assert.match(fabIconRule[1], /width:\s*22px/u, '底部垃圾桶图标至少 22px')
-    // 贴纸不出屏：墙面不滚动，不得再有可滚动画布。
+    assert.ok(smIconRule !== null, '缺对象图标尺寸规则')
+    assert.match(smIconRule[1], /width:\s*14px/u, '对象图标统一 14px')
     const wallRule = /\.dsh-desk-wall \{([^}]*)\}/u.exec(styles)
     assert.ok(wallRule !== null, '缺 .dsh-desk-wall 规则')
-    assert.match(wallRule[1], /overflow:\s*hidden/u, '墙面必须裁切不滚动（贴纸一律夹在可见区域内）')
-    // owner 2026-11-06：不要背板（显脏且缩小操作面积）；双击空白新建 + 淡提示保留。
+    assert.match(wallRule[1], /overflow:\s*hidden/u, '墙面必须裁切不滚动')
     assert.ok(!/border:\s*1px/u.test(wallRule[1]), '墙面不得再加背板边框')
     assert.ok(!/background:/u.test(wallRule[1]), '墙面不得再加背板底色')
     assert.match(page, /onDoubleClick/u, '便签墙要支持双击空白处新建')
     assert.match(page, /wall\.tip/u, '空墙中央要有双击新建提示')
     assert.match(page, /z:\s*layer/u, '新建便签要带层级（默认置顶）')
-    assert.match(page, /note\.z !== layer/u, '新建便签要对不认创建 z 的宿主做兜底（本地置顶 + 补丁落库）')
-    // owner 2026-11-06：不必为悬浮按钮预留空白，贴纸可铺满；按钮永远在贴纸之上。
-    const notesviewRule = /\.dsh-desk-notesview \{([^}]*)\}/u.exec(styles)
-    assert.ok(notesviewRule !== null, '缺 .dsh-desk-notesview 规则')
-    assert.ok(!/padding-bottom/u.test(notesviewRule[1]), '不得为悬浮按钮预留空白（贴纸要能铺满）')
-    assert.match(wallRule[1], /z-index:\s*0/u, '墙面要建立层级上下文，按钮才能永远盖住贴纸')
-    const tipRule = /\.dsh-desk-wall-tip-main \{([^}]*)\}/u.exec(styles)
-    assert.ok(tipRule !== null, '缺提示主文案样式')
-    assert.match(tipRule[1], /letter-spacing/u, '提示文案要有排版设计（字距）')
-    assert.match(tipRule[1], /color-mix\(/u, '提示颜色要压到很浅（color-mix 透明度）')
-    assert.ok(!/dsh-desk-canvas/u.test(page), '不得再有可滚动的画布容器')
-    // 真实便签是方角纸片，不是大圆角卡片。
-    const noteRule = /\.dsh-desk-note \{([^}]*)\}/u.exec(styles)
-    assert.ok(noteRule !== null, '缺 .dsh-desk-note 规则')
-    assert.match(noteRule[1], /border-radius:\s*2px/u, '便签必须是方角纸片（2px）')
-    assert.ok(!/border-radius:\s*10px/u.test(noteRule[1]), '便签不得回到 10px 大圆角')
-    // 改大小手柄 + 层级置顶 + 标签页记忆都在页面里。
-    assert.match(page, /dsh-desk-note-resize/u, '便签必须有右下角改大小手柄')
-    assert.match(page, /dsh-desk-note-grip/u, '便签必须有紧凑的六点抓握纹')
-    assert.match(page, /action\.drag/u, '抓握纹要带可访问文案')
-    const gripRule = /\.dsh-desk-note-grip \{([^}]*)\}/u.exec(styles)
-    assert.ok(gripRule !== null, '缺 .dsh-desk-note-grip 规则')
-    assert.match(gripRule[1], /grid-template-columns:\s*repeat\(2,\s*2px\)/u, '六点纹要紧凑（2px 点 / 2px 间距）')
-    assert.match(gripRule[1], /gap:\s*2px/u)
-    // 配色分层（owner 2026-11-06）：深色小色标负责色相，纸面取同色相但浅一档的中等深度。
-    const linearChannel = (channel) => {
-      const value = channel / 255
-      return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
-    }
-    const luminance = (hex) => {
-      const red = linearChannel(parseInt(hex.slice(1, 3), 16))
-      const green = linearChannel(parseInt(hex.slice(3, 5), 16))
-      const blue = linearChannel(parseInt(hex.slice(5, 7), 16))
-      return 0.2126 * red + 0.7152 * green + 0.0722 * blue
-    }
-    const notePalette = new Map([...styles.matchAll(/\.dsh-desk-note\[data-color='([a-z]+)'\] \{ background-color: (#[0-9a-f]{6}); \}/gu)].map(match => [match[1], match[2]]))
-    const dotPalette = new Map([...styles.matchAll(/\.dsh-desk-dot\[data-color='([a-z]+)'\] \{ background: (#[0-9a-f]{6}); \}/gu)].map(match => [match[1], match[2]]))
-    assert.equal(notePalette.size, 5, '便签色板应有 5 个色位')
-    for (const [color, paper] of notePalette) {
-      assert.ok(dotPalette.has(color), `色板缺 ${color}`)
-      assert.ok(luminance(paper) < 0.85, `纸面 ${color} 不能太浅（要向色标靠拢）`)
-      assert.ok(luminance(paper) > luminance(dotPalette.get(color)), `纸面 ${color} 应比色标浅一档`)
-    }
-    // 真实便签是平涂纸面：不得有渐变（owner 2026-11-06 明确否掉）。
-    assert.ok(!/gradient/u.test(noteRule[1]), '便签纸面不得有渐变')
-    // 改大小角标是极简角标，不是斜线花纹。
-    const resizeRule = /\.dsh-desk-note-resize \{([^}]*)\}/u.exec(styles)
-    assert.ok(resizeRule !== null, '缺 .dsh-desk-note-resize 规则')
-    assert.match(resizeRule[1], /width:\s*26px/u, '改大小热区要够大（26px）')
-    assert.match(resizeRule[1], /height:\s*26px/u, '改大小热区要够大（26px）')
-    const resizeVisual = /\.dsh-desk-note-resize::after \{([^}]*)\}/u.exec(styles)
-    assert.ok(resizeVisual !== null, '缺改大小角标（伪元素）规则')
-    assert.match(resizeVisual[1], /border-right/u, '改大小用右下角角标（border-right/bottom）')
-    assert.ok(!/gradient/u.test(resizeVisual[1]), '改大小角标不得用斜线花纹')
-    assert.match(page, /zIndex/u, '点/拖哪张就置顶需要 zIndex')
-    assert.match(page, /TAB_STORAGE_KEY/u, '上次停留的标签页要记住')
-    assert.match(page, /localStorage/u)
-    // 贴纸直接在墙上写字（textarea），不搞标题/保存按钮的登记表。
-    assert.match(page, /dsh-desk-note-body/u)
-    assert.ok(!/action\.save/u.test(page), '便签墙不得再有「保存」按钮（失焦即保存）')
-    assert.ok(!/placeholder\.title/u.test(page), '便签墙不得再有标题输入框')
-    assert.ok(!/dsh-desk-composer/u.test(styles), '登记表式编辑器样式应已删除')
+    assert.match(page, /note\.z !== layer/u, '新建便签要对不认创建 z 的宿主做兜底')
+  })
+
+  it('顶栏 应该 承载两种视图的全局动作，任务板不再有独立 toolbar', async () => {
+    const page = await readClientSurface()
+    const board = await readTaskBoard()
+    const styles = await readStyles()
+    assert.match(page, /dsh-desk-head-actions/u, '顶栏动作区')
+    assert.match(page, /dsh-desk-segmented/u, '排序是分段控件')
+    assert.match(page, /board\.beginDraft\('todo'\)/u, '顶栏新建任务默认落到待办')
+    assert.match(page, /board\.setSortMode/u)
+    assert.match(page, /board\.toggleArchive/u)
+    assert.match(page, /task\.backToBoard/u, '存档视图的返回在顶栏')
+    assert.match(page, /action\.newNote/u, '便签新建也在顶栏')
+    assert.match(page, /action\.backToWall/u, '垃圾桶返回在顶栏')
+    assert.match(styles, /\.dsh-desk-segmented \{/u)
+    assert.match(styles, /\.dsh-desk-segment\[data-active='true'\]/u, '分段控件选中态')
+    assert.ok(!/dsh-task-toolbar|dsh-task-tool\b/u.test(board), '任务板内不再有独立 toolbar')
+    assert.ok(!styles.includes('.dsh-task-toolbar'), '旧 toolbar 样式已删除')
+    assert.match(board, /export function TaskBoard\(\{ t, data, groupsData, board, sessionLink \}/u, 'TaskBoard 是受控视图')
+    assert.match(board, /dsh-task-archive/u, '存档视图保留滚动容器')
   })
 
   it('任务板客户端 应该 三泳道 + 卡片交互 + 拖拽 + 排序视图 + 存档', async () => {
@@ -551,9 +475,9 @@ describe('dsh-desk-one 结构', () => {
     assert.match(board, /GroupArchiveRow/u)
     assert.match(board, /deleteArchivedGroup/u, '删除存档分组时同时清掉其卡片')
     assert.match(column, /task\.group\.archive/u, '完成列分组要出现存档按钮')
-    assert.match(column, /dsh-task-iconbtn/u, '分组头按钮统一为小图标')
+    assert.match(column, /dsh-desk-iconbtn dsh-desk-iconbtn-sm/u, '分组头按钮统一为共享小图标')
     assert.ok(!column.includes('M5 5l10 10'), '分组删除不再用叉号')
-    assert.match(styles, /\.dsh-task-iconbtn \{/u)
+    assert.match(styles, /\.dsh-desk-iconbtn-sm \{/u, '共享小图标样式')
     assert.match(styles, /\.dsh-task-archive-group-icon \{/u)
     const groupBodyRule = /\.dsh-task-group-body \{([^}]*)\}/u.exec(styles)
     assert.ok(groupBodyRule !== null, '缺 .dsh-task-group-body 规则')

@@ -46,7 +46,7 @@ interface GroupMoveResult {
   readonly tasks: readonly DeskTask[]
 }
 
-interface TaskBoardApi {
+export interface TaskBoardApi {
   readonly lanes: LaneViews
   readonly archivedTasks: readonly DeskTask[]
   readonly sortMode: TaskSortMode

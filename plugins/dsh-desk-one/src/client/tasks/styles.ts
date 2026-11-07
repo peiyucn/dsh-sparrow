@@ -10,37 +10,6 @@ export const TASKS_CSS = `
   gap: 8px;
   padding-bottom: 8px;
 }
-.dsh-task-toolbar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.dsh-task-sort {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.dsh-task-tool {
-  appearance: none;
-  border: none;
-  background: transparent;
-  padding: 3px 8px;
-  border-radius: var(--dsw-radius-sm, 8px);
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.dsh-task-tool:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-}
-.dsh-task-tool[data-active='true'] {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--dsw-alias-label-primary, #1f2329);
-}
 .dsh-task-lanes {
   flex: 1;
   min-height: 0;
@@ -850,34 +819,7 @@ export const TASKS_CSS = `
   opacity: 0;
   transition: opacity 0.12s ease;
 }
-/* Compact group header icons: match each other and stay quieter than the lane buttons. */
-.dsh-task-iconbtn {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  border-radius: var(--dsw-radius-xs, 4px);
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  cursor: pointer;
-}
-.dsh-task-iconbtn svg {
-  display: block;
-  width: 14px;
-  height: 14px;
-}
-.dsh-task-iconbtn:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--dsw-alias-label-primary, #1f2329);
-}
-.dsh-task-iconbtn-danger[data-confirm='true'] {
-  color: var(--dsw-alias-state-error-primary, #c62828);
-  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c62828) 10%, transparent);
-}
+/* The shared icon primitive (app styles) keeps group actions quieter through hover-only reveal. */
 .dsh-task-group-head:hover .dsh-task-group-actions {
   opacity: 1;
 }

@@ -1,91 +1,36 @@
 /**
- * Task board: toolbar, three lanes with first-class groups, pointer dragging for cards and for
- * whole groups (same interaction model: a ghost follows the pointer, invalid drops fly back),
- * double-click-to-add and the archive view.
+ * Task board view: three lanes with first-class groups, pointer dragging for cards and for whole
+ * groups (a ghost follows the pointer, invalid drops fly back), double-click-to-add and the
+ * archive list. Data + board state are owned by DeskOnePage so the top bar can host the view
+ * actions; this component stays a controlled renderer.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { TASK_BOARD_COMPACT_WIDTH } from '../../../constants.js'
-import type {
-  CreateTaskGroupRequest, CreateTaskRequest, DeskTask, DeskTaskGroup, TaskGroupPatchRequest, TaskPatchRequest,
-  TaskStatus,
-} from '../../../contract.js'
+import type { DeskTask, DeskTaskGroup, TaskStatus } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
+import type { SessionChipInfo, SessionLinkApi } from '../../sessions/contract.js'
+import type { GroupsData } from '../hooks/useGroupsData.js'
+import { useSessionLinks } from '../hooks/useSessionLinks.js'
+import type { TaskBoardApi } from '../hooks/useTaskBoard.js'
+import type { TasksData } from '../hooks/useTasksData.js'
+import { TASK_LANE_ORDER } from '../types.js'
+import { LANE_LABEL_KEY } from '../taskLabels.js'
 import { TaskArchiveView } from './TaskArchiveView.js'
 import { TaskColumn, type DropTarget, type GroupDropTarget } from './TaskColumn.js'
 import { createCardGhost, createGroupGhost, lockSelection, placeGhost } from './taskDrag.js'
-import { LANE_LABEL_KEY } from '../taskLabels.js'
-import { useGroupsData } from '../hooks/useGroupsData.js'
-import { useSessionLinks } from '../hooks/useSessionLinks.js'
-import { useTaskBoard } from '../hooks/useTaskBoard.js'
-import { useTasksData } from '../hooks/useTasksData.js'
-import { TASK_LANE_ORDER, type TaskSortMode } from '../types.js'
-import type { SessionChipInfo, SessionLinkApi } from '../../sessions/contract.js'
 
-interface TaskBoardInjected {
-  readonly listTasks: () => Promise<readonly DeskTask[]>
-  readonly createTask: (input: CreateTaskRequest) => Promise<DeskTask>
-  readonly updateTask: (input: { id: string; expectedRevision: number; patch: TaskPatchRequest }) => Promise<DeskTask>
-  readonly deleteTask: (id: string) => Promise<void>
-  readonly listGroups: () => Promise<readonly DeskTaskGroup[]>
-  readonly createGroup: (input: CreateTaskGroupRequest) => Promise<DeskTaskGroup>
-  readonly updateGroup: (input: {
-    id: string
-    expectedRevision: number
-    patch: TaskGroupPatchRequest
-  }) => Promise<DeskTaskGroup>
-  readonly moveGroup: (input: {
-    id: string
-    expectedRevision: number
-    status: string
-    order?: number
-  }) => Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }>
-  readonly archiveGroup: (input: {
-    id: string
-    expectedRevision: number
-    archived: boolean
-  }) => Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }>
-  readonly deleteGroup: (id: string) => Promise<void>
-}
-
-interface TaskBoardProps extends TaskBoardInjected {
+interface TaskBoardProps {
   readonly t: DeskTranslator
+  readonly data: TasksData
+  readonly groupsData: GroupsData
+  readonly board: TaskBoardApi
   /** Optional session services facade; disabled when the host doesn't expose them. */
   readonly sessionLink: SessionLinkApi
 }
 
-export function TaskBoard(props: TaskBoardProps): ReactElement {
-  const {
-    t, listTasks, createTask, updateTask, deleteTask,
-    listGroups, createGroup: createGroupApi, updateGroup, moveGroup, archiveGroup: archiveGroupApi, deleteGroup,
-    sessionLink,
-  } = props
-  const data = useTasksData(t, { listTasks, createTask, updateTask, deleteTask })
-  const groupsData = useGroupsData(t, {
-    listGroups,
-    createGroup: createGroupApi,
-    updateGroup,
-    moveGroup,
-    deleteGroup,
-    archiveGroup: archiveGroupApi,
-  })
-  const board = useTaskBoard({
-    tasks: data.tasks,
-    setTasks: data.setTasks,
-    savePatch: data.savePatch,
-    addTask: data.addTask,
-    removeWithFeedback: data.removeWithFeedback,
-    setActionError: data.setActionError,
-    groups: groupsData.groups,
-    createGroup: groupsData.createGroup,
-    renameGroup: groupsData.renameGroup,
-    setGroupOrders: groupsData.setGroupOrders,
-    removeGroup: groupsData.removeGroup,
-    moveGroupToLane: groupsData.moveGroupToLane,
-    archiveGroup: groupsData.archiveGroup,
-  })
-  const [draggingId, setDraggingId] = useState<string | null>(null)
+export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoardProps): ReactElement {  const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [groupDrag, setGroupDrag] = useState<DeskTaskGroup | null>(null)
   const [groupDrop, setGroupDrop] = useState<GroupDropTarget | null>(null)
@@ -102,12 +47,6 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     observer.observe(element)
     return () => { observer.disconnect() }
   }, [data.loading, groupsData.loading])
-
-  const sortOptions = useMemo<readonly { mode: TaskSortMode; label: string }[]>(() => [
-    { mode: 'manual', label: t('task.sort.manual') },
-    { mode: 'created', label: t('task.sort.created') },
-    { mode: 'due', label: t('task.sort.due') },
-  ], [t])
 
   /** Resolve a card drop: a group's card list, or the lane's shared block sequence. */
   const resolveCardDrop = useCallback((x: number, y: number, movingTaskId: string): DropTarget | null => {
@@ -381,34 +320,6 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
   return (
     <div className="dsh-desk-tasksview">
       {actionError === null ? null : <p className="dsh-desk-error">{actionError}</p>}
-      <div className="dsh-task-toolbar">
-        {board.showArchive
-          ? (
-              <button type="button" className="dsh-task-tool" onClick={board.toggleArchive}>
-                {t('task.backToBoard')}
-              </button>
-            )
-          : (
-              <>
-                <div className="dsh-task-sort" role="group" aria-label={t('task.sort.label')}>
-                  {sortOptions.map(option => (
-                    <button
-                      key={option.mode}
-                      type="button"
-                      className="dsh-task-tool"
-                      data-active={board.sortMode === option.mode}
-                      onClick={() => board.setSortMode(option.mode)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-                <button type="button" className="dsh-task-tool" onClick={board.toggleArchive}>
-                  {t('task.archive')}{board.archivedTasks.length === 0 ? '' : ` (${board.archivedTasks.length})`}
-                </button>
-              </>
-            )}
-      </div>
       {board.showArchive
         ? (
             <TaskArchiveView

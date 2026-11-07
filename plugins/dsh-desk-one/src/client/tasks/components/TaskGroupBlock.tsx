@@ -121,7 +121,7 @@ export function TaskGroupBlock({
         <div className="dsh-task-group-actions">
           <button
             type="button"
-            className="dsh-task-iconbtn"
+            className="dsh-desk-iconbtn dsh-desk-iconbtn-sm"
             aria-label={t('task.add')}
             title={t('task.add')}
             onClick={() => onAdd(status, group.id)}
@@ -134,7 +134,7 @@ export function TaskGroupBlock({
             ? (
                 <button
                   type="button"
-                  className="dsh-task-iconbtn"
+                  className="dsh-desk-iconbtn dsh-desk-iconbtn-sm"
                   aria-label={t('task.group.archive')}
                   title={t('task.group.archive')}
                   onClick={() => onArchiveGroup(group)}
@@ -147,7 +147,7 @@ export function TaskGroupBlock({
             : null}
           <button
             type="button"
-            className="dsh-task-iconbtn dsh-task-iconbtn-danger"
+            className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-iconbtn-danger"
             data-confirm={confirming}
             aria-label={confirming ? t('task.group.removeConfirm') : t('task.group.remove')}
             title={confirming ? t('task.group.removeConfirm') : t('task.group.remove')}

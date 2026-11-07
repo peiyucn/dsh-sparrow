@@ -113,30 +113,33 @@ function ArchiveRow({
 export function TaskArchiveView({
   tasks, groups, t, countText, onRestoreGroup, onDeleteGroup, onRestoreTask, onDeleteTask,
 }: TaskArchiveViewProps): ReactElement {
-  if (groups.length === 0 && tasks.length === 0) {
-    return <p className="dsh-desk-wall-hint">{t('task.archiveEmpty')}</p>
-  }
   return (
-    <ul className="dsh-task-archive-list">
-      {groups.map(group => (
-        <GroupArchiveRow
-          key={group.id}
-          group={group}
-          countLabel={countText(tasks.filter(task => task.groupId === group.id).length)}
-          t={t}
-          onRestore={onRestoreGroup}
-          onDelete={onDeleteGroup}
-        />
-      ))}
-      {tasks.map(task => (
-        <ArchiveRow
-          key={task.id}
-          task={task}
-          t={t}
-          onRestore={onRestoreTask}
-          onDelete={onDeleteTask}
-        />
-      ))}
-    </ul>
+    <div className="dsh-task-archive">
+      {groups.length === 0 && tasks.length === 0
+        ? <p className="dsh-desk-wall-hint">{t('task.archiveEmpty')}</p>
+        : (
+            <ul className="dsh-task-archive-list">
+              {groups.map(group => (
+                <GroupArchiveRow
+                  key={group.id}
+                  group={group}
+                  countLabel={countText(tasks.filter(task => task.groupId === group.id).length)}
+                  t={t}
+                  onRestore={onRestoreGroup}
+                  onDelete={onDeleteGroup}
+                />
+              ))}
+              {tasks.map(task => (
+                <ArchiveRow
+                  key={task.id}
+                  task={task}
+                  t={t}
+                  onRestore={onRestoreTask}
+                  onDelete={onDeleteTask}
+                />
+              ))}
+            </ul>
+          )}
+    </div>
   )
 }

@@ -30,7 +30,7 @@ interface Actions {
   }) => Promise<{ group: DeskTaskGroup; tasks: readonly DeskTask[] }>
 }
 
-interface GroupsData {
+export interface GroupsData {
   readonly groups: readonly DeskTaskGroup[]
   readonly loading: boolean
   readonly loadError: string | null

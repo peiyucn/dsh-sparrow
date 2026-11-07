@@ -70,7 +70,7 @@ export function useTrash({
     if (!confirmSmash) return
     const onPointerDown = (event: PointerEvent): void => {
       const target = event.target as Element | null
-      if (target?.closest('.dsh-desk-smash') != null) return
+      if (target?.closest('[data-smash-confirm]') != null) return
       setConfirmSmash(false)
     }
     const onKeyDown = (event: KeyboardEvent): void => {
