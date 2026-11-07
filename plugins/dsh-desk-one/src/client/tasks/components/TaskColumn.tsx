@@ -372,7 +372,6 @@ export function TaskColumn({
             </div>
           )
         })}
-        <div className="dsh-task-group-dropmark" data-active={groupLaneOver && groupDrop?.index === lane.groups.length} />
         <div
           className="dsh-task-group-dropend"
           data-active={groupLaneOver && groupDrop !== null

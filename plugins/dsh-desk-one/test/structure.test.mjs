@@ -418,6 +418,8 @@ describe('dsh-desk-one 结构', () => {
     assert.match(board, /removeAllRanges/u)
     assert.match(column, /markerIndex/u, '插入线序号与被拖分组无关')
     assert.match(column, /dsh-task-group-dropend/u)
+    assert.ok(!column.includes('dsh-task-group-dropmark'), '只有一个末尾插入标记，避免双蓝条')
+    assert.ok(!styles.includes('.dsh-task-group-dropmark'), '删除旧插入标记样式')
     assert.match(styles, /\.dsh-task-group-dropend\[data-active='true'\]/u)
     // Task ghost is straight; the sticky-note drag gets the paper tilt instead.
     assert.ok(!/\.dsh-task-ghost \{[^}]*rotate/su.test(styles), '任务幽灵卡不要倾斜')

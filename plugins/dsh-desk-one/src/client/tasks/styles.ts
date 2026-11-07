@@ -906,17 +906,6 @@ export const TASKS_CSS = `
   height: 14px;
 }
 /* Insertion line while a group is dragged (per-index marker; the lane itself highlights too). */
-.dsh-task-group-dropmark {
-  flex: none;
-  height: 2px;
-  margin: 0 2px;
-  border-radius: 1px;
-  background: transparent;
-  transition: background 0.1s ease;
-}
-.dsh-task-group-dropmark[data-active='true'] {
-  background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
-}
 .dsh-task-group-dropend {
   flex: none;
   height: 2px;
