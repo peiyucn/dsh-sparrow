@@ -154,13 +154,24 @@ export const TASKS_CSS = `
 }
 /* Unified lane sequence: each top-level block is an ungrouped card or one group. */
 .dsh-task-block {
+  position: relative;
   flex: none;
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
-.dsh-task-block[data-drop='true'] {
-  box-shadow: inset 0 2px 0 0 var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+/* Insertion line sits above the child card/group background, otherwise its top edge covers it. */
+.dsh-task-block[data-drop='true']::before {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  left: 2px;
+  right: 2px;
+  top: -1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+  pointer-events: none;
 }
 .dsh-task-block-dropend {
   flex: none;

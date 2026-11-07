@@ -427,6 +427,8 @@ describe('dsh-desk-one 结构', () => {
     assert.match(column, /dsh-task-block-dropend/u)
     assert.match(column, /dsh-task-block/u, '泳道是统一块序列')
     assert.match(styles, /\.dsh-task-block \{/u)
+    assert.match(styles, /\.dsh-task-block\[data-drop='true'\]::before/u, '插入线用伪元素压在内容上，不能被下一块上沿盖住')
+    assert.match(styles, /\.dsh-task-block\[data-drop='true'\]::before \{[^}]*z-index: 3/su)
     assert.match(styles, /\.dsh-task-block-dropend\[data-active='true'\]/u)
     assert.ok(!column.includes('dsh-task-group-dropmark'), '只有一个末尾插入标记，避免双蓝条')
     assert.ok(!styles.includes('.dsh-task-group-dropmark'), '删除旧插入标记样式')
