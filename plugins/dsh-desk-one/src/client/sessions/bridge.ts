@@ -8,6 +8,11 @@
 
 import type { SessionChipInfo, SessionLinkApi, SessionLinkSnapshot } from './contract.js'
 
+interface SessionProjectionValuesLike {
+  /** Official `subagent` projection view value (summary key); label identifies the child. */
+  readonly subagent?: { readonly label?: string } | null
+}
+
 interface SessionRowLike {
   readonly id: string
   readonly displayTitle?: string
@@ -16,6 +21,7 @@ interface SessionRowLike {
   readonly updatedAt?: number
   readonly cwd?: string
   readonly origin?: string
+  readonly projectionValues?: SessionProjectionValuesLike
 }
 
 interface SessionListStateLike {
@@ -64,15 +70,20 @@ export interface SessionLinkBridge {
 
 /**
  * Display label for one client session row, aligned with the composer's `@` labels:
- * the durable title first; for subagent rows the subagent label (official `displayTitle`);
- * otherwise the raw id. `displayTitle` alone can be a cwd basename for cold rows and would
- * disagree with the composer.
+ * - subagent sessions use the `subagent` label first (composer shows `displayTitle`, whose
+ *   subagent branch is the label); the durable title is only a fallback;
+ * - ordinary sessions use the durable title, never the cwd-basename `displayTitle`.
  */
 function chipTitle(row: SessionRowLike | undefined, id: string): string {
   if (row === undefined) return id
-  if (row.title !== undefined && row.title !== '') return row.title
-  if (row.origin === 'subagent' && row.displayTitle !== undefined && row.displayTitle !== '') return row.displayTitle
-  return id
+  if (row.origin === 'subagent') {
+    const label = row.projectionValues?.subagent?.label
+    if (label !== undefined && label !== '') return label
+    if (row.title !== undefined && row.title !== '') return row.title
+    if (row.displayTitle !== undefined && row.displayTitle !== '') return row.displayTitle
+    return id
+  }
+  return row.title !== undefined && row.title !== '' ? row.title : id
 }
 
 function resolveSnapshot(services: SessionServices | null): SessionLinkSnapshot {
