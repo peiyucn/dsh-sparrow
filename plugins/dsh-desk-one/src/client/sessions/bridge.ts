@@ -38,7 +38,11 @@ interface WorkspaceStateLike {
 }
 
 interface WorkspacesServiceLike {
-  readonly list: { getSnapshot: () => WorkspaceStateLike }
+  readonly list: {
+    getSnapshot: () => WorkspaceStateLike
+    /** Optional for older hosts: archive changes must wake the picker when available. */
+    subscribe?: (listener: () => void) => () => void
+  }
 }
 
 interface UiWorkspaceLike {
@@ -58,6 +62,19 @@ export interface SessionLinkBridge {
   attach: (services: SessionServices) => () => void
 }
 
+/**
+ * Display label for one client session row, aligned with the composer's `@` labels:
+ * the durable title first; for subagent rows the subagent label (official `displayTitle`);
+ * otherwise the raw id. `displayTitle` alone can be a cwd basename for cold rows and would
+ * disagree with the composer.
+ */
+function chipTitle(row: SessionRowLike | undefined, id: string): string {
+  if (row === undefined) return id
+  if (row.title !== undefined && row.title !== '') return row.title
+  if (row.origin === 'subagent' && row.displayTitle !== undefined && row.displayTitle !== '') return row.displayTitle
+  return id
+}
+
 function resolveSnapshot(services: SessionServices | null): SessionLinkSnapshot {
   if (services === null) return { enabled: false, sessions: [] }
   const list = services.sessions.list.getSnapshot()
@@ -71,7 +88,7 @@ function resolveSnapshot(services: SessionServices | null): SessionLinkSnapshot 
       : archived.has(id) ? 'archived' : row === undefined ? 'unavailable' : 'available'
     return {
       id,
-      title: row?.displayTitle ?? row?.title ?? id,
+      title: chipTitle(row, id),
       running: row?.running === true,
       availability,
       updatedAt: row?.updatedAt ?? 0,
@@ -94,12 +111,14 @@ export function createSessionLinkBridge(): SessionLinkBridge {
 
   const attach = (next: SessionServices): (() => void) => {
     services = next
-    const unsubscribers = [
-      next.sessions.list.subscribe(emit),
-    ]
+    const unsubscribeSessions = next.sessions.list.subscribe(emit)
+    // Archive/unarchive changes land on the workspace store, not the session list: without this
+    // subscription a restored session would keep the stale status until a full page reload.
+    const unsubscribeWorkspaces = next.workspaces.list.subscribe?.(emit)
     emit()
     return () => {
-      for (const unsubscribe of unsubscribers) unsubscribe()
+      unsubscribeSessions()
+      unsubscribeWorkspaces?.()
       services = null
       emit()
     }

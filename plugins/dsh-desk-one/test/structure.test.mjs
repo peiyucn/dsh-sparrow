@@ -465,9 +465,13 @@ describe('dsh-desk-one 结构', () => {
     assert.match(sessionContract, /enabled: boolean/u, '缺少服务时功能要能禁用')
     assert.match(bridge, /archivedSessionIds/u)
     assert.match(bridge, /uiWorkspace\.openSession/u)
+    assert.match(bridge, /chipTitle/u, '标题口径统一在一处')
+    assert.match(bridge, /row\.title !== undefined/u, '优先持久化 title')
+    assert.match(bridge, /origin === 'subagent'/u, '子代理才用 displayTitle 兜底')
+    assert.match(bridge, /workspaces\.list\.subscribe/u, '归档集变化要唤醒 picker')
     assert.match(index, /ctx\.inject\(\['sessions', 'workspaces', 'uiWorkspace'\]/u, '会话服务走可选 fork')
     assert.match(index, /sessionLink: sessionLink\.api/u)
-    // UI: chips with status dot, multi-select picker with search, unlink, click-to-open.
+    // UI: chips with status tint, multi-select picker with search, unlink, click-to-open.
     assert.match(board, /useSessionLinks/u)
     assert.match(column, /sessionsFor/u)
     assert.match(card, /dsh-task-session-pop/u)
