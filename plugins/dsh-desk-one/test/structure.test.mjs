@@ -423,6 +423,10 @@ describe('dsh-desk-one 结构', () => {
     assert.match(column, /data-compact="true"/u, '紧凑泳道只显示计数')
     assert.match(column, /dsh-task-compact-row/u)
     assert.match(styles, /\.dsh-task-compact-row \{/u)
+    assert.match(styles, /\.dsh-task-lane-title \{/u, '泳道标题单独成规则')
+    assert.match(styles, /\.dsh-task-lane-title \{[^}]*font-size: 14px/su, '泳道标题字号加大')
+    assert.match(styles, /\.dsh-task-lane-title \{[^}]*font-weight: 700/su, '泳道标题加粗')
+    assert.match(styles, /\.dsh-task-lane-title \{[^}]*brand-primary-new-color/su, '泳道标题用官方品牌蓝紫')
     // Group headers drag with the same pointer gesture as cards.
     assert.match(column, /onGroupStartDrag/u, '整组拖拽走指针手势')
     assert.match(column, /dsh-task-group-grip/u, '分组要有拖动手柄')

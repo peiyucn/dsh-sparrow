@@ -75,6 +75,14 @@ export const TASKS_CSS = `
   line-height: 18px;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
+/* Lane names are the board's section titles: larger, bold and in the official brand colour. */
+.dsh-task-lane-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  letter-spacing: 0.01em;
+  color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+}
 .dsh-task-count {
   margin-left: 2px;
   font-size: 11px;
