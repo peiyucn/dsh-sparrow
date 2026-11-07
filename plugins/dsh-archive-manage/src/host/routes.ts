@@ -12,7 +12,7 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import {
   isDeleteConfirmationSufficient, straySessionIds, type ArchiveConfig, type HeaderFactsStore,
 } from '../archive.js'
-import { ROUTES } from '../constants.js'
+import { PROJECTION_SEED_BACKGROUND_BUDGET_MS, ROUTES } from '../constants.js'
 import type {
   ArchiveRequest, ArchiveResponse, DeleteMutationResponse, DeleteRequest, ListResponse, RestoreRequest, RestoreResponse,
   StraysResponse, TrashDeleteAllRequest, TrashDeleteAllResponse, TrashDeleteRequest, TrashDeleteResponse,
@@ -28,6 +28,7 @@ import { assertSessionLocationApi } from './gates.js'
 import type { HeaderFacts } from './headers.js'
 import { ArchiveError, bodyObject, readJsonBody, sendError, sendJson } from './http.js'
 import { readStrayBlankness } from './projection.js'
+import { finalizeRestoredSessions } from './projection-seed.js'
 import {
   assertHeaderFormatSupported, deleteSessionTree, ensureSessionNotLive, listSubagentTargets, moveSessionToTrash,
   sessionDirectoryFor,
@@ -187,7 +188,7 @@ async function trashDeleteRoute(route: ArchiveRouteContext, req: IncomingMessage
   if (parsed.confirm !== true) {
     throw new ArchiveError('CONFIRMATION_FAILED', '彻底删除回收站条目需要二次确认')
   }
-  const body = await deleteTrashEntry(route.settings.trashRoot, trashId)
+  const body = await deleteTrashEntry(route.ctx, route.settings.trashRoot, trashId)
   sendJson(res, 200, body satisfies TrashDeleteResponse)
 }
 
@@ -196,8 +197,14 @@ async function restoreRoute(route: ArchiveRouteContext, req: IncomingMessage, re
   const trashId = requireNonEmptyString(parsed.trashId, 'trashId 必须是非空字符串')
   const trashDir = resolveTrashDir(route.settings.trashRoot, trashId)
   const sidecar = await restoreTrashDir(route.ctx, route.surface, trashDir)
-  // 还原把会话目录移回持久化：立即失效 header 缓存（restore 不发 added 事件，写穿靠这里）。
+  // 还原把会话目录移回持久化：立即失效 header 缓存，后续读取才看得到它们。
   route.headerFacts.invalidate()
+  // 回收站期间投影行可能已被旧版启动清扫删掉：读回冷日志经官方 coldSnapshot 重建，
+  // 再补发带 cached 投影块的 added——输入框 @ 与任务板 @ 因此都能显示标题 / 子会话标签。
+  await finalizeRestoredSessions(route.ctx, [
+    sidecar.sessionId,
+    ...(sidecar.subagents ?? []).map(child => child.sessionId),
+  ])
   sendJson(res, 200, { ok: true, sessionId: sidecar.sessionId, workspaceIds: sidecar.workspaceIds } satisfies RestoreResponse)
 }
 
@@ -206,9 +213,16 @@ async function restoreAllRoute(route: ArchiveRouteContext, req: IncomingMessage,
   if (parsed.confirm !== true) {
     throw new ArchiveError('CONFIRMATION_FAILED', '还原全部回收站条目需要二次确认')
   }
-  const body = await restoreAllTrashItems(route.ctx, route.surface, route.settings.trashRoot)
+  const { body, restoredTreeIds } = await restoreAllTrashItems(route.ctx, route.surface, route.settings.trashRoot)
   route.headerFacts.invalidate()
   sendJson(res, 200, body satisfies TrashRestoreAllResponse)
+  // 「全部还原」可能一次恢复几十个条目（实测 43 条 / 139 MB）：投影回填放响应后台跑，
+  // 不阻塞操作；跑不完的部分由下次启动修复补齐（见 projection-seed.ts）。
+  if (restoredTreeIds.length > 0) {
+    void finalizeRestoredSessions(route.ctx, restoredTreeIds, PROJECTION_SEED_BACKGROUND_BUDGET_MS).catch((error: unknown) => {
+      route.ctx.logger.warn(`dsh-archive-manage: 全部还原后的投影行回填失败：${error instanceof Error ? error.message : String(error)}`)
+    })
+  }
 }
 
 async function deleteAllRoute(route: ArchiveRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -216,7 +230,7 @@ async function deleteAllRoute(route: ArchiveRouteContext, req: IncomingMessage, 
   if (parsed.confirm !== true) {
     throw new ArchiveError('CONFIRMATION_FAILED', '彻底删除全部回收站条目需要二次确认')
   }
-  const body = await deleteAllTrashItems(route.settings.trashRoot)
+  const body = await deleteAllTrashItems(route.ctx, route.settings.trashRoot)
   sendJson(res, 200, body satisfies TrashDeleteAllResponse)
 }
 

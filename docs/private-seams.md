@@ -37,19 +37,24 @@
     `sizeBytes`，**不含路径**；`SessionLocation`（`kind` + `path`）只出现在 `errors.ts`。
   * **WorkspaceRegistry 私有写通道**（`enqueueOperation` / `requireState` / `setState`）——
     归档集没有公开写入口。
-  * **`session_projcache` 存储域直读 / 直写**（`src/host.ts` 的 `PROJCACHE_DOMAIN_NAME` /
-    `PROJCACHE_SESSIONS_TABLE`）—— 移入回收站 / 删除把目录搬走后，必须让官方投影缓存里那几行失效，
-    否则 @ 列表仍读到已归档会话的标题。
+  * **`session_projcache` 存储域直读 / 直写**（`src/host/projection.ts` + `src/constants.ts` 的
+    `PROJECTION_CACHE_DOMAIN_SPEC_PACKAGE` / `PROJECTION_CACHE_DOMAIN_FALLBACK`）——
+    面板展示事实 / 空白判定要读官方投影行；彻底删除会话后要失效对应行（否则 @ 列表仍读到已删会话的标题）；
+    启动清扫要清理持久化里已不存在的行。**回收站里的会话行必须保留**（它们是可还原的，行是还原后标题 /
+    子会话标签的唯一来源），永久删除时才由删除路由失效父 + 子会话的行。
+    投影行**写回**不走这里：还原 / 启动修复用官方公开的 `ctx.sessionProjectionCache.coldSnapshot(...)`
+    （见 `src/host/projection-seed.ts`），不直写存储域。
     ⚠️ **这一条是「可以走公开路径却没走」**：官方**有**导出 `projectionCacheDomainSpec`
     （`@deepseek-ai/dsh-session-projection-cache`，`src/index.ts:59` 导出、`src/spec.ts` 定义），
     域名字符串与表名都该从它取。本插件目前写的是**字面量** `'session_projcache'` / `'sessions'`,
     等于把官方合法的公开契约降级成了私有 seam（官方改域名 / 改表名即静默失效）。
     **待办**：换成 import 官方 spec（属「收缩原则」，公开替代已存在）。
   * **`ctx.get('sessionProjections')` / `ctx.get('sessionProjectionCache')` + `fn.length` 形参自适应**
-    （`src/host.ts:202-253` 的 `cachedTitle`、`:571-600` 的 `subagentLabel`）—— 按被调函数**形参个数**
-    选择调用形态，而不是 try/catch 回退。**两处调用同一个 `cachedSnapshot`，必须同口径**：
-    只改一处会让另一处静默 miss（能取到缓存却永远读不出 label；不抛错、也不易被测试发现）。
-    这是「同一能力在不同 dsh 线里签名不同」的兼容写法；官方给全签名后应删。
+    （`src/host/projection.ts` 的 `cachedSnapshotOf` / `coldSnapshotOf`）—— 按被调函数**形参个数**
+    选择调用形态，而不是 try/catch 回退。**插件里所有 `cachedSnapshot` 读取必须走同一个入口**
+    （标题 / 子会话标签 / 行回填三处共用）：只改一处会让另一处静默 miss（能取到缓存却永远读不出
+    label；不抛错、也不易被测试发现）。`coldSnapshot` 同理：官方当前 3 参，形参不足时宁可放弃回填
+    也不猜参数。这是「同一能力在不同 dsh 线里签名不同」的兼容写法；官方给全签名后应删。
 
 ## B. 刻意改官方默认外观的例外（**均不带官方默认门**，两个档位都生效）
 

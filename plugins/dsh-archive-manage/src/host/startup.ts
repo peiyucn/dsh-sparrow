@@ -11,6 +11,8 @@ import { alignChildArchives, sweepGhostArchivedIds } from './archive-set.js'
 import type { RegistryMutationSurface } from './gates.js'
 import type { HeaderFacts } from './headers.js'
 import { sweepStaleProjectionCache } from './projection.js'
+import { healMissingSessionProjections } from './projection-seed.js'
+import { trashProjectionIds } from './trash.js'
 
 /** 启动三项清扫的「只跑一次」触发器；`run` 幂等。 */
 export interface StartupScans {
@@ -22,19 +24,34 @@ export interface StartupScans {
  *
  * 2026-09-29：**不再在 apply 里立刻发起**——三项启动读取（清扫 ×2 + 对齐）与官方会话列表接口
  * 抢同一次全量扫盘，会压住用户打开页面后等列表的窗口（真机实测 40–90 s）。
+ * @param ctx - 宿主上下文。
+ * @param surface - 官方 workspace 写通道。
+ * @param headerFacts - header 事实缓存。
+ * @param trashRoot - 回收站根目录：清扫据此保留可还原会话的投影行。
  */
 export function installStartupScans(
   ctx: Context,
   surface: RegistryMutationSurface,
   headerFacts: HeaderFactsStore<HeaderFacts>,
+  trashRoot: string,
 ): StartupScans {
   let startupScansDone = false
   const run = (): void => {
     if (startupScansDone) return
     startupScansDone = true
-    void sweepGhostArchivedIds(ctx, surface, headerFacts)
-    void sweepStaleProjectionCache(ctx, headerFacts)
-    void alignChildArchives(ctx, surface, headerFacts)
+    void (async () => {
+      // 回收站条目不在持久化清单里，但仍是可还原的会话：先取它们的 id，再让投影清扫跳过。
+      const preservedProjectionIds = await trashProjectionIds(trashRoot)
+      await Promise.all([
+        sweepGhostArchivedIds(ctx, surface, headerFacts),
+        sweepStaleProjectionCache(ctx, headerFacts, preservedProjectionIds),
+        alignChildArchives(ctx, surface, headerFacts),
+      ])
+      // 最后回填：修复旧版清扫在回收站期间删掉的存量投影行（正常机器无缺行 = 零 I/O 遍历）。
+      await healMissingSessionProjections(ctx, headerFacts)
+    })().catch((error: unknown) => {
+      ctx.logger.warn(`dsh-archive-manage: 启动扫描失败：${error instanceof Error ? error.message : String(error)}`)
+    })
   }
   const startupScanTimer = setTimeout(run, STARTUP_SCAN_DELAY_MS)
   ctx.effect(() => () => clearTimeout(startupScanTimer), 'dsh-archive-manage: 启动清扫兜底定时器')

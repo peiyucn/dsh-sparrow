@@ -67,8 +67,14 @@
 * 还原：校验 `originalPath` 是绝对路径 + 末段是安全的单会话目录名，条目仍在 `trashRoot` 内；
   目标目录已存在且非空 → `TARGET_EXISTS`（不覆盖）。父目录 `rename` 回原位后**立即**删除
   sidecar（避免记账文件污染用户会话目录），再逐个移回 `subagents/`，最后恢复工作区记账与归档集。
+  还原收尾还会**回填投影行**（行已可用则跳过）并补发 `api-session/added`（父 → 子，带官方
+  `cached` 投影块）：输入框 `@` 与任务板 `@` 因此在还原后立刻显示标题 / 子会话标签，无需刷新页面。
 * 标题三档：live 投影快照 → 冷投影缓存行（按官方方法形参个数自适应）→ 有界日志折叠
   （8s 整批预算）；取不到回退会话 id。子会话标签另走官方 subagent 投影（含自有后缀门）。
+* 投影行回填（`host/projection-seed.ts`）：还原 / 启动修复共用。读回完整冷日志后调用官方公开的
+  `sessionProjectionCache.coldSnapshot(meta, inheritedEventCount, events)` 写回（不直写存储域、
+  不复制官方折叠逻辑）；`cachedSnapshot` 读取统一走 `host/projection.ts` 的 `cachedSnapshotOf`
+  （按 `fn.length` 自适应 2/3 参，三处调用同口径）。
 
 ## 唯一配置参数
 
@@ -81,9 +87,13 @@
 1. **父子整树**：`/list` 输出父子树；`/archive` 一次写入父 + 全部后代；`/trash` / `/delete`
    搬运 / 删除全部后代（任意深度，`subagentDescendantIds`）；sidecar 记录已搬走的子会话；
    还原整棵一起移回；归档集清理用根 + 全部后代，避免深度 ≥2 的后代变成孤儿根。
-2. **回收站不失效投影行**：移入回收站只改目录位置、会话身份未变，投影行保留（否则还原后子会话
-   标题退化为首条用户消息）。彻底删除才失效投影行（最多重试 2 次，仍失败只告警，启动清扫兜底）；
-   启动清扫还会删除持久化里已不存在的投影行。
+2. **回收站期间保留投影行，还原时回填缺行**：移入回收站只改目录位置、会话身份未变，投影行保留
+   （否则还原后子会话标题退化为首条用户消息）。启动清扫把**回收站条目里的会话 id（父 + sidecar
+   记录的子会话）排除在清理范围外**——它们不在持久化清单里，但仍是可还原的会话，投影行是还原后
+   标题 / 子会话标签的唯一来源；历史版本清扫掉的存量行由还原收尾 / 启动修复用官方 `coldSnapshot`
+   重建。彻底删除才失效投影行（根 + sidecar 子会话，最多重试 2 次，仍失败只告警，启动清扫兜底）。
+   还原后补发 `api-session/added`（带 `cached` 投影块），客户端会话列表无需刷新即可恢复标题，
+   两个 `@` 列表（输入框 / 任务板）显示一致。
 3. **还原路径必须在 `trashRoot` 内**：`trashId` 先消毒再 `resolve`，结果必须仍是 `trashRoot`
    本身或其子路径；sidecar 的 `originalPath` 还要过绝对路径 + 安全目录名校验，防篡改后把目录
    rename 到任意位置。
@@ -120,7 +130,8 @@
 | `src/host/http.ts` | JSON 收发、请求体读取、统一错误类型 |
 | `src/host/gates.ts` | host 能力 / 会话格式门与两处私有 seam 的启动自检 |
 | `src/host/headers.ts` | header 事实缓存 store、双形状读取、树结构投影 |
-| `src/host/projection.ts` | 官方投影缓存域解析、行读取、失效与启动清扫 |
+| `src/host/projection.ts` | 官方投影缓存域解析、行读取、`cachedSnapshot` 读取（形参自适应）、`coldSnapshot` 写回、失效与启动清扫 |
+| `src/host/projection-seed.ts` | 还原 / 启动修复的投影行回填（读冷日志 → 官方 coldSnapshot）与带 cached 投影块的 added 补发 |
 | `src/host/titles.ts` | 标题三档 + subagent 标签三档（含形参自适应缓存读取） |
 | `src/host/archive-set.ts` | 归档集读改写、工作区记账、父子对齐、幽灵清扫、unarchive 通知 |
 | `src/host/trash.ts` | 回收站目录 / 清单 / 还原 / 删除 |
@@ -164,9 +175,13 @@
 * `test/archive.test.mjs` —— sidecar 解析、回收站视图、树构建 / 归档对齐 / 子树 id、LRU、预算信号、
   有界并发、header 事实缓存。
 * `test/host.test.mjs` —— `resolveTrashDir`、`sessionDirectoryFor`、私有 seam 检查、
-  `addedSummaryFor`、`titlesFor` 批量折叠、`subagentLabel` 三档读链。
+  `addedSummaryFor`、`titlesFor` 批量折叠、`subagentLabel` 三档读链、`cachedSnapshotOf` /
+  `coldSnapshotOf` 形参自适应、启动投影清扫保留回收站会话的行。
 * `test/route.test.mjs` —— 真实 `apply` + handler：信任栅栏、确认失败、ENOENT 宽恕、请求体
-  （>64KB / 非法 JSON / 数组）400、500 路径 logger 告警。
+  （>64KB / 非法 JSON / 数组）400、500 路径 logger 告警；回收站还原重建投影行 + 补发带 cached
+  块的 added（父 → 子）、彻底删除失效父 / 子投影行、「全部还原」响应后后台回填。
+* `test/projection-seed.test.mjs` —— 回填的缺行 / 已可用 / 空白 / 子会话缺单元 / 缓存缺失 /
+  签名不认识 / 冷日志失败降级，以及 added 载荷（cached 块、父子顺序）与启动修复（跳 live、零 I/O）。
 * `test/trust.test.mjs` —— 回环判定、Origin / sec-fetch-site、官方信任面复用与非法条目丢弃、
   栅栏调用顺序。
 * `test/compat.test.mjs` —— 会话格式门与 host 能力门。

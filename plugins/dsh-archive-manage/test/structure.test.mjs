@@ -267,7 +267,7 @@ describe('dsh-archive-manage 结构', () => {
     }
     const hostFiles = await fs.readdir(new URL('../src/host', import.meta.url))
     for (const file of [
-      'http.ts', 'gates.ts', 'headers.ts', 'projection.ts', 'titles.ts', 'archive-set.ts',
+      'http.ts', 'gates.ts', 'headers.ts', 'projection.ts', 'projection-seed.ts', 'titles.ts', 'archive-set.ts',
       'trash.ts', 'session-files.ts', 'views.ts', 'routes.ts', 'startup.ts',
     ]) {
       assert.ok(hostFiles.includes(file), `缺 src/host/${file}`)

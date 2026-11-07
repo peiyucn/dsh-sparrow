@@ -3,10 +3,11 @@ import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { after, describe, it } from 'node:test'
 import { TRASH_SIDECAR } from '../lib/archive.js'
 import { apply } from '../lib/host.js'
+import { trashProjectionIds } from '../lib/host/trash.js'
 
 /**
  * 归档路由的**真行为**用例：走真实的 `apply` → `webServer.register` → handler，
@@ -62,12 +63,89 @@ const header = (id, extra = {}) => ({ id, createdAt: 1, version: 4, ...extra })
 const childHeader = (id, rootId) => header(id, { parentSession: rootId, origin: 'subagent' })
 
 /**
+ * 造一个回收站条目：条目目录 + 可还原的 sidecar（父 + 可选子会话），模拟真实
+ * `.sessions-trash/<trashId>/` 布局。子会话目录名必须等于 `basename(originalPath)`
+ * （还原按它 rename 回原处）。
+ *
+ * @param {{ sessions: string, trash: string }} layout
+ * @param {{
+ *   trashId: string,
+ *   sessionId: string,
+ *   originalPath: string,
+ *   title?: string,
+ *   subagents?: Array<{ sessionId: string, originalPath: string, parentSessionId?: string, title?: string }>,
+ * }} spec
+ */
+async function makeTrashEntry(layout, { trashId, sessionId, originalPath, title = sessionId, subagents = [] }) {
+  const trashDir = join(layout.trash, trashId)
+  await mkdir(trashDir, { recursive: true })
+  await writeFile(join(trashDir, 'session.jsonl'), '{"type":"session"}\n', 'utf8')
+  for (const child of subagents) {
+    const childDir = join(trashDir, 'subagents', basename(child.originalPath))
+    await mkdir(childDir, { recursive: true })
+    await writeFile(join(childDir, 'session.jsonl'), '{"type":"session"}\n', 'utf8')
+  }
+  await writeFile(join(trashDir, TRASH_SIDECAR), JSON.stringify({
+    version: 2,
+    sessionId,
+    title,
+    originalPath,
+    archivedAt: new Date(0).toISOString(),
+    workspaceIds: [],
+    ...subagents.length === 0 ? {} : {
+      subagents: subagents.map(child => ({
+        sessionId: child.sessionId,
+        title: child.title ?? child.sessionId,
+        originalPath: child.originalPath,
+        workspaceIds: [],
+        ...child.parentSessionId === undefined ? {} : { parentSessionId: child.parentSessionId },
+      })),
+    },
+  }), 'utf8')
+  return trashDir
+}
+
+/**
+ * 官方投影缓存桩：`cachedSnapshot` 恒 miss（复现事故——还原的会话行已被旧版启动清扫删掉），
+ * `coldSnapshot` 是 3 形参的写回面，返回带 title 的投影块。
+ *
+ * @param {Map<string, string>} titles - 会话 id → 标题
+ */
+function makeProjectionCache(titles) {
+  const coldCalls = []
+  return {
+    coldCalls,
+    cache: {
+      cachedSnapshot(meta, keys) {
+        void meta
+        void keys
+        return undefined
+      },
+      coldSnapshot(meta, inheritedEventCount, events) {
+        coldCalls.push({ id: String(meta.id), inheritedEventCount, eventCount: events.length })
+        return { asOfSeq: 11, values: { title: titles.get(String(meta.id)) ?? String(meta.id), sessionStats: { turns: 3 } } }
+      },
+    },
+  }
+}
+
+/** 等后台任务（响应后触发的回填）完成：predicate 成立即返回，超时抛错。 */
+async function waitFor(predicate, timeoutMs = 2_000) {
+  const deadline = Date.now() + timeoutMs
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error('等待后台任务超时')
+    await new Promise(resolve => setTimeout(resolve, 5))
+  }
+}
+
+/**
  * 用最小 mock ctx 跑真实 `apply`，拿回注册的 prefix handler。
  *
  * options：`headers` = `sessionPersistence.list()` 返回的 header 列表；`dirs` = 会话 id →
  * 磁盘目录（`locate` 的 path 落在该目录下）；`archivedIds` = 归档集内容（含根会话即视为
  * 「已归档」）；`titles` = 会话 id → 标题（`readTitleSnapshots` 的返回值）；
- * `trashRoot` = 回收站根目录。
+ * `trashRoot` = 回收站根目录；`projectionCache` = 官方投影缓存服务桩（还原回填用）；
+ * `storageDomain` = 官方存储域桩（投影行失效用）。
  *
  * @param {{
  *   headers: any[],
@@ -76,9 +154,13 @@ const childHeader = (id, rootId) => header(id, { parentSession: rootId, origin: 
  *   titles: Map<string, string>,
  *   trashRoot: string,
  *   listError?: boolean,
+ *   projectionCache?: any,
+ *   storageDomain?: any,
  * }} options
  */
-async function buildHarness({ headers, dirs, archivedIds, titles, trashRoot, listError = false }) {
+async function buildHarness({
+  headers, dirs, archivedIds, titles, trashRoot, listError = false, projectionCache, storageDomain,
+}) {
   let route = null
   const warnings = []
   const emitted = []
@@ -92,6 +174,7 @@ async function buildHarness({ headers, dirs, archivedIds, titles, trashRoot, lis
       value: { title: { title: titles.get(String(id)) ?? String(id) } },
     })),
   }
+  const headerById = new Map(headers.map(entry => [String(entry.id), entry]))
 
   const ctx = {
     sessions: { get: () => undefined },
@@ -113,9 +196,25 @@ async function buildHarness({ headers, dirs, archivedIds, titles, trashRoot, lis
         const dir = dirs.get(String(candidate.id))
         return dir === undefined ? undefined : { kind: 'jsonl', path: join(dir, 'session.jsonl') }
       },
+      // 投影行回填的冷读面：stat 拿 header，open 返回最小读句柄（空日志即可，
+      // 回填只关心「是否读了日志」与 coldSnapshot 的入参形状）。
+      stat: async (candidate) => {
+        const found = headerById.get(String(candidate))
+        return found === undefined ? undefined : { header: found, revision: 1 }
+      },
+      open: async (candidate) => {
+        const found = headerById.get(String(candidate))
+        if (found === undefined) throw new Error(`not found: ${String(candidate)}`)
+        return {
+          header: found,
+          inheritedEventCount: 0,
+          read: async () => ({ eventState: {}, events: [] }),
+          close: async () => {},
+        }
+      },
     },
     sessionQuery,
-    storageDomain: { get: () => undefined },
+    storageDomain: storageDomain ?? { get: () => undefined },
     webServer: {
       register: (registered) => { route = registered; return () => { route = null } },
     },
@@ -128,7 +227,7 @@ async function buildHarness({ headers, dirs, archivedIds, titles, trashRoot, lis
     },
     on: () => () => {},
     emit: (event, payload) => { emitted.push({ event, payload }) },
-    get: (name) => (name === 'sessionQuery' ? sessionQuery : undefined),
+    get: (name) => (name === 'sessionQuery' ? sessionQuery : name === 'sessionProjectionCache' ? projectionCache : undefined),
   }
 
   await apply(ctx, { trashRoot })
@@ -410,6 +509,129 @@ describe('archive-manage host 路由：真实 handler 行为', () => {
     assert.equal(existsSync(ghostRoot), false)
     // 归档集必须被摘掉（否则归档面板里永远清不掉的幽灵条目）。
     assert.ok(h.emitted.some(e => e.event === 'api-session/removed' && String(e.payload) === 'gone-root'))
+  })
+
+  /**
+   * 回收站还原 / 彻底删除的投影行收尾（2026-11-08 事故）：
+   * 还原后的会话在回收站期间被旧版启动清扫删掉了投影行，输入框 @ 退化成裸 session id、
+   * 任务板 @ 退化成项目目录名（官方列表在标题缺失时回退 cwd basename），两边表现还不一样。
+   * 修复后：还原读回冷日志经官方 coldSnapshot 重建行，并补发带 cached 投影块的 added。
+   */
+  describe('回收站还原 / 彻底删除：投影行与会话列表同步', () => {
+    it('⛔ 还原：缺投影行 应该 重建并补发带 cached 块的 added（父 → 子）', async () => {
+      const layout = await makeLayout()
+      const rootTarget = join(layout.sessions, 'r1')
+      const childTarget = join(layout.sessions, 'c1')
+      const { cache, coldCalls } = makeProjectionCache(new Map([['r1', '父会话标题'], ['c1', '子会话标题']]))
+      const h = await buildHarness({
+        headers: [header('r1'), childHeader('c1', 'r1')],
+        dirs: new Map(),
+        archivedIds: [],
+        titles: new Map(),
+        trashRoot: layout.trash,
+        projectionCache: cache,
+      })
+      const trashDir = await makeTrashEntry(layout, {
+        trashId: 'entry-restore',
+        sessionId: 'r1',
+        originalPath: rootTarget,
+        title: '父会话标题',
+        subagents: [{ sessionId: 'c1', originalPath: childTarget, parentSessionId: 'r1', title: '子会话标题' }],
+      })
+
+      const result = await post(h.route.handler, `${PREFIX}/restore`, { trashId: 'entry-restore' })
+
+      assert.equal(result.statusCode, 200, `还原应成功，实际 ${result.statusCode}：${JSON.stringify(result.body)}`)
+      assert.equal(result.body.sessionId, 'r1')
+      assert.equal(existsSync(join(rootTarget, 'session.jsonl')), true, '父会话日志应移回原处')
+      assert.equal(existsSync(join(childTarget, 'session.jsonl')), true, '子会话日志应移回原处')
+      assert.equal(existsSync(join(rootTarget, TRASH_SIDECAR)), false, 'sidecar 不得留在会话目录')
+      assert.equal(existsSync(trashDir), false, '回收站条目目录应整体移走')
+
+      // 缺行 → 父 + 子都要读回冷日志回填（顺序 = 根在前）。
+      assert.deepEqual(coldCalls.map(call => call.id), ['r1', 'c1'])
+      const added = h.emitted.filter(entry => entry.event === 'api-session/added').map(entry => entry.payload)
+      assert.deepEqual(added.map(payload => String(payload.sessionId)), ['r1', 'c1'])
+      assert.equal(added[0].projections?.kind, 'cached', 'added 必须带 cached 投影块，客户端列表无需刷新即可显示标题')
+      assert.equal(added[0].projections?.values.title, '父会话标题')
+      assert.equal(added[1].projections?.values.title, '子会话标题')
+      assert.equal(added[1].parentSessionId, 'r1', '子会话 added 必须保留父子关系')
+      assert.equal(added[1].origin, 'subagent')
+    })
+
+    it('彻底删除回收站条目 应该 同时失效父 + 子会话的投影行', async () => {
+      const layout = await makeLayout()
+      const deleted = []
+      const storageDomain = {
+        get: (name) => name === 'session_projcache'
+          ? { table: () => ({ delete: async (id) => { deleted.push(String(id)) }, get: () => undefined }) }
+          : undefined,
+      }
+      const h = await buildHarness({
+        headers: [],
+        dirs: new Map(),
+        archivedIds: [],
+        titles: new Map(),
+        trashRoot: layout.trash,
+        storageDomain,
+      })
+      await makeTrashEntry(layout, {
+        trashId: 'entry-delete',
+        sessionId: 'r1',
+        originalPath: join(layout.sessions, 'r1'),
+        subagents: [{ sessionId: 'c1', originalPath: join(layout.sessions, 'c1'), parentSessionId: 'r1' }],
+      })
+
+      const result = await post(h.route.handler, `${PREFIX}/trash-delete`, { trashId: 'entry-delete', confirm: true })
+
+      assert.equal(result.statusCode, 200, `彻底删除应成功，实际 ${result.statusCode}：${JSON.stringify(result.body)}`)
+      assert.equal(existsSync(join(layout.trash, 'entry-delete')), false)
+      // 回收站期间投影行被清扫保留，彻底删除必须由删除路由收尾，否则留下永久读不到的僵尸体。
+      assert.deepEqual([...deleted].sort(), ['c1', 'r1'])
+    })
+
+    it('trashProjectionIds 应该 收集父 + 子会话 id，并跳过无 sidecar 的旧格式目录', async () => {
+      const layout = await makeLayout()
+      await makeTrashEntry(layout, {
+        trashId: 'ids-1',
+        sessionId: 'r1',
+        originalPath: join(layout.sessions, 'r1'),
+        subagents: [{ sessionId: 'c1', originalPath: join(layout.sessions, 'c1'), parentSessionId: 'r1' }],
+      })
+      await makeTrashEntry(layout, { trashId: 'ids-2', sessionId: 'r2', originalPath: join(layout.sessions, 'r2') })
+      // 旧格式（无 sidecar）不可还原：它的会话 id 无从得知，不属于「要保留投影行」的集合。
+      await mkdir(join(layout.trash, 'legacy-entry'), { recursive: true })
+
+      const ids = await trashProjectionIds(layout.trash)
+      assert.deepEqual([...ids].sort(), ['c1', 'r1', 'r2'])
+    })
+
+    it('全部还原 应该 先返回响应，再后台回填并补发 added（不阻塞请求）', async () => {
+      const layout = await makeLayout()
+      const { cache } = makeProjectionCache(new Map([['a1', '标题 A'], ['a2', '标题 B']]))
+      const h = await buildHarness({
+        headers: [header('a1'), header('a2')],
+        dirs: new Map(),
+        archivedIds: [],
+        titles: new Map(),
+        trashRoot: layout.trash,
+        projectionCache: cache,
+      })
+      await makeTrashEntry(layout, { trashId: 'all-1', sessionId: 'a1', originalPath: join(layout.sessions, 'a1') })
+      await makeTrashEntry(layout, { trashId: 'all-2', sessionId: 'a2', originalPath: join(layout.sessions, 'a2') })
+
+      const result = await post(h.route.handler, `${PREFIX}/trash-restore-all`, { confirm: true })
+
+      assert.equal(result.statusCode, 200)
+      assert.deepEqual([...result.body.restored].sort(), ['a1', 'a2'])
+      // 回填在响应之后启动：等后台完成（桩全在内存，微任务级即可）。
+      await waitFor(() => h.emitted.filter(entry => entry.event === 'api-session/added').length >= 2)
+      const added = h.emitted.filter(entry => entry.event === 'api-session/added')
+      assert.deepEqual(added.map(entry => String(entry.payload.sessionId)).sort(), ['a1', 'a2'])
+      for (const entry of added) {
+        assert.equal(entry.payload.projections?.kind, 'cached')
+      }
+    })
   })
 
   /**

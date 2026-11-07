@@ -10,7 +10,25 @@ declare module '@deepseek-ai/cordis' {
      * 补发此事件让侧边栏「未分组」等列表立即同步（2026-08-30 修复残留条目）。
      */
     'api-session/removed'(sessionId: SessionId): void
-    /** 官方公开事件：会话回到列表（载荷形状对齐官方 SessionSummary 的插件可用子集，见 dsh-api-session-controller types.ts）。 */
-    'api-session/added'(summary: { sessionId: SessionId; updatedAt: number; running: boolean; blank: boolean; parentSessionId?: SessionId; origin?: 'subagent'; cwd?: string; agentAvailable: boolean }): void
+    /**
+     * 官方公开事件：会话回到列表（载荷形状对齐官方 SessionSummary 的插件可用子集，见
+     * dsh-api-session-controller types.ts）。`projections` 是官方 cached 投影块：客户端
+     * `handleSessionAdded` 会对它 applyCached，因此会话列表无需刷新即可显示标题 / 子会话标签。
+     */
+    'api-session/added'(summary: {
+      sessionId: SessionId
+      updatedAt: number
+      running: boolean
+      blank: boolean
+      parentSessionId?: SessionId
+      origin?: 'subagent'
+      cwd?: string
+      agentAvailable: boolean
+      projections?: {
+        kind: 'cached'
+        asOfSeq: number
+        values: Readonly<Record<string, unknown>>
+      }
+    }): void
   }
 }

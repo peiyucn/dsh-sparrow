@@ -14,30 +14,7 @@ import {
 import {
   FOLDED_LABEL_CACHE_MAX_ENTRIES, LABEL_FOLD_TIMEOUT_MS, TITLE_FOLD_BUDGET_MS, TITLE_FOLD_CONCURRENCY,
 } from '../constants.js'
-
-/** 官方 `cachedSnapshot` 的最小结构（返回 { values } 行）。 */
-type CachedSnapshotReader = (...args: unknown[]) => { values?: Record<string, unknown> } | undefined
-type CachedSnapshotCache = { cachedSnapshot?: CachedSnapshotReader } | undefined
-
-/**
- * 读官方投影缓存行（`cachedSnapshot(meta, keys?)`）。
- *
- * ⚠️ **签名跨版本变过，必须按形参个数自适应**（2026-09-27 真机事故）：
- * - `0.1.5-rc.3` / `0.1.6-alpha.2`：`(meta, inheritedEventCount, keys?)` —— 3 参；
- * - **`0.1.7-rc.1` 起：`(meta, keys?)`** —— 中间参数被删，变 2 参。
- *
- * 此前写死三参时，0.1.7+ 上 `keys` 实收数字 `0` ⇒ 取不到任何单元 ⇒ 这一档**永远 miss**，
- * 全部退到有界日志折叠（实测单个会话 1.7 MB ~ 37 MB 压缩日志，超 8s 预算）⇒ 标题退化成 id。
- * 用 `try/catch` 兜不住：多传参数**不会抛错**（只是被忽略），必须显式用 `fn.length` 分派。
- */
-function readCachedSnapshotValues(cache: CachedSnapshotCache, header: SessionHeader, unit: string): Record<string, unknown> | undefined {
-  if (cache === undefined || typeof cache.cachedSnapshot !== 'function') return undefined
-  const fn = cache.cachedSnapshot
-  const snapshot = fn.length >= 3
-    ? fn.call(cache, header, 0, [unit])
-    : fn.call(cache, header, [unit])
-  return snapshot?.values
-}
+import { cachedSnapshotOf } from './projection.js'
 
 function titleFromObservation(result: SessionTitleObservationResult | undefined, fallback: string): string {
   if (result?.status !== 'fulfilled') return fallback
@@ -71,17 +48,7 @@ function cachedTitle(ctx: Context, header: SessionHeader, live: unknown): string
     }
     return undefined
   }
-  const cache = ctx.get('sessionProjectionCache') as unknown as CachedSnapshotCache
-  if (cache !== undefined && typeof cache.cachedSnapshot === 'function') {
-    try {
-      // 形参自适应见 readCachedSnapshotValues：写死三参会让这一档在 0.1.7+ 上 100% miss。
-      const hit = read(readCachedSnapshotValues(cache, header, 'title'))
-      if (hit !== undefined) return hit
-    } catch (error) {
-      ctx.logger.warn(`dsh-archive-manage: 标题投影缓存读取失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
-    }
-  }
-  return undefined
+  return read(cachedSnapshotOf(ctx, header, ['title'])?.values)
 }
 
 /**
@@ -204,23 +171,17 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
     }
     return undefined
   }
-  const cache = ctx.get('sessionProjectionCache') as unknown as CachedSnapshotCache
-  if (cache !== undefined && typeof cache.cachedSnapshot === 'function') {
-    try {
-      // 行的可靠性由官方保证：cachedSnapshot 先过 identityMatches（createdAt/cwd/isSeeded/
-      // inheritedEventCount，session-projection-cache/src/index.ts:435，由 recordFor:136 调用）
-      // 验「这份缓存属于这条生命周期」，viewCheckpoint 再丢弃 ver 与 live unit 不一致的行
-      // （session-projection/src/index.ts:448）。所以拿到的 identity 是这份日志的有效折叠
-      // 结果，可以直接当权威结论用。
-      // ⚠️ 形参表跨版本变过，写死三参会静默毁掉这一档（详见 readCachedSnapshotValues）。
-      const settled = labelFromSubagentIdentity(
-        readCachedSnapshotValues(cache, header, 'subagent')?.subagent as SubagentIdentityValue | null | undefined,
-      )
-      if (settled !== undefined) return settled ?? undefined // 有标签返回标签；权威无标签直接结束（不再折叠）
-    } catch (error) {
-      ctx.logger.warn(`dsh-archive-manage: subagent 投影缓存读取失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
-    }
-  }
+  // 行的可靠性由官方保证：cachedSnapshot 先过 identityMatches（createdAt/cwd/isSeeded/
+  // inheritedEventCount，session-projection-cache/src/index.ts:435，由 recordFor:136 调用）
+  // 验「这份缓存属于这条生命周期」，viewCheckpoint 再丢弃 ver 与 live unit 不一致的行
+  // （session-projection/src/index.ts:448）。所以拿到的 identity 是这份日志的有效折叠
+  // 结果，可以直接当权威结论用。
+  // ⚠️ 形参表跨版本变过，读取统一走 projection.ts 的 cachedSnapshotOf（按 fn.length 分派），
+  // 写死三参会静默毁掉这一档。
+  const settled = labelFromSubagentIdentity(
+    cachedSnapshotOf(ctx, header, ['subagent'])?.values.subagent as SubagentIdentityValue | null | undefined,
+  )
+  if (settled !== undefined) return settled ?? undefined // 有标签返回标签；权威无标签直接结束（不再折叠）
   if (!header.isSeeded) {
     const memoized = foldedSubagentLabels.get(String(sessionId))
     // null 亦为结论（该会话确实没有标签）：命中就不必再折一次整份日志。

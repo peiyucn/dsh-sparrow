@@ -19,7 +19,7 @@ import type { HeaderFacts } from './headers.js'
 import { treeHeaderOf } from './headers.js'
 import type {} from './events.js'
 import { ArchiveError } from './http.js'
-import { readStrayBlankness } from './projection.js'
+import { cachedSnapshotOf, readStrayBlankness, summaryBlockOf, type ProjectionBlock } from './projection.js'
 
 /**
  * 预建「会话 id → 持它的工作区 id 列表」索引（性能审计：热路径无 O(n²)）。
@@ -177,22 +177,50 @@ export function addedSummaryFor(header: SessionHeader, blank: boolean): {
 }
 
 /**
+ * 补发官方 api-session/added。
+ *
+ * 除会话摘要外可带一块官方 **cached** 投影：客户端 `handleSessionAdded` 会对它做
+ * `applyCached`（session-controller/src/client/sessions/manager.ts:677），因此会话列表
+ * 无需刷新就能拿到标题 / 子会话标签——还原后输入框 @ 与任务板 @ 显示一致的关键。
+ * @param ctx - 宿主上下文。
+ * @param header - 会话 header（added 载荷的事实来源）。
+ * @param blank - 会话是否为空白会话。
+ * @param projections - 官方 cached 投影块（可选；缺省时只补条目，标题要等下次列表刷新）。
+ */
+export function emitSessionAdded(
+  ctx: Context,
+  header: SessionHeader,
+  blank: boolean,
+  projections?: ProjectionBlock,
+): void {
+  try {
+    ctx.emit('api-session/added', {
+      ...addedSummaryFor(header, blank),
+      // rc.1 起 SessionSummary 新增必填 `agentAvailable`（该会话当前是否持有 live Agent，
+      // 见 `api/session-controller/src/types.ts:177-188`）：与官方语义一致，用 agents 注册表判定。
+      agentAvailable: ctx.agents.get(header.id) !== undefined,
+      ...projections === undefined ? {} : {
+        projections: { kind: 'cached' as const, asOfSeq: projections.asOfSeq, values: projections.values },
+      },
+    })
+  } catch (error) {
+    ctx.logger.warn(`dsh-archive-manage: api-session/added 通知失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+/**
  * unarchive 后补发官方 api-session/added：客户端 handleSessionAdded 即时并入会话列表，
  * 用户无需刷新页面。不发出则用户必须刷新——刷新会触发 dsh 把会话加载进 live store，
  * 之后「再归档 → 进回收站」会被 hold 守卫（ensureSessionNotLive）拦下。
  * headers 经 header 事实缓存取，与 /list /strays 共享单飞，不单独扫盘。
+ * 顺手带上 cached 投影块：回填过投影行的会话（回收站还原 / 启动修复）取消归档后标题立即可见。
  */
-async function emitSessionAdded(ctx: Context, sessionId: SessionId, headerFacts: HeaderFactsStore<HeaderFacts>): Promise<void> {
+async function emitSessionAddedForId(ctx: Context, sessionId: SessionId, headerFacts: HeaderFactsStore<HeaderFacts>): Promise<void> {
   try {
     const { headers } = await headerFacts.get()
     const header = headers.find(candidate => String(candidate.id) === String(sessionId))
     if (header === undefined) return
-    // rc.1 起 SessionSummary 新增必填 `agentAvailable`（该会话当前是否持有 live Agent，
-    // 见 `api/session-controller/src/types.ts:177-188`）：与官方语义一致，用 agents 注册表判定。
-    ctx.emit('api-session/added', {
-      ...addedSummaryFor(header, readStrayBlankness(ctx, String(sessionId))),
-      agentAvailable: ctx.agents.get(sessionId) !== undefined,
-    })
+    emitSessionAdded(ctx, header, readStrayBlankness(ctx, String(sessionId)), summaryBlockOf(ctx, cachedSnapshotOf(ctx, header)))
   } catch (error) {
     ctx.logger.warn(`dsh-archive-manage: api-session/added 通知失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
   }
@@ -206,7 +234,7 @@ export async function unarchiveSession(
   sessionId: SessionId,
 ): Promise<UnarchiveResponse> {
   await removeArchivedId(surface, sessionId)
-  await emitSessionAdded(ctx, sessionId, headerFacts)
+  await emitSessionAddedForId(ctx, sessionId, headerFacts)
   return { ok: true }
 }
 
