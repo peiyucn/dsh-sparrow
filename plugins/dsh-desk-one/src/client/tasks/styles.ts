@@ -1,7 +1,7 @@
 /** Task board CSS: toolbar, lanes, groups, cards, drag ghost, archive list and due warnings. */
 
 export const TASKS_CSS = `
-/* Board shell: fills the tab content area; lanes scroll horizontally on narrow panels. */
+/* Board shell: fills the tab content area; narrow panels switch lanes to their compact form. */
 .dsh-desk-tasksview {
   display: flex;
   flex-direction: column;
@@ -49,7 +49,7 @@ export const TASKS_CSS = `
   /* No horizontal scrollbar: below the threshold the lanes switch to their compact form. */
   overflow: hidden;
 }
-/* Lanes are equal columns; the header stays put while the card list scrolls (scrollbars hidden). */
+/* Lanes are equal columns; the header stays put while the card list scrolls with a thin scrollbar. */
 .dsh-task-lane {
   flex: 1 1 0;
   min-width: 0;
@@ -319,7 +319,7 @@ export const TASKS_CSS = `
 .dsh-task-color-swatch[data-active='true'] {
   box-shadow: 0 0 0 2px var(--dsw-alias-bg-layer-1, #ffffff), 0 0 0 3.5px rgba(55, 53, 47, 0.55);
 }
-/* Linked sessions: chips carry their state as tint + border (no separate status dot). */
+/* Linked sessions: available chips are green-tinted, archived ones neutral grey (no status dot). */
 .dsh-task-sessions {
   position: relative;
   display: flex;

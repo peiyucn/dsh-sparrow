@@ -12,7 +12,10 @@ import type {
   TaskStatus,
 } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
+import { TaskArchiveView } from './TaskArchiveView.js'
 import { TaskColumn, type DropTarget, type GroupDropTarget } from './TaskColumn.js'
+import { createCardGhost, createGroupGhost, lockSelection, placeGhost } from './taskDrag.js'
+import { LANE_LABEL_KEY } from '../taskLabels.js'
 import { useGroupsData } from '../hooks/useGroupsData.js'
 import { useSessionLinks } from '../hooks/useSessionLinks.js'
 import { useTaskBoard } from '../hooks/useTaskBoard.js'
@@ -20,7 +23,7 @@ import { useTasksData } from '../hooks/useTasksData.js'
 import { TASK_LANE_ORDER, type TaskSortMode } from '../types.js'
 import type { SessionChipInfo, SessionLinkApi } from '../../sessions/contract.js'
 
-export interface TaskBoardInjected {
+interface TaskBoardInjected {
   readonly listTasks: () => Promise<readonly DeskTask[]>
   readonly createTask: (input: CreateTaskRequest) => Promise<DeskTask>
   readonly updateTask: (input: { id: string; expectedRevision: number; patch: TaskPatchRequest }) => Promise<DeskTask>
@@ -50,161 +53,6 @@ interface TaskBoardProps extends TaskBoardInjected {
   readonly t: DeskTranslator
   /** Optional session services facade; disabled when the host doesn't expose them. */
   readonly sessionLink: SessionLinkApi
-}
-
-/** Static locale keys per lane (the dictionary key type is a closed union). */
-const LANE_LABEL_KEY = {
-  todo: 'task.lane.todo',
-  doing: 'task.lane.doing',
-  done: 'task.lane.done',
-} as const
-
-/** Two-step delete row for an archived group (deleting it also deletes its cards). */
-function GroupArchiveRow({
-  group, countLabel, t, onRestore, onDelete,
-}: {
-  readonly group: DeskTaskGroup
-  readonly countLabel: string
-  readonly t: DeskTranslator
-  readonly onRestore: (group: DeskTaskGroup) => void
-  readonly onDelete: (group: DeskTaskGroup) => void
-}): ReactElement {
-  const [confirm, setConfirm] = useState(false)
-  return (
-    <li className="dsh-task-archive-row">
-      <span className="dsh-task-archive-group-icon" aria-hidden="true">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <path d="M2.8 6.2h5l1.4 1.6h8v7.4H2.8zM2.8 6.2V4.8h5" />
-        </svg>
-      </span>
-      <span className="dsh-task-archive-title">{group.name}</span>
-      <span className="dsh-task-archive-count">{countLabel}</span>
-      <span className="dsh-task-archive-lane">{t(LANE_LABEL_KEY[group.status])}</span>
-      <button
-        type="button"
-        className="dsh-desk-iconbtn"
-        aria-label={t('task.group.restore')}
-        title={t('task.group.restore')}
-        onClick={() => onRestore(group)}
-      >
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-          <path d="M4.5 6.5v4h4" />
-          <path d="M5 10.3A5.2 5.2 0 1 1 6.6 13.2" />
-        </svg>
-      </button>
-      <button
-        type="button"
-        className="dsh-desk-iconbtn dsh-desk-iconbtn-danger"
-        data-confirm={confirm}
-        aria-label={confirm ? t('task.deleteConfirm') : t('task.delete')}
-        title={confirm ? t('task.deleteConfirm') : t('task.delete')}
-        onClick={() => { if (confirm) onDelete(group); else setConfirm(true) }}
-        onBlur={() => setConfirm(false)}
-      >
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-          <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
-        </svg>
-      </button>
-    </li>
-  )
-}
-
-/** Two-step delete row for the archive list (same pattern as the cards). */
-function ArchiveRow({
-  task, t, onRestore, onDelete,
-}: {
-  readonly task: DeskTask
-  readonly t: DeskTranslator
-  readonly onRestore: (task: DeskTask) => void
-  readonly onDelete: (id: string) => void
-}): ReactElement {
-  const [confirm, setConfirm] = useState(false)
-  return (
-    <li className="dsh-task-archive-row">
-      <span className="dsh-task-archive-dot" data-color={task.color} />
-      <span className="dsh-task-archive-title">{task.title}</span>
-      <span className="dsh-task-archive-lane">{t(LANE_LABEL_KEY[task.status])}</span>
-      <button
-        type="button"
-        className="dsh-desk-iconbtn"
-        aria-label={t('task.restore')}
-        title={t('task.restore')}
-        onClick={() => onRestore(task)}
-      >
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-          <path d="M4.5 6.5v4h4" />
-          <path d="M5 10.3A5.2 5.2 0 1 1 6.6 13.2" />
-        </svg>
-      </button>
-      <button
-        type="button"
-        className="dsh-desk-iconbtn dsh-desk-iconbtn-danger"
-        data-confirm={confirm}
-        aria-label={confirm ? t('task.deleteConfirm') : t('task.delete')}
-        title={confirm ? t('task.deleteConfirm') : t('task.delete')}
-        onClick={() => { if (confirm) onDelete(task.id); else setConfirm(true) }}
-        onBlur={() => setConfirm(false)}
-      >
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-          <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
-        </svg>
-      </button>
-    </li>
-  )
-}
-
-/** Copy live input values into a cloned node (cloneNode keeps attributes, not DOM properties). */
-function copyFieldValues(source: HTMLElement, clone: HTMLElement): void {
-  const sources = source.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input,textarea')
-  const copies = clone.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input,textarea')
-  sources.forEach((field, index) => {
-    const copy = copies[index]
-    if (copy !== undefined) copy.value = field.value
-  })
-}
-
-/** Build a pointer-following ghost from the real card (values copied; original stays dimmed). */
-function createCardGhost(card: HTMLElement): HTMLElement {
-  const ghost = card.cloneNode(true) as HTMLElement
-  ghost.classList.add('dsh-task-ghost')
-  ghost.removeAttribute('data-task-id')
-  copyFieldValues(card, ghost)
-  return ghost
-}
-
-/** Whole-group ghost: the header + its cards move together, exactly like a card. */
-function createGroupGhost(group: HTMLElement): HTMLElement {
-  const ghost = group.cloneNode(true) as HTMLElement
-  ghost.classList.add('dsh-task-group-ghost')
-  ghost.removeAttribute('data-dragging')
-  ghost.querySelectorAll<HTMLElement>('[data-group-id]').forEach(node => node.removeAttribute('data-group-id'))
-  copyFieldValues(group, ghost)
-  return ghost
-}
-
-function placeGhost(ghost: HTMLElement, left: number, top: number, width: number): void {
-  ghost.style.position = 'fixed'
-  ghost.style.left = `${left}px`
-  ghost.style.top = `${top}px`
-  ghost.style.width = `${width}px`
-  ghost.style.pointerEvents = 'none'
-  ghost.style.zIndex = '9999'
-}
-
-/**
- * Suppress native text selection while a pointer drag is possible. Because clicks must still
- * work (field editing / double-click rename), this is applied per gesture and always restored.
- */
-function lockSelection(): () => void {
-  const previous = document.body.style.userSelect
-  document.body.style.userSelect = 'none'
-  window.getSelection()?.removeAllRanges()
-  let released = false
-  return () => {
-    if (released) return
-    released = true
-    document.body.style.userSelect = previous
-  }
 }
 
 export function TaskBoard(props: TaskBoardProps): ReactElement {
@@ -405,7 +253,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
 
   /**
    * Whole-group drag: same 5px threshold and ghost model as a card. Drop on the same lane
-   * reorders groups; another lane moves the whole group and cascades its cards' status immediately.
+   * reorders blocks in the lane sequence; another lane moves the whole group and cascades its cards.
    */
   const startGroupDrag = useCallback((group: DeskTaskGroup, event: ReactPointerEvent<HTMLElement>): void => {
     const target = event.target as HTMLElement
@@ -494,7 +342,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     [sessionSnapshot.sessions],
   )
   // Same session universe as the composer's `@` source (the host session list): subagent
-  // sessions are included too, and archived ones stay selectable with a hollow status dot.
+  // sessions are included too; archived ones stay selectable and render with the neutral status tint.
   const sessionOptions = sessionSnapshot.sessions
   const sessionsFor = useCallback((ids: readonly string[]): readonly SessionChipInfo[] => ids.map(id =>
     sessionById.get(id) ?? {
@@ -563,33 +411,16 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
       </div>
       {board.showArchive
         ? (
-            <div className="dsh-task-archive">
-              {board.archivedGroups.length === 0 && board.archivedTasks.length === 0
-                ? <p className="dsh-desk-wall-hint">{t('task.archiveEmpty')}</p>
-                : (
-                    <ul className="dsh-task-archive-list">
-                      {board.archivedGroups.map(group => (
-                        <GroupArchiveRow
-                          key={group.id}
-                          group={group}
-                          countLabel={countText(data.tasks.filter(task => task.groupId === group.id && task.archived).length)}
-                          t={t}
-                          onRestore={archived => { void board.archiveGroup(archived, false) }}
-                          onDelete={deleteArchivedGroup}
-                        />
-                      ))}
-                      {board.archivedTasks.map(task => (
-                        <ArchiveRow
-                          key={task.id}
-                          task={task}
-                          t={t}
-                          onRestore={board.restoreTask}
-                          onDelete={board.deleteTask}
-                        />
-                      ))}
-                    </ul>
-                  )}
-            </div>
+            <TaskArchiveView
+              tasks={board.archivedTasks}
+              groups={board.archivedGroups}
+              t={t}
+              countText={countText}
+              onRestoreGroup={(group) => { void board.archiveGroup(group, false) }}
+              onDeleteGroup={deleteArchivedGroup}
+              onRestoreTask={board.restoreTask}
+              onDeleteTask={board.deleteTask}
+            />
           )
         : (
             <div className="dsh-task-lanes" data-loading={loading} data-compact={compact} ref={lanesRef}>

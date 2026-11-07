@@ -16,6 +16,13 @@ const readStyles = async () => [
   await read('src/client/tasks/styles.ts'),
 ].join('\n')
 
+/** Task board sources joined: guards survive the board / drag / archive split. */
+const readTaskBoard = async () => (await Promise.all([
+  read('src/client/tasks/components/TaskBoard.tsx'),
+  read('src/client/tasks/components/taskDrag.ts'),
+  read('src/client/tasks/components/TaskArchiveView.tsx'),
+])).join('\n')
+
 /** Task board components joined: guards survive the TaskColumn / group / draft split. */
 const readTaskColumn = async () => (await Promise.all([
   read('src/client/tasks/components/TaskColumn.tsx'),
@@ -330,7 +337,7 @@ describe('dsh-desk-one 结构', () => {
 
   it('任务板客户端 应该 三泳道 + 卡片交互 + 拖拽 + 排序视图 + 存档', async () => {
     const page = await readClientSurface()
-    const board = await read('src/client/tasks/components/TaskBoard.tsx')
+    const board = await readTaskBoard()
     const column = await readTaskColumn()
     const card = await read('src/client/tasks/components/TaskCard.tsx')
     const types = await read('src/client/tasks/types.ts')
@@ -399,7 +406,7 @@ describe('dsh-desk-one 结构', () => {
   })
 
   it('任务板 应该 无横向滚动条：窄宽度收成计数模式，分组可拖动排序', async () => {
-    const board = await read('src/client/tasks/components/TaskBoard.tsx')
+    const board = await readTaskBoard()
     const column = await readTaskColumn()
     const styles = await readStyles()
     const notesStyles = await read('src/client/notes/styles.ts')
@@ -448,7 +455,7 @@ describe('dsh-desk-one 结构', () => {
     const bridge = await read('src/client/sessions/bridge.ts')
     const index = await read('src/client/index.ts')
     const card = await read('src/client/tasks/components/TaskCard.tsx')
-    const board = await read('src/client/tasks/components/TaskBoard.tsx')
+    const board = await readTaskBoard()
     const column = await readTaskColumn()
     const styles = await readStyles()
     // Data: a card owns an opaque list of session ids; live titles/status are never persisted.
@@ -507,7 +514,7 @@ describe('dsh-desk-one 结构', () => {
     const api = await read('src/client/tasks/api.ts')
     const groupsHook = await read('src/client/tasks/hooks/useGroupsData.ts')
     const boardHook = await read('src/client/tasks/hooks/useTaskBoard.ts')
-    const board = await read('src/client/tasks/components/TaskBoard.tsx')
+    const board = await readTaskBoard()
     const column = await readTaskColumn()
     const styles = await readStyles()
     assert.match(contract, /export interface DeskTaskGroup/u, '分组是独立对象')

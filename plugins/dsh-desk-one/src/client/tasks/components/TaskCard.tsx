@@ -26,7 +26,7 @@ interface TaskCardProps {
   readonly onDelete: (id: string) => void
   /** False when the host lacks the optional session services — the @ entry stays hidden. */
   readonly sessionEnabled: boolean
-  /** Linkable sessions (subagent sessions already filtered out by the board). */
+  /** Linkable sessions (same universe as the composer's @ list, subagent sessions included). */
   readonly sessionOptions: readonly SessionChipInfo[]
   /** This card's linked sessions, resolved live (unavailable ids keep a fallback chip). */
   readonly sessionChips: readonly SessionChipInfo[]

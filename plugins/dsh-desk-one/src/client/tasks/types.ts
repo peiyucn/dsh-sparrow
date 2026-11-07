@@ -7,7 +7,7 @@ export const TASK_LANE_ORDER: readonly TaskStatus[] = ['todo', 'doing', 'done']
 
 export type TaskSortMode = 'manual' | 'created' | 'due'
 
-export interface LaneGroup {
+interface LaneGroup {
   readonly group: DeskTaskGroup
   readonly tasks: readonly DeskTask[]
 }

@@ -41,12 +41,12 @@ export interface TaskDraft {
   readonly groupId?: string
 }
 
-export interface GroupMoveResult {
+interface GroupMoveResult {
   readonly group: DeskTaskGroup
   readonly tasks: readonly DeskTask[]
 }
 
-export interface TaskBoardApi {
+interface TaskBoardApi {
   readonly lanes: LaneViews
   readonly archivedTasks: readonly DeskTask[]
   readonly sortMode: TaskSortMode
