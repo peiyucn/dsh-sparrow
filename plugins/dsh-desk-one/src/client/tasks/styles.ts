@@ -341,6 +341,7 @@ export const TASKS_CSS = `
   min-height: 16px;
 }
 .dsh-task-session {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -353,14 +354,33 @@ export const TASKS_CSS = `
   line-height: 16px;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
+/* Available sessions read as alive (green); archived ones read as neutral grey. */
 .dsh-task-session[data-state='running'] {
-  border-color: color-mix(in srgb, #2e9e5b 45%, transparent);
-  background: color-mix(in srgb, #2e9e5b 12%, var(--dsw-alias-bg-layer-1, #ffffff));
+  border-color: color-mix(in srgb, #2e9e5b 55%, transparent);
+  background: color-mix(in srgb, #2e9e5b 14%, var(--dsw-alias-bg-layer-1, #ffffff));
   color: color-mix(in srgb, #1d6b3f 72%, var(--dsw-alias-label-secondary, #6b7280));
 }
+/* A slow orbit ring is the only motion cue: running vs merely available, no extra hue. */
+.dsh-task-session[data-state='running']::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  padding: 1px;
+  background: conic-gradient(from 0deg, transparent 0deg 210deg, #2e9e5b 270deg, transparent 330deg 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: dsh-task-session-orbit 2.6s linear infinite;
+  pointer-events: none;
+}
+@keyframes dsh-task-session-orbit {
+  to { transform: rotate(360deg); }
+}
 .dsh-task-session[data-state='idle'] {
-  border-color: color-mix(in srgb, var(--dsw-alias-label-secondary, #6b7280) 18%, transparent);
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 88%, var(--dsw-alias-label-primary, #1f2329));
+  border-color: color-mix(in srgb, #2e9e5b 30%, transparent);
+  background: color-mix(in srgb, #2e9e5b 8%, var(--dsw-alias-bg-layer-1, #ffffff));
 }
 .dsh-task-session[data-state='loading'] {
   border-color: color-mix(in srgb, #d9a441 45%, transparent);
@@ -368,13 +388,20 @@ export const TASKS_CSS = `
 }
 .dsh-task-session[data-state='archived'],
 .dsh-task-session[data-state='unavailable'] {
-  border-color: color-mix(in srgb, var(--dsw-alias-label-tertiary, #8a919f) 28%, transparent);
-  border-style: dashed;
-  background: transparent;
+  border-color: color-mix(in srgb, var(--dsw-alias-label-secondary, #6b7280) 20%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 88%, var(--dsw-alias-label-primary, #1f2329));
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
 .dsh-task-session[data-state='unavailable'] {
   opacity: 0.65;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dsh-task-session[data-state='running']::before {
+    animation: none;
+  }
+  .dsh-task-session[data-state='running'] {
+    border-color: color-mix(in srgb, #2e9e5b 70%, transparent);
+  }
 }
 .dsh-task-session-title {
   appearance: none;
@@ -497,14 +524,18 @@ export const TASKS_CSS = `
   border-color: color-mix(in srgb, #2e9e5b 34%, transparent);
   background: color-mix(in srgb, #2e9e5b 9%, transparent);
 }
+.dsh-task-session-option[data-state='idle'] {
+  border-color: color-mix(in srgb, #2e9e5b 22%, transparent);
+  background: color-mix(in srgb, #2e9e5b 5%, transparent);
+}
 .dsh-task-session-option[data-state='loading'] {
   border-color: color-mix(in srgb, #d9a441 34%, transparent);
   background: color-mix(in srgb, #d9a441 9%, transparent);
 }
 .dsh-task-session-option[data-state='archived'],
 .dsh-task-session-option[data-state='unavailable'] {
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--dsw-alias-label-tertiary, #8a919f) 26%, transparent);
+  border-color: color-mix(in srgb, var(--dsw-alias-label-secondary, #6b7280) 18%, transparent);
+  color: var(--dsw-alias-label-tertiary, #8a919f);
 }
 .dsh-task-session-option:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
