@@ -360,14 +360,26 @@ export const TASKS_CSS = `
   background: color-mix(in srgb, #2e9e5b 14%, var(--dsw-alias-bg-layer-1, #ffffff));
   color: color-mix(in srgb, #1d6b3f 72%, var(--dsw-alias-label-secondary, #6b7280));
 }
-/* A slow orbit ring is the only motion cue: running vs merely available, no extra hue. */
+/* A slow orbit ring is the only motion cue: running vs merely available, no extra hue.
+   Animate the conic-gradient angle instead of rotating the element: the chip is a wide pill,
+   so rotating the whole ring would sweep a huge oval across the card. */
+@property --dsh-task-session-orbit-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
 .dsh-task-session[data-state='running']::before {
   content: '';
   position: absolute;
   inset: -2px;
   border-radius: 999px;
   padding: 1px;
-  background: conic-gradient(from 0deg, transparent 0deg 210deg, #2e9e5b 270deg, transparent 330deg 360deg);
+  background: conic-gradient(
+    from var(--dsh-task-session-orbit-angle),
+    transparent 0deg 210deg,
+    #2e9e5b 270deg,
+    transparent 330deg 360deg
+  );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
@@ -376,7 +388,7 @@ export const TASKS_CSS = `
   pointer-events: none;
 }
 @keyframes dsh-task-session-orbit {
-  to { transform: rotate(360deg); }
+  to { --dsh-task-session-orbit-angle: 360deg; }
 }
 .dsh-task-session[data-state='idle'] {
   border-color: color-mix(in srgb, #2e9e5b 30%, transparent);
