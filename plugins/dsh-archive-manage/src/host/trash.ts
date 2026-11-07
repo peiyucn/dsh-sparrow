@@ -71,7 +71,7 @@ async function readTrashSidecar(trashDir: string): Promise<ArchiveSidecar | unde
  * 启动清扫据此保留这些会话的投影行：它们不在持久化清单里，但仍是可还原的会话，
  * 投影行是还原后标题 / 子会话标签的唯一来源（见 projection.ts 的启动清扫说明）。
  */
-export async function trashProjectionIds(trashRoot: string): Promise<Set<string>> {
+export async function trashedSessionIds(trashRoot: string): Promise<Set<string>> {
   const ids = new Set<string>()
   for (const name of await trashDirNames(trashRoot)) {
     const sidecar = await readTrashSidecar(resolveTrashDir(trashRoot, name))
@@ -253,7 +253,7 @@ export async function deleteTrashEntry(ctx: Context, trashRoot: string, trashId:
 }
 
 /** 「全部还原」的结果：响应体 + 供路由在响应后后台回填投影行的会话 id（根 + 子会话，按还原顺序）。 */
-export interface RestoreAllResult {
+interface RestoreAllResult {
   readonly body: TrashRestoreAllResponse
   readonly restoredTreeIds: string[]
 }

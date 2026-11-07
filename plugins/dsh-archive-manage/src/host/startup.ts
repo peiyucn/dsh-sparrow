@@ -12,7 +12,7 @@ import type { RegistryMutationSurface } from './gates.js'
 import type { HeaderFacts } from './headers.js'
 import { sweepStaleProjectionCache } from './projection.js'
 import { healMissingSessionProjections } from './projection-seed.js'
-import { trashProjectionIds } from './trash.js'
+import { trashedSessionIds } from './trash.js'
 
 /** 启动三项清扫的「只跑一次」触发器；`run` 幂等。 */
 export interface StartupScans {
@@ -41,7 +41,7 @@ export function installStartupScans(
     startupScansDone = true
     void (async () => {
       // 回收站条目不在持久化清单里，但仍是可还原的会话：先取它们的 id，再让投影清扫跳过。
-      const preservedProjectionIds = await trashProjectionIds(trashRoot)
+      const preservedProjectionIds = await trashedSessionIds(trashRoot)
       await Promise.all([
         sweepGhostArchivedIds(ctx, surface, headerFacts),
         sweepStaleProjectionCache(ctx, headerFacts, preservedProjectionIds),
