@@ -424,8 +424,10 @@ describe('dsh-desk-one 结构', () => {
     assert.match(column, /dsh-task-compact-row/u)
     assert.match(styles, /\.dsh-task-compact-row \{/u)
     assert.match(styles, /\.dsh-task-lane-title \{/u, '泳道标题单独成规则')
-    assert.match(styles, /\.dsh-task-lane-title \{[^}]*font-size: 14px/su, '泳道标题字号加大')
+    assert.match(styles, /\.dsh-task-lane-title \{[^}]*font-size: 13px/su, '泳道标题用紧凑 overline 字号')
     assert.match(styles, /\.dsh-task-lane-title \{[^}]*font-weight: 700/su, '泳道标题加粗')
+    assert.match(styles, /\.dsh-task-lane-title \{[^}]*text-transform: uppercase/su, '英文转大写（中文不受影响）')
+    assert.match(styles, /\.dsh-task-lane-title \{[^}]*letter-spacing: 0\.06em/su, '全大写要加字距')
     assert.match(styles, /\.dsh-task-lane-title \{[^}]*brand-primary-new-color/su, '泳道标题用官方品牌蓝紫')
     // Group headers drag with the same pointer gesture as cards.
     assert.match(column, /onGroupStartDrag/u, '整组拖拽走指针手势')

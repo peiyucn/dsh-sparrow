@@ -75,12 +75,14 @@ export const TASKS_CSS = `
   line-height: 18px;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
-/* Lane names are the board's section titles: larger, bold and in the official brand colour. */
+/* Lane names read as compact section labels: uppercase Latin, tracked, bold and brand-coloured. */
 .dsh-task-lane-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 20px;
-  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
   color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
 }
 .dsh-task-count {
