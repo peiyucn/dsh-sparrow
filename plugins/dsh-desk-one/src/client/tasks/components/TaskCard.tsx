@@ -80,6 +80,10 @@ export function TaskCard({
   const overdue = remaining !== undefined && remaining < 0
   const dueSoon = remaining !== undefined && remaining >= 0 && remaining <= 1
   const canArchive = task.status === 'done'
+  // Stacked swatch: current colour on top, two palette neighbours peeking out behind, so the
+  // control reads as "there are more colours" without a separate palette row.
+  const colorIndex = NOTE_COLORS.indexOf(task.color)
+  const behindColors = [2, 1].map(offset => NOTE_COLORS[(colorIndex + offset) % NOTE_COLORS.length])
 
   // Keep edit-mode textareas sized to their content when a field is opened.
   useEffect(() => {
@@ -334,14 +338,24 @@ export function TaskCard({
         <button
           type="button"
           className="dsh-task-color"
-          data-color={task.color}
           data-color-anchor="true"
           aria-label={t('task.color')}
           aria-haspopup="true"
           aria-expanded={paletteOpen}
           title={t('task.color')}
           onClick={() => setPaletteOpen(open => !open)}
-        />
+        >
+          {behindColors.map((color, position) => (
+            <span
+              key={color}
+              className="dsh-task-color-layer"
+              data-color={color}
+              data-depth={position === 0 ? 2 : 1}
+              aria-hidden="true"
+            />
+          ))}
+          <span className="dsh-task-color-layer" data-color={task.color} data-depth={0} aria-hidden="true" />
+        </button>
         {paletteOpen
           ? (
               <div className="dsh-task-color-pop" role="listbox" aria-label={t('task.color')}>
@@ -382,13 +396,18 @@ export function TaskCard({
               <button
                 type="button"
                 className="dsh-task-due"
+                data-set={task.due !== undefined}
                 data-overdue={overdue}
                 data-soon={dueSoon}
-                data-empty={task.due === undefined}
-                title={task.due === undefined ? t('task.setDue') : t('task.due')}
+                aria-label={task.due === undefined ? t('task.setDue') : `${t('task.due')}: ${task.due.date}`}
+                title={task.due === undefined ? t('task.setDue') : `${t('task.due')}: ${task.due.date}`}
                 onClick={() => setEditingDue(true)}
               >
-                {task.due === undefined ? t('task.setDue') : task.due.date}
+                <svg className="dsh-task-due-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+                  <rect x="3.5" y="4.5" width="13" height="12" rx="1.5" />
+                  <path d="M3.5 8h13M6.5 3.5v3M13.5 3.5v3" />
+                </svg>
+                {task.due === undefined ? null : <span className="dsh-task-due-date">{task.due.date}</span>}
               </button>
             )}
         <div className="dsh-task-actions">

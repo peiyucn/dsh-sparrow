@@ -483,35 +483,74 @@ export const TASKS_CSS = `
 }
 .dsh-task-color {
   appearance: none;
+  position: relative;
   flex: none;
-  width: 10px;
-  height: 10px;
+  width: 16px;
+  height: 16px;
   padding: 0;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-}
-.dsh-task-color[data-color='default'] { background: #787774; }
-.dsh-task-color[data-color='yellow'] { background: #c29343; }
-.dsh-task-color[data-color='green'] { background: #548164; }
-.dsh-task-color[data-color='blue'] { background: #487ca5; }
-.dsh-task-color[data-color='pink'] { background: #b35488; }
-.dsh-task-due {
-  appearance: none;
   border: none;
   background: transparent;
-  padding: 0;
+  cursor: pointer;
+}
+/* Stacked colour card: current colour front, palette neighbours fanned out behind. */
+.dsh-task-color-layer {
+  position: absolute;
+  top: 3px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--dsw-alias-bg-layer-1, #ffffff);
+}
+.dsh-task-color-layer[data-depth='2'] {
+  transform: translate(4px, -3px);
+  opacity: 0.5;
+}
+.dsh-task-color-layer[data-depth='1'] {
+  transform: translate(2px, -1.5px);
+  opacity: 0.75;
+}
+.dsh-task-color-layer[data-depth='0'] {
+  z-index: 1;
+}
+.dsh-task-color-layer[data-color='default'] { background: #787774; }
+.dsh-task-color-layer[data-color='yellow'] { background: #c29343; }
+.dsh-task-color-layer[data-color='green'] { background: #548164; }
+.dsh-task-color-layer[data-color='blue'] { background: #487ca5; }
+.dsh-task-color-layer[data-color='pink'] { background: #b35488; }
+/* Due date: a calendar icon does the labelling; the bare date never stands alone. */
+.dsh-task-due {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: none;
+  background: transparent;
+  padding: 1px 2px;
+  margin-left: -2px;
+  border-radius: var(--dsw-radius-xs, 4px);
   font-size: 11px;
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
   cursor: pointer;
 }
-.dsh-task-due[data-empty='true'] {
-  opacity: 0;
+.dsh-task-due:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
 }
-.dsh-task-card:hover .dsh-task-due[data-empty='true'],
-.dsh-task-card:focus-within .dsh-task-due[data-empty='true'] {
-  opacity: 1;
+.dsh-task-due-icon {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+.dsh-task-due[data-set='true'] {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-task-due:hover {
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-task-due-date {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .dsh-task-due[data-soon='true'] {
   color: #a97b1f;
