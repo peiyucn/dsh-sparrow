@@ -11,6 +11,7 @@ import { assertRegistryMutationApi, assertSessionLocationApi } from '../lib/host
 import { sessionDirectoryFor } from '../lib/host/session-files.js'
 import { subagentLabel, titlesFor } from '../lib/host/titles.js'
 import { resolveTrashDir } from '../lib/host/trash.js'
+import { cachedSnapshotOf, canWriteProjectionCache, coldSnapshotOf, sweepStaleProjectionCache } from '../lib/host/projection.js'
 
 // 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
 // 测试夹具按当前平台构造——CI 跑 Ubuntu、本机跑 Windows，两边都必须绿。
@@ -779,6 +780,137 @@ describe('archive-manage host 纯逻辑', () => {
       assert.equal(await subagentLabel(ctx, labelHeader('cold-retry-1')), undefined)
       assert.equal(await subagentLabel(ctx, labelHeader('cold-retry-1')), undefined)
       assert.equal(observed, 2)
+    })
+  })
+
+  describe('投影缓存服务面（cachedSnapshot 读 / coldSnapshot 写回）', () => {
+    const projectionHeader = { id: 's1', createdAt: 1, isSeeded: false, version: 4 }
+
+    it('cachedSnapshotOf 应该 按形参个数自适应：2 参传 keys，3 参把 inheritedEventCount 放中间', () => {
+      const received = []
+      const block = { asOfSeq: 7, values: { title: '缓存标题' } }
+      const ctx = {
+        get: () => ({
+          cachedSnapshot: function cachedSnapshotTwo(meta, keys) { received.push({ argc: 2, meta, keys }); return block },
+        }),
+        logger: { warn: () => {} },
+      }
+      const two = cachedSnapshotOf(ctx, projectionHeader, ['title'])
+      assert.equal(two?.values.title, '缓存标题')
+      assert.deepEqual(received[0].keys, ['title'])
+
+      const legacyReceived = []
+      const legacyCtx = {
+        get: () => ({
+          cachedSnapshot: function cachedSnapshotLegacy(meta, inheritedEventCount, keys) {
+            legacyReceived.push({ inheritedEventCount, keys })
+            return block
+          },
+        }),
+        logger: { warn: () => {} },
+      }
+      assert.equal(cachedSnapshotOf(legacyCtx, projectionHeader, ['title'])?.values.title, '缓存标题')
+      assert.deepEqual(legacyReceived, [{ inheritedEventCount: 0, keys: ['title'] }])
+    })
+
+    it('cachedSnapshotOf 形状异常 / 抛错 应该 返回 undefined 而不是抛穿', () => {
+      const badShape = { get: () => ({ cachedSnapshot: () => ({ values: null }) }), logger: { warn: () => {} } }
+      assert.equal(cachedSnapshotOf(badShape, projectionHeader, undefined), undefined)
+      const throws = {
+        get: () => ({ cachedSnapshot: () => { throw new Error('cache boom') } }),
+        logger: { warn: () => {} },
+      }
+      assert.equal(cachedSnapshotOf(throws, projectionHeader, undefined), undefined)
+    })
+
+    it('coldSnapshotOf 应该 只在 3 参签名下调用，2 参签名拒绝猜参数', () => {
+      const calls = []
+      const ctx = {
+        get: () => ({
+          coldSnapshot: function coldSnapshotThree(meta, inheritedEventCount, events) {
+            calls.push({ meta, inheritedEventCount, events })
+            return { asOfSeq: 9, values: { title: '回填标题' } }
+          },
+        }),
+        logger: { warn: () => {} },
+      }
+      const events = [{ seq: 0 }]
+      const block = coldSnapshotOf(ctx, projectionHeader, 0, events)
+      assert.equal(block?.values.title, '回填标题')
+      assert.deepEqual(calls, [{ meta: projectionHeader, inheritedEventCount: 0, events }])
+
+      let unknownCalls = 0
+      const unknown = {
+        get: () => ({
+          coldSnapshot: function coldSnapshotTwo(meta, events) {
+            unknownCalls += 1
+            void meta
+            void events
+            return { asOfSeq: 1, values: { title: 'x' } }
+          },
+        }),
+        logger: { warn: () => {} },
+      }
+      assert.equal(coldSnapshotOf(unknown, projectionHeader, 0, events), undefined)
+      assert.equal(unknownCalls, 0, '形参不足时必须放弃回填，不能把 events 传成 inheritedEventCount')
+    })
+
+    it('canWriteProjectionCache 应该 只在 coldSnapshot 3 参时返回 true', () => {
+      const three = {
+        get: () => ({ coldSnapshot: function coldSnapshotThree(meta, inheritedEventCount, events) { void meta; void inheritedEventCount; void events; return undefined } }),
+        logger: { warn: () => {} },
+      }
+      assert.equal(canWriteProjectionCache(three), true)
+      const two = {
+        get: () => ({ coldSnapshot: function coldSnapshotTwo(meta, events) { void meta; void events; return undefined } }),
+        logger: { warn: () => {} },
+      }
+      assert.equal(canWriteProjectionCache(two), false)
+      assert.equal(canWriteProjectionCache({ get: () => undefined, logger: { warn: () => {} } }), false)
+    })
+  })
+
+  describe('sweepStaleProjectionCache（回收站会话的行必须保留）', () => {
+    it('只删「不在持久化、也不在回收站」的陈旧行', async () => {
+      const deleted = []
+      const ctx = {
+        storageDomain: {
+          get: () => ({
+            table: () => ({
+              keys: () => ['persisted', 'in-trash', 'stale'],
+              delete: async (id) => { deleted.push(String(id)) },
+            }),
+          }),
+        },
+        logger: { warn: () => {} },
+      }
+      const store = createHeaderFactsStore(async () => ({
+        headers: [{ id: 'persisted', createdAt: 1, isSeeded: false }],
+        sizes: new Map(),
+      }), 30_000, () => 0)
+      await sweepStaleProjectionCache(ctx, store, new Set(['in-trash']))
+      assert.deepEqual(deleted, ['stale'])
+    })
+
+    it('无保留集合时 保持旧口径（持久化清单外的行全部清理）', async () => {
+      const deleted = []
+      const ctx = {
+        storageDomain: {
+          get: () => ({
+            table: () => ({
+              keys: () => ['persisted', 'gone'],
+              delete: async (id) => { deleted.push(String(id)) },
+            }),
+          }),
+        },
+        logger: { warn: () => {} },
+      }
+      const store = createHeaderFactsStore(async () => ({
+        headers: [{ id: 'persisted', createdAt: 1, isSeeded: false }],
+        sizes: new Map(),
+      }), 30_000, () => 0)
+      await sweepStaleProjectionCache(ctx, store)
+      assert.deepEqual(deleted, ['gone'])
     })
   })
 })

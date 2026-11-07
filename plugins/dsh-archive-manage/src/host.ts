@@ -32,7 +32,7 @@ export async function apply(ctx: Context, config: Readonly<Partial<ArchiveConfig
   await resolveProjectionCacheDomain()
 
   const headerFacts = createHeaderStore(ctx)
-  const startup = installStartupScans(ctx, surface, headerFacts)
+  const startup = installStartupScans(ctx, surface, headerFacts, settings.trashRoot)
   const handler = createArchiveRequestHandler({ ctx, settings, surface, headerFacts, startup })
 
   ctx.effect(() => ctx.webServer.register({

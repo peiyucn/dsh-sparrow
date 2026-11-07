@@ -45,6 +45,17 @@ export const LABEL_FOLD_TIMEOUT_MS = 15_000
 export const FOLDED_LABEL_CACHE_MAX_ENTRIES = 256
 
 /**
+ * 还原 / 启动修复时回填投影缓存行的整批预算：回填要读完整冷日志（与标题折叠同量级），
+ * 超时未完成的行按失败处理，余量留给下次启动修复。
+ */
+export const PROJECTION_SEED_BUDGET_MS = 8_000
+/**
+ * 「全部还原」在响应发出后**后台**回填投影行的预算：条数可能很多（实测回收站 43 条 / 139 MB），
+ * 不能阻塞请求；跑不完的部分由下次启动修复补齐。
+ */
+export const PROJECTION_SEED_BACKGROUND_BUDGET_MS = 60_000
+
+/**
  * 启动三项扫描的兜底延迟：不在 apply 里立刻发起，避免与官方会话列表抢同一次全量扫盘；
  * 用户打开面板时另有「立即补跑」，这里只保证「一直不开面板」时清扫最终会发生。
  */
