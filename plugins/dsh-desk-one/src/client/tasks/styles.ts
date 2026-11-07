@@ -152,12 +152,25 @@ export const TASKS_CSS = `
 .dsh-task-lane[data-collapsed='true'] .dsh-task-list {
   flex: none;
 }
-.dsh-task-ungrouped {
+/* Unified lane sequence: each top-level block is an ungrouped card or one group. */
+.dsh-task-block {
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-height: 4px;
+  min-width: 0;
+}
+.dsh-task-block[data-drop='true'] {
+  box-shadow: inset 0 2px 0 0 var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+}
+.dsh-task-block-dropend {
+  flex: none;
+  height: 2px;
+  margin: 0 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+.dsh-task-block-dropend[data-active='true'] {
+  background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
 }
 /* Precise insertion line for card drags (before a card / after the last one). */
 .dsh-task-card-dropmark {
@@ -639,9 +652,6 @@ export const TASKS_CSS = `
   border-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
   background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 74%, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 35%, transparent);
-}
-.dsh-task-group[data-drop='true'] {
-  box-shadow: inset 0 2px 0 0 var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
 }
 .dsh-task-group[data-dragging='true'] {
   opacity: 0.45;

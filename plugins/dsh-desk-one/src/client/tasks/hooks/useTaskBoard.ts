@@ -1,17 +1,17 @@
 /**
  * Board state on top of tasks + first-class groups.
  *
- * Ordering is per container (ungrouped area or one group), so dragging a card renumbers only its
- * target container and dragging a group never touches task orders. Cross-lane group moves are
- * executed by the caller after confirmation and cascade the lane status host-side.
+ * A lane is ONE manual sequence of blocks: ungrouped cards and group blocks share the same
+ * `order` coordinate. Legacy boards kept two separate order spaces; until the first structural
+ * drag renumbers a lane, the view falls back to "cards first, then groups" (see manualBlocks).
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { TASK_GROUP_COLLAPSE_STORAGE_KEY, TASK_GROUPS_STORAGE_KEY, TASK_SORT_STORAGE_KEY } from '../../../constants.js'
 import type { CreateTaskGroupRequest, CreateTaskRequest, DeskTask, DeskTaskGroup, TaskPatchRequest, TaskStatus } from '../../../contract.js'
-import { sortGroups, sortTasks } from '../../../model.js'
-import { groupLanes, type LaneViews, type TaskSortMode } from '../types.js'
+import { sortTasks } from '../../../model.js'
+import { groupLanes, manualBlocks, type LaneBlock, type LaneViews, type TaskSortMode } from '../types.js'
 
 interface BoardDeps {
   readonly tasks: readonly DeskTask[]
@@ -23,17 +23,17 @@ interface BoardDeps {
   readonly groups: readonly DeskTaskGroup[]
   readonly createGroup: (input: CreateTaskGroupRequest) => Promise<DeskTaskGroup | null>
   readonly renameGroup: (group: DeskTaskGroup, name: string) => void
-  readonly reorderGroups: (status: TaskStatus, ordered: readonly DeskTaskGroup[]) => void
+  readonly setGroupOrders: (entries: readonly { group: DeskTaskGroup; order: number }[]) => void
   readonly removeGroup: (group: DeskTaskGroup) => void
   readonly moveGroupToLane: (group: DeskTaskGroup, status: TaskStatus, order?: number) => Promise<{
     group: DeskTaskGroup
     tasks: readonly DeskTask[]
+    groups: readonly DeskTaskGroup[]
   } | null>
   readonly archiveGroup: (group: DeskTaskGroup, archived: boolean) => Promise<{
     group: DeskTaskGroup
     tasks: readonly DeskTask[]
   } | null>
-  readonly reloadGroups: () => Promise<void>
 }
 
 export interface TaskDraft {
@@ -59,6 +59,7 @@ export interface TaskBoardApi {
   readonly beginDraft: (status: TaskStatus, groupId?: string) => void
   readonly cancelDraft: () => void
   readonly commitDraft: (title: string) => void
+  /** `toIndex` is a card index when `toGroupId` is set, otherwise a lane block index. */
   readonly moveTask: (taskId: string, toStatus: TaskStatus, toGroupId: string | undefined, toIndex: number) => void
   readonly archiveTask: (task: DeskTask) => void
   readonly restoreTask: (task: DeskTask) => void
@@ -68,8 +69,8 @@ export interface TaskBoardApi {
   readonly createGroup: (status: TaskStatus, name: string) => Promise<DeskTaskGroup | null>
   readonly renameGroup: (group: DeskTaskGroup, name: string) => void
   readonly removeGroup: (group: DeskTaskGroup) => void
-  readonly reorderGroup: (status: TaskStatus, groupId: string, toIndex: number) => void
-  readonly moveGroupWhole: (group: DeskTaskGroup, status: TaskStatus, order?: number) => Promise<GroupMoveResult | null>
+  /** Move a whole group block to a block index in a lane (host cascades its cards cross-lane). */
+  readonly moveGroupBlock: (group: DeskTaskGroup, status: TaskStatus, toIndex: number) => void
   /** Archive / restore a group and update its cards' archived flag from the host result. */
   readonly archiveGroup: (group: DeskTaskGroup, archived: boolean) => Promise<GroupMoveResult | null>
   readonly archivedGroups: readonly DeskTaskGroup[]
@@ -108,7 +109,7 @@ function persist(key: string, value: unknown): void {
 
 export function useTaskBoard({
   tasks, setTasks, savePatch, addTask, removeWithFeedback, setActionError,
-  groups, createGroup, renameGroup, reorderGroups, removeGroup, moveGroupToLane, archiveGroup, reloadGroups,
+  groups, createGroup, renameGroup, setGroupOrders, removeGroup, moveGroupToLane, archiveGroup,
 }: BoardDeps): TaskBoardApi {
   const [sortMode, setSortModeState] = useState<TaskSortMode>(readSortMode)
   const [doneCollapsed, setDoneCollapsed] = useState(false)
@@ -131,6 +132,45 @@ export function useTaskBoard({
   const archivedGroups = useMemo(() => [...groups.filter(group => group.archived)].sort((left, right) =>
     right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id)), [groups])
 
+  const blocksFor = useCallback((status: TaskStatus): LaneBlock[] =>
+    manualBlocks(tasks, activeGroups, status), [activeGroups, tasks])
+
+  /** Persist a lane's block sequence: ungrouped cards and groups share the block index. */
+  const applyBlockOrders = useCallback((
+    blocks: readonly LaneBlock[],
+    moving?: { readonly task: DeskTask; readonly patch: TaskPatchRequest },
+  ): void => {
+    const patchById = new Map<string, TaskPatchRequest>()
+    const groupOrders: Array<{ group: DeskTaskGroup; order: number }> = []
+    blocks.forEach((block, index) => {
+      if (block.kind === 'task') {
+        const isMoving = moving !== undefined && block.task.id === moving.task.id
+        const patch: TaskPatchRequest = {
+          ...block.task.order === index ? {} : { order: index },
+          ...isMoving ? moving.patch : {},
+        }
+        if (Object.keys(patch).length > 0) patchById.set(block.task.id, patch)
+        return
+      }
+      if (block.group.order !== index) groupOrders.push({ group: block.group, order: index })
+    })
+    if (patchById.size === 0 && groupOrders.length === 0) return
+    if (patchById.size > 0) {
+      setTasks(current => current.map(task => {
+        const patch = patchById.get(task.id)
+        return patch === undefined ? task : { ...task, ...patch } as DeskTask
+      }))
+      const sourceById = new Map<string, DeskTask>()
+      for (const block of blocks) if (block.kind === 'task') sourceById.set(block.task.id, block.task)
+      for (const [id, patch] of patchById) {
+        const source = sourceById.get(id)
+        if (source !== undefined) savePatch(source, patch)
+      }
+    }
+    if (groupOrders.length > 0) setGroupOrders(groupOrders)
+    setActionError(null)
+  }, [savePatch, setActionError, setGroupOrders, setTasks])
+
   const setSortMode = useCallback((mode: TaskSortMode): void => {
     setSortModeState(mode)
     persist(TASK_SORT_STORAGE_KEY, mode)
@@ -147,16 +187,15 @@ export function useTaskBoard({
     if (target === null) return
     const trimmed = title.trim()
     if (trimmed === '') return
-    const sameContainer = tasks.filter(task =>
-      task.status === target.status && (task.groupId ?? undefined) === target.groupId)
+    if (target.groupId === undefined) {
+      // New ungrouped card becomes the last block of the lane.
+      void addTask({ title: trimmed, status: target.status, order: blocksFor(target.status).length })
+      return
+    }
+    const sameContainer = tasks.filter(task => task.status === target.status && task.groupId === target.groupId)
     const order = sameContainer.reduce((max, task) => Math.max(max, task.order), -1) + 1
-    void addTask({
-      title: trimmed,
-      status: target.status,
-      order,
-      ...target.groupId === undefined ? {} : { groupId: target.groupId },
-    })
-  }, [addTask, draft, tasks])
+    void addTask({ title: trimmed, status: target.status, order, groupId: target.groupId })
+  }, [addTask, blocksFor, draft, tasks])
 
   const archiveTask = useCallback((task: DeskTask): void => {
     setTasks(current => current.map(item => item.id === task.id ? { ...item, archived: true } : item))
@@ -188,9 +227,8 @@ export function useTaskBoard({
   const createGroupAction = useCallback((status: TaskStatus, name: string): Promise<DeskTaskGroup | null> => {
     const trimmed = name.trim()
     if (trimmed === '') return Promise.resolve(null)
-    const order = groups.filter(group => group.status === status && !group.archived).length
-    return createGroup({ name: trimmed, status, order })
-  }, [createGroup, groups])
+    return createGroup({ name: trimmed, status, order: blocksFor(status).length })
+  }, [blocksFor, createGroup])
 
   const removeGroupAction = useCallback((group: DeskTaskGroup): void => {
     // Cards keep existing; only their membership is cleared.
@@ -200,35 +238,7 @@ export function useTaskBoard({
     removeGroup(group)
   }, [removeGroup, setTasks])
 
-  /** Same-lane group reorder: only active groups participate in the visible ordering. */
-  const reorderGroup = useCallback((status: TaskStatus, groupId: string, toIndex: number): void => {
-    const laneGroups = sortGroups(groups.filter(group => group.status === status && !group.archived))
-    const from = laneGroups.findIndex(group => group.id === groupId)
-    if (from === -1) return
-    const [moved] = laneGroups.splice(from, 1)
-    if (moved === undefined) return
-    laneGroups.splice(Math.max(0, Math.min(toIndex, laneGroups.length)), 0, moved)
-    reorderGroups(status, laneGroups)
-  }, [groups, reorderGroups])
-
-  const moveGroupWhole = useCallback(async (
-    group: DeskTaskGroup,
-    status: TaskStatus,
-    order?: number,
-  ): Promise<GroupMoveResult | null> => {
-    const result = await moveGroupToLane(group, status, order)
-    if (result === null) return null
-    const byId = new Map(result.tasks.map(task => [task.id, task]))
-    setTasks(current => current.map(task => byId.get(task.id) ?? task))
-    // Other groups' orders may have shifted in both lanes; pull the authoritative list.
-    void reloadGroups()
-    return result
-  }, [moveGroupToLane, reloadGroups, setTasks])
-
-  /**
-   * Move one card into (lane, group, index). Only the target container is renumbered; the source
-   * container keeps gaps, which is harmless because order is only compared per container.
-   */
+  /** Move one card into a group's card list, or into the lane's block sequence. */
   const moveTask = useCallback((
     taskId: string,
     toStatus: TaskStatus,
@@ -237,39 +247,91 @@ export function useTaskBoard({
   ): void => {
     const moving = tasks.find(task => task.id === taskId)
     if (moving === undefined) return
-    const target = sortTasks(tasks.filter(task =>
-      task.id !== taskId
-      && task.status === toStatus
-      && (task.groupId ?? undefined) === toGroupId))
-    const index = Math.max(0, Math.min(toIndex, target.length))
-    target.splice(index, 0, moving)
 
-    const patchById = new Map<string, TaskPatchRequest>()
-    const sourceById = new Map<string, DeskTask>()
-    target.forEach((task, position) => {
-      const statusChanged = task.id === taskId && task.status !== toStatus
-      const groupChanged = task.id === taskId && (task.groupId ?? undefined) !== toGroupId
-      const orderChanged = task.order !== position
-      if (!statusChanged && !groupChanged && !orderChanged) return
-      patchById.set(task.id, {
-        ...orderChanged ? { order: position } : {},
-        ...statusChanged ? { status: toStatus } : {},
-        ...groupChanged ? { groupId: toGroupId ?? null } : {},
+    if (toGroupId !== undefined) {
+      const target = sortTasks(tasks.filter(task =>
+        task.id !== taskId
+        && task.status === toStatus
+        && task.groupId === toGroupId))
+      const index = Math.max(0, Math.min(toIndex, target.length))
+      target.splice(index, 0, moving)
+      const patchById = new Map<string, TaskPatchRequest>()
+      const sourceById = new Map<string, DeskTask>()
+      target.forEach((task, position) => {
+        const isMoving = task.id === taskId
+        const patch: TaskPatchRequest = {
+          ...task.order === position ? {} : { order: position },
+          ...isMoving && task.status !== toStatus ? { status: toStatus } : {},
+          ...isMoving && task.groupId !== toGroupId ? { groupId: toGroupId } : {},
+        }
+        if (Object.keys(patch).length === 0) return
+        patchById.set(task.id, patch)
+        sourceById.set(task.id, task)
       })
-      sourceById.set(task.id, task)
-    })
-    if (patchById.size === 0) return
-
-    setTasks(current => current.map(task => {
-      const patch = patchById.get(task.id)
-      return patch === undefined ? task : { ...task, ...patch } as DeskTask
-    }))
-    for (const [id, patch] of patchById) {
-      const source = sourceById.get(id)
-      if (source !== undefined) savePatch(source, patch)
+      if (patchById.size === 0) return
+      setTasks(current => current.map(task => {
+        const patch = patchById.get(task.id)
+        return patch === undefined ? task : { ...task, ...patch } as DeskTask
+      }))
+      for (const [id, patch] of patchById) {
+        const source = sourceById.get(id)
+        if (source !== undefined) savePatch(source, patch)
+      }
+      setActionError(null)
+      return
     }
-    setActionError(null)
-  }, [savePatch, setActionError, setTasks, tasks])
+
+    // Ungrouped target: insert a card block into the shared lane sequence.
+    const blocks = blocksFor(toStatus)
+      .filter(block => !(block.kind === 'task' && block.task.id === taskId))
+    const index = Math.max(0, Math.min(toIndex, blocks.length))
+    blocks.splice(index, 0, { kind: 'task', task: moving })
+    applyBlockOrders(blocks, {
+      task: moving,
+      patch: {
+        ...moving.status === toStatus ? {} : { status: toStatus },
+        ...moving.groupId === undefined ? {} : { groupId: null },
+      },
+    })
+  }, [applyBlockOrders, blocksFor, savePatch, setActionError, setTasks, tasks])
+
+  /** Move a group block within the unified lane sequence (same lane) or across lanes. */
+  const moveGroupBlock = useCallback((group: DeskTaskGroup, status: TaskStatus, toIndex: number): void => {
+    if (status === group.status) {
+      const blocks = blocksFor(status)
+        .filter(block => !(block.kind === 'group' && block.group.id === group.id))
+      const index = Math.max(0, Math.min(toIndex, blocks.length))
+      blocks.splice(index, 0, {
+        kind: 'group',
+        group,
+        tasks: sortTasks(tasks.filter(task => task.groupId === group.id)),
+      })
+      applyBlockOrders(blocks)
+      return
+    }
+
+    void (async () => {
+      const result = await moveGroupToLane(group, status, toIndex)
+      if (result === null) return
+      const byId = new Map(result.tasks.map(task => [task.id, task]))
+      const updatedTasks = tasks.map(task => byId.get(task.id) ?? task)
+      setTasks(updatedTasks)
+      const updatedGroups = result.groups.filter(candidate => !candidate.archived)
+
+      const targetBlocks = manualBlocks(updatedTasks, updatedGroups, status)
+        .filter(block => !(block.kind === 'group' && block.group.id === group.id))
+      const targetIndex = Math.max(0, Math.min(toIndex, targetBlocks.length))
+      targetBlocks.splice(targetIndex, 0, {
+        kind: 'group',
+        group: result.group,
+        tasks: sortTasks(updatedTasks.filter(task => task.groupId === group.id)),
+      })
+      applyBlockOrders(targetBlocks)
+
+      // Close the gap the moved group left in its old lane.
+      applyBlockOrders(manualBlocks(updatedTasks, updatedGroups, group.status))
+    })()
+  }, [applyBlockOrders, blocksFor, moveGroupToLane, setTasks, tasks])
 
   const archiveGroupAction = useCallback(async (
     group: DeskTaskGroup,
@@ -288,6 +350,6 @@ export function useTaskBoard({
     moveTask, archiveTask, restoreTask, deleteTask,
     isGroupCollapsed, toggleGroup,
     createGroup: createGroupAction, renameGroup, removeGroup: removeGroupAction,
-    reorderGroup, moveGroupWhole, archiveGroup: archiveGroupAction,
+    moveGroupBlock, archiveGroup: archiveGroupAction,
   }
 }

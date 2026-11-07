@@ -40,12 +40,14 @@ export interface GroupsData {
   readonly createGroup: (input: CreateTaskGroupRequest) => Promise<DeskTaskGroup | null>
   readonly renameGroup: (group: DeskTaskGroup, name: string) => void
   /** Persist dense order for one lane; receives the groups already in their new order. */
-  readonly reorderGroups: (status: TaskStatus, ordered: readonly DeskTaskGroup[]) => void
+  /** Persist arbitrary group orders (shared lane block sequence: order is the block index). */
+  readonly setGroupOrders: (entries: readonly { group: DeskTaskGroup; order: number }[]) => void
   readonly removeGroup: (group: DeskTaskGroup) => void
-  /** Cross-lane move; resolves the moved group plus its cards whose status changed. */
+  /** Cross-lane move; resolves the moved group, its cards, and the authoritative group list. */
   readonly moveGroupToLane: (group: DeskTaskGroup, status: TaskStatus, order?: number) => Promise<{
     group: DeskTaskGroup
     tasks: readonly DeskTask[]
+    groups: readonly DeskTaskGroup[]
   } | null>
   /** Archive / restore the group together with its cards. */
   readonly archiveGroup: (group: DeskTaskGroup, archived: boolean) => Promise<{
@@ -128,21 +130,24 @@ export function useGroupsData(t: DeskTranslator, actions: Actions): GroupsData {
     }))
   }, [enqueue, replace, run, updateGroup])
 
-  const reorderGroups = useCallback((status: TaskStatus, ordered: readonly DeskTaskGroup[]): void => {
+  const setGroupOrders = useCallback((entries: readonly { group: DeskTaskGroup; order: number }[]): void => {
+    if (entries.length === 0) return
+    const byId = new Map(entries.map(entry => [entry.group.id, entry.order]))
     setGroups(current => current.map(group => {
-      if (group.status !== status) return group
-      const index = ordered.findIndex(item => item.id === group.id)
-      return index === -1 || group.order === index ? group : { ...group, order: index }
+      const order = byId.get(group.id)
+      return order === undefined || group.order === order ? group : { ...group, order }
     }))
-    ordered.forEach((group, index) => {
-      if (group.order === index) return
-      enqueue(group.id, () => run(async () => {
-        const latest = groupsRef.current.find(item => item.id === group.id)
-        if (latest === undefined) return
-        const updated = await updateGroup({ id: group.id, expectedRevision: latest.revision, patch: { order: index } })
+    for (const entry of entries) {
+      if (entry.group.order === entry.order) continue
+      enqueue(entry.group.id, () => run(async () => {
+        const updated = await updateGroup({
+          id: entry.group.id,
+          expectedRevision: entry.group.revision,
+          patch: { order: entry.order },
+        })
         replace(updated)
       }))
-    })
+    }
   }, [enqueue, replace, run, updateGroup])
 
   const removeGroup = useCallback((group: DeskTaskGroup): void => {
@@ -155,15 +160,23 @@ export function useGroupsData(t: DeskTranslator, actions: Actions): GroupsData {
   const moveGroupToLane = useCallback(async (group: DeskTaskGroup, status: TaskStatus, order?: number) => {
     try {
       const result = await moveGroup({ id: group.id, expectedRevision: group.revision, status, order })
-      replace(result.group)
+      // The host renumbered group orders in both lanes while moving: read the authoritative list
+      // back so the caller can renumber the unified block sequence with fresh revisions.
+      let latestGroups: readonly DeskTaskGroup[] | null = null
+      try {
+        latestGroups = await listGroups()
+        setGroups(latestGroups)
+      } catch {
+        replace(result.group)
+      }
       setActionError(null)
-      return result
+      return { group: result.group, tasks: result.tasks, groups: latestGroups ?? groupsRef.current }
     } catch (reason) {
       setActionError(t('state.saveFailed', { message: messageOf(reason) }))
       void reload()
       return null
     }
-  }, [moveGroup, reload, replace, t])
+  }, [listGroups, moveGroup, reload, replace, setActionError,t])
 
   const archiveGroupAction = useCallback(async (group: DeskTaskGroup, archived: boolean) => {
     try {
@@ -180,7 +193,7 @@ export function useGroupsData(t: DeskTranslator, actions: Actions): GroupsData {
 
   return {
     groups, loading, loadError, actionError, setActionError,
-    reload, createGroup: createGroupAction, renameGroup, reorderGroups, removeGroup,
+    reload, createGroup: createGroupAction, renameGroup, setGroupOrders, removeGroup,
     moveGroupToLane, archiveGroup: archiveGroupAction,
   }
 }

@@ -232,11 +232,10 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     groups: groupsData.groups,
     createGroup: groupsData.createGroup,
     renameGroup: groupsData.renameGroup,
-    reorderGroups: groupsData.reorderGroups,
+    setGroupOrders: groupsData.setGroupOrders,
     removeGroup: groupsData.removeGroup,
     moveGroupToLane: groupsData.moveGroupToLane,
     archiveGroup: groupsData.archiveGroup,
-    reloadGroups: groupsData.reload,
   })
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
@@ -262,8 +261,8 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     { mode: 'due', label: t('task.sort.due') },
   ], [t])
 
-  /** Resolve the lane/group under the pointer plus the insertion index within that container. */
-  const resolveDrop = useCallback((x: number, y: number): DropTarget | null => {
+  /** Resolve a card drop: a group's card list, or the lane's shared block sequence. */
+  const resolveCardDrop = useCallback((x: number, y: number, movingTaskId: string): DropTarget | null => {
     const element = document.elementFromPoint(x, y) as HTMLElement | null
     const lane = element?.closest<HTMLElement>('[data-lane]')
     if (lane === null || lane === undefined) return null
@@ -273,20 +272,32 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     const groupId = zone?.dataset.groupId === undefined || zone.dataset.groupId === ''
       ? undefined
       : zone.dataset.groupId
-    const scope = zone ?? lane.querySelector<HTMLElement>('.dsh-task-ungrouped')
-    const cards = scope === null ? [] : [...scope.querySelectorAll<HTMLElement>('.dsh-task-card')]
-    let index = cards.length
-    for (const [position, card] of cards.entries()) {
-      const rect = card.getBoundingClientRect()
-      if (y < rect.top + rect.height / 2) {
-        index = position
-        break
+    if (groupId !== undefined) {
+      const cards = [...zone!.querySelectorAll<HTMLElement>('[data-task-id]')]
+      let index = cards.length
+      for (const [position, card] of cards.entries()) {
+        const rect = card.getBoundingClientRect()
+        if (y < rect.top + rect.height / 2) {
+          index = position
+          break
+        }
       }
+      return { status, groupId, index }
     }
-    return { status, index, ...groupId === undefined ? {} : { groupId } }
+    // Ungrouped position: the pointer selects an insertion index in the unified block list,
+    // excluding the card being dragged (its block still occupies its slot).
+    const blocks = [...lane.querySelectorAll<HTMLElement>('.dsh-task-block')]
+    let index = 0
+    for (const block of blocks) {
+      if (block.querySelector<HTMLElement>('[data-task-id]')?.dataset.taskId === movingTaskId) continue
+      const rect = block.getBoundingClientRect()
+      if (y < rect.top + rect.height / 2) break
+      index += 1
+    }
+    return { status, index, block: true }
   }, [])
 
-  /** Resolve the lane plus group insertion position under the pointer (group drag). */
+  /** Resolve the lane plus block insertion position under the pointer (group drag). */
   const resolveGroupDrop = useCallback((x: number, y: number, excludeGroupId: string): GroupDropTarget | null => {
     const element = document.elementFromPoint(x, y) as HTMLElement | null
     const lane = element?.closest<HTMLElement>('[data-lane]')
@@ -294,11 +305,10 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     const status = lane.dataset.lane as TaskStatus | undefined
     if (status === undefined) return null
     let index = 0
-    for (const section of lane.querySelectorAll<HTMLElement>('.dsh-task-group')) {
-      // The dragged group keeps its layout slot while the ghost is out; skip it so the index is
-      // an insertion position into the *remaining* list (otherwise downward drags are off by one).
-      if (section.dataset.groupId === excludeGroupId) continue
-      const rect = section.getBoundingClientRect()
+    for (const block of lane.querySelectorAll<HTMLElement>('.dsh-task-block')) {
+      // Skip the dragged group's block: index is an insertion into the remaining list.
+      if (block.querySelector<HTMLElement>('.dsh-task-group')?.dataset.groupId === excludeGroupId) continue
+      const rect = block.getBoundingClientRect()
       if (y < rect.top + rect.height / 2) break
       index += 1
     }
@@ -336,7 +346,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
       if (ghost === null) return
       ghost.style.left = `${moveEvent.clientX - offsetX}px`
       ghost.style.top = `${moveEvent.clientY - offsetY}px`
-      latest = resolveDrop(moveEvent.clientX, moveEvent.clientY)
+      latest = resolveCardDrop(moveEvent.clientX, moveEvent.clientY, task.id)
       setDropTarget(latest)
     }
     const cleanup = (): void => {
@@ -391,7 +401,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
     window.addEventListener('pointerup', onFinish)
     window.addEventListener('pointercancel', onCancel)
     window.addEventListener('keydown', onKey)
-  }, [board, resolveDrop])
+  }, [board, resolveCardDrop])
 
   /**
    * Whole-group drag: same 5px threshold and ghost model as a card. Drop on the same lane
@@ -456,11 +466,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
         return
       }
       ghost.remove()
-      if (latest.status === group.status) {
-        board.reorderGroup(latest.status, group.id, latest.index)
-        return
-      }
-      void board.moveGroupWhole(group, latest.status, latest.index)
+      board.moveGroupBlock(group, latest.status, latest.index)
     }
     const onCancel = (): void => {
       cleanup()
@@ -597,6 +603,7 @@ export function TaskBoard(props: TaskBoardProps): ReactElement {
                   collapsed={status === 'done' && board.doneCollapsed}
                   draft={board.draft}
                   dropTarget={dropTarget}
+                  blockDrop={dropTarget?.block === true ? { status: dropTarget.status, index: dropTarget.index } : null}
                   groupDrop={groupDrop}
                   draggingId={draggingId}
                   groupDrag={groupDrag}

@@ -54,14 +54,14 @@ interface DeskNode {
 interface GroupPayload {
   name: string                             // 组名；同一泳道内唯一
   status: 'todo' | 'doing' | 'done'        // 分组属于某个泳道
-  order: number                            // 组在该泳道内的顺序
+  order: number                            // 组在该泳道块序列中的位置（与未分组卡片共享）
   archived: boolean                        // 整组存档（仅完成列）；存档时组内卡片一起归档
 }
 
 interface TaskPayload {
   status: 'todo' | 'doing' | 'done'        // S1 固定三泳道；inbox / cancelled 后置
   due?: { date: string; timezone?: string } // S1 只到天（date 必填，YYYY-MM-DD）
-  order: number                            // 同一容器（未分组区或某个分组）内手工排序
+  order: number                            // 未分组时 = 泳道级块顺序；在分组内 = 组内顺序
   groupId?: string                         // 一层分组 id；缺省未分组
   sessionIds?: string[]                    // 关联的 DSH 会话 id（多对多；标题/状态实时解析，不落库）
   color?: string                           // 卡片颜色条，复用便签五色板
