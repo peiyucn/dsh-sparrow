@@ -315,6 +315,8 @@ export function TaskCard({
                   className="dsh-task-session"
                   data-state={chip.availability === 'available' ? (chip.running ? 'running' : 'idle') : chip.availability}
                   data-expanded={previewId === chip.id ? 'true' : undefined}
+                  onClick={() => openPreview(chip)}
+                  onPointerDown={(event) => event.stopPropagation()}
                 >
                         {chip.availability === 'available'
                           ? <span className="dsh-task-session-dot" aria-hidden="true" />
@@ -323,7 +325,6 @@ export function TaskCard({
                     type="button"
                     className="dsh-task-session-title"
                     title={`${chip.title} · ${sessionStatusText(chip)}`}
-                    onClick={() => openPreview(chip)}
                   >
                     {chip.title}
                   </button>
@@ -332,7 +333,10 @@ export function TaskCard({
                     className="dsh-task-session-remove"
                     aria-label={t('task.session.remove')}
                     title={t('task.session.remove')}
-                    onClick={() => onLinkSessions(task.sessionIds.filter(id => id !== chip.id))}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onLinkSessions(task.sessionIds.filter(id => id !== chip.id))
+                    }}
                   >
                     <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
                       <path d="M3 3l6 6M9 3L3 9" />
@@ -356,7 +360,8 @@ export function TaskCard({
                               disabled={chip.availability !== 'available'}
                               aria-label={t('task.session.preview.open')}
                               title={t('task.session.preview.open')}
-                              onClick={() => {
+                              onClick={(event) => {
+                                event.stopPropagation()
                                 onOpenSession(chip.id)
                                 setPreviewId(null)
                               }}
