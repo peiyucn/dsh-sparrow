@@ -198,10 +198,8 @@ export function DeskOnePage(props: DeskPanelProps) {
   )
 
   const renderOverview = (): ReactElement => (
-    // Overview content is not designed yet; keep the page subtitle here.
-    <div className="dsh-desk-overview">
-      <p className="dsh-desk-subtitle">{t('page.subtitle')}</p>
-    </div>
+    // Overview content is not designed yet; the page intro already lives in the header.
+    <div className="dsh-desk-overview" />
   )
 
   const plusIcon = (
