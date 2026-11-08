@@ -91,7 +91,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'sessions.archive.delete'
       | 'sessions.archive.deleteConfirm'
       | 'sessions.archive.deletePlaceholder'
-      | 'sessions.archive.orphanDeleteNote'
       | 'sessions.archive.strays'
       | 'sessions.archive.straysHint'
       | 'sessions.archive.blank'

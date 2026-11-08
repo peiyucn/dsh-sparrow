@@ -3,7 +3,7 @@
 import { REQUEST_TIMEOUT_MS } from '../../constants.js'
 import type {
   ArchiveRequest, ArchiveTreeNode, DeleteMutationResponse, DeleteRequest, ListResponse, RestoreRequest, RestoreResponse,
-  StraysResponse, TrashDeleteAllResponse, TrashDeleteRequest, TrashDeleteResponse, TrashDirResponse, TrashEntry,
+  StraysResponse, TrashDeleteAllResponse, TrashDeleteRequest, TrashDeleteResponse, TrashDirResponse,
   TrashListResponse, TrashMutationResponse, TrashRequest, TrashRestoreAllResponse, UnarchiveRequest, UnarchiveResponse,
 } from '../../host/sessions/contract.js'
 
@@ -59,12 +59,10 @@ export const sessionsArchiveApi: SessionsArchiveApi = {
   trashDir: () => requestJson<TrashDirResponse>('/trash-dir'),
   unarchive: sessionId => post<UnarchiveResponse>('/unarchive', { sessionId } satisfies UnarchiveRequest).then(() => undefined),
   archive: sessionId => post<{ ok: true }>('/archive', { sessionId } satisfies ArchiveRequest).then(() => undefined),
-  moveToTrash: sessionId => post<TrashMutationResponse>('/trash', { sessionId } satisfies TrashRequest),
+  moveToTrash: sessionId => post<TrashMutationResponse>('/trash', { sessionId, confirm: true } satisfies TrashRequest),
   deleteSession: input => post<DeleteMutationResponse>('/delete', input),
   restore: trashId => post<RestoreResponse>('/restore', { trashId } satisfies RestoreRequest),
   restoreAll: () => post<TrashRestoreAllResponse>('/trash-restore-all', { confirm: true }),
   deleteTrashEntry: trashId => post<TrashDeleteResponse>('/trash-delete', { trashId, confirm: true } satisfies TrashDeleteRequest),
   deleteAllTrash: () => post<TrashDeleteAllResponse>('/trash-delete-all', { confirm: true }),
 }
-
-export type { TrashEntry }

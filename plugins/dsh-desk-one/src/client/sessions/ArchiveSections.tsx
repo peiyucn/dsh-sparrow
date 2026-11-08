@@ -81,9 +81,10 @@ function ArchiveTreeNodeRow(props: {
   const hasChildren = node.children.length > 0
   const open = expanded.has(node.sessionId)
   const deleteArmed = deleteDraft?.id === node.sessionId
-  const canDelete = deleteArmed && deleteDraft !== null && (node.orphan
-    ? true
-    : deleteDraft.text.trim() === node.title.trim() && node.title.trim() !== '')
+  // Archived rows always require the exact title: the host only waives confirmation for blank
+  // stray sessions, never for anything reached through the archived tree.
+  const canDelete = deleteArmed && deleteDraft !== null
+    && deleteDraft.text.trim() === node.title.trim() && node.title.trim() !== ''
   return (
     <li>
       <div
@@ -150,16 +151,12 @@ function ArchiveTreeNodeRow(props: {
       </div>
       {deleteArmed ? (
         <div className="dsh-desk-archive-deletebox" style={{ marginLeft: `calc(12px + ${depth} * 16px)` }}>
-          {node.orphan ? (
-            <span className="dsh-desk-archive-note">{t('sessions.archive.orphanDeleteNote')}</span>
-          ) : (
-            <input
-              className="dsh-desk-archive-input"
-              value={deleteDraft?.text ?? ''}
-              placeholder={t('sessions.archive.deletePlaceholder')}
-              onChange={event => props.onDeleteDraft(node.sessionId, event.target.value)}
-            />
-          )}
+          <input
+            className="dsh-desk-archive-input"
+            value={deleteDraft?.text ?? ''}
+            placeholder={t('sessions.archive.deletePlaceholder')}
+            onChange={event => props.onDeleteDraft(node.sessionId, event.target.value)}
+          />
           <button
             type="button"
             className="dsh-desk-archive-action"
@@ -260,11 +257,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
   }
 
   const onConfirmDelete = (node: ArchiveTreeNode): void => {
-    const confirmTitle = node.orphan ? undefined : deleteDraft?.text
-    void run(() => api.deleteSession({
-      sessionId: node.sessionId,
-      ...(node.orphan ? { confirm: true } : { confirmTitle }),
-    }))
+    void run(() => api.deleteSession({ sessionId: node.sessionId, confirmTitle: deleteDraft?.text }))
   }
 
   return (
