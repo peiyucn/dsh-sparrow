@@ -90,19 +90,13 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
       if (wall === null || dy === 0) return
       const rect = wall.getBoundingClientRect()
       const edge = Math.min(AUTO_SCROLL_EDGE, Math.max(12, rect.height / 3))
-      let direction = 0
-      let depth = 0
-      if (pointerY > rect.bottom - edge && dy > 0) {
-        direction = 1
-        depth = (pointerY - (rect.bottom - edge)) / edge
-      } else if (pointerY < rect.top + edge && dy < 0) {
-        direction = -1
-        depth = (rect.top + edge - pointerY) / edge
-      }
-      if (direction === 0) return
+      // Only the bottom edge scrolls: the canvas is infinite downward. Scrolling at the top
+      // while dragging upward fights the user's mouse and sweeps notes back off-screen.
+      if (pointerY <= rect.bottom - edge || dy <= 0) return
+      const depth = (pointerY - (rect.bottom - edge)) / edge
       const travel = Math.abs(dy) * Math.min(1, Math.max(0, depth)) * AUTO_SCROLL_FOLLOW
       const before = wall.scrollTop
-      wall.scrollTop = Math.max(0, before + direction * Math.min(AUTO_SCROLL_MAX_PER_MOVE, travel))
+      wall.scrollTop = before + Math.min(AUTO_SCROLL_MAX_PER_MOVE, travel)
       if (wall.scrollTop !== before) placeFromPointer()
     }
     const onMove = (moveEvent: PointerEvent): void => {
