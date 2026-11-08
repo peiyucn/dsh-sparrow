@@ -68,18 +68,78 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 }
 .dsh-desk-brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   min-width: 0;
   flex: 0 1 auto;
 }
-.dsh-desk-title {
+.dsh-desk-brand-mark {
+  display: inline-flex;
   flex: none;
-  margin: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--dsw-alias-label-primary, #1f2329);
+  color: var(--dsw-alias-label-primary-inverted, #ffffff);
+}
+.dsh-desk-info-wrap {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+.dsh-desk-info-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-caption, #8a919f);
+  cursor: pointer;
+}
+.dsh-desk-info-button:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
   color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
+}
+.dsh-desk-info-button svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.dsh-desk-intro-tooltip {
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: var(--dsw-radius-sm, 8px);
+  background: var(--dsw-menu-surface-fill, var(--dsw-specific-menu, #ffffff));
+  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
+  -webkit-backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
+  box-shadow: var(--dsw-elevation-panel, 0 10px 30px -12px rgba(20, 25, 40, 0.4));
+  outline: 0.5px solid var(--dsw-alias-border-l1, #e2e5ea);
+  outline-offset: -0.5px;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font-size: 12px;
+  line-height: 18px;
+}
+.dsh-desk-title {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 22px;
+  margin: 0;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--dsw-alias-label-primary, #1f2329);
+  color: var(--dsw-alias-label-primary-inverted, #ffffff);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 22px;
+  letter-spacing: 0.2px;
   white-space: nowrap;
 }
 .dsh-desk-intro {

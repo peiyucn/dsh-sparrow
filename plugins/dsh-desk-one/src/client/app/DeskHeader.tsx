@@ -1,16 +1,17 @@
 /**
  * Persistent panel header: official conversation-header geometry.
  *
- * Row 1: brand title + one-line intro, with the active view's actions on the right.
- * Row 2: official conversation-style plain text tabs (2px underline on the active tab).
- * The header is in normal flow and exactly reserves its height; feature views never sit
- * underneath it, so content and scrollbars always start below the header.
+ * Row 1: brand lockup (glyph + inverted wordmark) + one-line intro + info button, with the
+ * active view's actions on the right. Row 2: official conversation-style plain text tabs.
+ * The header is a fixed 76px overlay; feature views offset their first line below it.
  */
 
 import type { ReactElement, ReactNode } from 'react'
 import type { DeskTranslator, Tab } from './types.js'
 import { OVERFLOW_TABS, VISIBLE_TABS } from './tabs.js'
 import { DeskTabMenu } from './DeskTabMenu.js'
+import { DeskIntroInfo } from './DeskIntroInfo.js'
+import { DeskGlyph } from '../brand.js'
 
 interface DeskHeaderProps {
   readonly t: DeskTranslator
@@ -25,8 +26,10 @@ export function DeskHeader({ t, tab, onSelectTab, actions }: DeskHeaderProps): R
     <header className="dsh-desk-header" data-window-drag>
       <div className="dsh-desk-header-top">
         <div className="dsh-desk-brand">
+          <span className="dsh-desk-brand-mark" aria-hidden="true"><DeskGlyph size={14} /></span>
           <h1 className="dsh-desk-title">{t('page.title')}</h1>
           <p className="dsh-desk-intro">{t('page.subtitle')}</p>
+          <DeskIntroInfo t={t} />
         </div>
         {actions === null ? null : (
           <div className="dsh-desk-header-actions" data-window-drag-recall>{actions}</div>

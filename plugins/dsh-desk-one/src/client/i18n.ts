@@ -2,10 +2,11 @@
 
 export const LOCALE_DICTS = {
   zh: {
-    'button.label': '办公桌',
-    'page.title': '办公桌',
-    'page.subtitle': '在便签、任务、日程与时间中与 harness 协作',
-    'topbar.timePlaceholder': '时间管理 · 预留',
+    'button.label': '同桌',
+    'page.title': '同桌',
+    'page.subtitle': '与 harness 共用的一张办公桌',
+    'page.introLabel': '关于同桌',
+    'page.introDetail': '便签、任务、会话、日程与时间都在这张桌子上；你和 harness 在同一处协作，不用在插件之间来回切换。',
     'tab.overview': '总览',
     'tab.notes': '便签墙',
     'tab.tasks': '任务板',
@@ -102,8 +103,9 @@ export const LOCALE_DICTS = {
   en: {
     'button.label': 'Desk One',
     'page.title': 'Desk One',
-    'page.subtitle': 'Working with harness in Note, Task, Schedule, Time',
-    'topbar.timePlaceholder': 'Time management',
+    'page.subtitle': 'One desk for you and harness',
+    'page.introLabel': 'About Desk One',
+    'page.introDetail': 'Notes, tasks, sessions, schedule and time all live on this desk. Work with harness in the same place instead of switching between plugins.',
     'tab.overview': 'Overview',
     'tab.notes': 'Notes',
     'tab.tasks': 'Tasks',
