@@ -138,7 +138,10 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   font-size: 13px;
   font-weight: 600;
   line-height: 24px;
-  letter-spacing: 0.2px;
+  /* Logo-only casing: visual uppercase for the English wordmark; Chinese 同桌 is unaffected
+     and the i18n/accessible text keeps the original case. */
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 .dsh-desk-intro {
