@@ -931,10 +931,13 @@ export const TASKS_CSS = `
 /* Session preview: a floating layer that visually continues the chip. It never participates
    in card layout, so expanding cannot squeeze the board. */
 /* Expanded chip: grows in place, capped by the card width, pushing card height as needed. */
+/* Expanded chip: grow to the card width, never past it (border-box keeps padding inside). */
 .dsh-task-session[data-expanded='true'] {
-  flex: 1 0 100%;
+  box-sizing: border-box;
+  flex: 1 1 100%;
   align-items: flex-start;
-  width: 100%;
+  width: auto;
+  min-width: 0;
   max-width: 100%;
   padding: 3px 4px 4px 8px;
   border-radius: 10px;
@@ -948,10 +951,13 @@ export const TASKS_CSS = `
 }
 /* Details live inside the chip, inheriting its status tint; compact 2-column grid. */
 .dsh-task-session-preview {
+  box-sizing: border-box;
   display: flex;
   flex-basis: 100%;
   flex-direction: column;
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
   margin-top: 3px;
   padding: 3px 2px 1px 0;
   color: inherit;
