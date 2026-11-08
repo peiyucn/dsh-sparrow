@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH } from '../../lib/constants.js'
-import { noteDisplaySize } from '../../lib/client/notes/hooks/useWallLayout.js'
+import { noteDisplaySize, placeNote } from '../../lib/client/notes/hooks/useWallLayout.js'
 
 const note = (over = {}) => ({
   id: 'n1',
@@ -29,6 +29,12 @@ describe('便签渲染尺寸', () => {
     const size = noteDisplaySize(note({ width: 120, height: 60 }))
     assert.equal(size.width, NOTE_MIN_WIDTH)
     assert.equal(size.height, NOTE_MIN_HEIGHT)
+  })
+
+  it('纵向无限画布：Y 不被可视高度夹住，X 仍固定在墙宽内', () => {
+    const placed = placeNote(note({ x: 500, y: 1200 }), 0, { width: 600, height: 400 })
+    assert.equal(placed.y, 1200, '便签可以落在屏幕下方')
+    assert.ok(placed.x <= 600 - placed.width, '横向仍夹在固定宽度内')
   })
 
   it('正常尺寸与上限保持不变', () => {

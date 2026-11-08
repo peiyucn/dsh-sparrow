@@ -28,7 +28,7 @@ English | [简体中文](README.zh-CN.md)
 
 * **Overview** is a blank placeholder for now; the app opens on the notes wall instead of an empty page.
 * Tap **Capture** in the command bar or double-click empty space on the wall: a fresh sticky appears at that spot, lands on top of the pile and takes the keyboard focus. The command row also hosts **Smash!** and the trash entry; the empty wall keeps its faint two-line hint.
-* The wall never scrolls: notes are always kept inside the visible area, even after you resize the window.
+* The wall is a fixed-width, vertically infinite canvas: drag a note to the bottom edge and the wall auto-scrolls; notes can live below the viewport and the wall scrolls vertically to them.
 * Type straight onto the sticky; leaving it saves the text, and an emptied sticky is removed instead of kept as clutter.
 * Drag a sticky by its body; a compact six-dot grip at the top-left marks the grab area. Whichever sticky you click or drag comes to the front, and that layer order is saved too.
 * Drag the bottom-right corner of a sticky to change its size; position and size are saved per note.

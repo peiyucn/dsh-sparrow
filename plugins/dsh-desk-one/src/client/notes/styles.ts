@@ -16,7 +16,24 @@ export const NOTES_CSS = `
   z-index: 0; /* 建立层级上下文：贴纸的 z 再大也只在墙内比较，按钮永远盖在它们上面。 */
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  /* Fixed width, vertically infinite canvas: notes may live below the viewport and the wall
+     scrolls to them. Horizontal overflow stays clipped so the width never changes. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 24%, transparent) transparent;
+}
+.dsh-desk-wall::-webkit-scrollbar {
+  width: 8px;
+}
+.dsh-desk-wall::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 24%, transparent);
+  background-clip: content-box;
+}
+.dsh-desk-wall::-webkit-scrollbar-track {
+  background: transparent;
 }
 /* 空墙中央的轻提示：双层排版（主提示 + 次提示），颜色压到很浅，不抢贴纸。 */
 .dsh-desk-wall-tip {

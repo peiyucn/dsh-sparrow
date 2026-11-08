@@ -5,6 +5,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'button.label'
       | 'page.title'
       | 'page.subtitle'
+      | 'topbar.timePlaceholder'
       | 'tab.overview'
       | 'tab.notes'
       | 'tab.tasks'

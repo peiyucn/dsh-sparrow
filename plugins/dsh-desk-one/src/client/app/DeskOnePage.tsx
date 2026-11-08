@@ -133,8 +133,9 @@ export function DeskOnePage(props: DeskPanelProps) {
       return
     }
     const offset = (trash.activeNotes.length % 6) * 18
+    const scrollTop = wallRef.current?.scrollTop ?? 0
     const anchorX = point === undefined ? Math.max(0, (wallSize.width - NOTE_DEFAULT_WIDTH) / 2) + offset : point.x
-    const anchorY = point === undefined ? Math.max(0, (wallSize.height - NOTE_DEFAULT_HEIGHT) / 2) + offset : point.y
+    const anchorY = point === undefined ? scrollTop + Math.max(0, (wallSize.height - NOTE_DEFAULT_HEIGHT) / 2) + offset : point.y
     const layer = data.notes.reduce((max, item) => Math.max(max, item.z ?? 0), zTopRef.current) + 1
     zTopRef.current = layer
     setCreating(true)
@@ -363,7 +364,9 @@ export function DeskOnePage(props: DeskPanelProps) {
               </button>
             </nav>
           </div>
-          <div className="dsh-desk-global-slot" data-window-drag-recall aria-hidden="true" />
+          <div className="dsh-desk-global-slot" data-window-drag-recall>
+            <div className="dsh-desk-time-placeholder" aria-hidden="true">{t('topbar.timePlaceholder')}</div>
+          </div>
         </div>
         <div className="dsh-desk-chrome-actions" data-window-drag-recall>
           <div className="dsh-desk-toolbar">{actions}</div>

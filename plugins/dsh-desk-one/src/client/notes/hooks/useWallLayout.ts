@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH } from '../../../constants.js'
+import { NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH, NOTE_MAX_POSITION, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH } from '../../../constants.js'
 import type { DeskNote } from '../../../contract.js'
 import type { PlacedNote, WallSize } from '../../app/types.js'
 import { clamp, fallbackPosition } from '../../app/utils.js'
@@ -22,6 +22,17 @@ export function noteDisplaySize(note: DeskNote): { width: number; height: number
     width: clamp(note.width ?? NOTE_DEFAULT_WIDTH, NOTE_MIN_WIDTH, NOTE_MAX_SIZE),
     height: clamp(note.height ?? NOTE_DEFAULT_HEIGHT, NOTE_MIN_HEIGHT, NOTE_MAX_SIZE),
   }
+}
+
+/** Resolve one note to canvas coordinates: X is clamped to the fixed wall width, Y is free. */
+export function placeNote(note: DeskNote, index: number, wallSize: WallSize): PlacedNote {
+  const { width, height } = noteDisplaySize(note)
+  const fallback = fallbackPosition(index)
+  const rawX = note.x ?? fallback.x
+  const rawY = note.y ?? fallback.y
+  const x = wallSize.width === 0 ? rawX : clamp(rawX, 0, Math.max(0, wallSize.width - width))
+  const y = clamp(rawY, 0, NOTE_MAX_POSITION)
+  return { note, x, y, width, height, zIndex: note.z ?? index + 1 }
 }
 
 export interface WallLayout {
@@ -66,9 +77,10 @@ export function useWallLayout(enabled: boolean, activeNotes: readonly DeskNote[]
     const fallback = fallbackPosition(index)
     const rawX = note.x ?? fallback.x
     const rawY = note.y ?? fallback.y
-    // With no measured wall yet, keep the saved coordinates instead of clamping them to 0.
-    const x = wallSize.width === 0 ? rawX : clamp(rawX, 0, wallSize.width - width)
-    const y = wallSize.height === 0 ? rawY : clamp(rawY, 0, wallSize.height - height)
+    // The wall is a vertically infinite canvas with a fixed width: X clamps to the visible
+    // width, Y only has a floor so notes can live below the viewport (the wall scrolls).
+    const x = wallSize.width === 0 ? rawX : clamp(rawX, 0, Math.max(0, wallSize.width - width))
+    const y = clamp(rawY, 0, NOTE_MAX_POSITION)
     return { note, x, y, width, height, zIndex: note.z ?? index + 1 }
   }), [activeNotes, wallSize.height, wallSize.width])
 

@@ -36,7 +36,6 @@ export const APP_CSS = `
   background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 74%, transparent);
   backdrop-filter: blur(18px) saturate(125%);
   -webkit-backdrop-filter: blur(18px) saturate(125%);
-  border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
 }
 html[data-platform='darwin'] .dsh-desk-chrome {
   padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
@@ -109,7 +108,7 @@ html[data-platform='darwin'] .dsh-desk-chrome {
   color: var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6));
   font-weight: 500;
 }
-/* Intentionally empty for now: future time management / to-do widgets live top-right. */
+/* Reserved for time management / to-do widgets: a dashed frame marks the slot until it is built. */
 .dsh-desk-global-slot {
   margin-left: auto;
   display: flex;
@@ -118,6 +117,21 @@ html[data-platform='darwin'] .dsh-desk-chrome {
   gap: 8px;
   min-height: 30px;
   min-width: 0;
+}
+.dsh-desk-time-placeholder {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 14px;
+  border: 1px dashed color-mix(in srgb, var(--dsw-alias-label-tertiary, #8a919f) 55%, transparent);
+  border-radius: var(--dsw-radius-sm, 8px);
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  user-select: none;
 }
 /* Page-specific actions are a separate row under a hairline, not part of the global pill. */
 .dsh-desk-chrome-actions {

@@ -1,14 +1,16 @@
 /**
- * Drag and resize interactions for wall notes.
+ * Drag and resize interactions for wall notes on a fixed-width, vertically infinite canvas.
  *
  * During a gesture we mutate the dragged element's style directly and only commit to React
  * state on pointer-up: that keeps each pointermove O(1) instead of re-rendering the whole wall,
- * which matters when the wall is full (100 notes by design).
+ * which matters when the wall is full (100 notes by design). Dragging near the top/bottom edge
+ * auto-scrolls the wall, and pointer coordinates are converted to canvas coordinates through
+ * the wall's scrollTop so a note can be moved below the visible screen.
  */
 
 import { useCallback } from 'react'
 import type { Dispatch, PointerEvent as ReactPointerEvent, SetStateAction } from 'react'
-import { NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH } from '../../../constants.js'
+import { NOTE_MAX_POSITION, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH } from '../../../constants.js'
 import type { DeskNote } from '../../../contract.js'
 import type { DeskPanelInjected } from '../../install.js'
 import type { PlacedNote, WallSize } from '../../app/types.js'
@@ -29,12 +31,14 @@ export interface NoteDrag {
   readonly startResize: (event: ReactPointerEvent<HTMLElement>, item: PlacedNote) => void
 }
 
+/** Keep the wall scrolling while the pointer sits near an edge during a drag. */
+const AUTO_SCROLL_EDGE = 36
+const AUTO_SCROLL_STEP = 24
+
 export function useNoteDrag({ wallSize, wallRef, setNotes, savePatch }: DragDeps): NoteDrag {
-  /** Prefer the live box (gesture-time) over the possibly stale measured state. */
-  const liveSize = useCallback((): WallSize => {
+  const liveWidth = useCallback((): number => {
     const node = wallRef.current
-    if (node === null) return wallSize
-    return { width: node.clientWidth || wallSize.width, height: node.clientHeight || wallSize.height }
+    return node === null ? wallSize.width : (node.clientWidth || wallSize.width)
   }, [wallRef, wallSize])
 
   const startDrag = useCallback((event: ReactPointerEvent<HTMLElement>, item: PlacedNote): void => {
@@ -44,9 +48,13 @@ export function useNoteDrag({ wallSize, wallRef, setNotes, savePatch }: DragDeps
     event.preventDefault()
     const startX = event.clientX
     const startY = event.clientY
-    const size = liveSize()
-    const maxX = Math.max(0, size.width - item.width)
-    const maxY = Math.max(0, size.height - item.height)
+    const wall = wallRef.current
+    const rect = wall?.getBoundingClientRect()
+    const startScrollTop = wall?.scrollTop ?? 0
+    // Grab offset inside the note, expressed in canvas coordinates (viewport + scroll offset).
+    const grabX = startX - (rect?.left ?? 0) - item.x
+    const grabY = startY - (rect?.top ?? 0) + startScrollTop - item.y
+    const width = liveWidth()
     const element = event.currentTarget
     // A slight tilt while dragging sells the "paper" metaphor; removed on drop/cancel.
     element.dataset.dragging = 'true'
@@ -59,8 +67,23 @@ export function useNoteDrag({ wallSize, wallRef, setNotes, savePatch }: DragDeps
       const dy = moveEvent.clientY - startY
       if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return
       moved = true
-      currentX = clamp(Math.round(item.x + dx), 0, maxX)
-      currentY = clamp(Math.round(item.y + dy), 0, maxY)
+      if (wall !== null && rect !== undefined) {
+        const viewportY = moveEvent.clientY
+        if (viewportY > rect.bottom - AUTO_SCROLL_EDGE) {
+          wall.scrollTop += Math.min(AUTO_SCROLL_STEP, viewportY - (rect.bottom - AUTO_SCROLL_EDGE))
+        } else if (viewportY < rect.top + AUTO_SCROLL_EDGE) {
+          wall.scrollTop = Math.max(0, wall.scrollTop - Math.min(AUTO_SCROLL_STEP, rect.top + AUTO_SCROLL_EDGE - viewportY))
+        }
+        currentX = clamp(Math.round(moveEvent.clientX - rect.left - grabX), 0, Math.max(0, width - item.width))
+        currentY = clamp(
+          Math.round(moveEvent.clientY - rect.top + wall.scrollTop - grabY),
+          0,
+          NOTE_MAX_POSITION,
+        )
+      } else {
+        currentX = clamp(Math.round(item.x + dx), 0, Math.max(0, width - item.width))
+        currentY = clamp(Math.round(item.y + dy), 0, NOTE_MAX_POSITION)
+      }
       element.style.left = `${currentX}px`
       element.style.top = `${currentY}px`
     }
@@ -78,7 +101,7 @@ export function useNoteDrag({ wallSize, wallRef, setNotes, savePatch }: DragDeps
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', finish)
     window.addEventListener('pointercancel', finish)
-  }, [liveSize, savePatch, setNotes])
+  }, [liveWidth, savePatch, setNotes, wallRef])
 
   const startResize = useCallback((event: ReactPointerEvent<HTMLElement>, item: PlacedNote): void => {
     if (event.button !== 0) return
@@ -86,9 +109,9 @@ export function useNoteDrag({ wallSize, wallRef, setNotes, savePatch }: DragDeps
     event.stopPropagation()
     const startX = event.clientX
     const startY = event.clientY
-    const size = liveSize()
-    const maxWidth = Math.max(NOTE_MIN_WIDTH, size.width - item.x)
-    const maxHeight = Math.max(NOTE_MIN_HEIGHT, size.height - item.y)
+    const maxWidth = Math.max(NOTE_MIN_WIDTH, liveWidth() - item.x)
+    // The canvas is vertically infinite: only the configured upper bound applies to height.
+    const maxHeight = NOTE_MAX_SIZE
     const element = event.currentTarget.closest('.dsh-desk-note') as HTMLElement | null
     let currentWidth = item.width
     let currentHeight = item.height
@@ -97,7 +120,7 @@ export function useNoteDrag({ wallSize, wallRef, setNotes, savePatch }: DragDeps
       if (moveEvent.pointerId !== event.pointerId) return
       moved = true
       currentWidth = clamp(Math.round(item.width + moveEvent.clientX - startX), NOTE_MIN_WIDTH, Math.min(maxWidth, NOTE_MAX_SIZE))
-      currentHeight = clamp(Math.round(item.height + moveEvent.clientY - startY), NOTE_MIN_HEIGHT, Math.min(maxHeight, NOTE_MAX_SIZE))
+      currentHeight = clamp(Math.round(item.height + moveEvent.clientY - startY), NOTE_MIN_HEIGHT, maxHeight)
       if (element !== null) {
         element.style.width = `${currentWidth}px`
         element.style.height = `${currentHeight}px`
@@ -116,7 +139,7 @@ export function useNoteDrag({ wallSize, wallRef, setNotes, savePatch }: DragDeps
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', finish)
     window.addEventListener('pointercancel', finish)
-  }, [liveSize, savePatch, setNotes])
+  }, [liveWidth, savePatch, setNotes])
 
   return { startDrag, startResize }
 }
