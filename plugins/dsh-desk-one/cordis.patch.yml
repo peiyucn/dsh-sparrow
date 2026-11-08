@@ -1,4 +1,7 @@
-# dsh-desk-one 组合补丁：一个面板承载今天 / 便签 / 任务 / 日程，数据走 storage-domain。
+# dsh-desk-one 组合补丁：一个面板承载今天 / 便签 / 任务 / 日程 / 会话，数据走 storage-domain。
+# trashRoot 是会话归档（A1）自己的回收站目录，不动 dsh 会话根目录。
 - insert:
     - id: dsh-desk-one
       name: '@dsh-sparrow/dsh-desk-one'
+      config:
+        trashRoot: !!js dshHomePath('.sessions-trash')

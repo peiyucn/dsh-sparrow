@@ -5,6 +5,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { MAX_BODY_BYTES } from '../constants.js'
 import { DeskModelError } from '../model.js'
 import { ScheduleError } from './schedule/types.js'
+import { SessionsError } from './sessions/errors.js'
 
 export type DeskErrorCode =
   | 'BAD_BODY'
@@ -47,6 +48,11 @@ export function sendError(ctx: Context, res: ServerResponse, error: unknown): vo
     return
   }
   if (error instanceof DeskError) {
+    sendJson(res, error.status, { error: { code: error.code, message: error.message } })
+    return
+  }
+  // Session archive failures carry their own status code (404 / 409 / 501 / ...).
+  if (error instanceof SessionsError) {
     sendJson(res, error.status, { error: { code: error.code, message: error.message } })
     return
   }

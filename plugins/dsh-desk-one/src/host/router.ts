@@ -15,6 +15,7 @@ import { TASK_ROUTES } from './tasks/routes.js'
 import { SCHEDULE_ROUTES } from './schedule/routes.js'
 import type { DeskStore } from './store.js'
 import type { ScheduleHost } from './schedule/host.js'
+import type { SessionsHost } from './sessions/install.js'
 
 /** Collaborators available to one feature request. */
 export interface DeskRouteContext {
@@ -22,6 +23,8 @@ export interface DeskRouteContext {
   readonly store: DeskStore
   /** Schedule orchestration (optional so read-only tests can mount the router without it). */
   readonly schedule?: ScheduleHost
+  /** Session archive capabilities; routes are appended when installed. */
+  readonly sessions?: SessionsHost
 }
 
 export type RouteHandler = (route: DeskRouteContext, req: IncomingMessage, res: ServerResponse) => Promise<void>
@@ -32,13 +35,16 @@ export interface DeskRouteEntry {
   readonly handle: RouteHandler
 }
 
-/** All HTTP routes of the plugin; feature modules append their tables here. */
-const ROUTE_TABLE: readonly DeskRouteEntry[] = [
+/** All built-in HTTP routes; session routes are appended at handler creation when installed. */
+const BASE_ROUTE_TABLE: readonly DeskRouteEntry[] = [
   ...NOTE_ROUTES, ...TASK_ROUTES, ...GROUP_ROUTES, ...SCHEDULE_ROUTES,
 ]
 
 /** Build the prefix handler: fence -> exact match -> feature handler, with unified error mapping. */
 export function createDeskRequestHandler(route: DeskRouteContext): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+  const routes: readonly DeskRouteEntry[] = route.sessions === undefined
+    ? BASE_ROUTE_TABLE
+    : [...BASE_ROUTE_TABLE, ...route.sessions.routes]
   return async (req, res) => {
     const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
     try {
@@ -48,7 +54,7 @@ export function createDeskRequestHandler(route: DeskRouteContext): (req: Incomin
         sendError(route.ctx, res, new DeskError('FORBIDDEN', '拒绝非本机同源的请求', 403))
         return
       }
-      const match = ROUTE_TABLE.find(entry => entry.method === req.method && entry.path === pathname)
+      const match = routes.find(entry => entry.method === req.method && entry.path === pathname)
       if (match === undefined) {
         sendJson(res, 404, { error: { code: 'BAD_BODY', message: '未知的 desk-one 路由：' + pathname } })
         return
