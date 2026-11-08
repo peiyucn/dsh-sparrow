@@ -24,12 +24,22 @@ interface NoteCardProps {
   readonly onBodyCommit: (note: DeskNote, element: HTMLTextAreaElement) => void
 }
 
+/** Local date label: short for the paper edge, full for the hover title. */
+function createdLabel(iso: string): { readonly short: string; readonly full: string } | null {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return null
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  const short = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  return { short, full: `${short} ${pad(date.getHours())}:${pad(date.getMinutes())}` }
+}
+
 export function NoteCard({
   item, animating, animationDelayMs, t, onRaise, onDragStart, onResizeStart, onColor, onTrash, onBodyCommit,
 }: NoteCardProps): ReactElement {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const { note } = item
   const display = note.body === '' ? note.title : note.body
+  const created = createdLabel(note.createdAt)
 
   useEffect(() => {
     const element = textareaRef.current
@@ -95,6 +105,17 @@ export function NoteCard({
         spellCheck={false}
         onBlur={event => onBodyCommit(note, event.currentTarget)}
       />
+      {created === null
+        ? null
+        : (
+            <time
+              className="dsh-desk-note-created"
+              dateTime={note.createdAt}
+              title={`${t('note.created')} ${created.full}`}
+            >
+              {created.short}
+            </time>
+          )}
       <span
         className="dsh-desk-note-resize"
         aria-hidden="true"

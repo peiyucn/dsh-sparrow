@@ -191,6 +191,18 @@ export const NOTES_CSS = `
   background: rgba(55, 53, 47, 0.08);
   color: rgba(55, 53, 47, 0.92);
 }
+.dsh-desk-note-created {
+  flex: none;
+  align-self: flex-start;
+  margin-top: 2px;
+  color: rgba(55, 53, 47, 0.34);
+  font-size: 10px;
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+  cursor: default;
+  user-select: none;
+}
 .dsh-desk-note-body {
   box-sizing: border-box;
   flex: 1;
