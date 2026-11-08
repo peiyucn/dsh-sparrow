@@ -320,6 +320,7 @@ export const TASKS_CSS = `
 .dsh-task-session {
   position: relative;
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 3px;
   min-width: 0;
@@ -927,43 +928,84 @@ export const TASKS_CSS = `
   width: 14px;
   height: 14px;
 }
-/* Session preview: an inline expansion strip that inherits the card's own colors. */
+/* Session preview: a floating layer that visually continues the chip. It never participates
+   in card layout, so expanding cannot squeeze the board. */
 .dsh-task-session-preview {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px 8px;
-  width: 100%;
-  margin-top: 2px;
-  padding: 4px 2px 2px;
-  border-top: 1px dashed color-mix(in srgb, currentColor 16%, transparent);
-  background: transparent;
-  color: inherit;
+  box-sizing: border-box;
+  width: min(232px, calc(100vw - 24px));
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  border-radius: 10px;
+  background-color: var(--dsw-alias-bg-layer-1, #ffffff);
+  box-shadow: var(--dsw-elevation-panel, 0 10px 30px -12px rgba(20, 25, 40, 0.4));
+  color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 10px;
   line-height: 15px;
+  transform-origin: top left;
   animation: dsh-task-session-expand 0.12s ease-out;
 }
-.dsh-task-session-preview-stat {
+.dsh-task-session-preview[data-state='running'] {
+  border-color: color-mix(in srgb, #2e9e5b 55%, transparent);
+  background-color: color-mix(in srgb, #2e9e5b 14%, var(--dsw-alias-bg-layer-1, #ffffff));
+  color: color-mix(in srgb, #1d6b3f 72%, var(--dsw-alias-label-secondary, #6b7280));
+}
+.dsh-task-session-preview[data-state='idle'] {
+  border-color: color-mix(in srgb, #2e9e5b 30%, transparent);
+  background-color: color-mix(in srgb, #2e9e5b 8%, var(--dsw-alias-bg-layer-1, #ffffff));
+  color: color-mix(in srgb, #1d6b3f 72%, var(--dsw-alias-label-secondary, #6b7280));
+}
+.dsh-task-session-preview[data-state='loading'] {
+  border-color: color-mix(in srgb, #d9a441 45%, transparent);
+  background-color: color-mix(in srgb, #d9a441 12%, var(--dsw-alias-bg-layer-1, #ffffff));
+}
+.dsh-task-session-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.dsh-task-session-preview-token {
   display: inline-flex;
   align-items: baseline;
-  gap: 3px;
+  gap: 4px;
+  min-width: 0;
+}
+.dsh-task-session-preview-token b {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dsh-task-session-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 10px;
+}
+.dsh-task-session-preview-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
   min-width: 0;
 }
 .dsh-task-session-preview-label {
-  opacity: 0.55;
+  opacity: 0.58;
+  white-space: nowrap;
 }
 .dsh-task-session-preview-stat b {
+  overflow: hidden;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dsh-task-session-preview-enter {
   appearance: none;
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
   width: 20px;
   height: 20px;
-  margin-left: auto;
   padding: 0;
   border: 0;
   border-radius: 4px;
@@ -984,6 +1026,13 @@ export const TASKS_CSS = `
 .dsh-task-session-preview-enter:disabled {
   cursor: not-allowed;
   opacity: 0.3;
+}
+@keyframes dsh-task-session-expand {
+  from { opacity: 0; transform: translateY(-2px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dsh-task-session-preview { animation: none; }
 }
 @keyframes dsh-task-session-expand {
   from { opacity: 0; transform: translateY(-2px); }

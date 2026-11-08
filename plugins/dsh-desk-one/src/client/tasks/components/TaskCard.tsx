@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import { MAX_TASK_SESSIONS, NOTE_COLORS } from '../../../constants.js'
 import type { DeskTask, TaskPatchRequest } from '../../../contract.js'
@@ -43,6 +43,22 @@ function localToday(): Date {
   const now = new Date()
   now.setHours(0, 0, 0, 0)
   return now
+}
+
+/** Compact token count: 950, 12.3k, 1.2M. */
+function formatTokens(total: number): string {
+  if (total >= 1_000_000) return `${(total / 1_000_000).toFixed(1)}M`
+  if (total >= 1_000) return `${(total / 1_000).toFixed(1)}k`
+  return String(total)
+}
+
+/** Compact wall time: 42s, 3m 12s, 1h 04m. */
+function formatDuration(ms: number): string {
+  const seconds = Math.max(0, Math.round(ms / 1000))
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, '0')}s`
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`
 }
 
 function daysUntil(date: string): number {
@@ -82,6 +98,18 @@ export function TaskCard({
   const previewChip = previewId === null
     ? undefined
     : sessionChips.find(chip => chip.id === previewId) ?? sessionOptions.find(chip => chip.id === previewId)
+  const previewAnchorRef = useRef<HTMLButtonElement | null>(null)
+  const previewPanelRef = useRef<HTMLDivElement | null>(null)
+  const previewStyle = useAnchoredPanel({
+    open: previewId !== null,
+    anchorRef: previewAnchorRef,
+    panelRef: previewPanelRef,
+    gap: 2,
+    margin: 12,
+    maxWidth: 240,
+    fitContent: true,
+    align: 'start',
+  })
 
   const remaining = task.due === undefined ? undefined : daysUntil(task.due.date)
   const overdue = remaining !== undefined && remaining < 0
@@ -143,6 +171,26 @@ export function TaskCard({
     if (previewChip?.turns !== undefined || previewChip?.steps !== undefined) setPreviewLoading(false)
   }, [previewChip?.steps, previewChip?.turns])
 
+  // Expanded chip: any pointer down outside that chip restores it immediately.
+  useEffect(() => {
+    if (previewId === null) return
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target
+      if (target instanceof Element
+        && (target.closest('[data-session-expanded="true"]') !== null || target.closest('.dsh-task-session-preview') !== null)) return
+      setPreviewId(null)
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setPreviewId(null)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [previewId])
+
   const sessionStatusText = (chip: SessionChipInfo): string => {
     if (chip.availability === 'available') return chip.running ? t('task.session.running') : t('task.session.idle')
     if (chip.availability === 'loading') return t('task.session.loading')
@@ -161,11 +209,12 @@ export function TaskCard({
   }
 
   /** Inline expansion: click the same chip again to collapse it. */
-  const openPreview = (chip: SessionChipInfo): void => {
+  const openPreview = (chip: SessionChipInfo, event: ReactMouseEvent<HTMLButtonElement>): void => {
     if (previewId === chip.id) {
       setPreviewId(null)
       return
     }
+    previewAnchorRef.current = event.currentTarget
     setPreviewId(chip.id)
     setPreviewLoading(chip.turns === undefined && chip.steps === undefined)
     void onInspectSession(chip.id).finally(() => setPreviewLoading(false))
@@ -179,6 +228,14 @@ export function TaskCard({
       ? task.sessionIds.filter(id => id !== chip.id)
       : [...task.sessionIds, chip.id])
   }
+
+  const tokenTotal = [previewChip?.inputTokens, previewChip?.outputTokens, previewChip?.cacheReadTokens, previewChip?.cacheWriteTokens]
+    .filter((value): value is number => typeof value === 'number')
+    .reduce((sum, value) => sum + value, 0)
+  const tokenKnown = previewChip?.inputTokens !== undefined
+  const reading = t('task.session.preview.reading')
+  const tokenText = tokenKnown ? formatTokens(tokenTotal) : (previewLoading ? reading : '—')
+  const modelTimeText = previewChip?.llmMs === undefined ? (previewLoading ? reading : '—') : formatDuration(previewChip.llmMs)
 
   const sessionSearch = sessionQuery.trim().toLowerCase()
   const visibleSessionOptions = sessionOptions.filter(option =>
@@ -270,12 +327,13 @@ export function TaskCard({
                   key={chip.id}
                   className="dsh-task-session"
                   data-state={chip.availability === 'available' ? (chip.running ? 'running' : 'idle') : chip.availability}
+                  data-expanded={previewId === chip.id ? 'true' : undefined}
                 >
                         <button
                     type="button"
                     className="dsh-task-session-title"
                     title={`${chip.title} · ${sessionStatusText(chip)}`}
-                    onClick={() => openPreview(chip)}
+                    onClick={(event) => openPreview(chip, event)}
                   >
                     {chip.title}
                   </button>
@@ -292,43 +350,6 @@ export function TaskCard({
                   </button>
                 </span>
                       ))}
-                    </div>
-                  )}
-              {previewChip === undefined
-                ? null
-                : (
-                    <div
-                      className="dsh-task-session-preview"
-                      role="region"
-                      aria-label={`${previewChip.title} · ${sessionStatusText(previewChip)}`}
-                    >
-                      <span className="dsh-task-session-preview-stat">
-                        <span className="dsh-task-session-preview-label">{t('task.session.preview.lastRun')}</span>
-                        <b>{lastRunText(previewChip)}</b>
-                      </span>
-                      <span className="dsh-task-session-preview-stat">
-                        <span className="dsh-task-session-preview-label">{t('task.session.preview.turns')}</span>
-                        <b>{previewChip.turns ?? (previewLoading ? t('task.session.preview.reading') : '—')}</b>
-                      </span>
-                      <span className="dsh-task-session-preview-stat">
-                        <span className="dsh-task-session-preview-label">{t('task.session.preview.steps')}</span>
-                        <b>{previewChip.steps ?? (previewLoading ? t('task.session.preview.reading') : '—')}</b>
-                      </span>
-                      <button
-                        type="button"
-                        className="dsh-task-session-preview-enter"
-                        disabled={previewChip.availability !== 'available'}
-                        aria-label={t('task.session.preview.open')}
-                        title={t('task.session.preview.open')}
-                        onClick={() => {
-                          onOpenSession(previewChip.id)
-                          setPreviewId(null)
-                        }}
-                      >
-                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M4.5 10h11M11 5.5l4.5 4.5-4.5 4.5" />
-                        </svg>
-                      </button>
                     </div>
                   )}
               {sessionEnabled
@@ -512,6 +533,62 @@ export function TaskCard({
           </button>
         </div>
       </div>
+      {previewChip === undefined || previewChip === null
+        ? null
+        : createPortal(
+            <div
+              ref={previewPanelRef}
+              className="dsh-task-session-preview"
+              data-state={previewChip.availability === 'available' ? (previewChip.running ? 'running' : 'idle') : previewChip.availability}
+              style={previewStyle ?? { visibility: 'hidden' }}
+              role="region"
+              aria-label={`${previewChip.title} · ${sessionStatusText(previewChip)}`}
+            >
+              <div className="dsh-task-session-preview-head">
+                <span
+                  className="dsh-task-session-preview-token"
+                  title={tokenKnown ? `in ${previewChip.inputTokens ?? 0} / out ${previewChip.outputTokens ?? 0} / cache read ${previewChip.cacheReadTokens ?? 0} / cache write ${previewChip.cacheWriteTokens ?? 0}` : undefined}
+                >
+                  <span className="dsh-task-session-preview-label">{t('task.session.preview.tokens')}</span>
+                  <b>{tokenText}</b>
+                </span>
+                <button
+                  type="button"
+                  className="dsh-task-session-preview-enter"
+                  disabled={previewChip.availability !== 'available'}
+                  aria-label={t('task.session.preview.open')}
+                  title={t('task.session.preview.open')}
+                  onClick={() => {
+                    onOpenSession(previewChip.id)
+                    setPreviewId(null)
+                  }}
+                >
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4.5 10h11M11 5.5l4.5 4.5-4.5 4.5" />
+                  </svg>
+                </button>
+              </div>
+              <div className="dsh-task-session-preview-grid">
+                <span className="dsh-task-session-preview-stat">
+                  <span className="dsh-task-session-preview-label">{t('task.session.preview.lastRun')}</span>
+                  <b>{lastRunText(previewChip)}</b>
+                </span>
+                <span className="dsh-task-session-preview-stat">
+                  <span className="dsh-task-session-preview-label">{t('task.session.preview.modelTime')}</span>
+                  <b>{modelTimeText}</b>
+                </span>
+                <span className="dsh-task-session-preview-stat">
+                  <span className="dsh-task-session-preview-label">{t('task.session.preview.turns')}</span>
+                  <b>{previewChip.turns ?? (previewLoading ? reading : '—')}</b>
+                </span>
+                <span className="dsh-task-session-preview-stat">
+                  <span className="dsh-task-session-preview-label">{t('task.session.preview.steps')}</span>
+                  <b>{previewChip.steps ?? (previewLoading ? reading : '—')}</b>
+                </span>
+              </div>
+            </div>,
+            document.body,
+          )}
     </article>
   )
 }

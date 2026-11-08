@@ -8,11 +8,24 @@
 
 import type { SessionChipInfo, SessionLinkApi, SessionLinkSnapshot } from './contract.js'
 
+interface TokenUsageLike {
+  readonly uncachedInputTokens?: number
+  readonly outputTokens?: number
+  readonly cacheReadTokens?: number
+  readonly cacheWriteTokens?: number
+}
+
 interface SessionProjectionValuesLike {
   /** Official `subagent` projection view value (summary key); label identifies the child. */
   readonly subagent?: { readonly label?: string } | null
+  /** Provider-reported usage; a summary projection already present on list rows. */
+  readonly tokenUsage?: TokenUsageLike | null
   /** Full-projection stats read on demand (excluded from list summaries). */
-  readonly sessionStats?: { readonly turns?: number; readonly steps?: number } | null
+  readonly sessionStats?: {
+    readonly turns?: number
+    readonly steps?: number
+    readonly llmMs?: number
+  } | null
 }
 
 interface SessionRowLike {
@@ -110,7 +123,9 @@ function resolveSnapshot(services: SessionServices | null): SessionLinkSnapshot 
   const loading = list.phase === 'pending' || workspaces.phase === 'pending'
   const sessions: SessionChipInfo[] = (list.ids ?? []).map((id) => {
     const row = list.byId?.[id]
-    const stats = list.projectionsBySession?.[id]?.values?.sessionStats
+    const values = list.projectionsBySession?.[id]?.values
+    const stats = values?.sessionStats
+    const tokens = values?.tokenUsage
     const availability = loading
       ? 'loading'
       : archived.has(id) ? 'archived' : row === undefined ? 'unavailable' : 'available'
@@ -125,6 +140,11 @@ function resolveSnapshot(services: SessionServices | null): SessionLinkSnapshot 
       subagent: row?.origin === 'subagent',
       ...typeof stats?.turns === 'number' ? { turns: stats.turns } : {},
       ...typeof stats?.steps === 'number' ? { steps: stats.steps } : {},
+      ...typeof stats?.llmMs === 'number' ? { llmMs: stats.llmMs } : {},
+      ...typeof tokens?.uncachedInputTokens === 'number' ? { inputTokens: tokens.uncachedInputTokens } : {},
+      ...typeof tokens?.outputTokens === 'number' ? { outputTokens: tokens.outputTokens } : {},
+      ...typeof tokens?.cacheReadTokens === 'number' ? { cacheReadTokens: tokens.cacheReadTokens } : {},
+      ...typeof tokens?.cacheWriteTokens === 'number' ? { cacheWriteTokens: tokens.cacheWriteTokens } : {},
     }
   })
   // Running sessions first, then most recently updated — the picker's default order.

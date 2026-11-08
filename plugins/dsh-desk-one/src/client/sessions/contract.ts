@@ -21,6 +21,13 @@ export interface SessionChipInfo {
   /** Whole-log stats, filled after the card calls inspect() (excluded from list summaries). */
   readonly turns?: number
   readonly steps?: number
+  /** Summed model wall time for assembled steps, from the full sessionStats projection. */
+  readonly llmMs?: number
+  /** Provider-reported token totals; absent until the host has a usage sample. */
+  readonly inputTokens?: number
+  readonly outputTokens?: number
+  readonly cacheReadTokens?: number
+  readonly cacheWriteTokens?: number
 }
 
 /** One workspace bucket from the host client snapshot (title is user-visible). */

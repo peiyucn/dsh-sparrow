@@ -85,6 +85,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'task.session.preview.lastRun'
       | 'task.session.preview.turns'
       | 'task.session.preview.steps'
+      | 'task.session.preview.modelTime'
+      | 'task.session.preview.tokens'
       | 'task.session.preview.open'
       | 'task.session.preview.never'
       | 'task.session.preview.justNow'
