@@ -3,13 +3,8 @@
 export const NOTES_CSS = `
 /* 便签标签内部：墙面 / 垃圾桶；右下角留给悬浮操作组。 */
 /* 便签标签内部：墙面 / 垃圾桶，铺满整个可用区域（不再为悬浮按钮预留空白）。 */
-.dsh-desk-notesview {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-/* 墙面：正好占满剩余高度、**不滚动**；贴纸坐标一律夹在可见区域内。
+
+/* 墙面：固定宽度、纵向无限；滚动交给墙面，便签可以落在可视区下方。
    不加背板（owner 2026-11-06：背板显脏且缩小操作面积），沿用页面本身的干净底。 */
 .dsh-desk-wall {
   position: relative;
@@ -36,6 +31,12 @@ export const NOTES_CSS = `
   background: transparent;
 }
 /* 空墙中央的轻提示：双层排版（主提示 + 次提示），颜色压到很浅，不抢贴纸。 */
+.dsh-desk-wall-canvas {
+  position: relative;
+  min-height: calc(100% - var(--dsh-desk-chrome-height, 0px));
+  margin-top: var(--dsh-desk-chrome-height, 0px);
+  padding-bottom: 84px;
+}
 .dsh-desk-wall-tip {
   position: absolute;
   inset: 0;

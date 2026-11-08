@@ -9,7 +9,7 @@ English | [简体中文](README.zh-CN.md)
 * One left-sidebar entry named **Desk One**; functions live in tabs inside the panel instead of scattering across the UI.
 * **Overview** is the main tab in the long run, but its content is not designed yet — it stays intentionally blank in this release.
 * **Notes** is the first shipped feature: a free-form sticky wall, not an input form.
-* **Sessions** is the shared agent-session catalog: active sessions grouped by workspace, archived sessions as a read-only tree. The panel header is a translucent glass bar: a brand pill holds the title + tabs, page actions sit on their own hairline-divided row, and scrollable pages glide beneath the blur.
+* **Sessions** is the shared agent-session catalog: active sessions grouped by workspace, archived sessions as a read-only tree. The panel header mirrors the conversation and right-sidebar headers: an overlay glass bar with a theme-neutral title + tab track. Notes actions float over the canvas, so notes scroll beneath both the actions and the blurred header.
 * **Tasks** is the second shipped feature: a three-lane board (To do / Doing / Done) with colour tags, day-granular due dates, drag-to-move and an archive.
 
 ## Requirements
@@ -27,7 +27,7 @@ English | [简体中文](README.zh-CN.md)
 ## Use
 
 * **Overview** is a blank placeholder for now; the app opens on the notes wall instead of an empty page.
-* Tap **Capture** in the command bar or double-click empty space on the wall: a fresh sticky appears at that spot, lands on top of the pile and takes the keyboard focus. The command row also hosts **Smash!** and the trash entry; the empty wall keeps its faint two-line hint.
+* Tap **Capture** in the floating action bar at the lower-right of the canvas or double-click empty space on the wall: a fresh sticky appears at that spot, lands on top of the pile and takes the keyboard focus. The command row also hosts **Smash!** and the trash entry; the empty wall keeps its faint two-line hint.
 * The wall is a fixed-width, vertically infinite canvas: drag a note to the bottom edge and the wall auto-scrolls; notes can live below the viewport and the wall scrolls vertically to them.
 * Type straight onto the sticky; leaving it saves the text, and an emptied sticky is removed instead of kept as clutter.
 * Drag a sticky by its body; a compact six-dot grip at the top-left marks the grab area. Whichever sticky you click or drag comes to the front, and that layer order is saved too.

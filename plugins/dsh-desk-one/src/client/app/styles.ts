@@ -17,25 +17,80 @@ export const APP_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 14px;
 }
-/* 内容列统一限宽居中（顶栏与内容同宽）。 */
+/* Content column; the chrome is absolutely positioned above it. */
 .dsh-desk-page > * {
   width: 100%;
   max-width: 960px;
   margin-left: auto;
   margin-right: auto;
 }
-/* Glass chrome: a brand pill carries the app title + primary navigation (stable equal-width
-   tabs), while page-specific actions live on their own row under a hairline. Content scrolls
-   beneath the translucent bar, the way the conversation and right-sidebar headers behave. */
+.dsh-desk-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.dsh-desk-overview {
+  padding-top: calc(var(--dsh-desk-chrome-height, 0px) + 18px);
+}
+/* Notes stage: wall scrollport + floating actions over it. */
+.dsh-desk-notesview {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.dsh-desk-notes-stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.dsh-desk-trash-host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: calc(var(--dsh-desk-chrome-height, 0px) + 18px);
+}
+/* Floating action pill over the canvas: notes scroll underneath instead of being blocked by a row. */
+.dsh-desk-canvas-actions {
+  position: absolute;
+  right: 16px;
+  bottom: 18px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: calc(var(--dsw-radius-md, 12px) + 2px);
+  background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 58%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow:
+    0 10px 24px -16px rgba(0, 0, 0, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.12);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .dsh-desk-canvas-actions {
+    background: var(--dsw-alias-bg-base, #ffffff);
+  }
+}
+/* Glass chrome copied from the theme-tone recipe used by the conversation and right-sidebar
+   headers: the header is an absolute overlay, content scrolls beneath it and is blurred.
+   The menu itself stays theme-neutral (no brand fill / white text). */
 .dsh-desk-chrome {
   box-sizing: border-box;
-  position: relative;
-  z-index: 3;
-  flex: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
   padding: 28px 0 10px;
-  background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 74%, transparent);
-  backdrop-filter: blur(18px) saturate(125%);
-  -webkit-backdrop-filter: blur(18px) saturate(125%);
+  background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent);
+  backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
+  -webkit-backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
 }
 html[data-platform='darwin'] .dsh-desk-chrome {
   padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
@@ -52,6 +107,7 @@ html[data-platform='darwin'] .dsh-desk-chrome {
   gap: 16px;
   min-height: 36px;
 }
+/* Title + tabs share one rounded track, but every color comes from the active theme. */
 .dsh-desk-menupill {
   display: inline-flex;
   align-items: center;
@@ -59,14 +115,15 @@ html[data-platform='darwin'] .dsh-desk-chrome {
   flex: none;
   padding: 3px;
   border-radius: calc(var(--dsw-radius-md, 12px) + 3px);
-  background: var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6));
-  color: var(--dsw-alias-label-primary-foreground, #ffffff);
-  box-shadow: inset 0 0 0 var(--dsh-hairline-width, 0.5px) color-mix(in srgb, #ffffff 22%, transparent);
+  background: var(--dsw-alias-bg-module-platform, var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06)));
+  color: var(--dsw-alias-label-primary, #1f2329);
+  box-shadow: inset 0 0 0 var(--dsh-hairline-width, 0.5px) var(--dsw-alias-border-l1, #e2e5ea);
 }
 .dsh-desk-menu-title {
   padding: 0 12px;
-  border-right: 0.5px solid color-mix(in srgb, var(--dsw-alias-label-primary-foreground, #ffffff) 26%, transparent);
+  border-right: 0.5px solid var(--dsw-alias-border-l2, #cfd4dc);
   margin-right: 4px;
+  color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 14px;
   font-weight: 600;
   line-height: 30px;
@@ -92,20 +149,22 @@ html[data-platform='darwin'] .dsh-desk-chrome {
   border: none;
   border-radius: var(--dsw-radius-sm, 8px);
   background: transparent;
+  color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 13px;
   font-weight: 500;
   line-height: 18px;
-  color: color-mix(in srgb, var(--dsw-alias-label-primary-foreground, #ffffff) 78%, transparent);
   white-space: nowrap;
   cursor: pointer;
   transition: color 160ms ease, background 160ms ease;
 }
 .dsh-desk-tab:hover {
-  color: var(--dsw-alias-label-primary-foreground, #ffffff);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-label-primary, #1f2329);
 }
 .dsh-desk-tab[data-active='true'] {
   background: var(--dsw-alias-bg-layer-1, #ffffff);
-  color: var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6));
+  box-shadow: inset 0 0 0 var(--dsh-hairline-width, 0.5px) var(--dsw-alias-border-l1, #e2e5ea);
+  color: var(--dsw-alias-label-primary, #1f2329);
   font-weight: 500;
 }
 /* Reserved for time management / to-do widgets: a dashed frame marks the slot until it is built. */
