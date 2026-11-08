@@ -30,6 +30,12 @@ const readTaskColumn = async () => (await Promise.all([
   read('src/client/tasks/components/LaneHeader.tsx'),
   read('src/client/tasks/components/TaskDraftCard.tsx'),
 ])).join('\n')
+/** Task card + extracted session chip: guards survive the TaskCard / TaskSessionChip split. */
+const readTaskCard = async () => (await Promise.all([
+  read('src/client/tasks/components/TaskCard.tsx'),
+  read('src/client/tasks/components/TaskSessionChip.tsx'),
+])).join('\n')
+
 const readClientSurface = async () => {
   const entries = await readdir(CLIENT_DIR, { recursive: true })
   // Styles are asserted separately (they are the only files allowed to carry raw CSS values).
@@ -354,7 +360,7 @@ describe('dsh-desk-one 结构', () => {
     const page = await readClientSurface()
     const board = await readTaskBoard()
     const column = await readTaskColumn()
-    const card = await read('src/client/tasks/components/TaskCard.tsx')
+    const card = await readTaskCard()
     const types = await read('src/client/tasks/types.ts')
     const index = await read('src/client/index.ts')
     const install = await read('src/client/install.ts')
@@ -505,7 +511,7 @@ describe('dsh-desk-one 结构', () => {
     const sessionContract = await read('src/client/sessions/contract.ts')
     const bridge = await read('src/client/sessions/bridge.ts')
     const index = await read('src/client/index.ts')
-    const card = await read('src/client/tasks/components/TaskCard.tsx')
+    const card = await readTaskCard()
     const board = await readTaskBoard()
     const column = await readTaskColumn()
     const styles = await readStyles()

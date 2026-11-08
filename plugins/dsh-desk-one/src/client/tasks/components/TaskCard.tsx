@@ -15,6 +15,7 @@ import type { DeskTask, TaskPatchRequest } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
 import type { SessionChipInfo } from '../../sessions/contract.js'
 import { useAnchoredPanel } from '../hooks/useAnchoredPanel.js'
+import { TaskSessionChip, sessionStatusText } from './TaskSessionChip.js'
 
 interface TaskCardProps {
   readonly task: DeskTask
@@ -43,22 +44,6 @@ function localToday(): Date {
   const now = new Date()
   now.setHours(0, 0, 0, 0)
   return now
-}
-
-/** Compact token count: 950, 12.3k, 1.2M. */
-function formatTokens(total: number): string {
-  if (total >= 1_000_000) return `${(total / 1_000_000).toFixed(1)}M`
-  if (total >= 1_000) return `${(total / 1_000).toFixed(1)}k`
-  return String(total)
-}
-
-/** Compact wall time: 42s, 3m 12s, 1h 04m. */
-function formatDuration(ms: number): string {
-  const seconds = Math.max(0, Math.round(ms / 1000))
-  if (seconds < 60) return `${seconds}s`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, '0')}s`
-  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`
 }
 
 function daysUntil(date: string): number {
@@ -179,31 +164,14 @@ export function TaskCard({
     }
   }, [previewId])
 
-  const sessionStatusText = (chip: SessionChipInfo): string => {
-    if (chip.availability === 'available') return chip.running ? t('task.session.running') : t('task.session.idle')
-    if (chip.availability === 'loading') return t('task.session.loading')
-    if (chip.availability === 'archived') return t('task.session.archived')
-    return t('task.session.unavailable')
-  }
-
-  const lastRunText = (chip: SessionChipInfo): string => {
-    if (chip.updatedAt <= 0) return t('task.session.preview.never')
-    const minutes = Math.max(0, Math.floor((Date.now() - chip.updatedAt) / 60_000))
-    if (minutes < 1) return t('task.session.preview.justNow')
-    if (minutes < 60) return t('task.session.preview.minutesAgo', { count: minutes })
-    const hours = Math.floor(minutes / 60)
-    if (hours < 24) return t('task.session.preview.hoursAgo', { count: hours })
-    return t('task.session.preview.daysAgo', { count: Math.floor(hours / 24) })
-  }
-
   /** Inline expansion: click the same chip again to collapse it. */
-  const openPreview = (chip: SessionChipInfo): void => {
+  const togglePreview = (chip: SessionChipInfo): void => {
     if (previewId === chip.id) {
       setPreviewId(null)
       return
     }
     setPreviewId(chip.id)
-    setPreviewLoading(chip.turns === undefined && chip.steps === undefined)
+    setPreviewLoading(chip.turns === undefined && chip.steps === undefined && chip.llmMs === undefined)
     void onInspectSession(chip.id).finally(() => setPreviewLoading(false))
   }
 
@@ -215,15 +183,6 @@ export function TaskCard({
       ? task.sessionIds.filter(id => id !== chip.id)
       : [...task.sessionIds, chip.id])
   }
-
-  const tokenTotal = [previewChip?.inputTokens, previewChip?.outputTokens, previewChip?.cacheReadTokens, previewChip?.cacheWriteTokens]
-    .filter((value): value is number => typeof value === 'number')
-    .reduce((sum, value) => sum + value, 0)
-  const tokenKnown = [previewChip?.inputTokens, previewChip?.outputTokens, previewChip?.cacheReadTokens, previewChip?.cacheWriteTokens]
-    .some(value => typeof value === 'number')
-  const reading = t('task.session.preview.reading')
-  const tokenText = tokenKnown ? formatTokens(tokenTotal) : (previewLoading ? reading : '—')
-  const modelTimeText = previewChip?.llmMs === undefined ? (previewLoading ? reading : '—') : formatDuration(previewChip.llmMs)
 
   const sessionSearch = sessionQuery.trim().toLowerCase()
   const visibleSessionOptions = sessionOptions.filter(option =>
@@ -311,85 +270,19 @@ export function TaskCard({
                 : (
                     <div className="dsh-task-session-chips">
                       {sessionChips.map(chip => (
-                <span
-                  key={chip.id}
-                  className="dsh-task-session"
-                  data-state={chip.availability === 'available' ? (chip.running ? 'running' : 'idle') : chip.availability}
-                  data-expanded={previewId === chip.id ? 'true' : undefined}
-                  onClick={() => openPreview(chip)}
-                  onPointerDown={(event) => event.stopPropagation()}
-                >
-                        <button
-                    type="button"
-                    className="dsh-task-session-title"
-                    title={`${chip.title} · ${sessionStatusText(chip)}`}
-                  >
-                    {chip.title}
-                  </button>
-                  <button
-                    type="button"
-                    className="dsh-task-session-remove"
-                    aria-label={t('task.session.remove')}
-                    title={t('task.session.remove')}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onLinkSessions(task.sessionIds.filter(id => id !== chip.id))
-                    }}
-                  >
-                    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
-                      <path d="M3 3l6 6M9 3L3 9" />
-                    </svg>
-                  </button>
-                  {previewId !== chip.id
-                    ? null
-                    : (
-                        <span className="dsh-task-session-preview">
-                          <span className="dsh-task-session-preview-head">
-                            <span
-                              className="dsh-task-session-preview-token"
-                              title={tokenKnown ? `in ${chip.inputTokens ?? 0} / out ${chip.outputTokens ?? 0} / cache read ${chip.cacheReadTokens ?? 0} / cache write ${chip.cacheWriteTokens ?? 0}` : undefined}
-                            >
-                              <span className="dsh-task-session-preview-label">{t('task.session.preview.tokens')}</span>
-                              <b>{tokenText}</b>
-                            </span>
-                            <button
-                              type="button"
-                              className="dsh-task-session-preview-enter"
-                              disabled={chip.availability !== 'available'}
-                              aria-label={t('task.session.preview.open')}
-                              title={t('task.session.preview.open')}
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                onOpenSession(chip.id)
-                                setPreviewId(null)
-                              }}
-                            >
-                              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                <path d="M4.5 10h11M11 5.5l4.5 4.5-4.5 4.5" />
-                              </svg>
-                            </button>
-                          </span>
-                          <span className="dsh-task-session-preview-grid">
-                            <span className="dsh-task-session-preview-stat">
-                              <span className="dsh-task-session-preview-label">{t('task.session.preview.lastRun')}</span>
-                              <b>{lastRunText(chip)}</b>
-                            </span>
-                            <span className="dsh-task-session-preview-stat">
-                              <span className="dsh-task-session-preview-label">{t('task.session.preview.modelTime')}</span>
-                              <b>{modelTimeText}</b>
-                            </span>
-                            <span className="dsh-task-session-preview-stat">
-                              <span className="dsh-task-session-preview-label">{t('task.session.preview.turns')}</span>
-                              <b>{chip.turns ?? (previewLoading ? reading : '—')}</b>
-                            </span>
-                            <span className="dsh-task-session-preview-stat">
-                              <span className="dsh-task-session-preview-label">{t('task.session.preview.steps')}</span>
-                              <b>{chip.steps ?? (previewLoading ? reading : '—')}</b>
-                            </span>
-                          </span>
-                        </span>
-                      )}
-                </span>
+                        <TaskSessionChip
+                          key={chip.id}
+                          chip={chip}
+                          t={t}
+                          expanded={previewId === chip.id}
+                          loading={previewLoading}
+                          onToggle={() => togglePreview(chip)}
+                          onOpen={() => {
+                            onOpenSession(chip.id)
+                            setPreviewId(null)
+                          }}
+                          onUnlink={() => onLinkSessions(task.sessionIds.filter(id => id !== chip.id))}
+                        />
                       ))}
                     </div>
                   )}
@@ -453,7 +346,7 @@ export function TaskCard({
                               onClick={() => toggleSession(option)}
                             >
                                                 <span className="dsh-task-session-option-title">{option.title}</span>
-                              <span className="dsh-task-session-option-state">{sessionStatusText(option)}</span>
+                              <span className="dsh-task-session-option-state">{sessionStatusText(t, option)}</span>
                             </button>
                           </li>
                         )
