@@ -158,7 +158,7 @@ const ZH_DESCRIPTIONS = {
   'dsh-archive-manage': '会话归档管理：取消归档、移入回收站、彻底删除、从回收站还原，父会话与子会话整体操作',
   'dsh-codebuddy-credits': 'CodeBuddy 额度 LLM provider：用官方 API Key 直连，在 DSH 里选用 CodeBuddy 的模型额度',
   'dsh-theme-tone': '明暗主题之下的色调层与对话区布局优化：每轴一款「官方默认」加若干色调，含顶栏与输入框玻璃效果',
-  'dsh-desk-one': '办公桌（Desk One）：一个侧栏面板用标签页容纳便签墙、任务板与 Agent 会话；统一对象模型，数据存本机',
+  'dsh-desk-one': '办公桌（Desk One）：一个侧栏面板用标签页容纳便签墙、任务板、日程与会话管理；日程只读聚合企业微信 / iCloud / Outlook 个人日历，统一对象模型，数据存本机',
 }
 
 /**

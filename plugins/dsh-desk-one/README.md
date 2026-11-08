@@ -2,21 +2,22 @@
 
 English | [简体中文](README.zh-CN.md)
 
-**Desk One (同桌)** — a shared desk for you and harness inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. S0 ships the skeleton and the notes wall — a sticky wall you fill with "＋", drag around, resize and write on directly.
+**Desk One (同桌)** — a shared desk for you and harness inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. Notes, tasks, schedule and agent sessions live side by side; the schedule aggregates WeCom / iCloud / personal Outlook calendars (read-only).
 
 ## What it is
 
 * One left-sidebar entry named **Desk One**; functions live in tabs inside the panel instead of scattering across the UI. The panel chrome follows the official conversation header, and in-page action buttons reuse the official plugin-page button shape.
 * **Overview** is the main tab in the long run, but its content is not designed yet — it stays intentionally blank in this release.
 * **Notes** is the first shipped feature: a free-form sticky wall, not an input form.
-* **Sessions** is the shared agent-session catalog: active sessions grouped by workspace, archived sessions as a read-only tree. The panel header matches the conversation topbar: a compact 76px bar (solid official black/white by default; glass only when theme-tone is active) with the brand title plus a one-line intro and the active view actions, followed by official-style plain text tabs (2px underline on the active tab) and a trailing ellipsis launcher (official `More` button) that opens a blurred page menu; future tabs can move there instead of growing the strip. It is a fixed 76px overlay; every feature keeps a 76px content offset so the first paint starts below the glass while scrolling content passes underneath. The notes wall is full-bleed, and the trailing ellipsis opens a floating blurred page menu.
-* **Tasks** is the second shipped feature: a three-lane board (To do / Doing / Done) with colour tags, day-granular due dates, drag-to-move and an archive.
+* **Tasks** is the three-lane board (To do / Doing / Done) with colour tags, day-granular due dates, drag-to-move, groups and an archive.
+* **Schedule** aggregates WeCom, iCloud and personal Outlook calendars into one read-only view: an upcoming rail, a list / month / week main view and a calendar-source panel grouped by provider, with per-calendar colour and visibility.
+* **Sessions** is the shared agent-session catalog: active sessions grouped by workspace, plus archive management (unarchive, move to trash, restore, permanent delete, stray sessions) with typed-title confirmation for destructive actions. The panel header matches the conversation topbar: a compact 76px bar (solid official black/white by default; glass only when theme-tone is active) with the brand title plus a one-line intro and the active view actions, followed by official-style plain text tabs (2px underline on the active tab) and a trailing ellipsis launcher (official `More` button) that opens a blurred page menu; future tabs can move there instead of growing the strip. It is a fixed 76px overlay; every feature keeps a 76px content offset so the first paint starts below the glass while scrolling content passes underneath. The notes wall is full-bleed, and the trailing ellipsis opens a floating blurred page menu.
 
 ## Requirements
 
 * Requires DSH 0.2.2-rc.1, the exact version line the other plugins in this repository pin.
 * Node.js 24 or newer, matching the DSH host requirement.
-* No network access, no extra credentials, no account setup.
+* Notes, tasks and session management need no network or account setup. **Schedule aggregation** requires connecting at least one source in the panel (WeCom CalDAV sync password, iCloud app-specific password, or a personal Outlook published ICS link) and lets the host reach that service.
 
 ## Install
 
@@ -38,22 +39,26 @@ English | [简体中文](README.zh-CN.md)
 * Open **Tasks** for the fixed three-lane board. Add a card with a lane's **＋** or by double-clicking empty space in a lane; the card shows a wrapping title and description, a stacked colour swatch (current colour on top with palette neighbours peeking out; clicking opens a five-colour palette), and a calendar button for the day-granular deadline (icon only when unset, icon + date once set; click to change it). Click the title or description to edit it; the text is plain otherwise, so the **whole card is a drag surface**. Cards due within a day get an amber outline, overdue dates show in red, and only cards and groups in **Done** can be archived.
 * Press anywhere on a card to drag it: a copy follows the pointer, lanes highlight, and dropping it on an invalid spot flies the card back. Drop a card into a lane to change status or onto another card to reorder; while dragging, the target lane and group light up and a blue insertion line shows exactly where it will land. Delete asks for a second click.
 * The title-row actions switch between **manual order**, **creation time** and **due date**, and the **Done** lane can be collapsed. **＋ group** creates a real one-level group inside a lane: cards can be dragged in or out, the group can stay empty, its name can be edited in place, and the six-dot grip reorders groups. Its header uses two rows (name, then task count) so long names and the action icons fit a narrow lane. Ungrouped cards and group blocks share **one manual sequence**, so a group can be dropped between cards (and cards between groups). Dragging a group by its header moves the whole block just like a card — the header and its cards follow the pointer, dropping it on another lane moves its cards with it immediately (moving back is just as cheap), and a drop inside the same lane reorders groups. Deleting a group keeps its cards and makes them ungrouped. In the **Done** lane a group header also gets an archive button: archiving takes the whole group and its cards off the board, the archive view lists it as one row, restoring brings both back, and deleting an archived group removes its cards too. **Archived** lists archived tasks where they can be restored or deleted permanently.
-* Open **Sessions** for the shared agent-session catalog: active sessions grouped by workspace, plus a read-only archived tree (archive / trash management is being migrated from the standalone archive plugin).
+* Open **Sessions** for the shared agent-session catalog: active sessions on top, then the archive section (parent rows with collapsible subagent trees), stray sessions and the trash. Archived rows can be unarchived, moved to trash or deleted forever (a parent takes its subagents with it); the trash supports restore / restore all / permanent delete and shows a copyable path. Deleting a regular session requires typing its exact title, and blank strays plus bulk actions use their own two-step confirmation.
+* Open **Schedule** for the aggregated calendar: the left rail shows the next 7 days, the main view switches between list / month / week, and the right panel groups every calendar under its provider — click a calendar name to hide/show it, click its colour dot to change colour, and use **Manage connections** to configure sources. External events are read-only: open details, copy them or jump back to the original client. The panel syncs on open and then every 15 minutes.
 * Nothing scrolls sideways: when the panel gets too narrow the three lanes collapse into count-only columns (lane name plus per-group counts). When a lane's cards overflow vertically, its body shows a thin scrollbar and scrolls instead of squeezing the cards.
 * Link DSH sessions to a card with **@** — a card can carry several sessions and one session can serve several cards. Each session chip carries its live state as colour (available sessions are green; archived/unavailable ones are neutral grey) and a slow orbiting green ring marks the ones where the agent is actually running (it stays still under reduced-motion). Click a chip to expand it in place, up to the card width (the card height may grow, and a running chip keeps its animated border around the expanded box): last run, model time, turns, steps and token usage appear inside, click elsewhere restores it, and the arrow opens the session. The **@** entry sits on its own row below the linked chips; its picker is a floating panel over the whole page (never clipped by the lane) and lists the same session set as the composer's `@` menu, including subagent sessions. Linking never overwrites the card's own title or description.
 
 ## Data and privacy
 
-* Notes live in a DSH storage domain (`desk_one`) managed by the official storage service; nothing leaves the machine.
-* The panel talks to the plugin's own host routes under `/api/desk-one`; the client never touches storage directly.
+* Notes, tasks and the schedule mirror live in a DSH storage domain (`desk_one`) managed by the official storage service; the schedule is a read-only mirror and is never written back.
+* Schedule credentials (sync password / published link) live only in the official credential store (`ctx.credentials`); records keep only a reference name, and nothing is written to logs, HTML or exports.
+* The panel talks to the plugin's own host routes under `/api/desk-one` (sessions under `/api/desk-one/sessions/*`, schedule under `/api/desk-one/schedule/*`); the client never touches storage directly.
 * Agent tools (`desk_note_*`, `desk_task_*`, `desk_group_*`) read and write the same notes, tasks and groups, so the model and the UI always see one dataset. Session links store only opaque session ids next to your local data; their titles and running state are read from the host UI and never sent anywhere.
 
 ## Known limitations
 
-* S1 ships notes and the task board; focus sessions, calendars and richer task fields (priority, estimates, labels) are planned in the repository spec.
+* The schedule is a **read-only** aggregation: no local event creation, no write-back and no iCalendar subscription/publishing yet; the three sources must be configured by you on first use, and their protocol behaviour is owned by the official services.
+* Schedule aggregation is bounded by those services: re-issuing the WeCom sync password invalidates the old one; iCloud app-specific passwords are all revoked when the Apple account password changes; Outlook published ICS refreshes on the receiving side (usually 3–24 hours).
+* While the standalone archive plugin still exists it shares the same trash directory; after it retires, archive and trash management live only in Desk One.
+* Focus sessions, search and richer task fields (priority, estimates, labels) are planned in the repository spec.
 * Task drag is pointer-only; there is no keyboard reorder yet.
 * Session links are display and navigation only for now: the board never advances a card when a session starts or ends.
-* Notes are not synced to any external service yet; Outlook and WeCom calendar sync arrives in a later step.
 * Notes created by agent tools get an automatic wall position until you drag them yourself.
 * Saved positions are re-clamped on screen while the window is small, and return to their saved spots once there is room again.
 * Overview stays blank until its content and linkage rules are designed.
