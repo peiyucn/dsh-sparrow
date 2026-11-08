@@ -96,6 +96,7 @@ describe('host 装配（apply 接线）', () => {
         'desk_group_add', 'desk_group_archive', 'desk_group_delete', 'desk_group_list', 'desk_group_move',
         'desk_group_update',
         'desk_note_add', 'desk_note_delete', 'desk_note_list', 'desk_note_update',
+        'desk_schedule_connections', 'desk_schedule_list', 'desk_schedule_sync',
         'desk_task_add', 'desk_task_archive', 'desk_task_complete', 'desk_task_list', 'desk_task_update',
       ],
     )
