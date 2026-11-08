@@ -577,8 +577,9 @@ describe('dsh-desk-one 结构', () => {
     assert.match(styles, /\.dsh-task-session\[data-state='idle'\] \{[^}]*border-color: color-mix\([^}]*#2e9e5b/su, '空闲态用绿色静态边')
     assert.match(styles, /\.dsh-task-session\[data-state='archived'\],\s*\.dsh-task-session\[data-state='unavailable'\] \{[^}]*border-color: color-mix/su, '归档/不可用用灰色实线')
     assert.ok(!/\.dsh-task-session\[data-state='archived'\][^{]*\{[^}]*border-style: dashed/su.test(styles), '不再用虚线区分归档')
-    assert.ok(!card.includes('dsh-task-session-dot'), 'chip 不再用状态圆点')
-    assert.ok(!styles.includes('dsh-task-session-dot'), '删除状态圆点样式')
+    assert.match(card, /dsh-task-session-dot/u, 'chip 用状态圆点承载绿色')
+    assert.ok(!/\.dsh-task-session\[data-state='running'\] \{\n  color:/u.test(styles), '运行中文字不再染绿')
+    assert.match(styles, /\.dsh-task-session-dot \{/u, '状态圆点用官方 success 色')
     assert.match(styles, /\.dsh-task-session-pop \{/u)
   })
 

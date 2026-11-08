@@ -316,6 +316,9 @@ export function TaskCard({
                   data-state={chip.availability === 'available' ? (chip.running ? 'running' : 'idle') : chip.availability}
                   data-expanded={previewId === chip.id ? 'true' : undefined}
                 >
+                        {chip.availability === 'available'
+                          ? <span className="dsh-task-session-dot" aria-hidden="true" />
+                          : null}
                         <button
                     type="button"
                     className="dsh-task-session-title"

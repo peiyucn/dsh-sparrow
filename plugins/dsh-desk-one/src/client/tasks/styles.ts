@@ -317,12 +317,13 @@ export const TASKS_CSS = `
   align-items: center;
   min-height: 16px;
 }
+/* Neutral chip text: status lives in the dot/ring/border, not the title color. */
 .dsh-task-session {
   position: relative;
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
   max-width: 100%;
   padding: 1px 2px 1px 6px;
@@ -333,10 +334,21 @@ export const TASKS_CSS = `
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
 /* Available sessions read as alive (green); archived ones read as neutral grey. */
+/* Official success green, kept to borders/background/dot; text stays neutral. */
 .dsh-task-session[data-state='running'] {
-  border-color: color-mix(in srgb, #2e9e5b 55%, transparent);
-  background: color-mix(in srgb, #2e9e5b 14%, var(--dsw-alias-bg-layer-1, #ffffff));
-  color: color-mix(in srgb, #1d6b3f 72%, var(--dsw-alias-label-secondary, #6b7280));
+  border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 48%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 10%, var(--dsw-alias-bg-layer-1, #ffffff));
+}
+.dsh-task-session-dot {
+  box-sizing: border-box;
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-success-primary, #2e9e5b);
+}
+.dsh-task-session[data-state='idle'] .dsh-task-session-dot {
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 55%, transparent);
 }
 /* A slow orbit ring is the only motion cue: running vs merely available, no extra hue.
    Animate the conic-gradient angle instead of rotating the element: the chip is a wide pill,
@@ -355,7 +367,7 @@ export const TASKS_CSS = `
   background: conic-gradient(
     from var(--dsh-task-session-orbit-angle),
     transparent 0deg 210deg,
-    #2e9e5b 270deg,
+    var(--dsw-alias-state-success-primary, #2e9e5b) 270deg,
     transparent 330deg 360deg
   );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -369,8 +381,8 @@ export const TASKS_CSS = `
   to { --dsh-task-session-orbit-angle: 360deg; }
 }
 .dsh-task-session[data-state='idle'] {
-  border-color: color-mix(in srgb, #2e9e5b 30%, transparent);
-  background: color-mix(in srgb, #2e9e5b 8%, var(--dsw-alias-bg-layer-1, #ffffff));
+  border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 24%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 6%, var(--dsw-alias-bg-layer-1, #ffffff));
 }
 .dsh-task-session[data-state='loading'] {
   border-color: color-mix(in srgb, #d9a441 45%, transparent);
@@ -390,7 +402,7 @@ export const TASKS_CSS = `
     animation: none;
   }
   .dsh-task-session[data-state='running'] {
-    border-color: color-mix(in srgb, #2e9e5b 70%, transparent);
+    border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 55%, transparent);
   }
 }
 .dsh-task-session-title {
