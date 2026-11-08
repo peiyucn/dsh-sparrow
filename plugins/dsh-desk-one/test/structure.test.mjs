@@ -131,6 +131,10 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /MAX_ACTIVE_NOTES/u, '客户端要挡墙上限')
     assert.match(page, /wall\.full/u, '墙上限要有友好提示')
     assert.match(i18n, /便签太多了，请先清理一下吧/u, '墙上限提示文案按 owner 口径')
+    assert.match(constants, /NOTE_MIN_WIDTH = 152/u, '最小宽度要容纳完整工具条')
+    const wallLayout = await read('src/client/notes/hooks/useWallLayout.ts')
+    assert.match(wallLayout, /noteDisplaySize/u, '渲染时按当前最小尺寸夹取旧便签')
+    assert.match(wallLayout, /NOTE_MIN_WIDTH/u)
     assert.match(page, /trash\.full/u, '垃圾桶满了要提示先清空')
     assert.match(page, /action\.loadMore/u, '垃圾桶要能加载更多')
     // Smash stays in the command bar with the shared two-step confirm and danger tint.

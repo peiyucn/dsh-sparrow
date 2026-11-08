@@ -11,10 +11,18 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH } from '../../../constants.js'
+import { NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH } from '../../../constants.js'
 import type { DeskNote } from '../../../contract.js'
 import type { PlacedNote, WallSize } from '../../app/types.js'
 import { clamp, fallbackPosition } from '../../app/utils.js'
+
+/** Resolve a note's on-wall box, clamping legacy undersized notes to the current limits. */
+export function noteDisplaySize(note: DeskNote): { width: number; height: number } {
+  return {
+    width: clamp(note.width ?? NOTE_DEFAULT_WIDTH, NOTE_MIN_WIDTH, NOTE_MAX_SIZE),
+    height: clamp(note.height ?? NOTE_DEFAULT_HEIGHT, NOTE_MIN_HEIGHT, NOTE_MAX_SIZE),
+  }
+}
 
 export interface WallLayout {
   /** Mutable ref: the page attaches `setWallRef` (not this object) to the wall node. */
@@ -51,8 +59,10 @@ export function useWallLayout(enabled: boolean, activeNotes: readonly DeskNote[]
   }, [enabled])
 
   const placed = useMemo<PlacedNote[]>(() => activeNotes.map((note, index) => {
-    const width = note.width ?? NOTE_DEFAULT_WIDTH
-    const height = note.height ?? NOTE_DEFAULT_HEIGHT
+    // Legacy notes can carry a size smaller than the current minimum (the old 120px limit clipped
+    // the toolbar); clamp on render so the trash button stays inside every note.
+    const width = clamp(note.width ?? NOTE_DEFAULT_WIDTH, NOTE_MIN_WIDTH, NOTE_MAX_SIZE)
+    const height = clamp(note.height ?? NOTE_DEFAULT_HEIGHT, NOTE_MIN_HEIGHT, NOTE_MAX_SIZE)
     const fallback = fallbackPosition(index)
     const rawX = note.x ?? fallback.x
     const rawY = note.y ?? fallback.y

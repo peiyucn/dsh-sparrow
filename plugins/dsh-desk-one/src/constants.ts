@@ -71,7 +71,7 @@ export const TASK_STATUSES = ['todo', 'doing', 'done'] as const
 /** 便签几何（px）：默认尺寸与拖拽改大小的上下限，模型层与界面共用这一份真值。 */
 export const NOTE_DEFAULT_WIDTH = 208
 export const NOTE_DEFAULT_HEIGHT = 168
-export const NOTE_MIN_WIDTH = 120
+export const NOTE_MIN_WIDTH = 152
 export const NOTE_MIN_HEIGHT = 100
 export const NOTE_MAX_SIZE = 2000
 
