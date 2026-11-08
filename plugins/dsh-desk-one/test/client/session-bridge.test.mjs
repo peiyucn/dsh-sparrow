@@ -11,7 +11,7 @@ function fakeServices(initial = { archived: [] }) {
   const rows = {
     titled: { id: 'titled', title: '标题会话', displayTitle: 'display 标题会话', running: true, updatedAt: 3 },
     child: { id: 'child', title: '你是负责……', displayTitle: '你是负责……', origin: 'subagent', parentId: 'titled', updatedAt: 2, projectionValues: { subagent: { mode: 'continuable', label: '子代理标签', seq: 0 } } },
-    cold: { id: 'cold', displayTitle: 'pyai-meta-repo', updatedAt: 1 },
+    cold: { id: 'cold', displayTitle: 'workspace-basename', updatedAt: 1 },
   }
   return {
     services: {
