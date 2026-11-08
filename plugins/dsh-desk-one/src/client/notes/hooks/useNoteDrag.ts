@@ -33,9 +33,12 @@ export interface NoteDrag {
   readonly startResize: (event: ReactPointerEvent<HTMLElement>, item: PlacedNote) => void
 }
 
-/** Edge zone for drag auto-scroll, and its speed at the very edge (px per 60fps frame). */
+/** Edge zone for drag scrolling; the scroll distance follows the pointer's own movement. */
 const AUTO_SCROLL_EDGE = 40
-const AUTO_SCROLL_MAX_SPEED = 6
+/** Fraction of pointer travel converted into wall scroll at the very edge (0..1). */
+const AUTO_SCROLL_FOLLOW = 0.7
+/** Cap one pointermove's scroll so a fling cannot jump the wall. */
+const AUTO_SCROLL_MAX_PER_MOVE = 10
 
 export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch }: DragDeps): NoteDrag {
   const liveWidth = useCallback((): number => {
@@ -65,8 +68,6 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
     let moved = false
     let pointerX = startX
     let pointerY = startY
-    let frame = 0
-    let lastFrame = 0
     /** Pin the note under the pointer in canvas coordinates (pointer + current scrollTop). */
     const placeFromPointer = (): void => {
       if (wall !== null) {
@@ -81,34 +82,28 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
       element.style.top = `${currentY}px`
     }
     /**
-     * Auto-scroll on a frame clock instead of one jump per pointermove: the scroll speed grows
-     * with how deep the pointer is inside the edge zone and is time-normalized, so slow mouse
-     * movement near the edge does not launch the note to the top.
+     * Edge scrolling is driven by this pointermove's own Y travel: slow mouse movement scrolls
+     * slowly, a stationary pointer scrolls nothing (it used to keep scrolling on a frame clock,
+     * which swept the note back to the top regardless of the user's pace).
      */
-    const autoScroll = (time: number): void => {
-      frame = 0
-      const dt = lastFrame === 0 ? 16.7 : Math.min(32, Math.max(8, time - lastFrame))
-      lastFrame = time
-      if (wall !== null) {
-        const rect = wall.getBoundingClientRect()
-        const edge = Math.min(AUTO_SCROLL_EDGE, Math.max(12, rect.height / 3))
-        let direction = 0
-        let depth = 0
-        if (pointerY > rect.bottom - edge) {
-          direction = 1
-          depth = (pointerY - (rect.bottom - edge)) / edge
-        } else if (pointerY < rect.top + edge) {
-          direction = -1
-          depth = (rect.top + edge - pointerY) / edge
-        }
-        if (direction !== 0) {
-          const step = Math.min(1, Math.max(0, depth)) * AUTO_SCROLL_MAX_SPEED * (dt / 16.7)
-          const before = wall.scrollTop
-          wall.scrollTop = Math.max(0, before + direction * step)
-          if (wall.scrollTop !== before) placeFromPointer()
-        }
+    const scrollFromPointerStep = (dy: number): void => {
+      if (wall === null || dy === 0) return
+      const rect = wall.getBoundingClientRect()
+      const edge = Math.min(AUTO_SCROLL_EDGE, Math.max(12, rect.height / 3))
+      let direction = 0
+      let depth = 0
+      if (pointerY > rect.bottom - edge && dy > 0) {
+        direction = 1
+        depth = (pointerY - (rect.bottom - edge)) / edge
+      } else if (pointerY < rect.top + edge && dy < 0) {
+        direction = -1
+        depth = (rect.top + edge - pointerY) / edge
       }
-      if (moved) frame = window.requestAnimationFrame(autoScroll)
+      if (direction === 0) return
+      const travel = Math.abs(dy) * Math.min(1, Math.max(0, depth)) * AUTO_SCROLL_FOLLOW
+      const before = wall.scrollTop
+      wall.scrollTop = Math.max(0, before + direction * Math.min(AUTO_SCROLL_MAX_PER_MOVE, travel))
+      if (wall.scrollTop !== before) placeFromPointer()
     }
     const onMove = (moveEvent: PointerEvent): void => {
       if (moveEvent.pointerId !== event.pointerId) return
@@ -116,17 +111,16 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
       const dy = moveEvent.clientY - startY
       if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return
       moved = true
+      const stepY = moveEvent.clientY - pointerY
       pointerX = moveEvent.clientX
       pointerY = moveEvent.clientY
+      scrollFromPointerStep(stepY)
       placeFromPointer()
-      if (frame === 0) frame = window.requestAnimationFrame(autoScroll)
     }
     const finish = (): void => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', finish)
       window.removeEventListener('pointercancel', finish)
-      if (frame !== 0) window.cancelAnimationFrame(frame)
-      frame = 0
       delete element.dataset.dragging
       if (!moved) return
       setNotes(current => current.map(note => note.id === item.note.id
