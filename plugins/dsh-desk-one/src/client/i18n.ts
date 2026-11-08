@@ -2,8 +2,8 @@
 
 export const LOCALE_DICTS = {
   zh: {
-    'button.label': '同桌',
-    'page.title': '同桌',
+    'button.label': 'Desk One',
+    'page.title': 'Desk One',
     'page.subtitle': '与 harness 共用的一张办公桌',
     'page.introLabel': '关于同桌',
     'page.introDetail': '碳硅同席：两种生命，一张桌子。你出灵感，harness 出算力；便签、任务、会话、日程与时间，一起完成。',
