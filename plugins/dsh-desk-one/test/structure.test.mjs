@@ -256,6 +256,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(styles, /\.dsh-desk-tabs \{[^}]*display: flex/su, '菜单像官方对话区一样是纯文字标签')
     assert.match(styles, /\.dsh-desk-tabs \{[^}]*gap: 32px/su, '官方 32px 标签间距')
     assert.match(styles, /\.dsh-desk-tabs \{[^}]*overflow: visible/su, 'tab 行不能裁掉 More 的 hover')
+    assert.match(styles, /\.dsh-desk-tab \{[^}]*margin: 0 -10px/su, 'tab 负 margin 抵消命中内边距，文字间距等于 32px')
     assert.match(styles, /\.dsh-desk-tab \{[^}]*padding: 0 10px/su, 'tab 用官方 10px 命中内边距')
     assert.match(styles, /\.dsh-desk-tab::after \{[^}]*right: 10px[^}]*left: 10px/su, '下划线只覆盖文字块')
     assert.match(styles, /\.dsh-desk-tab-more \{[^}]*align-self: center/su, 'More 与 tab 文字垂直居中对齐')

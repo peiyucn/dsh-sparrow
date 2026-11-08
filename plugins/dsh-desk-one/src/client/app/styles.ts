@@ -107,7 +107,9 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
   flex: none;
   align-items: center;
   height: 25px;
-  margin: 0;
+  /* Official hit-area trick: 10px inline padding cancelled by -10px margins, so the text-to-text
+     gap is exactly the 32px row gap instead of 52px. */
+  margin: 0 -10px;
   padding: 0 10px;
   border: none;
   background: transparent;
