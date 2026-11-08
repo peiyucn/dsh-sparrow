@@ -192,10 +192,12 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 0;
   box-sizing: border-box;
+  width: 28px;
+  min-width: 28px;
   height: 28px;
-  padding: 0 10px;
+  padding: 0;
   border: 0.5px solid transparent;
   border-radius: var(--dsw-radius-sm, 8px);
   background: transparent;
@@ -218,8 +220,12 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 .dsh-desk-action svg {
   display: block;
   flex: none;
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
+}
+/* Header actions are icon-only square controls, matching the official topbar buttons. */
+.dsh-desk-action-label {
+  display: none;
 }
 .dsh-desk-action[data-active='true'] {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
@@ -246,11 +252,11 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 /* Sort dropdown: one compact trigger; options follow the official Menu card semantics. */
 .dsh-desk-sort-trigger {
   white-space: nowrap;
+  width: 28px;
+  padding: 0;
 }
 .dsh-desk-sort-chevron {
-  width: 12px !important;
-  height: 12px !important;
-  opacity: 0.7;
+  display: none;
 }
 .dsh-desk-sort-menu {
   box-sizing: border-box;
