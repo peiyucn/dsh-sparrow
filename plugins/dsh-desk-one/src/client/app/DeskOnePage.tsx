@@ -335,26 +335,28 @@ export function DeskOnePage(props: DeskPanelProps) {
         <div className="dsh-desk-chrome-inner">
           <div className="dsh-desk-chrome-top">
             <h1 className="dsh-desk-title">{t('page.title')}</h1>
-            <nav className="dsh-desk-tabs" role="tablist">
-              <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
-                {t('tab.overview')}
-              </button>
-              <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
-                {t('tab.notes')}
-              </button>
-              <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
-                {t('tab.tasks')}
-              </button>
-              <button type="button" className="dsh-desk-tab" data-active={tab === 'sessions'} onClick={() => selectTab('sessions')}>
-                {t('tab.sessions')}
-              </button>
-            </nav>
             <div className="dsh-desk-global-slot" data-window-drag-recall>
               <div className="dsh-desk-time-placeholder" aria-hidden="true">{t('topbar.timePlaceholder')}</div>
             </div>
           </div>
+          <nav className="dsh-desk-tabs" role="tablist">
+            <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
+              {t('tab.overview')}
+            </button>
+            <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
+              {t('tab.notes')}
+            </button>
+            <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
+              {t('tab.tasks')}
+            </button>
+            <button type="button" className="dsh-desk-tab" data-active={tab === 'sessions'} onClick={() => selectTab('sessions')}>
+              {t('tab.sessions')}
+            </button>
+          </nav>
           {actions === null ? null : (
-            <div className="dsh-desk-dock" data-window-drag-recall>{actions}</div>
+            <div className="dsh-desk-dock" data-window-drag-recall>
+              <div className="dsh-desk-dock-card">{actions}</div>
+            </div>
           )}
         </div>
       </header>

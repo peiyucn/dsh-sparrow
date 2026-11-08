@@ -17,7 +17,7 @@ export const APP_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 14px;
 }
-/* Content column; the chrome is absolutely positioned above it. */
+/* Content column; chrome and dock are normal-flow siblings above this body. */
 .dsh-desk-page > * {
   width: 100%;
   max-width: 960px;
@@ -60,21 +60,11 @@ export const APP_CSS = `
   position: relative;
   z-index: 5;
   flex: none;
-  padding: 28px 0 0;
+  padding: 20px 0 0;
   background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent);
   backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
   -webkit-backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
   border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
-}
-/* Sticky action dock: feature actions share one fixed position under the header, above content. */
-.dsh-desk-dock {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  min-height: 40px;
-  padding: 6px 0 8px;
-  border-top: 0.5px solid color-mix(in srgb, var(--dsw-alias-border-l3, #e2e5ea) 70%, transparent);
 }
 .dsh-desk-chrome-inner {
   box-sizing: border-box;
@@ -86,7 +76,7 @@ export const APP_CSS = `
   padding-right: clamp(20px, 3vw, 40px);
 }
 html[data-platform='darwin'] .dsh-desk-chrome {
-  padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
+  padding-top: calc(20px + var(--dsh-frame-top-clearance, 0px));
 }
 /* Without backdrop blur the translucent bar would let content fight the text: use a solid bar. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -97,63 +87,82 @@ html[data-platform='darwin'] .dsh-desk-chrome {
 .dsh-desk-chrome-top {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 36px;
+  gap: 16px;
+  min-height: 30px;
   min-width: 0;
-  overflow: hidden;
 }
 .dsh-desk-title {
   flex: none;
   margin: 0;
   color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 600;
   line-height: 30px;
   white-space: nowrap;
 }
-/* Menu stays separate from the brand title and follows the active theme. */
+/* Official conversation tabs: plain text, roomy 32px gap, 2px active underline. */
 .dsh-desk-tabs {
-  display: inline-grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 2px;
-  flex: 0 1 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
   min-width: 0;
-  padding: 2px;
-  border-radius: calc(var(--dsw-radius-md, 12px) + 2px);
-  background: var(--dsw-alias-bg-module-platform, var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06)));
-  box-shadow: inset 0 0 0 var(--dsh-hairline-width, 0.5px) var(--dsw-alias-border-l1, #e2e5ea);
+  margin-top: 4px;
+  padding: 0;
+  background: transparent;
+  flex-wrap: wrap;
 }
 .dsh-desk-tab {
   appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 28px;
-  padding: 0 12px;
+  position: relative;
+  box-sizing: border-box;
+  min-height: 35px;
+  margin: 0;
+  padding: 10px 0 9px;
   border: none;
-  border-radius: var(--dsw-radius-sm, 8px);
   background: transparent;
   color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 13px;
   font-weight: 500;
-  line-height: 18px;
+  line-height: 16px;
   white-space: nowrap;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   cursor: pointer;
-  transition: color 160ms ease, background 160ms ease;
+  transition: color 160ms ease;
 }
 .dsh-desk-tab:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
   color: var(--dsw-alias-label-primary, #1f2329);
 }
+.dsh-desk-tab::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: transparent;
+}
 .dsh-desk-tab[data-active='true'] {
-  background: var(--dsw-alias-bg-layer-1, #ffffff);
-  box-shadow: inset 0 0 0 var(--dsh-hairline-width, 0.5px) var(--dsw-alias-border-l1, #e2e5ea);
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-weight: 500;
+  color: var(--dsw-alias-state-business-primary, #4176e6);
+}
+.dsh-desk-tab[data-active='true']::after {
+  background: var(--dsw-alias-state-business-primary, #4176e6);
+}
+/* Floating dock card, styled after the composer's queue/todo info strips. */
+.dsh-desk-dock {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 0 10px;
+}
+.dsh-desk-dock-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 0.5px solid var(--dsw-alias-border-l1, #e2e5ea);
+  border-radius: var(--dsw-radius-lg, 14px);
+  background: var(--dsw-specific-menu, color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 92%, transparent));
+  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
+  box-shadow: var(--dsw-elevation-panel, 0 8px 22px -14px rgba(0, 0, 0, 0.4));
 }
 /* Reserved for time management / to-do widgets: a dashed frame marks the slot until it is built. */
 .dsh-desk-global-slot {
