@@ -6,7 +6,7 @@ English | [简体中文](README.zh-CN.md)
 
 ## What it is
 
-* One left-sidebar entry named **Desk One**; functions live in tabs inside the panel instead of scattering across the UI.
+* One left-sidebar entry named **Desk One**; functions live in tabs inside the panel instead of scattering across the UI. The panel chrome follows the official conversation header, and in-page action buttons reuse the official plugin-page button shape.
 * **Overview** is the main tab in the long run, but its content is not designed yet — it stays intentionally blank in this release.
 * **Notes** is the first shipped feature: a free-form sticky wall, not an input form.
 * **Sessions** is the shared agent-session catalog: active sessions grouped by workspace, archived sessions as a read-only tree. The panel header matches the conversation topbar: a compact 76px bar (solid official black/white by default; glass only when theme-tone is active) with the brand title plus a one-line intro and the active view actions, followed by official-style plain text tabs (2px underline on the active tab) and a trailing ellipsis launcher (official `More` button) that opens a blurred page menu; future tabs can move there instead of growing the strip. It is a fixed 76px overlay; every feature keeps a 76px content offset so the first paint starts below the glass while scrolling content passes underneath. The notes wall is full-bleed, and the trailing ellipsis opens a floating blurred page menu.
