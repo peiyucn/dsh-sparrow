@@ -17,11 +17,14 @@ export const NOTES_CSS = `
      scrolls to them. Horizontal overflow stays clipped so the width never changes. */
   overflow-x: hidden;
   overflow-y: auto;
-  /* Host scrollbar skin: the track starts below the overlay header (same contract as the
-     official conversation scroll region). */
-  --dsh-scrollbar-track-margin: var(--dsh-desk-header-h);
 }
 /* 空墙中央的轻提示：双层排版（主提示 + 次提示），颜色压到很浅，不抢贴纸。 */
+.dsh-desk-wall::-webkit-scrollbar-track {
+  /* Official conversation-scroll trick: only the top is pushed below the header; the bottom
+     keeps a 2px inset so the thumb can still reach the last row. */
+  margin: calc(var(--dsh-desk-header-h) + 2px) 2px 2px;
+  background: transparent;
+}
 .dsh-desk-wall-canvas {
   position: relative;
   box-sizing: border-box;

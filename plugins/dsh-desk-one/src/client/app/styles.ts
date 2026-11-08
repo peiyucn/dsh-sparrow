@@ -27,7 +27,7 @@ export const APP_CSS = `
   right: 0;
   z-index: 5;
   height: var(--dsh-desk-header-h);
-  padding: calc(10px + var(--dsh-frame-top-clearance, 0px)) 28px 0;
+  padding: calc(8px + var(--dsh-frame-top-clearance, 0px)) 28px 0;
   /* Plain official topbar: solid theme surface, no blur. The glass comes only when the
      theme-tone plugin is active (see the conditional rule below). */
   background-color: var(--dsw-alias-bg-base, #ffffff);
@@ -63,7 +63,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 30px;
+  min-height: 32px;
   min-width: 0;
 }
 .dsh-desk-brand {
@@ -192,20 +192,20 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0;
+  gap: 4px;
   box-sizing: border-box;
-  width: 28px;
-  min-width: 28px;
-  height: 28px;
-  padding: 0;
+  /* Official plugin-page toolbar Button: 32px high, 13px text, 12px radius
+     (PluginManagerPage .addPrimary/.addMore overrides). */
+  height: 32px;
+  padding: 0 12px;
   border: 0.5px solid transparent;
-  border-radius: var(--dsw-radius-sm, 8px);
+  border-radius: var(--dsw-radius-md, 12px);
   background: transparent;
   box-shadow: inset 0 0 0 var(--dsh-hairline-width, 0.5px) var(--dsh-button-outline-color, var(--dsw-alias-border-l3, #e2e5ea));
   color: var(--dsw-alias-label-primary, #1f2329);
   font: inherit;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 13px;
+  line-height: 20px;
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
@@ -220,12 +220,8 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 .dsh-desk-action svg {
   display: block;
   flex: none;
-  width: 14px;
-  height: 14px;
-}
-/* Header actions are icon-only square controls, matching the official topbar buttons. */
-.dsh-desk-action-label {
-  display: none;
+  width: 13px;
+  height: 13px;
 }
 .dsh-desk-action[data-active='true'] {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
@@ -233,7 +229,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   font-weight: 500;
 }
 .dsh-desk-action-primary {
-  border-color: transparent;
+  border: none;
   background: var(--dsw-alias-button-primary-fill, #4176e6);
   box-shadow: none;
   color: var(--dsw-alias-label-primary-foreground, #ffffff);
@@ -252,11 +248,11 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 /* Sort dropdown: one compact trigger; options follow the official Menu card semantics. */
 .dsh-desk-sort-trigger {
   white-space: nowrap;
-  width: 28px;
-  padding: 0;
 }
 .dsh-desk-sort-chevron {
-  display: none;
+  width: 12px !important;
+  height: 12px !important;
+  opacity: 0.7;
 }
 .dsh-desk-sort-menu {
   box-sizing: border-box;
@@ -383,7 +379,6 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 }
 /* Sessions view: read-only active catalog (grouped by workspace) + archived tree. */
 .dsh-desk-sessionsview {
-  --dsh-scrollbar-track-margin: var(--dsh-desk-header-h);
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -392,8 +387,10 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   gap: 20px;
   padding: calc(var(--dsh-desk-header-h) + 14px) 28px 16px;
 }
-.dsh-desk-sessionsview {
-  --dsh-scrollbar-track-margin: var(--dsh-desk-header-h);
+
+.dsh-desk-sessionsview::-webkit-scrollbar-track {
+  margin: calc(var(--dsh-desk-header-h) + 2px) 2px 2px;
+  background: transparent;
 }
 .dsh-desk-session-section {
   display: flex;
