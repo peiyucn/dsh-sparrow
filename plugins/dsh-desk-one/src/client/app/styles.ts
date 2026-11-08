@@ -28,9 +28,18 @@ export const APP_CSS = `
   z-index: 5;
   height: var(--dsh-desk-header-h);
   padding: calc(10px + var(--dsh-frame-top-clearance, 0px)) 28px 0;
-  background-color: var(--dsw-menu-surface-fill, color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent));
-  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(24px) saturate(170%) brightness(1.04));
-  -webkit-backdrop-filter: var(--dsw-menu-backdrop-filter, blur(24px) saturate(170%) brightness(1.04));
+  /* Plain official topbar: solid theme surface, no blur. The glass comes only when the
+     theme-tone plugin is active (see the conditional rule below). */
+  background-color: var(--dsw-alias-bg-base, #ffffff);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
+  overflow: hidden;
+}
+/* theme-tone active (not "plain"): reuse its official conversation-header glass recipe, so
+   DeskOne and the host topbar adapt together instead of DeskOne choosing an effect. */
+body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
+  background-color: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent);
+  backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
+  -webkit-backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
   background-image:
     radial-gradient(ellipse 80vw 45vh at 50% -10vh, color-mix(in srgb, var(--dsh-theme-tone-top, transparent) 85%, transparent), transparent var(--dsh-theme-tone-top-stop, 62%)),
     radial-gradient(ellipse 38vw 58vh at 0% -6vh, color-mix(in srgb, var(--dsh-theme-tone-left, transparent) 85%, transparent), transparent 68%);
@@ -38,13 +47,6 @@ export const APP_CSS = `
   background-position: 0 0, 0 0;
   background-repeat: no-repeat, no-repeat;
   background-attachment: fixed, fixed;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
-  overflow: hidden;
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .dsh-desk-header {
-    background-color: var(--dsw-alias-bg-base, #ffffff);
-  }
 }
 .dsh-desk-header-top {
   display: flex;
@@ -89,26 +91,24 @@ export const APP_CSS = `
 }
 .dsh-desk-tabs {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 32px;
   min-width: 0;
   min-height: 25px;
   margin-top: 10px;
   padding: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.dsh-desk-tabs::-webkit-scrollbar {
-  display: none;
+  overflow: visible;
 }
 .dsh-desk-tab {
   appearance: none;
   position: relative;
   box-sizing: border-box;
+  display: inline-flex;
   flex: none;
+  align-items: center;
   height: 25px;
   margin: 0;
-  padding: 0;
+  padding: 0 10px;
   border: none;
   background: transparent;
   color: var(--dsw-alias-label-secondary, #6b7280);
@@ -125,9 +125,9 @@ export const APP_CSS = `
 .dsh-desk-tab::after {
   content: '';
   position: absolute;
-  right: 0;
+  right: 10px;
   bottom: -1px;
-  left: 0;
+  left: 10px;
   height: 2px;
   border-radius: 2px;
   background: transparent;
@@ -500,12 +500,13 @@ export const APP_CSS = `
 /* Official More launcher: 22×22, 13px ellipsis icon, hover/expanded fill. */
 .dsh-desk-tab-more {
   display: inline-flex;
+  align-self: center;
   align-items: center;
   justify-content: center;
   width: 22px;
   min-width: 22px;
   height: 22px;
-  margin-top: -3px;
+  margin-top: 0;
   padding: 0;
   border-radius: var(--dsw-radius-sm, 8px);
   color: var(--dsw-alias-label-secondary, #6b7280);
