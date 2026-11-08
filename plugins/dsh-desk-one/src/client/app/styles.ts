@@ -37,7 +37,7 @@ export const APP_CSS = `
   padding: 0 clamp(20px, 3vw, 40px);
 }
 .dsh-desk-overview {
-  padding-top: 18px;
+  padding-top: calc(var(--dsh-desk-header-height, 112px) + 18px);
 }
 .dsh-desk-notesview {
   display: flex;
@@ -50,21 +50,24 @@ export const APP_CSS = `
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding-top: 18px;
+  padding-top: calc(var(--dsh-desk-header-height, 112px) + 18px);
 }
 /* Glass chrome copied from the theme-tone recipe used by the conversation and right-sidebar
    headers: the header is an absolute overlay, content scrolls beneath it and is blurred.
    The menu itself stays theme-neutral (no brand fill / white text). */
 .dsh-desk-chrome {
   box-sizing: border-box;
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 5;
-  flex: none;
-  padding: 20px 0 0;
-  background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent);
+  max-width: none;
+  margin: 0;
+  padding: 28px 0 0;
+  background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 42%, transparent);
   backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
   -webkit-backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
-  border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
 }
 .dsh-desk-chrome-inner {
   box-sizing: border-box;
@@ -72,11 +75,11 @@ export const APP_CSS = `
   max-width: 960px;
   margin-left: auto;
   margin-right: auto;
-  padding-left: clamp(20px, 3vw, 40px);
-  padding-right: clamp(20px, 3vw, 40px);
+  padding-left: clamp(24px, 4vw, 48px);
+  padding-right: clamp(24px, 4vw, 48px);
 }
 html[data-platform='darwin'] .dsh-desk-chrome {
-  padding-top: calc(20px + var(--dsh-frame-top-clearance, 0px));
+  padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
 }
 /* Without backdrop blur the translucent bar would let content fight the text: use a solid bar. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -84,40 +87,47 @@ html[data-platform='darwin'] .dsh-desk-chrome {
     background: var(--dsw-alias-bg-base, #ffffff);
   }
 }
+/* Title position matches the official plugin page: 28px inset, 20px/500 title. */
 .dsh-desk-chrome-top {
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-height: 30px;
+  gap: 28px;
   min-width: 0;
+  min-height: 35px;
+  overflow: hidden;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
 }
 .dsh-desk-title {
   flex: none;
   margin: 0;
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 20px;
-  font-weight: 600;
-  line-height: 30px;
+  font-weight: 500;
+  line-height: 28px;
   white-space: nowrap;
 }
-/* Official conversation tabs: plain text, roomy 32px gap, 2px active underline. */
+/* Official conversation tabs on the same row as the title to save vertical space. */
 .dsh-desk-tabs {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 32px;
   min-width: 0;
-  margin-top: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
   padding: 0;
   background: transparent;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+}
+.dsh-desk-tabs::-webkit-scrollbar {
+  display: none;
 }
 .dsh-desk-tab {
   appearance: none;
   position: relative;
   box-sizing: border-box;
-  min-height: 35px;
+  height: 35px;
   margin: 0;
-  padding: 10px 0 9px;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--dsw-alias-label-secondary, #6b7280);
@@ -135,7 +145,7 @@ html[data-platform='darwin'] .dsh-desk-chrome {
   content: '';
   position: absolute;
   right: 0;
-  bottom: -1px;
+  bottom: 0;
   left: 0;
   height: 2px;
   border-radius: 2px;
@@ -147,11 +157,11 @@ html[data-platform='darwin'] .dsh-desk-chrome {
 .dsh-desk-tab[data-active='true']::after {
   background: var(--dsw-alias-state-business-primary, #4176e6);
 }
-/* Floating dock card, styled after the composer's queue/todo info strips. */
+/* The dock hangs from the header's bottom edge: narrower, bottom-rounded, floating. */
 .dsh-desk-dock {
   display: flex;
   justify-content: flex-end;
-  padding: 10px 0 10px;
+  margin-top: 0;
 }
 .dsh-desk-dock-card {
   display: flex;
@@ -159,7 +169,8 @@ html[data-platform='darwin'] .dsh-desk-chrome {
   gap: 8px;
   padding: 4px 6px;
   border: 0.5px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: var(--dsw-radius-lg, 14px);
+  border-top: none;
+  border-radius: 0 0 var(--dsw-radius-lg, 14px) var(--dsw-radius-lg, 14px);
   background: var(--dsw-specific-menu, color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 92%, transparent));
   backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
   box-shadow: var(--dsw-elevation-panel, 0 8px 22px -14px rgba(0, 0, 0, 0.4));
