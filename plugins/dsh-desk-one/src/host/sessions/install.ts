@@ -16,8 +16,6 @@ export type SessionsConfig = Readonly<Partial<ArchiveConfig>>
 
 export interface SessionsHost {
   readonly routes: readonly SessionRouteEntry[]
-  /** Startup scans are idempotent; `/list` calls this so the first panel open shows swept data. */
-  readonly runStartup: () => void
 }
 
 /**
@@ -55,6 +53,5 @@ export async function installSessionsHost(ctx: Context, config: SessionsConfig =
 
   const headerFacts = createHeaderStore(ctx)
   const startup = installStartupScans(ctx, surface, headerFacts, settings.trashRoot)
-  const routes = createSessionRoutes({ ctx, settings, surface, headerFacts, startup })
-  return { routes, runStartup: () => startup.run() }
+  return { routes: createSessionRoutes({ ctx, settings, surface, headerFacts, startup }) }
 }

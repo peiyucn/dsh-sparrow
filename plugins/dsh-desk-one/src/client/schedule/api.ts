@@ -2,7 +2,7 @@
 
 import { REQUEST_TIMEOUT_MS, ROUTES, SCHEDULE_REQUEST_TIMEOUT_MS } from '../../constants.js'
 import type {
-  ApiErrorPayload, DeskCalendar, ScheduleCalendarUpdateRequest, ScheduleConnectionInput,
+  ApiErrorPayload, ScheduleCalendarUpdateRequest, ScheduleConnectionInput,
   ScheduleConnectionTestResponse, ScheduleEventListResponse, ScheduleStateResponse, ScheduleSyncResponse,
 } from '../../contract.js'
 
@@ -71,5 +71,3 @@ export function removeConnection(provider: string): Promise<ScheduleStateRespons
 export const scheduleApi: ScheduleApi = {
   loadState, loadEvents, updateCalendar, sync, testConnection, saveConnection, removeConnection,
 }
-
-export type { DeskCalendar }

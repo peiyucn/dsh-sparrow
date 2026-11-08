@@ -63,16 +63,6 @@ export function listRange(from: Date, days: number): { from: Date; to: Date } {
   return { from: startOfLocalDay(from), to: addDays(startOfLocalDay(from), days) }
 }
 
-export function eventsBetween(events: readonly DeskEvent[], from: Date, to: Date): DeskEvent[] {
-  const start = from.getTime()
-  const end = to.getTime()
-  return events.filter(event => {
-    const eventStart = new Date(event.start).getTime()
-    const eventEnd = new Date(event.end).getTime()
-    return eventStart < end && eventEnd > start
-  })
-}
-
 export interface DayGroup {
   readonly key: string
   readonly date: Date

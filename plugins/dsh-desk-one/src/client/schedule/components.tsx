@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
-import type { ScheduleProvider } from '../../constants.js'
+import { SCHEDULE_UPCOMING_DAYS, type ScheduleProvider } from '../../constants.js'
 import type {
   DeskCalendar, DeskEvent, DeskScheduleSource, ScheduleConnectionInput, ScheduleConnectionTestResponse,
 } from '../../contract.js'
@@ -105,7 +105,7 @@ interface UpcomingProps {
 
 export function UpcomingRail(props: UpcomingProps): ReactElement {
   const { t, today, events, calendars, onOpen } = props
-  const groups = useMemo(() => groupByDay(events, today, 7), [events, today])
+  const groups = useMemo(() => groupByDay(events, today, SCHEDULE_UPCOMING_DAYS), [events, today])
   return (
     <aside className="dsh-desk-schedule-upcoming">
       <header className="dsh-desk-schedule-panelhead">
