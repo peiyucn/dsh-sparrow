@@ -1,5 +1,7 @@
 # 05 · 日程 Schedule — 聚合设计（S2，只读）
 
+> **实现状态（2026-11-09）**：基础版已落地并 `verify` 全绿（126 个测试）；**真实服务未验证**——企微/iCloud/Outlook 均缺凭据探针，协议细节按 RFC 与公开观察实现，明早 owner 配置后联调。v1 范围与本文件一致：只读、无本地事件、无写回、无订阅。
+>
 > 模块中文名「日程」、英文 **Schedule**（不用 Calendar）：这里以后不只有日历，还会有日程列表与可排期的待办。
 > 底层数据仍是 `event`（日程条目）+ `calendar`（远端日历源）两种 kind，见 [01-object-model.md](01-object-model.md)。
 
@@ -107,3 +109,13 @@
 3. **iCloud CalDAV**（凭据到位后：分片、REPORT、限流、共享日历可见性）。
 
 未验证项（写代码前先探针钉死）：企微 `/calendar/` 家目录与标准发现链、非 IANA TZID 样本；iCloud 分片/REPORT/`sync-collection` 支持；共享日历是否出现在 CalDAV 集合；Outlook ICS 在 owner 个人账号上的发布入口与刷新延迟。
+
+## 9. 实现备注（2026-11-09 基础版）
+
+- **记录形态**：`event` / `calendar` / `schedule-source` 三种 kind 与便签/任务一样用**平铺字段**存进 `nodes`（`payload` 分层是设计目标，尚未迁移）；域版本不变，旧记录照常解码。
+- **日历身份**：`DeskCalendar.remoteId` 存的是**日历集合 pathname**（不是绝对 URL），避免 iCloud 在 `pNN-caldav` 分片间切换时同一本日历生成新行；查询时用当前家目录 origin 拼回绝对 URL。
+- **连接卡入口**：v1 放在日程页的「日历源 → 管理连接」浮层（单入口原则），宿主设置页后续再收编；保存前强制「测试连接」通过。
+- **同步触发**：打开日程页时若上次同步超过 5 分钟自动同步；面板打开期间每 15 分钟同步；手动同步按钮；宿主关闭即停止。
+- **Outlook 增量**：当前每次同步拉整份 ICS（未落 ETag/syncToken）；发布链接本身 3–24 小时才刷新，后续接 `If-None-Match`。
+- **重复事件覆盖件拆文件风险**：若服务端把 RECURRENCE-ID 覆盖件拆成独立 `.ics` 资源，主文件展开与覆盖件会产出同一 `externalId`（不同时间），host 侧按「最后写入者胜」去重；需真机探针确认后再做合并策略。
+- **未验证（禁止当已验证）**：企微 `/.well-known/caldav` 真实响应与 `/calendar/` 家目录、非 IANA TZID 样本；iCloud 分片跳转/REPORT 限制/共享日历可见性；Outlook 发布链接内容类型与被重定向到非白名单 CDN 的可能。

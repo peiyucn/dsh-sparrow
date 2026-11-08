@@ -145,6 +145,7 @@ interface ProjectPayload {
 ```
 
 > S1 实现范围以 `03-task-board.md` 为准；`priority` / `estimateMin` / 时刻级 `at` / 多板 / 自定义泳道后置。
+> **实现口径（2026-11-09）**：当前代码把各 kind 的字段**平铺在记录上**（便签 / 任务 / 日程一致），`payload` 分层是后续重构目标；本文件描述目标模型，字段语义与实现一致。
 > `group` 是独立 Node（kind `group`），分组名 / 泳道 / 顺序持久化在 `payload` 里；任务只存 `groupId`，改名是单条 group patch，空分组也能存在。
 > 关系一律走 Edge，不在 payload 里重复存 id；`FocusPayload.taskId` 只作渲染快照，权威关系是 `workedOn` 边。
 
