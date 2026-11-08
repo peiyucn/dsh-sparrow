@@ -9,6 +9,8 @@
 
 import type { ReactElement, ReactNode } from 'react'
 import type { DeskTranslator, Tab } from './types.js'
+import { DESK_TABS } from './tabs.js'
+import { DeskTabMenu } from './DeskTabMenu.js'
 
 interface DeskHeaderProps {
   readonly t: DeskTranslator
@@ -17,13 +19,6 @@ interface DeskHeaderProps {
   /** Active view actions; rendered on the title-row right edge. */
   readonly actions: ReactNode
 }
-
-const TABS: readonly { tab: Tab; labelKey: 'tab.overview' | 'tab.notes' | 'tab.tasks' | 'tab.sessions' }[] = [
-  { tab: 'overview', labelKey: 'tab.overview' },
-  { tab: 'notes', labelKey: 'tab.notes' },
-  { tab: 'tasks', labelKey: 'tab.tasks' },
-  { tab: 'sessions', labelKey: 'tab.sessions' },
-]
 
 export function DeskHeader({ t, tab, onSelectTab, actions }: DeskHeaderProps): ReactElement {
   return (
@@ -38,7 +33,7 @@ export function DeskHeader({ t, tab, onSelectTab, actions }: DeskHeaderProps): R
         )}
       </div>
       <nav className="dsh-desk-tabs" role="tablist">
-        {TABS.map(entry => (
+        {DESK_TABS.map(entry => (
           <button
             key={entry.tab}
             type="button"
@@ -49,6 +44,7 @@ export function DeskHeader({ t, tab, onSelectTab, actions }: DeskHeaderProps): R
             {t(entry.labelKey)}
           </button>
         ))}
+        <DeskTabMenu t={t} tab={tab} onSelectTab={onSelectTab} />
       </nav>
     </header>
   )

@@ -10,6 +10,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'tab.notes'
       | 'tab.tasks'
       | 'tab.sessions'
+      | 'tabs.more'
       | 'sessions.active'
       | 'sessions.archived'
       | 'sessions.activeEmpty'

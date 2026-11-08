@@ -135,6 +135,66 @@ html[data-platform='darwin'] .dsh-desk-header {
 .dsh-desk-tab[data-active='true']::after {
   background: var(--dsw-alias-state-business-primary, #4176e6);
 }
+.dsh-desk-tab-more {
+  min-width: 22px;
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+/* Overflow menu: same elevated menu-card language as the other popovers. */
+.dsh-desk-tabmenu {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--dsw-radius-md, 12px);
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+  box-shadow: var(--dsw-elevation-prominent, 0 10px 30px -12px rgba(20, 25, 40, 0.45));
+  outline: 0.5px solid var(--dsw-alias-border-l1, #e2e5ea);
+  outline-offset: -0.5px;
+}
+.dsh-desk-tabmenu-option {
+  appearance: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--dsw-radius-sm, 8px);
+  background: transparent;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dsh-desk-tabmenu-option:hover,
+.dsh-desk-tabmenu-option:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  outline: none;
+}
+.dsh-desk-tabmenu-option[data-active='true'] {
+  font-weight: 500;
+}
+.dsh-desk-tabmenu-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--dsw-alias-state-business-primary, #4176e6);
+}
+.dsh-desk-tabmenu-check svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
 .dsh-desk-body {
   box-sizing: border-box;
   display: flex;
