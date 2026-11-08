@@ -9,7 +9,7 @@
 
 | 区域 | 官方参考 | 落地约束 |
 |---|---|---|
-| 品牌 lockup | 官方 `BrandWordmark` 的反色徽章 | 中文 **同桌**、英文 **Desk One**（徽章内视觉大写 DESK ONE，i18n 仍保留原大小写）；页头用**一个**反色徽章：墨色底 + inverted 字，内部合并 14px 圆角矩形 + 小星星与标题（不拆成两个方块）；小字后接官方插件页同款 20px infoButton + 纯 hover/focus Tooltip（无点击行为、宽度上限 240px；文案走碳硅协同 slogan：两种生命、一张桌子，你出灵感、harness 出算力，便签/任务/会话/日程/时间一起完成）；左栏图标与页头共用同一字形 |
+| 品牌 lockup | 官方 `BrandWordmark` 的反色徽章 | 中文 **同桌**、英文 **Desk One**（与官方 HARNESS wordmark 一样，徽章内视觉全大写 DESK ONE；i18n 仍保留原大小写）；页头用**一个**反色徽章：墨色底 + inverted 字，内部合并 14px 圆角矩形 + 小星星与标题（不拆成两个方块）；小字后接官方插件页同款 20px infoButton + 纯 hover/focus Tooltip（无点击行为、宽度上限 240px；文案走碳硅协同 slogan：两种生命、一张桌子，你出灵感、harness 出算力，便签/任务/会话/日程/时间一起完成）；左栏图标与页头共用同一字形 |
 | 整体面板 | 对话区 `ui-conversation`（ConversationRoot / ConversationSession） | 76px 页头浮层；第一行品牌标题 + 小字说明 + 当前功能动作，第二行官方纯文字 tab；内容首屏用 `--dsh-desk-header-h` 下移，滚动时内容从页头下经过 |
 | 页头 tab | ConversationRoot 的 `.tabs` / `.viewTabs` / `.tab` | 两层 flex：外层 gap 20px（viewTabs ↔ More），内层 gap 32px（文字间）；tab 本体 35px 高、上抬 10px、padding 10/9、10px 命中内边距；当前项 2px 下划线压在页头 rule 上；More 22×22，menu 以三点为锚点左对齐浮出 |
 | 功能动作按钮 | 插件页 `ui-plugin-manager` 的 PluginManagerPage（`.addPrimary` / `.addMore` 覆盖值） | **32px 高 / 13px 文案 / 20px 行高 / 0 12px padding / 12px 圆角**；primary fill 或 0.5px 描边；保留图标 + 文字；不采用通用 Button sm 的 28px/8px |
