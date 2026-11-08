@@ -30,7 +30,7 @@
 
 ## A. 私有 seam（官方无公开能力，启动能力检查缺失即 fail-fast）
 
-* **`dsh-archive-manage`**
+* **`dsh-desk-one`（2026-11-09 起；原登记在 `dsh-archive-manage`，插件退役前两者共用同一套 seam）**
   * **`sessionPersistence.locate`** —— 后端私有方法（alpha.5 后从公开契约降级），是拿到会话**产物目录**的
     唯一途径：公开契约 `SessionPersistence` 只有 `create` / `open` / `flush` / `stat` / `list`，
     而 `stat` / `list` 返回的 `SessionPersistenceSnapshot` 只含 `header` / `revision` / `eventCount` /
