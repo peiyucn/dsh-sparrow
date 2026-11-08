@@ -998,23 +998,28 @@ export const TASKS_CSS = `
 .dsh-task-session-preview-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px 10px;
+  gap: 4px 12px;
 }
+/* Label above value: the value gets the full column width and never needs an ellipsis. */
 .dsh-task-session-preview-stat {
   display: flex;
-  justify-content: space-between;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
   min-width: 0;
 }
 .dsh-task-session-preview-label {
-  opacity: 0.58;
+  opacity: 0.5;
+  font-size: 9px;
+  line-height: 12px;
   white-space: nowrap;
 }
 .dsh-task-session-preview-stat b {
-  overflow: hidden;
+  max-width: 100%;
+  font-size: 11px;
+  line-height: 16px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .dsh-task-session-preview-enter {
