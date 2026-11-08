@@ -37,6 +37,15 @@ export const APP_CSS = `
 /* theme-tone active (not "plain"): reuse its official conversation-header glass recipe, so
    DeskOne and the host topbar adapt together instead of DeskOne choosing an effect. */
 body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
+  background-color: transparent;
+  isolation: isolate;
+}
+body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-color: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent);
   backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
   -webkit-backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
@@ -48,6 +57,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
   background-repeat: no-repeat, no-repeat;
   background-attachment: fixed, fixed;
 }
+
 .dsh-desk-header-top {
   display: flex;
   align-items: center;
@@ -359,6 +369,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
 }
 /* Sessions view: read-only active catalog (grouped by workspace) + archived tree. */
 .dsh-desk-sessionsview {
+  --dsh-scrollbar-track-margin: var(--dsh-desk-header-h);
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -367,8 +378,8 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
   gap: 20px;
   padding: calc(var(--dsh-desk-header-h) + 14px) 28px 16px;
 }
-.dsh-desk-sessionsview::-webkit-scrollbar-track {
-  margin-top: var(--dsh-desk-header-h);
+.dsh-desk-sessionsview {
+  --dsh-scrollbar-track-margin: var(--dsh-desk-header-h);
 }
 .dsh-desk-session-section {
   display: flex;
