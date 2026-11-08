@@ -21,10 +21,12 @@ export const APP_CSS = `
   flex: none;
   width: 100%;
   min-height: 76px;
-  padding: 10px clamp(20px, 3vw, 40px) 0;
-  background-color: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent);
-  backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
-  -webkit-backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
+  padding: 10px 28px 0 20px;
+  /* Material comes from the official surface tokens, so theme-tone drives it together with
+     the official header/menu glass instead of DeskOne hard-coding its own recipe. */
+  background-color: var(--dsw-menu-surface-fill, color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent));
+  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(24px) saturate(170%) brightness(1.04));
+  -webkit-backdrop-filter: var(--dsw-menu-backdrop-filter, blur(24px) saturate(170%) brightness(1.04));
   background-image:
     radial-gradient(ellipse 80vw 45vh at 50% -10vh, color-mix(in srgb, var(--dsh-theme-tone-top, transparent) 85%, transparent), transparent var(--dsh-theme-tone-top-stop, 62%)),
     radial-gradient(ellipse 38vw 58vh at 0% -6vh, color-mix(in srgb, var(--dsh-theme-tone-left, transparent) 85%, transparent), transparent 68%);
@@ -136,20 +138,39 @@ html[data-platform='darwin'] .dsh-desk-header {
   background: var(--dsw-alias-state-business-primary, #4176e6);
 }
 .dsh-desk-tab-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
   min-width: 22px;
-  font-size: 15px;
-  letter-spacing: 1px;
+  height: 22px;
+  margin-top: -3px;
+  padding: 0;
+  border-radius: var(--dsw-radius-sm, 8px);
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-desk-tab-more[aria-expanded='true'] {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+}
+.dsh-desk-tab-more-icon {
+  display: block;
+  width: 13px;
+  height: 13px;
 }
 /* Overflow menu: same elevated menu-card language as the other popovers. */
 .dsh-desk-tabmenu {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  width: 288px;
+  max-width: calc(100vw - 24px);
   padding: 4px;
   border: 0;
-  border-radius: var(--dsw-radius-md, 12px);
-  background: var(--dsw-alias-bg-layer-1, #ffffff);
-  box-shadow: var(--dsw-elevation-prominent, 0 10px 30px -12px rgba(20, 25, 40, 0.45));
+  border-radius: var(--dsw-radius-lg, 14px);
+  background: var(--dsw-menu-surface-fill, var(--dsw-specific-menu, #ffffff));
+  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
+  -webkit-backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
+  box-shadow: var(--dsw-elevation-panel, 0 10px 30px -12px rgba(20, 25, 40, 0.45));
   outline: 0.5px solid var(--dsw-alias-border-l1, #e2e5ea);
   outline-offset: -0.5px;
 }
@@ -202,11 +223,10 @@ html[data-platform='darwin'] .dsh-desk-header {
   flex-direction: column;
   width: 100%;
   min-height: 0;
-  padding: 0 clamp(20px, 3vw, 40px);
+  /* Same 14px gap under the header for every feature, and the same horizontal inset. */
+  padding: 14px 28px 0 20px;
 }
-.dsh-desk-overview {
-  padding-top: 14px;
-}
+.dsh-desk-overview {}
 .dsh-desk-subtitle {
   margin: 0;
   color: var(--dsw-alias-label-secondary, #6b7280);
@@ -218,14 +238,14 @@ html[data-platform='darwin'] .dsh-desk-header {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding-top: 14px;
+  width: 100%;
 }
 .dsh-desk-trash-host {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding-top: 14px;
+  width: 100%;
 }
 /* Official Button (sm) parity: outlined by default, primary for the single main action. */
 .dsh-desk-action {
@@ -550,5 +570,10 @@ html[data-platform='darwin'] .dsh-desk-header {
 }
 .dsh-desk-session-row[data-state='archived'] .dsh-desk-session-row-main {
   color: var(--dsw-alias-label-secondary, #6b7280);
+}
+/* Confirming labels are narrower than the default label; reserving the width keeps the
+   preceding "back to wall" button from shifting when the confirm state toggles. */
+.dsh-desk-action[data-stable-width='true'] {
+  min-width: 96px;
 }
 `

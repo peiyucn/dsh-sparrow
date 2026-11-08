@@ -246,6 +246,7 @@ export function DeskOnePage(props: DeskPanelProps) {
             aria-label={trash.confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
             title={trash.confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
             data-danger={trash.confirmClearTrash ? 'true' : undefined}
+            data-stable-width="true"
             disabled={trash.trashedNotes.length === 0 || trash.smashing}
             onClick={trash.clearTrash}
           >

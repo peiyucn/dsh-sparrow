@@ -8,6 +8,8 @@ export const NOTES_CSS = `
    不加背板（owner 2026-11-06：背板显脏且缩小操作面积），沿用页面本身的干净底。 */
 .dsh-desk-wall {
   position: relative;
+  width: 100%;
+  max-width: 100%;
   z-index: 0; /* 建立层级上下文：贴纸的 z 再大也只在墙内比较，按钮永远盖在它们上面。 */
   flex: 1;
   min-height: 0;
@@ -34,6 +36,7 @@ export const NOTES_CSS = `
 .dsh-desk-wall-canvas {
   position: relative;
   box-sizing: border-box;
+  width: 100%;
   min-height: 100%;
 }
 .dsh-desk-wall-tip {
