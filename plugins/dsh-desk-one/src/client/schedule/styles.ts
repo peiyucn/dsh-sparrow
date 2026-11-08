@@ -33,6 +33,11 @@ export const SCHEDULE_CSS = `
 }
 .dsh-desk-schedule-viewtab[data-active='true'] { background: var(--dsw-alias-bg-base, #fff); color: var(--dsw-alias-label-primary, #1f2329); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 .dsh-desk-schedule-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.dsh-desk-schedule-synced {
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  white-space: nowrap;
+}
 .dsh-desk-schedule-chip {
   border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); background: transparent; color: inherit;
   font: inherit; font-size: 12px; line-height: 22px; padding: 0 8px; border-radius: 6px; cursor: pointer; text-decoration: none;

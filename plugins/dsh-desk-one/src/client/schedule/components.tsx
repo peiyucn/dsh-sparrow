@@ -32,6 +32,7 @@ interface ToolbarProps {
   readonly syncing: boolean
   readonly loading: boolean
   readonly sourceCount: number
+  readonly lastSyncedAt?: string
   readonly error: string | null
   readonly onView: (view: ScheduleViewName) => void
   readonly onStep: (direction: -1 | 1) => void
@@ -74,6 +75,15 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
         ))}
       </div>
       <div className="dsh-desk-schedule-actions">
+        <span className="dsh-desk-schedule-synced">
+          {props.lastSyncedAt === undefined
+            ? t('schedule.neverSynced')
+            : t('schedule.lastSync', {
+                time: new Date(props.lastSyncedAt).toLocaleString([], {
+                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                }),
+              })}
+        </span>
         <button
           type="button"
           className="dsh-desk-schedule-chip"

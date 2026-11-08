@@ -168,6 +168,13 @@ export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
   const sources = state?.sources ?? []
   const counts = state?.counts ?? {}
   const staleSources = sources.filter(source => source.syncState === 'error')
+  const lastSyncedAt = useMemo(() => {
+    const times = sources
+      .map(source => source.lastSyncedAt)
+      .filter((value): value is string => value !== undefined && Number.isFinite(Date.parse(value)))
+      .sort()
+    return times[times.length - 1]
+  }, [sources])
 
   const step = (direction: -1 | 1): void => {
     if (view === 'month') {
@@ -200,6 +207,7 @@ export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
         syncing={syncing}
         loading={loading}
         sourceCount={sources.length}
+        lastSyncedAt={lastSyncedAt}
         error={staleSources.length > 0 ? staleSources[0]?.lastError?.message ?? null : error}
         onView={chooseView}
         onStep={step}

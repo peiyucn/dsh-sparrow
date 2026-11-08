@@ -120,6 +120,16 @@ export const SESSIONS_CSS = `
   font-size: 12px;
   color: #c2410c;
 }
+.dsh-desk-archive-loadmore {
+  margin: 6px auto;
+  display: block;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
 .dsh-desk-archive-bulk {
   display: flex;
   gap: 4px;

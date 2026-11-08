@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
+import { SESSION_STREAM_PAGE_SIZE } from '../../constants.js'
 import type {
   ArchiveTreeNode, StraySessionItem, TrashEntry, TrashDirResponse,
 } from '../../host/sessions/contract.js'
@@ -59,10 +60,18 @@ function ConfirmButton(props: {
   )
 }
 
+/** One-section pagination footer: the host returns the full list, the UI reveals it in pages. */
+function LoadMore(props: { readonly more: boolean; readonly label: string; readonly onClick: () => void }): ReactElement | null {
+  if (!props.more) return null
+  return <button type="button" className="dsh-desk-archive-loadmore" onClick={props.onClick}>{props.label}</button>
+}
+
 /** One archived subtree: parent row + collapsible children (children follow the parent's fate). */
 function ArchiveTreeNodeRow(props: {
   readonly node: ArchiveTreeNode
   readonly depth: number
+  /** Subagent rows are read-only: every operation is parent-scoped, exactly like the old plugin. */
+  readonly readOnly: boolean
   readonly t: DeskTranslator
   readonly expanded: Set<string>
   readonly armedTrash: Set<string>
@@ -77,7 +86,7 @@ function ArchiveTreeNodeRow(props: {
   readonly onDeleteDraft: (id: string, text: string) => void
   readonly onConfirmDelete: (node: ArchiveTreeNode) => void
 }): ReactElement {
-  const { node, depth, t, expanded, armedTrash, deleteDraft, busy } = props
+  const { node, depth, t, readOnly, expanded, armedTrash, deleteDraft, busy } = props
   const hasChildren = node.children.length > 0
   const open = expanded.has(node.sessionId)
   const deleteArmed = deleteDraft?.id === node.sessionId
@@ -97,8 +106,8 @@ function ArchiveTreeNodeRow(props: {
           className="dsh-desk-archive-row-toggle"
           aria-label={node.title}
           title={node.live ? t('sessions.archive.liveHint') : node.title}
-          disabled={node.live}
-          onClick={() => { if (!node.live) props.onOpen(node.sessionId) }}
+          disabled={node.live || readOnly}
+          onClick={() => { if (!node.live && !readOnly) props.onOpen(node.sessionId) }}
         >
           {hasChildren ? (
             <span
@@ -126,28 +135,30 @@ function ArchiveTreeNodeRow(props: {
             {` · ${formatDate(node.updatedAt)}`}
           </span>
         </button>
-        <div className="dsh-desk-archive-actions">
-          <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => props.onUnarchive(node.sessionId)}>{t('sessions.archive.unarchive')}</button>
-          <ConfirmButton
-            t={t}
-            label={t('sessions.archive.toTrash')}
-            confirmLabel={t('sessions.archive.toTrashConfirm')}
-            armed={armedTrash.has(node.sessionId)}
-            disabled={busy || !node.backendSupported}
-            onArm={() => props.onArmTrash(node.sessionId)}
-            onConfirm={() => props.onConfirmTrash(node.sessionId)}
-          />
-          <ConfirmButton
-            t={t}
-            label={t('sessions.archive.delete')}
-            confirmLabel={deleteArmed ? t('sessions.archive.deleteConfirm') : t('sessions.archive.delete')}
-            armed={deleteArmed}
-            danger
-            disabled={busy || !node.backendSupported}
-            onArm={() => props.onArmDelete(node.sessionId)}
-            onConfirm={() => props.onConfirmDelete(node)}
-          />
-        </div>
+        {readOnly ? null : (
+          <div className="dsh-desk-archive-actions">
+            <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => props.onUnarchive(node.sessionId)}>{t('sessions.archive.unarchive')}</button>
+            <ConfirmButton
+              t={t}
+              label={t('sessions.archive.toTrash')}
+              confirmLabel={t('sessions.archive.toTrashConfirm')}
+              armed={armedTrash.has(node.sessionId)}
+              disabled={busy || !node.backendSupported}
+              onArm={() => props.onArmTrash(node.sessionId)}
+              onConfirm={() => props.onConfirmTrash(node.sessionId)}
+            />
+            <ConfirmButton
+              t={t}
+              label={t('sessions.archive.delete')}
+              confirmLabel={deleteArmed ? t('sessions.archive.deleteConfirm') : t('sessions.archive.delete')}
+              armed={deleteArmed}
+              danger
+              disabled={busy || !node.backendSupported}
+              onArm={() => props.onArmDelete(node.sessionId)}
+              onConfirm={() => props.onConfirmDelete(node)}
+            />
+          </div>
+        )}
       </div>
       {deleteArmed ? (
         <div className="dsh-desk-archive-deletebox" style={{ marginLeft: `calc(12px + ${depth} * 16px)` }}>
@@ -173,6 +184,7 @@ function ArchiveTreeNodeRow(props: {
               key={child.sessionId}
               node={child}
               depth={depth + 1}
+              readOnly
               t={t}
               expanded={expanded}
               armedTrash={armedTrash}
@@ -205,6 +217,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
   const [armedTrashDelete, setArmedTrashDelete] = useState<Set<string>>(new Set())
   const [bulk, setBulk] = useState<null | 'restoreAll' | 'deleteAll'>(null)
   const [copied, setCopied] = useState(false)
+  const [visible, setVisible] = useState({ archived: SESSION_STREAM_PAGE_SIZE, strays: SESSION_STREAM_PAGE_SIZE, trash: SESSION_STREAM_PAGE_SIZE })
 
   const reload = useCallback(async (): Promise<void> => {
     try {
@@ -274,11 +287,12 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
         ) : (
           <div className="dsh-desk-session-group">
             <ul className="dsh-desk-archive-list">
-              {snapshot?.tree.map(node => (
+              {(snapshot?.tree ?? []).slice(0, visible.archived).map(node => (
                 <ArchiveTreeNodeRow
                   key={node.sessionId}
                   node={node}
                   depth={0}
+                  readOnly={false}
                   t={t}
                   expanded={expanded}
                   armedTrash={armedTrash}
@@ -300,6 +314,11 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                 />
               ))}
             </ul>
+            <LoadMore
+              more={(snapshot?.tree.length ?? 0) > visible.archived}
+              label={t('action.loadMore')}
+              onClick={() => setVisible(previous => ({ ...previous, archived: previous.archived + SESSION_STREAM_PAGE_SIZE }))}
+            />
           </div>
         )}
       </section>
@@ -313,7 +332,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
           <p className="dsh-desk-session-section-note">{t('sessions.archive.straysHint')}</p>
           <div className="dsh-desk-session-group">
             <ul className="dsh-desk-archive-list">
-              {strays.map(item => (
+              {strays.slice(0, visible.strays).map(item => (
                 <li key={item.sessionId}>
                   <div className="dsh-desk-archive-row">
                     <button type="button" className="dsh-desk-archive-row-toggle" onClick={() => onOpen(item.sessionId)}>
@@ -367,6 +386,11 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                 </li>
               ))}
             </ul>
+            <LoadMore
+              more={strays.length > visible.strays}
+              label={t('action.loadMore')}
+              onClick={() => setVisible(previous => ({ ...previous, strays: previous.strays + SESSION_STREAM_PAGE_SIZE }))}
+            />
           </div>
         </section>
       )}
@@ -405,7 +429,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
         {trash.length === 0 ? <p className="dsh-desk-wall-hint">{t('sessions.archive.trashEmpty')}</p> : (
           <div className="dsh-desk-session-group">
             <ul className="dsh-desk-archive-list">
-              {trash.map(entry => (
+              {trash.slice(0, visible.trash).map(entry => (
                 <li key={entry.trashId}>
                   <div className="dsh-desk-archive-row">
                     <span className="dsh-desk-archive-title">{entry.title}</span>
@@ -433,6 +457,11 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                 </li>
               ))}
             </ul>
+            <LoadMore
+              more={trash.length > visible.trash}
+              label={t('action.loadMore')}
+              onClick={() => setVisible(previous => ({ ...previous, trash: previous.trash + SESSION_STREAM_PAGE_SIZE }))}
+            />
           </div>
         )}
         {trash.length === 0 ? null : <p className="dsh-desk-session-section-note">{t('sessions.archive.uninstallHint')}</p>}

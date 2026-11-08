@@ -22,6 +22,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'schedule.today'
       | 'schedule.refresh'
       | 'schedule.syncing'
+      | 'schedule.lastSync'
+      | 'schedule.neverSynced'
       | 'schedule.upcoming'
       | 'schedule.upcomingEmpty'
       | 'schedule.viewAll'
