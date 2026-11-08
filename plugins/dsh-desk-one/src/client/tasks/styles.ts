@@ -339,17 +339,6 @@ export const TASKS_CSS = `
   border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 48%, transparent);
   background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 10%, var(--dsw-alias-bg-layer-1, #ffffff));
 }
-.dsh-task-session-dot {
-  box-sizing: border-box;
-  flex: none;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--dsw-alias-state-success-primary, #2e9e5b);
-}
-.dsh-task-session[data-state='idle'] .dsh-task-session-dot {
-  background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 55%, transparent);
-}
 /* A slow orbit ring is the only motion cue: running vs merely available, no extra hue.
    Animate the conic-gradient angle instead of rotating the element: the chip is a wide pill,
    so rotating the whole ring would sweep a huge oval across the card. */
