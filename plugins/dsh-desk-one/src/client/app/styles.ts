@@ -528,6 +528,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
   display: flex;
   flex-direction: column;
   width: max-content;
+  transform-origin: top left;
   min-width: 160px;
   max-width: min(288px, calc(100vw - 24px));
   padding: 4px;

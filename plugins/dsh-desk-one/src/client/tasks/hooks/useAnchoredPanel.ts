@@ -44,11 +44,14 @@ export function useAnchoredPanel({
       const available = Math.max(1, viewportWidth - margin * 2)
       let width = Math.min(maxWidth, available)
       if (fitContent) {
-        panel.style.width = 'auto'
+        // Never write a width here: the panel uses its CSS content width, so opening it cannot
+        // flash from an old/fallback width to the measured one. We only measure for placement.
+        panel.style.width = ''
         const measured = panel.getBoundingClientRect().width || panel.offsetWidth || Math.min(160, maxWidth)
         width = Math.min(Math.max(1, measured), maxWidth, available)
+      } else {
+        panel.style.width = `${width}px`
       }
-      panel.style.width = `${width}px`
       const height = panel.offsetHeight || 280
       const preferredLeft = align === 'end' ? rect.right - width : rect.left
       const left = Math.min(Math.max(margin, preferredLeft), Math.max(margin, viewportWidth - margin - width))
@@ -62,7 +65,7 @@ export function useAnchoredPanel({
           position: 'fixed',
           left,
           top,
-          width,
+          ...(fitContent ? {} : { width }),
           maxHeight,
           zIndex: 1000,
         }
