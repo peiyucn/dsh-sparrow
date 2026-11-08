@@ -33,9 +33,9 @@ export interface NoteDrag {
   readonly startResize: (event: ReactPointerEvent<HTMLElement>, item: PlacedNote) => void
 }
 
-/** Keep the wall scrolling while the pointer sits near an edge during a drag. */
-const AUTO_SCROLL_EDGE = 36
-const AUTO_SCROLL_STEP = 24
+/** Edge zone for drag auto-scroll, and its speed at the very edge (px per 60fps frame). */
+const AUTO_SCROLL_EDGE = 40
+const AUTO_SCROLL_MAX_SPEED = 6
 
 export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch }: DragDeps): NoteDrag {
   const liveWidth = useCallback((): number => {
@@ -63,34 +63,70 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
     let currentX = item.x
     let currentY = item.y
     let moved = false
+    let pointerX = startX
+    let pointerY = startY
+    let frame = 0
+    let lastFrame = 0
+    /** Pin the note under the pointer in canvas coordinates (pointer + current scrollTop). */
+    const placeFromPointer = (): void => {
+      if (wall !== null) {
+        const rectNow = (canvasRef.current ?? wall).getBoundingClientRect()
+        currentX = clamp(Math.round(pointerX - rectNow.left - grabX), 0, Math.max(0, width - item.width))
+        currentY = clamp(Math.round(pointerY - rectNow.top - grabY), 0, NOTE_MAX_POSITION)
+      } else {
+        currentX = clamp(Math.round(item.x + pointerX - startX), 0, Math.max(0, width - item.width))
+        currentY = clamp(Math.round(item.y + pointerY - startY), 0, NOTE_MAX_POSITION)
+      }
+      element.style.left = `${currentX}px`
+      element.style.top = `${currentY}px`
+    }
+    /**
+     * Auto-scroll on a frame clock instead of one jump per pointermove: the scroll speed grows
+     * with how deep the pointer is inside the edge zone and is time-normalized, so slow mouse
+     * movement near the edge does not launch the note to the top.
+     */
+    const autoScroll = (time: number): void => {
+      frame = 0
+      const dt = lastFrame === 0 ? 16.7 : Math.min(32, Math.max(8, time - lastFrame))
+      lastFrame = time
+      if (wall !== null) {
+        const rect = wall.getBoundingClientRect()
+        const edge = Math.min(AUTO_SCROLL_EDGE, Math.max(12, rect.height / 3))
+        let direction = 0
+        let depth = 0
+        if (pointerY > rect.bottom - edge) {
+          direction = 1
+          depth = (pointerY - (rect.bottom - edge)) / edge
+        } else if (pointerY < rect.top + edge) {
+          direction = -1
+          depth = (rect.top + edge - pointerY) / edge
+        }
+        if (direction !== 0) {
+          const step = Math.min(1, Math.max(0, depth)) * AUTO_SCROLL_MAX_SPEED * (dt / 16.7)
+          const before = wall.scrollTop
+          wall.scrollTop = Math.max(0, before + direction * step)
+          if (wall.scrollTop !== before) placeFromPointer()
+        }
+      }
+      if (moved) frame = window.requestAnimationFrame(autoScroll)
+    }
     const onMove = (moveEvent: PointerEvent): void => {
       if (moveEvent.pointerId !== event.pointerId) return
       const dx = moveEvent.clientX - startX
       const dy = moveEvent.clientY - startY
       if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return
       moved = true
-      if (wall !== null) {
-        const wallRect = wall.getBoundingClientRect()
-        const viewportY = moveEvent.clientY
-        if (viewportY > wallRect.bottom - AUTO_SCROLL_EDGE) {
-          wall.scrollTop += Math.min(AUTO_SCROLL_STEP, viewportY - (wallRect.bottom - AUTO_SCROLL_EDGE))
-        } else if (viewportY < wallRect.top + AUTO_SCROLL_EDGE) {
-          wall.scrollTop = Math.max(0, wall.scrollTop - Math.min(AUTO_SCROLL_STEP, wallRect.top + AUTO_SCROLL_EDGE - viewportY))
-        }
-        const rectNow = (canvasRef.current ?? wall).getBoundingClientRect()
-        currentX = clamp(Math.round(moveEvent.clientX - rectNow.left - grabX), 0, Math.max(0, width - item.width))
-        currentY = clamp(Math.round(moveEvent.clientY - rectNow.top - grabY), 0, NOTE_MAX_POSITION)
-      } else {
-        currentX = clamp(Math.round(item.x + dx), 0, Math.max(0, width - item.width))
-        currentY = clamp(Math.round(item.y + dy), 0, NOTE_MAX_POSITION)
-      }
-      element.style.left = `${currentX}px`
-      element.style.top = `${currentY}px`
+      pointerX = moveEvent.clientX
+      pointerY = moveEvent.clientY
+      placeFromPointer()
+      if (frame === 0) frame = window.requestAnimationFrame(autoScroll)
     }
     const finish = (): void => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', finish)
       window.removeEventListener('pointercancel', finish)
+      if (frame !== 0) window.cancelAnimationFrame(frame)
+      frame = 0
       delete element.dataset.dragging
       if (!moved) return
       setNotes(current => current.map(note => note.id === item.note.id
