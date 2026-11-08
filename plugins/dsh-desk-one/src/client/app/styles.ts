@@ -13,7 +13,7 @@ export const APP_CSS = `
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  padding: 0 clamp(20px, 3vw, 40px) 0;
+  padding: 0;
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 14px;
 }
@@ -25,23 +25,28 @@ export const APP_CSS = `
   margin-right: auto;
 }
 .dsh-desk-body {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  max-width: 960px;
+  min-height: 0;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 clamp(20px, 3vw, 40px);
+}
+.dsh-desk-view-stage {
+  position: relative;
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
 }
 .dsh-desk-overview {
-  padding-top: calc(var(--dsh-desk-chrome-height, 0px) + 18px);
+  padding-top: calc(var(--dsh-desk-chrome-height, 74px) + 18px);
 }
-/* Notes stage: wall scrollport + floating actions over it. */
 .dsh-desk-notesview {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
-.dsh-desk-notes-stage {
-  position: relative;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -52,7 +57,7 @@ export const APP_CSS = `
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding-top: calc(var(--dsh-desk-chrome-height, 0px) + 18px);
+  padding-top: calc(var(--dsh-desk-chrome-height, 74px) + 18px);
 }
 /* Floating action pill over the canvas: notes scroll underneath instead of being blocked by a row. */
 .dsh-desk-canvas-actions {
@@ -87,10 +92,22 @@ export const APP_CSS = `
   left: 0;
   right: 0;
   z-index: 5;
+  max-width: none;
+  margin: 0;
   padding: 28px 0 10px;
   background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent);
   backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
   -webkit-backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
+}
+.dsh-desk-chrome-inner {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: clamp(20px, 3vw, 40px);
+  padding-right: clamp(20px, 3vw, 40px);
 }
 html[data-platform='darwin'] .dsh-desk-chrome {
   padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
@@ -106,13 +123,18 @@ html[data-platform='darwin'] .dsh-desk-chrome {
   align-items: center;
   gap: 16px;
   min-height: 36px;
+  min-width: 0;
+  overflow: hidden;
 }
 /* Title + tabs share one rounded track, but every color comes from the active theme. */
 .dsh-desk-menupill {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   padding: 3px;
   border-radius: calc(var(--dsw-radius-md, 12px) + 3px);
   background: var(--dsw-alias-bg-module-platform, var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06)));
@@ -132,12 +154,13 @@ html[data-platform='darwin'] .dsh-desk-chrome {
 .dsh-desk-tabs {
   display: inline-grid;
   grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 2px;
+  min-width: 0;
   padding: 0;
   border-radius: 0;
   background: transparent;
-  flex: none;
+  flex: 0 1 auto;
 }
 .dsh-desk-tab {
   appearance: none;
@@ -154,6 +177,9 @@ html[data-platform='darwin'] .dsh-desk-chrome {
   font-weight: 500;
   line-height: 18px;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
   transition: color 160ms ease, background 160ms ease;
 }
@@ -191,27 +217,6 @@ html[data-platform='darwin'] .dsh-desk-chrome {
   line-height: 16px;
   white-space: nowrap;
   user-select: none;
-}
-/* Page-specific actions are a separate row under a hairline, not part of the global pill. */
-.dsh-desk-chrome-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 0.5px solid color-mix(in srgb, var(--dsw-alias-border-l3, #e2e5ea) 72%, transparent);
-  min-height: 28px;
-}
-.dsh-desk-toolbar {
-  display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px 16px;
-  min-height: 28px;
-  min-width: 0;
-  white-space: nowrap;
 }
 .dsh-desk-subtitle {
   margin: 4px 0 0;
