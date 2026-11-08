@@ -1,7 +1,7 @@
 /**
  * Fixed-position placement for a body-portaled panel anchored to an element.
  *
- * The session picker lives in the card, whose lane is a scroll container: an in-flow popover gets
+ * A picker/menu may live inside a scroll container (task lane, tab row): an in-flow popover gets
  * clipped by that overflow and squeezed by the card width. Portaling it to `document.body` plus
  * this hook keeps it viewport-fixed, flips it above the anchor when there is no room below, and
  * clamps it inside the visible area while the lane scrolls or the window resizes.

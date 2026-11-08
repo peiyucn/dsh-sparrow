@@ -2,9 +2,9 @@
 
 export const APP_CSS = `
 
-/* 主面板页面：官方入口型页面同款（标题行自带 28px 顶内边距，macOS 下让出窗口顶带）。
-   ⚠️ 中央列不提供基准字号，页面根必须显式给 14px。
-   便签墙要占满剩余高度：页面自身不滚动，滚动交给墙面。 */
+/* Panel shell. The header is a fixed official-conversation-size overlay; every feature view
+   offsets its first line below it. The central column supplies no base font size, so the root
+   declares 14px explicitly. */
 .dsh-desk-page {
   --dsh-desk-header-h: calc(76px + var(--dsh-frame-top-clearance, 0px));
   position: relative;
@@ -17,8 +17,8 @@ export const APP_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 14px;
 }
-/* Fixed official conversation-header overlay: 76px, full width. Material comes from the same
-   surface tokens theme-tone drives for the official header/menu, so the looks move together. */
+/* Fixed 76px conversation-style header. Plain by default; theme-tone supplies the glass only
+   when it is active (see the conditional ::before material below). */
 .dsh-desk-header {
   box-sizing: border-box;
   position: absolute;
@@ -126,7 +126,6 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   align-items: center;
   /* Official tab geometry: 35px box raised 10px into the row margin; 10px top / 9px bottom
      padding leaves the 16px text line, and the 2px bar sits 1px over the header rule. */
-  box-sizing: border-box;
   min-height: 35px;
   margin: -10px -10px 0;
   padding: 10px 10px 9px;
@@ -169,6 +168,8 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   min-height: 0;
 }
 .dsh-desk-overview {
+  flex: 1;
+  min-height: 0;
   padding: calc(var(--dsh-desk-header-h) + 14px) 28px 0;
 }
 /* Notes wall is full-bleed: it uses the whole page width, only the header keeps its insets. */
@@ -222,11 +223,6 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   flex: none;
   width: 13px;
   height: 13px;
-}
-.dsh-desk-action[data-active='true'] {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-weight: 500;
 }
 .dsh-desk-action-primary {
   border: none;
@@ -349,10 +345,6 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   height: 14px;
 }
 /* 总览：内容尚未设计，S0 保持空白占位（owner 2026-11-06：先不投入）。 */
-.dsh-desk-overview {
-  flex: 1;
-  min-height: 0;
-}
 .dsh-desk-error {
   flex: none;
   margin: 0 0 12px;

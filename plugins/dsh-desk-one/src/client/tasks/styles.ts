@@ -181,6 +181,7 @@ export const TASKS_CSS = `
 .dsh-task-card {
   position: relative;
   flex: none;
+  user-select: none;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -211,9 +212,6 @@ export const TASKS_CSS = `
 .dsh-task-card[data-color='pink'] { border-left-color: #b35488; }
 /* View mode: card text is plain, non-selectable text so the whole card stays a grab surface.
    Textareas/inputs only exist while editing and re-enable selection. */
-.dsh-task-card {
-  user-select: none;
-}
 .dsh-task-card textarea,
 .dsh-task-card input {
   user-select: text;
@@ -611,9 +609,6 @@ export const TASKS_CSS = `
   color: var(--dsw-alias-label-tertiary, #8a919f);
   cursor: pointer;
 }
-.dsh-task-due:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-}
 .dsh-task-due-icon {
   flex: none;
   width: 12px;
@@ -623,6 +618,7 @@ export const TASKS_CSS = `
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
 .dsh-task-due:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
   color: var(--dsw-alias-label-primary, #1f2329);
 }
 .dsh-task-due-date {
