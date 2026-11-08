@@ -112,8 +112,11 @@ interface CalendarPayload {
   provider: 'wecom' | 'icloud' | 'outlook'
   remoteId: string          // 远端日历 id（CalDAV 的 URL/路径，或 ICS 文件里的 X-WR-CALNAME 对应项）
   displayName: string
+  /** 日历颜色：首次同步按 8 色板自动分配，用户可在日历源栏改；事件条目沿用该颜色。 */
   color?: string
   enabled: boolean          // 是否参与聚合展示（多日历逐个勾选）
+  /** 同 provider 内的显示顺序（源 → 日历两级组织，见 05-schedule.md）。 */
+  order: number
   readOnly: true            // v1 恒只读
   syncState: 'idle' | 'syncing' | 'error'
   syncToken?: string        // ctag / sync-token / ICS ETag
