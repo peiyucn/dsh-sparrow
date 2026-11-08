@@ -21,10 +21,12 @@ on:
         required: false
         type: string
 
-# id-token: write 用于 npm Trusted Publishing（OIDC）；contents: write 用于自动建 GitHub Release
+# id-token: write 用于 npm Trusted Publishing（OIDC）；contents: write 用于自动建 GitHub Release；
+# security-events: read 供发布前的告警门禁查询 Dependabot / CodeQL / secret scanning（根规范 E18）。
 permissions:
   contents: write
   id-token: write
+  security-events: read
 
 jobs:
   publish:
@@ -43,6 +45,26 @@ jobs:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v7
+
+      # 发布硬门禁（根规范 E18）：任一未处理告警（Dependabot / CodeQL / secret scanning）即中止；
+      # 查询本身失败也中止（fail-closed，不因权限/网络问题静默放行）。计数写进日志供 Deployments 追查。
+      - name: Security alert gate (fail-closed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          count_open() {
+            gh api --paginate "repos/${repo}/$1?state=open&per_page=100" --jq '.[].number' | wc -l | tr -d '[:space:]'
+          }
+          dependabot="$(count_open dependabot/alerts)"
+          codeql="$(count_open code-scanning/alerts)"
+          secrets="$(count_open secret-scanning/alerts)"
+          echo "open alerts: dependabot=${dependabot} codeql=${codeql} secret-scanning=${secrets}"
+          if [[ "${dependabot}" -ne 0 || "${codeql}" -ne 0 || "${secrets}" -ne 0 ]]; then
+            echo "::error::unresolved security alerts found; publishing is blocked (root AGENTS E18)"
+            exit 1
+          fi
 
       - name: Resolve plugin, version, and npm dist-tag
         id: resolve
@@ -96,7 +118,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # 根守卫链（`pnpm run check` = check:paths + check:dsh-pin + check:plugin-docs）：
+      # 根守卫链（`pnpm run check` = check:paths + check:dsh-pin + check:plugin-docs
+      #   + check:market-index + check:test-ts-check）：
       # tag 发布会绕过 CI（ci.yml 只在 push dev/main 与 PR 上跑），所以这里必须自己跑一遍，
       # 否则"文档没跟版 / 文档漂移 / 本机路径泄漏"会**直接随发布出门**。
       # fail-closed：守卫红 → 这一步失败 → 后面的 publish 步骤不执行。
@@ -148,6 +171,27 @@ jobs:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v7
+
+      # promote 只移动 dist-tag（让版本成为 latest / next 默认安装版本），同样对外可见：
+      # 与 publish job 同口径先跑 E18 告警门禁，查询失败也中止（fail-closed）。
+      - name: Security alert gate (fail-closed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          count_open() {
+            gh api --paginate "repos/${repo}/$1?state=open&per_page=100" --jq '.[].number' | wc -l | tr -d '[:space:]'
+          }
+          dependabot="$(count_open dependabot/alerts)"
+          codeql="$(count_open code-scanning/alerts)"
+          secrets="$(count_open secret-scanning/alerts)"
+          echo "open alerts: dependabot=${dependabot} codeql=${codeql} secret-scanning=${secrets}"
+          if [[ "${dependabot}" -ne 0 || "${codeql}" -ne 0 || "${secrets}" -ne 0 ]]; then
+            echo "::error::unresolved security alerts found; dist-tag promotion is blocked (root AGENTS E18)"
+            exit 1
+          fi
+
       - uses: actions/setup-node@v7
         with:
           node-version: 24
