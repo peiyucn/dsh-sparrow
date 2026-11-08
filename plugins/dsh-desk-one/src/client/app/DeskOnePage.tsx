@@ -42,7 +42,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   const {
     listNotes, updateNote, deleteNote, createNote, t,
     listTasks, createTask, updateTask, deleteTask,
-    listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink, schedule,
+    listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink, sessionsArchive, schedule,
   } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
   /** Guards double-click / double-tap while one create request is in flight. */
@@ -369,7 +369,7 @@ export function DeskOnePage(props: DeskPanelProps) {
           ) : tab === 'schedule' ? (
             <ScheduleView t={t} api={schedule} />
           ) : tab === 'sessions' ? (
-            <SessionsView snapshot={sessionSnapshot} t={t} onOpen={sessionLink.open} />
+            <SessionsView snapshot={sessionSnapshot} t={t} onOpen={sessionLink.open} archive={sessionsArchive} />
           ) : (
             <TaskBoard
               t={t}

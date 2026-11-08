@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { activeSessionGroups, archivedSessionTree, workspaceLabel } from '../../lib/client/sessions/catalog.js'
+import { activeSessionGroups, workspaceLabel } from '../../lib/client/sessions/catalog.js'
 
 /** Minimal session chip fixture for grouping tests. */
 const session = (id, over = {}) => ({
@@ -36,20 +36,5 @@ describe('Sessions 目录分组', () => {
     assert.equal(workspaceLabel(undefined), '')
     const groups = activeSessionGroups([session('x')])
     assert.equal(groups[0]?.label, '')
-  })
-
-  it('归档会话按父子关系排成树，父未归档的子会话提升为根', () => {
-    const archived = [
-      session('root', { availability: 'archived', updatedAt: 5 }),
-      session('child', { availability: 'archived', parentId: 'root', updatedAt: 4 }),
-      session('grand', { availability: 'archived', parentId: 'child', updatedAt: 3 }),
-      session('orphan', { availability: 'archived', parentId: 'missing', updatedAt: 2 }),
-    ]
-    assert.deepEqual(archivedSessionTree(archived).map(node => [node.session.id, node.depth]), [
-      ['root', 0],
-      ['child', 1],
-      ['grand', 2],
-      ['orphan', 0],
-    ])
   })
 })

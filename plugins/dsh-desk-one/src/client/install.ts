@@ -16,6 +16,7 @@ import type {
   DeskNote, DeskTask, DeskTaskGroup, CreateTaskRequest, TaskGroupPatchRequest, TaskPatchRequest,
 } from '../contract.js'
 import type { SessionLinkApi } from './sessions/contract.js'
+import type { SessionsArchiveApi } from './sessions/archiveApi.js'
 import type { ScheduleApi } from './schedule/api.js'
 import { attachMainPanel } from './panel.js'
 import { ensureDeskStyles } from './styles.js'
@@ -77,6 +78,8 @@ export interface DeskPanelInjected {
   readonly deleteGroup: (id: string) => Promise<void>
   /** Session linkage facade (disabled when the host does not expose the optional services). */
   readonly sessionLink: SessionLinkApi
+  /** Session archive management (host routes; archive / trash / restore / delete). */
+  readonly sessionsArchive: SessionsArchiveApi
   /** Schedule (mirror + connection) facade backed by host REST routes. */
   readonly schedule: ScheduleApi
 }

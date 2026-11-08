@@ -1,14 +1,21 @@
-/** Sessions (Agent会话) view — Phase 1: read-only catalog, no file mutations yet. */
+/**
+ * Sessions (Agent会话) view: active catalog (Phase 1, client snapshot) + archive management
+ * (Phase 3/A2, host routes). The active list stays read-only; archived / stray / trash operations
+ * live in ArchiveSections and go through the host's validated routes.
+ */
 
 import type { ReactElement } from 'react'
 import type { DeskTranslator } from '../app/types.js'
 import type { SessionChipInfo, SessionLinkSnapshot } from './contract.js'
-import { activeSessionGroups, archivedSessionTree } from './catalog.js'
+import type { SessionsArchiveApi } from './archiveApi.js'
+import { activeSessionGroups } from './catalog.js'
+import { ArchiveSections } from './ArchiveSections.js'
 
 interface SessionsViewProps {
   readonly snapshot: SessionLinkSnapshot
   readonly t: DeskTranslator
   readonly onOpen: (sessionId: string) => void
+  readonly archive: SessionsArchiveApi
 }
 
 function stateText(t: DeskTranslator, session: SessionChipInfo): string {
@@ -53,63 +60,37 @@ function SessionRow({
   )
 }
 
-export function SessionsView({ snapshot, t, onOpen }: SessionsViewProps): ReactElement {
-  if (!snapshot.enabled) {
-    return <p className="dsh-desk-wall-hint">{t('sessions.disabled')}</p>
-  }
+export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps): ReactElement {
   const groups = activeSessionGroups(snapshot.sessions, snapshot.workspaces)
-  const archived = archivedSessionTree(snapshot.sessions)
   const activeCount = groups.reduce((sum, group) => sum + group.sessions.length, 0)
   return (
     <div className="dsh-desk-sessionsview">
-      <section className="dsh-desk-session-section">
-        <header className="dsh-desk-session-section-head">
-          <h2 className="dsh-desk-session-section-title">{t('sessions.active')}</h2>
-          <span className="dsh-desk-session-section-count">{t('sessions.count', { count: activeCount })}</span>
-        </header>
-        {groups.length === 0
-          ? <p className="dsh-desk-wall-hint">{t('sessions.activeEmpty')}</p>
-          : groups.map(group => (
-              <div className="dsh-desk-session-group" key={group.key}>
-                <div className="dsh-desk-session-group-head" title={group.key}>
-                  <span className="dsh-desk-session-group-title">
-                    {group.label === '' ? t('sessions.noWorkspace') : group.label}
-                  </span>
-                  <span className="dsh-desk-session-group-count">{group.sessions.length}</span>
+      {snapshot.enabled ? (
+        <section className="dsh-desk-session-section">
+          <header className="dsh-desk-session-section-head">
+            <h2 className="dsh-desk-session-section-title">{t('sessions.active')}</h2>
+            <span className="dsh-desk-session-section-count">{t('sessions.count', { count: activeCount })}</span>
+          </header>
+          {groups.length === 0
+            ? <p className="dsh-desk-wall-hint">{t('sessions.activeEmpty')}</p>
+            : groups.map(group => (
+                <div className="dsh-desk-session-group" key={group.key}>
+                  <div className="dsh-desk-session-group-head" title={group.key}>
+                    <span className="dsh-desk-session-group-title">
+                      {group.label === '' ? t('sessions.noWorkspace') : group.label}
+                    </span>
+                    <span className="dsh-desk-session-group-count">{group.sessions.length}</span>
+                  </div>
+                  <ul className="dsh-desk-session-list">
+                    {group.sessions.map(session => (
+                      <SessionRow key={session.id} session={session} t={t} onOpen={onOpen} />
+                    ))}
+                  </ul>
                 </div>
-                <ul className="dsh-desk-session-list">
-                  {group.sessions.map(session => (
-                    <SessionRow key={session.id} session={session} t={t} onOpen={onOpen} />
-                  ))}
-                </ul>
-              </div>
-            ))}
-      </section>
-      <section className="dsh-desk-session-section">
-        <header className="dsh-desk-session-section-head">
-          <h2 className="dsh-desk-session-section-title">{t('sessions.archived')}</h2>
-          <span className="dsh-desk-session-section-count">{t('sessions.count', { count: archived.length })}</span>
-        </header>
-        <p className="dsh-desk-session-section-note">{t('sessions.archivedHint')}</p>
-        {archived.length === 0
-          ? <p className="dsh-desk-wall-hint">{t('sessions.archivedEmpty')}</p>
-          : (
-              <div className="dsh-desk-session-group">
-                <ul className="dsh-desk-session-list">
-                  {archived.map(node => (
-                    <SessionRow
-                      key={node.session.id}
-                      session={node.session}
-                      depth={node.depth}
-                      t={t}
-                      onOpen={onOpen}
-                    />
-                  ))}
-                </ul>
-              </div>
-            )}
-      </section>
+              ))}
+        </section>
+      ) : <p className="dsh-desk-wall-hint">{t('sessions.disabled')}</p>}
+      <ArchiveSections t={t} api={archive} onOpen={onOpen} />
     </div>
   )
 }
-

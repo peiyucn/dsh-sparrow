@@ -14,6 +14,8 @@ const readStyles = async () => [
   await read('src/client/app/styles.ts'),
   await read('src/client/notes/styles.ts'),
   await read('src/client/tasks/styles.ts'),
+  await read('src/client/schedule/styles.ts'),
+  await read('src/client/sessions/styles.ts'),
 ].join('\n')
 
 /** Task board sources joined: guards survive the board / drag / archive split. */
@@ -119,7 +121,7 @@ describe('dsh-desk-one 结构', () => {
     const iconButtons = page.match(/dsh-desk-iconbtn/gu) ?? []
     assert.ok(iconButtons.length >= 3, '贴纸删除 / 恢复 / 永久删除都应是图标按钮')
     assert.ok(!/dsh-desk-wallbar/u.test(page), '不再有右上角单独的文字入口')
-    assert.ok(!/dsh-desk-archive|dsh-desk-note-archive|dsh-desk-link/u.test(page), '不得残留归档语义或文字按钮')
+    assert.ok(!/dsh-desk-wallbar|dsh-desk-note-archive|dsh-desk-link/u.test(page), '便签侧不得残留归档语义或文字按钮')
     const iconRule = /\.dsh-desk-iconbtn \{([^}]*)\}/u.exec(styles)
     assert.ok(iconRule !== null, '缺 .dsh-desk-iconbtn 规则')
     assert.match(iconRule[1], /--dsw-radius-sm/u, '图标按钮圆角用宿主 token')
@@ -475,9 +477,11 @@ describe('dsh-desk-one 结构', () => {
     assert.match(notesDrag, /dataset\.dragging = 'true'/u)
   })
 
-  it('Sessions 标签 应该 只读合并归档目录（活跃按工作区分组 + 归档树）', async () => {
+  it('Sessions 标签 应该 合并活跃目录 + 归档管理（A2 走 host 路由）', async () => {
     const page = await readClientSurface()
     const view = await read('src/client/sessions/SessionsView.tsx')
+    const sections = await read('src/client/sessions/ArchiveSections.tsx')
+    const api = await read('src/client/sessions/archiveApi.ts')
     const catalog = await read('src/client/sessions/catalog.ts')
     const contract = await read('src/client/sessions/contract.ts')
     const bridge = await read('src/client/sessions/bridge.ts')
@@ -486,12 +490,16 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /tab\.sessions/u, '新增会话标签')
     assert.match(page, /SessionsView/u, '页面挂载 Sessions 视图')
     assert.match(page, /useSessionLinks\(sessionLink\)/u, 'Sessions 复用可选会话服务')
+    assert.match(page, /sessionsArchive/u, '页面注入归档管理 API')
     assert.match(view, /activeSessionGroups/u)
-    assert.match(view, /archivedSessionTree/u)
-    assert.match(view, /sessions\.archivedHint/u)
+    assert.match(view, /ArchiveSections/u, '归档管理由独立区块承载')
+    assert.match(sections, /api\.unarchive/u, '取消归档走 host 路由')
+    assert.match(sections, /api\.moveToTrash/u, '移入回收站走 host 路由')
+    assert.match(sections, /api\.deleteSession/u, '彻底删除走 host 路由')
+    assert.match(sections, /api\.restore/u, '回收站还原')
+    assert.match(sections, /deleteConfirm/u, '破坏性操作必须有确认')
+    assert.match(api, /\/api\/desk-one\/sessions/u, '归档 API 走 host 前缀')
     assert.match(catalog, /export function activeSessionGroups/u)
-    assert.match(catalog, /export function archivedSessionTree/u)
-    assert.match(catalog, /parentId/u, '归档树用父会话关系')
     assert.match(contract, /parentId\?: string/u)
     assert.match(bridge, /parentId/u)
     assert.match(bridge, /sessionIds/u, '工作区成员关系来自 workspaces.items')
@@ -499,10 +507,10 @@ describe('dsh-desk-one 结构', () => {
     assert.match(view, /snapshot\.workspaces/u, '视图把工作区桶传给分组函数')
     assert.match(styles, /\.dsh-desk-sessionsview \{/u)
     assert.match(styles, /\.dsh-desk-session-row \{/u)
-    // Phase 1 is read-only: no archive/trash mutations in the view.
-    assert.ok(!/archiveSession|unarchiveSession|moveSessionToTrash|deleteSession|restoreTrash/u.test(view), 'Sessions 视图 Phase 1 只读')
+    assert.match(styles, /\.dsh-desk-archive-row \{/u)
     assert.match(spec, /Phase 1：只读目录/u)
     assert.match(spec, /Phase 2：迁移归档 host 能力/u)
+    assert.match(spec, /Phase 3：管理 UI 与退役/u)
   })
 
   it('任务会话关联 应该 多对多、实时状态与可选依赖降级', async () => {
