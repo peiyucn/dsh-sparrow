@@ -90,7 +90,7 @@ export function TaskCard({
     panelRef: previewPanelRef,
     gap: 6,
     margin: 12,
-    maxWidth: 320,
+    maxWidth: 240,
     fitContent: true,
     align: 'start',
   })
@@ -549,25 +549,21 @@ export function TaskCard({
                   <dd>{previewChip.steps ?? (previewLoading ? t('task.session.preview.reading') : '—')}</dd>
                 </div>
               </dl>
-              {previewChip.cwd === undefined
-                ? null
-                : (
-                    <div className="dsh-task-session-preview-workspace">
-                      <span>{t('task.session.preview.workspace')}</span>
-                      <code>{previewChip.cwd}</code>
-                    </div>
-                  )}
               <div className="dsh-task-session-preview-foot">
                 <button
                   type="button"
                   className="dsh-task-session-preview-enter"
                   disabled={previewChip.availability !== 'available'}
+                  aria-label={t('task.session.preview.open')}
+                  title={t('task.session.preview.open')}
                   onClick={() => {
                     onOpenSession(previewChip.id)
                     setPreviewId(null)
                   }}
                 >
-                  {t('task.session.preview.open')}
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4.5 10h11M11 5.5l4.5 4.5-4.5 4.5" />
+                  </svg>
                 </button>
               </div>
             </div>,

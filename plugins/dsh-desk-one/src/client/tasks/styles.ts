@@ -930,11 +930,14 @@ export const TASKS_CSS = `
 /* Session preview: a roomy anchored card (not a modal) shown before entering a session. */
 .dsh-task-session-preview {
   box-sizing: border-box;
-  width: min(320px, calc(100vw - 24px));
-  padding: 12px;
+  width: min(232px, calc(100vw - 24px));
+  padding: 10px;
   border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: var(--dsw-radius-md, 12px);
-  background: var(--dsw-menu-surface-fill, var(--dsw-specific-menu, #ffffff));
+  border-radius: var(--dsw-radius-sm, 8px);
+  /* The official menu surface is intentionally translucent for blurred menus; this compact
+     popover has no blur, so layer it over an opaque surface to keep the text readable. */
+  background-color: var(--dsw-alias-bg-layer-1, #ffffff);
+  background-image: linear-gradient(var(--dsw-menu-surface-fill, transparent), var(--dsw-menu-surface-fill, transparent));
   box-shadow: var(--dsw-elevation-panel, 0 10px 30px -12px rgba(20, 25, 40, 0.4));
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
@@ -953,9 +956,9 @@ export const TASKS_CSS = `
 }
 .dsh-task-session-preview-title {
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 18px;
+  line-height: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -991,8 +994,8 @@ export const TASKS_CSS = `
 .dsh-task-session-preview-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin: 12px 0;
+  gap: 6px;
+  margin: 8px 0;
 }
 .dsh-task-session-preview-grid div {
   display: flex;
@@ -1008,48 +1011,39 @@ export const TASKS_CSS = `
 .dsh-task-session-preview-grid dd {
   margin: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dsh-task-session-preview-workspace {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0 0 10px;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  font-size: 11px;
-  line-height: 15px;
-}
-.dsh-task-session-preview-workspace code {
-  overflow: hidden;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  font-family: var(--dsw-font-family-mono, ui-monospace, monospace);
-  font-size: 11px;
+  line-height: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .dsh-task-session-preview-foot {
   display: flex;
   justify-content: flex-end;
+  margin-top: 2px;
 }
 .dsh-task-session-preview-enter {
   appearance: none;
-  height: 28px;
-  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border: 0;
   border-radius: var(--dsw-radius-sm, 8px);
-  background: var(--dsw-alias-button-primary-fill, #4176e6);
-  color: var(--dsw-alias-label-primary-foreground, #ffffff);
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #6b7280);
   cursor: pointer;
 }
 .dsh-task-session-preview-enter:hover:not(:disabled) {
-  background: var(--dsw-alias-button-primary-hover, #3568d4);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-task-session-preview-enter svg {
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 .dsh-task-session-preview-enter:disabled {
   cursor: not-allowed;
