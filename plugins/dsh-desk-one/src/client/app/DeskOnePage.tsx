@@ -6,8 +6,8 @@
  * itself is capped (100 on the wall, 200 in the trash) so no pagination of the wall is needed.
  */
 
-import { useCallback, useRef, useState } from 'react'
-import type { ReactElement } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   LOCALE_NAMESPACE, MAX_ACTIVE_NOTES, NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH, TAB_STORAGE_KEY,
@@ -43,9 +43,22 @@ export function DeskOnePage(props: DeskPanelProps) {
     listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink,
   } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
+  const chromeRef = useRef<HTMLElement | null>(null)
+  const [chromeHeight, setChromeHeight] = useState(0)
   /** Guards double-click / double-tap while one create request is in flight. */
   const [creating, setCreating] = useState(false)
   const zTopRef = useRef(0)
+
+  useEffect(() => {
+    const element = chromeRef.current
+    if (element === null) return
+    const update = (): void => setChromeHeight(element.offsetHeight)
+    update()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    return () => { observer.disconnect() }
+  }, [])
 
   const selectTab = useCallback((next: Tab): void => {
     setTab(next)
@@ -326,27 +339,36 @@ export function DeskOnePage(props: DeskPanelProps) {
 
   return (
     <div className="dsh-desk-page">
-      <header className="dsh-desk-head" data-window-drag>
-        <div className="dsh-desk-heading">
-          <h1 className="dsh-desk-title">{t('page.title')}</h1>
+      <header
+        ref={chromeRef}
+        className="dsh-desk-chrome"
+        data-window-drag
+        style={{ '--dsh-desk-chrome-height': `${chromeHeight}px` } as CSSProperties}
+      >
+        <div className="dsh-desk-chrome-top">
+          <div className="dsh-desk-menupill">
+            <span className="dsh-desk-menu-title">{t('page.title')}</span>
+            <nav className="dsh-desk-tabs" role="tablist">
+              <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
+                {t('tab.overview')}
+              </button>
+              <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
+                {t('tab.notes')}
+              </button>
+              <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
+                {t('tab.tasks')}
+              </button>
+              <button type="button" className="dsh-desk-tab" data-active={tab === 'sessions'} onClick={() => selectTab('sessions')}>
+                {t('tab.sessions')}
+              </button>
+            </nav>
+          </div>
+          <div className="dsh-desk-global-slot" data-window-drag-recall aria-hidden="true" />
         </div>
-        <nav className="dsh-desk-tabs" role="tablist" data-window-drag-recall>
-          <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
-            {t('tab.overview')}
-          </button>
-          <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
-            {t('tab.notes')}
-          </button>
-          <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
-            {t('tab.tasks')}
-          </button>
-          <button type="button" className="dsh-desk-tab" data-active={tab === 'sessions'} onClick={() => selectTab('sessions')}>
-            {t('tab.sessions')}
-          </button>
-        </nav>
-        <div className="dsh-desk-global-slot" data-window-drag-recall aria-hidden="true" />
+        <div className="dsh-desk-chrome-actions" data-window-drag-recall>
+          <div className="dsh-desk-toolbar">{actions}</div>
+        </div>
       </header>
-      <div className="dsh-desk-toolbar" data-window-drag-recall>{actions}</div>
       {data.loadError === null ? null : (
         <div>
           <p className="dsh-desk-error">{t('state.loadFailed', { message: data.loadError })}</p>

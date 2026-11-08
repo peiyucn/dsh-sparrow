@@ -24,40 +24,90 @@ export const APP_CSS = `
   margin-left: auto;
   margin-right: auto;
 }
-/* DeskOne's own hierarchy (not the official page's order): row 1 is identity + primary
-   navigation, with the whole right side reserved for cross-feature time/todo widgets;
-   row 2 holds the active view's secondary actions. Official button/tab specs are reused. */
-.dsh-desk-head {
+/* Glass chrome: a brand pill carries the app title + primary navigation (stable equal-width
+   tabs), while page-specific actions live on their own row under a hairline. Content scrolls
+   beneath the translucent bar, the way the conversation and right-sidebar headers behave. */
+.dsh-desk-chrome {
   box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding-top: 28px;
-  margin-bottom: 6px;
+  position: relative;
+  z-index: 3;
   flex: none;
-  min-height: 32px;
+  padding: 28px 0 10px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 74%, transparent);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
 }
-html[data-platform='darwin'] .dsh-desk-head {
+html[data-platform='darwin'] .dsh-desk-chrome {
   padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
 }
-.dsh-desk-heading {
+/* Without backdrop blur the translucent bar would let content fight the text: use a solid bar. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .dsh-desk-chrome {
+    background: var(--dsw-alias-bg-base, #ffffff);
+  }
+}
+.dsh-desk-chrome-top {
   display: flex;
   align-items: center;
-  min-width: 0;
-  flex: none;
+  gap: 16px;
+  min-height: 36px;
 }
-.dsh-desk-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 500;
-  line-height: 28px;
+.dsh-desk-menupill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 3px;
+  border-radius: calc(var(--dsw-radius-md, 12px) + 3px);
+  background: var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6));
+  color: var(--dsw-alias-label-primary-foreground, #ffffff);
+  box-shadow: inset 0 0 0 var(--dsh-hairline-width, 0.5px) color-mix(in srgb, #ffffff 22%, transparent);
+}
+.dsh-desk-menu-title {
+  padding: 0 12px;
+  border-right: 0.5px solid color-mix(in srgb, var(--dsw-alias-label-primary-foreground, #ffffff) 26%, transparent);
+  margin-right: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 30px;
   white-space: nowrap;
 }
-.dsh-desk-subtitle {
-  margin: 4px 0 0;
+.dsh-desk-tabs {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  flex: none;
+}
+.dsh-desk-tab {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--dsw-radius-sm, 8px);
+  background: transparent;
   font-size: 13px;
-  line-height: 20px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-weight: 500;
+  line-height: 18px;
+  color: color-mix(in srgb, var(--dsw-alias-label-primary-foreground, #ffffff) 78%, transparent);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease;
+}
+.dsh-desk-tab:hover {
+  color: var(--dsw-alias-label-primary-foreground, #ffffff);
+}
+.dsh-desk-tab[data-active='true'] {
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+  color: var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6));
+  font-weight: 500;
 }
 /* Intentionally empty for now: future time management / to-do widgets live top-right. */
 .dsh-desk-global-slot {
@@ -69,54 +119,32 @@ html[data-platform='darwin'] .dsh-desk-head {
   min-height: 30px;
   min-width: 0;
 }
-/* Tabs are primary navigation: they share the identity row with the title and keep the
-   official SegmentedTabs (sm) visual spec. */
-.dsh-desk-tabs {
-  display: inline-grid;
-  grid-auto-flow: column;
-  gap: 2px;
-  padding: 2px;
-  border-radius: calc(var(--dsw-radius-md, 12px) + 2px);
-  background: var(--dsw-alias-bg-module-platform, var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05)));
-  flex: none;
-}
-.dsh-desk-tab {
-  appearance: none;
-  display: inline-flex;
+/* Page-specific actions are a separate row under a hairline, not part of the global pill. */
+.dsh-desk-chrome-actions {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  height: 30px;
-  padding: 0 12px;
-  border: 0.5px solid transparent;
-  border-radius: var(--dsw-radius-md, 12px);
-  background: transparent;
-  font-size: 14px;
-  line-height: 20px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  cursor: pointer;
-  transition: color 160ms ease, background 160ms ease;
+  justify-content: flex-end;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 0.5px solid color-mix(in srgb, var(--dsw-alias-border-l3, #e2e5ea) 72%, transparent);
+  min-height: 28px;
 }
-.dsh-desk-tab:hover {
-  color: var(--dsw-alias-label-primary, #1f2329);
-}
-.dsh-desk-tab[data-active='true'] {
-  border-color: var(--dsw-alias-border-l3, #e2e5ea);
-  background: var(--dsw-alias-bg-layer-3, #ffffff);
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-weight: 500;
-}
-/* Contextual action row: official toolbar interaction spec, but below navigation. */
 .dsh-desk-toolbar {
   display: flex;
-  flex: none;
+  flex: 1;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 8px 16px;
-  min-height: 32px;
+  min-height: 28px;
   min-width: 0;
-  margin-bottom: 10px;
   white-space: nowrap;
+}
+.dsh-desk-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
 }
 /* Official Button (sm) parity: outlined by default, primary for the single main action. */
 .dsh-desk-action {
