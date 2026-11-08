@@ -1,5 +1,5 @@
 /**
- * Shared DeskOne glyph: a desk silhouette with an agent spark.
+ * Shared DeskOne glyph: a rounded square with a small spark.
  *
  * Used by the sidebar entry and the header brand lockup. `currentColor` keeps the official
  * sidebar selected/hover states working without a second color path.
@@ -10,9 +10,8 @@ import type { ReactElement } from 'react'
 export function DeskGlyph({ size = 24 }: { readonly size?: number }): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="3.25" y="8" width="17.5" height="6.5" rx="1.8" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M6.25 14.5v4M17.75 14.5v4M7.5 11.25h4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M18.9 2.6l.78 2.12 2.12.78-2.12.78-.78 2.12-.78-2.12-2.12-.78 2.12-.78z" fill="currentColor" />
+      <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M12 7.2l1.35 3.45L16.8 12l-3.45 1.35L12 16.8l-1.35-3.45L7.2 12l3.45-1.35z" fill="currentColor" />
     </svg>
   )
 }
