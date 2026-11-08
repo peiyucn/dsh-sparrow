@@ -154,20 +154,24 @@ export function DeskOnePage(props: DeskPanelProps) {
   }, [createNote, creating, data, selectTab, t, trash, wallRef, wallSize.height, wallSize.width])
 
   const renderWall = (): ReactElement => (
-    <div className="dsh-desk-wall" ref={setWallRef}>
-      <div
-        className="dsh-desk-wall-canvas"
-        ref={canvasRef}
-        onDoubleClick={(event) => {
-          // Only empty canvas space creates a note; double-clicking a sticker or control is ignored.
-          if (event.target !== event.currentTarget) return
-          const rect = event.currentTarget.getBoundingClientRect()
-          void addNote({
-            x: event.clientX - rect.left - NOTE_DEFAULT_WIDTH / 2,
-            y: event.clientY - rect.top - NOTE_DEFAULT_HEIGHT / 2,
-          })
-        }}
-      >
+    <div
+      className="dsh-desk-wall"
+      ref={setWallRef}
+      onDoubleClick={(event) => {
+        // Listen on the scrollport: empty space below the canvas box is still part of the wall.
+        // Notes and controls own their double-clicks; coordinates are canvas-relative.
+        const target = event.target as HTMLElement
+        if (target.closest('.dsh-desk-note, button, textarea, input, .dsh-desk-wall-tip')) return
+        const canvas = canvasRef.current
+        if (canvas === null) return
+        const rect = canvas.getBoundingClientRect()
+        void addNote({
+          x: event.clientX - rect.left - NOTE_DEFAULT_WIDTH / 2,
+          y: event.clientY - rect.top - NOTE_DEFAULT_HEIGHT / 2,
+        })
+      }}
+    >
+      <div className="dsh-desk-wall-canvas" ref={canvasRef}>
         {data.loading
           ? <p className="dsh-desk-wall-hint">{t('state.loading')}</p>
           : trash.activeNotes.length === 0

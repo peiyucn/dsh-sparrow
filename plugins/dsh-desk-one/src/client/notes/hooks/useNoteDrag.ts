@@ -3,9 +3,9 @@
  *
  * During a gesture we mutate the dragged element's style directly and only commit to React
  * state on pointer-up: that keeps each pointermove O(1) instead of re-rendering the whole wall,
- * which matters when the wall is full (100 notes by design). Dragging near the top/bottom edge
- * auto-scrolls the wall, and pointer coordinates are converted to canvas coordinates through
- * the wall's scrollTop so a note can be moved below the visible screen.
+ * which matters when the wall is full (100 notes by design). The wall is not scrolled during a
+ * gesture; pointer coordinates are converted to canvas coordinates through the wall's current
+ * scrollTop, so a note keeps following the cursor exactly at any scroll position.
  */
 
 import { useCallback } from 'react'
@@ -33,12 +33,9 @@ export interface NoteDrag {
   readonly startResize: (event: ReactPointerEvent<HTMLElement>, item: PlacedNote) => void
 }
 
-/** Edge zone for drag scrolling; the scroll distance follows the pointer's own movement. */
-const AUTO_SCROLL_EDGE = 40
-/** Fraction of pointer travel converted into wall scroll at the very edge (0..1). */
-const AUTO_SCROLL_FOLLOW = 0.7
-/** Cap one pointermove's scroll so a fling cannot jump the wall. */
-const AUTO_SCROLL_MAX_PER_MOVE = 10
+// Deliberately no edge auto-scroll: moving the wall while the user drags fights the pointer
+// and sweeps notes back toward the top. The wall scrolls only through wheel/scrollbar gestures;
+// the note itself always stays under the pointer.
 
 export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch }: DragDeps): NoteDrag {
   const liveWidth = useCallback((): number => {
@@ -81,34 +78,14 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
       element.style.left = `${currentX}px`
       element.style.top = `${currentY}px`
     }
-    /**
-     * Edge scrolling is driven by this pointermove's own Y travel: slow mouse movement scrolls
-     * slowly, a stationary pointer scrolls nothing (it used to keep scrolling on a frame clock,
-     * which swept the note back to the top regardless of the user's pace).
-     */
-    const scrollFromPointerStep = (dy: number): void => {
-      if (wall === null || dy === 0) return
-      const rect = wall.getBoundingClientRect()
-      const edge = Math.min(AUTO_SCROLL_EDGE, Math.max(12, rect.height / 3))
-      // Only the bottom edge scrolls: the canvas is infinite downward. Scrolling at the top
-      // while dragging upward fights the user's mouse and sweeps notes back off-screen.
-      if (pointerY <= rect.bottom - edge || dy <= 0) return
-      const depth = (pointerY - (rect.bottom - edge)) / edge
-      const travel = Math.abs(dy) * Math.min(1, Math.max(0, depth)) * AUTO_SCROLL_FOLLOW
-      const before = wall.scrollTop
-      wall.scrollTop = before + Math.min(AUTO_SCROLL_MAX_PER_MOVE, travel)
-      if (wall.scrollTop !== before) placeFromPointer()
-    }
     const onMove = (moveEvent: PointerEvent): void => {
       if (moveEvent.pointerId !== event.pointerId) return
       const dx = moveEvent.clientX - startX
       const dy = moveEvent.clientY - startY
       if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return
       moved = true
-      const stepY = moveEvent.clientY - pointerY
       pointerX = moveEvent.clientX
       pointerY = moveEvent.clientY
-      scrollFromPointerStep(stepY)
       placeFromPointer()
     }
     const finish = (): void => {
