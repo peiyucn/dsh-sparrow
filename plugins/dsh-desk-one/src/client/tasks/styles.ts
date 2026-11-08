@@ -1,4 +1,4 @@
-/** Task board CSS: toolbar, lanes, groups, cards, drag ghost, archive list and due warnings. */
+/** Task board CSS: header actions, lanes, groups, cards, drag ghost, archive list and due warnings. */
 
 export const TASKS_CSS = `
 /* Board shell: fills the tab content area; narrow panels switch lanes to their compact form. */

@@ -70,8 +70,8 @@ export function DeskOnePage(props: DeskPanelProps) {
   const { wallRef, setWallRef, wallSize, placed } = useWallLayout(tab === 'notes', trash.activeNotes)
   const drag = useNoteDrag({ wallSize, wallRef, canvasRef, setNotes: data.setNotes, savePatch: data.savePatch })
 
-  // Task board data + state live here (not inside TaskBoard) so the top bar can own its view
-  // actions: new task, sort mode and the archive toggle.
+  // Task board data + state live here (not inside TaskBoard) so the shared header can own the
+  // view actions: new task, sort mode and the archive toggle.
   const taskData = useTasksData(t, { listTasks, createTask, updateTask, deleteTask })
   const groupsData = useGroupsData(t, { listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup })
   const sessionSnapshot = useSessionLinks(sessionLink)

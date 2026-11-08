@@ -1,8 +1,8 @@
 /**
  * Task board view: three lanes with first-class groups, pointer dragging for cards and for whole
  * groups (a ghost follows the pointer, invalid drops fly back), double-click-to-add and the
- * archive list. Data + board state are owned by DeskOnePage so the top bar can host the view
- * actions; this component stays a controlled renderer.
+ * archive list. Data + board state are owned by DeskOnePage so the shared header can host the
+ * view actions; this component stays a controlled renderer.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
