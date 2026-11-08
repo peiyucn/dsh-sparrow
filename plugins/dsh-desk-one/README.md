@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-**Desk One** — a personal office desk inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. S0 ships the skeleton and the notes wall — a sticky wall you fill with "＋", drag around, resize and write on directly.
+**Desk One（同桌）** — a shared desk for you and harness inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. S0 ships the skeleton and the notes wall — a sticky wall you fill with "＋", drag around, resize and write on directly.
 
 ## What it is
 
