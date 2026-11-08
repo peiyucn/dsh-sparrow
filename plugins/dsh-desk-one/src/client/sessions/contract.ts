@@ -18,6 +18,9 @@ export interface SessionChipInfo {
   /** Parent session id for subagent/fork lineage; absent for roots. */
   readonly parentId?: string
   readonly subagent: boolean
+  /** Whole-log stats, filled after the card calls inspect() (excluded from list summaries). */
+  readonly turns?: number
+  readonly steps?: number
 }
 
 /** One workspace bucket from the host client snapshot (title is user-visible). */
@@ -41,6 +44,8 @@ export interface SessionLinkApi {
   subscribe: (listener: () => void) => () => void
   /** Opens a session in the workspace when it is currently available; otherwise a no-op. */
   open: (sessionId: string) => void
+  /** Read full projections (turn/step stats) without opening the session. */
+  inspect: (sessionId: string) => Promise<void>
 }
 
 /** Build a disabled facade for hosts without the optional client services. */
@@ -49,5 +54,6 @@ export function disabledSessionLink(): SessionLinkApi {
     list: () => ({ enabled: false, sessions: [], workspaces: [] }),
     subscribe: () => () => {},
     open: () => {},
+    inspect: async () => {},
   }
 }

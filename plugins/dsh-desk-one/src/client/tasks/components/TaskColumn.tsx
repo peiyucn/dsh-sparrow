@@ -66,6 +66,7 @@ interface TaskColumnProps {
   readonly sessionsFor: (ids: readonly string[]) => readonly SessionChipInfo[]
   readonly onLinkSessions: (task: DeskTask, sessionIds: readonly string[]) => void
   readonly onOpenSession: (sessionId: string) => void
+  readonly onInspectSession: (sessionId: string) => Promise<void>
 }
 
 export function TaskColumn({
@@ -74,7 +75,7 @@ export function TaskColumn({
   onAdd, onToggleCollapse, onCommitDraft, onCancelDraft, onStartDrag, onGroupStartDrag,
   onPatch, onArchive, onDelete,
   isGroupCollapsed, onToggleGroup, onCreateGroup, onRenameGroup, onRemoveGroup, onArchiveGroup,
-  sessionEnabled, sessionOptions, sessionsFor, onLinkSessions, onOpenSession,
+  sessionEnabled, sessionOptions, sessionsFor, onLinkSessions, onOpenSession, onInspectSession,
 }: TaskColumnProps): ReactElement {
   const [addingGroup, setAddingGroup] = useState(false)
   const laneOver = (dropTarget?.status === status && dropTarget.block === true)
@@ -98,6 +99,7 @@ export function TaskColumn({
       sessionChips={sessionsFor(task.sessionIds)}
       onLinkSessions={(sessionIds) => onLinkSessions(task, sessionIds)}
       onOpenSession={onOpenSession}
+      onInspectSession={onInspectSession}
     />
   )
 

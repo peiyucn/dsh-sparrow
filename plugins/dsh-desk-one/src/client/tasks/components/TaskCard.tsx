@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import { MAX_TASK_SESSIONS, NOTE_COLORS } from '../../../constants.js'
 import type { DeskTask, TaskPatchRequest } from '../../../contract.js'
@@ -32,6 +32,8 @@ interface TaskCardProps {
   readonly sessionChips: readonly SessionChipInfo[]
   readonly onLinkSessions: (sessionIds: readonly string[]) => void
   readonly onOpenSession: (sessionId: string) => void
+  /** Read full session projections for the preview (turn/step stats). */
+  readonly onInspectSession: (sessionId: string) => Promise<void>
 }
 
 type EditableField = 'title' | 'body'
@@ -58,7 +60,7 @@ function autoGrow(element: HTMLTextAreaElement | null): void {
 
 export function TaskCard({
   task, dragging, t, onStartDrag, onPatch, onArchive, onDelete,
-  sessionEnabled, sessionOptions, sessionChips, onLinkSessions, onOpenSession,
+  sessionEnabled, sessionOptions, sessionChips, onLinkSessions, onOpenSession, onInspectSession,
 }: TaskCardProps): ReactElement {
   const titleRef = useRef<HTMLTextAreaElement | null>(null)
   const bodyRef = useRef<HTMLTextAreaElement | null>(null)
@@ -74,6 +76,23 @@ export function TaskCard({
     open: sessionPickerOpen && sessionEnabled,
     anchorRef: sessionAnchorRef,
     panelRef: sessionPanelRef,
+  })
+  const [previewId, setPreviewId] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const previewAnchorRef = useRef<HTMLButtonElement | null>(null)
+  const previewPanelRef = useRef<HTMLDivElement | null>(null)
+  const previewChip = previewId === null
+    ? undefined
+    : sessionChips.find(chip => chip.id === previewId) ?? sessionOptions.find(chip => chip.id === previewId)
+  const previewStyle = useAnchoredPanel({
+    open: previewId !== null,
+    anchorRef: previewAnchorRef,
+    panelRef: previewPanelRef,
+    gap: 6,
+    margin: 12,
+    maxWidth: 320,
+    fitContent: true,
+    align: 'start',
   })
 
   const remaining = task.due === undefined ? undefined : daysUntil(task.due.date)
@@ -131,11 +150,54 @@ export function TaskCard({
     }
   }, [sessionPickerOpen])
 
+  // Session preview: anchored card metadata, dismissed by outside press / Esc.
+  useEffect(() => {
+    if (previewId === null) return
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target
+      if (target instanceof Element
+        && (target.closest('.dsh-task-session-preview') !== null || target.closest('[data-session-preview-anchor]') !== null)) return
+      setPreviewId(null)
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setPreviewId(null)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [previewId])
+
+  // The projection read resolves asynchronously; stop the loading hint once stats land.
+  useEffect(() => {
+    if (previewChip?.turns !== undefined || previewChip?.steps !== undefined) setPreviewLoading(false)
+  }, [previewChip?.steps, previewChip?.turns])
+
   const sessionStatusText = (chip: SessionChipInfo): string => {
     if (chip.availability === 'available') return chip.running ? t('task.session.running') : t('task.session.idle')
     if (chip.availability === 'loading') return t('task.session.loading')
     if (chip.availability === 'archived') return t('task.session.archived')
     return t('task.session.unavailable')
+  }
+
+  const lastRunText = (chip: SessionChipInfo): string => {
+    if (chip.updatedAt <= 0) return t('task.session.preview.never')
+    const minutes = Math.max(0, Math.floor((Date.now() - chip.updatedAt) / 60_000))
+    if (minutes < 1) return t('task.session.preview.justNow')
+    if (minutes < 60) return t('task.session.preview.minutesAgo', { count: minutes })
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return t('task.session.preview.hoursAgo', { count: hours })
+    return t('task.session.preview.daysAgo', { count: Math.floor(hours / 24) })
+  }
+
+  const openPreview = (chip: SessionChipInfo, event: ReactMouseEvent<HTMLButtonElement>): void => {
+    event.stopPropagation()
+    previewAnchorRef.current = event.currentTarget
+    setPreviewId(chip.id)
+    setPreviewLoading(chip.turns === undefined && chip.steps === undefined)
+    void onInspectSession(chip.id).finally(() => setPreviewLoading(false))
   }
 
   const toggleSession = (chip: SessionChipInfo): void => {
@@ -241,8 +303,9 @@ export function TaskCard({
                         <button
                     type="button"
                     className="dsh-task-session-title"
+                    data-session-preview-anchor="true"
                     title={`${chip.title} · ${sessionStatusText(chip)}`}
-                    onClick={() => onOpenSession(chip.id)}
+                    onClick={(event) => openPreview(chip, event)}
                   >
                     {chip.title}
                   </button>
@@ -442,6 +505,74 @@ export function TaskCard({
           </button>
         </div>
       </div>
+      {previewChip === undefined
+        ? null
+        : createPortal(
+            <div
+              ref={previewPanelRef}
+              className="dsh-task-session-preview"
+              style={previewStyle ?? { visibility: 'hidden' }}
+              role="region"
+              aria-label={`${previewChip.title} · ${sessionStatusText(previewChip)}`}
+            >
+              <div className="dsh-task-session-preview-head">
+                <div className="dsh-task-session-preview-titleblock">
+                  <strong className="dsh-task-session-preview-title">{previewChip.title}</strong>
+                  <span className="dsh-task-session-preview-sub">
+                    {sessionStatusText(previewChip)}
+                    {previewChip.subagent ? ` · ${t('sessions.subagent')}` : ''}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="dsh-task-session-preview-close"
+                  aria-label={t('task.session.preview.close')}
+                  title={t('task.session.preview.close')}
+                  onClick={() => setPreviewId(null)}
+                >
+                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+                    <path d="M3 3l6 6M9 3L3 9" />
+                  </svg>
+                </button>
+              </div>
+              <dl className="dsh-task-session-preview-grid">
+                <div>
+                  <dt>{t('task.session.preview.lastRun')}</dt>
+                  <dd>{lastRunText(previewChip)}</dd>
+                </div>
+                <div>
+                  <dt>{t('task.session.preview.turns')}</dt>
+                  <dd>{previewChip.turns ?? (previewLoading ? t('task.session.preview.reading') : '—')}</dd>
+                </div>
+                <div>
+                  <dt>{t('task.session.preview.steps')}</dt>
+                  <dd>{previewChip.steps ?? (previewLoading ? t('task.session.preview.reading') : '—')}</dd>
+                </div>
+              </dl>
+              {previewChip.cwd === undefined
+                ? null
+                : (
+                    <div className="dsh-task-session-preview-workspace">
+                      <span>{t('task.session.preview.workspace')}</span>
+                      <code>{previewChip.cwd}</code>
+                    </div>
+                  )}
+              <div className="dsh-task-session-preview-foot">
+                <button
+                  type="button"
+                  className="dsh-task-session-preview-enter"
+                  disabled={previewChip.availability !== 'available'}
+                  onClick={() => {
+                    onOpenSession(previewChip.id)
+                    setPreviewId(null)
+                  }}
+                >
+                  {t('task.session.preview.open')}
+                </button>
+              </div>
+            </div>,
+            document.body,
+          )}
     </article>
   )
 }

@@ -520,7 +520,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(bridge, /workspaces\.list\.subscribe/u, '归档集变化要唤醒 picker')
     assert.match(index, /ctx\.inject\(\['sessions', 'workspaces', 'uiWorkspace'\]/u, '会话服务走可选 fork')
     assert.match(index, /sessionLink: sessionLink\.api/u)
-    // UI: chips with status tint, multi-select picker with search, unlink, click-to-open.
+    // UI: chips with status tint, multi-select picker with search, unlink, preview-before-open.
     assert.match(board, /useSessionLinks/u)
     assert.match(column, /sessionsFor/u)
     assert.match(card, /dsh-task-session-pop/u)

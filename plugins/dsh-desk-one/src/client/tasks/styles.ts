@@ -927,4 +927,133 @@ export const TASKS_CSS = `
   width: 14px;
   height: 14px;
 }
+/* Session preview: a roomy anchored card (not a modal) shown before entering a session. */
+.dsh-task-session-preview {
+  box-sizing: border-box;
+  width: min(320px, calc(100vw - 24px));
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  border-radius: var(--dsw-radius-md, 12px);
+  background: var(--dsw-menu-surface-fill, var(--dsw-specific-menu, #ffffff));
+  box-shadow: var(--dsw-elevation-panel, 0 10px 30px -12px rgba(20, 25, 40, 0.4));
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font-size: 12px;
+}
+.dsh-task-session-preview-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.dsh-task-session-preview-titleblock {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dsh-task-session-preview-title {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dsh-task-session-preview-sub {
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+  line-height: 15px;
+}
+.dsh-task-session-preview-close {
+  appearance: none;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  cursor: pointer;
+}
+.dsh-task-session-preview-close:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-task-session-preview-close svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+.dsh-task-session-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.dsh-task-session-preview-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dsh-task-session-preview-grid dt {
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+  line-height: 15px;
+}
+.dsh-task-session-preview-grid dd {
+  margin: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dsh-task-session-preview-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 10px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+  line-height: 15px;
+}
+.dsh-task-session-preview-workspace code {
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-family: var(--dsw-font-family-mono, ui-monospace, monospace);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dsh-task-session-preview-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+.dsh-task-session-preview-enter {
+  appearance: none;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm, 8px);
+  background: var(--dsw-alias-button-primary-fill, #4176e6);
+  color: var(--dsw-alias-label-primary-foreground, #ffffff);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+.dsh-task-session-preview-enter:hover:not(:disabled) {
+  background: var(--dsw-alias-button-primary-hover, #3568d4);
+}
+.dsh-task-session-preview-enter:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
 `

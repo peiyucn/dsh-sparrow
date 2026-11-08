@@ -370,6 +370,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
                   sessionsFor={sessionsFor}
                   onLinkSessions={linkSessions}
                   onOpenSession={sessionLink.open}
+                  onInspectSession={sessionLink.inspect}
                 />
               ))}
             </div>

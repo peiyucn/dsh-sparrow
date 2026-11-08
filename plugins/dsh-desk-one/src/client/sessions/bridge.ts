@@ -11,6 +11,8 @@ import type { SessionChipInfo, SessionLinkApi, SessionLinkSnapshot } from './con
 interface SessionProjectionValuesLike {
   /** Official `subagent` projection view value (summary key); label identifies the child. */
   readonly subagent?: { readonly label?: string } | null
+  /** Full-projection stats read on demand (excluded from list summaries). */
+  readonly sessionStats?: { readonly turns?: number; readonly steps?: number } | null
 }
 
 interface SessionRowLike {
@@ -29,6 +31,9 @@ interface SessionListStateLike {
   readonly ids?: readonly string[]
   readonly byId?: Readonly<Record<string, SessionRowLike>>
   readonly phase?: string
+  readonly projectionsBySession?: Readonly<Record<string, {
+    readonly values?: SessionProjectionValuesLike
+  }>>
 }
 
 interface SessionsServiceLike {
@@ -36,6 +41,8 @@ interface SessionsServiceLike {
     getSnapshot: () => SessionListStateLike
     subscribe: (listener: () => void) => () => void
   }
+  /** Official public read: load full projections without opening a Session. */
+  readonly refreshProjections?: (sessionId: string) => Promise<void>
 }
 
 interface WorkspaceRowLike {
@@ -103,6 +110,7 @@ function resolveSnapshot(services: SessionServices | null): SessionLinkSnapshot 
   const loading = list.phase === 'pending' || workspaces.phase === 'pending'
   const sessions: SessionChipInfo[] = (list.ids ?? []).map((id) => {
     const row = list.byId?.[id]
+    const stats = list.projectionsBySession?.[id]?.values?.sessionStats
     const availability = loading
       ? 'loading'
       : archived.has(id) ? 'archived' : row === undefined ? 'unavailable' : 'available'
@@ -115,6 +123,8 @@ function resolveSnapshot(services: SessionServices | null): SessionLinkSnapshot 
       ...row?.cwd === undefined ? {} : { cwd: row.cwd },
       ...row?.parentId === undefined ? {} : { parentId: row.parentId },
       subagent: row?.origin === 'subagent',
+      ...typeof stats?.turns === 'number' ? { turns: stats.turns } : {},
+      ...typeof stats?.steps === 'number' ? { steps: stats.steps } : {},
     }
   })
   // Running sessions first, then most recently updated — the picker's default order.
@@ -161,6 +171,15 @@ export function createSessionLinkBridge(): SessionLinkBridge {
       if (services === null) return
       const info = resolveSnapshot(services).sessions.find(session => session.id === sessionId)
       if (info !== undefined && info.availability === 'available') services.uiWorkspace.openSession(sessionId)
+    },
+    inspect: async (sessionId) => {
+      const refresh = services?.sessions.refreshProjections
+      if (refresh === undefined) return
+      try {
+        await refresh.call(services?.sessions, sessionId)
+      } catch {
+        // Stats are progressive enhancement: the preview still shows list metadata without them.
+      }
     },
   }
 
