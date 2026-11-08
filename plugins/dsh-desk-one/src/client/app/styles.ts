@@ -6,129 +6,106 @@ export const APP_CSS = `
    ⚠️ 中央列不提供基准字号，页面根必须显式给 14px。
    便签墙要占满剩余高度：页面自身不滚动，滚动交给墙面。 */
 .dsh-desk-page {
-  position: relative;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  padding: 0;
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 14px;
 }
-/* Content column; chrome and dock are normal-flow siblings above this body. */
-.dsh-desk-page > * {
-  width: 100%;
-  max-width: 960px;
-  margin-left: auto;
-  margin-right: auto;
-}
-.dsh-desk-body {
+/* Official conversation-header geometry: 10px inset + 30px title row + 10px gap + 25px tabs. */
+.dsh-desk-header {
   box-sizing: border-box;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  width: 100%;
-  max-width: 960px;
-  min-height: 0;
-  margin-left: auto;
-  margin-right: auto;
-  padding: 0 clamp(20px, 3vw, 40px);
-}
-.dsh-desk-overview {
-  padding-top: 18px;
-}
-.dsh-desk-notesview {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
-.dsh-desk-trash-host {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-  padding-top: 18px;
-}
-/* Glass chrome copied from the theme-tone recipe used by the conversation and right-sidebar
-   headers: the header is an absolute overlay, content scrolls beneath it and is blurred.
-   The menu itself stays theme-neutral (no brand fill / white text). */
-.dsh-desk-chrome {
-  box-sizing: border-box;
-  position: relative;
-  z-index: 5;
   flex: none;
-  padding: 28px 0 0;
-  background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent);
+  width: 100%;
+  min-height: 76px;
+  padding: 10px clamp(20px, 3vw, 40px) 0;
+  background-color: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent);
   backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
   -webkit-backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
+  background-image:
+    radial-gradient(ellipse 80vw 45vh at 50% -10vh, color-mix(in srgb, var(--dsh-theme-tone-top, transparent) 85%, transparent), transparent var(--dsh-theme-tone-top-stop, 62%)),
+    radial-gradient(ellipse 38vw 58vh at 0% -6vh, color-mix(in srgb, var(--dsh-theme-tone-left, transparent) 85%, transparent), transparent 68%);
+  background-size: 100vw 100vh, 100vw 100vh;
+  background-position: 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: fixed, fixed;
   border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
 }
-.dsh-desk-chrome-inner {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 960px;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: clamp(24px, 4vw, 48px);
-  padding-right: clamp(24px, 4vw, 48px);
+html[data-platform='darwin'] .dsh-desk-header {
+  padding-top: calc(10px + var(--dsh-frame-top-clearance, 0px));
 }
-html[data-platform='darwin'] .dsh-desk-chrome {
-  padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
-}
-/* Without backdrop blur the translucent bar would let content fight the text: use a solid bar. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .dsh-desk-chrome {
-    background: var(--dsw-alias-bg-base, #ffffff);
+  .dsh-desk-header {
+    background-color: var(--dsw-alias-bg-base, #ffffff);
   }
 }
-/* Row 1: brand title (official plugin-page position) + this view's actions on the right. */
-.dsh-desk-chrome-top {
+.dsh-desk-header-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  min-height: 30px;
   min-width: 0;
-  min-height: 35px;
+}
+.dsh-desk-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 .dsh-desk-title {
   flex: none;
   margin: 0;
   color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 500;
-  line-height: 28px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.dsh-desk-intro {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .dsh-desk-header-actions {
   display: flex;
-  flex: 0 1 auto;
-  flex-wrap: wrap;
+  flex: none;
   align-items: center;
-  justify-content: flex-end;
   gap: 8px;
   min-width: 0;
 }
-/* Row 2: official conversation tabs: plain text, 32px gap, 2px active underline. */
+/* Official tab strip: 10px below the title row, 25px tall, 2px active underline. */
 .dsh-desk-tabs {
   display: flex;
   align-items: flex-start;
   gap: 32px;
   min-width: 0;
-  margin-top: 4px;
+  min-height: 25px;
+  margin-top: 10px;
   padding: 0;
-  background: transparent;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.dsh-desk-tabs::-webkit-scrollbar {
+  display: none;
 }
 .dsh-desk-tab {
   appearance: none;
   position: relative;
   box-sizing: border-box;
-  min-height: 35px;
+  flex: none;
+  height: 25px;
   margin: 0;
-  padding: 10px 0 9px;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--dsw-alias-label-secondary, #6b7280);
@@ -158,11 +135,37 @@ html[data-platform='darwin'] .dsh-desk-chrome {
 .dsh-desk-tab[data-active='true']::after {
   background: var(--dsw-alias-state-business-primary, #4176e6);
 }
+.dsh-desk-body {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  padding: 0 clamp(20px, 3vw, 40px);
+}
+.dsh-desk-overview {
+  padding-top: 14px;
+}
 .dsh-desk-subtitle {
-  margin: 4px 0 0;
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 13px;
   line-height: 20px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-desk-notesview {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: 14px;
+}
+.dsh-desk-trash-host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: 14px;
 }
 /* Official Button (sm) parity: outlined by default, primary for the single main action. */
 .dsh-desk-action {

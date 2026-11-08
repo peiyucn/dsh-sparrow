@@ -4,7 +4,7 @@ export const LOCALE_DICTS = {
   zh: {
     'button.label': '办公桌',
     'page.title': '办公桌',
-    'page.subtitle': '随手贴便签，任务与日程汇总在总览',
+    'page.subtitle': '在便签、任务、日程与时间中与 harness 协作',
     'topbar.timePlaceholder': '时间管理 · 预留',
     'tab.overview': '总览',
     'tab.notes': '便签墙',
@@ -100,7 +100,7 @@ export const LOCALE_DICTS = {
   en: {
     'button.label': 'Desk One',
     'page.title': 'Desk One',
-    'page.subtitle': 'Jot notes here; tasks and calendars gather in Overview',
+    'page.subtitle': 'Working with harness in Note, Task, Schedule, Time',
     'topbar.timePlaceholder': 'Time management',
     'tab.overview': 'Overview',
     'tab.notes': 'Notes',

@@ -9,7 +9,7 @@ English | [简体中文](README.zh-CN.md)
 * One left-sidebar entry named **Desk One**; functions live in tabs inside the panel instead of scattering across the UI.
 * **Overview** is the main tab in the long run, but its content is not designed yet — it stays intentionally blank in this release.
 * **Notes** is the first shipped feature: a free-form sticky wall, not an input form.
-* **Sessions** is the shared agent-session catalog: active sessions grouped by workspace, archived sessions as a read-only tree. The panel header mirrors the conversation topbar: a title row with the active view's actions on the right, then official-style plain text tabs with a 2px underline on the active tab. The header sits in normal flow, so content and scrollbars start below it instead of running behind it.
+* **Sessions** is the shared agent-session catalog: active sessions grouped by workspace, archived sessions as a read-only tree. The panel header matches the conversation topbar: a compact 76px translucent bar with the brand title plus a one-line intro and the active view actions, followed by official-style plain text tabs (2px underline on the active tab). It stays in normal flow, so each feature and its scrollbar starts below it.
 * **Tasks** is the second shipped feature: a three-lane board (To do / Doing / Done) with colour tags, day-granular due dates, drag-to-move and an archive.
 
 ## Requirements

@@ -28,6 +28,7 @@ import { useTrash } from '../notes/hooks/useTrash.js'
 import { useWallLayout } from '../notes/hooks/useWallLayout.js'
 import type { DeskPanelInjected } from '../install.js'
 import type { DeskTranslator, Tab } from './types.js'
+import { DeskHeader } from './DeskHeader.js'
 import { messageOf, readInitialTab } from './utils.js'
 
 /** Page props: main-panel owner share + injected actions + locale seat (assembled by the host). */
@@ -197,8 +198,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   )
 
   const renderOverview = (): ReactElement => (
-    // Overview content is not designed yet; keep the page subtitle here rather than in the
-    // navigation row, which must stay tight for the reserved time-management slot.
+    // Overview content is not designed yet; keep the page subtitle here.
     <div className="dsh-desk-overview">
       <p className="dsh-desk-subtitle">{t('page.subtitle')}</p>
     </div>
@@ -331,30 +331,7 @@ export function DeskOnePage(props: DeskPanelProps) {
 
   return (
     <div className="dsh-desk-page">
-      <header className="dsh-desk-chrome" data-window-drag>
-        <div className="dsh-desk-chrome-inner">
-          <div className="dsh-desk-chrome-top">
-            <h1 className="dsh-desk-title">{t('page.title')}</h1>
-            {actions === null ? null : (
-              <div className="dsh-desk-header-actions" data-window-drag-recall>{actions}</div>
-            )}
-          </div>
-          <nav className="dsh-desk-tabs" role="tablist">
-            <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
-              {t('tab.overview')}
-            </button>
-            <button type="button" className="dsh-desk-tab" data-active={tab === 'notes'} onClick={() => selectTab('notes')}>
-              {t('tab.notes')}
-            </button>
-            <button type="button" className="dsh-desk-tab" data-active={tab === 'tasks'} onClick={() => selectTab('tasks')}>
-              {t('tab.tasks')}
-            </button>
-            <button type="button" className="dsh-desk-tab" data-active={tab === 'sessions'} onClick={() => selectTab('sessions')}>
-              {t('tab.sessions')}
-            </button>
-          </nav>
-        </div>
-      </header>
+      <DeskHeader t={t} tab={tab} onSelectTab={selectTab} actions={actions} />
       <div className="dsh-desk-body">
         {data.loadError === null ? null : (
           <div>
