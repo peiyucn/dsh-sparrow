@@ -32,18 +32,20 @@ export function DeskHeader({ t, tab, onSelectTab, actions }: DeskHeaderProps): R
           <div className="dsh-desk-header-actions" data-window-drag-recall>{actions}</div>
         )}
       </div>
-      <nav className="dsh-desk-tabs" role="tablist">
-        {VISIBLE_TABS.map(entry => (
-          <button
-            key={entry.tab}
-            type="button"
-            className="dsh-desk-tab"
-            data-active={tab === entry.tab}
-            onClick={() => onSelectTab(entry.tab)}
-          >
-            {t(entry.labelKey)}
-          </button>
-        ))}
+      <nav className="dsh-desk-tabs">
+        <div className="dsh-desk-viewtabs" role="tablist">
+          {VISIBLE_TABS.map(entry => (
+            <button
+              key={entry.tab}
+              type="button"
+              className="dsh-desk-tab"
+              data-active={tab === entry.tab}
+              onClick={() => onSelectTab(entry.tab)}
+            >
+              {t(entry.labelKey)}
+            </button>
+          ))}
+        </div>
         <DeskTabMenu t={t} tab={tab} onSelectTab={onSelectTab} entries={OVERFLOW_TABS} />
       </nav>
     </header>

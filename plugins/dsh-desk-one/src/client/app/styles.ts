@@ -99,15 +99,23 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   gap: 8px;
   min-width: 0;
 }
+/* Official two-level tab row: outer gap 20px (viewTabs ↔ More), inner text gap 32px. */
 .dsh-desk-tabs {
   display: flex;
   align-items: flex-start;
-  gap: 32px;
+  gap: 20px;
   min-width: 0;
   min-height: 25px;
   margin-top: 10px;
   padding: 0;
   overflow: visible;
+}
+.dsh-desk-viewtabs {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 32px;
+  min-width: 0;
 }
 .dsh-desk-tab {
   appearance: none;
