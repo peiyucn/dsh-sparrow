@@ -6,6 +6,8 @@ export const APP_CSS = `
    ⚠️ 中央列不提供基准字号，页面根必须显式给 14px。
    便签墙要占满剩余高度：页面自身不滚动，滚动交给墙面。 */
 .dsh-desk-page {
+  --dsh-desk-header-h: calc(76px + var(--dsh-frame-top-clearance, 0px));
+  position: relative;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -15,15 +17,17 @@ export const APP_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 14px;
 }
-/* Official conversation-header geometry: 10px inset + 30px title row + 10px gap + 25px tabs. */
+/* Fixed official conversation-header overlay: 76px, full width. Material comes from the same
+   surface tokens theme-tone drives for the official header/menu, so the looks move together. */
 .dsh-desk-header {
   box-sizing: border-box;
-  flex: none;
-  width: 100%;
-  min-height: 76px;
-  padding: 10px 28px 0 20px;
-  /* Material comes from the official surface tokens, so theme-tone drives it together with
-     the official header/menu glass instead of DeskOne hard-coding its own recipe. */
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  height: var(--dsh-desk-header-h);
+  padding: calc(10px + var(--dsh-frame-top-clearance, 0px)) 28px 0;
   background-color: var(--dsw-menu-surface-fill, color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent));
   backdrop-filter: var(--dsw-menu-backdrop-filter, blur(24px) saturate(170%) brightness(1.04));
   -webkit-backdrop-filter: var(--dsw-menu-backdrop-filter, blur(24px) saturate(170%) brightness(1.04));
@@ -35,9 +39,7 @@ export const APP_CSS = `
   background-repeat: no-repeat, no-repeat;
   background-attachment: fixed, fixed;
   border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
-}
-html[data-platform='darwin'] .dsh-desk-header {
-  padding-top: calc(10px + var(--dsh-frame-top-clearance, 0px));
+  overflow: hidden;
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .dsh-desk-header {
@@ -85,7 +87,6 @@ html[data-platform='darwin'] .dsh-desk-header {
   gap: 8px;
   min-width: 0;
 }
-/* Official tab strip: 10px below the title row, 25px tall, 2px active underline. */
 .dsh-desk-tabs {
   display: flex;
   align-items: flex-start;
@@ -137,85 +138,7 @@ html[data-platform='darwin'] .dsh-desk-header {
 .dsh-desk-tab[data-active='true']::after {
   background: var(--dsw-alias-state-business-primary, #4176e6);
 }
-.dsh-desk-tab-more {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  min-width: 22px;
-  height: 22px;
-  margin-top: -3px;
-  padding: 0;
-  border-radius: var(--dsw-radius-sm, 8px);
-  color: var(--dsw-alias-label-secondary, #6b7280);
-}
-.dsh-desk-tab-more[aria-expanded='true'] {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-}
-.dsh-desk-tab-more-icon {
-  display: block;
-  width: 13px;
-  height: 13px;
-}
-/* Overflow menu: same elevated menu-card language as the other popovers. */
-.dsh-desk-tabmenu {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  width: 288px;
-  max-width: calc(100vw - 24px);
-  padding: 4px;
-  border: 0;
-  border-radius: var(--dsw-radius-lg, 14px);
-  background: var(--dsw-menu-surface-fill, var(--dsw-specific-menu, #ffffff));
-  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
-  -webkit-backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
-  box-shadow: var(--dsw-elevation-panel, 0 10px 30px -12px rgba(20, 25, 40, 0.45));
-  outline: 0.5px solid var(--dsw-alias-border-l1, #e2e5ea);
-  outline-offset: -0.5px;
-}
-.dsh-desk-tabmenu-option {
-  appearance: none;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  height: 28px;
-  padding: 0 8px;
-  border: none;
-  border-radius: var(--dsw-radius-sm, 8px);
-  background: transparent;
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font: inherit;
-  font-size: 13px;
-  line-height: 18px;
-  text-align: left;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.dsh-desk-tabmenu-option:hover,
-.dsh-desk-tabmenu-option:focus-visible {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  outline: none;
-}
-.dsh-desk-tabmenu-option[data-active='true'] {
-  font-weight: 500;
-}
-.dsh-desk-tabmenu-check {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  color: var(--dsw-alias-state-business-primary, #4176e6);
-}
-.dsh-desk-tabmenu-check svg {
-  display: block;
-  width: 12px;
-  height: 12px;
-}
+/* Content fills the page; each view offsets its own content below the header. */
 .dsh-desk-body {
   box-sizing: border-box;
   display: flex;
@@ -223,16 +146,11 @@ html[data-platform='darwin'] .dsh-desk-header {
   flex-direction: column;
   width: 100%;
   min-height: 0;
-  /* Same 14px gap under the header for every feature, and the same horizontal inset. */
-  padding: 14px 28px 0 20px;
 }
-.dsh-desk-overview {}
-.dsh-desk-subtitle {
-  margin: 0;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  font-size: 13px;
-  line-height: 20px;
+.dsh-desk-overview {
+  padding: calc(var(--dsh-desk-header-h) + 14px) 28px 0;
 }
+/* Notes wall is full-bleed: it uses the whole page width, only the header keeps its insets. */
 .dsh-desk-notesview {
   display: flex;
   flex: 1;
@@ -245,7 +163,7 @@ html[data-platform='darwin'] .dsh-desk-header {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  width: 100%;
+  padding: calc(var(--dsh-desk-header-h) + 14px) 28px 0;
 }
 /* Official Button (sm) parity: outlined by default, primary for the single main action. */
 .dsh-desk-action {
@@ -444,7 +362,10 @@ html[data-platform='darwin'] .dsh-desk-header {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 2px 0 16px;
+  padding: calc(var(--dsh-desk-header-h) + 14px) 28px 16px;
+}
+.dsh-desk-sessionsview::-webkit-scrollbar-track {
+  margin-top: var(--dsh-desk-header-h);
 }
 .dsh-desk-session-section {
   display: flex;
@@ -575,5 +496,86 @@ html[data-platform='darwin'] .dsh-desk-header {
    preceding "back to wall" button from shifting when the confirm state toggles. */
 .dsh-desk-action[data-stable-width='true'] {
   min-width: 96px;
+}
+/* Official More launcher: 22×22, 13px ellipsis icon, hover/expanded fill. */
+.dsh-desk-tab-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  margin-top: -3px;
+  padding: 0;
+  border-radius: var(--dsw-radius-sm, 8px);
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-desk-tab-more:hover,
+.dsh-desk-tab-more[aria-expanded='true'] {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+}
+.dsh-desk-tab-more-icon {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+/* Floating page menu: official menu surface tokens (theme-tone aware) and elevation. */
+.dsh-desk-tabmenu {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 288px;
+  max-width: calc(100vw - 24px);
+  padding: 4px;
+  border: 0;
+  border-radius: var(--dsw-radius-lg, 14px);
+  background: var(--dsw-menu-surface-fill, var(--dsw-specific-menu, #ffffff));
+  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
+  -webkit-backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
+  box-shadow: var(--dsw-elevation-panel, 0 10px 30px -12px rgba(20, 25, 40, 0.45));
+  outline: 0.5px solid var(--dsw-alias-border-l1, #e2e5ea);
+  outline-offset: -0.5px;
+}
+.dsh-desk-tabmenu-option {
+  appearance: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--dsw-radius-sm, 8px);
+  background: transparent;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dsh-desk-tabmenu-option:hover,
+.dsh-desk-tabmenu-option:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  outline: none;
+}
+.dsh-desk-tabmenu-option[data-active='true'] {
+  font-weight: 500;
+}
+.dsh-desk-tabmenu-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--dsw-alias-state-business-primary, #4176e6);
+}
+.dsh-desk-tabmenu-check svg {
+  display: block;
+  width: 12px;
+  height: 12px;
 }
 `

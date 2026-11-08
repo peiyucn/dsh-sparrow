@@ -22,7 +22,7 @@ export function DeskTabMenu({ t, tab, onSelectTab }: DeskTabMenuProps): ReactEle
   const anchorRef = useRef<HTMLButtonElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
-  const style = useAnchoredPanel({ open, anchorRef, panelRef, gap: 6, margin: 8, maxWidth: 200 })
+  const style = useAnchoredPanel({ open, anchorRef, panelRef, gap: 6, margin: 8, maxWidth: 288 })
 
   useEffect(() => {
     if (!open) return

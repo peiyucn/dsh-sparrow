@@ -8,7 +8,7 @@ export const TASKS_CSS = `
   flex: 1;
   min-height: 0;
   gap: 8px;
-  padding-bottom: 8px;
+  padding: calc(var(--dsh-desk-header-h) + 14px) 28px 8px;
 }
 .dsh-task-lanes {
   flex: 1;

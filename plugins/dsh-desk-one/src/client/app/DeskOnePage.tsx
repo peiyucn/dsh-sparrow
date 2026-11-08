@@ -236,11 +236,12 @@ export function DeskOnePage(props: DeskPanelProps) {
     if (trash.showTrash) {
       return (
         <>
-          <button type="button" className="dsh-desk-action" aria-label={t('action.backToWall')} title={t('action.backToWall')} onClick={trash.toggleTrash}>
+          <button key="back" type="button" className="dsh-desk-action" aria-label={t('action.backToWall')} title={t('action.backToWall')} onClick={trash.toggleTrash}>
             {backIcon}
             <span className="dsh-desk-action-label">{t('action.backToWall')}</span>
           </button>
           <button
+            key="clear"
             type="button"
             className="dsh-desk-action"
             aria-label={trash.confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
@@ -261,6 +262,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     return (
       <>
         <button
+          key="capture"
           type="button"
           className="dsh-desk-action dsh-desk-action-primary"
           aria-label={t('action.newNote')}
@@ -272,6 +274,7 @@ export function DeskOnePage(props: DeskPanelProps) {
           <span className="dsh-desk-action-label">{t('action.newNote')}</span>
         </button>
         <button
+          key="smash"
           type="button"
           className="dsh-desk-action"
           data-smash-confirm="true"
@@ -286,7 +289,7 @@ export function DeskOnePage(props: DeskPanelProps) {
             {trash.confirmSmash ? t('action.smashConfirm') : t('action.smash')}
           </span>
         </button>
-        <button type="button" className="dsh-desk-action" aria-label={t('trash.title')} title={t('trash.title')} onClick={trash.toggleTrash}>
+        <button key="open-trash" type="button" className="dsh-desk-action" aria-label={t('trash.title')} title={t('trash.title')} onClick={trash.toggleTrash}>
           {trashIcon}
           <span className="dsh-desk-action-label">{t('trash.title')}</span>
         </button>
@@ -299,7 +302,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     if (tab !== 'tasks') return null
     if (board.showArchive) {
       return (
-        <button type="button" className="dsh-desk-action" aria-label={t('task.backToBoard')} title={t('task.backToBoard')} onClick={board.toggleArchive}>
+        <button key="task-back" type="button" className="dsh-desk-action" aria-label={t('task.backToBoard')} title={t('task.backToBoard')} onClick={board.toggleArchive}>
           {backIcon}
           <span className="dsh-desk-action-label">{t('task.backToBoard')}</span>
         </button>
@@ -308,6 +311,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     return (
       <>
         <button
+          key="task-add"
           type="button"
           className="dsh-desk-action dsh-desk-action-primary"
           aria-label={t('task.add')}
@@ -317,8 +321,8 @@ export function DeskOnePage(props: DeskPanelProps) {
           {plusIcon}
           <span className="dsh-desk-action-label">{t('task.add')}</span>
         </button>
-        <SortMenu t={t} mode={board.sortMode} onChange={board.setSortMode} />
-        <button type="button" className="dsh-desk-action" aria-label={t('task.archive')} title={t('task.archive')} onClick={board.toggleArchive}>
+        <SortMenu key="task-sort" t={t} mode={board.sortMode} onChange={board.setSortMode} />
+        <button key="task-archive" type="button" className="dsh-desk-action" aria-label={t('task.archive')} title={t('task.archive')} onClick={board.toggleArchive}>
           {archiveIcon}
           <span className="dsh-desk-action-label">
             {t('task.archive')}{board.archivedTasks.length === 0 ? '' : ` (${board.archivedTasks.length})`}
