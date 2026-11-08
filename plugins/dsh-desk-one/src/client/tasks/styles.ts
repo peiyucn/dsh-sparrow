@@ -317,7 +317,7 @@ export const TASKS_CSS = `
   align-items: center;
   min-height: 16px;
 }
-/* Neutral chip text: status lives in the dot/ring/border, not the title color. */
+/* Neutral chip text: status lives in the border/ring, not the title color. */
 .dsh-task-session {
   position: relative;
   display: inline-flex;

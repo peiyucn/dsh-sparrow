@@ -219,7 +219,8 @@ export function TaskCard({
   const tokenTotal = [previewChip?.inputTokens, previewChip?.outputTokens, previewChip?.cacheReadTokens, previewChip?.cacheWriteTokens]
     .filter((value): value is number => typeof value === 'number')
     .reduce((sum, value) => sum + value, 0)
-  const tokenKnown = previewChip?.inputTokens !== undefined
+  const tokenKnown = [previewChip?.inputTokens, previewChip?.outputTokens, previewChip?.cacheReadTokens, previewChip?.cacheWriteTokens]
+    .some(value => typeof value === 'number')
   const reading = t('task.session.preview.reading')
   const tokenText = tokenKnown ? formatTokens(tokenTotal) : (previewLoading ? reading : '—')
   const modelTimeText = previewChip?.llmMs === undefined ? (previewLoading ? reading : '—') : formatDuration(previewChip.llmMs)
