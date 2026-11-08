@@ -502,7 +502,10 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
 }
 /* Official More launcher: 22×22, 13px ellipsis icon, hover/expanded fill. */
 .dsh-desk-tab-more {
+  appearance: none;
+  box-sizing: border-box;
   display: inline-flex;
+  flex: none;
   align-self: flex-start;
   align-items: center;
   justify-content: center;
@@ -511,8 +514,13 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
   height: 22px;
   margin-top: -3px;
   padding: 0;
+  border: 0;
   border-radius: var(--dsw-radius-sm, 8px);
+  background: transparent;
   color: var(--dsw-alias-label-secondary, #6b7280);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
 }
 .dsh-desk-tab-more:hover,
 .dsh-desk-tab-more[aria-expanded='true'] {
