@@ -930,40 +930,41 @@ export const TASKS_CSS = `
 }
 /* Session preview: a floating layer that visually continues the chip. It never participates
    in card layout, so expanding cannot squeeze the board. */
-.dsh-task-session-preview {
-  box-sizing: border-box;
-  width: min(232px, calc(100vw - 24px));
-  padding: 8px 10px;
-  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+/* Expanded chip: grows in place, capped by the card width, pushing card height as needed. */
+.dsh-task-session[data-expanded='true'] {
+  flex: 1 0 100%;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 100%;
+  padding: 3px 4px 4px 8px;
   border-radius: 10px;
-  background-color: var(--dsw-alias-bg-layer-1, #ffffff);
-  box-shadow: var(--dsw-elevation-panel, 0 10px 30px -12px rgba(20, 25, 40, 0.4));
-  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-task-session[data-expanded='true']::before {
+  border-radius: 12px;
+}
+.dsh-task-session[data-expanded='true'] .dsh-task-session-title {
+  flex: 1;
+  max-width: none;
+}
+/* Details live inside the chip, inheriting its status tint; compact 2-column grid. */
+.dsh-task-session-preview {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  min-width: 0;
+  margin-top: 3px;
+  padding: 3px 2px 1px 0;
+  color: inherit;
   font-size: 10px;
   line-height: 15px;
-  transform-origin: top left;
   animation: dsh-task-session-expand 0.12s ease-out;
-}
-.dsh-task-session-preview[data-state='running'] {
-  border-color: color-mix(in srgb, #2e9e5b 55%, transparent);
-  background-color: color-mix(in srgb, #2e9e5b 14%, var(--dsw-alias-bg-layer-1, #ffffff));
-  color: color-mix(in srgb, #1d6b3f 72%, var(--dsw-alias-label-secondary, #6b7280));
-}
-.dsh-task-session-preview[data-state='idle'] {
-  border-color: color-mix(in srgb, #2e9e5b 30%, transparent);
-  background-color: color-mix(in srgb, #2e9e5b 8%, var(--dsw-alias-bg-layer-1, #ffffff));
-  color: color-mix(in srgb, #1d6b3f 72%, var(--dsw-alias-label-secondary, #6b7280));
-}
-.dsh-task-session-preview[data-state='loading'] {
-  border-color: color-mix(in srgb, #d9a441 45%, transparent);
-  background-color: color-mix(in srgb, #d9a441 12%, var(--dsw-alias-bg-layer-1, #ffffff));
 }
 .dsh-task-session-preview-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 .dsh-task-session-preview-token {
   display: inline-flex;
@@ -1026,6 +1027,13 @@ export const TASKS_CSS = `
 .dsh-task-session-preview-enter:disabled {
   cursor: not-allowed;
   opacity: 0.3;
+}
+@keyframes dsh-task-session-expand {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dsh-task-session-preview { animation: none; }
 }
 @keyframes dsh-task-session-expand {
   from { opacity: 0; transform: translateY(-2px) scale(0.97); }
