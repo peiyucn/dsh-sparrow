@@ -33,9 +33,8 @@ export const NOTES_CSS = `
 /* 空墙中央的轻提示：双层排版（主提示 + 次提示），颜色压到很浅，不抢贴纸。 */
 .dsh-desk-wall-canvas {
   position: relative;
-  min-height: calc(100% - var(--dsh-desk-chrome-height, 74px));
-  margin-top: var(--dsh-desk-chrome-height, 74px);
-  padding-bottom: 84px;
+  min-height: 100%;
+  padding-bottom: 16px;
 }
 .dsh-desk-wall-tip {
   position: absolute;

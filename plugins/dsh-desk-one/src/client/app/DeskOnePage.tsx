@@ -6,8 +6,8 @@
  * the collection itself is capped (100 on the wall, 200 in the trash).
  */
 
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import type { CSSProperties, ReactElement } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import type { ReactElement } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   LOCALE_NAMESPACE, MAX_ACTIVE_NOTES, NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH, TAB_STORAGE_KEY,
@@ -30,9 +30,6 @@ import type { DeskPanelInjected } from '../install.js'
 import type { DeskTranslator, Tab } from './types.js'
 import { messageOf, readInitialTab } from './utils.js'
 
-/** First-render height until the ResizeObserver reports the real chrome height. */
-const CHROME_HEIGHT_FALLBACK = 74
-
 /** Page props: main-panel owner share + injected actions + locale seat (assembled by the host). */
 export type DeskPanelProps = PropsRuntime<'main'> & InjectFace<DeskPanelInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
 
@@ -46,22 +43,9 @@ export function DeskOnePage(props: DeskPanelProps) {
     listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink,
   } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
-  const chromeRef = useRef<HTMLElement | null>(null)
-  const [chromeHeight, setChromeHeight] = useState(CHROME_HEIGHT_FALLBACK)
   /** Guards double-click / double-tap while one create request is in flight. */
   const [creating, setCreating] = useState(false)
   const zTopRef = useRef(0)
-
-  useLayoutEffect(() => {
-    const element = chromeRef.current
-    if (element === null) return
-    const update = (): void => setChromeHeight(element.offsetHeight)
-    update()
-    if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(update)
-    observer.observe(element)
-    return () => { observer.disconnect() }
-  }, [])
 
   const selectTab = useCallback((next: Tab): void => {
     setTab(next)
@@ -138,10 +122,9 @@ export function DeskOnePage(props: DeskPanelProps) {
     }
     const offset = (trash.activeNotes.length % 6) * 18
     const scrollTop = wallRef.current?.scrollTop ?? 0
-    const visibleHeight = Math.max(0, wallSize.height - chromeHeight)
     const anchorX = point === undefined ? Math.max(0, (wallSize.width - NOTE_DEFAULT_WIDTH) / 2) + offset : point.x
     const anchorY = point === undefined
-      ? scrollTop + Math.max(0, (visibleHeight - NOTE_DEFAULT_HEIGHT) / 2) + offset
+      ? scrollTop + Math.max(0, (wallSize.height - NOTE_DEFAULT_HEIGHT) / 2) + offset
       : point.y
     const layer = data.notes.reduce((max, item) => Math.max(max, item.z ?? 0), zTopRef.current) + 1
     zTopRef.current = layer
@@ -167,7 +150,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     } finally {
       setCreating(false)
     }
-  }, [chromeHeight, createNote, creating, data, selectTab, t, trash, wallRef, wallSize.height, wallSize.width])
+  }, [createNote, creating, data, selectTab, t, trash, wallRef, wallSize.height, wallSize.width])
 
   const renderWall = (): ReactElement => (
     <div className="dsh-desk-wall" ref={setWallRef}>
@@ -347,16 +330,11 @@ export function DeskOnePage(props: DeskPanelProps) {
   const actions = tab === 'notes' ? notesActions() : taskActions()
 
   return (
-    <div className="dsh-desk-page" style={{ '--dsh-desk-chrome-height': `${chromeHeight}px` } as CSSProperties}>
-      <header
-        ref={chromeRef}
-        className="dsh-desk-chrome"
-        data-window-drag
-      >
+    <div className="dsh-desk-page">
+      <header className="dsh-desk-chrome" data-window-drag>
         <div className="dsh-desk-chrome-inner">
           <div className="dsh-desk-chrome-top">
-            <div className="dsh-desk-menupill">
-            <span className="dsh-desk-menu-title">{t('page.title')}</span>
+            <h1 className="dsh-desk-title">{t('page.title')}</h1>
             <nav className="dsh-desk-tabs" role="tablist">
               <button type="button" className="dsh-desk-tab" data-active={tab === 'overview'} onClick={() => selectTab('overview')}>
                 {t('tab.overview')}
@@ -371,11 +349,13 @@ export function DeskOnePage(props: DeskPanelProps) {
                 {t('tab.sessions')}
               </button>
             </nav>
-          </div>
             <div className="dsh-desk-global-slot" data-window-drag-recall>
               <div className="dsh-desk-time-placeholder" aria-hidden="true">{t('topbar.timePlaceholder')}</div>
             </div>
           </div>
+          {actions === null ? null : (
+            <div className="dsh-desk-dock" data-window-drag-recall>{actions}</div>
+          )}
         </div>
       </header>
       <div className="dsh-desk-body">
@@ -386,7 +366,6 @@ export function DeskOnePage(props: DeskPanelProps) {
           </div>
         )}
         {data.actionError === null ? null : <p className="dsh-desk-error">{data.actionError}</p>}
-        <div className="dsh-desk-view-stage">
           {tab === 'overview' ? renderOverview() : tab === 'notes' ? (
             <div className="dsh-desk-notesview">
               {trash.showTrash
@@ -416,10 +395,6 @@ export function DeskOnePage(props: DeskPanelProps) {
               sessionLink={sessionLink}
             />
           )}
-          {actions === null ? null : (
-            <div className="dsh-desk-canvas-actions" data-window-drag-recall>{actions}</div>
-          )}
-        </div>
       </div>
     </div>
   )

@@ -36,15 +36,8 @@ export const APP_CSS = `
   margin-right: auto;
   padding: 0 clamp(20px, 3vw, 40px);
 }
-.dsh-desk-view-stage {
-  position: relative;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
 .dsh-desk-overview {
-  padding-top: calc(var(--dsh-desk-chrome-height, 74px) + 18px);
+  padding-top: 18px;
 }
 .dsh-desk-notesview {
   display: flex;
@@ -57,48 +50,31 @@ export const APP_CSS = `
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding-top: calc(var(--dsh-desk-chrome-height, 74px) + 18px);
-}
-/* Floating action pill over the canvas: notes scroll underneath instead of being blocked by a row. */
-.dsh-desk-canvas-actions {
-  position: absolute;
-  right: 16px;
-  bottom: 18px;
-  z-index: 8;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px;
-  border-radius: calc(var(--dsw-radius-md, 12px) + 2px);
-  background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 58%, transparent);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  box-shadow:
-    0 10px 24px -16px rgba(0, 0, 0, 0.4),
-    0 1px 3px rgba(0, 0, 0, 0.12);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .dsh-desk-canvas-actions {
-    background: var(--dsw-alias-bg-base, #ffffff);
-  }
+  padding-top: 18px;
 }
 /* Glass chrome copied from the theme-tone recipe used by the conversation and right-sidebar
    headers: the header is an absolute overlay, content scrolls beneath it and is blurred.
    The menu itself stays theme-neutral (no brand fill / white text). */
 .dsh-desk-chrome {
   box-sizing: border-box;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  position: relative;
   z-index: 5;
-  max-width: none;
-  margin: 0;
-  padding: 28px 0 10px;
+  flex: none;
+  padding: 28px 0 0;
   background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent);
   backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
   -webkit-backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
   border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
+}
+/* Sticky action dock: feature actions share one fixed position under the header, above content. */
+.dsh-desk-dock {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 0 8px;
+  border-top: 0.5px solid color-mix(in srgb, var(--dsw-alias-border-l3, #e2e5ea) 70%, transparent);
 }
 .dsh-desk-chrome-inner {
   box-sizing: border-box;
@@ -121,54 +97,40 @@ html[data-platform='darwin'] .dsh-desk-chrome {
 .dsh-desk-chrome-top {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   min-height: 36px;
   min-width: 0;
   overflow: hidden;
 }
-/* Title + tabs share one rounded track, but every color comes from the active theme. */
-.dsh-desk-menupill {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  padding: 3px;
-  border-radius: calc(var(--dsw-radius-md, 12px) + 3px);
-  background: var(--dsw-alias-bg-module-platform, var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06)));
+.dsh-desk-title {
+  flex: none;
+  margin: 0;
   color: var(--dsw-alias-label-primary, #1f2329);
-  box-shadow: inset 0 0 0 var(--dsh-hairline-width, 0.5px) var(--dsw-alias-border-l1, #e2e5ea);
-}
-.dsh-desk-menu-title {
-  padding: 0 12px;
-  border-right: 0.5px solid var(--dsw-alias-border-l2, #cfd4dc);
-  margin-right: 4px;
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   line-height: 30px;
   white-space: nowrap;
 }
+/* Menu stays separate from the brand title and follows the active theme. */
 .dsh-desk-tabs {
   display: inline-grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   gap: 2px;
-  min-width: 0;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
   flex: 0 1 auto;
+  min-width: 0;
+  padding: 2px;
+  border-radius: calc(var(--dsw-radius-md, 12px) + 2px);
+  background: var(--dsw-alias-bg-module-platform, var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06)));
+  box-shadow: inset 0 0 0 var(--dsh-hairline-width, 0.5px) var(--dsw-alias-border-l1, #e2e5ea);
 }
 .dsh-desk-tab {
   appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 30px;
-  padding: 0 10px;
+  height: 28px;
+  padding: 0 12px;
   border: none;
   border-radius: var(--dsw-radius-sm, 8px);
   background: transparent;
