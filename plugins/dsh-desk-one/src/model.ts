@@ -22,6 +22,9 @@ export type DeskModelErrorCode =
   | 'UNKNOWN_TASK'
   | 'INVALID_GROUP'
   | 'UNKNOWN_GROUP'
+  /** 日程模块：入参校验失败 / 未知日历（S2）。 */
+  | 'INVALID_SCHEDULE'
+  | 'UNKNOWN_CALENDAR'
 
 /** 模型层错误：路由据此映射 HTTP 状态（400 / 409 / 404）。 */
 export class DeskModelError extends Error {

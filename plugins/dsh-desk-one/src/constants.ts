@@ -21,6 +21,16 @@ export const ROUTES = Object.freeze({
   groupMove: `${PREFIX}/groups/move`,
   groupArchive: `${PREFIX}/groups/archive`,
   groupDelete: `${PREFIX}/groups/delete`,
+  /* Schedule (S2, read-only aggregation) */
+  scheduleEvents: `${PREFIX}/schedule/events`,
+  scheduleCalendars: `${PREFIX}/schedule/calendars`,
+  scheduleCalendarUpdate: `${PREFIX}/schedule/calendars/update`,
+  scheduleStatus: `${PREFIX}/schedule/status`,
+  scheduleSync: `${PREFIX}/schedule/sync`,
+  scheduleConnections: `${PREFIX}/schedule/connections`,
+  scheduleConnectionSave: `${PREFIX}/schedule/connections/save`,
+  scheduleConnectionTest: `${PREFIX}/schedule/connections/test`,
+  scheduleConnectionRemove: `${PREFIX}/schedule/connections/remove`,
 })
 
 /** 入口 id：同时是左栏面板行的 id 与中央列 `main` 槽的 key（官方 `MainPanelId`）。 */
@@ -67,6 +77,45 @@ export const NOTE_COLORS = ['default', 'yellow', 'green', 'blue', 'pink'] as con
 
 /** 任务状态：固定三泳道，与 board 的三列一一对应（自定义泳道后置，见 spec 03）。 */
 export const TASK_STATUSES = ['todo', 'doing', 'done'] as const
+
+/* ------------------------------ schedule ------------------------------ */
+
+/** 日程来源：v1 三条线路，均为只读镜像（见 docs/spec/05-schedule.md）。 */
+export const SCHEDULE_PROVIDERS = ['wecom', 'icloud', 'outlook'] as const
+export type ScheduleProvider = (typeof SCHEDULE_PROVIDERS)[number]
+/** 同一 provider 的接入通道：CalDAV（企微/iCloud）与 ICS（Outlook 发布链接）。 */
+export const SCHEDULE_CHANNELS = ['caldav', 'ics'] as const
+export type ScheduleChannel = (typeof SCHEDULE_CHANNELS)[number]
+
+/** 日历颜色板（8 色）：首次同步按序分配，用户可在日历源栏改；事件条目沿用该颜色。 */
+export const SCHEDULE_COLORS = [
+  '#5b8def', '#e2695b', '#4fa86b', '#c98a2e', '#8a6fd1', '#3fa6a0', '#c25b8c', '#7a8a99',
+] as const
+
+/** 镜像窗口：过去 6 个月 / 未来 3 个月（重复事件在该窗口内展开成实例）。 */
+export const SCHEDULE_PAST_MONTHS = 6
+export const SCHEDULE_FUTURE_MONTHS = 3
+/** 面板打开时自动同步的节流：距上次同步超过该值才自动触发。 */
+export const SCHEDULE_AUTO_SYNC_MS = 5 * 60_000
+/** 客户端轮询/自动同步间隔：面板保持打开时每 15 分钟同步一次。 */
+export const SCHEDULE_SYNC_INTERVAL_MS = 15 * 60_000
+/** 外部请求超时：CalDAV/ICS 拉取比普通 REST 慢，单独放宽。 */
+export const SCHEDULE_REQUEST_TIMEOUT_MS = 45_000
+/** 单次拉取的事件上限（防御超大会话日历把存储写爆）。 */
+export const SCHEDULE_MAX_EVENTS = 5_000
+/** 日历源栏「近期日程」窗口。 */
+export const SCHEDULE_UPCOMING_DAYS = 7
+/** 列表视图一次加载的天数（按需「加载更多」）。 */
+export const SCHEDULE_LIST_DAYS = 30
+
+/** 凭据引用名（`ctx.credentials` 的 ref）：只存名字，值在 DSH 凭据库。 */
+export const WECOM_PASSWORD_REF = 'DESK_ONE_WECOM_CALDAV_PASSWORD'
+export const ICLOUD_PASSWORD_REF = 'DESK_ONE_ICLOUD_CALDAV_PASSWORD'
+export const OUTLOOK_ICS_URL_REF = 'DESK_ONE_OUTLOOK_ICS_URL'
+
+/** 日程界面偏好（纯界面状态，不含用户内容）：视图与日历显隐。 */
+export const SCHEDULE_VIEW_STORAGE_KEY = 'dsh-desk-one:schedule-view'
+export const SCHEDULE_HIDDEN_STORAGE_KEY = 'dsh-desk-one:schedule-hidden-calendars'
 
 /** 便签几何（px）：默认尺寸与拖拽改大小的上下限，模型层与界面共用这一份真值。 */
 export const NOTE_DEFAULT_WIDTH = 208

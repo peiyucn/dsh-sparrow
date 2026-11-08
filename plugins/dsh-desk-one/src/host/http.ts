@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { MAX_BODY_BYTES } from '../constants.js'
 import { DeskModelError } from '../model.js'
+import { ScheduleError } from './schedule/types.js'
 
 export type DeskErrorCode =
   | 'BAD_BODY'
@@ -12,6 +13,12 @@ export type DeskErrorCode =
   | 'REVISION_CONFLICT'
   | 'UNKNOWN_NOTE'
   | 'STORAGE_ERROR'
+  /* schedule (S2) */
+  | 'INVALID_SCHEDULE'
+  | 'UNKNOWN_CALENDAR'
+  | 'SCHEDULE_NOT_CONNECTED'
+  | 'SCHEDULE_AUTH_EXPIRED'
+  | 'SCHEDULE_UNAVAILABLE'
 
 export class DeskError extends Error {
   constructor(readonly code: DeskErrorCode, message: string, readonly status = 400) {
@@ -34,12 +41,22 @@ export function sendError(ctx: Context, res: ServerResponse, error: unknown): vo
   if (error instanceof DeskModelError) {
     const status = error.code === 'REVISION_CONFLICT'
       ? 409
-      : error.code === 'UNKNOWN_NOTE' || error.code === 'UNKNOWN_TASK' || error.code === 'UNKNOWN_GROUP' ? 404 : 400
+      : error.code === 'UNKNOWN_NOTE' || error.code === 'UNKNOWN_TASK' || error.code === 'UNKNOWN_GROUP'
+        || error.code === 'UNKNOWN_CALENDAR' ? 404 : 400
     sendJson(res, status, { error: { code: error.code, message: error.message } })
     return
   }
   if (error instanceof DeskError) {
     sendJson(res, error.status, { error: { code: error.code, message: error.message } })
+    return
+  }
+  // Adapter failures carry a user-actionable kind: auth expiry is a 409 (re-enter credential),
+  // transient/unsupported is a 503 (retry or configure). Never leak credentials/URLs here.
+  if (error instanceof ScheduleError) {
+    const auth = error.kind === 'AUTH_EXPIRED'
+    sendJson(res, auth ? 409 : 503, {
+      error: { code: error.code ?? (auth ? 'SCHEDULE_AUTH_EXPIRED' : 'SCHEDULE_UNAVAILABLE'), message: error.message },
+    })
     return
   }
   const message = error instanceof Error ? error.message : String(error)

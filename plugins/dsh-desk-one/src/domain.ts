@@ -11,7 +11,7 @@ import { z } from 'zod'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import {
   DESK_NODE_SCHEMA, DOMAIN_NAME, DOMAIN_VERSION, EDGES_TABLE, MAX_TASK_SESSIONS, NODES_TABLE, NOTE_COLORS,
-  TASK_STATUSES,
+  SCHEDULE_CHANNELS, SCHEDULE_COLORS, SCHEDULE_PROVIDERS, TASK_STATUSES,
 } from './constants.js'
 import type { DeskEdge, DeskNode } from './contract.js'
 
@@ -80,7 +80,83 @@ const groupSchema = z.object({
   revision: z.number().int().positive(),
 })
 
-const nodeSchema = z.discriminatedUnion('kind', [noteSchema, taskSchema, groupSchema])
+/** Sync failure details kept on the source / calendar record (never credentials). */
+const scheduleErrorSchema = z.object({
+  code: z.string().min(1),
+  message: z.string(),
+  at: z.string().min(1),
+})
+
+/** One connection per provider+channel; the secret lives in `ctx.credentials`, not here. */
+const scheduleSourceSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('schedule-source'),
+  schema: z.number().int().positive(),
+  provider: z.enum(SCHEDULE_PROVIDERS),
+  channel: z.enum(SCHEDULE_CHANNELS),
+  account: z.string().optional(),
+  credentialRef: z.string().optional(),
+  enabled: z.boolean().default(true),
+  syncState: z.enum(['idle', 'syncing', 'error']),
+  lastSyncedAt: z.string().optional(),
+  lastError: scheduleErrorSchema.optional(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  revision: z.number().int().positive(),
+})
+
+/** One remote calendar under a source; v1 is always read-only. */
+const calendarSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('calendar'),
+  schema: z.number().int().positive(),
+  sourceId: z.string().min(1),
+  provider: z.enum(SCHEDULE_PROVIDERS),
+  channel: z.enum(SCHEDULE_CHANNELS),
+  remoteId: z.string().min(1),
+  displayName: z.string(),
+  color: z.enum(SCHEDULE_COLORS),
+  order: z.number().int().nonnegative(),
+  enabled: z.boolean().default(true),
+  readOnly: z.literal(true),
+  syncToken: z.string().optional(),
+  lastSyncedAt: z.string().optional(),
+  lastError: scheduleErrorSchema.optional(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  revision: z.number().int().positive(),
+})
+
+/** One mirrored event instance (recurring events are expanded to instances in the mirror window). */
+const eventSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('event'),
+  schema: z.number().int().positive(),
+  calendarNodeId: z.string().min(1),
+  provider: z.enum(SCHEDULE_PROVIDERS),
+  channel: z.enum(SCHEDULE_CHANNELS),
+  calendarRemoteId: z.string().min(1),
+  externalId: z.string().min(1),
+  uid: z.string().min(1),
+  recurrenceId: z.string().optional(),
+  title: z.string(),
+  description: z.string().optional(),
+  location: z.string().optional(),
+  start: z.string().min(1),
+  end: z.string().min(1),
+  allDay: z.boolean(),
+  timezone: z.string().min(1),
+  busy: z.boolean(),
+  url: z.string().optional(),
+  rrule: z.string().optional(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  revision: z.number().int().positive(),
+})
+
+const nodeSchema = z.discriminatedUnion('kind', [
+  noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema,
+])
 const edgeSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),

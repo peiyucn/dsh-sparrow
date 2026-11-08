@@ -3,7 +3,7 @@
  * S0 的落地对象是便签；任务 / 日程的字段按 `01-object-model.md` 逐步扩展。
  */
 
-import type { NOTE_COLORS, TASK_STATUSES } from './constants.js'
+import type { NOTE_COLORS, ScheduleChannel, ScheduleProvider, TASK_STATUSES } from './constants.js'
 
 export type NoteColor = (typeof NOTE_COLORS)[number]
 export type TaskStatus = (typeof TASK_STATUSES)[number]
@@ -102,7 +102,146 @@ export interface DeskTaskGroup {
 }
 
 /** 统一对象：存储域一张 nodes 表按 kind 判别（加 kind 只扩 schema，不改表）。 */
-export type DeskNode = DeskNote | DeskTask | DeskTaskGroup
+export type DeskNode = DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent
+
+/* ------------------------------------------------------------------ */
+/* Schedule (S2): read-only mirror of external calendars               */
+/* ------------------------------------------------------------------ */
+
+/** 同步源（连接级）：一个 provider + 通道一条；凭据值不在记录里，只存 `credentialRef` 名字。 */
+export interface DeskScheduleSource {
+  readonly id: string
+  readonly kind: 'schedule-source'
+  readonly schema: number
+  readonly provider: ScheduleProvider
+  readonly channel: ScheduleChannel
+  /** 非密账号标识（邮箱 / Apple ID / 发布日历链接的来源账号）。 */
+  readonly account?: string
+  /** `ctx.credentials` 的引用名；值由官方凭据库保存。 */
+  readonly credentialRef?: string
+  readonly enabled: boolean
+  readonly syncState: 'idle' | 'syncing' | 'error'
+  readonly lastSyncedAt?: string
+  readonly lastError?: ScheduleSyncError
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
+
+export interface ScheduleSyncError {
+  readonly code: string
+  readonly message: string
+  readonly at: string
+}
+
+/** 一个远端日历（同步源下的一本日历）；v1 恒只读。 */
+export interface DeskCalendar {
+  readonly id: string
+  readonly kind: 'calendar'
+  readonly schema: number
+  readonly sourceId: string
+  readonly provider: ScheduleProvider
+  readonly channel: ScheduleChannel
+  /** 远端日历 id（CalDAV 的集合 URL / ICS 的日历标识）。 */
+  readonly remoteId: string
+  readonly displayName: string
+  readonly color: string
+  /** 同源内显示顺序。 */
+  readonly order: number
+  readonly enabled: boolean
+  readonly readOnly: true
+  readonly syncToken?: string
+  readonly lastSyncedAt?: string
+  readonly lastError?: ScheduleSyncError
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
+
+/** 一条日程（远端事件的镜像实例；重复事件在镜像窗口内展开成多条）。 */
+export interface DeskEvent {
+  readonly id: string
+  readonly kind: 'event'
+  readonly schema: number
+  /** 所属 `DeskCalendar` 节点的 id。 */
+  readonly calendarNodeId: string
+  readonly provider: ScheduleProvider
+  readonly channel: ScheduleChannel
+  readonly calendarRemoteId: string
+  /** 唯一键的一部分：UID 或 `UID#RECURRENCE-ID`。 */
+  readonly externalId: string
+  readonly uid: string
+  readonly recurrenceId?: string
+  readonly title: string
+  readonly description?: string
+  readonly location?: string
+  /** ISO 8601 UTC；全天事件用当地日边界换算后的 UTC。 */
+  readonly start: string
+  readonly end: string
+  readonly allDay: boolean
+  readonly timezone: string
+  readonly busy: boolean
+  readonly url?: string
+  readonly rrule?: string
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
+
+export interface ScheduleStateResponse {
+  readonly sources: readonly DeskScheduleSource[]
+  readonly calendars: readonly DeskCalendar[]
+  /** 每个日历的镜像事件数（日历源栏显示；由 host 统计，客户端不重复扫全表）。 */
+  readonly counts: Readonly<Record<string, number>>
+}
+
+export interface ScheduleEventListResponse {
+  readonly events: readonly DeskEvent[]
+  /** 实际查询窗口（ISO 8601 UTC），客户端据此展示范围。 */
+  readonly from: string
+  readonly to: string
+}
+
+export interface ScheduleCalendarUpdateRequest {
+  readonly id: string
+  readonly expectedRevision: number
+  readonly patch: {
+    readonly color?: string
+    readonly enabled?: boolean
+    readonly order?: number
+  }
+}
+
+export interface ScheduleConnectionInput {
+  readonly provider: ScheduleProvider
+  /** 企业微信 / iCloud 的账号（邮箱或 Apple ID）。 */
+  readonly account?: string
+  /** 企业微信同步密码 / iCloud App 专用密码；只在保存时提交，不回读。 */
+  readonly password?: string
+  /** Outlook 个人发布日历的 ICS 链接。 */
+  readonly url?: string
+}
+
+export interface ScheduleConnectionTestResponse {
+  readonly provider: ScheduleProvider
+  readonly calendars: number
+  readonly events: number
+  readonly message: string
+}
+
+export interface ScheduleSyncSourceReport {
+  readonly provider: ScheduleProvider
+  readonly channel: ScheduleChannel
+  readonly ok: boolean
+  readonly calendars: number
+  readonly events: number
+  readonly error?: ScheduleSyncError
+}
+
+export interface ScheduleSyncResponse {
+  readonly syncedAt: string
+  readonly sources: readonly ScheduleSyncSourceReport[]
+}
 
 export interface NoteListResponse {
   readonly notes: readonly DeskNote[]

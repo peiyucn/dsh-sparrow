@@ -12,12 +12,16 @@ import { DeskError, sendError, sendJson } from './http.js'
 import { NOTE_ROUTES } from './notes/routes.js'
 import { GROUP_ROUTES } from './tasks/group-routes.js'
 import { TASK_ROUTES } from './tasks/routes.js'
+import { SCHEDULE_ROUTES } from './schedule/routes.js'
 import type { DeskStore } from './store.js'
+import type { ScheduleHost } from './schedule/host.js'
 
 /** Collaborators available to one feature request. */
 export interface DeskRouteContext {
   readonly ctx: Context
   readonly store: DeskStore
+  /** Schedule orchestration (optional so read-only tests can mount the router without it). */
+  readonly schedule?: ScheduleHost
 }
 
 export type RouteHandler = (route: DeskRouteContext, req: IncomingMessage, res: ServerResponse) => Promise<void>
@@ -29,7 +33,9 @@ export interface DeskRouteEntry {
 }
 
 /** All HTTP routes of the plugin; feature modules append their tables here. */
-const ROUTE_TABLE: readonly DeskRouteEntry[] = [...NOTE_ROUTES, ...TASK_ROUTES, ...GROUP_ROUTES]
+const ROUTE_TABLE: readonly DeskRouteEntry[] = [
+  ...NOTE_ROUTES, ...TASK_ROUTES, ...GROUP_ROUTES, ...SCHEDULE_ROUTES,
+]
 
 /** Build the prefix handler: fence -> exact match -> feature handler, with unified error mapping. */
 export function createDeskRequestHandler(route: DeskRouteContext): (req: IncomingMessage, res: ServerResponse) => Promise<void> {

@@ -8,6 +8,7 @@ import { PREFIX } from './constants.js'
 import { assertHostGates } from './host/gates.js'
 import { createDeskRequestHandler } from './host/router.js'
 import { DeskStore } from './host/store.js'
+import { ScheduleHost } from './host/schedule/host.js'
 import { registerDeskTools } from './host/notes/tools.js'
 import { registerGroupTools } from './host/tasks/group-tools.js'
 import { registerTaskTools } from './host/tasks/tools.js'
@@ -26,7 +27,8 @@ export async function apply(ctx: Context): Promise<void> {
   const store = await DeskStore.open(ctx)
   ctx.effect(() => () => store.close(), 'dsh-desk-one: storage domain')
 
-  const handler = createDeskRequestHandler({ ctx, store })
+  const schedule = new ScheduleHost(ctx, store)
+  const handler = createDeskRequestHandler({ ctx, store, schedule })
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: PREFIX,
