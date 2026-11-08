@@ -15,7 +15,7 @@ export function DeskIntroInfo({ t }: { readonly t: DeskTranslator }): ReactEleme
   const [open, setOpen] = useState(false)
   const anchorRef = useRef<HTMLButtonElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
-  const style = useAnchoredPanel({ open, anchorRef, panelRef, gap: 6, margin: 8, maxWidth: 280, fitContent: true, align: 'start' })
+  const style = useAnchoredPanel({ open, anchorRef, panelRef, gap: 6, margin: 8, maxWidth: 240, fitContent: true, align: 'start' })
 
   useEffect(() => {
     if (!open) return
@@ -43,8 +43,6 @@ export function DeskIntroInfo({ t }: { readonly t: DeskTranslator }): ReactEleme
           className="dsh-desk-info-button"
           aria-label={t('page.introLabel')}
           aria-describedby={open ? TOOLTIP_ID : undefined}
-          aria-expanded={open}
-          onClick={() => setOpen(value => !value)}
           onFocus={() => setOpen(true)}
           onBlur={() => setOpen(false)}
         >

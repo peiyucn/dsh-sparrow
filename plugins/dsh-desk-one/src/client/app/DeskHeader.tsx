@@ -26,8 +26,10 @@ export function DeskHeader({ t, tab, onSelectTab, actions }: DeskHeaderProps): R
     <header className="dsh-desk-header" data-window-drag>
       <div className="dsh-desk-header-top">
         <div className="dsh-desk-brand">
-          <span className="dsh-desk-brand-mark" aria-hidden="true"><DeskGlyph size={14} /></span>
-          <h1 className="dsh-desk-title">{t('page.title')}</h1>
+          <h1 className="dsh-desk-title">
+            <span className="dsh-desk-brand-mark" aria-hidden="true"><DeskGlyph size={14} /></span>
+            <span>{t('page.title')}</span>
+          </h1>
           <p className="dsh-desk-intro">{t('page.subtitle')}</p>
           <DeskIntroInfo t={t} />
         </div>
