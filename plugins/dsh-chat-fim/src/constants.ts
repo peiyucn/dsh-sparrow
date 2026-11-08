@@ -34,6 +34,13 @@ export const ECHO_ASSISTANT_WINDOW_CHARS = 15
 /** 转动环矩形测量周期：不订阅官方布局事件，靠周期测量自愈。 */
 export const RING_MEASURE_INTERVAL_MS = 300
 
+/**
+ * 转动环厚度（px）：环画在 composer 卡片**外圈**，向外扩这么宽。
+ * 几何约束：外圆角 = 官方卡片圆角 token（`--dsw-radius-panel`）+ 本厚度，内圆角才等于卡片圆角、
+ * 与卡片同心；写死一个圆角（曾写 24px）会在四个角露出背景缝隙。
+ */
+export const RING_THICKNESS = 2
+
 /** 候选菜单高度设计上限（同官方 @ 候选列表；样式表与 useAnchoredMaxHeight 共用）。 */
 export const MENU_MAX_HEIGHT = 400
 

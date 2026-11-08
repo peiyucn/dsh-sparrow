@@ -3,7 +3,7 @@
  * 类名与样式表共用同一份定义 —— TSX 里不再手写类名字符串，样式也不再内联在组件里。
  */
 
-import { MENU_MAX_HEIGHT, MENU_Z_INDEX, POPOVER_Z_INDEX, RING_Z_INDEX, STYLE_ATTR, STYLE_SELECTOR } from '../constants.js'
+import { MENU_MAX_HEIGHT, MENU_Z_INDEX, POPOVER_Z_INDEX, RING_THICKNESS, RING_Z_INDEX, STYLE_ATTR, STYLE_SELECTOR } from '../constants.js'
 
 const PREFIX = 'dsh-chat-fim'
 
@@ -146,8 +146,11 @@ export function buildChatFimCss(): string {
   z-index: ${RING_Z_INDEX};
   pointer-events: none;
   box-sizing: border-box;
-  padding: 2px;
-  border-radius: 24px;
+  padding: ${RING_THICKNESS}px;
+  /* 与卡片同心：环的**内**圆角必须等于卡片圆角（顶部外扩 ${RING_THICKNESS}px 后，外圆角再加同样厚度）。
+     卡片圆角取官方 token（InputBar .card = var(--dsw-radius-panel)，当前 28px）；写死旧值 24px 会在四个角
+     与卡片圆弧错位、露出背景缝隙（2026-11-08 修）。 */
+  border-radius: calc(var(--dsw-radius-panel, 28px) + ${RING_THICKNESS}px);
   background: conic-gradient(
     from var(${RING_ANGLE}),
     transparent 0deg,

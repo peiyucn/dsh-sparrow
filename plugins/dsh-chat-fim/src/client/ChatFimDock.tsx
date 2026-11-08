@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { RING_THICKNESS } from '../constants.js'
 import { TRIGGER_SENSITIVITIES, detectEndOfDraft, shouldTriggerSuggest } from '../suggest.js'
 import type { ChatFimDockProps } from './contracts.js'
 import { fimSupportRetryDelayMs } from './fim-support-machine.js'
@@ -194,7 +195,12 @@ export function ChatFimDock(props: ChatFimDockProps) {
         ? createPortal(
           <div
             className={cls.ring}
-            style={{ left: ring.x - 2, top: ring.y - 2, width: ring.width + 4, height: ring.height + 4 }}
+            style={{
+              left: ring.x - RING_THICKNESS,
+              top: ring.y - RING_THICKNESS,
+              width: ring.width + RING_THICKNESS * 2,
+              height: ring.height + RING_THICKNESS * 2,
+            }}
             aria-hidden
           />,
           document.body,

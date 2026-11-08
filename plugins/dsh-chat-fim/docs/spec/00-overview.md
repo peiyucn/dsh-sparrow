@@ -11,7 +11,9 @@
   选档持久化，非法值回退「中」。
 * **候选菜单**（`conversation.input.overlay`）：官方 `MenuSurface` 材质的悬浮卡，锚点由 shell 承载（零定位 JS）；
   建议 2 行截断、行尾 Tab / Esc 键位提示、底部品牌行 + token / 模型 / 温度。
-* **联想中转动环**：`busy` 时在**本会话** composer 卡片外圈画一圈旋转紫光，portal 到 `document.body`。
+* **联想中转动环**：`busy` 时在**本会话** composer 卡片外圈画一圈旋转紫光，portal 到 `document.body`；
+  环与卡片**同心**——外圆角 = 官方卡片圆角 token `--dsw-radius-panel`（当前 28px）+ 环厚 2px，内圆角因此正好压住
+  卡片边框（写死圆角值会在四角露背景缝，2026-11-08 修）。
 * **支持性状态机**：主模型是否 DeepSeek 系列未知时进入 `checking ⇄ retrying`，未定论前不显示任何 UI；
   「判不了」不与「判为不支持」混同，补查预算耗尽才 fail-open。
 * **模型门**：主模型非 deepseek-official 时开关 / 菜单整体隐藏（像没装插件）；补全模型跟随主模型。
@@ -150,6 +152,8 @@ host half 不 import 浏览器 API，client half 不 import Node 模块（`parse
 ## 已知偏离
 
 * **环的层级依赖官方遮罩**：`z-index: 900` 必须低于官方遮罩（1000）才能随背景一起虚化；官方改遮罩层级时环会浮在弹窗之上。
+* **环圆角跟随官方 token**：卡片圆角取 `--dsw-radius-panel`（fallback 28px）+ 环厚；官方改这个 token 时环自动跟随，
+  不再写死值。环仍是卡片外的独立测量层（300ms 轮询），输入框高度变化时最多滞后一拍。
 * **依赖三个官方 DOM 标记**：`[data-phase]`（会话根）、`[data-composer-card]`（卡片矩形与焦点判定）、
   `[data-trigger-menu]`（官方 @/斜杠菜单）。失效降级：`data-phase` 缺失 ⇒ 退回全局首张卡片（可能画到别的会话）；
   `data-composer-card` 缺失 ⇒ 无矩形、不画环；`data-trigger-menu` 改名 ⇒ 本菜单不再让位，Tab 与官方下钻冲突。

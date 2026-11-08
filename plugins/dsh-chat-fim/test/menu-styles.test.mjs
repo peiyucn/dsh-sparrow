@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 import { CHAT_FIM_CLASS, buildChatFimCss } from '../lib/client/styles.js'
+import { RING_THICKNESS, RING_Z_INDEX } from '../lib/constants.js'
 
 /** 注入的样式表文本（直接取构建产物，不再从 TSX 源码里切）。 */
 const css = buildChatFimCss()
@@ -100,6 +101,18 @@ describe('chat-fim 菜单样式契约（对齐官方 rc.3 菜单原语）', () =
     assert.ok(!sw.includes('border-radius: 24px'), '不得再用 24px 胶囊圆角（hover 底会被裁成椭圆）')
     const hover = ruleOf(`.${CHAT_FIM_CLASS.switch}:hover:not(:disabled)`)
     assert.ok(hover.includes('background: var(--dsw-alias-interactive-bg-hover)'), '悬停底必须与官方触发器同 token')
+  })
+
+  it('转动环与 composer 卡片同心：外圆角 = 官方卡片圆角 token + 环厚（四角不留缝）', () => {
+    const ring = ruleOf(`.${CHAT_FIM_CLASS.ring}`)
+    expectDeclarations(ring, [
+      'position: fixed',
+      `padding: ${RING_THICKNESS}px`,
+      `border-radius: calc(var(--dsw-radius-panel, 28px) + ${RING_THICKNESS}px)`,
+      'pointer-events: none',
+    ], '转动环')
+    assert.ok(ring.includes(`z-index: ${RING_Z_INDEX}`), '环的层级必须保持（低于官方遮罩）')
+    assert.ok(!ring.includes('border-radius: 24px'), '不得再写死 24px 圆角：卡片是 --dsw-radius-panel（28px），四角会露缝')
   })
 
   it('菜单底部沿用官方菜单 footer 的 l2 发丝线', () => {
