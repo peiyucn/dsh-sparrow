@@ -1,0 +1,710 @@
+// @ts-check
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import {
+  archiveAlignmentForChildren, archivedIdsToRemove, buildSessionTree, collectSubtreeIds, createBudgetSignal, createHeaderFactsStore,
+  createLruCache, isDeleteConfirmationSufficient, isSafeSessionDirName, legacyTrashItem, livingChildIds, maskHomePath,
+  normalizeArchiveConfig, parseTrashSidecar, parseBlankProjection, parseSessionFacts, runBounded, sanitizeSegment,
+  straySessionIds, subagentDescendantIds, trashItemView,
+} from '../../../lib/host/sessions/archive.js'
+
+describe('archive-manage 纯逻辑', () => {
+  describe('createHeaderFactsStore', () => {
+    it('TTL 内命中缓存，不重复 load', async () => {
+      let loads = 0
+      let now = 1000
+      const store = createHeaderFactsStore(async () => { loads += 1; return loads }, 30_000, () => now)
+      assert.equal(await store.get(), 1)
+      assert.equal(await store.get(), 1)
+      assert.equal(loads, 1)
+    })
+
+    it('TTL 过期后重新 load', async () => {
+      let loads = 0
+      let now = 1000
+      const store = createHeaderFactsStore(async () => { loads += 1; return loads }, 30_000, () => now)
+      await store.get()
+      now = 1000 + 30_000
+      assert.equal(await store.get(), 2)
+      assert.equal(loads, 2)
+    })
+
+    it('并发 get 共享单飞（只 load 一次）', async () => {
+      let loads = 0
+      const store = createHeaderFactsStore(async () => { loads += 1; return loads }, 30_000, () => 0)
+      const [a, b] = await Promise.all([store.get(), store.get()])
+      assert.equal(a, 1)
+      assert.equal(b, 1)
+      assert.equal(loads, 1)
+    })
+
+    it('invalidate 后下一次 get 重扫', async () => {
+      let loads = 0
+      let now = 1000
+      const store = createHeaderFactsStore(async () => { loads += 1; return loads }, 30_000, () => now)
+      await store.get()
+      store.invalidate()
+      assert.equal(await store.get(), 2)
+      assert.equal(loads, 2)
+    })
+
+    it('load 失败不缓存，下一次重试', async () => {
+      let loads = 0
+      const store = createHeaderFactsStore(async () => {
+        loads += 1
+        if (loads === 1) throw new Error('boom')
+        return loads
+      }, 30_000, () => 0)
+      await assert.rejects(store.get(), /boom/u)
+      assert.equal(await store.get(), 2)
+    })
+
+    it('invalidate 打断进行中的 load 应该 丢弃过期结果（不写回缓存）', async () => {
+      let loads = 0
+      const resolvers = []
+      const store = createHeaderFactsStore(async () => {
+        loads += 1
+        const value = loads
+        await new Promise(resolve => resolvers.push(() => resolve(value)))
+        return value
+      }, 30_000, () => 0)
+      const first = store.get()
+      store.invalidate() // 扫描期间发生写操作（写穿失效）
+      resolvers[0]()
+      assert.equal(await first, 1) // 发起时在等的调用方仍拿到自己的快照
+      assert.equal(loads, 1)
+      const second = store.get() // 失效后的读取必须重扫
+      assert.equal(loads, 2)
+      resolvers[1]()
+      assert.equal(await second, 2)
+      assert.equal(await store.get(), 2) // 新结果已缓存，不再扫
+      assert.equal(loads, 2)
+    })
+
+    it('invalidate 后并发 get 共享新 load（单飞仍成立）', async () => {
+      let loads = 0
+      const store = createHeaderFactsStore(async () => { loads += 1; return loads }, 30_000, () => 0)
+      await store.get()
+      store.invalidate()
+      const [a, b] = await Promise.all([store.get(), store.get()])
+      assert.equal(a, 2)
+      assert.equal(b, 2)
+      assert.equal(loads, 2)
+    })
+  })
+
+  describe('createLruCache', () => {
+    it('超过上限 应该 淘汰最久未使用条目', () => {
+      const cache = createLruCache(3)
+      cache.set('a', 1)
+      cache.set('b', 2)
+      cache.set('c', 3)
+      cache.get('a') // 命中 a → 移到最新
+      cache.set('d', 4) // 淘汰最久未用的 b
+      assert.equal(cache.get('b'), undefined)
+      assert.equal(cache.get('a'), 1)
+      assert.equal(cache.get('c'), 3)
+      assert.equal(cache.get('d'), 4)
+      assert.equal(cache.size, 3)
+    })
+
+    it('重复 set 同键 应该 更新值且不重复占位', () => {
+      const cache = createLruCache(2)
+      cache.set('a', 1)
+      cache.set('a', 2)
+      cache.set('b', 3)
+      assert.equal(cache.size, 2)
+      assert.equal(cache.get('a'), 2)
+      assert.equal(cache.get('b'), 3)
+    })
+  })
+
+  describe('createBudgetSignal', () => {
+    it('未 release 应该 到点中止', async () => {
+      const budget = createBudgetSignal(20)
+      await new Promise(resolve => setTimeout(resolve, 70))
+      assert.equal(budget.signal.aborted, true)
+    })
+
+    it('release 后 应该 解除定时器不再中止', async () => {
+      const budget = createBudgetSignal(20)
+      budget.release()
+      await new Promise(resolve => setTimeout(resolve, 70))
+      assert.equal(budget.signal.aborted, false)
+    })
+  })
+
+  describe('runBounded', () => {
+    it('结果与输入对齐，单任务失败只在该位置 undefined', async () => {
+      const results = await runBounded([1, 2, 3, 4], 2, async n => {
+        if (n === 2) throw new Error('boom')
+        return n * 10
+      })
+      assert.deepEqual(results, [10, undefined, 30, 40])
+    })
+
+    it('空输入返回空数组', async () => {
+      assert.deepEqual(await runBounded([], 2, async n => n), [])
+    })
+
+    it('同时进行中的任务不超过 limit', async () => {
+      let active = 0
+      let peak = 0
+      const results = await runBounded([1, 2, 3, 4, 5, 6], 2, async n => {
+        active += 1
+        peak = Math.max(peak, active)
+        await new Promise(resolve => setTimeout(resolve, 10))
+        active -= 1
+        return n
+      })
+      assert.equal(peak, 2)
+      assert.deepEqual(results, [1, 2, 3, 4, 5, 6])
+    })
+  })
+
+  describe('normalizeArchiveConfig', () => {
+    it('空配置 应该 提供默认回收站目录', () => {
+      const config = normalizeArchiveConfig(undefined)
+      assert.match(config.trashRoot, /\.sessions-trash/u)
+    })
+
+    it('trashRoot 配置 应该 优先采用', () => {
+      const config = normalizeArchiveConfig({ trashRoot: 'D:/trash' })
+      assert.equal(config.trashRoot, 'D:/trash')
+    })
+
+    it('trashRoot 空串 应该 抛明确错误', () => {
+      assert.throws(() => normalizeArchiveConfig({ trashRoot: '  ' }), /trashRoot/u)
+    })
+  })
+
+  describe('isDeleteConfirmationSufficient', () => {
+    it('逐字一致 应该 通过强确认', () => {
+      assert.equal(isDeleteConfirmationSufficient(' 会话标题 ', '会话标题'), true)
+    })
+
+    it('不一致 应该 拒绝', () => {
+      assert.equal(isDeleteConfirmationSufficient('a', 'b'), false)
+    })
+
+    it('空标题 应该 拒绝', () => {
+      assert.equal(isDeleteConfirmationSufficient('', ''), false)
+    })
+  })
+
+  describe('maskHomePath', () => {
+    it('Windows home 前缀 应该 掩码为 ~', () => {
+      assert.equal(
+        maskHomePath('C:\\Users\\alice\\.dsh\\.sessions-trash', 'C:\\Users\\alice'),
+        '~\\.dsh\\.sessions-trash',
+      )
+    })
+
+    it('Windows 大小写不同 应该 也能掩码', () => {
+      assert.equal(
+        maskHomePath('c:\\users\\alice\\.dsh\\x', 'C:\\Users\\Alice'),
+        '~\\.dsh\\x',
+      )
+    })
+
+    it('POSIX home 前缀 应该 掩码为 ~', () => {
+      assert.equal(maskHomePath('/home/alice/.dsh/trash', '/home/alice'), '~/.dsh/trash')
+    })
+
+    it('路径等于 home 应该 掩码为 ~', () => {
+      assert.equal(maskHomePath('/home/alice', '/home/alice'), '~')
+    })
+
+    it('不在 home 下 应该 原样返回', () => {
+      assert.equal(maskHomePath('/opt/data/trash', '/home/alice'), '/opt/data/trash')
+    })
+  })
+
+  describe('sanitizeSegment', () => {
+    it('危险字符 应该 替换为下划线', () => {
+      assert.equal(sanitizeSegment('../../a b'), '______a_b')
+    })
+
+    it('空串 应该 返回 unknown', () => {
+      assert.equal(sanitizeSegment('///'), 'unknown')
+    })
+  })
+
+  describe('isSafeSessionDirName', () => {
+    it('官方生成的 UUID 形目录名 应该 通过', () => {
+      assert.equal(isSafeSessionDirName('0d21fc8b-56e9-4761-a59f-d972c095d2d8'), true)
+      assert.equal(isSafeSessionDirName('session-0d21fc8b-56e9-4761-a59f-d972c095d2d8'), true)
+    })
+
+    it('官方 encodeSegment 转义形式（任意 id）应该 通过', () => {
+      assert.equal(isSafeSessionDirName('foo~002Fbar'), true)
+      assert.equal(isSafeSessionDirName('~002E'), true)
+      assert.equal(isSafeSessionDirName('a.b_c-d'), true)
+    })
+
+    it('路径穿越与分隔符 应该 拒绝', () => {
+      assert.equal(isSafeSessionDirName('..'), false)
+      assert.equal(isSafeSessionDirName('.'), false)
+      assert.equal(isSafeSessionDirName(''), false)
+      assert.equal(isSafeSessionDirName('../x'), false)
+      assert.equal(isSafeSessionDirName('C:'), false)
+      assert.equal(isSafeSessionDirName('a\\b'), false)
+      assert.equal(isSafeSessionDirName('a/b'), false)
+      assert.equal(isSafeSessionDirName('~002G'), false)
+    })
+  })
+
+  describe('legacyTrashItem', () => {
+    it('旧格式目录 应该 用目录名作 id 与标题并标记 legacy', () => {
+      const item = legacyTrashItem('0d21fc8b-56e9-4761-a59f-d972c095d2d8', 1788014172861)
+      assert.equal(item.trashId, '0d21fc8b-56e9-4761-a59f-d972c095d2d8')
+      assert.equal(item.sessionId, '0d21fc8b-56e9-4761-a59f-d972c095d2d8')
+      assert.equal(item.title, '0d21fc8b-56e9-4761-a59f-d972c095d2d8')
+      assert.equal(item.legacy, true)
+      assert.deepEqual(item.workspaceIds, [])
+      assert.match(item.archivedAt, /^\d{4}-\d{2}-\d{2}T/u)
+    })
+  })
+
+  describe('straySessionIds', () => {
+    it('持久化有且未归档且未挂工作区 应该 判定游离', () => {
+      assert.deepEqual(straySessionIds(['a', 'b'], [], []), ['a', 'b'])
+    })
+
+    it('已归档 应该 排除', () => {
+      assert.deepEqual(straySessionIds(['a', 'b'], ['a'], []), ['b'])
+    })
+
+    it('挂工作区 应该 排除', () => {
+      assert.deepEqual(straySessionIds(['a', 'b'], [], ['b']), ['a'])
+    })
+
+    it('归档与挂工作区叠加 应该 都排除且保持输入顺序', () => {
+      assert.deepEqual(straySessionIds(['a', 'b', 'c', 'd'], ['b'], ['c']), ['a', 'd'])
+    })
+
+    it('清单为空 应该 返回空数组', () => {
+      assert.deepEqual(straySessionIds([], ['x'], ['y']), [])
+    })
+  })
+
+  describe('parseBlankProjection', () => {
+    it('blank 标记为真 应该 判定空白', () => {
+      const row = { version: 4, record: { identity: {}, rows: { sessionListMetadata: { val: { blank: true, lastPromptAt: null } } } } }
+      assert.deepEqual(parseBlankProjection(row), { blank: true })
+    })
+
+    it('仅 turns 为 0 应该 判定空白', () => {
+      const row = { record: { rows: { sessionStats: { val: { turns: 0 } } } } }
+      assert.deepEqual(parseBlankProjection(row), { blank: true })
+    })
+
+    it('有轮次且无 blank 标记 应该 返回 undefined', () => {
+      const row = { record: { rows: { sessionStats: { val: { turns: 3 } } } } }
+      assert.equal(parseBlankProjection(row), undefined)
+    })
+
+    it('v6 行形状（顶层 identity + rows）blank 为真 应该 判定空白', () => {
+      const row = { identity: { createdAt: 1 }, rows: { sessionListMetadata: { ver: 1, seq: 2, val: { blank: true } } } }
+      assert.deepEqual(parseBlankProjection(row), { blank: true })
+    })
+
+    it('v6 行形状 turns 为 0 应该 判定空白', () => {
+      const row = { identity: {}, rows: { sessionStats: { ver: 1, seq: 0, val: { turns: 0 } } } }
+      assert.deepEqual(parseBlankProjection(row), { blank: true })
+    })
+
+    it('v6 行形状有轮次且无 blank 应该 返回 undefined', () => {
+      const row = { identity: {}, rows: { sessionStats: { ver: 1, seq: 3, val: { turns: 3 } } } }
+      assert.equal(parseBlankProjection(row), undefined)
+    })
+
+    it('行缺失 rows 应该 返回 undefined', () => {
+      assert.equal(parseBlankProjection({ record: { identity: {} } }), undefined)
+    })
+
+    it('非对象输入 应该 返回 undefined', () => {
+      assert.equal(parseBlankProjection(null), undefined)
+      assert.equal(parseBlankProjection('x'), undefined)
+    })
+  })
+
+  describe('buildSessionTree', () => {
+    const h = (id, createdAt, extra = {}) => ({ id, createdAt, ...extra })
+
+    it('父与两个子 应该 挂成一层树，子按 createdAt 升序', () => {
+      const tree = buildSessionTree([
+        h('p', 100),
+        h('c2', 40, { parentSession: 'p', origin: 'subagent' }),
+        h('c1', 10, { parentSession: 'p', origin: 'subagent' }),
+      ])
+      assert.equal(tree.length, 1)
+      assert.equal(tree[0].header.id, 'p')
+      assert.deepEqual(tree[0].children.map(c => c.header.id), ['c1', 'c2'])
+    })
+
+    it('孤儿子会话（父不在清单）应该 成为根节点', () => {
+      const tree = buildSessionTree([
+        h('p', 100),
+        h('orphan', 50, { parentSession: 'gone', origin: 'subagent' }),
+      ])
+      assert.deepEqual(tree.map(t => t.header.id).sort(), ['orphan', 'p'])
+    })
+
+    it('多层嵌套 应该 递归展开', () => {
+      const tree = buildSessionTree([
+        h('p', 100),
+        h('c', 50, { parentSession: 'p', origin: 'subagent' }),
+        h('gc', 10, { parentSession: 'c', origin: 'subagent' }),
+      ])
+      assert.equal(tree[0].children[0].children[0].header.id, 'gc')
+    })
+
+    it('根节点 应该 按 createdAt 降序', () => {
+      const tree = buildSessionTree([h('old', 1), h('new', 9)])
+      assert.deepEqual(tree.map(t => t.header.id), ['new', 'old'])
+    })
+  })
+
+  describe('archiveAlignmentForChildren', () => {
+    const h = (id, extra = {}) => ({ id, createdAt: 1, ...extra })
+    const child = (id, parent) => h(id, { parentSession: parent, origin: 'subagent' })
+
+    it('父已归档而子未归档 应该 子进 add', () => {
+      const r = archiveAlignmentForChildren([h('p'), child('c', 'p')], ['p'])
+      assert.deepEqual(r, { add: ['c'], remove: [] })
+    })
+
+    it('父未归档而子已归档 应该 子进 remove', () => {
+      const r = archiveAlignmentForChildren([h('p'), child('c', 'p')], ['c'])
+      assert.deepEqual(r, { add: [], remove: ['c'] })
+    })
+
+    it('父子状态一致 应该 全空', () => {
+      const r = archiveAlignmentForChildren([h('p'), child('c', 'p')], ['p', 'c'])
+      assert.deepEqual(r, { add: [], remove: [] })
+    })
+
+    it('孤儿与顶层会话 应该 不参与', () => {
+      const r = archiveAlignmentForChildren([h('top'), child('orphan', 'gone')], ['orphan'])
+      assert.deepEqual(r, { add: [], remove: [] })
+    })
+
+    // 子代理能再派子代理：多层树要一次算到全部后代，不能只对齐一层、靠写事件迭代收敛。
+    it('父已归档 应该 把多层后代一次全部补进 add', () => {
+      const r = archiveAlignmentForChildren([
+        h('p'), child('c', 'p'), child('gc', 'c'), child('ggc', 'gc'),
+      ], ['p'])
+      assert.deepEqual(r, { add: ['c', 'gc', 'ggc'], remove: [] })
+    })
+
+    it('父未归档 应该 把多层后代一次全部移进 remove', () => {
+      const r = archiveAlignmentForChildren([
+        h('p'), child('c', 'p'), child('gc', 'c'),
+      ], ['c', 'gc', 'other'])
+      assert.deepEqual(r, { add: [], remove: ['c', 'gc'] })
+    })
+
+    it('多层树里状态混杂 应该 按祖先统一（深度不再决定顺序）', () => {
+      const r = archiveAlignmentForChildren([
+        h('p'), child('c', 'p'), child('gc', 'c'), child('ggc', 'gc'),
+      ], ['p', 'gc'])
+      assert.deepEqual(r, { add: ['c', 'ggc'], remove: [] })
+    })
+
+    it('另一棵树的顶层未归档 应该 只影响它自己的后代', () => {
+      const r = archiveAlignmentForChildren([
+        h('p'), child('c', 'p'), h('q'), child('qc', 'q'), child('qgc', 'qc'),
+      ], ['p', 'c', 'qgc'])
+      assert.deepEqual(r, { add: [], remove: ['qgc'] })
+    })
+
+    it('父子成环（无根）应该 不产生任何差异（不误对齐、不转死）', () => {
+      const r = archiveAlignmentForChildren([
+        child('a', 'b'), child('b', 'a'),
+      ], ['a'])
+      assert.deepEqual(r, { add: [], remove: [] })
+    })
+
+    // 审计 S1：同一 id 出现两条 header 能造出**从根可达**的环（一条挂在链尾指回祖先）——
+    // 无守卫时 BFS 队列无界增长、在 domain/changed 监听里同步挂死（不是抛错）。
+    it('重复 id 造出的可达环 应该 终止、每个节点只传播一次', () => {
+      const r = archiveAlignmentForChildren([
+        h('r'), child('a', 'r'), child('b', 'a'), { id: 'a', createdAt: 1, parentSession: 'b', origin: 'subagent' },
+      ], ['r'])
+      assert.deepEqual(r, { add: ['a', 'b'], remove: [] })
+    })
+  })
+
+  describe('livingChildIds', () => {
+    const h = (id, extra = {}) => ({ id, createdAt: 1, ...extra })
+
+    it('有父的子会话 应该 入选', () => {
+      const ids = livingChildIds([h('p'), h('c', { parentSession: 'p', origin: 'subagent' })])
+      assert.deepEqual([...ids], ['c'])
+    })
+
+    it('孤儿子会话与顶层会话 应该 不入选', () => {
+      const ids = livingChildIds([h('top'), h('orphan', { parentSession: 'gone', origin: 'subagent' })])
+      assert.deepEqual([...ids], [])
+    })
+  })
+
+  describe('collectSubtreeIds', () => {
+    const h = (id, extra = {}) => ({ id, createdAt: 1, ...extra })
+
+    it('父与多层子孙 应该 全部收集且根在前', () => {
+      const ids = collectSubtreeIds([
+        h('p'), h('c', { parentSession: 'p', origin: 'subagent' }),
+        h('gc', { parentSession: 'c', origin: 'subagent' }),
+        h('other', { parentSession: 'x', origin: 'subagent' }),
+      ], 'p')
+      assert.deepEqual(ids, ['p', 'c', 'gc'])
+    })
+
+    it('无子会话 应该 只有根自身', () => {
+      assert.deepEqual(collectSubtreeIds([h('p')], 'p'), ['p'])
+    })
+
+    // 子代理能再派子代理：深度不固定，链再长也要收全。
+    it('四层链 应该 逐层收全（不截断在直接子会话）', () => {
+      const chain = [
+        h('p'),
+        h('c', { parentSession: 'p', origin: 'subagent' }),
+        h('gc', { parentSession: 'c', origin: 'subagent' }),
+        h('ggc', { parentSession: 'gc', origin: 'subagent' }),
+      ]
+      assert.deepEqual(collectSubtreeIds(chain, 'p'), ['p', 'c', 'gc', 'ggc'])
+    })
+
+    // 磁盘 header 由官方写入，理论上无环；万一出现环也不能让 BFS 转不出来（调用方要动文件）。
+    // 环只能由「同一 id 出现两条 header」（一条挂在链尾指回祖先）造出来。
+    it('父子成环（异常数据）应该 终止并只返回环上节点一次', () => {
+      const ids = collectSubtreeIds([
+        h('p'),
+        h('a', { parentSession: 'p', origin: 'subagent' }),
+        h('b', { parentSession: 'a', origin: 'subagent' }),
+        h('b', { parentSession: 'b', origin: 'subagent' }),
+      ], 'p')
+      assert.deepEqual(ids, ['p', 'a', 'b'])
+    })
+  })
+
+  // trash/delete 传给 host 的待处理集合：根 + 全部后代（任意深度）。
+  describe('subagentDescendantIds（trash/delete 一起搬走的后代集合）', () => {
+    const h = (id, extra = {}) => ({ id, createdAt: 1, ...extra })
+
+    it('多层后代 应该 全部返回且不含根', () => {
+      const ids = subagentDescendantIds([
+        h('p'),
+        h('c', { parentSession: 'p', origin: 'subagent' }),
+        h('gc', { parentSession: 'c', origin: 'subagent' }),
+      ], 'p')
+      assert.deepEqual(ids, ['c', 'gc'])
+    })
+
+    it('无子会话 应该 返回空数组', () => {
+      assert.deepEqual(subagentDescendantIds([h('p')], 'p'), [])
+    })
+
+    it('别的父下的子会话 应该 不入选', () => {
+      const ids = subagentDescendantIds([
+        h('p'),
+        h('c', { parentSession: 'p', origin: 'subagent' }),
+        h('other-child', { parentSession: 'other', origin: 'subagent' }),
+      ], 'p')
+      assert.deepEqual(ids, ['c'])
+    })
+  })
+
+  describe('archivedIdsToRemove（根 + host 实际搬走/删掉的全部后代）', () => {
+    it('根 + 后代清单 应该 根在前且去重保序', () => {
+      assert.deepEqual(archivedIdsToRemove('p', ['c', 'gc', 'c']), ['p', 'c', 'gc'])
+    })
+
+    it('子会话清单里混入根自身 应该 只出现一次', () => {
+      assert.deepEqual(archivedIdsToRemove('p', ['p', 'c']), ['p', 'c'])
+    })
+
+    it('无子会话 应该 只有根自身', () => {
+      assert.deepEqual(archivedIdsToRemove('p', []), ['p'])
+    })
+  })
+
+  describe('parseSessionFacts', () => {
+    it('v6 形状 应该 解析轮数/token/最后活跃时间', () => {
+      const row = {
+        identity: {},
+        rows: {
+          sessionStats: { ver: 1, seq: 3, val: { turns: 12, decodeTokens: 1200000 } },
+          sessionListMetadata: { ver: 1, seq: 3, val: { lastPromptAt: 1788 } },
+        },
+      }
+      assert.deepEqual(parseSessionFacts(row), { turns: 12, decodeTokens: 1200000, lastPromptAt: 1788 })
+    })
+
+    it('v5 形状（record 包装）应该 解析', () => {
+      const row = { record: { rows: { sessionStats: { val: { turns: 3 } } } } }
+      assert.deepEqual(parseSessionFacts(row), { turns: 3 })
+    })
+
+    it('无有效字段 应该 返回 undefined', () => {
+      assert.equal(parseSessionFacts({ rows: { sessionStats: { val: {} } } }), undefined)
+      assert.equal(parseSessionFacts(null), undefined)
+    })
+  })
+
+  describe('parseTrashSidecar', () => {
+    it('合法 sidecar 应该 返回结构化信息', () => {
+      const sidecar = parseTrashSidecar({
+        version: 1,
+        sessionId: 's',
+        title: 't',
+        originalPath: 'C:/tmp/s',
+        archivedAt: 'now',
+        workspaceIds: ['w'],
+      })
+      assert.equal(sidecar?.sessionId, 's')
+      assert.deepEqual(sidecar?.workspaceIds, ['w'])
+    })
+
+    it('缺少 originalPath 应该 返回 undefined', () => {
+      assert.equal(parseTrashSidecar({ version: 1, sessionId: 's', archivedAt: 'now', workspaceIds: [] }), undefined)
+    })
+
+    it('version 2 带合法 subagents 应该 解析出子会话清单', () => {
+      const sidecar = parseTrashSidecar({
+        version: 2,
+        sessionId: 'p',
+        title: 'parent',
+        originalPath: 'C:/tmp/p',
+        archivedAt: 'now',
+        workspaceIds: ['w'],
+        subagents: [
+          { sessionId: 'c1', title: 'child1', originalPath: 'C:/tmp/c1', workspaceIds: ['w'] },
+          { sessionId: 'c2', originalPath: 'C:/tmp/c2', workspaceIds: [] },
+        ],
+      })
+      assert.equal(sidecar?.version, 2)
+      assert.equal(sidecar?.subagents?.length, 2)
+      assert.equal(sidecar?.subagents?.[1].title, 'c2')
+      assert.deepEqual(sidecar?.subagents?.[0].workspaceIds, ['w'])
+      // 旧条目没有 parentSessionId（之前落的盘）→ 字段缺失，展示层回落平铺。
+      assert.equal(sidecar?.subagents?.[0].parentSessionId, undefined)
+    })
+
+    // parentSessionId 只服务展示层级，形状不对就丢该字段，不把整条判成不可还原。
+    it('subagent 的 parentSessionId 应该 透出；畸形值只丢字段不废条目', () => {
+      const withParent = parseTrashSidecar({
+        version: 2,
+        sessionId: 'p',
+        title: 'parent',
+        originalPath: 'C:/tmp/p',
+        archivedAt: 'now',
+        workspaceIds: [],
+        subagents: [
+          { sessionId: 'c1', originalPath: 'C:/tmp/c1', workspaceIds: [], parentSessionId: 'p' },
+          { sessionId: 'gc1', originalPath: 'C:/tmp/gc1', workspaceIds: [], parentSessionId: 'c1' },
+        ],
+      })
+      assert.equal(withParent?.subagents?.[0].parentSessionId, 'p')
+      assert.equal(withParent?.subagents?.[1].parentSessionId, 'c1')
+
+      const badParent = parseTrashSidecar({
+        version: 2,
+        sessionId: 'p',
+        title: 'parent',
+        originalPath: 'C:/tmp/p',
+        archivedAt: 'now',
+        workspaceIds: [],
+        subagents: [
+          { sessionId: 'c1', originalPath: 'C:/tmp/c1', workspaceIds: [], parentSessionId: 42 },
+          { sessionId: 'c2', originalPath: 'C:/tmp/c2', workspaceIds: [], parentSessionId: '   ' },
+        ],
+      })
+      assert.equal(badParent?.subagents?.length, 2)
+      assert.equal(badParent?.subagents?.[0].parentSessionId, undefined)
+      assert.equal(badParent?.subagents?.[1].parentSessionId, undefined)
+    })
+
+    it('version 2 subagents 含非法条目 应该 返回 undefined', () => {
+      const sidecar = parseTrashSidecar({
+        version: 2,
+        sessionId: 'p',
+        originalPath: 'C:/tmp/p',
+        archivedAt: 'now',
+        workspaceIds: [],
+        subagents: [{ sessionId: 'c1', originalPath: 'C:/tmp/c1', workspaceIds: ['w'] }, { title: 'bad' }],
+      })
+      assert.equal(sidecar, undefined)
+    })
+
+    it('version 1 无 subagents 应该 正常解析', () => {
+      const sidecar = parseTrashSidecar({
+        version: 1,
+        sessionId: 'p',
+        originalPath: 'C:/tmp/p',
+        archivedAt: 'now',
+        workspaceIds: [],
+      })
+      assert.equal(sidecar?.version, 1)
+      assert.equal(sidecar?.subagents, undefined)
+    })
+  })
+
+  describe('trashItemView', () => {
+    it('version 2 sidecar 应该 透出子会话展示清单（父子联动数据）', () => {
+      const view = trashItemView('trash-1', {
+        version: 2,
+        sessionId: 'p',
+        title: 'parent',
+        originalPath: 'C:/tmp/p',
+        archivedAt: '2026-09-04T10:00:00.000Z',
+        workspaceIds: ['w'],
+        subagents: [
+          { sessionId: 'c1', title: 'child1', originalPath: 'C:/tmp/c1', workspaceIds: ['w'] },
+          { sessionId: 'c2', title: 'child2', originalPath: 'C:/tmp/c2', workspaceIds: [] },
+        ],
+      })
+      assert.equal(view.trashId, 'trash-1')
+      assert.equal(view.sessionId, 'p')
+      assert.equal(view.title, 'parent')
+      assert.equal(view.legacy, false)
+      assert.deepEqual(view.subagents, [{ sessionId: 'c1', title: 'child1' }, { sessionId: 'c2', title: 'child2' }])
+    })
+
+    // 视图要带出 parentSessionId，回收站区才能画出 >2 层的树；旧条目没有该字段。
+    it('带 parentSessionId 的 sidecar 应该 逐条透出层级字段', () => {
+      const view = trashItemView('trash-3', {
+        version: 2,
+        sessionId: 'p',
+        title: 'parent',
+        originalPath: 'C:/tmp/p',
+        archivedAt: '2026-09-04T10:00:00.000Z',
+        workspaceIds: [],
+        subagents: [
+          { sessionId: 'c1', title: 'child1', originalPath: 'C:/tmp/c1', workspaceIds: [], parentSessionId: 'p' },
+          { sessionId: 'gc1', title: 'grandchild1', originalPath: 'C:/tmp/gc1', workspaceIds: [], parentSessionId: 'c1' },
+          { sessionId: 'legacy-row', title: 'no-parent', originalPath: 'C:/tmp/legacy', workspaceIds: [] },
+        ],
+      })
+      assert.deepEqual(view.subagents, [
+        { sessionId: 'c1', title: 'child1', parentSessionId: 'p' },
+        { sessionId: 'gc1', title: 'grandchild1', parentSessionId: 'c1' },
+        { sessionId: 'legacy-row', title: 'no-parent' },
+      ])
+    })
+
+    it('version 1 sidecar 无子会话 应该 返回空数组（不破坏列表渲染）', () => {
+      const view = trashItemView('trash-2', {
+        version: 1,
+        sessionId: 'p',
+        title: 'parent',
+        originalPath: 'C:/tmp/p',
+        archivedAt: '2026-09-04T10:00:00.000Z',
+        workspaceIds: [],
+      })
+      assert.deepEqual(view.subagents, [])
+    })
+  })
+})

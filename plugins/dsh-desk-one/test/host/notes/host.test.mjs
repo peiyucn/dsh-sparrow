@@ -76,9 +76,12 @@ const callRoute = async (handler, spec) => {
 }
 
 describe('host 装配（apply 接线）', () => {
-  it('入口 应该 导出 name / inject 三个硬依赖服务', () => {
+  it('入口 应该 导出 name / inject 硬依赖服务（含会话归档所需服务）', () => {
     assert.equal(name, 'dsh-desk-one')
-    assert.deepEqual(inject, ['webServer', 'storageDomain', 'tools'])
+    assert.deepEqual(inject, [
+      'webServer', 'storageDomain', 'tools',
+      'sessions', 'agents', 'workspaceRegistry', 'sessionPersistence', 'sessionQuery',
+    ])
   })
 
   it('apply 应该 打开存储域、挂前缀路由、注册便签 + 任务工具', async () => {

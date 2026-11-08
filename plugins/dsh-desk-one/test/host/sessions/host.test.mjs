@@ -1,0 +1,916 @@
+// @ts-check
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import { resolve, sep } from 'node:path'
+import { archivedIdsToRemove, createHeaderFactsStore, labelFromSubagentIdentity } from '../../../lib/host/sessions/archive.js'
+import { FOLDED_LABEL_CACHE_MAX_ENTRIES } from '../../../lib/host/sessions/constants.js'
+import {
+  addedSummaryFor, alignChildArchives, mutateArchivedSet, removeArchivedIds, workspaceIndexFor,
+} from '../../../lib/host/sessions/archive-set.js'
+import { assertRegistryMutationApi, assertSessionLocationApi } from '../../../lib/host/sessions/gates.js'
+import { sessionDirectoryFor } from '../../../lib/host/sessions/session-files.js'
+import { subagentLabel, titlesFor } from '../../../lib/host/sessions/titles.js'
+import { resolveTrashDir } from '../../../lib/host/sessions/trash.js'
+import { cachedSnapshotOf, canWriteProjectionCache, coldSnapshotOf, sweepStaleProjectionCache } from '../../../lib/host/sessions/projection.js'
+
+// 被测函数基于平台原生 path 语义（Windows 盘符路径在 POSIX 上不是绝对路径），
+// 测试夹具按当前平台构造——CI 跑 Ubuntu、本机跑 Windows，两边都必须绿。
+const win = sep === '\\'
+const root = win ? 'C:\\backups' : '/tmp/backups'
+const evilId = win ? 'C:\\evil\\outside' : '/evil/outside'
+const sessionPath = win ? 'C:\\dsh\\sessions\\session-1\\session.jsonl' : '/dsh/sessions/session-1/session.jsonl'
+const sessionDir = win ? 'C:\\dsh\\sessions\\session-1' : '/dsh/sessions/session-1'
+const rootLevelSession = win ? 'C:\\session.jsonl' : '/session.jsonl'
+
+describe('archive-manage host 纯逻辑', () => {
+  describe('resolveTrashDir', () => {
+    it('合法回收站 id 应该 解析到 trashRoot 下', () => {
+      const dir = resolveTrashDir(root, 'abc-123')
+      assert.equal(dir, resolve(root, 'abc-123'))
+    })
+
+    it('绝对路径风格的回收站 id 应该 被消毒后仍落在 trashRoot 下', () => {
+      const dir = resolveTrashDir(root, evilId)
+      const prefix = resolve(root)
+      assert.ok(dir === prefix || dir.startsWith(`${prefix}${sep}`))
+      assert.ok(!dir.startsWith(win ? 'C:\\evil' : '/evil'))
+    })
+
+    it('空回收站 id 应该 落到 unknown 目录', () => {
+      const dir = resolveTrashDir(root, '')
+      assert.equal(dir, resolve(root, 'unknown'))
+    })
+  })
+
+  describe('sessionDirectoryFor', () => {
+    it('jsonl 单会话目录 应该 返回其父目录', () => {
+      const dir = sessionDirectoryFor({ kind: 'jsonl', path: sessionPath })
+      assert.equal(dir, sessionDir)
+    })
+
+    it('rc.1 zstd 压缩产物（session.jsonl.zstd）应该 返回其父目录', () => {
+      const dir = sessionDirectoryFor({
+        kind: 'jsonl',
+        path: win ? 'C:\\dsh\\sessions\\session-1\\session.jsonl.zstd' : '/dsh/sessions/session-1/session.jsonl.zstd',
+      })
+      assert.equal(dir, sessionDir)
+    })
+
+    it('非 jsonl 后端 应该 返回 undefined', () => {
+      assert.equal(sessionDirectoryFor({ kind: 'memory', path: 'session-1' }), undefined)
+    })
+
+    it('相对路径 应该 返回 undefined', () => {
+      assert.equal(sessionDirectoryFor({ kind: 'jsonl', path: `sessions${sep}session-1${sep}session.jsonl` }), undefined)
+    })
+
+    it('根目录路径 应该 返回 undefined', () => {
+      assert.equal(sessionDirectoryFor({ kind: 'jsonl', path: rootLevelSession }), undefined)
+    })
+
+    it('path 字段漂移（非字符串 / 空串）应该 返回 undefined 而不是抛错', () => {
+      assert.equal(sessionDirectoryFor({ kind: 'jsonl', path: undefined }), undefined)
+      assert.equal(sessionDirectoryFor({ kind: 'jsonl', path: '' }), undefined)
+      assert.equal(sessionDirectoryFor({ kind: 'jsonl', path: null }), undefined)
+    })
+  })
+
+  describe('assertRegistryMutationApi', () => {
+    it('缺 enqueueOperation 应该 抛含方法名的明确错误', () => {
+      assert.throws(
+        () => assertRegistryMutationApi({ requireState: () => ({}), setState: async () => {} }),
+        /enqueueOperation/,
+      )
+    })
+
+    it('缺 requireState 应该 抛含方法名的明确错误', () => {
+      assert.throws(
+        () => assertRegistryMutationApi({ enqueueOperation: async fn => fn(), setState: async () => {} }),
+        /requireState/,
+      )
+    })
+
+    it('缺 setState 应该 抛含方法名的明确错误', () => {
+      assert.throws(
+        () => assertRegistryMutationApi({ enqueueOperation: async fn => fn(), requireState: () => ({}) }),
+        /setState/,
+      )
+    })
+
+    it('三个方法齐全 应该 返回可用 surface', () => {
+      const surface = assertRegistryMutationApi({
+        enqueueOperation: async fn => fn(),
+        requireState: () => ({ archivedSessionIds: [] }),
+        setState: async () => {},
+      })
+      assert.equal(typeof surface.enqueueOperation, 'function')
+      assert.equal(typeof surface.requireState, 'function')
+      assert.equal(typeof surface.setState, 'function')
+    })
+  })
+
+  describe('assertSessionLocationApi', () => {
+    it('缺 locate 应该 抛含 locate 的明确错误', () => {
+      assert.throws(() => assertSessionLocationApi({}), /locate/)
+    })
+
+    it('locate 非函数 应该 抛错', () => {
+      assert.throws(() => assertSessionLocationApi({ locate: 'x' }), /locate/)
+    })
+
+    it('locate 存在 应该 返回可转发调用的访问器', () => {
+      const location = { kind: 'jsonl', path: '/x/session.jsonl' }
+      const api = assertSessionLocationApi({ locate: () => location })
+      assert.deepEqual(api.locate({}), location)
+    })
+  })
+
+  describe('addedSummaryFor', () => {
+    it('普通 header 应该 只含必填字段', () => {
+      const summary = addedSummaryFor({ id: 'a', createdAt: 42, isSeeded: false }, true)
+      assert.deepEqual(summary, { sessionId: 'a', updatedAt: 42, running: false, blank: true })
+    })
+
+    it('subagent header 应该 透出 parent 与 origin 与 cwd', () => {
+      const summary = addedSummaryFor({ id: 'b', createdAt: 1, isSeeded: false, parentSession: 'p', origin: 'subagent', cwd: '/w' }, false)
+      assert.equal(summary.parentSessionId, 'p')
+      assert.equal(summary.origin, 'subagent')
+      assert.equal(summary.cwd, '/w')
+      assert.equal(summary.blank, false)
+    })
+  })
+
+  describe('mutateArchivedSet', () => {
+    function fakeRegistry(initialIds) {
+      const calls = []
+      let state = { archivedSessionIds: [...initialIds], initialized: true, workspaceIds: [] }
+      const surface = {
+        enqueueOperation: async (op) => { calls.push('enqueue'); return op() },
+        requireState: () => state,
+        setState: async (next) => { calls.push('set'); state = next },
+      }
+      return { surface, calls, get: () => state }
+    }
+
+    it('update 移除 id 应该 经串行链 setState 新集合', async () => {
+      const { surface, calls, get } = fakeRegistry(['a', 'b'])
+      await mutateArchivedSet(surface, ids => ids.filter(id => id !== 'a'))
+      assert.deepEqual(calls, ['enqueue', 'set'])
+      assert.deepEqual(get().archivedSessionIds, ['b'])
+    })
+
+    it('update 返回同一引用 应该 不触发 setState（幂等无写）', async () => {
+      const { surface, calls, get } = fakeRegistry(['a'])
+      await mutateArchivedSet(surface, ids => ids)
+      assert.deepEqual(calls, ['enqueue'])
+      assert.deepEqual(get().archivedSessionIds, ['a'])
+    })
+
+    it('update 返回内容一致的新数组 应该 不触发 setState（零写入）', async () => {
+      const { surface, calls, get } = fakeRegistry(['a', 'b'])
+      await mutateArchivedSet(surface, ids => ids.filter(id => id !== 'x'))
+      assert.deepEqual(calls, ['enqueue'])
+      assert.deepEqual(get().archivedSessionIds, ['a', 'b'])
+    })
+
+    it('追加已存在的 id 应该 不重复（幂等）', async () => {
+      const { surface, get } = fakeRegistry(['a'])
+      await mutateArchivedSet(surface, ids => ids.includes('a') ? ids : [...ids, 'a'])
+      assert.deepEqual(get().archivedSessionIds, ['a'])
+    })
+  })
+
+  // trash/delete 的归档集清理：待摘 id = 根 + host 实际搬走/删掉的**全部后代**子会话
+  // （archivedIdsToRemove）。子代理能再派子代理，故后代深度不固定——整棵子树都随父走、
+  // 都出归档集；只摘直接子会话会让更深的后代变成孤儿根（2026-09-12 实测）。
+  describe('removeArchivedIds + archivedIdsToRemove（整棵子树）', () => {
+    const removeSurface = (initialIds) => {
+      const calls = []
+      let state = { archivedSessionIds: [...initialIds], initialized: true, workspaceIds: [] }
+      return {
+        calls,
+        surface: {
+          enqueueOperation: async (op) => { calls.push('enqueue'); return op() },
+          requireState: () => state,
+          setState: async (next) => { calls.push('set'); state = next },
+        },
+        get: () => state,
+      }
+    }
+
+    it('摘根 + 全部后代 应该 把整棵子树移出归档集', async () => {
+      const { surface, calls, get } = removeSurface(['p', 'c', 'gc', 'other'])
+      await removeArchivedIds(surface, archivedIdsToRemove('p', ['c', 'gc']))
+      assert.deepEqual(calls, ['enqueue', 'set'])
+      assert.deepEqual(get().archivedSessionIds.map(String), ['other'])
+    })
+
+    it('无子会话的根 应该 只摘根自身', async () => {
+      const { surface, get } = removeSurface(['p', 'other'])
+      await removeArchivedIds(surface, archivedIdsToRemove('p', []))
+      assert.deepEqual(get().archivedSessionIds.map(String), ['other'])
+    })
+
+    it('待摘 id 都不在归档集 应该 零写入（幂等无事件噪音）', async () => {
+      const { surface, calls, get } = removeSurface(['other'])
+      await removeArchivedIds(surface, archivedIdsToRemove('p', ['c', 'gc']))
+      assert.deepEqual(calls, ['enqueue'])
+      assert.deepEqual(get().archivedSessionIds.map(String), ['other'])
+    })
+  })
+
+  describe('alignChildArchives', () => {
+    const headerOf = (id, extra = {}) => ({ id, createdAt: 1, isSeeded: false, ...extra })
+    const alignCtx = (archivedIds) => ({
+      workspaceRegistry: { archivedSessionIds: archivedIds },
+      logger: { info: () => {}, warn: () => {} },
+    })
+    const alignSurface = () => {
+      let state = { archivedSessionIds: ['p'] }
+      return {
+        surface: {
+          enqueueOperation: async (op) => op(),
+          requireState: () => state,
+          setState: async (next) => { state = next },
+        },
+        get: () => state,
+      }
+    }
+
+    it('headers 应该 经 header 事实缓存取（暖缓存不重复扫盘）', async () => {
+      let loads = 0
+      const store = createHeaderFactsStore(async () => {
+        loads += 1
+        return { headers: [], sizes: new Map() }
+      }, 30_000, () => 0)
+      const { surface } = alignSurface()
+      await alignChildArchives(alignCtx([]), surface, store)
+      await alignChildArchives(alignCtx([]), surface, store)
+      assert.equal(loads, 1)
+    })
+
+    it('父已归档而子未归档 应该 把子补进归档集', async () => {
+      const store = createHeaderFactsStore(async () => ({
+        headers: [headerOf('p'), headerOf('c', { parentSession: 'p', origin: 'subagent' })],
+        sizes: new Map(),
+      }), 30_000, () => 0)
+      const { surface, get } = alignSurface()
+      await alignChildArchives(alignCtx(['p']), surface, store)
+      assert.deepEqual(get().archivedSessionIds.map(String).sort(), ['c', 'p'])
+    })
+  })
+
+  // 标题兜底从「每个 miss 一次 readTitleSnapshots」改为「整批一次」——
+  // 官方 projectMany 每次调用都要重跑一遍全量 listPersisted，逐 id 单条调用是 O(m·K)。
+  describe('titlesFor 批量折叠', () => {
+    const titleHeader = (id) => ({ id, createdAt: 1, isSeeded: false })
+    /**
+     * 标题兜底的最小 ctx 桩：`cacheRow` 只在「缓存命中」档用，可能缺省。
+     *
+     * @param {{ readTitleSnapshots: (ids: any[]) => Promise<any[]>, cacheRow?: any }} spec
+     */
+    const titlesCtx = ({ readTitleSnapshots, cacheRow }) => ({
+      sessions: { get: () => undefined },
+      sessionQuery: { readTitleSnapshots },
+      get: (name) => (name === 'sessionProjectionCache' ? { cachedSnapshot: () => cacheRow } : undefined),
+      logger: { warn: () => {} },
+    })
+    const fulfilled = (id, title) => ({ sessionId: id, status: 'fulfilled', value: { title: { title } } })
+
+    it('多个 miss 应该 只调用一次 readTitleSnapshots，且整批传入全部 id', async () => {
+      const calls = []
+      const ctx = titlesCtx({
+        readTitleSnapshots: async (ids) => {
+          calls.push(ids.map(String))
+          return ids.map(id => fulfilled(String(id), `title-${String(id)}`))
+        },
+      })
+      const titles = await titlesFor(ctx, ['a', 'b', 'c', 'd', 'e'].map(titleHeader), header => header.id)
+      assert.equal(calls.length, 1)
+      assert.deepEqual(calls[0], ['a', 'b', 'c', 'd', 'e'])
+      assert.equal(titles.size, 5)
+      assert.equal(titles.get('a'), 'title-a')
+      assert.equal(titles.get('e'), 'title-e')
+    })
+
+    it('重复 id 应该 去重成一次请求，且每条都拿到同一个标题（不错位）', async () => {
+      const calls = []
+      const ctx = titlesCtx({
+        // 官方契约：每个唯一 id 一条结果、按首次出现顺序（corpus.ts:137/249）。
+        readTitleSnapshots: async (ids) => { calls.push(ids.map(String)); return ids.map(id => fulfilled(String(id), `title-${String(id)}`)) },
+      })
+      const titles = await titlesFor(ctx, [titleHeader('dup'), titleHeader('dup'), titleHeader('other')], header => `id:${header.id}`)
+      assert.deepEqual(calls, [['dup', 'other']])
+      assert.equal(titles.get('dup'), 'title-dup')
+      assert.equal(titles.get('other'), 'title-other')
+      assert.equal(titles.size, 2)
+    })
+
+    it('缓存命中 应该 不进折叠批（一次都不调用）', async () => {
+      const calls = []
+      const ctx = titlesCtx({
+        cacheRow: { values: { title: 'cached-title' } },
+        readTitleSnapshots: async (ids) => { calls.push(ids.map(String)); return ids.map(id => fulfilled(String(id), 'folded')) },
+      })
+      const titles = await titlesFor(ctx, [titleHeader('a')], header => header.id)
+      assert.equal(titles.get('a'), 'cached-title')
+      assert.deepEqual(calls, [])
+    })
+
+    it('⛔ 官方 cachedSnapshot 签名跨版本变化 —— 必须按形参个数自适应', async () => {
+      // ## 为什么（2026-09-27，owner：「归档会话名字也都没了，只剩 id 了」）
+      //
+      // 官方该方法的形参个数**变过**：
+      //   * 0.1.5-rc.3 / 0.1.6-alpha.2：`(meta, inheritedEventCount, keys?)` —— 3 参
+      //   * **0.1.7-rc.1 起：`(meta, keys?)`** —— 中间参数被删，变 2 参
+      //
+      // 插件原先写死 `cachedSnapshot(header, 0, ['title'])`，在 0.1.7 上 `keys` 收到数字 `0`
+      // ⇒ 取不到任何单元 ⇒ **「冷缓存」档永远 miss** ⇒ 每次都退到有界折叠 ⇒
+      // 折叠要解压扫描会话全量日志（实测 1.7/9.3/37 MB）⇒ 超 8 s 预算 ⇒ 落 fallback = **会话 id**。
+      //
+      // 真机实测：连续 12 次 `/list` 全部 8000~9100 ms，3 条标题全是 id。
+      //
+      // ⚠️ 用 `try/catch` 兜不住：多传参数**不会抛错**，只会被忽略 ⇒ 必须显式按 `fn.length` 分派。
+      const cases = [
+        {
+          name: '0.1.7+（2 参）',
+          // 模拟官方 0.1.7+：keys 不是数组就取不到值
+          fn: function cachedSnapshot(meta, keys) { return Array.isArray(keys) ? { values: { title: 't-017' } } : undefined },
+          expect: 't-017',
+        },
+        {
+          name: '0.1.5/0.1.6（3 参）',
+          fn: function cachedSnapshot(meta, inheritedEventCount, keys) {
+            return typeof inheritedEventCount === 'number' && Array.isArray(keys) ? { values: { title: 't-015' } } : undefined
+          },
+          expect: 't-015',
+        },
+      ]
+      for (const c of cases) {
+        const readCalls = []
+        const ctx = {
+          sessions: { get: () => undefined },
+          sessionQuery: { readTitleSnapshots: async (ids) => { readCalls.push(ids.map(String)); return ids.map(id => fulfilled(String(id), 'folded')) } },
+          get: (n) => (n === 'sessionProjectionCache' ? { cachedSnapshot: c.fn } : undefined),
+          logger: { warn: () => {} },
+        }
+        const titles = await titlesFor(ctx, [titleHeader('a')], header => header.id)
+        assert.equal(titles.get('a'), c.expect, `${c.name}：应按形参个数传对参数，取到缓存标题`)
+        assert.deepEqual(readCalls, [], `${c.name}：命中缓存就不该进折叠批（进了就会慢到超时、退化成 id）`)
+      }
+    })
+
+    it('单条 rejected（会话已被移走）应该 只退化为该条的 fallback', async () => {
+      const ctx = titlesCtx({
+        readTitleSnapshots: async (ids) => ids.map(id => String(id) === 'gone'
+          ? { sessionId: id, status: 'rejected', reason: new Error('not found') }
+          : fulfilled(String(id), `title-${String(id)}`)),
+      })
+      const titles = await titlesFor(ctx, ['kept', 'gone'].map(titleHeader), header => `id:${header.id}`)
+      assert.equal(titles.get('kept'), 'title-kept')
+      assert.equal(titles.get('gone'), 'id:gone')
+    })
+
+    it('整批抛错（预算超时）应该 全部退化为 fallback 且不抛给调用方', async () => {
+      const ctx = titlesCtx({
+        readTitleSnapshots: async () => { throw new Error('budget abort') },
+      })
+      const titles = await titlesFor(ctx, ['x', 'y'].map(titleHeader), header => `id:${header.id}`)
+      assert.deepEqual([...titles], [['x', 'id:x'], ['y', 'id:y']])
+    })
+
+    it('空输入 应该 不调用 readTitleSnapshots', async () => {
+      let calls = 0
+      const ctx = titlesCtx({ readTitleSnapshots: async () => { calls += 1; return [] } })
+      const titles = await titlesFor(ctx, [], header => header.id)
+      assert.equal(titles.size, 0)
+      assert.equal(calls, 0)
+    })
+  })
+
+  describe('labelFromSubagentIdentity（权威判定）', () => {
+    it('identity 带 label 应该 返回该标签', () => {
+      assert.equal(labelFromSubagentIdentity({ mode: 'continuable', label: '审查卸载残留', seq: 7 }), '审查卸载残留')
+    })
+
+    it('identity 存在但无 label（one-shot 可选）应该 返回 null（权威无标签，非「未定」）', () => {
+      assert.equal(labelFromSubagentIdentity({ mode: 'one-shot', seq: 7 }), null)
+    })
+
+    it('identity 为 null（未折到描述符）应该 返回 undefined（仍需折叠）', () => {
+      assert.equal(labelFromSubagentIdentity(null), undefined)
+    })
+
+    it('identity 缺失 / 形状异常 应该 返回 undefined（仍需折叠）', () => {
+      assert.equal(labelFromSubagentIdentity(undefined), undefined)
+      assert.equal(labelFromSubagentIdentity('not-an-object'), undefined)
+    })
+
+    it('label 为空白串 应该 按无标签处理（返回 null）', () => {
+      assert.equal(labelFromSubagentIdentity({ mode: 'one-shot', label: '   ', seq: 1 }), null)
+    })
+  })
+
+  describe('workspaceIndexFor（工作区归属预建索引）', () => {
+    it('按会话 id 汇总持有工作区，顺序与工作区列表一致', () => {
+      const index = workspaceIndexFor([
+        { id: 'w1', sessionIds: ['s1', 's2'] },
+        { id: 'w2', sessionIds: ['s2', 's3'] },
+      ])
+      assert.deepEqual(index.get('s1'), ['w1'])
+      assert.deepEqual(index.get('s2'), ['w1', 'w2'])
+      assert.deepEqual(index.get('s3'), ['w2'])
+      assert.equal(index.get('s4'), undefined)
+    })
+
+    it('同一工作区内重复的 sessionId 条目应该 只记一次', () => {
+      const index = workspaceIndexFor([{ id: 'w1', sessionIds: ['s1', 's1', 's2'] }])
+      assert.deepEqual(index.get('s1'), ['w1'])
+      assert.deepEqual(index.get('s2'), ['w1'])
+    })
+
+    it('无工作区输入应该 返回空索引', () => {
+      assert.equal(workspaceIndexFor([]).size, 0)
+    })
+  })
+
+  describe('subagentLabel 三档读链', () => {
+    const labelHeader = (id, extra = {}) => ({ id, createdAt: 1, isSeeded: false, origin: 'subagent', ...extra })
+
+    /**
+     * 官方 `viewCheckpoint` 的 keys 语义（session-projection/src/index.ts:453）：
+     * `keys === undefined` 取全部单元；否则 `new Set(keys)` —— **非数组会抛 TypeError**
+     * （数字 `0` 即 `new Set(0)`）。桩按这个语义处理 keys，才能让「写死三参」的调用
+     * 在测试里真的翻车，而不是被常量返回值掩盖。
+     */
+    const viewWithKeys = (row, keys) => {
+      const selected = keys === undefined ? undefined : new Set(keys)
+      if (row === undefined) return undefined
+      if (selected === undefined || selected.has('subagent')) return row
+      return { values: {} }
+    }
+
+    /**
+     * 官方 rc.2 的 `cachedSnapshot(meta, keys?)` 是 **2 形参**；旧契约
+     * （0.1.5-rc.3 / 0.1.6-alpha.2）是 3 形参 `(meta, inheritedEventCount, keys?)`。
+     * 桩必须用**真实形参个数**：0 参桩会让源码里的 `fn.length >= 3` 恒假，
+     * 于是「写死三参调用」这一侧的 bug 永远走不到（这正是本回归漏网的原因）。
+     * @param signature - 'rc2'（2 形参，被测默认）| 'legacy'（3 形参）。
+     */
+    const cacheStub = (row, signature) => {
+      if (signature === 'legacy') {
+        return function cachedSnapshotLegacy(meta, inheritedEventCount, keys) { return viewWithKeys(row, keys) }
+      }
+      return function cachedSnapshotRc2(meta, keys) { return viewWithKeys(row, keys) }
+    }
+
+    /**
+     * 子会话标签三档读链的最小 ctx 桩。三档的输入互斥地出现在不同用例里
+     * （live 快照 / 缓存行 / 日志折叠），故三者都可缺省。
+     *
+     * @param {{
+     *   live?: any,
+     *   cacheRow?: any,
+     *   cacheThrows?: boolean,
+     *   cacheSignature?: 'rc2' | 'legacy',
+     *   observe?: any,
+     *   observeThrows?: boolean,
+     * }} spec
+     */
+    const labelCtx = ({ live, cacheRow, cacheThrows = false, cacheSignature = 'rc2', observe, observeThrows = false }) => ({
+      sessions: { get: () => live },
+      get: (name) => {
+        if (name === 'sessionProjections') {
+          return live === undefined ? undefined : { snapshot: () => ({ values: { subagent: { label: 'live-label', seq: 7 } } }) }
+        }
+        if (name === 'sessionProjectionCache') {
+          if (cacheThrows) return { cachedSnapshot: (meta, keys) => { throw new Error('cache boom') } }
+          return { cachedSnapshot: cacheStub(cacheRow, cacheSignature) }
+        }
+        if (name === 'sessionQuery') {
+          return { observeSession: observeThrows ? async () => { throw new Error('fold boom') } : observe }
+        }
+        return undefined
+      },
+      logger: { warn: () => {} },
+    })
+
+    it('live 子会话 应该 走注册表快照', async () => {
+      const ctx = labelCtx({ live: { live: true, isOwnSeq: () => true } })
+      assert.equal(await subagentLabel(ctx, labelHeader('live-1')), 'live-label')
+    })
+
+    // 对齐官方 list-children.ts:224-225 的自有后缀门。
+    it('live 快照 identity 非自有（fork seed 祖先描述符）应该 不出标签', async () => {
+      const ctx = {
+        sessions: { get: () => ({ isOwnSeq: () => false }) },
+        get: (name) => {
+          if (name === 'sessionProjections') {
+            return { snapshot: () => ({ values: { subagent: { mode: 'one-shot', label: '祖先标签', seq: 7 } } }) }
+          }
+          return undefined
+        },
+        logger: { warn: () => {} },
+      }
+      assert.equal(await subagentLabel(ctx, labelHeader('live-seed-window-1')), undefined)
+    })
+
+    it('live 快照 identity seq 畸形 应该 保守不出标签（不抛 SessionSeq TypeError）', async () => {
+      const ctx = {
+        sessions: { get: () => ({ isOwnSeq: () => true }) },
+        get: (name) => {
+          if (name === 'sessionProjections') {
+            return { snapshot: () => ({ values: { subagent: { mode: 'one-shot', label: 'x', seq: -1 } } }) }
+          }
+          return undefined
+        },
+        logger: { warn: () => {} },
+      }
+      assert.equal(await subagentLabel(ctx, labelHeader('live-badseq-1')), undefined)
+    })
+
+    it('live 缺 isOwnSeq 能力 应该 静默保守不出标签（不抛不告警）', async () => {
+      let warned = 0
+      const ctx = {
+        sessions: { get: () => ({ live: true }) },
+        get: (name) => {
+          if (name === 'sessionProjections') {
+            return { snapshot: () => ({ values: { subagent: { mode: 'one-shot', label: 'x', seq: 7 } } }) }
+          }
+          return undefined
+        },
+        logger: { warn: () => { warned += 1 } },
+      }
+      assert.equal(await subagentLabel(ctx, labelHeader('live-nocap-1')), undefined)
+      assert.equal(warned, 0)
+    })
+
+    it('冷会话 + 缓存命中 应该 用缓存行标签', async () => {
+      const ctx = labelCtx({ cacheRow: { values: { subagent: { label: 'cached-label' } } } })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-cache-1')), 'cached-label')
+    })
+
+    /**
+     * ⛔ 回归（2026-10-04，H1）：官方 rc.2 的 `cachedSnapshot` 是 **2 参** `(meta, keys?)`，
+     * 而本插件 subagentLabel 第二档曾写死 **3 参** `(header, 0, ['subagent'])` ——
+     * 第 3 实参被丢弃、`keys` 实收数字 `0` ⇒ 官方 `viewCheckpoint` 里 `new Set(0)` 抛
+     * TypeError ⇒ 被 catch 吞掉 ⇒ **这一档 100% miss**（与 cachedTitle 那次同源，
+     * 同一文件 :244-247 已按 `fn.length` 自适应修好，这处漏改）。
+     *
+     * 本用例在修复前**必须红**：桩用真实 2 形参签名，且 keys 非数组即抛错。
+     */
+    it('⛔ 官方 2 参签名（rc.2）+ 冷会话 + 缓存有 label 应该 返回该 label（写死三参会静默 miss）', async () => {
+      const receivedKeys = []
+      const ctx = {
+        sessions: { get: () => undefined },
+        get: (name) => {
+          if (name !== 'sessionProjectionCache') return undefined
+          return {
+            // 真实 rc.2 形态：2 形参，keys 省略 / 数组都要能吃，收到数字即抛（官方 new Set(0) 语义）。
+            cachedSnapshot: function cachedSnapshotRc2(meta, keys) {
+              receivedKeys.push(keys)
+              if (keys !== undefined && !Array.isArray(keys)) {
+                throw new TypeError(`Invalid value used in weak set: ${String(keys)}`)
+              }
+              const selected = keys === undefined ? undefined : new Set(keys)
+              return selected === undefined || selected.has('subagent')
+                ? { values: { subagent: { mode: 'one-shot', label: 'rc2-cached-label', seq: 5 } } }
+                : { values: {} }
+            },
+          }
+        },
+        logger: { warn: () => {} },
+      }
+      assert.equal(await subagentLabel(ctx, labelHeader('rc2-cache-1')), 'rc2-cached-label')
+      // 键位也要对：keys 不能是数字 0，只能是数组（或省略）。
+      assert.deepEqual(receivedKeys, [['subagent']])
+    })
+
+    it('官方旧 3 参签名（0.1.5-rc.3 / 0.1.6-alpha.2）应该 仍取到缓存 label（形参自适应不得只认新签名）', async () => {
+      const receivedKeys = []
+      const ctx = {
+        sessions: { get: () => undefined },
+        get: (name) => {
+          if (name !== 'sessionProjectionCache') return undefined
+          return {
+            // 旧契约：中间那个 inheritedEventCount 位还在，keys 在第 3 位。
+            cachedSnapshot: function cachedSnapshotLegacy(meta, inheritedEventCount, keys) {
+              receivedKeys.push({ inheritedEventCount, keys })
+              const selected = keys === undefined ? undefined : new Set(keys)
+              return selected === undefined || selected.has('subagent')
+                ? { values: { subagent: { mode: 'one-shot', label: 'legacy-cached-label', seq: 5 } } }
+                : { values: {} }
+            },
+          }
+        },
+        logger: { warn: () => {} },
+      }
+      assert.equal(await subagentLabel(ctx, labelHeader('legacy-cache-1')), 'legacy-cached-label')
+      assert.deepEqual(receivedKeys, [{ inheritedEventCount: 0, keys: ['subagent'] }])
+    })
+
+    it('缓存落空 + 未种子 应该 从日志折叠并释放租约', async () => {
+      let disposed = 0
+      const ctx = labelCtx({
+        cacheRow: undefined,
+        observe: async () => ({
+          header: { createdAt: 1 },
+          projections: { values: { subagent: { label: 'folded-label' } } },
+          dispose: () => { disposed += 1 },
+        }),
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-1')), 'folded-label')
+      assert.equal(disposed, 1)
+    })
+
+    it('rc.1 Disposable 租约（仅 Symbol.dispose）应该 正确释放', async () => {
+      let disposed = 0
+      const ctx = labelCtx({
+        cacheRow: undefined,
+        observe: async () => ({
+          header: { createdAt: 1 },
+          projections: { values: { subagent: { label: 'rc1-label' } } },
+          [Symbol.dispose]: () => { disposed += 1 },
+        }),
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-rc1')), 'rc1-label')
+      assert.equal(disposed, 1)
+    })
+
+    it('缓存读取抛错 应该 继续走日志折叠档', async () => {
+      const ctx = labelCtx({
+        cacheThrows: true,
+        observe: async () => ({
+          header: { createdAt: 1 },
+          projections: { values: { subagent: { label: 'folded-after-cache-boom' } } },
+          dispose: () => {},
+        }),
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-2')), 'folded-after-cache-boom')
+    })
+
+    it('种子冷会话 应该 不走日志折叠档（OOM 场景门）', async () => {
+      let observed = 0
+      const ctx = labelCtx({
+        cacheRow: undefined,
+        observe: async () => { observed += 1; return undefined },
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('seeded-1', { isSeeded: true })), undefined)
+      assert.equal(observed, 0)
+    })
+
+    it('日志折叠抛错 应该 回退 undefined', async () => {
+      const ctx = labelCtx({ cacheRow: undefined, observeThrows: true })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-3')), undefined)
+    })
+
+    it('折叠成功结果 应该 按 sessionId 记忆（二次调用不再折叠）', async () => {
+      let observed = 0
+      const ctx = labelCtx({
+        cacheRow: undefined,
+        observe: async () => {
+          observed += 1
+          return { header: { createdAt: 1 }, projections: { values: { subagent: { label: 'memo-label' } } }, dispose: () => {} }
+        },
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-4')), 'memo-label')
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-4')), 'memo-label')
+      assert.equal(observed, 1)
+    })
+
+    it('折叠记忆超过 LRU 上限 应该 淘汰最旧条目（有界不无限累积）', async () => {
+      const observed = new Map()
+      const ctx = {
+        sessions: { get: () => undefined },
+        get: (name) => {
+          if (name === 'sessionQuery') {
+            return {
+              observeSession: async (id) => {
+                const key = String(id)
+                observed.set(key, (observed.get(key) ?? 0) + 1)
+                return { header: { createdAt: 1 }, projections: { values: { subagent: { label: `label-${key}` } } }, dispose: () => {} }
+              },
+            }
+          }
+          return undefined
+        },
+        logger: { warn: () => {} },
+      }
+      for (let i = 0; i <= FOLDED_LABEL_CACHE_MAX_ENTRIES; i++) {
+        assert.equal(await subagentLabel(ctx, labelHeader(`evict-${i}`)), `label-evict-${i}`)
+      }
+      // 最旧的 evict-0 已被 LRU 淘汰：再查一次会重新折叠，而不是无限记忆。
+      assert.equal(await subagentLabel(ctx, labelHeader('evict-0')), 'label-evict-0')
+      assert.equal(observed.get('evict-0'), 2)
+    })
+
+    it('观察生命周期与 header 不一致 应该 拒绝并释放租约', async () => {
+      let disposed = 0
+      const ctx = labelCtx({
+        cacheRow: undefined,
+        observe: async () => ({
+          header: { createdAt: 99 },
+          projections: { values: { subagent: { label: 'stale-label' } } },
+          dispose: () => { disposed += 1 },
+        }),
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-fold-5')), undefined)
+      assert.equal(disposed, 1)
+    })
+
+    // one-shot 子会话的 label 官方定义为可选，此前「取不到 label 就重折整份日志」，
+    // 导致每次打开面板都为这批会话解一遍 zstd 日志。缓存行给出 identity 即为权威结论。
+    it('缓存行 identity 存在但无 label 应该 直接结束（不再折叠日志）', async () => {
+      let observed = 0
+      const ctx = labelCtx({
+        cacheRow: { values: { subagent: { mode: 'one-shot', seq: 7 } } },
+        observe: async () => { observed += 1; return undefined },
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-nolabel-1')), undefined)
+      assert.equal(observed, 0)
+    })
+
+    it('缓存行 identity 为 null（未折到描述符）应该 继续走折叠档', async () => {
+      const ctx = labelCtx({
+        cacheRow: { values: { subagent: null } },
+        observe: async () => ({
+          header: { createdAt: 1 },
+          projections: { values: { subagent: { mode: 'continuable', label: 'folded-after-null' } } },
+          dispose: () => {},
+        }),
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-null-1')), 'folded-after-null')
+    })
+
+    it('权威无标签结论 应该 被记忆（二次调用不再折叠）', async () => {
+      let observed = 0
+      const ctx = labelCtx({
+        cacheRow: undefined,
+        observe: async () => {
+          observed += 1
+          return {
+            header: { createdAt: 1 },
+            projections: { values: { subagent: { mode: 'one-shot', seq: 3 } } },
+            dispose: () => {},
+          }
+        },
+      })
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-memo-null')), undefined)
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-memo-null')), undefined)
+      assert.equal(observed, 1)
+    })
+
+    it('折叠抛错（非权威）应该 不记忆，下次仍可重试', async () => {
+      let observed = 0
+      const ctx = {
+        sessions: { get: () => undefined },
+        get: (name) => {
+          if (name === 'sessionQuery') {
+            return {
+              observeSession: async () => {
+                observed += 1
+                throw new Error('fold boom')
+              },
+            }
+          }
+          return undefined
+        },
+        logger: { warn: () => {} },
+      }
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-retry-1')), undefined)
+      assert.equal(await subagentLabel(ctx, labelHeader('cold-retry-1')), undefined)
+      assert.equal(observed, 2)
+    })
+  })
+
+  describe('投影缓存服务面（cachedSnapshot 读 / coldSnapshot 写回）', () => {
+    const projectionHeader = { id: 's1', createdAt: 1, isSeeded: false, version: 4 }
+
+    it('cachedSnapshotOf 应该 按形参个数自适应：2 参传 keys，3 参把 inheritedEventCount 放中间', () => {
+      const received = []
+      const block = { asOfSeq: 7, values: { title: '缓存标题' } }
+      const ctx = {
+        get: () => ({
+          cachedSnapshot: function cachedSnapshotTwo(meta, keys) { received.push({ argc: 2, meta, keys }); return block },
+        }),
+        logger: { warn: () => {} },
+      }
+      const two = cachedSnapshotOf(ctx, projectionHeader, ['title'])
+      assert.equal(two?.values.title, '缓存标题')
+      assert.deepEqual(received[0].keys, ['title'])
+
+      const legacyReceived = []
+      const legacyCtx = {
+        get: () => ({
+          cachedSnapshot: function cachedSnapshotLegacy(meta, inheritedEventCount, keys) {
+            legacyReceived.push({ inheritedEventCount, keys })
+            return block
+          },
+        }),
+        logger: { warn: () => {} },
+      }
+      assert.equal(cachedSnapshotOf(legacyCtx, projectionHeader, ['title'])?.values.title, '缓存标题')
+      assert.deepEqual(legacyReceived, [{ inheritedEventCount: 0, keys: ['title'] }])
+    })
+
+    it('cachedSnapshotOf 形状异常 / 抛错 应该 返回 undefined 而不是抛穿', () => {
+      const badShape = { get: () => ({ cachedSnapshot: () => ({ values: null }) }), logger: { warn: () => {} } }
+      assert.equal(cachedSnapshotOf(badShape, projectionHeader, undefined), undefined)
+      const throws = {
+        get: () => ({ cachedSnapshot: () => { throw new Error('cache boom') } }),
+        logger: { warn: () => {} },
+      }
+      assert.equal(cachedSnapshotOf(throws, projectionHeader, undefined), undefined)
+    })
+
+    it('coldSnapshotOf 应该 只在 3 参签名下调用，2 参签名拒绝猜参数', () => {
+      const calls = []
+      const ctx = {
+        get: () => ({
+          coldSnapshot: function coldSnapshotThree(meta, inheritedEventCount, events) {
+            calls.push({ meta, inheritedEventCount, events })
+            return { asOfSeq: 9, values: { title: '回填标题' } }
+          },
+        }),
+        logger: { warn: () => {} },
+      }
+      const events = [{ seq: 0 }]
+      const block = coldSnapshotOf(ctx, projectionHeader, 0, events)
+      assert.equal(block?.values.title, '回填标题')
+      assert.deepEqual(calls, [{ meta: projectionHeader, inheritedEventCount: 0, events }])
+
+      let unknownCalls = 0
+      const unknown = {
+        get: () => ({
+          coldSnapshot: function coldSnapshotTwo(meta, events) {
+            unknownCalls += 1
+            void meta
+            void events
+            return { asOfSeq: 1, values: { title: 'x' } }
+          },
+        }),
+        logger: { warn: () => {} },
+      }
+      assert.equal(coldSnapshotOf(unknown, projectionHeader, 0, events), undefined)
+      assert.equal(unknownCalls, 0, '形参不足时必须放弃回填，不能把 events 传成 inheritedEventCount')
+    })
+
+    it('canWriteProjectionCache 应该 只在 coldSnapshot 3 参时返回 true', () => {
+      const three = {
+        get: () => ({ coldSnapshot: function coldSnapshotThree(meta, inheritedEventCount, events) { void meta; void inheritedEventCount; void events; return undefined } }),
+        logger: { warn: () => {} },
+      }
+      assert.equal(canWriteProjectionCache(three), true)
+      const two = {
+        get: () => ({ coldSnapshot: function coldSnapshotTwo(meta, events) { void meta; void events; return undefined } }),
+        logger: { warn: () => {} },
+      }
+      assert.equal(canWriteProjectionCache(two), false)
+      assert.equal(canWriteProjectionCache({ get: () => undefined, logger: { warn: () => {} } }), false)
+    })
+  })
+
+  describe('sweepStaleProjectionCache（回收站会话的行必须保留）', () => {
+    it('只删「不在持久化、也不在回收站」的陈旧行', async () => {
+      const deleted = []
+      const ctx = {
+        storageDomain: {
+          get: () => ({
+            table: () => ({
+              keys: () => ['persisted', 'in-trash', 'stale'],
+              delete: async (id) => { deleted.push(String(id)) },
+            }),
+          }),
+        },
+        logger: { warn: () => {} },
+      }
+      const store = createHeaderFactsStore(async () => ({
+        headers: [{ id: 'persisted', createdAt: 1, isSeeded: false }],
+        sizes: new Map(),
+      }), 30_000, () => 0)
+      await sweepStaleProjectionCache(ctx, store, new Set(['in-trash']))
+      assert.deepEqual(deleted, ['stale'])
+    })
+
+    it('无保留集合时 保持旧口径（持久化清单外的行全部清理）', async () => {
+      const deleted = []
+      const ctx = {
+        storageDomain: {
+          get: () => ({
+            table: () => ({
+              keys: () => ['persisted', 'gone'],
+              delete: async (id) => { deleted.push(String(id)) },
+            }),
+          }),
+        },
+        logger: { warn: () => {} },
+      }
+      const store = createHeaderFactsStore(async () => ({
+        headers: [{ id: 'persisted', createdAt: 1, isSeeded: false }],
+        sizes: new Map(),
+      }), 30_000, () => 0)
+      await sweepStaleProjectionCache(ctx, store)
+      assert.deepEqual(deleted, ['gone'])
+    })
+  })
+})
