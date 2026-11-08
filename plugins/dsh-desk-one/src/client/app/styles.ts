@@ -91,7 +91,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
 }
 .dsh-desk-tabs {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 32px;
   min-width: 0;
   min-height: 25px;
@@ -106,11 +106,12 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
   display: inline-flex;
   flex: none;
   align-items: center;
-  height: 25px;
-  /* Official hit-area trick: 10px inline padding cancelled by -10px margins, so the text-to-text
-     gap is exactly the 32px row gap instead of 52px. */
-  margin: 0 -10px;
-  padding: 0 10px;
+  /* Official tab geometry: 35px box raised 10px into the row margin; 10px top / 9px bottom
+     padding leaves the 16px text line, and the 2px bar sits 1px over the header rule. */
+  box-sizing: border-box;
+  min-height: 35px;
+  margin: -10px -10px 0;
+  padding: 10px 10px 9px;
   border: none;
   background: transparent;
   color: var(--dsw-alias-label-secondary, #6b7280);
@@ -502,13 +503,13 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
 /* Official More launcher: 22×22, 13px ellipsis icon, hover/expanded fill. */
 .dsh-desk-tab-more {
   display: inline-flex;
-  align-self: center;
+  align-self: flex-start;
   align-items: center;
   justify-content: center;
   width: 22px;
   min-width: 22px;
   height: 22px;
-  margin-top: 0;
+  margin-top: -3px;
   padding: 0;
   border-radius: var(--dsw-radius-sm, 8px);
   color: var(--dsw-alias-label-secondary, #6b7280);
