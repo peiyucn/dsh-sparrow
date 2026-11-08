@@ -318,11 +318,12 @@ interface SourcesProps {
   readonly counts: Readonly<Record<string, number>>
   readonly hidden: Set<string>
   readonly onToggle: (calendar: DeskCalendar) => void
+  readonly onColor: (calendar: DeskCalendar) => Promise<void>
   readonly onConnections: () => void
 }
 
 export function CalendarSources(props: SourcesProps): ReactElement {
-  const { t, sources, calendars, counts, hidden, onToggle } = props
+  const { t, sources, calendars, counts, hidden, onToggle, onColor } = props
   return (
     <aside className="dsh-desk-schedule-sources">
       <header className="dsh-desk-schedule-panelhead">
@@ -340,18 +341,25 @@ export function CalendarSources(props: SourcesProps): ReactElement {
             {source.syncState === 'error' ? <span className="dsh-desk-schedule-source-error" title={source.lastError?.message}>{t('schedule.syncFailed')}</span> : null}
           </h4>
           {calendars.filter(calendar => calendar.sourceId === source.id).map(calendar => (
-            <button
-              key={calendar.id}
-              type="button"
-              className="dsh-desk-schedule-calendar"
-              data-hidden={hidden.has(calendar.id)}
-              onClick={() => onToggle(calendar)}
-              title={t('schedule.toggleCalendar')}
-            >
-              <span className="dsh-desk-schedule-colorbar" style={{ background: calendar.color }} />
-              <span className="dsh-desk-schedule-calendar-name">{calendar.displayName}</span>
-              <span className="dsh-desk-schedule-calendar-count">{counts[calendar.id] ?? 0}</span>
-            </button>
+            <div key={calendar.id} className="dsh-desk-schedule-calendar" data-hidden={hidden.has(calendar.id)}>
+              <button
+                type="button"
+                className="dsh-desk-schedule-colorbutton"
+                style={{ background: calendar.color }}
+                title={t('schedule.changeColor')}
+                aria-label={t('schedule.changeColor')}
+                onClick={() => { void onColor(calendar) }}
+              />
+              <button
+                type="button"
+                className="dsh-desk-schedule-calendar-toggle"
+                title={t('schedule.toggleCalendar')}
+                onClick={() => onToggle(calendar)}
+              >
+                <span className="dsh-desk-schedule-calendar-name">{calendar.displayName}</span>
+                <span className="dsh-desk-schedule-calendar-count">{counts[calendar.id] ?? 0}</span>
+              </button>
+            </div>
           ))}
         </section>
       ))}

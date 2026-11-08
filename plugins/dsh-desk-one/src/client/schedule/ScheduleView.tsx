@@ -9,7 +9,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
-  SCHEDULE_HIDDEN_STORAGE_KEY, SCHEDULE_LIST_DAYS, SCHEDULE_SYNC_INTERVAL_MS, SCHEDULE_VIEW_STORAGE_KEY,
+  SCHEDULE_AUTO_SYNC_MS, SCHEDULE_COLORS, SCHEDULE_HIDDEN_STORAGE_KEY, SCHEDULE_LIST_DAYS,
+  SCHEDULE_SYNC_INTERVAL_MS, SCHEDULE_VIEW_STORAGE_KEY,
 } from '../../constants.js'
 import type { DeskCalendar, DeskEvent, ScheduleStateResponse } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
@@ -110,7 +111,7 @@ export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
     const newest = state.sources
       .map(source => (source.lastSyncedAt === undefined ? 0 : Date.parse(source.lastSyncedAt)))
       .reduce((max, value) => Math.max(max, value), 0)
-    if (Date.now() - newest > 5 * 60_000) void runSync()
+    if (Date.now() - newest > SCHEDULE_AUTO_SYNC_MS) void runSync()
   }, [runSync, state])
 
   // Keep a light 15-minute refresh while the panel stays open; cleanup on unmount.
@@ -141,6 +142,23 @@ export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
       return next
     })
   }, [])
+
+  /** Cycle one calendar through the shared palette; persisted on the calendar record. */
+  const cycleColor = useCallback(async (calendar: DeskCalendar): Promise<void> => {
+    const index = (SCHEDULE_COLORS as readonly string[]).indexOf(calendar.color)
+    const next = SCHEDULE_COLORS[(index + 1) % SCHEDULE_COLORS.length] ?? SCHEDULE_COLORS[0]
+    try {
+      const nextState = await api.updateCalendar({
+        id: calendar.id,
+        expectedRevision: calendar.revision,
+        patch: { color: next },
+      })
+      setState(nextState)
+      setError(null)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    }
+  }, [api])
 
   const visibleEvents = useMemo(
     () => events.filter(event => !hidden.has(event.calendarNodeId)),
@@ -225,6 +243,7 @@ export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
           counts={counts}
           hidden={hidden}
           onToggle={toggleHidden}
+          onColor={cycleColor}
           onConnections={() => { setShowConnections(true) }}
         />
       </div>

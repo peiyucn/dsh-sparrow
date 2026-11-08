@@ -127,12 +127,19 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-provider.is-icloud { background: #4a90d9; }
 .dsh-desk-schedule-provider.is-outlook { background: #2f6fd0; }
 .dsh-desk-schedule-calendar {
-  display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: transparent;
-  color: inherit; font: inherit; font-size: 12px; text-align: left; padding: 3px 2px; border-radius: 6px; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; width: 100%; font-size: 12px; padding: 2px 0;
 }
-.dsh-desk-schedule-calendar:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
+.dsh-desk-schedule-colorbutton {
+  width: 12px; height: 12px; min-width: 12px; padding: 0; border: 0; border-radius: 50%;
+  cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.14);
+}
+.dsh-desk-schedule-calendar-toggle {
+  flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; border: 0; background: transparent;
+  color: inherit; font: inherit; font-size: 12px; text-align: left; padding: 2px; border-radius: 6px; cursor: pointer;
+}
+.dsh-desk-schedule-calendar-toggle:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-schedule-calendar[data-hidden='true'] { opacity: .45; }
-.dsh-desk-schedule-calendar[data-hidden='true'] .dsh-desk-schedule-colorbar { background: var(--dsw-alias-label-tertiary, #8a919f) !important; }
+.dsh-desk-schedule-calendar[data-hidden='true'] .dsh-desk-schedule-colorbutton { background: var(--dsw-alias-label-tertiary, #8a919f) !important; }
 .dsh-desk-schedule-calendar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-desk-schedule-calendar-count { margin-left: auto; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); }
 

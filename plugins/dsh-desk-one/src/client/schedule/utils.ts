@@ -24,6 +24,9 @@ export function dayKey(date: Date): string {
 }
 
 export function keyOfEvent(event: DeskEvent): string {
+  // All-day events are stored as UTC date boundaries; grouping them by the local zone would
+  // shift the date in negative offsets, so their date part is authoritative.
+  if (event.allDay) return event.start.slice(0, 10)
   return dayKey(new Date(event.start))
 }
 
