@@ -28,14 +28,12 @@ export const NOTES_CSS = `
   background-clip: content-box;
 }
 .dsh-desk-wall::-webkit-scrollbar-track {
-  margin-top: var(--dsh-desk-header-height, 112px);
   background: transparent;
 }
 /* 空墙中央的轻提示：双层排版（主提示 + 次提示），颜色压到很浅，不抢贴纸。 */
 .dsh-desk-wall-canvas {
   position: relative;
-  min-height: calc(100% - var(--dsh-desk-header-height, 112px));
-  margin-top: var(--dsh-desk-header-height, 112px);
+  min-height: 100%;
   padding-bottom: 16px;
 }
 .dsh-desk-wall-tip {

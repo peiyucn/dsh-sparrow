@@ -37,7 +37,7 @@ export const APP_CSS = `
   padding: 0 clamp(20px, 3vw, 40px);
 }
 .dsh-desk-overview {
-  padding-top: calc(var(--dsh-desk-header-height, 112px) + 18px);
+  padding-top: 18px;
 }
 .dsh-desk-notesview {
   display: flex;
@@ -50,24 +50,21 @@ export const APP_CSS = `
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding-top: calc(var(--dsh-desk-header-height, 112px) + 18px);
+  padding-top: 18px;
 }
 /* Glass chrome copied from the theme-tone recipe used by the conversation and right-sidebar
    headers: the header is an absolute overlay, content scrolls beneath it and is blurred.
    The menu itself stays theme-neutral (no brand fill / white text). */
 .dsh-desk-chrome {
   box-sizing: border-box;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  position: relative;
   z-index: 5;
-  max-width: none;
-  margin: 0;
+  flex: none;
   padding: 28px 0 0;
-  background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 42%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-bg-base, #ffffff) 54%, transparent);
   backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
   -webkit-backdrop-filter: blur(24px) saturate(170%) brightness(1.04);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
 }
 .dsh-desk-chrome-inner {
   box-sizing: border-box;
@@ -87,15 +84,14 @@ html[data-platform='darwin'] .dsh-desk-chrome {
     background: var(--dsw-alias-bg-base, #ffffff);
   }
 }
-/* Title position matches the official plugin page: 28px inset, 20px/500 title. */
+/* Row 1: brand title (official plugin-page position) + this view's actions on the right. */
 .dsh-desk-chrome-top {
   display: flex;
   align-items: center;
-  gap: 28px;
+  justify-content: space-between;
+  gap: 16px;
   min-width: 0;
   min-height: 35px;
-  overflow: hidden;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
 }
 .dsh-desk-title {
   flex: none;
@@ -106,28 +102,33 @@ html[data-platform='darwin'] .dsh-desk-chrome {
   line-height: 28px;
   white-space: nowrap;
 }
-/* Official conversation tabs on the same row as the title to save vertical space. */
+.dsh-desk-header-actions {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+/* Row 2: official conversation tabs: plain text, 32px gap, 2px active underline. */
 .dsh-desk-tabs {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 32px;
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+  margin-top: 4px;
   padding: 0;
   background: transparent;
-  flex-wrap: nowrap;
-}
-.dsh-desk-tabs::-webkit-scrollbar {
-  display: none;
+  flex-wrap: wrap;
 }
 .dsh-desk-tab {
   appearance: none;
   position: relative;
   box-sizing: border-box;
-  height: 35px;
+  min-height: 35px;
   margin: 0;
-  padding: 0;
+  padding: 10px 0 9px;
   border: none;
   background: transparent;
   color: var(--dsw-alias-label-secondary, #6b7280);
@@ -145,7 +146,7 @@ html[data-platform='darwin'] .dsh-desk-chrome {
   content: '';
   position: absolute;
   right: 0;
-  bottom: 0;
+  bottom: -1px;
   left: 0;
   height: 2px;
   border-radius: 2px;
@@ -156,49 +157,6 @@ html[data-platform='darwin'] .dsh-desk-chrome {
 }
 .dsh-desk-tab[data-active='true']::after {
   background: var(--dsw-alias-state-business-primary, #4176e6);
-}
-/* The dock hangs from the header's bottom edge: narrower, bottom-rounded, floating. */
-.dsh-desk-dock {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 0;
-}
-.dsh-desk-dock-card {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 6px;
-  border: 0.5px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-top: none;
-  border-radius: 0 0 var(--dsw-radius-lg, 14px) var(--dsw-radius-lg, 14px);
-  background: var(--dsw-specific-menu, color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 92%, transparent));
-  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
-  box-shadow: var(--dsw-elevation-panel, 0 8px 22px -14px rgba(0, 0, 0, 0.4));
-}
-/* Reserved for time management / to-do widgets: a dashed frame marks the slot until it is built. */
-.dsh-desk-global-slot {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  min-height: 30px;
-  min-width: 0;
-}
-.dsh-desk-time-placeholder {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 30px;
-  padding: 0 14px;
-  border: 1px dashed color-mix(in srgb, var(--dsw-alias-label-tertiary, #8a919f) 55%, transparent);
-  border-radius: var(--dsw-radius-sm, 8px);
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  font-size: 11px;
-  line-height: 16px;
-  white-space: nowrap;
-  user-select: none;
 }
 .dsh-desk-subtitle {
   margin: 4px 0 0;
