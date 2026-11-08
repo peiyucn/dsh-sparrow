@@ -7,7 +7,7 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import type { DeskNote } from '../../contract.js'
 
-export type Tab = 'overview' | 'notes' | 'tasks' | 'sessions'
+export type Tab = 'overview' | 'notes' | 'tasks' | 'schedule' | 'sessions'
 /** Locale translator injected by the panel seat; components take it as a prop. */
 export type DeskTranslator = PropsLocale<typeof LOCALE_NAMESPACE>['t']
 

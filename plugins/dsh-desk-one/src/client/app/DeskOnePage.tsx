@@ -17,6 +17,7 @@ import { NoteCard } from '../notes/components/NoteCard.js'
 import { TrashPanel } from '../notes/components/TrashPanel.js'
 import { TaskBoard } from '../tasks/components/TaskBoard.js'
 import { SessionsView } from '../sessions/SessionsView.js'
+import { ScheduleView } from '../schedule/ScheduleView.js'
 import { SortMenu } from '../tasks/components/SortMenu.js'
 import { useSessionLinks } from '../tasks/hooks/useSessionLinks.js'
 import { useGroupsData } from '../tasks/hooks/useGroupsData.js'
@@ -41,7 +42,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   const {
     listNotes, updateNote, deleteNote, createNote, t,
     listTasks, createTask, updateTask, deleteTask,
-    listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink,
+    listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink, schedule,
   } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
   /** Guards double-click / double-tap while one create request is in flight. */
@@ -365,6 +366,8 @@ export function DeskOnePage(props: DeskPanelProps) {
                   )
                 : renderWall()}
             </div>
+          ) : tab === 'schedule' ? (
+            <ScheduleView t={t} api={schedule} />
           ) : tab === 'sessions' ? (
             <SessionsView snapshot={sessionSnapshot} t={t} onOpen={sessionLink.open} />
           ) : (

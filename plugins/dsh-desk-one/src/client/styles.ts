@@ -6,9 +6,10 @@
 import { STYLE_SELECTOR } from '../constants.js'
 import { APP_CSS } from './app/styles.js'
 import { NOTES_CSS } from './notes/styles.js'
+import { SCHEDULE_CSS } from './schedule/styles.js'
 import { TASKS_CSS } from './tasks/styles.js'
 
-const DESK_CSS = `${APP_CSS}\n${NOTES_CSS}\n${TASKS_CSS}`
+const DESK_CSS = `${APP_CSS}\n${NOTES_CSS}\n${TASKS_CSS}\n${SCHEDULE_CSS}`
 
 /** Inject the stylesheet and return the style element; the caller removes it on unload. HMR reuses it. */
 export function ensureDeskStyles(): HTMLStyleElement {
