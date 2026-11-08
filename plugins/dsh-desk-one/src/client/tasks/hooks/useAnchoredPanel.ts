@@ -17,10 +17,14 @@ interface AnchoredPanelOptions {
   readonly gap?: number
   readonly margin?: number
   readonly maxWidth?: number
+  /** Measure the panel content instead of forcing maxWidth (menus with little content). */
+  readonly fitContent?: boolean
+  /** Which panel edge the anchor aligns to. */
+  readonly align?: 'start' | 'end'
 }
 
 export function useAnchoredPanel({
-  open, anchorRef, panelRef, gap = 6, margin = 8, maxWidth = 280,
+  open, anchorRef, panelRef, gap = 6, margin = 8, maxWidth = 280, fitContent = false, align = 'start',
 }: AnchoredPanelOptions): CSSProperties | null {
   const [style, setStyle] = useState<CSSProperties | null>(null)
 
@@ -37,10 +41,17 @@ export function useAnchoredPanel({
       const rect = anchor.getBoundingClientRect()
       const viewportWidth = window.innerWidth
       const viewportHeight = window.innerHeight
-      const width = Math.min(maxWidth, viewportWidth - margin * 2)
+      const available = Math.max(1, viewportWidth - margin * 2)
+      let width = Math.min(maxWidth, available)
+      if (fitContent) {
+        panel.style.width = 'auto'
+        const measured = panel.getBoundingClientRect().width || panel.offsetWidth || Math.min(160, maxWidth)
+        width = Math.min(Math.max(1, measured), maxWidth, available)
+      }
       panel.style.width = `${width}px`
       const height = panel.offsetHeight || 280
-      const left = Math.min(Math.max(margin, rect.left), Math.max(margin, viewportWidth - margin - width))
+      const preferredLeft = align === 'end' ? rect.right - width : rect.left
+      const left = Math.min(Math.max(margin, preferredLeft), Math.max(margin, viewportWidth - margin - width))
       const below = rect.bottom + gap
       const above = rect.top - gap - height
       const fitsBelow = below + height <= viewportHeight - margin
@@ -81,7 +92,7 @@ export function useAnchoredPanel({
       window.removeEventListener('resize', update)
       document.removeEventListener('scroll', update, true)
     }
-  }, [anchorRef, gap, margin, maxWidth, open, panelRef])
+  }, [align, anchorRef, fitContent, gap, margin, maxWidth, open, panelRef])
 
   return style
 }

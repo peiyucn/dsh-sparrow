@@ -13,3 +13,13 @@ export const DESK_TABS: readonly DeskTabEntry[] = [
   { tab: 'tasks', labelKey: 'tab.tasks' },
   { tab: 'sessions', labelKey: 'tab.sessions' },
 ]
+
+/**
+ * Tabs that live only in the trailing More menu. Move an entry here when the visible
+ * strip should stop growing; the header filters DESK_TABS by this list.
+ */
+export const MORE_TABS: readonly Tab[] = []
+
+export const VISIBLE_TABS: readonly DeskTabEntry[] = DESK_TABS.filter(entry => !MORE_TABS.includes(entry.tab))
+
+export const OVERFLOW_TABS: readonly DeskTabEntry[] = DESK_TABS.filter(entry => MORE_TABS.includes(entry.tab))

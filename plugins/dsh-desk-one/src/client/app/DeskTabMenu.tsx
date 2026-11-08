@@ -8,21 +8,22 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactElement } from 'react'
 import type { DeskTranslator, Tab } from './types.js'
-import { DESK_TABS } from './tabs.js'
+import type { DeskTabEntry } from './tabs.js'
 import { useAnchoredPanel } from '../tasks/hooks/useAnchoredPanel.js'
 
 interface DeskTabMenuProps {
   readonly t: DeskTranslator
   readonly tab: Tab
   readonly onSelectTab: (tab: Tab) => void
+  readonly entries: readonly DeskTabEntry[]
 }
 
-export function DeskTabMenu({ t, tab, onSelectTab }: DeskTabMenuProps): ReactElement {
+export function DeskTabMenu({ t, tab, onSelectTab, entries }: DeskTabMenuProps): ReactElement {
   const [open, setOpen] = useState(false)
   const anchorRef = useRef<HTMLButtonElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
-  const style = useAnchoredPanel({ open, anchorRef, panelRef, gap: 6, margin: 8, maxWidth: 288 })
+  const style = useAnchoredPanel({ open, anchorRef, panelRef, gap: 6, margin: 8, maxWidth: 288, fitContent: true, align: 'end' })
 
   useEffect(() => {
     if (!open) return
@@ -50,12 +51,13 @@ export function DeskTabMenu({ t, tab, onSelectTab }: DeskTabMenuProps): ReactEle
 
   useEffect(() => {
     if (!open) return
-    const index = DESK_TABS.findIndex(entry => entry.tab === tab)
+    const index = entries.findIndex(entry => entry.tab === tab)
     itemRefs.current[Math.max(0, index)]?.focus()
-  }, [open, tab])
+  }, [entries, open, tab])
 
   const focusItem = (index: number): void => {
-    const count = DESK_TABS.length
+    const count = entries.length
+    if (count === 0) return
     itemRefs.current[(index + count) % count]?.focus()
   }
 
@@ -102,11 +104,14 @@ export function DeskTabMenu({ t, tab, onSelectTab }: DeskTabMenuProps): ReactEle
                   focusItem(0)
                 } else if (event.key === 'End') {
                   event.preventDefault()
-                  focusItem(DESK_TABS.length - 1)
+                  focusItem(entries.length - 1)
                 }
               }}
             >
-              {DESK_TABS.map((entry, index) => {
+              {entries.length === 0 ? (
+                <p className="dsh-desk-tabmenu-empty">{t('tabs.moreEmpty')}</p>
+              ) : null}
+              {entries.map((entry, index) => {
                 const selected = entry.tab === tab
                 return (
                   <button

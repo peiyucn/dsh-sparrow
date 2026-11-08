@@ -527,8 +527,9 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  width: 288px;
-  max-width: calc(100vw - 24px);
+  width: max-content;
+  min-width: 160px;
+  max-width: min(288px, calc(100vw - 24px));
   padding: 4px;
   border: 0;
   border-radius: var(--dsw-radius-lg, 14px);
@@ -538,6 +539,14 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header {
   box-shadow: var(--dsw-elevation-panel, 0 10px 30px -12px rgba(20, 25, 40, 0.45));
   outline: 0.5px solid var(--dsw-alias-border-l1, #e2e5ea);
   outline-offset: -0.5px;
+}
+.dsh-desk-tabmenu-empty {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
 }
 .dsh-desk-tabmenu-option {
   appearance: none;

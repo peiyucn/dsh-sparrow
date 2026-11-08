@@ -11,6 +11,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'tab.tasks'
       | 'tab.sessions'
       | 'tabs.more'
+      | 'tabs.moreEmpty'
       | 'sessions.active'
       | 'sessions.archived'
       | 'sessions.activeEmpty'

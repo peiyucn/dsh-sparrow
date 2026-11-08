@@ -9,7 +9,7 @@
 
 import type { ReactElement, ReactNode } from 'react'
 import type { DeskTranslator, Tab } from './types.js'
-import { DESK_TABS } from './tabs.js'
+import { OVERFLOW_TABS, VISIBLE_TABS } from './tabs.js'
 import { DeskTabMenu } from './DeskTabMenu.js'
 
 interface DeskHeaderProps {
@@ -33,7 +33,7 @@ export function DeskHeader({ t, tab, onSelectTab, actions }: DeskHeaderProps): R
         )}
       </div>
       <nav className="dsh-desk-tabs" role="tablist">
-        {DESK_TABS.map(entry => (
+        {VISIBLE_TABS.map(entry => (
           <button
             key={entry.tab}
             type="button"
@@ -44,7 +44,7 @@ export function DeskHeader({ t, tab, onSelectTab, actions }: DeskHeaderProps): R
             {t(entry.labelKey)}
           </button>
         ))}
-        <DeskTabMenu t={t} tab={tab} onSelectTab={onSelectTab} />
+        <DeskTabMenu t={t} tab={tab} onSelectTab={onSelectTab} entries={OVERFLOW_TABS} />
       </nav>
     </header>
   )
