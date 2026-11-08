@@ -927,127 +927,70 @@ export const TASKS_CSS = `
   width: 14px;
   height: 14px;
 }
-/* Session preview: a roomy anchored card (not a modal) shown before entering a session. */
+/* Session preview: an inline expansion strip that inherits the card's own colors. */
 .dsh-task-session-preview {
-  box-sizing: border-box;
-  width: min(232px, calc(100vw - 24px));
-  padding: 10px;
-  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: var(--dsw-radius-sm, 8px);
-  /* The official menu surface is intentionally translucent for blurred menus; this compact
-     popover has no blur, so layer it over an opaque surface to keep the text readable. */
-  background-color: var(--dsw-alias-bg-layer-1, #ffffff);
-  background-image: linear-gradient(var(--dsw-menu-surface-fill, transparent), var(--dsw-menu-surface-fill, transparent));
-  box-shadow: var(--dsw-elevation-panel, 0 10px 30px -12px rgba(20, 25, 40, 0.4));
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 12px;
-}
-.dsh-task-session-preview-head {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.dsh-task-session-preview-titleblock {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.dsh-task-session-preview-title {
-  overflow: hidden;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 17px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dsh-task-session-preview-sub {
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  font-size: 11px;
-  line-height: 15px;
-}
-.dsh-task-session-preview-close {
-  appearance: none;
-  display: inline-flex;
-  flex: none;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
+  gap: 2px 8px;
+  width: 100%;
+  margin-top: 2px;
+  padding: 4px 2px 2px;
+  border-top: 1px dashed color-mix(in srgb, currentColor 16%, transparent);
   background: transparent;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  cursor: pointer;
+  color: inherit;
+  font-size: 10px;
+  line-height: 15px;
+  animation: dsh-task-session-expand 0.12s ease-out;
 }
-.dsh-task-session-preview-close:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--dsw-alias-label-primary, #1f2329);
-}
-.dsh-task-session-preview-close svg {
-  display: block;
-  width: 12px;
-  height: 12px;
-}
-.dsh-task-session-preview-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  margin: 8px 0;
-}
-.dsh-task-session-preview-grid div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.dsh-task-session-preview-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
   min-width: 0;
 }
-.dsh-task-session-preview-grid dt {
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  font-size: 11px;
-  line-height: 15px;
+.dsh-task-session-preview-label {
+  opacity: 0.55;
 }
-.dsh-task-session-preview-grid dd {
-  margin: 0;
-  overflow: hidden;
-  font-size: 12px;
+.dsh-task-session-preview-stat b {
   font-weight: 600;
-  line-height: 17px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dsh-task-session-preview-foot {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
 }
 .dsh-task-session-preview-enter {
   appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
   padding: 0;
   border: 0;
-  border-radius: var(--dsw-radius-sm, 8px);
+  border-radius: 4px;
   background: transparent;
-  color: var(--dsw-alias-label-secondary, #6b7280);
+  color: inherit;
+  opacity: 0.62;
   cursor: pointer;
 }
 .dsh-task-session-preview-enter:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--dsw-alias-label-primary, #1f2329);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  opacity: 1;
 }
 .dsh-task-session-preview-enter svg {
   display: block;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 .dsh-task-session-preview-enter:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.3;
+}
+@keyframes dsh-task-session-expand {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dsh-task-session-preview { animation: none; }
 }
 
 `
