@@ -72,7 +72,7 @@ export function DeskTabMenu({ t, tab, onSelectTab, entries }: DeskTabMenuProps):
       <button
         ref={anchorRef}
         type="button"
-        className="dsh-desk-tab dsh-desk-tab-more"
+        className="dsh-desk-tab-more"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t('tabs.more')}

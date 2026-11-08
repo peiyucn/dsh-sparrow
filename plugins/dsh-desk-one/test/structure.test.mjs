@@ -278,6 +278,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(styles, /\.dsh-desk-tabmenu \{[^}]*max-width: min\(288px/su, '菜单宽度上限仍是官方 288px')
     assert.match(styles, /\.dsh-desk-tabmenu-option/u, '溢出菜单选项')
     assert.match(page, /role="menuitemradio"/u, '将来有溢出页面时的选项语义')
+    assert.match(page, /className="dsh-desk-tab-more"/u, 'More 不再复用 tab 基类，避免继承 35px 盒')
     assert.match(page, /dsh-desk-tab-more-icon/u, '… 用官方 ellipsis 图标，不是文字')
     assert.match(styles, /\.dsh-desk-tabmenu \{[^}]*dsw-menu-surface-fill/su, '弹出列表用官方模糊菜单 surface')
     assert.match(page, /data-stable-width="true"/u, '清空确认按钮固定宽度，返回按钮不闪')
