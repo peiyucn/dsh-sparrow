@@ -1,13 +1,23 @@
 /** Browser-side schedule data plane: host REST routes only (read-only mirror + connection CRUD). */
 
-import { REQUEST_TIMEOUT_MS, ROUTES, SCHEDULE_REQUEST_TIMEOUT_MS } from '../../constants.js'
+import {
+  REQUEST_TIMEOUT_MS, ROUTES, SCHEDULE_SYNC_TIMEOUT_MS, SCHEDULE_TEST_TIMEOUT_MS,
+} from '../../constants.js'
 import type {
   ApiErrorPayload, ScheduleCalendarUpdateRequest, ScheduleConnectionInput,
   ScheduleConnectionTestResponse, ScheduleEventListResponse, ScheduleStateResponse, ScheduleSyncResponse,
 } from '../../contract.js'
 
 async function fetchJson<T>(path: string, init?: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
-  const response = await fetch(path, { ...init, signal: init?.signal ?? AbortSignal.timeout(timeoutMs) })
+  let response: Response
+  try {
+    response = await fetch(path, { ...init, signal: init?.signal ?? AbortSignal.timeout(timeoutMs) })
+  } catch (error) {
+    if (error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+      throw new Error('请求超时：同步可能仍在后台继续，稍后点「同步」或重新打开日程查看')
+    }
+    throw error
+  }
   const text = await response.text()
   let payload: T & Partial<ApiErrorPayload>
   try {
@@ -52,15 +62,15 @@ export function updateCalendar(input: ScheduleCalendarUpdateRequest): Promise<Sc
 }
 
 export function sync(): Promise<ScheduleSyncResponse> {
-  return postJson<ScheduleSyncResponse>(ROUTES.scheduleSync, {}, SCHEDULE_REQUEST_TIMEOUT_MS)
+  return postJson<ScheduleSyncResponse>(ROUTES.scheduleSync, {}, SCHEDULE_SYNC_TIMEOUT_MS)
 }
 
 export function testConnection(input: ScheduleConnectionInput): Promise<ScheduleConnectionTestResponse> {
-  return postJson<ScheduleConnectionTestResponse>(ROUTES.scheduleConnectionTest, input, SCHEDULE_REQUEST_TIMEOUT_MS)
+  return postJson<ScheduleConnectionTestResponse>(ROUTES.scheduleConnectionTest, input, SCHEDULE_TEST_TIMEOUT_MS)
 }
 
 export function saveConnection(input: ScheduleConnectionInput): Promise<ScheduleStateResponse> {
-  return postJson<ScheduleStateResponse>(ROUTES.scheduleConnectionSave, input, SCHEDULE_REQUEST_TIMEOUT_MS)
+  return postJson<ScheduleStateResponse>(ROUTES.scheduleConnectionSave, input, SCHEDULE_SYNC_TIMEOUT_MS)
 }
 
 export function removeConnection(provider: string): Promise<ScheduleStateResponse> {

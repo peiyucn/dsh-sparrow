@@ -101,6 +101,10 @@ export const SCHEDULE_AUTO_SYNC_MS = 5 * 60_000
 export const SCHEDULE_SYNC_INTERVAL_MS = 15 * 60_000
 /** 外部请求超时：CalDAV/ICS 拉取比普通 REST 慢，单独放宽。 */
 export const SCHEDULE_REQUEST_TIMEOUT_MS = 45_000
+/** 客户端调用日程同步 / 保存连接的超时：首次同步要逐条拉 .ics，可能远超普通请求。 */
+export const SCHEDULE_SYNC_TIMEOUT_MS = 180_000
+/** 客户端「测试连接」的超时（发现 + 列日历，不含事件拉取）。 */
+export const SCHEDULE_TEST_TIMEOUT_MS = 90_000
 /** 单次拉取的事件上限（防御超大会话日历把存储写爆）。 */
 export const SCHEDULE_MAX_EVENTS = 5_000
 /** 日历源栏「近期日程」窗口。 */

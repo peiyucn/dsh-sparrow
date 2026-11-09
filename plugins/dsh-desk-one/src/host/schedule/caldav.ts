@@ -41,6 +41,8 @@ const WELL_KNOWN_PATH = '/.well-known/caldav'
 /** Documented WeCom fallback home (spec 05 §5 marks the discovery chain as unverified). */
 const WECOM_HOME_FALLBACK_PATH = '/calendar/'
 const MAX_REDIRECTS = 5
+/** WeCom serves one .ics per GET; a small worker pool keeps a large calendar's sync bounded. */
+const EVENT_FETCH_CONCURRENCY = 6
 const REDIRECT_STATUSES = new Set([301, 302, 307, 308])
 
 const PRINCIPAL_PROPFIND_BODY = `<?xml version="1.0" encoding="utf-8"?>
@@ -161,6 +163,7 @@ export async function queryCalDavEvents(
   const resources = parseWebDavBody(response, 'CalDAV 查询事件')
 
   const events: CalDavEventResource[] = []
+  const pending: Array<{ url: URL; etag: string }> = []
   for (const item of resources) {
     if (item.href === '') continue
     const url = resolveHref(item.href, response.url)
@@ -175,12 +178,37 @@ export async function queryCalDavEvents(
       continue
     }
     if (etag === undefined) continue
-    // Some servers omit calendar-data and only serve per-object GET (WeCom) — fetch those by href.
-    const fetched = await fetchCalendarObject(url, auth, deps)
-    if (fetched === null) continue
-    events.push({ href: url.href, etag, ics: fetched })
+    pending.push({ url, etag })
   }
+  // WeCom serves one .ics per GET (no multiget); bound the fan-out so a large calendar still
+  // finishes well inside the client's sync budget.
+  const fetched = await mapWithConcurrency(pending, EVENT_FETCH_CONCURRENCY, async item => {
+    const ics = await fetchCalendarObject(item.url, auth, deps)
+    return ics === null ? null : { href: item.url.href, etag: item.etag, ics }
+  })
+  for (const item of fetched) if (item !== null) events.push(item)
   return events
+}
+
+/** Map with a fixed concurrency, preserving input order in the result. */
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  task: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const index = next
+      next += 1
+      const item = items[index]
+      if (item === undefined) return
+      results[index] = await task(item)
+    }
+  })
+  await Promise.all(workers)
+  return results
 }
 
 async function discoverPrincipal(origin: URL, auth: CalDavAuth, deps: CalDavDeps): Promise<string | null> {
