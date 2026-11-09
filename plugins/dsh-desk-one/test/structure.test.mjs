@@ -734,6 +734,6 @@ describe('dsh-desk-one 结构', () => {
 
   it('spec 应该 包含已交付的设计文档', async () => {
     const specs = await readdir(new URL('../docs/spec', import.meta.url))
-    assert.deepEqual(specs.sort(), ['00-overview.md', '01-object-model.md', '02-modules.md', '03-task-board.md', '04-sessions.md', '05-schedule.md'])
+    assert.deepEqual(specs.sort(), ['00-overview.md', '01-object-model.md', '02-modules.md', '03-task-board.md', '04-sessions.md', '05-schedule.md', '06-session-index.md'])
   })
 })

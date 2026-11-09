@@ -49,7 +49,7 @@
 * 便签、任务与日程镜像存在由官方存储服务管理的 DSH 存储域（`desk_one`）里，数据不出本机；日程只是外部日历的只读镜像，不会回写。
 * 日程连接的密码 / 发布链接只保存在官方凭据库（`ctx.credentials`），记录里只留引用名；不会写进日志、HTML 或导出文件。
 * 面板只调用插件自己的 host 路由 `/api/desk-one`（会话归档在 `/api/desk-one/sessions/*`，日程在 `/api/desk-one/schedule/*`），客户端不直接接触存储。
-* Agent 工具（`desk_note_*`、`desk_task_*`、`desk_group_*`）读写同一批便签、任务与分组，模型和界面永远看到同一份数据。会话关联只在本地数据里存不透明的会话 id，标题与运行状态从宿主界面实时读取，不外发。
+* Agent 工具（`desk_note_*`、`desk_task_*`、`desk_group_*`、`desk_schedule_*`、`desk_session_search` / `desk_session_get`）读写同一套对象；会话索引只存外键元数据、不复制对话内容，模型和界面永远看到同一份数据。会话关联只在本地数据里存不透明的会话 id，标题与运行状态从宿主界面实时读取，不外发。
 
 ## 已知限制
 

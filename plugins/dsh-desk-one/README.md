@@ -49,7 +49,7 @@ English | [简体中文](README.zh-CN.md)
 * Notes, tasks and the schedule mirror live in a DSH storage domain (`desk_one`) managed by the official storage service; the schedule is a read-only mirror and is never written back.
 * Schedule credentials (sync password / published link) live only in the official credential store (`ctx.credentials`); records keep only a reference name, and nothing is written to logs, HTML or exports.
 * The panel talks to the plugin's own host routes under `/api/desk-one` (sessions under `/api/desk-one/sessions/*`, schedule under `/api/desk-one/schedule/*`); the client never touches storage directly.
-* Agent tools (`desk_note_*`, `desk_task_*`, `desk_group_*`) read and write the same notes, tasks and groups, so the model and the UI always see one dataset. Session links store only opaque session ids next to your local data; their titles and running state are read from the host UI and never sent anywhere.
+* Agent tools (`desk_note_*`, `desk_task_*`, `desk_group_*`, `desk_schedule_*`, `desk_session_search` / `desk_session_get`) read and write the same objects; the session index stores only FK metadata (never transcripts), so the model and the UI always see one dataset. Session links store only opaque session ids next to your local data; their titles and running state are read from the host UI and never sent anywhere.
 
 ## Known limitations
 
