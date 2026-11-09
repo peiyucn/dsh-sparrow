@@ -549,6 +549,7 @@ function OutlookGraphCard(props: {
 }): ReactElement {
   const { t, api, source, calendars } = props
   const [flow, setFlow] = useState<{ flowId: string; kind: 'redirect' | 'device'; userCode: string; verificationUri: string } | null>(null)
+  const popupRef = useRef<Window | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -560,6 +561,8 @@ function OutlookGraphCard(props: {
         const result = await api.pollOutlookLogin(flow.flowId)
         if (stopped) return
         if (result.status === 'connected') {
+          popupRef.current?.close()
+          popupRef.current = null
           setFlow(null)
           await props.onChanged()
         }
@@ -574,6 +577,7 @@ function OutlookGraphCard(props: {
   const login = async (device = false): Promise<void> => {
     setBusy(true); setError(null)
     const popup = device ? null : window.open('', 'desk-one-outlook', 'width=520,height=680')
+    popupRef.current = popup
     try {
       // Microsoft ignores the port for localhost redirect URIs, so the DSH port can vary.
       const port = window.location.port === '' ? '' : `:${window.location.port}`

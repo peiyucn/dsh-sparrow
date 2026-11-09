@@ -100,7 +100,7 @@ async function outlookCallback(route: DeskRouteContext, req: IncomingMessage, re
     : { ok: false, message: params.get('error_description') ?? params.get('error') ?? 'Microsoft 拒绝了登录' }
   const title = result.ok ? 'Outlook 已连接' : 'Outlook 连接失败'
   res.writeHead(result.ok ? 200 : 400, { 'content-type': 'text/html; charset=utf-8' })
-  res.end(`<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font-family:system-ui;padding:32px"><h2>${title}</h2><p>${result.message}</p><script>if(window.opener){window.opener.postMessage({type:'desk-one-outlook',ok:${result.ok}},'*')}</script></body>`)
+  res.end(`<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font-family:system-ui;padding:32px"><h2>${title}</h2><p>${result.message}</p><script>const ok=${result.ok};if(ok){if(window.opener){window.opener.postMessage({type:'desk-one-outlook',ok:true},'*')}setTimeout(function(){if(window.opener){window.close()}else{window.location.href='/'}},600)}</script></body>`)
 }
 
 async function pollOutlookLogin(route: DeskRouteContext, req: IncomingMessage): Promise<OutlookLoginPollResponse> {
