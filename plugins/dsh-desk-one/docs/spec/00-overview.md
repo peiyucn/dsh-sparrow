@@ -11,7 +11,8 @@ DSH Web 里「与 harness 共用一张桌子」的工作套件 **Desk One（同�
 
 * **企业微信（公司租户）**：CalDAV，服务器 `caldav.wecom.work`，账号为邮箱，密码在手机端「日程 → 日程设置 → 同步至其他日历」获取（每次重新获取会让旧密码失效）。
 * **iCloud（个人）**：CalDAV，服务器 `caldav.icloud.com`，账号为 Apple ID，密码用 Apple 官方「App 专用密码」（需先开启双重认证；改 Apple 主密码会让全部专用密码失效）。
-* **Outlook（个人账号）**：网页版「发布日历」得到 ICS 链接，按订阅方式拉取（只读，刷新由接收方决定，通常是小时级）；Microsoft Graph 设备码线路（实时、可增量、将来可写回）后置——注册 Azure 应用要求有效订阅，不放进 v1。
+* **Outlook（个人账号）**：走 Microsoft Graph OAuth（实时、可增量、将来可写回）；需要 owner 注册 Azure 应用提供 Client ID，权限先 `Calendars.Read`。**不使用公开 ICS 发布链接**（公开可读且不可编辑）。
+* **订阅（ICS，任意服务商）**：provider 无关的只读通道，可添加多条公开 ICS 链接，每条链接即一本日历；URL 存官方凭据库，仅适合外部订阅，不适合个人主日历。
 
 > **命名**：标签中文名为「时间」、英文名为 **Time**（替代原「日程 / Schedule」；路由与数据表仍沿用 `schedule` 前缀）。这里以后不只有日历，还会有专注时间、倒计时等小控件；底层远端日历对象仍按 provider 记录。
 
