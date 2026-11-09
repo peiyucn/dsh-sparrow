@@ -199,6 +199,36 @@ function ArchiveTreeNodeRow(props: {
     </li>
   )
 }
+/** Trash subagents keep their parent-child display; actions stay on the parent entry. */
+function TrashSubagentRows(props: {
+  readonly t: DeskTranslator
+  readonly parentId: string
+  readonly subagents: readonly { readonly sessionId: string; readonly title: string; readonly parentSessionId?: string }[]
+  readonly depth: number
+}): ReactElement | null {
+  const children = props.subagents.filter(child => (child.parentSessionId ?? props.parentId) === props.parentId)
+  if (children.length === 0) return null
+  return (
+    <ul className="dsh-desk-archive-list">
+      {children.map(child => (
+        <li key={child.sessionId}>
+          <SessionTreeRow
+            variant="archive"
+            title={child.title}
+            depth={props.depth}
+            subagent
+            tag={props.t('sessions.subagent')}
+            disabled
+            expandLabel={props.t('sessions.archive.expand')}
+            collapseLabel={props.t('sessions.archive.collapse')}
+          />
+          <TrashSubagentRows t={props.t} parentId={child.sessionId} subagents={props.subagents} depth={props.depth + 1} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): ReactElement {
   const [snapshot, setSnapshot] = useState<ArchiveSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
@@ -473,6 +503,9 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                       </>
                     )}
                   />
+                  {entry.legacy ? null : (
+                    <TrashSubagentRows t={t} parentId={entry.sessionId} subagents={entry.subagents} depth={1} />
+                  )}
                 </li>
               ))}
             </ul>
