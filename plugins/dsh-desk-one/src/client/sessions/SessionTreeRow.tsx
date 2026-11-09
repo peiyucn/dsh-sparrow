@@ -6,7 +6,7 @@
  * be collapsible, otherwise trash parents look permanently expanded/collapsed by accident.
  */
 
-import type { CSSProperties, ReactElement, ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 
 export interface SessionTreeRowProps {
   readonly variant: 'active' | 'archive'
@@ -33,20 +33,6 @@ export interface SessionTreeRowProps {
 export function SessionTreeRow(props: SessionTreeRowProps): ReactElement {
   const { title, depth, subagent, disabled, onOpen } = props
   const nested = depth > 0
-  const style = nested
-    ? { paddingLeft: `calc(10px + ${depth} * 16px)` } as CSSProperties
-    : undefined
-  const guides = nested
-    ? Array.from({ length: depth }, (_, index) => (
-        <span
-          key={index}
-          className="dsh-desk-tree-guide"
-          data-last={index === depth - 1 ? 'true' : undefined}
-          style={{ left: `${10 + index * 16}px` }}
-          aria-hidden="true"
-        />
-      ))
-    : null
   const caret = props.hasChildren === true ? (
     <span
       className="dsh-desk-tree-caret"
@@ -70,9 +56,7 @@ export function SessionTreeRow(props: SessionTreeRowProps): ReactElement {
       data-depth={depth}
       data-variant={props.variant}
       data-live={props.live === true ? 'true' : undefined}
-      style={style}
     >
-      {guides}
       {caret}
       <button
         type="button"

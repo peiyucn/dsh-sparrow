@@ -153,7 +153,7 @@ function ArchiveTreeNodeRow(props: {
         </div>
       ) : null}
       {hasChildren && open ? (
-        <ul className="dsh-desk-archive-list">
+        <ul className="dsh-desk-archive-list dsh-desk-tree-children">
           {node.children.map(child => (
             <ArchiveTreeNodeRow
               key={child.sessionId}
@@ -190,7 +190,7 @@ function TrashSubagentRows(props: {
   const children = props.subagents.filter(child => (child.parentSessionId ?? props.parentId) === props.parentId)
   if (children.length === 0) return null
   return (
-    <ul className="dsh-desk-archive-list">
+    <ul className="dsh-desk-archive-list dsh-desk-tree-children">
       {children.map(child => (
         <li key={child.sessionId}>
           <SessionTreeRow

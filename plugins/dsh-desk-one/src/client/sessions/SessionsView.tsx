@@ -103,20 +103,51 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
       return next
     })
   }
-  /** Hide descendants of a collapsed parent; active rows are expanded by default. */
-  const visibleRows = (rows: readonly { session: SessionChipInfo; depth: number; childCount: number }[]): typeof rows => {
-    const out: typeof rows[number][] = []
-    let skipBelow = -1
+  type ActiveNode = { session: SessionChipInfo; depth: number; childCount: number; children: ActiveNode[] }
+  /** Parent-first flat rows -> nested tree, so children can live in a real nested list with one rail. */
+  const treeOf = (rows: readonly { session: SessionChipInfo; depth: number; childCount: number }[]): ActiveNode[] => {
+    const roots: ActiveNode[] = []
+    const stack: ActiveNode[] = []
     for (const row of rows) {
-      if (hidden.has(row.session.id)) continue
-      if (skipBelow >= 0) {
-        if (row.depth > skipBelow) continue
-        skipBelow = -1
-      }
-      out.push(row)
-      if (collapsed.has(row.session.id)) skipBelow = row.depth
+      const node: ActiveNode = { ...row, children: [] }
+      while (stack.length > 0 && (stack[stack.length - 1]?.depth ?? 0) >= row.depth) stack.pop()
+      const parent = stack[stack.length - 1]
+      if (parent === undefined) roots.push(node)
+      else parent.children.push(node)
+      stack.push(node)
     }
-    return out
+    return roots
+  }
+  const renderNode = (node: ActiveNode): ReactElement | null => {
+    if (hidden.has(node.session.id)) return null
+    const isCollapsed = collapsed.has(node.session.id)
+    const children = isCollapsed ? [] : node.children
+    return (
+      <li key={node.session.id}>
+        <SessionRow
+          session={node.session}
+          depth={0}
+          t={t}
+          onOpen={onOpen}
+          childCount={node.children.length}
+          collapsed={isCollapsed}
+          onToggle={() => toggleCollapsed(node.session.id)}
+          actions={node.depth === 0 ? (
+            <SessionRowAction
+              kind="archive"
+              label={t('sessions.archive.archive')}
+              disabled={busy}
+              onClick={() => { void act(node.session.id, () => archive.archive(node.session.id)) }}
+            />
+          ) : undefined}
+        />
+        {children.length === 0 ? null : (
+          <ul className="dsh-desk-tree-children">
+            {children.map(renderNode)}
+          </ul>
+        )}
+      </li>
+    )
   }
   return (
     <div className="dsh-desk-sessionsview">
@@ -138,26 +169,7 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
                     <span className="dsh-desk-session-group-count">{group.sessions.length}</span>
                   </div>
                   <ul className="dsh-desk-session-list">
-                    {visibleRows(group.rows).map(row => (
-                      <SessionRow
-                        key={row.session.id}
-                        session={row.session}
-                        depth={row.depth}
-                        t={t}
-                        onOpen={onOpen}
-                        childCount={row.childCount}
-                        collapsed={collapsed.has(row.session.id)}
-                        onToggle={() => toggleCollapsed(row.session.id)}
-                        actions={row.depth === 0 ? (
-                          <SessionRowAction
-                            kind="archive"
-                            label={t('sessions.archive.archive')}
-                            disabled={busy}
-                            onClick={() => { void act(row.session.id, () => archive.archive(row.session.id)) }}
-                          />
-                        ) : undefined}
-                      />
-                    ))}
+                    {treeOf(group.rows).map(renderNode)}
                   </ul>
                 </div>
               ))}
