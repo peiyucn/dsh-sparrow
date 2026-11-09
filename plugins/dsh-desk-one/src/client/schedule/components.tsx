@@ -45,19 +45,15 @@ interface ToolbarProps {
   readonly t: DeskTranslator
   readonly view: ScheduleViewName
   readonly cursor: Date
-  readonly syncing: boolean
-  readonly loading: boolean
   readonly lastSyncedAt?: string
   readonly error: string | null
   readonly onView: (view: ScheduleViewName) => void
   readonly onStep: (direction: -1 | 1) => void
   readonly onToday: () => void
-  readonly onRefresh: () => void
-  readonly onSources: () => void
 }
 
 export function ScheduleToolbar(props: ToolbarProps): ReactElement {
-  const { t, view, cursor, syncing, error } = props
+  const { t, view, cursor, error } = props
   const weekStart = addDays(startOfLocalDay(cursor), -((cursor.getDay() + 6) % 7))
   const weekEnd = addDays(weekStart, 6)
   const rangeLabel = view === 'month'
@@ -94,10 +90,6 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
                 time: `${formatDateLabel(new Date(props.lastSyncedAt), t)} ${formatTime(props.lastSyncedAt)}`,
               })}
         </span>
-        <button type="button" className="dsh-desk-schedule-chip" disabled={syncing || props.loading} onClick={props.onRefresh}>
-          {syncing ? t('schedule.syncing') : t('schedule.refresh')}
-        </button>
-        <button type="button" className="dsh-desk-schedule-chip" onClick={props.onSources}>{t('schedule.sources')}</button>
       </div>
       {error === null ? null : <p className="dsh-desk-schedule-error">{error}</p>}
     </div>

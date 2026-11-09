@@ -44,7 +44,16 @@ function readHidden(): Set<string> {
   return new Set()
 }
 
-export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly api: ScheduleApi }): ReactElement {
+export interface ScheduleHeaderActions {
+  sync: () => void
+  openSources: () => void
+}
+
+export function ScheduleView({ t, api, headerActionsRef }: {
+  readonly t: DeskTranslator
+  readonly api: ScheduleApi
+  readonly headerActionsRef?: { current: ScheduleHeaderActions | null }
+}): ReactElement {
   const today = useMemo(() => startOfLocalDay(new Date()), [])
   const [page, setPage] = useState<SchedulePage>('calendar')
   const [view, setView] = useState<ScheduleViewName>(readView)
@@ -55,7 +64,6 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
   const [hidden, setHidden] = useState<Set<string>>(readHidden)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [syncing, setSyncing] = useState(false)
   const [selected, setSelected] = useState<{ event: DeskEvent; point?: ClickPoint } | null>(null)
   const [listStart, setListStart] = useState<Date>(today)
   const [listDays, setListDays] = useState(SCHEDULE_LIST_DAYS)
@@ -100,7 +108,6 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
   const runSync = useCallback(async (): Promise<void> => {
     if (syncingRef.current) return
     syncingRef.current = true
-    setSyncing(true)
     setError(null)
     try {
       await api.sync()
@@ -109,9 +116,18 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
       syncingRef.current = false
-      setSyncing(false)
     }
   }, [api, load])
+
+  // Publish the page actions to the shared header, matching the notes/tasks header chrome.
+  useEffect(() => {
+    if (headerActionsRef === undefined) return
+    headerActionsRef.current = {
+      sync: () => { void runSync() },
+      openSources: () => { setSelected(null); setPage('sources') },
+    }
+    return () => { headerActionsRef.current = null }
+  }, [headerActionsRef, runSync])
 
   // One auto-sync per mount (stale mirror only), never a state-driven loop.
   useEffect(() => {
@@ -247,15 +263,11 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
         t={t}
         view={view}
         cursor={cursor}
-        syncing={syncing}
-        loading={loading}
         {...(lastSyncedAt === undefined ? {} : { lastSyncedAt })}
         error={toolbarError}
         onView={chooseView}
         onStep={step}
         onToday={() => { setCursor(today) }}
-        onRefresh={() => { void runSync() }}
-        onSources={() => { setSelected(null); setPage('sources') }}
       />
       {state === null ? (
         <p className="dsh-desk-schedule-hint">{loading ? t('state.loading') : t('schedule.sourcesEmpty')}</p>

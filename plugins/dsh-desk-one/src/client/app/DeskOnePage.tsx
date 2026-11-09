@@ -17,7 +17,7 @@ import { NoteCard } from '../notes/components/NoteCard.js'
 import { TrashPanel } from '../notes/components/TrashPanel.js'
 import { TaskBoard } from '../tasks/components/TaskBoard.js'
 import { SessionsView } from '../sessions/SessionsView.js'
-import { ScheduleView } from '../schedule/ScheduleView.js'
+import { ScheduleView, type ScheduleHeaderActions } from '../schedule/ScheduleView.js'
 import { SortMenu } from '../tasks/components/SortMenu.js'
 import { useSessionLinks } from '../tasks/hooks/useSessionLinks.js'
 import { useGroupsData } from '../tasks/hooks/useGroupsData.js'
@@ -48,6 +48,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   /** Guards double-click / double-tap while one create request is in flight. */
   const [creating, setCreating] = useState(false)
   const zTopRef = useRef(0)
+  const scheduleActionsRef = useRef<ScheduleHeaderActions | null>(null)
 
   const selectTab = useCallback((next: Tab): void => {
     setTab(next)
@@ -335,7 +336,22 @@ export function DeskOnePage(props: DeskPanelProps) {
     )
   }
 
-  const actions = tab === 'notes' ? notesActions() : taskActions()
+  /** Schedule actions live in the same header slot as notes/tasks. */
+  const scheduleActions = (): ReactElement | null => {
+    if (tab !== 'schedule') return null
+    return (
+      <>
+        <button key="schedule-sync" type="button" className="dsh-desk-action" onClick={() => scheduleActionsRef.current?.sync()}>
+          <span className="dsh-desk-action-label">{t('schedule.refresh')}</span>
+        </button>
+        <button key="schedule-sources" type="button" className="dsh-desk-action" onClick={() => scheduleActionsRef.current?.openSources()}>
+          <span className="dsh-desk-action-label">{t('schedule.sources')}</span>
+        </button>
+      </>
+    )
+  }
+
+  const actions = tab === 'notes' ? notesActions() : tab === 'tasks' ? taskActions() : scheduleActions()
 
   return (
     <div className="dsh-desk-page">
@@ -367,7 +383,7 @@ export function DeskOnePage(props: DeskPanelProps) {
                 : renderWall()}
             </div>
           ) : tab === 'schedule' ? (
-            <ScheduleView t={t} api={schedule} />
+            <ScheduleView t={t} api={schedule} headerActionsRef={scheduleActionsRef} />
           ) : tab === 'sessions' ? (
             <SessionsView snapshot={sessionSnapshot} t={t} onOpen={sessionLink.open} archive={sessionsArchive} />
           ) : (

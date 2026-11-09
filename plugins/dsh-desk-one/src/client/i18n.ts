@@ -11,7 +11,7 @@ export const LOCALE_DICTS = {
     'tab.notes': '便签墙',
     'tab.tasks': '任务板',
     'tab.schedule': '时间',
-    'schedule.view.list': '日',
+    'schedule.view.list': '天',
     'schedule.view.month': '月历',
     'schedule.view.week': '周历',
     'schedule.prev': '上一段',
