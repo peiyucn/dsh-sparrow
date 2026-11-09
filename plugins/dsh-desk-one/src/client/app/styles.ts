@@ -509,6 +509,17 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   padding: 0;
   list-style: none;
 }
+.dsh-desk-session-row-wrap {
+  display: block;
+}
+.dsh-desk-session-caret {
+  flex: none;
+  width: 12px;
+  font-size: 10px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  cursor: pointer;
+}
 .dsh-desk-session-row {
   appearance: none;
   box-sizing: border-box;

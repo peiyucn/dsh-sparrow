@@ -10,6 +10,7 @@ import type { SessionChipInfo, SessionLinkSnapshot } from './contract.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
 import { activeSessionGroups } from './catalog.js'
 import { ArchiveSections } from './ArchiveSections.js'
+import { SessionTreeRow } from './SessionTreeRow.js'
 
 interface SessionsViewProps {
   readonly snapshot: SessionLinkSnapshot
@@ -36,30 +37,24 @@ function SessionRow({
   const archived = session.availability === 'archived'
   const unavailable = session.availability === 'unavailable' || session.availability === 'loading'
   const openable = !archived && !unavailable
-  const status = stateText(t, session)
   return (
     <li>
-      <button
-        type="button"
-        className="dsh-desk-session-row"
-        data-state={archived ? 'archived' : session.running ? 'running' : 'idle'}
-        data-subagent={session.subagent}
+      <SessionTreeRow
+        variant="active"
+        title={session.title}
+        depth={depth ?? 0}
+        subagent={session.subagent}
+        tag={t('sessions.subagent')}
+        live={archived}
         disabled={!openable}
-        style={depth === undefined || depth === 0 ? undefined : { paddingLeft: `calc(12px + ${depth} * 16px)` }}
-        aria-label={`${session.title} · ${status}`}
-        title={openable ? t('sessions.open') : status}
-        onClick={() => { if (openable) onOpen(session.id) }}
-      >
-        <span className="dsh-desk-session-row-main">
-          <span className="dsh-desk-session-row-title">{session.title}</span>
-          {session.subagent ? <span className="dsh-desk-session-tag">{t('sessions.subagent')}</span> : null}
-        </span>
-        <span className="dsh-desk-session-row-meta">{status}</span>
-      </button>
+        status={stateText(t, session)}
+        onOpen={() => onOpen(session.id)}
+        expandLabel={t('sessions.archive.expand')}
+        collapseLabel={t('sessions.archive.collapse')}
+      />
     </li>
   )
 }
-
 export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps): ReactElement {
   const groups = activeSessionGroups(snapshot.sessions, snapshot.workspaces)
   const activeCount = groups.reduce((sum, group) => sum + group.sessions.length, 0)

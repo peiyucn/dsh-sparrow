@@ -1,6 +1,7 @@
 /** dsh-archive-manage 纯逻辑：配置、确认强度、回收站目录、sidecar 解析。 */
 
 import { join } from 'node:path'
+import { nestTree } from '../../tree.js'
 import { SIDECAR_VERSION, TRASH_SIDECAR } from './constants.js'
 import type { LegacyTrashItem as ContractLegacyTrashItem, TrashItem as ContractTrashItem } from './contract.js'
 
@@ -261,25 +262,17 @@ export interface SessionTreeNode {
  * - 孤儿按顶层会话对待（无父可随，面板手动操作；）。
  */
 export function buildSessionTree(headers: readonly SessionTreeHeader[]): SessionTreeNode[] {
-  const byId = new Map(headers.map(header => [header.id, header]))
-  const childrenOf = new Map<string, SessionTreeHeader[]>()
-  const claimed = new Set<string>()
-  for (const header of headers) {
-    if (header.origin !== 'subagent' || header.parentSession === undefined) continue
-    if (!byId.has(header.parentSession)) continue
-    claimed.add(header.id)
-    const list = childrenOf.get(header.parentSession) ?? []
-    list.push(header)
-    childrenOf.set(header.parentSession, list)
-  }
-  const build = (header: SessionTreeHeader): SessionTreeNode => {
-    const childHeaders = (childrenOf.get(header.id) ?? []).sort((a, b) => a.createdAt - b.createdAt)
-    return { header, children: childHeaders.map(build) }
-  }
-  return headers
-    .filter(header => !claimed.has(header.id))
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .map(build)
+  const nodes = nestTree(headers, {
+    idOf: header => header.id,
+    parentIdOf: header => (header.origin === 'subagent' ? header.parentSession : undefined),
+    sortRoots: (left, right) => right.createdAt - left.createdAt,
+    sortChildren: (left, right) => left.createdAt - right.createdAt,
+  })
+  const convert = (node: (typeof nodes)[number]): SessionTreeNode => ({
+    header: node.value,
+    children: node.children.map(convert),
+  })
+  return nodes.map(convert)
 }
 
 export interface ArchiveAlignment {

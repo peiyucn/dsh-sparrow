@@ -1,5 +1,6 @@
 /** Pure grouping/tree helpers for the Sessions view (no React, unit-tested separately). */
 
+import { nestTree } from '../../tree.js'
 import type { SessionChipInfo, SessionWorkspaceGroupInfo } from './contract.js'
 
 export interface SessionWorkspaceGroup {
@@ -46,27 +47,16 @@ export function activeSessionGroups(
     for (const sessionId of workspace.sessionIds) workspaceBySession.set(sessionId, workspace)
   }
   const active = sessions.filter(session => session.availability !== 'archived')
-  const byId = new Map(active.map(session => [session.id, session]))
-  const children = new Map<string, SessionChipInfo[]>()
-  const roots: SessionChipInfo[] = []
-  for (const session of active) {
-    const parent = session.parentId === undefined ? undefined : byId.get(session.parentId)
-    if (parent === undefined) roots.push(session)
-    else {
-      const siblings = children.get(parent.id) ?? []
-      siblings.push(session)
-      children.set(parent.id, siblings)
-    }
-  }
+  const nodes = nestTree(active, {
+    idOf: session => session.id,
+    parentIdOf: session => session.parentId,
+    sortRoots: byActivity,
+    sortChildren: byActivity,
+  })
   type Group = { label: string; sessions: SessionChipInfo[]; rows: ActiveSessionRow[] }
   const groups = new Map<string, Group>()
-  const addRows = (group: Group, session: SessionChipInfo, depth: number): void => {
-    group.sessions.push(session)
-    group.rows.push({ session, depth })
-    const nested = (children.get(session.id) ?? []).sort(byActivity)
-    for (const child of nested) addRows(group, child, depth + 1)
-  }
-  for (const root of roots.sort(byActivity)) {
+  for (const node of nodes) {
+    const root = node.value
     const workspace = workspaceBySession.get(root.id)
     const key = workspace === undefined ? (root.cwd === undefined ? '' : `cwd:${root.cwd}`) : `ws:${workspace.id}`
     const label = workspace?.title ?? workspaceLabel(root.cwd)
@@ -75,7 +65,12 @@ export function activeSessionGroups(
       group = { label, sessions: [], rows: [] }
       groups.set(key, group)
     }
-    addRows(group, root, 0)
+    const addRows = (item: typeof node, depth: number): void => {
+      group.sessions.push(item.value)
+      group.rows.push({ session: item.value, depth })
+      for (const child of item.children) addRows(child, depth + 1)
+    }
+    addRows(node, 0)
   }
   return [...groups.entries()]
     .map(([key, group]) => ({ key, label: group.label, sessions: [...group.sessions].sort(byActivity), rows: group.rows }))

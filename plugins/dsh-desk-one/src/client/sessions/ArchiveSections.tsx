@@ -14,6 +14,7 @@ import type {
 } from '../../host/sessions/contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
+import { SessionTreeRow } from './SessionTreeRow.js'
 
 export interface ArchiveSnapshot {
   readonly tree: readonly ArchiveTreeNode[]
@@ -66,7 +67,7 @@ function LoadMore(props: { readonly more: boolean; readonly label: string; reado
   return <button type="button" className="dsh-desk-archive-loadmore" onClick={props.onClick}>{props.label}</button>
 }
 
-/** One archived subtree: parent row + collapsible children (children follow the parent's fate). */
+/** One archived subtree: shared tree row + archive-only actions/confirmation; children recurse. */
 function ArchiveTreeNodeRow(props: {
   readonly node: ArchiveTreeNode
   readonly depth: number
@@ -94,72 +95,63 @@ function ArchiveTreeNodeRow(props: {
   // stray sessions, never for anything reached through the archived tree.
   const canDelete = deleteArmed && deleteDraft !== null
     && deleteDraft.text.trim() === node.title.trim() && node.title.trim() !== ''
+  const badges = (
+    <>
+      {hasChildren ? <span className="dsh-desk-archive-badge">{node.children.length}</span> : null}
+      {node.orphan ? <span className="dsh-desk-archive-badge">{t('sessions.archive.orphan')}</span> : null}
+      {!node.backendSupported ? <span className="dsh-desk-archive-badge">{t('sessions.archive.unsupported')}</span> : null}
+    </>
+  )
+  const meta = (
+    <>
+      {node.turns === undefined ? '' : `${node.turns} ${t('sessions.archive.turns')}`}
+      {node.sizeBytes === undefined ? '' : ` · ${Math.max(1, Math.round(node.sizeBytes / 1024))} KB`}
+      {` · ${formatDate(node.updatedAt)}`}
+    </>
+  )
+  const actions = readOnly ? undefined : (
+    <>
+      <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => props.onUnarchive(node.sessionId)}>{t('sessions.archive.unarchive')}</button>
+      <ConfirmButton
+        t={t}
+        label={t('sessions.archive.toTrash')}
+        confirmLabel={t('sessions.archive.toTrashConfirm')}
+        armed={armedTrash.has(node.sessionId)}
+        disabled={busy || !node.backendSupported}
+        onArm={() => props.onArmTrash(node.sessionId)}
+        onConfirm={() => props.onConfirmTrash(node.sessionId)}
+      />
+      <ConfirmButton
+        t={t}
+        label={t('sessions.archive.delete')}
+        confirmLabel={deleteArmed ? t('sessions.archive.deleteConfirm') : t('sessions.archive.delete')}
+        armed={deleteArmed}
+        danger
+        disabled={busy || !node.backendSupported}
+        onArm={() => props.onArmDelete(node.sessionId)}
+        onConfirm={() => props.onConfirmDelete(node)}
+      />
+    </>
+  )
   return (
     <li>
-      <div
-        className="dsh-desk-archive-row"
-        data-live={node.live ? 'true' : undefined}
-        style={depth === 0 ? undefined : { paddingLeft: `calc(12px + ${depth} * 16px)` }}
-      >
-        <button
-          type="button"
-          className="dsh-desk-archive-row-toggle"
-          aria-label={node.title}
-          title={node.live ? t('sessions.archive.liveHint') : node.title}
-          disabled={node.live || readOnly}
-          onClick={() => { if (!node.live && !readOnly) props.onOpen(node.sessionId) }}
-        >
-          {hasChildren ? (
-            <span
-              className="dsh-desk-archive-caret"
-              role="button"
-              tabIndex={0}
-              aria-label={open ? t('sessions.archive.collapse') : t('sessions.archive.expand')}
-              onClick={(event) => { event.stopPropagation(); props.onToggleExpand(node.sessionId) }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  props.onToggleExpand(node.sessionId)
-                }
-              }}
-            >{open ? '▾' : '▸'}</span>
-          ) : <span className="dsh-desk-archive-caret" />}
-          <span className="dsh-desk-archive-title">{node.title}</span>
-          {hasChildren ? <span className="dsh-desk-archive-badge">{node.children.length}</span> : null}
-          {node.orphan ? <span className="dsh-desk-archive-badge">{t('sessions.archive.orphan')}</span> : null}
-          {!node.backendSupported ? <span className="dsh-desk-archive-badge">{t('sessions.archive.unsupported')}</span> : null}
-          <span className="dsh-desk-archive-meta">
-            {node.turns === undefined ? '' : `${node.turns} ${t('sessions.archive.turns')}`}
-            {node.sizeBytes === undefined ? '' : ` · ${Math.max(1, Math.round(node.sizeBytes / 1024))} KB`}
-            {` · ${formatDate(node.updatedAt)}`}
-          </span>
-        </button>
-        {readOnly ? null : (
-          <div className="dsh-desk-archive-actions">
-            <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => props.onUnarchive(node.sessionId)}>{t('sessions.archive.unarchive')}</button>
-            <ConfirmButton
-              t={t}
-              label={t('sessions.archive.toTrash')}
-              confirmLabel={t('sessions.archive.toTrashConfirm')}
-              armed={armedTrash.has(node.sessionId)}
-              disabled={busy || !node.backendSupported}
-              onArm={() => props.onArmTrash(node.sessionId)}
-              onConfirm={() => props.onConfirmTrash(node.sessionId)}
-            />
-            <ConfirmButton
-              t={t}
-              label={t('sessions.archive.delete')}
-              confirmLabel={deleteArmed ? t('sessions.archive.deleteConfirm') : t('sessions.archive.delete')}
-              armed={deleteArmed}
-              danger
-              disabled={busy || !node.backendSupported}
-              onArm={() => props.onArmDelete(node.sessionId)}
-              onConfirm={() => props.onConfirmDelete(node)}
-            />
-          </div>
-        )}
-      </div>
+      <SessionTreeRow
+        variant="archive"
+        title={node.title}
+        depth={depth}
+        live={node.live}
+        disabled={readOnly}
+        onOpen={() => props.onOpen(node.sessionId)}
+        hasChildren={hasChildren}
+        expanded={open}
+        onToggleExpand={() => props.onToggleExpand(node.sessionId)}
+        expandLabel={t('sessions.archive.expand')}
+        collapseLabel={t('sessions.archive.collapse')}
+        liveHint={t('sessions.archive.liveHint')}
+        badges={badges}
+        meta={meta}
+        {...(actions === undefined ? {} : { actions })}
+      />
       {deleteArmed ? (
         <div className="dsh-desk-archive-deletebox" style={{ marginLeft: `calc(12px + ${depth} * 16px)` }}>
           <input
@@ -205,7 +197,6 @@ function ArchiveTreeNodeRow(props: {
     </li>
   )
 }
-
 export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): ReactElement {
   const [snapshot, setSnapshot] = useState<ArchiveSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
