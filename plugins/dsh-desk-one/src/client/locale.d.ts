@@ -99,6 +99,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'schedule.form.notConnected'
       | 'schedule.form.note.wecom'
       | 'schedule.form.note.icloud'
+      | 'schedule.form.applePasswordLink'
       | 'schedule.form.note.outlook'
       | 'sessions.active'
       | 'sessions.archived'

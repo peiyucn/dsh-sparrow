@@ -804,6 +804,14 @@ function ProviderCard(props: {
             )}
           </div>
           <p className="dsh-desk-schedule-form-note">{t(`schedule.form.note.${provider}` as never)}</p>
+          {provider === 'icloud' ? (
+            <a
+              className="dsh-desk-schedule-link"
+              href="https://account.apple.com/account/manage"
+              target="_blank"
+              rel="noreferrer"
+            >{t('schedule.form.applePasswordLink')}</a>
+          ) : null}
           {message === null ? null : <p className="dsh-desk-schedule-form-ok">{message}</p>}
           {error === null ? null : <p className="dsh-desk-schedule-error">{error}</p>}
           <div className="dsh-desk-schedule-form-actions">
