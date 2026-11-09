@@ -28,6 +28,15 @@ function stateText(t: DeskTranslator, session: SessionChipInfo): string {
   return session.running ? t('task.session.running') : t('task.session.idle')
 }
 
+function sessionMeta(t: DeskTranslator, session: SessionChipInfo): string {
+  const parts: string[] = []
+  if (session.turns !== undefined) parts.push(`${session.turns} ${t('sessions.archive.turns')}`)
+  const tokens = (session.inputTokens ?? 0) + (session.outputTokens ?? 0) + (session.cacheReadTokens ?? 0) + (session.cacheWriteTokens ?? 0)
+  if (tokens > 0) parts.push(`${tokens} tok`)
+  parts.push(formatDate(new Date(session.updatedAt).toISOString()))
+  return parts.join(' · ')
+}
+
 function SessionRow({
   session, depth, t, onOpen, childCount, collapsed, onToggle,
 }: {
@@ -53,7 +62,7 @@ function SessionRow({
         live={archived}
         disabled={!openable}
         status={stateText(t, session)}
-        meta={formatDate(new Date(session.updatedAt).toISOString())}
+        meta={sessionMeta(t, session)}
         hasChildren={childCount > 0}
         expanded={!collapsed}
         onToggleExpand={onToggle}

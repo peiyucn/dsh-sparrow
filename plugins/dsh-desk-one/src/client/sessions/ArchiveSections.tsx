@@ -105,6 +105,7 @@ function ArchiveTreeNodeRow(props: {
   const meta = (
     <>
       {node.turns === undefined ? '' : `${node.turns} ${t('sessions.archive.turns')}`}
+      {node.tokens === undefined ? '' : ` · ${node.tokens} tok`}
       {node.sizeBytes === undefined ? '' : ` · ${Math.max(1, Math.round(node.sizeBytes / 1024))} KB`}
       {` · ${formatDate(node.updatedAt)}`}
     </>
@@ -337,7 +338,12 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                         {item.orphan ? <span className="dsh-desk-archive-badge">{t('sessions.archive.orphan')}</span> : null}
                       </>
                     )}
-                    meta={`${formatDate(item.createdAt)}${item.backendSupported ? '' : ` · ${t('sessions.archive.unsupported')}`}`}
+                    meta={[
+                      formatDate(item.createdAt),
+                      item.turns === undefined ? '' : `${item.turns} ${t('sessions.archive.turns')}`,
+                      item.tokens === undefined ? '' : `${item.tokens} tok`,
+                      item.backendSupported ? '' : t('sessions.archive.unsupported'),
+                    ].filter(Boolean).join(' · ')}
                     expandLabel={t('sessions.archive.expand')}
                     collapseLabel={t('sessions.archive.collapse')}
                     actions={(
