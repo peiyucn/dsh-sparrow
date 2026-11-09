@@ -168,13 +168,15 @@ export const SESSIONS_CSS = `
 }
 .dsh-desk-tree-row:nth-child(1) { border-top: 0; }
 .dsh-desk-tree-row[data-nested='true'] {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.035));
+  background: transparent;
 }
+/* Nested group uses the same soft status tint as task-board session chips, not a hard rail. */
 .dsh-desk-tree-children {
   list-style: none;
-  margin: 0 0 0 18px;
-  padding: 0 0 0 8px;
-  border-left: 1px solid var(--dsw-alias-border-l2, #d8dde5);
+  margin: 3px 0 3px 18px;
+  padding: 2px 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--dsw-alias-label-secondary, #6b7280) 4%, transparent);
 }
 .dsh-desk-tree-row-toggle {
   flex: 1;
@@ -247,9 +249,14 @@ export const SESSIONS_CSS = `
 .dsh-desk-row-action[data-armed='true'] { border-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); }
 .dsh-desk-row-action[data-danger='true'] { color: #c2410c; border-color: color-mix(in srgb, #c2410c 45%, transparent); }
 .dsh-desk-session-section {
-  border: 1px solid var(--dsw-alias-border-l2, #d8dde5);
-  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-label-secondary, #6b7280) 12%, transparent);
+  border-radius: 12px;
   padding: 8px 10px;
+  background: color-mix(in srgb, var(--dsw-alias-label-secondary, #6b7280) 2%, transparent);
 }
-.dsh-desk-session-section[data-active='true'] { border-color: #2e9e5b; }
+/* Same status language as the task-board session chip: faint success border + tint. */
+.dsh-desk-session-section[data-active='true'] {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 24%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 6%, var(--dsw-alias-bg-layer-1, #ffffff));
+}
 `
