@@ -247,7 +247,16 @@ export function ScheduleView({ t, api, headerActionsRef }: {
   const step = (direction: -1 | 1): void => {
     if (view === 'month') setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + direction, 1))
     else if (view === 'week') setCursor(addDays(cursor, direction * 7))
-    else setCursor(addDays(cursor, direction * SCHEDULE_LIST_DAYS))
+    else {
+      const next = addDays(listStart, direction)
+      setListStart(next)
+      setCursor(next)
+    }
+  }
+
+  const chooseViewFromTab = (next: ScheduleViewName): void => {
+    if (next === 'list' && view !== 'list') setListStart(today)
+    chooseView(next)
   }
 
   const toolbarError = staleSources[0]?.lastError?.message
@@ -262,12 +271,12 @@ export function ScheduleView({ t, api, headerActionsRef }: {
       <ScheduleToolbar
         t={t}
         view={view}
-        cursor={cursor}
+        cursor={view === 'list' ? listStart : cursor}
         {...(lastSyncedAt === undefined ? {} : { lastSyncedAt })}
         error={toolbarError}
-        onView={chooseView}
+        onView={chooseViewFromTab}
         onStep={step}
-        onToday={() => { setCursor(today) }}
+        onToday={() => { setCursor(today); setListStart(today) }}
       />
       {state === null ? (
         <p className="dsh-desk-schedule-hint">{loading ? t('state.loading') : t('schedule.sourcesEmpty')}</p>

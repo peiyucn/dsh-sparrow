@@ -45,6 +45,11 @@ export function formatDateLabel(date: Date, t: DeskTranslator): string {
   return t('schedule.dateFormat', { month: date.getMonth() + 1, day: date.getDate() })
 }
 
+/** Full date for the calendar view's range label ("具体哪天"). */
+export function formatFullDateLabel(date: Date, t: DeskTranslator): string {
+  return t('schedule.dateFormatFull', { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() })
+}
+
 export function formatMonthLabel(date: Date, t: DeskTranslator): string {
   const names = t('schedule.monthNames').split(',')
   const month = names[date.getMonth()] ?? String(date.getMonth() + 1)

@@ -11,7 +11,7 @@ import type { DeskCalendar, DeskEvent, DeskScheduleSource, ScheduleConnectionInp
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
 import {
-  addDays, calendarColorOf, calendarNameOf, conflictIds, dayKey, formatDateLabel, formatDayTitle, formatMonthLabel,
+  addDays, calendarColorOf, calendarNameOf, conflictIds, dayKey, formatDateLabel, formatDayTitle, formatFullDateLabel, formatMonthLabel,
   formatTime, groupByDay, keyOfEvent, monthRange, startOfLocalDay, weekdayLabel, weekdayLabels, weekBlocks,
   type ScheduleViewName,
 } from './utils.js'
@@ -60,7 +60,7 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
     ? formatMonthLabel(cursor, t)
     : view === 'week'
       ? `${formatDateLabel(weekStart, t)} – ${formatDateLabel(weekEnd, t)}`
-      : t('schedule.view.list')
+      : formatFullDateLabel(cursor, t)
   return (
     <div className="dsh-desk-schedule-toolbar">
       <div className="dsh-desk-schedule-nav">
