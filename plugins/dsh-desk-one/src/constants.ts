@@ -145,7 +145,7 @@ export const SESSION_INDEX_TTL_MS = 5 * 60_000
 export const SESSION_INDEX_MISSING_DAYS = 30
 
 /** 每区每次渲染的行数上限，「加载更多」按此递增。 */
-export const SESSION_STREAM_PAGE_SIZE = 100
+export const SESSION_STREAM_PAGE_SIZE = 30
 /** 上次停留的标签页（纯界面偏好，不含用户内容）；切走再回来停在原标签。 */
 export const TAB_STORAGE_KEY = 'dsh-desk-one:tab'
 /** 任务板排序视图偏好（manual / created / due），纯界面状态。 */
