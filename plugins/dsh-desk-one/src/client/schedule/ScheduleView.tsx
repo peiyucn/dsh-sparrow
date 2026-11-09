@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
   SCHEDULE_COLORS, SCHEDULE_HIDDEN_STORAGE_KEY, SCHEDULE_LIST_DAYS, SCHEDULE_SYNC_INTERVAL_MS,
-  SCHEDULE_VIEW_STORAGE_KEY,
+  SCHEDULE_UPCOMING_DAYS, SCHEDULE_VIEW_STORAGE_KEY,
 } from '../../constants.js'
 import type { DeskCalendar, DeskEvent, DeskScheduleSource, ScheduleStateResponse } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
@@ -51,6 +51,7 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
   const [cursor, setCursor] = useState<Date>(today)
   const [state, setState] = useState<ScheduleStateResponse | null>(null)
   const [events, setEvents] = useState<readonly DeskEvent[]>([])
+  const [upcomingEvents, setUpcomingEvents] = useState<readonly DeskEvent[]>([])
   const [hidden, setHidden] = useState<Set<string>>(readHidden)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -67,15 +68,19 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
     if (view === 'week') return weekRange(cursor)
     return listRange(listStart, listDays)
   }, [cursor, listDays, listStart, today, view])
+  // The upcoming card is pinned to "today .. +N days", independent of the calendar view range.
+  const upcoming = useMemo(() => listRange(today, SCHEDULE_UPCOMING_DAYS), [today])
 
   const load = useCallback(async (): Promise<void> => {
-    const [nextState, payload] = await Promise.all([
+    const [nextState, payload, upcomingPayload] = await Promise.all([
       api.loadState(),
       api.loadEvents(range.from.toISOString(), range.to.toISOString()),
+      api.loadEvents(upcoming.from.toISOString(), upcoming.to.toISOString()),
     ])
     setState(nextState)
     setEvents(payload.events)
-  }, [api, range.from, range.to])
+    setUpcomingEvents(upcomingPayload.events)
+  }, [api, range.from, range.to, upcoming.from, upcoming.to])
 
   useEffect(() => {
     let cancelled = false
@@ -175,6 +180,15 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
     }
   }, [api])
 
+  const setCalendarColor = useCallback(async (calendar: DeskCalendar, color: string): Promise<void> => {
+    try {
+      setState(await api.updateCalendar({ id: calendar.id, expectedRevision: calendar.revision, patch: { color } }))
+      setError(null)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    }
+  }, [api])
+
   const openEvent = (event: DeskEvent, point?: ClickPoint): void => {
     setSelected(point === undefined ? { event } : { event, point })
   }
@@ -189,6 +203,10 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
   const visibleEvents = useMemo(
     () => events.filter(event => !hidden.has(event.calendarNodeId)),
     [events, hidden],
+  )
+  const visibleUpcoming = useMemo(
+    () => upcomingEvents.filter(event => !hidden.has(event.calendarNodeId)),
+    [upcomingEvents, hidden],
   )
   const calendars = state?.calendars ?? []
   const sources = state?.sources ?? []
@@ -263,7 +281,7 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
             <UpcomingPanel
               t={t}
               today={today}
-              events={visibleEvents}
+              events={visibleUpcoming}
               calendars={calendars}
               onOpen={openEvent}
               onViewAll={() => { setListStart(today); chooseView('list'); setCursor(today) }}
@@ -275,7 +293,7 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
               counts={counts}
               hidden={hidden}
               onToggle={toggleHidden}
-              onColor={cycleColor}
+              onColorChange={setCalendarColor}
               onSetSourceVisible={setSourceVisible}
               onManage={() => { setSelected(null); setPage('sources') }}
             />

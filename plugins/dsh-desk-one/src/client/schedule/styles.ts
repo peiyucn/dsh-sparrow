@@ -88,36 +88,60 @@ export const SCHEDULE_CSS = `
   font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-secondary, #6b7280);
   margin-bottom: 4px;
 }
-.dsh-desk-schedule-picker-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
-.dsh-desk-schedule-picker-source { display: flex; flex-direction: column; gap: 1px; }
-.dsh-desk-schedule-picker-source-row { display: flex; align-items: center; gap: 4px; min-width: 0; padding: 1px 2px; }
+.dsh-desk-schedule-picker-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 2px; }
+.dsh-desk-schedule-picker-source { display: flex; flex-direction: column; gap: 4px; }
+.dsh-desk-schedule-picker-source-row { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .dsh-desk-schedule-picker-chevron {
   border: 0; background: transparent; color: var(--dsw-alias-label-tertiary, #8a919f);
-  font: inherit; font-size: 10px; width: 14px; height: 16px; padding: 0; cursor: pointer; flex: none;
+  font: inherit; font-size: 9px; width: 12px; height: 16px; padding: 0; cursor: pointer; flex: none;
 }
 .dsh-desk-schedule-picker-source-name {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
   border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; font-weight: 600; padding: 0; cursor: pointer;
 }
-.dsh-desk-schedule-picker-children { margin-left: 16px; border-left: 1px solid var(--dsw-alias-border-l3, #e2e5ea); padding-left: 4px; display: flex; flex-direction: column; gap: 1px; }
-.dsh-desk-schedule-picker-row {
-  display: flex; align-items: center; gap: 5px; min-width: 0; width: 100%;
-  border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px;
-  padding: 1px 2px; border-radius: 5px; cursor: pointer; text-align: left;
+.dsh-desk-schedule-picker-source-count {
+  flex: none; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); border-radius: 999px; padding: 1px 6px;
 }
-.dsh-desk-schedule-picker-row:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
-.dsh-desk-schedule-picker-row[data-hidden='true'] { opacity: .45; }
-.dsh-desk-schedule-picker-check {
-  flex: none; width: 13px; height: 13px; line-height: 13px; text-align: center; border-radius: 3px;
-  font-size: 10px; color: transparent; border: 1px solid var(--dsw-alias-border-l2, #cfd4dc);
-  padding: 0; background: transparent; cursor: pointer;
+.dsh-desk-schedule-picker-master {
+  flex: none; border: 0; background: transparent; color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+  font: inherit; font-size: 10px; padding: 0 2px; cursor: pointer; border-radius: 4px;
 }
-.dsh-desk-schedule-picker-check[data-visible='true'] {
-  color: #fff; background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
-  border-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+.dsh-desk-schedule-picker-master[data-on='false'] { color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-schedule-picker-children { margin-left: 17px; display: flex; flex-direction: column; gap: 3px; }
+.dsh-desk-schedule-picker-cal {
+  position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0;
+  padding: 3px 7px 3px 6px; border-radius: 999px; cursor: default;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 3%, transparent);
+  transition: background .12s ease;
 }
-.dsh-desk-schedule-picker-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dsh-desk-schedule-picker-count { margin-left: auto; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-schedule-picker-cal[data-on='false'] { background: transparent; opacity: .5; }
+.dsh-desk-schedule-picker-cal[data-on='true'] { background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 8%, transparent); }
+.dsh-desk-schedule-picker-swatch {
+  width: 14px; height: 14px; min-width: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.9);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.14); padding: 0; cursor: pointer;
+}
+.dsh-desk-schedule-picker-name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
+  border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; padding: 0; cursor: pointer;
+}
+.dsh-desk-schedule-picker-cal[data-on='false'] .dsh-desk-schedule-picker-name { text-decoration: line-through; text-decoration-thickness: 1px; }
+.dsh-desk-schedule-picker-count { flex: none; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-schedule-picker-dot {
+  flex: none; width: 11px; height: 11px; padding: 0; border-radius: 50%; border: 1.5px solid var(--dsw-alias-border-l2, #cfd4dc);
+  background: transparent; cursor: pointer;
+}
+.dsh-desk-schedule-picker-dot[data-on='true'] { background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); border-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); }
+.dsh-desk-schedule-palette {
+  flex-basis: 100%; margin: 2px 0 2px 20px;
+  display: flex; gap: 6px; padding: 6px 8px; border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1, #fff); border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
+  box-shadow: 0 6px 20px rgba(0,0,0,.16);
+}
+.dsh-desk-schedule-palette-swatch {
+  width: 14px; height: 14px; border-radius: 50%; border: 2px solid transparent; padding: 0; cursor: pointer;
+}
+.dsh-desk-schedule-palette-swatch[data-active='true'] { border-color: var(--dsw-alias-label-primary, #1f2329); }
 .dsh-desk-schedule-upcoming {
   flex: none; box-sizing: border-box; padding: 8px 12px 9px;
   background: var(--dsw-alias-bg-layer-1, #fff);

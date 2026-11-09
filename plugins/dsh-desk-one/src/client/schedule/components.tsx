@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement, WheelEvent as ReactWheelEvent } from 'react'
-import { SCHEDULE_UPCOMING_DAYS, type ScheduleProvider } from '../../constants.js'
+import { SCHEDULE_COLORS, SCHEDULE_UPCOMING_DAYS, type ScheduleProvider } from '../../constants.js'
 import type { DeskCalendar, DeskEvent, DeskScheduleSource, ScheduleConnectionInput } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
@@ -146,8 +146,8 @@ export function UpcomingPanel(props: {
 
 /* ------------------------- calendar quick picker ----------------------------- */
 
-/** Top-right card: source tree (collapsible) with a source-level master toggle; the full manager
- *  is still a page. Laid out like a small task list: source row first, calendars indent below. */
+/** Top-right card: modern per-source tree — tinted calendar rows, one-click visibility, inline
+ *  colour palette; the full connection manager is still a page. */
 export function CalendarPicker(props: {
   readonly t: DeskTranslator
   readonly sources: readonly DeskScheduleSource[]
@@ -155,12 +155,13 @@ export function CalendarPicker(props: {
   readonly counts: Readonly<Record<string, number>>
   readonly hidden: Set<string>
   readonly onToggle: (calendar: DeskCalendar) => void
-  readonly onColor: (calendar: DeskCalendar) => Promise<void>
+  readonly onColorChange: (calendar: DeskCalendar, color: string) => Promise<void>
   readonly onSetSourceVisible: (source: DeskScheduleSource, visible: boolean) => void
   readonly onManage: () => void
 }): ReactElement {
-  const { t, sources, calendars, counts, hidden, onToggle, onColor } = props
+  const { t, sources, calendars, counts, hidden, onToggle, onColorChange } = props
   const [open, setOpen] = useState<Set<string>>(new Set())
+  const [palette, setPalette] = useState<string | null>(null)
   const toggleOpen = (id: string): void => {
     setOpen(previous => {
       const next = new Set(previous)
@@ -194,39 +195,60 @@ export function CalendarPicker(props: {
                 <button type="button" className="dsh-desk-schedule-picker-source-name" onClick={() => toggleOpen(source.id)}>
                   {t(providerKey(source.provider) as never)}
                 </button>
-                <span className="dsh-desk-schedule-picker-count">{visible}/{own.length}</span>
+                <span className="dsh-desk-schedule-picker-source-count">{visible}/{own.length}</span>
                 <button
                   type="button"
-                  className="dsh-desk-schedule-picker-check"
-                  data-visible={visible > 0}
-                  aria-label={stateLabel(t, visible)}
+                  className="dsh-desk-schedule-picker-master"
+                  data-on={visible > 0}
                   onClick={() => props.onSetSourceVisible(source, visible === 0)}
-                >✓</button>
+                >{visible === 0 ? t('schedule.showSource') : t('schedule.hideSource')}</button>
               </div>
               {expanded ? (
                 <div className="dsh-desk-schedule-picker-children">
-                  {own.map(calendar => (
-                    <button
-                      key={calendar.id}
-                      type="button"
-                      className="dsh-desk-schedule-picker-row"
-                      data-hidden={hidden.has(calendar.id)}
-                      title={calendar.displayName}
-                      onClick={() => onToggle(calendar)}
-                    >
-                      <span className="dsh-desk-schedule-picker-check" data-visible={!hidden.has(calendar.id)}>✓</span>
-                      <span
-                        className="dsh-desk-schedule-colorbutton"
-                        style={{ background: calendar.color }}
-                        onClick={event => {
-                          event.stopPropagation()
-                          void onColor(calendar)
-                        }}
-                      />
-                      <span className="dsh-desk-schedule-picker-name">{calendar.displayName}</span>
-                      <span className="dsh-desk-schedule-picker-count">{counts[calendar.id] ?? 0}</span>
-                    </button>
-                  ))}
+                  {own.map(calendar => {
+                    const on = !hidden.has(calendar.id)
+                    return (
+                      <div key={calendar.id} className="dsh-desk-schedule-picker-cal" data-on={on}>
+                        <button
+                          type="button"
+                          className="dsh-desk-schedule-picker-swatch"
+                          style={{ background: calendar.color }}
+                          title={t('schedule.changeColor')}
+                          aria-label={t('schedule.changeColor')}
+                          onClick={() => setPalette(previous => previous === calendar.id ? null : calendar.id)}
+                        />
+                        <button type="button" className="dsh-desk-schedule-picker-name" onClick={() => onToggle(calendar)}>
+                          {calendar.displayName}
+                        </button>
+                        <span className="dsh-desk-schedule-picker-count">{counts[calendar.id] ?? 0}</span>
+                        <button
+                          type="button"
+                          className="dsh-desk-schedule-picker-dot"
+                          data-on={on}
+                          aria-label={on ? t('schedule.hideCalendar') : t('schedule.showCalendar')}
+                          onClick={() => onToggle(calendar)}
+                        />
+                        {palette === calendar.id ? (
+                          <div className="dsh-desk-schedule-palette">
+                            {SCHEDULE_COLORS.map(color => (
+                              <button
+                                key={color}
+                                type="button"
+                                className="dsh-desk-schedule-palette-swatch"
+                                data-active={calendar.color.toLowerCase() === color.toLowerCase()}
+                                style={{ background: color }}
+                                aria-label={color}
+                                onClick={() => {
+                                  setPalette(null)
+                                  void onColorChange(calendar, color)
+                                }}
+                              />
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    )
+                  })}
                 </div>
               ) : null}
             </div>
@@ -235,10 +257,6 @@ export function CalendarPicker(props: {
       </div>
     </section>
   )
-}
-
-function stateLabel(t: DeskTranslator, visible: number): string {
-  return visible === 0 ? t('schedule.sourceHidden') : t('schedule.sourceVisible')
 }
 
 /* ----------------------------------- list ------------------------------------ */
