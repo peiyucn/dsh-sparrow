@@ -148,14 +148,14 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
                         childCount={row.childCount}
                         collapsed={collapsed.has(row.session.id)}
                         onToggle={() => toggleCollapsed(row.session.id)}
-                        actions={(
+                        actions={row.depth === 0 ? (
                           <SessionRowAction
                             kind="archive"
                             label={t('sessions.archive.archive')}
                             disabled={busy}
                             onClick={() => { void act(row.session.id, () => archive.archive(row.session.id)) }}
                           />
-                        )}
+                        ) : undefined}
                       />
                     ))}
                   </ul>

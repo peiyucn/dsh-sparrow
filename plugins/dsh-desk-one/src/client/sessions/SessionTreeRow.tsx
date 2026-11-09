@@ -1,6 +1,9 @@
 /**
  * Shared session-tree row. Active catalog, archived tree, stray and trash rows all use this one
  * component so indentation, typography, metadata and action placement cannot drift apart.
+ *
+ * The expand caret is a sibling of the title button (not a child): a disabled/live row must still
+ * be collapsible, otherwise trash parents look permanently expanded/collapsed by accident.
  */
 
 import type { CSSProperties, ReactElement, ReactNode } from 'react'
@@ -31,22 +34,29 @@ export function SessionTreeRow(props: SessionTreeRowProps): ReactElement {
   const { title, depth, subagent, disabled, onOpen } = props
   const nested = depth > 0
   const style = nested
-    ? {
-        paddingLeft: `calc(10px + ${depth} * 16px)`,
-        '--dsh-tree-guide': `${10 + (depth - 1) * 16}px`,
-      } as CSSProperties
+    ? { paddingLeft: `calc(10px + ${depth} * 16px)` } as CSSProperties
     : undefined
+  const guides = nested
+    ? Array.from({ length: depth }, (_, index) => (
+        <span
+          key={index}
+          className="dsh-desk-tree-guide"
+          data-last={index === depth - 1 ? 'true' : undefined}
+          style={{ left: `${10 + index * 16}px` }}
+          aria-hidden="true"
+        />
+      ))
+    : null
   const caret = props.hasChildren === true ? (
     <span
       className="dsh-desk-tree-caret"
       role="button"
       tabIndex={0}
       aria-label={props.expanded === true ? props.collapseLabel : props.expandLabel}
-      onClick={event => { event.stopPropagation(); props.onToggleExpand?.() }}
+      onClick={() => props.onToggleExpand?.()}
       onKeyDown={event => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
-          event.stopPropagation()
           props.onToggleExpand?.()
         }
       }}
@@ -62,6 +72,8 @@ export function SessionTreeRow(props: SessionTreeRowProps): ReactElement {
       data-live={props.live === true ? 'true' : undefined}
       style={style}
     >
+      {guides}
+      {caret}
       <button
         type="button"
         className="dsh-desk-tree-row-toggle"
@@ -70,7 +82,6 @@ export function SessionTreeRow(props: SessionTreeRowProps): ReactElement {
         disabled={blocked}
         onClick={() => { if (!blocked) onOpen?.() }}
       >
-        {caret}
         <span className="dsh-desk-tree-title">{title}</span>
         {subagent === true ? <span className="dsh-desk-session-tag">{props.tag ?? props.status}</span> : null}
         {props.badges}

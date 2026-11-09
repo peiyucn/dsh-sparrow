@@ -90,7 +90,7 @@ function ArchiveTreeNodeRow(props: {
       {` · ${formatDate(node.updatedAt)}`}
     </>
   )
-  const actions = readOnly ? undefined : (
+  const actions = readOnly || depth > 0 ? undefined : (
     <>
       <SessionRowAction kind="unarchive" label={t('sessions.archive.unarchive')} disabled={busy} onClick={() => props.onUnarchive(node.sessionId)} />
       <SessionRowAction
