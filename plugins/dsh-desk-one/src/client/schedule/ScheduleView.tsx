@@ -13,7 +13,7 @@ import {
   SCHEDULE_COLORS, SCHEDULE_HIDDEN_STORAGE_KEY, SCHEDULE_LIST_DAYS, SCHEDULE_SYNC_INTERVAL_MS,
   SCHEDULE_VIEW_STORAGE_KEY,
 } from '../../constants.js'
-import type { DeskCalendar, DeskEvent, ScheduleStateResponse } from '../../contract.js'
+import type { DeskCalendar, DeskEvent, DeskScheduleSource, ScheduleStateResponse } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
 import { addDays, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName } from './utils.js'
@@ -132,19 +132,37 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
     }
   }, [])
 
+  const persistHidden = useCallback((next: Set<string>): void => {
+    try {
+      window.localStorage.setItem(SCHEDULE_HIDDEN_STORAGE_KEY, JSON.stringify([...next]))
+    } catch {
+      // Preference only.
+    }
+  }, [])
+
   const toggleHidden = useCallback((calendar: DeskCalendar): void => {
     setHidden(previous => {
       const next = new Set(previous)
       if (next.has(calendar.id)) next.delete(calendar.id)
       else next.add(calendar.id)
-      try {
-        window.localStorage.setItem(SCHEDULE_HIDDEN_STORAGE_KEY, JSON.stringify([...next]))
-      } catch {
-        // Preference only.
-      }
+      persistHidden(next)
       return next
     })
-  }, [])
+  }, [persistHidden])
+
+  /** Source-level master switch: show/hide every calendar of that source at once. */
+  const setSourceVisible = useCallback((source: DeskScheduleSource, visible: boolean): void => {
+    const own = (state?.calendars ?? []).filter(item => item.sourceId === source.id)
+    setHidden(previous => {
+      const next = new Set(previous)
+      for (const calendar of own) {
+        if (visible) next.delete(calendar.id)
+        else next.add(calendar.id)
+      }
+      persistHidden(next)
+      return next
+    })
+  }, [persistHidden, state])
 
   const cycleColor = useCallback(async (calendar: DeskCalendar): Promise<void> => {
     const index = (SCHEDULE_COLORS as readonly string[]).indexOf(calendar.color)
@@ -258,6 +276,7 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
               hidden={hidden}
               onToggle={toggleHidden}
               onColor={cycleColor}
+              onSetSourceVisible={setSourceVisible}
               onManage={() => { setSelected(null); setPage('sources') }}
             />
           </div>

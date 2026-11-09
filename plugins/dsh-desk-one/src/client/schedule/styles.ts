@@ -69,8 +69,9 @@ export const SCHEDULE_CSS = `
 
 /* top row: upcoming (left) + calendar quick picker (right); calendar takes the rest */
 .dsh-desk-schedule-top {
-  flex: none; display: grid; gap: 8px; height: 152px;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  flex: none; display: grid; gap: 8px; height: 160px;
+  /* Always horizontal: wide upcoming on the left, narrow source tree on the right. */
+  grid-template-columns: minmax(0, 1.7fr) minmax(180px, 1fr);
 }
 .dsh-desk-schedule-upcoming {
   height: 100%; overflow: hidden;
@@ -89,10 +90,16 @@ export const SCHEDULE_CSS = `
 }
 .dsh-desk-schedule-picker-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .dsh-desk-schedule-picker-source { display: flex; flex-direction: column; gap: 1px; }
-.dsh-desk-schedule-picker-provider {
-  display: flex; align-items: center; gap: 4px;
-  font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); padding: 1px 2px;
+.dsh-desk-schedule-picker-source-row { display: flex; align-items: center; gap: 4px; min-width: 0; padding: 1px 2px; }
+.dsh-desk-schedule-picker-chevron {
+  border: 0; background: transparent; color: var(--dsw-alias-label-tertiary, #8a919f);
+  font: inherit; font-size: 10px; width: 14px; height: 16px; padding: 0; cursor: pointer; flex: none;
 }
+.dsh-desk-schedule-picker-source-name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
+  border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; font-weight: 600; padding: 0; cursor: pointer;
+}
+.dsh-desk-schedule-picker-children { margin-left: 16px; border-left: 1px solid var(--dsw-alias-border-l3, #e2e5ea); padding-left: 4px; display: flex; flex-direction: column; gap: 1px; }
 .dsh-desk-schedule-picker-row {
   display: flex; align-items: center; gap: 5px; min-width: 0; width: 100%;
   border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px;
@@ -103,6 +110,7 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-picker-check {
   flex: none; width: 13px; height: 13px; line-height: 13px; text-align: center; border-radius: 3px;
   font-size: 10px; color: transparent; border: 1px solid var(--dsw-alias-border-l2, #cfd4dc);
+  padding: 0; background: transparent; cursor: pointer;
 }
 .dsh-desk-schedule-picker-check[data-visible='true'] {
   color: #fff; background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
@@ -283,8 +291,7 @@ export const SCHEDULE_CSS = `
   .dsh-desk-schedule-actions { width: 100%; margin-left: 0; justify-content: flex-end; }
 }
 @container (max-width: 900px) {
-  .dsh-desk-schedule-top { grid-template-columns: 1fr; height: auto; }
-  .dsh-desk-schedule-upcoming { height: auto; max-height: 112px; }
-  .dsh-desk-schedule-picker { height: auto; max-height: 168px; }
+  /* Keep the two top cards side by side even in a narrow panel; only tighten the right column. */
+  .dsh-desk-schedule-top { grid-template-columns: minmax(0, 1.7fr) minmax(150px, 1fr); }
 }
 `

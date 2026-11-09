@@ -146,7 +146,8 @@ export function UpcomingPanel(props: {
 
 /* ------------------------- calendar quick picker ----------------------------- */
 
-/** Top-right card: quickly toggle per-calendar visibility / colour; the full manager is a page. */
+/** Top-right card: source tree (collapsible) with a source-level master toggle; the full manager
+ *  is still a page. Laid out like a small task list: source row first, calendars indent below. */
 export function CalendarPicker(props: {
   readonly t: DeskTranslator
   readonly sources: readonly DeskScheduleSource[]
@@ -155,9 +156,19 @@ export function CalendarPicker(props: {
   readonly hidden: Set<string>
   readonly onToggle: (calendar: DeskCalendar) => void
   readonly onColor: (calendar: DeskCalendar) => Promise<void>
+  readonly onSetSourceVisible: (source: DeskScheduleSource, visible: boolean) => void
   readonly onManage: () => void
 }): ReactElement {
   const { t, sources, calendars, counts, hidden, onToggle, onColor } = props
+  const [open, setOpen] = useState<Set<string>>(new Set())
+  const toggleOpen = (id: string): void => {
+    setOpen(previous => {
+      const next = new Set(previous)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
   return (
     <section className="dsh-desk-schedule-picker">
       <header>
@@ -165,35 +176,69 @@ export function CalendarPicker(props: {
         <button type="button" className="dsh-desk-schedule-link" onClick={props.onManage}>{t('schedule.manage')}</button>
       </header>
       <div className="dsh-desk-schedule-picker-list">
-        {sources.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.sourcesEmpty')}</p> : sources.map(source => (
-          <div key={source.id} className="dsh-desk-schedule-picker-source">
-            <span className="dsh-desk-schedule-picker-provider">
-              <span className={`dsh-desk-schedule-provider is-${source.provider}`} />
-              {t(providerKey(source.provider) as never)}
-            </span>
-            {calendars.filter(calendar => calendar.sourceId === source.id).map(calendar => (
-              <button
-                key={calendar.id}
-                type="button"
-                className="dsh-desk-schedule-picker-row"
-                data-hidden={hidden.has(calendar.id)}
-                title={calendar.displayName}
-                onClick={() => onToggle(calendar)}
-              >
-                <span className="dsh-desk-schedule-picker-check" data-visible={!hidden.has(calendar.id)}>✓</span>
-                <span className="dsh-desk-schedule-colorbutton" style={{ background: calendar.color }} onClick={event => {
-                  event.stopPropagation()
-                  void onColor(calendar)
-                }} />
-                <span className="dsh-desk-schedule-picker-name">{calendar.displayName}</span>
-                <span className="dsh-desk-schedule-picker-count">{counts[calendar.id] ?? 0}</span>
-              </button>
-            ))}
-          </div>
-        ))}
+        {sources.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.sourcesEmpty')}</p> : sources.map(source => {
+          const own = calendars.filter(calendar => calendar.sourceId === source.id)
+          const visible = own.filter(calendar => !hidden.has(calendar.id)).length
+          const expanded = open.has(source.id)
+          return (
+            <div key={source.id} className="dsh-desk-schedule-picker-source">
+              <div className="dsh-desk-schedule-picker-source-row">
+                <button
+                  type="button"
+                  className="dsh-desk-schedule-picker-chevron"
+                  aria-expanded={expanded}
+                  aria-label={expanded ? t('schedule.collapse') : t('schedule.expand')}
+                  onClick={() => toggleOpen(source.id)}
+                >{expanded ? '▾' : '▸'}</button>
+                <span className={`dsh-desk-schedule-provider is-${source.provider}`} />
+                <button type="button" className="dsh-desk-schedule-picker-source-name" onClick={() => toggleOpen(source.id)}>
+                  {t(providerKey(source.provider) as never)}
+                </button>
+                <span className="dsh-desk-schedule-picker-count">{visible}/{own.length}</span>
+                <button
+                  type="button"
+                  className="dsh-desk-schedule-picker-check"
+                  data-visible={visible > 0}
+                  aria-label={stateLabel(t, visible)}
+                  onClick={() => props.onSetSourceVisible(source, visible === 0)}
+                >✓</button>
+              </div>
+              {expanded ? (
+                <div className="dsh-desk-schedule-picker-children">
+                  {own.map(calendar => (
+                    <button
+                      key={calendar.id}
+                      type="button"
+                      className="dsh-desk-schedule-picker-row"
+                      data-hidden={hidden.has(calendar.id)}
+                      title={calendar.displayName}
+                      onClick={() => onToggle(calendar)}
+                    >
+                      <span className="dsh-desk-schedule-picker-check" data-visible={!hidden.has(calendar.id)}>✓</span>
+                      <span
+                        className="dsh-desk-schedule-colorbutton"
+                        style={{ background: calendar.color }}
+                        onClick={event => {
+                          event.stopPropagation()
+                          void onColor(calendar)
+                        }}
+                      />
+                      <span className="dsh-desk-schedule-picker-name">{calendar.displayName}</span>
+                      <span className="dsh-desk-schedule-picker-count">{counts[calendar.id] ?? 0}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
       </div>
     </section>
   )
+}
+
+function stateLabel(t: DeskTranslator, visible: number): string {
+  return visible === 0 ? t('schedule.sourceHidden') : t('schedule.sourceVisible')
 }
 
 /* ----------------------------------- list ------------------------------------ */
