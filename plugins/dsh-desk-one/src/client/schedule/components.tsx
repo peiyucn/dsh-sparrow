@@ -719,14 +719,11 @@ function ProviderCard(props: {
   const [editing, setEditing] = useState(!connected)
   const [account, setAccount] = useState(source?.account ?? '')
   const [password, setPassword] = useState('')
-  const [icsUrl, setIcsUrl] = useState('')
   const [busy, setBusy] = useState<'test' | 'save' | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const input = (): ScheduleConnectionInput => provider === 'outlook'
-    ? { provider, url: icsUrl }
-    : { provider, account, password }
+  const input = (): ScheduleConnectionInput => ({ provider, account, password })
 
   const runTest = async (): Promise<void> => {
     setBusy('test'); setError(null); setMessage(null)
@@ -781,65 +778,29 @@ function ProviderCard(props: {
       {connected && !editing ? (
         <div className="dsh-desk-schedule-source">
           <p className="dsh-desk-schedule-sync-hint">{t('schedule.syncCalendarHint')}</p>
-          {calendars.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.noCalendars')}</p> : null}
-          {calendars.map(calendar => (
-            <div key={calendar.id} className="dsh-desk-schedule-mgmt-row" data-off={!calendar.enabled}>
-              <button
-                type="button"
-                className="dsh-desk-schedule-colorbutton"
-                style={{ background: calendar.color }}
-                title={t('schedule.changeColor')}
-                aria-label={t('schedule.changeColor')}
-                onClick={() => { void onColor(calendar) }}
-              />
-              <span className="dsh-desk-schedule-mgmt-name">{calendar.displayName}</span>
-              <span className="dsh-desk-schedule-mgmt-count">{counts[calendar.id] ?? 0}</span>
-              <span className="dsh-desk-schedule-mgmt-label">{t('schedule.syncLabel')}</span>
-              <button
-                type="button"
-                className="dsh-desk-switch"
-                role="switch"
-                aria-checked={calendar.enabled}
-                data-on={calendar.enabled}
-                title={t('schedule.syncCalendar')}
-                aria-label={t('schedule.syncCalendar')}
-                onClick={() => { void onSetEnabled(calendar, !calendar.enabled) }}
-              />
-              <span className="dsh-desk-schedule-mgmt-label">{t('schedule.displayLabel')}</span>
-              <button
-                type="button"
-                className="dsh-desk-switch"
-                role="switch"
-                aria-checked={!hidden.has(calendar.id)}
-                data-on={!hidden.has(calendar.id)}
-                aria-label={t('schedule.showCalendar')}
-                onClick={() => onToggle(calendar)}
-              />
-            </div>
-          ))}
+          <CalendarRows
+            t={t}
+            calendars={calendars}
+            counts={counts}
+            hidden={hidden}
+            onToggle={onToggle}
+            onColor={onColor}
+            onSetEnabled={onSetEnabled}
+          />
         </div>
       ) : null}
 
       {editing ? (
         <div className="dsh-desk-schedule-connection-form">
           <div className="dsh-desk-schedule-form-fields">
-            {provider === 'outlook' ? (
-              <label>
-                <span>{t('schedule.form.ics')}</span>
-                <input value={icsUrl} onChange={event => setIcsUrl(event.target.value)} placeholder="https://…/calendar.ics" spellCheck={false} />
-              </label>
-            ) : (
-              <>
-                <label>
-                  <span>{t('schedule.form.account')}</span>
-                  <input value={account} onChange={event => setAccount(event.target.value)} spellCheck={false} autoComplete="username" />
-                </label>
-                <label>
-                  <span>{t('schedule.form.password')}</span>
-                  <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" />
-                </label>
-              </>
-            )}
+            <label>
+              <span>{t('schedule.form.account')}</span>
+              <input value={account} onChange={event => setAccount(event.target.value)} spellCheck={false} autoComplete="username" />
+            </label>
+            <label>
+              <span>{t('schedule.form.password')}</span>
+              <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" />
+            </label>
           </div>
           <p className="dsh-desk-schedule-form-note">{t(`schedule.form.note.${provider}` as never)}</p>
           {provider === 'icloud' ? (
