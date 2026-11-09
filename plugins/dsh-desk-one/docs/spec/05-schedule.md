@@ -1,6 +1,6 @@
 # 05 · 时间 Time — 聚合设计（S2，只读）
 
-> **实现状态（2026-11-09）**：基础版已落地并 `verify` 全绿（126 个测试）；**真实服务未验证**——企微/iCloud/Outlook 均缺凭据探针，协议细节按 RFC 与公开观察实现，明早 owner 配置后联调。v1 范围与本文件一致：只读、无本地事件、无写回、无订阅。
+> **实现状态（2026-11-09）**：基础版与 Outlook Graph 已落地并 `verify` 全绿（350 个测试）；**真实服务未验证**——企微/iCloud/Outlook 均缺凭据探针，协议细节按 RFC 与公开观察实现，明早 owner 配置后联调。v1 范围与本文件一致：只读、无本地事件、无写回、无订阅。
 >
 > 标签中文名「时间」、英文 **Time**（原「日程 / Schedule」）：这里以后不只有日历，还会有专注时间、倒计时等小控件。
 > 底层数据仍是 `event`（日程条目）+ `calendar`（远端日历源）两种 kind，见 [01-object-model.md](01-object-model.md)。
@@ -108,8 +108,9 @@
 ## 8. 实现顺序与未验证项
 
 1. **企业微信 CalDAV**（先做：公司日程信息量最大）→ 探针验证 `/.well-known/caldav`、家目录、VTIMEZONE、REPORT 形态。
-2. **Outlook ICS**（网页端发布链接；条件 GET + UID upsert）。
-3. **iCloud CalDAV**（凭据到位后：分片、REPORT、限流、共享日历可见性）。
+2. **Outlook Graph OAuth**（浏览器回调 + PKCE 为主，设备码兜底；多日历 `/me/calendars` + `calendarView`，refresh token 存凭据库；`http://localhost/.../callback` 注册为免端口回调）。
+3. **Outlook ICS**（历史兼容：网页端发布链接，条件 GET + UID upsert；UI 不再暴露）。
+4. **iCloud CalDAV**（凭据到位后：分片、REPORT、限流、共享日历可见性）。
 
 未验证项（写代码前先探针钉死）：企微 `/calendar/` 家目录与标准发现链、非 IANA TZID 样本；iCloud 分片/REPORT/`sync-collection` 支持；共享日历是否出现在 CalDAV 集合；Outlook ICS 在 owner 个人账号上的发布入口与刷新延迟。
 
