@@ -18,7 +18,8 @@ import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
 import { addDays, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName } from './utils.js'
 import {
-  EventCard, ListBoard, MonthBoard, ScheduleToolbar, SourcesPage, UpcomingStrip, WeekBoard,
+  CalendarPicker, EventCard, ListBoard, MonthBoard, ScheduleToolbar, SourcesPage, UpcomingPanel, WeekBoard,
+  type ClickPoint,
 } from './components.js'
 
 type SchedulePage = 'calendar' | 'sources'
@@ -54,7 +55,8 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
-  const [selected, setSelected] = useState<DeskEvent | null>(null)
+  const [selected, setSelected] = useState<{ event: DeskEvent; point?: ClickPoint } | null>(null)
+  const [listStart, setListStart] = useState<Date>(today)
   const [listDays, setListDays] = useState(SCHEDULE_LIST_DAYS)
   const syncingRef = useRef(false)
   const autoSyncTried = useRef(false)
@@ -63,8 +65,8 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
   const range = useMemo(() => {
     if (view === 'month') return monthRange(cursor)
     if (view === 'week') return weekRange(cursor)
-    return listRange(today, listDays)
-  }, [cursor, listDays, today, view])
+    return listRange(listStart, listDays)
+  }, [cursor, listDays, listStart, today, view])
 
   const load = useCallback(async (): Promise<void> => {
     const [nextState, payload] = await Promise.all([
@@ -155,8 +157,15 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
     }
   }, [api])
 
-  const openEvent = (event: DeskEvent): void => {
-    setSelected(event)
+  const openEvent = (event: DeskEvent, point?: ClickPoint): void => {
+    setSelected(point === undefined ? { event } : { event, point })
+  }
+
+  /** Month "+N" / day number: jump to the agenda list starting at that day. */
+  const openDay = (date: Date): void => {
+    setListStart(startOfLocalDay(date))
+    chooseView('list')
+    setCursor(date)
   }
 
   const visibleEvents = useMemo(
@@ -214,14 +223,12 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
         cursor={cursor}
         syncing={syncing}
         loading={loading}
-        sourceCount={sources.length}
         {...(lastSyncedAt === undefined ? {} : { lastSyncedAt })}
         error={toolbarError}
         onView={chooseView}
         onStep={step}
         onToday={() => { setCursor(today) }}
         onRefresh={() => { void runSync() }}
-        onSources={() => { setSelected(null); setPage('sources') }}
       />
       {state === null ? (
         <p className="dsh-desk-schedule-hint">{loading ? t('state.loading') : t('schedule.sourcesEmpty')}</p>
@@ -234,23 +241,45 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
         </div>
       ) : (
         <>
-          <UpcomingStrip
-            t={t}
-            today={today}
-            events={visibleEvents}
-            calendars={calendars}
-            onOpen={openEvent}
-            onViewAll={() => { chooseView('list'); setCursor(today) }}
-          />
+          <div className="dsh-desk-schedule-top">
+            <UpcomingPanel
+              t={t}
+              today={today}
+              events={visibleEvents}
+              calendars={calendars}
+              onOpen={openEvent}
+              onViewAll={() => { setListStart(today); chooseView('list'); setCursor(today) }}
+            />
+            <CalendarPicker
+              t={t}
+              sources={sources}
+              calendars={calendars}
+              counts={counts}
+              hidden={hidden}
+              onToggle={toggleHidden}
+              onColor={cycleColor}
+              onManage={() => { setSelected(null); setPage('sources') }}
+            />
+          </div>
           <section className="dsh-desk-schedule-main">
             {view === 'month' ? (
-              <MonthBoard t={t} cursor={cursor} today={today} events={visibleEvents} calendars={calendars} onOpen={openEvent} />
+              <MonthBoard
+                t={t}
+                cursor={cursor}
+                today={today}
+                events={visibleEvents}
+                calendars={calendars}
+                onOpen={openEvent}
+                onOpenDay={openDay}
+                onStep={step}
+              />
             ) : view === 'week' ? (
               <WeekBoard t={t} from={range.from} today={today} events={visibleEvents} calendars={calendars} onOpen={openEvent} />
             ) : (
               <ListBoard
                 t={t}
                 today={today}
+                from={listStart}
                 events={visibleEvents}
                 calendars={calendars}
                 days={listDays}
@@ -262,7 +291,14 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
         </>
       )}
       {selected === null ? null : (
-        <EventCard t={t} event={selected} calendars={calendars} onClose={() => { setSelected(null) }} />
+        <EventCard
+          t={t}
+          event={selected.event}
+          calendars={calendars}
+          sources={sources}
+          {...(selected.point === undefined ? {} : { point: selected.point })}
+          onClose={() => { setSelected(null) }}
+        />
       )}
     </div>
   )

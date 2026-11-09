@@ -1,24 +1,25 @@
 /**
- * Schedule page building blocks, aligned with the rest of Desk One: sub-features are in-panel
- * pages (like the notes trash or task archive), never modal overlays.
- *
- * Layout contract: the calendar page has only a compact toolbar + one-line upcoming strip + the
- * calendar itself; month and week views fill the available height without scrolling. Calendar
- * sources and event details each own a page reached from the toolbar / a calendar item.
+ * Schedule page building blocks. Management (connections + calendars) is an in-panel page like the
+ * notes trash; a single event opens a floating card anchored to the click, and month/week fill the
+ * remaining height (week shows 12 hours per screen with internal scrolling).
  */
 
-import { useMemo, useState } from 'react'
-import type { ReactElement } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactElement, WheelEvent as ReactWheelEvent } from 'react'
 import { SCHEDULE_UPCOMING_DAYS, type ScheduleProvider } from '../../constants.js'
 import type { DeskCalendar, DeskEvent, DeskScheduleSource, ScheduleConnectionInput } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
 import {
-  addDays, calendarColorOf, calendarNameOf, conflictIds, dayKey, formatDayTitle, formatTime, groupByDay, keyOfEvent,
-  monthRange, startOfLocalDay, weekBlocks, weekdayLabel, type ScheduleViewName,
+  addDays, calendarColorOf, calendarNameOf, conflictIds, dayKey, formatDateLabel, formatDayTitle, formatMonthLabel,
+  formatTime, groupByDay, keyOfEvent, monthRange, startOfLocalDay, weekdayLabel, weekdayLabels, weekBlocks,
+  type ScheduleViewName,
 } from './utils.js'
 
 const PROVIDER_ORDER: readonly ScheduleProvider[] = ['wecom', 'icloud', 'outlook']
+/** Card width / approximate height used to flip the detail card around the click point. */
+const DETAIL_CARD_WIDTH = 360
+const DETAIL_CARD_HEIGHT = 300
 
 function providerKey(provider: ScheduleProvider): string {
   return `schedule.provider.${provider}`
@@ -29,7 +30,13 @@ function eventTitle(t: DeskTranslator, event: DeskEvent): string {
 }
 
 function dayLabel(t: DeskTranslator, date: Date, today: Date): string {
-  return formatDayTitle(date, today, { today: t('schedule.day.today'), tomorrow: t('schedule.day.tomorrow') })
+  return formatDayTitle(date, today, { today: t('schedule.day.today'), tomorrow: t('schedule.day.tomorrow') },
+    value => `${weekdayLabel(value, weekdayLabels(t('schedule.weekdays'))) } ${formatDateLabel(value, t)}`)
+}
+
+export interface ClickPoint {
+  readonly x: number
+  readonly y: number
 }
 
 /* --------------------------------- toolbar ---------------------------------- */
@@ -41,23 +48,21 @@ interface ToolbarProps {
   readonly syncing: boolean
   readonly loading: boolean
   readonly lastSyncedAt?: string
-  readonly sourceCount: number
   readonly error: string | null
   readonly onView: (view: ScheduleViewName) => void
   readonly onStep: (direction: -1 | 1) => void
   readonly onToday: () => void
   readonly onRefresh: () => void
-  readonly onSources: () => void
 }
 
 export function ScheduleToolbar(props: ToolbarProps): ReactElement {
   const { t, view, cursor, syncing, error } = props
-  const weekStart = addDays(startOfLocalDay(cursor), -((cursor.getDay() + 6) % 7))
+  const weekStart = addDays(startOfLocalDay(cursor), -cursor.getDay())
   const weekEnd = addDays(weekStart, 6)
   const rangeLabel = view === 'month'
-    ? cursor.toLocaleDateString([], { year: 'numeric', month: 'long' })
+    ? formatMonthLabel(cursor, t)
     : view === 'week'
-      ? `${weekStart.toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${weekEnd.toLocaleDateString([], { month: 'short', day: 'numeric' })}`
+      ? `${formatDateLabel(weekStart, t)} – ${formatDateLabel(weekEnd, t)}`
       : t('schedule.view.list')
   return (
     <div className="dsh-desk-schedule-toolbar">
@@ -85,16 +90,11 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
           {props.lastSyncedAt === undefined
             ? t('schedule.neverSynced')
             : t('schedule.lastSync', {
-                time: new Date(props.lastSyncedAt).toLocaleString([], {
-                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                }),
+                time: `${formatDateLabel(new Date(props.lastSyncedAt), t)} ${formatTime(props.lastSyncedAt)}`,
               })}
         </span>
         <button type="button" className="dsh-desk-schedule-chip" disabled={syncing || props.loading} onClick={props.onRefresh}>
           {syncing ? t('schedule.syncing') : t('schedule.refresh')}
-        </button>
-        <button type="button" className="dsh-desk-schedule-chip" onClick={props.onSources}>
-          {props.sourceCount === 0 ? t('schedule.addConnection') : t('schedule.sources')}
         </button>
       </div>
       {error === null ? null : <p className="dsh-desk-schedule-error">{error}</p>}
@@ -102,13 +102,14 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
   )
 }
 
-/** Compact one-line upcoming strip: only the next few items, never a full column. */
-export function UpcomingStrip(props: {
+/* ------------------------------ upcoming panel ------------------------------- */
+
+export function UpcomingPanel(props: {
   readonly t: DeskTranslator
   readonly today: Date
   readonly events: readonly DeskEvent[]
   readonly calendars: readonly DeskCalendar[]
-  readonly onOpen: (event: DeskEvent) => void
+  readonly onOpen: (event: DeskEvent, point?: ClickPoint) => void
   readonly onViewAll: () => void
 }): ReactElement {
   const { t, today, events, calendars, onOpen } = props
@@ -120,18 +121,78 @@ export function UpcomingStrip(props: {
     return result.sort((left, right) => left.event.start.localeCompare(right.event.start)).slice(0, 3)
   }, [events, today])
   return (
-    <div className="dsh-desk-schedule-upcoming">
-      <span className="dsh-desk-schedule-upcoming-label">{t('schedule.upcoming')}</span>
-      {upcoming.length === 0 ? <span className="dsh-desk-schedule-upcoming-empty">{t('schedule.upcomingEmpty')}</span> : upcoming.map(({ event, day }) => (
-        <button key={event.id} type="button" className="dsh-desk-schedule-upcoming-item" onClick={() => onOpen(event)}>
-          <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
-          <span className="dsh-desk-schedule-upcoming-day">{dayLabel(t, day, today)}</span>
-          <span className="dsh-desk-schedule-upcoming-time">{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
-          <span className="dsh-desk-schedule-upcoming-title">{eventTitle(t, event)}</span>
-        </button>
-      ))}
-      <button type="button" className="dsh-desk-schedule-link" onClick={props.onViewAll}>{t('schedule.viewAll')}</button>
-    </div>
+    <section className="dsh-desk-schedule-upcoming">
+      <header>
+        <span>{t('schedule.upcoming')}</span>
+        <button type="button" className="dsh-desk-schedule-link" onClick={props.onViewAll}>{t('schedule.viewAll')}</button>
+      </header>
+      {upcoming.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.upcomingEmpty')}</p> : (
+        <ul>
+          {upcoming.map(({ event, day }) => (
+            <li key={event.id}>
+              <button type="button" className="dsh-desk-schedule-upcoming-item" onClick={click => onOpen(event, { x: click.clientX, y: click.clientY })}>
+                <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
+                <span className="dsh-desk-schedule-upcoming-day">{dayLabel(t, day, today)}</span>
+                <span className="dsh-desk-schedule-upcoming-time">{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
+                <span className="dsh-desk-schedule-upcoming-title">{eventTitle(t, event)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+/* ------------------------- calendar quick picker ----------------------------- */
+
+/** Top-right card: quickly toggle per-calendar visibility / colour; the full manager is a page. */
+export function CalendarPicker(props: {
+  readonly t: DeskTranslator
+  readonly sources: readonly DeskScheduleSource[]
+  readonly calendars: readonly DeskCalendar[]
+  readonly counts: Readonly<Record<string, number>>
+  readonly hidden: Set<string>
+  readonly onToggle: (calendar: DeskCalendar) => void
+  readonly onColor: (calendar: DeskCalendar) => Promise<void>
+  readonly onManage: () => void
+}): ReactElement {
+  const { t, sources, calendars, counts, hidden, onToggle, onColor } = props
+  return (
+    <section className="dsh-desk-schedule-picker">
+      <header>
+        <span>{t('schedule.calendars')}</span>
+        <button type="button" className="dsh-desk-schedule-link" onClick={props.onManage}>{t('schedule.manage')}</button>
+      </header>
+      <div className="dsh-desk-schedule-picker-list">
+        {sources.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.sourcesEmpty')}</p> : sources.map(source => (
+          <div key={source.id} className="dsh-desk-schedule-picker-source">
+            <span className="dsh-desk-schedule-picker-provider">
+              <span className={`dsh-desk-schedule-provider is-${source.provider}`} />
+              {t(providerKey(source.provider) as never)}
+            </span>
+            {calendars.filter(calendar => calendar.sourceId === source.id).map(calendar => (
+              <button
+                key={calendar.id}
+                type="button"
+                className="dsh-desk-schedule-picker-row"
+                data-hidden={hidden.has(calendar.id)}
+                title={calendar.displayName}
+                onClick={() => onToggle(calendar)}
+              >
+                <span className="dsh-desk-schedule-picker-check" data-visible={!hidden.has(calendar.id)}>✓</span>
+                <span className="dsh-desk-schedule-colorbutton" style={{ background: calendar.color }} onClick={event => {
+                  event.stopPropagation()
+                  void onColor(calendar)
+                }} />
+                <span className="dsh-desk-schedule-picker-name">{calendar.displayName}</span>
+                <span className="dsh-desk-schedule-picker-count">{counts[calendar.id] ?? 0}</span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -140,26 +201,29 @@ export function UpcomingStrip(props: {
 interface ListProps {
   readonly t: DeskTranslator
   readonly today: Date
+  readonly from: Date
   readonly events: readonly DeskEvent[]
   readonly calendars: readonly DeskCalendar[]
   readonly days: number
-  readonly onOpen: (event: DeskEvent) => void
+  readonly onOpen: (event: DeskEvent, point?: ClickPoint) => void
   readonly onLoadMore: () => void
 }
 
 export function ListBoard(props: ListProps): ReactElement {
-  const { t, today, events, calendars, onOpen, days } = props
-  const groups = useMemo(() => groupByDay(events, today, days), [days, events, today])
+  const { t, today, from, events, calendars, onOpen, days } = props
+  const groups = useMemo(() => groupByDay(events, from, days), [days, events, from])
   const conflicts = useMemo(() => conflictIds(events), [events])
-  const visibleGroups = groups.filter(group => group.events.length > 0 || group.key === dayKey(today))
+  const visibleGroups = groups.filter(group => group.events.length > 0 || group.key === dayKey(from))
   return (
     <div className="dsh-desk-schedule-list">
       {visibleGroups.every(group => group.events.length === 0) ? <p className="dsh-desk-schedule-hint">{t('schedule.listEmpty')}</p> : null}
-      {visibleGroups.map(group => (
-        <section key={group.key} className="dsh-desk-schedule-list-day">
-          <h4>{dayLabel(t, group.date, today)}</h4>
+      {visibleGroups.map((group, index) => (
+        <section key={group.key} className="dsh-desk-schedule-list-day" data-weekend={isWeekend(group.date)}>
+          <h4 data-weekend={isWeekend(group.date)}>
+            {index === 0 && group.key === dayKey(today) ? dayLabel(t, group.date, today) : `${weekdayLabel(group.date, weekdayLabels(t('schedule.weekdays')))} ${formatDateLabel(group.date, t)}`}
+          </h4>
           {group.events.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.dayEmpty')}</p> : group.events.map(event => (
-            <button key={event.id} type="button" className="dsh-desk-schedule-row" onClick={() => onOpen(event)}>
+            <button key={event.id} type="button" className="dsh-desk-schedule-row" onClick={click => onOpen(event, { x: click.clientX, y: click.clientY })}>
               <span className="dsh-desk-schedule-row-time">{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
               <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
               <span className="dsh-desk-schedule-row-title">{eventTitle(t, event)}</span>
@@ -174,6 +238,10 @@ export function ListBoard(props: ListProps): ReactElement {
   )
 }
 
+function isWeekend(date: Date): boolean {
+  return date.getDay() === 0 || date.getDay() === 6
+}
+
 /* ----------------------------------- month ----------------------------------- */
 
 interface MonthProps {
@@ -182,12 +250,16 @@ interface MonthProps {
   readonly today: Date
   readonly events: readonly DeskEvent[]
   readonly calendars: readonly DeskCalendar[]
-  readonly onOpen: (event: DeskEvent) => void
+  readonly onOpen: (event: DeskEvent, point?: ClickPoint) => void
+  readonly onOpenDay: (date: Date) => void
+  readonly onStep: (direction: -1 | 1) => void
 }
 
 export function MonthBoard(props: MonthProps): ReactElement {
-  const { t, cursor, today, events, calendars, onOpen } = props
+  const { t, cursor, today, events, calendars, onOpen, onOpenDay } = props
+  const wheelAt = useRef(0)
   const { from, to } = useMemo(() => monthRange(cursor), [cursor])
+  const labels = weekdayLabels(t('schedule.weekdays'))
   const weeks = useMemo(() => {
     const cells: Date[] = []
     for (let date = from; date < to; date = addDays(date, 1)) cells.push(date)
@@ -205,11 +277,18 @@ export function MonthBoard(props: MonthProps): ReactElement {
     }
     return map
   }, [events])
+  const onWheel = (event: ReactWheelEvent<HTMLDivElement>): void => {
+    if (Math.abs(event.deltaY) < 12) return
+    const now = Date.now()
+    if (now - wheelAt.current < 380) return
+    wheelAt.current = now
+    props.onStep(event.deltaY > 0 ? 1 : -1)
+  }
   return (
-    <div className="dsh-desk-schedule-month">
+    <div className="dsh-desk-schedule-month" onWheel={onWheel} title={t('schedule.monthWheelHint')}>
       <div className="dsh-desk-schedule-month-head">
-        {[0, 1, 2, 3, 4, 5, 6].map(offset => (
-          <span key={offset}>{weekdayLabel(addDays(from, offset))}</span>
+        {labels.map((label, index) => (
+          <span key={label} data-weekend={index === 0 || index === 6}>{label}</span>
         ))}
       </div>
       <div className="dsh-desk-schedule-month-body" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
@@ -218,18 +297,35 @@ export function MonthBoard(props: MonthProps): ReactElement {
             {row.map(date => {
               const dayEvents = byDay.get(dayKey(date)) ?? []
               const isToday = date.toDateString() === today.toDateString()
+              const hiddenCount = dayEvents.length - 2
               return (
-                <div key={date.toISOString()} className="dsh-desk-schedule-month-cell" data-today={isToday} data-outside={date.getMonth() !== cursor.getMonth()}>
-                  <span className="dsh-desk-schedule-month-day">{date.getDate()}</span>
+                <div
+                  key={date.toISOString()}
+                  className="dsh-desk-schedule-month-cell"
+                  data-today={isToday}
+                  data-weekend={isWeekend(date)}
+                  data-outside={date.getMonth() !== cursor.getMonth()}
+                >
+                  <button type="button" className="dsh-desk-schedule-month-day" onClick={() => onOpenDay(date)}>{date.getDate()}</button>
                   <div className="dsh-desk-schedule-month-events">
                     {dayEvents.slice(0, 2).map(event => (
-                      <button key={event.id} type="button" className="dsh-desk-schedule-month-chip" onClick={() => onOpen(event)} title={eventTitle(t, event)}>
+                      <button
+                        key={event.id}
+                        type="button"
+                        className="dsh-desk-schedule-month-chip"
+                        onClick={click => onOpen(event, { x: click.clientX, y: click.clientY })}
+                        title={eventTitle(t, event)}
+                      >
                         <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
                         {event.allDay ? null : <span className="dsh-desk-schedule-month-time">{formatTime(event.start)}</span>}
                         <span>{eventTitle(t, event)}</span>
                       </button>
                     ))}
-                    {dayEvents.length > 2 ? <span className="dsh-desk-schedule-more-count">+{dayEvents.length - 2}</span> : null}
+                    {hiddenCount > 0 ? (
+                      <button type="button" className="dsh-desk-schedule-more-count" onClick={() => onOpenDay(date)}>
+                        +{hiddenCount}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               )
@@ -249,21 +345,37 @@ interface WeekProps {
   readonly today: Date
   readonly events: readonly DeskEvent[]
   readonly calendars: readonly DeskCalendar[]
-  readonly onOpen: (event: DeskEvent) => void
+  readonly onOpen: (event: DeskEvent, point?: ClickPoint) => void
 }
 
 export function WeekBoard(props: WeekProps): ReactElement {
   const { t, from, today, events, calendars, onOpen } = props
+  const scrollRef = useRef<HTMLDivElement>(null)
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(from, index)), [from])
+  const labels = weekdayLabels(t('schedule.weekdays'))
   const blocks = useMemo(() => weekBlocks(events, from), [events, from])
   const allDay = useMemo(() => days.map(day => events.filter(event =>
     event.allDay && keyOfEvent(event) === dayKey(day))), [days, events])
+  const todayIndex = days.findIndex(day => day.toDateString() === today.toDateString())
+  const now = new Date()
+  const nowPct = ((now.getHours() * 60 + now.getMinutes()) / 1440) * 100
+  // Show 12 hours per screen (inner height = 200% of the viewport); center the initial scroll on
+  // the current time (or 08:00 when browsing another week).
+  useEffect(() => {
+    const element = scrollRef.current
+    if (element === null) return
+    const fraction = todayIndex >= 0 ? (now.getHours() + now.getMinutes() / 60) / 24 : 8 / 24
+    const target = element.scrollHeight * fraction - element.clientHeight / 3
+    element.scrollTop = Math.max(0, Math.min(target, element.scrollHeight - element.clientHeight))
+    // Only re-anchor when the week changes, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [from])
   return (
     <div className="dsh-desk-schedule-week">
       <div className="dsh-desk-schedule-week-head">
         {days.map(day => (
-          <span key={day.toISOString()} className="dsh-desk-schedule-week-day" data-today={day.toDateString() === today.toDateString()}>
-            <span>{weekdayLabel(day)}</span>
+          <span key={day.toISOString()} className="dsh-desk-schedule-week-day" data-today={day.toDateString() === today.toDateString()} data-weekend={isWeekend(day)}>
+            <span>{weekdayLabel(day, labels)}</span>
             <strong>{day.getDate()}</strong>
           </span>
         ))}
@@ -272,7 +384,7 @@ export function WeekBoard(props: WeekProps): ReactElement {
         {days.map((day, index) => (
           <span key={day.toISOString()} className="dsh-desk-schedule-week-allday-cell">
             {allDay[index]?.map(event => (
-              <button key={event.id} type="button" className="dsh-desk-schedule-week-allday-chip" onClick={() => onOpen(event)}>
+              <button key={event.id} type="button" className="dsh-desk-schedule-week-allday-chip" onClick={click => onOpen(event, { x: click.clientX, y: click.clientY })}>
                 <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
                 {eventTitle(t, event)}
               </button>
@@ -280,34 +392,115 @@ export function WeekBoard(props: WeekProps): ReactElement {
           </span>
         ))}
       </div>
-      <div className="dsh-desk-schedule-week-body">
-        {days.map((day, index) => (
-          <div key={day.toISOString()} className="dsh-desk-schedule-week-col">
-            {Array.from({ length: 24 }, (_, hour) => (
-              <div key={hour} className="dsh-desk-schedule-week-hour" style={{ top: `${(hour / 24) * 100}%` }} />
-            ))}
-            {blocks.filter(block => block.dayIndex === index).map(block => (
-              <button
-                key={block.event.id}
-                type="button"
-                className="dsh-desk-schedule-week-block"
-                style={{
-                  top: `${block.topPct}%`,
-                  height: `${block.heightPct}%`,
-                  left: `${(block.lane / block.lanes) * 100}%`,
-                  width: `${100 / block.lanes}%`,
-                  borderLeftColor: calendarColorOf(block.event, calendars),
-                }}
-                onClick={() => onOpen(block.event)}
-              >
-                <strong>{formatTime(block.event.start)}</strong>
-                <span>{eventTitle(t, block.event)}</span>
-              </button>
-            ))}
-          </div>
-        ))}
+      <div className="dsh-desk-schedule-week-scroll" ref={scrollRef}>
+        <div className="dsh-desk-schedule-week-inner">
+          {days.map((day, index) => (
+            <div key={day.toISOString()} className="dsh-desk-schedule-week-col" data-weekend={isWeekend(day)}>
+              {Array.from({ length: 23 }, (_, hour) => (
+                <div key={hour} className="dsh-desk-schedule-week-hour" style={{ top: `${((hour + 1) / 24) * 100}%` }} />
+              ))}
+              {index === todayIndex ? <div className="dsh-desk-schedule-week-now" style={{ top: `${nowPct}%` }} /> : null}
+              {blocks.filter(block => block.dayIndex === index).map(block => (
+                <button
+                  key={block.event.id}
+                  type="button"
+                  className="dsh-desk-schedule-week-block"
+                  style={{
+                    top: `${block.topPct}%`,
+                    height: `${block.heightPct}%`,
+                    left: `${(block.lane / block.lanes) * 100}%`,
+                    width: `${100 / block.lanes}%`,
+                    borderLeftColor: calendarColorOf(block.event, calendars),
+                  }}
+                  onClick={click => onOpen(block.event, { x: click.clientX, y: click.clientY })}
+                >
+                  <strong>{formatTime(block.event.start)}</strong>
+                  <span>{eventTitle(t, block.event)}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
+  )
+}
+
+/* -------------------------------- detail card -------------------------------- */
+
+export function EventCard(props: {
+  readonly t: DeskTranslator
+  readonly event: DeskEvent
+  readonly calendars: readonly DeskCalendar[]
+  readonly sources: readonly DeskScheduleSource[]
+  readonly point?: ClickPoint
+  readonly onClose: () => void
+}): ReactElement {
+  const { t, event, calendars, sources, point } = props
+  const cardRef = useRef<HTMLElement>(null)
+  const [copied, setCopied] = useState(false)
+  const source = sources.find(item => item.provider === event.provider)
+  const when = event.allDay
+    ? `${dayLabel(t, startOfLocalDay(new Date(event.start)), new Date())} · ${t('schedule.allDay')}`
+    : `${dayLabel(t, startOfLocalDay(new Date(event.start)), new Date())} ${formatTime(event.start)} – ${formatTime(event.end)}`
+  const style = useMemo(() => {
+    const width = DETAIL_CARD_WIDTH
+    const height = DETAIL_CARD_HEIGHT
+    const x = point === undefined ? window.innerWidth - width - 24 : point.x + 14
+    const y = point === undefined ? window.innerHeight - height - 24 : point.y + 14
+    return {
+      left: Math.max(8, Math.min(x, window.innerWidth - width - 8)),
+      top: Math.max(8, Math.min(y, window.innerHeight - height - 8)),
+      width: `${width}px`,
+    }
+  }, [point])
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent): void => {
+      if (cardRef.current !== null && !cardRef.current.contains(event.target as Node)) props.onClose()
+    }
+    const onKeyDown = (event: KeyboardEvent): void => { if (event.key === 'Escape') props.onClose() }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [props])
+
+  const copy = async (): Promise<void> => {
+    const text = `${event.title}\n${when}\n${event.location ?? ''}`
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      window.setTimeout(() => { setCopied(false) }, 2000)
+    } catch {
+      setCopied(false)
+    }
+  }
+  return (
+    <aside ref={cardRef} className="dsh-desk-schedule-detail-card" style={style} aria-label={eventTitle(t, event)}>
+      <header>
+        <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
+        <h3 title={eventTitle(t, event)}>{eventTitle(t, event)}</h3>
+        <button type="button" className="dsh-desk-schedule-icon" aria-label={t('schedule.detail.close')} onClick={props.onClose}>×</button>
+      </header>
+      <p className="dsh-desk-schedule-detail-source">
+        {source === undefined ? calendarNameOf(event, calendars) : `${t(providerKey(source.provider) as never)} · ${source.account ?? ''} · ${calendarNameOf(event, calendars)}`}
+      </p>
+      <dl>
+        <dt>{t('schedule.detail.when')}</dt><dd>{when}</dd>
+        {event.location === undefined ? null : <><dt>{t('schedule.detail.location')}</dt><dd>{event.location}</dd></>}
+        {event.description === undefined ? null : <><dt>{t('schedule.detail.description')}</dt><dd className="dsh-desk-schedule-detail-desc">{event.description}</dd></>}
+      </dl>
+      <footer>
+        <span className="dsh-desk-schedule-readonly">{t('schedule.readOnly')}</span>
+        <button type="button" className="dsh-desk-schedule-chip" onClick={() => { void copy() }}>{copied ? t('schedule.detail.copied') : t('schedule.detail.copy')}</button>
+        {event.url === undefined ? null : (
+          <a className="dsh-desk-schedule-chip" href={event.url} target="_blank" rel="noreferrer">{t('schedule.detail.open')}</a>
+        )}
+      </footer>
+    </aside>
   )
 }
 
@@ -433,88 +626,36 @@ export function SourcesPage(props: SourcesPageProps): ReactElement {
         <h2>{t('schedule.sources')}</h2>
       </header>
       <div className="dsh-desk-schedule-sources-page">
-        {PROVIDER_ORDER.map(provider => (
-          <div key={provider}>
-            <ConnectionCard
-              t={t}
-              api={props.api}
-              provider={provider}
-              {...(sources.find(source => source.provider === provider) === undefined
-                ? {}
-                : { source: sources.find(source => source.provider === provider) })}
-              onChanged={props.onChanged}
-            />
-            {sources.filter(source => source.provider === provider).map(source => (
-              <div key={source.id} className="dsh-desk-schedule-source">
-                {calendars.filter(calendar => calendar.sourceId === source.id).map(calendar => (
-                  <div key={calendar.id} className="dsh-desk-schedule-calendar" data-hidden={hidden.has(calendar.id)}>
-                    <button
-                      type="button"
-                      className="dsh-desk-schedule-colorbutton"
-                      style={{ background: calendar.color }}
-                      title={t('schedule.changeColor')}
-                      aria-label={t('schedule.changeColor')}
-                      onClick={() => { void onColor(calendar) }}
-                    />
-                    <button type="button" className="dsh-desk-schedule-calendar-toggle" onClick={() => onToggle(calendar)}>
-                      <span className="dsh-desk-schedule-calendar-name">{calendar.displayName}</span>
-                      <span className="dsh-desk-schedule-calendar-count">{counts[calendar.id] ?? 0}</span>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        ))}
+        {PROVIDER_ORDER.map(provider => {
+          const source = sources.find(item => item.provider === provider)
+          return (
+            <div key={provider}>
+              <ConnectionCard t={t} api={props.api} provider={provider} {...(source === undefined ? {} : { source })} onChanged={props.onChanged} />
+              {source === undefined ? null : (
+                <div className="dsh-desk-schedule-source">
+                  {calendars.filter(calendar => calendar.sourceId === source.id).map(calendar => (
+                    <div key={calendar.id} className="dsh-desk-schedule-calendar" data-hidden={hidden.has(calendar.id)}>
+                      <button
+                        type="button"
+                        className="dsh-desk-schedule-colorbutton"
+                        style={{ background: calendar.color }}
+                        title={t('schedule.changeColor')}
+                        aria-label={t('schedule.changeColor')}
+                        onClick={() => { void onColor(calendar) }}
+                      />
+                      <button type="button" className="dsh-desk-schedule-calendar-toggle" onClick={() => onToggle(calendar)}>
+                        <span className="dsh-desk-schedule-calendar-name">{calendar.displayName}</span>
+                        <span className="dsh-desk-schedule-calendar-count">{counts[calendar.id] ?? 0}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
         {sources.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.sourcesEmpty')}</p> : null}
       </div>
     </div>
-  )
-}
-
-/* -------------------------------- detail card -------------------------------- */
-
-export function EventCard(props: {
-  readonly t: DeskTranslator
-  readonly event: DeskEvent
-  readonly calendars: readonly DeskCalendar[]
-  readonly onClose: () => void
-}): ReactElement {
-  const { t, event, calendars } = props
-  const [copied, setCopied] = useState(false)
-  const when = event.allDay
-    ? `${new Date(event.start).toLocaleDateString()} · ${t('schedule.allDay')}`
-    : `${new Date(event.start).toLocaleDateString([], { month: 'short', day: 'numeric', weekday: 'short' })} ${formatTime(event.start)} – ${formatTime(event.end)}`
-  const copy = async (): Promise<void> => {
-    const text = `${event.title}\n${when}\n${event.location ?? ''}`
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      window.setTimeout(() => { setCopied(false) }, 2000)
-    } catch {
-      setCopied(false)
-    }
-  }
-  return (
-    <aside className="dsh-desk-schedule-detail-card" aria-label={eventTitle(t, event)}>
-      <header>
-        <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
-        <h3>{eventTitle(t, event)}</h3>
-        <button type="button" className="dsh-desk-schedule-icon" aria-label={t('schedule.detail.close')} onClick={props.onClose}>×</button>
-      </header>
-      <dl>
-        <dt>{t('schedule.detail.when')}</dt><dd>{when}</dd>
-        <dt>{t('schedule.detail.calendar')}</dt><dd>{calendarNameOf(event, calendars)}</dd>
-        {event.location === undefined ? null : <><dt>{t('schedule.detail.location')}</dt><dd>{event.location}</dd></>}
-        {event.description === undefined ? null : <><dt>{t('schedule.detail.description')}</dt><dd className="dsh-desk-schedule-detail-desc">{event.description}</dd></>}
-      </dl>
-      <footer>
-        <span className="dsh-desk-schedule-readonly">{t('schedule.readOnly')}</span>
-        <button type="button" className="dsh-desk-schedule-chip" onClick={() => { void copy() }}>{copied ? t('schedule.detail.copied') : t('schedule.detail.copy')}</button>
-        {event.url === undefined ? null : (
-          <a className="dsh-desk-schedule-chip" href={event.url} target="_blank" rel="noreferrer">{t('schedule.detail.open')}</a>
-        )}
-      </footer>
-    </aside>
   )
 }

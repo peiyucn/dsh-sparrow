@@ -1,8 +1,9 @@
 /**
- * Schedule page CSS. The calendar page fits the panel: toolbar + one-line upcoming strip +
- * a month/week surface that stretches to the remaining height (no scrollbars). List and sources
- * pages scroll inside their own surface. Sub-pages (sources / detail) replace the calendar in-panel,
- * matching the notes-trash / task-archive navigation language.
+ * Schedule page CSS. Layout contract:
+ *  - calendar page = toolbar + upcoming card + calendar card; month/week fill the remaining height
+ *  - week grid: 12 hours per screen (inner = 200% of the viewport), anchored on the current time
+ *  - sources page replaces the calendar in-panel (management is paged, like the notes trash)
+ *  - event detail is a floating card anchored at the click position, closed by outside click / Esc
  */
 
 export const SCHEDULE_CSS = `
@@ -66,23 +67,70 @@ export const SCHEDULE_CSS = `
 }
 .dsh-desk-schedule-empty p { margin: 0; }
 
-/* one-line upcoming strip */
-.dsh-desk-schedule-upcoming {
-  flex: none; display: flex; align-items: center; gap: 4px 10px; min-width: 0;
-  height: 28px; overflow: hidden;
-  font-size: 12px;
+/* top row: upcoming (left) + calendar quick picker (right); calendar takes the rest */
+.dsh-desk-schedule-top {
+  flex: none; display: grid; gap: 8px; height: 152px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
 }
-.dsh-desk-schedule-upcoming-label { flex: none; font-weight: 600; color: var(--dsw-alias-label-secondary, #6b7280); }
-.dsh-desk-schedule-upcoming-empty { color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-schedule-upcoming {
+  height: 100%; overflow: hidden;
+}
+.dsh-desk-schedule-picker {
+  box-sizing: border-box; height: 100%; min-height: 0; display: flex; flex-direction: column;
+  padding: 8px 12px 9px;
+  background: var(--dsw-alias-bg-layer-1, #fff);
+  border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
+  border-radius: var(--dsw-radius-lg, 16px);
+}
+.dsh-desk-schedule-picker header {
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-secondary, #6b7280);
+  margin-bottom: 4px;
+}
+.dsh-desk-schedule-picker-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.dsh-desk-schedule-picker-source { display: flex; flex-direction: column; gap: 1px; }
+.dsh-desk-schedule-picker-provider {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); padding: 1px 2px;
+}
+.dsh-desk-schedule-picker-row {
+  display: flex; align-items: center; gap: 5px; min-width: 0; width: 100%;
+  border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px;
+  padding: 1px 2px; border-radius: 5px; cursor: pointer; text-align: left;
+}
+.dsh-desk-schedule-picker-row:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
+.dsh-desk-schedule-picker-row[data-hidden='true'] { opacity: .45; }
+.dsh-desk-schedule-picker-check {
+  flex: none; width: 13px; height: 13px; line-height: 13px; text-align: center; border-radius: 3px;
+  font-size: 10px; color: transparent; border: 1px solid var(--dsw-alias-border-l2, #cfd4dc);
+}
+.dsh-desk-schedule-picker-check[data-visible='true'] {
+  color: #fff; background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+  border-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+}
+.dsh-desk-schedule-picker-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-desk-schedule-picker-count { margin-left: auto; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-schedule-upcoming {
+  flex: none; box-sizing: border-box; padding: 8px 12px 9px;
+  background: var(--dsw-alias-bg-layer-1, #fff);
+  border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
+  border-radius: var(--dsw-radius-lg, 16px);
+}
+.dsh-desk-schedule-upcoming header {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-secondary, #6b7280);
+  margin-bottom: 3px;
+}
+.dsh-desk-schedule-upcoming ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
 .dsh-desk-schedule-upcoming-item {
-  display: flex; align-items: center; gap: 5px; min-width: 0; max-width: 33%;
-  border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; padding: 2px 4px; border-radius: 6px; cursor: pointer;
+  display: flex; align-items: center; gap: 7px; width: 100%; min-width: 0;
+  border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px;
+  padding: 3px 4px; border-radius: 6px; cursor: pointer; text-align: left;
 }
 .dsh-desk-schedule-upcoming-item:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-schedule-upcoming-day { flex: none; color: var(--dsw-alias-label-tertiary, #8a919f); }
 .dsh-desk-schedule-upcoming-time { flex: none; color: var(--dsw-alias-label-tertiary, #8a919f); }
 .dsh-desk-schedule-upcoming-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dsh-desk-schedule-upcoming .dsh-desk-schedule-link { margin-left: auto; flex: none; }
 .dsh-desk-schedule-colorbar { display: inline-block; width: 3px; min-width: 3px; height: 13px; border-radius: 2px; }
 
 /* calendar surface */
@@ -94,16 +142,24 @@ export const SCHEDULE_CSS = `
   overflow: hidden;
 }
 
-/* month: fills, never scrolls */
+/* month: fills, never scrolls; wheel switches month */
 .dsh-desk-schedule-month { flex: 1; min-height: 0; display: flex; flex-direction: column; font-size: 11px; }
 .dsh-desk-schedule-month-head { flex: none; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .dsh-desk-schedule-month-head span { padding: 6px 8px; color: var(--dsw-alias-label-tertiary, #8a919f); font-weight: 600; }
+.dsh-desk-schedule-month-head span[data-weekend='true'] { color: #c2410c; }
 .dsh-desk-schedule-month-body { flex: 1; min-height: 0; display: grid; }
 .dsh-desk-schedule-month-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); min-height: 0; border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); }
 .dsh-desk-schedule-month-cell { min-height: 0; overflow: hidden; padding: 3px 5px; border-right: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); display: flex; flex-direction: column; gap: 1px; }
+.dsh-desk-schedule-month-cell[data-weekend='true'] { background: color-mix(in srgb, #f59e0b 4%, transparent); }
 .dsh-desk-schedule-month-cell[data-outside='true'] { opacity: .45; }
 .dsh-desk-schedule-month-cell[data-today='true'] { background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 8%, transparent); }
-.dsh-desk-schedule-month-day { flex: none; font-size: 11px; color: var(--dsw-alias-label-secondary, #6b7280); }
+.dsh-desk-schedule-month-day {
+  align-self: flex-start; flex: none; border: 0; background: transparent; color: var(--dsw-alias-label-secondary, #6b7280);
+  font: inherit; font-size: 11px; width: 18px; height: 16px; border-radius: 50%; cursor: pointer; padding: 0;
+}
+.dsh-desk-schedule-month-day:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.08)); }
+.dsh-desk-schedule-month-cell[data-weekend='true'] .dsh-desk-schedule-month-day { color: #c2410c; }
+.dsh-desk-schedule-month-cell[data-today='true'] .dsh-desk-schedule-month-day { background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); color: #fff; }
 .dsh-desk-schedule-month-events { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 1px; }
 .dsh-desk-schedule-month-chip {
   display: flex; align-items: center; gap: 4px; min-width: 0; border: 0; background: transparent; color: inherit;
@@ -112,12 +168,17 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-month-chip:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-schedule-month-chip > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-desk-schedule-month-time { flex: none; color: var(--dsw-alias-label-tertiary, #8a919f); }
-.dsh-desk-schedule-more-count { font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-schedule-more-count {
+  align-self: flex-start; border: 0; background: transparent; color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+  font: inherit; font-size: 10px; padding: 0 2px; cursor: pointer; border-radius: 4px;
+}
+.dsh-desk-schedule-more-count:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.06)); }
 
-/* week: fills, never scrolls */
+/* week: 12h per screen, inner canvas = 24h (200% of the viewport) */
 .dsh-desk-schedule-week { flex: 1; min-height: 0; display: flex; flex-direction: column; font-size: 11px; }
 .dsh-desk-schedule-week-head { flex: none; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .dsh-desk-schedule-week-day { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; color: var(--dsw-alias-label-secondary, #6b7280); }
+.dsh-desk-schedule-week-day[data-weekend='true'] { color: #c2410c; }
 .dsh-desk-schedule-week-day[data-today='true'] { color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); }
 .dsh-desk-schedule-week-allday {
   flex: none; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -127,9 +188,13 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-week-allday-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 0 2px; overflow: hidden; }
 .dsh-desk-schedule-week-allday-chip { display: flex; align-items: center; gap: 4px; min-width: 0; border: 0; border-radius: 4px; background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); color: inherit; font: inherit; font-size: 10px; padding: 2px 4px; cursor: pointer; overflow: hidden; }
 .dsh-desk-schedule-week-allday-chip > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dsh-desk-schedule-week-body { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.dsh-desk-schedule-week-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.dsh-desk-schedule-week-inner { position: relative; height: 200%; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .dsh-desk-schedule-week-col { position: relative; min-width: 0; border-left: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); }
+.dsh-desk-schedule-week-col[data-weekend='true'] { background: color-mix(in srgb, #f59e0b 4%, transparent); }
 .dsh-desk-schedule-week-hour { position: absolute; left: 0; right: 0; border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); }
+.dsh-desk-schedule-week-now { position: absolute; left: 0; right: 0; height: 0; border-top: 1.5px solid #e5484d; z-index: 3; }
+.dsh-desk-schedule-week-now::before { content: ''; position: absolute; left: -3px; top: -4px; width: 6px; height: 6px; border-radius: 50%; background: #e5484d; }
 .dsh-desk-schedule-week-block {
   position: absolute; display: flex; flex-direction: column; gap: 1px; overflow: hidden;
   border: 0; border-left: 2px solid; border-radius: 4px; padding: 1px 3px; cursor: pointer;
@@ -141,6 +206,7 @@ export const SCHEDULE_CSS = `
 /* list: scrolls inside the surface */
 .dsh-desk-schedule-list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 12px; }
 .dsh-desk-schedule-list-day h4 { margin: 8px 0 3px; font-size: 12px; color: var(--dsw-alias-label-secondary, #6b7280); }
+.dsh-desk-schedule-list-day h4[data-weekend='true'] { color: #c2410c; }
 .dsh-desk-schedule-row {
   display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
   border: 0; background: transparent; color: inherit; font: inherit; padding: 4px 2px; border-radius: 6px; cursor: pointer;
@@ -152,24 +218,27 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-conflict { width: 14px; height: 14px; border-radius: 50%; background: #f59e0b; color: #fff; font-size: 10px; line-height: 14px; text-align: center; }
 .dsh-desk-schedule-more { margin: 8px auto; display: block; border: 0; background: transparent; color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); font: inherit; font-size: 12px; cursor: pointer; }
 
-/* event detail card (floating card, not a page: events are peeked, management is paged) */
+/* event detail: fixed card anchored at the click point (not a page) */
 .dsh-desk-schedule-detail-card {
-  position: absolute; right: 16px; bottom: 16px; z-index: 6;
-  width: min(360px, calc(100% - 32px)); max-height: 62%;
-  box-sizing: border-box; display: flex; flex-direction: column; gap: 8px;
+  position: fixed; z-index: 50; box-sizing: border-box;
+  max-height: 70vh; display: flex; flex-direction: column; gap: 8px;
   padding: 12px 14px; font-size: 12px; overflow-y: auto;
   background: var(--dsw-alias-bg-layer-1, #fff);
   border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
-  border-radius: var(--dsw-radius-md, 12px);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, .18);
+  border-radius: 10px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, .22);
 }
 .dsh-desk-schedule-detail-card header { display: flex; align-items: center; gap: 7px; }
-.dsh-desk-schedule-detail-card h3 { margin: 0; font-size: 13px; font-weight: 600; flex: 1; overflow-wrap: anywhere; }
+.dsh-desk-schedule-detail-card h3 {
+  margin: 0; font-size: 13px; font-weight: 600; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dsh-desk-schedule-detail-source { margin: 0; font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); overflow-wrap: anywhere; }
 .dsh-desk-schedule-detail-card dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; margin: 0; }
 .dsh-desk-schedule-detail-card dt { color: var(--dsw-alias-label-tertiary, #8a919f); }
 .dsh-desk-schedule-detail-card dd { margin: 0; }
-.dsh-desk-schedule-detail-desc { white-space: pre-wrap; }
-.dsh-desk-schedule-detail-card footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dsh-desk-schedule-detail-desc { white-space: pre-wrap; max-height: 96px; overflow-y: auto; }
+.dsh-desk-schedule-detail-card footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 2px; border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); }
 .dsh-desk-schedule-readonly { font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); }
 
 /* sources page (in-panel, not a modal) */
@@ -207,12 +276,15 @@ export const SCHEDULE_CSS = `
 }
 .dsh-desk-schedule-calendar-toggle:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-schedule-calendar[data-hidden='true'] { opacity: .45; }
-.dsh-desk-schedule-calendar[data-hidden='true'] .dsh-desk-schedule-colorbutton { background: var(--dsw-alias-label-tertiary, #8a919f) !important; }
 .dsh-desk-schedule-calendar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-desk-schedule-calendar-count { margin-left: auto; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); }
 
 @container (max-width: 760px) {
-  .dsh-desk-schedule-upcoming-item { max-width: 45%; }
   .dsh-desk-schedule-actions { width: 100%; margin-left: 0; justify-content: flex-end; }
+}
+@container (max-width: 900px) {
+  .dsh-desk-schedule-top { grid-template-columns: 1fr; height: auto; }
+  .dsh-desk-schedule-upcoming { height: auto; max-height: 112px; }
+  .dsh-desk-schedule-picker { height: auto; max-height: 168px; }
 }
 `
