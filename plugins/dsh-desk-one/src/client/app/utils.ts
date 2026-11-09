@@ -4,6 +4,25 @@ import { TAB_STORAGE_KEY } from '../../constants.js'
 import type { Tab } from './types.js'
 import { DESK_TABS } from './tabs.js'
 
+/** 12.3K / 52.8M style shorthand used by the session meta (trim trailing .0). */
+export function formatCompactNumber(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0'
+  if (value < 1000) return String(Math.round(value))
+  const units = ['K', 'M', 'B'] as const
+  let scaled = value
+  let unit = -1
+  while (scaled >= 1000 && unit < units.length - 1) {
+    scaled /= 1000
+    unit += 1
+  }
+  const rounded = scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1)
+  return `${rounded.replace(/\.0$/u, '')}${units[unit]}`
+}
+
+export function formatTokens(value: number): string {
+  return `${formatCompactNumber(value)} tok`
+}
+
 export const messageOf = (reason: unknown): string => reason instanceof Error ? reason.message : String(reason)
 
 export const clamp = (value: number, min: number, max: number): number =>

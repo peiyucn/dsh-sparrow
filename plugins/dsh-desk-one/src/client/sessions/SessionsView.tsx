@@ -12,7 +12,7 @@ import type { SessionsArchiveApi } from './archiveApi.js'
 import { activeSessionGroups } from './catalog.js'
 import { ArchiveSections } from './ArchiveSections.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
-import { formatDate } from '../app/utils.js'
+import { formatDate, formatTokens } from '../app/utils.js'
 
 interface SessionsViewProps {
   readonly snapshot: SessionLinkSnapshot
@@ -32,7 +32,7 @@ function sessionMeta(t: DeskTranslator, session: SessionChipInfo): string {
   const parts: string[] = []
   if (session.turns !== undefined) parts.push(`${session.turns} ${t('sessions.archive.turns')}`)
   const tokens = (session.inputTokens ?? 0) + (session.outputTokens ?? 0) + (session.cacheReadTokens ?? 0) + (session.cacheWriteTokens ?? 0)
-  if (tokens > 0) parts.push(`${tokens} tok`)
+  if (tokens > 0) parts.push(formatTokens(tokens))
   parts.push(formatDate(new Date(session.updatedAt).toISOString()))
   return parts.join(' · ')
 }

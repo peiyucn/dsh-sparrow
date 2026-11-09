@@ -14,6 +14,7 @@ import type {
 } from '../../host/sessions/contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
+import { formatTokens } from '../app/utils.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
 
 export interface ArchiveSnapshot {
@@ -105,7 +106,7 @@ function ArchiveTreeNodeRow(props: {
   const meta = (
     <>
       {node.turns === undefined ? '' : `${node.turns} ${t('sessions.archive.turns')}`}
-      {node.tokens === undefined ? '' : ` · ${node.tokens} tok`}
+      {node.tokens === undefined ? '' : ` · ${formatTokens(node.tokens)}`}
       {node.sizeBytes === undefined ? '' : ` · ${Math.max(1, Math.round(node.sizeBytes / 1024))} KB`}
       {` · ${formatDate(node.updatedAt)}`}
     </>
@@ -341,7 +342,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                     meta={[
                       formatDate(item.createdAt),
                       item.turns === undefined ? '' : `${item.turns} ${t('sessions.archive.turns')}`,
-                      item.tokens === undefined ? '' : `${item.tokens} tok`,
+                      item.tokens === undefined ? '' : formatTokens(item.tokens),
                       item.backendSupported ? '' : t('sessions.archive.unsupported'),
                     ].filter(Boolean).join(' · ')}
                     expandLabel={t('sessions.archive.expand')}
