@@ -79,6 +79,27 @@ describe('discoverCalDav', () => {
     assert.equal(calls[1]?.body, calls[0]?.body)
   })
 
+  it('derives the iCloud home from the principal when the home property is missing', async () => {
+    const { fetchImpl } = fakeFetch((url) => {
+      if (url === 'https://caldav.icloud.com/.well-known/caldav') {
+        return xmlResponse(multistatus(davResponse(
+          '/123/principal/',
+          propstat('<d:current-user-principal><d:href>/123/principal/</d:href></d:current-user-principal>'),
+        )))
+      }
+      if (url === 'https://caldav.icloud.com/123/principal/') {
+        return xmlResponse(multistatus(davResponse('/123/principal/', propstat('<d:displayname>Principal</d:displayname>'))))
+      }
+      throw new Error(`unexpected URL ${url}`)
+    })
+
+    const result = await discoverCalDav('https://caldav.icloud.com', AUTH, { fetchImpl })
+    assert.deepEqual(result, {
+      principalUrl: 'https://caldav.icloud.com/123/principal/',
+      homeUrl: 'https://caldav.icloud.com/123/calendars/',
+    })
+  })
+
   it('refuses to forward the credential to a non-approved redirect host', async () => {
     const { calls, fetchImpl } = fakeFetch(() => redirect('https://evil.example.test/.well-known/caldav'))
     await assert.rejects(

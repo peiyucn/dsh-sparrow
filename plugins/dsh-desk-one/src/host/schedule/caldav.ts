@@ -108,13 +108,18 @@ export async function discoverCalDav(
 ): Promise<CalDavDiscovery> {
   const base = parseHttpUrl(baseUrl, 'CalDAV 地址')
   const origin = new URL(base.origin)
-  const principalUrl = await discoverPrincipal(origin, auth, deps)
-  const homeUrl = principalUrl === null ? null : await findCalendarHome(principalUrl, auth, deps)
+  const trace: string[] = []
+  const principalUrl = await discoverPrincipal(origin, auth, deps, trace)
+  const homeUrl = principalUrl === null
+    ? null
+    : await findCalendarHome(principalUrl, auth, deps).then(home => home
+      ?? (isICloudHost(new URL(principalUrl).hostname) ? iCloudHomeFromPrincipal(principalUrl) : null))
   if (principalUrl !== null && homeUrl !== null) return { principalUrl, homeUrl }
   if (isWecomHost(origin.hostname)) {
     return { principalUrl: origin.href, homeUrl: new URL(WECOM_HOME_FALLBACK_PATH, origin).href }
   }
-  throw new ScheduleError('UNSUPPORTED', 'CalDAV 发现失败：未找到当前账号的日历家目录')
+  const detail = trace.length === 0 ? '' : `（探测状态：${trace.join('，')}）`
+  throw new ScheduleError('UNSUPPORTED', `CalDAV 发现失败：未找到当前账号的日历家目录${detail}`)
 }
 
 /** List the calendars under a home URL; `remoteId` is the absolute calendar URL used for queries. */
@@ -211,20 +216,27 @@ async function mapWithConcurrency<T, R>(
   return results
 }
 
-async function discoverPrincipal(origin: URL, auth: CalDavAuth, deps: CalDavDeps): Promise<string | null> {
+async function discoverPrincipal(origin: URL, auth: CalDavAuth, deps: CalDavDeps, trace: string[] = []): Promise<string | null> {
   // Standard chain first, then the origin itself: some servers answer /.well-known with 404 but
   // still expose current-user-principal at the root.
   const fromWellKnown = await findHrefFromPropfind(
-    new URL(WELL_KNOWN_PATH, origin), '0', PRINCIPAL_PROPFIND_BODY, 'current-user-principal', auth, deps,
+    new URL(WELL_KNOWN_PATH, origin), '0', PRINCIPAL_PROPFIND_BODY, 'current-user-principal', auth, deps, trace,
   )
   if (fromWellKnown !== null) return fromWellKnown
-  return findHrefFromPropfind(origin, '0', PRINCIPAL_PROPFIND_BODY, 'current-user-principal', auth, deps)
+  return findHrefFromPropfind(origin, '0', PRINCIPAL_PROPFIND_BODY, 'current-user-principal', auth, deps, trace)
 }
 
 async function findCalendarHome(principalUrl: string, auth: CalDavAuth, deps: CalDavDeps): Promise<string | null> {
   return findHrefFromPropfind(
     new URL(principalUrl), '0', HOME_PROPFIND_BODY, 'calendar-home-set', auth, deps,
   )
+}
+
+/** iCloud home lives at `/{dsid}/calendars/`; derive it when the principal probe omits the home. */
+function iCloudHomeFromPrincipal(principalUrl: string): string | null {
+  const url = new URL(principalUrl)
+  if (!/\/principal\/?$/u.test(url.pathname)) return null
+  return new URL(url.pathname.replace(/\/principal\/?$/u, '/calendars/'), url.origin).href
 }
 
 async function findHrefFromPropfind(
@@ -234,8 +246,10 @@ async function findHrefFromPropfind(
   propName: string,
   auth: CalDavAuth,
   deps: CalDavDeps,
+  trace: string[] = [],
 ): Promise<string | null> {
   const response = await requestPropfind(url, depth, body, auth, deps)
+  trace.push(`${url.pathname} ${response.status}`)
   if (response.status === 401 || response.status === 403) throwForStatus(response.status, 'CalDAV 发现')
   if (response.status < 200 || response.status >= 300) return null
   for (const item of parseWebDavBody(response, 'CalDAV 发现')) {
