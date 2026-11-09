@@ -350,6 +350,14 @@ export function CalendarSources(props: SourcesProps): ReactElement {
             <span className="dsh-desk-schedule-source-account">{source.account ?? ''}</span>
             {source.syncState === 'error' ? <span className="dsh-desk-schedule-source-error" title={source.lastError?.message}>{t('schedule.syncFailed')}</span> : null}
           </h4>
+          {calendars.some(calendar => calendar.sourceId === source.id && calendar.lastError !== undefined) ? (
+            <p className="dsh-desk-schedule-source-errornote">
+              {t('schedule.calendarSyncFailed', {
+                count: calendars.filter(calendar => calendar.sourceId === source.id && calendar.lastError !== undefined).length,
+                message: calendars.find(calendar => calendar.sourceId === source.id && calendar.lastError !== undefined)?.lastError?.message ?? '',
+              })}
+            </p>
+          ) : null}
           {calendars.filter(calendar => calendar.sourceId === source.id).map(calendar => (
             <div key={calendar.id} className="dsh-desk-schedule-calendar" data-hidden={hidden.has(calendar.id)}>
               <button
@@ -482,6 +490,9 @@ export function ConnectionsPanel(props: ConnectionsProps): ReactElement {
       setPassword('')
       setMessage(t('schedule.form.saved'))
       await props.onChanged()
+      // Close on success: the page behind already shows the connected calendars (and any
+      // per-calendar sync error), so leaving the dialog open only looks like a dead overlay.
+      props.onClose()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {

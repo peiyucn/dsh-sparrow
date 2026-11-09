@@ -127,6 +127,13 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-source h4 { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-size: 11px; color: var(--dsw-alias-label-secondary, #6b7280); font-weight: 600; }
 .dsh-desk-schedule-source-account { font-weight: 400; color: var(--dsw-alias-label-tertiary, #8a919f); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-desk-schedule-source-error { margin-left: auto; font-size: 10px; color: #c2410c; }
+.dsh-desk-schedule-source-errornote {
+  margin: 2px 0 6px;
+  font-size: 11px;
+  line-height: 15px;
+  color: #c2410c;
+  overflow-wrap: anywhere;
+}
 .dsh-desk-schedule-provider { width: 7px; height: 7px; border-radius: 50%; background: var(--dsw-alias-label-tertiary, #8a919f); }
 .dsh-desk-schedule-provider.is-wecom { background: #2f8d5b; }
 .dsh-desk-schedule-provider.is-icloud { background: #4a90d9; }

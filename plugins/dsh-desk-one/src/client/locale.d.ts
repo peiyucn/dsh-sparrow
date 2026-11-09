@@ -38,6 +38,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'schedule.readOnly'
       | 'schedule.conflict'
       | 'schedule.syncFailed'
+      | 'schedule.calendarSyncFailed'
       | 'schedule.toggleCalendar'
       | 'schedule.changeColor'
       | 'schedule.loadMore'
