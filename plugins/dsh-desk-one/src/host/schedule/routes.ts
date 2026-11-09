@@ -61,7 +61,10 @@ async function updateCalendar(route: DeskRouteContext, req: IncomingMessage): Pr
     throw new DeskError('INVALID_SCHEDULE', '缺少 patch', 400)
   }
   const schedule = scheduleOf(route)
-  await route.store.updateCalendar(body.id, body.expectedRevision, patch)
+  const updated = await route.store.updateCalendar(body.id, body.expectedRevision, patch)
+  // Turning per-calendar sync off also drops its mirrored events, so stale/leftover calendars
+  // stop contributing data immediately instead of lingering until the next full sync.
+  if (patch.enabled === false) await route.store.syncCalendarEvents(updated, [])
   return schedule.state()
 }
 

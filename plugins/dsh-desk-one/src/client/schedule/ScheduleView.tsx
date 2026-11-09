@@ -180,6 +180,18 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
     }
   }, [api])
 
+  const setCalendarEnabled = useCallback(async (calendar: DeskCalendar, enabled: boolean): Promise<void> => {
+    try {
+      setState(await api.updateCalendar({ id: calendar.id, expectedRevision: calendar.revision, patch: { enabled } }))
+      setError(null)
+      // Re-enabling starts a pull right away so the mirror is not empty until the next interval.
+      if (enabled) await api.sync()
+      await load()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    }
+  }, [api, load])
+
   const setCalendarColor = useCallback(async (calendar: DeskCalendar, color: string): Promise<void> => {
     try {
       setState(await api.updateCalendar({ id: calendar.id, expectedRevision: calendar.revision, patch: { color } }))
@@ -232,6 +244,7 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
         hidden={hidden}
         onToggle={toggleHidden}
         onColor={cycleColor}
+        onSetEnabled={setCalendarEnabled}
         onBack={() => { setPage('calendar') }}
         onChanged={async () => { await load() }}
       />
@@ -289,7 +302,7 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
             <CalendarPicker
               t={t}
               sources={sources}
-              calendars={calendars}
+              calendars={calendars.filter(calendar => calendar.enabled)}
               counts={counts}
               hidden={hidden}
               onToggle={toggleHidden}

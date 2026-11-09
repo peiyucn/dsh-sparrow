@@ -578,6 +578,7 @@ interface SourcesPageProps {
   readonly hidden: Set<string>
   readonly onToggle: (calendar: DeskCalendar) => void
   readonly onColor: (calendar: DeskCalendar) => Promise<void>
+  readonly onSetEnabled: (calendar: DeskCalendar, enabled: boolean) => Promise<void>
   readonly onBack: () => void
   readonly onChanged: () => Promise<void>
 }
@@ -681,7 +682,7 @@ function ConnectionCard(props: {
 }
 
 export function SourcesPage(props: SourcesPageProps): ReactElement {
-  const { t, sources, calendars, counts, hidden, onToggle, onColor } = props
+  const { t, sources, calendars, counts, hidden, onToggle, onColor, onSetEnabled } = props
   return (
     <div className="dsh-desk-schedule-page">
       <header className="dsh-desk-schedule-pagehead">
@@ -696,6 +697,7 @@ export function SourcesPage(props: SourcesPageProps): ReactElement {
               <ConnectionCard t={t} api={props.api} provider={provider} {...(source === undefined ? {} : { source })} onChanged={props.onChanged} />
               {source === undefined ? null : (
                 <div className="dsh-desk-schedule-source">
+                  <p className="dsh-desk-schedule-sync-hint">{t('schedule.syncCalendarHint')}</p>
                   {calendars.filter(calendar => calendar.sourceId === source.id).map(calendar => (
                     <div key={calendar.id} className="dsh-desk-schedule-calendar" data-hidden={hidden.has(calendar.id)}>
                       <button
@@ -710,6 +712,14 @@ export function SourcesPage(props: SourcesPageProps): ReactElement {
                         <span className="dsh-desk-schedule-calendar-name">{calendar.displayName}</span>
                         <span className="dsh-desk-schedule-calendar-count">{counts[calendar.id] ?? 0}</span>
                       </button>
+                      <button
+                        type="button"
+                        className="dsh-desk-schedule-sync-toggle"
+                        data-on={calendar.enabled}
+                        title={t('schedule.syncCalendar')}
+                        aria-label={t('schedule.syncCalendar')}
+                        onClick={() => { void onSetEnabled(calendar, !calendar.enabled) }}
+                      >{calendar.enabled ? t('schedule.syncOn') : t('schedule.syncOff')}</button>
                     </div>
                   ))}
                 </div>

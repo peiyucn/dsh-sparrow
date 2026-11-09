@@ -297,6 +297,16 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-form-ok { margin: 0; color: #2f8d5b; }
 .dsh-desk-schedule-form-actions { display: flex; gap: 8px; align-items: center; }
 .dsh-desk-schedule-source { display: flex; flex-direction: column; gap: 2px; padding: 4px 2px; font-size: 12px; }
+.dsh-desk-schedule-sync-hint { margin: 0 0 4px; font-size: 11px; line-height: 15px; color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-schedule-sync-toggle {
+  flex: none; border: 0; border-radius: 999px; padding: 2px 8px; font: inherit; font-size: 10px; cursor: pointer;
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.06)); color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-desk-schedule-sync-toggle[data-on='true'] {
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 12%, transparent);
+  color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+}
+.dsh-desk-schedule-sync-toggle[data-on='false'] { color: #c2410c; background: color-mix(in srgb, #c2410c 10%, transparent); }
 .dsh-desk-schedule-calendar { display: flex; align-items: center; gap: 6px; }
 .dsh-desk-schedule-colorbutton {
   width: 12px; height: 12px; min-width: 12px; padding: 0; border: 0; border-radius: 50%;
