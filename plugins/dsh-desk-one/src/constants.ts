@@ -118,7 +118,7 @@ export const ICLOUD_PASSWORD_REF = 'DESK_ONE_ICLOUD_CALDAV_PASSWORD'
 export const OUTLOOK_ICS_URL_REF = 'DESK_ONE_OUTLOOK_ICS_URL'
 
 /** 日程界面偏好（纯界面状态，不含用户内容）：视图与日历显隐。 */
-export const SCHEDULE_VIEW_STORAGE_KEY = 'dsh-desk-one:schedule-view'
+export const SCHEDULE_VIEW_STORAGE_KEY = 'dsh-desk-one:schedule-view-v2'
 export const SCHEDULE_HIDDEN_STORAGE_KEY = 'dsh-desk-one:schedule-hidden-calendars'
 
 /** 便签几何（px）：默认尺寸与拖拽改大小的上下限，模型层与界面共用这一份真值。 */

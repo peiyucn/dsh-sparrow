@@ -35,7 +35,9 @@ function readView(): ScheduleViewName {
   } catch {
     // Storage unavailable: fall back to the default view for this session.
   }
-  return 'list'
+  // Default to the month grid: a "schedule" page must show a calendar first, with the list as
+  // one of the views rather than the landing state.
+  return 'month'
 }
 
 function readHidden(): Set<string> {

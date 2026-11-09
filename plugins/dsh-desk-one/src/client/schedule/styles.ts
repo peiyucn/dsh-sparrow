@@ -7,12 +7,14 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule {
   container-type: inline-size;
   position: relative;
+  box-sizing: border-box;
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 10px;
-  height: 100%;
   min-height: 0;
-  padding: 10px 16px 16px;
+  /* The panel header is a fixed 76px overlay; content must start below it. */
+  padding: calc(var(--dsh-desk-header-h) + 10px) 16px 16px;
   color: var(--dsw-alias-label-primary, #1f2329);
 }
 
