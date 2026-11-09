@@ -63,6 +63,7 @@ export const SCHEDULE_CSS = `
   display: inline-flex; align-items: center; justify-content: center;
   width: 24px; height: 24px; padding: 0; border-radius: 6px; cursor: pointer;
 }
+.dsh-desk-schedule-icon svg { display: block; }
 .dsh-desk-schedule-icon:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-schedule-error { flex-basis: 100%; margin: 0; font-size: 12px; color: #c2410c; }
 .dsh-desk-schedule-hint { margin: 8px 0; font-size: 12px; color: var(--dsw-alias-label-tertiary, #8a919f); }

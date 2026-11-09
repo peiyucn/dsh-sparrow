@@ -64,9 +64,13 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
   return (
     <div className="dsh-desk-schedule-toolbar">
       <div className="dsh-desk-schedule-nav">
-        <button type="button" className="dsh-desk-schedule-icon" aria-label={t('schedule.prev')} title={t('schedule.prev')} onClick={() => props.onStep(-1)}>‹</button>
+        <button type="button" className="dsh-desk-schedule-icon" aria-label={t('schedule.prev')} title={t('schedule.prev')} onClick={() => props.onStep(-1)}>
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
         <span className="dsh-desk-schedule-range">{rangeLabel}</span>
-        <button type="button" className="dsh-desk-schedule-icon" aria-label={t('schedule.next')} title={t('schedule.next')} onClick={() => props.onStep(1)}>›</button>
+        <button type="button" className="dsh-desk-schedule-icon" aria-label={t('schedule.next')} title={t('schedule.next')} onClick={() => props.onStep(1)}>
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M9 18l6-6-6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
         <button type="button" className="dsh-desk-schedule-chip" onClick={props.onToday}>{t('schedule.today')}</button>
       </div>
       <div className="dsh-desk-schedule-viewtabs" role="tablist">

@@ -241,6 +241,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
   const [bulk, setBulk] = useState<null | 'restoreAll' | 'deleteAll'>(null)
   const [copied, setCopied] = useState(false)
   const [visible, setVisible] = useState({ archived: SESSION_STREAM_PAGE_SIZE, strays: SESSION_STREAM_PAGE_SIZE, trash: SESSION_STREAM_PAGE_SIZE })
+  const [expandedTrash, setExpandedTrash] = useState<Set<string>>(new Set())
 
   const reload = useCallback(async (): Promise<void> => {
     try {
@@ -485,6 +486,14 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                       </>
                     )}
                     meta={formatDate(Date.parse(entry.archivedAt))}
+                    hasChildren={!entry.legacy && entry.subagents.length > 0}
+                    expanded={expandedTrash.has(entry.trashId)}
+                    onToggleExpand={() => setExpandedTrash(previous => {
+                      const next = new Set(previous)
+                      if (next.has(entry.trashId)) next.delete(entry.trashId)
+                      else next.add(entry.trashId)
+                      return next
+                    })}
                     actions={(
                       <>
                         {entry.legacy ? null : (
@@ -503,7 +512,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                       </>
                     )}
                   />
-                  {entry.legacy ? null : (
+                  {entry.legacy || !expandedTrash.has(entry.trashId) ? null : (
                     <TrashSubagentRows t={t} parentId={entry.sessionId} subagents={entry.subagents} depth={1} />
                   )}
                 </li>
