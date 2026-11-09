@@ -165,16 +165,20 @@ export async function queryCalDavEvents(
     if (item.href === '') continue
     const url = resolveHref(item.href, response.url)
     if (url === null) continue
+    // WeCom's REPORT also returns the collection self-entry (no etag, no calendar-data);
+    // GET on that collection is a 403. Real event resources always carry an ETag here.
+    if (url.href === calendar.href || url.pathname.endsWith('/')) continue
     const etag = normalizeEtag(item.props.getetag)
     const ics = (item.props['calendar-data'] ?? '').trim()
     if (ics !== '') {
       events.push({ href: url.href, ...(etag === undefined ? {} : { etag }), ics })
       continue
     }
+    if (etag === undefined) continue
     // Some servers omit calendar-data and only serve per-object GET (WeCom) — fetch those by href.
     const fetched = await fetchCalendarObject(url, auth, deps)
     if (fetched === null) continue
-    events.push({ href: url.href, ...(etag === undefined ? {} : { etag }), ics: fetched })
+    events.push({ href: url.href, etag, ics: fetched })
   }
   return events
 }
