@@ -575,7 +575,9 @@ function OutlookGraphCard(props: {
     setBusy(true); setError(null)
     const popup = device ? null : window.open('', 'desk-one-outlook', 'width=520,height=680')
     try {
-      const redirectUri = device ? undefined : `${window.location.origin}/api/desk-one/schedule/outlook/callback`
+      // Microsoft ignores the port for localhost redirect URIs, so the DSH port can vary.
+      const port = window.location.port === '' ? '' : `:${window.location.port}`
+      const redirectUri = device ? undefined : `http://localhost${port}/api/desk-one/schedule/outlook/callback`
       const start = await api.startOutlookLogin(redirectUri)
       if (start.kind === 'redirect' && start.authUrl !== undefined) {
         if (popup === null || popup.closed) window.location.href = start.authUrl
