@@ -1,6 +1,6 @@
 # 06 · 会话索引（Session Index）— 统一对象的外键层
 
-> 状态（2026-11-09）：索引节点、刷新逻辑、`desk_session_search` / `desk_session_get` 已实现；
+> 状态（2026-11-09）：索引节点、刷新逻辑已实现；**不暴露重复的 agent 搜索工具**（官方会话工具已覆盖）；
 > 任务卡 `sessionIds` → `link` 边的迁移尚未执行（见第 4 节，属于下一步）。
 
 ## 1. 定位
@@ -59,15 +59,11 @@ edge { type: 'link', from: 'task_<id>', to: 'session_<sessionId>', meta: { relat
 4. 写入路径（@ 选择器）改为加边/删边；迁移完成后删除兼容分支；
 5. agent 通过边遍历任务 ↔ 会话。
 
-## 5. Agent 工具
+## 5. Agent 接口
 
-| 工具 | 行为 |
-|---|---|
-| `desk_session_search` | 按 `query`（标题 / cwd / sessionId）搜索，默认 20 条；包含归档；返回规范 sessionId 与状态 |
-| `desk_session_get` | 按 sessionId 解析索引行；未索引时返回 `SESSION_NOT_INDEXED` |
-
-拿到 sessionId 后，agent 使用现有会话读取能力看内容，不经过第二份副本。
-
+- **不新增重复的会话搜索工具**：DSH 官方已有 `session_search` / `session_trace` 等能力，AI 用官方工具找对话即可；Desk One 再暴露一个 `desk_session_search` 只是重复且更容易漂移。
+- 索引的 agent 价值在**图关系**：任务/便签 ↔ 会话的 `link` 边落地后，提供官方工具做不到的查询（例如“这个任务关联了哪些会话和便签”），而不是再做一份全文搜索。
+- 索引同时供 UI 解析任务卡上的会话引用（标题 / 归档状态 / 运行状态），避免客户端快照与存储两套真相。
 ## 6. 验收
 
 - 索引节点与真实会话数量/状态一致（含归档）；
