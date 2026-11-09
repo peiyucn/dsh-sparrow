@@ -7,13 +7,13 @@
 
 DSH Web 里「与 harness 共用一张桌子」的工作套件 **Desk One（同桌）**：一个侧栏入口、一个面板、**一套统一对象**，把待办、日程、专注、便签、看板收在一处；Agent 通过一组工具读写同一套数据，而不是各模块各存一份。
 
-日程聚合来自三条「个人可搞定」的线路（v1 只读）：
+时间页的日程聚合来自三条「个人可搞定」的线路（v1 只读）：
 
 * **企业微信（公司租户）**：CalDAV，服务器 `caldav.wecom.work`，账号为邮箱，密码在手机端「日程 → 日程设置 → 同步至其他日历」获取（每次重新获取会让旧密码失效）。
 * **iCloud（个人）**：CalDAV，服务器 `caldav.icloud.com`，账号为 Apple ID，密码用 Apple 官方「App 专用密码」（需先开启双重认证；改 Apple 主密码会让全部专用密码失效）。
 * **Outlook（个人账号）**：网页版「发布日历」得到 ICS 链接，按订阅方式拉取（只读，刷新由接收方决定，通常是小时级）；Microsoft Graph 设备码线路（实时、可增量、将来可写回）后置——注册 Azure 应用要求有效订阅，不放进 v1。
 
-> **命名**：模块中文名为「日程」、英文名为 **Schedule**（不用 Calendar）。以后这里不只有日历，还会有日程列表与可排期的待办；底层远端日历对象仍按 provider 记录。
+> **命名**：标签中文名为「时间」、英文名为 **Time**（替代原「日程 / Schedule」；路由与数据表仍沿用 `schedule` 前缀）。这里以后不只有日历，还会有专注时间、倒计时等小控件；底层远端日历对象仍按 provider 记录。
 
 ## 设计原则
 
@@ -31,7 +31,7 @@ DSH Web 里「与 harness 共用一张桌子」的工作套件 **Desk One（同�
 | 1 | 面板外壳 Shell | 侧栏入口、面板框架、模块路由、加载与错误态 | — | S0 |
 | 2 | 总览 Overview | 跨模块汇总（内容与联动规则待设计；S0 空白占位） | 全部 | 待设计 |
 | 3 | 待办 Tasks | 收集箱、推进、完成、优先级、估算、排期入口 | `task` | S1 |
-| 4 | 日程 Schedule | 分区页面：近期日程 + 列表/月/周主视图 + 源→日历两级筛选；外部日程只读镜像（v1 不做本地事件） | `event` + `calendar` | S2（只读，三源） |
+| 4 | 时间 Time | 日历主页（近期日程 + 日历源快捷选择 + 月/周/列表）+ 连接与日历源管理页；外部日程只读镜像（v1 不做本地事件），专注/倒计时等小控件后续加入 | `event` + `calendar` | S2（只读，三源） |
 | 5 | 同步 Sync | 企业微信 / iCloud CalDAV 与 Outlook 个人 ICS 的连接、拉取、状态与错误 | `event`（镜像）+ `calendar` | S2（只读） |
 | 6 | 专注 Focus | 番茄计时，绑定任务，累计实际用时 | `focus` | S3 |
 | 7 | 便签墙 Notes | 快速记录、置顶、颜色、一键转任务 | `note` | S0 |
@@ -43,7 +43,7 @@ DSH Web 里「与 harness 共用一张桌子」的工作套件 **Desk One（同�
 
 ## 代码结构（按功能模块）
 
-共享一套对象模型，功能按目录隔离；新功能（任务板 / 日程 / 专注 / 会话）照此扩展，不往便签目录里堆。
+共享一套对象模型，功能按目录隔离；新功能（任务板 / 时间 / 专注 / 会话）照此扩展，不往便签目录里堆。
 
 ```text
 src/
@@ -55,7 +55,7 @@ src/
     notes/{routes,tools}.ts                                # 便签功能的 host 半（路由表由 router 挂载）
     tasks/{routes,tools,group-routes,group-tools}.ts       # 任务板功能的 host 半（含分组实体，S1）
     sessions/**                                            # 会话归档管理 host 半（Phase 2 从 archive-manage 迁移）
-    schedule/{routes,sync,providers/**,caldav/**,ics/**}   # 日程聚合 host 半（S2，只读）
+    schedule/{routes,sync,providers/**,caldav/**,ics/**}   # 时间页的日程聚合 host 半（S2，只读）
   client/
     index.ts install.ts panel.ts icon.tsx compat.ts       # 入口与客户端装配
     i18n.ts locale.d.ts                                   # 共享文案（键按功能命名空间）
@@ -100,10 +100,10 @@ test/
 | :-- | :--- | :--- |
 | **S0** | 插件骨架 + 对象模型核心（Node/Edge/Store/迁移/扩展位）+ 便签墙 + 文档与登记 | 能装、`verify` 绿；断网可新增/编辑/置顶便签，刷新不丢 |
 | **S1** | 任务模型 + 看板视图（+ 简单列表） | 卡片拖拽改状态与列表一致；「总览」先出任务版 |
-| **S2** | 日程聚合：企业微信 CalDAV + iCloud CalDAV + Outlook 个人发布 ICS（只读），并入「总览」；会话归档能力的 host 迁移 + 管理 UI（第二阶段 A 线） | 三源事件合并展示、冲突标记；密码 / 授权 / 订阅链接失效有提示；归档插件能力对等并退役 |
+| **S2** | 时间页的日程聚合：企业微信 CalDAV + iCloud CalDAV + Outlook 个人发布 ICS（只读），并入「总览」；会话归档能力的 host 迁移 + 管理 UI（第二阶段 A 线） | 三源事件合并展示、冲突标记；密码 / 授权 / 订阅链接失效有提示；归档插件能力对等并退役 |
 | **S3** | 专注 + 搜索 + 日程写回（本地事件、写回外部、订阅发布） | 番茄绑定任务、跨对象搜索、写回失败逐条反馈 |
 
-> 第二阶段按 A（归档能力完全移植）/ B（日程聚合 v1）两条线推进：A1 host 迁移 → B 日程 → A2 会话管理 UI + Desk One 首发 → 归档插件退役；细节分别见 `04-sessions.md`、`05-schedule.md` 与 `02-modules.md` 第 4–5 节。
+> 第二阶段按 A（归档能力完全移植）/ B（时间页的日程聚合 v1）两条线推进：A1 host 迁移 → B 日程 → A2 会话管理 UI + Desk One 首发 → 归档插件退役；细节分别见 `04-sessions.md`、`05-schedule.md` 与 `02-modules.md` 第 4–5 节。
 > **进度（2026-11-09）**：B 日程 v1 基础版已实现并 `verify` 全绿，真实外部服务未验证（等 owner 凭据联调）；A1 会话归档 host 迁移 + A2 管理 UI 已实现（318 项测试全绿）。**归档插件退役待 owner 真机验证 Desk One 首发版本后执行**（npm deprecate 由 owner 手动）。
 
 每一步合并前：插件目录 `npm run verify` + 根 `pnpm run verify` 全绿；文档与守卫同步更新（活跃插件四件套 + 登记 + 市场索引），不把守卫留到下一步。
@@ -148,7 +148,7 @@ test/
 
 ## 已确认决策（2026-11-09 增补）
 
-5. 模块命名：中文 **日程**、英文 **Schedule**（不用 Calendar）；代码目录 `host/schedule/`、`client/schedule/`，路由前缀 `/api/desk-one/schedule/*`，agent 工具 `desk_schedule_*`，标签页文案「日程」。理由：以后不只有日历，还会有日程列表与可排期的待办，并与便签、任务板、会话联动；底层远端日历对象仍按 provider 记录。
+5. 模块命名：中文 **时间**、英文 **Time**（不用 Calendar）；代码目录 `host/schedule/`、`client/schedule/`，路由前缀 `/api/desk-one/schedule/*`，agent 工具 `desk_schedule_*`，标签页文案「日程」。理由：以后不只有日历，还会有日程列表与可排期的待办，并与便签、任务板、会话联动；底层远端日历对象仍按 provider 记录。
 6. S2 支持三源只读：企业微信 CalDAV、iCloud CalDAV（Apple App 专用密码）、Outlook **仅个人账号**的发布 ICS；Microsoft Graph 后置。实现顺序：企业微信 → Outlook → iCloud（凭据到位后先跑真机探针再联调）。
 7. v1 不创建本地事件、不提供订阅/发布；将来做本地事件时必须**同时提供订阅能力**（iCalendar 导出/订阅源），否则用户迁移日历的成本无法回收。
 8. 归档插件退役：Desk One 首发包含归档管理 UI、并经 owner 真机验证后，由 owner 执行 npm deprecate；README / CHANGELOG / AGENTS 等工程文件由 agent 维护。退役不早于会话管理 UI 上线。
