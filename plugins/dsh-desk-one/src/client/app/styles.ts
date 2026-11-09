@@ -514,12 +514,19 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 }
 .dsh-desk-session-caret {
   flex: none;
-  width: 12px;
-  font-size: 10px;
-  line-height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: -4px;
+  font-size: 11px;
+  line-height: 1;
   color: var(--dsw-alias-label-tertiary, #8a919f);
   cursor: pointer;
+  border-radius: 4px;
 }
+.dsh-desk-session-caret:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.06)); }
 .dsh-desk-session-row {
   appearance: none;
   box-sizing: border-box;

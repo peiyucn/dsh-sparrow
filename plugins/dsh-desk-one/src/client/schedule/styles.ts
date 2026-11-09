@@ -39,6 +39,7 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-nav { display: flex; align-items: center; gap: 6px; }
 .dsh-desk-schedule-range {
   font-size: 14px; font-weight: 600; width: 168px; flex: none;
+  display: inline-flex; align-items: center; height: 24px; line-height: 24px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .dsh-desk-schedule-viewtabs { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
@@ -50,14 +51,16 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .dsh-desk-schedule-synced { font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); white-space: nowrap; }
 .dsh-desk-schedule-chip {
+  box-sizing: border-box;
   border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); background: transparent; color: inherit;
-  font: inherit; font-size: 12px; line-height: 22px; padding: 0 8px; border-radius: 6px; cursor: pointer;
+  font: inherit; font-size: 12px; height: 24px; padding: 0 8px; border-radius: 6px; cursor: pointer;
   display: inline-flex; align-items: center; text-decoration: none;
 }
 .dsh-desk-schedule-chip:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-schedule-chip:disabled { opacity: .55; cursor: default; }
 .dsh-desk-schedule-icon {
-  border: 0; background: transparent; color: inherit; font-size: 18px; line-height: 22px;
+  border: 0; background: transparent; color: inherit; font-size: 16px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
   width: 24px; height: 24px; padding: 0; border-radius: 6px; cursor: pointer;
 }
 .dsh-desk-schedule-icon:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }

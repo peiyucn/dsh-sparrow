@@ -39,12 +39,19 @@ export const SESSIONS_CSS = `
 }
 .dsh-desk-archive-row-toggle:disabled { cursor: default; }
 .dsh-desk-archive-caret {
-  width: 14px;
+  width: 20px;
+  height: 20px;
   flex: none;
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -4px;
+  font-size: 11px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
   cursor: pointer;
+  border-radius: 4px;
 }
+.dsh-desk-archive-caret:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.06)); }
 .dsh-desk-archive-title {
   min-width: 0;
   overflow: hidden;
