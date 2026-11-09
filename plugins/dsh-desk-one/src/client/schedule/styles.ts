@@ -269,10 +269,16 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-form-ok { margin: 0; color: #2f8d5b; }
 .dsh-desk-schedule-form-actions { display: flex; gap: 8px; align-items: center; }
 .dsh-desk-schedule-source {
-  display: flex; flex-direction: column; gap: 2px; padding: 10px 12px 6px; font-size: 12px;
-  border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); border-radius: 12px;
-  background: var(--dsw-alias-bg-layer-1, #fff);
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 0 2px; font-size: 12px;
+  border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
 }
+.dsh-desk-schedule-statusdot {
+  width: 8px; height: 8px; min-width: 8px; border-radius: 50%;
+  background: var(--dsw-alias-label-tertiary, #b8bec8);
+}
+.dsh-desk-schedule-statusdot[data-on='true'] { background: #2f9e5b; }
+.dsh-desk-schedule-connection-count { font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); margin-left: 6px; }
+.dsh-desk-schedule-connection-form { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); }
 .dsh-desk-schedule-mgmt-row {
   display: flex; align-items: center; gap: 7px; min-width: 0; padding: 6px 2px;
   border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);

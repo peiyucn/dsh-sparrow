@@ -484,14 +484,27 @@ interface SourcesPageProps {
   readonly onChanged: () => Promise<void>
 }
 
-function ConnectionCard(props: {
+/**
+ * One source card: status header, in-card calendar selection and a collapsible connection form.
+ * A configured source keeps its form collapsed; the whole block (connection + calendars) is one
+ * surface instead of two stacked boxes.
+ */
+function ProviderCard(props: {
   readonly t: DeskTranslator
   readonly api: ScheduleApi
   readonly provider: ScheduleProvider
   readonly source?: DeskScheduleSource
+  readonly calendars: readonly DeskCalendar[]
+  readonly counts: Readonly<Record<string, number>>
+  readonly hidden: Set<string>
+  readonly onToggle: (calendar: DeskCalendar) => void
+  readonly onColor: (calendar: DeskCalendar) => Promise<void>
+  readonly onSetEnabled: (calendar: DeskCalendar, enabled: boolean) => Promise<void>
   readonly onChanged: () => Promise<void>
 }): ReactElement {
-  const { t, api, provider, source, onChanged } = props
+  const { t, api, provider, source, calendars, counts, hidden, onToggle, onColor, onSetEnabled } = props
+  const connected = source !== undefined
+  const [editing, setEditing] = useState(!connected)
   const [account, setAccount] = useState(source?.account ?? '')
   const [password, setPassword] = useState('')
   const [icsUrl, setIcsUrl] = useState('')
@@ -519,7 +532,8 @@ function ConnectionCard(props: {
       await api.saveConnection(input())
       setPassword('')
       setMessage(t('schedule.form.saved'))
-      await onChanged()
+      setEditing(false)
+      await props.onChanged()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally { setBusy(null) }
@@ -530,56 +544,108 @@ function ConnectionCard(props: {
     try {
       await api.removeConnection(provider)
       setMessage(t('schedule.form.removed'))
-      await onChanged()
+      await props.onChanged()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally { setBusy(null) }
   }
 
+  const enabledCount = calendars.filter(calendar => calendar.enabled).length
   return (
-    <section className="dsh-desk-schedule-connection-card">
+    <section className="dsh-desk-schedule-connection-card" data-connected={connected}>
       <header>
-        <span className={`dsh-desk-schedule-provider is-${provider}`} />
+        <span className="dsh-desk-schedule-statusdot" data-on={connected} />
         <h3>{t(providerKey(provider) as never)}</h3>
         <span className="dsh-desk-schedule-connection-status" data-error={source?.syncState === 'error'}>
-          {source === undefined ? t('schedule.form.notConnected') : t('schedule.form.connected')}
+          {connected ? t('schedule.form.connected') : t('schedule.form.notConnected')}
         </span>
+        {connected ? <span className="dsh-desk-schedule-connection-count">{enabledCount}/{calendars.length}</span> : null}
+        <button type="button" className="dsh-desk-schedule-chip" onClick={() => setEditing(value => !value)}>
+          {editing ? t('schedule.collapse') : t('schedule.connectionSettings')}
+        </button>
       </header>
-      <div className="dsh-desk-schedule-form-fields">
-        {provider === 'outlook' ? (
-          <label>
-            <span>{t('schedule.form.ics')}</span>
-            <input value={icsUrl} onChange={event => setIcsUrl(event.target.value)} placeholder="https://…/calendar.ics" spellCheck={false} />
-          </label>
-        ) : (
-          <>
-            <label>
-              <span>{t('schedule.form.account')}</span>
-              <input value={account} onChange={event => setAccount(event.target.value)} spellCheck={false} autoComplete="username" />
-            </label>
-            <label>
-              <span>{t('schedule.form.password')}</span>
-              <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" />
-            </label>
-          </>
-        )}
-      </div>
-      <p className="dsh-desk-schedule-form-note">{t(`schedule.form.note.${provider}` as never)}</p>
-      {message === null ? null : <p className="dsh-desk-schedule-form-ok">{message}</p>}
-      {error === null ? null : <p className="dsh-desk-schedule-error">{error}</p>}
-      <div className="dsh-desk-schedule-form-actions">
-        <button type="button" className="dsh-desk-schedule-chip" disabled={busy !== null} onClick={() => { void runTest() }}>
-          {busy === 'test' ? t('schedule.form.testing') : t('schedule.form.test')}
-        </button>
-        <button type="button" className="dsh-desk-btn dsh-desk-btn-primary" disabled={busy !== null} onClick={() => { void save() }}>
-          {busy === 'save' ? t('schedule.form.saving') : t('schedule.form.save')}
-        </button>
-        {source === undefined ? null : (
-          <button type="button" className="dsh-desk-schedule-chip" disabled={busy !== null} onClick={() => { void disconnect() }}>
-            {t('schedule.form.remove')}
-          </button>
-        )}
-      </div>
+
+      {connected && !editing ? (
+        <div className="dsh-desk-schedule-source">
+          <p className="dsh-desk-schedule-sync-hint">{t('schedule.syncCalendarHint')}</p>
+          {calendars.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.noCalendars')}</p> : null}
+          {calendars.map(calendar => (
+            <div key={calendar.id} className="dsh-desk-schedule-mgmt-row" data-off={!calendar.enabled}>
+              <button
+                type="button"
+                className="dsh-desk-schedule-colorbutton"
+                style={{ background: calendar.color }}
+                title={t('schedule.changeColor')}
+                aria-label={t('schedule.changeColor')}
+                onClick={() => { void onColor(calendar) }}
+              />
+              <span className="dsh-desk-schedule-mgmt-name">{calendar.displayName}</span>
+              <span className="dsh-desk-schedule-mgmt-count">{counts[calendar.id] ?? 0}</span>
+              <span className="dsh-desk-schedule-mgmt-label">{t('schedule.syncLabel')}</span>
+              <button
+                type="button"
+                className="dsh-desk-switch"
+                role="switch"
+                aria-checked={calendar.enabled}
+                data-on={calendar.enabled}
+                title={t('schedule.syncCalendar')}
+                aria-label={t('schedule.syncCalendar')}
+                onClick={() => { void onSetEnabled(calendar, !calendar.enabled) }}
+              />
+              <span className="dsh-desk-schedule-mgmt-label">{t('schedule.displayLabel')}</span>
+              <button
+                type="button"
+                className="dsh-desk-switch"
+                role="switch"
+                aria-checked={!hidden.has(calendar.id)}
+                data-on={!hidden.has(calendar.id)}
+                aria-label={t('schedule.showCalendar')}
+                onClick={() => onToggle(calendar)}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {editing ? (
+        <div className="dsh-desk-schedule-connection-form">
+          <div className="dsh-desk-schedule-form-fields">
+            {provider === 'outlook' ? (
+              <label>
+                <span>{t('schedule.form.ics')}</span>
+                <input value={icsUrl} onChange={event => setIcsUrl(event.target.value)} placeholder="https://…/calendar.ics" spellCheck={false} />
+              </label>
+            ) : (
+              <>
+                <label>
+                  <span>{t('schedule.form.account')}</span>
+                  <input value={account} onChange={event => setAccount(event.target.value)} spellCheck={false} autoComplete="username" />
+                </label>
+                <label>
+                  <span>{t('schedule.form.password')}</span>
+                  <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" />
+                </label>
+              </>
+            )}
+          </div>
+          <p className="dsh-desk-schedule-form-note">{t(`schedule.form.note.${provider}` as never)}</p>
+          {message === null ? null : <p className="dsh-desk-schedule-form-ok">{message}</p>}
+          {error === null ? null : <p className="dsh-desk-schedule-error">{error}</p>}
+          <div className="dsh-desk-schedule-form-actions">
+            <button type="button" className="dsh-desk-schedule-chip" disabled={busy !== null} onClick={() => { void runTest() }}>
+              {busy === 'test' ? t('schedule.form.testing') : t('schedule.form.test')}
+            </button>
+            <button type="button" className="dsh-desk-btn dsh-desk-btn-primary" disabled={busy !== null} onClick={() => { void save() }}>
+              {busy === 'save' ? t('schedule.form.saving') : t('schedule.form.save')}
+            </button>
+            {connected ? (
+              <button type="button" className="dsh-desk-schedule-chip" disabled={busy !== null} onClick={() => { void disconnect() }}>
+                {t('schedule.form.remove')}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }
@@ -596,52 +662,22 @@ export function SourcesPage(props: SourcesPageProps): ReactElement {
         {PROVIDER_ORDER.map(provider => {
           const source = sources.find(item => item.provider === provider)
           return (
-            <div key={provider}>
-              <ConnectionCard t={t} api={props.api} provider={provider} {...(source === undefined ? {} : { source })} onChanged={props.onChanged} />
-              {source === undefined ? null : (
-                <div className="dsh-desk-schedule-source">
-                  <p className="dsh-desk-schedule-sync-hint">{t('schedule.syncCalendarHint')}</p>
-                  {calendars.filter(calendar => calendar.sourceId === source.id).map(calendar => (
-                    <div key={calendar.id} className="dsh-desk-schedule-mgmt-row" data-off={!calendar.enabled}>
-                      <button
-                        type="button"
-                        className="dsh-desk-schedule-colorbutton"
-                        style={{ background: calendar.color }}
-                        title={t('schedule.changeColor')}
-                        aria-label={t('schedule.changeColor')}
-                        onClick={() => { void onColor(calendar) }}
-                      />
-                      <span className="dsh-desk-schedule-mgmt-name">{calendar.displayName}</span>
-                      <span className="dsh-desk-schedule-mgmt-count">{counts[calendar.id] ?? 0}</span>
-                      <span className="dsh-desk-schedule-mgmt-label">{t('schedule.syncLabel')}</span>
-                      <button
-                        type="button"
-                        className="dsh-desk-switch"
-                        role="switch"
-                        aria-checked={calendar.enabled}
-                        data-on={calendar.enabled}
-                        title={t('schedule.syncCalendar')}
-                        aria-label={t('schedule.syncCalendar')}
-                        onClick={() => { void onSetEnabled(calendar, !calendar.enabled) }}
-                      />
-                      <span className="dsh-desk-schedule-mgmt-label">{t('schedule.displayLabel')}</span>
-                      <button
-                        type="button"
-                        className="dsh-desk-switch"
-                        role="switch"
-                        aria-checked={!hidden.has(calendar.id)}
-                        data-on={!hidden.has(calendar.id)}
-                        aria-label={t('schedule.showCalendar')}
-                        onClick={() => onToggle(calendar)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <ProviderCard
+              key={provider}
+              t={t}
+              api={props.api}
+              provider={provider}
+              {...(source === undefined ? {} : { source })}
+              calendars={source === undefined ? [] : calendars.filter(calendar => calendar.sourceId === source.id)}
+              counts={counts}
+              hidden={hidden}
+              onToggle={onToggle}
+              onColor={onColor}
+              onSetEnabled={onSetEnabled}
+              onChanged={props.onChanged}
+            />
           )
         })}
-        {sources.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.sourcesEmpty')}</p> : null}
       </div>
     </div>
   )
