@@ -7,6 +7,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
+import { ROUTES } from '../constants.js'
 import { isTrustedPluginRequest, officialTrustedHosts } from '../trust.js'
 import { DeskError, sendError, sendJson } from './http.js'
 import { NOTE_ROUTES } from './notes/routes.js'
@@ -40,6 +41,16 @@ const BASE_ROUTE_TABLE: readonly DeskRouteEntry[] = [
   ...NOTE_ROUTES, ...TASK_ROUTES, ...GROUP_ROUTES, ...SCHEDULE_ROUTES,
 ]
 
+/** OAuth redirects are top-level browser navigations from Microsoft, so they carry no plugin
+ * trusted-origin headers. Only the loopback callback path is exempt; it still validates the
+ * one-time OAuth state before exchanging the code. */
+function isLoopbackOauthCallback(req: IncomingMessage, pathname: string): boolean {
+  if (req.method !== 'GET' || pathname !== ROUTES.scheduleOutlookCallback) return false
+  const host = (req.headers.host ?? '').toLowerCase()
+  const hostname = host.replace(/:\d+$/u, '')
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+}
+
 /** Build the prefix handler: fence -> exact match -> feature handler, with unified error mapping. */
 export function createDeskRequestHandler(route: DeskRouteContext): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   const routes: readonly DeskRouteEntry[] = route.sessions === undefined
@@ -50,7 +61,8 @@ export function createDeskRequestHandler(route: DeskRouteContext): (req: Incomin
     try {
       // The fence runs before any route (read-only included): our prefix is longer than the
       // official `/api` fence, so the host-level check would not fire for requests under it.
-      if (!isTrustedPluginRequest(req.headers, officialTrustedHosts(route.ctx))) {
+      if (!isLoopbackOauthCallback(req, pathname)
+        && !isTrustedPluginRequest(req.headers, officialTrustedHosts(route.ctx))) {
         sendError(route.ctx, res, new DeskError('FORBIDDEN', '拒绝非本机同源的请求', 403))
         return
       }
