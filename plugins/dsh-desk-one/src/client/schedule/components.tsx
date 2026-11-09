@@ -1,12 +1,12 @@
 /**
  * Schedule page building blocks. Management (connections + calendars) is an in-panel page like the
  * notes trash; a single event opens a floating card anchored to the click, and month/week fill the
- * remaining height (week shows 12 hours per screen with internal scrolling).
+ * remaining height (week shows 8 hours per screen with internal scrolling).
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement, WheelEvent as ReactWheelEvent } from 'react'
-import { SCHEDULE_COLORS, SCHEDULE_UPCOMING_DAYS, type ScheduleProvider } from '../../constants.js'
+import { SCHEDULE_UPCOMING_DAYS, type ScheduleProvider } from '../../constants.js'
 import type { DeskCalendar, DeskEvent, DeskScheduleSource, ScheduleConnectionInput } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
@@ -53,6 +53,7 @@ interface ToolbarProps {
   readonly onStep: (direction: -1 | 1) => void
   readonly onToday: () => void
   readonly onRefresh: () => void
+  readonly onSources: () => void
 }
 
 export function ScheduleToolbar(props: ToolbarProps): ReactElement {
@@ -96,6 +97,7 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
         <button type="button" className="dsh-desk-schedule-chip" disabled={syncing || props.loading} onClick={props.onRefresh}>
           {syncing ? t('schedule.syncing') : t('schedule.refresh')}
         </button>
+        <button type="button" className="dsh-desk-schedule-chip" onClick={props.onSources}>{t('schedule.sources')}</button>
       </div>
       {error === null ? null : <p className="dsh-desk-schedule-error">{error}</p>}
     </div>
@@ -144,118 +146,17 @@ export function UpcomingPanel(props: {
   )
 }
 
-/* ------------------------- calendar quick picker ----------------------------- */
-
-/** Top-right card: modern per-source tree — tinted calendar rows, one-click visibility, inline
- *  colour palette; the full connection manager is still a page. */
-export function CalendarPicker(props: {
-  readonly t: DeskTranslator
-  readonly sources: readonly DeskScheduleSource[]
-  readonly calendars: readonly DeskCalendar[]
-  readonly counts: Readonly<Record<string, number>>
-  readonly hidden: Set<string>
-  readonly onToggle: (calendar: DeskCalendar) => void
-  readonly onColorChange: (calendar: DeskCalendar, color: string) => Promise<void>
-  readonly onSetSourceVisible: (source: DeskScheduleSource, visible: boolean) => void
-  readonly onManage: () => void
-}): ReactElement {
-  const { t, sources, calendars, counts, hidden, onToggle, onColorChange } = props
-  const [open, setOpen] = useState<Set<string>>(new Set())
-  const [palette, setPalette] = useState<string | null>(null)
-  const toggleOpen = (id: string): void => {
-    setOpen(previous => {
-      const next = new Set(previous)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
+/** Reserved top-right slot for future cross-feature linkage (notes / tasks). */
+export function LinkagePanel(props: { readonly t: DeskTranslator }): ReactElement {
   return (
-    <section className="dsh-desk-schedule-picker">
-      <header>
-        <span>{t('schedule.calendars')}</span>
-        <button type="button" className="dsh-desk-schedule-link" onClick={props.onManage}>{t('schedule.manage')}</button>
-      </header>
-      <div className="dsh-desk-schedule-picker-list">
-        {sources.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.sourcesEmpty')}</p> : sources.map(source => {
-          const own = calendars.filter(calendar => calendar.sourceId === source.id)
-          const visible = own.filter(calendar => !hidden.has(calendar.id)).length
-          const expanded = open.has(source.id)
-          return (
-            <div key={source.id} className="dsh-desk-schedule-picker-source">
-              <div className="dsh-desk-schedule-picker-source-row">
-                <button
-                  type="button"
-                  className="dsh-desk-schedule-picker-chevron"
-                  aria-expanded={expanded}
-                  aria-label={expanded ? t('schedule.collapse') : t('schedule.expand')}
-                  onClick={() => toggleOpen(source.id)}
-                >{expanded ? '▾' : '▸'}</button>
-                <span className={`dsh-desk-schedule-provider is-${source.provider}`} />
-                <button type="button" className="dsh-desk-schedule-picker-source-name" onClick={() => toggleOpen(source.id)}>
-                  {t(providerKey(source.provider) as never)}
-                </button>
-                <span className="dsh-desk-schedule-picker-source-count">{visible}/{own.length}</span>
-                <button
-                  type="button"
-                  className="dsh-desk-schedule-picker-master"
-                  data-on={visible > 0}
-                  onClick={() => props.onSetSourceVisible(source, visible === 0)}
-                >{visible === 0 ? t('schedule.showSource') : t('schedule.hideSource')}</button>
-              </div>
-              {expanded ? (
-                <div className="dsh-desk-schedule-picker-children">
-                  {own.map(calendar => {
-                    const on = !hidden.has(calendar.id)
-                    return (
-                      <div key={calendar.id} className="dsh-desk-schedule-picker-cal" data-on={on}>
-                        <button
-                          type="button"
-                          className="dsh-desk-schedule-picker-swatch"
-                          style={{ background: calendar.color }}
-                          title={t('schedule.changeColor')}
-                          aria-label={t('schedule.changeColor')}
-                          onClick={() => setPalette(previous => previous === calendar.id ? null : calendar.id)}
-                        />
-                        <button type="button" className="dsh-desk-schedule-picker-name" onClick={() => onToggle(calendar)}>
-                          {calendar.displayName}
-                        </button>
-                        <span className="dsh-desk-schedule-picker-count">{counts[calendar.id] ?? 0}</span>
-                        <button
-                          type="button"
-                          className="dsh-desk-schedule-picker-dot"
-                          data-on={on}
-                          aria-label={on ? t('schedule.hideCalendar') : t('schedule.showCalendar')}
-                          onClick={() => onToggle(calendar)}
-                        />
-                        {palette === calendar.id ? (
-                          <div className="dsh-desk-schedule-palette">
-                            {SCHEDULE_COLORS.map(color => (
-                              <button
-                                key={color}
-                                type="button"
-                                className="dsh-desk-schedule-palette-swatch"
-                                data-active={calendar.color.toLowerCase() === color.toLowerCase()}
-                                style={{ background: color }}
-                                aria-label={color}
-                                onClick={() => {
-                                  setPalette(null)
-                                  void onColorChange(calendar, color)
-                                }}
-                              />
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : null}
-            </div>
-          )
-        })}
+    <aside className="dsh-desk-schedule-linkage">
+      <header>{props.t('schedule.linkage')}</header>
+      <p>{props.t('schedule.linkageHint')}</p>
+      <div className="dsh-desk-schedule-linkage-chips">
+        <span>{props.t('tab.notes')}</span>
+        <span>{props.t('tab.tasks')}</span>
       </div>
-    </section>
+    </aside>
   )
 }
 
@@ -281,7 +182,7 @@ export function ListBoard(props: ListProps): ReactElement {
     <div className="dsh-desk-schedule-list">
       {visibleGroups.every(group => group.events.length === 0) ? <p className="dsh-desk-schedule-hint">{t('schedule.listEmpty')}</p> : null}
       {visibleGroups.map((group, index) => (
-        <section key={group.key} className="dsh-desk-schedule-list-day" data-weekend={isWeekend(group.date)}>
+        <section key={group.key} className="dsh-desk-schedule-list-day" data-weekend={isWeekend(group.date)} data-today={group.key === dayKey(today)}>
           <h4 data-weekend={isWeekend(group.date)}>
             {index === 0 && group.key === dayKey(today) ? dayLabel(t, group.date, today) : `${weekdayLabel(group.date, weekdayLabels(t('schedule.weekdays')))} ${formatDateLabel(group.date, t)}`}
           </h4>
@@ -422,7 +323,7 @@ export function WeekBoard(props: WeekProps): ReactElement {
   const todayIndex = days.findIndex(day => day.toDateString() === today.toDateString())
   const now = new Date()
   const nowPct = ((now.getHours() * 60 + now.getMinutes()) / 1440) * 100
-  // Show 12 hours per screen (inner height = 200% of the viewport); center the initial scroll on
+  // Show 8 hours per screen (inner height = 300% of the viewport); center the initial scroll on
   // the current time (or 08:00 when browsing another week).
   useEffect(() => {
     const element = scrollRef.current
@@ -644,23 +545,25 @@ function ConnectionCard(props: {
           {source === undefined ? t('schedule.form.notConnected') : t('schedule.form.connected')}
         </span>
       </header>
-      {provider === 'outlook' ? (
-        <label>
-          <span>{t('schedule.form.ics')}</span>
-          <input value={icsUrl} onChange={event => setIcsUrl(event.target.value)} placeholder="https://…/calendar.ics" spellCheck={false} />
-        </label>
-      ) : (
-        <>
+      <div className="dsh-desk-schedule-form-fields">
+        {provider === 'outlook' ? (
           <label>
-            <span>{t('schedule.form.account')}</span>
-            <input value={account} onChange={event => setAccount(event.target.value)} spellCheck={false} autoComplete="username" />
+            <span>{t('schedule.form.ics')}</span>
+            <input value={icsUrl} onChange={event => setIcsUrl(event.target.value)} placeholder="https://…/calendar.ics" spellCheck={false} />
           </label>
-          <label>
-            <span>{t('schedule.form.password')}</span>
-            <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" />
-          </label>
-        </>
-      )}
+        ) : (
+          <>
+            <label>
+              <span>{t('schedule.form.account')}</span>
+              <input value={account} onChange={event => setAccount(event.target.value)} spellCheck={false} autoComplete="username" />
+            </label>
+            <label>
+              <span>{t('schedule.form.password')}</span>
+              <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" />
+            </label>
+          </>
+        )}
+      </div>
       <p className="dsh-desk-schedule-form-note">{t(`schedule.form.note.${provider}` as never)}</p>
       {message === null ? null : <p className="dsh-desk-schedule-form-ok">{message}</p>}
       {error === null ? null : <p className="dsh-desk-schedule-error">{error}</p>}
@@ -699,7 +602,7 @@ export function SourcesPage(props: SourcesPageProps): ReactElement {
                 <div className="dsh-desk-schedule-source">
                   <p className="dsh-desk-schedule-sync-hint">{t('schedule.syncCalendarHint')}</p>
                   {calendars.filter(calendar => calendar.sourceId === source.id).map(calendar => (
-                    <div key={calendar.id} className="dsh-desk-schedule-calendar" data-hidden={hidden.has(calendar.id)}>
+                    <div key={calendar.id} className="dsh-desk-schedule-mgmt-row" data-off={!calendar.enabled}>
                       <button
                         type="button"
                         className="dsh-desk-schedule-colorbutton"
@@ -708,18 +611,29 @@ export function SourcesPage(props: SourcesPageProps): ReactElement {
                         aria-label={t('schedule.changeColor')}
                         onClick={() => { void onColor(calendar) }}
                       />
-                      <button type="button" className="dsh-desk-schedule-calendar-toggle" onClick={() => onToggle(calendar)}>
-                        <span className="dsh-desk-schedule-calendar-name">{calendar.displayName}</span>
-                        <span className="dsh-desk-schedule-calendar-count">{counts[calendar.id] ?? 0}</span>
-                      </button>
+                      <span className="dsh-desk-schedule-mgmt-name">{calendar.displayName}</span>
+                      <span className="dsh-desk-schedule-mgmt-count">{counts[calendar.id] ?? 0}</span>
+                      <span className="dsh-desk-schedule-mgmt-label">{t('schedule.syncLabel')}</span>
                       <button
                         type="button"
-                        className="dsh-desk-schedule-sync-toggle"
+                        className="dsh-desk-switch"
+                        role="switch"
+                        aria-checked={calendar.enabled}
                         data-on={calendar.enabled}
                         title={t('schedule.syncCalendar')}
                         aria-label={t('schedule.syncCalendar')}
                         onClick={() => { void onSetEnabled(calendar, !calendar.enabled) }}
-                      >{calendar.enabled ? t('schedule.syncOn') : t('schedule.syncOff')}</button>
+                      />
+                      <span className="dsh-desk-schedule-mgmt-label">{t('schedule.displayLabel')}</span>
+                      <button
+                        type="button"
+                        className="dsh-desk-switch"
+                        role="switch"
+                        aria-checked={!hidden.has(calendar.id)}
+                        data-on={!hidden.has(calendar.id)}
+                        aria-label={t('schedule.showCalendar')}
+                        onClick={() => onToggle(calendar)}
+                      />
                     </div>
                   ))}
                 </div>

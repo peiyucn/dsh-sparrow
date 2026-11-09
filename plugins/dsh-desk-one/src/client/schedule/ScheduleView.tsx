@@ -13,12 +13,12 @@ import {
   SCHEDULE_COLORS, SCHEDULE_HIDDEN_STORAGE_KEY, SCHEDULE_LIST_DAYS, SCHEDULE_SYNC_INTERVAL_MS,
   SCHEDULE_UPCOMING_DAYS, SCHEDULE_VIEW_STORAGE_KEY,
 } from '../../constants.js'
-import type { DeskCalendar, DeskEvent, DeskScheduleSource, ScheduleStateResponse } from '../../contract.js'
+import type { DeskCalendar, DeskEvent, ScheduleStateResponse } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
 import { addDays, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName } from './utils.js'
 import {
-  CalendarPicker, EventCard, ListBoard, MonthBoard, ScheduleToolbar, SourcesPage, UpcomingPanel, WeekBoard,
+  EventCard, LinkagePanel, ListBoard, MonthBoard, ScheduleToolbar, SourcesPage, UpcomingPanel, WeekBoard,
   type ClickPoint,
 } from './components.js'
 
@@ -156,19 +156,6 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
   }, [persistHidden])
 
   /** Source-level master switch: show/hide every calendar of that source at once. */
-  const setSourceVisible = useCallback((source: DeskScheduleSource, visible: boolean): void => {
-    const own = (state?.calendars ?? []).filter(item => item.sourceId === source.id)
-    setHidden(previous => {
-      const next = new Set(previous)
-      for (const calendar of own) {
-        if (visible) next.delete(calendar.id)
-        else next.add(calendar.id)
-      }
-      persistHidden(next)
-      return next
-    })
-  }, [persistHidden, state])
-
   const cycleColor = useCallback(async (calendar: DeskCalendar): Promise<void> => {
     const index = (SCHEDULE_COLORS as readonly string[]).indexOf(calendar.color)
     const next = SCHEDULE_COLORS[(index + 1) % SCHEDULE_COLORS.length] ?? SCHEDULE_COLORS[0]
@@ -184,22 +171,12 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
     try {
       setState(await api.updateCalendar({ id: calendar.id, expectedRevision: calendar.revision, patch: { enabled } }))
       setError(null)
-      // Re-enabling starts a pull right away so the mirror is not empty until the next interval.
       if (enabled) await api.sync()
       await load()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     }
   }, [api, load])
-
-  const setCalendarColor = useCallback(async (calendar: DeskCalendar, color: string): Promise<void> => {
-    try {
-      setState(await api.updateCalendar({ id: calendar.id, expectedRevision: calendar.revision, patch: { color } }))
-      setError(null)
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
-    }
-  }, [api])
 
   const openEvent = (event: DeskEvent, point?: ClickPoint): void => {
     setSelected(point === undefined ? { event } : { event, point })
@@ -278,6 +255,7 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
         onStep={step}
         onToday={() => { setCursor(today) }}
         onRefresh={() => { void runSync() }}
+        onSources={() => { setSelected(null); setPage('sources') }}
       />
       {state === null ? (
         <p className="dsh-desk-schedule-hint">{loading ? t('state.loading') : t('schedule.sourcesEmpty')}</p>
@@ -299,17 +277,7 @@ export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly 
               onOpen={openEvent}
               onViewAll={() => { setListStart(today); chooseView('list'); setCursor(today) }}
             />
-            <CalendarPicker
-              t={t}
-              sources={sources}
-              calendars={calendars.filter(calendar => calendar.enabled)}
-              counts={counts}
-              hidden={hidden}
-              onToggle={toggleHidden}
-              onColorChange={setCalendarColor}
-              onSetSourceVisible={setSourceVisible}
-              onManage={() => { setSelected(null); setPage('sources') }}
-            />
+            <LinkagePanel t={t} />
           </div>
           <section className="dsh-desk-schedule-main">
             {view === 'month' ? (

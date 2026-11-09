@@ -695,7 +695,7 @@ describe('dsh-desk-one 结构', () => {
     const tools = await read('src/host/schedule/tools.ts')
     const sections = await read('src/client/sessions/ArchiveSections.tsx')
     assert.match(view, /UpcomingPanel/u, '近期日程分区')
-    assert.match(view, /CalendarPicker/u, '日历源快捷选择')
+    assert.match(view, /LinkagePanel/u, '联动位占位')
     assert.match(view, /ListBoard/u, '列表视图')
     assert.match(view, /MonthBoard/u, '月视图')
     assert.match(view, /WeekBoard/u, '周视图')
