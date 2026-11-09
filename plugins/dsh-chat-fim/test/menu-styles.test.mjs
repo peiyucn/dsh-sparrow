@@ -115,9 +115,14 @@ describe('chat-fim 菜单样式契约（对齐官方 rc.3 菜单原语）', () =
     assert.ok(!ring.includes('border-radius: 24px'), '不得再写死 24px 圆角：卡片是 --dsw-radius-panel（28px），四角会露缝')
   })
 
-  it('菜单底部沿用官方菜单 footer 的 l2 发丝线', () => {
+  it('菜单底部沿用官方菜单 footer 的 l2 发丝线，且不再有品牌行', async () => {
     const footer = ruleOf(`.${CHAT_FIM_CLASS.menuFooter}`)
     assert.ok(footer.includes('border-top: 0.5px solid var(--dsw-alias-border-l2)'), '底部发丝线用 l2')
+    // 2026-11-09：去掉 🐦 dsh-sparrow 品牌行后 token/模型信息靠右对齐，footer 里不再有品牌类。
+    assert.ok(footer.includes('justify-content: flex-end'), '品牌行移除后 footer 内容靠右')
+    assert.ok(!('menuBrand' in CHAT_FIM_CLASS), '类名表里不再保留 menuBrand')
+    assert.ok(!css.includes('dsh-chat-fim-menu-brand'), '样式表里不再保留品牌行规则')
+    assert.ok(!(await domSource()).includes('dsh-sparrow'), '候选菜单组件不得再输出 dsh-sparrow 品牌文字')
   })
 
   it('灵敏度弹层同样走官方 MenuSurface + 官方行几何，左缘对齐开关', async () => {

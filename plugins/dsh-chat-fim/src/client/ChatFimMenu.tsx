@@ -145,7 +145,6 @@ export function ChatFimMenu(props: ChatFimMenuProps) {
             </span>
           </button>
           <div className={cls.menuFooter}>
-            <span className={cls.menuBrand}>🐦 dsh-sparrow</span>
             <span className={cls.menuUsage}>
               {t('menu.tokens', {
                 tokens: formatTokenCount(suggestion.totalTokens),

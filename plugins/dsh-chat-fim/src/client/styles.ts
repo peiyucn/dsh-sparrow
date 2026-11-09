@@ -31,7 +31,6 @@ export const CHAT_FIM_CLASS = Object.freeze({
   menuHint: `${PREFIX}-menu-hint`,
   menuKbd: `${PREFIX}-menu-kbd`,
   menuFooter: `${PREFIX}-menu-footer`,
-  menuBrand: `${PREFIX}-menu-brand`,
   menuUsage: `${PREFIX}-menu-usage`,
   error: `${PREFIX}-error`,
   sensitivityPopover: `${PREFIX}-sensitivity-popover`,
@@ -249,21 +248,16 @@ export function buildChatFimCss(): string {
   font-size: 10px;
   line-height: 16px;
 }
-/* 菜单底部：左下角品牌行（🐦 dsh-sparrow），右下角展示 token 数与实际模型。
+/* 菜单底部：右下角展示 token 数与实际模型（不再有 🐦 dsh-sparrow 品牌行）。
    分隔线走官方菜单 footer 的 l2 发丝线（l1 在菜单面上近不可见）。 */
 .${cls.menuFooter} {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
   margin-top: 3px;
   padding: 3px 4px 0;
   border-top: 0.5px solid var(--dsw-alias-border-l2);
-}
-.${cls.menuBrand} {
-  font-size: 11px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-tertiary);
 }
 /* 触发灵敏度弹层：与官方菜单同构（MenuSurface 承载材质，几何对齐官方 Menu 卡），
    左缘对齐开关胶囊、空间不足自动向上（官方 Menu 的 start 对齐）。 */

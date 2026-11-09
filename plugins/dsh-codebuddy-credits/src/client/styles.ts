@@ -40,7 +40,6 @@ export const CCB_CLASS = Object.freeze({
   modelFacts: 'ccb-indicator-model-facts',
   featuresRow: 'ccb-indicator-features',
   featuresValue: 'ccb-indicator-features-value',
-  brand: 'ccb-indicator-brand',
   // 设置卡
   cardRoot: 'ccb-card-root',
   cardRootHidden: 'ccb-card-root-hidden',
@@ -189,8 +188,6 @@ export function buildIndicatorCss(): string {
 .ccb-indicator-model-facts { flex: 0 0 auto; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
 .ccb-indicator-features { display: flex; justify-content: space-between; gap: 12px; }
 .ccb-indicator-features-value { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
-/* 品牌行：-6px 底距抵消面板 12px 内边距，使上下边距对称 */
-.ccb-indicator-brand { border-top: 1px solid var(--dsw-alias-border-l1); padding-top: 2px; margin-bottom: -6px; text-align: center; font-size: 11px; line-height: 14px; color: var(--dsw-alias-label-tertiary); }
 `
 }
 

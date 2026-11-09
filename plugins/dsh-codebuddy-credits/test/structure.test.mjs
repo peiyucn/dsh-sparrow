@@ -188,6 +188,14 @@ describe('dsh-codebuddy-credits 结构：样式统一注入', () => {
     }
   })
 
+  it('额度面板不再输出 dsh-sparrow 品牌行', async () => {
+    const panel = await readClient('credits-panel.tsx')
+    assert.ok(!panel.includes('dsh-sparrow'), 'credits-panel 不得再输出 dsh-sparrow 品牌文字')
+    assert.ok(!panel.includes('CCB_CLASS.brand'), 'credits-panel 不得再引用品牌行类')
+    const styles = await readClient('styles.ts')
+    assert.ok(!styles.includes('ccb-indicator-brand'), 'styles.ts 不再保留品牌行样式')
+  })
+
   it('组件静态样式应该 走类名表，只有定位 / 宽度等动态值保留 inline style', async () => {
     for (const file of [
       'CodeBuddyCreditsIndicator.tsx', 'credits-panel.tsx', 'CodeBuddyProviderCard.tsx',

@@ -305,10 +305,6 @@ export function CreditsPanel({
           </>
         )
         : null}
-      {/* 品牌行：-6px 底距抵消面板 12px 内边距，使上下边距对称。 */}
-      <div className={CCB_CLASS.brand}>
-        🐦 dsh-sparrow
-      </div>
     </div>
   )
 }
