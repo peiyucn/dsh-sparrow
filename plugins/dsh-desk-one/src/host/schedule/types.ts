@@ -6,7 +6,7 @@
  * same way (auth vs transient vs unsupported) for the UI to offer the right next action.
  */
 
-export type CalendarProvider = 'wecom' | 'icloud' | 'outlook'
+export type CalendarProvider = 'wecom' | 'icloud' | 'outlook' | 'ics'
 
 /** One remote calendar. `order` preserves the server-side order for the source → calendar tree. */
 export interface RemoteCalendar {

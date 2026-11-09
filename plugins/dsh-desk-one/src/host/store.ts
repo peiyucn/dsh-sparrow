@@ -427,6 +427,23 @@ export class DeskStore {
     return this.allSources().find(source => source.provider === provider && source.channel === channel)
   }
 
+  /** Create one standalone source (used by ICS subscriptions: several sources per provider). */
+  async createScheduleSource(input: {
+    readonly provider: 'ics'
+    readonly channel: 'ics'
+    readonly account?: string
+    readonly credentialRef: string
+  }): Promise<DeskScheduleSource> {
+    const now = new Date().toISOString()
+    const record = createScheduleSourceRecord(input, { now })
+    await this.nodes.put(record.id, record)
+    return record
+  }
+
+  getScheduleSource(id: string): DeskScheduleSource | undefined {
+    return this.allSources().find(source => source.id === id)
+  }
+
   /** Create or refresh a connection record; secrets are never stored here (only the ref name). */
   async upsertScheduleSource(input: {
     readonly provider: 'wecom' | 'icloud' | 'outlook'

@@ -4,6 +4,7 @@
  * "one failure never blocks the other sources" rule.
  */
 
+import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import {
   ICLOUD_PASSWORD_REF, OUTLOOK_ICS_URL_REF, SCHEDULE_FUTURE_MONTHS, SCHEDULE_MAX_EVENTS,
@@ -11,7 +12,7 @@ import {
   type ScheduleChannel, type ScheduleProvider,
 } from '../../constants.js'
 import type {
-  DeskCalendar, DeskScheduleSource, ScheduleConnectionInput, ScheduleConnectionTestResponse,
+  DeskCalendar, DeskScheduleSource, ScheduleConnectionInput, ScheduleConnectionTestResponse, ScheduleSubscriptionInput,
   ScheduleEventListResponse, ScheduleStateResponse, ScheduleSyncResponse, ScheduleSyncSourceReport,
 } from '../../contract.js'
 import { DeskError } from '../http.js'
@@ -42,12 +43,14 @@ const PROVIDER_CHANNEL: Record<ScheduleProvider, ScheduleChannel> = {
   wecom: 'caldav',
   icloud: 'caldav',
   outlook: 'ics',
+  ics: 'ics',
 }
 
 const CREDENTIAL_REF: Record<ScheduleProvider, string> = {
   wecom: WECOM_PASSWORD_REF,
   icloud: ICLOUD_PASSWORD_REF,
   outlook: OUTLOOK_ICS_URL_REF,
+  ics: 'DESK_ONE_ICS_URL',
 }
 
 /** Mirror window: `[-6, +3]` months around now, ISO UTC. */
@@ -60,7 +63,7 @@ export function mirrorWindow(now = new Date()): PullWindow & { from: string; to:
 }
 
 function isProvider(value: unknown): value is ScheduleProvider {
-  return value === 'wecom' || value === 'icloud' || value === 'outlook'
+  return value === 'wecom' || value === 'icloud' || value === 'outlook' || value === 'ics'
 }
 
 function text(value: unknown): string {
@@ -139,14 +142,19 @@ export class ScheduleHost {
   /** Test without saving: discovery + one calendar list, or one ICS fetch + parse. */
   async test(input: ScheduleConnectionInput): Promise<ScheduleConnectionTestResponse> {
     if (!isProvider(input.provider)) throw new DeskError('INVALID_SCHEDULE', '未知的日程来源', 400)
-    if (input.provider === 'outlook') {
+    if (input.provider === 'outlook' || input.provider === 'ics') {
       const url = text(input.url)
-      if (url === '') throw new DeskError('INVALID_SCHEDULE', '请填写 Outlook 发布日历的 ICS 链接', 400)
+      if (url === '') throw new DeskError('INVALID_SCHEDULE', '请填写 ICS 订阅链接', 400)
       const result = await fetchOutlookIcs(url, { timeoutMs: SCHEDULE_REQUEST_TIMEOUT_MS })
       if (result.ics === undefined) throw new DeskError('SCHEDULE_UNAVAILABLE', '这个链接没有返回日历内容', 400)
       const window = mirrorWindow()
-      const events = parseIcsEvents(result.ics, { provider: 'outlook', calendarRemoteId: 'published', window })
-      return { provider: 'outlook', calendars: 1, events: events.length, message: `已读到 ${events.length} 条日程` }
+      const events = parseIcsEvents(result.ics, { provider: input.provider, calendarRemoteId: 'published', window })
+      return {
+        provider: input.provider,
+        calendars: 1,
+        events: events.length,
+        message: `已读到 ${events.length} 条日程`,
+      }
     }
     const account = text(input.account)
     const password = text(input.password)
@@ -168,6 +176,7 @@ export class ScheduleHost {
   /** Save (or replace) one connection, then try one sync; sync failure is recorded, not thrown. */
   async saveConnection(input: ScheduleConnectionInput): Promise<ScheduleStateResponse> {
     if (!isProvider(input.provider)) throw new DeskError('INVALID_SCHEDULE', '未知的日程来源', 400)
+    if (input.provider === 'ics') throw new DeskError('INVALID_SCHEDULE', '订阅请使用订阅接口', 400)
     // Product rule: a connection must pass a real test before its secret is stored.
     await this.test(input)
     const ref = CREDENTIAL_REF[input.provider]
@@ -205,6 +214,42 @@ export class ScheduleHost {
     return this.state()
   }
 
+  /** Add one provider-agnostic ICS subscription (each subscription is its own source). */
+  async addSubscription(input: ScheduleSubscriptionInput): Promise<ScheduleStateResponse> {
+    const url = text(input.url)
+    if (url === '') throw new DeskError('INVALID_SCHEDULE', '请填写 ICS 订阅链接', 400)
+    // Validate before persisting the URL in the credential store.
+    const fetched = await fetchOutlookIcs(url, { timeoutMs: SCHEDULE_REQUEST_TIMEOUT_MS })
+    if (fetched.ics === undefined) throw new DeskError('SCHEDULE_UNAVAILABLE', '这个链接没有返回日历内容', 400)
+    const name = text(input.name)
+    const credentialRef = `DESK_ONE_ICS_URL_${randomUUID()}`
+    const service = this.requireCredentials()
+    const source = await this.store.createScheduleSource({
+      provider: 'ics',
+      channel: 'ics',
+      account: name === '' ? new URL(url).hostname : name,
+      credentialRef,
+    })
+    await service.set(credentialRef, url)
+    await this.syncSource(source).catch(() => undefined)
+    return this.state()
+  }
+
+  /** Remove one subscription plus its mirrored calendar/events; remote content is untouched. */
+  async removeSubscription(sourceId: unknown): Promise<ScheduleStateResponse> {
+    const id = text(sourceId)
+    const source = this.store.getScheduleSource(id)
+    if (source === undefined || source.provider !== 'ics') {
+      throw new DeskError('INVALID_SCHEDULE', '订阅不存在', 404)
+    }
+    const service = this.credentials()
+    if (service !== undefined && source.credentialRef !== undefined) {
+      await service.unset(source.credentialRef).catch(() => undefined)
+    }
+    await this.store.removeScheduleSource(source.id)
+    return this.state()
+  }
+
   /** Sync every enabled source; sources run sequentially so one slow line cannot starve the others. */
   async sync(): Promise<ScheduleSyncResponse> {
     const sources = this.store.listScheduleSources().filter(source => source.enabled)
@@ -232,7 +277,23 @@ export class ScheduleHost {
     try {
       let totalEvents = 0
       let calendarCount = 0
-      if (source.provider === 'outlook') {
+      if (source.provider === 'ics') {
+        const url = await this.resolveSecret(source.credentialRef ?? CREDENTIAL_REF.ics)
+        const fetched = await fetchOutlookIcs(url, { timeoutMs: SCHEDULE_REQUEST_TIMEOUT_MS })
+        if (fetched.ics === undefined) throw new DeskError('SCHEDULE_UNAVAILABLE', '订阅链接没有返回内容', 502)
+        const [calendar] = await this.store.upsertCalendars(source, [
+          { remoteId: 'ics-published', displayName: source.account ?? 'ICS 订阅' },
+        ])
+        if (calendar !== undefined) {
+          const drafts = dedupeDrafts(parseIcsEvents(fetched.ics, {
+            provider: 'ics', calendarRemoteId: calendar.remoteId, window,
+          }).map(event => this.draftOf(event)))
+          await this.store.syncCalendarEvents(calendar, drafts.slice(0, SCHEDULE_MAX_EVENTS))
+          await this.store.setScheduleSyncState(calendar.id, { lastSyncedAt: now })
+          totalEvents += drafts.length
+          calendarCount = 1
+        }
+      } else if (source.provider === 'outlook') {
         const url = await this.resolveSecret(CREDENTIAL_REF.outlook)
         const fetched = await fetchOutlookIcs(url, { timeoutMs: SCHEDULE_REQUEST_TIMEOUT_MS })
         if (fetched.ics === undefined) throw new DeskError('SCHEDULE_UNAVAILABLE', '发布日历链接没有返回内容', 502)

@@ -222,6 +222,12 @@ export interface ScheduleConnectionInput {
   readonly url?: string
 }
 
+/** One provider-agnostic ICS subscription; the URL is stored in the credential store. */
+export interface ScheduleSubscriptionInput {
+  readonly name?: string
+  readonly url: string
+}
+
 export interface ScheduleConnectionTestResponse {
   readonly provider: ScheduleProvider
   readonly calendars: number

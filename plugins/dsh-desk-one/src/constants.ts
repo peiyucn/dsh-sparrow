@@ -31,6 +31,8 @@ export const ROUTES = Object.freeze({
   scheduleConnectionSave: `${PREFIX}/schedule/connections/save`,
   scheduleConnectionTest: `${PREFIX}/schedule/connections/test`,
   scheduleConnectionRemove: `${PREFIX}/schedule/connections/remove`,
+  scheduleSubscriptionAdd: `${PREFIX}/schedule/subscriptions/add`,
+  scheduleSubscriptionRemove: `${PREFIX}/schedule/subscriptions/remove`,
 })
 
 /** 入口 id：同时是左栏面板行的 id 与中央列 `main` 槽的 key（官方 `MainPanelId`）。 */
@@ -81,7 +83,7 @@ export const TASK_STATUSES = ['todo', 'doing', 'done'] as const
 /* ------------------------------ schedule ------------------------------ */
 
 /** 日程来源：v1 三条线路，均为只读镜像（见 docs/spec/05-schedule.md）。 */
-export const SCHEDULE_PROVIDERS = ['wecom', 'icloud', 'outlook'] as const
+export const SCHEDULE_PROVIDERS = ['wecom', 'icloud', 'outlook', 'ics'] as const
 export type ScheduleProvider = (typeof SCHEDULE_PROVIDERS)[number]
 /** 同一 provider 的接入通道：CalDAV（企微/iCloud）与 ICS（Outlook 发布链接）。 */
 export const SCHEDULE_CHANNELS = ['caldav', 'ics'] as const

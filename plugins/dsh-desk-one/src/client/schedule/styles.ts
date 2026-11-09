@@ -279,6 +279,10 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-statusdot[data-on='true'] { background: #2f9e5b; }
 .dsh-desk-schedule-connection-count { font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); margin-left: 6px; }
 .dsh-desk-schedule-connection-form { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); }
+.dsh-desk-schedule-subscription { display: flex; flex-direction: column; gap: 2px; padding: 8px 0 4px; border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); }
+.dsh-desk-schedule-subscription:first-of-type { border-top: 0; }
+.dsh-desk-schedule-subscription-head { display: flex; align-items: center; gap: 6px; padding-bottom: 2px; }
+.dsh-desk-schedule-subscription-head .dsh-desk-schedule-link { margin-left: auto; font-size: 11px; }
 .dsh-desk-schedule-mgmt-row {
   display: flex; align-items: center; gap: 7px; min-width: 0; padding: 6px 2px;
   border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);

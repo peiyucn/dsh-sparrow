@@ -6,7 +6,7 @@ import {
 } from '../../constants.js'
 import type {
   ScheduleCalendarUpdateRequest, ScheduleConnectionInput, ScheduleConnectionTestResponse,
-  ScheduleEventListResponse, ScheduleStateResponse, ScheduleSyncResponse,
+  ScheduleEventListResponse, ScheduleStateResponse, ScheduleSubscriptionInput, ScheduleSyncResponse,
 } from '../../contract.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
 import type { DeskRouteEntry } from '../router.js'
@@ -87,6 +87,16 @@ async function removeConnection(route: DeskRouteContext, req: IncomingMessage): 
   return scheduleOf(route).removeConnection(body.provider)
 }
 
+async function addSubscription(route: DeskRouteContext, req: IncomingMessage): Promise<ScheduleStateResponse> {
+  const body = bodyObject<ScheduleSubscriptionInput>(await readJsonBody(req), '订阅请求必须是 JSON 对象')
+  return scheduleOf(route).addSubscription(body)
+}
+
+async function removeSubscription(route: DeskRouteContext, req: IncomingMessage): Promise<ScheduleStateResponse> {
+  const body = bodyObject<{ readonly id?: unknown }>(await readJsonBody(req), '取消订阅请求必须是 JSON 对象')
+  return scheduleOf(route).removeSubscription(body.id)
+}
+
 /** Route table appended to the desk router; the trust fence and error mapping stay in router.ts. */
 export const SCHEDULE_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.scheduleEvents, handle: (route, req, res) => reply(res, getEvents(route, req)) },
@@ -97,6 +107,8 @@ export const SCHEDULE_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'POST', path: ROUTES.scheduleConnectionSave, handle: (route, req, res) => reply(res, saveConnection(route, req)) },
   { method: 'POST', path: ROUTES.scheduleConnectionTest, handle: (route, req, res) => reply(res, testConnection(route, req)) },
   { method: 'POST', path: ROUTES.scheduleConnectionRemove, handle: (route, req, res) => reply(res, removeConnection(route, req)) },
+  { method: 'POST', path: ROUTES.scheduleSubscriptionAdd, handle: (route, req, res) => reply(res, addSubscription(route, req)) },
+  { method: 'POST', path: ROUTES.scheduleSubscriptionRemove, handle: (route, req, res) => reply(res, removeSubscription(route, req)) },
 ]
 
 async function reply<T>(res: ServerResponse, task: Promise<T>): Promise<void> {

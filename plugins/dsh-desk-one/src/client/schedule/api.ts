@@ -5,7 +5,7 @@ import {
 } from '../../constants.js'
 import type {
   ApiErrorPayload, ScheduleCalendarUpdateRequest, ScheduleConnectionInput,
-  ScheduleConnectionTestResponse, ScheduleEventListResponse, ScheduleStateResponse, ScheduleSyncResponse,
+  ScheduleConnectionTestResponse, ScheduleEventListResponse, ScheduleStateResponse, ScheduleSubscriptionInput, ScheduleSyncResponse,
 } from '../../contract.js'
 
 async function fetchJson<T>(path: string, init?: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
@@ -45,6 +45,8 @@ export interface ScheduleApi {
   readonly testConnection: (input: ScheduleConnectionInput) => Promise<ScheduleConnectionTestResponse>
   readonly saveConnection: (input: ScheduleConnectionInput) => Promise<ScheduleStateResponse>
   readonly removeConnection: (provider: string) => Promise<ScheduleStateResponse>
+  readonly addSubscription: (input: ScheduleSubscriptionInput) => Promise<ScheduleStateResponse>
+  readonly removeSubscription: (id: string) => Promise<ScheduleStateResponse>
 }
 
 export function loadState(): Promise<ScheduleStateResponse> {
@@ -73,6 +75,14 @@ export function saveConnection(input: ScheduleConnectionInput): Promise<Schedule
   return postJson<ScheduleStateResponse>(ROUTES.scheduleConnectionSave, input, SCHEDULE_SYNC_TIMEOUT_MS)
 }
 
+export function addSubscription(input: ScheduleSubscriptionInput): Promise<ScheduleStateResponse> {
+  return postJson<ScheduleStateResponse>(ROUTES.scheduleSubscriptionAdd, input, SCHEDULE_SYNC_TIMEOUT_MS)
+}
+
+export function removeSubscription(id: string): Promise<ScheduleStateResponse> {
+  return postJson<ScheduleStateResponse>(ROUTES.scheduleSubscriptionRemove, { id })
+}
+
 export function removeConnection(provider: string): Promise<ScheduleStateResponse> {
   return postJson<ScheduleStateResponse>(ROUTES.scheduleConnectionRemove, { provider })
 }
@@ -80,4 +90,5 @@ export function removeConnection(provider: string): Promise<ScheduleStateRespons
 /** Shared facade injected into the panel seat (keeps components free of fetch details). */
 export const scheduleApi: ScheduleApi = {
   loadState, loadEvents, updateCalendar, sync, testConnection, saveConnection, removeConnection,
+  addSubscription, removeSubscription,
 }
