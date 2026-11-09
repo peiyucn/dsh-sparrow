@@ -100,6 +100,54 @@ function formBody(values: Record<string, string>): URLSearchParams {
   return body
 }
 
+/** PKCE S256: code challenge for the browser redirect flow. */
+export async function codeChallenge(verifier: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
+  return Buffer.from(digest).toString('base64url')
+}
+
+export function graphAuthorizeUrl(input: {
+  readonly redirectUri: string
+  readonly state: string
+  readonly challenge: string
+}): string {
+  const params = new URLSearchParams({
+    client_id: OUTLOOK_GRAPH_CLIENT_ID,
+    response_type: 'code',
+    redirect_uri: input.redirectUri,
+    response_mode: 'query',
+    scope: OUTLOOK_GRAPH_SCOPE,
+    state: input.state,
+    code_challenge: input.challenge,
+    code_challenge_method: 'S256',
+    prompt: 'select_account',
+  })
+  return `${tokenUrl('authorize')}?${params.toString()}`
+}
+
+export async function exchangeGraphCode(input: {
+  readonly code: string
+  readonly redirectUri: string
+  readonly verifier: string
+}, deps: GraphDeps = {}): Promise<GraphTokens> {
+  const payload = await requestJson<{ access_token: string; refresh_token?: string; expires_in?: number }>(`${tokenUrl('token')}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: formBody({
+      grant_type: 'authorization_code',
+      client_id: OUTLOOK_GRAPH_CLIENT_ID,
+      code: input.code,
+      redirect_uri: input.redirectUri,
+      code_verifier: input.verifier,
+    }).toString(),
+  }, deps, 'Microsoft 授权码兑换')
+  return {
+    accessToken: payload.access_token,
+    ...(payload.refresh_token === undefined ? {} : { refreshToken: payload.refresh_token }),
+    expiresIn: payload.expires_in ?? 3600,
+  }
+}
+
 export async function startGraphDeviceCode(deps: GraphDeps = {}): Promise<GraphDeviceCode> {
   const payload = await requestJson<{
     device_code: string

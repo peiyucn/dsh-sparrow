@@ -53,6 +53,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'schedule.graphLogin'
       | 'schedule.graphLoginHint'
       | 'schedule.graphCodeHint'
+      | 'schedule.graphRedirectHint'
+      | 'schedule.graphDeviceLogin'
       | 'schedule.graphDisconnect'
       | 'schedule.graphPendingHint'
       | 'schedule.noCalendars'

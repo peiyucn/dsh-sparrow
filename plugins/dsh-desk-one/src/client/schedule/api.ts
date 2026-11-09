@@ -47,7 +47,7 @@ export interface ScheduleApi {
   readonly removeConnection: (provider: string) => Promise<ScheduleStateResponse>
   readonly addSubscription: (input: ScheduleSubscriptionInput) => Promise<ScheduleStateResponse>
   readonly removeSubscription: (id: string) => Promise<ScheduleStateResponse>
-  readonly startOutlookLogin: () => Promise<OutlookLoginStartResponse>
+  readonly startOutlookLogin: (redirectUri?: string) => Promise<OutlookLoginStartResponse>
   readonly pollOutlookLogin: (flowId: string) => Promise<OutlookLoginPollResponse>
   readonly disconnectOutlook: () => Promise<ScheduleStateResponse>
 }
@@ -82,8 +82,8 @@ export function addSubscription(input: ScheduleSubscriptionInput): Promise<Sched
   return postJson<ScheduleStateResponse>(ROUTES.scheduleSubscriptionAdd, input, SCHEDULE_SYNC_TIMEOUT_MS)
 }
 
-export function startOutlookLogin(): Promise<OutlookLoginStartResponse> {
-  return postJson<OutlookLoginStartResponse>(ROUTES.scheduleOutlookLoginStart, {}, SCHEDULE_TEST_TIMEOUT_MS)
+export function startOutlookLogin(redirectUri?: string): Promise<OutlookLoginStartResponse> {
+  return postJson<OutlookLoginStartResponse>(ROUTES.scheduleOutlookLoginStart, { redirectUri }, SCHEDULE_TEST_TIMEOUT_MS)
 }
 
 export function pollOutlookLogin(flowId: string): Promise<OutlookLoginPollResponse> {

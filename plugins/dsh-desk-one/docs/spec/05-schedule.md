@@ -82,7 +82,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | 企业微信（工作） | CalDAV `caldav.wecom.work` | 发现入口 `/.well-known/caldav`；日历家目录疑似裸 `/calendar/`（**未验证**）；按日历 ctag/ETag 增量 | 手机端同步密码；重新获取使旧密码失效 | 非 IANA TZID（靠内嵌 VTIMEZONE）；读限额未查到 |
 | iCloud（个人） | CalDAV `caldav.icloud.com` | 发现可能跳 `pNN-caldav.icloud.com` 分片；REPORT 只请求裸 `<calendar-data/>`；窗口 ≤ 366 天 / 400 条 | Apple ID + App 专用密码（需双重认证；改主密码全部失效） | 60 读/分钟、单日历 5 万事件上限；共享/家庭日历可见性**未验证** |
-| Outlook（个人） | Microsoft Graph 设备码 OAuth | refresh token → access token；`/me/calendars` + `calendarView`；多日历、UTC、分页 | 公共客户端 Client ID 内置；权限 `Calendars.ReadWrite`；refresh token 存官方凭据库 | 不发布公开 ICS；设备码登录一次后自动续期 |
+| Outlook（个人） | Microsoft Graph OAuth（浏览器回调 + PKCE，设备码兜底） | refresh token → access token；`/me/calendars` + `calendarView`；多日历、UTC、分页 | 公共客户端 Client ID 内置；回调 `http://localhost:3080/api/desk-one/schedule/outlook/callback` 需在应用注册；权限 `Calendars.ReadWrite`；refresh token 存官方凭据库 | 不发布公开 ICS；登录一次后自动续期 |
 | 订阅（ICS，provider 无关） | 任意公开 ICS 链接（多条） | 条件 GET；每条链接 = 一本日历 | 链接本身就是凭据；URL 存官方凭据库 | 公开可读，仅适合外部订阅；刷新由发布方决定 |
 
 统一适配器接口：`probe` / `listCalendars` / `pull(cursor, window)`；失败分类 `AUTH_EXPIRED`（不自动重试）与 `TRANSIENT`（退避重试）。

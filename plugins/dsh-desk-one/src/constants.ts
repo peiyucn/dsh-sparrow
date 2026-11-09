@@ -36,6 +36,7 @@ export const ROUTES = Object.freeze({
   scheduleOutlookLoginStart: `${PREFIX}/schedule/outlook/login/start`,
   scheduleOutlookLoginPoll: `${PREFIX}/schedule/outlook/login/poll`,
   scheduleOutlookDisconnect: `${PREFIX}/schedule/outlook/disconnect`,
+  scheduleOutlookCallback: `${PREFIX}/schedule/outlook/callback`,
 })
 
 /** 入口 id：同时是左栏面板行的 id 与中央列 `main` 槽的 key（官方 `MainPanelId`）。 */

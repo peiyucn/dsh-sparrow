@@ -245,6 +245,8 @@ export interface ScheduleConnectionInput {
 /** One provider-agnostic ICS subscription; the URL is stored in the credential store. */
 export interface OutlookLoginStartResponse {
   readonly flowId: string
+  readonly kind?: 'device' | 'redirect'
+  readonly authUrl?: string
   readonly userCode: string
   readonly verificationUri: string
   readonly expiresIn: number

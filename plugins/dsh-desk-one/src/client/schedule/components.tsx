@@ -548,7 +548,7 @@ function OutlookGraphCard(props: {
   readonly onChanged: () => Promise<void>
 }): ReactElement {
   const { t, api, source, calendars } = props
-  const [flow, setFlow] = useState<{ flowId: string; userCode: string; verificationUri: string } | null>(null)
+  const [flow, setFlow] = useState<{ flowId: string; kind: 'redirect' | 'device'; userCode: string; verificationUri: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -571,12 +571,22 @@ function OutlookGraphCard(props: {
     return () => { stopped = true; window.clearInterval(timer) }
   }, [api, flow, props])
 
-  const login = async (): Promise<void> => {
+  const login = async (device = false): Promise<void> => {
     setBusy(true); setError(null)
+    const popup = device ? null : window.open('', 'desk-one-outlook', 'width=520,height=680')
     try {
-      const start = await api.startOutlookLogin()
-      setFlow({ flowId: start.flowId, userCode: start.userCode, verificationUri: start.verificationUri })
+      const redirectUri = device ? undefined : `${window.location.origin}/api/desk-one/schedule/outlook/callback`
+      const start = await api.startOutlookLogin(redirectUri)
+      if (start.kind === 'redirect' && start.authUrl !== undefined) {
+        if (popup === null || popup.closed) window.location.href = start.authUrl
+        else popup.location.href = start.authUrl
+        setFlow({ flowId: start.flowId, kind: 'redirect', userCode: '', verificationUri: '' })
+      } else {
+        popup?.close()
+        setFlow({ flowId: start.flowId, kind: 'device', userCode: start.userCode, verificationUri: start.verificationUri })
+      }
     } catch (reason) {
+      popup?.close()
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally { setBusy(false) }
   }
@@ -613,7 +623,12 @@ function OutlookGraphCard(props: {
               <button type="button" className="dsh-desk-btn dsh-desk-btn-primary" disabled={busy} onClick={() => { void login() }}>
                 {busy ? t('schedule.form.saving') : t('schedule.graphLogin')}
               </button>
+              <button type="button" className="dsh-desk-schedule-link" disabled={busy} onClick={() => { void login(true) }}>
+                {t('schedule.graphDeviceLogin')}
+              </button>
             </div>
+          ) : flow.kind === 'redirect' ? (
+            <p className="dsh-desk-schedule-form-ok">{t('schedule.graphRedirectHint')}</p>
           ) : (
             <p className="dsh-desk-schedule-form-ok">
               {t('schedule.graphCodeHint', { url: flow.verificationUri, code: flow.userCode })}

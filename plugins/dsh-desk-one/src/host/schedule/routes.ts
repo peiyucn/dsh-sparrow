@@ -88,8 +88,19 @@ async function removeConnection(route: DeskRouteContext, req: IncomingMessage): 
   return scheduleOf(route).removeConnection(body.provider)
 }
 
-async function startOutlookLogin(route: DeskRouteContext): Promise<OutlookLoginStartResponse> {
-  return scheduleOf(route).startOutlookLogin()
+async function startOutlookLogin(route: DeskRouteContext, req: IncomingMessage): Promise<OutlookLoginStartResponse> {
+  const body = bodyObject<{ readonly redirectUri?: unknown }>(await readJsonBody(req), '登录请求必须是 JSON 对象')
+  return scheduleOf(route).startOutlookLogin(typeof body.redirectUri === 'string' ? body.redirectUri : undefined)
+}
+
+async function outlookCallback(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const params = new URL(req.url ?? '/', 'http://localhost').searchParams
+  const result = params.get('error') === null
+    ? await scheduleOf(route).completeOutlookLogin(params.get('code') ?? '', params.get('state') ?? '')
+    : { ok: false, message: params.get('error_description') ?? params.get('error') ?? 'Microsoft 拒绝了登录' }
+  const title = result.ok ? 'Outlook 已连接' : 'Outlook 连接失败'
+  res.writeHead(result.ok ? 200 : 400, { 'content-type': 'text/html; charset=utf-8' })
+  res.end(`<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font-family:system-ui;padding:32px"><h2>${title}</h2><p>${result.message}</p><script>if(window.opener){window.opener.postMessage({type:'desk-one-outlook',ok:${result.ok}},'*')}</script></body>`)
 }
 
 async function pollOutlookLogin(route: DeskRouteContext, req: IncomingMessage): Promise<OutlookLoginPollResponse> {
@@ -123,7 +134,8 @@ export const SCHEDULE_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'POST', path: ROUTES.scheduleConnectionRemove, handle: (route, req, res) => reply(res, removeConnection(route, req)) },
   { method: 'POST', path: ROUTES.scheduleSubscriptionAdd, handle: (route, req, res) => reply(res, addSubscription(route, req)) },
   { method: 'POST', path: ROUTES.scheduleSubscriptionRemove, handle: (route, req, res) => reply(res, removeSubscription(route, req)) },
-  { method: 'POST', path: ROUTES.scheduleOutlookLoginStart, handle: (route, _req, res) => reply(res, startOutlookLogin(route)) },
+  { method: 'POST', path: ROUTES.scheduleOutlookLoginStart, handle: (route, req, res) => reply(res, startOutlookLogin(route, req)) },
+  { method: 'GET', path: ROUTES.scheduleOutlookCallback, handle: (route, req, res) => outlookCallback(route, req, res) },
   { method: 'POST', path: ROUTES.scheduleOutlookLoginPoll, handle: (route, req, res) => reply(res, pollOutlookLogin(route, req)) },
   { method: 'POST', path: ROUTES.scheduleOutlookDisconnect, handle: (route, _req, res) => reply(res, disconnectOutlook(route)) },
 ]

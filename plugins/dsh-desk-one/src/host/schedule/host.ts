@@ -25,7 +25,8 @@ import {
 import { parseIcsEvents } from './ical.js'
 import { fetchOutlookIcs } from './providers/outlook-ics.js'
 import {
-  fetchGraphCalendarEvents, listGraphCalendars, pollGraphDeviceCode, refreshGraphToken, startGraphDeviceCode,
+  codeChallenge, exchangeGraphCode, fetchGraphCalendarEvents, graphAuthorizeUrl, listGraphCalendars, pollGraphDeviceCode,
+  refreshGraphToken, startGraphDeviceCode,
 } from './providers/graph.js'
 import { scheduleErrorOf, type EventDraft } from './records.js'
 import { ScheduleError } from './types.js'
@@ -94,21 +95,59 @@ function dedupeDrafts(drafts: readonly EventDraft[]): EventDraft[] {
   return [...seen.values()]
 }
 
+type OutlookFlow =
+  | { kind: 'device'; deviceCode: string; expiresAt: number }
+  | {
+      kind: 'redirect'
+      verifier: string
+      state: string
+      redirectUri: string
+      expiresAt: number
+      completed?: ScheduleStateResponse
+    }
+
 export class ScheduleHost {
   private readonly inflight = new Map<string, Promise<ScheduleSyncSourceReport>>()
 
-  private readonly outlookFlows = new Map<string, { deviceCode: string; expiresAt: number }>()
+  private readonly outlookFlows = new Map<string, OutlookFlow>()
   private readonly graphAccess = new Map<string, { token: string; expiresAt: number }>()
 
   constructor(private readonly ctx: Context, private readonly store: DeskStore) {}
 
-  /** Device-code login: the UI shows the code, the host keeps the device code server-side. */
-  async startOutlookLogin(): Promise<OutlookLoginStartResponse> {
+  /** Browser redirect login (default) or device code (fallback). */
+  async startOutlookLogin(redirectUri?: string): Promise<OutlookLoginStartResponse> {
+    if (redirectUri !== undefined && redirectUri !== '') {
+      const parsed = new URL(redirectUri)
+      if (parsed.protocol !== 'http:' || !['localhost', '127.0.0.1'].includes(parsed.hostname)
+        || !parsed.pathname.endsWith('/api/desk-one/schedule/outlook/callback')) {
+        throw new DeskError('INVALID_SCHEDULE', '登录回调地址必须是本机 desk-one 的 callback 路由', 400)
+      }
+      const verifier = randomUUID() + randomUUID()
+      const state = randomUUID()
+      const flowId = randomUUID()
+      this.outlookFlows.set(flowId, {
+        kind: 'redirect',
+        verifier,
+        state,
+        redirectUri,
+        expiresAt: Date.now() + 10 * 60_000,
+      })
+      return {
+        flowId,
+        kind: 'redirect',
+        authUrl: graphAuthorizeUrl({ redirectUri, state, challenge: await codeChallenge(verifier) }),
+        userCode: '',
+        verificationUri: '',
+        expiresIn: 600,
+        interval: 2,
+      }
+    }
     const code = await startGraphDeviceCode(this.adapterDeps())
     const flowId = randomUUID()
-    this.outlookFlows.set(flowId, { deviceCode: code.deviceCode, expiresAt: Date.now() + code.expiresIn * 1000 })
+    this.outlookFlows.set(flowId, { kind: 'device', deviceCode: code.deviceCode, expiresAt: Date.now() + code.expiresIn * 1000 })
     return {
       flowId,
+      kind: 'device',
       userCode: code.userCode,
       verificationUri: code.verificationUri,
       expiresIn: code.expiresIn,
@@ -123,6 +162,11 @@ export class ScheduleHost {
       this.outlookFlows.delete(id)
       throw new DeskError('SCHEDULE_AUTH_EXPIRED', '登录已过期，请重新发起', 409)
     }
+    if (flow.kind === 'redirect') {
+      return flow.completed === undefined
+        ? { status: 'pending' }
+        : { status: 'connected', state: flow.completed }
+    }
     let tokens
     try {
       tokens = await pollGraphDeviceCode(flow.deviceCode, this.adapterDeps())
@@ -135,8 +179,31 @@ export class ScheduleHost {
     }
     if (tokens === null || tokens.refreshToken === undefined) return { status: 'pending' }
     this.outlookFlows.delete(id)
+    return this.finishOutlookLogin(tokens.refreshToken)
+  }
+
+  /** OAuth redirect callback: exchange the code, persist the refresh token, warm one sync. */
+  async completeOutlookLogin(code: unknown, state: unknown): Promise<{ ok: boolean; message: string }> {
+    const value = text(code)
+    const stateId = text(state)
+    const entry = [...this.outlookFlows.entries()].find(([, flow]) => flow.kind === 'redirect' && flow.state === stateId)
+    if (entry === undefined) return { ok: false, message: '登录状态已过期，请回到 Desk One 重新点击登录。' }
+    const [, flow] = entry
+    if (flow.kind !== 'redirect') return { ok: false, message: '登录状态无效。' }
+    try {
+      const tokens = await exchangeGraphCode({ code: value, redirectUri: flow.redirectUri, verifier: flow.verifier }, this.adapterDeps())
+      if (tokens.refreshToken === undefined) return { ok: false, message: 'Microsoft 没有返回 refresh token，请重试。' }
+      const result = await this.finishOutlookLogin(tokens.refreshToken)
+      flow.completed = result.state
+      return { ok: true, message: 'Outlook 已连接，请回到 Desk One 关闭本窗口。' }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
+  private async finishOutlookLogin(refreshToken: string): Promise<OutlookLoginPollResponse> {
     const service = this.requireCredentials()
-    await service.set(OUTLOOK_GRAPH_REFRESH_REF, tokens.refreshToken)
+    await service.set(OUTLOOK_GRAPH_REFRESH_REF, refreshToken)
     const source = await this.store.upsertScheduleSource({
       provider: 'outlook',
       channel: 'graph',
