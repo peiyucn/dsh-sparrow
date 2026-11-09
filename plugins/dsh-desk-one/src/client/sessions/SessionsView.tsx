@@ -1,7 +1,7 @@
 /**
  * Sessions (Agent会话) view: active catalog (Phase 1, client snapshot) + archive management
- * (Phase 3/A2, host routes). The active list stays read-only; archived / stray / trash operations
- * live in ArchiveSections and go through the host's validated routes.
+ * (Phase 3/A2, host routes). Active rows can be archived or moved to trash; archived / stray /
+ * trash operations live in ArchiveSections and all mutations go through the host's routes.
  */
 
 import { useState } from 'react'
@@ -11,6 +11,7 @@ import type { SessionChipInfo, SessionLinkSnapshot } from './contract.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
 import { activeSessionGroups } from './catalog.js'
 import { ArchiveSections } from './ArchiveSections.js'
+import { ConfirmButton } from './ConfirmButton.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
 import { formatDate, formatTokens } from '../app/utils.js'
 
@@ -38,7 +39,7 @@ function sessionMeta(t: DeskTranslator, session: SessionChipInfo): string {
 }
 
 function SessionRow({
-  session, depth, t, onOpen, childCount, collapsed, onToggle,
+  session, depth, t, onOpen, childCount, collapsed, onToggle, actions,
 }: {
   readonly session: SessionChipInfo
   readonly depth?: number
@@ -47,6 +48,7 @@ function SessionRow({
   readonly childCount: number
   readonly collapsed: boolean
   readonly onToggle: () => void
+  readonly actions?: ReactElement
 }): ReactElement {
   const archived = session.availability === 'archived'
   const unavailable = session.availability === 'unavailable' || session.availability === 'loading'
@@ -66,6 +68,7 @@ function SessionRow({
         hasChildren={childCount > 0}
         expanded={!collapsed}
         onToggleExpand={onToggle}
+        actions={actions}
         onOpen={() => onOpen(session.id)}
         expandLabel={t('sessions.archive.expand')}
         collapseLabel={t('sessions.archive.collapse')}
@@ -77,6 +80,23 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
   const groups = activeSessionGroups(snapshot.sessions, snapshot.workspaces)
   const activeCount = groups.reduce((sum, group) => sum + group.sessions.length, 0)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [busy, setBusy] = useState(false)
+  const [armed, setArmed] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [hidden, setHidden] = useState<Set<string>>(new Set())
+  const act = async (sessionId: string, task: () => Promise<unknown>): Promise<void> => {
+    setBusy(true)
+    setError(null)
+    try {
+      await task()
+      setHidden(previous => new Set(previous).add(sessionId))
+      setArmed(null)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
   const toggleCollapsed = (id: string): void => {
     setCollapsed(previous => {
       const next = new Set(previous)
@@ -90,6 +110,7 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
     const out: typeof rows[number][] = []
     let skipBelow = -1
     for (const row of rows) {
+      if (hidden.has(row.session.id)) continue
       if (skipBelow >= 0) {
         if (row.depth > skipBelow) continue
         skipBelow = -1
@@ -107,6 +128,7 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
             <h2 className="dsh-desk-session-section-title">{t('sessions.active')}</h2>
             <span className="dsh-desk-session-section-count">{t('sessions.count', { count: activeCount })}</span>
           </header>
+          {error === null ? null : <p className="dsh-desk-archive-error">{error}</p>}
           {groups.length === 0
             ? <p className="dsh-desk-wall-hint">{t('sessions.activeEmpty')}</p>
             : groups.map(group => (
@@ -128,6 +150,24 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
                         childCount={row.childCount}
                         collapsed={collapsed.has(row.session.id)}
                         onToggle={() => toggleCollapsed(row.session.id)}
+                        actions={(
+                          <>
+                            <button
+                              type="button"
+                              className="dsh-desk-archive-action"
+                              disabled={busy}
+                              onClick={() => { void act(row.session.id, () => archive.archive(row.session.id)) }}
+                            >{t('sessions.archive.archive')}</button>
+                            <ConfirmButton
+                              label={t('sessions.archive.toTrash')}
+                              confirmLabel={t('sessions.archive.toTrashConfirm')}
+                              armed={armed === row.session.id}
+                              disabled={busy}
+                              onArm={() => setArmed(row.session.id)}
+                              onConfirm={() => { void act(row.session.id, () => archive.moveToTrash(row.session.id)) }}
+                            />
+                          </>
+                        )}
                       />
                     ))}
                   </ul>

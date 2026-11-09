@@ -94,6 +94,7 @@ export function SessionTreeRow(props: SessionTreeRowProps): ReactElement {
         {props.meta === undefined ? null : <span className="dsh-desk-archive-meta">{props.meta}</span>}
         <span className="dsh-desk-session-row-meta">{props.status}</span>
       </button>
+      {props.actions === undefined ? null : <div className="dsh-desk-archive-actions">{props.actions}</div>}
     </div>
   )
 }

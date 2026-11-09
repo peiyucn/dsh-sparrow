@@ -15,6 +15,7 @@ import type {
 import type { DeskTranslator } from '../app/types.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
 import { formatTokens } from '../app/utils.js'
+import { ConfirmButton } from './ConfirmButton.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
 
 export interface ArchiveSnapshot {
@@ -39,29 +40,6 @@ function formatDate(ms: number): string {
 }
 
 /** Two-step confirm button: first click arms, second click runs. */
-function ConfirmButton(props: {
-  readonly t: DeskTranslator
-  readonly label: string
-  readonly confirmLabel: string
-  readonly armed: boolean
-  readonly danger?: boolean
-  readonly disabled?: boolean
-  readonly onArm: () => void
-  readonly onConfirm: () => void
-}): ReactElement {
-  return (
-    <button
-      type="button"
-      className="dsh-desk-archive-action"
-      data-danger={props.danger === true ? 'true' : undefined}
-      disabled={props.disabled === true}
-      onClick={() => { if (props.armed) props.onConfirm(); else props.onArm() }}
-    >
-      {props.armed ? props.confirmLabel : props.label}
-    </button>
-  )
-}
-
 /** One-section pagination footer: the host returns the full list, the UI reveals it in pages. */
 function LoadMore(props: { readonly more: boolean; readonly label: string; readonly onClick: () => void }): ReactElement | null {
   if (!props.more) return null
@@ -115,7 +93,6 @@ function ArchiveTreeNodeRow(props: {
     <>
       <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => props.onUnarchive(node.sessionId)}>{t('sessions.archive.unarchive')}</button>
       <ConfirmButton
-        t={t}
         label={t('sessions.archive.toTrash')}
         confirmLabel={t('sessions.archive.toTrashConfirm')}
         armed={armedTrash.has(node.sessionId)}
@@ -124,7 +101,6 @@ function ArchiveTreeNodeRow(props: {
         onConfirm={() => props.onConfirmTrash(node.sessionId)}
       />
       <ConfirmButton
-        t={t}
         label={t('sessions.archive.delete')}
         confirmLabel={deleteArmed ? t('sessions.archive.deleteConfirm') : t('sessions.archive.delete')}
         armed={deleteArmed}
@@ -382,7 +358,6 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                       <>
                         <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => { void run(() => api.archive(item.sessionId)) }}>{t('sessions.archive.archive')}</button>
                         <ConfirmButton
-                          t={t}
                           label={t('sessions.archive.toTrash')}
                           confirmLabel={t('sessions.archive.toTrashConfirm')}
                           armed={armedTrash.has(item.sessionId)}
@@ -391,7 +366,6 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                           onConfirm={() => { void run(() => api.moveToTrash(item.sessionId)) }}
                         />
                         <ConfirmButton
-                          t={t}
                           label={t('sessions.archive.delete')}
                           confirmLabel={t('sessions.archive.deleteConfirm')}
                           armed={deleteDraft?.id === item.sessionId}
@@ -440,7 +414,6 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
           <span className="dsh-desk-session-section-count">{t('sessions.count', { count: trash.length })}</span>
           <div className="dsh-desk-archive-bulk">
             <ConfirmButton
-              t={t}
               label={t('sessions.archive.restoreAll')}
               confirmLabel={t('sessions.archive.restoreAllConfirm')}
               armed={bulk === 'restoreAll'}
@@ -449,7 +422,6 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
               onConfirm={() => { void run(() => api.restoreAll()) }}
             />
             <ConfirmButton
-              t={t}
               label={t('sessions.archive.deleteAll')}
               confirmLabel={t('sessions.archive.deleteAllConfirm')}
               armed={bulk === 'deleteAll'}
@@ -500,7 +472,6 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                           <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => { void run(() => api.restore(entry.trashId)) }}>{t('sessions.archive.restore')}</button>
                         )}
                         <ConfirmButton
-                          t={t}
                           label={t('sessions.archive.delete')}
                           confirmLabel={t('sessions.archive.deleteConfirm')}
                           armed={armedTrashDelete.has(entry.trashId)}
