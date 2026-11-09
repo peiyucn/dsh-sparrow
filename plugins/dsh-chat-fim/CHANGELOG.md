@@ -5,6 +5,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 ## [0.2.2-rc.1.1] - 2026-11-08
 
 - The rotating highlight shown while FIM is thinking now hugs the composer border, with no gaps at the corners.
+- The 🐦 dsh-sparrow brand line at the bottom of the suggestion card is removed.
 
 ## [0.2.2-rc.1] - 2026-11-05
 
