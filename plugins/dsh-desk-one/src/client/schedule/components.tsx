@@ -649,9 +649,9 @@ function OutlookGraphCard(props: {
   return (
     <section className="dsh-desk-schedule-connection-card" data-connected={source !== undefined}>
       <header>
-        <span className="dsh-desk-schedule-statusdot" data-on={source !== undefined} />
         <ProviderLogo provider="outlook" />
         <h3>{t('schedule.provider.outlook')}</h3>
+        <span className="dsh-desk-schedule-statusdot" data-on={source !== undefined} />
         <span className="dsh-desk-schedule-connection-status">
           {source === undefined ? t('schedule.graphPending') : t('schedule.form.connected')}
         </span>
@@ -766,9 +766,9 @@ function ProviderCard(props: {
   return (
     <section className="dsh-desk-schedule-connection-card" data-connected={connected}>
       <header>
-        <span className="dsh-desk-schedule-statusdot" data-on={connected} />
         <ProviderLogo provider={provider} />
         <h3>{t(providerKey(provider) as never)}</h3>
+        <span className="dsh-desk-schedule-statusdot" data-on={connected} />
         <span className="dsh-desk-schedule-connection-status" data-error={source?.syncState === 'error'}>
           {connected ? t('schedule.form.connected') : t('schedule.form.notConnected')}
         </span>
@@ -926,8 +926,8 @@ function SubscriptionCard(props: {
   return (
     <section className="dsh-desk-schedule-connection-card">
       <header>
-        <span className="dsh-desk-schedule-statusdot" data-on={sources.length > 0} />
         <h3>{t('schedule.subscriptions')}</h3>
+        <span className="dsh-desk-schedule-statusdot" data-on={sources.length > 0} />
         <span className="dsh-desk-schedule-connection-status">{t('schedule.subscriptionHint')}</span>
       </header>
       {sources.length === 0 ? <p className="dsh-desk-schedule-form-note">{t('schedule.subscriptionEmpty')}</p> : null}
@@ -936,8 +936,8 @@ function SubscriptionCard(props: {
         return (
           <div key={source.id} className="dsh-desk-schedule-subscription">
             <div className="dsh-desk-schedule-subscription-head">
-              <span className="dsh-desk-schedule-statusdot" data-on={source.syncState !== 'error'} />
               <span className="dsh-desk-schedule-mgmt-name">{source.account ?? t('schedule.subscriptions')}</span>
+              <span className="dsh-desk-schedule-statusdot" data-on={source.syncState !== 'error'} />
               <button
                 type="button"
                 className="dsh-desk-schedule-link"
