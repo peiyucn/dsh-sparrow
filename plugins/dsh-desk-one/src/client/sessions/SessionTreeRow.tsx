@@ -85,10 +85,13 @@ export function SessionTreeRow(props: SessionTreeRowProps): ReactElement {
         title={disabled === true ? undefined : title}
         onClick={() => { if (disabled !== true) onOpen?.() }}
       >
+        {caret}
         <span className="dsh-desk-session-row-main">
           <span className="dsh-desk-session-row-title">{title}</span>
           {subagent === true ? <span className="dsh-desk-session-tag">{props.tag ?? props.status}</span> : null}
+          {props.badges}
         </span>
+        {props.meta === undefined ? null : <span className="dsh-desk-archive-meta">{props.meta}</span>}
         <span className="dsh-desk-session-row-meta">{props.status}</span>
       </button>
     </div>

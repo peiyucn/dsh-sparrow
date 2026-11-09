@@ -17,6 +17,7 @@ export interface SessionWorkspaceGroup {
 export interface ActiveSessionRow {
   readonly session: SessionChipInfo
   readonly depth: number
+  readonly childCount: number
 }
 
 /** Last path segment for either Windows or POSIX cwd strings. */
@@ -67,7 +68,7 @@ export function activeSessionGroups(
     }
     const addRows = (item: typeof node, depth: number): void => {
       group.sessions.push(item.value)
-      group.rows.push({ session: item.value, depth })
+      group.rows.push({ session: item.value, depth, childCount: item.children.length })
       for (const child of item.children) addRows(child, depth + 1)
     }
     addRows(node, 0)

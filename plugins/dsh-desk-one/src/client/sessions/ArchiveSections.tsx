@@ -325,43 +325,53 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
             <ul className="dsh-desk-archive-list">
               {strays.slice(0, visible.strays).map(item => (
                 <li key={item.sessionId}>
-                  <div className="dsh-desk-archive-row">
-                    <button type="button" className="dsh-desk-archive-row-toggle" onClick={() => onOpen(item.sessionId)}>
-                      <span className="dsh-desk-archive-title">{item.title}</span>
-                      {item.blank ? <span className="dsh-desk-archive-badge">{t('sessions.archive.blank')}</span> : null}
-                      {item.orphan ? <span className="dsh-desk-archive-badge">{t('sessions.archive.orphan')}</span> : null}
-                      <span className="dsh-desk-archive-meta">{`${formatDate(item.createdAt)}${item.backendSupported ? '' : ` · ${t('sessions.archive.unsupported')}`}`}</span>
-                    </button>
-                    <div className="dsh-desk-archive-actions">
-                      <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => { void run(() => api.archive(item.sessionId)) }}>{t('sessions.archive.archive')}</button>
-                      <ConfirmButton
-                        t={t}
-                        label={t('sessions.archive.toTrash')}
-                        confirmLabel={t('sessions.archive.toTrashConfirm')}
-                        armed={armedTrash.has(item.sessionId)}
-                        disabled={busy || !item.backendSupported}
-                        onArm={() => setArmedTrash(new Set([item.sessionId]))}
-                        onConfirm={() => { void run(() => api.moveToTrash(item.sessionId)) }}
-                      />
-                      <ConfirmButton
-                        t={t}
-                        label={t('sessions.archive.delete')}
-                        confirmLabel={t('sessions.archive.deleteConfirm')}
-                        armed={deleteDraft?.id === item.sessionId}
-                        danger
-                        disabled={busy || !item.backendSupported}
-                        onArm={() => setDeleteDraft({ id: item.sessionId, text: '' })}
-                        onConfirm={() => {
-                          const confirmTitle = deleteDraft?.text
-                          void run(() => api.deleteSession(
-                            item.blank
-                              ? { sessionId: item.sessionId, confirm: true }
-                              : { sessionId: item.sessionId, confirmTitle },
-                          ))
-                        }}
-                      />
-                    </div>
-                  </div>
+                  <SessionTreeRow
+                    variant="archive"
+                    title={item.title}
+                    depth={0}
+                    disabled={false}
+                    onOpen={() => onOpen(item.sessionId)}
+                    badges={(
+                      <>
+                        {item.blank ? <span className="dsh-desk-archive-badge">{t('sessions.archive.blank')}</span> : null}
+                        {item.orphan ? <span className="dsh-desk-archive-badge">{t('sessions.archive.orphan')}</span> : null}
+                      </>
+                    )}
+                    meta={`${formatDate(item.createdAt)}${item.backendSupported ? '' : ` · ${t('sessions.archive.unsupported')}`}`}
+                    expandLabel={t('sessions.archive.expand')}
+                    collapseLabel={t('sessions.archive.collapse')}
+                    actions={(
+                      <>
+                        <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => { void run(() => api.archive(item.sessionId)) }}>{t('sessions.archive.archive')}</button>
+                        <ConfirmButton
+                          t={t}
+                          label={t('sessions.archive.toTrash')}
+                          confirmLabel={t('sessions.archive.toTrashConfirm')}
+                          armed={armedTrash.has(item.sessionId)}
+                          disabled={busy || !item.backendSupported}
+                          onArm={() => setArmedTrash(new Set([item.sessionId]))}
+                          onConfirm={() => { void run(() => api.moveToTrash(item.sessionId)) }}
+                        />
+                        <ConfirmButton
+                          t={t}
+                          label={t('sessions.archive.delete')}
+                          confirmLabel={t('sessions.archive.deleteConfirm')}
+                          armed={deleteDraft?.id === item.sessionId}
+                          danger
+                          disabled={busy || !item.backendSupported}
+                          onArm={() => setDeleteDraft({ id: item.sessionId, text: '' })}
+                          onConfirm={() => {
+                            const confirmTitle = deleteDraft?.text
+                            void run(() => api.deleteSession(
+                              item.blank
+                                ? { sessionId: item.sessionId, confirm: true }
+                                : { sessionId: item.sessionId, confirmTitle },
+                            ))
+                          }}
+                        />
+                      </>
+                    )}
+                  />
                   {deleteDraft?.id === item.sessionId ? (
                     <div className="dsh-desk-archive-deletebox">
                       {item.blank ? <span className="dsh-desk-archive-note">{t('sessions.archive.blankDeleteNote')}</span> : (
@@ -422,29 +432,40 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
             <ul className="dsh-desk-archive-list">
               {trash.slice(0, visible.trash).map(entry => (
                 <li key={entry.trashId}>
-                  <div className="dsh-desk-archive-row">
-                    <span className="dsh-desk-archive-title">{entry.title}</span>
-                    {entry.legacy ? <span className="dsh-desk-archive-badge">{t('sessions.archive.legacy')}</span> : null}
-                    {!entry.legacy && entry.subagents.length > 0
-                      ? <span className="dsh-desk-archive-badge">{entry.subagents.length} {t('sessions.archive.subagents')}</span>
-                      : null}
-                    <span className="dsh-desk-archive-meta">{formatDate(Date.parse(entry.archivedAt))}</span>
-                    <div className="dsh-desk-archive-actions">
-                      {entry.legacy ? null : (
-                        <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => { void run(() => api.restore(entry.trashId)) }}>{t('sessions.archive.restore')}</button>
-                      )}
-                      <ConfirmButton
-                        t={t}
-                        label={t('sessions.archive.delete')}
-                        confirmLabel={t('sessions.archive.deleteConfirm')}
-                        armed={armedTrashDelete.has(entry.trashId)}
-                        danger
-                        disabled={busy}
-                        onArm={() => setArmedTrashDelete(new Set([entry.trashId]))}
-                        onConfirm={() => { void run(() => api.deleteTrashEntry(entry.trashId)) }}
-                      />
-                    </div>
-                  </div>
+                  <SessionTreeRow
+                    variant="archive"
+                    title={entry.title}
+                    depth={0}
+                    disabled
+                    expandLabel={t('sessions.archive.expand')}
+                    collapseLabel={t('sessions.archive.collapse')}
+                    badges={(
+                      <>
+                        {entry.legacy ? <span className="dsh-desk-archive-badge">{t('sessions.archive.legacy')}</span> : null}
+                        {!entry.legacy && entry.subagents.length > 0
+                          ? <span className="dsh-desk-archive-badge">{entry.subagents.length} {t('sessions.archive.subagents')}</span>
+                          : null}
+                      </>
+                    )}
+                    meta={formatDate(Date.parse(entry.archivedAt))}
+                    actions={(
+                      <>
+                        {entry.legacy ? null : (
+                          <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => { void run(() => api.restore(entry.trashId)) }}>{t('sessions.archive.restore')}</button>
+                        )}
+                        <ConfirmButton
+                          t={t}
+                          label={t('sessions.archive.delete')}
+                          confirmLabel={t('sessions.archive.deleteConfirm')}
+                          armed={armedTrashDelete.has(entry.trashId)}
+                          danger
+                          disabled={busy}
+                          onArm={() => setArmedTrashDelete(new Set([entry.trashId]))}
+                          onConfirm={() => { void run(() => api.deleteTrashEntry(entry.trashId)) }}
+                        />
+                      </>
+                    )}
+                  />
                 </li>
               ))}
             </ul>

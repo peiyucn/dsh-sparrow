@@ -4,6 +4,7 @@
  * live in ArchiveSections and go through the host's validated routes.
  */
 
+import { useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DeskTranslator } from '../app/types.js'
 import type { SessionChipInfo, SessionLinkSnapshot } from './contract.js'
@@ -11,6 +12,7 @@ import type { SessionsArchiveApi } from './archiveApi.js'
 import { activeSessionGroups } from './catalog.js'
 import { ArchiveSections } from './ArchiveSections.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
+import { formatDate } from '../app/utils.js'
 
 interface SessionsViewProps {
   readonly snapshot: SessionLinkSnapshot
@@ -27,12 +29,15 @@ function stateText(t: DeskTranslator, session: SessionChipInfo): string {
 }
 
 function SessionRow({
-  session, depth, t, onOpen,
+  session, depth, t, onOpen, childCount, collapsed, onToggle,
 }: {
   readonly session: SessionChipInfo
   readonly depth?: number
   readonly t: DeskTranslator
   readonly onOpen: (sessionId: string) => void
+  readonly childCount: number
+  readonly collapsed: boolean
+  readonly onToggle: () => void
 }): ReactElement {
   const archived = session.availability === 'archived'
   const unavailable = session.availability === 'unavailable' || session.availability === 'loading'
@@ -48,6 +53,10 @@ function SessionRow({
         live={archived}
         disabled={!openable}
         status={stateText(t, session)}
+        meta={formatDate(new Date(session.updatedAt).toISOString())}
+        hasChildren={childCount > 0}
+        expanded={!collapsed}
+        onToggleExpand={onToggle}
         onOpen={() => onOpen(session.id)}
         expandLabel={t('sessions.archive.expand')}
         collapseLabel={t('sessions.archive.collapse')}
@@ -58,6 +67,29 @@ function SessionRow({
 export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps): ReactElement {
   const groups = activeSessionGroups(snapshot.sessions, snapshot.workspaces)
   const activeCount = groups.reduce((sum, group) => sum + group.sessions.length, 0)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const toggleCollapsed = (id: string): void => {
+    setCollapsed(previous => {
+      const next = new Set(previous)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  /** Hide descendants of a collapsed parent; active rows are expanded by default. */
+  const visibleRows = (rows: readonly { session: SessionChipInfo; depth: number; childCount: number }[]): typeof rows => {
+    const out: typeof rows[number][] = []
+    let skipBelow = -1
+    for (const row of rows) {
+      if (skipBelow >= 0) {
+        if (row.depth > skipBelow) continue
+        skipBelow = -1
+      }
+      out.push(row)
+      if (collapsed.has(row.session.id)) skipBelow = row.depth
+    }
+    return out
+  }
   return (
     <div className="dsh-desk-sessionsview">
       {snapshot.enabled ? (
@@ -77,8 +109,17 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
                     <span className="dsh-desk-session-group-count">{group.sessions.length}</span>
                   </div>
                   <ul className="dsh-desk-session-list">
-                    {group.rows.map(row => (
-                      <SessionRow key={row.session.id} session={row.session} depth={row.depth} t={t} onOpen={onOpen} />
+                    {visibleRows(group.rows).map(row => (
+                      <SessionRow
+                        key={row.session.id}
+                        session={row.session}
+                        depth={row.depth}
+                        t={t}
+                        onOpen={onOpen}
+                        childCount={row.childCount}
+                        collapsed={collapsed.has(row.session.id)}
+                        onToggle={() => toggleCollapsed(row.session.id)}
+                      />
                     ))}
                   </ul>
                 </div>
