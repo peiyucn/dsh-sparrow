@@ -102,7 +102,27 @@ export interface DeskTaskGroup {
 }
 
 /** 统一对象：存储域一张 nodes 表按 kind 判别（加 kind 只扩 schema，不改表）。 */
-export type DeskNode = DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent
+/** Lightweight foreign-key index of a DSH session: no transcript, only searchable metadata. */
+export interface DeskSessionIndex {
+  readonly id: string
+  readonly kind: 'session'
+  readonly schema: number
+  readonly sessionId: string
+  readonly title: string
+  readonly cwd?: string
+  readonly parentSessionId?: string
+  readonly subagent: boolean
+  readonly running: boolean
+  readonly availability: 'available' | 'archived' | 'missing'
+  /** Session creation/update timestamp (ms), not the index refresh time. */
+  readonly updatedAt: number
+  readonly indexedAt: string
+  readonly missingSince?: string
+  readonly createdAt: string
+  readonly revision: number
+}
+
+export type DeskNode = DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent | DeskSessionIndex
 
 /* ------------------------------------------------------------------ */
 /* Schedule (S2): read-only mirror of external calendars               */

@@ -10,6 +10,7 @@ import { createDeskRequestHandler } from './host/router.js'
 import { DeskStore } from './host/store.js'
 import { ScheduleHost } from './host/schedule/host.js'
 import { registerScheduleTools } from './host/schedule/tools.js'
+import { registerSessionTools } from './host/sessions/tools.js'
 import { installSessionsHost, hasSessionServices, type SessionsConfig } from './host/sessions/install.js'
 import { registerDeskTools } from './host/notes/tools.js'
 import { registerGroupTools } from './host/tasks/group-tools.js'
@@ -34,10 +35,12 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
   // Session gates include the session-format probe + the two private seams; failing here disables
   // the plugin before any storage/effect is registered. Hosts without the services (unit tests,
   // stripped builds) simply skip the session capabilities.
-  const sessions = hasSessionServices(ctx) ? await installSessionsHost(ctx, config) : undefined
-
   const store = await DeskStore.open(ctx)
   ctx.effect(() => () => store.close(), 'dsh-desk-one: storage domain')
+  // Session gates include the session-format probe + the two private seams; failing here disables
+  // the plugin before any storage/effect is registered. Hosts without the services (unit tests,
+  // stripped builds) simply skip the session capabilities.
+  const sessions = hasSessionServices(ctx) ? await installSessionsHost(ctx, store, config) : undefined
 
   const schedule = new ScheduleHost(ctx, store)
   const handler = createDeskRequestHandler({ ctx, store, schedule, sessions })
@@ -51,4 +54,9 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
   registerTaskTools(ctx, store)
   registerGroupTools(ctx, store)
   registerScheduleTools(ctx, schedule)
+  if (sessions !== undefined) {
+    registerSessionTools(ctx, store, sessions)
+    // Warm the index at startup; the tools refresh it with a TTL afterwards.
+    void sessions.refreshIndex().catch(() => undefined)
+  }
 }

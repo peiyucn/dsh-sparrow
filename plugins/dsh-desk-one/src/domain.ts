@@ -154,8 +154,26 @@ const eventSchema = z.object({
   revision: z.number().int().positive(),
 })
 
+const sessionIndexSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('session'),
+  schema: z.number().int().positive(),
+  sessionId: z.string().min(1),
+  title: z.string(),
+  cwd: z.string().optional(),
+  parentSessionId: z.string().optional(),
+  subagent: z.boolean(),
+  running: z.boolean(),
+  availability: z.enum(['available', 'archived', 'missing']),
+  updatedAt: z.number(),
+  indexedAt: z.string().min(1),
+  missingSince: z.string().optional(),
+  createdAt: z.string().min(1),
+  revision: z.number().int().nonnegative(),
+})
+
 const nodeSchema = z.discriminatedUnion('kind', [
-  noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema,
+  noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema, sessionIndexSchema,
 ])
 const edgeSchema = z.object({
   id: z.string().min(1),

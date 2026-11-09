@@ -132,6 +132,10 @@ export const NOTE_MAX_SIZE = 2000
 /** Upper bound for vertical canvas coordinates: effectively infinite, still blocks corrupt data. */
 export const NOTE_MAX_POSITION = 100000
 
+/** 会话索引：刷新 TTL 与墓碑保留天数（索引只是外键，不复制会话内容）。 */
+export const SESSION_INDEX_TTL_MS = 5 * 60_000
+export const SESSION_INDEX_MISSING_DAYS = 30
+
 /** 每区每次渲染的行数上限，「加载更多」按此递增。 */
 export const SESSION_STREAM_PAGE_SIZE = 100
 /** 上次停留的标签页（纯界面偏好，不含用户内容）；切走再回来停在原标签。 */
