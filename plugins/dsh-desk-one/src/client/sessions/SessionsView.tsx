@@ -82,8 +82,8 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
                     <span className="dsh-desk-session-group-count">{group.sessions.length}</span>
                   </div>
                   <ul className="dsh-desk-session-list">
-                    {group.sessions.map(session => (
-                      <SessionRow key={session.id} session={session} t={t} onOpen={onOpen} />
+                    {group.rows.map(row => (
+                      <SessionRow key={row.session.id} session={row.session} depth={row.depth} t={t} onOpen={onOpen} />
                     ))}
                   </ul>
                 </div>

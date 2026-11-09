@@ -7,7 +7,15 @@ export interface SessionWorkspaceGroup {
   readonly key: string
   /** Display label: workspace title, then last path segment; empty means "no workspace". */
   readonly label: string
+  /** All sessions in the group (flat, for counts and compatibility). */
   readonly sessions: readonly SessionChipInfo[]
+  /** Parent-first rows: subagents follow their parent at depth 1, same nesting as the archive tree. */
+  readonly rows: readonly ActiveSessionRow[]
+}
+
+export interface ActiveSessionRow {
+  readonly session: SessionChipInfo
+  readonly depth: number
 }
 
 /** Last path segment for either Windows or POSIX cwd strings. */
@@ -26,8 +34,8 @@ function byActivity(left: SessionChipInfo, right: SessionChipInfo): number {
 
 /**
  * Active catalog grouped by host Workspace first (the registry's title/sessionIds), falling back
- * to the session's cwd basename for sessions outside any workspace. Archived rows are handled by
- * the archive tree; subagent rows stay in their group and are tagged in the UI.
+ * to the session's cwd basename for sessions outside any workspace. Subagent sessions are nested
+ * under their parent (same lineage rule as the archive tree), never shown as a separate group.
  */
 export function activeSessionGroups(
   sessions: readonly SessionChipInfo[],
@@ -37,18 +45,40 @@ export function activeSessionGroups(
   for (const workspace of workspaces) {
     for (const sessionId of workspace.sessionIds) workspaceBySession.set(sessionId, workspace)
   }
-  const groups = new Map<string, { label: string; sessions: SessionChipInfo[] }>()
-  for (const session of sessions) {
-    if (session.availability === 'archived') continue
-    const workspace = workspaceBySession.get(session.id)
-    const key = workspace === undefined ? (session.cwd === undefined ? '' : `cwd:${session.cwd}`) : `ws:${workspace.id}`
-    const label = workspace?.title ?? workspaceLabel(session.cwd)
-    const group = groups.get(key)
-    if (group === undefined) groups.set(key, { label, sessions: [session] })
-    else group.sessions.push(session)
+  const active = sessions.filter(session => session.availability !== 'archived')
+  const byId = new Map(active.map(session => [session.id, session]))
+  const children = new Map<string, SessionChipInfo[]>()
+  const roots: SessionChipInfo[] = []
+  for (const session of active) {
+    const parent = session.parentId === undefined ? undefined : byId.get(session.parentId)
+    if (parent === undefined) roots.push(session)
+    else {
+      const siblings = children.get(parent.id) ?? []
+      siblings.push(session)
+      children.set(parent.id, siblings)
+    }
+  }
+  type Group = { label: string; sessions: SessionChipInfo[]; rows: ActiveSessionRow[] }
+  const groups = new Map<string, Group>()
+  const addRows = (group: Group, session: SessionChipInfo, depth: number): void => {
+    group.sessions.push(session)
+    group.rows.push({ session, depth })
+    const nested = (children.get(session.id) ?? []).sort(byActivity)
+    for (const child of nested) addRows(group, child, depth + 1)
+  }
+  for (const root of roots.sort(byActivity)) {
+    const workspace = workspaceBySession.get(root.id)
+    const key = workspace === undefined ? (root.cwd === undefined ? '' : `cwd:${root.cwd}`) : `ws:${workspace.id}`
+    const label = workspace?.title ?? workspaceLabel(root.cwd)
+    let group = groups.get(key)
+    if (group === undefined) {
+      group = { label, sessions: [], rows: [] }
+      groups.set(key, group)
+    }
+    addRows(group, root, 0)
   }
   return [...groups.entries()]
-    .map(([key, group]) => ({ key, label: group.label, sessions: [...group.sessions].sort(byActivity) }))
+    .map(([key, group]) => ({ key, label: group.label, sessions: [...group.sessions].sort(byActivity), rows: group.rows }))
     .sort((left, right) => left.label.localeCompare(right.label) || left.key.localeCompare(right.key))
 }
 

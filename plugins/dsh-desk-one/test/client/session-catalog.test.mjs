@@ -30,6 +30,16 @@ describe('Sessions 目录分组', () => {
     assert.ok(!groups.some(group => group.sessions.some(item => item.id === 'd')))
   })
 
+  it('子代理跟随父会话嵌套，不再单独成组', () => {
+    const parent = session('p', { cwd: 'C:\\work\\repo-a', updatedAt: 10 })
+    const child = session('c', {
+      cwd: 'C:\\work\\repo-a', updatedAt: 20, subagent: true, parentId: 'p',
+    })
+    const groups = activeSessionGroups([child, parent], [{ id: 'w-a', title: 'Repo A', path: 'C:\\work\\repo-a', sessionIds: ['p'] }])
+    assert.equal(groups.length, 1)
+    assert.deepEqual(groups[0]?.rows.map(row => [row.session.id, row.depth]), [['p', 0], ['c', 1]])
+    assert.deepEqual(groups[0]?.sessions.map(item => item.id).sort(), ['c', 'p'])
+  })
   it('无工作区会话归入空 label 组，路径末尾分隔符被忽略', () => {
     assert.equal(workspaceLabel('C:\\work\\repo-a\\'), 'repo-a')
     assert.equal(workspaceLabel('/work/repo-b'), 'repo-b')
