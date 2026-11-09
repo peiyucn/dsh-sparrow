@@ -39,7 +39,7 @@ function sessionMeta(t: DeskTranslator, session: SessionChipInfo): string {
 }
 
 function SessionRow({
-  session, depth, t, onOpen, childCount, collapsed, onToggle, actions,
+  session, depth, t, onOpen, childCount, collapsed, onToggle, actions, badges,
 }: {
   readonly session: SessionChipInfo
   readonly depth?: number
@@ -49,6 +49,7 @@ function SessionRow({
   readonly collapsed: boolean
   readonly onToggle: () => void
   readonly actions?: ReactElement
+  readonly badges?: ReactElement
 }): ReactElement {
   const archived = session.availability === 'archived'
   const unavailable = session.availability === 'unavailable' || session.availability === 'loading'
@@ -69,6 +70,7 @@ function SessionRow({
         expanded={!collapsed}
         onToggleExpand={onToggle}
         actions={actions}
+        badges={badges}
         onOpen={() => onOpen(session.id)}
         expandLabel={t('sessions.archive.expand')}
         collapseLabel={t('sessions.archive.collapse')}
@@ -132,6 +134,9 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
           childCount={node.children.length}
           collapsed={isCollapsed}
           onToggle={() => toggleCollapsed(node.session.id)}
+          badges={node.children.length === 0 ? undefined : (
+            <span className="dsh-desk-archive-badge">{t('sessions.childCount', { count: node.children.length })}</span>
+          )}
           actions={node.depth === 0 ? (
             <SessionRowAction
               kind="archive"

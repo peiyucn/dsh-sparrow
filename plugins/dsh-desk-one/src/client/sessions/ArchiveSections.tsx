@@ -77,7 +77,7 @@ function ArchiveTreeNodeRow(props: {
     && deleteDraft.text.trim() === node.title.trim() && node.title.trim() !== ''
   const badges = (
     <>
-      {hasChildren ? <span className="dsh-desk-archive-badge">{node.children.length}</span> : null}
+      {hasChildren ? <span className="dsh-desk-archive-badge">{t('sessions.childCount', { count: node.children.length })}</span> : null}
       {node.orphan ? <span className="dsh-desk-archive-badge">{t('sessions.archive.orphan')}</span> : null}
       {!node.backendSupported ? <span className="dsh-desk-archive-badge">{t('sessions.archive.unsupported')}</span> : null}
     </>
@@ -460,7 +460,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                       <>
                         {entry.legacy ? <span className="dsh-desk-archive-badge">{t('sessions.archive.legacy')}</span> : null}
                         {!entry.legacy && entry.subagents.length > 0
-                          ? <span className="dsh-desk-archive-badge">{entry.subagents.length} {t('sessions.archive.subagents')}</span>
+                          ? <span className="dsh-desk-archive-badge">{t('sessions.childCount', { count: entry.subagents.length })}</span>
                           : null}
                       </>
                     )}
