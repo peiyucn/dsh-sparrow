@@ -173,7 +173,7 @@ export const SESSIONS_CSS = `
 /* Nested group uses the same soft status tint as task-board session chips, not a hard rail. */
 .dsh-desk-tree-children {
   list-style: none;
-  margin: 3px 0 3px 18px;
+  margin: 3px 8px 3px 18px;
   padding: 2px 0;
   border-radius: 8px;
   background: color-mix(in srgb, var(--dsw-alias-label-secondary, #6b7280) 4%, transparent);
