@@ -8,15 +8,18 @@ import type {
 } from '../../host/sessions/contract.js'
 
 const BASE = '/api/desk-one/sessions'
+/** Archive reads scan disk and align the tree; mutations may move whole session trees. */
+const ARCHIVE_READ_TIMEOUT_MS = 60_000
+const ARCHIVE_MUTATION_TIMEOUT_MS = 120_000
 
 interface ApiErrorBody {
   readonly error?: { readonly code?: string; readonly message?: string }
 }
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+async function requestJson<T>(path: string, init?: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     ...init,
-    signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: init?.signal ?? AbortSignal.timeout(timeoutMs),
   })
   const text = await response.text()
   let payload: T & ApiErrorBody
@@ -29,12 +32,12 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return payload
 }
 
-function post<T>(path: string, body: unknown): Promise<T> {
+function post<T>(path: string, body: unknown, timeoutMs = ARCHIVE_MUTATION_TIMEOUT_MS): Promise<T> {
   return requestJson<T>(path, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
-  })
+  }, timeoutMs)
 }
 
 export interface SessionsArchiveApi {
@@ -53,10 +56,10 @@ export interface SessionsArchiveApi {
 }
 
 export const sessionsArchiveApi: SessionsArchiveApi = {
-  list: () => requestJson<ListResponse>('/list').then(body => body.tree),
-  strays: () => requestJson<StraysResponse>('/strays').then(body => body.items),
-  trash: () => requestJson<TrashListResponse>('/trash').then(body => body.items),
-  trashDir: () => requestJson<TrashDirResponse>('/trash-dir'),
+  list: () => requestJson<ListResponse>('/list', undefined, ARCHIVE_READ_TIMEOUT_MS).then(body => body.tree),
+  strays: () => requestJson<StraysResponse>('/strays', undefined, ARCHIVE_READ_TIMEOUT_MS).then(body => body.items),
+  trash: () => requestJson<TrashListResponse>('/trash', undefined, ARCHIVE_READ_TIMEOUT_MS).then(body => body.items),
+  trashDir: () => requestJson<TrashDirResponse>('/trash-dir', undefined, ARCHIVE_READ_TIMEOUT_MS),
   unarchive: sessionId => post<UnarchiveResponse>('/unarchive', { sessionId } satisfies UnarchiveRequest).then(() => undefined),
   archive: sessionId => post<{ ok: true }>('/archive', { sessionId } satisfies ArchiveRequest).then(() => undefined),
   moveToTrash: sessionId => post<TrashMutationResponse>('/trash', { sessionId, confirm: true } satisfies TrashRequest),
