@@ -37,7 +37,8 @@ export function weekdayLabels(value: string): string[] {
 }
 
 export function weekdayLabel(date: Date, labels: readonly string[]): string {
-  return labels[date.getDay()] ?? ''
+  // Labels are Monday-first (Chinese convention), so map Sunday=0 to the last slot.
+  return labels[(date.getDay() + 6) % 7] ?? ''
 }
 
 export function formatDateLabel(date: Date, t: DeskTranslator): string {
@@ -50,9 +51,9 @@ export function formatMonthLabel(date: Date, t: DeskTranslator): string {
   return t('schedule.monthLabel', { year: date.getFullYear(), month })
 }
 
-/** Week start (Sunday) of the given date, at local midnight. */
+/** Week start (Monday) of the given date, at local midnight. */
 export function weekStartOf(date: Date): Date {
-  return addDays(startOfLocalDay(date), -date.getDay())
+  return addDays(startOfLocalDay(date), -((date.getDay() + 6) % 7))
 }
 
 export function formatDayTitle(date: Date, today: Date, labels: { today: string; tomorrow: string }, format: (date: Date) => string): string {
@@ -62,7 +63,7 @@ export function formatDayTitle(date: Date, today: Date, labels: { today: string;
   return format(date)
 }
 
-/** Month grid range (local): first visible week (Sunday) .. Monday after the last visible week. */
+/** Month grid range (local): first visible week (Monday) .. Monday after the last visible week. */
 export function monthRange(cursor: Date): { from: Date; to: Date } {
   const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
   const from = weekStartOf(first)
@@ -71,7 +72,7 @@ export function monthRange(cursor: Date): { from: Date; to: Date } {
   return { from, to }
 }
 
-/** Week grid range (local Sunday .. next Sunday, exclusive). */
+/** Week grid range (local Monday .. next Monday, exclusive). */
 export function weekRange(cursor: Date): { from: Date; to: Date } {
   const from = weekStartOf(cursor)
   return { from, to: addDays(from, 7) }

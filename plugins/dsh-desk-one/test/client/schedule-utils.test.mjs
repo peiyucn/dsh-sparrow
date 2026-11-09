@@ -13,17 +13,17 @@ const event = (id, start, end, over = {}) => ({
 })
 
 describe('client schedule utils', () => {
-  it('monthRange 覆盖完整周（周日起始）', () => {
+  it('monthRange 覆盖完整周（周一起始）', () => {
     const { from, to } = monthRange(new Date(2026, 10, 15)) // 2026-11
-    assert.equal(from.getDay(), 0, '从周日开始')
-    assert.equal(to.getDay(), 0, '到下一周的周日（排他）')
+    assert.equal(from.getDay(), 1, '从周一开始')
+    assert.equal(to.getDay(), 1, '到下一周的周一（排他）')
     assert.ok(from <= new Date(2026, 10, 1))
     assert.ok(to > new Date(2026, 10, 30))
   })
 
-  it('weekRange / listRange 起点是本地零点（周日起始）', () => {
+  it('weekRange / listRange 起点是本地零点（周一起始）', () => {
     const { from, to } = weekRange(new Date(2026, 10, 11, 15, 30)) // 周三
-    assert.equal(from.getDay(), 0)
+    assert.equal(from.getDay(), 1)
     assert.equal(from.getHours(), 0)
     assert.equal((to.getTime() - from.getTime()) / 86_400_000, 7)
     const list = listRange(new Date(2026, 10, 11, 15), 30)

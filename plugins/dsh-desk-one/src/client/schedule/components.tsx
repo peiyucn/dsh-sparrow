@@ -57,7 +57,7 @@ interface ToolbarProps {
 
 export function ScheduleToolbar(props: ToolbarProps): ReactElement {
   const { t, view, cursor, syncing, error } = props
-  const weekStart = addDays(startOfLocalDay(cursor), -cursor.getDay())
+  const weekStart = addDays(startOfLocalDay(cursor), -((cursor.getDay() + 6) % 7))
   const weekEnd = addDays(weekStart, 6)
   const rangeLabel = view === 'month'
     ? formatMonthLabel(cursor, t)
@@ -351,7 +351,7 @@ export function MonthBoard(props: MonthProps): ReactElement {
     <div className="dsh-desk-schedule-month" onWheel={onWheel} title={t('schedule.monthWheelHint')}>
       <div className="dsh-desk-schedule-month-head">
         {labels.map((label, index) => (
-          <span key={label} data-weekend={index === 0 || index === 6}>{label}</span>
+          <span key={label} data-weekend={index >= 5}>{label}</span>
         ))}
       </div>
       <div className="dsh-desk-schedule-month-body" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
