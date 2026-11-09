@@ -2,6 +2,7 @@
 
 import { TAB_STORAGE_KEY } from '../../constants.js'
 import type { Tab } from './types.js'
+import { DESK_TABS } from './tabs.js'
 
 export const messageOf = (reason: unknown): string => reason instanceof Error ? reason.message : String(reason)
 
@@ -9,13 +10,14 @@ export const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), Math.max(min, max))
 
 /**
- * Restore the tab the user left on. `localStorage` can be unavailable (private mode), in which
- * case we silently fall back to the notes wall — the UI stays usable, only the memory is lost.
+ * Restore the tab the user left on. Derived from DESK_TABS so a new tab is remembered without
+ * touching this function (a hard-coded list previously forgot `schedule` / `sessions`).
  */
 export function readInitialTab(): Tab {
   try {
     const value = window.localStorage.getItem(TAB_STORAGE_KEY)
-    if (value === 'overview' || value === 'notes' || value === 'tasks') return value
+    const known = DESK_TABS.find(entry => entry.tab === value)
+    if (known !== undefined) return known.tab
   } catch {
     // Private mode / storage disabled: use the default tab.
   }
