@@ -5,7 +5,8 @@ import {
   ROUTES, SCHEDULE_PROVIDERS, type ScheduleProvider,
 } from '../../constants.js'
 import type {
-  ScheduleCalendarUpdateRequest, ScheduleConnectionInput, ScheduleConnectionTestResponse,
+  OutlookLoginPollResponse, OutlookLoginStartResponse, ScheduleCalendarUpdateRequest, ScheduleConnectionInput,
+  ScheduleConnectionTestResponse,
   ScheduleEventListResponse, ScheduleStateResponse, ScheduleSubscriptionInput, ScheduleSyncResponse,
 } from '../../contract.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
@@ -87,6 +88,19 @@ async function removeConnection(route: DeskRouteContext, req: IncomingMessage): 
   return scheduleOf(route).removeConnection(body.provider)
 }
 
+async function startOutlookLogin(route: DeskRouteContext): Promise<OutlookLoginStartResponse> {
+  return scheduleOf(route).startOutlookLogin()
+}
+
+async function pollOutlookLogin(route: DeskRouteContext, req: IncomingMessage): Promise<OutlookLoginPollResponse> {
+  const body = bodyObject<{ readonly flowId?: unknown }>(await readJsonBody(req), '登录轮询请求必须是 JSON 对象')
+  return scheduleOf(route).pollOutlookLogin(body.flowId)
+}
+
+async function disconnectOutlook(route: DeskRouteContext): Promise<ScheduleStateResponse> {
+  return scheduleOf(route).disconnectOutlookGraph()
+}
+
 async function addSubscription(route: DeskRouteContext, req: IncomingMessage): Promise<ScheduleStateResponse> {
   const body = bodyObject<ScheduleSubscriptionInput>(await readJsonBody(req), '订阅请求必须是 JSON 对象')
   return scheduleOf(route).addSubscription(body)
@@ -109,6 +123,9 @@ export const SCHEDULE_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'POST', path: ROUTES.scheduleConnectionRemove, handle: (route, req, res) => reply(res, removeConnection(route, req)) },
   { method: 'POST', path: ROUTES.scheduleSubscriptionAdd, handle: (route, req, res) => reply(res, addSubscription(route, req)) },
   { method: 'POST', path: ROUTES.scheduleSubscriptionRemove, handle: (route, req, res) => reply(res, removeSubscription(route, req)) },
+  { method: 'POST', path: ROUTES.scheduleOutlookLoginStart, handle: (route, _req, res) => reply(res, startOutlookLogin(route)) },
+  { method: 'POST', path: ROUTES.scheduleOutlookLoginPoll, handle: (route, req, res) => reply(res, pollOutlookLogin(route, req)) },
+  { method: 'POST', path: ROUTES.scheduleOutlookDisconnect, handle: (route, _req, res) => reply(res, disconnectOutlook(route)) },
 ]
 
 async function reply<T>(res: ServerResponse, task: Promise<T>): Promise<void> {

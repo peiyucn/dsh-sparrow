@@ -243,6 +243,20 @@ export interface ScheduleConnectionInput {
 }
 
 /** One provider-agnostic ICS subscription; the URL is stored in the credential store. */
+export interface OutlookLoginStartResponse {
+  readonly flowId: string
+  readonly userCode: string
+  readonly verificationUri: string
+  readonly expiresIn: number
+  readonly interval: number
+}
+
+export interface OutlookLoginPollResponse {
+  readonly status: 'pending' | 'connected'
+  readonly message?: string
+  readonly state?: ScheduleStateResponse
+}
+
 export interface ScheduleSubscriptionInput {
   readonly name?: string
   readonly url: string

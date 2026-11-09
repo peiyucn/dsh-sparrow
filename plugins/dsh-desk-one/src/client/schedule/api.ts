@@ -4,7 +4,7 @@ import {
   REQUEST_TIMEOUT_MS, ROUTES, SCHEDULE_SYNC_TIMEOUT_MS, SCHEDULE_TEST_TIMEOUT_MS,
 } from '../../constants.js'
 import type {
-  ApiErrorPayload, ScheduleCalendarUpdateRequest, ScheduleConnectionInput,
+  ApiErrorPayload, OutlookLoginPollResponse, OutlookLoginStartResponse, ScheduleCalendarUpdateRequest, ScheduleConnectionInput,
   ScheduleConnectionTestResponse, ScheduleEventListResponse, ScheduleStateResponse, ScheduleSubscriptionInput, ScheduleSyncResponse,
 } from '../../contract.js'
 
@@ -47,6 +47,9 @@ export interface ScheduleApi {
   readonly removeConnection: (provider: string) => Promise<ScheduleStateResponse>
   readonly addSubscription: (input: ScheduleSubscriptionInput) => Promise<ScheduleStateResponse>
   readonly removeSubscription: (id: string) => Promise<ScheduleStateResponse>
+  readonly startOutlookLogin: () => Promise<OutlookLoginStartResponse>
+  readonly pollOutlookLogin: (flowId: string) => Promise<OutlookLoginPollResponse>
+  readonly disconnectOutlook: () => Promise<ScheduleStateResponse>
 }
 
 export function loadState(): Promise<ScheduleStateResponse> {
@@ -79,6 +82,18 @@ export function addSubscription(input: ScheduleSubscriptionInput): Promise<Sched
   return postJson<ScheduleStateResponse>(ROUTES.scheduleSubscriptionAdd, input, SCHEDULE_SYNC_TIMEOUT_MS)
 }
 
+export function startOutlookLogin(): Promise<OutlookLoginStartResponse> {
+  return postJson<OutlookLoginStartResponse>(ROUTES.scheduleOutlookLoginStart, {}, SCHEDULE_TEST_TIMEOUT_MS)
+}
+
+export function pollOutlookLogin(flowId: string): Promise<OutlookLoginPollResponse> {
+  return postJson<OutlookLoginPollResponse>(ROUTES.scheduleOutlookLoginPoll, { flowId })
+}
+
+export function disconnectOutlook(): Promise<ScheduleStateResponse> {
+  return postJson<ScheduleStateResponse>(ROUTES.scheduleOutlookDisconnect, {})
+}
+
 export function removeSubscription(id: string): Promise<ScheduleStateResponse> {
   return postJson<ScheduleStateResponse>(ROUTES.scheduleSubscriptionRemove, { id })
 }
@@ -90,5 +105,5 @@ export function removeConnection(provider: string): Promise<ScheduleStateRespons
 /** Shared facade injected into the panel seat (keeps components free of fetch details). */
 export const scheduleApi: ScheduleApi = {
   loadState, loadEvents, updateCalendar, sync, testConnection, saveConnection, removeConnection,
-  addSubscription, removeSubscription,
+  addSubscription, removeSubscription, startOutlookLogin, pollOutlookLogin, disconnectOutlook,
 }

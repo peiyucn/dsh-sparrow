@@ -33,6 +33,9 @@ export const ROUTES = Object.freeze({
   scheduleConnectionRemove: `${PREFIX}/schedule/connections/remove`,
   scheduleSubscriptionAdd: `${PREFIX}/schedule/subscriptions/add`,
   scheduleSubscriptionRemove: `${PREFIX}/schedule/subscriptions/remove`,
+  scheduleOutlookLoginStart: `${PREFIX}/schedule/outlook/login/start`,
+  scheduleOutlookLoginPoll: `${PREFIX}/schedule/outlook/login/poll`,
+  scheduleOutlookDisconnect: `${PREFIX}/schedule/outlook/disconnect`,
 })
 
 /** 入口 id：同时是左栏面板行的 id 与中央列 `main` 槽的 key（官方 `MainPanelId`）。 */
@@ -86,7 +89,7 @@ export const TASK_STATUSES = ['todo', 'doing', 'done'] as const
 export const SCHEDULE_PROVIDERS = ['wecom', 'icloud', 'outlook', 'ics'] as const
 export type ScheduleProvider = (typeof SCHEDULE_PROVIDERS)[number]
 /** 同一 provider 的接入通道：CalDAV（企微/iCloud）与 ICS（Outlook 发布链接）。 */
-export const SCHEDULE_CHANNELS = ['caldav', 'ics'] as const
+export const SCHEDULE_CHANNELS = ['caldav', 'ics', 'graph'] as const
 export type ScheduleChannel = (typeof SCHEDULE_CHANNELS)[number]
 
 /** 日历颜色板（8 色）：首次同步按序分配，用户可在日历源栏改；事件条目沿用该颜色。 */
@@ -118,6 +121,10 @@ export const SCHEDULE_LIST_DAYS = 30
 export const WECOM_PASSWORD_REF = 'DESK_ONE_WECOM_CALDAV_PASSWORD'
 export const ICLOUD_PASSWORD_REF = 'DESK_ONE_ICLOUD_CALDAV_PASSWORD'
 export const OUTLOOK_ICS_URL_REF = 'DESK_ONE_OUTLOOK_ICS_URL'
+export const OUTLOOK_GRAPH_REFRESH_REF = 'DESK_ONE_OUTLOOK_GRAPH_REFRESH_TOKEN'
+export const OUTLOOK_GRAPH_CLIENT_ID = '4d2de5ae-e112-41f5-944e-b17f5136836a'
+export const OUTLOOK_GRAPH_TENANT = 'common'
+export const OUTLOOK_GRAPH_SCOPE = 'https://graph.microsoft.com/Calendars.ReadWrite offline_access openid profile User.Read'
 
 /** 日程界面偏好（纯界面状态，不含用户内容）：视图与日历显隐。 */
 export const SCHEDULE_VIEW_STORAGE_KEY = 'dsh-desk-one:schedule-view-v2'

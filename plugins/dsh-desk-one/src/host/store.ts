@@ -448,8 +448,8 @@ export class DeskStore {
 
   /** Create or refresh a connection record; secrets are never stored here (only the ref name). */
   async upsertScheduleSource(input: {
-    readonly provider: 'wecom' | 'icloud' | 'outlook'
-    readonly channel: 'caldav' | 'ics'
+    readonly provider: 'wecom' | 'icloud' | 'outlook' | 'ics'
+    readonly channel: 'caldav' | 'ics' | 'graph'
     readonly account?: string
     readonly credentialRef: string
   }): Promise<DeskScheduleSource> {

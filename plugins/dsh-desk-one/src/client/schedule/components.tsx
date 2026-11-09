@@ -16,7 +16,7 @@ import {
   type ScheduleViewName,
 } from './utils.js'
 
-const PROVIDER_ORDER: readonly ScheduleProvider[] = ['wecom', 'icloud', 'outlook']
+const PROVIDER_ORDER: readonly ScheduleProvider[] = ['wecom', 'icloud']
 /** Card width / approximate height used to flip the detail card around the click point. */
 const DETAIL_CARD_WIDTH = 360
 const DETAIL_CARD_HEIGHT = 300
@@ -481,6 +481,164 @@ interface SourcesPageProps {
  * A configured source keeps its form collapsed; the whole block (connection + calendars) is one
  * surface instead of two stacked boxes.
  */
+/** Calendar rows shared by the personal-account cards and the Outlook Graph card. */
+function CalendarRows(props: {
+  readonly t: DeskTranslator
+  readonly calendars: readonly DeskCalendar[]
+  readonly counts: Readonly<Record<string, number>>
+  readonly hidden: Set<string>
+  readonly onToggle: (calendar: DeskCalendar) => void
+  readonly onColor: (calendar: DeskCalendar) => Promise<void>
+  readonly onSetEnabled: (calendar: DeskCalendar, enabled: boolean) => Promise<void>
+}): ReactElement {
+  const { t, calendars, counts, hidden, onToggle, onColor, onSetEnabled } = props
+  return (
+    <>
+      {calendars.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.noCalendars')}</p> : null}
+      {calendars.map(calendar => (
+        <div key={calendar.id} className="dsh-desk-schedule-mgmt-row" data-off={!calendar.enabled}>
+          <button
+            type="button"
+            className="dsh-desk-schedule-colorbutton"
+            style={{ background: calendar.color }}
+            title={t('schedule.changeColor')}
+            aria-label={t('schedule.changeColor')}
+            onClick={() => { void onColor(calendar) }}
+          />
+          <span className="dsh-desk-schedule-mgmt-name">{calendar.displayName}</span>
+          <span className="dsh-desk-schedule-mgmt-count">{counts[calendar.id] ?? 0}</span>
+          <span className="dsh-desk-schedule-mgmt-label">{t('schedule.syncLabel')}</span>
+          <button
+            type="button"
+            className="dsh-desk-switch"
+            role="switch"
+            aria-checked={calendar.enabled}
+            data-on={calendar.enabled}
+            title={t('schedule.syncCalendar')}
+            aria-label={t('schedule.syncCalendar')}
+            onClick={() => { void onSetEnabled(calendar, !calendar.enabled) }}
+          />
+          <span className="dsh-desk-schedule-mgmt-label">{t('schedule.displayLabel')}</span>
+          <button
+            type="button"
+            className="dsh-desk-switch"
+            role="switch"
+            aria-checked={!hidden.has(calendar.id)}
+            data-on={!hidden.has(calendar.id)}
+            aria-label={t('schedule.showCalendar')}
+            onClick={() => onToggle(calendar)}
+          />
+        </div>
+      ))}
+    </>
+  )
+}
+
+/** Outlook personal account: OAuth device code, never a published ICS link. */
+function OutlookGraphCard(props: {
+  readonly t: DeskTranslator
+  readonly api: ScheduleApi
+  readonly source?: DeskScheduleSource
+  readonly calendars: readonly DeskCalendar[]
+  readonly counts: Readonly<Record<string, number>>
+  readonly hidden: Set<string>
+  readonly onToggle: (calendar: DeskCalendar) => void
+  readonly onColor: (calendar: DeskCalendar) => Promise<void>
+  readonly onSetEnabled: (calendar: DeskCalendar, enabled: boolean) => Promise<void>
+  readonly onChanged: () => Promise<void>
+}): ReactElement {
+  const { t, api, source, calendars } = props
+  const [flow, setFlow] = useState<{ flowId: string; userCode: string; verificationUri: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (flow === null) return
+    let stopped = false
+    const tick = async (): Promise<void> => {
+      try {
+        const result = await api.pollOutlookLogin(flow.flowId)
+        if (stopped) return
+        if (result.status === 'connected') {
+          setFlow(null)
+          await props.onChanged()
+        }
+      } catch (reason) {
+        if (!stopped) setError(reason instanceof Error ? reason.message : String(reason))
+      }
+    }
+    const timer = window.setInterval(() => { void tick() }, 5000)
+    return () => { stopped = true; window.clearInterval(timer) }
+  }, [api, flow, props])
+
+  const login = async (): Promise<void> => {
+    setBusy(true); setError(null)
+    try {
+      const start = await api.startOutlookLogin()
+      setFlow({ flowId: start.flowId, userCode: start.userCode, verificationUri: start.verificationUri })
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally { setBusy(false) }
+  }
+
+  const disconnect = async (): Promise<void> => {
+    setBusy(true); setError(null)
+    try {
+      await api.disconnectOutlook()
+      await props.onChanged()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <section className="dsh-desk-schedule-connection-card" data-connected={source !== undefined}>
+      <header>
+        <span className="dsh-desk-schedule-statusdot" data-on={source !== undefined} />
+        <h3>{t('schedule.provider.outlook')}</h3>
+        <span className="dsh-desk-schedule-connection-status">
+          {source === undefined ? t('schedule.graphPending') : t('schedule.form.connected')}
+        </span>
+        {source === undefined ? null : (
+          <button type="button" className="dsh-desk-schedule-chip" disabled={busy} onClick={() => { void disconnect() }}>
+            {t('schedule.graphDisconnect')}
+          </button>
+        )}
+      </header>
+      {source === undefined ? (
+        <>
+          <p className="dsh-desk-schedule-form-note">{t('schedule.graphLoginHint')}</p>
+          {flow === null ? (
+            <div className="dsh-desk-schedule-form-actions">
+              <button type="button" className="dsh-desk-btn dsh-desk-btn-primary" disabled={busy} onClick={() => { void login() }}>
+                {busy ? t('schedule.form.saving') : t('schedule.graphLogin')}
+              </button>
+            </div>
+          ) : (
+            <p className="dsh-desk-schedule-form-ok">
+              {t('schedule.graphCodeHint', { url: flow.verificationUri, code: flow.userCode })}
+            </p>
+          )}
+        </>
+      ) : (
+        <div className="dsh-desk-schedule-source">
+          <p className="dsh-desk-schedule-sync-hint">{t('schedule.syncCalendarHint')}</p>
+          <CalendarRows
+            t={t}
+            calendars={calendars}
+            counts={props.counts}
+            hidden={props.hidden}
+            onToggle={props.onToggle}
+            onColor={props.onColor}
+            onSetEnabled={props.onSetEnabled}
+          />
+        </div>
+      )}
+      {error === null ? null : <p className="dsh-desk-schedule-error">{error}</p>}
+    </section>
+  )
+}
+
 function ProviderCard(props: {
   readonly t: DeskTranslator
   readonly api: ScheduleApi
@@ -543,20 +701,6 @@ function ProviderCard(props: {
   }
 
   const enabledCount = calendars.filter(calendar => calendar.enabled).length
-  // Outlook personal accounts need Graph OAuth; publishing an ICS link is neither private nor
-  // editable, so the card stays a placeholder until an Azure Client ID is available.
-  if (provider === 'outlook' && !connected) {
-    return (
-      <section className="dsh-desk-schedule-connection-card" data-connected="false">
-        <header>
-          <span className="dsh-desk-schedule-statusdot" data-on="false" />
-          <h3>{t('schedule.provider.outlook')}</h3>
-          <span className="dsh-desk-schedule-connection-status">{t('schedule.graphPending')}</span>
-        </header>
-        <p className="dsh-desk-schedule-form-note">{t('schedule.graphPendingHint')}</p>
-      </section>
-    )
-  }
   return (
     <section className="dsh-desk-schedule-connection-card" data-connected={connected}>
       <header>
@@ -805,6 +949,23 @@ export function SourcesPage(props: SourcesPageProps): ReactElement {
             />
           )
         })}
+        {(() => {
+          const graphSource = sources.find(item => item.provider === 'outlook' && item.channel === 'graph')
+          return (
+            <OutlookGraphCard
+              t={t}
+              api={props.api}
+              {...(graphSource === undefined ? {} : { source: graphSource })}
+              calendars={graphSource === undefined ? [] : calendars.filter(calendar => calendar.sourceId === graphSource.id)}
+              counts={counts}
+              hidden={hidden}
+              onToggle={onToggle}
+              onColor={onColor}
+              onSetEnabled={onSetEnabled}
+              onChanged={props.onChanged}
+            />
+          )
+        })()}
         <SubscriptionCard
           t={t}
           api={props.api}
