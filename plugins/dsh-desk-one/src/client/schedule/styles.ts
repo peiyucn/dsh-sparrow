@@ -319,4 +319,7 @@ export const SCHEDULE_CSS = `
   /* Keep the two top cards side by side even in a narrow panel; only tighten the right column. */
   .dsh-desk-schedule-top { grid-template-columns: minmax(0, 1.7fr) minmax(150px, 1fr); }
 }
+.dsh-desk-schedule-steps { margin: 6px 0; font-size: 12px; color: var(--dsw-alias-label-secondary, #6b7280); }
+.dsh-desk-schedule-steps summary { cursor: pointer; color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-schedule-steps ol { margin: 6px 0 0 18px; padding: 0; }
 `
