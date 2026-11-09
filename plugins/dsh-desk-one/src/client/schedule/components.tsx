@@ -538,6 +538,18 @@ function CalendarRows(props: {
   )
 }
 
+/** Microsoft four-square mark used on the OAuth button (official brand colours). */
+function MicrosoftLogo(): ReactElement {
+  return (
+    <svg viewBox="0 0 23 23" width="14" height="14" aria-hidden="true" focusable="false">
+      <rect x="1" y="1" width="10" height="10" fill="#f25022" />
+      <rect x="12" y="1" width="10" height="10" fill="#7fba00" />
+      <rect x="1" y="12" width="10" height="10" fill="#00a4ef" />
+      <rect x="12" y="12" width="10" height="10" fill="#ffb900" />
+    </svg>
+  )
+}
+
 /** Outlook personal account: OAuth device code, never a published ICS link. */
 function OutlookGraphCard(props: {
   readonly t: DeskTranslator
@@ -630,7 +642,8 @@ function OutlookGraphCard(props: {
           <p className="dsh-desk-schedule-form-note">{t('schedule.graphLoginHint')}</p>
           {flow === null ? (
             <div className="dsh-desk-schedule-form-actions">
-              <button type="button" className="dsh-desk-btn dsh-desk-btn-primary" disabled={busy} onClick={() => { void login() }}>
+              <button type="button" className="dsh-desk-btn dsh-desk-btn-primary dsh-desk-graph-login" disabled={busy} onClick={() => { void login() }}>
+                <MicrosoftLogo />
                 {busy ? t('schedule.form.saving') : t('schedule.graphLogin')}
               </button>
               <button type="button" className="dsh-desk-schedule-link" disabled={busy} onClick={() => { void login(true) }}>

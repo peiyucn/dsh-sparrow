@@ -67,6 +67,7 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-icon:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-schedule-error { flex-basis: 100%; margin: 0; font-size: 12px; color: #c2410c; }
 .dsh-desk-schedule-hint { margin: 8px 0; font-size: 12px; color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-graph-login { display: inline-flex; align-items: center; gap: 6px; }
 .dsh-desk-schedule-link { border: 0; background: transparent; color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); font: inherit; font-size: 12px; cursor: pointer; padding: 0; }
 .dsh-desk-schedule-empty {
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
