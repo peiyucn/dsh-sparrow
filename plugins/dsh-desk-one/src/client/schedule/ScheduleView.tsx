@@ -1,42 +1,35 @@
 /**
  * Schedule page (S2, read-only aggregation).
  *
- * Fixed page partitions: upcoming rail (next 7 days) · main view (list / month / week) ·
- * calendar sources (provider → calendar). The page never collapses into a single calendar widget;
- * narrow widths stack the same three areas. All data comes from the host mirror via the schedule API.
+ * Information architecture follows the rest of Desk One: the tab holds in-panel pages, not modals.
+ *   calendar (month / week / list) → sources (connections + calendars) → event detail
+ * The calendar page keeps only a toolbar, a one-line upcoming strip and the calendar itself;
+ * month and week fill the available height without scrolling.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
-  SCHEDULE_AUTO_SYNC_MS, SCHEDULE_COLORS, SCHEDULE_HIDDEN_STORAGE_KEY, SCHEDULE_LIST_DAYS,
-  SCHEDULE_SYNC_INTERVAL_MS, SCHEDULE_VIEW_STORAGE_KEY,
+  SCHEDULE_COLORS, SCHEDULE_HIDDEN_STORAGE_KEY, SCHEDULE_LIST_DAYS, SCHEDULE_SYNC_INTERVAL_MS,
+  SCHEDULE_VIEW_STORAGE_KEY,
 } from '../../constants.js'
 import type { DeskCalendar, DeskEvent, ScheduleStateResponse } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
+import { addDays, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName } from './utils.js'
 import {
-  addDays, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName,
-} from './utils.js'
-import {
-  CalendarSources, ConnectionsPanel, EventDetail, MonthBoard, ScheduleToolbar, UpcomingRail, WeekBoard,
-  ListBoard,
+  EventCard, ListBoard, MonthBoard, ScheduleToolbar, SourcesPage, UpcomingStrip, WeekBoard,
 } from './components.js'
 
-export interface ScheduleViewProps {
-  readonly t: DeskTranslator
-  readonly api: ScheduleApi
-}
+type SchedulePage = 'calendar' | 'sources'
 
 function readView(): ScheduleViewName {
   try {
     const stored = window.localStorage.getItem(SCHEDULE_VIEW_STORAGE_KEY)
-    if (stored === 'list' || stored === 'month' || stored === 'week') return stored
+    if (stored === 'month' || stored === 'week' || stored === 'list') return stored
   } catch {
-    // Storage unavailable: fall back to the default view for this session.
+    // Storage unavailable: use the default view for this session.
   }
-  // Default to the month grid: a "schedule" page must show a calendar first, with the list as
-  // one of the views rather than the landing state.
   return 'month'
 }
 
@@ -50,8 +43,9 @@ function readHidden(): Set<string> {
   return new Set()
 }
 
-export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
+export function ScheduleView({ t, api }: { readonly t: DeskTranslator; readonly api: ScheduleApi }): ReactElement {
   const today = useMemo(() => startOfLocalDay(new Date()), [])
+  const [page, setPage] = useState<SchedulePage>('calendar')
   const [view, setView] = useState<ScheduleViewName>(readView)
   const [cursor, setCursor] = useState<Date>(today)
   const [state, setState] = useState<ScheduleStateResponse | null>(null)
@@ -61,9 +55,10 @@ export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
   const [error, setError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [selected, setSelected] = useState<DeskEvent | null>(null)
-  const [showConnections, setShowConnections] = useState(false)
   const [listDays, setListDays] = useState(SCHEDULE_LIST_DAYS)
   const syncingRef = useRef(false)
+  const autoSyncTried = useRef(false)
+  const loadedOnce = useRef(false)
 
   const range = useMemo(() => {
     if (view === 'month') return monthRange(cursor)
@@ -71,23 +66,27 @@ export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
     return listRange(today, listDays)
   }, [cursor, listDays, today, view])
 
-  const load = useCallback(async (): Promise<ScheduleStateResponse> => {
+  const load = useCallback(async (): Promise<void> => {
     const [nextState, payload] = await Promise.all([
       api.loadState(),
       api.loadEvents(range.from.toISOString(), range.to.toISOString()),
     ])
     setState(nextState)
     setEvents(payload.events)
-    return nextState
   }, [api, range.from, range.to])
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
+    // Only the very first load blanks the page; background refreshes keep the current surface.
+    if (!loadedOnce.current) setLoading(true)
     load()
       .then(() => { if (!cancelled) setError(null) })
       .catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason)) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .finally(() => {
+        if (cancelled) return
+        loadedOnce.current = true
+        setLoading(false)
+      })
     return () => { cancelled = true }
   }, [load])
 
@@ -107,16 +106,16 @@ export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
     }
   }, [api, load])
 
-  // First paint: sync when the mirror has never synced or the last pull is older than the policy.
+  // One auto-sync per mount (stale mirror only), never a state-driven loop.
   useEffect(() => {
-    if (state === null || state.sources.length === 0) return
+    if (state === null || autoSyncTried.current) return
+    autoSyncTried.current = true
     const newest = state.sources
       .map(source => (source.lastSyncedAt === undefined ? 0 : Date.parse(source.lastSyncedAt)))
       .reduce((max, value) => Math.max(max, value), 0)
-    if (Date.now() - newest > SCHEDULE_AUTO_SYNC_MS) void runSync()
+    if (Date.now() - newest > 5 * 60_000) void runSync()
   }, [runSync, state])
 
-  // Keep a light 15-minute refresh while the panel stays open; cleanup on unmount.
   useEffect(() => {
     const timer = window.setInterval(() => { void runSync() }, SCHEDULE_SYNC_INTERVAL_MS)
     return () => { window.clearInterval(timer) }
@@ -145,22 +144,20 @@ export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
     })
   }, [])
 
-  /** Cycle one calendar through the shared palette; persisted on the calendar record. */
   const cycleColor = useCallback(async (calendar: DeskCalendar): Promise<void> => {
     const index = (SCHEDULE_COLORS as readonly string[]).indexOf(calendar.color)
     const next = SCHEDULE_COLORS[(index + 1) % SCHEDULE_COLORS.length] ?? SCHEDULE_COLORS[0]
     try {
-      const nextState = await api.updateCalendar({
-        id: calendar.id,
-        expectedRevision: calendar.revision,
-        patch: { color: next },
-      })
-      setState(nextState)
+      setState(await api.updateCalendar({ id: calendar.id, expectedRevision: calendar.revision, patch: { color: next } }))
       setError(null)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     }
   }, [api])
+
+  const openEvent = (event: DeskEvent): void => {
+    setSelected(event)
+  }
 
   const visibleEvents = useMemo(
     () => events.filter(event => !hidden.has(event.calendarNodeId)),
@@ -170,6 +167,7 @@ export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
   const sources = state?.sources ?? []
   const counts = state?.counts ?? {}
   const staleSources = sources.filter(source => source.syncState === 'error')
+  const failedCalendars = calendars.filter(calendar => calendar.lastError !== undefined)
   const lastSyncedAt = useMemo(() => {
     const times = sources
       .map(source => source.lastSyncedAt)
@@ -178,26 +176,35 @@ export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
     return times[times.length - 1]
   }, [sources])
 
-  const step = (direction: -1 | 1): void => {
-    if (view === 'month') {
-      const next = new Date(cursor.getFullYear(), cursor.getMonth() + direction, 1)
-      setCursor(next)
-    } else if (view === 'week') {
-      setCursor(addDays(cursor, direction * 7))
-    } else {
-      setCursor(addDays(cursor, direction * SCHEDULE_LIST_DAYS))
-    }
+  if (page === 'sources') {
+    return (
+      <SourcesPage
+        t={t}
+        api={api}
+        sources={sources}
+        calendars={calendars}
+        counts={counts}
+        hidden={hidden}
+        onToggle={toggleHidden}
+        onColor={cycleColor}
+        onBack={() => { setPage('calendar') }}
+        onChanged={async () => { await load() }}
+      />
+    )
   }
 
-  const connectionPanel = (showConnections || sources.length === 0) ? (
-    <ConnectionsPanel
-      t={t}
-      api={api}
-      sources={sources}
-      onClose={() => { setShowConnections(false) }}
-      onChanged={async () => { await load() }}
-    />
-  ) : null
+  const step = (direction: -1 | 1): void => {
+    if (view === 'month') setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + direction, 1))
+    else if (view === 'week') setCursor(addDays(cursor, direction * 7))
+    else setCursor(addDays(cursor, direction * SCHEDULE_LIST_DAYS))
+  }
+
+  const toolbarError = staleSources[0]?.lastError?.message
+    ?? (failedCalendars.length === 0 ? null : t('schedule.calendarSyncFailed', {
+      count: failedCalendars.length,
+      message: failedCalendars[0]?.lastError?.message ?? '',
+    }))
+    ?? error
 
   return (
     <div className="dsh-desk-schedule">
@@ -205,68 +212,58 @@ export function ScheduleView({ t, api }: ScheduleViewProps): ReactElement {
         t={t}
         view={view}
         cursor={cursor}
-        today={today}
         syncing={syncing}
         loading={loading}
         sourceCount={sources.length}
-        lastSyncedAt={lastSyncedAt}
-        error={staleSources.length > 0 ? staleSources[0]?.lastError?.message ?? null : error}
+        {...(lastSyncedAt === undefined ? {} : { lastSyncedAt })}
+        error={toolbarError}
         onView={chooseView}
         onStep={step}
         onToday={() => { setCursor(today) }}
         onRefresh={() => { void runSync() }}
-        onConnections={() => { setShowConnections(true) }}
+        onSources={() => { setSelected(null); setPage('sources') }}
       />
-
-      {loading ? <p className="dsh-desk-schedule-hint">{t('state.loading' as never)}</p> : null}
-
-      <div className="dsh-desk-schedule-grid" data-view={view}>
-        <UpcomingRail
-          t={t}
-          today={today}
-          events={visibleEvents}
-          calendars={calendars}
-          onOpen={setSelected}
-          onViewAll={() => { chooseView('list'); setCursor(today) }}
-        />
-        <section className="dsh-desk-schedule-main">
-          {view === 'list' ? (
-            <ListBoard
-              t={t}
-              today={today}
-              events={visibleEvents}
-              calendars={calendars}
-              days={listDays}
-              onOpen={setSelected}
-              onLoadMore={() => { setListDays(days => days + SCHEDULE_LIST_DAYS) }}
-            />
-          ) : view === 'month' ? (
-            <MonthBoard t={t} cursor={cursor} today={today} events={visibleEvents} calendars={calendars} onOpen={setSelected} />
-          ) : (
-            <WeekBoard t={t} from={range.from} today={today} events={visibleEvents} calendars={calendars} onOpen={setSelected} />
-          )}
-        </section>
-        <CalendarSources
-          t={t}
-          sources={sources}
-          calendars={calendars}
-          counts={counts}
-          hidden={hidden}
-          onToggle={toggleHidden}
-          onColor={cycleColor}
-          onConnections={() => { setShowConnections(true) }}
-        />
-      </div>
-
-      {selected === null ? null : (
-        <EventDetail
-          t={t}
-          event={selected}
-          calendars={calendars}
-          onClose={() => { setSelected(null) }}
-        />
+      {state === null ? (
+        <p className="dsh-desk-schedule-hint">{loading ? t('state.loading') : t('schedule.sourcesEmpty')}</p>
+      ) : sources.length === 0 ? (
+        <div className="dsh-desk-schedule-empty">
+          <p>{t('schedule.sourcesEmpty')}</p>
+          <button type="button" className="dsh-desk-btn dsh-desk-btn-primary" onClick={() => { setPage('sources') }}>
+            {t('schedule.addConnection')}
+          </button>
+        </div>
+      ) : (
+        <>
+          <UpcomingStrip
+            t={t}
+            today={today}
+            events={visibleEvents}
+            calendars={calendars}
+            onOpen={openEvent}
+            onViewAll={() => { chooseView('list'); setCursor(today) }}
+          />
+          <section className="dsh-desk-schedule-main">
+            {view === 'month' ? (
+              <MonthBoard t={t} cursor={cursor} today={today} events={visibleEvents} calendars={calendars} onOpen={openEvent} />
+            ) : view === 'week' ? (
+              <WeekBoard t={t} from={range.from} today={today} events={visibleEvents} calendars={calendars} onOpen={openEvent} />
+            ) : (
+              <ListBoard
+                t={t}
+                today={today}
+                events={visibleEvents}
+                calendars={calendars}
+                days={listDays}
+                onOpen={openEvent}
+                onLoadMore={() => { setListDays(days => days + SCHEDULE_LIST_DAYS) }}
+              />
+            )}
+          </section>
+        </>
       )}
-      {connectionPanel}
+      {selected === null ? null : (
+        <EventCard t={t} event={selected} calendars={calendars} onClose={() => { setSelected(null) }} />
+      )}
     </div>
   )
 }

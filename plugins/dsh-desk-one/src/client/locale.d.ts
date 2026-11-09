@@ -33,6 +33,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'schedule.sourcesEmpty'
       | 'schedule.addConnection'
       | 'schedule.manageConnections'
+      | 'schedule.back'
       | 'schedule.allDay'
       | 'schedule.untitled'
       | 'schedule.readOnly'

@@ -114,14 +114,13 @@ export function calendarNameOf(event: DeskEvent, calendars: readonly DeskCalenda
   return calendars.find(calendar => calendar.id === event.calendarNodeId)?.displayName ?? ''
 }
 
-/** Block geometry for the week grid: 32px per hour, half-open [start, end). */
-export const WEEK_HOUR_PX = 32
-
+/** Week grid geometry is expressed in percentages of the full day so the week view always fits
+ *  the panel without scrolling (owner requirement: month/week must show completely). */
 export interface WeekBlock {
   readonly event: DeskEvent
   readonly dayIndex: number
-  readonly top: number
-  readonly height: number
+  readonly topPct: number
+  readonly heightPct: number
   readonly lane: number
   readonly lanes: number
 }
@@ -159,9 +158,16 @@ export function weekBlocks(events: readonly DeskEvent[], from: Date): WeekBlock[
       for (const event of laneEvents) {
         const start = new Date(event.start)
         const end = new Date(event.end)
-        const top = (start.getHours() + start.getMinutes() / 60) * WEEK_HOUR_PX
-        const height = Math.max(18, ((end.getTime() - start.getTime()) / 3_600_000) * WEEK_HOUR_PX)
-        blocks.push({ event, dayIndex, top, height, lane, lanes: lanes.length })
+        const startMinutes = start.getHours() * 60 + start.getMinutes()
+        const durationMinutes = Math.max(15, (end.getTime() - start.getTime()) / 60_000)
+        blocks.push({
+          event,
+          dayIndex,
+          topPct: (startMinutes / 1440) * 100,
+          heightPct: Math.max(1.4, (durationMinutes / 1440) * 100),
+          lane,
+          lanes: lanes.length,
+        })
       }
     }
   }

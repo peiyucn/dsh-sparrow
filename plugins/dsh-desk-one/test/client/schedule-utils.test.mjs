@@ -68,7 +68,7 @@ describe('client schedule utils', () => {
     assert.equal(blocks[0]?.dayIndex, 0)
     assert.equal(new Set(blocks.map(block => block.lane)).size, 2)
     assert.equal(blocks[0]?.lanes, 2)
-    assert.ok((blocks[0]?.top ?? 0) > 0)
+    assert.ok((blocks[0]?.topPct ?? 0) > 0)
   })
 
   it('formatDayTitle 的今天/明天使用传入文案，其它日期本地化', () => {
