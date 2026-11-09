@@ -1,10 +1,9 @@
 /**
- * Shared session-tree row. The active catalog (client snapshot) and the archive tree (host
- * projection) render through this one component; only the variant differs (read-only catalog vs
- * row actions). Keeps lineage rows visually and semantically identical across the page.
+ * Shared session-tree row. Active catalog, archived tree, stray and trash rows all use this one
+ * component so indentation, typography, metadata and action placement cannot drift apart.
  */
 
-import type { ReactElement, ReactNode } from 'react'
+import type { CSSProperties, ReactElement, ReactNode } from 'react'
 
 export interface SessionTreeRowProps {
   readonly variant: 'active' | 'archive'
@@ -30,10 +29,16 @@ export interface SessionTreeRowProps {
 
 export function SessionTreeRow(props: SessionTreeRowProps): ReactElement {
   const { title, depth, subagent, disabled, onOpen } = props
-  const indent = depth === 0 ? undefined : { paddingLeft: `calc(12px + ${depth} * 16px)` }
+  const nested = depth > 0
+  const style = nested
+    ? {
+        paddingLeft: `calc(10px + ${depth} * 16px)`,
+        '--dsh-tree-guide': `${10 + (depth - 1) * 16}px`,
+      } as CSSProperties
+    : undefined
   const caret = props.hasChildren === true ? (
     <span
-      className={props.variant === 'archive' ? 'dsh-desk-archive-caret' : 'dsh-desk-session-caret'}
+      className="dsh-desk-tree-caret"
       role="button"
       tabIndex={0}
       aria-label={props.expanded === true ? props.collapseLabel : props.expandLabel}
@@ -47,54 +52,32 @@ export function SessionTreeRow(props: SessionTreeRowProps): ReactElement {
       }}
     >{props.expanded === true ? '▾' : '▸'}</span>
   ) : null
-  const main = (
-    <>
-      {props.variant === 'archive' ? caret : null}
-      <span className={props.variant === 'archive' ? 'dsh-desk-archive-title' : 'dsh-desk-session-row-title'}>{title}</span>
-      {subagent === true ? <span className="dsh-desk-session-tag">{props.tag ?? props.status}</span> : null}
-      {props.badges}
-      {props.meta === undefined ? null : <span className="dsh-desk-archive-meta">{props.meta}</span>}
-    </>
-  )
-  if (props.variant === 'archive') {
-    return (
-      <div className="dsh-desk-archive-row" data-live={props.live === true ? 'true' : undefined} style={indent}>
-        <button
-          type="button"
-          className="dsh-desk-archive-row-toggle"
-          aria-label={title}
-          title={props.live === true ? props.liveHint : title}
-          disabled={props.live === true || disabled === true}
-          onClick={() => { if (props.live !== true && disabled !== true) onOpen?.() }}
-        >
-          {main}
-        </button>
-        {props.actions === undefined ? null : <div className="dsh-desk-archive-actions">{props.actions}</div>}
-      </div>
-    )
-  }
+  const blocked = props.variant === 'archive' ? (props.live === true || disabled === true) : disabled === true
   return (
-    <div className="dsh-desk-session-row-wrap" style={indent}>
+    <div
+      className="dsh-desk-tree-row"
+      data-nested={nested ? 'true' : undefined}
+      data-depth={depth}
+      data-variant={props.variant}
+      data-live={props.live === true ? 'true' : undefined}
+      style={style}
+    >
       <button
         type="button"
-        className="dsh-desk-session-row"
-        data-state={props.live === true ? 'archived' : undefined}
-        data-subagent={subagent === true ? 'true' : undefined}
-        disabled={disabled === true}
-        aria-label={`${title} · ${typeof props.status === 'string' ? props.status : ''}`}
-        title={disabled === true ? undefined : title}
-        onClick={() => { if (disabled !== true) onOpen?.() }}
+        className="dsh-desk-tree-row-toggle"
+        aria-label={title}
+        title={props.live === true ? props.liveHint : title}
+        disabled={blocked}
+        onClick={() => { if (!blocked) onOpen?.() }}
       >
         {caret}
-        <span className="dsh-desk-session-row-main">
-          <span className="dsh-desk-session-row-title">{title}</span>
-          {subagent === true ? <span className="dsh-desk-session-tag">{props.tag ?? props.status}</span> : null}
-          {props.badges}
-        </span>
-        {props.meta === undefined ? null : <span className="dsh-desk-archive-meta">{props.meta}</span>}
-        <span className="dsh-desk-session-row-meta">{props.status}</span>
+        <span className="dsh-desk-tree-title">{title}</span>
+        {subagent === true ? <span className="dsh-desk-session-tag">{props.tag ?? props.status}</span> : null}
+        {props.badges}
+        {props.meta === undefined ? null : <span className="dsh-desk-tree-meta">{props.meta}</span>}
+        {props.status === undefined ? null : <span className="dsh-desk-tree-status">{props.status}</span>}
       </button>
-      {props.actions === undefined ? null : <div className="dsh-desk-archive-actions">{props.actions}</div>}
+      {props.actions === undefined ? null : <div className="dsh-desk-tree-actions">{props.actions}</div>}
     </div>
   )
 }

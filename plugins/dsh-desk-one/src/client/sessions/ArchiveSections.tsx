@@ -16,6 +16,7 @@ import type { DeskTranslator } from '../app/types.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
 import { formatTokens } from '../app/utils.js'
 import { ConfirmButton } from './ConfirmButton.js'
+import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
 
 export interface ArchiveSnapshot {
@@ -91,23 +92,27 @@ function ArchiveTreeNodeRow(props: {
   )
   const actions = readOnly ? undefined : (
     <>
-      <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => props.onUnarchive(node.sessionId)}>{t('sessions.archive.unarchive')}</button>
-      <ConfirmButton
+      <SessionRowAction kind="unarchive" label={t('sessions.archive.unarchive')} disabled={busy} onClick={() => props.onUnarchive(node.sessionId)} />
+      <SessionRowAction
+        kind="trash"
         label={t('sessions.archive.toTrash')}
-        confirmLabel={t('sessions.archive.toTrashConfirm')}
         armed={armedTrash.has(node.sessionId)}
         disabled={busy || !node.backendSupported}
-        onArm={() => props.onArmTrash(node.sessionId)}
-        onConfirm={() => props.onConfirmTrash(node.sessionId)}
+        onClick={() => {
+          if (armedTrash.has(node.sessionId)) props.onConfirmTrash(node.sessionId)
+          else props.onArmTrash(node.sessionId)
+        }}
       />
-      <ConfirmButton
-        label={t('sessions.archive.delete')}
-        confirmLabel={deleteArmed ? t('sessions.archive.deleteConfirm') : t('sessions.archive.delete')}
+      <SessionRowAction
+        kind="delete"
+        label={deleteArmed ? t('sessions.archive.deleteConfirm') : t('sessions.archive.delete')}
         armed={deleteArmed}
         danger
         disabled={busy || !node.backendSupported}
-        onArm={() => props.onArmDelete(node.sessionId)}
-        onConfirm={() => props.onConfirmDelete(node)}
+        onClick={() => {
+          if (deleteArmed) props.onConfirmDelete(node)
+          else props.onArmDelete(node.sessionId)
+        }}
       />
     </>
   )
@@ -356,24 +361,26 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                     collapseLabel={t('sessions.archive.collapse')}
                     actions={(
                       <>
-                        <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => { void run(() => api.archive(item.sessionId)) }}>{t('sessions.archive.archive')}</button>
-                        <ConfirmButton
+                        <SessionRowAction kind="archive" label={t('sessions.archive.archive')} disabled={busy} onClick={() => { void run(() => api.archive(item.sessionId)) }} />
+                        <SessionRowAction
+                          kind="trash"
                           label={t('sessions.archive.toTrash')}
-                          confirmLabel={t('sessions.archive.toTrashConfirm')}
                           armed={armedTrash.has(item.sessionId)}
                           disabled={busy || !item.backendSupported}
-                          onArm={() => setArmedTrash(new Set([item.sessionId]))}
-                          onConfirm={() => { void run(() => api.moveToTrash(item.sessionId)) }}
+                          onClick={() => {
+                            if (armedTrash.has(item.sessionId)) { void run(() => api.moveToTrash(item.sessionId)) }
+                            else setArmedTrash(new Set([item.sessionId]))
+                          }}
                         />
-                        <ConfirmButton
+                        <SessionRowAction
+                          kind="delete"
                           label={t('sessions.archive.delete')}
-                          confirmLabel={t('sessions.archive.deleteConfirm')}
                           armed={deleteDraft?.id === item.sessionId}
                           danger
                           disabled={busy || !item.backendSupported}
-                          onArm={() => setDeleteDraft({ id: item.sessionId, text: '' })}
-                          onConfirm={() => {
-                            const confirmTitle = deleteDraft?.text
+                          onClick={() => {
+                            if (deleteDraft?.id !== item.sessionId) { setDeleteDraft({ id: item.sessionId, text: '' }); return }
+                            const confirmTitle = deleteDraft.text
                             void run(() => api.deleteSession(
                               item.blank
                                 ? { sessionId: item.sessionId, confirm: true }
@@ -469,16 +476,18 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                     actions={(
                       <>
                         {entry.legacy ? null : (
-                          <button type="button" className="dsh-desk-archive-action" disabled={busy} onClick={() => { void run(() => api.restore(entry.trashId)) }}>{t('sessions.archive.restore')}</button>
+                          <SessionRowAction kind="restore" label={t('sessions.archive.restore')} disabled={busy} onClick={() => { void run(() => api.restore(entry.trashId)) }} />
                         )}
-                        <ConfirmButton
+                        <SessionRowAction
+                          kind="delete"
                           label={t('sessions.archive.delete')}
-                          confirmLabel={t('sessions.archive.deleteConfirm')}
                           armed={armedTrashDelete.has(entry.trashId)}
                           danger
                           disabled={busy}
-                          onArm={() => setArmedTrashDelete(new Set([entry.trashId]))}
-                          onConfirm={() => { void run(() => api.deleteTrashEntry(entry.trashId)) }}
+                          onClick={() => {
+                            if (armedTrashDelete.has(entry.trashId)) { void run(() => api.deleteTrashEntry(entry.trashId)) }
+                            else setArmedTrashDelete(new Set([entry.trashId]))
+                          }}
                         />
                       </>
                     )}

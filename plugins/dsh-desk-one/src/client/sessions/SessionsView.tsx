@@ -11,7 +11,7 @@ import type { SessionChipInfo, SessionLinkSnapshot } from './contract.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
 import { activeSessionGroups } from './catalog.js'
 import { ArchiveSections } from './ArchiveSections.js'
-import { ConfirmButton } from './ConfirmButton.js'
+import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
 import { formatDate, formatTokens } from '../app/utils.js'
 
@@ -81,7 +81,6 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
   const activeCount = groups.reduce((sum, group) => sum + group.sessions.length, 0)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
-  const [armed, setArmed] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const act = async (sessionId: string, task: () => Promise<unknown>): Promise<void> => {
@@ -90,7 +89,6 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
     try {
       await task()
       setHidden(previous => new Set(previous).add(sessionId))
-      setArmed(null)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
@@ -123,7 +121,7 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
   return (
     <div className="dsh-desk-sessionsview">
       {snapshot.enabled ? (
-        <section className="dsh-desk-session-section">
+        <section className="dsh-desk-session-section" data-active="true">
           <header className="dsh-desk-session-section-head">
             <h2 className="dsh-desk-session-section-title">{t('sessions.active')}</h2>
             <span className="dsh-desk-session-section-count">{t('sessions.count', { count: activeCount })}</span>
@@ -151,22 +149,12 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
                         collapsed={collapsed.has(row.session.id)}
                         onToggle={() => toggleCollapsed(row.session.id)}
                         actions={(
-                          <>
-                            <button
-                              type="button"
-                              className="dsh-desk-archive-action"
-                              disabled={busy}
-                              onClick={() => { void act(row.session.id, () => archive.archive(row.session.id)) }}
-                            >{t('sessions.archive.archive')}</button>
-                            <ConfirmButton
-                              label={t('sessions.archive.toTrash')}
-                              confirmLabel={t('sessions.archive.toTrashConfirm')}
-                              armed={armed === row.session.id}
-                              disabled={busy}
-                              onArm={() => setArmed(row.session.id)}
-                              onConfirm={() => { void act(row.session.id, () => archive.moveToTrash(row.session.id)) }}
-                            />
-                          </>
+                          <SessionRowAction
+                            kind="archive"
+                            label={t('sessions.archive.archive')}
+                            disabled={busy}
+                            onClick={() => { void act(row.session.id, () => archive.archive(row.session.id)) }}
+                          />
                         )}
                       />
                     ))}
