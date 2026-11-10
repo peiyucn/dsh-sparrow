@@ -229,7 +229,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(view, /notebook\.searchPlaceholder/u, '书架要带全库搜索')
     assert.match(view, /notebook\.unsetTitle/u, '未配置笔记库时要有引导态')
     assert.match(view, /notebook\.createLibrary/u, '空库态要能创建/导入笔记库')
-    assert.match(view, /notebook\.changeRoot/u, '已配置时也能更换目录')
+    assert.match(view, /notebook\.disconnect/u, '已链接时能断开笔记库')
     assert.ok(!/contentEditable|<textarea/u.test(view), '笔记不提供编辑器')
     assert.match(host, /workspaceRegistry\.list\(\)/u, '笔记库根必须校验落在 DSH 工作区之内')
     assert.match(page, /createWorkspaceAccess/u, '笔记库创建走 DSH 自己的工作区流程')

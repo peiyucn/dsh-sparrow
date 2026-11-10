@@ -111,8 +111,8 @@ export function NotebookView(props: {
     }
   }, [notebook, workspaceAccess])
 
-  /** Forget the configured root: back to the first-run state (the index is derived, so nothing is lost). */
-  const resetRoot = useCallback(async (): Promise<void> => {
+  /** Disconnect the library: clear the configured root and return to the first-run state. */
+  const disconnectLibrary = useCallback(async (): Promise<void> => {
     setCreateError(null)
     try {
       setState(await notebook.clearRoot())
@@ -154,7 +154,7 @@ export function NotebookView(props: {
               <p>{unset ? t('notebook.unsetBody') : t('notebook.outside')}</p>
               <div className="dsh-desk-notebook-actions">
                 {libraryAction}
-                {unset ? null : <button type="button" className="dsh-desk-btn" onClick={() => { void resetRoot() }}>{t('notebook.reset')}</button>}
+                {unset ? null : <button type="button" className="dsh-desk-btn" onClick={() => { void disconnectLibrary() }}>{t('notebook.disconnect')}</button>}
               </div>
               <p className="dsh-desk-notebook-hint">{t('notebook.createHint')}</p>
             </div>
@@ -166,7 +166,7 @@ export function NotebookView(props: {
                 <p>{t('notebook.emptyLibraryBody')}</p>
                 <div className="dsh-desk-notebook-actions">
                   {libraryAction}
-                  <button type="button" className="dsh-desk-btn" onClick={() => { void resetRoot() }}>{t('notebook.reset')}</button>
+                  <button type="button" className="dsh-desk-btn" onClick={() => { void disconnectLibrary() }}>{t('notebook.disconnect')}</button>
                 </div>
               </div>
             )
@@ -179,10 +179,7 @@ export function NotebookView(props: {
                     placeholder={t('notebook.searchPlaceholder')}
                     onChange={event => setQuery(event.target.value)}
                   />
-                  <button type="button" className="dsh-desk-btn" onClick={() => { void createLibrary() }} disabled={creating}>
-                    {t('notebook.changeRoot')}
-                  </button>
-                  <button type="button" className="dsh-desk-btn" onClick={() => { void resetRoot() }}>{t('notebook.reset')}</button>
+                  <button type="button" className="dsh-desk-btn" onClick={() => { void disconnectLibrary() }}>{t('notebook.disconnect')}</button>
                 </div>
                 {state === null ? null : (
                   <div className="dsh-desk-notebook-stats">
