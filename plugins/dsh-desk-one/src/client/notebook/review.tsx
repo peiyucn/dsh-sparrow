@@ -444,9 +444,11 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                           <span className="dsh-desk-review-status">{t(STATUS_KEY[thread.status])}</span>
                         </div>
                         <p className="dsh-desk-review-thread-sub" title={anchorLabel(thread.anchor, t)}>{anchorLabel(thread.anchor, t)}</p>
-                        {thread.status === 'orphaned' || anchorResolves(thread.anchor, body) ? null : (
-                          <p className="dsh-desk-review-orphan">{t('review.missingAnchor')}</p>
-                        )}
+                        {thread.status === 'resolved' || thread.status === 'orphaned' || anchorResolves(thread.anchor, body)
+                          ? null
+                          : (
+                              <p className="dsh-desk-review-orphan">{t('review.missingAnchor')}</p>
+                            )}
                         {thread.status === 'resolved' ? <p className="dsh-desk-review-hint">{t('review.replyReopens')}</p> : null}
                         {thread.comments.map((comment, index) => (
                           <CommentLine key={`${thread.id}-${index}`} t={t} comment={comment} />
