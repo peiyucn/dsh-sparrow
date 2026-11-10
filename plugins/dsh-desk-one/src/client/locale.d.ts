@@ -27,7 +27,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'schedule.upcoming'
       | 'schedule.upcomingRange'
       | 'schedule.upcomingEmpty'
-      | 'schedule.viewAll'
       | 'schedule.weekdays'
       | 'schedule.monthNames'
       | 'schedule.monthLabel'

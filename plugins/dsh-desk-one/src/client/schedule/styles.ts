@@ -77,7 +77,7 @@ export const SCHEDULE_CSS = `
 /* Top row: Start (narrow) + Today + Upcoming, centred as one block.
    Three columns separate the three jobs, and stacking the create buttons keeps the row short. */
 .dsh-desk-schedule-top {
-  flex: none; display: grid; gap: 8px; height: 148px;
+  flex: none; display: grid; gap: 8px; height: 136px;
   width: 100%; max-width: 920px; margin: 0 auto;
   grid-template-columns: 0.36fr minmax(0, 1fr) minmax(0, 1fr);
 }
@@ -108,10 +108,10 @@ export const SCHEDULE_CSS = `
   border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); border-radius: var(--dsw-radius-lg, 16px);
   overflow: hidden;
 }
-/* Today header: title and date stack on two lines so its event rows line up with Upcoming's. */
-.dsh-desk-schedule-today-head { flex: none; display: flex; flex-direction: column; gap: 1px; }
+/* Today header: title and date share one line to keep the row short. */
+.dsh-desk-schedule-today-head { flex: none; display: flex; align-items: baseline; gap: 6px; }
 .dsh-desk-schedule-today-head h3 { margin: 0; font-size: 12px; font-weight: 600; line-height: 16px; color: var(--dsw-alias-label-secondary, #6b7280); }
-.dsh-desk-schedule-today-head span { font-size: 11px; line-height: 14px; color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-schedule-today-head span { font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary, #8a919f); white-space: nowrap; }
 /* Left = today's events, right = clickable counts, divided by a hairline. */
 .dsh-desk-today-split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr); gap: 10px; }
 .dsh-desk-today-events { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
@@ -123,8 +123,8 @@ export const SCHEDULE_CSS = `
 .dsh-desk-today-event:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-today-event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-desk-today-stats {
-  min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px;
-  padding-left: 10px; border-left: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  min-width: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: 4px;
+  padding-top: 2px; padding-left: 10px; border-left: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
 }
 .dsh-desk-today-stat {
   border: 0; background: transparent; color: var(--dsw-alias-label-secondary, #6b7280);
@@ -175,7 +175,10 @@ export const SCHEDULE_CSS = `
   width: 16px; height: 8px; border-radius: 3px;
   background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); border: none; cursor: pointer;
 }
-.dsh-desk-upcoming-range-label { flex: none; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); white-space: nowrap; }
+.dsh-desk-upcoming-range-label {
+  flex: none; font-size: 11px; font-weight: 400; line-height: 16px;
+  color: var(--dsw-alias-label-tertiary, #8a919f); white-space: nowrap;
+}
 .dsh-desk-schedule-upcoming ul { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; overflow: auto; }
 .dsh-desk-schedule-upcoming-item {
   display: flex; align-items: center; gap: 7px; width: 100%; min-width: 0;

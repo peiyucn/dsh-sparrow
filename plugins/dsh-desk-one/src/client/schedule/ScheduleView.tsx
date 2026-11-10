@@ -331,7 +331,6 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
               range={upcomingRange}
               onRangeChange={setUpcomingDays}
               onOpen={openEvent}
-              onViewAll={() => { setListStart(today); chooseView('list'); setCursor(today) }}
             />
           </div>
           <section className="dsh-desk-schedule-main">

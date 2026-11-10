@@ -703,6 +703,8 @@ describe('dsh-desk-one 结构', () => {
     assert.match(view, /<StartPanel/u, '上排三列：开始 / 今日 / 近期')
     assert.match(components, /type="range"/u, '近期天数滑杆')
     assert.match(components, /--dsh-desk-range-fill/u, '滑杆已选区间按比例着色')
+    assert.doesNotMatch(components, /onViewAll/u, '近期卡去掉查看完整日程按钮')
+    assert.match(components, /dsh-desk-upcoming-range-label/u, '近期卡日期区间在标题行')
     assert.match(components, /weekdayLabels/u, '今日卡日期带星期')
     assert.match(components, /onSync/u, '手动同步在日历源子页内')
     assert.match(view, /syncing=\{syncing\}/u, '日历源子页接收同步状态')

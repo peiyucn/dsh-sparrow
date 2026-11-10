@@ -118,7 +118,6 @@ export function UpcomingPanel(props: {
   readonly range: UpcomingRange
   readonly onRangeChange: (days: number) => void
   readonly onOpen: (event: DeskEvent, point?: ClickPoint) => void
-  readonly onViewAll: () => void
 }): ReactElement {
   const { t, today, events, calendars, range } = props
   const visible = useMemo(() => {
@@ -138,7 +137,9 @@ export function UpcomingPanel(props: {
     <section className="dsh-desk-schedule-upcoming">
       <header>
         <span>{t('schedule.upcoming')}</span>
-        <button type="button" className="dsh-desk-schedule-link" onClick={props.onViewAll}>{t('schedule.viewAll')}</button>
+        <span className="dsh-desk-upcoming-range-label">
+          {formatDateLabel(range.from, t)} – {formatDateLabel(addDays(range.to, -1), t)}
+        </span>
       </header>
       <div className="dsh-desk-upcoming-range">
         <input
@@ -151,9 +152,6 @@ export function UpcomingPanel(props: {
           style={{ '--dsh-desk-range-fill': `${fillPct}%` } as CSSProperties}
           onChange={event => props.onRangeChange(Number(event.target.value))}
         />
-        <span className="dsh-desk-upcoming-range-label">
-          {formatDateLabel(range.from, t)} – {formatDateLabel(addDays(range.to, -1), t)}
-        </span>
       </div>
       {shown.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.upcomingEmpty')}</p> : (
         <ul>
@@ -212,8 +210,7 @@ export function TodayPanel(props: {
       <div className="dsh-desk-schedule-today-head">
         <h3>{t('today.title')}</h3>
         <span>{formatDateLabel(today, t)} {weekdayLabel(today, weekdayLabels(t('schedule.weekdays')))}</span>
-      </div>
-      <div className="dsh-desk-today-split">
+      </div>      <div className="dsh-desk-today-split">
         <div className="dsh-desk-today-events">
           {events.length === 0
             ? <p className="dsh-desk-schedule-hint">{t('today.noEvents')}</p>
