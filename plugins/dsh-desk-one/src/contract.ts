@@ -529,5 +529,9 @@ export interface NotebookSearchQuery {
   readonly query?: string
   readonly type?: string
   readonly tag?: string
+  /** Only pages without a frontmatter block (the shelf's actionable count). */
+  readonly missingFrontmatter?: boolean
+  /** Only pages whose body is empty (the shelf's actionable count). */
+  readonly emptyBody?: boolean
   readonly limit?: number
 }

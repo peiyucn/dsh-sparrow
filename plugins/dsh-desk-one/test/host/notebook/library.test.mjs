@@ -71,6 +71,16 @@ describe('notebook library: search', () => {
     assert.deepEqual(searchPages(pages, { tag: '无此标签' }).entries, [])
   })
 
+  it('书架计数即筛选：缺 frontmatter / 空正文', () => {
+    const mixed = [
+      page({ path: 'a.md', hasFrontmatter: false }),
+      page({ path: 'b.md', bodyChars: 0 }),
+      page({ path: 'c.md' }),
+    ]
+    assert.deepEqual(searchPages(mixed, { missingFrontmatter: true }).entries.map(entry => entry.path), ['a.md'])
+    assert.deepEqual(searchPages(mixed, { emptyBody: true }).entries.map(entry => entry.path), ['b.md'])
+  })
+
   it('limit 截断并标记 truncated', () => {
     const result = searchPages(pages, { limit: 1 })
     assert.equal(result.entries.length, 1)

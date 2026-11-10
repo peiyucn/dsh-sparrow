@@ -221,10 +221,17 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /ref=\{setWallRef\}/u, '墙面要挂到 callback ref 上')
   })
 
-  it('笔记 应该 保持空白占位（内容按独立规划推进）', async () => {
+  it('笔记 应该是书架：只读列表 + 可配置的笔记库根（不做编辑器）', async () => {
     const page = await readClientSurface()
-    assert.match(page, /dsh-desk-notebook/u, '笔记要有空白占位容器')
-    assert.ok(!/notebook\.(counts|recent|recentEmpty|hint)/u.test(page), '笔记不得出现未定稿的内容区块')
+    const view = await read('src/client/notebook/NotebookView.tsx')
+    const host = await read('src/host/notebook/host.ts')
+    assert.match(page, /<NotebookView/u, '笔记标签要渲染书架组件')
+    assert.match(view, /notebook\.searchPlaceholder/u, '书架要带全库搜索')
+    assert.match(view, /notebook\.unsetTitle/u, '未配置笔记库时要有引导态')
+    assert.match(view, /notebook\.pickFolder/u, '空库态要能选择笔记库目录')
+    assert.match(view, /notebook\.changeRoot/u, '已配置时也能更换目录')
+    assert.ok(!/contentEditable|<textarea/u.test(view), '笔记不提供编辑器')
+    assert.match(host, /workspaceRegistry\.list\(\)/u, '笔记库根必须校验落在 DSH 工作区之内')
   })
 
   it('便签标签 应该是「满墙贴纸」：标题行统一动作 + 可拖动贴纸', async () => {

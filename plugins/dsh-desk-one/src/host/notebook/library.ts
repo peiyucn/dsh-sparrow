@@ -62,6 +62,8 @@ export function searchPages(pages: readonly ScannedPage[], query: NotebookSearch
     const entry = page.entry
     if (type !== undefined && type !== '' && entry.type !== type) continue
     if (tag !== undefined && tag !== '' && !entry.tags.includes(tag)) continue
+    if (query.missingFrontmatter === true && entry.hasFrontmatter) continue
+    if (query.emptyBody === true && entry.bodyChars > 0) continue
     if (needle !== ''
       && !entry.title.toLowerCase().includes(needle)
       && !entry.path.toLowerCase().includes(needle)

@@ -16,6 +16,7 @@ import type { DeskNote, NoteColor } from '../../contract.js'
 import { notesActions, scheduleActions, taskActions } from './headerActions.js'
 import { NoteCard } from '../notes/components/NoteCard.js'
 import { TrashPanel } from '../notes/components/TrashPanel.js'
+import { NotebookView } from '../notebook/NotebookView.js'
 import { TaskBoard } from '../tasks/components/TaskBoard.js'
 import { SessionsView } from '../sessions/SessionsView.js'
 import { ScheduleView, type ScheduleHeaderActions } from '../schedule/ScheduleView.js'
@@ -43,6 +44,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     listNotes, updateNote, deleteNote, createNote, t,
     listTasks, createTask, updateTask, deleteTask,
     listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink, sessionsArchive, schedule,
+    notebook, workspacePaths,
   } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
   /** Guards double-click / double-tap while one create request is in flight. */
@@ -205,8 +207,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   )
 
   const renderNotebook = (): ReactElement => (
-    // Notebook content is being designed on its own track; this keeps the tab slot stable.
-    <div className="dsh-desk-notebook" />
+    <NotebookView t={t} notebook={notebook} workspacePaths={workspacePaths} />
   )
 
   /** Notes/trash actions float over the canvas so notes can scroll underneath them. */

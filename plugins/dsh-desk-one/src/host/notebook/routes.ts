@@ -39,6 +39,8 @@ async function searchRoute(route: DeskRouteContext, req: IncomingMessage, res: S
     query,
     ...type === null || type === '' ? {} : { type },
     ...tag === null || tag === '' ? {} : { tag },
+    ...url.searchParams.get('missing') === '1' ? { missingFrontmatter: true } : {},
+    ...url.searchParams.get('empty') === '1' ? { emptyBody: true } : {},
     ...Number.isInteger(rawLimit) && rawLimit > 0 ? { limit: rawLimit } : {},
   })
   sendJson(res, 200, result satisfies NotebookSearchResponse)

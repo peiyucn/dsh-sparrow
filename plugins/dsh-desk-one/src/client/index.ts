@@ -12,6 +12,8 @@ import * as taskApi from './tasks/api.js'
 import { DeskOnePage } from './app/DeskOnePage.js'
 import { createSessionLinkBridge, type SessionServices } from './sessions/bridge.js'
 import { scheduleApi } from './schedule/api.js'
+import { notebookApi } from './notebook/api.js'
+import { createWorkspacePaths, type WorkspacesServiceLike } from './notebook/workspaces.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { DeskPanelIcon } from './icon.js'
@@ -36,11 +38,20 @@ export function apply(ctx: ClientContext): void {
     sessionCtx.effect(() => detach, `${PACKAGE_NAME}: session link`)
   })
 
+  // The notebook picker offers the same workspaces the sidebar lists; absent service → empty list.
+  const workspacePaths = createWorkspacePaths()
+  ctx.inject(['workspaces'], (workspaceCtx) => {
+    const detach = workspacePaths.attach(workspaceCtx.get('workspaces') as unknown as WorkspacesServiceLike)
+    workspaceCtx.effect(() => detach, `${PACKAGE_NAME}: workspace paths`)
+  })
+
   installDeskClient(ctx, {
     page: DeskOnePage,
     icon: DeskPanelIcon,
     locales: LOCALE_DICTS,
     api: {
+      notebook: notebookApi,
+      workspacePaths,
       listNotes: api.listNotes,
       createNote: api.createNote,
       updateNote: api.updateNote,
