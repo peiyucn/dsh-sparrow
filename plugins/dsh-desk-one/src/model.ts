@@ -6,34 +6,14 @@
  */
 
 import {
-  DESK_NODE_SCHEMA, MAX_BODY_CHARS, MAX_GROUP_CHARS, MAX_TASK_SESSIONS, MAX_TITLE_CHARS, NOTE_COLORS, NOTE_MAX_SIZE,
-  NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH, TASK_STATUSES,
+  DESK_NODE_SCHEMA, MAX_BODY_CHARS, MAX_TITLE_CHARS, NOTE_COLORS, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH,
 } from './constants.js'
-import type { DeskNote, DeskTask, DeskTaskGroup, NoteColor, TaskStatus } from './contract.js'
-
-type DeskModelErrorCode =
-  | 'INVALID_NOTE'
-  | 'REVISION_CONFLICT'
-  | 'UNKNOWN_NOTE'
-  /** The note wall has reached its 100-note cap (product constraint, see constants.MAX_ACTIVE_NOTES). */
-  | 'NOTE_LIMIT'
-  /** The trash has reached its 200-note cap and must be emptied first (see constants.MAX_TRASH_NOTES). */
-  | 'TRASH_FULL'
-  | 'INVALID_TASK'
-  | 'UNKNOWN_TASK'
-  | 'INVALID_GROUP'
-  | 'UNKNOWN_GROUP'
-  /** Schedule module: input validation failure / unknown calendar (S2). */
-  | 'INVALID_SCHEDULE'
-  | 'UNKNOWN_CALENDAR'
-
-/** Model-layer error: routes map it to HTTP status (400 / 409 / 404). */
-export class DeskModelError extends Error {
-  constructor(readonly code: DeskModelErrorCode, message: string) {
-    super(message)
-    this.name = 'DeskModelError'
-  }
-}
+import type { DeskNote, DeskTask, NoteColor, TaskStatus } from './contract.js'
+import { DeskModelError } from './model/errors.js'
+import { isTaskStatus, normalizeDue, normalizeGroupId, normalizeSessionIds, normalizeOrder } from './model/fields.js'
+export { DeskModelError } from './model/errors.js'
+export type { GroupPatch, GroupInput } from './model/groups.js'
+export { createGroupRecord, filterGroups, normalizeGroupInput, patchGroupRecord, sortGroups } from './model/groups.js'
 
 export interface NoteInput {
   readonly title: string
@@ -98,7 +78,6 @@ export function normalizeLayer(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined
   return Math.round(value)
 }
-
 
 /** Create a note object (id / time / coordinates / layer come from the caller, keeping this function pure). */
 export function createNoteRecord(
@@ -242,68 +221,6 @@ export interface TaskPatch {
   readonly groupId?: string | null
   /** Replaces the whole linked-session list; `undefined` leaves it unchanged. */
   readonly sessionIds?: readonly string[]
-}
-
-function isTaskStatus(value: unknown): value is TaskStatus {
-  return typeof value === 'string' && (TASK_STATUSES as readonly string[]).includes(value)
-}
-
-/** Accept only real calendar days in `YYYY-MM-DD` (2026-02-31 must not silently roll over). */
-function isValidDueDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false
-  const parsed = new Date(`${value}T00:00:00.000Z`)
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
-}
-
-function normalizeDue(raw: { readonly date?: unknown; readonly timezone?: unknown }): { date: string; timezone?: string } {
-  if (typeof raw.date !== 'string' || !isValidDueDate(raw.date)) {
-    throw new DeskModelError('INVALID_TASK', '截止日期必须是合法的 YYYY-MM-DD')
-  }
-  const timezone = typeof raw.timezone === 'string' ? raw.timezone.trim() : ''
-  return { date: raw.date, ...(timezone === '' ? {} : { timezone }) }
-}
-
-/** Non-negative integer order; invalid values are ignored (display order falls back to creation). */
-function normalizeOrder(value: unknown): number | undefined {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined
-  return Math.round(value)
-}
-
-/** One-level group name: trimmed, blank means "no name", overlength is rejected. */
-function normalizeGroupName(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined
-  const name = value.trim()
-  if (name === '') return undefined
-  if (name.length > MAX_GROUP_CHARS) {
-    throw new DeskModelError('INVALID_GROUP', `分组名超过 ${MAX_GROUP_CHARS} 字符上限`)
-  }
-  return name
-}
-
-/** Membership id: non-empty trimmed string (the group record itself is validated by the store). */
-function normalizeGroupId(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined
-  const id = value.trim()
-  return id === '' ? undefined : id
-}
-
-/** Linked session ids: opaque strings, deduplicated in order, bounded so a card stays readable. */
-function normalizeSessionIds(value: unknown): readonly string[] {
-  if (value === undefined || value === null) return []
-  if (!Array.isArray(value)) throw new DeskModelError('INVALID_TASK', 'sessionIds 必须是字符串数组')
-  const seen = new Set<string>()
-  const ids: string[] = []
-  for (const item of value) {
-    if (typeof item !== 'string') throw new DeskModelError('INVALID_TASK', 'sessionIds 必须是字符串数组')
-    const id = item.trim()
-    if (id === '' || seen.has(id)) continue
-    seen.add(id)
-    ids.push(id)
-  }
-  if (ids.length > MAX_TASK_SESSIONS) {
-    throw new DeskModelError('INVALID_TASK', `一张任务卡最多关联 ${MAX_TASK_SESSIONS} 个会话`)
-  }
-  return ids
 }
 
 /**
@@ -470,100 +387,3 @@ export function filterTasks(tasks: readonly DeskTask[], query: string | undefine
 /* ------------------------------------------------------------------ */
 /* Task groups: first-class entities, one level, owned by a lane      */
 /* ------------------------------------------------------------------ */
-
-interface GroupInput {
-  readonly name: string
-  readonly status: TaskStatus
-  readonly order: number
-}
-
-export interface GroupPatch {
-  readonly name?: string
-  readonly order?: number
-  readonly archived?: boolean
-}
-
-/** Normalize a group creation request; groups always live in exactly one lane. */
-export function normalizeGroupInput(raw: {
-  readonly name?: unknown
-  readonly status?: unknown
-  readonly order?: unknown
-}): GroupInput {
-  const name = normalizeGroupName(raw.name)
-  if (name === undefined) throw new DeskModelError('INVALID_GROUP', '分组需要名字')
-  const status = raw.status === undefined || raw.status === '' ? 'todo' : raw.status
-  if (!isTaskStatus(status)) throw new DeskModelError('INVALID_GROUP', `未知的泳道：${String(raw.status)}`)
-  return { name, status, order: normalizeOrder(raw.order) ?? 0 }
-}
-
-/** Create a group record (pure: id / time come from the caller). */
-export function createGroupRecord(
-  input: GroupInput,
-  meta: { readonly id: string; readonly now: string },
-): DeskTaskGroup {
-  return {
-    id: meta.id,
-    kind: 'group',
-    schema: DESK_NODE_SCHEMA,
-    name: input.name,
-    status: input.status,
-    order: input.order,
-    archived: false,
-    createdAt: meta.now,
-    updatedAt: meta.now,
-    revision: 1,
-  }
-}
-
-/** Apply a name / order patch; lane moves go through the store (they cascade to member tasks). */
-export function patchGroupRecord(
-  current: DeskTaskGroup,
-  patch: GroupPatch,
-  meta: { readonly expectedRevision: number; readonly now: string },
-): DeskTaskGroup {
-  if (!Number.isInteger(meta.expectedRevision) || current.revision !== meta.expectedRevision) {
-    throw new DeskModelError(
-      'REVISION_CONFLICT',
-      `分组已被修改（当前 revision ${current.revision}，请求 ${meta.expectedRevision}）`,
-    )
-  }
-  const next: {
-    id: string
-    kind: 'group'
-    schema: number
-    name: string
-    status: TaskStatus
-    order: number
-    archived: boolean
-    createdAt: string
-    updatedAt: string
-    revision: number
-  } = { ...current, revision: current.revision + 1, updatedAt: meta.now }
-  if (patch.name !== undefined) {
-    const name = normalizeGroupName(patch.name)
-    if (name === undefined) throw new DeskModelError('INVALID_GROUP', '分组名不能为空')
-    next.name = name
-  }
-  const order = normalizeOrder(patch.order)
-  if (order !== undefined) next.order = order
-  if (patch.archived !== undefined) {
-    if (typeof patch.archived !== 'boolean') throw new DeskModelError('INVALID_GROUP', 'archived 必须是布尔值')
-    next.archived = patch.archived
-  }
-  return next
-}
-
-/** Group order inside a lane: manual order, then creation time, then id (stable fallback). */
-export function sortGroups(groups: readonly DeskTaskGroup[]): DeskTaskGroup[] {
-  return [...groups].sort((left, right) =>
-    left.order - right.order
-    || left.createdAt.localeCompare(right.createdAt)
-    || left.id.localeCompare(right.id))
-}
-
-/** Keyword filter over group names (case-insensitive); empty query returns all. */
-export function filterGroups(groups: readonly DeskTaskGroup[], query: string | undefined): DeskTaskGroup[] {
-  const text = (query ?? '').trim().toLowerCase()
-  if (text === '') return [...groups]
-  return groups.filter(group => group.name.toLowerCase().includes(text))
-}
