@@ -13,6 +13,7 @@ import {
   LOCALE_NAMESPACE, MAX_ACTIVE_NOTES, NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH, TAB_STORAGE_KEY,
 } from '../../constants.js'
 import type { DeskNote, NoteColor } from '../../contract.js'
+import { archiveIcon, backIcon, plusIcon, smashIcon, sourcesIcon, trashIcon } from './icons.js'
 import { NoteCard } from '../notes/components/NoteCard.js'
 import { TrashPanel } from '../notes/components/TrashPanel.js'
 import { TaskBoard } from '../tasks/components/TaskBoard.js'
@@ -207,39 +208,6 @@ export function DeskOnePage(props: DeskPanelProps) {
   const renderNotebook = (): ReactElement => (
     // Notebook content is being designed on its own track; this keeps the tab slot stable.
     <div className="dsh-desk-notebook" />
-  )
-
-  const plusIcon = (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-      <path d="M10 4.5v11M4.5 10h11" />
-    </svg>
-  )
-  const backIcon = (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-      <path d="M11.5 5.5L7 10l4.5 4.5M7.5 10h7" />
-    </svg>
-  )
-  const trashIcon = (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-      <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
-    </svg>
-  )
-  const archiveIcon = (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-      <path d="M4 5.5h12v11H4zM3 3.5h14v2H3zM8 9h4" />
-    </svg>
-  )
-  const sourcesIcon = (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-      <rect x="3.5" y="4.5" width="13" height="12" rx="1.6" />
-      <path d="M3.5 8h13M7 3.5v2M13 3.5v2" />
-    </svg>
-  )
-  const smashIcon = (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-      <path d="M10 2.6v3.1M10 14.3v3.1M2.6 10h3.1M14.3 10h3.1M4.8 4.8l2.2 2.2M13 13l2.2 2.2M15.2 4.8L13 7M7 13l-2.2 2.2" />
-      <circle cx="10" cy="10" r="2.1" />
-    </svg>
   )
 
   /** Notes/trash actions float over the canvas so notes can scroll underneath them. */
