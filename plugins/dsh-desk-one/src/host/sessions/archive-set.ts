@@ -90,8 +90,8 @@ async function removeArchivedId(surface: RegistryMutationSurface, sessionId: Ses
 }
 
 /**
- * Archived-set cleanup after moving to the trash / permanent deletion: remove "the root plus **all descendants**
- * actually moved/deleted" in one write chain. Official persistence has a flat sibling layout
+ * Archived-set cleanup after moving to the trash / permanent deletion: remove the root plus **all descendants**
+ * that were actually moved/deleted, in one write chain. Official persistence has a flat sibling layout
  * (sessionDir = projectDir/encodeSegment(id), and children inherit the parent's cwd), while trash/delete moves
  * or deletes the whole subtree directory by directory, so the entire subtree must leave the archived set —
  * removing only direct children would leave depth ≥2 descendants as permanent orphan roots (their parents are
@@ -256,7 +256,7 @@ export async function unarchiveSession(
 }
 
 /** Archiving is parent-scoped: the parent plus all its child sessions enter the archived set together (atomic
- *  single write chain). Only serves stray / orphan child sessions. */
+ *  single write chain). This path only handles stray / orphan child sessions. */
 export async function archiveSessionSubtree(
   surface: RegistryMutationSurface,
   headerFacts: HeaderFactsStore<HeaderFacts>,

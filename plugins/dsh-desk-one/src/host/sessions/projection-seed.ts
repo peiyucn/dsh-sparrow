@@ -8,7 +8,7 @@
  * directory name (observed 2026-11-08: all three restored subagent rows were missing).
  * The fix has two layers: ① the sweep no longer deletes rows for trashed sessions (see projection.ts);
  * ② this module rebuilds missing rows through the official public `coldSnapshot` write-back surface (covering
- * stock data already deleted before the fix), and re-emits `api-session/added` after restore (with a cached
+ * existing data already deleted before the fix), and re-emits `api-session/added` after restore (with a cached
  * projection block), so the client session list shows titles without a refresh.
  */
 

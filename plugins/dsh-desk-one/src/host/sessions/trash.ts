@@ -48,7 +48,7 @@ export function resolveTrashDir(trashRoot: string, trashId: string): string {
   return candidate
 }
 
-/** List safely named directory names under the trash root. */
+/** List directory names under the trash root that satisfy the safe naming rule. */
 async function trashDirNames(trashRoot: string): Promise<string[]> {
   try {
     const names = await readdir(trashRoot)
@@ -112,7 +112,7 @@ export async function listTrashPayload(trashRoot: string): Promise<TrashListResp
 }
 
 export function trashDirPayload(trashRoot: string): TrashDirResponse {
-  // For the panel hint: show where the trash actually lives (makes uninstall impact visible); displayPath masks
+  // For the panel hint: show where the trash actually lives (makes the impact of uninstalling visible); displayPath masks
   // the home prefix (~).
   return { path: trashRoot, displayPath: maskHomePath(trashRoot, homedir()) }
 }
@@ -182,7 +182,7 @@ export async function restoreTrashDir(ctx: Context, surface: RegistryMutationSur
     targetDirExists = true
   } catch (error) {
     if (error instanceof SessionsError) throw error
-    // A missing directory is fine; other read errors surface from the subsequent rename.
+    // A missing directory can be ignored; other read errors surface from the subsequent rename.
   }
   if (targetDirExists) {
     await rm(sidecar.originalPath, { recursive: true, force: false })

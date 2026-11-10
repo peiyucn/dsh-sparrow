@@ -32,9 +32,9 @@ import { readTitle } from './titles.js'
 
 /**
  * Live-session guard: sessions resident (not released) in the current dsh process cannot be unloaded by the plugin —
- * AgentHandle.dispose is teardown capability held and discarded by the official session-controller, and dsh exposes
+ * AgentHandle.dispose is a teardown capability held and discarded by the official session-controller, and dsh exposes
  * no public "end session" API (verified in 0.1.2-alpha.1 sources: session / agent stay in the live store until process
- * exit). Forcing a directory move would later be undone by write-back recreating a ghost directory. The panel groups
+ * exit). A forced directory move would be followed by write-back recreating a ghost directory. The panel groups
  * and greys out such sessions in the archive view, with a host-side backstop rejection.
  */
 export function ensureSessionNotLive(ctx: Context, sessionId: SessionId): void {
