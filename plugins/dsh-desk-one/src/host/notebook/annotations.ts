@@ -245,3 +245,20 @@ function quoteAnchorAt(body: string, start: number, end: number): AnnotationAnch
     position: start,
   }
 }
+
+/**
+ * Whether a stale anchor may mark its thread orphaned.
+ *
+ * Only an untouched thread can lose its meaning: once the AI has replied, the change that
+ * moved the text is usually the AI's own answer to this very thread, so invalidating it would
+ * break the accept path. Accepted threads are history and never change state on detection.
+ * @param status - current thread status.
+ * @param hasAiComment - whether any comment in the thread came from the AI.
+ * @returns true when the thread may become orphaned.
+ */
+export function mayBecomeOrphan(
+  status: DeskAnnotation['status'],
+  hasAiComment: boolean,
+): boolean {
+  return status === 'open' && !hasAiComment
+}

@@ -4,7 +4,7 @@ import { describe, it } from 'node:test'
 import { DeskModelError } from '../../../lib/model/errors.js'
 import {
   anchorStillValid, appendAnnotationComment, assertAnnotationDeletable, autoRelocateAnchor, createAnnotationRecord,
-  normalizeAnnotationAnchor, patchAnnotationStatus,
+  mayBecomeOrphan, normalizeAnnotationAnchor, patchAnnotationStatus,
 } from '../../../lib/host/notebook/annotations.js'
 import { normalizeLibraryPath } from '../../../lib/host/notebook/library.js'
 import { NOTEBOOK_BASELINE_MAX_CHARS } from '../../../lib/constants.js'
@@ -182,5 +182,16 @@ describe('annotation: review baseline', () => {
       { id: 'a2', now: '2026-11-11T00:00:00.000Z', schema: 1, baselineText: 'x'.repeat(NOTEBOOK_BASELINE_MAX_CHARS + 10) },
     )
     assert.equal(capped.baseline?.text.length, NOTEBOOK_BASELINE_MAX_CHARS)
+  })
+})
+
+describe('annotation: orphan eligibility', () => {
+  it('只有「未处理且 AI 从未参与」的线程会因锚点失效而变 orphaned', () => {
+    assert.equal(mayBecomeOrphan('open', false), true)
+    // AI 回复后改掉原文是正常闭环，不能判失效。
+    assert.equal(mayBecomeOrphan('open', true), false)
+    assert.equal(mayBecomeOrphan('answered', false), false)
+    assert.equal(mayBecomeOrphan('answered', true), false)
+    assert.equal(mayBecomeOrphan('resolved', true), false)
   })
 })

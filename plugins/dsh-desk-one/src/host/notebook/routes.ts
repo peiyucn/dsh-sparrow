@@ -8,7 +8,7 @@ import type {
   ReplyAnnotationRequest, UpdateAnnotationRequest, DetectOrphansRequest, DetectOrphansResponse,
   AnnotationDiffResponse,
 } from '../../contract.js'
-import { anchorStillValid, autoRelocateAnchor } from './annotations.js'
+import { anchorStillValid, autoRelocateAnchor, mayBecomeOrphan } from './annotations.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
 import type { DeskRouteContext, DeskRouteEntry } from '../router.js'
 
@@ -157,6 +157,18 @@ async function detectOrphansRoute(route: DeskRouteContext, req: IncomingMessage,
   }
   let relocated = 0
   for (const thread of route.store.listAnnotations({ path })) {
+    const hasAiComment = thread.comments.some(comment => comment.author === 'ai')
+    // Heal an earlier false positive: an AI-handled thread whose anchor moved because of that
+    // very answer must not stay orphaned. Its last speaker decides the restored status.
+    if (thread.status === 'orphaned' && hasAiComment) {
+      const last = thread.comments[thread.comments.length - 1]
+      try {
+        await route.store.updateAnnotationStatus(thread.id, thread.revision, last?.author === 'ai' ? 'answered' : 'open')
+      } catch {
+        // A concurrent change wins; the next detect pass will settle it.
+      }
+      continue
+    }
     if (thread.status === 'resolved' || thread.status === 'orphaned') continue
     if (anchorStillValid(thread.anchor, pageBody, fields)) continue
     const candidate = thread.anchor.type === 'quote' ? autoRelocateAnchor(thread.anchor, pageBody, fields) : undefined
@@ -164,9 +176,10 @@ async function detectOrphansRoute(route: DeskRouteContext, req: IncomingMessage,
       if (candidate !== undefined) {
         await route.store.updateAnnotationAnchor({ id: thread.id, expectedRevision: thread.revision, anchor: candidate })
         relocated += 1
-      } else {
+      } else if (mayBecomeOrphan(thread.status, hasAiComment)) {
         await route.store.updateAnnotationStatus(thread.id, thread.revision, 'orphaned')
       }
+      // Otherwise leave it alone: a stale anchor on an AI-handled or accepted thread is normal.
     } catch {
       // A concurrent change wins; the next detect pass will settle it.
     }
