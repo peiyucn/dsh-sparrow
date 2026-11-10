@@ -233,13 +233,18 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-more-count:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.06)); }
 
 /* week: 8h per screen, inner canvas = 24h (300% of the viewport) */
-.dsh-desk-schedule-week { flex: 1; min-height: 0; display: flex; flex-direction: column; font-size: 11px; }
-.dsh-desk-schedule-week-head { flex: none; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.dsh-desk-schedule-week {
+  --dsh-desk-week-gutter: 30px;
+  flex: 1; min-height: 0; display: flex; flex-direction: column; font-size: 11px;
+}
+.dsh-desk-schedule-week-head { flex: none; display: grid; grid-template-columns: var(--dsh-desk-week-gutter) repeat(7, minmax(0, 1fr)); }
+/* Empty first cell keeps the day columns aligned with the hour ruler below. */
+.dsh-desk-schedule-week-gutter { display: block; }
 .dsh-desk-schedule-week-day { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; color: var(--dsw-alias-label-secondary, #6b7280); }
 .dsh-desk-schedule-week-day[data-weekend='true'] { color: #c2410c; }
 .dsh-desk-schedule-week-day[data-today='true'] { color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); }
 .dsh-desk-schedule-week-allday {
-  flex: none; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  flex: none; display: grid; grid-template-columns: var(--dsh-desk-week-gutter) repeat(7, minmax(0, 1fr));
   max-height: 52px; overflow: hidden; padding: 2px 0;
   border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
 }
@@ -247,7 +252,18 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-week-allday-chip { display: flex; align-items: center; gap: 4px; min-width: 0; border: 0; border-radius: 4px; background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); color: inherit; font: inherit; font-size: 10px; padding: 2px 4px; cursor: pointer; overflow: hidden; }
 .dsh-desk-schedule-week-allday-chip > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-desk-schedule-week-scroll { flex: 1; min-height: 0; overflow-y: auto; }
-.dsh-desk-schedule-week-inner { position: relative; height: 300%; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+/* Ruler and grid share one 300%-tall body so the hour labels scroll with the lines. */
+.dsh-desk-schedule-week-body { display: grid; grid-template-columns: var(--dsh-desk-week-gutter) minmax(0, 1fr); height: 300%; }
+.dsh-desk-schedule-week-hours { position: relative; min-width: 0; }
+.dsh-desk-schedule-week-hourlabel {
+  position: absolute; left: 0; right: 0; padding-right: 5px; text-align: right;
+  font-size: 9px; line-height: 1; font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-tertiary, #8a919f); transform: translateY(-50%);
+}
+/* The 0 and 24 labels sit on the outer edges, so they must not overflow the ruler. */
+.dsh-desk-schedule-week-hourlabel[data-edge='start'] { transform: translateY(0); }
+.dsh-desk-schedule-week-hourlabel[data-edge='end'] { transform: translateY(-100%); }
+.dsh-desk-schedule-week-inner { position: relative; height: 100%; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .dsh-desk-schedule-week-col { position: relative; min-width: 0; border-left: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); }
 .dsh-desk-schedule-week-col[data-weekend='true'] { background: color-mix(in srgb, #f59e0b 4%, transparent); }
 .dsh-desk-schedule-week-hour { position: absolute; left: 0; right: 0; border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); }

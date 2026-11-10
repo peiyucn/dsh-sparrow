@@ -444,6 +444,7 @@ export function WeekBoard(props: WeekProps): ReactElement {
   return (
     <div className="dsh-desk-schedule-week">
       <div className="dsh-desk-schedule-week-head">
+        <span className="dsh-desk-schedule-week-gutter" aria-hidden="true" />
         {days.map(day => (
           <span key={day.toISOString()} className="dsh-desk-schedule-week-day" data-today={day.toDateString() === today.toDateString()} data-weekend={isWeekend(day)}>
             <span>{weekdayLabel(day, labels)}</span>
@@ -452,6 +453,7 @@ export function WeekBoard(props: WeekProps): ReactElement {
         ))}
       </div>
       <div className="dsh-desk-schedule-week-allday">
+        <span className="dsh-desk-schedule-week-gutter" aria-hidden="true" />
         {days.map((day, index) => (
           <span key={day.toISOString()} className="dsh-desk-schedule-week-allday-cell">
             {allDay[index]?.map(event => (
@@ -464,33 +466,46 @@ export function WeekBoard(props: WeekProps): ReactElement {
         ))}
       </div>
       <div className="dsh-desk-schedule-week-scroll" ref={scrollRef}>
-        <div className="dsh-desk-schedule-week-inner">
-          {days.map((day, index) => (
-            <div key={day.toISOString()} className="dsh-desk-schedule-week-col" data-weekend={isWeekend(day)}>
-              {Array.from({ length: 23 }, (_, hour) => (
-                <div key={hour} className="dsh-desk-schedule-week-hour" style={{ top: `${((hour + 1) / 24) * 100}%` }} />
-              ))}
-              {index === todayIndex ? <div className="dsh-desk-schedule-week-now" style={{ top: `${nowPct}%` }} /> : null}
-              {blocks.filter(block => block.dayIndex === index).map(block => (
-                <button
-                  key={block.event.id}
-                  type="button"
-                  className="dsh-desk-schedule-week-block"
-                  style={{
-                    top: `${block.topPct}%`,
-                    height: `${block.heightPct}%`,
-                    left: `${(block.lane / block.lanes) * 100}%`,
-                    width: `${100 / block.lanes}%`,
-                    borderLeftColor: calendarColorOf(block.event, calendars),
-                  }}
-                  onClick={click => onOpen(block.event, { x: click.clientX, y: click.clientY })}
-                >
-                  <strong>{formatTime(block.event.start)}</strong>
-                  <span>{eventTitle(t, block.event)}</span>
-                </button>
-              ))}
-            </div>
-          ))}
+        <div className="dsh-desk-schedule-week-body">
+          {/* Hour ruler: 0–24 down the left edge so every grid line has a time. */}
+          <div className="dsh-desk-schedule-week-hours" aria-hidden="true">
+            {Array.from({ length: 25 }, (_, hour) => (
+              <span
+                key={hour}
+                className="dsh-desk-schedule-week-hourlabel"
+                data-edge={hour === 0 ? 'start' : hour === 24 ? 'end' : undefined}
+                style={{ top: `${(hour / 24) * 100}%` }}
+              >{hour}</span>
+            ))}
+          </div>
+          <div className="dsh-desk-schedule-week-inner">
+            {days.map((day, index) => (
+              <div key={day.toISOString()} className="dsh-desk-schedule-week-col" data-weekend={isWeekend(day)}>
+                {Array.from({ length: 23 }, (_, hour) => (
+                  <div key={hour} className="dsh-desk-schedule-week-hour" style={{ top: `${((hour + 1) / 24) * 100}%` }} />
+                ))}
+                {index === todayIndex ? <div className="dsh-desk-schedule-week-now" style={{ top: `${nowPct}%` }} /> : null}
+                {blocks.filter(block => block.dayIndex === index).map(block => (
+                  <button
+                    key={block.event.id}
+                    type="button"
+                    className="dsh-desk-schedule-week-block"
+                    style={{
+                      top: `${block.topPct}%`,
+                      height: `${block.heightPct}%`,
+                      left: `${(block.lane / block.lanes) * 100}%`,
+                      width: `${100 / block.lanes}%`,
+                      borderLeftColor: calendarColorOf(block.event, calendars),
+                    }}
+                    onClick={click => onOpen(block.event, { x: click.clientX, y: click.clientY })}
+                  >
+                    <strong>{formatTime(block.event.start)}</strong>
+                    <span>{eventTitle(t, block.event)}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
