@@ -24,12 +24,13 @@ export const inject = [
 ]
 
 /**
- * host half 入口：打开统一对象存储、挂 REST 路由与工具。
- * @param ctx - DSH 插件上下文。
- * @param config - 插件配置（cordis.patch.yml 注入：trashRoot）。
+ * host-half entry: opens the shared object store, mounts REST routes and agent tools.
+ * @param ctx - DSH plugin context.
+ * @param config - Plugin config injected by cordis.patch.yml (trashRoot).
  */
 export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<void> {
-  // 宿主兼容自检（根 AGENTS《插件与宿主兼容》，先于一切注册）：能力缺失即抛错自停用。
+  // Host compatibility gate (root AGENTS "plugin/host compatibility"), before any registration:
+// a missing capability throws so the plugin disables itself instead of breaking dsh.
   assertHostGates(ctx)
   // Session gates include the session-format probe + the two private seams; failing here disables
   // the plugin before any storage/effect is registered. Hosts without the services (unit tests,

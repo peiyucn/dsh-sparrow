@@ -409,7 +409,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   width: 14px;
   height: 14px;
 }
-/* 笔记：内容按独立规划推进，标签槽位先保持空白。 */
+/* Notebook: contents are planned separately; the tab slot stays empty for now. */
 .dsh-desk-error {
   flex: none;
   margin: 0 0 12px;

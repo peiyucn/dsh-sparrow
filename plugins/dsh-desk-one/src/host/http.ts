@@ -1,4 +1,4 @@
-/** host half 的 HTTP 基础件：JSON 收发、请求体读取、统一错误类型。 */
+/** Host-half HTTP primitives: JSON envelopes, body reading and the shared error type. */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
@@ -37,7 +37,8 @@ export function sendJson(res: ServerResponse, status: number, payload: unknown):
   res.end(body)
 }
 
-/** 统一错误收口：模型错误按语义映射状态码；未知错误记日志并回 500（不把内部细节透给前端）。 */
+/** One error funnel: model errors map to semantic status codes; unknown errors are logged and
+ * answered with 500 so internals never leak to the browser. */
 export function sendError(ctx: Context, res: ServerResponse, error: unknown): void {
   if (error instanceof DeskModelError) {
     const status = error.code === 'REVISION_CONFLICT'
@@ -70,7 +71,7 @@ export function sendError(ctx: Context, res: ServerResponse, error: unknown): vo
   sendJson(res, 500, { error: { code: 'STORAGE_ERROR', message: '存储或路由内部错误' } })
 }
 
-/** 读并解析 JSON 请求体；超限 / 读取失败 / 非法 JSON 一律抛 {@link DeskError}。 */
+/** Read and parse a JSON body; oversized, unreadable or malformed input throws {@link DeskError}. */
 export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = []
   let size = 0
@@ -94,7 +95,7 @@ export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   }
 }
 
-/** 断言请求体是 JSON 对象；具体字段由各路由按 contract.ts 的请求类型读取。 */
+/** Assert the body is a JSON object; each route then reads its own fields from contract.ts. */
 export function bodyObject<T extends object>(value: unknown, message: string): T {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new DeskError('BAD_BODY', message)

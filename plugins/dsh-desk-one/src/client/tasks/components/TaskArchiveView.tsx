@@ -1,3 +1,5 @@
+/** Task archive sub-page: archived groups first, then archived cards, each with restore and delete. */
+
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DeskTask, DeskTaskGroup } from '../../../contract.js'

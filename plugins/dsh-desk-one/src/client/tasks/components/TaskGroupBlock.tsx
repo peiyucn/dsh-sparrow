@@ -1,3 +1,5 @@
+/** One collapsible task group inside a lane, holding its cards and drop target. */
+
 import { useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import type { DeskTask, DeskTaskGroup, TaskStatus } from '../../../contract.js'

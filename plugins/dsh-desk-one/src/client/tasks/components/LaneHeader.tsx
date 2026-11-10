@@ -1,3 +1,5 @@
+/** Lane header: column title, count and the lane-scoped add button. */
+
 import type { ReactElement } from 'react'
 import type { TaskStatus } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'

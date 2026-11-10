@@ -1,5 +1,5 @@
 /**
- * Sessions (Agent会话) view: active catalog (Phase 1, client snapshot) + archive management
+ * Sessions (agent sessions) view: active catalog (client snapshot) plus archive management
  * (Phase 3/A2, host routes). Active rows can be archived or moved to trash; archived / stray /
  * trash operations live in ArchiveSections and all mutations go through the host's routes.
  */

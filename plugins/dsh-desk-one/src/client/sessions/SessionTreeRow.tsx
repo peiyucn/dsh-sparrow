@@ -13,7 +13,7 @@ export interface SessionTreeRowProps {
   readonly title: string
   readonly depth: number
   readonly subagent?: boolean
-  /** Optional lineage badge text (e.g. 子代理). */
+  /** Optional lineage badge text (e.g. "subagent"). */
   readonly tag?: ReactNode
   readonly live?: boolean
   readonly disabled?: boolean
