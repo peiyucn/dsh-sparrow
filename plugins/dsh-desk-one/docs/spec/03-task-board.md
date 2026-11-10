@@ -144,6 +144,6 @@ interface TaskPayload {
 
 * 数据：`src/model.ts` 的任务归一化 / 创建 / 补丁 / 排序 / 过滤；`src/domain.ts` 的 nodes 表扩为 kind 判别联合；共享存储 `src/host/store.ts`。
 * host：`src/host/tasks/{routes,tools}.ts`（4 条 REST + 5 个 agent 工具）；`src/host/router.ts` 统一挂载。
-* 客户端：`src/client/sessions/{contract,bridge}.ts`（可选服务桥）+ `src/client/tasks/hooks/useSessionLinks.ts`（订阅快照）；`src/client/tasks/{api,types,styles}.ts`、`hooks/{useTasksData,useTaskBoard}.ts`、`components/{TaskBoard,TaskColumn,TaskCard}.tsx`；页面标签 `总览 | 便签墙 | 任务板`。卡片为自动换行 textarea、整卡直立幽灵拖拽（便签拖动才做纸张倾斜）、完成列才可存档；分组为任务 `group` 字段 + localStorage 分组名 / 折叠状态 / 顺序；窄容器切换计数列。
+* 客户端：`src/client/sessions/{contract,bridge}.ts`（可选服务桥）+ `src/client/tasks/hooks/useSessionLinks.ts`（订阅快照）；`src/client/tasks/{api,types,styles}.ts`、`hooks/{useTasksData,useTaskBoard}.ts`、`components/{TaskBoard,TaskColumn,TaskCard}.tsx`；页面标签 `日程 | 便签 | 任务 | 笔记 | 会话`。卡片为自动换行 textarea、整卡直立幽灵拖拽（便签拖动才做纸张倾斜）、完成列才可存档；分组为任务 `group` 字段 + localStorage 分组名 / 折叠状态 / 顺序；窄容器切换计数列。
 * 排序视图：手动 / 创建时间 / 截止日期；视图偏好存 `localStorage`（`dsh-desk-one:task-sort`）。
 * 命名：完成列的归档统一叫「存档」（工具名 `desk_task_archive` 保持英文 API 命名）。
