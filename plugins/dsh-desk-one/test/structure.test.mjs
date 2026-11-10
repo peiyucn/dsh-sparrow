@@ -788,6 +788,13 @@ describe('dsh-desk-one 结构', () => {
     }
   })
 
+  it('页头动作 应该 只在当前标签页渲染（防止跨页泄漏）', async () => {
+    const page = await read('src/client/app/DeskOnePage.tsx')
+    assert.match(page, /visible: tab === 'tasks'/u, '任务动作必须绑定任务页')
+    assert.match(page, /visible: tab === 'schedule'/u, '日程动作必须绑定日程页')
+    assert.doesNotMatch(page, /visible: true/u, '不允许把动作可见性硬编码为 true')
+  })
+
   it('client bundle 应该 保留 main 与 sidebar.panellist 两处槽位注册', async () => {
     const bundle = await read('lib/client.js')
     assert.ok(bundle.includes('sidebar.panellist'), 'bundle 缺 sidebar.panellist 槽位注册')

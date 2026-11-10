@@ -227,7 +227,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     : tab === 'tasks'
       ? taskActions({
           t,
-          visible: true,
+          visible: tab === 'tasks',
           showArchive: board.showArchive,
           toggleArchive: board.toggleArchive,
           beginDraft: () => board.beginDraft('todo'),
@@ -237,7 +237,7 @@ export function DeskOnePage(props: DeskPanelProps) {
         })
       : scheduleActions({
           t,
-          visible: true,
+          visible: tab === 'schedule',
           onSourcesPage,
           backToCalendar: () => scheduleActionsRef.current?.backToCalendar(),
           openSources: () => scheduleActionsRef.current?.openSources(),
