@@ -58,6 +58,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'review.missingAnchor'
       | 'review.noPath'
       | 'review.refresh'
+      | 'review.pageUnavailable'
       | 'review.copy'
       | 'review.copied'
       | 'review.footnotes'

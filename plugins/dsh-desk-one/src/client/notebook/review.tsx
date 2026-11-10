@@ -268,7 +268,18 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       {notice === null ? null : <p className="dsh-desk-review-notice">{notice}</p>}
       {loading
         ? <p className="dsh-desk-notebook-hint">{t('state.loading')}</p>
-        : (
+        : page === null
+          ? (
+              <div className="dsh-desk-review-card">
+                <p className="dsh-desk-notebook-hint">{t('review.pageUnavailable')}</p>
+                <div className="dsh-desk-review-actions">
+                  <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={() => { void load() }}>
+                    {t('review.refresh')}
+                  </button>
+                </div>
+              </div>
+            )
+          : (
             <div className="dsh-desk-review-scroll">
               <section className="dsh-desk-review-card">
                 <h4>{t('review.fields')}</h4>
