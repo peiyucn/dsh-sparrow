@@ -1,4 +1,4 @@
-/** Page shell CSS: panel page, header, tabs, overview placeholder, error and retry button. */
+/** Page shell CSS: panel page, header, tabs, notebook placeholder, error and retry button. */
 
 export const APP_CSS = `
 
@@ -229,7 +229,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   width: 100%;
   min-height: 0;
 }
-.dsh-desk-overview {
+.dsh-desk-notebook {
   flex: 1;
   min-height: 0;
   padding: calc(var(--dsh-desk-header-h) + 14px) 28px 0;
@@ -406,7 +406,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   width: 14px;
   height: 14px;
 }
-/* 总览：内容尚未设计，S0 保持空白占位（owner 2026-11-06：先不投入）。 */
+/* 笔记：内容按独立规划推进，标签槽位先保持空白。 */
 .dsh-desk-error {
   flex: none;
   margin: 0 0 12px;

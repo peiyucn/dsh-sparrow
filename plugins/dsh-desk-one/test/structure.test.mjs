@@ -215,10 +215,10 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /ref=\{setWallRef\}/u, '墙面要挂到 callback ref 上')
   })
 
-  it('总览 应该 保持空白占位（内容未设计前不堆放功能）', async () => {
+  it('笔记 应该 保持空白占位（内容按独立规划推进）', async () => {
     const page = await readClientSurface()
-    assert.match(page, /dsh-desk-overview/u, '总览要有空白占位容器')
-    assert.ok(!/overview\.(counts|recent|recentEmpty|hint)/u.test(page), '总览不得出现未定稿的内容区块')
+    assert.match(page, /dsh-desk-notebook/u, '笔记要有空白占位容器')
+    assert.ok(!/notebook\.(counts|recent|recentEmpty|hint)/u.test(page), '笔记不得出现未定稿的内容区块')
   })
 
   it('便签标签 应该是「满墙贴纸」：标题行统一动作 + 可拖动贴纸', async () => {
@@ -651,7 +651,7 @@ describe('dsh-desk-one 结构', () => {
     const page = await readClientSurface()
     assert.match(page, /dsh-desk-tabs/u)
     assert.match(page, /data-window-drag/u)
-    assert.match(page, /'overview'/u)
+    assert.match(page, /'notebook'/u)
     assert.match(page, /'notes'/u)
     assert.match(page, /'tasks'/u)
     for (const forbidden of ['role="dialog"', 'aria-modal', 'position: fixed', 'backdrop-filter']) {

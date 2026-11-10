@@ -203,9 +203,9 @@ export function DeskOnePage(props: DeskPanelProps) {
     </div>
   )
 
-  const renderOverview = (): ReactElement => (
-    // Overview content is not designed yet; the page intro already lives in the header.
-    <div className="dsh-desk-overview" />
+  const renderNotebook = (): ReactElement => (
+    // Notebook content is being designed on its own track; this keeps the tab slot stable.
+    <div className="dsh-desk-notebook" />
   )
 
   const plusIcon = (
@@ -377,7 +377,7 @@ export function DeskOnePage(props: DeskPanelProps) {
           </div>
         )}
         {data.actionError === null ? null : <p className="dsh-desk-error">{data.actionError}</p>}
-          {tab === 'overview' ? renderOverview() : tab === 'notes' ? (
+          {tab === 'notebook' ? renderNotebook() : tab === 'notes' ? (
             <div className="dsh-desk-notesview">
               {trash.showTrash
                 ? (

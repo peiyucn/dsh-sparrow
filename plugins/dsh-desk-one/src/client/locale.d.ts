@@ -7,7 +7,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'page.subtitle'
       | 'page.introLabel'
       | 'page.introDetail'
-      | 'tab.overview'
+      | 'tab.notebook'
       | 'tab.notes'
       | 'tab.tasks'
       | 'tab.schedule'

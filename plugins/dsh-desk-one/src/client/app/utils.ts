@@ -34,13 +34,15 @@ export const clamp = (value: number, min: number, max: number): number =>
  */
 export function readInitialTab(): Tab {
   try {
-    const value = window.localStorage.getItem(TAB_STORAGE_KEY)
+    const stored = window.localStorage.getItem(TAB_STORAGE_KEY)
+    // The old Overview tab became Notebook; keep returning users on it instead of resetting.
+    const value = stored === 'overview' ? 'notebook' : stored
     const known = DESK_TABS.find(entry => entry.tab === value)
     if (known !== undefined) return known.tab
   } catch {
     // Private mode / storage disabled: use the default tab.
   }
-  return 'notes'
+  return 'schedule'
 }
 
 /**
