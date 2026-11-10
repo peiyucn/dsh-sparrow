@@ -173,65 +173,6 @@ export const NOTEBOOK_CSS = `
   font-size: 12px;
 }
 
-.dsh-desk-notebook-picker {
-  margin: 10px auto 0;
-  width: min(520px, 100%);
-  padding: 16px;
-  border: 0.5px solid var(--dsw-alias-border-l2, #d5d9e0);
-  border-radius: 12px;
-  background: var(--dsw-menu-surface-fill, var(--dsw-specific-menu, #ffffff));
-  box-shadow: var(--dsw-elevation-panel, 0 10px 30px -12px rgba(20, 25, 40, 0.4));
-  text-align: left;
-}
-.dsh-desk-notebook-picker h4 {
-  margin: 0 0 10px;
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 13px;
-  font-weight: 600;
-}
-.dsh-desk-notebook-picker-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 180px;
-  overflow-y: auto;
-  margin-bottom: 10px;
-}
-.dsh-desk-notebook-picker-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 7px 9px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-}
-.dsh-desk-notebook-picker-row:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-}
-.dsh-desk-notebook-picker-row[data-picked='true'] {
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4f7cff) 10%, transparent);
-}
-.dsh-desk-notebook-picker-name {
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 12px;
-}
-.dsh-desk-notebook-picker-path {
-  color: var(--dsw-alias-label-caption, #8a919f);
-  font-size: 10px;
-  word-break: break-all;
-}
-
-.dsh-desk-notebook-picker-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
-}
 .dsh-desk-notebook-hint {
   color: var(--dsw-alias-label-caption, #8a919f);
   font-size: 11px;

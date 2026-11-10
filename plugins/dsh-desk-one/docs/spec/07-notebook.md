@@ -40,6 +40,10 @@
 - 浏览 / 搜索 / 批注 / 查看全部正常（这些不碰 md 文件）；
 - 「交给 AI」仍可点（引用能进输入框），但**提示必须提前给**，不能等写失败才发现。
 
+**建库 = 建工作区**：新建笔记库直接复用 DSH 自己的流程——`uiWorkspace.pickDirectory()`（系统文件夹选择器）+ `IWorkspaces.create({ path })`（注册工作区），随后把笔记库根指向该工作区。
+这样「必须落在工作区之下」是**构造上成立**的，不需要用户理解沙箱或自己判断工作区边界。
+用户既可以把空文件夹建成库，也可以直接指向已有的 markdown 笔记目录（DSH 工作区注册对已存在目录是幂等的）。
+
 ## 3. 层级与来源兼容
 
 - 数据层统一为「**路径 + md**」，层数 = 路径段数，**N 级任意深度，不预设**。
@@ -105,12 +109,12 @@ interface NoteIndexEntry {
 
 ```
 📓 还没有笔记库
-选一个 DSH 工作区（或其下的文件夹）作为笔记库：
-[ 选择工作区文件夹… ]
-或者告诉我你在用哪个笔记服务，我帮你接入：Obsidian / OneNote
+把 DSH 工作区当成笔记库
+            [ 创建 / 导入笔记库 ]
+会新建一个 DSH 工作区：可以指向空文件夹，也可以指向你已有的 markdown 笔记目录。
 ```
 
-「选择工作区文件夹」是**配置动作**（不写笔记内容），可以放开。
+「创建 / 导入笔记库」= **配置动作**（不写笔记内容）：打开 DSH 的文件夹选择器，注册为工作区，再把笔记库根指向它。
 
 **B. 已配置目录但无 md**
 
@@ -253,7 +257,7 @@ open ──(交给 AI)──> open ──(AI 处理并回复)──> answered �
 | 1 | 右侧栏注册自定义审阅 tab | ✅ 可行 | `ctx.sidebarRightTabs.register({ id, kind, title, patterns? })` + 槽位 `sidebar.right.pane.tab` / `.title`（官方 `ui-sidebar-right` 公开面）。官方 `ui-plan`（builtin）与 `client-ui-forge`（extension）都用这一套；页面型 tab 可省略 `patterns`，用 `openTab(kind)` 打开 |
 | 2 | `insertQuote` 从插件 client 半可达 | ✅ 可行 | `ctx.sessions.scope(sessionId)?.get('conversation')` → `conversation.input.for(scope)` → `insertQuote(text)`。`ISessions.scope` 与 `IConversation.input`（`SessionInputResolver`）都是公开契约，forge 即用此链路 |
 | 3 | host 枚举工作区目录 | ✅ 可行 | 插件 host 半已有 `node:fs/promises` 先例（`host/sessions/session-files.ts`、`trash.ts`）；工作区根经 `ctx.workspaceRegistry.list()` 的 `path` 取得，无需 `workspaceFiles.list` |
-| 4 | 笔记库配置界面 | ✅ 可行（两条路，按宿主能力切换） | ① 选工作区列表走 `ctx.get('workspaces')`；② 文件夹选择走 `ctx.remote.directoryPicker`。**实测：本机宿主编排的是 native 后端**——`pick()`（系统文件夹对话框）可用，`list()` 被拒（「needs the browse capability」）。故主流程用 `pick()`，宿主若只提供 browse 后端则回退到逐级浏览（`list`）。不手输路径 |
+| 4 | 笔记库配置界面 | ✅ 可行（复用 DSH 工作区创建流程） | **实测：本机宿主编排的是 native 后端**——`pick()`（系统文件夹对话框）可用，`list()` 被拒（「needs the browse capability」）。因此建库直接走官方链路：`ctx.get('uiWorkspace').pickDirectory()`（打开系统选择器）+ `ctx.get('workspaces').create({ path })`（注册工作区，已存在目录幂等），随后 `setRoot(workspace.path)`。宿主只提供 browse 后端时，官方 `pickDirectory()` 本身不可用，属于该部署的既有约束，不在本插件内另行兜底 |
 | 5 | frontmatter 解析 | ✅ 可行（需加依赖） | 插件当前无 YAML 解析。实测 `yaml@2.9.1` 能正确解析本项目的 `title/date/type/tags`、带冒号的引号值、嵌套未知字段。**只在 host 半引入**，解析结果经 REST 把「字段名 + 值 + 原文」发给 client，客户端不打包 YAML |
 
 ### 探针带出的两条实施约束

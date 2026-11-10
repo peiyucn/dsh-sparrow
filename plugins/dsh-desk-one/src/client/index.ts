@@ -13,8 +13,7 @@ import { DeskOnePage } from './app/DeskOnePage.js'
 import { createSessionLinkBridge, type SessionServices } from './sessions/bridge.js'
 import { scheduleApi } from './schedule/api.js'
 import { notebookApi } from './notebook/api.js'
-import { createDirectoryBrowser, type DirectoryPickerLike } from './notebook/directory.js'
-import { createWorkspacePaths, type WorkspacesServiceLike } from './notebook/workspaces.js'
+import { createWorkspaceAccess, type UiWorkspaceLike, type WorkspacesServiceLike } from './notebook/workspaces.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { DeskPanelIcon } from './icon.js'
@@ -39,19 +38,16 @@ export function apply(ctx: ClientContext): void {
     sessionCtx.effect(() => detach, `${PACKAGE_NAME}: session link`)
   })
 
-  // The notebook picker offers the same workspaces the sidebar lists; absent service → empty list.
-  const workspacePaths = createWorkspacePaths()
+  // The notebook library is created through DSH's own workspace flow (folder picker +
+  // registration), so both services are optional: absent → the action reports unavailable.
+  const workspaceAccess = createWorkspaceAccess()
   ctx.inject(['workspaces'], (workspaceCtx) => {
-    const detach = workspacePaths.attach(workspaceCtx.get('workspaces') as unknown as WorkspacesServiceLike)
-    workspaceCtx.effect(() => detach, `${PACKAGE_NAME}: workspace paths`)
+    const detach = workspaceAccess.attach(workspaceCtx.get('workspaces') as unknown as WorkspacesServiceLike)
+    workspaceCtx.effect(() => detach, `${PACKAGE_NAME}: workspace access`)
   })
-
-  // Folder browsing inside a workspace uses the shared Host picker; missing seam degrades
-  // to "workspace root only" instead of failing the picker.
-  const directories = createDirectoryBrowser()
-  ctx.inject(['remote.directoryPicker'], (pickerCtx) => {
-    const detach = directories.attach(pickerCtx.get('remote.directoryPicker') as unknown as DirectoryPickerLike)
-    pickerCtx.effect(() => detach, `${PACKAGE_NAME}: directory picker`)
+  ctx.inject(['uiWorkspace'], (navigationCtx) => {
+    const detach = workspaceAccess.attachNavigation(navigationCtx.get('uiWorkspace') as unknown as UiWorkspaceLike)
+    navigationCtx.effect(() => detach, `${PACKAGE_NAME}: workspace navigation`)
   })
 
   installDeskClient(ctx, {
@@ -60,8 +56,7 @@ export function apply(ctx: ClientContext): void {
     locales: LOCALE_DICTS,
     api: {
       notebook: notebookApi,
-      workspacePaths,
-      directories,
+      workspaceAccess,
       listNotes: api.listNotes,
       createNote: api.createNote,
       updateNote: api.updateNote,
