@@ -13,6 +13,7 @@ import type {
   ArchiveTreeNode, StraySessionItem, TrashEntry, TrashDirResponse,
 } from '../../host/sessions/contract.js'
 import type { DeskTranslator } from '../app/types.js'
+import { LoadMore } from '../app/SubPageHeader.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
 import { formatTokens } from '../app/utils.js'
 import { ConfirmButton } from './ConfirmButton.js'
@@ -42,12 +43,6 @@ function formatDate(ms: number): string {
 }
 
 /** Two-step confirm button: first click arms, second click runs. */
-/** One-section pagination footer: the host returns the full list, the UI reveals it in pages. */
-function LoadMore(props: { readonly more: boolean; readonly label: string; readonly onClick: () => void }): ReactElement | null {
-  if (!props.more) return null
-  return <button type="button" className="dsh-desk-archive-loadmore" onClick={props.onClick}>{props.label}</button>
-}
-
 /** One archived subtree: shared tree row + archive-only actions/confirmation; children recurse. */
 function ArchiveTreeNodeRow(props: {
   readonly node: ArchiveTreeNode

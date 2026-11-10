@@ -449,6 +449,38 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   margin: calc(var(--dsh-desk-header-h) + 2px) 2px 2px;
   background: transparent;
 }
+/* Shared in-panel sub-page header: the back button is always in the top-bar actions slot,
+   so only title + optional count live here. Keeps trash / archive / sources aligned. */
+.dsh-desk-subpage-head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.dsh-desk-subpage-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-desk-subpage-count {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
+.dsh-desk-subpage-loadmore {
+  margin: 6px auto;
+  display: block;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
 /* Layout only; the section frame/border/tint lives in sessions/styles.ts so active vs neutral
    sections render from one rule set instead of overlapping rules in two stylesheets. */
 .dsh-desk-session-section {

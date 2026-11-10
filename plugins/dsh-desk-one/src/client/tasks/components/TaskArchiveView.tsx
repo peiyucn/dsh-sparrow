@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DeskTask, DeskTaskGroup } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
+import { SubPageHeader } from '../../app/SubPageHeader.js'
 import { LANE_LABEL_KEY } from '../taskLabels.js'
 
 interface TaskArchiveViewProps {
@@ -115,6 +116,10 @@ export function TaskArchiveView({
 }: TaskArchiveViewProps): ReactElement {
   return (
     <div className="dsh-task-archive">
+      <SubPageHeader
+        title={t('task.archive')}
+        {...(groups.length + tasks.length > 0 ? { count: countText(groups.length + tasks.length) } : {})}
+      />
       {groups.length === 0 && tasks.length === 0
         ? <p className="dsh-desk-wall-hint">{t('task.archiveEmpty')}</p>
         : (

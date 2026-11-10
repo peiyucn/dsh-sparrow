@@ -9,6 +9,7 @@ import type { ReactElement, WheelEvent as ReactWheelEvent } from 'react'
 import { SCHEDULE_UPCOMING_MAX_DAYS, type ScheduleProvider } from '../../constants.js'
 import type { DeskCalendar, DeskEvent, DeskScheduleSource, ScheduleConnectionInput } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
+import { SubPageHeader } from '../app/SubPageHeader.js'
 import type { ScheduleApi } from './api.js'
 import {
   addDays, calendarColorOf, calendarNameOf, conflictIds, dayKey, formatDateLabel, formatDayTitle, formatFullDateLabel, formatMonthLabel,
@@ -205,10 +206,10 @@ export function TodayPanel(props: {
   ]
   return (
     <section className="dsh-desk-schedule-today">
-      <header>
+      <div className="dsh-desk-schedule-today-head">
         <h3>{t('today.title')}</h3>
         <span>{formatDateLabel(today, t)}</span>
-      </header>
+      </div>
       <div className="dsh-desk-today-split">
         <div className="dsh-desk-today-events">
           {events.length === 0
@@ -570,7 +571,6 @@ interface SourcesPageProps {
   readonly onToggle: (calendar: DeskCalendar) => void
   readonly onColor: (calendar: DeskCalendar) => Promise<void>
   readonly onSetEnabled: (calendar: DeskCalendar, enabled: boolean) => Promise<void>
-  readonly onBack: () => void
   readonly onChanged: () => Promise<void>
 }
 
@@ -1059,12 +1059,10 @@ function SubscriptionCard(props: {
 }
 export function SourcesPage(props: SourcesPageProps): ReactElement {
   const { t, sources, calendars, counts, hidden, onToggle, onColor, onSetEnabled } = props
+  const connected = sources.length
   return (
     <div className="dsh-desk-schedule-page">
-      <header className="dsh-desk-schedule-pagehead">
-        <button type="button" className="dsh-desk-schedule-chip" onClick={props.onBack}>{t('schedule.back')}</button>
-        <h2>{t('schedule.sources')}</h2>
-      </header>
+      <SubPageHeader title={t('schedule.sources')} {...(connected > 0 ? { count: t('schedule.sourceCount', { count: connected }) } : {})} />
       <div className="dsh-desk-schedule-sources-page">
         {PROVIDER_ORDER.map(provider => {
           const source = sources.find(item => item.provider === provider)

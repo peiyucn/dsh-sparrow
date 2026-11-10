@@ -28,8 +28,6 @@ export const SCHEDULE_CSS = `
   padding: calc(var(--dsh-desk-header-h) + 10px) 20px 18px;
   box-sizing: border-box;
 }
-.dsh-desk-schedule-pagehead { display: flex; align-items: center; gap: 10px; }
-.dsh-desk-schedule-pagehead h2 { margin: 0; font-size: 15px; font-weight: 600; }
 
 /* toolbar */
 .dsh-desk-schedule-toolbar {
@@ -89,16 +87,17 @@ export const SCHEDULE_CSS = `
   border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); border-radius: var(--dsw-radius-lg, 16px);
   overflow: hidden;
 }
-.dsh-desk-schedule-today > header { display: flex; align-items: baseline; gap: 8px; flex: none; }
-.dsh-desk-schedule-today > header h3 { margin: 0; font-size: 13px; font-weight: 600; }
-.dsh-desk-schedule-today > header span { font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); }
+/* Today header: title and date stack on two lines so its event rows line up with Upcoming's. */
+.dsh-desk-schedule-today-head { flex: none; display: flex; flex-direction: column; gap: 1px; }
+.dsh-desk-schedule-today-head h3 { margin: 0; font-size: 12px; font-weight: 600; line-height: 16px; color: var(--dsw-alias-label-secondary, #6b7280); }
+.dsh-desk-schedule-today-head span { font-size: 11px; line-height: 14px; color: var(--dsw-alias-label-tertiary, #8a919f); }
 /* Left = today's events, right = clickable counts, divided by a hairline. */
 .dsh-desk-today-split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr); gap: 10px; }
 .dsh-desk-today-events { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .dsh-desk-today-events ul { list-style: none; margin: 0; padding: 0; overflow: auto; }
 .dsh-desk-today-event {
   display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; border: 0; background: transparent;
-  color: inherit; font: inherit; font-size: 11px; padding: 2px 3px; border-radius: 5px; cursor: pointer; text-align: left;
+  color: inherit; font: inherit; font-size: 12px; padding: 3px 4px; border-radius: 6px; cursor: pointer; text-align: left;
 }
 .dsh-desk-today-event:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-today-event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -145,18 +144,18 @@ export const SCHEDULE_CSS = `
   display: flex; align-items: center; justify-content: space-between; flex: none;
   font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-secondary, #6b7280);
 }
-/* Range slider: a small rounded-square thumb matches the official DSH control language. */
+/* Range slider: a small horizontal rounded rectangle matches the official DSH control language. */
 .dsh-desk-upcoming-range { flex: none; display: flex; align-items: center; gap: 8px; }
 .dsh-desk-upcoming-range input[type='range'] {
   flex: 1; min-width: 0; height: 4px; appearance: none; -webkit-appearance: none;
   border-radius: 2px; background: var(--dsw-alias-border-l2, #cfd4dc); cursor: pointer;
 }
 .dsh-desk-upcoming-range input[type='range']::-webkit-slider-thumb {
-  appearance: none; -webkit-appearance: none; width: 12px; height: 12px; border-radius: 3px;
+  appearance: none; -webkit-appearance: none; width: 16px; height: 8px; border-radius: 3px;
   background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); border: none; cursor: pointer;
 }
 .dsh-desk-upcoming-range input[type='range']::-moz-range-thumb {
-  width: 12px; height: 12px; border-radius: 3px;
+  width: 16px; height: 8px; border-radius: 3px;
   background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); border: none; cursor: pointer;
 }
 .dsh-desk-upcoming-range-label { flex: none; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); white-space: nowrap; }

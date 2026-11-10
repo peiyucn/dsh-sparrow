@@ -50,6 +50,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   const zTopRef = useRef(0)
   const scheduleActionsRef = useRef<ScheduleHeaderActions | null>(null)
   const [scheduleSyncing, setScheduleSyncing] = useState(false)
+  const [onSourcesPage, setOnSourcesPage] = useState(false)
 
   const selectTab = useCallback((next: Tab): void => {
     setTab(next)
@@ -262,6 +263,7 @@ export function DeskOnePage(props: DeskPanelProps) {
             className="dsh-desk-action"
             aria-label={trash.confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
             title={trash.confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
+            data-clear-trash-confirm="true"
             data-danger={trash.confirmClearTrash ? 'true' : undefined}
             data-stable-width="true"
             disabled={trash.trashedNotes.length === 0 || trash.smashing}
@@ -351,6 +353,14 @@ export function DeskOnePage(props: DeskPanelProps) {
   /** Schedule actions live in the same header slot as notes/tasks. */
   const scheduleActions = (): ReactElement | null => {
     if (tab !== 'schedule') return null
+    if (onSourcesPage) {
+      return (
+        <button key="schedule-back" type="button" className="dsh-desk-action" aria-label={t('schedule.back')} title={t('schedule.back')} onClick={() => scheduleActionsRef.current?.backToCalendar()}>
+          {backIcon}
+          <span className="dsh-desk-action-label">{t('schedule.back')}</span>
+        </button>
+      )
+    }
     return (
       <>
         <button key="schedule-sync" type="button" className="dsh-desk-action" disabled={scheduleSyncing} data-busy={scheduleSyncing ? 'true' : undefined} onClick={() => scheduleActionsRef.current?.sync()}>
@@ -402,6 +412,7 @@ export function DeskOnePage(props: DeskPanelProps) {
               api={schedule}
               headerActionsRef={scheduleActionsRef}
               onSyncStateChange={setScheduleSyncing}
+              onPageChange={setOnSourcesPage}
               todayContext={{
                 notesCount: trash.activeNotes.length,
                 openTasks: taskData.tasks.filter(task => task.status !== 'done' && !task.archived).length,

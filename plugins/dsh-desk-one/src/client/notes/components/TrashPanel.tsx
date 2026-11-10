@@ -6,6 +6,7 @@
 import type { ReactElement } from 'react'
 import type { DeskNote } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
+import { LoadMore, SubPageHeader } from '../../app/SubPageHeader.js'
 import { formatDate } from '../../app/utils.js'
 
 interface TrashPanelProps {
@@ -23,27 +24,10 @@ export function TrashPanel({
 }: TrashPanelProps): ReactElement {
   return (
     <div className="dsh-desk-trash">
-      <div className="dsh-desk-trash-head">
-        <h2 className="dsh-desk-trash-title">
-          {t('trash.title')}
-          {trashedNotes.length > 0
-            ? <span className="dsh-desk-trash-count">{t('trash.total', { count: trashedNotes.length })}</span>
-            : null}
-        </h2>
-        {trashedNotes.length === 0
-          ? null
-          : (
-              <div className="dsh-desk-trash-actions">
-                {trashVisible < trashedNotes.length
-                  ? (
-                      <button type="button" className="dsh-desk-trash-clear" onClick={onLoadMore}>
-                        {t('action.loadMore')}
-                      </button>
-                    )
-                  : null}
-              </div>
-            )}
-      </div>
+      <SubPageHeader
+        title={t('trash.title')}
+        {...(trashedNotes.length > 0 ? { count: t('trash.total', { count: trashedNotes.length }) } : {})}
+      />
       {trashedNotes.length === 0
         ? <p className="dsh-desk-wall-hint">{t('trash.empty')}</p>
         : (
@@ -80,6 +64,11 @@ export function TrashPanel({
               ))}
             </ul>
           )}
+      <LoadMore
+        more={trashVisible < trashedNotes.length}
+        label={t('action.loadMore')}
+        onClick={onLoadMore}
+      />
     </div>
   )
 }

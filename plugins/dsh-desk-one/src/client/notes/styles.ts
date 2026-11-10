@@ -271,49 +271,6 @@ export const NOTES_CSS = `
   /* 列表滚到底时留出悬浮按钮的高度，最后一行不被按钮盖住。 */
   padding-bottom: 88px;
 }
-.dsh-desk-trash-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-.dsh-desk-trash-count {
-  margin-left: 8px;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 18px;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-}
-.dsh-desk-trash-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.dsh-desk-trash-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 20px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-}
-/* 清空垃圾桶：用户显式触发（二次确认），不自动清空。 */
-.dsh-desk-trash-clear {
-  appearance: none;
-  border: none;
-  background: transparent;
-  padding: 2px 6px;
-  border-radius: var(--dsw-radius-sm, 8px);
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.dsh-desk-trash-clear:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--dsw-alias-state-error-primary, #c62828);
-}
 .dsh-desk-trash-list {
   margin: 0;
   padding: 0;

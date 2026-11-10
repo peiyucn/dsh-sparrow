@@ -64,17 +64,18 @@ export function useTrash({
     trashTimers.current.clear()
   }, [])
 
-  // An armed Smash is a modal-ish intent: clicking anywhere else or pressing Esc must cancel it,
-  // otherwise the button stays red until the component remounts.
+  // An armed destructive action is a modal-ish intent: clicking anywhere else or pressing Esc
+  // cancels it. Covers both Smash and "clear trash" so the button never stays red.
   useEffect(() => {
-    if (!confirmSmash) return
+    if (!confirmSmash && !confirmClearTrash) return
     const onPointerDown = (event: PointerEvent): void => {
       const target = event.target as Element | null
-      if (target?.closest('[data-smash-confirm]') != null) return
+      if (target?.closest('[data-smash-confirm], [data-clear-trash-confirm]') != null) return
       setConfirmSmash(false)
+      setConfirmClearTrash(false)
     }
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setConfirmSmash(false)
+      if (event.key === 'Escape') { setConfirmSmash(false); setConfirmClearTrash(false) }
     }
     window.addEventListener('pointerdown', onPointerDown, true)
     window.addEventListener('keydown', onKeyDown)
@@ -82,7 +83,7 @@ export function useTrash({
       window.removeEventListener('pointerdown', onPointerDown, true)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [confirmSmash])
+  }, [confirmSmash, confirmClearTrash])
 
   const activeNotes = useMemo(() => notes.filter(note => !note.trashed), [notes])
   const trashedNotes = useMemo(() => notes.filter(note => note.trashed), [notes])
