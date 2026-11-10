@@ -22,12 +22,15 @@ import {
   type GroupPatch, type NotePatch, type TaskPatch,
 } from '../model.js'
 import {
+  appendAnnotationComment, createAnnotationRecord, patchAnnotationStatus,
+} from './notebook/annotations.js'
+import {
   createCalendarRecord, createEventRecord, createScheduleSourceRecord, eventMatchesDraft, filterEvents,
   type CalendarDraft, type EventDraft, type EventQuery,
 } from './schedule/records.js'
 import type {
-  DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskNotebookConfig, DeskScheduleSource, DeskSessionIndex, DeskTask,
-  DeskTaskGroup, ScheduleSyncError, TaskStatus,
+  DeskAnnotation, DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskNotebookConfig, DeskScheduleSource, DeskSessionIndex,
+  DeskTask, DeskTaskGroup, ScheduleSyncError, TaskStatus,
 } from '../contract.js'
 
 type DeskDomain = Domain<typeof DESK_DOMAIN>
@@ -386,7 +389,11 @@ export class DeskStore {
   }
 
   /** Translate the domain's missing-key error into the feature-specific 404. */
-  private mapMissing(error: unknown, code: 'UNKNOWN_NOTE' | 'UNKNOWN_TASK' | 'UNKNOWN_GROUP', message: string): unknown {
+  private mapMissing(
+    error: unknown,
+    code: 'UNKNOWN_NOTE' | 'UNKNOWN_TASK' | 'UNKNOWN_GROUP' | 'UNKNOWN_ANNOTATION',
+    message: string,
+  ): unknown {
     if (error instanceof DomainError && error.code === 'missing-key') return new DeskModelError(code, message)
     return error
   }
@@ -764,6 +771,97 @@ export class DeskStore {
   /** Remove the notes-root record (used when the user clears the library). */
   async clearNotebookRoot(): Promise<void> {
     await this.nodes.delete(NOTEBOOK_CONFIG_ID)
+  }
+
+  /* ------------------------------ annotations ------------------------------ */
+
+  /** Threads newest-first; `path` narrows to one page, `status` to one review state. */
+  listAnnotations(filter?: { readonly path?: string; readonly status?: string }): DeskAnnotation[] {
+    const path = filter?.path
+    const status = filter?.status
+    return this.allNodes()
+      .filter((node): node is DeskAnnotation => node.kind === 'annotation')
+      .filter(node => path === undefined || node.path === path)
+      .filter(node => status === undefined || node.status === status)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+  }
+
+  /** One thread by id, or undefined. */
+  getAnnotation(id: string): DeskAnnotation | undefined {
+    const node = this.nodes.get(id)
+    return node?.kind === 'annotation' ? node : undefined
+  }
+
+  /** Create a thread on a page; the first comment is the reviewer's and the status starts `open`. */
+  async createAnnotation(raw: {
+    readonly path?: unknown
+    readonly anchor?: unknown
+    readonly body?: unknown
+    readonly linkedSessionId?: string
+  }): Promise<DeskAnnotation> {
+    const record = createAnnotationRecord(raw, {
+      id: `annotation_${randomUUID()}`,
+      now: new Date().toISOString(),
+      schema: DESK_NODE_SCHEMA,
+      ...raw.linkedSessionId === undefined ? {} : { linkedSessionId: raw.linkedSessionId },
+    })
+    await this.nodes.put(record.id, record)
+    return record
+  }
+
+  /** Change one thread's review status (the transition rules live in the model). */
+  async updateAnnotationStatus(id: string, expectedRevision: number, status: unknown): Promise<DeskAnnotation> {
+    const now = new Date().toISOString()
+    try {
+      const updated = await this.nodes.update(id, (current) => {
+        if (current.kind !== 'annotation') throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${id}`)
+        if (!Number.isInteger(expectedRevision) || current.revision !== expectedRevision) {
+          throw new DeskModelError('REVISION_CONFLICT', `批注已被修改（当前 revision ${current.revision}，请求 ${expectedRevision}）`)
+        }
+        return patchAnnotationStatus(current, status, now)
+      })
+      if (updated.kind !== 'annotation') throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${id}`)
+      return updated
+    } catch (error) {
+      throw this.mapMissing(error, 'UNKNOWN_ANNOTATION', `批注不存在：${id}`)
+    }
+  }
+
+  /** Append one message to a thread (AI replies land here and move the thread to `answered`). */
+  async replyAnnotation(input: {
+    readonly id: string
+    readonly expectedRevision: number
+    readonly body: string
+    readonly author: 'human' | 'ai'
+  }): Promise<DeskAnnotation> {
+    const now = new Date().toISOString()
+    try {
+      const updated = await this.nodes.update(input.id, (current) => {
+        if (current.kind !== 'annotation') throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${input.id}`)
+        if (!Number.isInteger(input.expectedRevision) || current.revision !== input.expectedRevision) {
+          throw new DeskModelError('REVISION_CONFLICT', `批注已被修改（当前 revision ${current.revision}，请求 ${input.expectedRevision}）`)
+        }
+        const replied = appendAnnotationComment(current, { body: input.body, author: input.author }, now)
+        // An AI reply means "handled, waiting for the human"; only a human resolves.
+        return input.author === 'ai' && replied.status === 'open'
+          ? { ...replied, status: 'answered', updatedAt: now, revision: replied.revision + 1 }
+          : replied
+      })
+      if (updated.kind !== 'annotation') throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${input.id}`)
+      return updated
+    } catch (error) {
+      throw this.mapMissing(error, 'UNKNOWN_ANNOTATION', `批注不存在：${input.id}`)
+    }
+  }
+
+  /** Delete one thread permanently. */
+  async deleteAnnotation(id: string): Promise<boolean> {
+    const current = this.nodes.get(id)
+    if (current === undefined || current.kind !== 'annotation') {
+      throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${id}`)
+    }
+    await this.nodes.delete(id)
+    return true
   }
 
   /** Close the storage domain (plugin unload / host shutdown, via the effect). */

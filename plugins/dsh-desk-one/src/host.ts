@@ -9,6 +9,7 @@ import { assertHostGates } from './host/gates.js'
 import { createDeskRequestHandler } from './host/router.js'
 import { DeskStore } from './host/store.js'
 import { NotebookHost } from './host/notebook/host.js'
+import { registerNotebookTools } from './host/notebook/tools.js'
 import { ScheduleHost } from './host/schedule/host.js'
 import { registerScheduleTools } from './host/schedule/tools.js'
 import { installSessionsHost, hasSessionServices, type SessionsConfig } from './host/sessions/install.js'
@@ -56,6 +57,7 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
   registerTaskTools(ctx, store)
   registerGroupTools(ctx, store)
   registerScheduleTools(ctx, schedule)
+  registerNotebookTools(ctx, store, notebook)
   if (sessions !== undefined) {
     // Warm the session index at startup; task/session edges resolve through it (no extra agent
     // search tool: official session tools already cover full-text search).

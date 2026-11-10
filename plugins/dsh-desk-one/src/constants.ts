@@ -43,6 +43,7 @@ export const ROUTES = Object.freeze({
   notebookSearch: `${PREFIX}/notebook/search`,
   annotationList: `${PREFIX}/notebook/annotations`,
   annotationAdd: `${PREFIX}/notebook/annotations/add`,
+  annotationReply: `${PREFIX}/notebook/annotations/reply`,
   annotationUpdate: `${PREFIX}/notebook/annotations/update`,
   annotationDelete: `${PREFIX}/notebook/annotations/delete`,
 })

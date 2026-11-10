@@ -19,6 +19,9 @@ type DeskModelErrorCode =
   /** Schedule module: input validation failure / unknown calendar (S2). */
   | 'INVALID_SCHEDULE'
   | 'UNKNOWN_CALENDAR'
+  /** Notebook annotations: invalid anchor/path/comment, or a missing thread. */
+  | 'INVALID_ANNOTATION'
+  | 'UNKNOWN_ANNOTATION'
 
 /** Model-layer error: routes map it to HTTP status (400 / 409 / 404). */
 export class DeskModelError extends Error {

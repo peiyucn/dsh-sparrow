@@ -48,7 +48,7 @@ export function sendError(ctx: Context, res: ServerResponse, error: unknown): vo
     const status = error.code === 'REVISION_CONFLICT'
       ? 409
       : error.code === 'UNKNOWN_NOTE' || error.code === 'UNKNOWN_TASK' || error.code === 'UNKNOWN_GROUP'
-        || error.code === 'UNKNOWN_CALENDAR' ? 404 : 400
+        || error.code === 'UNKNOWN_CALENDAR' || error.code === 'UNKNOWN_ANNOTATION' ? 404 : 400
     sendJson(res, status, { error: { code: error.code, message: error.message } })
     return
   }

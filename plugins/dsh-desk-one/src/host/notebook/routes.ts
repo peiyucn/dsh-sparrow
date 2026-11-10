@@ -3,7 +3,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { MAX_QUERY_CHARS, ROUTES } from '../../constants.js'
 import type {
-  NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse,
+  AnnotationListResponse, AnnotationMutationResponse, CreateAnnotationRequest, DeleteAnnotationRequest,
+  NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse, ReplyAnnotationRequest, UpdateAnnotationRequest,
 } from '../../contract.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
 import type { DeskRouteContext, DeskRouteEntry } from '../router.js'
@@ -52,9 +53,67 @@ async function clearRootRoute(route: DeskRouteContext, _req: IncomingMessage, re
   sendJson(res, 200, state satisfies NotebookStateResponse)
 }
 
+/* ------------------------------ annotations ------------------------------ */
+
+async function listAnnotationsRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  const path = url.searchParams.get('path') ?? undefined
+  const status = url.searchParams.get('status') ?? undefined
+  const annotations = route.store.listAnnotations({
+    ...path === undefined || path === '' ? {} : { path },
+    ...status === undefined || status === '' ? {} : { status },
+  })
+  sendJson(res, 200, { annotations } satisfies AnnotationListResponse)
+}
+
+async function addAnnotationRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = bodyObject<CreateAnnotationRequest>(await readJsonBody(req), '请求体必须是对象')
+  const annotation = await route.store.createAnnotation(body)
+  sendJson(res, 201, { annotation } satisfies AnnotationMutationResponse)
+}
+
+async function replyAnnotationRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = bodyObject<ReplyAnnotationRequest>(await readJsonBody(req), '请求体必须是对象')
+  if (typeof body.id !== 'string' || body.id.trim() === '') throw new DeskError('BAD_BODY', '缺少批注 id')
+  if (!Number.isInteger(body.expectedRevision)) throw new DeskError('BAD_BODY', '缺少 expectedRevision')
+  const annotation = await route.store.replyAnnotation({
+    id: body.id,
+    expectedRevision: body.expectedRevision,
+    body: body.body,
+    author: body.author === 'ai' ? 'ai' : 'human',
+  })
+  sendJson(res, 200, { annotation } satisfies AnnotationMutationResponse)
+}
+
+async function updateAnnotationRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = bodyObject<UpdateAnnotationRequest>(await readJsonBody(req), '请求体必须是对象')
+  if (typeof body.id !== 'string' || body.id.trim() === '') throw new DeskError('BAD_BODY', '缺少批注 id')
+  if (!Number.isInteger(body.expectedRevision)) throw new DeskError('BAD_BODY', '缺少 expectedRevision')
+  const rawPatch: unknown = body.patch
+  if (typeof rawPatch !== 'object' || rawPatch === null || Array.isArray(rawPatch)) {
+    throw new DeskError('BAD_BODY', '缺少 patch 对象')
+  }
+  const patch = rawPatch as { readonly status?: unknown }
+  if (patch.status === undefined) throw new DeskError('BAD_BODY', 'patch 只接受 status')
+  const annotation = await route.store.updateAnnotationStatus(body.id, body.expectedRevision, patch.status)
+  sendJson(res, 200, { annotation } satisfies AnnotationMutationResponse)
+}
+
+async function deleteAnnotationRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = bodyObject<DeleteAnnotationRequest>(await readJsonBody(req), '请求体必须是对象')
+  if (typeof body.id !== 'string' || body.id.trim() === '') throw new DeskError('BAD_BODY', '缺少批注 id')
+  await route.store.deleteAnnotation(body.id)
+  sendJson(res, 200, { deleted: true })
+}
+
 export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.notebookState, handle: stateRoute },
   { method: 'POST', path: ROUTES.notebookRoot, handle: setRootRoute },
   { method: 'DELETE', path: ROUTES.notebookRoot, handle: clearRootRoute },
   { method: 'GET', path: ROUTES.notebookSearch, handle: searchRoute },
+  { method: 'GET', path: ROUTES.annotationList, handle: listAnnotationsRoute },
+  { method: 'POST', path: ROUTES.annotationAdd, handle: addAnnotationRoute },
+  { method: 'POST', path: ROUTES.annotationReply, handle: replyAnnotationRoute },
+  { method: 'POST', path: ROUTES.annotationUpdate, handle: updateAnnotationRoute },
+  { method: 'POST', path: ROUTES.annotationDelete, handle: deleteAnnotationRoute },
 ]

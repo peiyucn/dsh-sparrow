@@ -122,7 +122,7 @@ export interface DeskSessionIndex {
   readonly revision: number
 }
 
-export type DeskNode = DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent | DeskSessionIndex | DeskNotebookConfig
+export type DeskNode = DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent | DeskSessionIndex | DeskNotebookConfig | DeskAnnotation
 
 /* ------------------------------------------------------------------ */
 /* Schedule (S2): read-only mirror of external calendars               */
@@ -534,4 +534,96 @@ export interface NotebookSearchQuery {
   /** Only pages whose body is empty (the shelf's actionable count). */
   readonly emptyBody?: boolean
   readonly limit?: number
+}
+
+/* ------------------------------------------------------------------ */
+/* Notebook: annotations (human review of AI-written pages)             */
+/* ------------------------------------------------------------------ */
+
+/** Annotation on one frontmatter field (AI-written metadata is reviewable too). */
+export interface AnnotationFieldAnchor {
+  readonly type: 'field'
+  readonly field: string
+  /** The value when the annotation was written (shown against the current value). */
+  readonly value: string
+}
+
+/** Annotation on a quoted passage of the body, anchored by text quote (W3C-style). */
+export interface AnnotationQuoteAnchor {
+  readonly type: 'quote'
+  readonly quote: string
+  /** Up to ~32 characters before the quote, used to disambiguate repeats. */
+  readonly prefix?: string
+  /** Up to ~32 characters after the quote. */
+  readonly suffix?: string
+  /** Approximate character offset; only a tiebreaker, never trusted alone. */
+  readonly position?: number
+}
+
+export type AnnotationAnchor = AnnotationFieldAnchor | AnnotationQuoteAnchor
+
+/** One message in an annotation thread. */
+export interface AnnotationComment {
+  readonly author: 'human' | 'ai'
+  readonly body: string
+  /** ISO instant. */
+  readonly at: string
+}
+
+/**
+ * One review thread on a page. Lives in the Desk One store, never written back into the
+ * markdown file; only a human moves `answered` to `resolved`.
+ */
+export interface DeskAnnotation {
+  readonly id: string
+  readonly kind: 'annotation'
+  readonly schema: number
+  /** Target page, relative to the notes root and `/`-separated. */
+  readonly path: string
+  readonly anchor: AnnotationAnchor
+  readonly comments: readonly AnnotationComment[]
+  readonly status: 'open' | 'answered' | 'resolved' | 'orphaned'
+  /** Session that produced or is handling the thread. */
+  readonly linkedSessionId?: string
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
+
+export interface AnnotationListResponse {
+  readonly annotations: readonly DeskAnnotation[]
+}
+
+export interface AnnotationMutationResponse {
+  readonly annotation: DeskAnnotation
+}
+
+export interface CreateAnnotationRequest {
+  readonly path: string
+  readonly anchor: AnnotationAnchor
+  /** First comment, written by the human who selected the passage. */
+  readonly body: string
+  readonly linkedSessionId?: string
+}
+
+/** Status is the only field a reviewer patches directly; comments go through their own route. */
+export interface AnnotationPatchRequest {
+  readonly status?: string
+}
+
+export interface UpdateAnnotationRequest {
+  readonly id: string
+  readonly expectedRevision: number
+  readonly patch: AnnotationPatchRequest
+}
+
+export interface ReplyAnnotationRequest {
+  readonly id: string
+  readonly expectedRevision: number
+  readonly body: string
+  readonly author?: 'human' | 'ai'
+}
+
+export interface DeleteAnnotationRequest {
+  readonly id: string
 }
