@@ -192,6 +192,20 @@ export const REVIEW_CSS = `
 .dsh-desk-review-diff {
   margin: 8px 0 4px;
 }
+.dsh-desk-review-diffadded {
+  color: #3a9a5b;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.dsh-desk-review-diffremoved {
+  color: #c0503f;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.dsh-desk-review-diffaction {
+  color: var(--dsw-alias-label-caption, #8a919f);
+  font-size: 10px;
+}
 .dsh-desk-review-hint {
   margin: 4px 0 0;
   color: var(--dsw-alias-label-caption, #8a919f);

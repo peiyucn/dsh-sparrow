@@ -7,7 +7,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
-import { DiffBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  DiffBlock, DisclosureRow, IconInspectOutlineRegular, MarkdownText, diffTotals,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
@@ -101,6 +103,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const [annotations, setAnnotations] = useState<readonly DeskAnnotation[]>([])
   /** Per-thread "this round" diff; absent for threads without a usable baseline. */
   const [diffs, setDiffs] = useState<ReadonlyMap<string, AnnotationDiffResponse>>(new Map())
+  /** Threads whose diff is expanded; collapsed by default (summary row only). */
+  const [expandedDiffs, setExpandedDiffs] = useState<ReadonlySet<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [composer, setComposer] = useState<ComposerState | null>(null)
@@ -450,14 +454,38 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                         {(() => {
                           const diff = diffs.get(thread.id)
                           if (diff === undefined || !diff.hasBaseline || diff.oldText === diff.newText) return null
+                          const totals = diffTotals([{ path: thread.path, oldText: diff.oldText, newText: diff.newText }])
+                          const open = expandedDiffs.has(thread.id)
                           return (
                             <div className="dsh-desk-review-diff">
-                              <p className="dsh-desk-review-hint">{t('review.changesThisRound')}</p>
-                              <DiffBlock
-                                diffs={[{ path: thread.path, oldText: diff.oldText, newText: diff.newText }]}
-                                labels={diffLabels}
-                                maxLines={120}
-                              />
+                              <DisclosureRow
+                                icon={<IconInspectOutlineRegular />}
+                                title={t('review.changesThisRound')}
+                                open={open}
+                                expandable
+                                expandOnRowClick
+                                previewChevron
+                                onToggle={() => {
+                                  setExpandedDiffs(current => {
+                                    const next = new Set(current)
+                                    if (next.has(thread.id)) next.delete(thread.id)
+                                    else next.add(thread.id)
+                                    return next
+                                  })
+                                }}
+                                collapsedContent={(
+                                  <>
+                                    <span className="dsh-desk-review-diffadded">{` +${totals.added}`}</span>
+                                    <span className="dsh-desk-review-diffremoved">{` -${totals.removed}`}</span>
+                                  </>
+                                )}
+                              >
+                                <DiffBlock
+                                  diffs={[{ path: thread.path, oldText: diff.oldText, newText: diff.newText }]}
+                                  labels={diffLabels}
+                                  maxLines={120}
+                                />
+                              </DisclosureRow>
                             </div>
                           )
                         })()}
