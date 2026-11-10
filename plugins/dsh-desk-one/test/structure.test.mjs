@@ -750,6 +750,30 @@ describe('dsh-desk-one 结构', () => {
     }
   })
 
+  it('分层 应该 只允许 client 与 host 各自向内依赖', async () => {
+    const walk = async (dir) => {
+      const entries = await readdir(dir, { withFileTypes: true })
+      const out = []
+      for (const entry of entries) {
+        const url = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, dir)
+        if (entry.isDirectory()) out.push(...await walk(url))
+        else if (/\.tsx?$/u.test(entry.name)) out.push(url)
+      }
+      return out
+    }
+    const clientRoot = new URL('../src/client/', import.meta.url)
+    for (const file of await walk(clientRoot)) {
+      const text = await readFile(file, 'utf8')
+      assert.doesNotMatch(text, /from '[^']*\/host\//u, `${file.pathname} 从 client 反向 import host`)
+      assert.doesNotMatch(text, /from 'node:/u, `${file.pathname} 在 client half 引入 node 内置模块`)
+    }
+    const hostFiles = [new URL('../src/host.ts', import.meta.url), ...await walk(new URL('../src/host/', import.meta.url))]
+    for (const file of hostFiles) {
+      const text = await readFile(file, 'utf8')
+      assert.doesNotMatch(text, /from '[^']*client\//u, `${file.pathname} 从 host 反向 import client`)
+    }
+  })
+
   it('client bundle 应该 保留 main 与 sidebar.panellist 两处槽位注册', async () => {
     const bundle = await read('lib/client.js')
     assert.ok(bundle.includes('sidebar.panellist'), 'bundle 缺 sidebar.panellist 槽位注册')
