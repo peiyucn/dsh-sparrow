@@ -12,8 +12,8 @@ import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
 import { createSessionIndexRecord, sessionIndexId, type SessionIndexDraft } from './sessions/records.js'
 import {
-  MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NODES_TABLE, PACKAGE_NAME, SCHEDULE_COLORS, SESSION_INDEX_MISSING_DAYS,
-  TASK_STATUSES,
+  MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTEBOOK_CONFIG_ID, NODES_TABLE, PACKAGE_NAME, SCHEDULE_COLORS,
+  SESSION_INDEX_MISSING_DAYS, TASK_STATUSES, DESK_NODE_SCHEMA,
 } from '../constants.js'
 import {
   DeskModelError, createGroupRecord, createNoteRecord, createTaskRecord, filterGroups, filterNotes, filterTasks,
@@ -26,7 +26,8 @@ import {
   type CalendarDraft, type EventDraft, type EventQuery,
 } from './schedule/records.js'
 import type {
-  DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskScheduleSource, DeskSessionIndex, DeskTask, DeskTaskGroup, ScheduleSyncError, TaskStatus,
+  DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskNotebookConfig, DeskScheduleSource, DeskSessionIndex, DeskTask,
+  DeskTaskGroup, ScheduleSyncError, TaskStatus,
 } from '../contract.js'
 
 type DeskDomain = Domain<typeof DESK_DOMAIN>
@@ -724,6 +725,45 @@ export class DeskStore {
   findSessionIndex(sessionId: string): DeskSessionIndex | undefined {
     const node = this.nodes.get(sessionIndexId(sessionId))
     return node?.kind === 'session' ? node : undefined
+  }
+
+  /* ------------------------------ notebook ------------------------------ */
+
+  /** The configured notes root, or `undefined` before the user picks one. */
+  getNotebookConfig(): DeskNotebookConfig | undefined {
+    const node = this.nodes.get(NOTEBOOK_CONFIG_ID)
+    return node?.kind === 'notebook-config' ? node : undefined
+  }
+
+  /**
+   * Set (or repoint) the notes root. The record is a singleton: the first write
+   * creates it, later writes bump its revision. The path is validated by the
+   * caller before it reaches the store.
+   */
+  async saveNotebookRoot(rootPath: string): Promise<DeskNotebookConfig> {
+    const now = new Date().toISOString()
+    const existing = this.getNotebookConfig()
+    if (existing === undefined) {
+      const record: DeskNotebookConfig = {
+        id: NOTEBOOK_CONFIG_ID,
+        kind: 'notebook-config',
+        schema: DESK_NODE_SCHEMA,
+        rootPath,
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      }
+      await this.nodes.put(record.id, record)
+      return record
+    }
+    return this.nodes.update(NOTEBOOK_CONFIG_ID, current => current.kind === 'notebook-config'
+      ? { ...current, rootPath, updatedAt: now, revision: current.revision + 1 }
+      : current) as Promise<DeskNotebookConfig>
+  }
+
+  /** Remove the notes-root record (used when the user clears the library). */
+  async clearNotebookRoot(): Promise<void> {
+    await this.nodes.delete(NOTEBOOK_CONFIG_ID)
   }
 
   /** Close the storage domain (plugin unload / host shutdown, via the effect). */

@@ -172,8 +172,20 @@ const sessionIndexSchema = z.object({
   revision: z.number().int().nonnegative(),
 })
 
+/** The single profile-level notes-root record (fixed id `notebook_config`). */
+const notebookConfigSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('notebook-config'),
+  schema: z.number().int().positive(),
+  rootPath: z.string().min(1),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  revision: z.number().int().positive(),
+})
+
 const nodeSchema = z.discriminatedUnion('kind', [
   noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema, sessionIndexSchema,
+  notebookConfigSchema,
 ])
 const edgeSchema = z.object({
   id: z.string().min(1),

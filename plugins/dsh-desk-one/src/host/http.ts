@@ -20,6 +20,10 @@ type DeskErrorCode =
   | 'SCHEDULE_NOT_CONNECTED'
   | 'SCHEDULE_AUTH_EXPIRED'
   | 'SCHEDULE_UNAVAILABLE'
+  /* notebook (third stage) */
+  | 'INVALID_NOTEBOOK'
+  | 'NOTEBOOK_UNAVAILABLE'
+  | 'NOTEBOOK_SCAN_TIMEOUT'
 
 export class DeskError extends Error {
   constructor(readonly code: DeskErrorCode, message: string, readonly status = 400) {

@@ -11,10 +11,12 @@ import { ROUTES } from '../constants.js'
 import { isTrustedPluginRequest, officialTrustedHosts } from '../trust.js'
 import { DeskError, sendError, sendJson } from './http.js'
 import { NOTE_ROUTES } from './notes/routes.js'
+import { NOTEBOOK_ROUTES } from './notebook/routes.js'
 import { GROUP_ROUTES } from './tasks/group-routes.js'
 import { TASK_ROUTES } from './tasks/routes.js'
 import { SCHEDULE_ROUTES } from './schedule/routes.js'
 import type { DeskStore } from './store.js'
+import type { NotebookHost } from './notebook/host.js'
 import type { ScheduleHost } from './schedule/host.js'
 import type { SessionsHost } from './sessions/install.js'
 
@@ -26,6 +28,8 @@ export interface DeskRouteContext {
   readonly schedule?: ScheduleHost
   /** Session archive capabilities; routes are appended when installed. */
   readonly sessions?: SessionsHost
+  /** Notebook library index and its root setting. */
+  readonly notebook?: NotebookHost
 }
 
 export type RouteHandler = (route: DeskRouteContext, req: IncomingMessage, res: ServerResponse) => Promise<void>
@@ -38,7 +42,7 @@ export interface DeskRouteEntry {
 
 /** All built-in HTTP routes; session routes are appended at handler creation when installed. */
 const BASE_ROUTE_TABLE: readonly DeskRouteEntry[] = [
-  ...NOTE_ROUTES, ...TASK_ROUTES, ...GROUP_ROUTES, ...SCHEDULE_ROUTES,
+  ...NOTE_ROUTES, ...TASK_ROUTES, ...GROUP_ROUTES, ...SCHEDULE_ROUTES, ...NOTEBOOK_ROUTES,
 ]
 
 /** OAuth redirects are top-level browser navigations from Microsoft, so they carry no plugin

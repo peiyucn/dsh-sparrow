@@ -122,7 +122,7 @@ export interface DeskSessionIndex {
   readonly revision: number
 }
 
-export type DeskNode = DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent | DeskSessionIndex
+export type DeskNode = DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent | DeskSessionIndex | DeskNotebookConfig
 
 /* ------------------------------------------------------------------ */
 /* Schedule (S2): read-only mirror of external calendars               */
@@ -442,4 +442,92 @@ export interface ApiErrorPayload {
     readonly code: string
     readonly message: string
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Notebook: local markdown library index (read-only projection)       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The configured notes root. One record per profile (`id` is fixed), so the
+ * library is a profile-level setting rather than a per-session one. The path is
+ * absolute and never leaves this machine; it is not exported by `desk_export`.
+ */
+export interface DeskNotebookConfig {
+  readonly id: string
+  readonly kind: 'notebook-config'
+  readonly schema: number
+  /** Absolute directory of the notes library. */
+  readonly rootPath: string
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
+
+/** One indexed markdown page. Derived from disk on every scan; never persisted. */
+export interface NoteIndexEntry {
+  /** Path relative to the configured root, `/`-separated. */
+  readonly path: string
+  /** `frontmatter.title`, else the file stem. */
+  readonly title: string
+  /** `frontmatter.type` when present (`note` / `meeting` / `daily` / `task` …). */
+  readonly type?: string
+  /** `frontmatter.date` when present. */
+  readonly date?: string
+  readonly tags: readonly string[]
+  readonly mtimeMs: number
+  readonly bytes: number
+  /** Whether the page opens with a YAML frontmatter block. */
+  readonly hasFrontmatter: boolean
+  /** Body characters after the frontmatter block (search/stats use it). */
+  readonly bodyChars: number
+}
+
+/** Actionable counts shown on the shelf; they double as list filters. */
+export interface NotebookStats {
+  readonly total: number
+  /** Pages without any frontmatter block. */
+  readonly missingFrontmatter: number
+  /** Pages whose body is empty or whitespace. */
+  readonly emptyBody: number
+}
+
+/** Root validation result: a usable path, or the reason scanning is skipped. */
+export interface NotebookRootState {
+  readonly path: string
+  /** `unset` before the user picks a folder; `outside-workspace` / `missing` explain a skipped scan. */
+  readonly status: 'ok' | 'unset' | 'outside-workspace' | 'missing' | 'not-directory'
+}
+
+export interface NotebookStateResponse {
+  readonly config: DeskNotebookConfig | null
+  readonly root: NotebookRootState
+  readonly stats: NotebookStats
+  /** Newest pages first, bounded by `NOTEBOOK_STATE_LIMIT`. */
+  readonly recent: readonly NoteIndexEntry[]
+  /** True when the walk hit `NOTEBOOK_MAX_FILES` / `NOTEBOOK_MAX_DEPTH`. */
+  readonly truncated: boolean
+  /** ISO instant of the scan that produced this response. */
+  readonly scannedAt: string
+  /** Present when the scan itself failed (unreadable root); the panel shows it verbatim. */
+  readonly error?: string
+}
+
+export interface NotebookRootRequest {
+  /** Absolute directory the user picked. */
+  readonly rootPath: string
+}
+
+export interface NotebookSearchResponse {
+  readonly entries: readonly NoteIndexEntry[]
+  /** Whether `NOTEBOOK_SEARCH_LIMIT` cut the result. */
+  readonly truncated: boolean
+}
+
+/** Query parameters for the host-side full-library search. */
+export interface NotebookSearchQuery {
+  readonly query?: string
+  readonly type?: string
+  readonly tag?: string
+  readonly limit?: number
 }
