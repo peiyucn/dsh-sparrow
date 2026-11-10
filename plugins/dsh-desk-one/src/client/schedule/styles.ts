@@ -36,7 +36,7 @@ export const SCHEDULE_CSS = `
 }
 .dsh-desk-schedule-nav { display: flex; align-items: center; gap: 6px; }
 .dsh-desk-schedule-range {
-  font-size: 14px; font-weight: 600; width: 168px; flex: none;
+  font-size: 14px; font-weight: 600; width: 216px; flex: none;
   display: inline-flex; align-items: center; justify-content: center; height: 24px; line-height: 24px;
   text-align: center;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

@@ -713,6 +713,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(view, /MonthBoard/u, '月视图')
     assert.match(view, /WeekBoard/u, '周视图')
     assert.match(components, /week-hourlabel/u, '周历左侧 0–24 小时刻度')
+    assert.match(components, /isoWeekNumber/u, '周历工具栏显示第几周')
     assert.match(view, /SourcesPage/u, '日历源页面')
     assert.match(view, /EventCard/u, '事件详情卡片')
     assert.match(view, /lastSyncedAt/u, '页头显示上次同步')

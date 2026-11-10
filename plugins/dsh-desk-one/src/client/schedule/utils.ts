@@ -61,6 +61,20 @@ export function weekStartOf(date: Date): Date {
   return addDays(startOfLocalDay(date), -((date.getDay() + 6) % 7))
 }
 
+/**
+ * ISO-8601 week number (weeks start Monday, week 1 is the one holding the first Thursday).
+ * The week grid is Monday-first, so this is the numbering that matches what the user sees.
+ */
+export function isoWeekNumber(date: Date): number {
+  // Shift to the Thursday of this ISO week, then count weeks from the first Thursday of the year.
+  const thursday = addDays(startOfLocalDay(date), 3 - ((date.getDay() + 6) % 7))
+  const firstThursday = (() => {
+    const jan4 = new Date(thursday.getFullYear(), 0, 4)
+    return addDays(startOfLocalDay(jan4), 3 - ((jan4.getDay() + 6) % 7))
+  })()
+  return 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * DAY_MS))
+}
+
 export function formatDayTitle(date: Date, today: Date, labels: { today: string; tomorrow: string }, format: (date: Date) => string): string {
   const delta = Math.round((startOfLocalDay(date).getTime() - startOfLocalDay(today).getTime()) / DAY_MS)
   if (delta === 0) return labels.today

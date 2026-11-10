@@ -13,7 +13,7 @@ import { SubPageHeader } from '../app/SubPageHeader.js'
 import type { ScheduleApi } from './api.js'
 import {
   addDays, calendarColorOf, calendarNameOf, conflictIds, dayKey, formatDateLabel, formatDayTitle, formatFullDateLabel, formatMonthLabel,
-  formatTime, groupByDay, keyOfEvent, monthRange, startOfLocalDay, weekdayLabel, weekdayLabels, weekBlocks,
+  formatTime, groupByDay, isoWeekNumber, keyOfEvent, monthRange, startOfLocalDay, weekdayLabel, weekdayLabels, weekBlocks,
   type ScheduleViewName,
 } from './utils.js'
 
@@ -60,7 +60,7 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
   const rangeLabel = view === 'month'
     ? formatMonthLabel(cursor, t)
     : view === 'week'
-      ? `${formatDateLabel(weekStart, t)} – ${formatDateLabel(weekEnd, t)}`
+      ? `${t('schedule.weekNumber', { week: isoWeekNumber(weekStart) })} · ${formatDateLabel(weekStart, t)} – ${formatDateLabel(weekEnd, t)}`
       : formatFullDateLabel(cursor, t)
   return (
     <div className="dsh-desk-schedule-toolbar">

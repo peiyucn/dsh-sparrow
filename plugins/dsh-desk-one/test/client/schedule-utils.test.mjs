@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  addDays, conflictIds, dayKey, formatDayTitle, groupByDay, keyOfEvent, listRange, monthRange,
+  addDays, conflictIds, dayKey, formatDayTitle, groupByDay, isoWeekNumber, keyOfEvent, listRange, monthRange,
   startOfLocalDay, weekBlocks, weekRange,
 } from '../../lib/client/schedule/utils.js'
 
@@ -37,6 +37,14 @@ describe('client schedule utils', () => {
     const local = new Date(2026, 10, 9, 10, 0)
     const timed = event('b', local.toISOString(), new Date(local.getTime() + 3_600_000).toISOString())
     assert.equal(keyOfEvent(timed), dayKey(local))
+  })
+
+  it('isoWeekNumber 按 ISO-8601（周一起始、跨年周归属周四所在年）', () => {
+    assert.equal(isoWeekNumber(new Date(2026, 10, 9)), 46, '2026-11-09 是第 46 周')
+    assert.equal(isoWeekNumber(new Date(2026, 0, 1)), 1, '2026-01-01（周四）属第 1 周')
+    assert.equal(isoWeekNumber(new Date(2025, 11, 29)), 1, '2025-12-29 周一起即 2026 年第 1 周')
+    assert.equal(isoWeekNumber(new Date(2026, 11, 31)), 53, '2026-12-31 属第 53 周')
+    assert.equal(isoWeekNumber(new Date(2026, 0, 5)), 2, '2026-01-05 周一进入第 2 周')
   })
 
   it('groupByDay 生成固定天数并只把事件放进本地日期那天', () => {
