@@ -1,6 +1,7 @@
 /**
- * 官方投影缓存（session_projcache）：域解析、行读取、失效与启动清扫。
- * 投影是派生数据，删除安全；读失败一律按「没有」处理，不让面板因投影异常挂掉。
+ * Official projection cache (session_projcache): domain resolution, row reads, invalidation and startup sweep.
+ * Projections are derived data and safe to delete; read failures are always treated as "absent", so the panel
+ * never breaks because of a projection problem.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -17,8 +18,10 @@ import {
 import type { HeaderFacts } from './headers.js'
 
 /**
- * 官方投影缓存域：移入回收站/删除移走目录后失效对应行，@ 列表不再读到。域名与表名优先
- * 取自官方 `projectionCacheDomainSpec`（官方改名后不需要跟版改代码），取不到才用回退字面量。
+ * Official projection cache domain: after trashing/deleting moves a directory away, the matching row is
+ * invalidated so the @ list no longer reads it. Domain and table names prefer the official
+ * `projectionCacheDomainSpec` (so an official rename needs no code change), falling back to literals only
+ * when it can't be read.
  */
 let projectionCacheDomain: ProjectionCacheDomain = PROJECTION_CACHE_DOMAIN_FALLBACK
 
@@ -27,21 +30,22 @@ export async function resolveProjectionCacheDomain(): Promise<void> {
     const surface = await import(PROJECTION_CACHE_DOMAIN_SPEC_PACKAGE)
     projectionCacheDomain = projectionCacheDomainOf((surface as { projectionCacheDomainSpec?: unknown }).projectionCacheDomainSpec)
   } catch {
-    // 官方包不在本插件的依赖面内（只存在于宿主安装树），读不到不是错误。
+    // The official package is not in this plugin's dependency surface (it only exists in the host install tree), so failing to read it is not an error.
   }
 }
 
 /* ------------------------------------------------------------------ *
- * 官方投影缓存服务面：cachedSnapshot 读（两版本形参自适应）与 coldSnapshot 写回
+ * Official projection cache service surface: cachedSnapshot reads (adaptive to two signature versions)
+ * and coldSnapshot write-back
  * ------------------------------------------------------------------ */
 
-/** 官方投影缓存服务的结构化面（本插件不依赖该包类型；官方改签名时按形参个数自适应）。 */
+/** Structural view of the official projection cache service (this plugin doesn't depend on that package's types; it adapts to the parameter count when the official signature changes). */
 interface ProjectionCacheLike {
   readonly cachedSnapshot?: (...args: unknown[]) => unknown
   readonly coldSnapshot?: (...args: unknown[]) => unknown
 }
 
-/** 官方投影块：values 是 wire 值，asOfSeq 是所属序列空间的 watermark（cached 块不参与 seq 比较）。 */
+/** Official projection block: values are wire values, asOfSeq is the watermark of the sequence space it belongs to (cached blocks take no part in seq comparison). */
 export interface ProjectionBlock {
   readonly asOfSeq: number
   readonly values: Record<string, unknown>
@@ -51,7 +55,7 @@ function projectionCacheService(ctx: Context): ProjectionCacheLike | undefined {
   return ctx.get('sessionProjectionCache') as unknown as ProjectionCacheLike | undefined
 }
 
-/** 官方快照 → 投影块；形状异常按「没有」处理（派生数据读失败不让调用方挂掉）。 */
+/** Official snapshot → projection block; a malformed shape is treated as "absent" (a derived-data read failure must not break callers). */
 function projectionBlockOf(raw: unknown): ProjectionBlock | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined
   const snapshot = raw as { readonly asOfSeq?: unknown; readonly values?: unknown }
@@ -64,20 +68,22 @@ function projectionBlockOf(raw: unknown): ProjectionBlock | undefined {
 }
 
 /**
- * 读官方投影缓存块（`cachedSnapshot(meta, keys?)`）。
+ * Read an official projection cache block (`cachedSnapshot(meta, keys?)`).
  *
- * ⚠️ **形参个数跨版本变过，必须按形参个数自适应**（2026-09-27 真机事故）：
- * - `0.1.5-rc.3` / `0.1.6-alpha.2`：`(meta, inheritedEventCount, keys?)` —— 3 参；
- * - **`0.1.7-rc.1` 起：`(meta, keys?)`** —— 中间参数被删，变 2 参。
- * 写死三参时 `keys` 实收数字 `0` ⇒ 取不到任何单元 ⇒ 缓存档永远 miss，标题退化成会话 id。
- * 用 `try/catch` 兜不住：多传参数不抛错、只会被忽略，必须显式用 `fn.length` 分派。
+ * ⚠️ **The parameter count changed across versions and adapting to it is mandatory** (2026-09-27 production incident):
+ * - `0.1.5-rc.3` / `0.1.6-alpha.2`: `(meta, inheritedEventCount, keys?)` — 3 parameters;
+ * - **from `0.1.7-rc.1`: `(meta, keys?)`** — the middle parameter was removed, so 2 parameters.
+ * With three parameters hardcoded, `keys` actually receives the number `0` ⇒ no unit resolves ⇒ the cache tier
+ * misses forever and titles degrade to session ids. `try/catch` cannot cover this: extra arguments don't throw,
+ * they are simply ignored, so dispatch on `fn.length` explicitly.
  *
- * 本函数是插件里读 cachedSnapshot 的**唯一入口**（标题、子会话标签、投影行回填共用），
- * 保证三处同口径——只改一处会让另一处静默 miss。
- * @param ctx - 宿主上下文。
- * @param header - 会话 header（生命周期身份）。
- * @param keys - 需要的投影单元；省略表示取全部。
- * @returns 投影块；行缺失 / 服务不可用 / 形状异常均 undefined。
+ * This function is the **single entry point** for reading cachedSnapshot in the plugin (titles, subagent labels
+ * and projection-row write-back all share it), keeping the three call sites on one definition — changing only
+ * one of them makes another silently miss.
+ * @param ctx - Host context.
+ * @param header - Session header (lifecycle identity).
+ * @param keys - Projection units to read; omitted means all.
+ * @returns Projection block; undefined when the row is missing / the service is unavailable / the shape is malformed.
  */
 export function cachedSnapshotOf(
   ctx: Context,
@@ -99,16 +105,17 @@ export function cachedSnapshotOf(
 }
 
 /**
- * 折叠完整冷日志并写回官方投影缓存（`coldSnapshot(meta, inheritedEventCount, events)`）。
+ * Fold a complete cold log and write it back to the official projection cache (`coldSnapshot(meta, inheritedEventCount, events)`).
  *
- * 官方写回是 fail-soft、fire-and-forget 的（写失败只让下次冷读多折一段），本函数返回本次
- * 折叠结果供调用方立即使用（补发 added 时带上 cached 投影块）。这是官方公开的投影写回面：
- * 不直接写存储域、不复制官方折叠逻辑。
- * @param ctx - 宿主上下文。
- * @param header - 冷日志 header（须与 inheritedEventCount、events 同源）。
- * @param inheritedEventCount - fork 继承的事件前缀长度。
- * @param events - 完整有序事件日志。
- * @returns 投影块；服务不可用 / 官方签名不认识 / 折叠失败均 undefined（调用方降级）。
+ * The official write-back is fail-soft and fire-and-forget (a failed write only means the next cold read folds
+ * a bit more), so this function returns the current fold result for the caller to use immediately (attaching the
+ * cached projection block when re-emitting `added`). This is the official public projection write-back surface:
+ * it does not write the storage domain directly and does not copy the official fold logic.
+ * @param ctx - Host context.
+ * @param header - Cold-log header (must come from the same source as inheritedEventCount and events).
+ * @param inheritedEventCount - Length of the event prefix inherited from the fork.
+ * @param events - Complete ordered event log.
+ * @returns Projection block; undefined when the service is unavailable / the official signature is unrecognized / the fold fails (caller degrades).
  */
 export function coldSnapshotOf(
   ctx: Context,
@@ -118,7 +125,7 @@ export function coldSnapshotOf(
 ): ProjectionBlock | undefined {
   const cache = projectionCacheService(ctx)
   const fn = cache?.coldSnapshot
-  // 官方当前是 3 参；形参不足说明这条宿主线的签名不认识——宁可放弃回填也不传错参数。
+  // The official code currently takes 3 parameters; fewer parameters means this host line's signature is unrecognized — better to skip the write-back than pass wrong arguments.
   if (typeof fn !== 'function' || fn.length < 3) return undefined
   try {
     return projectionBlockOf(fn.call(cache, header, inheritedEventCount, events))
@@ -129,12 +136,13 @@ export function coldSnapshotOf(
 }
 
 /**
- * 把完整投影块过滤成官方 **summary 键集**（与官方冷摘要 `projectionsFor` 同口径）：
- * 整行投影可能几十 KB（turnOutline / tokenUsage / contextBreakdown 等非摘要单元），
- * `api-session/added` 只该带摘要键。取不到 `summaryKeys`（老版本）时回退整块——正确性优先。
- * @param ctx - 宿主上下文。
- * @param block - 完整投影块。
- * @returns 过滤后的投影块；输入 undefined 原样返回。
+ * Filter a complete projection block down to the official **summary key set** (same definition as the official
+ * cold summary `projectionsFor`): a whole-row projection can be tens of KB (turnOutline / tokenUsage /
+ * contextBreakdown and other non-summary units), while `api-session/added` should carry summary keys only.
+ * When `summaryKeys` is unavailable (older versions), fall back to the whole block — correctness first.
+ * @param ctx - Host context.
+ * @param block - Complete projection block.
+ * @returns Filtered projection block; an undefined input is returned as-is.
  */
 export function summaryBlockOf(ctx: Context, block: ProjectionBlock | undefined): ProjectionBlock | undefined {
   if (block === undefined) return undefined
@@ -153,13 +161,13 @@ export function summaryBlockOf(ctx: Context, block: ProjectionBlock | undefined)
   }
 }
 
-/** 官方投影缓存是否提供可识别的写回面（coldSnapshot 当前 3 参）：没有就不必读日志回填。 */
+/** Whether the official projection cache offers a recognizable write-back surface (coldSnapshot currently takes 3 parameters): without it there's no point reading logs for write-back. */
 export function canWriteProjectionCache(ctx: Context): boolean {
   const fn = projectionCacheService(ctx)?.coldSnapshot
   return typeof fn === 'function' && fn.length >= 3
 }
 
-/** 读一条投影行（缺失 / 形状异常 / 服务不可用均 undefined）。 */
+/** Read one projection row (missing / malformed shape / service unavailable all yield undefined). */
 export function readProjectionRow(ctx: Context, sessionId: string): unknown {
   try {
     return ctx.storageDomain.get(projectionCacheDomain.name)?.table(projectionCacheDomain.table).get(sessionId)
@@ -168,17 +176,17 @@ export function readProjectionRow(ctx: Context, sessionId: string): unknown {
   }
 }
 
-/** 会话统计/列表元数据（projcache 行，缺失返回 undefined）。 */
+/** Session stats / list metadata (projcache row; missing returns undefined). */
 export function sessionFacts(ctx: Context, sessionId: string): SessionFacts | undefined {
   return parseSessionFacts(readProjectionRow(ctx, sessionId))
 }
 
-/** 游离会话的「空白」判定：只读官方投影行（与失效投影行同域，见 AGENTS seam 特例）；读失败按非空白保守处理。 */
+/** Blankness test for stray sessions: reads only the official projection row (same domain as the invalidated projection rows, see the AGENTS seam exception); read failures are conservatively treated as non-blank. */
 export function readStrayBlankness(ctx: Context, sessionId: string): boolean {
   return parseBlankProjection(readProjectionRow(ctx, sessionId))?.blank === true
 }
 
-/** 失效官方投影缓存行（派生数据，可安全删除；官方服务常驻打开该域，走 get）。 */
+/** Invalidate an official projection cache row (derived data, safe to delete; the official service keeps this domain open, so we go through get). */
 async function invalidateProjectionCache(ctx: Context, sessionId: string): Promise<void> {
   try {
     const domain = ctx.storageDomain.get(projectionCacheDomain.name)
@@ -189,7 +197,7 @@ async function invalidateProjectionCache(ctx: Context, sessionId: string): Promi
   }
 }
 
-/** 移入回收站/删除后校验投影缓存是否已删除；未删除时重试一次并告警，供启动清扫兜底。 */
+/** After trashing/deleting, verify the projection cache row is gone; retry once and warn when it isn't, with the startup sweep as the backstop. */
 export async function invalidateProjectionCacheGuarded(ctx: Context, sessionId: string): Promise<void> {
   for (let attempt = 0; attempt < PROJECTION_CACHE_INVALIDATE_ATTEMPTS; attempt++) {
     await invalidateProjectionCache(ctx, sessionId)
@@ -207,15 +215,18 @@ export async function invalidateProjectionCacheGuarded(ctx: Context, sessionId: 
 }
 
 /**
- * 启动清扫：投影缓存里既不在持久化清单、也不在回收站里的会话行删除，@ 列表与真实持久化保持一致。
+ * Startup sweep: delete projection-cache rows for sessions that are neither in the persisted list nor in the
+ * trash, keeping the @ list consistent with real persistence.
  *
- * 回收站里的会话（根 + sidecar 记录的子会话）必须**排除在外**：它们确实不在持久化清单里，
- * 但仍是「可还原的会话」，投影行是还原后标题 / 子会话标签的唯一来源。此前一律按持久化清单
- * 清扫，导致回收站期间行被删、还原后输入框 @ 退化成裸会话 id、任务板 @ 退化成项目目录名
- * （2026-11-08 实测）。永久删除时由删除路由负责失效这些行（见 trash.ts）。
- * @param ctx - 宿主上下文。
- * @param headerFacts - header 事实缓存（持久化清单）。
- * @param preservedIds - 需要保留投影行的会话 id（回收站里的可还原会话）。
+ * Sessions in the trash (the root plus the child sessions recorded in its sidecar) must be **excluded**: they
+ * really aren't in the persisted list, but they are still "restorable sessions", and the projection row is the
+ * only source for their title / subagent labels after restore. Sweeping strictly by the persisted list used to
+ * delete those rows while the session was in the trash, so after restore the input box's @ degraded to a bare
+ * session id and the task board's @ degraded to a project directory name (verified 2026-11-08). On permanent
+ * deletion the delete route is responsible for invalidating these rows (see trash.ts).
+ * @param ctx - Host context.
+ * @param headerFacts - Header facts cache (persisted list).
+ * @param preservedIds - Session ids whose projection rows must be kept (restorable sessions in the trash).
  */
 export async function sweepStaleProjectionCache(
   ctx: Context,

@@ -1,6 +1,6 @@
 /**
- * Agent 工具面：与界面共用同一个 DeskStore（同一套对象、同一套校验），
- * 工具返回结构化 JSON + 一段人类可读摘要，便于模型直接复述。
+ * Agent tool surface: shares the same DeskStore as the UI (same objects, same validation);
+ * tools return structured JSON plus a human-readable summary so the model can restate it directly.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -8,7 +8,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { PACKAGE_NAME, NOTE_COLORS } from '../../constants.js'
 import type { DeskStore } from '../store.js'
 
-/** 工具输出统一用字符串（JSON 文本），render 原样交给对话区。 */
+/** Tool output is always a string (JSON text); render hands it to the conversation area as-is. */
 const textOutput = {
   schema: { type: 'string' as const },
   render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }],
@@ -19,7 +19,7 @@ function toolError(error: unknown): never {
   throw new Error(String(error))
 }
 
-/** 注册 S0 的四个便签工具；工具与 REST 路由共享 store，界面刷新靠下次拉取。 */
+/** Register the four S0 note tools; the tools share the store with the REST routes, and the UI refreshes on its next fetch. */
 export function registerDeskTools(ctx: Context, store: DeskStore): void {
   ctx.tools.register(defineTool({
     name: 'desk_note_add',

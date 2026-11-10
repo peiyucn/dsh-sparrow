@@ -1,26 +1,27 @@
 /**
- * client half 的能力门（不抛错版）：DSH Web 的 boot 审计把**任一 client entry 非 active** 当致命
- * 失败（宿主整页只渲染 "Failed to load plugins"），故 client 侧缺能力只能告警 + 惰性停用，绝不能抛错。
+ * Client-half capability gate (non-throwing variant): DSH Web's boot audit treats **any non-active client entry**
+ * as a fatal failure (the host page renders only "Failed to load plugins"), so a missing client capability may
+ * only warn and lazily disable — it must never throw.
  */
 
-/** 一项能力：`name` 进日志，`ok` 由调用方探测。 */
+/** One capability: `name` goes into logs, `ok` is probed by the caller. */
 export interface ClientCapability {
   readonly name: string
   readonly ok: boolean
 }
 
-/** 缺失的能力名（纯逻辑，供单测）。 */
+/** Names of the missing capabilities (pure logic, for unit tests). */
 export function missingCapabilities(capabilities: readonly ClientCapability[]): string[] {
   return capabilities.filter(capability => !capability.ok).map(capability => capability.name)
 }
 
-/** 面向用户的告警：cordis logger + `console.warn`（浏览器侧唯一可见通道）。 */
+/** User-facing warning: cordis logger + `console.warn` (the only visible channel on the browser side). */
 function warnUser(ctx: { logger?: { warn(message: string): void } }, message: string): void {
   ctx.logger?.warn(message)
   console.warn(message)
 }
 
-/** client 能力门：缺失即告警并返回 false，调用方直接 return（不注册任何槽位 / 样式 / 监听）。 */
+/** Client capability gate: warn and return false when anything is missing; the caller just returns (registers no slot / style / listener). */
 export function warnMissingCapabilities(
   ctx: { logger?: { warn(message: string): void } },
   pluginName: string,
@@ -32,7 +33,7 @@ export function warnMissingCapabilities(
   return false
 }
 
-/** 惰性探针：属性 / 方法缺失或抛错都算缺能力（不产生链接期失败）。 */
+/** Lazy probe: a missing property / method or a throw both count as a missing capability (never a link-time failure). */
 export function hasCapability(probe: () => unknown, expectedType = 'function'): boolean {
   try {
     return typeof probe() === expectedType

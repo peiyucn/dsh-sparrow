@@ -1,6 +1,8 @@
 /**
- * 归档集 / 工作区记账：读改写走官方写串行链；父子对齐、幽灵清扫与 unarchive 通知在此。
- * 归档集是官方 WorkspaceRegistry 的公开状态，写入只经 enqueueOperation + requireState + setState。
+ * Archived set / workspace accounting: reads and writes go through the official write serialization chain;
+ * parent-child alignment, ghost sweeping, and unarchive notifications live here.
+ * The archived set is public state of the official WorkspaceRegistry; writes only go through
+ * enqueueOperation + requireState + setState.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -22,9 +24,11 @@ import { SessionsError } from './errors.js'
 import { cachedSnapshotOf, readStrayBlankness, summaryBlockOf, type ProjectionBlock } from './projection.js'
 
 /**
- * 预建「会话 id → 持它的工作区 id 列表」索引（性能审计：热路径无 O(n²)）。
- * /list 组装按节点调用时，旧实现每节点全量扫「工作区 × 会话」；改为一次建索引、全树复用。
- * 输出顺序 = 工作区列表顺序；同一工作区内重复的 sessionId 条目只记一次（对齐旧实现 includes 语义）。
+ * Prebuild a "session id → ids of workspaces holding it" index (performance audit: no O(n²) on the hot path).
+ * The old implementation scanned all "workspaces × sessions" for every node while assembling /list; now the
+ * index is built once and reused for the whole tree.
+ * Output order = workspace list order; duplicate sessionId entries in one workspace are recorded once
+ * (matching the old includes semantics).
  */
 export function workspaceIndexFor(workspaces: readonly Workspace[]): Map<string, readonly string[]> {
   const index = new Map<string, string[]>()
@@ -55,15 +59,18 @@ export async function attachWorkspaceAccounting(ctx: Context, sessionId: Session
   }
 }
 
-/** 读归档集：官方公开 getter（通道迁移后内存态与域恒同步，无需再直读域）。 */
+/** Read the archived set via the official public getter (after the channel migration, in-memory state and the
+ *  domain stay in sync, so reading the domain directly is no longer needed). */
 export async function readArchivedIds(ctx: Context): Promise<SessionId[]> {
   return [...ctx.workspaceRegistry.archivedSessionIds]
 }
 
 /**
- * 归档集读改写：挂官方 enqueueOperation 串行链，链内 requireState → 计算新集合 →
- * setState（官方持久化写：域 + 内存态一步同步）。update 返回同一引用或内容逐项一致视为无变化
- * （removeArchivedId 的 filter 恒返回新数组，内容比较才能让「不在集合内」真正零写入、零事件噪音）。
+ * Read-modify-write of the archived set: run on the official enqueueOperation serialization chain; inside the
+ * chain, requireState → compute the new set → setState (official persistence write: domain + in-memory state
+ * sync in one step). If update returns the same reference, or the contents are item-by-item identical, treat it
+ * as no change (removeArchivedId's filter always returns a new array, so content comparison is what makes
+ * "not in the set" truly zero writes and zero event noise).
  */
 export function mutateArchivedSet(surface: RegistryMutationSurface, update: (ids: readonly SessionId[]) => readonly SessionId[]): Promise<void> {
   return surface.enqueueOperation(async () => {
@@ -77,34 +84,36 @@ export function mutateArchivedSet(surface: RegistryMutationSurface, update: (ids
   })
 }
 
-/** 从归档集移除会话（取消归档 / 移入回收站 / 彻底删除共用）；不在集合内幂等无操作。 */
+/** Remove a session from the archived set (shared by unarchive / move to trash / permanent delete); no-op if absent. */
 async function removeArchivedId(surface: RegistryMutationSurface, sessionId: SessionId): Promise<void> {
   await mutateArchivedSet(surface, ids => ids.filter(id => String(id) !== String(sessionId)))
 }
 
 /**
- * 移入回收站 / 彻底删除后的归档集清理：摘「根 + 实际被搬走/删掉的**全部后代**子会话」一次写链。
- * 官方持久化是扁平同级布局（sessionDir = projectDir/encodeSegment(id)，子会话继承父 cwd），
- * trash/delete 逐个搬运/删除整棵子树的目录，故整棵子树都要出归档集——只摘直接子会话会把
- * 深度 ≥2 的后代永久留成孤儿根（父已不在 headers，父子对齐对孤儿不参与，摘不回来）。
- * 待摘 id 由调用方用 archivedIdsToRemove(根, 全部后代 id) 给出。
+ * Archived-set cleanup after moving to the trash / permanent deletion: remove "the root plus **all descendants**
+ * actually moved/deleted" in one write chain. Official persistence has a flat sibling layout
+ * (sessionDir = projectDir/encodeSegment(id), and children inherit the parent's cwd), while trash/delete moves
+ * or deletes the whole subtree directory by directory, so the entire subtree must leave the archived set —
+ * removing only direct children would leave depth ≥2 descendants as permanent orphan roots (their parents are
+ * gone from headers, parent-child alignment skips orphans, and there is no way to remove them).
+ * The caller supplies ids to remove via archivedIdsToRemove(root, all descendant ids).
  */
 export async function removeArchivedIds(surface: RegistryMutationSurface, ids: readonly string[]): Promise<void> {
   const remove = new Set(ids)
   await mutateArchivedSet(surface, current => current.filter(id => !remove.has(String(id))))
 }
 
-/** 把会话加回归档集（回收站还原后回归隐藏态）；已在集合内幂等无操作。 */
+/** Add a session back to the archived set (restore from trash returns it to the hidden state); no-op if already present. */
 export async function addArchivedId(surface: RegistryMutationSurface, sessionId: SessionId): Promise<void> {
   await mutateArchivedSet(surface, ids => ids.some(id => String(id) === String(sessionId)) ? ids : [...ids, sessionId])
 }
 
 /**
- * 父子归档对齐（状态不变量：子镜像父）：
- * - 「父已归档而子未归档」→ 子补进归档集；「父未归档而子已归档」→ 子移出。
- * - 触发：启动 + 官方 workspace 域写入事件（domain/changed）+ 面板打开惰性兜底；幂等。
- * - headers 经 header 事实缓存取（缓存层单飞/TTL/写穿失效），
- *   面板打开不再为对齐做全量扫盘（此前每次 /list 都直接 list() 一次）。
+ * Parent-child archive alignment (state invariant: children mirror parents):
+ * - "parent archived, child not archived" → add the child; "parent not archived, child archived" → remove the child.
+ * - Triggers: startup + official workspace domain write event (domain/changed) + lazy fallback on panel open; idempotent.
+ * - Headers come from the header facts cache (single-flight / TTL / write-through invalidation), so opening the
+ *   panel no longer scans the disk for alignment (previously every /list called list() directly).
  */
 export async function alignChildArchives(
   ctx: Context,
@@ -129,9 +138,10 @@ export async function alignChildArchives(
 }
 
 /**
- * 启动清扫：归档集里不在持久化中的幽灵 id 清理掉（历史遗留防御——旧版本直写时代可能已
- * 产生幽灵条目；通道迁移后不再产生新幽灵，保留一次性防御）。
- * headers 经 header 事实缓存取，与其余启动读取共享同一次扫盘。
+ * Startup sweep: remove ghost ids from the archived set that are not in persistence (legacy defense — ghost
+ * entries may have been created during the old direct-write era; the channel migration no longer creates new
+ * ghosts, so this remains a one-time defense).
+ * Headers come from the header facts cache, sharing the same disk scan with other startup reads.
  */
 export async function sweepGhostArchivedIds(
   ctx: Context,
@@ -152,9 +162,9 @@ export async function sweepGhostArchivedIds(
 }
 
 /**
- * 构造官方 api-session/added 的载荷（SessionSummary 结构化子集）：仅 sessionId/updatedAt/
- * running/blank 必填，其余字段按 header 可选透出。非驻留会话没有活跃事件时间，
- * updatedAt 用 header.createdAt（与 /list 列表口径一致）。
+ * Build the official api-session/added payload (a structured subset of SessionSummary): only sessionId/updatedAt/
+ * running/blank are required; other fields are exposed optionally based on the header. Non-resident sessions have
+ * no active event time, so updatedAt uses header.createdAt (consistent with the /list view).
  */
 export function addedSummaryFor(header: SessionHeader, blank: boolean): {
   sessionId: SessionId
@@ -177,15 +187,17 @@ export function addedSummaryFor(header: SessionHeader, blank: boolean): {
 }
 
 /**
- * 补发官方 api-session/added。
+ * Re-emit the official api-session/added event.
  *
- * 除会话摘要外可带一块官方 **cached** 投影：客户端 `handleSessionAdded` 会对它做
- * `applyCached`（session-controller/src/client/sessions/manager.ts:677），因此会话列表
- * 无需刷新就能拿到标题 / 子会话标签——还原后输入框 @ 与任务板 @ 显示一致的关键。
- * @param ctx - 宿主上下文。
- * @param header - 会话 header（added 载荷的事实来源）。
- * @param blank - 会话是否为空白会话。
- * @param projections - 官方 cached 投影块（可选；缺省时只补条目，标题要等下次列表刷新）。
+ * Besides the session summary, it can carry an official **cached** projection block: the client's
+ * `handleSessionAdded` applies it via `applyCached` (session-controller/src/client/sessions/manager.ts:677),
+ * so the session list gets titles / subagent labels without a refresh — the key to keeping input-box @ and
+ * task-board @ displays consistent after restore.
+ * @param ctx - Host context.
+ * @param header - Session header (source of truth for the added payload).
+ * @param blank - Whether the session is blank.
+ * @param projections - Optional official cached projection block; when omitted, only the entry is added and
+ * titles wait for the next list refresh.
  */
 export function emitSessionAdded(
   ctx: Context,
@@ -196,8 +208,8 @@ export function emitSessionAdded(
   try {
     ctx.emit('api-session/added', {
       ...addedSummaryFor(header, blank),
-      // rc.1 起 SessionSummary 新增必填 `agentAvailable`（该会话当前是否持有 live Agent，
-      // 见 `api/session-controller/src/types.ts:177-188`）：与官方语义一致，用 agents 注册表判定。
+      // Since rc.1, SessionSummary has a required `agentAvailable` (whether the session currently holds a live
+      // Agent; see `api/session-controller/src/types.ts:177-188`): match official semantics and use the agents registry.
       agentAvailable: ctx.agents.get(header.id) !== undefined,
       ...projections === undefined ? {} : {
         projections: { kind: 'cached' as const, asOfSeq: projections.asOfSeq, values: projections.values },
@@ -209,12 +221,15 @@ export function emitSessionAdded(
 }
 
 /**
- * 取消归档：只动归档集、不碰文件（live 会话同样可取消）；随后补发「回到列表」通知。
+ * Unarchive: touch only the archived set, never files (live sessions can be unarchived too); then re-emit the
+ * "back in the list" notification.
  *
- * 补发 added 的动机：客户端 `handleSessionAdded` 即时并入会话列表，用户无需刷新页面；
- * 不发出则必须刷新——刷新会触发 dsh 把会话加载进 live store，之后「再归档 → 进回收站」会被
- * hold 守卫（ensureSessionNotLive）拦下。headers 经 header 事实缓存取，与 /list /strays 共享
- * 单飞，不单独扫盘；顺手带上 cached 投影块，回填过投影行的会话取消归档后标题立即可见。
+ * Why re-emit added: the client's `handleSessionAdded` merges the session into the list immediately, so the user
+ * does not need to refresh; without it a refresh is required — and the refresh makes dsh load the session into
+ * the live store, after which "archive again → move to trash" is blocked by the hold guard
+ * (ensureSessionNotLive). Headers come from the header facts cache, sharing the single flight with /list /strays,
+ * so this does not scan the disk separately; it also includes the cached projection block, so sessions with a
+ * seeded projection row show their titles immediately after unarchive.
  */
 export async function unarchiveSession(
   ctx: Context,
@@ -240,7 +255,8 @@ export async function unarchiveSession(
   return { ok: true }
 }
 
-/** 归档以父为单位：父 + 全部有父的子会话一并进归档集（单写链原子）。只服务游离 / 孤儿子会话。 */
+/** Archiving is parent-scoped: the parent plus all its child sessions enter the archived set together (atomic
+ *  single write chain). Only serves stray / orphan child sessions. */
 export async function archiveSessionSubtree(
   surface: RegistryMutationSurface,
   headerFacts: HeaderFactsStore<HeaderFacts>,

@@ -1,4 +1,4 @@
-/** dsh-archive-manage 纯逻辑：配置、确认强度、回收站目录、sidecar 解析。 */
+/** dsh-archive-manage pure logic: config, confirmation strength, trash directory, sidecar parsing. */
 
 import { join } from 'node:path'
 import { nestTree } from '../../tree.js'
@@ -6,7 +6,7 @@ import { SIDECAR_VERSION, TRASH_SIDECAR } from './constants.js'
 import type { LegacyTrashItem, TrashItem } from '../../session-admin.js'
 
 export { TRASH_SIDECAR }
-/** 回收站目录名（. 前缀与 DSH 官方目录区分）。 */
+/** Trash directory name (the . prefix distinguishes it from official DSH directories). */
 export const DEFAULT_TRASH_DIR = '.sessions-trash'
 
 export interface ArchiveConfig {
@@ -18,7 +18,7 @@ export interface ArchiveSubagentSidecar {
   readonly title: string
   readonly originalPath: string
   readonly workspaceIds: readonly string[]
-  /** 该子会话的父会话 id（回收站区据此还原父子层级）；旧条目无此字段 → 平铺展示。 */
+  /** Parent session id of this child session (the trash area restores the hierarchy from it); old entries lack this field → rendered flat. */
   readonly parentSessionId?: string
 }
 
@@ -29,17 +29,17 @@ export interface ArchiveSidecar {
   readonly originalPath: string
   readonly archivedAt: string
   readonly workspaceIds: readonly string[]
-  /** version 2：移入回收站时随父会话一起移动的 subagent 会话。 */
+  /** version 2: subagent sessions moved into the trash together with their parent session. */
   readonly subagents?: readonly ArchiveSubagentSidecar[]
 }
 
-/** DSH 数据主目录（$DSH_HOME 优先，缺省 ~/.dsh）。 */
+/** DSH data home directory ($DSH_HOME takes precedence, defaults to ~/.dsh). */
 function dshHomeBase(): string {
   const fallbackHome = join(process.env.USERPROFILE || process.env.HOME || '.', '.dsh')
   return process.env.DSH_HOME?.trim() || fallbackHome
 }
 
-/** 默认回收站目录的绝对路径。 */
+/** Absolute path of the default trash directory. */
 export function defaultTrashDir(): string {
   return join(dshHomeBase(), DEFAULT_TRASH_DIR)
 }
@@ -50,23 +50,23 @@ export function normalizeArchiveConfig(input: Readonly<Partial<ArchiveConfig>> |
   return { trashRoot: trash || defaultTrashDir() }
 }
 
-/** 彻底删除强确认：用户输入必须与会话当前标题逐字一致（trim 后比较）。 */
+/** Permanent-delete hard confirmation: the user input must match the session's current title exactly (compared after trim). */
 export function isDeleteConfirmationSufficient(expectedTitle: string, input: unknown): boolean {
   return typeof input === 'string' && input.trim() === expectedTitle.trim() && expectedTitle.trim() !== ''
 }
 
-/** 回收站目录 / 回收站 id 只允许大小写字母、数字、- 和 _，避免路径穿越。 */
+/** Trash directory / trash id may contain only ASCII letters, digits, - and _, to avoid path traversal. */
 export function sanitizeSegment(value: string): string {
   const safe = value.replace(/[^A-Za-z0-9_-]/gu, '_')
   return /[A-Za-z0-9]/u.test(safe) ? safe : 'unknown'
 }
 
 /**
- * 官方 jsonl 后端单会话目录名的安全判定（rc.1 布局 `<root>/<project>/<encodeSegment(id)>/`）：
- * - 普通形式：大小写字母、数字、-、_（官方生成的会话 id 为 UUID / session-<uuid> / webhook-<uuid>，直接落盘）；
- * - 官方 encodeSegment 转义形式：`~XXXX`（4 位大写十六进制）穿插在 `[A-Za-z0-9._-]` 之间
- *   （外部注入的任意会话 id——如 ACP——会被官方转义成该形式）。
- * 两种形式都不含路径分隔符与盘符冒号；`.`、`..`、空串一律拒绝（`.` 会命中转义形式字符集，须显式排除）。
+ * Safety check for an official jsonl-backend single-session directory name (rc.1 layout `<root>/<project>/<encodeSegment(id)>/`):
+ * - Plain form: ASCII letters, digits, -, _ (official session ids are UUID / session-<uuid> / webhook-<uuid> and land on disk as-is);
+ * - Official encodeSegment escape form: `~XXXX` (4 uppercase hex digits) interleaved within `[A-Za-z0-9._-]`
+ *   (any externally injected session id — e.g. ACP — is escaped by the official code into this form).
+ * Neither form contains a path separator or a drive colon; `.`, `..` and the empty string are always rejected (`.` hits the escape-form charset, so it must be excluded explicitly).
  */
 export function isSafeSessionDirName(name: string): boolean {
   if (name === '' || name === '.' || name === '..') return false
@@ -74,9 +74,9 @@ export function isSafeSessionDirName(name: string): boolean {
 }
 
 /**
- * 把 home 目录前缀掩码为 `~`（跨平台）：Windows 反斜杠与 POSIX 斜杠都处理；
- * 先精确匹配，再回退大小写不敏感匹配（Windows 大小写不敏感的盘符路径）。
- * 不在 home 下的路径原样返回。
+ * Mask the home directory prefix as `~` (cross-platform): handles both Windows backslashes and POSIX slashes;
+ * exact match first, then a case-insensitive fallback (Windows drive paths are case-insensitive).
+ * Paths outside home are returned unchanged.
  */
 export function maskHomePath(path: string, homeDir: string): string {
   const home = homeDir.replace(/[\\/]+$/u, '')
@@ -88,7 +88,7 @@ export function maskHomePath(path: string, homeDir: string): string {
   return path
 }
 
-/** 从回收站 sidecar 解析出安全的还原信息；非法输入返回 undefined。 */
+/** Parse safe restore information from a trash sidecar; invalid input returns undefined. */
 export function parseTrashSidecar(value: unknown): ArchiveSidecar | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
   const sidecar = value as Record<string, unknown>
@@ -111,8 +111,8 @@ export function parseTrashSidecar(value: unknown): ArchiveSidecar | undefined {
         title: typeof child.title === 'string' ? child.title : child.sessionId,
         originalPath: child.originalPath,
         workspaceIds: child.workspaceIds,
-        // 层级字段只影响展示：形状不对就丢掉该字段（回落平铺），不让一个畸形字段把整条
-        // 回收站条目判成不可还原（还原只依赖 originalPath）。
+        // The hierarchy field only affects display: drop it when its shape is wrong (fall back to flat)
+        // instead of letting one malformed field make the whole trash entry unrestorable (restore only needs originalPath).
         ...typeof child.parentSessionId === 'string' && child.parentSessionId.trim() !== ''
           ? { parentSessionId: child.parentSessionId }
           : {},
@@ -131,7 +131,7 @@ export function parseTrashSidecar(value: unknown): ArchiveSidecar | undefined {
   }
 }
 
-/** sidecar → 列表条目视图；v1 无子会话记录时 subagents 为空数组。 */
+/** sidecar → list-item view; when v1 has no subagent records, subagents is an empty array. */
 export function trashItemView(trashId: string, sidecar: ArchiveSidecar): TrashItem {
   return {
     trashId,
@@ -149,9 +149,9 @@ export function trashItemView(trashId: string, sidecar: ArchiveSidecar): TrashIt
 }
 
 /**
- * 从旧格式目录构造列表条目；时间取目录 mtime。
- * @param name - 回收站目录名（旧格式下即会话 id）。
- * @param mtimeMs - 目录最后修改时间（毫秒时间戳）。
+ * Build a list item from a legacy-format directory; the timestamp comes from the directory mtime.
+ * @param name - Trash directory name (equal to the session id in the legacy format).
+ * @param mtimeMs - Directory last-modified time (millisecond timestamp).
  */
 export function legacyTrashItem(name: string, mtimeMs: number): LegacyTrashItem {
   return {
@@ -165,11 +165,11 @@ export function legacyTrashItem(name: string, mtimeMs: number): LegacyTrashItem 
 }
 
 /**
- * 游离会话识别（三差集，见 docs/spec/05-stray-sessions.md）：
- * 持久化清单里有 ∧ 不在归档集 ∧ 不挂任何工作区。保持输入顺序。
- * @param persistedIds - sessionPersistence.list() 的会话 id。
- * @param archivedIds - workspace 域 archivedSessionIds。
- * @param attachedIds - 所有 workspace.sessionIds 的并集。
+ * Stray session detection (three-way set difference, see docs/spec/05-stray-sessions.md):
+ * present in the persisted list ∧ not in the archived set ∧ not attached to any workspace. Input order is preserved.
+ * @param persistedIds - Session ids from sessionPersistence.list().
+ * @param archivedIds - `archivedSessionIds` of the workspace domain.
+ * @param attachedIds - Union of all workspace.sessionIds.
  */
 export function straySessionIds(
   persistedIds: readonly string[],
@@ -182,9 +182,9 @@ export function straySessionIds(
 }
 
 /**
- * 从官方投影行解析「空白会话」信号（session_projcache 行形状：{ version, record: { identity, rows } }）：
- * blank = sessionListMetadata.blank === true 或 sessionStats.turns === 0。
- * 行缺失 / 形状异常 / 明确非空白一律返回 undefined（调用方按非空白保守对待）。
+ * Parse the "blank session" signal from an official projection row (session_projcache row shape: { version, record: { identity, rows } }):
+ * blank = sessionListMetadata.blank === true or sessionStats.turns === 0.
+ * A missing row / malformed shape / explicitly non-blank all return undefined (callers conservatively treat that as non-blank).
  */
 export function parseBlankProjection(row: unknown): { blank: true } | undefined {
   if (typeof row !== 'object' || row === null || Array.isArray(row)) return undefined
@@ -204,7 +204,7 @@ export function parseBlankProjection(row: unknown): { blank: true } | undefined 
   return undefined
 }
 
-/** 会话统计与列表元数据（展示用；v5/v6 双形状，与 parseBlankProjection 同款 record ?? outer 回退）。 */
+/** Session stats and list metadata (display only; v5/v6 dual shape, same record ?? outer fallback as parseBlankProjection). */
 export interface SessionFacts {
   readonly turns?: number
   readonly decodeTokens?: number
@@ -235,7 +235,7 @@ export function parseSessionFacts(row: unknown): SessionFacts | undefined {
   return facts
 }
 
-/** 树构建所需的 SessionHeader 结构子集（纯模块零依赖，host 侧传入真实 header）。 */
+/** Structural subset of SessionHeader needed to build the tree (pure module, zero dependencies; the host side passes the real header). */
 export interface SessionTreeHeader {
   readonly id: string
   readonly createdAt: number
@@ -249,10 +249,10 @@ export interface SessionTreeNode {
 }
 
 /**
- * 由全量会话 header 构建父子树：
- * - 子会话（origin === 'subagent' 且父在清单内）挂到父节点下，同级按 createdAt 升序；
- * - 顶层会话与孤儿子会话（父不在清单内）为根节点，按 createdAt 降序；
- * - 孤儿按顶层会话对待（无父可随，面板手动操作；）。
+ * Build the parent/child tree from the full set of session headers:
+ * - Child sessions (origin === 'subagent' and parent present in the list) hang under their parent, siblings sorted by createdAt ascending;
+ * - Top-level sessions and orphan child sessions (parent absent from the list) are roots, sorted by createdAt descending;
+ * - Orphans are treated as top-level sessions (no parent to follow; the panel handles them manually).
  */
 export function buildSessionTree(headers: readonly SessionTreeHeader[]): SessionTreeNode[] {
   const nodes = nestTree(headers, {
@@ -274,19 +274,24 @@ export interface ArchiveAlignment {
 }
 
 /**
- * 计算父子归档对齐差异（状态不变量：子镜像父）：
- * - 父已归档而子未归档 → 加入 add；
- * - 父未归档而子已归档 → 加入 remove；
- * - 孤儿子会话（父不在清单）与顶层会话不参与。
+ * Compute the parent/child archive alignment diff (state invariant: children mirror their parent):
+ * - Parent archived but child not → added to `add`;
+ * - Parent not archived but child archived → added to `remove`;
+ * - Orphan child sessions (parent absent from the list) and top-level sessions are not involved.
  *
- * 子代理自身也能再派子代理，故「子镜像父」要沿父子链传到**全部后代**：从每个顶层节点 BFS
- * 逐层把祖先的归档态传播下去（id 唯一时每个节点只访问一次，O(n)）。单趟只看一层的旧实现在多层树上
- * 只对齐一层，要靠「自己那次写又触发一轮 domain/changed」迭代收敛——把正确性押在事件链上，
- * 且面板惰性对齐每打开一次也只能推进一层。无根节点（父子成环）时无人可传播，不做任何对齐。
+ * A subagent can itself spawn further subagents, so "children mirror their parent" must travel down the
+ * parent/child chain to **all descendants**: BFS from every top-level node propagates the ancestor's archive
+ * state down level by level (each node is visited once when ids are unique, O(n)). The old implementation that
+ * looked at only one level per pass aligned a single level on multi-level trees and relied on its own write
+ * triggering another `domain/changed` round to converge — betting correctness on the event chain — and the
+ * panel's lazy alignment could only advance one level per open. With no root node (parent/child cycle) nobody
+ * can propagate, so no alignment is done at all.
  *
- * `seen` 守卫（同一批给 `collectSubtreeIds` 补的同款）：id 唯一时环必然不可达；但畸形数据里
- * 同一 id 出现两条 header 就能造出**从根可达**的环（一条挂在链尾指回祖先），没有守卫会让
- * 这个函数在宿主的 `domain/changed` 监听与 `/list` 路由里同步转不出来（2026-09-12 审计 S1）。
+ * The `seen` guard (same one added to `collectSubtreeIds` in the same batch): when ids are unique a cycle is
+ * necessarily unreachable; but in malformed data two headers sharing one id can create a cycle that is
+ * **reachable from a root** (one of them sits at the tail of the chain and points back to an ancestor), and
+ * without the guard this function would spin forever inside the host's `domain/changed` listener and the
+ * `/list` route (2026-09-12 audit S1).
  */
 export function archiveAlignmentForChildren(
   headers: readonly SessionTreeHeader[],
@@ -332,7 +337,7 @@ export function archiveAlignmentForChildren(
   return { add, remove }
 }
 
-/** 有父（父在清单内）的子会话 id 集合——这些子会话跟随父，不单独出现在游离区。 */
+/** Set of child session ids that have a parent (parent present in the list) — they follow their parent and never show up alone in the stray area. */
 export function livingChildIds(headers: readonly SessionTreeHeader[]): Set<string> {
   const byId = new Set(headers.map(header => header.id))
   const out = new Set<string>()
@@ -343,7 +348,7 @@ export function livingChildIds(headers: readonly SessionTreeHeader[]): Set<strin
   return out
 }
 
-/** 根会话及其全部后代 id（任意深度，BFS 保序、根在前；按父为单位归档 / trash / delete 时使用）。 */
+/** Root session id plus all its descendant ids (any depth, BFS order preserved, root first; used when archiving / trashing / deleting a parent as a unit). */
 export function collectSubtreeIds(headers: readonly SessionTreeHeader[], rootId: string): string[] {
   const childrenOf = new Map<string, string[]>()
   const byId = new Set(headers.map(header => header.id))
@@ -355,8 +360,8 @@ export function collectSubtreeIds(headers: readonly SessionTreeHeader[], rootId:
     childrenOf.set(header.parentSession, list)
   }
   const out: string[] = [rootId]
-  // seen 守卫：父子链由磁盘 header 决定，理论上无环；万一出现环（手工改盘 / 上游写入异常）
-  // 也不能让 BFS 转不出来——调用方是文件级移动 / 删除，卡死比少搬更糟。
+  // seen guard: the parent/child chain comes from on-disk headers and is acyclic in theory; should a cycle
+  // appear (manual disk edits / abnormal upstream writes), BFS must still terminate — callers do file-level moves / deletes, and hanging is worse than moving less.
   const seen = new Set(out)
   for (let i = 0; i < out.length; i++) {
     for (const child of childrenOf.get(out[i]) ?? []) {
@@ -369,18 +374,21 @@ export function collectSubtreeIds(headers: readonly SessionTreeHeader[], rootId:
 }
 
 /**
- * 要与根会话一起搬走 / 删掉的 subagent 会话 id：根的**全部后代**（任意深度，BFS 父在子前，不含根）。
- * 子代理自身也能再派子代理，故深度不是固定一层——只取直接子会话会漏掉更深的后代。
+ * subagent session ids to move / delete together with the root session: **all descendants** of the root
+ * (any depth, BFS with parents before children, root excluded). A subagent can spawn further subagents, so
+ * the depth is not fixed at one level — taking only direct children would miss deeper descendants.
  */
 export function subagentDescendantIds(headers: readonly SessionTreeHeader[], rootId: string): string[] {
   return collectSubtreeIds(headers, rootId).slice(1)
 }
 
 /**
- * 移入回收站 / 彻底删除后要从归档集摘除的 id：根 + **实际被搬走/删掉的子会话**（去重、根在前）。
- * 调用方传的是 `listSubagentTargets` 查到的**全部后代**（任意深度）——trash/delete 逐个搬运/删除
- * 整棵子树，故整棵子树都要出归档集；只摘直接子会话会把深度 ≥2 的后代永久留成孤儿根
- * （父已不在持久化，父子对齐也看不到它们；2026-09-12 实测）。
+ * Ids to remove from the archived set after trashing / permanently deleting: the root plus the **child
+ * sessions actually moved/deleted** (deduplicated, root first). Callers pass the **full descendant set**
+ * returned by `listSubagentTargets` (any depth) — trash/delete moves/deletes the entire subtree one by one,
+ * so the whole subtree must leave the archived set; removing only direct children would leave descendants at
+ * depth ≥2 as permanent orphan roots (their parent is no longer persisted and parent/child alignment cannot
+ * see them either; verified 2026-09-12).
  */
 export function archivedIdsToRemove(rootId: string, subagentIds: readonly string[]): string[] {
   const out: string[] = [rootId]
@@ -394,13 +402,15 @@ export function archivedIdsToRemove(rootId: string, subagentIds: readonly string
 }
 
 /**
- * header 事实缓存存储（纯逻辑供单测）：TTL 内直接返回缓存；过期后
- * 单飞填充（并发调用共享同一 promise）；invalidate 清缓存让下一次 get 重扫。
- * 安全依据：jsonl header 物化后不可变，按 id 缓存只需处理成员增减（写穿失效）。
+ * Header-facts cache store (pure logic, unit-testable): returns the cache directly within the TTL; once
+ * expired it fills single-flight (concurrent calls share one promise); invalidate clears the cache so the
+ * next get rescans. Safety basis: jsonl headers are immutable once materialized, so caching by id only needs
+ * to handle members appearing/disappearing (write-through invalidation).
  *
- * 失效代际：invalidate 作废进行中的 load——失效前启动的扫描
- * 结果不许写回缓存，否则写穿失效会被「旧成员表重新填满缓存」抵消（TTL 内持续
- * 陈旧）；作废的 promise 仍会正常落定给当时在等的调用方（快照语义），只是不缓存。
+ * Invalidation generation: invalidate voids an in-flight load — a scan started before the invalidation may
+ * not write its result back to the cache, otherwise write-through invalidation would be cancelled out by
+ * "the old member table refilling the cache" (stale for the whole TTL); a voided promise still settles
+ * normally for whoever was waiting on it (snapshot semantics), it just isn't cached.
  */
 export interface HeaderFactsStore<F> {
   get(): Promise<F>
@@ -428,7 +438,7 @@ export function createHeaderFactsStore<F>(
           }
           return value
         }).finally(() => {
-          // 只清理自己这一代：invalidate 后新 load 已顶替 inflight，旧 load 落定不得误清新代。
+          // Only clear its own generation: after invalidate a new load has already replaced inflight, so an old load settling must not clear the new generation by mistake.
           if (inflight === attempt) inflight = undefined
         })
         inflight = attempt
@@ -445,32 +455,34 @@ export function createHeaderFactsStore<F>(
 }
 
 /**
- * 官方 subagent 投影单元的值（`SubagentIdentityProjection` 的最小结构，
- * 官方 projection-types.ts:28）：判别联合（mode one-shot / continuable）+ 可选 label。
- * 本插件只关心 label 是否存在，故按最小结构断言，不复制官方的 mode 判别。
+ * Value of the official subagent projection unit (the minimal shape of `SubagentIdentityProjection`,
+ * official projection-types.ts:28): a discriminated union (mode one-shot / continuable) plus an optional label.
+ * This plugin only cares whether a label exists, so it asserts the minimal shape and does not replicate the
+ * official mode discriminant.
  */
 export interface SubagentIdentityValue {
   readonly label?: string
   /**
-   * 折叠出该 identity 的 `subagent/descriptor` 事件位置。官方用它证明描述符来自子会话
-   * **自有**后缀（`Session.isOwnSeq`，官方 list-children.ts:224-225 的自有后缀门），
-   * 而非 fork seed 里继承的祖先描述符。缺失/畸形时无法验证自有性。
+   * Position of the `subagent/descriptor` event that folded this identity. The official code uses it to prove
+   * the descriptor comes from the child session's **own** suffix (`Session.isOwnSeq`, the own-suffix gate at
+   * official list-children.ts:224-225) rather than an ancestor descriptor inherited from the fork seed.
+   * Missing/malformed means ownership cannot be verified.
    */
   readonly seq?: number
 }
 
 /**
- * 权威 identity → 标签结论。
+ * Authoritative identity → label conclusion.
  *
- * `identity` 非 null 表示官方已在这份日志上折到 subagent 描述符（官方
- * `subagent` 单元的 view = `state.identity ?? null`，projection.ts:178）；描述符
- * 一经追加即不可变（官方注释 "a descriptor is immutable once appended"）且位于子会话
- * 日志开头，因此折到一次即永久成立。label 对 one-shot 子会话是**可选**的
- * （projection-types.ts:30-33），所以「有 identity 而无 label」的正确解读是
- * 「该会话确实没有标签」，而非「还没折出来」——不该再为它重折整份日志。
+ * A non-null `identity` means the official code already folded a subagent descriptor on this log (the official
+ * `subagent` unit's view = `state.identity ?? null`, projection.ts:178); a descriptor is immutable once
+ * appended (official note "a descriptor is immutable once appended") and sits at the start of the child
+ * session's log, so folding it once holds forever. `label` is **optional** for one-shot child sessions
+ * (projection-types.ts:30-33), so the correct reading of "identity but no label" is "this session really has
+ * no label", not "not folded yet" — there is no reason to re-fold the whole log for it.
  *
- * @param identity - 官方 subagent 投影单元的值（live 快照 / 缓存行 / 日志折叠三处同形）。
- * @returns 有标签 = 标签字符串；权威无标签 = `null`；无法判定（identity 缺失或为 null）= `undefined`。
+ * @param identity - Value of the official subagent projection unit (same shape in the live snapshot / cache row / log fold).
+ * @returns With label = the label string; authoritatively no label = `null`; undeterminable (identity missing or null) = `undefined`.
  */
 export function labelFromSubagentIdentity(identity: SubagentIdentityValue | null | undefined): string | null | undefined {
   if (identity === null || typeof identity !== 'object') return undefined
@@ -479,10 +491,11 @@ export function labelFromSubagentIdentity(identity: SubagentIdentityValue | null
 }
 
 /**
- * 有上限的 LRU 缓存（纯逻辑供单测）：Map 插入序即访问序，
- * get 命中删后重插 = 移到最新；set 超上限淘汰最久未使用条目。
- * 值域不含 undefined（缺键与「值为 undefined」不可区分）；可存 null（「权威无标签」这类
- * 结论同样要被记住，否则每次都要重折日志），调用方需保证不存 undefined 值。
+ * Bounded LRU cache (pure logic, unit-testable): Map insertion order is access order,
+ * a get hit deletes and re-inserts = moves to newest; a set beyond the cap evicts the least recently used entry.
+ * The value domain excludes undefined (a missing key is indistinguishable from "value is undefined"); null is
+ * allowed (conclusions like "authoritatively no label" must be remembered too, otherwise the log would be
+ * re-folded every time), so callers must never store undefined values.
  */
 export interface LruCache<K, V> {
   get(key: K): V | undefined
@@ -516,9 +529,10 @@ export function createLruCache<K, V>(maxEntries: number): LruCache<K, V> {
 }
 
 /**
- * 可提前释放的预算信号（纯逻辑供单测）：AbortSignal.timeout 的
- * 定时器在批结束后仍活到死线（成功路径不释放）；这里改为自建 AbortController +
- * 定时器，release() 在成功与失败路径都清 timer，句柄不滞留。
+ * Budget signal that can be released early (pure logic, unit-testable): AbortSignal.timeout's timer stays
+ * alive until the deadline even after the batch ends (it isn't released on the success path); here we build our
+ * own AbortController + timer instead, and release() clears the timer on both success and failure paths, so no
+ * handle lingers.
  */
 export function createBudgetSignal(timeoutMs: number): { signal: AbortSignal; release: () => void } {
   const controller = new AbortController()
@@ -534,8 +548,9 @@ export function createBudgetSignal(timeoutMs: number): { signal: AbortSignal; re
 }
 
 /**
- * 有界并发执行（纯逻辑供单测）：至多 limit 个 worker 顺序取任务；
- * 单任务失败只在该位置记 undefined，不中断其余任务；结果与输入对齐。
+ * Bounded-concurrency execution (pure logic, unit-testable): at most `limit` workers pull tasks in order;
+ * a single task failure only records undefined at its position and does not abort the others; results stay
+ * aligned with the input.
  */
 export async function runBounded<T, R>(
   items: readonly T[],

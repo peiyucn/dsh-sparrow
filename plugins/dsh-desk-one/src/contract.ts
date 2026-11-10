@@ -1,6 +1,6 @@
 /**
- * host 与 client 共用的跨端契约（只含类型与纯常量，不得 import 运行时模块）。
- * S0 的落地对象是便签；任务 / 日程的字段按 `01-object-model.md` 逐步扩展。
+ * Cross-half contract shared by host and client (types and pure constants only; no runtime imports).
+ * S0 ships notes; task / schedule fields expand step by step per `01-object-model.md`.
  */
 
 import type { NOTE_COLORS, ScheduleChannel, ScheduleProvider, TASK_STATUSES } from './constants.js'
@@ -9,9 +9,9 @@ export type NoteColor = (typeof NOTE_COLORS)[number]
 export type TaskStatus = (typeof TASK_STATUSES)[number]
 
 /**
- * 便签对象（S0 唯一的 DeskNode kind）。字段与 spec 的 Node 基础字段对齐：
- * `id / kind / schema / title / body / tags / createdAt / updatedAt / revision` 是核心，
- * 便签特有字段（color / pinned / trashed）在 S0 直接放对象上；后续引入 payload 分层时随迁移补。
+ * Note object (the only DeskNode kind in S0). Fields align with the spec's base Node fields:
+ * `id / kind / schema / title / body / tags / createdAt / updatedAt / revision` are core;
+ * note-specific fields (color / pinned / trashed) sit on the object in S0; they are added with the payload split in a later migration.
  */
 export interface DeskNote {
   readonly id: string
@@ -22,22 +22,22 @@ export interface DeskNote {
   readonly tags: readonly string[]
   readonly color: NoteColor
   readonly pinned: boolean
-  /** 是否在垃圾桶里（轻便签的删除是先进垃圾桶，可恢复）。 */
+  /** Whether the note is in the trash (deleting a lightweight note trashes it first, recoverable). */
   readonly trashed: boolean
-  /** 便签墙自由位置（px，相对墙面画布）；缺省时界面按序号级联摆放。 */
+  /** Free position on the note wall (px, relative to the wall canvas); when absent the UI cascades by index. */
   readonly x?: number
   readonly y?: number
-  /** 便签尺寸（px）；缺省用默认尺寸，用户拖右下角改过的才写回。 */
+  /** Note size (px); defaults when absent, written back only after the user resizes from the bottom-right corner. */
   readonly width?: number
   readonly height?: number
-  /** 贴纸层级（越大越靠上）；缺省按列表顺序兜底，点/拖过才写回。 */
+  /** Sticker layer (higher is on top); falls back to list order when absent, written back only after a click/drag. */
   readonly z?: number
   readonly createdAt: string
   readonly updatedAt: string
   readonly revision: number
 }
 
-/** 边对象：S0 不产出，先占住域布局（见 constants 的说明）。 */
+/** Edge object: not produced in S0, declared now to lock the domain layout (see the note in constants). */
 export interface DeskEdge {
   readonly id: string
   readonly type: string
@@ -47,35 +47,35 @@ export interface DeskEdge {
   readonly meta?: Readonly<Record<string, unknown>>
 }
 
-/** 任务对象（S1）：固定三泳道 + 列内手动顺序，完成列可折叠、可存档。 */
+/** Task object (S1): fixed three lanes + manual order within a column; the done column can collapse and archive. */
 export interface DeskTask {
   readonly id: string
   readonly kind: 'task'
   readonly schema: number
-  /** 必填标题；任务没有一个可脱离标题的存在（详情 / 正文只是补充）。 */
+  /** Title is required; a task has no existence apart from its title (detail / body are supplementary). */
   readonly title: string
   readonly body: string
   readonly tags: readonly string[]
   readonly status: TaskStatus
-  /** 卡片颜色条；复用便签五色板。 */
+  /** Card color bar; reuses the five-color note palette. */
   readonly color: NoteColor
-  /** 截止日期（只到天）；缺省表示没有截止。 */
+  /** Due date (day granularity only); absent means no due date. */
   readonly due?: {
     readonly date: string
     readonly timezone?: string
   }
-  /** 容器内手动顺序：越大越靠后。容器 = 未分组区或某个分组。 */
+  /** Manual order within the container: larger sorts later. Container = ungrouped area or a group. */
   readonly order: number
-  /** 所属分组 id；缺省表示未分组（分组属于泳道，跨列移动卡片会移出分组）。 */
+  /** Owning group id; absent means ungrouped (groups belong to a lane, so moving a card across columns removes it from its group). */
   readonly groupId?: string
   /**
-   * 关联的 DSH 会话 id（不透明引用，可多个；一个会话也可被多张卡关联）。
-   * 会话标题 / 运行状态在客户端实时解析，不落库（避免快照过期）。
+   * Linked DSH session ids (opaque references, possibly several; one session may be linked by many cards).
+   * Session title / running state are resolved live on the client and not persisted (to avoid stale snapshots).
    */
   readonly sessionIds: readonly string[]
-  /** 存档后从板上消失，进任务板存档视图（命名避开宿主「会话归档」）。 */
+  /** Disappears from the board once archived and moves to the task-board archive view (named to avoid the host's "session archive"). */
   readonly archived: boolean
-  /** 预留：多板 / 自定义泳道后启用，S1 不写。 */
+  /** Reserved: enabled once multiple boards / custom lanes exist; not written in S1. */
   readonly projectId?: string
   readonly laneId?: string
   readonly createdAt: string
@@ -84,8 +84,8 @@ export interface DeskTask {
 }
 
 /**
- * 任务分组（S1 一层）：分组是实体，不是卡片上的标签。分组属于某个泳道，可以为空；
- * `order` 是组在所属泳道内的顺序。成员关系存于 `DeskTask.groupId`，删除分组时成员回未分组。
+ * Task group (one level in S1): a group is an entity, not a tag on a card. It belongs to a lane and may be empty;
+ * `order` is its position within that lane. Membership lives in `DeskTask.groupId`; deleting a group returns its members to ungrouped.
  */
 export interface DeskTaskGroup {
   readonly id: string
@@ -94,14 +94,14 @@ export interface DeskTaskGroup {
   readonly name: string
   readonly status: TaskStatus
   readonly order: number
-  /** 分组可整组存档（仅完成列）；存档时组内卡片一起存档。 */
+  /** A group can be archived as a whole (done lane only); archiving also archives the cards inside it. */
   readonly archived: boolean
   readonly createdAt: string
   readonly updatedAt: string
   readonly revision: number
 }
 
-/** 统一对象：存储域一张 nodes 表按 kind 判别（加 kind 只扩 schema，不改表）。 */
+/** Unified object: one `nodes` table in the storage domain, discriminated by kind (adding a kind only extends the schema, not the table). */
 /** Lightweight foreign-key index of a DSH session: no transcript, only searchable metadata. */
 export interface DeskSessionIndex {
   readonly id: string
@@ -128,16 +128,16 @@ export type DeskNode = DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource 
 /* Schedule (S2): read-only mirror of external calendars               */
 /* ------------------------------------------------------------------ */
 
-/** 同步源（连接级）：一个 provider + 通道一条；凭据值不在记录里，只存 `credentialRef` 名字。 */
+/** Sync source (connection level): one per provider + channel; no credential values in the record, only the `credentialRef` name. */
 export interface DeskScheduleSource {
   readonly id: string
   readonly kind: 'schedule-source'
   readonly schema: number
   readonly provider: ScheduleProvider
   readonly channel: ScheduleChannel
-  /** 非密账号标识（邮箱 / Apple ID / 发布日历链接的来源账号）。 */
+  /** Non-secret account identifier (email / Apple ID / the account that published the calendar link). */
   readonly account?: string
-  /** `ctx.credentials` 的引用名；值由官方凭据库保存。 */
+  /** Reference name in `ctx.credentials`; the value is kept by the official credential store. */
   readonly credentialRef?: string
   readonly enabled: boolean
   readonly syncState: 'idle' | 'syncing' | 'error'
@@ -154,7 +154,7 @@ export interface ScheduleSyncError {
   readonly at: string
 }
 
-/** 一个远端日历（同步源下的一本日历）；v1 恒只读。 */
+/** One remote calendar (a calendar under a sync source); always read-only in v1. */
 export interface DeskCalendar {
   readonly id: string
   readonly kind: 'calendar'
@@ -162,11 +162,11 @@ export interface DeskCalendar {
   readonly sourceId: string
   readonly provider: ScheduleProvider
   readonly channel: ScheduleChannel
-  /** 远端日历 id（CalDAV 的集合 URL / ICS 的日历标识）。 */
+  /** Remote calendar id (the CalDAV collection URL / the ICS calendar identifier). */
   readonly remoteId: string
   readonly displayName: string
   readonly color: string
-  /** 同源内显示顺序。 */
+  /** Display order within the same source. */
   readonly order: number
   readonly enabled: boolean
   readonly readOnly: true
@@ -178,24 +178,24 @@ export interface DeskCalendar {
   readonly revision: number
 }
 
-/** 一条日程（远端事件的镜像实例；重复事件在镜像窗口内展开成多条）。 */
+/** One schedule entry (a mirror instance of a remote event; recurring events expand into several within the mirror window). */
 export interface DeskEvent {
   readonly id: string
   readonly kind: 'event'
   readonly schema: number
-  /** 所属 `DeskCalendar` 节点的 id。 */
+  /** Id of the owning `DeskCalendar` node. */
   readonly calendarNodeId: string
   readonly provider: ScheduleProvider
   readonly channel: ScheduleChannel
   readonly calendarRemoteId: string
-  /** 唯一键的一部分：UID 或 `UID#RECURRENCE-ID`。 */
+  /** Part of the unique key: UID or `UID#RECURRENCE-ID`. */
   readonly externalId: string
   readonly uid: string
   readonly recurrenceId?: string
   readonly title: string
   readonly description?: string
   readonly location?: string
-  /** ISO 8601 UTC；全天事件用当地日边界换算后的 UTC。 */
+  /** ISO 8601 UTC; all-day events use the UTC converted from local day boundaries. */
   readonly start: string
   readonly end: string
   readonly allDay: boolean
@@ -211,13 +211,13 @@ export interface DeskEvent {
 export interface ScheduleStateResponse {
   readonly sources: readonly DeskScheduleSource[]
   readonly calendars: readonly DeskCalendar[]
-  /** 每个日历的镜像事件数（日历源栏显示；由 host 统计，客户端不重复扫全表）。 */
+  /** Mirrored event count per calendar (shown in the calendar source bar; counted by the host so the client does not rescan the whole table). */
   readonly counts: Readonly<Record<string, number>>
 }
 
 export interface ScheduleEventListResponse {
   readonly events: readonly DeskEvent[]
-  /** 实际查询窗口（ISO 8601 UTC），客户端据此展示范围。 */
+  /** The actual query window (ISO 8601 UTC); the client uses it to show the range. */
   readonly from: string
   readonly to: string
 }
@@ -234,11 +234,11 @@ export interface ScheduleCalendarUpdateRequest {
 
 export interface ScheduleConnectionInput {
   readonly provider: ScheduleProvider
-  /** 企业微信 / iCloud 的账号（邮箱或 Apple ID）。 */
+  /** WeCom / iCloud account (email or Apple ID). */
   readonly account?: string
-  /** 企业微信同步密码 / iCloud App 专用密码；只在保存时提交，不回读。 */
+  /** WeCom sync password / iCloud app-specific password; submitted only on save and never read back. */
   readonly password?: string
-  /** Outlook 个人发布日历的 ICS 链接。 */
+  /** ICS link of an Outlook personal published calendar. */
   readonly url?: string
 }
 
@@ -303,7 +303,7 @@ export interface CreateNoteRequest {
   readonly color?: string
   readonly x?: number
   readonly y?: number
-  /** 新建时直接置顶：层级由客户端按当前最大 z + 1 计算并落库。 */
+  /** Brings the new note to the top immediately: the client computes the layer as current max z + 1 and persists it. */
   readonly z?: number
 }
 
@@ -350,9 +350,9 @@ export interface CreateTaskRequest {
   readonly dueDate?: string
   readonly dueTimezone?: string
   readonly order?: number
-  /** 所属分组 id；缺省不分组。 */
+  /** Owning group id; absent means ungrouped. */
   readonly groupId?: string
-  /** 关联会话 id 列表（可多个）。 */
+  /** Linked session id list (may be multiple). */
   readonly sessionIds?: readonly string[]
 }
 
@@ -361,13 +361,13 @@ export interface TaskPatchRequest {
   readonly body?: string
   readonly status?: string
   readonly color?: string
-  /** `null` 表示清除截止日期；缺省表示不改。 */
+  /** `null` clears the due date; absent leaves it unchanged. */
   readonly due?: { readonly date: string; readonly timezone?: string } | null
   readonly order?: number
   readonly archived?: boolean
-  /** `null` 表示移出分组；缺省表示不改。 */
+  /** `null` removes it from its group; absent leaves it unchanged. */
   readonly groupId?: string | null
-  /** 替换整份关联会话列表；缺省表示不改。 */
+  /** Replaces the whole linked-session list; absent leaves it unchanged. */
   readonly sessionIds?: readonly string[]
 }
 
@@ -381,9 +381,9 @@ export interface TaskGroupMutationResponse {
 
 export interface TaskGroupMoveResponse {
   readonly group: DeskTaskGroup
-  /** 整组跨列时被一起改状态的成员任务（同列排序时为空数组）。 */
+  /** Member tasks whose status changed with the group when it crosses columns (empty array when reordering within the same column). */
   readonly tasks: readonly DeskTask[]
-  /** 移动后整表的权威分组列表（供客户端统一块序列重编号，避免额外 GET）。 */
+  /** The authoritative group list for the whole table after the move (lets the client renumber the block sequence without an extra GET). */
   readonly groups: readonly DeskTaskGroup[]
 }
 
@@ -422,7 +422,7 @@ export interface DeleteTaskGroupRequest {
 export interface ArchiveTaskGroupRequest {
   readonly id: string
   readonly expectedRevision: number
-  /** true = 存档（组 + 组内卡片），false = 恢复。 */
+  /** true = archive (group + cards inside), false = restore. */
   readonly archived: boolean
 }
 
@@ -436,7 +436,7 @@ export interface DeleteTaskRequest {
   readonly id: string
 }
 
-/** 统一错误体：与仓库其它插件的 `{ error: { code, message } }` 口径一致。 */
+/** Unified error body: matches the `{ error: { code, message } }` shape used by other plugins in the repo. */
 export interface ApiErrorPayload {
   readonly error: {
     readonly code: string

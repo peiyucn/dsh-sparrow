@@ -1,9 +1,9 @@
-/** 浏览器侧数据面：只走 host 自有 REST 路由（客户端不直接碰存储）。 */
+/** Browser-side data surface: goes only through the host's own REST routes (the client never touches storage directly). */
 
 import { REQUEST_TIMEOUT_MS, ROUTES } from '../../constants.js'
 import type { ApiErrorPayload, DeskNote, NoteDeleteResponse, NoteListResponse, NoteMutationResponse } from '../../contract.js'
 
-/** 带超时的 JSON 请求；非 2xx 抛带服务端 message 的错误（失败路径用户可见）。 */
+/** JSON request with a timeout; non-2xx throws an error carrying the server message (the failure path is user-visible). */
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { ...init, signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
   const text = await response.text()

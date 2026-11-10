@@ -56,7 +56,7 @@ const taskSchema = z.object({
   groupId: z.string().optional(),
   // Linked DSH sessions (opaque ids). Old records default to [] without migration.
   sessionIds: z.array(z.string().min(1)).max(MAX_TASK_SESSIONS).default([]),
-  // "存档" (archive) is a task-board concept; naming chosen to avoid the host's session archive.
+  // "Archive" is a task-board concept; this naming was chosen to avoid colliding with the host's session archive.
   archived: z.boolean().default(false),
   projectId: z.string().optional(),
   laneId: z.string().optional(),

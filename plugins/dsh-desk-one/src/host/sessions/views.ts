@@ -1,4 +1,4 @@
-/** 只读视图的 DTO 组装：GET /list 的归档树与 GET /strays 的游离会话清单。 */
+/** DTO assembly for the read-only views: GET /list's archive tree and GET /strays's stray-session list. */
 
 import { basename } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -20,7 +20,7 @@ import { readStrayBlankness, sessionFacts } from './projection.js'
 import { sessionDirectoryFor } from './session-files.js'
 import { subagentLabels, titlesFor } from './titles.js'
 
-/** GET /list：归档区父子树（标题三档 + 子会话标签，展示事实取官方投影）。 */
+/** GET /list: the archive parent/child tree (three-tier titles + child-session labels; display facts come from the official projection). */
 export async function archiveTreePayload(
   ctx: Context,
   headerFacts: HeaderFactsStore<HeaderFacts>,
@@ -32,12 +32,12 @@ export async function archiveTreePayload(
   const tree = buildSessionTree(archivedHeaders.map(treeHeaderOf))
   const ids = treeIds(tree)
   const workspaceIds = workspaceIndexFor(ctx.workspaceRegistry.list())
-  // 标题三档（live 投影 → 冷缓存 → 有界折叠兜底），不再整树全日志折叠。
+  // Three-tier titles (live projection → cold cache → bounded-collapse fallback); no longer folds every log of the whole tree.
   const treeHeaders = ids
     .map(id => byId.get(id))
     .filter((header): header is SessionHeader => header !== undefined)
   const titles = await titlesFor(ctx, treeHeaders, header => header.id)
-  // 子会话标签走官方 subagent 投影（标题单元对种子会话取到父消息，2026-09-02 实测）。
+  // Child-session labels use the official subagent projection (measured 2026-09-02: for a seed session the title unit resolves to the parent message).
   const childHeaders = treeHeaders.filter(header => header.origin === 'subagent')
   const childLabels = childHeaders.length > 0
     ? await subagentLabels(ctx, childHeaders)
@@ -71,7 +71,7 @@ export async function archiveTreePayload(
   return { tree: tree.map(nodeOf) }
 }
 
-/** GET /strays：不在归档集、也不挂任何工作区的会话（有父的子会话跟随父，不单独出现）。 */
+/** GET /strays: sessions that are neither archived nor attached to any workspace (a child session follows its parent and does not appear separately). */
 export async function strayItemsPayload(
   ctx: Context,
   headerFacts: HeaderFactsStore<HeaderFacts>,
@@ -79,15 +79,15 @@ export async function strayItemsPayload(
   const { headers, sizes } = await headerFacts.get()
   const archivedIds = await readArchivedIds(ctx)
   const attachedIds = ctx.workspaceRegistry.list().flatMap(workspace => workspace.sessionIds.map(id => String(id)))
-  // 有父的子会话跟随父、不单独出现在游离区；孤儿子会话（父不在）按顶层对待并打 orphan 标。
+  // A child with a parent follows the parent and is not listed separately as stray; an orphan child (parent absent) is treated as top-level and flagged orphan.
   const children = livingChildIds(headers.map(treeHeaderOf))
   const strayIds = straySessionIds(
     headers.map(header => String(header.id)),
     archivedIds.map(id => String(id)),
     attachedIds,
   ).filter(id => !children.has(id))
-  // 先取游离 header 集，标题/子标签批量三档（缓存优先 + 有界折叠），不再逐会话串行全日志折叠。
-  // 审计（host.ts 旧 :1013 的 O(K·S)）：成员判定先建一次 Set，避免逐 header 对 strayIds 做线性 includes。
+  // Collect the stray header set first; titles / child labels resolve in three tiers in batch (cache first + bounded collapse), no longer folding full logs serially per session.
+  // Audit (the O(K·S) at old host.ts :1013): build the membership Set once instead of a linear includes over strayIds per header.
   const strayIdSet = new Set(strayIds)
   const strayHeaders = headers.filter(header => strayIdSet.has(String(header.id)))
   const titles = await titlesFor(ctx, strayHeaders, header => header.id)

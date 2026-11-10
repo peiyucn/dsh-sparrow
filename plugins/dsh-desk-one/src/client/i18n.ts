@@ -1,4 +1,4 @@
-/** 本插件的 locale 字典（zh/en）。键集必须一一对应（structure.test 守卫）。 */
+/** Locale dictionaries for this plugin (zh/en). The key sets must correspond one-to-one (guarded by structure.test). */
 
 export const LOCALE_DICTS = {
   zh: {

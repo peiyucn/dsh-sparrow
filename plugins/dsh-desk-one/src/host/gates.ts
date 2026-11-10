@@ -1,6 +1,6 @@
 /**
- * host half 的启动门：宿主能力自检。任一门不通过即抛错 —— cordis 逐插件捕获 `apply` 异常并
- * 标 inactive，不影响 dsh 本体。
+ * Host-half startup gates: host capability self-check. Any failing gate throws — cordis catches `apply`
+ * exceptions per plugin and marks it inactive without affecting dsh itself.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-tools'
 import { assertCapabilities } from '../compat.js'
 import { PACKAGE_NAME } from '../constants.js'
 
-/** 本插件依赖的三个宿主面：REST 路由、存储域、agent 工具注册。 */
+/** The three host surfaces this plugin depends on: REST routes, the storage domain, and agent tool registration. */
 export function assertHostGates(ctx: Context): void {
   const storageDomain = (ctx as unknown as { storageDomain?: { open?: unknown } }).storageDomain
   const tools = (ctx as unknown as { tools?: { register?: unknown } }).tools

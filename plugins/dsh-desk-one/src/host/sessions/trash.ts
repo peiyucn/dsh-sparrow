@@ -1,4 +1,5 @@
-/** 回收站：目录解析、清单、还原与彻底删除。所有路径校验都保证结果落在 trashRoot 内。 */
+/** Trash: directory resolution, listing, restore, and permanent deletion. Every path check guarantees the result
+ *  stays under trashRoot. */
 
 import { mkdir, readdir, readFile, rename, rm, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -30,13 +31,14 @@ export async function ensureTrashRoot(trashRoot: string): Promise<void> {
   }
 }
 
-/** 回收站目录内 subagent 子目录名必须安全（兼容官方 encodeSegment 转义形式），防 sidecar 篡改后路径穿越。 */
+/** Subagent directory names inside a trash directory must be safe (compatible with official encodeSegment escaping)
+ *  to prevent path traversal after sidecar tampering. */
 export function safeDirName(value: string): string {
   if (!isSafeSessionDirName(value)) throw new SessionsError('BAD_BODY', `非法会话目录名：${value}`)
   return value
 }
 
-/** 保证传入目录名只能落到 trashRoot 下。 */
+/** Ensure the supplied directory name can only resolve under trashRoot. */
 export function resolveTrashDir(trashRoot: string, trashId: string): string {
   const candidate = resolve(trashRoot, sanitizeSegment(trashId))
   const prefix = resolve(trashRoot)
@@ -46,7 +48,7 @@ export function resolveTrashDir(trashRoot: string, trashId: string): string {
   return candidate
 }
 
-/** 列出回收站根下符合安全命名的目录名。 */
+/** List safely named directory names under the trash root. */
 async function trashDirNames(trashRoot: string): Promise<string[]> {
   try {
     const names = await readdir(trashRoot)
@@ -56,7 +58,8 @@ async function trashDirNames(trashRoot: string): Promise<string[]> {
   }
 }
 
-/** 读回收站条目的 sidecar；无文件 / JSON 坏 / 形状不合法均 undefined（调用方按旧格式处理）。 */
+/** Read a trash entry's sidecar; missing file / bad JSON / invalid shape all yield undefined (the caller treats it
+ *  as the legacy format). */
 async function readTrashSidecar(trashDir: string): Promise<ArchiveSidecar | undefined> {
   try {
     const raw = await readFile(join(trashDir, TRASH_SIDECAR), 'utf8')
@@ -67,9 +70,10 @@ async function readTrashSidecar(trashDir: string): Promise<ArchiveSidecar | unde
 }
 
 /**
- * 回收站里全部可还原会话 id（父 + sidecar 记录的子会话）。
- * 启动清扫据此保留这些会话的投影行：它们不在持久化清单里，但仍是可还原的会话，
- * 投影行是还原后标题 / 子会话标签的唯一来源（见 projection.ts 的启动清扫说明）。
+ * All restorable session ids in the trash (parent + child sessions recorded in the sidecar).
+ * The startup sweep uses this to keep their projection rows: they are not in the persistence list, but they are
+ * still restorable sessions, and projection rows are the only source of titles / subagent labels after restore
+ * (see the startup sweep notes in projection.ts).
  */
 export async function trashedSessionIds(trashRoot: string): Promise<Set<string>> {
   const ids = new Set<string>()
@@ -87,7 +91,7 @@ async function listTrashItems(trashRoot: string): Promise<TrashEntry[]> {
   const items: TrashEntry[] = []
   for (const name of names) {
     const dir = resolveTrashDir(trashRoot, name)
-    // 无合法 sidecar：按旧格式目录收纳（只列/删，不可还原）。
+    // No valid sidecar: treat it as a legacy-format directory (list/delete only, no restore).
     const sidecar = await readTrashSidecar(dir)
     if (sidecar !== undefined) {
       items.push(trashItemView(name, sidecar))
@@ -97,7 +101,7 @@ async function listTrashItems(trashRoot: string): Promise<TrashEntry[]> {
       const info = await stat(dir)
       if (info.isDirectory()) items.push(legacyTrashItem(name, info.mtimeMs))
     } catch {
-      // 目录不存在或不可读：跳过，不让列表挂死。
+      // Directory missing or unreadable: skip it so the list does not hang.
     }
   }
   return items.sort((left, right) => String((right as { archivedAt?: string }).archivedAt ?? '').localeCompare(String((left as { archivedAt?: string }).archivedAt ?? '')))
@@ -108,11 +112,13 @@ export async function listTrashPayload(trashRoot: string): Promise<TrashListResp
 }
 
 export function trashDirPayload(trashRoot: string): TrashDirResponse {
-  // 面板提示信息用：明示回收站实际存放位置（卸载影响可见化）；displayPath 掩码 home 前缀（~）。
+  // For the panel hint: show where the trash actually lives (makes uninstall impact visible); displayPath masks
+  // the home prefix (~).
   return { path: trashRoot, displayPath: maskHomePath(trashRoot, homedir()) }
 }
 
-/** 按 sidecar 还原单个回收站条目（移动回原处 + 工作区记账 + 归档集回填）。 */
+/** Restore one trash entry according to its sidecar (move back to the original location + workspace accounting +
+ *  archived-set reinsertion). */
 export async function restoreTrashDir(ctx: Context, surface: RegistryMutationSurface, trashDir: string): Promise<ArchiveSidecar> {
   let sidecar: ArchiveSidecar | undefined
   try {
@@ -124,8 +130,9 @@ export async function restoreTrashDir(ctx: Context, surface: RegistryMutationSur
   if (sidecar === undefined) {
     throw new SessionsError('BAD_BODY', '回收站条目 sidecar 无效', 404)
   }
-  // sidecar 校验：originalPath 必须是「绝对路径 + 安全命名的单层目录」（兼容官方 encodeSegment 转义形式），
-  // 防被篡改后把回收站条目 rename 到任意位置。
+  // Sidecar validation: originalPath must be "an absolute path + a safely named single-level directory"
+  // (compatible with official encodeSegment escaping) to prevent a tampered sidecar from renaming the trash
+  // entry to an arbitrary location.
   if (!isAbsolute(sidecar.originalPath)
     || dirname(sidecar.originalPath) === sidecar.originalPath
     || !isSafeSessionDirName(basename(sidecar.originalPath))) {
@@ -135,15 +142,19 @@ export async function restoreTrashDir(ctx: Context, surface: RegistryMutationSur
   if (ctx.sessions.get(sessionId) !== undefined || ctx.agents.get(sessionId) !== undefined) {
     throw new SessionsError('SESSION_LIVE', '该会话仍被 dsh 进程占用（未释放），不能重复还原')
   }
-  // 格式门为什么**不**装在这里（与 host/session-files.ts 的 trash / delete 不对称，是有意的）：
-  // ① 宿主级门已在 apply() 开头由 assertHostCompatible 把住 —— 宿主会话格式不在支持集里时
-  //    整个插件早已自停用，本函数根本不会被调用；
-  // ② trash / delete 那里的逐 header 门（assertHeaderFormatSupported）针对的是「磁盘上混着
-  //    旧代文件」，而**还原是撤销我们自己刚才那次移动**：把目录 rename 回 sidecar.originalPath，
-  //    不解析任何会话内容，因此没有「认错格式 ⇒ 丢数据」的通路；
-  // ③ 反过来，在这里加门会**把用户自己的撤销动作锁死** —— 回收站里躺着的旧代会话将永远
-  //    无法还原（那时用户唯一的选择只剩彻底删除）。撤销路径必须始终可走。
-  // sidecar 也不记录会话格式版本（见 archive.ts 的 ArchiveSidecar），本来就没有可判据。
+  // Why the format gate is deliberately **not** installed here (the asymmetry with trash / delete in
+  // host/session-files.ts is intentional):
+  // ① The host-level gate is already enforced at the top of apply() by assertHostCompatible — when the host
+  //    session format is outside the supported set, the whole plugin has already disabled itself and this
+  //    function is never called;
+  // ② the per-header gate in trash / delete (assertHeaderFormatSupported) targets "old-generation files mixed
+  //    onto disk", whereas **restore undoes the move we just performed**: it renames the directory back to
+  //    sidecar.originalPath without parsing any session content, so there is no "misread format ⇒ data loss" path;
+  // ③ conversely, adding a gate here would **lock out the user's own undo action** — old-generation sessions
+  //    sitting in the trash could never be restored (leaving permanent deletion as the only option). The undo path
+  //    must always remain available.
+  // The sidecar does not record a session format version either (see ArchiveSidecar in archive.ts), so there is
+  // no criterion to test in the first place.
 
   const subagentTargets = (sidecar.subagents ?? []).map(child => {
     const childId = SessionId(child.sessionId)
@@ -171,16 +182,18 @@ export async function restoreTrashDir(ctx: Context, surface: RegistryMutationSur
     targetDirExists = true
   } catch (error) {
     if (error instanceof SessionsError) throw error
-    // 目录不存在可继续；其他读取错误由后续 rename 报出。
+    // A missing directory is fine; other read errors surface from the subsequent rename.
   }
   if (targetDirExists) {
     await rm(sidecar.originalPath, { recursive: true, force: false })
   }
   await rename(trashDir, sidecar.originalPath)
-  // 记账 sidecar 在回收站目录里，上面这次 rename 会把它一起带回会话目录：它是回收站元数据
-  // （含标题与原工作区记账 id），留在用户数据目录里只会被官方日志导出/打包捎带。**紧跟 rename 清理**：
-  // 排在 subagent 移回之前，因为那条路径失败会直接抛出，放在末尾的清理就再也不会执行（审计 S2）；
-  // 此刻条目已被 rename 走，删它不会把回收站条目退化成「无 sidecar 的旧格式条目」。删不掉只告警。
+  // The accounting sidecar lives in the trash directory, so the rename above carries it back into the session
+  // directory: it is trash metadata (including the title and original workspace accounting ids), and leaving it in
+  // the user data directory would only get it swept into official log exports/packages. **Clean it up right after
+  // the rename**: before moving subagents back, because that path throws on failure and a cleanup placed at the end
+  // would never run (audit S2). At this point the entry has been renamed away, so deleting it cannot degrade the
+  // trash entry into "a legacy entry without a sidecar". If deletion fails, only log a warning.
   try {
     await rm(join(sidecar.originalPath, TRASH_SIDECAR), { force: true })
   } catch (error) {
@@ -191,14 +204,15 @@ export async function restoreTrashDir(ctx: Context, surface: RegistryMutationSur
       await mkdir(dirname(target.originalPath), { recursive: true })
       await rename(join(sidecar.originalPath, 'subagents', safeDirName(basename(target.originalPath))), target.originalPath)
     } catch (error) {
-      // 父目录已移回，属「已还原但 subagent 未移回」——明确提示，避免重试撞 TARGET_EXISTS。
+      // The parent is already back: this is "restored, but the subagent was not moved back" — say so explicitly
+      // so a retry does not hit TARGET_EXISTS.
       throw new SessionsError('IO_ERROR', `父会话已还原，但 subagent 会话目录移回失败（${String(target.childId)}，请勿重复还原）：${error instanceof Error ? error.message : String(error)}`, 500)
     }
   }
   try {
     await rm(join(sidecar.originalPath, 'subagents'), { recursive: true, force: false })
   } catch {
-    // subagents 目录不存在时忽略。
+    // Ignore a missing subagents directory.
   }
   try {
     await attachWorkspaceAccounting(ctx, sessionId, sidecar.workspaceIds)
@@ -210,7 +224,8 @@ export async function restoreTrashDir(ctx: Context, surface: RegistryMutationSur
       }
     }
   } catch (error) {
-    // 目录已移回，属「已还原但记账失败」——明确提示，避免重试撞 TARGET_EXISTS。
+    // The directory is already back: this is "restored, but accounting failed" — say so explicitly so a retry
+    // does not hit TARGET_EXISTS.
     throw new SessionsError('IO_ERROR', `会话已还原，但工作区记账失败（请勿重复还原）：${error instanceof Error ? error.message : String(error)}`, 500)
   }
   try {
@@ -222,9 +237,10 @@ export async function restoreTrashDir(ctx: Context, surface: RegistryMutationSur
 }
 
 /**
- * 彻底删除回收站条目后失效它们的投影行（父 + sidecar 记录的子会话）。
- * 回收站期间这些行被启动清扫**保留**（见 projection.ts），所以删除时必须由这里收尾，
- * 否则持久化里已不存在的会话会留下永远读不到的投影行。
+ * Invalidate projection rows for permanently deleted trash entries (parent + child sessions in the sidecar).
+ * These rows were **preserved** by the startup sweep while the sessions were in the trash (see projection.ts),
+ * so deletion must clean them up here; otherwise sessions absent from persistence would leave projection rows
+ * that can never be read again.
  */
 async function invalidateTrashProjectionRows(ctx: Context, sidecar: ArchiveSidecar | undefined): Promise<void> {
   if (sidecar === undefined) return
@@ -234,7 +250,7 @@ async function invalidateTrashProjectionRows(ctx: Context, sidecar: ArchiveSidec
   }
 }
 
-/** 彻底删除单个回收站条目（目录不存在 / 不是目录 → 404）。 */
+/** Permanently delete a single trash entry (missing directory / not a directory → 404). */
 export async function deleteTrashEntry(ctx: Context, trashRoot: string, trashId: string): Promise<TrashDeleteResponse> {
   const trashDir = resolveTrashDir(trashRoot, trashId)
   let info
@@ -252,13 +268,14 @@ export async function deleteTrashEntry(ctx: Context, trashRoot: string, trashId:
   return { ok: true, trashId }
 }
 
-/** 「全部还原」的结果：响应体 + 供路由在响应后后台回填投影行的会话 id（根 + 子会话，按还原顺序）。 */
+/** Result of "restore all": the response body + session ids (roots + children, in restore order) for the route
+ *  to seed projection rows in the background after responding. */
 interface RestoreAllResult {
   readonly body: TrashRestoreAllResponse
   readonly restoredTreeIds: string[]
 }
 
-/** 全部还原：旧格式条目跳过并计数，单条失败只记录、不中断其余条目。 */
+/** Restore all: legacy entries are skipped and counted; a single failure is recorded without stopping the rest. */
 export async function restoreAllTrashItems(
   ctx: Context,
   surface: RegistryMutationSurface,
@@ -274,7 +291,8 @@ export async function restoreAllTrashItems(
     try {
       const sidecar = await restoreTrashDir(ctx, surface, dir)
       restored.push(sidecar.sessionId)
-      // 根在前、子会话按 sidecar 顺序在后：后台回填 / added 通知保持「父先于子」。
+      // Root first, then child sessions in sidecar order: background seeding / added notifications keep
+      // "parent before child".
       restoredTreeIds.push(sidecar.sessionId, ...(sidecar.subagents ?? []).map(child => child.sessionId))
     } catch (error) {
       if (error instanceof SessionsError && error.code === 'UNKNOWN_TRASH') {
@@ -287,7 +305,7 @@ export async function restoreAllTrashItems(
   return { body: { ok: true, restored, skippedLegacy, failed }, restoredTreeIds }
 }
 
-/** 全部彻底删除：逐条 stat + rm，失败条目按目录名回报。 */
+/** Permanently delete all: stat + rm one by one, reporting failed entries by directory name. */
 export async function deleteAllTrashItems(ctx: Context, trashRoot: string): Promise<TrashDeleteAllResponse> {
   const names = await trashDirNames(trashRoot)
   const failed: string[] = []

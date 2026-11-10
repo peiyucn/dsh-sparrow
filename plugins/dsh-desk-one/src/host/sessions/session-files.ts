@@ -1,6 +1,8 @@
 /**
- * 会话目录的文件级操作：定位、占用守卫、子会话目标收集，以及移入回收站 / 彻底删除的整棵搬运。
- * 只认已知的「单会话目录」后端（jsonl）；后端不提供目录时由调用方降级为 501。
+ * File-level operations on session directories: locating them, live-session guards, subagent target collection,
+ * and whole-tree moves into the trash or permanent deletion.
+ * Only known "one directory per session" backends (jsonl) are supported; when a backend provides no directory,
+ * the caller degrades to 501.
  */
 
 import { mkdir, rename, rm, rmdir, writeFile } from 'node:fs/promises'
@@ -29,14 +31,15 @@ import { ensureTrashRoot, resolveTrashDir, safeDirName } from './trash.js'
 import { readTitle } from './titles.js'
 
 /**
- * 活动会话防护：本次 dsh 运行中驻留（未释放）的会话无法被插件卸载——AgentHandle.dispose
- * 是官方 session-controller 持有且被丢弃的 teardown 能力，dsh 无公开「结束会话」
- * API（查证 0.1.2-alpha.1 源码：session / agent 常驻 live store 至进程退出），
- * 硬移目录会被后续回写重建幽灵目录。面板把这类会话在归档区内分组置灰，host 侧兜底拒绝。
+ * Live-session guard: sessions resident (not released) in the current dsh process cannot be unloaded by the plugin —
+ * AgentHandle.dispose is teardown capability held and discarded by the official session-controller, and dsh exposes
+ * no public "end session" API (verified in 0.1.2-alpha.1 sources: session / agent stay in the live store until process
+ * exit). Forcing a directory move would later be undone by write-back recreating a ghost directory. The panel groups
+ * and greys out such sessions in the archive view, with a host-side backstop rejection.
  */
 export function ensureSessionNotLive(ctx: Context, sessionId: SessionId): void {
   const agent = ctx.agents.get(sessionId)
-  // 生成中的会话不静默取消用户回合：先让用户停止生成。
+  // Do not silently cancel a user turn for a generating session: make the user stop generation first.
   if (agent !== undefined && agent.status === 'running') {
     throw new SessionsError('SESSION_LIVE', '该会话正在生成回复：请先停止生成后再移入回收站', 409)
   }
@@ -49,30 +52,36 @@ export function ensureSessionNotLive(ctx: Context, sessionId: SessionId): void {
   }
 }
 
-/** 只有已知的「单会话目录」后端（当前为 jsonl）才允许文件级移动 / 删除。 */
+/** Only known "one directory per session" backends (currently jsonl) allow file-level moves / deletes. */
 export function sessionDirectoryFor(location: { kind: string; path: string }): string | undefined {
   if (location.kind !== 'jsonl') return undefined
-  // 宿主字段漂移防御（审计 B1，2026-09-10）：path 非字符串/为空时返回 undefined，让调用方走
-  // 既有的 BACKEND_UNSUPPORTED 降级（backendSupported:false / 501），而不是 dirname(undefined) 抛穿整条路由。
+  // Defense against host field drift (audit B1, 2026-09-10): return undefined when path is not a string or is empty,
+  // so the caller takes the existing BACKEND_UNSUPPORTED fallback (backendSupported:false / 501) instead of
+  // dirname(undefined) throwing through the whole route.
   if (typeof location.path !== 'string' || location.path === '') return undefined
   const dir = dirname(location.path)
   if (!isAbsolute(dir) || dirname(dir) === dir || basename(dir) === '') return undefined
   return dir
 }
 
-/** 宿主真值格式门（请求期）：header 由宿主给出，不受「插件解析到旧版官方包」影响。
- *  不支持即拒绝——本插件的操作会移动/删除会话目录，认错格式的代价是丢数据。 */
+/** Host-truth format gate (per request): the header comes from the host and is unaffected by the plugin resolving
+ *  an old official package. Reject when unsupported — these operations move/delete session directories, and
+ *  misidentifying the format costs data. */
 export function assertHeaderFormatSupported(header: SessionHeader): void {
   const reason = unsupportedStoredFormatReason([header])
   if (reason === undefined) return
   throw new SessionsError('BACKEND_UNSUPPORTED', `${reason}；已拒绝本次操作（升级本插件后自动恢复）`, 501)
 }
 
-/** 找出某个父会话下的**全部后代** subagent 会话（任意深度）；任一会话仍被占用时不处理任何文件。
- *  子代理自身也能再派子代理（官方 header 有 `delegationDepth`，subagent 工具可嵌套），故不能只取
- *  直接子会话：深度 ≥2 的后代目录留在磁盘上，父已缺位后它们要么以孤儿根浮现在归档区根级、
- *  要么落进游离区（2026-09-12 实测：两个孙会话在其祖父会话入回收站后掉出来，用户只能逐个再操作）。
- *  headers 经 header 事实缓存取，与同请求的主 header 查表口径一致。 */
+/**
+ * Find **all descendant** subagent sessions (at any depth) under a parent session; if any session is still live,
+ * no files are touched. Subagents can spawn their own subagents (official headers carry `delegationDepth`, and the
+ * subagent tool can nest), so direct children are not enough: depth ≥2 descendant directories stay on disk, and
+ * once their parent is gone they surface either as orphan roots at the archive root or in the strays area
+ * (observed 2026-09-12: two grandchild sessions fell out after their grandparent entered the trash, forcing the
+ * user to handle each individually). Headers come from the header facts cache, matching how the primary header
+ * for the same request is looked up.
+ */
 export async function listSubagentTargets(
   ctx: Context,
   parentSessionId: SessionId,
@@ -80,12 +89,14 @@ export async function listSubagentTargets(
 ): Promise<SubagentTarget[]> {
   const { headers } = await headerFacts.get()
   const byId = new Map(headers.map(header => [String(header.id), header]))
-  // 全后代（BFS，父在子前）；id 由 subagentDescendantIds 从同一份 headers 产出，故查表不会落空。
+  // All descendants (BFS, parent before children); ids come from subagentDescendantIds over the same headers,
+  // so the lookup cannot miss.
   const descendantIds = subagentDescendantIds(headers.map(treeHeaderOf), String(parentSessionId))
   const targets: SubagentTarget[] = []
   for (const id of descendantIds) {
     const header = byId.get(id)
-    // 防御分支：上游 header 形状变化时宁可少搬一个目录，也不要在 undefined 上取字段抛穿整条路由。
+    // Defensive branch: if the upstream header shape changes, prefer skipping a directory over reading a field
+    // on undefined and throwing through the whole route.
     if (header === undefined) continue
     assertHeaderFormatSupported(header)
     const sessionId = SessionId(String(header.id))
@@ -108,7 +119,8 @@ export interface SubagentTarget {
   readonly dir: string
 }
 
-/** 移入回收站所需的父会话上下文（路由已完成格式门、占用守卫与后端检查）。 */
+/** Parent session context needed to move into the trash (the route has already done the format gate, live-session
+ *  guard, and backend check). */
 export interface SessionMoveAction {
   readonly sessionId: SessionId
   readonly sessionDir: string
@@ -117,7 +129,7 @@ export interface SessionMoveAction {
   readonly workspaceIds: readonly string[]
 }
 
-/** 彻底删除所需的父会话上下文。 */
+/** Parent session context needed for permanent deletion. */
 export interface SessionDeleteAction {
   readonly sessionId: SessionId
   readonly sessionDir: string
@@ -126,8 +138,9 @@ export interface SessionDeleteAction {
 }
 
 /**
- * 把父会话 + 全部后代目录搬进回收站：先搬父（ENOENT 明确报错），再逐个搬子目录（幽灵子目录跳过），
- * 任何失败整单回滚；成功后写 sidecar、清工作区记账与归档集、补发 removed 事件。
+ * Move the parent session plus all descendant directories into the trash: move the parent first (ENOENT is a hard
+ * error), then each child directory (ghost children are skipped); any failure rolls back the whole operation.
+ * On success, write the sidecar, clear workspace accounting and the archived set, and emit removed events.
  */
 export async function moveSessionToTrash(
   ctx: Context,
@@ -153,9 +166,11 @@ export async function moveSessionToTrash(
     await rename(action.sessionDir, trashDir)
     moved.push({ from: action.sessionDir, to: trashDir })
   } catch (error) {
-    // 根目录缺失（陈旧 header 缓存 / 已被别的操作搬走或手工删过）：没有东西可搬进回收站。
-    // 有意**不**像后代那样静默跳过——回收站条目一旦只有 sidecar 没有日志，还原就会造出一个
-    // 空会话目录，比直接报错更糟。给一条人能看懂的提示，用户可改用「彻底删除」（它宽容 ENOENT）。
+    // Root directory missing (stale header cache / already moved by another operation or deleted manually):
+    // there is nothing to move into the trash. Deliberately do **not** skip it silently the way descendants are
+    // skipped — a trash entry with a sidecar but no log would make restore create an empty session directory,
+    // which is worse than failing outright. Give a human-readable hint so the user can switch to "delete permanently"
+    // (which tolerates ENOENT).
     if ((error as NodeJS.ErrnoException)?.code === ENOENT) {
       throw new SessionsError('UNKNOWN_SESSION', '会话目录不在磁盘上（可能已被移走或删除）：没有可移入回收站的内容，请刷新面板', 404)
     }
@@ -173,10 +188,11 @@ export async function moveSessionToTrash(
         try {
           await rename(child.dir, to)
         } catch (error) {
-          // ENOENT = 目录本就不在磁盘上（陈旧 header 缓存 / 手工删过）：没有东西可搬，
-          // 跳过并继续——与 delete 分支的 ENOENT 口径一致（审计 F2），不让一个幽灵条目把
-          // 整单拖回滚、把用户永久卡在「这个树移不进回收站」。它仍留在响应/归档集清理清单里
-          // （磁盘上已无该会话，标记不该留）。其余错误照旧整单回滚。
+          // ENOENT = the directory was never on disk (stale header cache / deleted manually): nothing to move,
+          // so skip and continue — same ENOENT policy as the delete path (audit F2). A ghost entry must not roll
+          // back the whole operation and leave the user permanently stuck on "this tree cannot enter the trash".
+          // It stays in the response/archive cleanup list (the session is gone from disk, so the marker should not
+          // remain). Other errors still roll back the whole operation as before.
           if ((error as NodeJS.ErrnoException)?.code === ENOENT) {
             ctx.logger.warn(`dsh-archive-manage: subagent 会话目录不在磁盘上（${String(child.sessionId)}），已跳过搬运：${error instanceof Error ? error.message : String(error)}`)
             continue
@@ -189,14 +205,16 @@ export async function moveSessionToTrash(
           title: await readTitle(ctx, child.header, child.header.id),
           originalPath: child.dir,
           workspaceIds: workspaceIds.get(String(child.sessionId)) ?? [],
-          // 记父子链：回收站区据此还原任意深度的层级。深度 ≥2 的后代父是
-          // 中间层子会话，不记就只能平铺展示（2026-09-12 owner 实测「回收站里显示不了 >2 的树」）。
+          // Record the parent-child chain: the trash view uses it to restore hierarchies at any depth. For depth ≥2
+          // descendants the parent is an intermediate child session, and without the link they can only be shown
+          // flat (owner observed on 2026-09-12 that "trees deeper than 2 do not render in the trash").
           ...child.header.parentSession === undefined ? {} : { parentSessionId: String(child.header.parentSession) },
         })
       }
     } catch (error) {
       await rollbackMoves()
-      // 回滚成功后 trashDir 已移回原处，清掉残留的空 subagents/ 子目录（非空时保留，避免误删未移回的会话）。
+      // After a successful rollback trashDir is back in place; remove the leftover empty subagents/ subdirectory
+      // (keep it when non-empty so sessions that were not moved back are not deleted by mistake).
       await rmdir(join(action.sessionDir, 'subagents')).catch(() => undefined)
       throw new SessionsError('IO_ERROR', `移动 subagent 会话目录失败（已回滚）：${error instanceof Error ? error.message : String(error)}`, 500)
     }
@@ -217,8 +235,9 @@ export async function moveSessionToTrash(
     await rmdir(join(action.sessionDir, 'subagents')).catch(() => undefined)
     throw new SessionsError('IO_ERROR', `写入回收站 sidecar 失败（已回滚）：${error instanceof Error ? error.message : String(error)}`, 500)
   }
-  // 工作区记账 detach 是 best-effort：会话目录已移走，官方 workspace 投影对缺失 header 的
-  // 候选自动过滤、下次工作区变更时 durable 修剪（rc.1 Workspace.sessionIds 契约），失败可自愈。
+  // Detaching workspace accounting is best-effort: the session directory is already moved, and the official
+  // workspace projection filters candidates with missing headers and durably prunes them on the next workspace
+  // change (rc.1 Workspace.sessionIds contract), so a failure self-heals.
   try {
     await detachWorkspaceAccounting(ctx, sessionId)
   } catch (cleanupError) {
@@ -237,9 +256,10 @@ export async function moveSessionToTrash(
   } catch (cleanupError) {
     ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
   }
-  // 移入回收站不失效投影行：会话身份未变，还原后标题投影依然有效（否则子会话标题退化为
-  // 冷读首条用户消息 = 委派指令文本；2026-09-02 实测。
-  // 通知会话列表消费者移除条目（官方公开事件；会话目录已移走）。
+  // Moving to the trash does not invalidate projection rows: the session identity is unchanged, so the title
+  // projection remains valid after restore (otherwise subagent titles would degrade to the first user message read
+  // cold = the delegation instruction text; observed 2026-09-02).
+  // Tell session-list consumers to remove the entries (official public event; session directories are gone).
   ctx.emit('api-session/removed', sessionId)
   for (const child of subagents) {
     ctx.emit('api-session/removed', child.sessionId)
@@ -247,24 +267,28 @@ export async function moveSessionToTrash(
   return { ok: true, trashId, workspaceIds: action.workspaceIds, subagentIds }
 }
 
-/** 彻底删除父会话 + 全部后代目录；子目录删除是 best-effort，只有真正消失的才摘归档集与投影行。 */
+/** Permanently delete the parent session plus all descendant directories; child deletion is best-effort, and only
+ *  sessions that actually disappear are removed from the archived set and projection rows. */
 export async function deleteSessionTree(
   ctx: Context,
   surface: RegistryMutationSurface,
   action: SessionDeleteAction,
 ): Promise<DeleteMutationResponse> {
   const { sessionId, subagents } = action
-  // force:true 只吞 ENOENT：根目录本就不在磁盘上同样算「已消失」（与子会话同一条道理，
-  // 见下方注释），否则幽灵会话会永久留在归档面板、面板里再也清不掉（审计 S4）。
+  // force:true swallows only ENOENT: a root directory that was never on disk also counts as "gone" (same
+  // reasoning as for child sessions, see below), otherwise a ghost session would remain forever in the archive
+  // panel and could never be cleared there (audit S4).
   await rm(action.sessionDir, { recursive: true, force: true })
-  // 只有真正从磁盘上消失的子会话（含全部后代）才算 removed：rm 失败者仍在磁盘上，保留其归档标记
-  // 与工作区记账，让它在归档面板以孤儿根继续可操作（审计 S7）。
+  // Only child sessions (with all their descendants) that actually disappear from disk count as removed: a failed
+  // rm is still on disk, so keep its archive marker and workspace accounting, letting it remain actionable as an
+  // orphan root in the archive panel (audit S7).
   const deletedSubagentIds: string[] = []
   for (const child of subagents) {
     try {
-      // force:true 只吞 ENOENT——目录本就不在磁盘上同样算「已消失」，否则它会被
-      // 当成「失败、仍在磁盘上」而永久保留归档标记，成为再也删不掉的孤儿根
-      // （父目录已删，再点删除会在上面那行 rm 上整单失败）。其余错误照旧抛出、保留标记。
+      // force:true swallows only ENOENT — a directory that was never on disk also counts as "gone"; otherwise it
+      // would be treated as "failed, still on disk" and keep its archive marker forever, becoming an orphan root
+      // that can never be deleted (the parent is already gone, so clicking delete again would fail the whole
+      // operation at the rm above). Other errors still throw and keep the marker.
       await rm(child.dir, { recursive: true, force: true })
       deletedSubagentIds.push(String(child.sessionId))
     } catch (error) {
@@ -272,7 +296,8 @@ export async function deleteSessionTree(
     }
   }
   const deletedSubagentIdSet = new Set(deletedSubagentIds)
-  // 工作区记账 detach 是 best-effort（同移入回收站：官方过滤投影 + 下次变更修剪自愈）。
+  // Detaching workspace accounting is best-effort (same as moving to the trash: official projection filtering +
+  // next-change pruning self-heal).
   try {
     await detachWorkspaceAccounting(ctx, sessionId)
   } catch (cleanupError) {
@@ -296,7 +321,7 @@ export async function deleteSessionTree(
     if (!deletedSubagentIdSet.has(String(child.sessionId))) continue
     await invalidateProjectionCacheGuarded(ctx, String(child.sessionId))
   }
-  // 通知会话列表消费者移除条目（官方公开事件；会话目录已删除）。
+  // Tell session-list consumers to remove the entries (official public event; session directories are deleted).
   ctx.emit('api-session/removed', sessionId)
   for (const child of subagents) {
     if (!deletedSubagentIdSet.has(String(child.sessionId))) continue

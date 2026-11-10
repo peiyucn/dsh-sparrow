@@ -1,13 +1,14 @@
 /**
- * 浏览器信任栅栏：与官方 `isTrustedApiRequest` / `isLoopbackHostname` 同口径，纯逻辑供单测。
- * 本插件自带这道门：官方栅栏只挂在 `/api` 前缀路由上，而 webServer 的前缀匹配取最长者命中，
- * 本插件的 `/api/desk-one` 更长 ⇒ 官方那道门（含浏览器令牌鉴权）根本不会执行。
- * Host 栅栏对所有请求生效 —— DNS rebinding 伪造不了 Host；Origin 为 "null" 的不透明源拒绝。
+ * Browser trust fence: same rules as the official `isTrustedApiRequest` / `isLoopbackHostname`, pure logic for unit tests.
+ * The plugin carries this gate itself: the official fence only hangs on routes prefixed `/api`, while webServer's prefix
+ * matching picks the longest hit, and this plugin's `/api/desk-one` is longer ⇒ the official gate (including browser
+ * token auth) never runs. The Host fence applies to every request — DNS rebinding cannot forge Host; opaque origins
+ * whose Origin is "null" are rejected.
  */
 
 import { PACKAGE_NAME } from './constants.js'
 
-/** 规范化一个 Host 头 authority（hostname 小写、缺省端口去掉、IPv6 带括号）；不可解析时 undefined。 */
+/** Normalize a Host header authority (lowercase hostname, default port dropped, IPv6 in brackets); undefined when unparseable. */
 export function parseAuthority(authority: string): URL | undefined {
   try {
     return new URL(`http://${authority}`)
@@ -16,7 +17,7 @@ export function parseAuthority(authority: string): URL | undefined {
   }
 }
 
-/** 是否回环地址：`localhost`、IPv6 回环，或 127/8 的任意 IPv4。 */
+/** Whether the address is loopback: `localhost`, the IPv6 loopback, or any IPv4 in 127/8. */
 export function isLoopbackHostname(hostname: string): boolean {
   if (hostname === 'localhost' || hostname === '[::1]') return true
   const parts = hostname.split('.')
@@ -25,13 +26,13 @@ export function isLoopbackHostname(hostname: string): boolean {
     && parts.every(part => /^\d{1,3}$/.test(part) && Number(part) <= 255)
 }
 
-/** authority 规范形式：写了端口即 `hostname:port`，否则只有 `hostname`。 */
+/** Canonical authority form: `hostname:port` when a port was written, otherwise just `hostname`. */
 function canonicalAuthority(entry: string, entryUrl: URL): string {
   const port = entryUrl.port !== '' ? entryUrl.port : new URL(`https://${entry}`).port
   return port === '' ? entryUrl.hostname : `${entryUrl.hostname}:${port}`
 }
 
-/** 条目是否命中请求 authority：带端口的条目只匹配该确切 authority，不带端口的匹配该主机名任意端口。 */
+/** Whether an entry matches the request authority: entries with a port match only that exact authority, entries without a port match that hostname on any port. */
 export function isTrustedAuthority(hostUrl: URL, allowedHosts: readonly string[]): boolean {
   return allowedHosts.some((entry) => {
     const entryUrl = parseAuthority(entry)
@@ -42,7 +43,7 @@ export function isTrustedAuthority(hostUrl: URL, allowedHosts: readonly string[]
   })
 }
 
-/** 断言一条 `allowedHosts` 条目是裸 authority（`host` 或 `host:port`）。 */
+/** Assert that an `allowedHosts` entry is a bare authority (`host` or `host:port`). */
 export function assertTrustedAuthority(entry: string): void {
   const entryUrl = parseAuthority(entry)
   if (entryUrl !== undefined && canonicalAuthority(entry, entryUrl) === entry.toLowerCase()) return
@@ -78,8 +79,9 @@ function bindAddressAuthority(ctx: { get(name: string): unknown }): readonly str
 }
 
 /**
- * 回环之外的补充信任面：`webStartup.trustedHosts` 优先，旧宿主回退 `webRuntime`，再把 webServer
- * 的监听绑定地址纳入；非法条目丢弃并告警，不抛错（官方信任面异常不应让插件停用）。
+ * Extra trust surface beyond loopback: `webStartup.trustedHosts` first, falling back to `webRuntime` on older hosts,
+ * plus the webServer's listen bind address; invalid entries are dropped with a warning instead of throwing (a broken
+ * official trust surface should not disable the plugin).
  */
 export function officialTrustedHosts(ctx: {
   get(name: string): unknown
@@ -104,7 +106,7 @@ export function officialTrustedHosts(ctx: {
   return trusted
 }
 
-/** 与官方同口径的请求检查：Host 必须回环或命中信任面，且不得跨站 / 异源。 */
+/** Request check with the same rules as the official one: Host must be loopback or hit the trust surface, and must not be cross-site / cross-origin. */
 export function isTrustedPluginRequest(
   headers: { host?: string; origin?: string; 'sec-fetch-site'?: string },
   allowedHosts: readonly string[] = [],

@@ -1,6 +1,6 @@
 /**
- * 12 条 REST 路由的请求校验与分发：信任栅栏 → 表驱动匹配 → 请求层校验 → 域模块执行 → 统一错误收口。
- * 业务实现在 host/ 各域模块；本文件只关心 HTTP 形状与 contract.ts 的请求 / 响应 DTO。
+ * Request validation and dispatch for the 12 REST routes: trust fence → table-driven match → request-level validation → domain module execution → unified error funnel.
+ * Business logic lives in the host/ domain modules; this file only cares about HTTP shape and the request / response DTOs in contract.ts.
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -42,7 +42,7 @@ import {
 import { readTitle } from './titles.js'
 import { archiveTreePayload, strayItemsPayload } from './views.js'
 
-/** 一次请求可用的 host 装配件。 */
+/** Host wiring available to a single request. */
 export interface ArchiveRouteContext {
   readonly ctx: Context
   readonly settings: ArchiveConfig
@@ -72,14 +72,14 @@ export function createSessionRoutes(deps: ArchiveRouteContext): readonly Session
   }))
 }
 
-/** 请求体里的 id 字段：非空字符串，否则 400。保留原值（是否 trim 由各路由自己决定）。 */
+/** id field in the request body: a non-empty string, otherwise 400. The original value is kept (each route decides whether to trim). */
 function requireNonEmptyString(value: unknown, message: string): string {
   if (typeof value !== 'string' || value.trim() === '') throw new SessionsError('BAD_BODY', message)
   return value
 }
 
 async function listRoute(route: ArchiveRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
-  // /list 是「用户打开面板」的信号：先补跑启动三项扫描，再做惰性父子对齐，保证首屏是清扫后的结果。
+  // /list is the "user opened the panel" signal: run the three startup scans first, then lazily align parent/child state so the first screen shows the cleaned-up result.
   route.startup.run()
   await alignChildArchives(route.ctx, route.surface, route.headerFacts)
   const body = await archiveTreePayload(route.ctx, route.headerFacts)
@@ -101,7 +101,7 @@ async function trashDirRoute(route: ArchiveRouteContext, _req: IncomingMessage, 
 }
 
 async function unarchiveRoute(route: ArchiveRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  // 取消归档：只动归档集、不碰文件——live 会话（被 dsh hold）同样可取消归档；幂等。
+  // Unarchive: only touches the archived set, never files — live sessions (held by dsh) can be unarchived too; idempotent.
   const parsed = bodyObject<UnarchiveRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
   const sessionId = SessionId(requireNonEmptyString(parsed.sessionId, 'sessionId 必须是非空字符串'))
   const body = await unarchiveSession(route.ctx, route.surface, route.headerFacts, sessionId)
@@ -109,8 +109,8 @@ async function unarchiveRoute(route: ArchiveRouteContext, req: IncomingMessage, 
 }
 
 async function archiveRoute(route: ArchiveRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  // 归档以父为单位——父 + 全部有父的子会话一并进归档集（单写链原子）。
-  // 只服务游离/孤儿子会话（官方菜单覆盖不到）；官方归档的父由 domain/changed 对齐补子。
+  // Archiving is parent-scoped — the parent plus every child session enters the archived set (atomic in a single write chain).
+  // Only serves stray/orphan child sessions (the official menu cannot reach them); children of officially archived parents are aligned by domain/changed.
   const parsed = bodyObject<ArchiveRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
   const rootId = requireNonEmptyString(parsed.sessionId, 'sessionId 必须是非空字符串').trim()
   const body = await archiveSessionSubtree(route.surface, route.headerFacts, rootId)
@@ -140,7 +140,7 @@ async function sessionTrashOrDeleteRoute(
   if (header === undefined) {
     throw new SessionsError('UNKNOWN_SESSION', '会话持久化中没有这个会话', 404)
   }
-  // 宿主真值格式门（请求期，先于任何文件操作）。
+  // Host-truth format gate (request time, before any file operation).
   assertHeaderFormatSupported(header)
   const title = await readTitle(ctx, header, header.id)
   const strayBlank = isStray && readStrayBlankness(ctx, String(sessionId))
@@ -191,10 +191,11 @@ async function restoreRoute(route: ArchiveRouteContext, req: IncomingMessage, re
   const trashId = requireNonEmptyString(parsed.trashId, 'trashId 必须是非空字符串')
   const trashDir = resolveTrashDir(route.settings.trashRoot, trashId)
   const sidecar = await restoreTrashDir(route.ctx, route.surface, trashDir)
-  // 还原把会话目录移回持久化：立即失效 header 缓存，后续读取才看得到它们。
+  // Restore moves session directories back into persistence: invalidate the header cache immediately so later reads can see them.
   route.headerFacts.invalidate()
-  // 回收站期间投影行可能已被旧版启动清扫删掉：读回冷日志经官方 coldSnapshot 重建，
-  // 再补发带 cached 投影块的 added——输入框 @ 与任务板 @ 因此都能显示标题 / 子会话标签。
+  // Projection rows may have been removed by an older startup sweep while in the trash: read the cold logs back and rebuild
+  // through the official coldSnapshot, then emit added with cached projection blocks — so both the input-box @ and task-board @
+  // can show titles / sub-session labels.
   await finalizeRestoredSessions(route.ctx, [
     sidecar.sessionId,
     ...(sidecar.subagents ?? []).map(child => child.sessionId),
@@ -210,8 +211,8 @@ async function restoreAllRoute(route: ArchiveRouteContext, req: IncomingMessage,
   const { body, restoredTreeIds } = await restoreAllTrashItems(route.ctx, route.surface, route.settings.trashRoot)
   route.headerFacts.invalidate()
   sendJson(res, 200, body satisfies TrashRestoreAllResponse)
-  // 「全部还原」可能一次恢复几十个条目（实测 43 条 / 139 MB）：投影回填放响应后台跑，
-  // 不阻塞操作；跑不完的部分由下次启动修复补齐（见 projection-seed.ts）。
+  // "Restore all" may restore dozens of entries at once (measured: 43 entries / 139 MB): projection backfill runs in the background after the response,
+  // without blocking the operation; unfinished parts are completed by the next startup repair (see projection-seed.ts).
   if (restoredTreeIds.length > 0) {
     void finalizeRestoredSessions(route.ctx, restoredTreeIds, PROJECTION_SEED_BACKGROUND_BUDGET_MS).catch((error: unknown) => {
       route.ctx.logger.warn(`dsh-archive-manage: 全部还原后的投影行回填失败：${error instanceof Error ? error.message : String(error)}`)
@@ -228,7 +229,7 @@ async function deleteAllRoute(route: ArchiveRouteContext, req: IncomingMessage, 
   sendJson(res, 200, body satisfies TrashDeleteAllResponse)
 }
 
-/** 路由表：method + 精确路径 → 处理器（`/trash` 同时承载 GET 列表与 POST 移入）。 */
+/** Route table: method + exact path → handler (`/trash` serves both GET list and POST move-to-trash). */
 const ROUTE_TABLE: readonly { readonly method: string; readonly path: string; readonly handle: RouteHandler }[] = [
   { method: 'GET', path: ROUTES.list, handle: listRoute },
   { method: 'GET', path: ROUTES.strays, handle: straysRoute },

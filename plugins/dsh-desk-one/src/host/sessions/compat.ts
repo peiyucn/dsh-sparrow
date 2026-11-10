@@ -1,5 +1,5 @@
 /**
- * 宿主兼容自检（根 AGENTS《插件与宿主兼容》）：宿主契约不认识时**自停用**，判定与文案是纯逻辑，供单测。
+ * Host compatibility self-check (root AGENTS "Plugin-host compatibility"): **self-disable** when the host contract is unrecognized; the decision and message are pure logic for unit tests.
  */
 
 import * as dshSessionSurface from '@deepseek-ai/dsh-session'
@@ -11,13 +11,15 @@ export { assertCapabilities, missingCapabilities } from '../../compat.js'
 export type { HostCapability } from '../../compat.js'
 
 /**
- * 本插件构建时对齐的 dsh 会话格式版本集合（单调整数）。认错格式的代价是丢数据 —— 本插件按**目录**
- * 移动/删除会话文件，故只声明已知可安全处理的版本。0.1.5 起 `list()/stat()` 返回的 header 已被
- * 持久化层翻译成当前逻辑版本，本门判的是「宿主契约代」而非磁盘物理代。
+ * Set of dsh session-format versions this plugin was built against (monotonic integers). Misjudging the format
+ * costs data — the plugin moves/deletes session files at the **directory** level, so it declares only versions it
+ * knows are safe to handle. Since 0.1.5 the headers returned by `list()/stat()` are already translated to the
+ * current logical version by the persistence layer, so this gate judges the host-contract generation, not the
+ * physical on-disk generation.
  */
 export const SUPPORTED_SESSION_FORMAT_VERSIONS: readonly number[] = [0, 3, 4]
 
-/** 宿主会话格式是否可安全处理；不可时返回可直接进日志的原因。 */
+/** Whether the host session format is safe to handle; when it is not, returns a reason fit for logging. */
 export function unsupportedSessionFormatReason(
   version: unknown,
   supported: readonly number[] = SUPPORTED_SESSION_FORMAT_VERSIONS,
@@ -28,8 +30,9 @@ export function unsupportedSessionFormatReason(
 }
 
 /**
- * 宿主**真值**格式门：以宿主给出的会话 header 的 `version` 为准（插件里的 `@deepseek-ai/dsh-session`
- * 可能解析到自己的 peer 副本、常量探针读到旧值而误判兼容；header 由宿主产生，不受影响）。
+ * Host **source-of-truth** format gate: trust the `version` on the session header the host supplies (inside the
+ * plugin, `@deepseek-ai/dsh-session` may resolve to its own peer copy and a constant probe would read a stale
+ * value and wrongly report compatibility; headers are produced by the host and unaffected).
  */
 export function unsupportedStoredFormatReason(
   headers: readonly { readonly version?: unknown }[],
@@ -43,14 +46,15 @@ export function unsupportedStoredFormatReason(
 }
 
 /**
- * 宿主上报的会话格式版本。用**命名空间访问**而非具名导入：官方删除/改名该导出时这里只得到 `undefined`
- * （不支持 → 自停用），而不是 ESM 链接期失败（链接期失败不在插件容器的异常保护范围内）。
+ * Session format version reported by the host. Uses **namespace access** rather than a named import: if the official
+ * side removes/renames that export, this only yields `undefined` (unsupported → self-disable) instead of an ESM
+ * link-time failure (link-time failures are outside the plugin container's exception protection).
  */
 export function hostSessionFormatVersion(): unknown {
   return (dshSessionSurface as { readonly SESSION_FORMAT_VERSION?: unknown }).SESSION_FORMAT_VERSION
 }
 
-/** 启动自检：宿主会话格式不在支持集合内即抛错（自停用），抛错前先记面向用户的告警。 */
+/** Startup self-check: throw (self-disable) when the host session format is outside the supported set, logging a user-facing warning first. */
 export function assertHostCompatible(
   ctx: { logger: { warn(message: string): void } },
   pluginName: string,

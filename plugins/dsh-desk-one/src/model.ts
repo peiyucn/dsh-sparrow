@@ -1,7 +1,8 @@
 /**
- * 统一对象模型的纯逻辑（不 import Node / 浏览器 API，`node:test` 可直接驱动）：
- * 输入归一化、对象创建、补丁与乐观并发、排序与过滤。
- * 便签墙形态下 body 是唯一内容；title 由正文首行派生，保留给 agent 工具与列表展示。
+ * Pure logic of the unified object model (imports no Node / browser API, so `node:test` can drive it directly):
+ * input normalization, object creation, patching with optimistic concurrency, sorting and filtering.
+ * On the note wall the body is the only content; title is derived from the body's first line and kept for the
+ * agent tools and list display.
  */
 
 import {
@@ -14,19 +15,19 @@ export type DeskModelErrorCode =
   | 'INVALID_NOTE'
   | 'REVISION_CONFLICT'
   | 'UNKNOWN_NOTE'
-  /** 便签墙已达 100 张上限（产品约束，见 constants.MAX_ACTIVE_NOTES）。 */
+  /** The note wall has reached its 100-note cap (product constraint, see constants.MAX_ACTIVE_NOTES). */
   | 'NOTE_LIMIT'
-  /** 垃圾桶已达 200 张上限，必须先清空（见 constants.MAX_TRASH_NOTES）。 */
+  /** The trash has reached its 200-note cap and must be emptied first (see constants.MAX_TRASH_NOTES). */
   | 'TRASH_FULL'
   | 'INVALID_TASK'
   | 'UNKNOWN_TASK'
   | 'INVALID_GROUP'
   | 'UNKNOWN_GROUP'
-  /** 日程模块：入参校验失败 / 未知日历（S2）。 */
+  /** Schedule module: input validation failure / unknown calendar (S2). */
   | 'INVALID_SCHEDULE'
   | 'UNKNOWN_CALENDAR'
 
-/** 模型层错误：路由据此映射 HTTP 状态（400 / 409 / 404）。 */
+/** Model-layer error: routes map it to HTTP status (400 / 409 / 404). */
 export class DeskModelError extends Error {
   constructor(readonly code: DeskModelErrorCode, message: string) {
     super(message)
@@ -46,17 +47,17 @@ export interface NotePatch {
   readonly color?: string
   readonly pinned?: boolean
   readonly trashed?: boolean
-  /** 便签墙自由位置（px，相对墙面画布）。 */
+  /** Free position on the note wall (px, relative to the wall canvas). */
   readonly x?: number
   readonly y?: number
-  /** 便签尺寸（px）：用户拖右下角改大小后写回。 */
+  /** Note size (px): written back after the user resizes from the bottom-right corner. */
   readonly width?: number
   readonly height?: number
-  /** 贴纸层级：点/拖后抬到最大 + 1，并持久化。 */
+  /** Sticker layer: raised to max + 1 on click/drag, and persisted. */
   readonly z?: number
 }
 
-/** 由正文首行派生标题（便签墙不展示 title，但 agent 工具与检索需要它）。 */
+/** Derive the title from the body's first line (the note wall does not show title, but agent tools and search need it). */
 export function titleFromBody(body: string): string {
   const firstLine = body.split(/\r?\n/u).map(line => line.trim()).find(line => line !== '')
   return (firstLine ?? '').slice(0, 60)
@@ -66,7 +67,7 @@ function isNoteColor(value: unknown): value is NoteColor {
   return typeof value === 'string' && (NOTE_COLORS as readonly string[]).includes(value)
 }
 
-/** 校验并归一化创建入参：便签墙允许空白便签（先「+」再打字）。 */
+/** Validate and normalize creation input: the note wall allows blank notes (click "+" first, then type). */
 export function normalizeNoteInput(raw: { readonly title?: unknown; readonly body?: unknown; readonly color?: unknown }): NoteInput {
   const body = typeof raw.body === 'string' ? raw.body : ''
   const explicitTitle = typeof raw.title === 'string' ? raw.title.trim() : ''
@@ -81,25 +82,25 @@ export function normalizeNoteInput(raw: { readonly title?: unknown; readonly bod
   return { title: explicitTitle === '' ? titleFromBody(body) : explicitTitle, body, color }
 }
 
-/** 合法坐标：有限非负数；非法一律忽略（位置只是展示属性，坏值不该挡住整条便签）。 */
+/** Valid coordinate: finite non-negative; invalid values are ignored (position is display-only, a bad value should not block the whole note). */
 export function normalizeCoordinate(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.round(value) : undefined
 }
 
-/** 合法尺寸：夹到 [min, NOTE_MAX_SIZE]；非法一律忽略（沿用当前/默认尺寸）。 */
+/** Valid size: clamped to [min, NOTE_MAX_SIZE]; invalid values are ignored (current / default size is kept). */
 export function normalizeSize(value: unknown, min: number): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return undefined
   return Math.round(Math.min(Math.max(value, min), NOTE_MAX_SIZE))
 }
 
-/** 合法层级：非负整数；非法一律忽略。 */
+/** Valid layer: non-negative integer; invalid values are ignored. */
 export function normalizeLayer(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined
   return Math.round(value)
 }
 
 
-/** 创建一条便签对象（id / 时间 / 坐标 / 层级由调用方提供，保持本函数纯净）。 */
+/** Create a note object (id / time / coordinates / layer come from the caller, keeping this function pure). */
 export function createNoteRecord(
   input: NoteInput,
   meta: { readonly id: string; readonly now: string; readonly x?: number; readonly y?: number; readonly z?: number },
@@ -126,7 +127,7 @@ export function createNoteRecord(
   }
 }
 
-/** 应用补丁并递增 revision；revision 不匹配抛 REVISION_CONFLICT（与存储写串行链配合做乐观并发）。 */
+/** Apply a patch and bump revision; a revision mismatch throws REVISION_CONFLICT (optimistic concurrency together with the store's serialized write chain). */
 export function patchNoteRecord(
   current: DeskNote,
   patch: NotePatch,
@@ -170,7 +171,7 @@ export function patchNoteRecord(
       throw new DeskModelError('INVALID_NOTE', `便签正文超过 ${MAX_BODY_CHARS} 字符上限`)
     }
     next.body = patch.body
-    // 正文变化且调用方没显式给标题时，标题跟随正文首行（保持两者一致）。
+    // When the body changes and the caller gave no explicit title, the title follows the body's first line (keeping both consistent).
     if (patch.title === undefined) next.title = titleFromBody(patch.body)
   }
   if (patch.color !== undefined) {
@@ -198,7 +199,7 @@ export function patchNoteRecord(
   return next
 }
 
-/** 面板顺序：置顶优先，其次最近更新，最后按 id 稳定排序。 */
+/** Panel order: pinned first, then most recently updated, then id for a stable sort. */
 export function sortNotes(notes: readonly DeskNote[]): DeskNote[] {
   return [...notes].sort((left, right) =>
     Number(right.pinned) - Number(left.pinned)
@@ -206,7 +207,7 @@ export function sortNotes(notes: readonly DeskNote[]): DeskNote[] {
     || left.id.localeCompare(right.id))
 }
 
-/** 关键词过滤（标题 + 正文，大小写不敏感）；空查询原样返回。 */
+/** Keyword filter (title + body, case-insensitive); an empty query returns everything unchanged. */
 export function filterNotes(notes: readonly DeskNote[], query: string | undefined): DeskNote[] {
   const text = (query ?? '').trim().toLowerCase()
   if (text === '') return [...notes]

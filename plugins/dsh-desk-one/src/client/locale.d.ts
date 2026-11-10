@@ -1,4 +1,4 @@
-/** desk-one locale 命名空间扩充：值为字典键的字符串联合。 */
+/** desk-one locale namespace augmentation: the value is a string union of dictionary keys. */
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     'desk-one':

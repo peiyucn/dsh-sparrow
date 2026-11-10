@@ -1,6 +1,7 @@
 /**
- * 标题与子会话标签的读取链：live 投影 → 冷投影缓存行 → 有界日志折叠，取不到回退会话 id / 无标签。
- * 两条链的缓存读取都按官方 `cachedSnapshot` 的**形参个数**自适应（官方跨版本改过签名）。
+ * Read chain for titles and subagent labels: live projection → cold projection-cache row → bounded log fold,
+ * falling back to the session id / no label when unavailable. Both chains adapt the cache read to the official
+ * `cachedSnapshot`'s **parameter count** (the official signature changed across versions).
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -22,9 +23,10 @@ function titleFromObservation(result: SessionTitleObservationResult | undefined,
 }
 
 /**
- * 标题投影缓存读取（官方 title 单元 stateSchema = string|null、latest-wins）：
- * live 会话走投影注册表快照；冷会话走 sessionProjectionCache 行（官方 @ 列表同款，
- * list.ts:335 口径）。行值防御性解析（直接字符串或 {title} 对象都接受），无/空返回 undefined。
+ * Title projection-cache read (official title unit stateSchema = string|null, latest-wins):
+ * live sessions go through the projection registry snapshot; cold sessions go through the
+ * sessionProjectionCache row (same as the official @ list, list.ts:335). Row values are parsed
+ * defensively (a bare string or a {title} object are both accepted); absent/empty returns undefined.
  */
 function cachedTitle(ctx: Context, header: SessionHeader, live: unknown): string | undefined {
   const read = (values: Record<string, unknown> | null | undefined): string | undefined => {
@@ -52,17 +54,18 @@ function cachedTitle(ctx: Context, header: SessionHeader, live: unknown): string
 }
 
 /**
- * 批量标题三档：live 投影 → 冷缓存 → 折叠兜底。
- * 折叠共享一个整体预算信号（超时后未完成项按失败处理），最终取不到的 id 落 fallback（默认会话 id）。
- * 返回值包含全部输入 id 的键。
+ * Batched titles, three tiers: live projection → cold cache → fold fallback.
+ * The fold shares one overall budget signal (items unfinished at timeout count as failed), and ids still
+ * unavailable at the end land on fallback (the session id by default). The result has a key for every input id.
  *
- * 标题批量化（诊断结论 O(m·K) → O(K + m·L)）：全部 miss **整批一次** readTitleSnapshots——
- * 官方 projectMany 每次调用都要先跑一遍全量 listPersisted（corpus.ts:161），逐 id 单条调用是 O(m·K)
- * （m 个 miss = m 次全盘扫描 + m 次全日志折叠，只被 runBounded 的并发压成 ceil(m/4) 轮）；
- * 整批一次即 O(K + m·L)，且官方 projectMany 内部本就是 4 路并发读
- * （config.ts:9，与本插件 TITLE_FOLD_CONCURRENCY 同值）。返回**每个唯一 id 一条**、按首次出现顺序
- * 落定（官方 corpus.ts:137/249），故此处先按 id 去重再回填——输入重复 id 也不会错位。
- * 单条失败只影响该条（取不到 → fallback）；整批抛错（预算已超时等）同样退化为全部 fallback。
+ * Title batching (diagnosis: O(m·K) → O(K + m·L)): all misses go through **one** readTitleSnapshots call —
+ * the official projectMany runs a full listPersisted on every call (corpus.ts:161), so calling it per id is
+ * O(m·K) (m misses = m full scans + m full log folds, squeezed only into ceil(m/4) rounds by runBounded's
+ * concurrency); one batch is O(K + m·L), and the official projectMany already reads 4-way concurrently
+ * internally (config.ts:9, the same value as this plugin's TITLE_FOLD_CONCURRENCY). It returns **one entry per
+ * unique id**, settled in first-seen order (official corpus.ts:137/249), so we dedupe by id before filling
+ * back — duplicate input ids cannot misalign. A single failure affects only that item (unavailable → fallback);
+ * a whole-batch throw (budget already expired, etc.) degrades to all fallbacks as well.
  */
 export async function titlesFor(
   ctx: Context,
@@ -80,7 +83,7 @@ export async function titlesFor(
     misses.push(header)
   }
   if (misses.length === 0) return out
-  // 预算信号自建：批结束（成功或失败）即 release，定时器不滞留到死线。
+  // Budget signal is self-built: released as soon as the batch ends (success or failure), so the timer doesn't linger until the deadline.
   const budget = createBudgetSignal(TITLE_FOLD_BUDGET_MS)
   try {
     const missingIds = [...new Set(misses.map(header => String(header.id)))]
@@ -91,7 +94,7 @@ export async function titlesFor(
     }
     return out
   } catch (error) {
-    // 整批失败（含预算超时）：标题退化为 fallback，列表照常返回，不让路由 500。
+    // Whole-batch failure (including budget timeout): titles degrade to fallback and the list still returns, so the route never 500s.
     ctx.logger.warn(`dsh-archive-manage: 标题折叠失败（${misses.length} 个会话）：${error instanceof Error ? error.message : String(error)}`)
     for (const header of misses) out.set(String(header.id), fallback(header))
     return out
@@ -100,32 +103,34 @@ export async function titlesFor(
   }
 }
 
-/** 单会话标题（三档 + 兜底折叠；fallback 默认会话 id）。 */
+/** Title of a single session (three tiers + fallback fold; fallback defaults to the session id). */
 export async function readTitle(ctx: Context, header: SessionHeader, fallback: string): Promise<string> {
   return titlesFor(ctx, [header], () => fallback).then(map => map.get(String(header.id)) ?? fallback)
 }
 
 /**
- * 日志折叠的 subagent 标签结论记忆：描述符事件一旦写入即不可变（官方注释 "a descriptor is
- * immutable once appended"），归档会话日志静止，按 sessionId 记忆安全。
- * 值 = 折叠出的标签；`null` = 权威判定「该会话没有标签」（同样值得记——否则每次打开面板
- * 都要为它重折一遍整份日志）。非权威结果（折叠失败、生命周期不匹配）不记。
- * LRU 上限淘汰最久未用条目（sessionId 为 UUID，删除后重建同 id 的可能性忽略不计）。
+ * Memory of log-fold subagent label conclusions: a descriptor event is immutable once written (official note
+ * "a descriptor is immutable once appended") and an archived session's log is static, so memoizing by
+ * sessionId is safe. Value = the folded label; `null` = authoritatively "this session has no label" (worth
+ * remembering too — otherwise the whole log would be re-folded every time the panel opens). Non-authoritative
+ * results (fold failure, lifecycle mismatch) are not recorded. The LRU cap evicts the least recently used
+ * entries (sessionIds are UUIDs, so the chance of the same id being recreated after deletion is negligible).
  */
 const foldedSubagentLabels = createLruCache<string, string | null>(FOLDED_LABEL_CACHE_MAX_ENTRIES)
 
-/** observeSession 观察结果（租约，用后必须 dispose）的最小结构。 */
+/** Minimal shape of an observeSession observation result (a lease; must be disposed after use). */
 interface FoldObservation {
   header?: { createdAt?: number }
   projections?: { values?: Record<string, SubagentIdentityValue | null | undefined> }
   dispose?: () => void
-  /** rc.1 起官方观察租约是 Disposable 契约（[Symbol.dispose]），旧中间版是 dispose() 方法；两者都探测。 */
+  /** Since rc.1 the official observation lease is a Disposable contract ([Symbol.dispose]); older intermediate builds expose a dispose() method; both are probed. */
   [Symbol.dispose]?: () => void
 }
 
 /**
- * identity.seq → 官方 SessionSeq 品牌值；畸形值（缺失 / 负数 / 非安全整数 / -0）返回 undefined。
- * 官方 `SessionSeq()` 对非法输入抛 TypeError，本插件把它当「无法验证自有性」处理，不抛给调用方。
+ * identity.seq → official SessionSeq branded value; malformed values (missing / negative / non-safe integer /
+ * -0) return undefined. The official `SessionSeq()` throws a TypeError on invalid input; this plugin treats
+ * that as "ownership cannot be verified" and does not throw to its callers.
  */
 function ownSeqOf(value: number | undefined): SessionSeq | undefined {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || Object.is(value, -0)) return undefined
@@ -133,19 +138,25 @@ function ownSeqOf(value: number | undefined): SessionSeq | undefined {
 }
 
 /**
- * 子会话标签：官方 subagent 投影单元 label（父会话给子会话的任务描述，不受父消息污染）。
- * 三档读链，与官方 list-children 同构——缓存只是捷径，日志才是权威，缓存坏掉只变慢、不变错：
- *   1. live 子会话 → 投影注册表快照（内存、同步；官方对 live 只走这一档，observeSession 会悬挂）；
- *   2. 冷会话 → 投影缓存行（展示级；行自带 identity + ver 校验，见下）；
- *   3. 冷 + 未种子 + 缓存行未给出权威结论 → observeSession 从日志重新折叠（官方同款权威兜底）。
- *      9-03 的 OOM 是「种子冷会话连带读父会话前缀」——isSeeded 门把该场景挡在档外，
- *      而不是禁用整条正路；观察是租约，用后 dispose，15s 超时防悬挂。
- * 均做能力检查 + 结构断言，失败返回 undefined，调用方回退标题单元结果。
+ * Subagent label: the official subagent projection unit's label (the task description the parent gave the
+ * child, unpolluted by parent messages). A three-tier read chain, isomorphic to the official list-children —
+ * the cache is only a shortcut, the log is authoritative, and a broken cache only makes things slower, not wrong:
+ *   1. live child session → projection registry snapshot (in-memory, synchronous; the official code only uses
+ *      this tier for live sessions, observeSession would hang);
+ *   2. cold session → projection cache row (display-grade; the row carries its own identity + ver checks, see below);
+ *   3. cold + unseeded + cache row gave no authoritative conclusion → observeSession re-folds from the log
+ *      (the same authoritative fallback the official code uses). The 9-03 OOM was "a seeded cold session
+ *      reading its parent's prefix along with it" — the isSeeded gate keeps that case out of this tier rather
+ *      than disabling the whole legitimate path; observations are leases, disposed after use, with a 15s
+ *      timeout against hangs.
+ * All of them do capability checks + structural assertions and return undefined on failure, so the caller
+ * falls back to the title unit's result.
  *
- * 第二档的判定从「取到 label 才算命中」改为「identity 非 null 即权威」——
- * one-shot 子会话的 label 官方定义为可选（projection-types.ts:30-33），此前这类会话
- * 每个都掉进第三档，把整份 zstd 日志解出来重折一遍（本机 10 个子会话 ≈ 8MB 压缩日志
- * ≈ 1s/次打开，且因折不出 label 永不进记忆 → 每次打开都重来）。
+ * Tier 2's criterion changed from "a label was obtained, so it's a hit" to "identity is non-null, so it's
+ * authoritative" — the label of a one-shot child session is officially optional (projection-types.ts:30-33),
+ * and previously every such session fell into tier 3, decompressing the whole zstd log to re-fold it (10 child
+ * sessions on this machine ≈ 8MB compressed log ≈ 1s per panel open, and since no label could be folded they
+ * never entered the memo → starting over on every open).
  */
 export async function subagentLabel(ctx: Context, header: SessionHeader): Promise<string | undefined> {
   const sessionId = SessionId(String(header.id))
@@ -158,10 +169,12 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
       try {
         const identity = registry.snapshot(live, ['subagent']).values.subagent
         if (identity === null || typeof identity !== 'object') return undefined
-        // 自有后缀门（对齐官方 list-children.ts:224-225）：identity 必须折自
-        // 子会话**自有**事件。fork 子会话在「自己的描述符写入前」的创建窗口里，快照带的是
-        // seed 继承的祖先描述符——不挡就会把祖先标签显示成这个子会话的标签（官方此时不出行）。
-        // seq 畸形 / 缺官方 isOwnSeq（不支持的 dsh）一律按「无法验证自有性」保守不出行。
+        // Own-suffix gate (aligned with official list-children.ts:224-225): the identity must be folded from
+        // the child session's **own** events. During the creation window before a forked child session writes
+        // its own descriptor, the snapshot carries the ancestor descriptor inherited from the seed — without
+        // this gate the ancestor's label would be shown as this child's label (the official code emits no row
+        // at that point). A malformed seq / a missing official isOwnSeq (unsupported dsh) is conservatively
+        // treated as "ownership cannot be verified", emitting no row.
         const seq = ownSeqOf(identity.seq)
         if (seq === undefined || typeof live.isOwnSeq !== 'function' || !live.isOwnSeq(seq)) return undefined
         return labelFromSubagentIdentity(identity) ?? undefined
@@ -171,35 +184,35 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
     }
     return undefined
   }
-  // 行的可靠性由官方保证：cachedSnapshot 先过 identityMatches（createdAt/cwd/isSeeded/
-  // inheritedEventCount，session-projection-cache/src/index.ts:435，由 recordFor:136 调用）
-  // 验「这份缓存属于这条生命周期」，viewCheckpoint 再丢弃 ver 与 live unit 不一致的行
-  // （session-projection/src/index.ts:448）。所以拿到的 identity 是这份日志的有效折叠
-  // 结果，可以直接当权威结论用。
-  // ⚠️ 形参表跨版本变过，读取统一走 projection.ts 的 cachedSnapshotOf（按 fn.length 分派），
-  // 写死三参会静默毁掉这一档。
+  // Row reliability is guaranteed by the official code: cachedSnapshot first runs identityMatches
+  // (createdAt/cwd/isSeeded/inheritedEventCount, session-projection-cache/src/index.ts:435, called by
+  // recordFor:136) to verify "this cache belongs to this lifecycle", then viewCheckpoint drops rows whose
+  // ver doesn't match the live unit (session-projection/src/index.ts:448). So the identity we get is a valid
+  // fold result for this log and can be used directly as an authoritative conclusion.
+  // ⚠️ The parameter list changed across versions, so reads always go through cachedSnapshotOf in
+  // projection.ts (dispatching on fn.length); hardcoding three parameters would silently kill this tier.
   const settled = labelFromSubagentIdentity(
     cachedSnapshotOf(ctx, header, ['subagent'])?.values.subagent as SubagentIdentityValue | null | undefined,
   )
-  if (settled !== undefined) return settled ?? undefined // 有标签返回标签；权威无标签直接结束（不再折叠）
+  if (settled !== undefined) return settled ?? undefined // label present returns the label; authoritatively no label ends here (no fold)
   if (!header.isSeeded) {
     const memoized = foldedSubagentLabels.get(String(sessionId))
-    // null 亦为结论（该会话确实没有标签）：命中就不必再折一次整份日志。
+    // null is also a conclusion (the session really has no label): on a hit there's no need to fold the whole log again.
     if (memoized !== undefined) return memoized ?? undefined
     const query = ctx.get('sessionQuery') as unknown as {
       observeSession?: (id: unknown, options: { signal?: AbortSignal }) => Promise<FoldObservation>
     } | undefined
     if (query !== undefined && typeof query.observeSession === 'function') {
       let observation: FoldObservation | undefined
-      // 预算信号自建：成功与失败路径都 release，定时器不滞留到死线。
+      // Budget signal is self-built: released on both success and failure paths, so the timer doesn't linger until the deadline.
       const budget = createBudgetSignal(LABEL_FOLD_TIMEOUT_MS)
       try {
         observation = await query.observeSession(sessionId, { signal: budget.signal })
-        // 生命周期见证：同 id 槽位被删后重建（createdAt 变化）不得串用旧观察。
+        // Lifecycle witness: a slot recreated under the same id after deletion (createdAt changed) must not reuse the old observation.
         if (observation !== undefined
           && (observation.header?.createdAt === undefined || observation.header.createdAt === header.createdAt)) {
           const settled = labelFromSubagentIdentity(observation.projections?.values?.subagent)
-          // 只记权威结论：折叠失败 / identity 缺失不记，下次仍可重试。
+          // Only record authoritative conclusions: fold failures / missing identity are not recorded, so the next attempt can still retry.
           if (settled !== undefined) {
             foldedSubagentLabels.set(String(sessionId), settled)
             return settled ?? undefined
@@ -210,13 +223,13 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
       } finally {
         budget.release()
         try {
-          // rc.1 租约走 [Symbol.dispose]，旧中间版走 dispose()；释放失败不影响回退。
+          // The rc.1 lease uses [Symbol.dispose], older intermediate builds use dispose(); a failed release does not affect the fallback.
           if (observation !== undefined) {
             if (typeof observation.dispose === 'function') observation.dispose()
             else observation[Symbol.dispose]?.()
           }
         } catch {
-          // 租约释放 best-effort：失败不影响回退。
+          // Lease release is best-effort: a failure does not affect the fallback.
         }
       }
     }
@@ -224,7 +237,7 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
   return undefined
 }
 
-/** 批量子会话标签（有界并发折叠，与标题兜底同一并发上限；header.id → label，取不到的 id 不在映射中）。 */
+/** Batched subagent labels (bounded-concurrency folds, same concurrency cap as the title fallback; header.id → label, ids that can't be resolved are absent from the map). */
 export async function subagentLabels(ctx: Context, headers: readonly SessionHeader[]): Promise<Map<string, string>> {
   const out = new Map<string, string>()
   const results = await runBounded(headers, TITLE_FOLD_CONCURRENCY, header => subagentLabel(ctx, header))

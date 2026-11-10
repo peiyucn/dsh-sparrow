@@ -1,19 +1,21 @@
-/** 补官方 session-controller 公开事件的类型（本插件 emit 用；运行时由宿主事件总线处理）。 */
+/** Types for the official session-controller public events (emitted by this plugin; handled at runtime by the host event bus). */
 
 import type { SessionId } from '@deepseek-ai/dsh-session'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
     /**
-     * 官方 session-controller 公开事件（@mode emit，见 dsh-api-session-controller types.ts）：
-     * 会话离开宿主时客户端会话列表据此即时移除条目。移入回收站/删除成功后会话目录已移走，
-     * 补发此事件让侧边栏「未分组」等列表立即同步（2026-08-30 修复残留条目）。
+     * Official session-controller public event (@mode emit, see dsh-api-session-controller types.ts):
+     * the client session list removes entries immediately from it when a session leaves the host. After a
+     * move to trash / delete succeeds the session directory is already gone, so re-emitting this event lets
+     * the sidebar's "Ungrouped" and other lists sync immediately (2026-08-30 fix for stale entries).
      */
     'api-session/removed'(sessionId: SessionId): void
     /**
-     * 官方公开事件：会话回到列表（载荷形状对齐官方 SessionSummary 的插件可用子集，见
-     * dsh-api-session-controller types.ts）。`projections` 是官方 cached 投影块：客户端
-     * `handleSessionAdded` 会对它 applyCached，因此会话列表无需刷新即可显示标题 / 子会话标签。
+     * Official public event: a session returns to the list (payload shape mirrors the plugin-usable subset of
+     * the official SessionSummary, see dsh-api-session-controller types.ts). `projections` is the official
+     * cached projection block: the client's `handleSessionAdded` applies it via applyCached, so the session
+     * list shows titles / child-session labels without a refresh.
      */
     'api-session/added'(summary: {
       sessionId: SessionId

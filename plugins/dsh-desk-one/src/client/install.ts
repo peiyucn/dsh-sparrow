@@ -1,7 +1,8 @@
 /**
- * client half 安装：能力门 → 样式（effect 清理）→ locale 字典 → 官方主面板两处注册。
- * 页面 / 图标 / 字典 / 数据面由 index.ts 注入，本模块不 import React 组件 —— node:test 因此可以
- * 直接驱动安装流程（含能力门与 style 元素的移除），无需在 Node 里加载浏览器侧 UI 依赖。
+ * Client-half installation: capability gate → styles (cleaned up by effect) → locale dictionaries → the two
+ * official main-panel registrations. Page / icon / dictionaries / data surface are injected by index.ts, and
+ * this module imports no React component — so node:test can drive the installation flow directly (including
+ * the capability gate and removal of the style element) without loading browser-side UI deps in Node.
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -21,7 +22,7 @@ import type { ScheduleApi } from './schedule/api.js'
 import { attachMainPanel } from './panel.js'
 import { ensureDeskStyles } from './styles.js'
 
-/** 面板的注入面：数据动作由 host REST 路由提供，页面只持有这几个函数。 */
+/** Panel injection surface: data actions come from host REST routes, and the page holds only these functions. */
 export interface DeskPanelInjected {
   readonly listNotes: (query?: string) => Promise<readonly DeskNote[]>
   readonly createNote: (input: {
@@ -84,7 +85,7 @@ export interface DeskPanelInjected {
   readonly schedule: ScheduleApi
 }
 
-/** 入口注入的浏览器侧件（由 index.ts 提供；测试可传桩）。 */
+/** Browser-side pieces injected at the entry (supplied by index.ts; tests may pass stubs). */
 export interface DeskClientDeps {
   readonly page: SlotComponent<
     PropsRuntime<'main'> & InjectFace<DeskPanelInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
@@ -94,7 +95,7 @@ export interface DeskClientDeps {
   readonly api: DeskPanelInjected
 }
 
-/** client 能力门：任一硬依赖缺失即告警并返回 false（不抛错，避免 boot 审计致命失败）。 */
+/** Client capability gate: any missing hard dependency warns and returns false (never throws, avoiding a fatal boot-audit failure). */
 export function passesClientGate(ctx: ClientContext): boolean {
   const c = ctx as unknown as Record<string, unknown>
   const slots = c.slots as { inject?: unknown; register?: unknown } | undefined
@@ -108,8 +109,9 @@ export function passesClientGate(ctx: ClientContext): boolean {
 }
 
 /**
- * 安装 client half：任何硬依赖缺失只告警并返回，**不抛错**（客户端 boot 审计把非 active 的
- * entry 当致命失败，抛错会让宿主整页只显示 "Failed to load plugins"）。
+ * Install the client half: any missing hard dependency only warns and returns, **never throws** (the client
+ * boot audit treats a non-active entry as a fatal failure, and a throw would leave the whole host page
+ * showing only "Failed to load plugins").
  */
 export function installDeskClient(ctx: ClientContext, deps: DeskClientDeps): void {
   if (!passesClientGate(ctx)) return
@@ -120,8 +122,8 @@ export function installDeskClient(ctx: ClientContext, deps: DeskClientDeps): voi
   const disposeDictionaries = ctx.locale.register(LOCALE_NAMESPACE, deps.locales)
   ctx.effect(() => disposeDictionaries, `${PACKAGE_NAME}: locale dictionaries`)
 
-  // 官方主面板两处注册（`main` 页面 + `sidebar.panellist` 图标行）走可选依赖 fork：
-  // 官方布局服务不在位时整条不注册（惰性停用、不抛错），宿主照常启动。
+  // The two official main-panel registrations (`main` page + `sidebar.panellist` icon row) go through an optional-dependency fork:
+  // when the official layout service is absent, neither is registered (lazy disable, no throw) and the host still boots.
   attachMainPanel(ctx, {
     id: PANEL_ID as MainPanelId,
     order: PANEL_ORDER,

@@ -1,8 +1,9 @@
 /**
- * 官方「主面板」入口装配（对齐官方 `ui-plugin-manager` / `ui-schedule` / 本仓库 dsh-archive-manage）：
- * `main` keyed 槽与 `sidebar.panellist` list 槽**共用同一个 id**；本模块零运行时依赖，故 node:test
- * 可直接导入。`layout` 不写进 inject（缺服务会让 fiber 永远 pending、触发 boot 审计的致命失败），
- * 改走 `ctx.inject(['layout'], cb)` 的可选依赖 fork：服务不在位就什么都不做，绝不抛错。
+ * Official "main panel" entry assembly (mirrors official `ui-plugin-manager` / `ui-schedule` / this repo's dsh-archive-manage):
+ * the `main` keyed slot and the `sidebar.panellist` list slot **share one id**; this module has zero runtime dependencies,
+ * so node:test can import it directly. `layout` is not written into inject (a missing service would leave the fiber pending
+ * forever and trigger a fatal boot-audit failure); it goes through the optional-dependency fork `ctx.inject(['layout'], cb)`
+ * instead: when the service is absent nothing happens and nothing ever throws.
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -11,25 +12,25 @@ import type { InjectFace, LocaleNamespaceMap, PropsLocale, PropsRuntime, SlotCom
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
-/** 一条主面板入口：两处注册各自的件与共用身份。 */
+/** One main-panel entry: the pieces for each registration plus the shared identity. */
 export interface MainPanelEntry<
   N extends keyof LocaleNamespaceMap & string,
   I extends object,
 > {
-  /** 入口 id —— 同时是 `sidebar.panellist` 的 id 与 `main` 的 key（官方称 `MainPanelId`）。 */
+  /** Entry id — both the `sidebar.panellist` id and the `main` key (the official name is `MainPanelId`). */
   readonly id: MainPanelId
-  /** 左栏行序（官方 plugins = 0、schedules = 10）。 */
+  /** Sidebar row order (official plugins = 0, schedules = 10). */
   readonly order: number
   readonly locale: N
-  /** 左栏行标题：传 thunk 让语言切换无需重注册。 */
+  /** Sidebar row title: pass a thunk so switching language needs no re-registration. */
   readonly label: () => string
   readonly inject: () => I
   readonly page: SlotComponent<PropsRuntime<'main'> & InjectFace<I> & PropsLocale<N>>
-  /** 左栏主面板行的图标组件（宿主给 `size`，颜色走 currentColor）。 */
+  /** Icon component for the sidebar main-panel row (the host passes `size`; color comes from currentColor). */
   readonly icon: SlotComponent<PropsRuntime<'sidebar.panellist'>>
 }
 
-/** 装配主面板入口：官方布局服务就位后同时挂上两处注册；缺失时不注册、不抛错（惰性停用）。 */
+/** Assemble the main-panel entry: attach both registrations once the official layout service is available; when it is missing, register nothing and never throw (lazy disable). */
 export function attachMainPanel<
   N extends keyof LocaleNamespaceMap & string,
   I extends object,

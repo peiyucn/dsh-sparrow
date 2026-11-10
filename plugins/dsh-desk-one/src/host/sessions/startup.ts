@@ -1,6 +1,7 @@
 /**
- * 启动清扫接线：不在 apply 里立刻扫盘（会与官方会话列表抢同一次全量扫描），改为
- * 「首次打开归档面板时补跑」+ 一条延迟兜底；同时把官方写事件接成缓存失效与父子对齐。
+ * Startup sweep wiring: no immediate disk scan in apply (it would contend with the official session
+ * list for the same full scan); instead run on "first open of the archive panel" plus a delayed
+ * fallback, and wire official write events to cache invalidation and parent/child alignment.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -14,20 +15,21 @@ import { sweepStaleProjectionCache } from './projection.js'
 import { healMissingSessionProjections } from './projection-seed.js'
 import { trashedSessionIds } from './trash.js'
 
-/** 启动三项清扫的「只跑一次」触发器；`run` 幂等。 */
+/** Run-once trigger for the three startup sweeps; `run` is idempotent. */
 export interface StartupScans {
   run(): void
 }
 
 /**
- * 注册启动清扫与事件监听（全部挂在 ctx.effect 上，卸载即清理）。
+ * Register startup sweeps and event listeners (all attached via ctx.effect, cleaned up on dispose).
  *
- * 2026-09-29：**不再在 apply 里立刻发起**——三项启动读取（清扫 ×2 + 对齐）与官方会话列表接口
- * 抢同一次全量扫盘，会压住用户打开页面后等列表的窗口（真机实测 40–90 s）。
- * @param ctx - 宿主上下文。
- * @param surface - 官方 workspace 写通道。
- * @param headerFacts - header 事实缓存。
- * @param trashRoot - 回收站根目录：清扫据此保留可还原会话的投影行。
+ * 2026-09-29: **no longer starts inside apply** — the three startup reads (sweeps ×2 plus alignment)
+ * contend with the official session-list endpoint for the same full disk scan, which blocks the window
+ * where the user waits for the list after opening the page (measured 40–90 s on real hardware).
+ * @param ctx - host context.
+ * @param surface - official workspace write channel.
+ * @param headerFacts - header facts cache.
+ * @param trashRoot - trash root directory: sweeps use it to keep projection rows of restorable sessions.
  */
 export function installStartupScans(
   ctx: Context,
@@ -40,14 +42,14 @@ export function installStartupScans(
     if (startupScansDone) return
     startupScansDone = true
     void (async () => {
-      // 回收站条目不在持久化清单里，但仍是可还原的会话：先取它们的 id，再让投影清扫跳过。
+      // Trash entries are absent from the persisted list but are still restorable sessions: collect their ids first so the projection sweep skips them.
       const preservedProjectionIds = await trashedSessionIds(trashRoot)
       await Promise.all([
         sweepGhostArchivedIds(ctx, surface, headerFacts),
         sweepStaleProjectionCache(ctx, headerFacts, preservedProjectionIds),
         alignChildArchives(ctx, surface, headerFacts),
       ])
-      // 最后回填：修复旧版清扫在回收站期间删掉的存量投影行（正常机器无缺行 = 零 I/O 遍历）。
+      // Backfill last: repair projection rows that older sweeps deleted while the session was trashed (a healthy machine has no missing rows = zero I/O traversal).
       await healMissingSessionProjections(ctx, headerFacts)
     })().catch((error: unknown) => {
       ctx.logger.warn(`dsh-archive-manage: 启动扫描失败：${error instanceof Error ? error.message : String(error)}`)
@@ -56,15 +58,16 @@ export function installStartupScans(
   const startupScanTimer = setTimeout(run, STARTUP_SCAN_DELAY_MS)
   ctx.effect(() => () => clearTimeout(startupScanTimer), 'dsh-archive-manage: 启动清扫兜底定时器')
 
-  // 父子联动：官方 workspace 域写入事件驱动实时对齐（幂等，官方 feed 同款监听）。
-  // 同事件写穿失效 header 缓存（官方菜单归档等外部写不经过本插件路由）。
+  // Parent/child linkage: official workspace-domain write events drive real-time alignment (idempotent,
+  // the same listener shape as the official feed); the same event invalidates the header cache in a
+  // write-through path (external writes such as the official menu's archive never hit this plugin's routes).
   ctx.effect(() => ctx.on('domain/changed', (change) => {
     if (change.domain !== 'workspace' || change.operation !== 'put') return
     headerFacts.invalidate()
     void alignChildArchives(ctx, surface, headerFacts)
   }), 'dsh-archive-manage: 父子归档对齐')
 
-  // 会话进出事件写穿失效 header 缓存（自身写操作补发的 removed/added 亦经此路径）。
+  // Session add/remove events invalidate the header cache in a write-through path (the removed/added events our own writes re-emit also take this path).
   ctx.effect(() => ctx.on('api-session/added', () => headerFacts.invalidate()), 'dsh-archive-manage: header 缓存失效（added）')
   ctx.effect(() => ctx.on('api-session/removed', () => headerFacts.invalidate()), 'dsh-archive-manage: header 缓存失效（removed）')
 

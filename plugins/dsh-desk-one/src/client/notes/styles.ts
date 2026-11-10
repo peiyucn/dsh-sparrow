@@ -1,16 +1,16 @@
 /** Notes feature CSS: wall, sticky card, bottom actions, trash view and Smash animation. */
 
 export const NOTES_CSS = `
-/* 便签标签内部：墙面 / 垃圾桶；右下角留给悬浮操作组。 */
-/* 便签标签内部：墙面 / 垃圾桶，铺满整个可用区域（不再为悬浮按钮预留空白）。 */
+/* Inside the notes tab: wall / trash; the bottom-right corner is left to the floating action group. */
+/* Inside the notes tab: wall / trash, filling the whole available area (no blank reserved for the floating buttons anymore). */
 
-/* 墙面：固定宽度、纵向无限；滚动交给墙面，便签可以落在可视区下方。
-   不加背板（owner 2026-11-06：背板显脏且缩小操作面积），沿用页面本身的干净底。 */
+/* Wall: fixed width, vertically infinite; the wall owns scrolling, so notes may sit below the viewport.
+   No backdrop (owner 2026-11-06: a backdrop looks dirty and shrinks the interaction area); keep the page's clean base. */
 .dsh-desk-wall {
   position: relative;
   width: 100%;
   max-width: 100%;
-  z-index: 0; /* 建立层级上下文：贴纸的 z 再大也只在墙内比较，按钮永远盖在它们上面。 */
+  z-index: 0; /* Establishes a stacking context: however large a note's z, it only compares inside the wall, so buttons always cover them. */
   flex: 1;
   min-height: 0;
   /* Fixed width, vertically infinite canvas: notes may live below the viewport and the wall
@@ -18,7 +18,7 @@ export const NOTES_CSS = `
   overflow-x: hidden;
   overflow-y: auto;
 }
-/* 空墙中央的轻提示：双层排版（主提示 + 次提示），颜色压到很浅，不抢贴纸。 */
+/* Faint hint centered on an empty wall: two tiers (main + secondary), colors kept very light so it never competes with notes. */
 .dsh-desk-wall::-webkit-scrollbar-track {
   /* Official conversation-scroll trick: only the top is pushed below the header; the bottom
      keeps a 2px inset so the thumb can still reach the last row. */
@@ -73,8 +73,8 @@ export const NOTES_CSS = `
   color: var(--dsw-alias-label-tertiary, #8a919f);
   pointer-events: none;
 }
-/* 贴纸：便签墙的基本单位。真实便签是方角纸片，不做大圆角、不做渐变。
-   配色参考 Notion 浅色模式的背景色板（低饱和、偏暖中性），文字用 Notion 墨色 #37352F。 */
+/* Sticky: the notes wall's basic unit. Real sticky notes are square-cornered paper, so no large radii
+   and no gradients. Palette follows Notion's light-mode background swatches (low saturation, warm neutrals); text uses Notion ink #37352F. */
 .dsh-desk-note {
   position: absolute;
   box-sizing: border-box;
@@ -104,8 +104,8 @@ export const NOTES_CSS = `
   cursor: grabbing;
   z-index: 100000;
 }
-/* 纸色取 Notion 深色色标的同色相中等深度（比色标浅一档、比旧版纸色深一档）：
-   纸面负责“这是一张便签”，色标负责“这是哪个色”。 */
+/* Paper color is the same hue as the Notion dark color tag at medium depth (one step lighter than the tag,
+   one step darker than the old paper): the paper says "this is a note", the tag says "which color this is". */
 .dsh-desk-note[data-color='default'] { background-color: #e4e0d9; }
 .dsh-desk-note[data-color='yellow'] { background-color: #e9d3a3; }
 .dsh-desk-note[data-color='green'] { background-color: #bccebb; }
@@ -118,8 +118,8 @@ export const NOTES_CSS = `
   height: 26px;
   margin-bottom: 2px;
 }
-/* 拖动提示：紧凑的六点抓握纹（2 列 × 3 行、2px 点、2px 间距），低对比度常驻、悬停略清楚。
-   不用文字、不用背景块；整个正文以外的区域都能拖，它只是「这里能抓」的提示。 */
+/* Drag affordance: compact six-dot grip (2 columns × 3 rows, 2px dots, 2px gaps), always visible at low
+   contrast and slightly clearer on hover. No text, no background block; everything outside the body is draggable, this only hints "grab here". */
 .dsh-desk-note-grip {
   flex: none;
   display: grid;
@@ -154,8 +154,8 @@ export const NOTES_CSS = `
 .dsh-desk-note:focus-within .dsh-desk-note-colors {
   opacity: 1;
 }
-/* 色板：用 Notion 的深色文字色（#C29343 / #548164 / #487CA5 / #B35488 / #787774），
-   小尺寸下色相清晰；与纸面同色相、深一档，形成「纸面 + 色标」的分层。 */
+/* Swatches: Notion's dark text colors (#C29343 / #548164 / #487CA5 / #B35488 / #787774), whose hue stays
+   clear at small sizes; same hue as the paper, one step darker, forming the "paper + tag" layering. */
 .dsh-desk-dot {
   appearance: none;
   width: 12px;
@@ -177,7 +177,7 @@ export const NOTES_CSS = `
 .dsh-desk-dot[data-active='true'] {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 3px rgba(55, 53, 47, 0.55);
 }
-/* 贴纸上的小号图标（垃圾桶）：深墨色常驻，light / dark 主题下都看得清。 */
+/* Small icon on the sticky (trash): stays deep ink so it reads under both light and dark themes. */
 .dsh-desk-note-action {
   color: rgba(55, 53, 47, 0.55);
   opacity: 0;
@@ -223,7 +223,7 @@ export const NOTES_CSS = `
 .dsh-desk-note-body::placeholder {
   color: rgba(55, 53, 47, 0.3);
 }
-/* 右下角改大小：热区放大到 26px（好抓），可见角标仍是极简的两条细线（画在伪元素上）。 */
+/* Bottom-right resize: hit area enlarged to 26px (easy to grab) while the visible corner stays two minimal thin lines (drawn on a pseudo-element). */
 .dsh-desk-note-resize {
   position: absolute;
   right: 0;
@@ -253,7 +253,7 @@ export const NOTES_CSS = `
 .dsh-desk-note-resize:hover::after {
   border-color: rgba(55, 53, 47, 0.6);
 }
-/* Smash 动画：贴纸依次向上飞散、淡出；落库在动画结束后统一进行。 */
+/* Smash animation: stickies fly upward and fade out one after another; persistence runs once, after the animation ends. */
 @keyframes dsh-desk-smash-out {
   from { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
   to { opacity: 0; transform: translateY(-16px) rotate(-4deg) scale(0.94); }
@@ -262,13 +262,13 @@ export const NOTES_CSS = `
   animation: dsh-desk-smash-out 260ms ease-in forwards;
   pointer-events: none;
 }
-/* 垃圾桶：便签墙内的第二视图（右下角图标进入 / 返回）。 */
+/* Trash: the second view inside the notes wall (enter / return through the bottom-right icon). */
 .dsh-desk-trash {
   position: relative;
   flex: 1;
   min-height: 0;
   overflow: auto;
-  /* 列表滚到底时留出悬浮按钮的高度，最后一行不被按钮盖住。 */
+  /* Reserve the floating buttons' height at the end of the list so the last row is not covered. */
   padding-bottom: 88px;
 }
 .dsh-desk-trash-list {

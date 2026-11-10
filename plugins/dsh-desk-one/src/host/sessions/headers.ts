@@ -1,4 +1,4 @@
-/** header 事实缓存：双形状读取 + TTL 单飞 store，以及 host 树结构所需的 header 投影。 */
+/** Header facts cache: dual-shape read + TTL single-flight store, plus the header projection the host tree needs. */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionHeader } from '@deepseek-ai/dsh-session'
@@ -9,15 +9,15 @@ import {
 } from './archive.js'
 import { HEADER_CACHE_TTL_MS } from './constants.js'
 
-/** header 事实缓存承载类型：全量 header + 快照 size 映射。 */
+/** Payload type of the header facts cache: full headers + a snapshot size map. */
 export type HeaderFacts = { headers: SessionHeader[]; sizes: Map<string, number> }
 
 /**
- * sessionPersistence.list() 双形状兼容读取：
- * - npm 0.1.2-alpha.5 及更早：直接返回 SessionHeader[]；
- * - alpha.5 发布后的 master（2026-09-02 会话持久化重构）：返回 Snapshot[]（{ header, revision, ... }）。
- * 按元素是否携带 header 字段分流，统一返回 SessionHeader[]（见 AGENTS 插件私有 seam 特例），
- * 并顺带收集快照形状才有的 sizeBytes。
+ * Dual-shape compatible read of sessionPersistence.list():
+ * - npm 0.1.2-alpha.5 and earlier: returns SessionHeader[] directly;
+ * - master after the alpha.5 release (2026-09-02 session-persistence refactor): returns Snapshot[] ({ header, revision, ... }).
+ * Branches on whether an element carries a header field, always returns SessionHeader[] (see the AGENTS plugin
+ * private-seam exception), and collects sizeBytes, which only the snapshot shape has.
  */
 async function storedHeaderFacts(ctx: Context): Promise<HeaderFacts> {
   const entries = await ctx.sessionPersistence.list() as readonly unknown[]
@@ -37,12 +37,12 @@ async function storedHeaderFacts(ctx: Context): Promise<HeaderFacts> {
   return { headers, sizes }
 }
 
-/** header 事实缓存（单飞 + TTL）。写穿失效由 startup 的事件监听与写路由负责。 */
+/** Header facts cache (single-flight + TTL). Write-through invalidation is handled by startup's event listeners and the write routes. */
 export function createHeaderStore(ctx: Context): HeaderFactsStore<HeaderFacts> {
   return createHeaderFactsStore(() => storedHeaderFacts(ctx), HEADER_CACHE_TTL_MS)
 }
 
-/** SessionHeader → 纯逻辑树结构。 */
+/** SessionHeader → pure-logic tree structure. */
 export function treeHeaderOf(header: SessionHeader): SessionTreeHeader {
   return {
     id: String(header.id),
@@ -52,7 +52,7 @@ export function treeHeaderOf(header: SessionHeader): SessionTreeHeader {
   }
 }
 
-/** 树内全部节点 id（前序遍历，供批量标题读取）。 */
+/** Ids of every node in the tree (pre-order, for batch title reads). */
 export function treeIds(nodes: readonly SessionTreeNode[]): string[] {
   const out: string[] = []
   for (const node of nodes) {
