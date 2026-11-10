@@ -128,6 +128,14 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
 
   const body = page?.body ?? ''
 
+  // One 批注 per entry, numbered in creation order (stable across status changes).
+  // Declared as a memo BEFORE the callbacks: a plain const declared later would be captured
+  // by the first render's closure and stay empty forever (id -> 0).
+  const numberOf = useMemo(() => {
+    const ordered = [...annotations].sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+    return new Map(ordered.map((thread, index) => [thread.id, index + 1]))
+  }, [annotations])
+
   /** Selection → composer. Selections outside the rendered body are ignored. */
   const handleSelect = useCallback((): void => {
     const container = bodyRef.current
@@ -250,7 +258,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       const number = numberOf.get(thread.id) ?? 0
       return `【批注 ${number}】${thread.path}\n${head}\n${history}`
     }).join('\n\n')
-  }, [t])
+  }, [numberOf, t])
 
   const handoff = useCallback((threads: readonly DeskAnnotation[]): void => {
     if (sessionId === undefined || threads.length === 0) return
@@ -261,10 +269,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   if (path === undefined) {
     return <div className="dsh-desk-review"><p className="dsh-desk-notebook-hint">{t('review.noPath')}</p></div>
   }
-
-  // One 批注 per entry, numbered in creation order (stable across status changes).
-  const orderedThreads = [...annotations].sort((left, right) => left.createdAt.localeCompare(right.createdAt))
-  const numberOf = new Map(orderedThreads.map((thread, index) => [thread.id, index + 1]))
 
   const openThreads = annotations.filter(thread => thread.status === 'open' || thread.status === 'answered')
   const answeredCount = annotations.filter(thread => thread.status === 'answered').length
