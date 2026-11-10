@@ -74,11 +74,31 @@ export const SCHEDULE_CSS = `
 }
 .dsh-desk-schedule-empty p { margin: 0; }
 
-/* top row: Today (left) + Upcoming (right), equal width, calendar takes the rest */
+/* Top row: Start (narrow) + Today + Upcoming, centred as one block.
+   Three columns separate the three jobs, and stacking the create buttons keeps the row short. */
 .dsh-desk-schedule-top {
-  flex: none; display: grid; gap: 8px; height: 168px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: none; display: grid; gap: 8px; height: 148px;
+  width: 100%; max-width: 920px; margin: 0 auto;
+  grid-template-columns: 0.36fr minmax(0, 1fr) minmax(0, 1fr);
 }
+.dsh-desk-schedule-start {
+  box-sizing: border-box; height: 100%; min-width: 0; display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 10px 9px; background: var(--dsw-alias-bg-layer-1, #fff);
+  border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); border-radius: var(--dsw-radius-lg, 16px);
+  overflow: hidden;
+}
+.dsh-desk-schedule-start > header { flex: none; }
+.dsh-desk-schedule-start > header h3 {
+  margin: 0; font-size: 12px; font-weight: 600; line-height: 16px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-desk-start-actions { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
+/* Same white primary button as the notes/tasks toolbar, scaled to a narrow stacked column. */
+.dsh-desk-start-actions .dsh-desk-action {
+  flex: 1; min-height: 0; width: 100%; height: auto; padding: 0 6px; gap: 3px;
+  font-size: 11px; border-radius: 10px;
+}
+.dsh-desk-start-actions .dsh-desk-action-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-desk-schedule-upcoming {
   height: 100%; overflow: hidden;
 }
@@ -113,16 +133,6 @@ export const SCHEDULE_CSS = `
 }
 .dsh-desk-today-stat b { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .dsh-desk-today-stat:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
-/* Dedicated action strip: the three buttons share the width evenly instead of wrapping. */
-.dsh-desk-today-actions {
-  flex: none; display: flex; align-items: center; gap: 6px;
-  padding-top: 6px; border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-}
-.dsh-desk-today-actions .dsh-desk-action {
-  flex: 1; min-width: 0; height: 26px; padding: 0 4px; font-size: 11px; gap: 2px; border-radius: 8px;
-}
-.dsh-desk-today-actions .dsh-desk-action-label { overflow: hidden; text-overflow: ellipsis; }
-
 /** Compact switch shared by the management page. */
 .dsh-desk-switch {
   flex: none; width: 26px; height: 15px; padding: 0; border: 0; border-radius: 999px; position: relative; cursor: pointer;
@@ -351,8 +361,10 @@ export const SCHEDULE_CSS = `
   .dsh-desk-schedule-actions { width: 100%; margin-left: 0; justify-content: flex-end; }
 }
 @container (max-width: 900px) {
-  /* Keep the two top cards side by side even in a narrow panel; only tighten the right column. */
-  .dsh-desk-schedule-top { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Keep all three cards side by side in a narrow panel; only the Start column tightens. */
+  .dsh-desk-schedule-top { grid-template-columns: 0.3fr minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+  .dsh-desk-schedule-start { padding: 8px 7px 9px; }
+  .dsh-desk-start-actions .dsh-desk-action { padding: 0 3px; gap: 2px; }
 }
 .dsh-desk-schedule-steps { margin: 6px 0; font-size: 12px; color: var(--dsw-alias-label-secondary, #6b7280); }
 .dsh-desk-schedule-steps summary { cursor: pointer; color: var(--dsw-alias-label-tertiary, #8a919f); }

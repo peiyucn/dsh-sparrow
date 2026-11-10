@@ -41,6 +41,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'schedule.addConnection'
       | 'schedule.back'
       | 'today.title'
+      | 'today.start'
       | 'today.copyTitle'
       | 'today.events'
       | 'today.noEvents'

@@ -18,7 +18,7 @@ import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
 import { addDays, dayKey, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName } from './utils.js'
 import {
-  EventCard, ListBoard, MonthBoard, ScheduleToolbar, SourcesPage, TodayPanel, UpcomingPanel, WeekBoard,
+  EventCard, ListBoard, MonthBoard, ScheduleToolbar, SourcesPage, StartPanel, TodayPanel, UpcomingPanel, WeekBoard,
   type ClickPoint,
   type TodayContext,
   type UpcomingRange,
@@ -314,6 +314,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
       ) : (
         <>
           <div className="dsh-desk-schedule-top">
+            <StartPanel t={t} context={todayContext} />
             <TodayPanel
               t={t}
               today={today}

@@ -239,7 +239,23 @@ export function TodayPanel(props: {
           ))}
         </div>
       </div>
-      <div className="dsh-desk-today-actions">
+    </section>
+  )
+}
+
+/**
+ * Narrow "Start" card holding the three create actions. They stack vertically and stretch, so the
+ * row can stay short while each button is taller than a plain toolbar button.
+ */
+export function StartPanel(props: {
+  readonly t: DeskTranslator
+  readonly context: TodayContext
+}): ReactElement {
+  const { t, context } = props
+  return (
+    <section className="dsh-desk-schedule-start">
+      <header><h3>{t('today.start')}</h3></header>
+      <div className="dsh-desk-start-actions">
         <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={context.onAddNote}>
           {plusIcon}<span className="dsh-desk-action-label">{t('action.newNote')}</span>
         </button>
