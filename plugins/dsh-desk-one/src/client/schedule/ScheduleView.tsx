@@ -303,7 +303,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext }: {
             <UpcomingPanel
               t={t}
               today={today}
-              events={visibleUpcoming}
+              events={visibleUpcoming.filter(event => dayKey(new Date(event.start)) !== dayKey(today))}
               calendars={calendars}
               onOpen={openEvent}
               onViewAll={() => { setListStart(today); chooseView('list'); setCursor(today) }}

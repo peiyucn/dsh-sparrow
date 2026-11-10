@@ -228,6 +228,17 @@ export function DeskOnePage(props: DeskPanelProps) {
       <path d="M4 5.5h12v11H4zM3 3.5h14v2H3zM8 9h4" />
     </svg>
   )
+  const syncIcon = (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4.2 8.5A6 6 0 0 1 15.5 6M15.8 11.5A6 6 0 0 1 4.5 14M15.5 3.5V6h-2.5M4.5 16.5V14H7" />
+    </svg>
+  )
+  const sourcesIcon = (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <rect x="3.5" y="4.5" width="13" height="12" rx="1.6" />
+      <path d="M3.5 8h13M7 3.5v2M13 3.5v2" />
+    </svg>
+  )
   const smashIcon = (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
       <path d="M10 2.6v3.1M10 14.3v3.1M2.6 10h3.1M14.3 10h3.1M4.8 4.8l2.2 2.2M13 13l2.2 2.2M15.2 4.8L13 7M7 13l-2.2 2.2" />
@@ -342,9 +353,11 @@ export function DeskOnePage(props: DeskPanelProps) {
     return (
       <>
         <button key="schedule-sync" type="button" className="dsh-desk-action" onClick={() => scheduleActionsRef.current?.sync()}>
+          {syncIcon}
           <span className="dsh-desk-action-label">{t('schedule.refresh')}</span>
         </button>
         <button key="schedule-sources" type="button" className="dsh-desk-action" onClick={() => scheduleActionsRef.current?.openSources()}>
+          {sourcesIcon}
           <span className="dsh-desk-action-label">{t('schedule.sources')}</span>
         </button>
       </>
