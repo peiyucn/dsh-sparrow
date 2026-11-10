@@ -49,7 +49,6 @@ export function DeskOnePage(props: DeskPanelProps) {
   const [creating, setCreating] = useState(false)
   const zTopRef = useRef(0)
   const scheduleActionsRef = useRef<ScheduleHeaderActions | null>(null)
-  const [scheduleSyncing, setScheduleSyncing] = useState(false)
   const [onSourcesPage, setOnSourcesPage] = useState(false)
 
   const selectTab = useCallback((next: Tab): void => {
@@ -230,11 +229,6 @@ export function DeskOnePage(props: DeskPanelProps) {
       <path d="M4 5.5h12v11H4zM3 3.5h14v2H3zM8 9h4" />
     </svg>
   )
-  const syncIcon = (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4.2 8.5A6 6 0 0 1 15.5 6M15.8 11.5A6 6 0 0 1 4.5 14M15.5 3.5V6h-2.5M4.5 16.5V14H7" />
-    </svg>
-  )
   const sourcesIcon = (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
       <rect x="3.5" y="4.5" width="13" height="12" rx="1.6" />
@@ -362,16 +356,10 @@ export function DeskOnePage(props: DeskPanelProps) {
       )
     }
     return (
-      <>
-        <button key="schedule-sync" type="button" className="dsh-desk-action" disabled={scheduleSyncing} data-busy={scheduleSyncing ? 'true' : undefined} onClick={() => scheduleActionsRef.current?.sync()}>
-          {syncIcon}
-          <span className="dsh-desk-action-label">{scheduleSyncing ? t('schedule.syncing') : t('schedule.refresh')}</span>
-        </button>
-        <button key="schedule-sources" type="button" className="dsh-desk-action" onClick={() => scheduleActionsRef.current?.openSources()}>
-          {sourcesIcon}
-          <span className="dsh-desk-action-label">{t('schedule.sources')}</span>
-        </button>
-      </>
+      <button key="schedule-sources" type="button" className="dsh-desk-action" onClick={() => scheduleActionsRef.current?.openSources()}>
+        {sourcesIcon}
+        <span className="dsh-desk-action-label">{t('schedule.sources')}</span>
+      </button>
     )
   }
 
@@ -411,7 +399,6 @@ export function DeskOnePage(props: DeskPanelProps) {
               t={t}
               api={schedule}
               headerActionsRef={scheduleActionsRef}
-              onSyncStateChange={setScheduleSyncing}
               onPageChange={setOnSourcesPage}
               todayContext={{
                 notesCount: trash.activeNotes.length,

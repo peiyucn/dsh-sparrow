@@ -37,7 +37,8 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-nav { display: flex; align-items: center; gap: 6px; }
 .dsh-desk-schedule-range {
   font-size: 14px; font-weight: 600; width: 168px; flex: none;
-  display: inline-flex; align-items: center; height: 24px; line-height: 24px;
+  display: inline-flex; align-items: center; justify-content: center; height: 24px; line-height: 24px;
+  text-align: center;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .dsh-desk-schedule-viewtabs { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
@@ -52,7 +53,7 @@ export const SCHEDULE_CSS = `
   box-sizing: border-box;
   border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); background: transparent; color: inherit;
   font: inherit; font-size: 12px; height: 24px; padding: 0 8px; border-radius: 6px; cursor: pointer;
-  display: inline-flex; align-items: center; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px; text-decoration: none;
 }
 .dsh-desk-schedule-chip:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-schedule-chip:disabled { opacity: .55; cursor: default; }
@@ -144,11 +145,17 @@ export const SCHEDULE_CSS = `
   display: flex; align-items: center; justify-content: space-between; flex: none;
   font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-secondary, #6b7280);
 }
-/* Range slider: a small horizontal rounded rectangle matches the official DSH control language. */
+/* Range slider: the selected span is tinted so the fill matches what the card actually shows.
+   The percentage arrives as --dsh-desk-range-fill from the component (value / max). */
 .dsh-desk-upcoming-range { flex: none; display: flex; align-items: center; gap: 8px; }
 .dsh-desk-upcoming-range input[type='range'] {
   flex: 1; min-width: 0; height: 4px; appearance: none; -webkit-appearance: none;
-  border-radius: 2px; background: var(--dsw-alias-border-l2, #cfd4dc); cursor: pointer;
+  border-radius: 2px; cursor: pointer;
+  background: linear-gradient(
+    to right,
+    var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 0 var(--dsh-desk-range-fill, 0%),
+    var(--dsw-alias-border-l2, #cfd4dc) var(--dsh-desk-range-fill, 0%) 100%
+  );
 }
 .dsh-desk-upcoming-range input[type='range']::-webkit-slider-thumb {
   appearance: none; -webkit-appearance: none; width: 16px; height: 8px; border-radius: 3px;
@@ -294,7 +301,8 @@ export const SCHEDULE_CSS = `
 }
 .dsh-desk-schedule-form-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
 .dsh-desk-schedule-connection-card header { display: flex; align-items: center; gap: 8px; }
-.dsh-desk-schedule-connection-card h3 { margin: 0; font-size: 13px; }
+/* Sub-page content scale matches trash / archive: primary row 14px, meta 12px. */
+.dsh-desk-schedule-connection-card h3 { margin: 0; font-size: 14px; font-weight: 600; line-height: 20px; }
 .dsh-desk-schedule-connection-status {
   margin-left: auto; font-size: 11px; padding: 1px 8px; border-radius: 999px;
   background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); color: var(--dsw-alias-label-secondary, #6b7280);
@@ -329,9 +337,9 @@ export const SCHEDULE_CSS = `
 }
 .dsh-desk-schedule-mgmt-row:first-of-type { border-top: 0; }
 .dsh-desk-schedule-mgmt-row[data-off='true'] .dsh-desk-schedule-mgmt-name { color: var(--dsw-alias-label-tertiary, #8a919f); }
-.dsh-desk-schedule-mgmt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.dsh-desk-schedule-mgmt-count { flex: none; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); }
-.dsh-desk-schedule-mgmt-label { flex: none; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); margin-left: 6px; }
+.dsh-desk-schedule-mgmt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.dsh-desk-schedule-mgmt-count { flex: none; font-size: 12px; color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-schedule-mgmt-label { flex: none; font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); margin-left: 6px; }
 .dsh-desk-schedule-sync-hint { margin: 0 0 4px; font-size: 11px; line-height: 15px; color: var(--dsw-alias-label-tertiary, #8a919f); }
 .dsh-desk-schedule-colorbutton {
   width: 12px; height: 12px; min-width: 12px; padding: 0; border: 0; border-radius: 50%;

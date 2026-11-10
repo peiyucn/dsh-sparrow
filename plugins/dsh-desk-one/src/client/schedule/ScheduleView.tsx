@@ -47,22 +47,17 @@ function readHidden(): Set<string> {
 }
 
 export interface ScheduleHeaderActions {
-  sync: () => void
   openSources: () => void
-  /** Published whenever a sync starts/finishes so the shared header can show progress. */
-  syncing: boolean
   /** True on the in-panel sources page, so the header can host the shared back button. */
   onSourcesPage: boolean
   backToCalendar: () => void
 }
 
-export function ScheduleView({ t, api, headerActionsRef, todayContext, onSyncStateChange, onPageChange }: {
+export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageChange }: {
   readonly t: DeskTranslator
   readonly api: ScheduleApi
   readonly headerActionsRef?: { current: ScheduleHeaderActions | null }
   readonly todayContext: TodayContext
-  /** Lets the shared header reflect sync progress without subscribing to internal state. */
-  readonly onSyncStateChange?: (syncing: boolean) => void
   /** Lets the shared header swap in the back button when the sources page opens. */
   readonly onPageChange?: (onSourcesPage: boolean) => void
 }): ReactElement {
@@ -126,7 +121,6 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onSyncSta
     if (syncingRef.current) return
     syncingRef.current = true
     setSyncing(true)
-    onSyncStateChange?.(true)
     setError(null)
     try {
       await api.sync()
@@ -136,9 +130,8 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onSyncSta
     } finally {
       syncingRef.current = false
       setSyncing(false)
-      onSyncStateChange?.(false)
     }
-  }, [api, load, onSyncStateChange])
+  }, [api, load])
 
   useEffect(() => { onPageChange?.(page === 'sources') }, [page, onPageChange])
 
@@ -146,14 +139,12 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onSyncSta
   useEffect(() => {
     if (headerActionsRef === undefined) return
     headerActionsRef.current = {
-      sync: () => { void runSync() },
       openSources: () => { setSelected(null); setPage('sources') },
-      syncing,
       onSourcesPage: page === 'sources',
       backToCalendar: () => { setPage('calendar') },
     }
     return () => { headerActionsRef.current = null }
-  }, [headerActionsRef, runSync, syncing, page])
+  }, [headerActionsRef, page])
 
   // One auto-sync per mount (stale mirror only), never a state-driven loop.
   useEffect(() => {
@@ -270,6 +261,9 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onSyncSta
         onColor={cycleColor}
         onSetEnabled={setCalendarEnabled}
         onChanged={async () => { await load() }}
+        onSync={() => { void runSync() }}
+        syncing={syncing}
+        syncError={error}
       />
     )
   }
