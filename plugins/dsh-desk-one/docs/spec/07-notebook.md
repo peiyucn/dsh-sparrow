@@ -184,11 +184,16 @@ kind: 'annotation'
 ### 6.4 状态机与批量接受
 
 ```
-open ──(交给 AI)──> open ──(AI 处理并回复)──> answered ──(人点 ✓)──> resolved
-  └─(锚点失效)──> orphaned ──(重新定位)──> open
+open ──(交给 AI)──> open ──(AI 处理并回复)──> answered ──(人点【接受】)──> resolved
+  └─(锚点失效)──> orphaned ──(重新定位)──> open                        │
+                                                                       │
+resolved ──(人点【重新打开】)──> open ──继续补充回复 → 交给 AI ──> answered ──> 接受（循环）
 ```
 
-- **AI 只能标 `answered`；`resolved` 只能人点**。
+- **AI 只能标 `answered`；`resolved` 只能人点**（REST 路由给界面；agent 工具不暴露 `resolved`）。
+- **接受 = 关闭当前这一轮 AI 反馈**：只有 `answered` 能接受。`重新打开` 回到 `open` 后没有待接受的答复，
+  必须再走一轮「补充回复 → 交给 AI → AI 反馈」，才会出现新的「接受」。
+- 这样「接受」不会对旧答复反复反悔，也不需要回滚已经落地的文件改动。
 - **「全部接受」**：只作用于**当前这篇笔记**的 `answered`，绝不碰 `open`；执行后 toast「已接受 N 条 [撤销]」。
 - 当前文件没有 `answered` 时按钮禁用（不隐藏，避免布局跳动）。
 

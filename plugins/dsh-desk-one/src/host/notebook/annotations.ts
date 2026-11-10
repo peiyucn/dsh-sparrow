@@ -99,8 +99,12 @@ export function appendAnnotationComment(
 }
 
 /**
- * The status machine: every transition keeps a thread reviewable. `resolved` is
- * reachable only from `answered`, because accepting is the human's review act.
+ * The status machine: every transition keeps a thread reviewable.
+ *
+ * Accepting closes the CURRENT round only, so `resolved` comes from `answered` alone:
+ * a reopened thread (`open`) has no pending AI answer to accept until another round
+ * produces one. `resolved` is a human act — the REST surface sets it and the agent
+ * tools expose `answered` alone, so the model can never close a thread.
  */
 const STATUS_TRANSITIONS: Readonly<Record<DeskAnnotation['status'], readonly DeskAnnotation['status'][]>> = {
   open: ['open', 'answered', 'orphaned'],
