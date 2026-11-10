@@ -234,16 +234,22 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     }
   }, [notebook])
 
-  /** Quote text for one thread, handed to the composer (never auto-sent). */
+  /**
+   * Quote text for one thread, handed to the composer (never auto-sent). The whole
+   * thread travels with it: the AI must see what the human already said and what an
+   * earlier AI turn answered, or it re-does work that is already settled.
+   */
   const handoffText = useCallback((threads: readonly DeskAnnotation[]): string => {
     return threads.map(thread => {
-      const anchor = thread.anchor.type === 'field'
+      const head = thread.anchor.type === 'field'
         ? `${thread.anchor.field}: ${thread.anchor.value}`
         : `> ${thread.anchor.quote}`
-      const first = thread.comments[0]?.body ?? ''
-      return `【批注】${thread.path}\n${anchor}\n${first}`
+      const history = thread.comments
+        .map(comment => `${comment.author === 'ai' ? t('review.byAi') : t('review.byHuman')}：${comment.body}`)
+        .join('\n')
+      return `【批注】${thread.path}\n${head}\n${history}`
     }).join('\n\n')
-  }, [])
+  }, [t])
 
   const handoff = useCallback((threads: readonly DeskAnnotation[]): void => {
     if (sessionId === undefined || threads.length === 0) return
