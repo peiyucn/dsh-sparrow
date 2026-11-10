@@ -27,15 +27,28 @@ type RemoteResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: { readonly message: string } }
 
-/** The slice of the directory-picker Remote namespace this module needs. */
+/**
+ * The directory-picker Remote namespace. A host composes exactly one capability:
+ * a native OS chooser (`pick`) or in-app browsing (`list`/`createDirectory`), and
+ * refuses the verbs it does not serve.
+ */
 export interface DirectoryPickerLike {
-  list(path: string, signal?: AbortSignal): Promise<RemoteResult<DirectoryListingView>>
+  pick(signal?: AbortSignal): Promise<RemoteResult<string | null>>
+  list?(path: string, signal?: AbortSignal): Promise<RemoteResult<DirectoryListingView>>
 }
 
 /** Optional folder browser the notebook picker uses. */
 export interface DirectoryBrowser {
   /** Whether the seam is currently attached. */
   available(): boolean
+  /** Whether the seam also serves in-app browsing (the browse backend). */
+  canBrowse(): boolean
+  /**
+   * Open the host's chooser.
+   * @param signal - caller lifetime.
+   * @returns the chosen absolute path, or null when the operator cancels.
+   */
+  pick(signal?: AbortSignal): Promise<string | null>
   /**
    * List one level.
    * @param path - absolute directory path.
@@ -56,9 +69,17 @@ export function createDirectoryBrowser(): DirectoryBrowser {
   let attached: DirectoryPickerLike | undefined
   return {
     available: () => attached !== undefined,
-    async list(path, signal) {
+    canBrowse: () => attached?.list !== undefined,
+    async pick(signal) {
       const service = attached
       if (service === undefined) throw new Error('目录选择器不可用')
+      const result = await service.pick(signal)
+      if (!result.ok) throw new Error(result.error.message)
+      return result.value
+    },
+    async list(path, signal) {
+      const service = attached
+      if (service?.list === undefined) throw new Error('目录浏览不可用')
       const result = await service.list(path, signal)
       if (!result.ok) throw new Error(result.error.message)
       return result.value

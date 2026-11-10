@@ -253,7 +253,7 @@ open ──(交给 AI)──> open ──(AI 处理并回复)──> answered �
 | 1 | 右侧栏注册自定义审阅 tab | ✅ 可行 | `ctx.sidebarRightTabs.register({ id, kind, title, patterns? })` + 槽位 `sidebar.right.pane.tab` / `.title`（官方 `ui-sidebar-right` 公开面）。官方 `ui-plan`（builtin）与 `client-ui-forge`（extension）都用这一套；页面型 tab 可省略 `patterns`，用 `openTab(kind)` 打开 |
 | 2 | `insertQuote` 从插件 client 半可达 | ✅ 可行 | `ctx.sessions.scope(sessionId)?.get('conversation')` → `conversation.input.for(scope)` → `insertQuote(text)`。`ISessions.scope` 与 `IConversation.input`（`SessionInputResolver`）都是公开契约，forge 即用此链路 |
 | 3 | host 枚举工作区目录 | ✅ 可行 | 插件 host 半已有 `node:fs/promises` 先例（`host/sessions/session-files.ts`、`trash.ts`）；工作区根经 `ctx.workspaceRegistry.list()` 的 `path` 取得，无需 `workspaceFiles.list` |
-| 4 | 笔记库配置界面 | ✅ 可行（两条路） | ① `ctx.remote.directoryPicker`（`directory-picker-auto` 已在 web-app 组合，`ui-workspace` 即这么用）；② `ctx.get('workspaces')` 的 `IWorkspaces.list` 让用户选工作区 + 填相对子路径。**推荐 ②**：天然保证"位于工作区之下"这条约束 |
+| 4 | 笔记库配置界面 | ✅ 可行（两条路，按宿主能力切换） | ① 选工作区列表走 `ctx.get('workspaces')`；② 文件夹选择走 `ctx.remote.directoryPicker`。**实测：本机宿主编排的是 native 后端**——`pick()`（系统文件夹对话框）可用，`list()` 被拒（「needs the browse capability」）。故主流程用 `pick()`，宿主若只提供 browse 后端则回退到逐级浏览（`list`）。不手输路径 |
 | 5 | frontmatter 解析 | ✅ 可行（需加依赖） | 插件当前无 YAML 解析。实测 `yaml@2.9.1` 能正确解析本项目的 `title/date/type/tags`、带冒号的引号值、嵌套未知字段。**只在 host 半引入**，解析结果经 REST 把「字段名 + 值 + 原文」发给 client，客户端不打包 YAML |
 
 ### 探针带出的两条实施约束
