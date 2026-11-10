@@ -6,7 +6,7 @@
  * same way (auth vs transient vs unsupported) for the UI to offer the right next action.
  */
 
-export type CalendarProvider = 'wecom' | 'icloud' | 'outlook' | 'ics'
+type CalendarProvider = 'wecom' | 'icloud' | 'outlook' | 'ics'
 
 /** One remote calendar. `order` preserves the server-side order for the source → calendar tree. */
 export interface RemoteCalendar {
@@ -49,7 +49,7 @@ export interface PullWindow {
  * - `TRANSIENT` is a network / 5xx / rate-limit failure and may be retried with backoff.
  * - `UNSUPPORTED` means the server answered with something this adapter cannot map.
  */
-export type SyncErrorKind = 'AUTH_EXPIRED' | 'TRANSIENT' | 'UNSUPPORTED'
+type SyncErrorKind = 'AUTH_EXPIRED' | 'TRANSIENT' | 'UNSUPPORTED'
 
 export class ScheduleError extends Error {
   constructor(readonly kind: SyncErrorKind, message: string, readonly code?: string) {

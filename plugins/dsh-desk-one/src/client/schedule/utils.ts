@@ -57,7 +57,7 @@ export function formatMonthLabel(date: Date, t: DeskTranslator): string {
 }
 
 /** Week start (Monday) of the given date, at local midnight. */
-export function weekStartOf(date: Date): Date {
+function weekStartOf(date: Date): Date {
   return addDays(startOfLocalDay(date), -((date.getDay() + 6) % 7))
 }
 
@@ -124,7 +124,7 @@ export function groupByDay(events: readonly DeskEvent[], today: Date, days: numb
 }
 
 /** Week grid geometry in percentages of the full day so the grid is a fixed 24h canvas. */
-export interface WeekBlock {
+interface WeekBlock {
   readonly event: DeskEvent
   readonly dayIndex: number
   readonly topPct: number

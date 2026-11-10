@@ -168,7 +168,7 @@ export function canWriteProjectionCache(ctx: Context): boolean {
 }
 
 /** Read one projection row (missing / malformed shape / service unavailable all yield undefined). */
-export function readProjectionRow(ctx: Context, sessionId: string): unknown {
+function readProjectionRow(ctx: Context, sessionId: string): unknown {
   try {
     return ctx.storageDomain.get(projectionCacheDomain.name)?.table(projectionCacheDomain.table).get(sessionId)
   } catch {

@@ -146,7 +146,7 @@ export function eventMatchesDraft(event: DeskEvent, draft: EventDraft): boolean 
 }
 
 /** ISO instants compare lexicographically only when the timezone suffix is identical (Z). */
-export function eventOverlaps(event: Pick<DeskEvent, 'start' | 'end'>, from: string, to: string): boolean {
+function eventOverlaps(event: Pick<DeskEvent, 'start' | 'end'>, from: string, to: string): boolean {
   return event.start < to && event.end > from
 }
 

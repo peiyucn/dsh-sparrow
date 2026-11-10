@@ -5,7 +5,7 @@
  * optional `ctx.inject` fork, and degrades to `enabled: false` when any service is absent.
  */
 
-export type SessionAvailability = 'available' | 'loading' | 'archived' | 'unavailable'
+type SessionAvailability = 'available' | 'loading' | 'archived' | 'unavailable'
 
 /** One linkable session, resolved live from the host client services (never persisted). */
 export interface SessionChipInfo {

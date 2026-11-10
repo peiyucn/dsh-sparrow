@@ -58,7 +58,7 @@ const CREDENTIAL_REF: Record<ScheduleProvider, string> = {
 }
 
 /** Mirror window: `[-6, +3]` months around now, ISO UTC. */
-export function mirrorWindow(now = new Date()): PullWindow & { from: string; to: string } {
+function mirrorWindow(now = new Date()): PullWindow & { from: string; to: string } {
   const start = new Date(now)
   start.setUTCMonth(start.getUTCMonth() - SCHEDULE_PAST_MONTHS)
   const end = new Date(now)

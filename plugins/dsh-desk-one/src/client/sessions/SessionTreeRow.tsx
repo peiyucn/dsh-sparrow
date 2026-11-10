@@ -8,7 +8,7 @@
 
 import type { ReactElement, ReactNode } from 'react'
 
-export interface SessionTreeRowProps {
+interface SessionTreeRowProps {
   readonly variant: 'active' | 'archive'
   readonly title: string
   readonly depth: number

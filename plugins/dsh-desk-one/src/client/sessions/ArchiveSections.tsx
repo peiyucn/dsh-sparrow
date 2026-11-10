@@ -22,7 +22,7 @@ import { FillTitleButton } from './FillTitleButton.js'
 import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
 
-export interface ArchiveSnapshot {
+interface ArchiveSnapshot {
   readonly tree: readonly ArchiveTreeNode[]
   readonly strays: readonly StraySessionItem[]
   readonly trash: readonly TrashEntry[]

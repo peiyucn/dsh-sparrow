@@ -26,7 +26,7 @@ type IcalComponent = InstanceType<typeof ICAL.Component>
 type IcalEvent = InstanceType<typeof ICAL.Event>
 type IcalTime = InstanceType<typeof ICAL.Time>
 
-export interface ParseIcsOptions {
+interface ParseIcsOptions {
   provider: RemoteEvent['provider']
   calendarRemoteId: string
   window: PullWindow

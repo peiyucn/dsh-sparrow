@@ -7,7 +7,7 @@ import type { LegacyTrashItem, TrashItem } from '../../session-admin.js'
 
 export { TRASH_SIDECAR }
 /** Trash directory name (the . prefix distinguishes it from official DSH directories). */
-export const DEFAULT_TRASH_DIR = '.sessions-trash'
+const DEFAULT_TRASH_DIR = '.sessions-trash'
 
 export interface ArchiveConfig {
   readonly trashRoot: string
@@ -40,7 +40,7 @@ function dshHomeBase(): string {
 }
 
 /** Absolute path of the default trash directory. */
-export function defaultTrashDir(): string {
+function defaultTrashDir(): string {
   return join(dshHomeBase(), DEFAULT_TRASH_DIR)
 }
 
@@ -268,7 +268,7 @@ export function buildSessionTree(headers: readonly SessionTreeHeader[]): Session
   return nodes.map(convert)
 }
 
-export interface ArchiveAlignment {
+interface ArchiveAlignment {
   readonly add: string[]
   readonly remove: string[]
 }
@@ -497,7 +497,7 @@ export function labelFromSubagentIdentity(identity: SubagentIdentityValue | null
  * allowed (conclusions like "authoritatively no label" must be remembered too, otherwise the log would be
  * re-folded every time), so callers must never store undefined values.
  */
-export interface LruCache<K, V> {
+interface LruCache<K, V> {
   get(key: K): V | undefined
   set(key: K, value: V): void
   readonly size: number

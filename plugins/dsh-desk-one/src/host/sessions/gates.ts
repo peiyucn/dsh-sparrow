@@ -63,13 +63,13 @@ export function assertRegistryMutationApi(registry: unknown): RegistryMutationSu
  * Return shape of the private locate method: this plugin only uses kind and path (see sessionDirectoryFor).
  * Since 0.1.5-rc.1 the official code no longer exposes it on the public SessionPersistence type, so that type cannot be used directly.
  */
-export interface SessionLocationLike {
+interface SessionLocationLike {
   readonly kind: string
   readonly path: string
 }
 
 /** Checked accessor for the private locate method. */
-export interface SessionLocationApi {
+interface SessionLocationApi {
   locate(header: SessionHeader): SessionLocationLike | undefined
 }
 

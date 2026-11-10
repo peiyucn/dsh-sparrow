@@ -28,7 +28,7 @@ interface TrashDeps {
   readonly t: DeskTranslator
 }
 
-export interface TrashApi {
+interface TrashApi {
   readonly showTrash: boolean
   readonly setShowTrash: Dispatch<SetStateAction<boolean>>
   readonly toggleTrash: () => void

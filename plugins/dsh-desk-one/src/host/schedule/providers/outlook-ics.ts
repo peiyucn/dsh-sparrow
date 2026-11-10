@@ -9,14 +9,14 @@
 import { SCHEDULE_REQUEST_TIMEOUT_MS } from '../../../constants.js'
 import { ScheduleError } from '../types.js'
 
-export interface OutlookIcsFetchOptions {
+interface OutlookIcsFetchOptions {
   /** ETag from the previous pull; sent as `If-None-Match`. */
   etag?: string
   fetchImpl?: typeof fetch
   timeoutMs?: number
 }
 
-export interface OutlookIcsFetchResult {
+interface OutlookIcsFetchResult {
   ics?: string
   etag?: string
   notModified: boolean

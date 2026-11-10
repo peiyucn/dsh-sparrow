@@ -16,7 +16,7 @@ import { messageOf } from '../../app/utils.js'
 type Patch = Parameters<DeskPanelInjected['updateNote']>[0]['patch']
 type Actions = Pick<DeskPanelInjected, 'listNotes' | 'updateNote' | 'deleteNote'>
 
-export interface NotesData {
+interface NotesData {
   readonly notes: readonly DeskNote[]
   readonly setNotes: Dispatch<SetStateAction<readonly DeskNote[]>>
   readonly loading: boolean

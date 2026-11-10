@@ -33,7 +33,7 @@ import { DeskHeader } from './DeskHeader.js'
 import { messageOf, readInitialTab } from './utils.js'
 
 /** Page props: main-panel owner share + injected actions + locale seat (assembled by the host). */
-export type DeskPanelProps = PropsRuntime<'main'> & InjectFace<DeskPanelInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
+type DeskPanelProps = PropsRuntime<'main'> & InjectFace<DeskPanelInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
 
 /** Colours cycled for freshly captured notes (default colour is left to the user). */
 const STICKY_COLORS: readonly NoteColor[] = ['yellow', 'green', 'blue', 'pink']

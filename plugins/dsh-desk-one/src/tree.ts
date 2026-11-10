@@ -4,12 +4,12 @@
  * and cycle handling instead of maintaining two subtly different builders.
  */
 
-export interface TreeNode<T> {
+interface TreeNode<T> {
   readonly value: T
   readonly children: readonly TreeNode<T>[]
 }
 
-export interface NestOptions<T> {
+interface NestOptions<T> {
   readonly idOf: (item: T) => string
   /** Parent id; return undefined for roots (e.g. non-subagent sessions). */
   readonly parentIdOf: (item: T) => string | undefined

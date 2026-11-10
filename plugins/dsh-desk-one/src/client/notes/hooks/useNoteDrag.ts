@@ -28,7 +28,7 @@ interface DragDeps {
   readonly savePatch: (note: DeskNote, patch: Patch) => void
 }
 
-export interface NoteDrag {
+interface NoteDrag {
   readonly startDrag: (event: ReactPointerEvent<HTMLElement>, item: PlacedNote) => void
   readonly startResize: (event: ReactPointerEvent<HTMLElement>, item: PlacedNote) => void
 }

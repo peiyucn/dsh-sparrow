@@ -1,6 +1,6 @@
 /** Sessions host errors: same semantics as the archived plugin's ArchiveError. */
 
-export type SessionsErrorCode =
+type SessionsErrorCode =
   | 'BAD_BODY'
   | 'NOT_ARCHIVED'
   | 'UNKNOWN_SESSION'

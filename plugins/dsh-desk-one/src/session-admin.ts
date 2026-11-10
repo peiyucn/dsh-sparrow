@@ -46,7 +46,7 @@ export interface StraySessionItem {
 }
 
 /** Child session of a trash entry (sidecar v2 bookkeeping, only to show the parent/child hierarchy; restore / delete the whole subtree through the parent entry). */
-export interface TrashSubagentItem {
+interface TrashSubagentItem {
   readonly sessionId: string
   readonly title: string
   readonly parentSessionId?: string
@@ -167,7 +167,7 @@ export interface RestoreResponse {
   readonly workspaceIds: readonly string[]
 }
 
-export interface TrashRestoreFailure {
+interface TrashRestoreFailure {
   readonly trashId: string
   readonly message: string
 }

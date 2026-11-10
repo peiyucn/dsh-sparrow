@@ -113,7 +113,7 @@ export async function listSubagentTargets(
   return targets
 }
 
-export interface SubagentTarget {
+interface SubagentTarget {
   readonly sessionId: SessionId
   readonly header: SessionHeader
   readonly dir: string
@@ -121,7 +121,7 @@ export interface SubagentTarget {
 
 /** Parent session context needed to move into the trash (the route has already done the format gate, live-session
  *  guard, and backend check). */
-export interface SessionMoveAction {
+interface SessionMoveAction {
   readonly sessionId: SessionId
   readonly sessionDir: string
   readonly title: string
@@ -130,7 +130,7 @@ export interface SessionMoveAction {
 }
 
 /** Parent session context needed for permanent deletion. */
-export interface SessionDeleteAction {
+interface SessionDeleteAction {
   readonly sessionId: SessionId
   readonly sessionDir: string
   readonly subagents: readonly SubagentTarget[]

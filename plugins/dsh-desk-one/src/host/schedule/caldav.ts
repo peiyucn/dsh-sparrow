@@ -14,7 +14,7 @@ import type { PullWindow, RemoteCalendar } from './types.js'
 import { parseMultistatus } from './xml.js'
 import type { ParsedResponse } from './xml.js'
 
-export interface CalDavAuth {
+interface CalDavAuth {
   user: string
   password: string
 }
@@ -26,12 +26,12 @@ export interface CalDavDeps {
   provider?: RemoteCalendar['provider']
 }
 
-export interface CalDavDiscovery {
+interface CalDavDiscovery {
   principalUrl: string
   homeUrl: string
 }
 
-export interface CalDavEventResource {
+interface CalDavEventResource {
   href: string
   etag?: string
   ics: string

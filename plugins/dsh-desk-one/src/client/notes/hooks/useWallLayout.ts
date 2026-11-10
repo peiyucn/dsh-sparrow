@@ -35,7 +35,7 @@ export function placeNote(note: DeskNote, index: number, wallSize: WallSize): Pl
   return { note, x, y, width, height, zIndex: note.z ?? index + 1 }
 }
 
-export interface WallLayout {
+interface WallLayout {
   /** Mutable ref: the page attaches `setWallRef` (not this object) to the wall node. */
   readonly wallRef: { current: HTMLDivElement | null }
   readonly setWallRef: (node: HTMLDivElement | null) => void

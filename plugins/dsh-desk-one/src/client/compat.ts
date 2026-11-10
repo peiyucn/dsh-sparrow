@@ -5,7 +5,7 @@
  */
 
 /** One capability: `name` goes into logs, `ok` is probed by the caller. */
-export interface ClientCapability {
+interface ClientCapability {
   readonly name: string
   readonly ok: boolean
 }

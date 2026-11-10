@@ -43,7 +43,7 @@ import { readTitle } from './titles.js'
 import { archiveTreePayload, strayItemsPayload } from './views.js'
 
 /** Host wiring available to a single request. */
-export interface ArchiveRouteContext {
+interface ArchiveRouteContext {
   readonly ctx: Context
   readonly settings: ArchiveConfig
   readonly surface: RegistryMutationSurface

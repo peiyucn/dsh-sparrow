@@ -307,7 +307,7 @@ export interface CreateNoteRequest {
   readonly z?: number
 }
 
-export interface NotePatchRequest {
+interface NotePatchRequest {
   readonly title?: string
   readonly body?: string
   readonly color?: string

@@ -91,7 +91,7 @@ export interface SessionServices {
   readonly uiWorkspace: UiWorkspaceLike
 }
 
-export interface SessionLinkBridge {
+interface SessionLinkBridge {
   readonly api: SessionLinkApi
   /** Attach to live services; returns a detach that restores the disabled facade. */
   attach: (services: SessionServices) => () => void

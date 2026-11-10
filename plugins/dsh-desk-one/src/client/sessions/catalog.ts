@@ -3,7 +3,7 @@
 import { nestTree } from '../../tree.js'
 import type { SessionChipInfo, SessionWorkspaceGroupInfo } from './contract.js'
 
-export interface SessionWorkspaceGroup {
+interface SessionWorkspaceGroup {
   /** Stable key: workspace id, cwd fallback, or '' for sessions without both. */
   readonly key: string
   /** Display label: workspace title, then last path segment; empty means "no workspace". */
@@ -14,7 +14,7 @@ export interface SessionWorkspaceGroup {
   readonly rows: readonly ActiveSessionRow[]
 }
 
-export interface ActiveSessionRow {
+interface ActiveSessionRow {
   readonly session: SessionChipInfo
   readonly depth: number
   readonly childCount: number

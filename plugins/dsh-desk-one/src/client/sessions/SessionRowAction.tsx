@@ -1,7 +1,7 @@
 /** Icon actions for session rows: element-level operations are icons, section-level ones stay text. */
 import type { ReactElement } from 'react'
 
-export type SessionActionKind = 'archive' | 'unarchive' | 'trash' | 'restore' | 'delete'
+type SessionActionKind = 'archive' | 'unarchive' | 'trash' | 'restore' | 'delete'
 
 const PATHS: Record<SessionActionKind, ReactElement> = {
   archive: <><path d="M3 4h18v4H3z" /><path d="M5 8v11h14V8" /><path d="M9 12h6" /></>,

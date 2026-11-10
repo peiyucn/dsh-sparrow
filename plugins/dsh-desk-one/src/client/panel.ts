@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
 /** One main-panel entry: the pieces for each registration plus the shared identity. */
-export interface MainPanelEntry<
+interface MainPanelEntry<
   N extends keyof LocaleNamespaceMap & string,
   I extends object,
 > {

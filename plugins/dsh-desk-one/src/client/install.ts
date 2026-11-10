@@ -86,7 +86,7 @@ export interface DeskPanelInjected {
 }
 
 /** Browser-side pieces injected at the entry (supplied by index.ts; tests may pass stubs). */
-export interface DeskClientDeps {
+interface DeskClientDeps {
   readonly page: SlotComponent<
     PropsRuntime<'main'> & InjectFace<DeskPanelInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
   >

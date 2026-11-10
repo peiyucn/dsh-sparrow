@@ -11,7 +11,7 @@ import {
 } from './constants.js'
 import type { DeskNote, DeskTask, DeskTaskGroup, NoteColor, TaskStatus } from './contract.js'
 
-export type DeskModelErrorCode =
+type DeskModelErrorCode =
   | 'INVALID_NOTE'
   | 'REVISION_CONFLICT'
   | 'UNKNOWN_NOTE'
@@ -58,7 +58,7 @@ export interface NotePatch {
 }
 
 /** Derive the title from the body's first line (the note wall does not show title, but agent tools and search need it). */
-export function titleFromBody(body: string): string {
+function titleFromBody(body: string): string {
   const firstLine = body.split(/\r?\n/u).map(line => line.trim()).find(line => line !== '')
   return (firstLine ?? '').slice(0, 60)
 }
@@ -88,7 +88,7 @@ export function normalizeCoordinate(value: unknown): number | undefined {
 }
 
 /** Valid size: clamped to [min, NOTE_MAX_SIZE]; invalid values are ignored (current / default size is kept). */
-export function normalizeSize(value: unknown, min: number): number | undefined {
+function normalizeSize(value: unknown, min: number): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return undefined
   return Math.round(Math.min(Math.max(value, min), NOTE_MAX_SIZE))
 }
@@ -264,13 +264,13 @@ function normalizeDue(raw: { readonly date?: unknown; readonly timezone?: unknow
 }
 
 /** Non-negative integer order; invalid values are ignored (display order falls back to creation). */
-export function normalizeOrder(value: unknown): number | undefined {
+function normalizeOrder(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined
   return Math.round(value)
 }
 
 /** One-level group name: trimmed, blank means "no name", overlength is rejected. */
-export function normalizeGroupName(value: unknown): string | undefined {
+function normalizeGroupName(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const name = value.trim()
   if (name === '') return undefined
@@ -281,14 +281,14 @@ export function normalizeGroupName(value: unknown): string | undefined {
 }
 
 /** Membership id: non-empty trimmed string (the group record itself is validated by the store). */
-export function normalizeGroupId(value: unknown): string | undefined {
+function normalizeGroupId(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const id = value.trim()
   return id === '' ? undefined : id
 }
 
 /** Linked session ids: opaque strings, deduplicated in order, bounded so a card stays readable. */
-export function normalizeSessionIds(value: unknown): readonly string[] {
+function normalizeSessionIds(value: unknown): readonly string[] {
   if (value === undefined || value === null) return []
   if (!Array.isArray(value)) throw new DeskModelError('INVALID_TASK', 'sessionIds 必须是字符串数组')
   const seen = new Set<string>()
@@ -471,7 +471,7 @@ export function filterTasks(tasks: readonly DeskTask[], query: string | undefine
 /* Task groups: first-class entities, one level, owned by a lane      */
 /* ------------------------------------------------------------------ */
 
-export interface GroupInput {
+interface GroupInput {
   readonly name: string
   readonly status: TaskStatus
   readonly order: number

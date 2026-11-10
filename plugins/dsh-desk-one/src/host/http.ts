@@ -7,7 +7,7 @@ import { DeskModelError } from '../model.js'
 import { ScheduleError } from './schedule/types.js'
 import { SessionsError } from './sessions/errors.js'
 
-export type DeskErrorCode =
+type DeskErrorCode =
   | 'BAD_BODY'
   | 'FORBIDDEN'
   | 'INVALID_NOTE'

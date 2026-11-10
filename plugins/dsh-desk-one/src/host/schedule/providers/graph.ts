@@ -13,7 +13,7 @@ import type { EventDraft } from '../records.js'
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
 const MAX_PAGES = 10
 
-export interface GraphDeviceCode {
+interface GraphDeviceCode {
   readonly deviceCode: string
   readonly userCode: string
   readonly verificationUri: string
@@ -21,13 +21,13 @@ export interface GraphDeviceCode {
   readonly interval: number
 }
 
-export interface GraphTokens {
+interface GraphTokens {
   readonly accessToken: string
   readonly refreshToken?: string
   readonly expiresIn: number
 }
 
-export interface GraphCalendar {
+interface GraphCalendar {
   readonly id: string
   readonly name: string
 }
@@ -46,12 +46,12 @@ interface GraphEvent {
   readonly isCancelled?: boolean
 }
 
-export interface GraphEventPage {
+interface GraphEventPage {
   readonly value?: readonly GraphEvent[]
   readonly '@odata.nextLink'?: string
 }
 
-export interface GraphDeps {
+interface GraphDeps {
   readonly fetchImpl?: typeof fetch
   readonly timeoutMs?: number
 }
