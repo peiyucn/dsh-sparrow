@@ -4,7 +4,7 @@
  */
 
 /** Local YYYY-MM-DD (due dates are day-granular, so "due soon" is a local-calendar question). */
-export function localToday(): Date {
+function localToday(): Date {
   const now = new Date()
   now.setHours(0, 0, 0, 0)
   return now
