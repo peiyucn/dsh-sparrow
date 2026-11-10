@@ -31,6 +31,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'schedule.monthNames'
       | 'schedule.monthLabel'
       | 'schedule.weekNumber'
+      | 'schedule.weekShort'
       | 'schedule.dateFormat'
       | 'schedule.dateFormatFull'
       | 'schedule.listEmpty'

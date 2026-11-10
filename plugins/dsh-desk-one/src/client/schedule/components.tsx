@@ -60,7 +60,7 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
   const rangeLabel = view === 'month'
     ? formatMonthLabel(cursor, t)
     : view === 'week'
-      ? `${t('schedule.weekNumber', { week: isoWeekNumber(weekStart) })} · ${formatDateLabel(weekStart, t)} – ${formatDateLabel(weekEnd, t)}`
+      ? `${formatDateLabel(weekStart, t)} – ${formatDateLabel(weekEnd, t)}`
       : formatFullDateLabel(cursor, t)
   return (
     <div className="dsh-desk-schedule-toolbar">
@@ -448,7 +448,10 @@ export function WeekBoard(props: WeekProps): ReactElement {
   return (
     <div className="dsh-desk-schedule-week">
       <div className="dsh-desk-schedule-week-head">
-        <span className="dsh-desk-schedule-week-gutter" aria-hidden="true" />
+        <span
+          className="dsh-desk-schedule-week-gutter dsh-desk-schedule-week-weekno"
+          title={t('schedule.weekNumber', { week: isoWeekNumber(from) })}
+        >{t('schedule.weekShort', { week: isoWeekNumber(from) })}</span>
         {days.map(day => (
           <span key={day.toISOString()} className="dsh-desk-schedule-week-day" data-today={day.toDateString() === today.toDateString()} data-weekend={isWeekend(day)}>
             <span>{weekdayLabel(day, labels)}</span>

@@ -36,7 +36,7 @@ export const SCHEDULE_CSS = `
 }
 .dsh-desk-schedule-nav { display: flex; align-items: center; gap: 6px; }
 .dsh-desk-schedule-range {
-  font-size: 14px; font-weight: 600; width: 216px; flex: none;
+  font-size: 14px; font-weight: 600; width: 168px; flex: none;
   display: inline-flex; align-items: center; justify-content: center; height: 24px; line-height: 24px;
   text-align: center;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -240,6 +240,12 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-week-head { flex: none; display: grid; grid-template-columns: var(--dsh-desk-week-gutter) repeat(7, minmax(0, 1fr)); }
 /* Empty first cell keeps the day columns aligned with the hour ruler below. */
 .dsh-desk-schedule-week-gutter { display: block; }
+/* The corner above the hour ruler carries the week number, e.g. "W46". */
+.dsh-desk-schedule-week-weekno {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
 .dsh-desk-schedule-week-day { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; color: var(--dsw-alias-label-secondary, #6b7280); }
 .dsh-desk-schedule-week-day[data-weekend='true'] { color: #c2410c; }
 .dsh-desk-schedule-week-day[data-today='true'] { color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); }
