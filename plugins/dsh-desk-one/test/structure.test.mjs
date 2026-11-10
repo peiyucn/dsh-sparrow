@@ -153,7 +153,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /dsh-desk-action/u, '视图动作统一走顶栏按钮')
     assert.match(page, /trash\.smashWall/u, 'Smash 仍由页面动作触发')
     assert.match(page, /data-smash-confirm="true"/u, 'Smash 按钮要能被确认态排除')
-    assert.match(page, /data-danger=\{trash\.confirmSmash \? 'true' : undefined\}/u, 'Smash 确认态用危险色')
+    assert.match(page, /data-danger=\{(?:props\.)?confirmSmash \? 'true' : undefined\}/u, 'Smash 确认态用危险色')
     assert.ok(!/!\s*showTrash\s*&&\s*activeNotes\.length > 0/u.test(page), 'Smash 要常驻')
     assert.match(page, /trashingIds/u, '单张贴纸删除也要播同一段飞散动画')
     assert.match(page, /ids\.has\(item\.id\)/u, 'Smash 要先乐观清墙再落库')

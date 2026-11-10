@@ -13,13 +13,12 @@ import {
   LOCALE_NAMESPACE, MAX_ACTIVE_NOTES, NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH, TAB_STORAGE_KEY,
 } from '../../constants.js'
 import type { DeskNote, NoteColor } from '../../contract.js'
-import { archiveIcon, backIcon, plusIcon, smashIcon, sourcesIcon, trashIcon } from './icons.js'
+import { notesActions, scheduleActions, taskActions } from './headerActions.js'
 import { NoteCard } from '../notes/components/NoteCard.js'
 import { TrashPanel } from '../notes/components/TrashPanel.js'
 import { TaskBoard } from '../tasks/components/TaskBoard.js'
 import { SessionsView } from '../sessions/SessionsView.js'
 import { ScheduleView, type ScheduleHeaderActions } from '../schedule/ScheduleView.js'
-import { SortMenu } from '../tasks/components/SortMenu.js'
 import { useSessionLinks } from '../tasks/hooks/useSessionLinks.js'
 import { useGroupsData } from '../tasks/hooks/useGroupsData.js'
 import { useTaskBoard } from '../tasks/hooks/useTaskBoard.js'
@@ -211,127 +210,38 @@ export function DeskOnePage(props: DeskPanelProps) {
   )
 
   /** Notes/trash actions float over the canvas so notes can scroll underneath them. */
-  const notesActions = (): ReactElement => {
-    if (trash.showTrash) {
-      return (
-        <>
-          <button key="back" type="button" className="dsh-desk-action" aria-label={t('action.backToWall')} title={t('action.backToWall')} onClick={trash.toggleTrash}>
-            {backIcon}
-            <span className="dsh-desk-action-label">{t('action.backToWall')}</span>
-          </button>
-          <button
-            key="clear"
-            type="button"
-            className="dsh-desk-action"
-            aria-label={trash.confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
-            title={trash.confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
-            data-clear-trash-confirm="true"
-            data-danger={trash.confirmClearTrash ? 'true' : undefined}
-            data-stable-width="true"
-            disabled={trash.trashedNotes.length === 0 || trash.smashing}
-            onClick={trash.clearTrash}
-          >
-            {trashIcon}
-            <span className="dsh-desk-action-label">
-              {trash.confirmClearTrash ? t('action.clearTrashConfirm') : t('action.clearTrash')}
-            </span>
-          </button>
-        </>
-      )
-    }
-    return (
-      <>
-        <button
-          key="capture"
-          type="button"
-          className="dsh-desk-action dsh-desk-action-primary"
-          aria-label={t('action.newNote')}
-          title={t('action.newNote')}
-          disabled={creating || trash.smashing}
-          onClick={() => { void addNote() }}
-        >
-          {plusIcon}
-          <span className="dsh-desk-action-label">{t('action.newNote')}</span>
-        </button>
-        <button
-          key="smash"
-          type="button"
-          className="dsh-desk-action"
-          data-smash-confirm="true"
-          aria-label={trash.confirmSmash ? t('action.smashConfirm') : t('action.smash')}
-          title={trash.confirmSmash ? t('action.smashConfirm') : t('action.smash')}
-          data-danger={trash.confirmSmash ? 'true' : undefined}
-          disabled={trash.smashing}
-          onClick={trash.smashWall}
-        >
-          {smashIcon}
-          <span className="dsh-desk-action-label">
-            {trash.confirmSmash ? t('action.smashConfirm') : t('action.smash')}
-          </span>
-        </button>
-        <button key="open-trash" type="button" className="dsh-desk-action" aria-label={t('trash.title')} title={t('trash.title')} onClick={trash.toggleTrash}>
-          {trashIcon}
-          <span className="dsh-desk-action-label">{t('trash.title')}</span>
-        </button>
-      </>
-    )
-  }
-
-  /** Task actions stay in the chrome's second row (board layout is fixed height). */
-  const taskActions = (): ReactElement | null => {
-    if (tab !== 'tasks') return null
-    if (board.showArchive) {
-      return (
-        <button key="task-back" type="button" className="dsh-desk-action" aria-label={t('task.backToBoard')} title={t('task.backToBoard')} onClick={board.toggleArchive}>
-          {backIcon}
-          <span className="dsh-desk-action-label">{t('task.backToBoard')}</span>
-        </button>
-      )
-    }
-    return (
-      <>
-        <button
-          key="task-add"
-          type="button"
-          className="dsh-desk-action dsh-desk-action-primary"
-          aria-label={t('task.add')}
-          title={t('task.add')}
-          onClick={() => board.beginDraft('todo')}
-        >
-          {plusIcon}
-          <span className="dsh-desk-action-label">{t('task.add')}</span>
-        </button>
-        <SortMenu key="task-sort" t={t} mode={board.sortMode} onChange={board.setSortMode} />
-        <button key="task-archive" type="button" className="dsh-desk-action" aria-label={t('task.archive')} title={t('task.archive')} onClick={board.toggleArchive}>
-          {archiveIcon}
-          <span className="dsh-desk-action-label">
-            {t('task.archive')}{board.archivedTasks.length === 0 ? '' : ` (${board.archivedTasks.length})`}
-          </span>
-        </button>
-      </>
-    )
-  }
-
-  /** Schedule actions live in the same header slot as notes/tasks. */
-  const scheduleActions = (): ReactElement | null => {
-    if (tab !== 'schedule') return null
-    if (onSourcesPage) {
-      return (
-        <button key="schedule-back" type="button" className="dsh-desk-action" aria-label={t('schedule.back')} title={t('schedule.back')} onClick={() => scheduleActionsRef.current?.backToCalendar()}>
-          {backIcon}
-          <span className="dsh-desk-action-label">{t('schedule.back')}</span>
-        </button>
-      )
-    }
-    return (
-      <button key="schedule-sources" type="button" className="dsh-desk-action" onClick={() => scheduleActionsRef.current?.openSources()}>
-        {sourcesIcon}
-        <span className="dsh-desk-action-label">{t('schedule.sources')}</span>
-      </button>
-    )
-  }
-
-  const actions = tab === 'notes' ? notesActions() : tab === 'tasks' ? taskActions() : scheduleActions()
+  const actions = tab === 'notes'
+    ? notesActions({
+        t,
+        showTrash: trash.showTrash,
+        toggleTrash: trash.toggleTrash,
+        confirmClearTrash: trash.confirmClearTrash,
+        clearTrash: trash.clearTrash,
+        trashedCount: trash.trashedNotes.length,
+        smashing: trash.smashing,
+        confirmSmash: trash.confirmSmash,
+        smashWall: trash.smashWall,
+        creating,
+        addNote: () => { void addNote() },
+      })
+    : tab === 'tasks'
+      ? taskActions({
+          t,
+          visible: true,
+          showArchive: board.showArchive,
+          toggleArchive: board.toggleArchive,
+          beginDraft: () => board.beginDraft('todo'),
+          sortMode: board.sortMode,
+          setTaskSortMode: board.setSortMode,
+          archivedCount: board.archivedTasks.length,
+        })
+      : scheduleActions({
+          t,
+          visible: true,
+          onSourcesPage,
+          backToCalendar: () => scheduleActionsRef.current?.backToCalendar(),
+          openSources: () => scheduleActionsRef.current?.openSources(),
+        })
 
   return (
     <div className="dsh-desk-page">
