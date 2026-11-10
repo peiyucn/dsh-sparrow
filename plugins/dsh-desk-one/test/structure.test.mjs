@@ -12,13 +12,17 @@ const joined = async (...paths) => (await Promise.all(paths.map(path => read(pat
 /** All client TS/TSX sources joined: structure guards survive component/hook splits. */
 const CLIENT_DIR = new URL('../src/client/', import.meta.url)
 /** Shell + notes feature styles concatenated (CSS is split by feature module). */
-const readStyles = async () => [
-  await read('src/client/app/styles.ts'),
-  await read('src/client/notes/styles.ts'),
-  await read('src/client/tasks/styles.ts'),
-  await read('src/client/schedule/styles.ts'),
-  await read('src/client/sessions/styles.ts'),
-].join('\n')
+const readStyles = async () => await joined(
+  'src/client/app/styles.ts',
+  'src/client/notes/styles.ts',
+  'src/client/tasks/styles/board.ts',
+  'src/client/tasks/styles/card.ts',
+  'src/client/tasks/styles/drag.ts',
+  'src/client/tasks/styles/group.ts',
+  'src/client/tasks/styles/archive.ts',
+  'src/client/schedule/styles.ts',
+  'src/client/sessions/styles.ts',
+)
 
 /** Task board sources joined: guards survive the board / drag / archive split. */
 const readTaskBoard = async () => (await Promise.all([
