@@ -35,6 +35,9 @@ interface ComposerState {
 
 /** Rendered text of one body node, used to derive quote anchors. */
 const CONTEXT_CHARS = 32
+/** How often the thread list catches up while the tab is on screen (AI updates land in the conversation). */
+const REVIEW_POLL_MS = 5_000
+
 /** Cap a stored quote so one thread stays small. */
 const QUOTE_MAX_CHARS = 2_000
 
@@ -125,6 +128,21 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   }, [notebook, path])
 
   useEffect(() => { void load() }, [load])
+
+  // AI turns land in the conversation, not here: the thread list must catch up on its own,
+  // or a status that changed server-side stays invisible and the thread can never be accepted.
+  useEffect(() => {
+    if (path === undefined || info.tab.visible !== true) return
+    const reload = (): void => {
+      void notebook.listAnnotations({ path }).then(setAnnotations, () => undefined)
+    }
+    const timer = setInterval(reload, REVIEW_POLL_MS)
+    window.addEventListener('focus', reload)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', reload)
+    }
+  }, [notebook, path, info.tab.visible])
 
   const body = page?.body ?? ''
 
