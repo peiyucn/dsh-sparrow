@@ -119,11 +119,7 @@ export const SCHEDULE_CSS = `
 .dsh-desk-today-event:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-today-event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-desk-today-actions { display: flex; align-items: center; gap: 6px; margin-top: auto; }
-.dsh-desk-today-actions .dsh-desk-action {
-  height: 26px; padding: 0 10px; font-size: 11px; gap: 2px; border-radius: 8px;
-  background: var(--dsw-alias-bg-layer-1, #ffffff);
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2, #d8dde5);
-}
+
 /** Compact switch shared by the management page. */
 .dsh-desk-switch {
   flex: none; width: 26px; height: 15px; padding: 0; border: 0; border-radius: 999px; position: relative; cursor: pointer;
