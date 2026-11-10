@@ -16,10 +16,11 @@ import {
 import type { DeskCalendar, DeskEvent, ScheduleStateResponse } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
-import { addDays, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName } from './utils.js'
+import { addDays, dayKey, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName } from './utils.js'
 import {
-  EventCard, LinkagePanel, ListBoard, MonthBoard, ScheduleToolbar, SourcesPage, UpcomingPanel, WeekBoard,
+  EventCard, ListBoard, MonthBoard, ScheduleToolbar, SourcesPage, TodayPanel, UpcomingPanel, WeekBoard,
   type ClickPoint,
+  type TodayContext,
 } from './components.js'
 
 type SchedulePage = 'calendar' | 'sources'
@@ -49,10 +50,11 @@ export interface ScheduleHeaderActions {
   openSources: () => void
 }
 
-export function ScheduleView({ t, api, headerActionsRef }: {
+export function ScheduleView({ t, api, headerActionsRef, todayContext }: {
   readonly t: DeskTranslator
   readonly api: ScheduleApi
   readonly headerActionsRef?: { current: ScheduleHeaderActions | null }
+  readonly todayContext: TodayContext
 }): ReactElement {
   const today = useMemo(() => startOfLocalDay(new Date()), [])
   const [page, setPage] = useState<SchedulePage>('calendar')
@@ -290,6 +292,14 @@ export function ScheduleView({ t, api, headerActionsRef }: {
       ) : (
         <>
           <div className="dsh-desk-schedule-top">
+            <TodayPanel
+              t={t}
+              today={today}
+              events={visibleUpcoming.filter(event => dayKey(new Date(event.start)) === dayKey(today))}
+              calendars={calendars}
+              context={todayContext}
+              onOpenEvent={openEvent}
+            />
             <UpcomingPanel
               t={t}
               today={today}
@@ -298,7 +308,6 @@ export function ScheduleView({ t, api, headerActionsRef }: {
               onOpen={openEvent}
               onViewAll={() => { setListStart(today); chooseView('list'); setCursor(today) }}
             />
-            <LinkagePanel t={t} />
           </div>
           <section className="dsh-desk-schedule-main">
             {view === 'month' ? (

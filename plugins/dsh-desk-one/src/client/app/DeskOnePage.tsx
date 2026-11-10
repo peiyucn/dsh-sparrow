@@ -383,7 +383,20 @@ export function DeskOnePage(props: DeskPanelProps) {
                 : renderWall()}
             </div>
           ) : tab === 'schedule' ? (
-            <ScheduleView t={t} api={schedule} headerActionsRef={scheduleActionsRef} />
+            <ScheduleView
+              t={t}
+              api={schedule}
+              headerActionsRef={scheduleActionsRef}
+              todayContext={{
+                notesCount: trash.activeNotes.length,
+                tasks: taskData.tasks
+                  .filter(task => task.status !== 'done' && !task.archived)
+                  .map(task => ({ id: task.id, title: task.title, status: task.status, ...(task.due === undefined ? {} : { dueDate: task.due.date }) })),
+                onAddNote: () => { selectTab('notes'); void addNote() },
+                onAddTask: () => { selectTab('tasks'); board.beginDraft('todo') },
+                onOpenTasks: () => selectTab('tasks'),
+              }}
+            />
           ) : tab === 'sessions' ? (
             <SessionsView snapshot={sessionSnapshot} t={t} onOpen={sessionLink.open} archive={sessionsArchive} />
           ) : (

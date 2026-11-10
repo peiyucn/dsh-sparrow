@@ -142,17 +142,198 @@ export function UpcomingPanel(props: {
   )
 }
 
-/** Reserved top-right slot for future cross-feature linkage (notes / tasks). */
-export function LinkagePanel(props: { readonly t: DeskTranslator }): ReactElement {
+export interface TodayTask {
+  readonly id: string
+  readonly title: string
+  readonly status: 'todo' | 'doing' | 'done'
+  readonly dueDate?: string
+}
+
+export interface TodayContext {
+  readonly notesCount: number
+  readonly tasks: readonly TodayTask[]
+  readonly onAddNote: () => void
+  readonly onAddTask: () => void
+  readonly onOpenTasks: () => void
+}
+
+const FOCUS_STORAGE_KEY = 'dsh-desk-focus-v1'
+const FOCUS_PRESETS = [15, 25, 45] as const
+const FOCUS_DEFAULT_MIN = 25
+
+function readFocus(): { endsAt: number | null; remainingMs: number; durationMs: number } {
+  try {
+    const raw = window.localStorage.getItem(FOCUS_STORAGE_KEY)
+    if (raw === null) return { endsAt: null, remainingMs: FOCUS_DEFAULT_MIN * 60_000, durationMs: FOCUS_DEFAULT_MIN * 60_000 }
+    const parsed = JSON.parse(raw) as { endsAt?: unknown; remainingMs?: unknown; durationMs?: unknown }
+    const durationMs = typeof parsed.durationMs === 'number' ? parsed.durationMs : FOCUS_DEFAULT_MIN * 60_000
+    const endsAt = typeof parsed.endsAt === 'number' ? parsed.endsAt : null
+    const remainingMs = typeof parsed.remainingMs === 'number' ? parsed.remainingMs : durationMs
+    return { endsAt, remainingMs, durationMs }
+  } catch {
+    return { endsAt: null, remainingMs: FOCUS_DEFAULT_MIN * 60_000, durationMs: FOCUS_DEFAULT_MIN * 60_000 }
+  }
+}
+
+function notifyFocusDone(t: DeskTranslator): void {
+  try {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification(t('today.finish'))
+    }
+  } catch { /* notification is best-effort */ }
+  try {
+    const AudioCtor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (AudioCtor !== undefined) {
+      const ctx = new AudioCtor()
+      const oscillator = ctx.createOscillator()
+      const gain = ctx.createGain()
+      oscillator.frequency.value = 880
+      gain.gain.value = 0.08
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      oscillator.start()
+      oscillator.stop(ctx.currentTime + 0.18)
+    }
+  } catch { /* audio is best-effort */ }
+}
+
+function FocusTimer(props: { readonly t: DeskTranslator }): ReactElement {
+  const initial = useMemo(readFocus, [])
+  const [endsAt, setEndsAt] = useState<number | null>(initial.endsAt)
+  const [remainingMs, setRemainingMs] = useState(Math.max(0, initial.remainingMs))
+  const [durationMs, setDurationMs] = useState(initial.durationMs)
+  const [finished, setFinished] = useState(false)
+  const running = endsAt !== null
+
+  useEffect(() => {
+    const payload = { endsAt, remainingMs, durationMs }
+    try { window.localStorage.setItem(FOCUS_STORAGE_KEY, JSON.stringify(payload)) } catch { /* storage is best-effort */ }
+  }, [endsAt, remainingMs, durationMs])
+
+  useEffect(() => {
+    if (endsAt === null) return
+    const tick = (): void => {
+      const left = endsAt - Date.now()
+      if (left <= 0) {
+        setEndsAt(null)
+        setRemainingMs(0)
+        setFinished(true)
+        notifyFocusDone(props.t)
+        return
+      }
+      setRemainingMs(left)
+    }
+    tick()
+    const timer = window.setInterval(tick, 500)
+    return () => window.clearInterval(timer)
+  }, [endsAt, props.t])
+
+  const start = (minutes: number): void => {
+    const ms = minutes * 60_000
+    setDurationMs(ms)
+    setRemainingMs(ms)
+    setEndsAt(Date.now() + ms)
+    setFinished(false)
+    try {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') void Notification.requestPermission()
+    } catch { /* notification is best-effort */ }
+  }
+  const pause = (): void => {
+    if (endsAt === null) return
+    setRemainingMs(Math.max(0, endsAt - Date.now()))
+    setEndsAt(null)
+  }
+  const reset = (): void => {
+    setEndsAt(null)
+    setRemainingMs(durationMs)
+    setFinished(false)
+  }
+
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000))
+  const clock = `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`
   return (
-    <aside className="dsh-desk-schedule-linkage">
-      <header>{props.t('schedule.linkage')}</header>
-      <p>{props.t('schedule.linkageHint')}</p>
-      <div className="dsh-desk-schedule-linkage-chips">
-        <span>{props.t('tab.notes')}</span>
-        <span>{props.t('tab.tasks')}</span>
+    <div className="dsh-desk-today-focus">
+      <div className="dsh-desk-today-focus-head">{props.t('today.focus')}</div>
+      <div className="dsh-desk-today-clock" data-running={running ? 'true' : undefined}>{clock}</div>
+      <div className="dsh-desk-today-presets">
+        {FOCUS_PRESETS.map(minutes => (
+          <button key={minutes} type="button" className="dsh-desk-schedule-chip" onClick={() => start(minutes)}>
+            {minutes}
+          </button>
+        ))}
       </div>
-    </aside>
+      <div className="dsh-desk-today-focus-actions">
+        {running
+          ? <button type="button" className="dsh-desk-schedule-chip" onClick={pause}>{props.t('today.pause')}</button>
+          : <button type="button" className="dsh-desk-schedule-chip" onClick={() => start(durationMs / 60_000)}>{props.t('today.start')}</button>}
+        <button type="button" className="dsh-desk-schedule-chip" onClick={reset}>{props.t('today.reset')}</button>
+      </div>
+      {finished ? <p className="dsh-desk-today-focus-done">{props.t('today.finish')}</p> : null}
+    </div>
+  )
+}
+
+/** Top-left "Today": focus, today's events and open tasks — the human side of the day. */
+export function TodayPanel(props: {
+  readonly t: DeskTranslator
+  readonly today: Date
+  readonly events: readonly DeskEvent[]
+  readonly calendars: readonly DeskCalendar[]
+  readonly context: TodayContext
+  readonly onOpenEvent: (event: DeskEvent, point?: ClickPoint) => void
+}): ReactElement {
+  const { t, today, events, calendars, context } = props
+  const sortedTasks = useMemo(() => {
+    const rank = (task: TodayTask): number => task.dueDate === undefined ? 2 : task.dueDate < new Date().toISOString().slice(0, 10) ? 0 : task.dueDate === new Date().toISOString().slice(0, 10) ? 1 : 2
+    return [...context.tasks].sort((left, right) => rank(left) - rank(right) || (left.dueDate ?? '').localeCompare(right.dueDate ?? ''))
+  }, [context.tasks])
+  return (
+    <section className="dsh-desk-schedule-today">
+      <header>
+        <h3>{t('today.title')}</h3>
+        <span>{formatDateLabel(today, t)}</span>
+      </header>
+      <div className="dsh-desk-today-top">
+        <FocusTimer t={t} />
+        <div className="dsh-desk-today-events">
+          <div className="dsh-desk-today-subhead">{t('today.events')}</div>
+          {events.length === 0
+            ? <p className="dsh-desk-schedule-hint">{t('today.noEvents')}</p>
+            : (
+                <ul>
+                  {[...events].sort((left, right) => left.start.localeCompare(right.start)).slice(0, 4).map(event => (
+                    <li key={event.id}>
+                      <button type="button" className="dsh-desk-today-event" onClick={click => props.onOpenEvent(event, { x: click.clientX, y: click.clientY })}>
+                        <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
+                        <span>{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
+                        <span className="dsh-desk-today-event-title">{eventTitle(t, event)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+        </div>
+      </div>
+      <div className="dsh-desk-today-tasks">
+        <div className="dsh-desk-today-subhead">{t('today.unfinished')} {sortedTasks.length}</div>
+        {sortedTasks.length === 0 ? <p className="dsh-desk-schedule-hint">{t('today.empty')}</p> : (
+          <ul>
+            {sortedTasks.slice(0, 5).map(task => (
+              <li key={task.id}>
+                <span className="dsh-desk-today-task-title">{task.title}</span>
+                {task.dueDate === undefined ? null : <span className="dsh-desk-today-task-due">{task.dueDate}</span>}
+                <button type="button" className="dsh-desk-schedule-link" onClick={context.onOpenTasks}>{t('today.continue')}</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="dsh-desk-today-actions">
+        <button type="button" className="dsh-desk-action" onClick={context.onAddTask}>{t('today.newTask')}</button>
+        <button type="button" className="dsh-desk-action" onClick={context.onAddNote}>{t('today.newNote')}</button>
+        <span className="dsh-desk-today-note-count">{t('today.notesOnWall', { count: context.notesCount })}</span>
+      </div>
+    </section>
   )
 }
 
