@@ -14,6 +14,9 @@ import { createSessionLinkBridge, type SessionServices } from './sessions/bridge
 import { scheduleApi } from './schedule/api.js'
 import { notebookApi } from './notebook/api.js'
 import { createWorkspaceAccess, type UiWorkspaceLike, type WorkspacesServiceLike } from './notebook/workspaces.js'
+import { createReviewBridge } from './notebook/review-bridge.js'
+import { mountNoteReviewTab } from './notebook/register.js'
+import type { LayoutLike, SessionsLike, SidebarRightLike } from './notebook/faces.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { DeskPanelIcon } from './icon.js'
@@ -50,6 +53,25 @@ export function apply(ctx: ClientContext): void {
     navigationCtx.effect(() => detach, `${PACKAGE_NAME}: workspace navigation`)
   })
 
+  // Review tab + hand-off: each underlying service is optional, so the shelf degrades to
+  // read-only when the host does not expose the right sidebar or the session scope.
+  const review = createReviewBridge()
+  ctx.inject(['layout'], (layoutCtx) => {
+    const detach = review.attachLayout(layoutCtx.get('layout') as unknown as LayoutLike)
+    layoutCtx.effect(() => detach, `${PACKAGE_NAME}: review layout`)
+  })
+  ctx.inject(['sidebarRight'], (sidebarCtx) => {
+    const detach = review.attachSidebar(sidebarCtx.get('sidebarRight') as unknown as SidebarRightLike)
+    sidebarCtx.effect(() => detach, `${PACKAGE_NAME}: review sidebar`)
+  })
+  ctx.inject(['sessions'], (sessionCtx) => {
+    const detach = review.attachSessions(sessionCtx.get('sessions') as unknown as SessionsLike)
+    sessionCtx.effect(() => detach, `${PACKAGE_NAME}: review sessions`)
+  })
+  ctx.inject(['sidebarRightTabs'], (tabCtx) => {
+    mountNoteReviewTab(tabCtx, review, notebookApi)
+  })
+
   installDeskClient(ctx, {
     page: DeskOnePage,
     icon: DeskPanelIcon,
@@ -57,6 +79,7 @@ export function apply(ctx: ClientContext): void {
     api: {
       notebook: notebookApi,
       workspaceAccess,
+      review,
       listNotes: api.listNotes,
       createNote: api.createNote,
       updateNote: api.updateNote,

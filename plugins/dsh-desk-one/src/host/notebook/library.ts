@@ -6,6 +6,7 @@
  */
 
 import { normalize, sep } from 'node:path'
+import { DeskModelError } from '../../model/errors.js'
 import type { NoteIndexEntry, NotebookSearchQuery, NotebookStats } from '../../contract.js'
 import { NOTEBOOK_SEARCH_LIMIT, NOTEBOOK_STATE_LIMIT } from '../../constants.js'
 import type { ScannedPage } from './scan.js'
@@ -26,6 +27,26 @@ export function isPathWithin(child: string, parent: string): boolean {
   if (child === parent) return true
   const prefix = parent.endsWith('/') ? parent : `${parent}/`
   return child.startsWith(prefix)
+}
+
+/**
+ * Normalize a page path relative to the library root; absolute paths and parent
+ * segments are rejected so a thread (or an open request) can never point outside.
+ * @param raw - candidate path.
+ * @returns the normalized, `/`-separated relative path.
+ */
+export function normalizeLibraryPath(raw: unknown): string {
+  if (typeof raw !== 'string') throw new DeskModelError('INVALID_ANNOTATION', '缺少笔记路径')
+  const normalized = raw.replace(/\\/gu, '/').trim()
+  if (normalized === '') throw new DeskModelError('INVALID_ANNOTATION', '缺少笔记路径')
+  if (normalized.startsWith('/') || /^[A-Za-z]:/u.test(normalized)) {
+    throw new DeskModelError('INVALID_ANNOTATION', '笔记路径必须是相对笔记库根的路径')
+  }
+  const segments = normalized.split('/')
+  if (segments.some(segment => segment === '' || segment === '.' || segment === '..')) {
+    throw new DeskModelError('INVALID_ANNOTATION', '笔记路径不能包含空段或上级目录')
+  }
+  return segments.join('/')
 }
 
 /** Stats plus the newest rows the shelf shows. */

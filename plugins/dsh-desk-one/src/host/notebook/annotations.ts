@@ -12,21 +12,7 @@ import type {
   AnnotationAnchor, AnnotationComment, DeskAnnotation,
 } from '../../contract.js'
 import { DeskModelError } from '../../model/errors.js'
-
-/** The page-relative path an annotation points at: normalized, never absolute or escaping. */
-export function normalizeAnnotationPath(raw: unknown): string {
-  if (typeof raw !== 'string') throw new DeskModelError('INVALID_ANNOTATION', '缺少笔记路径')
-  const normalized = raw.replace(/\\/gu, '/').trim()
-  if (normalized === '') throw new DeskModelError('INVALID_ANNOTATION', '缺少笔记路径')
-  if (normalized.startsWith('/') || /^[A-Za-z]:/u.test(normalized)) {
-    throw new DeskModelError('INVALID_ANNOTATION', '批注路径必须是相对笔记库根的路径')
-  }
-  const segments = normalized.split('/')
-  if (segments.some(segment => segment === '' || segment === '.' || segment === '..')) {
-    throw new DeskModelError('INVALID_ANNOTATION', '批注路径不能包含空段或上级目录')
-  }
-  return segments.join('/')
-}
+import { normalizeLibraryPath } from './library.js'
 
 /** A non-empty comment body, capped like the note body cap. */
 export function normalizeCommentBody(raw: unknown, label = '批注内容'): string {
@@ -85,7 +71,7 @@ export function createAnnotationRecord(
     id: options.id,
     kind: 'annotation',
     schema: options.schema,
-    path: normalizeAnnotationPath(input.path),
+    path: normalizeLibraryPath(input.path),
     anchor: normalizeAnnotationAnchor(input.anchor),
     comments: [comment],
     status: 'open',

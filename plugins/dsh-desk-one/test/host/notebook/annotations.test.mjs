@@ -3,8 +3,9 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { DeskModelError } from '../../../lib/model/errors.js'
 import {
-  appendAnnotationComment, createAnnotationRecord, normalizeAnnotationAnchor, normalizeAnnotationPath, patchAnnotationStatus,
+  appendAnnotationComment, createAnnotationRecord, normalizeAnnotationAnchor, patchAnnotationStatus,
 } from '../../../lib/host/notebook/annotations.js'
+import { normalizeLibraryPath } from '../../../lib/host/notebook/library.js'
 
 /** Build one record the same way the store does. */
 function record(overrides = {}) {
@@ -16,13 +17,13 @@ function record(overrides = {}) {
 
 describe('annotation: path', () => {
   it('接受相对路径并归一化反斜杠', () => {
-    assert.equal(normalizeAnnotationPath('notes/a.md'), 'notes/a.md')
-    assert.equal(normalizeAnnotationPath('notes\\sub\\a.md'), 'notes/sub/a.md')
+    assert.equal(normalizeLibraryPath('notes/a.md'), 'notes/a.md')
+    assert.equal(normalizeLibraryPath('notes\\sub\\a.md'), 'notes/sub/a.md')
   })
 
   it('拒绝绝对路径与上级目录', () => {
     for (const bad of ['/abs/a.md', 'C:\\notes\\a.md', '../a.md', 'notes/../a.md', 'notes//a.md', '']) {
-      assert.throws(() => normalizeAnnotationPath(bad), DeskModelError, `应拒绝 ${JSON.stringify(bad)}`)
+      assert.throws(() => normalizeLibraryPath(bad), DeskModelError, `应拒绝 ${JSON.stringify(bad)}`)
     }
   })
 })

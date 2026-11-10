@@ -7,15 +7,17 @@
  * own file tools without any extra sandbox grant.
  */
 
-import { stat } from 'node:fs/promises'
+import { readFile, realpath, stat } from 'node:fs/promises'
+import { join } from 'node:path'
 import { isAbsolute } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {
-  DeskNotebookConfig, NoteIndexEntry, NotebookRootState, NotebookSearchQuery, NotebookStateResponse,
+  DeskNotebookConfig, NoteIndexEntry, NotebookPageResponse, NotebookRootState, NotebookSearchQuery, NotebookStateResponse,
 } from '../../contract.js'
 import { NOTEBOOK_SCAN_TIMEOUT_MS, NOTEBOOK_SCAN_TTL_MS } from '../../constants.js'
 import { DeskError } from '../http.js'
-import { normalizeNotebookPath, isPathWithin, searchPages, summarizePages } from './library.js'
+import { isPathWithin, normalizeLibraryPath, normalizeNotebookPath, searchPages, summarizePages } from './library.js'
+import { parseFrontmatter } from './frontmatter.js'
 import { scanNotebook, type ScannedPage } from './scan.js'
 import type { DeskStore } from '../store.js'
 
@@ -132,6 +134,41 @@ export class NotebookHost {
     if (root.status !== 'ok') return { entries: [], truncated: false }
     const scan = await this.scan(config.rootPath)
     return searchPages(scan.pages, query)
+  }
+
+  /**
+   * Read one page for review: frontmatter fields plus the markdown body.
+   * @param rawPath - path relative to the library root.
+   * @returns the page content; never cached (the file is the truth).
+   */
+  async page(rawPath: string): Promise<NotebookPageResponse> {
+    const config = this.config()
+    if (config === undefined) throw new DeskError('INVALID_NOTEBOOK', '还没有链接笔记库', 400)
+    const root = await this.inspectRoot(config.rootPath)
+    if (root.status !== 'ok') throw new DeskError('INVALID_NOTEBOOK', '笔记库目录不可用', 400)
+    const path = normalizeLibraryPath(rawPath)
+    if (!/\.(?:md|markdown)$/iu.test(path)) throw new DeskError('INVALID_NOTEBOOK', '只能审阅 markdown 笔记', 400)
+    const absolute = join(config.rootPath, ...path.split('/'))
+    try {
+      // Follow one symlink chain and re-check containment: a link inside the library must not read outside it.
+      const [realRoot, realFile] = await Promise.all([realpath(config.rootPath), realpath(absolute)])
+      if (!isPathWithin(normalizeNotebookPath(realFile), normalizeNotebookPath(realRoot))) {
+        throw new DeskError('FORBIDDEN', '笔记路径越出笔记库', 403)
+      }
+      const info = await stat(realFile)
+      const text = await readFile(realFile, 'utf8')
+      const parsed = parseFrontmatter(text, info.size)
+      return {
+        path,
+        fields: parsed.fields,
+        body: parsed.body,
+        hasFrontmatter: parsed.bytes > 0,
+        bytes: info.size,
+      }
+    } catch (error) {
+      if (error instanceof DeskError) throw error
+      throw new DeskError('UNKNOWN_ANNOTATION', '笔记不存在或不可读', 404)
+    }
   }
 
   /** Reuse a fresh scan; single-flight concurrent readers; abandon one walk by timeout. */

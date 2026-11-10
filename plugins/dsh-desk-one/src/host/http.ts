@@ -24,6 +24,7 @@ type DeskErrorCode =
   | 'INVALID_NOTEBOOK'
   | 'NOTEBOOK_UNAVAILABLE'
   | 'NOTEBOOK_SCAN_TIMEOUT'
+  | 'UNKNOWN_ANNOTATION'
 
 export class DeskError extends Error {
   constructor(readonly code: DeskErrorCode, message: string, readonly status = 400) {

@@ -235,6 +235,23 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /createWorkspaceAccess/u, '笔记库创建走 DSH 自己的工作区流程')
   })
 
+  it('笔记审阅 应该 注册右侧栏 tab，并把批注交给对话输入框（不自动发送）', async () => {
+    const register = await read('src/client/notebook/register.ts')
+    const review = await read('src/client/notebook/review.tsx')
+    const bridge = await read('src/client/notebook/review-bridge.ts')
+    const page = await readClientSurface()
+    assert.match(register, /sidebarRightTabs\.register/u, 'tab 类型要注册进官方右栏注册表')
+    assert.match(register, /'sidebar\.right\.pane\.tab'/u, '正文挂在官方 tab 槽位')
+    assert.match(page, /mountNoteReviewTab/u, '客户端要挂载审阅 tab')
+    assert.match(bridge, /insertQuote\(/u, '交给 AI 走官方输入框引用')
+    assert.ok(!/send\(/u.test(bridge), '交给 AI 不得自动发送')
+    assert.match(review, /notebook\.addAnnotation/u, '审阅页能新建批注')
+    assert.match(review, /notebook\.updateAnnotationStatus/u, '审阅页能改状态（接受/重开）')
+    assert.match(review, /anchorResolves/u, '锚点失效要显示提示，不静默错位')
+    const bundle = await read('lib/client.js')
+    assert.ok(bundle.includes('note-review'), '构建产物要包含审阅 tab kind')
+  })
+
   it('便签标签 应该是「满墙贴纸」：标题行统一动作 + 可拖动贴纸', async () => {
     const page = await readClientSurface()
     const styles = await readStyles()

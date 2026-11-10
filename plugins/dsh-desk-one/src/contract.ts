@@ -524,6 +524,22 @@ export interface NotebookSearchResponse {
   readonly truncated: boolean
 }
 
+/** One frontmatter field as the review tab lists it. */
+export interface NotebookPageField {
+  readonly name: string
+  readonly value: string
+}
+
+/** One page's content, read on demand by the review tab (never cached in the store). */
+export interface NotebookPageResponse {
+  readonly path: string
+  readonly fields: readonly NotebookPageField[]
+  /** Body markdown after the frontmatter block. */
+  readonly body: string
+  readonly hasFrontmatter: boolean
+  readonly bytes: number
+}
+
 /** Query parameters for the host-side full-library search. */
 export interface NotebookSearchQuery {
   readonly query?: string

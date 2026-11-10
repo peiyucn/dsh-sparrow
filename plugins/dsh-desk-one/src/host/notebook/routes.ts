@@ -4,7 +4,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { MAX_QUERY_CHARS, ROUTES } from '../../constants.js'
 import type {
   AnnotationListResponse, AnnotationMutationResponse, CreateAnnotationRequest, DeleteAnnotationRequest,
-  NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse, ReplyAnnotationRequest, UpdateAnnotationRequest,
+  NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse, ReplyAnnotationRequest,
+  UpdateAnnotationRequest,
 } from '../../contract.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
 import type { DeskRouteContext, DeskRouteEntry } from '../router.js'
@@ -51,6 +52,14 @@ async function clearRootRoute(route: DeskRouteContext, _req: IncomingMessage, re
   await notebookOf(route).clearRoot()
   const state = await notebookOf(route).state()
   sendJson(res, 200, state satisfies NotebookStateResponse)
+}
+
+async function pageRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  const path = url.searchParams.get('path') ?? ''
+  if (path === '') throw new DeskError('BAD_BODY', '缺少笔记路径')
+  const page = await notebookOf(route).page(path)
+  sendJson(res, 200, page satisfies NotebookPageResponse)
 }
 
 /* ------------------------------ annotations ------------------------------ */
@@ -111,6 +120,7 @@ export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'POST', path: ROUTES.notebookRoot, handle: setRootRoute },
   { method: 'DELETE', path: ROUTES.notebookRoot, handle: clearRootRoute },
   { method: 'GET', path: ROUTES.notebookSearch, handle: searchRoute },
+  { method: 'GET', path: ROUTES.notebookPage, handle: pageRoute },
   { method: 'GET', path: ROUTES.annotationList, handle: listAnnotationsRoute },
   { method: 'POST', path: ROUTES.annotationAdd, handle: addAnnotationRoute },
   { method: 'POST', path: ROUTES.annotationReply, handle: replyAnnotationRoute },

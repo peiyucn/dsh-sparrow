@@ -9,17 +9,25 @@
 import { parseDocument, isMap, isScalar } from 'yaml'
 import { NOTEBOOK_FRONTMATTER_MAX_BYTES } from '../../constants.js'
 
+/** One top-level scalar field, in document order (what the review tab lists). */
+export interface FrontmatterField {
+  readonly name: string
+  readonly value: string
+}
+
 /** Facts the index keeps from one page's frontmatter. */
 export interface ParsedFrontmatter {
   readonly title?: string
   readonly type?: string
   readonly date?: string
   readonly tags: readonly string[]
+  /** Every top-level scalar field, for the review view's field anchors. */
+  readonly fields: readonly FrontmatterField[]
   /** Byte length of the whole block including delimiters; 0 when the page has none. */
   readonly bytes: number
 }
 
-const EMPTY: ParsedFrontmatter = { tags: [], bytes: 0 }
+const EMPTY: ParsedFrontmatter = { tags: [], fields: [], bytes: 0 }
 
 /** One closing delimiter line (`---` or `...`). */
 const CLOSING = /^(?:---|\.\.\.)[ \t]*$/u
@@ -98,7 +106,7 @@ export function parseFrontmatter(head: string, fileBytes: number): ParsedFrontma
   const document = parseDocument(split.block)
   if (document.errors.length > 0) {
     // Invalid YAML still counts as a frontmatter block: the page has one, it just does not parse.
-    return { tags: [], bytes: split.bytes, body: split.body, truncated: false }
+    return { tags: [], fields: [], bytes: split.bytes, body: split.body, truncated: false }
   }
   const contents = document.contents
   return {
@@ -106,10 +114,26 @@ export function parseFrontmatter(head: string, fileBytes: number): ParsedFrontma
     type: stringField(contents, 'type'),
     date: stringField(contents, 'date'),
     tags: tagField(contents),
+    fields: fieldList(contents),
     bytes: split.bytes,
     body: split.body,
     truncated: false,
   }
+}
+
+/** Every top-level scalar field in document order. */
+function fieldList(contents: unknown): readonly FrontmatterField[] {
+  if (!isMap(contents)) return []
+  const fields: FrontmatterField[] = []
+  for (const item of contents.items) {
+    if (!isScalar(item.key)) continue
+    const name = typeof item.key.value === 'string' ? item.key.value : String(item.key.value ?? '')
+    if (name === '' || !isScalar(item.value)) continue
+    const raw = item.value.value
+    if (typeof raw !== 'string' && typeof raw !== 'number' && typeof raw !== 'boolean') continue
+    fields.push({ name, value: String(raw) })
+  }
+  return fields
 }
 
 /** How much of a file head is read for frontmatter detection. */
