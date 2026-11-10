@@ -3,6 +3,12 @@
  */
 
 import * as dshSessionSurface from '@deepseek-ai/dsh-session'
+import { disabledLine } from '../../compat.js'
+
+// The capability gate is identical for every plugin surface, so it lives in the root module only;
+// this file adds just the session-format gate on top.
+export { assertCapabilities, missingCapabilities } from '../../compat.js'
+export type { HostCapability } from '../../compat.js'
 
 /**
  * 本插件构建时对齐的 dsh 会话格式版本集合（单调整数）。认错格式的代价是丢数据 —— 本插件按**目录**
@@ -10,11 +16,6 @@ import * as dshSessionSurface from '@deepseek-ai/dsh-session'
  * 持久化层翻译成当前逻辑版本，本门判的是「宿主契约代」而非磁盘物理代。
  */
 export const SUPPORTED_SESSION_FORMAT_VERSIONS: readonly number[] = [0, 3, 4]
-
-/** 面向日志/错误的统一停用前缀。 */
-function disabledLine(pluginName: string, reason: string): string {
-  return `${pluginName}: ${reason}；已停用插件以免影响 dsh（升级本插件或运行环境后自动恢复）`
-}
 
 /** 宿主会话格式是否可安全处理；不可时返回可直接进日志的原因。 */
 export function unsupportedSessionFormatReason(
@@ -47,33 +48,6 @@ export function unsupportedStoredFormatReason(
  */
 export function hostSessionFormatVersion(): unknown {
   return (dshSessionSurface as { readonly SESSION_FORMAT_VERSION?: unknown }).SESSION_FORMAT_VERSION
-}
-
-/** 一项宿主能力：`name` 进日志，`ok` 由调用方探测（服务/方法/导出是否存在）。 */
-export interface HostCapability {
-  readonly name: string
-  readonly ok: boolean
-}
-
-/** 缺失的能力名，按声明顺序（纯逻辑，供单测）。 */
-export function missingCapabilities(capabilities: readonly HostCapability[]): string[] {
-  return capabilities.filter(capability => !capability.ok).map(capability => capability.name)
-}
-
-/**
- * 能力门：宿主缺少任一必需能力即抛错（自停用）—— cordis 逐插件捕获 `apply` 异常并标 inactive，
- * 抛错前先记一条面向用户的告警（为什么停用、怎么恢复）。
- */
-export function assertCapabilities(
-  ctx: { logger: { warn(message: string): void } },
-  pluginName: string,
-  capabilities: readonly HostCapability[],
-): void {
-  const missing = missingCapabilities(capabilities)
-  if (missing.length === 0) return
-  const reason = `缺少本插件依赖的 ${missing.join('、')}`
-  ctx.logger.warn(disabledLine(pluginName, reason))
-  throw new Error(`${pluginName}: ${reason}`)
 }
 
 /** 启动自检：宿主会话格式不在支持集合内即抛错（自停用），抛错前先记面向用户的告警。 */

@@ -29,10 +29,7 @@ import {
   refreshGraphToken, startGraphDeviceCode,
 } from './providers/graph.js'
 import { scheduleErrorOf, type EventDraft } from './records.js'
-import { ScheduleError } from './types.js'
-
-/** The adapters take an ISO UTC window and format protocol-specific stamps themselves. */
-export interface PullWindow { readonly startUtc: string; readonly endUtc: string }
+import { ScheduleError, type PullWindow } from './types.js'
 
 /** Structural view of the official credentials seam (avoids a hard package dependency). */
 interface CredentialsLike {

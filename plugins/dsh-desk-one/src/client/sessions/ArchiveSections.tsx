@@ -11,7 +11,7 @@ import type { ReactElement } from 'react'
 import { SESSION_STREAM_PAGE_SIZE } from '../../constants.js'
 import type {
   ArchiveTreeNode, StraySessionItem, TrashEntry, TrashDirResponse,
-} from '../../host/sessions/contract.js'
+} from '../../session-admin.js'
 import type { DeskTranslator } from '../app/types.js'
 import { LoadMore } from '../app/SubPageHeader.js'
 import type { SessionsArchiveApi } from './archiveApi.js'

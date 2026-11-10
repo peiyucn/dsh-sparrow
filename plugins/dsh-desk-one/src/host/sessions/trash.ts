@@ -16,7 +16,7 @@ import { TRASH_SIDECAR } from './constants.js'
 import type {
   TrashDeleteAllResponse, TrashDeleteResponse, TrashDirResponse, TrashEntry, TrashListResponse,
   TrashRestoreAllResponse,
-} from './contract.js'
+} from '../../session-admin.js'
 import { addArchivedId, attachWorkspaceAccounting } from './archive-set.js'
 import type { RegistryMutationSurface } from './gates.js'
 import { SessionsError } from './errors.js'

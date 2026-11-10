@@ -1,7 +1,8 @@
 /**
- * host ↔ client 的 REST 契约：12 条方法路由的请求 / 响应 DTO。
+ * 会话管理 REST 契约（中性层）：12 条方法路由的请求 / 响应 DTO。
  *
- * 只放类型，零运行时依赖，host 与 client 两半共用 —— 响应形状在 host 组装、在 client 消费，
+ * 只放类型，零运行时依赖，host 与 client 两半共用（放在根级而不是 host/ 下，
+ * 否则 client half 要反向 import 宿主目录，层次就倒挂了） —— 响应形状在 host 组装、在 client 消费，
  * 同一形状写两遍必然漂移（历史上就漏过 `parentSessionId` / `agentAvailable`）。
  */
 

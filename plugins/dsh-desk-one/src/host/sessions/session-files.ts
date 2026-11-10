@@ -17,7 +17,7 @@ import {
 } from './archive.js'
 import { unsupportedStoredFormatReason } from './compat.js'
 import { ENOENT, SIDECAR_VERSION, TRASH_SIDECAR } from './constants.js'
-import type { DeleteMutationResponse, TrashMutationResponse } from './contract.js'
+import type { DeleteMutationResponse, TrashMutationResponse } from '../../session-admin.js'
 import { detachWorkspaceAccounting, removeArchivedIds, workspaceIndexFor } from './archive-set.js'
 import type { RegistryMutationSurface } from './gates.js'
 import { assertSessionLocationApi } from './gates.js'

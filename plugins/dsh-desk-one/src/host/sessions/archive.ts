@@ -3,7 +3,7 @@
 import { join } from 'node:path'
 import { nestTree } from '../../tree.js'
 import { SIDECAR_VERSION, TRASH_SIDECAR } from './constants.js'
-import type { LegacyTrashItem as ContractLegacyTrashItem, TrashItem as ContractTrashItem } from './contract.js'
+import type { LegacyTrashItem, TrashItem } from '../../session-admin.js'
 
 export { TRASH_SIDECAR }
 /** 回收站目录名（. 前缀与 DSH 官方目录区分）。 */
@@ -131,15 +131,8 @@ export function parseTrashSidecar(value: unknown): ArchiveSidecar | undefined {
   }
 }
 
-/** 旧格式条目（无 sidecar）：目录名即会话 id；只可列出/彻底删除，不可还原。 */
-export type LegacyTrashItem = ContractLegacyTrashItem
-
-/** 回收站条目视图（列表接口返回形状）：子会话仅展示用（父子联动），
- *  还原/删除整棵走 sidecar 原样。parentSessionId 供回收站区还原层级。 */
-export type TrashItemView = ContractTrashItem
-
 /** sidecar → 列表条目视图；v1 无子会话记录时 subagents 为空数组。 */
-export function trashItemView(trashId: string, sidecar: ArchiveSidecar): TrashItemView {
+export function trashItemView(trashId: string, sidecar: ArchiveSidecar): TrashItem {
   return {
     trashId,
     sessionId: sidecar.sessionId,

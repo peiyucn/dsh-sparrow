@@ -12,7 +12,7 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import {
   buildSessionTree, livingChildIds, straySessionIds, type HeaderFactsStore, type SessionTreeNode,
 } from './archive.js'
-import type { ArchiveTreeNode, ListResponse, StraySessionItem, StraysResponse } from './contract.js'
+import type { ArchiveTreeNode, ListResponse, StraySessionItem, StraysResponse } from '../../session-admin.js'
 import { readArchivedIds, workspaceIndexFor } from './archive-set.js'
 import { assertSessionLocationApi } from './gates.js'
 import { treeHeaderOf, treeIds, type HeaderFacts } from './headers.js'

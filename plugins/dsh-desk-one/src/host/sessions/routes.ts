@@ -18,7 +18,7 @@ import type {
   StraysResponse, TrashDeleteAllRequest, TrashDeleteAllResponse, TrashDeleteRequest, TrashDeleteResponse,
   TrashDirResponse, TrashListResponse, TrashMutationResponse, TrashRequest, TrashRestoreAllRequest, TrashRestoreAllResponse,
   UnarchiveRequest, UnarchiveResponse,
-} from './contract.js'
+} from '../../session-admin.js'
 import type { DeskRouteContext } from '../router.js'
 import { bodyObject, readJsonBody, sendJson } from '../http.js'
 import { SessionsError } from './errors.js'

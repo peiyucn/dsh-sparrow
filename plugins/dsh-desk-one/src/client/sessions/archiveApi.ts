@@ -5,7 +5,7 @@ import type {
   ArchiveRequest, ArchiveTreeNode, DeleteMutationResponse, DeleteRequest, ListResponse, RestoreRequest, RestoreResponse,
   StraysResponse, TrashDeleteAllResponse, TrashDeleteRequest, TrashDeleteResponse, TrashDirResponse,
   TrashListResponse, TrashMutationResponse, TrashRequest, TrashRestoreAllResponse, UnarchiveRequest, UnarchiveResponse,
-} from '../../host/sessions/contract.js'
+} from '../../session-admin.js'
 
 const BASE = '/api/desk-one/sessions'
 /** Archive reads scan disk and align the tree; mutations may move whole session trees. */

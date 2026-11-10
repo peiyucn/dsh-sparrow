@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import {
   archiveAlignmentForChildren, collectSubtreeIds, type HeaderFactsStore,
 } from './archive.js'
-import type { ArchiveResponse, UnarchiveResponse } from './contract.js'
+import type { ArchiveResponse, UnarchiveResponse } from '../../session-admin.js'
 import type { RegistryMutationSurface } from './gates.js'
 import type { HeaderFacts } from './headers.js'
 import { treeHeaderOf } from './headers.js'

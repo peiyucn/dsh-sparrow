@@ -14,8 +14,8 @@ export function missingCapabilities(capabilities: readonly HostCapability[]): st
   return capabilities.filter(capability => !capability.ok).map(capability => capability.name)
 }
 
-/** 面向日志 / 错误的统一停用前缀。 */
-function disabledLine(pluginName: string, reason: string): string {
+/** 面向日志 / 错误的统一停用前缀；会话格式门复用同一文案。 */
+export function disabledLine(pluginName: string, reason: string): string {
   return `${pluginName}: ${reason}；已停用插件以免影响 dsh（升级本插件或运行环境后自动恢复）`
 }
 
