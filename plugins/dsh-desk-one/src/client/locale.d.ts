@@ -52,6 +52,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'schedule.subscriptions'
       | 'schedule.subscriptionHint'
       | 'schedule.subscriptionEmpty'
+      | 'schedule.subscriptionSynced'
+      | 'schedule.subscriptionFailed'
       | 'schedule.subscriptionName'
       | 'schedule.subscriptionNameHint'
       | 'schedule.subscriptionUrl'

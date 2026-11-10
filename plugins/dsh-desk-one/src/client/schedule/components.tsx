@@ -990,17 +990,26 @@ function SubscriptionCard(props: {
     <section className="dsh-desk-schedule-connection-card">
       <header>
         <h3>{t('schedule.subscriptions')}</h3>
-        <span className="dsh-desk-schedule-statusdot" data-on={sources.length > 0} />
         <span className="dsh-desk-schedule-connection-status">{t('schedule.subscriptionHint')}</span>
       </header>
       {sources.length === 0 ? <p className="dsh-desk-schedule-form-note">{t('schedule.subscriptionEmpty')}</p> : null}
       {sources.map(source => {
         const own = calendars.filter(calendar => calendar.sourceId === source.id)
+        // The status dot belongs to each subscription: one ICS card can hold several, and only the
+        // individual feed knows whether its own pull failed.
+        const failed = source.syncState === 'error'
         return (
           <div key={source.id} className="dsh-desk-schedule-subscription">
             <div className="dsh-desk-schedule-subscription-head">
               <span className="dsh-desk-schedule-mgmt-name">{source.account ?? t('schedule.subscriptions')}</span>
-              <span className="dsh-desk-schedule-statusdot" data-on={source.syncState !== 'error'} />
+              <span
+                className="dsh-desk-schedule-statusdot"
+                data-on={!failed}
+                data-error={failed ? 'true' : undefined}
+                role="img"
+                aria-label={failed ? t('schedule.subscriptionFailed') : t('schedule.subscriptionSynced')}
+                title={failed ? t('schedule.subscriptionFailed') : t('schedule.subscriptionSynced')}
+              />
               <button
                 type="button"
                 className="dsh-desk-schedule-link"
