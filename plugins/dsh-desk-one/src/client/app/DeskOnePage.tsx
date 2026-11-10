@@ -389,12 +389,9 @@ export function DeskOnePage(props: DeskPanelProps) {
               headerActionsRef={scheduleActionsRef}
               todayContext={{
                 notesCount: trash.activeNotes.length,
-                tasks: taskData.tasks
-                  .filter(task => task.status !== 'done' && !task.archived)
-                  .map(task => ({ id: task.id, title: task.title, status: task.status, ...(task.due === undefined ? {} : { dueDate: task.due.date }) })),
+                openTasks: taskData.tasks.filter(task => task.status !== 'done' && !task.archived).length,
                 onAddNote: () => { selectTab('notes'); void addNote() },
                 onAddTask: () => { selectTab('tasks'); board.beginDraft('todo') },
-                onOpenTasks: () => selectTab('tasks'),
               }}
             />
           ) : tab === 'sessions' ? (

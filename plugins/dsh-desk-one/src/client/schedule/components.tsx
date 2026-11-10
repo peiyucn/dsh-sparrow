@@ -142,19 +142,11 @@ export function UpcomingPanel(props: {
   )
 }
 
-export interface TodayTask {
-  readonly id: string
-  readonly title: string
-  readonly status: 'todo' | 'doing' | 'done'
-  readonly dueDate?: string
-}
-
 export interface TodayContext {
   readonly notesCount: number
-  readonly tasks: readonly TodayTask[]
+  readonly openTasks: number
   readonly onAddNote: () => void
   readonly onAddTask: () => void
-  readonly onOpenTasks: () => void
 }
 
 const FOCUS_STORAGE_KEY = 'dsh-desk-focus-v1'
@@ -273,7 +265,7 @@ function FocusTimer(props: { readonly t: DeskTranslator }): ReactElement {
   )
 }
 
-/** Top-left "Today": focus, today's events and open tasks — the human side of the day. */
+/** Top-left "Today": focus on the left, today's events and two counts on the right. */
 export function TodayPanel(props: {
   readonly t: DeskTranslator
   readonly today: Date
@@ -283,10 +275,6 @@ export function TodayPanel(props: {
   readonly onOpenEvent: (event: DeskEvent, point?: ClickPoint) => void
 }): ReactElement {
   const { t, today, events, calendars, context } = props
-  const sortedTasks = useMemo(() => {
-    const rank = (task: TodayTask): number => task.dueDate === undefined ? 2 : task.dueDate < new Date().toISOString().slice(0, 10) ? 0 : task.dueDate === new Date().toISOString().slice(0, 10) ? 1 : 2
-    return [...context.tasks].sort((left, right) => rank(left) - rank(right) || (left.dueDate ?? '').localeCompare(right.dueDate ?? ''))
-  }, [context.tasks])
   return (
     <section className="dsh-desk-schedule-today">
       <header>
@@ -295,43 +283,34 @@ export function TodayPanel(props: {
       </header>
       <div className="dsh-desk-today-top">
         <FocusTimer t={t} />
-        <div className="dsh-desk-today-events">
-          <div className="dsh-desk-today-subhead">{t('today.events')}</div>
-          {events.length === 0
-            ? <p className="dsh-desk-schedule-hint">{t('today.noEvents')}</p>
-            : (
-                <ul>
-                  {[...events].sort((left, right) => left.start.localeCompare(right.start)).slice(0, 4).map(event => (
-                    <li key={event.id}>
-                      <button type="button" className="dsh-desk-today-event" onClick={click => props.onOpenEvent(event, { x: click.clientX, y: click.clientY })}>
-                        <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
-                        <span>{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
-                        <span className="dsh-desk-today-event-title">{eventTitle(t, event)}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+        <div className="dsh-desk-today-side">
+          <div className="dsh-desk-today-events">
+            <div className="dsh-desk-today-subhead">{t('today.events')}</div>
+            {events.length === 0
+              ? <p className="dsh-desk-schedule-hint">{t('today.noEvents')}</p>
+              : (
+                  <ul>
+                    {[...events].sort((left, right) => left.start.localeCompare(right.start)).slice(0, 4).map(event => (
+                      <li key={event.id}>
+                        <button type="button" className="dsh-desk-today-event" onClick={click => props.onOpenEvent(event, { x: click.clientX, y: click.clientY })}>
+                          <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
+                          <span>{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
+                          <span className="dsh-desk-today-event-title">{eventTitle(t, event)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+          </div>
+          <div className="dsh-desk-today-stats">
+            <span><b>{context.notesCount}</b> {t('tab.notes')}</span>
+            <span><b>{context.openTasks}</b> {t('today.unfinished')}</span>
+          </div>
         </div>
-      </div>
-      <div className="dsh-desk-today-tasks">
-        <div className="dsh-desk-today-subhead">{t('today.unfinished')} {sortedTasks.length}</div>
-        {sortedTasks.length === 0 ? <p className="dsh-desk-schedule-hint">{t('today.empty')}</p> : (
-          <ul>
-            {sortedTasks.slice(0, 5).map(task => (
-              <li key={task.id}>
-                <span className="dsh-desk-today-task-title">{task.title}</span>
-                {task.dueDate === undefined ? null : <span className="dsh-desk-today-task-due">{task.dueDate}</span>}
-                <button type="button" className="dsh-desk-schedule-link" onClick={context.onOpenTasks}>{t('today.continue')}</button>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
       <div className="dsh-desk-today-actions">
         <button type="button" className="dsh-desk-action" onClick={context.onAddTask}>{t('today.newTask')}</button>
         <button type="button" className="dsh-desk-action" onClick={context.onAddNote}>{t('today.newNote')}</button>
-        <span className="dsh-desk-today-note-count">{t('today.notesOnWall', { count: context.notesCount })}</span>
       </div>
     </section>
   )
