@@ -482,7 +482,10 @@ describe('dsh-desk-one 结构', () => {
   it('Sessions 标签 应该 合并活跃目录 + 归档管理（A2 走 host 路由）', async () => {
     const page = await readClientSurface()
     const view = await read('src/client/sessions/SessionsView.tsx')
-    const sections = await read('src/client/sessions/ArchiveSections.tsx')
+    const sections = await joined(
+      'src/client/sessions/ArchiveSections.tsx',
+      'src/client/sessions/archive-rows.tsx',
+    )
     const api = await read('src/client/sessions/archiveApi.ts')
     const catalog = await read('src/client/sessions/catalog.ts')
     const contract = await read('src/client/sessions/contract.ts')
@@ -705,7 +708,10 @@ describe('dsh-desk-one 结构', () => {
     const router = await read('src/host/router.ts')
     const host = await read('src/host.ts')
     const tools = await read('src/host/schedule/tools.ts')
-    const sections = await read('src/client/sessions/ArchiveSections.tsx')
+    const sections = await joined(
+      'src/client/sessions/ArchiveSections.tsx',
+      'src/client/sessions/archive-rows.tsx',
+    )
     assert.match(view, /UpcomingPanel/u, '近期日程分区')
     assert.match(view, /TodayPanel/u, '今日分区：今日日程 / 可点击计数 / 新建入口')
     assert.match(components, /dsh-desk-action-primary/u, '今日新建按钮复用页头白色主按钮')
