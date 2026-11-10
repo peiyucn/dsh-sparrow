@@ -46,6 +46,7 @@ export const ROUTES = Object.freeze({
   annotationAdd: `${PREFIX}/notebook/annotations/add`,
   annotationReply: `${PREFIX}/notebook/annotations/reply`,
   annotationDetect: `${PREFIX}/notebook/annotations/detect`,
+  annotationDiff: `${PREFIX}/notebook/annotations/diff`,
   annotationUpdate: `${PREFIX}/notebook/annotations/update`,
   annotationDelete: `${PREFIX}/notebook/annotations/delete`,
 })
@@ -199,6 +200,9 @@ export const NOTEBOOK_STATE_LIMIT = 30
 export const NOTEBOOK_BODY_PREVIEW_CHARS = 4_000
 /** Annotation bodies share the note body cap; threads are capped to keep one record bounded. */
 export const MAX_ANNOTATION_COMMENTS = 50
+
+/** Baseline snapshot cap: a note larger than this is compared from its first slice only. */
+export const NOTEBOOK_BASELINE_MAX_CHARS = 200_000
 
 /** Annotation status values (see 07-notebook.md §6.4): only a human moves `answered` → `resolved`. */
 export const ANNOTATION_STATUSES = ['open', 'answered', 'resolved', 'orphaned'] as const

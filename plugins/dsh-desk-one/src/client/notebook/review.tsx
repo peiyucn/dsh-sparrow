@@ -7,11 +7,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
-import { MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import { DiffBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import type {
-  AnnotationAnchor, AnnotationComment, DeskAnnotation, NotebookPageResponse, NotebookPageField,
+  AnnotationAnchor, AnnotationComment, AnnotationDiffResponse, DeskAnnotation, NotebookPageResponse, NotebookPageField,
 } from '../../contract.js'
 import type { NotebookApi } from './api.js'
 import type { NoteReviewParams, ReviewBridge } from './review-bridge.js'
@@ -98,6 +99,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const [page, setPage] = useState<NotebookPageResponse | null>(null)
   const [annotations, setAnnotations] = useState<readonly DeskAnnotation[]>([])
+  /** Per-thread "this round" diff; absent for threads without a usable baseline. */
+  const [diffs, setDiffs] = useState<ReadonlyMap<string, AnnotationDiffResponse>>(new Map())
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [composer, setComposer] = useState<ComposerState | null>(null)
@@ -113,6 +116,31 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     code: { copyLabel: t('review.copy'), copiedLabel: t('review.copied') },
     footnotes: t('review.footnotes'),
   }), [t])
+  const diffLabels = useMemo<DiffBlockLabels>(() => ({
+    codeLabel: t('review.diffCodeLabel'),
+    wrapLabel: t('review.diffWrap'),
+    unwrapLabel: t('review.diffUnwrap'),
+    copy: t('review.copy'),
+    copied: t('review.copied'),
+    collapseAria: t('review.diffCollapse'),
+    expandAria: (hidden: number) => t('review.diffExpand', { hidden }),
+    collapse: t('review.diffCollapse'),
+    expand: (hidden: number) => t('review.diffExpand', { hidden }),
+  }), [t])
+
+  /** Refresh the per-thread diffs for the threads that can still change (open / answered). */
+  const refreshDiffs = useCallback(async (threads: readonly DeskAnnotation[]): Promise<void> => {
+    const targets = threads.filter(thread => thread.status === 'open' || thread.status === 'answered')
+    if (targets.length === 0) { setDiffs(new Map()); return }
+    const settled = await Promise.all(targets.map(async (thread) => {
+      try {
+        return [thread.id, await notebook.annotationDiff(thread.id)] as const
+      } catch {
+        return null
+      }
+    }))
+    setDiffs(new Map(settled.filter((entry): entry is readonly [string, AnnotationDiffResponse] => entry !== null)))
+  }, [notebook])
 
   const load = useCallback(async (): Promise<void> => {
     if (path === undefined) { setLoading(false); return }
@@ -131,12 +159,13 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         threads = await notebook.listAnnotations({ path })
       }
       setAnnotations(threads)
+      void refreshDiffs(threads)
     } catch (cause) {
       setError(messageOf(cause))
     } finally {
       setLoading(false)
     }
-  }, [notebook, path, t])
+  }, [notebook, path, refreshDiffs, t])
 
   useEffect(() => { void load() }, [load])
 
@@ -152,7 +181,10 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   useEffect(() => {
     if (path === undefined || info.tab.visible !== true) return
     const reload = (): void => {
-      void notebook.listAnnotations({ path }).then(setAnnotations, () => undefined)
+      void notebook.listAnnotations({ path }).then(
+        threads => { setAnnotations(threads); void refreshDiffs(threads) },
+        () => undefined,
+      )
     }
     const timer = setInterval(reload, REVIEW_POLL_MS)
     window.addEventListener('focus', reload)
@@ -160,7 +192,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       clearInterval(timer)
       window.removeEventListener('focus', reload)
     }
-  }, [notebook, path, info.tab.visible])
+  }, [notebook, path, refreshDiffs, info.tab.visible])
 
   const body = page?.body ?? ''
 
@@ -234,17 +266,18 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     setBusy(true)
     setError(null)
     try {
-      refreshThread(await notebook.updateAnnotationStatus({
+      await notebook.updateAnnotationStatus({
         id: thread.id,
         expectedRevision: thread.revision,
         patch: { status: 'resolved' },
-      }))
+      })
+      await load()
     } catch (cause) {
       setError(messageOf(cause))
     } finally {
       setBusy(false)
     }
-  }, [notebook, refreshThread])
+  }, [load, notebook])
 
   const acceptAll = useCallback(async (): Promise<void> => {
     const answered = annotations.filter(thread => thread.status === 'answered')
@@ -414,6 +447,20 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                         {thread.comments.map((comment, index) => (
                           <CommentLine key={`${thread.id}-${index}`} t={t} comment={comment} />
                         ))}
+                        {(() => {
+                          const diff = diffs.get(thread.id)
+                          if (diff === undefined || !diff.hasBaseline || diff.oldText === diff.newText) return null
+                          return (
+                            <div className="dsh-desk-review-diff">
+                              <p className="dsh-desk-review-hint">{t('review.changesThisRound')}</p>
+                              <DiffBlock
+                                diffs={[{ path: thread.path, oldText: diff.oldText, newText: diff.newText }]}
+                                labels={diffLabels}
+                                maxLines={120}
+                              />
+                            </div>
+                          )
+                        })()}
                         {replyFor === thread.id && thread.status !== 'orphaned'
                           ? (
                               <div className="dsh-desk-review-replybox">

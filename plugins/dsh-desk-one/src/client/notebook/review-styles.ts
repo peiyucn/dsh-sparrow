@@ -189,6 +189,9 @@ export const REVIEW_CSS = `
   font-size: 11px;
   line-height: 1.6;
 }
+.dsh-desk-review-diff {
+  margin: 8px 0 4px;
+}
 .dsh-desk-review-hint {
   margin: 4px 0 0;
   color: var(--dsw-alias-label-caption, #8a919f);

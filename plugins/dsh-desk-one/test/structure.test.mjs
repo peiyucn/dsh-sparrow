@@ -267,6 +267,8 @@ describe('dsh-desk-one 结构', () => {
     assert.match(review, /notebook\.detectOrphans/u, '打开审阅页时检测失效锚点')
     assert.match(review, /notebook\.detectOrphans/u, '打开审阅页即检测失效锚点')
     assert.match(review, /orphansDetected/u, '批量失效要提示用户')
+    assert.match(review, /DiffBlock/u, '审阅页用官方 DiffBlock 展示本轮改动')
+    assert.match(review, /annotationDiff\(/u, '本轮改动从 host 取基线 diff')
     const bundle = await read('lib/client.js')
     assert.ok(bundle.includes('note-review'), '构建产物要包含审阅 tab kind')
   })

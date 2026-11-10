@@ -208,6 +208,7 @@ const annotationSchema = z.object({
   })).min(1),
   status: z.enum(ANNOTATION_STATUSES),
   linkedSessionId: z.string().optional(),
+  baseline: z.object({ at: z.string().min(1), text: z.string() }).optional(),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   revision: z.number().int().positive(),

@@ -7,6 +7,7 @@ import {
   normalizeAnnotationAnchor, patchAnnotationStatus,
 } from '../../../lib/host/notebook/annotations.js'
 import { normalizeLibraryPath } from '../../../lib/host/notebook/library.js'
+import { NOTEBOOK_BASELINE_MAX_CHARS } from '../../../lib/constants.js'
 
 /** Build one record the same way the store does. */
 function record(overrides = {}) {
@@ -166,5 +167,20 @@ describe('annotation: orphan detection & automatic relocation', () => {
     const field = { type: 'field', field: 'type', value: 'meeting' }
     assert.deepEqual(autoRelocateAnchor(field, '', [{ name: 'type', value: 'note' }]), field)
     assert.equal(autoRelocateAnchor(field, '', [{ name: 'date', value: 'x' }]), undefined)
+  })
+})
+
+describe('annotation: review baseline', () => {
+  it('创建时快照正文作为 diff 基线，超长截到上限', () => {
+    const kept = createAnnotationRecord(
+      { path: 'a.md', anchor: { type: 'quote', quote: '结论' }, body: '意见' },
+      { id: 'a1', now: '2026-11-11T00:00:00.000Z', schema: 1, baselineText: '旧正文' },
+    )
+    assert.equal(kept.baseline?.text, '旧正文')
+    const capped = createAnnotationRecord(
+      { path: 'a.md', anchor: { type: 'quote', quote: '结论' }, body: '意见' },
+      { id: 'a2', now: '2026-11-11T00:00:00.000Z', schema: 1, baselineText: 'x'.repeat(NOTEBOOK_BASELINE_MAX_CHARS + 10) },
+    )
+    assert.equal(capped.baseline?.text.length, NOTEBOOK_BASELINE_MAX_CHARS)
   })
 })

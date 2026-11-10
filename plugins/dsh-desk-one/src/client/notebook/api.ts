@@ -8,7 +8,8 @@
 import { ROUTES } from '../../constants.js'
 import type {
   AnnotationListResponse, AnnotationMutationResponse, CreateAnnotationRequest, DeskAnnotation, NotebookPageResponse,
-  DetectOrphansResponse, NotebookSearchResponse, NotebookStateResponse, ReplyAnnotationRequest, UpdateAnnotationRequest,
+  AnnotationDiffResponse, DetectOrphansResponse, NotebookSearchResponse, NotebookStateResponse,
+  ReplyAnnotationRequest, UpdateAnnotationRequest,
 } from '../../contract.js'
 import { deleteJson, fetchJson, postJson } from '../http.js'
 
@@ -84,6 +85,11 @@ export function detectOrphans(path: string): Promise<DetectOrphansResponse> {
   return postJson<DetectOrphansResponse>(ROUTES.annotationDetect, { path })
 }
 
+/** The change this thread is reviewing: baseline body vs current body. */
+export function annotationDiff(id: string): Promise<AnnotationDiffResponse> {
+  return fetchJson<AnnotationDiffResponse>(`${ROUTES.annotationDiff}?id=${encodeURIComponent(id)}`)
+}
+
 /** Delete one thread. */
 export function deleteAnnotation(id: string): Promise<void> {
   return postJson<{ deleted: boolean }>(ROUTES.annotationDelete, { id }).then(() => undefined)
@@ -101,6 +107,7 @@ export interface NotebookApi {
   readonly replyAnnotation: typeof replyAnnotation
   readonly updateAnnotationStatus: typeof updateAnnotationStatus
   readonly detectOrphans: typeof detectOrphans
+  readonly annotationDiff: typeof annotationDiff
   readonly deleteAnnotation: typeof deleteAnnotation
 }
 
@@ -116,5 +123,6 @@ export const notebookApi: NotebookApi = {
   replyAnnotation,
   updateAnnotationStatus,
   detectOrphans,
+  annotationDiff,
   deleteAnnotation,
 }

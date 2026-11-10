@@ -12,7 +12,8 @@ import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
 import { createSessionIndexRecord, sessionIndexId, type SessionIndexDraft } from './sessions/records.js'
 import {
-  MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTEBOOK_CONFIG_ID, NODES_TABLE, PACKAGE_NAME, SCHEDULE_COLORS,
+  MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTEBOOK_BASELINE_MAX_CHARS, NOTEBOOK_CONFIG_ID, NODES_TABLE, PACKAGE_NAME,
+  SCHEDULE_COLORS,
   SESSION_INDEX_MISSING_DAYS, TASK_STATUSES, DESK_NODE_SCHEMA,
 } from '../constants.js'
 import {
@@ -799,12 +800,15 @@ export class DeskStore {
     readonly anchor?: unknown
     readonly body?: unknown
     readonly linkedSessionId?: string
+    /** Page body at creation; the review diff compares against it. */
+    readonly baselineText?: string
   }): Promise<DeskAnnotation> {
     const record = createAnnotationRecord(raw, {
       id: `annotation_${randomUUID()}`,
       now: new Date().toISOString(),
       schema: DESK_NODE_SCHEMA,
       ...raw.linkedSessionId === undefined ? {} : { linkedSessionId: raw.linkedSessionId },
+      ...raw.baselineText === undefined ? {} : { baselineText: raw.baselineText },
     })
     await this.nodes.put(record.id, record)
     return record
@@ -877,6 +881,30 @@ export class DeskStore {
       return updated
     } catch (error) {
       throw this.mapMissing(error, 'UNKNOWN_ANNOTATION', `批注不存在：${input.id}`)
+    }
+  }
+
+  /**
+   * Accept one thread: `answered → resolved`, and snapshot the current page as the new baseline
+   * so the next round diff starts from here. One operation, one revision bump.
+   */
+  async resolveAnnotation(id: string, expectedRevision: number, baselineText?: string): Promise<DeskAnnotation> {
+    const now = new Date().toISOString()
+    try {
+      const updated = await this.nodes.update(id, (current) => {
+        if (current.kind !== 'annotation') throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${id}`)
+        if (!Number.isInteger(expectedRevision) || current.revision !== expectedRevision) {
+          throw new DeskModelError('REVISION_CONFLICT', `批注已被修改（当前 revision ${current.revision}，请求 ${expectedRevision}）`)
+        }
+        const resolved = patchAnnotationStatus(current, 'resolved', now)
+        return baselineText === undefined
+          ? resolved
+          : { ...resolved, baseline: { at: now, text: baselineText.slice(0, NOTEBOOK_BASELINE_MAX_CHARS) } }
+      })
+      if (updated.kind !== 'annotation') throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${id}`)
+      return updated
+    } catch (error) {
+      throw this.mapMissing(error, 'UNKNOWN_ANNOTATION', `批注不存在：${id}`)
     }
   }
 

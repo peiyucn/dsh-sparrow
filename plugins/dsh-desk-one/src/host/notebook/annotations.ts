@@ -7,7 +7,7 @@
  * which transitions exist.
  */
 
-import { MAX_ANNOTATION_COMMENTS } from '../../constants.js'
+import { MAX_ANNOTATION_COMMENTS, NOTEBOOK_BASELINE_MAX_CHARS } from '../../constants.js'
 import type {
   AnnotationAnchor, AnnotationComment, DeskAnnotation,
 } from '../../contract.js'
@@ -64,7 +64,14 @@ export function normalizeAnnotationAnchor(raw: unknown): AnnotationAnchor {
 /** One new thread: the first comment is the human's, and the thread starts `open`. */
 export function createAnnotationRecord(
   input: { readonly path?: unknown; readonly anchor?: unknown; readonly body?: unknown },
-  options: { readonly id: string; readonly now: string; readonly schema: number; readonly linkedSessionId?: string },
+  options: {
+    readonly id: string
+    readonly now: string
+    readonly schema: number
+    readonly linkedSessionId?: string
+    /** Page body at creation, when the caller could read it. */
+    readonly baselineText?: string
+  },
 ): DeskAnnotation {
   const comment: AnnotationComment = { author: 'human', body: normalizeCommentBody(input.body), at: options.now }
   return {
@@ -76,6 +83,7 @@ export function createAnnotationRecord(
     comments: [comment],
     status: 'open',
     ...options.linkedSessionId === undefined ? {} : { linkedSessionId: options.linkedSessionId },
+    ...options.baselineText === undefined ? {} : { baseline: { at: options.now, text: options.baselineText.slice(0, NOTEBOOK_BASELINE_MAX_CHARS) } },
     createdAt: options.now,
     updatedAt: options.now,
     revision: 1,

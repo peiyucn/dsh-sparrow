@@ -6,6 +6,7 @@ import type {
   AnnotationListResponse, AnnotationMutationResponse, CreateAnnotationRequest, DeleteAnnotationRequest,
   NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse,
   ReplyAnnotationRequest, UpdateAnnotationRequest, DetectOrphansRequest, DetectOrphansResponse,
+  AnnotationDiffResponse,
 } from '../../contract.js'
 import { anchorStillValid, autoRelocateAnchor } from './annotations.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
@@ -78,7 +79,14 @@ async function listAnnotationsRoute(route: DeskRouteContext, req: IncomingMessag
 
 async function addAnnotationRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = bodyObject<CreateAnnotationRequest>(await readJsonBody(req), '请求体必须是对象')
-  const annotation = await route.store.createAnnotation(body)
+  // Best-effort baseline: the review diff compares the page against this snapshot.
+  let baselineText: string | undefined
+  try {
+    baselineText = (await notebookOf(route).page(String(body.path))).body
+  } catch {
+    baselineText = undefined
+  }
+  const annotation = await route.store.createAnnotation({ ...body, ...baselineText === undefined ? {} : { baselineText } })
   sendJson(res, 201, { annotation } satisfies AnnotationMutationResponse)
 }
 
@@ -105,6 +113,20 @@ async function updateAnnotationRoute(route: DeskRouteContext, req: IncomingMessa
   }
   const patch = rawPatch as { readonly status?: unknown }
   if (patch.status === undefined) throw new DeskError('BAD_BODY', 'patch 只接受 status')
+  if (patch.status === 'resolved') {
+    const current = route.store.getAnnotation(body.id)
+    let baselineText: string | undefined
+    if (current !== undefined) {
+      try {
+        baselineText = (await notebookOf(route).page(current.path)).body
+      } catch {
+        baselineText = undefined
+      }
+    }
+    const annotation = await route.store.resolveAnnotation(body.id, body.expectedRevision, baselineText)
+    sendJson(res, 200, { annotation } satisfies AnnotationMutationResponse)
+    return
+  }
   const annotation = await route.store.updateAnnotationStatus(body.id, body.expectedRevision, patch.status)
   sendJson(res, 200, { annotation } satisfies AnnotationMutationResponse)
 }
@@ -154,6 +176,26 @@ async function detectOrphansRoute(route: DeskRouteContext, req: IncomingMessage,
     relocated,
   } satisfies DetectOrphansResponse)
 }
+async function annotationDiffRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  const id = url.searchParams.get('id') ?? ''
+  if (id === '') throw new DeskError('BAD_BODY', '缺少批注 id')
+  const annotation = route.store.getAnnotation(id)
+  if (annotation === undefined) throw new DeskError('UNKNOWN_ANNOTATION', '批注不存在', 404)
+  let newText = ''
+  try {
+    newText = (await notebookOf(route).page(annotation.path)).body
+  } catch {
+    newText = ''
+  }
+  const oldText = annotation.baseline?.text ?? null
+  sendJson(res, 200, {
+    path: annotation.path,
+    oldText,
+    newText,
+    hasBaseline: oldText !== null,
+  } satisfies AnnotationDiffResponse)
+}
 export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.notebookState, handle: stateRoute },
   { method: 'POST', path: ROUTES.notebookRoot, handle: setRootRoute },
@@ -161,6 +203,7 @@ export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.notebookSearch, handle: searchRoute },
   { method: 'GET', path: ROUTES.notebookPage, handle: pageRoute },
   { method: 'GET', path: ROUTES.annotationList, handle: listAnnotationsRoute },
+  { method: 'GET', path: ROUTES.annotationDiff, handle: annotationDiffRoute },
   { method: 'POST', path: ROUTES.annotationAdd, handle: addAnnotationRoute },
   { method: 'POST', path: ROUTES.annotationReply, handle: replyAnnotationRoute },
   { method: 'POST', path: ROUTES.annotationDetect, handle: detectOrphansRoute },

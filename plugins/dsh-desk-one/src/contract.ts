@@ -586,6 +586,12 @@ export interface AnnotationComment {
   readonly at: string
 }
 
+/** The page content a thread compares against ("this round started here"). */
+export interface AnnotationBaseline {
+  readonly at: string
+  readonly text: string
+}
+
 /**
  * One review thread on a page. Lives in the Desk One store, never written back into the
  * markdown file; only a human moves `answered` to `resolved`.
@@ -601,6 +607,8 @@ export interface DeskAnnotation {
   readonly status: 'open' | 'answered' | 'resolved' | 'orphaned'
   /** Session that produced or is handling the thread. */
   readonly linkedSessionId?: string
+  /** Page body captured when the thread was created (and after each accept): the diff baseline. */
+  readonly baseline?: AnnotationBaseline
   readonly createdAt: string
   readonly updatedAt: string
   readonly revision: number
@@ -653,4 +661,13 @@ export interface DetectOrphansResponse {
   readonly annotations: readonly DeskAnnotation[]
   /** How many stale anchors were relocated automatically. */
   readonly relocated: number
+}
+
+/** The change one thread is reviewing: baseline body vs current body. */
+export interface AnnotationDiffResponse {
+  readonly path: string
+  /** Null when the thread predates baselines. */
+  readonly oldText: string | null
+  readonly newText: string
+  readonly hasBaseline: boolean
 }
