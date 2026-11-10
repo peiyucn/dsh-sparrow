@@ -149,123 +149,21 @@ export interface TodayContext {
   readonly onAddTask: () => void
 }
 
-const FOCUS_STORAGE_KEY = 'dsh-desk-focus-v1'
-const FOCUS_PRESETS = [15, 25, 45] as const
-const FOCUS_DEFAULT_MIN = 25
-
-function readFocus(): { endsAt: number | null; remainingMs: number; durationMs: number } {
-  try {
-    const raw = window.localStorage.getItem(FOCUS_STORAGE_KEY)
-    if (raw === null) return { endsAt: null, remainingMs: FOCUS_DEFAULT_MIN * 60_000, durationMs: FOCUS_DEFAULT_MIN * 60_000 }
-    const parsed = JSON.parse(raw) as { endsAt?: unknown; remainingMs?: unknown; durationMs?: unknown }
-    const durationMs = typeof parsed.durationMs === 'number' ? parsed.durationMs : FOCUS_DEFAULT_MIN * 60_000
-    const endsAt = typeof parsed.endsAt === 'number' ? parsed.endsAt : null
-    const remainingMs = typeof parsed.remainingMs === 'number' ? parsed.remainingMs : durationMs
-    return { endsAt, remainingMs, durationMs }
-  } catch {
-    return { endsAt: null, remainingMs: FOCUS_DEFAULT_MIN * 60_000, durationMs: FOCUS_DEFAULT_MIN * 60_000 }
-  }
+export interface TodayContext {
+  readonly notesCount: number
+  readonly openTasks: number
+  readonly onAddNote: () => void
+  readonly onAddTask: () => void
 }
 
-function notifyFocusDone(t: DeskTranslator): void {
-  try {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      new Notification(t('today.finish'))
-    }
-  } catch { /* notification is best-effort */ }
-  try {
-    const AudioCtor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (AudioCtor !== undefined) {
-      const ctx = new AudioCtor()
-      const oscillator = ctx.createOscillator()
-      const gain = ctx.createGain()
-      oscillator.frequency.value = 880
-      gain.gain.value = 0.08
-      oscillator.connect(gain)
-      gain.connect(ctx.destination)
-      oscillator.start()
-      oscillator.stop(ctx.currentTime + 0.18)
-    }
-  } catch { /* audio is best-effort */ }
-}
+/** Same plus glyph as the shared header actions, so Today's create buttons match their language. */
+const plusIcon = (
+  <svg viewBox="0 0 20 20" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+    <path d="M10 4.5v11M4.5 10h11" />
+  </svg>
+)
 
-function FocusTimer(props: { readonly t: DeskTranslator }): ReactElement {
-  const initial = useMemo(readFocus, [])
-  const [endsAt, setEndsAt] = useState<number | null>(initial.endsAt)
-  const [remainingMs, setRemainingMs] = useState(Math.max(0, initial.remainingMs))
-  const [durationMs, setDurationMs] = useState(initial.durationMs)
-  const [finished, setFinished] = useState(false)
-  const running = endsAt !== null
-
-  useEffect(() => {
-    const payload = { endsAt, remainingMs, durationMs }
-    try { window.localStorage.setItem(FOCUS_STORAGE_KEY, JSON.stringify(payload)) } catch { /* storage is best-effort */ }
-  }, [endsAt, remainingMs, durationMs])
-
-  useEffect(() => {
-    if (endsAt === null) return
-    const tick = (): void => {
-      const left = endsAt - Date.now()
-      if (left <= 0) {
-        setEndsAt(null)
-        setRemainingMs(0)
-        setFinished(true)
-        notifyFocusDone(props.t)
-        return
-      }
-      setRemainingMs(left)
-    }
-    tick()
-    const timer = window.setInterval(tick, 500)
-    return () => window.clearInterval(timer)
-  }, [endsAt, props.t])
-
-  const start = (minutes: number): void => {
-    const ms = minutes * 60_000
-    setDurationMs(ms)
-    setRemainingMs(ms)
-    setEndsAt(Date.now() + ms)
-    setFinished(false)
-    try {
-      if (typeof Notification !== 'undefined' && Notification.permission === 'default') void Notification.requestPermission()
-    } catch { /* notification is best-effort */ }
-  }
-  const pause = (): void => {
-    if (endsAt === null) return
-    setRemainingMs(Math.max(0, endsAt - Date.now()))
-    setEndsAt(null)
-  }
-  const reset = (): void => {
-    setEndsAt(null)
-    setRemainingMs(durationMs)
-    setFinished(false)
-  }
-
-  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000))
-  const clock = `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`
-  return (
-    <div className="dsh-desk-today-focus">
-      <div className="dsh-desk-today-focus-head">{props.t('today.focus')}</div>
-      <div className="dsh-desk-today-clock" data-running={running ? 'true' : undefined}>{clock}</div>
-      <div className="dsh-desk-today-presets">
-        {FOCUS_PRESETS.map(minutes => (
-          <button key={minutes} type="button" className="dsh-desk-schedule-chip" onClick={() => start(minutes)}>
-            {minutes}
-          </button>
-        ))}
-      </div>
-      <div className="dsh-desk-today-focus-actions">
-        {running
-          ? <button type="button" className="dsh-desk-schedule-chip" onClick={pause}>{props.t('today.pause')}</button>
-          : <button type="button" className="dsh-desk-schedule-chip" onClick={() => start(durationMs / 60_000)}>{props.t('today.start')}</button>}
-        <button type="button" className="dsh-desk-schedule-chip" onClick={reset}>{props.t('today.reset')}</button>
-      </div>
-      {finished ? <p className="dsh-desk-today-focus-done">{props.t('today.finish')}</p> : null}
-    </div>
-  )
-}
-
-/** Top-left "Today": focus on the left, today's events and two counts on the right. */
+/** Top-left "Today": today's events, two counts and the shared create actions. No local timer. */
 export function TodayPanel(props: {
   readonly t: DeskTranslator
   readonly today: Date
@@ -281,36 +179,37 @@ export function TodayPanel(props: {
         <h3>{t('today.title')}</h3>
         <span>{formatDateLabel(today, t)}</span>
       </header>
-      <div className="dsh-desk-today-top">
-        <FocusTimer t={t} />
-        <div className="dsh-desk-today-side">
-          <div className="dsh-desk-today-events">
-            <div className="dsh-desk-today-subhead">{t('today.events')}</div>
-            {events.length === 0
-              ? <p className="dsh-desk-schedule-hint">{t('today.noEvents')}</p>
-              : (
-                  <ul>
-                    {[...events].sort((left, right) => left.start.localeCompare(right.start)).slice(0, 4).map(event => (
-                      <li key={event.id}>
-                        <button type="button" className="dsh-desk-today-event" onClick={click => props.onOpenEvent(event, { x: click.clientX, y: click.clientY })}>
-                          <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
-                          <span>{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
-                          <span className="dsh-desk-today-event-title">{eventTitle(t, event)}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-          </div>
-          <div className="dsh-desk-today-stats">
-            <span><b>{context.notesCount}</b> {t('tab.notes')}</span>
-            <span><b>{context.openTasks}</b> {t('today.unfinished')}</span>
-          </div>
-        </div>
+      <div className="dsh-desk-today-events">
+        <div className="dsh-desk-today-subhead">{t('today.events')}</div>
+        {events.length === 0
+          ? <p className="dsh-desk-schedule-hint">{t('today.noEvents')}</p>
+          : (
+              <ul>
+                {[...events].sort((left, right) => left.start.localeCompare(right.start)).slice(0, 4).map(event => (
+                  <li key={event.id}>
+                    <button type="button" className="dsh-desk-today-event" onClick={click => props.onOpenEvent(event, { x: click.clientX, y: click.clientY })}>
+                      <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
+                      <span>{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
+                      <span className="dsh-desk-today-event-title">{eventTitle(t, event)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+      </div>
+      <div className="dsh-desk-today-stats">
+        <span><b>{context.notesCount}</b> {t('tab.notes')}</span>
+        <span><b>{context.openTasks}</b> {t('today.unfinished')}</span>
       </div>
       <div className="dsh-desk-today-actions">
-        <button type="button" className="dsh-desk-action" onClick={context.onAddTask}>{t('today.newTask')}</button>
-        <button type="button" className="dsh-desk-action" onClick={context.onAddNote}>{t('today.newNote')}</button>
+        <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={context.onAddTask}>
+          {plusIcon}
+          <span className="dsh-desk-action-label">{t('task.add')}</span>
+        </button>
+        <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={context.onAddNote}>
+          {plusIcon}
+          <span className="dsh-desk-action-label">{t('action.newNote')}</span>
+        </button>
       </div>
     </section>
   )

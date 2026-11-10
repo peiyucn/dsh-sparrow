@@ -93,23 +93,14 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-today > header { display: flex; align-items: baseline; gap: 8px; }
 .dsh-desk-schedule-today > header h3 { margin: 0; font-size: 13px; font-weight: 600; }
 .dsh-desk-schedule-today > header span { font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); }
-.dsh-desk-today-top { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 8px; min-height: 0; }
-.dsh-desk-today-focus { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
-.dsh-desk-today-focus-head { font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); }
-.dsh-desk-today-clock { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 32px; }
-.dsh-desk-today-clock[data-running='true'] { color: var(--dsw-alias-state-success-primary, #2e9e5b); }
-.dsh-desk-today-presets, .dsh-desk-today-focus-actions { display: flex; gap: 4px; align-items: center; }
-.dsh-desk-today-focus .dsh-desk-schedule-chip { font-size: 10px; height: 20px; padding: 0 6px; }
-.dsh-desk-today-focus-done { margin: 0; font-size: 10px; color: var(--dsw-alias-state-success-primary, #2e9e5b); }
-.dsh-desk-today-side { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
-.dsh-desk-today-stats { display: flex; gap: 6px; margin-top: auto; flex-wrap: wrap; }
+.dsh-desk-today-stats { display: flex; gap: 6px; flex-wrap: wrap; }
 .dsh-desk-today-stats span {
   font-size: 10px; line-height: 18px; padding: 0 8px; border-radius: 999px;
   color: var(--dsw-alias-label-secondary, #6b7280);
   background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05));
 }
 .dsh-desk-today-stats b { font-weight: 600; color: var(--dsw-alias-label-primary, #1f2329); }
-.dsh-desk-today-events { min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.dsh-desk-today-events { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
 .dsh-desk-today-subhead { font-size: 11px; font-weight: 600; color: var(--dsw-alias-label-secondary, #6b7280); }
 .dsh-desk-today-events ul { list-style: none; margin: 0; padding: 0; overflow: auto; }
 .dsh-desk-today-event {
