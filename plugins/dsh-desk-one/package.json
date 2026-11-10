@@ -38,6 +38,7 @@
     "!lib/client/**",
     "lib/types/**/*.d.ts",
     "cordis.patch.yml",
+    "skills/**",
     "README.md",
     "README.zh-CN.md",
     "CHANGELOG.md",

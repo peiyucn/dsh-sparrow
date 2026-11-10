@@ -7,6 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { PREFIX } from './constants.js'
 import { assertHostGates } from './host/gates.js'
 import { createDeskRequestHandler } from './host/router.js'
+import { registerBundledSkills } from './host/skills.js'
 import { DeskStore } from './host/store.js'
 import { NotebookHost } from './host/notebook/host.js'
 import { registerNotebookTools } from './host/notebook/tools.js'
@@ -37,6 +38,8 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
   // Session gates include the session-format probe + the two private seams; failing here disables
   // the plugin before any storage/effect is registered. Hosts without the services (unit tests,
   // stripped builds) simply skip the session capabilities.
+  // Routing documents for the model: bundled with the package, optional service.
+  await registerBundledSkills(ctx)
   const store = await DeskStore.open(ctx)
   ctx.effect(() => () => store.close(), 'dsh-desk-one: storage domain')
   // Session gates include the session-format probe + the two private seams; failing here disables

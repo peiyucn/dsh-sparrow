@@ -1,6 +1,6 @@
 # 08 · 能力包（Capability Pack）— 随插件分发的 skill 与工具
 
-> 状态（2026-11-10）：**设计稿，待评审**；评审通过后与 `07-notebook.md` 一起开工。
+> 状态（2026-11-11）：**已实现**（v1：随包 note2md + desk-notes，host 侧注册为 runtime skill）。
 > 关联：`07-notebook.md`（笔记功能本体）、`06-session-index.md`（外键层）、
 > `01-object-model.md`（统一对象与工具面）。
 
@@ -56,8 +56,12 @@ Desk One 不只是一个面板，而是**面板 + 数据 + 能力包**：
 
 ## 5. 打包与加载
 
-- skill 内容随 npm 包分发（`files` 清单需包含 `skills/**`），运行时通过
-  `ctx.skills.register()` / `registerProvider()` 注册。
+**实现落点**：`skills/note2md/`（SKILL.md + templates/ + tools/*.ps1，原样随包）、
+`skills/desk-notes/SKILL.md`（批注循环语义）、`src/host/skills.ts`（解析 frontmatter 描述 +
+注册 runtime skill，缺 `skills` 服务时只告警不拖垮面板）。
+
+- skill 内容随 npm 包分发（`files` 已含 `skills/**`），运行时通过 `ctx.skills.register()`
+  注册，并用 `resourceBase: { kind: 'directory' }` 指向包内 skill 目录，模板/脚本按相对路径解析。
 - **包内资源路径不得写死绝对路径**（仓库公开，`check:paths` 会红）；相对路径由
   `resourceBase` 交给模型解析（官方 `renderSkillContent` 会注入 base directory）。
 - `note2md` 的 `templates/` 与三个 `.ps1` 一并随包（导入链路依赖它们）。
