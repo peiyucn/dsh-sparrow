@@ -73,10 +73,6 @@ export interface LegacyTrashItem {
 
 export type TrashEntry = TrashItem | LegacyTrashItem
 
-export interface ErrorBody {
-  readonly error: { readonly code: string; readonly message: string }
-}
-
 /* ------------------------------ 请求体 ------------------------------ */
 
 export interface UnarchiveRequest {

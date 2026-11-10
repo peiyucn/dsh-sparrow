@@ -10,7 +10,7 @@
 import { z } from 'zod'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import {
-  DESK_NODE_SCHEMA, DOMAIN_NAME, DOMAIN_VERSION, EDGES_TABLE, MAX_TASK_SESSIONS, NODES_TABLE, NOTE_COLORS,
+  DOMAIN_NAME, DOMAIN_VERSION, EDGES_TABLE, MAX_TASK_SESSIONS, NODES_TABLE, NOTE_COLORS,
   SCHEDULE_CHANNELS, SCHEDULE_COLORS, SCHEDULE_PROVIDERS, TASK_STATUSES,
 } from './constants.js'
 import type { DeskEdge, DeskNode } from './contract.js'
@@ -193,6 +193,3 @@ export const DESK_DOMAIN = defineDomain({
     [EDGES_TABLE]: domainTable<string, DeskEdge>(edgeSchema),
   },
 })
-
-/** Node schema version referenced once so it stays in sync with record validation (migrations in spec). */
-export const SUPPORTED_NODE_SCHEMA = DESK_NODE_SCHEMA

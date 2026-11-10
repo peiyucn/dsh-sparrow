@@ -5,8 +5,8 @@
  */
 
 import {
-  MAX_BODY_CHARS, MAX_GROUP_CHARS, MAX_TASK_SESSIONS, MAX_TITLE_CHARS, NOTE_COLORS, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT,
-  NOTE_MIN_WIDTH, TASK_STATUSES,
+  DESK_NODE_SCHEMA, MAX_BODY_CHARS, MAX_GROUP_CHARS, MAX_TASK_SESSIONS, MAX_TITLE_CHARS, NOTE_COLORS, NOTE_MAX_SIZE,
+  NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH, TASK_STATUSES,
 } from './constants.js'
 import type { DeskNote, DeskTask, DeskTaskGroup, NoteColor, TaskStatus } from './contract.js'
 
@@ -110,7 +110,7 @@ export function createNoteRecord(
   return {
     id: meta.id,
     kind: 'note',
-    schema: 1,
+    schema: DESK_NODE_SCHEMA,
     title: input.title,
     body: input.body,
     tags: [],
@@ -357,7 +357,7 @@ export function createTaskRecord(
   return {
     id: meta.id,
     kind: 'task',
-    schema: 1,
+    schema: DESK_NODE_SCHEMA,
     title: input.title,
     body: input.body,
     tags: [],
@@ -503,7 +503,7 @@ export function createGroupRecord(
   return {
     id: meta.id,
     kind: 'group',
-    schema: 1,
+    schema: DESK_NODE_SCHEMA,
     name: input.name,
     status: input.status,
     order: input.order,

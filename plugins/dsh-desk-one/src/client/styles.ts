@@ -25,6 +25,3 @@ export function ensureDeskStyles(): HTMLStyleElement {
   document.head.appendChild(style)
   return style
 }
-
-/** For node:test: the aggregated stylesheet as text. */
-export const DESK_STYLESHEET = DESK_CSS

@@ -55,12 +55,3 @@ export interface SessionLinkApi {
   inspect: (sessionId: string) => Promise<void>
 }
 
-/** Build a disabled facade for hosts without the optional client services. */
-export function disabledSessionLink(): SessionLinkApi {
-  return {
-    list: () => ({ enabled: false, sessions: [], workspaces: [] }),
-    subscribe: () => () => {},
-    open: () => {},
-    inspect: async () => {},
-  }
-}

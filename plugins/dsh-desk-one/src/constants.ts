@@ -101,8 +101,6 @@ export const SCHEDULE_COLORS = [
 /** 镜像窗口：过去 6 个月 / 未来 3 个月（重复事件在该窗口内展开成实例）。 */
 export const SCHEDULE_PAST_MONTHS = 6
 export const SCHEDULE_FUTURE_MONTHS = 3
-/** 面板打开时自动同步的节流：距上次同步超过该值才自动触发。 */
-export const SCHEDULE_AUTO_SYNC_MS = 5 * 60_000
 /** 客户端轮询/自动同步间隔：面板保持打开时每 15 分钟同步一次。 */
 export const SCHEDULE_SYNC_INTERVAL_MS = 15 * 60_000
 /** 外部请求超时：CalDAV/ICS 拉取比普通 REST 慢，单独放宽。 */
