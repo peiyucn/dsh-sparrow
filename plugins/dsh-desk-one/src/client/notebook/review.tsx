@@ -247,7 +247,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       const history = thread.comments
         .map(comment => `${comment.author === 'ai' ? t('review.byAi') : t('review.byHuman')}：${comment.body}`)
         .join('\n')
-      return `【批注】${thread.path}\n${head}\n${history}`
+      const number = numberOf.get(thread.id) ?? 0
+      return `【批注 ${number}】${thread.path}\n${head}\n${history}`
     }).join('\n\n')
   }, [t])
 
@@ -260,6 +261,10 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   if (path === undefined) {
     return <div className="dsh-desk-review"><p className="dsh-desk-notebook-hint">{t('review.noPath')}</p></div>
   }
+
+  // One 批注 per entry, numbered in creation order (stable across status changes).
+  const orderedThreads = [...annotations].sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+  const numberOf = new Map(orderedThreads.map((thread, index) => [thread.id, index + 1]))
 
   const openThreads = annotations.filter(thread => thread.status === 'open' || thread.status === 'answered')
   const answeredCount = annotations.filter(thread => thread.status === 'answered').length
@@ -338,7 +343,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
               )}
               <section className="dsh-desk-review-card">
                 <div className="dsh-desk-review-threadhead">
-                  <h4>{t('review.threads')} {annotations.length}</h4>
+                  <h4>{t('review.threadsCount', { count: annotations.length })}</h4>
                   {answeredCount === 0 ? null : (
                     <button type="button" className="dsh-desk-btn" disabled={busy} onClick={() => { void acceptAll() }}>
                       {t('review.acceptAll')}
@@ -356,9 +361,10 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                       <div className="dsh-desk-review-thread" key={thread.id} data-status={thread.status}>
                         <div className="dsh-desk-review-threadhead">
                           <span className="dsh-desk-review-dot" />
-                          <span className="dsh-desk-review-anchor" title={anchorLabel(thread.anchor, t)}>{anchorLabel(thread.anchor, t)}</span>
+                          <span className="dsh-desk-review-anchor">{t('review.threadNo', { number: numberOf.get(thread.id) ?? 0 })}</span>
                           <span className="dsh-desk-review-status">{t(STATUS_KEY[thread.status])}</span>
                         </div>
+                        <p className="dsh-desk-review-thread-sub" title={anchorLabel(thread.anchor, t)}>{anchorLabel(thread.anchor, t)}</p>
                         {anchorResolves(thread.anchor, body) ? null : (
                           <p className="dsh-desk-review-orphan">{t('review.missingAnchor')}</p>
                         )}

@@ -185,6 +185,14 @@ export const REVIEW_CSS = `
   color: var(--dsw-alias-label-caption, #8a919f);
   font-size: 10px;
 }
+.dsh-desk-review-thread-sub {
+  margin: 3px 0 0 13px;
+  color: var(--dsw-alias-label-caption, #8a919f);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .dsh-desk-review-orphan {
   margin: 4px 0 0;
   color: #8a5a00;
