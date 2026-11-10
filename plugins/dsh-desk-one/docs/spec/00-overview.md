@@ -48,7 +48,8 @@ DSH Web 里「与 harness 共用一张桌子」的工作套件 **Desk One（同�
 
 ```text
 src/
-  constants.ts contract.ts domain.ts model.ts trust.ts   # 共享：统一对象模型与安全基线
+  constants.ts contract.ts domain.ts model.ts trust.ts    # 共享：统一对象模型与安全基线
+  session-admin.ts                                        # 共享：会话管理 REST 契约（host 组装 / client 消费）
   host.ts index.ts                                        # host 入口 / 公共再导出
   host/
     gates.ts http.ts router.ts                            # 装配：能力门 / HTTP 基础 / 前缀路由（含信任栅栏）
@@ -60,11 +61,11 @@ src/
   client/
     index.ts install.ts panel.ts icon.tsx compat.ts       # 入口与客户端装配
     i18n.ts locale.d.ts                                   # 共享文案（键按功能命名空间）
-    app/{DeskOnePage.tsx,types.ts,utils.ts,styles.ts}      # 面板外壳：页头 / 标签 / 空态 / 外壳样式
+    app/{DeskOnePage.tsx,DeskHeader.tsx,SubPageHeader.tsx,types.ts,utils.ts,styles.ts}  # 面板外壳
     notes/{api.ts,components/*,hooks/*,styles.ts}          # 便签功能的 client 半
     tasks/{api.ts,types.ts,components/*,hooks/*,styles.ts}  # 任务板功能的 client 半（S1）
-    sessions/{bridge.ts,catalog.ts,SessionsView.tsx}       # 会话功能的 client 半（Phase 1 只读；Phase 3 补操作）
-    schedule/{api.ts,views/**,components/**,styles.ts}      # 日程功能的 client 半（S2）
+    sessions/{bridge.ts,catalog.ts,contract.ts,archiveApi.ts,SessionsView.tsx,ArchiveSections.tsx,SessionTreeRow.tsx,SessionRowAction.tsx,ConfirmButton.tsx,FillTitleButton.tsx}
+    schedule/{ScheduleView.tsx,shared.ts,toolbar.tsx,panels.tsx,boards.tsx,event-card.tsx,sources.tsx,utils.ts,api.ts,styles.ts}
     styles.ts                                             # 聚合注入：app + 各功能 CSS
 test/
   shared/{model,task-model,trust}.test.mjs
@@ -75,6 +76,8 @@ test/
 ```
 
 * 约定：**新功能 = `src/client/<feature>/` + `src/host/<feature>/` + `test/<layer>/<feature>/`**；只有真正跨功能的东西才放在 `src/` 根或 `client/app/`。
+* **层次方向（硬约束）**：`client/**` 不得 import `host/**`，`host/**` 不得 import `client/**`；两半共用的类型放 `src/` 根（如 `contract.ts`、`session-admin.ts`）。客户端构建链与宿主运行环境不同，反向依赖会同时破坏类型边界和打包体积。
+* 日程页的 client 半按职责分文件：`shared`（标题回退 / 日期标签 / provider key）、`toolbar`（导航与视图切换）、`panels`（开始 / 今日 / 近期）、`boards`（列表 / 月 / 周）、`event-card`（浮动详情）、`sources`（日历设置子页）。新增视图放进对应文件，不再造巨型组件文件。
 * CSS：外壳在 `client/app/styles.ts`、功能在 `client/<feature>/styles.ts`，由 `client/styles.ts` 聚合；结构测试按功能文件读取。
 * 测试发现：仓库 `scripts/verify.mjs` 使用 `test/**/*.test.mjs`，支持按功能分子目录。
 
