@@ -42,6 +42,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'review.accept'
       | 'review.replyReopens'
       | 'review.delete'
+      | 'review.deleteConfirm'
       | 'review.handoff'
       | 'review.handoffAll'
       | 'review.handoffDone'

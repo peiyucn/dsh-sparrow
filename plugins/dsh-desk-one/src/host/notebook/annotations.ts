@@ -127,3 +127,12 @@ export function patchAnnotationStatus(
   if (status === current.status) return current
   return { ...current, status, updatedAt: now, revision: current.revision + 1 }
 }
+
+/**
+ * Deleting a thread removes the whole review record; accept it or keep it instead.
+ * Accepted threads are the review history, so only unfinished records may be deleted.
+ * @param status - current thread status.
+ */
+export function assertAnnotationDeletable(status: DeskAnnotation['status']): void {
+  if (status === 'resolved') throw new DeskModelError('INVALID_ANNOTATION', '已接受的批注不能删除（审阅历史保留）')
+}

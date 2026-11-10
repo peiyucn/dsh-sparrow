@@ -106,6 +106,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const [replyFor, setReplyFor] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
+  /** Thread awaiting the second delete click (null = none). */
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null)
 
   const labels = useMemo(() => ({
     code: { copyLabel: t('review.copy'), copiedLabel: t('review.copied') },
@@ -128,6 +130,13 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   }, [notebook, path])
 
   useEffect(() => { void load() }, [load])
+
+  // A delete confirmation that is not confirmed quickly simply expires.
+  useEffect(() => {
+    if (confirmingDelete === null) return
+    const timer = setTimeout(() => setConfirmingDelete(null), 3_000)
+    return () => clearTimeout(timer)
+  }, [confirmingDelete])
 
   // AI turns land in the conversation, not here: the thread list must catch up on its own,
   // or a status that changed server-side stays invisible and the thread can never be accepted.
@@ -439,9 +448,25 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                                   {t('review.handoff')}
                                 </button>
                               )}
-                          <button type="button" className="dsh-desk-review-mini dsh-desk-review-danger" disabled={busy} onClick={() => { void removeThread(thread) }}>
-                            {t('review.delete')}
-                          </button>
+                          {thread.status === 'resolved'
+                            ? null
+                            : (
+                                <button
+                                  type="button"
+                                  className="dsh-desk-review-mini dsh-desk-review-danger"
+                                  disabled={busy}
+                                  onClick={() => {
+                                    if (confirmingDelete === thread.id) {
+                                      setConfirmingDelete(null)
+                                      void removeThread(thread)
+                                      return
+                                    }
+                                    setConfirmingDelete(thread.id)
+                                  }}
+                                >
+                                  {confirmingDelete === thread.id ? t('review.deleteConfirm') : t('review.delete')}
+                                </button>
+                              )}
                         </div>
                       </div>
                     ))}

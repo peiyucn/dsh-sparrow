@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { DeskModelError } from '../../../lib/model/errors.js'
 import {
-  appendAnnotationComment, createAnnotationRecord, normalizeAnnotationAnchor, patchAnnotationStatus,
+  appendAnnotationComment, assertAnnotationDeletable, createAnnotationRecord, normalizeAnnotationAnchor,
+  patchAnnotationStatus,
 } from '../../../lib/host/notebook/annotations.js'
 import { normalizeLibraryPath } from '../../../lib/host/notebook/library.js'
 
@@ -111,5 +112,14 @@ describe('annotation: status machine', () => {
 
   it('拒绝非法状态', () => {
     assert.throws(() => patchAnnotationStatus(record(), 'done', '2026-11-11T02:00:00.000Z'), DeskModelError)
+  })
+})
+
+describe('annotation: delete', () => {
+  it('已接受的批注不能删除，其余状态可删', () => {
+    for (const status of ['open', 'answered', 'orphaned']) {
+      assert.doesNotThrow(() => assertAnnotationDeletable(status), `${status} 应可删除`)
+    }
+    assert.throws(() => assertAnnotationDeletable('resolved'), DeskModelError)
   })
 })

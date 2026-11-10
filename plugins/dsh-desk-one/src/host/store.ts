@@ -22,7 +22,7 @@ import {
   type GroupPatch, type NotePatch, type TaskPatch,
 } from '../model.js'
 import {
-  appendAnnotationComment, createAnnotationRecord, patchAnnotationStatus,
+  appendAnnotationComment, assertAnnotationDeletable, createAnnotationRecord, patchAnnotationStatus,
 } from './notebook/annotations.js'
 import {
   createCalendarRecord, createEventRecord, createScheduleSourceRecord, eventMatchesDraft, filterEvents,
@@ -860,6 +860,7 @@ export class DeskStore {
     if (current === undefined || current.kind !== 'annotation') {
       throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${id}`)
     }
+    assertAnnotationDeletable(current.status)
     await this.nodes.delete(id)
     return true
   }
