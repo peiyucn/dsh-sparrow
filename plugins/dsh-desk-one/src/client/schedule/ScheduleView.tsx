@@ -49,13 +49,17 @@ function readHidden(): Set<string> {
 export interface ScheduleHeaderActions {
   sync: () => void
   openSources: () => void
+  /** Published whenever a sync starts/finishes so the shared header can show progress. */
+  syncing: boolean
 }
 
-export function ScheduleView({ t, api, headerActionsRef, todayContext }: {
+export function ScheduleView({ t, api, headerActionsRef, todayContext, onSyncStateChange }: {
   readonly t: DeskTranslator
   readonly api: ScheduleApi
   readonly headerActionsRef?: { current: ScheduleHeaderActions | null }
   readonly todayContext: TodayContext
+  /** Lets the shared header reflect sync progress without subscribing to internal state. */
+  readonly onSyncStateChange?: (syncing: boolean) => void
 }): ReactElement {
   const today = useMemo(() => startOfLocalDay(new Date()), [])
   const [page, setPage] = useState<SchedulePage>('calendar')
@@ -71,6 +75,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext }: {
   const [listStart, setListStart] = useState<Date>(today)
   const [listDays, setListDays] = useState(SCHEDULE_LIST_DAYS)
   const [upcomingDays, setUpcomingDays] = useState(SCHEDULE_UPCOMING_DEFAULT_DAYS)
+  const [syncing, setSyncing] = useState(false)
   const syncingRef = useRef(false)
   const autoSyncTried = useRef(false)
   const loadedOnce = useRef(false)
@@ -115,6 +120,8 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext }: {
   const runSync = useCallback(async (): Promise<void> => {
     if (syncingRef.current) return
     syncingRef.current = true
+    setSyncing(true)
+    onSyncStateChange?.(true)
     setError(null)
     try {
       await api.sync()
@@ -123,8 +130,10 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext }: {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
       syncingRef.current = false
+      setSyncing(false)
+      onSyncStateChange?.(false)
     }
-  }, [api, load])
+  }, [api, load, onSyncStateChange])
 
   // Publish the page actions to the shared header, matching the notes/tasks header chrome.
   useEffect(() => {
@@ -132,9 +141,10 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext }: {
     headerActionsRef.current = {
       sync: () => { void runSync() },
       openSources: () => { setSelected(null); setPage('sources') },
+      syncing,
     }
     return () => { headerActionsRef.current = null }
-  }, [headerActionsRef, runSync])
+  }, [headerActionsRef, runSync, syncing])
 
   // One auto-sync per mount (stale mirror only), never a state-driven loop.
   useEffect(() => {

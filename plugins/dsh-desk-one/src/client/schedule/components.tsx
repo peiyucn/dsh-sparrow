@@ -174,10 +174,12 @@ export function UpcomingPanel(props: {
 export interface TodayContext {
   readonly notesCount: number
   readonly openTasks: number
+  readonly activeSessions: number
   readonly onAddNote: () => void
   readonly onAddTask: () => void
   readonly onOpenNotes: () => void
   readonly onOpenTasks: () => void
+  readonly onOpenSessions: () => void
 }
 
 /** Same plus glyph as the shared header actions, so Today's create buttons match their language. */
@@ -196,6 +198,11 @@ export function TodayPanel(props: {
   readonly onOpenEvent: (event: DeskEvent, point?: ClickPoint) => void
 }): ReactElement {
   const { t, today, events, calendars, context } = props
+  const counts: readonly { readonly value: number; readonly label: string; readonly color: string; readonly onClick: () => void }[] = [
+    { value: context.notesCount, label: t('today.notes'), color: '#d9a441', onClick: context.onOpenNotes },
+    { value: context.openTasks, label: t('today.tasks'), color: '#4176e6', onClick: context.onOpenTasks },
+    { value: context.activeSessions, label: t('today.sessions'), color: '#2e9e5b', onClick: context.onOpenSessions },
+  ]
   return (
     <section className="dsh-desk-schedule-today">
       <header>
@@ -204,12 +211,11 @@ export function TodayPanel(props: {
       </header>
       <div className="dsh-desk-today-split">
         <div className="dsh-desk-today-events">
-          <div className="dsh-desk-today-subhead">{t('today.events')}</div>
           {events.length === 0
             ? <p className="dsh-desk-schedule-hint">{t('today.noEvents')}</p>
             : (
                 <ul>
-                  {[...events].sort((left, right) => left.start.localeCompare(right.start)).slice(0, 3).map(event => (
+                  {[...events].sort((left, right) => left.start.localeCompare(right.start)).slice(0, 4).map(event => (
                     <li key={event.id}>
                       <button type="button" className="dsh-desk-today-event" onClick={click => props.onOpenEvent(event, { x: click.clientX, y: click.clientY })}>
                         <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
@@ -222,12 +228,11 @@ export function TodayPanel(props: {
               )}
         </div>
         <div className="dsh-desk-today-stats">
-          <button type="button" className="dsh-desk-today-stat" onClick={context.onOpenNotes}>
-            {t('today.notesRemaining', { count: context.notesCount })}
-          </button>
-          <button type="button" className="dsh-desk-today-stat" onClick={context.onOpenTasks}>
-            {t('today.tasksRemaining', { count: context.openTasks })}
-          </button>
+          {counts.map(item => (
+            <button key={item.label} type="button" className="dsh-desk-today-stat" onClick={item.onClick}>
+              <b style={{ color: item.color }}>{item.value}</b> {item.label}
+            </button>
+          ))}
         </div>
       </div>
       <div className="dsh-desk-today-actions">

@@ -77,25 +77,24 @@ export const SCHEDULE_CSS = `
 
 /* top row: Today (left) + Upcoming (right), equal width, calendar takes the rest */
 .dsh-desk-schedule-top {
-  flex: none; display: grid; gap: 8px; height: 150px;
+  flex: none; display: grid; gap: 8px; height: 168px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .dsh-desk-schedule-upcoming {
   height: 100%; overflow: hidden;
 }
 .dsh-desk-schedule-today {
-  box-sizing: border-box; height: 100%; min-width: 0; display: flex; flex-direction: column; gap: 4px;
-  padding: 7px 10px 8px; background: var(--dsw-alias-bg-layer-1, #fff);
+  box-sizing: border-box; height: 100%; min-width: 0; display: flex; flex-direction: column; gap: 5px;
+  padding: 8px 12px 9px; background: var(--dsw-alias-bg-layer-1, #fff);
   border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); border-radius: var(--dsw-radius-lg, 16px);
   overflow: hidden;
 }
-.dsh-desk-schedule-today > header { display: flex; align-items: baseline; gap: 8px; }
+.dsh-desk-schedule-today > header { display: flex; align-items: baseline; gap: 8px; flex: none; }
 .dsh-desk-schedule-today > header h3 { margin: 0; font-size: 13px; font-weight: 600; }
 .dsh-desk-schedule-today > header span { font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); }
 /* Left = today's events, right = clickable counts, divided by a hairline. */
-.dsh-desk-today-split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr); gap: 8px; }
-.dsh-desk-today-events { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
-.dsh-desk-today-subhead { font-size: 11px; font-weight: 600; color: var(--dsw-alias-label-secondary, #6b7280); }
+.dsh-desk-today-split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr); gap: 10px; }
+.dsh-desk-today-events { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .dsh-desk-today-events ul { list-style: none; margin: 0; padding: 0; overflow: auto; }
 .dsh-desk-today-event {
   display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; border: 0; background: transparent;
@@ -104,17 +103,25 @@ export const SCHEDULE_CSS = `
 .dsh-desk-today-event:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-today-event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-desk-today-stats {
-  min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px;
-  padding-left: 8px; border-left: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  padding-left: 10px; border-left: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
 }
 .dsh-desk-today-stat {
   border: 0; background: transparent; color: var(--dsw-alias-label-secondary, #6b7280);
-  font: inherit; font-size: 11px; line-height: 16px; text-align: left; padding: 3px 4px;
-  border-radius: 5px; cursor: pointer;
+  font: inherit; font-size: 11px; line-height: 16px; text-align: left; padding: 1px 4px;
+  border-radius: 5px; cursor: pointer; white-space: nowrap;
 }
-.dsh-desk-today-stat:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); }
-.dsh-desk-today-actions { display: flex; align-items: center; gap: 5px; margin-top: auto; flex-wrap: wrap; }
-.dsh-desk-today-actions .dsh-desk-action { height: 26px; padding: 0 8px; font-size: 11px; gap: 2px; border-radius: 8px; }
+.dsh-desk-today-stat b { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.dsh-desk-today-stat:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
+/* Dedicated action strip: the three buttons share the width evenly instead of wrapping. */
+.dsh-desk-today-actions {
+  flex: none; display: flex; align-items: center; gap: 6px;
+  padding-top: 6px; border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+}
+.dsh-desk-today-actions .dsh-desk-action {
+  flex: 1; min-width: 0; height: 26px; padding: 0 4px; font-size: 11px; gap: 2px; border-radius: 8px;
+}
+.dsh-desk-today-actions .dsh-desk-action-label { overflow: hidden; text-overflow: ellipsis; }
 
 /** Compact switch shared by the management page. */
 .dsh-desk-switch {
@@ -138,9 +145,20 @@ export const SCHEDULE_CSS = `
   display: flex; align-items: center; justify-content: space-between; flex: none;
   font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-secondary, #6b7280);
 }
-/* Range slider: pick how many days ahead the upcoming card covers. */
+/* Range slider: a small rounded-square thumb matches the official DSH control language. */
 .dsh-desk-upcoming-range { flex: none; display: flex; align-items: center; gap: 8px; }
-.dsh-desk-upcoming-range input[type='range'] { flex: 1; min-width: 0; height: 4px; accent-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); cursor: pointer; }
+.dsh-desk-upcoming-range input[type='range'] {
+  flex: 1; min-width: 0; height: 4px; appearance: none; -webkit-appearance: none;
+  border-radius: 2px; background: var(--dsw-alias-border-l2, #cfd4dc); cursor: pointer;
+}
+.dsh-desk-upcoming-range input[type='range']::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none; width: 12px; height: 12px; border-radius: 3px;
+  background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); border: none; cursor: pointer;
+}
+.dsh-desk-upcoming-range input[type='range']::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 3px;
+  background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); border: none; cursor: pointer;
+}
 .dsh-desk-upcoming-range-label { flex: none; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); white-space: nowrap; }
 .dsh-desk-schedule-upcoming ul { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; overflow: auto; }
 .dsh-desk-schedule-upcoming-item {

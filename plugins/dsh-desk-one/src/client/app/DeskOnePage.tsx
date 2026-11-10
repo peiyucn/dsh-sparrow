@@ -49,6 +49,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   const [creating, setCreating] = useState(false)
   const zTopRef = useRef(0)
   const scheduleActionsRef = useRef<ScheduleHeaderActions | null>(null)
+  const [scheduleSyncing, setScheduleSyncing] = useState(false)
 
   const selectTab = useCallback((next: Tab): void => {
     setTab(next)
@@ -352,9 +353,9 @@ export function DeskOnePage(props: DeskPanelProps) {
     if (tab !== 'schedule') return null
     return (
       <>
-        <button key="schedule-sync" type="button" className="dsh-desk-action" onClick={() => scheduleActionsRef.current?.sync()}>
+        <button key="schedule-sync" type="button" className="dsh-desk-action" disabled={scheduleSyncing} data-busy={scheduleSyncing ? 'true' : undefined} onClick={() => scheduleActionsRef.current?.sync()}>
           {syncIcon}
-          <span className="dsh-desk-action-label">{t('schedule.refresh')}</span>
+          <span className="dsh-desk-action-label">{scheduleSyncing ? t('schedule.syncing') : t('schedule.refresh')}</span>
         </button>
         <button key="schedule-sources" type="button" className="dsh-desk-action" onClick={() => scheduleActionsRef.current?.openSources()}>
           {sourcesIcon}
@@ -400,13 +401,16 @@ export function DeskOnePage(props: DeskPanelProps) {
               t={t}
               api={schedule}
               headerActionsRef={scheduleActionsRef}
+              onSyncStateChange={setScheduleSyncing}
               todayContext={{
                 notesCount: trash.activeNotes.length,
                 openTasks: taskData.tasks.filter(task => task.status !== 'done' && !task.archived).length,
+                activeSessions: sessionSnapshot.sessions.filter(session => session.availability !== 'archived').length,
                 onAddNote: () => { selectTab('notes'); void addNote() },
                 onAddTask: () => { selectTab('tasks'); board.beginDraft('todo') },
                 onOpenNotes: () => selectTab('notes'),
                 onOpenTasks: () => selectTab('tasks'),
+                onOpenSessions: () => selectTab('sessions'),
               }}
             />
           ) : tab === 'sessions' ? (

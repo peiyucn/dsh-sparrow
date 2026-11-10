@@ -16,6 +16,7 @@ import type { DeskTranslator } from '../app/types.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
 import { formatTokens } from '../app/utils.js'
 import { ConfirmButton } from './ConfirmButton.js'
+import { FillTitleButton } from './FillTitleButton.js'
 import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
 
@@ -137,10 +138,15 @@ function ArchiveTreeNodeRow(props: {
       />
       {deleteArmed ? (
         <div className="dsh-desk-archive-deletebox" style={{ marginLeft: `calc(12px + ${depth} * 16px)` }}>
+          <FillTitleButton
+            title={node.title}
+            label={props.t('today.copyTitle')}
+            onFill={() => props.onDeleteDraft(node.sessionId, node.title)}
+          />
           <input
             className="dsh-desk-archive-input"
             value={deleteDraft?.text ?? ''}
-            placeholder={t('sessions.archive.deletePlaceholder')}
+            placeholder={props.t('sessions.archive.deletePlaceholder')}
             onChange={event => props.onDeleteDraft(node.sessionId, event.target.value)}
           />
           <button
@@ -149,7 +155,7 @@ function ArchiveTreeNodeRow(props: {
             data-danger="true"
             disabled={!canDelete || busy}
             onClick={() => props.onConfirmDelete(node)}
-          >{t('sessions.archive.deleteConfirm')}</button>
+          >{props.t('sessions.archive.deleteConfirm')}</button>
         </div>
       ) : null}
       {hasChildren && open ? (
@@ -224,7 +230,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
   const [visible, setVisible] = useState({ archived: SESSION_STREAM_PAGE_SIZE, strays: SESSION_STREAM_PAGE_SIZE, trash: SESSION_STREAM_PAGE_SIZE })
   const [expandedTrash, setExpandedTrash] = useState<Set<string>>(new Set())
 
-  const reload = useCallback(async (): Promise<void> => {
+  const reload = useCallback(async (quiet = false): Promise<void> => {
     try {
       const [tree, strays, trash, trashDir] = await Promise.all([
         api.list(), api.strays(), api.trash(), api.trashDir(),
@@ -234,18 +240,23 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [api])
 
   useEffect(() => { void reload() }, [reload])
 
-  const run = useCallback(async (task: () => Promise<unknown>): Promise<boolean> => {
+  /**
+   * Optimistically drop a row before the background refresh: the host has already committed the
+   * mutation, so replacing the whole list in one paint is what makes rows "blink".
+   */
+  const run = useCallback(async (task: () => Promise<unknown>, onDone?: (current: ArchiveSnapshot) => ArchiveSnapshot): Promise<boolean> => {
     setBusy(true)
     setError(null)
     try {
       await task()
-      await reload()
+      if (onDone !== undefined) setSnapshot(current => current === null ? current : onDone(current))
+      await reload(true)
       return true
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
@@ -274,8 +285,17 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
     }
   }
 
+  /** Remove a subtree by root id from the archived tree, keeping descendants out too. */
+  const dropFromTree = (id: string) => (current: ArchiveSnapshot): ArchiveSnapshot => ({
+    ...current,
+    tree: current.tree.filter(node => node.sessionId !== id),
+  })
+
   const onConfirmDelete = (node: ArchiveTreeNode): void => {
-    void run(() => api.deleteSession({ sessionId: node.sessionId, confirmTitle: deleteDraft?.text }))
+    void run(
+      () => api.deleteSession({ sessionId: node.sessionId, confirmTitle: deleteDraft?.text }),
+      dropFromTree(node.sessionId),
+    )
   }
 
   return (
@@ -310,9 +330,9 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                     return next
                   })}
                   onOpen={onOpen}
-                  onUnarchive={(id) => { void run(() => api.unarchive(id)) }}
+                  onUnarchive={(id) => { void run(() => api.unarchive(id), dropFromTree(id)) }}
                   onArmTrash={(id) => setArmedTrash(new Set([id]))}
-                  onConfirmTrash={(id) => { void run(() => api.moveToTrash(id)) }}
+                  onConfirmTrash={(id) => { void run(() => api.moveToTrash(id), dropFromTree(id)) }}
                   onArmDelete={(id) => setDeleteDraft({ id, text: '' })}
                   onDeleteDraft={(id, text) => setDeleteDraft({ id, text })}
                   onConfirmDelete={onConfirmDelete}
@@ -361,14 +381,14 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                     collapseLabel={t('sessions.archive.collapse')}
                     actions={(
                       <>
-                        <SessionRowAction kind="archive" label={t('sessions.archive.archive')} disabled={busy} onClick={() => { void run(() => api.archive(item.sessionId)) }} />
+                        <SessionRowAction kind="archive" label={t('sessions.archive.archive')} disabled={busy} onClick={() => { void run(() => api.archive(item.sessionId), current => ({ ...current, strays: current.strays.filter(row => row.sessionId !== item.sessionId) })) }} />
                         <SessionRowAction
                           kind="trash"
                           label={t('sessions.archive.toTrash')}
                           armed={armedTrash.has(item.sessionId)}
                           disabled={busy || !item.backendSupported}
                           onClick={() => {
-                            if (armedTrash.has(item.sessionId)) { void run(() => api.moveToTrash(item.sessionId)) }
+                            if (armedTrash.has(item.sessionId)) { void run(() => api.moveToTrash(item.sessionId), current => ({ ...current, strays: current.strays.filter(row => row.sessionId !== item.sessionId) })) }
                             else setArmedTrash(new Set([item.sessionId]))
                           }}
                         />
@@ -381,11 +401,14 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                           onClick={() => {
                             if (deleteDraft?.id !== item.sessionId) { setDeleteDraft({ id: item.sessionId, text: '' }); return }
                             const confirmTitle = deleteDraft.text
-                            void run(() => api.deleteSession(
-                              item.blank
-                                ? { sessionId: item.sessionId, confirm: true }
-                                : { sessionId: item.sessionId, confirmTitle },
-                            ))
+                            void run(
+                              () => api.deleteSession(
+                                item.blank
+                                  ? { sessionId: item.sessionId, confirm: true }
+                                  : { sessionId: item.sessionId, confirmTitle },
+                              ),
+                              current => ({ ...current, strays: current.strays.filter(row => row.sessionId !== item.sessionId) }),
+                            )
                           }}
                         />
                       </>
@@ -394,13 +417,20 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                   {deleteDraft?.id === item.sessionId ? (
                     <div className="dsh-desk-archive-deletebox">
                       {item.blank ? <span className="dsh-desk-archive-note">{t('sessions.archive.blankDeleteNote')}</span> : (
-                        <input
-                          className="dsh-desk-archive-input"
-                          value={deleteDraft.text}
-                          placeholder={t('sessions.archive.deletePlaceholder')}
-                          onChange={event => setDeleteDraft({ id: item.sessionId, text: event.target.value })}
-                        />
-                      )}
+                         <>
+                           <FillTitleButton
+                             title={item.title}
+                             label={t('today.copyTitle')}
+                             onFill={() => setDeleteDraft({ id: item.sessionId, text: item.title })}
+                           />
+                           <input
+                             className="dsh-desk-archive-input"
+                             value={deleteDraft.text}
+                             placeholder={t('sessions.archive.deletePlaceholder')}
+                             onChange={event => setDeleteDraft({ id: item.sessionId, text: event.target.value })}
+                           />
+                         </>
+                       )}
                     </div>
                   ) : null}
                 </li>
@@ -476,7 +506,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                     actions={(
                       <>
                         {entry.legacy ? null : (
-                          <SessionRowAction kind="restore" label={t('sessions.archive.restore')} disabled={busy} onClick={() => { void run(() => api.restore(entry.trashId)) }} />
+                          <SessionRowAction kind="restore" label={t('sessions.archive.restore')} disabled={busy} onClick={() => { void run(() => api.restore(entry.trashId), current => ({ ...current, trash: current.trash.filter(row => row.trashId !== entry.trashId) })) }} />
                         )}
                         <SessionRowAction
                           kind="delete"
@@ -485,7 +515,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                           danger
                           disabled={busy}
                           onClick={() => {
-                            if (armedTrashDelete.has(entry.trashId)) { void run(() => api.deleteTrashEntry(entry.trashId)) }
+                            if (armedTrashDelete.has(entry.trashId)) { void run(() => api.deleteTrashEntry(entry.trashId), current => ({ ...current, trash: current.trash.filter(row => row.trashId !== entry.trashId) })) }
                             else setArmedTrashDelete(new Set([entry.trashId]))
                           }}
                         />

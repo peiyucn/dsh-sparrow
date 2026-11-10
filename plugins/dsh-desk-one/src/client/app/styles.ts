@@ -286,6 +286,9 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   width: 13px;
   height: 13px;
 }
+.dsh-desk-action[data-busy='true'] svg { animation: dsh-desk-spin 1s linear infinite; }
+@keyframes dsh-desk-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .dsh-desk-action[data-busy='true'] svg { animation: none; } }
 .dsh-desk-action-primary {
   border: none;
   background: var(--dsw-alias-button-primary-fill, #4176e6);
@@ -446,6 +449,8 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   margin: calc(var(--dsh-desk-header-h) + 2px) 2px 2px;
   background: transparent;
 }
+/* Layout only; the section frame/border/tint lives in sessions/styles.ts so active vs neutral
+   sections render from one rule set instead of overlapping rules in two stylesheets. */
 .dsh-desk-session-section {
   display: flex;
   flex-direction: column;
