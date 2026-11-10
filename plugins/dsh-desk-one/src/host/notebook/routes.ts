@@ -4,10 +4,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { MAX_QUERY_CHARS, ROUTES } from '../../constants.js'
 import type {
   AnnotationListResponse, AnnotationMutationResponse, CreateAnnotationRequest, DeleteAnnotationRequest,
-  NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse, ReanchorAnnotationRequest,
-  ReplyAnnotationRequest, UpdateAnnotationRequest, DetectOrphansRequest,
+  NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse,
+  ReplyAnnotationRequest, UpdateAnnotationRequest, DetectOrphansRequest, DetectOrphansResponse,
 } from '../../contract.js'
-import { anchorStillValid } from './annotations.js'
+import { anchorStillValid, autoRelocateAnchor } from './annotations.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
 import type { DeskRouteContext, DeskRouteEntry } from '../router.js'
 
@@ -116,18 +116,6 @@ async function deleteAnnotationRoute(route: DeskRouteContext, req: IncomingMessa
   sendJson(res, 200, { deleted: true })
 }
 
-async function reanchorAnnotationRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = bodyObject<ReanchorAnnotationRequest>(await readJsonBody(req), '请求体必须是对象')
-  if (typeof body.id !== 'string' || body.id.trim() === '') throw new DeskError('BAD_BODY', '缺少批注 id')
-  if (!Number.isInteger(body.expectedRevision)) throw new DeskError('BAD_BODY', '缺少 expectedRevision')
-  const annotation = await route.store.updateAnnotationAnchor({
-    id: body.id,
-    expectedRevision: body.expectedRevision,
-    anchor: body.anchor,
-  })
-  sendJson(res, 200, { annotation } satisfies AnnotationMutationResponse)
-}
-
 /**
  * Mark threads whose anchors no longer resolve. A missing page invalidates every thread on it
  * (the file was moved or deleted outside DSH), which is exactly the external-edit case.
@@ -145,16 +133,26 @@ async function detectOrphansRoute(route: DeskRouteContext, req: IncomingMessage,
   } catch {
     // Missing page → every anchor on it is stale; handled by the same loop below.
   }
+  let relocated = 0
   for (const thread of route.store.listAnnotations({ path })) {
     if (thread.status === 'resolved' || thread.status === 'orphaned') continue
     if (anchorStillValid(thread.anchor, pageBody, fields)) continue
+    const candidate = thread.anchor.type === 'quote' ? autoRelocateAnchor(thread.anchor, pageBody, fields) : undefined
     try {
-      await route.store.updateAnnotationStatus(thread.id, thread.revision, 'orphaned')
+      if (candidate !== undefined) {
+        await route.store.updateAnnotationAnchor({ id: thread.id, expectedRevision: thread.revision, anchor: candidate })
+        relocated += 1
+      } else {
+        await route.store.updateAnnotationStatus(thread.id, thread.revision, 'orphaned')
+      }
     } catch {
       // A concurrent change wins; the next detect pass will settle it.
     }
   }
-  sendJson(res, 200, { annotations: route.store.listAnnotations({ path }) } satisfies AnnotationListResponse)
+  sendJson(res, 200, {
+    annotations: route.store.listAnnotations({ path }),
+    relocated,
+  } satisfies DetectOrphansResponse)
 }
 export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.notebookState, handle: stateRoute },
@@ -165,7 +163,6 @@ export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.annotationList, handle: listAnnotationsRoute },
   { method: 'POST', path: ROUTES.annotationAdd, handle: addAnnotationRoute },
   { method: 'POST', path: ROUTES.annotationReply, handle: replyAnnotationRoute },
-  { method: 'POST', path: ROUTES.annotationReanchor, handle: reanchorAnnotationRoute },
   { method: 'POST', path: ROUTES.annotationDetect, handle: detectOrphansRoute },
   { method: 'POST', path: ROUTES.annotationUpdate, handle: updateAnnotationRoute },
   { method: 'POST', path: ROUTES.annotationDelete, handle: deleteAnnotationRoute },

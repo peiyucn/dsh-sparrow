@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { DeskModelError } from '../../../lib/model/errors.js'
 import {
-  anchorStillValid, appendAnnotationComment, assertAnnotationDeletable, createAnnotationRecord, normalizeAnnotationAnchor,
-  patchAnnotationStatus, reanchorAnnotation,
+  anchorStillValid, appendAnnotationComment, assertAnnotationDeletable, autoRelocateAnchor, createAnnotationRecord,
+  normalizeAnnotationAnchor, patchAnnotationStatus,
 } from '../../../lib/host/notebook/annotations.js'
 import { normalizeLibraryPath } from '../../../lib/host/notebook/library.js'
 
@@ -124,7 +124,7 @@ describe('annotation: delete', () => {
   })
 })
 
-describe('annotation: orphan detection & relocation', () => {
+describe('annotation: orphan detection & automatic relocation', () => {
   it('引用锚按原文匹配，字段锚只看字段是否存在（值变不算失效）', () => {
     const body = '正文里包含结论这句话'
     assert.equal(anchorStillValid({ type: 'quote', quote: '结论' }, body, []), true)
@@ -133,18 +133,38 @@ describe('annotation: orphan detection & relocation', () => {
     assert.equal(anchorStillValid({ type: 'field', field: 'type', value: 'meeting' }, body, [{ name: 'date', value: '2026-11-11' }]), false)
   })
 
-  it('重新定位更新锚点、回到 open、revision 只加一', () => {
-    const orphaned = { ...record(), status: 'orphaned', revision: 3 }
-    const next = reanchorAnnotation(orphaned, { type: 'quote', quote: '新位置' }, '2026-11-11T05:00:00.000Z')
-    assert.equal(next.status, 'open')
-    assert.equal(next.revision, 4)
-    assert.deepEqual(next.anchor, { type: 'quote', quote: '新位置' })
+  it('自动定位：忽略空白差异重新匹配', () => {
+    const relocated = autoRelocateAnchor(
+      { type: 'quote', quote: '多session协作' },
+      '前言\n多 session 协作，对抗\n后记',
+      [],
+    )
+    assert.ok(relocated && relocated.type === 'quote')
+    assert.match(relocated.quote, /多 session 协作/u)
   })
 
-  it('已接受的批注不能重新定位（审阅历史）', () => {
-    assert.throws(
-      () => reanchorAnnotation({ ...record(), status: 'resolved' }, { type: 'quote', quote: 'x' }, '2026-11-11T05:00:00.000Z'),
-      DeskModelError,
+  it('自动定位：靠前后文找回被改写的段落', () => {
+    const relocated = autoRelocateAnchor(
+      { type: 'quote', quote: '旧的措辞', prefix: 'AAAAAAA--', suffix: '--CCCCCCC' },
+      '前缀AAAAAAA--完全重写后的新句子--CCCCCCC后缀',
+      [],
     )
+    assert.ok(relocated && relocated.type === 'quote')
+    assert.equal(relocated.quote, '完全重写后的新句子')
+    assert.equal(relocated.position, '前缀AAAAAAA--'.length)
+  })
+
+  it('前后文不唯一时放弃（宁失效不错位）', () => {
+    assert.equal(autoRelocateAnchor(
+      { type: 'quote', quote: '旧的', prefix: 'AAAAAAA--', suffix: '--CCCCCCC' },
+      'AAAAAAA--one--CCCCCCC 与 AAAAAAA--two--CCCCCCC',
+      [],
+    ), undefined)
+  })
+
+  it('字段锚能定位当且仅当字段仍存在', () => {
+    const field = { type: 'field', field: 'type', value: 'meeting' }
+    assert.deepEqual(autoRelocateAnchor(field, '', [{ name: 'type', value: 'note' }]), field)
+    assert.equal(autoRelocateAnchor(field, '', [{ name: 'date', value: 'x' }]), undefined)
   })
 })

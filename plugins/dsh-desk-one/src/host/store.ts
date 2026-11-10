@@ -22,8 +22,8 @@ import {
   type GroupPatch, type NotePatch, type TaskPatch,
 } from '../model.js'
 import {
-  appendAnnotationComment, assertAnnotationDeletable, createAnnotationRecord, patchAnnotationStatus,
-  reanchorAnnotation,
+  appendAnnotationComment, assertAnnotationDeletable, createAnnotationRecord, normalizeAnnotationAnchor,
+  patchAnnotationStatus,
 } from './notebook/annotations.js'
 import {
   createCalendarRecord, createEventRecord, createScheduleSourceRecord, eventMatchesDraft, filterEvents,
@@ -855,7 +855,10 @@ export class DeskStore {
     }
   }
 
-  /** Move one thread to a new anchor (revision-checked); it becomes `open` again. */
+  /**
+   * Replace one thread's anchor after an automatic relocation. The review status is kept:
+   * fixing where a thread points is not a new discussion round.
+   */
   async updateAnnotationAnchor(input: {
     readonly id: string
     readonly expectedRevision: number
@@ -868,7 +871,7 @@ export class DeskStore {
         if (!Number.isInteger(input.expectedRevision) || current.revision !== input.expectedRevision) {
           throw new DeskModelError('REVISION_CONFLICT', `批注已被修改（当前 revision ${current.revision}，请求 ${input.expectedRevision}）`)
         }
-        return reanchorAnnotation(current, input.anchor, now)
+        return { ...current, anchor: normalizeAnnotationAnchor(input.anchor), updatedAt: now, revision: current.revision + 1 }
       })
       if (updated.kind !== 'annotation') throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${input.id}`)
       return updated

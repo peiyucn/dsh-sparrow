@@ -108,9 +108,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const [notice, setNotice] = useState<string | null>(null)
   /** Thread awaiting the second delete click (null = none). */
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null)
-  /** Thread being relocated; the next body selection becomes its new anchor. */
-  const [relocatingFor, setRelocatingFor] = useState<string | null>(null)
-  const [pendingAnchor, setPendingAnchor] = useState<AnnotationAnchor | null>(null)
 
   const labels = useMemo(() => ({
     code: { copyLabel: t('review.copy'), copiedLabel: t('review.copied') },
@@ -126,7 +123,9 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       setPage(nextPage)
       let threads: readonly DeskAnnotation[]
       try {
-        threads = await notebook.detectOrphans(path)
+        const detected = await notebook.detectOrphans(path)
+        threads = detected.annotations
+        if (detected.relocated > 0) setNotice(t('review.autoRelocated', { count: detected.relocated }))
       } catch {
         // Older host without the detect route: fall back to the plain list.
         threads = await notebook.listAnnotations({ path })
@@ -137,7 +136,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     } finally {
       setLoading(false)
     }
-  }, [notebook, path])
+  }, [notebook, path, t])
 
   useEffect(() => { void load() }, [load])
 
@@ -182,14 +181,9 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     if (anchorNode === null || !container.contains(anchorNode)) return
     const selected = selection.toString().trim()
     if (selected === '') return
-    const anchor = quoteAnchorOf(container, selected)
-    if (relocatingFor !== null) {
-      setPendingAnchor(anchor)
-      return
-    }
-    setComposer({ anchor, label: `「${selected.slice(0, 40)}${selected.length > 40 ? '…' : ''}」` })
+    setComposer({ anchor: quoteAnchorOf(container, selected), label: `「${selected.slice(0, 40)}${selected.length > 40 ? '…' : ''}」` })
     setDraft('')
-  }, [relocatingFor])
+  }, [])
 
   const submitComposer = useCallback(async (): Promise<void> => {
     if (path === undefined || composer === null || draft.trim() === '') return
@@ -270,26 +264,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       setBusy(false)
     }
   }, [annotations, notebook, refreshThread])
-
-  /** Point an orphaned thread at the freshly selected anchor; it reopens as a new round. */
-  const confirmRelocate = useCallback(async (thread: DeskAnnotation): Promise<void> => {
-    if (pendingAnchor === null) return
-    setBusy(true)
-    setError(null)
-    try {
-      refreshThread(await notebook.reanchorAnnotation({
-        id: thread.id,
-        expectedRevision: thread.revision,
-        anchor: pendingAnchor,
-      }))
-      setRelocatingFor(null)
-      setPendingAnchor(null)
-    } catch (cause) {
-      setError(messageOf(cause))
-    } finally {
-      setBusy(false)
-    }
-  }, [notebook, pendingAnchor, refreshThread])
 
   const removeThread = useCallback(async (thread: DeskAnnotation): Promise<void> => {
     setBusy(true)
@@ -436,60 +410,11 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                         {thread.status === 'orphaned' || anchorResolves(thread.anchor, body) ? null : (
                           <p className="dsh-desk-review-orphan">{t('review.missingAnchor')}</p>
                         )}
-                        {thread.status === 'orphaned'
-                          ? (
-                              <div className="dsh-desk-review-replybox">
-                                {relocatingFor === thread.id
-                                  ? (
-                                      <>
-                                        <p className="dsh-desk-review-hint">
-                                          {thread.anchor.type === 'quote' ? t('review.reanchorQuoteHint') : t('review.reanchorFieldHint')}
-                                        </p>
-                                        {thread.anchor.type === 'field'
-                                          ? (
-                                              <div className="dsh-desk-review-actions">
-                                                {(page?.fields ?? []).map(field => (
-                                                  <button
-                                                    key={field.name}
-                                                    type="button"
-                                                    className="dsh-desk-review-mini"
-                                                    onClick={() => setPendingAnchor({ type: 'field', field: field.name, value: field.value })}
-                                                  >
-                                                    {field.name}
-                                                  </button>
-                                                ))}
-                                              </div>
-                                            )
-                                          : null}
-                                        {pendingAnchor === null
-                                          ? null
-                                          : (
-                                              <div className="dsh-desk-review-actions">
-                                                <button type="button" className="dsh-desk-review-mini" onClick={() => { setPendingAnchor(null); setRelocatingFor(null) }}>
-                                                  {t('review.cancel')}
-                                                </button>
-                                                <button type="button" className="dsh-desk-action dsh-desk-action-primary" disabled={busy} onClick={() => { void confirmRelocate(thread) }}>
-                                                  {t('review.reanchorConfirm')}
-                                                </button>
-                                              </div>
-                                            )}
-                                      </>
-                                    )
-                                  : (
-                                      <div className="dsh-desk-review-actions">
-                                        <button type="button" className="dsh-desk-review-mini" disabled={busy} onClick={() => { setRelocatingFor(thread.id); setPendingAnchor(null) }}>
-                                          {t('review.reanchor')}
-                                        </button>
-                                      </div>
-                                    )}
-                              </div>
-                            )
-                          : null}
                         {thread.status === 'resolved' ? <p className="dsh-desk-review-hint">{t('review.replyReopens')}</p> : null}
                         {thread.comments.map((comment, index) => (
                           <CommentLine key={`${thread.id}-${index}`} t={t} comment={comment} />
                         ))}
-                        {replyFor === thread.id
+                        {replyFor === thread.id && thread.status !== 'orphaned'
                           ? (
                               <div className="dsh-desk-review-replybox">
                                 <textarea
@@ -513,13 +438,17 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                             )
                           : null}
                         <div className="dsh-desk-review-actions">
-                          <button
-                            type="button"
-                            className="dsh-desk-review-mini"
-                            onClick={() => { setReplyFor(thread.id); setReplyText('') }}
-                          >
-                            {t('review.reply')}
-                          </button>
+                          {thread.status === 'orphaned'
+                            ? null
+                            : (
+                                <button
+                                  type="button"
+                                  className="dsh-desk-review-mini"
+                                  onClick={() => { setReplyFor(thread.id); setReplyText('') }}
+                                >
+                                  {t('review.reply')}
+                                </button>
+                              )}
                           {thread.status === 'answered'
                             ? (
                                 <button type="button" className="dsh-desk-review-mini" disabled={busy} onClick={() => { void acceptThread(thread) }}>
@@ -527,7 +456,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                                 </button>
                               )
                             : null}
-                          {thread.status === 'resolved'
+                          {thread.status === 'resolved' || thread.status === 'orphaned'
                             ? null
                             : (
                                 <button type="button" className="dsh-desk-review-mini" disabled={busy} onClick={() => handoff([thread])}>

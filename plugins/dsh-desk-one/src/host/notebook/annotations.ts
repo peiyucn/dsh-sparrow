@@ -162,25 +162,78 @@ export function anchorStillValid(
   return fields.some(field => field.name === anchor.field)
 }
 
-/**
- * Point a thread at a new anchor after its old one went stale.
- *
- * The thread goes back to `open`: relocation is a fresh round, so the human decides what
- * happens next (hand it to the AI, or accept after answering themselves). Accepted threads
- * are review history and cannot be moved.
- * @param current - thread record.
- * @param rawAnchor - the new anchor as supplied by the caller.
- * @param now - ISO instant of the change.
- * @returns the updated record (revision bumped once).
- */
-export function reanchorAnnotation(
-  current: DeskAnnotation,
-  rawAnchor: unknown,
-  now: string,
-): DeskAnnotation {
-  if (current.status === 'resolved') {
-    throw new DeskModelError('INVALID_ANNOTATION', '已接受的批注不能重新定位')
+/** Context characters kept on either side of a relocated quote. */
+const RELOCATION_CONTEXT_CHARS = 32
+/** A relocation candidate longer than this is treated as a mismatch, not a quote. */
+const RELOCATION_QUOTE_MAX = 1_000
+
+/** Whitespace-insensitive projection of a string, with a map back to original offsets. */
+function projectWithoutWhitespace(text: string): { readonly flat: string; readonly map: readonly number[] } {
+  let flat = ''
+  const map: number[] = []
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index]
+    if (/\s/u.test(char)) continue
+    flat += char
+    map.push(index)
   }
-  const anchor = normalizeAnnotationAnchor(rawAnchor)
-  return { ...current, anchor, status: 'open', updatedAt: now, revision: current.revision + 1 }
+  return { flat, map }
+}
+
+/**
+ * Try to find where a stale quote anchor moved to, without asking the human.
+ *
+ * Two passes, cheapest first: an exact match after removing whitespace (re-wrapped or
+ * re-indented text), then the stored prefix/suffix context (the passage was rewritten but
+ * its surroundings survived). Anything ambiguous returns undefined — a wrong relocation is
+ * worse than an orphaned thread.
+ * @param anchor - stale anchor.
+ * @param body - current markdown body.
+ * @param fields - current frontmatter fields (field anchors only).
+ * @returns the relocated anchor, or undefined when relocation is not reliable.
+ */
+export function autoRelocateAnchor(
+  anchor: AnnotationAnchor,
+  body: string,
+  fields: readonly CurrentField[],
+): AnnotationAnchor | undefined {
+  if (anchor.type === 'field') return fields.some(field => field.name === anchor.field) ? anchor : undefined
+  if (body.includes(anchor.quote)) return anchor
+  // Pass 1: whitespace-insensitive exact match.
+  const source = projectWithoutWhitespace(body)
+  const needle = projectWithoutWhitespace(anchor.quote).flat
+  if (needle !== '') {
+    const at = source.flat.indexOf(needle)
+    if (at >= 0) {
+      const start = source.map[at]
+      const end = source.map[at + needle.length - 1] + 1
+      return quoteAnchorAt(body, start, end)
+    }
+  }
+  // Pass 2: the surrounding context survived but the passage itself changed.
+  const prefix = anchor.prefix?.trim() ?? ''
+  const suffix = anchor.suffix?.trim() ?? ''
+  if (prefix.length < 8 || suffix.length < 8) return undefined
+  const prefixAt = body.indexOf(prefix)
+  if (prefixAt < 0 || body.indexOf(prefix, prefixAt + prefix.length) >= 0) return undefined
+  const contentStart = prefixAt + prefix.length
+  const suffixAt = body.indexOf(suffix, contentStart)
+  if (suffixAt < 0 || body.indexOf(suffix, suffixAt + suffix.length) >= 0) return undefined
+  const candidate = body.slice(contentStart, suffixAt).trim()
+  if (candidate === '' || candidate.length > RELOCATION_QUOTE_MAX) return undefined
+  const candidateAt = body.indexOf(candidate, contentStart)
+  return candidateAt < 0 ? undefined : quoteAnchorAt(body, candidateAt, candidateAt + candidate.length)
+}
+
+/** Build a quote anchor for one body range, with fresh surrounding context. */
+function quoteAnchorAt(body: string, start: number, end: number): AnnotationAnchor {
+  const prefix = body.slice(Math.max(0, start - RELOCATION_CONTEXT_CHARS), start)
+  const suffix = body.slice(end, end + RELOCATION_CONTEXT_CHARS)
+  return {
+    type: 'quote',
+    quote: body.slice(start, end),
+    ...prefix === '' ? {} : { prefix },
+    ...suffix === '' ? {} : { suffix },
+    position: start,
+  }
 }

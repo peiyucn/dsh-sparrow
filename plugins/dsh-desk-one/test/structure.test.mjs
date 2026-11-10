@@ -265,7 +265,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(review, /notebook\.updateAnnotationStatus/u, '审阅页能改状态（接受/重开）')
     assert.match(review, /anchorResolves/u, '锚点失效要显示提示，不静默错位')
     assert.match(review, /notebook\.detectOrphans/u, '打开审阅页时检测失效锚点')
-    assert.match(review, /notebook\.reanchorAnnotation/u, '失效批注可重新定位')
+    assert.match(review, /notebook\.detectOrphans/u, '打开审阅页即检测失效锚点')
     assert.match(review, /orphansDetected/u, '批量失效要提示用户')
     const bundle = await read('lib/client.js')
     assert.ok(bundle.includes('note-review'), '构建产物要包含审阅 tab kind')
