@@ -17,12 +17,12 @@ import type { DeskCalendar, DeskEvent, ScheduleStateResponse } from '../../contr
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
 import { addDays, dayKey, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName } from './utils.js'
-import {
-  EventCard, ListBoard, MonthBoard, ScheduleToolbar, SourcesPage, StartPanel, TodayPanel, UpcomingPanel, WeekBoard,
-  type ClickPoint,
-  type TodayContext,
-  type UpcomingRange,
-} from './components.js'
+import { ListBoard, MonthBoard, WeekBoard } from './boards.js'
+import { EventCard } from './event-card.js'
+import { StartPanel, TodayPanel, UpcomingPanel, type TodayContext, type UpcomingRange } from './panels.js'
+import type { ClickPoint } from './shared.js'
+import { SourcesPage } from './sources.js'
+import { ScheduleToolbar } from './toolbar.js'
 
 type SchedulePage = 'calendar' | 'sources'
 

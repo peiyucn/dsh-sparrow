@@ -6,6 +6,8 @@ import { describe, it } from 'node:test'
 
 const read = (relative) => readFile(new URL(`../${relative}`, import.meta.url), 'utf8')
 const json = async (relative) => JSON.parse(await read(relative))
+/** Several sources joined: guards keep working after a file is split into modules. */
+const joined = async (...paths) => (await Promise.all(paths.map(path => read(path)))).join('\n')
 
 /** All client TS/TSX sources joined: structure guards survive component/hook splits. */
 const CLIENT_DIR = new URL('../src/client/', import.meta.url)
@@ -689,7 +691,13 @@ describe('dsh-desk-one 结构', () => {
 
   it('日程页 应该 分区并在 router / host 接线（A/B 双线）', async () => {
     const view = await read('src/client/schedule/ScheduleView.tsx')
-    const components = await read('src/client/schedule/components.tsx')
+    const components = await joined(
+      'src/client/schedule/toolbar.tsx',
+      'src/client/schedule/panels.tsx',
+      'src/client/schedule/boards.tsx',
+      'src/client/schedule/event-card.tsx',
+      'src/client/schedule/sources.tsx',
+    )
     const router = await read('src/host/router.ts')
     const host = await read('src/host.ts')
     const tools = await read('src/host/schedule/tools.ts')
