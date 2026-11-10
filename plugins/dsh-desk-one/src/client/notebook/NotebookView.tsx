@@ -12,17 +12,11 @@ import type { NoteIndexEntry, NotebookStateResponse } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import { messageOf } from '../app/utils.js'
 import type { NotebookApi } from './api.js'
+import { parentDirectory, type DirectoryBrowser, type DirectoryListingView } from './directory.js'
 import type { WorkspacePathView, WorkspacePaths } from './workspaces.js'
 
 /** Which actionable count the list is narrowed to (`all` shows the recent list). */
 type ShelfFilter = 'all' | 'missing' | 'empty'
-
-/** Join a workspace root and an optional subfolder into the path the host validates. */
-function composeRoot(workspacePath: string, subfolder: string): string {
-  const base = workspacePath.replace(/\\/gu, '/').replace(/\/+$/u, '')
-  const sub = subfolder.trim().replace(/\\/gu, '/').replace(/^\/+|\/+$/gu, '')
-  return sub === '' ? base : `${base}/${sub}`
-}
 
 /** One list row: title, relative path, metadata badges and date. */
 function ShelfRow(props: {
@@ -50,19 +44,112 @@ function ShelfRow(props: {
   )
 }
 
-/** The workspace picker: choose a DSH workspace, then an optional subfolder. */
+/**
+ * The notes-root picker, two steps: choose a DSH workspace, then browse its
+ * folders with the shared Host directory picker. No path is typed by hand —
+ * the notebook must live under a workspace, and the picker keeps it there.
+ */
 function RootPicker(props: {
   readonly t: DeskTranslator
   readonly workspaces: readonly WorkspacePathView[]
+  readonly directories: DirectoryBrowser
   readonly busy: boolean
   readonly error: string | null
   readonly onConfirm: (rootPath: string) => void
   readonly onCancel: () => void
   readonly onRetry: () => void
 }): ReactElement {
-  const { t, workspaces, busy, error } = props
-  const [picked, setPicked] = useState<string | null>(workspaces[0]?.path ?? null)
-  const [subfolder, setSubfolder] = useState('')
+  const { t, workspaces, directories, busy, error } = props
+  const [rootPath, setRootPath] = useState<string | null>(null)
+  const [listing, setListing] = useState<DirectoryListingView | null>(null)
+  const [browseBusy, setBrowseBusy] = useState(false)
+  const [browseError, setBrowseError] = useState<string | null>(null)
+
+  const browse = useCallback(async (path: string): Promise<void> => {
+    setBrowseBusy(true)
+    setBrowseError(null)
+    try {
+      setListing(await directories.list(path, AbortSignal.timeout(10_000)))
+    } catch (cause) {
+      setBrowseError(messageOf(cause))
+    } finally {
+      setBrowseBusy(false)
+    }
+  }, [directories])
+
+  const enter = useCallback((path: string): void => {
+    setRootPath(path)
+    setListing(null)
+    void browse(path)
+  }, [browse])
+
+  const openWorkspace = (workspace: WorkspacePathView): void => {
+    if (!directories.available()) { setRootPath(workspace.path); return }
+    enter(workspace.path)
+  }
+
+  const confirm = (): void => {
+    const target = listing?.path ?? rootPath
+    if (target !== null) props.onConfirm(target)
+  }
+
+  if (rootPath !== null && directories.available()) {
+    const current = listing?.path ?? rootPath
+    const atRoot = listing === null || parentDirectory(current) === current || current === rootPath
+    const folders = (listing?.entries ?? []).filter(entry => !entry.hidden)
+    return (
+      <div className="dsh-desk-notebook-picker">
+        <h4>{t('notebook.chooseFolderTitle')}</h4>
+        <p className="dsh-desk-notebook-picker-path">{current}</p>
+        <div className="dsh-desk-notebook-picker-list">
+          {atRoot ? null : (
+            <button
+              type="button"
+              className="dsh-desk-notebook-picker-row"
+              onClick={() => {
+                const parent = parentDirectory(current)
+                if (parent === rootPath) { setListing({ path: rootPath, entries: [], truncated: false }); return }
+                void browse(parent)
+              }}
+            >
+              <span className="dsh-desk-notebook-picker-name">.. {t('notebook.browseUp')}</span>
+            </button>
+          )}
+          {browseBusy
+            ? <p className="dsh-desk-notebook-hint">{t('state.loading')}</p>
+            : listing !== null && folders.length === 0
+              ? <p className="dsh-desk-notebook-hint">{t('notebook.dirEmpty')}</p>
+              : folders.map(folder => (
+                  <button
+                    key={folder.path}
+                    type="button"
+                    className="dsh-desk-notebook-picker-row"
+                    onClick={() => { void browse(folder.path) }}
+                  >
+                    <span className="dsh-desk-notebook-picker-name">{folder.name}/</span>
+                  </button>
+                ))}
+        </div>
+        {browseError === null ? null : <p className="dsh-desk-notebook-error">{browseError}</p>}
+        {error === null ? null : <p className="dsh-desk-notebook-error">{error}</p>}
+        <div className="dsh-desk-notebook-picker-actions">
+          <button type="button" className="dsh-desk-btn" onClick={() => { setRootPath(null); setListing(null) }}>
+            {t('notebook.backWorkspaces')}
+          </button>
+          <button type="button" className="dsh-desk-btn" onClick={props.onCancel}>{t('notebook.cancel')}</button>
+          <button
+            type="button"
+            className="dsh-desk-action dsh-desk-action-primary"
+            disabled={busy || browseBusy}
+            onClick={confirm}
+          >
+            {t('notebook.useThisFolder')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="dsh-desk-notebook-picker">
       <h4>{t('notebook.pickTitle')}</h4>
@@ -75,8 +162,7 @@ function RootPicker(props: {
                   key={workspace.path}
                   type="button"
                   className="dsh-desk-notebook-picker-row"
-                  data-picked={picked === workspace.path}
-                  onClick={() => setPicked(workspace.path)}
+                  onClick={() => openWorkspace(workspace)}
                 >
                   <span className="dsh-desk-notebook-picker-name">{workspace.title}</span>
                   <span className="dsh-desk-notebook-picker-path">{workspace.path}</span>
@@ -84,32 +170,26 @@ function RootPicker(props: {
               ))}
             </div>
           )}
-      {workspaces.length === 0 ? null : (
-        <label className="dsh-desk-notebook-hint">
-          {t('notebook.subfolder')}
-          <input
-            className="dsh-desk-notebook-subfolder"
-            value={subfolder}
-            placeholder={t('notebook.subfolderPlaceholder')}
-            onChange={event => setSubfolder(event.target.value)}
-          />
-        </label>
-      )}
+      {directories.available() || workspaces.length === 0
+        ? null
+        : <p className="dsh-desk-notebook-hint">{t('notebook.browserUnavailable')}</p>}
       {error === null ? null : <p className="dsh-desk-notebook-error">{error}</p>}
       <div className="dsh-desk-notebook-picker-actions">
         <button type="button" className="dsh-desk-btn" onClick={props.onCancel}>{t('notebook.cancel')}</button>
         {workspaces.length === 0
           ? <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={props.onRetry}>{t('action.retry')}</button>
-          : (
-              <button
-                type="button"
-                className="dsh-desk-action dsh-desk-action-primary"
-                disabled={busy || picked === null}
-                onClick={() => { if (picked !== null) props.onConfirm(composeRoot(picked, subfolder)) }}
-              >
-                {t('notebook.confirm')}
-              </button>
-            )}
+          : directories.available()
+            ? null
+            : (
+                <button
+                  type="button"
+                  className="dsh-desk-action dsh-desk-action-primary"
+                  disabled={busy || rootPath === null}
+                  onClick={confirm}
+                >
+                  {t('notebook.confirm')}
+                </button>
+              )}
       </div>
     </div>
   )
@@ -120,9 +200,10 @@ export function NotebookView(props: {
   readonly t: DeskTranslator
   readonly notebook: NotebookApi
   readonly workspacePaths: WorkspacePaths
+  readonly directories: DirectoryBrowser
   readonly onOpen?: (path: string) => void
 }): ReactElement {
-  const { t, notebook, workspacePaths } = props
+  const { t, notebook, workspacePaths, directories } = props
   const [state, setState] = useState<NotebookStateResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -218,6 +299,7 @@ export function NotebookView(props: {
                     <RootPicker
                       t={t}
                       workspaces={pickerWorkspaces}
+                      directories={directories}
                       busy={pickerBusy}
                       error={pickerError}
                       onConfirm={rootPath => { void confirmRoot(rootPath) }}
@@ -241,6 +323,7 @@ export function NotebookView(props: {
                       <RootPicker
                         t={t}
                         workspaces={pickerWorkspaces}
+                      directories={directories}
                         busy={pickerBusy}
                         error={pickerError}
                         onConfirm={rootPath => { void confirmRoot(rootPath) }}
@@ -306,6 +389,7 @@ export function NotebookView(props: {
                       <RootPicker
                         t={t}
                         workspaces={pickerWorkspaces}
+                      directories={directories}
                         busy={pickerBusy}
                         error={pickerError}
                         onConfirm={rootPath => { void confirmRoot(rootPath) }}

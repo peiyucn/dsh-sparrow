@@ -2,11 +2,12 @@
 
 export const NOTEBOOK_CSS = `
 .dsh-desk-notebookview {
+  box-sizing: border-box;
   display: flex;
+  flex: 1;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
-  padding: 18px 28px 24px;
+  padding: calc(var(--dsh-desk-header-h) + 14px) 28px 0;
   overflow: hidden;
 }
 .dsh-desk-notebook-toolbar {
@@ -76,6 +77,7 @@ export const NOTEBOOK_CSS = `
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding-bottom: 24px;
 }
 .dsh-desk-notebook-row {
   display: flex;
@@ -94,9 +96,7 @@ export const NOTEBOOK_CSS = `
 .dsh-desk-notebook-row:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
 }
-.dsh-desk-notebook-row:disabled {
-  cursor: default;
-}
+
 .dsh-desk-notebook-row-title {
   flex: 0 1 auto;
   min-width: 0;
@@ -172,14 +172,7 @@ export const NOTEBOOK_CSS = `
   color: #b2352a;
   font-size: 12px;
 }
-.dsh-desk-notebook-warn {
-  margin: 0 0 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: color-mix(in srgb, #e2a03c 14%, transparent);
-  color: #8a5a00;
-  font-size: 12px;
-}
+
 .dsh-desk-notebook-picker {
   margin: 10px auto 0;
   width: min(520px, 100%);
@@ -232,17 +225,7 @@ export const NOTEBOOK_CSS = `
   font-size: 10px;
   word-break: break-all;
 }
-.dsh-desk-notebook-subfolder {
-  width: 100%;
-  height: 30px;
-  padding: 0 10px;
-  border: 0.5px solid var(--dsw-alias-border-l2, #d5d9e0);
-  border-radius: 8px;
-  background: var(--dsw-alias-bg-base, #ffffff);
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 12px;
-  outline: none;
-}
+
 .dsh-desk-notebook-picker-actions {
   display: flex;
   justify-content: flex-end;

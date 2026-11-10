@@ -229,11 +229,6 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   width: 100%;
   min-height: 0;
 }
-.dsh-desk-notebook {
-  flex: 1;
-  min-height: 0;
-  padding: calc(var(--dsh-desk-header-h) + 14px) 28px 0;
-}
 /* Notes wall is full-bleed: it uses the whole page width, only the header keeps its insets. */
 .dsh-desk-notesview {
   display: flex;

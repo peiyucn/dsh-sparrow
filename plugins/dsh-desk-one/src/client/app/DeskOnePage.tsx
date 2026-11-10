@@ -44,7 +44,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     listNotes, updateNote, deleteNote, createNote, t,
     listTasks, createTask, updateTask, deleteTask,
     listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink, sessionsArchive, schedule,
-    notebook, workspacePaths,
+    notebook, workspacePaths, directories,
   } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
   /** Guards double-click / double-tap while one create request is in flight. */
@@ -207,7 +207,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   )
 
   const renderNotebook = (): ReactElement => (
-    <NotebookView t={t} notebook={notebook} workspacePaths={workspacePaths} />
+    <NotebookView t={t} notebook={notebook} workspacePaths={workspacePaths} directories={directories} />
   )
 
   /** Notes/trash actions float over the canvas so notes can scroll underneath them. */

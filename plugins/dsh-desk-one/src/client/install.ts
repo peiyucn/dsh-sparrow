@@ -20,6 +20,7 @@ import type { SessionLinkApi } from './sessions/contract.js'
 import type { SessionsArchiveApi } from './sessions/archiveApi.js'
 import type { ScheduleApi } from './schedule/api.js'
 import type { NotebookApi } from './notebook/api.js'
+import type { DirectoryBrowser } from './notebook/directory.js'
 import type { WorkspacePaths } from './notebook/workspaces.js'
 import { attachMainPanel } from './panel.js'
 import { ensureDeskStyles } from './styles.js'
@@ -89,6 +90,8 @@ export interface DeskPanelInjected {
   readonly notebook: NotebookApi
   /** Workspace rows the notebook picker offers (empty when the optional service is absent). */
   readonly workspacePaths: WorkspacePaths
+  /** Host folder browser behind the notebook picker (unavailable without the seam). */
+  readonly directories: DirectoryBrowser
 }
 
 /** Browser-side pieces injected at the entry (supplied by index.ts; tests may pass stubs). */

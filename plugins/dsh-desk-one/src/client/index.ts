@@ -13,6 +13,7 @@ import { DeskOnePage } from './app/DeskOnePage.js'
 import { createSessionLinkBridge, type SessionServices } from './sessions/bridge.js'
 import { scheduleApi } from './schedule/api.js'
 import { notebookApi } from './notebook/api.js'
+import { createDirectoryBrowser, type DirectoryPickerLike } from './notebook/directory.js'
 import { createWorkspacePaths, type WorkspacesServiceLike } from './notebook/workspaces.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
@@ -45,6 +46,14 @@ export function apply(ctx: ClientContext): void {
     workspaceCtx.effect(() => detach, `${PACKAGE_NAME}: workspace paths`)
   })
 
+  // Folder browsing inside a workspace uses the shared Host picker; missing seam degrades
+  // to "workspace root only" instead of failing the picker.
+  const directories = createDirectoryBrowser()
+  ctx.inject(['remote.directoryPicker'], (pickerCtx) => {
+    const detach = directories.attach(pickerCtx.get('remote.directoryPicker') as unknown as DirectoryPickerLike)
+    pickerCtx.effect(() => detach, `${PACKAGE_NAME}: directory picker`)
+  })
+
   installDeskClient(ctx, {
     page: DeskOnePage,
     icon: DeskPanelIcon,
@@ -52,6 +61,7 @@ export function apply(ctx: ClientContext): void {
     api: {
       notebook: notebookApi,
       workspacePaths,
+      directories,
       listNotes: api.listNotes,
       createNote: api.createNote,
       updateNote: api.updateNote,
