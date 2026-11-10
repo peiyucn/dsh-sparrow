@@ -264,6 +264,19 @@ export function NotebookView(props: {
     }
   }, [notebook])
 
+  /** Forget the configured root: back to the first-run state (the index is derived, so nothing is lost). */
+  const resetRoot = useCallback(async (): Promise<void> => {
+    setPickerError(null)
+    try {
+      setState(await notebook.clearRoot())
+      setPickerOpen(false)
+      setFilter('all')
+      setQuery('')
+    } catch (cause) {
+      setPickerError(messageOf(cause))
+    }
+  }, [notebook])
+
   const reopenPicker = useCallback((): void => {
     setPickerError(null)
     setPickerOpen(true)
@@ -293,6 +306,7 @@ export function NotebookView(props: {
                 <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={reopenPicker}>
                   {t('notebook.pickFolder')}
                 </button>
+                <button type="button" className="dsh-desk-btn" onClick={() => { void resetRoot() }}>{t('notebook.reset')}</button>
               </div>
               {pickerOpen
                 ? (
@@ -317,6 +331,7 @@ export function NotebookView(props: {
                 <p>{t('notebook.emptyLibraryBody')}</p>
                 <div className="dsh-desk-notebook-actions">
                   <button type="button" className="dsh-desk-btn" onClick={reopenPicker}>{t('notebook.changeRoot')}</button>
+                  <button type="button" className="dsh-desk-btn" onClick={() => { void resetRoot() }}>{t('notebook.reset')}</button>
                 </div>
                 {pickerOpen
                   ? (
@@ -344,6 +359,7 @@ export function NotebookView(props: {
                     onChange={event => setQuery(event.target.value)}
                   />
                   <button type="button" className="dsh-desk-btn" onClick={reopenPicker}>{t('notebook.changeRoot')}</button>
+                  <button type="button" className="dsh-desk-btn" onClick={() => { void resetRoot() }}>{t('notebook.reset')}</button>
                 </div>
                 {state === null ? null : (
                   <div className="dsh-desk-notebook-stats">

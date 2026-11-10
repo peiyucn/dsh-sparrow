@@ -32,6 +32,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'notebook.outside'
       | 'notebook.rootMissing'
       | 'notebook.changeRoot'
+      | 'notebook.reset'
       | 'notebook.emptyLibrary'
       | 'notebook.emptyLibraryBody'
       | 'notebook.missingBadge'
