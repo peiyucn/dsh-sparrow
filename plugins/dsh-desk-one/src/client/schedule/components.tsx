@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement, WheelEvent as ReactWheelEvent } from 'react'
-import { SCHEDULE_UPCOMING_DAYS, type ScheduleProvider } from '../../constants.js'
+import { SCHEDULE_UPCOMING_MAX_DAYS, type ScheduleProvider } from '../../constants.js'
 import type { DeskCalendar, DeskEvent, DeskScheduleSource, ScheduleConnectionInput } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
@@ -102,35 +102,62 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
 
 /* ------------------------------ upcoming panel ------------------------------- */
 
+export interface UpcomingRange {
+  /** Inclusive day count starting tomorrow: 1..SCHEDULE_UPCOMING_MAX_DAYS. */
+  readonly days: number
+  readonly from: Date
+  readonly to: Date
+}
+
 export function UpcomingPanel(props: {
   readonly t: DeskTranslator
   readonly today: Date
   readonly events: readonly DeskEvent[]
   readonly calendars: readonly DeskCalendar[]
+  readonly range: UpcomingRange
+  readonly onRangeChange: (days: number) => void
   readonly onOpen: (event: DeskEvent, point?: ClickPoint) => void
   readonly onViewAll: () => void
 }): ReactElement {
-  const { t, today, events, calendars, onOpen } = props
-  const upcoming = useMemo(() => {
-    const result: { event: DeskEvent; day: Date }[] = []
-    for (const group of groupByDay(events, today, SCHEDULE_UPCOMING_DAYS)) {
-      for (const event of group.events) result.push({ event, day: group.date })
-    }
-    return result.sort((left, right) => left.event.start.localeCompare(right.event.start)).slice(0, 3)
-  }, [events, today])
+  const { t, today, events, calendars, range } = props
+  const visible = useMemo(() => {
+    const fromDay = dayKey(range.from)
+    const toDay = dayKey(addDays(range.to, -1))
+    return [...events]
+      .filter(event => {
+        const key = dayKey(new Date(event.start))
+        return key >= fromDay && key <= toDay
+      })
+      .sort((left, right) => left.start.localeCompare(right.start))
+  }, [events, range.from, range.to])
+  const shown = visible.slice(0, 3)
   return (
     <section className="dsh-desk-schedule-upcoming">
       <header>
         <span>{t('schedule.upcoming')}</span>
         <button type="button" className="dsh-desk-schedule-link" onClick={props.onViewAll}>{t('schedule.viewAll')}</button>
       </header>
-      {upcoming.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.upcomingEmpty')}</p> : (
+      <div className="dsh-desk-upcoming-range">
+        <input
+          type="range"
+          min="1"
+          max={SCHEDULE_UPCOMING_MAX_DAYS}
+          step="1"
+          value={range.days}
+          aria-label={t('schedule.upcomingRange')}
+          onChange={event => props.onRangeChange(Number(event.target.value))}
+        />
+        <span className="dsh-desk-upcoming-range-label">
+          {formatDateLabel(range.from, t)} – {formatDateLabel(addDays(range.to, -1), t)}
+        </span>
+      </div>
+      {shown.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.upcomingEmpty')}</p> : (
         <ul>
-          {upcoming.map(({ event, day }) => (
+          {shown.map(event => (
             <li key={event.id}>
-              <button type="button" className="dsh-desk-schedule-upcoming-item" onClick={click => onOpen(event, { x: click.clientX, y: click.clientY })}>
+              <button type="button" className="dsh-desk-schedule-upcoming-item" onClick={click => props.onOpen(event, { x: click.clientX, y: click.clientY })}>
                 <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
-                <span className="dsh-desk-schedule-upcoming-day">{dayLabel(t, day, today)}</span>
+                <span className="dsh-desk-schedule-upcoming-day">{dayLabel(t, new Date(event.start), today)}</span>
                 <span className="dsh-desk-schedule-upcoming-time">{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
                 <span className="dsh-desk-schedule-upcoming-title">{eventTitle(t, event)}</span>
               </button>
@@ -142,18 +169,15 @@ export function UpcomingPanel(props: {
   )
 }
 
-export interface TodayContext {
-  readonly notesCount: number
-  readonly openTasks: number
-  readonly onAddNote: () => void
-  readonly onAddTask: () => void
-}
+/* --------------------------------- today panel -------------------------------- */
 
 export interface TodayContext {
   readonly notesCount: number
   readonly openTasks: number
   readonly onAddNote: () => void
   readonly onAddTask: () => void
+  readonly onOpenNotes: () => void
+  readonly onOpenTasks: () => void
 }
 
 /** Same plus glyph as the shared header actions, so Today's create buttons match their language. */
@@ -163,7 +187,6 @@ const plusIcon = (
   </svg>
 )
 
-/** Top-left "Today": today's events, two counts and the shared create actions. No local timer. */
 export function TodayPanel(props: {
   readonly t: DeskTranslator
   readonly today: Date
@@ -179,36 +202,43 @@ export function TodayPanel(props: {
         <h3>{t('today.title')}</h3>
         <span>{formatDateLabel(today, t)}</span>
       </header>
-      <div className="dsh-desk-today-events">
-        <div className="dsh-desk-today-subhead">{t('today.events')}</div>
-        {events.length === 0
-          ? <p className="dsh-desk-schedule-hint">{t('today.noEvents')}</p>
-          : (
-              <ul>
-                {[...events].sort((left, right) => left.start.localeCompare(right.start)).slice(0, 4).map(event => (
-                  <li key={event.id}>
-                    <button type="button" className="dsh-desk-today-event" onClick={click => props.onOpenEvent(event, { x: click.clientX, y: click.clientY })}>
-                      <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
-                      <span>{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
-                      <span className="dsh-desk-today-event-title">{eventTitle(t, event)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-      </div>
-      <div className="dsh-desk-today-stats">
-        <span><b>{context.notesCount}</b> {t('tab.notes')}</span>
-        <span><b>{context.openTasks}</b> {t('today.unfinished')}</span>
+      <div className="dsh-desk-today-split">
+        <div className="dsh-desk-today-events">
+          <div className="dsh-desk-today-subhead">{t('today.events')}</div>
+          {events.length === 0
+            ? <p className="dsh-desk-schedule-hint">{t('today.noEvents')}</p>
+            : (
+                <ul>
+                  {[...events].sort((left, right) => left.start.localeCompare(right.start)).slice(0, 3).map(event => (
+                    <li key={event.id}>
+                      <button type="button" className="dsh-desk-today-event" onClick={click => props.onOpenEvent(event, { x: click.clientX, y: click.clientY })}>
+                        <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
+                        <span>{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
+                        <span className="dsh-desk-today-event-title">{eventTitle(t, event)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+        </div>
+        <div className="dsh-desk-today-stats">
+          <button type="button" className="dsh-desk-today-stat" onClick={context.onOpenNotes}>
+            {t('today.notesRemaining', { count: context.notesCount })}
+          </button>
+          <button type="button" className="dsh-desk-today-stat" onClick={context.onOpenTasks}>
+            {t('today.tasksRemaining', { count: context.openTasks })}
+          </button>
+        </div>
       </div>
       <div className="dsh-desk-today-actions">
-        <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={context.onAddTask}>
-          {plusIcon}
-          <span className="dsh-desk-action-label">{t('task.add')}</span>
-        </button>
         <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={context.onAddNote}>
-          {plusIcon}
-          <span className="dsh-desk-action-label">{t('action.newNote')}</span>
+          {plusIcon}<span className="dsh-desk-action-label">{t('action.newNote')}</span>
+        </button>
+        <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={context.onAddTask}>
+          {plusIcon}<span className="dsh-desk-action-label">{t('task.add')}</span>
+        </button>
+        <button type="button" className="dsh-desk-action dsh-desk-action-primary" disabled title={t('tabs.moreEmpty')}>
+          {plusIcon}<span className="dsh-desk-action-label">{t('tab.notebook')}</span>
         </button>
       </div>
     </section>

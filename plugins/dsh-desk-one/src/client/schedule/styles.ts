@@ -75,32 +75,26 @@ export const SCHEDULE_CSS = `
 }
 .dsh-desk-schedule-empty p { margin: 0; }
 
-/* top row: upcoming (left) + reserved linkage slot (right); calendar takes the rest */
+/* top row: Today (left) + Upcoming (right), equal width, calendar takes the rest */
 .dsh-desk-schedule-top {
-  flex: none; display: grid; gap: 8px; height: 190px;
-  /* Today and upcoming share the row equally; both stay usable on a narrow panel. */
+  flex: none; display: grid; gap: 8px; height: 150px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .dsh-desk-schedule-upcoming {
   height: 100%; overflow: hidden;
 }
 .dsh-desk-schedule-today {
-  box-sizing: border-box; height: 100%; min-width: 0; display: flex; flex-direction: column; gap: 5px;
-  padding: 8px 12px 9px; background: var(--dsw-alias-bg-layer-1, #fff);
+  box-sizing: border-box; height: 100%; min-width: 0; display: flex; flex-direction: column; gap: 4px;
+  padding: 7px 10px 8px; background: var(--dsw-alias-bg-layer-1, #fff);
   border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); border-radius: var(--dsw-radius-lg, 16px);
   overflow: hidden;
 }
 .dsh-desk-schedule-today > header { display: flex; align-items: baseline; gap: 8px; }
 .dsh-desk-schedule-today > header h3 { margin: 0; font-size: 13px; font-weight: 600; }
 .dsh-desk-schedule-today > header span { font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); }
-.dsh-desk-today-stats { display: flex; gap: 6px; flex-wrap: wrap; }
-.dsh-desk-today-stats span {
-  font-size: 10px; line-height: 18px; padding: 0 8px; border-radius: 999px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05));
-}
-.dsh-desk-today-stats b { font-weight: 600; color: var(--dsw-alias-label-primary, #1f2329); }
-.dsh-desk-today-events { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+/* Left = today's events, right = clickable counts, divided by a hairline. */
+.dsh-desk-today-split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr); gap: 8px; }
+.dsh-desk-today-events { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
 .dsh-desk-today-subhead { font-size: 11px; font-weight: 600; color: var(--dsw-alias-label-secondary, #6b7280); }
 .dsh-desk-today-events ul { list-style: none; margin: 0; padding: 0; overflow: auto; }
 .dsh-desk-today-event {
@@ -109,7 +103,18 @@ export const SCHEDULE_CSS = `
 }
 .dsh-desk-today-event:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
 .dsh-desk-today-event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dsh-desk-today-actions { display: flex; align-items: center; gap: 6px; margin-top: auto; }
+.dsh-desk-today-stats {
+  min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px;
+  padding-left: 8px; border-left: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+}
+.dsh-desk-today-stat {
+  border: 0; background: transparent; color: var(--dsw-alias-label-secondary, #6b7280);
+  font: inherit; font-size: 11px; line-height: 16px; text-align: left; padding: 3px 4px;
+  border-radius: 5px; cursor: pointer;
+}
+.dsh-desk-today-stat:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); }
+.dsh-desk-today-actions { display: flex; align-items: center; gap: 5px; margin-top: auto; flex-wrap: wrap; }
+.dsh-desk-today-actions .dsh-desk-action { height: 26px; padding: 0 8px; font-size: 11px; gap: 2px; border-radius: 8px; }
 
 /** Compact switch shared by the management page. */
 .dsh-desk-switch {
@@ -123,17 +128,21 @@ export const SCHEDULE_CSS = `
 .dsh-desk-switch[data-on='true'] { background: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); }
 .dsh-desk-switch[data-on='true']::after { left: 13px; }
 .dsh-desk-schedule-upcoming {
-  flex: none; box-sizing: border-box; padding: 8px 12px 9px;
+  height: 100%; min-height: 0; box-sizing: border-box; padding: 7px 10px 8px;
+  display: flex; flex-direction: column; gap: 3px; overflow: hidden;
   background: var(--dsw-alias-bg-layer-1, #fff);
   border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
   border-radius: var(--dsw-radius-lg, 16px);
 }
 .dsh-desk-schedule-upcoming header {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; flex: none;
   font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-secondary, #6b7280);
-  margin-bottom: 3px;
 }
-.dsh-desk-schedule-upcoming ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+/* Range slider: pick how many days ahead the upcoming card covers. */
+.dsh-desk-upcoming-range { flex: none; display: flex; align-items: center; gap: 8px; }
+.dsh-desk-upcoming-range input[type='range'] { flex: 1; min-width: 0; height: 4px; accent-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); cursor: pointer; }
+.dsh-desk-upcoming-range-label { flex: none; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); white-space: nowrap; }
+.dsh-desk-schedule-upcoming ul { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; overflow: auto; }
 .dsh-desk-schedule-upcoming-item {
   display: flex; align-items: center; gap: 7px; width: 100%; min-width: 0;
   border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px;

@@ -113,8 +113,10 @@ export const SCHEDULE_SYNC_TIMEOUT_MS = 180_000
 export const SCHEDULE_TEST_TIMEOUT_MS = 90_000
 /** 单次拉取的事件上限（防御超大会话日历把存储写爆）。 */
 export const SCHEDULE_MAX_EVENTS = 5_000
-/** 日历源栏「近期日程」窗口。 */
-export const SCHEDULE_UPCOMING_DAYS = 7
+/** 「近期日程」滑杆可选择的天数上限（从明天起算，最小 1 天）。 */
+export const SCHEDULE_UPCOMING_MAX_DAYS = 14
+/** 「近期日程」默认窗口（从明天起算）。 */
+export const SCHEDULE_UPCOMING_DEFAULT_DAYS = 6
 /** 列表视图一次加载的天数（按需「加载更多」）。 */
 export const SCHEDULE_LIST_DAYS = 30
 

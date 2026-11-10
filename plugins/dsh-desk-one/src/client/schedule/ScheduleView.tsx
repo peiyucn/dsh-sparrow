@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
   SCHEDULE_COLORS, SCHEDULE_HIDDEN_STORAGE_KEY, SCHEDULE_LIST_DAYS, SCHEDULE_SYNC_INTERVAL_MS,
-  SCHEDULE_UPCOMING_DAYS, SCHEDULE_VIEW_STORAGE_KEY,
+  SCHEDULE_UPCOMING_DEFAULT_DAYS, SCHEDULE_UPCOMING_MAX_DAYS, SCHEDULE_VIEW_STORAGE_KEY,
 } from '../../constants.js'
 import type { DeskCalendar, DeskEvent, ScheduleStateResponse } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
@@ -21,6 +21,7 @@ import {
   EventCard, ListBoard, MonthBoard, ScheduleToolbar, SourcesPage, TodayPanel, UpcomingPanel, WeekBoard,
   type ClickPoint,
   type TodayContext,
+  type UpcomingRange,
 } from './components.js'
 
 type SchedulePage = 'calendar' | 'sources'
@@ -69,6 +70,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext }: {
   const [selected, setSelected] = useState<{ event: DeskEvent; point?: ClickPoint } | null>(null)
   const [listStart, setListStart] = useState<Date>(today)
   const [listDays, setListDays] = useState(SCHEDULE_LIST_DAYS)
+  const [upcomingDays, setUpcomingDays] = useState(SCHEDULE_UPCOMING_DEFAULT_DAYS)
   const syncingRef = useRef(false)
   const autoSyncTried = useRef(false)
   const loadedOnce = useRef(false)
@@ -78,8 +80,11 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext }: {
     if (view === 'week') return weekRange(cursor)
     return listRange(listStart, listDays)
   }, [cursor, listDays, listStart, today, view])
-  // The upcoming card is pinned to "today .. +N days", independent of the calendar view range.
-  const upcoming = useMemo(() => listRange(today, SCHEDULE_UPCOMING_DAYS), [today])
+  // Load today plus the whole slider window once; both panels filter locally, dragging never refetches.
+  const upcoming = useMemo(
+    () => listRange(today, SCHEDULE_UPCOMING_MAX_DAYS + 1),
+    [today],
+  )
 
   const load = useCallback(async (): Promise<void> => {
     const [nextState, payload, upcomingPayload] = await Promise.all([
@@ -211,6 +216,11 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext }: {
     () => events.filter(event => !hidden.has(event.calendarNodeId)),
     [events, hidden],
   )
+  const upcomingRange: UpcomingRange = useMemo(() => ({
+    days: upcomingDays,
+    from: addDays(today, 1),
+    to: addDays(today, 1 + upcomingDays),
+  }), [today, upcomingDays])
   const visibleUpcoming = useMemo(
     () => upcomingEvents.filter(event => !hidden.has(event.calendarNodeId)),
     [upcomingEvents, hidden],
@@ -305,6 +315,8 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext }: {
               today={today}
               events={visibleUpcoming.filter(event => dayKey(new Date(event.start)) !== dayKey(today))}
               calendars={calendars}
+              range={upcomingRange}
+              onRangeChange={setUpcomingDays}
               onOpen={openEvent}
               onViewAll={() => { setListStart(today); chooseView('list'); setCursor(today) }}
             />
