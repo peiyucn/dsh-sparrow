@@ -288,10 +288,6 @@ export const SCHEDULE_CSS = `
   font: inherit; padding: 6px 8px; border-radius: 6px; color: inherit;
   border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); background: transparent;
 }
-.dsh-desk-schedule-provider { width: 7px; height: 7px; border-radius: 50%; background: var(--dsw-alias-label-tertiary, #8a919f); }
-.dsh-desk-schedule-provider.is-wecom { background: #2f8d5b; }
-.dsh-desk-schedule-provider.is-icloud { background: #4a90d9; }
-.dsh-desk-schedule-provider.is-outlook { background: #2f6fd0; }
 .dsh-desk-schedule-form-note { margin: 0; color: var(--dsw-alias-label-tertiary, #8a919f); font-size: 11px; }
 .dsh-desk-schedule-form-ok { margin: 0; color: #2f8d5b; }
 .dsh-desk-schedule-form-actions { display: flex; gap: 8px; align-items: center; }
@@ -320,19 +316,10 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-mgmt-count { flex: none; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); }
 .dsh-desk-schedule-mgmt-label { flex: none; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); margin-left: 6px; }
 .dsh-desk-schedule-sync-hint { margin: 0 0 4px; font-size: 11px; line-height: 15px; color: var(--dsw-alias-label-tertiary, #8a919f); }
-.dsh-desk-schedule-calendar { display: flex; align-items: center; gap: 6px; }
 .dsh-desk-schedule-colorbutton {
   width: 12px; height: 12px; min-width: 12px; padding: 0; border: 0; border-radius: 50%;
   cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.14);
 }
-.dsh-desk-schedule-calendar-toggle {
-  flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; border: 0; background: transparent;
-  color: inherit; font: inherit; font-size: 12px; text-align: left; padding: 2px; border-radius: 6px; cursor: pointer;
-}
-.dsh-desk-schedule-calendar-toggle:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
-.dsh-desk-schedule-calendar[data-hidden='true'] { opacity: .45; }
-.dsh-desk-schedule-calendar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dsh-desk-schedule-calendar-count { margin-left: auto; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); }
 
 @container (max-width: 760px) {
   .dsh-desk-schedule-actions { width: 100%; margin-left: 0; justify-content: flex-end; }
