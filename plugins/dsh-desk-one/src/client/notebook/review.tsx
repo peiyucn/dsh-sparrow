@@ -186,14 +186,14 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     }
   }, [notebook, replyText, refreshThread])
 
-  const setStatus = useCallback(async (thread: DeskAnnotation, status: 'open' | 'resolved'): Promise<void> => {
+  const acceptThread = useCallback(async (thread: DeskAnnotation): Promise<void> => {
     setBusy(true)
     setError(null)
     try {
       refreshThread(await notebook.updateAnnotationStatus({
         id: thread.id,
         expectedRevision: thread.revision,
-        patch: { status },
+        patch: { status: 'resolved' },
       }))
     } catch (cause) {
       setError(messageOf(cause))
@@ -362,6 +362,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                         {anchorResolves(thread.anchor, body) ? null : (
                           <p className="dsh-desk-review-orphan">{t('review.missingAnchor')}</p>
                         )}
+                        {thread.status === 'resolved' ? <p className="dsh-desk-review-hint">{t('review.replyReopens')}</p> : null}
                         {thread.comments.map((comment, index) => (
                           <CommentLine key={`${thread.id}-${index}`} t={t} comment={comment} />
                         ))}
@@ -398,15 +399,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                           </button>
                           {thread.status === 'answered'
                             ? (
-                                <button type="button" className="dsh-desk-review-mini" disabled={busy} onClick={() => { void setStatus(thread, 'resolved') }}>
+                                <button type="button" className="dsh-desk-review-mini" disabled={busy} onClick={() => { void acceptThread(thread) }}>
                                   {t('review.accept')}
-                                </button>
-                              )
-                            : null}
-                          {thread.status === 'resolved'
-                            ? (
-                                <button type="button" className="dsh-desk-review-mini" disabled={busy} onClick={() => { void setStatus(thread, 'open') }}>
-                                  {t('review.reopen')}
                                 </button>
                               )
                             : null}

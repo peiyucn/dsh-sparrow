@@ -99,17 +99,17 @@ export function appendAnnotationComment(
 }
 
 /**
- * The status machine: every transition keeps a thread reviewable.
+ * The status machine for explicit patches.
  *
- * Accepting closes the CURRENT round only, so `resolved` comes from `answered` alone:
- * a reopened thread (`open`) has no pending AI answer to accept until another round
- * produces one. `resolved` is a human act — the REST surface sets it and the agent
- * tools expose `answered` alone, so the model can never close a thread.
+ * Replies move the thread on their own (AI reply → `answered`, human reply → `open`),
+ * so this map only has to cover accept and anchor loss: accepting is the single
+ * `answered → resolved` step, and a resolved thread is terminal here — replying is
+ * what reopens a discussion.
  */
 const STATUS_TRANSITIONS: Readonly<Record<DeskAnnotation['status'], readonly DeskAnnotation['status'][]>> = {
   open: ['open', 'answered', 'orphaned'],
   answered: ['answered', 'open', 'resolved', 'orphaned'],
-  resolved: ['resolved', 'open', 'orphaned'],
+  resolved: ['resolved'],
   orphaned: ['orphaned', 'open'],
 }
 

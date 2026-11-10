@@ -40,7 +40,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'review.replyPlaceholder'
       | 'review.send'
       | 'review.accept'
-      | 'review.reopen'
+      | 'review.replyReopens'
       | 'review.delete'
       | 'review.handoff'
       | 'review.handoffAll'

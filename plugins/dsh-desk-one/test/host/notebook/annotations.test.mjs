@@ -95,11 +95,13 @@ describe('annotation: status machine', () => {
     assert.equal(patched.revision, 2)
   })
 
-  it('resolved 只能从 answered 进入：接受只关闭当前这一轮 AI 反馈', () => {
+  it('resolved 只能从 answered 进入；已接受是终态（由回复重开，不由 status 改）', () => {
     const answered = patchAnnotationStatus(record(), 'answered', '2026-11-11T02:00:00.000Z')
-    assert.equal(patchAnnotationStatus(answered, 'resolved', '2026-11-11T03:00:00.000Z').status, 'resolved')
-    // A reopened thread has no pending answer to accept until another round produces one.
+    const resolved = patchAnnotationStatus(answered, 'resolved', '2026-11-11T03:00:00.000Z')
+    assert.equal(resolved.status, 'resolved')
+    // No pending answer on an open thread, and an accepted thread is not reopened by status.
     assert.throws(() => patchAnnotationStatus(record(), 'resolved', '2026-11-11T03:00:00.000Z'), DeskModelError)
+    assert.throws(() => patchAnnotationStatus(resolved, 'open', '2026-11-11T04:00:00.000Z'), DeskModelError)
   })
 
   it('状态不变时不增加 revision', () => {
