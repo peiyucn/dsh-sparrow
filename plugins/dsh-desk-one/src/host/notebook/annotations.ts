@@ -136,3 +136,51 @@ export function patchAnnotationStatus(
 export function assertAnnotationDeletable(status: DeskAnnotation['status']): void {
   if (status === 'resolved') throw new DeskModelError('INVALID_ANNOTATION', '已接受的批注不能删除（审阅历史保留）')
 }
+
+/** One frontmatter field as the page currently has it. */
+export interface CurrentField {
+  readonly name: string
+  readonly value: string
+}
+
+/**
+ * Whether an anchor still resolves against the current page.
+ *
+ * A quote anchor resolves while its exact text exists; a field anchor resolves while the
+ * field exists (a changed value is shown as old/new, not treated as stale).
+ * @param anchor - stored anchor.
+ * @param body - current markdown body.
+ * @param fields - current frontmatter fields.
+ * @returns true while the anchor can be located.
+ */
+export function anchorStillValid(
+  anchor: AnnotationAnchor,
+  body: string,
+  fields: readonly CurrentField[],
+): boolean {
+  if (anchor.type === 'quote') return body.includes(anchor.quote)
+  return fields.some(field => field.name === anchor.field)
+}
+
+/**
+ * Point a thread at a new anchor after its old one went stale.
+ *
+ * The thread goes back to `open`: relocation is a fresh round, so the human decides what
+ * happens next (hand it to the AI, or accept after answering themselves). Accepted threads
+ * are review history and cannot be moved.
+ * @param current - thread record.
+ * @param rawAnchor - the new anchor as supplied by the caller.
+ * @param now - ISO instant of the change.
+ * @returns the updated record (revision bumped once).
+ */
+export function reanchorAnnotation(
+  current: DeskAnnotation,
+  rawAnchor: unknown,
+  now: string,
+): DeskAnnotation {
+  if (current.status === 'resolved') {
+    throw new DeskModelError('INVALID_ANNOTATION', '已接受的批注不能重新定位')
+  }
+  const anchor = normalizeAnnotationAnchor(rawAnchor)
+  return { ...current, anchor, status: 'open', updatedAt: now, revision: current.revision + 1 }
+}

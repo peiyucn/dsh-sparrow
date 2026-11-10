@@ -23,6 +23,7 @@ import {
 } from '../model.js'
 import {
   appendAnnotationComment, assertAnnotationDeletable, createAnnotationRecord, patchAnnotationStatus,
+  reanchorAnnotation,
 } from './notebook/annotations.js'
 import {
   createCalendarRecord, createEventRecord, createScheduleSourceRecord, eventMatchesDraft, filterEvents,
@@ -846,6 +847,28 @@ export class DeskStore {
         // reply reopens the discussion (no separate "reopen" action). One logical reply is one
         // revision bump, so the status change rides along. Only a human accept resolves.
         return { ...replied, status: input.author === 'ai' ? 'answered' : 'open' }
+      })
+      if (updated.kind !== 'annotation') throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${input.id}`)
+      return updated
+    } catch (error) {
+      throw this.mapMissing(error, 'UNKNOWN_ANNOTATION', `批注不存在：${input.id}`)
+    }
+  }
+
+  /** Move one thread to a new anchor (revision-checked); it becomes `open` again. */
+  async updateAnnotationAnchor(input: {
+    readonly id: string
+    readonly expectedRevision: number
+    readonly anchor: unknown
+  }): Promise<DeskAnnotation> {
+    const now = new Date().toISOString()
+    try {
+      const updated = await this.nodes.update(input.id, (current) => {
+        if (current.kind !== 'annotation') throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${input.id}`)
+        if (!Number.isInteger(input.expectedRevision) || current.revision !== input.expectedRevision) {
+          throw new DeskModelError('REVISION_CONFLICT', `批注已被修改（当前 revision ${current.revision}，请求 ${input.expectedRevision}）`)
+        }
+        return reanchorAnnotation(current, input.anchor, now)
       })
       if (updated.kind !== 'annotation') throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${input.id}`)
       return updated

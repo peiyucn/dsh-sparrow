@@ -8,7 +8,8 @@
 import { ROUTES } from '../../constants.js'
 import type {
   AnnotationListResponse, AnnotationMutationResponse, CreateAnnotationRequest, DeskAnnotation, NotebookPageResponse,
-  NotebookSearchResponse, NotebookStateResponse, ReplyAnnotationRequest, UpdateAnnotationRequest,
+  NotebookSearchResponse, NotebookStateResponse, ReanchorAnnotationRequest, ReplyAnnotationRequest,
+  UpdateAnnotationRequest,
 } from '../../contract.js'
 import { deleteJson, fetchJson, postJson } from '../http.js'
 
@@ -79,6 +80,16 @@ export function updateAnnotationStatus(input: UpdateAnnotationRequest): Promise<
   return postJson<AnnotationMutationResponse>(ROUTES.annotationUpdate, input).then(payload => payload.annotation)
 }
 
+/** Move one thread to a new anchor; it becomes open again. */
+export function reanchorAnnotation(input: ReanchorAnnotationRequest): Promise<DeskAnnotation> {
+  return postJson<AnnotationMutationResponse>(ROUTES.annotationReanchor, input).then(payload => payload.annotation)
+}
+
+/** Ask the host to mark stale anchors orphaned, and return the settled list. */
+export function detectOrphans(path: string): Promise<readonly DeskAnnotation[]> {
+  return postJson<AnnotationListResponse>(ROUTES.annotationDetect, { path }).then(payload => payload.annotations)
+}
+
 /** Delete one thread. */
 export function deleteAnnotation(id: string): Promise<void> {
   return postJson<{ deleted: boolean }>(ROUTES.annotationDelete, { id }).then(() => undefined)
@@ -95,6 +106,8 @@ export interface NotebookApi {
   readonly addAnnotation: typeof addAnnotation
   readonly replyAnnotation: typeof replyAnnotation
   readonly updateAnnotationStatus: typeof updateAnnotationStatus
+  readonly reanchorAnnotation: typeof reanchorAnnotation
+  readonly detectOrphans: typeof detectOrphans
   readonly deleteAnnotation: typeof deleteAnnotation
 }
 
@@ -109,5 +122,7 @@ export const notebookApi: NotebookApi = {
   addAnnotation,
   replyAnnotation,
   updateAnnotationStatus,
+  reanchorAnnotation,
+  detectOrphans,
   deleteAnnotation,
 }

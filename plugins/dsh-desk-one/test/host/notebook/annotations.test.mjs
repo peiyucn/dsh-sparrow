@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { DeskModelError } from '../../../lib/model/errors.js'
 import {
-  appendAnnotationComment, assertAnnotationDeletable, createAnnotationRecord, normalizeAnnotationAnchor,
-  patchAnnotationStatus,
+  anchorStillValid, appendAnnotationComment, assertAnnotationDeletable, createAnnotationRecord, normalizeAnnotationAnchor,
+  patchAnnotationStatus, reanchorAnnotation,
 } from '../../../lib/host/notebook/annotations.js'
 import { normalizeLibraryPath } from '../../../lib/host/notebook/library.js'
 
@@ -121,5 +121,30 @@ describe('annotation: delete', () => {
       assert.doesNotThrow(() => assertAnnotationDeletable(status), `${status} 应可删除`)
     }
     assert.throws(() => assertAnnotationDeletable('resolved'), DeskModelError)
+  })
+})
+
+describe('annotation: orphan detection & relocation', () => {
+  it('引用锚按原文匹配，字段锚只看字段是否存在（值变不算失效）', () => {
+    const body = '正文里包含结论这句话'
+    assert.equal(anchorStillValid({ type: 'quote', quote: '结论' }, body, []), true)
+    assert.equal(anchorStillValid({ type: 'quote', quote: '已被删掉的句子' }, body, []), false)
+    assert.equal(anchorStillValid({ type: 'field', field: 'type', value: 'meeting' }, body, [{ name: 'type', value: 'note' }]), true)
+    assert.equal(anchorStillValid({ type: 'field', field: 'type', value: 'meeting' }, body, [{ name: 'date', value: '2026-11-11' }]), false)
+  })
+
+  it('重新定位更新锚点、回到 open、revision 只加一', () => {
+    const orphaned = { ...record(), status: 'orphaned', revision: 3 }
+    const next = reanchorAnnotation(orphaned, { type: 'quote', quote: '新位置' }, '2026-11-11T05:00:00.000Z')
+    assert.equal(next.status, 'open')
+    assert.equal(next.revision, 4)
+    assert.deepEqual(next.anchor, { type: 'quote', quote: '新位置' })
+  })
+
+  it('已接受的批注不能重新定位（审阅历史）', () => {
+    assert.throws(
+      () => reanchorAnnotation({ ...record(), status: 'resolved' }, { type: 'quote', quote: 'x' }, '2026-11-11T05:00:00.000Z'),
+      DeskModelError,
+    )
   })
 })

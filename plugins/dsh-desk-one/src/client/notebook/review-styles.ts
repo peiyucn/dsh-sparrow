@@ -180,6 +180,15 @@ export const REVIEW_CSS = `
   color: var(--dsw-alias-label-caption, #8a919f);
   font-size: 10px;
 }
+.dsh-desk-review-warn {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #e2a03c 14%, transparent);
+  color: #8a5a00;
+  font-size: 11px;
+  line-height: 1.6;
+}
 .dsh-desk-review-hint {
   margin: 4px 0 0;
   color: var(--dsw-alias-label-caption, #8a919f);

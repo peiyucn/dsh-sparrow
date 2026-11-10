@@ -643,3 +643,15 @@ export interface ReplyAnnotationRequest {
 export interface DeleteAnnotationRequest {
   readonly id: string
 }
+
+/** Move one annotation to a new anchor (used after the anchored text or field changed). */
+export interface ReanchorAnnotationRequest {
+  readonly id: string
+  readonly expectedRevision: number
+  readonly anchor: AnnotationAnchor
+}
+
+/** Ask the host to mark annotations whose anchors no longer resolve. */
+export interface DetectOrphansRequest {
+  readonly path: string
+}
