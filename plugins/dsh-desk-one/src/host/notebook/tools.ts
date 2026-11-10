@@ -66,7 +66,7 @@ export function registerNotebookTools(ctx: Context, store: DeskStore, notebook: 
           body: args.body,
           author: 'ai',
         })
-        return JSON.stringify({ ok: true, annotation, summary: `已回复批注，状态改为「待人确认」（${annotation.status}）` })
+        return JSON.stringify({ ok: true, annotation, summary: `已回复批注，状态改为「待接受」（${annotation.status}）` })
       } catch (error) {
         toolError(error)
       }
@@ -84,7 +84,7 @@ export function registerNotebookTools(ctx: Context, store: DeskStore, notebook: 
     async execute(args) {
       try {
         const annotation = await store.updateAnnotationStatus(args.id, args.expected_revision, 'answered')
-        return JSON.stringify({ ok: true, annotation, summary: '已标记为「待人确认」；接受与否由人决定' })
+        return JSON.stringify({ ok: true, annotation, summary: '已标记为「待接受」；接受与否由人决定' })
       } catch (error) {
         toolError(error)
       }

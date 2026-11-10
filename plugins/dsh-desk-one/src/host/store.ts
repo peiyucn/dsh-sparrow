@@ -842,10 +842,9 @@ export class DeskStore {
           throw new DeskModelError('REVISION_CONFLICT', `批注已被修改（当前 revision ${current.revision}，请求 ${input.expectedRevision}）`)
         }
         const replied = appendAnnotationComment(current, { body: input.body, author: input.author }, now)
-        // An AI reply means "handled, waiting for the human"; only a human resolves.
-        return input.author === 'ai' && replied.status === 'open'
-          ? { ...replied, status: 'answered', updatedAt: now, revision: replied.revision + 1 }
-          : replied
+        // An AI reply means "handled, awaiting acceptance"; one logical reply is one revision
+        // bump, so the status change rides along instead of bumping again. Only a human resolves.
+        return input.author === 'ai' && replied.status === 'open' ? { ...replied, status: 'answered' } : replied
       })
       if (updated.kind !== 'annotation') throw new DeskModelError('UNKNOWN_ANNOTATION', `批注不存在：${input.id}`)
       return updated
