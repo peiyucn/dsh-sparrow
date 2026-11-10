@@ -198,9 +198,12 @@ export function TodayPanel(props: {
   readonly calendars: readonly DeskCalendar[]
   readonly context: TodayContext
   readonly onOpenEvent: (event: DeskEvent, point?: ClickPoint) => void
+  /** Jumps to the full calendar list for today: the "N events" shortcut. */
+  readonly onOpenSchedule: () => void
 }): ReactElement {
   const { t, today, events, calendars, context } = props
   const counts: readonly { readonly value: number; readonly label: string; readonly color: string; readonly onClick: () => void }[] = [
+    { value: events.length, label: t('today.schedule'), color: '#7c5cd6', onClick: props.onOpenSchedule },
     { value: context.notesCount, label: t('today.notes'), color: '#d9a441', onClick: context.onOpenNotes },
     { value: context.openTasks, label: t('today.tasks'), color: '#4176e6', onClick: context.onOpenTasks },
     { value: context.activeSessions, label: t('today.sessions'), color: '#2e9e5b', onClick: context.onOpenSessions },
@@ -210,7 +213,8 @@ export function TodayPanel(props: {
       <div className="dsh-desk-schedule-today-head">
         <h3>{t('today.title')}</h3>
         <span>{formatDateLabel(today, t)} {weekdayLabel(today, weekdayLabels(t('schedule.weekdays')))}</span>
-      </div>      <div className="dsh-desk-today-split">
+      </div>
+      <div className="dsh-desk-today-split">
         <div className="dsh-desk-today-events">
           {events.length === 0
             ? <p className="dsh-desk-schedule-hint">{t('today.noEvents')}</p>

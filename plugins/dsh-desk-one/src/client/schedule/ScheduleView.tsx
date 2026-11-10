@@ -322,6 +322,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
               calendars={calendars}
               context={todayContext}
               onOpenEvent={openEvent}
+              onOpenSchedule={() => { setListStart(today); chooseView('list'); setCursor(today) }}
             />
             <UpcomingPanel
               t={t}

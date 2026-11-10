@@ -44,6 +44,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'today.copyTitle'
       | 'today.events'
       | 'today.noEvents'
+      | 'today.schedule'
       | 'today.notes'
       | 'today.tasks'
       | 'today.sessions'
