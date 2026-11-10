@@ -21,7 +21,7 @@ import { ListBoard, MonthBoard, WeekBoard } from './boards.js'
 import { EventCard } from './event-card.js'
 import { StartPanel, TodayPanel, UpcomingPanel, type TodayContext, type UpcomingRange } from './panels.js'
 import type { ClickPoint } from './shared.js'
-import { SourcesPage } from './sources.js'
+import { SourcesPage } from './sources/index.js'
 import { ScheduleToolbar } from './toolbar.js'
 
 type SchedulePage = 'calendar' | 'sources'

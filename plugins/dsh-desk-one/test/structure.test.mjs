@@ -696,7 +696,11 @@ describe('dsh-desk-one 结构', () => {
       'src/client/schedule/panels.tsx',
       'src/client/schedule/boards.tsx',
       'src/client/schedule/event-card.tsx',
-      'src/client/schedule/sources.tsx',
+      'src/client/schedule/sources/index.tsx',
+      'src/client/schedule/sources/provider-card.tsx',
+      'src/client/schedule/sources/outlook-card.tsx',
+      'src/client/schedule/sources/subscription-card.tsx',
+      'src/client/schedule/sources/logos.tsx',
     )
     const router = await read('src/host/router.ts')
     const host = await read('src/host.ts')

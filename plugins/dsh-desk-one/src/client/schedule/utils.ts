@@ -31,7 +31,7 @@ export function formatTime(iso: string): string {
   return `${hours}:${minutes}`
 }
 
-/** `日/一/二/…` (or English short names) parsed from the locale dictionary. */
+/** Comma-separated weekday labels (Chinese single-character days or English short names) parsed from the locale dictionary. */
 export function weekdayLabels(value: string): string[] {
   return value.split(',').map(part => part.trim())
 }
