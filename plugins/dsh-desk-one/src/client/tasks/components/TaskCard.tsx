@@ -16,6 +16,7 @@ import type { DeskTranslator } from '../../app/types.js'
 import type { SessionChipInfo } from '../../sessions/contract.js'
 import { useAnchoredPanel } from '../hooks/useAnchoredPanel.js'
 import { TaskSessionChip, sessionStatusText } from './TaskSessionChip.js'
+import { autoGrow, daysUntil } from './taskCardUtils.js'
 
 interface TaskCardProps {
   readonly task: DeskTask
@@ -38,26 +39,6 @@ interface TaskCardProps {
 }
 
 type EditableField = 'title' | 'body'
-
-/** Local YYYY-MM-DD (due dates are day-granular, so "due soon" is a local-calendar question). */
-function localToday(): Date {
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  return now
-}
-
-function daysUntil(date: string): number {
-  const target = new Date(`${date}T00:00:00`)
-  target.setHours(0, 0, 0, 0)
-  return Math.round((target.getTime() - localToday().getTime()) / 86_400_000)
-}
-
-/** Reset height then follow scrollHeight — the standard textarea auto-grow trick. */
-function autoGrow(element: HTMLTextAreaElement | null): void {
-  if (element === null) return
-  element.style.height = 'auto'
-  element.style.height = `${element.scrollHeight}px`
-}
 
 export function TaskCard({
   task, dragging, t, onStartDrag, onPatch, onArchive, onDelete,
