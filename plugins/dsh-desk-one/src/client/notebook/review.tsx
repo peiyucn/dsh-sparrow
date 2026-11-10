@@ -414,9 +414,13 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                                 </button>
                               )
                             : null}
-                          <button type="button" className="dsh-desk-review-mini" disabled={busy} onClick={() => handoff([thread])}>
-                            {t('review.handoff')}
-                          </button>
+                          {thread.status === 'resolved'
+                            ? null
+                            : (
+                                <button type="button" className="dsh-desk-review-mini" disabled={busy} onClick={() => handoff([thread])}>
+                                  {t('review.handoff')}
+                                </button>
+                              )}
                           <button type="button" className="dsh-desk-review-mini dsh-desk-review-danger" disabled={busy} onClick={() => { void removeThread(thread) }}>
                             {t('review.delete')}
                           </button>
