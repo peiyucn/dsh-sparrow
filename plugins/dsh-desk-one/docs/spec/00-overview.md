@@ -49,6 +49,7 @@ DSH Web 里「与 harness 共用一张桌子」的工作套件 **Desk One（同�
 ```text
 src/
   constants.ts contract.ts domain.ts model.ts trust.ts    # 共享：统一对象模型与安全基线
+  model/{errors,fields,groups}.ts                         # 对象模型分层：错误类型 / 字段归一化 / 分组记录（model.ts 再导出）
   session-admin.ts                                        # 共享：会话管理 REST 契约（host 组装 / client 消费）
   host.ts index.ts                                        # host 入口 / 公共再导出
   host/
