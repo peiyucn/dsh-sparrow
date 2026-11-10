@@ -77,13 +77,47 @@ export const SCHEDULE_CSS = `
 
 /* top row: upcoming (left) + reserved linkage slot (right); calendar takes the rest */
 .dsh-desk-schedule-top {
-  flex: none; display: grid; gap: 8px; height: 160px;
-  /* Always horizontal: wide upcoming on the left, reserved linkage slot on the right. */
-  grid-template-columns: minmax(0, 1.7fr) minmax(180px, 1fr);
+  flex: none; display: grid; gap: 8px; height: 220px;
+  /* Today and upcoming share the row equally; both stay usable on a narrow panel. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .dsh-desk-schedule-upcoming {
   height: 100%; overflow: hidden;
 }
+.dsh-desk-schedule-today {
+  box-sizing: border-box; height: 100%; min-width: 0; display: flex; flex-direction: column; gap: 5px;
+  padding: 8px 12px 9px; background: var(--dsw-alias-bg-layer-1, #fff);
+  border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); border-radius: var(--dsw-radius-lg, 16px);
+  overflow: hidden;
+}
+.dsh-desk-schedule-today > header { display: flex; align-items: baseline; gap: 8px; }
+.dsh-desk-schedule-today > header h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.dsh-desk-schedule-today > header span { font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-today-top { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 8px; min-height: 0; }
+.dsh-desk-today-focus { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.dsh-desk-today-focus-head { font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-today-clock { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 32px; }
+.dsh-desk-today-clock[data-running='true'] { color: var(--dsw-alias-state-success-primary, #2e9e5b); }
+.dsh-desk-today-presets, .dsh-desk-today-focus-actions { display: flex; gap: 4px; align-items: center; }
+.dsh-desk-today-focus .dsh-desk-schedule-chip { font-size: 10px; height: 20px; padding: 0 6px; }
+.dsh-desk-today-focus-done { margin: 0; font-size: 10px; color: var(--dsw-alias-state-success-primary, #2e9e5b); }
+.dsh-desk-today-events { min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.dsh-desk-today-subhead { font-size: 11px; font-weight: 600; color: var(--dsw-alias-label-secondary, #6b7280); }
+.dsh-desk-today-events ul { list-style: none; margin: 0; padding: 0; overflow: auto; }
+.dsh-desk-today-event {
+  display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; border: 0; background: transparent;
+  color: inherit; font: inherit; font-size: 11px; padding: 2px 3px; border-radius: 5px; cursor: pointer; text-align: left;
+}
+.dsh-desk-today-event:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); }
+.dsh-desk-today-event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-desk-today-tasks { min-height: 0; display: flex; flex-direction: column; gap: 2px; }
+.dsh-desk-today-tasks ul { list-style: none; margin: 0; padding: 0; overflow: auto; }
+.dsh-desk-today-tasks li { display: flex; align-items: center; gap: 6px; font-size: 11px; min-width: 0; padding: 1px 0; }
+.dsh-desk-today-task-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.dsh-desk-today-task-due { flex: none; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); }
+.dsh-desk-today-actions { display: flex; align-items: center; gap: 6px; margin-top: auto; }
+.dsh-desk-today-actions .dsh-desk-action { height: 24px; padding: 0 8px; font-size: 11px; gap: 2px; border-radius: 8px; }
+.dsh-desk-today-note-count { margin-left: auto; font-size: 10px; color: var(--dsw-alias-label-tertiary, #8a919f); }
 /** Compact switch shared by the management page. */
 .dsh-desk-switch {
   flex: none; width: 26px; height: 15px; padding: 0; border: 0; border-radius: 999px; position: relative; cursor: pointer;
