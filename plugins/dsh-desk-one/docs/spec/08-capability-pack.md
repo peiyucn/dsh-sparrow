@@ -19,7 +19,7 @@ Desk One 不只是一个面板，而是**面板 + 数据 + 能力包**：
 | 项 | 类型 | 作用 | 是否强制 |
 | :--- | :--- | :--- | :--- |
 | `note2md` | skill | 笔记本初始化、OneNote 导入、模板 / 命名 / frontmatter 约定、AGENTS.md 清单 | **预制、非强制** |
-| `desk-notes` | skill（新增） | 笔记库契约、批注锚点语义、收到批注后的处理流程 | 随笔记功能 |
+| `desk-review` | skill（新增） | 审阅会话流程：按编号逐项处理、逐项回复、不自行宣布完成 | 随审阅功能 |
 | `desk_note_*` 工具 | tool | 批注读写、frontmatter 语义检索（见第 3 节） | 随笔记功能 |
 | 既有 `desk_note_*` / `desk_task_*` / `desk_group_*` / `desk_schedule_*` | tool | 便签 / 任务 / 分组 / 日程（已实现） | 已有 |
 
