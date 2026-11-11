@@ -48,7 +48,8 @@ export function NotebookView(props: {
   readonly t: DeskTranslator
   readonly notebook: NotebookApi
   readonly workspaceAccess: WorkspaceAccess
-  readonly onOpen?: (path: string) => void
+  /** Start (or continue) the review of one file: the shell creates the review session. */
+  readonly onStartReview?: (input: { readonly cwd: string; readonly path: string }) => void
 }): ReactElement {
   const { t, notebook, workspaceAccess } = props
   const [state, setState] = useState<NotebookStateResponse | null>(null)
@@ -93,6 +94,8 @@ export function NotebookView(props: {
   }, [query, filter, notebook])
 
   const rows = results ?? state?.recent ?? []
+  const onStartReview = props.onStartReview
+  const rootPath = state?.config?.rootPath
 
   /** DSH's own workspace creation: pick a folder, register it, then point the library at it. */
   const createLibrary = useCallback(async (): Promise<void> => {
@@ -217,7 +220,14 @@ export function NotebookView(props: {
                   {rows.length === 0
                     ? <p className="dsh-desk-notebook-hint">{t('notebook.noResults')}</p>
                     : rows.map(entry => (
-                        <ShelfRow key={entry.path} t={t} entry={entry} {...props.onOpen === undefined ? {} : { onOpen: props.onOpen }} />
+                        <ShelfRow
+                          key={entry.path}
+                          t={t}
+                          entry={entry}
+                          {...rootPath === undefined || onStartReview === undefined
+                            ? {}
+                            : { onOpen: (path: string) => onStartReview({ cwd: rootPath, path }) }}
+                        />
                       ))}
                 </div>
               </>

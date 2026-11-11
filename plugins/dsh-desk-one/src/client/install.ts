@@ -21,7 +21,7 @@ import type { SessionsArchiveApi } from './sessions/archiveApi.js'
 import type { ScheduleApi } from './schedule/api.js'
 import type { NotebookApi } from './notebook/api.js'
 import type { WorkspaceAccess } from './notebook/workspaces.js'
-import type { ReviewBridge } from './notebook/review-bridge.js'
+import type { ReviewBridge, ReviewStartInput } from './notebook/review-bridge.js'
 import { attachMainPanel } from './panel.js'
 import { ensureDeskStyles } from './styles.js'
 
@@ -90,8 +90,10 @@ export interface DeskPanelInjected {
   readonly notebook: NotebookApi
   /** DSH workspace flow behind the notebook's create/import action (unavailable without the services). */
   readonly workspaceAccess: WorkspaceAccess
-  /** Right-sidebar review opener and composer hand-off (unavailable without the services). */
+  /** Right-sidebar review opener (unavailable without the services). */
   readonly review: ReviewBridge
+  /** Continue or start the review of one file (creates a review session). */
+  readonly startReview: (input: ReviewStartInput) => Promise<boolean>
 }
 
 /** Browser-side pieces injected at the entry (supplied by index.ts; tests may pass stubs). */

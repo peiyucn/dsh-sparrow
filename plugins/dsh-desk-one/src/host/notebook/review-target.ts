@@ -1,13 +1,15 @@
 /**
- * Review target resolution: turn (cwd, relative path) into the snapshot a review
- * record stores — title, render kind, content fingerprint — and refuse anything the
- * AI could not edit or that is not plain text.
+ * Review target resolution and page reads.
+ *
+ * A review target is a snapshot of where one workspace text file was when the review
+ * started. Reading it back never trusts the snapshot blindly: the path is re-resolved
+ * against the live file system on every read.
  */
 
 import { createHash } from 'node:crypto'
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { basename, isAbsolute, join } from 'node:path'
-import type { ReviewTarget } from '../../contract.js'
+import type { ReviewPageResponse, ReviewTarget } from '../../contract.js'
 import { MAX_REVIEW_FILE_BYTES } from '../../constants.js'
 import { DeskError } from '../http.js'
 import { parseFrontmatter } from './frontmatter.js'
@@ -71,5 +73,28 @@ export async function resolveReviewTarget(input: {
     title: titleOf(text, relative, markdown),
     kind: markdown ? 'markdown' : 'text',
     hash: createHash('sha256').update(bytes).digest('hex'),
+  }
+}
+
+/**
+ * Read the file one review targets, in the shape the review tab renders.
+ * @param target - stored review target.
+ * @returns page fields (markdown frontmatter) and body; text files report no fields.
+ * @throws DeskError when the file moved away, is no longer textual, or grew too large.
+ */
+export async function readReviewPage(target: ReviewTarget): Promise<ReviewPageResponse> {
+  const resolved = await resolveReviewTarget({ cwd: target.cwd, path: target.path })
+  const absolute = join(resolved.cwd, ...resolved.path.split('/'))
+  const bytes = await readFile(absolute)
+  const text = bytes.toString('utf8')
+  const markdown = resolved.kind === 'markdown'
+  const parsed = markdown ? parseFrontmatter(text, bytes.byteLength) : undefined
+  return {
+    path: resolved.path,
+    title: resolved.title,
+    kind: resolved.kind,
+    fields: parsed?.fields ?? [],
+    body: parsed === undefined ? text : parsed.body,
+    bytes: bytes.byteLength,
   }
 }

@@ -13,10 +13,11 @@ import { DeskOnePage } from './app/DeskOnePage.js'
 import { createSessionLinkBridge, type SessionServices } from './sessions/bridge.js'
 import { scheduleApi } from './schedule/api.js'
 import { notebookApi } from './notebook/api.js'
-import { createWorkspaceAccess, type UiWorkspaceLike, type WorkspacesServiceLike } from './notebook/workspaces.js'
+import { reviewApi } from './notebook/review-api.js'
+import { createWorkspaceAccess, type UiWorkspaceLike as NotebookNavigationLike, type WorkspacesServiceLike } from './notebook/workspaces.js'
 import { createReviewBridge } from './notebook/review-bridge.js'
 import { mountNoteReviewTab } from './notebook/register.js'
-import type { LayoutLike, SidebarRightLike } from './notebook/faces.js'
+import type { LayoutLike, SessionNavigationLike, SessionsLike, SidebarRightLike } from './notebook/faces.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { DeskPanelIcon } from './icon.js'
@@ -49,13 +50,13 @@ export function apply(ctx: ClientContext): void {
     workspaceCtx.effect(() => detach, `${PACKAGE_NAME}: workspace access`)
   })
   ctx.inject(['uiWorkspace'], (navigationCtx) => {
-    const detach = workspaceAccess.attachNavigation(navigationCtx.get('uiWorkspace') as unknown as UiWorkspaceLike)
+    const detach = workspaceAccess.attachNavigation(navigationCtx.get('uiWorkspace') as unknown as NotebookNavigationLike)
     navigationCtx.effect(() => detach, `${PACKAGE_NAME}: workspace navigation`)
   })
 
   // Review tab + hand-off: each underlying service is optional, so the shelf degrades to
   // read-only when the host does not expose the right sidebar or the session scope.
-  const review = createReviewBridge()
+  const review = createReviewBridge(reviewApi)
   ctx.inject(['layout'], (layoutCtx) => {
     const detach = review.attachLayout(layoutCtx.get('layout') as unknown as LayoutLike)
     layoutCtx.effect(() => detach, `${PACKAGE_NAME}: review layout`)
@@ -64,8 +65,18 @@ export function apply(ctx: ClientContext): void {
     const detach = review.attachSidebar(sidebarCtx.get('sidebarRight') as unknown as SidebarRightLike)
     sidebarCtx.effect(() => detach, `${PACKAGE_NAME}: review sidebar`)
   })
+  // A review creates its own Session, so it needs the sessions service and the workspace
+  // navigation that puts that Session on screen.
+  ctx.inject(['sessions'], (sessionCtx) => {
+    const detach = review.attachSessions(sessionCtx.get('sessions') as unknown as SessionsLike)
+    sessionCtx.effect(() => detach, `${PACKAGE_NAME}: review sessions`)
+  })
+  ctx.inject(['uiWorkspace'], (navigationCtx) => {
+    const detach = review.attachNavigation(navigationCtx.get('uiWorkspace') as unknown as SessionNavigationLike)
+    navigationCtx.effect(() => detach, `${PACKAGE_NAME}: review navigation`)
+  })
   ctx.inject(['sidebarRightTabs'], (tabCtx) => {
-    mountNoteReviewTab(tabCtx, notebookApi)
+    mountNoteReviewTab(tabCtx, reviewApi)
   })
 
   installDeskClient(ctx, {
@@ -76,6 +87,7 @@ export function apply(ctx: ClientContext): void {
       notebook: notebookApi,
       workspaceAccess,
       review,
+      startReview: review.start,
       listNotes: api.listNotes,
       createNote: api.createNote,
       updateNote: api.updateNote,

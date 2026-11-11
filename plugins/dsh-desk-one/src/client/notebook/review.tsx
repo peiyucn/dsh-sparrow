@@ -11,24 +11,25 @@ import type { ReactElement } from 'react'
 import { MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
-import type { NotebookPageResponse } from '../../contract.js'
-import type { NotebookApi } from './api.js'
+import type { DeskReview, ReviewPageResponse } from '../../contract.js'
+import type { ReviewApi } from './review-api.js'
 import type { NoteReviewParams } from './review-bridge.js'
 
 /** What the tab receives from the client entry. */
 export interface NoteReviewInjected {
-  readonly notebook: NotebookApi
+  readonly reviewApi: ReviewApi
 }
 
 type ReviewProps = PropsRuntime<'sidebar.right.pane.tab'> & InjectFace<NoteReviewInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
 
 /** Notes review tab: the page under review. */
 export function NoteReviewTab(props: ReviewProps): ReactElement {
-  const { t, notebook, useTabInfo } = props
+  const { t, reviewApi, useTabInfo } = props
   const info = useTabInfo()
   const params = info.tab.navigation.params as NoteReviewParams | undefined
-  const path = params?.path
-  const [page, setPage] = useState<NotebookPageResponse | null>(null)
+  const reviewId = params?.reviewId
+  const [review, setReview] = useState<DeskReview | null>(null)
+  const [page, setPage] = useState<ReviewPageResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -38,28 +39,30 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   }
 
   const load = useCallback(async (): Promise<void> => {
-    if (path === undefined) { setLoading(false); return }
+    if (reviewId === undefined) { setLoading(false); return }
     setLoading(true)
     setError(null)
     try {
-      setPage(await notebook.page(path))
+      setReview(await reviewApi.get(reviewId))
+      setPage(await reviewApi.page(reviewId))
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       setLoading(false)
     }
-  }, [notebook, path])
+  }, [reviewApi, reviewId])
 
   useEffect(() => { void load() }, [load])
 
-  if (path === undefined) {
+  if (reviewId === undefined) {
     return <div className="dsh-desk-review"><p className="dsh-desk-notebook-hint">{t('review.noPath')}</p></div>
   }
 
   return (
     <div className="dsh-desk-review">
       <header className="dsh-desk-review-head">
-        <span className="dsh-desk-review-path" title={path}>{path}</span>
+        <span className="dsh-desk-review-path" title={review?.target.path ?? page?.path ?? ''}>{review?.target.path ?? page?.path ?? ''}</span>
+        {page === null ? null : <span className="dsh-desk-review-kind">{page.kind === 'markdown' ? 'MD' : 'TXT'}</span>}
         <button type="button" className="dsh-desk-btn" disabled={loading} onClick={() => { void load() }}>
           {t('review.refresh')}
         </button>
@@ -96,7 +99,9 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                 <section className="dsh-desk-review-card">
                   <h4>{t('review.body')}</h4>
                   <div className="dsh-desk-review-body">
-                    <MarkdownText text={page.body} labels={labels} omitHtml />
+                    {page.kind === 'markdown'
+                      ? <MarkdownText text={page.body} labels={labels} omitHtml />
+                      : <pre className="dsh-desk-review-text">{page.body}</pre>}
                   </div>
                 </section>
               </div>

@@ -3,11 +3,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { ROUTES } from '../../constants.js'
 import type {
-  CreateReviewRequest, ReviewListResponse, ReviewMutationResponse, UpdateReviewTargetRequest,
+  CreateReviewRequest, ReviewListResponse, ReviewMutationResponse, ReviewPageResponse, UpdateReviewTargetRequest,
 } from '../../contract.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
 import type { DeskRouteContext, DeskRouteEntry } from '../router.js'
-import { resolveReviewTarget } from './review-target.js'
+import { readReviewPage, resolveReviewTarget } from './review-target.js'
 
 /** Cap on one list response; a review list is a history view, not an export. */
 const MAX_REVIEW_ROWS = 100
@@ -44,8 +44,27 @@ async function updateReviewTargetRoute(route: DeskRouteContext, req: IncomingMes
   sendJson(res, 200, { review } satisfies ReviewMutationResponse)
 }
 
+async function getReviewRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  const id = url.searchParams.get('id') ?? ''
+  if (id === '') throw new DeskError('BAD_BODY', '缺少审阅记录 id')
+  const review = route.store.getReview(id)
+  if (review === undefined) throw new DeskError('UNKNOWN_REVIEW', '审阅记录不存在', 404)
+  sendJson(res, 200, { review } satisfies ReviewMutationResponse)
+}
+
+async function reviewPageRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  const reviewId = url.searchParams.get('reviewId') ?? ''
+  if (reviewId === '') throw new DeskError('BAD_BODY', '缺少审阅记录 id')
+  const review = route.store.getReview(reviewId)
+  if (review === undefined) throw new DeskError('UNKNOWN_REVIEW', '审阅记录不存在', 404)
+  sendJson(res, 200, await readReviewPage(review.target) satisfies ReviewPageResponse)
+}
 export const REVIEW_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.reviewList, handle: listReviewsRoute },
+  { method: 'GET', path: ROUTES.reviewGet, handle: getReviewRoute },
+  { method: 'GET', path: ROUTES.reviewPage, handle: reviewPageRoute },
   { method: 'POST', path: ROUTES.reviewCreate, handle: createReviewRoute },
   { method: 'POST', path: ROUTES.reviewUpdateTarget, handle: updateReviewTargetRoute },
 ]

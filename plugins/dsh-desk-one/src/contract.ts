@@ -608,3 +608,13 @@ export interface UpdateReviewTargetRequest {
   readonly cwd: string
   readonly path: string
 }
+
+/** One page read through a review target (kind decides the renderer). */
+export interface ReviewPageResponse {
+  readonly path: string
+  readonly title: string
+  readonly kind: 'markdown' | 'text'
+  readonly fields: readonly NotebookPageField[]
+  readonly body: string
+  readonly bytes: number
+}

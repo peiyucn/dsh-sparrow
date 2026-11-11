@@ -258,7 +258,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(register, /sidebarRightTabs\.register/u, 'tab 类型要注册进官方右栏注册表')
     assert.match(register, /'sidebar\.right\.pane\.tab'/u, '正文挂在官方 tab 槽位')
     assert.match(page, /mountNoteReviewTab/u, '客户端要挂载审阅 tab')
-    assert.match(review, /notebook\.page\(/u, '审阅页读取单页内容')
+    assert.match(review, /reviewApi\.page\(/u, '审阅页按 review 读取目标文件')
     assert.match(review, /MarkdownText/u, '正文用官方渲染')
     assert.ok(!/annotation|Annotation|insertQuote/u.test(review), '审阅页不再包含批注对象')
     const bundle = await read('lib/client.js')

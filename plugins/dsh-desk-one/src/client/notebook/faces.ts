@@ -12,3 +12,13 @@ export interface LayoutLike {
 export interface SidebarRightLike {
   openTab(kind: string, options?: { readonly params?: unknown }): void
 }
+
+/** Official sessions service face (create a review session without a current one). */
+export interface SessionsLike {
+  create(options?: { readonly cwd?: string }): Promise<string>
+}
+
+/** Official workspace navigation face: open one Session in the main column. */
+export interface SessionNavigationLike {
+  openSession(sessionId: string): void
+}
