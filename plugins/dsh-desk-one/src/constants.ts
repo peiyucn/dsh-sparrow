@@ -42,6 +42,9 @@ export const ROUTES = Object.freeze({
   notebookRoot: `${PREFIX}/notebook/root`,
   notebookSearch: `${PREFIX}/notebook/search`,
   notebookPage: `${PREFIX}/notebook/page`,
+  reviewList: `${PREFIX}/notebook/reviews`,
+  reviewCreate: `${PREFIX}/notebook/reviews/create`,
+  reviewUpdateTarget: `${PREFIX}/notebook/reviews/update-target`,
 })
 
 /** Entry id: both the left-rail panel row id and the key of the center-column `main` slot (official `MainPanelId`). */
@@ -170,6 +173,9 @@ export const REQUEST_TIMEOUT_MS = 10_000
 export const STYLE_SELECTOR = 'style[data-dsh-desk-one]'
 
 /* ------------------------------ notebook ------------------------------ */
+
+/** A review target must be a plain-text file within this size; bigger files are refused. */
+export const MAX_REVIEW_FILE_BYTES = 1_048_576
 
 /** Fixed record id of the single notes-root config (profile level, one per profile). */
 export const NOTEBOOK_CONFIG_ID = 'notebook_config'

@@ -267,7 +267,7 @@ function buildRemoteEvent(input: BuildEventInput, opts: ParseIcsOptions): Remote
     busy: input.busy,
   }
   if (input.recurrenceId !== undefined) event.recurrenceId = input.recurrenceId
-  const description = textValue(input.event.description)
+  const description = cleanDescription(textValue(input.event.description))
   if (description !== '') event.description = description
   const location = textValue(input.event.location)
   if (location !== '') event.location = location
@@ -323,6 +323,25 @@ function rruleText(master: IcalComponent): string | undefined {
 
 function textValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+/**
+ * DESCRIPTION arrives with client-specific formatting noise: WeCom writes literal `\r` escapes at
+ * line ends and pads separators with 100 dots. Keep the readable text, drop the decoration.
+ */
+export function cleanDescription(raw: string): string {
+  return raw
+    .replace(/\\r\\n/gu, '\n')
+    .replace(/\\r/gu, '')
+    .replace(/\\n/gu, '\n')
+    .replace(/\r\n?/gu, '\n')
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+$/u, ''))
+    // Rules made only of dots / dashes are a separator drawn by the source client.
+    .filter((line) => !/^\s*[.·。_\-—]{3,}\s*$/u.test(line))
+    .join('\n')
+    .replace(/\n{3,}/gu, '\n\n')
+    .trim()
 }
 
 function intersectsWindow(startMs: number, endMs: number, range: WindowRange): boolean {

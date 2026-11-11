@@ -122,7 +122,7 @@ export interface DeskSessionIndex {
   readonly revision: number
 }
 
-export type DeskNode = DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent | DeskSessionIndex | DeskNotebookConfig
+export type DeskNode = DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent | DeskSessionIndex | DeskNotebookConfig | DeskReview
 
 /* ------------------------------------------------------------------ */
 /* Schedule (S2): read-only mirror of external calendars               */
@@ -555,3 +555,56 @@ export interface NotebookSearchQuery {
 /* ------------------------------------------------------------------ */
 /* Notebook: annotations (human review of AI-written pages)             */
 /* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/* Review: a review session attached to one workspace text file        */
+/* ------------------------------------------------------------------ */
+
+/** What a review session reviews: where the file was, and its snapshot. */
+export interface ReviewTarget {
+  /** Workspace root the relative path is based on. */
+  readonly cwd: string
+  /** File path relative to `cwd`, `/`-separated. */
+  readonly path: string
+  /** Display title captured at creation (frontmatter title for markdown). */
+  readonly title: string
+  readonly kind: 'markdown' | 'text'
+  /** SHA-256 of the file bytes at creation (record only; never auto-matches). */
+  readonly hash: string
+}
+
+/** One review association: a DSH session linked to one text file. */
+export interface DeskReview {
+  readonly id: string
+  readonly kind: 'review'
+  readonly schema: number
+  /** The review session (DSH session id). */
+  readonly sessionId: string
+  readonly target: ReviewTarget
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
+
+export interface ReviewListResponse {
+  readonly reviews: readonly DeskReview[]
+}
+
+export interface ReviewMutationResponse {
+  readonly review: DeskReview
+}
+
+/** Create one review link; the client creates the DSH session first. */
+export interface CreateReviewRequest {
+  readonly sessionId: string
+  readonly cwd: string
+  readonly path: string
+}
+
+/** Re-attach a review when its file moved or was renamed. */
+export interface UpdateReviewTargetRequest {
+  readonly id: string
+  readonly expectedRevision: number
+  readonly cwd: string
+  readonly path: string
+}

@@ -26,8 +26,8 @@ import {
   type CalendarDraft, type EventDraft, type EventQuery,
 } from './schedule/records.js'
 import type {
-  DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskNotebookConfig, DeskScheduleSource, DeskSessionIndex, DeskTask,
-  DeskTaskGroup, ScheduleSyncError, TaskStatus,
+  DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskNotebookConfig, DeskReview, DeskScheduleSource, DeskSessionIndex,
+  DeskTask, DeskTaskGroup, ReviewTarget, ScheduleSyncError, TaskStatus,
 } from '../contract.js'
 
 type DeskDomain = Domain<typeof DESK_DOMAIN>
@@ -386,7 +386,11 @@ export class DeskStore {
   }
 
   /** Translate the domain's missing-key error into the feature-specific 404. */
-  private mapMissing(error: unknown, code: 'UNKNOWN_NOTE' | 'UNKNOWN_TASK' | 'UNKNOWN_GROUP', message: string): unknown {
+  private mapMissing(
+    error: unknown,
+    code: 'UNKNOWN_NOTE' | 'UNKNOWN_TASK' | 'UNKNOWN_GROUP' | 'UNKNOWN_REVIEW',
+    message: string,
+  ): unknown {
     if (error instanceof DomainError && error.code === 'missing-key') return new DeskModelError(code, message)
     return error
   }
@@ -764,6 +768,63 @@ export class DeskStore {
   /** Remove the notes-root record (used when the user clears the library). */
   async clearNotebookRoot(): Promise<void> {
     await this.nodes.delete(NOTEBOOK_CONFIG_ID)
+  }
+
+  /* -------------------------------- reviews -------------------------------- */
+
+  /** Review links newest-first; filter by session, workspace root, or file path. */
+  listReviews(filter?: {
+    readonly sessionId?: string
+    readonly cwd?: string
+    readonly path?: string
+  }): DeskReview[] {
+    return this.allNodes()
+      .filter((node): node is DeskReview => node.kind === 'review')
+      .filter(node => filter?.sessionId === undefined || node.sessionId === filter.sessionId)
+      .filter(node => filter?.cwd === undefined || node.target.cwd === filter.cwd)
+      .filter(node => filter?.path === undefined || node.target.path === filter.path)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+  }
+
+  /** One review link by id. */
+  getReview(id: string): DeskReview | undefined {
+    const node = this.nodes.get(id)
+    return node?.kind === 'review' ? node : undefined
+  }
+
+  /** Create the link between a review session and its file snapshot. */
+  async createReview(input: { readonly sessionId: string; readonly target: ReviewTarget }): Promise<DeskReview> {
+    const now = new Date().toISOString()
+    const record: DeskReview = {
+      id: `review_${randomUUID()}`,
+      kind: 'review',
+      schema: DESK_NODE_SCHEMA,
+      sessionId: input.sessionId,
+      target: input.target,
+      createdAt: now,
+      updatedAt: now,
+      revision: 1,
+    }
+    await this.nodes.put(record.id, record)
+    return record
+  }
+
+  /** Re-point one review link at a new file snapshot (manual re-attach). */
+  async updateReviewTarget(id: string, expectedRevision: number, target: ReviewTarget): Promise<DeskReview> {
+    const now = new Date().toISOString()
+    try {
+      const updated = await this.nodes.update(id, (current) => {
+        if (current.kind !== 'review') throw new DeskModelError('UNKNOWN_REVIEW', `审阅记录不存在：${id}`)
+        if (!Number.isInteger(expectedRevision) || current.revision !== expectedRevision) {
+          throw new DeskModelError('REVISION_CONFLICT', `审阅记录已被修改（当前 revision ${current.revision}，请求 ${expectedRevision}）`)
+        }
+        return { ...current, target, updatedAt: now, revision: current.revision + 1 }
+      })
+      if (updated.kind !== 'review') throw new DeskModelError('UNKNOWN_REVIEW', `审阅记录不存在：${id}`)
+      return updated
+    } catch (error) {
+      throw this.mapMissing(error, 'UNKNOWN_REVIEW', `审阅记录不存在：${id}`)
+    }
   }
 
   /** Close the storage domain (plugin unload / host shutdown, via the effect). */

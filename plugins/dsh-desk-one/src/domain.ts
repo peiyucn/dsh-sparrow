@@ -183,9 +183,27 @@ const notebookConfigSchema = z.object({
   revision: z.number().int().positive(),
 })
 
+/** One review association (a DSH review session plus its file snapshot). */
+const reviewSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('review'),
+  schema: z.number().int().positive(),
+  sessionId: z.string().min(1),
+  target: z.object({
+    cwd: z.string().min(1),
+    path: z.string().min(1),
+    title: z.string(),
+    kind: z.enum(['markdown', 'text']),
+    hash: z.string().min(1),
+  }),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  revision: z.number().int().positive(),
+})
+
 const nodeSchema = z.discriminatedUnion('kind', [
   noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema, sessionIndexSchema,
-  notebookConfigSchema,
+  notebookConfigSchema, reviewSchema,
 ])
 const edgeSchema = z.object({
   id: z.string().min(1),
