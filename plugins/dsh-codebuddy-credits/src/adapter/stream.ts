@@ -60,9 +60,33 @@ export function mapUsage(raw: Record<string, unknown>): { tokens: TokenUsage; cr
   }
 }
 
+/**
+ * 从 SSE 帧里取上游错误文案：OpenAI 方言 `{"error":{"message":...}}`、
+ * CodeBuddy 方言 `{"code":<非0>,"msg":...}`（无 choices）。普通帧返回 undefined。
+ *
+ * 上游偶尔先回 200 再在流里夹错误帧；不识别的话流会走到「结束前中断」，
+ * 上游的真实文案被吞掉（2026-11-11 报障：带图请求只看到通用 400 / 中断）。
+ * @param frame - 已解析的 SSE 数据帧。
+ * @returns 错误文案；不是错误帧时为 undefined。
+ */
+export function errorFrameMessage(frame: Record<string, unknown>): string | undefined {
+  const error = frame.error
+  if (typeof error === 'string' && error.length > 0) return error
+  if (error !== null && typeof error === 'object') {
+    const message = (error as Record<string, unknown>).message
+    return typeof message === 'string' && message.length > 0 ? message : '未知错误'
+  }
+  // CodeBuddy 方言错误帧：没有 choices 的 {code, msg}；code 0 / 正常帧不在此列。
+  if (!Array.isArray(frame.choices)
+    && typeof frame.code === 'number' && frame.code !== 0
+    && typeof frame.msg === 'string' && frame.msg.length > 0) {
+    return frame.msg
+  }
+  return undefined
+}
+
 /** 已开块的最终 ContentBlock 组装（block-end 携带）——必须带累计的完整内容：空内容终块
- *  会让流式过程可见、结果消失，工具调用变成「unknown tool ""」。 */
-function blockFor(
+ *  会让流式过程可见、结果消失，工具调用变成「unknown tool ""」。 */function blockFor(
   index: number,
   textByIndex: ReadonlyMap<number, string>,
   toolIdByIndex: ReadonlyMap<number, string>,
@@ -124,6 +148,8 @@ export async function* streamFrames(
         buffer = buffer.slice(lineEnd + 1)
         const frame = parseSseLine(line)
         if (frame === undefined) continue
+        const failure = errorFrameMessage(frame)
+        if (failure !== undefined) throw new LlmError('CodeBuddy 上游错误：' + failure, 'PROVIDER')
         const choices = Array.isArray(frame.choices) ? frame.choices as Array<Record<string, unknown>> : []
         const choice = choices[0]
         const delta = choice !== undefined && typeof choice.delta === 'object' && choice.delta !== null

@@ -24,6 +24,9 @@ import {
   stripChannelFingerprints,
 } from './fingerprints.js'
 import { effectiveReasoningEffort, streamFrames } from './adapter/stream.js'
+import { assertImageCapable, IMAGE_REJECTION_HINT, outboundImageCount } from './adapter/image-guard.js'
+import { readErrorDetail, rejectionError } from './adapter/rejection.js'
+import type { ErrorDetail } from './adapter/rejection.js'
 import type { CodeBuddyReadImage, NeutralizeText } from './adapter/wire.js'
 import { toWireMessages, toWireTools } from './adapter/wire.js'
 
@@ -68,38 +71,11 @@ export interface CodeBuddyAdapterOptions {
   onCatalogRead?: () => void
   /** 图片字节读取（官方附件 seam）；未配置时带图请求以明确错误失败。 */
   readImage?: CodeBuddyReadImage
+  /** 带图请求在模型事实为空时等待目录落定的上限（普通请求不等，避免给每次调用加延迟）。 */
+  awaitModels?: () => Promise<void>
   maxMode?: () => boolean
   /** 「自适应 API 拦截」开关（设置节驱动，缺省开）。 */
   autoAdapt?: () => boolean
-}
-
-/** 服务端错误体解析结果：code 供 11128 判定，msg 供错误透传。 */
-interface ErrorDetail {
-  code?: unknown
-  msg?: string
-}
-
-/** 400 错误体只解析一次：code 供 11128 判定，msg 供错误透传（避免二次读体）。 */
-async function readErrorDetail(response: Response): Promise<ErrorDetail> {
-  try {
-    const body = await response.json() as { code?: unknown; msg?: unknown }
-    return {
-      ...(body.code === undefined ? {} : { code: body.code }),
-      ...(body.msg === undefined ? {} : { msg: String(body.msg) }),
-    }
-  } catch {
-    // 非 JSON 错误体：交给状态码兜底
-    return {}
-  }
-}
-
-/** 非 2xx 响应 → LlmError（服务端 code/msg 原样透传，如 10081 ip whitelist）。 */
-function rejectionError(status: number, detail: ErrorDetail, hint?: string): never {
-  const text = detail.msg ?? (detail.code === undefined ? '' : 'code ' + String(detail.code))
-  const base = text.length > 0
-    ? 'CodeBuddy 请求被拒（HTTP ' + String(status) + '）：' + text
-    : 'CodeBuddy 请求失败（HTTP ' + String(status) + '）'
-  throw new LlmError(hint === undefined ? base : base + '（' + hint + '）', 'PROVIDER', { status })
 }
 
 /** CodeBuddy 推理适配器：请求编排、流取消/超时、模型事实投影、11128 有界降级。 */
@@ -127,7 +103,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
     })))
   }
 
-  override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+  override async resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
     const facts = this.config.models().find(entry => entry.id === model)
     const info: LlmResolvedModelInfo = {
       provider,
@@ -146,7 +122,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
           : {}),
       }
     }
-    return Promise.resolve(info)
+    return info
   }
 
   // 与官方基类同款命名（`_signal`）：本适配器不消费 prepare 期的取消信号
@@ -192,6 +168,15 @@ export class CodeBuddyAdapter extends LlmAdapter {
 
   /** 按指定正文变换构造请求体：阶梯每一格都从 options 重建，内容一致、只换变换。 */
   private async buildBody(options: GenerateOptions, neutralize: NeutralizeText): Promise<Record<string, unknown>> {
+    const images = outboundImageCount(options.messages)
+    let facts = this.config.models().find(entry => entry.id === options.model)
+    // 只有带图请求值得等目录落定（最多 IMAGE_FACTS_WAIT_MS）；普通请求不等待，避免给每次调用加延迟。
+    if (images > 0 && facts === undefined) {
+      await this.config.awaitModels?.()
+      facts = this.config.models().find(entry => entry.id === options.model)
+    }
+    // 先把图片能力判掉：纯文本 / 能力未知的模型不做无谓的附件读取与上游请求。
+    assertImageCapable(options.model, facts, images)
     const body: Record<string, unknown> = {
       model: options.model,
       messages: await toWireMessages(options, this.config.readImage, neutralize),
@@ -202,7 +187,6 @@ export class CodeBuddyAdapter extends LlmAdapter {
     if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens
     if (options.stop !== undefined && options.stop.length > 0) body.stop = options.stop
     // Max 模式（档位锁）开且模型有推理能力时强制 max，覆盖调用方档位。
-    const facts = this.config.models().find(entry => entry.id === options.model)
     const effort = effectiveReasoningEffort(
       this.config.maxMode?.() ?? false,
       facts?.reasoning === true,
@@ -224,6 +208,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
     // 记住的成功位置可能超出本次可用阶梯（开关被关过）：夹到范围内。
     const start = Math.min(this.rungIndex, rungs.length - 1)
     let exhausted: { status: number; detail: ErrorDetail } | undefined
+    const imageHint = outboundImageCount(options.messages) > 0
     for (const [offset, rung] of rungs.slice(start).entries()) {
       const index = start + offset
       const body = await this.buildBody(options, rung.transform)
@@ -245,7 +230,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
           this.rungIndex = Math.min(index + 1, rungs.length - 1)
           continue
         }
-        rejectionError(response.status, detail)
+        rejectionError(response.status, detail, imageHint && response.status === 400 ? IMAGE_REJECTION_HINT : undefined)
       }
       if (response.body === null) throw new LlmError('CodeBuddy 返回了空响应流', 'TRANSPORT')
       // 该格可用：记住位置，后续请求直接从它开始。

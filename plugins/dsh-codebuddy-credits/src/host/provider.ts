@@ -13,6 +13,7 @@ import { warnRegistrationFailure } from '../compat.js'
 import type { Config } from '../config.js'
 import {
   DISPLAY_NAME,
+  IMAGE_FACTS_WAIT_MS,
   IMAGE_REQUEST_POLICY,
   PROVIDER_ID,
   SETTINGS_NAMESPACE,
@@ -51,6 +52,8 @@ export interface ProviderDeps {
 export function installProvider(ctx: Context, config: Config, deps: ProviderDeps): ProviderHost {
   const adapter = new CodeBuddyAdapter({
     models: () => deps.models.list(),
+    // 只有带图请求在事实为空时才等目录（≤1s）；普通请求不等，模型信息解析保持即时。
+    awaitModels: () => deps.models.ready(IMAGE_FACTS_WAIT_MS),
     resolveApiKey: deps.credentials.resolveApiKey,
     account: () => deps.account.current(),
     streamIdleTimeoutMs: STREAM_IDLE_TIMEOUT_MS,

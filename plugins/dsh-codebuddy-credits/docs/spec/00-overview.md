@@ -17,7 +17,9 @@
 | 协议 | `src/adapter.ts` | 请求编排（body、fetch、错误透传、空闲超时、取消） |
 | 协议 | `src/adapter/wire.ts` | DSH 消息 / 工具 schema → CodeBuddy wire |
 | 协议 | `src/adapter/sse.ts` | SSE 数据行 → 帧 |
-| 协议 | `src/adapter/stream.ts` | 流状态机（块索引、终块、usage / finish） |
+| 协议 | `src/adapter/stream.ts` | 流状态机（块索引、终块、usage / finish、SSE 错误帧透出） |
+| 协议 | `src/adapter/image-guard.ts` | 图片能力预检（不支持 / 事实未加载时明确失败，带图 400 提示） |
+| 协议 | `src/adapter/rejection.ts` | 上游错误体解析与 LlmError 包装（code / msg 透传、带图提示） |
 | client 入口 | `src/client/index.ts` | 官方槽位注册、词典与样式统一注入 |
 | 额度入口 | `src/client/CodeBuddyCreditsIndicator.tsx` | 入口与槽位接线（trigger / hero portal / 面板挂载） |
 | 额度入口 | `src/client/hero.tsx` | hero portal 目标与几何测量 |
@@ -255,6 +257,15 @@ host 投影 / 事件重放、Max 模式以设置节为真值。`test/structure.t
   （表现仍是 400 / 11128）。
 - **图片只认最后一条 user 消息**：DSH 把运行上下文 / 技能目录追加在真实用户消息之后，故适配器合并连续
   user 消息；多轮对话里更早轮次的图片上游仍会丢弃（无法在插件侧消除）。
+- **图片能力=适配器声明的 `inputModalities`**：宿主据此做 prompt 门禁与纯文本模型的图片投影。事实是进程内
+  缓存，宿主重启后为空；**只有带图请求**在事实为空时先等目录落定（≤1s，`IMAGE_FACTS_WAIT_MS`，普通请求
+  不等待、保持即时），等不到且请求带图时适配器直接报「无法确认模型是否支持图片输入」/「模型不支持图片输入」，
+  不把图片漏给上游。上游仍可能对「声明支持图片」的模型回通用 400
+  （`the request parameters were rejected by the model provider`）——带图请求的 400 文案会追加
+  「该模型可能不支持图片输入」提示。
+- **上游流内错误帧**：HTTP 200 后错误也可能以 SSE 帧到达（OpenAI 方言 `{"error":{...}}`、CodeBuddy 方言
+  `{"code":<非0>,"msg":...}`）；`adapter/stream.ts` 识别后按 PROVIDER 错误抛出上游原文，不再吞成
+  「CodeBuddy 流在结束前中断」。
 - **手动刷新绕过 60s 冷却但复用上游单飞**：`loadFactsOnce` / `sameFacts` 是 `apply` 内闭包，路由测试只 mock
   `shared.refreshModels`，该组合路径目前没有单测覆盖（已知缺口）。
 
@@ -263,5 +274,6 @@ host 投影 / 事件重放、Max 模式以设置节为真值。`test/structure.t
 - 插件目录 `npm run verify`：typecheck → build（tsc + client bundle）→ test → pack。
 - 测试覆盖：契约常量单一来源、能力门 / DUPLICATE 文案、client 惰性门接线、样式统一注入与
   「组件内不得自建 style」、LAN 信任栅栏、正文指纹中和与自适应 API 拦截阶梯（11128 重试 / 成功格记忆 /
-  开关 / strip 兜底）、积分重放 / 投影、路由与请求体字节限流。
+  开关 / strip 兜底）、图片能力预检与带图 400 提示、SSE 错误帧透出、模型事实落定（`ready`）、
+  积分重放 / 投影、路由与请求体字节限流。
 - 真机验收：保存 / 清空 Key、模型选择器分组与目录角标、额度面板、会话 / 每轮积分胶囊与弹层。

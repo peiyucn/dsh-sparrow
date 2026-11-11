@@ -74,6 +74,11 @@ export const ACCOUNT_FETCH_TIMEOUT_MS = 5_000
 export const QUOTA_FETCH_TIMEOUT_MS = 10_000
 /** 后台模型刷新节流：宿主重建模型目录会触发刷新，这是两次尝试之间的最小间隔（密集重建时不连环打服务端）。 */
 export const MODEL_REFRESH_COOLDOWN_MS = 60_000
+/**
+ * **带图请求**在事实为空时等待模型目录落定的上限（普通请求不等待）。事实是进程内缓存，
+ * 宿主重启后为空；带图请求值得等这一拍再判定能力（最多 1s），避免把图片盲发给上游。
+ */
+export const IMAGE_FACTS_WAIT_MS = 1_000
 /** 未声明容量的模型的上下文窗口兜底值。 */
 export const DEFAULT_CONTEXT_WINDOW = 262_144
 /** 未声明容量的模型的最大输出兜底值。 */

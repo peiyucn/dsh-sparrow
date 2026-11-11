@@ -21,6 +21,11 @@ export interface ModelRoutes {
 
 export interface ModelFactsStore {
   list(): readonly CodeBuddyModelFacts[]
+  /**
+   * 等模型目录落定：已就绪立即返回；为空时触发一次刷新并等它（最多 `waitMs`），
+   * 超时/刷新被冷却挡住也照常返回（调用方按「事实仍未知」处理）。
+   */
+  ready(waitMs: number): Promise<void>
   /** save / reapply 落定：直接替换事实（代际由调用方先行自增）。 */
   set(entries: readonly CodeBuddyModelEntry[]): void
   reset(): void
@@ -112,6 +117,21 @@ export function createModelFacts(options: ModelFactsOptions): ModelFactsStore {
 
   return {
     list: () => facts,
+    async ready(waitMs) {
+      if (facts.length > 0) return
+      kick()
+      const pending = refreshInFlight
+      if (pending === undefined) return
+      let timer: ReturnType<typeof setTimeout> | undefined
+      try {
+        await Promise.race([
+          pending.catch(() => {}),
+          new Promise<void>((resolve) => { timer = setTimeout(resolve, waitMs) }),
+        ])
+      } finally {
+        if (timer !== undefined) clearTimeout(timer)
+      }
+    },
     set(entries) {
       facts = factsFromEntries(entries)
     },

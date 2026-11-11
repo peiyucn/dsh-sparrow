@@ -566,3 +566,147 @@ describe('CodeBuddyAdapter「自适应 API 拦截」阶梯（11128 有界降级�
     }
   })
 })
+
+describe('CodeBuddyAdapter 图片能力预检与上游错误文案', () => {
+  const IMAGE = { attachmentId: 'sha256:abc', mediaType: 'image/png', bytes: 4, width: 2, height: 2 }
+  /** 造一条模型事实（只需要 id / input / reasoning 三个字段参与判定）。 */
+  const factsOf = (input) => [{ id: 'm', name: 'M', contextWindow: 1000, maxTokens: 100, input, reasoning: false }]
+  const imageMessages = [{ id: 'm1', role: 'user', source: { kind: 'user' }, content: [{ type: 'image', attachment: IMAGE }] }]
+  const textMessages = [{ id: 'm1', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'hi' }] }]
+  const OK_SSE = [
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: 'ok' } }] }) + '\n\n',
+    'data: ' + JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1 } }) + '\n\n',
+  ].join('')
+
+  /** fetch 桩：记录调用次数，可读取最后一次请求体。 */
+  function stubFetch(factory) {
+    const state = { calls: 0, body: undefined }
+    globalThis.fetch = async (_url, init) => {
+      state.calls += 1
+      state.body = JSON.parse(init.body)
+      return factory(state.body)
+    }
+    return state
+  }
+
+  function makeAdapter(models, extra = {}) {
+    return new CodeBuddyAdapter({
+      models: () => models,
+      resolveApiKey: async () => 'test-key',
+      account: () => undefined,
+      streamIdleTimeoutMs: 1_000,
+      readImage: async () => ({ mediaType: 'image/png', data: new Uint8Array([1, 2, 3, 4]) }),
+      ...extra,
+    })
+  }
+
+  /** @param {any} adapter @param {any[]} messages */
+  async function drain(adapter, messages) {
+    for await (const chunk of adapter.stream({ provider: 'codebuddy-credits', model: 'm', system: 'sys', messages })) void chunk
+  }
+
+  it('纯文本模型 + 图片：直接报「不支持图片输入」，不发上游请求', async () => {
+    const state = stubFetch(() => new Response(OK_SSE, { status: 200 }))
+    try {
+      await assert.rejects(drain(makeAdapter(factsOf(['text'])), imageMessages), /模型 "m" 不支持图片输入/u)
+      assert.equal(state.calls, 0, '能力预检失败不得打上游')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('模型事实未加载 + 图片：明确报「无法确认」，不发上游请求', async () => {
+    const state = stubFetch(() => new Response(OK_SSE, { status: 200 }))
+    try {
+      await assert.rejects(drain(makeAdapter([]), imageMessages), /无法确认模型 "m" 是否支持图片输入/u)
+      assert.equal(state.calls, 0, '事实未知时不得把图片发给上游')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('视觉模型 + 图片：照常发送 image_url', async () => {
+    const state = stubFetch(() => new Response(OK_SSE, { status: 200 }))
+    try {
+      await drain(makeAdapter(factsOf(['text', 'image'])), imageMessages)
+      const body = /** @type {any} */ (state.body)
+      const users = body.messages.filter((message) => message.role === 'user')
+      assert.ok(users.at(-1).content.some((part) => part.type === 'image_url'), '图片必须以 image_url 发出')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('带图请求被 400 拒绝：追加「模型可能不支持图片输入」提示', async () => {
+    stubFetch(() => new Response(
+      JSON.stringify({ code: 400, msg: 'the request parameters were rejected by the model provider' }),
+      { status: 400, headers: { 'content-type': 'application/json' } },
+    ))
+    try {
+      await assert.rejects(drain(makeAdapter(factsOf(['text', 'image'])), imageMessages), (error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        assert.match(message, /the request parameters were rejected by the model provider/u)
+        assert.match(message, /该模型可能不支持图片输入/u)
+        return true
+      })
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('不带图的 400 不追加图片提示', async () => {
+    stubFetch(() => new Response(
+      JSON.stringify({ code: 10081, msg: 'ip not in whitelist' }),
+      { status: 400, headers: { 'content-type': 'application/json' } },
+    ))
+    try {
+      await assert.rejects(drain(makeAdapter(factsOf(['text'])), textMessages), (error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        assert.match(message, /ip not in whitelist/u)
+        assert.ok(!message.includes('图片'), '无图请求不得追加图片提示')
+        return true
+      })
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('SSE 错误帧（OpenAI 方言）：透出上游文案，不吞成「结束前中断」', async () => {
+    const body = 'data: ' + JSON.stringify({ error: { message: 'image input is not supported by this model' } }) + '\n\n'
+    stubFetch(() => new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } }))
+    try {
+      await assert.rejects(drain(makeAdapter(factsOf(['text', 'image'])), textMessages), /image input is not supported by this model/u)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('SSE 错误帧（CodeBuddy 方言 {code,msg}）：同样透出文案', async () => {
+    const body = 'data: ' + JSON.stringify({ code: 400, msg: '模型不支持图片' }) + '\n\n'
+    stubFetch(() => new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } }))
+    try {
+      await assert.rejects(drain(makeAdapter(factsOf(['text', 'image'])), textMessages), /模型不支持图片/u)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('带图且事实为空：先等目录落定（有上限）再判定，落定后照常发图', async () => {
+    let loaded = false
+    const state = stubFetch(() => new Response(OK_SSE, { status: 200 }))
+    try {
+      const adapter = new CodeBuddyAdapter({
+        models: () => loaded ? factsOf(['text', 'image']) : [],
+        awaitModels: async () => { loaded = true },
+        resolveApiKey: async () => 'test-key',
+        account: () => undefined,
+        streamIdleTimeoutMs: 1_000,
+        readImage: async () => ({ mediaType: 'image/png', data: new Uint8Array([1, 2, 3, 4]) }),
+      })
+      await drain(adapter, imageMessages)
+      assert.equal(state.calls, 1, '目录落定后应按视觉模型正常请求')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+})
