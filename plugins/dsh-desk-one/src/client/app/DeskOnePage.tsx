@@ -290,6 +290,7 @@ export function DeskOnePage(props: DeskPanelProps) {
                 openTasks: taskData.tasks.filter(task => task.status !== 'done' && !task.archived).length,
                 activeSessions: sessionSnapshot.sessions.filter(session => session.availability !== 'archived').length,
                 onAddNote: () => { selectTab('notes'); void addNote() },
+        onOpenNotebook: () => { selectTab('notebook') },
                 onAddTask: () => { selectTab('tasks'); board.beginDraft('todo') },
                 onOpenNotes: () => selectTab('notes'),
                 onOpenTasks: () => selectTab('tasks'),
