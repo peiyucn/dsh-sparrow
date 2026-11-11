@@ -68,6 +68,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const [overlay, setOverlay] = useState<OverlayKind | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [blocked, setBlocked] = useState(false)
+  /** Re-attach panel: new target path typed by the user. */
+  const [reanchor, setReanchor] = useState<string | null>(null)
 
   const labels = useMemo(() => ({
     code: { copyLabel: t('review.copy'), copiedLabel: t('review.copied') },
@@ -189,9 +191,24 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
           ? (
               <div className="dsh-desk-review-card">
                 <p className="dsh-desk-notebook-hint">{t('review.pageUnavailable')}</p>
+                {review === null
+                  ? null
+                  : (
+                      <p className="dsh-desk-notebook-hint">
+                        {t('review.targetHint', { title: review.target.title, path: review.target.path })}
+                      </p>
+                    )}
                 <div className="dsh-desk-review-actions">
-                  <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={() => { void load() }}>
+                  <button type="button" className="dsh-desk-btn" onClick={() => { void load() }}>
                     {t('review.refresh')}
+                  </button>
+                  <button
+                    type="button"
+                    className="dsh-desk-action dsh-desk-action-primary"
+                    disabled={review === null}
+                    onClick={() => setReanchor(review?.target.path ?? '')}
+                  >
+                    {t('review.reanchor')}
                   </button>
                 </div>
               </div>
@@ -218,6 +235,36 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                 </div>
               </div>
             )}
+      {reanchor === null || review === null
+        ? null
+        : (
+            <div className="dsh-desk-review-composer">
+              <p className="dsh-desk-notebook-hint">{t('review.reanchorHint')}</p>
+              <input
+                className="dsh-desk-review-input"
+                value={reanchor}
+                placeholder={review.target.path}
+                onChange={event => setReanchor(event.target.value)}
+              />
+              <div className="dsh-desk-review-actions">
+                <button type="button" className="dsh-desk-btn" onClick={() => setReanchor(null)}>{t('review.cancel')}</button>
+                <button
+                  type="button"
+                  className="dsh-desk-action dsh-desk-action-primary"
+                  disabled={reanchor.trim() === ''}
+                  onClick={() => {
+                    const nextPath = reanchor.trim()
+                    void reviewApi
+                      .updateTarget({ id: review.id, expectedRevision: review.revision, cwd: review.target.cwd, path: nextPath })
+                      .then(() => { setReanchor(null); setBaseline(null); void load() })
+                      .catch((cause: unknown) => setNotice(t('review.reanchorFailed', { message: messageOf(cause) })))
+                  }}
+                >
+                  {t('review.reanchorConfirm')}
+                </button>
+              </div>
+            </div>
+          )}
       {composer === null ? null : (
         <div className="dsh-desk-review-composer">
           <p className="dsh-desk-review-quote">{quoteBlock(composer.quote)}</p>

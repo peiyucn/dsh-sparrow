@@ -11,6 +11,7 @@ import type { ReviewApi } from './review-api.js'
 import type {
   ConversationLike, LayoutLike, SessionNavigationLike, SessionsLike, SidebarRightLike, TabRecordLike,
 } from './faces.js'
+import { invalidateReviewBadges } from './review-badges.js'
 
 /** Stable implementation id (the slot registration key and the tab definition id). */
 export const REVIEW_TAB_ID = 'dsh-desk-one-note-review'
@@ -103,6 +104,7 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
         if (review === undefined) {
           const sessionId = await sessions.create({ cwd: input.cwd })
           review = await api.create({ sessionId, cwd: input.cwd, path: input.path })
+          invalidateReviewBadges()
         }
         // Opening a review tab needs the conversation surface on screen.
         layout?.selectPanel(null)

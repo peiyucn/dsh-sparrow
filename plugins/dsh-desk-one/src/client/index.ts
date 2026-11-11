@@ -6,7 +6,7 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { PACKAGE_NAME } from '../constants.js'
+import { LOCALE_NAMESPACE, PACKAGE_NAME } from '../constants.js'
 import * as api from './notes/api.js'
 import * as taskApi from './tasks/api.js'
 import { DeskOnePage } from './app/DeskOnePage.js'
@@ -17,6 +17,7 @@ import { reviewApi } from './notebook/review-api.js'
 import { createWorkspaceAccess, type UiWorkspaceLike as NotebookNavigationLike, type WorkspacesServiceLike } from './notebook/workspaces.js'
 import { createReviewBridge } from './notebook/review-bridge.js'
 import { mountNoteReviewTab } from './notebook/register.js'
+import { configureReviewBadges, SessionReviewBadge } from './notebook/review-badges.js'
 import type { LayoutLike, SessionNavigationLike, SessionsLike, SidebarRightLike } from './notebook/faces.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
@@ -57,6 +58,7 @@ export function apply(ctx: ClientContext): void {
   // Review tab + hand-off: each underlying service is optional, so the shelf degrades to
   // read-only when the host does not expose the right sidebar or the session scope.
   const review = createReviewBridge(reviewApi)
+  configureReviewBadges(reviewApi)
   ctx.inject(['layout'], (layoutCtx) => {
     const detach = review.attachLayout(layoutCtx.get('layout') as unknown as LayoutLike)
     layoutCtx.effect(() => detach, `${PACKAGE_NAME}: review layout`)
@@ -78,6 +80,12 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(['sidebarRightTabs'], (tabCtx) => {
     mountNoteReviewTab(tabCtx, reviewApi, review)
   })
+  // Review sessions are ordinary DSH sessions; a trailing badge marks them in the browser row.
+  ctx.slots.inject('sidebar.session.row.trailing', () => ctx.slots.register({
+    name: 'sidebar.session.row.trailing',
+    id: 'dsh-desk-one-review-badge',
+    locale: LOCALE_NAMESPACE,
+  }, SessionReviewBadge))
 
   installDeskClient(ctx, {
     page: DeskOnePage,
