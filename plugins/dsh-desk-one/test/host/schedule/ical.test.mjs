@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { parseIcsEvents } from '../../../lib/host/schedule/ical.js'
+import { cleanDescription, parseIcsEvents } from '../../../lib/host/schedule/ical.js'
 import { ScheduleError } from '../../../lib/host/schedule/types.js'
 
 const WINDOW = { startUtc: '2026-11-01T00:00:00.000Z', endUtc: '2026-12-01T00:00:00.000Z' }
@@ -106,6 +106,23 @@ END:VCALENDAR
 const DST_WINDOW = { startUtc: '2026-03-01T00:00:00.000Z', endUtc: '2026-05-01T00:00:00.000Z' }
 
 describe('parseIcsEvents: single, all-day and window filtering', () => {
+
+describe('cleanDescription（来源客户端塞进来的排版噪音）', () => {
+  it('去掉字面 \\r 转义、CRLF 与纯点分隔线', () => {
+    const raw = '地址：南京\r\n24日报道\r\n....................................................................................................\r\n包含1个附件\r\n....................................................................................................\r'
+    const cleaned = cleanDescription(raw)
+    assert.equal(cleaned, '地址：南京\n24日报道\n包含1个附件')
+  })
+
+  it('真实换行/回车混排也能收拾，并折叠多余空行', () => {
+    const raw = '第一行\r\n\r\n\r\n第二行   \n-----\n第三行'
+    assert.equal(cleanDescription(raw), '第一行\n\n第二行\n第三行')
+  })
+
+  it('正常描述原样保留', () => {
+    assert.equal(cleanDescription('带三点省略号的句子… 正常'), '带三点省略号的句子… 正常')
+  })
+})
   const events = parseIcsEvents(WECOM_ICS, { provider: 'wecom', calendarRemoteId: 'calendar-1', window: WINDOW })
 
   it('maps a timed event to UTC and keeps its original TZID', () => {
