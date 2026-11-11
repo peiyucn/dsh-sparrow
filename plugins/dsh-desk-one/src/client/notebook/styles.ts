@@ -123,6 +123,15 @@ export const NOTEBOOK_CSS = `
   color: #a86500;
   font-size: 10px;
 }
+.dsh-desk-notebook-row-review {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-interactive-bg-secondary, rgba(0, 0, 0, 0.06));
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 10px;
+  white-space: nowrap;
+}
 .dsh-desk-notebook-row-date {
   flex: none;
   color: var(--dsw-alias-label-caption, #8a919f);

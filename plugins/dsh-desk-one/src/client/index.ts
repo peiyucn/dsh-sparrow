@@ -88,6 +88,7 @@ export function apply(ctx: ClientContext): void {
       workspaceAccess,
       review,
       startReview: review.start,
+      reviewApi,
       listNotes: api.listNotes,
       createNote: api.createNote,
       updateNote: api.updateNote,

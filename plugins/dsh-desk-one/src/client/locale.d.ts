@@ -26,6 +26,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'notebook.emptyLibrary'
       | 'notebook.emptyLibraryBody'
       | 'notebook.missingBadge'
+      | 'notebook.reviewCount'
       | 'review.tabTitle'
       | 'review.fields'
       | 'review.body'

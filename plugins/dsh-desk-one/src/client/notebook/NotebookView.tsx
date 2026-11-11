@@ -11,6 +11,7 @@ import type { ReactElement } from 'react'
 import type { NoteIndexEntry, NotebookStateResponse } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import { messageOf } from '../app/utils.js'
+import type { ReviewApi } from './review-api.js'
 import type { NotebookApi } from './api.js'
 import type { WorkspaceAccess } from './workspaces.js'
 
@@ -22,8 +23,10 @@ function ShelfRow(props: {
   readonly t: DeskTranslator
   readonly entry: NoteIndexEntry
   readonly onOpen?: (path: string) => void
+  /** How many review sessions point at this file. */
+  readonly reviewCount?: number
 }): ReactElement {
-  const { t, entry, onOpen } = props
+  const { t, entry, onOpen, reviewCount } = props
   const content = (
     <>
       <span className="dsh-desk-notebook-row-title">{entry.title}</span>
@@ -33,6 +36,7 @@ function ShelfRow(props: {
         {entry.tags.slice(0, 3).map(tag => <span key={tag} className="dsh-desk-notebook-tag">{tag}</span>)}
       </span>
       {entry.date === undefined ? null : <span className="dsh-desk-notebook-row-date">{entry.date}</span>}
+      {reviewCount === undefined || reviewCount === 0 ? null : <span className="dsh-desk-notebook-row-review">{t('notebook.reviewCount', { count: reviewCount })}</span>}
     </>
   )
   if (onOpen === undefined) return <div className="dsh-desk-notebook-row">{content}</div>
@@ -50,6 +54,8 @@ export function NotebookView(props: {
   readonly workspaceAccess: WorkspaceAccess
   /** Start (or continue) the review of one file: the shell creates the review session. */
   readonly onStartReview?: (input: { readonly cwd: string; readonly path: string }) => void
+  /** Review links surface: one badge per row showing how many reviews the file has. */
+  readonly reviewApi?: ReviewApi
 }): ReactElement {
   const { t, notebook, workspaceAccess } = props
   const [state, setState] = useState<NotebookStateResponse | null>(null)
@@ -96,6 +102,24 @@ export function NotebookView(props: {
   const rows = results ?? state?.recent ?? []
   const onStartReview = props.onStartReview
   const rootPath = state?.config?.rootPath
+  const reviewApi = props.reviewApi
+  const [reviewCounts, setReviewCounts] = useState<ReadonlyMap<string, number>>(new Map())
+
+  // One list call per library root: per-row review counts come from that map, not N requests.
+  useEffect(() => {
+    if (reviewApi === undefined || rootPath === undefined) { setReviewCounts(new Map()); return }
+    let cancelled = false
+    void reviewApi.list({ cwd: rootPath }).then(reviews => {
+      if (cancelled) return
+      const counts = new Map<string, number>()
+      for (const review of reviews) {
+        const key = review.target.path
+        counts.set(key, (counts.get(key) ?? 0) + 1)
+      }
+      setReviewCounts(counts)
+    }, () => { if (!cancelled) setReviewCounts(new Map()) })
+    return () => { cancelled = true }
+  }, [reviewApi, rootPath])
 
   /** DSH's own workspace creation: pick a folder, register it, then point the library at it. */
   const createLibrary = useCallback(async (): Promise<void> => {
@@ -224,6 +248,7 @@ export function NotebookView(props: {
                           key={entry.path}
                           t={t}
                           entry={entry}
+                          reviewCount={reviewCounts.get(entry.path)}
                           {...rootPath === undefined || onStartReview === undefined
                             ? {}
                             : { onOpen: (path: string) => onStartReview({ cwd: rootPath, path }) }}

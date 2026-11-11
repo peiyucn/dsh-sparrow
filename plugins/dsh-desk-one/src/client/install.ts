@@ -22,6 +22,7 @@ import type { ScheduleApi } from './schedule/api.js'
 import type { NotebookApi } from './notebook/api.js'
 import type { WorkspaceAccess } from './notebook/workspaces.js'
 import type { ReviewBridge, ReviewStartInput } from './notebook/review-bridge.js'
+import type { ReviewApi } from './notebook/review-api.js'
 import { attachMainPanel } from './panel.js'
 import { ensureDeskStyles } from './styles.js'
 
@@ -94,6 +95,8 @@ export interface DeskPanelInjected {
   readonly review: ReviewBridge
   /** Continue or start the review of one file (creates a review session). */
   readonly startReview: (input: ReviewStartInput) => Promise<boolean>
+  /** Review links data surface (history badges on the notebook rows). */
+  readonly reviewApi: ReviewApi
 }
 
 /** Browser-side pieces injected at the entry (supplied by index.ts; tests may pass stubs). */

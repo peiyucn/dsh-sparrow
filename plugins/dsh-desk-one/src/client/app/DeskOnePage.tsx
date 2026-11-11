@@ -44,7 +44,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     listNotes, updateNote, deleteNote, createNote, t,
     listTasks, createTask, updateTask, deleteTask,
     listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink, sessionsArchive, schedule,
-    notebook, workspaceAccess, startReview,
+    notebook, workspaceAccess, startReview, reviewApi,
   } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
   /** Guards double-click / double-tap while one create request is in flight. */
@@ -211,6 +211,7 @@ export function DeskOnePage(props: DeskPanelProps) {
       t={t}
       notebook={notebook}
       workspaceAccess={workspaceAccess}
+      reviewApi={reviewApi}
       onStartReview={input => { void startReview(input) }}
     />
   )
