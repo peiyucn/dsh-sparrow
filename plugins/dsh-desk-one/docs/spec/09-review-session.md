@@ -82,6 +82,9 @@ kind: 'review'
    但把 `dsh-resource://file/session/<sessionId>/<path>` 还原成「工作区根 + 相对路径」还需要
    Session cwd 的客户端读取面，**v1 未接**；当前入口只有笔记页（任意工作区文件可通过笔记库
    指向其所在目录间接使用）。
+   后续实现路径已确认可行：`sessions.list` 的 `SessionSummary.cwd` 提供会话工作区根，
+   加上 `TabRecord.contentId`（`dsh-resource://file/session/<sessionId>/<path>`）即可还原
+   「cwd + 相对路径」，无需私有 seam。
 
 流程：
 
