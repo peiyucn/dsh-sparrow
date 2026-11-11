@@ -76,7 +76,7 @@ export function apply(ctx: ClientContext): void {
     navigationCtx.effect(() => detach, `${PACKAGE_NAME}: review navigation`)
   })
   ctx.inject(['sidebarRightTabs'], (tabCtx) => {
-    mountNoteReviewTab(tabCtx, reviewApi)
+    mountNoteReviewTab(tabCtx, reviewApi, review)
   })
 
   installDeskClient(ctx, {

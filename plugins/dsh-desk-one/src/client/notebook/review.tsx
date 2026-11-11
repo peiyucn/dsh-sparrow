@@ -1,52 +1,101 @@
 /**
- * Review tab body (stage 3, document reading only).
+ * Review tab body: the reviewed file, a compose popup, and a bottom overlay for the
+ * pending annotation batch and this round's diff.
  *
- * This tab renders the file being reviewed. A review directive belongs to the review
- * conversation, not to the stateless file; the quoting/session flow arrives with the
- * review-session work that follows.
+ * All annotation state is tab-local (never persisted): a directive belongs to the
+ * review conversation. The tab is kept mounted, and closing it with unsaved
+ * annotations asks for confirmation instead of silently dropping them.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
-import { MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  DiffBlock, DisclosureRow, IconInspectOutlineRegular, MarkdownText, diffTotals,
+} from '@deepseek-ai/dsh-client-ui-primitives'
+import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import type { DeskReview, ReviewPageResponse } from '../../contract.js'
 import type { ReviewApi } from './review-api.js'
-import type { NoteReviewParams } from './review-bridge.js'
+import { messageOf } from '../app/utils.js'
+import type { NoteReviewParams, ReviewBridge } from './review-bridge.js'
 
 /** What the tab receives from the client entry. */
 export interface NoteReviewInjected {
   readonly reviewApi: ReviewApi
+  readonly bridge: ReviewBridge
+  readonly sessionId: string
 }
 
 type ReviewProps = PropsRuntime<'sidebar.right.pane.tab'> & InjectFace<NoteReviewInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
 
-/** Notes review tab: the page under review. */
+/** One unsaved annotation: the selected text plus the user's request. */
+interface PendingAnnotation {
+  readonly id: string
+  readonly quote: string
+  readonly text: string
+}
+
+/** Which bottom overlay is open. */
+type OverlayKind = 'pending' | 'diff'
+
+/** Cap one quote so a batch message stays readable. */
+const QUOTE_MAX_CHARS = 2_000
+
+/** Quote one passage as a markdown blockquote. */
+function quoteBlock(quote: string): string {
+  return quote.split('\n').map(line => `> ${line}`).join('\n')
+}
+
+/** Notes review tab: read, annotate, submit the batch. */
 export function NoteReviewTab(props: ReviewProps): ReactElement {
-  const { t, reviewApi, useTabInfo } = props
+  const { t, reviewApi, bridge, sessionId, useTabInfo } = props
   const info = useTabInfo()
   const params = info.tab.navigation.params as NoteReviewParams | undefined
   const reviewId = params?.reviewId
+  const tabId = info.tab.id
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+
   const [review, setReview] = useState<DeskReview | null>(null)
   const [page, setPage] = useState<ReviewPageResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  /** Body snapshot when this tab (or the last baseline move) started. */
+  const [baseline, setBaseline] = useState<string | null>(null)
+  const [pending, setPending] = useState<readonly PendingAnnotation[]>([])
+  const [composer, setComposer] = useState<{ readonly quote: string } | null>(null)
+  const [draft, setDraft] = useState('')
+  const [overlay, setOverlay] = useState<OverlayKind | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [blocked, setBlocked] = useState(false)
 
-  const labels = {
+  const labels = useMemo(() => ({
     code: { copyLabel: t('review.copy'), copiedLabel: t('review.copied') },
     footnotes: t('review.footnotes'),
-  }
+  }), [t])
+  const diffLabels = useMemo<DiffBlockLabels>(() => ({
+    codeLabel: t('review.text'),
+    wrapLabel: t('review.wrap'),
+    unwrapLabel: t('review.unwrap'),
+    copy: t('review.copy'),
+    copied: t('review.copied'),
+    collapseAria: t('review.collapse'),
+    expandAria: (hidden: number) => t('review.expand', { hidden }),
+    collapse: t('review.collapse'),
+    expand: (hidden: number) => t('review.expand', { hidden }),
+  }), [t])
 
   const load = useCallback(async (): Promise<void> => {
     if (reviewId === undefined) { setLoading(false); return }
     setLoading(true)
     setError(null)
     try {
-      setReview(await reviewApi.get(reviewId))
-      setPage(await reviewApi.page(reviewId))
+      const [nextReview, nextPage] = await Promise.all([reviewApi.get(reviewId), reviewApi.page(reviewId)])
+      setReview(nextReview)
+      setPage(nextPage)
+      setBaseline(current => current ?? nextPage.body)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setError(messageOf(cause))
     } finally {
       setLoading(false)
     }
@@ -54,20 +103,86 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
 
   useEffect(() => { void load() }, [load])
 
+  // The tab owns the unsaved-work guard: tell the bridge how much is pending.
+  useEffect(() => {
+    bridge.setPending(tabId, pending.length)
+    return () => { bridge.setPending(tabId, 0) }
+  }, [bridge, pending.length, tabId])
+
+  // A blocked close asks the user to confirm in place.
+  useEffect(() => bridge.onCloseBlocked(id => { if (id === tabId) setBlocked(true) }), [bridge, tabId])
+
+  // Closing the browser window with unsaved annotations gets the standard prompt.
+  useEffect(() => {
+    if (pending.length === 0) return
+    const warn = (event: BeforeUnloadEvent): void => { event.preventDefault() }
+    window.addEventListener('beforeunload', warn)
+    return () => { window.removeEventListener('beforeunload', warn) }
+  }, [pending.length])
+
+  /** Selection → compose popup (the document itself keeps its size). */
+  const handleSelect = useCallback((): void => {
+    const container = bodyRef.current
+    const selection = window.getSelection()
+    if (container === null || selection === null || selection.isCollapsed) return
+    const anchorNode = selection.anchorNode
+    if (anchorNode === null || !container.contains(anchorNode)) return
+    const quote = selection.toString().trim().slice(0, QUOTE_MAX_CHARS)
+    if (quote === '') return
+    setComposer({ quote })
+    setDraft('')
+    setNotice(null)
+  }, [])
+
+  const addPending = useCallback((): void => {
+    if (composer === null || draft.trim() === '') return
+    setPending(current => [...current, {
+      id: `${Date.now()}-${current.length}`,
+      quote: composer.quote,
+      text: draft.trim(),
+    }])
+    setComposer(null)
+    setDraft('')
+  }, [composer, draft])
+
+  /** Submit the whole batch as one numbered message in the composer (never sends). */
+  const submitAll = useCallback((): void => {
+    if (pending.length === 0) return
+    const text = pending
+      .map((item, index) => `【批注 ${index + 1}】\n${quoteBlock(item.quote)}\n${item.text}`)
+      .join('\n\n')
+    const accepted = bridge.sendQuote(sessionId, text)
+    if (accepted) {
+      setPending([])
+      setOverlay(null)
+      setNotice(t('review.submitted'))
+    } else {
+      setNotice(t('review.submitFailed'))
+    }
+  }, [bridge, pending, sessionId, t])
+
+  const diff = baseline !== null && page !== null && baseline !== page.body
+    ? { oldText: baseline, newText: page.body }
+    : null
+  const totals = diff === null ? null : diffTotals([{ path: page?.path ?? '', oldText: diff.oldText, newText: diff.newText }])
+
   if (reviewId === undefined) {
     return <div className="dsh-desk-review"><p className="dsh-desk-notebook-hint">{t('review.noPath')}</p></div>
   }
 
+  const title = review?.target.title ?? page?.title ?? review?.target.path ?? ''
+
   return (
     <div className="dsh-desk-review">
       <header className="dsh-desk-review-head">
-        <span className="dsh-desk-review-path" title={review?.target.path ?? page?.path ?? ''}>{review?.target.path ?? page?.path ?? ''}</span>
+        <span className="dsh-desk-review-path" title={review?.target.path ?? page?.path ?? ''}>{title}</span>
         {page === null ? null : <span className="dsh-desk-review-kind">{page.kind === 'markdown' ? 'MD' : 'TXT'}</span>}
         <button type="button" className="dsh-desk-btn" disabled={loading} onClick={() => { void load() }}>
           {t('review.refresh')}
         </button>
       </header>
       {error === null ? null : <p className="dsh-desk-notebook-error">{t('state.loadFailed', { message: error })}</p>}
+      {notice === null ? null : <p className="dsh-desk-review-notice">{notice}</p>}
       {loading
         ? <p className="dsh-desk-notebook-hint">{t('state.loading')}</p>
         : page === null
@@ -96,16 +211,139 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                         ))}
                       </section>
                     )}
-                <section className="dsh-desk-review-card">
-                  <h4>{t('review.body')}</h4>
-                  <div className="dsh-desk-review-body">
-                    {page.kind === 'markdown'
-                      ? <MarkdownText text={page.body} labels={labels} omitHtml />
-                      : <pre className="dsh-desk-review-text">{page.body}</pre>}
-                  </div>
-                </section>
+                <div ref={bodyRef} className="dsh-desk-review-body" onMouseUp={handleSelect}>
+                  {page.kind === 'markdown'
+                    ? <MarkdownText text={page.body} labels={labels} omitHtml />
+                    : <pre className="dsh-desk-review-text">{page.body}</pre>}
+                </div>
               </div>
             )}
+      {composer === null ? null : (
+        <div className="dsh-desk-review-composer">
+          <p className="dsh-desk-review-quote">{quoteBlock(composer.quote)}</p>
+          <textarea
+            className="dsh-desk-review-input"
+            value={draft}
+            placeholder={t('review.placeholder')}
+            onChange={event => setDraft(event.target.value)}
+          />
+          <div className="dsh-desk-review-actions">
+            <button type="button" className="dsh-desk-btn" onClick={() => setComposer(null)}>{t('review.cancel')}</button>
+            <button
+              type="button"
+              className="dsh-desk-action dsh-desk-action-primary"
+              disabled={draft.trim() === ''}
+              onClick={addPending}
+            >
+              {t('review.addToPending')}
+            </button>
+          </div>
+        </div>
+      )}
+      {overlay === 'pending'
+        ? (
+            <div className="dsh-desk-review-layer">
+              <div className="dsh-desk-review-layerhead">
+                <h4>{t('review.pendingTitle', { count: pending.length })}</h4>
+                <button type="button" className="dsh-desk-action dsh-desk-action-primary" disabled={pending.length === 0} onClick={submitAll}>
+                  {t('review.submitAll')}
+                </button>
+              </div>
+              {pending.length === 0
+                ? <p className="dsh-desk-notebook-hint">{t('review.pendingEmpty')}</p>
+                : pending.map((item, index) => (
+                    <div className="dsh-desk-review-pending" key={item.id}>
+                      <span className="dsh-desk-review-pending-no">{index + 1}</span>
+                      <div className="dsh-desk-review-pending-main">
+                        <p className="dsh-desk-review-quote dsh-desk-review-quote-inline">{quoteBlock(item.quote)}</p>
+                        <p className="dsh-desk-review-pending-text">{item.text}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="dsh-desk-review-mini"
+                        onClick={() => setPending(current => current.filter(entry => entry.id !== item.id))}
+                      >
+                        {t('review.delete')}
+                      </button>
+                    </div>
+                  ))}
+            </div>
+          )
+        : null}
+      {overlay === 'diff'
+        ? (
+            <div className="dsh-desk-review-layer">
+              <div className="dsh-desk-review-layerhead">
+                <h4>{t('review.changes')}</h4>
+                <button type="button" className="dsh-desk-review-mini" disabled={page === null} onClick={() => setBaseline(page?.body ?? null)}>
+                  {t('review.rebaseline')}
+                </button>
+              </div>
+              {diff === null || totals === null
+                ? <p className="dsh-desk-notebook-hint">{t('review.diffEmpty')}</p>
+                : (
+                    <DisclosureRow
+                      icon={<IconInspectOutlineRegular />}
+                      title={t('review.changes')}
+                      open
+                      expandable={false}
+                      onToggle={() => undefined}
+                      collapsedContent={(
+                        <>
+                          <span className="dsh-desk-review-diffadded">{` +${totals.added}`}</span>
+                          <span className="dsh-desk-review-diffremoved">{` -${totals.removed}`}</span>
+                        </>
+                      )}
+                    >
+                      <DiffBlock
+                        diffs={[{ path: page?.path ?? '', oldText: diff.oldText, newText: diff.newText }]}
+                        labels={diffLabels}
+                        maxLines={200}
+                      />
+                    </DisclosureRow>
+                  )}
+            </div>
+          )
+        : null}
+      {blocked
+        ? (
+            <div className="dsh-desk-review-blocker">
+              <p>{t('review.closeBlocked', { count: pending.length })}</p>
+              <div className="dsh-desk-review-actions">
+                <button type="button" className="dsh-desk-btn" onClick={() => setBlocked(false)}>{t('review.keepEditing')}</button>
+                <button type="button" className="dsh-desk-review-mini dsh-desk-review-danger" onClick={() => { setBlocked(false); bridge.forceClose(tabId) }}>
+                  {t('review.closeAnyway')}
+                </button>
+              </div>
+            </div>
+          )
+        : null}
+      <div className="dsh-desk-review-bar">
+        <button
+          type="button"
+          className="dsh-desk-review-baritem"
+          data-active={overlay === 'pending'}
+          onClick={() => setOverlay(current => current === 'pending' ? null : 'pending')}
+        >
+          {t('review.pendingBar', { count: pending.length })}
+        </button>
+        <button
+          type="button"
+          className="dsh-desk-review-baritem"
+          data-active={overlay === 'diff'}
+          onClick={() => setOverlay(current => current === 'diff' ? null : 'diff')}
+        >
+          {t('review.changes')}{' '}
+          {totals === null
+            ? '—'
+            : (
+                <>
+                  <span className="dsh-desk-review-diffadded">{`+${totals.added}`}</span>
+                  <span className="dsh-desk-review-diffremoved">{` -${totals.removed}`}</span>
+                </>
+              )}
+        </button>
+      </div>
     </div>
   )
 }

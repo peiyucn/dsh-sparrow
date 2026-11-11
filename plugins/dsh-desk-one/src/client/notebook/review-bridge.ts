@@ -1,13 +1,16 @@
 /**
- * Review bridge: starts or continues a review session and opens the review tab.
+ * Review bridge: starts or continues a review session, opens the review tab, hands the
+ * pending annotations to the composer, and guards the tab's close when work is unsaved.
  *
- * A review is a DSH session of its own: creating one never depends on a current
- * Session being open, and continuing one reuses the most recent review of the file.
+ * A review is a DSH session of its own: creating one never depends on a current Session
+ * being open, and continuing one reuses the most recent review of the file.
  */
 
 import type { DeskReview } from '../../contract.js'
 import type { ReviewApi } from './review-api.js'
-import type { LayoutLike, SessionNavigationLike, SessionsLike, SidebarRightLike } from './faces.js'
+import type {
+  ConversationLike, LayoutLike, SessionNavigationLike, SessionsLike, SidebarRightLike, TabRecordLike,
+} from './faces.js'
 
 /** Stable implementation id (the slot registration key and the tab definition id). */
 export const REVIEW_TAB_ID = 'dsh-desk-one-note-review'
@@ -42,6 +45,14 @@ export interface ReviewBridge {
    * @returns whether the tab was asked to open.
    */
   open(reviewId: string): boolean
+  /** Put one pending batch into the session composer (never sends). */
+  sendQuote(sessionId: string, text: string): boolean
+  /** Report how many unsaved annotations one tab holds (0 clears the guard). */
+  setPending(tabId: string, count: number): void
+  /** Subscribe to "a close was blocked because of unsaved work". */
+  onCloseBlocked(listener: (tabId: string) => void): () => void
+  /** Close one tab, bypassing the unsaved-work guard once. */
+  forceClose(tabId: string): void
   attachLayout(service: LayoutLike): () => void
   attachSidebar(service: SidebarRightLike): () => void
   attachSessions(service: SessionsLike): () => void
@@ -59,6 +70,11 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
   let sidebarRight: SidebarRightLike | undefined
   let sessions: SessionsLike | undefined
   let navigation: SessionNavigationLike | undefined
+  /** Unsaved annotation count per tab id. */
+  const pending = new Map<string, number>()
+  /** Tabs whose next close must skip the guard. */
+  const bypass = new Set<string>()
+  const closeBlocked = new Set<(tabId: string) => void>()
 
   const openTab = (reviewId: string): boolean => {
     const sidebar = sidebarRight
@@ -91,7 +107,6 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
         // Opening a review tab needs the conversation surface on screen.
         layout?.selectPanel(null)
         navigation.openSession(review.sessionId)
-        // Let the selection render before opening the sidebar page.
         setTimeout(() => { openTab(review.id) }, 0)
         return true
       } catch {
@@ -102,13 +117,44 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
       layout?.selectPanel(null)
       return openTab(reviewId)
     },
+    sendQuote(sessionId, text) {
+      const scope = sessions?.scope(sessionId)
+      const conversation = scope?.get('conversation') as ConversationLike | undefined
+      if (scope === undefined || conversation === undefined) return false
+      const input = conversation.input.for(scope)
+      const accepted = input.insertQuote(text)
+      if (accepted) input.focus()
+      return accepted
+    },
+    setPending(tabId, count) {
+      if (count <= 0) pending.delete(tabId)
+      else pending.set(tabId, count)
+    },
+    onCloseBlocked(listener) {
+      closeBlocked.add(listener)
+      return () => { closeBlocked.delete(listener) }
+    },
+    forceClose(tabId) {
+      bypass.add(tabId)
+      sidebarRight?.close(tabId)
+    },
     attachLayout(service) {
       layout = service
       return () => { if (layout === service) layout = undefined }
     },
     attachSidebar(service) {
       sidebarRight = service
-      return () => { if (sidebarRight === service) sidebarRight = undefined }
+      const dispose = service.registerCloseHandler(REVIEW_TAB_KIND, (_sessionId: string, tab: TabRecordLike) => {
+        if (bypass.delete(tab.id)) return
+        if ((pending.get(tab.id) ?? 0) === 0) return
+        // Throwing preserves the tab; the body then asks the user to confirm.
+        for (const listener of closeBlocked) listener(tab.id)
+        throw new Error('review: unsaved annotations')
+      })
+      return () => {
+        dispose()
+        if (sidebarRight === service) sidebarRight = undefined
+      }
     },
     attachSessions(service) {
       sessions = service
