@@ -1,6 +1,6 @@
 /** Calendar boards: list, month and week. The week board owns its 0–24 hour ruler and scroll anchor. */
 
-import { addDays, calendarColorOf, calendarNameOf, conflictIds, dayKey, formatDateLabel, formatTime, groupByDay, isoWeekNumber, keyOfEvent, monthRange, weekBlocks, weekdayLabel, weekdayLabels } from './utils.js'
+import { addDays, calendarColorOf, calendarNameOf, conflictIds, coversDayKey, dayKey, eventDayKeys, formatDateLabel, formatTime, groupByDay, isoWeekNumber, monthRange, weekBlocks, weekdayLabel, weekdayLabels } from './utils.js'
 import { dayLabel, eventTitle } from './shared.js'
 import { useEffect, useMemo, useRef } from 'react'
 import type { ClickPoint } from './shared.js'
@@ -82,10 +82,12 @@ export function MonthBoard(props: MonthProps): ReactElement {
   const byDay = useMemo(() => {
     const map = new Map<string, DeskEvent[]>()
     for (const event of events) {
-      const key = keyOfEvent(event)
-      const bucket = map.get(key) ?? []
-      bucket.push(event)
-      map.set(key, bucket)
+      // Multi-day events land on every day cell they cover.
+      for (const key of eventDayKeys(event)) {
+        const bucket = map.get(key) ?? []
+        bucket.push(event)
+        map.set(key, bucket)
+      }
     }
     return map
   }, [events])
@@ -166,8 +168,11 @@ export function WeekBoard(props: WeekProps): ReactElement {
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(from, index)), [from])
   const labels = weekdayLabels(t('schedule.weekdays'))
   const blocks = useMemo(() => weekBlocks(events, from), [events, from])
-  const allDay = useMemo(() => days.map(day => events.filter(event =>
-    event.allDay && keyOfEvent(event) === dayKey(day))), [days, events])
+  // An all-day event spanning several days shows in this row on each of those days.
+  const allDay = useMemo(() => days.map((day) => {
+    const key = dayKey(day)
+    return events.filter(event => event.allDay && coversDayKey(event, key))
+  }), [days, events])
   const todayIndex = days.findIndex(day => day.toDateString() === today.toDateString())
   const now = new Date()
   const nowPct = ((now.getHours() * 60 + now.getMinutes()) / 1440) * 100

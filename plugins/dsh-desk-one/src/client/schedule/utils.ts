@@ -108,6 +108,46 @@ export function keyOfEvent(event: DeskEvent): string {
   return dayKey(new Date(event.start))
 }
 
+/** Guard against absurd spans (a bad DTEND must not loop thousands of days). */
+const MAX_SPAN_DAYS = 366
+
+/**
+ * Every day an event covers, so a multi-day event appears on each of its days instead of only
+ * on the start day. All-day events carry calendar dates in UTC and their end is exclusive
+ * (ICS DTEND), so `24..27` yields 24/25/26/27; timed events that cross midnight cover both days.
+ */
+export function eventDayKeys(event: DeskEvent): string[] {
+  const startMs = Date.parse(event.start)
+  if (!Number.isFinite(startMs)) return []
+  const endMs = Date.parse(event.end)
+  const start = new Date(startMs)
+
+  if (event.allDay) {
+    const firstKey = start.toISOString().slice(0, 10)
+    if (!Number.isFinite(endMs) || endMs <= startMs) return [firstKey]
+    const keys: string[] = []
+    for (let cursor = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+      cursor < endMs && keys.length < MAX_SPAN_DAYS;
+      cursor += DAY_MS) {
+      keys.push(new Date(cursor).toISOString().slice(0, 10))
+    }
+    return keys.length === 0 ? [firstKey] : keys
+  }
+
+  // Timed: walk local calendar days; the last covered day is the one holding `end - 1ms`.
+  const last = new Date(Number.isFinite(endMs) && endMs > startMs ? endMs - 1 : startMs)
+  const keys: string[] = []
+  for (let day = startOfLocalDay(start); day <= last && keys.length < MAX_SPAN_DAYS; day = addDays(day, 1)) {
+    keys.push(dayKey(day))
+  }
+  return keys.length === 0 ? [dayKey(start)] : keys
+}
+
+/** True when the event covers the given day key (single-day events match their start day only). */
+export function coversDayKey(event: DeskEvent, key: string): boolean {
+  return eventDayKeys(event).includes(key)
+}
+
 /** Group events into local days covering [today, today + days). Days without events stay empty. */
 export function groupByDay(events: readonly DeskEvent[], today: Date, days: number): Array<{ key: string; date: Date; events: DeskEvent[] }> {
   const start = startOfLocalDay(today)
@@ -117,7 +157,8 @@ export function groupByDay(events: readonly DeskEvent[], today: Date, days: numb
   })
   const byKey = new Map(groups.map(group => [group.key, group]))
   for (const event of events) {
-    byKey.get(keyOfEvent(event))?.events.push(event)
+    // A multi-day event belongs to every day it covers, not just its start day.
+    for (const key of eventDayKeys(event)) byKey.get(key)?.events.push(event)
   }
   for (const group of groups) group.events.sort((left, right) => left.start.localeCompare(right.start))
   return groups

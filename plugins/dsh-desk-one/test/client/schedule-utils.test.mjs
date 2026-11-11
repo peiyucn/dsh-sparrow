@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  addDays, conflictIds, dayKey, formatDayTitle, groupByDay, isoWeekNumber, keyOfEvent, listRange, monthRange,
-  startOfLocalDay, weekBlocks, weekRange,
+  addDays, conflictIds, coversDayKey, dayKey, eventDayKeys, formatDayTitle, groupByDay, isoWeekNumber, keyOfEvent,
+  listRange, monthRange, startOfLocalDay, weekBlocks, weekRange,
 } from '../../lib/client/schedule/utils.js'
 
 const event = (id, start, end, over = {}) => ({
@@ -37,6 +37,46 @@ describe('client schedule utils', () => {
     const local = new Date(2026, 10, 9, 10, 0)
     const timed = event('b', local.toISOString(), new Date(local.getTime() + 3_600_000).toISOString())
     assert.equal(keyOfEvent(timed), dayKey(local))
+  })
+
+  it('eventDayKeys：跨天日程展开到它覆盖的每一天', () => {
+    // 企微全天培训：DTO 里 DTEND 排他，24..28 表示 24/25/26/27 四天。
+    const training = event('training', '2026-11-24T00:00:00.000Z', '2026-11-28T00:00:00.000Z', { allDay: true })
+    assert.deepEqual(eventDayKeys(training), ['2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27'])
+
+    const single = event('single', '2026-11-24T00:00:00.000Z', '2026-11-25T00:00:00.000Z', { allDay: true })
+    assert.deepEqual(eventDayKeys(single), ['2026-11-24'])
+
+    // 定时事件跨午夜：两天都要出现。
+    const midnight = event(
+      'midnight',
+      new Date(2026, 10, 24, 23, 0).toISOString(),
+      new Date(2026, 10, 25, 1, 0).toISOString(),
+    )
+    assert.deepEqual(eventDayKeys(midnight), ['2026-11-24', '2026-11-25'])
+
+    // 当天内的事件只落一天。
+    const sameDay = event(
+      'same',
+      new Date(2026, 10, 24, 9, 0).toISOString(),
+      new Date(2026, 10, 24, 10, 0).toISOString(),
+    )
+    assert.deepEqual(eventDayKeys(sameDay), ['2026-11-24'])
+
+    // 结束不晚于开始（坏数据）只算开始那天，不抛错。
+    const broken = event('broken', new Date(2026, 10, 24, 9, 0).toISOString(), new Date(2026, 10, 24, 9, 0).toISOString())
+    assert.deepEqual(eventDayKeys(broken), ['2026-11-24'])
+    assert.equal(coversDayKey(broken, '2026-11-24'), true)
+    assert.equal(coversDayKey(broken, '2026-11-25'), false)
+  })
+
+  it('groupByDay：跨天日程出现在覆盖的每一天，且每天只出现一次', () => {
+    const training = event('training', '2026-11-24T00:00:00.000Z', '2026-11-28T00:00:00.000Z', { allDay: true })
+    const groups = /** @type {any[]} */ (groupByDay([training], new Date(2026, 10, 24), 5))
+    assert.deepEqual(groups.map(group => group.events.length), [1, 1, 1, 1, 0])
+    for (const group of groups.slice(0, 4)) {
+      assert.deepEqual(group.events.map(e => e.id), ['training'])
+    }
   })
 
   it('isoWeekNumber 按 ISO-8601（周一起始、跨年周归属周四所在年）', () => {

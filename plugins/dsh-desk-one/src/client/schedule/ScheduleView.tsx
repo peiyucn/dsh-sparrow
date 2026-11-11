@@ -16,7 +16,7 @@ import {
 import type { DeskCalendar, DeskEvent, ScheduleStateResponse } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
-import { addDays, dayKey, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName } from './utils.js'
+import { addDays, coversDayKey, dayKey, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName } from './utils.js'
 import { ListBoard, MonthBoard, WeekBoard } from './boards.js'
 import { EventCard } from './event-card.js'
 import { StartPanel, TodayPanel, UpcomingPanel, type TodayContext, type UpcomingRange } from './panels.js'
@@ -318,7 +318,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
             <TodayPanel
               t={t}
               today={today}
-              events={visibleUpcoming.filter(event => dayKey(new Date(event.start)) === dayKey(today))}
+              events={visibleUpcoming.filter(event => coversDayKey(event, dayKey(today)))}
               calendars={calendars}
               context={todayContext}
               onOpenEvent={openEvent}
@@ -327,7 +327,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
             <UpcomingPanel
               t={t}
               today={today}
-              events={visibleUpcoming.filter(event => dayKey(new Date(event.start)) !== dayKey(today))}
+              events={visibleUpcoming}
               calendars={calendars}
               range={upcomingRange}
               onRangeChange={setUpcomingDays}

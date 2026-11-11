@@ -3,7 +3,7 @@
  * slider). They share the row so their internal rhythm is written together.
  */
 
-import { addDays, calendarColorOf, dayKey, formatDateLabel, formatTime, weekdayLabel, weekdayLabels } from './utils.js'
+import { addDays, calendarColorOf, dayKey, eventDayKeys, formatDateLabel, formatTime, weekdayLabel, weekdayLabels } from './utils.js'
 import { dayLabel, eventTitle } from './shared.js'
 import { SCHEDULE_UPCOMING_MAX_DAYS } from '../../constants.js'
 import { useMemo } from 'react'
@@ -35,10 +35,7 @@ export function UpcomingPanel(props: {
     const fromDay = dayKey(range.from)
     const toDay = dayKey(addDays(range.to, -1))
     return [...events]
-      .filter(event => {
-        const key = dayKey(new Date(event.start))
-        return key >= fromDay && key <= toDay
-      })
+      .filter(event => eventDayKeys(event).some(key => key >= fromDay && key <= toDay))
       .sort((left, right) => left.start.localeCompare(right.start))
   }, [events, range.from, range.to])
   const shown = visible.slice(0, 3)
