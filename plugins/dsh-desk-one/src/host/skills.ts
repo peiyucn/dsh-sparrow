@@ -1,5 +1,5 @@
 /**
- * Bundled skills: note2md (library init / import / templates) and desk-notes (review loop).
+ * Bundled skills: note2md (library init / import / templates) and desk-review (review-loop contract).
  *
  * Skills are plain directories shipped inside the npm package. They are read at
  * runtime and registered through the official skill registry, with a directory
@@ -31,8 +31,8 @@ const BUNDLED_SKILLS: readonly BundledSkill[] = [
     description: 'Agent-native Markdown note management with Notebook→Section→Page hierarchy (init, new page/section, templates, OneNote import, archive, AGENTS.md manifest).',
   },
   {
-    dir: 'desk-notes',
-    name: 'desk-notes',
+    dir: 'desk-review',
+    name: 'desk-review',
     description: 'Review loop for AI-written notes: annotations, anchors, statuses and the human-in-the-loop rule that only the human resolves.',
   },
 ]

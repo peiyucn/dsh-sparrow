@@ -235,16 +235,16 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /createWorkspaceAccess/u, '笔记库创建走 DSH 自己的工作区流程')
   })
 
-  it('随包 skill 应该 存在并被注册（note2md / desk-notes）', async () => {
+  it('随包 skill 应该 存在并被注册（note2md / desk-review）', async () => {
     const host = await read('src/host.ts')
     const skills = await read('src/host/skills.ts')
     const manifest = JSON.parse(await read('package.json'))
     assert.ok(manifest.files.includes('skills/**'), 'npm files 清单要带上 skills/**')
     assert.match(host, /registerBundledSkills/u, 'host 装配要注册随包 skill')
     assert.match(skills, /note2md/u)
-    assert.match(skills, /desk-notes/u)
+    assert.match(skills, /desk-review/u)
     assert.match(skills, /resourceBase/u, '要以目录为资源基准，模板/脚本相对路径才能解析')
-    for (const dir of ['note2md', 'desk-notes']) {
+    for (const dir of ['note2md', 'desk-review']) {
       const content = await read(`skills/${dir}/SKILL.md`)
       assert.match(content, /^---\nname:/u, `${dir} 要有 frontmatter`)
       assert.match(content, /description:/u, `${dir} 要有 description`)
@@ -275,16 +275,16 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(bundle.includes('note-review'), '构建产物要包含审阅 tab kind')
   })
 
-  it('随包 skill 应该 存在并被注册（note2md / desk-notes）', async () => {
+  it('随包 skill 应该 存在并被注册（note2md / desk-review）', async () => {
     const host = await read('src/host.ts')
     const skills = await read('src/host/skills.ts')
     const manifest = JSON.parse(await read('package.json'))
     assert.ok(manifest.files.includes('skills/**'), 'npm files 清单要带上 skills/**')
     assert.match(host, /registerBundledSkills/u, 'host 装配要注册随包 skill')
     assert.match(skills, /note2md/u)
-    assert.match(skills, /desk-notes/u)
+    assert.match(skills, /desk-review/u)
     assert.match(skills, /resourceBase/u, '要以目录为资源基准，模板/脚本相对路径才能解析')
-    for (const dir of ['note2md', 'desk-notes']) {
+    for (const dir of ['note2md', 'desk-review']) {
       const content = await read(`skills/${dir}/SKILL.md`)
       assert.match(content, /^---\nname:/u, `${dir} 要有 frontmatter`)
       assert.match(content, /description:/u, `${dir} 要有 description`)

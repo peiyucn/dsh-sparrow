@@ -1,6 +1,6 @@
 # 08 · 能力包（Capability Pack）— 随插件分发的 skill 与工具
 
-> 状态（2026-11-11）：**已实现**（v1：随包 note2md + desk-notes，host 侧注册为 runtime skill）。
+> 状态（2026-11-11）：**已实现**（v1：随包 note2md + desk-review，host 侧注册为 runtime skill）。
 > 关联：`07-notebook.md`（笔记功能本体）、`06-session-index.md`（外键层）、
 > `01-object-model.md`（统一对象与工具面）。
 
@@ -19,7 +19,7 @@ Desk One 不只是一个面板，而是**面板 + 数据 + 能力包**：
 | 项 | 类型 | 作用 | 是否强制 |
 | :--- | :--- | :--- | :--- |
 | `note2md` | skill | 笔记本初始化、OneNote 导入、模板 / 命名 / frontmatter 约定、AGENTS.md 清单 | **预制、非强制** |
-| `desk-review` | skill（新增） | 审阅会话流程：按编号逐项处理、逐项回复、不自行宣布完成 | 随审阅功能 |
+| `desk-review` | skill（随包） | 审阅会话流程：按编号逐项处理、逐项回复、不自行宣布完成 | 随审阅功能 |
 | `desk_note_*` 工具 | tool | 批注读写、frontmatter 语义检索（见第 3 节） | 随笔记功能 |
 | 既有 `desk_note_*` / `desk_task_*` / `desk_group_*` / `desk_schedule_*` | tool | 便签 / 任务 / 分组 / 日程（已实现） | 已有 |
 
@@ -57,7 +57,7 @@ Desk One 不只是一个面板，而是**面板 + 数据 + 能力包**：
 ## 5. 打包与加载
 
 **实现落点**：`skills/note2md/`（SKILL.md + templates/ + tools/*.ps1，原样随包）、
-`skills/desk-notes/SKILL.md`（批注循环语义）、`src/host/skills.ts`（解析 frontmatter 描述 +
+`skills/desk-review/SKILL.md`（审阅循环语义）、`src/host/skills.ts`（解析 frontmatter 描述 +
 注册 runtime skill，缺 `skills` 服务时只告警不拖垮面板）。
 
 - skill 内容随 npm 包分发（`files` 已含 `skills/**`），运行时通过 `ctx.skills.register()`
@@ -77,7 +77,7 @@ Desk One 不只是一个面板，而是**面板 + 数据 + 能力包**：
 
 ## 7. 验收
 
-- 安装插件后，模型能在 `<available_skills>` 看到 `note2md` 与 `desk-notes`；
+- 安装插件后，模型能在 `<available_skills>` 看到 `note2md` 与 `desk-review`；
 - `desk_note_annotation_*` / `desk_note_search` 可被发现并调用；
 - 移除插件后 skill / 工具随之消失（fiber 生命周期清理）；
 - 包内无绝对路径；`files` 清单包含全部随包资源；

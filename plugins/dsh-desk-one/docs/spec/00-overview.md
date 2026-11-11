@@ -39,7 +39,7 @@ DSH Web 里「与 harness 共用一张桌子」的工作套件 **Desk One（同�
 | 8 | 看板 Board | 按项目分泳道、拖拽改状态 | `project` + `task` | S1 |
 | 9 | 搜索 Search | 跨对象标题/正文/标签检索 | 全部 | S3 |
 | 10 | 设置 Settings | 连接配置、同步状态、导入导出、关于 | — | S0（连接卡 S2 补） |
-| 11 | Agent 工具层 | 跨模块工具，读写同一套对象；插件随包分发 skill（`note2md` / `desk-notes`），见 `08-capability-pack.md` | 全部 | S0 起随模块 |
+| 11 | Agent 工具层 | 跨模块工具，读写同一套对象；插件随包分发 skill（`note2md` / `desk-review`），见 `08-capability-pack.md` | 全部 | S0 起随模块 |
 | 12 | Agent 会话 Sessions | 活跃会话按工作区分组、归档树与归档管理（从归档插件迁移） | 宿主会话目录（非 DeskNode） | Phase 1 已交付；Phase 2–3 在第二阶段 |
 
 ## 代码结构（按功能模块）
