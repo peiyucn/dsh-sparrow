@@ -16,7 +16,7 @@ import { notebookApi } from './notebook/api.js'
 import { createWorkspaceAccess, type UiWorkspaceLike, type WorkspacesServiceLike } from './notebook/workspaces.js'
 import { createReviewBridge } from './notebook/review-bridge.js'
 import { mountNoteReviewTab } from './notebook/register.js'
-import type { LayoutLike, SessionsLike, SidebarRightLike } from './notebook/faces.js'
+import type { LayoutLike, SidebarRightLike } from './notebook/faces.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { DeskPanelIcon } from './icon.js'
@@ -64,12 +64,8 @@ export function apply(ctx: ClientContext): void {
     const detach = review.attachSidebar(sidebarCtx.get('sidebarRight') as unknown as SidebarRightLike)
     sidebarCtx.effect(() => detach, `${PACKAGE_NAME}: review sidebar`)
   })
-  ctx.inject(['sessions'], (sessionCtx) => {
-    const detach = review.attachSessions(sessionCtx.get('sessions') as unknown as SessionsLike)
-    sessionCtx.effect(() => detach, `${PACKAGE_NAME}: review sessions`)
-  })
   ctx.inject(['sidebarRightTabs'], (tabCtx) => {
-    mountNoteReviewTab(tabCtx, review, notebookApi)
+    mountNoteReviewTab(tabCtx, notebookApi)
   })
 
   installDeskClient(ctx, {

@@ -1,16 +1,13 @@
 /**
- * Browser-side notebook data surface: the notes library index and its root setting.
+ * Browser-side notebook data surface: the notes library index, its root setting,
+ * and single-page reads for the review tab.
  *
  * The library itself lives on disk and the index is derived host-side; this module
- * only carries JSON over the plugin's own REST routes (read-only, no file writes).
+ * only carries JSON over the plugin's own REST routes (no file writes here).
  */
 
 import { ROUTES } from '../../constants.js'
-import type {
-  AnnotationListResponse, AnnotationMutationResponse, CreateAnnotationRequest, DeskAnnotation, NotebookPageResponse,
-  AnnotationDiffResponse, DetectOrphansResponse, NotebookSearchResponse, NotebookStateResponse,
-  ReplyAnnotationRequest, UpdateAnnotationRequest,
-} from '../../contract.js'
+import type { NotebookPageResponse, NotebookSearchResponse, NotebookStateResponse } from '../../contract.js'
 import { deleteJson, fetchJson, postJson } from '../http.js'
 
 /** Everything the shelf renders: root status, stats and the newest pages. */
@@ -53,48 +50,6 @@ export function notebookPage(path: string): Promise<NotebookPageResponse> {
   return fetchJson<NotebookPageResponse>(`${ROUTES.notebookPage}?path=${encodeURIComponent(path)}`)
 }
 
-/** Threads newest-first, optionally narrowed to one page or one status. */
-export function listAnnotations(filter?: {
-  readonly path?: string
-  readonly status?: string
-}): Promise<readonly DeskAnnotation[]> {
-  const params = new URLSearchParams()
-  if (filter?.path !== undefined && filter.path !== '') params.set('path', filter.path)
-  if (filter?.status !== undefined && filter.status !== '') params.set('status', filter.status)
-  const suffix = params.size === 0 ? '' : `?${params.toString()}`
-  return fetchJson<AnnotationListResponse>(`${ROUTES.annotationList}${suffix}`).then(payload => payload.annotations)
-}
-
-/** Create one thread on a page. */
-export function addAnnotation(input: CreateAnnotationRequest): Promise<DeskAnnotation> {
-  return postJson<AnnotationMutationResponse>(`${ROUTES.annotationAdd}`, input).then(payload => payload.annotation)
-}
-
-/** Append one message to a thread. */
-export function replyAnnotation(input: ReplyAnnotationRequest): Promise<DeskAnnotation> {
-  return postJson<AnnotationMutationResponse>(ROUTES.annotationReply, input).then(payload => payload.annotation)
-}
-
-/** Change one thread's review status. */
-export function updateAnnotationStatus(input: UpdateAnnotationRequest): Promise<DeskAnnotation> {
-  return postJson<AnnotationMutationResponse>(ROUTES.annotationUpdate, input).then(payload => payload.annotation)
-}
-
-/** Ask the host to mark stale anchors orphaned, and return the settled list. */
-export function detectOrphans(path: string): Promise<DetectOrphansResponse> {
-  return postJson<DetectOrphansResponse>(ROUTES.annotationDetect, { path })
-}
-
-/** The change this thread is reviewing: baseline body vs current body. */
-export function annotationDiff(id: string): Promise<AnnotationDiffResponse> {
-  return fetchJson<AnnotationDiffResponse>(`${ROUTES.annotationDiff}?id=${encodeURIComponent(id)}`)
-}
-
-/** Delete one thread. */
-export function deleteAnnotation(id: string): Promise<void> {
-  return postJson<{ deleted: boolean }>(ROUTES.annotationDelete, { id }).then(() => undefined)
-}
-
 /** The injected facade shape the panel receives. */
 export interface NotebookApi {
   readonly state: typeof notebookState
@@ -102,13 +57,6 @@ export interface NotebookApi {
   readonly clearRoot: typeof clearNotebookRoot
   readonly search: typeof searchNotebook
   readonly page: typeof notebookPage
-  readonly listAnnotations: typeof listAnnotations
-  readonly addAnnotation: typeof addAnnotation
-  readonly replyAnnotation: typeof replyAnnotation
-  readonly updateAnnotationStatus: typeof updateAnnotationStatus
-  readonly detectOrphans: typeof detectOrphans
-  readonly annotationDiff: typeof annotationDiff
-  readonly deleteAnnotation: typeof deleteAnnotation
 }
 
 /** One facade object handed to the page through `DeskPanelInjected`. */
@@ -118,11 +66,4 @@ export const notebookApi: NotebookApi = {
   clearRoot: clearNotebookRoot,
   search: searchNotebook,
   page: notebookPage,
-  listAnnotations,
-  addAnnotation,
-  replyAnnotation,
-  updateAnnotationStatus,
-  detectOrphans,
-  annotationDiff,
-  deleteAnnotation,
 }

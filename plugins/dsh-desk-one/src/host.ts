@@ -60,7 +60,7 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
   registerTaskTools(ctx, store)
   registerGroupTools(ctx, store)
   registerScheduleTools(ctx, schedule)
-  registerNotebookTools(ctx, store, notebook)
+  registerNotebookTools(ctx, notebook)
   if (sessions !== undefined) {
     // Warm the session index at startup; task/session edges resolve through it (no extra agent
     // search tool: official session tools already cover full-text search).

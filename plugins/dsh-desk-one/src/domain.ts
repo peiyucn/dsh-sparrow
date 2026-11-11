@@ -10,7 +10,7 @@
 import { z } from 'zod'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import {
-  ANNOTATION_AUTHORS, ANNOTATION_STATUSES, DOMAIN_NAME, DOMAIN_VERSION, EDGES_TABLE, MAX_TASK_SESSIONS, NODES_TABLE,
+  DOMAIN_NAME, DOMAIN_VERSION, EDGES_TABLE, MAX_TASK_SESSIONS, NODES_TABLE,
   NOTE_COLORS, SCHEDULE_CHANNELS, SCHEDULE_COLORS, SCHEDULE_PROVIDERS, TASK_STATUSES,
 } from './constants.js'
 import type { DeskEdge, DeskNode } from './contract.js'
@@ -183,40 +183,9 @@ const notebookConfigSchema = z.object({
   revision: z.number().int().positive(),
 })
 
-/** One review thread on a notebook page (never written back into the markdown). */
-const annotationAnchorSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('field'), field: z.string().min(1), value: z.string() }),
-  z.object({
-    type: z.literal('quote'),
-    quote: z.string().min(1),
-    prefix: z.string().optional(),
-    suffix: z.string().optional(),
-    position: z.number().int().nonnegative().optional(),
-  }),
-])
-
-const annotationSchema = z.object({
-  id: z.string().min(1),
-  kind: z.literal('annotation'),
-  schema: z.number().int().positive(),
-  path: z.string().min(1),
-  anchor: annotationAnchorSchema,
-  comments: z.array(z.object({
-    author: z.enum(ANNOTATION_AUTHORS),
-    body: z.string().min(1),
-    at: z.string().min(1),
-  })).min(1),
-  status: z.enum(ANNOTATION_STATUSES),
-  linkedSessionId: z.string().optional(),
-  baseline: z.object({ at: z.string().min(1), text: z.string() }).optional(),
-  createdAt: z.string().min(1),
-  updatedAt: z.string().min(1),
-  revision: z.number().int().positive(),
-})
-
 const nodeSchema = z.discriminatedUnion('kind', [
   noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema, sessionIndexSchema,
-  notebookConfigSchema, annotationSchema,
+  notebookConfigSchema,
 ])
 const edgeSchema = z.object({
   id: z.string().min(1),

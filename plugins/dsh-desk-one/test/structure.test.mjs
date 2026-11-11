@@ -251,29 +251,34 @@ describe('dsh-desk-one 结构', () => {
     }
   })
 
-  it('笔记审阅 应该 注册右侧栏 tab，并把批注交给对话输入框（不自动发送）', async () => {
+  it('笔记审阅 应该 注册右侧栏 tab（文档只读视图）', async () => {
     const register = await read('src/client/notebook/register.ts')
     const review = await read('src/client/notebook/review.tsx')
-    const bridge = await read('src/client/notebook/review-bridge.ts')
     const page = await readClientSurface()
     assert.match(register, /sidebarRightTabs\.register/u, 'tab 类型要注册进官方右栏注册表')
     assert.match(register, /'sidebar\.right\.pane\.tab'/u, '正文挂在官方 tab 槽位')
     assert.match(page, /mountNoteReviewTab/u, '客户端要挂载审阅 tab')
-    assert.match(bridge, /insertQuote\(/u, '交给 AI 走官方输入框引用')
-    assert.ok(!/send\(/u.test(bridge), '交给 AI 不得自动发送')
-    assert.match(review, /notebook\.addAnnotation/u, '审阅页能新建批注')
-    assert.match(review, /notebook\.updateAnnotationStatus/u, '审阅页能改状态（接受/重开）')
-    assert.match(review, /anchorResolves/u, '锚点失效要显示提示，不静默错位')
-    assert.match(review, /notebook\.detectOrphans/u, '打开审阅页时检测失效锚点')
-    assert.match(review, /notebook\.detectOrphans/u, '打开审阅页即检测失效锚点')
-    assert.match(review, /orphansDetected/u, '批量失效要提示用户')
-    assert.match(review, /DiffBlock/u, '审阅页用官方 DiffBlock 展示本轮改动')
-    assert.match(review, /diffTotals/u, 'diff 默认收起，只显示 +N -M')
-    assert.match(review, /expandedDiffs/u, '点击才展开 diff')
-    assert.match(review, /DisclosureRow/u, '折叠行复用官方 DisclosureRow（hover 出 chevron、点标题展开）')
-    assert.match(review, /annotationDiff\(/u, '本轮改动从 host 取基线 diff')
+    assert.match(review, /notebook\.page\(/u, '审阅页读取单页内容')
+    assert.match(review, /MarkdownText/u, '正文用官方渲染')
+    assert.ok(!/annotation|Annotation|insertQuote/u.test(review), '审阅页不再包含批注对象')
     const bundle = await read('lib/client.js')
     assert.ok(bundle.includes('note-review'), '构建产物要包含审阅 tab kind')
+  })
+
+  it('随包 skill 应该 存在并被注册（note2md / desk-notes）', async () => {
+    const host = await read('src/host.ts')
+    const skills = await read('src/host/skills.ts')
+    const manifest = JSON.parse(await read('package.json'))
+    assert.ok(manifest.files.includes('skills/**'), 'npm files 清单要带上 skills/**')
+    assert.match(host, /registerBundledSkills/u, 'host 装配要注册随包 skill')
+    assert.match(skills, /note2md/u)
+    assert.match(skills, /desk-notes/u)
+    assert.match(skills, /resourceBase/u, '要以目录为资源基准，模板/脚本相对路径才能解析')
+    for (const dir of ['note2md', 'desk-notes']) {
+      const content = await read(`skills/${dir}/SKILL.md`)
+      assert.match(content, /^---\nname:/u, `${dir} 要有 frontmatter`)
+      assert.match(content, /description:/u, `${dir} 要有 description`)
+    }
   })
 
   it('便签标签 应该是「满墙贴纸」：标题行统一动作 + 可拖动贴纸', async () => {

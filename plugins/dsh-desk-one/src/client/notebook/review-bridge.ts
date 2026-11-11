@@ -1,11 +1,11 @@
 /**
- * Review bridge: opens the note-review tab and hands annotation text to the composer.
+ * Review bridge: opens the review tab at a page path.
  *
- * Both ends are optional services; a host without them simply cannot open the
- * review (the shelf stays read-only) instead of failing the panel.
+ * The session-backed review flow (create/continue a review session) arrives with the
+ * review-session work; this stage only keeps the tab reachable from the notebook.
  */
 
-import type { ConversationLike, LayoutLike, SessionsLike, SidebarRightLike } from './faces.js'
+import type { LayoutLike, SidebarRightLike } from './faces.js'
 
 /** Stable implementation id (the slot registration key and the tab definition id). */
 export const REVIEW_TAB_ID = 'dsh-desk-one-note-review'
@@ -18,7 +18,7 @@ export interface NoteReviewParams {
   readonly path: string
 }
 
-/** Open + hand-off face the shelf and the tab body share. */
+/** Open face the notebook shares with the review tab. */
 export interface ReviewBridge {
   /**
    * Reveal one page in the right sidebar.
@@ -26,16 +26,8 @@ export interface ReviewBridge {
    * @returns whether the tab was asked to open.
    */
   open(path: string): boolean
-  /**
-   * Put one annotation into the session composer (never sends).
-   * @param sessionId - the session whose composer receives the quote.
-   * @param text - quote text.
-   * @returns whether the composer accepted it.
-   */
-  sendToAi(sessionId: string, text: string): boolean
   attachLayout(service: LayoutLike): () => void
   attachSidebar(service: SidebarRightLike): () => void
-  attachSessions(service: SessionsLike): () => void
 }
 
 /** How many frames to wait for the conversation surface after leaving the panel. */
@@ -47,7 +39,6 @@ const OPEN_RETRY_MS = 60
 export function createReviewBridge(): ReviewBridge {
   let layout: LayoutLike | undefined
   let sidebarRight: SidebarRightLike | undefined
-  let sessions: SessionsLike | undefined
 
   return {
     open(path) {
@@ -69,15 +60,6 @@ export function createReviewBridge(): ReviewBridge {
       setTimeout(attempt, 0)
       return true
     },
-    sendToAi(sessionId, text) {
-      const scope = sessions?.scope(sessionId)
-      const conversation = scope?.get('conversation') as ConversationLike | undefined
-      if (scope === undefined || conversation === undefined) return false
-      const input = conversation.input.for(scope)
-      const accepted = input.insertQuote(text)
-      if (accepted) input.focus()
-      return accepted
-    },
     attachLayout(service) {
       layout = service
       return () => { if (layout === service) layout = undefined }
@@ -85,10 +67,6 @@ export function createReviewBridge(): ReviewBridge {
     attachSidebar(service) {
       sidebarRight = service
       return () => { if (sidebarRight === service) sidebarRight = undefined }
-    },
-    attachSessions(service) {
-      sessions = service
-      return () => { if (sessions === service) sessions = undefined }
     },
   }
 }
