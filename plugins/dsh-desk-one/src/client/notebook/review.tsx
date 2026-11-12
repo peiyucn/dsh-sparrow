@@ -200,12 +200,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     )
   }, [filePath, t])
 
-  /** Hand the next round to the AI with a plain instruction in the composer. */
-  const continueWithAi = useCallback((): void => {
-    const inserted = bridge.appendText(sessionId, t('review.continuePrompt', { path: filePath }))
-    setNotice(inserted ? t('review.continueSent') : t('review.submitFailed'))
-  }, [bridge, filePath, sessionId, t])
-
   /** Selection → compose popup (the document itself keeps its size). */
   const handleSelect = useCallback((): void => {
     const container = bodyRef.current
@@ -279,9 +273,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         {page === null ? null : <span className="dsh-desk-review-kind">{page.kind === 'markdown' ? 'MD' : 'TXT'}</span>}
         <button type="button" className="dsh-desk-review-mini" title={filePath} onClick={copyPath}>
           {t('review.copyPath')}
-        </button>
-        <button type="button" className="dsh-desk-review-mini" onClick={continueWithAi}>
-          {t('review.continueTitle')}
         </button>
       </header>
       {error === null ? null : <p className="dsh-desk-notebook-error">{t('state.loadFailed', { message: error })}</p>}
