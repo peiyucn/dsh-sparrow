@@ -300,6 +300,14 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
 
   const composerCard = (
     <div ref={composerRef} className="dsh-desk-review-composer">
+      <div className="dsh-desk-review-annohead">
+        <span className="dsh-desk-review-annorange">
+          {composer?.scope === 'document'
+            ? t('review.documentScope')
+            : t('review.lineHint', { start: composer?.startLine ?? 0, end: composer?.endLine ?? composer?.startLine ?? 0 })}
+        </span>
+        <span className="dsh-desk-review-annoquote">{t('review.placeholder')}</span>
+      </div>
       <p className="dsh-desk-review-quote dsh-desk-review-quote-inline">{quoteBlock(composer?.quote ?? '')}</p>
       <textarea
         className="dsh-desk-review-input"

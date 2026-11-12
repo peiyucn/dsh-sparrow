@@ -171,24 +171,31 @@ export const REVIEW_CSS = `
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
+/* The composer occupies exactly the slot a saved annotation will take: same left rail,
+   same indent under the line numbers, same card rhythm. */
 .dsh-desk-review-composer {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 6px 0 10px;
-  padding: 10px 12px;
-  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-  border-radius: var(--dsw-radius-md, 12px);
-  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.02));
+  gap: 6px;
+  margin: 2px 0 6px 2.6em;
+  padding: 6px 8px;
+  border-left: 2px solid var(--dsw-alias-brand-primary, #4176e6);
+  border-radius: var(--dsw-radius-sm, 8px);
+  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.03));
+}
+.dsh-desk-review-composer .dsh-desk-review-quote {
+  padding-left: 0;
+  border-left: 0;
+  font-size: 11px;
 }
 .dsh-desk-review-input {
   box-sizing: border-box;
   width: 100%;
-  min-height: 64px;
+  min-height: 56px;
   max-height: 160px;
-  padding: 6px 8px;
-  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-  border-radius: 8px;
+  padding: 5px 8px;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.12));
+  border-radius: var(--dsw-radius-sm, 8px);
   background: var(--dsw-alias-bg-base, #ffffff);
   color: var(--dsw-alias-label-primary, #1f2329);
   font: inherit;
