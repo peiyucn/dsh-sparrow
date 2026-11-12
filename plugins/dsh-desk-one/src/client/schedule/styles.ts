@@ -369,6 +369,8 @@ export const SCHEDULE_CSS = `
 /* People facts: the count is the default view, the full list opens on demand. */
 .dsh-desk-schedule-detail-people { overflow-wrap: anywhere; }
 .dsh-desk-schedule-detail-people > p { margin: 2px 0 0; overflow-wrap: anywhere; line-height: 1.45; }
+.dsh-desk-schedule-people-list { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.dsh-desk-schedule-people-list > span { color: var(--dsw-alias-label-secondary, #4e5969); }
 .dsh-desk-schedule-people-toggle {
   display: inline-flex; align-items: baseline; gap: 6px; border: 0; background: none; padding: 0;
   color: inherit; font: inherit; cursor: pointer;

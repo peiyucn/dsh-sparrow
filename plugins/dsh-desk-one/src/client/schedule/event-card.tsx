@@ -1,7 +1,7 @@
 /** Floating read-only event card, anchored near the click point. */
 
 import { calendarColorOf, calendarNameOf, formatTime, startOfLocalDay } from './utils.js'
-import { dayLabel, eventTitle, providerKey } from './shared.js'
+import { dayLabel, eventTitle, personDisplayName, providerKey } from './shared.js'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ClickPoint } from './shared.js'
 import type { DeskCalendar, DeskEvent, DeskScheduleSource } from '../../contract.js'
@@ -117,7 +117,7 @@ export function EventCard(props: {
       <dl>
         <dt>{t('schedule.detail.when')}</dt><dd>{when}</dd>
         {event.location === undefined ? null : <><dt>{t('schedule.detail.location')}</dt><dd>{event.location}</dd></>}
-        {event.organizer === undefined ? null : <><dt>{t('schedule.detail.organizer')}</dt><dd>{event.organizer}</dd></>}
+        {event.organizer === undefined ? null : <><dt>{t('schedule.detail.organizer')}</dt><dd title={event.organizer}>{personDisplayName(event.organizer)}</dd></>}
         {event.attendees === undefined || event.attendees.length === 0 ? null : (
           <>
             <dt>{t('schedule.detail.attendees')}</dt>
@@ -133,7 +133,13 @@ export function EventCard(props: {
                   {peopleOpen ? t('schedule.detail.attendeesHide') : t('schedule.detail.attendeesShow')}
                 </span>
               </button>
-              {peopleOpen ? <p>{event.attendees.join('、')}</p> : null}
+              {peopleOpen ? (
+                <p className="dsh-desk-schedule-people-list">
+                  {event.attendees.map(label => (
+                    <span key={label} title={label}>{personDisplayName(label)}</span>
+                  ))}
+                </p>
+              ) : null}
             </dd>
           </>
         )}
