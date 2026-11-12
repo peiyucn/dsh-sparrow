@@ -195,7 +195,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(store, /async updateTask/u)
     assert.match(store, /listTasks/u)
     assert.match(taskRoutes, /TASK_ROUTES/u)
-    for (const name of ['desk_task_add', 'desk_task_list', 'desk_task_update', 'desk_task_complete', 'desk_task_archive']) {
+    for (const name of ['desk_task_save', 'desk_task_list', 'desk_task_archive']) {
       assert.match(taskTools, new RegExp(name, 'u'), `缺工具 ${name}`)
     }
     assert.match(index, /createTaskRecord/u, '任务纯逻辑要从包入口导出')
@@ -622,8 +622,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(store, /async deleteGroup/u, '删组由 host 把成员解绑')
     assert.match(groupRoutes, /ROUTES\.groupMove/u)
     assert.match(groupRoutes, /ROUTES\.groupArchive/u)
-    assert.match(groupTools, /desk_group_move/u)
-    assert.match(groupTools, /desk_group_archive/u)
+    assert.match(groupTools, /desk_group_save/u, '整组移动 / 归档统一走 save')
     assert.match(host, /registerGroupTools/u)
     assert.match(api, /export function listGroups/u)
     assert.match(groupsHook, /useGroupsData/u)
@@ -716,6 +715,10 @@ describe('dsh-desk-one 结构', () => {
     assert.match(host, /watchSkillCatalog/u, '可选技能服务经由 inject fork 接入')
     assert.match(catalog, /ctx\.inject\(\['skills'\]/u, '技能服务必须是可选依赖 fork')
     assert.match(catalog, /acquireScope/u, '技能目录按默认预设 scope 读取，与官方新会话一致')
+    const skill = await read('src/host/skill.ts')
+    assert.match(host, /installDeskSkill/u, '随包操作指南 skill 要在 host 装配')
+    assert.match(skill, /ctx\.inject\(\['skills'\]/u, '指南 skill 必须走可选依赖 fork')
+    assert.match(skill, /userInvocable: true/u, '指南 skill 同时出现在 / 菜单')
   })
 
   it('页面 应该 用一个面板承载标签页，而不是弹窗', async () => {
