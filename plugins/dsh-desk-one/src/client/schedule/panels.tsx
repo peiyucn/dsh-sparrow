@@ -86,6 +86,8 @@ export interface TodayContext {
   readonly openTasks: number
   readonly activeSessions: number
   readonly onAddNote: () => void
+  /** Open the notebook tab (library + review entry). */
+  readonly onOpenNotebook: () => void
   readonly onAddTask: () => void
   readonly onOpenNotes: () => void
   readonly onOpenTasks: () => void
@@ -165,6 +167,9 @@ export function StartPanel(props: {
     <section className="dsh-desk-schedule-start">
       <header><h3>{t('today.start')}</h3></header>
       <div className="dsh-desk-start-actions">
+        <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={context.onOpenNotebook}>
+          {plusIcon}<span className="dsh-desk-action-label">{t('tab.notebook')}</span>
+        </button>
         <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={context.onAddNote}>
           {plusIcon}<span className="dsh-desk-action-label">{t('action.newNote')}</span>
         </button>

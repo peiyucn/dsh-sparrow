@@ -16,6 +16,7 @@ import type { DeskNote, NoteColor } from '../../contract.js'
 import { notesActions, scheduleActions, taskActions } from './headerActions.js'
 import { NoteCard } from '../notes/components/NoteCard.js'
 import { TrashPanel } from '../notes/components/TrashPanel.js'
+import { NotebookView } from '../notebook/NotebookView.js'
 import { TaskBoard } from '../tasks/components/TaskBoard.js'
 import { SessionsView } from '../sessions/SessionsView.js'
 import { ScheduleView, type ScheduleHeaderActions } from '../schedule/ScheduleView.js'
@@ -43,6 +44,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     listNotes, updateNote, deleteNote, createNote, t,
     listTasks, createTask, updateTask, deleteTask,
     listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink, sessionsArchive, schedule,
+    notebook, workspaceAccess, openReview,
   } = props
   const [tab, setTab] = useState<Tab>(readInitialTab)
   /** Guards double-click / double-tap while one create request is in flight. */
@@ -205,6 +207,10 @@ export function DeskOnePage(props: DeskPanelProps) {
   )
 
   /** Notes/trash actions float over the canvas so notes can scroll underneath them. */
+  const renderNotebook = (): ReactElement => (
+    <NotebookView t={t} notebook={notebook} workspaceAccess={workspaceAccess} onOpenReview={openReview} />
+  )
+
   const actions = tab === 'notes'
     ? notesActions({
         t,
@@ -249,7 +255,7 @@ export function DeskOnePage(props: DeskPanelProps) {
           </div>
         )}
         {data.actionError === null ? null : <p className="dsh-desk-error">{data.actionError}</p>}
-        {tab === 'notes' ? (
+        {tab === 'notebook' ? renderNotebook() : tab === 'notes' ? (
             <div className="dsh-desk-notesview">
               {trash.showTrash
                 ? (
@@ -280,6 +286,7 @@ export function DeskOnePage(props: DeskPanelProps) {
                 onAddNote: () => { selectTab('notes'); void addNote() },
                 onAddTask: () => { selectTab('tasks'); board.beginDraft('todo') },
                 onOpenNotes: () => selectTab('notes'),
+                onOpenNotebook: () => selectTab('notebook'),
                 onOpenTasks: () => selectTab('tasks'),
                 onOpenSessions: () => selectTab('sessions'),
               }}

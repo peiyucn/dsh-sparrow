@@ -650,6 +650,15 @@ describe('dsh-desk-one 结构', () => {
     assert.ok(!styles.includes('.dsh-task-group-dragimage'), '不再使用 HTML5 拖影')
   })
 
+  it('笔记标签 应该 渲染书架组件并从当前会话打开审阅', async () => {
+    const page = await readClientSurface()
+    assert.match(page, /<NotebookView/u, '笔记标签要渲染书架组件')
+    assert.match(page, /tab === 'notebook' \? renderNotebook\(\)/u, '笔记标签必须有自己的渲染分支，不能落到兜底')
+    assert.match(page, /openReview/u, '书架点击要接到审阅打开')
+    const register = await read('src/client/notebook/register.ts')
+    assert.match(register, /sidebarRightTabs\.register/u, '审阅 tab 要注册进官方右栏')
+  })
+
   it('页面 应该 用一个面板承载标签页，而不是弹窗', async () => {
     const page = await readClientSurface()
     assert.match(page, /dsh-desk-tabs/u)
