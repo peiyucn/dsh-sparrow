@@ -18,7 +18,9 @@ import { createWorkspaceAccess, type UiWorkspaceLike as NotebookNavigationLike, 
 import { createReviewBridge } from './notebook/review-bridge.js'
 import { mountNoteReviewTab } from './notebook/register.js'
 import { configureReviewBadges, SessionReviewBadge } from './notebook/review-badges.js'
-import type { LayoutLike, SessionNavigationLike, SessionsLike, SidebarRightLike, WorkspacesLike } from './notebook/faces.js'
+import type {
+  LayoutLike, SessionNavigationLike, SessionsLike, SidebarRightLike, WorkspacesLike,
+} from './notebook/faces.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { DeskPanelIcon } from './icon.js'
@@ -50,9 +52,6 @@ export function apply(ctx: ClientContext): void {
     const service = workspaceCtx.get('workspaces')
     const detach = workspaceAccess.attach(service as unknown as WorkspacesServiceLike)
     workspaceCtx.effect(() => detach, `${PACKAGE_NAME}: workspace access`)
-    // The review bridge resolves the reviewed file's workspace, so it needs the same service.
-    const detachReview = review.attachWorkspaces(service as unknown as WorkspacesLike)
-    workspaceCtx.effect(() => detachReview, `${PACKAGE_NAME}: review workspaces`)
   })
   ctx.inject(['uiWorkspace'], (navigationCtx) => {
     const detach = workspaceAccess.attachNavigation(navigationCtx.get('uiWorkspace') as unknown as NotebookNavigationLike)
@@ -71,8 +70,8 @@ export function apply(ctx: ClientContext): void {
     const detach = review.attachSidebar(sidebarCtx.get('sidebarRight') as unknown as SidebarRightLike)
     sidebarCtx.effect(() => detach, `${PACKAGE_NAME}: review sidebar`)
   })
-  // A review creates its own Session, so it needs the sessions service and the workspace
-  // navigation that puts that Session on screen.
+  // The review bridge creates the session in the reviewed file's workspace, so it needs the
+  // workspace catalog, the workspace navigation, and the session catalog.
   ctx.inject(['sessions'], (sessionCtx) => {
     const detach = review.attachSessions(sessionCtx.get('sessions') as unknown as SessionsLike)
     sessionCtx.effect(() => detach, `${PACKAGE_NAME}: review sessions`)
@@ -80,6 +79,10 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(['uiWorkspace'], (navigationCtx) => {
     const detach = review.attachNavigation(navigationCtx.get('uiWorkspace') as unknown as SessionNavigationLike)
     navigationCtx.effect(() => detach, `${PACKAGE_NAME}: review navigation`)
+  })
+  ctx.inject(['workspaces'], (reviewWorkspaceCtx) => {
+    const detach = review.attachWorkspaces(reviewWorkspaceCtx.get('workspaces') as unknown as WorkspacesLike)
+    reviewWorkspaceCtx.effect(() => detach, `${PACKAGE_NAME}: review workspace catalog`)
   })
   ctx.inject(['sidebarRightTabs'], (tabCtx) => {
     mountNoteReviewTab(tabCtx, reviewApi, review)

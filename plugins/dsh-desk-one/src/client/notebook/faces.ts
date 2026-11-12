@@ -38,10 +38,11 @@ export interface SessionSummaryLike {
   readonly cwd?: string
 }
 
-/** Official sessions service face (reach one session's composer; check a listed session). */
+/** Official sessions service face (catalog, refresh, composer). */
 export interface SessionsLike {
   scope(id: string): SessionScopeLike | undefined
   readonly list: { getSnapshot(): { readonly byId: Readonly<Record<string, SessionSummaryLike>> } }
+  refresh(): Promise<void>
 }
 
 /** Session-scope lookup face. */
@@ -70,4 +71,9 @@ export interface SessionNavigationLike {
    * @returns the session id, bound to that workspace.
    */
   connectWorkspace(workspaceId: string): Promise<string>
+  /**
+   * Connect a workspace and open its Session (the official New Session path).
+   * @param workspaceId - target workspace.
+   */
+  openWorkspace(workspaceId: string): Promise<void>
 }
