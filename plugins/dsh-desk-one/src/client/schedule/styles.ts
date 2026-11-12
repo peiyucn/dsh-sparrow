@@ -207,27 +207,32 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-month-head span[data-weekend='true'] { color: #c2410c; }
 .dsh-desk-schedule-month-body { flex: 1; min-height: 0; display: grid; }
 .dsh-desk-schedule-month-row {
-  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr);
+  position: relative; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
   min-height: 0; border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
 }
-/* Multi-day events occupy one continuous bar across the columns they cover, above the day cells. */
+/* Multi-day bars float over the row top, so the cells keep their full-height separators. */
 .dsh-desk-schedule-month-spans {
-  grid-column: 1 / -1; grid-row: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0 0; padding: 2px 0 1px; min-height: 0;
+  position: absolute; top: 1px; left: 0; right: 0; z-index: 1;
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  pointer-events: none;
 }
+.dsh-desk-schedule-month-row[data-spans='true'] .dsh-desk-schedule-month-cell { padding-top: 21px; }
 .dsh-desk-schedule-month-span {
-  display: flex; align-items: center; gap: 4px; min-width: 0; height: 15px; margin: 0 1px 1px;
-  border: 0; border-radius: 5px; padding: 0 4px; cursor: pointer; text-align: left;
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 10%, transparent);
-  color: inherit; font: inherit; font-size: 10px; line-height: 15px;
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 4px; min-width: 0; height: 17px; margin: 0 1px;
+  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 55%, transparent);
+  border-radius: 5px; padding: 0 5px; cursor: pointer; text-align: left;
+  /* Solid enough to separate from the cell background on both light and dark themes. */
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 30%, var(--dsw-alias-bg-layer-1, #fff));
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font: inherit; font-size: 10px; line-height: 16px; font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .12);
 }
-.dsh-desk-schedule-month-span:hover { background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 18%, transparent); }
+.dsh-desk-schedule-month-span:hover { background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 42%, var(--dsw-alias-bg-layer-1, #fff)); }
 .dsh-desk-schedule-month-span > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Clipped at a row edge: square that side so the bar reads as "continues". */
 .dsh-desk-schedule-month-span[data-open-start='true'] { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .dsh-desk-schedule-month-span[data-open-end='true'] { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-/* Day cells sit on the second row, below the span lane. */
-.dsh-desk-schedule-month-cell { grid-row: 2; }
 .dsh-desk-schedule-month-cell { min-height: 0; overflow: hidden; padding: 3px 5px; border-right: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); display: flex; flex-direction: column; gap: 1px; }
 .dsh-desk-schedule-month-cell[data-weekend='true'] { background: color-mix(in srgb, #f59e0b 4%, transparent); }
 .dsh-desk-schedule-month-cell[data-outside='true'] { opacity: .45; }
@@ -279,12 +284,14 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-week-spans { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .dsh-desk-schedule-week-allday-cells { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .dsh-desk-schedule-week-span {
-  display: flex; align-items: center; gap: 4px; min-width: 0; height: 14px; margin: 0 1px 0;
-  border: 0; border-radius: 4px; padding: 0 4px; cursor: pointer; text-align: left;
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 10%, transparent);
-  color: inherit; font: inherit; font-size: 10px; line-height: 14px;
+  display: flex; align-items: center; gap: 4px; min-width: 0; height: 16px; margin: 0 1px 0;
+  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 55%, transparent);
+  border-radius: 4px; padding: 0 5px; cursor: pointer; text-align: left;
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 30%, var(--dsw-alias-bg-layer-1, #fff));
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font: inherit; font-size: 10px; line-height: 15px; font-weight: 500;
 }
-.dsh-desk-schedule-week-span:hover { background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 18%, transparent); }
+.dsh-desk-schedule-week-span:hover { background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6) 42%, var(--dsw-alias-bg-layer-1, #fff)); }
 .dsh-desk-schedule-week-span > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-desk-schedule-week-span[data-open-start='true'] { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .dsh-desk-schedule-week-span[data-open-end='true'] { border-top-right-radius: 0; border-bottom-right-radius: 0; }

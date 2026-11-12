@@ -105,25 +105,10 @@ export function MonthBoard(props: MonthProps): ReactElement {
         ))}
       </div>
       <div className="dsh-desk-schedule-month-body" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
-        {weeks.map(row => (
-          <div key={row[0]?.toISOString()} className="dsh-desk-schedule-month-row">
-            <div className="dsh-desk-schedule-month-spans">
-              {spanBars(events, row).map(bar => (
-                <button
-                  key={bar.event.id}
-                  type="button"
-                  className="dsh-desk-schedule-month-span"
-                  style={{ gridColumn: `${bar.startIndex + 1} / span ${bar.span}` }}
-                  data-open-start={bar.continuesBefore ? 'true' : undefined}
-                  data-open-end={bar.continuesAfter ? 'true' : undefined}
-                  title={eventTitle(t, bar.event)}
-                  onClick={click => onOpen(bar.event, { x: click.clientX, y: click.clientY })}
-                >
-                  <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(bar.event, calendars) }} />
-                  <span>{eventTitle(t, bar.event)}</span>
-                </button>
-              ))}
-            </div>
+        {weeks.map(row => {
+          const bars = spanBars(events, row)
+          return (
+          <div key={row[0]?.toISOString()} className="dsh-desk-schedule-month-row" data-spans={bars.length > 0 ? 'true' : undefined}>
             {row.map(date => {
               const dayEvents = byDay.get(dayKey(date)) ?? []
               const isToday = date.toDateString() === today.toDateString()
@@ -160,8 +145,28 @@ export function MonthBoard(props: MonthProps): ReactElement {
                 </div>
               )
             })}
+            {bars.length === 0 ? null : (
+              <div className="dsh-desk-schedule-month-spans">
+                {bars.map(bar => (
+                  <button
+                    key={bar.event.id}
+                    type="button"
+                    className="dsh-desk-schedule-month-span"
+                    style={{ gridColumn: `${bar.startIndex + 1} / span ${bar.span}` }}
+                    data-open-start={bar.continuesBefore ? 'true' : undefined}
+                    data-open-end={bar.continuesAfter ? 'true' : undefined}
+                    title={eventTitle(t, bar.event)}
+                    onClick={click => onOpen(bar.event, { x: click.clientX, y: click.clientY })}
+                  >
+                    <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(bar.event, calendars) }} />
+                    <span>{eventTitle(t, bar.event)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
