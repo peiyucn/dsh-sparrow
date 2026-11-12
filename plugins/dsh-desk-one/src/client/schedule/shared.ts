@@ -9,20 +9,6 @@ import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleProvider } from '../../constants.js'
 
 export const PROVIDER_ORDER: readonly ScheduleProvider[] = ['wecom', 'icloud']
-/**
- * Readable form of an organizer/attendee label. Sources often export only a mail address
- * (WeCom omits ATTENDEE CN), so the domain is dropped and a leading employee-id prefix such as
- * `dj014024luwei` is removed. Display only -- the stored value stays the full address.
- */
-export function personDisplayName(label: string): string {
-  const at = label.indexOf('@')
-  if (at < 0) return label
-  const local = label.slice(0, at)
-  const named = /^[a-z]{2}\d{6,8}([a-z].*)$/u.exec(local)
-  const name = named?.[1]
-  return name === undefined || name === '' ? local : name
-}
-
 export function providerKey(provider: ScheduleProvider): string {
   return `schedule.provider.${provider}`
 }

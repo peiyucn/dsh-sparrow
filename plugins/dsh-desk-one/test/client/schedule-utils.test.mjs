@@ -5,7 +5,6 @@ import {
   addDays, conflictIds, coversDayKey, dayKey, eventDayKeys, formatDayTitle, groupByDay, isoWeekNumber, keyOfEvent,
   isMultiDay, listRange, monthRange, spanBars, startOfLocalDay, weekBlocks, weekRange,
 } from '../../lib/client/schedule/utils.js'
-import { personDisplayName } from '../../lib/client/schedule/shared.js'
 
 const event = (id, start, end, over = {}) => ({
   id, title: id, start, end, allDay: false, busy: true, provider: 'wecom', channel: 'caldav',
@@ -112,15 +111,6 @@ describe('client schedule utils', () => {
     for (const group of groups.slice(0, 4)) {
       assert.deepEqual(group.events.map(e => e.id), ['training'])
     }
-  })
-
-  it('personDisplayName：去域名与工号前缀，姓名与普通地址不受影响', () => {
-    assert.equal(personDisplayName('dj014024luwei@djbx.com'), 'luwei')
-    assert.equal(personDisplayName('dj002362fuxin@djbx.com'), 'fuxin')
-    assert.equal(personDisplayName('zhaizhi@djbxjt.wecom.work'), 'zhaizhi')
-    assert.equal(personDisplayName('zhang.yan@example.com'), 'zhang.yan')
-    // 已经是姓名（组织者带 CN）就原样返回
-    assert.equal(personDisplayName('杨丛丛'), '杨丛丛')
   })
 
   it('isoWeekNumber 按 ISO-8601（周一起始、跨年周归属周四所在年）', () => {
