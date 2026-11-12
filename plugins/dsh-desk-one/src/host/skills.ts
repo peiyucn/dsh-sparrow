@@ -41,6 +41,8 @@ const BUNDLED_SKILLS: readonly BundledSkill[] = [
 interface SkillRegistryLike {
   register(skill: {
     readonly name: string
+    /** Required by the 0.2.2 registry contract (SkillSummary.source). */
+    readonly source: 'bundled'
     readonly description: string
     readonly content: string
     readonly resourceBase?: { readonly kind: 'directory'; readonly path: string }
@@ -127,6 +129,9 @@ export async function registerBundledSkills(ctx: Context): Promise<void> {
       const parsed = parseSkillFile(raw)
       const dispose = skills.register({
         name: entry.name,
+        // SkillSummary.source is required by the 0.2.2 registry contract; bundled skills
+        // report "bundled" like the official filesystem provider does.
+        source: 'bundled',
         description: parsed.description === '' ? entry.description : parsed.description,
         content: parsed.content,
         resourceBase: { kind: 'directory', path: dir },
