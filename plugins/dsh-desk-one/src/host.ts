@@ -13,6 +13,7 @@ import { watchSkillCatalog } from './host/skill-catalog.js'
 import { installDeskSkill } from './host/skill.js'
 import { ScheduleHost } from './host/schedule/host.js'
 import { registerScheduleTools } from './host/schedule/tools.js'
+import { registerNotebookTools } from './host/notebook/tools.js'
 import { installSessionsHost, hasSessionServices, type SessionsConfig } from './host/sessions/install.js'
 import { registerDeskTools } from './host/notes/tools.js'
 import { registerGroupTools } from './host/tasks/group-tools.js'
@@ -58,6 +59,7 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
   registerTaskTools(ctx, store)
   registerGroupTools(ctx, store)
   registerScheduleTools(ctx, schedule)
+  registerNotebookTools(ctx, notebook)
   // One short operating guide skill (object choice + revision workflow + side effects). Optional
   // service: without it the tools still work, so this never disables the plugin.
   installDeskSkill(ctx)

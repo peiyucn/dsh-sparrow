@@ -28,7 +28,7 @@ Desk One 是用户的「一张办公桌」，同一份对象存在面板里，�
 
 - 有时限、要跟进、有完成状态 → 任务（不要用便签代替待办）。
 - 随手记、想法、不需要跟进 → 便签。
-- 成篇内容、要长期维护 → 笔记页（用文件工具，不用 Desk 工具）。
+- 成篇内容、要长期维护 → 笔记页（用 desk_page_list 检索，用文件工具读/改，不用 Desk 写工具）。
 - 只是想看看外部日历 → 日程只读工具。
 
 ## 工具
@@ -37,6 +37,7 @@ Desk One 是用户的「一张办公桌」，同一份对象存在面板里，�
 - 任务：desk_task_list → desk_task_add（新建）/ desk_task_update（改标题正文泳道截止排序分组）/ desk_task_complete（完成）/ desk_task_archive（存档或恢复）。
 - 分组：desk_group_list → desk_group_add（新建）/ desk_group_update（改名排序）/ desk_group_move（整组换泳道）/ desk_group_archive（存档或恢复）/ desk_group_delete（删除已归档分组会连卡片一起删）。
 - 日程：desk_schedule_list / desk_schedule_sync / desk_schedule_connections（全部只读）。
+- 笔记页：desk_page_list（只读检索标题/路径/标签/缺元数据/空笔记，返回相对 root 的路径）；读正文、改稿仍用文件工具，不要用 Desk 工具写笔记。
 
 ## 规则
 
