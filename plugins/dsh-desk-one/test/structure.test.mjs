@@ -707,6 +707,14 @@ describe('dsh-desk-one 结构', () => {
     assert.match(docAction, /review\.open/u, '审阅入口要开新审阅会话')
   })
 
+  it('host half 应该 用 inject fork 访问可选技能服务（否则整只插件停用）', async () => {
+    const host = await read('src/host.ts')
+    const catalog = await read('src/host/skill-catalog.ts')
+    assert.doesNotMatch(host, /ctx\.skills/u, '未声明 inject 直接读 ctx.skills 会让 apply 抛错、所有路由 404')
+    assert.match(host, /watchSkillCatalog/u, '可选技能服务经由 inject fork 接入')
+    assert.match(catalog, /ctx\.inject\(\['skills'\]/u, '技能服务必须是可选依赖 fork')
+  })
+
   it('页面 应该 用一个面板承载标签页，而不是弹窗', async () => {
     const page = await readClientSurface()
     assert.match(page, /dsh-desk-tabs/u)

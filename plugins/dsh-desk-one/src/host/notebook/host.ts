@@ -59,11 +59,11 @@ export class NotebookHost {
 
   /**
    * @param store - unified storage store.
-   * @param skills - optional host skill catalog; absent hosts simply offer no drafting skills.
+   * @param skillCatalog - live optional host skill catalog; absent hosts simply offer no skills.
    */
   constructor(
     private readonly store: DeskStore,
-    private readonly skills?: SkillCatalog,
+    private readonly skillCatalog?: () => SkillCatalog | undefined,
   ) {}
 
   /** Configured root, if any. */
@@ -95,9 +95,10 @@ export class NotebookHost {
 
   /** Skills offered for drafting, recomputed per request so catalog changes show up live. */
   private async draftSkills(root: string): Promise<readonly NotebookSkill[]> {
-    if (this.skills === undefined) return []
+    const catalog = this.skillCatalog?.()
+    if (catalog === undefined) return []
     try {
-      const summaries = await this.skills.list({ cwd: root })
+      const summaries = await catalog.list({ cwd: root })
       return toNotebookSkills(summaries.filter(summary => summary.invocation?.modelInvocable !== false).slice(0, 200))
     } catch {
       // The catalog is an optional enhancement: a broken provider must not break the page.
