@@ -285,8 +285,10 @@ interface DeskApi {
 | `desk_task_add` / `desk_task_list` / `desk_task_update` / `desk_task_complete` / `desk_task_archive` | 任务：新建 / 查询 / 更新（含状态与排序）/ 完成 / 存档或恢复 | 低 |
 | `desk_group_add` / `desk_group_list` / `desk_group_update` / `desk_group_move` / `desk_group_archive` / `desk_group_delete` | 分组：新建 / 查询 / 改名排序 / 整组移动 / 存档或恢复 / 删除 | 中（移动、存档、删除会影响组内卡片） |
 | `desk_schedule_list` / `desk_schedule_sync` / `desk_schedule_connections` | 日程镜像查询 / 手动同步 / 连接状态（只读，不写回） | 低 |
+| `desk_page_list` | 笔记库只读检索：标题 / 路径 / 标签 / 缺元数据 / 空笔记；返回相对 root 的路径与元信息 | 低 |
 
 * **一个工具一个动作**：工具名即意图（add / update / complete / move / archive / delete），不把语义不同的动作合并成通用 `save`；更新类工具要求显式 `expected_revision`。
+* **笔记页是文件系统对象**：`desk_page_list` 只做只读检索；正文读取与改稿仍用文件工具，Desk 工具不写笔记文件。
 * 写工具返回结构化结果 + 一句人类可读摘要；跨外部源的写操作必须带确认。
 * 工具与界面共用同一 Store API，禁止绕过 Store 直接写文件。
 
