@@ -84,53 +84,80 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     expand: (hidden: number) => t('review.expand', { hidden }),
   }), [t])
 
-  // A fresh open (no reviewId) links this file to the session on screen: the review session is
-  // the one DSH just opened, so the tab only records the association. Reusing an existing record
-  // for the same session keeps the draft box intact.
-  useEffect(() => {
-    if (reviewId !== undefined || targetCwd === undefined || targetPath === undefined) return
-    let cancelled = false
-    void (async (): Promise<void> => {
-      try {
-        const reviews = await reviewApi.list({ cwd: targetCwd, path: targetPath })
-        const own = reviews.find(entry => entry.sessionId === sessionId)
-        const review = own ?? await reviewApi.create({ sessionId, cwd: targetCwd, path: targetPath })
-        if (!cancelled) setReviewId(review.id)
-      } catch (cause) {
-        if (!cancelled) setError(messageOf(cause))
-      }
-    })()
-    return () => { cancelled = true }
-  }, [reviewApi, reviewId, sessionId, targetCwd, targetPath])
-
   const load = useCallback(async (): Promise<void> => {
-    if (reviewId === undefined) return
     setLoading(true)
     setError(null)
     try {
-      const [nextReview, nextPage] = await Promise.all([reviewApi.get(reviewId), reviewApi.page(reviewId)])
-      setReview(nextReview)
+      // A concrete review record (history tab) reads through itself.
+      if (reviewId !== undefined) {
+        const [nextReview, nextPage] = await Promise.all([reviewApi.get(reviewId), reviewApi.page(reviewId)])
+        setReview(nextReview)
+        setPage(nextPage)
+        setPending(nextReview.drafts)
+        setBaseline(current => current ?? nextPage.body)
+        return
+      }
+      if (targetCwd === undefined || targetPath === undefined) return
+      // A fresh open has no record yet: adopt one only when this very session already reviews
+      // this very file; otherwise read the file directly and persist nothing.
+      const own = (await reviewApi.list({ sessionId }))
+        .find(entry => entry.target.cwd === targetCwd && entry.target.path === targetPath)
+      if (own !== undefined) {
+        setReview(own)
+        setReviewId(own.id)
+        setPending(own.drafts)
+        const nextPage = await reviewApi.page(own.id)
+        setPage(nextPage)
+        setBaseline(current => current ?? nextPage.body)
+        return
+      }
+      const nextPage = await reviewApi.pageByTarget({ cwd: targetCwd, path: targetPath })
       setPage(nextPage)
-      setPending(nextReview.drafts)
       setBaseline(current => current ?? nextPage.body)
     } catch (cause) {
       setError(messageOf(cause))
     } finally {
       setLoading(false)
     }
-  }, [reviewApi, reviewId])
+  }, [reviewApi, reviewId, sessionId, targetCwd, targetPath])
 
   useEffect(() => { void load() }, [load])
 
+  /**
+   * Resolve (or create on first use) the review record for this session and file.
+   * Entering a review must not persist anything; the first annotation creates the record.
+   */
+  const ensureReview = useCallback(async (): Promise<DeskReview | null> => {
+    if (review !== null) return review
+    if (targetCwd === undefined || targetPath === undefined) return null
+    try {
+      const own = (await reviewApi.list({ sessionId }))
+        .find(entry => entry.target.cwd === targetCwd && entry.target.path === targetPath)
+      const next = own ?? await reviewApi.create({ sessionId, cwd: targetCwd, path: targetPath })
+      setReview(next)
+      setReviewId(next.id)
+      return next
+    } catch (cause) {
+      setNotice(t('review.draftSaveFailed', { message: messageOf(cause) }))
+      return null
+    }
+  }, [review, reviewApi, sessionId, targetCwd, targetPath, t])
+
   /** Write the draft list back to the review record; drafts are the user's intent, so they persist. */
   const persistDrafts = useCallback((next: readonly ReviewDraft[]): void => {
-    const current = review
-    if (current === undefined || current === null) return
     setPending(next)
-    void reviewApi.updateDrafts({ id: current.id, expectedRevision: current.revision, drafts: next })
-      .then((updated) => { setReview(updated) })
-      .catch((cause: unknown) => { setNotice(t('review.draftSaveFailed', { message: messageOf(cause) })) })
-  }, [review, reviewApi, t])
+    void (async (): Promise<void> => {
+      const current = await ensureReview()
+      if (current === null) return
+      try {
+        const updated = await reviewApi.updateDrafts({ id: current.id, expectedRevision: current.revision, drafts: next })
+        setReview(updated)
+        setReviewId(updated.id)
+      } catch (cause) {
+        setNotice(t('review.draftSaveFailed', { message: messageOf(cause) }))
+      }
+    })()
+  }, [ensureReview, reviewApi, t])
 
   /** Selection → compose popup (the document itself keeps its size). */
   const handleSelect = useCallback((): void => {
@@ -166,13 +193,14 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       .join('\n\n')
     const accepted = bridge.sendQuote(sessionId, text)
     if (accepted) {
-      persistDrafts([])
+      setPending([])
+      if (review !== null) persistDrafts([])
       setOverlay(null)
       setNotice(t('review.submitted'))
     } else {
       setNotice(t('review.submitFailed'))
     }
-  }, [bridge, pending, sessionId, t])
+  }, [bridge, pending, review, persistDrafts, sessionId, t])
 
   // A transient status line should not accumulate in the tab.
   useEffect(() => {

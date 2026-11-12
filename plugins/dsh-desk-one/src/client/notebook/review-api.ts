@@ -46,6 +46,12 @@ export function updateReviewDrafts(input: UpdateReviewDraftsRequest): Promise<De
   return postJson<ReviewMutationResponse>(ROUTES.reviewUpdateDrafts, input).then(payload => payload.review)
 }
 
+/** Read a file straight from a target, without creating a review record. */
+export function reviewTargetPage(input: { readonly cwd: string; readonly path: string }): Promise<ReviewPageResponse> {
+  const params = new URLSearchParams({ cwd: input.cwd, path: input.path })
+  return fetchJson<ReviewPageResponse>(`${ROUTES.reviewTargetPage}?${params.toString()}`)
+}
+
 /** Read the reviewed file as the tab renders it. */
 export function reviewPage(reviewId: string): Promise<ReviewPageResponse> {
   return fetchJson<ReviewPageResponse>(`${ROUTES.reviewPage}?reviewId=${encodeURIComponent(reviewId)}`)
@@ -59,6 +65,7 @@ export interface ReviewApi {
   readonly updateTarget: typeof updateReviewTarget
   readonly updateDrafts: typeof updateReviewDrafts
   readonly page: typeof reviewPage
+  readonly pageByTarget: typeof reviewTargetPage
 }
 
 /** One facade object handed to the page through `DeskPanelInjected`. */
@@ -69,4 +76,5 @@ export const reviewApi: ReviewApi = {
   updateTarget: updateReviewTarget,
   updateDrafts: updateReviewDrafts,
   page: reviewPage,
+  pageByTarget: reviewTargetPage,
 }

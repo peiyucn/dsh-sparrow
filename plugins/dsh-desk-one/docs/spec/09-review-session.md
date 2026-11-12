@@ -96,8 +96,8 @@ kind: 'review'
   → uiWorkspace.startSession(workspaceId)   // 与「+ 新会话」完全同一条官方路径：
                                              // 创建/复用空白会话、选中它、离开 Desk One 面板
   → 右侧栏打开「审阅」tab，参数 { cwd, path }
-  → tab 挂载后：用所在会话的 sessionId 创建（或复用）review 记录，
-    之后加载目标文件、恢复草稿
+  → tab 挂载后：先用「按目标直读」接口渲染文件；**不创建任何记录**，
+    第一次「加到待提交」时才创建（或复用同会话同文件的）review 记录并写入草稿
 ```
 
 要点：

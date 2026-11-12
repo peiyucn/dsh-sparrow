@@ -60,6 +60,16 @@ async function updateReviewTargetRoute(route: DeskRouteContext, req: IncomingMes
   sendJson(res, 200, { review } satisfies ReviewMutationResponse)
 }
 
+async function targetPageRoute(_route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  const cwd = url.searchParams.get('cwd') ?? ''
+  const path = url.searchParams.get('path') ?? ''
+  if (cwd === '' || path === '') throw new DeskError('BAD_BODY', '缺少 cwd 或 path')
+  // Entering a review must not persist anything: read the file straight from the target.
+  const target = await resolveReviewTarget({ cwd, path })
+  sendJson(res, 200, await readReviewPage(target) satisfies ReviewPageResponse)
+}
+
 async function getReviewRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost')
   const id = url.searchParams.get('id') ?? ''
@@ -81,6 +91,7 @@ export const REVIEW_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.reviewList, handle: listReviewsRoute },
   { method: 'GET', path: ROUTES.reviewGet, handle: getReviewRoute },
   { method: 'GET', path: ROUTES.reviewPage, handle: reviewPageRoute },
+  { method: 'GET', path: ROUTES.reviewTargetPage, handle: targetPageRoute },
   { method: 'POST', path: ROUTES.reviewCreate, handle: createReviewRoute },
   { method: 'POST', path: ROUTES.reviewUpdateTarget, handle: updateReviewTargetRoute },
   { method: 'POST', path: ROUTES.reviewUpdateDrafts, handle: updateReviewDraftsRoute },
