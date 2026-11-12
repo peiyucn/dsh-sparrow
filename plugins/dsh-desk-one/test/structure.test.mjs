@@ -195,7 +195,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(store, /async updateTask/u)
     assert.match(store, /listTasks/u)
     assert.match(taskRoutes, /TASK_ROUTES/u)
-    for (const name of ['desk_task_save', 'desk_task_list', 'desk_task_archive']) {
+    for (const name of ['desk_task_add', 'desk_task_list', 'desk_task_update', 'desk_task_complete', 'desk_task_archive']) {
       assert.match(taskTools, new RegExp(name, 'u'), `缺工具 ${name}`)
     }
     assert.match(index, /createTaskRecord/u, '任务纯逻辑要从包入口导出')
@@ -622,7 +622,8 @@ describe('dsh-desk-one 结构', () => {
     assert.match(store, /async deleteGroup/u, '删组由 host 把成员解绑')
     assert.match(groupRoutes, /ROUTES\.groupMove/u)
     assert.match(groupRoutes, /ROUTES\.groupArchive/u)
-    assert.match(groupTools, /desk_group_save/u, '整组移动 / 归档统一走 save')
+    assert.match(groupTools, /desk_group_move/u)
+    assert.match(groupTools, /desk_group_archive/u)
     assert.match(host, /registerGroupTools/u)
     assert.match(api, /export function listGroups/u)
     assert.match(groupsHook, /useGroupsData/u)

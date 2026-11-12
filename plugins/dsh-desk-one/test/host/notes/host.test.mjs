@@ -93,10 +93,11 @@ describe('host 装配（apply 接线）', () => {
     assert.deepEqual(
       collected.tools.map(tool => tool.name).sort(),
       [
-        'desk_group_delete', 'desk_group_list', 'desk_group_save',
-        'desk_note_delete', 'desk_note_list', 'desk_note_save',
+        'desk_group_add', 'desk_group_archive', 'desk_group_delete', 'desk_group_list', 'desk_group_move',
+        'desk_group_update',
+        'desk_note_add', 'desk_note_delete', 'desk_note_list', 'desk_note_update',
         'desk_schedule_connections', 'desk_schedule_list', 'desk_schedule_sync',
-        'desk_task_archive', 'desk_task_list', 'desk_task_save',
+        'desk_task_add', 'desk_task_archive', 'desk_task_complete', 'desk_task_list', 'desk_task_update',
       ],
     )
     assert.ok(collected.effects.length >= 2, '存储域与路由都要有 effect 清理')
@@ -357,7 +358,7 @@ describe('host 装配（apply 接线）', () => {
   it('agent 工具 应该 与 REST 共用同一份数据（工具建 → 路由查）', async () => {
     const { ctx, collected } = fakeHost()
     await apply(ctx)
-    const addTool = collected.tools.find(tool => tool.name === 'desk_note_save')
+    const addTool = collected.tools.find(tool => tool.name === 'desk_note_add')
     assert.ok(addTool)
     const exec = { signal: AbortSignal.timeout(1_000) }
     const output = await addTool.execute({ body: '来自工具的一条便签' }, exec)
@@ -376,7 +377,7 @@ describe('host 装配（apply 接线）', () => {
   it('任务工具 应该 与 REST 共用同一份数据（工具建任务 → 路由查）', async () => {
     const { ctx, collected } = fakeHost()
     await apply(ctx)
-    const addTool = collected.tools.find(tool => tool.name === 'desk_task_save')
+    const addTool = collected.tools.find(tool => tool.name === 'desk_task_add')
     assert.ok(addTool)
     const exec = { signal: AbortSignal.timeout(1_000) }
     const output = await addTool.execute({ title: '来自工具的任务', status: 'doing' }, exec)

@@ -2,8 +2,7 @@
  * Task tools for the agent surface.
  *
  * They share the DeskStore with the board UI: same validation, same revision guard. Listing is
- * limited by default so a large board cannot flood the model context. One `save` tool creates
- * (no id) or updates (id + revision); archive stays a separate reversible action.
+ * limited by default so a large board cannot flood the model context.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -22,11 +21,36 @@ function toolError(error: unknown): never {
   throw new Error(String(error))
 }
 
-/** Register the three task tools; the board UI refreshes on its next pull. */
+/** Register the five task tools; the board UI refreshes on its next pull. */
 export function registerTaskTools(ctx: Context, store: DeskStore): void {
   ctx.tools.register(defineTool({
+    name: 'desk_task_add',
+    description: 'Add a task to the user\'s desk board (todo lane by default). Title is required; due date is day-granular (YYYY-MM-DD).',
+    parameters: {
+      title: { type: 'string', required: true, description: 'Task title (at most 200 characters).' },
+      body: { type: 'string', description: 'Optional description / notes (at most 20000 characters).' },
+      status: { type: 'string', enum: TASK_STATUSES, description: 'Lane: todo (default), doing or done.' },
+      color: { type: 'string', enum: NOTE_COLORS, description: 'Card color tag; defaults to "default".' },
+      due_date: { type: 'string', description: 'Due date, YYYY-MM-DD.' },
+      due_timezone: { type: 'string', description: 'IANA timezone for the due date (optional).' },
+      order: { type: 'number', description: 'Manual order inside the lane (larger = later).' },
+      group_id: { type: 'string', description: 'Optional group id (see desk_group_list); must belong to the same lane.' },
+    },
+    output: textOutput,
+    async execute(args) {
+      try {
+        const { group_id, ...rest } = args
+        const task = await store.createTask({ ...rest, groupId: group_id })
+        return JSON.stringify({ ok: true, task, summary: `已添加任务「${task.title}」` })
+      } catch (error) {
+        toolError(error)
+      }
+    },
+  }))
+
+  ctx.tools.register(defineTool({
     name: 'desk_task_list',
-    description: 'List desk tasks in board order. Excludes archived tasks by default; optionally filter by lane and keyword. Use this before a save-update to obtain the current id and revision.',
+    description: 'List desk tasks in board order. Excludes archived tasks by default; optionally filter by lane and keyword.',
     parameters: {
       status: { type: 'string', enum: TASK_STATUSES, description: 'Only tasks in this lane.' },
       query: { type: 'string', description: 'Case-insensitive keyword over title and body.' },
@@ -53,42 +77,25 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
   }))
 
   ctx.tools.register(defineTool({
-    name: 'desk_task_save',
-    description: 'Create or update one desk task. Omit id to create (title required); pass id + expected_revision to update title/description/lane/color/due date/order/group. "Done" is just status="done". Get id + revision from desk_task_list first.',
+    name: 'desk_task_update',
+    description: 'Update one desk task (title, description, lane, color, due date, order). Use desk_task_list to get the current revision first.',
     parameters: {
-      id: { type: 'string', description: 'Task id from desk_task_list; omit to create a new task.' },
-      expected_revision: { type: 'number', description: 'Required when id is given: revision returned by desk_task_list.' },
-      title: { type: 'string', description: 'Task title (at most 200 characters). Required when creating.' },
-      body: { type: 'string', description: 'Optional description / notes (at most 20000 characters).' },
-      status: { type: 'string', enum: TASK_STATUSES, description: 'Lane: todo (default), doing or done.' },
-      color: { type: 'string', enum: NOTE_COLORS, description: 'Card color tag; defaults to "default".' },
-      due_date: { type: 'string', description: 'Due date, YYYY-MM-DD.' },
-      due_timezone: { type: 'string', description: 'IANA timezone for the due date (optional).' },
-      clear_due: { type: 'boolean', description: 'Clear the due date instead of setting it (update only).' },
-      order: { type: 'number', description: 'Manual order inside the lane (larger = later).' },
-      group_id: { type: 'string', description: 'Group id (see desk_group_list); must belong to the same lane.' },
-      clear_group: { type: 'boolean', description: 'Move the task out of its group (update only).' },
+      id: { type: 'string', required: true, description: 'Task id from desk_task_list.' },
+      expected_revision: { type: 'number', required: true, description: 'Revision returned by desk_task_list.' },
+      title: { type: 'string', description: 'New title.' },
+      body: { type: 'string', description: 'New description.' },
+      status: { type: 'string', enum: TASK_STATUSES, description: 'Move the task to this lane.' },
+      color: { type: 'string', enum: NOTE_COLORS, description: 'New color tag.' },
+      due_date: { type: 'string', description: 'New due date (YYYY-MM-DD).' },
+      due_timezone: { type: 'string', description: 'IANA timezone for the due date.' },
+      clear_due: { type: 'boolean', description: 'Clear the due date instead of setting it.' },
+      order: { type: 'number', description: 'New manual order in the lane.' },
+      group_id: { type: 'string', description: 'Move the task into this group (must be in the target lane).' },
+      clear_group: { type: 'boolean', description: 'Move the task out of its group.' },
     },
     output: textOutput,
     async execute(args) {
       try {
-        if (args.id === undefined) {
-          if (typeof args.title !== 'string' || args.title.trim() === '') throw new Error('新建任务需要 title')
-          const task = await store.createTask({
-            title: args.title,
-            body: args.body,
-            status: args.status,
-            color: args.color,
-            dueDate: args.due_date,
-            dueTimezone: args.due_timezone,
-            order: args.order,
-            groupId: args.group_id,
-          })
-          return JSON.stringify({ ok: true, created: true, task, summary: `已新建任务「${task.title}」` })
-        }
-        if (typeof args.expected_revision !== 'number') {
-          throw new Error('更新任务需要 expected_revision：先调 desk_task_list 拿 id 和 revision')
-        }
         const due = args.clear_due === true
           ? null
           : args.due_date === undefined ? undefined : { date: args.due_date, timezone: args.due_timezone }
@@ -102,7 +109,25 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
           ...args.order === undefined ? {} : { order: args.order },
           ...groupId === undefined ? {} : { groupId },
         })
-        return JSON.stringify({ ok: true, created: false, task, summary: `已更新任务「${task.title}」` })
+        return JSON.stringify({ ok: true, task, summary: `已更新任务「${task.title}」` })
+      } catch (error) {
+        toolError(error)
+      }
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'desk_task_complete',
+    description: 'Mark one desk task as done. Use desk_task_list to get the current revision first.',
+    parameters: {
+      id: { type: 'string', required: true, description: 'Task id from desk_task_list.' },
+      expected_revision: { type: 'number', required: true, description: 'Revision returned by desk_task_list.' },
+    },
+    output: textOutput,
+    async execute(args) {
+      try {
+        const task = await store.updateTask(args.id, args.expected_revision, { status: 'done' })
+        return JSON.stringify({ ok: true, task, summary: `已完成任务「${task.title}」` })
       } catch (error) {
         toolError(error)
       }
@@ -111,7 +136,7 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
 
   ctx.tools.register(defineTool({
     name: 'desk_task_archive',
-    description: 'Move one desk task to the board archive (or restore it). Archived tasks leave the board but stay recoverable. Use desk_task_list (include_archived) to get id + revision.',
+    description: 'Move one desk task to the board archive (or restore it). Archived tasks leave the board but stay recoverable.',
     parameters: {
       id: { type: 'string', required: true, description: 'Task id from desk_task_list (pass include_archived to see them).' },
       expected_revision: { type: 'number', required: true, description: 'Revision returned by desk_task_list.' },
@@ -128,5 +153,5 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
     },
   }))
 
-  ctx.logger.info?.(`${PACKAGE_NAME}: registered 3 desk task tools`)
+  ctx.logger.info?.(`${PACKAGE_NAME}: registered 5 desk task tools`)
 }
