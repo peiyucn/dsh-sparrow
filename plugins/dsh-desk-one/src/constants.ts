@@ -47,6 +47,7 @@ export const ROUTES = Object.freeze({
   reviewUpdateTarget: `${PREFIX}/notebook/reviews/update-target`,
   reviewGet: `${PREFIX}/notebook/reviews/get`,
   reviewPage: `${PREFIX}/notebook/reviews/page`,
+  reviewUpdateDrafts: `${PREFIX}/notebook/reviews/update-drafts`,
 })
 
 /** Entry id: both the left-rail panel row id and the key of the center-column `main` slot (official `MainPanelId`). */

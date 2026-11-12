@@ -823,12 +823,35 @@ export class DeskStore {
       schema: DESK_NODE_SCHEMA,
       sessionId: input.sessionId,
       target: input.target,
+      drafts: [],
       createdAt: now,
       updatedAt: now,
       revision: 1,
     }
     await this.nodes.put(record.id, record)
     return record
+  }
+
+  /** Replace the unsaved draft list (revision-checked; drafts are the user's intent, not review state). */
+  async updateReviewDrafts(
+    id: string,
+    expectedRevision: number,
+    drafts: DeskReview['drafts'],
+  ): Promise<DeskReview> {
+    const now = new Date().toISOString()
+    try {
+      const updated = await this.nodes.update(id, (current) => {
+        if (current.kind !== 'review') throw new DeskModelError('UNKNOWN_REVIEW', `审阅记录不存在：${id}`)
+        if (!Number.isInteger(expectedRevision) || current.revision !== expectedRevision) {
+          throw new DeskModelError('REVISION_CONFLICT', `审阅记录已被修改（当前 revision ${current.revision}，请求 ${expectedRevision}）`)
+        }
+        return { ...current, drafts, updatedAt: now, revision: current.revision + 1 }
+      })
+      if (updated.kind !== 'review') throw new DeskModelError('UNKNOWN_REVIEW', `审阅记录不存在：${id}`)
+      return updated
+    } catch (error) {
+      throw this.mapMissing(error, 'UNKNOWN_REVIEW', `审阅记录不存在：${id}`)
+    }
   }
 
   /** Re-point one review link at a new file snapshot (manual re-attach). */

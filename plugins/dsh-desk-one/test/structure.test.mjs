@@ -251,14 +251,15 @@ describe('dsh-desk-one 结构', () => {
     }
   })
 
-  it('笔记审阅 应该 渲染文档、弹窗批注、底部浮层并拦截未提交关闭', async () => {
+  it('笔记审阅 应该 渲染文档、弹窗批注、底部浮层，草稿落库', async () => {
     const register = await read('src/client/notebook/register.ts')
     const review = await read('src/client/notebook/review.tsx')
     const bridge = await read('src/client/notebook/review-bridge.ts')
+    const api = await read('src/client/notebook/review-api.ts')
     const page = await readClientSurface()
     assert.match(register, /sidebarRightTabs\.register/u, 'tab 类型要注册进官方右栏注册表')
     assert.match(register, /'sidebar\.right\.pane\.tab'/u, '正文挂在官方 tab 槽位')
-    assert.match(register, /keepMounted: true/u, '未提交批注要求 tab 保活（切 tab/切会话不丢）')
+    assert.match(register, /keepMounted: true/u, '审阅 tab 保活（切 tab/切会话不丢草稿）')
     assert.match(page, /mountNoteReviewTab/u, '客户端要挂载审阅 tab')
     assert.match(review, /reviewApi\.page\(/u, '审阅页按 review 读取目标文件')
     assert.match(review, /MarkdownText/u, 'markdown 用官方渲染')
@@ -267,9 +268,9 @@ describe('dsh-desk-one 结构', () => {
     assert.match(review, /sendQuote/u, '提交走桥接的输入框引用，不自动发送')
     assert.match(bridge, /insertQuote/u, '引用走官方 SessionInput.insertQuote')
     assert.ok(!/send\(/u.test(bridge), '不得自动发送')
-    assert.match(bridge, /registerCloseHandler/u, '未提交时拦截 tab 关闭')
-    assert.match(bridge, /forceClose/u, '确认后允许关闭')
-    assert.match(page, /beforeunload/u, '关闭浏览器时提示未提交内容')
+    assert.match(review, /reviewApi\.updateDrafts/u, '加到待提交即落库（关 tab/重启 DSH 不丢）')
+    assert.match(review, /persistDrafts/u, '草稿增删改都写回 review 记录')
+    assert.match(api, /reviewUpdateDrafts/u, '草稿路由接进客户端数据面')
     assert.ok(!/DeskAnnotation|addAnnotation|updateAnnotationStatus|deleteAnnotation/u.test(review), '审阅页不再包含持久批注对象')
     const bundle = await read('lib/client.js')
     assert.ok(bundle.includes('note-review'), '构建产物要包含审阅 tab kind')

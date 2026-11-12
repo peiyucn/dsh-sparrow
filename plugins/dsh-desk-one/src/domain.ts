@@ -198,6 +198,13 @@ const reviewSchema = z.object({
     kind: z.enum(['markdown', 'text']),
     hash: z.string().min(1),
   }),
+  // Drafts are the user's unsaved annotations; older records default to none.
+  drafts: z.array(z.object({
+    id: z.string().min(1),
+    quote: z.string(),
+    text: z.string(),
+    createdAt: z.string().min(1),
+  })).default([]),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   revision: z.number().int().positive(),

@@ -579,6 +579,14 @@ export interface ReviewTarget {
   readonly hash: string
 }
 
+/** One unsaved review annotation: a quoted passage plus the human's request. */
+export interface ReviewDraft {
+  readonly id: string
+  readonly quote: string
+  readonly text: string
+  readonly createdAt: string
+}
+
 /** One review association: a DSH session linked to one text file. */
 export interface DeskReview {
   readonly id: string
@@ -587,6 +595,8 @@ export interface DeskReview {
   /** The review session (DSH session id). */
   readonly sessionId: string
   readonly target: ReviewTarget
+  /** Unsaved annotations; persisted so closing the tab or restarting never loses them. */
+  readonly drafts: readonly ReviewDraft[]
   readonly createdAt: string
   readonly updatedAt: string
   readonly revision: number
@@ -608,6 +618,13 @@ export interface CreateReviewRequest {
 }
 
 /** Re-attach a review when its file moved or was renamed. */
+/** Replace the draft list of one review (drafts survive close/restart). */
+export interface UpdateReviewDraftsRequest {
+  readonly id: string
+  readonly expectedRevision: number
+  readonly drafts: readonly ReviewDraft[]
+}
+
 export interface UpdateReviewTargetRequest {
   readonly id: string
   readonly expectedRevision: number

@@ -8,7 +8,7 @@
 import { ROUTES } from '../../constants.js'
 import type {
   CreateReviewRequest, DeskReview, ReviewListResponse, ReviewMutationResponse, ReviewPageResponse,
-  UpdateReviewTargetRequest,
+  UpdateReviewDraftsRequest, UpdateReviewTargetRequest,
 } from '../../contract.js'
 import { fetchJson, postJson } from '../http.js'
 
@@ -41,6 +41,11 @@ export function updateReviewTarget(input: UpdateReviewTargetRequest): Promise<De
   return postJson<ReviewMutationResponse>(ROUTES.reviewUpdateTarget, input).then(payload => payload.review)
 }
 
+/** Replace one review's unsaved drafts (survives closing the tab and restarting DSH). */
+export function updateReviewDrafts(input: UpdateReviewDraftsRequest): Promise<DeskReview> {
+  return postJson<ReviewMutationResponse>(ROUTES.reviewUpdateDrafts, input).then(payload => payload.review)
+}
+
 /** Read the reviewed file as the tab renders it. */
 export function reviewPage(reviewId: string): Promise<ReviewPageResponse> {
   return fetchJson<ReviewPageResponse>(`${ROUTES.reviewPage}?reviewId=${encodeURIComponent(reviewId)}`)
@@ -52,6 +57,7 @@ export interface ReviewApi {
   readonly get: typeof getReview
   readonly create: typeof createReview
   readonly updateTarget: typeof updateReviewTarget
+  readonly updateDrafts: typeof updateReviewDrafts
   readonly page: typeof reviewPage
 }
 
@@ -61,5 +67,6 @@ export const reviewApi: ReviewApi = {
   get: getReview,
   create: createReview,
   updateTarget: updateReviewTarget,
+  updateDrafts: updateReviewDrafts,
   page: reviewPage,
 }

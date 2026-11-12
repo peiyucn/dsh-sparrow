@@ -12,7 +12,7 @@
 import type { ReviewApi } from './review-api.js'
 import type {
   ConversationLike, LayoutLike, SessionNavigationLike, SessionScopeLike, SessionsLike, SidebarRightLike,
-  TabRecordLike, WorkspacesLike,
+  WorkspacesLike,
 } from './faces.js'
 import { invalidateReviewBadges } from './review-badges.js'
 
@@ -53,12 +53,6 @@ export interface ReviewBridge {
   reveal(sessionId: string): Promise<void>
   /** Put one pending batch into the session composer (never sends). */
   sendQuote(sessionId: string, text: string): boolean
-  /** Report how many unsaved annotations one tab holds (0 clears the guard). */
-  setPending(tabId: string, count: number): void
-  /** Subscribe to "a close was blocked because of unsaved work". */
-  onCloseBlocked(listener: (tabId: string) => void): () => void
-  /** Close one tab, bypassing the unsaved-work guard once. */
-  forceClose(tabId: string): void
   attachLayout(service: LayoutLike): () => void
   attachSidebar(service: SidebarRightLike): () => void
   attachSessions(service: SessionsLike): () => void
@@ -97,11 +91,6 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
   let sessions: SessionsLike | undefined
   let navigation: SessionNavigationLike | undefined
   let workspaces: WorkspacesLike | undefined
-  /** Unsaved annotation count per tab id. */
-  const pending = new Map<string, number>()
-  /** Tabs whose next close must skip the guard. */
-  const bypass = new Set<string>()
-  const closeBlocked = new Set<(tabId: string) => void>()
 
   /** Open the tab, retrying while the conversation surface mounts. */
   const openTab = async (reviewId: string): Promise<boolean> => {
@@ -211,35 +200,13 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
       if (accepted) input.focus()
       return accepted
     },
-    setPending(tabId, count) {
-      if (count <= 0) pending.delete(tabId)
-      else pending.set(tabId, count)
-    },
-    onCloseBlocked(listener) {
-      closeBlocked.add(listener)
-      return () => { closeBlocked.delete(listener) }
-    },
-    forceClose(tabId) {
-      bypass.add(tabId)
-      sidebarRight?.close(tabId)
-    },
     attachLayout(service) {
       layout = service
       return () => { if (layout === service) layout = undefined }
     },
     attachSidebar(service) {
       sidebarRight = service
-      const dispose = service.registerCloseHandler(REVIEW_TAB_KIND, (_sessionId: string, tab: TabRecordLike) => {
-        if (bypass.delete(tab.id)) return
-        if ((pending.get(tab.id) ?? 0) === 0) return
-        // Throwing preserves the tab; the body then asks the user to confirm.
-        for (const listener of closeBlocked) listener(tab.id)
-        throw new Error('review: unsaved annotations')
-      })
-      return () => {
-        dispose()
-        if (sidebarRight === service) sidebarRight = undefined
-      }
+      return () => { if (sidebarRight === service) sidebarRight = undefined }
     },
     attachSessions(service) {
       sessions = service

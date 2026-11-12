@@ -15,7 +15,7 @@ import {
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
-import type { DeskReview, ReviewPageResponse } from '../../contract.js'
+import type { DeskReview, ReviewDraft, ReviewPageResponse } from '../../contract.js'
 import type { ReviewApi } from './review-api.js'
 import { messageOf } from '../app/utils.js'
 import type { NoteReviewParams, ReviewBridge } from './review-bridge.js'
@@ -29,12 +29,8 @@ export interface NoteReviewInjected {
 
 type ReviewProps = PropsRuntime<'sidebar.right.pane.tab'> & InjectFace<NoteReviewInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
 
-/** One unsaved annotation: the selected text plus the user's request. */
-interface PendingAnnotation {
-  readonly id: string
-  readonly quote: string
-  readonly text: string
-}
+/** One unsaved annotation (the persisted draft shape). */
+type PendingAnnotation = ReviewDraft
 
 /** Which bottom overlay is open. */
 type OverlayKind = 'pending' | 'diff'
@@ -53,7 +49,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const info = useTabInfo()
   const params = info.tab.navigation.params as NoteReviewParams | undefined
   const reviewId = params?.reviewId
-  const tabId = info.tab.id
   const bodyRef = useRef<HTMLDivElement | null>(null)
 
   const [review, setReview] = useState<DeskReview | null>(null)
@@ -67,7 +62,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const [draft, setDraft] = useState('')
   const [overlay, setOverlay] = useState<OverlayKind | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [blocked, setBlocked] = useState(false)
   /** Re-attach panel: new target path typed by the user. */
   const [reanchor, setReanchor] = useState<string | null>(null)
 
@@ -95,6 +89,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       const [nextReview, nextPage] = await Promise.all([reviewApi.get(reviewId), reviewApi.page(reviewId)])
       setReview(nextReview)
       setPage(nextPage)
+      setPending(nextReview.drafts)
       setBaseline(current => current ?? nextPage.body)
     } catch (cause) {
       setError(messageOf(cause))
@@ -105,22 +100,15 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
 
   useEffect(() => { void load() }, [load])
 
-  // The tab owns the unsaved-work guard: tell the bridge how much is pending.
-  useEffect(() => {
-    bridge.setPending(tabId, pending.length)
-    return () => { bridge.setPending(tabId, 0) }
-  }, [bridge, pending.length, tabId])
-
-  // A blocked close asks the user to confirm in place.
-  useEffect(() => bridge.onCloseBlocked(id => { if (id === tabId) setBlocked(true) }), [bridge, tabId])
-
-  // Closing the browser window with unsaved annotations gets the standard prompt.
-  useEffect(() => {
-    if (pending.length === 0) return
-    const warn = (event: BeforeUnloadEvent): void => { event.preventDefault() }
-    window.addEventListener('beforeunload', warn)
-    return () => { window.removeEventListener('beforeunload', warn) }
-  }, [pending.length])
+  /** Write the draft list back to the review record; drafts are the user's intent, so they persist. */
+  const persistDrafts = useCallback((next: readonly ReviewDraft[]): void => {
+    const current = review
+    if (current === undefined || current === null) return
+    setPending(next)
+    void reviewApi.updateDrafts({ id: current.id, expectedRevision: current.revision, drafts: next })
+      .then((updated) => { setReview(updated) })
+      .catch((cause: unknown) => { setNotice(t('review.draftSaveFailed', { message: messageOf(cause) })) })
+  }, [review, reviewApi, t])
 
   /** Selection → compose popup (the document itself keeps its size). */
   const handleSelect = useCallback((): void => {
@@ -138,14 +126,15 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
 
   const addPending = useCallback((): void => {
     if (composer === null || draft.trim() === '') return
-    setPending(current => [...current, {
-      id: `${Date.now()}-${current.length}`,
+    persistDrafts([...pending, {
+      id: `${Date.now()}-${pending.length}`,
       quote: composer.quote,
       text: draft.trim(),
+      createdAt: new Date().toISOString(),
     }])
     setComposer(null)
     setDraft('')
-  }, [composer, draft])
+  }, [composer, draft, pending, persistDrafts])
 
   /** Submit the whole batch as one numbered message in the composer (never sends). */
   const submitAll = useCallback((): void => {
@@ -155,7 +144,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       .join('\n\n')
     const accepted = bridge.sendQuote(sessionId, text)
     if (accepted) {
-      setPending([])
+      persistDrafts([])
       setOverlay(null)
       setNotice(t('review.submitted'))
     } else {
@@ -328,7 +317,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                       <button
                         type="button"
                         className="dsh-desk-review-mini"
-                        onClick={() => setPending(current => current.filter(entry => entry.id !== item.id))}
+                        onClick={() => persistDrafts(pending.filter(entry => entry.id !== item.id))}
                       >
                         {t('review.delete')}
                       </button>
@@ -370,19 +359,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                       />
                     </DisclosureRow>
                   )}
-            </div>
-          )
-        : null}
-      {blocked
-        ? (
-            <div className="dsh-desk-review-blocker">
-              <p>{t('review.closeBlocked', { count: pending.length })}</p>
-              <div className="dsh-desk-review-actions">
-                <button type="button" className="dsh-desk-btn" onClick={() => setBlocked(false)}>{t('review.keepEditing')}</button>
-                <button type="button" className="dsh-desk-review-mini dsh-desk-review-danger" onClick={() => { setBlocked(false); bridge.forceClose(tabId) }}>
-                  {t('review.closeAnyway')}
-                </button>
-              </div>
             </div>
           )
         : null}
