@@ -95,14 +95,12 @@ function NewNoteForm({ page }: { readonly page: NotebookPageController }): React
   )
 }
 
-/** Unlinked state: a centred offer to link or create a DSH workspace. */
+/** Unlinked state: the two actions are the guidance, all copy sits below the divider. */
 function Unlinked({ page }: { readonly page: NotebookPageController }): ReactElement {
   const { t } = page
   return (
     <div className="dsh-desk-notebook-center">
       <div className="dsh-desk-notebook-centerinner">
-        <h2 className="dsh-desk-notebook-centertitle">{t('notebook.welcomeTitle')}</h2>
-        <p className="dsh-desk-notebook-centertext">{t('notebook.welcomeBody')}</p>
         <div className="dsh-desk-notebook-centeractions">
           <Button variant="primary" size="md" disabled={page.busy} onClick={page.toggleChoosing}>
             {t('notebook.linkWorkspace')}
@@ -115,7 +113,7 @@ function Unlinked({ page }: { readonly page: NotebookPageController }): ReactEle
           ? (
               <div className="dsh-desk-notebook-picker">
                 {page.workspaces.length === 0
-                  ? <p className="dsh-desk-notebook-fineprint">{t('notebook.noWorkspace')}</p>
+                  ? <p className="dsh-desk-notebook-centerhint">{t('notebook.noWorkspace')}</p>
                   : page.workspaces.map(item => (
                       <button key={item.workspaceId} type="button" className="dsh-desk-notebook-pickeritem" disabled={page.busy} onClick={() => { void page.chooseRoot(item.path) }}>
                         <span className="dsh-desk-notebook-pickertitle">{item.title}</span>
@@ -126,6 +124,7 @@ function Unlinked({ page }: { readonly page: NotebookPageController }): ReactEle
             )
           : null}
         <div className="dsh-desk-notebook-centerdivider" aria-hidden="true" />
+        <p className="dsh-desk-notebook-centerhint">{t('notebook.welcomeBody')}</p>
         <p className="dsh-desk-notebook-centerhint">{t('notebook.workspaceHint')}</p>
       </div>
     </div>

@@ -310,25 +310,12 @@ button.dsh-desk-notebook-rowbody {
   max-width: 640px;
   text-align: center;
 }
-.dsh-desk-notebook-centertitle {
-  margin: 0;
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 26px;
-}
-.dsh-desk-notebook-centertext {
-  margin: 0;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  font-size: 13px;
-  line-height: 20px;
-}
+
 .dsh-desk-notebook-centeractions {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  margin-top: 2px;
 }
 .dsh-desk-notebook-centerdivider {
   align-self: stretch;
