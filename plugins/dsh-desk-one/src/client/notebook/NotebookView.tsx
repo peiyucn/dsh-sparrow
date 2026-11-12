@@ -1,13 +1,14 @@
 /**
  * Notebook page: a thin management surface for a linked note workspace.
  *
- * Browsing is delegated to the official right-sidebar file browser (opened by default in a
- * session of the linked workspace); this page only creates notes, searches the library, and
- * manages submitted / unsubmitted review records.
+ * Browsing is delegated to the official right-sidebar file browser (opened explicitly, in a
+ * session of the linked workspace); this page creates notes, searches the library, lists files
+ * (recent first, reviewed files flagged), and manages submitted / unsubmitted review records.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
+import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DeskTranslator } from '../app/types.js'
 import { messageOf } from '../app/utils.js'
 import type { NotebookEntry, NotebookStateResponse, ReviewHistoryEntry } from '../../notebook-contract.js'
@@ -17,26 +18,31 @@ import type { ReviewOpenInput, ReviewOpenResult } from './review-bridge.js'
 import type { WorkspaceAccess } from './workspaces.js'
 import { findWorkspaceForRoot } from './workspaces.js'
 
-/** Which list the page shows under the actions. */
-type Panel = 'search' | 'drafts' | 'history'
+/** Which panel the page shows below the header. */
+type Panel = 'drafts' | 'history'
 
-/** One page row in search / draft lists. */
+/** One list row (recent files, search results, drafts). */
 function PageRow(props: {
   readonly t: DeskTranslator
   readonly path: string
   readonly title: string
+  readonly date?: string
   readonly draftCount?: number
-  /** Frontmatter is missing: flag it so the row still tells the user. */
+  readonly reviewedCount?: number
   readonly missing?: boolean
   readonly onOpen: () => void
 }): ReactElement {
-  const { t, path, title, draftCount, missing, onOpen } = props
+  const { t, path, title, date, draftCount, reviewedCount, missing, onOpen } = props
   return (
     <button type="button" className="dsh-desk-notebook-page" onClick={onOpen} title={path}>
       <span className="dsh-desk-notebook-page-title">{title}</span>
       <span className="dsh-desk-notebook-page-path">{path}</span>
       {missing === true ? <span className="dsh-desk-notebook-badge">{t('notebook.missingBadge')}</span> : null}
+      {reviewedCount === undefined || reviewedCount === 0 ? null : (
+        <span className="dsh-desk-notebook-badge dsh-desk-notebook-badge-review">{t('notebook.reviewedBadge', { count: reviewedCount })}</span>
+      )}
       {draftCount === undefined || draftCount === 0 ? null : <span className="dsh-desk-notebook-badge">{t('notebook.draftBadge', { count: draftCount })}</span>}
+      {date === undefined ? null : <span className="dsh-desk-notebook-page-date">{date}</span>}
     </button>
   )
 }
@@ -47,26 +53,30 @@ export function NotebookView(props: {
   readonly notebook: NotebookApi
   readonly workspaceAccess: WorkspaceAccess
   readonly onOpenReview: (input: ReviewOpenInput) => Promise<ReviewOpenResult>
+  readonly onOpenBrowser: (workspaceId: string) => Promise<ReviewOpenResult>
   readonly onDraftWithAi: (workspaceId: string, prompt: string) => void
 }): ReactElement {
-  const { t, notebook, workspaceAccess, onOpenReview, onDraftWithAi } = props
+  const { t, notebook, workspaceAccess, onOpenReview, onOpenBrowser, onDraftWithAi } = props
 
   const [state, setState] = useState<NotebookStateResponse | null>(null)
+  const [history, setHistory] = useState<readonly ReviewHistoryEntry[]>([])
   const [panel, setPanel] = useState<Panel | null>(null)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<readonly NotebookEntry[] | null>(null)
-  const [history, setHistory] = useState<readonly ReviewHistoryEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [choosing, setChoosing] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  const [browserOpen, setBrowserOpen] = useState<'pending' | 'opened' | 'failed' | null>(null)
 
   const load = useCallback(async (): Promise<void> => {
     setError(null)
     try {
-      setState(await notebook.state())
+      const [next, entries] = await Promise.all([notebook.state(), notebook.history()])
+      setState(next)
+      setHistory(entries.entries)
     } catch (cause) {
       setError(messageOf(cause))
     }
@@ -78,10 +88,26 @@ export function NotebookView(props: {
   const workspaces = workspaceAccess.list()
   const workspace = rootPath === undefined ? undefined : findWorkspaceForRoot(workspaces, rootPath)
 
-  // Search is a flat library query; clearing returns to the management view.
+  /** Explicit browse: start a session in the library workspace and open the official file page. */
+  const openBrowser = useCallback(async (): Promise<void> => {
+    if (workspace === undefined) {
+      setNotice(t('notebook.noWorkspaceForRoot'))
+      return
+    }
+    setBrowserOpen('pending')
+    try {
+      const result = await onOpenBrowser(workspace.workspaceId)
+      setBrowserOpen(result.ok ? 'opened' : 'failed')
+      if (!result.ok) setNotice(result.message ?? t('review.openFailed'))
+    } catch (cause) {
+      setBrowserOpen('failed')
+      setNotice(messageOf(cause))
+    }
+  }, [onOpenBrowser, t, workspace])
+
+  // Search is a flat library query; clearing returns to the recent list.
   useEffect(() => {
     if (query.trim() === '') { setResults(null); return }
-    setPanel('search')
     let cancelled = false
     const timer = setTimeout(() => {
       void notebook.search({ query, limit: 200 }).then(payload => {
@@ -96,17 +122,13 @@ export function NotebookView(props: {
     }
   }, [notebook, query])
 
-  useEffect(() => {
-    if (panel !== 'history') return
-    void notebook.history().then(payload => setHistory(payload.entries), cause => setError(messageOf(cause)))
-  }, [notebook, panel])
-
   const chooseRoot = useCallback(async (path: string): Promise<void> => {
     setBusy(true)
     setError(null)
     try {
       setState(await notebook.setRoot(path))
       setChoosing(false)
+      setBrowserOpen(null)
     } catch (cause) {
       setError(messageOf(cause))
     } finally {
@@ -132,6 +154,7 @@ export function NotebookView(props: {
       setState(await notebook.clearRoot())
       setPanel(null)
       setQuery('')
+      setBrowserOpen(null)
     } catch (cause) {
       setError(messageOf(cause))
     } finally {
@@ -191,7 +214,7 @@ export function NotebookView(props: {
     setBusy(true)
     try {
       await notebook.deleteHistory(id)
-      setHistory(entries => entries?.filter(entry => entry.record.id !== id) ?? null)
+      setHistory(entries => entries.filter(entry => entry.record.id !== id))
       await load()
     } catch (cause) {
       setNotice(messageOf(cause))
@@ -200,9 +223,46 @@ export function NotebookView(props: {
     }
   }, [load, notebook])
 
-  const drafts = useMemo(() => state?.drafts ?? [], [state?.drafts])
+  /** Reviewed files (unique), newest review first. */
+  const reviewed = useMemo(() => {
+    const map = new Map<string, { count: number; lastAt: string }>()
+    for (const entry of history) {
+      const path = entry.resolvedPath ?? entry.record.pathSnapshot
+      const previous = map.get(path)
+      map.set(path, {
+        count: (previous?.count ?? 0) + entry.record.annotations.length,
+        lastAt: previous === undefined || entry.record.createdAt > previous.lastAt ? entry.record.createdAt : previous.lastAt,
+      })
+    }
+    return map
+  }, [history])
+
+  const draftCounts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const draft of state?.drafts ?? []) map.set(draft.path, draft.drafts.length)
+    return map
+  }, [state?.drafts])
+
+  /** Recent files: reviewed first (by review time), then unreviewed by modification time. */
+  const recent = useMemo(() => {
+    const rows = (state?.recent ?? []).map(entry => ({
+      entry,
+      review: reviewed.get(entry.path),
+    }))
+    return rows.sort((left, right) => {
+      if (left.review !== undefined && right.review !== undefined) return right.review.lastAt.localeCompare(left.review.lastAt)
+      if (left.review !== undefined) return -1
+      if (right.review !== undefined) return 1
+      return right.entry.mtime.localeCompare(left.entry.mtime)
+    }).map(row => row.entry)
+  }, [reviewed, state?.recent])
+
   const historyBytes = state?.historyBytes ?? 0
   const historyWarn = historyBytes >= NOTEBOOK_HISTORY_WARN_BYTES
+  const listRows = query.trim() === '' ? recent : results ?? []
+  const listHint = query.trim() === ''
+    ? t('notebook.recentHint')
+    : t('notebook.searchResults', { count: results?.length ?? 0 })
 
   return (
     <div className="dsh-desk-notebookview">
@@ -215,12 +275,12 @@ export function NotebookView(props: {
                 <h3>{t('notebook.welcomeTitle')}</h3>
                 <p>{t('notebook.welcomeBody')}</p>
                 <div className="dsh-desk-notebook-center-actions">
-                  <button type="button" className="dsh-desk-action dsh-desk-action-primary" disabled={busy} onClick={() => setChoosing(current => !current)}>
+                  <Button variant="primary" size="sm" disabled={busy} onClick={() => setChoosing(current => !current)}>
                     {t('notebook.linkWorkspace')}
-                  </button>
-                  <button type="button" className="dsh-desk-action" disabled={busy} onClick={() => { void pickNewWorkspace() }}>
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={busy} onClick={() => { void pickNewWorkspace() }}>
                     {t('notebook.createWorkspace')}
-                  </button>
+                  </Button>
                 </div>
                 {choosing
                   ? (
@@ -244,18 +304,16 @@ export function NotebookView(props: {
             <>
               <section className="dsh-desk-notebook-hero">
                 <div className="dsh-desk-notebook-hero-main">
-                  <button
-                    type="button"
-                    className="dsh-desk-action dsh-desk-action-primary dsh-desk-notebook-newbutton"
-                    disabled={busy}
-                    onClick={() => setNewOpen(current => !current)}
-                  >
+                  <Button variant="primary" size="md" disabled={busy} onClick={() => setNewOpen(current => !current)}>
                     {t('notebook.new')}
-                  </button>
+                  </Button>
                   <div className="dsh-desk-notebook-hero-copy">
                     <h3>{t('notebook.heroTitle')}</h3>
                     <p>{t('notebook.heroBody')}</p>
                   </div>
+                  <Button variant="outline" size="sm" disabled={busy || browserOpen === 'pending'} onClick={() => { void openBrowser() }}>
+                    {browserOpen === 'pending' ? t('notebook.browserOpening') : t('notebook.openBrowser')}
+                  </Button>
                 </div>
                 <input
                   className="dsh-desk-notebook-searchengine"
@@ -274,12 +332,12 @@ export function NotebookView(props: {
                           autoFocus
                         />
                         <div className="dsh-desk-notebook-actions">
-                          <button type="button" className="dsh-desk-btn" disabled={busy || newTitle.trim() === ''} onClick={() => { void createEmpty() }}>
+                          <Button variant="outline" size="sm" disabled={busy || newTitle.trim() === ''} onClick={() => { void createEmpty() }}>
                             {t('notebook.createEmpty')}
-                          </button>
-                          <button type="button" className="dsh-desk-btn" disabled={newTitle.trim() === '' || workspace === undefined} onClick={draftWithAi}>
+                          </Button>
+                          <Button variant="outline" size="sm" disabled={newTitle.trim() === '' || workspace === undefined} onClick={draftWithAi}>
                             {state?.note2md === true ? t('notebook.note2mdNew') : t('notebook.aiDraft')}
-                          </button>
+                          </Button>
                         </div>
                         {newTitle.trim() === '' ? <p className="dsh-desk-notebook-fineprint">{t('notebook.newHint')}</p> : null}
                       </div>
@@ -288,6 +346,9 @@ export function NotebookView(props: {
               </section>
 
               <div className="dsh-desk-notebook-panelbar">
+                <button type="button" className="dsh-desk-notebook-paneltab" data-active={panel === null || undefined} onClick={() => setPanel(null)}>
+                  {t('notebook.recentTab')}
+                </button>
                 <button type="button" className="dsh-desk-notebook-paneltab" data-active={panel === 'drafts' || undefined} onClick={() => setPanel(current => current === 'drafts' ? null : 'drafts')}>
                   {t('notebook.entryDrafts', { count: state?.draftCount ?? 0 })}
                 </button>
@@ -298,46 +359,6 @@ export function NotebookView(props: {
                 <button type="button" className="dsh-desk-review-mini" disabled={busy} onClick={() => { void disconnect() }}>{t('notebook.disconnect')}</button>
               </div>
 
-              {panel === null ? <p className="dsh-desk-notebook-hint">{t('notebook.startHint')}</p> : null}
-              {panel === 'search'
-                ? (
-                    <div className="dsh-desk-notebook-pages">
-                      {results === null
-                        ? <p className="dsh-desk-notebook-hint">{t('state.loading')}</p>
-                        : results.length === 0
-                          ? <p className="dsh-desk-notebook-hint">{t('notebook.searchEmpty')}</p>
-                          : results.map(entry => (
-                              <PageRow
-                                key={entry.path}
-                                t={t}
-                                path={entry.path}
-                                title={entry.title}
-                                missing={!entry.hasFrontmatter}
-                                draftCount={state?.drafts.find(draft => draft.path === entry.path)?.drafts.length}
-                                onOpen={() => { void openPage(entry.path) }}
-                              />
-                            ))}
-                    </div>
-                  )
-                : null}
-              {panel === 'drafts'
-                ? (
-                    <div className="dsh-desk-notebook-pages">
-                      {drafts.length === 0
-                        ? <p className="dsh-desk-notebook-hint">{t('notebook.draftsEmpty')}</p>
-                        : drafts.map(draft => (
-                            <PageRow
-                              key={draft.id}
-                              t={t}
-                              path={draft.path}
-                              title={draft.path.split('/').pop() ?? draft.path}
-                              draftCount={draft.drafts.length}
-                              onOpen={() => { void openPage(draft.path) }}
-                            />
-                          ))}
-                    </div>
-                  )
-                : null}
               {panel === 'history'
                 ? (
                     <div className="dsh-desk-notebook-history">
@@ -346,29 +367,70 @@ export function NotebookView(props: {
                           {t('notebook.historyUsage', { size: (historyBytes / 1024).toFixed(1) })}
                         </span>
                       </div>
-                      {history === null
-                        ? <p className="dsh-desk-notebook-hint">{t('state.loading')}</p>
-                        : history.length === 0
-                          ? <p className="dsh-desk-notebook-hint">{t('notebook.historyEmpty')}</p>
-                          : history.map(entry => (
-                              <div className="dsh-desk-notebook-historyrow" key={entry.record.id}>
-                                <div className="dsh-desk-notebook-historymain">
-                                  <span className="dsh-desk-notebook-page-title">{entry.record.fileTitle}</span>
-                                  <span className="dsh-desk-notebook-page-path">{entry.resolvedPath ?? entry.record.pathSnapshot}</span>
-                                  <span className="dsh-desk-notebook-badge">{t('notebook.historyCount', { count: entry.record.annotations.length })}</span>
-                                  <span className="dsh-desk-notebook-badge">
-                                    {entry.status === 'linked' ? t('notebook.linkLinked') : entry.status === 'moved' ? t('notebook.linkMoved') : t('notebook.linkDetached')}
-                                  </span>
-                                  <span className="dsh-desk-notebook-page-date">{new Date(entry.record.createdAt).toLocaleString()}</span>
-                                </div>
-                                <button type="button" className="dsh-desk-review-mini" disabled={busy} onClick={() => { void deleteHistory(entry.record.id) }}>
-                                  {t('review.delete')}
-                                </button>
+                      {history.length === 0
+                        ? <p className="dsh-desk-notebook-hint">{t('notebook.historyEmpty')}</p>
+                        : history.map(entry => (
+                            <div className="dsh-desk-notebook-historyrow" key={entry.record.id}>
+                              <div className="dsh-desk-notebook-historymain">
+                                <span className="dsh-desk-notebook-page-title">{entry.record.fileTitle}</span>
+                                <span className="dsh-desk-notebook-page-path">{entry.resolvedPath ?? entry.record.pathSnapshot}</span>
+                                <span className="dsh-desk-notebook-badge">{t('notebook.historyCount', { count: entry.record.annotations.length })}</span>
+                                <span className="dsh-desk-notebook-badge">
+                                  {entry.status === 'linked' ? t('notebook.linkLinked') : entry.status === 'moved' ? t('notebook.linkMoved') : t('notebook.linkDetached')}
+                                </span>
+                                <span className="dsh-desk-notebook-page-date">{new Date(entry.record.createdAt).toLocaleString()}</span>
                               </div>
-                            ))}
+                              <button type="button" className="dsh-desk-review-mini" disabled={busy} onClick={() => { void deleteHistory(entry.record.id) }}>
+                                {t('review.delete')}
+                              </button>
+                            </div>
+                          ))}
                     </div>
                   )
-                : null}
+                : panel === 'drafts'
+                  ? (
+                      <div className="dsh-desk-notebook-pages">
+                        {(state?.drafts ?? []).length === 0
+                          ? <p className="dsh-desk-notebook-hint">{t('notebook.draftsEmpty')}</p>
+                          : (state?.drafts ?? []).map(draft => (
+                              <PageRow
+                                key={draft.id}
+                                t={t}
+                                path={draft.path}
+                                title={draft.path.split('/').pop() ?? draft.path}
+                                draftCount={draft.drafts.length}
+                                reviewedCount={reviewed.get(draft.path)?.count}
+                                onOpen={() => { void openPage(draft.path) }}
+                              />
+                            ))}
+                      </div>
+                    )
+                  : (
+                      <div className="dsh-desk-notebook-recent">
+                        <div className="dsh-desk-notebook-recenthead">
+                          <h4>{listHint}</h4>
+                        </div>
+                        {listRows.length === 0
+                          ? <p className="dsh-desk-notebook-hint">{t('notebook.emptyFolder')}</p>
+                          : (
+                              <div className="dsh-desk-notebook-pages">
+                                {listRows.map(entry => (
+                                  <PageRow
+                                    key={entry.path}
+                                    t={t}
+                                    path={entry.path}
+                                    title={entry.title}
+                                    date={entry.date}
+                                    missing={!entry.hasFrontmatter}
+                                    draftCount={draftCounts.get(entry.path)}
+                                    reviewedCount={reviewed.get(entry.path)?.count}
+                                    onOpen={() => { void openPage(entry.path) }}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                      </div>
+                    )}
             </>
           )}
     </div>

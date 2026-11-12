@@ -257,6 +257,25 @@ export const NOTEBOOK_CSS = `
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
+.dsh-desk-notebook-recent {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dsh-desk-notebook-recenthead {
+  padding: 2px 2px 4px;
+}
+.dsh-desk-notebook-recenthead h4 {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 11px;
+  font-weight: 600;
+}
+.dsh-desk-notebook-badge-review {
+  color: var(--dsw-alias-brand-primary, #4176e6);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4176e6) 12%, transparent);
+}
 .dsh-desk-notebook-badge {
   flex: none;
   padding: 0 5px;

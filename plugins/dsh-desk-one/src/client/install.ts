@@ -33,6 +33,8 @@ export interface DeskPanelInjected {
   readonly workspaceAccess: WorkspaceAccess
   /** Start a review in a new session of the library workspace and open the review tab. */
   readonly openReview: (input: import('./notebook/review-bridge.js').ReviewOpenInput) => Promise<ReviewOpenResult>
+  /** Start a session in the library workspace and open the official file browser. */
+  readonly openBrowser: (workspaceId: string) => Promise<import('./notebook/review-bridge.js').ReviewOpenResult>
   /** Start a new session with a prefilled prompt (new-note drafting). */
   readonly draftWithAi: (workspaceId: string, prompt: string) => void
   readonly listNotes: (query?: string) => Promise<readonly DeskNote[]>
