@@ -12,8 +12,8 @@ import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
 import { createSessionIndexRecord, sessionIndexId, type SessionIndexDraft } from './sessions/records.js'
 import {
-  MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTEBOOK_CONFIG_ID, NODES_TABLE, PACKAGE_NAME, SCHEDULE_COLORS,
-  SESSION_INDEX_MISSING_DAYS, TASK_STATUSES, DESK_NODE_SCHEMA,
+  MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NODES_TABLE, PACKAGE_NAME, SCHEDULE_COLORS,
+  SESSION_INDEX_MISSING_DAYS, TASK_STATUSES,
 } from '../constants.js'
 import {
   DeskModelError, createGroupRecord, createNoteRecord, createTaskRecord, filterGroups, filterNotes, filterTasks,
@@ -26,8 +26,8 @@ import {
   type CalendarDraft, type EventDraft, type EventQuery,
 } from './schedule/records.js'
 import type {
-  DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskNotebookConfig, DeskReview, DeskScheduleSource, DeskSessionIndex,
-  DeskTask, DeskTaskGroup, ReviewTarget, ScheduleSyncError, TaskStatus,
+  DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskScheduleSource, DeskSessionIndex, DeskTask, DeskTaskGroup,
+  ScheduleSyncError, TaskStatus,
 } from '../contract.js'
 
 type DeskDomain = Domain<typeof DESK_DOMAIN>
@@ -40,7 +40,7 @@ export class DeskStore {
     try {
       const domain = await ctx.storageDomain.open(DESK_DOMAIN)
       const store = new DeskStore(domain)
-      await store.purgeLegacyAnnotations(ctx)
+      await store.purgeLegacyRecords(ctx)
       return store
     } catch (error) {
       ctx.logger.warn(
@@ -51,23 +51,24 @@ export class DeskStore {
   }
 
   /**
-   * Delete pre-review annotation records once, after the domain opened.
+   * Delete records of the withdrawn notebook feature once, after the domain opened.
    *
    * They are accepted by the schema only to keep an upgrade from rejecting the whole domain;
-   * review state lives in conversations now, so these rows have no reader.
+   * notebook and review state live elsewhere now, so these rows have no reader.
    * @param ctx - host context (logging only).
    */
-  private async purgeLegacyAnnotations(ctx: Context): Promise<void> {
-    const legacy = this.allNodes().filter(node => node.kind === 'annotation')
+  private async purgeLegacyRecords(ctx: Context): Promise<void> {
+    const legacyKinds = new Set(['annotation', 'notebook-config', 'review'])
+    const legacy = this.allNodes().filter(node => legacyKinds.has((node as { kind?: string }).kind ?? ''))
     if (legacy.length === 0) return
     for (const node of legacy) {
       try {
         await this.nodes.delete(node.id)
       } catch (error) {
-        ctx.logger.warn(`${PACKAGE_NAME}: 清理旧批注记录失败（${node.id}）：${error instanceof Error ? error.message : String(error)}`)
+        ctx.logger.warn(`${PACKAGE_NAME}: 清理旧笔记功能记录失败（${node.id}）：${error instanceof Error ? error.message : String(error)}`)
       }
     }
-    ctx.logger.info(`${PACKAGE_NAME}: 已清理 ${legacy.length} 条旧批注记录（审阅状态已改为会话承载）`)
+    ctx.logger.info(`${PACKAGE_NAME}: 已清理 ${legacy.length} 条旧笔记功能记录`)
   }
 
   /** The unified node table (all kinds share it; kind is the discriminator). */
@@ -408,11 +409,7 @@ export class DeskStore {
   }
 
   /** Translate the domain's missing-key error into the feature-specific 404. */
-  private mapMissing(
-    error: unknown,
-    code: 'UNKNOWN_NOTE' | 'UNKNOWN_TASK' | 'UNKNOWN_GROUP' | 'UNKNOWN_REVIEW',
-    message: string,
-  ): unknown {
+  private mapMissing(error: unknown, code: 'UNKNOWN_NOTE' | 'UNKNOWN_TASK' | 'UNKNOWN_GROUP', message: string): unknown {
     if (error instanceof DomainError && error.code === 'missing-key') return new DeskModelError(code, message)
     return error
   }
@@ -751,125 +748,6 @@ export class DeskStore {
   findSessionIndex(sessionId: string): DeskSessionIndex | undefined {
     const node = this.nodes.get(sessionIndexId(sessionId))
     return node?.kind === 'session' ? node : undefined
-  }
-
-  /* ------------------------------ notebook ------------------------------ */
-
-  /** The configured notes root, or `undefined` before the user picks one. */
-  getNotebookConfig(): DeskNotebookConfig | undefined {
-    const node = this.nodes.get(NOTEBOOK_CONFIG_ID)
-    return node?.kind === 'notebook-config' ? node : undefined
-  }
-
-  /**
-   * Set (or repoint) the notes root. The record is a singleton: the first write
-   * creates it, later writes bump its revision. The path is validated by the
-   * caller before it reaches the store.
-   */
-  async saveNotebookRoot(rootPath: string): Promise<DeskNotebookConfig> {
-    const now = new Date().toISOString()
-    const existing = this.getNotebookConfig()
-    if (existing === undefined) {
-      const record: DeskNotebookConfig = {
-        id: NOTEBOOK_CONFIG_ID,
-        kind: 'notebook-config',
-        schema: DESK_NODE_SCHEMA,
-        rootPath,
-        createdAt: now,
-        updatedAt: now,
-        revision: 1,
-      }
-      await this.nodes.put(record.id, record)
-      return record
-    }
-    return this.nodes.update(NOTEBOOK_CONFIG_ID, current => current.kind === 'notebook-config'
-      ? { ...current, rootPath, updatedAt: now, revision: current.revision + 1 }
-      : current) as Promise<DeskNotebookConfig>
-  }
-
-  /** Remove the notes-root record (used when the user clears the library). */
-  async clearNotebookRoot(): Promise<void> {
-    await this.nodes.delete(NOTEBOOK_CONFIG_ID)
-  }
-
-  /* -------------------------------- reviews -------------------------------- */
-
-  /** Review links newest-first; filter by session, workspace root, or file path. */
-  listReviews(filter?: {
-    readonly sessionId?: string
-    readonly cwd?: string
-    readonly path?: string
-  }): DeskReview[] {
-    return this.allNodes()
-      .filter((node): node is DeskReview => node.kind === 'review')
-      .filter(node => filter?.sessionId === undefined || node.sessionId === filter.sessionId)
-      .filter(node => filter?.cwd === undefined || node.target.cwd === filter.cwd)
-      .filter(node => filter?.path === undefined || node.target.path === filter.path)
-      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-  }
-
-  /** One review link by id. */
-  getReview(id: string): DeskReview | undefined {
-    const node = this.nodes.get(id)
-    return node?.kind === 'review' ? node : undefined
-  }
-
-  /** Create the link between a review session and its file snapshot. */
-  async createReview(input: { readonly sessionId: string; readonly target: ReviewTarget }): Promise<DeskReview> {
-    const now = new Date().toISOString()
-    const record: DeskReview = {
-      id: `review_${randomUUID()}`,
-      kind: 'review',
-      schema: DESK_NODE_SCHEMA,
-      sessionId: input.sessionId,
-      target: input.target,
-      drafts: [],
-      createdAt: now,
-      updatedAt: now,
-      revision: 1,
-    }
-    await this.nodes.put(record.id, record)
-    return record
-  }
-
-  /** Replace the unsaved draft list (revision-checked; drafts are the user's intent, not review state). */
-  async updateReviewDrafts(
-    id: string,
-    expectedRevision: number,
-    drafts: DeskReview['drafts'],
-  ): Promise<DeskReview> {
-    const now = new Date().toISOString()
-    try {
-      const updated = await this.nodes.update(id, (current) => {
-        if (current.kind !== 'review') throw new DeskModelError('UNKNOWN_REVIEW', `审阅记录不存在：${id}`)
-        if (!Number.isInteger(expectedRevision) || current.revision !== expectedRevision) {
-          throw new DeskModelError('REVISION_CONFLICT', `审阅记录已被修改（当前 revision ${current.revision}，请求 ${expectedRevision}）`)
-        }
-        return { ...current, drafts, updatedAt: now, revision: current.revision + 1 }
-      })
-      if (updated.kind !== 'review') throw new DeskModelError('UNKNOWN_REVIEW', `审阅记录不存在：${id}`)
-      return updated
-    } catch (error) {
-      throw this.mapMissing(error, 'UNKNOWN_REVIEW', `审阅记录不存在：${id}`)
-    }
-  }
-
-  /** Re-point one review link at a new file snapshot (manual re-attach). */
-  async updateReviewTarget(id: string, expectedRevision: number, target: ReviewTarget): Promise<DeskReview> {
-    const now = new Date().toISOString()
-    try {
-      const updated = await this.nodes.update(id, (current) => {
-        if (current.kind !== 'review') throw new DeskModelError('UNKNOWN_REVIEW', `审阅记录不存在：${id}`)
-        if (!Number.isInteger(expectedRevision) || current.revision !== expectedRevision) {
-          throw new DeskModelError('REVISION_CONFLICT', `审阅记录已被修改（当前 revision ${current.revision}，请求 ${expectedRevision}）`)
-        }
-        return { ...current, target, updatedAt: now, revision: current.revision + 1 }
-      })
-      if (updated.kind !== 'review') throw new DeskModelError('UNKNOWN_REVIEW', `审阅记录不存在：${id}`)
-      return updated
-    } catch (error) {
-      throw this.mapMissing(error, 'UNKNOWN_REVIEW', `审阅记录不存在：${id}`)
-    }
   }
 
   /** Close the storage domain (plugin unload / host shutdown, via the effect). */

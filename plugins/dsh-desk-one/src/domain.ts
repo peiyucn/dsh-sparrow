@@ -174,55 +174,30 @@ const sessionIndexSchema = z.object({
   revision: z.number().int().nonnegative(),
 })
 
-/** The single profile-level notes-root record (fixed id `notebook_config`). */
-const notebookConfigSchema = z.object({
-  id: z.string().min(1),
-  kind: z.literal('notebook-config'),
-  schema: z.number().int().positive(),
-  rootPath: z.string().min(1),
-  createdAt: z.string().min(1),
-  updatedAt: z.string().min(1),
-  revision: z.number().int().positive(),
-})
-
-/** One review association (a DSH review session plus its file snapshot). */
-const reviewSchema = z.object({
-  id: z.string().min(1),
-  kind: z.literal('review'),
-  schema: z.number().int().positive(),
-  sessionId: z.string().min(1),
-  target: z.object({
-    cwd: z.string().min(1),
-    path: z.string().min(1),
-    title: z.string(),
-    kind: z.enum(['markdown', 'text']),
-    hash: z.string().min(1),
-  }),
-  // Drafts are the user's unsaved annotations; older records default to none.
-  drafts: z.array(z.object({
-    id: z.string().min(1),
-    quote: z.string(),
-    text: z.string(),
-    createdAt: z.string().min(1),
-  })).default([]),
-  createdAt: z.string().min(1),
-  updatedAt: z.string().min(1),
-  revision: z.number().int().positive(),
-})
-
 /**
- * Pre-review annotation records, tolerated only so an upgrade opens the domain (one invalid
- * record rejects the whole open); `Store.open` deletes them immediately afterwards.
+ * Records from the withdrawn notebook feature (annotation / notebook-config / review).
+ * They are tolerated only so an upgrade opens the domain (one invalid record rejects the
+ * whole open); `Store.open` deletes them right after opening.
  */
 const legacyAnnotationSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('annotation'),
   schema: z.number().int().positive(),
 }).passthrough()
+const legacyNotebookConfigSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('notebook-config'),
+  schema: z.number().int().positive(),
+}).passthrough()
+const legacyReviewSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('review'),
+  schema: z.number().int().positive(),
+}).passthrough()
 
 const nodeSchema = z.discriminatedUnion('kind', [
   noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema, sessionIndexSchema,
-  notebookConfigSchema, reviewSchema, legacyAnnotationSchema,
+  legacyAnnotationSchema, legacyNotebookConfigSchema, legacyReviewSchema,
 ])
 const edgeSchema = z.object({
   id: z.string().min(1),
@@ -238,7 +213,7 @@ export const DESK_DOMAIN = defineDomain({
   version: DOMAIN_VERSION,
   layout: 'per-record',
   tables: {
-    [NODES_TABLE]: domainTable<string, DeskNode>(nodeSchema),
+    [NODES_TABLE]: domainTable<string, DeskNode>(nodeSchema as unknown as z.ZodType<DeskNode>),
     [EDGES_TABLE]: domainTable<string, DeskEdge>(edgeSchema),
   },
 })

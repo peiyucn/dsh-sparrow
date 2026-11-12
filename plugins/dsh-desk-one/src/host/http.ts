@@ -20,13 +20,6 @@ type DeskErrorCode =
   | 'SCHEDULE_NOT_CONNECTED'
   | 'SCHEDULE_AUTH_EXPIRED'
   | 'SCHEDULE_UNAVAILABLE'
-  /* notebook (third stage) */
-  | 'INVALID_NOTEBOOK'
-  | 'NOTEBOOK_UNAVAILABLE'
-  | 'NOTEBOOK_SCAN_TIMEOUT'
-  | 'UNKNOWN_ANNOTATION'
-  | 'UNKNOWN_REVIEW_TARGET'
-  | 'UNKNOWN_REVIEW'
 
 export class DeskError extends Error {
   constructor(readonly code: DeskErrorCode, message: string, readonly status = 400) {
@@ -51,7 +44,7 @@ export function sendError(ctx: Context, res: ServerResponse, error: unknown): vo
     const status = error.code === 'REVISION_CONFLICT'
       ? 409
       : error.code === 'UNKNOWN_NOTE' || error.code === 'UNKNOWN_TASK' || error.code === 'UNKNOWN_GROUP'
-        || error.code === 'UNKNOWN_CALENDAR' || error.code === 'UNKNOWN_ANNOTATION' ? 404 : 400
+        || error.code === 'UNKNOWN_CALENDAR' ? 404 : 400
     sendJson(res, status, { error: { code: error.code, message: error.message } })
     return
   }

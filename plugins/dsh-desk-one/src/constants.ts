@@ -37,19 +37,7 @@ export const ROUTES = Object.freeze({
   scheduleOutlookLoginPoll: `${PREFIX}/schedule/outlook/login/poll`,
   scheduleOutlookDisconnect: `${PREFIX}/schedule/outlook/disconnect`,
   scheduleOutlookCallback: `${PREFIX}/schedule/outlook/callback`,
-  /* Notebook (third stage): local markdown library index, read-only for the panel */
-  notebookState: `${PREFIX}/notebook/state`,
-  notebookRoot: `${PREFIX}/notebook/root`,
-  notebookSearch: `${PREFIX}/notebook/search`,
-  notebookPage: `${PREFIX}/notebook/page`,
-  reviewList: `${PREFIX}/notebook/reviews`,
-  reviewCreate: `${PREFIX}/notebook/reviews/create`,
-  reviewUpdateTarget: `${PREFIX}/notebook/reviews/update-target`,
-  reviewGet: `${PREFIX}/notebook/reviews/get`,
-  reviewPage: `${PREFIX}/notebook/reviews/page`,
-  reviewUpdateDrafts: `${PREFIX}/notebook/reviews/update-drafts`,
-  reviewTargetPage: `${PREFIX}/notebook/reviews/target-page`,
-})
+  })
 
 /** Entry id: both the left-rail panel row id and the key of the center-column `main` slot (official `MainPanelId`). */
 export const PANEL_ID = 'desk-one'
@@ -176,29 +164,15 @@ export const REQUEST_TIMEOUT_MS = 10_000
 /** Selector for the style tag marker attribute (HMR / repeated installs reuse the same element by it). */
 export const STYLE_SELECTOR = 'style[data-dsh-desk-one]'
 
-/* ------------------------------ notebook ------------------------------ */
-
 /** A review target must be a plain-text file within this size; bigger files are refused. */
-export const MAX_REVIEW_FILE_BYTES = 1_048_576
 
 /** Fixed record id of the single notes-root config (profile level, one per profile). */
-export const NOTEBOOK_CONFIG_ID = 'notebook_config'
 /** Markdown suffixes the library index accepts (the official preview registry uses the same pair). */
-export const NOTEBOOK_SUFFIXES = ['.md', '.markdown'] as const
 /** Directories never indexed: tool internals and app state, matched case-insensitively at any depth. */
-export const NOTEBOOK_EXCLUDED_DIRS = ['.note2md', '.obsidian', '.trash', '.git', 'node_modules'] as const
 /** Filesystem walk limits: a runaway library must degrade to a "too large" state, never hang the request. */
-export const NOTEBOOK_MAX_DEPTH = 16
-export const NOTEBOOK_MAX_FILES = 20_000
 /** Scan TTL and how long one walk may run before it is abandoned. */
-export const NOTEBOOK_SCAN_TTL_MS = 30_000
-export const NOTEBOOK_SCAN_TIMEOUT_MS = 20_000
 /** How much of a file is read for frontmatter; a longer head is treated as "no frontmatter". */
-export const NOTEBOOK_FRONTMATTER_MAX_BYTES = 64 * 1024
 /** Search result cap (host-side; the client renders at most this many rows). */
-export const NOTEBOOK_SEARCH_LIMIT = 200
 /** "Recent" rows carried by the shelf state response. */
-export const NOTEBOOK_STATE_LIMIT = 30
 /** A note body preview kept for search: longer bodies are matched only on their first slice. */
-export const NOTEBOOK_BODY_PREVIEW_CHARS = 4_000
 

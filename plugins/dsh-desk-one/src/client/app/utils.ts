@@ -35,8 +35,7 @@ export const clamp = (value: number, min: number, max: number): number =>
 export function readInitialTab(): Tab {
   try {
     const stored = window.localStorage.getItem(TAB_STORAGE_KEY)
-    // The old Overview tab became Notebook; keep returning users on it instead of resetting.
-    const value = stored === 'overview' ? 'notebook' : stored
+    const value = stored
     const known = DESK_TABS.find(entry => entry.tab === value)
     if (known !== undefined) return known.tab
   } catch {

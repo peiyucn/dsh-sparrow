@@ -19,10 +19,6 @@ import type {
 import type { SessionLinkApi } from './sessions/contract.js'
 import type { SessionsArchiveApi } from './sessions/archiveApi.js'
 import type { ScheduleApi } from './schedule/api.js'
-import type { NotebookApi } from './notebook/api.js'
-import type { WorkspaceAccess } from './notebook/workspaces.js'
-import type { ReviewBridge, ReviewStartInput, ReviewStartResult } from './notebook/review-bridge.js'
-import type { ReviewApi } from './notebook/review-api.js'
 import { attachMainPanel } from './panel.js'
 import { ensureDeskStyles } from './styles.js'
 
@@ -87,16 +83,6 @@ export interface DeskPanelInjected {
   readonly sessionsArchive: SessionsArchiveApi
   /** Schedule (mirror + connection) facade backed by host REST routes. */
   readonly schedule: ScheduleApi
-  /** Notebook library index and its root setting (read-only over host REST). */
-  readonly notebook: NotebookApi
-  /** DSH workspace flow behind the notebook's create/import action (unavailable without the services). */
-  readonly workspaceAccess: WorkspaceAccess
-  /** Right-sidebar review opener (unavailable without the services). */
-  readonly review: ReviewBridge
-  /** Continue or start the review of one file (creates a review session). */
-  readonly startReview: (input: ReviewStartInput) => Promise<ReviewStartResult>
-  /** Review links data surface (history badges on the notebook rows). */
-  readonly reviewApi: ReviewApi
 }
 
 /** Browser-side pieces injected at the entry (supplied by index.ts; tests may pass stubs). */

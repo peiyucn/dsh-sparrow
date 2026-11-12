@@ -221,80 +221,6 @@ describe('dsh-desk-one 结构', () => {
     assert.match(page, /ref=\{setWallRef\}/u, '墙面要挂到 callback ref 上')
   })
 
-  it('笔记 应该是书架：只读列表 + 可配置的笔记库根（不做编辑器）', async () => {
-    const page = await readClientSurface()
-    const view = await read('src/client/notebook/NotebookView.tsx')
-    const host = await read('src/host/notebook/host.ts')
-    assert.match(page, /<NotebookView/u, '笔记标签要渲染书架组件')
-    assert.match(view, /notebook\.searchPlaceholder/u, '书架要带全库搜索')
-    assert.match(view, /notebook\.unsetTitle/u, '未配置笔记库时要有引导态')
-    assert.match(view, /notebook\.createLibrary/u, '空库态要能创建/导入笔记库')
-    assert.match(view, /notebook\.disconnect/u, '已链接时能断开笔记库')
-    assert.ok(!/contentEditable|<textarea/u.test(view), '笔记不提供编辑器')
-    assert.match(host, /workspaceRegistry\.list\(\)/u, '笔记库根必须校验落在 DSH 工作区之内')
-    assert.match(page, /createWorkspaceAccess/u, '笔记库创建走 DSH 自己的工作区流程')
-  })
-
-  it('随包 skill 应该 存在并被注册（note2md / desk-review）', async () => {
-    const host = await read('src/host.ts')
-    const skills = await read('src/host/skills.ts')
-    const manifest = JSON.parse(await read('package.json'))
-    assert.ok(manifest.files.includes('skills/**'), 'npm files 清单要带上 skills/**')
-    assert.match(host, /registerBundledSkills/u, 'host 装配要注册随包 skill')
-    assert.match(skills, /note2md/u)
-    assert.match(skills, /desk-review/u)
-    assert.match(skills, /resourceBase/u, '要以目录为资源基准，模板/脚本相对路径才能解析')
-    for (const dir of ['note2md', 'desk-review']) {
-      const content = await read(`skills/${dir}/SKILL.md`)
-      assert.match(content, /^---\nname:/u, `${dir} 要有 frontmatter`)
-      assert.match(content, /description:/u, `${dir} 要有 description`)
-    }
-  })
-
-  it('笔记审阅 应该 渲染文档、弹窗批注、底部浮层，草稿落库', async () => {
-    const register = await read('src/client/notebook/register.ts')
-    const review = await read('src/client/notebook/review.tsx')
-    const bridge = await read('src/client/notebook/review-bridge.ts')
-    const api = await read('src/client/notebook/review-api.ts')
-    const page = await readClientSurface()
-    assert.match(register, /sidebarRightTabs\.register/u, 'tab 类型要注册进官方右栏注册表')
-    assert.match(register, /'sidebar\.right\.pane\.tab'/u, '正文挂在官方 tab 槽位')
-    assert.match(register, /keepMounted: true/u, '审阅 tab 保活（切 tab/切会话不丢草稿）')
-    assert.match(page, /mountNoteReviewTab/u, '客户端要挂载审阅 tab')
-    assert.match(review, /reviewApi\.page\(/u, '审阅页按 review 读取目标文件')
-    assert.match(review, /MarkdownText/u, 'markdown 用官方渲染')
-    assert.match(review, /dsh-desk-review-composer/u, '写批注用弹窗（不压缩正文）')
-    assert.match(review, /dsh-desk-review-layer/u, '底部浮层展示待提交/本轮改动')
-    assert.match(review, /sendQuote/u, '提交走桥接的输入框引用，不自动发送')
-    assert.match(bridge, /insertQuote/u, '引用走官方 SessionInput.insertQuote')
-    assert.ok(!/send\(/u.test(bridge), '不得自动发送')
-    assert.match(review, /reviewApi\.updateDrafts/u, '加到待提交即落库（关 tab/重启 DSH 不丢）')
-    assert.match(review, /persistDrafts/u, '草稿增删改都写回 review 记录')
-    assert.match(review, /【审阅 /u, '提交格式带文件与引用（便于 AI 定位）')
-    assert.match(review, /visibilitychange/u, '可见时才刷新')
-    assert.match(review, /review\.undo|setUndo/u, '删除草稿可撤销')
-    assert.match(api, /reviewUpdateDrafts/u, '草稿路由接进客户端数据面')
-    assert.ok(!/DeskAnnotation|addAnnotation|updateAnnotationStatus|deleteAnnotation/u.test(review), '审阅页不再包含持久批注对象')
-    const bundle = await read('lib/client.js')
-    assert.ok(bundle.includes('note-review'), '构建产物要包含审阅 tab kind')
-  })
-
-  it('随包 skill 应该 存在并被注册（note2md / desk-review）', async () => {
-    const host = await read('src/host.ts')
-    const skills = await read('src/host/skills.ts')
-    const manifest = JSON.parse(await read('package.json'))
-    assert.ok(manifest.files.includes('skills/**'), 'npm files 清单要带上 skills/**')
-    assert.match(host, /registerBundledSkills/u, 'host 装配要注册随包 skill')
-    assert.match(skills, /note2md/u)
-    assert.match(skills, /desk-review/u)
-    assert.match(skills, /resourceBase/u, '要以目录为资源基准，模板/脚本相对路径才能解析')
-    for (const dir of ['note2md', 'desk-review']) {
-      const content = await read(`skills/${dir}/SKILL.md`)
-      assert.match(content, /^---\nname:/u, `${dir} 要有 frontmatter`)
-      assert.match(content, /description:/u, `${dir} 要有 description`)
-    }
-  })
-
   it('便签标签 应该是「满墙贴纸」：标题行统一动作 + 可拖动贴纸', async () => {
     const page = await readClientSurface()
     const styles = await readStyles()
@@ -728,7 +654,6 @@ describe('dsh-desk-one 结构', () => {
     const page = await readClientSurface()
     assert.match(page, /dsh-desk-tabs/u)
     assert.match(page, /data-window-drag/u)
-    assert.match(page, /'notebook'/u)
     assert.match(page, /'notes'/u)
     assert.match(page, /'tasks'/u)
     for (const forbidden of ['role="dialog"', 'aria-modal', 'position: fixed', 'backdrop-filter']) {
@@ -871,6 +796,6 @@ describe('dsh-desk-one 结构', () => {
 
   it('spec 应该 包含已交付的设计文档', async () => {
     const specs = await readdir(new URL('../docs/spec', import.meta.url))
-    assert.deepEqual(specs.sort(), ['00-overview.md', '01-object-model.md', '02-modules.md', '03-task-board.md', '04-sessions.md', '05-schedule.md', '06-session-index.md', '07-notebook.md', '08-capability-pack.md', '09-review-session.md'])
+    assert.deepEqual(specs.sort(), ['00-overview.md', '01-object-model.md', '02-modules.md', '03-task-board.md', '04-sessions.md', '05-schedule.md', '06-session-index.md'])
   })
 })

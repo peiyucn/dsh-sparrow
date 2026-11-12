@@ -6,19 +6,12 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { LOCALE_NAMESPACE, PACKAGE_NAME } from '../constants.js'
+import { PACKAGE_NAME } from '../constants.js'
 import * as api from './notes/api.js'
 import * as taskApi from './tasks/api.js'
 import { DeskOnePage } from './app/DeskOnePage.js'
 import { createSessionLinkBridge, type SessionServices } from './sessions/bridge.js'
 import { scheduleApi } from './schedule/api.js'
-import { notebookApi } from './notebook/api.js'
-import { reviewApi } from './notebook/review-api.js'
-import { createWorkspaceAccess, type UiWorkspaceLike as NotebookNavigationLike, type WorkspacesServiceLike } from './notebook/workspaces.js'
-import { createReviewBridge } from './notebook/review-bridge.js'
-import { mountNoteReviewTab } from './notebook/register.js'
-import { configureReviewBadges, SessionReviewBadge } from './notebook/review-badges.js'
-import type { SessionNavigationLike, SessionsLike, SidebarRightLike, WorkspacesLike } from './notebook/faces.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { DeskPanelIcon } from './icon.js'
@@ -43,61 +36,12 @@ export function apply(ctx: ClientContext): void {
     sessionCtx.effect(() => detach, `${PACKAGE_NAME}: session link`)
   })
 
-  // The notebook library is created through DSH's own workspace flow (folder picker +
-  // registration), so both services are optional: absent → the action reports unavailable.
-  const workspaceAccess = createWorkspaceAccess()
-  ctx.inject(['workspaces'], (workspaceCtx) => {
-    const service = workspaceCtx.get('workspaces')
-    const detach = workspaceAccess.attach(service as unknown as WorkspacesServiceLike)
-    workspaceCtx.effect(() => detach, `${PACKAGE_NAME}: workspace access`)
-  })
-  ctx.inject(['uiWorkspace'], (navigationCtx) => {
-    const detach = workspaceAccess.attachNavigation(navigationCtx.get('uiWorkspace') as unknown as NotebookNavigationLike)
-    navigationCtx.effect(() => detach, `${PACKAGE_NAME}: workspace navigation`)
-  })
-
-  // Review tab + hand-off: each underlying service is optional, so the shelf degrades to
-  // read-only when the host does not expose the right sidebar or the session scope.
-  const review = createReviewBridge()
-  configureReviewBadges(reviewApi)
-  ctx.inject(['sidebarRight'], (sidebarCtx) => {
-    const detach = review.attachSidebar(sidebarCtx.get('sidebarRight') as unknown as SidebarRightLike)
-    sidebarCtx.effect(() => detach, `${PACKAGE_NAME}: review sidebar`)
-  })
-  // The review bridge creates the session in the reviewed file's workspace, so it needs the
-  // workspace catalog, the workspace navigation, and the session catalog.
-  ctx.inject(['sessions'], (sessionCtx) => {
-    const detach = review.attachSessions(sessionCtx.get('sessions') as unknown as SessionsLike)
-    sessionCtx.effect(() => detach, `${PACKAGE_NAME}: review sessions`)
-  })
-  ctx.inject(['uiWorkspace'], (navigationCtx) => {
-    const detach = review.attachNavigation(navigationCtx.get('uiWorkspace') as unknown as SessionNavigationLike)
-    navigationCtx.effect(() => detach, `${PACKAGE_NAME}: review navigation`)
-  })
-  ctx.inject(['workspaces'], (reviewWorkspaceCtx) => {
-    const detach = review.attachWorkspaces(reviewWorkspaceCtx.get('workspaces') as unknown as WorkspacesLike)
-    reviewWorkspaceCtx.effect(() => detach, `${PACKAGE_NAME}: review workspace catalog`)
-  })
-  ctx.inject(['sidebarRightTabs'], (tabCtx) => {
-    mountNoteReviewTab(tabCtx, reviewApi, review)
-  })
-  // Review sessions are ordinary DSH sessions; a trailing badge marks them in the browser row.
-  ctx.slots.inject('sidebar.session.row.trailing', () => ctx.slots.register({
-    name: 'sidebar.session.row.trailing',
-    id: 'dsh-desk-one-review-badge',
-    locale: LOCALE_NAMESPACE,
-  }, SessionReviewBadge))
 
   installDeskClient(ctx, {
     page: DeskOnePage,
     icon: DeskPanelIcon,
     locales: LOCALE_DICTS,
     api: {
-      notebook: notebookApi,
-      workspaceAccess,
-      review,
-      startReview: review.start,
-      reviewApi,
       listNotes: api.listNotes,
       createNote: api.createNote,
       updateNote: api.updateNote,
