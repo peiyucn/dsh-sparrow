@@ -2,15 +2,14 @@
 
 import { calendarColorOf, calendarNameOf, formatTime, startOfLocalDay } from './utils.js'
 import { dayLabel, eventTitle, providerKey } from './shared.js'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ClickPoint } from './shared.js'
 import type { DeskCalendar, DeskEvent, DeskScheduleSource } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ReactElement } from 'react'
 
-/** Card width / approximate height used to flip the card around the click point. */
+/** Card width used for viewport clamping (height is measured after render). */
 const DETAIL_CARD_WIDTH = 360
-const DETAIL_CARD_HEIGHT = 300
 
 /* -------------------------------- detail card -------------------------------- */
 
@@ -31,17 +30,28 @@ export function EventCard(props: {
   const when = event.allDay
     ? `${dayLabel(t, startOfLocalDay(new Date(event.start)), new Date())} · ${t('schedule.allDay')}`
     : `${dayLabel(t, startOfLocalDay(new Date(event.start)), new Date())} ${formatTime(event.start)} – ${formatTime(event.end)}`
-  const style = useMemo(() => {
+  const [place, setPlace] = useState<{ left: number; top: number }>()
+  // The card height changes (guest list expands), so measure it and clamp/flip instead of assuming
+  // a fixed height -- otherwise a card opened near the bottom edge is cut off.
+  useLayoutEffect(() => {
+    const node = cardRef.current
+    if (node === null) return
     const width = DETAIL_CARD_WIDTH
-    const height = DETAIL_CARD_HEIGHT
-    const x = point === undefined ? window.innerWidth - width - 24 : point.x + 14
-    const y = point === undefined ? window.innerHeight - height - 24 : point.y + 14
-    return {
-      left: Math.max(8, Math.min(x, window.innerWidth - width - 8)),
-      top: Math.max(8, Math.min(y, window.innerHeight - height - 8)),
-      width: `${width}px`,
-    }
-  }, [point])
+    const height = node.getBoundingClientRect().height
+    const anchorX = point === undefined ? window.innerWidth - width - 24 : point.x
+    const anchorY = point === undefined ? window.innerHeight - height - 24 : point.y
+    const below = point === undefined ? anchorY : anchorY + 14
+    const above = anchorY - height - 14
+    const top = below + height <= window.innerHeight - 8 || above < 8 ? below : above
+    setPlace({
+      left: Math.max(8, Math.min(anchorX + 14, window.innerWidth - width - 8)),
+      top: Math.max(8, Math.min(top, window.innerHeight - height - 8)),
+    })
+  }, [point, peopleOpen, event.id])
+  const style = {
+    width: `${DETAIL_CARD_WIDTH}px`,
+    ...(place === undefined ? { visibility: 'hidden' as const } : { left: place.left, top: place.top }),
+  }
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent): void => {
