@@ -281,18 +281,23 @@ interface DeskApi {
 
 | 工具 | 作用 | 风险 |
 | :--- | :--- | :--- |
-| `desk_task_add` / `desk_task_list` / `desk_task_update` / `desk_task_complete` | 待办增查改完成 | 低 |
-| `desk_overview` | 总览摘要 | 低 |
-| `desk_schedule_list` | 区间日程（三源镜像，只读） | 低 |
-| `desk_schedule_sync` | 手动触发日程同步，返回每源报告 | 中 |
-| `desk_schedule_connections` | 连接状态摘要（不含凭据） | 低 |
-| `desk_focus_start` / `desk_focus_stop` / `desk_focus_status` | 专注计时 | 低（v2） |
-| `desk_note_add` | 便签 | 低（v2） |
-| `desk_board_list` / `desk_board_move` | 看板 | 低（v2） |
-| `desk_export` | 导出 JSONL | 低 |
+| `desk_note_add` / `desk_note_list` / `desk_note_update` / `desk_note_delete` | 便签：新建 / 查询 / 更新 / 永久删除 | 低 |
+| `desk_task_add` / `desk_task_list` / `desk_task_update` / `desk_task_complete` / `desk_task_archive` | 任务：新建 / 查询 / 更新（含状态与排序）/ 完成 / 存档或恢复 | 低 |
+| `desk_group_add` / `desk_group_list` / `desk_group_update` / `desk_group_move` / `desk_group_archive` / `desk_group_delete` | 分组：新建 / 查询 / 改名排序 / 整组移动 / 存档或恢复 / 删除 | 中（移动、存档、删除会影响组内卡片） |
+| `desk_schedule_list` / `desk_schedule_sync` / `desk_schedule_connections` | 日程镜像查询 / 手动同步 / 连接状态（只读，不写回） | 低 |
 
+* **一个工具一个动作**：工具名即意图（add / update / complete / move / archive / delete），不把语义不同的动作合并成通用 `save`；更新类工具要求显式 `expected_revision`。
 * 写工具返回结构化结果 + 一句人类可读摘要；跨外部源的写操作必须带确认。
 * 工具与界面共用同一 Store API，禁止绕过 Store 直接写文件。
+
+### 随包操作指南 skill
+
+插件随包注册一个 `desk-one` skill（来源 `bundled`，模型与 `/` 用户命令都可见，默认开启、无配置开关），
+内容只讲工具描述装不下的部分：对象选择（便签 / 任务 / 笔记页）、`list → id + revision → update` 顺序、
+归档/删除的连带影响、日程只读、批注由人操作。
+
+技能服务是可选依赖（`ctx.inject(['skills'], …)`）：宿主没有该服务时不注册、工具照常可用；禁止直接读
+`ctx.skills`（cordis 会抛错并让整只插件停用、全部路由 404）。
 
 ## 纯逻辑与测试边界
 
