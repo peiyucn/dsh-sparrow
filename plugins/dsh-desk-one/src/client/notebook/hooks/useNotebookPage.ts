@@ -7,13 +7,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DeskTranslator } from '../../app/types.js'
 import { messageOf } from '../../app/utils.js'
-import type { NotebookEntry, NotebookStateResponse, ReviewHistoryEntry } from '../../../notebook-contract.js'
+import type { NotebookEntry, NotebookSkill, NotebookStateResponse, ReviewHistoryEntry } from '../../../notebook-contract.js'
 import { NOTEBOOK_HISTORY_WARN_BYTES } from '../../../constants.js'
 import type { NotebookApi } from '../api.js'
 import type { ReviewOpenInput, ReviewOpenResult } from '../review-bridge.js'
 import type { WorkspaceAccess, WorkspacePathView } from '../workspaces.js'
 import { findWorkspaceForRoot } from '../workspaces.js'
-import { paginate, type PageSlice } from '../paging.js'
+import { NOTEBOOK_PAGE_SIZE, paginate } from '../paging.js'
 
 /** The four list views the toolbar switches between. */
 export type NotebookMode = 'recent' | 'drafts' | 'history' | 'missing'
@@ -52,7 +52,12 @@ export interface NotebookPageController {
   readonly searching: boolean
   readonly newOpen: boolean
   readonly brief: string
-  readonly slice: PageSlice<NotebookRow>
+  readonly skillName: string | null
+  readonly skills: readonly NotebookSkill[]
+  readonly rows: readonly NotebookRow[]
+  readonly page: number
+  readonly pages: number
+  readonly totalCount: number
   readonly total: number
   /** Count line of the active view, shown next to the list. */
   readonly summary: string
@@ -71,6 +76,7 @@ export interface NotebookPageController {
   readonly setBrief: (brief: string) => void
   readonly createEmpty: () => Promise<void>
   readonly draftWithAi: () => void
+  readonly chooseSkill: (name: string | null) => Promise<void>
   readonly setMode: (mode: NotebookMode) => void
   readonly setQuery: (query: string) => void
   readonly setPage: (page: number) => void
@@ -87,11 +93,6 @@ function titleOfBrief(brief: string, fallback: string): string {
   return fallback
 }
 
-/** One file's review facts: submitted-record count and the newest record time. */
-interface FileReviewFacts {
-  readonly records: number
-  readonly lastAt: string
-}
 
 /**
  * Create the notebook page controller.
@@ -123,6 +124,7 @@ export function useNotebookPage(input: {
   const [newOpen, setNewOpen] = useState(false)
   const [brief, setBrief] = useState('')
   const [browserOpen, setBrowserOpen] = useState<'pending' | 'opened' | 'failed' | null>(null)
+  const [paged, setPaged] = useState<{ readonly entries: readonly NotebookEntry[]; readonly total: number } | null>(null)
 
   const reload = useCallback(async (): Promise<void> => {
     setError(null)
@@ -261,16 +263,25 @@ export function useNotebookPage(input: {
       return
     }
     const text = brief.trim()
-    // The workspace marker (not a skill picker) decides the note2md wording: the entry page has no
-    // session yet, and the official skill catalog is session-addressed (see docs/spec/07).
-    const prompt = state?.note2md === true
-      ? t('notebook.note2mdDraftPrompt', { brief: text })
-      : t('notebook.draftPrompt', { brief: text })
+    const prompt = state?.skillName == null
+      ? t('notebook.draftPrompt', { brief: text })
+      : t('notebook.skillDraftPrompt', { skill: state.skillName, brief: text })
     onDraftWithAi(workspace.workspaceId, prompt)
     setNewOpen(false)
     setBrief('')
   }, [brief, onDraftWithAi, state?.skillName, t, workspace])
 
+
+  const chooseSkill = useCallback(async (name: string | null): Promise<void> => {
+    setBusy(true)
+    try {
+      setState(await notebook.setSkill(name))
+    } catch (cause) {
+      setNotice(messageOf(cause))
+    } finally {
+      setBusy(false)
+    }
+  }, [notebook])
 
   const deleteHistory = useCallback(async (id: string): Promise<void> => {
     setBusy(true)
@@ -299,16 +310,18 @@ export function useNotebookPage(input: {
     setPageState(next)
   }, [])
 
-  /** Submitted reviews per file: record count plus newest time (drives ordering and badges). */
-  const reviewFacts = useMemo(() => {
-    const map = new Map<string, FileReviewFacts>()
+  const searching = query.trim() !== ''
+  const needle = query.trim().toLowerCase()
+  const matchesQuery = useCallback((...values: readonly string[]): boolean => (
+    needle === '' || values.some(value => value.toLowerCase().includes(needle))
+  ), [needle])
+
+  /** How many submitted records each file has (row badges). */
+  const recordCounts = useMemo(() => {
+    const map = new Map<string, number>()
     for (const entry of history) {
       const path = entry.resolvedPath ?? entry.record.pathSnapshot
-      const previous = map.get(path)
-      map.set(path, {
-        records: (previous?.records ?? 0) + 1,
-        lastAt: previous === undefined || entry.record.createdAt > previous.lastAt ? entry.record.createdAt : previous.lastAt,
-      })
+      map.set(path, (map.get(path) ?? 0) + 1)
     }
     return map
   }, [history])
@@ -320,25 +333,38 @@ export function useNotebookPage(input: {
     return map
   }, [state?.drafts])
 
-  /** Recent files: reviewed first (newest review), then unreviewed by modification time. */
-  const recent = useMemo(() => {
-    const rows = (state?.recent ?? []).map(entry => ({ entry, facts: reviewFacts.get(entry.path) }))
-    return rows.sort((left, right) => {
-      if (left.facts !== undefined && right.facts !== undefined) return right.facts.lastAt.localeCompare(left.facts.lastAt)
-      if (left.facts !== undefined) return -1
-      if (right.facts !== undefined) return 1
-      return right.entry.mtime.localeCompare(left.entry.mtime)
-    }).map(row => row.entry)
-  }, [reviewFacts, state?.recent])
+  // Whole-library views page on the server: the list is the library, so its rows and its count
+  // always describe the same set (no "30 recent vs 104 total" mismatch).
+  const serverPaged = !searching && (mode === 'recent' || mode === 'missing')
+  useEffect(() => {
+    if (!active || rootPath === undefined || searching) return
+    if (mode !== 'recent' && mode !== 'missing') return
+    let cancelled = false
+    void notebook.list({
+      offset: (page - 1) * NOTEBOOK_PAGE_SIZE,
+      limit: NOTEBOOK_PAGE_SIZE,
+      ...(mode === 'missing' ? { missingFrontmatter: true } : {}),
+    }).then((payload) => {
+      if (!cancelled) setPaged(payload)
+    }, (cause) => {
+      if (!cancelled) setError(messageOf(cause))
+    })
+    return () => { cancelled = true }
+  }, [active, mode, notebook, page, rootPath, searching, state?.stats.missingFrontmatter, state?.stats.total])
 
-  const searching = query.trim() !== ''
-  const sourceEntries = searching ? results ?? [] : recent
-  const needle = query.trim().toLowerCase()
-  const matchesQuery = useCallback((...values: readonly string[]): boolean => (
-    needle === '' || values.some(value => value.toLowerCase().includes(needle))
-  ), [needle])
+  const entryRow = useCallback((entry: NotebookEntry): NotebookRow => ({
+    key: entry.path,
+    title: entry.title,
+    path: entry.path,
+    ...entry.date === undefined ? {} : { date: entry.date },
+    draftCount: draftCounts.get(entry.path),
+    recordCount: recordCounts.get(entry.path),
+    ...entry.hasFrontmatter ? {} : { missing: true },
+    onOpen: () => { void openPage(entry.path) },
+  }), [draftCounts, openPage, recordCounts])
 
-  const rows = useMemo<readonly NotebookRow[]>(() => {
+  /** All matching rows (client-paged for search / drafts / history; one server page otherwise). */
+  const allRows = useMemo<readonly NotebookRow[]>(() => {
     if (mode === 'history') {
       return history
         .filter(entry => matchesQuery(entry.record.fileTitle, entry.resolvedPath ?? entry.record.pathSnapshot))
@@ -360,24 +386,22 @@ export function useNotebookPage(input: {
           title: draft.path.split('/').pop() ?? draft.path,
           path: draft.path,
           draftCount: draft.drafts.length,
-          recordCount: reviewFacts.get(draft.path)?.records,
+          recordCount: recordCounts.get(draft.path),
           onOpen: () => { void openPage(draft.path) },
         }))
     }
-    const entries = mode === 'missing' ? sourceEntries.filter(entry => !entry.hasFrontmatter) : sourceEntries
-    return entries.map(entry => ({
-      key: entry.path,
-      title: entry.title,
-      path: entry.path,
-      ...entry.date === undefined ? {} : { date: entry.date },
-      draftCount: draftCounts.get(entry.path),
-      recordCount: reviewFacts.get(entry.path)?.records,
-      ...entry.hasFrontmatter ? {} : { missing: true },
-      onOpen: () => { void openPage(entry.path) },
-    }))
-  }, [deleteHistory, draftCounts, matchesQuery, mode, openPage, reviewFacts, sourceEntries, state?.drafts])
+    if (searching) {
+      const entries = (results ?? []).filter(entry => mode !== 'missing' || !entry.hasFrontmatter)
+      return entries.map(entryRow)
+    }
+    return (paged?.entries ?? []).map(entryRow)
+  }, [deleteHistory, entryRow, matchesQuery, mode, openPage, paged, recordCounts, results, searching, state?.drafts])
 
-  const slice = useMemo(() => paginate(rows, page), [page, rows])
+  const totalCount = serverPaged ? paged?.total ?? 0 : allRows.length
+  const pages = Math.max(1, Math.ceil(totalCount / NOTEBOOK_PAGE_SIZE))
+  const slice = serverPaged
+    ? { rows: allRows, page: Math.min(page, pages), pages }
+    : paginate(allRows, page)
 
   // Keep the stored page in sync with the clamped one (deleting the last row of a page, filtering).
   useEffect(() => {
@@ -386,14 +410,14 @@ export function useNotebookPage(input: {
 
   const historyBytes = state?.historyBytes ?? 0
   const summary = searching
-    ? t('notebook.searchResults', { count: rows.length })
+    ? t('notebook.searchResults', { count: totalCount })
     : mode === 'history'
-      ? t('notebook.summaryHistory', { count: history.length })
+      ? t('notebook.summaryHistory', { count: totalCount })
       : mode === 'drafts'
-        ? t('notebook.summaryDrafts', { count: state?.draftCount ?? 0 })
+        ? t('notebook.summaryDrafts', { count: totalCount })
         : mode === 'missing'
-          ? t('notebook.summaryMissing', { count: state?.stats.missingFrontmatter ?? 0 })
-          : t('notebook.summaryRecent', { recent: state?.recent.length ?? 0, total: state?.stats.total ?? 0 })
+          ? t('notebook.summaryMissing', { count: totalCount })
+          : t('notebook.summaryRecent', { count: totalCount })
   const summaryHint = mode === 'missing' ? t('notebook.missingHint') : null
 
   return {
@@ -412,7 +436,12 @@ export function useNotebookPage(input: {
     searching,
     newOpen,
     brief,
-    slice,
+    skillName: state?.skillName ?? null,
+    skills: state?.skills ?? [],
+    rows: slice.rows,
+    page: slice.page,
+    pages: slice.pages,
+    totalCount,
     total: state?.stats.total ?? 0,
     summary,
     summaryHint,
@@ -429,6 +458,7 @@ export function useNotebookPage(input: {
     setBrief,
     createEmpty,
     draftWithAi,
+    chooseSkill,
     setMode,
     setQuery,
     setPage,

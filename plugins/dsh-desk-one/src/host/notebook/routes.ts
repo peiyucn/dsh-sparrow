@@ -68,6 +68,17 @@ async function searchRoute(route: DeskRouteContext, req: IncomingMessage, res: S
   }))
 }
 
+async function listRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  const offsetRaw = Number(url.searchParams.get('offset') ?? '')
+  const limitRaw = Number(url.searchParams.get('limit') ?? '')
+  sendJson(res, 200, await notebookOf(route).list({
+    ...Number.isFinite(offsetRaw) && offsetRaw > 0 ? { offset: Math.floor(offsetRaw) } : {},
+    ...Number.isFinite(limitRaw) && limitRaw > 0 ? { limit: Math.floor(limitRaw) } : {},
+    missingFrontmatter: url.searchParams.get('missing') === '1',
+  }))
+}
+
 async function pageRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost')
   const path = url.searchParams.get('path') ?? ''
@@ -145,6 +156,7 @@ export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'DELETE', path: ROUTES.notebookRoot, handle: clearRootRoute },
   { method: 'POST', path: ROUTES.notebookSkill, handle: setSkillRoute },
   { method: 'GET', path: ROUTES.notebookSearch, handle: searchRoute },
+  { method: 'GET', path: ROUTES.notebookList, handle: listRoute },
   { method: 'GET', path: ROUTES.notebookPage, handle: pageRoute },
   { method: 'POST', path: ROUTES.notebookFile, handle: fileRoute },
   { method: 'POST', path: ROUTES.notebookCreate, handle: createRoute },

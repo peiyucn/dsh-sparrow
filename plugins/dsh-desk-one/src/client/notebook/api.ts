@@ -6,7 +6,7 @@
 import { ROUTES } from '../../constants.js'
 import type {
   CreateNotebookNoteRequest, CreateNoteResponse, DraftAnnotation, NoteDraft, NoteDraftResponse,
-  NotebookFileResponse, NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse,
+  NotebookFileResponse, NotebookListResponse, NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse,
   RecordReviewRequest, ReviewHistoryResponse, ReviewRecord,
 } from '../../notebook-contract.js'
 import { deleteJson, fetchJson, postJson } from '../http.js'
@@ -49,6 +49,20 @@ export function searchNotebook(input: {
   if (input.limit !== undefined) params.set('limit', String(input.limit))
   const suffix = params.size === 0 ? '' : `?${params.toString()}`
   return fetchJson<NotebookSearchResponse>(`${ROUTES.notebookSearch}${suffix}`)
+}
+
+/** One page of the whole library (newest first) plus the total. */
+export function listNotebook(input: {
+  readonly offset?: number
+  readonly limit?: number
+  readonly missingFrontmatter?: boolean
+}): Promise<NotebookListResponse> {
+  const params = new URLSearchParams()
+  if (input.offset !== undefined && input.offset > 0) params.set('offset', String(input.offset))
+  if (input.limit !== undefined) params.set('limit', String(input.limit))
+  if (input.missingFrontmatter === true) params.set('missing', '1')
+  const suffix = params.size === 0 ? '' : `?${params.toString()}`
+  return fetchJson<NotebookListResponse>(`${ROUTES.notebookList}${suffix}`)
 }
 
 /** Read one page for the review tab. */
@@ -99,6 +113,7 @@ export function deleteReviewRecord(id: string): Promise<void> {
 export interface NotebookApi {
   readonly state: typeof notebookState
   readonly setRoot: typeof setNotebookRoot
+  readonly list: typeof listNotebook
   readonly clearRoot: typeof clearNotebookRoot
   readonly setSkill: typeof setNotebookSkill
   readonly search: typeof searchNotebook
@@ -116,6 +131,7 @@ export interface NotebookApi {
 export const notebookApi: NotebookApi = {
   state: notebookState,
   setRoot: setNotebookRoot,
+  list: listNotebook,
   clearRoot: clearNotebookRoot,
   setSkill: setNotebookSkill,
   search: searchNotebook,

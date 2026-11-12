@@ -9,28 +9,47 @@ const SKILLS = [{ name: 'note2md', description: 'note management', source: 'bund
 /**
  * Build a fake host context whose optional fork either attaches or stays pending.
  * @param {boolean} attaches - whether the fake skill service becomes available.
- * @returns {{ ctx: any, deps: () => string[] | undefined, effects: Array<() => void> }} fake context pieces.
+ * @param {{ preset?: boolean }} [options] - also expose a preset registry with a scope lease.
+ * @returns {any} fake context pieces.
  */
-function fakeContext(attaches) {
+function fakeContext(attaches, options = {}) {
   const effects = []
   let deps
+  let leases = 0
+  let lastListOptions
   const ctx = {
     inject(/** @type {string[]} */ names, /** @type {(scoped: any) => void} */ callback) {
       deps = names
       if (!attaches) return
-      callback({
+      const scoped = {
         get: (/** @type {string} */ name) => {
-          assert.equal(name, 'skills')
-          return { list: async () => SKILLS }
+          if (name === 'skills') {
+            return {
+              list: async (/** @type {any} */ listOptions) => {
+                lastListOptions = listOptions
+                return SKILLS
+              },
+            }
+          }
+          if (name === 'agentPresets' && options.preset === true) {
+            return {
+              acquireScope: async () => {
+                leases += 1
+                return { key: { id: 'preset' }, [Symbol.asyncDispose]: async () => { leases -= 1 } }
+              },
+            }
+          }
+          return undefined
         },
         effect(/** @type {() => void} */ register) {
           effects.push(register())
           return () => {}
         },
-      })
+      }
+      callback(scoped)
     },
   }
-  return { ctx, deps: () => deps, effects }
+  return { ctx, deps: () => deps, effects, leases: () => leases, lastOptions: () => lastListOptions }
 }
 
 describe('可选技能目录', () => {
@@ -47,6 +66,15 @@ describe('可选技能目录', () => {
     const catalog = get()
     assert.ok(catalog !== undefined)
     assert.deepEqual(await catalog.list({ cwd: '/notes' }), SKILLS)
+  })
+
+  it('有预设注册表时用默认预设 scope 读取（对齐官方新会话的目录）', async () => {
+    const { ctx, leases, lastOptions } = fakeContext(true, { preset: true })
+    const catalog = watchSkillCatalog(ctx)()
+    assert.ok(catalog !== undefined)
+    await catalog.list({ cwd: '/notes' })
+    assert.equal(leases(), 0)
+    assert.deepEqual(lastOptions()?.scope, { id: 'preset' })
   })
 
   it('fork 销毁后目录复位', () => {

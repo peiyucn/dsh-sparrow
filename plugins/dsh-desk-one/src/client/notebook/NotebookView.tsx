@@ -13,6 +13,7 @@ import {
 import type { DeskTranslator } from '../app/types.js'
 import type { ReviewHistoryEntry } from '../../notebook-contract.js'
 import type { NotebookPageController, NotebookRow } from './hooks/useNotebookPage.js'
+import { SkillPicker } from './components/SkillPicker.js'
 
 /** Empty-state copy for the active view. */
 function emptyText(page: NotebookPageController): string {
@@ -174,7 +175,7 @@ function NewNoteForm({ page }: { readonly page: NotebookPageController }): React
           </Button>
         </div>
       </div>
-      {page.state?.note2md === true ? <p className="dsh-desk-notebook-fineprint">{t('notebook.note2mdHint')}</p> : null}
+      <SkillPicker page={page} />
     </section>
   )
 }
@@ -264,11 +265,11 @@ export function NotebookView({ page }: { readonly page: NotebookPageController }
                         )
                       : null}
                   </div>
-                  {page.slice.rows.length === 0
+                  {page.rows.length === 0
                     ? <p className="dsh-desk-notebook-empty">{emptyText(page)}</p>
                     : (
                         <div className="dsh-desk-notebook-rows">
-                          {page.slice.rows.map(row => (
+                          {page.rows.map(row => (
                             <Row
                               key={row.key}
                               page={page}
@@ -279,28 +280,28 @@ export function NotebookView({ page }: { readonly page: NotebookPageController }
                         </div>
                       )}
                 </div>
-                {page.slice.pages <= 1
+                {page.pages <= 1
                   ? null
                   : (
                       <div className="dsh-desk-notebook-pager">
                         <span className="dsh-desk-notebook-pagerstatus">
-                          {t('notebook.pagerStatus', { page: page.slice.page, pages: page.slice.pages })}
+                          {t('notebook.pagerStatus', { page: page.page, pages: page.pages })}
                         </span>
                         <Button
                           variant="ghost"
                           size="sm"
                           icon={<IconChevronLeftOutlineMedium />}
                           aria-label={t('notebook.pagerPrev')}
-                          disabled={page.slice.page <= 1}
-                          onClick={() => page.setPage(page.slice.page - 1)}
+                          disabled={page.page <= 1}
+                          onClick={() => page.setPage(page.page - 1)}
                         />
                         <Button
                           variant="ghost"
                           size="sm"
                           icon={<IconChevronRightOutlineRegular />}
                           aria-label={t('notebook.pagerNext')}
-                          disabled={page.slice.page >= page.slice.pages}
-                          onClick={() => page.setPage(page.slice.page + 1)}
+                          disabled={page.page >= page.pages}
+                          onClick={() => page.setPage(page.page + 1)}
                         />
                       </div>
                     )}

@@ -149,6 +149,26 @@ export class NotebookHost {
     }
   }
 
+  /**
+   * Page through the whole library, newest first (the list is the library, not a fixed recent
+   * shelf, so its count and its pages always describe the same set).
+   * @param input - zero-based offset, page size, and whether to keep only files without frontmatter.
+   * @returns the page plus the total number of matching files.
+   */
+  async list(input: {
+    readonly offset?: number
+    readonly limit?: number
+    readonly missingFrontmatter?: boolean
+  }): Promise<{ entries: readonly NotebookEntry[]; total: number }> {
+    const root = this.root()
+    if (root === undefined) return { entries: [], total: 0 }
+    const all = await this.entries(root)
+    const filtered = input.missingFrontmatter === true ? all.filter(entry => !entry.hasFrontmatter) : all
+    const offset = Math.max(0, Math.trunc(input.offset ?? 0))
+    const limit = Math.min(Math.max(1, Math.trunc(input.limit ?? 10)), 200)
+    return { entries: filtered.slice(offset, offset + limit), total: filtered.length }
+  }
+
   /** Search indexed entries. */
   async search(input: {
     readonly query?: string

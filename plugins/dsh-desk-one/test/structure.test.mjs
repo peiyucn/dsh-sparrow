@@ -687,7 +687,9 @@ describe('dsh-desk-one 结构', () => {
     assert.match(header, /notebook\.disconnectNamed/u, '断开链接要用真实工作区名')
     assert.doesNotMatch(header, /Menu/u, '断开链接不藏在 More 菜单里')
     assert.match(header, /notebook\.disconnect/u, '没有工作区名时有兜底文案')
-    assert.match(view, /notebook\.note2mdHint|notebook\.note2mdDraftPrompt/u, 'note2md 仅按工作区标记使用（技能选择待讨论）')
+    const picker = await read('src/client/notebook/components/SkillPicker.tsx')
+    assert.match(picker, /notebook\.skillChange/u, '技能可以更换（默认 / 自选 / 不用）')
+    assert.match(picker, /notebook\.skillNone/u, '技能可以选「不使用」')
     assert.match(pageSource, /NotebookHeaderActions/u, '笔记页动作走共享顶栏')
     assert.match(view, /dsh-desk-notebook-brief/u, '新建引导写一段话，而不是只写标题')
     assert.match(header, /notebook\.openBrowser/u, '顶栏要有显式的打开文件浏览按钮')
@@ -713,6 +715,7 @@ describe('dsh-desk-one 结构', () => {
     assert.doesNotMatch(host, /ctx\.skills/u, '未声明 inject 直接读 ctx.skills 会让 apply 抛错、所有路由 404')
     assert.match(host, /watchSkillCatalog/u, '可选技能服务经由 inject fork 接入')
     assert.match(catalog, /ctx\.inject\(\['skills'\]/u, '技能服务必须是可选依赖 fork')
+    assert.match(catalog, /acquireScope/u, '技能目录按默认预设 scope 读取，与官方新会话一致')
   })
 
   it('页面 应该 用一个面板承载标签页，而不是弹窗', async () => {

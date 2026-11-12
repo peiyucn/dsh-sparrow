@@ -170,6 +170,12 @@ export interface NotebookSearchResponse {
   readonly truncated: boolean
 }
 
+/** One page of the whole library, newest first, with the total for paging. */
+export interface NotebookListResponse {
+  readonly entries: readonly NotebookEntry[]
+  readonly total: number
+}
+
 export interface NotebookFileResponse {
   readonly file: NoteFileRef
 }
