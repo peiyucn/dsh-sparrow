@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client'
-import { IconListPenOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconListPenOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import { messageOf } from '../app/utils.js'
@@ -89,10 +89,13 @@ export function DocReviewAction(props: DocReviewActionProps): ReactNode {
 
   return (
     <Tooltip label={label} side="bottom" delayMs={400}>
-      <button
-        type="button"
+      <Button
+        variant="primary"
+        size="sm"
         className="dsh-desk-docreview"
+        icon={<IconListPenOutlineRegular />}
         aria-label={t('review.openInPreview')}
+        title={t('review.openInPreview')}
         disabled={busy}
         onClick={() => {
           setBusy(true)
@@ -105,9 +108,7 @@ export function DocReviewAction(props: DocReviewActionProps): ReactNode {
             setFailed(messageOf(cause))
           }).finally(() => setBusy(false))
         }}
-      >
-        <IconListPenOutlineRegular />
-      </button>
+      />
     </Tooltip>
   )
 }

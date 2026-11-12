@@ -6,7 +6,7 @@
  * manages submitted / unsubmitted review records.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DeskTranslator } from '../app/types.js'
 import { messageOf } from '../app/utils.js'
@@ -64,8 +64,6 @@ export function NotebookView(props: {
   const [newOpen, setNewOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [browserOpen, setBrowserOpen] = useState<'pending' | 'opened' | 'failed' | null>(null)
-  /** The official browser opens once per page mount, not on every re-render. */
-  const browserTried = useRef(false)
 
   const load = useCallback(async (): Promise<void> => {
     setError(null)
@@ -99,12 +97,6 @@ export function NotebookView(props: {
     }
   }, [onOpenBrowser, t, workspace])
 
-  useEffect(() => {
-    if (browserTried.current || rootPath === undefined || workspace === undefined) return
-    browserTried.current = true
-    void openBrowser()
-  }, [openBrowser, rootPath, workspace])
-
   // Search is a flat library query; clearing returns to the management view.
   useEffect(() => {
     if (query.trim() === '') { setResults(null); return }
@@ -134,7 +126,6 @@ export function NotebookView(props: {
     try {
       setState(await notebook.setRoot(path))
       setChoosing(false)
-      browserTried.current = false
       setBrowserOpen(null)
     } catch (cause) {
       setError(messageOf(cause))
@@ -162,7 +153,6 @@ export function NotebookView(props: {
       setPanel(null)
       setQuery('')
       setBrowserOpen(null)
-      browserTried.current = false
     } catch (cause) {
       setError(messageOf(cause))
     } finally {

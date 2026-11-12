@@ -95,41 +95,6 @@ export const REVIEW_CSS = `
   font-size: 12px;
   line-height: 1.6;
 }
-.dsh-desk-review-bar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 5;
-  display: flex;
-  height: var(--dsh-desk-review-bar-h);
-  box-sizing: border-box;
-  border-top: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-  background: var(--dsw-alias-bg-base, #ffffff);
-}
-.dsh-desk-review-baritem {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 0 10px;
-  border: 0;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-}
-.dsh-desk-review-baritem + .dsh-desk-review-baritem {
-  border-left: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.04));
-}
-.dsh-desk-review-baritem:hover,
-.dsh-desk-review-baritem[data-active='true'] {
-  color: var(--dsw-alias-label-primary, #1f2329);
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.04));
-}
 .dsh-desk-review-layer {
   position: absolute;
   left: 0;
@@ -207,19 +172,14 @@ export const REVIEW_CSS = `
   font-variant-numeric: tabular-nums;
 }
 .dsh-desk-review-composer {
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: calc(var(--dsh-desk-review-bar-h) + 7px);
-  z-index: 6;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin: 6px 0 10px;
   padding: 10px 12px;
-  border: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
-  border-radius: 10px;
-  background: var(--dsw-alias-bg-layer-2, #ffffff);
-  box-shadow: var(--dsw-elevation-prominent, 0 -6px 24px rgba(0, 0, 0, 0.18));
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: var(--dsw-radius-md, 12px);
+  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.02));
 }
 .dsh-desk-review-input {
   box-sizing: border-box;
@@ -406,32 +366,10 @@ export const REVIEW_CSS = `
 .dsh-desk-review-line[data-selected] {
   background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4176e6) 18%, transparent);
 }
-.dsh-desk-review-composer-inline {
-  position: static;
-  margin: 6px 0 10px 2.6em;
-  box-shadow: var(--dsw-elevation-panel, 0 2px 10px rgba(0, 0, 0, 0.08));
-}
 .dsh-desk-review-float {
   padding: 2px 10px;
   font-size: 11px;
   border-radius: 999px;
-}
-.dsh-desk-review-bar {
-  gap: 4px;
-  padding: 3px 6px;
-  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.03));
-  border-top: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-}
-.dsh-desk-review-baritem {
-  height: calc(var(--dsh-desk-review-bar-h) - 6px);
-  border-radius: 8px;
-  border-left: 0 !important;
-  font-size: 11px;
-}
-.dsh-desk-review-baritem[data-active] {
-  background: var(--dsw-alias-bg-base, #ffffff);
-  box-shadow: var(--dsw-elevation-panel, 0 1px 4px rgba(0, 0, 0, 0.08));
-  color: var(--dsw-alias-label-primary, #1f2329);
 }
 .dsh-desk-review-rendered {
   flex: 1;
@@ -461,5 +399,52 @@ export const REVIEW_CSS = `
 .dsh-desk-docreview:disabled {
   opacity: 0.5;
   cursor: default;
+}
+/* Official composer-pill reading: transparent pills on the pane floor. */
+.dsh-desk-review-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  height: var(--dsh-desk-review-bar-h);
+  padding: 0 6px;
+  background: var(--dsw-alias-bg-base, #ffffff);
+}
+.dsh-desk-review-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 8px;
+  border: none;
+  border-radius: var(--dsw-radius-sm, 8px);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font: inherit;
+  font-size: 11px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dsh-desk-review-pill svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.dsh-desk-review-pill[data-active] {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+@media (hover: hover) {
+  .dsh-desk-review-pill:hover {
+    background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+    color: var(--dsw-alias-label-secondary, #6b7280);
+  }
+}
+/* Square brand-icon button in the official preview header (official Button geometry). */
+button.dsh-desk-docreview.dsh-desk-docreview {
+  flex: none;
+  min-width: 28px;
+  padding: 0;
 }
 `

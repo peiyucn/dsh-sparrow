@@ -10,7 +10,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
-  DiffBlock, DisclosureRow, IconInspectOutlineRegular, MarkdownText, diffTotals,
+  DiffBlock, DisclosureRow, IconInspectOutlineRegular, IconListPenOutlineRegular, MarkdownText, diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -520,19 +520,21 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       <div className="dsh-desk-review-bar">
         <button
           type="button"
-          className="dsh-desk-review-baritem"
-          data-active={overlay === 'annotations'}
+          className="dsh-desk-review-pill"
+          data-active={overlay === 'annotations' || undefined}
           onClick={() => setOverlay(current => current === 'annotations' ? null : 'annotations')}
         >
-          {t('review.pendingBar', { count: annotations.length })}
+          <IconListPenOutlineRegular />
+          <span>{t('review.pendingBar', { count: annotations.length })}</span>
         </button>
         <button
           type="button"
-          className="dsh-desk-review-baritem"
-          data-active={overlay === 'diff'}
+          className="dsh-desk-review-pill"
+          data-active={overlay === 'diff' || undefined}
           onClick={() => setOverlay(current => current === 'diff' ? null : 'diff')}
         >
-          {t('review.changes')}{' '}
+          <IconInspectOutlineRegular />
+          <span>{t('review.changes')}</span>{' '}
           {totals === null
             ? t('review.noChange')
             : (
