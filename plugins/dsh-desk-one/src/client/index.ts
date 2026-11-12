@@ -6,12 +6,13 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { PACKAGE_NAME } from '../constants.js'
+import { LOCALE_NAMESPACE, PACKAGE_NAME } from '../constants.js'
 import * as api from './notes/api.js'
 import * as taskApi from './tasks/api.js'
 import { DeskOnePage } from './app/DeskOnePage.js'
 import { notebookApi } from './notebook/api.js'
 import { createReviewBridge } from './notebook/review-bridge.js'
+import { DocReviewAction } from './notebook/DocReviewAction.js'
 import { mountNoteReviewTab } from './notebook/register.js'
 import { createWorkspaceAccess } from './notebook/workspaces.js'
 import { createSessionLinkBridge, type SessionServices } from './sessions/bridge.js'
@@ -69,6 +70,14 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(['sidebarRightTabs'], (tabCtx) => {
     mountNoteReviewTab(tabCtx, notebookApi, review)
   })
+  // Official document-preview header: one extra action that starts a review session for
+  // notebook files. The official preview itself is untouched.
+  ctx.slots.inject('sidebar.right.tab.document.actions', () => ctx.slots.register({
+    name: 'sidebar.right.tab.document.actions',
+    id: 'desk-one-note-review',
+    locale: LOCALE_NAMESPACE,
+    inject: () => ({ notebook: notebookApi, review, workspaceAccess }),
+  }, DocReviewAction))
 
   installDeskClient(ctx, {
     page: DeskOnePage,

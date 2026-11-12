@@ -139,6 +139,22 @@ export interface NotebookStateResponse {
   readonly note2md: boolean
 }
 
+/** One immediate subfolder of the selected tree node. */
+export interface NotebookTreeFolder {
+  readonly path: string
+  readonly name: string
+  /** Number of indexed files anywhere below this folder. */
+  readonly count: number
+}
+
+/** One level of the library tree. */
+export interface NotebookTreeResponse {
+  readonly path: string
+  readonly folders: readonly NotebookTreeFolder[]
+  readonly files: readonly NotebookEntry[]
+  readonly totalFiles: number
+}
+
 export interface NotebookRootRequest {
   readonly rootPath: string
 }

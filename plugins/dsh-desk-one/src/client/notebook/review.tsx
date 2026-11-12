@@ -10,7 +10,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
-  DiffBlock, DisclosureRow, IconInspectOutlineRegular, diffTotals,
+  DiffBlock, DisclosureRow, IconInspectOutlineRegular, MarkdownText, diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -102,8 +102,14 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const [comment, setComment] = useState('')
   const [overlay, setOverlay] = useState<OverlayKind | null>(null)
   const [diffOpen, setDiffOpen] = useState(false)
+  /** Source view (exact lines, annotations) or read-only rendered view. */
+  const [view, setView] = useState<'source' | 'render'>('source')
 
   const lines = useMemo(() => (page === null ? [] : page.body.split('\n')), [page])
+  const markdownLabels = useMemo(() => ({
+    code: { copyLabel: t('review.copy'), copiedLabel: t('review.copied') },
+    footnotes: t('review.footnotes'),
+  }), [t])
   const diffLabels = useMemo<DiffBlockLabels>(() => ({
     codeLabel: t('review.text'),
     wrapLabel: t('review.wrap'),
@@ -196,7 +202,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const startCompose = (target: ComposeTarget): void => {
     setComposer(target)
     setComment('')
-    setSelection(null)
   }
 
   const saveAnnotation = useCallback((): void => {
@@ -218,6 +223,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       : annotations.map(item => item.id === composer.editingId ? next : item))
     setComposer(null)
     setComment('')
+    setSelection(null)
   }, [annotations, comment, composer, persist])
 
   /** Submit the whole batch into the new review session's composer (never sends). */
@@ -263,6 +269,30 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     return <div className="dsh-desk-review"><p className="dsh-desk-notebook-hint">{t('review.noPath')}</p></div>
   }
 
+  const composerCard = (
+    <div className="dsh-desk-review-composer dsh-desk-review-composer-inline">
+      <p className="dsh-desk-review-quote dsh-desk-review-quote-inline">{quoteBlock(composer?.quote ?? '')}</p>
+      <textarea
+        className="dsh-desk-review-input"
+        value={comment}
+        maxLength={TEXT_MAX_CHARS}
+        placeholder={t('review.placeholder')}
+        autoFocus
+        onChange={event => setComment(event.target.value)}
+      />
+      <div className="dsh-desk-review-actions">
+        <button type="button" className="dsh-desk-btn" onClick={() => { setComposer(null); setComment(''); setSelection(null) }}>{t('review.cancel')}</button>
+        <button type="button" className="dsh-desk-action dsh-desk-action-primary" disabled={comment.trim() === ''} onClick={saveAnnotation}>
+          {t('review.save')}
+        </button>
+      </div>
+    </div>
+  )
+  const selectedRange = composer !== null && composer.scope === 'selection'
+    ? { start: composer.startLine ?? 0, end: composer.endLine ?? composer.startLine ?? 0 }
+    : selection === null
+      ? undefined
+      : { start: selection.startLine, end: selection.endLine }
   const documentAnnotations = annotations.filter(annotation => annotation.scope === 'document')
   const lineAnnotations = new Map<number, DraftAnnotation[]>()
   for (const annotation of annotations) {
@@ -290,6 +320,10 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     <div className="dsh-desk-review" ref={rootRef}>
       <header className="dsh-desk-review-head">
         <span className="dsh-desk-review-path" title={path}>{page?.title ?? path}</span>
+        <span className="dsh-desk-review-viewtoggle">
+          <button type="button" data-active={view === 'source' || undefined} onClick={() => setView('source')}>{t('review.viewSource')}</button>
+          <button type="button" data-active={view === 'render' || undefined} onClick={() => setView('render')}>{t('review.viewRender')}</button>
+        </span>
         <button type="button" className="dsh-desk-review-mini" onClick={copyPath}>{t('review.copyPath')}</button>
         <button type="button" className="dsh-desk-review-mini" disabled={loading} onClick={() => { void load() }}>{t('review.refresh')}</button>
         <button
@@ -329,14 +363,23 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                     onDelete={() => persist(annotations.filter(item => item.id !== annotation.id))}
                   />
                 ))}
-                <div ref={codeRef} className="dsh-desk-review-code" onMouseUp={handleSelect}>
+                {composer !== null && composer.scope === 'document' ? composerCard : null}
+                {view === 'render'
+                  ? <p className="dsh-desk-review-notice">{t('review.renderHint')}</p>
+                  : null}
+                {view === 'render'
+                  ? <div className="dsh-desk-review-rendered"><MarkdownText text={page.body} labels={markdownLabels} omitHtml /></div>
+                  : <div ref={codeRef} className="dsh-desk-review-code" onMouseUp={handleSelect}>
                   {lines.map((text, index) => {
                     const line = index + 1
                     const marked = lineAnnotations.has(line)
                     const own = (lineAnnotations.get(line) ?? []).filter(annotation => annotation.endLine === line)
+                    const selected = selectedRange !== undefined && line >= selectedRange.start && line <= selectedRange.end
+                    const composeHere = composer !== null && composer.scope === 'selection'
+                      && (composer.endLine ?? composer.startLine ?? 0) === line
                     return (
                       <Fragment key={line}>
-                        <div className="dsh-desk-review-line" data-line={line} data-marked={marked || undefined}>
+                        <div className="dsh-desk-review-line" data-line={line} data-marked={marked || undefined} data-selected={selected || undefined}>
                           <span className="dsh-desk-review-lineno">{line}</span>
                           <span className="dsh-desk-review-source">{text === '' ? '\u00a0' : text}</span>
                         </div>
@@ -355,10 +398,11 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                             onDelete={() => persist(annotations.filter(item => item.id !== annotation.id))}
                           />
                         ))}
+                        {composeHere ? composerCard : null}
                       </Fragment>
                     )
                   })}
-                </div>
+                </div>}
               </div>
             )}
       {selection === null || composer !== null || page === null
@@ -366,7 +410,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         : (
             <button
               type="button"
-              className="dsh-desk-review-float"
+              className="dsh-desk-action dsh-desk-action-primary dsh-desk-review-float"
               style={floatPos}
               onClick={() => startCompose({
                 scope: 'selection',
@@ -378,31 +422,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
             >
               {t('review.annotate')}
             </button>
-          )}
-      {composer === null
-        ? null
-        : (
-            <div className="dsh-desk-review-composer">
-              <p className="dsh-desk-review-quote">{quoteBlock(composer.quote)}</p>
-              <p className="dsh-desk-review-lines">
-                {composer.scope === 'document'
-                  ? t('review.documentScope')
-                  : t('review.lineHint', { start: composer.startLine ?? 0, end: composer.endLine ?? composer.startLine ?? 0 })}
-              </p>
-              <textarea
-                className="dsh-desk-review-input"
-                value={comment}
-                maxLength={TEXT_MAX_CHARS}
-                placeholder={t('review.placeholder')}
-                onChange={event => setComment(event.target.value)}
-              />
-              <div className="dsh-desk-review-actions">
-                <button type="button" className="dsh-desk-btn" onClick={() => setComposer(null)}>{t('review.cancel')}</button>
-                <button type="button" className="dsh-desk-action dsh-desk-action-primary" disabled={comment.trim() === ''} onClick={saveAnnotation}>
-                  {t('review.save')}
-                </button>
-              </div>
-            </div>
           )}
       {overlay === 'annotations'
         ? (
@@ -486,7 +505,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         >
           {t('review.changes')}{' '}
           {totals === null
-            ? '—'
+            ? t('review.noChange')
             : (
                 <>
                   <span className="dsh-desk-review-difftag dsh-desk-review-difftag-plus">{`+${totals.added}`}</span>

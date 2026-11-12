@@ -672,6 +672,18 @@ describe('dsh-desk-one 结构', () => {
     assert.match(view, /notebook\.missingBadge/u, '列表要有缺元数据徽标')
     assert.match(view, /notebook\.historyUsage/u, '历史占用要显示')
     assert.match(routes, /ROUTES\.notebookHistory/u, '历史路由要挂上')
+    assert.match(routes, /ROUTES\.notebookTree/u, '目录树路由要挂上')
+    assert.match(view, /dsh-desk-notebook-searchengine/u, '入口页搜索要居中的搜索引擎式')
+    assert.match(view, /TreeBranch/u, '入口页要有目录树')
+    assert.match(view, /notebook\.loadMore/u, '页面列表要能加载更多')
+    assert.match(view, /notebook\.linkWorkspace/u, '未链接时要有链接工作区入口')
+    assert.match(review, /review\.viewRender/u, '审阅要能切渲染视图')
+    assert.match(review, /composerCard/u, '批注输入框要就地渲染')
+    const entry = await read('src/client/index.ts')
+    const docAction = await read('src/client/notebook/DocReviewAction.tsx')
+    assert.match(entry, /sidebar\.right\.tab\.document\.actions/u, '官方预览头部要挂审阅入口')
+    assert.match(docAction, /isUnderRoot/u, '审阅入口只认笔记库内的文件')
+    assert.match(docAction, /review\.open/u, '审阅入口要开新审阅会话')
   })
 
   it('页面 应该 用一个面板承载标签页，而不是弹窗', async () => {

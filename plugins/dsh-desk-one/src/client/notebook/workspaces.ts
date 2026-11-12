@@ -24,6 +24,24 @@ export interface UiWorkspaceLike {
   pickDirectory(): Promise<string | null>
 }
 
+/**
+ * Find the workspace that owns a library root (the root is a registered workspace directory,
+ * though it may be a subfolder of one).
+ * @param workspaces - registered workspaces.
+ * @param rootPath - absolute library root.
+ * @returns the owning workspace, or `undefined` when the root is not inside any workspace.
+ */
+export function findWorkspaceForRoot(
+  workspaces: readonly WorkspacePathView[],
+  rootPath: string,
+): WorkspacePathView | undefined {
+  const normalized = rootPath.replace(/\\/gu, '/').replace(/\/+$/u, '').toLowerCase()
+  return workspaces.find((workspace) => {
+    const path = workspace.path.replace(/\\/gu, '/').replace(/\/+$/u, '').toLowerCase()
+    return normalized === path || normalized.startsWith(`${path}/`)
+  })
+}
+
 /** Library creation through DSH's own workspace flow. */
 export interface WorkspaceAccess {
   /** Registered workspaces (empty before the service attaches). */

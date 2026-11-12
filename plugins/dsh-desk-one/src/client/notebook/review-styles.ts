@@ -382,4 +382,85 @@ export const REVIEW_CSS = `
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+/* --- v4: view toggle, selected lines, inline composer, segmented bar ------ */
+.dsh-desk-review-viewtoggle {
+  display: inline-flex;
+  flex: none;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dsh-desk-review-viewtoggle button {
+  padding: 2px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.dsh-desk-review-viewtoggle button[data-active] {
+  color: var(--dsw-alias-label-primary, #1f2329);
+  background: var(--dsw-alias-interactive-bg-secondary, rgba(0, 0, 0, 0.06));
+}
+.dsh-desk-review-line[data-selected] {
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4176e6) 18%, transparent);
+}
+.dsh-desk-review-composer-inline {
+  position: static;
+  margin: 6px 0 10px 2.6em;
+  box-shadow: var(--dsw-elevation-panel, 0 2px 10px rgba(0, 0, 0, 0.08));
+}
+.dsh-desk-review-float {
+  padding: 2px 10px;
+  font-size: 11px;
+  border-radius: 999px;
+}
+.dsh-desk-review-bar {
+  gap: 4px;
+  padding: 3px 6px;
+  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.03));
+  border-top: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+}
+.dsh-desk-review-baritem {
+  height: calc(var(--dsh-desk-review-bar-h) - 6px);
+  border-radius: 8px;
+  border-left: 0 !important;
+  font-size: 11px;
+}
+.dsh-desk-review-baritem[data-active] {
+  background: var(--dsw-alias-bg-base, #ffffff);
+  box-shadow: var(--dsw-elevation-panel, 0 1px 4px rgba(0, 0, 0, 0.08));
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-desk-review-rendered {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 4px calc(var(--dsh-desk-review-bar-h) + 12px);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.dsh-desk-docreview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  cursor: pointer;
+}
+.dsh-desk-docreview:hover {
+  color: var(--dsw-alias-label-primary, #1f2329);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+}
+.dsh-desk-docreview:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 `

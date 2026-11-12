@@ -6,7 +6,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
-* **Notebook (minimal)**: pick a workspace folder as the library and browse/search markdown and text files (missing frontmatter is flagged); a new-note entry can create an empty note or start an AI draft (note2md-aware when the folder is a note2md workspace). Clicking a page starts a review in a **new session of that workspace**; the review tab renders the **source with exact line numbers**, offers a small Annotate button on selection, shows saved annotations inline under their lines, keeps drafts across tab close and restart, and **Submit all** inserts one numbered message (file + exact line range + quote + comment) without sending. Submitted reviews become deletable history with a red usage meter above 2 MB. No editor, no git dependency, no bundled skills.
+* **Notebook**: the entry page is now search-first with a workspace picker (centered when nothing is linked), a folder tree plus a paginated page list, missing-metadata badges and separate drafts/history panels; new notes can be created empty or AI-drafted (note2md-aware). The review tab gained a source/rendered toggle, an annotate button on selection, an inline comment box under the selected lines, and inline annotation cards; **Submit all** still inserts one numbered message without sending, and submitted reviews remain as deletable history with a red usage meter above 2 MB.
 
 ## [0.2.2-rc.1] - 2026-11-06
 
