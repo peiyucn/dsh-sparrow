@@ -11,6 +11,14 @@ import type { ReactElement } from 'react'
 /** Card width used for viewport clamping (height is measured after render). */
 const DETAIL_CARD_WIDTH = 360
 
+/** Chosen once per open: either a top edge (grows down) or a bottom edge (grows up), plus the cap. */
+interface Placement {
+  readonly left: number
+  readonly top?: number
+  readonly bottom?: number
+  readonly maxHeight: number
+}
+
 /* -------------------------------- detail card -------------------------------- */
 
 export function EventCard(props: {
@@ -30,28 +38,44 @@ export function EventCard(props: {
   const when = event.allDay
     ? `${dayLabel(t, startOfLocalDay(new Date(event.start)), new Date())} · ${t('schedule.allDay')}`
     : `${dayLabel(t, startOfLocalDay(new Date(event.start)), new Date())} ${formatTime(event.start)} – ${formatTime(event.end)}`
-  const [place, setPlace] = useState<{ left: number; top: number }>()
-  // The card height changes (guest list expands), so measure it and clamp/flip instead of assuming
-  // a fixed height -- otherwise a card opened near the bottom edge is cut off.
+  const [place, setPlace] = useState<Placement>()
+  /**
+   * Anchor the card once per open: growing content (the guest list) must not move it, otherwise the
+   * card jumps away right after the user clicks "show". Growth is absorbed by an internal scroll
+   * limited to the space available on the chosen side.
+   */
   useLayoutEffect(() => {
     const node = cardRef.current
     if (node === null) return
     const width = DETAIL_CARD_WIDTH
     const height = node.getBoundingClientRect().height
-    const anchorX = point === undefined ? window.innerWidth - width - 24 : point.x
-    const anchorY = point === undefined ? window.innerHeight - height - 24 : point.y
-    const below = point === undefined ? anchorY : anchorY + 14
-    const above = anchorY - height - 14
-    const top = below + height <= window.innerHeight - 8 || above < 8 ? below : above
-    setPlace({
-      left: Math.max(8, Math.min(anchorX + 14, window.innerWidth - width - 8)),
-      top: Math.max(8, Math.min(top, window.innerHeight - height - 8)),
-    })
-  }, [point, peopleOpen, event.id])
-  const style = {
-    width: `${DETAIL_CARD_WIDTH}px`,
-    ...(place === undefined ? { visibility: 'hidden' as const } : { left: place.left, top: place.top }),
-  }
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+    const anchorX = point === undefined ? viewportWidth - width - 24 : point.x
+    const anchorY = point === undefined ? viewportHeight - height - 24 : point.y
+    const left = Math.max(8, Math.min(anchorX + 14, viewportWidth - width - 8))
+    const belowTop = anchorY + 14
+    const fitsBelow = belowTop + height <= viewportHeight - 8
+    const fitsAbove = anchorY - 14 - height >= 8
+    if (fitsBelow || !fitsAbove) {
+      // Open downwards; a clamped top only happens when the click is at the very bottom of a small
+      // viewport, where there is no better side to pick.
+      const top = Math.max(8, Math.min(belowTop, viewportHeight - 8 - height))
+      setPlace({ left, top, maxHeight: viewportHeight - top - 8 })
+      return
+    }
+    // Not enough room below: pin the bottom edge above the click point and let it grow upward.
+    const bottom = Math.max(8, viewportHeight - (anchorY - 14))
+    setPlace({ left, bottom, maxHeight: anchorY - 14 - 8 })
+  }, [point, event.id])
+  const style = place === undefined
+    ? { width: `${DETAIL_CARD_WIDTH}px`, visibility: 'hidden' as const }
+    : {
+        width: `${DETAIL_CARD_WIDTH}px`,
+        left: place.left,
+        maxHeight: place.maxHeight,
+        ...(place.top === undefined ? { bottom: place.bottom } : { top: place.top }),
+      }
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent): void => {
