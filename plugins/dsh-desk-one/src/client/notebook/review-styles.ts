@@ -7,6 +7,7 @@
 
 export const REVIEW_CSS = `
 .dsh-desk-review {
+  --dsh-desk-review-bar-h: 34px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -52,7 +53,7 @@ export const REVIEW_CSS = `
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 10px 2px 48px;
+  padding: 10px 2px calc(var(--dsh-desk-review-bar-h) + 14px);
 }
 .dsh-desk-review-scroll::-webkit-scrollbar {
   width: 8px;
@@ -117,14 +118,21 @@ export const REVIEW_CSS = `
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 5;
   display: flex;
+  height: var(--dsh-desk-review-bar-h);
+  box-sizing: border-box;
   border-top: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
   background: var(--dsw-alias-bg-base, #ffffff);
 }
 .dsh-desk-review-baritem {
   flex: 1;
   min-width: 0;
-  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 10px;
   border: 0;
   background: transparent;
   color: var(--dsw-alias-label-secondary, #6b7280);
@@ -145,8 +153,8 @@ export const REVIEW_CSS = `
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 33px;
-  z-index: 2;
+  bottom: var(--dsh-desk-review-bar-h);
+  z-index: 4;
   max-height: 60%;
   overflow-y: auto;
   padding: 10px 12px 12px;
@@ -213,8 +221,8 @@ export const REVIEW_CSS = `
   position: absolute;
   left: 8px;
   right: 8px;
-  bottom: 41px;
-  z-index: 3;
+  bottom: calc(var(--dsh-desk-review-bar-h) + 7px);
+  z-index: 6;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -257,8 +265,8 @@ export const REVIEW_CSS = `
   position: absolute;
   left: 8px;
   right: 8px;
-  bottom: 41px;
-  z-index: 4;
+  bottom: calc(var(--dsh-desk-review-bar-h) + 7px);
+  z-index: 7;
   padding: 10px 12px;
   border: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
   border-radius: 10px;

@@ -12,6 +12,7 @@ import type { NoteIndexEntry, NotebookStateResponse } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import { messageOf } from '../app/utils.js'
 import type { ReviewApi } from './review-api.js'
+import type { ReviewStartResult } from './review-bridge.js'
 import type { NotebookApi } from './api.js'
 import type { WorkspaceAccess } from './workspaces.js'
 
@@ -53,7 +54,7 @@ export function NotebookView(props: {
   readonly notebook: NotebookApi
   readonly workspaceAccess: WorkspaceAccess
   /** Start (or continue) the review of one file: the shell creates the review session. */
-  readonly onStartReview?: (input: { readonly cwd: string; readonly path: string }) => void
+  readonly onStartReview?: (input: { readonly cwd: string; readonly path: string }) => Promise<ReviewStartResult>
   /** Review links surface: one badge per row showing how many reviews the file has. */
   readonly reviewApi?: ReviewApi
 }): ReactElement {
@@ -102,6 +103,8 @@ export function NotebookView(props: {
   const rows = results ?? state?.recent ?? []
   const onStartReview = props.onStartReview
   const rootPath = state?.config?.rootPath
+  /** Why the last review attempt did not open (visible instead of a silent no-op). */
+  const [startError, setStartError] = useState<string | null>(null)
   const reviewApi = props.reviewApi
   const [reviewCounts, setReviewCounts] = useState<ReadonlyMap<string, number>>(new Map())
 
@@ -174,6 +177,7 @@ export function NotebookView(props: {
   return (
     <div className="dsh-desk-notebookview">
       {actionError === null ? null : <p className="dsh-desk-notebook-error">{t('state.loadFailed', { message: actionError })}</p>}
+      {startError === null ? null : <p className="dsh-desk-notebook-error">{startError}</p>}
       {unusable
         ? (
             <div className="dsh-desk-notebook-empty">
@@ -251,7 +255,15 @@ export function NotebookView(props: {
                           reviewCount={reviewCounts.get(entry.path)}
                           {...rootPath === undefined || onStartReview === undefined
                             ? {}
-                            : { onOpen: (path: string) => onStartReview({ cwd: rootPath, path }) }}
+                            : {
+                                onOpen: (path: string) => {
+                                  void onStartReview({ cwd: rootPath, path }).then((result) => {
+                                    setStartError(result.ok ? null : result.message ?? '无法打开审阅会话')
+                                  }, (cause: unknown) => {
+                                    setStartError(cause instanceof Error ? cause.message : String(cause))
+                                  })
+                                },
+                              }}
                         />
                       ))}
                 </div>

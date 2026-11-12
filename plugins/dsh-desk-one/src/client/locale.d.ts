@@ -62,6 +62,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'review.diffEmpty'
       | 'review.closeBlocked'
       | 'review.closeAnyway'
+      | 'review.hideOverlay'
       | 'review.keepEditing'
       | 'tab.notes'
       | 'tab.tasks'

@@ -212,7 +212,7 @@ export function DeskOnePage(props: DeskPanelProps) {
       notebook={notebook}
       workspaceAccess={workspaceAccess}
       reviewApi={reviewApi}
-      onStartReview={input => { void startReview(input) }}
+      onStartReview={startReview}
     />
   )
 

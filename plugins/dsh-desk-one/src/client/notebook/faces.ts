@@ -33,9 +33,15 @@ export interface WorkspacesLike {
   create(input: { readonly path: string }): Promise<WorkspaceViewLike>
 }
 
-/** Official sessions service face (reach one session's composer). */
+/** One listed session, as far as the review bridge cares. */
+export interface SessionSummaryLike {
+  readonly cwd?: string
+}
+
+/** Official sessions service face (reach one session's composer; check a listed session). */
 export interface SessionsLike {
   scope(id: string): SessionScopeLike | undefined
+  readonly list: { getSnapshot(): { readonly byId: Readonly<Record<string, SessionSummaryLike>> } }
 }
 
 /** Session-scope lookup face. */
@@ -54,13 +60,14 @@ export interface ConversationLike {
   readonly input: { for(scope: unknown): SessionInputLike }
 }
 
-/** Official workspace navigation face: open one Session, or a workspace with its Session. */
+/** Official workspace navigation face used to open the review session. */
 export interface SessionNavigationLike {
+  /** Reveal one existing Session in the main column. */
   openSession(sessionId: string): void
   /**
-   * Connect a workspace and open its blank Session, creating or reusing it.
+   * Connect a workspace and resolve its blank Session (created or reused).
    * @param workspaceId - target workspace.
-   * @param beforeOpen - synchronous preparation for the selected Session (writes the review link).
+   * @returns the session id, bound to that workspace.
    */
-  openWorkspace(workspaceId: string, beforeOpen?: (sessionId: string) => void): Promise<void>
+  connectWorkspace(workspaceId: string): Promise<string>
 }

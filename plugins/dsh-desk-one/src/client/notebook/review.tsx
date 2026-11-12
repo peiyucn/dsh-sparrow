@@ -302,6 +302,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                 <button type="button" className="dsh-desk-action dsh-desk-action-primary" disabled={pending.length === 0} onClick={submitAll}>
                   {t('review.submitAll')}
                 </button>
+                <button type="button" className="dsh-desk-review-mini" onClick={() => setOverlay(null)}>{t('review.hideOverlay')}</button>
               </div>
               {pending.length === 0
                 ? <p className="dsh-desk-notebook-hint">{t('review.pendingEmpty')}</p>
@@ -332,6 +333,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                 <button type="button" className="dsh-desk-review-mini" disabled={page === null} onClick={() => setBaseline(page?.body ?? null)}>
                   {t('review.rebaseline')}
                 </button>
+                <button type="button" className="dsh-desk-review-mini" onClick={() => setOverlay(null)}>{t('review.hideOverlay')}</button>
               </div>
               {diff === null || totals === null
                 ? <p className="dsh-desk-notebook-hint">{t('review.diffEmpty')}</p>

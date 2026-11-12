@@ -2,10 +2,11 @@
  * Review bridge: starts or continues a review session, opens the review tab, hands the
  * pending annotations to the composer, and guards the tab's close when work is unsaved.
  *
- * A review session must live in the reviewed file's workspace: the main column then shows a
- * real DSH session (workspace selected, agent context intact) instead of the empty new-session
- * hero. Starting therefore goes through the official workspace navigation
- * (`openWorkspace`), not through a bare `sessions.create`.
+ * A review session must be a real workspace session: the main column then shows a DSH
+ * session bound to the reviewed file's workspace instead of the empty home screen. The
+ * bridge therefore goes through the official workspace navigation (`connectWorkspace`
+ * returns the session id, `openSession` reveals it) and reports a readable reason when
+ * that fails, so the notebook can show it instead of silently doing nothing.
  */
 
 import type { ReviewApi } from './review-api.js'
@@ -34,14 +35,20 @@ export interface ReviewStartInput {
   readonly path: string
 }
 
+/** Result of one start attempt: the notebook shows `message` when the session could not open. */
+export interface ReviewStartResult {
+  readonly ok: boolean
+  readonly message?: string
+}
+
 /** Open face the notebook shares with the review tab. */
 export interface ReviewBridge {
   /**
    * Continue the file's most recent review, or start a new one in its workspace.
    * @param input - workspace root and file path.
-   * @returns whether a review session was opened.
+   * @returns whether a review session was opened, plus a readable failure reason.
    */
-  start(input: ReviewStartInput): Promise<boolean>
+  start(input: ReviewStartInput): Promise<ReviewStartResult>
   /**
    * Reveal one review tab.
    * @param reviewId - review record id.
@@ -71,6 +78,11 @@ const OPEN_RETRY_MS = 60
 /** Normalize a filesystem path for prefix comparison (Windows case-insensitive, slashes unified). */
 function normalizedPath(path: string): string {
   return path.replace(/\\/gu, '/').replace(/\/+$/u, '').toLowerCase()
+}
+
+/** Readable message from an unknown rejection. */
+function reasonOf(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause)
 }
 
 /** Create the bridge; all services start detached. */
@@ -103,10 +115,27 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
     return true
   }
 
+  /**
+   * Reveal one session; the catalog can lag a just-created session by a moment, so the
+   * reveal is retried briefly instead of leaving the home screen behind.
+   * @param sessionId - session to select.
+   */
+  const revealSession = (sessionId: string): void => {
+    const nav = navigation
+    if (nav === undefined) return
+    let attempts = 0
+    const attempt = (): void => {
+      attempts += 1
+      nav.openSession(sessionId)
+      if (attempts < 4) setTimeout(attempt, 150 * attempts)
+    }
+    setTimeout(attempt, 0)
+  }
+
   /** The official workspace containing `cwd`, creating one through the official flow when absent. */
   const workspaceFor = async (cwd: string): Promise<string> => {
     const service = workspaces
-    if (service === undefined) throw new Error('workspaces unavailable')
+    if (service === undefined) throw new Error('工作区服务不可用')
     const target = normalizedPath(cwd)
     const match = service.list.getSnapshot().items.find((item) => {
       const root = normalizedPath(item.path)
@@ -120,36 +149,42 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
   return {
     async start(input) {
       const nav = navigation
-      if (nav === undefined) return false
+      if (nav === undefined) return { ok: false, message: '对话导航服务不可用（无法打开会话）' }
+      if (workspaces === undefined) return { ok: false, message: '工作区服务不可用（无法定位文件所属工作区）' }
+      let step = '定位工作区'
       try {
-        const existing = await api.list({ cwd: input.cwd, path: input.path })
-        layout?.selectPanel(null)
         const workspaceId = await workspaceFor(input.cwd)
-        // Continue only when the latest review still reads its file; a moved or renamed
-        // target would otherwise reopen a dead tab instead of starting a usable review.
+        layout?.selectPanel(null)
+        step = '检查历史审阅'
+        const existing = await api.list({ cwd: input.cwd, path: input.path })
         const latest = existing[0]
         if (latest !== undefined) {
           try {
+            step = '检查历史审阅会话'
+            const listed = sessions?.list.getSnapshot().byId[latest.sessionId]
+            if (listed === undefined) throw new Error('该审阅会话已不存在或不可用')
+            step = '读取历史审阅的目标文件'
             await api.page(latest.id)
-            await nav.openWorkspace(workspaceId)
-            nav.openSession(latest.sessionId)
+            step = '打开历史审阅会话'
+            revealSession(latest.sessionId)
             openTab(latest.id)
-            return true
-          } catch {
-            // Fall through and start a fresh review for the file that exists now.
+            return { ok: true }
+          } catch (cause) {
+            // A moved/renamed target or a vanished session must not reopen a dead tab.
+            step = `历史审阅不可用（${reasonOf(cause)}）；将新建审阅`
           }
         }
-        // New review: the workspace's blank session becomes the review session, so the main
-        // column shows a real workspace session while the link is written inside `beforeOpen`.
-        await nav.openWorkspace(workspaceId, (sessionId: string) => {
-          void api.create({ sessionId, cwd: input.cwd, path: input.path }).then((review) => {
-            invalidateReviewBadges()
-            openTab(review.id)
-          }, () => undefined)
-        })
-        return true
-      } catch {
-        return false
+        step = '创建审阅会话'
+        const sessionId = await nav.connectWorkspace(workspaceId)
+        step = '写入审阅记录'
+        const review = await api.create({ sessionId, cwd: input.cwd, path: input.path })
+        invalidateReviewBadges()
+        step = '打开审阅会话'
+        revealSession(sessionId)
+        openTab(review.id)
+        return { ok: true }
+      } catch (cause) {
+        return { ok: false, message: `${step}失败：${reasonOf(cause)}` }
       }
     },
     open(reviewId) {

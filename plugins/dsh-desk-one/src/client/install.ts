@@ -21,7 +21,7 @@ import type { SessionsArchiveApi } from './sessions/archiveApi.js'
 import type { ScheduleApi } from './schedule/api.js'
 import type { NotebookApi } from './notebook/api.js'
 import type { WorkspaceAccess } from './notebook/workspaces.js'
-import type { ReviewBridge, ReviewStartInput } from './notebook/review-bridge.js'
+import type { ReviewBridge, ReviewStartInput, ReviewStartResult } from './notebook/review-bridge.js'
 import type { ReviewApi } from './notebook/review-api.js'
 import { attachMainPanel } from './panel.js'
 import { ensureDeskStyles } from './styles.js'
@@ -94,7 +94,7 @@ export interface DeskPanelInjected {
   /** Right-sidebar review opener (unavailable without the services). */
   readonly review: ReviewBridge
   /** Continue or start the review of one file (creates a review session). */
-  readonly startReview: (input: ReviewStartInput) => Promise<boolean>
+  readonly startReview: (input: ReviewStartInput) => Promise<ReviewStartResult>
   /** Review links data surface (history badges on the notebook rows). */
   readonly reviewApi: ReviewApi
 }
