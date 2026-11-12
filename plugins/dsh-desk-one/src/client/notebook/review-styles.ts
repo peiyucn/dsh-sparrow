@@ -14,12 +14,41 @@ export const REVIEW_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
 }
+/* Mirrors the official document-preview header: 38px row, official viewer-tool button, hairline. */
 .dsh-desk-review-head {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 6px;
-  padding-bottom: 8px;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.04));
+  gap: 4px;
+  box-sizing: border-box;
+  height: 38px;
+  padding: 0 6px 0 12px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
+}
+.dsh-desk-review-viewer {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 28px;
+  max-width: 160px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm, 8px);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.dsh-desk-review-viewer:hover {
+  color: var(--dsw-alias-label-primary, #1f2329);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
 }
 .dsh-desk-review-path {
   flex: 1;
@@ -340,10 +369,7 @@ export const REVIEW_CSS = `
   font-variant-numeric: tabular-nums;
 }
 /* --- v4: view toggle, selected lines, inline composer, segmented bar ------ */
-.dsh-desk-review-viewtoggle {
-  flex: none;
-  width: 128px;
-}
+
 .dsh-desk-review-line[data-selected] {
   background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4176e6) 18%, transparent);
 }

@@ -47,13 +47,13 @@ export function toNotebookSkills(summaries: readonly SkillSummaryLike[]): Notebo
 }
 
 /**
- * Effective drafting skill: an explicit stored choice wins (including `null` = none); when nothing
- * was chosen yet, note2md is recommended when the catalog provides it.
- * @param skills - the page's skill list.
+ * Effective drafting skill: only an explicit stored choice selects one. The default is no skill —
+ * most users do not have note2md installed, so recommending it by default was wrong.
+ * @param skills - the page's skill list (kept for the picker; unused by the default rule).
  * @param stored - the persisted selection (`undefined` = never chosen).
  * @returns the skill name in effect, or null for "no skill".
  */
 export function resolveSkillName(skills: readonly NotebookSkill[], stored: string | null | undefined): string | null {
-  if (stored !== undefined) return stored
-  return skills.some(skill => skill.name === 'note2md') ? 'note2md' : null
+  void skills
+  return stored ?? null
 }

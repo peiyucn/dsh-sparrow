@@ -24,13 +24,14 @@ describe('笔记技能识别', () => {
     assert.equal(list[1]?.note, false)
   })
 
-  it('默认选 note2md；显式选择优先；null 表示不用技能', () => {
+  it('默认不用技能；显式选择才生效', () => {
     const skills = toNotebookSkills([
       { name: 'note2md', description: 'notes', source: 'bundled' },
       { name: 'other', description: 'notes too', source: 'user' },
     ])
-    assert.equal(resolveSkillName(skills, undefined), 'note2md')
+    assert.equal(resolveSkillName(skills, undefined), null)
     assert.equal(resolveSkillName(skills, 'other'), 'other')
+    assert.equal(resolveSkillName(skills, 'note2md'), 'note2md')
     assert.equal(resolveSkillName(skills, null), null)
     assert.equal(resolveSkillName([], undefined), null)
   })
