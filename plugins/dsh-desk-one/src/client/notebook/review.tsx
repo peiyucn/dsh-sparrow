@@ -95,18 +95,36 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     return () => clearTimeout(timer)
   }, [undo])
 
-  const load = useCallback(async (): Promise<void> => {
-    setLoading(true)
-    setError(null)
+  /**
+   * Load (or silently refresh) the reviewed page.
+   *
+   * A silent refresh never touches the loading spinner and keeps identical page objects stable,
+   * so a background poll does not re-render or flash the tab.
+   * @param silent - refresh without loading/error UI changes.
+   */
+  const load = useCallback(async (silent = false): Promise<void> => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
+    const applyPage = (nextPage: ReviewPageResponse): void => {
+      setPage((current) => current !== null
+        && current.body === nextPage.body
+        && current.path === nextPage.path
+        && current.kind === nextPage.kind
+        && current.title === nextPage.title
+        ? current
+        : nextPage)
+      setBaseline(current => current ?? nextPage.body)
+      setBaselineAt(current => current ?? new Date().toISOString())
+    }
     try {
       // A concrete review record (history tab) reads through itself.
       if (reviewId !== undefined) {
         const [nextReview, nextPage] = await Promise.all([reviewApi.get(reviewId), reviewApi.page(reviewId)])
-        setReview(nextReview)
-        setPage(nextPage)
-        setPending(nextReview.drafts)
-        setBaseline(current => current ?? nextPage.body)
-        setBaselineAt(current => current ?? new Date().toISOString())
+        setReview(current => current !== null && current.revision === nextReview.revision ? current : nextReview)
+        if (!silent) setPending(nextReview.drafts)
+        applyPage(nextPage)
         return
       }
       if (targetCwd === undefined || targetPath === undefined) return
@@ -117,38 +135,31 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       if (own !== undefined) {
         setReview(own)
         setReviewId(own.id)
-        setPending(own.drafts)
-        const nextPage = await reviewApi.page(own.id)
-        setPage(nextPage)
-        setBaseline(current => current ?? nextPage.body)
-        setBaselineAt(current => current ?? new Date().toISOString())
+        if (!silent) setPending(own.drafts)
+        applyPage(await reviewApi.page(own.id))
         return
       }
-      const nextPage = await reviewApi.pageByTarget({ cwd: targetCwd, path: targetPath })
-      setPage(nextPage)
-      setBaseline(current => current ?? nextPage.body)
-        setBaselineAt(current => current ?? new Date().toISOString())
+      applyPage(await reviewApi.pageByTarget({ cwd: targetCwd, path: targetPath }))
     } catch (cause) {
-      setError(messageOf(cause))
+      // A silent refresh keeps whatever is on screen instead of replacing it with an error.
+      if (!silent) setError(messageOf(cause))
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [reviewApi, reviewId, sessionId, targetCwd, targetPath])
 
   useEffect(() => { void load() }, [load])
 
-  // Visible-tab refresh: the reviewed file can change while the tab is hidden, so refresh
-  // on focus/visibility plus a slow interval; a hidden tab does no work at all.
+  // Background refresh only while the tab is visible: coming back to the window and a slow
+  // interval check the file quietly, so the tab never flashes and a hidden tab does no work.
   useEffect(() => {
     const refresh = (): void => {
-      if (document.visibilityState === 'visible') void load()
+      if (document.visibilityState === 'visible') void load(true)
     }
     document.addEventListener('visibilitychange', refresh)
-    window.addEventListener('focus', refresh)
-    const timer = setInterval(refresh, 30_000)
+    const timer = setInterval(refresh, 60_000)
     return () => {
       document.removeEventListener('visibilitychange', refresh)
-      window.removeEventListener('focus', refresh)
       clearInterval(timer)
     }
   }, [load])
