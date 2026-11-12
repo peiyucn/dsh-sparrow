@@ -148,6 +148,60 @@ export function coversDayKey(event: DeskEvent, key: string): boolean {
   return eventDayKeys(event).includes(key)
 }
 
+/** True when an event spans more than one day, so calendar grids draw it as a bar, not a cell chip. */
+export function isMultiDay(event: DeskEvent): boolean {
+  return eventDayKeys(event).length > 1
+}
+
+/** A multi-day event clipped to one week/month row: `startIndex` is 0-based within `days`. */
+export interface SpanBar {
+  readonly event: DeskEvent
+  readonly startIndex: number
+  readonly span: number
+  /** The event started before this row's first day (draw the left edge open). */
+  readonly continuesBefore: boolean
+  /** The event ends after this row's last day (draw the right edge open). */
+  readonly continuesAfter: boolean
+}
+
+/**
+ * Multi-day events as continuous bars across the given day columns, clipped per row. Single-day
+ * events are not returned -- they stay inside their day cell.
+ */
+export function spanBars(events: readonly DeskEvent[], days: readonly Date[]): SpanBar[] {
+  if (days.length === 0) return []
+  const keys = days.map((day) => dayKey(day))
+  const firstKey = keys[0] ?? ''
+  const lastKey = keys[keys.length - 1] ?? ''
+  const bars: SpanBar[] = []
+  for (const event of events) {
+    const own = eventDayKeys(event)
+    if (own.length <= 1) continue
+    const eventFirst = own[0] ?? ''
+    const eventLast = own[own.length - 1] ?? ''
+    let startIndex = -1
+    let endIndex = -1
+    for (let index = 0; index < keys.length; index++) {
+      const key = keys[index] ?? ''
+      if (key < eventFirst || key > eventLast) continue
+      if (startIndex < 0) startIndex = index
+      endIndex = index
+    }
+    if (startIndex < 0 || endIndex < startIndex) continue
+    bars.push({
+      event,
+      startIndex,
+      span: endIndex - startIndex + 1,
+      continuesBefore: eventFirst < firstKey,
+      continuesAfter: eventLast > lastKey,
+    })
+  }
+  return bars.sort((left, right) =>
+    left.startIndex - right.startIndex
+    || right.span - left.span
+    || left.event.start.localeCompare(right.event.start))
+}
+
 /** Group events into local days covering [today, today + days). Days without events stay empty. */
 export function groupByDay(events: readonly DeskEvent[], today: Date, days: number): Array<{ key: string; date: Date; events: DeskEvent[] }> {
   const start = startOfLocalDay(today)

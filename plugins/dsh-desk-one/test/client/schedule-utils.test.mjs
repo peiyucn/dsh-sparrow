@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   addDays, conflictIds, coversDayKey, dayKey, eventDayKeys, formatDayTitle, groupByDay, isoWeekNumber, keyOfEvent,
-  listRange, monthRange, startOfLocalDay, weekBlocks, weekRange,
+  isMultiDay, listRange, monthRange, spanBars, startOfLocalDay, weekBlocks, weekRange,
 } from '../../lib/client/schedule/utils.js'
 
 const event = (id, start, end, over = {}) => ({
@@ -68,6 +68,40 @@ describe('client schedule utils', () => {
     assert.deepEqual(eventDayKeys(broken), ['2026-11-24'])
     assert.equal(coversDayKey(broken, '2026-11-24'), true)
     assert.equal(coversDayKey(broken, '2026-11-25'), false)
+  })
+
+  it('spanBars：跨天日程按周裁成连续条（单日不进条、跨界开口）', () => {
+    const week = Array.from({ length: 7 }, (_, index) => addDays(new Date(2026, 10, 23), index)) // 11-23 .. 11-29
+    const training = event('training', '2026-11-24T00:00:00.000Z', '2026-11-28T00:00:00.000Z', { allDay: true })
+    const outside = event('outside', '2026-11-26T00:00:00.000Z', '2026-12-02T00:00:00.000Z', { allDay: true })
+    const single = event('single', '2026-11-25T00:00:00.000Z', '2026-11-26T00:00:00.000Z', { allDay: true })
+
+    const bars = spanBars([training, outside, single], week)
+    assert.equal(bars.length, 2, '单日事件不进条')
+
+    const train = bars.find(bar => bar.event.id === 'training')
+    assert.deepEqual({ startIndex: train?.startIndex, span: train?.span }, { startIndex: 1, span: 4 })
+    assert.equal(train?.continuesBefore, false, '在本周内开始')
+    assert.equal(train?.continuesAfter, false, '在本周内结束')
+
+    const tail = bars.find(bar => bar.event.id === 'outside')
+    assert.deepEqual({ startIndex: tail?.startIndex, span: tail?.span }, { startIndex: 3, span: 4 })
+    assert.equal(tail?.continuesAfter, true, '跨到下周要开口')
+
+    assert.equal(isMultiDay(single), false)
+    assert.equal(isMultiDay(training), true)
+  })
+
+  it('spanBars：跨周前后都开口，且按起始列、长度排序', () => {
+    const week = Array.from({ length: 7 }, (_, index) => addDays(new Date(2026, 10, 23), index))
+    const before = event('before', '2026-11-20T00:00:00.000Z', '2026-11-26T00:00:00.000Z', { allDay: true })
+    const long = event('long', '2026-11-24T00:00:00.000Z', '2026-12-01T00:00:00.000Z', { allDay: true }) // DTEND 排他：覆盖到 11-30 才算跨界
+    const short = event('short', '2026-11-24T00:00:00.000Z', '2026-11-26T00:00:00.000Z', { allDay: true })
+    const bars = spanBars([short, long, before], week)
+    assert.deepEqual(bars.map(bar => bar.event.id), ['before', 'long', 'short'], '同起始列时长者在前')
+    assert.equal(bars[0]?.continuesBefore, true)
+    assert.equal(bars[1]?.continuesAfter, true)
+    assert.equal(bars[2]?.span, 2)
   })
 
   it('groupByDay：跨天日程出现在覆盖的每一天，且每天只出现一次', () => {

@@ -1,6 +1,6 @@
 /** Calendar boards: list, month and week. The week board owns its 0–24 hour ruler and scroll anchor. */
 
-import { addDays, calendarColorOf, calendarNameOf, conflictIds, coversDayKey, dayKey, eventDayKeys, formatDateLabel, formatTime, groupByDay, isoWeekNumber, monthRange, weekBlocks, weekdayLabel, weekdayLabels } from './utils.js'
+import { addDays, calendarColorOf, calendarNameOf, conflictIds, coversDayKey, dayKey, formatDateLabel, formatTime, groupByDay, isMultiDay, isoWeekNumber, monthRange, spanBars, weekBlocks, weekdayLabel, weekdayLabels } from './utils.js'
 import { dayLabel, eventTitle } from './shared.js'
 import { useEffect, useMemo, useRef } from 'react'
 import type { ClickPoint } from './shared.js'
@@ -79,15 +79,14 @@ export function MonthBoard(props: MonthProps): ReactElement {
     for (let index = 0; index < cells.length; index += 7) rows.push(cells.slice(index, index + 7))
     return rows
   }, [from, to])
+  // Multi-day events are drawn as continuous bars (see spanBars); cells only hold single-day ones.
   const byDay = useMemo(() => {
     const map = new Map<string, DeskEvent[]>()
     for (const event of events) {
-      // Multi-day events land on every day cell they cover.
-      for (const key of eventDayKeys(event)) {
-        const bucket = map.get(key) ?? []
-        bucket.push(event)
-        map.set(key, bucket)
-      }
+      if (isMultiDay(event)) continue
+      const bucket = map.get(dayKey(new Date(event.start))) ?? []
+      bucket.push(event)
+      map.set(dayKey(new Date(event.start)), bucket)
     }
     return map
   }, [events])
@@ -108,6 +107,23 @@ export function MonthBoard(props: MonthProps): ReactElement {
       <div className="dsh-desk-schedule-month-body" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
         {weeks.map(row => (
           <div key={row[0]?.toISOString()} className="dsh-desk-schedule-month-row">
+            <div className="dsh-desk-schedule-month-spans">
+              {spanBars(events, row).map(bar => (
+                <button
+                  key={bar.event.id}
+                  type="button"
+                  className="dsh-desk-schedule-month-span"
+                  style={{ gridColumn: `${bar.startIndex + 1} / span ${bar.span}` }}
+                  data-open-start={bar.continuesBefore ? 'true' : undefined}
+                  data-open-end={bar.continuesAfter ? 'true' : undefined}
+                  title={eventTitle(t, bar.event)}
+                  onClick={click => onOpen(bar.event, { x: click.clientX, y: click.clientY })}
+                >
+                  <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(bar.event, calendars) }} />
+                  <span>{eventTitle(t, bar.event)}</span>
+                </button>
+              ))}
+            </div>
             {row.map(date => {
               const dayEvents = byDay.get(dayKey(date)) ?? []
               const isToday = date.toDateString() === today.toDateString()
@@ -168,11 +184,13 @@ export function WeekBoard(props: WeekProps): ReactElement {
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(from, index)), [from])
   const labels = weekdayLabels(t('schedule.weekdays'))
   const blocks = useMemo(() => weekBlocks(events, from), [events, from])
-  // An all-day event spanning several days shows in this row on each of those days.
   const allDay = useMemo(() => days.map((day) => {
     const key = dayKey(day)
     return events.filter(event => event.allDay && coversDayKey(event, key))
   }), [days, events])
+  // Multi-day all-day events become continuous bars; single-day ones stay in their day cell.
+  const allDaySpans = useMemo(() => spanBars(allDay.flat(), days), [allDay, days])
+  const allDaySingle = useMemo(() => allDay.map(list => list.filter(event => !isMultiDay(event))), [allDay])
   const todayIndex = days.findIndex(day => day.toDateString() === today.toDateString())
   const now = new Date()
   const nowPct = ((now.getHours() * 60 + now.getMinutes()) / 1440) * 100
@@ -203,9 +221,28 @@ export function WeekBoard(props: WeekProps): ReactElement {
       </div>
       <div className="dsh-desk-schedule-week-allday">
         <span className="dsh-desk-schedule-week-gutter" aria-hidden="true" />
+        <div className="dsh-desk-schedule-week-allday-grid">
+          <div className="dsh-desk-schedule-week-spans">
+            {allDaySpans.map(bar => (
+              <button
+                key={bar.event.id}
+                type="button"
+                className="dsh-desk-schedule-week-span"
+                style={{ gridColumn: `${bar.startIndex + 1} / span ${bar.span}` }}
+                data-open-start={bar.continuesBefore ? 'true' : undefined}
+                data-open-end={bar.continuesAfter ? 'true' : undefined}
+                title={eventTitle(t, bar.event)}
+                onClick={click => onOpen(bar.event, { x: click.clientX, y: click.clientY })}
+              >
+                <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(bar.event, calendars) }} />
+                <span>{eventTitle(t, bar.event)}</span>
+              </button>
+            ))}
+          </div>
+          <div className="dsh-desk-schedule-week-allday-cells">
         {days.map((day, index) => (
           <span key={day.toISOString()} className="dsh-desk-schedule-week-allday-cell">
-            {allDay[index]?.map(event => (
+            {(allDaySingle[index] ?? []).map(event => (
               <button key={event.id} type="button" className="dsh-desk-schedule-week-allday-chip" onClick={click => onOpen(event, { x: click.clientX, y: click.clientY })}>
                 <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
                 {eventTitle(t, event)}
@@ -213,6 +250,8 @@ export function WeekBoard(props: WeekProps): ReactElement {
             ))}
           </span>
         ))}
+          </div>
+        </div>
       </div>
       <div className="dsh-desk-schedule-week-scroll" ref={scrollRef}>
         <div className="dsh-desk-schedule-week-body">
