@@ -25,30 +25,9 @@ export const REVIEW_CSS = `
   padding: 0 6px 0 12px;
   border-bottom: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
 }
-.dsh-desk-review-viewer {
-  display: inline-flex;
+.dsh-desk-review-viewtoggle {
   flex: none;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  height: 28px;
-  max-width: 160px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: var(--dsw-radius-sm, 8px);
-  background: transparent;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
-}
-.dsh-desk-review-viewer:hover {
-  color: var(--dsw-alias-label-primary, #1f2329);
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  width: 112px;
 }
 .dsh-desk-review-path {
   flex: 1;
