@@ -8,7 +8,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
-import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DeskTranslator } from '../app/types.js'
 import { messageOf } from '../app/utils.js'
 import type { NotebookEntry, NotebookStateResponse, ReviewHistoryEntry } from '../../notebook-contract.js'
@@ -275,12 +274,12 @@ export function NotebookView(props: {
                 <h3>{t('notebook.welcomeTitle')}</h3>
                 <p>{t('notebook.welcomeBody')}</p>
                 <div className="dsh-desk-notebook-center-actions">
-                  <Button variant="primary" size="sm" disabled={busy} onClick={() => setChoosing(current => !current)}>
+                  <button type="button" className="dsh-desk-action dsh-desk-action-primary" disabled={busy} onClick={() => setChoosing(current => !current)}>
                     {t('notebook.linkWorkspace')}
-                  </Button>
-                  <Button variant="outline" size="sm" disabled={busy} onClick={() => { void pickNewWorkspace() }}>
+                  </button>
+                  <button type="button" className="dsh-desk-action" disabled={busy} onClick={() => { void pickNewWorkspace() }}>
                     {t('notebook.createWorkspace')}
-                  </Button>
+                  </button>
                 </div>
                 {choosing
                   ? (
@@ -304,16 +303,16 @@ export function NotebookView(props: {
             <>
               <section className="dsh-desk-notebook-hero">
                 <div className="dsh-desk-notebook-hero-main">
-                  <Button variant="primary" size="md" disabled={busy} onClick={() => setNewOpen(current => !current)}>
+                  <button type="button" className="dsh-desk-action dsh-desk-action-primary dsh-desk-notebook-newbutton" disabled={busy} onClick={() => setNewOpen(current => !current)}>
                     {t('notebook.new')}
-                  </Button>
+                  </button>
                   <div className="dsh-desk-notebook-hero-copy">
                     <h3>{t('notebook.heroTitle')}</h3>
                     <p>{t('notebook.heroBody')}</p>
                   </div>
-                  <Button variant="outline" size="sm" disabled={busy || browserOpen === 'pending'} onClick={() => { void openBrowser() }}>
+                  <button type="button" className="dsh-desk-action" disabled={busy || browserOpen === 'pending'} onClick={() => { void openBrowser() }}>
                     {browserOpen === 'pending' ? t('notebook.browserOpening') : t('notebook.openBrowser')}
-                  </Button>
+                  </button>
                 </div>
                 <input
                   className="dsh-desk-notebook-searchengine"
@@ -332,12 +331,12 @@ export function NotebookView(props: {
                           autoFocus
                         />
                         <div className="dsh-desk-notebook-actions">
-                          <Button variant="outline" size="sm" disabled={busy || newTitle.trim() === ''} onClick={() => { void createEmpty() }}>
+                          <button type="button" className="dsh-desk-btn" disabled={busy || newTitle.trim() === ''} onClick={() => { void createEmpty() }}>
                             {t('notebook.createEmpty')}
-                          </Button>
-                          <Button variant="outline" size="sm" disabled={newTitle.trim() === '' || workspace === undefined} onClick={draftWithAi}>
+                          </button>
+                          <button type="button" className="dsh-desk-btn" disabled={newTitle.trim() === '' || workspace === undefined} onClick={draftWithAi}>
                             {state?.note2md === true ? t('notebook.note2mdNew') : t('notebook.aiDraft')}
-                          </Button>
+                          </button>
                         </div>
                         {newTitle.trim() === '' ? <p className="dsh-desk-notebook-fineprint">{t('notebook.newHint')}</p> : null}
                       </div>
