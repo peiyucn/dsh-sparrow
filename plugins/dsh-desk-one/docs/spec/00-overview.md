@@ -5,7 +5,7 @@
 
 ## 定位
 
-DSH Web 里「与 harness 共用一张桌子」的工作套件 **Desk One（同桌）**：一个侧栏入口、一个面板、**一套统一对象**，把待办、日程、专注、便签、看板收在一处；Agent 通过一组工具读写同一套数据，而不是各模块各存一份。
+DSH Web 里「与 harness 共用一张桌子」的工作套件 **Desk One（同桌）**：五个侧栏直达入口（每个 tab 一个，可用官方入口自定义固定 / 移出）、一个页面组件、**一套统一对象**，把待办、日程、专注、便签、看板收在一处；Agent 通过一组工具读写同一套数据，而不是各模块各存一份。
 
 日程页的日程聚合来自三条「个人可搞定」的线路（v1 只读）：
 
@@ -23,7 +23,7 @@ DSH Web 里「与 harness 共用一张桌子」的工作套件 **Desk One（同�
 3. **外部数据只镜像**：外部日程在本地是带来源与版本的镜像对象；写回是显式动作，v1 默认只读。
 4. **本地优先**：断网、令牌失效、同步失败都不阻塞本地记录；每个失败在界面上可见，不静默。
 5. **可迁移**：对象可导出为 JSON Lines；schema 变化走迁移表，旧数据能平滑升级。
-6. **单入口**：客户端只注册一个 entry，模块在面板内路由——宿主 boot 审计把任一 client entry 非 active 当致命失败，入口越少风险越小。
+6. **单 entry、多入口行**：客户端只注册一个 entry；左栏按 tab 注册 5 个 main panel（共用同一页面组件、各自初始 tab），模块在页面内路由——宿主 boot 审计把任一 client entry 非 active 当致命失败，入口越少风险越小。
 
 ## 模块地图
 
@@ -60,7 +60,7 @@ src/
     sessions/**                                            # 会话归档管理 host 半（Phase 2 从 archive-manage 迁移）
     schedule/{routes,sync,providers/**,caldav/**,ics/**}   # 日程页的日程聚合 host 半（S2，只读）
   client/
-    index.ts install.ts panel.ts icon.tsx compat.ts       # 入口与客户端装配
+    index.ts install.ts panel.ts tabIcons.tsx compat.ts       # 入口与客户端装配
     i18n.ts locale.d.ts                                   # 共享文案（键按功能命名空间）
     app/{DeskOnePage.tsx,DeskHeader.tsx,SubPageHeader.tsx,types.ts,utils.ts,styles.ts}  # 面板外壳
     notes/{api.ts,components/*,hooks/*,styles.ts}          # 便签功能的 client 半
@@ -134,7 +134,7 @@ test/
 
 | 能力 | 状态 |
 | :--- | :--- |
-| 侧栏入口与主面板槽位 | 已用（S0，`client/install.ts` + `panel.ts`） |
+| 侧栏入口与主面板槽位 | 已用（每个 tab 一组 `main` + `sidebar.panellist`，共 5 组；`client/install.ts` + `panel.ts`） |
 | 持久化 seam | 已用（`ctx.storageDomain`，域 `desk_one` / `nodes` / `edges`，per-record） |
 | Agent 工具注册 | 已用（`ctx.tools`，S0/S1 已注册便签与任务工具） |
 | 凭据 | 公开契约已查证：`ctx.credentials` 支持 `ref`（任意非空字符串，适合 CalDAV 密码）与 `record`（grant 载荷，适合 OAuth 令牌）；见 `dsh-codebuddy-credits` 先例 |
