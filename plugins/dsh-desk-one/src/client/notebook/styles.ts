@@ -6,9 +6,9 @@ export const NOTEBOOK_CSS = `
   display: flex;
   flex-direction: column;
   gap: 10px;
-  height: 100%;
+  flex: 1;
   min-height: 0;
-  padding: 12px 14px;
+  padding: calc(var(--dsh-desk-header-h) + 12px) 14px 14px;
   overflow-y: auto;
 }
 .dsh-desk-notebook-error {
