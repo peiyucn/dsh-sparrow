@@ -201,9 +201,19 @@ const reviewSchema = z.object({
   revision: z.number().int().positive(),
 })
 
+/**
+ * Pre-review annotation records, tolerated only so an upgrade opens the domain (one invalid
+ * record rejects the whole open); `Store.open` deletes them immediately afterwards.
+ */
+const legacyAnnotationSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('annotation'),
+  schema: z.number().int().positive(),
+}).passthrough()
+
 const nodeSchema = z.discriminatedUnion('kind', [
   noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema, sessionIndexSchema,
-  notebookConfigSchema, reviewSchema,
+  notebookConfigSchema, reviewSchema, legacyAnnotationSchema,
 ])
 const edgeSchema = z.object({
   id: z.string().min(1),

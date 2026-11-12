@@ -187,7 +187,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(constants, /TASK_STATUSES = \['todo', 'doing', 'done'\]/u, '任务固定三泳道')
     assert.match(constants, /tasks: `\$\{PREFIX\}\/tasks`/u, '任务路由前缀')
     assert.match(contract, /interface DeskTask/u)
-    assert.match(contract, /export type DeskNode = DeskNote \| DeskTask/u, '统一对象是 kind 判别联合')
+    assert.match(contract, /export type DeskNode =\s*\n?\s*\|? ?DeskNote \| DeskTask/u, '统一对象是 kind 判别联合')
     assert.match(domain, /z\.literal\('task'\)/u, 'nodes 表 schema 扩 task')
     assert.match(domain, /z\.discriminatedUnion\('kind'/u, '按 kind 判别读取')
     assert.match(router, /TASK_ROUTES/u, 'router 要挂任务路由')

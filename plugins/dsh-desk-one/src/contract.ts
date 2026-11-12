@@ -122,7 +122,9 @@ export interface DeskSessionIndex {
   readonly revision: number
 }
 
-export type DeskNode = DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent | DeskSessionIndex | DeskNotebookConfig | DeskReview
+export type DeskNode =
+  | DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent | DeskSessionIndex
+  | DeskNotebookConfig | DeskReview | DeskLegacyAnnotation
 
 /* ------------------------------------------------------------------ */
 /* Schedule (S2): read-only mirror of external calendars               */
@@ -617,4 +619,18 @@ export interface ReviewPageResponse {
   readonly fields: readonly NotebookPageField[]
   readonly body: string
   readonly bytes: number
+}
+
+/**
+ * Pre-review annotation record (desk-one <= 0.2.2-rc.1).
+ *
+ * Only tolerated at domain open so an upgrade never bricks the plugin: the storage domain
+ * rejects the whole open on one invalid record. These records are purged right after the
+ * store opens and nothing writes this kind any more.
+ */
+export interface DeskLegacyAnnotation {
+  readonly id: string
+  readonly kind: 'annotation'
+  readonly schema: number
+  readonly [field: string]: unknown
 }

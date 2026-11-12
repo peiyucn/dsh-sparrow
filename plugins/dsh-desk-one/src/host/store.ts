@@ -39,13 +39,35 @@ export class DeskStore {
   static async open(ctx: Context): Promise<DeskStore> {
     try {
       const domain = await ctx.storageDomain.open(DESK_DOMAIN)
-      return new DeskStore(domain)
+      const store = new DeskStore(domain)
+      await store.purgeLegacyAnnotations(ctx)
+      return store
     } catch (error) {
       ctx.logger.warn(
         `${PACKAGE_NAME}: 打开存储域失败：${error instanceof Error ? error.message : String(error)}；已停用插件以免影响 dsh`,
       )
       throw error
     }
+  }
+
+  /**
+   * Delete pre-review annotation records once, after the domain opened.
+   *
+   * They are accepted by the schema only to keep an upgrade from rejecting the whole domain;
+   * review state lives in conversations now, so these rows have no reader.
+   * @param ctx - host context (logging only).
+   */
+  private async purgeLegacyAnnotations(ctx: Context): Promise<void> {
+    const legacy = this.allNodes().filter(node => node.kind === 'annotation')
+    if (legacy.length === 0) return
+    for (const node of legacy) {
+      try {
+        await this.nodes.delete(node.id)
+      } catch (error) {
+        ctx.logger.warn(`${PACKAGE_NAME}: 清理旧批注记录失败（${node.id}）：${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    ctx.logger.info(`${PACKAGE_NAME}: 已清理 ${legacy.length} 条旧批注记录（审阅状态已改为会话承载）`)
   }
 
   /** The unified node table (all kinds share it; kind is the discriminator). */
