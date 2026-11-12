@@ -62,11 +62,7 @@ export function recordAttendeeProbe(entry: ProbeEntry): void {
   }, 500)
 }
 
-/**
- * Kept for callers that want an explicit reset; the parse path no longer calls it because one sync
- * pulls several calendars and each is parsed separately -- resetting per parse would keep only the
- * last calendar's events.
- */
+/** Reset between pulls so the dump reflects the newest sync only. */
 export function resetAttendeeProbe(): void {
   entries = []
 }

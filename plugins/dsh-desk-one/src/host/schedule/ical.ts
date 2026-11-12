@@ -14,7 +14,7 @@
 import ICAL from 'ical.js'
 import { SCHEDULE_MAX_EVENTS } from '../../constants.js'
 import { ScheduleError } from './types.js'
-import { describeComponent, recordAttendeeProbe } from './attendee-probe.js'
+import { describeComponent, recordAttendeeProbe, resetAttendeeProbe } from './attendee-probe.js'
 import type { PullWindow, RemoteEvent } from './types.js'
 
 /**
@@ -56,6 +56,8 @@ export function parseIcsEvents(ics: string, opts: ParseIcsOptions): RemoteEvent[
   }
 
   const registeredZones: string[] = []
+  // TEMPORARY probe: one dump per pull, so the file reflects the newest sync.
+  resetAttendeeProbe()
   try {
     registerTimezones(root, registeredZones)
     const events: RemoteEvent[] = []
