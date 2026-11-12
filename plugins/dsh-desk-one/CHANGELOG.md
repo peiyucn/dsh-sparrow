@@ -6,10 +6,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
-* **Notebook** is now a working library: pick a workspace folder, browse/search notes with frontmatter stats (missing frontmatter, empty notes) and a per-note review count, and the **+ Notebook** button on the Schedule start card opens it.
-* **Review sessions**: clicking a note continues its latest review session or starts a new one — a DSH conversation of its own, so reviewing never needs an open conversation first. The right-sidebar review tab shows the note (markdown rendered, other text files as plain text); select text to write an annotation in a popup, batch them, and **submit all** as one numbered message into the composer (it never sends by itself). A bottom overlay shows the pending batch and this round's changes (collapsed +N/-M, official diff view) without shrinking the document; annotations added to the batch are saved to the review record immediately, so closing the tab or restarting DSH keeps them until they are submitted.
-* If the reviewed file was moved or renamed, the review tab says so and offers **re-attach** to another file instead of losing the session; sessions that are reviews carry a **Review** badge in the Sessions browser.
-* Removed the old persistent annotation threads (anchors, statuses, accept step): a review directive belongs to its conversation, so the file stays a plain stateless text file. Bundled skill `desk-notes` is replaced by `desk-review`; the `desk_note_*` annotation tools are gone (`desk_note_search` stays).
+* The notebook and review-session direction is withdrawn (never shipped): local-diff review with line comments is already covered by the official change-request panel, and revision history by git. No bundled skills are shipped any more.
 
 ## [0.2.2-rc.1] - 2026-11-06
 

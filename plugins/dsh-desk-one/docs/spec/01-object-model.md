@@ -287,7 +287,7 @@ interface DeskApi {
 | `desk_schedule_sync` | 手动触发日程同步，返回每源报告 | 中 |
 | `desk_schedule_connections` | 连接状态摘要（不含凭据） | 低 |
 | `desk_focus_start` / `desk_focus_stop` / `desk_focus_status` | 专注计时 | 低（v2） |
-| `desk_note_add` / `desk_note_search` | 便签 | 低（v2） |
+| `desk_note_add` | 便签 | 低（v2） |
 | `desk_board_list` / `desk_board_move` | 看板 | 低（v2） |
 | `desk_export` | 导出 JSONL | 低 |
 
