@@ -6,7 +6,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
-* The notebook and review-session direction is withdrawn (never shipped): local-diff review with line comments is already covered by the official change-request panel, and revision history by git. No bundled skills are shipped any more.
+* **Notebook (minimal)** — AI writes, you review: pick a workspace folder as the library, browse/search markdown and text files with metadata counts, and click a page to open the review tab **in the current conversation**. Select text to write an annotation (approximate line range shown); annotations added to the batch are saved immediately and survive closing the tab or restarting DSH. **Submit all** inserts one numbered message into the composer without sending it; the tab also shows this tab's changes (collapsed +N/-M, official diff view). No editor, no git dependency, no bundled skills.
 
 ## [0.2.2-rc.1] - 2026-11-06
 
