@@ -102,7 +102,7 @@
 * agent 工具与界面读写同一批任务（工具建的任务出现在板上）。
 * 会话关联支持多对多；chip 的实时颜色随宿主会话状态变化；已归档 / 不可用会话以中性灰实线和提示降级，不丢失关联；宿主缺会话服务时卡片照常可用；旋转动画在 `prefers-reduced-motion: reduce` 下静止。
 
-**Agent 工具**：`desk_task_add`、`desk_task_list`、`desk_task_update`、`desk_task_complete`、`desk_task_archive`；分组：`desk_group_add`、`desk_group_list`、`desk_group_update`、`desk_group_move`、`desk_group_archive`、`desk_group_delete`。
+**Agent 工具**：`desk_task_list`、`desk_task_save`、`desk_task_archive`；分组：`desk_group_list`、`desk_group_save`、`desk_group_delete`（对象化：save 无 id 新建、有 id + revision 更新）。
 
 ## 4. 日程 Schedule（S2 只读）
 
@@ -285,7 +285,7 @@
 * 第 101 张被拦下并提示；垃圾桶满 200 时丢入被拦下并提示先清空；垃圾桶每页 10、加载更多可用；垃圾桶按钮无角标；Smash 二次确认后整墙清空且有动画，确认态点击旁边 / Esc 可取消；垃圾桶入口提示为「打开垃圾桶」。
 * agent 工具建的便签出现在墙上（兜底位置 + 默认尺寸），且能被拖动 / 改大小落位。
 
-**Agent 工具**：`desk_note_add`、`desk_note_list`、`desk_note_update`、`desk_note_delete`（位置 / 尺寸字段暂不进工具面）。
+**Agent 工具**：`desk_note_list`、`desk_note_save`、`desk_note_delete`（位置 / 尺寸字段暂不进工具面）。
 
 ## 8. 看板 Board（v2）
 
