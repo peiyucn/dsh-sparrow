@@ -163,7 +163,6 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
             step = '读取历史审阅的目标文件'
             await api.page(latest.id)
             step = '激活审阅会话'
-            layout?.selectPanel(null)
             await nav.openWorkspace(workspaceId)
             await revealSession(latest.sessionId)
             await openTab(latest.id)
@@ -178,7 +177,6 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
         const review = await api.create({ sessionId, cwd: input.cwd, path: input.path })
         invalidateReviewBadges()
         step = '激活工作区会话'
-        layout?.selectPanel(null)
         await nav.openWorkspace(workspaceId)
         step = '显示审阅会话'
         await revealSession(sessionId)
