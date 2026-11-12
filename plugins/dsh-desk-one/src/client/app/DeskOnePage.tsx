@@ -46,9 +46,10 @@ export function DeskOnePage(props: DeskPanelProps) {
     listNotes, updateNote, deleteNote, createNote, t,
     listTasks, createTask, updateTask, deleteTask,
     listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink, sessionsArchive, schedule,
-    notebook, workspaceAccess, openReview, draftWithAi,
+    notebook, workspaceAccess, openReview, draftWithAi, initialTab,
   } = props
-  const [tab, setTab] = useState<Tab>(readInitialTab)
+  // A left-rail entry opens its own tab; the base entry (no initialTab) resumes the last visited tab.
+  const [tab, setTab] = useState<Tab>(() => initialTab ?? readInitialTab())
   /** Guards double-click / double-tap while one create request is in flight. */
   const [creating, setCreating] = useState(false)
   const zTopRef = useRef(0)

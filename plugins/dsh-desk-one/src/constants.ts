@@ -49,8 +49,17 @@ export const ROUTES = Object.freeze({
   scheduleOutlookCallback: `${PREFIX}/schedule/outlook/callback`,
   })
 
-/** Entry id: both the left-rail panel row id and the key of the center-column `main` slot (official `MainPanelId`). */
-export const PANEL_ID = 'desk-one'
+/**
+ * One left-rail entry per tab: each id is both the panel row id and the key of the center-column
+ * `main` slot (official `MainPanelId`), so clicking a row opens Desk One directly on that tab.
+ */
+export const PANEL_IDS = {
+  schedule: 'desk-one-schedule',
+  notebook: 'desk-one-notebook',
+  notes: 'desk-one-notes',
+  tasks: 'desk-one-tasks',
+  sessions: 'desk-one-sessions',
+} as const
 /** Left-rail row order: official plugins = 0, schedules = 10, archive-manage = 20; this plugin comes after them. */
 export const PANEL_ORDER = 30
 export const LOCALE_NAMESPACE = 'desk-one' as const

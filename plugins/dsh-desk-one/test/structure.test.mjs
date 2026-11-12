@@ -101,6 +101,8 @@ describe('dsh-desk-one 结构', () => {
     const install = await read('src/client/install.ts')
     const index = await read('src/client/index.ts')
     assert.match(install, /attachMainPanel\(/u)
+    assert.match(install, /PANEL_IDS/u, '每个 tab 一个左栏入口')
+    assert.match(install, /initialTab: entry\.tab/u, '入口打开对应 tab')
     assert.match(install, /warnMissingCapabilities\(/u)
     assert.match(install, /ctx\.effect\(\(\) => \(\) => \{ style\.remove\(\) \}/u)
     assert.ok(!/assertCapabilities\(/u.test(install), 'client half 不得用抛错版能力门')
@@ -863,6 +865,7 @@ describe('dsh-desk-one 结构', () => {
   it('client bundle 应该 保留 main 与 sidebar.panellist 两处槽位注册', async () => {
     const bundle = await read('lib/client.js')
     assert.ok(bundle.includes('sidebar.panellist'), 'bundle 缺 sidebar.panellist 槽位注册')
+    assert.ok(bundle.includes('desk-one-tasks'), 'bundle 缺按 tab 的左栏入口 id')
     assert.ok(bundle.includes("'main'") || bundle.includes('"main"'), 'bundle 缺 main 槽位注册')
   })
 

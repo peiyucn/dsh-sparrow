@@ -12,7 +12,9 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { InjectFace, LocaleDictOf, PropsLocale, PropsRuntime, SlotComponent } from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { hasCapability, warnMissingCapabilities } from './compat.js'
-import { LOCALE_NAMESPACE, PACKAGE_NAME, PANEL_ID, PANEL_ORDER } from '../constants.js'
+import { LOCALE_NAMESPACE, PACKAGE_NAME, PANEL_IDS, PANEL_ORDER } from '../constants.js'
+import { DESK_TABS } from './app/tabs.js'
+import type { Tab } from './app/types.js'
 import type {
   DeskNote, DeskTask, DeskTaskGroup, CreateTaskRequest, TaskGroupPatchRequest, TaskPatchRequest,
 } from '../contract.js'
@@ -27,6 +29,8 @@ import { ensureDeskStyles } from './styles.js'
 
 /** Panel injection surface: data actions come from host REST routes, and the page holds only these functions. */
 export interface DeskPanelInjected {
+  /** Tab this left-rail entry opens (one panel per tab); absent = last visited tab. */
+  readonly initialTab?: Tab
   /** Notebook library data surface. */
   readonly notebook: NotebookApi
   /** DSH workspace flow behind the library action. */
@@ -103,7 +107,8 @@ interface DeskClientDeps {
   readonly page: SlotComponent<
     PropsRuntime<'main'> & InjectFace<DeskPanelInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
   >
-  readonly icon: SlotComponent<PropsRuntime<'sidebar.panellist'>>
+  /** One left-rail icon per tab (each tab gets its own sidebar entry). */
+  readonly icons: Readonly<Record<Tab, SlotComponent<PropsRuntime<'sidebar.panellist'>>>>
   readonly locales: Record<'zh' | 'en', LocaleDictOf<typeof LOCALE_NAMESPACE>>
   readonly api: DeskPanelInjected
 }
@@ -135,15 +140,18 @@ export function installDeskClient(ctx: ClientContext, deps: DeskClientDeps): voi
   const disposeDictionaries = ctx.locale.register(LOCALE_NAMESPACE, deps.locales)
   ctx.effect(() => disposeDictionaries, `${PACKAGE_NAME}: locale dictionaries`)
 
-  // The two official main-panel registrations (`main` page + `sidebar.panellist` icon row) go through an optional-dependency fork:
-  // when the official layout service is absent, neither is registered (lazy disable, no throw) and the host still boots.
-  attachMainPanel(ctx, {
-    id: PANEL_ID as MainPanelId,
-    order: PANEL_ORDER,
-    locale: LOCALE_NAMESPACE,
-    label: () => ctx.locale.bind(LOCALE_NAMESPACE)('button.label'),
-    inject: () => deps.api,
-    page: deps.page,
-    icon: deps.icon,
+  // One official main-panel registration per tab: the `main` page + `sidebar.panellist` row share the id,
+  // so each left-rail row opens Desk One directly on its tab. Both go through an optional-dependency fork:
+  // when the official layout service is absent, nothing is registered (lazy disable, no throw).
+  DESK_TABS.forEach((entry, index) => {
+    attachMainPanel(ctx, {
+      id: PANEL_IDS[entry.tab] as MainPanelId,
+      order: PANEL_ORDER + index,
+      locale: LOCALE_NAMESPACE,
+      label: () => ctx.locale.bind(LOCALE_NAMESPACE)(entry.labelKey),
+      inject: () => ({ ...deps.api, initialTab: entry.tab }),
+      page: deps.page,
+      icon: deps.icons[entry.tab],
+    })
   })
 }
