@@ -125,7 +125,8 @@ function Unlinked({ page }: { readonly page: NotebookPageController }): ReactEle
               </div>
             )
           : null}
-        <p className="dsh-desk-notebook-fineprint">{t('notebook.workspaceHint')}</p>
+        <div className="dsh-desk-notebook-centerdivider" aria-hidden="true" />
+        <p className="dsh-desk-notebook-centerhint">{t('notebook.workspaceHint')}</p>
       </div>
     </div>
   )

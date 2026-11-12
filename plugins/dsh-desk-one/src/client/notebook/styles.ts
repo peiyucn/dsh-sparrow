@@ -305,9 +305,9 @@ button.dsh-desk-notebook-rowbody {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  max-width: 560px;
+  max-width: 640px;
   text-align: center;
 }
 .dsh-desk-notebook-centertitle {
@@ -328,7 +328,19 @@ button.dsh-desk-notebook-rowbody {
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 2px;
+}
+.dsh-desk-notebook-centerdivider {
+  align-self: stretch;
+  height: 0;
+  margin-top: 2px;
+  border-top: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.06));
+}
+.dsh-desk-notebook-centerhint {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 12px;
+  line-height: 18px;
 }
 .dsh-desk-notebook-picker {
   display: flex;
