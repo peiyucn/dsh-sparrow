@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client'
-import { IconInspectOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconListPenOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import { messageOf } from '../app/utils.js'
@@ -106,7 +106,7 @@ export function DocReviewAction(props: DocReviewActionProps): ReactNode {
           }).finally(() => setBusy(false))
         }}
       >
-        <IconInspectOutlineRegular />
+        <IconListPenOutlineRegular />
       </button>
     </Tooltip>
   )

@@ -30,7 +30,6 @@ export const ROUTES = Object.freeze({
   notebookState: `${PREFIX}/notebook/state`,
   notebookRoot: `${PREFIX}/notebook/root`,
   notebookSearch: `${PREFIX}/notebook/search`,
-  notebookTree: `${PREFIX}/notebook/tree`,
   notebookPage: `${PREFIX}/notebook/page`,
   notebookDraft: `${PREFIX}/notebook/draft`,
   notebookFile: `${PREFIX}/notebook/file`,

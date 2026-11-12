@@ -7,7 +7,6 @@ import { ROUTES } from '../../constants.js'
 import type {
   CreateNotebookNoteRequest, CreateNoteResponse, DraftAnnotation, NoteDraft, NoteDraftResponse,
   NotebookFileResponse, NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse,
-  NotebookTreeResponse,
   RecordReviewRequest, ReviewHistoryResponse, ReviewRecord,
 } from '../../notebook-contract.js'
 import { deleteJson, fetchJson, postJson } from '../http.js'
@@ -46,13 +45,6 @@ export function searchNotebook(input: {
   const suffix = params.size === 0 ? '' : `?${params.toString()}`
   return fetchJson<NotebookSearchResponse>(`${ROUTES.notebookSearch}${suffix}`)
 }
-
-  /** One level of the library tree with a page of files. */
-  export function notebookTree(path: string, offset: number, limit: number): Promise<NotebookTreeResponse> {
-    const params = new URLSearchParams({ offset: String(offset), limit: String(limit) })
-    if (path !== '') params.set('path', path)
-    return fetchJson<NotebookTreeResponse>(`${ROUTES.notebookTree}?${params.toString()}`)
-  }
 
 /** Read one page for the review tab. */
 export function notebookPage(path: string): Promise<NotebookPageResponse> {
@@ -107,7 +99,6 @@ export interface NotebookApi {
   readonly setRoot: typeof setNotebookRoot
   readonly clearRoot: typeof clearNotebookRoot
   readonly search: typeof searchNotebook
-  readonly tree: typeof notebookTree
   readonly page: typeof notebookPage
   readonly ensureFile: typeof ensureNotebookFile
   readonly createNote: typeof createNotebookNote
@@ -124,7 +115,6 @@ export const notebookApi: NotebookApi = {
   setRoot: setNotebookRoot,
   clearRoot: clearNotebookRoot,
   search: searchNotebook,
-  tree: notebookTree,
   page: notebookPage,
   ensureFile: ensureNotebookFile,
   createNote: createNotebookNote,

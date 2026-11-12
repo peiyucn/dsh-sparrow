@@ -89,6 +89,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const workspaceId = params?.workspaceId
   const codeRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const composerRef = useRef<HTMLDivElement | null>(null)
 
   const [page, setPage] = useState<NotebookPageResponse | null>(null)
   const [annotations, setAnnotations] = useState<readonly DraftAnnotation[]>([])
@@ -164,6 +165,33 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     return () => clearTimeout(timer)
   }, [notice])
 
+  /** Drop the pending selection (state, float button and the browser's own highlight). */
+  const cancelSelection = useCallback((): void => {
+    setComposer(null)
+    setComment('')
+    setSelection(null)
+    window.getSelection()?.removeAllRanges()
+  }, [])
+
+  // Escape or a click outside the inline composer cancels the pending annotation.
+  useEffect(() => {
+    if (composer === null) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') cancelSelection()
+    }
+    const onPointerDown = (event: PointerEvent): void => {
+      const composerElement = composerRef.current
+      if (composerElement !== null && event.target instanceof Node && composerElement.contains(event.target)) return
+      cancelSelection()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('pointerdown', onPointerDown, true)
+    }
+  }, [cancelSelection, composer])
+
   /** Persist the draft box (per file identity). */
   const persist = useCallback((next: readonly DraftAnnotation[]): void => {
     setAnnotations(next)
@@ -224,6 +252,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     setComposer(null)
     setComment('')
     setSelection(null)
+    window.getSelection()?.removeAllRanges()
   }, [annotations, comment, composer, persist])
 
   /** Submit the whole batch into the new review session's composer (never sends). */
@@ -270,7 +299,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   }
 
   const composerCard = (
-    <div className="dsh-desk-review-composer dsh-desk-review-composer-inline">
+    <div ref={composerRef} className="dsh-desk-review-composer">
       <p className="dsh-desk-review-quote dsh-desk-review-quote-inline">{quoteBlock(composer?.quote ?? '')}</p>
       <textarea
         className="dsh-desk-review-input"
@@ -281,7 +310,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         onChange={event => setComment(event.target.value)}
       />
       <div className="dsh-desk-review-actions">
-        <button type="button" className="dsh-desk-btn" onClick={() => { setComposer(null); setComment(''); setSelection(null) }}>{t('review.cancel')}</button>
+        <button type="button" className="dsh-desk-btn" onClick={cancelSelection}>{t('review.cancel')}</button>
         <button type="button" className="dsh-desk-action dsh-desk-action-primary" disabled={comment.trim() === ''} onClick={saveAnnotation}>
           {t('review.save')}
         </button>

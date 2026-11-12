@@ -6,7 +6,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
-* **Notebook**: the entry page is now search-first with a workspace picker (centered when nothing is linked), a folder tree plus a paginated page list, missing-metadata badges and separate drafts/history panels; new notes can be created empty or AI-drafted (note2md-aware). The review tab gained a source/rendered toggle, an annotate button on selection, an inline comment box under the selected lines, and inline annotation cards; **Submit all** still inserts one numbered message without sending, and submitted reviews remain as deletable history with a red usage meter above 2 MB.
+* **Notebook**: the entry page is a management surface (opens the official right-sidebar file browser by default; keeps new note / search / review records only). Notebook files get a brand-colored **Review view** button in the official preview header; annotation selection is cancellable (Esc or click outside clears both the composer and the highlight). The entry page is now search-first with a workspace picker (centered when nothing is linked), a folder tree plus a paginated page list, missing-metadata badges and separate drafts/history panels; new notes can be created empty or AI-drafted (note2md-aware). The review tab gained a source/rendered toggle, an annotate button on selection, an inline comment box under the selected lines, and inline annotation cards; **Submit all** still inserts one numbered message without sending, and submitted reviews remain as deletable history with a red usage meter above 2 MB.
 
 ## [0.2.2-rc.1] - 2026-11-06
 

@@ -6,7 +6,6 @@ import { realpath, readFile, stat } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import type {
   NotebookEntry, NotebookField, NotebookPageResponse, NotebookSearchResponse, NotebookStats,
-  NotebookTreeFolder, NotebookTreeResponse,
 } from '../../notebook-contract.js'
 import { NOTEBOOK_MAX_BYTES } from '../../constants.js'
 import { DeskError } from '../http.js'
@@ -116,45 +115,3 @@ export function searchEntries(
   return { entries: matched.slice(0, limit), truncated: matched.length > limit }
 }
 
-/** Localized folder ordering that matches the panel (Chinese names sort naturally). */
-const FOLDER_COLLATOR = new Intl.Collator('zh-Hans-CN')
-
-/**
- * One level of the library tree: immediate subfolders with descendant counts plus a page of
- * immediate files. Pure so the pagination/slicing can be unit-tested without a filesystem.
- */
-export function treeLevel(
-  entries: readonly NotebookEntry[],
-  folderPath: string,
-  offset: number,
-  limit: number,
-): NotebookTreeResponse {
-  const prefix = folderPath === '' ? '' : `${folderPath}/`
-  const files: NotebookEntry[] = []
-  const folderCounts = new Map<string, number>()
-  for (const entry of entries) {
-    if (!entry.path.startsWith(prefix)) continue
-    const rest = entry.path.slice(prefix.length)
-    const slash = rest.indexOf('/')
-    if (slash < 0) {
-      files.push(entry)
-      continue
-    }
-    const name = rest.slice(0, slash)
-    folderCounts.set(name, (folderCounts.get(name) ?? 0) + 1)
-  }
-  const folders: NotebookTreeFolder[] = [...folderCounts.entries()]
-    .map(([name, count]) => ({
-      path: folderPath === '' ? name : `${folderPath}/${name}`,
-      name,
-      count,
-    }))
-    .sort((left, right) => FOLDER_COLLATOR.compare(left.name, right.name))
-  const sorted = files.sort((left, right) => right.mtime.localeCompare(left.mtime) || left.path.localeCompare(right.path))
-  return {
-    path: folderPath,
-    folders,
-    files: sorted.slice(offset, offset + limit),
-    totalFiles: sorted.length,
-  }
-}

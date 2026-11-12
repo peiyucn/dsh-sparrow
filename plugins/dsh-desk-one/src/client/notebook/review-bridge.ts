@@ -43,6 +43,12 @@ export interface ReviewBridge {
   open(input: ReviewOpenInput): Promise<ReviewOpenResult>
   /** Start a new session in one workspace with a prefilled composer draft (never sends). */
   draftInNewSession(workspaceId: string, prompt: string): void
+  /**
+   * Start a session in the library workspace and open the official file browser there.
+   * @param workspaceId - workspace that owns the library root.
+   * @returns whether the official files tab opened, plus a readable reason.
+   */
+  openFilesBrowser(workspaceId: string): Promise<ReviewOpenResult>
   /** Put one submitted batch into the session composer (never sends). */
   sendQuote(sessionId: string, text: string): boolean
   attachSidebar(service: SidebarRightLike): () => void
@@ -89,6 +95,26 @@ export function createReviewBridge(): ReviewBridge {
         }
       }
       return { ok: false, message: '审阅会话已创建，但右侧栏没有就绪，请再点一次「审阅」' }
+    },
+    async openFilesBrowser(workspaceId) {
+      const nav = navigation
+      const sidebar = sidebarRight
+      if (nav === undefined) return { ok: false, message: '对话导航服务不可用（无法新建会话）' }
+      if (sidebar === undefined) return { ok: false, message: '右侧栏服务不可用（无法打开文件浏览）' }
+      try {
+        nav.startSession(workspaceId)
+      } catch (cause) {
+        return { ok: false, message: `新建会话失败：${cause instanceof Error ? cause.message : String(cause)}` }
+      }
+      for (let attempt = 0; attempt < OPEN_RETRIES; attempt += 1) {
+        try {
+          sidebar.openTab('files')
+          return { ok: true }
+        } catch {
+          await delay(OPEN_RETRY_MS)
+        }
+      }
+      return { ok: false, message: '会话已创建，但右侧栏没有就绪，请再点一次「打开文件浏览」' }
     },
     draftInNewSession(workspaceId, prompt) {
       navigation?.startSession(workspaceId, { prompt })

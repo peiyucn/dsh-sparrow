@@ -11,13 +11,13 @@ import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import type {
   CreateNotebookNoteRequest, NoteDraft, NotebookEntry, NotebookFileResponse, NotebookStateResponse,
-  NotebookTreeResponse, RecordReviewRequest, ReviewHistoryEntry, ReviewRecord,
+  RecordReviewRequest, ReviewHistoryEntry, ReviewRecord,
 } from '../../notebook-contract.js'
 import { NOTEBOOK_HISTORY_WARN_BYTES, NOTEBOOK_MAX_BYTES, NOTEBOOK_SCAN_TIMEOUT_MS } from '../../constants.js'
 import { DeskError } from '../http.js'
 import type { DeskStore } from '../store.js'
 import { detectNote2md, ensureNoteFile, createNoteFile } from './files.js'
-import { readPage, searchEntries, summarize, treeLevel } from './library.js'
+import { readPage, searchEntries, summarize } from './library.js'
 import { scanLibrary } from './scan.js'
 
 /** How long one scan is reused before the next request rescans. */
@@ -131,15 +131,6 @@ export class NotebookHost {
     if (root === undefined) return { entries: [], truncated: false }
     const entries = await this.entries(root)
     return searchEntries(entries, input.query ?? '', input, input.limit ?? 100)
-  }
-
-  /**
-   * One level of the library tree: immediate subfolders with descendant counts, plus a page
-   * of immediate files (the tree drives navigation; search stays a separate flat query).
-   */
-  async tree(folderPath: string, offset: number, limit: number): Promise<NotebookTreeResponse> {
-    const root = this.requireRoot()
-    return treeLevel(await this.entries(root), folderPath, offset, limit)
   }
 
   /** Read one page for the review tab. */

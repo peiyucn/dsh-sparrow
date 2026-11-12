@@ -449,7 +449,6 @@ export type {
   CreateNotebookNoteRequest, CreateNoteResponse, DeleteReviewRequest, DeskNotebookConfig, DraftAnnotation, NoteDraft,
   NoteDraftRequest, NoteDraftResponse, NoteFileRef, NotebookEntry, NotebookField, NotebookFileResponse,
   NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse, NotebookStats,
-  NotebookTreeFolder, NotebookTreeResponse,
   RecordReviewRequest, ReviewHistoryEntry, ReviewHistoryResponse, ReviewLinkStatus, ReviewRecord,
 } from './notebook-contract.js'
 

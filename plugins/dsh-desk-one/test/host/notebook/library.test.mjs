@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { normalizeRelativePath, searchEntries, summarize, treeLevel } from '../../../lib/host/notebook/library.js'
+import { normalizeRelativePath, searchEntries, summarize } from '../../../lib/host/notebook/library.js'
 import { isIndexedPath, sortEntries } from '../../../lib/host/notebook/scan.js'
 
 /**
@@ -34,25 +34,6 @@ describe('notebook library', () => {
       entry({ path: 'a.md', mtime: '2026-11-13T00:00:00.000Z' }),
     ])
     assert.deepEqual(sorted.map(item => item.path), ['a.md', 'b.md'])
-  })
-
-  it('目录树：只取直接子层，文件夹带子孙计数，文件分页', () => {
-    const entries = [
-      entry({ path: 'Diary/a.md', mtime: '2026-11-12T00:00:00.000Z' }),
-      entry({ path: 'Diary/b.md', mtime: '2026-11-13T00:00:00.000Z' }),
-      entry({ path: 'Diary/快速笔记/c.md' }),
-      entry({ path: 'Work/d.md' }),
-      entry({ path: 'root.md' }),
-    ]
-    const rootLevel = treeLevel(entries, '', 0, 10)
-    assert.deepEqual(rootLevel.folders.map(folder => [folder.path, folder.count]), [['Diary', 3], ['Work', 1]])
-    assert.deepEqual(rootLevel.files.map(item => item.path), ['root.md'])
-    const diary = treeLevel(entries, 'Diary', 0, 1)
-    assert.deepEqual(diary.folders.map(folder => [folder.path, folder.count]), [['Diary/快速笔记', 1]])
-    assert.equal(diary.totalFiles, 2)
-    assert.deepEqual(diary.files.map(item => item.path), ['Diary/b.md'])
-    const page2 = treeLevel(entries, 'Diary', 1, 1)
-    assert.deepEqual(page2.files.map(item => item.path), ['Diary/a.md'])
   })
 
   it('统计与筛选：文本、类型/标签、缺元数据、空笔记', () => {

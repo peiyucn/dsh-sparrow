@@ -451,13 +451,12 @@ export const REVIEW_CSS = `
   padding: 0;
   border: 0;
   border-radius: 8px;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary, #6b7280);
+  background: var(--dsw-alias-brand-primary, #4176e6);
+  color: #ffffff;
   cursor: pointer;
 }
 .dsh-desk-docreview:hover {
-  color: var(--dsw-alias-label-primary, #1f2329);
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4176e6) 84%, #000000);
 }
 .dsh-desk-docreview:disabled {
   opacity: 0.5;
