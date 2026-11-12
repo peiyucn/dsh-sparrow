@@ -88,7 +88,6 @@ export function apply(ctx: ClientContext): void {
       workspaceAccess,
       openReview: review.open,
       draftWithAi: review.draftInNewSession,
-      openBrowser: review.openFilesBrowser,
       listNotes: api.listNotes,
       createNote: api.createNote,
       updateNote: api.updateNote,

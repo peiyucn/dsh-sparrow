@@ -47,10 +47,9 @@ export function NotebookView(props: {
   readonly notebook: NotebookApi
   readonly workspaceAccess: WorkspaceAccess
   readonly onOpenReview: (input: ReviewOpenInput) => Promise<ReviewOpenResult>
-  readonly onOpenBrowser: (workspaceId: string) => Promise<ReviewOpenResult>
   readonly onDraftWithAi: (workspaceId: string, prompt: string) => void
 }): ReactElement {
-  const { t, notebook, workspaceAccess, onOpenReview, onOpenBrowser, onDraftWithAi } = props
+  const { t, notebook, workspaceAccess, onOpenReview, onDraftWithAi } = props
 
   const [state, setState] = useState<NotebookStateResponse | null>(null)
   const [panel, setPanel] = useState<Panel | null>(null)
@@ -63,7 +62,6 @@ export function NotebookView(props: {
   const [choosing, setChoosing] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
-  const [browserOpen, setBrowserOpen] = useState<'pending' | 'opened' | 'failed' | null>(null)
 
   const load = useCallback(async (): Promise<void> => {
     setError(null)
@@ -79,23 +77,6 @@ export function NotebookView(props: {
   const rootPath = state?.config?.rootPath
   const workspaces = workspaceAccess.list()
   const workspace = rootPath === undefined ? undefined : findWorkspaceForRoot(workspaces, rootPath)
-
-  /** Default action: open the official file browser in a session of the library workspace. */
-  const openBrowser = useCallback(async (): Promise<void> => {
-    if (workspace === undefined) {
-      setNotice(t('notebook.noWorkspaceForRoot'))
-      return
-    }
-    setBrowserOpen('pending')
-    try {
-      const result = await onOpenBrowser(workspace.workspaceId)
-      setBrowserOpen(result.ok ? 'opened' : 'failed')
-      if (!result.ok) setNotice(result.message ?? t('review.openFailed'))
-    } catch (cause) {
-      setBrowserOpen('failed')
-      setNotice(messageOf(cause))
-    }
-  }, [onOpenBrowser, t, workspace])
 
   // Search is a flat library query; clearing returns to the management view.
   useEffect(() => {
@@ -126,7 +107,6 @@ export function NotebookView(props: {
     try {
       setState(await notebook.setRoot(path))
       setChoosing(false)
-      setBrowserOpen(null)
     } catch (cause) {
       setError(messageOf(cause))
     } finally {
@@ -152,7 +132,6 @@ export function NotebookView(props: {
       setState(await notebook.clearRoot())
       setPanel(null)
       setQuery('')
-      setBrowserOpen(null)
     } catch (cause) {
       setError(messageOf(cause))
     } finally {
@@ -277,9 +256,6 @@ export function NotebookView(props: {
                     <h3>{t('notebook.heroTitle')}</h3>
                     <p>{t('notebook.heroBody')}</p>
                   </div>
-                  <button type="button" className="dsh-desk-action" disabled={busy || browserOpen === 'pending'} onClick={() => { void openBrowser() }}>
-                    {browserOpen === 'pending' ? t('notebook.browserOpening') : t('notebook.openBrowser')}
-                  </button>
                 </div>
                 <input
                   className="dsh-desk-notebook-searchengine"
@@ -318,12 +294,11 @@ export function NotebookView(props: {
                 <button type="button" className="dsh-desk-notebook-paneltab" data-active={panel === 'history' || undefined} onClick={() => setPanel(current => current === 'history' ? null : 'history')}>
                   {t('notebook.entryHistory', { count: state?.historyCount ?? 0 })}
                 </button>
-                <span className="dsh-desk-notebook-fineprint dsh-desk-notebook-panelhint">
-                  {browserOpen === 'opened' ? t('notebook.browserOpened') : browserOpen === 'failed' ? t('notebook.browserFailed') : t('notebook.browserHint')}
-                </span>
+                <span className="dsh-desk-notebook-fineprint dsh-desk-notebook-panelhint">{t('notebook.browseHint')}</span>
                 <button type="button" className="dsh-desk-review-mini" disabled={busy} onClick={() => { void disconnect() }}>{t('notebook.disconnect')}</button>
               </div>
 
+              {panel === null ? <p className="dsh-desk-notebook-hint">{t('notebook.startHint')}</p> : null}
               {panel === 'search'
                 ? (
                     <div className="dsh-desk-notebook-pages">

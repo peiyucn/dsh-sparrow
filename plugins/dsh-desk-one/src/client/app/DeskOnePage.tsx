@@ -213,7 +213,6 @@ export function DeskOnePage(props: DeskPanelProps) {
       notebook={notebook}
       workspaceAccess={workspaceAccess}
       onOpenReview={openReview}
-      onOpenBrowser={props.openBrowser}
       onDraftWithAi={draftWithAi}
     />
   )
