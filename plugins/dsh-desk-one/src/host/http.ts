@@ -14,6 +14,9 @@ type DeskErrorCode =
   | 'REVISION_CONFLICT'
   | 'UNKNOWN_NOTE'
   | 'STORAGE_ERROR'
+  /* notebook */
+  | 'INVALID_NOTEBOOK'
+  | 'NOTEBOOK_UNAVAILABLE'
   /* schedule (S2) */
   | 'INVALID_SCHEDULE'
   | 'UNKNOWN_CALENDAR'

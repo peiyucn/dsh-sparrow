@@ -175,7 +175,7 @@ const sessionIndexSchema = z.object({
 })
 
 /**
- * Records from the withdrawn notebook feature (annotation / notebook-config / review).
+ * Records from the withdrawn review layer (annotation / review) and the notebook draft box.
  * They are tolerated only so an upgrade opens the domain (one invalid record rejects the
  * whole open); `Store.open` deletes them right after opening.
  */
@@ -184,11 +184,37 @@ const legacyAnnotationSchema = z.object({
   kind: z.literal('annotation'),
   schema: z.number().int().positive(),
 }).passthrough()
-const legacyNotebookConfigSchema = z.object({
+/** The single notes-root record (fixed id). */
+const notebookConfigSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('notebook-config'),
   schema: z.number().int().positive(),
-}).passthrough()
+  rootPath: z.string().min(1),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  revision: z.number().int().positive(),
+})
+
+/** One file's persisted draft box; review state itself lives in the conversation. */
+const noteDraftSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('note-draft'),
+  schema: z.number().int().positive(),
+  cwd: z.string().min(1),
+  path: z.string().min(1),
+  drafts: z.array(z.object({
+    id: z.string().min(1),
+    quote: z.string(),
+    text: z.string(),
+    line: z.number().int().positive().optional(),
+    endLine: z.number().int().positive().optional(),
+    createdAt: z.string().min(1),
+  })).default([]),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  revision: z.number().int().positive(),
+})
+
 const legacyReviewSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('review'),
@@ -197,7 +223,7 @@ const legacyReviewSchema = z.object({
 
 const nodeSchema = z.discriminatedUnion('kind', [
   noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema, sessionIndexSchema,
-  legacyAnnotationSchema, legacyNotebookConfigSchema, legacyReviewSchema,
+  notebookConfigSchema, noteDraftSchema, legacyAnnotationSchema, legacyReviewSchema,
 ])
 const edgeSchema = z.object({
   id: z.string().min(1),

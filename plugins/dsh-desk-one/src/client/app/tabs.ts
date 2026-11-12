@@ -4,12 +4,13 @@ import type { Tab } from './types.js'
 
 export interface DeskTabEntry {
   readonly tab: Tab
-  readonly labelKey: 'tab.notes' | 'tab.tasks' | 'tab.schedule' | 'tab.sessions'
+  readonly labelKey: 'tab.notebook' | 'tab.notes' | 'tab.tasks' | 'tab.schedule' | 'tab.sessions'
 }
 
 export const DESK_TABS: readonly DeskTabEntry[] = [
   { tab: 'schedule', labelKey: 'tab.schedule' },
   { tab: 'notes', labelKey: 'tab.notes' },
+  { tab: 'notebook', labelKey: 'tab.notebook' },
   { tab: 'tasks', labelKey: 'tab.tasks' },
   { tab: 'sessions', labelKey: 'tab.sessions' },
 ]

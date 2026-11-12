@@ -16,6 +16,8 @@ import { TASK_ROUTES } from './tasks/routes.js'
 import { SCHEDULE_ROUTES } from './schedule/routes.js'
 import type { DeskStore } from './store.js'
 import type { ScheduleHost } from './schedule/host.js'
+import type { NotebookHost } from './notebook/host.js'
+import { NOTEBOOK_ROUTES } from './notebook/routes.js'
 import type { SessionsHost } from './sessions/install.js'
 
 /** Collaborators available to one feature request. */
@@ -24,6 +26,8 @@ export interface DeskRouteContext {
   readonly store: DeskStore
   /** Schedule orchestration (optional so read-only tests can mount the router without it). */
   readonly schedule?: ScheduleHost
+  /** Notebook library index + draft box. */
+  readonly notebook?: NotebookHost
   /** Session archive capabilities; routes are appended when installed. */
   readonly sessions?: SessionsHost
 }
@@ -38,7 +42,7 @@ export interface DeskRouteEntry {
 
 /** All built-in HTTP routes; session routes are appended at handler creation when installed. */
 const BASE_ROUTE_TABLE: readonly DeskRouteEntry[] = [
-  ...NOTE_ROUTES, ...TASK_ROUTES, ...GROUP_ROUTES, ...SCHEDULE_ROUTES,
+  ...NOTE_ROUTES, ...TASK_ROUTES, ...GROUP_ROUTES, ...SCHEDULE_ROUTES, ...NOTEBOOK_ROUTES,
 ]
 
 /** OAuth redirects are top-level browser navigations from Microsoft, so they carry no plugin

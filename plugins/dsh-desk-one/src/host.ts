@@ -8,6 +8,7 @@ import { PREFIX } from './constants.js'
 import { assertHostGates } from './host/gates.js'
 import { createDeskRequestHandler } from './host/router.js'
 import { DeskStore } from './host/store.js'
+import { NotebookHost } from './host/notebook/host.js'
 import { ScheduleHost } from './host/schedule/host.js'
 import { registerScheduleTools } from './host/schedule/tools.js'
 import { installSessionsHost, hasSessionServices, type SessionsConfig } from './host/sessions/install.js'
@@ -43,7 +44,8 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
   const sessions = hasSessionServices(ctx) ? await installSessionsHost(ctx, store, config) : undefined
 
   const schedule = new ScheduleHost(ctx, store)
-  const handler = createDeskRequestHandler({ ctx, store, schedule, sessions })
+  const notebook = new NotebookHost(store)
+  const handler = createDeskRequestHandler({ ctx, store, schedule, sessions, notebook })
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: PREFIX,

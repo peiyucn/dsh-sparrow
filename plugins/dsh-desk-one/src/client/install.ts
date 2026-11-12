@@ -19,11 +19,20 @@ import type {
 import type { SessionLinkApi } from './sessions/contract.js'
 import type { SessionsArchiveApi } from './sessions/archiveApi.js'
 import type { ScheduleApi } from './schedule/api.js'
+import type { NotebookApi } from './notebook/api.js'
+import type { ReviewOpenResult } from './notebook/review-bridge.js'
+import type { WorkspaceAccess } from './notebook/workspaces.js'
 import { attachMainPanel } from './panel.js'
 import { ensureDeskStyles } from './styles.js'
 
 /** Panel injection surface: data actions come from host REST routes, and the page holds only these functions. */
 export interface DeskPanelInjected {
+  /** Notebook library data surface. */
+  readonly notebook: NotebookApi
+  /** DSH workspace flow behind the library action. */
+  readonly workspaceAccess: WorkspaceAccess
+  /** Open the review tab for one page in the session on screen. */
+  readonly openReview: (path: string) => Promise<ReviewOpenResult>
   readonly listNotes: (query?: string) => Promise<readonly DeskNote[]>
   readonly createNote: (input: {
     readonly title?: string

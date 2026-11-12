@@ -10,6 +10,10 @@ import { PACKAGE_NAME } from '../constants.js'
 import * as api from './notes/api.js'
 import * as taskApi from './tasks/api.js'
 import { DeskOnePage } from './app/DeskOnePage.js'
+import { notebookApi } from './notebook/api.js'
+import { createReviewBridge } from './notebook/review-bridge.js'
+import { mountNoteReviewTab } from './notebook/register.js'
+import { createWorkspaceAccess } from './notebook/workspaces.js'
 import { createSessionLinkBridge, type SessionServices } from './sessions/bridge.js'
 import { scheduleApi } from './schedule/api.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
@@ -37,11 +41,43 @@ export function apply(ctx: ClientContext): void {
   })
 
 
+  // Notebook library access goes through DSH's own workspace flow (picker + registration).
+  const workspaceAccess = createWorkspaceAccess()
+  ctx.inject(['workspaces'], (workspaceCtx) => {
+    const detach = workspaceAccess.attach(workspaceCtx.get('workspaces') as never)
+    workspaceCtx.effect(() => detach, `${PACKAGE_NAME}: notebook workspaces`)
+  })
+  ctx.inject(['uiWorkspace'], (navigationCtx) => {
+    const detach = workspaceAccess.attachNavigation(navigationCtx.get('uiWorkspace') as never)
+    navigationCtx.effect(() => detach, `${PACKAGE_NAME}: notebook navigation`)
+  })
+
+  // The review tab is a conversation capability: it opens in the session on screen.
+  const review = createReviewBridge()
+  ctx.inject(['layout'], (layoutCtx) => {
+    const detach = review.attachLayout(layoutCtx.get('layout') as never)
+    layoutCtx.effect(() => detach, `${PACKAGE_NAME}: review layout`)
+  })
+  ctx.inject(['sidebarRight'], (sidebarCtx) => {
+    const detach = review.attachSidebar(sidebarCtx.get('sidebarRight') as never)
+    sidebarCtx.effect(() => detach, `${PACKAGE_NAME}: review sidebar`)
+  })
+  ctx.inject(['sessions'], (sessionCtx) => {
+    const detach = review.attachSessions(sessionCtx.get('sessions') as never)
+    sessionCtx.effect(() => detach, `${PACKAGE_NAME}: review sessions`)
+  })
+  ctx.inject(['sidebarRightTabs'], (tabCtx) => {
+    mountNoteReviewTab(tabCtx, notebookApi, review)
+  })
+
   installDeskClient(ctx, {
     page: DeskOnePage,
     icon: DeskPanelIcon,
     locales: LOCALE_DICTS,
     api: {
+      notebook: notebookApi,
+      workspaceAccess,
+      openReview: review.open,
       listNotes: api.listNotes,
       createNote: api.createNote,
       updateNote: api.updateNote,

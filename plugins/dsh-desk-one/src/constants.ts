@@ -27,6 +27,11 @@ export const ROUTES = Object.freeze({
   scheduleCalendarUpdate: `${PREFIX}/schedule/calendars/update`,
   scheduleStatus: `${PREFIX}/schedule/status`,
   scheduleSync: `${PREFIX}/schedule/sync`,
+  notebookState: `${PREFIX}/notebook/state`,
+  notebookRoot: `${PREFIX}/notebook/root`,
+  notebookSearch: `${PREFIX}/notebook/search`,
+  notebookPage: `${PREFIX}/notebook/page`,
+  notebookDraft: `${PREFIX}/notebook/draft`,
   scheduleConnections: `${PREFIX}/schedule/connections`,
   scheduleConnectionSave: `${PREFIX}/schedule/connections/save`,
   scheduleConnectionTest: `${PREFIX}/schedule/connections/test`,
@@ -74,6 +79,17 @@ export const MAX_TASK_SESSIONS = 10
  * Product capacity caps (owner 2026-11-06): the note wall is for lightweight notes, and 100 already exceeds
  * human attention; the trash holds at most 200 and must be emptied first when full. Both halves share this truth.
  */
+/** Library scan limits: files indexed, depth, and scan time before giving up. */
+export const NOTEBOOK_MAX_FILES = 20_000
+export const NOTEBOOK_MAX_DEPTH = 12
+export const NOTEBOOK_SCAN_TIMEOUT_MS = 20_000
+/** One read page cap; review targets are source files, not exports. */
+export const NOTEBOOK_MAX_BYTES = 1_048_576
+/** Persisted draft box: one file keeps at most this many annotations. */
+export const NOTEBOOK_MAX_DRAFTS = 100
+/** Fixed record id of the notebook root setting. */
+export const NOTEBOOK_CONFIG_ID = 'notebook_config'
+
 export const MAX_ACTIVE_NOTES = 100
 export const MAX_TRASH_NOTES = 200
 /** Trash view paging: render 10 rows at a time and load the rest on demand (less rendering is lighter). */

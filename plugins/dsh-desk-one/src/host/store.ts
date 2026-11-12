@@ -6,14 +6,14 @@
  * domain's serial write chain, and optimistic concurrency uses the per-object revision.
  */
 
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
 import { createSessionIndexRecord, sessionIndexId, type SessionIndexDraft } from './sessions/records.js'
 import {
-  MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NODES_TABLE, PACKAGE_NAME, SCHEDULE_COLORS,
-  SESSION_INDEX_MISSING_DAYS, TASK_STATUSES,
+  DESK_NODE_SCHEMA, MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTEBOOK_CONFIG_ID, NOTEBOOK_MAX_DRAFTS, NODES_TABLE,
+  PACKAGE_NAME, SCHEDULE_COLORS, SESSION_INDEX_MISSING_DAYS, TASK_STATUSES,
 } from '../constants.js'
 import {
   DeskModelError, createGroupRecord, createNoteRecord, createTaskRecord, filterGroups, filterNotes, filterTasks,
@@ -26,8 +26,8 @@ import {
   type CalendarDraft, type EventDraft, type EventQuery,
 } from './schedule/records.js'
 import type {
-  DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskScheduleSource, DeskSessionIndex, DeskTask, DeskTaskGroup,
-  ScheduleSyncError, TaskStatus,
+  DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskNotebookConfig, DeskScheduleSource, DeskSessionIndex, DeskTask,
+  DeskTaskGroup, DraftAnnotation, NoteDraft, ScheduleSyncError, TaskStatus,
 } from '../contract.js'
 
 type DeskDomain = Domain<typeof DESK_DOMAIN>
@@ -58,7 +58,7 @@ export class DeskStore {
    * @param ctx - host context (logging only).
    */
   private async purgeLegacyRecords(ctx: Context): Promise<void> {
-    const legacyKinds = new Set(['annotation', 'notebook-config', 'review'])
+    const legacyKinds = new Set(['annotation', 'review'])
     const legacy = this.allNodes().filter(node => legacyKinds.has((node as { kind?: string }).kind ?? ''))
     if (legacy.length === 0) return
     for (const node of legacy) {
@@ -749,6 +749,85 @@ export class DeskStore {
     const node = this.nodes.get(sessionIndexId(sessionId))
     return node?.kind === 'session' ? node : undefined
   }
+
+  /* ------------------------------ notebook ------------------------------ */
+
+  /** The configured notes root, if any. */
+  getNotebookConfig(): DeskNotebookConfig | undefined {
+    const node = this.nodes.get(NOTEBOOK_CONFIG_ID)
+    return node?.kind === 'notebook-config' ? node : undefined
+  }
+
+  /** Point the library at one absolute folder (idempotent on the single record). */
+  async saveNotebookRoot(rootPath: string): Promise<DeskNotebookConfig> {
+    const now = new Date().toISOString()
+    const existing = this.getNotebookConfig()
+    if (existing === undefined) {
+      const record: DeskNotebookConfig = {
+        id: NOTEBOOK_CONFIG_ID,
+        kind: 'notebook-config',
+        schema: DESK_NODE_SCHEMA,
+        rootPath,
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      }
+      await this.nodes.put(record.id, record)
+      return record
+    }
+    if (existing.rootPath === rootPath) return existing
+    return await this.nodes.update(NOTEBOOK_CONFIG_ID, current => current.kind === 'notebook-config'
+      ? { ...current, rootPath, updatedAt: now, revision: current.revision + 1 }
+      : current) as DeskNotebookConfig
+  }
+
+  /** Forget the configured root (drafts stay; they are found by path again). */
+  async clearNotebookRoot(): Promise<void> {
+    await this.nodes.delete(NOTEBOOK_CONFIG_ID)
+  }
+
+  /** Deterministic draft-box id for one (cwd, path) pair. */
+  private static draftId(cwd: string, path: string): string {
+    const digest = createHash('sha1').update(`${cwd}\u0000${path.toLowerCase()}`).digest('hex').slice(0, 24)
+    return `note_draft_${digest}`
+  }
+
+  /** One file's persisted draft box. */
+  getNoteDraft(cwd: string, path: string): NoteDraft | undefined {
+    const node = this.nodes.get(DeskStore.draftId(cwd, path))
+    return node?.kind === 'note-draft' ? node : undefined
+  }
+
+  /** Replace one file's draft box (bounded; revision-checked against the current record). */
+  async saveNoteDraft(input: {
+    readonly cwd: string
+    readonly path: string
+    readonly drafts: readonly DraftAnnotation[]
+  }): Promise<NoteDraft> {
+    const now = new Date().toISOString()
+    const id = DeskStore.draftId(input.cwd, input.path)
+    const drafts = input.drafts.slice(0, NOTEBOOK_MAX_DRAFTS)
+    const existing = this.getNoteDraft(input.cwd, input.path)
+    if (existing === undefined) {
+      const record: NoteDraft = {
+        id,
+        kind: 'note-draft',
+        schema: DESK_NODE_SCHEMA,
+        cwd: input.cwd,
+        path: input.path,
+        drafts,
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      }
+      await this.nodes.put(record.id, record)
+      return record
+    }
+    return await this.nodes.update(id, current => current.kind === 'note-draft'
+      ? { ...current, drafts, updatedAt: now, revision: current.revision + 1 }
+      : current) as NoteDraft
+  }
+
 
   /** Close the storage domain (plugin unload / host shutdown, via the effect). */
   close(): Promise<void> {

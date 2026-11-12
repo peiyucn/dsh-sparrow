@@ -27,6 +27,8 @@ English | [简体中文](README.zh-CN.md)
 
 ## Use
 
+* **Notebook** is "AI writes, you review": pick a workspace folder as the library, browse/search markdown and text files, then click a page to open the review tab **inside the current conversation**. Select text to write an annotation (an approximate line range is shown), batch them, and **Submit all** inserts one numbered message into the composer; unsaved annotations persist across closing the tab and restarting DSH. No editor, no git required.
+
 * Tap **Capture** in the title-row actions or double-click empty space on the wall: a fresh sticky appears at that spot, lands on top of the pile and takes the keyboard focus. The command row also hosts **Smash!** and the trash entry; the empty wall keeps its faint two-line hint.
 * The wall is a fixed-width, vertically infinite canvas: drag a note to the bottom edge and the wall auto-scrolls; notes can live below the viewport and the wall scrolls vertically to them.
 * Type straight onto the sticky; leaving it saves the text, and an emptied sticky is removed instead of kept as clutter.
