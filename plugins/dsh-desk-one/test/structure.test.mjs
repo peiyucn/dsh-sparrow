@@ -48,7 +48,7 @@ const readClientSurface = async () => {
   const entries = await readdir(CLIENT_DIR, { recursive: true })
   // Styles are asserted separately (they are the only files allowed to carry raw CSS values).
   const files = entries
-    .filter(entry => /\.(ts|tsx)$/u.test(entry) && !/(^|[\\/])styles[\\/]/.test(entry) && !/(^|[\\/])styles\.ts$/u.test(entry))
+    .filter(entry => /\.(ts|tsx)$/u.test(entry) && !/(^|[\\/])styles[\\/]/.test(entry) && !/(^|[\\/])[^\\/]*styles\.ts$/u.test(entry))
     .sort()
   const parts = await Promise.all(files.map(file => readFile(new URL(file.replaceAll('\\', '/'), CLIENT_DIR), 'utf8')))
   return parts.join('\n')
@@ -684,10 +684,10 @@ describe('dsh-desk-one 结构', () => {
     const notebookCss = await read('src/client/notebook/styles.ts')
     assert.match(notebookCss, /\.dsh-desk-notebookview \{[^}]*overflow: hidden/su, '笔记页固定一屏高度')
     assert.match(notebookCss, /\.dsh-desk-notebook-rows \{[^}]*overflow-y: auto/su, '列表区域内部滚动')
-    assert.match(header, /notebook\.headerCount/u, '篇数在顶栏')
-    assert.match(header, /notebook\.disconnect/u, '断开工作区链接在顶栏更多菜单')
-    const skill = await read('src/client/notebook/components/SkillPicker.tsx')
-    assert.match(skill, /notebook\.skillInfoNote2md/u, 'note2md 用叹号提示说明')
+    assert.match(header, /notebook\.disconnectNamed/u, '断开链接要用真实工作区名')
+    assert.doesNotMatch(header, /Menu/u, '断开链接不藏在 More 菜单里')
+    assert.match(header, /notebook\.disconnect/u, '没有工作区名时有兜底文案')
+    assert.match(view, /notebook\.note2mdHint|notebook\.note2mdDraftPrompt/u, 'note2md 仅按工作区标记使用（技能选择待讨论）')
     assert.match(pageSource, /NotebookHeaderActions/u, '笔记页动作走共享顶栏')
     assert.match(view, /dsh-desk-notebook-brief/u, '新建引导写一段话，而不是只写标题')
     assert.match(header, /notebook\.openBrowser/u, '顶栏要有显式的打开文件浏览按钮')

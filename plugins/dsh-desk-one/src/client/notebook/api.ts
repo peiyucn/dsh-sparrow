@@ -72,15 +72,12 @@ export function getNoteDraft(fileId: string): Promise<NoteDraft | null> {
     .then(payload => payload.draft)
 }
 
-/** Replace one file's draft box. */
+/** Replace one file's draft box; an empty batch deletes it (`null`). */
 export function saveNoteDraft(input: {
   readonly fileId: string
   readonly drafts: readonly DraftAnnotation[]
-}): Promise<NoteDraft> {
-  return postJson<NoteDraftResponse>(ROUTES.notebookDraft, input).then((payload) => {
-    if (payload.draft === null) throw new Error('审阅草稿保存失败')
-    return payload.draft
-  })
+}): Promise<NoteDraft | null> {
+  return postJson<NoteDraftResponse>(ROUTES.notebookDraft, input).then(payload => payload.draft)
 }
 
 /** Submitted review history with current link state. */

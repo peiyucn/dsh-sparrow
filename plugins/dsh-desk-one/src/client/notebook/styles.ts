@@ -171,14 +171,7 @@ export const NOTEBOOK_CSS = `
   gap: 6px;
   min-height: 0;
 }
-.dsh-desk-notebook-listmeta {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 0 2px;
-}
+
 .dsh-desk-notebook-card {
   box-sizing: border-box;
   display: flex;
@@ -190,6 +183,29 @@ export const NOTEBOOK_CSS = `
   border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
   border-radius: var(--dsw-radius-sm, 8px);
   background: var(--dsw-alias-bg-layer-1, #ffffff);
+}
+.dsh-desk-notebook-cardhead {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+}
+.dsh-desk-notebook-cardhead-title {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+}
+.dsh-desk-notebook-cardhead-hint {
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+  line-height: 16px;
+}
+.dsh-desk-notebook-cardhead-usage {
+  margin-left: auto;
 }
 .dsh-desk-notebook-rows {
   display: flex;
@@ -364,4 +380,103 @@ button.dsh-desk-notebook-rowbody {
   font-weight: 500;
   line-height: 20px;
 }
-`
+
+/* --- header unlink ------------------------------------------------------- */
+.dsh-desk-notebook-unlink {
+  min-width: 0;
+  max-width: 220px;
+}
+.dsh-desk-notebook-unlink-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- review record detail ------------------------------------------------ */
+.dsh-desk-notebook-recorddialog {
+  width: min(560px, 100%);
+}
+.dsh-desk-notebook-record {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dsh-desk-notebook-recordmeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dsh-desk-notebook-recordtitle {
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.dsh-desk-notebook-recordpath {
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+.dsh-desk-notebook-recorddate {
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.dsh-desk-notebook-recordannos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.dsh-desk-notebook-recordanno {
+  padding: 8px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: var(--dsw-radius-sm, 8px);
+  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.02));
+}
+.dsh-desk-notebook-recordannohead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.dsh-desk-notebook-recordanno-no {
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.dsh-desk-notebook-recordanno-range {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.dsh-desk-notebook-recordquote {
+  margin: 0 0 4px;
+  padding-left: 8px;
+  border-left: 2px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.dsh-desk-notebook-recordtext {
+  margin: 0;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.dsh-desk-notebook-recordactions {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dsh-desk-notebook-recorddelete {
+  color: var(--dsw-alias-state-error-primary, #c62828);
+}`

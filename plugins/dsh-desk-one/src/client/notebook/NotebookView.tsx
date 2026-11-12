@@ -4,14 +4,15 @@
  * `useNotebookPage` (owned by the panel), because the header renders this page's primary actions.
  */
 
+import { useState } from 'react'
 import type { ReactElement } from 'react'
 import {
   Button, IconChevronLeftOutlineMedium, IconChevronRightOutlineRegular, IconSearchOutlineRegular,
-  Input, SegmentedTabs, Tag,
+  Input, Modal, SegmentedTabs, Tag,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DeskTranslator } from '../app/types.js'
+import type { ReviewHistoryEntry } from '../../notebook-contract.js'
 import type { NotebookPageController, NotebookRow } from './hooks/useNotebookPage.js'
-import { SkillPicker } from './components/SkillPicker.js'
 
 /** Empty-state copy for the active view. */
 function emptyText(page: NotebookPageController): string {
@@ -25,9 +26,92 @@ function emptyText(page: NotebookPageController): string {
   }
 }
 
-/** One compact row: title, path, facts, optional inline delete. */
-function Row({ page, row }: { readonly page: NotebookPageController; readonly row: NotebookRow }): ReactElement {
+/** Read-only detail of one submitted review record. */
+function RecordDialog(props: {
+  readonly page: NotebookPageController
+  readonly record: ReviewHistoryEntry | null
+  readonly onClose: () => void
+}): ReactElement | null {
+  const { page, record, onClose } = props
   const { t } = page
+  if (record === null) return null
+  const linked = record.status === 'linked' && record.resolvedPath !== undefined
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={t('notebook.recordTitle')}
+      closeLabel={t('notebook.close')}
+      className="dsh-desk-notebook-recorddialog"
+      footer={(
+        <div className="dsh-desk-notebook-recordactions">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="dsh-desk-notebook-recorddelete"
+            disabled={page.busy}
+            onClick={() => { void page.deleteHistory(record.record.id).then(onClose) }}
+          >
+            {t('review.delete')}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!linked}
+            onClick={() => {
+              if (record.resolvedPath === undefined) return
+              onClose()
+              void page.openPage(record.resolvedPath)
+            }}
+          >
+            {t('notebook.openOriginal')}
+          </Button>
+        </div>
+      )}
+    >
+      <div className="dsh-desk-notebook-record">
+        <div className="dsh-desk-notebook-recordmeta">
+          <span className="dsh-desk-notebook-recordtitle">{record.record.fileTitle}</span>
+          <span className="dsh-desk-notebook-recordpath">{record.resolvedPath ?? record.record.pathSnapshot}</span>
+          <span className="dsh-desk-notebook-recorddate">{new Date(record.record.createdAt).toLocaleString()}</span>
+          {linked ? null : <Tag tone="warning">{t('notebook.recordDetached')}</Tag>}
+        </div>
+        {record.record.annotations.length === 0
+          ? <p className="dsh-desk-notebook-empty">{t('notebook.recordEmpty')}</p>
+          : (
+              <div className="dsh-desk-notebook-recordannos">
+                {record.record.annotations.map((annotation, index) => (
+                  <div className="dsh-desk-notebook-recordanno" key={annotation.id}>
+                    <div className="dsh-desk-notebook-recordannohead">
+                      <span className="dsh-desk-notebook-recordanno-no">{index + 1}</span>
+                      <span className="dsh-desk-notebook-recordanno-range">
+                        {annotation.scope === 'document'
+                          ? t('review.documentScope')
+                          : t('review.lineHint', {
+                              start: annotation.startLine ?? 0,
+                              end: annotation.endLine ?? annotation.startLine ?? 0,
+                            })}
+                      </span>
+                    </div>
+                    {annotation.quote === '' ? null : <p className="dsh-desk-notebook-recordquote">{annotation.quote}</p>}
+                    <p className="dsh-desk-notebook-recordtext">{annotation.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+      </div>
+    </Modal>
+  )
+}
+
+/** One compact row: title, path, facts, optional inline delete. */
+function Row({ page, row, onOpen }: {
+  readonly page: NotebookPageController
+  readonly row: NotebookRow
+  readonly onOpen?: (() => void) | undefined
+}): ReactElement {
+  const { t } = page
+  const open = onOpen ?? row.onOpen
   const body = (
     <>
       <span className="dsh-desk-notebook-rowtitle">{row.title}</span>
@@ -49,10 +133,10 @@ function Row({ page, row }: { readonly page: NotebookPageController; readonly ro
   )
   return (
     <div className="dsh-desk-notebook-row">
-      {row.onOpen === undefined
+      {open === undefined
         ? <div className="dsh-desk-notebook-rowbody">{body}</div>
         : (
-            <button type="button" className="dsh-desk-notebook-rowbody" title={row.path} onClick={row.onOpen}>
+            <button type="button" className="dsh-desk-notebook-rowbody" title={row.path} onClick={open}>
               {body}
             </button>
           )}
@@ -90,7 +174,7 @@ function NewNoteForm({ page }: { readonly page: NotebookPageController }): React
           </Button>
         </div>
       </div>
-      <SkillPicker page={page} />
+      {page.state?.note2md === true ? <p className="dsh-desk-notebook-fineprint">{t('notebook.note2mdHint')}</p> : null}
     </section>
   )
 }
@@ -134,6 +218,7 @@ function Unlinked({ page }: { readonly page: NotebookPageController }): ReactEle
 /** Notebook page body. */
 export function NotebookView({ page }: { readonly page: NotebookPageController }): ReactElement {
   const { t } = page
+  const [record, setRecord] = useState<ReviewHistoryEntry | null>(null)
   return (
     <div className="dsh-desk-notebookview">
       {page.error === null ? null : <p className="dsh-desk-notebook-error">{t('state.loadFailed', { message: page.error })}</p>}
@@ -167,28 +252,30 @@ export function NotebookView({ page }: { readonly page: NotebookPageController }
               </div>
 
               <div className="dsh-desk-notebook-listwrap">
-                {page.mode === 'history'
-                  ? (
-                      <div className="dsh-desk-notebook-listmeta">
-                        <Tag tone={page.historyWarn ? 'danger' : 'neutral'}>
-                          {t('notebook.historyUsage', { size: (page.historyBytes / 1024).toFixed(1) })}
-                        </Tag>
-                        <span className="dsh-desk-notebook-fineprint">
-                          {t('notebook.linkState', {
-                            linked: page.linkState.linked,
-                            moved: page.linkState.moved,
-                            detached: page.linkState.detached,
-                          })}
-                        </span>
-                      </div>
-                    )
-                  : null}
                 <div className="dsh-desk-notebook-card">
+                  <div className="dsh-desk-notebook-cardhead">
+                    <span className="dsh-desk-notebook-cardhead-title">{page.summary}</span>
+                    {page.summaryHint === null ? null : <span className="dsh-desk-notebook-cardhead-hint">{page.summaryHint}</span>}
+                    {page.mode === 'history'
+                      ? (
+                          <Tag tone={page.historyWarn ? 'danger' : 'neutral'} className="dsh-desk-notebook-cardhead-usage">
+                            {t('notebook.historyUsage', { size: (page.historyBytes / 1024).toFixed(1) })}
+                          </Tag>
+                        )
+                      : null}
+                  </div>
                   {page.slice.rows.length === 0
                     ? <p className="dsh-desk-notebook-empty">{emptyText(page)}</p>
                     : (
                         <div className="dsh-desk-notebook-rows">
-                          {page.slice.rows.map(row => <Row key={row.key} page={page} row={row} />)}
+                          {page.slice.rows.map(row => (
+                            <Row
+                              key={row.key}
+                              page={page}
+                              row={row}
+                              {...row.record === undefined ? {} : { onOpen: () => setRecord(row.record ?? null) }}
+                            />
+                          ))}
                         </div>
                       )}
                 </div>
@@ -220,6 +307,7 @@ export function NotebookView({ page }: { readonly page: NotebookPageController }
               </div>
             </div>
           )}
+      <RecordDialog page={page} record={record} onClose={() => setRecord(null)} />
     </div>
   )
 }

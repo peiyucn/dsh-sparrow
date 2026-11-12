@@ -53,9 +53,17 @@ export function notesActions(props: {
   }
   return (
     <>
-      <button key="open-trash" type="button" className="dsh-desk-action" aria-label={t('trash.title')} title={t('trash.title')} onClick={props.toggleTrash}>
-        {trashIcon}
-        <span className="dsh-desk-action-label">{t('trash.title')}</span>
+      <button
+        key="capture"
+        type="button"
+        className="dsh-desk-action dsh-desk-action-primary"
+        aria-label={t('action.newNote')}
+        title={t('action.newNote')}
+        disabled={props.creating || props.smashing}
+        onClick={props.addNote}
+      >
+        {plusIcon}
+        <span className="dsh-desk-action-label">{t('action.newNote')}</span>
       </button>
       <button
         key="smash"
@@ -73,17 +81,9 @@ export function notesActions(props: {
           {props.confirmSmash ? t('action.smashConfirm') : t('action.smash')}
         </span>
       </button>
-      <button
-        key="capture"
-        type="button"
-        className="dsh-desk-action dsh-desk-action-primary"
-        aria-label={t('action.newNote')}
-        title={t('action.newNote')}
-        disabled={props.creating || props.smashing}
-        onClick={props.addNote}
-      >
-        {plusIcon}
-        <span className="dsh-desk-action-label">{t('action.newNote')}</span>
+      <button key="open-trash" type="button" className="dsh-desk-action" aria-label={t('trash.title')} title={t('trash.title')} onClick={props.toggleTrash}>
+        {trashIcon}
+        <span className="dsh-desk-action-label">{t('trash.title')}</span>
       </button>
     </>
   )
@@ -112,13 +112,6 @@ export function taskActions(props: {
   }
   return (
     <>
-      <SortMenu key="task-sort" t={t} mode={props.sortMode} onChange={props.setTaskSortMode} />
-      <button key="task-archive" type="button" className="dsh-desk-action" aria-label={t('task.archive')} title={t('task.archive')} onClick={props.toggleArchive}>
-        {archiveIcon}
-        <span className="dsh-desk-action-label">
-          {t('task.archive')}{props.archivedCount === 0 ? '' : ` (${props.archivedCount})`}
-        </span>
-      </button>
       <button
         key="task-add"
         type="button"
@@ -129,6 +122,13 @@ export function taskActions(props: {
       >
         {plusIcon}
         <span className="dsh-desk-action-label">{t('task.add')}</span>
+      </button>
+      <SortMenu key="task-sort" t={t} mode={props.sortMode} onChange={props.setTaskSortMode} />
+      <button key="task-archive" type="button" className="dsh-desk-action" aria-label={t('task.archive')} title={t('task.archive')} onClick={props.toggleArchive}>
+        {archiveIcon}
+        <span className="dsh-desk-action-label">
+          {t('task.archive')}{props.archivedCount === 0 ? '' : ` (${props.archivedCount})`}
+        </span>
       </button>
     </>
   )

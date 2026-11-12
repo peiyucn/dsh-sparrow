@@ -6,24 +6,31 @@ export const SESSIONS_CSS = `
   padding: 0;
   list-style: none;
 }
+/* Capsule + action geometry match the notebook list rows, so both tabs read as one product. */
 .dsh-desk-archive-badge {
   flex: none;
-  padding: 0 5px;
+  padding: 1px 8px;
   border-radius: 999px;
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.06));
+  background: var(--dsw-alias-bg-module-platform, rgba(0,0,0,.04));
   color: var(--dsw-alias-label-secondary, #6b7280);
-  font-size: 10px;
-  line-height: 16px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 17px;
 }
 .dsh-desk-archive-action {
-  border: 0.5px solid var(--dsw-alias-border-l2, #d8dde5);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 10px;
+  border: 0.5px solid var(--dsw-alias-border-l3, #d4d8e0);
+  border-radius: var(--dsw-radius-sm, 8px);
   background: transparent;
-  color: inherit;
+  color: var(--dsw-alias-label-primary, #1f2329);
   font: inherit;
-  font-size: 11px;
-  line-height: 20px;
-  padding: 0 7px;
-  border-radius: 6px;
+  font-size: 12px;
+  line-height: 18px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -85,7 +92,7 @@ export const SESSIONS_CSS = `
   align-items: center;
   gap: 6px;
   min-height: 32px;
-  padding: 4px 8px 4px 10px;
+  padding: 4px 10px;
   border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
 }
 .dsh-desk-tree-row:nth-child(1) { border-top: 0; }

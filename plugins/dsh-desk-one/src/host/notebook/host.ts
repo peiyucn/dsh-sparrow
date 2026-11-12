@@ -127,7 +127,7 @@ export class NotebookHost {
       }
     }
     const entries = await this.entries(root)
-    const drafts = this.store.listNoteDrafts().filter(draft => draft.rootPath === root)
+    const drafts = this.store.listNoteDrafts().filter(draft => draft.rootPath === root && draft.drafts.length > 0)
     let note2md = false
     if (this.note2mdCache?.root === root) note2md = this.note2mdCache.value
     else {

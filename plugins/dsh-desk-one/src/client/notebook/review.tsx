@@ -10,7 +10,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
-  DiffBlock, DisclosureRow, IconInspectOutlineRegular, IconListPenOutlineRegular, MarkdownText, diffTotals,
+  Button, DiffBlock, DisclosureRow, IconChevronDownOutlineRegular, IconCopyOutlineRegular,
+  IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
+  MarkdownText, Pill, SegmentedTabs, Tooltip, diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -71,8 +73,8 @@ function AnnotationCard(props: {
       <div className="dsh-desk-review-annohead">
         <span className="dsh-desk-review-annorange">{range}</span>
         {annotation.quote === '' ? null : <span className="dsh-desk-review-annoquote">{annotation.quote.split('\n')[0]?.slice(0, 80)}</span>}
-        <button type="button" className="dsh-desk-review-mini" onClick={onEdit}>{t('review.edit')}</button>
-        <button type="button" className="dsh-desk-review-mini" onClick={onDelete}>{t('review.delete')}</button>
+        <Button variant="ghost" size="sm" onClick={onEdit}>{t('review.edit')}</Button>
+        <Button variant="ghost" size="sm" onClick={onDelete}>{t('review.delete')}</Button>
       </div>
       <p className="dsh-desk-review-annotext">{annotation.text}</p>
     </div>
@@ -90,6 +92,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const codeRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const composerRef = useRef<HTMLDivElement | null>(null)
+  const floatRef = useRef<HTMLButtonElement | null>(null)
 
   const [page, setPage] = useState<NotebookPageResponse | null>(null)
   const [annotations, setAnnotations] = useState<readonly DraftAnnotation[]>([])
@@ -191,6 +194,21 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       document.removeEventListener('pointerdown', onPointerDown, true)
     }
   }, [cancelSelection, composer])
+
+  // Clicking anywhere but the float "annotate" button drops the pending selection, so the
+  // highlight never gets stuck without a way out.
+  useEffect(() => {
+    if (selection === null || composer !== null) return
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target as Node | null
+      if (target === null) return
+      if (floatRef.current?.contains(target) === true) return
+      setSelection(null)
+      window.getSelection()?.removeAllRanges()
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [composer, selection])
 
   /** Persist the draft box (per file identity). */
   const persist = useCallback((next: readonly DraftAnnotation[]): void => {
@@ -357,20 +375,26 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     <div className="dsh-desk-review" ref={rootRef}>
       <header className="dsh-desk-review-head">
         <span className="dsh-desk-review-path" title={path}>{page?.title ?? path}</span>
-        <span className="dsh-desk-review-viewtoggle">
-          <button type="button" data-active={view === 'source' || undefined} onClick={() => setView('source')}>{t('review.viewSource')}</button>
-          <button type="button" data-active={view === 'render' || undefined} onClick={() => setView('render')}>{t('review.viewRender')}</button>
-        </span>
-        <button type="button" className="dsh-desk-review-mini" onClick={copyPath}>{t('review.copyPath')}</button>
-        <button type="button" className="dsh-desk-review-mini" disabled={loading} onClick={() => { void load() }}>{t('review.refresh')}</button>
-        <button
-          type="button"
-          className="dsh-desk-review-mini"
-          disabled={page === null}
-          onClick={() => startCompose({ scope: 'document', quote: page?.title ?? path })}
-        >
+        <SegmentedTabs
+          className="dsh-desk-review-viewtoggle"
+          size="sm"
+          label={t('review.viewLabel')}
+          value={view}
+          onChange={setView}
+          items={[
+            { value: 'source', label: t('review.viewSource'), id: 'desk-review-view-source', panelId: 'desk-review-panel' },
+            { value: 'render', label: t('review.viewRender'), id: 'desk-review-view-render', panelId: 'desk-review-panel' },
+          ] as const}
+        />
+        <Tooltip label={t('review.copyPath')} side="bottom" delayMs={400}>
+          <Button variant="ghost" size="sm" icon={<IconCopyOutlineRegular />} aria-label={t('review.copyPath')} onClick={copyPath} />
+        </Tooltip>
+        <Tooltip label={t('review.refresh')} side="bottom" delayMs={400}>
+          <Button variant="ghost" size="sm" icon={<IconRefreshOutlineRegular />} aria-label={t('review.refresh')} disabled={loading} onClick={() => { void load() }} />
+        </Tooltip>
+        <Button variant="outline" size="sm" disabled={page === null} onClick={() => startCompose({ scope: 'document', quote: page?.title ?? path })}>
           {t('review.wholeDoc')}
-        </button>
+        </Button>
       </header>
       {error === null ? null : <p className="dsh-desk-notebook-error">{t('state.loadFailed', { message: error })}</p>}
       {notice === null ? null : <p className="dsh-desk-review-notice">{notice}</p>}
@@ -446,6 +470,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         ? null
         : (
             <button
+              ref={floatRef}
               type="button"
               className="dsh-desk-action dsh-desk-action-primary dsh-desk-review-float"
               style={floatPos}
@@ -465,10 +490,12 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
             <div className="dsh-desk-review-layer">
               <div className="dsh-desk-review-layerhead">
                 <h4>{t('review.pendingTitle', { count: annotations.length })}</h4>
-                <button type="button" className="dsh-desk-action dsh-desk-action-primary" disabled={annotations.length === 0} onClick={submitAll}>
+                <Button variant="primary" size="sm" disabled={annotations.length === 0} onClick={submitAll}>
                   {t('review.submitAll')}
-                </button>
-                <button type="button" className="dsh-desk-review-mini" onClick={() => setOverlay(null)}>{t('review.hideOverlay')}</button>
+                </Button>
+                <Tooltip label={t('review.hideOverlay')} side="bottom" delayMs={400}>
+                  <Button variant="ghost" size="sm" icon={<IconChevronDownOutlineRegular />} aria-label={t('review.hideOverlay')} onClick={() => setOverlay(null)} />
+                </Tooltip>
               </div>
               {annotations.length === 0
                 ? <p className="dsh-desk-notebook-hint">{t('review.pendingEmpty')}</p>
@@ -492,10 +519,12 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                 {baselineAt === null
                   ? null
                   : <span className="dsh-desk-review-baseline">{t('review.baselineHint', { time: new Date(baselineAt).toLocaleTimeString() })}</span>}
-                <button type="button" className="dsh-desk-review-mini" disabled={page === null} onClick={() => { setBaseline(page?.body ?? null); setBaselineAt(new Date().toISOString()) }}>
+                <Button variant="ghost" size="sm" disabled={page === null} onClick={() => { setBaseline(page?.body ?? null); setBaselineAt(new Date().toISOString()) }}>
                   {t('review.rebaseline')}
-                </button>
-                <button type="button" className="dsh-desk-review-mini" onClick={() => setOverlay(null)}>{t('review.hideOverlay')}</button>
+                </Button>
+                <Tooltip label={t('review.hideOverlay')} side="bottom" delayMs={400}>
+                  <Button variant="ghost" size="sm" icon={<IconChevronDownOutlineRegular />} aria-label={t('review.hideOverlay')} onClick={() => setOverlay(null)} />
+                </Tooltip>
               </div>
               {diff === null || totals === null || page === null
                 ? <p className="dsh-desk-notebook-hint">{t('review.diffEmpty')}</p>
@@ -526,32 +555,30 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
           )
         : null}
       <div className="dsh-desk-review-bar">
-        <button
-          type="button"
-          className="dsh-desk-review-pill"
-          data-active={overlay === 'annotations' || undefined}
+        <Pill
+          active={overlay === 'annotations'}
+          aria-expanded={overlay === 'annotations'}
           onClick={() => setOverlay(current => current === 'annotations' ? null : 'annotations')}
         >
-          <IconListPenOutlineRegular />
+          <span className="dsh-desk-review-pillicon"><IconListPenOutlineRegular /></span>
           <span>{t('review.pendingBar', { count: annotations.length })}</span>
-        </button>
-        <button
-          type="button"
-          className="dsh-desk-review-pill"
-          data-active={overlay === 'diff' || undefined}
+        </Pill>
+        <Pill
+          active={overlay === 'diff'}
+          aria-expanded={overlay === 'diff'}
           onClick={() => setOverlay(current => current === 'diff' ? null : 'diff')}
         >
-          <IconInspectOutlineRegular />
-          <span>{t('review.changes')}</span>{' '}
+          <span className="dsh-desk-review-pillicon"><IconInspectOutlineRegular /></span>
+          <span>{t('review.changes')}</span>
           {totals === null
-            ? t('review.noChange')
+            ? <span>{t('review.noChange')}</span>
             : (
                 <>
                   <span className="dsh-desk-review-difftag dsh-desk-review-difftag-plus">{`+${totals.added}`}</span>
                   <span className="dsh-desk-review-difftag dsh-desk-review-difftag-minus">{`−${totals.removed}`}</span>
                 </>
               )}
-        </button>
+        </Pill>
       </div>
     </div>
   )

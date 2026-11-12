@@ -110,6 +110,7 @@ async function draftSaveRoute(route: DeskRouteContext, req: IncomingMessage, res
     fileId: file.id,
     drafts: body.drafts,
   })
+  // Empty batch = deleted draft box; the response shape stays `{ draft: null }`.
   sendJson(res, 200, { draft })
 }
 

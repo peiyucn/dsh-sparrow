@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DeskTranslator } from '../../app/types.js'
 import { messageOf } from '../../app/utils.js'
-import type { NotebookEntry, NotebookSkill, NotebookStateResponse, ReviewHistoryEntry } from '../../../notebook-contract.js'
+import type { NotebookEntry, NotebookStateResponse, ReviewHistoryEntry } from '../../../notebook-contract.js'
 import { NOTEBOOK_HISTORY_WARN_BYTES } from '../../../constants.js'
 import type { NotebookApi } from '../api.js'
 import type { ReviewOpenInput, ReviewOpenResult } from '../review-bridge.js'
@@ -29,6 +29,8 @@ export interface NotebookRow {
   /** Submitted annotations inside a history record. */
   readonly annotationCount?: number
   readonly missing?: boolean
+  /** The submitted record a history row stands for (opens the read-only detail). */
+  readonly record?: ReviewHistoryEntry
   readonly onOpen?: () => void
   readonly onDelete?: () => void
 }
@@ -50,12 +52,13 @@ export interface NotebookPageController {
   readonly searching: boolean
   readonly newOpen: boolean
   readonly brief: string
-  readonly skillName: string | null
-  readonly skills: readonly NotebookSkill[]
   readonly slice: PageSlice<NotebookRow>
   readonly total: number
-  /** How the history records currently relate to the files on disk. */
-  readonly linkState: { readonly linked: number; readonly moved: number; readonly detached: number }
+  /** Count line of the active view, shown next to the list. */
+  readonly summary: string
+  /** One-line explanation under the count (currently used by the missing-metadata view). */
+  readonly summaryHint: string | null
+  readonly history: readonly ReviewHistoryEntry[]
   readonly historyBytes: number
   readonly historyWarn: boolean
   readonly reload: () => Promise<void>
@@ -68,7 +71,6 @@ export interface NotebookPageController {
   readonly setBrief: (brief: string) => void
   readonly createEmpty: () => Promise<void>
   readonly draftWithAi: () => void
-  readonly chooseSkill: (name: string | null) => Promise<void>
   readonly setMode: (mode: NotebookMode) => void
   readonly setQuery: (query: string) => void
   readonly setPage: (page: number) => void
@@ -259,24 +261,16 @@ export function useNotebookPage(input: {
       return
     }
     const text = brief.trim()
-    const prompt = state?.skillName == null
-      ? t('notebook.draftPrompt', { brief: text })
-      : t('notebook.skillDraftPrompt', { skill: state.skillName, brief: text })
+    // The workspace marker (not a skill picker) decides the note2md wording: the entry page has no
+    // session yet, and the official skill catalog is session-addressed (see docs/spec/07).
+    const prompt = state?.note2md === true
+      ? t('notebook.note2mdDraftPrompt', { brief: text })
+      : t('notebook.draftPrompt', { brief: text })
     onDraftWithAi(workspace.workspaceId, prompt)
     setNewOpen(false)
     setBrief('')
   }, [brief, onDraftWithAi, state?.skillName, t, workspace])
 
-  const chooseSkill = useCallback(async (name: string | null): Promise<void> => {
-    setBusy(true)
-    try {
-      setState(await notebook.setSkill(name))
-    } catch (cause) {
-      setNotice(messageOf(cause))
-    } finally {
-      setBusy(false)
-    }
-  }, [notebook])
 
   const deleteHistory = useCallback(async (id: string): Promise<void> => {
     setBusy(true)
@@ -354,6 +348,7 @@ export function useNotebookPage(input: {
           path: entry.resolvedPath ?? entry.record.pathSnapshot,
           date: new Date(entry.record.createdAt).toLocaleDateString(),
           annotationCount: entry.record.annotations.length,
+          record: entry,
           onDelete: () => { void deleteHistory(entry.record.id) },
         }))
     }
@@ -390,12 +385,16 @@ export function useNotebookPage(input: {
   }, [page, slice.page])
 
   const historyBytes = state?.historyBytes ?? 0
-
-  const linkState = useMemo(() => ({
-    linked: history.filter(entry => entry.status === 'linked').length,
-    moved: history.filter(entry => entry.status === 'moved').length,
-    detached: history.filter(entry => entry.status === 'detached').length,
-  }), [history])
+  const summary = searching
+    ? t('notebook.searchResults', { count: rows.length })
+    : mode === 'history'
+      ? t('notebook.summaryHistory', { count: history.length })
+      : mode === 'drafts'
+        ? t('notebook.summaryDrafts', { count: state?.draftCount ?? 0 })
+        : mode === 'missing'
+          ? t('notebook.summaryMissing', { count: state?.stats.missingFrontmatter ?? 0 })
+          : t('notebook.summaryRecent', { recent: state?.recent.length ?? 0, total: state?.stats.total ?? 0 })
+  const summaryHint = mode === 'missing' ? t('notebook.missingHint') : null
 
   return {
     t,
@@ -413,11 +412,11 @@ export function useNotebookPage(input: {
     searching,
     newOpen,
     brief,
-    skillName: state?.skillName ?? null,
-    skills: state?.skills ?? [],
     slice,
     total: state?.stats.total ?? 0,
-    linkState,
+    summary,
+    summaryHint,
+    history,
     historyBytes,
     historyWarn: historyBytes >= NOTEBOOK_HISTORY_WARN_BYTES,
     reload,
@@ -430,7 +429,6 @@ export function useNotebookPage(input: {
     setBrief,
     createEmpty,
     draftWithAi,
-    chooseSkill,
     setMode,
     setQuery,
     setPage,

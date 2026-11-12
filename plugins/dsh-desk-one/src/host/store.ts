@@ -868,17 +868,25 @@ export class DeskStore {
     return this.allNodes().filter((node): node is NoteDraft => node.kind === 'note-draft' && node.fileId !== undefined)
   }
 
-  /** Replace one file draft box (bounded; drafts are the user intent, not review state). */
+  /**
+   * Replace one file draft box (bounded; drafts are the user intent, not review state).
+   * An empty batch deletes the box: a submitted review must not leave a "has drafts" shell that
+   * the entry page would count and list while the review tab shows nothing.
+   */
   async saveNoteDraft(input: {
     readonly rootPath: string
     readonly path: string
     readonly fileId: string
     readonly drafts: readonly DraftAnnotation[]
-  }): Promise<NoteDraft> {
+  }): Promise<NoteDraft | null> {
     const now = new Date().toISOString()
     const id = DeskStore.draftId(input.fileId)
     const drafts = input.drafts.slice(0, NOTEBOOK_MAX_DRAFTS)
     const existing = this.getNoteDraft(input.fileId)
+    if (drafts.length === 0) {
+      if (existing !== undefined) await this.nodes.delete(id)
+      return null
+    }
     if (existing === undefined) {
       const record: NoteDraft = {
         id,

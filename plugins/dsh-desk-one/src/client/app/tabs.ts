@@ -9,8 +9,9 @@ export interface DeskTabEntry {
 
 export const DESK_TABS: readonly DeskTabEntry[] = [
   { tab: 'schedule', labelKey: 'tab.schedule' },
-  { tab: 'notes', labelKey: 'tab.notes' },
+  // Notebook leads the create actions (Schedule's + buttons order: notebook / note / task).
   { tab: 'notebook', labelKey: 'tab.notebook' },
+  { tab: 'notes', labelKey: 'tab.notes' },
   { tab: 'tasks', labelKey: 'tab.tasks' },
   { tab: 'sessions', labelKey: 'tab.sessions' },
 ]

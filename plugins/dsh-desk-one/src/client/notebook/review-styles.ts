@@ -97,17 +97,20 @@ export const REVIEW_CSS = `
 }
 .dsh-desk-review-layer {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: var(--dsh-desk-review-bar-h);
+  left: 8px;
+  right: 8px;
+  bottom: calc(var(--dsh-desk-review-bar-h) + 6px);
   z-index: 4;
   max-height: 60%;
   overflow-y: auto;
   padding: 10px 12px 12px;
-  border-top: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-  border-radius: 10px 10px 0 0;
-  background: var(--dsw-alias-bg-layer-2, #ffffff);
+  border-radius: var(--dsw-radius-lg, 14px);
+  background: var(--dsw-menu-surface-fill, var(--dsw-specific-menu, #ffffff));
+  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
+  -webkit-backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
   box-shadow: var(--dsw-elevation-panel, 0 -6px 24px rgba(0, 0, 0, 0.16));
+  outline: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.06));
+  outline-offset: -0.5px;
 }
 .dsh-desk-review-layerhead {
   display: flex;
@@ -225,20 +228,7 @@ export const REVIEW_CSS = `
   color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 11px;
 }
-.dsh-desk-review-mini {
-  flex: none;
-  padding: 2px 6px;
-  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-  border-radius: 6px;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  font-size: 10px;
-  cursor: pointer;
-}
-.dsh-desk-review-mini:hover {
-  color: var(--dsw-alias-label-primary, #1f2329);
-  border-color: var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
-}
+
 .dsh-desk-review-code {
   flex: 1;
   min-height: 0;
@@ -351,24 +341,8 @@ export const REVIEW_CSS = `
 }
 /* --- v4: view toggle, selected lines, inline composer, segmented bar ------ */
 .dsh-desk-review-viewtoggle {
-  display: inline-flex;
   flex: none;
-  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-  border-radius: 8px;
-  overflow: hidden;
-}
-.dsh-desk-review-viewtoggle button {
-  padding: 2px 8px;
-  border: 0;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  font: inherit;
-  font-size: 10px;
-  cursor: pointer;
-}
-.dsh-desk-review-viewtoggle button[data-active] {
-  color: var(--dsw-alias-label-primary, #1f2329);
-  background: var(--dsw-alias-interactive-bg-secondary, rgba(0, 0, 0, 0.06));
+  width: 128px;
 }
 .dsh-desk-review-line[data-selected] {
   background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4176e6) 18%, transparent);
@@ -396,62 +370,53 @@ export const REVIEW_CSS = `
   padding: 0;
   border: 0;
   border-radius: 8px;
-  background: var(--dsw-alias-brand-primary, #4176e6);
-  color: #ffffff;
+  /* Brand-primary turns near-white in the dark theme; the business state color stays a real
+     brand fill in both themes, which is what the coloured preview-header action needs. */
+  background: var(--dsw-alias-state-business-primary, #4176e6);
+  color: var(--dsw-alias-label-primary-foreground, #ffffff);
   cursor: pointer;
 }
 .dsh-desk-docreview:hover {
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4176e6) 84%, #000000);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #4176e6) 84%, #000000);
 }
 .dsh-desk-docreview:disabled {
   opacity: 0.5;
   cursor: default;
 }
-/* Official composer-pill reading: transparent pills on the pane floor. */
+/* Official composer-pill reading: transparent, centred pills on the pane floor. */
 .dsh-desk-review-bar {
   display: flex;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  gap: 6px;
   flex: none;
   height: var(--dsh-desk-review-bar-h);
-  padding: 0 6px;
-  background: var(--dsw-alias-bg-base, #ffffff);
+  padding: 0 8px;
+  border-top: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.06));
+  background: transparent;
 }
-.dsh-desk-review-pill {
+.dsh-desk-review-pillicon {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 1px 8px;
-  border: none;
-  border-radius: var(--dsw-radius-sm, 8px);
-  background: transparent;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  font: inherit;
-  font-size: 11px;
-  line-height: 20px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.dsh-desk-review-pill svg {
+  justify-content: center;
   width: 14px;
   height: 14px;
-  flex: none;
 }
-.dsh-desk-review-pill[data-active] {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--dsw-alias-label-secondary, #6b7280);
+.dsh-desk-review-pillicon svg {
+  width: 14px;
+  height: 14px;
 }
-@media (hover: hover) {
-  .dsh-desk-review-pill:hover {
-    background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-    color: var(--dsw-alias-label-secondary, #6b7280);
-  }
-}
-/* Square brand-icon button in the official preview header (official Button geometry). */
+/* Square brand-icon button in the official preview header (official Button geometry).
+   The doubled class beats the host Button's primary fill, which is near-white in dark theme. */
 button.dsh-desk-docreview.dsh-desk-docreview {
   flex: none;
   min-width: 28px;
   padding: 0;
+  background: var(--dsw-alias-state-business-primary, #4176e6);
+  color: var(--dsw-alias-label-primary-foreground, #ffffff);
+}
+button.dsh-desk-docreview.dsh-desk-docreview:hover {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #4176e6) 84%, #000000);
+  color: var(--dsw-alias-label-primary-foreground, #ffffff);
 }
 `
