@@ -1,4 +1,9 @@
-/** Review tab styles: document view plus the bottom bar, overlay, compose popup and guard. */
+/**
+ * Review tab styles: the reviewed document, a compose popup, and bottom overlays.
+ *
+ * Every surface uses the official DSH theme aliases (bg-layer-1/2, label-primary, border-l2),
+ * so the tab follows light/dark themes instead of shipping its own colours.
+ */
 
 export const REVIEW_CSS = `
 .dsh-desk-review {
@@ -8,8 +13,9 @@ export const REVIEW_CSS = `
   position: relative;
   height: 100%;
   min-height: 0;
-  padding: 12px 14px 0;
+  padding: 10px 12px 0;
   overflow: hidden;
+  color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
 }
 .dsh-desk-review-head {
@@ -17,6 +23,7 @@ export const REVIEW_CSS = `
   align-items: center;
   gap: 8px;
   padding-bottom: 8px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.04));
 }
 .dsh-desk-review-path {
   flex: 1;
@@ -33,8 +40,9 @@ export const REVIEW_CSS = `
   padding: 0 5px;
   border-radius: 4px;
   background: var(--dsw-alias-interactive-bg-secondary, rgba(0, 0, 0, 0.06));
-  color: var(--dsw-alias-label-caption, #8a919f);
+  color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 9px;
+  line-height: 16px;
   letter-spacing: 0.04em;
 }
 .dsh-desk-review-scroll {
@@ -44,13 +52,22 @@ export const REVIEW_CSS = `
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-bottom: 44px;
+  padding: 10px 2px 48px;
+}
+.dsh-desk-review-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.dsh-desk-review-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background-clip: padding-box;
+  background-color: var(--dsw-alias-border-l4, rgba(0, 0, 0, 0.16));
 }
 .dsh-desk-review-card {
-  border: 0.5px solid var(--dsw-alias-border-l2, #d5d9e0);
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
   border-radius: 10px;
   padding: 10px 12px;
-  background: var(--dsw-alias-bg-base, #ffffff);
+  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.02));
 }
 .dsh-desk-review-card h4 {
   margin: 0 0 8px;
@@ -84,6 +101,9 @@ export const REVIEW_CSS = `
   font-size: 13px;
   line-height: 1.7;
 }
+.dsh-desk-review-body ::selection {
+  background: var(--dsw-alias-bg-document-selection, rgba(65, 118, 230, 0.4));
+}
 .dsh-desk-review-text {
   margin: 0;
   white-space: pre-wrap;
@@ -98,8 +118,7 @@ export const REVIEW_CSS = `
   right: 0;
   bottom: 0;
   display: flex;
-  gap: 0;
-  border-top: 0.5px solid var(--dsw-alias-border-l2, #d5d9e0);
+  border-top: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
   background: var(--dsw-alias-bg-base, #ffffff);
 }
 .dsh-desk-review-baritem {
@@ -114,6 +133,9 @@ export const REVIEW_CSS = `
   text-align: center;
   cursor: pointer;
 }
+.dsh-desk-review-baritem + .dsh-desk-review-baritem {
+  border-left: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.04));
+}
 .dsh-desk-review-baritem:hover,
 .dsh-desk-review-baritem[data-active='true'] {
   color: var(--dsw-alias-label-primary, #1f2329);
@@ -123,14 +145,16 @@ export const REVIEW_CSS = `
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 34px;
+  bottom: 33px;
   z-index: 2;
   max-height: 60%;
   overflow-y: auto;
-  padding: 10px 12px;
-  border-top: 0.5px solid var(--dsw-alias-border-l2, #d5d9e0);
-  background: var(--dsw-alias-bg-elevated, #ffffff);
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.12);
+  padding: 10px 12px 12px;
+  border-top: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: 10px 10px 0 0;
+  background: var(--dsw-alias-bg-layer-2, #ffffff);
+  color: var(--dsw-alias-label-primary, #1f2329);
+  box-shadow: var(--dsw-elevation-panel, 0 -6px 24px rgba(0, 0, 0, 0.16));
 }
 .dsh-desk-review-layerhead {
   display: flex;
@@ -150,12 +174,12 @@ export const REVIEW_CSS = `
   align-items: flex-start;
   gap: 8px;
   padding: 8px 0;
-  border-top: 0.5px solid var(--dsw-alias-border-l2, #d5d9e0);
+  border-top: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.04));
 }
 .dsh-desk-review-pending-no {
   flex: none;
   width: 16px;
-  color: var(--dsw-alias-label-caption, #8a919f);
+  color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
@@ -174,7 +198,7 @@ export const REVIEW_CSS = `
 .dsh-desk-review-quote {
   margin: 0;
   padding: 0 0 0 8px;
-  border-left: 2px solid var(--dsw-alias-border-l2, #d5d9e0);
+  border-left: 2px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
   color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 11px;
   line-height: 1.5;
@@ -187,18 +211,19 @@ export const REVIEW_CSS = `
 }
 .dsh-desk-review-composer {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 42px;
+  left: 8px;
+  right: 8px;
+  bottom: 41px;
   z-index: 3;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 10px 12px;
-  border: 0.5px solid var(--dsw-alias-border-l2, #d5d9e0);
+  border: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
   border-radius: 10px;
-  background: var(--dsw-alias-bg-elevated, #ffffff);
-  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.14);
+  background: var(--dsw-alias-bg-layer-2, #ffffff);
+  color: var(--dsw-alias-label-primary, #1f2329);
+  box-shadow: var(--dsw-elevation-prominent, 0 -6px 24px rgba(0, 0, 0, 0.18));
 }
 .dsh-desk-review-input {
   box-sizing: border-box;
@@ -206,14 +231,21 @@ export const REVIEW_CSS = `
   min-height: 64px;
   max-height: 160px;
   padding: 6px 8px;
-  border: 0.5px solid var(--dsw-alias-border-l2, #d5d9e0);
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
   border-radius: 8px;
-  background: transparent;
-  color: inherit;
+  background: var(--dsw-alias-bg-base, #ffffff);
+  color: var(--dsw-alias-label-primary, #1f2329);
   font: inherit;
   font-size: 12px;
   line-height: 1.6;
   resize: vertical;
+}
+.dsh-desk-review-input::placeholder {
+  color: var(--dsw-alias-label-caption, #8a919f);
+}
+.dsh-desk-review-input:focus {
+  outline: none;
+  border-color: var(--dsw-alias-brand-primary, #4176e6);
 }
 .dsh-desk-review-actions {
   display: flex;
@@ -223,53 +255,55 @@ export const REVIEW_CSS = `
 }
 .dsh-desk-review-blocker {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 42px;
+  left: 8px;
+  right: 8px;
+  bottom: 41px;
   z-index: 4;
   padding: 10px 12px;
-  border: 0.5px solid var(--dsw-alias-border-l2, #d5d9e0);
+  border: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
   border-radius: 10px;
-  background: var(--dsw-alias-bg-elevated, #ffffff);
-  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.16);
+  background: var(--dsw-alias-bg-layer-2, #ffffff);
+  color: var(--dsw-alias-label-primary, #1f2329);
+  box-shadow: var(--dsw-elevation-prominent, 0 -6px 24px rgba(0, 0, 0, 0.18));
 }
 .dsh-desk-review-blocker p {
   margin: 0 0 8px;
-  color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
 }
 .dsh-desk-review-notice {
   margin: 0 0 8px;
   padding: 6px 8px;
   border-radius: 8px;
-  background: var(--dsw-alias-interactive-bg-secondary, rgba(0, 0, 0, 0.05));
+  border: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.04));
+  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.02));
   color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 11px;
 }
 .dsh-desk-review-mini {
   flex: none;
   padding: 2px 6px;
-  border: 0.5px solid var(--dsw-alias-border-l2, #d5d9e0);
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
   border-radius: 6px;
   background: transparent;
-  color: var(--dsw-alias-label-caption, #8a919f);
+  color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 10px;
   cursor: pointer;
 }
 .dsh-desk-review-mini:hover {
   color: var(--dsw-alias-label-primary, #1f2329);
+  border-color: var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
 }
 .dsh-desk-review-danger {
-  border-color: var(--dsw-alias-state-error, #c0503f);
-  color: var(--dsw-alias-state-error, #c0503f);
+  border-color: var(--dsw-alias-state-error-primary, #c0503f);
+  color: var(--dsw-alias-state-error-primary, #c0503f);
 }
 .dsh-desk-review-diffadded {
-  color: #3a9a5b;
+  color: var(--dsw-alias-code-diff-added, #3a9a5b);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 .dsh-desk-review-diffremoved {
-  color: #c0503f;
+  color: var(--dsw-alias-code-diff-deleted, #c0503f);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }

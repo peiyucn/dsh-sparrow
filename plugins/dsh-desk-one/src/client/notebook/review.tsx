@@ -163,6 +163,13 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     }
   }, [bridge, pending, sessionId, t])
 
+  // A transient status line should not accumulate in the tab.
+  useEffect(() => {
+    if (notice === null) return
+    const timer = setTimeout(() => setNotice(null), 4_000)
+    return () => clearTimeout(timer)
+  }, [notice])
+
   const diff = baseline !== null && page !== null && baseline !== page.body
     ? { oldText: baseline, newText: page.body }
     : null

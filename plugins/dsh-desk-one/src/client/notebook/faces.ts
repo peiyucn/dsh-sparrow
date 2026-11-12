@@ -20,9 +20,21 @@ export interface SidebarRightLike {
   registerCloseHandler(kind: string, handler: (sessionId: string, tab: TabRecordLike) => void): () => void
 }
 
-/** Official sessions service face (create a review session; reach its composer). */
+/** One projected workspace (the official workspace-controller view). */
+export interface WorkspaceViewLike {
+  readonly workspaceId: string
+  readonly path: string
+  readonly title: string
+}
+
+/** Official workspace-controller service face (resolve the reviewed file's workspace). */
+export interface WorkspacesLike {
+  readonly list: { getSnapshot(): { readonly items: readonly WorkspaceViewLike[] } }
+  create(input: { readonly path: string }): Promise<WorkspaceViewLike>
+}
+
+/** Official sessions service face (reach one session's composer). */
 export interface SessionsLike {
-  create(options?: { readonly cwd?: string }): Promise<string>
   scope(id: string): SessionScopeLike | undefined
 }
 
@@ -42,7 +54,13 @@ export interface ConversationLike {
   readonly input: { for(scope: unknown): SessionInputLike }
 }
 
-/** Official workspace navigation face: open one Session in the main column. */
+/** Official workspace navigation face: open one Session, or a workspace with its Session. */
 export interface SessionNavigationLike {
   openSession(sessionId: string): void
+  /**
+   * Connect a workspace and open its blank Session, creating or reusing it.
+   * @param workspaceId - target workspace.
+   * @param beforeOpen - synchronous preparation for the selected Session (writes the review link).
+   */
+  openWorkspace(workspaceId: string, beforeOpen?: (sessionId: string) => void): Promise<void>
 }

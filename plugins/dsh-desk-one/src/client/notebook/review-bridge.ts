@@ -2,14 +2,16 @@
  * Review bridge: starts or continues a review session, opens the review tab, hands the
  * pending annotations to the composer, and guards the tab's close when work is unsaved.
  *
- * A review is a DSH session of its own: creating one never depends on a current Session
- * being open, and continuing one reuses the most recent review of the file.
+ * A review session must live in the reviewed file's workspace: the main column then shows a
+ * real DSH session (workspace selected, agent context intact) instead of the empty new-session
+ * hero. Starting therefore goes through the official workspace navigation
+ * (`openWorkspace`), not through a bare `sessions.create`.
  */
 
-import type { DeskReview } from '../../contract.js'
 import type { ReviewApi } from './review-api.js'
 import type {
   ConversationLike, LayoutLike, SessionNavigationLike, SessionsLike, SidebarRightLike, TabRecordLike,
+  WorkspacesLike,
 } from './faces.js'
 import { invalidateReviewBadges } from './review-badges.js'
 
@@ -35,7 +37,7 @@ export interface ReviewStartInput {
 /** Open face the notebook shares with the review tab. */
 export interface ReviewBridge {
   /**
-   * Continue the file's most recent review, or start a new one.
+   * Continue the file's most recent review, or start a new one in its workspace.
    * @param input - workspace root and file path.
    * @returns whether a review session was opened.
    */
@@ -58,6 +60,7 @@ export interface ReviewBridge {
   attachSidebar(service: SidebarRightLike): () => void
   attachSessions(service: SessionsLike): () => void
   attachNavigation(service: SessionNavigationLike): () => void
+  attachWorkspaces(service: WorkspacesLike): () => void
 }
 
 /** How many frames to wait for the conversation surface after leaving the panel. */
@@ -65,12 +68,18 @@ const OPEN_RETRIES = 6
 /** Delay between attempts (ms). */
 const OPEN_RETRY_MS = 60
 
+/** Normalize a filesystem path for prefix comparison (Windows case-insensitive, slashes unified). */
+function normalizedPath(path: string): string {
+  return path.replace(/\\/gu, '/').replace(/\/+$/u, '').toLowerCase()
+}
+
 /** Create the bridge; all services start detached. */
 export function createReviewBridge(api: ReviewApi): ReviewBridge {
   let layout: LayoutLike | undefined
   let sidebarRight: SidebarRightLike | undefined
   let sessions: SessionsLike | undefined
   let navigation: SessionNavigationLike | undefined
+  let workspaces: WorkspacesLike | undefined
   /** Unsaved annotation count per tab id. */
   const pending = new Map<string, number>()
   /** Tabs whose next close must skip the guard. */
@@ -94,22 +103,50 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
     return true
   }
 
+  /** The official workspace containing `cwd`, creating one through the official flow when absent. */
+  const workspaceFor = async (cwd: string): Promise<string> => {
+    const service = workspaces
+    if (service === undefined) throw new Error('workspaces unavailable')
+    const target = normalizedPath(cwd)
+    const match = service.list.getSnapshot().items.find((item) => {
+      const root = normalizedPath(item.path)
+      return target === root || target.startsWith(`${root}/`)
+    })
+    if (match !== undefined) return match.workspaceId
+    const created = await service.create({ path: cwd })
+    return created.workspaceId
+  }
+
   return {
     async start(input) {
-      if (sessions === undefined || navigation === undefined) return false
+      const nav = navigation
+      if (nav === undefined) return false
       try {
-        // Continue the file's latest review when there is one; otherwise start a new session.
         const existing = await api.list({ cwd: input.cwd, path: input.path })
-        let review: DeskReview | undefined = existing[0]
-        if (review === undefined) {
-          const sessionId = await sessions.create({ cwd: input.cwd })
-          review = await api.create({ sessionId, cwd: input.cwd, path: input.path })
-          invalidateReviewBadges()
-        }
-        // Opening a review tab needs the conversation surface on screen.
         layout?.selectPanel(null)
-        navigation.openSession(review.sessionId)
-        setTimeout(() => { openTab(review.id) }, 0)
+        const workspaceId = await workspaceFor(input.cwd)
+        // Continue only when the latest review still reads its file; a moved or renamed
+        // target would otherwise reopen a dead tab instead of starting a usable review.
+        const latest = existing[0]
+        if (latest !== undefined) {
+          try {
+            await api.page(latest.id)
+            await nav.openWorkspace(workspaceId)
+            nav.openSession(latest.sessionId)
+            openTab(latest.id)
+            return true
+          } catch {
+            // Fall through and start a fresh review for the file that exists now.
+          }
+        }
+        // New review: the workspace's blank session becomes the review session, so the main
+        // column shows a real workspace session while the link is written inside `beforeOpen`.
+        await nav.openWorkspace(workspaceId, (sessionId: string) => {
+          void api.create({ sessionId, cwd: input.cwd, path: input.path }).then((review) => {
+            invalidateReviewBadges()
+            openTab(review.id)
+          }, () => undefined)
+        })
         return true
       } catch {
         return false
@@ -165,6 +202,10 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
     attachNavigation(service) {
       navigation = service
       return () => { if (navigation === service) navigation = undefined }
+    },
+    attachWorkspaces(service) {
+      workspaces = service
+      return () => { if (workspaces === service) workspaces = undefined }
     },
   }
 }

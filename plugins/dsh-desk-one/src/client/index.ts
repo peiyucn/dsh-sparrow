@@ -18,7 +18,7 @@ import { createWorkspaceAccess, type UiWorkspaceLike as NotebookNavigationLike, 
 import { createReviewBridge } from './notebook/review-bridge.js'
 import { mountNoteReviewTab } from './notebook/register.js'
 import { configureReviewBadges, SessionReviewBadge } from './notebook/review-badges.js'
-import type { LayoutLike, SessionNavigationLike, SessionsLike, SidebarRightLike } from './notebook/faces.js'
+import type { LayoutLike, SessionNavigationLike, SessionsLike, SidebarRightLike, WorkspacesLike } from './notebook/faces.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { DeskPanelIcon } from './icon.js'
@@ -47,8 +47,12 @@ export function apply(ctx: ClientContext): void {
   // registration), so both services are optional: absent → the action reports unavailable.
   const workspaceAccess = createWorkspaceAccess()
   ctx.inject(['workspaces'], (workspaceCtx) => {
-    const detach = workspaceAccess.attach(workspaceCtx.get('workspaces') as unknown as WorkspacesServiceLike)
+    const service = workspaceCtx.get('workspaces')
+    const detach = workspaceAccess.attach(service as unknown as WorkspacesServiceLike)
     workspaceCtx.effect(() => detach, `${PACKAGE_NAME}: workspace access`)
+    // The review bridge resolves the reviewed file's workspace, so it needs the same service.
+    const detachReview = review.attachWorkspaces(service as unknown as WorkspacesLike)
+    workspaceCtx.effect(() => detachReview, `${PACKAGE_NAME}: review workspaces`)
   })
   ctx.inject(['uiWorkspace'], (navigationCtx) => {
     const detach = workspaceAccess.attachNavigation(navigationCtx.get('uiWorkspace') as unknown as NotebookNavigationLike)
