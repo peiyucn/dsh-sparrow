@@ -35,3 +35,9 @@
       <circle cx="10" cy="10" r="2.1" />
     </svg>
   )
+  export const searchIcon = (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <circle cx="8.7" cy="8.7" r="4.9" />
+      <path d="M12.4 12.4l3.7 3.7" />
+    </svg>
+  )

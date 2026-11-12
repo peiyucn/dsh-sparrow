@@ -243,13 +243,16 @@ export function DeskOnePage(props: DeskPanelProps) {
           setTaskSortMode: board.setSortMode,
           archivedCount: board.archivedTasks.length,
         })
-      : scheduleActions({
-          t,
-          visible: tab === 'schedule',
-          onSourcesPage,
-          backToCalendar: () => scheduleActionsRef.current?.backToCalendar(),
-          openSources: () => scheduleActionsRef.current?.openSources(),
-        })
+      // The notebook page owns its title-row actions (new note / open file browser).
+      : tab === 'notebook'
+        ? null
+        : scheduleActions({
+            t,
+            visible: tab === 'schedule',
+            onSourcesPage,
+            backToCalendar: () => scheduleActionsRef.current?.backToCalendar(),
+            openSources: () => scheduleActionsRef.current?.openSources(),
+          })
 
   return (
     <div className="dsh-desk-page">
