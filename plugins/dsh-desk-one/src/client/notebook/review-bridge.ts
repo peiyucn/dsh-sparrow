@@ -49,6 +49,8 @@ export interface ReviewBridge {
    * @returns whether the review session was opened, plus a readable failure step.
    */
   start(input: ReviewStartInput): Promise<ReviewStartResult>
+  /** Reveal one review session again (manual recovery from the home screen). */
+  reveal(sessionId: string): Promise<void>
   /** Put one pending batch into the session composer (never sends). */
   sendQuote(sessionId: string, text: string): boolean
   /** Report how many unsaved annotations one tab holds (0 clears the guard). */
@@ -130,6 +132,17 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
     return created.workspaceId
   }
 
+  /**
+   * Keep revealing a just-opened review session for a few seconds: another navigation can
+   * settle after ours and drop the main column back to the home screen.
+   * @param sessionId - review session to keep visible.
+   */
+  const keepRevealed = (sessionId: string): void => {
+    for (const ms of [600, 1_500, 3_000]) {
+      setTimeout(() => { navigation?.openSession(sessionId) }, ms)
+    }
+  }
+
   /** Reveal one session, waiting for the client catalog to list it first. */
   const revealSession = async (sessionId: string): Promise<void> => {
     const nav = navigation
@@ -180,6 +193,7 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
         await nav.openWorkspace(workspaceId)
         step = '显示审阅会话'
         await revealSession(sessionId)
+        keepRevealed(sessionId)
         step = '打开审阅视图'
         await openTab(review.id)
         return { ok: true }
@@ -187,6 +201,7 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
         return { ok: false, message: `${step}失败：${reasonOf(cause)}` }
       }
     },
+    async reveal(sessionId) { await revealSession(sessionId) },
     sendQuote(sessionId, text) {
       const scope = sessions?.scope(sessionId) as SessionScopeLike | undefined
       const conversation = scope?.get('conversation') as ConversationLike | undefined

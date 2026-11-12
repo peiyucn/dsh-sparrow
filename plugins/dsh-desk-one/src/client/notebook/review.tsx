@@ -186,6 +186,18 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       <header className="dsh-desk-review-head">
         <span className="dsh-desk-review-path" title={review?.target.path ?? page?.path ?? ''}>{title}</span>
         {page === null ? null : <span className="dsh-desk-review-kind">{page.kind === 'markdown' ? 'MD' : 'TXT'}</span>}
+        {review === null
+          ? null
+          : (
+              <button
+                type="button"
+                className="dsh-desk-review-mini"
+                title={review.sessionId}
+                onClick={() => { void bridge.reveal(review.sessionId) }}
+              >
+                {t('review.openSession')}
+              </button>
+            )}
         <button type="button" className="dsh-desk-btn" disabled={loading} onClick={() => { void load() }}>
           {t('review.refresh')}
         </button>
