@@ -173,6 +173,64 @@ export const NOTEBOOK_CSS = `
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
+.dsh-desk-notebook-badge {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--dsw-alias-interactive-bg-secondary, rgba(0, 0, 0, 0.06));
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 9px;
+  line-height: 15px;
+  white-space: nowrap;
+}
+.dsh-desk-notebook-new {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.02));
+}
+.dsh-desk-notebook-meters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dsh-desk-notebook-meter {
+  padding: 2px 8px;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: 999px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 10px;
+}
+.dsh-desk-notebook-meter-warn {
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-state-error-primary, #c0503f);
+  border-radius: 999px;
+  color: var(--dsw-alias-state-error-primary, #c0503f);
+  font-size: 10px;
+}
+.dsh-desk-notebook-history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dsh-desk-notebook-historyrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.04));
+}
+.dsh-desk-notebook-historymain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .dsh-desk-notebook-tags {
   display: flex;
   flex: none;

@@ -31,8 +31,10 @@ export interface DeskPanelInjected {
   readonly notebook: NotebookApi
   /** DSH workspace flow behind the library action. */
   readonly workspaceAccess: WorkspaceAccess
-  /** Open the review tab for one page in the session on screen. */
-  readonly openReview: (path: string) => Promise<ReviewOpenResult>
+  /** Start a review in a new session of the library workspace and open the review tab. */
+  readonly openReview: (input: import('./notebook/review-bridge.js').ReviewOpenInput) => Promise<ReviewOpenResult>
+  /** Start a new session with a prefilled prompt (new-note drafting). */
+  readonly draftWithAi: (workspaceId: string, prompt: string) => void
   readonly listNotes: (query?: string) => Promise<readonly DeskNote[]>
   readonly createNote: (input: {
     readonly title?: string

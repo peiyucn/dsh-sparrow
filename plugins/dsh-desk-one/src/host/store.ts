@@ -6,7 +6,7 @@
  * domain's serial write chain, and optimistic concurrency uses the per-object revision.
  */
 
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
@@ -27,7 +27,7 @@ import {
 } from './schedule/records.js'
 import type {
   DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskNotebookConfig, DeskScheduleSource, DeskSessionIndex, DeskTask,
-  DeskTaskGroup, DraftAnnotation, NoteDraft, ScheduleSyncError, TaskStatus,
+  DeskTaskGroup, DraftAnnotation, NoteDraft, NoteFileRef, ReviewRecord, ScheduleSyncError, TaskStatus,
 } from '../contract.js'
 
 type DeskDomain = Domain<typeof DESK_DOMAIN>
@@ -59,7 +59,12 @@ export class DeskStore {
    */
   private async purgeLegacyRecords(ctx: Context): Promise<void> {
     const legacyKinds = new Set(['annotation', 'review'])
-    const legacy = this.allNodes().filter(node => legacyKinds.has((node as { kind?: string }).kind ?? ''))
+    const legacy = this.allNodes().filter((node) => {
+      const kind = (node as { kind?: string }).kind ?? ''
+      if (legacyKinds.has(kind)) return true
+      // Draft boxes from the path-keyed design have no file identity and cannot be migrated cheaply.
+      return kind === 'note-draft' && (node as { fileId?: string }).fileId === undefined
+    })
     if (legacy.length === 0) return
     for (const node of legacy) {
       try {
@@ -786,35 +791,89 @@ export class DeskStore {
     await this.nodes.delete(NOTEBOOK_CONFIG_ID)
   }
 
-  /** Deterministic draft-box id for one (cwd, path) pair. */
-  private static draftId(cwd: string, path: string): string {
-    const digest = createHash('sha1').update(`${cwd}\u0000${path.toLowerCase()}`).digest('hex').slice(0, 24)
-    return `note_draft_${digest}`
+  /** Deterministic draft-box id: one draft box per file identity. */
+  private static draftId(fileId: string): string {
+    return `note_draft_${fileId}`
   }
 
-  /** One file's persisted draft box. */
-  getNoteDraft(cwd: string, path: string): NoteDraft | undefined {
-    const node = this.nodes.get(DeskStore.draftId(cwd, path))
-    return node?.kind === 'note-draft' ? node : undefined
+  /** One file identity by id. */
+  getNoteFile(id: string): NoteFileRef | undefined {
+    const node = this.nodes.get(id)
+    return node?.kind === 'note-file' ? node : undefined
   }
 
-  /** Replace one file's draft box (bounded; revision-checked against the current record). */
-  async saveNoteDraft(input: {
-    readonly cwd: string
+  /** All assigned file identities. */
+  listNoteFiles(): NoteFileRef[] {
+    return this.allNodes().filter((node): node is NoteFileRef => node.kind === 'note-file')
+  }
+
+  /** Resolve or lazily assign one file identity for (rootPath, path). */
+  async ensureNoteFile(input: {
+    readonly rootPath: string
     readonly path: string
+    readonly hash: string
+  }): Promise<NoteFileRef> {
+    const now = new Date().toISOString()
+    const existing = this.listNoteFiles().find(node => node.rootPath === input.rootPath && node.path === input.path)
+    if (existing !== undefined) {
+      if (existing.hash === input.hash) return existing
+      return await this.nodes.update(existing.id, current => current.kind === 'note-file'
+        ? { ...current, hash: input.hash, updatedAt: now, revision: current.revision + 1 }
+        : current) as NoteFileRef
+    }
+    const record: NoteFileRef = {
+      id: `note_file_${randomUUID()}`,
+      kind: 'note-file',
+      schema: DESK_NODE_SCHEMA,
+      rootPath: input.rootPath,
+      path: input.path,
+      hash: input.hash,
+      createdAt: now,
+      updatedAt: now,
+      revision: 1,
+    }
+    await this.nodes.put(record.id, record)
+    return record
+  }
+
+  /** Re-point one file identity after a rename/move. */
+  async updateNoteFilePath(id: string, path: string, hash: string): Promise<NoteFileRef> {
+    const now = new Date().toISOString()
+    return await this.nodes.update(id, current => current.kind === 'note-file'
+      ? { ...current, path, hash, updatedAt: now, revision: current.revision + 1 }
+      : current) as NoteFileRef
+  }
+
+  /** One file draft box. */
+  getNoteDraft(fileId: string): NoteDraft | undefined {
+    const node = this.nodes.get(DeskStore.draftId(fileId))
+    return node?.kind === 'note-draft' && node.fileId === fileId ? node : undefined
+  }
+
+  /** All files with unsaved annotations. */
+  listNoteDrafts(): NoteDraft[] {
+    return this.allNodes().filter((node): node is NoteDraft => node.kind === 'note-draft' && node.fileId !== undefined)
+  }
+
+  /** Replace one file draft box (bounded; drafts are the user intent, not review state). */
+  async saveNoteDraft(input: {
+    readonly rootPath: string
+    readonly path: string
+    readonly fileId: string
     readonly drafts: readonly DraftAnnotation[]
   }): Promise<NoteDraft> {
     const now = new Date().toISOString()
-    const id = DeskStore.draftId(input.cwd, input.path)
+    const id = DeskStore.draftId(input.fileId)
     const drafts = input.drafts.slice(0, NOTEBOOK_MAX_DRAFTS)
-    const existing = this.getNoteDraft(input.cwd, input.path)
+    const existing = this.getNoteDraft(input.fileId)
     if (existing === undefined) {
       const record: NoteDraft = {
         id,
         kind: 'note-draft',
         schema: DESK_NODE_SCHEMA,
-        cwd: input.cwd,
+        rootPath: input.rootPath,
         path: input.path,
+        fileId: input.fileId,
         drafts,
         createdAt: now,
         updatedAt: now,
@@ -824,8 +883,49 @@ export class DeskStore {
       return record
     }
     return await this.nodes.update(id, current => current.kind === 'note-draft'
-      ? { ...current, drafts, updatedAt: now, revision: current.revision + 1 }
+      ? { ...current, rootPath: input.rootPath, path: input.path, drafts, updatedAt: now, revision: current.revision + 1 }
       : current) as NoteDraft
+  }
+
+  /* ---------------------------- review records ---------------------------- */
+
+  /** One submitted review record. */
+  async createReviewRecord(input: {
+    readonly sessionId: string
+    readonly workspaceId?: string
+    readonly fileId: string
+    readonly fileTitle: string
+    readonly pathSnapshot: string
+    readonly annotations: readonly DraftAnnotation[]
+  }): Promise<ReviewRecord> {
+    const annotations = input.annotations.slice(0, NOTEBOOK_MAX_DRAFTS)
+    const record: ReviewRecord = {
+      id: `review_record_${randomUUID()}`,
+      kind: 'review-record',
+      schema: DESK_NODE_SCHEMA,
+      sessionId: input.sessionId,
+      ...input.workspaceId === undefined ? {} : { workspaceId: input.workspaceId },
+      fileId: input.fileId,
+      fileTitle: input.fileTitle,
+      pathSnapshot: input.pathSnapshot,
+      annotations,
+      bytes: Buffer.byteLength(JSON.stringify(annotations), 'utf8'),
+      createdAt: new Date().toISOString(),
+    }
+    await this.nodes.put(record.id, record)
+    return record
+  }
+
+  /** All submitted review records, newest first. */
+  listReviewRecords(): ReviewRecord[] {
+    return this.allNodes()
+      .filter((node): node is ReviewRecord => node.kind === 'review-record')
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+  }
+
+  /** Delete one review record. */
+  async deleteReviewRecord(id: string): Promise<void> {
+    await this.nodes.delete(id)
   }
 
 

@@ -1,15 +1,17 @@
 /**
- * Browser-side notebook surface: library state, root setting, page reads, and the draft box.
- * Review state itself lives in the conversation; this module only moves JSON over the plugin routes.
+ * Browser-side notebook surface: library state, root setting, page reads, file identity, the
+ * draft box, and review history.
  */
 
 import { ROUTES } from '../../constants.js'
 import type {
-  NoteDraft, NoteDraftResponse, NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse,
+  CreateNotebookNoteRequest, CreateNoteResponse, DraftAnnotation, NoteDraft, NoteDraftResponse,
+  NotebookFileResponse, NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse,
+  RecordReviewRequest, ReviewHistoryResponse, ReviewRecord,
 } from '../../notebook-contract.js'
 import { deleteJson, fetchJson, postJson } from '../http.js'
 
-/** Root, counts and newest pages. */
+/** Root, counts, newest pages, drafts and history usage. */
 export function notebookState(): Promise<NotebookStateResponse> {
   return fetchJson<NotebookStateResponse>(ROUTES.notebookState)
 }
@@ -24,7 +26,7 @@ export function clearNotebookRoot(): Promise<NotebookStateResponse> {
   return deleteJson<NotebookStateResponse>(ROUTES.notebookRoot)
 }
 
-/** Search titles / paths, optionally narrowed by a count filter or frontmatter values. */
+/** Search titles / paths, optionally narrowed by a count filter. */
 export function searchNotebook(input: {
   readonly query?: string
   readonly type?: string
@@ -49,22 +51,46 @@ export function notebookPage(path: string): Promise<NotebookPageResponse> {
   return fetchJson<NotebookPageResponse>(`${ROUTES.notebookPage}?path=${encodeURIComponent(path)}`)
 }
 
+/** Resolve (or lazily assign) one file identity. */
+export function ensureNotebookFile(path: string): Promise<NotebookFileResponse> {
+  return postJson<NotebookFileResponse>(ROUTES.notebookFile, { path })
+}
+
+/** Create one note file from the template. */
+export function createNotebookNote(input: CreateNotebookNoteRequest): Promise<CreateNoteResponse> {
+  return postJson<CreateNoteResponse>(ROUTES.notebookCreate, input)
+}
+
 /** One file's persisted draft box. */
-export function getNoteDraft(cwd: string, path: string): Promise<NoteDraft | null> {
-  const params = new URLSearchParams({ cwd, path })
-  return fetchJson<NoteDraftResponse>(`${ROUTES.notebookDraft}?${params.toString()}`).then(payload => payload.draft)
+export function getNoteDraft(fileId: string): Promise<NoteDraft | null> {
+  return fetchJson<NoteDraftResponse>(`${ROUTES.notebookDraft}?fileId=${encodeURIComponent(fileId)}`)
+    .then(payload => payload.draft)
 }
 
 /** Replace one file's draft box. */
 export function saveNoteDraft(input: {
-  readonly cwd: string
-  readonly path: string
-  readonly drafts: NoteDraft['drafts']
+  readonly fileId: string
+  readonly drafts: readonly DraftAnnotation[]
 }): Promise<NoteDraft> {
-  return postJson<NoteDraftResponse>(ROUTES.notebookDraft, input).then(payload => {
+  return postJson<NoteDraftResponse>(ROUTES.notebookDraft, input).then((payload) => {
     if (payload.draft === null) throw new Error('草稿保存失败')
     return payload.draft
   })
+}
+
+/** Submitted review history with current link state. */
+export function notebookHistory(): Promise<ReviewHistoryResponse> {
+  return fetchJson<ReviewHistoryResponse>(ROUTES.notebookHistory)
+}
+
+/** Record one submitted review. */
+export function recordReview(input: RecordReviewRequest): Promise<ReviewRecord> {
+  return postJson<{ record: ReviewRecord }>(ROUTES.notebookHistory, input).then(payload => payload.record)
+}
+
+/** Delete one history record. */
+export function deleteReviewRecord(id: string): Promise<void> {
+  return deleteJson<{ ok: boolean }>(ROUTES.notebookHistory, { id }).then(() => undefined)
 }
 
 /** The injected facade shape the panel and review tab receive. */
@@ -74,8 +100,13 @@ export interface NotebookApi {
   readonly clearRoot: typeof clearNotebookRoot
   readonly search: typeof searchNotebook
   readonly page: typeof notebookPage
+  readonly ensureFile: typeof ensureNotebookFile
+  readonly createNote: typeof createNotebookNote
   readonly draft: typeof getNoteDraft
   readonly saveDraft: typeof saveNoteDraft
+  readonly history: typeof notebookHistory
+  readonly recordReview: typeof recordReview
+  readonly deleteHistory: typeof deleteReviewRecord
 }
 
 /** One facade object handed to the page through `DeskPanelInjected`. */
@@ -85,6 +116,11 @@ export const notebookApi: NotebookApi = {
   clearRoot: clearNotebookRoot,
   search: searchNotebook,
   page: notebookPage,
+  ensureFile: ensureNotebookFile,
+  createNote: createNotebookNote,
   draft: getNoteDraft,
   saveDraft: saveNoteDraft,
+  history: notebookHistory,
+  recordReview,
+  deleteHistory: deleteReviewRecord,
 }

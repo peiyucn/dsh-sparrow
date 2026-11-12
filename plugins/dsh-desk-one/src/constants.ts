@@ -32,6 +32,9 @@ export const ROUTES = Object.freeze({
   notebookSearch: `${PREFIX}/notebook/search`,
   notebookPage: `${PREFIX}/notebook/page`,
   notebookDraft: `${PREFIX}/notebook/draft`,
+  notebookFile: `${PREFIX}/notebook/file`,
+  notebookCreate: `${PREFIX}/notebook/create`,
+  notebookHistory: `${PREFIX}/notebook/history`,
   scheduleConnections: `${PREFIX}/schedule/connections`,
   scheduleConnectionSave: `${PREFIX}/schedule/connections/save`,
   scheduleConnectionTest: `${PREFIX}/schedule/connections/test`,
@@ -87,6 +90,8 @@ export const NOTEBOOK_SCAN_TIMEOUT_MS = 20_000
 export const NOTEBOOK_MAX_BYTES = 1_048_576
 /** Persisted draft box: one file keeps at most this many annotations. */
 export const NOTEBOOK_MAX_DRAFTS = 100
+/** History usage above this turns the entry-page meter red (no modal). */
+export const NOTEBOOK_HISTORY_WARN_BYTES = 2 * 1024 * 1024
 /** Fixed record id of the notebook root setting. */
 export const NOTEBOOK_CONFIG_ID = 'notebook_config'
 

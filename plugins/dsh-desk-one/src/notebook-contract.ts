@@ -1,7 +1,10 @@
 /**
- * Notebook (minimal) contracts: library library index, single-page reads, and the persisted
- * draft box. Review state itself stays in the conversation; only the user's unsaved
- * annotations are stored, keyed by the file they belong to.
+ * Notebook (minimal) contracts: library index, file identity, the persisted draft box, and the
+ * review history. Review state itself stays in the conversation; stored objects are:
+ *   - notebook-config: the single library root
+ *   - note-file: one lazily assigned file identity (path + content hash)
+ *   - note-draft: the unsaved annotations of one file
+ *   - review-record: one submitted review (annotations + file snapshot metadata)
  */
 
 /** One page in the library index (derived, never written back into the file). */
@@ -54,41 +57,90 @@ export interface NotebookPageResponse {
   readonly bytes: number
 }
 
-/** One unsaved annotation (the persisted draft shape). */
+/** One lazily assigned file identity (survives renames while the content matches). */
+export interface NoteFileRef {
+  readonly id: string
+  readonly kind: 'note-file'
+  readonly schema: number
+  readonly rootPath: string
+  /** Current relative path. */
+  readonly path: string
+  /** sha256 of the file content at the last assignment/resolution. */
+  readonly hash: string
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
+
+/** One unsaved annotation. Lines are exact source lines in the code view. */
 export interface DraftAnnotation {
   readonly id: string
   readonly quote: string
   readonly text: string
-  /** Approximate first source line of the quote (1-based). */
-  readonly line?: number
-  /** Approximate last source line of the quote. */
+  /** Whole-document annotation: the quote is the title and no line range is attached. */
+  readonly scope?: 'document'
+  /** First source line (1-based), exact in the code view. */
+  readonly startLine?: number
+  /** Last source line, inclusive. */
   readonly endLine?: number
   readonly createdAt: string
 }
 
-/** The persisted draft box of one file (id is derived from cwd + path). */
+/** The persisted draft box of one file (id derives from the file identity). */
 export interface NoteDraft {
   readonly id: string
   readonly kind: 'note-draft'
   readonly schema: number
-  readonly cwd: string
+  readonly rootPath: string
   readonly path: string
+  readonly fileId: string
   readonly drafts: readonly DraftAnnotation[]
   readonly createdAt: string
   readonly updatedAt: string
   readonly revision: number
 }
 
+/** One submitted review (annotations + the file snapshot metadata at submit time). */
+export interface ReviewRecord {
+  readonly id: string
+  readonly kind: 'review-record'
+  readonly schema: number
+  readonly sessionId: string
+  readonly workspaceId?: string
+  readonly fileId: string
+  readonly fileTitle: string
+  readonly pathSnapshot: string
+  readonly annotations: readonly DraftAnnotation[]
+  readonly bytes: number
+  readonly createdAt: string
+}
+
+/** How one history entry currently relates to the file on disk. */
+export type ReviewLinkStatus = 'linked' | 'moved' | 'detached'
+
+/** One history entry with the current link state resolved by the host. */
+export interface ReviewHistoryEntry {
+  readonly record: ReviewRecord
+  readonly status: ReviewLinkStatus
+  /** Current path when the file is still reachable. */
+  readonly resolvedPath?: string
+}
+
 export interface NotebookStateResponse {
   readonly config: DeskNotebookConfig | null
   readonly stats: NotebookStats
   readonly recent: readonly NotebookEntry[]
+  /** Files with unsaved annotations. */
+  readonly drafts: readonly NoteDraft[]
+  readonly draftCount: number
+  readonly historyCount: number
+  readonly historyBytes: number
+  /** True when the library root looks like a note2md-managed workspace. */
+  readonly note2md: boolean
 }
 
 export interface NotebookRootRequest {
   readonly rootPath: string
-  /** True when the root was deliberately re-pointed; false/absent keeps drafts of other files. */
-  readonly keepDrafts?: boolean
 }
 
 export interface NotebookSearchResponse {
@@ -96,9 +148,12 @@ export interface NotebookSearchResponse {
   readonly truncated: boolean
 }
 
+export interface NotebookFileResponse {
+  readonly file: NoteFileRef
+}
+
 export interface NoteDraftRequest {
-  readonly cwd: string
-  readonly path: string
+  readonly fileId: string
   readonly drafts: readonly DraftAnnotation[]
 }
 
@@ -106,9 +161,28 @@ export interface NoteDraftResponse {
   readonly draft: NoteDraft | null
 }
 
-/** A changed window the review tab shows above the document. */
-export interface ReviewDiffResponse {
+export interface CreateNotebookNoteRequest {
+  readonly title: string
+  /** Optional subfolder, `/`-separated. */
+  readonly folder?: string
+}
+
+export interface CreateNoteResponse {
   readonly path: string
-  readonly oldText: string
-  readonly newText: string
+}
+
+export interface RecordReviewRequest {
+  readonly sessionId: string
+  readonly workspaceId?: string
+  readonly fileId: string
+  readonly annotations: readonly DraftAnnotation[]
+}
+
+export interface ReviewHistoryResponse {
+  readonly entries: readonly ReviewHistoryEntry[]
+  readonly bytes: number
+}
+
+export interface DeleteReviewRequest {
+  readonly id: string
 }

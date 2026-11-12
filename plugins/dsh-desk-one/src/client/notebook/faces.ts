@@ -3,11 +3,6 @@
  * panel boots on hosts that do not expose them).
  */
 
-/** Official layout service face: switch between a global panel and the conversation. */
-export interface LayoutLike {
-  selectPanel(id: string | null): void
-}
-
 /** Official right-sidebar service face. */
 export interface SidebarRightLike {
   openTab(kind: string, options?: { readonly params?: unknown }): void
@@ -32,4 +27,10 @@ export interface SessionInputLike {
 /** Session-scoped conversation service (public `IConversation` subset). */
 export interface ConversationLike {
   readonly input: { for(scope: unknown): SessionInputLike }
+}
+
+/** Official workspace navigation face. */
+export interface SessionNavigationLike {
+  /** Start a new session in one workspace — the official New Session action. */
+  startSession(workspaceId: string, options?: { readonly prompt?: string }): void
 }

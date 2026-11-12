@@ -124,7 +124,7 @@ export interface DeskSessionIndex {
 
 export type DeskNode =
   | DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent | DeskSessionIndex
-  | DeskNotebookConfig | NoteDraft
+  | DeskNotebookConfig | NoteFileRef | NoteDraft | ReviewRecord
 
 /* ------------------------------------------------------------------ */
 /* Schedule (S2): read-only mirror of external calendars               */
@@ -442,13 +442,14 @@ export interface DeleteTaskRequest {
   readonly id: string
 }
 
-import type { DeskNotebookConfig, NoteDraft } from './notebook-contract.js'
+import type { DeskNotebookConfig, NoteDraft, NoteFileRef, ReviewRecord } from './notebook-contract.js'
 
 /* Notebook: library index + persisted draft box (review state stays in the conversation). */
 export type {
-  DeskNotebookConfig, DraftAnnotation, NoteDraft, NoteDraftRequest, NoteDraftResponse, NotebookEntry, NotebookField,
+  CreateNotebookNoteRequest, CreateNoteResponse, DeleteReviewRequest, DeskNotebookConfig, DraftAnnotation, NoteDraft,
+  NoteDraftRequest, NoteDraftResponse, NoteFileRef, NotebookEntry, NotebookField, NotebookFileResponse,
   NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse, NotebookStats,
-  ReviewDiffResponse,
+  RecordReviewRequest, ReviewHistoryEntry, ReviewHistoryResponse, ReviewLinkStatus, ReviewRecord,
 } from './notebook-contract.js'
 
 /** Unified error body: matches the `{ error: { code, message } }` shape used by other plugins in the repo. */

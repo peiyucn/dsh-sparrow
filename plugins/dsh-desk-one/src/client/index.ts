@@ -52,12 +52,8 @@ export function apply(ctx: ClientContext): void {
     navigationCtx.effect(() => detach, `${PACKAGE_NAME}: notebook navigation`)
   })
 
-  // The review tab is a conversation capability: it opens in the session on screen.
+  // A review opens its own session in the library workspace and the tab binds to that session.
   const review = createReviewBridge()
-  ctx.inject(['layout'], (layoutCtx) => {
-    const detach = review.attachLayout(layoutCtx.get('layout') as never)
-    layoutCtx.effect(() => detach, `${PACKAGE_NAME}: review layout`)
-  })
   ctx.inject(['sidebarRight'], (sidebarCtx) => {
     const detach = review.attachSidebar(sidebarCtx.get('sidebarRight') as never)
     sidebarCtx.effect(() => detach, `${PACKAGE_NAME}: review sidebar`)
@@ -65,6 +61,10 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(['sessions'], (sessionCtx) => {
     const detach = review.attachSessions(sessionCtx.get('sessions') as never)
     sessionCtx.effect(() => detach, `${PACKAGE_NAME}: review sessions`)
+  })
+  ctx.inject(['uiWorkspace'], (navigationCtx) => {
+    const detach = review.attachNavigation(navigationCtx.get('uiWorkspace') as never)
+    navigationCtx.effect(() => detach, `${PACKAGE_NAME}: review navigation`)
   })
   ctx.inject(['sidebarRightTabs'], (tabCtx) => {
     mountNoteReviewTab(tabCtx, notebookApi, review)
@@ -78,6 +78,7 @@ export function apply(ctx: ClientContext): void {
       notebook: notebookApi,
       workspaceAccess,
       openReview: review.open,
+      draftWithAi: review.draftInNewSession,
       listNotes: api.listNotes,
       createNote: api.createNote,
       updateNote: api.updateNote,

@@ -1,21 +1,27 @@
-/** Notebook REST routes: library state, root setting, search, page reads, and the draft box. */
+/** Notebook REST routes: library state, root setting, search, page reads, files, drafts, history. */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isAbsolute } from 'node:path'
 import { ROUTES } from '../../constants.js'
-import type { NoteDraftRequest, NotebookRootRequest } from '../../notebook-contract.js'
+import type {
+  CreateNotebookNoteRequest, DeleteReviewRequest, NoteDraftRequest, NotebookRootRequest, RecordReviewRequest,
+} from '../../notebook-contract.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
 import type { DeskRouteContext, DeskRouteEntry } from '../router.js'
 
-async function stateRoute(route: DeskRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
+/** Notebook host or an unavailable error. */
+function notebookOf(route: DeskRouteContext) {
   const notebook = route.notebook
   if (notebook === undefined) throw new DeskError('NOTEBOOK_UNAVAILABLE', '笔记库不可用', 503)
-  sendJson(res, 200, await notebook.state())
+  return notebook
+}
+
+async function stateRoute(route: DeskRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
+  sendJson(res, 200, await notebookOf(route).state())
 }
 
 async function setRootRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const notebook = route.notebook
-  if (notebook === undefined) throw new DeskError('NOTEBOOK_UNAVAILABLE', '笔记库不可用', 503)
+  const notebook = notebookOf(route)
   const body = bodyObject<NotebookRootRequest>(await readJsonBody(req), '请求体必须是对象')
   const rootPath = typeof body.rootPath === 'string' ? body.rootPath.trim() : ''
   if (rootPath === '' || !isAbsolute(rootPath)) throw new DeskError('BAD_BODY', '笔记库必须是绝对路径')
@@ -25,16 +31,14 @@ async function setRootRoute(route: DeskRouteContext, req: IncomingMessage, res: 
 }
 
 async function clearRootRoute(route: DeskRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const notebook = route.notebook
-  if (notebook === undefined) throw new DeskError('NOTEBOOK_UNAVAILABLE', '笔记库不可用', 503)
+  const notebook = notebookOf(route)
   await route.store.clearNotebookRoot()
   notebook.invalidate()
   sendJson(res, 200, await notebook.state())
 }
 
 async function searchRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const notebook = route.notebook
-  if (notebook === undefined) throw new DeskError('NOTEBOOK_UNAVAILABLE', '笔记库不可用', 503)
+  const notebook = notebookOf(route)
   const url = new URL(req.url ?? '/', 'http://localhost')
   const limitRaw = Number(url.searchParams.get('limit') ?? '')
   sendJson(res, 200, await notebook.search({
@@ -48,31 +52,73 @@ async function searchRoute(route: DeskRouteContext, req: IncomingMessage, res: S
 }
 
 async function pageRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const notebook = route.notebook
-  if (notebook === undefined) throw new DeskError('NOTEBOOK_UNAVAILABLE', '笔记库不可用', 503)
   const url = new URL(req.url ?? '/', 'http://localhost')
   const path = url.searchParams.get('path') ?? ''
   if (path === '') throw new DeskError('BAD_BODY', '缺少 path')
-  sendJson(res, 200, await notebook.page(path))
+  sendJson(res, 200, await notebookOf(route).page(path))
+}
+
+async function fileRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = bodyObject<{ path?: string }>(await readJsonBody(req), '请求体必须是对象')
+  const path = typeof body.path === 'string' ? body.path : ''
+  if (path === '') throw new DeskError('BAD_BODY', '缺少 path')
+  sendJson(res, 200, await notebookOf(route).ensureFile(path))
+}
+
+async function createRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = bodyObject<CreateNotebookNoteRequest>(await readJsonBody(req), '请求体必须是对象')
+  if (typeof body.title !== 'string') throw new DeskError('BAD_BODY', '缺少标题')
+  sendJson(res, 201, await notebookOf(route).createNote({
+    title: body.title,
+    ...body.folder === undefined ? {} : { folder: body.folder },
+  }))
 }
 
 async function draftGetRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost')
-  const cwd = url.searchParams.get('cwd') ?? ''
-  const path = url.searchParams.get('path') ?? ''
-  if (cwd === '' || path === '') throw new DeskError('BAD_BODY', '缺少 cwd 或 path')
-  const draft = route.store.getNoteDraft(cwd, path) ?? null
-  sendJson(res, 200, { draft })
+  const fileId = url.searchParams.get('fileId') ?? ''
+  if (fileId === '') throw new DeskError('BAD_BODY', '缺少 fileId')
+  sendJson(res, 200, { draft: notebookOf(route).draft(fileId) })
 }
 
 async function draftSaveRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = bodyObject<NoteDraftRequest>(await readJsonBody(req), '请求体必须是对象')
-  if (typeof body.cwd !== 'string' || body.cwd === '' || typeof body.path !== 'string' || body.path === '') {
-    throw new DeskError('BAD_BODY', '缺少 cwd 或 path')
-  }
+  if (typeof body.fileId !== 'string' || body.fileId === '') throw new DeskError('BAD_BODY', '缺少 fileId')
   if (!Array.isArray(body.drafts)) throw new DeskError('BAD_BODY', 'drafts 必须是数组')
-  const draft = await route.store.saveNoteDraft({ cwd: body.cwd, path: body.path, drafts: body.drafts })
+  const file = route.store.getNoteFile(body.fileId)
+  if (file === undefined) throw new DeskError('UNKNOWN_NOTE', '文件身份不存在', 404)
+  const draft = await route.store.saveNoteDraft({
+    rootPath: file.rootPath,
+    path: file.path,
+    fileId: file.id,
+    drafts: body.drafts,
+  })
   sendJson(res, 200, { draft })
+}
+
+async function historyGetRoute(route: DeskRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
+  sendJson(res, 200, await notebookOf(route).history())
+}
+
+async function historyRecordRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = bodyObject<RecordReviewRequest>(await readJsonBody(req), '请求体必须是对象')
+  if (typeof body.sessionId !== 'string' || body.sessionId === '') throw new DeskError('BAD_BODY', '缺少 sessionId')
+  if (typeof body.fileId !== 'string' || body.fileId === '') throw new DeskError('BAD_BODY', '缺少 fileId')
+  if (!Array.isArray(body.annotations)) throw new DeskError('BAD_BODY', 'annotations 必须是数组')
+  const record = await notebookOf(route).recordReview({
+    sessionId: body.sessionId,
+    ...body.workspaceId === undefined ? {} : { workspaceId: body.workspaceId },
+    fileId: body.fileId,
+    annotations: body.annotations,
+  })
+  sendJson(res, 201, { record })
+}
+
+async function historyDeleteRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = bodyObject<DeleteReviewRequest>(await readJsonBody(req), '请求体必须是对象')
+  if (typeof body.id !== 'string' || body.id === '') throw new DeskError('BAD_BODY', '缺少 id')
+  await notebookOf(route).deleteHistory(body.id)
+  sendJson(res, 200, { ok: true })
 }
 
 export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
@@ -81,6 +127,11 @@ export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'DELETE', path: ROUTES.notebookRoot, handle: clearRootRoute },
   { method: 'GET', path: ROUTES.notebookSearch, handle: searchRoute },
   { method: 'GET', path: ROUTES.notebookPage, handle: pageRoute },
+  { method: 'POST', path: ROUTES.notebookFile, handle: fileRoute },
+  { method: 'POST', path: ROUTES.notebookCreate, handle: createRoute },
   { method: 'GET', path: ROUTES.notebookDraft, handle: draftGetRoute },
   { method: 'POST', path: ROUTES.notebookDraft, handle: draftSaveRoute },
+  { method: 'GET', path: ROUTES.notebookHistory, handle: historyGetRoute },
+  { method: 'POST', path: ROUTES.notebookHistory, handle: historyRecordRoute },
+  { method: 'DELETE', path: ROUTES.notebookHistory, handle: historyDeleteRoute },
 ]

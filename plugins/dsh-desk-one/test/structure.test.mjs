@@ -659,6 +659,21 @@ describe('dsh-desk-one 结构', () => {
     assert.match(register, /sidebarRightTabs\.register/u, '审阅 tab 要注册进官方右栏')
   })
 
+  it('笔记审阅 应该 源码视图 + 新建会话 + 历史记录', async () => {
+    const review = await read('src/client/notebook/review.tsx')
+    const bridge = await read('src/client/notebook/review-bridge.ts')
+    const view = await read('src/client/notebook/NotebookView.tsx')
+    const routes = await read('src/host/notebook/routes.ts')
+    assert.match(review, /dsh-desk-review-code/u, '审批 tab 用源码视图（精确行号）')
+    assert.match(review, /dsh-desk-review-line/u, '逐行渲染，行号可锚定')
+    assert.match(review, /wholeDoc|整篇/u, '需要整篇批注入口')
+    assert.match(review, /recordReview/u, '提交时写历史记录')
+    assert.match(bridge, /startSession/u, '审阅在库工作区新建会话，不占当前会话')
+    assert.match(view, /notebook\.missingBadge/u, '列表要有缺元数据徽标')
+    assert.match(view, /notebook\.historyUsage/u, '历史占用要显示')
+    assert.match(routes, /ROUTES\.notebookHistory/u, '历史路由要挂上')
+  })
+
   it('页面 应该 用一个面板承载标签页，而不是弹窗', async () => {
     const page = await readClientSurface()
     assert.match(page, /dsh-desk-tabs/u)

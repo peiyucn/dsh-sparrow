@@ -174,16 +174,17 @@ const sessionIndexSchema = z.object({
   revision: z.number().int().nonnegative(),
 })
 
-/**
- * Records from the withdrawn review layer (annotation / review) and the notebook draft box.
- * They are tolerated only so an upgrade opens the domain (one invalid record rejects the
- * whole open); `Store.open` deletes them right after opening.
- */
-const legacyAnnotationSchema = z.object({
+/** One unsaved annotation (source-line anchored in the code view). */
+const annotationSchema = z.object({
   id: z.string().min(1),
-  kind: z.literal('annotation'),
-  schema: z.number().int().positive(),
-}).passthrough()
+  quote: z.string(),
+  text: z.string(),
+  scope: z.literal('document').optional(),
+  startLine: z.number().int().positive().optional(),
+  endLine: z.number().int().positive().optional(),
+  createdAt: z.string().min(1),
+})
+
 /** The single notes-root record (fixed id). */
 const notebookConfigSchema = z.object({
   id: z.string().min(1),
@@ -195,26 +196,55 @@ const notebookConfigSchema = z.object({
   revision: z.number().int().positive(),
 })
 
-/** One file's persisted draft box; review state itself lives in the conversation. */
-const noteDraftSchema = z.object({
+/** One lazily assigned file identity (survives renames while content matches). */
+const noteFileSchema = z.object({
   id: z.string().min(1),
-  kind: z.literal('note-draft'),
+  kind: z.literal('note-file'),
   schema: z.number().int().positive(),
-  cwd: z.string().min(1),
+  rootPath: z.string().min(1),
   path: z.string().min(1),
-  drafts: z.array(z.object({
-    id: z.string().min(1),
-    quote: z.string(),
-    text: z.string(),
-    line: z.number().int().positive().optional(),
-    endLine: z.number().int().positive().optional(),
-    createdAt: z.string().min(1),
-  })).default([]),
+  hash: z.string().min(1),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   revision: z.number().int().positive(),
 })
 
+/** One submitted review: annotations plus the file snapshot metadata. */
+const reviewRecordSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('review-record'),
+  schema: z.number().int().positive(),
+  sessionId: z.string().min(1),
+  workspaceId: z.string().min(1).optional(),
+  fileId: z.string().min(1),
+  fileTitle: z.string(),
+  pathSnapshot: z.string().min(1),
+  annotations: z.array(annotationSchema),
+  bytes: z.number().int().nonnegative(),
+  createdAt: z.string().min(1),
+})
+
+/** One file's persisted draft box; legacy records (cwd-keyed) only need to parse. */
+const noteDraftSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('note-draft'),
+  schema: z.number().int().positive(),
+  rootPath: z.string().min(1).optional(),
+  cwd: z.string().min(1).optional(),
+  path: z.string().min(1),
+  fileId: z.string().min(1).optional(),
+  drafts: z.array(annotationSchema).default([]),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  revision: z.number().int().positive(),
+})
+
+/** Withdrawn record kinds: tolerated only so an upgrade opens the domain; purged at open. */
+const legacyAnnotationSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('annotation'),
+  schema: z.number().int().positive(),
+}).passthrough()
 const legacyReviewSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('review'),
@@ -223,8 +253,10 @@ const legacyReviewSchema = z.object({
 
 const nodeSchema = z.discriminatedUnion('kind', [
   noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema, sessionIndexSchema,
-  notebookConfigSchema, noteDraftSchema, legacyAnnotationSchema, legacyReviewSchema,
+  notebookConfigSchema, noteFileSchema, reviewRecordSchema, noteDraftSchema, legacyAnnotationSchema, legacyReviewSchema,
 ])
+
+
 const edgeSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),

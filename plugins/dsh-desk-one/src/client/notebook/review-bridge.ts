@@ -1,12 +1,13 @@
 /**
- * Review bridge: opens the notebook review tab inside the conversation on screen.
+ * Review bridge: starts a dedicated review session in the notebook's workspace and opens the
+ * review tab there.
  *
- * A review is a conversation capability, not a new session: the tab only needs a Session
- * surface, so the bridge leaves the panel and opens the tab; when no session is on screen it
- * reports that instead of silently doing nothing.
+ * A review must not borrow the conversation the user is currently in (that would silently mix
+ * review context into an unrelated session), so the entry goes through the official New Session
+ * action for the library's workspace and the tab binds to that fresh session.
  */
 
-import type { ConversationLike, LayoutLike, SessionScopeLike, SessionsLike, SidebarRightLike } from './faces.js'
+import type { ConversationLike, SessionNavigationLike, SessionScopeLike, SessionsLike, SidebarRightLike } from './faces.js'
 
 /** Tab implementation id (registration key and definition id). */
 export const REVIEW_TAB_ID = 'dsh-desk-one-note-review'
@@ -17,7 +18,14 @@ export const REVIEW_TAB_KIND = 'note-review'
 export interface NoteReviewParams {
   /** Page path relative to the configured library root. */
   readonly path: string
+  /** File identity the review is attached to. */
+  readonly fileId: string
+  /** Workspace that owns the library root. */
+  readonly workspaceId: string
 }
+
+/** What the notebook hands the bridge when the user starts a review. */
+export type ReviewOpenInput = NoteReviewParams
 
 /** Result of one open attempt. */
 export interface ReviewOpenResult {
@@ -28,20 +36,22 @@ export interface ReviewOpenResult {
 /** Open face shared with the notebook page. */
 export interface ReviewBridge {
   /**
-   * Open the review tab for one page in the session on screen.
-   * @param path - library-relative page path.
+   * Start a review in a new session of the library workspace, then open the review tab.
+   * @param input - page path, file identity, and the workspace to open the session in.
    * @returns whether the tab opened, plus a readable reason.
    */
-  open(path: string): Promise<ReviewOpenResult>
+  open(input: ReviewOpenInput): Promise<ReviewOpenResult>
+  /** Start a new session in one workspace with a prefilled composer draft (never sends). */
+  draftInNewSession(workspaceId: string, prompt: string): void
   /** Put one submitted batch into the session composer (never sends). */
   sendQuote(sessionId: string, text: string): boolean
-  attachLayout(service: LayoutLike): () => void
   attachSidebar(service: SidebarRightLike): () => void
   attachSessions(service: SessionsLike): () => void
+  attachNavigation(service: SessionNavigationLike): () => void
 }
 
-/** Attempts to find the conversation surface after leaving the panel. */
-const OPEN_RETRIES = 12
+/** Attempts to reach the conversation surface after starting the session. */
+const OPEN_RETRIES = 20
 /** Delay between attempts (ms). */
 const OPEN_RETRY_MS = 100
 
@@ -52,24 +62,36 @@ function delay(ms: number): Promise<void> {
 
 /** Create the bridge; all services start detached. */
 export function createReviewBridge(): ReviewBridge {
-  let layout: LayoutLike | undefined
   let sidebarRight: SidebarRightLike | undefined
   let sessions: SessionsLike | undefined
+  let navigation: SessionNavigationLike | undefined
 
   return {
-    async open(path) {
+    async open(input) {
+      const nav = navigation
       const sidebar = sidebarRight
+      if (nav === undefined) return { ok: false, message: '对话导航服务不可用（无法新建审阅会话）' }
       if (sidebar === undefined) return { ok: false, message: '右侧栏服务不可用（无法打开审阅视图）' }
-      layout?.selectPanel(null)
+      try {
+        // Same call as the New Session button: the official flow selects the session and leaves
+        // the Desk One panel, so no manual navigation is needed here.
+        nav.startSession(input.workspaceId)
+      } catch (cause) {
+        return { ok: false, message: `新建审阅会话失败：${cause instanceof Error ? cause.message : String(cause)}` }
+      }
+      const params: NoteReviewParams = { path: input.path, fileId: input.fileId, workspaceId: input.workspaceId }
       for (let attempt = 0; attempt < OPEN_RETRIES; attempt += 1) {
         try {
-          sidebar.openTab(REVIEW_TAB_KIND, { params: { path } satisfies NoteReviewParams })
+          sidebar.openTab(REVIEW_TAB_KIND, { params })
           return { ok: true }
         } catch {
           await delay(OPEN_RETRY_MS)
         }
       }
-      return { ok: false, message: '请先在对话里打开一个会话（或新建会话），再点「审阅」' }
+      return { ok: false, message: '审阅会话已创建，但右侧栏没有就绪，请再点一次「审阅」' }
+    },
+    draftInNewSession(workspaceId, prompt) {
+      navigation?.startSession(workspaceId, { prompt })
     },
     sendQuote(sessionId, text) {
       const scope = sessions?.scope(sessionId) as SessionScopeLike | undefined
@@ -80,10 +102,6 @@ export function createReviewBridge(): ReviewBridge {
       if (accepted) input.focus()
       return accepted
     },
-    attachLayout(service) {
-      layout = service
-      return () => { if (layout === service) layout = undefined }
-    },
     attachSidebar(service) {
       sidebarRight = service
       return () => { if (sidebarRight === service) sidebarRight = undefined }
@@ -91,6 +109,10 @@ export function createReviewBridge(): ReviewBridge {
     attachSessions(service) {
       sessions = service
       return () => { if (sessions === service) sessions = undefined }
+    },
+    attachNavigation(service) {
+      navigation = service
+      return () => { if (navigation === service) navigation = undefined }
     },
   }
 }

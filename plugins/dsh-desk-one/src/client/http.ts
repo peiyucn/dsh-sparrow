@@ -32,6 +32,9 @@ export function postJson<T>(path: string, body: unknown): Promise<T> {
 }
 
 /** DELETE one route. */
-export function deleteJson<T>(path: string): Promise<T> {
-  return fetchJson<T>(path, { method: 'DELETE' })
+export function deleteJson<T>(path: string, body?: unknown): Promise<T> {
+  return fetchJson<T>(path, {
+    method: 'DELETE',
+    ...body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
+  })
 }
