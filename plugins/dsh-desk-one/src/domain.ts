@@ -191,6 +191,8 @@ const notebookConfigSchema = z.object({
   kind: z.literal('notebook-config'),
   schema: z.number().int().positive(),
   rootPath: z.string().min(1),
+  // Optional (absent in older records): the skill used to draft a new note; null means none.
+  skillName: z.string().min(1).nullable().optional(),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   revision: z.number().int().positive(),

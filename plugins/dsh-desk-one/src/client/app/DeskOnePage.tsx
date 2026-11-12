@@ -17,6 +17,8 @@ import { notesActions, scheduleActions, taskActions } from './headerActions.js'
 import { NoteCard } from '../notes/components/NoteCard.js'
 import { TrashPanel } from '../notes/components/TrashPanel.js'
 import { NotebookView } from '../notebook/NotebookView.js'
+import { NotebookHeaderActions } from '../notebook/HeaderActions.js'
+import { useNotebookPage } from '../notebook/hooks/useNotebookPage.js'
 import { TaskBoard } from '../tasks/components/TaskBoard.js'
 import { SessionsView } from '../sessions/SessionsView.js'
 import { ScheduleView, type ScheduleHeaderActions } from '../schedule/ScheduleView.js'
@@ -96,8 +98,19 @@ export function DeskOnePage(props: DeskPanelProps) {
     archiveGroup: groupsData.archiveGroup,
   })
 
-  /** Click / drag / resize raises one note to the top; skip the write when it already is. */
-  const raise = useCallback((noteId: string): void => {
+  // Notebook data + view state live here (not inside NotebookView) so the shared header can own
+  // the page's primary actions: new note / open browser / unlink.
+  const notebookPage = useNotebookPage({
+    t,
+    active: tab === 'notebook',
+    notebook,
+    workspaceAccess,
+    onOpenReview: openReview,
+    onOpenBrowser: props.openBrowser,
+    onDraftWithAi: draftWithAi,
+  })
+
+  /** Click / drag / resize raises one note to the top; skip the write when it already is. */  const raise = useCallback((noteId: string): void => {
     const current = data.notes.find(item => item.id === noteId)
     if (current === undefined) return
     const maxZ = data.notes.reduce((max, item) => Math.max(max, item.z ?? 0), zTopRef.current)
@@ -207,16 +220,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   )
 
   /** Notes/trash actions float over the canvas so notes can scroll underneath them. */
-  const renderNotebook = (): ReactElement => (
-    <NotebookView
-      t={t}
-      notebook={notebook}
-      workspaceAccess={workspaceAccess}
-      onOpenReview={openReview}
-      onOpenBrowser={props.openBrowser}
-      onDraftWithAi={draftWithAi}
-    />
-  )
+  const renderNotebook = (): ReactElement => <NotebookView page={notebookPage} />
 
   const actions = tab === 'notes'
     ? notesActions({
@@ -243,9 +247,10 @@ export function DeskOnePage(props: DeskPanelProps) {
           setTaskSortMode: board.setSortMode,
           archivedCount: board.archivedTasks.length,
         })
-      // The notebook page owns its title-row actions (new note / open file browser).
+      // The notebook page owns its title-row actions (new note / open file browser) but renders
+      // them through the shared header, like every other tab.
       : tab === 'notebook'
-        ? null
+        ? <NotebookHeaderActions t={t} page={notebookPage} />
         : scheduleActions({
             t,
             visible: tab === 'schedule',

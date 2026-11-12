@@ -8,7 +8,7 @@ import { PREFIX } from './constants.js'
 import { assertHostGates } from './host/gates.js'
 import { createDeskRequestHandler } from './host/router.js'
 import { DeskStore } from './host/store.js'
-import { NotebookHost } from './host/notebook/host.js'
+import { NotebookHost, type SkillCatalog } from './host/notebook/host.js'
 import { ScheduleHost } from './host/schedule/host.js'
 import { registerScheduleTools } from './host/schedule/tools.js'
 import { installSessionsHost, hasSessionServices, type SessionsConfig } from './host/sessions/install.js'
@@ -23,6 +23,29 @@ export const inject = [
   // missing one disables the whole panel instead of mounting half of it.
   'sessions', 'agents', 'workspaceRegistry', 'sessionPersistence', 'sessionQuery',
 ]
+
+/**
+ * Narrow the optional host skill registry to the read-only catalog the notebook page needs.
+ * A host without the skill service (or with a changed surface) simply offers no drafting skills;
+ * the skill body itself is never injected — the page only names a skill in the prompt.
+ * @param ctx - DSH plugin context.
+ * @returns a catalog view, or undefined when this host has no usable skill service.
+ */
+function skillCatalogOf(ctx: Context): SkillCatalog | undefined {
+  const candidate = (ctx as unknown as {
+    skills?: {
+      list?: (options: { cwd?: string; signal?: AbortSignal }) => Promise<readonly {
+        name: string
+        description: string
+        source: string
+        invocation?: { modelInvocable: boolean }
+      }[]>
+    }
+  }).skills
+  const list = candidate?.list
+  if (candidate === undefined || typeof list !== 'function') return undefined
+  return { list: options => list.call(candidate, options) }
+}
 
 /**
  * host-half entry: opens the shared object store, mounts REST routes and agent tools.
@@ -44,7 +67,7 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
   const sessions = hasSessionServices(ctx) ? await installSessionsHost(ctx, store, config) : undefined
 
   const schedule = new ScheduleHost(ctx, store)
-  const notebook = new NotebookHost(store)
+  const notebook = new NotebookHost(store, skillCatalogOf(ctx))
   const handler = createDeskRequestHandler({ ctx, store, schedule, sessions, notebook })
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',

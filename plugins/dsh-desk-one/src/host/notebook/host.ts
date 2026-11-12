@@ -10,7 +10,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import type {
-  CreateNotebookNoteRequest, NoteDraft, NotebookEntry, NotebookFileResponse, NotebookStateResponse,
+  CreateNotebookNoteRequest, NoteDraft, NotebookEntry, NotebookFileResponse, NotebookStateResponse, NotebookSkill,
   RecordReviewRequest, ReviewHistoryEntry, ReviewRecord,
 } from '../../notebook-contract.js'
 import { NOTEBOOK_HISTORY_WARN_BYTES, NOTEBOOK_MAX_BYTES, NOTEBOOK_SCAN_TIMEOUT_MS } from '../../constants.js'
@@ -18,6 +18,7 @@ import { DeskError } from '../http.js'
 import type { DeskStore } from '../store.js'
 import { detectNote2md, ensureNoteFile, createNoteFile } from './files.js'
 import { readPage, searchEntries, summarize } from './library.js'
+import { resolveSkillName, toNotebookSkills, type SkillSummaryLike } from './skills.js'
 import { scanLibrary } from './scan.js'
 
 /** How long one scan is reused before the next request rescans. */
@@ -42,6 +43,11 @@ async function hashFile(rootPath: string, relativePath: string): Promise<string 
   }
 }
 
+/** Host skill catalog narrowed to what the notebook page needs. */
+export interface SkillCatalog {
+  list(options: { readonly cwd?: string; readonly signal?: AbortSignal }): Promise<readonly SkillSummaryLike[]>
+}
+
 /** Notebook data facade shared by routes and tools. */
 export class NotebookHost {
   /** Last successful scan and its root. */
@@ -51,8 +57,14 @@ export class NotebookHost {
   /** note2md detection per root. */
   private note2mdCache: { readonly root: string; readonly value: boolean } | undefined
 
-  /** @param store - unified storage store. */
-  constructor(private readonly store: DeskStore) {}
+  /**
+   * @param store - unified storage store.
+   * @param skills - optional host skill catalog; absent hosts simply offer no drafting skills.
+   */
+  constructor(
+    private readonly store: DeskStore,
+    private readonly skills?: SkillCatalog,
+  ) {}
 
   /** Configured root, if any. */
   root(): string | undefined {
@@ -81,11 +93,24 @@ export class NotebookHost {
     return root
   }
 
+  /** Skills offered for drafting, recomputed per request so catalog changes show up live. */
+  private async draftSkills(root: string): Promise<readonly NotebookSkill[]> {
+    if (this.skills === undefined) return []
+    try {
+      const summaries = await this.skills.list({ cwd: root })
+      return toNotebookSkills(summaries.filter(summary => summary.invocation?.modelInvocable !== false).slice(0, 200))
+    } catch {
+      // The catalog is an optional enhancement: a broken provider must not break the page.
+      return []
+    }
+  }
+
   /** Header state: config, counts, newest pages, drafts and history usage. */
   async state(): Promise<NotebookStateResponse> {
     const root = this.root()
     const history = this.store.listReviewRecords()
     const historyBytes = history.reduce((sum, record) => sum + record.bytes, 0)
+    const config = this.store.getNotebookConfig() ?? null
     if (root === undefined) {
       return {
         config: null,
@@ -96,6 +121,8 @@ export class NotebookHost {
         historyCount: 0,
         historyBytes: 0,
         note2md: false,
+        skills: [],
+        skillName: null,
       }
     }
     const entries = await this.entries(root)
@@ -106,8 +133,9 @@ export class NotebookHost {
       note2md = await detectNote2md(root)
       this.note2mdCache = { root, value: note2md }
     }
+    const skills = await this.draftSkills(root)
     return {
-      config: this.store.getNotebookConfig() ?? null,
+      config,
       stats: summarize(entries),
       recent: entries.slice(0, RECENT_LIMIT),
       drafts,
@@ -115,6 +143,8 @@ export class NotebookHost {
       historyCount: history.length,
       historyBytes,
       note2md,
+      skills,
+      skillName: resolveSkillName(skills, config?.skillName),
     }
   }
 

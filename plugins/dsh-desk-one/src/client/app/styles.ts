@@ -161,6 +161,14 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   gap: 8px;
   min-width: 0;
 }
+/* Read-only count caption that precedes a page's header actions (e.g. notebook "共 N 篇"). */
+.dsh-desk-header-count {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+}
 /* Official two-level tab row: outer gap 20px (viewTabs ↔ More), inner text gap 32px. */
 .dsh-desk-tabs {
   display: flex;
@@ -404,7 +412,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   width: 14px;
   height: 14px;
 }
-/* Notebook: contents are planned separately; the tab slot stays empty for now. */
+
 .dsh-desk-error {
   flex: none;
   margin: 0 0 12px;

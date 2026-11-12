@@ -791,6 +791,19 @@ export class DeskStore {
     await this.nodes.delete(NOTEBOOK_CONFIG_ID)
   }
 
+  /**
+   * Choose the drafting skill for this library (`null` = no skill). The record must exist: the
+   * route rejects the request before reaching here when no library is configured.
+   * @param skillName - kebab-case skill name, or null for "no skill".
+   * @returns the updated notebook config.
+   */
+  async saveNotebookSkill(skillName: string | null): Promise<DeskNotebookConfig> {
+    const now = new Date().toISOString()
+    return await this.nodes.update(NOTEBOOK_CONFIG_ID, current => current.kind === 'notebook-config'
+      ? { ...current, skillName, updatedAt: now, revision: current.revision + 1 }
+      : current) as DeskNotebookConfig
+  }
+
   /** Deterministic draft-box id: one draft box per file identity. */
   private static draftId(fileId: string): string {
     return `note_draft_${fileId}`

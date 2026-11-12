@@ -37,6 +37,23 @@ async function clearRootRoute(route: DeskRouteContext, _req: IncomingMessage, re
   sendJson(res, 200, await notebook.state())
 }
 
+/** Skill name grammar shared with the host registry (kebab-case). */
+const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
+
+async function setSkillRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const notebook = notebookOf(route)
+  const body = bodyObject<{ name?: string | null }>(await readJsonBody(req), '请求体必须是对象')
+  const name = body.name
+  if (name !== null && (typeof name !== 'string' || !SKILL_NAME.test(name))) {
+    throw new DeskError('BAD_BODY', '技能名不合法')
+  }
+  if (route.store.getNotebookConfig() === undefined) {
+    throw new DeskError('NOTEBOOK_UNAVAILABLE', '还没有设置笔记库', 409)
+  }
+  await route.store.saveNotebookSkill(name)
+  sendJson(res, 200, await notebook.state())
+}
+
 async function searchRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const notebook = notebookOf(route)
   const url = new URL(req.url ?? '/', 'http://localhost')
@@ -125,6 +142,7 @@ export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.notebookState, handle: stateRoute },
   { method: 'POST', path: ROUTES.notebookRoot, handle: setRootRoute },
   { method: 'DELETE', path: ROUTES.notebookRoot, handle: clearRootRoute },
+  { method: 'POST', path: ROUTES.notebookSkill, handle: setSkillRoute },
   { method: 'GET', path: ROUTES.notebookSearch, handle: searchRoute },
   { method: 'GET', path: ROUTES.notebookPage, handle: pageRoute },
   { method: 'POST', path: ROUTES.notebookFile, handle: fileRoute },

@@ -26,6 +26,11 @@ export function clearNotebookRoot(): Promise<NotebookStateResponse> {
   return deleteJson<NotebookStateResponse>(ROUTES.notebookRoot)
 }
 
+/** Choose the drafting skill (`null` = no skill). */
+export function setNotebookSkill(name: string | null): Promise<NotebookStateResponse> {
+  return postJson<NotebookStateResponse>(ROUTES.notebookSkill, { name })
+}
+
 /** Search titles / paths, optionally narrowed by a count filter. */
 export function searchNotebook(input: {
   readonly query?: string
@@ -73,7 +78,7 @@ export function saveNoteDraft(input: {
   readonly drafts: readonly DraftAnnotation[]
 }): Promise<NoteDraft> {
   return postJson<NoteDraftResponse>(ROUTES.notebookDraft, input).then((payload) => {
-    if (payload.draft === null) throw new Error('草稿保存失败')
+    if (payload.draft === null) throw new Error('审阅草稿保存失败')
     return payload.draft
   })
 }
@@ -98,6 +103,7 @@ export interface NotebookApi {
   readonly state: typeof notebookState
   readonly setRoot: typeof setNotebookRoot
   readonly clearRoot: typeof clearNotebookRoot
+  readonly setSkill: typeof setNotebookSkill
   readonly search: typeof searchNotebook
   readonly page: typeof notebookPage
   readonly ensureFile: typeof ensureNotebookFile
@@ -114,6 +120,7 @@ export const notebookApi: NotebookApi = {
   state: notebookState,
   setRoot: setNotebookRoot,
   clearRoot: clearNotebookRoot,
+  setSkill: setNotebookSkill,
   search: searchNotebook,
   page: notebookPage,
   ensureFile: ensureNotebookFile,

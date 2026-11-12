@@ -30,12 +30,30 @@ export interface NotebookStats {
   readonly emptyBody: number
 }
 
+/**
+ * One skill offered for drafting a new note. The plugin never injects a skill body: it only names
+ * the chosen skill in the prefilled prompt, and the agent loads it from its own catalog on demand.
+ */
+export interface NotebookSkill {
+  readonly name: string
+  /** Routing description from the skill catalog (shown in the picker). */
+  readonly description: string
+  readonly source: string
+  /** True when the skill reads as note-oriented; recommended for drafting. */
+  readonly note: boolean
+}
+
 /** The single configured notes root record (fixed id `notebook_config`). */
 export interface DeskNotebookConfig {
   readonly id: string
   readonly kind: 'notebook-config'
   readonly schema: number
   readonly rootPath: string
+  /**
+   * Skill used when drafting a new note. `undefined` = not chosen yet (defaults to note2md when
+   * available), `null` = explicitly no skill.
+   */
+  readonly skillName?: string | null
   readonly createdAt: string
   readonly updatedAt: string
   readonly revision: number
@@ -137,6 +155,10 @@ export interface NotebookStateResponse {
   readonly historyBytes: number
   /** True when the library root looks like a note2md-managed workspace. */
   readonly note2md: boolean
+  /** Skills the agent can load when drafting a new note (note-oriented ones first). */
+  readonly skills: readonly NotebookSkill[]
+  /** Effective skill selection; `null` means no skill is used for drafting. */
+  readonly skillName: string | null
 }
 
 export interface NotebookRootRequest {
