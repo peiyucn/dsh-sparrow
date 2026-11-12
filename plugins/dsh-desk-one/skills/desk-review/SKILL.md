@@ -1,6 +1,6 @@
 ---
 name: desk-review
-description: "Review sessions for plain-text files in Desk One. Use when a review batch arrives from the notebook panel (numbered blocks like 【批注 N】 with a quoted passage and the human's request), when the user asks to continue a review, or when the user wants to search the notes library by frontmatter (desk_note_search). Explains the stateless review model: the review state lives in the conversation, the file stays the only content truth, and only the human decides when a round is done."
+description: "Review sessions for plain-text files in Desk One. Use when a review batch arrives from the notebook panel (numbered blocks like 【审阅 N】 with a file path, a quoted passage and the human's request), when the user asks to continue a review, or when the user wants to search the notes library by frontmatter (desk_note_search). Explains the stateless review model: the review state lives in the conversation, the file stays the only content truth, and only the human decides when a round is done."
 ---
 
 # desk-review — the review half of "AI writes, human reviews"
@@ -16,16 +16,16 @@ comments into the file itself.
 
 ## What arrives
 
-A batch is a numbered block, usually shaped like:
+A batch is a numbered block carrying the file, the quoted passage and the request:
 
 ```
-【批注 1】
+【审阅 1】文件：Work/工作待办/2026-11-工作待办.md
 > quoted passage from the file
-the human's request for this passage
+意见：the human's request for this passage
 
-【批注 2】
+【审阅 2】文件：Work/工作待办/2026-11-工作待办.md
 > another passage
-another request
+意见：another request
 ```
 
 The file path/title is either in the surrounding message, in the review tab the human
@@ -48,7 +48,7 @@ reviewed, ask before editing.
 
 ## Rules
 
-- Never write markup such as `【批注 N】` or review status into the file.
+- Never write markup such as `【审阅 N】` or review status into the file.
 - Never invent file content: if a quoted passage cannot be found, say where you looked
   and ask whether the human re-attached the right file (the panel reports a missing
   target when the file moved or was renamed).

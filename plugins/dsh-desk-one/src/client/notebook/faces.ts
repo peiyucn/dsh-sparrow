@@ -39,6 +39,10 @@ export interface SessionScopeLike {
 /** Composer input facade (public `SessionInput` subset used here). */
 export interface SessionInputLike {
   insertQuote(text: string): boolean
+  /** Replace the whole draft with plain text (we append to the current one ourselves). */
+  setDraft(text: string): void
+  /** Input state snapshot (read the current draft before appending). */
+  readonly state: { getSnapshot(): { readonly draft: string } }
   focus(): void
 }
 

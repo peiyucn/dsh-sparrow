@@ -14,8 +14,8 @@ import type { ReviewApi } from './review-api.js'
 
 /** Review-api handle, configured once at client start. */
 let api: ReviewApi | undefined
-/** Review session id → reviewed file title; `null` until the first load resolves. */
-let cache: Map<string, string> | null = null
+/** Review session id → reviewed file title and its pending draft count; `null` before first load. */
+let cache: Map<string, { readonly title: string; readonly drafts: number }> | null = null
 /** In-flight load (one fetch at a time). */
 let loading: Promise<void> | null = null
 const listeners = new Set<() => void>()
@@ -36,7 +36,7 @@ function ensureLoaded(): void {
   if (api === undefined || cache !== null || loading !== null) return
   loading = api.list()
     .then((reviews) => {
-      cache = new Map(reviews.map(review => [review.sessionId, review.target.title]))
+      cache = new Map(reviews.map(review => [review.sessionId, { title: review.target.title, drafts: review.drafts.length }]))
       for (const listener of listeners) listener()
     }, () => undefined)
     .finally(() => { loading = null })
@@ -51,12 +51,13 @@ export function SessionReviewBadge(
     ensureLoaded()
     listeners.add(() => force(value => value + 1))
   }, [])
-  const title = cache?.get(props.sessionId)
-  if (title === undefined) return null
+  const entry = cache?.get(props.sessionId)
+  if (entry === undefined) return null
+  const pending = entry.drafts === 0 ? '' : ` · ${props.t('review.badgePending', { count: entry.drafts })}`
   return (
     <span
       className="dsh-desk-session-review-badge"
-      title={props.t('review.badgeTitle', { title })}
+      title={props.t('review.badgeTitle', { title: entry.title }) + pending}
     >
       {props.t('review.badge')}
     </span>

@@ -67,6 +67,10 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const [notice, setNotice] = useState<string | null>(null)
   /** Re-attach panel: new target path typed by the user. */
   const [reanchor, setReanchor] = useState<string | null>(null)
+  /** When the diff baseline was captured (an old baseline is made explicit). */
+  const [baselineAt, setBaselineAt] = useState<string | null>(null)
+  /** Last removed draft plus its position, for a short undo window. */
+  const [undo, setUndo] = useState<{ readonly item: ReviewDraft; readonly index: number } | null>(null)
 
   const labels = useMemo(() => ({
     code: { copyLabel: t('review.copy'), copiedLabel: t('review.copied') },
@@ -84,6 +88,13 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     expand: (hidden: number) => t('review.expand', { hidden }),
   }), [t])
 
+  // A removed draft stays undoable for a short while.
+  useEffect(() => {
+    if (undo === null) return
+    const timer = setTimeout(() => setUndo(null), 6_000)
+    return () => clearTimeout(timer)
+  }, [undo])
+
   const load = useCallback(async (): Promise<void> => {
     setLoading(true)
     setError(null)
@@ -95,6 +106,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         setPage(nextPage)
         setPending(nextReview.drafts)
         setBaseline(current => current ?? nextPage.body)
+        setBaselineAt(current => current ?? new Date().toISOString())
         return
       }
       if (targetCwd === undefined || targetPath === undefined) return
@@ -109,11 +121,13 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         const nextPage = await reviewApi.page(own.id)
         setPage(nextPage)
         setBaseline(current => current ?? nextPage.body)
+        setBaselineAt(current => current ?? new Date().toISOString())
         return
       }
       const nextPage = await reviewApi.pageByTarget({ cwd: targetCwd, path: targetPath })
       setPage(nextPage)
       setBaseline(current => current ?? nextPage.body)
+        setBaselineAt(current => current ?? new Date().toISOString())
     } catch (cause) {
       setError(messageOf(cause))
     } finally {
@@ -122,6 +136,22 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   }, [reviewApi, reviewId, sessionId, targetCwd, targetPath])
 
   useEffect(() => { void load() }, [load])
+
+  // Visible-tab refresh: the reviewed file can change while the tab is hidden, so refresh
+  // on focus/visibility plus a slow interval; a hidden tab does no work at all.
+  useEffect(() => {
+    const refresh = (): void => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    const timer = setInterval(refresh, 30_000)
+    return () => {
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+      clearInterval(timer)
+    }
+  }, [load])
 
   /**
    * Resolve (or create on first use) the review record for this session and file.
@@ -159,6 +189,23 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     })()
   }, [ensureReview, reviewApi, t])
 
+  const filePath = review?.target.path ?? page?.path ?? targetPath ?? ''
+
+  /** Copy the reviewed file's workspace-relative path. */
+  const copyPath = useCallback((): void => {
+    if (filePath === '') return
+    void navigator.clipboard.writeText(filePath).then(
+      () => setNotice(t('review.copied')),
+      () => setNotice(filePath),
+    )
+  }, [filePath, t])
+
+  /** Hand the next round to the AI with a plain instruction in the composer. */
+  const continueWithAi = useCallback((): void => {
+    const inserted = bridge.appendText(sessionId, t('review.continuePrompt', { path: filePath }))
+    setNotice(inserted ? t('review.continueSent') : t('review.submitFailed'))
+  }, [bridge, filePath, sessionId, t])
+
   /** Selection → compose popup (the document itself keeps its size). */
   const handleSelect = useCallback((): void => {
     const container = bodyRef.current
@@ -188,8 +235,13 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   /** Submit the whole batch as one numbered message in the composer (never sends). */
   const submitAll = useCallback((): void => {
     if (pending.length === 0) return
+    const submitPath = review?.target.path ?? page?.path ?? targetPath ?? ''
     const text = pending
-      .map((item, index) => `【批注 ${index + 1}】\n${quoteBlock(item.quote)}\n${item.text}`)
+      .map((item, index) => [
+        `【审阅 ${index + 1}】文件：${submitPath}`,
+        quoteBlock(item.quote),
+        `意见：${item.text}`,
+      ].join('\n'))
       .join('\n\n')
     const accepted = bridge.sendQuote(sessionId, text)
     if (accepted) {
@@ -223,11 +275,36 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   return (
     <div className="dsh-desk-review">
       <header className="dsh-desk-review-head">
-        <span className="dsh-desk-review-path" title={review?.target.path ?? page?.path ?? ''}>{title}</span>
+        <span className="dsh-desk-review-path" title={filePath}>{title}</span>
         {page === null ? null : <span className="dsh-desk-review-kind">{page.kind === 'markdown' ? 'MD' : 'TXT'}</span>}
+        <button type="button" className="dsh-desk-review-mini" title={filePath} onClick={copyPath}>
+          {t('review.copyPath')}
+        </button>
+        <button type="button" className="dsh-desk-review-mini" onClick={continueWithAi}>
+          {t('review.continueTitle')}
+        </button>
       </header>
       {error === null ? null : <p className="dsh-desk-notebook-error">{t('state.loadFailed', { message: error })}</p>}
       {notice === null ? null : <p className="dsh-desk-review-notice">{notice}</p>}
+      {undo === null
+        ? null
+        : (
+            <p className="dsh-desk-review-notice">
+              {t('review.deletedDraft')}
+              <button
+                type="button"
+                className="dsh-desk-review-mini"
+                onClick={() => {
+                  const next = [...pending]
+                  next.splice(Math.max(0, Math.min(undo.index, next.length)), 0, undo.item)
+                  setUndo(null)
+                  persistDrafts(next)
+                }}
+              >
+                {t('review.undo')}
+              </button>
+            </p>
+          )}
       {loading
         ? <p className="dsh-desk-notebook-hint">{t('state.loading')}</p>
         : page === null
@@ -352,7 +429,11 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                       <button
                         type="button"
                         className="dsh-desk-review-mini"
-                        onClick={() => persistDrafts(pending.filter(entry => entry.id !== item.id))}
+                        onClick={() => {
+                          const index = pending.findIndex(entry => entry.id === item.id)
+                          setUndo({ item, index })
+                          persistDrafts(pending.filter(entry => entry.id !== item.id))
+                        }}
                       >
                         {t('review.delete')}
                       </button>
@@ -366,7 +447,14 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
             <div className="dsh-desk-review-layer">
               <div className="dsh-desk-review-layerhead">
                 <h4>{t('review.changes')}</h4>
-                <button type="button" className="dsh-desk-review-mini" disabled={page === null} onClick={() => setBaseline(page?.body ?? null)}>
+                {baselineAt === null
+                  ? null
+                  : (
+                      <span className="dsh-desk-review-baseline">
+                        {t('review.baselineHint', { time: new Date(baselineAt).toLocaleTimeString() })}
+                      </span>
+                    )}
+                <button type="button" className="dsh-desk-review-mini" disabled={page === null} onClick={() => { setBaseline(page?.body ?? null); setBaselineAt(new Date().toISOString()) }}>
                   {t('review.rebaseline')}
                 </button>
                 <button type="button" className="dsh-desk-review-mini" onClick={() => setOverlay(null)}>{t('review.hideOverlay')}</button>
@@ -374,6 +462,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
               {diff === null || totals === null
                 ? <p className="dsh-desk-notebook-hint">{t('review.diffEmpty')}</p>
                 : (
+                    <>
+                    <p className="dsh-desk-notebook-hint">{t('review.baselineNote')}</p>
                     <DisclosureRow
                       icon={<IconInspectOutlineRegular />}
                       title={t('review.changes')}
@@ -393,6 +483,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                         maxLines={200}
                       />
                     </DisclosureRow>
+                    </>
                   )}
             </div>
           )

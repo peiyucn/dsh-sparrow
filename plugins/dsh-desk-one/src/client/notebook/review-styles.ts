@@ -305,6 +305,11 @@ export const REVIEW_CSS = `
   border-color: var(--dsw-alias-state-error-primary, #c0503f);
   color: var(--dsw-alias-state-error-primary, #c0503f);
 }
+.dsh-desk-review-baseline {
+  color: var(--dsw-alias-label-caption, #8a919f);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
 .dsh-desk-review-diffadded {
   color: var(--dsw-alias-code-diff-added, #3a9a5b);
   font-size: 11px;

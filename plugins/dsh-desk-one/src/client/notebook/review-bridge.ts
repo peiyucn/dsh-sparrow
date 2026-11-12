@@ -50,6 +50,8 @@ export interface ReviewBridge {
   start(input: ReviewStartInput): Promise<ReviewStartResult>
   /** Put one pending batch into the session composer (never sends). */
   sendQuote(sessionId: string, text: string): boolean
+  /** Append plain instruction text to the composer (never sends). */
+  appendText(sessionId: string, text: string): boolean
   attachSidebar(service: SidebarRightLike): () => void
   attachSessions(service: SessionsLike): () => void
   attachNavigation(service: SessionNavigationLike): () => void
@@ -130,6 +132,16 @@ export function createReviewBridge(): ReviewBridge {
       } catch (cause) {
         return { ok: false, message: `发起审阅失败：${reasonOf(cause)}` }
       }
+    },
+    appendText(sessionId, text) {
+      const scope = sessions?.scope(sessionId) as SessionScopeLike | undefined
+      const conversation = scope?.get('conversation') as ConversationLike | undefined
+      if (scope === undefined || conversation === undefined) return false
+      const input = conversation.input.for(scope)
+      const current = input.state.getSnapshot().draft
+      input.setDraft(current.trim() === '' ? text : `${current.trimEnd()}\n${text}`)
+      input.focus()
+      return true
     },
     sendQuote(sessionId, text) {
       const scope = sessions?.scope(sessionId) as SessionScopeLike | undefined
