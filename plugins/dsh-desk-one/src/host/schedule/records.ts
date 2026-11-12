@@ -132,6 +132,36 @@ export function createEventRecord(
   }
 }
 
+/**
+ * Adapter events carry provider-owned fields; the store only needs the draft shape. Every field is
+ * copied explicitly, so adding one to {@link RemoteEvent} requires adding it here too.
+ */
+export function draftFromRemote(event: {
+  readonly externalId: string; readonly uid: string; readonly recurrenceId?: string
+  readonly title: string; readonly description?: string; readonly location?: string
+  readonly organizer?: string; readonly attendees?: readonly string[]
+  readonly startUtc: string; readonly endUtc: string; readonly allDay: boolean
+  readonly timezone: string; readonly busy: boolean; readonly url?: string; readonly rrule?: string
+}): EventDraft {
+  return {
+    externalId: event.externalId,
+    uid: event.uid,
+    ...(event.recurrenceId === undefined ? {} : { recurrenceId: event.recurrenceId }),
+    title: event.title,
+    ...(event.description === undefined ? {} : { description: event.description }),
+    ...(event.location === undefined ? {} : { location: event.location }),
+    ...(event.organizer === undefined ? {} : { organizer: event.organizer }),
+    ...(event.attendees === undefined ? {} : { attendees: event.attendees }),
+    start: event.startUtc,
+    end: event.endUtc,
+    allDay: event.allDay,
+    timezone: event.timezone,
+    busy: event.busy,
+    ...(event.url === undefined ? {} : { url: event.url }),
+    ...(event.rrule === undefined ? {} : { rrule: event.rrule }),
+  }
+}
+
 /** True when a stored event already carries everything the fresh draft has (skip the write). */
 export function eventMatchesDraft(event: DeskEvent, draft: EventDraft): boolean {
   return event.externalId === draft.externalId

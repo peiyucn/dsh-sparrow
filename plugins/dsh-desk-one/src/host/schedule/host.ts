@@ -28,7 +28,7 @@ import {
   codeChallenge, exchangeGraphCode, fetchGraphCalendarEvents, graphAuthorizeUrl, listGraphCalendars, pollGraphDeviceCode,
   refreshGraphToken, startGraphDeviceCode,
 } from './providers/graph.js'
-import { scheduleErrorOf, type EventDraft } from './records.js'
+import { draftFromRemote, scheduleErrorOf, type EventDraft } from './records.js'
 import { ScheduleError, type PullWindow } from './types.js'
 
 /** Structural view of the official credentials seam (avoids a hard package dependency). */
@@ -445,7 +445,7 @@ export class ScheduleHost {
         if (calendar !== undefined) {
           const drafts = dedupeDrafts(parseIcsEvents(fetched.ics, {
             provider: 'ics', calendarRemoteId: calendar.remoteId, window,
-          }).map(event => this.draftOf(event)))
+          }).map(event => draftFromRemote(event)))
           await this.store.syncCalendarEvents(calendar, drafts.slice(0, SCHEDULE_MAX_EVENTS))
           await this.store.setScheduleSyncState(calendar.id, { lastSyncedAt: now })
           totalEvents += drafts.length
@@ -461,7 +461,7 @@ export class ScheduleHost {
         if (calendar !== undefined) {
           const drafts = dedupeDrafts(parseIcsEvents(fetched.ics, {
             provider: 'outlook', calendarRemoteId: calendar.remoteId, window,
-          }).map(event => this.draftOf(event)))
+          }).map(event => draftFromRemote(event)))
           await this.store.syncCalendarEvents(calendar, drafts.slice(0, SCHEDULE_MAX_EVENTS))
           await this.store.setScheduleSyncState(calendar.id, { lastSyncedAt: now })
           totalEvents += drafts.length
@@ -487,7 +487,7 @@ export class ScheduleHost {
             const parsed = remoteEvents.flatMap(response => parseIcsEvents(response.ics, {
               provider: source.provider, calendarRemoteId: calendar.remoteId, window,
             }))
-            const drafts = dedupeDrafts(parsed.map(event => this.draftOf(event)))
+            const drafts = dedupeDrafts(parsed.map(event => draftFromRemote(event)))
             await this.store.syncCalendarEvents(calendar, drafts.slice(0, SCHEDULE_MAX_EVENTS))
             await this.store.setScheduleSyncState(calendar.id, { lastSyncedAt: now })
             totalEvents += drafts.length
@@ -505,29 +505,6 @@ export class ScheduleHost {
     }
   }
 
-  /** Adapter events carry provider-owned fields; the store only needs the draft shape. */
-  private draftOf(event: {
-    readonly externalId: string; readonly uid: string; readonly recurrenceId?: string
-    readonly title: string; readonly description?: string; readonly location?: string
-    readonly startUtc: string; readonly endUtc: string; readonly allDay: boolean
-    readonly timezone: string; readonly busy: boolean; readonly url?: string; readonly rrule?: string
-  }): EventDraft {
-    return {
-      externalId: event.externalId,
-      uid: event.uid,
-      ...(event.recurrenceId === undefined ? {} : { recurrenceId: event.recurrenceId }),
-      title: event.title,
-      ...(event.description === undefined ? {} : { description: event.description }),
-      ...(event.location === undefined ? {} : { location: event.location }),
-      start: event.startUtc,
-      end: event.endUtc,
-      allDay: event.allDay,
-      timezone: event.timezone,
-      busy: event.busy,
-      ...(event.url === undefined ? {} : { url: event.url }),
-      ...(event.rrule === undefined ? {} : { rrule: event.rrule }),
-    }
-  }
 }
 
 /** Calendar lifecycle helpers kept on the store; declared here for the route layer's import list. */

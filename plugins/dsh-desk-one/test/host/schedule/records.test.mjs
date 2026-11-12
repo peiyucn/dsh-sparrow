@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  colorForOrder, createCalendarRecord, createEventRecord, createScheduleSourceRecord, eventMatchesDraft,
+  colorForOrder, createCalendarRecord, createEventRecord, createScheduleSourceRecord, draftFromRemote, eventMatchesDraft,
   filterEvents, scheduleErrorOf, sortEvents,
 } from '../../../lib/host/schedule/records.js'
 
@@ -18,6 +18,27 @@ const draft = (over = {}) => ({
   timezone: 'Asia/Shanghai',
   busy: true,
   ...over,
+})
+
+describe('schedule records · RemoteEvent → 草稿映射', () => {
+  const remote = (over = {}) => ({
+    externalId: 'evt-1', uid: 'evt-1', title: '周会',
+    startUtc: '2026-11-09T01:00:00.000Z', endUtc: '2026-11-09T02:00:00.000Z',
+    allDay: false, timezone: 'Asia/Shanghai', busy: true,
+    ...over,
+  })
+
+  it('组织者与参与人会进入草稿（曾经在这里被丢掉）', () => {
+    const draft = draftFromRemote(remote({ organizer: '张三', attendees: ['李四', '王五'] }))
+    assert.equal(draft.organizer, '张三')
+    assert.deepEqual(draft.attendees, ['李四', '王五'])
+  })
+
+  it('来源没给时不留空字段', () => {
+    const draft = draftFromRemote(remote())
+    assert.equal('organizer' in draft, false)
+    assert.equal('attendees' in draft, false)
+  })
 })
 
 describe('schedule records · 参与人', () => {
