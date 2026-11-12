@@ -300,7 +300,7 @@ export function NotebookView(props: {
             </div>
           )
         : (
-            <>
+            <div className="dsh-desk-notebook-content">
               <section className="dsh-desk-notebook-hero">
                 <div className="dsh-desk-notebook-hero-main">
                   <button type="button" className="dsh-desk-action dsh-desk-action-primary dsh-desk-notebook-newbutton" disabled={busy} onClick={() => setNewOpen(current => !current)}>
@@ -430,7 +430,7 @@ export function NotebookView(props: {
                             )}
                       </div>
                     )}
-            </>
+            </div>
           )}
     </div>
   )

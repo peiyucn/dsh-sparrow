@@ -6,11 +6,23 @@ export const NOTEBOOK_CSS = `
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 12px;
   flex: 1;
   min-height: 0;
   padding: calc(var(--dsh-desk-header-h) + 12px) 18px 14px;
   overflow-y: auto;
+}
+/* Content column: the panel can be very wide; keep one readable centered column
+   instead of stretching hero controls and list rows across the whole frame. */
+.dsh-desk-notebook-content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
 }
 .dsh-desk-notebook-error {
   margin: 0;
@@ -105,7 +117,7 @@ export const NOTEBOOK_CSS = `
 .dsh-desk-notebook-hero-main {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 .dsh-desk-notebook-newbutton {
   flex: none;
@@ -131,9 +143,8 @@ export const NOTEBOOK_CSS = `
 }
 .dsh-desk-notebook-searchengine {
   box-sizing: border-box;
-  width: min(640px, 100%);
-  margin: 0 auto;
-  padding: 10px 18px;
+  width: 100%;
+  padding: 9px 16px;
   border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
   border-radius: 999px;
   background: var(--dsw-alias-bg-base, #ffffff);
@@ -214,6 +225,13 @@ export const NOTEBOOK_CSS = `
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding: 4px 8px;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: var(--dsw-radius-md, 12px);
+  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.02));
+}
+.dsh-desk-notebook-page:first-child {
+  border-top: 0;
 }
 .dsh-desk-notebook-page {
   display: flex;
@@ -262,6 +280,10 @@ export const NOTEBOOK_CSS = `
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding: 8px 10px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: var(--dsw-radius-md, 12px);
+  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.02));
 }
 .dsh-desk-notebook-recenthead {
   padding: 2px 2px 4px;
@@ -310,6 +332,10 @@ export const NOTEBOOK_CSS = `
   display: flex;
   flex-direction: column;
   gap: 0;
+  padding: 8px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: var(--dsw-radius-md, 12px);
+  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.02));
 }
 .dsh-desk-notebook-historyrow {
   display: flex;
