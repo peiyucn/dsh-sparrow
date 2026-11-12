@@ -359,6 +359,8 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-detail-card dd { margin: 0; }
 .dsh-desk-schedule-detail-desc { white-space: pre-wrap; max-height: 96px; overflow-y: auto; }
 .dsh-desk-schedule-detail-card footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 2px; border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); }
+/* People facts: wrap instead of ellipsis so a long guest list is readable. */
+.dsh-desk-schedule-detail-people { overflow-wrap: anywhere; }
 .dsh-desk-schedule-readonly { font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); }
 
 /* sources page (in-panel, not a modal) */

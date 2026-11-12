@@ -55,7 +55,11 @@ export function EventCard(props: {
   }, [props])
 
   const copy = async (): Promise<void> => {
-    const text = `${event.title}\n${when}\n${event.location ?? ''}`
+    const people = [
+      event.organizer === undefined ? '' : `${t('schedule.detail.organizer')}：${event.organizer}`,
+      event.attendees === undefined || event.attendees.length === 0 ? '' : `${t('schedule.detail.attendees')}：${event.attendees.join('、')}`,
+    ].filter(value => value !== '').join('\n')
+    const text = `${event.title}\n${when}\n${event.location ?? ''}${people === '' ? '' : `\n${people}`}`
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
@@ -77,6 +81,16 @@ export function EventCard(props: {
       <dl>
         <dt>{t('schedule.detail.when')}</dt><dd>{when}</dd>
         {event.location === undefined ? null : <><dt>{t('schedule.detail.location')}</dt><dd>{event.location}</dd></>}
+        {event.organizer === undefined ? null : <><dt>{t('schedule.detail.organizer')}</dt><dd>{event.organizer}</dd></>}
+        {event.attendees === undefined || event.attendees.length === 0 ? null : (
+          <>
+            <dt>{t('schedule.detail.attendees')}</dt>
+            <dd className="dsh-desk-schedule-detail-people">
+              {event.attendees.slice(0, 8).join('、')}
+              {event.attendees.length > 8 ? ` +${event.attendees.length - 8}` : ''}
+            </dd>
+          </>
+        )}
         {event.description === undefined ? null : <><dt>{t('schedule.detail.description')}</dt><dd className="dsh-desk-schedule-detail-desc">{event.description}</dd></>}
       </dl>
       <footer>

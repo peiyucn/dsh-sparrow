@@ -197,6 +197,10 @@ export interface DeskEvent {
   readonly title: string
   readonly description?: string
   readonly location?: string
+  /** Organizer as exported by the source (display name when it provides one, else the address). */
+  readonly organizer?: string
+  /** Attendees as exported by the source; display names when available, otherwise addresses. */
+  readonly attendees?: readonly string[]
   /** ISO 8601 UTC; all-day events use the UTC converted from local day boundaries. */
   readonly start: string
   readonly end: string

@@ -142,6 +142,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'schedule.day.tomorrow'
       | 'schedule.detail.when'
       | 'schedule.detail.location'
+      | 'schedule.detail.organizer'
+      | 'schedule.detail.attendees'
       | 'schedule.detail.description'
       | 'schedule.detail.copy'
       | 'schedule.detail.copied'

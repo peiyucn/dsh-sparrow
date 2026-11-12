@@ -107,6 +107,37 @@ const DST_WINDOW = { startUtc: '2026-03-01T00:00:00.000Z', endUtc: '2026-05-01T0
 
 describe('parseIcsEvents: single, all-day and window filtering', () => {
 
+describe('organizer / attendees（来源日历的参与人事实）', () => {
+  const ics = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//dsh-desk-one//test//EN
+BEGIN:VEVENT
+UID:meeting@example.test
+DTSTAMP:20261101T000000Z
+DTSTART:20261110T090000Z
+DTEND:20261110T100000Z
+SUMMARY:月度例会
+ORGANIZER;CN=张三:mailto:zhangsan@example.test
+ATTENDEE;CN=李四:mailto:lisi@example.test
+ATTENDEE:mailto:wangwu@example.test
+ATTENDEE:mailto:lisi@example.test
+END:VEVENT
+END:VCALENDAR`
+
+  it('CN 优先、无 CN 退回邮箱、去重', () => {
+    const [event] = parseIcsEvents(ics, { window: WINDOW, provider: 'wecom', calendarRemoteId: '/c/1/' })
+    assert.equal(event?.organizer, '张三')
+    assert.deepEqual(event?.attendees, ['李四', 'wangwu@example.test'], '重复的参与人只记一次')
+  })
+
+  it('没有 ATTENDEE 时不产生字段（企微某类事件确实没有）', () => {
+    const bare = ics.replace(/ATTENDEE[^\n]*\n/gu, '')
+    const [event] = parseIcsEvents(bare, { window: WINDOW, provider: 'wecom', calendarRemoteId: '/c/1/' })
+    assert.equal(event?.attendees, undefined)
+    assert.equal(event?.organizer, '张三')
+  })
+})
+
 describe('cleanDescription（来源客户端塞进来的排版噪音）', () => {
   it('去掉字面 \\r 转义、CRLF 与纯点分隔线', () => {
     const raw = '地址：南京\r\n24日报道\r\n....................................................................................................\r\n包含1个附件\r\n....................................................................................................\r'

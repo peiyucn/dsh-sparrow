@@ -20,6 +20,20 @@ const draft = (over = {}) => ({
   ...over,
 })
 
+describe('schedule records · 参与人', () => {
+  it('参与人变化才触发重写，顺序/重复无关', () => {
+    const base = draft({ organizer: '张三', attendees: ['李四', '王五'] })
+    const record = createEventRecord(base, {
+      id: 'evt-1', calendarNodeId: 'cal-1', schema: 1, provider: 'wecom', channel: 'caldav',
+      calendarRemoteId: '/c/1/', now,
+    })
+    assert.deepEqual(record.attendees, ['李四', '王五'])
+    assert.equal(eventMatchesDraft(record, draft({ organizer: '张三', attendees: ['李四', '王五'] })), true)
+    assert.equal(eventMatchesDraft(record, draft({ organizer: '张三', attendees: ['李四', '王五', '赵六'] })), false)
+    assert.equal(eventMatchesDraft(record, draft({ organizer: '李四', attendees: ['李四', '王五'] })), false)
+  })
+})
+
 describe('schedule records', () => {
   it('colorForOrder 在色板内循环且负数安全', () => {
     assert.equal(colorForOrder(0), colorForOrder(8))

@@ -21,6 +21,8 @@ export interface EventDraft {
   readonly title: string
   readonly description?: string
   readonly location?: string
+  readonly organizer?: string
+  readonly attendees?: readonly string[]
   readonly start: string
   readonly end: string
   readonly allDay: boolean
@@ -115,6 +117,8 @@ export function createEventRecord(
     title: draft.title,
     ...(draft.description === undefined ? {} : { description: draft.description }),
     ...(draft.location === undefined ? {} : { location: draft.location }),
+    ...(draft.organizer === undefined ? {} : { organizer: draft.organizer }),
+    ...(draft.attendees === undefined ? {} : { attendees: draft.attendees }),
     start: draft.start,
     end: draft.end,
     allDay: draft.allDay,
@@ -136,6 +140,8 @@ export function eventMatchesDraft(event: DeskEvent, draft: EventDraft): boolean 
     && event.title === draft.title
     && event.description === draft.description
     && event.location === draft.location
+    && event.organizer === draft.organizer
+    && sameList(event.attendees, draft.attendees)
     && event.start === draft.start
     && event.end === draft.end
     && event.allDay === draft.allDay
@@ -143,6 +149,14 @@ export function eventMatchesDraft(event: DeskEvent, draft: EventDraft): boolean 
     && event.busy === draft.busy
     && event.url === draft.url
     && event.rrule === draft.rrule
+}
+
+/** List equality for optional read-only facts (undefined and empty are both "absent"). */
+function sameList(left: readonly string[] | undefined, right: readonly string[] | undefined): boolean {
+  const a = left ?? []
+  const b = right ?? []
+  if (a.length !== b.length) return false
+  return a.every((value, index) => value === b[index])
 }
 
 /** ISO instants compare lexicographically only when the timezone suffix is identical (Z). */

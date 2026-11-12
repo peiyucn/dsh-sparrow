@@ -23,6 +23,7 @@ import type { PullWindow, RemoteEvent } from './types.js'
 const MAX_RECURRENCE_ITERATIONS = 100_000
 
 type IcalComponent = InstanceType<typeof ICAL.Component>
+type IcalProperty = InstanceType<typeof ICAL.Property>
 type IcalEvent = InstanceType<typeof ICAL.Event>
 type IcalTime = InstanceType<typeof ICAL.Time>
 
@@ -250,6 +251,47 @@ interface BuildEventInput {
   rrule?: string
 }
 
+/** Calendar addresses cap: a 500-person invite would otherwise bloat every mirrored row. */
+const MAX_ATTENDEES = 50
+
+/**
+ * One CAL-ADDRESS property as a display label: the CN parameter wins (WeCom and iCloud both send
+ * the person's name there), otherwise the address without its `mailto:` prefix.
+ */
+function addressLabel(property: IcalProperty): string {
+  const rawCn = property.getParameter('cn')
+  const cn = typeof rawCn === 'string' ? rawCn.trim() : ''
+  const raw = String(property.getFirstValue() ?? '').trim()
+  const address = raw.replace(/^mailto:/iu, '').trim()
+  return cn !== '' ? cn : address
+}
+
+/**
+ * Attendees in feed order, deduplicated by address (the same person may appear once with a CN and
+ * once without) and bounded; empty when the source exports none.
+ */
+function attendeeLabels(component: IcalComponent): string[] {
+  const labels: string[] = []
+  const seen = new Set<string>()
+  for (const property of component.getAllProperties('attendee')) {
+    const label = addressLabel(property)
+    if (label === '') continue
+    const address = String(property.getFirstValue() ?? '').trim().replace(/^mailto:/iu, '').toLowerCase()
+    const key = address === '' ? label.toLowerCase() : address
+    if (seen.has(key)) continue
+    seen.add(key)
+    labels.push(label)
+    if (labels.length >= MAX_ATTENDEES) break
+  }
+  return labels
+}
+
+function organizerLabel(component: IcalComponent): string {
+  const property = component.getFirstProperty('organizer')
+  if (property === null) return ''
+  return addressLabel(property).trim()
+}
+
 function buildRemoteEvent(input: BuildEventInput, opts: ParseIcsOptions): RemoteEvent {
   const allDay = input.start.isDate
   const event: RemoteEvent = {
@@ -271,6 +313,10 @@ function buildRemoteEvent(input: BuildEventInput, opts: ParseIcsOptions): Remote
   if (description !== '') event.description = description
   const location = textValue(input.event.location)
   if (location !== '') event.location = location
+  const organizer = organizerLabel(input.event.component)
+  if (organizer !== '') event.organizer = organizer
+  const attendees = attendeeLabels(input.event.component)
+  if (attendees.length > 0) event.attendees = attendees
   if (input.url !== undefined) event.url = input.url
   if (input.rrule !== undefined) event.rrule = input.rrule
   return event

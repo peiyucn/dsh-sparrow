@@ -141,6 +141,8 @@ const eventSchema = z.object({
   recurrenceId: z.string().optional(),
   title: z.string(),
   description: z.string().optional(),
+  organizer: z.string().optional(),
+  attendees: z.array(z.string()).optional(),
   location: z.string().optional(),
   start: z.string().min(1),
   end: z.string().min(1),

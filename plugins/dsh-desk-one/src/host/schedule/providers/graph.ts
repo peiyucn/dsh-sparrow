@@ -44,6 +44,31 @@ interface GraphEvent {
   readonly showAs?: string
   readonly webLink?: string
   readonly isCancelled?: boolean
+  readonly organizer?: { readonly emailAddress?: { readonly name?: string; readonly address?: string } }
+  readonly attendees?: readonly { readonly emailAddress?: { readonly name?: string; readonly address?: string } }[]
+}
+
+/** Display name wins over the address, matching how the ICS path labels people. */
+function personLabel(person: { readonly name?: string; readonly address?: string } | undefined): string {
+  const name = typeof person?.name === 'string' ? person.name.trim() : ''
+  if (name !== '') return name
+  const address = typeof person?.address === 'string' ? person.address.trim() : ''
+  return address
+}
+
+function organizerOf(event: GraphEvent): string | undefined {
+  const label = personLabel(event.organizer?.emailAddress)
+  return label === '' ? undefined : label
+}
+
+function attendeesOf(event: GraphEvent): string[] {
+  const labels: string[] = []
+  for (const attendee of event.attendees ?? []) {
+    const label = personLabel(attendee.emailAddress)
+    if (label !== '' && !labels.includes(label)) labels.push(label)
+    if (labels.length >= 50) break
+  }
+  return labels
 }
 
 interface GraphEventPage {
@@ -255,6 +280,8 @@ export function graphEventDraft(event: GraphEvent): EventDraft | undefined {
     uid: externalId,
     title: event.subject?.trim() ?? '',
     ...(event.bodyPreview === undefined ? {} : { description: event.bodyPreview }),
+    ...(organizerOf(event) === undefined ? {} : { organizer: organizerOf(event) }),
+    ...(attendeesOf(event).length === 0 ? {} : { attendees: attendeesOf(event) }),
     ...(event.location?.displayName === undefined ? {} : { location: event.location.displayName }),
     start,
     end,
@@ -274,7 +301,7 @@ export async function fetchGraphCalendarEvents(
   const params = new URLSearchParams({
     startDateTime: window.startUtc,
     endDateTime: window.endUtc,
-    $select: 'id,iCalUId,subject,bodyPreview,location,start,end,isAllDay,showAs,webLink,isCancelled',
+    $select: 'id,iCalUId,subject,bodyPreview,location,start,end,isAllDay,showAs,webLink,isCancelled,organizer,attendees',
     $top: '100',
   })
   let url: string | undefined = `${GRAPH_BASE}/me/calendars/${encodeURIComponent(calendarId)}/calendarView?${params.toString()}`

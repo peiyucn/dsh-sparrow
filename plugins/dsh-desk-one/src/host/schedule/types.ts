@@ -27,6 +27,8 @@ export interface RemoteEvent {
   title: string
   description?: string
   location?: string
+  organizer?: string
+  attendees?: readonly string[]
   startUtc: string
   endUtc: string
   allDay: boolean
