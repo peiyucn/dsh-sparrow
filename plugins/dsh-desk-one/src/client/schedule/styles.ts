@@ -366,8 +366,15 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-detail-card dd { margin: 0; }
 .dsh-desk-schedule-detail-desc { white-space: pre-wrap; max-height: 96px; overflow-y: auto; }
 .dsh-desk-schedule-detail-card footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 2px; border-top: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea); }
-/* People facts: wrap instead of ellipsis so a long guest list is readable. */
+/* People facts: the count is the default view, the full list opens on demand. */
 .dsh-desk-schedule-detail-people { overflow-wrap: anywhere; }
+.dsh-desk-schedule-detail-people > p { margin: 2px 0 0; overflow-wrap: anywhere; line-height: 1.45; }
+.dsh-desk-schedule-people-toggle {
+  display: inline-flex; align-items: baseline; gap: 6px; border: 0; background: none; padding: 0;
+  color: inherit; font: inherit; cursor: pointer;
+}
+.dsh-desk-schedule-people-toggle:hover .dsh-desk-schedule-people-action { text-decoration: underline; }
+.dsh-desk-schedule-people-action { color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); font-size: 11px; }
 .dsh-desk-schedule-readonly { font-size: 11px; color: var(--dsw-alias-label-tertiary, #8a919f); }
 
 /* sources page (in-panel, not a modal) */

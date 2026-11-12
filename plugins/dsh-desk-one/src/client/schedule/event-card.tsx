@@ -25,6 +25,8 @@ export function EventCard(props: {
   const { t, event, calendars, sources, point } = props
   const cardRef = useRef<HTMLElement>(null)
   const [copied, setCopied] = useState(false)
+  // Guest lists are long and unreadable at a glance: show the count and open on demand.
+  const [peopleOpen, setPeopleOpen] = useState(false)
   const source = sources.find(item => item.provider === event.provider)
   const when = event.allDay
     ? `${dayLabel(t, startOfLocalDay(new Date(event.start)), new Date())} · ${t('schedule.allDay')}`
@@ -86,8 +88,18 @@ export function EventCard(props: {
           <>
             <dt>{t('schedule.detail.attendees')}</dt>
             <dd className="dsh-desk-schedule-detail-people">
-              {event.attendees.slice(0, 8).join('、')}
-              {event.attendees.length > 8 ? ` +${event.attendees.length - 8}` : ''}
+              <button
+                type="button"
+                className="dsh-desk-schedule-people-toggle"
+                aria-expanded={peopleOpen}
+                onClick={() => { setPeopleOpen(open => !open) }}
+              >
+                <span>{t('schedule.detail.attendeesCount', { count: event.attendees.length })}</span>
+                <span className="dsh-desk-schedule-people-action">
+                  {peopleOpen ? t('schedule.detail.attendeesHide') : t('schedule.detail.attendeesShow')}
+                </span>
+              </button>
+              {peopleOpen ? <p>{event.attendees.join('、')}</p> : null}
             </dd>
           </>
         )}
