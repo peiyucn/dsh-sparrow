@@ -48,7 +48,10 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const { t, reviewApi, bridge, sessionId, useTabInfo } = props
   const info = useTabInfo()
   const params = info.tab.navigation.params as NoteReviewParams | undefined
-  const reviewId = params?.reviewId
+  const targetCwd = params?.cwd
+  const targetPath = params?.path
+  /** Resolved review record; a fresh open binds the record to the session it is opened in. */
+  const [reviewId, setReviewId] = useState<string | undefined>(params?.reviewId)
   const bodyRef = useRef<HTMLDivElement | null>(null)
 
   const [review, setReview] = useState<DeskReview | null>(null)
@@ -81,8 +84,27 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     expand: (hidden: number) => t('review.expand', { hidden }),
   }), [t])
 
+  // A fresh open (no reviewId) links this file to the session on screen: the review session is
+  // the one DSH just opened, so the tab only records the association. Reusing an existing record
+  // for the same session keeps the draft box intact.
+  useEffect(() => {
+    if (reviewId !== undefined || targetCwd === undefined || targetPath === undefined) return
+    let cancelled = false
+    void (async (): Promise<void> => {
+      try {
+        const reviews = await reviewApi.list({ cwd: targetCwd, path: targetPath })
+        const own = reviews.find(entry => entry.sessionId === sessionId)
+        const review = own ?? await reviewApi.create({ sessionId, cwd: targetCwd, path: targetPath })
+        if (!cancelled) setReviewId(review.id)
+      } catch (cause) {
+        if (!cancelled) setError(messageOf(cause))
+      }
+    })()
+    return () => { cancelled = true }
+  }, [reviewApi, reviewId, sessionId, targetCwd, targetPath])
+
   const load = useCallback(async (): Promise<void> => {
-    if (reviewId === undefined) { setLoading(false); return }
+    if (reviewId === undefined) return
     setLoading(true)
     setError(null)
     try {
@@ -164,7 +186,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     : null
   const totals = diff === null ? null : diffTotals([{ path: page?.path ?? '', oldText: diff.oldText, newText: diff.newText }])
 
-  if (reviewId === undefined) {
+  if (reviewId === undefined && (targetCwd === undefined || targetPath === undefined)) {
     return <div className="dsh-desk-review"><p className="dsh-desk-notebook-hint">{t('review.noPath')}</p></div>
   }
 
@@ -175,21 +197,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       <header className="dsh-desk-review-head">
         <span className="dsh-desk-review-path" title={review?.target.path ?? page?.path ?? ''}>{title}</span>
         {page === null ? null : <span className="dsh-desk-review-kind">{page.kind === 'markdown' ? 'MD' : 'TXT'}</span>}
-        {review === null
-          ? null
-          : (
-              <button
-                type="button"
-                className="dsh-desk-review-mini"
-                title={review.sessionId}
-                onClick={() => { void bridge.reveal(review.sessionId) }}
-              >
-                {t('review.openSession')}
-              </button>
-            )}
-        <button type="button" className="dsh-desk-btn" disabled={loading} onClick={() => { void load() }}>
-          {t('review.refresh')}
-        </button>
       </header>
       {error === null ? null : <p className="dsh-desk-notebook-error">{t('state.loadFailed', { message: error })}</p>}
       {notice === null ? null : <p className="dsh-desk-review-notice">{notice}</p>}

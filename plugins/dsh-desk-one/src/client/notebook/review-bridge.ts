@@ -1,20 +1,15 @@
 /**
- * Review bridge: creates a review session in the reviewed file's workspace, reveals it, and
- * opens the review tab.
+ * Review bridge: starts a review through DSH's own "new session" action and opens the review tab.
  *
- * Evidence from the host storage showed the session was created in the right workspace but the
- * main column stayed on the home screen: a freshly created session is not in the client catalog
- * yet, so revealing it must wait for the catalog to refresh. The bridge therefore refreshes the
- * session list, activates the workspace through the official `openWorkspace`, and then reveals
- * the exact session with retries.
+ * The previous attempts created a session through the session controller and then tried to reveal
+ * it; a freshly created session is not in the client catalog yet, so the main column kept the home
+ * screen. The supported path is the workspace navigation: `startSession(workspaceId)` is exactly
+ * what the New Session button runs, so the conversation surface, selection and panel switch are
+ * all handled by the host UI. The review tab then binds itself to the session it is opened in and
+ * writes the review link for that session.
  */
 
-import type { ReviewApi } from './review-api.js'
-import type {
-  ConversationLike, LayoutLike, SessionNavigationLike, SessionScopeLike, SessionsLike, SidebarRightLike,
-  WorkspacesLike,
-} from './faces.js'
-import { invalidateReviewBadges } from './review-badges.js'
+import type { ConversationLike, SessionNavigationLike, SessionScopeLike, SessionsLike, SidebarRightLike, WorkspacesLike } from './faces.js'
 
 /** Stable implementation id (the slot registration key and the tab definition id). */
 export const REVIEW_TAB_ID = 'dsh-desk-one-note-review'
@@ -23,8 +18,12 @@ export const REVIEW_TAB_KIND = 'note-review'
 
 /** Navigation parameters of the review tab. */
 export interface NoteReviewParams {
-  /** The review record the tab shows. */
-  readonly reviewId: string
+  /** Existing review record, when the tab is reopened from history. */
+  readonly reviewId?: string
+  /** Workspace root of the reviewed file (a fresh open; the tab creates the review record). */
+  readonly cwd?: string
+  /** File path relative to `cwd` (a fresh open). */
+  readonly path?: string
 }
 
 /** What the notebook hands the bridge when the user reviews a file. */
@@ -35,7 +34,7 @@ export interface ReviewStartInput {
   readonly path: string
 }
 
-/** Result of one start attempt: the notebook shows `message` when the session could not open. */
+/** Result of one start attempt: the notebook shows `message` when the tab could not open. */
 export interface ReviewStartResult {
   readonly ok: boolean
   readonly message?: string
@@ -44,30 +43,23 @@ export interface ReviewStartResult {
 /** Open face the notebook shares with the review tab. */
 export interface ReviewBridge {
   /**
-   * Continue the file's most recent review, or create a review session and reveal it.
+   * Start a review: open a session in the file's workspace, then the review tab for the file.
    * @param input - workspace root and file path.
-   * @returns whether the review session was opened, plus a readable failure step.
+   * @returns whether the review tab opened, plus a readable failure reason.
    */
   start(input: ReviewStartInput): Promise<ReviewStartResult>
-  /** Reveal one review session again (manual recovery from the home screen). */
-  reveal(sessionId: string): Promise<void>
   /** Put one pending batch into the session composer (never sends). */
   sendQuote(sessionId: string, text: string): boolean
-  attachLayout(service: LayoutLike): () => void
   attachSidebar(service: SidebarRightLike): () => void
   attachSessions(service: SessionsLike): () => void
   attachNavigation(service: SessionNavigationLike): () => void
   attachWorkspaces(service: WorkspacesLike): () => void
 }
 
-/** Attempts to reach the conversation surface after leaving the panel. */
-const OPEN_RETRIES = 8
+/** Attempts to reach the conversation surface after the new session is requested. */
+const OPEN_RETRIES = 15
 /** Delay between attempts (ms). */
-const OPEN_RETRY_MS = 80
-/** Attempts to reveal a just-created session. */
-const REVEAL_RETRIES = 10
-/** Reveal retry delay (ms). */
-const REVEAL_RETRY_MS = 120
+const OPEN_RETRY_MS = 100
 
 /** Normalize a filesystem path for prefix comparison (Windows case-insensitive, slashes unified). */
 function normalizedPath(path: string): string {
@@ -85,20 +77,19 @@ function delay(ms: number): Promise<void> {
 }
 
 /** Create the bridge; all services start detached. */
-export function createReviewBridge(api: ReviewApi): ReviewBridge {
-  let layout: LayoutLike | undefined
+export function createReviewBridge(): ReviewBridge {
   let sidebarRight: SidebarRightLike | undefined
   let sessions: SessionsLike | undefined
   let navigation: SessionNavigationLike | undefined
   let workspaces: WorkspacesLike | undefined
 
   /** Open the tab, retrying while the conversation surface mounts. */
-  const openTab = async (reviewId: string): Promise<boolean> => {
+  const openTab = async (params: NoteReviewParams): Promise<boolean> => {
     const sidebar = sidebarRight
     if (sidebar === undefined) return false
     for (let attempt = 0; attempt < OPEN_RETRIES; attempt += 1) {
       try {
-        sidebar.openTab(REVIEW_TAB_KIND, { params: { reviewId } satisfies NoteReviewParams })
+        sidebar.openTab(REVIEW_TAB_KIND, { params })
         return true
       } catch {
         await delay(OPEN_RETRY_MS)
@@ -121,76 +112,25 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
     return created.workspaceId
   }
 
-  /**
-   * Keep revealing a just-opened review session for a few seconds: another navigation can
-   * settle after ours and drop the main column back to the home screen.
-   * @param sessionId - review session to keep visible.
-   */
-  const keepRevealed = (sessionId: string): void => {
-    for (const ms of [600, 1_500, 3_000]) {
-      setTimeout(() => { navigation?.openSession(sessionId) }, ms)
-    }
-  }
-
-  /** Reveal one session, waiting for the client catalog to list it first. */
-  const revealSession = async (sessionId: string): Promise<void> => {
-    const nav = navigation
-    if (nav === undefined) return
-    try { await sessions?.refresh() } catch { /* list may already be fresh */ }
-    for (let attempt = 0; attempt < REVEAL_RETRIES; attempt += 1) {
-      const listed = sessions?.list.getSnapshot().byId[sessionId]
-      if (listed !== undefined) {
-        nav.openSession(sessionId)
-        return
-      }
-      await delay(REVEAL_RETRY_MS)
-    }
-    // Last resort: reveal anyway; the surface may accept it even when the cached list lags.
-    nav.openSession(sessionId)
-  }
-
   return {
     async start(input) {
       const nav = navigation
-      if (nav === undefined) return { ok: false, message: '对话导航服务不可用（无法打开会话）' }
+      if (nav === undefined) return { ok: false, message: '对话导航服务不可用（无法新建会话）' }
       if (workspaces === undefined) return { ok: false, message: '工作区服务不可用（无法定位文件所属工作区）' }
-      let step = '定位工作区'
       try {
+        // The same call the New Session button makes: the official flow creates/reuses the blank
+        // session, selects it and leaves the Desk One panel.
         const workspaceId = await workspaceFor(input.cwd)
-        step = '检查历史审阅'
-        const existing = await api.list({ cwd: input.cwd, path: input.path })
-        const latest = existing[0]
-        if (latest !== undefined) {
-          try {
-            step = '读取历史审阅的目标文件'
-            await api.page(latest.id)
-            step = '激活审阅会话'
-            await nav.openWorkspace(workspaceId)
-            await revealSession(latest.sessionId)
-            await openTab(latest.id)
-            return { ok: true }
-          } catch (cause) {
-            step = `历史审阅不可用（${reasonOf(cause)}）；改为新建审阅`
-          }
-        }
-        step = '创建审阅会话'
-        const sessionId = await nav.connectWorkspace(workspaceId)
-        step = '写入审阅记录'
-        const review = await api.create({ sessionId, cwd: input.cwd, path: input.path })
-        invalidateReviewBadges()
-        step = '激活工作区会话'
-        await nav.openWorkspace(workspaceId)
-        step = '显示审阅会话'
-        await revealSession(sessionId)
-        keepRevealed(sessionId)
-        step = '打开审阅视图'
-        await openTab(review.id)
-        return { ok: true }
+        nav.startSession(workspaceId)
+        // The tab links the review to whatever session ended up on screen.
+        const opened = await openTab({ cwd: input.cwd, path: input.path })
+        return opened
+          ? { ok: true }
+          : { ok: false, message: '会话面板还没就绪，请再点一次「审阅」' }
       } catch (cause) {
-        return { ok: false, message: `${step}失败：${reasonOf(cause)}` }
+        return { ok: false, message: `发起审阅失败：${reasonOf(cause)}` }
       }
     },
-    async reveal(sessionId) { await revealSession(sessionId) },
     sendQuote(sessionId, text) {
       const scope = sessions?.scope(sessionId) as SessionScopeLike | undefined
       const conversation = scope?.get('conversation') as ConversationLike | undefined
@@ -199,10 +139,6 @@ export function createReviewBridge(api: ReviewApi): ReviewBridge {
       const accepted = input.insertQuote(text)
       if (accepted) input.focus()
       return accepted
-    },
-    attachLayout(service) {
-      layout = service
-      return () => { if (layout === service) layout = undefined }
     },
     attachSidebar(service) {
       sidebarRight = service

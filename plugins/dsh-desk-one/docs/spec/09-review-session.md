@@ -39,7 +39,7 @@
 
 ## 2. 实体模型
 
-### 2.1 审阅会话本体 = DSH 会话
+### 2.1 审阅会话本体 = DSH 会话（由官方 New Session 创建）
 
 复用官方会话系统：持久化、历史、搜索、归档/回收站、文件编辑工具卡的 diff。
 
@@ -88,16 +88,24 @@ kind: 'review'
    加上 `TabRecord.contentId`（`dsh-resource://file/session/<sessionId>/<path>`）即可还原
    「cwd + 相对路径」，无需私有 seam。
 
-流程：
+流程（全部走 DSH 官方动作）：
 
 ```
 发起审阅
-  → 解析目标：cwd（工作区根）+ 相对路径 + 渲染类型 + 内容指纹
-  → sessions.create({ cwd: 该工作区 })      // 不依赖「当前会话」，无会话也能用
-  → 写入 review 记录
-  → 切到该会话（layout.selectPanel(null) + 官方会话导航）
-  → 右侧栏打开「审阅」tab，参数 { reviewId }
+  → 解析目标：工作区根 + 相对路径（由服务端校验可读、可写、纯文本）
+  → uiWorkspace.startSession(workspaceId)   // 与「+ 新会话」完全同一条官方路径：
+                                             // 创建/复用空白会话、选中它、离开 Desk One 面板
+  → 右侧栏打开「审阅」tab，参数 { cwd, path }
+  → tab 挂载后：用所在会话的 sessionId 创建（或复用）review 记录，
+    之后加载目标文件、恢复草稿
 ```
+
+要点：
+
+- **不自己创建会话、不自己导航**。曾经的 `sessions.create` + `openSession` 方案在「新建会话 → 目录滞后 → reveal 被覆盖」上反复失败；
+  `startSession` 是 DSH 官方 New Session 按钮的实现，会话选择与面板切换由宿主 UI 原子完成；
+- 审阅 tab 是 session scope 的右栏 tab，天然知道自己所在的会话，用该会话写 review 关联；
+- 纯文本 / 大小 / 工作区约束仍由 host 的 review 路由校验。
 
 ## 5. 打开历史审阅
 
@@ -267,7 +275,7 @@ annotation 行已从 domain schema 移除；旧记录不再被解析，按 stora
 
 1. 插件 client 半创建会话并可导航：`ctx.sessions.create({ cwd })` + `layout.selectPanel(null)` + 官方会话切换；
 2. 官方文件预览 tab 菜单槽位 `sidebar.right.tab.menu.item` 的运行时可用性与 tab 地址判别（能否只对文本文件显示「发起审阅」）；
-3. 官方会话行槽位（`sidebar.session.row.trailing`）注册审阅标记；
+3. 官方会话行槽位（`sidebar.session.row.trailing`）注册审阅标记（已实现）；
 4. 工作区相对路径的解析与「文件是否可写」判定（沙箱域内）；
 5. 非 md 文本的渲染选择（CodeBlock 语言映射、纯文本回退、超大文件截断）；
 6. 存量 annotation 记录清理与 domain kind 移除的兼容行为。

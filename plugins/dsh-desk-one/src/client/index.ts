@@ -18,9 +18,7 @@ import { createWorkspaceAccess, type UiWorkspaceLike as NotebookNavigationLike, 
 import { createReviewBridge } from './notebook/review-bridge.js'
 import { mountNoteReviewTab } from './notebook/register.js'
 import { configureReviewBadges, SessionReviewBadge } from './notebook/review-badges.js'
-import type {
-  LayoutLike, SessionNavigationLike, SessionsLike, SidebarRightLike, WorkspacesLike,
-} from './notebook/faces.js'
+import type { SessionNavigationLike, SessionsLike, SidebarRightLike, WorkspacesLike } from './notebook/faces.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { DeskPanelIcon } from './icon.js'
@@ -60,12 +58,8 @@ export function apply(ctx: ClientContext): void {
 
   // Review tab + hand-off: each underlying service is optional, so the shelf degrades to
   // read-only when the host does not expose the right sidebar or the session scope.
-  const review = createReviewBridge(reviewApi)
+  const review = createReviewBridge()
   configureReviewBadges(reviewApi)
-  ctx.inject(['layout'], (layoutCtx) => {
-    const detach = review.attachLayout(layoutCtx.get('layout') as unknown as LayoutLike)
-    layoutCtx.effect(() => detach, `${PACKAGE_NAME}: review layout`)
-  })
   ctx.inject(['sidebarRight'], (sidebarCtx) => {
     const detach = review.attachSidebar(sidebarCtx.get('sidebarRight') as unknown as SidebarRightLike)
     sidebarCtx.effect(() => detach, `${PACKAGE_NAME}: review sidebar`)

@@ -8,16 +8,9 @@ export interface LayoutLike {
   selectPanel(id: string | null): void
 }
 
-/** One tab record as the close handler sees it. */
-export interface TabRecordLike {
-  readonly id: string
-}
-
 /** Official right-sidebar service face used by the review tab. */
 export interface SidebarRightLike {
   openTab(kind: string, options?: { readonly params?: unknown }): void
-  close(tabId: string): void
-  registerCloseHandler(kind: string, handler: (sessionId: string, tab: TabRecordLike) => void): () => void
 }
 
 /** One projected workspace (the official workspace-controller view). */
@@ -33,16 +26,9 @@ export interface WorkspacesLike {
   create(input: { readonly path: string }): Promise<WorkspaceViewLike>
 }
 
-/** One listed session, as far as the review bridge cares. */
-export interface SessionSummaryLike {
-  readonly cwd?: string
-}
-
-/** Official sessions service face (catalog, refresh, composer). */
+/** Official sessions service face (reach one session's composer). */
 export interface SessionsLike {
   scope(id: string): SessionScopeLike | undefined
-  readonly list: { getSnapshot(): { readonly byId: Readonly<Record<string, SessionSummaryLike>> } }
-  refresh(): Promise<void>
 }
 
 /** Session-scope lookup face. */
@@ -63,17 +49,6 @@ export interface ConversationLike {
 
 /** Official workspace navigation face used to open the review session. */
 export interface SessionNavigationLike {
-  /** Reveal one existing Session in the main column. */
-  openSession(sessionId: string): void
-  /**
-   * Connect a workspace and resolve its blank Session (created or reused).
-   * @param workspaceId - target workspace.
-   * @returns the session id, bound to that workspace.
-   */
-  connectWorkspace(workspaceId: string): Promise<string>
-  /**
-   * Connect a workspace and open its Session (the official New Session path).
-   * @param workspaceId - target workspace.
-   */
-  openWorkspace(workspaceId: string): Promise<void>
+  /** Start a new session in one workspace — the official New Session action. */
+  startSession(workspaceId: string): void
 }
