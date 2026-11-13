@@ -40,6 +40,18 @@ export const REVIEW_CSS = `
   background: var(--dsw-alias-state-business-primary, #4176e6);
   color: var(--dsw-alias-label-primary-foreground, #ffffff);
 }
+/* Sidebar session-row leading cell: the same blue brand mark as the bubble avatar, miniaturised. */
+.dsh-desk-review-session-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-business-primary, #4176e6);
+  color: var(--dsw-alias-label-primary-foreground, #ffffff);
+}
 .dsh-desk-review-prompt-key {
   display: inline-flex;
   align-items: center;

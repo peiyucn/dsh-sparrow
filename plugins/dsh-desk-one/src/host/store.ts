@@ -12,7 +12,8 @@ import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
 import { createSessionIndexRecord, sessionIndexId, type SessionIndexDraft } from './sessions/records.js'
 import {
-  DESK_NODE_SCHEMA, MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTEBOOK_BASELINE_MAX_CHARS, NOTEBOOK_CONFIG_ID, NOTEBOOK_MAX_DRAFTS, NODES_TABLE,
+  DESK_NODE_SCHEMA, MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTEBOOK_BASELINE_MAX_CHARS, NOTEBOOK_CONFIG_ID, NOTEBOOK_MAX_DRAFTS,
+  NOTEBOOK_MAX_REVIEW_SESSIONS, NODES_TABLE,
   PACKAGE_NAME, SCHEDULE_COLORS, SESSION_INDEX_MISSING_DAYS, TASK_STATUSES,
 } from '../constants.js'
 import {
@@ -27,7 +28,7 @@ import {
 } from './schedule/records.js'
 import type {
   DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskNotebookConfig, DeskScheduleSource, DeskSessionIndex, DeskTask,
-  DeskTaskGroup, DraftAnnotation, NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ScheduleSyncError, TaskStatus,
+  DeskTaskGroup, DraftAnnotation, NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ReviewSessionMarker, ScheduleSyncError, TaskStatus,
 } from '../contract.js'
 
 type DeskDomain = Domain<typeof DESK_DOMAIN>
@@ -954,6 +955,70 @@ export class DeskStore {
     return await this.nodes.update(id, current => current.kind === 'note-baseline'
       ? { ...current, rootPath: input.rootPath, body: input.body, at: input.at, updatedAt: now, revision: current.revision + 1 }
       : current) as NoteBaseline
+  }
+
+  /* ------------------------ review session markers ------------------------ */
+
+  /** Stable id for one marked Session. */
+  private static reviewSessionId(sessionId: string): string {
+    return `review_session_${sessionId}`
+  }
+
+  /** All durable review-session markers, newest first (bounded by the storage cap). */
+  listReviewSessions(): ReviewSessionMarker[] {
+    return this.allNodes()
+      .filter((node): node is ReviewSessionMarker => node.kind === 'review-session')
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .slice(0, NOTEBOOK_MAX_REVIEW_SESSIONS)
+  }
+
+  /**
+   * Mark or refresh one Session as a review session. Called when the review tab mounts, so a
+   * re-open only bumps the timestamp; old markers are pruned so the domain stays bounded.
+   */
+  async markReviewSession(input: {
+    readonly sessionId: string
+    readonly workspaceId?: string
+    readonly fileId?: string
+  }): Promise<ReviewSessionMarker> {
+    const id = DeskStore.reviewSessionId(input.sessionId)
+    const now = new Date().toISOString()
+    const existing = this.nodes.get(id)
+    if (existing?.kind === 'review-session') {
+      return await this.nodes.update(id, current => current.kind === 'review-session'
+        ? {
+            ...current,
+            ...input.workspaceId === undefined ? {} : { workspaceId: input.workspaceId },
+            ...input.fileId === undefined ? {} : { fileId: input.fileId },
+            updatedAt: now,
+            revision: current.revision + 1,
+          }
+        : current) as ReviewSessionMarker
+    }
+    const marker: ReviewSessionMarker = {
+      id,
+      kind: 'review-session',
+      schema: DESK_NODE_SCHEMA,
+      sessionId: input.sessionId,
+      ...input.workspaceId === undefined ? {} : { workspaceId: input.workspaceId },
+      ...input.fileId === undefined ? {} : { fileId: input.fileId },
+      createdAt: now,
+      updatedAt: now,
+      revision: 1,
+    }
+    await this.nodes.put(id, marker)
+    await this.pruneReviewSessions()
+    return marker
+  }
+
+  /** Delete the oldest markers beyond the cap. */
+  private async pruneReviewSessions(): Promise<void> {
+    const markers = this.allNodes().filter((node): node is ReviewSessionMarker => node.kind === 'review-session')
+    if (markers.length <= NOTEBOOK_MAX_REVIEW_SESSIONS) return
+    markers.sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+    for (const marker of markers.slice(0, markers.length - NOTEBOOK_MAX_REVIEW_SESSIONS)) {
+      await this.nodes.delete(marker.id)
+    }
   }
 
   /* ---------------------------- review records ---------------------------- */

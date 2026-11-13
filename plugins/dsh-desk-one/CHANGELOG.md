@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review Session marker**: Sessions opened by the review flow show the blue whale mark before their sidebar title; the marker is persisted by the host (survives refresh/restart) so review Sessions are recognisable at a glance.
+
 * **Review annotation records**: a third bottom pill reads “R rounds / M annotations” (rounds and annotation items reported separately), and lists the submitted records for the current file (time, count, quote and comment); it refreshes after submitting.
 
 * **Review hint bubble**: moved from above to **below the composer** in both the blank and docked states (the composer stays visible); it no longer touches the sidebar edge.

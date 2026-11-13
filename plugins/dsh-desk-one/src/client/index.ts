@@ -20,6 +20,8 @@ import { scheduleApi } from './schedule/api.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { ReviewPromptDock } from './notebook/ReviewPromptDock.js'
+import { ReviewSessionIcon } from './notebook/ReviewSessionIcon.js'
+import { hydrateReviewSessions } from './reviewSessions.js'
 import { DESK_TAB_ICONS, DeskBaseIcon } from './tabIcons.js'
 import { installDeskClient, passesClientGate } from './install.js'
 
@@ -109,6 +111,23 @@ export function apply(ctx: ClientContext): void {
       sessionsArchive: sessionsArchiveApi,
       schedule: scheduleApi,
     },
+  })
+  // Durable markers drive both the sidebar icon and the conversation hint after a restart.
+  hydrateReviewSessions(notebookApi)
+  // Leading decoration on Session rows opened by the review flow (official session-row slot).
+  void ctx.slots.inject('sidebar.session.row.leading' as never, () => {
+    try {
+      return ctx.slots.register({
+        name: 'sidebar.session.row.leading' as never,
+        id: 'dsh-desk-one-review-session',
+        order: 40,
+        locale: LOCALE_NAMESPACE,
+        inject: () => ({ notebook: notebookApi }),
+      } as never, ReviewSessionIcon as never)
+    } catch {
+      // The workspace package is optional; never let a row decoration take the panel down.
+      return () => {}
+    }
   })
   // Session-scoped conversation hint for review sessions (left-aligned AI bubble above the composer).
   // The conversation package is not a compile dependency, hence the structural casts for its slot.

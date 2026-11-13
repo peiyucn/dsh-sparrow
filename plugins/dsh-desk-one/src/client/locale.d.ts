@@ -132,6 +132,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'review.tabTitle'
       | 'review.frontmatter'
       | 'review.frontmatterCount'
+      | 'sessions.reviewMark'
       | 'review.promptLead'
       | 'review.promptStart'
       | 'review.promptHandle'

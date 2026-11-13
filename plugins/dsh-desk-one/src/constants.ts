@@ -38,6 +38,7 @@ export const ROUTES = Object.freeze({
   notebookFile: `${PREFIX}/notebook/file`,
   notebookCreate: `${PREFIX}/notebook/create`,
   notebookHistory: `${PREFIX}/notebook/history`,
+  notebookReviewSessions: `${PREFIX}/notebook/review-sessions`,
   scheduleConnections: `${PREFIX}/schedule/connections`,
   scheduleConnectionSave: `${PREFIX}/schedule/connections/save`,
   scheduleConnectionTest: `${PREFIX}/schedule/connections/test`,
@@ -104,6 +105,8 @@ export const NOTEBOOK_SCAN_TIMEOUT_MS = 20_000
 export const NOTEBOOK_MAX_BYTES = 1_048_576
 /** Persisted draft box: one file keeps at most this many annotations. */
 export const NOTEBOOK_MAX_DRAFTS = 100
+/** Review-session markers kept for the sidebar hint; the oldest are pruned beyond this. */
+export const NOTEBOOK_MAX_REVIEW_SESSIONS = 500
 /** Host-side review-baseline body cap (larger bodies keep only the in-memory baseline). */
 export const NOTEBOOK_BASELINE_MAX_CHARS = NOTEBOOK_MAX_BYTES
 /** History usage above this turns the entry-page meter red (no modal). */

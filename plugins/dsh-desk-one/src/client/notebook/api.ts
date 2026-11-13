@@ -5,7 +5,8 @@
 
 import { ROUTES } from '../../constants.js'
 import type {
-  CreateNotebookNoteRequest, CreateNoteResponse, DraftAnnotation, NoteDraft, NoteDraftResponse, NotebookBaselineResponse,
+  CreateNotebookNoteRequest, CreateNoteResponse, DraftAnnotation, MarkReviewSessionRequest, NoteDraft, NoteDraftResponse,
+  NotebookBaselineResponse, ReviewSessionListResponse,
   NotebookFileResponse, NotebookListResponse, NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse,
   RecordReviewRequest, ReviewHistoryResponse, ReviewRecord,
 } from '../../notebook-contract.js'
@@ -104,6 +105,16 @@ export function saveNoteDraft(input: {
   return postJson<NoteDraftResponse>(ROUTES.notebookDraft, input).then(payload => payload.draft)
 }
 
+/** Durable review-session markers (session ids only). */
+export function listReviewSessions(): Promise<ReviewSessionListResponse> {
+  return fetchJson<ReviewSessionListResponse>(ROUTES.notebookReviewSessions)
+}
+
+/** Mark one session as started by the review flow; idempotent, updates the timestamp. */
+export function markReviewSession(input: MarkReviewSessionRequest): Promise<void> {
+  return postJson<{ sessionId: string }>(ROUTES.notebookReviewSessions, input).then(() => undefined)
+}
+
 /** Submitted review history with current link state. */
 export function notebookHistory(): Promise<ReviewHistoryResponse> {
   return fetchJson<ReviewHistoryResponse>(ROUTES.notebookHistory)
@@ -132,6 +143,8 @@ export interface NotebookApi {
   readonly createNote: typeof createNotebookNote
   readonly draft: typeof getNoteDraft
   readonly saveDraft: typeof saveNoteDraft
+  readonly listReviewSessions: typeof listReviewSessions
+  readonly markReviewSession: typeof markReviewSession
   readonly history: typeof notebookHistory
   readonly recordReview: typeof recordReview
   readonly deleteHistory: typeof deleteReviewRecord
@@ -152,6 +165,8 @@ export const notebookApi: NotebookApi = {
   createNote: createNotebookNote,
   draft: getNoteDraft,
   saveDraft: saveNoteDraft,
+  listReviewSessions,
+  markReviewSession,
   history: notebookHistory,
   recordReview,
   deleteHistory: deleteReviewRecord,

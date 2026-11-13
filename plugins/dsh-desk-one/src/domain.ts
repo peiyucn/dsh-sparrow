@@ -265,9 +265,22 @@ const noteBaselineSchema = z.object({
   revision: z.number().int().positive(),
 })
 
+const reviewSessionSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('review-session'),
+  schema: z.number().int().positive(),
+  sessionId: z.string().min(1),
+  workspaceId: z.string().min(1).optional(),
+  fileId: z.string().min(1).optional(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  revision: z.number().int().positive(),
+})
+
 const nodeSchema = z.discriminatedUnion('kind', [
   noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema, sessionIndexSchema,
-  notebookConfigSchema, noteFileSchema, reviewRecordSchema, noteDraftSchema, noteBaselineSchema, legacyAnnotationSchema, legacyReviewSchema,
+  notebookConfigSchema, noteFileSchema, reviewRecordSchema, noteDraftSchema, noteBaselineSchema, reviewSessionSchema,
+  legacyAnnotationSchema, legacyReviewSchema,
 ])
 
 

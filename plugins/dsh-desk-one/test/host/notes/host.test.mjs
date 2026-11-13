@@ -394,3 +394,50 @@ describe('host 装配（apply 接线）', () => {
     assert.equal(listed.json.tasks[0].title, '来自工具的任务')
   })
 })
+
+  it('审阅会话标记 应该 能标记 / 列出 / 拒空 sessionId', async () => {
+    const { ctx, collected } = fakeHost()
+    await apply(ctx)
+    const handler = collected.routes[0].handler
+    const host = { host: '127.0.0.1:3080' }
+
+    const empty = await callRoute(handler, { method: 'GET', url: ROUTES.notebookReviewSessions, headers: host })
+    assert.equal(empty.status, 200)
+    assert.deepEqual(empty.json.sessionIds, [])
+
+    const first = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.notebookReviewSessions,
+      body: JSON.stringify({ sessionId: 'session-1', fileId: 'file-1' }),
+      headers: host,
+    })
+    assert.equal(first.status, 200)
+    assert.equal(first.json.sessionId, 'session-1')
+
+    // Re-marking is idempotent (one row per session) and refreshes the marker.
+    await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.notebookReviewSessions,
+      body: JSON.stringify({ sessionId: 'session-1' }),
+      headers: host,
+    })
+    await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.notebookReviewSessions,
+      body: JSON.stringify({ sessionId: 'session-2' }),
+      headers: host,
+    })
+
+    const listed = await callRoute(handler, { method: 'GET', url: ROUTES.notebookReviewSessions, headers: host })
+    assert.equal(listed.status, 200)
+    assert.deepEqual(new Set(listed.json.sessionIds), new Set(['session-1', 'session-2']))
+    assert.equal(listed.json.sessionIds.length, 2)
+
+    const invalid = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.notebookReviewSessions,
+      body: JSON.stringify({ sessionId: '' }),
+      headers: host,
+    })
+    assert.equal(invalid.status, 400)
+  })

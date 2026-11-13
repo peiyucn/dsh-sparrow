@@ -17,7 +17,7 @@ import {
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
-import { rememberReviewSession } from '../reviewSessions.js'
+import { persistReviewSession } from '../reviewSessions.js'
 import type { DraftAnnotation, NotebookPageResponse, ReviewHistoryEntry } from '../../notebook-contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import { messageOf } from '../app/utils.js'
@@ -85,14 +85,20 @@ function AnnotationCard(props: {
 /** Notes review tab. */
 export function NoteReviewTab(props: ReviewProps): ReactElement {
   const { t, notebook, bridge, sessionId, useTabInfo } = props
-  // Any session showing the review tab counts as a review session, including ones opened before
-  // this build. The conversation hint subscribes to this registry and appears once it is set.
-  useEffect(() => { rememberReviewSession(sessionId) }, [sessionId])
   const info = useTabInfo()
   const params = info.tab.navigation.params as NoteReviewParams | undefined
   const path = params?.path
   const fileId = params?.fileId
   const workspaceId = params?.workspaceId
+  // Any session showing the review tab counts as a review session, including ones opened before
+  // this build. Marking is durable so the sidebar icon survives a restart.
+  useEffect(() => {
+    persistReviewSession(notebook, {
+      sessionId,
+      ...workspaceId === undefined ? {} : { workspaceId },
+      ...fileId === undefined ? {} : { fileId },
+    })
+  }, [fileId, notebook, sessionId, workspaceId])
   const codeRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const composerRef = useRef<HTMLDivElement | null>(null)

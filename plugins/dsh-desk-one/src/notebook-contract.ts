@@ -237,6 +237,29 @@ export interface RecordReviewRequest {
   readonly annotations: readonly DraftAnnotation[]
 }
 
+/** Durable marker: this Session was opened by the review flow (drives the sidebar hint icon). */
+export interface ReviewSessionMarker {
+  readonly id: string
+  readonly kind: 'review-session'
+  readonly schema: number
+  readonly sessionId: string
+  readonly workspaceId?: string
+  readonly fileId?: string
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
+
+export interface MarkReviewSessionRequest {
+  readonly sessionId: string
+  readonly workspaceId?: string
+  readonly fileId?: string
+}
+
+export interface ReviewSessionListResponse {
+  readonly sessionIds: readonly string[]
+}
+
 export interface ReviewHistoryResponse {
   readonly entries: readonly ReviewHistoryEntry[]
   readonly bytes: number

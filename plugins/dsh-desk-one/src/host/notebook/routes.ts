@@ -4,7 +4,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isAbsolute } from 'node:path'
 import { ROUTES } from '../../constants.js'
 import type {
-  CreateNotebookNoteRequest, DeleteReviewRequest, NoteBaselineRequest, NoteDraftRequest, NotebookRootRequest, RecordReviewRequest,
+  CreateNotebookNoteRequest, DeleteReviewRequest, MarkReviewSessionRequest, NoteBaselineRequest, NoteDraftRequest, NotebookRootRequest,
+  RecordReviewRequest,
 } from '../../notebook-contract.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
 import type { DeskRouteContext, DeskRouteEntry } from '../router.js'
@@ -102,6 +103,21 @@ async function createRoute(route: DeskRouteContext, req: IncomingMessage, res: S
   }))
 }
 
+async function reviewSessionsGetRoute(route: DeskRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
+  sendJson(res, 200, { sessionIds: route.store.listReviewSessions().map(marker => marker.sessionId) })
+}
+
+async function reviewSessionMarkRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = bodyObject<MarkReviewSessionRequest>(await readJsonBody(req), '请求体必须是对象')
+  if (typeof body.sessionId !== 'string' || body.sessionId === '') throw new DeskError('BAD_BODY', '缺少 sessionId')
+  const marker = await route.store.markReviewSession({
+    sessionId: body.sessionId,
+    ...typeof body.workspaceId === 'string' && body.workspaceId !== '' ? { workspaceId: body.workspaceId } : {},
+    ...typeof body.fileId === 'string' && body.fileId !== '' ? { fileId: body.fileId } : {},
+  })
+  sendJson(res, 200, { sessionId: marker.sessionId })
+}
+
 async function baselineGetRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost')
   const fileId = url.searchParams.get('fileId') ?? ''
@@ -184,6 +200,8 @@ export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.notebookPage, handle: pageRoute },
   { method: 'POST', path: ROUTES.notebookFile, handle: fileRoute },
   { method: 'POST', path: ROUTES.notebookCreate, handle: createRoute },
+  { method: 'GET', path: ROUTES.notebookReviewSessions, handle: reviewSessionsGetRoute },
+  { method: 'POST', path: ROUTES.notebookReviewSessions, handle: reviewSessionMarkRoute },
   { method: 'GET', path: ROUTES.notebookBaseline, handle: baselineGetRoute },
   { method: 'POST', path: ROUTES.notebookBaseline, handle: baselineSaveRoute },
   { method: 'GET', path: ROUTES.notebookDraft, handle: draftGetRoute },
