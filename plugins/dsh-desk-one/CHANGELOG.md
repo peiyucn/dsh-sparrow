@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Schedule sync errors**: failures no longer surface on the calendar page; the top-bar **Calendar settings** action gets a red exclamation badge, and the settings page shows the exact error in the failing source card, with the status dot turning red (source failed) or amber (some calendars failed).
+
 * **Review naming and toolbar**: the right-pane tab is **Note review** again and the official preview header entry reads **Review view**; individual items stay **annotations**. The MD / code capsule is compacted to the 28px tool row (same height as copy / refresh), and the floating **Annotate** button now keeps its brand blue and deepens on hover instead of turning white, matching the composer's send button.
 
 * **Sidebar entry**: Desk One keeps a single left-rail entry by default; each tab header now has an **Pin to sidebar** / **Unpin from sidebar** button that adds or removes that tab's own sidebar entry live, with the choice persisted across restarts. Tab labels also gained icons (a local calendar for Schedule so it does not repeat the Automation task clock glyph).
