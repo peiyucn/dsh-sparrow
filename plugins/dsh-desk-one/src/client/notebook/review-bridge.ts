@@ -7,6 +7,7 @@
  * action for the library's workspace and the tab binds to that fresh session.
  */
 
+import { rememberReviewSession } from '../reviewSessions.js'
 import type { ConversationLike, SessionNavigationLike, SessionScopeLike, SessionsLike, SidebarRightLike } from './faces.js'
 
 /** Tab implementation id (registration key and definition id). */
@@ -80,9 +81,13 @@ export function createReviewBridge(): ReviewBridge {
       if (nav === undefined) return { ok: false, message: '对话导航服务不可用（无法新建审阅会话）' }
       if (sidebar === undefined) return { ok: false, message: '右侧栏服务不可用（无法打开审阅视图）' }
       try {
-        // Same call as the New Session button: the official flow selects the session and leaves
-        // the Desk One panel, so no manual navigation is needed here.
-        nav.startSession(input.workspaceId)
+        // Same flow as the New Session button; openWorkspace also tells us the session id so the
+        // conversation-area review hint can be scoped to this session only.
+        if (nav.openWorkspace !== undefined) {
+          await nav.openWorkspace(input.workspaceId, sessionId => { rememberReviewSession(sessionId) })
+        } else {
+          nav.startSession(input.workspaceId)
+        }
       } catch (cause) {
         return { ok: false, message: `新建审阅会话失败：${cause instanceof Error ? cause.message : String(cause)}` }
       }

@@ -33,4 +33,9 @@ export interface ConversationLike {
 export interface SessionNavigationLike {
   /** Start a new session in one workspace — the official New Session action. */
   startSession(workspaceId: string, options?: { readonly prompt?: string }): void
+  /**
+   * Open a session in a workspace, exposing the created/reused session id synchronously.
+   * Official Workspace navigation; optional because older hosts may only expose startSession.
+   */
+  openWorkspace?(workspaceId: string, beforeOpen?: (sessionId: string) => void): Promise<void>
 }

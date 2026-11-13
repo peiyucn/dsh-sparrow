@@ -14,6 +14,36 @@ export const REVIEW_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
 }
+/* Conversation-area hint for review sessions: AI avatar + left speech bubble above the composer. */
+.dsh-desk-review-prompt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 520px;
+  margin: 0 0 8px;
+}
+.dsh-desk-review-prompt-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--dsw-alias-state-business-primary, #4176e6);
+  color: var(--dsw-alias-label-primary-foreground, #ffffff);
+}
+.dsh-desk-review-prompt-text {
+  margin: 0;
+  padding: 8px 12px;
+  border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
+  border-radius: 4px 14px 14px 14px;
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font-size: 12px;
+  line-height: 18px;
+}
+
 /* Frontmatter block: quiet metadata card above the page content (raw frontmatter is stripped from body). */
 .dsh-desk-review-frontmatter {
   display: flex;

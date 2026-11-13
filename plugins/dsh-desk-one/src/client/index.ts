@@ -19,6 +19,7 @@ import { createSessionLinkBridge, type SessionServices } from './sessions/bridge
 import { scheduleApi } from './schedule/api.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
+import { ReviewPromptDock } from './notebook/ReviewPromptDock.js'
 import { DESK_TAB_ICONS, DeskBaseIcon } from './tabIcons.js'
 import { installDeskClient, passesClientGate } from './install.js'
 
@@ -72,6 +73,14 @@ export function apply(ctx: ClientContext): void {
   })
   // Official document-preview header: one extra action that starts a review session for
   // notebook files. The official preview itself is untouched.
+  // Session-scoped conversation hint for review sessions (left-aligned AI bubble above the composer).
+  // The conversation package is not a compile dependency, hence the structural casts for its slot.
+  void ctx.slots.inject('conversation.input.dock' as never, () => ctx.slots.register({
+    name: 'conversation.input.dock' as never,
+    id: 'dsh-desk-one-review-prompt',
+    order: 30,
+    locale: LOCALE_NAMESPACE,
+  } as never, ReviewPromptDock as never))
   ctx.slots.inject('sidebar.right.tab.document.actions', () => ctx.slots.register({
     name: 'sidebar.right.tab.document.actions',
     id: 'desk-one-note-review',

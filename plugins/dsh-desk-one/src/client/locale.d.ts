@@ -131,6 +131,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'notebook.review'
       | 'review.tabTitle'
       | 'review.frontmatter'
+      | 'review.prompt'
       | 'review.openFailed'
       | 'review.noLibrary'
       | 'review.noPath'
