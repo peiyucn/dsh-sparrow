@@ -10,7 +10,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
-  Button, DiffBlock, DisclosureRow, FileTypeIcon, IconChevronDownOutlineRegular, IconCopyOutlineRegular,
+  Button, DiffBlock, DisclosureRow, FileTypeIcon, IconChevronDownOutlineRegular, IconClockOutlineRegular, IconCopyOutlineRegular,
   IconInfoOutlineRegular, IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
   MarkdownText, SegmentedTabs, Tooltip, diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -18,7 +18,7 @@ import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import { rememberReviewSession } from '../reviewSessions.js'
-import type { DraftAnnotation, NotebookPageResponse } from '../../notebook-contract.js'
+import type { DraftAnnotation, NotebookPageResponse, ReviewHistoryEntry } from '../../notebook-contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import { messageOf } from '../app/utils.js'
 import type { NotebookApi } from './api.js'
@@ -34,7 +34,7 @@ export interface NoteReviewInjected {
 type ReviewProps = PropsRuntime<'sidebar.right.pane.tab'> & InjectFace<NoteReviewInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
 
 /** Which bottom overlay is open. */
-type OverlayKind = 'annotations' | 'diff'
+type OverlayKind = 'annotations' | 'records' | 'diff'
 
 /** Composer target: a selected line range or the whole document. */
 interface ComposeTarget {
@@ -109,6 +109,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const [composer, setComposer] = useState<ComposeTarget | null>(null)
   const [comment, setComment] = useState('')
   const [overlay, setOverlay] = useState<OverlayKind | null>(null)
+  /** Submitted records for this file (null while the first fetch runs). */
+  const [records, setRecords] = useState<readonly ReviewHistoryEntry[] | null>(null)
   const [diffOpen, setDiffOpen] = useState(false)
   /** Source view (exact lines, annotations) or read-only rendered view. */
   const [view, setView] = useState<'source' | 'render'>('source')
@@ -163,10 +165,29 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
 
   useEffect(() => { void load() }, [load])
 
+  /** Records are per file: filter the submitted history by the tab's fileId (or its resolved path). */
+  const loadRecords = useCallback(async (): Promise<void> => {
+    if (fileId === undefined) {
+      setRecords([])
+      return
+    }
+    try {
+      const payload = await notebook.history()
+      setRecords(payload.entries.filter(entry => entry.record.fileId === fileId
+        || (path !== undefined && entry.resolvedPath === path)))
+    } catch {
+      setRecords([])
+    }
+  }, [fileId, notebook, path])
+
+  useEffect(() => { void loadRecords() }, [loadRecords])
+
   // Quiet refresh while visible; a hidden tab does no work.
   useEffect(() => {
     const refresh = (): void => {
-      if (document.visibilityState === 'visible') void load(true)
+      if (document.visibilityState !== 'visible') return
+      void load(true)
+      void loadRecords()
     }
     document.addEventListener('visibilitychange', refresh)
     const timer = setInterval(refresh, 60_000)
@@ -174,7 +195,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       document.removeEventListener('visibilitychange', refresh)
       clearInterval(timer)
     }
-  }, [load])
+  }, [load, loadRecords])
 
   useEffect(() => {
     if (notice === null) return
@@ -313,11 +334,12 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       annotations,
     }
     void notebook.recordReview(record)
+      .then(() => { void loadRecords() })
       .catch((cause: unknown) => setNotice(t('review.historySaveFailed', { message: messageOf(cause) })))
     persist([])
     setOverlay(null)
     setNotice(t('review.submitted'))
-  }, [annotations, bridge, fileId, notebook, path, persist, sessionId, t, workspaceId])
+  }, [annotations, bridge, fileId, loadRecords, notebook, path, persist, sessionId, t, workspaceId])
 
   const diff = baseline !== null && page !== null && baseline !== page.body
     ? { oldText: baseline, newText: page.body }
@@ -603,6 +625,43 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
             </div>
           )
         : null}
+      {overlay === 'records'
+        ? (
+            <div className="dsh-desk-review-layer">
+              <div className="dsh-desk-review-layerhead">
+                <span className="dsh-desk-review-layericon" aria-hidden="true"><IconClockOutlineRegular /></span>
+                <h4>{t('review.recordsTitle', { count: records?.length ?? 0 })}</h4>
+                <Tooltip label={t('review.hideOverlay')} side="bottom" delayMs={400}>
+                  <Button variant="ghost" size="sm" icon={<IconChevronDownOutlineRegular />} aria-label={t('review.hideOverlay')} onClick={() => setOverlay(null)} />
+                </Tooltip>
+              </div>
+              <div className="dsh-desk-review-layerbody">
+                {records === null
+                  ? <p className="dsh-desk-notebook-hint">{t('state.loading')}</p>
+                  : records.length === 0
+                    ? <p className="dsh-desk-notebook-hint">{t('review.recordsEmpty')}</p>
+                    : records.map(entry => (
+                        <div className="dsh-desk-review-record" key={entry.record.id}>
+                          <div className="dsh-desk-review-recordehead">
+                            <span>{new Date(entry.record.createdAt).toLocaleString()}</span>
+                            <span className="dsh-desk-review-fieldcount">
+                              {t('review.recordAnnotations', { count: entry.record.annotations.length })}
+                            </span>
+                          </div>
+                          {entry.record.annotations.map(annotation => (
+                            <div className="dsh-desk-review-pending" key={annotation.id}>
+                              <div className="dsh-desk-review-pending-main">
+                                <p className="dsh-desk-review-quote dsh-desk-review-quote-inline">{quoteBlock(annotation.quote)}</p>
+                                <p className="dsh-desk-review-pending-text">{annotation.text}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+              </div>
+            </div>
+          )
+        : null}
       <div className="dsh-desk-review-bar">
         <button
           type="button"
@@ -613,6 +672,16 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         >
           <span className="dsh-desk-review-pillicon"><IconListPenOutlineRegular /></span>
           <span>{t('review.pendingBar', { count: annotations.length })}</span>
+        </button>
+        <button
+          type="button"
+          className="dsh-desk-review-pill"
+          data-active={overlay === 'records'}
+          aria-expanded={overlay === 'records'}
+          onClick={() => setOverlay(current => current === 'records' ? null : 'records')}
+        >
+          <span className="dsh-desk-review-pillicon"><IconClockOutlineRegular /></span>
+          <span>{t('review.recordsBar', { count: records?.length ?? 0 })}</span>
         </button>
         <button
           type="button"

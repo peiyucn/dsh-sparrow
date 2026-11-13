@@ -79,14 +79,14 @@
 - 顶部工具条：**模仿官方文档预览的表头**——38px 行高、发丝底边；视图切换用面板既有的官方 `SegmentedTabs`
   胶囊（sm），两档 `MD / 代码`（代码 = 源码 + 批注，默认）；复制路径 / 刷新用官方 Button ghost + Tooltip，整篇批注用官方 outline Button；
 - 底部固定菜单：**官方 composer 胶囊**（官方 `Pill`）——透明底、左侧拖拽条上方一条发丝分隔线、
-  两枚胶囊**居中**：`批注草稿 N 处` 与 `本轮改动 +A −D`（无改动显示「持平」），点开为浮层；
+  三枚胶囊**居中**：`批注草稿 N 处`、`批注记录 N 条` 与 `本轮改动 +A −D`（无改动显示「持平」），点开为浮层；批注记录浮层按当前 fileId（或解析后的路径）列出已提交记录，含时间、批注条数、引用与意见；
   浮层用官方菜单面（menu surface token + 圆角 + elevation），提交 / 收起用官方 Button；
 - frontmatter：`page.fields` 在审阅内容上方以**默认折叠**的只读元数据行渲染（点开后展开元数据块）（MD / 源码都显示；源码正文仍是不含 frontmatter 的 body，行号与批注保持一致）。
 - 本轮基线：按 `fileId` 持久化在宿主 `desk_one` 域的 `note-baseline` 记录（不是浏览器 storage，清浏览器缓存不丢；正文上限 1MB（与可审阅文件上限一致），超限删除宿主记录、只保留内存基线），刷新 / 重开 tab 不重置；「本轮改动」里的重新取基线会覆盖。
 - 对话提示：审阅会话在官方 `conversation.input.dock`（session 级）注册一个左侧 AI 气泡「请您开始审阅吧…」，用 flex order 排到输入框下方（空白会话与已开始会话一致），只在审阅会话显示（reviewSessions 记录 session id）。
 - 视觉规范：入口页、审阅 tab、官方预览按钮统一用官方主题 token 与官方基础组件
   （Button / Input / SegmentedTabs / Pill / Tag / Modal），不自造按钮/胶囊样式；
-  官方预览头部的「审阅视图」按钮用品牌色填充（`state-business-primary`），深色主题下不再变白块。
+  官方预览头部的「审阅视图」按钮用品牌色填充（`state-business-primary`），深色主题下不再变白块。底部胶囊采用官方 Pill 形状 + 自包含玻璃（半透明 + backdrop blur + 发丝边框，不依赖 theme-tone），不复制官方组件。
 - 「本轮改动」= tab 打开时正文 vs 当前正文（官方 DiffBlock，默认收起）；可见时静默刷新；
 - 「提交批注」：按编号插入新会话输入框（不自动发送），格式：
 

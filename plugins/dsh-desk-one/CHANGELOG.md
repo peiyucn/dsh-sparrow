@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review annotation records**: a third bottom pill “N annotation records” lists the submitted annotation records for the current file (time, count, quote and comment) and refreshes after submitting.
+
 * **Review hint bubble**: moved from above to **below the composer** in both the blank and docked states (the composer stays visible); it no longer touches the sidebar edge.
 
 * **Notebook list**: rows per page raised from 10 to 20 so the list fills large screens better.

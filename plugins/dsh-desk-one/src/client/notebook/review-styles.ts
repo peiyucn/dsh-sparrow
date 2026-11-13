@@ -244,6 +244,26 @@ export const REVIEW_CSS = `
   overflow-y: auto;
   padding: 10px 12px 12px;
 }
+.dsh-desk-review-record {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px 0;
+  border-top: 1px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.06));
+}
+.dsh-desk-review-record:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.dsh-desk-review-recordehead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+  line-height: 16px;
+}
 .dsh-desk-review-layerhead h4 {
   flex: 1;
   margin: 0;
