@@ -89,7 +89,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'review.viewSource'
       | 'review.viewRender'
       | 'review.renderHint'
-      | 'review.noChange'
       | 'notebook.new'
       | 'notebook.newTitlePlaceholder'
       | 'notebook.createEmpty'

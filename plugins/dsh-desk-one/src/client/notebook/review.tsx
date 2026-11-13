@@ -448,7 +448,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const pendingLabel = t('review.pendingBar', { count: annotations.length })
   const recordsLabel = t('review.recordsBar', { rounds: recordRounds, notes: recordAnnotations })
   const changesLabel = totals === null
-    ? `${t('review.changes')} ${t('review.noChange')}`
+    ? t('review.changes')
     : `${t('review.changes')} +${totals.added} −${totals.removed}`
 
   return (
@@ -740,7 +740,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
             <span className="dsh-desk-review-split-icon"><IconInspectOutlineRegular /></span>
             <span className="dsh-desk-review-split-label">{t('review.changes')}</span>
             {totals === null
-              ? <span className="dsh-desk-review-split-muted">{t('review.noChange')}</span>
+              ? null
               : (
                   <>
                     <span className="dsh-desk-review-difftag dsh-desk-review-difftag-plus">{`+${totals.added}`}</span>

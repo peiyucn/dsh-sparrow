@@ -587,8 +587,7 @@ body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   white-space: nowrap;
   font-weight: 500;
 }
-.dsh-desk-review-split-count,
-.dsh-desk-review-split-muted {
+.dsh-desk-review-split-count {
   flex: none;
   color: color-mix(in srgb, currentColor 68%, transparent);
   font-size: 12px;
