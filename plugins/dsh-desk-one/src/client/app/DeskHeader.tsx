@@ -9,7 +9,7 @@
  */
 
 import type { ReactElement, ReactNode } from 'react'
-import { IconPanelLeftOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloseOutlineRegular, IconPlusOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DeskTranslator, Tab } from './types.js'
 import { OVERFLOW_TABS, VISIBLE_TABS } from './tabs.js'
 import { DeskTabMenu } from './DeskTabMenu.js'
@@ -71,7 +71,7 @@ export function DeskHeader({ t, tab, onSelectTab, pinned, onTogglePin, actions }
           title={shortcutLabel}
           onClick={onTogglePin}
         >
-          <IconPanelLeftOutlineRegular />
+          {pinned ? <IconCloseOutlineRegular /> : <IconPlusOutlineRegular />}
           <span>{shortcutLabel}</span>
         </button>
       </nav>
