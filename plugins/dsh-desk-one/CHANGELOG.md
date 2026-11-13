@@ -8,7 +8,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 * **Review round baseline**: stored per **review session** — opening a review session starts a fresh round from the body it opens, a refresh or reopened tab keeps this round’s changes, and the confusing “use current as baseline” button is gone.
 * **Review guidance bubble**: hides once the conversation starts; it is only a blank-session hint instead of staying under the composer.
-* **Review sidebar mark**: the note markdown icon now also shows while the Session is running / waiting (moved after the relative time), so it no longer waits for the run to finish.
+* **Review sidebar mark**: the notebook-area tab glyph now also shows while the Session is running / waiting (moved after the relative time), so it no longer waits for the run to finish.
 * **MD / code switch**: restyled like the header ghost buttons (transparent with a hairline outline, same height) with labels centred horizontally and vertically.
 
 * **Review bottom bar**: the two split buttons are now 36px tall and sit 18px above the bottom edge; the code scrolls under them and fades into the pane ground at the bottom (like the official @ / slash list); the chevron menus use the same white-blur material and open above the buttons instead of covering them; the buttons now use the official primary material instead of a hand-made glass, matching the app’s white buttons.
@@ -19,7 +19,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 * **Review bottom bar**: on a narrow pane the three pills shrink and ellipsize their labels (hover shows the full reading, like official composer pills) instead of overflowing; below 430px the gap and padding tighten too.
 
-* **Review Session marker**: Sessions opened by the review flow show the note markdown icon before their sidebar title; the marker is persisted by the host (survives refresh/restart) so review Sessions are recognisable at a glance.
+* **Review Session marker**: Sessions opened by the review flow show the notebook-area tab glyph before their sidebar title; the marker is persisted by the host (survives refresh/restart) so review Sessions are recognisable at a glance.
 
 * **Review annotation records**: a third bottom pill reads “R rounds / M annotations” (rounds and annotation items reported separately), and lists the submitted records for the current file (time, count, quote and comment); it refreshes after submitting.
 

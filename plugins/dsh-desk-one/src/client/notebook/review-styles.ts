@@ -117,8 +117,9 @@ export const REVIEW_CSS = `
   white-space: nowrap;
 }
 
-/* Coloured markdown sheet before the review tab title, mirroring official file/Browser tab titles. */
+/* The notebook-area tab glyph before the review tab title, so the review tab and the 笔记 tab match. */
 .dsh-desk-review-tabicon {
+  display: inline-flex;
   flex: 0 0 auto;
   margin-right: 4px;
   vertical-align: middle;

@@ -10,7 +10,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
-  Button, DiffBlock, DisclosureRow, FileTypeIcon, IconChevronDownOutlineRegular, IconClockOutlineRegular, IconCopyOutlineRegular,
+  Button, DiffBlock, DisclosureRow, IconChevronDownOutlineRegular, IconClockOutlineRegular, IconCopyOutlineRegular,
   IconInfoOutlineRegular, IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
   MarkdownText, Menu, MenuItemButton, SegmentedTabs, Tooltip, diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -18,6 +18,7 @@ import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import { persistReviewSession } from '../reviewSessions.js'
+import { DeskTabGlyph } from '../tabIcons.js'
 import type { DraftAnnotation, NotebookPageResponse, ReviewHistoryEntry } from '../../notebook-contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import { messageOf } from '../app/utils.js'
@@ -767,7 +768,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
 export function NoteReviewTabTitle(props: PropsLocale<typeof LOCALE_NAMESPACE>): ReactElement {
   return (
     <>
-      <FileTypeIcon kind="markdown" size={16} className="dsh-desk-review-tabicon" />
+      <span className="dsh-desk-review-tabicon"><DeskTabGlyph tab="notebook" size={16} /></span>
       {props.t('review.tabTitle')}
     </>
   )
