@@ -104,7 +104,16 @@ async function createRoute(route: DeskRouteContext, req: IncomingMessage, res: S
 }
 
 async function reviewSessionsGetRoute(route: DeskRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
-  sendJson(res, 200, { sessionIds: route.store.listReviewSessions().map(marker => marker.sessionId) })
+  const markers = route.store.listReviewSessions()
+  sendJson(res, 200, {
+    sessionIds: markers.map(marker => marker.sessionId),
+    sessions: markers.map(marker => ({
+      sessionId: marker.sessionId,
+      ...marker.workspaceId === undefined ? {} : { workspaceId: marker.workspaceId },
+      ...marker.fileId === undefined ? {} : { fileId: marker.fileId },
+      updatedAt: marker.updatedAt,
+    })),
+  })
 }
 
 async function reviewSessionMarkRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {

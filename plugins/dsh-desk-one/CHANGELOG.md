@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review session reuse**: opening the same note again returns to that note’s existing openable review session (matched by the host-persisted note identity; deleted, archived or other-workspace sessions are not reused) instead of starting a new one each time; a fresh session starts only when none is usable.
+
 * **Review composer hint**: the placeholder-style guidance now matches the official placeholder box — same type and caret origin, one-line ellipsis in the docked composer, two-line clamping in the hero empty state.
 
 * **Session list**: every row gains copy-name and copy-session-id buttons (active, archived, stray and trash alike) with success / failure feedback on the button itself.

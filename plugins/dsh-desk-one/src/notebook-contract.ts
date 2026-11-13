@@ -263,6 +263,16 @@ export interface MarkReviewSessionRequest {
 
 export interface ReviewSessionListResponse {
   readonly sessionIds: readonly string[]
+  /** Durable markers with the note identity, so the client can reopen a file's existing review. */
+  readonly sessions?: readonly ReviewSessionInfo[]
+}
+
+/** Lightweight durable marker the client keeps to find a note's existing review Session. */
+export interface ReviewSessionInfo {
+  readonly sessionId: string
+  readonly workspaceId?: string
+  readonly fileId?: string
+  readonly updatedAt: string
 }
 
 export interface ReviewHistoryResponse {

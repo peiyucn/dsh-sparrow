@@ -1,14 +1,20 @@
 /**
- * Review bridge: starts a dedicated review session in the notebook's workspace and opens the
- * review tab there.
+ * Review bridge: opens one note's review in a Session.
  *
- * A review must not borrow the conversation the user is currently in (that would silently mix
- * review context into an unrelated session), so the entry goes through the official New Session
- * action for the library's workspace and the tab binds to that fresh session.
+ * A review must not borrow the conversation the user is currently in, so this never reuses an
+ * unrelated Session. It does, however, reopen the note's OWN previous review Session when that
+ * Session is still around: the durable review-session markers carry the note `fileId`, so clicking
+ * the same note again continues the existing conversation instead of piling up a new Session per
+ * click. A fresh Session is started only for a first review, or when the marker points at a
+ * deleted / archived / other-workspace Session.
  */
 
-import { rememberReviewSession } from '../reviewSessions.js'
-import type { ConversationLike, SessionNavigationLike, SessionScopeLike, SessionsLike, SidebarRightLike } from './faces.js'
+import {
+  pickReusableReviewSession, rememberReviewSession, reviewSessionCandidates, reviewSessionsReady,
+} from '../reviewSessions.js'
+import type {
+  ConversationLike, SessionNavigationLike, SessionScopeLike, SessionsLike, SidebarRightLike, WorkspacesLike,
+} from './faces.js'
 
 /** Tab implementation id (registration key and definition id). */
 export const REVIEW_TAB_ID = 'dsh-desk-one-note-review'
@@ -37,16 +43,12 @@ export interface ReviewOpenResult {
 /** Open face shared with the notebook page. */
 export interface ReviewBridge {
   /**
-   * Start a review in a new session of the library workspace, then open the review tab.
+   * Open a review for one note: reopen the note's existing review Session when it is still
+   * openable in the same workspace, otherwise start a new one. Then open the review tab there.
    * @param input - page path, file identity, and the workspace to open the session in.
    * @returns whether the tab opened, plus a readable reason.
    */
   open(input: ReviewOpenInput): Promise<ReviewOpenResult>
-  /**
-   * Reveal the review tab in the CURRENT session, used when a review Session already exists and
-   * the user pressed the preview header's review button while browsing its files.
-   */
-  reveal(input: ReviewOpenInput): ReviewOpenResult
   /** Start a new session in one workspace with a prefilled composer draft (never sends). */
   draftInNewSession(workspaceId: string, prompt: string): void
   /**
@@ -60,6 +62,7 @@ export interface ReviewBridge {
   sendQuote(sessionId: string, text: string): boolean
   attachSidebar(service: SidebarRightLike): () => void
   attachSessions(service: SessionsLike): () => void
+  attachWorkspaces(service: WorkspacesLike): () => void
   attachNavigation(service: SessionNavigationLike): () => void
 }
 
@@ -67,17 +70,62 @@ export interface ReviewBridge {
 const OPEN_RETRIES = 20
 /** Delay between attempts (ms). */
 const OPEN_RETRY_MS = 100
+/** Attempts to see the sidebar mount a reused Session before opening its tab. */
+const MOUNT_RETRIES = 40
+/** Delay between mount checks (ms). */
+const MOUNT_RETRY_MS = 50
 
 /** Sleep one retry slice. */
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+/** Wait until the right sidebar reports one Session on screen. */
+async function waitForMounted(sidebar: SidebarRightLike, sessionId: string): Promise<boolean> {
+  const mounted = sidebar.mounted
+  if (mounted === undefined) return false
+  for (let attempt = 0; attempt < MOUNT_RETRIES; attempt += 1) {
+    if (mounted.getSnapshot() === sessionId) return true
+    await delay(MOUNT_RETRY_MS)
+  }
+  return false
+}
+
+/** Open the review tab, retrying while the sidebar surface settles for the Session. */
+async function openReviewTab(sidebar: SidebarRightLike, params: NoteReviewParams): Promise<boolean> {
+  for (let attempt = 0; attempt < OPEN_RETRIES; attempt += 1) {
+    try {
+      sidebar.openTab(REVIEW_TAB_KIND, { params })
+      return true
+    } catch {
+      await delay(OPEN_RETRY_MS)
+    }
+  }
+  return false
+}
+
 /** Create the bridge; all services start detached. */
 export function createReviewBridge(): ReviewBridge {
   let sidebarRight: SidebarRightLike | undefined
   let sessions: SessionsLike | undefined
+  let workspaces: WorkspacesLike | undefined
   let navigation: SessionNavigationLike | undefined
+
+  /** Whether a marked Session still exists and is not archived (the only safe reuse targets). */
+  const isOpenable = (sessionId: string): boolean => {
+    const list = sessions?.list?.getSnapshot()
+    if (list?.ids === undefined || !list.ids.includes(sessionId)) return false
+    const archived = workspaces?.list?.getSnapshot().archivedSessionIds
+    return archived?.includes(sessionId) !== true
+  }
+
+  /** The note's own review Session, when one is still openable in this workspace. */
+  const reusableSession = async (input: NoteReviewParams): Promise<string | undefined> => {
+    await reviewSessionsReady()
+    const candidates = reviewSessionCandidates(input.fileId)
+    if (candidates.length === 0) return undefined
+    return pickReusableReviewSession(candidates, input.workspaceId, isOpenable)
+  }
 
   return {
     async open(input) {
@@ -85,6 +133,23 @@ export function createReviewBridge(): ReviewBridge {
       const sidebar = sidebarRight
       if (nav === undefined) return { ok: false, message: '对话导航服务不可用（无法新建审阅会话）' }
       if (sidebar === undefined) return { ok: false, message: '右侧栏服务不可用（无法打开审阅视图）' }
+      const params: NoteReviewParams = { path: input.path, fileId: input.fileId, workspaceId: input.workspaceId }
+      // 1) Continue this note's existing review conversation when it is still openable.
+      if (nav.openSession !== undefined) {
+        try {
+          const reusable = await reusableSession(input)
+          if (reusable !== undefined) {
+            nav.openSession(reusable)
+            if (await waitForMounted(sidebar, reusable) && await openReviewTab(sidebar, params)) {
+              rememberReviewSession(reusable)
+              return { ok: true }
+            }
+          }
+        } catch {
+          // Navigation refused (e.g. the Host stopped listing it) — fall through to a fresh Session.
+        }
+      }
+      // 2) First review of this note, or the previous review Session is gone.
       try {
         // Same flow as the New Session button; openWorkspace also tells us the session id so the
         // conversation-area review hint can be scoped to this session only.
@@ -96,26 +161,10 @@ export function createReviewBridge(): ReviewBridge {
       } catch (cause) {
         return { ok: false, message: `新建审阅会话失败：${cause instanceof Error ? cause.message : String(cause)}` }
       }
-      const params: NoteReviewParams = { path: input.path, fileId: input.fileId, workspaceId: input.workspaceId }
-      for (let attempt = 0; attempt < OPEN_RETRIES; attempt += 1) {
-        try {
-          sidebar.openTab(REVIEW_TAB_KIND, { params })
-          return { ok: true }
-        } catch {
-          await delay(OPEN_RETRY_MS)
-        }
+      if (!await openReviewTab(sidebar, params)) {
+        return { ok: false, message: '审阅会话已创建，但右侧栏没有就绪，请再点一次「审阅」' }
       }
-      return { ok: false, message: '审阅会话已创建，但右侧栏没有就绪，请再点一次「审阅」' }
-    },
-    reveal(input) {
-      const sidebar = sidebarRight
-      if (sidebar === undefined) return { ok: false, message: '右侧栏服务不可用（无法打开审阅视图）' }
-      try {
-        sidebar.openTab(REVIEW_TAB_KIND, { params: { path: input.path, fileId: input.fileId, workspaceId: input.workspaceId } })
-        return { ok: true }
-      } catch (cause) {
-        return { ok: false, message: `打开审阅视图失败：${cause instanceof Error ? cause.message : String(cause)}` }
-      }
+      return { ok: true }
     },
     async openFilesBrowser(workspaceId) {
       const nav = navigation
@@ -156,6 +205,10 @@ export function createReviewBridge(): ReviewBridge {
     attachSessions(service) {
       sessions = service
       return () => { if (sessions === service) sessions = undefined }
+    },
+    attachWorkspaces(service) {
+      workspaces = service
+      return () => { if (workspaces === service) workspaces = undefined }
     },
     attachNavigation(service) {
       navigation = service

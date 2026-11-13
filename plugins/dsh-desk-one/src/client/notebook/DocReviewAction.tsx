@@ -2,9 +2,10 @@
  * Document-preview entry: one "review view" button in the official preview header.
  *
  * The official file browser and markdown preview are left untouched; this contribution only
- * appears for markdown/text files inside the linked notebook workspace, and clicking it starts a
- * dedicated review session (in that workspace) and opens the review tab, which shows the markdown
- * source with exact line numbers by default. The official preview stays as it was.
+ * appears for markdown/text files inside the linked notebook workspace, and clicking it opens the
+ * review view for that note — the note's existing review Session when it is still openable,
+ * otherwise a fresh one (the bridge owns that decision) — so the official preview and the review
+ * view toggle in place instead of piling up review Sessions.
  */
 
 import { useEffect, useState } from 'react'
@@ -14,7 +15,6 @@ import { Button, IconListPenOutlineRegular, Tooltip } from '@deepseek-ai/dsh-cli
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import { messageOf } from '../app/utils.js'
-import { isReviewSession } from '../reviewSessions.js'
 import type { NotebookApi } from './api.js'
 import type { ReviewBridge } from './review-bridge.js'
 import type { WorkspaceAccess } from './workspaces.js'
@@ -63,8 +63,6 @@ function relativeToRoot(absolutePath: string, rootPath: string): string {
  */
 export function DocReviewAction(props: DocReviewActionProps): ReactNode {
   const { absolutePath, notebook, review, workspaceAccess, t } = props
-  // Session-scoped slot: the runtime always supplies the current Session id.
-  const sessionId = (props as unknown as { readonly sessionId?: string }).sessionId
   const [rootPath, setRootPath] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
@@ -103,12 +101,9 @@ export function DocReviewAction(props: DocReviewActionProps): ReactNode {
           setBusy(true)
           setFailed(null)
           void notebook.ensureFile(relativePath).then(({ file }) => (
-            // A Session that already shows the review tab just switches back to it, so the
-            // official files preview and the review view toggle in place instead of opening a
-            // second review Session.
-            sessionId !== undefined && isReviewSession(sessionId)
-              ? Promise.resolve(review.reveal({ path: relativePath, fileId: file.id, workspaceId: workspace.workspaceId }))
-              : review.open({ path: relativePath, fileId: file.id, workspaceId: workspace.workspaceId })
+            // The bridge reopens this note's own review Session when it is still openable, so the
+            // official files preview and the review view toggle in place.
+            review.open({ path: relativePath, fileId: file.id, workspaceId: workspace.workspaceId })
           )).then((result) => {
             if (!result.ok) setFailed(result.message ?? t('review.openFailed'))
           }, (cause: unknown) => {

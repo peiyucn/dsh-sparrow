@@ -67,6 +67,11 @@ export function apply(ctx: ClientContext): void {
     const detach = review.attachSessions(sessionCtx.get('sessions') as never)
     sessionCtx.effect(() => detach, `${PACKAGE_NAME}: review sessions`)
   })
+  // The archived set decides whether a note's previous review Session can be reopened.
+  ctx.inject(['workspaces'], (workspaceCtx) => {
+    const detach = review.attachWorkspaces(workspaceCtx.get('workspaces') as never)
+    workspaceCtx.effect(() => detach, `${PACKAGE_NAME}: review workspaces`)
+  })
   ctx.inject(['uiWorkspace'], (navigationCtx) => {
     const detach = review.attachNavigation(navigationCtx.get('uiWorkspace') as never)
     navigationCtx.effect(() => detach, `${PACKAGE_NAME}: review navigation`)

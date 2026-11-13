@@ -3,14 +3,31 @@
  * panel boots on hosts that do not expose them).
  */
 
+/** Read-only snapshot store subset shared by the official list services. */
+export interface SnapshotLike<T> {
+  getSnapshot(): T
+}
+
 /** Official right-sidebar service face. */
 export interface SidebarRightLike {
   openTab(kind: string, options?: { readonly params?: unknown }): void
+  /**
+   * The Session currently drawn by the sidebar. It moves before React paints the switch, so reuse
+   * navigation can wait for it and only then open the tab in the arriving Session.
+   */
+  readonly mounted?: SnapshotLike<string | undefined>
 }
 
-/** Official sessions service face (reach one session's composer). */
+/** Official sessions service face (reach one session's composer, inspect the live catalog). */
 export interface SessionsLike {
   scope(id: string): SessionScopeLike | undefined
+  /** Live Session catalog: a marker's Session must still be listed to be reopened. */
+  readonly list?: SnapshotLike<{ readonly ids?: readonly string[] }>
+}
+
+/** Official workspaces service face (archived Sessions cannot be reopened). */
+export interface WorkspacesLike {
+  readonly list?: SnapshotLike<{ readonly archivedSessionIds?: readonly string[] }>
 }
 
 /** Session-scope lookup face. */
@@ -38,4 +55,6 @@ export interface SessionNavigationLike {
    * Official Workspace navigation; optional because older hosts may only expose startSession.
    */
   openWorkspace?(workspaceId: string, beforeOpen?: (sessionId: string) => void): Promise<void>
+  /** Select an existing Session (official `uiWorkspace.openSession`). */
+  openSession?(sessionId: string): void
 }

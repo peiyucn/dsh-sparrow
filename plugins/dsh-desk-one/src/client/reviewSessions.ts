@@ -1,13 +1,19 @@
 /**
- * Session ids opened by the notebook review flow.
+ * Session ids opened by the notebook review flow, plus the durable note identity of each one.
  *
- * The conversation hint is a session-scoped dock, so it must only render for sessions we started
- * for a review — not for every new session. Ids are kept in memory for this client run.
+ * Two consumers share the registry: session-scoped decorations (the composer hint and the sidebar
+ * row icon) only need "is this a review Session", while opening a note again needs to find that
+ * note's existing review Session. The host storage marker carries the note `fileId`, so the same
+ * file reopens its own conversation instead of starting a new one; both maps are filled by the
+ * one-shot host hydration and kept current whenever a review tab mounts.
  */
 
 import type { NotebookApi } from './notebook/api.js'
+import type { ReviewSessionInfo } from '../notebook-contract.js'
 
 const reviewSessionIds = new Set<string>()
+/** Latest known marker per Session id: durable note identity for reopening. */
+const markers = new Map<string, ReviewSessionInfo>()
 const listeners = new Set<() => void>()
 let hydrated = false
 let hydrating: Promise<void> | undefined
@@ -29,6 +35,10 @@ export function hydrateReviewSessions(notebook: NotebookApi): void {
     try {
       const payload = await notebook.listReviewSessions()
       for (const sessionId of payload.sessionIds) rememberReviewSession(sessionId)
+      for (const info of payload.sessions ?? []) {
+        markers.set(info.sessionId, info)
+        rememberReviewSession(info.sessionId)
+      }
     } catch {
       // The hint is optional; the panel keeps working without persisted markers.
     } finally {
@@ -38,12 +48,26 @@ export function hydrateReviewSessions(notebook: NotebookApi): void {
   })()
 }
 
+/** Resolve once the durable markers had their chance to load, so a fast first click still sees them. */
+export function reviewSessionsReady(): Promise<void> {
+  return hydrating ?? Promise.resolve()
+}
+
 /** Mark one review session locally (instant) and in host storage (durable across restarts). */
 export function persistReviewSession(notebook: NotebookApi, input: {
   readonly sessionId: string
   readonly workspaceId?: string
   readonly fileId?: string
 }): void {
+  const previous = markers.get(input.sessionId)
+  const workspaceId = input.workspaceId ?? previous?.workspaceId
+  const fileId = input.fileId ?? previous?.fileId
+  markers.set(input.sessionId, {
+    sessionId: input.sessionId,
+    updatedAt: new Date().toISOString(),
+    ...workspaceId === undefined ? {} : { workspaceId },
+    ...fileId === undefined ? {} : { fileId },
+  })
   rememberReviewSession(input.sessionId)
   void notebook.markReviewSession(input).catch(() => {
     // Local memory still shows the hint; only the restart-persistent marker is lost.
@@ -53,6 +77,32 @@ export function persistReviewSession(notebook: NotebookApi, input: {
 /** Whether the session was started by the review flow. */
 export function isReviewSession(sessionId: string): boolean {
   return reviewSessionIds.has(sessionId)
+}
+
+/** Durable markers for one note file, newest first. */
+export function reviewSessionCandidates(fileId: string): ReviewSessionInfo[] {
+  return [...markers.values()]
+    .filter(info => info.fileId === fileId)
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+}
+
+/**
+ * Pick the newest review Session of one note that is still openable in the same workspace.
+ * @param candidates - markers for that note, newest first.
+ * @param workspaceId - workspace the note library is linked to.
+ * @param isOpenable - whether the Session still exists and is not archived.
+ * @returns the Session id to reuse, or undefined when a new Session must start.
+ */
+export function pickReusableReviewSession(
+  candidates: readonly ReviewSessionInfo[],
+  workspaceId: string,
+  isOpenable: (sessionId: string) => boolean,
+): string | undefined {
+  for (const candidate of candidates) {
+    if (candidate.workspaceId !== undefined && candidate.workspaceId !== workspaceId) continue
+    if (isOpenable(candidate.sessionId)) return candidate.sessionId
+  }
+  return undefined
 }
 
 /** Observe the registry so the conversation hint can appear after a review tab mounts. */
