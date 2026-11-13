@@ -2,6 +2,7 @@
 
 export const REVIEW_CSS = `
 .dsh-desk-review {
+  container-type: inline-size;
   --dsh-desk-review-bar-h: 28px;
   box-sizing: border-box;
   display: flex;
@@ -578,9 +579,12 @@ export const REVIEW_CSS = `
    reading does not depend on the optional theme-tone plugin. */
 .dsh-desk-review-pill {
   display: inline-flex;
+  flex: 0 1 auto;
   align-items: center;
   gap: 6px;
   box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
   height: 28px;
   padding: 0 11px;
   border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
@@ -599,6 +603,27 @@ export const REVIEW_CSS = `
   width: 15px;
   height: 15px;
   flex: none;
+}
+/* Long labels ellipsize instead of pushing the three pills out of the pane. */
+.dsh-desk-review-pill-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dsh-desk-review-pill > .dsh-desk-review-difftag {
+  flex: none;
+}
+@container (max-width: 430px) {
+  .dsh-desk-review-bar {
+    left: 8px;
+    right: 8px;
+    gap: 4px;
+  }
+  .dsh-desk-review-pill {
+    gap: 4px;
+    padding: 0 8px;
+  }
 }
 .dsh-desk-review-pill:hover,
 .dsh-desk-review-pill[data-active='true'] {

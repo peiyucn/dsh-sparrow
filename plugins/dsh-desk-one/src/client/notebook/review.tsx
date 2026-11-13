@@ -681,7 +681,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
           onClick={() => setOverlay(current => current === 'annotations' ? null : 'annotations')}
         >
           <span className="dsh-desk-review-pillicon"><IconListPenOutlineRegular /></span>
-          <span>{t('review.pendingBar', { count: annotations.length })}</span>
+          <span className="dsh-desk-review-pill-label">{t('review.pendingBar', { count: annotations.length })}</span>
         </button>
         <button
           type="button"
@@ -691,7 +691,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
           onClick={() => setOverlay(current => current === 'records' ? null : 'records')}
         >
           <span className="dsh-desk-review-pillicon"><IconClockOutlineRegular /></span>
-          <span>{t('review.recordsBar', { rounds: recordRounds, notes: recordAnnotations })}</span>
+          <span className="dsh-desk-review-pill-label">{t('review.recordsBar', { rounds: recordRounds, notes: recordAnnotations })}</span>
         </button>
         <button
           type="button"
@@ -701,7 +701,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
           onClick={() => setOverlay(current => current === 'diff' ? null : 'diff')}
         >
           <span className="dsh-desk-review-pillicon"><IconInspectOutlineRegular /></span>
-          <span>{t('review.changes')}</span>
+          <span className="dsh-desk-review-pill-label">{t('review.changes')}</span>
           {totals === null
             ? <span>{t('review.noChange')}</span>
             : (

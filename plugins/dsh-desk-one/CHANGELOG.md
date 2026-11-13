@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review bottom bar**: on a narrow pane the three pills shrink and ellipsize their labels instead of overflowing (below 430px the gap and padding tighten too).
+
 * **Review Session marker**: Sessions opened by the review flow show the blue whale mark before their sidebar title; the marker is persisted by the host (survives refresh/restart) so review Sessions are recognisable at a glance.
 
 * **Review annotation records**: a third bottom pill reads “R rounds / M annotations” (rounds and annotation items reported separately), and lists the submitted records for the current file (time, count, quote and comment); it refreshes after submitting.
