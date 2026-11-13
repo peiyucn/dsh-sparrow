@@ -90,9 +90,8 @@ export function DocReviewAction(props: DocReviewActionProps): ReactNode {
   return (
     <Tooltip label={label} side="bottom" delayMs={400}>
       <Button
-        variant="primary"
+        variant="ghost"
         size="sm"
-        className="dsh-desk-docreview"
         icon={<IconListPenOutlineRegular />}
         aria-label={t('review.openInPreview')}
         title={t('review.openInPreview')}

@@ -550,28 +550,6 @@ export const REVIEW_CSS = `
   line-height: 1.7;
 }
 
-.dsh-desk-docreview {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  /* Brand-primary turns near-white in the dark theme; the business state color stays a real
-     brand fill in both themes, which is what the coloured preview-header action needs. */
-  background: var(--dsw-alias-state-business-primary, #4176e6);
-  color: var(--dsw-alias-label-primary-foreground, #ffffff);
-  cursor: pointer;
-}
-.dsh-desk-docreview:hover {
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #4176e6) 84%, #000000);
-}
-.dsh-desk-docreview:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
 /* Official composer-pill reading: transparent, centred pills on the pane floor. */
 .dsh-desk-review-bar {
   position: absolute;
@@ -743,18 +721,5 @@ export const REVIEW_CSS = `
 }
 .dsh-desk-review-menu [role='menuitem'] svg {
   color: inherit;
-}
-/* Square brand-icon button in the official preview header (official Button geometry).
-   The doubled class beats the host Button's primary fill, which is near-white in dark theme. */
-button.dsh-desk-docreview.dsh-desk-docreview {
-  flex: none;
-  min-width: 28px;
-  padding: 0;
-  background: var(--dsw-alias-state-business-primary, #4176e6);
-  color: var(--dsw-alias-label-primary-foreground, #ffffff);
-}
-button.dsh-desk-docreview.dsh-desk-docreview:hover {
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #4176e6) 84%, #000000);
-  color: var(--dsw-alias-label-primary-foreground, #ffffff);
 }
 `
