@@ -521,6 +521,8 @@ export const REVIEW_CSS = `
   gap: 8px;
   height: var(--dsh-desk-review-bar-h);
   padding: 0;
+  border: 0;
+  background: none;
   pointer-events: none;
 }
 .dsh-desk-review-bar > * {
@@ -561,7 +563,6 @@ export const REVIEW_CSS = `
   .dsh-desk-review-pill {
     background: var(--dsw-alias-bg-layer-2, #f2f3f5);
   }
-}
 }
 .dsh-desk-review-pillicon {
   display: inline-flex;
