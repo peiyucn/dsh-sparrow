@@ -67,12 +67,17 @@ export function listNotebook(input: {
 }
 
 /** Read the persisted round baseline for one file. */
-export function loadReviewBaseline(fileId: string): Promise<NotebookBaselineResponse> {
-  return fetchJson<NotebookBaselineResponse>(`${ROUTES.notebookBaseline}?fileId=${encodeURIComponent(fileId)}`)
+export function loadReviewBaseline(sessionId: string): Promise<NotebookBaselineResponse> {
+  return fetchJson<NotebookBaselineResponse>(`${ROUTES.notebookBaseline}?sessionId=${encodeURIComponent(sessionId)}`)
 }
 
 /** Persist the round baseline (host storage, survives clearing browser storage). */
-export function saveReviewBaseline(input: { readonly fileId: string; readonly body: string; readonly at: string }): Promise<NotebookBaselineResponse> {
+export function saveReviewBaseline(input: {
+  readonly sessionId: string
+  readonly fileId: string
+  readonly body: string
+  readonly at: string
+}): Promise<NotebookBaselineResponse> {
   return postJson<NotebookBaselineResponse>(ROUTES.notebookBaseline, input)
 }
 

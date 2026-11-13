@@ -170,7 +170,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'review.submitted'
       | 'review.submitFailed'
       | 'review.changes'
-      | 'review.rebaseline'
       | 'review.diffEmpty'
       | 'review.baselineHint'
       | 'review.delete'

@@ -120,14 +120,15 @@ async function reviewSessionMarkRoute(route: DeskRouteContext, req: IncomingMess
 
 async function baselineGetRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost')
-  const fileId = url.searchParams.get('fileId') ?? ''
-  if (fileId === '') throw new DeskError('BAD_BODY', '缺少 fileId')
-  const record = route.store.getNoteBaseline(fileId)
+  const sessionId = url.searchParams.get('sessionId') ?? ''
+  if (sessionId === '') throw new DeskError('BAD_BODY', '缺少 sessionId')
+  const record = route.store.getNoteBaseline(sessionId)
   sendJson(res, 200, { baseline: record === undefined ? undefined : { body: record.body, at: record.at } })
 }
 
 async function baselineSaveRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = bodyObject<NoteBaselineRequest>(await readJsonBody(req), '请求体必须是对象')
+  if (typeof body.sessionId !== 'string' || body.sessionId === '') throw new DeskError('BAD_BODY', '缺少 sessionId')
   if (typeof body.fileId !== 'string' || body.fileId === '') throw new DeskError('BAD_BODY', '缺少 fileId')
   if (typeof body.body !== 'string') throw new DeskError('BAD_BODY', 'body 必须是字符串')
   if (typeof body.at !== 'string' || body.at === '') throw new DeskError('BAD_BODY', '缺少 at')
@@ -135,6 +136,7 @@ async function baselineSaveRoute(route: DeskRouteContext, req: IncomingMessage, 
   if (file === undefined) throw new DeskError('UNKNOWN_NOTE', '文件身份不存在', 404)
   const saved = await route.store.saveNoteBaseline({
     rootPath: file.rootPath,
+    sessionId: body.sessionId,
     fileId: file.id,
     body: body.body,
     at: body.at,

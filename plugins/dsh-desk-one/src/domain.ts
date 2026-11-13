@@ -256,6 +256,7 @@ const legacyReviewSchema = z.object({
 const noteBaselineSchema = z.object({
   kind: z.literal('note-baseline'),
   schema: z.number().int().positive(),
+  sessionId: z.string().min(1).optional(),
   fileId: z.string().min(1),
   rootPath: z.string().min(1),
   body: z.string(),

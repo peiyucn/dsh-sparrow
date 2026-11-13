@@ -152,7 +152,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       await notebook.state()
       const nextPage = await notebook.page(path)
       const draft = await notebook.draft(fileId)
-      const stored = await notebook.loadBaseline(fileId)
+      const stored = await notebook.loadBaseline(sessionId)
       setPage(current => current !== null && current.body === nextPage.body ? current : nextPage)
       if (!silent) setAnnotations(draft?.drafts ?? [])
       if (stored.baseline !== undefined) {
@@ -162,14 +162,14 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         const at = new Date().toISOString()
         setBaseline(nextPage.body)
         setBaselineAt(at)
-        void notebook.saveBaseline({ fileId, body: nextPage.body, at })
+        void notebook.saveBaseline({ sessionId, fileId, body: nextPage.body, at })
       }
     } catch (cause) {
       if (!silent) setError(messageOf(cause))
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [fileId, notebook, path])
+  }, [fileId, notebook, path, sessionId])
 
   useEffect(() => { void load() }, [load])
 
@@ -186,7 +186,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     } catch {
       setRecords([])
     }
-  }, [fileId, notebook, path])
+  }, [fileId, notebook, path, sessionId])
 
   useEffect(() => { void loadRecords() }, [loadRecords])
 
@@ -600,15 +600,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                 {baselineAt === null
                   ? null
                   : <span className="dsh-desk-review-baseline">{t('review.baselineHint', { time: new Date(baselineAt).toLocaleTimeString() })}</span>}
-                <Button variant="ghost" size="sm" disabled={page === null} onClick={() => {
-                  const body = page?.body ?? null
-                  const at = new Date().toISOString()
-                  setBaseline(body)
-                  setBaselineAt(at)
-                  if (fileId !== undefined && body !== null) void notebook.saveBaseline({ fileId, body, at })
-                }}>
-                  {t('review.rebaseline')}
-                </Button>
                 <Tooltip label={t('review.hideOverlay')} side="bottom" delayMs={400}>
                   <Button variant="ghost" size="sm" icon={<IconChevronDownOutlineRegular />} aria-label={t('review.hideOverlay')} onClick={() => setOverlay(null)} />
                 </Tooltip>

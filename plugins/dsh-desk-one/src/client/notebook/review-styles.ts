@@ -43,6 +43,10 @@ export const REVIEW_CSS = `
   color: var(--dsw-alias-label-primary-foreground, #ffffff);
 }
 /* Sidebar session-row leading cell: the same blue brand mark as the bubble avatar, miniaturised. */
+.dsh-desk-review-session-mark-trailing {
+  width: 14px;
+  height: 14px;
+}
 .dsh-desk-review-session-mark {
   display: inline-flex;
   flex: none;
@@ -138,15 +142,27 @@ export const REVIEW_CSS = `
   flex: none;
   width: auto;
   height: 28px;
-  padding: 1px;
+  padding: 2px;
   border-radius: var(--dsw-radius-sm, 8px);
+  background: transparent;
+  box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
 }
 .dsh-desk-review-viewtoggle [role='tab'] {
-  height: 26px;
-  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 10px;
   border-radius: var(--dsw-radius-sm, 6px);
+  background: transparent;
+  box-shadow: none;
   font-size: 12px;
-  line-height: 18px;
+  line-height: 1;
+}
+.dsh-desk-review-viewtoggle [role='tab'][aria-selected='true'] {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06));
+  color: var(--dsw-alias-label-primary, #1f2329);
+  box-shadow: none;
 }
 .dsh-desk-review-path {
   flex: 1;

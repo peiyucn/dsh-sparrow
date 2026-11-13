@@ -13,7 +13,7 @@ import { DESK_DOMAIN } from '../domain.js'
 import { createSessionIndexRecord, sessionIndexId, type SessionIndexDraft } from './sessions/records.js'
 import {
   DESK_NODE_SCHEMA, MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTEBOOK_BASELINE_MAX_CHARS, NOTEBOOK_CONFIG_ID, NOTEBOOK_MAX_DRAFTS,
-  NOTEBOOK_MAX_REVIEW_SESSIONS, NODES_TABLE,
+  NOTEBOOK_MAX_REVIEW_BASELINES, NOTEBOOK_MAX_REVIEW_SESSIONS, NODES_TABLE,
   PACKAGE_NAME, SCHEDULE_COLORS, SESSION_INDEX_MISSING_DAYS, TASK_STATUSES,
 } from '../constants.js'
 import {
@@ -810,8 +810,8 @@ export class DeskStore {
     return `note_draft_${fileId}`
   }
 
-  private static baselineId(fileId: string): string {
-    return `note_baseline_${fileId}`
+  private static baselineId(sessionId: string): string {
+    return `note_baseline_${sessionId}`
   }
 
   /** One file identity by id. */
@@ -914,9 +914,18 @@ export class DeskStore {
   }
 
   /** One review round's persisted baseline for a file. */
-  getNoteBaseline(fileId: string): NoteBaseline | undefined {
-    const node = this.nodes.get(DeskStore.baselineId(fileId))
-    return node?.kind === 'note-baseline' && node.fileId === fileId ? node : undefined
+  /** One review session's round baseline. */
+  getNoteBaseline(sessionId: string): NoteBaseline | undefined {
+    const node = this.nodes.get(DeskStore.baselineId(sessionId))
+    return node?.kind === 'note-baseline' && node.sessionId === sessionId ? node : undefined
+  }
+
+  /** Round baselines newest first (bounded by the storage cap). */
+  listNoteBaselines(): NoteBaseline[] {
+    return this.allNodes()
+      .filter((node): node is NoteBaseline => node.kind === 'note-baseline' && node.sessionId !== undefined)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .slice(0, NOTEBOOK_MAX_REVIEW_BASELINES)
   }
 
   /**
@@ -925,12 +934,13 @@ export class DeskStore {
    */
   async saveNoteBaseline(input: {
     readonly rootPath: string
+    readonly sessionId: string
     readonly fileId: string
     readonly body: string
     readonly at: string
   }): Promise<NoteBaseline | null> {
-    const id = DeskStore.baselineId(input.fileId)
-    const existing = this.getNoteBaseline(input.fileId)
+    const id = DeskStore.baselineId(input.sessionId)
+    const existing = this.getNoteBaseline(input.sessionId)
     if (input.body.length > NOTEBOOK_BASELINE_MAX_CHARS) {
       if (existing !== undefined) await this.nodes.delete(id)
       return null
@@ -942,6 +952,7 @@ export class DeskStore {
         kind: 'note-baseline',
         schema: DESK_NODE_SCHEMA,
         rootPath: input.rootPath,
+        sessionId: input.sessionId,
         fileId: input.fileId,
         body: input.body,
         at: input.at,
@@ -950,11 +961,22 @@ export class DeskStore {
         revision: 1,
       }
       await this.nodes.put(record.id, record)
+      await this.pruneNoteBaselines()
       return record
     }
     return await this.nodes.update(id, current => current.kind === 'note-baseline'
       ? { ...current, rootPath: input.rootPath, body: input.body, at: input.at, updatedAt: now, revision: current.revision + 1 }
       : current) as NoteBaseline
+  }
+
+  /** Delete the oldest round baselines beyond the cap. */
+  private async pruneNoteBaselines(): Promise<void> {
+    const baselines = this.allNodes().filter((node): node is NoteBaseline => node.kind === 'note-baseline' && node.sessionId !== undefined)
+    if (baselines.length <= NOTEBOOK_MAX_REVIEW_BASELINES) return
+    baselines.sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+    for (const baseline of baselines.slice(0, baselines.length - NOTEBOOK_MAX_REVIEW_BASELINES)) {
+      await this.nodes.delete(baseline.id)
+    }
   }
 
   /* ------------------------ review session markers ------------------------ */

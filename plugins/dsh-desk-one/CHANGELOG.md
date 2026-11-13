@@ -6,6 +6,11 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review round baseline**: stored per **review session** — opening a review session starts a fresh round from the body it opens, a refresh or reopened tab keeps this round’s changes, and the confusing “use current as baseline” button is gone.
+* **Review guidance bubble**: hides once the conversation starts; it is only a blank-session hint instead of staying under the composer.
+* **Review sidebar mark**: the blue whale mark now also shows while the Session is running / waiting (moved after the relative time), so it no longer waits for the run to finish.
+* **MD / code switch**: restyled like the header ghost buttons (transparent with a hairline outline, same height) with labels centred horizontally and vertically.
+
 * **Review bottom bar**: the two split buttons are now 36px tall and sit 18px above the bottom edge; the code scrolls under them and fades into the pane ground at the bottom (like the official @ / slash list); the chevron menus use the same white-blur material and open above the buttons instead of covering them; the buttons now use the official primary material instead of a hand-made glass, matching the app’s white buttons.
 
 * **Review bottom bar**: two split buttons painted with the official primary-button fill (near-white with dark ink in the dark theme) — **Submit annotations** with a chevron menu for the drafts, and **This round’s changes** with a chevron menu for the records; the glass is painted on the group only (no backing strip, no theme-tone dependency), the code scrolls under the buttons, and overlays keep a 4px gap.

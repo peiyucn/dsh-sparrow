@@ -107,6 +107,8 @@ export const NOTEBOOK_MAX_BYTES = 1_048_576
 export const NOTEBOOK_MAX_DRAFTS = 100
 /** Review-session markers kept for the sidebar hint; the oldest are pruned beyond this. */
 export const NOTEBOOK_MAX_REVIEW_SESSIONS = 500
+/** Round baselines kept across review sessions; the oldest are pruned beyond this. */
+export const NOTEBOOK_MAX_REVIEW_BASELINES = 200
 /** Host-side review-baseline body cap (larger bodies keep only the in-memory baseline). */
 export const NOTEBOOK_BASELINE_MAX_CHARS = NOTEBOOK_MAX_BYTES
 /** History usage above this turns the entry-page meter red (no modal). */

@@ -110,6 +110,8 @@ export interface NoteBaseline {
   readonly id: string
   readonly kind: 'note-baseline'
   readonly schema: number
+  /** Review session this round belongs to (legacy records may omit it). */
+  readonly sessionId?: string
   readonly fileId: string
   readonly rootPath: string
   readonly body: string
@@ -131,6 +133,7 @@ export interface NotebookBaselineResponse {
 }
 
 export interface NoteBaselineRequest {
+  readonly sessionId: string
   readonly fileId: string
   readonly body: string
   readonly at: string

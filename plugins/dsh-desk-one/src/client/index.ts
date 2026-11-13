@@ -21,6 +21,7 @@ import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
 import { ReviewPromptDock } from './notebook/ReviewPromptDock.js'
 import { ReviewSessionIcon } from './notebook/ReviewSessionIcon.js'
+import { ReviewSessionTrailingIcon } from './notebook/ReviewSessionTrailingIcon.js'
 import { hydrateReviewSessions } from './reviewSessions.js'
 import { DESK_TAB_ICONS, DeskBaseIcon } from './tabIcons.js'
 import { installDeskClient, passesClientGate } from './install.js'
@@ -126,6 +127,20 @@ export function apply(ctx: ClientContext): void {
       } as never, ReviewSessionIcon as never)
     } catch {
       // The workspace package is optional; never let a row decoration take the panel down.
+      return () => {}
+    }
+  })
+  // Busy review rows show a status dot in the leading cell, so mirror the mark in the trailing slot
+  // while the Session is running / waiting.
+  void ctx.slots.inject('sidebar.session.row.trailing' as never, () => {
+    try {
+      return ctx.slots.register({
+        name: 'sidebar.session.row.trailing' as never,
+        id: 'dsh-desk-one-review-session-busy',
+        order: 40,
+        locale: LOCALE_NAMESPACE,
+      } as never, ReviewSessionTrailingIcon as never)
+    } catch {
       return () => {}
     }
   })

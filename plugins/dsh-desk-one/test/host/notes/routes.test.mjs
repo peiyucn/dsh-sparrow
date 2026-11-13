@@ -165,4 +165,28 @@ describe('desk-one REST 路由', () => {
     assert.equal(response.status, 400)
     assert.equal(response.json.error.code, 'BAD_BODY')
   })
+
+  it('基线接口按 sessionId 校验（轮次基线挂在审阅会话上）', async () => {
+    const handler = createDeskRequestHandler({
+      ctx: fakeContext(),
+      store: {
+        getNoteBaseline: () => undefined,
+        getNoteFile: () => undefined,
+        saveNoteBaseline: async () => null,
+        listNotes: () => [],
+        createNote: async () => { throw new Error('unused') },
+        updateNote: async () => { throw new Error('unused') },
+        deleteNote: async () => { throw new Error('unused') },
+      },
+    })
+    const get = await callHandler(handler, fakeRequest({ method: 'GET', url: ROUTES.notebookBaseline, headers: { host: '127.0.0.1:3080' } }))
+    assert.equal(get.status, 400)
+    const post = await callHandler(handler, fakeRequest({
+      method: 'POST',
+      url: ROUTES.notebookBaseline,
+      body: JSON.stringify({ fileId: 'f1', body: 'x', at: 'now' }),
+      headers: { host: '127.0.0.1:3080' },
+    }))
+    assert.equal(post.status, 400)
+  })
 })
