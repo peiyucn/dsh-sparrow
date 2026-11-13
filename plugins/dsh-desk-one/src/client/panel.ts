@@ -52,6 +52,7 @@ export function mountMainPanel<
 >(ctx: ClientContext, entry: MainPanelEntry<N, I>, onLayout?: (layout: LayoutFace) => void): () => void {
   let disposeInner: (() => void) | undefined
   ctx.inject(['layout'], (layoutCtx) => {
+    console.info('[dsh-desk-one] layout fork ready', entry.id)
     const slots = layoutCtx.slots
     const disposers = [
       slots.register({ name: 'main', key: entry.id, locale: entry.locale, inject: entry.inject }, entry.page),
