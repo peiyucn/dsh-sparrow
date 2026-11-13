@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review bottom overlays**: the annotation-draft, annotation-record and this-round overlays now close on an outside click or Escape; the chevron menus keep the official Menu’s outside-click dismissal.
+
 * **MD / code switch**: now the official `SegmentedTabs` default style (two options, code by default).
 * **Review frontmatter**: the code view shows the raw frontmatter as source lines (line numbers match the file), while the MD view renders the metadata block inline before the body and scrolls with it instead of being pinned.
 
