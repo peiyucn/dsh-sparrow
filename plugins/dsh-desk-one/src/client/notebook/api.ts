@@ -106,6 +106,8 @@ export function getNoteDraft(fileId: string): Promise<NoteDraft | null> {
 export function saveNoteDraft(input: {
   readonly fileId: string
   readonly drafts: readonly DraftAnnotation[]
+  /** Revision last seen; a mismatch fails with 409 instead of overwriting another pane's edits. */
+  readonly expectedRevision?: number
 }): Promise<NoteDraft | null> {
   return postJson<NoteDraftResponse>(ROUTES.notebookDraft, input).then(payload => payload.draft)
 }

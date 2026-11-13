@@ -29,6 +29,10 @@ const RECENT_LIMIT = 30
 const RELOCATE_CANDIDATES = 400
 /** Resolve budget for one history request (ms). */
 const RELOCATE_BUDGET_MS = 3_000
+/** How long one rename-detection conclusion (found or detached) is reused. */
+const RELOCATE_TTL_MS = 60_000
+/** Upper bound of remembered rename conclusions; one entry per file identity. */
+const RELOCATE_CACHE_LIMIT = 500
 
 /** One file's content hash. */
 async function hashFile(rootPath: string, relativePath: string): Promise<string | undefined> {
@@ -56,6 +60,12 @@ export class NotebookHost {
   private pending: Promise<readonly NotebookEntry[]> | undefined
   /** note2md detection per root. */
   private note2mdCache: { readonly root: string; readonly value: boolean } | undefined
+  /** Recent rename-detection outcomes, so a detached history entry is not re-hashed every request. */
+  private readonly relocateCache = new Map<string, {
+    readonly hash: string
+    readonly at: number
+    readonly path?: string
+  }>()
 
   /**
    * @param store - unified storage store.
@@ -249,23 +259,50 @@ export class NotebookHost {
         entries.push({ record, status: 'detached' })
         continue
       }
-      candidates ??= await this.entries(root)
+      const cached = this.relocateCache.get(file.id)
       let moved: string | undefined
-      for (const candidate of candidates.slice(0, RELOCATE_CANDIDATES)) {
-        const hash = await hashFile(root, candidate.path)
-        if (hash !== undefined && hash === file.hash) {
-          moved = candidate.path
-          break
+      let conclusive = true
+      if (cached !== undefined && cached.hash === file.hash && Date.now() - cached.at < RELOCATE_TTL_MS) {
+        moved = cached.path
+      } else {
+        candidates ??= await this.entries(root)
+        for (const candidate of candidates.slice(0, RELOCATE_CANDIDATES)) {
+          if (Date.now() > deadline) {
+            // Not a conclusion: leave it uncached so the next request can finish the search.
+            conclusive = false
+            break
+          }
+          const hash = await hashFile(root, candidate.path)
+          if (hash !== undefined && hash === file.hash) {
+            moved = candidate.path
+            break
+          }
         }
+        if (conclusive) this.rememberRelocate(file.id, file.hash, moved)
       }
       if (moved === undefined) {
         entries.push({ record, status: 'detached' })
         continue
       }
       await this.store.updateNoteFilePath(file.id, moved, file.hash)
+      this.rememberRelocate(file.id, file.hash, moved)
       entries.push({ record, status: 'moved', resolvedPath: moved })
     }
     return { entries, bytes: records.reduce((sum, record) => sum + record.bytes, 0) }
+  }
+
+  /** Remember one rename conclusion, keeping the cache bounded. */
+  private rememberRelocate(fileId: string, hash: string, path: string | undefined): void {
+    this.relocateCache.set(fileId, {
+      hash,
+      at: Date.now(),
+      ...path === undefined ? {} : { path },
+    })
+    while (this.relocateCache.size > RELOCATE_CACHE_LIMIT) {
+      const oldest = this.relocateCache.keys().next()
+      if (oldest.done === true) break
+      this.relocateCache.delete(oldest.value)
+    }
   }
 
   /** Delete one history record. */
@@ -287,6 +324,7 @@ export class NotebookHost {
   invalidate(): void {
     this.cache = undefined
     this.note2mdCache = undefined
+    this.relocateCache.clear()
   }
 
 }

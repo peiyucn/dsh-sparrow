@@ -18,12 +18,14 @@ import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import { persistReviewSession } from '../reviewSessions.js'
+import { HttpError } from '../http.js'
 import { DeskTabGlyph } from '../tabIcons.js'
 import type { DraftAnnotation, NotebookPageResponse, ReviewHistoryEntry } from '../../notebook-contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import { formatDateTime, formatTime, messageOf } from '../app/utils.js'
 import type { NotebookApi } from './api.js'
 import { lineChanges } from './review-changes.js'
+import { pageText, sameReviewPage } from './review-page.js'
 import type { NoteReviewParams, ReviewBridge } from './review-bridge.js'
 import { readReviewTabParams, recoverReviewParams, writeReviewTabParams } from './review-tab-memory.js'
 
@@ -53,11 +55,6 @@ interface ComposeTarget {
 
 /** Comment text cap. */
 const TEXT_MAX_CHARS = 4_000
-
-/** Whole file text shown in the code view and diffed against the round baseline. */
-function pageText(page: NotebookPageResponse): string {
-  return page.kind === 'markdown' ? `${page.frontmatter}${page.body}` : page.body
-}
 
 /** Quote one passage as a markdown blockquote. */
 function quoteBlock(quote: string): string {
@@ -139,6 +136,10 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const composerRef = useRef<HTMLDivElement | null>(null)
   const floatRef = useRef<HTMLButtonElement | null>(null)
+  /** Revision of the persisted draft box last adopted from / written to the host (0 = none yet). */
+  const draftRevisionRef = useRef<number | undefined>(undefined)
+  /** Draft-box writes run in edit order; concurrent PUTs must not reorder a delete and an add. */
+  const draftSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   const [page, setPage] = useState<NotebookPageResponse | null>(null)
   const [annotations, setAnnotations] = useState<readonly DraftAnnotation[]>([])
@@ -187,9 +188,15 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       const nextText = pageText(nextPage)
       const draft = await notebook.draft(fileId)
       const stored = await notebook.loadBaseline(sessionId)
-      setPage(current => current !== null && current.body === nextPage.body ? current : nextPage)
-      if (!silent) setAnnotations(draft?.drafts ?? [])
-      if (stored.baseline !== undefined) {
+      setPage(current => current !== null && sameReviewPage(current, nextPage) ? current : nextPage)
+      if (!silent) {
+        draftRevisionRef.current = draft?.revision ?? 0
+        setAnnotations(draft?.drafts ?? [])
+      }
+      // A Session can be reused past the note it was opened for; only the baseline bound to this
+      // tab's note is this round's baseline, otherwise the diff would compare two different notes.
+      const usableBaseline = stored.baseline !== undefined && stored.baseline.fileId === fileId
+      if (usableBaseline) {
         setBaseline(stored.baseline.body)
         setBaselineAt(stored.baseline.at)
       } else if (!silent) {
@@ -197,13 +204,19 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         setBaseline(nextText)
         setBaselineAt(at)
         void notebook.saveBaseline({ sessionId, fileId, body: nextText, at })
+          .then((saved) => {
+            if (saved.baseline === undefined) setNotice(t('review.baselineMemoryOnly'))
+          })
+          .catch((cause: unknown) => {
+            setNotice(t('review.baselineSaveFailed', { message: messageOf(cause) }))
+          })
       }
     } catch (cause) {
       if (!silent) setError(messageOf(cause))
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [fileId, notebook, path, sessionId])
+  }, [fileId, notebook, path, sessionId, t])
 
   useEffect(() => { void load() }, [load])
 
@@ -224,8 +237,12 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
 
   useEffect(() => { void loadRecords() }, [loadRecords])
 
-  // Quiet refresh while visible; a hidden tab does no work.
+  // Quiet refresh only while this tab is actually on screen. `keepMounted` bodies stay alive for
+  // hidden tabs / other panes, and the browser tab visibility alone does not cover that; the
+  // official tab info's `visible` is the authoritative "foreground Session shows this tab" signal.
+  const tabVisible = info.tab.visible
   useEffect(() => {
+    if (!tabVisible) return
     const refresh = (): void => {
       if (document.visibilityState !== 'visible') return
       void load(true)
@@ -237,7 +254,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       document.removeEventListener('visibilitychange', refresh)
       clearInterval(timer)
     }
-  }, [load, loadRecords])
+  }, [load, loadRecords, tabVisible])
 
   useEffect(() => {
     if (notice === null) return
@@ -308,12 +325,36 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     return () => document.removeEventListener('pointerdown', onPointerDown, true)
   }, [composer, selection])
 
-  /** Persist the draft box (per file identity). */
+  /** Persist the draft box (per file identity); queued so host writes keep the edit order. */
   const persist = useCallback((next: readonly DraftAnnotation[]): void => {
     setAnnotations(next)
     if (fileId === undefined) return
-    void notebook.saveDraft({ fileId, drafts: next })
-      .catch((cause: unknown) => setNotice(t('review.draftSaveFailed', { message: messageOf(cause) })))
+    draftSaveQueueRef.current = draftSaveQueueRef.current.then(async () => {
+      try {
+        const expectedRevision = draftRevisionRef.current
+        const saved = await notebook.saveDraft({
+          fileId,
+          drafts: next,
+          ...expectedRevision === undefined ? {} : { expectedRevision },
+        })
+        draftRevisionRef.current = saved?.revision ?? 0
+      } catch (cause) {
+        if (cause instanceof HttpError && cause.status === 409) {
+          // Another window / pane wrote first. Re-read the authoritative box (revision included) so
+          // the next edit starts from a valid revision; the user stays informed.
+          setNotice(t('review.draftConflict'))
+          try {
+            const latest = await notebook.draft(fileId)
+            draftRevisionRef.current = latest?.revision ?? 0
+            setAnnotations(latest?.drafts ?? [])
+          } catch {
+            // Re-read failed too: keep the local list, the next save retries from scratch.
+          }
+          return
+        }
+        setNotice(t('review.draftSaveFailed', { message: messageOf(cause) }))
+      }
+    })
   }, [fileId, notebook, t])
 
   /** Line-based selection: exact source lines, quote as the selected text. */

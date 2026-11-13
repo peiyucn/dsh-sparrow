@@ -128,6 +128,12 @@ export interface NoteBaseline {
 export interface NoteBaselinePayload {
   readonly body: string
   readonly at: string
+  /**
+   * File identity the baseline belongs to. A Session can outlive (or be reused past) the note it
+   * was opened for, so the client verifies this before treating the stored body as this tab's round
+   * baseline; a mismatch must re-baseline instead of showing a cross-note diff.
+   */
+  readonly fileId: string
 }
 
 export interface NotebookBaselineResponse {
@@ -219,6 +225,11 @@ export interface NotebookFileResponse {
 export interface NoteDraftRequest {
   readonly fileId: string
   readonly drafts: readonly DraftAnnotation[]
+  /**
+   * Optimistic-concurrency guard: the draft-box revision the caller last saw (0 = no record yet).
+   * A mismatch is a conflict (another window/pane wrote first) and must not overwrite silently.
+   */
+  readonly expectedRevision?: number
 }
 
 export interface NoteDraftResponse {

@@ -74,16 +74,20 @@ export function sendError(ctx: Context, res: ServerResponse, error: unknown): vo
   sendJson(res, 500, { error: { code: 'STORAGE_ERROR', message: '存储或路由内部错误' } })
 }
 
-/** Read and parse a JSON body; oversized, unreadable or malformed input throws {@link DeskError}. */
-export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+/**
+ * Read and parse a JSON body; oversized, unreadable or malformed input throws {@link DeskError}.
+ * @param maxBytes - transport cap; routes that carry a bounded-but-large payload (a note body up to
+ *   the reviewable file size) raise it explicitly, every other route keeps the default.
+ */
+export async function readJsonBody(req: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<unknown> {
   const chunks: Buffer[] = []
   let size = 0
   try {
     for await (const chunk of req) {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
       size += buffer.byteLength
-      if (size > MAX_BODY_BYTES) {
-        throw new DeskError('BAD_BODY', `请求体超过 ${MAX_BODY_BYTES} 字节上限`)
+      if (size > maxBytes) {
+        throw new DeskError('BAD_BODY', `请求体超过 ${maxBytes} 字节上限`)
       }
       chunks.push(buffer)
     }

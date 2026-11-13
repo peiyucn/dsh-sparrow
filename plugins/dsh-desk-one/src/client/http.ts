@@ -3,6 +3,14 @@
 import { REQUEST_TIMEOUT_MS } from '../constants.js'
 import type { ApiErrorPayload } from '../contract.js'
 
+/** Transport failure carrying the HTTP status, so callers can special-case opt-in outcomes (409). */
+export class HttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message)
+    this.name = 'HttpError'
+  }
+}
+
 /**
  * Fetch one JSON document with a timeout.
  * @param path - route path (this plugin's own prefix).
@@ -16,9 +24,9 @@ export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T>
   try {
     payload = JSON.parse(text) as T & Partial<ApiErrorPayload>
   } catch {
-    throw new Error(`请求失败（HTTP ${response.status}）：${text.slice(0, 160) || '响应不是 JSON'}`)
+    throw new HttpError(response.status, `请求失败（HTTP ${response.status}）：${text.slice(0, 160) || '响应不是 JSON'}`)
   }
-  if (!response.ok) throw new Error(payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
+  if (!response.ok) throw new HttpError(response.status, payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
   return payload
 }
 

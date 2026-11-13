@@ -61,7 +61,10 @@ export function persistReviewSession(notebook: NotebookApi, input: {
 }): void {
   const previous = markers.get(input.sessionId)
   const workspaceId = input.workspaceId ?? previous?.workspaceId
-  const fileId = input.fileId ?? previous?.fileId
+  // First binding wins: the same Session must not silently switch to another note (the official
+  // workspace flow may hand a blank Session to a second note). The tab's own params/baseline carry
+  // the actual note identity, and the marker keeps the original note's reuse entry.
+  const fileId = previous?.fileId ?? input.fileId
   markers.set(input.sessionId, {
     sessionId: input.sessionId,
     updatedAt: new Date().toISOString(),

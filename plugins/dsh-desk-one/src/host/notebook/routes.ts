@@ -2,7 +2,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isAbsolute } from 'node:path'
-import { ROUTES } from '../../constants.js'
+import { ROUTES, NOTEBOOK_WRITE_BODY_BYTES } from '../../constants.js'
 import type {
   CreateNotebookNoteRequest, DeleteReviewRequest, MarkReviewSessionRequest, NoteBaselineRequest, NoteDraftRequest, NotebookRootRequest,
   RecordReviewRequest,
@@ -132,11 +132,15 @@ async function baselineGetRoute(route: DeskRouteContext, req: IncomingMessage, r
   const sessionId = url.searchParams.get('sessionId') ?? ''
   if (sessionId === '') throw new DeskError('BAD_BODY', '缺少 sessionId')
   const record = route.store.getNoteBaseline(sessionId)
-  sendJson(res, 200, { baseline: record === undefined ? undefined : { body: record.body, at: record.at } })
+  sendJson(res, 200, {
+    baseline: record === undefined ? undefined : { body: record.body, at: record.at, fileId: record.fileId },
+  })
 }
 
 async function baselineSaveRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = bodyObject<NoteBaselineRequest>(await readJsonBody(req), '请求体必须是对象')
+  // A review baseline carries the whole note body (up to the reviewable file cap), so it must not
+  // be rejected by the default 64 KiB transport cap.
+  const body = bodyObject<NoteBaselineRequest>(await readJsonBody(req, NOTEBOOK_WRITE_BODY_BYTES), '请求体必须是对象')
   if (typeof body.sessionId !== 'string' || body.sessionId === '') throw new DeskError('BAD_BODY', '缺少 sessionId')
   if (typeof body.fileId !== 'string' || body.fileId === '') throw new DeskError('BAD_BODY', '缺少 fileId')
   if (typeof body.body !== 'string') throw new DeskError('BAD_BODY', 'body 必须是字符串')
@@ -150,7 +154,9 @@ async function baselineSaveRoute(route: DeskRouteContext, req: IncomingMessage, 
     body: body.body,
     at: body.at,
   })
-  sendJson(res, 200, { baseline: saved === null ? undefined : { body: saved.body, at: saved.at } })
+  sendJson(res, 200, {
+    baseline: saved === null ? undefined : { body: saved.body, at: saved.at, fileId: saved.fileId },
+  })
 }
 
 async function draftGetRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -161,7 +167,8 @@ async function draftGetRoute(route: DeskRouteContext, req: IncomingMessage, res:
 }
 
 async function draftSaveRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = bodyObject<NoteDraftRequest>(await readJsonBody(req), '请求体必须是对象')
+  // A draft box may carry up to NOTEBOOK_MAX_DRAFTS annotations, well above the default cap.
+  const body = bodyObject<NoteDraftRequest>(await readJsonBody(req, NOTEBOOK_WRITE_BODY_BYTES), '请求体必须是对象')
   if (typeof body.fileId !== 'string' || body.fileId === '') throw new DeskError('BAD_BODY', '缺少 fileId')
   if (!Array.isArray(body.drafts)) throw new DeskError('BAD_BODY', 'drafts 必须是数组')
   const file = route.store.getNoteFile(body.fileId)
@@ -171,6 +178,9 @@ async function draftSaveRoute(route: DeskRouteContext, req: IncomingMessage, res
     path: file.path,
     fileId: file.id,
     drafts: body.drafts,
+    ...typeof body.expectedRevision === 'number' && Number.isInteger(body.expectedRevision) && body.expectedRevision >= 0
+      ? { expectedRevision: body.expectedRevision }
+      : {},
   })
   // Empty batch = deleted draft box; the response shape stays `{ draft: null }`.
   sendJson(res, 200, { draft })
@@ -181,7 +191,7 @@ async function historyGetRoute(route: DeskRouteContext, _req: IncomingMessage, r
 }
 
 async function historyRecordRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = bodyObject<RecordReviewRequest>(await readJsonBody(req), '请求体必须是对象')
+  const body = bodyObject<RecordReviewRequest>(await readJsonBody(req, NOTEBOOK_WRITE_BODY_BYTES), '请求体必须是对象')
   if (typeof body.sessionId !== 'string' || body.sessionId === '') throw new DeskError('BAD_BODY', '缺少 sessionId')
   if (typeof body.fileId !== 'string' || body.fileId === '') throw new DeskError('BAD_BODY', '缺少 fileId')
   if (!Array.isArray(body.annotations)) throw new DeskError('BAD_BODY', 'annotations 必须是数组')

@@ -164,10 +164,22 @@ export function createReviewBridge(): ReviewBridge {
           const reusable = await reusableSession(input)
           if (reusable !== undefined) {
             nav.openSession(reusable)
+            if (sidebar.mounted === undefined) {
+              // The host does not expose the sidebar's current Session; open the tab in place as a
+              // best effort rather than starting a duplicate Session after the user was moved.
+              if (await openReviewTab(sidebar, params)) {
+                rememberReviewSession(reusable)
+                return { ok: true }
+              }
+              return { ok: false, message: '审阅会话已打开，但右侧栏没有就绪，请再点一次「审阅」' }
+            }
             if (await waitForMounted(sidebar, reusable) && await openReviewTab(sidebar, params)) {
               rememberReviewSession(reusable)
               return { ok: true }
             }
+            // The reuse navigation already happened. Falling through to a fresh Session here would
+            // silently create a duplicate; ask for one more click instead (the same Session is retried).
+            return { ok: false, message: '原审阅会话正在加载，请稍后再点一次「审阅」（不会新建会话）' }
           }
         } catch {
           // Navigation refused (e.g. the Host stopped listing it) — fall through to a fresh Session.

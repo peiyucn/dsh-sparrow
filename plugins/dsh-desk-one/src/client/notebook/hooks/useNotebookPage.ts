@@ -4,7 +4,7 @@
  * header own the page's primary actions without the page reaching into the header.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DeskTranslator } from '../../app/types.js'
 import { formatDate, messageOf } from '../../app/utils.js'
 import type { NotebookEntry, NotebookSkill, NotebookStateResponse, ReviewHistoryEntry } from '../../../notebook-contract.js'
@@ -228,11 +228,15 @@ export function useNotebookPage(input: {
     }
   }, [notebook])
 
+  /** One review-open request at a time: double-click / double-tap must not start two opens. */
+  const openingRef = useRef(false)
   const openPage = useCallback(async (path: string): Promise<void> => {
     if (workspace === undefined) {
       setNotice(t('notebook.noWorkspaceForRoot'))
       return
     }
+    if (openingRef.current) return
+    openingRef.current = true
     setBusy(true)
     try {
       const { file } = await notebook.ensureFile(path)
@@ -241,6 +245,7 @@ export function useNotebookPage(input: {
     } catch (cause) {
       setNotice(messageOf(cause))
     } finally {
+      openingRef.current = false
       setBusy(false)
     }
   }, [notebook, onOpenReview, t, workspace])

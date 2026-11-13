@@ -111,6 +111,13 @@ export const NOTEBOOK_MAX_REVIEW_SESSIONS = 500
 export const NOTEBOOK_MAX_REVIEW_BASELINES = 200
 /** Host-side review-baseline body cap (larger bodies keep only the in-memory baseline). */
 export const NOTEBOOK_BASELINE_MAX_CHARS = NOTEBOOK_MAX_BYTES
+
+/**
+ * JSON body allowance for the notebook write routes. The limits above are measured in characters,
+ * while the wire body carries JSON escaping and annotation payloads (up to `NOTEBOOK_MAX_DRAFTS`
+ * items with inline quotes), so the transport cap must sit above the storage cap.
+ */
+export const NOTEBOOK_WRITE_BODY_BYTES = NOTEBOOK_MAX_BYTES * 4
 /** History usage above this turns the entry-page meter red (no modal). */
 export const NOTEBOOK_HISTORY_WARN_BYTES = 2 * 1024 * 1024
 /** Fixed record id of the notebook root setting. */

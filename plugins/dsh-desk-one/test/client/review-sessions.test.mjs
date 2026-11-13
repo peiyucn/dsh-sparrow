@@ -69,6 +69,25 @@ describe('审阅会话标记', () => {
     assert.deepEqual(reviewSessionCandidates('file-c').map(info => info.sessionId), ['persisted-session'])
   })
 
+  it('会话首次绑定的笔记身份不被后来的笔记覆盖', () => {
+    /** @type {any} */
+    const notebook = {
+      listReviewSessions: async () => ({ sessionIds: [] }),
+      markReviewSession: async () => undefined,
+    }
+    // A Session opened for note A; the official blank-Session reuse can then mount a review tab for
+    // note B on the same Session. B must not erase A's reuse entry.
+    persistReviewSession(notebook, { sessionId: 'shared-session', workspaceId: 'w1', fileId: 'file-first-a' })
+    persistReviewSession(notebook, { sessionId: 'shared-session', workspaceId: 'w1', fileId: 'file-first-b' })
+    assert.deepEqual(reviewSessionCandidates('file-first-a').map(info => info.sessionId), ['shared-session'])
+    assert.deepEqual(reviewSessionCandidates('file-first-b'), [])
+
+    // Missing identity can still be filled in later (markers written before the params arrive).
+    persistReviewSession(notebook, { sessionId: 'late-identity' })
+    persistReviewSession(notebook, { sessionId: 'late-identity', fileId: 'file-late' })
+    assert.deepEqual(reviewSessionCandidates('file-late').map(info => info.sessionId), ['late-identity'])
+  })
+
   it('复用选择：同工作区最新且仍可打开的会话优先，否则回退下一个', () => {
     const candidates = [
       { sessionId: 'a', workspaceId: 'w1', fileId: 'file-x', updatedAt: '4' },

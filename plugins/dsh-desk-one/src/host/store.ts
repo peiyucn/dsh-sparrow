@@ -883,11 +883,16 @@ export class DeskStore {
     readonly path: string
     readonly fileId: string
     readonly drafts: readonly DraftAnnotation[]
+    /** Revision the caller last saw; when given, a mismatch fails instead of overwriting. */
+    readonly expectedRevision?: number
   }): Promise<NoteDraft | null> {
     const now = new Date().toISOString()
     const id = DeskStore.draftId(input.fileId)
     const drafts = input.drafts.slice(0, NOTEBOOK_MAX_DRAFTS)
     const existing = this.getNoteDraft(input.fileId)
+    if (input.expectedRevision !== undefined && input.expectedRevision !== (existing?.revision ?? 0)) {
+      throw new DeskModelError('REVISION_CONFLICT', '批注草稿已被其他窗口更新，请刷新后重试')
+    }
     if (drafts.length === 0) {
       if (existing !== undefined) await this.nodes.delete(id)
       return null
@@ -965,7 +970,17 @@ export class DeskStore {
       return record
     }
     return await this.nodes.update(id, current => current.kind === 'note-baseline'
-      ? { ...current, rootPath: input.rootPath, body: input.body, at: input.at, updatedAt: now, revision: current.revision + 1 }
+      ? {
+          ...current,
+          rootPath: input.rootPath,
+          // The note identity is authoritative per save: a Session reused for another note must not
+          // keep serving the previous note's body as this round's baseline.
+          fileId: input.fileId,
+          body: input.body,
+          at: input.at,
+          updatedAt: now,
+          revision: current.revision + 1,
+        }
       : current) as NoteBaseline
   }
 
@@ -997,6 +1012,10 @@ export class DeskStore {
   /**
    * Mark or refresh one Session as a review session. Called when the review tab mounts, so a
    * re-open only bumps the timestamp; old markers are pruned so the domain stays bounded.
+   *
+   * The note identity is first-binding-wins: the official workspace flow may reuse a blank Session
+   * for a different note, and letting the later tab overwrite `fileId` would erase the previous
+   * note's reuse marker. Re-binding information lives in the tab params / baseline instead.
    */
   async markReviewSession(input: {
     readonly sessionId: string
@@ -1011,7 +1030,9 @@ export class DeskStore {
         ? {
             ...current,
             ...input.workspaceId === undefined ? {} : { workspaceId: input.workspaceId },
-            ...input.fileId === undefined ? {} : { fileId: input.fileId },
+            ...input.fileId === undefined || current.fileId !== undefined
+              ? {}
+              : { fileId: input.fileId },
             updatedAt: now,
             revision: current.revision + 1,
           }
