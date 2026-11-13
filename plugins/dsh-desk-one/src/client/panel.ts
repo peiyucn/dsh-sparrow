@@ -53,15 +53,18 @@ export function mountMainPanel<
   let disposeInner: (() => void) | undefined
   ctx.inject(['layout'], (layoutCtx) => {
       const slots = layoutCtx.slots
+    // Register through slots.inject: the sidebar declares 'sidebar.panellist' from its own entry,
+    // which may load after ours. A direct register() races that declaration and is rejected on some
+    // cold loads (the reason the entry randomly vanished after a refresh).
     const disposers = [
-      slots.register({ name: 'main', key: entry.id, locale: entry.locale, inject: entry.inject }, entry.page),
-      slots.register({
+      slots.inject('main', () => slots.register({ name: 'main', key: entry.id, locale: entry.locale, inject: entry.inject }, entry.page)),
+      slots.inject('sidebar.panellist', () => slots.register({
         name: 'sidebar.panellist',
         id: entry.id,
         order: entry.order,
         locale: entry.locale,
         label: entry.label,
-      }, entry.icon),
+      }, entry.icon)),
     ]
     disposeInner = () => {
       for (const dispose of disposers) dispose()
