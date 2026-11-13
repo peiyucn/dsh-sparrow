@@ -7,7 +7,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { SidebarRightTabDefinition } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import type { NotebookApi } from './api.js'
-import { NoteReviewTab, NoteReviewTabTitle } from './review.js'
+import { NoteReviewTab, NoteReviewTabTitle } from './review/ReviewTab.js'
 import { REVIEW_TAB_ID, REVIEW_TAB_KIND, type ReviewBridge } from './review-bridge.js'
 
 /**
