@@ -2,7 +2,7 @@
 
 export const REVIEW_CSS = `
 .dsh-desk-review {
-  --dsh-desk-review-bar-h: 28px;
+  --dsh-desk-review-bar-h: 24px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -142,7 +142,7 @@ export const REVIEW_CSS = `
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 10px 2px calc(var(--dsh-desk-review-bar-h) + 4px);
+  padding: 10px 2px calc(var(--dsh-desk-review-bar-h) + 10px);
 }
 .dsh-desk-review-card {
   border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
@@ -477,7 +477,7 @@ export const REVIEW_CSS = `
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 4px calc(var(--dsh-desk-review-bar-h) + 4px);
+  padding: 8px 4px calc(var(--dsh-desk-review-bar-h) + 10px);
   font-size: 13px;
   line-height: 1.7;
 }
@@ -506,14 +506,49 @@ export const REVIEW_CSS = `
 }
 /* Official composer-pill reading: transparent, centred pills on the pane floor. */
 .dsh-desk-review-bar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 6px;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  flex: none;
+  gap: 8px;
   height: var(--dsh-desk-review-bar-h);
-  padding: 0 8px;
+  padding: 0;
+  pointer-events: none;
+}
+.dsh-desk-review-bar > * {
+  pointer-events: auto;
+}
+/* Official composer stat-pill reading: transparent, tertiary, no filled capsule at rest. */
+.dsh-desk-review-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 22px;
+  padding: 1px 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm, 8px);
   background: transparent;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font: inherit;
+  font-size: calc(var(--dsh-content-font-size-secondary, 13px) - 1px);
+  line-height: 18px;
+  cursor: pointer;
+}
+.dsh-desk-review-pill svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.dsh-desk-review-pill:hover,
+.dsh-desk-review-pill[data-active='true'] {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
 }
 .dsh-desk-review-pillicon {
   display: inline-flex;

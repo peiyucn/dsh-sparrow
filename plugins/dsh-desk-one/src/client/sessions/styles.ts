@@ -112,7 +112,7 @@ export const SESSIONS_CSS = `
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -137,6 +137,8 @@ export const SESSIONS_CSS = `
 }
 .dsh-desk-tree-caret:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.06)); }
 .dsh-desk-tree-title {
+  /* Same two-column reading as the notebook list: fixed title column, facts to the right. */
+  flex: 0 0 34%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -12,7 +12,7 @@ import type { ReactElement } from 'react'
 import {
   Button, DiffBlock, DisclosureRow, FileTypeIcon, IconChevronDownOutlineRegular, IconCopyOutlineRegular,
   IconInfoOutlineRegular, IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
-  MarkdownText, Pill, SegmentedTabs, Tooltip, diffTotals,
+  MarkdownText, SegmentedTabs, Tooltip, diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -604,16 +604,20 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
           )
         : null}
       <div className="dsh-desk-review-bar">
-        <Pill
-          active={overlay === 'annotations'}
+        <button
+          type="button"
+          className="dsh-desk-review-pill"
+          data-active={overlay === 'annotations'}
           aria-expanded={overlay === 'annotations'}
           onClick={() => setOverlay(current => current === 'annotations' ? null : 'annotations')}
         >
           <span className="dsh-desk-review-pillicon"><IconListPenOutlineRegular /></span>
           <span>{t('review.pendingBar', { count: annotations.length })}</span>
-        </Pill>
-        <Pill
-          active={overlay === 'diff'}
+        </button>
+        <button
+          type="button"
+          className="dsh-desk-review-pill"
+          data-active={overlay === 'diff'}
           aria-expanded={overlay === 'diff'}
           onClick={() => setOverlay(current => current === 'diff' ? null : 'diff')}
         >
@@ -627,7 +631,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                   <span className="dsh-desk-review-difftag dsh-desk-review-difftag-minus">{`−${totals.removed}`}</span>
                 </>
               )}
-        </Pill>
+        </button>
       </div>
     </div>
   )
