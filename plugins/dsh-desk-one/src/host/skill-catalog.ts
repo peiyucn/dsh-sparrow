@@ -9,18 +9,22 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { SkillCatalog } from './notebook/host.js'
+import { isNoteSkill } from './notebook/skills.js'
 
 /** Live catalog getter: undefined until (and unless) the skill service is available. */
 export type SkillCatalogGetter = () => SkillCatalog | undefined
 
+/** One catalog summary (the fields the notebook page consumes). */
+interface SkillSummaryLike {
+  readonly name: string
+  readonly description: string
+  readonly source: string
+  readonly invocation?: { modelInvocable: boolean; userInvocable: boolean }
+}
+
 /** The slice of the skill registry the notebook page uses. */
 interface SkillServiceLike {
-  list: (options: { cwd?: string; scope?: unknown; signal?: AbortSignal }) => Promise<readonly {
-    name: string
-    description: string
-    source: string
-    invocation?: { modelInvocable: boolean }
-  }[]>
+  list: (options: { cwd?: string; scope?: unknown; signal?: AbortSignal }) => Promise<readonly SkillSummaryLike[]>
 }
 
 /** The slice of the preset registry that mints a read-only scope lease. */
@@ -41,13 +45,24 @@ export function watchSkillCatalog(ctx: Context): SkillCatalogGetter {
   ctx.inject(['skills'], (scoped) => {
     const skills = (scoped as unknown as { get(name: string): SkillServiceLike }).get('skills')
     const presets = (scoped as unknown as { get(name: string): unknown }).get('agentPresets') as PresetRegistryLike | undefined
+    /**
+     * List summaries for one scope, keeping only skills the human can invoke (the same set the
+     * official / menu shows). Model-only agent skills stay out, and our own operating guide is not a
+     * note-drafting skill.
+     */
+    const collect = async (options: { cwd?: string; scope?: unknown; signal?: AbortSignal }): Promise<readonly SkillSummaryLike[]> => {
+      const summaries = await skills.list(options)
+      return summaries.filter(summary => summary.invocation?.userInvocable !== false
+        && summary.name !== 'desk-one'
+        && isNoteSkill(summary.name, summary.description))
+    }
     catalog = {
       async list(options) {
         if (presets !== undefined && typeof presets.acquireScope === 'function') {
           try {
             const lease = await presets.acquireScope()
             try {
-              return await skills.list({ ...options, scope: lease.key })
+              return await collect({ ...options, scope: lease.key })
             } finally {
               await lease[Symbol.asyncDispose]()
             }
@@ -55,7 +70,7 @@ export function watchSkillCatalog(ctx: Context): SkillCatalogGetter {
             // A host without a usable preset registry falls back to the global catalog.
           }
         }
-        return await skills.list(options)
+        return await collect(options)
       },
     }
     scoped.effect(() => () => { catalog = undefined }, 'dsh-desk-one: notebook skill catalog')

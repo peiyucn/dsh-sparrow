@@ -18,7 +18,7 @@ export interface SkillSummaryLike {
 }
 
 /** Name/description markers that read as note-writing skills. */
-const NOTE_SKILL_PATTERN = /(?:^|[-_ ])note|notes?\b|笔记|markdown|obsidian|notion|zettel|journal|日记/iu
+const NOTE_SKILL_PATTERN = /(?:^|[-_ ])note|notes?\b|writing\b|笔记|写作|markdown|obsidian|notion|zettel|journal|日记/iu
 
 /**
  * Whether one skill looks note-oriented (used only to sort and to label the recommendation).

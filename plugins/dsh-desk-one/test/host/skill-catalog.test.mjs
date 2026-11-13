@@ -3,9 +3,14 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { watchSkillCatalog } from '../../lib/host/skill-catalog.js'
 
-/** Skill service slice the notebook page reads. */
-const SKILLS = [{ name: 'note2md', description: 'note management', source: 'bundled', invocation: { modelInvocable: true } }]
-
+/** Catalog fixtures: legacy note2md, our guide, an opted-in skill, and non-drafting skills. */
+const SKILLS = [
+  { name: 'note2md', description: 'note management', source: 'bundled', invocation: { modelInvocable: true, userInvocable: true } },
+  { name: 'desk-one', description: 'operate desk one', source: 'bundled', invocation: { modelInvocable: true, userInvocable: true } },
+  { name: 'marked-note', description: 'drafting', source: 'user-dsh', invocation: { modelInvocable: true, userInvocable: true } },
+  { name: 'internal-agent', description: 'agent helper', source: 'bundled', invocation: { modelInvocable: true, userInvocable: false } },
+  { name: 'random-skill', description: 'unrelated', source: 'user-dsh', invocation: { modelInvocable: true, userInvocable: true } },
+]
 /**
  * Build a fake host context whose optional fork either attaches or stays pending.
  * @param {boolean} attaches - whether the fake skill service becomes available.
@@ -49,7 +54,13 @@ function fakeContext(attaches, options = {}) {
       callback(scoped)
     },
   }
-  return { ctx, deps: () => deps, effects, leases: () => leases, lastOptions: () => lastListOptions }
+  return {
+    ctx,
+    deps: () => deps,
+    effects,
+    leases: () => leases,
+    lastOptions: () => lastListOptions,
+  }
 }
 
 describe('可选技能目录', () => {
@@ -60,15 +71,15 @@ describe('可选技能目录', () => {
     assert.equal(get(), undefined)
   })
 
-  it('技能服务挂上后转发 list', async () => {
+  it('只保留声明 note-drafting 协议 / note2md 兼容项，且过滤模型专用技能与自身指南', async () => {
     const { ctx } = fakeContext(true)
-    const get = watchSkillCatalog(ctx)
-    const catalog = get()
+    const catalog = watchSkillCatalog(ctx)()
     assert.ok(catalog !== undefined)
-    assert.deepEqual(await catalog.list({ cwd: '/notes' }), SKILLS)
+    const listed = await catalog.list({ cwd: '/notes' })
+    assert.deepEqual(listed.map(skill => skill.name), ['note2md', 'marked-note'])
   })
 
-  it('有预设注册表时用默认预设 scope 读取（对齐官方新会话的目录）', async () => {
+  it('有预设注册表时用默认预设 scope 读取', async () => {
     const { ctx, leases, lastOptions } = fakeContext(true, { preset: true })
     const catalog = watchSkillCatalog(ctx)()
     assert.ok(catalog !== undefined)
