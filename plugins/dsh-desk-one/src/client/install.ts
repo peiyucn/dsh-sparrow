@@ -185,7 +185,6 @@ export function installDeskClient(ctx: ClientContext, deps: DeskClientDeps): voi
     },
   }
   // Base entry: always present, opens the last visited tab.
-  console.info('[dsh-desk-one] mounting base entry', PANEL_ID, 'pinned tabs:', [...pinned].join(',') || '(none)')
   mountMainPanel(ctx, {
     id: PANEL_ID as MainPanelId,
     order: PANEL_ORDER,
