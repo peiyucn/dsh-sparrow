@@ -729,6 +729,8 @@ describe('dsh-desk-one 结构', () => {
     assert.match(review, /data-changed/u, '改动行在代码视图就地标记')
     assert.match(reviewCss, /\.dsh-desk-review-line\[data-changed\]/u, '改动行高亮样式')
     assert.match(reviewCss, /code-diff-added/u, '高亮复用官方 diff 的改动底色')
+    assert.match(review, /dsh-desk-review-difftags/u, '折叠行的增减计数要包一层，才能拉开间距')
+    assert.match(reviewCss, /\.dsh-desk-review-difftags \{[^}]*gap: 4px/su, '增减计数标签之间留 4px 间距')
     assert.doesNotMatch(reviewCss, /\.dsh-desk-review-composer \{[^}]*position: absolute/su, '就地输入框不能被绝对定位到面板底部')
     assert.match(review, /dsh-desk-review-split/u, '底部是官方 split button 形状（主按钮 + 箭头菜单）')
     assert.doesNotMatch(review, /MenuItemButton/u, '第二段图标直接打开对应浮层，不再套一层菜单')

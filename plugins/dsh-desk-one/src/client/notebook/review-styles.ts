@@ -487,6 +487,12 @@ body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+/* The collapsed "本轮改动" row renders the tags side by side; keep a readable gap between them. */
+.dsh-desk-review-difftags {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .dsh-desk-review-difftag-plus {
   background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #3a9a5b) 16%, transparent);
   color: var(--dsw-alias-state-success-primary, #3a9a5b);

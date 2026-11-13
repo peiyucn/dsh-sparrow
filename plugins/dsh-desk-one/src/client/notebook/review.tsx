@@ -658,10 +658,10 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                       previewChevron
                       onToggle={() => setDiffOpen(current => !current)}
                       collapsedContent={(
-                        <>
+                        <span className="dsh-desk-review-difftags">
                           <span className="dsh-desk-review-difftag dsh-desk-review-difftag-plus">{`+${totals.added}`}</span>
                           <span className="dsh-desk-review-difftag dsh-desk-review-difftag-minus">{`−${totals.removed}`}</span>
-                        </>
+                        </span>
                       )}
                     >
                         <DiffBlock
