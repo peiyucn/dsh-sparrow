@@ -9,11 +9,11 @@
  */
 
 import type { ReactElement, ReactNode } from 'react'
-import { IconCloseOutlineRegular, IconPlusOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DeskTranslator, Tab } from './types.js'
 import { OVERFLOW_TABS, VISIBLE_TABS } from './tabs.js'
 import { DeskTabMenu } from './DeskTabMenu.js'
 import { DeskIntroInfo } from './DeskIntroInfo.js'
+import { ShortcutStar } from '../shortcutStar.js'
 import { DeskTabGlyph } from '../tabIcons.js'
 import { DeskGlyph } from '../brand.js'
 
@@ -71,7 +71,7 @@ export function DeskHeader({ t, tab, onSelectTab, pinned, onTogglePin, actions }
           title={shortcutLabel}
           onClick={onTogglePin}
         >
-          {pinned ? <IconCloseOutlineRegular /> : <IconPlusOutlineRegular />}
+          <ShortcutStar filled={pinned} />
           <span>{shortcutLabel}</span>
         </button>
       </nav>
