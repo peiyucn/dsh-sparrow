@@ -322,6 +322,20 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   width: 13px;
   height: 13px;
 }
+/* Red exclamation on a toolbar action that has attention-worthy state (calendar sync issues). */
+.dsh-desk-action-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--dsw-alias-state-error-primary, #c0503f);
+  color: var(--dsw-alias-label-primary-foreground, #ffffff);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+}
 [data-busy='true'] svg { animation: dsh-desk-spin 1s linear infinite; }
 @keyframes dsh-desk-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { [data-busy='true'] svg { animation: none; } }

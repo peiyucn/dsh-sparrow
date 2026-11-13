@@ -5,6 +5,8 @@
 
 import { providerKey } from '../shared.js'
 import { ProviderLogo } from './logos.js'
+import { SourceIssues } from './issues.js'
+import { sourceHealth } from './status.js'
 import { useState } from 'react'
 import type { DeskCalendar, DeskScheduleSource, ScheduleConnectionInput } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
@@ -124,20 +126,29 @@ export function ProviderCard(props: {
   }
 
   const enabledCount = calendars.filter(calendar => calendar.enabled).length
+  const health = sourceHealth(source, calendars)
   return (
     <section className="dsh-desk-schedule-connection-card" data-connected={connected}>
       <header>
         <ProviderLogo provider={provider} />
         <h3>{t(providerKey(provider) as never)}</h3>
-        <span className="dsh-desk-schedule-statusdot" data-on={connected} />
-        <span className="dsh-desk-schedule-connection-status" data-error={source?.syncState === 'error'}>
-          {connected ? t('schedule.form.connected') : t('schedule.form.notConnected')}
+        <span
+          className="dsh-desk-schedule-statusdot"
+          data-on={health.tone === 'ok'}
+          data-tone={health.tone}
+          data-error={health.tone === 'error' ? 'true' : undefined}
+          role="img"
+          aria-label={health.tone === 'error' ? t('schedule.statusError') : health.tone === 'warn' ? t('schedule.statusWarning') : connected ? t('schedule.form.connected') : t('schedule.form.notConnected')}
+        />
+        <span className="dsh-desk-schedule-connection-status" data-error={health.tone === 'error'}>
+          {connected ? (health.tone === 'error' ? t('schedule.statusError') : health.tone === 'warn' ? t('schedule.statusWarning') : t('schedule.form.connected')) : t('schedule.form.notConnected')}
         </span>
         {connected ? <span className="dsh-desk-schedule-connection-count">{enabledCount}/{calendars.length}</span> : null}
         <button type="button" className="dsh-desk-schedule-chip" onClick={() => setEditing(value => !value)}>
           {editing ? t('schedule.collapse') : t('schedule.connectionSettings')}
         </button>
       </header>
+      <SourceIssues t={t} health={health} />
 
       {connected && !editing ? (
         <div className="dsh-desk-schedule-source">

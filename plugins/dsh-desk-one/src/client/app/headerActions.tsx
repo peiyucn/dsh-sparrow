@@ -139,6 +139,8 @@ export function scheduleActions(props: {
   readonly t: DeskTranslator
   readonly visible: boolean
   readonly onSourcesPage: boolean
+  /** Sync-failing sources/calendars; shown as a red badge on the settings entry. */
+  readonly issueCount: number
   readonly backToCalendar: () => void
   readonly openSources: () => void
 }): ReactElement | null {
@@ -152,10 +154,21 @@ export function scheduleActions(props: {
       </button>
     )
   }
+  const hasIssues = props.issueCount > 0
+  const hint = hasIssues ? t('schedule.syncIssuesHint') : t('schedule.sources')
   return (
-    <button key="schedule-sources" type="button" className="dsh-desk-action" onClick={props.openSources}>
+    <button
+      key="schedule-sources"
+      type="button"
+      className="dsh-desk-action"
+      data-error={hasIssues ? 'true' : undefined}
+      aria-label={hint}
+      title={hint}
+      onClick={props.openSources}
+    >
       {sourcesIcon}
       <span className="dsh-desk-action-label">{t('schedule.sources')}</span>
+      {hasIssues ? <span className="dsh-desk-action-badge" aria-hidden="true">!</span> : null}
     </button>
   )
 }

@@ -53,13 +53,15 @@ export interface ScheduleHeaderActions {
   backToCalendar: () => void
 }
 
-export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageChange }: {
+export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageChange, onHealthChange }: {
   readonly t: DeskTranslator
   readonly api: ScheduleApi
   readonly headerActionsRef?: { current: ScheduleHeaderActions | null }
   readonly todayContext: TodayContext
   /** Lets the shared header swap in the back button when the sources page opens. */
   readonly onPageChange?: (onSourcesPage: boolean) => void
+  /** Number of sources/calendars with a sync failure; the shared header shows it on the settings button. */
+  readonly onHealthChange?: (issues: number) => void
 }): ReactElement {
   const today = useMemo(() => startOfLocalDay(new Date()), [])
   const [page, setPage] = useState<SchedulePage>('calendar')
@@ -240,6 +242,10 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
   const counts = state?.counts ?? {}
   const staleSources = sources.filter(source => source.syncState === 'error')
   const failedCalendars = calendars.filter(calendar => calendar.lastError !== undefined)
+  const issues = staleSources.length + failedCalendars.length + (error === null || staleSources.length > 0 || failedCalendars.length > 0 ? 0 : 1)
+  useEffect(() => {
+    onHealthChange?.(issues)
+  }, [issues, onHealthChange])
   const lastSyncedAt = useMemo(() => {
     const times = sources
       .map(source => source.lastSyncedAt)
@@ -283,13 +289,6 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
     chooseView(next)
   }
 
-  const toolbarError = staleSources[0]?.lastError?.message
-    ?? (failedCalendars.length === 0 ? null : t('schedule.calendarSyncFailed', {
-      count: failedCalendars.length,
-      message: failedCalendars[0]?.lastError?.message ?? '',
-    }))
-    ?? error
-
   return (
     <div className="dsh-desk-schedule">
       <ScheduleToolbar
@@ -297,7 +296,6 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
         view={view}
         cursor={view === 'list' ? listStart : cursor}
         {...(lastSyncedAt === undefined ? {} : { lastSyncedAt })}
-        error={toolbarError}
         onView={chooseViewFromTab}
         onStep={step}
         onToday={() => { setCursor(today); setListStart(today) }}

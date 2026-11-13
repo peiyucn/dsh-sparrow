@@ -1,6 +1,8 @@
 /** Provider-agnostic ICS subscriptions: several URLs, each one its own read-only calendar. */
 
 import { useState } from 'react'
+import { SourceIssues } from './issues.js'
+import { sourceHealth } from './status.js'
 import type { DeskCalendar, DeskScheduleSource } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
 import type { ReactElement } from 'react'
@@ -58,18 +60,19 @@ export function SubscriptionCard(props: {
         const own = calendars.filter(calendar => calendar.sourceId === source.id)
         // The status dot belongs to each subscription: one ICS card can hold several, and only the
         // individual feed knows whether its own pull failed.
-        const failed = source.syncState === 'error'
+        const health = sourceHealth(source, own)
         return (
           <div key={source.id} className="dsh-desk-schedule-subscription">
             <div className="dsh-desk-schedule-subscription-head">
               <span className="dsh-desk-schedule-mgmt-name">{source.account ?? t('schedule.subscriptions')}</span>
               <span
                 className="dsh-desk-schedule-statusdot"
-                data-on={!failed}
-                data-error={failed ? 'true' : undefined}
+                data-on={health.tone === 'ok'}
+                data-tone={health.tone}
+                data-error={health.tone === 'error' ? 'true' : undefined}
                 role="img"
-                aria-label={failed ? t('schedule.subscriptionFailed') : t('schedule.subscriptionSynced')}
-                title={failed ? t('schedule.subscriptionFailed') : t('schedule.subscriptionSynced')}
+                aria-label={health.tone === 'error' ? t('schedule.subscriptionFailed') : health.tone === 'warn' ? t('schedule.statusWarning') : t('schedule.subscriptionSynced')}
+                title={health.tone === 'error' ? t('schedule.subscriptionFailed') : health.tone === 'warn' ? t('schedule.statusWarning') : t('schedule.subscriptionSynced')}
               />
               <button
                 type="button"
@@ -78,6 +81,7 @@ export function SubscriptionCard(props: {
                 onClick={() => { void remove(source.id) }}
               >{t('schedule.removeSubscription')}</button>
             </div>
+            <SourceIssues t={t} health={health} />
             {own.map(calendar => (
               <div key={calendar.id} className="dsh-desk-schedule-mgmt-row" data-off={!calendar.enabled}>
                 <button

@@ -2,6 +2,8 @@
 
 import { CalendarRows } from './provider-card.js'
 import { MicrosoftLogo, ProviderLogo } from './logos.js'
+import { SourceIssues } from './issues.js'
+import { sourceHealth } from './status.js'
 import { useEffect, useRef, useState } from 'react'
 import type { DeskCalendar, DeskScheduleSource } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
@@ -80,14 +82,22 @@ export function OutlookGraphCard(props: {
     } finally { setBusy(false) }
   }
 
+  const health = sourceHealth(source, props.calendars)
   return (
     <section className="dsh-desk-schedule-connection-card" data-connected={source !== undefined}>
       <header>
         <ProviderLogo provider="outlook" />
         <h3>{t('schedule.provider.outlook')}</h3>
-        <span className="dsh-desk-schedule-statusdot" data-on={source !== undefined} />
+        <span
+          className="dsh-desk-schedule-statusdot"
+          data-on={health.tone === 'ok'}
+          data-tone={health.tone}
+          data-error={health.tone === 'error' ? 'true' : undefined}
+          role="img"
+          aria-label={health.tone === 'error' ? t('schedule.statusError') : health.tone === 'warn' ? t('schedule.statusWarning') : source === undefined ? t('schedule.graphPending') : t('schedule.form.connected')}
+        />
         <span className="dsh-desk-schedule-connection-status">
-          {source === undefined ? t('schedule.graphPending') : t('schedule.form.connected')}
+          {source === undefined ? t('schedule.graphPending') : health.tone === 'error' ? t('schedule.statusError') : health.tone === 'warn' ? t('schedule.statusWarning') : t('schedule.form.connected')}
         </span>
         {source === undefined ? null : (
           <button type="button" className="dsh-desk-schedule-chip" disabled={busy} onClick={() => { void disconnect() }}>
@@ -95,6 +105,7 @@ export function OutlookGraphCard(props: {
           </button>
         )}
       </header>
+      <SourceIssues t={t} health={health} />
       {source === undefined ? (
         <>
           <p className="dsh-desk-schedule-form-note">{t('schedule.graphLoginHint')}</p>

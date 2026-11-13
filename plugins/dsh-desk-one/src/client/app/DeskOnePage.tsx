@@ -55,6 +55,7 @@ export function DeskOnePage(props: DeskPanelProps) {
   const zTopRef = useRef(0)
   const scheduleActionsRef = useRef<ScheduleHeaderActions | null>(null)
   const [onSourcesPage, setOnSourcesPage] = useState(false)
+  const [scheduleIssues, setScheduleIssues] = useState(0)
 
   const [pinnedHere, setPinnedHere] = useState<boolean>(() => pin.isPinned(tab))
 
@@ -270,6 +271,7 @@ export function DeskOnePage(props: DeskPanelProps) {
             t,
             visible: tab === 'schedule',
             onSourcesPage,
+            issueCount: scheduleIssues,
             backToCalendar: () => scheduleActionsRef.current?.backToCalendar(),
             openSources: () => scheduleActionsRef.current?.openSources(),
           })
@@ -309,6 +311,7 @@ export function DeskOnePage(props: DeskPanelProps) {
               api={schedule}
               headerActionsRef={scheduleActionsRef}
               onPageChange={setOnSourcesPage}
+              onHealthChange={setScheduleIssues}
               todayContext={{
                 notesCount: trash.activeNotes.length,
                 openTasks: taskData.tasks.filter(task => task.status !== 'done' && !task.archived).length,

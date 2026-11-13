@@ -12,14 +12,13 @@ interface ToolbarProps {
   readonly view: ScheduleViewName
   readonly cursor: Date
   readonly lastSyncedAt?: string
-  readonly error: string | null
   readonly onView: (view: ScheduleViewName) => void
   readonly onStep: (direction: -1 | 1) => void
   readonly onToday: () => void
 }
 
 export function ScheduleToolbar(props: ToolbarProps): ReactElement {
-  const { t, view, cursor, error } = props
+  const { t, view, cursor } = props
   const weekStart = addDays(startOfLocalDay(cursor), -((cursor.getDay() + 6) % 7))
   const weekEnd = addDays(weekStart, 6)
   const rangeLabel = view === 'month'
@@ -61,7 +60,6 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
               })}
         </span>
       </div>
-      {error === null ? null : <p className="dsh-desk-schedule-error">{error}</p>}
     </div>
   )
 }
