@@ -618,22 +618,22 @@ export const REVIEW_CSS = `
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  border: 0.5px solid rgba(0, 0, 0, 0.12);
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.6), 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 0.5px solid rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.75), 0 2px 10px rgba(0, 0, 0, 0.08);
   pointer-events: none;
 }
 body[data-ds-dark-theme] .dsh-desk-review-split {
   color: #16181d;
 }
 body[data-ds-dark-theme] .dsh-desk-review-split::before {
-  border-color: rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
-  -webkit-backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.5), 0 2px 10px rgba(0, 0, 0, 0.22);
+  border-color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(150%) brightness(1.02);
+  -webkit-backdrop-filter: blur(20px) saturate(150%) brightness(1.02);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.7), 0 4px 16px rgba(0, 0, 0, 0.16);
 }
 .dsh-desk-review-split-main,
 .dsh-desk-review-split-arrow {
@@ -732,17 +732,17 @@ body[data-ds-dark-theme] .dsh-desk-review-split-arrow[aria-expanded='true'] {
 .dsh-desk-review-menu {
   border: 0.5px solid rgba(0, 0, 0, 0.12) !important;
   border-radius: var(--dsw-radius-lg, 14px) !important;
-  background: rgba(255, 255, 255, 0.82) !important;
-  backdrop-filter: blur(14px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(160%) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(20px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18) !important;
   color: #1f2329 !important;
 }
 body[data-ds-dark-theme] .dsh-desk-review-menu {
-  border-color: rgba(255, 255, 255, 0.55) !important;
-  background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(14px) saturate(160%) brightness(1.05) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(160%) brightness(1.05) !important;
+  border-color: rgba(255, 255, 255, 0.72) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(20px) saturate(150%) brightness(1.02) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(150%) brightness(1.02) !important;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32) !important;
 }
 .dsh-desk-review-menu [role='menuitem'] {
