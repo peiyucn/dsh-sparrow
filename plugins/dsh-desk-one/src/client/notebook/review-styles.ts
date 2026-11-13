@@ -40,6 +40,17 @@ export const REVIEW_CSS = `
   background: var(--dsw-alias-state-business-primary, #4176e6);
   color: var(--dsw-alias-label-primary-foreground, #ffffff);
 }
+.dsh-desk-review-prompt-key {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 2px;
+  padding: 0 5px;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-layer-2, #f2f3f5);
+  font-size: 11px;
+  line-height: 16px;
+}
 .dsh-desk-review-prompt-text {
   margin: 0;
   padding: 8px 12px;

@@ -24,7 +24,13 @@ export function ReviewPromptDock({ session, t }: ReviewPromptDockProps): ReactNo
   return (
     <div className="dsh-desk-review-prompt" role="status">
       <span className="dsh-desk-review-prompt-avatar" aria-hidden="true"><DeskGlyph size={15} /></span>
-      <p className="dsh-desk-review-prompt-text">{t('review.prompt')}</p>
+      <p className="dsh-desk-review-prompt-text">
+        {t('review.promptLead')}
+        <span className="dsh-desk-review-prompt-key">{t('review.annotate')}</span>
+        {t('review.promptStart')}
+        <span className="dsh-desk-review-prompt-key">{t('review.submitAll')}</span>
+        {t('review.promptHandle')}
+      </p>
     </div>
   )
 }
