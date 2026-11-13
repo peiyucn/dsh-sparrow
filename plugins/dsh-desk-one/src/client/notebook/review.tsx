@@ -417,6 +417,12 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     ? undefined
     : { top: Math.max(selection.rect.top - rootRect.top - 34, 8), left: Math.max(selection.rect.left - rootRect.left, 8) }
 
+  const pendingLabel = t('review.pendingBar', { count: annotations.length })
+  const recordsLabel = t('review.recordsBar', { rounds: recordRounds, notes: recordAnnotations })
+  const changesLabel = totals === null
+    ? `${t('review.changes')} ${t('review.noChange')}`
+    : `${t('review.changes')} +${totals.added} −${totals.removed}`
+
   return (
     <div className="dsh-desk-review" ref={rootRef}>
       <header className="dsh-desk-review-head">
@@ -673,44 +679,53 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
           )
         : null}
       <div className="dsh-desk-review-bar">
-        <button
-          type="button"
-          className="dsh-desk-review-pill"
-          data-active={overlay === 'annotations'}
-          aria-expanded={overlay === 'annotations'}
-          onClick={() => setOverlay(current => current === 'annotations' ? null : 'annotations')}
-        >
-          <span className="dsh-desk-review-pillicon"><IconListPenOutlineRegular /></span>
-          <span className="dsh-desk-review-pill-label">{t('review.pendingBar', { count: annotations.length })}</span>
-        </button>
-        <button
-          type="button"
-          className="dsh-desk-review-pill"
-          data-active={overlay === 'records'}
-          aria-expanded={overlay === 'records'}
-          onClick={() => setOverlay(current => current === 'records' ? null : 'records')}
-        >
-          <span className="dsh-desk-review-pillicon"><IconClockOutlineRegular /></span>
-          <span className="dsh-desk-review-pill-label">{t('review.recordsBar', { rounds: recordRounds, notes: recordAnnotations })}</span>
-        </button>
-        <button
-          type="button"
-          className="dsh-desk-review-pill"
-          data-active={overlay === 'diff'}
-          aria-expanded={overlay === 'diff'}
-          onClick={() => setOverlay(current => current === 'diff' ? null : 'diff')}
-        >
-          <span className="dsh-desk-review-pillicon"><IconInspectOutlineRegular /></span>
-          <span className="dsh-desk-review-pill-label">{t('review.changes')}</span>
-          {totals === null
-            ? <span>{t('review.noChange')}</span>
-            : (
-                <>
-                  <span className="dsh-desk-review-difftag dsh-desk-review-difftag-plus">{`+${totals.added}`}</span>
-                  <span className="dsh-desk-review-difftag dsh-desk-review-difftag-minus">{`−${totals.removed}`}</span>
-                </>
-              )}
-        </button>
+        <Tooltip label={pendingLabel} side="top" portal delayMs={300} onlyWhenClipped>
+          <button
+            type="button"
+            className="dsh-desk-review-pill"
+            data-active={overlay === 'annotations'}
+            aria-expanded={overlay === 'annotations'}
+            aria-label={pendingLabel}
+            onClick={() => setOverlay(current => current === 'annotations' ? null : 'annotations')}
+          >
+            <span className="dsh-desk-review-pillicon"><IconListPenOutlineRegular /></span>
+            <span className="dsh-desk-review-pill-label">{pendingLabel}</span>
+          </button>
+        </Tooltip>
+        <Tooltip label={recordsLabel} side="top" portal delayMs={300} onlyWhenClipped>
+          <button
+            type="button"
+            className="dsh-desk-review-pill"
+            data-active={overlay === 'records'}
+            aria-expanded={overlay === 'records'}
+            aria-label={recordsLabel}
+            onClick={() => setOverlay(current => current === 'records' ? null : 'records')}
+          >
+            <span className="dsh-desk-review-pillicon"><IconClockOutlineRegular /></span>
+            <span className="dsh-desk-review-pill-label">{recordsLabel}</span>
+          </button>
+        </Tooltip>
+        <Tooltip label={changesLabel} side="top" portal delayMs={300} onlyWhenClipped>
+          <button
+            type="button"
+            className="dsh-desk-review-pill"
+            data-active={overlay === 'diff'}
+            aria-expanded={overlay === 'diff'}
+            aria-label={changesLabel}
+            onClick={() => setOverlay(current => current === 'diff' ? null : 'diff')}
+          >
+            <span className="dsh-desk-review-pillicon"><IconInspectOutlineRegular /></span>
+            <span className="dsh-desk-review-pill-label">{t('review.changes')}</span>
+            {totals === null
+              ? <span className="dsh-desk-review-difftag">{t('review.noChange')}</span>
+              : (
+                  <>
+                    <span className="dsh-desk-review-difftag dsh-desk-review-difftag-plus">{`+${totals.added}`}</span>
+                    <span className="dsh-desk-review-difftag dsh-desk-review-difftag-minus">{`−${totals.removed}`}</span>
+                  </>
+                )}
+          </button>
+        </Tooltip>
       </div>
     </div>
   )

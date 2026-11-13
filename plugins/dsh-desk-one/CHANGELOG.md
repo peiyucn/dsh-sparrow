@@ -6,7 +6,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
-* **Review bottom bar**: on a narrow pane the three pills shrink and ellipsize their labels instead of overflowing (below 430px the gap and padding tighten too).
+* **Review bottom bar**: on a narrow pane the three pills shrink and ellipsize their labels (hover shows the full reading, like official composer pills) instead of overflowing; below 430px the gap and padding tighten too.
 
 * **Review Session marker**: Sessions opened by the review flow show the blue whale mark before their sidebar title; the marker is persisted by the host (survives refresh/restart) so review Sessions are recognisable at a glance.
 
