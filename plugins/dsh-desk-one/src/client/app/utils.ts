@@ -56,9 +56,57 @@ export function fallbackPosition(index: number): { x: number; y: number } {
   }
 }
 
-/** Date shown in the trash list (day granularity is enough there). */
-export function formatDate(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso.slice(0, 10)
-  return date.toLocaleDateString()
+/**
+ * Locale used for date output. The official locale runtime keeps `<html lang>` in sync with the
+ * active UI language (zh → `zh-CN`, otherwise the active locale id), so dates follow the interface
+ * language instead of the browser's own locale (a Chinese UI on an English browser used to render
+ * English month names).
+ */
+function activeDateLocale(): string {
+  const lang = typeof document === 'undefined' ? '' : document.documentElement.lang
+  return lang === '' ? 'en' : lang
+}
+
+/**
+ * Format one date in an explicit locale (the UI-locale wrappers below call it with the active one).
+ * @param locale - BCP 47 locale id, e.g. `zh-CN` / `en`.
+ * @param value - timestamp, ISO string or Date.
+ * @param style - `date`: y/m/d; `short`: month + day; `datetime`: y/m/d + h:m; `time`: h:m.
+ * @returns the localized text, or a stable fallback for invalid input.
+ */
+export function formatDateIn(
+  locale: string,
+  value: number | string | Date,
+  style: 'date' | 'short' | 'datetime' | 'time' = 'date',
+): string {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return typeof value === 'string' ? value.slice(0, 10) : ''
+  const options: Intl.DateTimeFormatOptions = style === 'short'
+    ? { month: 'short', day: 'numeric' }
+    : style === 'time'
+      ? { hour: '2-digit', minute: '2-digit' }
+      : style === 'datetime'
+        ? { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }
+        : { year: 'numeric', month: '2-digit', day: '2-digit' }
+  return new Intl.DateTimeFormat(locale, options).format(date)
+}
+
+/** Date shown in session rows and the trash list (day granularity, UI locale). */
+export function formatDate(value: number | string | Date): string {
+  return formatDateIn(activeDateLocale(), value)
+}
+
+/** Month + day only (session archive / stray / trash rows, UI locale). */
+export function formatShortDate(value: number | string | Date): string {
+  return formatDateIn(activeDateLocale(), value, 'short')
+}
+
+/** Date + time (annotation records, review baselines, UI locale). */
+export function formatDateTime(value: number | string | Date): string {
+  return formatDateIn(activeDateLocale(), value, 'datetime')
+}
+
+/** Clock time only (review baseline hint, UI locale). */
+export function formatTime(value: number | string | Date): string {
+  return formatDateIn(activeDateLocale(), value, 'time')
 }

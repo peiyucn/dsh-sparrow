@@ -6,7 +6,7 @@
 import type { ReactElement } from 'react'
 import type { ArchiveTreeNode } from '../../session-admin.js'
 import type { DeskTranslator } from '../app/types.js'
-import { formatTokens } from '../app/utils.js'
+import { formatShortDate, formatTokens } from '../app/utils.js'
 import { FillTitleButton } from './FillTitleButton.js'
 import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
@@ -14,10 +14,6 @@ import { SessionTreeRow } from './SessionTreeRow.js'
 
 export function countTree(nodes: readonly ArchiveTreeNode[]): number {
   return nodes.reduce((sum, node) => sum + 1 + countTree(node.children), 0)
-}
-
-export function formatDate(ms: number): string {
-  return new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
 /** Two-step confirm button: first click arms, second click runs. */
@@ -61,7 +57,7 @@ export function ArchiveTreeNodeRow(props: {
       {node.turns === undefined ? '' : `${node.turns} ${t('sessions.archive.turns')}`}
       {node.tokens === undefined ? '' : ` · ${formatTokens(node.tokens)}`}
       {node.sizeBytes === undefined ? '' : ` · ${Math.max(1, Math.round(node.sizeBytes / 1024))} KB`}
-      {` · ${formatDate(node.updatedAt)}`}
+      {` · ${formatShortDate(node.updatedAt)}`}
     </>
   )
   const actions = (

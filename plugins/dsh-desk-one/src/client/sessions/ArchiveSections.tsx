@@ -15,8 +15,8 @@ import type {
 import type { DeskTranslator } from '../app/types.js'
 import { LoadMore } from '../app/SubPageHeader.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
-import { formatTokens } from '../app/utils.js'
-import { ArchiveTreeNodeRow, countTree, formatDate, TrashSubagentRows } from './archive-rows.js'
+import { formatShortDate, formatTokens } from '../app/utils.js'
+import { ArchiveTreeNodeRow, countTree, TrashSubagentRows } from './archive-rows.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { FillTitleButton } from './FillTitleButton.js'
 import { SessionCopyActions } from './SessionCopyActions.js'
@@ -193,7 +193,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                       </>
                     )}
                     meta={[
-                      formatDate(item.createdAt),
+                      formatShortDate(item.createdAt),
                       item.turns === undefined ? '' : `${item.turns} ${t('sessions.archive.turns')}`,
                       item.tokens === undefined ? '' : formatTokens(item.tokens),
                       item.backendSupported ? '' : t('sessions.archive.unsupported'),
@@ -316,7 +316,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                           : null}
                       </>
                     )}
-                    meta={formatDate(Date.parse(entry.archivedAt))}
+                    meta={formatShortDate(Date.parse(entry.archivedAt))}
                     hasChildren={!entry.legacy && entry.subagents.length > 0}
                     expanded={expandedTrash.has(entry.trashId)}
                     onToggleExpand={() => setExpandedTrash(previous => {

@@ -11,6 +11,7 @@ import {
   Input, Modal, SegmentedTabs, Tag,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DeskTranslator } from '../app/types.js'
+import { formatDateTime } from '../app/utils.js'
 import type { ReviewHistoryEntry } from '../../notebook-contract.js'
 import type { NotebookPageController, NotebookRow } from './hooks/useNotebookPage.js'
 import { SkillPicker } from './components/SkillPicker.js'
@@ -74,7 +75,7 @@ function RecordDialog(props: {
         <div className="dsh-desk-notebook-recordmeta">
           <span className="dsh-desk-notebook-recordtitle">{record.record.fileTitle}</span>
           <span className="dsh-desk-notebook-recordpath">{record.resolvedPath ?? record.record.pathSnapshot}</span>
-          <span className="dsh-desk-notebook-recorddate">{new Date(record.record.createdAt).toLocaleString()}</span>
+          <span className="dsh-desk-notebook-recorddate">{formatDateTime(record.record.createdAt)}</span>
           {linked ? null : <Tag tone="warning">{t('notebook.recordDetached')}</Tag>}
         </div>
         {record.record.annotations.length === 0

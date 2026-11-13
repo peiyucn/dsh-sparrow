@@ -21,7 +21,7 @@ import { persistReviewSession } from '../reviewSessions.js'
 import { DeskTabGlyph } from '../tabIcons.js'
 import type { DraftAnnotation, NotebookPageResponse, ReviewHistoryEntry } from '../../notebook-contract.js'
 import type { DeskTranslator } from '../app/types.js'
-import { messageOf } from '../app/utils.js'
+import { formatDateTime, formatTime, messageOf } from '../app/utils.js'
 import type { NotebookApi } from './api.js'
 import { lineChanges } from './review-changes.js'
 import type { NoteReviewParams, ReviewBridge } from './review-bridge.js'
@@ -640,7 +640,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                 <h4>{t('review.changes')}</h4>
                 {baselineAt === null
                   ? null
-                  : <span className="dsh-desk-review-baseline">{t('review.baselineHint', { time: new Date(baselineAt).toLocaleTimeString() })}</span>}
+                  : <span className="dsh-desk-review-baseline">{t('review.baselineHint', { time: formatTime(baselineAt) })}</span>}
                 <Tooltip label={t('review.hideOverlay')} side="bottom" delayMs={400}>
                   <Button variant="ghost" size="sm" icon={<IconChevronDownOutlineRegular />} aria-label={t('review.hideOverlay')} onClick={() => setOverlay(null)} />
                 </Tooltip>
@@ -693,7 +693,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                     : records.map(entry => (
                         <div className="dsh-desk-review-record" key={entry.record.id}>
                           <div className="dsh-desk-review-recordehead">
-                            <span>{new Date(entry.record.createdAt).toLocaleString()}</span>
+                            <span>{formatDateTime(entry.record.createdAt)}</span>
                             <span className="dsh-desk-review-fieldcount">
                               {t('review.recordAnnotations', { count: entry.record.annotations.length })}
                             </span>

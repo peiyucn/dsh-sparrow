@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DeskTranslator } from '../../app/types.js'
-import { messageOf } from '../../app/utils.js'
+import { formatDate, messageOf } from '../../app/utils.js'
 import type { NotebookEntry, NotebookSkill, NotebookStateResponse, ReviewHistoryEntry } from '../../../notebook-contract.js'
 import { NOTEBOOK_HISTORY_WARN_BYTES } from '../../../constants.js'
 import type { NotebookApi } from '../api.js'
@@ -377,7 +377,7 @@ export function useNotebookPage(input: {
           key: entry.record.id,
           title: entry.record.fileTitle,
           path: entry.resolvedPath ?? entry.record.pathSnapshot,
-          date: new Date(entry.record.createdAt).toLocaleDateString(),
+          date: formatDate(entry.record.createdAt),
           annotationCount: entry.record.annotations.length,
           record: entry,
           onDelete: () => { void deleteHistory(entry.record.id) },
