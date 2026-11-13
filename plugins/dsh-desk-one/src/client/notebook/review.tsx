@@ -11,7 +11,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { ReactElement } from 'react'
 import {
   Button, DiffBlock, DisclosureRow, FileTypeIcon, IconChevronDownOutlineRegular, IconCopyOutlineRegular,
-  IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
+  IconInfoOutlineRegular, IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
   MarkdownText, Pill, SegmentedTabs, Tooltip, diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -112,6 +112,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const [diffOpen, setDiffOpen] = useState(false)
   /** Source view (exact lines, annotations) or read-only rendered view. */
   const [view, setView] = useState<'source' | 'render'>('source')
+  /** Frontmatter stays collapsed so the body owns the pane by default. */
+  const [fieldsOpen, setFieldsOpen] = useState(false)
 
   const lines = useMemo(() => (page === null ? [] : page.body.split('\n')), [page])
   const markdownLabels = useMemo(() => ({
@@ -424,14 +426,27 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
           : (
               <div className="dsh-desk-review-scroll">
                 {page.fields.length === 0 ? null : (
-                  <dl className="dsh-desk-review-frontmatter" aria-label={t('review.frontmatter')}>
-                    {page.fields.map(field => (
-                      <div key={field.name} className="dsh-desk-review-field">
-                        <dt>{field.name}</dt>
-                        <dd>{field.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
+                  <DisclosureRow
+                    icon={<IconInfoOutlineRegular />}
+                    title={t('review.frontmatter')}
+                    open={fieldsOpen}
+                    expandable
+                    expandOnRowClick
+                    previewChevron
+                    onToggle={() => setFieldsOpen(current => !current)}
+                    collapsedContent={(
+                      <span className="dsh-desk-review-fieldcount">{t('review.frontmatterCount', { count: page.fields.length })}</span>
+                    )}
+                  >
+                    <dl className="dsh-desk-review-frontmatter" aria-label={t('review.frontmatter')}>
+                      {page.fields.map(field => (
+                        <div key={field.name} className="dsh-desk-review-field">
+                          <dt>{field.name}</dt>
+                          <dd>{field.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </DisclosureRow>
                 )}
                 {documentAnnotations.map(annotation => (
                   <AnnotationCard

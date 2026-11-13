@@ -81,7 +81,7 @@
 - 底部固定菜单：**官方 composer 胶囊**（官方 `Pill`）——透明底、左侧拖拽条上方一条发丝分隔线、
   两枚胶囊**居中**：`批注草稿 N 处` 与 `本轮改动 +A −D`（无改动显示「持平」），点开为浮层；
   浮层用官方菜单面（menu surface token + 圆角 + elevation），提交 / 收起用官方 Button；
-- frontmatter：`page.fields` 在审阅内容上方以只读元数据块渲染（MD / 源码都显示；源码正文仍是不含 frontmatter 的 body，行号与批注保持一致）。
+- frontmatter：`page.fields` 在审阅内容上方以**默认折叠**的只读元数据行渲染（点开后展开元数据块）（MD / 源码都显示；源码正文仍是不含 frontmatter 的 body，行号与批注保持一致）。
 - 本轮基线：按 `fileId` 持久化在宿主 `desk_one` 域的 `note-baseline` 记录（不是浏览器 storage，清浏览器缓存不丢；正文上限 1MB（与可审阅文件上限一致），超限删除宿主记录、只保留内存基线），刷新 / 重开 tab 不重置；「本轮改动」里的重新取基线会覆盖。
 - 对话提示：审阅会话在官方 `conversation.input.dock`（session 级）注册一个左侧 AI 气泡「请您开始审阅吧…」，只在审阅会话显示（reviewSessions 记录 session id）。
 - 视觉规范：入口页、审阅 tab、官方预览按钮统一用官方主题 token 与官方基础组件

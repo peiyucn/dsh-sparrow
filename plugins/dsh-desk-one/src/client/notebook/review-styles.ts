@@ -2,7 +2,7 @@
 
 export const REVIEW_CSS = `
 .dsh-desk-review {
-  --dsh-desk-review-bar-h: 34px;
+  --dsh-desk-review-bar-h: 28px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -44,6 +44,12 @@ export const REVIEW_CSS = `
   line-height: 18px;
 }
 
+/* Frontmatter disclosure: one compact row when closed, metadata card when opened. */
+.dsh-desk-review-fieldcount {
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
 /* Frontmatter block: quiet metadata card above the page content (raw frontmatter is stripped from body). */
 .dsh-desk-review-frontmatter {
   display: flex;
@@ -136,7 +142,7 @@ export const REVIEW_CSS = `
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 10px 2px calc(var(--dsh-desk-review-bar-h) + 14px);
+  padding: 10px 2px calc(var(--dsh-desk-review-bar-h) + 4px);
 }
 .dsh-desk-review-card {
   border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
@@ -471,7 +477,7 @@ export const REVIEW_CSS = `
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 4px calc(var(--dsh-desk-review-bar-h) + 12px);
+  padding: 8px 4px calc(var(--dsh-desk-review-bar-h) + 4px);
   font-size: 13px;
   line-height: 1.7;
 }
@@ -507,7 +513,6 @@ export const REVIEW_CSS = `
   flex: none;
   height: var(--dsh-desk-review-bar-h);
   padding: 0 8px;
-  border-top: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.06));
   background: transparent;
 }
 .dsh-desk-review-pillicon {

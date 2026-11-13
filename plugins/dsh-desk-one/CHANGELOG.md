@@ -6,6 +6,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review layout**: frontmatter is collapsed to one metadata row by default (expand to read all), and the bottom pill area shrank from 34px to 28px with less reserved scroll padding so the body gets more room.
 * **Review overlays**: the two bottom pills now open an official-style title row (icon + title + actions) that stays fixed while the content, including long diffs, scrolls on its own.
 
 * **Responsive layout and review details**: the schedule top cards reflow (two columns / one column) on narrow panels and share the same 1100px maximum width as the calendar below; the notebook search and view tabs wrap with the width and the content cap follows the panel; the review page shows a frontmatter metadata block above MD and source.
