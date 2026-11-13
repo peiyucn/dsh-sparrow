@@ -32,6 +32,7 @@ export const SCHEDULE_CSS = `
 /* toolbar */
 .dsh-desk-schedule-toolbar {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  width: 100%; max-width: min(1100px, 100%); margin: 0 auto;
   padding-bottom: 8px; border-bottom: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
 }
 .dsh-desk-schedule-nav { display: flex; align-items: center; gap: 6px; }
@@ -194,6 +195,7 @@ export const SCHEDULE_CSS = `
 /* calendar surface */
 .dsh-desk-schedule-main {
   flex: 1; min-height: 0; display: flex;
+  width: 100%; max-width: min(1100px, 100%); margin: 0 auto;
   background: var(--dsw-alias-bg-layer-1, #fff);
   border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
   border-radius: var(--dsw-radius-lg, 16px);
