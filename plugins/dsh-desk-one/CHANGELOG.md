@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Responsive layout and review details**: the schedule top cards reflow (two columns / one column) on narrow panels; the notebook search and view tabs wrap with the width and the content cap follows the panel; the review page shows a frontmatter metadata block above MD and source; the round baseline is persisted per file so a refresh or reopened tab keeps this round’s changes.
+
 * **Schedule sync errors**: failures no longer surface on the calendar page; the top-bar **Calendar settings** action gets a red exclamation badge, and the settings page shows the exact error in the failing source card, with the status dot turning red (source failed) or amber (some calendars failed).
 
 * **Review naming and toolbar**: the right-pane tab is **Note review** again and the official preview header entry reads **Review view**; individual items stay **annotations**. The MD / code capsule is compacted to the 28px tool row (same height as copy / refresh), and the floating **Annotate** button now keeps its brand blue and deepens on hover instead of turning white, matching the composer's send button. The **Note review** tab title now carries the coloured Markdown file icon.
