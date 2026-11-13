@@ -2,7 +2,7 @@
 
 export const REVIEW_CSS = `
 .dsh-desk-review {
-  --dsh-desk-review-bar-h: 24px;
+  --dsh-desk-review-bar-h: 28px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -527,10 +527,10 @@ export const REVIEW_CSS = `
 .dsh-desk-review-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   box-sizing: border-box;
-  height: 24px;
-  padding: 0 8px;
+  height: 28px;
+  padding: 0 11px;
   border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
   border-radius: 999px;
   background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 58%, transparent);
@@ -544,8 +544,8 @@ export const REVIEW_CSS = `
   transition: background 160ms ease, color 160ms ease;
 }
 .dsh-desk-review-pill svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   flex: none;
 }
 .dsh-desk-review-pill:hover,
