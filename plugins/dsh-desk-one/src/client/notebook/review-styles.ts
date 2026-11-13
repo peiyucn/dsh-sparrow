@@ -226,7 +226,7 @@ export const REVIEW_CSS = `
   position: absolute;
   left: 8px;
   right: 8px;
-  bottom: calc(var(--dsh-desk-review-bar-h) + 18px);
+  bottom: calc(var(--dsh-desk-review-bar-h) + 10px);
   z-index: 4;
   display: flex;
   flex-direction: column;
@@ -577,93 +577,133 @@ export const REVIEW_CSS = `
 .dsh-desk-review-bar > * {
   pointer-events: auto;
 }
-/* Official Pill shape + isolated glass: the button box stays fully transparent; one pseudo-element
-   per capsule paints the translucent fill, blur and hairline, so nothing can read as a full-width
-   bar behind the three pills. */
-.dsh-desk-review-pill {
+/* Split action controls: official task-page create-button geometry (main label + chevron menu)
+   rendered as white glass. The glass lives on the group so the seam is one capsule, not two. */
+.dsh-desk-review-split {
   position: relative;
   isolation: isolate;
   display: inline-flex;
   flex: 0 1 auto;
-  align-items: center;
-  gap: 6px;
+  align-items: stretch;
   box-sizing: border-box;
   min-width: 0;
-  overflow: hidden;
   height: 28px;
-  padding: 0 11px;
-  border: 0;
   border-radius: 999px;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  font: inherit;
+  color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
   line-height: 18px;
-  cursor: pointer;
-  transition: color 160ms ease;
 }
-.dsh-desk-review-pill::before {
+.dsh-desk-review-split::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 26%, transparent);
+  border: 0.5px solid rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.34);
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
   pointer-events: none;
-  transition: background 160ms ease;
 }
-.dsh-desk-review-pill svg {
-  width: 15px;
-  height: 15px;
+body[data-ds-dark-theme] .dsh-desk-review-split::before {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+}
+.dsh-desk-review-split-main,
+.dsh-desk-review-split-arrow {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.dsh-desk-review-split-main {
+  gap: 6px;
+  min-width: 0;
+  padding: 0 10px 0 12px;
+  border-radius: 999px 0 0 999px;
+}
+.dsh-desk-review-split-icon {
+  display: inline-flex;
   flex: none;
 }
-/* Long labels ellipsize instead of pushing the three pills out of the pane. */
-.dsh-desk-review-pill-label {
+.dsh-desk-review-split-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.dsh-desk-review-split-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
 }
-.dsh-desk-review-pill > .dsh-desk-review-difftag {
+.dsh-desk-review-split-count,
+.dsh-desk-review-split-muted {
   flex: none;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+}
+.dsh-desk-review-split > .dsh-desk-review-difftag,
+.dsh-desk-review-split-main > .dsh-desk-review-difftag {
+  flex: none;
+}
+.dsh-desk-review-split-arrow {
+  flex: none;
+  justify-content: center;
+  width: 26px;
+  padding: 0;
+  border-left: 0.5px solid rgba(0, 0, 0, 0.12);
+  border-radius: 0 999px 999px 0;
+}
+body[data-ds-dark-theme] .dsh-desk-review-split-arrow {
+  border-left-color: rgba(255, 255, 255, 0.18);
+}
+.dsh-desk-review-split-arrow svg {
+  width: 12px;
+  height: 12px;
+}
+.dsh-desk-review-split-main:hover,
+.dsh-desk-review-split-arrow:hover,
+.dsh-desk-review-split-arrow[aria-expanded='true'] {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+}
+.dsh-desk-review-split-main:focus-visible,
+.dsh-desk-review-split-arrow:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #4176e6);
+  outline-offset: 1px;
+}
+.dsh-desk-review-split-main:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.dsh-desk-review-split-main:disabled:hover {
+  background: transparent;
 }
 @container (max-width: 430px) {
   .dsh-desk-review-bar {
     left: 8px;
     right: 8px;
-    gap: 4px;
+    gap: 6px;
   }
-  .dsh-desk-review-pill {
+  .dsh-desk-review-split-main {
     gap: 4px;
     padding: 0 8px;
   }
-}
-.dsh-desk-review-pill:hover,
-.dsh-desk-review-pill[data-active='true'] {
-  color: var(--dsw-alias-label-primary, #1f2329);
-}
-.dsh-desk-review-pill:hover::before,
-.dsh-desk-review-pill[data-active='true']::before {
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 50%, transparent);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .dsh-desk-review-pill::before {
-    background: var(--dsw-alias-bg-layer-2, #f2f3f5);
+  .dsh-desk-review-split-arrow {
+    width: 22px;
   }
 }
-.dsh-desk-review-pillicon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-}
-.dsh-desk-review-pillicon svg {
-  width: 14px;
-  height: 14px;
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .dsh-desk-review-split::before {
+    background: var(--dsw-alias-bg-layer-2, #f2f3f5);
+  }
 }
 /* Square brand-icon button in the official preview header (official Button geometry).
    The doubled class beats the host Button's primary fill, which is near-white in dark theme. */

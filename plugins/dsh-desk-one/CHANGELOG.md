@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review bottom bar**: redesigned into two white-glass split buttons — **Submit annotations** with a chevron menu for the annotation drafts, and **This round’s changes** with a chevron menu for the annotation records, using the official task page create control’s main/chevron geometry; the glass is painted on the group only (no backing strip, no theme-tone dependency), and overlays keep a 4px gap above the buttons.
+
 * **Review bottom bar**: the glass is painted inside each capsule’s own pseudo-element (lower opacity, no full-width backing strip), and overlays now keep a 12px gap above the pills instead of touching them.
 
 * **Review bottom bar**: on a narrow pane the three pills shrink and ellipsize their labels (hover shows the full reading, like official composer pills) instead of overflowing; below 430px the gap and padding tighten too.
