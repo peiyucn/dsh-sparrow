@@ -596,11 +596,9 @@ export const REVIEW_CSS = `
   pointer-events: auto;
 }
 /* Split action controls: official task-page create-button geometry (main label + chevron menu)
-   rendered as frosted white glass: light fill with dark ink in both themes, so it reads as a white
-   action button (not a grey fill) while the blur still shows the code behind it. */
+   painted with the OFFICIAL primary-button tokens. In the dark theme that token is the near-white
+   primary fill with dark ink (the clean white the rest of the app uses); no hand-made glass. */
 .dsh-desk-review-split {
-  position: relative;
-  isolation: isolate;
   display: inline-flex;
   flex: 0 1 auto;
   align-items: stretch;
@@ -608,36 +606,14 @@ export const REVIEW_CSS = `
   min-width: 0;
   height: var(--dsh-desk-review-bar-h);
   border-radius: 999px;
-  color: #1f2329;
+  background: var(--dsw-alias-button-primary-fill, #4176e6);
+  color: var(--dsw-alias-label-primary-foreground, #ffffff);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
   font-size: 13px;
   line-height: 20px;
 }
-.dsh-desk-review-split::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  border: 0.5px solid rgba(0, 0, 0, 0.1);
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.75), 0 2px 10px rgba(0, 0, 0, 0.08);
-  pointer-events: none;
-}
-body[data-ds-dark-theme] .dsh-desk-review-split {
-  color: #16181d;
-}
-body[data-ds-dark-theme] .dsh-desk-review-split::before {
-  border-color: rgba(255, 255, 255, 0.72);
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(20px) saturate(150%) brightness(1.02);
-  -webkit-backdrop-filter: blur(20px) saturate(150%) brightness(1.02);
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.7), 0 4px 16px rgba(0, 0, 0, 0.16);
-}
 .dsh-desk-review-split-main,
 .dsh-desk-review-split-arrow {
-  position: relative;
   display: inline-flex;
   align-items: center;
   box-sizing: border-box;
@@ -673,7 +649,7 @@ body[data-ds-dark-theme] .dsh-desk-review-split::before {
 .dsh-desk-review-split-count,
 .dsh-desk-review-split-muted {
   flex: none;
-  color: rgba(31, 35, 41, 0.55);
+  color: color-mix(in srgb, currentColor 68%, transparent);
   font-size: 12px;
 }
 .dsh-desk-review-split > .dsh-desk-review-difftag,
@@ -685,7 +661,7 @@ body[data-ds-dark-theme] .dsh-desk-review-split::before {
   justify-content: center;
   width: 32px;
   padding: 0;
-  border-left: 0.5px solid rgba(0, 0, 0, 0.16);
+  border-left: 0.5px solid color-mix(in srgb, currentColor 22%, transparent);
   border-radius: 0 999px 999px 0;
 }
 .dsh-desk-review-split-arrow svg {
@@ -695,21 +671,20 @@ body[data-ds-dark-theme] .dsh-desk-review-split::before {
 .dsh-desk-review-split-main:hover,
 .dsh-desk-review-split-arrow:hover,
 .dsh-desk-review-split-arrow[aria-expanded='true'] {
-  background: rgba(255, 255, 255, 0.55);
+  background: color-mix(in srgb, currentColor 10%, transparent);
 }
-body[data-ds-dark-theme] .dsh-desk-review-split-main:hover,
-body[data-ds-dark-theme] .dsh-desk-review-split-arrow:hover,
-body[data-ds-dark-theme] .dsh-desk-review-split-arrow[aria-expanded='true'] {
-  background: rgba(255, 255, 255, 0.32);
+.dsh-desk-review-split:has(.dsh-desk-review-split-main:hover),
+.dsh-desk-review-split:has(.dsh-desk-review-split-arrow:hover) {
+  background: var(--dsw-alias-button-primary-hover, #3568d4);
 }
 .dsh-desk-review-split-main:focus-visible,
 .dsh-desk-review-split-arrow:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary, #4176e6);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 .dsh-desk-review-split-main:disabled {
   cursor: default;
-  opacity: 0.45;
+  opacity: 0.4;
 }
 .dsh-desk-review-split-main:disabled:hover {
   background: transparent;
@@ -728,40 +703,30 @@ body[data-ds-dark-theme] .dsh-desk-review-split-arrow[aria-expanded='true'] {
     width: 26px;
   }
 }
-/* White translucent menu card (same material as the split buttons), not the dark menu surface. */
+/* The chevron menus use the same official primary surface as their button, so the pair reads as
+   one control instead of a dark menu card floating over a white button. */
 .dsh-desk-review-menu {
-  border: 0.5px solid rgba(0, 0, 0, 0.12) !important;
+  border: 0 !important;
   border-radius: var(--dsw-radius-lg, 14px) !important;
-  background: rgba(255, 255, 255, 0.9) !important;
-  backdrop-filter: blur(20px) saturate(150%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18) !important;
-  color: #1f2329 !important;
+  background: var(--dsw-alias-button-primary-fill, #4176e6) !important;
+  color: var(--dsw-alias-label-primary-foreground, #ffffff) !important;
+  box-shadow: var(--dsw-elevation-prominent, 0 10px 30px -12px rgba(20, 25, 40, 0.45)) !important;
 }
-body[data-ds-dark-theme] .dsh-desk-review-menu {
-  border-color: rgba(255, 255, 255, 0.72) !important;
-  background: rgba(255, 255, 255, 0.72) !important;
-  backdrop-filter: blur(20px) saturate(150%) brightness(1.02) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(150%) brightness(1.02) !important;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32) !important;
+.dsh-desk-review-menu > [class*='material'] {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .dsh-desk-review-menu [role='menuitem'] {
-  color: #16181d !important;
+  color: inherit !important;
+  border-radius: var(--dsw-radius-sm, 8px) !important;
 }
 .dsh-desk-review-menu [role='menuitem']:hover,
 .dsh-desk-review-menu [role='menuitem']:focus-visible {
-  background: rgba(0, 0, 0, 0.07) !important;
+  background: color-mix(in srgb, currentColor 12%, transparent) !important;
 }
 .dsh-desk-review-menu [role='menuitem'] svg {
-  color: #16181d;
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .dsh-desk-review-split::before {
-    background: #f5f6f8;
-  }
-  body[data-ds-dark-theme] .dsh-desk-review-split::before {
-    background: #e8e9ee;
-  }
+  color: inherit;
 }
 /* Square brand-icon button in the official preview header (official Button geometry).
    The doubled class beats the host Button's primary fill, which is near-white in dark theme. */
