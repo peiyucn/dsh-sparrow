@@ -227,36 +227,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   height: 14px;
   flex: none;
 }
-/* Pin toggle for the current tab: official 25px tool geometry next to the tab row. */
-.dsh-desk-pin {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  width: 25px;
-  height: 25px;
-  margin-left: auto;
-  padding: 5px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  line-height: 1;
-  background: transparent;
-  border: none;
-  border-radius: var(--dsw-radius-sm, 8px);
-  cursor: pointer;
-  transition: color 160ms ease, background 160ms ease;
-}
-.dsh-desk-pin svg {
-  width: 15px;
-  height: 15px;
-}
-.dsh-desk-pin:hover {
-  color: var(--dsw-alias-label-primary, #1f2329);
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-}
-.dsh-desk-pin[data-pinned='true'] {
-  color: var(--dsw-alias-state-business-primary, #4176e6);
-}
+
 /* Content fills the page; each view offsets its own content below the header. */
 .dsh-desk-body {
   box-sizing: border-box;
