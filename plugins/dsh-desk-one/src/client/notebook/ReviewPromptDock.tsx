@@ -6,10 +6,10 @@
  * never render it because the component checks the review-session registry.
  */
 
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
-import { isReviewSession } from '../reviewSessions.js'
+import { isReviewSession, subscribeReviewSessions } from '../reviewSessions.js'
 import { DeskGlyph } from '../brand.js'
 
 /** Runtime props: session-scoped dock owner passes the session snapshot; locale comes from our namespace. */
@@ -18,6 +18,8 @@ interface ReviewPromptDockProps extends PropsLocale<typeof LOCALE_NAMESPACE> {
 }
 
 export function ReviewPromptDock({ session, t }: ReviewPromptDockProps): ReactNode {
+  const [, setVersion] = useState(0)
+  useEffect(() => subscribeReviewSessions(() => { setVersion(value => value + 1) }), [])
   if (!isReviewSession(session.id)) return null
   return (
     <div className="dsh-desk-review-prompt" role="status">
