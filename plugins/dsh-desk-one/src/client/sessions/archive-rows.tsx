@@ -8,6 +8,7 @@ import type { ArchiveTreeNode } from '../../session-admin.js'
 import type { DeskTranslator } from '../app/types.js'
 import { formatTokens } from '../app/utils.js'
 import { FillTitleButton } from './FillTitleButton.js'
+import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
 
@@ -63,30 +64,35 @@ export function ArchiveTreeNodeRow(props: {
       {` · ${formatDate(node.updatedAt)}`}
     </>
   )
-  const actions = readOnly || depth > 0 ? undefined : (
+  const actions = (
     <>
-      <SessionRowAction kind="unarchive" label={t('sessions.archive.unarchive')} disabled={busy} onClick={() => props.onUnarchive(node.sessionId)} />
-      <SessionRowAction
-        kind="trash"
-        label={t('sessions.archive.toTrash')}
-        armed={armedTrash.has(node.sessionId)}
-        disabled={busy || !node.backendSupported}
-        onClick={() => {
-          if (armedTrash.has(node.sessionId)) props.onConfirmTrash(node.sessionId)
-          else props.onArmTrash(node.sessionId)
-        }}
-      />
-      <SessionRowAction
-        kind="delete"
-        label={deleteArmed ? t('sessions.archive.deleteConfirm') : t('sessions.archive.delete')}
-        armed={deleteArmed}
-        danger
-        disabled={busy || !node.backendSupported}
-        onClick={() => {
-          if (deleteArmed) props.onConfirmDelete(node)
-          else props.onArmDelete(node.sessionId)
-        }}
-      />
+      <SessionCopyActions title={node.title} sessionId={node.sessionId} t={t} />
+      {readOnly || depth > 0 ? null : (
+        <>
+          <SessionRowAction kind="unarchive" label={t('sessions.archive.unarchive')} disabled={busy} onClick={() => props.onUnarchive(node.sessionId)} />
+          <SessionRowAction
+            kind="trash"
+            label={t('sessions.archive.toTrash')}
+            armed={armedTrash.has(node.sessionId)}
+            disabled={busy || !node.backendSupported}
+            onClick={() => {
+              if (armedTrash.has(node.sessionId)) props.onConfirmTrash(node.sessionId)
+              else props.onArmTrash(node.sessionId)
+            }}
+          />
+          <SessionRowAction
+            kind="delete"
+            label={deleteArmed ? t('sessions.archive.deleteConfirm') : t('sessions.archive.delete')}
+            armed={deleteArmed}
+            danger
+            disabled={busy || !node.backendSupported}
+            onClick={() => {
+              if (deleteArmed) props.onConfirmDelete(node)
+              else props.onArmDelete(node.sessionId)
+            }}
+          />
+        </>
+      )}
     </>
   )
   return (
@@ -106,7 +112,7 @@ export function ArchiveTreeNodeRow(props: {
         liveHint={t('sessions.archive.liveHint')}
         badges={badges}
         meta={meta}
-        {...(actions === undefined ? {} : { actions })}
+        actions={actions}
       />
       {deleteArmed ? (
         <div className="dsh-desk-archive-deletebox" style={{ marginLeft: `calc(12px + ${depth} * 16px)` }}>
@@ -180,6 +186,7 @@ export function TrashSubagentRows(props: {
             disabled
             expandLabel={props.t('sessions.archive.expand')}
             collapseLabel={props.t('sessions.archive.collapse')}
+            actions={<SessionCopyActions title={child.title} sessionId={child.sessionId} t={props.t} />}
           />
           <TrashSubagentRows t={props.t} parentId={child.sessionId} subagents={props.subagents} depth={props.depth + 1} />
         </li>

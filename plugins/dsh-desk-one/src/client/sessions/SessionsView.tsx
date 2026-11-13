@@ -11,6 +11,7 @@ import type { SessionChipInfo, SessionLinkSnapshot } from './contract.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
 import { activeSessionGroups } from './catalog.js'
 import { ArchiveSections } from './ArchiveSections.js'
+import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
 import { formatDate, formatTokens } from '../app/utils.js'
@@ -137,14 +138,19 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
           badges={node.children.length === 0 ? undefined : (
             <span className="dsh-desk-archive-badge">{t('sessions.childCount', { count: node.children.length })}</span>
           )}
-          actions={node.depth === 0 ? (
-            <SessionRowAction
-              kind="archive"
-              label={t('sessions.archive.archive')}
-              disabled={busy}
-              onClick={() => { void act(node.session.id, () => archive.archive(node.session.id)) }}
-            />
-          ) : undefined}
+          actions={(
+            <>
+              <SessionCopyActions title={node.session.title} sessionId={node.session.id} t={t} />
+              {node.depth === 0 ? (
+                <SessionRowAction
+                  kind="archive"
+                  label={t('sessions.archive.archive')}
+                  disabled={busy}
+                  onClick={() => { void act(node.session.id, () => archive.archive(node.session.id)) }}
+                />
+              ) : null}
+            </>
+          )}
         />
         {children.length === 0 ? null : (
           <ul className="dsh-desk-tree-children">

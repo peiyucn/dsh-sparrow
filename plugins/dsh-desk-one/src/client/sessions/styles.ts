@@ -185,4 +185,13 @@ export const SESSIONS_CSS = `
 .dsh-desk-row-action:disabled { opacity: .4; cursor: default; }
 .dsh-desk-row-action[data-armed='true'] { border-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); }
 .dsh-desk-row-action[data-danger='true'] { color: #c2410c; border-color: color-mix(in srgb, #c2410c 45%, transparent); }
+/* Copy feedback stays on the button itself: green check on success, red tint on a rejected write. */
+.dsh-desk-row-copy[data-copy-state='copied'] {
+  color: var(--dsw-alias-state-success-primary, #3a9a5b);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary, #3a9a5b) 45%, transparent);
+}
+.dsh-desk-row-copy[data-copy-state='failed'] {
+  color: var(--dsw-alias-state-error-primary, #c0503f);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c0503f) 45%, transparent);
+}
 `

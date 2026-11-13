@@ -19,6 +19,7 @@ import { formatTokens } from '../app/utils.js'
 import { ArchiveTreeNodeRow, countTree, formatDate, TrashSubagentRows } from './archive-rows.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { FillTitleButton } from './FillTitleButton.js'
+import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
 
@@ -201,6 +202,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                     collapseLabel={t('sessions.archive.collapse')}
                     actions={(
                       <>
+                        <SessionCopyActions title={item.title} sessionId={item.sessionId} t={t} />
                         <SessionRowAction kind="archive" label={t('sessions.archive.archive')} disabled={busy} onClick={() => { void run(() => api.archive(item.sessionId), current => ({ ...current, strays: current.strays.filter(row => row.sessionId !== item.sessionId) })) }} />
                         <SessionRowAction
                           kind="trash"
@@ -325,6 +327,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
                     })}
                     actions={(
                       <>
+                        <SessionCopyActions title={entry.title} sessionId={entry.sessionId} t={t} />
                         {entry.legacy ? null : (
                           <SessionRowAction kind="restore" label={t('sessions.archive.restore')} disabled={busy} onClick={() => { void run(() => api.restore(entry.trashId), current => ({ ...current, trash: current.trash.filter(row => row.trashId !== entry.trashId) })) }} />
                         )}
