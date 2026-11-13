@@ -215,6 +215,27 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     const timer = setTimeout(() => setNotice(null), 4_000)
     return () => clearTimeout(timer)
   }, [notice])
+  // Bottom overlays dismiss on an outside click or Escape, like the official menus.
+  useEffect(() => {
+    if (overlay === null) return
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest('.dsh-desk-review-layer') !== null) return
+      if (target.closest('.dsh-desk-review-bar') !== null) return
+      if (composerRef.current?.contains(target) === true) return
+      setOverlay(null)
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setOverlay(null)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [overlay])
 
   /** Drop the pending selection (state, float button and the browser's own highlight). */
   const cancelSelection = useCallback((): void => {
