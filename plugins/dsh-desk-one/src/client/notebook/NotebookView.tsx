@@ -11,7 +11,7 @@ import {
   Input, Modal, SegmentedTabs, Tag,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DeskTranslator } from '../app/types.js'
-import { formatDateTime } from '../app/utils.js'
+import { formatDateTime, formatKilobytes } from '../app/utils.js'
 import type { ReviewHistoryEntry } from '../../notebook-contract.js'
 import type { NotebookPageController, NotebookRow } from './hooks/useNotebookPage.js'
 import { SkillPicker } from './components/SkillPicker.js'
@@ -263,7 +263,7 @@ export function NotebookView({ page }: { readonly page: NotebookPageController }
                     {page.mode === 'history'
                       ? (
                           <Tag tone={page.historyWarn ? 'danger' : 'neutral'} className="dsh-desk-notebook-cardhead-usage">
-                            {t('notebook.historyUsage', { size: (page.historyBytes / 1024).toFixed(1) })}
+                            {t('notebook.historyUsage', { size: formatKilobytes(page.historyBytes) })}
                           </Tag>
                         )
                       : null}

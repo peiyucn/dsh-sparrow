@@ -23,8 +23,13 @@ export function dayKey(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`
 }
 
-/** 24h wall clock, locale-independent so the UI never mixes AM/PM with a Chinese shell. */
-export function formatTime(iso: string): string {
+/**
+ * 24h wall clock, locale-independent so the UI never mixes AM/PM with a Chinese shell.
+ *
+ * Named `formatClock24h` rather than `formatTime` to stay distinct from the locale-aware helper in
+ * `app/utils.ts`; the two intentionally produce different text for the same instant.
+ */
+export function formatClock24h(iso: string): string {
   const date = new Date(iso)
   const hours = String(date.getHours()).padStart(2, '0')
   const minutes = String(date.getMinutes()).padStart(2, '0')

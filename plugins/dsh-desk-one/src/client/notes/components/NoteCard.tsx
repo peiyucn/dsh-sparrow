@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { NOTE_COLORS } from '../../../constants.js'
 import type { DeskNote, NoteColor } from '../../../contract.js'
+import { formatLocalDateTime } from '../../app/utils.js'
 import type { DeskTranslator, PlacedNote } from '../../app/types.js'
 
 interface NoteCardProps {
@@ -24,22 +25,13 @@ interface NoteCardProps {
   readonly onBodyCommit: (note: DeskNote, element: HTMLTextAreaElement) => void
 }
 
-/** Local date label: short for the paper edge, full for the hover title. */
-function createdLabel(iso: string): { readonly short: string; readonly full: string } | null {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return null
-  const pad = (value: number): string => String(value).padStart(2, '0')
-  const short = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-  return { short, full: `${short} ${pad(date.getHours())}:${pad(date.getMinutes())}` }
-}
-
 export function NoteCard({
   item, animating, animationDelayMs, t, onRaise, onDragStart, onResizeStart, onColor, onTrash, onBodyCommit,
 }: NoteCardProps): ReactElement {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const { note } = item
   const display = note.body === '' ? note.title : note.body
-  const created = createdLabel(note.createdAt)
+  const created = formatLocalDateTime(note.createdAt)
 
   useEffect(() => {
     const element = textareaRef.current

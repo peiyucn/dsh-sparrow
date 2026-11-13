@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  addDays, conflictIds, coversDayKey, dayKey, eventDayKeys, formatDayTitle, groupByDay, isoWeekNumber, keyOfEvent,
+  addDays, conflictIds, coversDayKey, dayKey, eventDayKeys, formatClock24h, formatDayTitle, groupByDay, isoWeekNumber, keyOfEvent,
   isMultiDay, listRange, monthRange, spanBars, startOfLocalDay, weekBlocks, weekRange,
 } from '../../lib/client/schedule/utils.js'
 
@@ -158,5 +158,10 @@ describe('client schedule utils', () => {
     assert.equal(formatDayTitle(today, today, { today: '今天', tomorrow: '明天' }, value => `F${value.getDate()}`), '今天')
     assert.equal(formatDayTitle(addDays(today, 1), today, { today: '今天', tomorrow: '明天' }, value => `F${value.getDate()}`), '明天')
     assert.notEqual(formatDayTitle(addDays(today, 2), today, { today: '今天', tomorrow: '明天' }, value => `F${value.getDate()}`), '今天')
+  })
+
+  it('formatClock24h 固定 24 小时制并补零（不随界面语言出 AM/PM）', () => {
+    assert.equal(formatClock24h(new Date(2026, 10, 9, 9, 5).toISOString()), '09:05')
+    assert.equal(formatClock24h(new Date(2026, 10, 9, 23, 54).toISOString()), '23:54')
   })
 })

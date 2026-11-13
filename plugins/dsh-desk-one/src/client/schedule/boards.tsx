@@ -1,6 +1,6 @@
 /** Calendar boards: list, month and week. The week board owns its 0–24 hour ruler and scroll anchor. */
 
-import { addDays, calendarColorOf, calendarNameOf, conflictIds, coversDayKey, dayKey, formatDateLabel, formatTime, groupByDay, isMultiDay, isoWeekNumber, monthRange, spanBars, weekBlocks, weekdayLabel, weekdayLabels } from './utils.js'
+import { addDays, calendarColorOf, calendarNameOf, conflictIds, coversDayKey, dayKey, formatClock24h, formatDateLabel, groupByDay, isMultiDay, isoWeekNumber, monthRange, spanBars, weekBlocks, weekdayLabel, weekdayLabels } from './utils.js'
 import { dayLabel, eventTitle } from './shared.js'
 import { useEffect, useMemo, useRef } from 'react'
 import type { ClickPoint } from './shared.js'
@@ -36,7 +36,7 @@ export function ListBoard(props: ListProps): ReactElement {
           </h4>
           {group.events.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.dayEmpty')}</p> : group.events.map(event => (
             <button key={event.id} type="button" className="dsh-desk-schedule-row" onClick={click => onOpen(event, { x: click.clientX, y: click.clientY })}>
-              <span className="dsh-desk-schedule-row-time">{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
+              <span className="dsh-desk-schedule-row-time">{event.allDay ? t('schedule.allDay') : formatClock24h(event.start)}</span>
               <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
               <span className="dsh-desk-schedule-row-title">{eventTitle(t, event)}</span>
               {conflicts.has(event.id) ? <span className="dsh-desk-schedule-conflict" title={t('schedule.conflict')}>!</span> : null}
@@ -132,7 +132,7 @@ export function MonthBoard(props: MonthProps): ReactElement {
                         title={eventTitle(t, event)}
                       >
                         <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
-                        {event.allDay ? null : <span className="dsh-desk-schedule-month-time">{formatTime(event.start)}</span>}
+                        {event.allDay ? null : <span className="dsh-desk-schedule-month-time">{formatClock24h(event.start)}</span>}
                         <span>{eventTitle(t, event)}</span>
                       </button>
                     ))}
@@ -292,7 +292,7 @@ export function WeekBoard(props: WeekProps): ReactElement {
                     }}
                     onClick={click => onOpen(block.event, { x: click.clientX, y: click.clientY })}
                   >
-                    <strong>{formatTime(block.event.start)}</strong>
+                    <strong>{formatClock24h(block.event.start)}</strong>
                     <span>{eventTitle(t, block.event)}</span>
                   </button>
                 ))}

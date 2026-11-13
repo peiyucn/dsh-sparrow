@@ -1,8 +1,9 @@
 /** Floating read-only event card, anchored near the click point. */
 
-import { calendarColorOf, calendarNameOf, formatTime, startOfLocalDay } from './utils.js'
+import { calendarColorOf, calendarNameOf, formatClock24h, startOfLocalDay } from './utils.js'
 import { dayLabel, eventTitle, providerKey } from './shared.js'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCopyFeedback } from '../app/useCopyFeedback.js'
 import type { ClickPoint } from './shared.js'
 import type { DeskCalendar, DeskEvent, DeskScheduleSource } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
@@ -10,6 +11,8 @@ import type { ReactElement } from 'react'
 
 /** Card width used for viewport clamping (height is measured after render). */
 const DETAIL_CARD_WIDTH = 360
+/** How long the card's copy label stays flipped (the previous inline feedback also used 2s). */
+const COPY_FEEDBACK_MS = 2_000
 
 /** Chosen once per open: either a top edge (grows down) or a bottom edge (grows up), plus the cap. */
 interface Placement {
@@ -31,13 +34,13 @@ export function EventCard(props: {
 }): ReactElement {
   const { t, event, calendars, sources, point } = props
   const cardRef = useRef<HTMLElement>(null)
-  const [copied, setCopied] = useState(false)
+  const copyFeedback = useCopyFeedback({ feedbackMs: COPY_FEEDBACK_MS })
   // Guest lists are long and unreadable at a glance: show the count and open on demand.
   const [peopleOpen, setPeopleOpen] = useState(false)
   const source = sources.find(item => item.provider === event.provider)
   const when = event.allDay
     ? `${dayLabel(t, startOfLocalDay(new Date(event.start)), new Date())} · ${t('schedule.allDay')}`
-    : `${dayLabel(t, startOfLocalDay(new Date(event.start)), new Date())} ${formatTime(event.start)} – ${formatTime(event.end)}`
+    : `${dayLabel(t, startOfLocalDay(new Date(event.start)), new Date())} ${formatClock24h(event.start)} – ${formatClock24h(event.end)}`
   const [place, setPlace] = useState<Placement>()
   /**
    * Anchor the card once per open: growing content (the guest list) must not move it, otherwise the
@@ -90,19 +93,13 @@ export function EventCard(props: {
     }
   }, [props])
 
-  const copy = async (): Promise<void> => {
+  const copy = (): void => {
     const people = [
       event.organizer === undefined ? '' : `${t('schedule.detail.organizer')}：${event.organizer}`,
       event.attendees === undefined || event.attendees.length === 0 ? '' : `${t('schedule.detail.attendees')}：${event.attendees.join('、')}`,
     ].filter(value => value !== '').join('\n')
     const text = `${event.title}\n${when}\n${event.location ?? ''}${people === '' ? '' : `\n${people}`}`
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      window.setTimeout(() => { setCopied(false) }, 2000)
-    } catch {
-      setCopied(false)
-    }
+    void copyFeedback.copy(text)
   }
   return (
     <aside ref={cardRef} className="dsh-desk-schedule-detail-card" style={style} aria-label={eventTitle(t, event)}>
@@ -147,7 +144,7 @@ export function EventCard(props: {
       </dl>
       <footer>
         <span className="dsh-desk-schedule-readonly">{t('schedule.readOnly')}</span>
-        <button type="button" className="dsh-desk-schedule-chip" onClick={() => { void copy() }}>{copied ? t('schedule.detail.copied') : t('schedule.detail.copy')}</button>
+        <button type="button" className="dsh-desk-schedule-chip" onClick={copy}>{copyFeedback.state === 'copied' ? t('schedule.detail.copied') : t('schedule.detail.copy')}</button>
         {event.url === undefined ? null : (
           <a className="dsh-desk-schedule-chip" href={event.url} target="_blank" rel="noreferrer">{t('schedule.detail.open')}</a>
         )}

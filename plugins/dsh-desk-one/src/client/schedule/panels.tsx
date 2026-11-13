@@ -3,7 +3,7 @@
  * slider). They share the row so their internal rhythm is written together.
  */
 
-import { addDays, calendarColorOf, dayKey, eventDayKeys, formatDateLabel, formatTime, weekdayLabel, weekdayLabels } from './utils.js'
+import { addDays, calendarColorOf, dayKey, eventDayKeys, formatClock24h, formatDateLabel, weekdayLabel, weekdayLabels } from './utils.js'
 import { dayLabel, eventTitle } from './shared.js'
 import { SCHEDULE_UPCOMING_MAX_DAYS } from '../../constants.js'
 import { useMemo } from 'react'
@@ -68,7 +68,7 @@ export function UpcomingPanel(props: {
               <button type="button" className="dsh-desk-schedule-upcoming-item" onClick={click => props.onOpen(event, { x: click.clientX, y: click.clientY })}>
                 <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
                 <span className="dsh-desk-schedule-upcoming-day">{dayLabel(t, new Date(event.start), today)}</span>
-                <span className="dsh-desk-schedule-upcoming-time">{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
+                <span className="dsh-desk-schedule-upcoming-time">{event.allDay ? t('schedule.allDay') : formatClock24h(event.start)}</span>
                 <span className="dsh-desk-schedule-upcoming-title">{eventTitle(t, event)}</span>
               </button>
             </li>
@@ -134,7 +134,7 @@ export function TodayPanel(props: {
                     <li key={event.id}>
                       <button type="button" className="dsh-desk-today-event" onClick={click => props.onOpenEvent(event, { x: click.clientX, y: click.clientY })}>
                         <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
-                        <span>{event.allDay ? t('schedule.allDay') : formatTime(event.start)}</span>
+                        <span>{event.allDay ? t('schedule.allDay') : formatClock24h(event.start)}</span>
                         <span className="dsh-desk-today-event-title">{eventTitle(t, event)}</span>
                       </button>
                     </li>

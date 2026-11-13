@@ -1,6 +1,10 @@
 /** Fills the exact session title into the delete-confirmation input (and the clipboard). */
 import { useState } from 'react'
 import type { ReactElement } from 'react'
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+
+/** How long the button shows its check mark: feedback for the fill action, not for the copy. */
+const FILL_FEEDBACK_MS = 1_600
 
 export function FillTitleButton(props: {
   readonly title: string
@@ -10,9 +14,10 @@ export function FillTitleButton(props: {
   const [done, setDone] = useState(false)
   const fill = (): void => {
     props.onFill()
-    try { void navigator.clipboard.writeText(props.title) } catch { /* clipboard is best-effort */ }
+    // Best-effort and never blocking: the input is filled even when the clipboard is unavailable.
+    void writeClipboard(props.title).catch(() => { /* clipboard is best-effort */ })
     setDone(true)
-    window.setTimeout(() => setDone(false), 1600)
+    window.setTimeout(() => setDone(false), FILL_FEEDBACK_MS)
   }
   return (
     <button type="button" className="dsh-desk-row-action" title={props.label} aria-label={props.label} onClick={fill}>

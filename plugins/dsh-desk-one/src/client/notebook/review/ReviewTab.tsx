@@ -7,6 +7,7 @@
  */
 
 import type { ReactElement } from 'react'
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../../constants.js'
 import type { DraftAnnotation } from '../../../notebook-contract.js'
@@ -72,10 +73,9 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   )
 
   const copyPath = (): void => {
-    void navigator.clipboard.writeText(target.path).then(
-      () => data.setNotice(t('review.copied')),
-      () => data.setNotice(target.path),
-    )
+    // The tab shows a transient notice instead of in-place button feedback, so it uses the shared
+    // clipboard primitive directly rather than the `useCopyFeedback` state machine.
+    void writeClipboard(target.path).then(ok => data.setNotice(ok ? t('review.copied') : target.path))
   }
 
   const recordRounds = data.records?.length ?? 0

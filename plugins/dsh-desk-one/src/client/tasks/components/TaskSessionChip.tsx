@@ -7,6 +7,7 @@
  */
 
 import type { ReactElement } from 'react'
+import { formatDuration, formatTokenCount, relativeTimeOf } from '../../app/utils.js'
 import type { DeskTranslator } from '../../app/types.js'
 import type { SessionChipInfo } from '../../sessions/contract.js'
 
@@ -28,30 +29,16 @@ export function sessionStatusText(t: DeskTranslator, chip: SessionChipInfo): str
   return t('task.session.unavailable')
 }
 
-/** Compact token count: 950, 12.3k, 1.2M. */
-function formatTokens(total: number): string {
-  if (total >= 1_000_000) return `${(total / 1_000_000).toFixed(1)}M`
-  if (total >= 1_000) return `${(total / 1_000).toFixed(1)}k`
-  return String(total)
-}
-
-/** Compact wall time: 42s, 3m 12s, 1h 04m. */
-function formatDuration(ms: number): string {
-  const seconds = Math.max(0, Math.round(ms / 1000))
-  if (seconds < 60) return `${seconds}s`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, '0')}s`
-  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`
-}
-
+/** Localize the shared age bucket of the session's last run. */
 function lastRunText(t: DeskTranslator, chip: SessionChipInfo): string {
-  if (chip.updatedAt <= 0) return t('task.session.preview.never')
-  const minutes = Math.max(0, Math.floor((Date.now() - chip.updatedAt) / 60_000))
-  if (minutes < 1) return t('task.session.preview.justNow')
-  if (minutes < 60) return t('task.session.preview.minutesAgo', { count: minutes })
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return t('task.session.preview.hoursAgo', { count: hours })
-  return t('task.session.preview.daysAgo', { count: Math.floor(hours / 24) })
+  const age = relativeTimeOf(chip.updatedAt)
+  switch (age.unit) {
+    case 'never': return t('task.session.preview.never')
+    case 'now': return t('task.session.preview.justNow')
+    case 'minutes': return t('task.session.preview.minutesAgo', { count: age.count })
+    case 'hours': return t('task.session.preview.hoursAgo', { count: age.count })
+    case 'days': return t('task.session.preview.daysAgo', { count: age.count })
+  }
 }
 
 /** Total provider-reported tokens (input + output + cache read/write). */
@@ -66,7 +53,7 @@ export function TaskSessionChip({
 }: TaskSessionChipProps): ReactElement {
   const tokens = tokenTotalOf(chip)
   const reading = t('task.session.preview.reading')
-  const tokenText = tokens.known ? formatTokens(tokens.total) : (loading ? reading : '—')
+  const tokenText = tokens.known ? formatTokenCount(tokens.total) : (loading ? reading : '—')
   const modelTimeText = chip.llmMs === undefined ? (loading ? reading : '—') : formatDuration(chip.llmMs)
 
   return (

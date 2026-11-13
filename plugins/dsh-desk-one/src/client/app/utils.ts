@@ -4,23 +4,107 @@ import { TAB_STORAGE_KEY } from '../../constants.js'
 import type { Tab } from './types.js'
 import { DESK_TABS } from './tabs.js'
 
-/** 12.3K / 52.8M style shorthand used by the session meta (trim trailing .0). */
-export function formatCompactNumber(value: number): string {
+/** Unit suffixes plus decimal policy of one compact-number style. */
+interface CompactNumberStyle {
+  /** Suffixes from the smallest to the largest supported unit. */
+  readonly units: readonly string[]
+  /** `trim`: whole numbers from 100 up, one trimmed decimal below; `fixed`: always one decimal. */
+  readonly decimals: 'trim' | 'fixed'
+}
+
+/** Shared scaling core; the two public styles differ only in units and decimals. */
+function scaleCompact(value: number, style: CompactNumberStyle): string {
   if (!Number.isFinite(value) || value <= 0) return '0'
   if (value < 1000) return String(Math.round(value))
-  const units = ['K', 'M', 'B'] as const
   let scaled = value
   let unit = -1
-  while (scaled >= 1000 && unit < units.length - 1) {
+  while (scaled >= 1000 && unit < style.units.length - 1) {
     scaled /= 1000
     unit += 1
   }
-  const rounded = scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1)
-  return `${rounded.replace(/\.0$/u, '')}${units[unit]}`
+  const rounded = style.decimals === 'fixed'
+    ? scaled.toFixed(1)
+    : scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1).replace(/\.0$/u, '')
+  return `${rounded}${style.units[unit]}`
+}
+
+/** 12.3K / 52.8M style shorthand used by the session meta (trim trailing .0). */
+export function formatCompactNumber(value: number): string {
+  return scaleCompact(value, { units: ['K', 'M', 'B'], decimals: 'trim' })
 }
 
 export function formatTokens(value: number): string {
   return `${formatCompactNumber(value)} tok`
+}
+
+/**
+ * Token count as shown by the task card's session chip: `950`, `12.3k`, `1.0M`.
+ *
+ * Kept separate from {@link formatTokens}: that one appends the `tok` suffix and upper-cases the
+ * unit (session archive meta), while the chip relies on its own label and the historical lower-case
+ * spelling, so folding them together would change the rendered text.
+ */
+export function formatTokenCount(value: number): string {
+  return scaleCompact(value, { units: ['k', 'M'], decimals: 'fixed' })
+}
+
+/** Compact wall time: 42s, 3m 12s, 1h 04m (task card's model-time stat). */
+export function formatDuration(ms: number): string {
+  const seconds = Math.max(0, Math.round(ms / 1000))
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, '0')}s`
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`
+}
+
+/** Coarse age bucket of one timestamp; labels stay in the locale dictionary. */
+export type RelativeTimeUnit = 'never' | 'now' | 'minutes' | 'hours' | 'days'
+
+/** Age of a timestamp, bucketed for the task card's "last run" line. */
+export interface RelativeTime {
+  readonly unit: RelativeTimeUnit
+  /** Magnitude of the bucket (0 for `never` / `now`). */
+  readonly count: number
+}
+
+/**
+ * Bucket a timestamp into the coarse age the task card shows (`never` for a zero timestamp).
+ * @param at - epoch ms of the dated moment; `<= 0` means "not run yet".
+ * @param now - current epoch ms (injected for pure rendering / tests).
+ * @returns the bucket plus its magnitude.
+ */
+export function relativeTimeOf(at: number, now: number = Date.now()): RelativeTime {
+  if (at <= 0) return { unit: 'never', count: 0 }
+  const minutes = Math.max(0, Math.floor((now - at) / 60_000))
+  if (minutes < 1) return { unit: 'now', count: 0 }
+  if (minutes < 60) return { unit: 'minutes', count: minutes }
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return { unit: 'hours', count: hours }
+  return { unit: 'days', count: Math.floor(hours / 24) }
+}
+
+/**
+ * Byte count in whole kilobytes with one decimal (`1.5`), for dictionaries whose string already
+ * carries the `KB` unit (e.g. `notebook.historyUsage`). Use the official `fileSizeText` when the
+ * unit is ours to choose.
+ */
+export function formatKilobytes(bytes: number): string {
+  return (bytes / 1024).toFixed(1)
+}
+
+/**
+ * Local date label of a wall note: `YYYY-MM-DD` on the paper edge, `YYYY-MM-DD HH:mm` in the hover
+ * title. Locale-independent on purpose (the note edge is a fixed stamp, not a localised sentence).
+ * @returns both labels, or null for an invalid timestamp.
+ */
+export function formatLocalDateTime(
+  value: number | string | Date,
+): { readonly short: string; readonly full: string } | null {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const pad = (part: number): string => String(part).padStart(2, '0')
+  const short = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  return { short, full: `${short} ${pad(date.getHours())}:${pad(date.getMinutes())}` }
 }
 
 export const messageOf = (reason: unknown): string => reason instanceof Error ? reason.message : String(reason)

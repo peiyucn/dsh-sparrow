@@ -14,6 +14,7 @@ import type {
 } from '../../session-admin.js'
 import type { DeskTranslator } from '../app/types.js'
 import { LoadMore } from '../app/SubPageHeader.js'
+import { useCopyFeedback } from '../app/useCopyFeedback.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
 import { formatShortDate, formatTokens } from '../app/utils.js'
 import { ArchiveTreeNodeRow, countTree, TrashSubagentRows } from './archive-rows.js'
@@ -22,6 +23,9 @@ import { FillTitleButton } from './FillTitleButton.js'
 import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
+
+/** How long the trash-path button shows "copied" (the previous inline feedback also used 2s). */
+const TRASH_DIR_COPY_FEEDBACK_MS = 2_000
 
 interface ArchiveSnapshot {
   readonly tree: readonly ArchiveTreeNode[]
@@ -47,7 +51,8 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
   const [deleteDraft, setDeleteDraft] = useState<{ id: string; text: string } | null>(null)
   const [armedTrashDelete, setArmedTrashDelete] = useState<Set<string>>(new Set())
   const [bulk, setBulk] = useState<null | 'restoreAll' | 'deleteAll'>(null)
-  const [copied, setCopied] = useState(false)
+  /** Feedback for the trash-directory copy: the path button flips to "copied" for 2s. */
+  const trashDirCopy = useCopyFeedback({ feedbackMs: TRASH_DIR_COPY_FEEDBACK_MS })
   const [visible, setVisible] = useState({ archived: SESSION_STREAM_PAGE_SIZE, strays: SESSION_STREAM_PAGE_SIZE, trash: SESSION_STREAM_PAGE_SIZE })
   const [expandedTrash, setExpandedTrash] = useState<Set<string>>(new Set())
 
@@ -95,15 +100,8 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
   const strays = snapshot?.strays ?? []
   const trash = snapshot?.trash ?? []
 
-  const copyTrashPath = async (): Promise<void> => {
-    const display = snapshot?.trashDir?.displayPath ?? ''
-    try {
-      await navigator.clipboard.writeText(display)
-      setCopied(true)
-      window.setTimeout(() => { setCopied(false) }, 2000)
-    } catch {
-      setCopied(false)
-    }
+  const copyTrashPath = (): void => {
+    void trashDirCopy.copy(snapshot?.trashDir?.displayPath ?? '')
   }
 
   /** Remove a subtree by root id from the archived tree, keeping descendants out too. */
@@ -292,8 +290,8 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
           </div>
         </header>
         {snapshot?.trashDir === null || snapshot?.trashDir === undefined ? null : (
-          <button type="button" className="dsh-desk-archive-trashdir" onClick={() => { void copyTrashPath() }} title={t('sessions.archive.copyPath')}>
-            {copied ? t('sessions.archive.copied') : snapshot.trashDir.displayPath}
+          <button type="button" className="dsh-desk-archive-trashdir" onClick={copyTrashPath} title={t('sessions.archive.copyPath')}>
+            {trashDirCopy.state === 'copied' ? t('sessions.archive.copied') : snapshot.trashDir.displayPath}
           </button>
         )}
         {trash.length === 0 ? <p className="dsh-desk-wall-hint">{t('sessions.archive.trashEmpty')}</p> : (

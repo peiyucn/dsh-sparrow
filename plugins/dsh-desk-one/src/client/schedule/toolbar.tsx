@@ -1,6 +1,6 @@
 /** Schedule toolbar: range navigation, view switch and last-sync stamp. */
 
-import { addDays, formatDateLabel, formatFullDateLabel, formatMonthLabel, formatTime, startOfLocalDay } from './utils.js'
+import { addDays, formatClock24h, formatDateLabel, formatFullDateLabel, formatMonthLabel, startOfLocalDay } from './utils.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ReactElement } from 'react'
 import type { ScheduleViewName } from './utils.js'
@@ -56,7 +56,7 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
           {props.lastSyncedAt === undefined
             ? t('schedule.neverSynced')
             : t('schedule.lastSync', {
-                time: `${formatDateLabel(new Date(props.lastSyncedAt), t)} ${formatTime(props.lastSyncedAt)}`,
+                time: `${formatDateLabel(new Date(props.lastSyncedAt), t)} ${formatClock24h(props.lastSyncedAt)}`,
               })}
         </span>
       </div>

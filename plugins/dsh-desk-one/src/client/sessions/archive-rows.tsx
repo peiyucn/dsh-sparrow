@@ -4,6 +4,7 @@
  */
 
 import type { ReactElement } from 'react'
+import { fileSizeText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ArchiveTreeNode } from '../../session-admin.js'
 import type { DeskTranslator } from '../app/types.js'
 import { formatShortDate, formatTokens } from '../app/utils.js'
@@ -55,7 +56,7 @@ export function ArchiveTreeNodeRow(props: {
     <>
       {node.turns === undefined ? '' : `${node.turns} ${t('sessions.archive.turns')}`}
       {node.tokens === undefined ? '' : ` · ${formatTokens(node.tokens)}`}
-      {node.sizeBytes === undefined ? '' : ` · ${Math.max(1, Math.round(node.sizeBytes / 1024))} KB`}
+      {node.sizeBytes === undefined ? '' : ` · ${fileSizeText(node.sizeBytes)}`}
       {` · ${formatShortDate(node.updatedAt)}`}
     </>
   )
