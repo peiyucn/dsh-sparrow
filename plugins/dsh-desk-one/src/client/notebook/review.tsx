@@ -341,6 +341,10 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     setNotice(t('review.submitted'))
   }, [annotations, bridge, fileId, loadRecords, notebook, path, persist, sessionId, t, workspaceId])
 
+  // One record = one submitted round; the pill reports both rounds and annotation items.
+  const recordRounds = records?.length ?? 0
+  const recordAnnotations = records?.reduce((sum, entry) => sum + entry.record.annotations.length, 0) ?? 0
+
   const diff = baseline !== null && page !== null && baseline !== page.body
     ? { oldText: baseline, newText: page.body }
     : null
@@ -630,7 +634,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
             <div className="dsh-desk-review-layer">
               <div className="dsh-desk-review-layerhead">
                 <span className="dsh-desk-review-layericon" aria-hidden="true"><IconClockOutlineRegular /></span>
-                <h4>{t('review.recordsTitle', { count: records?.length ?? 0 })}</h4>
+                <h4>{t('review.recordsTitle', { rounds: recordRounds, notes: recordAnnotations })}</h4>
                 <Tooltip label={t('review.hideOverlay')} side="bottom" delayMs={400}>
                   <Button variant="ghost" size="sm" icon={<IconChevronDownOutlineRegular />} aria-label={t('review.hideOverlay')} onClick={() => setOverlay(null)} />
                 </Tooltip>
@@ -681,7 +685,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
           onClick={() => setOverlay(current => current === 'records' ? null : 'records')}
         >
           <span className="dsh-desk-review-pillicon"><IconClockOutlineRegular /></span>
-          <span>{t('review.recordsBar', { count: records?.length ?? 0 })}</span>
+          <span>{t('review.recordsBar', { rounds: recordRounds, notes: recordAnnotations })}</span>
         </button>
         <button
           type="button"
