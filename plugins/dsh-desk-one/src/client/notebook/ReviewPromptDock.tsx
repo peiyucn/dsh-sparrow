@@ -28,6 +28,8 @@ export function ReviewPromptDock({ session, t }: ReviewPromptDockProps): ReactNo
         {t('review.promptLead')}
         <span className="dsh-desk-review-prompt-key">{t('review.annotate')}</span>
         {t('review.promptStart')}
+        <br />
+        {t('review.promptAfter')}
         <span className="dsh-desk-review-prompt-key">{t('review.submitAll')}</span>
         {t('review.promptHandle')}
       </p>

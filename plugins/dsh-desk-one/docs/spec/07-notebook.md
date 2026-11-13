@@ -84,7 +84,7 @@
 - frontmatter：`page.fields` 在审阅内容上方以**默认折叠**的只读元数据行渲染（点开后展开元数据块）（MD / 源码都显示；源码正文仍是不含 frontmatter 的 body，行号与批注保持一致）。
 - 本轮基线：按 `fileId` 持久化在宿主 `desk_one` 域的 `note-baseline` 记录（不是浏览器 storage，清浏览器缓存不丢；正文上限 1MB（与可审阅文件上限一致），超限删除宿主记录、只保留内存基线），刷新 / 重开 tab 不重置；「本轮改动」里的重新取基线会覆盖。
 - 侧栏标记：审阅会话在官方 `sidebar.session.row.leading`（root 级，16px 前置格）注册蓝色小鲸鱼标记；标记由宿主 `desk_one` 域的 `review-session` 节点持久化（每会话一条，上限 500 条按 `updatedAt` 淘汰），客户端启动时 hydrate；行处于运行 / 待处理状态时官方用状态点替换该格，归档行不显示。
-- 对话提示：审阅会话在官方 `conversation.input.dock`（session 级）注册一个左侧 AI 操作引导气泡「选中文本点击 [批注] 开始；[提交批注] 后我在这边处理。」，操作名用内联小框，用 flex order 排到输入框下方（空白会话与已开始会话一致），只在审阅会话显示（reviewSessions 记录 session id）。
+- 对话提示：审阅会话在官方 `conversation.input.dock`（session 级）注册一个左侧 AI 操作引导气泡「选中右栏内的文本，点击 [批注]，开始审阅；[提交批注] 后我在这边修订。」，分两行显示（`<br />`），操作名用内联小框，用 flex order 排到输入框下方（空白会话与已开始会话一致），只在审阅会话显示（reviewSessions 记录 session id）。
 - 视觉规范：入口页、审阅 tab、官方预览按钮统一用官方主题 token 与官方基础组件
   （Button / Input / SegmentedTabs / Pill / Tag / Modal），不自造按钮/胶囊样式；
   官方预览头部的「审阅视图」按钮用品牌色填充（`state-business-primary`），深色主题下不再变白块。底部胶囊采用官方 Pill 形状 + 自包含玻璃（半透明 + backdrop blur + 发丝边框，不依赖 theme-tone），不复制官方组件。
