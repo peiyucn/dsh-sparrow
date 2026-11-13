@@ -78,9 +78,9 @@
 - 顶部「整篇批注」：范围为整篇，引用用标题；
 - 顶部工具条：**模仿官方文档预览的表头**——38px 行高、发丝底边；视图切换用面板既有的官方 `SegmentedTabs`
   胶囊（sm），两档 `MD / 代码`（代码 = 源码 + 批注，默认）；复制路径 / 刷新用官方 Button ghost + Tooltip，整篇批注用官方 outline Button；
-- 底部固定菜单：**官方 composer 胶囊**（官方 `Pill`）——透明底、左侧拖拽条上方一条发丝分隔线、
+- 底部固定菜单：**官方 Pill 形状 + 每枚胶囊自包含玻璃**（玻璃画在胶囊自身伪元素里，无整条底衬；不依赖 theme-tone）——
   三枚胶囊**居中**：`批注草稿 N 处`、`批注记录 R 轮 / M 条` 与 `本轮改动 +A −D`（无改动显示「持平」），点开为浮层；面板宽度不足时胶囊可收缩、标签以省略号截断，被截断时悬停用官方 `Tooltip onlyWhenClipped` 显示完整读数（容器查询 ≤430px 收紧内边距与间距）；批注记录浮层按当前 fileId（或解析后的路径）列出已提交记录，含时间、批注条数、引用与意见；
-  浮层用官方菜单面（menu surface token + 圆角 + elevation），提交 / 收起用官方 Button；
+  浮层用官方菜单面（menu surface token + 圆角 + elevation），其底边与胶囊顶留 12px 间距；提交 / 收起用官方 Button；
 - frontmatter：`page.fields` 在审阅内容上方以**默认折叠**的只读元数据行渲染（点开后展开元数据块）（MD / 源码都显示；源码正文仍是不含 frontmatter 的 body，行号与批注保持一致）。
 - 本轮基线：按 `fileId` 持久化在宿主 `desk_one` 域的 `note-baseline` 记录（不是浏览器 storage，清浏览器缓存不丢；正文上限 1MB（与可审阅文件上限一致），超限删除宿主记录、只保留内存基线），刷新 / 重开 tab 不重置；「本轮改动」里的重新取基线会覆盖。
 - 侧栏标记：审阅会话在官方 `sidebar.session.row.leading`（root 级，16px 前置格）注册蓝色小鲸鱼标记；标记由宿主 `desk_one` 域的 `review-session` 节点持久化（每会话一条，上限 500 条按 `updatedAt` 淘汰），客户端启动时 hydrate；行处于运行 / 待处理状态时官方用状态点替换该格，归档行不显示。

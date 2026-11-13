@@ -226,7 +226,7 @@ export const REVIEW_CSS = `
   position: absolute;
   left: 8px;
   right: 8px;
-  bottom: calc(var(--dsh-desk-review-bar-h) + 6px);
+  bottom: calc(var(--dsh-desk-review-bar-h) + 18px);
   z-index: 4;
   display: flex;
   flex-direction: column;
@@ -569,15 +569,20 @@ export const REVIEW_CSS = `
   height: var(--dsh-desk-review-bar-h);
   padding: 0;
   border: 0;
-  background: none;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
   pointer-events: none;
 }
 .dsh-desk-review-bar > * {
   pointer-events: auto;
 }
-/* Official Pill shape + self-contained glass: translucent layer, blur and a hairline, so the
-   reading does not depend on the optional theme-tone plugin. */
+/* Official Pill shape + isolated glass: the button box stays fully transparent; one pseudo-element
+   per capsule paints the translucent fill, blur and hairline, so nothing can read as a full-width
+   bar behind the three pills. */
 .dsh-desk-review-pill {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   flex: 0 1 auto;
   align-items: center;
@@ -587,17 +592,28 @@ export const REVIEW_CSS = `
   overflow: hidden;
   height: 28px;
   padding: 0 11px;
-  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border: 0;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 58%, transparent);
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  background: transparent;
   color: var(--dsw-alias-label-secondary, #6b7280);
   font: inherit;
   font-size: 12px;
   line-height: 18px;
   cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
+  transition: color 160ms ease;
+}
+.dsh-desk-review-pill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 26%, transparent);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  pointer-events: none;
+  transition: background 160ms ease;
 }
 .dsh-desk-review-pill svg {
   width: 15px;
@@ -627,11 +643,14 @@ export const REVIEW_CSS = `
 }
 .dsh-desk-review-pill:hover,
 .dsh-desk-review-pill[data-active='true'] {
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 78%, transparent);
   color: var(--dsw-alias-label-primary, #1f2329);
 }
+.dsh-desk-review-pill:hover::before,
+.dsh-desk-review-pill[data-active='true']::before {
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 50%, transparent);
+}
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .dsh-desk-review-pill {
+  .dsh-desk-review-pill::before {
     background: var(--dsw-alias-bg-layer-2, #f2f3f5);
   }
 }
