@@ -105,7 +105,7 @@ export const NOTEBOOK_MAX_BYTES = 1_048_576
 /** Persisted draft box: one file keeps at most this many annotations. */
 export const NOTEBOOK_MAX_DRAFTS = 100
 /** Host-side review-baseline body cap (larger bodies keep only the in-memory baseline). */
-export const NOTEBOOK_BASELINE_MAX_CHARS = 200_000
+export const NOTEBOOK_BASELINE_MAX_CHARS = NOTEBOOK_MAX_BYTES
 /** History usage above this turns the entry-page meter red (no modal). */
 export const NOTEBOOK_HISTORY_WARN_BYTES = 2 * 1024 * 1024
 /** Fixed record id of the notebook root setting. */

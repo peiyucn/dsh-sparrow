@@ -7,7 +7,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 ## [Unreleased]
 
 * **Responsive layout and review details**: the schedule top cards reflow (two columns / one column) on narrow panels; the notebook search and view tabs wrap with the width and the content cap follows the panel; the review page shows a frontmatter metadata block above MD and source.
-* **Review baseline and conversation hint**: the round baseline moved from browser localStorage into the host `desk_one` storage domain (survives clearing browser storage; 200k cap; refresh or reopened tab keeps the round’s changes), and review sessions show a left-aligned AI bubble above the conversation composer: "Ready when you are — I am here for your review notes."
+* **Review baseline and conversation hint**: the round baseline moved from browser localStorage into the host `desk_one` storage domain (survives clearing browser storage; 1MB cap (same as the reviewable file limit); refresh or reopened tab keeps the round’s changes), and review sessions show a left-aligned AI bubble above the conversation composer: "Ready when you are — I am here for your review notes."
 
 * **Schedule sync errors**: failures no longer surface on the calendar page; the top-bar **Calendar settings** action gets a red exclamation badge, and the settings page shows the exact error in the failing source card, with the status dot turning red (source failed) or amber (some calendars failed).
 
