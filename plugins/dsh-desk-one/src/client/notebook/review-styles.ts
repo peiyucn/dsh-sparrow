@@ -47,6 +47,8 @@ export const REVIEW_CSS = `
   width: 14px;
   height: 14px;
 }
+/* Sidebar session-row mark: the note's own markdown file icon, so a review Session is easier to
+   pick out than the monochrome brand glyph. */
 .dsh-desk-review-session-mark {
   display: inline-flex;
   flex: none;
@@ -54,9 +56,6 @@ export const REVIEW_CSS = `
   justify-content: center;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
-  background: var(--dsw-alias-state-business-primary, #4176e6);
-  color: var(--dsw-alias-label-primary-foreground, #ffffff);
 }
 .dsh-desk-review-prompt-key {
   display: inline-flex;
