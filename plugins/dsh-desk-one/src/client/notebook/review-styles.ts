@@ -522,22 +522,26 @@ export const REVIEW_CSS = `
 .dsh-desk-review-bar > * {
   pointer-events: auto;
 }
-/* Official composer stat-pill reading: transparent, tertiary, no filled capsule at rest. */
+/* Official Pill shape + self-contained glass: translucent layer, blur and a hairline, so the
+   reading does not depend on the optional theme-tone plugin. */
 .dsh-desk-review-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   box-sizing: border-box;
-  height: 22px;
-  padding: 1px 8px;
-  border: 0;
-  border-radius: var(--dsw-radius-sm, 8px);
-  background: transparent;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
+  height: 24px;
+  padding: 0 8px;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 58%, transparent);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  color: var(--dsw-alias-label-secondary, #6b7280);
   font: inherit;
-  font-size: calc(var(--dsh-content-font-size-secondary, 13px) - 1px);
+  font-size: 12px;
   line-height: 18px;
   cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
 }
 .dsh-desk-review-pill svg {
   width: 14px;
@@ -546,8 +550,13 @@ export const REVIEW_CSS = `
 }
 .dsh-desk-review-pill:hover,
 .dsh-desk-review-pill[data-active='true'] {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--dsw-alias-label-secondary, #6b7280);
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 78%, transparent);
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .dsh-desk-review-pill {
+    background: var(--dsw-alias-bg-layer-2, #f2f3f5);
+  }
 }
 }
 .dsh-desk-review-pillicon {

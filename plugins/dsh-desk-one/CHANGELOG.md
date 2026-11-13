@@ -8,7 +8,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 * **Notebook list**: rows per page raised from 10 to 20 so the list fills large screens better.
 
-* **Review bottom bar**: the two pills now use the official composer stat-pill reading (transparent, tertiary text, subtle hover/open fill, no full-width band) and float over the body instead of taking their own row, giving the text more room.
+* **Review bottom bar**: the two pills use the official Pill shape with self-contained glass (translucent fill + backdrop blur + hairline; no theme-tone dependency, solid fallback) and float over the body instead of taking a row or needing an opaque backdrop strip.
 * **Sessions list**: row titles now use the notebook list’s fixed 34% title column with status/metadata on the right, so both lists share one style.
 
 * **Notebook first paint**: a loading state shows until the first fetch settles, so the unlinked empty page no longer flashes.
