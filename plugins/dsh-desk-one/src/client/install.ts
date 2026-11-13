@@ -12,7 +12,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { InjectFace, LocaleDictOf, PropsLocale, PropsRuntime, SlotComponent } from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { hasCapability, warnMissingCapabilities } from './compat.js'
-import { LOCALE_NAMESPACE, PACKAGE_NAME, PANEL_IDS, PANEL_ORDER } from '../constants.js'
+import { LOCALE_NAMESPACE, PACKAGE_NAME, PANEL_ID, PANEL_IDS, PANEL_ORDER } from '../constants.js'
 import { DESK_TABS } from './app/tabs.js'
 import type { Tab } from './app/types.js'
 import type {
@@ -24,13 +24,16 @@ import type { ScheduleApi } from './schedule/api.js'
 import type { NotebookApi } from './notebook/api.js'
 import type { ReviewOpenResult } from './notebook/review-bridge.js'
 import type { WorkspaceAccess } from './notebook/workspaces.js'
-import { attachMainPanel } from './panel.js'
+import { mountMainPanel, type LayoutFace } from './panel.js'
+import { readPinnedTabs, writePinnedTabs, type DeskPinApi } from './pin.js'
 import { ensureDeskStyles } from './styles.js'
 
 /** Panel injection surface: data actions come from host REST routes, and the page holds only these functions. */
 export interface DeskPanelInjected {
-  /** Tab this left-rail entry opens (one panel per tab); absent = last visited tab. */
+  /** Tab this left-rail entry opens (pinned tab entries only); absent = last visited tab. */
   readonly initialTab?: Tab
+  /** Pin / unpin this tab's optional left-rail entry (dynamic, persisted). */
+  readonly pin: DeskPinApi
   /** Notebook library data surface. */
   readonly notebook: NotebookApi
   /** DSH workspace flow behind the library action. */
@@ -107,10 +110,12 @@ interface DeskClientDeps {
   readonly page: SlotComponent<
     PropsRuntime<'main'> & InjectFace<DeskPanelInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
   >
-  /** One left-rail icon per tab (each tab gets its own sidebar entry). */
+  /** Base "Desk One" left-rail icon. */
+  readonly baseIcon: SlotComponent<PropsRuntime<'sidebar.panellist'>>
+  /** Left-rail icon per tab (used by optional pinned entries). */
   readonly icons: Readonly<Record<Tab, SlotComponent<PropsRuntime<'sidebar.panellist'>>>>
   readonly locales: Record<'zh' | 'en', LocaleDictOf<typeof LOCALE_NAMESPACE>>
-  readonly api: DeskPanelInjected
+  readonly api: Omit<DeskPanelInjected, 'pin'>
 }
 
 /** Client capability gate: any missing hard dependency warns and returns false (never throws, avoiding a fatal boot-audit failure). */
@@ -140,18 +145,55 @@ export function installDeskClient(ctx: ClientContext, deps: DeskClientDeps): voi
   const disposeDictionaries = ctx.locale.register(LOCALE_NAMESPACE, deps.locales)
   ctx.effect(() => disposeDictionaries, `${PACKAGE_NAME}: locale dictionaries`)
 
-  // One official main-panel registration per tab: the `main` page + `sidebar.panellist` row share the id,
-  // so each left-rail row opens Desk One directly on its tab. Both go through an optional-dependency fork:
-  // when the official layout service is absent, nothing is registered (lazy disable, no throw).
-  DESK_TABS.forEach((entry, index) => {
-    attachMainPanel(ctx, {
-      id: PANEL_IDS[entry.tab] as MainPanelId,
-      order: PANEL_ORDER + index,
+  const pinned = new Set<Tab>(readPinnedTabs())
+  const mounted = new Map<Tab, () => void>()
+  let layout: LayoutFace | undefined
+  const captureLayout = (next: LayoutFace): void => { layout = next }
+  const labelFor = (tab: Tab): string => {
+    const entry = DESK_TABS.find(candidate => candidate.tab === tab)
+    return entry === undefined ? tab : ctx.locale.bind(LOCALE_NAMESPACE)(entry.labelKey)
+  }
+  const mountTab = (tab: Tab): void => {
+    if (mounted.has(tab)) return
+    const index = DESK_TABS.findIndex(entry => entry.tab === tab)
+    mounted.set(tab, mountMainPanel(ctx, {
+      id: PANEL_IDS[tab] as MainPanelId,
+      order: PANEL_ORDER + 1 + index,
       locale: LOCALE_NAMESPACE,
-      label: () => ctx.locale.bind(LOCALE_NAMESPACE)(entry.labelKey),
-      inject: () => ({ ...deps.api, initialTab: entry.tab }),
+      label: () => labelFor(tab),
+      inject: () => ({ ...deps.api, initialTab: tab, pin: pinApi }),
       page: deps.page,
-      icon: deps.icons[entry.tab],
-    })
-  })
+      icon: deps.icons[tab],
+    }, captureLayout))
+  }
+  const pinApi: DeskPinApi = {
+    isPinned: tab => pinned.has(tab),
+    setPinned: (tab, next) => {
+      if (next === pinned.has(tab)) return
+      if (next) {
+        pinned.add(tab)
+        mountTab(tab)
+      } else {
+        const panelId = PANEL_IDS[tab] as MainPanelId
+        // Unpinning the row we are standing on: move to the base entry before removing it.
+        if (layout?.panelInfo.getSnapshot().activePanelId === panelId) layout.selectPanel(PANEL_ID as MainPanelId)
+        mounted.get(tab)?.()
+        mounted.delete(tab)
+        pinned.delete(tab)
+      }
+      writePinnedTabs([...pinned])
+    },
+  }
+  // Base entry: always present, opens the last visited tab.
+  mountMainPanel(ctx, {
+    id: PANEL_ID as MainPanelId,
+    order: PANEL_ORDER,
+    locale: LOCALE_NAMESPACE,
+    label: () => ctx.locale.bind(LOCALE_NAMESPACE)('button.label'),
+    inject: () => ({ ...deps.api, pin: pinApi }),
+    page: deps.page,
+    icon: deps.baseIcon,
+  }, captureLayout)
+  // Restore the user's pinned tab entries (dynamic: pin/unpin registers/removes them while running).
+  for (const tab of pinned) mountTab(tab)
 }

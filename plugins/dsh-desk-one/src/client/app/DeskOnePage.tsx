@@ -6,7 +6,7 @@
  * the collection itself is capped (100 on the wall, 200 in the trash).
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
@@ -46,7 +46,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     listNotes, updateNote, deleteNote, createNote, t,
     listTasks, createTask, updateTask, deleteTask,
     listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink, sessionsArchive, schedule,
-    notebook, workspaceAccess, openReview, draftWithAi, initialTab,
+    notebook, workspaceAccess, openReview, draftWithAi, initialTab, pin,
   } = props
   // A left-rail entry opens its own tab; the base entry (no initialTab) resumes the last visited tab.
   const [tab, setTab] = useState<Tab>(() => initialTab ?? readInitialTab())
@@ -55,6 +55,20 @@ export function DeskOnePage(props: DeskPanelProps) {
   const zTopRef = useRef(0)
   const scheduleActionsRef = useRef<ScheduleHeaderActions | null>(null)
   const [onSourcesPage, setOnSourcesPage] = useState(false)
+
+  const [pinnedHere, setPinnedHere] = useState<boolean>(() => pin.isPinned(tab))
+
+  // A pinned tab entry is part of the left rail only while its tab is pinned; keep the header
+  // toggle in sync when the tab changes (the base entry can switch tabs in place).
+  useEffect(() => {
+    setPinnedHere(pin.isPinned(tab))
+  }, [pin, tab])
+
+  const togglePinned = useCallback((): void => {
+    const next = !pin.isPinned(tab)
+    pin.setPinned(tab, next)
+    setPinnedHere(next)
+  }, [pin, tab])
 
   const selectTab = useCallback((next: Tab): void => {
     setTab(next)
@@ -262,7 +276,7 @@ export function DeskOnePage(props: DeskPanelProps) {
 
   return (
     <div className="dsh-desk-page">
-      <DeskHeader t={t} tab={tab} onSelectTab={selectTab} actions={actions} />
+      <DeskHeader t={t} tab={tab} onSelectTab={selectTab} pinned={pinnedHere} onTogglePin={togglePinned} actions={actions} />
       <div className="dsh-desk-body">
         {data.loadError === null ? null : (
           <div>

@@ -49,9 +49,11 @@ export const ROUTES = Object.freeze({
   scheduleOutlookCallback: `${PREFIX}/schedule/outlook/callback`,
   })
 
+/** Base left-rail entry (always present, opens the last visited tab). */
+export const PANEL_ID = 'desk-one'
 /**
- * One left-rail entry per tab: each id is both the panel row id and the key of the center-column
- * `main` slot (official `MainPanelId`), so clicking a row opens Desk One directly on that tab.
+ * Optional pinned-tab entries: each id is both the panel row id and the key of the center-column
+ * `main` slot (official `MainPanelId`), so a pinned row opens Desk One on that tab.
  */
 export const PANEL_IDS = {
   schedule: 'desk-one-schedule',

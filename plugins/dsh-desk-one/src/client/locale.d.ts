@@ -165,6 +165,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'tab.notes'
       | 'tab.tasks'
       | 'tab.schedule'
+      | 'tab.pin'
+      | 'tab.unpin'
       | 'tab.sessions'
       | 'tabs.more'
       | 'tabs.moreEmpty'

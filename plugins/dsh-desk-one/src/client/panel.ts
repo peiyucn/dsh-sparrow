@@ -4,6 +4,9 @@
  * so node:test can import it directly. `layout` is not written into inject (a missing service would leave the fiber pending
  * forever and trigger a fatal boot-audit failure); it goes through the optional-dependency fork `ctx.inject(['layout'], cb)`
  * instead: when the service is absent nothing happens and nothing ever throws.
+ *
+ * `mountMainPanel` returns a disposer because tab entries are pinned/unpinned at runtime; the base entry simply keeps
+ * its disposer for the plugin lifetime.
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -12,8 +15,14 @@ import type { InjectFace, LocaleNamespaceMap, PropsLocale, PropsRuntime, SlotCom
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
+/** The layout actions this module needs once the official service is available. */
+export interface LayoutFace {
+  selectPanel(panelId: MainPanelId | null): void
+  readonly panelInfo: { getSnapshot(): { readonly activePanelId: MainPanelId | null } }
+}
+
 /** One main-panel entry: the pieces for each registration plus the shared identity. */
-interface MainPanelEntry<
+export interface MainPanelEntry<
   N extends keyof LocaleNamespaceMap & string,
   I extends object,
 > {
@@ -30,24 +39,41 @@ interface MainPanelEntry<
   readonly icon: SlotComponent<PropsRuntime<'sidebar.panellist'>>
 }
 
-/** Assemble the main-panel entry: attach both registrations once the official layout service is available; when it is missing, register nothing and never throw (lazy disable). */
-export function attachMainPanel<
+/**
+ * Register one main-panel entry when the official layout service is available.
+ * @param ctx - client plugin context.
+ * @param entry - ids, labels, icon, and the page component.
+ * @param onLayout - called with the live layout actions (used to select the base panel before unpinning).
+ * @returns a disposer that removes both registrations (no-op when layout is absent).
+ */
+export function mountMainPanel<
   N extends keyof LocaleNamespaceMap & string,
   I extends object,
->(ctx: ClientContext, entry: MainPanelEntry<N, I>): void {
+>(ctx: ClientContext, entry: MainPanelEntry<N, I>, onLayout?: (layout: LayoutFace) => void): () => void {
+  let disposeInner: (() => void) | undefined
   ctx.inject(['layout'], (layoutCtx) => {
-    layoutCtx.slots.inject('main', () => layoutCtx.slots.register({
-      name: 'main',
-      key: entry.id,
-      locale: entry.locale,
-      inject: entry.inject,
-    }, entry.page))
-    layoutCtx.slots.inject('sidebar.panellist', () => layoutCtx.slots.register({
-      name: 'sidebar.panellist',
-      id: entry.id,
-      order: entry.order,
-      locale: entry.locale,
-      label: entry.label,
-    }, entry.icon))
+    const slots = layoutCtx.slots
+    const disposers = [
+      slots.register({ name: 'main', key: entry.id, locale: entry.locale, inject: entry.inject }, entry.page),
+      slots.register({
+        name: 'sidebar.panellist',
+        id: entry.id,
+        order: entry.order,
+        locale: entry.locale,
+        label: entry.label,
+      }, entry.icon),
+    ]
+    disposeInner = () => {
+      for (const dispose of disposers) dispose()
+    }
+    onLayout?.(layoutCtx.get('layout') as LayoutFace)
+    layoutCtx.effect(() => () => {
+      disposeInner?.()
+      disposeInner = undefined
+    }, `dsh-desk-one: main panel ${entry.id}`)
   })
+  return () => {
+    disposeInner?.()
+    disposeInner = undefined
+  }
 }

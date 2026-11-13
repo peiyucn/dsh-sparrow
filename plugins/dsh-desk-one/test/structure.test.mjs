@@ -100,9 +100,13 @@ describe('dsh-desk-one 结构', () => {
   it('client half 应该 只注册官方 main + sidebar.panellist，且用不抛错的能力门', async () => {
     const install = await read('src/client/install.ts')
     const index = await read('src/client/index.ts')
-    assert.match(install, /attachMainPanel\(/u)
-    assert.match(install, /PANEL_IDS/u, '每个 tab 一个左栏入口')
-    assert.match(install, /initialTab: entry\.tab/u, '入口打开对应 tab')
+    assert.match(install, /mountMainPanel\(/u)
+    assert.match(install, /PANEL_ID\b/u, '默认始终有一个「同桌」入口')
+    assert.match(install, /readPinnedTabs/u, '固定状态要持久化')
+    assert.match(install, /setPinned/u, '每个 tab 可动态固定 / 取消固定')
+    const header = await read('src/client/app/DeskHeader.tsx')
+    assert.match(header, /DeskTabGlyph/u, 'tab 上要有图标')
+    assert.match(header, /tab\.pin/u, '每个 tab 要有固定到左栏按钮')
     assert.match(install, /warnMissingCapabilities\(/u)
     assert.match(install, /ctx\.effect\(\(\) => \(\) => \{ style\.remove\(\) \}/u)
     assert.ok(!/assertCapabilities\(/u.test(install), 'client half 不得用抛错版能力门')
@@ -865,7 +869,7 @@ describe('dsh-desk-one 结构', () => {
   it('client bundle 应该 保留 main 与 sidebar.panellist 两处槽位注册', async () => {
     const bundle = await read('lib/client.js')
     assert.ok(bundle.includes('sidebar.panellist'), 'bundle 缺 sidebar.panellist 槽位注册')
-    assert.ok(bundle.includes('desk-one-tasks'), 'bundle 缺按 tab 的左栏入口 id')
+    assert.ok(bundle.includes('dsh-desk-one.pinned-tabs'), 'bundle 缺固定状态持久化')
     assert.ok(bundle.includes("'main'") || bundle.includes('"main"'), 'bundle 缺 main 槽位注册')
   })
 

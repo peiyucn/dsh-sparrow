@@ -187,6 +187,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   display: inline-flex;
   flex: none;
   align-items: center;
+  gap: 5px;
   /* Official tab geometry: 35px box raised 10px into the row margin; 10px top / 9px bottom
      padding leaves the 16px text line, and the 2px bar sits 1px over the header rule. */
   min-height: 35px;
@@ -220,6 +221,41 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 }
 .dsh-desk-tab[data-active='true']::after {
   background: var(--dsw-alias-state-business-primary, #4176e6);
+}
+.dsh-desk-tab svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+/* Pin toggle for the current tab: official 25px tool geometry next to the tab row. */
+.dsh-desk-pin {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 25px;
+  height: 25px;
+  margin-left: auto;
+  padding: 5px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  line-height: 1;
+  background: transparent;
+  border: none;
+  border-radius: var(--dsw-radius-sm, 8px);
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease;
+}
+.dsh-desk-pin svg {
+  width: 15px;
+  height: 15px;
+}
+.dsh-desk-pin:hover {
+  color: var(--dsw-alias-label-primary, #1f2329);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+}
+.dsh-desk-pin[data-pinned='true'] {
+  color: var(--dsw-alias-state-business-primary, #4176e6);
 }
 /* Content fills the page; each view offsets its own content below the header. */
 .dsh-desk-body {

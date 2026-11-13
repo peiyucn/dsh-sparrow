@@ -19,7 +19,7 @@ import { createSessionLinkBridge, type SessionServices } from './sessions/bridge
 import { scheduleApi } from './schedule/api.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
-import { DESK_TAB_ICONS } from './tabIcons.js'
+import { DESK_TAB_ICONS, DeskBaseIcon } from './tabIcons.js'
 import { installDeskClient, passesClientGate } from './install.js'
 
 // `layout` is deliberately absent: a missing service in a client-half `inject` keeps the entry
@@ -81,6 +81,7 @@ export function apply(ctx: ClientContext): void {
 
   installDeskClient(ctx, {
     page: DeskOnePage,
+    baseIcon: DeskBaseIcon,
     icons: DESK_TAB_ICONS,
     locales: LOCALE_DICTS,
     api: {
