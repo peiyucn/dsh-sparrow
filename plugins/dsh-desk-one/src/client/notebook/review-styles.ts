@@ -16,10 +16,14 @@ export const REVIEW_CSS = `
 }
 /* Conversation-area hint for review sessions: AI avatar + left speech bubble above the composer. */
 .dsh-desk-review-prompt {
+  box-sizing: border-box;
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  max-width: 520px;
+  width: 100%;
+  max-width: none;
+  /* Match the composer card's horizontal inset so the AI bubble does not sit on the sidebar edge. */
+  padding: 0 20px;
   margin: 0 0 8px;
 }
 .dsh-desk-review-prompt-avatar {
