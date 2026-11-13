@@ -12,7 +12,7 @@ import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
 import { createSessionIndexRecord, sessionIndexId, type SessionIndexDraft } from './sessions/records.js'
 import {
-  DESK_NODE_SCHEMA, MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTEBOOK_CONFIG_ID, NOTEBOOK_MAX_DRAFTS, NODES_TABLE,
+  DESK_NODE_SCHEMA, MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTEBOOK_BASELINE_MAX_CHARS, NOTEBOOK_CONFIG_ID, NOTEBOOK_MAX_DRAFTS, NODES_TABLE,
   PACKAGE_NAME, SCHEDULE_COLORS, SESSION_INDEX_MISSING_DAYS, TASK_STATUSES,
 } from '../constants.js'
 import {
@@ -27,7 +27,7 @@ import {
 } from './schedule/records.js'
 import type {
   DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskNotebookConfig, DeskScheduleSource, DeskSessionIndex, DeskTask,
-  DeskTaskGroup, DraftAnnotation, NoteDraft, NoteFileRef, ReviewRecord, ScheduleSyncError, TaskStatus,
+  DeskTaskGroup, DraftAnnotation, NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ScheduleSyncError, TaskStatus,
 } from '../contract.js'
 
 type DeskDomain = Domain<typeof DESK_DOMAIN>
@@ -809,6 +809,10 @@ export class DeskStore {
     return `note_draft_${fileId}`
   }
 
+  private static baselineId(fileId: string): string {
+    return `note_baseline_${fileId}`
+  }
+
   /** One file identity by id. */
   getNoteFile(id: string): NoteFileRef | undefined {
     const node = this.nodes.get(id)
@@ -906,6 +910,50 @@ export class DeskStore {
     return await this.nodes.update(id, current => current.kind === 'note-draft'
       ? { ...current, rootPath: input.rootPath, path: input.path, drafts, updatedAt: now, revision: current.revision + 1 }
       : current) as NoteDraft
+  }
+
+  /** One review round's persisted baseline for a file. */
+  getNoteBaseline(fileId: string): NoteBaseline | undefined {
+    const node = this.nodes.get(DeskStore.baselineId(fileId))
+    return node?.kind === 'note-baseline' && node.fileId === fileId ? node : undefined
+  }
+
+  /**
+   * Store or replace one file's review baseline. Oversized bodies delete the stored value so a
+   * huge file cannot bloat the storage domain; the tab keeps the in-memory baseline.
+   */
+  async saveNoteBaseline(input: {
+    readonly rootPath: string
+    readonly fileId: string
+    readonly body: string
+    readonly at: string
+  }): Promise<NoteBaseline | null> {
+    const id = DeskStore.baselineId(input.fileId)
+    const existing = this.getNoteBaseline(input.fileId)
+    if (input.body.length > NOTEBOOK_BASELINE_MAX_CHARS) {
+      if (existing !== undefined) await this.nodes.delete(id)
+      return null
+    }
+    const now = new Date().toISOString()
+    if (existing === undefined) {
+      const record: NoteBaseline = {
+        id,
+        kind: 'note-baseline',
+        schema: DESK_NODE_SCHEMA,
+        rootPath: input.rootPath,
+        fileId: input.fileId,
+        body: input.body,
+        at: input.at,
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      }
+      await this.nodes.put(record.id, record)
+      return record
+    }
+    return await this.nodes.update(id, current => current.kind === 'note-baseline'
+      ? { ...current, rootPath: input.rootPath, body: input.body, at: input.at, updatedAt: now, revision: current.revision + 1 }
+      : current) as NoteBaseline
   }
 
   /* ---------------------------- review records ---------------------------- */

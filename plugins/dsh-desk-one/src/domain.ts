@@ -253,9 +253,21 @@ const legacyReviewSchema = z.object({
   schema: z.number().int().positive(),
 }).passthrough()
 
+const noteBaselineSchema = z.object({
+  kind: z.literal('note-baseline'),
+  schema: z.number().int().positive(),
+  fileId: z.string().min(1),
+  rootPath: z.string().min(1),
+  body: z.string(),
+  at: z.string().min(1),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  revision: z.number().int().positive(),
+})
+
 const nodeSchema = z.discriminatedUnion('kind', [
   noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema, sessionIndexSchema,
-  notebookConfigSchema, noteFileSchema, reviewRecordSchema, noteDraftSchema, legacyAnnotationSchema, legacyReviewSchema,
+  notebookConfigSchema, noteFileSchema, reviewRecordSchema, noteDraftSchema, noteBaselineSchema, legacyAnnotationSchema, legacyReviewSchema,
 ])
 
 

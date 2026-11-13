@@ -34,6 +34,7 @@ export const ROUTES = Object.freeze({
   notebookList: `${PREFIX}/notebook/list`,
   notebookPage: `${PREFIX}/notebook/page`,
   notebookDraft: `${PREFIX}/notebook/draft`,
+  notebookBaseline: `${PREFIX}/notebook/baseline`,
   notebookFile: `${PREFIX}/notebook/file`,
   notebookCreate: `${PREFIX}/notebook/create`,
   notebookHistory: `${PREFIX}/notebook/history`,
@@ -103,6 +104,8 @@ export const NOTEBOOK_SCAN_TIMEOUT_MS = 20_000
 export const NOTEBOOK_MAX_BYTES = 1_048_576
 /** Persisted draft box: one file keeps at most this many annotations. */
 export const NOTEBOOK_MAX_DRAFTS = 100
+/** Host-side review-baseline body cap (larger bodies keep only the in-memory baseline). */
+export const NOTEBOOK_BASELINE_MAX_CHARS = 200_000
 /** History usage above this turns the entry-page meter red (no modal). */
 export const NOTEBOOK_HISTORY_WARN_BYTES = 2 * 1024 * 1024
 /** Fixed record id of the notebook root setting. */

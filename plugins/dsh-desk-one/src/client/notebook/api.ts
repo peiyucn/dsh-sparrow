@@ -5,7 +5,7 @@
 
 import { ROUTES } from '../../constants.js'
 import type {
-  CreateNotebookNoteRequest, CreateNoteResponse, DraftAnnotation, NoteDraft, NoteDraftResponse,
+  CreateNotebookNoteRequest, CreateNoteResponse, DraftAnnotation, NoteDraft, NoteDraftResponse, NotebookBaselineResponse,
   NotebookFileResponse, NotebookListResponse, NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse,
   RecordReviewRequest, ReviewHistoryResponse, ReviewRecord,
 } from '../../notebook-contract.js'
@@ -63,6 +63,16 @@ export function listNotebook(input: {
   if (input.missingFrontmatter === true) params.set('missing', '1')
   const suffix = params.size === 0 ? '' : `?${params.toString()}`
   return fetchJson<NotebookListResponse>(`${ROUTES.notebookList}${suffix}`)
+}
+
+/** Read the persisted round baseline for one file. */
+export function loadReviewBaseline(fileId: string): Promise<NotebookBaselineResponse> {
+  return fetchJson<NotebookBaselineResponse>(`${ROUTES.notebookBaseline}?fileId=${encodeURIComponent(fileId)}`)
+}
+
+/** Persist the round baseline (host storage, survives clearing browser storage). */
+export function saveReviewBaseline(input: { readonly fileId: string; readonly body: string; readonly at: string }): Promise<NotebookBaselineResponse> {
+  return postJson<NotebookBaselineResponse>(ROUTES.notebookBaseline, input)
 }
 
 /** Read one page for the review tab. */
@@ -125,6 +135,8 @@ export interface NotebookApi {
   readonly history: typeof notebookHistory
   readonly recordReview: typeof recordReview
   readonly deleteHistory: typeof deleteReviewRecord
+  readonly loadBaseline: typeof loadReviewBaseline
+  readonly saveBaseline: typeof saveReviewBaseline
 }
 
 /** One facade object handed to the page through `DeskPanelInjected`. */
@@ -143,4 +155,6 @@ export const notebookApi: NotebookApi = {
   history: notebookHistory,
   recordReview,
   deleteHistory: deleteReviewRecord,
+  loadBaseline: loadReviewBaseline,
+  saveBaseline: saveReviewBaseline,
 }

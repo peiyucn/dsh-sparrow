@@ -105,6 +105,37 @@ export interface DraftAnnotation {
 }
 
 /** The persisted draft box of one file (id derives from the file identity). */
+/** One review round's baseline body, stored host-side so clearing browser storage does not lose it. */
+export interface NoteBaseline {
+  readonly id: string
+  readonly kind: 'note-baseline'
+  readonly schema: number
+  readonly fileId: string
+  readonly rootPath: string
+  readonly body: string
+  /** ISO time when the baseline was taken. */
+  readonly at: string
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
+
+/** Body + capture time returned to the review tab. */
+export interface NoteBaselinePayload {
+  readonly body: string
+  readonly at: string
+}
+
+export interface NotebookBaselineResponse {
+  readonly baseline?: NoteBaselinePayload
+}
+
+export interface NoteBaselineRequest {
+  readonly fileId: string
+  readonly body: string
+  readonly at: string
+}
+
 export interface NoteDraft {
   readonly id: string
   readonly kind: 'note-draft'

@@ -124,7 +124,7 @@ export interface DeskSessionIndex {
 
 export type DeskNode =
   | DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent | DeskSessionIndex
-  | DeskNotebookConfig | NoteFileRef | NoteDraft | ReviewRecord
+  | DeskNotebookConfig | NoteFileRef | NoteDraft | ReviewRecord | NoteBaseline
 
 /* ------------------------------------------------------------------ */
 /* Schedule (S2): read-only mirror of external calendars               */
@@ -442,11 +442,11 @@ export interface DeleteTaskRequest {
   readonly id: string
 }
 
-import type { DeskNotebookConfig, NoteDraft, NoteFileRef, ReviewRecord } from './notebook-contract.js'
+import type { DeskNotebookConfig, NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord } from './notebook-contract.js'
 
 /* Notebook: library index + persisted draft box (review state stays in the conversation). */
 export type {
-  CreateNotebookNoteRequest, CreateNoteResponse, DeleteReviewRequest, DeskNotebookConfig, DraftAnnotation, NoteDraft,
+  CreateNotebookNoteRequest, CreateNoteResponse, DeleteReviewRequest, DeskNotebookConfig, DraftAnnotation, NoteBaseline, NoteDraft,
   NoteDraftRequest, NoteDraftResponse, NoteFileRef, NotebookEntry, NotebookField, NotebookFileResponse,
   NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse, NotebookStats,
   RecordReviewRequest, ReviewHistoryEntry, ReviewHistoryResponse, ReviewLinkStatus, ReviewRecord,

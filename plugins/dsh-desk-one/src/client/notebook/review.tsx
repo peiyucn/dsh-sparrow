@@ -17,7 +17,6 @@ import {
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
-import { readReviewBaseline, writeReviewBaseline } from './baseline.js'
 import type { DraftAnnotation, NotebookPageResponse } from '../../notebook-contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import { messageOf } from '../app/utils.js'
@@ -137,10 +136,18 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       await notebook.state()
       const nextPage = await notebook.page(path)
       const draft = await notebook.draft(fileId)
+      const stored = await notebook.loadBaseline(fileId)
       setPage(current => current !== null && current.body === nextPage.body ? current : nextPage)
       if (!silent) setAnnotations(draft?.drafts ?? [])
-      setBaseline(current => current ?? nextPage.body)
-      setBaselineAt(current => current ?? new Date().toISOString())
+      if (stored.baseline !== undefined) {
+        setBaseline(stored.baseline.body)
+        setBaselineAt(stored.baseline.at)
+      } else if (!silent) {
+        const at = new Date().toISOString()
+        setBaseline(nextPage.body)
+        setBaselineAt(at)
+        void notebook.saveBaseline({ fileId, body: nextPage.body, at })
+      }
     } catch (cause) {
       if (!silent) setError(messageOf(cause))
     } finally {
@@ -148,22 +155,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     }
   }, [fileId, notebook, path])
 
-  // Restore the round's baseline for this file identity before the page loads; a re-mount or
-  // browser refresh must not silently rebaseline to the current body and hide the diff.
-  useEffect(() => {
-    if (fileId === undefined) return
-    const stored = readReviewBaseline(fileId)
-    setBaseline(stored?.body ?? null)
-    setBaselineAt(stored?.at ?? null)
-  }, [fileId])
-
   useEffect(() => { void load() }, [load])
-
-  // Persist whichever baseline is in effect (first load, restored value, or "rebaseline").
-  useEffect(() => {
-    if (fileId === undefined || baseline === null || baselineAt === null) return
-    writeReviewBaseline(fileId, { body: baseline, at: baselineAt })
-  }, [baseline, baselineAt, fileId])
 
   // Quiet refresh while visible; a hidden tab does no work.
   useEffect(() => {
@@ -550,7 +542,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                   const at = new Date().toISOString()
                   setBaseline(body)
                   setBaselineAt(at)
-                  if (fileId !== undefined && body !== null) writeReviewBaseline(fileId, { body, at })
+                  if (fileId !== undefined && body !== null) void notebook.saveBaseline({ fileId, body, at })
                 }}>
                   {t('review.rebaseline')}
                 </Button>
