@@ -184,15 +184,18 @@ export const REVIEW_CSS = `
   font-size: 12px;
   line-height: 1.6;
 }
+/* Official pill-dialog layout: fixed title row with icon, content scrolls on its own. */
 .dsh-desk-review-layer {
   position: absolute;
   left: 8px;
   right: 8px;
   bottom: calc(var(--dsh-desk-review-bar-h) + 6px);
   z-index: 4;
+  display: flex;
+  flex-direction: column;
   max-height: 60%;
-  overflow-y: auto;
-  padding: 10px 12px 12px;
+  overflow: hidden;
+  padding: 0;
   border-radius: var(--dsw-radius-lg, 14px);
   background: var(--dsw-menu-surface-fill, var(--dsw-specific-menu, #ffffff));
   backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
@@ -202,10 +205,31 @@ export const REVIEW_CSS = `
   outline-offset: -0.5px;
 }
 .dsh-desk-review-layerhead {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-bottom: 8px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.06));
+}
+.dsh-desk-review-layericon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-desk-review-layericon svg {
+  width: 16px;
+  height: 16px;
+}
+.dsh-desk-review-layerbody {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px 12px;
 }
 .dsh-desk-review-layerhead h4 {
   flex: 1;

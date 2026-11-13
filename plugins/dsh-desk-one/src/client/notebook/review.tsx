@@ -511,6 +511,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         ? (
             <div className="dsh-desk-review-layer">
               <div className="dsh-desk-review-layerhead">
+                <span className="dsh-desk-review-layericon" aria-hidden="true"><IconListPenOutlineRegular /></span>
                 <h4>{t('review.pendingTitle', { count: annotations.length })}</h4>
                 <Button variant="primary" size="sm" disabled={annotations.length === 0} onClick={submitAll}>
                   {t('review.submitAll')}
@@ -519,17 +520,19 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                   <Button variant="ghost" size="sm" icon={<IconChevronDownOutlineRegular />} aria-label={t('review.hideOverlay')} onClick={() => setOverlay(null)} />
                 </Tooltip>
               </div>
-              {annotations.length === 0
-                ? <p className="dsh-desk-notebook-hint">{t('review.pendingEmpty')}</p>
-                : annotations.map((annotation, index) => (
-                    <div className="dsh-desk-review-pending" key={annotation.id}>
-                      <span className="dsh-desk-review-pending-no">{index + 1}</span>
-                      <div className="dsh-desk-review-pending-main">
-                        <p className="dsh-desk-review-quote dsh-desk-review-quote-inline">{quoteBlock(annotation.quote)}</p>
-                        <p className="dsh-desk-review-pending-text">{annotation.text}</p>
+              <div className="dsh-desk-review-layerbody">
+                {annotations.length === 0
+                  ? <p className="dsh-desk-notebook-hint">{t('review.pendingEmpty')}</p>
+                  : annotations.map((annotation, index) => (
+                      <div className="dsh-desk-review-pending" key={annotation.id}>
+                        <span className="dsh-desk-review-pending-no">{index + 1}</span>
+                        <div className="dsh-desk-review-pending-main">
+                          <p className="dsh-desk-review-quote dsh-desk-review-quote-inline">{quoteBlock(annotation.quote)}</p>
+                          <p className="dsh-desk-review-pending-text">{annotation.text}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+              </div>
             </div>
           )
         : null}
@@ -537,6 +540,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         ? (
             <div className="dsh-desk-review-layer">
               <div className="dsh-desk-review-layerhead">
+                <span className="dsh-desk-review-layericon" aria-hidden="true"><IconInspectOutlineRegular /></span>
                 <h4>{t('review.changes')}</h4>
                 {baselineAt === null
                   ? null
@@ -554,10 +558,11 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                   <Button variant="ghost" size="sm" icon={<IconChevronDownOutlineRegular />} aria-label={t('review.hideOverlay')} onClick={() => setOverlay(null)} />
                 </Tooltip>
               </div>
-              {diff === null || totals === null || page === null
-                ? <p className="dsh-desk-notebook-hint">{t('review.diffEmpty')}</p>
-                : (
-                    <DisclosureRow
+              <div className="dsh-desk-review-layerbody">
+                {diff === null || totals === null || page === null
+                  ? <p className="dsh-desk-notebook-hint">{t('review.diffEmpty')}</p>
+                  : (
+                      <DisclosureRow
                       icon={<IconInspectOutlineRegular />}
                       title={t('review.changes')}
                       open={diffOpen}
@@ -572,13 +577,14 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                         </>
                       )}
                     >
-                      <DiffBlock
-                        diffs={[{ path: page.path, oldText: diff.oldText, newText: diff.newText }]}
-                        labels={diffLabels}
-                        maxLines={200}
-                      />
-                    </DisclosureRow>
-                  )}
+                        <DiffBlock
+                          diffs={[{ path: page.path, oldText: diff.oldText, newText: diff.newText }]}
+                          labels={diffLabels}
+                          maxLines={200}
+                        />
+                      </DisclosureRow>
+                    )}
+              </div>
             </div>
           )
         : null}

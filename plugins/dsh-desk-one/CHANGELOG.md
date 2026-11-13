@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review overlays**: the two bottom pills now open an official-style title row (icon + title + actions) that stays fixed while the content, including long diffs, scrolls on its own.
+
 * **Responsive layout and review details**: the schedule top cards reflow (two columns / one column) on narrow panels and share the same 1100px maximum width as the calendar below; the notebook search and view tabs wrap with the width and the content cap follows the panel; the review page shows a frontmatter metadata block above MD and source.
 * **Review baseline and conversation hint**: the round baseline moved from browser localStorage into the host `desk_one` storage domain (survives clearing browser storage; 1MB cap (same as the reviewable file limit); refresh or reopened tab keeps the round’s changes), and review sessions show a left-aligned AI bubble above the conversation composer: "Ready when you are — I am here for your review notes."
 
