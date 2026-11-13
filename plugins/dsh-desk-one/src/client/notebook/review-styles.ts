@@ -19,13 +19,18 @@ export const REVIEW_CSS = `
 /* Placeholder-style review guidance inside the composer card. */
 .dsh-desk-review-composer-hint {
   position: absolute;
-  inset: 10px 16px auto;
+  /* Same box and type as the official composer placeholder (.placeholder): the
+     overlay anchor sits at the card top, the editable's pads start the text 4px down / 14px in. */
+  top: 4px;
+  left: 14px;
+  right: 8px;
   z-index: 0;
   pointer-events: none;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  font-size: 13px;
-  line-height: 20px;
+  color: var(--dsw-alias-label-caption, #8a919f);
+  font: inherit;
+  line-height: inherit;
   white-space: normal;
+  overflow: hidden;
 }
 /* The official composer draws its placeholder as a [data-composer-placeholder] div (the
    editable surface is Lexical, not a textarea): hide that div while our hint stands in, and hide
