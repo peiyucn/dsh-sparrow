@@ -173,7 +173,7 @@ export const REVIEW_CSS = `
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 10px 2px calc(var(--dsh-desk-review-bar-h) + 10px);
+  padding: 10px 2px 12px;
 }
 .dsh-desk-review-card {
   border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
@@ -528,7 +528,7 @@ export const REVIEW_CSS = `
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 4px calc(var(--dsh-desk-review-bar-h) + 10px);
+  padding: 8px 4px 12px;
   font-size: 13px;
   line-height: 1.7;
 }
@@ -578,7 +578,8 @@ export const REVIEW_CSS = `
   pointer-events: auto;
 }
 /* Split action controls: official task-page create-button geometry (main label + chevron menu)
-   rendered as white glass. The glass lives on the group so the seam is one capsule, not two. */
+   rendered as frosted white glass: light fill with dark ink in both themes, so it reads as a white
+   action button (not a grey fill) while the blur still shows the code behind it. */
 .dsh-desk-review-split {
   position: relative;
   isolation: isolate;
@@ -589,7 +590,7 @@ export const REVIEW_CSS = `
   min-width: 0;
   height: 28px;
   border-radius: 999px;
-  color: var(--dsw-alias-label-primary, #1f2329);
+  color: #1f2329;
   font-size: 12px;
   line-height: 18px;
 }
@@ -599,15 +600,22 @@ export const REVIEW_CSS = `
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  border: 0.5px solid rgba(0, 0, 0, 0.1);
-  background: rgba(255, 255, 255, 0.34);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 0.5px solid rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.6), 0 1px 2px rgba(0, 0, 0, 0.05);
   pointer-events: none;
 }
+body[data-ds-dark-theme] .dsh-desk-review-split {
+  color: #16181d;
+}
 body[data-ds-dark-theme] .dsh-desk-review-split::before {
-  border-color: rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
+  -webkit-backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.5), 0 2px 10px rgba(0, 0, 0, 0.22);
 }
 .dsh-desk-review-split-main,
 .dsh-desk-review-split-arrow {
@@ -647,7 +655,7 @@ body[data-ds-dark-theme] .dsh-desk-review-split::before {
 .dsh-desk-review-split-count,
 .dsh-desk-review-split-muted {
   flex: none;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
+  color: rgba(31, 35, 41, 0.55);
   font-size: 11px;
 }
 .dsh-desk-review-split > .dsh-desk-review-difftag,
@@ -659,11 +667,8 @@ body[data-ds-dark-theme] .dsh-desk-review-split::before {
   justify-content: center;
   width: 26px;
   padding: 0;
-  border-left: 0.5px solid rgba(0, 0, 0, 0.12);
+  border-left: 0.5px solid rgba(0, 0, 0, 0.16);
   border-radius: 0 999px 999px 0;
-}
-body[data-ds-dark-theme] .dsh-desk-review-split-arrow {
-  border-left-color: rgba(255, 255, 255, 0.18);
 }
 .dsh-desk-review-split-arrow svg {
   width: 12px;
@@ -672,7 +677,12 @@ body[data-ds-dark-theme] .dsh-desk-review-split-arrow {
 .dsh-desk-review-split-main:hover,
 .dsh-desk-review-split-arrow:hover,
 .dsh-desk-review-split-arrow[aria-expanded='true'] {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  background: rgba(255, 255, 255, 0.55);
+}
+body[data-ds-dark-theme] .dsh-desk-review-split-main:hover,
+body[data-ds-dark-theme] .dsh-desk-review-split-arrow:hover,
+body[data-ds-dark-theme] .dsh-desk-review-split-arrow[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.32);
 }
 .dsh-desk-review-split-main:focus-visible,
 .dsh-desk-review-split-arrow:focus-visible {
@@ -702,7 +712,10 @@ body[data-ds-dark-theme] .dsh-desk-review-split-arrow {
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .dsh-desk-review-split::before {
-    background: var(--dsw-alias-bg-layer-2, #f2f3f5);
+    background: #f5f6f8;
+  }
+  body[data-ds-dark-theme] .dsh-desk-review-split::before {
+    background: #e8e9ee;
   }
 }
 /* Square brand-icon button in the official preview header (official Button geometry).
