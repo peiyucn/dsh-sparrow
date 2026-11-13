@@ -78,7 +78,7 @@ export const SCHEDULE_CSS = `
    Three columns separate the three jobs, and stacking the create buttons keeps the row short. */
 .dsh-desk-schedule-top {
   flex: none; display: grid; gap: 8px; height: 136px;
-  width: 100%; max-width: 920px; margin: 0 auto;
+  width: 100%; max-width: min(1100px, 100%); margin: 0 auto;
   grid-template-columns: 0.36fr minmax(0, 1fr) minmax(0, 1fr);
 }
 .dsh-desk-schedule-start {
@@ -455,4 +455,17 @@ export const SCHEDULE_CSS = `
 .dsh-desk-schedule-steps { margin: 6px 0; font-size: 12px; color: var(--dsw-alias-label-secondary, #6b7280); }
 .dsh-desk-schedule-steps summary { cursor: pointer; color: var(--dsw-alias-label-tertiary, #8a919f); }
 .dsh-desk-schedule-steps ol { margin: 6px 0 0 18px; padding: 0; }
+
+/* Narrow panels: two cards + a full-width Start row, then one column on phones. */
+@container (max-width: 760px) {
+  .dsh-desk-schedule-top { height: auto; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .dsh-desk-schedule-start { grid-column: 1 / -1; height: auto; }
+  .dsh-desk-start-actions { flex-direction: row; }
+  .dsh-desk-schedule-start > header { display: flex; align-items: center; gap: 8px; }
+}
+@container (max-width: 560px) {
+  .dsh-desk-schedule-top { grid-template-columns: minmax(0, 1fr); }
+  .dsh-desk-schedule-today, .dsh-desk-schedule-upcoming { height: auto; min-height: 132px; }
+  .dsh-desk-today-split { grid-template-columns: minmax(0, 1fr); }
+}
 `

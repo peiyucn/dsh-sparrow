@@ -16,6 +16,7 @@ export const PINNED_TABS_STORAGE_KEY = 'dsh-desk-one.pinned-tabs'
 export interface StorageLike {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
+  removeItem?(key: string): void
 }
 
 /** The page-facing pin API: read the current state and toggle one tab. */

@@ -22,7 +22,7 @@ export const NOTEBOOK_CSS = `
   box-sizing: border-box;
   flex: none;
   width: 100%;
-  max-width: 960px;
+  max-width: min(1100px, 100%);
   margin: 0 auto 10px;
   padding: 8px 12px;
   border-radius: var(--dsw-radius-md, 12px);
@@ -44,7 +44,7 @@ export const NOTEBOOK_CSS = `
   flex-direction: column;
   gap: 12px;
   width: 100%;
-  max-width: 960px;
+  max-width: min(1100px, 100%);
   min-height: 0;
   margin: 0 auto;
 }
@@ -155,8 +155,8 @@ export const NOTEBOOK_CSS = `
   gap: 12px;
 }
 .dsh-desk-notebook-search {
-  flex: 0 1 320px;
-  min-width: 180px;
+  flex: 1 1 260px;
+  min-width: 0;
 }
 .dsh-desk-notebook-tabs {
   flex: 0 1 420px;
@@ -479,4 +479,11 @@ button.dsh-desk-notebook-rowbody {
 }
 .dsh-desk-notebook-recorddelete {
   color: var(--dsw-alias-state-error-primary, #c62828);
-}`
+}
+/* Narrow main panels: search and view tabs each take a full row instead of squeezing. */
+@container (max-width: 760px) {
+  .dsh-desk-notebook-toolbar { gap: 8px; }
+  .dsh-desk-notebook-search { flex: 1 1 100%; }
+  .dsh-desk-notebook-tabs { flex: 1 1 100%; }
+}
+`

@@ -14,6 +14,38 @@ export const REVIEW_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
 }
+/* Frontmatter block: quiet metadata card above the page content (raw frontmatter is stripped from body). */
+.dsh-desk-review-frontmatter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l1, #e2e5ea);
+  border-radius: var(--dsw-radius-md, 12px);
+  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.02));
+}
+.dsh-desk-review-field {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 16px;
+}
+.dsh-desk-review-field dt {
+  flex: none;
+  min-width: 56px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
+.dsh-desk-review-field dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Coloured markdown sheet before the review tab title, mirroring official file/Browser tab titles. */
 .dsh-desk-review-tabicon {
   flex: 0 0 auto;

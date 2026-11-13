@@ -17,6 +17,7 @@ import {
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
+import { readReviewBaseline, writeReviewBaseline } from './baseline.js'
 import type { DraftAnnotation, NotebookPageResponse } from '../../notebook-contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import { messageOf } from '../app/utils.js'
@@ -147,7 +148,22 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     }
   }, [fileId, notebook, path])
 
+  // Restore the round's baseline for this file identity before the page loads; a re-mount or
+  // browser refresh must not silently rebaseline to the current body and hide the diff.
+  useEffect(() => {
+    if (fileId === undefined) return
+    const stored = readReviewBaseline(fileId)
+    setBaseline(stored?.body ?? null)
+    setBaselineAt(stored?.at ?? null)
+  }, [fileId])
+
   useEffect(() => { void load() }, [load])
+
+  // Persist whichever baseline is in effect (first load, restored value, or "rebaseline").
+  useEffect(() => {
+    if (fileId === undefined || baseline === null || baselineAt === null) return
+    writeReviewBaseline(fileId, { body: baseline, at: baselineAt })
+  }, [baseline, baselineAt, fileId])
 
   // Quiet refresh while visible; a hidden tab does no work.
   useEffect(() => {
@@ -411,6 +427,16 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
             )
           : (
               <div className="dsh-desk-review-scroll">
+                {page.fields.length === 0 ? null : (
+                  <dl className="dsh-desk-review-frontmatter" aria-label={t('review.frontmatter')}>
+                    {page.fields.map(field => (
+                      <div key={field.name} className="dsh-desk-review-field">
+                        <dt>{field.name}</dt>
+                        <dd>{field.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
                 {documentAnnotations.map(annotation => (
                   <AnnotationCard
                     key={annotation.id}
@@ -519,7 +545,13 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                 {baselineAt === null
                   ? null
                   : <span className="dsh-desk-review-baseline">{t('review.baselineHint', { time: new Date(baselineAt).toLocaleTimeString() })}</span>}
-                <Button variant="ghost" size="sm" disabled={page === null} onClick={() => { setBaseline(page?.body ?? null); setBaselineAt(new Date().toISOString()) }}>
+                <Button variant="ghost" size="sm" disabled={page === null} onClick={() => {
+                  const body = page?.body ?? null
+                  const at = new Date().toISOString()
+                  setBaseline(body)
+                  setBaselineAt(at)
+                  if (fileId !== undefined && body !== null) writeReviewBaseline(fileId, { body, at })
+                }}>
                   {t('review.rebaseline')}
                 </Button>
                 <Tooltip label={t('review.hideOverlay')} side="bottom" delayMs={400}>

@@ -130,6 +130,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'notebook.empty'
       | 'notebook.review'
       | 'review.tabTitle'
+      | 'review.frontmatter'
       | 'review.openFailed'
       | 'review.noLibrary'
       | 'review.noPath'
