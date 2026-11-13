@@ -5,6 +5,9 @@ export const REVIEW_CSS = `
   container-type: inline-size;
   --dsh-desk-review-bar-h: 36px;
   --dsh-desk-review-bar-bottom: 18px;
+  /* Scroll-end clearance for the floating bar: the last line must rest ABOVE the buttons so it can
+     still be selected and annotated, while mid-scroll content continues under the glass. */
+  --dsh-desk-review-bar-clear: calc(var(--dsh-desk-review-bar-h) + var(--dsh-desk-review-bar-bottom) + 14px);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -386,7 +389,9 @@ body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   flex: 1;
   min-height: 0;
   overflow-x: auto;
-  padding: 6px 0;
+  /* The code view is its own vertical scroller (overflow-x forces overflow-y to auto), so the
+     floating bar's clearance belongs to THIS padding: the last line must stop above the buttons. */
+  padding: 6px 0 var(--dsh-desk-review-bar-clear);
   font-family: var(--dsw-alias-font-mono, ui-monospace, monospace);
   font-size: 12px;
   line-height: 1.55;
@@ -526,7 +531,7 @@ body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 4px 12px;
+  padding: 8px 4px var(--dsh-desk-review-bar-clear);
   font-size: 13px;
   line-height: 1.7;
 }
