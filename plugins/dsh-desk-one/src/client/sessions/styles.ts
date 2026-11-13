@@ -95,7 +95,13 @@ export const SESSIONS_CSS = `
   padding: 4px 10px;
   border-top: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
 }
-.dsh-desk-tree-row:nth-child(1) { border-top: 0; }
+/* Each row is the only child of its <li>, so :nth-child(1) on the row matched every row and
+   removed every separator. Drop the line only for the first row of a list instead. */
+.dsh-desk-session-list > li:first-child > .dsh-desk-tree-row,
+.dsh-desk-tree-children > li:first-child > .dsh-desk-tree-row,
+.dsh-desk-archive-list > li:first-child > .dsh-desk-tree-row {
+  border-top: 0;
+}
 .dsh-desk-tree-row[data-nested='true'] {
   background: transparent;
 }
