@@ -67,6 +67,8 @@ export interface NotebookPageController {
   readonly historyBytes: number
   readonly historyWarn: boolean
   readonly reload: () => Promise<void>
+  /** True once the first state fetch settled; the page must not flash the unlinked offer before it. */
+  readonly ready: boolean
   readonly openBrowser: () => Promise<void>
   readonly toggleChoosing: () => void
   readonly chooseRoot: (path: string) => Promise<void>
@@ -118,6 +120,7 @@ export function useNotebookPage(input: {
   const [results, setResults] = useState<readonly NotebookEntry[] | null>(null)
   const [page, setPageState] = useState(1)
   const [error, setError] = useState<string | null>(null)
+  const [ready, setReady] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [choosing, setChoosing] = useState(false)
@@ -134,6 +137,8 @@ export function useNotebookPage(input: {
       setHistory(entries.entries)
     } catch (cause) {
       setError(messageOf(cause))
+    } finally {
+      setReady(true)
     }
   }, [notebook])
 
@@ -449,6 +454,7 @@ export function useNotebookPage(input: {
     historyBytes,
     historyWarn: historyBytes >= NOTEBOOK_HISTORY_WARN_BYTES,
     reload,
+    ready,
     openBrowser,
     toggleChoosing: () => setChoosing(current => !current),
     chooseRoot,

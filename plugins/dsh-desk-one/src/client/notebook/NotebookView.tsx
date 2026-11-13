@@ -224,10 +224,12 @@ export function NotebookView({ page }: { readonly page: NotebookPageController }
     <div className="dsh-desk-notebookview">
       {page.error === null ? null : <p className="dsh-desk-notebook-error">{t('state.loadFailed', { message: page.error })}</p>}
       {page.notice === null ? null : <p className="dsh-desk-notebook-notice">{page.notice}</p>}
-      {page.rootPath === undefined
-        ? <Unlinked page={page} />
-        : (
-            <div className="dsh-desk-notebook-column">
+      {!page.ready
+        ? <div className="dsh-desk-notebook-center"><p className="dsh-desk-notebook-hint">{t('state.loading')}</p></div>
+        : page.rootPath === undefined
+          ? <Unlinked page={page} />
+          : (
+              <div className="dsh-desk-notebook-column">
               {page.newOpen ? <NewNoteForm page={page} /> : null}
               <div className="dsh-desk-notebook-toolbar">
                 <Input

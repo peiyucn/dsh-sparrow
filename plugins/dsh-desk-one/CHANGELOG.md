@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Notebook first paint**: a loading state shows until the first fetch settles, so the unlinked empty page no longer flashes.
+
 * **Review layout**: frontmatter is collapsed to one metadata row by default (expand to read all), and the bottom pill area shrank from 34px to 28px with less reserved scroll padding so the body gets more room.
 * **Review overlays**: the two bottom pills now open an official-style title row (icon + title + actions) that stays fixed while the content, including long diffs, scrolls on its own.
 
