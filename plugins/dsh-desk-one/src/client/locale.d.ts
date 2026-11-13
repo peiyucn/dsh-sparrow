@@ -153,8 +153,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       | 'review.lineHint'
       | 'review.pendingBar'
       | 'review.recordsBar'
-      | 'review.moreDraftActions'
-      | 'review.moreChangeActions'
       | 'review.submitDisabled'
       | 'review.recordsTitle'
       | 'review.recordsEmpty'

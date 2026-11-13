@@ -707,7 +707,7 @@ describe('dsh-desk-one 结构', () => {
     const reviewCss = await read('src/client/notebook/review-styles.ts')
     assert.doesNotMatch(reviewCss, /\.dsh-desk-review-composer \{[^}]*position: absolute/su, '就地输入框不能被绝对定位到面板底部')
     assert.match(review, /dsh-desk-review-split/u, '底部是官方 split button 形状（主按钮 + 箭头菜单）')
-    assert.match(review, /MenuItemButton/u, '箭头菜单用官方菜单行')
+    assert.doesNotMatch(review, /MenuItemButton/u, '第二段图标直接打开对应浮层，不再套一层菜单')
     assert.doesNotMatch(view, /browserTried|useRef/u, '入口页不能挂载即自动开新会话')
     const entry = await read('src/client/index.ts')
     const docAction = await read('src/client/notebook/DocReviewAction.tsx')

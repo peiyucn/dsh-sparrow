@@ -600,14 +600,15 @@ export const REVIEW_CSS = `
 .dsh-desk-review-split-arrow {
   flex: none;
   justify-content: center;
-  width: 32px;
+  width: 34px;
   padding: 0;
   border-left: 0.5px solid color-mix(in srgb, currentColor 22%, transparent);
   border-radius: 0 999px 999px 0;
 }
 .dsh-desk-review-split-arrow svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
+  color: inherit;
 }
 .dsh-desk-review-split-main:hover,
 .dsh-desk-review-split-arrow:hover,
@@ -643,30 +644,5 @@ export const REVIEW_CSS = `
   .dsh-desk-review-split-arrow {
     width: 26px;
   }
-}
-/* The chevron menus use the same official primary surface as their button, so the pair reads as
-   one control instead of a dark menu card floating over a white button. */
-.dsh-desk-review-menu {
-  border: 0 !important;
-  border-radius: var(--dsw-radius-lg, 14px) !important;
-  background: var(--dsw-alias-button-primary-fill, #4176e6) !important;
-  color: var(--dsw-alias-label-primary-foreground, #ffffff) !important;
-  box-shadow: var(--dsw-elevation-prominent, 0 10px 30px -12px rgba(20, 25, 40, 0.45)) !important;
-}
-.dsh-desk-review-menu > [class*='material'] {
-  background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-.dsh-desk-review-menu [role='menuitem'] {
-  color: inherit !important;
-  border-radius: var(--dsw-radius-sm, 8px) !important;
-}
-.dsh-desk-review-menu [role='menuitem']:hover,
-.dsh-desk-review-menu [role='menuitem']:focus-visible {
-  background: color-mix(in srgb, currentColor 12%, transparent) !important;
-}
-.dsh-desk-review-menu [role='menuitem'] svg {
-  color: inherit;
 }
 `

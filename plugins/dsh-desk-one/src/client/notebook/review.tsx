@@ -12,7 +12,7 @@ import type { ReactElement } from 'react'
 import {
   Button, DiffBlock, DisclosureRow, FileTypeIcon, IconChevronDownOutlineRegular, IconClockOutlineRegular, IconCodeOutlineRegular, IconCopyOutlineRegular,
   IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
-  MarkdownText, Menu, MenuItemButton, Tooltip, diffTotals,
+  MarkdownText, Tooltip, diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -121,8 +121,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const [composer, setComposer] = useState<ComposeTarget | null>(null)
   const [comment, setComment] = useState('')
   const [overlay, setOverlay] = useState<OverlayKind | null>(null)
-  const [draftsMenuOpen, setDraftsMenuOpen] = useState(false)
-  const [recordsMenuOpen, setRecordsMenuOpen] = useState(false)
   /** Submitted records for this file (null while the first fetch runs). */
   const [records, setRecords] = useState<readonly ReviewHistoryEntry[] | null>(null)
   const [diffOpen, setDiffOpen] = useState(false)
@@ -456,28 +454,22 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     <div className="dsh-desk-review" ref={rootRef}>
       <header className="dsh-desk-review-head">
         <span className="dsh-desk-review-path" title={path}>{page?.title ?? path}</span>
-        <Tooltip label={t('review.viewRender')} side="bottom" delayMs={400}>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="dsh-desk-review-viewbtn"
-            aria-pressed={view === 'render'}
-            aria-label={t('review.viewRender')}
-            icon={<FileTypeIcon kind="markdown" size={14} />}
-            onClick={() => setView('render')}
-          />
-        </Tooltip>
-        <Tooltip label={t('review.viewSource')} side="bottom" delayMs={400}>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="dsh-desk-review-viewbtn"
-            aria-pressed={view === 'source'}
-            aria-label={t('review.viewSource')}
-            icon={<IconCodeOutlineRegular size={14} />}
-            onClick={() => setView('source')}
-          />
-        </Tooltip>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="dsh-desk-review-viewbtn"
+          aria-pressed={view === 'render'}
+          icon={<FileTypeIcon kind="markdown" size={14} />}
+          onClick={() => setView('render')}
+        >{t('review.viewRender')}</Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="dsh-desk-review-viewbtn"
+          aria-pressed={view === 'source'}
+          icon={<IconCodeOutlineRegular size={14} />}
+          onClick={() => setView('source')}
+        >{t('review.viewSource')}</Button>
         <Tooltip label={t('review.copyPath')} side="bottom" delayMs={400}>
           <Button variant="ghost" size="sm" icon={<IconCopyOutlineRegular />} aria-label={t('review.copyPath')} onClick={copyPath} />
         </Tooltip>
@@ -714,32 +706,16 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
             <span className="dsh-desk-review-split-label">{t('review.submitAll')}</span>
             {annotations.length === 0 ? null : <span className="dsh-desk-review-split-count">{annotations.length}</span>}
           </button>
-          <Menu
-            open={draftsMenuOpen}
-            onClose={() => { setDraftsMenuOpen(false) }}
-            align="end"
-            side="top"
-            portal
-            autoFocus
-            listClassName="dsh-desk-review-menu"
-            anchor={(
-              <button
-                type="button"
-                className="dsh-desk-review-split-arrow"
-                aria-label={t('review.moreDraftActions')}
-                aria-haspopup="menu"
-                aria-expanded={draftsMenuOpen}
-                onClick={() => { setDraftsMenuOpen(value => !value) }}
-              >
-                <IconChevronDownOutlineRegular size={12} />
-              </button>
-            )}
-          >
-            <MenuItemButton
-              icon={<IconListPenOutlineRegular size={14} />}
-              onSelect={() => { setDraftsMenuOpen(false); setOverlay('annotations') }}
-            >{pendingLabel}</MenuItemButton>
-          </Menu>
+          <Tooltip label={pendingLabel} side="top" delayMs={400}>
+            <button
+              type="button"
+              className="dsh-desk-review-split-arrow"
+              aria-label={t('review.pendingTitle', { count: annotations.length })}
+              onClick={() => { setOverlay('annotations') }}
+            >
+              <IconListPenOutlineRegular size={14} />
+            </button>
+          </Tooltip>
         </span>
         <span className="dsh-desk-review-split" role="group" aria-label={changesLabel}>
           <button
@@ -760,32 +736,16 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                   </>
                 )}
           </button>
-          <Menu
-            open={recordsMenuOpen}
-            onClose={() => { setRecordsMenuOpen(false) }}
-            align="end"
-            side="top"
-            portal
-            autoFocus
-            listClassName="dsh-desk-review-menu"
-            anchor={(
-              <button
-                type="button"
-                className="dsh-desk-review-split-arrow"
-                aria-label={t('review.moreChangeActions')}
-                aria-haspopup="menu"
-                aria-expanded={recordsMenuOpen}
-                onClick={() => { setRecordsMenuOpen(value => !value) }}
-              >
-                <IconChevronDownOutlineRegular size={12} />
-              </button>
-            )}
-          >
-            <MenuItemButton
-              icon={<IconClockOutlineRegular size={14} />}
-              onSelect={() => { setRecordsMenuOpen(false); setOverlay('records') }}
-            >{recordsLabel}</MenuItemButton>
-          </Menu>
+          <Tooltip label={recordsLabel} side="top" delayMs={400}>
+            <button
+              type="button"
+              className="dsh-desk-review-split-arrow"
+              aria-label={t('review.recordsTitle', { rounds: recordRounds, notes: recordAnnotations })}
+              onClick={() => { setOverlay('records') }}
+            >
+              <IconClockOutlineRegular size={14} />
+            </button>
+          </Tooltip>
         </span>
       </div>
     </div>

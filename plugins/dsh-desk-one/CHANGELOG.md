@@ -6,6 +6,9 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review bottom bar**: the second segment is now a list-pen / clock icon that opens the annotation-drafts / annotation-records overlay directly — no intermediate menu, and the icon inherits the button ink.
+* **MD / code**: two official ghost buttons (icon + label), code by default.
+
 * **Official preview review entry**: the action is pinned after the official header buttons; when the current Session is already a review Session it switches back to the review tab in place instead of creating another Session.
 * **MD / code**: now two official ghost icon buttons (MD / code), with code as the default.
 * **Review guidance**: moved from a bubble below the composer to a placeholder-style hint inside the input, disappearing once typing starts or the conversation begins.
