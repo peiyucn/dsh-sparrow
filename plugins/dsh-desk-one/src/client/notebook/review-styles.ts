@@ -25,9 +25,21 @@ export const REVIEW_CSS = `
   padding: 0 6px 0 12px;
   border-bottom: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
 }
+/* Compact the official sm segmented control to the toolbar's 28px tool row: the stock sm track is
+   34px tall with 14px labels, noticeably heavier than the ghost icon buttons beside it. */
 .dsh-desk-review-viewtoggle {
   flex: none;
-  width: 112px;
+  width: auto;
+  height: 28px;
+  padding: 1px;
+  border-radius: var(--dsw-radius-sm, 8px);
+}
+.dsh-desk-review-viewtoggle [role='tab'] {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--dsw-radius-sm, 6px);
+  font-size: 12px;
+  line-height: 18px;
 }
 .dsh-desk-review-path {
   flex: 1;
@@ -318,6 +330,11 @@ export const REVIEW_CSS = `
   font-size: 11px;
   cursor: pointer;
   box-shadow: var(--dsw-elevation-prominent, 0 4px 12px rgba(0, 0, 0, 0.2));
+}
+/* The element also carries .dsh-desk-action, whose generic hover would paint it white; keep the
+   primary action blue and deepen it like the composer's send button. */
+.dsh-desk-review-float:hover {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #4176e6) 84%, #000000);
 }
 .dsh-desk-review-difftag {
   display: inline-flex;
