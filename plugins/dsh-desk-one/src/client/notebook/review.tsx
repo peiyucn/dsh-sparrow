@@ -11,7 +11,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { ReactElement } from 'react'
 import {
   Button, DiffBlock, DisclosureRow, IconChevronDownOutlineRegular, IconClockOutlineRegular, IconCopyOutlineRegular,
-  IconInfoOutlineRegular, IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
+  IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
   MarkdownText, Menu, MenuItemButton, SegmentedTabs, Tooltip, diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -51,6 +51,11 @@ interface ComposeTarget {
 
 /** Comment text cap. */
 const TEXT_MAX_CHARS = 4_000
+
+/** Whole file text shown in the code view and diffed against the round baseline. */
+function pageText(page: NotebookPageResponse): string {
+  return page.kind === 'markdown' ? `${page.frontmatter}${page.body}` : page.body
+}
 
 /** Quote one passage as a markdown blockquote. */
 function quoteBlock(quote: string): string {
@@ -123,10 +128,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const [diffOpen, setDiffOpen] = useState(false)
   /** Source view (exact lines, annotations) or read-only rendered view. */
   const [view, setView] = useState<'source' | 'render'>('source')
-  /** Frontmatter stays collapsed so the body owns the pane by default. */
-  const [fieldsOpen, setFieldsOpen] = useState(false)
 
-  const lines = useMemo(() => (page === null ? [] : page.body.split('\n')), [page])
+  const lines = useMemo(() => (page === null ? [] : pageText(page).split('\n')), [page])
   const markdownLabels = useMemo(() => ({
     code: { copyLabel: t('review.copy'), copiedLabel: t('review.copied') },
     footnotes: t('review.footnotes'),
@@ -152,6 +155,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     try {
       await notebook.state()
       const nextPage = await notebook.page(path)
+      const nextText = pageText(nextPage)
       const draft = await notebook.draft(fileId)
       const stored = await notebook.loadBaseline(sessionId)
       setPage(current => current !== null && current.body === nextPage.body ? current : nextPage)
@@ -161,9 +165,9 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         setBaselineAt(stored.baseline.at)
       } else if (!silent) {
         const at = new Date().toISOString()
-        setBaseline(nextPage.body)
+        setBaseline(nextText)
         setBaselineAt(at)
-        void notebook.saveBaseline({ sessionId, fileId, body: nextPage.body, at })
+        void notebook.saveBaseline({ sessionId, fileId, body: nextText, at })
       }
     } catch (cause) {
       if (!silent) setError(messageOf(cause))
@@ -354,8 +358,9 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const recordRounds = records?.length ?? 0
   const recordAnnotations = records?.reduce((sum, entry) => sum + entry.record.annotations.length, 0) ?? 0
 
-  const diff = baseline !== null && page !== null && baseline !== page.body
-    ? { oldText: baseline, newText: page.body }
+  const currentText = page === null ? '' : pageText(page)
+  const diff = baseline !== null && page !== null && baseline !== currentText
+    ? { oldText: baseline, newText: currentText }
     : null
   const totals = diff === null || page === null
     ? null
@@ -431,7 +436,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
       <header className="dsh-desk-review-head">
         <span className="dsh-desk-review-path" title={path}>{page?.title ?? path}</span>
         <SegmentedTabs
-          className="dsh-desk-review-viewtoggle"
           size="sm"
           label={t('review.viewLabel')}
           value={view}
@@ -466,29 +470,6 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
             )
           : (
               <div className="dsh-desk-review-scroll">
-                {page.fields.length === 0 ? null : (
-                  <DisclosureRow
-                    icon={<IconInfoOutlineRegular />}
-                    title={t('review.frontmatter')}
-                    open={fieldsOpen}
-                    expandable
-                    expandOnRowClick
-                    previewChevron
-                    onToggle={() => setFieldsOpen(current => !current)}
-                    collapsedContent={(
-                      <span className="dsh-desk-review-fieldcount">{t('review.frontmatterCount', { count: page.fields.length })}</span>
-                    )}
-                  >
-                    <dl className="dsh-desk-review-frontmatter" aria-label={t('review.frontmatter')}>
-                      {page.fields.map(field => (
-                        <div key={field.name} className="dsh-desk-review-field">
-                          <dt>{field.name}</dt>
-                          <dd>{field.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </DisclosureRow>
-                )}
                 {documentAnnotations.map(annotation => (
                   <AnnotationCard
                     key={annotation.id}
@@ -507,7 +488,21 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                   ? <p className="dsh-desk-review-notice">{t('review.renderHint')}</p>
                   : null}
                 {view === 'render'
-                  ? <div className="dsh-desk-review-rendered"><MarkdownText text={page.body} labels={markdownLabels} omitHtml /></div>
+                  ? (
+                      <div className="dsh-desk-review-rendered">
+                        {page.fields.length === 0 ? null : (
+                          <dl className="dsh-desk-review-frontmatter" aria-label={t('review.frontmatter')}>
+                            {page.fields.map(field => (
+                              <div key={field.name} className="dsh-desk-review-field">
+                                <dt>{field.name}</dt>
+                                <dd>{field.value}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        )}
+                        <MarkdownText text={page.body} labels={markdownLabels} omitHtml />
+                      </div>
+                    )
                   : <div ref={codeRef} className="dsh-desk-review-code" onMouseUp={handleSelect}>
                   {lines.map((text, index) => {
                     const line = index + 1

@@ -6,6 +6,9 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **MD / code switch**: now the official `SegmentedTabs` default style (two options, code by default).
+* **Review frontmatter**: the code view shows the raw frontmatter as source lines (line numbers match the file), while the MD view renders the metadata block inline before the body and scrolls with it instead of being pinned.
+
 * **Official preview entry**: the Review view button drops its coloured square and becomes a standard ghost icon button matching the neighbouring header actions, with even spacing between them.
 
 * **Review round baseline**: stored per **review session** — opening a review session starts a fresh round from the body it opens, a refresh or reopened tab keeps this round’s changes, and the confusing “use current as baseline” button is gone.

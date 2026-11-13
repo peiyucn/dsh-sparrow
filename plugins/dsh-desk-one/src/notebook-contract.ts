@@ -71,6 +71,8 @@ export interface NotebookPageResponse {
   readonly title: string
   readonly kind: 'markdown' | 'text'
   readonly fields: readonly NotebookField[]
+  /** Raw frontmatter block (both fences), empty for text files / files without metadata. */
+  readonly frontmatter: string
   readonly body: string
   readonly bytes: number
 }

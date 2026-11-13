@@ -68,6 +68,7 @@ export async function readPage(root: string, relativePath: string): Promise<Note
     title: displayTitle(parsed, relative),
     kind: markdown ? 'markdown' : 'text',
     fields,
+    frontmatter: markdown ? parsed.frontmatter : '',
     body: markdown ? parsed.body : raw,
     bytes: bytes.byteLength,
   }

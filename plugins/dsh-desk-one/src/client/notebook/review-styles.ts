@@ -79,12 +79,7 @@ export const REVIEW_CSS = `
   line-height: 18px;
 }
 
-/* Frontmatter disclosure: one compact row when closed, metadata card when opened. */
-.dsh-desk-review-fieldcount {
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
+
 /* Frontmatter block: quiet metadata card above the page content (raw frontmatter is stripped from body). */
 .dsh-desk-review-frontmatter {
   display: flex;
@@ -138,32 +133,6 @@ export const REVIEW_CSS = `
 }
 /* Compact the official sm segmented control to the toolbar's 28px tool row: the stock sm track is
    34px tall with 14px labels, noticeably heavier than the ghost icon buttons beside it. */
-.dsh-desk-review-viewtoggle {
-  flex: none;
-  width: auto;
-  height: 28px;
-  padding: 2px;
-  border-radius: var(--dsw-radius-sm, 8px);
-  background: transparent;
-  box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-}
-.dsh-desk-review-viewtoggle [role='tab'] {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: var(--dsw-radius-sm, 6px);
-  background: transparent;
-  box-shadow: none;
-  font-size: 12px;
-  line-height: 1;
-}
-.dsh-desk-review-viewtoggle [role='tab'][aria-selected='true'] {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06));
-  color: var(--dsw-alias-label-primary, #1f2329);
-  box-shadow: none;
-}
 .dsh-desk-review-path {
   flex: 1;
   min-width: 0;
@@ -295,6 +264,11 @@ export const REVIEW_CSS = `
 .dsh-desk-review-record:first-child {
   padding-top: 0;
   border-top: 0;
+}
+.dsh-desk-review-fieldcount {
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 .dsh-desk-review-recordehead {
   display: flex;

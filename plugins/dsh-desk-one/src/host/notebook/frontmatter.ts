@@ -20,6 +20,8 @@ export interface ParsedPage {
   readonly date?: string
   readonly tags: readonly string[]
   readonly fields: readonly ParsedField[]
+  /** Raw frontmatter block including both fences; empty when the file has none. */
+  readonly frontmatter: string
   readonly body: string
   readonly bytes: number
 }
@@ -54,11 +56,11 @@ function parseList(value: string): string[] {
 export function parsePage(raw: string, bytes: number): ParsedPage {
   const text = raw.replace(/\r\n/g, '\n')
   if (!text.startsWith('---\n')) {
-    return { hasFrontmatter: false, tags: [], fields: [], body: text, bytes }
+    return { hasFrontmatter: false, tags: [], fields: [], frontmatter: '', body: text, bytes }
   }
   const end = text.indexOf('\n---\n', 3)
   if (end < 0) {
-    return { hasFrontmatter: false, tags: [], fields: [], body: text, bytes }
+    return { hasFrontmatter: false, tags: [], fields: [], frontmatter: '', body: text, bytes }
   }
   const fence = text.slice(4, end)
   const body = text.slice(end + 5)
@@ -85,6 +87,7 @@ export function parsePage(raw: string, bytes: number): ParsedPage {
     ...date === undefined || date === '' ? {} : { date },
     tags,
     fields,
+    frontmatter: text.slice(0, end + 5),
     body,
     bytes,
   }
