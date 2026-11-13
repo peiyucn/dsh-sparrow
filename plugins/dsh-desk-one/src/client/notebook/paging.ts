@@ -1,7 +1,7 @@
 /** Client-side pagination for the notebook list views (the library itself stays server-side). */
 
 /** Rows shown per page in every notebook view. */
-export const NOTEBOOK_PAGE_SIZE = 10
+export const NOTEBOOK_PAGE_SIZE = 20
 
 /** One page of rows plus the page bounds after clamping. */
 export interface PageSlice<Row> {
