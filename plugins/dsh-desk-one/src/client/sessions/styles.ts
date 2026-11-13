@@ -179,16 +179,4 @@ export const SESSIONS_CSS = `
 .dsh-desk-row-action:disabled { opacity: .4; cursor: default; }
 .dsh-desk-row-action[data-armed='true'] { border-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); }
 .dsh-desk-row-action[data-danger='true'] { color: #c2410c; border-color: color-mix(in srgb, #c2410c 45%, transparent); }
-.dsh-desk-session-section {
-  border: 1px solid color-mix(in srgb, var(--dsw-alias-label-secondary, #6b7280) 12%, transparent);
-  border-radius: 12px;
-  padding: 8px 10px;
-  background: color-mix(in srgb, var(--dsw-alias-label-secondary, #6b7280) 2%, transparent);
-}
-/* Active section: green outline only. Mixing the tint with a white base turns muddy on dark themes,
-   so the fill stays transparent and only the border carries the status colour. */
-.dsh-desk-session-section[data-active='true'] {
-  border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 34%, transparent);
-  background: transparent;
-}
 `

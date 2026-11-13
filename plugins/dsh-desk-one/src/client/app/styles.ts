@@ -492,7 +492,15 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: calc(var(--dsh-desk-header-h) + 14px) 28px 16px;
+  padding: calc(var(--dsh-desk-header-h) + 16px) clamp(20px, 3vw, 40px) 16px;
+}
+/* Same content cap as the notebook page, so both lists sit on one width. */
+.dsh-desk-sessionsview > * {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: min(1100px, 100%);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .dsh-desk-sessionsview::-webkit-scrollbar-track {
@@ -571,9 +579,9 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 12px;
+  padding: 7px 10px;
   border-bottom: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 82%, var(--dsw-alias-label-primary, #1f2329));
+  background: transparent;
 }
 .dsh-desk-session-group-title {
   flex: 1;
@@ -588,6 +596,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 }
 .dsh-desk-session-group-count {
   flex: none;
+  margin-left: auto;
   font-size: 11px;
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
