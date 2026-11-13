@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review bottom bar**: the two split buttons are now 36px tall and sit 18px above the bottom edge; the code scrolls under them and fades into the pane ground at the bottom (like the official @ / slash list); the chevron menus use the same white-blur material and open above the buttons instead of covering them.
+
 * **Review bottom bar**: two split buttons in frosted white glass (about 82% white in the light theme / 55% in the dark theme plus blur, dark ink) — **Submit annotations** with a chevron menu for the drafts, and **This round’s changes** with a chevron menu for the records; the glass is painted on the group only (no backing strip, no theme-tone dependency), the code scrolls under the buttons, and overlays keep a 4px gap.
 
 * **Review bottom bar**: the glass is painted inside each capsule’s own pseudo-element (lower opacity, no full-width backing strip), and overlays now keep a 12px gap above the pills instead of touching them.

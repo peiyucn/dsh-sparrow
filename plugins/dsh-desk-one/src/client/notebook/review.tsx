@@ -698,8 +698,10 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
             open={draftsMenuOpen}
             onClose={() => { setDraftsMenuOpen(false) }}
             align="end"
+            side="top"
             portal
             autoFocus
+            listClassName="dsh-desk-review-menu"
             anchor={(
               <button
                 type="button"
@@ -742,8 +744,10 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
             open={recordsMenuOpen}
             onClose={() => { setRecordsMenuOpen(false) }}
             align="end"
+            side="top"
             portal
             autoFocus
+            listClassName="dsh-desk-review-menu"
             anchor={(
               <button
                 type="button"

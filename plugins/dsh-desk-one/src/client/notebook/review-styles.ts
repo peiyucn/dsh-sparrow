@@ -3,7 +3,8 @@
 export const REVIEW_CSS = `
 .dsh-desk-review {
   container-type: inline-size;
-  --dsh-desk-review-bar-h: 28px;
+  --dsh-desk-review-bar-h: 36px;
+  --dsh-desk-review-bar-bottom: 18px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -226,7 +227,7 @@ export const REVIEW_CSS = `
   position: absolute;
   left: 8px;
   right: 8px;
-  bottom: calc(var(--dsh-desk-review-bar-h) + 10px);
+  bottom: calc(var(--dsh-desk-review-bar-h) + var(--dsh-desk-review-bar-bottom) + 4px);
   z-index: 4;
   display: flex;
   flex-direction: column;
@@ -560,7 +561,7 @@ export const REVIEW_CSS = `
   position: absolute;
   left: 12px;
   right: 12px;
-  bottom: 6px;
+  bottom: var(--dsh-desk-review-bar-bottom);
   z-index: 3;
   display: flex;
   align-items: center;
@@ -573,6 +574,23 @@ export const REVIEW_CSS = `
   box-shadow: none;
   backdrop-filter: none;
   pointer-events: none;
+}
+/* Fade the last lines into the pane ground, mirroring the official @ / slash composer lists. */
+.dsh-desk-review::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--dsh-desk-review-bar-h) + var(--dsh-desk-review-bar-bottom) + 24px);
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    var(--dsw-alias-bg-base, #151517) 18%,
+    color-mix(in srgb, var(--dsw-alias-bg-base, #151517) 72%, transparent) 55%,
+    transparent 100%
+  );
 }
 .dsh-desk-review-bar > * {
   pointer-events: auto;
@@ -588,11 +606,11 @@ export const REVIEW_CSS = `
   align-items: stretch;
   box-sizing: border-box;
   min-width: 0;
-  height: 28px;
+  height: var(--dsh-desk-review-bar-h);
   border-radius: 999px;
   color: #1f2329;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 13px;
+  line-height: 20px;
 }
 .dsh-desk-review-split::before {
   content: '';
@@ -632,9 +650,9 @@ body[data-ds-dark-theme] .dsh-desk-review-split::before {
   cursor: pointer;
 }
 .dsh-desk-review-split-main {
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  padding: 0 10px 0 12px;
+  padding: 0 12px 0 16px;
   border-radius: 999px 0 0 999px;
 }
 .dsh-desk-review-split-icon {
@@ -642,8 +660,8 @@ body[data-ds-dark-theme] .dsh-desk-review-split::before {
   flex: none;
 }
 .dsh-desk-review-split-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 .dsh-desk-review-split-label {
   min-width: 0;
@@ -656,7 +674,7 @@ body[data-ds-dark-theme] .dsh-desk-review-split::before {
 .dsh-desk-review-split-muted {
   flex: none;
   color: rgba(31, 35, 41, 0.55);
-  font-size: 11px;
+  font-size: 12px;
 }
 .dsh-desk-review-split > .dsh-desk-review-difftag,
 .dsh-desk-review-split-main > .dsh-desk-review-difftag {
@@ -665,14 +683,14 @@ body[data-ds-dark-theme] .dsh-desk-review-split::before {
 .dsh-desk-review-split-arrow {
   flex: none;
   justify-content: center;
-  width: 26px;
+  width: 32px;
   padding: 0;
   border-left: 0.5px solid rgba(0, 0, 0, 0.16);
   border-radius: 0 999px 999px 0;
 }
 .dsh-desk-review-split-arrow svg {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
 }
 .dsh-desk-review-split-main:hover,
 .dsh-desk-review-split-arrow:hover,
@@ -703,12 +721,39 @@ body[data-ds-dark-theme] .dsh-desk-review-split-arrow[aria-expanded='true'] {
     gap: 6px;
   }
   .dsh-desk-review-split-main {
-    gap: 4px;
-    padding: 0 8px;
+    gap: 6px;
+    padding: 0 10px;
   }
   .dsh-desk-review-split-arrow {
-    width: 22px;
+    width: 26px;
   }
+}
+/* White translucent menu card (same material as the split buttons), not the dark menu surface. */
+.dsh-desk-review-menu {
+  border: 0.5px solid rgba(0, 0, 0, 0.12) !important;
+  border-radius: var(--dsw-radius-lg, 14px) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(14px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(160%) !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18) !important;
+  color: #1f2329 !important;
+}
+body[data-ds-dark-theme] .dsh-desk-review-menu {
+  border-color: rgba(255, 255, 255, 0.55) !important;
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(14px) saturate(160%) brightness(1.05) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(160%) brightness(1.05) !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32) !important;
+}
+.dsh-desk-review-menu [role='menuitem'] {
+  color: #16181d !important;
+}
+.dsh-desk-review-menu [role='menuitem']:hover,
+.dsh-desk-review-menu [role='menuitem']:focus-visible {
+  background: rgba(0, 0, 0, 0.07) !important;
+}
+.dsh-desk-review-menu [role='menuitem'] svg {
+  color: #16181d;
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .dsh-desk-review-split::before {
