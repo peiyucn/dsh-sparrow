@@ -8,7 +8,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 * **Review scroll clearance**: at the end of the code / rendered view the last lines stop above the floating buttons, so the “Submit annotations / This round’s changes” bar no longer covers them and the tail stays selectable for annotating.
 
-* **Review changes overlay**: the “+A” and “−A” count tags in the collapsed row now keep a gap instead of touching.
+* **Review changes overlay**: in the collapsed row the “+A” / “−A” count tags now keep a gap from the title text and from each other instead of touching.
 
 * **Review session reuse**: when a note has several historical review sessions, the one with a real conversation wins — the 0-turn blank duplicates left behind by the old per-click flow no longer shadow it.
 

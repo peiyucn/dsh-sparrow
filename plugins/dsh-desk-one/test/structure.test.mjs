@@ -731,6 +731,7 @@ describe('dsh-desk-one 结构', () => {
     assert.match(reviewCss, /code-diff-added/u, '高亮复用官方 diff 的改动底色')
     assert.match(review, /dsh-desk-review-difftags/u, '折叠行的增减计数要包一层，才能拉开间距')
     assert.match(reviewCss, /\.dsh-desk-review-difftags \{[^}]*gap: 4px/su, '增减计数标签之间留 4px 间距')
+    assert.match(reviewCss, /\.dsh-desk-review-difftags \{[^}]*margin-left: 6px/su, '标签与折叠行标题文字之间留间距')
     assert.match(reviewCss, /--dsh-desk-review-bar-clear:/u, '底部浮动按钮要留出滚动净空')
     assert.match(reviewCss, /\.dsh-desk-review-code \{[^}]*padding: 6px 0 var\(--dsh-desk-review-bar-clear\)/su, '代码视图（真正的滚动容器）滚到底不被按钮遮挡')
     assert.match(reviewCss, /\.dsh-desk-review-rendered \{[^}]*padding: 8px 4px var\(--dsh-desk-review-bar-clear\)/su, '渲染视图同样留出按钮净空')
