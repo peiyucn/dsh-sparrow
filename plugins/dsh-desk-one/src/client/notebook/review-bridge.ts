@@ -42,6 +42,11 @@ export interface ReviewBridge {
    * @returns whether the tab opened, plus a readable reason.
    */
   open(input: ReviewOpenInput): Promise<ReviewOpenResult>
+  /**
+   * Reveal the review tab in the CURRENT session, used when a review Session already exists and
+   * the user pressed the preview header's review button while browsing its files.
+   */
+  reveal(input: ReviewOpenInput): ReviewOpenResult
   /** Start a new session in one workspace with a prefilled composer draft (never sends). */
   draftInNewSession(workspaceId: string, prompt: string): void
   /**
@@ -101,6 +106,16 @@ export function createReviewBridge(): ReviewBridge {
         }
       }
       return { ok: false, message: '审阅会话已创建，但右侧栏没有就绪，请再点一次「审阅」' }
+    },
+    reveal(input) {
+      const sidebar = sidebarRight
+      if (sidebar === undefined) return { ok: false, message: '右侧栏服务不可用（无法打开审阅视图）' }
+      try {
+        sidebar.openTab(REVIEW_TAB_KIND, { params: { path: input.path, fileId: input.fileId, workspaceId: input.workspaceId } })
+        return { ok: true }
+      } catch (cause) {
+        return { ok: false, message: `打开审阅视图失败：${cause instanceof Error ? cause.message : String(cause)}` }
+      }
     },
     async openFilesBrowser(workspaceId) {
       const nav = navigation

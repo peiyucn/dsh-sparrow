@@ -14,6 +14,7 @@ import { Button, IconListPenOutlineRegular, Tooltip } from '@deepseek-ai/dsh-cli
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import { messageOf } from '../app/utils.js'
+import { isReviewSession } from '../reviewSessions.js'
 import type { NotebookApi } from './api.js'
 import type { ReviewBridge } from './review-bridge.js'
 import type { WorkspaceAccess } from './workspaces.js'
@@ -62,6 +63,8 @@ function relativeToRoot(absolutePath: string, rootPath: string): string {
  */
 export function DocReviewAction(props: DocReviewActionProps): ReactNode {
   const { absolutePath, notebook, review, workspaceAccess, t } = props
+  // Session-scoped slot: the runtime always supplies the current Session id.
+  const sessionId = (props as unknown as { readonly sessionId?: string }).sessionId
   const [rootPath, setRootPath] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
@@ -100,7 +103,12 @@ export function DocReviewAction(props: DocReviewActionProps): ReactNode {
           setBusy(true)
           setFailed(null)
           void notebook.ensureFile(relativePath).then(({ file }) => (
-            review.open({ path: relativePath, fileId: file.id, workspaceId: workspace.workspaceId })
+            // A Session that already shows the review tab just switches back to it, so the
+            // official files preview and the review view toggle in place instead of opening a
+            // second review Session.
+            sessionId !== undefined && isReviewSession(sessionId)
+              ? Promise.resolve(review.reveal({ path: relativePath, fileId: file.id, workspaceId: workspace.workspaceId }))
+              : review.open({ path: relativePath, fileId: file.id, workspaceId: workspace.workspaceId })
           )).then((result) => {
             if (!result.ok) setFailed(result.message ?? t('review.openFailed'))
           }, (cause: unknown) => {

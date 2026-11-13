@@ -16,31 +16,22 @@ export const REVIEW_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
 }
-/* Conversation-area hint for review sessions: AI avatar + left speech bubble above the composer. */
-.dsh-desk-review-prompt {
-  box-sizing: border-box;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  width: 100%;
-  max-width: none;
-  /* The official input.dock is above the composer; a flex order past the input bar puts the hint
-     below it in both the centred hero composer and the docked composer, with no duplicate slot. */
-  order: 1;
-  /* Match the composer card's horizontal inset so the AI bubble does not sit on the sidebar edge. */
-  padding: 0 20px;
-  margin: 0;
+/* Placeholder-style review guidance inside the composer card. */
+.dsh-desk-review-composer-hint {
+  position: absolute;
+  inset: 10px 16px auto;
+  z-index: 0;
+  pointer-events: none;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: normal;
 }
-.dsh-desk-review-prompt-avatar {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: var(--dsw-alias-state-business-primary, #4176e6);
-  color: var(--dsw-alias-label-primary-foreground, #ffffff);
+[data-composer-card]:has(.dsh-desk-review-composer-hint) textarea::placeholder {
+  color: transparent;
+}
+[data-composer-card]:has(textarea:not(:placeholder-shown)) .dsh-desk-review-composer-hint {
+  display: none;
 }
 /* Sidebar session-row leading cell: the same blue brand mark as the bubble avatar, miniaturised. */
 .dsh-desk-review-session-mark-trailing {
@@ -57,28 +48,6 @@ export const REVIEW_CSS = `
   width: 16px;
   height: 16px;
 }
-.dsh-desk-review-prompt-key {
-  display: inline-flex;
-  align-items: center;
-  margin: 0 2px;
-  padding: 0 5px;
-  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-  border-radius: 6px;
-  background: var(--dsw-alias-bg-layer-2, #f2f3f5);
-  font-size: 11px;
-  line-height: 16px;
-}
-.dsh-desk-review-prompt-text {
-  margin: 0;
-  padding: 8px 12px;
-  border: 0.5px solid var(--dsw-alias-border-l3, #e2e5ea);
-  border-radius: 4px 14px 14px 14px;
-  background: var(--dsw-alias-bg-layer-1, #ffffff);
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 12px;
-  line-height: 18px;
-}
-
 
 /* Frontmatter block: quiet metadata card above the page content (raw frontmatter is stripped from body). */
 .dsh-desk-review-frontmatter {
@@ -133,6 +102,10 @@ export const REVIEW_CSS = `
 }
 /* Compact the official sm segmented control to the toolbar's 28px tool row: the stock sm track is
    34px tall with 14px labels, noticeably heavier than the ghost icon buttons beside it. */
+.dsh-desk-review-viewbtn[aria-pressed='true'] {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06));
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
 .dsh-desk-review-path {
   flex: 1;
   min-width: 0;

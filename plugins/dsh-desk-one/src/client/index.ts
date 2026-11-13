@@ -19,7 +19,7 @@ import { createSessionLinkBridge, type SessionServices } from './sessions/bridge
 import { scheduleApi } from './schedule/api.js'
 import { sessionsArchiveApi } from './sessions/archiveApi.js'
 import { LOCALE_DICTS } from './i18n.js'
-import { ReviewPromptDock } from './notebook/ReviewPromptDock.js'
+import { ReviewComposerHint } from './notebook/ReviewPromptDock.js'
 import { ReviewSessionIcon } from './notebook/ReviewSessionIcon.js'
 import { ReviewSessionTrailingIcon } from './notebook/ReviewSessionTrailingIcon.js'
 import { hydrateReviewSessions } from './reviewSessions.js'
@@ -79,6 +79,7 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('sidebar.right.tab.document.actions', () => ctx.slots.register({
     name: 'sidebar.right.tab.document.actions',
     id: 'desk-one-note-review',
+    order: 100,
     locale: LOCALE_NAMESPACE,
     inject: () => ({ notebook: notebookApi, review, workspaceAccess }),
   }, DocReviewAction))
@@ -144,16 +145,15 @@ export function apply(ctx: ClientContext): void {
       return () => {}
     }
   })
-  // Session-scoped conversation hint for review sessions (left-aligned AI bubble above the composer).
-  // The conversation package is not a compile dependency, hence the structural casts for its slot.
-  void ctx.slots.inject('conversation.input.dock' as never, () => {
+  // Placeholder-style hint inside the composer card for blank review sessions.
+  void ctx.slots.inject('conversation.input.overlay' as never, () => {
     try {
       return ctx.slots.register({
-        name: 'conversation.input.dock' as never,
+        name: 'conversation.input.overlay' as never,
         id: 'dsh-desk-one-review-prompt',
         order: 30,
         locale: LOCALE_NAMESPACE,
-      } as never, ReviewPromptDock as never)
+      } as never, ReviewComposerHint as never)
     } catch {
       // The conversation slot is optional; never let the hint take the whole panel down.
       return () => {}

@@ -10,9 +10,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
-  Button, DiffBlock, DisclosureRow, IconChevronDownOutlineRegular, IconClockOutlineRegular, IconCopyOutlineRegular,
+  Button, DiffBlock, DisclosureRow, FileTypeIcon, IconChevronDownOutlineRegular, IconClockOutlineRegular, IconCodeOutlineRegular, IconCopyOutlineRegular,
   IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
-  MarkdownText, Menu, MenuItemButton, SegmentedTabs, Tooltip, diffTotals,
+  MarkdownText, Menu, MenuItemButton, Tooltip, diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -456,16 +456,28 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     <div className="dsh-desk-review" ref={rootRef}>
       <header className="dsh-desk-review-head">
         <span className="dsh-desk-review-path" title={path}>{page?.title ?? path}</span>
-        <SegmentedTabs
-          size="sm"
-          label={t('review.viewLabel')}
-          value={view}
-          onChange={setView}
-          items={[
-            { value: 'render', label: t('review.viewRender'), id: 'desk-review-view-md', panelId: 'desk-review-panel' },
-            { value: 'source', label: t('review.viewSource'), id: 'desk-review-view-code', panelId: 'desk-review-panel' },
-          ] as const}
-        />
+        <Tooltip label={t('review.viewRender')} side="bottom" delayMs={400}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="dsh-desk-review-viewbtn"
+            aria-pressed={view === 'render'}
+            aria-label={t('review.viewRender')}
+            icon={<FileTypeIcon kind="markdown" size={14} />}
+            onClick={() => setView('render')}
+          />
+        </Tooltip>
+        <Tooltip label={t('review.viewSource')} side="bottom" delayMs={400}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="dsh-desk-review-viewbtn"
+            aria-pressed={view === 'source'}
+            aria-label={t('review.viewSource')}
+            icon={<IconCodeOutlineRegular size={14} />}
+            onClick={() => setView('source')}
+          />
+        </Tooltip>
         <Tooltip label={t('review.copyPath')} side="bottom" delayMs={400}>
           <Button variant="ghost" size="sm" icon={<IconCopyOutlineRegular />} aria-label={t('review.copyPath')} onClick={copyPath} />
         </Tooltip>

@@ -6,6 +6,10 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Official preview review entry**: the action is pinned after the official header buttons; when the current Session is already a review Session it switches back to the review tab in place instead of creating another Session.
+* **MD / code**: now two official ghost icon buttons (MD / code), with code as the default.
+* **Review guidance**: moved from a bubble below the composer to a placeholder-style hint inside the input, disappearing once typing starts or the conversation begins.
+
 * **Review bottom overlays**: the annotation-draft, annotation-record and this-round overlays now close on an outside click or Escape; the chevron menus keep the official Menu’s outside-click dismissal.
 
 * **MD / code switch**: now the official `SegmentedTabs` default style (two options, code by default).
