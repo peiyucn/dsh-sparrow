@@ -12,7 +12,7 @@ import type { ReactElement } from 'react'
 import {
   Button, DiffBlock, DisclosureRow, IconChevronDownOutlineRegular, IconClockOutlineRegular, IconCopyOutlineRegular,
   IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
-  MarkdownText, Menu, Tooltip, diffTotals,
+  MarkdownText, Menu, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -23,6 +23,7 @@ import type { DraftAnnotation, NotebookPageResponse, ReviewHistoryEntry } from '
 import type { DeskTranslator } from '../app/types.js'
 import { messageOf } from '../app/utils.js'
 import type { NotebookApi } from './api.js'
+import { lineChanges } from './review-changes.js'
 import type { NoteReviewParams, ReviewBridge } from './review-bridge.js'
 
 /** What the tab receives from the client entry. */
@@ -379,12 +380,19 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const recordAnnotations = records?.reduce((sum, entry) => sum + entry.record.annotations.length, 0) ?? 0
 
   const currentText = page === null ? '' : pageText(page)
-  const diff = baseline !== null && page !== null && baseline !== currentText
-    ? { oldText: baseline, newText: currentText }
-    : null
-  const totals = diff === null || page === null
+  // One line-level script drives both the in-place highlight and the ± counts in the bottom bar,
+  // so the code view and "this round's changes" can never disagree.
+  const changes = useMemo(
+    () => baseline === null || page === null ? null : lineChanges(baseline, currentText),
+    [baseline, currentText, page],
+  )
+  const changedLines = useMemo(() => new Set(changes?.addedLines ?? []), [changes])
+  const diff = changes === null || baseline === null
     ? null
-    : diffTotals([{ path: page.path, oldText: diff.oldText, newText: diff.newText }])
+    : { oldText: baseline, newText: currentText }
+  const totals = changes === null
+    ? null
+    : { added: changes.addedLines.length, removed: changes.removed }
 
   if (path === undefined || fileId === undefined) {
     return <div className="dsh-desk-review"><p className="dsh-desk-notebook-hint">{t('review.noPath')}</p></div>
@@ -543,13 +551,14 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
                   {lines.map((text, index) => {
                     const line = index + 1
                     const marked = lineAnnotations.has(line)
+                    const changed = changedLines.has(line)
                     const own = (lineAnnotations.get(line) ?? []).filter(annotation => annotation.endLine === line)
                     const selected = selectedRange !== undefined && line >= selectedRange.start && line <= selectedRange.end
                     const composeHere = composer !== null && composer.scope === 'selection'
                       && (composer.endLine ?? composer.startLine ?? 0) === line
                     return (
                       <Fragment key={line}>
-                        <div className="dsh-desk-review-line" data-line={line} data-marked={marked || undefined} data-selected={selected || undefined}>
+                        <div className="dsh-desk-review-line" data-line={line} data-changed={changed || undefined} data-marked={marked || undefined} data-selected={selected || undefined}>
                           <span className="dsh-desk-review-lineno">{line}</span>
                           <span className="dsh-desk-review-source">{text === '' ? '\u00a0' : text}</span>
                         </div>

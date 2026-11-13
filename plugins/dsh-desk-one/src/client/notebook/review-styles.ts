@@ -386,6 +386,15 @@ body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* This round's changed source lines, painted with the official diff-added material: the code view
+   and the bottom "本轮改动" pill read as one state. Annotation / selection tints paint over it. */
+.dsh-desk-review-line[data-changed] {
+  background: var(--dsw-alias-code-diff-added, rgba(58, 154, 91, 0.14));
+  box-shadow: inset 3px 0 0 var(--dsw-alias-state-success-primary, #3a9a5b);
+}
+.dsh-desk-review-line[data-changed] .dsh-desk-review-lineno {
+  color: var(--dsw-alias-state-success-primary, #3a9a5b);
+}
 .dsh-desk-review-line[data-marked] {
   background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #4176e6) 12%, transparent);
 }

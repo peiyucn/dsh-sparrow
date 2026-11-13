@@ -7,6 +7,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 ## [Unreleased]
 
 * **Session list**: every row gains copy-name and copy-session-id buttons (active, archived, stray and trash alike) with success / failure feedback on the button itself.
+* **Review highlight**: after a review round, the code view highlights the lines this round added or rewrote, using the same diff material and line script as the bottom bar’s +A/−D counts.
 
 * **Review guidance**: every review Session — a blank new one or a conversation already under way — keeps the review guidance in the composer whenever it is empty instead of falling back to the official placeholder; it hides while typing and returns once the input is empty again.
 
