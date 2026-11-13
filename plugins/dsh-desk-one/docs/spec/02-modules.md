@@ -9,7 +9,7 @@
 
 | 区域 | 官方参考 | 落地约束 |
 |---|---|---|
-| 品牌 lockup | 官方 `BrandWordmark` 的反色徽章 | 中文 **同桌**、英文 **Desk One**（与官方 HARNESS wordmark 一样，英文徽章视觉全大写 DESK ONE；中文标题不受影响）；页头用**一个**反色徽章：墨色底 + inverted 字，内部合并 14px 圆角矩形 + 小星星与标题（不拆成两个方块）；小字后接官方插件页同款 20px infoButton + 纯 hover/focus Tooltip（无点击行为、宽度上限 240px；文案走碳硅协同 slogan：两种生命、一张桌子，你出灵感、harness 出算力，便签/任务/会话/日程/时间一起完成）；左栏每个入口用对应官方图标（日程 / 笔记 / 便签 / 任务 / 会话），页头锁标仍用同一 Desk 字形 |
+| 品牌 lockup | 官方 `BrandWordmark` 的反色徽章 | 中文 **同桌**、英文 **Desk One**（与官方 HARNESS wordmark 一样，英文徽章视觉全大写 DESK ONE；中文标题不受影响）；页头用**一个**反色徽章：墨色底 + inverted 字，内部合并 14px 圆角矩形 + 小星星与标题（不拆成两个方块）；小字后接官方插件页同款 20px infoButton + 纯 hover/focus Tooltip（无点击行为、宽度上限 240px；文案走碳硅协同 slogan：两种生命、一张桌子，你出灵感、harness 出算力，便签/任务/会话/日程/时间一起完成）；tab 与（固定后的）左栏入口共用同一套图标（日程用自绘小日历，避免与官方自动化任务的时钟图标重复），页头锁标仍用同一 Desk 字形 |
 | 整体面板 | 对话区 `ui-conversation`（ConversationRoot / ConversationSession） | 76px 页头浮层；第一行品牌标题 + 小字说明 + 当前功能动作，第二行官方纯文字 tab；内容首屏用 `--dsh-desk-header-h` 下移，滚动时内容从页头下经过 |
 | 页头 tab | ConversationRoot 的 `.tabs` / `.viewTabs` / `.tab` | 两层 flex：外层 gap 20px（viewTabs ↔ More），内层 gap 32px（文字间）；tab 本体 35px 高、上抬 10px、padding 10/9、10px 命中内边距；当前项 2px 下划线压在页头 rule 上；More 22×22，menu 以三点为锚点左对齐浮出 |
 | 功能动作按钮 | 插件页 `ui-plugin-manager` 的 PluginManagerPage（`.addPrimary` / `.addMore` 覆盖值） | **32px 高 / 13px 文案 / 20px 行高 / 0 12px padding / 12px 圆角**；primary fill 或 0.5px 描边；保留图标 + 文字；不采用通用 Button sm 的 28px/8px |
@@ -23,11 +23,11 @@
 
 ## 1. 面板外壳 Shell（v1）
 
-**目标**：每个 tab 一个侧栏入口（共 5 个），共用一块页面组件，内部路由七个模块；统一加载态、错误态与空态。
+**目标**：默认一个侧栏入口；每个 tab 可用图钉按需固定成独立入口（共用一块页面组件、动态增删），内部路由七个模块；统一加载态、错误态与空态。
 
 **用户故事**
 
-* 我从侧栏点对应入口（日程 / 笔记 / 便签 / 任务 / 会话）直达该 tab；点「笔记」时默认落在笔记库入口页。
+* 我从侧栏点「同桌」打开面板；也可以把某个 tab 固定成独立入口，点它直达该 tab（点「笔记」时默认落在笔记库入口页）。
 * 我切到别的标签再切回来，当前标签与滚动位置不丢（面板生命周期内）。
 * 面板出问题时我能看到一条错误带和「重试」，而不是一片空白。
 
