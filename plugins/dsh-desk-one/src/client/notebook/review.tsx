@@ -722,7 +722,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
               type="button"
               className="dsh-desk-review-split-arrow"
               aria-label={t('review.pendingTitle', { count: annotations.length })}
-              onClick={() => { setOverlay('annotations') }}
+              aria-expanded={overlay === 'annotations'}
+              onClick={() => { setOverlay(current => current === 'annotations' ? null : 'annotations') }}
             >
               <IconListPenOutlineRegular size={14} />
             </button>
@@ -752,7 +753,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
               type="button"
               className="dsh-desk-review-split-arrow"
               aria-label={t('review.recordsTitle', { rounds: recordRounds, notes: recordAnnotations })}
-              onClick={() => { setOverlay('records') }}
+              aria-expanded={overlay === 'records'}
+              onClick={() => { setOverlay(current => current === 'records' ? null : 'records') }}
             >
               <IconClockOutlineRegular size={14} />
             </button>

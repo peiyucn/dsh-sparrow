@@ -607,6 +607,9 @@ export const REVIEW_CSS = `
   height: 15px;
   color: inherit;
 }
+.dsh-desk-review-split-arrow[aria-expanded='true'] {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
 .dsh-desk-review-split-main:hover,
 .dsh-desk-review-split-arrow:hover,
 .dsh-desk-review-split-arrow[aria-expanded='true'] {
