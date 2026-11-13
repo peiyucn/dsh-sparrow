@@ -4,7 +4,7 @@ import { describe, it } from 'node:test'
 import {
   hydrateReviewSessions, isReviewSession, persistReviewSession, pickReusableReviewSession,
   reviewSessionCandidates, reviewSessionsReady, subscribeReviewSessions,
-} from '../../lib/client/reviewSessions.js'
+} from '../../lib/client/notebook/review/sessions.js'
 
 /** Review markers the fake host returns; hydration runs once per module, so the first test owns it. */
 const HOST_MARKERS = [

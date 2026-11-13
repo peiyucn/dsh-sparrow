@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { lineChanges } from '../../lib/client/notebook/review-changes.js'
+import { lineChanges } from '../../lib/client/notebook/review/changes.js'
 
 /** Build `count` numbered lines (`line 1`..`line count`) joined with newlines plus a final one. */
 const numbered = (count, prefix = 'line') => {

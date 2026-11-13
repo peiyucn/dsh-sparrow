@@ -6,8 +6,8 @@
 import { useEffect, useState } from 'react'
 import type { NotebookApi } from '../../api.js'
 import type { NoteReviewParams } from '../../review-bridge.js'
-import { readReviewTabParams, recoverReviewParams, writeReviewTabParams } from '../../review-tab-memory.js'
-import { persistReviewSession } from '../../../reviewSessions.js'
+import { readReviewTabParams, recoverReviewParams, writeReviewTabParams } from '../tab-memory.js'
+import { persistReviewSession } from '../sessions.js'
 import type { ReviewTarget } from '../types.js'
 
 /** Recover + persist the note target of one review Session. */

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   readReviewTabParams, recoverReviewParams, writeReviewTabParams,
-} from '../../lib/client/notebook/review-tab-memory.js'
+} from '../../lib/client/notebook/review/tab-memory.js'
 
 /** Minimal notebook API fake for the recovery path. */
 const fakeNotebook = (/** @type {{ markers: unknown, history: unknown, failList?: boolean }} */ input) => ({

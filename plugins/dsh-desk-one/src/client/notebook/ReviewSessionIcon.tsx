@@ -8,7 +8,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import { DeskTabGlyph } from '../tabIcons.js'
-import { hydrateReviewSessions, isReviewSession, subscribeReviewSessions } from '../reviewSessions.js'
+import { hydrateReviewSessions, isReviewSession, subscribeReviewSessions } from './review/sessions.js'
 import type { NotebookApi } from './api.js'
 
 interface ReviewSessionIconProps extends InjectFace<{ readonly notebook: NotebookApi }>, PropsLocale<typeof LOCALE_NAMESPACE> {

@@ -8,8 +8,8 @@
  * one-shot host hydration and kept current whenever a review tab mounts.
  */
 
-import type { NotebookApi } from './notebook/api.js'
-import type { ReviewSessionInfo } from '../notebook-contract.js'
+import type { NotebookApi } from '../api.js'
+import type { ReviewSessionInfo } from '../../../notebook-contract.js'
 
 const reviewSessionIds = new Set<string>()
 /** Latest known marker per Session id: durable note identity for reopening. */

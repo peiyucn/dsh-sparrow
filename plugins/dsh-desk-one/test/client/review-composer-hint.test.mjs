@@ -5,7 +5,7 @@ import { describe, it } from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { ReviewComposerHint } from '../../lib/client/notebook/ReviewPromptDock.js'
-import { rememberReviewSession } from '../../lib/client/reviewSessions.js'
+import { rememberReviewSession } from '../../lib/client/notebook/review/sessions.js'
 
 /** Render the placeholder hint; `useSession` mimics the slot's session-snapshot selector. */
 const renderHint = (/** @type {Record<string, unknown>} */ props) =>

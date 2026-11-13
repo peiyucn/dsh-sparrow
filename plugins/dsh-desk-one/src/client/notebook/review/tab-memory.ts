@@ -9,8 +9,8 @@
  * the current file path.
  */
 
-import type { NoteReviewParams } from './review-bridge.js'
-import type { NotebookApi } from './api.js'
+import type { NoteReviewParams } from '../review-bridge.js'
+import type { NotebookApi } from '../api.js'
 
 /** Browser-storage key per Session (the official sidebar layout uses the same kind of storage). */
 const KEY_PREFIX = 'dsh-desk-one.review-tab.'

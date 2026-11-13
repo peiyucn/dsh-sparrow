@@ -10,8 +10,8 @@ import type { DeskTranslator } from '../../../app/types.js'
 import { messageOf } from '../../../app/utils.js'
 import { HttpError } from '../../../http.js'
 import type { NotebookApi } from '../../api.js'
-import { lineChanges } from '../../review-changes.js'
-import { pageText, sameReviewPage } from '../../review-page.js'
+import { lineChanges } from '../changes.js'
+import { pageText, sameReviewPage } from '../page.js'
 import type { ReviewTarget } from '../types.js'
 
 /** Quiet-refresh interval while the tab is on screen. */

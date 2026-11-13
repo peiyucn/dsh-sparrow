@@ -8,7 +8,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
 import { DeskTabGlyph } from '../tabIcons.js'
-import { isReviewSession, subscribeReviewSessions } from '../reviewSessions.js'
+import { isReviewSession, subscribeReviewSessions } from './review/sessions.js'
 
 interface ReviewSessionTrailingIconProps extends PropsLocale<typeof LOCALE_NAMESPACE> {
   readonly sessionId: string

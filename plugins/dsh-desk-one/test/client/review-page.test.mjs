@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { pageText, sameReviewPage } from '../../lib/client/notebook/review-page.js'
+import { pageText, sameReviewPage } from '../../lib/client/notebook/review/page.js'
 
 /** Minimal page fixture; overrides keep each case readable. */
 const page = (overrides = {}) => ({

@@ -7,7 +7,7 @@
  * the tab must compare the whole rendered state, not just the body.
  */
 
-import type { NotebookPageResponse } from '../../notebook-contract.js'
+import type { NotebookPageResponse } from '../../../notebook-contract.js'
 
 /** Whole file text shown in the code view and diffed against the round baseline. */
 export function pageText(page: NotebookPageResponse): string {

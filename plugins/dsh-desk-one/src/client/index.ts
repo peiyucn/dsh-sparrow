@@ -22,7 +22,7 @@ import { LOCALE_DICTS } from './i18n.js'
 import { ReviewComposerHint } from './notebook/ReviewPromptDock.js'
 import { ReviewSessionIcon } from './notebook/ReviewSessionIcon.js'
 import { ReviewSessionTrailingIcon } from './notebook/ReviewSessionTrailingIcon.js'
-import { hydrateReviewSessions } from './reviewSessions.js'
+import { hydrateReviewSessions } from './notebook/review/sessions.js'
 import { DESK_TAB_ICONS, DeskBaseIcon } from './tabIcons.js'
 import { installDeskClient, passesClientGate } from './install.js'
 

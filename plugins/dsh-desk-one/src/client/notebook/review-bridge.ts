@@ -11,8 +11,8 @@
 
 import {
   pickReusableReviewSession, rememberReviewSession, reviewSessionCandidates, reviewSessionsReady,
-} from '../reviewSessions.js'
-import type { ReusableSessionFacts } from '../reviewSessions.js'
+} from './review/sessions.js'
+import type { ReusableSessionFacts } from './review/sessions.js'
 import type {
   ConversationLike, SessionNavigationLike, SessionScopeLike, SessionsLike, SidebarRightLike, WorkspacesLike,
 } from './faces.js'
