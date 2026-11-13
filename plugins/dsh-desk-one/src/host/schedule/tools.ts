@@ -6,12 +6,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { SCHEDULE_PROVIDERS, type ScheduleProvider } from '../../constants.js'
+import { textOutput } from '../tools/shared.js'
 import type { ScheduleHost } from './host.js'
-
-const textOutput = {
-  schema: { type: 'string' as const },
-  render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }],
-}
 
 const ISO = /^\d{4}-\d{2}-\d{2}T/u
 

@@ -16,7 +16,7 @@ type DeskModelErrorCode =
   | 'UNKNOWN_TASK'
   | 'INVALID_GROUP'
   | 'UNKNOWN_GROUP'
-  /** Schedule module: input validation failure / unknown calendar (S2). */
+  /** Schedule module: input validation failure / unknown calendar. */
   | 'INVALID_SCHEDULE'
   | 'UNKNOWN_CALENDAR'
 

@@ -1,7 +1,8 @@
 /**
- * Schedule host orchestration (S2, read-only): connection records → credentials → provider pull →
- * mirrored events. The adapters stay stateless; this module owns the sync order, window and the
- * "one failure never blocks the other sources" rule.
+ * Schedule host orchestration: connection records → credentials → provider pull → mirrored events,
+ * plus the connection / credential management actions. External calendar data stays read-only; the
+ * adapters stay stateless; this module owns the sync order, window and the "one failure never
+ * blocks the other sources" rule.
  */
 
 import { randomUUID } from 'node:crypto'

@@ -5,10 +5,10 @@
 
 export const PACKAGE_NAME = 'dsh-desk-one'
 
-/** Route prefix: longer than the official `/api` fence, so this plugin does its own trust check (same approach as dsh-archive-manage). */
+/** Route prefix: longer than the official `/api` fence, so this plugin does its own trust check (the same approach as the official prefix router). */
 export const PREFIX = '/api/desk-one'
 
-/** REST routes; S0 has notes only, S1 adds tasks (schedule / focus will be appended here without changing existing paths). */
+/** REST routes; every feature\x27s endpoints are appended here without changing existing paths. */
 export const ROUTES = Object.freeze({
   notes: `${PREFIX}/notes`,
   noteUpdate: `${PREFIX}/notes/update`,
@@ -21,7 +21,7 @@ export const ROUTES = Object.freeze({
   groupMove: `${PREFIX}/groups/move`,
   groupArchive: `${PREFIX}/groups/archive`,
   groupDelete: `${PREFIX}/groups/delete`,
-  /* Schedule (S2, read-only aggregation) */
+  /* Schedule: read-only aggregation of external calendars */
   scheduleEvents: `${PREFIX}/schedule/events`,
   scheduleCalendars: `${PREFIX}/schedule/calendars`,
   scheduleCalendarUpdate: `${PREFIX}/schedule/calendars/update`,
@@ -64,7 +64,7 @@ export const PANEL_IDS = {
   tasks: 'desk-one-tasks',
   sessions: 'desk-one-sessions',
 } as const
-/** Left-rail row order: official plugins = 0, schedules = 10, archive-manage = 20; this plugin comes after them. */
+/** Left-rail row order: official plugins = 0, schedules = 10, archive-like plugins = 20; this plugin comes after them. */
 export const PANEL_ORDER = 30
 export const LOCALE_NAMESPACE = 'desk-one' as const
 
@@ -72,12 +72,12 @@ export const LOCALE_NAMESPACE = 'desk-one' as const
 export const DOMAIN_NAME = 'desk_one'
 export const DOMAIN_VERSION = 1
 /**
- * Unified object table: all kinds (notes only in S0) share one table and are validated by record shape.
+ * Unified object table: all kinds share one table and are validated by record shape.
  * Adding a kind later only extends the schema, not the domain description — adding a table changes the backend
  * layout, and a published domain should not be changed again.
  */
 export const NODES_TABLE = 'nodes'
-/** Edge table declared before use: S0 writes no edges, but once the domain description ships it is unwise to add tables (adding a table changes the backend layout). */
+/** Edge table declared before use: the current features write no edges, but once the domain description ships it is unwise to add tables (adding a table changes the backend layout). */
 export const EDGES_TABLE = 'edges'
 
 /** Object-level schema version (per object, used for migrations). */
@@ -213,15 +213,4 @@ export const REQUEST_TIMEOUT_MS = 10_000
 /** Selector for the style tag marker attribute (HMR / repeated installs reuse the same element by it). */
 export const STYLE_SELECTOR = 'style[data-dsh-desk-one]'
 
-/** A review target must be a plain-text file within this size; bigger files are refused. */
-
-/** Fixed record id of the single notes-root config (profile level, one per profile). */
-/** Markdown suffixes the library index accepts (the official preview registry uses the same pair). */
-/** Directories never indexed: tool internals and app state, matched case-insensitively at any depth. */
-/** Filesystem walk limits: a runaway library must degrade to a "too large" state, never hang the request. */
-/** Scan TTL and how long one walk may run before it is abandoned. */
-/** How much of a file is read for frontmatter; a longer head is treated as "no frontmatter". */
-/** Search result cap (host-side; the client renders at most this many rows). */
-/** "Recent" rows carried by the shelf state response. */
-/** A note body preview kept for search: longer bodies are matched only on their first slice. */
 

@@ -48,7 +48,7 @@ function defaultTrashDir(): string {
 
 export function normalizeArchiveConfig(input: Readonly<Partial<ArchiveConfig>> | undefined): ArchiveConfig {
   const trash = input?.trashRoot?.trim()
-  if (trash !== undefined && trash === '') throw new Error('dsh-archive-manage: trashRoot 不能为空')
+  if (trash !== undefined && trash === '') throw new Error('回收站根目录（trashRoot）不能为空')
   return { trashRoot: trash || defaultTrashDir() }
 }
 

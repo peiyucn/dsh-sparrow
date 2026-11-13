@@ -17,7 +17,7 @@ type DeskErrorCode =
   /* notebook */
   | 'INVALID_NOTEBOOK'
   | 'NOTEBOOK_UNAVAILABLE'
-  /* schedule (S2) */
+  /* schedule */
   | 'INVALID_SCHEDULE'
   | 'UNKNOWN_CALENDAR'
   | 'SCHEDULE_NOT_CONNECTED'

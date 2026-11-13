@@ -1,4 +1,4 @@
-/** Schedule REST table (S2): read-only events, calendar source metadata and connection management. */
+/** Schedule REST table: read-only events, calendar source metadata and connection management. */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {

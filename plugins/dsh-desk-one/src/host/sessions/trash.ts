@@ -13,7 +13,7 @@ import {
   isSafeSessionDirName, legacyTrashItem, maskHomePath, parseTrashSidecar, sanitizeSegment, trashItemView,
   type ArchiveSidecar,
 } from './archive.js'
-import { TRASH_SIDECAR } from './constants.js'
+import { PACKAGE_NAME, TRASH_SIDECAR } from './constants.js'
 import type {
   TrashDeleteAllResponse, TrashDeleteResponse, TrashDirResponse, TrashEntry, TrashListResponse,
   TrashRestoreAllResponse,
@@ -192,12 +192,12 @@ export async function restoreTrashDir(ctx: Context, surface: RegistryMutationSur
   // directory: it is trash metadata (including the title and original workspace accounting ids), and leaving it in
   // the user data directory would only get it swept into official log exports/packages. **Clean it up right after
   // the rename**: before moving subagents back, because that path throws on failure and a cleanup placed at the end
-  // would never run (audit S2). At this point the entry has been renamed away, so deleting it cannot degrade the
+  // would never run (a second sweep would be too late). At this point the entry has been renamed away, so deleting it cannot degrade the
   // trash entry into "a legacy entry without a sidecar". If deletion fails, only log a warning.
   try {
     await rm(join(sidecar.originalPath, TRASH_SIDECAR), { force: true })
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: 还原后回收站记账文件清理失败（${sidecar.originalPath}）：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 还原后回收站记账文件清理失败（${sidecar.originalPath}）：${error instanceof Error ? error.message : String(error)}`)
   }
   for (const target of subagentTargets) {
     try {
@@ -220,7 +220,7 @@ export async function restoreTrashDir(ctx: Context, surface: RegistryMutationSur
       try {
         await attachWorkspaceAccounting(ctx, target.childId, target.workspaceIds)
       } catch (childError) {
-        ctx.logger.warn(`dsh-archive-manage: 还原后 subagent 工作区记账失败（${String(target.childId)}）：${String(childError)}`)
+        ctx.logger.warn(`${PACKAGE_NAME}: 还原后 subagent 工作区记账失败（${String(target.childId)}）：${String(childError)}`)
       }
     }
   } catch (error) {
@@ -231,7 +231,7 @@ export async function restoreTrashDir(ctx: Context, surface: RegistryMutationSur
   try {
     await addArchivedId(surface, sessionId)
   } catch (cleanupError) {
-    ctx.logger.warn(`dsh-archive-manage: 还原后归档集同步失败：${String(cleanupError)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 还原后归档集同步失败：${String(cleanupError)}`)
   }
   return sidecar
 }

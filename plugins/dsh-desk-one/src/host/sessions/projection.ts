@@ -12,7 +12,7 @@ import {
   parseBlankProjection, parseSessionFacts, type HeaderFactsStore, type SessionFacts,
 } from './archive.js'
 import {
-  PROJECTION_CACHE_DOMAIN_FALLBACK, PROJECTION_CACHE_DOMAIN_SPEC_PACKAGE, PROJECTION_CACHE_INVALIDATE_ATTEMPTS,
+  PACKAGE_NAME, PROJECTION_CACHE_DOMAIN_FALLBACK, PROJECTION_CACHE_DOMAIN_SPEC_PACKAGE, PROJECTION_CACHE_INVALIDATE_ATTEMPTS,
   projectionCacheDomainOf, type ProjectionCacheDomain,
 } from './constants.js'
 import type { HeaderFacts } from './headers.js'
@@ -99,7 +99,7 @@ export function cachedSnapshotOf(
       : fn.call(cache, header, keys)
     return projectionBlockOf(raw)
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: 投影缓存读取失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 投影缓存读取失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
     return undefined
   }
 }
@@ -130,7 +130,7 @@ export function coldSnapshotOf(
   try {
     return projectionBlockOf(fn.call(cache, header, inheritedEventCount, events))
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: 投影缓存回填失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 投影缓存回填失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
     return undefined
   }
 }
@@ -193,7 +193,7 @@ async function invalidateProjectionCache(ctx: Context, sessionId: string): Promi
     if (domain === undefined) return
     await domain.table(projectionCacheDomain.table).delete(sessionId)
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: 投影缓存失效失败（${sessionId}）：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 投影缓存失效失败（${sessionId}）：${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -205,11 +205,11 @@ export async function invalidateProjectionCacheGuarded(ctx: Context, sessionId: 
       const domain = ctx.storageDomain.get(projectionCacheDomain.name)
       if (domain === undefined || domain.table(projectionCacheDomain.table).get(sessionId) === undefined) return
     } catch (error) {
-      ctx.logger.warn(`dsh-archive-manage: 投影缓存校验失败（${sessionId}）：${error instanceof Error ? error.message : String(error)}`)
+      ctx.logger.warn(`${PACKAGE_NAME}: 投影缓存校验失败（${sessionId}）：${error instanceof Error ? error.message : String(error)}`)
       return
     }
     if (attempt === PROJECTION_CACHE_INVALIDATE_ATTEMPTS - 1) {
-      ctx.logger.warn(`dsh-archive-manage: 移入回收站/删除后投影缓存仍残留 ${sessionId}，重启后启动清扫会再次清理`)
+      ctx.logger.warn(`${PACKAGE_NAME}: 移入回收站/删除后投影缓存仍残留 ${sessionId}，重启后启动清扫会再次清理`)
     }
   }
 }
@@ -246,8 +246,8 @@ export async function sweepStaleProjectionCache(
       await table.delete(sessionId)
       removed++
     }
-    if (removed > 0) ctx.logger.warn(`dsh-archive-manage: 启动清扫投影缓存移除 ${removed} 个陈旧会话`)
+    if (removed > 0) ctx.logger.warn(`${PACKAGE_NAME}: 启动清扫投影缓存移除 ${removed} 个陈旧会话`)
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: 投影缓存启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 投影缓存启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
   }
 }

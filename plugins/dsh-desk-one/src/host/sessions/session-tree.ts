@@ -60,7 +60,7 @@ interface ArchiveAlignment {
  * necessarily unreachable; but in malformed data two headers sharing one id can create a cycle that is
  * **reachable from a root** (one of them sits at the tail of the chain and points back to an ancestor), and
  * without the guard this function would spin forever inside the host's `domain/changed` listener and the
- * `/list` route (2026-09-12 audit S1).
+ * `/list` route (the list route must not fan out unbounded per-row work).
  */
 export function archiveAlignmentForChildren(
   headers: readonly SessionTreeHeader[],

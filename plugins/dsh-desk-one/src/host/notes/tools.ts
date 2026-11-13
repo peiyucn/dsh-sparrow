@@ -6,20 +6,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { PACKAGE_NAME, NOTE_COLORS } from '../../constants.js'
+import { textOutput, toolError } from '../tools/shared.js'
 import type { DeskStore } from '../store.js'
 
-/** Tool output is always a string (JSON text); render hands it to the conversation area as-is. */
-const textOutput = {
-  schema: { type: 'string' as const },
-  render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }],
-}
-
-function toolError(error: unknown): never {
-  if (error instanceof Error) throw error
-  throw new Error(String(error))
-}
-
-/** Register the four S0 note tools; the tools share the store with the REST routes, and the UI refreshes on its next fetch. */
+/** Register the four note tools; the tools share the store with the REST routes, and the UI refreshes on its next fetch. */
 export function registerDeskTools(ctx: Context, store: DeskStore): void {
   ctx.tools.register(defineTool({
     name: 'desk_note_add',

@@ -18,7 +18,7 @@ import {
   type HeaderFactsStore,
 } from './archive.js'
 import { unsupportedStoredFormatReason } from './compat.js'
-import { ENOENT, SIDECAR_VERSION, TRASH_SIDECAR } from './constants.js'
+import { ENOENT, PACKAGE_NAME, SIDECAR_VERSION, TRASH_SIDECAR } from './constants.js'
 import type { DeleteMutationResponse, TrashMutationResponse } from '../../session-admin.js'
 import { detachWorkspaceAccounting, removeArchivedIds, workspaceIndexFor } from './archive-set.js'
 import type { RegistryMutationSurface } from './gates.js'
@@ -158,7 +158,7 @@ export async function moveSessionToTrash(
       try {
         await rename(move.to, move.from)
       } catch (rollbackError) {
-        ctx.logger.warn(`dsh-archive-manage: 回滚失败（${move.to} → ${move.from}）：${String(rollbackError)}`)
+        ctx.logger.warn(`${PACKAGE_NAME}: 回滚失败（${move.to} → ${move.from}）：${String(rollbackError)}`)
       }
     }
   }
@@ -194,7 +194,7 @@ export async function moveSessionToTrash(
           // It stays in the response/archive cleanup list (the session is gone from disk, so the marker should not
           // remain). Other errors still roll back the whole operation as before.
           if ((error as NodeJS.ErrnoException)?.code === ENOENT) {
-            ctx.logger.warn(`dsh-archive-manage: subagent 会话目录不在磁盘上（${String(child.sessionId)}），已跳过搬运：${error instanceof Error ? error.message : String(error)}`)
+            ctx.logger.warn(`${PACKAGE_NAME}: subagent 会话目录不在磁盘上（${String(child.sessionId)}），已跳过搬运：${error instanceof Error ? error.message : String(error)}`)
             continue
           }
           throw error
@@ -241,20 +241,20 @@ export async function moveSessionToTrash(
   try {
     await detachWorkspaceAccounting(ctx, sessionId)
   } catch (cleanupError) {
-    ctx.logger.warn(`dsh-archive-manage: 工作区记账清理失败（${String(sessionId)}）：${String(cleanupError)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 工作区记账清理失败（${String(sessionId)}）：${String(cleanupError)}`)
   }
   for (const child of subagents) {
     try {
       await detachWorkspaceAccounting(ctx, child.sessionId)
     } catch (cleanupError) {
-      ctx.logger.warn(`dsh-archive-manage: subagent 工作区记账清理失败（${String(child.sessionId)}）：${String(cleanupError)}`)
+      ctx.logger.warn(`${PACKAGE_NAME}: subagent 工作区记账清理失败（${String(child.sessionId)}）：${String(cleanupError)}`)
     }
   }
   const subagentIds = subagents.map(child => String(child.sessionId))
   try {
     await removeArchivedIds(surface, archivedIdsToRemove(String(sessionId), subagentIds))
   } catch (cleanupError) {
-    ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 归档集清理失败：${String(cleanupError)}`)
   }
   // Moving to the trash does not invalidate projection rows: the session identity is unchanged, so the title
   // projection remains valid after restore (otherwise subagent titles would degrade to the first user message read
@@ -277,11 +277,11 @@ export async function deleteSessionTree(
   const { sessionId, subagents } = action
   // force:true swallows only ENOENT: a root directory that was never on disk also counts as "gone" (same
   // reasoning as for child sessions, see below), otherwise a ghost session would remain forever in the archive
-  // panel and could never be cleared there (audit S4).
+  // panel and could never be cleared there (a full-disk scan, not a list).
   await rm(action.sessionDir, { recursive: true, force: true })
   // Only child sessions (with all their descendants) that actually disappear from disk count as removed: a failed
   // rm is still on disk, so keep its archive marker and workspace accounting, letting it remain actionable as an
-  // orphan root in the archive panel (audit S7).
+  // orphan root in the archive panel (an orphan root left by an interrupted move).
   const deletedSubagentIds: string[] = []
   for (const child of subagents) {
     try {
@@ -292,7 +292,7 @@ export async function deleteSessionTree(
       await rm(child.dir, { recursive: true, force: true })
       deletedSubagentIds.push(String(child.sessionId))
     } catch (error) {
-      ctx.logger.warn(`dsh-archive-manage: 删除 subagent 会话目录失败（${String(child.sessionId)}），属 best-effort 清理、已跳过并保留归档标记：${error instanceof Error ? error.message : String(error)}`)
+      ctx.logger.warn(`${PACKAGE_NAME}: 删除 subagent 会话目录失败（${String(child.sessionId)}），属 best-effort 清理、已跳过并保留归档标记：${error instanceof Error ? error.message : String(error)}`)
     }
   }
   const deletedSubagentIdSet = new Set(deletedSubagentIds)
@@ -301,20 +301,20 @@ export async function deleteSessionTree(
   try {
     await detachWorkspaceAccounting(ctx, sessionId)
   } catch (cleanupError) {
-    ctx.logger.warn(`dsh-archive-manage: 工作区记账清理失败（${String(sessionId)}）：${String(cleanupError)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 工作区记账清理失败（${String(sessionId)}）：${String(cleanupError)}`)
   }
   for (const child of subagents) {
     if (!deletedSubagentIdSet.has(String(child.sessionId))) continue
     try {
       await detachWorkspaceAccounting(ctx, child.sessionId)
     } catch (cleanupError) {
-      ctx.logger.warn(`dsh-archive-manage: subagent 工作区记账清理失败（${String(child.sessionId)}）：${String(cleanupError)}`)
+      ctx.logger.warn(`${PACKAGE_NAME}: subagent 工作区记账清理失败（${String(child.sessionId)}）：${String(cleanupError)}`)
     }
   }
   try {
     await removeArchivedIds(surface, archivedIdsToRemove(String(sessionId), deletedSubagentIds))
   } catch (cleanupError) {
-    ctx.logger.warn(`dsh-archive-manage: 归档集清理失败：${String(cleanupError)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 归档集清理失败：${String(cleanupError)}`)
   }
   await invalidateProjectionCacheGuarded(ctx, String(sessionId))
   for (const child of subagents) {

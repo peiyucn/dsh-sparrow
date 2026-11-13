@@ -22,6 +22,7 @@ import { treeHeaderOf } from './headers.js'
 import type {} from './events.js'
 import { SessionsError } from './errors.js'
 import { cachedSnapshotOf, readStrayBlankness, summaryBlockOf, type ProjectionBlock } from './projection.js'
+import { PACKAGE_NAME } from './constants.js'
 
 /**
  * Prebuild a "session id → ids of workspaces holding it" index (performance audit: no O(n²) on the hot path).
@@ -131,9 +132,9 @@ export async function alignChildArchives(
       for (const id of remove) next.delete(id)
       return [...next].map(id => SessionId(id))
     })
-    ctx.logger.info(`dsh-archive-manage: 父子归档对齐 +${add.length} / -${remove.length}`)
+    ctx.logger.info(`${PACKAGE_NAME}: 父子归档对齐 +${add.length} / -${remove.length}`)
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: 父子归档对齐失败：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 父子归档对齐失败：${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -155,9 +156,9 @@ export async function sweepGhostArchivedIds(
     const cleaned = current.filter(id => known.has(String(id)))
     if (cleaned.length === current.length) return
     await mutateArchivedSet(surface, () => cleaned)
-    ctx.logger.warn(`dsh-archive-manage: 启动清扫移除 ${current.length - cleaned.length} 个幽灵归档 id`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 启动清扫移除 ${current.length - cleaned.length} 个幽灵归档 id`)
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: 启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 启动清扫失败：${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -216,7 +217,7 @@ export function emitSessionAdded(
       },
     })
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: api-session/added 通知失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: api-session/added 通知失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -250,7 +251,7 @@ export async function unarchiveSession(
       )
     }
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: api-session/added 通知失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: api-session/added 通知失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
   }
   return { ok: true }
 }

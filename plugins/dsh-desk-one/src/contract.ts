@@ -1,6 +1,6 @@
 /**
  * Cross-half contract shared by host and client (types and pure constants only; no runtime imports).
- * S0 ships notes; task / schedule fields expand step by step per `01-object-model.md`.
+ * Each object family grows per `01-object-model.md`.
  */
 
 import type { NOTE_COLORS, ScheduleChannel, ScheduleProvider, TASK_STATUSES } from './constants.js'
@@ -9,9 +9,9 @@ export type NoteColor = (typeof NOTE_COLORS)[number]
 export type TaskStatus = (typeof TASK_STATUSES)[number]
 
 /**
- * Note object (the only DeskNode kind in S0). Fields align with the spec's base Node fields:
+ * Note object. Fields align with the spec's base Node fields:
  * `id / kind / schema / title / body / tags / createdAt / updatedAt / revision` are core;
- * note-specific fields (color / pinned / trashed) sit on the object in S0; they are added with the payload split in a later migration.
+ * note-specific fields (color / pinned / trashed) sit on the object; they are added with the payload split in a later migration.
  */
 export interface DeskNote {
   readonly id: string
@@ -37,7 +37,7 @@ export interface DeskNote {
   readonly revision: number
 }
 
-/** Edge object: not produced in S0, declared now to lock the domain layout (see the note in constants). */
+/** Edge object: not produced yet, declared now to lock the domain layout (see the note in constants). */
 export interface DeskEdge {
   readonly id: string
   readonly type: string
@@ -47,7 +47,7 @@ export interface DeskEdge {
   readonly meta?: Readonly<Record<string, unknown>>
 }
 
-/** Task object (S1): fixed three lanes + manual order within a column; the done column can collapse and archive. */
+/** Task object: fixed three lanes + manual order within a column; the done column can collapse and archive. */
 export interface DeskTask {
   readonly id: string
   readonly kind: 'task'
@@ -75,7 +75,7 @@ export interface DeskTask {
   readonly sessionIds: readonly string[]
   /** Disappears from the board once archived and moves to the task-board archive view (named to avoid the host's "session archive"). */
   readonly archived: boolean
-  /** Reserved: enabled once multiple boards / custom lanes exist; not written in S1. */
+  /** Reserved: enabled once multiple boards / custom lanes exist; not written yet. */
   readonly projectId?: string
   readonly laneId?: string
   readonly createdAt: string
@@ -84,7 +84,7 @@ export interface DeskTask {
 }
 
 /**
- * Task group (one level in S1): a group is an entity, not a tag on a card. It belongs to a lane and may be empty;
+ * Task group (one level): a group is an entity, not a tag on a card. It belongs to a lane and may be empty;
  * `order` is its position within that lane. Membership lives in `DeskTask.groupId`; deleting a group returns its members to ungrouped.
  */
 export interface DeskTaskGroup {
@@ -127,7 +127,7 @@ export type DeskNode =
   | DeskNotebookConfig | NoteFileRef | NoteDraft | ReviewRecord | NoteBaseline | ReviewSessionMarker
 
 /* ------------------------------------------------------------------ */
-/* Schedule (S2): read-only mirror of external calendars               */
+/* Schedule: read-only mirror of external calendars                    */
 /* ------------------------------------------------------------------ */
 
 /** Sync source (connection level): one per provider + channel; no credential values in the record, only the `credentialRef` name. */

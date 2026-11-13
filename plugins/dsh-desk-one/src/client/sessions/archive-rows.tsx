@@ -16,12 +16,11 @@ export function countTree(nodes: readonly ArchiveTreeNode[]): number {
   return nodes.reduce((sum, node) => sum + 1 + countTree(node.children), 0)
 }
 
-/** Two-step confirm button: first click arms, second click runs. */
 /** One archived subtree: shared tree row + archive-only actions/confirmation; children recurse. */
 export function ArchiveTreeNodeRow(props: {
   readonly node: ArchiveTreeNode
   readonly depth: number
-  /** Subagent rows are read-only: every operation is parent-scoped, exactly like the old plugin. */
+  /** Subagent rows are read-only: every operation is parent-scoped, same as the retired archive plugin. */
   readonly readOnly: boolean
   readonly t: DeskTranslator
   readonly expanded: Set<string>

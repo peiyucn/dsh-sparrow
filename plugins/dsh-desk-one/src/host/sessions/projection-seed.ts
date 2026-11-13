@@ -20,7 +20,7 @@ import { readColdSessionLog } from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-session-query'
 import { createBudgetSignal, runBounded, type HeaderFactsStore } from './archive.js'
 import {
-  PROJECTION_SEED_BUDGET_MS, TITLE_FOLD_CONCURRENCY,
+  PACKAGE_NAME, PROJECTION_SEED_BUDGET_MS, TITLE_FOLD_CONCURRENCY,
 } from './constants.js'
 import { emitSessionAdded } from './archive-set.js'
 import type { HeaderFacts } from './headers.js'
@@ -86,7 +86,7 @@ async function seedOneSession(
     header = stored.header
   } catch (error) {
     if (!signal.aborted) {
-      ctx.logger.warn(`dsh-archive-manage: 读取会话事实失败（${id}）：${error instanceof Error ? error.message : String(error)}`)
+      ctx.logger.warn(`${PACKAGE_NAME}: 读取会话事实失败（${id}）：${error instanceof Error ? error.message : String(error)}`)
     }
     return undefined
   }
@@ -98,7 +98,7 @@ async function seedOneSession(
   // The cache service has no write-back surface at all: reading a log would not write anything, so degrade
   // immediately — avoid folding a large log for every session for nothing.
   if (!canWriteProjectionCache(ctx)) {
-    ctx.logger.warn(`dsh-archive-manage: 宿主未提供可识别的 coldSnapshot，跳过投影行回填（${id}）`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 宿主未提供可识别的 coldSnapshot，跳过投影行回填（${id}）`)
     return degraded(header, cachedProjections, blankOf(ctx, id, cached))
   }
   let log
@@ -106,13 +106,13 @@ async function seedOneSession(
     log = await readColdSessionLog(ctx.sessionPersistence, sessionId, signal)
   } catch (error) {
     if (!signal.aborted) {
-      ctx.logger.warn(`dsh-archive-manage: 回填投影行读取冷日志失败（${id}）：${error instanceof Error ? error.message : String(error)}`)
+      ctx.logger.warn(`${PACKAGE_NAME}: 回填投影行读取冷日志失败（${id}）：${error instanceof Error ? error.message : String(error)}`)
     }
     return degraded(header, cachedProjections, blankOf(ctx, id, cached))
   }
   const seeded = coldSnapshotOf(ctx, log.header, log.inheritedEventCount, log.events)
   if (seeded === undefined) {
-    ctx.logger.warn(`dsh-archive-manage: 投影行回填不可用（${id}）：宿主未提供可识别的 coldSnapshot`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 投影行回填不可用（${id}）：宿主未提供可识别的 coldSnapshot`)
     return degraded(header, cachedProjections, blankOf(ctx, id, cached))
   }
   return { header: log.header, blank: blankOf(ctx, id, seeded), projections: summaryBlockOf(ctx, seeded) }
@@ -171,7 +171,7 @@ export async function finalizeRestoredSessions(
   for (const id of ids) {
     const entry = facts.get(id)
     if (entry === undefined) {
-      ctx.logger.warn(`dsh-archive-manage: 还原后缺少会话事实，跳过 api-session/added（${id}）`)
+      ctx.logger.warn(`${PACKAGE_NAME}: 还原后缺少会话事实，跳过 api-session/added（${id}）`)
       continue
     }
     emitSessionAdded(ctx, entry.header, entry.blank, entry.projections)
@@ -209,8 +209,8 @@ export async function healMissingSessionProjections(
       emitSessionAdded(ctx, entry.header, entry.blank, entry.projections)
       healed += 1
     }
-    if (healed > 0) ctx.logger.info(`dsh-archive-manage: 回填 ${healed} 个会话的投影行（标题 / 子会话标签恢复）`)
+    if (healed > 0) ctx.logger.info(`${PACKAGE_NAME}: 回填 ${healed} 个会话的投影行（标题 / 子会话标签恢复）`)
   } catch (error) {
-    ctx.logger.warn(`dsh-archive-manage: 启动投影行回填失败：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 启动投影行回填失败：${error instanceof Error ? error.message : String(error)}`)
   }
 }

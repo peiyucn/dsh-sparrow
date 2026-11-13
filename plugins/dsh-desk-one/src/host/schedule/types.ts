@@ -1,5 +1,5 @@
 /**
- * Domain types for the schedule module (S2, read-only aggregation).
+ * Domain types for the schedule module (read-only aggregation of external calendars).
  *
  * Kept dependency-free so the adapters, the store mapping and the tests all agree on one
  * vocabulary. Only {@link ScheduleError} has behavior: every adapter must classify failures the

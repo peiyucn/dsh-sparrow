@@ -10,13 +10,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { PACKAGE_NAME } from '../../constants.js'
+import { textOutput, toolError } from '../tools/shared.js'
 import type { NotebookEntry } from '../../notebook-contract.js'
-
-/** Tool output is always a string (JSON text). */
-const textOutput = {
-  schema: { type: 'string' as const },
-  render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }],
-}
 
 /** Notebook capabilities this tool needs (structural, so tests can fake it). */
 export interface NotebookSearchFace {
@@ -29,11 +24,6 @@ export interface NotebookSearchFace {
     readonly emptyBody?: boolean
     readonly limit?: number
   }): Promise<{ readonly entries: readonly NotebookEntry[]; readonly truncated: boolean }>
-}
-
-function toolError(error: unknown): never {
-  if (error instanceof Error) throw error
-  throw new Error(String(error))
 }
 
 /** Register the read-only page list tool. */

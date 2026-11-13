@@ -6,18 +6,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { PACKAGE_NAME, TASK_STATUSES } from '../../constants.js'
+import { textOutput, toolError } from '../tools/shared.js'
 import type { DeskStore } from '../store.js'
-
-/** Tool output is plain JSON text (rendered verbatim in the transcript). */
-const textOutput = {
-  schema: { type: 'string' as const },
-  render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }],
-}
-
-function toolError(error: unknown): never {
-  if (error instanceof Error) throw error
-  throw new Error(String(error))
-}
 
 /** Register the five group tools. */
 export function registerGroupTools(ctx: Context, store: DeskStore): void {

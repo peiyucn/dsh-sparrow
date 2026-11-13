@@ -1,5 +1,5 @@
 /**
- * Official "main panel" entry assembly (mirrors official `ui-plugin-manager` / `ui-schedule` / this repo's dsh-archive-manage):
+ * Official "main panel" entry assembly (mirrors official `ui-plugin-manager` / `ui-schedule` / this repo's other plugins):
  * the `main` keyed slot and the `sidebar.panellist` list slot **share one id**; this module has zero runtime dependencies,
  * so node:test can import it directly. `layout` is not written into inject (a missing service would leave the fiber pending
  * forever and trigger a fatal boot-audit failure); it goes through the optional-dependency fork `ctx.inject(['layout'], cb)`

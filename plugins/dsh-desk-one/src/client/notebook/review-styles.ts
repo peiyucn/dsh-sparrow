@@ -125,9 +125,6 @@ body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   padding: 0 6px 0 12px;
   border-bottom: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
 }
-/* Compact the official sm segmented control to the toolbar's 28px tool row: the stock sm track is
-   34px tall with 14px labels, noticeably heavier than the ghost icon buttons beside it. */
-
 .dsh-desk-review-path {
   flex: 1;
   min-width: 0;
@@ -136,16 +133,6 @@ body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   white-space: nowrap;
   font-size: 12px;
   font-weight: 600;
-}
-.dsh-desk-review-kind {
-  flex: none;
-  padding: 0 5px;
-  border-radius: 4px;
-  background: var(--dsw-alias-interactive-bg-secondary, rgba(0, 0, 0, 0.06));
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  font-size: 9px;
-  line-height: 16px;
-  letter-spacing: 0.04em;
 }
 .dsh-desk-review-scroll {
   flex: 1;
@@ -172,35 +159,6 @@ body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   align-items: baseline;
   gap: 8px;
   padding: 3px 0;
-}
-.dsh-desk-review-field-name {
-  flex: none;
-  min-width: 64px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  font-size: 11px;
-}
-.dsh-desk-review-field-value {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-}
-.dsh-desk-review-body {
-  font-size: 13px;
-  line-height: 1.7;
-}
-.dsh-desk-review-body ::selection {
-  background: var(--dsw-alias-bg-document-selection, rgba(65, 118, 230, 0.4));
-}
-.dsh-desk-review-text {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: var(--dsw-alias-font-mono, ui-monospace, monospace);
-  font-size: 12px;
-  line-height: 1.6;
 }
 /* Official pill-dialog layout: fixed title row with icon, content scrolls on its own. */
 .dsh-desk-review-layer {
@@ -323,12 +281,6 @@ body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
 .dsh-desk-review-quote-inline {
   max-height: 96px;
   overflow: hidden;
-}
-.dsh-desk-review-lines {
-  margin: 4px 0 0;
-  color: var(--dsw-alias-label-caption, #8a919f);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
 }
 /* The composer occupies exactly the slot a saved annotation will take: same left rail,
    same indent under the line numbers, same card rhythm. */
@@ -508,18 +460,6 @@ body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c0503f) 16%, transparent);
   color: var(--dsw-alias-state-error-primary, #c0503f);
 }
-
-.dsh-desk-review-diffadded {
-  color: var(--dsw-alias-code-diff-added, #3a9a5b);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-.dsh-desk-review-diffremoved {
-  color: var(--dsw-alias-code-diff-deleted, #c0503f);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-/* --- v4: view toggle, selected lines, inline composer, segmented bar ------ */
 
 .dsh-desk-review-line[data-selected] {
   background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4176e6) 18%, transparent);

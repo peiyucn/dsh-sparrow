@@ -1,5 +1,5 @@
 /**
- * Schedule page (S2, read-only aggregation).
+ * Schedule page: read-only aggregation of external calendars, plus connection management.
  *
  * Information architecture follows the rest of Desk One: the tab holds in-panel pages, not modals.
  *   calendar (month / week / list) → sources (connections + calendars) → event detail

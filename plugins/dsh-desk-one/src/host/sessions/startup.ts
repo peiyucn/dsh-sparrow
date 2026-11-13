@@ -7,7 +7,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type { HeaderFactsStore } from './archive.js'
-import { STARTUP_SCAN_DELAY_MS } from './constants.js'
+import { PACKAGE_NAME, STARTUP_SCAN_DELAY_MS } from './constants.js'
 import { alignChildArchives, sweepGhostArchivedIds } from './archive-set.js'
 import type { RegistryMutationSurface } from './gates.js'
 import type { HeaderFacts } from './headers.js'
@@ -52,11 +52,11 @@ export function installStartupScans(
       // Backfill last: repair projection rows that older sweeps deleted while the session was trashed (a healthy machine has no missing rows = zero I/O traversal).
       await healMissingSessionProjections(ctx, headerFacts)
     })().catch((error: unknown) => {
-      ctx.logger.warn(`dsh-archive-manage: 启动扫描失败：${error instanceof Error ? error.message : String(error)}`)
+      ctx.logger.warn(`${PACKAGE_NAME}: 启动扫描失败：${error instanceof Error ? error.message : String(error)}`)
     })
   }
   const startupScanTimer = setTimeout(run, STARTUP_SCAN_DELAY_MS)
-  ctx.effect(() => () => clearTimeout(startupScanTimer), 'dsh-archive-manage: 启动清扫兜底定时器')
+  ctx.effect(() => () => clearTimeout(startupScanTimer), `${PACKAGE_NAME}: 启动清扫兜底定时器`)
 
   // Parent/child linkage: official workspace-domain write events drive real-time alignment (idempotent,
   // the same listener shape as the official feed); the same event invalidates the header cache in a
@@ -65,11 +65,11 @@ export function installStartupScans(
     if (change.domain !== 'workspace' || change.operation !== 'put') return
     headerFacts.invalidate()
     void alignChildArchives(ctx, surface, headerFacts)
-  }), 'dsh-archive-manage: 父子归档对齐')
+  }), `${PACKAGE_NAME}: 父子归档对齐`)
 
   // Session add/remove events invalidate the header cache in a write-through path (the removed/added events our own writes re-emit also take this path).
-  ctx.effect(() => ctx.on('api-session/added', () => headerFacts.invalidate()), 'dsh-archive-manage: header 缓存失效（added）')
-  ctx.effect(() => ctx.on('api-session/removed', () => headerFacts.invalidate()), 'dsh-archive-manage: header 缓存失效（removed）')
+  ctx.effect(() => ctx.on('api-session/added', () => headerFacts.invalidate()), `${PACKAGE_NAME}: header 缓存失效（added）`)
+  ctx.effect(() => ctx.on('api-session/removed', () => headerFacts.invalidate()), `${PACKAGE_NAME}: header 缓存失效（removed）`)
 
   return { run }
 }

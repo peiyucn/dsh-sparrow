@@ -12,7 +12,7 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import {
   isDeleteConfirmationSufficient, straySessionIds, type ArchiveConfig, type HeaderFactsStore,
 } from './archive.js'
-import { PROJECTION_SEED_BACKGROUND_BUDGET_MS, ROUTES } from './constants.js'
+import { PACKAGE_NAME, PROJECTION_SEED_BACKGROUND_BUDGET_MS, ROUTES } from './constants.js'
 import type {
   ArchiveRequest, ArchiveResponse, DeleteMutationResponse, DeleteRequest, ListResponse, RestoreRequest, RestoreResponse,
   StraysResponse, TrashDeleteAllRequest, TrashDeleteAllResponse, TrashDeleteRequest, TrashDeleteResponse,
@@ -215,7 +215,7 @@ async function restoreAllRoute(route: ArchiveRouteContext, req: IncomingMessage,
   // without blocking the operation; unfinished parts are completed by the next startup repair (see projection-seed.ts).
   if (restoredTreeIds.length > 0) {
     void finalizeRestoredSessions(route.ctx, restoredTreeIds, PROJECTION_SEED_BACKGROUND_BUDGET_MS).catch((error: unknown) => {
-      route.ctx.logger.warn(`dsh-archive-manage: 全部还原后的投影行回填失败：${error instanceof Error ? error.message : String(error)}`)
+      route.ctx.logger.warn(`${PACKAGE_NAME}: 全部还原后的投影行回填失败：${error instanceof Error ? error.message : String(error)}`)
     })
   }
 }

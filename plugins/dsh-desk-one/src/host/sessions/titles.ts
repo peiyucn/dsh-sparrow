@@ -13,7 +13,7 @@ import {
   createBudgetSignal, createLruCache, labelFromSubagentIdentity, runBounded, type SubagentIdentityValue,
 } from './archive.js'
 import {
-  FOLDED_LABEL_CACHE_MAX_ENTRIES, LABEL_FOLD_TIMEOUT_MS, TITLE_FOLD_BUDGET_MS, TITLE_FOLD_CONCURRENCY,
+  FOLDED_LABEL_CACHE_MAX_ENTRIES, LABEL_FOLD_TIMEOUT_MS, PACKAGE_NAME, TITLE_FOLD_BUDGET_MS, TITLE_FOLD_CONCURRENCY,
 } from './constants.js'
 import { cachedSnapshotOf } from './projection.js'
 
@@ -45,7 +45,7 @@ function cachedTitle(ctx: Context, header: SessionHeader, live: unknown): string
         const hit = read(registry.snapshot(live, ['title'])?.values)
         if (hit !== undefined) return hit
       } catch (error) {
-        ctx.logger.warn(`dsh-archive-manage: 标题投影快照失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
+        ctx.logger.warn(`${PACKAGE_NAME}: 标题投影快照失败（${String(header.id)}）：${error instanceof Error ? error.message : String(error)}`)
       }
     }
     return undefined
@@ -95,7 +95,7 @@ export async function titlesFor(
     return out
   } catch (error) {
     // Whole-batch failure (including budget timeout): titles degrade to fallback and the list still returns, so the route never 500s.
-    ctx.logger.warn(`dsh-archive-manage: 标题折叠失败（${misses.length} 个会话）：${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger.warn(`${PACKAGE_NAME}: 标题折叠失败（${misses.length} 个会话）：${error instanceof Error ? error.message : String(error)}`)
     for (const header of misses) out.set(String(header.id), fallback(header))
     return out
   } finally {
@@ -179,7 +179,7 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
         if (seq === undefined || typeof live.isOwnSeq !== 'function' || !live.isOwnSeq(seq)) return undefined
         return labelFromSubagentIdentity(identity) ?? undefined
       } catch (error) {
-        ctx.logger.warn(`dsh-archive-manage: subagent 投影快照失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+        ctx.logger.warn(`${PACKAGE_NAME}: subagent 投影快照失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
       }
     }
     return undefined
@@ -219,7 +219,7 @@ export async function subagentLabel(ctx: Context, header: SessionHeader): Promis
           }
         }
       } catch (error) {
-        ctx.logger.warn(`dsh-archive-manage: subagent 标签日志折叠失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+        ctx.logger.warn(`${PACKAGE_NAME}: subagent 标签日志折叠失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
       } finally {
         budget.release()
         try {

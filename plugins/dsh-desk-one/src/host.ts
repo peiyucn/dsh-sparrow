@@ -36,9 +36,6 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
   // Host compatibility gate (root AGENTS "plugin/host compatibility"), before any registration:
 // a missing capability throws so the plugin disables itself instead of breaking dsh.
   assertHostGates(ctx)
-  // Session gates include the session-format probe + the two private seams; failing here disables
-  // the plugin before any storage/effect is registered. Hosts without the services (unit tests,
-  // stripped builds) simply skip the session capabilities.
   const store = await DeskStore.open(ctx)
   ctx.effect(() => () => store.close(), 'dsh-desk-one: storage domain')
   // Session gates include the session-format probe + the two private seams; failing here disables

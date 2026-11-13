@@ -106,7 +106,6 @@ export interface DraftAnnotation {
   readonly createdAt: string
 }
 
-/** The persisted draft box of one file (id derives from the file identity). */
 /** One review round's baseline body, stored host-side so clearing browser storage does not lose it. */
 export interface NoteBaseline {
   readonly id: string
@@ -147,6 +146,7 @@ export interface NoteBaselineRequest {
   readonly at: string
 }
 
+/** The persisted draft box of one file (id derives from the file identity). */
 export interface NoteDraft {
   readonly id: string
   readonly kind: 'note-draft'

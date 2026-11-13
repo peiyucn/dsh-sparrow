@@ -3,7 +3,8 @@
  * Every value crossing requests / renders lives here so the same semantics does not drift between host and client.
  */
 
-export const PACKAGE_NAME = 'dsh-desk-one'
+/** Package name shared with the rest of the plugin (single truth in the root constants). */
+export { PACKAGE_NAME } from '../../constants.js'
 
 /** Route prefix: longer than the official `/api` fence, so this plugin does its own trust check. */
 export const PREFIX = '/api/desk-one/sessions'
@@ -23,13 +24,10 @@ export const ROUTES = Object.freeze({
   trashDeleteAll: `${PREFIX}/trash-delete-all`,
 })
 
-/** Trash bookkeeping file: the file name is part of the on-disk format; renaming it would degrade existing trash entries to "old format". */
+/** Trash bookkeeping file: the name is the on-disk format inherited from the retired `dsh-archive-manage` (its trash entries must stay readable); renaming it would degrade existing entries to "old format". */
 export const TRASH_SIDECAR = 'dsh-archive-manage.json'
 /** Current sidecar version; v1 is read-only (no subagents field), v2 adds sub-session bookkeeping. */
 export const SIDECAR_VERSION = 2
-
-/** Write-route request body cap; going over means 400 instead of reading the whole payload into memory first. */
-export const MAX_BODY_BYTES = 64 * 1024
 
 /** Header-facts cache TTL: a fallback beyond write-through invalidation, so event-less edge paths do not leave a stale membership table. */
 export const HEADER_CACHE_TTL_MS = 30_000
