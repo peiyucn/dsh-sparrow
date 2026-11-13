@@ -4,44 +4,57 @@
  * All kinds share one `nodes` table; per-kind helpers narrow by `kind` so callers get a typed
  * record and cannot accidentally patch a note through a task API. Writes go through the storage
  * domain's serial write chain, and optimistic concurrency uses the per-object revision.
+ *
+ * This class is the facade call sites see: the per-domain repositories under `store/` own the
+ * implementation, and every public method here is a one-line delegate with the original signature.
  */
 
-import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
-import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { DESK_DOMAIN } from '../domain.js'
-import { createSessionIndexRecord, sessionIndexId, type SessionIndexDraft } from './sessions/records.js'
-import {
-  DESK_NODE_SCHEMA, MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTEBOOK_BASELINE_MAX_CHARS, NOTEBOOK_CONFIG_ID, NOTEBOOK_MAX_DRAFTS,
-  NOTEBOOK_MAX_REVIEW_BASELINES, NOTEBOOK_MAX_REVIEW_SESSIONS, NODES_TABLE,
-  PACKAGE_NAME, SCHEDULE_COLORS, SESSION_INDEX_MISSING_DAYS, TASK_STATUSES,
-} from '../constants.js'
-import {
-  DeskModelError, createGroupRecord, createNoteRecord, createTaskRecord, filterGroups, filterNotes, filterTasks,
-  normalizeCoordinate, normalizeGroupInput, normalizeLayer, normalizeNoteInput, normalizeTaskInput, patchGroupRecord,
-  patchNoteRecord, patchTaskRecord, sortGroups, sortNotes, sortTasks,
-  type GroupPatch, type NotePatch, type TaskPatch,
-} from '../model.js'
-import {
-  createCalendarRecord, createEventRecord, createScheduleSourceRecord, eventMatchesDraft, filterEvents,
-  type CalendarDraft, type EventDraft, type EventQuery,
-} from './schedule/records.js'
+import { PACKAGE_NAME } from '../constants.js'
+import type { GroupPatch, NotePatch, TaskPatch } from '../model.js'
+import type { CalendarDraft, EventDraft, EventQuery } from './schedule/records.js'
+import type { SessionIndexDraft } from './sessions/records.js'
 import type {
-  DeskCalendar, DeskEvent, DeskNode, DeskNote, DeskNotebookConfig, DeskScheduleSource, DeskSessionIndex, DeskTask,
-  DeskTaskGroup, DraftAnnotation, NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ReviewSessionMarker, ScheduleSyncError, TaskStatus,
+  DeskCalendar, DeskEvent, DeskNote, DeskNotebookConfig, DeskScheduleSource, DeskSessionIndex, DeskTask, DeskTaskGroup,
+  NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ReviewSessionMarker, ScheduleSyncError,
 } from '../contract.js'
-
-type DeskDomain = Domain<typeof DESK_DOMAIN>
+import { StoreCore, type DeskDomain } from './store/core.js'
+import { NoteRepository, type CreateNoteInput } from './store/notes.js'
+import { TaskRepository, type CreateTaskInput } from './store/tasks.js'
+import { GroupRepository, type CreateGroupInput } from './store/groups.js'
+import { ScheduleRepository, type CreateScheduleSourceInput, type UpsertScheduleSourceInput } from './store/schedule.js'
+import { SessionIndexRepository } from './store/sessions.js'
+import { NotebookRepository, type EnsureNoteFileInput, type SaveNoteBaselineInput, type SaveNoteDraftInput } from './store/notebook.js'
+import { ReviewRepository, type CreateReviewRecordInput, type MarkReviewSessionInput } from './store/review.js'
 
 export class DeskStore {
-  private constructor(private readonly domain: DeskDomain) {}
+  private readonly core: StoreCore
+  private readonly notes: NoteRepository
+  private readonly tasks: TaskRepository
+  private readonly groups: GroupRepository
+  private readonly schedule: ScheduleRepository
+  private readonly sessions: SessionIndexRepository
+  private readonly notebook: NotebookRepository
+  private readonly review: ReviewRepository
+
+  private constructor(domain: DeskDomain) {
+    this.core = new StoreCore(domain)
+    this.groups = new GroupRepository(this.core)
+    this.notes = new NoteRepository(this.core)
+    this.tasks = new TaskRepository(this.core, this.groups)
+    this.schedule = new ScheduleRepository(this.core)
+    this.sessions = new SessionIndexRepository(this.core)
+    this.notebook = new NotebookRepository(this.core)
+    this.review = new ReviewRepository(this.core)
+  }
 
   /** Open the storage domain; log a user-facing warning before rethrowing (cordis marks us inactive). */
   static async open(ctx: Context): Promise<DeskStore> {
     try {
       const domain = await ctx.storageDomain.open(DESK_DOMAIN)
       const store = new DeskStore(domain)
-      await store.purgeLegacyRecords(ctx)
+      await store.core.purgeLegacyRecords(ctx)
       return store
     } catch (error) {
       ctx.logger.warn(
@@ -51,1063 +64,142 @@ export class DeskStore {
     }
   }
 
-  /**
-   * Delete records of the withdrawn notebook feature once, after the domain opened.
-   *
-   * They are accepted by the schema only to keep an upgrade from rejecting the whole domain;
-   * notebook and review state live elsewhere now, so these rows have no reader.
-   * @param ctx - host context (logging only).
-   */
-  private async purgeLegacyRecords(ctx: Context): Promise<void> {
-    const legacyKinds = new Set(['annotation', 'review'])
-    const legacy = this.allNodes().filter((node) => {
-      const kind = (node as { kind?: string }).kind ?? ''
-      if (legacyKinds.has(kind)) return true
-      // Draft boxes from the path-keyed design have no file identity and cannot be migrated cheaply.
-      return kind === 'note-draft' && (node as { fileId?: string }).fileId === undefined
-    })
-    if (legacy.length === 0) return
-    for (const node of legacy) {
-      try {
-        await this.nodes.delete(node.id)
-      } catch (error) {
-        ctx.logger.warn(`${PACKAGE_NAME}: 清理旧笔记功能记录失败（${node.id}）：${error instanceof Error ? error.message : String(error)}`)
-      }
-    }
-    ctx.logger.info(`${PACKAGE_NAME}: 已清理 ${legacy.length} 条旧笔记功能记录`)
-  }
-
-  /** The unified node table (all kinds share it; kind is the discriminator). */
-  private get nodes() {
-    return this.domain.table(NODES_TABLE)
-  }
-
-  private allNodes(): DeskNode[] {
-    return [...this.nodes.entries()].map(([, node]) => node)
-  }
-
-  private allTasks(): DeskTask[] {
-    return this.allNodes().filter((node): node is DeskTask => node.kind === 'task')
-  }
-
-  private groupById(id: string): DeskTaskGroup | undefined {
-    const node = this.nodes.get(id)
-    return node !== undefined && node.kind === 'group' ? node : undefined
-  }
-
   /* ------------------------------- notes ------------------------------- */
 
-  /** List notes (pinned first, newest first); an optional limit protects the agent tool context. */
-  listNotes(query?: string, limit?: number): DeskNote[] {
-    const notes = this.allNodes().filter((node): node is DeskNote => node.kind === 'note')
-    const filtered = filterNotes(sortNotes(notes), query)
-    if (limit === undefined) return filtered
-    const bounded = Number.isInteger(limit) && limit > 0 ? Math.min(limit, MAX_ACTIVE_NOTES + MAX_TRASH_NOTES) : 0
-    return bounded === 0 ? filtered : filtered.slice(0, bounded)
-  }
+  listNotes(query?: string, limit?: number): DeskNote[] { return this.notes.listNotes(query, limit) }
 
-  /** Count notes by trash state (capacity guard; O(n) only on writes, and n is capped). */
-  private countNotesByTrashed(trashed: boolean): number {
-    let count = 0
-    for (const node of this.allNodes()) {
-      if (node.kind === 'note' && node.trashed === trashed) count += 1
-    }
-    return count
-  }
+  async createNote(raw: CreateNoteInput): Promise<DeskNote> { return this.notes.createNote(raw) }
 
-  /** Create a note (validation / normalisation lives in the model). */
-  async createNote(raw: {
-    readonly title?: unknown
-    readonly body?: unknown
-    readonly color?: unknown
-    readonly x?: unknown
-    readonly y?: unknown
-    readonly z?: unknown
-  }): Promise<DeskNote> {
-    // Product hard limit (owner decision): 100 on the wall, enforced host-side too.
-    if (this.countNotesByTrashed(false) >= MAX_ACTIVE_NOTES) {
-      throw new DeskModelError('NOTE_LIMIT', `便签墙最多放 ${MAX_ACTIVE_NOTES} 张便签`)
-    }
-    const input = normalizeNoteInput(raw)
-    const note = createNoteRecord(input, {
-      id: `note_${randomUUID()}`,
-      now: new Date().toISOString(),
-      x: normalizeCoordinate(raw.x),
-      y: normalizeCoordinate(raw.y),
-      z: normalizeLayer(raw.z),
-    })
-    await this.nodes.put(note.id, note)
-    return note
-  }
+  async updateNote(id: string, expectedRevision: number, patch: NotePatch): Promise<DeskNote> { return this.notes.updateNote(id, expectedRevision, patch) }
 
-  /** Patch one note; revision mismatch -> REVISION_CONFLICT, missing -> UNKNOWN_NOTE. */
-  async updateNote(id: string, expectedRevision: number, patch: NotePatch): Promise<DeskNote> {
-    if (patch.trashed === true && this.countNotesByTrashed(true) >= MAX_TRASH_NOTES) {
-      throw new DeskModelError('TRASH_FULL', `垃圾桶最多放 ${MAX_TRASH_NOTES} 张便签，请先清空垃圾桶`)
-    }
-    const now = new Date().toISOString()
-    try {
-      const updated = await this.nodes.update(id, (current) => {
-        if (current.kind !== 'note') throw new DeskModelError('UNKNOWN_NOTE', `便签不存在：${id}`)
-        return patchNoteRecord(current, patch, { expectedRevision, now })
-      })
-      if (updated.kind !== 'note') throw new DeskModelError('UNKNOWN_NOTE', `便签不存在：${id}`)
-      return updated
-    } catch (error) {
-      throw this.mapMissing(error, 'UNKNOWN_NOTE', `便签不存在：${id}`)
-    }
-  }
-
-  /** Delete one note permanently. */
-  async deleteNote(id: string): Promise<boolean> {
-    const current = this.nodes.get(id)
-    if (current === undefined || current.kind !== 'note') {
-      throw new DeskModelError('UNKNOWN_NOTE', `便签不存在：${id}`)
-    }
-    await this.nodes.delete(id)
-    return true
-  }
+  async deleteNote(id: string): Promise<boolean> { return this.notes.deleteNote(id) }
 
   /* ------------------------------- tasks ------------------------------- */
 
-  /** List tasks in board order; callers pass a limit on the tool surface. */
-  listTasks(query?: string, limit?: number): DeskTask[] {
-    const tasks = this.allNodes().filter((node): node is DeskTask => node.kind === 'task')
-    const filtered = filterTasks(sortTasks(tasks), query)
-    if (limit === undefined) return filtered
-    const bounded = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 500) : 0
-    return bounded === 0 ? filtered : filtered.slice(0, bounded)
-  }
+  listTasks(query?: string, limit?: number): DeskTask[] { return this.tasks.listTasks(query, limit) }
 
-  /** Create a task; titles are required and validated in the model. */
-  async createTask(raw: {
-    readonly title?: unknown
-    readonly body?: unknown
-    readonly status?: unknown
-    readonly color?: unknown
-    readonly dueDate?: unknown
-    readonly dueTimezone?: unknown
-    readonly order?: unknown
-    readonly groupId?: unknown
-  }): Promise<DeskTask> {
-    const input = normalizeTaskInput(raw)
-    if (input.groupId !== undefined) {
-      const group = this.groupById(input.groupId)
-      if (group === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${input.groupId}`)
-      if (group.archived) throw new DeskModelError('INVALID_GROUP', '不能把任务放进已存档的分组')
-      if (group.status !== input.status) {
-        throw new DeskModelError('INVALID_GROUP', '任务状态与所属分组的泳道不一致')
-      }
-    }
-    const task = createTaskRecord(input, { id: `task_${randomUUID()}`, now: new Date().toISOString() })
-    await this.nodes.put(task.id, task)
-    return task
-  }
+  async createTask(raw: CreateTaskInput): Promise<DeskTask> { return this.tasks.createTask(raw) }
 
-  /**
-   * Membership invariant: a task may only belong to a group in its own lane. A cross-lane status
-   * move that leaves `groupId` untouched clears the membership (the group stays in its lane).
-   */
-  private reconcileTaskGroup(task: DeskTask, patch: TaskPatch): DeskTask {
-    if (task.groupId === undefined) return task
-    const group = this.groupById(task.groupId)
-    if (group === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${task.groupId}`)
-    if (group.archived && patch.groupId !== undefined) {
-      throw new DeskModelError('INVALID_GROUP', '已存档的分组不能再收任务')
-    }
-    if (group.status === task.status) return task
-    if (patch.groupId === undefined && patch.status !== undefined) {
-      const { groupId: _cleared, ...rest } = task
-      return rest
-    }
-    throw new DeskModelError('INVALID_GROUP', '任务状态与所属分组的泳道不一致')
-  }
+  async updateTask(id: string, expectedRevision: number, patch: TaskPatch): Promise<DeskTask> { return this.tasks.updateTask(id, expectedRevision, patch) }
 
-  /** Patch one task; revision mismatch -> REVISION_CONFLICT, missing -> UNKNOWN_TASK. */
-  async updateTask(id: string, expectedRevision: number, patch: TaskPatch): Promise<DeskTask> {
-    const now = new Date().toISOString()
-    try {
-      const updated = await this.nodes.update(id, (current) => {
-        if (current.kind !== 'task') throw new DeskModelError('UNKNOWN_TASK', `任务不存在：${id}`)
-        return this.reconcileTaskGroup(patchTaskRecord(current, patch, { expectedRevision, now }), patch)
-      })
-      if (updated.kind !== 'task') throw new DeskModelError('UNKNOWN_TASK', `任务不存在：${id}`)
-      return updated
-    } catch (error) {
-      throw this.mapMissing(error, 'UNKNOWN_TASK', `任务不存在：${id}`)
-    }
-  }
-
-  /** Delete one task permanently. */
-  async deleteTask(id: string): Promise<boolean> {
-    const current = this.nodes.get(id)
-    if (current === undefined || current.kind !== 'task') {
-      throw new DeskModelError('UNKNOWN_TASK', `任务不存在：${id}`)
-    }
-    await this.nodes.delete(id)
-    return true
-  }
+  async deleteTask(id: string): Promise<boolean> { return this.tasks.deleteTask(id) }
 
   /* ------------------------------- groups ------------------------------- */
 
-  /** List groups in board order (all lanes unless the caller filters). */
-  listGroups(query?: string, limit?: number): DeskTaskGroup[] {
-    const groups = this.allNodes().filter((node): node is DeskTaskGroup => node.kind === 'group')
-    const filtered = filterGroups(sortGroups(groups), query)
-    if (limit === undefined) return filtered
-    const bounded = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 500) : 0
-    return bounded === 0 ? filtered : filtered.slice(0, bounded)
-  }
+  listGroups(query?: string, limit?: number): DeskTaskGroup[] { return this.groups.listGroups(query, limit) }
 
-  /** Groups of one lane in manual order (used to keep group order dense after edits). */
-  private laneGroups(status: TaskStatus): DeskTaskGroup[] {
-    return sortGroups(this.allNodes().filter(
-      (node): node is DeskTaskGroup => node.kind === 'group' && node.status === status,
-    ))
-  }
+  async createGroup(raw: CreateGroupInput): Promise<DeskTaskGroup> { return this.groups.createGroup(raw) }
 
-  async createGroup(raw: { readonly name?: unknown; readonly status?: unknown; readonly order?: unknown }): Promise<DeskTaskGroup> {
-    const input = normalizeGroupInput(raw)
-    if (this.laneGroups(input.status).some(group => !group.archived && group.name === input.name)) {
-      throw new DeskModelError('INVALID_GROUP', `分组已存在：${input.name}`)
-    }
-    const active = this.laneGroups(input.status).filter(group => !group.archived)
-    const order = raw.order === undefined ? active.length : input.order
-    const group = createGroupRecord({ ...input, order }, { id: `group_${randomUUID()}`, now: new Date().toISOString() })
-    await this.nodes.put(group.id, group)
-    return group
-  }
+  async updateGroup(id: string, expectedRevision: number, patch: GroupPatch): Promise<DeskTaskGroup> { return this.groups.updateGroup(id, expectedRevision, patch) }
 
-  /** Rename / reorder one group; lane moves go through `moveGroup` because they cascade to tasks. */
-  async updateGroup(id: string, expectedRevision: number, patch: GroupPatch): Promise<DeskTaskGroup> {
-    const now = new Date().toISOString()
-    try {
-      const updated = await this.nodes.update(id, (current) => {
-        if (current.kind !== 'group') throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
-        const patched = patchGroupRecord(current, patch, { expectedRevision, now })
-        if (patch.name !== undefined && this.laneGroups(current.status).some(
-          group => group.id !== id && !group.archived && group.name === patched.name,
-        )) {
-          throw new DeskModelError('INVALID_GROUP', `分组已存在：${patched.name}`)
-        }
-        return patched
-      })
-      if (updated.kind !== 'group') throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
-      return updated
-    } catch (error) {
-      throw this.mapMissing(error, 'UNKNOWN_GROUP', `分组不存在：${id}`)
-    }
-  }
-
-  /** Write dense 0..n-1 group orders; only records whose order actually changed are rewritten. */
-  private async applyGroupOrders(ordered: readonly DeskTaskGroup[], now: string): Promise<DeskTaskGroup[]> {
-    const updated: DeskTaskGroup[] = []
-    for (const [index, group] of ordered.entries()) {
-      if (group.order === index) {
-        updated.push(group)
-        continue
-      }
-      const next = await this.nodes.update(group.id, (current) => current.kind === 'group'
-        ? { ...current, order: index, revision: current.revision + 1, updatedAt: now }
-        : current)
-      if (next.kind === 'group') updated.push(next)
-    }
-    return updated
-  }
-
-  /**
-   * Move a group to a lane / position. Same-lane moves only reorder groups; cross-lane moves
-   * cascade the new status to every member task (the group remains their container).
-   */
   async moveGroup(
     id: string,
     expectedRevision: number,
     toStatus: string,
     toOrder?: number,
-  ): Promise<{ group: DeskTaskGroup; tasks: DeskTask[] }> {
-    const current = this.groupById(id)
-    if (current === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
-    if (!Number.isInteger(expectedRevision) || current.revision !== expectedRevision) {
-      throw new DeskModelError(
-        'REVISION_CONFLICT',
-        `分组已被修改（当前 revision ${current.revision}，请求 ${expectedRevision}）`,
-      )
-    }
-    if (current.archived) throw new DeskModelError('INVALID_GROUP', '已存档的分组不能移动，请先恢复')
-    if (!(TASK_STATUSES as readonly string[]).includes(toStatus)) {
-      throw new DeskModelError('INVALID_GROUP', `未知的泳道：${toStatus}`)
-    }
-    const status = toStatus as TaskStatus
-    const now = new Date().toISOString()
-    let movedGroup = current
-    const updatedTasks: DeskTask[] = []
+  ): Promise<{ group: DeskTaskGroup; tasks: DeskTask[] }> { return this.groups.moveGroup(id, expectedRevision, toStatus, toOrder) }
 
-    if (current.status !== status) {
-      const moved = await this.nodes.update(id, (node) => node.kind === 'group'
-        ? { ...node, status, revision: node.revision + 1, updatedAt: now }
-        : node)
-      if (moved.kind === 'group') movedGroup = moved
-      for (const task of this.allTasks().filter(task => task.groupId === id)) {
-        const next = await this.nodes.update(task.id, (node) => node.kind === 'task'
-          ? { ...node, status, revision: node.revision + 1, updatedAt: now }
-          : node)
-        if (next.kind === 'task') updatedTasks.push(next)
-      }
-      // Close the gap the group left behind in its old lane.
-      await this.applyGroupOrders(this.laneGroups(current.status), now)
-    }
-
-    const target = this.laneGroups(status).filter(group => group.id !== id)
-    const index = toOrder === undefined ? target.length : Math.max(0, Math.min(Math.round(toOrder), target.length))
-    target.splice(index, 0, movedGroup)
-    const ordered = await this.applyGroupOrders(target, now)
-    return { group: ordered.find(group => group.id === id) ?? movedGroup, tasks: updatedTasks }
-  }
-
-  /** Archive / restore a group together with every card in it (archive is Done-lane only). */
   async archiveGroup(
     id: string,
     expectedRevision: number,
     archived: boolean,
-  ): Promise<{ group: DeskTaskGroup; tasks: DeskTask[] }> {
-    const current = this.groupById(id)
-    if (current === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
-    if (archived && current.status !== 'done') {
-      throw new DeskModelError('INVALID_GROUP', '只有完成列的分组可以存档')
-    }
-    const now = new Date().toISOString()
-    const updated = await this.nodes.update(id, (node) => node.kind === 'group'
-      ? patchGroupRecord(node, { archived }, { expectedRevision, now })
-      : node)
-    if (updated.kind !== 'group') throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
-    const tasks: DeskTask[] = []
-    for (const task of this.allTasks().filter(task => task.groupId === id)) {
-      const next = await this.nodes.update(task.id, (node) => node.kind === 'task'
-        ? { ...node, archived, revision: node.revision + 1, updatedAt: now }
-        : node)
-      if (next.kind === 'task') tasks.push(next)
-    }
-    return { group: updated, tasks }
-  }
+  ): Promise<{ group: DeskTaskGroup; tasks: DeskTask[] }> { return this.groups.archiveGroup(id, expectedRevision, archived) }
 
-  /** Delete a group; its cards become ungrouped (explicit delete only — empty groups persist). */
-  async deleteGroup(id: string): Promise<boolean> {
-    const current = this.groupById(id)
-    if (current === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
-    const now = new Date().toISOString()
-    if (current.archived) {
-      // Archived groups own archived cards: permanent delete removes them too.
-      for (const task of this.allTasks().filter(task => task.groupId === id)) {
-        await this.nodes.delete(task.id)
-      }
-    } else {
-      for (const task of this.allTasks().filter(task => task.groupId === id)) {
-        await this.nodes.update(task.id, (node) => {
-          if (node.kind !== 'task') return node
-          const { groupId: _cleared, ...rest } = node
-          return { ...rest, revision: node.revision + 1, updatedAt: now }
-        })
-      }
-    }
-    await this.nodes.delete(id)
-    await this.applyGroupOrders(this.laneGroups(current.status), now)
-    return true
-  }
-
-  /** Translate the domain's missing-key error into the feature-specific 404. */
-  private mapMissing(error: unknown, code: 'UNKNOWN_NOTE' | 'UNKNOWN_TASK' | 'UNKNOWN_GROUP', message: string): unknown {
-    if (error instanceof DomainError && error.code === 'missing-key') return new DeskModelError(code, message)
-    return error
-  }
+  async deleteGroup(id: string): Promise<boolean> { return this.groups.deleteGroup(id) }
 
   /* ------------------------------ schedule ------------------------------ */
 
-  private allSources(): DeskScheduleSource[] {
-    return this.allNodes().filter((node): node is DeskScheduleSource => node.kind === 'schedule-source')
-  }
+  listScheduleSources(): DeskScheduleSource[] { return this.schedule.listScheduleSources() }
 
-  private allCalendars(): DeskCalendar[] {
-    return this.allNodes().filter((node): node is DeskCalendar => node.kind === 'calendar')
-  }
+  listCalendars(sourceId?: string): DeskCalendar[] { return this.schedule.listCalendars(sourceId) }
 
-  private allEvents(): DeskEvent[] {
-    return this.allNodes().filter((node): node is DeskEvent => node.kind === 'event')
-  }
+  findScheduleSource(provider: string, channel: string): DeskScheduleSource | undefined { return this.schedule.findScheduleSource(provider, channel) }
 
-  /** Sources in a stable provider order (wecom -> icloud -> outlook); one per provider+channel. */
-  listScheduleSources(): DeskScheduleSource[] {
-    const order: Record<string, number> = { wecom: 0, icloud: 1, outlook: 2 }
-    return [...this.allSources()].sort((left, right) =>
-      (order[left.provider] ?? 99) - (order[right.provider] ?? 99)
-      || left.id.localeCompare(right.id))
-  }
+  async createScheduleSource(input: CreateScheduleSourceInput): Promise<DeskScheduleSource> { return this.schedule.createScheduleSource(input) }
 
-  /** Calendars grouped by source order first, then their manual order inside the source. */
-  listCalendars(sourceId?: string): DeskCalendar[] {
-    const sources = this.listScheduleSources()
-    const sourceRank = new Map(sources.map((source, index) => [source.id, index]))
-    return this.allCalendars()
-      .filter(calendar => sourceId === undefined || calendar.sourceId === sourceId)
-      .sort((left, right) =>
-        (sourceRank.get(left.sourceId) ?? 99) - (sourceRank.get(right.sourceId) ?? 99)
-        || left.order - right.order
-        || left.id.localeCompare(right.id))
-  }
+  getScheduleSource(id: string): DeskScheduleSource | undefined { return this.schedule.getScheduleSource(id) }
 
-  /** Find the connection record for one provider+channel (v1 keeps a single account per line). */
-  findScheduleSource(provider: string, channel: string): DeskScheduleSource | undefined {
-    return this.allSources().find(source => source.provider === provider && source.channel === channel)
-  }
+  async upsertScheduleSource(input: UpsertScheduleSourceInput): Promise<DeskScheduleSource> { return this.schedule.upsertScheduleSource(input) }
 
-  /** Create one standalone source (used by ICS subscriptions: several sources per provider). */
-  async createScheduleSource(input: {
-    readonly provider: 'ics'
-    readonly channel: 'ics'
-    readonly account?: string
-    readonly credentialRef: string
-  }): Promise<DeskScheduleSource> {
-    const now = new Date().toISOString()
-    const record = createScheduleSourceRecord(input, { now })
-    await this.nodes.put(record.id, record)
-    return record
-  }
-
-  getScheduleSource(id: string): DeskScheduleSource | undefined {
-    return this.allSources().find(source => source.id === id)
-  }
-
-  /** Create or refresh a connection record; secrets are never stored here (only the ref name). */
-  async upsertScheduleSource(input: {
-    readonly provider: 'wecom' | 'icloud' | 'outlook' | 'ics'
-    readonly channel: 'caldav' | 'ics' | 'graph'
-    readonly account?: string
-    readonly credentialRef: string
-  }): Promise<DeskScheduleSource> {
-    const now = new Date().toISOString()
-    const current = this.findScheduleSource(input.provider, input.channel)
-    if (current !== undefined) {
-      const updated = await this.nodes.update(current.id, (node) => {
-        if (node.kind !== 'schedule-source') return node
-        const next: DeskScheduleSource = {
-          ...node,
-          ...(input.account === undefined ? {} : { account: input.account }),
-          credentialRef: input.credentialRef,
-          enabled: true,
-          syncState: 'idle',
-          updatedAt: now,
-          revision: node.revision + 1,
-        }
-        const { lastError: _cleared, ...rest } = next
-        return rest
-      })
-      if (updated.kind !== 'schedule-source') throw new DeskModelError('INVALID_SCHEDULE', '日程连接不存在')
-      return updated
-    }
-    const source = createScheduleSourceRecord(
-      { provider: input.provider, channel: input.channel, account: input.account, credentialRef: input.credentialRef },
-      { now },
-    )
-    await this.nodes.put(source.id, source)
-    return source
-  }
-
-  /** Persist sync state / error on a source or calendar record. */
   async setScheduleSyncState(
     id: string,
     patch: { readonly syncState?: 'idle' | 'syncing' | 'error'; readonly lastSyncedAt?: string; readonly lastError?: ScheduleSyncError },
-  ): Promise<void> {
-    const now = new Date().toISOString()
-    await this.nodes.update(id, (node) => {
-      if (node.kind === 'schedule-source') {
-        const next: DeskScheduleSource = {
-          ...node,
-          updatedAt: now,
-          revision: node.revision + 1,
-          ...(patch.syncState === undefined ? {} : { syncState: patch.syncState }),
-          ...(patch.lastSyncedAt === undefined ? {} : { lastSyncedAt: patch.lastSyncedAt }),
-          ...(patch.lastError === undefined ? {} : { lastError: patch.lastError }),
-        }
-        if (patch.lastError === undefined && patch.lastSyncedAt !== undefined) {
-          const { lastError: _cleared, ...rest } = next
-          return rest
-        }
-        return next
-      }
-      if (node.kind === 'calendar') {
-        const next: DeskCalendar = {
-          ...node,
-          updatedAt: now,
-          revision: node.revision + 1,
-          ...(patch.lastSyncedAt === undefined ? {} : { lastSyncedAt: patch.lastSyncedAt }),
-          ...(patch.lastError === undefined ? {} : { lastError: patch.lastError }),
-        }
-        if (patch.lastError === undefined && patch.lastSyncedAt !== undefined) {
-          const { lastError: _cleared, ...rest } = next
-          return rest
-        }
-        return next
-      }
-      return node
-    })
-  }
+  ): Promise<void> { return this.schedule.setScheduleSyncState(id, patch) }
 
-  /** Upsert the remote calendars of one source; existing rows keep the user's colour / visibility. */
   async upsertCalendars(source: DeskScheduleSource, drafts: readonly CalendarDraft[]): Promise<DeskCalendar[]> {
-    const now = new Date().toISOString()
-    const existing = this.allCalendars().filter(calendar => calendar.sourceId === source.id)
-    const byRemote = new Map(existing.map(calendar => [calendar.remoteId, calendar]))
-    let nextOrder = existing.reduce((max, calendar) => Math.max(max, calendar.order + 1), 0)
-    for (const draft of drafts) {
-      const current = byRemote.get(draft.remoteId)
-      if (current === undefined) {
-        const created = createCalendarRecord(
-          { ...draft, sourceId: source.id, provider: source.provider, channel: source.channel, order: nextOrder },
-          { now },
-        )
-        nextOrder += 1
-        await this.nodes.put(created.id, created)
-        continue
-      }
-      // Renames come from the remote; colour / order / visibility stay local decisions.
-      if (current.displayName === draft.displayName) continue
-      await this.nodes.update(current.id, (node) => node.kind === 'calendar'
-        ? { ...node, displayName: draft.displayName, updatedAt: now, revision: node.revision + 1 }
-        : node)
-    }
-    return this.listCalendars(source.id)
+    return this.schedule.upsertCalendars(source, drafts)
   }
 
-  /** Local-only metadata patch (colour / visibility / order); remote data is untouched. */
   async updateCalendar(
     id: string,
     expectedRevision: number,
     patch: { readonly color?: unknown; readonly enabled?: unknown; readonly order?: unknown },
-  ): Promise<DeskCalendar> {
-    const now = new Date().toISOString()
-    const updated = await this.nodes.update(id, (node) => {
-      if (node.kind !== 'calendar') throw new DeskModelError('UNKNOWN_CALENDAR', `日历不存在：${id}`)
-      if (node.revision !== expectedRevision) {
-        throw new DeskModelError('REVISION_CONFLICT', `日历已被修改（当前 revision ${node.revision}）`)
-      }
-      let color = node.color
-      if (patch.color !== undefined) {
-        if (typeof patch.color !== 'string' || !(SCHEDULE_COLORS as readonly string[]).includes(patch.color)) {
-          throw new DeskModelError('INVALID_SCHEDULE', '未知的日历颜色')
-        }
-        color = patch.color as DeskCalendar['color']
-      }
-      let enabled = node.enabled
-      if (patch.enabled !== undefined) {
-        if (typeof patch.enabled !== 'boolean') throw new DeskModelError('INVALID_SCHEDULE', 'enabled 必须是布尔值')
-        enabled = patch.enabled
-      }
-      let order = node.order
-      if (patch.order !== undefined) {
-        if (typeof patch.order !== 'number' || !Number.isInteger(patch.order) || patch.order < 0) {
-          throw new DeskModelError('INVALID_SCHEDULE', 'order 必须是非负整数')
-        }
-        order = patch.order
-      }
-      return { ...node, color, enabled, order, updatedAt: now, revision: node.revision + 1 }
-    })
-    if (updated.kind !== 'calendar') throw new DeskModelError('UNKNOWN_CALENDAR', `日历不存在：${id}`)
-    return updated
-  }
+  ): Promise<DeskCalendar> { return this.schedule.updateCalendar(id, expectedRevision, patch) }
 
-  /**
-   * Replace the mirrored events of one calendar with a fresh pull.
-   * The adapter supplies the full mirror window, so events absent from the pull are stale and get
-   * removed (the mirror has no user-owned data; soft delete would only grow tombstones).
-   */
   async syncCalendarEvents(calendar: DeskCalendar, drafts: readonly EventDraft[]): Promise<number> {
-    const now = new Date().toISOString()
-    const existing = this.allEvents().filter(event => event.calendarNodeId === calendar.id)
-    const byExternal = new Map(existing.map(event => [event.externalId, event]))
-    const seen = new Set<string>()
-    let written = 0
-    for (const draft of drafts) {
-      if (draft.externalId === '' || draft.uid === '') continue
-      if (seen.has(draft.externalId)) continue
-      seen.add(draft.externalId)
-      const current = byExternal.get(draft.externalId)
-      if (current === undefined) {
-        const created = createEventRecord(draft, {
-          calendarNodeId: calendar.id,
-          provider: calendar.provider,
-          channel: calendar.channel,
-          calendarRemoteId: calendar.remoteId,
-          now,
-        })
-        await this.nodes.put(created.id, created)
-      } else if (!eventMatchesDraft(current, draft)) {
-        await this.nodes.update(current.id, (node) => node.kind === 'event'
-          ? {
-              ...createEventRecord(draft, {
-                calendarNodeId: calendar.id,
-                provider: calendar.provider,
-                channel: calendar.channel,
-                calendarRemoteId: calendar.remoteId,
-                now,
-                id: node.id,
-              }),
-              revision: node.revision + 1,
-              createdAt: node.createdAt,
-            }
-          : node)
-      }
-      written += 1
-    }
-    for (const [externalId, event] of byExternal) {
-      if (!seen.has(externalId)) await this.nodes.delete(event.id)
-    }
-    return written
+    return this.schedule.syncCalendarEvents(calendar, drafts)
   }
 
-  /** Remove a connection record plus its calendars and mirrored events (local only). */
-  async removeScheduleSource(sourceId: string): Promise<void> {
-    const calendars = this.allCalendars().filter(calendar => calendar.sourceId === sourceId)
-    const calendarIds = new Set(calendars.map(calendar => calendar.id))
-    for (const event of this.allEvents()) {
-      if (calendarIds.has(event.calendarNodeId)) await this.nodes.delete(event.id)
-    }
-    for (const calendar of calendars) await this.nodes.delete(calendar.id)
-    await this.nodes.delete(sourceId)
-  }
+  async removeScheduleSource(sourceId: string): Promise<void> { return this.schedule.removeScheduleSource(sourceId) }
 
-  /** Range query over mirrored events (the only read path for the schedule views). */
-  listEvents(query: EventQuery): DeskEvent[] {
-    return filterEvents(this.allEvents(), query)
-  }
+  listEvents(query: EventQuery): DeskEvent[] { return this.schedule.listEvents(query) }
 
-  /** Event count per calendar (shown in the calendar-source panel). */
-  countEventsByCalendar(): Map<string, number> {
-    const counts = new Map<string, number>()
-    for (const event of this.allEvents()) {
-      counts.set(event.calendarNodeId, (counts.get(event.calendarNodeId) ?? 0) + 1)
-    }
-    return counts
-  }
+  countEventsByCalendar(): Map<string, number> { return this.schedule.countEventsByCalendar() }
 
-  /** Session index: refresh from host headers; never copies session content. */
+  /* --------------------------- session index --------------------------- */
+
   async upsertSessionIndexes(drafts: readonly SessionIndexDraft[]): Promise<{ indexed: number; missing: number }> {
-    const now = new Date().toISOString()
-    const seen = new Set<string>()
-    let indexed = 0
-    for (const draft of drafts) {
-      const id = sessionIndexId(draft.sessionId)
-      seen.add(id)
-      const current = this.nodes.get(id)
-      if (current === undefined) {
-        await this.nodes.put(id, createSessionIndexRecord(draft, { now }))
-        indexed += 1
-        continue
-      }
-      if (current.kind !== 'session') continue
-      await this.nodes.update(id, (node) => node.kind === 'session'
-        ? {
-            ...node,
-            title: draft.title,
-            ...(draft.cwd === undefined ? {} : { cwd: draft.cwd }),
-            ...(draft.parentSessionId === undefined ? {} : { parentSessionId: draft.parentSessionId }),
-            subagent: draft.subagent,
-            running: draft.running,
-            availability: draft.availability,
-            updatedAt: draft.updatedAt,
-            indexedAt: now,
-            revision: node.revision + 1,
-          }
-        : node)
-      indexed += 1
-    }
-    let missing = 0
-    const cutoff = Date.now() - SESSION_INDEX_MISSING_DAYS * 86_400_000
-    for (const node of this.allNodes()) {
-      if (node.kind !== 'session' || seen.has(node.id)) continue
-      const missingSince = node.missingSince ?? now
-      if (Date.parse(missingSince) < cutoff) {
-        await this.nodes.delete(node.id)
-        continue
-      }
-      missing += 1
-      await this.nodes.update(node.id, current => current.kind === 'session'
-        ? { ...current, availability: 'missing', missingSince, running: false, revision: current.revision + 1 }
-        : current)
-    }
-    return { indexed, missing }
+    return this.sessions.upsertSessionIndexes(drafts)
   }
 
-  listSessionIndexes(query?: string, limit?: number): DeskSessionIndex[] {
-    const needle = (query ?? '').trim().toLowerCase()
-    const all = this.allNodes()
-      .filter((node): node is DeskSessionIndex => node.kind === 'session' && node.availability !== 'missing')
-      .filter(node => needle === ''
-        || node.title.toLowerCase().includes(needle)
-        || node.sessionId.toLowerCase().includes(needle)
-        || (node.cwd ?? '').toLowerCase().includes(needle))
-      .sort((left, right) => Number(right.running) - Number(left.running)
-        || right.updatedAt - left.updatedAt
-        || left.title.localeCompare(right.title))
-    const bounded = limit === undefined ? 20 : Math.min(Math.max(0, limit), 100)
-    return all.slice(0, bounded)
-  }
+  listSessionIndexes(query?: string, limit?: number): DeskSessionIndex[] { return this.sessions.listSessionIndexes(query, limit) }
 
-  findSessionIndex(sessionId: string): DeskSessionIndex | undefined {
-    const node = this.nodes.get(sessionIndexId(sessionId))
-    return node?.kind === 'session' ? node : undefined
-  }
+  findSessionIndex(sessionId: string): DeskSessionIndex | undefined { return this.sessions.findSessionIndex(sessionId) }
 
   /* ------------------------------ notebook ------------------------------ */
 
-  /** The configured notes root, if any. */
-  getNotebookConfig(): DeskNotebookConfig | undefined {
-    const node = this.nodes.get(NOTEBOOK_CONFIG_ID)
-    return node?.kind === 'notebook-config' ? node : undefined
-  }
+  getNotebookConfig(): DeskNotebookConfig | undefined { return this.notebook.getNotebookConfig() }
 
-  /** Point the library at one absolute folder (idempotent on the single record). */
-  async saveNotebookRoot(rootPath: string): Promise<DeskNotebookConfig> {
-    const now = new Date().toISOString()
-    const existing = this.getNotebookConfig()
-    if (existing === undefined) {
-      const record: DeskNotebookConfig = {
-        id: NOTEBOOK_CONFIG_ID,
-        kind: 'notebook-config',
-        schema: DESK_NODE_SCHEMA,
-        rootPath,
-        createdAt: now,
-        updatedAt: now,
-        revision: 1,
-      }
-      await this.nodes.put(record.id, record)
-      return record
-    }
-    if (existing.rootPath === rootPath) return existing
-    return await this.nodes.update(NOTEBOOK_CONFIG_ID, current => current.kind === 'notebook-config'
-      ? { ...current, rootPath, updatedAt: now, revision: current.revision + 1 }
-      : current) as DeskNotebookConfig
-  }
+  async saveNotebookRoot(rootPath: string): Promise<DeskNotebookConfig> { return this.notebook.saveNotebookRoot(rootPath) }
 
-  /** Forget the configured root (drafts stay; they are found by path again). */
-  async clearNotebookRoot(): Promise<void> {
-    await this.nodes.delete(NOTEBOOK_CONFIG_ID)
-  }
+  async clearNotebookRoot(): Promise<void> { return this.notebook.clearNotebookRoot() }
 
-  /**
-   * Choose the drafting skill for this library (`null` = no skill). The record must exist: the
-   * route rejects the request before reaching here when no library is configured.
-   * @param skillName - kebab-case skill name, or null for "no skill".
-   * @returns the updated notebook config.
-   */
-  async saveNotebookSkill(skillName: string | null): Promise<DeskNotebookConfig> {
-    const now = new Date().toISOString()
-    return await this.nodes.update(NOTEBOOK_CONFIG_ID, current => current.kind === 'notebook-config'
-      ? { ...current, skillName, updatedAt: now, revision: current.revision + 1 }
-      : current) as DeskNotebookConfig
-  }
+  async saveNotebookSkill(skillName: string | null): Promise<DeskNotebookConfig> { return this.notebook.saveNotebookSkill(skillName) }
 
-  /** Deterministic draft-box id: one draft box per file identity. */
-  private static draftId(fileId: string): string {
-    return `note_draft_${fileId}`
-  }
+  getNoteFile(id: string): NoteFileRef | undefined { return this.notebook.getNoteFile(id) }
 
-  private static baselineId(sessionId: string): string {
-    return `note_baseline_${sessionId}`
-  }
+  listNoteFiles(): NoteFileRef[] { return this.notebook.listNoteFiles() }
 
-  /** One file identity by id. */
-  getNoteFile(id: string): NoteFileRef | undefined {
-    const node = this.nodes.get(id)
-    return node?.kind === 'note-file' ? node : undefined
-  }
+  async ensureNoteFile(input: EnsureNoteFileInput): Promise<NoteFileRef> { return this.notebook.ensureNoteFile(input) }
 
-  /** All assigned file identities. */
-  listNoteFiles(): NoteFileRef[] {
-    return this.allNodes().filter((node): node is NoteFileRef => node.kind === 'note-file')
-  }
+  async updateNoteFilePath(id: string, path: string, hash: string): Promise<NoteFileRef> { return this.notebook.updateNoteFilePath(id, path, hash) }
 
-  /** Resolve or lazily assign one file identity for (rootPath, path). */
-  async ensureNoteFile(input: {
-    readonly rootPath: string
-    readonly path: string
-    readonly hash: string
-  }): Promise<NoteFileRef> {
-    const now = new Date().toISOString()
-    const existing = this.listNoteFiles().find(node => node.rootPath === input.rootPath && node.path === input.path)
-    if (existing !== undefined) {
-      if (existing.hash === input.hash) return existing
-      return await this.nodes.update(existing.id, current => current.kind === 'note-file'
-        ? { ...current, hash: input.hash, updatedAt: now, revision: current.revision + 1 }
-        : current) as NoteFileRef
-    }
-    const record: NoteFileRef = {
-      id: `note_file_${randomUUID()}`,
-      kind: 'note-file',
-      schema: DESK_NODE_SCHEMA,
-      rootPath: input.rootPath,
-      path: input.path,
-      hash: input.hash,
-      createdAt: now,
-      updatedAt: now,
-      revision: 1,
-    }
-    await this.nodes.put(record.id, record)
-    return record
-  }
+  getNoteDraft(fileId: string): NoteDraft | undefined { return this.notebook.getNoteDraft(fileId) }
 
-  /** Re-point one file identity after a rename/move. */
-  async updateNoteFilePath(id: string, path: string, hash: string): Promise<NoteFileRef> {
-    const now = new Date().toISOString()
-    return await this.nodes.update(id, current => current.kind === 'note-file'
-      ? { ...current, path, hash, updatedAt: now, revision: current.revision + 1 }
-      : current) as NoteFileRef
-  }
+  listNoteDrafts(): NoteDraft[] { return this.notebook.listNoteDrafts() }
 
-  /** One file draft box. */
-  getNoteDraft(fileId: string): NoteDraft | undefined {
-    const node = this.nodes.get(DeskStore.draftId(fileId))
-    return node?.kind === 'note-draft' && node.fileId === fileId ? node : undefined
-  }
+  async saveNoteDraft(input: SaveNoteDraftInput): Promise<NoteDraft | null> { return this.notebook.saveNoteDraft(input) }
 
-  /** All files with unsaved annotations. */
-  listNoteDrafts(): NoteDraft[] {
-    return this.allNodes().filter((node): node is NoteDraft => node.kind === 'note-draft' && node.fileId !== undefined)
-  }
+  getNoteBaseline(sessionId: string): NoteBaseline | undefined { return this.notebook.getNoteBaseline(sessionId) }
 
-  /**
-   * Replace one file draft box (bounded; drafts are the user intent, not review state).
-   * An empty batch deletes the box: a submitted review must not leave a "has drafts" shell that
-   * the entry page would count and list while the review tab shows nothing.
-   */
-  async saveNoteDraft(input: {
-    readonly rootPath: string
-    readonly path: string
-    readonly fileId: string
-    readonly drafts: readonly DraftAnnotation[]
-    /** Revision the caller last saw; when given, a mismatch fails instead of overwriting. */
-    readonly expectedRevision?: number
-  }): Promise<NoteDraft | null> {
-    const now = new Date().toISOString()
-    const id = DeskStore.draftId(input.fileId)
-    const drafts = input.drafts.slice(0, NOTEBOOK_MAX_DRAFTS)
-    const existing = this.getNoteDraft(input.fileId)
-    if (input.expectedRevision !== undefined && input.expectedRevision !== (existing?.revision ?? 0)) {
-      throw new DeskModelError('REVISION_CONFLICT', '批注草稿已被其他窗口更新，请刷新后重试')
-    }
-    if (drafts.length === 0) {
-      if (existing !== undefined) await this.nodes.delete(id)
-      return null
-    }
-    if (existing === undefined) {
-      const record: NoteDraft = {
-        id,
-        kind: 'note-draft',
-        schema: DESK_NODE_SCHEMA,
-        rootPath: input.rootPath,
-        path: input.path,
-        fileId: input.fileId,
-        drafts,
-        createdAt: now,
-        updatedAt: now,
-        revision: 1,
-      }
-      await this.nodes.put(record.id, record)
-      return record
-    }
-    return await this.nodes.update(id, current => current.kind === 'note-draft'
-      ? { ...current, rootPath: input.rootPath, path: input.path, drafts, updatedAt: now, revision: current.revision + 1 }
-      : current) as NoteDraft
-  }
+  listNoteBaselines(): NoteBaseline[] { return this.notebook.listNoteBaselines() }
 
-  /** One review round's persisted baseline for a file. */
-  /** One review session's round baseline. */
-  getNoteBaseline(sessionId: string): NoteBaseline | undefined {
-    const node = this.nodes.get(DeskStore.baselineId(sessionId))
-    return node?.kind === 'note-baseline' && node.sessionId === sessionId ? node : undefined
-  }
+  async saveNoteBaseline(input: SaveNoteBaselineInput): Promise<NoteBaseline | null> { return this.notebook.saveNoteBaseline(input) }
 
-  /** Round baselines newest first (bounded by the storage cap). */
-  listNoteBaselines(): NoteBaseline[] {
-    return this.allNodes()
-      .filter((node): node is NoteBaseline => node.kind === 'note-baseline' && node.sessionId !== undefined)
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-      .slice(0, NOTEBOOK_MAX_REVIEW_BASELINES)
-  }
+  /* ------------------------ review markers / records ------------------------ */
 
-  /**
-   * Store or replace one file's review baseline. Oversized bodies delete the stored value so a
-   * huge file cannot bloat the storage domain; the tab keeps the in-memory baseline.
-   */
-  async saveNoteBaseline(input: {
-    readonly rootPath: string
-    readonly sessionId: string
-    readonly fileId: string
-    readonly body: string
-    readonly at: string
-  }): Promise<NoteBaseline | null> {
-    const id = DeskStore.baselineId(input.sessionId)
-    const existing = this.getNoteBaseline(input.sessionId)
-    if (input.body.length > NOTEBOOK_BASELINE_MAX_CHARS) {
-      if (existing !== undefined) await this.nodes.delete(id)
-      return null
-    }
-    const now = new Date().toISOString()
-    if (existing === undefined) {
-      const record: NoteBaseline = {
-        id,
-        kind: 'note-baseline',
-        schema: DESK_NODE_SCHEMA,
-        rootPath: input.rootPath,
-        sessionId: input.sessionId,
-        fileId: input.fileId,
-        body: input.body,
-        at: input.at,
-        createdAt: now,
-        updatedAt: now,
-        revision: 1,
-      }
-      await this.nodes.put(record.id, record)
-      await this.pruneNoteBaselines()
-      return record
-    }
-    return await this.nodes.update(id, current => current.kind === 'note-baseline'
-      ? {
-          ...current,
-          rootPath: input.rootPath,
-          // The note identity is authoritative per save: a Session reused for another note must not
-          // keep serving the previous note's body as this round's baseline.
-          fileId: input.fileId,
-          body: input.body,
-          at: input.at,
-          updatedAt: now,
-          revision: current.revision + 1,
-        }
-      : current) as NoteBaseline
-  }
+  listReviewSessions(): ReviewSessionMarker[] { return this.review.listReviewSessions() }
 
-  /** Delete the oldest round baselines beyond the cap. */
-  private async pruneNoteBaselines(): Promise<void> {
-    const baselines = this.allNodes().filter((node): node is NoteBaseline => node.kind === 'note-baseline' && node.sessionId !== undefined)
-    if (baselines.length <= NOTEBOOK_MAX_REVIEW_BASELINES) return
-    baselines.sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
-    for (const baseline of baselines.slice(0, baselines.length - NOTEBOOK_MAX_REVIEW_BASELINES)) {
-      await this.nodes.delete(baseline.id)
-    }
-  }
+  async markReviewSession(input: MarkReviewSessionInput): Promise<ReviewSessionMarker> { return this.review.markReviewSession(input) }
 
-  /* ------------------------ review session markers ------------------------ */
+  async createReviewRecord(input: CreateReviewRecordInput): Promise<ReviewRecord> { return this.review.createReviewRecord(input) }
 
-  /** Stable id for one marked Session. */
-  private static reviewSessionId(sessionId: string): string {
-    return `review_session_${sessionId}`
-  }
+  listReviewRecords(): ReviewRecord[] { return this.review.listReviewRecords() }
 
-  /** All durable review-session markers, newest first (bounded by the storage cap). */
-  listReviewSessions(): ReviewSessionMarker[] {
-    return this.allNodes()
-      .filter((node): node is ReviewSessionMarker => node.kind === 'review-session')
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-      .slice(0, NOTEBOOK_MAX_REVIEW_SESSIONS)
-  }
+  async deleteReviewRecord(id: string): Promise<void> { return this.review.deleteReviewRecord(id) }
 
-  /**
-   * Mark or refresh one Session as a review session. Called when the review tab mounts, so a
-   * re-open only bumps the timestamp; old markers are pruned so the domain stays bounded.
-   *
-   * The note identity is first-binding-wins: the official workspace flow may reuse a blank Session
-   * for a different note, and letting the later tab overwrite `fileId` would erase the previous
-   * note's reuse marker. Re-binding information lives in the tab params / baseline instead.
-   */
-  async markReviewSession(input: {
-    readonly sessionId: string
-    readonly workspaceId?: string
-    readonly fileId?: string
-  }): Promise<ReviewSessionMarker> {
-    const id = DeskStore.reviewSessionId(input.sessionId)
-    const now = new Date().toISOString()
-    const existing = this.nodes.get(id)
-    if (existing?.kind === 'review-session') {
-      return await this.nodes.update(id, current => current.kind === 'review-session'
-        ? {
-            ...current,
-            ...input.workspaceId === undefined ? {} : { workspaceId: input.workspaceId },
-            ...input.fileId === undefined || current.fileId !== undefined
-              ? {}
-              : { fileId: input.fileId },
-            updatedAt: now,
-            revision: current.revision + 1,
-          }
-        : current) as ReviewSessionMarker
-    }
-    const marker: ReviewSessionMarker = {
-      id,
-      kind: 'review-session',
-      schema: DESK_NODE_SCHEMA,
-      sessionId: input.sessionId,
-      ...input.workspaceId === undefined ? {} : { workspaceId: input.workspaceId },
-      ...input.fileId === undefined ? {} : { fileId: input.fileId },
-      createdAt: now,
-      updatedAt: now,
-      revision: 1,
-    }
-    await this.nodes.put(id, marker)
-    await this.pruneReviewSessions()
-    return marker
-  }
-
-  /** Delete the oldest markers beyond the cap. */
-  private async pruneReviewSessions(): Promise<void> {
-    const markers = this.allNodes().filter((node): node is ReviewSessionMarker => node.kind === 'review-session')
-    if (markers.length <= NOTEBOOK_MAX_REVIEW_SESSIONS) return
-    markers.sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
-    for (const marker of markers.slice(0, markers.length - NOTEBOOK_MAX_REVIEW_SESSIONS)) {
-      await this.nodes.delete(marker.id)
-    }
-  }
-
-  /* ---------------------------- review records ---------------------------- */
-
-  /** One submitted review record. */
-  async createReviewRecord(input: {
-    readonly sessionId: string
-    readonly workspaceId?: string
-    readonly fileId: string
-    readonly fileTitle: string
-    readonly pathSnapshot: string
-    readonly annotations: readonly DraftAnnotation[]
-  }): Promise<ReviewRecord> {
-    const annotations = input.annotations.slice(0, NOTEBOOK_MAX_DRAFTS)
-    const record: ReviewRecord = {
-      id: `review_record_${randomUUID()}`,
-      kind: 'review-record',
-      schema: DESK_NODE_SCHEMA,
-      sessionId: input.sessionId,
-      ...input.workspaceId === undefined ? {} : { workspaceId: input.workspaceId },
-      fileId: input.fileId,
-      fileTitle: input.fileTitle,
-      pathSnapshot: input.pathSnapshot,
-      annotations,
-      bytes: Buffer.byteLength(JSON.stringify(annotations), 'utf8'),
-      createdAt: new Date().toISOString(),
-    }
-    await this.nodes.put(record.id, record)
-    return record
-  }
-
-  /** All submitted review records, newest first. */
-  listReviewRecords(): ReviewRecord[] {
-    return this.allNodes()
-      .filter((node): node is ReviewRecord => node.kind === 'review-record')
-      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-  }
-
-  /** Delete one review record. */
-  async deleteReviewRecord(id: string): Promise<void> {
-    await this.nodes.delete(id)
-  }
-
+  /* ------------------------------ lifecycle ------------------------------ */
 
   /** Close the storage domain (plugin unload / host shutdown, via the effect). */
-  close(): Promise<void> {
-    return this.domain.close()
-  }
+  close(): Promise<void> { return this.core.close() }
 }
