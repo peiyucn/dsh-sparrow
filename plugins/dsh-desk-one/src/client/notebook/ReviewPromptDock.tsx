@@ -14,13 +14,13 @@ import { DeskGlyph } from '../brand.js'
 
 /** Runtime props: session-scoped dock owner passes the session snapshot; locale comes from our namespace. */
 interface ReviewPromptDockProps extends PropsLocale<typeof LOCALE_NAMESPACE> {
-  readonly session: { readonly id: string }
+  readonly session: { readonly sessionId: string }
 }
 
 export function ReviewPromptDock({ session, t }: ReviewPromptDockProps): ReactNode {
   const [, setVersion] = useState(0)
   useEffect(() => subscribeReviewSessions(() => { setVersion(value => value + 1) }), [])
-  if (!isReviewSession(session.id)) return null
+  if (!isReviewSession(session.sessionId)) return null
   return (
     <div className="dsh-desk-review-prompt" role="status">
       <span className="dsh-desk-review-prompt-avatar" aria-hidden="true"><DeskGlyph size={15} /></span>
