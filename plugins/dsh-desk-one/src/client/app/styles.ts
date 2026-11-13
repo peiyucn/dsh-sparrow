@@ -227,6 +227,39 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   height: 14px;
   flex: none;
 }
+/* Quiet row-end shortcut: same 35px tab box / text baseline as the tabs, flush to the content
+   right edge, so it reads as tab-row utility rather than a toolbar action. */
+.dsh-desk-shortcut {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: 35px;
+  margin: -10px 0 0 auto;
+  padding: 10px 0 9px 12px;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+.dsh-desk-shortcut svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.dsh-desk-shortcut:hover {
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-desk-shortcut[data-pinned='true'] {
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
 
 /* Content fills the page; each view offsets its own content below the header. */
 .dsh-desk-body {

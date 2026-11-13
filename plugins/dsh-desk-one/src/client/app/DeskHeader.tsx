@@ -2,10 +2,10 @@
  * Persistent panel header: official conversation-header geometry.
  *
  * Row 1: brand lockup (glyph + inverted wordmark) + one-line intro + info button, with the
- * "add current tab to the left rail" toggle and the active view's actions on the right.
- * Row 2: official conversation-style plain text tabs, each with the same glyph the optional
- * left-rail entry uses. The header is a fixed 76px overlay; feature views offset their first
- * line below it.
+ * active view's actions on the right. Row 2: official conversation-style plain text tabs, each
+ * with the same glyph the optional left-rail entry uses; the row ends with a quiet text action
+ * that adds the current tab to the left rail (or removes it again).
+ * The header is a fixed 76px overlay; feature views offset their first line below it.
  */
 
 import type { ReactElement, ReactNode } from 'react'
@@ -25,7 +25,7 @@ interface DeskHeaderProps {
   readonly pinned: boolean
   /** Add the current tab to the left rail, or remove it again (dynamic, persisted). */
   readonly onTogglePin: () => void
-  /** Active view actions; rendered on the title-row right edge, after the shortcut toggle. */
+  /** Active view actions; rendered on the title-row right edge. */
   readonly actions: ReactNode
 }
 
@@ -42,21 +42,9 @@ export function DeskHeader({ t, tab, onSelectTab, pinned, onTogglePin, actions }
           <p className="dsh-desk-intro">{t('page.subtitle')}</p>
           <DeskIntroInfo t={t} />
         </div>
-        <div className="dsh-desk-header-actions" data-window-drag-recall>
-          <button
-            type="button"
-            className="dsh-desk-action"
-            aria-label={shortcutLabel}
-            aria-pressed={pinned}
-            data-pinned={pinned}
-            title={shortcutLabel}
-            onClick={onTogglePin}
-          >
-            <IconPanelLeftOutlineRegular />
-            <span className="dsh-desk-action-label">{shortcutLabel}</span>
-          </button>
-          {actions}
-        </div>
+        {actions === null ? null : (
+          <div className="dsh-desk-header-actions" data-window-drag-recall>{actions}</div>
+        )}
       </div>
       <nav className="dsh-desk-tabs">
         <div className="dsh-desk-viewtabs" role="tablist">
@@ -74,6 +62,18 @@ export function DeskHeader({ t, tab, onSelectTab, pinned, onTogglePin, actions }
           ))}
         </div>
         <DeskTabMenu t={t} tab={tab} onSelectTab={onSelectTab} entries={OVERFLOW_TABS} />
+        <button
+          type="button"
+          className="dsh-desk-shortcut"
+          aria-label={shortcutLabel}
+          aria-pressed={pinned}
+          data-pinned={pinned}
+          title={shortcutLabel}
+          onClick={onTogglePin}
+        >
+          <IconPanelLeftOutlineRegular />
+          <span>{shortcutLabel}</span>
+        </button>
       </nav>
     </header>
   )
