@@ -10,7 +10,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
-  Button, DiffBlock, DisclosureRow, IconChevronDownOutlineRegular, IconCopyOutlineRegular,
+  Button, DiffBlock, DisclosureRow, FileTypeIcon, IconChevronDownOutlineRegular, IconCopyOutlineRegular,
   IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
   MarkdownText, Pill, SegmentedTabs, Tooltip, diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -586,5 +586,10 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
 
 /** Tab chip title. */
 export function NoteReviewTabTitle(props: PropsLocale<typeof LOCALE_NAMESPACE>): ReactElement {
-  return <>{props.t('review.tabTitle')}</>
+  return (
+    <>
+      <FileTypeIcon kind="markdown" size={16} className="dsh-desk-review-tabicon" />
+      {props.t('review.tabTitle')}
+    </>
+  )
 }

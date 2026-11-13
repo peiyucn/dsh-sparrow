@@ -14,6 +14,13 @@ export const REVIEW_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
 }
+/* Coloured markdown sheet before the review tab title, mirroring official file/Browser tab titles. */
+.dsh-desk-review-tabicon {
+  flex: 0 0 auto;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
 /* Mirrors the official document-preview header: 38px row, official viewer-tool button, hairline. */
 .dsh-desk-review-head {
   display: flex;
