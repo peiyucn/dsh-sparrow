@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review guidance**: every review Session — a blank new one or a conversation already under way — keeps the review guidance in the composer whenever it is empty instead of falling back to the official placeholder; it hides while typing and returns once the input is empty again.
+
 * **Review bottom bar**: the “This round’s changes” button no longer shows an “unchanged” tag; the +A/−D counts appear only when there are changes.
 
 * **Review bottom bar**: the second segment is now a list-pen / clock icon that opens the annotation-drafts / annotation-records overlay directly (a second click closes it) — no intermediate menu, and the icon inherits the button ink.

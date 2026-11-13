@@ -1,7 +1,8 @@
 /**
  * Placeholder-style review guidance rendered INSIDE the resident composer card
- * (`conversation.input.overlay`): it stands in for the official placeholder while the review
- * Session is blank, and disappears as soon as the conversation starts or the user types.
+ * (`conversation.input.overlay`). Every review Session keeps it as the composer placeholder —
+ * a blank new one and a conversation already under way alike — and it disappears only while the
+ * user is typing, because the official placeholder unmounts then (see review-styles.ts).
  */
 
 import { useEffect, useState, type ReactNode } from 'react'
@@ -11,13 +12,11 @@ import { isReviewSession, subscribeReviewSessions } from '../reviewSessions.js'
 
 interface ReviewComposerHintProps extends PropsLocale<typeof LOCALE_NAMESPACE> {
   readonly sessionId?: string
-  readonly useSession?: (selector: (snapshot: { readonly blank?: boolean }) => boolean) => boolean
 }
 
-export function ReviewComposerHint({ sessionId, useSession, t }: ReviewComposerHintProps): ReactNode {
+export function ReviewComposerHint({ sessionId, t }: ReviewComposerHintProps): ReactNode {
   const [, setVersion] = useState(0)
   useEffect(() => subscribeReviewSessions(() => { setVersion(value => value + 1) }), [])
-  const blank = useSession === undefined ? true : useSession(snapshot => snapshot.blank !== false)
-  if (sessionId === undefined || !isReviewSession(sessionId) || !blank) return null
+  if (sessionId === undefined || !isReviewSession(sessionId)) return null
   return <div className="dsh-desk-review-composer-hint" role="status">{t('review.composerHint')}</div>
 }

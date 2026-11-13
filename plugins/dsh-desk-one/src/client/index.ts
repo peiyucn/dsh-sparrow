@@ -145,7 +145,9 @@ export function apply(ctx: ClientContext): void {
       return () => {}
     }
   })
-  // Placeholder-style hint inside the composer card for blank review sessions.
+  // Placeholder-style review guidance inside the composer card: every review Session shows it
+  // whenever the composer is empty, so opening an old review conversation does not fall back to
+  // the official placeholder.
   void ctx.slots.inject('conversation.input.overlay' as never, () => {
     try {
       return ctx.slots.register({

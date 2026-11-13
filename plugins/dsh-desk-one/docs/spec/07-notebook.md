@@ -83,7 +83,7 @@
 - frontmatter：代码视图把 `page.frontmatter` 原始块（含两条 `---` 围栏）作为源码行显示，行号与真实文件一致；MD 视图在正文前把 `page.fields` 内联渲染为只读元数据块，随内容一起滚动，**不吸顶**（与官方 markdown / 代码展示一致）。
 - 本轮基线：**按审阅会话（sessionId）** 持久化在宿主 `desk_one` 域的 `note-baseline` 记录（不是浏览器 storage，清浏览器缓存不丢；正文上限 1MB（与可审阅文件上限一致），超限删除宿主记录、只保留内存基线；最多保留 200 条按 `updatedAt` 淘汰）。打开审阅时若无该会话的基线，自动取当前正文作为本轮基线；刷新 / 重开同一个 tab 不重置；新开一个审阅会话即自动开始新一轮，不再提供「以当前为基线」按钮。
 - 侧栏标记：审阅会话在官方 `sidebar.session.row.leading`（root 级，16px 前置格）注册笔记功能区 tab 的图标（`IconListPenOutlineRegular`，与「笔记」tab 一致）标记；审阅 tab 标题也用同一图标；标记由宿主 `desk_one` 域的 `review-session` 节点持久化（每会话一条，上限 500 条按 `updatedAt` 淘汰），客户端启动时 hydrate；行处于运行 / 待处理状态时官方用状态点替换该格，此时同一标记改注册到 `sidebar.session.row.trailing`（时间标签后）继续显示；归档行不显示。
-- 对话提示：审阅会话在官方 `conversation.input.overlay`（session 级）注册一个输入框内的 placeholder 式引导「选中右栏内的文本，点击「批注」开始审阅；提交批注后我在这边修订。」；官方 placeholder 在提示存在时透明，输入文字或对话开始后提示消失。
+- 对话提示：审阅会话在官方 `conversation.input.overlay`（session 级）注册一个输入框内的 placeholder 式引导「选中右栏内的文本，点击「批注」开始审阅；提交批注后我在这边修订。」；**只要是审阅会话**（空白新会话与对话已开始的都算），输入框为空时该引导一直显示并顶替官方 placeholder；开始输入后官方 placeholder 消失，引导随之隐藏，清空后重新出现。
 - 视觉规范：入口页、审阅 tab、官方预览按钮统一用官方主题 token 与官方基础组件
   （Button / Input / SegmentedTabs / Pill / Tag / Modal），不自造按钮/胶囊样式；
   官方预览头部的「审阅视图」按钮与相邻头部按钮一致（官方 ghost 图标按钮，无彩色底、同一间距）。底部按钮使用官方主按钮材质，不复制自定义玻璃组件。
