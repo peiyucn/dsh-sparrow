@@ -27,10 +27,13 @@ export const REVIEW_CSS = `
   line-height: 20px;
   white-space: normal;
 }
-[data-composer-card]:has(.dsh-desk-review-composer-hint) textarea::placeholder {
-  color: transparent;
+/* The official composer draws its placeholder as a [data-composer-placeholder] div (the
+   editable surface is Lexical, not a textarea): hide that div while our hint stands in, and hide
+   the hint once the official placeholder disappears (i.e. the user typed something). */
+body:has(.dsh-desk-review-composer-hint) [data-composer-placeholder] {
+  display: none;
 }
-[data-composer-card]:has(textarea:not(:placeholder-shown)) .dsh-desk-review-composer-hint {
+body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   display: none;
 }
 /* Sidebar session-row leading cell: the same blue brand mark as the bubble avatar, miniaturised. */
