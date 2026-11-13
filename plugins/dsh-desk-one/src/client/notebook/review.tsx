@@ -25,6 +25,7 @@ import { formatDateTime, formatTime, messageOf } from '../app/utils.js'
 import type { NotebookApi } from './api.js'
 import { lineChanges } from './review-changes.js'
 import type { NoteReviewParams, ReviewBridge } from './review-bridge.js'
+import { readReviewTabParams, recoverReviewParams, writeReviewTabParams } from './review-tab-memory.js'
 
 /** What the tab receives from the client entry. */
 export interface NoteReviewInjected {
@@ -93,10 +94,38 @@ function AnnotationCard(props: {
 export function NoteReviewTab(props: ReviewProps): ReactElement {
   const { t, notebook, bridge, sessionId, useTabInfo } = props
   const info = useTabInfo()
-  const params = info.tab.navigation.params as NoteReviewParams | undefined
+  const navigationParams = info.tab.navigation.params as NoteReviewParams | undefined
+  /** Official sidebar restores the tab layout without its navigation params; recover the note. */
+  const [recovered, setRecovered] = useState<NoteReviewParams | null>(null)
+  const [recovering, setRecovering] = useState(navigationParams === undefined)
+  const params = navigationParams ?? recovered ?? readReviewTabParams(sessionId)
   const path = params?.path
   const fileId = params?.fileId
   const workspaceId = params?.workspaceId
+  // Remember the params when they arrive, and resolve a restored tab from the memo / host markers.
+  useEffect(() => {
+    if (navigationParams !== undefined) {
+      writeReviewTabParams(sessionId, navigationParams)
+      setRecovered(null)
+      setRecovering(false)
+      return
+    }
+    if (readReviewTabParams(sessionId) !== undefined) {
+      setRecovering(false)
+      return
+    }
+    let cancelled = false
+    setRecovering(true)
+    void recoverReviewParams(notebook, sessionId).then((next) => {
+      if (cancelled) return
+      if (next !== undefined) writeReviewTabParams(sessionId, next)
+      setRecovered(next ?? null)
+      setRecovering(false)
+    }, () => {
+      if (!cancelled) setRecovering(false)
+    })
+    return () => { cancelled = true }
+  }, [navigationParams, notebook, sessionId])
   // Any session showing the review tab counts as a review session, including ones opened before
   // this build. Marking is durable so the sidebar icon survives a restart.
   useEffect(() => {
@@ -395,7 +424,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     : { added: changes.addedLines.length, removed: changes.removed }
 
   if (path === undefined || fileId === undefined) {
-    return <div className="dsh-desk-review"><p className="dsh-desk-notebook-hint">{t('review.noPath')}</p></div>
+    return <div className="dsh-desk-review"><p className="dsh-desk-notebook-hint">{recovering ? t('state.loading') : t('review.noPath')}</p></div>
   }
 
   const composerCard = (

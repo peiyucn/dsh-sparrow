@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review tab restore**: opening an old review session directly now restores the note in the「笔记审阅」tab (the official sidebar restores the tab layout but not its navigation params) instead of showing “no file specified”.
+
 * **Review scroll clearance**: at the end of the code / rendered view the last lines stop above the floating buttons, so the “Submit annotations / This round’s changes” bar no longer covers them and the tail stays selectable for annotating.
 
 * **Review changes overlay**: in the collapsed row the “+A” / “−A” count tags now keep a gap from the title text and from each other instead of touching.
