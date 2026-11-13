@@ -1,8 +1,9 @@
 // @ts-check
 /**
  * i18n contract: the zh / en dictionaries are two views of the same key set, and the TypeScript
- * locale augmentation must cover every key (otherwise `t('…')` silently stops type-checking).
- * Copy itself is free to change; keys and placeholder slots are the contract.
+ * locale augmentation must DERIVE from the dictionary instead of carrying a second handwritten key
+ * union (otherwise `t('…')` silently stops type-checking on a missed key). Copy itself is free to
+ * change; keys and placeholder slots are the contract.
  */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
@@ -39,11 +40,20 @@ describe('locale 契约', () => {
     assert.deepEqual(placeholderMismatch, [], 'zh / en 同一键的占位符必须一致（否则译文会丢参数）')
   })
 
-  it('locale.d.ts 应该覆盖全部字典键', async () => {
-    const source = await read('src/client/locale.d.ts')
-    assert.ok(source.includes(`'${LOCALE_NAMESPACE}':`), `locale.d.ts 必须声明命名空间 '${LOCALE_NAMESPACE}'`)
-    const missing = ZH_KEYS.filter(key => !source.includes(`'${key}'`))
-    assert.deepEqual(missing, [], 'locale.d.ts 缺字典键（t() 的键会失去类型检查）')
+  it('locale.d.ts 应该从字典派生命名空间键集（不得手写第二份 key 联合）', async () => {
+    const [augmentation, i18n] = await Promise.all([read('src/client/locale.d.ts'), read('src/client/i18n.ts')])
+    assert.match(i18n, /export type DeskLocaleKey = keyof typeof ZH/u, 'i18n.ts 必须从 zh 字典导出 DeskLocaleKey')
+    assert.match(
+      augmentation,
+      /import type \{[^}]*\bDeskLocaleKey\b[^}]*\} from '\.\/i18n\.js'/u,
+      'locale.d.ts 必须从 ./i18n.js 导入派生类型 DeskLocaleKey',
+    )
+    assert.match(
+      augmentation,
+      new RegExp(`'${LOCALE_NAMESPACE}':\\s*DeskLocaleKey`, 'u'),
+      `locale.d.ts 的 '${LOCALE_NAMESPACE}' 命名空间值必须是派生的 DeskLocaleKey`,
+    )
+    assert.doesNotMatch(augmentation, /\|\s*'[A-Za-z][^'\n]*'/u, 'locale.d.ts 不得再手写 key 联合（必须从字典派生）')
   })
 
   it('tab 注册表与 i18n 应该对齐：每个 tab 都有标签键，可见 / 溢出两份覆盖全部 tab', async () => {
