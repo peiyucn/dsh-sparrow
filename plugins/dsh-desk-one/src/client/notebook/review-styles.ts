@@ -16,21 +16,35 @@ export const REVIEW_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
 }
-/* Placeholder-style review guidance inside the composer card. */
+/* Placeholder-style review guidance inside the composer card. Reproduces the official
+   composer placeholder (DraftEditor's placeholder div) box for box: that element is inset 4px
+   inside the grow box, which starts below the card's 8px top pad, so the caret line starts 12px
+   from the card's border box where the overlay anchor sits; the text column starts 14px in and
+   the scrollport's 4px right margin widens the right inset to 12px. Type is inherited from the
+   card, exactly like the official placeholder. */
 .dsh-desk-review-composer-hint {
   position: absolute;
-  /* Same box and type as the official composer placeholder (.placeholder): the
-     overlay anchor sits at the card top, the editable's pads start the text 4px down / 14px in. */
-  top: 4px;
+  top: 12px;
   left: 14px;
-  right: 8px;
+  right: 12px;
   z-index: 0;
   pointer-events: none;
+  user-select: none;
   color: var(--dsw-alias-label-caption, #8a919f);
   font: inherit;
   line-height: inherit;
-  white-space: normal;
+  /* Docked composers keep the official one-line ellipsis. */
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The hero (centred empty-state) composer clamps its placeholder to two lines instead. */
+[data-phase='hero'] .dsh-desk-review-composer-hint {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
 }
 /* The official composer draws its placeholder as a [data-composer-placeholder] div (the
    editable surface is Lexical, not a textarea): hide that div while our hint stands in, and hide

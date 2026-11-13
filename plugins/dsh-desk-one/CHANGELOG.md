@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review composer hint**: the placeholder-style guidance now matches the official placeholder box — same type and caret origin, one-line ellipsis in the docked composer, two-line clamping in the hero empty state.
+
 * **Session list**: every row gains copy-name and copy-session-id buttons (active, archived, stray and trash alike) with success / failure feedback on the button itself.
 * **Review highlight**: after a review round, the code view highlights the lines this round added or rewrote, using the same diff material and line script as the bottom bar’s +A/−D counts.
 
