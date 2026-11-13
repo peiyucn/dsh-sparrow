@@ -2,20 +2,23 @@
  * dsh-desk-one main panel.
  *
  * This file is composition only: state lives in the hooks under `hooks/`, rendering in the
- * components under `components/`. The notes wall is a fixed-width, vertically infinite canvas;
- * the collection itself is capped (100 on the wall, 200 in the trash).
+ * components under `components/` and in each feature's folder. The notes wall's own behavior lives
+ * in `client/notes/` (`useNoteWall` + `NotesWall`); this shell only switches tabs and wires the
+ * shared header actions.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import {
-  LOCALE_NAMESPACE, MAX_ACTIVE_NOTES, NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH, TAB_STORAGE_KEY,
-} from '../../constants.js'
-import type { DeskNote, NoteColor } from '../../contract.js'
+import { LOCALE_NAMESPACE, TAB_STORAGE_KEY } from '../../constants.js'
 import { notesActions, scheduleActions, taskActions } from './headerActions.js'
-import { NoteCard } from '../notes/components/NoteCard.js'
+import { NotesWall } from '../notes/NotesWall.js'
+import { useNoteWall } from '../notes/useNoteWall.js'
 import { TrashPanel } from '../notes/components/TrashPanel.js'
+import { useNoteDrag } from '../notes/hooks/useNoteDrag.js'
+import { useNotesData } from '../notes/hooks/useNotesData.js'
+import { useTrash } from '../notes/hooks/useTrash.js'
+import { useWallLayout } from '../notes/hooks/useWallLayout.js'
 import { NotebookView } from '../notebook/NotebookView.js'
 import { NotebookHeaderActions } from '../notebook/HeaderActions.js'
 import { useNotebookPage } from '../notebook/hooks/useNotebookPage.js'
@@ -26,20 +29,13 @@ import { useSessionLinks } from '../tasks/hooks/useSessionLinks.js'
 import { useGroupsData } from '../tasks/hooks/useGroupsData.js'
 import { useTaskBoard } from '../tasks/hooks/useTaskBoard.js'
 import { useTasksData } from '../tasks/hooks/useTasksData.js'
-import { useNoteDrag } from '../notes/hooks/useNoteDrag.js'
-import { useNotesData } from '../notes/hooks/useNotesData.js'
-import { useTrash } from '../notes/hooks/useTrash.js'
-import { useWallLayout } from '../notes/hooks/useWallLayout.js'
 import type { DeskPanelInjected } from '../install.js'
 import type { DeskTranslator, Tab } from './types.js'
 import { DeskHeader } from './DeskHeader.js'
-import { messageOf, readInitialTab } from './utils.js'
+import { readInitialTab } from './utils.js'
 
 /** Page props: main-panel owner share + injected actions + locale seat (assembled by the host). */
 type DeskPanelProps = PropsRuntime<'main'> & InjectFace<DeskPanelInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
-
-/** Colours cycled for freshly captured notes (default colour is left to the user). */
-const STICKY_COLORS: readonly NoteColor[] = ['yellow', 'green', 'blue', 'pink']
 
 export function DeskOnePage(props: DeskPanelProps) {
   const {
@@ -50,9 +46,6 @@ export function DeskOnePage(props: DeskPanelProps) {
   } = props
   // A left-rail entry opens its own tab; the base entry (no initialTab) resumes the last visited tab.
   const [tab, setTab] = useState<Tab>(() => initialTab ?? readInitialTab())
-  /** Guards double-click / double-tap while one create request is in flight. */
-  const [creating, setCreating] = useState(false)
-  const zTopRef = useRef(0)
   const scheduleActionsRef = useRef<ScheduleHeaderActions | null>(null)
   const [onSourcesPage, setOnSourcesPage] = useState(false)
   const [scheduleIssues, setScheduleIssues] = useState(0)
@@ -80,6 +73,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     }
   }, [])
 
+  // Notes wall: data, trash, geometry … and the wall's own behavior (create / raise / commit).
   const data = useNotesData(t, { listNotes, updateNote, deleteNote })
   const trash = useTrash({
     notes: data.notes,
@@ -92,6 +86,15 @@ export function DeskOnePage(props: DeskPanelProps) {
   const canvasRef = useRef<HTMLDivElement | null>(null)
   const { wallRef, setWallRef, wallSize, placed } = useWallLayout(tab === 'notes', trash.activeNotes)
   const drag = useNoteDrag({ wallSize, wallRef, canvasRef, setNotes: data.setNotes, savePatch: data.savePatch })
+  const wall = useNoteWall({
+    t,
+    data,
+    trash,
+    wallRef,
+    wallSize,
+    selectNotesTab: () => selectTab('notes'),
+    createNote,
+  })
 
   // Task board data + state live here (not inside TaskBoard) so the shared header can own the
   // view actions: new task, sort mode and the archive toggle.
@@ -126,115 +129,6 @@ export function DeskOnePage(props: DeskPanelProps) {
     onDraftWithAi: draftWithAi,
   })
 
-  /** Click / drag / resize raises one note to the top; skip the write when it already is. */  const raise = useCallback((noteId: string): void => {
-    const current = data.notes.find(item => item.id === noteId)
-    if (current === undefined) return
-    const maxZ = data.notes.reduce((max, item) => Math.max(max, item.z ?? 0), zTopRef.current)
-    if (current.z !== undefined && current.z === maxZ) return
-    zTopRef.current = maxZ + 1
-    const layer = zTopRef.current
-    data.setNotes(list => list.map(item => item.id === noteId ? { ...item, z: layer } : item))
-    data.savePatch(current, { z: layer })
-  }, [data])
-
-  /** Body blur commits; a brand-new blank note is dropped instead of leaving an empty sticker. */
-  const commitBody = useCallback((note: DeskNote, element: HTMLTextAreaElement): void => {
-    const body = element.value
-    if (body === note.body) return
-    if (body.trim() === '' && note.body.trim() === '') {
-      data.removeWithFeedback(note.id)
-      return
-    }
-    data.savePatch(note, { body })
-  }, [data])
-
-  /** Capture via + / double-click: place at the given point (or centre), top layer, focused. */
-  const addNote = useCallback(async (point?: { x: number; y: number }): Promise<void> => {
-    if (creating) return
-    if (trash.activeNotes.length >= MAX_ACTIVE_NOTES) {
-      data.setActionError(t('wall.full'))
-      return
-    }
-    const offset = (trash.activeNotes.length % 6) * 18
-    const scrollTop = wallRef.current?.scrollTop ?? 0
-    const anchorX = point === undefined ? Math.max(0, (wallSize.width - NOTE_DEFAULT_WIDTH) / 2) + offset : point.x
-    const anchorY = point === undefined
-      ? scrollTop + Math.max(0, (wallSize.height - NOTE_DEFAULT_HEIGHT) / 2) + offset
-      : point.y
-    const layer = data.notes.reduce((max, item) => Math.max(max, item.z ?? 0), zTopRef.current) + 1
-    zTopRef.current = layer
-    setCreating(true)
-    try {
-      const note = await createNote({
-        body: '',
-        color: STICKY_COLORS[trash.activeNotes.length % STICKY_COLORS.length] ?? 'yellow',
-        x: Math.max(0, Math.round(anchorX)),
-        y: Math.max(0, Math.round(anchorY)),
-        z: layer,
-      })
-      // Show it on top immediately even when the running host ignores the create-time z.
-      data.appendNote(note.z === layer ? note : { ...note, z: layer })
-      selectTab('notes')
-      trash.setShowTrash(false)
-      if (note.z !== layer) data.persistZ(note, layer)
-      requestAnimationFrame(() => {
-        wallRef.current?.querySelector<HTMLTextAreaElement>(`[data-note-id="${note.id}"] textarea`)?.focus()
-      })
-    } catch (reason) {
-      data.setActionError(t('state.saveFailed', { message: messageOf(reason) }))
-    } finally {
-      setCreating(false)
-    }
-  }, [createNote, creating, data, selectTab, t, trash, wallRef, wallSize.height, wallSize.width])
-
-  const renderWall = (): ReactElement => (
-    <div
-      className="dsh-desk-wall"
-      ref={setWallRef}
-      onDoubleClick={(event) => {
-        // Listen on the scrollport: empty space below the canvas box is still part of the wall.
-        // Notes and controls own their double-clicks; coordinates are canvas-relative.
-        const target = event.target as HTMLElement
-        if (target.closest('.dsh-desk-note, button, textarea, input, .dsh-desk-wall-tip')) return
-        const canvas = canvasRef.current
-        if (canvas === null) return
-        const rect = canvas.getBoundingClientRect()
-        void addNote({
-          x: event.clientX - rect.left - NOTE_DEFAULT_WIDTH / 2,
-          y: event.clientY - rect.top - NOTE_DEFAULT_HEIGHT / 2,
-        })
-      }}
-    >
-      <div className="dsh-desk-wall-canvas" ref={canvasRef}>
-        {data.loading
-          ? <p className="dsh-desk-wall-hint">{t('state.loading')}</p>
-          : trash.activeNotes.length === 0
-            ? (
-                <p className="dsh-desk-wall-tip">
-                  <span className="dsh-desk-wall-tip-main">{t('wall.tip')}</span>
-                  <span className="dsh-desk-wall-tip-sub">{t('wall.tipAlt')}</span>
-                </p>
-              )
-            : null}
-        {placed.map((item, index) => (
-          <NoteCard
-            key={item.note.id}
-            item={item}
-            animating={trash.smashing || trash.trashingIds.has(item.note.id)}
-            animationDelayMs={trash.smashing ? Math.min(index, 8) * 18 : 0}
-            t={t}
-            onRaise={raise}
-            onDragStart={drag.startDrag}
-            onResizeStart={drag.startResize}
-            onColor={(note: DeskNote, color: NoteColor) => data.savePatch(note, { color })}
-            onTrash={trash.trashNote}
-            onBodyCommit={commitBody}
-          />
-        ))}
-      </div>
-    </div>
-  )
-
   /** Notes/trash actions float over the canvas so notes can scroll underneath them. */
   const renderNotebook = (): ReactElement => <NotebookView page={notebookPage} />
 
@@ -249,8 +143,8 @@ export function DeskOnePage(props: DeskPanelProps) {
         smashing: trash.smashing,
         confirmSmash: trash.confirmSmash,
         smashWall: trash.smashWall,
-        creating,
-        addNote: () => { void addNote() },
+        creating: wall.creating,
+        addNote: () => { void wall.addNote() },
       })
     : tab === 'tasks'
       ? taskActions({
@@ -303,7 +197,25 @@ export function DeskOnePage(props: DeskPanelProps) {
                       />
                     </div>
                   )
-                : renderWall()}
+                : (
+                    <NotesWall
+                      t={t}
+                      setWallRef={setWallRef}
+                      canvasRef={canvasRef}
+                      placed={placed}
+                      loading={data.loading}
+                      empty={trash.activeNotes.length === 0}
+                      animating={trash.smashing}
+                      trashingIds={trash.trashingIds}
+                      onAddAt={(point) => { void wall.addNote(point) }}
+                      onRaise={wall.raise}
+                      onDragStart={drag.startDrag}
+                      onResizeStart={drag.startResize}
+                      onColor={(note, color) => data.savePatch(note, { color })}
+                      onTrash={trash.trashNote}
+                      onBodyCommit={wall.commitBody}
+                    />
+                  )}
             </div>
           ) : tab === 'schedule' ? (
             <ScheduleView
@@ -316,7 +228,7 @@ export function DeskOnePage(props: DeskPanelProps) {
                 notesCount: trash.activeNotes.length,
                 openTasks: taskData.tasks.filter(task => task.status !== 'done' && !task.archived).length,
                 activeSessions: sessionSnapshot.sessions.filter(session => session.availability !== 'archived').length,
-                onAddNote: () => { selectTab('notes'); void addNote() },
+                onAddNote: () => { selectTab('notes'); void wall.addNote() },
                 onAddTask: () => { selectTab('tasks'); board.beginDraft('todo') },
                 onOpenNotes: () => selectTab('notes'),
                 onOpenNotebook: () => selectTab('notebook'),
