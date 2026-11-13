@@ -6,7 +6,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
-* **Sidebar entry**: Desk One keeps a single left-rail entry by default; each tab header now has an **Add to sidebar** / **Remove from sidebar** button that adds or removes that tab's own sidebar entry live, with the choice persisted across restarts. Tab labels also gained icons (a local calendar for Schedule so it does not repeat the Automation task clock glyph).
+* **Sidebar entry**: Desk One keeps a single left-rail entry by default; each tab header now has an **Pin to sidebar** / **Unpin from sidebar** button that adds or removes that tab's own sidebar entry live, with the choice persisted across restarts. Tab labels also gained icons (a local calendar for Schedule so it does not repeat the Automation task clock glyph).
 
 * **Agent surface**: a bundled `desk-one` operating guide skill (on by default; available to the model and via `/`) explains object choice, the list → revision → update flow and archive/delete side effects; agent tools keep one explicit action per tool (19 in total, including the read-only `desk_page_list` notebook search) instead of a generic save.
 
