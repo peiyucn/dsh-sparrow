@@ -22,9 +22,12 @@ export const REVIEW_CSS = `
   gap: 8px;
   width: 100%;
   max-width: none;
+  /* The official input.dock is above the composer; a flex order past the input bar puts the hint
+     below it in both the centred hero composer and the docked composer, with no duplicate slot. */
+  order: 1;
   /* Match the composer card's horizontal inset so the AI bubble does not sit on the sidebar edge. */
   padding: 0 20px;
-  margin: 0 0 8px;
+  margin: 0;
 }
 .dsh-desk-review-prompt-avatar {
   display: inline-flex;

@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review hint bubble**: moved from above to **below the composer** in both the blank and docked states (the composer stays visible); it no longer touches the sidebar edge.
+
 * **Notebook list**: rows per page raised from 10 to 20 so the list fills large screens better.
 
 * **Review bottom bar**: the two pills use the official Pill shape with self-contained glass (translucent fill + backdrop blur + hairline; no theme-tone dependency, solid fallback) and float over the body instead of taking a row or needing an opaque backdrop strip.
