@@ -102,10 +102,7 @@ export const REVIEW_CSS = `
 }
 /* Compact the official sm segmented control to the toolbar's 28px tool row: the stock sm track is
    34px tall with 14px labels, noticeably heavier than the ghost icon buttons beside it. */
-.dsh-desk-review-viewbtn[aria-pressed='true'] {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06));
-  color: var(--dsw-alias-label-primary, #1f2329);
-}
+
 .dsh-desk-review-path {
   flex: 1;
   min-width: 0;

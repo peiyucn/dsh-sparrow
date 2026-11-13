@@ -10,9 +10,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
-  Button, DiffBlock, DisclosureRow, FileTypeIcon, IconChevronDownOutlineRegular, IconClockOutlineRegular, IconCodeOutlineRegular, IconCopyOutlineRegular,
+  Button, DiffBlock, DisclosureRow, IconChevronDownOutlineRegular, IconClockOutlineRegular, IconCopyOutlineRegular,
   IconInspectOutlineRegular, IconListPenOutlineRegular, IconRefreshOutlineRegular,
-  MarkdownText, Tooltip, diffTotals,
+  MarkdownText, Menu, Tooltip, diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DiffBlockLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -126,6 +126,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const [diffOpen, setDiffOpen] = useState(false)
   /** Source view (exact lines, annotations) or read-only rendered view. */
   const [view, setView] = useState<'source' | 'render'>('source')
+  const [viewMenuOpen, setViewMenuOpen] = useState(false)
 
   const lines = useMemo(() => (page === null ? [] : pageText(page).split('\n')), [page])
   const markdownLabels = useMemo(() => ({
@@ -454,22 +455,32 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
     <div className="dsh-desk-review" ref={rootRef}>
       <header className="dsh-desk-review-head">
         <span className="dsh-desk-review-path" title={path}>{page?.title ?? path}</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="dsh-desk-review-viewbtn"
-          aria-pressed={view === 'render'}
-          icon={<FileTypeIcon kind="markdown" size={14} />}
-          onClick={() => setView('render')}
-        >{t('review.viewRender')}</Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="dsh-desk-review-viewbtn"
-          aria-pressed={view === 'source'}
-          icon={<IconCodeOutlineRegular size={14} />}
-          onClick={() => setView('source')}
-        >{t('review.viewSource')}</Button>
+        <Menu
+          open={viewMenuOpen}
+          onClose={() => { setViewMenuOpen(false) }}
+          align="end"
+          portal
+          autoFocus
+          dense
+          selectedId={view}
+          items={[
+            { id: 'render', label: t('review.viewRender') },
+            { id: 'source', label: t('review.viewSource') },
+          ]}
+          onSelect={(id) => {
+            setViewMenuOpen(false)
+            if (id === 'render' || id === 'source') setView(id)
+          }}
+          anchor={(
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-haspopup="menu"
+              aria-expanded={viewMenuOpen}
+              onClick={() => { setViewMenuOpen(value => !value) }}
+            >{view === 'source' ? t('review.viewSource') : t('review.viewRender')}</Button>
+          )}
+        />
         <Tooltip label={t('review.copyPath')} side="bottom" delayMs={400}>
           <Button variant="ghost" size="sm" icon={<IconCopyOutlineRegular />} aria-label={t('review.copyPath')} onClick={copyPath} />
         </Tooltip>
