@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { DESK_DOMAIN } from '../../lib/domain.js'
+import { DESK_DOMAIN } from '../../lib/host/domain.js'
 import { MAX_TASK_SESSIONS, PREFIX, ROUTES, TASK_STATUSES } from '../../lib/constants.js'
 import { DeskStore } from '../../lib/host/store.js'
 import { TASK_ROUTES } from '../../lib/host/tasks/routes.js'

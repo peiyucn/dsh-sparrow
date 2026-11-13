@@ -8,7 +8,7 @@
  */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { DESK_DOMAIN } from '../../lib/domain.js'
+import { DESK_DOMAIN } from '../../lib/host/domain.js'
 import { MAX_ACTIVE_NOTES, MAX_TRASH_NOTES, NOTE_COLORS, PREFIX, ROUTES, TRASH_PAGE_SIZE } from '../../lib/constants.js'
 import { DeskModelError } from '../../lib/model.js'
 import { DeskStore } from '../../lib/host/store.js'

@@ -10,15 +10,17 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { DESK_DOMAIN } from '../domain.js'
+import { DESK_DOMAIN } from './domain.js'
 import { PACKAGE_NAME } from '../constants.js'
 import type { GroupPatch, NotePatch, TaskPatch } from '../model.js'
 import type { CalendarDraft, EventDraft, EventQuery } from './schedule/records.js'
 import type { SessionIndexDraft } from './sessions/records.js'
 import type {
-  DeskCalendar, DeskEvent, DeskNote, DeskNotebookConfig, DeskScheduleSource, DeskSessionIndex, DeskTask, DeskTaskGroup,
-  NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ReviewSessionMarker, ScheduleSyncError,
+  DeskCalendar, DeskEvent, DeskNote, DeskScheduleSource, DeskSessionIndex, DeskTask, DeskTaskGroup, ScheduleSyncError,
 } from '../contract.js'
+import type {
+  DeskNotebookConfig, NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ReviewSessionMarker,
+} from '../notebook-contract.js'
 import { StoreCore, type DeskDomain } from './store/core.js'
 import { NoteRepository, type CreateNoteInput } from './store/notes.js'
 import { TaskRepository, type CreateTaskInput } from './store/tasks.js'

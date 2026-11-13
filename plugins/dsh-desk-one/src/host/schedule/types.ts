@@ -54,8 +54,21 @@ export interface PullWindow {
 type SyncErrorKind = 'AUTH_EXPIRED' | 'TRANSIENT' | 'UNSUPPORTED'
 
 export class ScheduleError extends Error {
-  constructor(readonly kind: SyncErrorKind, message: string, readonly code?: string) {
+  constructor(readonly kind: SyncErrorKind, message: string, private readonly explicitCode?: string) {
     super(message)
     this.name = 'ScheduleError'
+  }
+
+  /**
+   * HTTP mapping: auth expiry asks for a credential re-entry (409); transient / unsupported are
+   * 503 so the client can retry or ask the user to configure a source.
+   */
+  get status(): number {
+    return this.kind === 'AUTH_EXPIRED' ? 409 : 503
+  }
+
+  /** Stable wire code; an explicit construction value (e.g. `SCHEDULE_TRANSIENT`) wins. */
+  get code(): string {
+    return this.explicitCode ?? (this.kind === 'AUTH_EXPIRED' ? 'SCHEDULE_AUTH_EXPIRED' : 'SCHEDULE_UNAVAILABLE')
   }
 }

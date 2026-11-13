@@ -4,6 +4,9 @@
  */
 
 import type { NOTE_COLORS, ScheduleChannel, ScheduleProvider, TASK_STATUSES } from './constants.js'
+import type {
+  DeskNotebookConfig, NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ReviewSessionMarker,
+} from './notebook-contract.js'
 
 export type NoteColor = (typeof NOTE_COLORS)[number]
 export type TaskStatus = (typeof TASK_STATUSES)[number]
@@ -441,17 +444,6 @@ export interface UpdateTaskRequest {
 export interface DeleteTaskRequest {
   readonly id: string
 }
-
-import type { DeskNotebookConfig, NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ReviewSessionMarker } from './notebook-contract.js'
-
-/* Notebook: library index + persisted draft box (review state stays in the conversation). */
-export type {
-  CreateNotebookNoteRequest, CreateNoteResponse, DeleteReviewRequest, DeskNotebookConfig, DraftAnnotation, NoteBaseline, NoteDraft,
-  NoteDraftRequest, NoteDraftResponse, NoteFileRef, NotebookEntry, NotebookField, NotebookFileResponse,
-  NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse, NotebookStats,
-  ReviewSessionMarker, MarkReviewSessionRequest, ReviewSessionListResponse,
-  RecordReviewRequest, ReviewHistoryEntry, ReviewHistoryResponse, ReviewLinkStatus, ReviewRecord,
-} from './notebook-contract.js'
 
 /** Unified error body: matches the `{ error: { code, message } }` shape used by other plugins in the repo. */
 export interface ApiErrorPayload {

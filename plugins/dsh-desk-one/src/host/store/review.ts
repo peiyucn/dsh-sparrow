@@ -2,7 +2,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { DESK_NODE_SCHEMA, NOTEBOOK_MAX_DRAFTS, NOTEBOOK_MAX_REVIEW_SESSIONS } from '../../constants.js'
-import type { DraftAnnotation, ReviewRecord, ReviewSessionMarker } from '../../contract.js'
+import type { DraftAnnotation, ReviewRecord, ReviewSessionMarker } from '../../notebook-contract.js'
 import type { StoreCore } from './core.js'
 
 /** Stable id for one marked Session. */

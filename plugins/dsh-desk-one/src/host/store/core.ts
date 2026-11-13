@@ -8,7 +8,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { DomainError, type Domain } from '@deepseek-ai/dsh-storage-domain'
-import { DESK_DOMAIN } from '../../domain.js'
+import { DESK_DOMAIN } from '../domain.js'
 import { NODES_TABLE, PACKAGE_NAME } from '../../constants.js'
 import { DeskModelError } from '../../model.js'
 import type { DeskNode, DeskTask } from '../../contract.js'

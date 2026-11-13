@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { DESK_DOMAIN } from '../../lib/domain.js'
+import { DESK_DOMAIN } from '../../lib/host/domain.js'
 import { PREFIX, ROUTES, SCHEDULE_CHANNELS, SCHEDULE_COLORS, SCHEDULE_PROVIDERS } from '../../lib/constants.js'
 import { SCHEDULE_ROUTES } from '../../lib/host/schedule/routes.js'
 import { registerScheduleTools } from '../../lib/host/schedule/tools.js'

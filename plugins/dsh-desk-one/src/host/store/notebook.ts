@@ -5,7 +5,7 @@ import {
   DESK_NODE_SCHEMA, NOTEBOOK_BASELINE_MAX_CHARS, NOTEBOOK_CONFIG_ID, NOTEBOOK_MAX_DRAFTS, NOTEBOOK_MAX_REVIEW_BASELINES,
 } from '../../constants.js'
 import { DeskModelError } from '../../model.js'
-import type { DeskNotebookConfig, DraftAnnotation, NoteBaseline, NoteDraft, NoteFileRef } from '../../contract.js'
+import type { DeskNotebookConfig, DraftAnnotation, NoteBaseline, NoteDraft, NoteFileRef } from '../../notebook-contract.js'
 import type { StoreCore } from './core.js'
 
 /** Deterministic draft-box id: one draft box per file identity. */

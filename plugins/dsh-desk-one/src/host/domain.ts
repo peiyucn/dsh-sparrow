@@ -12,8 +12,8 @@ import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import {
   DOMAIN_NAME, DOMAIN_VERSION, EDGES_TABLE, MAX_TASK_SESSIONS, NODES_TABLE,
   NOTE_COLORS, SCHEDULE_CHANNELS, SCHEDULE_COLORS, SCHEDULE_PROVIDERS, TASK_STATUSES,
-} from './constants.js'
-import type { DeskEdge, DeskNode } from './contract.js'
+} from '../constants.js'
+import type { DeskEdge, DeskNode } from '../contract.js'
 
 /** Shared base fields of every Desk node (kept explicit per schema for readable validation errors). */
 const noteSchema = z.object({

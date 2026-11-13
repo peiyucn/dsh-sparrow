@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { DESK_DOMAIN } from '../../lib/domain.js'
+import { DESK_DOMAIN } from '../../lib/host/domain.js'
 import { PREFIX, ROUTES } from '../../lib/constants.js'
 import { NOTEBOOK_ROUTES } from '../../lib/host/notebook/routes.js'
 import { registerNotebookTools } from '../../lib/host/notebook/tools.js'

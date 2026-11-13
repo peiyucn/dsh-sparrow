@@ -4,8 +4,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { MAX_BODY_BYTES } from '../constants.js'
 import { DeskModelError } from '../model.js'
-import { ScheduleError } from './schedule/types.js'
-import { SessionsError } from './sessions/errors.js'
 
 type DeskErrorCode =
   | 'BAD_BODY'
@@ -29,6 +27,23 @@ export class DeskError extends Error {
     super(message)
     this.name = 'DeskError'
   }
+}
+
+/**
+ * A feature error that already carries its wire mapping. `sendError` matches this shape instead of
+ * importing each feature's error class, so the shared HTTP layer stays independent of the features.
+ */
+export interface DeskHttpFailure {
+  readonly code: string
+  readonly message: string
+  readonly status: number
+}
+
+/** Whether one thrown value is a feature error with its own HTTP mapping. */
+function isHttpFailure(error: unknown): error is DeskHttpFailure {
+  if (!(error instanceof Error)) return false
+  const candidate = error as Partial<DeskHttpFailure>
+  return typeof candidate.code === 'string' && typeof candidate.status === 'number'
 }
 
 export function sendJson(res: ServerResponse, status: number, payload: unknown): void {
@@ -55,18 +70,10 @@ export function sendError(ctx: Context, res: ServerResponse, error: unknown): vo
     sendJson(res, error.status, { error: { code: error.code, message: error.message } })
     return
   }
-  // Session archive failures carry their own status code (404 / 409 / 501 / ...).
-  if (error instanceof SessionsError) {
+  // Feature errors that own their HTTP mapping (session archive, schedule adapters). They expose
+  // `{ code, status, message }` and are matched structurally; the shared layer does not know them.
+  if (isHttpFailure(error)) {
     sendJson(res, error.status, { error: { code: error.code, message: error.message } })
-    return
-  }
-  // Adapter failures carry a user-actionable kind: auth expiry is a 409 (re-enter credential),
-  // transient/unsupported is a 503 (retry or configure). Never leak credentials/URLs here.
-  if (error instanceof ScheduleError) {
-    const auth = error.kind === 'AUTH_EXPIRED'
-    sendJson(res, auth ? 409 : 503, {
-      error: { code: error.code ?? (auth ? 'SCHEDULE_AUTH_EXPIRED' : 'SCHEDULE_UNAVAILABLE'), message: error.message },
-    })
     return
   }
   const message = error instanceof Error ? error.message : String(error)

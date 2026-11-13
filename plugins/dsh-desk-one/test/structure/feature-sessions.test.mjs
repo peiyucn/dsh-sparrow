@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { DESK_DOMAIN } from '../../lib/domain.js'
+import { DESK_DOMAIN } from '../../lib/host/domain.js'
 import { SESSION_STREAM_PAGE_SIZE } from '../../lib/constants.js'
 import { PREFIX as SESSIONS_PREFIX, ROUTES as SESSION_ROUTES } from '../../lib/host/sessions/constants.js'
 import { hasSessionServices, installSessionsHost } from '../../lib/host/sessions/install.js'
