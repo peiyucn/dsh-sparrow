@@ -22,7 +22,15 @@ export interface SidebarRightLike {
 export interface SessionsLike {
   scope(id: string): SessionScopeLike | undefined
   /** Live Session catalog: a marker's Session must still be listed to be reopened. */
-  readonly list?: SnapshotLike<{ readonly ids?: readonly string[] }>
+  readonly list?: SnapshotLike<{
+    readonly ids?: readonly string[]
+    /** Full projection values, filled lazily by `refreshProjections`. */
+    readonly projectionsBySession?: Readonly<Record<string, {
+      readonly values?: { readonly sessionStats?: { readonly turns?: number } | null }
+    }>>
+  }>
+  /** Official public read: load one Session's full projections without opening it. */
+  readonly refreshProjections?: (sessionId: string) => Promise<void>
 }
 
 /** Official workspaces service face (archived Sessions cannot be reopened). */

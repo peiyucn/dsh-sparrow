@@ -86,23 +86,36 @@ export function reviewSessionCandidates(fileId: string): ReviewSessionInfo[] {
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
 }
 
+/** What the live Session catalog says about one reuse candidate. */
+export interface ReusableSessionFacts {
+  /** The Session still exists and is not archived. */
+  readonly openable: boolean
+  /** Known turn count; greater than zero means the Session carries a real conversation. */
+  readonly turns?: number
+}
+
 /**
- * Pick the newest review Session of one note that is still openable in the same workspace.
+ * Pick the review Session of one note to reopen.
+ *
+ * Newest first, but a 0-turn Session is only used when every candidate has no conversation: the old
+ * "new Session per click" behaviour left blank duplicates behind, and those must not shadow the
+ * note's real conversation.
  * @param candidates - markers for that note, newest first.
  * @param workspaceId - workspace the note library is linked to.
- * @param isOpenable - whether the Session still exists and is not archived.
+ * @param inspect - live catalog facts for one candidate Session.
  * @returns the Session id to reuse, or undefined when a new Session must start.
  */
 export function pickReusableReviewSession(
   candidates: readonly ReviewSessionInfo[],
   workspaceId: string,
-  isOpenable: (sessionId: string) => boolean,
+  inspect: (sessionId: string) => ReusableSessionFacts,
 ): string | undefined {
-  for (const candidate of candidates) {
-    if (candidate.workspaceId !== undefined && candidate.workspaceId !== workspaceId) continue
-    if (isOpenable(candidate.sessionId)) return candidate.sessionId
-  }
-  return undefined
+  const usable = candidates
+    .filter(info => info.workspaceId === undefined || info.workspaceId === workspaceId)
+    .map(info => ({ info, facts: inspect(info.sessionId) }))
+    .filter(entry => entry.facts.openable)
+  const preferred = usable.find(entry => (entry.facts.turns ?? 0) > 0)
+  return (preferred ?? usable[0])?.info.sessionId
 }
 
 /** Observe the registry so the conversation hint can appear after a review tab mounts. */

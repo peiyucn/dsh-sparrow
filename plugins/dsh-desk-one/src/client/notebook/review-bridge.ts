@@ -12,6 +12,7 @@
 import {
   pickReusableReviewSession, rememberReviewSession, reviewSessionCandidates, reviewSessionsReady,
 } from '../reviewSessions.js'
+import type { ReusableSessionFacts } from '../reviewSessions.js'
 import type {
   ConversationLike, SessionNavigationLike, SessionScopeLike, SessionsLike, SidebarRightLike, WorkspacesLike,
 } from './faces.js'
@@ -74,6 +75,8 @@ const OPEN_RETRY_MS = 100
 const MOUNT_RETRIES = 40
 /** Delay between mount checks (ms). */
 const MOUNT_RETRY_MS = 50
+/** How long warming one candidate's turn count may take before the pick falls back to newest. */
+const TURNS_TIMEOUT_MS = 1_500
 
 /** Sleep one retry slice. */
 function delay(ms: number): Promise<void> {
@@ -111,12 +114,28 @@ export function createReviewBridge(): ReviewBridge {
   let workspaces: WorkspacesLike | undefined
   let navigation: SessionNavigationLike | undefined
 
-  /** Whether a marked Session still exists and is not archived (the only safe reuse targets). */
-  const isOpenable = (sessionId: string): boolean => {
+  /** Live catalog facts: the Session must exist, be unarchived, and report its turns when known. */
+  const inspect = (sessionId: string): ReusableSessionFacts => {
     const list = sessions?.list?.getSnapshot()
-    if (list?.ids === undefined || !list.ids.includes(sessionId)) return false
+    const turns = list?.projectionsBySession?.[sessionId]?.values?.sessionStats?.turns
     const archived = workspaces?.list?.getSnapshot().archivedSessionIds
-    return archived?.includes(sessionId) !== true
+    return {
+      openable: list?.ids?.includes(sessionId) === true && archived?.includes(sessionId) !== true,
+      ...turns === undefined ? {} : { turns },
+    }
+  }
+
+  /** Load turn counts for the openable candidates, bounded so a slow host cannot block opening. */
+  const warmTurns = async (sessionIds: readonly string[]): Promise<void> => {
+    if (sessions?.refreshProjections === undefined || sessionIds.length === 0) return
+    const refresh = sessions.refreshProjections.bind(sessions)
+    await Promise.all(sessionIds.map(async (sessionId) => {
+      try {
+        await Promise.race([refresh(sessionId), delay(TURNS_TIMEOUT_MS)])
+      } catch {
+        // Turn counts are progressive enhancement: the newest candidate still reopens.
+      }
+    }))
   }
 
   /** The note's own review Session, when one is still openable in this workspace. */
@@ -124,7 +143,12 @@ export function createReviewBridge(): ReviewBridge {
     await reviewSessionsReady()
     const candidates = reviewSessionCandidates(input.fileId)
     if (candidates.length === 0) return undefined
-    return pickReusableReviewSession(candidates, input.workspaceId, isOpenable)
+    // Warm the counts so a newer 0-turn duplicate cannot shadow the note's real conversation.
+    await warmTurns(candidates
+      .filter(info => info.workspaceId === undefined || info.workspaceId === input.workspaceId)
+      .map(info => info.sessionId)
+      .filter(sessionId => inspect(sessionId).openable))
+    return pickReusableReviewSession(candidates, input.workspaceId, inspect)
   }
 
   return {

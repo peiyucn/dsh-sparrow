@@ -687,6 +687,8 @@ describe('dsh-desk-one 结构', () => {
     const reviewSessionsSource = await read('src/client/reviewSessions.ts')
     assert.match(reviewSessionsSource, /reviewSessionCandidates/u, '按笔记文件身份找该笔记的审阅会话')
     assert.match(reviewSessionsSource, /pickReusableReviewSession/u, '复用选择是纯函数，可单测')
+    assert.match(reviewSessionsSource, /facts\.turns/u, '同一篇有多个会话时优先有对话轮数的，0 轮空会话不遮挡')
+    assert.match(bridge, /refreshProjections/u, '轮数由官方 refreshProjections 读取（不打开会话）')
     assert.match(reviewSessionsSource, /reviewSessionsReady/u, '首次点击可等宿主标记 hydrate 完成')
     assert.match(bridge, /reviewSessionCandidates/u, '打开同一篇时先查已有审阅会话')
     assert.match(bridge, /pickReusableReviewSession/u, '复用仍可打开的最新审阅会话')

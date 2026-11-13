@@ -71,16 +71,29 @@ describe('审阅会话标记', () => {
 
   it('复用选择：同工作区最新且仍可打开的会话优先，否则回退下一个', () => {
     const candidates = [
-      { sessionId: 'a', workspaceId: 'w1', fileId: 'file-x', updatedAt: '3' },
-      { sessionId: 'b', workspaceId: 'w2', fileId: 'file-x', updatedAt: '2' },
-      { sessionId: 'c', fileId: 'file-x', updatedAt: '1' },
+      { sessionId: 'a', workspaceId: 'w1', fileId: 'file-x', updatedAt: '4' },
+      { sessionId: 'b', workspaceId: 'w2', fileId: 'file-x', updatedAt: '3' },
+      { sessionId: 'c', fileId: 'file-x', updatedAt: '2' },
     ]
-    assert.equal(pickReusableReviewSession(candidates, 'w1', () => true), 'a')
-    assert.equal(pickReusableReviewSession(candidates, 'w2', () => true), 'b')
+    assert.equal(pickReusableReviewSession(candidates, 'w1', () => ({ openable: true })), 'a')
+    assert.equal(pickReusableReviewSession(candidates, 'w2', () => ({ openable: true })), 'b')
     // A marker that predates workspace recording matches any workspace.
-    assert.equal(pickReusableReviewSession(candidates, 'w1', sessionId => sessionId !== 'a'), 'c')
+    assert.equal(pickReusableReviewSession(candidates, 'w1', sessionId => ({ openable: sessionId !== 'a' })), 'c')
     // Nothing openable: start a new Session instead.
-    assert.equal(pickReusableReviewSession(candidates, 'w1', () => false), undefined)
-    assert.equal(pickReusableReviewSession([], 'w1', () => true), undefined)
+    assert.equal(pickReusableReviewSession(candidates, 'w1', () => ({ openable: false })), undefined)
+    assert.equal(pickReusableReviewSession([], 'w1', () => ({ openable: true })), undefined)
+  })
+
+  it('复用选择：0 轮空会话只在没有有内容会话时使用', () => {
+    const candidates = [
+      { sessionId: 'blank-new', workspaceId: 'w1', fileId: 'file-y', updatedAt: '9' },
+      { sessionId: 'real-old', workspaceId: 'w1', fileId: 'file-y', updatedAt: '1' },
+    ]
+    const inspect = sessionId => ({ openable: true, turns: sessionId === 'blank-new' ? 0 : 5 })
+    assert.equal(pickReusableReviewSession(candidates, 'w1', inspect), 'real-old')
+    // All 0-turn: the newest blank still reopens (a genuinely new review in progress).
+    assert.equal(pickReusableReviewSession(candidates, 'w1', () => ({ openable: true, turns: 0 })), 'blank-new')
+    // Unknown turn counts (older host): newest wins.
+    assert.equal(pickReusableReviewSession(candidates, 'w1', () => ({ openable: true })), 'blank-new')
   })
 })

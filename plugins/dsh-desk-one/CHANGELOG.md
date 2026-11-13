@@ -6,6 +6,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [Unreleased]
 
+* **Review session reuse**: when a note has several historical review sessions, the one with a real conversation wins — the 0-turn blank duplicates left behind by the old per-click flow no longer shadow it.
+
 * **Dates**: session lists, archive / trash rows and annotation records now format dates and times in the UI language — a Chinese UI shows “11月13日” / “2026/11/13” instead of English month names or month-first ordering.
 
 * **Review session reuse**: opening the same note again returns to that note’s existing openable review session (matched by the host-persisted note identity; deleted, archived or other-workspace sessions are not reused) instead of starting a new one each time; a fresh session starts only when none is usable.
