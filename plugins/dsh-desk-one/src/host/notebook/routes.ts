@@ -9,6 +9,7 @@ import type {
 } from '../../notebook-contract.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
 import type { DeskRouteContext, DeskRouteEntry } from '../router.js'
+import { workspaceRootOf } from './workspace-root.js'
 
 /** Notebook host or an unavailable error. */
 function notebookOf(route: DeskRouteContext) {
@@ -92,6 +93,24 @@ async function fileRoute(route: DeskRouteContext, req: IncomingMessage, res: Ser
   const path = typeof body.path === 'string' ? body.path : ''
   if (path === '') throw new DeskError('BAD_BODY', '缺少 path')
   sendJson(res, 200, await notebookOf(route).ensureFile(path))
+}
+
+/** Workspace-scoped open: the client names the workspace it is browsing, not a global library. */
+async function openRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = bodyObject<{ workspaceId?: string; path?: string }>(await readJsonBody(req), '请求体必须是对象')
+  const workspaceId = typeof body.workspaceId === 'string' ? body.workspaceId.trim() : ''
+  const path = typeof body.path === 'string' ? body.path : ''
+  if (workspaceId === '') throw new DeskError('BAD_BODY', '缺少 workspaceId')
+  if (path === '') throw new DeskError('BAD_BODY', '缺少 path')
+  sendJson(res, 200, await notebookOf(route).openAt(workspaceRootOf(route.ctx.workspaceRegistry, workspaceId), path))
+}
+
+/** Read one file back by its persisted identity (used when restoring a review tab). */
+async function openByIdRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  const fileId = url.searchParams.get('fileId') ?? ''
+  if (fileId === '') throw new DeskError('BAD_BODY', '缺少 fileId')
+  sendJson(res, 200, await notebookOf(route).openById(fileId))
 }
 
 async function createRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -220,6 +239,8 @@ export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.notebookList, handle: listRoute },
   { method: 'GET', path: ROUTES.notebookPage, handle: pageRoute },
   { method: 'POST', path: ROUTES.notebookFile, handle: fileRoute },
+  { method: 'POST', path: ROUTES.notebookOpen, handle: openRoute },
+  { method: 'GET', path: ROUTES.notebookOpenById, handle: openByIdRoute },
   { method: 'POST', path: ROUTES.notebookCreate, handle: createRoute },
   { method: 'GET', path: ROUTES.notebookReviewSessions, handle: reviewSessionsGetRoute },
   { method: 'POST', path: ROUTES.notebookReviewSessions, handle: reviewSessionMarkRoute },

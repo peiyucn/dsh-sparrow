@@ -11,6 +11,7 @@ type DeskErrorCode =
   | 'INVALID_NOTE'
   | 'REVISION_CONFLICT'
   | 'UNKNOWN_NOTE'
+  | 'UNKNOWN_WORKSPACE'
   | 'STORAGE_ERROR'
   /* notebook */
   | 'INVALID_NOTEBOOK'

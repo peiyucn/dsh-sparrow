@@ -10,7 +10,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import type {
-  CreateNotebookNoteRequest, NoteDraft, NotebookEntry, NotebookFileResponse, NotebookStateResponse, NotebookSkill,
+  CreateNotebookNoteRequest, NoteDraft, NotebookEntry, NotebookFileResponse, NotebookPageResponse, NotebookStateResponse, NotebookSkill,
   RecordReviewRequest, ReviewHistoryEntry, ReviewRecord,
 } from '../../notebook-contract.js'
 import { NOTEBOOK_HISTORY_WARN_BYTES, NOTEBOOK_MAX_BYTES, NOTEBOOK_SCAN_TIMEOUT_MS } from '../../constants.js'
@@ -205,6 +205,31 @@ export class NotebookHost {
     return { file }
   }
 
+  /**
+   * Resolve one file under an explicit root (a registered workspace) and read it back.
+   *
+   * This is the workspace-scoped path used by the annotation entry: the caller names a workspace
+   * and a relative path inside it, so no global "library root" is required.
+   * @param rootPath - absolute workspace root.
+   * @param relativePath - path relative to that workspace root.
+   * @returns the file identity plus the renderable page.
+   */
+  async openAt(rootPath: string, relativePath: string): Promise<{ file: NotebookFileResponse['file']; page: NotebookPageResponse }> {
+    const file = await ensureNoteFile(this.store, rootPath, relativePath)
+    return { file, page: await readPage(rootPath, relativePath) }
+  }
+
+  /**
+   * Read one file back by the root recorded with its identity (the file's own workspace).
+   * @param fileId - persisted file identity.
+   * @returns the file identity plus the renderable page.
+   */
+  async openById(fileId: string): Promise<{ file: NotebookFileResponse['file']; page: NotebookPageResponse }> {
+    const file = this.store.getNoteFile(fileId)
+    if (file === undefined) throw new DeskError('UNKNOWN_NOTE', '文件身份不存在', 404)
+    return { file, page: await readPage(file.rootPath, file.path) }
+  }
+
   /** Create one new note file from the template; returns its relative path. */
   async createNote(input: CreateNotebookNoteRequest): Promise<{ path: string }> {
     const path = await createNoteFile(this.requireRoot(), input)
@@ -214,10 +239,10 @@ export class NotebookHost {
 
   /** Record one submitted review (annotations + file snapshot metadata). */
   async recordReview(input: RecordReviewRequest): Promise<ReviewRecord> {
-    const root = this.requireRoot()
     const file = this.store.getNoteFile(input.fileId)
-    if (file === undefined || file.rootPath !== root) throw new DeskError('UNKNOWN_NOTE', '文件身份不存在', 404)
-    const page = await readPage(root, file.path)
+    if (file === undefined) throw new DeskError('UNKNOWN_NOTE', '文件身份不存在', 404)
+    // The identity remembers its own root, so a review can belong to any workspace.
+    const page = await readPage(file.rootPath, file.path)
     return await this.store.createReviewRecord({
       sessionId: input.sessionId,
       ...input.workspaceId === undefined ? {} : { workspaceId: input.workspaceId },
@@ -234,20 +259,17 @@ export class NotebookHost {
    */
   async history(): Promise<{ entries: ReviewHistoryEntry[]; bytes: number }> {
     const records = this.store.listReviewRecords()
-    const root = this.root()
     const entries: ReviewHistoryEntry[] = []
     const deadline = Date.now() + RELOCATE_BUDGET_MS
-    let candidates: readonly NotebookEntry[] | undefined
+    /** Per-root index cache for this request: records may belong to different workspaces. */
+    const candidatesByRoot = new Map<string, readonly NotebookEntry[]>()
     for (const record of records) {
-      if (root === undefined) {
-        entries.push({ record, status: 'detached' })
-        continue
-      }
       const file = this.store.getNoteFile(record.fileId)
-      if (file === undefined || file.rootPath !== root) {
+      if (file === undefined) {
         entries.push({ record, status: 'detached' })
         continue
       }
+      const root = file.rootPath
       try {
         await stat(join(root, ...file.path.split('/')))
         entries.push({ record, status: 'linked', resolvedPath: file.path })
@@ -265,7 +287,11 @@ export class NotebookHost {
       if (cached !== undefined && cached.hash === file.hash && Date.now() - cached.at < RELOCATE_TTL_MS) {
         moved = cached.path
       } else {
-        candidates ??= await this.entries(root)
+        let candidates = candidatesByRoot.get(root)
+        if (candidates === undefined) {
+          candidates = await this.entries(root)
+          candidatesByRoot.set(root, candidates)
+        }
         for (const candidate of candidates.slice(0, RELOCATE_CANDIDATES)) {
           if (Date.now() > deadline) {
             // Not a conclusion: leave it uncached so the next request can finish the search.
