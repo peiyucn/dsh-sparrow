@@ -123,7 +123,7 @@ export function TaskArchiveView({
         {...(groups.length + tasks.length > 0 ? { count: countText(groups.length + tasks.length) } : {})}
       />
       {groups.length === 0 && tasks.length === 0
-        ? <p className="dsh-desk-wall-hint">{t('task.archiveEmpty')}</p>
+        ? <p className="dsh-desk-page-hint">{t('task.archiveEmpty')}</p>
         : (
             <ul className="dsh-task-archive-list">
               {groups.map(group => (

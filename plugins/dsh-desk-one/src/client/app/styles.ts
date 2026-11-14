@@ -615,6 +615,14 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
+/* Static in-panel hint (sessions / task archive). Never reuse the notes-wall hint here: that one is
+   absolutely centred over the wall canvas, so in an unpositioned page it floats over the list. */
+.dsh-desk-page-hint {
+  margin: 4px 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
 .dsh-desk-session-group {
   border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
   border-radius: var(--dsw-radius-sm, 8px);

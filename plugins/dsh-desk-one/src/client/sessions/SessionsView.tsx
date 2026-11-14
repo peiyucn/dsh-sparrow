@@ -10,6 +10,7 @@ import type { DeskTranslator } from '../app/types.js'
 import type { SessionChipInfo, SessionLinkSnapshot } from './contract.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
 import { activeSessionGroups } from './catalog.js'
+import { excludeKnownSessions, type KnownSessions } from './known.js'
 import { ArchiveSections } from './ArchiveSections.js'
 import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
@@ -80,12 +81,16 @@ function SessionRow({
   )
 }
 export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps): ReactElement {
-  const groups = activeSessionGroups(snapshot.sessions, snapshot.workspaces)
-  const activeCount = groups.reduce((sum, group) => sum + group.sessions.length, 0)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hidden, setHidden] = useState<Set<string>>(new Set())
+  /** Ids the archive sections already show; keep them out of the active catalog even while the
+   *  official session list still carries their rows (a trash move leaves that list stale). */
+  const [known, setKnown] = useState<KnownSessions>({ archived: new Set(), trashed: new Set() })
+  const activeSessions = excludeKnownSessions(snapshot.sessions, known)
+  const groups = activeSessionGroups(activeSessions, snapshot.workspaces)
+  const activeCount = groups.reduce((sum, group) => sum + group.sessions.length, 0)
   const act = async (sessionId: string, task: () => Promise<unknown>): Promise<void> => {
     setBusy(true)
     setError(null)
@@ -170,7 +175,7 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
           </header>
           {error === null ? null : <p className="dsh-desk-archive-error">{error}</p>}
           {groups.length === 0
-            ? <p className="dsh-desk-wall-hint">{t('sessions.activeEmpty')}</p>
+            ? <p className="dsh-desk-page-hint">{t('sessions.activeEmpty')}</p>
             : groups.map(group => (
                 <div className="dsh-desk-session-group" key={group.key}>
                   <div className="dsh-desk-session-group-head" title={group.key}>
@@ -185,8 +190,8 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
                 </div>
               ))}
         </section>
-      ) : <p className="dsh-desk-wall-hint">{t('sessions.disabled')}</p>}
-      <ArchiveSections t={t} api={archive} onOpen={onOpen} />
+      ) : <p className="dsh-desk-page-hint">{t('sessions.disabled')}</p>}
+      <ArchiveSections t={t} api={archive} onOpen={onOpen} onKnownChange={setKnown} />
     </div>
   )
 }

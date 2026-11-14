@@ -6,7 +6,7 @@
  * and file validation live on the host; this file only renders state and confirms intent.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { SESSION_STREAM_PAGE_SIZE } from '../../constants.js'
 import type {
@@ -20,6 +20,7 @@ import { formatShortDate, formatTokens } from '../app/utils.js'
 import { ArchiveTreeNodeRow, countTree, TrashSubagentRows } from './archive-rows.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { FillTitleButton } from './FillTitleButton.js'
+import { knownSessionIds, type KnownSessions } from './known.js'
 import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
@@ -38,10 +39,12 @@ interface ArchiveSectionsProps {
   readonly t: DeskTranslator
   readonly api: SessionsArchiveApi
   readonly onOpen: (sessionId: string) => void
+  /** Report every id these sections display, so the active catalog can drop stale rows. */
+  readonly onKnownChange?: (known: KnownSessions) => void
 }
 
 
-export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): ReactElement {
+export function ArchiveSections({ t, api, onOpen, onKnownChange }: ArchiveSectionsProps): ReactElement {
   const [snapshot, setSnapshot] = useState<ArchiveSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -71,6 +74,14 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
   }, [api])
 
   useEffect(() => { void reload() }, [reload])
+
+  /** Keep the report stable for the parent even when its setState identity changes per render. */
+  const onKnownChangeRef = useRef(onKnownChange)
+  onKnownChangeRef.current = onKnownChange
+  useEffect(() => {
+    if (snapshot === null) return
+    onKnownChangeRef.current?.(knownSessionIds(snapshot.tree, snapshot.trash))
+  }, [snapshot])
 
   /**
    * Optimistically drop a row before the background refresh: the host has already committed the
@@ -126,8 +137,8 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
           <span className="dsh-desk-session-section-count">{t('sessions.count', { count: archivedCount })}</span>
         </header>
         <p className="dsh-desk-session-section-note">{t('sessions.archive.hint')}</p>
-        {loading ? <p className="dsh-desk-wall-hint">{t('state.loading')}</p> : archivedCount === 0 ? (
-          <p className="dsh-desk-wall-hint">{t('sessions.archivedEmpty')}</p>
+        {loading ? <p className="dsh-desk-page-hint">{t('state.loading')}</p> : archivedCount === 0 ? (
+          <p className="dsh-desk-page-hint">{t('sessions.archivedEmpty')}</p>
         ) : (
           <div className="dsh-desk-session-group">
             <ul className="dsh-desk-archive-list">
@@ -294,7 +305,7 @@ export function ArchiveSections({ t, api, onOpen }: ArchiveSectionsProps): React
             {trashDirCopy.state === 'copied' ? t('sessions.archive.copied') : snapshot.trashDir.displayPath}
           </button>
         )}
-        {trash.length === 0 ? <p className="dsh-desk-wall-hint">{t('sessions.archive.trashEmpty')}</p> : (
+        {trash.length === 0 ? <p className="dsh-desk-page-hint">{t('sessions.archive.trashEmpty')}</p> : (
           <div className="dsh-desk-session-group">
             <ul className="dsh-desk-archive-list">
               {trash.slice(0, visible.trash).map(entry => (
