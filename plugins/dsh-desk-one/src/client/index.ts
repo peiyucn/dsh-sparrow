@@ -107,7 +107,6 @@ export function apply(ctx: ClientContext): void {
       notebook: notebookApi,
       workspaceAccess,
       openReview: review.open,
-      draftWithAi: review.draftInNewSession,
       startWithPrompt: (prompt) => { coauthor.start(prompt) },
       openBrowser: review.openFilesBrowser,
       listNotes: api.listNotes,

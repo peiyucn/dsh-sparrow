@@ -175,7 +175,6 @@ describe('client 入口 / 槽位接线契约', () => {
       'attachNavigation',
       'open',
       'openFilesBrowser',
-      'draftInNewSession',
       'sendQuote',
     ]) {
       assert.equal(typeof bridge[method], 'function', `审阅 bridge 缺注入/编排方法 ${method}`)
