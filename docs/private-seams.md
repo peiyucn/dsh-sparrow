@@ -4,11 +4,10 @@
 > 旧实现里的私有 seam 与破例**全部退出**：`src/mask.ts`（遮罩模糊恢复）、`src/popover.ts`（弹层列内夹取）、
 > `src/handle-glow.ts`（拖拽条光带跟随）、`src/sweep.ts`（扫光带）、`src/caption.ts`（桌面标题栏 overlay）、
 > `src/surface.ts`（浮层光层与悬停卡字色）、`src/anchors.ts`（运行期锚点扫描）、`src/phase.ts`（视口相位测量）
-> 均已删除。当前 theme-tone **已无私有 seam**：左边栏 Workspace hover 卡的牌面修复曾依赖官方 CSS-module
-> 类名后缀（`_hoverTitle` / `_hoverPath` / `_hoverTime` / `_hoverStatus` / `_copied`）命中字色，官方
-> `dsh 0.2.2-rc.3` 起悬停卡改吃 `--dsw-alias-hovercard-*` 设计 token，本插件改为在卡根覆盖这四个官方
-> token，类名后缀依赖随之删除（`docs/upstream/0.2.2-rc.3.md` §3）。其余仍只用 `ctx.theme` 的 token
-> 覆盖通道与官方公开 data 属性。下文涉及 theme-tone 的旧条目保留为历史记录，不再对应当前代码。
+> 均已删除。当前 theme-tone **无私有 seam（§A）**；左边栏 Workspace hover 卡的牌面修复已不再依赖官方
+> CSS-module 类名后缀（`_hoverTitle` 等），改为在卡根覆盖官方 `--dsw-alias-hovercard-*` 设计 token，
+> 但**卡根元素本身仍只能按官方 portal 包装节点的 hashed 类名定位**（`_portal`，见 §D）。
+> 其余只用 `ctx.theme` 的 token 覆盖通道与官方公开 data 属性。
 
 > 本文件**只登记"欠官方的债"**——需要 owner 认可的例外。三类：
 > **A 私有 seam**（官方无公开能力）、**B 刻意改官方默认外观**、**C 无门可拦的静默失效风险**。
@@ -21,178 +20,137 @@
 > （方法与口径见 [`docs/upstream/0.2.0-rc.1.md`](upstream/0.2.0-rc.1.md) §4.1）。
 > 理由：手工清单已证会漂——0.2.0-rc.1 审计时发现它漏列了三处一直在用的锚点。
 >
-> 最近一次跟版复核：dsh `0.2.2-rc.3`（2026-11-14）。本次复核收缩了一条长期静默失效风险：
-> theme-tone 悬停卡的字色改为覆盖官方 `--dsw-alias-hovercard-*` token（不再依赖 hashed 类名后缀），
-> 该插件**已无私有 seam**；其余条目的“存续”以各插件源码为准，证据与边界见
+> 最近一次跟版复核：dsh **`0.2.2-rc.3`**（tag `38a6a5c9`，2026-11-14；官方 source 与当前插件源码逐条对照）。
+> 本轮结果：§A 四条里 **1 条官方已有公开替代**（`sessionPersistence.locate` → `snapshot.location`）、
+> **2 条已部分收缩**（投影缓存域已改用官方 `projectionCacheDomainSpec`、`fn.length` 形参分派已成死代码）、
+> **1 条仍待 owner 决策**（归档写通道）；§B 收敛为**两组**；原 §C 的官方缺陷**上游已修**（删除本节）；
+> §D 只保留 **3 条**真实静默风险。收缩明细见 §E；证据与边界见
 > [`docs/upstream/0.2.2-rc.3.md`](upstream/0.2.2-rc.3.md)。
 
 ---
 
 ## A. 私有 seam（官方无公开能力，启动能力检查缺失即 fail-fast）
 
-* **`dsh-desk-one`（2026-11-09 起；原登记在 `dsh-archive-manage`，插件退役前两者共用同一套 seam）**
-  * **`sessionPersistence.locate`** —— 后端私有方法（alpha.5 后从公开契约降级），是拿到会话**产物目录**的
-    唯一途径：公开契约 `SessionPersistence` 只有 `create` / `open` / `flush` / `stat` / `list`，
-    而 `stat` / `list` 返回的 `SessionPersistenceSnapshot` 只含 `header` / `revision` / `eventCount` /
-    `sizeBytes`，**不含路径**；`SessionLocation`（`kind` + `path`）只出现在 `errors.ts`。
-  * **WorkspaceRegistry 私有写通道**（`enqueueOperation` / `requireState` / `setState`）——
-    归档集没有公开写入口。
-  * **`session_projcache` 存储域直读 / 直写**（`src/host/projection.ts` + `src/constants.ts` 的
-    `PROJECTION_CACHE_DOMAIN_SPEC_PACKAGE` / `PROJECTION_CACHE_DOMAIN_FALLBACK`）——
-    面板展示事实 / 空白判定要读官方投影行；彻底删除会话后要失效对应行（否则 @ 列表仍读到已删会话的标题）；
-    启动清扫要清理持久化里已不存在的行。**回收站里的会话行必须保留**（它们是可还原的，行是还原后标题 /
-    子会话标签的唯一来源），永久删除时才由删除路由失效父 + 子会话的行。
-    投影行**写回**不走这里：还原 / 启动修复用官方公开的 `ctx.sessionProjectionCache.coldSnapshot(...)`
-    （见 `src/host/projection-seed.ts`），不直写存储域。
-    ⚠️ **这一条是「可以走公开路径却没走」**：官方**有**导出 `projectionCacheDomainSpec`
-    （`@deepseek-ai/dsh-session-projection-cache`，`src/index.ts:59` 导出、`src/spec.ts` 定义），
-    域名字符串与表名都该从它取。本插件目前写的是**字面量** `'session_projcache'` / `'sessions'`,
-    等于把官方合法的公开契约降级成了私有 seam（官方改域名 / 改表名即静默失效）。
-    **待办**：换成 import 官方 spec（属「收缩原则」，公开替代已存在）。
-  * **`ctx.get('sessionProjections')` / `ctx.get('sessionProjectionCache')` + `fn.length` 形参自适应**
-    （`src/host/projection.ts` 的 `cachedSnapshotOf` / `coldSnapshotOf`）—— 按被调函数**形参个数**
-    选择调用形态，而不是 try/catch 回退。**插件里所有 `cachedSnapshot` 读取必须走同一个入口**
-    （标题 / 子会话标签 / 行回填三处共用）：只改一处会让另一处静默 miss（能取到缓存却永远读不出
-    label；不抛错、也不易被测试发现）。`coldSnapshot` 同理：官方当前 3 参，形参不足时宁可放弃回填
-    也不猜参数。这是「同一能力在不同 dsh 线里签名不同」的兼容写法；官方给全签名后应删。
+> 登记对象 = `dsh-desk-one` 的 host half（`plugins/dsh-desk-one/src/host/sessions/`）；仍在仓库内的
+> `dsh-archive-manage`（`plugins/dsh-archive-manage/src/host/`）是同构实现，退役前两者共用同一套 seam。
+> 两边的能力门与私有面守卫见各自的 `host/.../gates.ts`。
+
+* **`sessionPersistence.locate`（2026-11-14 复核：官方公开替代已存在 ⇒ 收缩项；代码尚未切换，故条目暂留）**
+  * 现状：jsonl 后端的**私有方法**（rc.3 `packages/session/session-persistence-jsonl/src/index.ts:345`），
+    拿 header → `SessionLocation`，是当前代码取会话**产物目录**的途径。调用点：
+    desk-one `src/host/sessions/routes.ts:161`、`session-files.ts:106`、`views.ts:50,101`；
+    守卫 `src/host/sessions/gates.ts:28,81-87`（缺失即自停用）。archive-manage 同构
+    （`src/host/routes.ts:167`、`session-files.ts:95`、`views.ts:50,101`、`gates.ts:28,81`）。
+  * **官方公开替代（rc.3 实测）**：`SessionPersistenceSnapshot.location?: SessionLocation` 就在公开类型上
+    （`packages/session/session-persistence/src/index.ts:51-68`；`SessionLocation` 自 `:37` 公开 re-export），
+    jsonl `list()` 给每个**已落盘**会话填 `location: { kind: 'jsonl', path }`
+    （`packages/session/session-persistence-jsonl/src/index.ts:545-561`，快照在 `:556`）。
+  * 边界：pending（created 但未落盘）会话的 `list()` 快照**没有** `location`（同文件 `:559-560`）⇒
+    切换后 pending 子会话的 session-files 会得到「无位置」（旧实现是给一个不存在的目录后操作失败）。
+  * 旧文本两处失真已删：「stat/list 的 snapshot **不含路径**」「`SessionLocation` 只出现在 `errors.ts`」。
+  * **收缩提案（只进报告，不改代码）**：把 `location` 收进 `storedHeaderFacts()` 的 `list()` 遍历
+    （`src/host/sessions/headers.ts`），删两处能力门 / `assertSessionLocationApi` / `SessionLocationLike`
+    及相关类型，补一条「pending 会话无 location」回归用例；改完删除本条。
+
+* **WorkspaceRegistry 私有写通道（`enqueueOperation` / `requireState` / `setState`）—— 仍需要（行为选择，待 owner 决策）**
+  * 现状：归档集的**写**只经该通道（desk-one `src/host/sessions/archive-set.ts:76-84` `mutateArchivedSet`；
+    守卫 `src/host/sessions/gates.ts:41-60`）。**读已收缩**：归档集读取改走官方公开 getter
+    `ctx.workspaceRegistry.archivedSessionIds`（`archive-set.ts:65-68` `readArchivedIds`，2026-11-14 复核确认）。
+  * **官方公开替代（rc.3 实测）**：`archiveSession(id, { stopActivity })` / `unarchiveSession(id)` 是公开方法
+    （`packages/workspace/workspace/src/index.ts:381,420`）——**旧文本「归档集没有公开写入口」已过期，删**。
+  * 未切换的原因（行为差异，不是能力缺失）：公开路径 ① 无 `stopActivity` 时先跑 `workspace/session-activity`
+    瀑布、有活动即拒绝；② 归档的同一写入里丢 pin；③ **派发 `workspace/session-archived`**——rc.2 起官方
+    worktree 清理挂在该事件上（`packages/experimental/worktree/src/archive.ts:86`），`session-unarchiving`
+    还可拒绝还原；④ 子树归档从「单次 `setState` 原子」变成 N 次排队写入。
+  * 故当前是「刻意保留私有写通道」：切换即接受上述行为；不切换则须在 README「已知限制」写清（现状）。
+    **需 owner 定**；决定后本条删除或保留。
+
+* **`session_projcache` 存储域直读 / 直删 / 启动清扫 —— 已收缩一半，剩余仍需要**
+  * **已收缩**（2026-11-14 复核确认代码已改）：域/表名优先取官方公开 `projectionCacheDomainSpec`
+    （rc.3 导出：`packages/session/session-projection-cache/src/index.ts:60`；插件
+    `src/host/sessions/projection.ts:28-35` 动态 import，`src/host/sessions/constants.ts:65-95`
+    只在该包无法解析时回退字面量）；冷读回填走官方公开 `coldSnapshot`
+    （`projection.ts:120-136`，调用点 `projection-seed.ts`）。**旧文本的「待办：换成 import 官方 spec」已完成，删。**
+  * **剩余私有部分**：投影行的**读取 / 失效删除 / 启动清扫**仍直读 storage-domain
+    （`projection.ts:171-177` 读、`:190-215` `delete`、`:231-252` 遍历 `keys()` 清扫）——官方服务只公开
+    `cachedSnapshot` / `cachedPredecessorTitle` / `hydratePrepared` / `write` / `coldSnapshot`，
+    **没有删行 / 清扫 API**（`session-projection-cache/src/index.ts:162,187,223,257,288`）。
+  * 业务约束（保留）：回收站会话的投影行必须保留（还原后标题 / 子会话标签的唯一来源），永久删除时由
+    删除路由失效父 + 子会话的行；启动清扫已用 `preservedIds` 排除可还原会话。
+
+* **`ctx.get('sessionProjections')` / `ctx.get('sessionProjectionCache')` + `fn.length` 形参自适应
+  —— 仍需要，但形参分派已成死代码（收缩项）**
+  * 现状：desk-one `src/host/sessions/projection.ts:88-105` 是 `cachedSnapshot` 读取的**唯一入口**
+    （标题 / 子会话标签 / 行回填三处共用；`fn.length >= 3` 走旧签名），`:120-136` `coldSnapshot`
+    形参不足即放弃回填，`:164-168` 同款判断；`summaryBlockOf` 经 `ctx.get('sessionProjections')`
+    取 `summaryKeys()`（`:147-162`）。
+  * **rc.3 实测签名已固定**：`cachedSnapshot(meta, keys?)`（2 参，
+    `session-projection-cache/src/index.ts:162`）、`coldSnapshot(meta, inheritedEventCount, events)`
+    （3 参，同文件 `:288`）、注册表 `summaryKeys()`（`session-projection/src/index.ts:570`）
+    ⇒ 3 参 `cachedSnapshot` 分支与「形参不足放弃回填」永远走不到。
+  * **收缩提案（只进报告，不改代码）**：删 `fn.length` 分派，直接按 rc.3 签名调用（保留 try/catch 与
+    fail-soft 语义并同步简化 `canWriteProjectionCache` 守卫）。改完本条只剩「字符串取服务」的半个欠账；
+    彻底去掉需把两个服务纳入依赖声明，收益是可读性，需 owner 权衡。
 
 ## B. 刻意改官方默认外观的例外（**均不带官方默认门**，两个档位都生效）
 
-> 判据：「恢复官方本该有的行为」（修 bug、复原）⇒ 不带门；「改变官方有意的设计选择」（断点、留白）⇒ 带门。
->
-> ⚠️ 不带门的规则另有一条硬约束：**不得依赖插件 token 层就绪**——token 层在 `status: loading` 窗口内
-> 不具备，`var()` 解析为空，比不生效更糟（悬停卡栽过一次，卡片变全透明）。
+> 判据：「恢复官方本该有的行为」（修 bug、复原）⇒ 不带门；「改变官方有意的设计选择」⇒ 带门
+> （本插件用 `data-dsh-theme-tone-plain` 表达「官方默认」档，只对 `backdrop.ts` / `glass.ts` 生效）。
+> 2026-11-14 复核：不带门的只有下面**两组**；旧文本的「三处 / 四条」计数以及 `src/mask.ts`（遮罩模糊）、
+> `src/handle-glow.ts`（悬停光带）两条已随 2026-10-27 重写删除，一并删除。
 
-1. **悬停卡**（`HOVER_CARD_ANCHOR`）：官方把这张卡的面与字都写成组件内字面量（浅色轴下官方自己就是深卡）。
-   owner：「深卡不对吧」→ 跟随主题、两个档都修。
-2. **弹窗遮罩模糊**（`src/mask.ts`）：官方 0.1.7-rc.2 把 `--dsw-mask-blur` 改成 `none`（**有意为之**），
-   owner 要求恢复 0.1.5 观感。证据链见 [`0.1.7-rc.2-mask-blur.md`](upstream/0.1.7-rc.2-mask-blur.md)。
-3. **悬停光带跟随指针**（`src/handle-glow.ts`，**已随 `dsh-nav-pin` 并入 `dsh-theme-tone` 落地**）：官方
-   `--dsh-width-handle-pointer-y` 只在**拖拽中**被写，纯悬停走 CSS 兜底 `50%`，而那个 `50%` 是相对
-   `.body` 盒（官方顶栏在流内占 76px）算的 ⇒ 光带比视口中心低 38px。官方**无意的 bug**，
-   owner 2026-09-29 定案「官方的也一起修复」。
-⚠️ 新增破例时**必须同步更新本节计数**（曾经写着「唯一一处」，加到第二处后即失真）。
-第 3 处随 `dsh-nav-pin` 并入 `dsh-theme-tone` 落地；实施时本节改为「三处」，
-并顺手修 `src/surface.ts:1223` 那句已过期的「全插件**唯一**不带官方默认门的一条」（实为两条）。
-**2026-10-08 复核：本节仍为三处** —— 曾有过第 4 处「顶栏弹出层的列内夹取」（`src/popover.ts`，2026-10-02 加），
-因该修法把弹框压成「贴列左缘、横跨整个对话区」，且复查找明**纯 CSS 无解**，**整表已回退**（见 §C 第一条）。
+1. **浮层材料修正**（`plugins/dsh-theme-tone/src/surfaces.ts`，`buildSurfaceCss` 无条件注入）：
+   官方把少数浮层的面 / 字写成组件内字面量或半透明玻璃，深色玻璃上不可读 ⇒ 统一换成官方 token：
+   * 左边栏 Workspace 行 hover 卡：在卡根覆盖官方 `--dsw-alias-hovercard-*`（官方 rc.3 起改吃这组
+     token：`packages/client/ui-primitives/src/HoverCard.module.css:16,36`；标签行见
+     `ui-workspace/src/client/rows/Rows.module.css:420-443`）；
+   * 停靠卡（todo / goal / queue）：半透明菜单玻璃 → 不透明抬升面；
+   * 菜单分组标题（`[data-menu-group-heading]`，官方 rc.3 仍在 `ui-primitives/src/MenuGroup.tsx:15`）：
+     sticky 却没有不透明底 → 用主题底 + 菜单色合成；
+   * 输入框触发菜单「下面还有内容」的官角色块提示（`[data-trigger-menu]::after`）→ 改成列表内容渐隐
+     （只在官方 `data-overflow-below/above` 存在时生效）。
+2. **轮次导航恒显 + 内容宽度钳制**（`plugins/dsh-theme-tone/src/nav-pin.ts`，自 `dsh-nav-pin` 并入）：
+   官方在 900px 隐藏轮次导航；owner 定案改到 700px 才停显（hover / focus 淡入）；内容宽度在**没有**
+   官方用户宽度偏好时钳到「每侧 ≥120px、地板 640px」，有偏好时原样交还官方（守卫
+   `test/nav-pin.test.mjs:38` 明示这组规则不带门）。
 
-> ⚠️ **计数口径**：§B 的「四条」只数**改官方默认外观**这一类（不带官方默认门）。
-> `src/caption.ts` 的桌面端标题栏 overlay 同样不带门，但它是**只读判别 + 改探针自己的 token**、
-> 不改官方外观，故登记在 §D 而不计入 §B —— 凡写「三条 / 四条」时指的是 §B 这一组，别把 §D 那条算进来。
-> 2026-10-03 复核时把 `src/surface.ts`、`docs/spec/00-overview.md`、`docs/spec/05-surfaces.md`
-> 三处过期计数（仍写「唯一」/「三处」）一并校正为「四条（之一）」。
+## C. 官方缺陷（我们不修，仅登记）
 
-## C. 官方缺陷（**我们不修**，仅登记以免被反复当成我们的 bug 重查）
-
-> ⚠️ 本节只登记**确认不修**的。
-> 第一条那个弹出层缺陷曾在 2026-10-02 被移出本节、记为「已修」，**2026-10-08 整表回退并移回本节** —— 理由见下。
-
-* **会话中列裁切 / 遮盖顶栏里的弹出层**（官方 `JobListAction` 的 `.menu`）—— **不修，仅登记**。
-  两个**各自独立**的成因：
-  * **① 被裁**：弹框向右伸出会话列，而中列是 `overflow: hidden`
-    （`ConversationRoot.module.css:363-365` 的 `.root[data-phase='active'] { overflow: hidden }`），
-    裁切右边界逐像素等于右栏面板左缘（实测 1600×900 下 880 = 880）。
-  * **② 被盖**：弹框 `z-index: 100` 长在**顶栏**子树里，而本插件把顶栏抬成 `absolute + z-index: 82`
-    ⟹ 自作层叠上下文，那个 100 **被关在里面**、对外只算 82；右栏面板也正好 82，
-    同号按绘制次序决胜、面板在 DOM 更后 ⇒ 面板赢。
-
-  **2026-10-02 曾「修掉」它**（换包含块 + `left: 0 !important`），**2026-10-08 全部回退**：
-  那个修法把弹框压成「贴列左缘、横跨整个对话区」，owner 真机报障说比原缺陷更难看。
-  按 owner 建议「先恢复成官方原状态再改」回退后重查，查明了**为什么纯 CSS 修不了**：
-
-  * **`container-type: inline-size` 隐含 `contain: layout`**（`ConversationRoot.module.css:71` 的
-    `.titleRow`，而弹出层就在它的子树里）⇒ 该元素成为 abspos / **fixed** 后代的**包含块**。
-    于是「把包含块上移到列外」这条路被官方 containment 钉死：换谁当包含块都还在 `.titleRow` 内，
-    而 `.root` 的 `overflow: hidden` 是它的**祖先** ⇒ **恒被裁**。`position: fixed` 同样无效。
-  * 抬**弹框自己**的 `z-index` 无效（出不了顶栏那层；受控实测见 `docs/spec/12`）；
-    抬**顶栏**能盖过面板，但**改不了裁切**（`overflow` 不受 z-index 影响），
-    且与官方全屏面板次序冲突（见下）。
-  * 位置那一半另有坑：官方把锚定值写成**相对触发器**的内联 `left`，换了包含块就落在错误的坐标系里
-    （实测偏 −300px）；`left: auto` 能让它回到静态位置 = 触发器左缘（受控实测弹框−触发器 = 0）。
-
-  ⇒ 结论：这是**官方 popover 没有 portal 到 body** 造成的结构性缺陷。**决定性对照**（同一个顶栏区域）：
-  它旁边的「智能体团队 / 成员」弹窗走 `SubagentHeaderLineage.tsx:727` 的
-  `createPortal(..., document.body)` ⇒ 节点挂在 body 下 ⇒ **既逃出列的裁切、也逃出顶栏的层叠上下文**，
-  所以能完美浮在右栏上面；而 `JobListAction.tsx` 全文**没有** `createPortal`
-  （官方 client 里 27 处 `createPortal(` 一处都不在它身上）⇒ `<ul>` 直接长在顶栏子树里，两道都吃。
-  **官方自己这两处实现不一致**，真正的修法只有官方把 `JobListAction` 也 portal 出去，属上游事项。
-
-  **当前采用的缓解**（最小改动，2026-10-08）：只把弹框**右对齐**（`right: 0` + `left: auto !important`；
-  包含块、`z-index`、`overflow` 全不动）⇒ 它不再向右伸出列、**不再被裁**，但仍盖不到右栏上面
-  （它没离开对话列的范围）。用户可见的说明写在 README 的《Known limitations / 已知限制》。
-
-  ⚠️ 别再把下面这些当成还没试过的修法 —— 全都试过，受控实验与失败记录在 `docs/spec/12`：
-  换包含块 / `position: fixed` / 抬弹框自己的 `z-index` / 抬顶栏 / 动中列 `overflow`。
-  ⚠️ 也别想「我们替它 portal」（把官方那个 `<ul>` 搬到 `document.body`）：React 记录着**原父节点**，
-  卸载时对已搬走的节点 `removeChild` 会抛 `NotFoundError` ⇒ 会把宿主搞崩。
-  ⚠️ 同理别想「把 `.titleRow` 的 `container-type` 关掉」来放 `position: fixed` 出去：
-  那会**同时废掉官方与咱们自己的 `@container` 窄化**（codebuddy 的入口收窄就靠它）。
-
-* **仍不该做的**（此后若有人想「顺手」）：
-  * 把顶栏抬到右栏面板之上会违反官方次序 —— 官方全屏面板 `--dsh-dockkit-dock-layer: 40`
-    高于顶栏 9（`SidebarRight.module.css:19-21,64-66`，原话「fullscreen (40) covers the frame and
-    remains below independently floating panels (60)」），dockkit 浮窗又是 60 —— 三者都必须能压住顶栏；
-    守卫钉在 `test/glass.test.mjs`「顶栏不得抬到右栏面板之上」那条。
-  * 去动中列的 `overflow` 同样不行：那是列自身的裁切契约。
+> 2026-11-14 复核：原登记的「会话中列裁切 / 遮盖顶栏里的弹出层（`JobListAction`）」**上游已修**——
+> rc.3 `packages/client/ui-jobs/src/client/JobListAction.tsx:596` 用 `createPortal` 把弹层挂到 body
+> 并改用 CSS anchor（`rc.1` tag 即已有、`rc.3` 仍在），本插件也已没有对应缓解代码。
+> 本节当前**暂无条目**；官方层叠次序相关的历史约束见 §E。
 
 ## D. 静默失效风险（官方改名 / 改行为即失效，没有任何门能拦）
 
-* **`dsh-theme-tone`** —— 仓库规矩是「不依赖 hashed CSS-module 类名」，以下四处**例外**，
-  且测试**抓不到官方重命名后缀**：  1. **悬停卡字色**（`src/surfaces.ts` 的 `TITLE` / `SECONDARY` / `TERTIARY` / `COPIED`）：`body > [class*='_portal'] [role='button'][aria-label] [class*='_hoverTitle'|'_hoverPath'|'_hoverTime'|'_hoverStatus'|'_copied']`（0.2.2 起多一层 portal 包装节点）
-     —— **2026-11-14 已收缩**（dsh 0.2.2-rc.3）：官方悬停卡改吃 `--dsw-alias-hovercard-*` 设计 token，现改为在卡根覆盖官方 token，不再依赖类名后缀；本条保留为历史记录。
-  2. **扫光带**（`SWEEP_ANCHORS`，`src/sweep.ts`）：`[class*='_row']::after` —— **已收窄**：必须同时带
-     `data-variant` / `data-tool` 才命中（`test/sweep.test.mjs` 钉住不得回退）
-  3. **弹窗遮罩**（`MASK_SELECTOR`，`src/mask.ts`）：`[class*='_mask']`（官方三个遮罩 `Modal` /
-     `SettingsRoot` / `ImageLightbox` 只在哈希类名上可辨）
-  4. **桌面端标题栏 overlay**（`src/caption.ts`）：`body > span[style*='--dsw-specific-sidebar-fill'][style*='--dsw-alias-label-primary']`
-     —— 官方那条 Windows preload 探针（`apps/desktop/src/preload-windows.ts`）没有 data 属性，
-     唯一可辨的是它 inline style 里逐字写着的两个 token 名；**两者同时出现 + `body` 直接子**双重收窄
-     （`test/caption.test.mjs` 钉住）。命中后把探针**自己**那个 token 设为 `transparent`，
-     让官方 WCO overlay 透明、由本插件铺满视口的装饰层透上来。官方改写那一行即**不命中**，
-     退回改前外观（不透明 overlay），属良性降级。
-     ⚠️ 本条**刻意不带**官方默认门：官方那套 `MutationObserver` 只 observe
-     `root[lang]` / `body[data-ds-dark-theme,style]` / `head`，**不观察本插件的门属性** ——
-     带门则门翻开时不重发、overlay 停在旧色（实测），是不留痕迹的失效；
-     而不带门在颜色上恒等（探针与官方 `.frame::before` 读的是**同一个** token，必然同值）。
-  5. **轮次导航 nav 的 `aria-label` 文案**（`src/nav-pin.ts` 的 `NAV_ARIA_LABELS`）：
-     `[data-conversation-scroll] div:has(> nav[aria-label="轮次导航"|"Turn navigation"])` ——
-     官方 nav 没有可依赖的公开属性，只能按**本地化文案**认它；代码自己的注释也写了
-     「官方改文案需同步更新」。官方改字即**不命中**（那条窄屏浮现规则静默失效），
-     降级表现 = 窄对话列上轮次导航照官方那样消失。
-  6. **「未选工作区」空态的官方 `::after` 检测**（`src/workstart.ts`）：读官方
-     `::after` 伪元素的 `content` 是否非空、且 `mask-image` 是否含 `stroke-dasharray`，
-     用来判断官方那个虚线圆环（= 没有工作区）在不在。语义属性全被污染、哈希类名又禁用，
-     只剩这条读**计算样式**的路。官方改那个圆环的画法即**不命中**（驱动
-     `WORKSTART_ATTR` 的两条规则失效），降级表现 = 该空态少了我们那点装饰。
+* **`dsh-theme-tone` 悬停卡卡根锚点**（`src/surfaces.ts:13`
+  `CARD = body > [class*='_portal'] [role='button'][aria-label]`）：官方 HoverCard 的 portal 包装节点
+  （rc.3 `ui-primitives/src/HoverCard.module.css:95` `.portal { display: contents }`；
+  可复制卡根带 `role='button'` + `aria-label`：`HoverCard.tsx:283-292`）**只有 hashed 类名可辨**。
+  这是 theme-tone **唯一剩下的 hashed 类名依赖**（字色已改官方 token）。官方改名即 token 覆盖不命中、
+  悬停卡退回官方深卡（不抛错、不崩）⇒ 良性降级。守卫：`test/surfaces.test.mjs:10,14-22`。
+* **`dsh-theme-tone` 轮次导航 `nav` 的本地化 `aria-label`**（`src/nav-pin.ts:8`
+  `NAV_ARIA_LABELS = ['Turn navigation', '轮次导航']`）：官方 nav 没有 data 属性、只有 `aria-label`
+  （rc.3 `ui-chat/src/client/chat/TurnNavigator.tsx:235-237`），只能按文案认；官方改字即「恒显 / 窄屏浮现」
+  静默失效（降级 = 窄列上轮次导航照官方消失）。建议向上游提「给该 `<nav>` 加稳定 data 属性」。
+* **`dsh-codebuddy-credits` 设置行 DOM seam**（`src/client/settings-row.ts` 全文；官方结构：
+  `ui-settings-models/src/client/ModelsSection.tsx:464-508`，`li > div.rowHead > span.rowActions > 第一个 button(编辑)`）：
+  本卡在**捕获阶段**拦截官方行头「编辑」按钮（`CodeBuddyProviderCard.tsx:134-143`，`stopPropagation`
+  阻断官方编辑器并展开自建编辑器），并用 `insertSavedNotice` 把绿色保存提示插到 section 顶部、
+  用本插件样式隐藏官方占位编辑器（`styles.ts:194-245`）。官方改行头结构即三处一起静默降级：
+  捕获不到「编辑」→ 本卡不再展开（官方编辑器按原行为打开，按钮位置 / 样式始终是官方的）；
+  提示插不进去 → 只是不显示「已保存」，Key 的保存 / 清空不受影响。
 
-  以上 5 / 6 两条都是**本地化文案 / 计算样式**级别的依赖：官方一改就静默失效、不抛错、
-  也不影响宿主，属 §D 的标准类型。
+## E. 已退役 / 已收缩（历史，不再维护）
 
-* **`dsh-codebuddy-credits`** —— 捕获阶段拦截官方行头「编辑」按钮（`stopPropagation` 阻断官方编辑器打开，
-  改为展开本插件自建编辑器）：按钮保留官方原位与样式，但**官方改这个按钮即静默失效**。
-
-* **`dsh-theme-tone`** —— 账号通知卡的锚点依赖官方公开 DOM 属性 `aside[data-front]`（rc.2 新增的
-  `AccountNoticeStack`：`createPortal` 直挂 body、`position: fixed; z-index: 40; isolation: isolate`）。
-  本插件把背景层 / 内容层 / 右栏抬到 80 / 81 / 82 ⇒ 官方 z 40 会被压住；故 client half 用该属性找到通知卡、
-  把锚点 token 打在**它的父元素（stack）**上，再抬到 83（card 在 stack 的层叠上下文内，抬 card 出不去）。
-  官方改掉这个属性即**不命中** —— 降级表现 = 通知退回 z 40、重新被主题层遮挡/染色（不崩、不抛错）。
-
-### D-旁注：**不是** hashed 类名、但同样「官方改行为即静默失效」的一类
-
-* **`dsh-theme-tone` 的分组菜单锚点依赖「谁带 `role='menu'`」**（`src/surface.ts`）。
-  这条**不**依赖 hashed 类名（用的是公开 role / data 属性），却在 **0.2.0-rc.2 真的踩了一次**：
-  官方把 `role='menu'` 从菜单**卡片**搬到了内层**滚动容器**上
-  （`ModelSelect.tsx:484` 卡片改成 `role={pane==='model'?'group':'menu'}`；
-  `:551-555` 的 `div.groups.scrollable` 自己带 `role="menu"`）。
-  于是「菜单锚点的**直接子**」这个结构关系整体上移一层，内圈圆角规则
-  `[role='menu'] > :has([role='group'])` 在新结构下**一条也命不中**（实测 rc.2 结构 0 命中 /
-  rc.1 结构 1 命中）—— **token 级审计抓不到**：`role="menu"` 这个名字还在、还出现，
-  只是**换了元素**（§4.4 说的那类行为变化）。
-  现出两条腿各自覆盖（`GROUPED_MENU_SCROLLER_SELECTOR` + `GROUPED_MENU_SELF_SCROLLER_SUFFIX`）；
-  守卫在 `test/surfaces.test.mjs`（反向注入验过有牙齿）。
-  ⚠️ 下次官方再动这一带，要问的是「**哪个元素带这个 role**」，不是「这个 role 还在不在」。
-
-## E. 已退役（历史，不再维护）
-
+* **2026-11-14（dsh 0.2.2-rc.3 复核）**：
+  * 删除 §C「官方 JobListAction 弹层被裁 / 被盖」整条登记（上游已 portal，见 §C 说明）；
+  * 删除 theme-tone 旧 §D 条目中对应代码已在 2026-10-27 重写删除的六项（扫光带 `[class*='_row']`、
+    弹窗遮罩 `[class*='_mask']`、桌面标题栏 overlay 的 inline token 探针、`workstart` 计算样式检测、
+    分组菜单 `role='menu'` 结构、账号通知 `aside[data-front]`）——这些文件
+    （`src/sweep.ts` / `src/mask.ts` / `src/caption.ts` / `src/workstart.ts` / `src/surface.ts`）
+    当前均不存在，文档随之删除；
+  * `sessionPersistence.locate` 改标「官方公开替代已存在（`snapshot.location`），收缩候选」；
+  * `session_projcache` 改标「域 spec 已接入（`projectionCacheDomainSpec`），仅剩直读 / 删行 / 清扫」；
+  * `WorkspaceRegistry` 条目改为「读已走公开 getter、写仍刻意走私通道」。
 * **`dsh-vision-bridge`**（2026-09-10 退役，2026-10-27 插件目录已彻底删除）：历史记录，见 git 历史。
