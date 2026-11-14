@@ -185,12 +185,14 @@ const annotationSchema = z.object({
   createdAt: z.string().min(1),
 })
 
-/** Legacy notebook-root record (kept so profiles written before the annotation refactor validate). */
+/** The single linked notes-root record (fixed id). */
 const notebookConfigSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('notebook-config'),
   schema: z.number().int().positive(),
   rootPath: z.string().min(1),
+  // Optional (absent in older records): the drafting skill; the picker is gone, the field stays so
+  // old profiles keep validating.
   skillName: z.string().min(1).nullable().optional(),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),

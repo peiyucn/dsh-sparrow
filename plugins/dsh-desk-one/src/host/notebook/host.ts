@@ -1,27 +1,29 @@
 /**
- * Annotation host: file identity, single-page reads, the draft box, and review history.
+ * Notebook host: derived index, single-page reads, file identity, the draft box, and review
+ * history.
  *
- * There is no global "library root" and no user-facing index any more: callers name a registered
- * workspace, and each file identity remembers the workspace root it came from. The only remaining
- * directory scan is the bounded, on-demand one used to follow a renamed file by content hash.
+ * The scan is cached with a short TTL and single-flight semantics. File identities are assigned
+ * lazily (first review) and re-resolved by content hash, so a renamed file keeps its history.
  */
 
 import { readFile, stat } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import type {
-  NoteDraft, NotebookEntry, NotebookFileResponse, NotebookPageResponse,
+  NoteDraft, NotebookEntry, NotebookFileResponse, NotebookPageResponse, NotebookStateResponse,
   RecordReviewRequest, ReviewHistoryEntry, ReviewRecord,
 } from '../../notebook-contract.js'
 import { NOTEBOOK_MAX_BYTES, NOTEBOOK_SCAN_TIMEOUT_MS } from '../../constants.js'
 import { DeskError } from '../http.js'
 import type { DeskStore } from '../store.js'
 import { ensureNoteFile } from './files.js'
-import { readPage } from './library.js'
+import { readPage, searchEntries, summarize } from './library.js'
 import { scanLibrary } from './scan.js'
 
 /** How long one scan is reused before the next request rescans. */
 const SCAN_TTL_MS = 30_000
+/** How many recent pages the shelf shows. */
+const RECENT_LIMIT = 30
 /** How many candidate files a history resolution hashes before giving up. */
 const RELOCATE_CANDIDATES = 400
 /** Resolve budget for one history request (ms). */
@@ -44,7 +46,7 @@ async function hashFile(rootPath: string, relativePath: string): Promise<string 
   }
 }
 
-/** Annotation data facade shared by routes. */
+/** Notebook data facade shared by routes and tools. */
 export class NotebookHost {
   /** Last successful scan and its root. */
   private cache: { readonly root: string; readonly at: number; readonly entries: readonly NotebookEntry[] } | undefined
@@ -60,7 +62,12 @@ export class NotebookHost {
   /** @param store - unified storage store. */
   constructor(private readonly store: DeskStore) {}
 
-  /** Scan one root on demand, reusing the last scan while it is fresh (rename detection only). */
+  /** Configured root, if any. */
+  root(): string | undefined {
+    return this.store.getNotebookConfig()?.rootPath
+  }
+
+  /** Index the root, reusing the last scan while it is fresh. */
   private async entries(root: string): Promise<readonly NotebookEntry[]> {
     const now = Date.now()
     if (this.cache !== undefined && this.cache.root === root && now - this.cache.at < SCAN_TTL_MS) {
@@ -73,6 +80,84 @@ export class NotebookHost {
     }).finally(() => { this.pending = undefined })
     this.pending = scan
     return await scan
+  }
+
+  /** Library root or a readable error. */
+  private requireRoot(): string {
+    const root = this.root()
+    if (root === undefined) throw new DeskError('NOTEBOOK_UNAVAILABLE', '还没有设置笔记库', 409)
+    return root
+  }
+
+  /** Header state: config, counts, newest pages, drafts and history usage. */
+  async state(): Promise<NotebookStateResponse> {
+    const root = this.root()
+    const history = this.store.listReviewRecords()
+    const historyBytes = history.reduce((sum, record) => sum + record.bytes, 0)
+    const config = this.store.getNotebookConfig() ?? null
+    if (root === undefined) {
+      return {
+        config: null,
+        stats: { total: 0, missingFrontmatter: 0, emptyBody: 0 },
+        recent: [],
+        drafts: [],
+        draftCount: 0,
+        historyCount: 0,
+        historyBytes: 0,
+      }
+    }
+    const entries = await this.entries(root)
+    const drafts = this.store.listNoteDrafts().filter(draft => draft.rootPath === root && draft.drafts.length > 0)
+    return {
+      config,
+      stats: summarize(entries),
+      recent: entries.slice(0, RECENT_LIMIT),
+      drafts,
+      draftCount: drafts.length,
+      historyCount: history.length,
+      historyBytes,
+    }
+  }
+
+  /**
+   * Page through the whole library, newest first (the list is the library, not a fixed recent
+   * shelf, so its count and its pages always describe the same set).
+   * @param input - zero-based offset, page size, and whether to keep only files without frontmatter.
+   * @returns the page plus the total number of matching files.
+   */
+  async list(input: {
+    readonly offset?: number
+    readonly limit?: number
+    readonly missingFrontmatter?: boolean
+  }): Promise<{ entries: readonly NotebookEntry[]; total: number }> {
+    const root = this.root()
+    if (root === undefined) return { entries: [], total: 0 }
+    const all = await this.entries(root)
+    const filtered = input.missingFrontmatter === true ? all.filter(entry => !entry.hasFrontmatter) : all
+    const offset = Math.max(0, Math.trunc(input.offset ?? 0))
+    const limit = Math.min(Math.max(1, Math.trunc(input.limit ?? 10)), 200)
+    return { entries: filtered.slice(offset, offset + limit), total: filtered.length }
+  }
+
+  /** Search indexed entries. */
+  async search(input: {
+    readonly query?: string
+    readonly type?: string
+    readonly tag?: string
+    readonly missingFrontmatter?: boolean
+    readonly emptyBody?: boolean
+    readonly limit?: number
+  }) {
+    const root = this.root()
+    if (root === undefined) return { entries: [], truncated: false }
+    const entries = await this.entries(root)
+    return searchEntries(entries, input.query ?? '', input, input.limit ?? 100)
+  }
+
+  /** Resolve (or lazily assign) the identity of one file of the linked library. */
+  async ensureFile(relativePath: string): Promise<NotebookFileResponse> {
+    const file = await ensureNoteFile(this.store, this.requireRoot(), relativePath)
+    return { file }
   }
 
   /**
@@ -203,4 +288,11 @@ export class NotebookHost {
   draft(fileId: string): NoteDraft | null {
     return this.store.getNoteDraft(fileId) ?? null
   }
+
+  /** Drop the cached scan (root changed). */
+  invalidate(): void {
+    this.cache = undefined
+    this.relocateCache.clear()
+  }
+
 }

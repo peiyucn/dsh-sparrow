@@ -27,11 +27,19 @@ export const ROUTES = Object.freeze({
   scheduleCalendarUpdate: `${PREFIX}/schedule/calendars/update`,
   scheduleStatus: `${PREFIX}/schedule/status`,
   scheduleSync: `${PREFIX}/schedule/sync`,
+  notebookState: `${PREFIX}/notebook/state`,
+  notebookRoot: `${PREFIX}/notebook/root`,
+  notebookSkill: `${PREFIX}/notebook/skill`,
   notebookOpen: `${PREFIX}/notebook/open`,
   notebookOpenById: `${PREFIX}/notebook/open-by-id`,
   notebookSummary: `${PREFIX}/notebook/summary`,
+  notebookSearch: `${PREFIX}/notebook/search`,
+  notebookList: `${PREFIX}/notebook/list`,
+  notebookPage: `${PREFIX}/notebook/page`,
   notebookDraft: `${PREFIX}/notebook/draft`,
   notebookBaseline: `${PREFIX}/notebook/baseline`,
+  notebookFile: `${PREFIX}/notebook/file`,
+  notebookCreate: `${PREFIX}/notebook/create`,
   notebookHistory: `${PREFIX}/notebook/history`,
   notebookReviewSessions: `${PREFIX}/notebook/review-sessions`,
   scheduleConnections: `${PREFIX}/schedule/connections`,
@@ -113,6 +121,10 @@ export const NOTEBOOK_BASELINE_MAX_CHARS = NOTEBOOK_MAX_BYTES
  * items with inline quotes), so the transport cap must sit above the storage cap.
  */
 export const NOTEBOOK_WRITE_BODY_BYTES = NOTEBOOK_MAX_BYTES * 4
+/** History usage above this turns the entry-page meter red (no modal). */
+export const NOTEBOOK_HISTORY_WARN_BYTES = 2 * 1024 * 1024
+/** Fixed record id of the notebook root setting. */
+export const NOTEBOOK_CONFIG_ID = 'notebook_config'
 
 export const MAX_ACTIVE_NOTES = 100
 export const MAX_TRASH_NOTES = 200

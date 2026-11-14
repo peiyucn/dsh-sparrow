@@ -40,6 +40,28 @@ export interface NotebookEntry {
   readonly mtime: string
 }
 
+/** Header counts for the library. */
+export interface NotebookStats {
+  readonly total: number
+  readonly missingFrontmatter: number
+  readonly emptyBody: number
+}
+
+/** The single linked notes root record (fixed id `notebook_config`). */
+export interface DeskNotebookConfig {
+  readonly id: string
+  readonly kind: 'notebook-config'
+  readonly schema: number
+  readonly rootPath: string
+  /**
+   * Legacy field from the removed AI-draft flow: old records may carry it, new ones never write it.
+   */
+  readonly skillName?: string | null
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
+
 /** One frontmatter field as the review tab shows it. */
 export interface NotebookField {
   readonly name: string
@@ -167,6 +189,32 @@ export interface ReviewHistoryEntry {
   readonly resolvedPath?: string
 }
 
+export interface NotebookStateResponse {
+  readonly config: DeskNotebookConfig | null
+  readonly stats: NotebookStats
+  readonly recent: readonly NotebookEntry[]
+  /** Files with unsaved annotations. */
+  readonly drafts: readonly NoteDraft[]
+  readonly draftCount: number
+  readonly historyCount: number
+  readonly historyBytes: number
+}
+
+export interface NotebookRootRequest {
+  readonly rootPath: string
+}
+
+export interface NotebookSearchResponse {
+  readonly entries: readonly NotebookEntry[]
+  readonly truncated: boolean
+}
+
+/** One page of the whole library, newest first, with the total for paging. */
+export interface NotebookListResponse {
+  readonly entries: readonly NotebookEntry[]
+  readonly total: number
+}
+
 export interface NotebookFileResponse {
   readonly file: NoteFileRef
 }
@@ -232,31 +280,4 @@ export interface ReviewHistoryResponse {
 
 export interface DeleteReviewRequest {
   readonly id: string
-}
-
-/** One file row on the annotation landing page. */
-export interface NotebookSummaryRow {
-  /** Stable key for React lists. */
-  readonly key: string
-  /** File identity (absent when a marker cannot resolve one). */
-  readonly fileId?: string
-  /** Workspace-relative path (absent when it cannot be resolved). */
-  readonly path?: string
-  /** Display title derived from the file name (records keep their submitted title). */
-  readonly title: string
-  readonly workspaceId?: string
-  readonly workspaceTitle?: string
-  /** Last activity: draft update, record submit, or review-session update. */
-  readonly updatedAt: string
-  /** Pending annotations (drafts) or submitted annotations (records); 0 for reviews. */
-  readonly count: number
-  /** Submitted rounds folded into one row (records are grouped per file); absent elsewhere. */
-  readonly rounds?: number
-}
-
-/** The three aggregate lists of the annotation landing page (no library root involved). */
-export interface NotebookSummaryResponse {
-  readonly drafts: readonly NotebookSummaryRow[]
-  readonly records: readonly NotebookSummaryRow[]
-  readonly recent: readonly NotebookSummaryRow[]
 }

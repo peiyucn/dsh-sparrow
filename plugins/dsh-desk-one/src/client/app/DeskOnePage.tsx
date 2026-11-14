@@ -18,7 +18,9 @@ import { useNoteDrag } from '../notes/hooks/useNoteDrag.js'
 import { useNotesData } from '../notes/hooks/useNotesData.js'
 import { useTrash } from '../notes/hooks/useTrash.js'
 import { useWallLayout } from '../notes/hooks/useWallLayout.js'
-import { AnnotationLanding } from '../notebook/landing/AnnotationLanding.js'
+import { NotebookView } from '../notebook/NotebookView.js'
+import { NotebookHeaderActions } from '../notebook/HeaderActions.js'
+import { useNotebookPage } from '../notebook/hooks/useNotebookPage.js'
 import { TaskBoard } from '../tasks/components/TaskBoard.js'
 import { SessionsView } from '../sessions/SessionsView.js'
 import { ScheduleView, type ScheduleHeaderActions } from '../schedule/ScheduleView.js'
@@ -130,6 +132,17 @@ export function DeskOnePage(props: DeskPanelProps) {
     archiveGroup: groupsData.archiveGroup,
   })
 
+  // Notebook data + view state live here (not inside NotebookView) so the shared header can own
+  // the page's primary actions and the page can keep its workspace switcher in one place.
+  const notebookPage = useNotebookPage({
+    t,
+    active: tab === 'notebook',
+    notebook,
+    workspaceAccess,
+    onOpenReview: openReview,
+    onOpenBrowser: openBrowser,
+  })
+
   const actions = tab === 'notes'
     ? notesActions({
         t,
@@ -155,10 +168,10 @@ export function DeskOnePage(props: DeskPanelProps) {
           setTaskSortMode: board.setSortMode,
           archivedCount: board.archivedTasks.length,
         })
-      // The annotation landing page owns its primary action in the body, like an empty state;
-      // the shared header keeps no actions for this tab.
+      // The notebook page renders its workspace switcher in the body; the header keeps the
+      // secondary "open file browser" action.
       : tab === 'notebook'
-        ? null
+        ? <NotebookHeaderActions t={t} page={notebookPage} />
         : scheduleActions({
             t,
             visible: tab === 'schedule',
@@ -180,13 +193,7 @@ export function DeskOnePage(props: DeskPanelProps) {
         )}
         {data.actionError === null ? null : <p className="dsh-desk-error">{data.actionError}</p>}
         {tab === 'notebook' ? (
-            <AnnotationLanding
-              t={t}
-              notebook={notebook}
-              workspaceAccess={workspaceAccess}
-              onOpenReview={openReview}
-              onOpenBrowser={openBrowser}
-            />
+            <NotebookView page={notebookPage} />
           ) : tab === 'notes' ? (
             <div className="dsh-desk-notesview">
               {trash.showTrash

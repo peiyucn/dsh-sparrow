@@ -1,15 +1,70 @@
 /**
- * Browser-side annotation surface: workspace-scoped opens, the landing summary, single-page reads,
- * the draft box, round baselines, review-session markers, and review history.
+ * Browser-side notebook surface: library state, root setting, page reads, file identity, the
+ * draft box, and review history.
  */
 
 import { ROUTES } from '../../constants.js'
 import type {
   DraftAnnotation, MarkReviewSessionRequest, NoteDraft, NoteDraftResponse,
-  NotebookBaselineResponse, NotebookFileResponse, NotebookPageResponse, NotebookSummaryResponse,
-  RecordReviewRequest, ReviewHistoryResponse, ReviewRecord, ReviewSessionListResponse,
+  NotebookBaselineResponse, ReviewSessionListResponse,
+  NotebookFileResponse, NotebookListResponse, NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse,
+  RecordReviewRequest, ReviewHistoryResponse, ReviewRecord,
 } from '../../notebook-contract.js'
 import { deleteJson, fetchJson, postJson } from '../http.js'
+
+/** Root, counts, newest pages, drafts and history usage. */
+export function notebookState(): Promise<NotebookStateResponse> {
+  return fetchJson<NotebookStateResponse>(ROUTES.notebookState)
+}
+
+/** Point the library at one workspace directory. */
+export function setNotebookRoot(rootPath: string): Promise<NotebookStateResponse> {
+  return postJson<NotebookStateResponse>(ROUTES.notebookRoot, { rootPath } satisfies NotebookRootRequest)
+}
+
+/** Forget the configured root (the index is derived). */
+export function clearNotebookRoot(): Promise<NotebookStateResponse> {
+  return deleteJson<NotebookStateResponse>(ROUTES.notebookRoot)
+}
+
+/** Choose the drafting skill (`null` = no skill). */
+export function setNotebookSkill(name: string | null): Promise<NotebookStateResponse> {
+  return postJson<NotebookStateResponse>(ROUTES.notebookSkill, { name })
+}
+
+/** Search titles / paths, optionally narrowed by a count filter. */
+export function searchNotebook(input: {
+  readonly query?: string
+  readonly type?: string
+  readonly tag?: string
+  readonly missingFrontmatter?: boolean
+  readonly emptyBody?: boolean
+  readonly limit?: number
+}): Promise<NotebookSearchResponse> {
+  const params = new URLSearchParams()
+  if (input.query !== undefined && input.query !== '') params.set('q', input.query)
+  if (input.type !== undefined && input.type !== '') params.set('type', input.type)
+  if (input.tag !== undefined && input.tag !== '') params.set('tag', input.tag)
+  if (input.missingFrontmatter === true) params.set('missing', '1')
+  if (input.emptyBody === true) params.set('empty', '1')
+  if (input.limit !== undefined) params.set('limit', String(input.limit))
+  const suffix = params.size === 0 ? '' : `?${params.toString()}`
+  return fetchJson<NotebookSearchResponse>(`${ROUTES.notebookSearch}${suffix}`)
+}
+
+/** One page of the whole library (newest first) plus the total. */
+export function listNotebook(input: {
+  readonly offset?: number
+  readonly limit?: number
+  readonly missingFrontmatter?: boolean
+}): Promise<NotebookListResponse> {
+  const params = new URLSearchParams()
+  if (input.offset !== undefined && input.offset > 0) params.set('offset', String(input.offset))
+  if (input.limit !== undefined) params.set('limit', String(input.limit))
+  if (input.missingFrontmatter === true) params.set('missing', '1')
+  const suffix = params.size === 0 ? '' : `?${params.toString()}`
+  return fetchJson<NotebookListResponse>(`${ROUTES.notebookList}${suffix}`)
+}
 
 /** Read the persisted round baseline for one file. */
 export function loadReviewBaseline(sessionId: string): Promise<NotebookBaselineResponse> {
@@ -26,24 +81,9 @@ export function saveReviewBaseline(input: {
   return postJson<NotebookBaselineResponse>(ROUTES.notebookBaseline, input)
 }
 
-/** Resolve one workspace file and read it back (workspace-scoped annotation entry). */
-export function openNotebookFile(input: {
-  readonly workspaceId: string
-  readonly path: string
-}): Promise<NotebookFileResponse & { readonly page: NotebookPageResponse }> {
-  return postJson<NotebookFileResponse & { page: NotebookPageResponse }>(ROUTES.notebookOpen, input)
-}
-
-/** Read one file back by its persisted identity (review-tab restore). */
-export function openNotebookFileById(fileId: string): Promise<NotebookFileResponse & { readonly page: NotebookPageResponse }> {
-  return fetchJson<NotebookFileResponse & { page: NotebookPageResponse }>(
-    `${ROUTES.notebookOpenById}?fileId=${encodeURIComponent(fileId)}`,
-  )
-}
-
-/** Landing page aggregates: pending drafts, submitted records, and recent reviews. */
-export function notebookSummary(): Promise<NotebookSummaryResponse> {
-  return fetchJson<NotebookSummaryResponse>(ROUTES.notebookSummary)
+/** Resolve (or lazily assign) one file identity. */
+export function ensureNotebookFile(path: string): Promise<NotebookFileResponse> {
+  return postJson<NotebookFileResponse>(ROUTES.notebookFile, { path })
 }
 
 /** One file's persisted draft box. */
@@ -87,11 +127,31 @@ export function deleteReviewRecord(id: string): Promise<void> {
   return deleteJson<{ ok: boolean }>(ROUTES.notebookHistory, { id }).then(() => undefined)
 }
 
-/** The injected facade shape the landing page and review tab receive. */
+/** Resolve one workspace file and read it back (workspace-scoped annotation entry). */
+export function openNotebookFile(input: {
+  readonly workspaceId: string
+  readonly path: string
+}): Promise<NotebookFileResponse & { readonly page: NotebookPageResponse }> {
+  return postJson<NotebookFileResponse & { page: NotebookPageResponse }>(ROUTES.notebookOpen, input)
+}
+
+/** Read one file back by its persisted identity (review-tab restore). */
+export function openNotebookFileById(fileId: string): Promise<NotebookFileResponse & { readonly page: NotebookPageResponse }> {
+  return fetchJson<NotebookFileResponse & { page: NotebookPageResponse }>(
+    `${ROUTES.notebookOpenById}?fileId=${encodeURIComponent(fileId)}`,
+  )
+}
+
+/** The injected facade shape the panel and review tab receive. */
 export interface NotebookApi {
+  readonly state: typeof notebookState
+  readonly setRoot: typeof setNotebookRoot
+  readonly list: typeof listNotebook
+  readonly clearRoot: typeof clearNotebookRoot
+  readonly search: typeof searchNotebook
+  readonly ensureFile: typeof ensureNotebookFile
   readonly open: typeof openNotebookFile
   readonly openById: typeof openNotebookFileById
-  readonly summary: typeof notebookSummary
   readonly draft: typeof getNoteDraft
   readonly saveDraft: typeof saveNoteDraft
   readonly listReviewSessions: typeof listReviewSessions
@@ -103,11 +163,16 @@ export interface NotebookApi {
   readonly saveBaseline: typeof saveReviewBaseline
 }
 
-/** One facade object handed to the panel through `DeskPanelInjected`. */
+/** One facade object handed to the page through `DeskPanelInjected`. */
 export const notebookApi: NotebookApi = {
+  state: notebookState,
+  setRoot: setNotebookRoot,
+  list: listNotebook,
+  clearRoot: clearNotebookRoot,
+  search: searchNotebook,
+  ensureFile: ensureNotebookFile,
   open: openNotebookFile,
   openById: openNotebookFileById,
-  summary: notebookSummary,
   draft: getNoteDraft,
   saveDraft: saveNoteDraft,
   listReviewSessions,
