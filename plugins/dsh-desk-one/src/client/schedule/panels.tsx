@@ -168,7 +168,7 @@ export function StartPanel(props: {
       <header><h3>{t('today.start')}</h3></header>
       <div className="dsh-desk-start-actions">
         <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={context.onOpenNotebook}>
-          {plusIcon}<span className="dsh-desk-action-label">{t('tab.notebook')}</span>
+          {plusIcon}<span className="dsh-desk-action-label">{t('action.notebook')}</span>
         </button>
         <button type="button" className="dsh-desk-action dsh-desk-action-primary" onClick={context.onAddNote}>
           {plusIcon}<span className="dsh-desk-action-label">{t('action.newNote')}</span>
