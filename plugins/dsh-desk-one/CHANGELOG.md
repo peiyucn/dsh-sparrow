@@ -28,4 +28,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 * **Data and privacy**: notes, tasks, schedule mirror and notebook review records live in the profile-level `desk_one` DSH storage domain; schedule credentials (sync password / OAuth refresh token / subscription link) live only in the official credential store, and nothing is written to logs, HTML or exports.
 
+* **Notebook filter tabs**: the four view tabs stay on one line in the English UI (shorter labels), so they no longer wrap into two lines on a normal-width panel.
+
+* **Pinned sidebar shortcuts**: clicking a pinned shortcut (for example Sessions) now always returns to that tab, even after switching tabs inside its panel.
+
 * **Known limits**: the schedule is read-only (no local event creation, no write-back, and no publishing your own calendar as an iCalendar feed; subscribing to external ICS links is supported). Focus sessions, cross-object search, data export / import and richer task fields are planned in the repository spec.
