@@ -1,10 +1,10 @@
 /**
  * Persistent panel header: official conversation-header geometry.
  *
- * Row 1: brand lockup (glyph + inverted wordmark) + one-line intro + info button, with the
- * active view's actions on the right. Row 2: official conversation-style plain text tabs, each
- * with the same glyph the optional left-rail entry uses; the row ends with a quiet text action
- * that adds the current tab to the left rail (or removes it again).
+ * Row 1: one split brand control (「✦」同桌 | 和我说, the right half opens the tab-aware prompt menu)
+ * + one-line intro + info button, with the active view's actions on the right. Row 2: official
+ * conversation-style plain text tabs, each with the same glyph the optional left-rail entry uses;
+ * the row ends with a quiet text action that adds the current tab to the left rail (or removes it).
  * The header is a fixed 76px overlay; feature views offset their first line below it.
  */
 
@@ -16,7 +16,6 @@ import { DeskTabMenu } from './DeskTabMenu.js'
 import { DeskIntroInfo } from './DeskIntroInfo.js'
 import { DeskAskMenu } from './DeskAskMenu.js'
 import { DeskTabGlyph } from '../tabIcons.js'
-import { DeskGlyph } from '../brand.js'
 
 interface DeskHeaderProps {
   readonly t: DeskTranslator
@@ -38,13 +37,11 @@ export function DeskHeader({ t, tab, onSelectTab, pinned, onTogglePin, actions, 
     <header className="dsh-desk-header" data-window-drag>
       <div className="dsh-desk-header-top">
         <div className="dsh-desk-brand">
-          <h1 className="dsh-desk-title">
-            <span className="dsh-desk-brand-mark" aria-hidden="true"><DeskGlyph size={14} /></span>
-            <span>{t('page.title')}</span>
+          <h1 className="dsh-desk-brand-heading">
+            <DeskAskMenu t={t} tab={tab} onAskDesk={onAskDesk} />
           </h1>
           <p className="dsh-desk-intro">{t('page.subtitle')}</p>
           <DeskIntroInfo t={t} />
-          <DeskAskMenu t={t} tab={tab} onAskDesk={onAskDesk} />
         </div>
         {actions === null ? null : (
           <div className="dsh-desk-header-actions" data-window-drag-recall>{actions}</div>

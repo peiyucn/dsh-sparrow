@@ -2,7 +2,7 @@
 
 export const zh = {
   'task.add': '任务',
-  'task.askDesk': '让 DSH 建任务',
+  'task.askDesk': '「帮我加一个任务…」',
   'task.archive': '存档',
   'task.archiveEmpty': '存档区是空的',
   'task.backToBoard': '返回任务板',
@@ -65,7 +65,7 @@ export const zh = {
 /** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
 export const en = {
   'task.add': 'Task',
-  'task.askDesk': 'Let DSH add a task',
+  'task.askDesk': '"Add a task: …"',
   'task.archive': 'Archived',
   'task.archiveEmpty': 'No archived tasks',
   'task.backToBoard': 'Back to board',

@@ -7,10 +7,10 @@ export const zh = {
   'trash.full': '垃圾桶满了，请先清空一下吧。',
   'trash.title': '垃圾桶',
   'trash.total': '共 {count} 个便签',
-  'wall.askDesk': '让 DSH 记一条',
+  'wall.askDesk': '「帮我记一条便签…」',
   'wall.full': '便签太多了，请先清理一下吧。',
   'wall.tip': '双击空白处新建便签',
-  'wall.tipAlt': '或点顶栏的 + 号；也可以直接对我说',
+  'wall.tipAlt': '或点击顶栏「+便签」，也可以直接对我说',
 } as const
 
 /** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
@@ -21,8 +21,8 @@ export const en = {
   'trash.full': 'The trash is full — empty it first.',
   'trash.title': 'Trash',
   'trash.total': '{count} notes in total',
-  'wall.askDesk': 'Let DSH note it',
+  'wall.askDesk': '"Note this down: …"',
   'wall.full': 'Too many notes — clear some of them first.',
   'wall.tip': 'Double-click empty space',
-  'wall.tipAlt': 'or click + in the top bar; or just tell DSH',
+  'wall.tipAlt': 'or click "+ Note" in the top bar, or just tell me',
 } satisfies Record<keyof typeof zh, string>

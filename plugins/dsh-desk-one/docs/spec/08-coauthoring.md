@@ -1,7 +1,7 @@
 # 08 · 和 DSH 一起：面板 ↔ 对话的联动入口
 
 > 状态：**已评审并实施**（2026-11-14）。owner 决定：三层一起做、页头入口放 info 旁、日程 / 会话只留只读示例、预填用半句让用户接着写。
-> 本文档记录交互与边界；实现落点见第 8 节。**逐条文案评审见 [`09-ui-copy.md`](09-ui-copy.md)（讨论中；定稿后反馈列删除）。**
+> 本文档记录交互与边界；实现落点见第 8 节。**定稿文案见 [`09-ui-copy.md`](09-ui-copy.md)（2026-11-14 定稿）。**
 
 ## 0. 一句话方案
 
@@ -31,8 +31,8 @@
 
 ### 3.1 页头统一入口（常驻）
 
-- 位置：`DeskHeader` 第一行、info 按钮右侧（品牌簇内）；不占用当前 tab 的动作区。
-- 形态：官方图标按钮 + 「和 DSH 说」文字；窄面板只留图标，tooltip 补全。
+- 位置：`DeskHeader` 第一行品牌位。标题徽章（「✦」同桌）与入口**合并成一枚分段按钮**：左半是原来的反色徽章（不变），右半是墨色 0.5px 线框、无填充的「和我说」；整枚按钮打开菜单，不再占用 tab 动作区。
+- 形态：左半徽章保持墨色底 + inverted 字 + 14px「✦」字形；右半线框/文字跟随主题反色（浅色主题墨线，深色主题亮线），hover 只给右半加浅底。窄面板不折叠文字（`nowrap`），由副标题让出宽度。
 - 点击弹官方 `Menu`，内容随当前 tab（点击任一项 = 预填并切到会话，不发送）：
 
 | 当前 tab | 菜单项（中） | 预填 prompt（中） |
@@ -88,18 +88,19 @@
 2. 页头入口放 info 旁。
 3. 日程 / 会话真的不给写入口，只留页头只读示例。
 4. 预填文案用半句（「帮我记一条便签：」），让用户接着写。
+5. 文案评审（`09-ui-copy.md`，2026-11-14 定稿）后追加：标题徽章与入口合并成一枚分段按钮（左「✦」同桌、右「和我说」）；info 小标的位置等这枚按钮定型后再定。
 
 ## 8. 实现落点
 
 | 层 | 落点 |
 |---|---|
 | 预填桥 | `src/client/coauthor.ts`（`createCoauthorBridge`）+ `src/client/index.ts` 的 `uiWorkspace` 可选注入；`install.ts` 的 `startWithPrompt` |
-| 页头入口 | `src/client/app/DeskAskMenu.tsx` + `DeskHeader.tsx`（`onAskDesk`） |
+| 页头入口 | `src/client/app/DeskAskMenu.tsx` + `DeskHeader.tsx`（品牌分段按钮，`onAskDesk`） |
 | info 浮层 | `src/client/app/DeskIntroInfo.tsx` |
 | 便签空态 | `src/client/notes/NotesWall.tsx` |
 | 任务空态 | `src/client/tasks/components/TaskBoard.tsx` → `TaskColumn.tsx`（仅整板为空时的待办列） |
 | 笔记未链接文案 | `src/client/i18n/notebook.ts` 的 `notebook.welcomeBody` |
-| 文案 | `src/client/i18n/app.ts`（`coauthor.*`）、`notes.ts`、`tasks.ts`；逐条评审稿见 `09-ui-copy.md` |
+| 文案 | `src/client/i18n/app.ts`（`coauthor.*`）、`notes.ts`、`tasks.ts`；定稿文案见 `09-ui-copy.md` |
 | 单测 | `test/client/coauthor.test.mjs` |
 
 **便签的预填怎么触发**：便签没有自己的「会话」，所以按钮并不写便签本身——它调用官方 `uiWorkspace.startSession(undefined, { prompt: '帮我记一条便签：', whenDraftExists: 'append' })`：打开（或复用）当前 / 最近工作区的空白会话，把半句指令追加进输入框草稿并聚焦，用户接着写内容、自己按发送；DSH 收到后通过 `desk_note_add` 落库。和「让 AI 起草」是同一条路，只是不带工作区参数、用 `append` 保护已有草稿。无工作区时由官方导航给出「需要工作区」提示。

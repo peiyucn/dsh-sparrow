@@ -73,14 +73,6 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   min-width: 0;
   flex: 0 1 auto;
 }
-.dsh-desk-brand-mark {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-}
 .dsh-desk-info-wrap {
   display: inline-flex;
   flex: none;
@@ -109,38 +101,66 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   width: 16px;
   height: 16px;
 }
-/* "和 DSH 一起" entry: quiet text button beside the intro info; the glyph carries the accent. */
-.dsh-desk-ask-entry {
-  appearance: none;
+/* Brand lockup + "和我说": one split control. The left half is the unchanged inverted badge; the
+   right half uses the same ink as a hairline frame with no fill (the inverse treatment). The whole
+   lockup opens the tab-aware prompt menu. */
+.dsh-desk-brand-heading {
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 4px;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+}
+.dsh-desk-brand-ask {
+  appearance: none;
+  display: inline-flex;
+  align-items: stretch;
   height: 24px;
-  padding: 0 8px;
+  padding: 0;
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-  font-size: 12px;
-  line-height: 16px;
   white-space: nowrap;
   cursor: pointer;
 }
-.dsh-desk-ask-entry:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--dsw-alias-label-primary, #1f2329);
+.dsh-desk-brand-ask:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #4176e6);
+  outline-offset: 2px;
 }
-.dsh-desk-ask-entry-icon {
+.dsh-desk-brand-ask-logo {
   display: inline-flex;
-  flex: none;
   align-items: center;
-  color: var(--dsw-alias-state-business-primary, #4176e6);
+  gap: 6px;
+  padding: 0 8px 0 6px;
+  border-radius: 6px 0 0 6px;
+  background: var(--dsw-alias-label-primary, #1f2329);
+  color: var(--dsw-alias-label-primary-inverted, #ffffff);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 24px;
+  /* Logo-only casing: the badge always renders uppercase; the i18n text keeps its casing. */
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
-.dsh-desk-ask-entry-icon svg {
+.dsh-desk-brand-ask-logo svg {
   display: block;
 }
-/* Inline "让 DSH …" action inside an empty state (notes wall / empty task lane). */
+.dsh-desk-brand-ask-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border: 0.5px solid var(--dsw-alias-label-primary, #1f2329);
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font-size: 12px;
+  line-height: 23px;
+}
+.dsh-desk-brand-ask:hover .dsh-desk-brand-ask-action {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+}
+/* Inline prompt-style action inside an empty state (empty To-do lane). */
 .dsh-desk-ask-link {
   appearance: none;
   padding: 0;
@@ -185,26 +205,6 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 }
 .dsh-desk-intro-examples li + li {
   margin-top: 2px;
-}
-.dsh-desk-title {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  margin: 0;
-  padding: 0 8px 0 6px;
-  border-radius: 6px;
-  background: var(--dsw-alias-label-primary, #1f2329);
-  color: var(--dsw-alias-label-primary-inverted, #ffffff);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 24px;
-  /* Logo-only casing: the badge always renders uppercase; the i18n/accessible text keeps
-     the original "Desk One" casing. */
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  white-space: nowrap;
 }
 .dsh-desk-intro {
   min-width: 0;

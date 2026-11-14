@@ -9,7 +9,7 @@
 
 | 区域 | 官方参考 | 落地约束 |
 |---|---|---|
-| 品牌 lockup | 官方 `BrandWordmark` 的反色徽章 | 中文 **同桌**、英文 **Desk One**（与官方 HARNESS wordmark 一样，英文徽章视觉全大写 DESK ONE；中文标题不受影响）；页头用**一个**反色徽章：墨色底 + inverted 字，内部合并 14px **「✦」字形**与标题（图标不再是圆角方块：外框只用上左「、下右」两段引号角框，中间一颗火花；与「和 DSH 一起」入口的星形线索一致）；小字后接官方插件页同款 20px infoButton + Tooltip（无点击行为、宽度上限 300px，内含「两种用法 + 示例」；文案走碳硅协同 slogan：两种生命、一张桌子，你出灵感、harness 出算力，便签/任务/会话/日程/时间一起完成）；tab 与（固定后的）左栏入口共用同一套图标（日程用自绘小日历，避免与官方自动化任务的时钟图标重复；会话用官方会话列表的「queue」图标，避免与官方「新会话」图标重复），页头锁标仍用同一 Desk 字形 |
+| 品牌 lockup | 官方 `BrandWordmark` 的反色徽章 | 中文 **同桌**、英文 **Desk One**（与官方 HARNESS wordmark 一样，英文徽章视觉全大写 DESK ONE；中文标题不受影响）；页头品牌位是**一枚分段按钮**：左半为反色徽章（墨色底 + inverted 字 + 14px **「✦」字形**，不拆成两个方块），右半为墨色 0.5px 线框、无填充的「和我说」（主题反色；整枚按钮打开按 tab 的预填菜单，见 08）；副标题后接官方插件页同款 20px infoButton + Tooltip（无点击行为、宽度上限 300px，内含「两种用法 + 示例」；info 小标位置待品牌按钮定型后再定）；tab 与（固定后的）左栏入口共用同一套图标（日程用自绘小日历，避免与官方自动化任务的时钟图标重复；会话用官方会话列表的「queue」图标，避免与官方「新会话」图标重复），页头锁标仍用同一 Desk 字形 |
 | 整体面板 | 对话区 `ui-conversation`（ConversationRoot / ConversationSession） | 76px 页头浮层；第一行品牌标题 + 小字说明 + 当前功能动作，第二行官方纯文字 tab；内容首屏用 `--dsh-desk-header-h` 下移，滚动时内容从页头下经过 |
 | 页头 tab | ConversationRoot 的 `.tabs` / `.viewTabs` / `.tab` | 两层 flex：外层 gap 20px（viewTabs ↔ More），内层 gap 32px（文字间）；tab 本体 35px 高、上抬 10px、padding 10/9、10px 命中内边距；当前项 2px 下划线压在页头 rule 上；More 22×22，menu 以三点为锚点左对齐浮出 |
 | 功能动作按钮 | 插件页 `ui-plugin-manager` 的 PluginManagerPage（`.addPrimary` / `.addMore` 覆盖值） | **32px 高 / 13px 文案 / 20px 行高 / 0 12px padding / 12px 圆角**；primary fill 或 0.5px 描边；保留图标 + 文字；不采用通用 Button sm 的 28px/8px |

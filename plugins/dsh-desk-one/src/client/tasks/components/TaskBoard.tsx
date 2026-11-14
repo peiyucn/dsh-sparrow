@@ -28,7 +28,7 @@ interface TaskBoardProps {
   readonly board: TaskBoardApi
   /** Optional session services facade; disabled when the host doesn't expose them. */
   readonly sessionLink: SessionLinkApi
-  /** "和 DSH 一起": shown in the empty To-do lane only when the whole board is empty. */
+  /** "和 DSH 一起": only the empty To-do lane offers it (never the other two lanes). */
   readonly onAskDesk?: () => void
 }
 
@@ -373,7 +373,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink, onAskDesk }
                   onLinkSessions={linkSessions}
                   onOpenSession={sessionLink.open}
                   onInspectSession={sessionLink.inspect}
-                  onAskDesk={data.tasks.length === 0 && status === 'todo' ? onAskDesk : undefined}
+                  onAskDesk={status === 'todo' ? onAskDesk : undefined}
                 />
               ))}
             </div>

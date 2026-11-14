@@ -55,7 +55,7 @@ export const zh = {
   'notebook.viewHistory': '批注记录 {count}',
   'notebook.viewMissing': '缺元数据 {count}',
   'notebook.viewRecent': '全部',
-  'notebook.welcomeBody': '笔记库就是一个 DSH 工作区目录：AI 在里面写，你在这里审。也可以直接对我说「帮我新建一篇笔记…」。',
+  'notebook.welcomeBody': '笔记库 = DSH 工作区，你审阅批注，其余的交给 harness。也可以直接对我说「帮我新建一篇笔记…」。',
   'notebook.workspaceHint': '链接或创建的是 DSH 工作区；只索引目录内的 markdown / 文本文件。',
 } as const
 
@@ -115,6 +115,6 @@ export const en = {
   'notebook.viewHistory': 'Records {count}',
   'notebook.viewMissing': 'No metadata {count}',
   'notebook.viewRecent': 'All',
-  'notebook.welcomeBody': 'The library is a DSH workspace folder: the AI writes there, you review here. You can also just tell DSH "start a new note…".',
+  'notebook.welcomeBody': 'The library = a DSH workspace: you review and annotate, harness handles the rest. You can also just tell me "start a new note…".',
   'notebook.workspaceHint': 'Linking or creating a DSH workspace; only markdown and text files inside it are indexed.',
 } satisfies Record<keyof typeof zh, string>

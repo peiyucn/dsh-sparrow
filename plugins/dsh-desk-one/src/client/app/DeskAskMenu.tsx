@@ -1,14 +1,16 @@
 /**
- * Header "和 DSH 一起" entry: one quiet icon+label button beside the intro info. Its menu offers two
- * prefilled prompts for the tab the user is looking at; picking one opens (or reuses) the Workspace
- * blank Session with that prompt appended to the composer — it never sends, and the panel gives way
- * to the conversation. At most two entries per tab keeps the menu scannable.
+ * Header brand control: the inverted 「✦」 Desk One lockup and the line-framed 「和我说」 segment are
+ * one split button, and its menu offers two prefilled prompts for the tab the user is looking at.
+ * Picking one opens (or reuses) the Workspace blank Session with that prompt appended to the
+ * composer — it never sends. The split keeps the brand mark unchanged on the left while the right
+ * half advertises the conversation entry; at most two entries per tab keeps the menu scannable.
  */
 
 import { useState } from 'react'
 import type { ReactElement } from 'react'
-import { IconSparkleRegular, Menu, MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Menu, MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DeskLocaleKey } from '../i18n.js'
+import { DeskGlyph } from '../brand.js'
 import type { DeskTranslator, Tab } from './types.js'
 
 interface AskEntry {
@@ -41,7 +43,7 @@ const ASK_ENTRIES: Readonly<Record<Tab, readonly AskEntry[]>> = {
   ],
 }
 
-/** Header entry for the "和 DSH 一起" prompts of the active tab. */
+/** Brand split button + the "和 DSH 一起" prompt menu of the active tab. */
 export function DeskAskMenu({ t, tab, onAskDesk }: {
   readonly t: DeskTranslator
   readonly tab: Tab
@@ -57,14 +59,16 @@ export function DeskAskMenu({ t, tab, onAskDesk }: {
       anchor={(
         <button
           type="button"
-          className="dsh-desk-ask-entry"
+          className="dsh-desk-brand-ask"
           aria-haspopup="menu"
           aria-expanded={open}
-          title={t('coauthor.entry')}
           onClick={() => setOpen(value => !value)}
         >
-          <span className="dsh-desk-ask-entry-icon" aria-hidden="true"><IconSparkleRegular size={14} /></span>
-          <span className="dsh-desk-ask-entry-label">{t('coauthor.entry')}</span>
+          <span className="dsh-desk-brand-ask-logo">
+            <DeskGlyph size={14} />
+            <span>{t('page.title')}</span>
+          </span>
+          <span className="dsh-desk-brand-ask-action">{t('coauthor.entry')}</span>
         </button>
       )}
     >
