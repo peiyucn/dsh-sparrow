@@ -35,6 +35,11 @@
       <circle cx="10" cy="10" r="2.1" />
     </svg>
   )
+  export const folderIcon = (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <path d="M3.5 6.2c0-.9.7-1.6 1.6-1.6h2.6l1.5 1.8h5.7c.9 0 1.6.7 1.6 1.6v6.3c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.6-.7-1.6-1.6V6.2z" />
+    </svg>
+  )
   export const searchIcon = (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
       <circle cx="8.7" cy="8.7" r="4.9" />

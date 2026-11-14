@@ -1,79 +1,48 @@
 /**
- * Annotation landing page styles (official theme aliases only).
- *
- * The hero is the page's primary action; the three aggregates below reuse the compact single-line
- * geometry of the session list, so the page reads as one product with the other tabs.
+ * Annotation landing page styles: the same compact, card-based vocabulary as the Sessions tab.
+ * The start card carries the only primary action; the three aggregate sections reuse the session
+ * section head and card frame, so the page reads as one product with the other tabs.
  */
 
 export const ANNOTATION_CSS = `
 .dsh-desk-annotation {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  height: 100%;
-  overflow: auto;
+  padding: calc(var(--dsh-desk-header-h) + 16px) clamp(20px, 3vw, 40px) 16px;
+}
+.dsh-desk-annotation > * {
   box-sizing: border-box;
-  padding: 28px 28px 24px;
+  width: 100%;
+  max-width: min(1100px, 100%);
+  margin-left: auto;
+  margin-right: auto;
 }
-.dsh-desk-annotation-hero {
+.dsh-desk-annotation-start {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  text-align: center;
-  padding: 56px 16px 32px;
+  gap: 12px 16px;
+  padding: 12px 14px;
 }
-.dsh-desk-annotation-title {
+.dsh-desk-annotation-starthint {
+  flex: 1 1 260px;
+  min-width: 0;
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-primary, #1f2329);
-}
-.dsh-desk-annotation-hint {
-  margin: 0;
-  max-width: 540px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-}
-.dsh-desk-annotation-primary {
-  margin-top: 4px;
-  min-height: 40px;
-  padding: 0 24px;
-  font-size: 14px;
-}
-.dsh-desk-annotation-loading {
-  margin: 0;
-  font-size: 13px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
-}
-.dsh-desk-annotation-section {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.dsh-desk-annotation-sectiontitle {
-  margin: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
   font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  line-height: 18px;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
-.dsh-desk-annotation-total {
-  font-size: 12px;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
+.dsh-desk-annotation-startaction {
+  flex: none;
 }
 .dsh-desk-annotation-list {
-  list-style: none;
   margin: 0;
   padding: 0;
+  list-style: none;
 }
 .dsh-desk-annotation-row {
   display: grid;
@@ -82,17 +51,21 @@ export const ANNOTATION_CSS = `
   gap: 14px;
   width: 100%;
   min-height: 32px;
-  padding: 6px 6px;
-  border: none;
-  border-bottom: 1px solid var(--dsw-alias-line-1, #e5e7eb);
+  padding: 6px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
   background: none;
   text-align: left;
+  font: inherit;
   font-size: 13px;
   color: var(--dsw-alias-label-primary, #1f2329);
   cursor: pointer;
 }
+.dsh-desk-annotation-list li:last-child .dsh-desk-annotation-row {
+  border-bottom: 0;
+}
 .dsh-desk-annotation-row:hover:not(:disabled) {
-  background: var(--dsw-alias-bg-hover, #f2f3f5);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
 }
 .dsh-desk-annotation-row:disabled {
   opacity: 0.55;
@@ -112,6 +85,6 @@ export const ANNOTATION_CSS = `
 }
 .dsh-desk-annotation-rowcount {
   font-size: 12px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
+  color: var(--dsw-alias-label-tertiary, #8a919f);
 }
 `
