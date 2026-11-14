@@ -23,10 +23,10 @@
 
 | tab · 项 | 菜单 key / 预填 key | 菜单文字（中） | 菜单文字（英） | 预填文案（中） | 预填文案（英） |
 |---|---|---|---|---|---|
-| 便签 · 第 1 项 | `coauthor.menu.noteAdd` / `coauthor.prompt.noteAdd` | 记一条便签 | Note something down | 帮我记一条便签： | Note this down: |
-| 便签 · 第 2 项 | `coauthor.menu.noteTidy` / `coauthor.prompt.noteTidy` | 整理最近的便签 | Tidy recent notes | 帮我整理一下最近的便签，看看哪些值得保留。 | Tidy up my recent notes and tell me which ones are worth keeping. |
-| 任务 · 第 1 项 | `coauthor.menu.taskFromSchedule` / `coauthor.prompt.taskFromSchedule` | 日程变任务 | Turn schedule into tasks | 帮我看看今天的日程，把需要行动的事项整理成任务放进任务板；先查一下任务板，已有的不要重复创建。 | Check my schedule for today and turn the actionable items into tasks on the board; check the board first so no task is created twice. |
-| 任务 · 第 2 项 | `coauthor.menu.taskFromNotes` / `coauthor.prompt.taskFromNotes` | 便签变任务 | Turn notes into tasks | 帮我看看最近一周的便签，把需要跟进的事项整理成任务放进任务板；先查一下任务板，已有的不要重复创建。 | Look at my notes from the last week and turn the actionable ones into tasks on the board; check the board first so no task is created twice. |
+| 便签 · 第 1 项 | `coauthor.menu.noteClarify` / `coauthor.prompt.noteClarify` | 理清便签 | Tidy my notes | 帮我读一遍最近的便签，按主题归类、合并重复的说法，把每条整理成一句更清楚的话；先把整理方案列出来给我看，不要直接改。 | Read through my recent notes, group them by topic, merge duplicates and rewrite each one as one clear sentence; list the proposed cleanup for me first, do not edit anything yet. |
+| 便签 · 第 2 项 | `coauthor.menu.noteCleanup` / `coauthor.prompt.noteCleanup` | 清一清便签 | Find throwaways | 帮我找出重复、过时或已经没有后续的便签，列出来让我决定哪些可以扔；不要直接删。 | Find notes that are duplicated, outdated or have no follow-up left, and list them so I can decide what to throw away; do not delete anything. |
+| 任务 · 第 1 项 | `coauthor.menu.taskFromSchedule` / `coauthor.prompt.taskFromSchedule` | 安排今天 | Plan today | 帮我看看今天的日程和任务板，把今天要做的事理出来，缺的补成任务；已经在任务板里的不要重复。 | Check today's schedule and the task board, lay out what I need to do today and add whatever is missing as tasks; do not duplicate what is already on the board. |
+| 任务 · 第 2 项 | `coauthor.menu.taskFromNotes` / `coauthor.prompt.taskFromNotes` | 从便签收待办 | Collect from notes | 帮我看看最近一周的便签，把值得跟进的事收成任务；先看任务板避免重复，不要改动便签本身。 | Check my notes from the last week and collect the actionable ones as tasks; check the board first to avoid duplicates and leave the notes themselves untouched. |
 | 笔记 · 第 1 项 | `coauthor.menu.notebookNew` / `coauthor.prompt.notebookNew` | 新建一篇笔记 | Start a note | 帮我新建一篇笔记： | Start a new note: |
 | 笔记 · 第 2 项 | `coauthor.menu.notebookBrowse` / `coauthor.prompt.notebookBrowse` | 看看笔记库 | Browse the notebook | 帮我看看笔记库里最近的内容。 | Show me what is recent in my notebook library. |
 | 日程 · 第 1 项 | `coauthor.menu.scheduleToday` / `coauthor.prompt.scheduleToday` | 看看今天的安排 | Check today's schedule | 帮我看看今天的日程安排，有哪些需要注意的。 | Check my schedule for today and tell me what needs attention. |

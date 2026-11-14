@@ -21,8 +21,8 @@ interface AskEntry {
 
 const ASK_ENTRIES: Readonly<Record<Tab, readonly AskEntry[]>> = {
   notes: [
-    { id: 'note-add', label: 'coauthor.menu.noteAdd', prompt: 'coauthor.prompt.noteAdd' },
-    { id: 'note-tidy', label: 'coauthor.menu.noteTidy', prompt: 'coauthor.prompt.noteTidy' },
+    { id: 'note-clarify', label: 'coauthor.menu.noteClarify', prompt: 'coauthor.prompt.noteClarify' },
+    { id: 'note-cleanup', label: 'coauthor.menu.noteCleanup', prompt: 'coauthor.prompt.noteCleanup' },
   ],
   tasks: [
     { id: 'task-from-schedule', label: 'coauthor.menu.taskFromSchedule', prompt: 'coauthor.prompt.taskFromSchedule' },
