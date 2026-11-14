@@ -21,8 +21,9 @@
 > 理由：手工清单已证会漂——0.2.0-rc.1 审计时发现它漏列了三处一直在用的锚点。
 >
 > 最近一次跟版复核：dsh **`0.2.2-rc.3`**（tag `38a6a5c9`，2026-11-14；官方 source 与当前插件源码逐条对照）。
-> 本轮结果：§A 四条里 **1 条官方已有公开替代**（`sessionPersistence.locate` → `snapshot.location`）、
-> **2 条已部分收缩**（投影缓存域已改用官方 `projectionCacheDomainSpec`、`fn.length` 形参分派已成死代码）、
+> 本轮结果：§A 原四条里 **1 条已删除**（`sessionPersistence.locate` 私有依赖 → 改用公开
+> `snapshot.location`，代码已切换，见 §E）、**1 条已部分收缩**（投影缓存域已改用官方
+> `projectionCacheDomainSpec`）、**1 条形参分派已成死代码**（`fn.length`，收缩项）、
 > **1 条仍待 owner 决策**（归档写通道）；§B 收敛为**两组**；原 §C 的官方缺陷**上游已修**（删除本节）；
 > §D 只保留 **3 条**真实静默风险。收缩明细见 §E；证据与边界见
 > [`docs/upstream/0.2.2-rc.3.md`](upstream/0.2.2-rc.3.md)。
@@ -32,25 +33,9 @@
 ## A. 私有 seam（官方无公开能力，启动能力检查缺失即 fail-fast）
 
 > 登记对象 = `dsh-desk-one` 的 host half（`plugins/dsh-desk-one/src/host/sessions/`）；仍在仓库内的
-> `dsh-archive-manage`（`plugins/dsh-archive-manage/src/host/`）是同构实现，退役前两者共用同一套 seam。
-> 两边的能力门与私有面守卫见各自的 `host/.../gates.ts`。
-
-* **`sessionPersistence.locate`（2026-11-14 复核：官方公开替代已存在 ⇒ 收缩项；代码尚未切换，故条目暂留）**
-  * 现状：jsonl 后端的**私有方法**（rc.3 `packages/session/session-persistence-jsonl/src/index.ts:345`），
-    拿 header → `SessionLocation`，是当前代码取会话**产物目录**的途径。调用点：
-    desk-one `src/host/sessions/routes.ts:161`、`session-files.ts:106`、`views.ts:50,101`；
-    守卫 `src/host/sessions/gates.ts:28,81-87`（缺失即自停用）。archive-manage 同构
-    （`src/host/routes.ts:167`、`session-files.ts:95`、`views.ts:50,101`、`gates.ts:28,81`）。
-  * **官方公开替代（rc.3 实测）**：`SessionPersistenceSnapshot.location?: SessionLocation` 就在公开类型上
-    （`packages/session/session-persistence/src/index.ts:51-68`；`SessionLocation` 自 `:37` 公开 re-export），
-    jsonl `list()` 给每个**已落盘**会话填 `location: { kind: 'jsonl', path }`
-    （`packages/session/session-persistence-jsonl/src/index.ts:545-561`，快照在 `:556`）。
-  * 边界：pending（created 但未落盘）会话的 `list()` 快照**没有** `location`（同文件 `:559-560`）⇒
-    切换后 pending 子会话的 session-files 会得到「无位置」（旧实现是给一个不存在的目录后操作失败）。
-  * 旧文本两处失真已删：「stat/list 的 snapshot **不含路径**」「`SessionLocation` 只出现在 `errors.ts`」。
-  * **收缩提案（只进报告，不改代码）**：把 `location` 收进 `storedHeaderFacts()` 的 `list()` 遍历
-    （`src/host/sessions/headers.ts`），删两处能力门 / `assertSessionLocationApi` / `SessionLocationLike`
-    及相关类型，补一条「pending 会话无 location」回归用例；改完删除本条。
+> `dsh-archive-manage`（`plugins/dsh-archive-manage/src/host/`）是同构实现，退役前两者共用同一套 seam
+> （其 `sessionPersistence.locate` 调用随退役一并删除，见 §E）。两边的能力门与私有面守卫见各自的
+> `host/.../gates.ts`。
 
 * **WorkspaceRegistry 私有写通道（`enqueueOperation` / `requireState` / `setState`）—— 仍需要（行为选择，待 owner 决策）**
   * 现状：归档集的**写**只经该通道（desk-one `src/host/sessions/archive-set.ts:76-84` `mutateArchivedSet`；
@@ -144,6 +129,11 @@
 ## E. 已退役 / 已收缩（历史，不再维护）
 
 * **2026-11-14（dsh 0.2.2-rc.3 复核）**：
+  * **删除 `sessionPersistence.locate` 私有依赖**（desk-one 代码已切换）：会话目录改取公开
+    `SessionPersistenceSnapshot.location`（rc.3 `list()` 对已落盘会话填充；pending 会话无 location，
+    与既有的 BACKEND_UNSUPPORTED / 501 降级语义一致）。`storedHeaderFacts()` 现收敛 headers / sizes /
+    locations 三项事实，能力门改为 `sessionPersistence.list`，`assertSessionLocationApi` 与
+    `SessionLocationLike` 已删除；archive-manage 的同构调用随插件退役一并删除；
   * 删除 §C「官方 JobListAction 弹层被裁 / 被盖」整条登记（上游已 portal，见 §C 说明）；
   * 删除 theme-tone 旧 §D 条目中对应代码已在 2026-10-27 重写删除的六项（扫光带 `[class*='_row']`、
     弹窗遮罩 `[class*='_mask']`、桌面标题栏 overlay 的 inline token 探针、`workstart` 计算样式检测、

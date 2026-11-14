@@ -142,7 +142,8 @@ async function waitFor(predicate, timeoutMs = 2_000) {
  * 用最小 mock ctx 跑真实 `apply`，拿回注册的 prefix handler。
  *
  * options：`headers` = `sessionPersistence.list()` 返回的 header 列表；`dirs` = 会话 id →
- * 磁盘目录（`locate` 的 path 落在该目录下）；`archivedIds` = 归档集内容（含根会话即视为
+ * 磁盘目录（公开快照的 `location.path` 落在该目录下；缺省 = pending / 不可寻址会话）；
+ * `archivedIds` = 归档集内容（含根会话即视为
  * 「已归档」）；`titles` = 会话 id → 标题（`readTitleSnapshots` 的返回值）；
  * `trashRoot` = 回收站根目录；`projectionCache` = 官方投影缓存服务桩（还原回填用）；
  * `storageDomain` = 官方存储域桩（投影行失效用）。
@@ -210,13 +211,17 @@ async function buildHarness({
       setState: async (state) => { archived.length = 0; archived.push(...state.archivedSessionIds) },
     },
     sessionPersistence: {
+      // Public snapshot shape: the host's `location` is the only source of session directories now.
       list: async () => {
         if (listError) throw new Error('disk boom')
-        return headers
-      },
-      locate: (candidate) => {
-        const dir = dirs.get(String(candidate.id))
-        return dir === undefined ? undefined : { kind: 'jsonl', path: join(dir, 'session.jsonl') }
+        return headers.map(header => {
+          const dir = dirs.get(String(header.id))
+          return {
+            header,
+            revision: 1,
+            ...(dir === undefined ? {} : { location: { kind: 'jsonl', path: join(dir, 'session.jsonl') } }),
+          }
+        })
       },
       // 投影行回填的冷读面：stat 拿 header，open 返回最小读句柄（空日志即可，
       // 回填只关心「是否读了日志」与 coldSnapshot 的入参形状）。

@@ -1,40 +1,43 @@
-/** Header facts cache: dual-shape read + TTL single-flight store, plus the header projection the host tree needs. */
+/**
+ * Header facts cache: public `sessionPersistence.list()` snapshot facts (headers, sizes, storage
+ * locations) behind a TTL single-flight store, plus the header projection the host tree needs.
+ */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionHeader } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-session-persistence'
+import type { SessionLocation, SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
 import {
   createHeaderFactsStore, type HeaderFactsStore, type SessionTreeHeader, type SessionTreeNode,
 } from './archive.js'
 import { HEADER_CACHE_TTL_MS } from './constants.js'
 
-/** Payload type of the header facts cache: full headers + a snapshot size map. */
-export type HeaderFacts = { headers: SessionHeader[]; sizes: Map<string, number> }
-
 /**
- * Dual-shape compatible read of sessionPersistence.list():
- * - npm 0.1.2-alpha.5 and earlier: returns SessionHeader[] directly;
- * - master after the alpha.5 release (2026-09-02 session-persistence refactor): returns Snapshot[] ({ header, revision, ... }).
- * Branches on whether an element carries a header field, always returns SessionHeader[] (see the AGENTS plugin
- * private-seam exception), and collects sizeBytes, which only the snapshot shape has.
+ * Payload type of the header facts cache: full headers, a snapshot size map, and the public
+ * per-session storage location (jsonl path). Pending sessions (created but not flushed) carry no
+ * location, so they simply stay absent from `locations` and callers fall back to their existing
+ * "backend cannot address this session" path.
  */
+export type HeaderFacts = {
+  headers: SessionHeader[]
+  sizes: Map<string, number>
+  locations: Map<string, SessionLocation>
+}
+
+/** Read the public persistence list once and flatten it into the facts this host tree needs. */
 async function storedHeaderFacts(ctx: Context): Promise<HeaderFacts> {
-  const entries = await ctx.sessionPersistence.list() as readonly unknown[]
+  const snapshots = await ctx.sessionPersistence.list() as readonly SessionPersistenceSnapshot[]
   const headers: SessionHeader[] = []
   const sizes = new Map<string, number>()
-  for (const entry of entries) {
-    const record = entry as Record<string, unknown> | null | undefined
-    const header = record?.header
-    if (typeof header === 'object' && header !== null && typeof (header as Record<string, unknown>).id === 'string') {
-      headers.push(header as SessionHeader)
-      const sizeBytes = record?.sizeBytes
-      if (typeof sizeBytes === 'number') sizes.set(String((header as SessionHeader).id), sizeBytes)
-    } else {
-      headers.push(entry as SessionHeader)
-    }
+  const locations = new Map<string, SessionLocation>()
+  for (const snapshot of snapshots) {
+    const header = snapshot.header
+    headers.push(header)
+    const id = String(header.id)
+    if (typeof snapshot.sizeBytes === 'number') sizes.set(id, snapshot.sizeBytes)
+    if (snapshot.location !== undefined) locations.set(id, snapshot.location)
   }
-  return { headers, sizes }
+  return { headers, sizes, locations }
 }
 
 /** Header facts cache (single-flight + TTL). Write-through invalidation is handled by startup's event listeners and the write routes. */

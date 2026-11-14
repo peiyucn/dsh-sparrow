@@ -22,7 +22,6 @@ import { ENOENT, PACKAGE_NAME, SIDECAR_VERSION, TRASH_SIDECAR } from './constant
 import type { DeleteMutationResponse, TrashMutationResponse } from '../../session-admin.js'
 import { detachWorkspaceAccounting, removeArchivedIds, workspaceIndexFor } from './archive-set.js'
 import type { RegistryMutationSurface } from './gates.js'
-import { assertSessionLocationApi } from './gates.js'
 import type { HeaderFacts } from './headers.js'
 import { treeHeaderOf } from './headers.js'
 import { SessionsError } from './errors.js'
@@ -64,6 +63,18 @@ export function sessionDirectoryFor(location: { kind: string; path: string }): s
   return dir
 }
 
+/**
+ * Session directory from the public snapshot location recorded in the header facts cache.
+ * Pending sessions (no flushed snapshot location) have no directory, exactly like non-jsonl backends.
+ * @param facts - cached header facts of the current request.
+ * @param sessionId - session to address.
+ * @returns the single-session directory, or undefined when the backend cannot address it.
+ */
+export function sessionDirectoryFromFacts(facts: HeaderFacts, sessionId: SessionId | string): string | undefined {
+  const location = facts.locations.get(String(sessionId))
+  return location === undefined ? undefined : sessionDirectoryFor(location)
+}
+
 /** Host-truth format gate (per request): the header comes from the host and is unaffected by the plugin resolving
  *  an old official package. Reject when unsupported — these operations move/delete session directories, and
  *  misidentifying the format costs data. */
@@ -87,7 +98,7 @@ export async function listSubagentTargets(
   parentSessionId: SessionId,
   headerFacts: HeaderFactsStore<HeaderFacts>,
 ): Promise<SubagentTarget[]> {
-  const { headers } = await headerFacts.get()
+  const { headers, locations } = await headerFacts.get()
   const byId = new Map(headers.map(header => [String(header.id), header]))
   // All descendants (BFS, parent before children); ids come from subagentDescendantIds over the same headers,
   // so the lookup cannot miss.
@@ -103,7 +114,7 @@ export async function listSubagentTargets(
     if (ctx.sessions.get(sessionId) !== undefined || ctx.agents.get(sessionId) !== undefined) {
       throw new SessionsError('SESSION_LIVE', `subagent 会话 ${String(sessionId)} 仍被 dsh 进程占用，不能与父会话一起处理`, 409)
     }
-    const location = assertSessionLocationApi(ctx.sessionPersistence).locate(header)
+    const location = locations.get(id)
     const dir = location === undefined ? undefined : sessionDirectoryFor(location)
     if (dir === undefined) {
       throw new SessionsError('BACKEND_UNSUPPORTED', `subagent 会话 ${String(sessionId)} 的持久化后端不支持文件级处理`, 501)

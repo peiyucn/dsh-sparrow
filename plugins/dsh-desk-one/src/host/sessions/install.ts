@@ -6,7 +6,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { normalizeArchiveConfig, type ArchiveConfig } from './archive.js'
-import { assertHostGates, assertRegistryMutationApi, assertSessionLocationApi } from './gates.js'
+import { assertHostGates, assertRegistryMutationApi } from './gates.js'
 import { createHeaderStore } from './headers.js'
 import { resolveProjectionCacheDomain } from './projection.js'
 import { createSessionRoutes, type SessionRouteEntry } from './routes.js'
@@ -33,11 +33,11 @@ export function hasSessionServices(ctx: Context): boolean {
   const sessions = c.sessions as { get?: unknown } | undefined
   const storage = c.storageDomain as { open?: unknown } | undefined
   const web = c.webServer as { register?: unknown } | undefined
-  const persistence = c.sessionPersistence as { locate?: unknown } | undefined
+  const persistence = c.sessionPersistence as { list?: unknown } | undefined
   return typeof sessions?.get === 'function'
     && c.agents !== undefined
     && c.workspaceRegistry !== undefined
-    && typeof persistence?.locate === 'function'
+    && typeof persistence?.list === 'function'
     && c.sessionQuery !== undefined
     && typeof storage?.open === 'function'
     && typeof web?.register === 'function'
@@ -51,9 +51,9 @@ export async function installSessionsHost(ctx: Context, store: DeskStore, config
   // Format + capability gates run before any registration (an unknown host line disables us).
   assertHostGates(ctx)
   const settings = normalizeArchiveConfig(config)
-  // Private seams: WorkspaceRegistry write channel and sessionPersistence.locate; missing = fail fast.
+  // Private seam: WorkspaceRegistry write channel; missing = fail fast. (The session directory now
+  // comes from the public list() snapshot location, so no persistence private method is needed.)
   const surface = assertRegistryMutationApi(ctx.workspaceRegistry)
-  assertSessionLocationApi(ctx.sessionPersistence)
   await resolveProjectionCacheDomain()
 
   const headerFacts = createHeaderStore(ctx)

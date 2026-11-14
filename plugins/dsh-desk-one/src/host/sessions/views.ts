@@ -14,10 +14,9 @@ import {
 } from './archive.js'
 import type { ArchiveTreeNode, ListResponse, StraySessionItem, StraysResponse } from '../../session-admin.js'
 import { readArchivedIds, workspaceIndexFor } from './archive-set.js'
-import { assertSessionLocationApi } from './gates.js'
 import { treeHeaderOf, treeIds, type HeaderFacts } from './headers.js'
 import { readStrayBlankness, sessionFacts } from './projection.js'
-import { sessionDirectoryFor } from './session-files.js'
+import { sessionDirectoryFromFacts } from './session-files.js'
 import { subagentLabels, titlesFor } from './titles.js'
 
 /** GET /list: the archive parent/child tree (three-tier titles + child-session labels; display facts come from the official projection). */
@@ -25,7 +24,8 @@ export async function archiveTreePayload(
   ctx: Context,
   headerFacts: HeaderFactsStore<HeaderFacts>,
 ): Promise<ListResponse> {
-  const { headers, sizes } = await headerFacts.get()
+  const stored = await headerFacts.get()
+  const { headers, sizes } = stored
   const byId = new Map(headers.map(header => [String(header.id), header]))
   const archivedIds = new Set((await readArchivedIds(ctx)).map(String))
   const archivedHeaders = headers.filter(header => archivedIds.has(String(header.id)))
@@ -47,7 +47,6 @@ export async function archiveTreePayload(
     const sessionId = SessionId(node.header.id)
     const liveSession = ctx.sessions.get(sessionId)
     const agent = ctx.agents.get(sessionId)
-    const location = header === undefined ? undefined : assertSessionLocationApi(ctx.sessionPersistence).locate(header)
     const facts = header === undefined ? undefined : sessionFacts(ctx, node.header.id)
     return {
       sessionId: node.header.id,
@@ -61,7 +60,7 @@ export async function archiveTreePayload(
       sizeBytes: sizes.get(node.header.id),
       live: liveSession !== undefined,
       running: agent?.status === 'running',
-      backendSupported: location !== undefined && sessionDirectoryFor(location) !== undefined,
+      backendSupported: sessionDirectoryFromFacts(stored, node.header.id) !== undefined,
       workspaceIds: header === undefined ? [] : workspaceIds.get(String(sessionId)) ?? [],
       orphan: header !== undefined && header.origin === 'subagent'
         && header.parentSession !== undefined && !byId.has(String(header.parentSession)),
@@ -76,7 +75,8 @@ export async function strayItemsPayload(
   ctx: Context,
   headerFacts: HeaderFactsStore<HeaderFacts>,
 ): Promise<StraysResponse> {
-  const { headers, sizes } = await headerFacts.get()
+  const stored = await headerFacts.get()
+  const { headers, sizes } = stored
   const archivedIds = await readArchivedIds(ctx)
   const attachedIds = ctx.workspaceRegistry.list().flatMap(workspace => workspace.sessionIds.map(id => String(id)))
   // A child with a parent follows the parent and is not listed separately as stray; an orphan child (parent absent) is treated as top-level and flagged orphan.
@@ -98,7 +98,7 @@ export async function strayItemsPayload(
   const items: StraySessionItem[] = []
   for (const header of strayHeaders) {
     const sessionId = SessionId(String(header.id))
-    const location = assertSessionLocationApi(ctx.sessionPersistence).locate(header)
+    const backendSupported = sessionDirectoryFromFacts(stored, String(header.id)) !== undefined
     const facts = sessionFacts(ctx, String(header.id))
     items.push({
       sessionId: String(header.id),
@@ -113,7 +113,7 @@ export async function strayItemsPayload(
       orphan: header.origin === 'subagent',
       live: ctx.sessions.get(sessionId) !== undefined,
       running: ctx.agents.get(sessionId)?.status === 'running',
-      backendSupported: location !== undefined && sessionDirectoryFor(location) !== undefined,
+      backendSupported,
     })
   }
   return { items }

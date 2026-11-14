@@ -1,14 +1,15 @@
 // @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { resolve, sep } from 'node:path'
+import { join, resolve, sep } from 'node:path'
+import { tmpdir } from 'node:os'
 import { archivedIdsToRemove, createHeaderFactsStore, labelFromSubagentIdentity } from '../../../lib/host/sessions/archive.js'
 import { FOLDED_LABEL_CACHE_MAX_ENTRIES } from '../../../lib/host/sessions/constants.js'
 import {
   addedSummaryFor, alignChildArchives, mutateArchivedSet, removeArchivedIds, workspaceIndexFor,
 } from '../../../lib/host/sessions/archive-set.js'
-import { assertRegistryMutationApi, assertSessionLocationApi } from '../../../lib/host/sessions/gates.js'
-import { sessionDirectoryFor } from '../../../lib/host/sessions/session-files.js'
+import { assertRegistryMutationApi } from '../../../lib/host/sessions/gates.js'
+import { sessionDirectoryFor, sessionDirectoryFromFacts } from '../../../lib/host/sessions/session-files.js'
 import { subagentLabel, titlesFor } from '../../../lib/host/sessions/titles.js'
 import { resolveTrashDir } from '../../../lib/host/sessions/trash.js'
 import { cachedSnapshotOf, canWriteProjectionCache, coldSnapshotOf, sweepStaleProjectionCache } from '../../../lib/host/sessions/projection.js'
@@ -109,19 +110,25 @@ describe('archive-manage host 纯逻辑', () => {
     })
   })
 
-  describe('assertSessionLocationApi', () => {
-    it('缺 locate 应该 抛含 locate 的明确错误', () => {
-      assert.throws(() => assertSessionLocationApi({}), /locate/)
+  describe('sessionDirectoryFromFacts', () => {
+    const facts = (/** @type {Map<string, { kind: string, path: string }>} */ locations) => ({
+      headers: [],
+      sizes: new Map(),
+      locations,
     })
 
-    it('locate 非函数 应该 抛错', () => {
-      assert.throws(() => assertSessionLocationApi({ locate: 'x' }), /locate/)
+    it('公开 list() 快照带 location 时应该 解析出单会话目录', () => {
+      const dir = join(tmpdir(), 'sessions', 'session-a')
+      const resolved = sessionDirectoryFromFacts(facts(new Map([['a', { kind: 'jsonl', path: join(dir, 'session.jsonl') }]])), 'a')
+      assert.equal(resolved, dir)
     })
 
-    it('locate 存在 应该 返回可转发调用的访问器', () => {
-      const location = { kind: 'jsonl', path: '/x/session.jsonl' }
-      const api = assertSessionLocationApi({ locate: () => location })
-      assert.deepEqual(api.locate({}), location)
+    it('pending 会话（快照无 location）应该 返回 undefined', () => {
+      assert.equal(sessionDirectoryFromFacts(facts(new Map()), 'pending'), undefined)
+    })
+
+    it('非 jsonl 后端的 location 应该 返回 undefined', () => {
+      assert.equal(sessionDirectoryFromFacts(facts(new Map([['m', { kind: 'memory', path: 'memory' }]])), 'm'), undefined)
     })
   })
 

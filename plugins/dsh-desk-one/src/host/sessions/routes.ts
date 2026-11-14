@@ -26,13 +26,12 @@ import {
   alignChildArchives, archiveSessionSubtree, readArchivedIds, unarchiveSession, workspaceIndexFor,
 } from './archive-set.js'
 import type { RegistryMutationSurface } from './gates.js'
-import { assertSessionLocationApi } from './gates.js'
 import type { HeaderFacts } from './headers.js'
 import { readStrayBlankness } from './projection.js'
 import { finalizeRestoredSessions } from './projection-seed.js'
 import {
   assertHeaderFormatSupported, deleteSessionTree, ensureSessionNotLive, listSubagentTargets, moveSessionToTrash,
-  sessionDirectoryFor,
+  sessionDirectoryFromFacts,
 } from './session-files.js'
 import type { StartupScans } from './startup.js'
 import {
@@ -127,7 +126,8 @@ async function sessionTrashOrDeleteRoute(
   const parsed = bodyObject<TrashRequest & DeleteRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
   const sessionId = SessionId(requireNonEmptyString(parsed.sessionId, 'sessionId 必须是非空字符串'))
   const archivedIds = await readArchivedIds(ctx)
-  const headers = (await headerFacts.get()).headers
+  const facts = await headerFacts.get()
+  const headers = facts.headers
   const attachedIds = ctx.workspaceRegistry.list().flatMap(workspace => workspace.sessionIds.map(id => String(id)))
   const strayIds = straySessionIds(headers.map(header => String(header.id)), archivedIds.map(id => String(id)), attachedIds)
   const isArchived = archivedIds.some(id => String(id) === String(sessionId))
@@ -158,8 +158,7 @@ async function sessionTrashOrDeleteRoute(
 
   const workspaces = workspaceIndexFor(ctx.workspaceRegistry.list()).get(String(sessionId)) ?? []
   ensureSessionNotLive(ctx, sessionId)
-  const location = assertSessionLocationApi(ctx.sessionPersistence).locate(header)
-  const sessionDir = location === undefined ? undefined : sessionDirectoryFor(location)
+  const sessionDir = sessionDirectoryFromFacts(facts, sessionId)
   if (sessionDir === undefined) {
     throw new SessionsError('BACKEND_UNSUPPORTED', '当前会话持久化后端不提供已知的单会话目录，无法移入回收站/删除', 501)
   }

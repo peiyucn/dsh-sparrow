@@ -59,7 +59,7 @@ describe('会话归档契约', () => {
       sessions: { get: () => ({}) },
       agents: {},
       workspaceRegistry: {},
-      sessionPersistence: { locate: () => undefined },
+      sessionPersistence: { list: async () => [] },
       sessionQuery: {},
       storageDomain: { open: async () => ({}) },
       webServer: { register: () => {} },

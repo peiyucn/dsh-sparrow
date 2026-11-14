@@ -1,10 +1,10 @@
 /**
- * Startup gates for the host half: host capability / session format self-checks plus structural checks for two private seams.
+ * Startup gates for the host half: host capability / session format self-checks plus the structural
+ * check for the one remaining private seam (the WorkspaceRegistry write channel).
  * Any failing gate throws — cordis catches `apply` errors per plugin and marks it inactive, leaving dsh itself untouched.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { SessionHeader } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-session'
@@ -25,7 +25,7 @@ export function assertHostGates(ctx: Context): void {
     { name: 'sessions', ok: ctx.sessions !== undefined },
     { name: 'agents', ok: ctx.agents !== undefined },
     { name: 'workspaceRegistry', ok: ctx.workspaceRegistry !== undefined },
-    { name: 'sessionPersistence.locate', ok: typeof (ctx.sessionPersistence as unknown as { locate?: unknown }).locate === 'function' },
+    { name: 'sessionPersistence.list', ok: typeof ctx.sessionPersistence?.list === 'function' },
     { name: 'sessionQuery', ok: ctx.sessionQuery !== undefined },
     { name: 'storageDomain', ok: ctx.storageDomain !== undefined },
   ])
@@ -57,32 +57,4 @@ export function assertRegistryMutationApi(registry: unknown): RegistryMutationSu
     throw new Error(`不支持的 DSH workspace registry：缺少私有写入方法 ${missing.join('、')}；请升级插件以匹配当前 dsh 版本`)
   }
   return registry as unknown as RegistryMutationSurface
-}
-
-/**
- * Return shape of the private locate method: this plugin only uses kind and path (see sessionDirectoryFor).
- * Since 0.1.5-rc.1 the official code no longer exposes it on the public SessionPersistence type, so that type cannot be used directly.
- */
-interface SessionLocationLike {
-  readonly kind: string
-  readonly path: string
-}
-
-/** Checked accessor for the private locate method. */
-interface SessionLocationApi {
-  locate(header: SessionHeader): SessionLocationLike | undefined
-}
-
-/**
- * Private-seam dependency: sessionPersistence.locate. After the alpha.5 release, master demoted it from the public
- * service contract to a private jsonl backend method, and 0.1.5-rc.1 removed it from the public `SessionPersistence`
- * type (the runtime member still exists; this plugin only reads it and never replaces or overrides it). Missing means
- * fail-fast, returning a structured accessor for all call sites (same guardrail as the registry write channel).
- */
-export function assertSessionLocationApi(persistence: unknown): SessionLocationApi {
-  const locate = (persistence as Record<string, unknown> | null | undefined)?.locate
-  if (typeof locate !== 'function') {
-    throw new Error('不支持的 DSH session persistence：缺少私有 locate 方法；请升级插件以匹配当前 dsh 版本')
-  }
-  return persistence as unknown as SessionLocationApi
 }
