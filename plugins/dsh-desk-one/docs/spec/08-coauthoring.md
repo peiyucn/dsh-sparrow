@@ -62,7 +62,7 @@
 ### 3.4 「…」菜单：许愿
 
 - tab 行末尾的「…」菜单**最后一行永远是「许个愿」**（行首 Desk One 徽标字形「✦」，品牌蓝；当前没有溢出 tab，所以它就是唯一一行；以后有溢出 tab 时排在它们后面），行下有小字「去 GitHub 提 feature issue，我帮你整理」。
-- 点选 = 把 `coauthor.prompt.wish` 预填进输入框（不发送）：句首「我想给同桌增加一个功能：」留给人写愿望，其后要求 agent 把它整理成 **GitHub feature issue 草稿**（仓库固定 `https://github.com/peiyucn/dsh-sparrow`）：**先给标题和正文草稿、不自动发布、不包含私人内容**。
+- 点选 = 把 `coauthor.prompt.wish` 预填进输入框（不发送）：句首「我想给同桌增加一个功能：XXXXX（替换成你的想法）」用占位符指明写哪里，其后要求 agent 把它整理成 **GitHub feature issue 草稿**（仓库固定 `https://github.com/peiyucn/dsh-sparrow`）：**先给标题和正文草稿、不自动发布、不包含私人内容**。
 - 不是「让用户自己定义插件」：这里只是需求收集入口；真正的插件生成 / 安装属于另一项能力，不在本条里承诺。
 - 为什么不让 agent 直接发 issue：创建公开 issue 是**对外且不可逆**的动作，必须由人确认；agent 只负责起草和给出 `issues/new` 链接，或经人明确同意后再用 `gh` 提交。
 

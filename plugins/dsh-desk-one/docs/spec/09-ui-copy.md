@@ -56,4 +56,4 @@
 |---|---|---|---|
 | 许愿行 | `tabs.wish` | 许个愿 | Make a wish |
 | 行下小字 | `tabs.wishHint` | 去 GitHub 提 feature issue，我帮你整理 | File a feature issue on GitHub; I will draft it |
-| 隐藏预填 | `coauthor.prompt.wish` | 我想给同桌增加一个功能：（用户在这里写）<br><br>帮我把它整理成一条 GitHub feature issue（仓库 https://github.com/peiyucn/dsh-sparrow）：先给我看标题和正文草稿，不要自动发布，也不要包含我的私人内容。 | I want to add a feature to Desk One:（user writes here）<br><br>Turn it into a GitHub feature issue for https://github.com/peiyucn/dsh-sparrow: show me the title and body first, do not publish automatically, and do not include my private content. |
+| 隐藏预填 | `coauthor.prompt.wish` | 我想给同桌增加一个功能：XXXXX（替换成你的想法）<br><br>帮我把它整理成一条 GitHub feature issue（仓库 https://github.com/peiyucn/dsh-sparrow）：先给我看标题和正文草稿，不要自动发布，也不要包含我的私人内容。 | I want to add a feature to Desk One: XXXXX (replace with your idea)<br><br>Turn it into a GitHub feature issue for https://github.com/peiyucn/dsh-sparrow: show me the title and body first, do not publish automatically, and do not include my private content. |
