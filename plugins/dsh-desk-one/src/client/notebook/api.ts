@@ -8,6 +8,7 @@ import type {
   CreateNotebookNoteRequest, CreateNoteResponse, DraftAnnotation, MarkReviewSessionRequest, NoteDraft, NoteDraftResponse,
   NotebookBaselineResponse, ReviewSessionListResponse,
   NotebookFileResponse, NotebookListResponse, NotebookPageResponse, NotebookRootRequest, NotebookSearchResponse, NotebookStateResponse,
+  NotebookSummaryResponse,
   RecordReviewRequest, ReviewHistoryResponse, ReviewRecord,
 } from '../../notebook-contract.js'
 import { deleteJson, fetchJson, postJson } from '../http.js'
@@ -152,6 +153,11 @@ export function openNotebookFileById(fileId: string): Promise<NotebookFileRespon
   )
 }
 
+/** Landing page aggregates: pending drafts, submitted records, and recent reviews. */
+export function notebookSummary(): Promise<NotebookSummaryResponse> {
+  return fetchJson<NotebookSummaryResponse>(ROUTES.notebookSummary)
+}
+
 /** The injected facade shape the panel and review tab receive. */
 export interface NotebookApi {
   readonly state: typeof notebookState
@@ -164,6 +170,7 @@ export interface NotebookApi {
   readonly ensureFile: typeof ensureNotebookFile
   readonly open: typeof openNotebookFile
   readonly openById: typeof openNotebookFileById
+  readonly summary: typeof notebookSummary
   readonly createNote: typeof createNotebookNote
   readonly draft: typeof getNoteDraft
   readonly saveDraft: typeof saveNoteDraft
@@ -188,6 +195,7 @@ export const notebookApi: NotebookApi = {
   ensureFile: ensureNotebookFile,
   open: openNotebookFile,
   openById: openNotebookFileById,
+  summary: notebookSummary,
   createNote: createNotebookNote,
   draft: getNoteDraft,
   saveDraft: saveNoteDraft,

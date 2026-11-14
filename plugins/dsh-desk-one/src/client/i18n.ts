@@ -6,6 +6,7 @@
  * test/structure/i18n.test.mjs).
  */
 import { en as appEn, zh as appZh } from './i18n/app.js'
+import { en as annotationEn, zh as annotationZh } from './i18n/annotation.js'
 import { en as notebookEn, zh as notebookZh } from './i18n/notebook.js'
 import { en as reviewEn, zh as reviewZh } from './i18n/review.js'
 import { en as notesEn, zh as notesZh } from './i18n/notes.js'
@@ -16,6 +17,7 @@ import { en as sessionsEn, zh as sessionsZh } from './i18n/sessions.js'
 
 const ZH = {
   ...appZh,
+  ...annotationZh,
   ...notebookZh,
   ...reviewZh,
   ...notesZh,
@@ -27,6 +29,7 @@ const ZH = {
 
 const EN = {
   ...appEn,
+  ...annotationEn,
   ...notebookEn,
   ...reviewEn,
   ...notesEn,

@@ -8,7 +8,6 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ReactElement } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE, TAB_STORAGE_KEY } from '../../constants.js'
 import { notesActions, scheduleActions, taskActions } from './headerActions.js'
@@ -19,9 +18,7 @@ import { useNoteDrag } from '../notes/hooks/useNoteDrag.js'
 import { useNotesData } from '../notes/hooks/useNotesData.js'
 import { useTrash } from '../notes/hooks/useTrash.js'
 import { useWallLayout } from '../notes/hooks/useWallLayout.js'
-import { NotebookView } from '../notebook/NotebookView.js'
-import { NotebookHeaderActions } from '../notebook/HeaderActions.js'
-import { useNotebookPage } from '../notebook/hooks/useNotebookPage.js'
+import { AnnotationLanding } from '../notebook/landing/AnnotationLanding.js'
 import { TaskBoard } from '../tasks/components/TaskBoard.js'
 import { SessionsView } from '../sessions/SessionsView.js'
 import { ScheduleView, type ScheduleHeaderActions } from '../schedule/ScheduleView.js'
@@ -43,7 +40,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     listNotes, updateNote, deleteNote, createNote, t,
     listTasks, createTask, updateTask, deleteTask,
     listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink, sessionsArchive, schedule,
-    notebook, workspaceAccess, openReview, draftWithAi, startWithPrompt, initialTab, pin,
+    notebook, workspaceAccess, openReview, openBrowser, startWithPrompt, initialTab, pin,
   } = props
   // A left-rail entry opens its own tab; the base entry (no initialTab) resumes the last visited tab.
   const [tab, setTab] = useState<Tab>(() => initialTab ?? readInitialTab())
@@ -133,21 +130,6 @@ export function DeskOnePage(props: DeskPanelProps) {
     archiveGroup: groupsData.archiveGroup,
   })
 
-  // Notebook data + view state live here (not inside NotebookView) so the shared header can own
-  // the page's primary actions: new note / open browser / unlink.
-  const notebookPage = useNotebookPage({
-    t,
-    active: tab === 'notebook',
-    notebook,
-    workspaceAccess,
-    onOpenReview: openReview,
-    onOpenBrowser: props.openBrowser,
-    onDraftWithAi: draftWithAi,
-  })
-
-  /** Notes/trash actions float over the canvas so notes can scroll underneath them. */
-  const renderNotebook = (): ReactElement => <NotebookView page={notebookPage} />
-
   const actions = tab === 'notes'
     ? notesActions({
         t,
@@ -173,10 +155,10 @@ export function DeskOnePage(props: DeskPanelProps) {
           setTaskSortMode: board.setSortMode,
           archivedCount: board.archivedTasks.length,
         })
-      // The notebook page owns its title-row actions (new note / open file browser) but renders
-      // them through the shared header, like every other tab.
+      // The annotation landing page owns its primary action in the body, like an empty state;
+      // the shared header keeps no actions for this tab.
       : tab === 'notebook'
-        ? <NotebookHeaderActions t={t} page={notebookPage} />
+        ? null
         : scheduleActions({
             t,
             visible: tab === 'schedule',
@@ -197,7 +179,15 @@ export function DeskOnePage(props: DeskPanelProps) {
           </div>
         )}
         {data.actionError === null ? null : <p className="dsh-desk-error">{data.actionError}</p>}
-        {tab === 'notebook' ? renderNotebook() : tab === 'notes' ? (
+        {tab === 'notebook' ? (
+            <AnnotationLanding
+              t={t}
+              notebook={notebook}
+              workspaceAccess={workspaceAccess}
+              onOpenReview={openReview}
+              onOpenBrowser={openBrowser}
+            />
+          ) : tab === 'notes' ? (
             <div className="dsh-desk-notesview">
               {trash.showTrash
                 ? (
