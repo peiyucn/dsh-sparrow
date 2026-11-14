@@ -58,9 +58,10 @@ body:has(.dsh-desk-review-composer-hint) [data-composer-placeholder] {
 body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   display: none;
 }
-/* Review entry marks (sidebar Session rows and the official document-preview header): one glyph in
-   the official business blue, no filled badge. The official Session row owns the 16px leading cell
-   and swaps in a status dot for busy rows, so the mark stays purely decorative. */
+/* Review entry marks: the sidebar Session-row mark is the Desk One glyph (「✦」), the official
+   document-preview header action keeps the file+pen glyph. Both use the official business blue,
+   no filled badge. The official Session row owns the 16px leading cell and swaps in a status dot
+   for busy rows, so the mark stays purely decorative. */
 .dsh-desk-review-session-mark {
   display: inline-flex;
   flex: none;

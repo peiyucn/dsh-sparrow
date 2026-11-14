@@ -7,7 +7,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../constants.js'
-import { DeskTabGlyph } from '../tabIcons.js'
+import { DeskGlyph } from '../brand.js'
 import { isReviewSession, subscribeReviewSessions } from './review/sessions.js'
 
 interface ReviewSessionTrailingIconProps extends PropsLocale<typeof LOCALE_NAMESPACE> {
@@ -27,7 +27,7 @@ export function ReviewSessionTrailingIcon({ sessionId, t, useSessionStatus }: Re
   if (!isReviewSession(sessionId) || !busy) return null
   return (
     <span className="dsh-desk-review-session-mark dsh-desk-review-session-mark-trailing" title={t('sessions.reviewMark')} aria-hidden="true">
-      <DeskTabGlyph tab="notebook" size={13} />
+      <DeskGlyph size={13} />
     </span>
   )
 }
