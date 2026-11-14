@@ -8,7 +8,7 @@
 
 import { useState } from 'react'
 import type { ReactElement } from 'react'
-import { Menu, MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Menu, MenuItemButton, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DeskLocaleKey } from '../i18n.js'
 import { DeskGlyph } from '../brand.js'
 import type { DeskTranslator, Tab } from './types.js'
@@ -82,15 +82,28 @@ export function DeskAskMenu({ t, tab, onAskDesk }: {
       )}
     >
       {entries.map(entry => (
-        <MenuItemButton
+        // Hovering (or focusing) a short menu row reveals the hidden prefill in a tooltip, so the
+        // user can read exactly what the click will put into the composer before choosing it.
+        <Tooltip
           key={entry.id}
-          onSelect={() => {
-            setOpen(false)
-            onAskDesk(t(entry.prompt))
-          }}
+          label={t(entry.prompt)}
+          side="right"
+          delayMs={400}
+          focusDelayMs={600}
+          maxWidth={360}
+          portal
         >
-          {t(entry.label)}
-        </MenuItemButton>
+          <div className="dsh-desk-ask-option">
+            <MenuItemButton
+              onSelect={() => {
+                setOpen(false)
+                onAskDesk(t(entry.prompt))
+              }}
+            >
+              {t(entry.label)}
+            </MenuItemButton>
+          </div>
+        </Tooltip>
       ))}
     </Menu>
   )
