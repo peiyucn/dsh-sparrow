@@ -24,7 +24,8 @@
 > 本轮结果：§A 原四条里 **1 条已删除**（`sessionPersistence.locate` 私有依赖 → 改用公开
 > `snapshot.location`，代码已切换，见 §E）、**1 条已部分收缩**（投影缓存域已改用官方
 > `projectionCacheDomainSpec`）、**1 条形参分派已成死代码**（`fn.length`，收缩项）、
-> **1 条仍待 owner 决策**（归档写通道）；§B 收敛为**两组**；原 §C 的官方缺陷**上游已修**（删除本节）；
+> **1 条收缩为仅静默维护**（用户归档/取消归档已转官方公开 API，私有写只剩回收站/删除/还原/对齐）；
+> §B 收敛为**两组**；原 §C 的官方缺陷**上游已修**（删除本节）；
 > §D 只保留 **3 条**真实静默风险。收缩明细见 §E；证据与边界见
 > [`docs/upstream/0.2.2-rc.3.md`](upstream/0.2.2-rc.3.md)。
 
@@ -37,26 +38,24 @@
 > （其 `sessionPersistence.locate` 调用随退役一并删除，见 §E）。两边的能力门与私有面守卫见各自的
 > `host/.../gates.ts`。
 
-* **WorkspaceRegistry 私有写通道（`enqueueOperation` / `requireState` / `setState`）—— 仍需要（行为选择，待 owner 决策）**
-  * 现状：归档集的**写**只经该通道（desk-one `src/host/sessions/archive-set.ts:76-84` `mutateArchivedSet`；
-    守卫 `src/host/sessions/gates.ts:41-60`）。**读已收缩**：归档集读取改走官方公开 getter
-    `ctx.workspaceRegistry.archivedSessionIds`（`archive-set.ts:65-68` `readArchivedIds`，2026-11-14 复核确认）。
-  * **官方公开替代（rc.3 实测）**：`archiveSession(id, { stopActivity })` / `unarchiveSession(id)` 是公开方法
-    （`packages/workspace/workspace/src/index.ts:381,420`）——**旧文本「归档集没有公开写入口」已过期，删**。
-  * 未切换的原因（行为差异，不是能力缺失）：公开路径 ① 无 `stopActivity` 时先跑 `workspace/session-activity`
-    瀑布、有活动即拒绝（Desk One 未实现「停止并归档」确认流）；② 子树归档从「单次 `setState` 原子」变成
-    N 次排队写入。
-  * **已对齐的两项**：③ **pin**——私有写在同一个 `setState` 里摘掉被归档 id 的 pin
-    （`archiveIdsDroppingPins`），与官方 `archiveSession` 的 ≤pinning and archival are mutually exclusive≥ 一致；
-    ④ **归档后续动作派发**——归档/取消归档成功后重放公开事件 `workspace/session-archived` /
-    `workspace/session-unarchiving`（`announceArchived` / `announceUnarchiving`，仅对新归档 id 各派发一次；
-    监听失败只记日志、不回滚归档），故 rc.2 起的官方 worktree 清理行为与官方 `archiveSession` 一致。
-  * 剩余决策只剩 ①②（活动门 / 子树原子性）——切换公开 API 即接受这些行为变化。
-    故当前是「刻意保留私有写通道」：不切换则须在 README「已知限制」写清（现状）。
-    **需 owner 定**；决定后本条删除或保留。
-  * 说明：`trash/delete/restore` 与父子归档对齐仍无公开替代——官方只提供会派发后续动作、带活动检查的
-    `archiveSession/unarchiveSession`，没有「只改归档集不做后续动作」的原语；此为本条无法整体转正路的
+* **WorkspaceRegistry 私有写通道（`enqueueOperation` / `requireState` / `setState`）—— 仅剩静默维护（结构性必需）**
+  * **用户归档 / 取消归档已转正路**（2026-11-14）：`/api/desk-one/sessions/archive|unarchive` 直接委托官方
+    公开 API `ctx.workspaceRegistry.archiveSession(id)` / `unarchiveSession(id)`
+    （`archive-set.ts` 的 `archiveSession` / `unarchiveSession`）；活动门、pin 摘除、持久化与后续动作
+    `workspace/session-archived` / `session-unarchiving`（rc.2+ worktree 清理据此生效）全部由官方负责。
+    官方活动门拒绝被映射为用户可读的 409 `SESSION_ACTIVE`（提示先停止生成），未知会话映射 404。
+    `stopActivity`（停止并归档）尚未接入 Desk One UI，保持官方默认的「拒绝活动会话」语义。
+  * 私有写链（`mutateArchivedSet`）现在只服务官方 API **无法表达**的静默维护：
+    ① 移入回收站 / 彻底删除（把 id 移出归档集，但不触发 unarchive 后续动作、不做活动检查）；
+    ② 回收站还原（把 id 加回归档集，但不触发 archive 后续动作）；
+    ③ 父子归档对齐（idempotent 镜像；官方不对子会话派发归档后续动作）；
+    ④ 启动幽灵 id 清扫。
+    官方只提供「带后续动作 + 活动门」的写入口，没有「只改归档集」的公开原语——这是本条无法整体转正路的
     结构性原因（可向上游提 API 需求）。
+  * 守卫：`src/host/sessions/gates.ts` 的 `assertRegistryMutationApi`（缺私有面即自停用）。
+    读取仍走公开 getter `ctx.workspaceRegistry.archivedSessionIds`（`readArchivedIds`）。
+  * 子树语义：归档委托官方单会话写入后，子会话由 ③ 的对齐在 `domain/changed` 后异步补齐（不再是一次
+    `setState` 原子写）；官方对子会话本身也不派发归档后续动作，行为与官方一致。
 
 * **`session_projcache` 存储域直读 / 直删 / 启动清扫 —— 已收缩一半，剩余仍需要**
   * **已收缩**（2026-11-14 复核确认代码已改）：域/表名优先取官方公开 `projectionCacheDomainSpec`
@@ -150,5 +149,10 @@
     当前均不存在，文档随之删除；
   * `sessionPersistence.locate` 改标「官方公开替代已存在（`snapshot.location`），收缩候选」；
   * `session_projcache` 改标「域 spec 已接入（`projectionCacheDomainSpec`），仅剩直读 / 删行 / 清扫」；
-  * `WorkspaceRegistry` 条目改为「读已走公开 getter、写仍刻意走私通道」。
+  * `WorkspaceRegistry` 条目改为「读已走公开 getter、写仍刻意走私通道」；
+  * **用户归档 / 取消归档转正路**（2026-11-14 下午）：Desk One 的归档 / 取消归档路由改为直接委托官方公开
+    `workspaceRegistry.archiveSession` / `unarchiveSession`——活动门、pin 摘除、后续事件（worktree 清理）与
+    持久化全由官方负责；`announceArchived` / `announceUnarchiving` / `archiveIdsDroppingPins` /
+    `archiveSessionSubtree` 均已删除。私有写通道只剩官方 API 无法表达的静默维护（回收站 / 删除 / 还原 /
+    父子对齐 / 幽灵清扫）。
 * **`dsh-vision-bridge`**（2026-09-10 退役，2026-10-27 插件目录已彻底删除）：历史记录，见 git 历史。

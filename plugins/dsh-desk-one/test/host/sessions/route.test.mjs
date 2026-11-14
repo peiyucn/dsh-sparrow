@@ -153,6 +153,7 @@ async function waitFor(predicate, timeoutMs = 2_000) {
  *   dirs: Map<string, string>,
  *   archivedIds: string[],
  *   pinnedIds?: string[],
+ *   busyIds?: string[],
  *   titles: Map<string, string>,
  *   trashRoot: string,
  *   listError?: boolean,
@@ -161,7 +162,7 @@ async function waitFor(predicate, timeoutMs = 2_000) {
  * }} options
  */
 async function buildHarness({
-  headers, dirs, archivedIds, pinnedIds = [], titles, trashRoot, listError = false, projectionCache, storageDomain,
+  headers, dirs, archivedIds, pinnedIds = [], busyIds = [], titles, trashRoot, listError = false, projectionCache, storageDomain,
 }) {
   let route = null
   const warnings = []
@@ -170,6 +171,9 @@ async function buildHarness({
   const disposers = []
   const archived = [...archivedIds]
   const pinned = [...pinnedIds]
+  const busy = new Set(busyIds.map(String))
+  /** @type {{ archive: string[], unarchive: string[] }} */
+  const registryCalls = { archive: [], unarchive: [] }
 
   const sessionQuery = {
     // titlesFor 的第二档：官方批量标题读取；这里返回「全部 fulfilled」的桩。
@@ -211,6 +215,34 @@ async function buildHarness({
       list: () => [],
       get: () => undefined,
       enqueueOperation: async (operation) => operation(),
+      archiveSession: async (sessionId) => {
+        const id = String(sessionId)
+        if (busy.has(id)) {
+          const error = /** @type {any} */ (new Error(`cannot archive session '${id}': the session is active (agent)`))
+          error.name = 'WorkspaceActiveSessionError'
+          error.activity = [{ kind: 'agent' }]
+          throw error
+        }
+        if (!headerById.has(id)) {
+          const error = /** @type {any} */ (new Error(`cannot archive session '${id}': live sessions and session persistence hold no such session`))
+          error.name = 'WorkspaceUnknownSessionError'
+          throw error
+        }
+        registryCalls.archive.push(id)
+        if (!archived.some(existing => String(existing) === id)) archived.push(id)
+        for (let index = pinned.length - 1; index >= 0; index -= 1) {
+          if (String(pinned[index]) === id) pinned.splice(index, 1)
+        }
+        parallelEvents.push({ event: 'workspace/session-archived', payload: { sessionId: id } })
+      },
+      unarchiveSession: async (sessionId) => {
+        const id = String(sessionId)
+        const index = archived.findIndex(existing => String(existing) === id)
+        if (index < 0) return
+        registryCalls.unarchive.push(id)
+        parallelEvents.push({ event: 'workspace/session-unarchiving', payload: { sessionId: id } })
+        archived.splice(index, 1)
+      },
       requireState: () => ({ archivedSessionIds: archived, pinnedSessionIds: pinned }),
       setState: async (state) => {
         archived.length = 0; archived.push(...state.archivedSessionIds)
@@ -278,6 +310,7 @@ async function buildHarness({
     parallelEvents,
     get archivedIds() { return [...archived] },
     get pinnedIds() { return [...pinned] },
+    registryCalls,
     get route() { return route },
     dispose() { for (const dispose of disposers.splice(0)) { try { dispose() } catch { /* best-effort */ } } },
   }
@@ -737,49 +770,65 @@ describe('archive-manage host 路由：真实 handler 行为', () => {
 })
 
 
-describe('归档 / 取消归档：官方后续动作重放', () => {
-  it('Desk One 归档 应该 重放 workspace/session-archived（官方 worktree 清理等监听方据此处理）', async () => {
+describe('归档 / 取消归档：委托官方 registry 正路', () => {
+  it('归档 应该 调用官方 archiveSession（活动门 / 摘 pin / 后续事件由官方负责）', async () => {
     const layout = await makeLayout()
     const h = await buildHarness({
-      headers: [header('root-a')], dirs: new Map(), archivedIds: [], titles: new Map(), trashRoot: layout.trash,
+      headers: [header('root-a')], dirs: new Map(), archivedIds: [], pinnedIds: ['root-a'], titles: new Map(), trashRoot: layout.trash,
     })
     const result = await post(h.route.handler, `${PREFIX}/archive`, { sessionId: 'root-a' })
     assert.equal(result.statusCode, 200)
+    assert.deepEqual(h.registryCalls.archive, ['root-a'], '必须委托官方 archiveSession，而不是自己写归档集')
+    assert.deepEqual(h.archivedIds, ['root-a'])
+    assert.deepEqual(h.pinnedIds, [], 'pin 摘除由官方写入负责')
     assert.deepEqual(h.parallelEvents, [
       { event: 'workspace/session-archived', payload: { sessionId: 'root-a' } },
-    ], '归档写入成功后必须重放官方后续动作事件')
+    ], '归档后续动作由官方派发（worktree 清理等监听方据此处理）')
   })
 
-  it('归档整棵子树 应该 只为新归档会话各重放一次（已归档的不重复）', async () => {
+  it('归档有进行中活动的会话 应该 映射成 409 SESSION_ACTIVE（不再绕过官方活动门）', async () => {
     const layout = await makeLayout()
     const h = await buildHarness({
-      headers: [header('p-root'), childHeader('c-a', 'p-root')],
+      headers: [header('busy-a')],
       dirs: new Map(),
-      archivedIds: ['c-a'],
+      archivedIds: [],
+      busyIds: ['busy-a'],
       titles: new Map(),
       trashRoot: layout.trash,
     })
-    const result = await post(h.route.handler, `${PREFIX}/archive`, { sessionId: 'p-root' })
-    assert.equal(result.statusCode, 200)
-    assert.deepEqual(h.parallelEvents, [
-      { event: 'workspace/session-archived', payload: { sessionId: 'p-root' } },
-    ], '子会话原本已归档 ⇒ 不重复重放；与官方「重复归档不派发」一致')
+    const result = await post(h.route.handler, `${PREFIX}/archive`, { sessionId: 'busy-a' })
+    assert.equal(result.statusCode, 409)
+    assert.equal(result.body.error.code, 'SESSION_ACTIVE')
+    assert.match(result.body.error.message, /停止/u)
+    assert.deepEqual(h.archivedIds, [], '被官方拒绝时归档集不得变化')
   })
 
-  it('取消归档 应该 在移除之前重放 workspace/session-unarchiving（供官方监听方取消后续动作）', async () => {
+  it('归档不存在的会话 应该 映射成 404 UNKNOWN_SESSION（官方会话存在性检查）', async () => {
+    const layout = await makeLayout()
+    const h = await buildHarness({
+      headers: [], dirs: new Map(), archivedIds: [], titles: new Map(), trashRoot: layout.trash,
+    })
+    const result = await post(h.route.handler, `${PREFIX}/archive`, { sessionId: 'ghost-a' })
+    assert.equal(result.statusCode, 404)
+    assert.equal(result.body.error.code, 'UNKNOWN_SESSION')
+  })
+
+  it('取消归档 应该 调用官方 unarchiveSession，并保留 api-session/added 通知', async () => {
     const layout = await makeLayout()
     const h = await buildHarness({
       headers: [header('root-b')], dirs: new Map(), archivedIds: ['root-b'], titles: new Map(), trashRoot: layout.trash,
     })
     const result = await post(h.route.handler, `${PREFIX}/unarchive`, { sessionId: 'root-b' })
     assert.equal(result.statusCode, 200)
+    assert.deepEqual(h.registryCalls.unarchive, ['root-b'], '必须委托官方 unarchiveSession')
+    assert.deepEqual(h.archivedIds, [])
     assert.deepEqual(h.parallelEvents, [
       { event: 'workspace/session-unarchiving', payload: { sessionId: 'root-b' } },
     ])
-    assert.deepEqual(h.archivedIds, [], 'unarchive 必须把 id 移出归档集')
+    assert.ok(h.emitted.some(entry => entry.event === 'api-session/added'), '恢复后仍需重发 added，避免列表要刷新')
   })
 
-  it('取消归档一个本来未归档的会话 应该 不重放事件（与官方 no-op 语义一致）', async () => {
+  it('取消归档一个本来未归档的会话 应该 是 no-op（官方幂等语义）', async () => {
     const layout = await makeLayout()
     const h = await buildHarness({
       headers: [header('root-c')], dirs: new Map(), archivedIds: [], titles: new Map(), trashRoot: layout.trash,
@@ -787,21 +836,6 @@ describe('归档 / 取消归档：官方后续动作重放', () => {
     const result = await post(h.route.handler, `${PREFIX}/unarchive`, { sessionId: 'root-c' })
     assert.equal(result.statusCode, 200)
     assert.deepEqual(h.parallelEvents, [])
-  })
-
-  it('归档 应该 在同一持久化写入里摘掉 pin（官方不变量：归档与置顶互斥）', async () => {
-    const layout = await makeLayout()
-    const h = await buildHarness({
-      headers: [header('root-p')],
-      dirs: new Map(),
-      archivedIds: [],
-      pinnedIds: ['root-p'],
-      titles: new Map(),
-      trashRoot: layout.trash,
-    })
-    const result = await post(h.route.handler, `${PREFIX}/archive`, { sessionId: 'root-p' })
-    assert.equal(result.statusCode, 200)
-    assert.deepEqual(h.archivedIds, ['root-p'])
-    assert.deepEqual(h.pinnedIds, [], '归档必须同时摘掉 pin（与官方 archiveSession 一致）')
+    assert.deepEqual(h.registryCalls.unarchive, [])
   })
 })

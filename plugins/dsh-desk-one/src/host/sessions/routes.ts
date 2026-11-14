@@ -23,7 +23,7 @@ import type { DeskRouteContext } from '../router.js'
 import { bodyObject, readJsonBody, sendJson } from '../http.js'
 import { SessionsError } from './errors.js'
 import {
-  alignChildArchives, archiveSessionSubtree, readArchivedIds, unarchiveSession, workspaceIndexFor,
+  alignChildArchives, archiveSession, readArchivedIds, unarchiveSession, workspaceIndexFor,
 } from './archive-set.js'
 import type { RegistryMutationSurface } from './gates.js'
 import type { HeaderFacts } from './headers.js'
@@ -101,19 +101,20 @@ async function trashDirRoute(route: ArchiveRouteContext, _req: IncomingMessage, 
 
 async function unarchiveRoute(route: ArchiveRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   // Unarchive: only touches the archived set, never files — live sessions (held by dsh) can be unarchived too; idempotent.
+  // Delegated to the official registry (it dispatches workspace/session-unarchiving before removing the id).
   const parsed = bodyObject<UnarchiveRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
   const sessionId = SessionId(requireNonEmptyString(parsed.sessionId, 'sessionId 必须是非空字符串'))
-  const body = await unarchiveSession(route.ctx, route.surface, route.headerFacts, sessionId)
+  const body = await unarchiveSession(route.ctx, route.headerFacts, sessionId)
   sendJson(res, 200, body satisfies UnarchiveResponse)
 }
 
 async function archiveRoute(route: ArchiveRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  // Archiving is parent-scoped — the parent plus every child session enters the archived set (atomic in a single write chain).
-  // Callers are the Desk One sessions surface itself: the active-session row action and the stray/orphan list (the official
-  // session menu cannot reach strays). Sessions archived from the official menu do not come through here.
+  // Archiving delegates to the official registry API (`workspaceRegistry.archiveSession`): the official write
+  // chain owns the activity gate, pin drop, durability and follow-up admissions (worktree reclamation). Child
+  // sessions of a newly archived parent are mirrored by alignChildArchives on the next domain write event.
   const parsed = bodyObject<ArchiveRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
   const rootId = requireNonEmptyString(parsed.sessionId, 'sessionId 必须是非空字符串').trim()
-  const body = await archiveSessionSubtree(route.ctx, route.surface, route.headerFacts, rootId)
+  const body = await archiveSession(route.ctx, SessionId(rootId))
   sendJson(res, 200, body satisfies ArchiveResponse)
 }
 
