@@ -1,8 +1,10 @@
 {
   "name": "@dsh-sparrow/dsh-desk-one",
-  "description": "Desk One — a personal office desk in the DSH web UI: one sidebar panel with tabs for notes, tasks and calendars on one shared object model",
+  "description": "Desk One — a shared desk for you and your DSH harness: notes, tasks, a read-only calendar and AI-written notebook review in one panel.",
+  "icon": "icon.svg",
   "version": "0.2.2-rc.3",
   "license": "MIT",
+  "homepage": "https://dsh.pyai.site",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/peiyucn/dsh-sparrow.git",
@@ -30,6 +32,7 @@
       "types": "./lib/types/client/index.d.ts",
       "default": "./lib/client.js"
     },
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "files": [
@@ -38,6 +41,8 @@
     "!lib/client/**",
     "lib/types/**/*.d.ts",
     "cordis.patch.yml",
+    "icon.svg",
+    "locale/*.json",
     "README.md",
     "README.zh-CN.md",
     "CHANGELOG.md",
