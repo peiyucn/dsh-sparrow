@@ -16,11 +16,11 @@ const QUOTE_TOP_PATH = 'M2.6 16V2.6H9'
 /** Lower half of the frame: the 」 corner — short bottom edge, long right edge. */
 const QUOTE_BOTTOM_PATH = 'M21.4 8V21.4H15'
 
-export function DeskGlyph({ size = 24 }: { readonly size?: number }): ReactElement {
+export function DeskGlyph({ size = 24, strokeWidth = 1.6 }: { readonly size?: number; readonly strokeWidth?: number }): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d={QUOTE_TOP_PATH} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path d={QUOTE_BOTTOM_PATH} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d={QUOTE_TOP_PATH} stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" />
+      <path d={QUOTE_BOTTOM_PATH} stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" />
       <path d={SPARK_PATH} fill="currentColor" />
     </svg>
   )
