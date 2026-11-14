@@ -90,13 +90,12 @@ export function DocReviewAction(props: DocReviewActionProps): ReactNode {
   const label = failed ?? t('review.openInPreview')
 
   return (
-    <Tooltip label={label} side="bottom" delayMs={400}>
+    <Tooltip label={label} side="bottom" delayMs={500}>
       <Button
         variant="ghost"
         size="sm"
         icon={<span className="dsh-desk-review-entry-icon"><DeskGlyph size={16} strokeWidth={2} /></span>}
         aria-label={t('review.openInPreview')}
-        title={t('review.openInPreview')}
         disabled={busy}
         onClick={() => {
           setBusy(true)
