@@ -59,6 +59,8 @@ export interface NotebookPageController {
   readonly toggleChoosing: () => void
   readonly chooseRoot: (path: string) => Promise<void>
   readonly pickNewWorkspace: () => Promise<void>
+  /** Link an arbitrary folder inside a registered workspace (the old library was often a subfolder). */
+  readonly chooseFolder: () => Promise<void>
   /** Switch the linked workspace without unlinking first (the "loose" link). */
   readonly switchTo: (workspace: WorkspacePathView) => Promise<void>
   /** Clear the linked workspace (still reachable from the switcher menu). */

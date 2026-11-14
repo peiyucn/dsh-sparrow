@@ -112,6 +112,7 @@ export function useNotebookPage(input: {
     toggleChoosing: actions.toggleChoosing,
     chooseRoot: actions.chooseRoot,
     pickNewWorkspace: actions.pickNewWorkspace,
+    chooseFolder: actions.chooseFolder,
     switchTo: actions.switchTo,
     forgetWorkspace: actions.forgetWorkspace,
     toggleSwitching: actions.toggleSwitching,

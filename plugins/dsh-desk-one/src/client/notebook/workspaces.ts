@@ -79,6 +79,8 @@ export interface WorkspaceAccess {
   list(): readonly WorkspacePathView[]
   /** Pick a folder through DSH's picker and register it as a workspace. */
   createFromPicker(): Promise<WorkspacePathView | null>
+  /** Pick any folder through DSH's picker, without registering it (link a subfolder). */
+  pickDirectory(): Promise<string | null>
   attach(service: WorkspacesServiceLike): () => void
   attachNavigation(navigation: UiWorkspaceLike): () => void
 }
@@ -94,6 +96,11 @@ export function createWorkspaceAccess(): WorkspaceAccess {
       const path = await navigation.pickDirectory()
       if (path === null || path === '') return null
       return await workspaces.create({ path })
+    },
+    async pickDirectory() {
+      if (navigation === undefined) return null
+      const path = await navigation.pickDirectory()
+      return path === null || path === '' ? null : path
     },
     attach(service) {
       workspaces = service

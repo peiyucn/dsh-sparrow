@@ -186,6 +186,9 @@ function WorkspaceBar({ page }: { readonly page: NotebookPageController }): Reac
                     </button>
                   ))}
               <div className="dsh-desk-notebook-switchsep" aria-hidden="true" />
+              <button type="button" className="dsh-desk-notebook-switchaction" onClick={() => { void page.chooseFolder() }}>
+                {t('notebook.chooseFolder')}
+              </button>
               <button type="button" className="dsh-desk-notebook-switchaction" onClick={() => { void page.pickNewWorkspace() }}>
                 {t('notebook.createWorkspace')}
               </button>

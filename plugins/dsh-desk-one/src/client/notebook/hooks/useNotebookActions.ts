@@ -10,6 +10,7 @@ import { messageOf } from '../../app/utils.js'
 import type { NotebookApi } from '../api.js'
 import type { ReviewOpenInput, ReviewOpenResult } from '../review-bridge.js'
 import type { WorkspaceAccess, WorkspacePathView } from '../workspaces.js'
+import { findWorkspaceForPath } from '../workspaces.js'
 import type { NotebookLibrary } from './useNotebookLibrary.js'
 
 /** Everything the page body and header actions can trigger. */
@@ -26,6 +27,8 @@ export interface NotebookActions {
   /** Switch to another registered workspace without unlinking first. */
   readonly switchTo: (workspace: WorkspacePathView) => Promise<void>
   readonly pickNewWorkspace: () => Promise<void>
+  /** Link an arbitrary folder (typically a subfolder of a registered workspace). */
+  readonly chooseFolder: () => Promise<void>
   readonly forgetWorkspace: () => Promise<void>
   readonly openPage: (path: string) => Promise<void>
   readonly deleteHistory: (id: string) => Promise<void>
@@ -98,6 +101,17 @@ export function useNotebookActions(input: {
     await chooseRoot(next.path)
   }, [chooseRoot])
 
+  /** Pick a folder directly: the old library root was often a subfolder, not a workspace root. */
+  const chooseFolder = useCallback(async (): Promise<void> => {
+    const path = await workspaceAccess.pickDirectory()
+    if (path === null) return
+    if (findWorkspaceForPath(workspaceAccess.list(), path) === undefined) {
+      setNotice(t('notebook.folderNotInWorkspace'))
+      return
+    }
+    await chooseRoot(path)
+  }, [chooseRoot, setNotice, t, workspaceAccess])
+
   const forgetWorkspace = useCallback(async (): Promise<void> => {
     setBusy(true)
     try {
@@ -157,6 +171,7 @@ export function useNotebookActions(input: {
     chooseRoot,
     switchTo,
     pickNewWorkspace,
+    chooseFolder,
     forgetWorkspace,
     openPage,
     deleteHistory,
