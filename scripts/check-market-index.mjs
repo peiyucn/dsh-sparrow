@@ -11,6 +11,7 @@
  *      **例外**：从未发布过的活跃插件——它缺席索引且 `peer-snapshot.json` 无记录时只告警，
  *      因为索引只能来自 npm 已发布版本，否则新插件首发时发布 workflow 的根 check 会死锁）；
  *   2. 每个插件都有中英双语 title/description 与至少一个能力标签；
+ *   2b. 带品牌位的插件（`BRANDED_PLUGINS`）必须有中英标题、图标与主页；
  *   3. 每个版本的 `engines.dsh` = 该版本 manifest 的 peer 派生结果（同 `market-index.mjs` 的 `dshRangeOf`）；
  *   4. 版本集合覆盖「索引生成时 registry 上所有声明了 `dsh.bundle.patch` 的版本」——
  *      离线可比对的只有仓库内 package.json 的当前版本，故判据 4 校验「当前版本在索引里」，
@@ -23,6 +24,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import semver from 'semver'
 import { activePluginNames, repoRoot } from './plugin-set.mjs'
+import { BRANDED_PLUGINS } from './market-index.mjs'
 
 const INDEX_PATH = join(repoRoot, 'market', 'index.json')
 const SNAPSHOT_PATH = join(repoRoot, 'market', 'peer-snapshot.json')
@@ -77,6 +79,23 @@ for (const plugin of index.plugins) {
   }
   if (!Array.isArray(plugin.metadata?.labels) || plugin.metadata.labels.length === 0) {
     fail(`判据 2 失败：${plugin.name} 没有能力标签（在 market-index.mjs 的 PLUGIN_LABELS 补一条）`)
+  }
+
+  // 判据 2b：品牌位（旗舰插件在市场卡上必须有中英标题、图标与主页）。
+  // ⚠️ 只在索引真的收录了该插件时校验：首次发布前它不在索引里（判据 1 的首发例外），不能误红。
+  if (BRANDED_PLUGINS.includes(dirName)) {
+    if (typeof plugin.title?.en !== 'string' || plugin.title.en === '') {
+      fail(`判据 2b 失败：${plugin.name} 缺英文标题（在 market-index.mjs 的 BRANDING 补 title）`)
+    }
+    if (typeof plugin.title?.zh !== 'string' || plugin.title.zh === '') {
+      fail(`判据 2b 失败：${plugin.name} 缺中文标题（在 market-index.mjs 的 BRANDING 补 title.zh）`)
+    }
+    if (typeof plugin.icon !== 'string' || plugin.icon === '') {
+      fail(`判据 2b 失败：${plugin.name} 缺图标（在 market-index.mjs 的 BRANDING 补 icon 文件）`)
+    }
+    if (typeof plugin.homepage !== 'string' || plugin.homepage === '') {
+      fail(`判据 2b 失败：${plugin.name} 缺主页（在 market-index.mjs 的 BRANDING 补 homepage）`)
+    }
   }
 
   // 判据 4a：索引版本必须按降序、且是合法 SemVer。

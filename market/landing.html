@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>dsh-sparrow · DSH plugin market index</title>
+<title>dsh-sparrow · Desk One and small DSH plugins</title>
 <!--
   双语落地页：默认英文，点右上角切换。两种语言都在同一份 HTML 里（显示/隐藏切换），
   不写 cookie、不重定向、不依赖 JS 才能读内容（JS 只负责切换）。
   ⚠️ 这里引用的索引地址必须与 README / AGENTS 保持一致，改域名时一起改。
+  首位卡片是 Desk One（旗舰），其余插件是随桌附送的小工具。
 -->
 <style>
   :root {
@@ -20,6 +21,7 @@
     --panel: #18181b;
     --accent: #ffd48a;
     --head: #fafafa;
+    --brand: #4176E6;
   }
   * { box-sizing: border-box }
   body {
@@ -45,6 +47,24 @@
   }
   .switcher button[aria-pressed="true"] { color: var(--accent); border-color: #3f3f46 }
   .switcher button:hover { color: var(--fg) }
+
+  /* Desk One：首位卡片 */
+  .feature {
+    margin: 0 0 2.5rem; padding: 1.1rem 1.25rem 1.2rem;
+    border: 1px solid var(--line); border-radius: .6rem; background: var(--panel);
+  }
+  .feature-head { display: flex; align-items: center; gap: .8rem }
+  .feature-mark { width: 40px; height: 40px; flex: none; border-radius: 9px; box-shadow: 0 0 0 1px #2c2e36 }
+  .feature-title { margin: 0; font-size: 1.1rem; letter-spacing: -.01em; text-transform: none; color: var(--head) }
+  .feature-cn { margin-left: .15rem; font-size: .95rem; font-weight: 400; color: var(--dim) }
+  .feature-sub { margin: .12rem 0 0; font-size: .85rem; color: var(--dim) }
+  .feature-body { margin: .85rem 0 0; font-size: .9rem }
+  .feature-cmd {
+    display: inline-block; margin-top: .7rem; padding: .45rem .6rem; border-radius: .4rem;
+    background: #0f0f14; border: 1px solid var(--line);
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .8rem; color: var(--accent);
+  }
+  .feature-links { margin: .7rem 0 0; font-size: .85rem }
 
   h2 { margin: 2rem 0 .5rem; font-size: .8rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim) }
   code { word-break: break-all }
@@ -72,8 +92,8 @@
   <div class="top">
     <div>
       <h1>dsh-sparrow</h1>
-      <p class="sub" data-lang-block="en">Plugin market index for a small collection of DeepSeek Harness plugins</p>
-      <p class="sub" data-lang-block="zh">DeepSeek Harness（DSH）Web 插件小合集的插件市场索引</p>
+      <p class="sub" data-lang-block="en">Plugin market index for Desk One and a few small DeepSeek Harness plugins</p>
+      <p class="sub" data-lang-block="zh">Desk One 与几件小工具的 DSH 插件市场索引</p>
     </div>
     <div class="switcher" role="group" aria-label="Language / 语言">
       <button type="button" data-lang-set="en" aria-pressed="true">EN</button>
@@ -83,6 +103,28 @@
 
   <!-- ============ English ============ -->
   <div data-lang-block="en">
+    <section class="feature">
+      <div class="feature-head">
+        <svg class="feature-mark" viewBox="0 0 512 512" aria-hidden="true">
+          <rect width="512" height="512" rx="112" fill="#17181C"/>
+          <g transform="translate(53.44 53.44) scale(16.88)">
+            <g fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round">
+              <path d="M2.6 16V2.6H9"/>
+              <path d="M21.4 8V21.4H15"/>
+            </g>
+            <path fill="#FFFFFF" d="M12 4.4C12.55 9.2 14.8 11.45 19.6 12C14.8 12.55 12.55 14.8 12 19.6C11.45 14.8 9.2 12.55 4.4 12C9.2 11.45 11.45 9.2 12 4.4Z"/>
+          </g>
+        </svg>
+        <div>
+          <h2 class="feature-title">Desk One <span class="feature-cn">同桌</span></h2>
+          <p class="feature-sub">One desk for you and harness.</p>
+        </div>
+      </div>
+      <p class="feature-body">Sticky notes, a task board, a read-only calendar and AI-written notebook review in one sidebar panel — plus a header button that turns a plain sentence into a prefilled prompt for DSH.</p>
+      <code class="feature-cmd">dsh plugin --profile web add @dsh-sparrow/dsh-desk-one</code>
+      <p class="feature-links"><a href="https://github.com/peiyucn/dsh-sparrow/tree/main/plugins/dsh-desk-one">Docs</a> · <a href="https://www.npmjs.com/package/@dsh-sparrow/dsh-desk-one">npm</a></p>
+    </section>
+
     <h2>Index URL</h2>
     <code class="url">https://dsh.pyai.site/market/index.json</code>
 
@@ -93,6 +135,9 @@
       <li>Paste the index URL above</li>
     </ol>
     <p class="sub">The market marks which versions work with the DSH you are running. Every plugin here supports only the exact DSH version line stated in its version number.</p>
+
+    <h2>More plugins</h2>
+    <p class="sub">Three small tools come with the desk and are installed separately: chat suggestions (dsh-chat-fim), CodeBuddy credits (dsh-codebuddy-credits) and tone skins (dsh-theme-tone).</p>
 
     <h2>Links</h2>
     <ul>
@@ -108,6 +153,28 @@
 
   <!-- ============ 简体中文 ============ -->
   <div data-lang-block="zh">
+    <section class="feature">
+      <div class="feature-head">
+        <svg class="feature-mark" viewBox="0 0 512 512" aria-hidden="true">
+          <rect width="512" height="512" rx="112" fill="#17181C"/>
+          <g transform="translate(53.44 53.44) scale(16.88)">
+            <g fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round">
+              <path d="M2.6 16V2.6H9"/>
+              <path d="M21.4 8V21.4H15"/>
+            </g>
+            <path fill="#FFFFFF" d="M12 4.4C12.55 9.2 14.8 11.45 19.6 12C14.8 12.55 12.55 14.8 12 19.6C11.45 14.8 9.2 12.55 4.4 12C9.2 11.45 11.45 9.2 12 4.4Z"/>
+          </g>
+        </svg>
+        <div>
+          <h2 class="feature-title">同桌 <span class="feature-cn">Desk One</span></h2>
+          <p class="feature-sub">和 harness 共用的一张办公桌。</p>
+        </div>
+      </div>
+      <p class="feature-body">便签、任务板、只读日程和 AI 写你审的笔记，都在一个侧栏面板里——顶栏还有一个按钮，把一句人话变成给 DSH 的预填提示。</p>
+      <code class="feature-cmd">dsh plugin --profile web add @dsh-sparrow/dsh-desk-one</code>
+      <p class="feature-links"><a href="https://github.com/peiyucn/dsh-sparrow/tree/main/plugins/dsh-desk-one">文档</a> · <a href="https://www.npmjs.com/package/@dsh-sparrow/dsh-desk-one">npm</a></p>
+    </section>
+
     <h2>索引地址</h2>
     <code class="url">https://dsh.pyai.site/market/index.json</code>
 
@@ -118,6 +185,9 @@
       <li>粘贴上面的索引地址</li>
     </ol>
     <p class="sub">市场会按你当前运行的 DSH 版本标出可用版本。每个插件只支持其版本号所标示的那一条 DSH 版本线。</p>
+
+    <h2>更多插件</h2>
+    <p class="sub">随桌附送的三件小工具，单独安装：输入框续写（dsh-chat-fim）、CodeBuddy 额度（dsh-codebuddy-credits）、色调皮肤（dsh-theme-tone）。</p>
 
     <h2>相关链接</h2>
     <ul>

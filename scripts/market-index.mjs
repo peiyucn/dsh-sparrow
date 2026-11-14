@@ -22,7 +22,7 @@
  * 本仓库的包只声明 peerDependencies，故索引里的值一律从 peer 派生、不得手写。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
+import { dirname, extname, join, relative } from 'node:path'
 import semver from 'semver'
 import { activePluginNames, repoRoot } from './plugin-set.mjs'
 
@@ -158,7 +158,46 @@ const ZH_DESCRIPTIONS = {
   'dsh-archive-manage': '会话归档管理：取消归档、移入回收站、彻底删除、从回收站还原，父会话与子会话整体操作',
   'dsh-codebuddy-credits': 'CodeBuddy 额度 LLM provider：用官方 API Key 直连，在 DSH 里选用 CodeBuddy 的模型额度',
   'dsh-theme-tone': '明暗主题之下的色调层与对话区布局优化：每轴一款「官方默认」加若干色调，含顶栏与输入框玻璃效果',
-  'dsh-desk-one': '办公桌（Desk One）：一个侧栏面板用标签页容纳便签墙、任务板、日程与会话管理；日程只读聚合企业微信 / iCloud / Outlook 个人日历，统一对象模型，数据存本机',
+  'dsh-desk-one': '同桌（Desk One）：和 DSH 共用的一张办公桌——便签、任务、只读日程，以及 AI 写、你审的笔记，都在一个面板里',
+}
+
+/**
+ * 品牌位（市场卡片）：标题 / 图标 / 主页。只放人工维护的静态展示信息，不参与版本数据。
+ *
+ * 图标在生成时内联成 data URL（索引格式允许，解码后 ≤32 KiB）：既不用改 Pages 产物
+ * （当前只发布 `index.json` 与 `landing.html`），也不依赖外部图床。
+ */
+const BRANDING = {
+  'dsh-desk-one': {
+    title: { en: 'Desk One', zh: '同桌' },
+    icon: 'plugins/dsh-desk-one/icon.svg',
+    homepage: 'https://dsh.pyai.site',
+  },
+}
+
+/** 带品牌位的插件目录名（`check-market-index` 据此要求索引里必须有 title / icon / homepage）。 */
+export const BRANDED_PLUGINS = Object.keys(BRANDING)
+
+/** 索引格式允许的内联图标 MIME。 */
+const ICON_MIME = {
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+}
+
+/**
+ * 把仓库内的图片读成 data URL（索引条目的 `icon`）。
+ * @param {string} relativePath - 相对仓库根的图片路径。
+ * @returns {string} base64 data URL。
+ */
+function iconDataUrl(relativePath) {
+  const mime = ICON_MIME[extname(relativePath).toLowerCase()]
+  if (mime === undefined) throw new Error(`品牌图标扩展名不受支持（索引只接受 SVG/PNG/JPEG/WebP）：${relativePath}`)
+  const bytes = readFileSync(join(repoRoot, relativePath))
+  if (bytes.byteLength > 32 * 1024) throw new Error(`品牌图标超过 32 KiB 的索引格式上限：${relativePath}`)
+  return `data:${mime};base64,${bytes.toString('base64')}`
 }
 
 /**
@@ -256,10 +295,14 @@ function entryOf(dirName, packument, peerSnapshot) {
     ? undefined
     : zh === undefined ? { en: description } : { en: description, zh }
 
+  const brand = BRANDING[dirName]
   return {
     name: latest.name ?? packument.name,
+    ...(brand?.title === undefined ? {} : { title: brand.title }),
     ...(localized === undefined ? {} : { description: localized }),
+    ...(brand?.icon === undefined ? {} : { icon: iconDataUrl(brand.icon) }),
     author: AUTHOR,
+    ...(brand?.homepage === undefined ? {} : { homepage: brand.homepage }),
     repository: { url: REPO_URL, directory: `plugins/${dirName}` },
     metadata: {
       keywords: Array.isArray(latest.keywords) ? latest.keywords : [],
@@ -321,8 +364,8 @@ export async function buildIndex(options = {}) {
       format: 1,
       title: { en: 'dsh-sparrow', zh: 'dsh-sparrow' },
       description: {
-        en: 'Small DeepSeek Harness web plugins published under @dsh-sparrow.',
-        zh: '@dsh-sparrow 下的 DeepSeek Harness Web 插件小合集。',
+        en: 'Desk One and a few small DeepSeek Harness web plugins, published under @dsh-sparrow.',
+        zh: 'Desk One 与几件小工具：@dsh-sparrow 下的 DeepSeek Harness Web 插件合集。',
       },
       metadata: { categories: {}, labels: LABELS, sortKeys: {} },
       plugins,
