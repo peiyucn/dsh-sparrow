@@ -42,11 +42,16 @@ function makeStore() {
         id: 'r2', sessionId: 's2', workspaceId: 'ws-2', fileId: 'f2', fileTitle: '笔记 B', pathSnapshot: 'deep/b.md',
         annotations: [{}], createdAt: '2026-11-15T00:00:00.000Z',
       },
+      {
+        id: 'r3', sessionId: 's4', fileId: 'f1', fileTitle: '笔记 A 修订版', pathSnapshot: 'notes/a.md',
+        annotations: [{}], createdAt: '2026-11-15T01:00:00.000Z',
+      },
     ],
     listReviewSessions: () => [
       { sessionId: 's1', workspaceId: 'ws-1', fileId: 'f1', updatedAt: '2026-11-15T02:00:00.000Z' },
       { sessionId: 's2', workspaceId: 'ws-2', fileId: 'f2', updatedAt: '2026-11-15T03:00:00.000Z' },
       { sessionId: 's3', updatedAt: '2026-11-15T04:00:00.000Z' },
+      { sessionId: 's4', workspaceId: 'ws-1', fileId: 'f1', updatedAt: '2026-11-15T04:00:00.000Z' },
     ],
     getNoteFile: (/** @type {string} */ id) => files.get(id),
   }
@@ -62,19 +67,23 @@ describe('批注落地页：聚合列表', () => {
     assert.equal(summary.drafts[1]?.workspaceTitle, '工作区')
   })
 
-  it('记录：保留提交时的标题与工作区；缺 workspaceId 时按文件根反查', () => {
+  it('记录：同一文件折叠为一条（轮次 / 条数 / 最新标题），缺 workspaceId 时按文件根反查', () => {
     const summary = buildSummary(makeStore(), registry)
-    assert.deepEqual(summary.records.map(row => row.key), ['r2', 'r1'])
-    assert.equal(summary.records[0]?.workspaceTitle, '嵌套')
-    assert.equal(summary.records[1]?.workspaceTitle, '工作区')
-    assert.equal(summary.records[1]?.title, '笔记 A')
-    assert.equal(summary.records[1]?.count, 2)
+    assert.deepEqual(summary.records.map(row => row.key), ['f1', 'f2'])
+    assert.deepEqual(summary.records.map(row => row.rounds), [2, 1])
+    assert.deepEqual(summary.records.map(row => row.count), [3, 1])
+    assert.equal(summary.records[0]?.title, '笔记 A 修订版')
+    assert.equal(summary.records[0]?.updatedAt, '2026-11-15T01:00:00.000Z')
+    assert.equal(summary.records[0]?.workspaceTitle, '工作区')
+    assert.equal(summary.records[1]?.workspaceTitle, '嵌套')
   })
 
-  it('最近批注：按标记时间倒序、跳过没有文件身份的标记', () => {
+  it('最近批注：同一文件的多个标记只保留最新一条，跳过没有文件身份的标记', () => {
     const summary = buildSummary(makeStore(), registry)
-    assert.deepEqual(summary.recent.map(row => row.key), ['s2', 's1'])
-    assert.equal(summary.recent[0]?.path, 'deep/b.md')
-    assert.equal(summary.recent[0]?.workspaceTitle, '嵌套')
+    assert.deepEqual(summary.recent.map(row => row.key), ['f1', 'f2'])
+    assert.equal(summary.recent.length, 2)
+    assert.equal(summary.recent[0]?.path, 'notes/a.md')
+    assert.equal(summary.recent[0]?.workspaceTitle, '工作区')
+    assert.equal(summary.recent[0]?.updatedAt, '2026-11-15T04:00:00.000Z')
   })
 })

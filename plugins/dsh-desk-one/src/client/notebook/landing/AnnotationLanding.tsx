@@ -34,11 +34,14 @@ function LandingSection(props: {
   const { t, title, rows, onOpen } = props
   if (rows.length === 0) return null
   const total = rows.reduce((sum, row) => sum + row.count, 0)
+  const rounds = rows.reduce((sum, row) => sum + (row.rounds ?? 0), 0)
   return (
     <section className="dsh-desk-annotation-section">
       <h3 className="dsh-desk-annotation-sectiontitle">
         {title}
-        {total === 0 ? null : <span className="dsh-desk-annotation-total">{t('annotation.count', { count: total })}</span>}
+        {rounds > 0
+          ? <span className="dsh-desk-annotation-total">{t('annotation.roundsCount', { rounds, count: total })}</span>
+          : total === 0 ? null : <span className="dsh-desk-annotation-total">{t('annotation.count', { count: total })}</span>}
       </h3>
       <ul className="dsh-desk-annotation-list">
         {rows.map((row) => {
@@ -56,7 +59,9 @@ function LandingSection(props: {
                   {[row.workspaceTitle, row.path].filter(value => value !== undefined && value !== '').join(' · ')}
                 </span>
                 <span className="dsh-desk-annotation-rowcount">
-                  {row.count === 0 ? '' : t('annotation.count', { count: row.count })}
+                  {row.rounds !== undefined
+                    ? t('annotation.roundsCount', { rounds: row.rounds, count: row.count })
+                    : row.count === 0 ? '' : t('annotation.count', { count: row.count })}
                 </span>
               </button>
             </li>

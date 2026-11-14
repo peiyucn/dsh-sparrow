@@ -250,6 +250,8 @@ export interface NotebookSummaryRow {
   readonly updatedAt: string
   /** Pending annotations (drafts) or submitted annotations (records); 0 for reviews. */
   readonly count: number
+  /** Submitted rounds folded into one row (records are grouped per file); absent elsewhere. */
+  readonly rounds?: number
 }
 
 /** The three aggregate lists of the annotation landing page (no library root involved). */

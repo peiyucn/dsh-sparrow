@@ -11,6 +11,7 @@ export const zh = {
   'annotation.openFiles': '打开工作区文件',
   'annotation.records': '批注记录',
   'annotation.recent': '最近批注',
+  'annotation.roundsCount': '{rounds} 轮 / {count} 条',
   'annotation.title': '批注',
   'annotation.workspaceHint': '批注对象是工作区里的文件。还没有工作区，先建一个（和官方「新建工作区」同一套流程）。',
 } as const
@@ -27,6 +28,7 @@ export const en = {
   'annotation.openFiles': 'Open workspace files',
   'annotation.records': 'Submitted annotations',
   'annotation.recent': 'Recent annotations',
+  'annotation.roundsCount': '{rounds} round(s) / {count} annotation(s)',
   'annotation.title': 'Annotations',
   'annotation.workspaceHint': 'Annotations live in workspace files. Create a workspace first (same flow as the official “New workspace”).',
 } satisfies Record<keyof typeof zh, string>

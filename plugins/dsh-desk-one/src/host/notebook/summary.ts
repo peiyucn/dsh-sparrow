@@ -3,7 +3,7 @@
  * with the workspace each file belongs to. Root-free by design (the notebook library is gone).
  */
 
-import type { NotebookSummaryResponse, NotebookSummaryRow } from '../../notebook-contract.js'
+import type { NotebookSummaryResponse, NotebookSummaryRow, ReviewRecord } from '../../notebook-contract.js'
 import type { DeskStore } from '../store.js'
 import {
   workspaceRefOfId, workspaceRefOfPath, type WorkspaceListRegistryLike, type WorkspaceRef,
@@ -52,39 +52,75 @@ export function buildSummary(store: DeskStore, registry: WorkspaceListRegistryLi
       }
     })
 
-  const records = store.listReviewRecords().map((record): NotebookSummaryRow => {
+  /** Records are folded per file: one landing row per file, with its round and annotation totals. */
+  const recordGroups = new Map<string, { latest: ReviewRecord; rounds: number; count: number; workspace?: WorkspaceRef }>()
+  for (const record of store.listReviewRecords()) {
     const file = store.getNoteFile(record.fileId)
     const workspace = record.workspaceId === undefined
       ? (file === undefined ? undefined : workspaceOfRoot(registry, file.rootPath))
       : workspaceRefOfId(registry, record.workspaceId)
-    return {
-      key: record.id,
-      fileId: record.fileId,
-      path: record.pathSnapshot,
-      title: record.fileTitle,
-      ...workspace === undefined ? {} : { workspaceId: String(workspace.id), workspaceTitle: workspace.title },
-      updatedAt: record.createdAt,
-      count: record.annotations.length,
+    const current = recordGroups.get(record.fileId)
+    if (current === undefined) {
+      recordGroups.set(record.fileId, {
+        latest: record,
+        rounds: 1,
+        count: record.annotations.length,
+        ...workspace === undefined ? {} : { workspace },
+      })
+      continue
     }
-  })
+    current.rounds += 1
+    current.count += record.annotations.length
+    if (record.createdAt > current.latest.createdAt) current.latest = record
+    if (current.workspace === undefined && workspace !== undefined) current.workspace = workspace
+  }
+  const records = [...recordGroups.values()].map((group): NotebookSummaryRow => ({
+    key: group.latest.fileId,
+    fileId: group.latest.fileId,
+    path: group.latest.pathSnapshot,
+    title: group.latest.fileTitle,
+    ...group.workspace === undefined ? {} : { workspaceId: String(group.workspace.id), workspaceTitle: group.workspace.title },
+    updatedAt: group.latest.createdAt,
+    count: group.count,
+    rounds: group.rounds,
+  }))
 
-  const recent: NotebookSummaryRow[] = []
+  /** Recent is per file too: several review sessions for one file must not repeat the row. */
+  const recentGroups = new Map<string, { updatedAt: string; path?: string; workspace?: WorkspaceRef }>()
   for (const marker of store.listReviewSessions()) {
     if (marker.fileId === undefined) continue
     const file = store.getNoteFile(marker.fileId)
     const workspace = marker.workspaceId === undefined
       ? (file === undefined ? undefined : workspaceOfRoot(registry, file.rootPath))
       : workspaceRefOfId(registry, marker.workspaceId)
-    recent.push({
-      key: marker.sessionId,
-      fileId: marker.fileId,
-      ...file === undefined ? {} : { path: file.path },
-      title: file === undefined ? marker.fileId : titleOfPath(file.path),
-      ...workspace === undefined ? {} : { workspaceId: String(workspace.id), workspaceTitle: workspace.title },
-      updatedAt: marker.updatedAt,
-      count: 0,
-    })
+    const path = file?.path
+    const current = recentGroups.get(marker.fileId)
+    if (current === undefined) {
+      recentGroups.set(marker.fileId, {
+        updatedAt: marker.updatedAt,
+        ...path === undefined ? {} : { path },
+        ...workspace === undefined ? {} : { workspace },
+      })
+      continue
+    }
+    if (marker.updatedAt > current.updatedAt) {
+      current.updatedAt = marker.updatedAt
+      if (path !== undefined) current.path = path
+      if (workspace !== undefined) current.workspace = workspace
+    } else {
+      if (current.path === undefined && path !== undefined) current.path = path
+      if (current.workspace === undefined && workspace !== undefined) current.workspace = workspace
+    }
   }
+  const recent = [...recentGroups.entries()].map(([fileId, group]): NotebookSummaryRow => ({
+    key: fileId,
+    fileId,
+    ...group.path === undefined ? {} : { path: group.path },
+    title: group.path === undefined ? fileId : titleOfPath(group.path),
+    ...group.workspace === undefined ? {} : { workspaceId: String(group.workspace.id), workspaceTitle: group.workspace.title },
+    updatedAt: group.updatedAt,
+    count: 0,
+  }))
 
   return {
     drafts: newest(drafts, DRAFT_LIMIT),
