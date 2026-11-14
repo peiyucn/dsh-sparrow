@@ -49,102 +49,6 @@ export const NOTEBOOK_CSS = `
   margin: 0 auto;
 }
 
-/* --- new-note form ------------------------------------------------------- */
-.dsh-desk-notebook-new {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
-  border-radius: var(--dsw-radius-lg, 14px);
-  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.02));
-}
-.dsh-desk-notebook-brief {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 64px;
-  max-height: 180px;
-  padding: 7px 10px;
-  border: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
-  border-radius: var(--dsw-radius-md, 12px);
-  outline: none;
-  background: var(--dsw-alias-bg-base, #ffffff);
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font: inherit;
-  font-size: 13px;
-  line-height: 1.6;
-  resize: vertical;
-}
-.dsh-desk-notebook-brief::placeholder {
-  color: var(--dsw-alias-label-dimmed, #9aa1ab);
-}
-.dsh-desk-notebook-brief:focus {
-  border-color: var(--dsw-alias-state-business-primary, #4176e6);
-}
-.dsh-desk-notebook-newfoot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
-}
-.dsh-desk-notebook-newactions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 8px;
-}
-.dsh-desk-notebook-skill {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  min-height: 20px;
-}
-.dsh-desk-notebook-skillname {
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 18px;
-}
-.dsh-desk-notebook-info {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  cursor: pointer;
-}
-.dsh-desk-notebook-info svg {
-  display: block;
-  width: 13px;
-  height: 13px;
-}
-.dsh-desk-notebook-info:hover:not(:disabled) {
-  color: var(--dsw-alias-label-primary, #1f2329);
-}
-.dsh-desk-notebook-link {
-  appearance: none;
-  padding: 0 2px;
-  border: 0;
-  background: none;
-  color: var(--dsw-alias-state-business-primary, #4176e6);
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
-  cursor: pointer;
-}
-.dsh-desk-notebook-link:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
 
 /* --- toolbar ------------------------------------------------------------- */
 .dsh-desk-notebook-toolbar {
@@ -309,12 +213,6 @@ button.dsh-desk-notebook-rowbody {
   line-height: 16px;
   font-variant-numeric: tabular-nums;
 }
-.dsh-desk-notebook-fineprint {
-  margin: 0;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  font-size: 12px;
-  line-height: 18px;
-}
 
 /* --- unlinked state: centred offer -------------------------------------- */
 .dsh-desk-notebook-center {
@@ -389,16 +287,6 @@ button.dsh-desk-notebook-rowbody {
   line-height: 20px;
 }
 
-/* --- header unlink ------------------------------------------------------- */
-.dsh-desk-notebook-unlink {
-  min-width: 0;
-  max-width: 220px;
-}
-.dsh-desk-notebook-unlink-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* --- review record detail ------------------------------------------------ */
 .dsh-desk-notebook-recorddialog {
