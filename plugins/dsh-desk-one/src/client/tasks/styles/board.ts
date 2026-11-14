@@ -128,8 +128,11 @@ export const TASK_BOARD_CSS = `
   background: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 24%, transparent);
   background-clip: content-box;
 }
+/* Collapsed Done lane: hide the list so only the lane header (title / count / expand button)
+   remains. This rule was accidentally changed to "flex: none", which left the list visible and made
+   the collapse button look dead. */
 .dsh-task-lane[data-collapsed='true'] .dsh-task-list {
-  flex: none;
+  display: none;
 }
 /* Unified lane sequence: each top-level block is an ungrouped card or one group. */
 .dsh-task-block {
