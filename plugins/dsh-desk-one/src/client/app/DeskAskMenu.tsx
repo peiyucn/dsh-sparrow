@@ -56,6 +56,9 @@ export function DeskAskMenu({ t, tab, onAskDesk }: {
       open={open}
       onClose={() => setOpen(false)}
       align="start"
+      // The header clips its content (`overflow: hidden`), so the list must render under
+      // document.body with CSS anchor positioning instead of in place.
+      portal
       anchor={(
         <button
           type="button"
