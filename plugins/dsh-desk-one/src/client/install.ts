@@ -26,6 +26,7 @@ import type { ReviewOpenResult } from './notebook/review-bridge.js'
 import type { WorkspaceAccess } from './notebook/workspaces.js'
 import { mountMainPanel, type LayoutFace } from './panel.js'
 import { readPinnedTabs, writePinnedTabs, type DeskPinApi } from './pin.js'
+import { PANEL_TAB_ATTRIBUTE, requestPanelReset } from './app/panelReset.js'
 import { ensureDeskStyles } from './styles.js'
 
 /** Panel injection surface: data actions come from host REST routes, and the page holds only these functions. */
@@ -141,6 +142,27 @@ export function installDeskClient(ctx: ClientContext, deps: DeskClientDeps): voi
 
   const style = ensureDeskStyles()
   ctx.effect(() => () => { style.remove() }, `${PACKAGE_NAME}: styles`)
+
+  // Click capture for pinned left-rail entries: clicking a row (glyph or label) must also return
+  // its panel to the tab that entry owns. The official row has no click hook and re-selecting the
+  // already active panel produces no store notification, so the reset signal travels out-of-band
+  // (app/panelReset.ts). Capture phase so the panel state is reset before the official row handler
+  // re-selects the same panel; guarded because node:test runs this installer with a minimal document.
+  const isDeskTab = (value: string | null): value is Tab => DESK_TABS.some(entry => entry.tab === value)
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    const onPanelClick = (event: MouseEvent): void => {
+      const target = event.target
+      // `Element` is absent in node test runs; the guard keeps the capture listener inert there.
+      if (typeof Element === 'undefined' || !(target instanceof Element)) return
+      const row = target.closest('button')
+      if (row === null) return
+      const marker = row.querySelector(`[${PANEL_TAB_ATTRIBUTE}]`)
+      const tab = marker?.getAttribute(PANEL_TAB_ATTRIBUTE) ?? null
+      if (isDeskTab(tab)) requestPanelReset(tab)
+    }
+    document.addEventListener('click', onPanelClick, true)
+    ctx.effect(() => () => { document.removeEventListener('click', onPanelClick, true) }, `${PACKAGE_NAME}: panel entry capture`)
+  }
 
   const disposeDictionaries = ctx.locale.register(LOCALE_NAMESPACE, deps.locales)
   ctx.effect(() => disposeDictionaries, `${PACKAGE_NAME}: locale dictionaries`)

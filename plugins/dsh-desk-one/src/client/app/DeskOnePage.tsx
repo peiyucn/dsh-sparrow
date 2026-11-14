@@ -33,6 +33,7 @@ import type { DeskPanelInjected } from '../install.js'
 import type { DeskTranslator, Tab } from './types.js'
 import { DeskHeader } from './DeskHeader.js'
 import { readInitialTab } from './utils.js'
+import { subscribePanelReset } from './panelReset.js'
 
 /** Page props: main-panel owner share + injected actions + locale seat (assembled by the host). */
 type DeskPanelProps = PropsRuntime<'main'> & InjectFace<DeskPanelInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
@@ -72,6 +73,16 @@ export function DeskOnePage(props: DeskPanelProps) {
       // Storage unavailable (private mode): keep the choice for this session only.
     }
   }, [])
+
+  // Pinned left-rail entries own exactly one tab. Clicking such a row while this panel is already
+  // active produces no store notification (same panel id), so the click arrives through the
+  // out-of-band bridge and returns the panel's strip to its entry tab instead of looking dead.
+  useEffect(() => {
+    if (initialTab === undefined) return undefined
+    return subscribePanelReset(requested => {
+      if (requested === initialTab) setTab(initialTab)
+    })
+  }, [initialTab])
 
   // Notes wall: data, trash, geometry … and the wall's own behavior (create / raise / commit).
   const data = useNotesData(t, { listNotes, updateNote, deleteNote })

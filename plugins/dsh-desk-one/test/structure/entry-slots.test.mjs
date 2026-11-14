@@ -60,18 +60,30 @@ function fakeClientContext() {
   return { ctx, registrations, effects, locales }
 }
 
-/** @returns {{ styleElement: any, restore: () => void }} */
+/** @returns {{ styleElement: any, listeners: { click: Function[] }, removed: Function[], restore: () => void }} */
 function stubDocument() {
   const styleElement = { textContent: '', setAttribute: () => {}, remove: () => {} }
+  /** @type {{ click: Function[] }} */
+  const listeners = { click: [] }
+  /** @type {Function[]} */
+  const removed = []
   const globals = /** @type {any} */ (globalThis)
   const previous = globals.document
   globals.document = {
     querySelector: () => null,
     createElement: () => styleElement,
     head: { appendChild: () => {} },
+    addEventListener: (/** @type {string} */ type, /** @type {Function} */ listener) => {
+      if (type === 'click') listeners.click.push(listener)
+    },
+    removeEventListener: (/** @type {string} */ type, /** @type {Function} */ listener) => {
+      if (type === 'click') removed.push(listener)
+    },
   }
   return {
     styleElement,
+    listeners,
+    removed,
     restore: () => {
       if (previous === undefined) delete globals.document
       else globals.document = previous
@@ -135,6 +147,23 @@ describe('client 入口 / 槽位接线契约', () => {
     assert.equal(main.entry.key, panellist.entry.id, '官方主面板契约：main.key 与 sidebar.panellist.id 共享')
     assert.ok(locales.some(registration => registration.namespace === LOCALE_NAMESPACE), 'locale 字典要注册进本插件命名空间')
     assert.ok(effects.length >= 2, '样式与面板注册都要挂 effect 清理（不泄漏监听）')
+  })
+
+  it('边栏快捷入口的点击捕获监听必须挂上并在 effect 清理时移除', async () => {
+    const { ctx, effects } = fakeClientContext()
+    const documentStub = stubDocument()
+    try {
+      installDeskClient(ctx, fakeClientDeps())
+      assert.equal(documentStub.listeners.click.length, 1, 'panel 入口点击捕获只挂一份（capture 阶段）')
+      // Every effect callback returns its disposer; running them must remove the capture listener.
+      for (const effect of effects) {
+        const dispose = effect()
+        if (typeof dispose === 'function') dispose()
+      }
+      assert.equal(documentStub.removed.length, 1, 'effect 清理必须移除点击捕获监听（不泄漏 DOM 监听）')
+    } finally {
+      documentStub.restore()
+    }
   })
 
   it('审阅 bridge 应该暴露官方服务注入面（复用 / 新建会话的编排契约）', async () => {

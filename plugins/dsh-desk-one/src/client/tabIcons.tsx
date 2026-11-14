@@ -15,6 +15,7 @@ import {
   IconNewChatOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Tab } from './app/types.js'
+import { PANEL_TAB_ATTRIBUTE } from './app/panelReset.js'
 import { DeskGlyph } from './brand.js'
 
 /** One-pixel official glyph. */
@@ -53,10 +54,20 @@ export function DeskBaseIcon({ size }: PropsRuntime<'sidebar.panellist'>): React
   return <DeskGlyph size={size} />
 }
 
-/** Wrap a tab glyph as a sidebar-panellist slot component (the official row passes `size`). */
+/**
+ * Wrap a tab glyph as a sidebar-panellist slot component (the official row passes `size`).
+ *
+ * The glyph also carries the panel-tab marker: the official row has no per-entry click hook, so the
+ * client install captures clicks inside this row (glyph *or* label) and resets the panel's own tab
+ * strip to the tab this entry owns (see app/panelReset.ts).
+ */
 function panellistIcon(tab: Tab) {
   return function DeskTabPanelIcon({ size }: PropsRuntime<'sidebar.panellist'>): ReactNode {
-    return <DeskTabGlyph tab={tab} size={size} />
+    return (
+      <span {...{ [PANEL_TAB_ATTRIBUTE]: tab }} style={{ display: 'inline-flex' }}>
+        <DeskTabGlyph tab={tab} size={size} />
+      </span>
+    )
   }
 }
 
