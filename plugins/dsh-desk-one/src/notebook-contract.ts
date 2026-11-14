@@ -50,8 +50,8 @@ export interface DeskNotebookConfig {
   readonly schema: number
   readonly rootPath: string
   /**
-   * Skill used when drafting a new note. `undefined` = not chosen yet (defaults to note2md when
-   * available), `null` = explicitly no skill.
+   * Skill used when drafting a new note. `undefined` = not chosen yet, `null` = explicitly no
+   * skill; the effective default is "no skill" (`resolveSkillName` in host/notebook/skills.ts).
    */
   readonly skillName?: string | null
   readonly createdAt: string

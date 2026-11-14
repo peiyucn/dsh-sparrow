@@ -9,7 +9,7 @@ export const zh = {
   'trash.total': '共 {count} 个便签',
   'wall.full': '便签太多了，请先清理一下吧。',
   'wall.tip': '双击空白处新建便签',
-  'wall.tipAlt': '或点顶栏「随手记」',
+  'wall.tipAlt': '或点顶栏的 + 号',
 } as const
 
 /** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
@@ -22,5 +22,5 @@ export const en = {
   'trash.total': '{count} notes in total',
   'wall.full': 'Too many notes — clear some of them first.',
   'wall.tip': 'Double-click empty space',
-  'wall.tipAlt': 'or use Capture in the top bar',
+  'wall.tipAlt': 'or click + in the top bar',
 } satisfies Record<keyof typeof zh, string>
