@@ -1,10 +1,11 @@
 /**
- * Notebook (minimal) contracts: library index, file identity, the persisted draft box, and the
- * review history. Review state itself stays in the conversation; stored objects are:
- *   - notebook-config: the single library root
- *   - note-file: one lazily assigned file identity (path + content hash)
+ * Annotation contracts: file identity, the persisted draft box, baselines, and the review history.
+ * Review state itself stays in the conversation; stored objects are:
+ *   - note-file: one lazily assigned file identity (workspace root + relative path + content hash)
  *   - note-draft: the unsaved annotations of one file
+ *   - note-baseline: this round's baseline body, one per annotation session
  *   - review-record: one submitted review (annotations + file snapshot metadata)
+ *   - review-session: the durable marker that one session was opened by the annotation flow
  */
 
 /** One page in the library index (derived, never written back into the file). */
