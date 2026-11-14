@@ -6,7 +6,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 ## [0.2.2-rc.3] - 2026-11-14
 
-* **First release — Desk One**: one **Desk One** entry in the left sidebar hosting a tabbed panel (order: Schedule / Notebook / Notes / Tasks / Sessions); each tab can be pinned as its own sidebar shortcut (live add / remove, kept across restarts), and the panel remembers the last tab you were on. The panel chrome follows the official conversation header; the glass material is used only when theme-tone is active.
+* **First release — Desk One**: one **Desk One** entry in the left sidebar hosting a tabbed panel (order: Notes / Tasks / Notebook / Schedule / Sessions); each tab can be pinned as its own sidebar shortcut (live add / remove, kept across restarts), and the panel remembers the last tab you were on. The panel chrome follows the official conversation header; the glass material is used only when theme-tone is active.
 
 * **Notebook**: link a DSH workspace as the note library, browse and search indexed Markdown / text pages with four views (All / Annotation drafts / Annotation records / Missing metadata), and create a note either as an empty file or through **Let AI draft** with an optional note / writing skill (off by default, only user-invocable note skills are listed). The official file browser and markdown preview are left untouched.
 

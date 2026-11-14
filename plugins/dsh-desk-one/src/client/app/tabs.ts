@@ -8,11 +8,14 @@ export interface DeskTabEntry {
 }
 
 export const DESK_TABS: readonly DeskTabEntry[] = [
-  { tab: 'schedule', labelKey: 'tab.schedule' },
-  // Notebook leads the create actions (Schedule's + buttons order: notebook / note / task).
-  { tab: 'notebook', labelKey: 'tab.notebook' },
+  // Quick capture leads: writing a thought down is the most frequent visit and needs no setup.
   { tab: 'notes', labelKey: 'tab.notes' },
   { tab: 'tasks', labelKey: 'tab.tasks' },
+  // The notebook is the flagship workspace but needs a linked library, so the two zero-setup tabs
+  // come first and this one follows them.
+  { tab: 'notebook', labelKey: 'tab.notebook' },
+  // Read-only mirror and management: they trail the writing surfaces.
+  { tab: 'schedule', labelKey: 'tab.schedule' },
   { tab: 'sessions', labelKey: 'tab.sessions' },
 ]
 

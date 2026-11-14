@@ -126,7 +126,9 @@ export function readInitialTab(): Tab {
   } catch {
     // Private mode / storage disabled: use the default tab.
   }
-  return 'schedule'
+  // First visit lands on the first tab (quick capture), so reordering DESK_TABS also moves the
+  // default landing page instead of leaving it stale.
+  return DESK_TABS[0]?.tab ?? 'notes'
 }
 
 /**
