@@ -51,8 +51,6 @@ export interface TaskBoardApi {
   readonly archivedTasks: readonly DeskTask[]
   readonly sortMode: TaskSortMode
   readonly setSortMode: (mode: TaskSortMode) => void
-  readonly doneCollapsed: boolean
-  readonly toggleDone: () => void
   readonly showArchive: boolean
   readonly toggleArchive: () => void
   readonly draft: TaskDraft | null
@@ -112,7 +110,6 @@ export function useTaskBoard({
   groups, createGroup, renameGroup, setGroupOrders, removeGroup, moveGroupToLane, archiveGroup,
 }: BoardDeps): TaskBoardApi {
   const [sortMode, setSortModeState] = useState<TaskSortMode>(readSortMode)
-  const [doneCollapsed, setDoneCollapsed] = useState(false)
   const [showArchive, setShowArchive] = useState(false)
   const [draft, setDraft] = useState<TaskDraft | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(readCollapsed)
@@ -176,7 +173,6 @@ export function useTaskBoard({
     persist(TASK_SORT_STORAGE_KEY, mode)
   }, [])
 
-  const toggleDone = useCallback((): void => setDoneCollapsed(value => !value), [])
   const toggleArchive = useCallback((): void => setShowArchive(value => !value), [])
   const beginDraft = useCallback((status: TaskStatus, groupId?: string): void => setDraft({ status, groupId }), [])
   const cancelDraft = useCallback((): void => setDraft(null), [])
@@ -334,7 +330,7 @@ export function useTaskBoard({
   }, [archiveGroup, setTasks])
 
   return {
-    lanes, archivedTasks, archivedGroups, sortMode, setSortMode, doneCollapsed, toggleDone,
+    lanes, archivedTasks, archivedGroups, sortMode, setSortMode,
     showArchive, toggleArchive, draft, beginDraft, cancelDraft, commitDraft,
     moveTask, archiveTask, restoreTask, deleteTask,
     isGroupCollapsed, toggleGroup,

@@ -342,7 +342,6 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
                   title={t(LANE_LABEL_KEY[status])}
                   lane={board.lanes[status]}
                   compact={compact}
-                  collapsed={status === 'done' && board.doneCollapsed}
                   draft={board.draft}
                   dropTarget={dropTarget}
                   blockDrop={dropTarget?.block === true ? { status: dropTarget.status, index: dropTarget.index } : null}
@@ -351,7 +350,6 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
                   groupDrag={groupDrag}
                   t={t}
                   onAdd={board.beginDraft}
-                  onToggleCollapse={board.toggleDone}
                   onCommitDraft={board.commitDraft}
                   onCancelDraft={board.cancelDraft}
                   onStartDrag={startDrag}

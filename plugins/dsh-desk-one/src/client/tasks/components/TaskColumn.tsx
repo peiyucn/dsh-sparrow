@@ -38,7 +38,6 @@ interface TaskColumnProps {
   readonly title: string
   readonly lane: LaneView
   readonly compact: boolean
-  readonly collapsed: boolean
   readonly draft: TaskDraft | null
   readonly dropTarget: DropTarget | null
   readonly blockDrop: GroupDropTarget | null
@@ -47,7 +46,6 @@ interface TaskColumnProps {
   readonly groupDrag: DeskTaskGroup | null
   readonly t: DeskTranslator
   readonly onAdd: (status: TaskStatus, groupId?: string) => void
-  readonly onToggleCollapse: () => void
   readonly onCommitDraft: (title: string) => void
   readonly onCancelDraft: () => void
   readonly onStartDrag: (task: DeskTask, event: ReactPointerEvent<HTMLElement>) => void
@@ -70,9 +68,9 @@ interface TaskColumnProps {
 }
 
 export function TaskColumn({
-  status, title, lane, compact, collapsed, draft, dropTarget, blockDrop, groupDrop,
+  status, title, lane, compact, draft, dropTarget, blockDrop, groupDrop,
   draggingId, groupDrag, t,
-  onAdd, onToggleCollapse, onCommitDraft, onCancelDraft, onStartDrag, onGroupStartDrag,
+  onAdd, onCommitDraft, onCancelDraft, onStartDrag, onGroupStartDrag,
   onPatch, onArchive, onDelete,
   isGroupCollapsed, onToggleGroup, onCreateGroup, onRenameGroup, onRemoveGroup, onArchiveGroup,
   sessionEnabled, sessionOptions, sessionsFor, onLinkSessions, onOpenSession, onInspectSession,
@@ -116,10 +114,8 @@ export function TaskColumn({
       title={title}
       countLabel={countText(total)}
       compact={compact}
-      collapsed={collapsed}
       t={t}
       onAdd={onAdd}
-      onToggleCollapse={onToggleCollapse}
       onBeginGroup={() => setAddingGroup(true)}
     />
   )
@@ -157,7 +153,6 @@ export function TaskColumn({
       className="dsh-task-lane"
       data-lane={status}
       data-over={laneOver}
-      data-collapsed={collapsed}
     >
       {header}
       <div className="dsh-task-list" onDoubleClick={handleDoubleClick}>
