@@ -10,7 +10,7 @@ import type { NotebookStateResponse, ReviewHistoryEntry } from '../../../noteboo
 import { messageOf } from '../../app/utils.js'
 import type { NotebookApi } from '../api.js'
 import type { WorkspaceAccess, WorkspacePathView } from '../workspaces.js'
-import { findWorkspaceForRoot } from '../workspaces.js'
+import { findWorkspaceForPath } from '../workspaces.js'
 
 /** Library data + the setters the action layer needs while it mutates it. */
 export interface NotebookLibrary {
@@ -65,7 +65,7 @@ export function useNotebookLibrary(input: {
 
   const rootPath = state?.config?.rootPath
   const workspaces = workspaceAccess.list()
-  const workspace = rootPath === undefined ? undefined : findWorkspaceForRoot(workspaces, rootPath)
+  const workspace = rootPath === undefined ? undefined : findWorkspaceForPath(workspaces, rootPath)
 
   return {
     state,

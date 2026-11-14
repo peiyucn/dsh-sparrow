@@ -137,6 +137,21 @@ export function deleteReviewRecord(id: string): Promise<void> {
   return deleteJson<{ ok: boolean }>(ROUTES.notebookHistory, { id }).then(() => undefined)
 }
 
+/** Resolve one workspace file and read it back (workspace-scoped annotation entry). */
+export function openNotebookFile(input: {
+  readonly workspaceId: string
+  readonly path: string
+}): Promise<NotebookFileResponse & { readonly page: NotebookPageResponse }> {
+  return postJson<NotebookFileResponse & { page: NotebookPageResponse }>(ROUTES.notebookOpen, input)
+}
+
+/** Read one file back by its persisted identity (review-tab restore). */
+export function openNotebookFileById(fileId: string): Promise<NotebookFileResponse & { readonly page: NotebookPageResponse }> {
+  return fetchJson<NotebookFileResponse & { page: NotebookPageResponse }>(
+    `${ROUTES.notebookOpenById}?fileId=${encodeURIComponent(fileId)}`,
+  )
+}
+
 /** The injected facade shape the panel and review tab receive. */
 export interface NotebookApi {
   readonly state: typeof notebookState
@@ -147,6 +162,8 @@ export interface NotebookApi {
   readonly search: typeof searchNotebook
   readonly page: typeof notebookPage
   readonly ensureFile: typeof ensureNotebookFile
+  readonly open: typeof openNotebookFile
+  readonly openById: typeof openNotebookFileById
   readonly createNote: typeof createNotebookNote
   readonly draft: typeof getNoteDraft
   readonly saveDraft: typeof saveNoteDraft
@@ -169,6 +186,8 @@ export const notebookApi: NotebookApi = {
   search: searchNotebook,
   page: notebookPage,
   ensureFile: ensureNotebookFile,
+  open: openNotebookFile,
+  openById: openNotebookFileById,
   createNote: createNotebookNote,
   draft: getNoteDraft,
   saveDraft: saveNoteDraft,

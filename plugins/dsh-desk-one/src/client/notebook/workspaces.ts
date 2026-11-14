@@ -25,22 +25,53 @@ export interface UiWorkspaceLike {
 }
 
 /**
- * Find the workspace that owns a library root (the root is a registered workspace directory,
- * though it may be a subfolder of one).
+ * Find the workspace that owns one absolute file path.
+ *
+ * The longest matching root wins, so a workspace nested inside another one is not shadowed by its
+ * parent. This replaces the removed "library root" check for the official file-preview entry.
  * @param workspaces - registered workspaces.
- * @param rootPath - absolute library root.
- * @returns the owning workspace, or `undefined` when the root is not inside any workspace.
+ * @param absolutePath - previewed file path.
+ * @returns the owning workspace, or `undefined` when the file is outside every workspace.
  */
-export function findWorkspaceForRoot(
+export function findWorkspaceForPath(
   workspaces: readonly WorkspacePathView[],
-  rootPath: string,
+  absolutePath: string,
 ): WorkspacePathView | undefined {
-  const normalized = rootPath.replace(/\\/gu, '/').replace(/\/+$/u, '').toLowerCase()
-  return workspaces.find((workspace) => {
-    const path = workspace.path.replace(/\\/gu, '/').replace(/\/+$/u, '').toLowerCase()
-    return normalized === path || normalized.startsWith(`${path}/`)
-  })
+  const file = normalizeAbsolute(absolutePath)
+  // Windows drive and UNC paths are case-insensitive; POSIX paths are not.
+  const caseless = /^[A-Za-z]:\//u.test(file) || file.startsWith('//')
+  const fold = (value: string): string => (caseless ? value.toLowerCase() : value)
+  const target = fold(file)
+  let best: WorkspacePathView | undefined
+  let bestLength = -1
+  for (const workspace of workspaces) {
+    const prefix = fold(normalizeAbsolute(workspace.path))
+    if (target !== prefix && !target.startsWith(`${prefix}/`)) continue
+    if (prefix.length > bestLength) {
+      best = workspace
+      bestLength = prefix.length
+    }
+  }
+  return best
 }
+
+/**
+ * Path of one file relative to its workspace root, `/`-separated.
+ * @param absolutePath - previewed file path.
+ * @param rootPath - owning workspace root.
+ * @returns the relative path.
+ */
+export function relativeToWorkspace(absolutePath: string, rootPath: string): string {
+  const file = normalizeAbsolute(absolutePath)
+  const root = normalizeAbsolute(rootPath)
+  return file.slice(root.length + 1)
+}
+
+/** Normalize one absolute path for prefix comparison (`/`, no trailing separator). */
+function normalizeAbsolute(path: string): string {
+  return path.replace(/\\/gu, '/').replace(/\/+$/u, '')
+}
+
 
 /** Library creation through DSH's own workspace flow. */
 export interface WorkspaceAccess {

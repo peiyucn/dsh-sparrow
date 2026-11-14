@@ -73,8 +73,9 @@ export function useReviewDocument(input: {
       setError(null)
     }
     try {
-      await notebook.state()
-      const nextPage = await notebook.page(path)
+      // The file identity remembers its own workspace root, so a review no longer depends on a
+      // single global notebook library.
+      const { page: nextPage } = await notebook.openById(fileId)
       const nextText = pageText(nextPage)
       const draft = await notebook.draft(fileId)
       const stored = await notebook.loadBaseline(sessionId)
