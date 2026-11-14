@@ -103,8 +103,9 @@ export const SURFACE_RUNGS: Readonly<Record<ColorScheme, Readonly<Record<Surface
 
 /**
  * 「弹出来的框」落在哪几个官方 token 上：`--dsw-alias-bg-layer-1/2/3` 与 `--dsw-specific-input-major`（**问询卡片**用的那个，
- * 归 `layer2` —— 官方把两个 token 绑在同一个 static 变量上）；**有意不染**工具提示 / 轻提示 / 对比按钮底（两轴都是**反色**）、
- * 悬停卡（组件内字面量，只能靠 hashed 类名覆盖 = 本插件红线）。
+ * 归 `layer2` —— 官方把两个 token 绑在同一个 static 变量上）；**有意不染**工具提示 / 轻提示 / 对比按钮底（两轴都是**反色**）。
+ * 悬停卡不走这里：官方 rc.3 起吃 `--dsw-alias-hovercard-*`，由 `surfaces.ts` 在卡根覆盖（卡根定位仍依赖官方 portal
+ * 的 hashed 类名，见 docs/private-seams.md §D）。
  */
 export const SURFACE_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRung }>[] = Object.freeze([
   Object.freeze({ token: '--dsw-alias-bg-layer-1', rung: 'layer1' as const }),
@@ -114,7 +115,7 @@ export const SURFACE_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRun
 ])
 
 /**
- * **菜单族**两个 token —— 与 {@link SURFACE_TOKENS} 同法：**只装颜色，不装图层**（图层交给 `surface.ts` 的选择器表）。装图层会让**粘性分组标题**烂掉：官方把同一个 `--dsw-specific-menu` 也用在 `.groupTitle` 上，那条必须与菜单主体同色的 24px sticky 横条会被百分比渐变重新压成一道硬边金带。
+ * **菜单族**两个 token —— 与 {@link SURFACE_TOKENS} 同法：**只装颜色，不装图层**（图层交给 `surfaces.ts` 的选择器表）。装图层会让**粘性分组标题**烂掉：官方把同一个 `--dsw-specific-menu` 也用在 `.groupTitle` 上，那条必须与菜单主体同色的 24px sticky 横条会被百分比渐变重新压成一道硬边金带。
  * ⚠️ 该 token 是**半透明玻璃色**（配 `backdrop-filter`）⇒ 走 {@link washFill}（只换 RGB、alpha 一字不动）保住官方玻璃。
  * ⚠️ **两个名字都要染且同值**（官方 `.material` 读 `--dsw-menu-surface-fill`，`.groupTitle` 与自家 codebuddy 菜单读别名），只染一个会让卡片与粘性标题分叉成色差横带；`official` 快照须与官方对齐，否则官方档也发过期色。
  */
