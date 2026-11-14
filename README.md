@@ -4,9 +4,19 @@
 
 English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
-**A collection of small DeepSeek Harness (DSH) Web plugins.**
+**Desk One (同桌) — one desk for you and harness.**
 
-Each plugin is published and installed independently; a plugin retires from the collection once DSH natively supports its feature or it is no longer worth maintaining. The version badge above tracks the collection's aligned release line (mirrored from official dsh) and links to the npm org page, where each package's own version is listed.
+![Desk One hero](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-desk-one-hero.png)
+
+`dsh plugin --profile web add @dsh-sparrow/dsh-desk-one`
+
+* **One panel, not five pages.** Notes, tasks, schedule and notebook review live behind a single sidebar entry.
+* **Made for DSH.** The header's **Talk to Me** button turns a plain sentence into a prefilled prompt — notes, tasks and notebook pages can all be done by talking.
+* **AI writes, you review.** Link a DSH workspace as the notebook library: the AI writes there, you annotate exact lines in a review session.
+
+[Desk One docs](plugins/dsh-desk-one/README.md) · [Plugin market](https://dsh.pyai.site/)
+
+Desk One is the desk; the tools below come with it and are installed separately. Each plugin is published independently and retires once DSH natively supports its feature. The version badge above tracks the collection's aligned release line (mirrored from official dsh).
 
 ## Requirements
 

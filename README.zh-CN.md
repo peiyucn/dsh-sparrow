@@ -4,9 +4,19 @@
 
 简体中文 | [English](README.md) | [GitHub](https://github.com/peiyucn/dsh-sparrow)
 
-**DeepSeek Harness（DSH）Web 插件小合集。**
+**同桌（Desk One）—— 和 harness 共用的一张办公桌。**
 
-每个插件独立发布、独立安装；某功能被官方原生支持、或插件不再值得维护时，对应插件从合集中退役。上方版本徽章跟踪合集对齐版本线（镜像官方 dsh），点击进入 npm org 页可看各包自己的版本。
+![Desk One 主视觉](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-desk-one-hero.png)
+
+`dsh plugin --profile web add @dsh-sparrow/dsh-desk-one`
+
+* **一张桌子，不是五个页面。** 便签、任务、日程、笔记审阅都在一个侧栏入口后面。
+* **和 DSH 一起。** 顶栏「和我说」把一句人话变成预填提示——便签、任务、笔记都可以直接说。
+* **AI 写、你审。** 把 DSH 工作区链接成笔记库：AI 在里面写，你在审阅会话里逐行批注。
+
+[Desk One 文档](plugins/dsh-desk-one/README.zh-CN.md) · [插件市场](https://dsh.pyai.site/)
+
+下面这些工具随桌附送、单独安装；每个插件独立发布，某功能被官方原生支持、或插件不再值得维护时，对应插件从合集中退役。上方版本徽章跟踪合集对齐版本线（镜像官方 dsh）。
 
 ## 环境要求
 
