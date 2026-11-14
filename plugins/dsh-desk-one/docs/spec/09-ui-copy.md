@@ -2,13 +2,15 @@
 
 > 状态：**已定稿（2026-11-14）**。本表是这些界面文案的单一真值，实现同步在 `src/client/i18n/` 对应 key；交互与版式见 `08-coauthoring.md`。后续文案变更直接改本表并同步 i18n。
 >
-> 约束：预填提示是「半句指令」，用户接着写——中文以「：」结尾，英文以 `: ` 结尾，不自动发送；菜单项 ≤ 8 个汉字（英文 ≤ 4 个词），按钮 ≤ 8 个汉字；中英同义，英文用界面称谓 DSH。
+> 约束：预填提示是「半句指令」，用户接着写——中文以「：」结尾，英文以 `: ` 结尾，不自动发送；按钮 ≤ 8 个汉字；中英同义，英文用界面称谓 DSH。
+>
+> **菜单即句子（做好榜样）**：logo 菜单里每一行本身就是一句可以直接发出去的话（第一人称「帮我…」、写明对象与期望结果），不是「理清便签」这种动作标题；点选后把这句**原样**预填进输入框，没有隐藏的后半段。用户会照着我们的句式说话，提示词本身就是教学。
 
 ## 1. 页头与 info 浮层
 
 | 场景 | key | 中文 | 英文 |
 |---|---|---|---|
-| 品牌分段按钮右半（所有 tab 常驻，左半是「✦」同桌徽标） | `coauthor.entry`        | 和我说                                              | Talk to Me                                                                                                                    |
+| 品牌分段按钮右半（所有 tab 常驻，左半是「✦」同桌徽标） | `coauthor.entry` | 和我说 | Talk to Me |
 | 页头副标题 | `page.subtitle` | 与 harness 共用的一张办公桌 | One desk for you and harness |
 | info 按钮的无障碍名 | `page.introLabel` | 关于同桌 | About Desk One |
 | info 浮层首段 | `page.introDetail` | 碳硅同席：两种生命，一张桌子。你出灵感，harness 出力；便签、任务、会话与日程，一起完成。 | Carbon and silicon, one desk. You bring the spark, harness does the work; notes, tasks, sessions and schedule, done together. |
@@ -17,21 +19,22 @@
 | info 示例 ② | `coauthor.example.task` | 「帮我加一个任务：…」 | "Add a task: …" |
 | info 示例 ③ | `coauthor.example.plan` | 「把今天的日程整理成任务。」 | "Turn today's schedule into tasks." |
 
-## 2. 页头菜单与预填提示
+## 2. 页头菜单（每行就是一句可直接发送的话）
 
-> 位置：点品牌分段按钮右半的「和我说」后，按当前 tab 出现的菜单；选中某一项即把「预填」列的文字追加进输入框草稿，不发送。
+> 位置：点品牌分段按钮右半的「和我说」后，按当前 tab 出现的菜单。点选某一项 = 把这句原样追加进输入框草稿（不发送）。
 
-| tab · 项 | 菜单 key / 预填 key | 菜单文字（中） | 菜单文字（英） | 预填文案（中） | 预填文案（英） |
-|---|---|---|---|---|---|
-| 便签 · 第 1 项 | `coauthor.menu.noteClarify` / `coauthor.prompt.noteClarify` | 理清便签 | Tidy my notes | 帮我读一遍最近的便签，按主题归类、合并重复的说法，把每条整理成一句更清楚的话；先把整理方案列出来给我看，不要直接改。 | Read through my recent notes, group them by topic, merge duplicates and rewrite each one as one clear sentence; list the proposed cleanup for me first, do not edit anything yet. |
-| 便签 · 第 2 项 | `coauthor.menu.noteCleanup` / `coauthor.prompt.noteCleanup` | 清一清便签 | Find throwaways | 帮我找出重复、过时或已经没有后续的便签，列出来让我决定哪些可以扔；不要直接删。 | Find notes that are duplicated, outdated or have no follow-up left, and list them so I can decide what to throw away; do not delete anything. |
-| 任务 · 第 1 项 | `coauthor.menu.taskFromSchedule` / `coauthor.prompt.taskFromSchedule` | 安排今天 | Plan today | 帮我看看今天的日程和任务板，把今天要做的事理出来，缺的补成任务；已经在任务板里的不要重复。 | Check today's schedule and the task board, lay out what I need to do today and add whatever is missing as tasks; do not duplicate what is already on the board. |
-| 任务 · 第 2 项 | `coauthor.menu.taskFromNotes` / `coauthor.prompt.taskFromNotes` | 从便签收待办 | Collect from notes | 帮我看看最近一周的便签，把值得跟进的事收成任务；先看任务板避免重复，不要改动便签本身。 | Check my notes from the last week and collect the actionable ones as tasks; check the board first to avoid duplicates and leave the notes themselves untouched. |
-| 笔记 · 第 1 项 | `coauthor.menu.notebookNew` / `coauthor.prompt.notebookNew` | 新建一篇笔记 | Start a note | 帮我新建一篇笔记： | Start a new note: |
-| 笔记 · 第 2 项 | `coauthor.menu.notebookBrowse` / `coauthor.prompt.notebookBrowse` | 看看笔记库 | Browse the notebook | 帮我看看笔记库里最近的内容。 | Show me what is recent in my notebook library. |
-| 日程 · 第 1 项 | `coauthor.menu.scheduleToday` / `coauthor.prompt.scheduleToday` | 看看今天的安排 | Check today's schedule | 帮我看看今天的日程安排，有哪些需要注意的。 | Check my schedule for today and tell me what needs attention. |
-| 日程 · 第 2 项 | `coauthor.menu.scheduleUpcoming` / `coauthor.prompt.scheduleUpcoming` | 梳理近期日程 | Review upcoming events | 帮我梳理一下近期的日程。 | Review my upcoming schedule. |
-| 会话 · 第 1 项 | `coauthor.menu.sessionsTidy` / `coauthor.prompt.sessionsTidy` | 整理最近的会话 | Tidy recent sessions | 帮我整理一下最近的会话，看看哪些可以归档。 | Tidy my recent sessions and tell me which ones can be archived. |
+| tab · 项 | key | 句子（中） | 句子（英） |
+|---|---|---|---|
+| 便签 · 第 1 项 | `coauthor.prompt.noteClarify` | 帮我把便签里重复的说法合并 | Merge the duplicate wording in my notes |
+| 便签 · 第 2 项 | `coauthor.prompt.noteCleanup` | 帮我挑出已经没用的便签 | Pick out the notes I no longer need |
+| 任务 · 第 1 项 | `coauthor.prompt.taskFromSchedule` | 帮我把今天的日程变成待办 | Turn today's schedule into tasks |
+| 任务 · 第 2 项 | `coauthor.prompt.taskFromNotes` | 帮我把便签里的事收成待办 | Collect the tasks buried in my notes |
+| 笔记 · 第 1 项 | `coauthor.prompt.notebookAudit` | 帮我列出笔记库里缺元数据的页 | List the notebook pages missing metadata |
+| 笔记 · 第 2 项 | `coauthor.prompt.notebookFromNotes` | 帮我把值得留的便签写成笔记 | Turn my keeper notes into a notebook page |
+| 日程 · 第 1 项 | `coauthor.prompt.scheduleToday` | 帮我看看今天有没有时间冲突 | Flag any time conflicts in today's schedule |
+| 日程 · 第 2 项 | `coauthor.prompt.scheduleWeek` | 帮我看看这周哪天排得太满 | Show me which days this week are overloaded |
+| 会话 · 第 1 项 | `coauthor.prompt.sessionsDuplicates` | 帮我找出最近的重复会话 | Find my duplicate sessions from recent weeks |
+| 会话 · 第 2 项 | `coauthor.prompt.sessionsReview` | 帮我复盘这一周做了哪些事 | Summarize what I did this week |
 
 ## 3. 空状态
 
