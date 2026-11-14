@@ -30,7 +30,7 @@ DSH Web 里「与 harness 共用一张桌子」的工作套件 **Desk One（同�
 | # | 模块 | 职责 | 主要对象 | 阶段 |
 | :-- | :--- | :--- | :--- | :--- |
 | 1 | 面板外壳 Shell | 侧栏入口、面板框架、模块路由、加载与错误态 | — | **S0 已交付** |
-| 2 | 批注 Annotations | 工作区文件上的逐行批注：落地页（打开工作区文件 / 新建工作区 + 三个聚合列表）+ **专用批注会话**里的批注 tab（AI 主写、人批注；无编辑器、不依赖 git） | `note-file` + `note-draft` + `review-record` + `review-session` + `note-baseline` | **已交付**（见 `07-notebook.md`） |
+| 2 | 批注（笔记页） | 链接工作区的笔记页：文件列表 / 搜索 / 四档视图 + 在**专用批注会话**里的逐行批注（AI 主写、人批注；无编辑器、不依赖 git）；工作区链接可在页面顶部随时切换，无新建笔记 | `notebook-config` + `note-file` + `note-draft` + `review-record` + `review-session` + `note-baseline` | **已交付**（见 `07-notebook.md`） |
 | 3 | 待办 Tasks | 收集箱、推进、完成、优先级、估算、排期入口 | `task` + `group` | **S1 已交付**（收集箱/优先级/估算后置） |
 | 4 | 日程 Schedule | 日历主页（开始 / 今日 / 近期 + 月历 / 周历 / 日历）+ 连接与日历设置管理页；外部日程只读镜像（v1 不做本地事件） | `event` + `calendar` + `schedule-source` | **S2 已交付**（只读） |
 | 5 | 同步 Sync | 企业微信 / iCloud CalDAV、Outlook Graph 与公开 ICS 订阅的连接、拉取、状态与错误 | `event`（镜像）+ `calendar` | **S2 已交付**（只读） |
@@ -39,7 +39,7 @@ DSH Web 里「与 harness 共用一张桌子」的工作套件 **Desk One（同�
 | 8 | 看板 Board | 按项目分泳道、拖拽改状态 | `project` + `task` | 多项目板未做（当前任务板已交付，S3） |
 | 9 | 搜索 Search | 跨对象标题/正文/标签检索 | 全部 | S3 未开始（批注按工作区文件寻址，不做库搜索） |
 | 10 | 设置 Settings | 连接配置、同步状态、导入导出、关于 | — | **不单独设页**：连接与日历设置收在日程页「日历设置」子页（S2 已交付）；导入导出/关于未做 |
-| 11 | Agent 工具层 | 跨模块工具，读写同一套对象；随包 `desk-one` 操作指南 skill | 全部 | **已交付**（18 个工具 + 随包 skill） |
+| 11 | Agent 工具层 | 跨模块工具，读写同一套对象；随包 `desk-one` 操作指南 skill | 全部 | **已交付**（19 个工具 + 随包 skill） |
 | 12 | Agent 会话 Sessions | 活跃会话按工作区分组、归档树与归档管理（从归档插件迁移） | 宿主会话目录（非 DeskNode） | **Phase 1–2 已交付**；Phase 3 管理 UI 已交付，归档插件退役待 owner 真机验证首发后执行 |
 | 13 | 和 DSH 一起 | 面板 ↔ 对话联动：页头品牌分段按钮「✦ 同桌 ｜ 和我说」+ 便签墙入口（任务待办列为同句式的纯文本引导），把 tab 相关提示预填进会话草稿；「…」菜单可许愿、由 agent 起草 GitHub issue（不自动发布） | — | **已交付**（2026-11-14，见 `08-coauthoring.md`、文案定稿 `09-ui-copy.md`） |
 
@@ -62,7 +62,7 @@ src/
     sessions/**                                                   # 会话目录 + 归档管理 host 半（Phase 1–2 + Phase 3 管理 UI）
     schedule/{host,connections,sync,outlook-oauth,caldav,ical,xml,records,routes,tools,types}.ts
     schedule/providers/{graph,outlook-ics}.ts                     # Outlook Graph / 历史 ICS 通道
-    notebook/{host,scan,library,files,frontmatter,skills,routes,tools}.ts   # 笔记库索引 / 文件身份 / 草稿 / 审阅记录
+    notebook/{host,scan,library,files,frontmatter,routes,tools,workspace-root}.ts   # 笔记页索引 / 工作区寻址 / 文件身份 / 草稿 / 批注记录
   client/
     index.ts install.ts panel.ts pin.ts brand.tsx compat.ts http.ts styles.ts tabIcons.tsx
     app/**                                                        # 面板外壳：页头 / tab / 动作 / 图标 / 样式 / 工具
@@ -72,9 +72,10 @@ src/
     schedule/{ScheduleView,shared,toolbar,panels,boards,event-card,utils,api,styles}.ts(x)
     schedule/sources/**                                           # 日历设置子页（来源卡 / Outlook Graph 卡 / ICS 订阅卡）
     sessions/**                                                   # 会话目录与归档管理 UI
-    notebook/                                                     # 笔记库入口页 + 审阅
+    notebook/                                                     # 笔记页 + 批注
       NotebookView.tsx HeaderActions.tsx DocReviewAction.tsx ReviewPromptDock.tsx ReviewSessionIcon.tsx ReviewSessionTrailingIcon.tsx
       hooks/{useNotebookPage,useNotebookLibrary,useNotebookRows,useNotebookActions}.ts
+      paging.ts page-types.ts api.ts workspaces.ts
       review/ReviewTab.tsx
       review/components/{ReviewHeader,ReviewCodeView,ReviewDocumentView,ReviewLayers,ReviewSubmitBar,AnnotationCard}.tsx
       review/hooks/{useReviewSession,useReviewDocument,useReviewInteraction}.ts
@@ -155,7 +156,7 @@ test/
 | :--- | :--- |
 | 侧栏入口与主面板槽位 | 已用（默认 1 组；固定 tab 时动态增加，`client/install.ts` + `panel.ts` + `pin.ts`） |
 | 持久化 seam | 已用（`ctx.storageDomain`，域 `desk_one` = `nodes` + `edges` 两表，per-record） |
-| Agent 工具注册 | 已用（`ctx.tools`，18 个 `desk_*` 工具：便签 / 任务 / 分组 / 日程） |
+| Agent 工具注册 | 已用（`ctx.tools`，19 个 `desk_*` 工具：便签 / 任务 / 分组 / 日程 / 笔记页检索） |
 | 随包 skill | 已用（可选 `skills` 服务经 `ctx.inject` fork 注册 `desk-one` 操作指南；缺服务时工具照常） |
 | 凭据 | 已用：`ctx.credentials` 的 `ref`（CalDAV 密码 / ICS 订阅链接）与 `record`（Graph refresh token）；值不进日志 / HTML |
 | 设置页注册 | v1 不注册宿主设置页；连接与日历设置收在面板内「日历设置」子页（单入口原则） |
@@ -192,11 +193,13 @@ test/
 ### 2026-11-15 增补
 
 13. **标签页改用功能名**：便签墙 / 任务板 / 笔记审阅 / 日程聚合 / 会话管理（顺序不变，仍是便签墙 → 任务板 → 笔记审阅 → 日程聚合 → 会话管理）；英文依次为 **Notes wall / Task board / Notebook review / Schedule / Sessions**。理由：标签是「视图」，对象是「便签 / 任务 / 笔记 / 日程 / 会话」；用视图名让面板、品牌图、README 与市场卡的说法一致。`00-overview` 第 1 / 11 条里的旧标签名只作历史记录；第 5 条的模块口径仍是「日程 / Schedule」，只有标签页改名。
-14. **「笔记审阅」改名「批注 / Annotations」，并与笔记库解耦**（2026-11-15）：`review` 在 coding 语境里专指 code review，官方本身也有「变更请求 / 本地变更」那套；我们的动作是在文本行上写批注，且只针对工作区里的 Markdown / 文本，叫「审阅」既不准确也会撞车。tab 名改「批注」，英文 **Annotations**，右栏入口 tooltip 用动词 **Annotate**；同时按 `07-notebook.md` 删除笔记库 / 索引 / 搜索，批注按「工作区 + 文件」寻址，入口页改为批注落地页。
+14. **「笔记审阅」改名「批注 / Annotations」，并与笔记库解耦**（2026-11-15）：`review` 在 coding 语境里专指 code review，官方本身也有「变更请求 / 本地变更」那套；我们的动作是在文本行上写批注，且只针对工作区里的 Markdown / 文本，叫「审阅」既不准确也会撞车。tab 名改「批注」，英文 **Annotations**，右栏入口 tooltip 用动词 **Annotate**；同时按 `07-notebook.md` 删除笔记库 / 索引 / 搜索，批注按「工作区 + 文件」寻址，入口页改为批注落地页。**（同日被第 15 条回退部分取代。）**
+15. **回退落地页，恢复笔记页；链接改成可切换，删除新建笔记**（2026-11-15，owner 决策）：落地页隐藏了「当前是哪个工作区」这个关键状态（打开文件页时默认取工作区列表第一项），且过度削减了已有能力。恢复「链接工作区 + 文件列表 / 搜索 / 四档视图」的笔记页；链接改为页面顶部「当前工作区 ▾」切换器（已注册工作区 / 选择文件夹 / 新建工作区 / 取消当前工作区，切换不需先断开）；**删除新建笔记**（含 AI 起草与技能选择）；右栏「✦ 批注」入口保持对所有工作区文件开放（不随链接收紧）。命名保持「批注 / Annotations」。
 
-## 当前进度（2026-11-14）
+## 当前进度（2026-11-15）
 
-* **已交付**：S0 / S1 / S2 + 批注（07）+ 会话目录与归档管理（04，Phase 1–2 + Phase 3 管理 UI）+ 18 个 agent 工具与随包操作指南 skill + 面板 ↔ 对话联动入口（08）。插件 `npm run verify`（typecheck / build / test / package）与根 `pnpm run check` 为合并门禁。
+* **已交付**：S0 / S1 / S2 + 批注（笔记页，07）+ 会话目录与归档管理（04，Phase 1–2 + Phase 3 管理 UI）+ 19 个 agent 工具与随包操作指南 skill + 面板 ↔ 对话联动入口（08）。插件 `npm run verify`（typecheck / build / test / package）与根 `pnpm run check` 为合并门禁。
+* **已回退（2026-11-15）**：落地页 → 笔记页；工作区链接改为可切换；删除新建笔记（AI 起草 / 技能选择 / host create 接口）。回退后 19 个工具恢复（含 `desk_page_list`）。
 * **已重构（2026-11-14）**：审阅模块拆分（`client/notebook/review/`）、notebook controller 拆 hook、`host/store/` 按领域拆仓库、schedule host 拆 `connections/sync/outlook-oauth`、i18n 拆功能片段、共享工具 helper 收敛；行为保持不变，测试全绿。
 * **未验证**：企业微信 / iCloud / Outlook 真实账号联调（等 owner 凭据真机验证）；归档插件退役未执行（等首发验证）。
 * **未开始**：S3（专注、跨对象搜索、日程写回、多项目看板）。

@@ -25,7 +25,7 @@
 - **不重复**：同一动作不在页头和空状态各放一个大按钮；空状态入口在内容出现后自然消失。
 - **不替用户做主**：只把提示词预填进草稿，**不自动发送**；也不自动应用任何 AI 结果。
 - **菜单即短句（做好榜样）**：logo 菜单行是一句人话短句（≤10 汉字，通常不带「帮我」），像你会对助理说的一句话；点选后预填的是更完整的请求（范围 / 输出 / 边界放在隐藏的后半段）。菜单行不当动作标题（不写「理清便签」「安排今天」），隐藏预填不写「帮我整理一下」这类开放结果——用户会照着我们的句式说话，提示词本身就是教学。
-- **不新增私有 seam**：复用「让 AI 起草」已经在用的官方公开服务 `uiWorkspace.startSession(workspaceId?, options)`。已确认安装版本 0.2.2-rc.3 支持 `whenDraftExists: 'replace' | 'append' | 'keep'`（`ui-conversation` 的 `DraftInitializationOptions`）。
+- **不新增私有 seam**：复用「和我说」已经在用的官方公开服务 `uiWorkspace.startSession(workspaceId?, options)`。已确认安装版本 0.2.2-rc.3 支持 `whenDraftExists: 'replace' | 'append' | 'keep'`（`ui-conversation` 的 `DraftInitializationOptions`）。
 - **不切走是做不到的**：面板与对话互斥，点击入口必然切到会话；这是预期行为，回来后 panel 仍记住上次 tab。
 
 ## 3. 交互
@@ -51,7 +51,7 @@
 
 - **便签墙空态**（`NotesWall`）：主文案保留「双击空白处新建便签」，副文案改「或点击顶栏「+便签」，也可以直接对我说」；下方加次级按钮「「帮我记一条便签…」」。仅在空状态出现。
 - **任务待办空列**（`TaskColumn`）：与便签墙同一句式写满两行纯文本——`双击空白处新建任务` / `或点击顶栏「+任务」，也可以直接对我说「帮我加一个任务…」`；**不加点击动作**（点击入口只保留在便签墙）。进行中 / 完成列的空列仍显示「暂无任务」。
-- **没有工作区（批注空态）**：不新增按钮；主按钮「新建工作区」本身就是入口，空态文案补一句 AI 协作说明。
+- **没有链接工作区（笔记页空态）**：不新增按钮；空态的主按钮「选择工作区 / 新建工作区」本身就是入口，说明文案补一句 AI 协作说明。
 - **日程**：只读，不放写入口；页头的只读示例（「看看今天的安排」）已足够。空状态文案保持现状。
 - **会话**：管理性页面，不放。
 
@@ -71,7 +71,7 @@
 - **草稿已有内容**：`whenDraftExists: 'append'`，提示词追加在现有草稿后并换行，不覆盖、不清空。
 - **空白会话复用**：`startSession` 会复用当前 / 最近工作区里第一个可复用空白会话，不堆会话。
 - **无工作区**：官方 toast，不改选择；按钮保持可点（隐藏会让人误以为功能不存在）。
-- **不自动发送**：用户仍需自己按发送；这是与「让 AI 起草」「提交批注」一致的口径。
+- **不自动发送**：用户仍需自己按发送；这是与「提交批注」一致的口径。
 - **空状态按钮不常驻**：有内容后消失，老用户不受打扰。
 - **不碰工具面**：19 个常驻工具保持不变（决策见 `01-object-model.md`）。
 
@@ -108,7 +108,7 @@
 | 便签空态 | `src/client/notes/NotesWall.tsx` |
 | 任务空态 | `src/client/tasks/components/TaskColumn.tsx`（仅待办空列，两行纯文本，无点击动作） |
 | 「…」许愿 | `src/client/app/DeskTabMenu.tsx`（末行「许个愿」）+ `DeskHeader.tsx` / `DeskOnePage.tsx` 的 `onWish` |
-| 批注空态文案 | `src/client/i18n/annotation.ts` 的 `annotation.workspaceHint` |
+| 笔记页空态文案 | `src/client/i18n/notebook.ts` 的 `notebook.welcomeBody` / `notebook.workspaceHint` |
 | 文案 | `src/client/i18n/app.ts`（`coauthor.*`、`tabs.wish*`）、`notes.ts`、`tasks.ts`；定稿文案见 `09-ui-copy.md` |
 | 单测 | `test/client/coauthor.test.mjs` |
 

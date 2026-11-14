@@ -17,7 +17,7 @@
 | :--- | :--- |
 | **Node（对象）** | 一切可被引用、查询、链接的东西：任务、便签、分组、日程镜像、日历源、会话索引，以及批注对象族（库配置、文件身份、批注草稿、批注记录、轮次基线、批注会话标记）。 |
 | **Edge（关系）** | 类型化有向边，独立存储；关系不污染对象字段。`edges` 表已声明，当前功能尚未写入关系边（见〈模块协同〉）。 |
-| **View（视图）** | Node 的查询投影：任务板、便签墙、日程页、批注落地页。视图不落库。 |
+| **View（视图）** | Node 的查询投影：任务板、便签墙、日程页、笔记页文件列表。视图不落库。 |
 | **Provider（来源）** | 生成镜像 Node 的外部通道：企业微信 CalDAV / iCloud CalDAV / Outlook 个人 Microsoft Graph（`graph` 通道）/ 公开 ICS 订阅（`ics` 通道，含 Outlook 发布 ICS 历史兼容）/ 本地。 |
 | **Store（仓库）** | 单一持久化层 + 内存索引；所有写入走它，保证一致性与事件广播。`DeskStore` 是门面，按领域拆在 `host/store/`。 |
 
@@ -167,6 +167,7 @@ interface ProjectPayload {
 
 | kind | 一条记录代表 | 关键字段 | 上限 / 淘汰 |
 | :--- | :--- | :--- | :--- |
+| `notebook-config` | 笔记页当前链接的工作区根（单条，固定 id `notebook_config`） | `rootPath`（可指向工作区或其子目录）、`skillName?`（旧字段，仅兼容） | 单条 |
 | `note-file` | 一个文件的**惰性身份**（首次批注分配；工作区根 + 相对路径 + 内容哈希；改名按哈希重挂） | `rootPath`、`path`、`hash`(sha256) | 一个文件一条 |
 | `note-draft` | 该文件的未提交批注草稿箱 | `fileId`、`drafts: DraftAnnotation[]` | 每箱 `NOTEBOOK_MAX_DRAFTS = 100` 条批注 |
 | `review-record` | 一次提交（一轮批注），不存正文快照 | `sessionId`、`workspaceId?`、`fileId`、`fileTitle`、`pathSnapshot`、`annotations`、`bytes` | 按文件 / 会话查询；历史占用有阈值提示 |
@@ -177,7 +178,7 @@ interface ProjectPayload {
 * **文件身份随内容走**：`note-file` 只存路径 + 内容哈希；文件改名后按哈希重关联（host 有候选数与时间预算上限），因此批注记录 / 基线不会因改名而丢。
 * **草稿箱 = 文件级、非会话级**：同一文件在任意批注会话里的未提交批注都落在同一 `note-draft`（带乐观并发 revision）；提交后清空。
 * **批注历史是提交记录**：批注本身随会话消息走；`review-record` 只是「独立批注对象」的历史留档（文件快照元信息 + 批注，不存被审正文）。
-* **迁移兼容**：早期「工作区文件 + 批注线程」版本的 `annotation` / `review` 两个 kind 只保留 schema 解析，打开存储域时清理，不参与业务；`notebook-config` 只保留 schema 解析、不再读写（**不能直接删 kind**：打开存储域时遇到未知 kind 会整域失败，连带所有插件路由 404）。域声明 `invalidRecords: 'backup-and-skip'`，往后遇到本版不认识的记录时备份、告警并跳过。
+* **迁移兼容**：早期「工作区文件 + 批注线程」版本的 `annotation` / `review` 两个 kind 只保留 schema 解析，打开存储域时清理，不参与业务；`notebook-config` 是**活记录**（链接工作区），旧记录直接沿用。域声明 `invalidRecords: 'backup-and-skip'`：遇到本版不认识的记录时备份、告警并跳过，而不是让整个域（连带所有插件路由）打不开。
 
 ## Edge（关系）
 
@@ -268,7 +269,7 @@ interface SourceRef {
 | 任务板 | 按 `status` 分组；一层分组按 `group` 记录在泳道块序列中穿插；排序视图（手动 / 创建 / 截止）是查询投影 |
 | 便签墙 | `note` 按 pinned、updatedAt 排序；坐标 / 尺寸 / 层级为可选字段，缺省时界面兜底 |
 | 日程 | 时间区间内的 `event`，按开始时间排序；按 `calendarNodeId` 关联来源与颜色；近期 / 日视图是同一查询的两种投影 |
-| 批注 | 落地页聚合：跨工作区的草稿箱、批注记录与 `review-session` 标记（按更新时间倒序，最近批注上限 20）；不做库内检索，跨对象搜索未做（S3） |
+| 笔记页 | **派生视图**：扫描工作区根的 `.md/.markdown/.txt` 得到的文件索引（标题 / 类型 / 日期 / 标签 / 缺元数据）+ 草稿箱 / 批注记录计数；四档视图与搜索都在这份索引上做，分页每页 20 条；不落第二份正文 |
 
 ## API 面（host 服务，符号名待实现期对齐官方 seam）
 
@@ -316,10 +317,11 @@ interface DeskApi {
 | `desk_task_add` / `desk_task_list` / `desk_task_update` / `desk_task_complete` / `desk_task_archive` | 任务：新建 / 查询 / 更新（含状态与排序）/ 完成 / 存档或恢复 | 低 |
 | `desk_group_add` / `desk_group_list` / `desk_group_update` / `desk_group_move` / `desk_group_archive` / `desk_group_delete` | 分组：新建 / 查询 / 改名排序 / 整组移动 / 存档或恢复 / 删除 | 中（移动、存档、删除会影响组内卡片） |
 | `desk_schedule_list` / `desk_schedule_sync` / `desk_schedule_connections` | 日程镜像查询 / 手动同步 / 连接状态（只读，不写回） | 低 |
+| `desk_page_list` | 笔记库只读检索：标题 / 路径 / 标签 / 缺元数据 / 空笔记；返回相对 root 的路径与元信息 | 低 |
 
 * **一个工具一个动作**：工具名即意图（add / update / complete / move / archive / delete），不把语义不同的动作合并成通用 `save`；更新类工具要求显式 `expected_revision`。
-* **常驻可见（2026-11-14 决策）**：18 个工具保持每个请求全量可见，**不做** skill 激活式惰性加载。实测 wire schema 约 11.1k 字符（≈2.8–3.7k tokens/请求）；对比官方 `tool-office` 的「skill 加载后激活」模式，我们更重视发现性——用户随口说「记一下」时工具必须已经在上下文里；同时激活态会在 resume / fork / 热重载 / 子 agent 上引入额外状态机与「工具明明装了却不可见」的支持成本。工具面显著膨胀（>30 个）时再评估，届时候选是「只惰性化低频工具」而非全量。
-* **工作区文件是文件系统对象**：批注工具不读写文件；正文读取与改稿仍用文件工具，Desk 工具不写工作区文件。
+* **常驻可见（2026-11-14 决策）**：19 个工具保持每个请求全量可见，**不做** skill 激活式惰性加载。实测 wire schema 约 11.1k 字符（≈2.8–3.7k tokens/请求）；对比官方 `tool-office` 的「skill 加载后激活」模式，我们更重视发现性——用户随口说「记一下」时工具必须已经在上下文里；同时激活态会在 resume / fork / 热重载 / 子 agent 上引入额外状态机与「工具明明装了却不可见」的支持成本。工具面显著膨胀（>30 个）时再评估，届时候选是「只惰性化低频工具」而非全量。
+* **笔记页是文件系统对象**：`desk_page_list` 只做只读检索；正文读取与改稿仍用文件工具，Desk 工具不写笔记文件。
 * 写工具返回结构化结果 + 一句人类可读摘要；跨外部源的写操作必须带确认。
 * 工具与界面共用同一 Store API，禁止绕过 Store 直接写文件。
 
@@ -339,7 +341,7 @@ interface DeskApi {
 * Node 校验（字段、kind/payload 匹配、时间区间合法性、calendar 唯一键）。
 * 状态机迁移（task / focus）。
 * 边唯一性与级联删除。
-* 视图查询（任务板 / 便签墙 / 日程 / 批注落地页的定义）。
+* 视图查询（任务板 / 便签墙 / 日程 / 笔记页文件索引的定义）。
 * 冲突判定（半开区间、时区、全天事件）。
 * schema 迁移与未知字段保留。
 * 同步 upsert 的唯一键与冲突策略；RRULE 窗口展开（EXDATE / RECURRENCE-ID / DST）；ICS / CalDAV / Graph 映射纯函数。

@@ -46,7 +46,7 @@
 | 任务 · 进行中 / 完成 空列 | `task.emptyLane` | 暂无任务 | No tasks |
 | 任务 · 待办空列 主提示 | `task.emptyTip` | 双击空白处新建任务 | Double-click empty space |
 | 任务 · 待办空列 副提示 | `task.emptyTipAlt` | 或点击顶栏「+任务」，也可以直接对我说「帮我加一个任务…」 | or click "+ Task" in the top bar, or just tell me "add a task: …" |
-| 批注空态说明 | `annotation.workspaceHint` | 批注对象是工作区里的文件。还没有工作区，先建一个（和官方「新建工作区」同一套流程）。 | Annotations live in workspace files. Create a workspace first (same flow as the official “New workspace”). |
+| 笔记页空态说明 | `notebook.welcomeBody` / `notebook.workspaceHint` | 笔记库 = DSH 工作区：AI 在里面写，你在专用批注会话里逐行批注，其余的交给 harness。只索引目录内的 markdown / 文本文件；随时可以在页面顶部更换工作区。 | The library = a DSH workspace: the AI writes there, you annotate exact lines in a dedicated session, and harness handles the rest. Only markdown and text files inside it are indexed; switch the workspace from the bar above at any time. |
 
 ## 4. 「…」菜单（许愿）
 
