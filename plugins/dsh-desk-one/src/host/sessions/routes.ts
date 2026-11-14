@@ -109,7 +109,8 @@ async function unarchiveRoute(route: ArchiveRouteContext, req: IncomingMessage, 
 
 async function archiveRoute(route: ArchiveRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   // Archiving is parent-scoped — the parent plus every child session enters the archived set (atomic in a single write chain).
-  // Only serves stray/orphan child sessions (the official menu cannot reach them); children of officially archived parents are aligned by domain/changed.
+  // Callers are the Desk One sessions surface itself: the active-session row action and the stray/orphan list (the official
+  // session menu cannot reach strays). Sessions archived from the official menu do not come through here.
   const parsed = bodyObject<ArchiveRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
   const rootId = requireNonEmptyString(parsed.sessionId, 'sessionId 必须是非空字符串').trim()
   const body = await archiveSessionSubtree(route.ctx, route.surface, route.headerFacts, rootId)

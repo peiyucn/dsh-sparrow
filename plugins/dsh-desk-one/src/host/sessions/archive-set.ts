@@ -317,7 +317,8 @@ export async function unarchiveSession(
 }
 
 /** Archiving is parent-scoped: the parent plus all its child sessions enter the archived set together (atomic
- *  single write chain). This path only handles stray / orphan child sessions.
+ *  single write chain). Callers: the Desk One active-session row action and the stray/orphan list (the official
+ *  session menu cannot reach strays); sessions archived from the official menu come through the registry itself.
  *  Newly archived ids re-dispatch the official "archived" admission afterwards so official follow-up work
  *  (rc.2+ worktree reclamation) runs exactly as it would after `workspaceRegistry.archiveSession`. */
 export async function archiveSessionSubtree(
