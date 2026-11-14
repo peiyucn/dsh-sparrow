@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest a feature for Desk One or one of the plugins
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. For Desk One you can also use **Make a wish** in the panel's "…" menu — it writes a prefilled prompt that drafts this request for you.
+  - type: dropdown
+    id: plugin
+    attributes:
+      label: Which plugin
+      options:
+        - Desk One (dsh-desk-one)
+        - dsh-chat-fim
+        - dsh-codebuddy-credits
+        - dsh-theme-tone
+        - dsh-archive-manage
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does it solve
+      description: Describe the situation, not the solution yet.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What should happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, links, examples from other tools.
+    validations:
+      required: false

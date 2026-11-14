@@ -1,0 +1,57 @@
+name: Bug report
+description: Something does not work as documented
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please do not paste tokens, passwords, private paths, session titles or calendar content — a redacted description is enough.
+  - type: dropdown
+    id: plugin
+    attributes:
+      label: Which plugin
+      options:
+        - Desk One (dsh-desk-one)
+        - dsh-chat-fim
+        - dsh-codebuddy-credits
+        - dsh-theme-tone
+        - dsh-archive-manage
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DSH version
+      description: The exact version line this repository supports is stated in each plugin's README.
+      placeholder: 0.2.2-rc.3
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: From `dsh plugin list`, the npm page, or the plugin manager.
+      placeholder: 0.2.2-rc.3
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps, starting from a fresh page load.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Redact private content first.
+    validations:
+      required: false
