@@ -6,16 +6,17 @@
  */
 
 import { Fragment } from 'react'
-import type { CSSProperties, MutableRefObject } from 'react'
+import type { MutableRefObject } from 'react'
 import { CodeBuddyMark } from './CodeBuddyMark.js'
 import { formatCredits } from './format.js'
 import { CCB_CLASS } from './styles.js'
+import type { AnchorStyles } from './statDialog.js'
 
 export interface CreditDialogProps {
-  /** 弹层本体（量尺寸 / 外点关闭判定用）。 */
+  /** 弹层本体（外点关闭判定用）。 */
   panelRef: MutableRefObject<HTMLDivElement | null>
-  /** 定位坐标；首次测量前为 null（按 MEASURE_STYLE 不可见预排）。 */
-  style: CSSProperties
+  /** 触发件的 CSS 锚点名（弹层以 positionAnchor 绑定它）。 */
+  anchorName: string
   ariaLabel: string
   title: string
   credit: number
@@ -27,10 +28,10 @@ export interface CreditDialogProps {
 }
 
 export function CreditDialog({
-  panelRef, style, ariaLabel, title, credit, callsLabel, calls, perCallLabel, byModel,
+  panelRef, anchorName, ariaLabel, title, credit, callsLabel, calls, perCallLabel, byModel,
 }: CreditDialogProps) {
   return (
-    <div ref={panelRef} role="dialog" aria-label={ariaLabel} className={CCB_CLASS.dialog} style={style}>
+    <div ref={panelRef} role="dialog" aria-label={ariaLabel} className={CCB_CLASS.dialog} style={{ positionAnchor: anchorName } as AnchorStyles}>
       <div className={CCB_CLASS.dialogTitle}>
         <span className={CCB_CLASS.dialogTitleLabel}>
           <CodeBuddyMark size={14} />

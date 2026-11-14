@@ -5,16 +5,12 @@
  * ① 左边栏 Workspace 行 hover 卡（HoverCard 的 compact/copyable 变体）：官方给它固定的深底与白系
  *    字色（两轴同值），这里把面换成官方抬升面 token、字换成官方 label token（标题最亮 → 路径/时间
  *    次之 → 状态最暗）。锚点：dsh 0.2.2 起 HoverCard 用 `display: contents` 的 portal 包装节点再挂卡
- *    （卡不再是 body 直接子节点），故从 `body > [class*='_portal']` 下的可复制卡根命中；字色仍按
- *    官方 CSS-module 类名的稳定后缀命中（`[class*='_hoverTitle']` 等），已登记 docs/private-seams.md
- *    的静默失效风险。
+ *    （卡不再是 body 直接子节点），故从 `body > [class*='_portal']` 下的可复制卡根命中；rc.3 起官方
+ *    材质改吃 `--dsw-alias-hovercard-*` 设计 token，直接在卡根覆盖官方 token 即可，不再按 CSS-module
+ *    类名后缀命中字色（旧私有 seam 已退场，见 docs/private-seams.md）。
  * ② 停靠卡 / ③ 菜单分组标题 / ④ 输入框触发菜单：见各自常量上的注释。
  */
 const CARD = "body > [class*='_portal'] [role='button'][aria-label]"
-const TITLE = "body > [class*='_portal'] [role='button'][aria-label] [class*='_hoverTitle']"
-const SECONDARY = "body > [class*='_portal'] [role='button'][aria-label] [class*='_hoverPath'],\nbody > [class*='_portal'] [role='button'][aria-label] [class*='_hoverTime']"
-const TERTIARY = "body > [class*='_portal'] [role='button'][aria-label] [class*='_hoverStatus']"
-const COPIED = "body > [class*='_portal'] [role='button'][aria-label] [class*='_copied']"
 
 /** 菜单分组标题（模型选择列表等）：官方给了 sticky 却没给背景，列表标题滚动时条目从标题下面穿过。 */
 const MENU_GROUP_HEADING = '[data-menu-group-heading]'
@@ -38,20 +34,14 @@ const fadeEdges = (top: string, bottom: string): string => {
 }
 
 export function buildSurfaceCss(): string {
-  return `/* 面包：官方深底 → 主题抬升面 */
+  return `/* 面包：官方深底 → 主题抬升面；字色：官方白系 → 官方 label token（层次不变）。
+   rc.3 起官方悬停卡改吃 --dsw-alias-hovercard-* 设计 token，卡根覆盖这四个官方 token 即可，
+   不再按 CSS-module 类名后缀命中字色（私有 seam 随之退场）。 */
 ${CARD} {
-  --dsw-hovercard-bg: var(--dsw-alias-bg-layer-3);
-}
-/* 字色：官方写死的白系 → 官方 label token（层次不变） */
-${TITLE},
-${COPIED} {
-  color: var(--dsw-alias-label-primary);
-}
-${SECONDARY} {
-  color: var(--dsw-alias-label-secondary);
-}
-${TERTIARY} {
-  color: var(--dsw-alias-label-tertiary);
+  --dsw-alias-hovercard-bg: var(--dsw-alias-bg-layer-3);
+  --dsw-alias-hovercard-label-primary: var(--dsw-alias-label-primary);
+  --dsw-alias-hovercard-label-secondary: var(--dsw-alias-label-secondary);
+  --dsw-alias-hovercard-label-tertiary: var(--dsw-alias-label-tertiary);
 }
 
 /* 停靠卡材质：半透明菜单玻璃 → 不透明抬升面。todo 的材质在卡根元素上，goal / queue 在卡面子层的

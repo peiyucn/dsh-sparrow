@@ -148,7 +148,7 @@ export function createModelFacts(options: ModelFactsOptions): ModelFactsStore {
       const next = await loadFactsOnce(key)
       // 刷新期间凭据被换掉/清空：结果已过期，既不能覆盖新状态，也不能据此注册 route。
       if (generation !== options.generation()) {
-        throw new LlmError(`${options.name}: 凭据在刷新期间发生变化，请稍后重试`, 'REFRESH_SUPERSEDED')
+        throw LlmError.fromFailure({ message: `${options.name}: 凭据在刷新期间发生变化，请稍后重试`, code: 'REFRESH_SUPERSEDED' })
       }
       const changed = !sameFacts(facts, next)
       facts = next

@@ -77,7 +77,7 @@ export function apply(ctx: Context, config: Config): void {
   const writeSetting = async (path: 'maxMode' | 'autoAdapt', value: boolean, label: string): Promise<void> => {
     const settings = ctx.get('settings')
     if (settings === undefined) {
-      throw new LlmError(`${name}: 本组合没有设置服务，无法保存${label}`, 'NO_SETTINGS_STORE')
+      throw LlmError.fromFailure({ message: `${name}: 本组合没有设置服务，无法保存${label}`, code: 'NO_SETTINGS_STORE' })
     }
     await settings.mutate(SETTINGS_NAMESPACE, [{ op: 'set', path: [path], value }])
   }

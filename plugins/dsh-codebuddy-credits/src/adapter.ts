@@ -240,6 +240,6 @@ export class CodeBuddyAdapter extends LlmAdapter {
     }
     if (exhausted !== undefined) rejectionError(exhausted.status, exhausted.detail, ADAPT_EXHAUSTED_HINT)
     // 理论上不可达（rungs 至少一格，非 11128 分支已抛错）；防御性兜底。
-    throw new LlmError('CodeBuddy 上游渠道校验拒绝', 'PROVIDER', { status: 400 })
+    throw LlmError.fromFailure({ message: 'CodeBuddy 上游渠道校验拒绝', code: 'PROVIDER', status: 400 })
   }
 }

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CodeBuddyMark } from './CodeBuddyMark.js'
 import { CreditDialog } from './CreditDialog.js'
-import { MEASURE_STYLE, useCreditStatDialog } from './statDialog.js'
+import { useCreditStatDialog, type AnchorStyles } from './statDialog.js'
 import { fetchLocal } from './fetch-timeout.js'
 import { formatCredits } from './format.js'
 import { API_PREFIX } from '../constants.js'
@@ -48,7 +48,7 @@ export interface CodeBuddyTurnCreditProps {
 export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBuddyTurnCreditProps) {
   const [usage, setUsage] = useState<TurnUsageView | undefined>(undefined)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
-  const { open, toggle, panelRef, pos } = useCreditStatDialog(buttonRef)
+  const { open, toggle, panelRef, anchorName } = useCreditStatDialog(buttonRef)
 
   // 每次渲染后重跑：官方行可能因任何信号重渲染把我们移回原位；只移动自有节点，幂等。
   useEffect(() => {
@@ -92,6 +92,7 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
         ref={buttonRef}
         type="button"
         className={CCB_CLASS.turnTrigger}
+        style={{ anchorName } as AnchorStyles}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={t('turnCredit.aria', { credit: formatCredits(usage.credit) })}
@@ -104,7 +105,7 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
         ? createPortal(
           <CreditDialog
             panelRef={panelRef}
-            style={pos ?? MEASURE_STYLE}
+            anchorName={anchorName}
             ariaLabel={t('turnCredit.title')}
             title={t('turnCredit.title')}
             credit={usage.credit}

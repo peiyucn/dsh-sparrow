@@ -50,13 +50,13 @@ export async function fetchQuota(
     if (timeout.aborted) throw new LlmError('CodeBuddy 配额接口超时', 'TRANSPORT', { cause: error })
     throw new LlmError('无法连接 CodeBuddy 配额接口', 'TRANSPORT', { cause: error })
   }
-  if (!response.ok) throw new LlmError('CodeBuddy 配额接口返回 HTTP ' + String(response.status), 'PROVIDER', { status: response.status })
+  if (!response.ok) throw LlmError.fromFailure({ message: 'CodeBuddy 配额接口返回 HTTP ' + String(response.status), code: 'PROVIDER', status: response.status })
   const body = await response.json().catch(error => {
-    throw new LlmError('CodeBuddy 配额接口返回了无法解析的数据', 'PROVIDER', { cause: error })
+    throw LlmError.fromFailure({ message: 'CodeBuddy 配额接口返回了无法解析的数据', code: 'PROVIDER' }, { cause: error })
   })
   if ((body as { code?: number })?.code !== 0) {
     const detail = body as { msg?: unknown; code?: unknown }
-    throw new LlmError('CodeBuddy 配额接口错误：' + String(detail.msg ?? detail.code ?? '未知'), 'PROVIDER')
+    throw LlmError.fromFailure({ message: 'CodeBuddy 配额接口错误：' + String(detail.msg ?? detail.code ?? '未知'), code: 'PROVIDER' })
   }
   const data = (body as { data?: Record<string, unknown> }).data ?? {}
   const used = numberOr(data.credit, 0)

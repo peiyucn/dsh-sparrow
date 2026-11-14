@@ -149,7 +149,7 @@ export async function* streamFrames(
         const frame = parseSseLine(line)
         if (frame === undefined) continue
         const failure = errorFrameMessage(frame)
-        if (failure !== undefined) throw new LlmError('CodeBuddy 上游错误：' + failure, 'PROVIDER')
+        if (failure !== undefined) throw LlmError.fromFailure({ message: 'CodeBuddy 上游错误：' + failure, code: 'PROVIDER' })
         const choices = Array.isArray(frame.choices) ? frame.choices as Array<Record<string, unknown>> : []
         const choice = choices[0]
         const delta = choice !== undefined && typeof choice.delta === 'object' && choice.delta !== null
@@ -229,7 +229,7 @@ export async function* streamFrames(
           }
           const finish = mapFinish(reason)
           if (finish === undefined) {
-            throw new LlmError('CodeBuddy 返回了未知的结束原因：' + reason, 'PROVIDER')
+            throw LlmError.fromFailure({ message: 'CodeBuddy 返回了未知的结束原因：' + reason, code: 'PROVIDER' })
           }
           chunks.push({
             type: 'finish',

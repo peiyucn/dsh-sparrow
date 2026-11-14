@@ -311,19 +311,20 @@ export function buildModelLabelCss(): string {
 `
 }
 
-/** 积分弹层皮肤（官方 ui-chat stat-dialog 同配方；定位由组件按锚点算）。 */
+/** 积分弹层皮肤（官方 rc.3 stat-dialog 同配方：CSS 锚点定位 + @position-try 兜底）。 */
 export function buildCreditDialogCss(): string {
-  return `/* 积分弹层：官方 .panel（定位由 pos 覆盖） */
+  return `/* 积分弹层：官方 .panel（触发件挂 anchorName、弹层挂 positionAnchor，落位规则见下） */
 .ccb-credit-dialog {
   position: fixed;
   z-index: 1100;
   box-sizing: border-box;
+  /* Size to the widest row so provider/model stays on one line, within a cap. */
   width: max-content;
-  min-width: min(260px, calc(100vw - 24px));
+  min-width: min(300px, calc(100vw - 24px));
   max-width: min(440px, calc(100vw - 24px));
   padding: 16px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--dsw-radius-lg);
   background: var(--dsw-specific-menu);
   /* --dsw-specific-menu 是半透明玻璃色，须同规则配对 backdrop-filter，否则背后文字透出来 */
   backdrop-filter: var(--dsw-menu-backdrop-filter);
@@ -333,6 +334,66 @@ export function buildCreditDialogCss(): string {
   line-height: 18px;
   color: var(--dsw-alias-label-secondary);
   cursor: default;
+  max-height: calc(100dvh - 12px - max(12px, var(--dsh-frame-overlay-top, 12px)));
+  overflow-x: hidden;
+  overflow-y: auto;
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  position-area: none;
+  top: max(12px, var(--dsh-frame-overlay-top, 12px));
+  bottom: max(12px, calc(anchor(top) + 8px));
+  left: max(12px, anchor(left));
+  right: 12px;
+  position-try-fallbacks: --ccb-stat-window, --ccb-stat-opposite, --ccb-stat-wide-opposite, --ccb-stat-tall, --ccb-stat-viewport;
+  align-self: end;
+  justify-self: start;
+  height: fit-content;
+  min-height: 0;
+  margin: 0;
+}
+/* 窄窗兜底：横向铺满、贴在触发件上方 */
+@position-try --ccb-stat-window {
+  position-area: none;
+  top: max(12px, var(--dsh-frame-overlay-top, 12px));
+  bottom: max(12px, calc(anchor(top) + 8px));
+  left: 12px;
+  right: 12px;
+  margin: 0;
+  align-self: safe end;
+  justify-self: safe end;
+}
+/* 上方放不下：翻到触发件下方 */
+@position-try --ccb-stat-opposite {
+  top: max(12px, calc(anchor(bottom) + 8px));
+  bottom: 12px;
+  align-self: start;
+}
+@position-try --ccb-stat-wide-opposite {
+  top: max(12px, calc(anchor(bottom) + 8px));
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  align-self: start;
+  justify-self: safe end;
+}
+/* 弹层比视口高：顶到 12px，底部留 12px，允许内部滚动 */
+@position-try --ccb-stat-tall {
+  position-area: none;
+  top: max(12px, var(--dsh-frame-overlay-top, 12px));
+  bottom: 12px;
+  left: max(12px, anchor(left));
+  right: 12px;
+  margin: 0;
+  align-self: safe start;
+  justify-self: start;
+}
+/* 最后兜底：视口内铺满 */
+@position-try --ccb-stat-viewport {
+  position-area: none;
+  inset: max(12px, var(--dsh-frame-overlay-top, 12px)) 12px 12px;
+  margin: 0;
+  align-self: safe start;
+  justify-self: safe end;
 }
 /* 官方 .title */
 .ccb-credit-dialog-title {

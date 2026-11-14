@@ -115,7 +115,7 @@ export function createCredentials(ctx: Context, name: string, config: Config): C
     }
     const settings = ctx.get('settings')
     if (settings === undefined) {
-      throw new LlmError(`${name}: 本组合没有设置服务，无法记录凭据引用`, 'NO_SETTINGS_STORE')
+      throw LlmError.fromFailure({ message: `${name}: 本组合没有设置服务，无法记录凭据引用`, code: 'NO_SETTINGS_STORE' })
     }
     const { account, models, routes } = requireDeps()
     // 用户给 Key = 对模型目录与账号信息拉取的授权；先取账号上下文（best-effort）再拉目录，

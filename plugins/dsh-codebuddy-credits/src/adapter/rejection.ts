@@ -31,5 +31,5 @@ export function rejectionError(status: number, detail: ErrorDetail, hint?: strin
   const base = text.length > 0
     ? 'CodeBuddy 请求被拒（HTTP ' + String(status) + '）：' + text
     : 'CodeBuddy 请求失败（HTTP ' + String(status) + '）'
-  throw new LlmError(hint === undefined ? base : base + '（' + hint + '）', 'PROVIDER', { status })
+  throw LlmError.fromFailure({ message: hint === undefined ? base : base + '（' + hint + '）', code: 'PROVIDER', status })
 }

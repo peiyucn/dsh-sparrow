@@ -13,7 +13,7 @@ import { createPortal } from 'react-dom'
 import { boundedSet } from './boundedCache.js'
 import { CodeBuddyMark } from './CodeBuddyMark.js'
 import { CreditDialog } from './CreditDialog.js'
-import { MEASURE_STYLE, useCreditStatDialog } from './statDialog.js'
+import { useCreditStatDialog, type AnchorStyles } from './statDialog.js'
 import { fetchLocal } from './fetch-timeout.js'
 import { formatCredits } from './format.js'
 import { API_PREFIX } from '../constants.js'
@@ -45,7 +45,7 @@ export interface CodeBuddyCreditsStatsProps {
 export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCreditsStatsProps) {
   const [usage, setUsage] = useState<SessionUsageView | undefined>(() => usageCache.get(sessionId))
   const buttonRef = useRef<HTMLButtonElement | null>(null)
-  const { open, toggle, panelRef, pos } = useCreditStatDialog(buttonRef)
+  const { open, toggle, panelRef, anchorName } = useCreditStatDialog(buttonRef)
 
   const load = useCallback(() => {
     void fetchLocal(`${SESSION_USAGE_URL}?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' })
@@ -88,6 +88,7 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
             ref={buttonRef}
             type="button"
             className={CCB_CLASS.statsPill}
+            style={{ anchorName } as AnchorStyles}
             aria-haspopup="dialog"
             aria-expanded={open}
             aria-label={t('stats.sessionCreditsAria', {
@@ -110,7 +111,7 @@ export function CodeBuddyCreditsStats({ t, sessionId, useChat }: CodeBuddyCredit
         ? createPortal(
           <CreditDialog
             panelRef={panelRef}
-            style={pos ?? MEASURE_STYLE}
+            anchorName={anchorName}
             ariaLabel={t('stats.sessionCreditsTitle')}
             title={t('stats.sessionCreditsTitle')}
             credit={usage.credit}
