@@ -5,7 +5,7 @@
 
 ## 设计目标
 
-1. **统一**：待办、便签、日程、专注、项目、笔记与审阅状态都是同一存储域里的对象，共享 id / 时间 / revision / 扩展位（笔记 / 审阅对象族的字段形态见下文）。
+1. **统一**：待办、便签、日程、专注、项目、批注状态都是同一存储域里的对象，共享 id / 时间 / revision / 扩展位（批注对象族的字段形态见下文）。
 2. **可扩展**：新增对象类型只加注册项，不改核心；新增字段进命名空间 `attrs`，不破坏旧数据。
 3. **可迁移**：对象自带 `schema` 版本，迁移函数顺序执行；未知字段原样保留（前向兼容）。
 4. **可同步**：外部对象是「镜像」，来源与版本显式记录；写回是显式动作。
@@ -15,9 +15,9 @@
 
 | 概念 | 说明 |
 | :--- | :--- |
-| **Node（对象）** | 一切可被引用、查询、链接的东西：任务、便签、分组、日程镜像、日历源、会话索引，以及笔记 / 审阅对象族（库配置、文件身份、批注草稿、审阅记录、轮次基线、审阅会话标记）。 |
+| **Node（对象）** | 一切可被引用、查询、链接的东西：任务、便签、分组、日程镜像、日历源、会话索引，以及批注对象族（库配置、文件身份、批注草稿、批注记录、轮次基线、批注会话标记）。 |
 | **Edge（关系）** | 类型化有向边，独立存储；关系不污染对象字段。`edges` 表已声明，当前功能尚未写入关系边（见〈模块协同〉）。 |
-| **View（视图）** | Node 的查询投影：任务板、便签墙、日程页、笔记库列表。视图不落库。 |
+| **View（视图）** | Node 的查询投影：任务板、便签墙、日程页、批注落地页。视图不落库。 |
 | **Provider（来源）** | 生成镜像 Node 的外部通道：企业微信 CalDAV / iCloud CalDAV / Outlook 个人 Microsoft Graph（`graph` 通道）/ 公开 ICS 订阅（`ics` 通道，含 Outlook 发布 ICS 历史兼容）/ 本地。 |
 | **Store（仓库）** | 单一持久化层 + 内存索引；所有写入走它，保证一致性与事件广播。`DeskStore` 是门面，按领域拆在 `host/store/`。 |
 
@@ -27,16 +27,15 @@
 /** 经典 desk 对象（payload 分层是目标形态；当前代码字段平铺，见下）。 */
 type DeskKind = 'task' | 'note' | 'event' | 'calendar' | 'focus' | 'project' | 'group'
 
-/** 笔记与审阅对象族（文件系统 / 审阅状态派生；当前代码已在 DeskNode 判别联合中）。 */
+/** 批注对象族（文件系统派生；当前代码已在 DeskNode 判别联合中）。 */
 type NotebookKind =
-  | 'notebook-config'  // 单个笔记库根配置（固定 id notebook_config）
-  | 'note-file'        // 文件身份：根 + 相对路径 + 内容 sha256（惰性分配）
+  | 'note-file'        // 文件身份：工作区根 + 相对路径 + 内容 sha256（惰性分配）
   | 'note-draft'       // 每个文件身份一条未提交批注草稿箱
-  | 'review-record'    // 每次提交一条审阅记录（会话 + 文件快照元信息 + 批注）
-  | 'note-baseline'    // 每个审阅会话一条本轮基线正文
-  | 'review-session'   // 每个审阅会话一条持久标记（侧栏图标 / 复用判定）
+  | 'review-record'    // 每次提交一条批注记录（会话 + 文件快照元信息 + 批注）
+  | 'note-baseline'    // 每个批注会话一条本轮基线正文
+  | 'review-session'   // 每个批注会话一条持久标记（侧栏图标 / 复用判定）
 
-/** 代码里的判别联合 = 经典 kind + 笔记/审阅 kind + 会话索引（见 contract.ts）。 */
+/** 代码里的判别联合 = 经典 kind + 批注 kind + 会话索引（见 contract.ts）。 */
 type DeskNodeKind = DeskKind | NotebookKind | 'session' | 'schedule-source'
 
 interface DeskNode {
@@ -57,7 +56,7 @@ interface DeskNode {
 }
 ```
 
-* **`payload` 按 `kind` 判别**，模块字段只放这里，核心字段保持稳定。笔记 / 审阅对象族不走 `payload` 分层：它们是**文件系统派生索引 + 审阅状态记录**，字段直接平铺在记录上（`id` / `kind` / `schema` + 各自字段），由 `src/notebook-contract.ts` 定义、`host/domain.ts` 校验。
+* **`payload` 按 `kind` 判别**，模块字段只放这里，核心字段保持稳定。批注对象族不走 `payload` 分层：它们是**文件系统派生索引 + 批注状态记录**，字段直接平铺在记录上（`id` / `kind` / `schema` + 各自字段），由 `src/notebook-contract.ts` 定义、`host/domain.ts` 校验。
 * **`attrs` 只放带命名空间的扩展**（如 `dsh.desk`、`memory`），模块只能写自己的命名空间。
 * **`deletedAt` 软删除**：外部删除、回收站、恢复都靠它；物理清理单独做。
 
@@ -162,24 +161,23 @@ interface ProjectPayload {
 > `group` 是独立 Node（kind `group`），分组名 / 泳道 / 顺序持久化在记录字段里；任务只存 `groupId`，改名是单条 group patch，空分组也能存在。
 > 关系一律走 Edge，不在 payload 里重复存 id；`FocusPayload.taskId` 只作渲染快照，权威关系是 `workedOn` 边（当前尚未写入）。
 
-### 笔记与审阅对象族（notebook kinds）
+### 批注对象族（annotation kinds）
 
-笔记库不是「再把文件复制进 nodes」：**文件系统是内容真值，nodes 只存配置、派生索引与审阅状态**。实现在 `src/notebook-contract.ts` + `src/host/notebook/` + `src/host/store/notebook.ts|review.ts`。
+工作区文件不是「再把文件复制进 nodes」：**文件系统是内容真值，nodes 只存文件身份、草稿、批注记录与基线**。实现在 `src/notebook-contract.ts` + `src/host/notebook/` + `src/host/store/notebook.ts|review.ts`。
 
 | kind | 一条记录代表 | 关键字段 | 上限 / 淘汰 |
 | :--- | :--- | :--- | :--- |
-| `notebook-config` | 单个笔记库根配置（固定 id `notebook_config`） | `rootPath`、`skillName?`（`null` = 明确不用技能；缺省也按不用） | 单条 |
-| `note-file` | 一个文件的**惰性身份**（首次审阅分配；改名按内容哈希重挂） | `rootPath`、`path`、`hash`(sha256) | 一个文件一条 |
+| `note-file` | 一个文件的**惰性身份**（首次批注分配；工作区根 + 相对路径 + 内容哈希；改名按哈希重挂） | `rootPath`、`path`、`hash`(sha256) | 一个文件一条 |
 | `note-draft` | 该文件的未提交批注草稿箱 | `fileId`、`drafts: DraftAnnotation[]` | 每箱 `NOTEBOOK_MAX_DRAFTS = 100` 条批注 |
-| `review-record` | 一次提交（一轮审阅），不存正文快照 | `sessionId`、`workspaceId?`、`fileId`、`fileTitle`、`pathSnapshot`、`annotations`、`bytes` | 按文件 / 会话查询；历史占用有阈值提示 |
-| `note-baseline` | 某一个**审阅会话**的本轮基线正文 | `sessionId`、`fileId`、`rootPath`、`body`、`at` | 正文 ≤ `NOTEBOOK_BASELINE_MAX_CHARS`（1 MiB）；最多 200 条按 `updatedAt` 淘汰；超限删宿主记录、只留内存基线 |
-| `review-session` | 某一个会话是「审阅会话」的持久标记 | `sessionId`、`workspaceId?`、`fileId?` | 最多 500 条按 `updatedAt` 淘汰（侧栏图标 / 复用判定） |
+| `review-record` | 一次提交（一轮批注），不存正文快照 | `sessionId`、`workspaceId?`、`fileId`、`fileTitle`、`pathSnapshot`、`annotations`、`bytes` | 按文件 / 会话查询；历史占用有阈值提示 |
+| `note-baseline` | 某一个**批注会话**的本轮基线正文 | `sessionId`、`fileId`、`rootPath`、`body`、`at` | 正文 ≤ `NOTEBOOK_BASELINE_MAX_CHARS`（1 MiB）；最多 200 条按 `updatedAt` 淘汰；超限删宿主记录、只留内存基线 |
+| `review-session` | 某一个会话是「批注会话」的持久标记 | `sessionId`、`workspaceId?`、`fileId?` | 最多 500 条按 `updatedAt` 淘汰（侧栏图标 / 复用判定） |
 
-* **正文不在 nodes 里**：阅读走 host 的只读 page 接口；写正文仍用 agent 的文件工具（Desk 工具不写笔记文件）。
-* **文件身份随内容走**：`note-file` 只存路径 + 内容哈希；文件改名后按哈希重关联（host 有候选数与时间预算上限），因此审阅记录 / 基线不会因改名而丢。
-* **草稿箱 = 文件级、非会话级**：同一文件在任意审阅会话里的未提交批注都落在同一 `note-draft`（带乐观并发 revision）；提交后清空。
-* **审阅历史是提交记录**：批注本身随会话消息走；`review-record` 只是「独立审阅对象」的历史留档（文件快照元信息 + 批注，不存被审正文）。
-* **迁移兼容**：早期「笔记库 + 批注线程」版本的 `annotation` / `review` 两个 kind 只保留 schema 解析，打开存储域时清理，不参与业务。
+* **正文不在 nodes 里**：阅读走 host 的只读 open 接口；写正文仍用 agent 的文件工具（Desk 工具不写工作区文件）。
+* **文件身份随内容走**：`note-file` 只存路径 + 内容哈希；文件改名后按哈希重关联（host 有候选数与时间预算上限），因此批注记录 / 基线不会因改名而丢。
+* **草稿箱 = 文件级、非会话级**：同一文件在任意批注会话里的未提交批注都落在同一 `note-draft`（带乐观并发 revision）；提交后清空。
+* **批注历史是提交记录**：批注本身随会话消息走；`review-record` 只是「独立批注对象」的历史留档（文件快照元信息 + 批注，不存被审正文）。
+* **迁移兼容**：早期「工作区文件 + 批注线程」版本的 `annotation` / `review` 两个 kind 只保留 schema 解析，打开存储域时清理，不参与业务；`notebook-config` 随笔记库一起删除，旧记录在域校验时被拒。
 
 ## Edge（关系）
 
@@ -222,7 +220,7 @@ interface DeskEdge {
 
 **note / event / calendar / project**：note 用 `trashed` 布尔（垃圾桶）；event 无用户状态（镜像同步状态在 `source.syncState`）；calendar 的同步状态在自身记录里（连接级），project 用 `archived`（未实现，命名待定）。
 
-**笔记 / 审阅对象族**：没有用户可见状态机——`note-file` 是惰性身份（改路径即更新）、`note-draft` 的「草稿 → 提交」由 `review-record` 留档、`note-baseline` 按审阅会话一条并在超限时淘汰、`review-session` 标记随会话存在。删除审阅记录是物理删除；笔记库「断开链接」只删 `notebook-config`，不删文件。
+**批注对象族**：没有用户可见状态机——`note-file` 是惰性身份（改路径即更新）、`note-draft` 的「草稿 → 提交」由 `review-record` 留档、`note-baseline` 按批注会话一条并在超限时淘汰、`review-session` 标记随会话存在。删除批注记录是物理删除；笔记库「断开链接」只删 `notebook-config`，不删文件。
 
 ## 时间模型
 
@@ -270,8 +268,7 @@ interface SourceRef {
 | 任务板 | 按 `status` 分组；一层分组按 `group` 记录在泳道块序列中穿插；排序视图（手动 / 创建 / 截止）是查询投影 |
 | 便签墙 | `note` 按 pinned、updatedAt 排序；坐标 / 尺寸 / 层级为可选字段，缺省时界面兜底 |
 | 日程 | 时间区间内的 `event`，按开始时间排序；按 `calendarNodeId` 关联来源与颜色；近期 / 日视图是同一查询的两种投影 |
-| 笔记库 | **派生视图**：扫描笔记库根目录得到的文件索引（标题 / 类型 / 日期 / 标签 / 缺元数据）+ 草稿箱 / 审阅记录计数；不落第二份正文 |
-| 搜索 | 笔记库内标题 / 路径 / 标签 / 元数据的 host 侧检索（已交付）；跨对象搜索未做（S3） |
+| 批注 | 落地页聚合：跨工作区的草稿箱、批注记录与 `review-session` 标记（按更新时间倒序，最近批注上限 20）；不做库内检索，跨对象搜索未做（S3） |
 
 ## API 面（host 服务，符号名待实现期对齐官方 seam）
 
@@ -319,18 +316,17 @@ interface DeskApi {
 | `desk_task_add` / `desk_task_list` / `desk_task_update` / `desk_task_complete` / `desk_task_archive` | 任务：新建 / 查询 / 更新（含状态与排序）/ 完成 / 存档或恢复 | 低 |
 | `desk_group_add` / `desk_group_list` / `desk_group_update` / `desk_group_move` / `desk_group_archive` / `desk_group_delete` | 分组：新建 / 查询 / 改名排序 / 整组移动 / 存档或恢复 / 删除 | 中（移动、存档、删除会影响组内卡片） |
 | `desk_schedule_list` / `desk_schedule_sync` / `desk_schedule_connections` | 日程镜像查询 / 手动同步 / 连接状态（只读，不写回） | 低 |
-| `desk_page_list` | 笔记库只读检索：标题 / 路径 / 标签 / 缺元数据 / 空笔记；返回相对 root 的路径与元信息 | 低 |
 
 * **一个工具一个动作**：工具名即意图（add / update / complete / move / archive / delete），不把语义不同的动作合并成通用 `save`；更新类工具要求显式 `expected_revision`。
-* **常驻可见（2026-11-14 决策）**：19 个工具保持每个请求全量可见，**不做** skill 激活式惰性加载。实测 wire schema 约 11.1k 字符（≈2.8–3.7k tokens/请求）；对比官方 `tool-office` 的「skill 加载后激活」模式，我们更重视发现性——用户随口说「记一下」时工具必须已经在上下文里；同时激活态会在 resume / fork / 热重载 / 子 agent 上引入额外状态机与「工具明明装了却不可见」的支持成本。工具面显著膨胀（>30 个）时再评估，届时候选是「只惰性化低频工具」而非全量。
-* **笔记页是文件系统对象**：`desk_page_list` 只做只读检索；正文读取与改稿仍用文件工具，Desk 工具不写笔记文件。
+* **常驻可见（2026-11-14 决策）**：18 个工具保持每个请求全量可见，**不做** skill 激活式惰性加载。实测 wire schema 约 11.1k 字符（≈2.8–3.7k tokens/请求）；对比官方 `tool-office` 的「skill 加载后激活」模式，我们更重视发现性——用户随口说「记一下」时工具必须已经在上下文里；同时激活态会在 resume / fork / 热重载 / 子 agent 上引入额外状态机与「工具明明装了却不可见」的支持成本。工具面显著膨胀（>30 个）时再评估，届时候选是「只惰性化低频工具」而非全量。
+* **工作区文件是文件系统对象**：批注工具不读写文件；正文读取与改稿仍用文件工具，Desk 工具不写工作区文件。
 * 写工具返回结构化结果 + 一句人类可读摘要；跨外部源的写操作必须带确认。
 * 工具与界面共用同一 Store API，禁止绕过 Store 直接写文件。
 
 ### 随包操作指南 skill
 
 插件随包注册一个 `desk-one` skill（来源 `bundled`，模型与 `/` 用户命令都可见，默认开启、无配置开关），
-内容只讲工具描述装不下的部分：对象选择（便签 / 任务 / 笔记页）、`list → id + revision → update` 顺序、
+内容只讲工具描述装不下的部分：对象选择（便签 / 任务 / 工作区文件）、`list → id + revision → update` 顺序、
 归档/删除的连带影响、日程只读、批注由人操作。
 
 技能服务是可选依赖（`ctx.inject(['skills'], …)`）：宿主没有该服务时不注册、工具照常可用；禁止直接读
@@ -343,9 +339,9 @@ interface DeskApi {
 * Node 校验（字段、kind/payload 匹配、时间区间合法性、calendar 唯一键）。
 * 状态机迁移（task / focus）。
 * 边唯一性与级联删除。
-* 视图查询（任务板 / 便签墙 / 日程 / 笔记库的定义）。
+* 视图查询（任务板 / 便签墙 / 日程 / 批注落地页的定义）。
 * 冲突判定（半开区间、时区、全天事件）。
 * schema 迁移与未知字段保留。
 * 同步 upsert 的唯一键与冲突策略；RRULE 窗口展开（EXDATE / RECURRENCE-ID / DST）；ICS / CalDAV / Graph 映射纯函数。
-* 笔记库纯逻辑：frontmatter 解析（title / type / date / tags）、库扫描过滤与上限、文件身份哈希与改名重挂、批注草稿合并、审阅记录 bytes 计算。
-* 审阅纯逻辑：行级 diff（前后缀裁剪 + 有界编辑搜索）、批注提交消息格式、会话复用选择（工作区 / 归档 / 轮数优先）、tab 参数恢复、每会话基线校验。
+* 批注纯逻辑：frontmatter 解析（title / type / date / tags）、路径安全与文件身份哈希、改名重挂、批注草稿合并、批注记录 bytes 计算。
+* 批注纯逻辑：行级 diff（前后缀裁剪 + 有界编辑搜索）、批注提交消息格式、会话复用选择（工作区 / 归档 / 轮数优先）、tab 参数恢复、每会话基线校验。

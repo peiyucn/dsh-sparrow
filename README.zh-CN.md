@@ -10,9 +10,9 @@
 
 `dsh plugin --profile web add @dsh-sparrow/dsh-desk-one`
 
-* **一张桌子，不是五个页面。** 便签、任务、日程、笔记审阅都在一个侧栏入口后面。
-* **和 DSH 一起。** 顶栏「和我说」把一句人话变成预填提示——便签、任务、笔记都可以直接说。
-* **AI 写、你审。** 把 DSH 工作区链接成笔记库：AI 在里面写，你在审阅会话里逐行批注。
+* **一张桌子，不是五个页面。** 便签、任务、日程、批注都在一个侧栏入口后面。
+* **和 DSH 一起。** 顶栏「和我说」把一句人话变成预填提示——便签、任务、批注都可以直接说。
+* **AI 写、你批注。** 工作区里的任意 Markdown / 文本文件都能直接打开：AI 在里面写，你在专用会话里逐行批注。
 
 [Desk One 文档](plugins/dsh-desk-one/README.zh-CN.md) · [插件市场](https://dsh.pyai.site/)
 
@@ -45,7 +45,7 @@ https://dsh.pyai.site/market/index.json
 | [dsh-chat-fim](plugins/dsh-chat-fim/README.zh-CN.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-chat-fim&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-chat-fim) | ![续写联想建议卡](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-chat-fim.png "ratio:0.18")<br>输入框续写联想：停顿后浮现一张建议卡、Tab 采纳；DeepSeek FIM（Beta）驱动，触发灵敏度三档，续写模型跟随主模型。 | `dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim` |
 | [dsh-codebuddy-credits](plugins/dsh-codebuddy-credits/README.zh-CN.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-codebuddy-credits&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-codebuddy-credits) | ![会话页额度入口与面板](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-codebuddy-credits.png "ratio:0.25")<br>公司 CodeBuddy 额度接成 DSH LLM provider：模型选择器里显示各模型的积分倍率、顶栏有额度面板、每轮显示消耗的积分。 | `dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits` |
 | [dsh-theme-tone](plugins/dsh-theme-tone/README.zh-CN.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-theme-tone&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-theme-tone) | ![深色主题](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png "ratio:0.5") ![浅色主题](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png "ratio:0.5")<br>在 DSH 内置的浅色与深色主题上各加几款色调皮肤（左深右浅），选了色调后还会一并优化对话区布局。 | `dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone` |
-| [dsh-desk-one](plugins/dsh-desk-one/README.zh-CN.md) | **同桌（Desk One）**——这张桌子：便签、任务、只读日程，以及 AI 写、你审的笔记，都在一个面板里。 | `dsh plugin --profile web add @dsh-sparrow/dsh-desk-one` |
+| [dsh-desk-one](plugins/dsh-desk-one/README.zh-CN.md) | **同桌（Desk One）**——这张桌子：便签、任务、只读日程，以及 AI 写、你批注的工作区文件，都在一个面板里。 | `dsh plugin --profile web add @dsh-sparrow/dsh-desk-one` |
 
 ## 已退役
 

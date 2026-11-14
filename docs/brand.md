@@ -42,9 +42,9 @@
 | M2 | hero 素材 ×5 | 1440×900（原始） | 合成 M1 用，不进仓库 |
 | M3 | 社交预览 | 1280×640 | GitHub Social preview（文字烘焙在图里） |
 
-- M2 清单（hero 素材）：便签墙 / 任务板 / 日程 / 笔记审阅（含批注）/ 对话里的「和我说」预填。
-- 构图优先级（2026-11-15 定）：笔记审阅（主面板）→ 任务板 → 日程聚合 → 便签墙 → 会话管理（浮层）；左侧五个功能标签保留。
-- 图片语言（2026-11-15 定）：中英同图（不是两套）；功能名用「中文 English」并列：笔记审阅 Notebook review / 任务板 Task board / 日程聚合 Schedule / 便签墙 Notes wall / 会话管理 Sessions。
+- M2 清单（hero 素材）：便签墙 / 任务板 / 日程 / 批注（落地页 + 批注视图）/ 对话里的「和我说」预填。
+- 构图优先级（2026-11-15 定）：批注（主面板）→ 任务板 → 日程聚合 → 便签墙 → 会话管理（浮层）；左侧五个功能标签保留。
+- 图片语言（2026-11-15 定）：中英同图（不是两套）；功能名用「中文 English」并列：批注 Annotations / 任务板 Task board / 日程聚合 Schedule / 便签墙 Notes wall / 会话管理 Sessions。
 - 演示数据：便签、任务、日程、会话标题一律用示例内容；**不得出现真实工作区名、路径、日历事件、会话标题**。
 - 拍摄：浏览器窗口 1440×900、缩放 100%；需要 2x 时用 200% 缩放截取后缩回 1440 宽。
 - 主题：只出深色（2026-11-15 定），README 不用 `<picture>` 切换。
@@ -105,7 +105,7 @@
 | 方案 | 中文 | 英文 |
 | --- | --- | --- |
 | A（延续现句） | 和 harness 共用的一张办公桌。 | One desk for you and harness. |
-| B（列产物） | 便签、任务、日程、笔记，一张桌子。 | Notes, tasks, schedule and notebook — one desk. |
+| B（列产物） | 便签、任务、日程、批注，一张桌子。 | Notes, tasks, schedule and annotations — one desk. |
 | C（说协作） | 你写，它算；一张桌子上一起干。 | You write, harness works — at one desk. |
 
 **已定：A。** 使用处：根 README 第一屏、插件 README、市场卡中文描述、GitHub description。
@@ -114,7 +114,7 @@
 
 1. 一张桌子，不是五个页面：一个侧栏入口，标签页切换。
 2. 和 DSH 一起：顶栏「和我说」把一句人话变成预填提示，便签、任务、笔记都能直接说。
-3. AI 写、你审：笔记库 = DSH 工作区，审阅会话里逐行批注，改动对基线。
+3. AI 写、你批注：工作区文件 + 专用批注会话，逐行批注，改动对基线。
 
 ### 5.3 三件小工具的分区标题
 
@@ -127,7 +127,7 @@
 
 ### 5.5 npm description（英文一句）
 
-`Desk One — a shared desk for you and your DSH harness: notes, tasks, a read-only calendar and AI-written notebook review in one panel.`
+`Desk One — a shared desk for you and your DSH harness: notes, tasks, a read-only calendar and annotations on workspace files in one panel.`
 
 ## 6 执行顺序
 

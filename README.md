@@ -10,9 +10,9 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 `dsh plugin --profile web add @dsh-sparrow/dsh-desk-one`
 
-* **One panel, not five pages.** Notes, tasks, schedule and notebook review live behind a single sidebar entry.
-* **Made for DSH.** The header's **Talk to Me** button turns a plain sentence into a prefilled prompt — notes, tasks and notebook pages can all be done by talking.
-* **AI writes, you review.** Link a DSH workspace as the notebook library: the AI writes there, you annotate exact lines in a review session.
+* **One panel, not five pages.** Notes, tasks, schedule and annotations live behind a single sidebar entry.
+* **Made for DSH.** The header's **Talk to Me** button turns a plain sentence into a prefilled prompt — notes, tasks and annotations can all be done by talking.
+* **AI writes, you annotate.** Open any Markdown / text file inside a DSH workspace: the AI writes there, you annotate exact lines in a dedicated session.
 
 [Desk One docs](plugins/dsh-desk-one/README.md) · [Plugin market](https://dsh.pyai.site/)
 
@@ -45,7 +45,7 @@ Paste it into **Discover → Add index source**. The market marks which versions
 | [dsh-chat-fim](plugins/dsh-chat-fim/README.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-chat-fim&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-chat-fim) | ![Fill-in-the-middle (FIM) suggestion card](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-chat-fim.png "ratio:0.18")<br>Chat input suggestions powered by DeepSeek FIM (Beta): pause to get a suggestion card, Tab adopts; three trigger-sensitivity levels; the completion model follows the main model. | `dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim` |
 | [dsh-codebuddy-credits](plugins/dsh-codebuddy-credits/README.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-codebuddy-credits&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-codebuddy-credits) | ![Credits entry and quota panel on the session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-codebuddy-credits.png "ratio:0.25")<br>Company CodeBuddy credits as a DSH LLM provider: each model's credit rate in the model picker, a quota panel in the header, and per-turn credits. | `dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits` |
 | [dsh-theme-tone](plugins/dsh-theme-tone/README.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-theme-tone&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-theme-tone) | ![Dark theme](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png "ratio:0.5") ![Light theme](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png "ratio:0.5")<br>Tone skins for DSH's built-in light and dark themes (dark on the left, light on the right), plus conversation-area layout tuning once a tone is picked. | `dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone` |
-| [dsh-desk-one](plugins/dsh-desk-one/README.md) | **Desk One** — the desk: notes, tasks, a read-only calendar and AI-written notebook review in one panel. | `dsh plugin --profile web add @dsh-sparrow/dsh-desk-one` |
+| [dsh-desk-one](plugins/dsh-desk-one/README.md) | **Desk One** — the desk: notes, tasks, a read-only calendar and annotations on workspace files in one panel. | `dsh plugin --profile web add @dsh-sparrow/dsh-desk-one` |
 
 ## Retired
 
