@@ -22,9 +22,9 @@
 | --- | --- | --- | --- | --- | --- |
 | B1 | 标志（透明） | `resources/brand/desk-one-mark.svg` | 24 viewBox；品牌蓝 `#4176E6`、墨色两版 | README、市场、社交图 | 待制作 |
 | B2 | 应用图标 | `plugins/dsh-desk-one/icon.svg` | 512×512，圆角 22%，方底反白 | 插件管理器、市场卡 | **已定 B（方底反白）**，已入包 |
-| B3 | 社交预览 | `resources/brand/social-preview.png` | 1280×640 | GitHub Social preview | 待制作（依赖 M2） |
-| B4 | README 首图 | `resources/brand/desk-one-hero.svg` | 1600×900 | 根 README、插件 README 第一屏 | 待制作（由 M1 合成） |
-| B5 | 截图 ×5 | `resources/dsh-desk-one-0N-*.png` | 1440×900 | README、市场详情 | 待 GUI 验收 |
+| B3 | 社交预览 | `resources/brand/social-preview.png` | 1280×640 | GitHub Social preview | 待制作（依赖真实截图） |
+| B4 | README 首图 | `resources/dsh-desk-one-hero.png` | 1600×900 | 根 README、插件 README 第一屏 | 占位已生成，待同名替换 |
+| B5 | 截图 ×5 | `resources/dsh-desk-one-0N-*.png` | 1440×900 | README、市场详情 | 占位已生成 ×5，待同名替换 |
 | B6 | 演示 GIF | `resources/dsh-desk-one-demo.gif` | ≤5 MB，可选 | README | 可选 |
 | B7 | 徽章 | README 内联 | DSH 版本（静态）、License、CI；npm 版本与下载首发后加 | 根与插件 README | 待制作 |
 
