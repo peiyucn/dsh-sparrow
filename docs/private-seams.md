@@ -4,12 +4,11 @@
 > 旧实现里的私有 seam 与破例**全部退出**：`src/mask.ts`（遮罩模糊恢复）、`src/popover.ts`（弹层列内夹取）、
 > `src/handle-glow.ts`（拖拽条光带跟随）、`src/sweep.ts`（扫光带）、`src/caption.ts`（桌面标题栏 overlay）、
 > `src/surface.ts`（浮层光层与悬停卡字色）、`src/anchors.ts`（运行期锚点扫描）、`src/phase.ts`（视口相位测量）
-> 均已删除。当前 theme-tone 只剩**一处**私有 seam：左边栏 Workspace hover 卡的牌面修复（2026-10-27 新增）
-> —— dsh 0.2.2 起 HoverCard 先挂一个 `display: contents` 的 portal 包装节点再 portal 卡（卡不再是 body
-> 直接子节点），锚点改为 `body > [class*='_portal'] [role="button"][aria-label]`；字色按官方 CSS-module
-> 类名后缀（`_hoverTitle` / `_hoverPath` / `_hoverTime` / `_hoverStatus` / `_copied`）命中；官方改包装或改后缀
-> 即静默失效（回退成官方写死的白系字，不崩）。其余仍只用 `ctx.theme` 的 token 覆盖通道与官方公开 data 属性。
-> 下文涉及 theme-tone 的旧条目保留为历史记录，不再对应当前代码。
+> 均已删除。当前 theme-tone **已无私有 seam**：左边栏 Workspace hover 卡的牌面修复曾依赖官方 CSS-module
+> 类名后缀（`_hoverTitle` / `_hoverPath` / `_hoverTime` / `_hoverStatus` / `_copied`）命中字色，官方
+> `dsh 0.2.2-rc.3` 起悬停卡改吃 `--dsw-alias-hovercard-*` 设计 token，本插件改为在卡根覆盖这四个官方
+> token，类名后缀依赖随之删除（`docs/upstream/0.2.2-rc.3.md` §3）。其余仍只用 `ctx.theme` 的 token
+> 覆盖通道与官方公开 data 属性。下文涉及 theme-tone 的旧条目保留为历史记录，不再对应当前代码。
 
 > 本文件**只登记"欠官方的债"**——需要 owner 认可的例外。三类：
 > **A 私有 seam**（官方无公开能力）、**B 刻意改官方默认外观**、**C 无门可拦的静默失效风险**。
@@ -22,9 +21,10 @@
 > （方法与口径见 [`docs/upstream/0.2.0-rc.1.md`](upstream/0.2.0-rc.1.md) §4.1）。
 > 理由：手工清单已证会漂——0.2.0-rc.1 审计时发现它漏列了三处一直在用的锚点。
 >
-> 最近一次跟版复核：dsh `0.2.2-rc.1`（2026-11-05）。本次复核了 theme-tone 悬停卡锚点（HoverCard 改为
-> portal 包装节点）与 theme-tone 的 token 删除（`--dsw-specific-sidebar-nav-item-hover` 在 0.2.2 移除）；
-> 其余条目的“存续”以各插件源码为准，证据与边界见 [`docs/upstream/0.2.2-rc.1.md`](upstream/0.2.2-rc.1.md)。
+> 最近一次跟版复核：dsh `0.2.2-rc.3`（2026-11-14）。本次复核收缩了一条长期静默失效风险：
+> theme-tone 悬停卡的字色改为覆盖官方 `--dsw-alias-hovercard-*` token（不再依赖 hashed 类名后缀），
+> 该插件**已无私有 seam**；其余条目的“存续”以各插件源码为准，证据与边界见
+> [`docs/upstream/0.2.2-rc.3.md`](upstream/0.2.2-rc.3.md)。
 
 ---
 
@@ -140,6 +140,7 @@
 
 * **`dsh-theme-tone`** —— 仓库规矩是「不依赖 hashed CSS-module 类名」，以下四处**例外**，
   且测试**抓不到官方重命名后缀**：  1. **悬停卡字色**（`src/surfaces.ts` 的 `TITLE` / `SECONDARY` / `TERTIARY` / `COPIED`）：`body > [class*='_portal'] [role='button'][aria-label] [class*='_hoverTitle'|'_hoverPath'|'_hoverTime'|'_hoverStatus'|'_copied']`（0.2.2 起多一层 portal 包装节点）
+     —— **2026-11-14 已收缩**（dsh 0.2.2-rc.3）：官方悬停卡改吃 `--dsw-alias-hovercard-*` 设计 token，现改为在卡根覆盖官方 token，不再依赖类名后缀；本条保留为历史记录。
   2. **扫光带**（`SWEEP_ANCHORS`，`src/sweep.ts`）：`[class*='_row']::after` —— **已收窄**：必须同时带
      `data-variant` / `data-tool` 才命中（`test/sweep.test.mjs` 钉住不得回退）
   3. **弹窗遮罩**（`MASK_SELECTOR`，`src/mask.ts`）：`[class*='_mask']`（官方三个遮罩 `Modal` /

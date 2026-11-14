@@ -2,6 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## [0.2.2-rc.3] - 2026-11-14
+
+- Adapted to official dsh 0.2.2-rc.3 (web and desktop): the workspace hover card now follows the official hovercard design tokens, so the selected tone keeps its surface and label colors on both themes; no other visual changes intended.
+
 ## [0.2.2-rc.1] - 2026-11-05
 
 - Adapted to official dsh 0.2.2-rc.1 (web and desktop): no new features; the look stays as before (composer frosted glass, transcript scrolling underneath, footer cover strips blending with the page light, one continuous right-sidebar header).

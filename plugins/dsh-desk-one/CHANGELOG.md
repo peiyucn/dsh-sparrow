@@ -4,7 +4,7 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 All notable changes to `dsh-desk-one` are documented here. The format follows Keep a Changelog and the version numbers mirror the official DSH release line.
 
-## [Unreleased]
+## [0.2.2-rc.3] - 2026-11-14
 
 * **Review tab restore**: opening an old review session directly now restores the note in the「笔记审阅」tab (the official sidebar restores the tab layout but not its navigation params) instead of showing “no file specified”.
 
