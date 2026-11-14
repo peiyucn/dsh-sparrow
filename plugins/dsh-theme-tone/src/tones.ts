@@ -105,7 +105,7 @@ export const SURFACE_RUNGS: Readonly<Record<ColorScheme, Readonly<Record<Surface
  * 「弹出来的框」落在哪几个官方 token 上：`--dsw-alias-bg-layer-1/2/3` 与 `--dsw-specific-input-major`（**问询卡片**用的那个，
  * 归 `layer2` —— 官方把两个 token 绑在同一个 static 变量上）；**有意不染**工具提示 / 轻提示 / 对比按钮底（两轴都是**反色**）。
  * 悬停卡不走这里：官方 rc.3 起吃 `--dsw-alias-hovercard-*`，由 `surfaces.ts` 在卡根覆盖（卡根定位仍依赖官方 portal
- * 的 hashed 类名，见 docs/private-seams.md §D）。
+ * 的 hashed 类名，见 docs/private-seams.md §C）。
  */
 export const SURFACE_TOKENS: readonly Readonly<{ token: string; rung: SurfaceRung }>[] = Object.freeze([
   Object.freeze({ token: '--dsw-alias-bg-layer-1', rung: 'layer1' as const }),
