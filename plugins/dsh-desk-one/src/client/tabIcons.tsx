@@ -12,7 +12,7 @@ import {
   IconChecklistOutlineRegular,
   IconEditOutlineRegular,
   IconListPenOutlineRegular,
-  IconNewChatOutlineRegular,
+  IconQueueOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Tab } from './app/types.js'
 import { PANEL_TAB_ATTRIBUTE } from './app/panelReset.js'
@@ -40,7 +40,9 @@ const GLYPHS: Record<Tab, OfficialIcon> = {
   notebook: IconListPenOutlineRegular,
   notes: IconEditOutlineRegular,
   tasks: IconChecklistOutlineRegular,
-  sessions: IconNewChatOutlineRegular,
+  // The official "session list" glyph (speech bubble with lines; the official empty-session state
+  // uses it). NOT the new-chat glyph, which belongs to the official New Session action.
+  sessions: IconQueueOutlineRegular,
 }
 
 /** Header tab-strip glyph (decorative; the tab label carries the accessible name). */

@@ -34,4 +34,6 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 * **Pinned sidebar shortcuts**: clicking a pinned shortcut (for example Sessions) now always returns to that tab, even after switching tabs inside its panel.
 
+* **Sessions tab icon**: the Sessions tab and its pinned sidebar entry use the official session-list glyph (a speech bubble with two lines) instead of the official New Session icon, so the two no longer look alike.
+
 * **Known limits**: the schedule is read-only (no local event creation, no write-back, and no publishing your own calendar as an iCalendar feed; subscribing to external ICS links is supported). Focus sessions, cross-object search, data export / import and richer task fields are planned in the repository spec.
