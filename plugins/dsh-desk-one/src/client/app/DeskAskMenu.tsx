@@ -1,9 +1,9 @@
 /**
  * Header brand control: the inverted 「✦」 Desk One lockup and the line-framed 「和我说」 segment are
- * one split button. Its menu is a short list of **sentences the user can send as-is** — each row is
- * a complete, scoped request ("帮我…") rather than an action label; picking one opens (or reuses) the
- * Workspace blank Session with that exact sentence prepended to the composer. It never sends, and at
- * most two rows per tab keeps the menu scannable.
+ * one split button. Its menu rows are **short human phrases** (what you'd say out loud); picking one
+ * opens (or reuses) the Workspace blank Session and prefills the matching complete request — the
+ * visible phrase is the label, the hidden half carries the scope and boundaries. It never sends, and
+ * at most two rows per tab keeps the menu scannable.
  */
 
 import { useState } from 'react'
@@ -15,35 +15,37 @@ import type { DeskTranslator, Tab } from './types.js'
 
 interface AskEntry {
   readonly id: string
-  /** One complete sentence: shown as the menu row and prefilled verbatim into the composer. */
-  readonly text: DeskLocaleKey
+  /** Short human phrase shown as the menu row. */
+  readonly label: DeskLocaleKey
+  /** Complete request prefilled into the composer; may carry scope and boundaries. */
+  readonly prompt: DeskLocaleKey
 }
 
 const ASK_ENTRIES: Readonly<Record<Tab, readonly AskEntry[]>> = {
-  // Notes: merge duplicate wording, then pick out notes that no longer matter.
+  // Notes: deduplicate wording, or promote the follow-ups into tasks.
   notes: [
-    { id: 'note-clarify', text: 'coauthor.prompt.noteClarify' },
-    { id: 'note-cleanup', text: 'coauthor.prompt.noteCleanup' },
+    { id: 'note-merge', label: 'coauthor.menu.noteMerge', prompt: 'coauthor.prompt.noteMerge' },
+    { id: 'note-to-task', label: 'coauthor.menu.noteToTask', prompt: 'coauthor.prompt.noteToTask' },
   ],
   // Tasks: pull work in from the two sources that most often turn into tasks.
   tasks: [
-    { id: 'task-from-schedule', text: 'coauthor.prompt.taskFromSchedule' },
-    { id: 'task-from-notes', text: 'coauthor.prompt.taskFromNotes' },
+    { id: 'task-from-schedule', label: 'coauthor.menu.taskFromSchedule', prompt: 'coauthor.prompt.taskFromSchedule' },
+    { id: 'task-from-notes', label: 'coauthor.menu.taskFromNotes', prompt: 'coauthor.prompt.taskFromNotes' },
   ],
-  // Notebook: audit the library, then turn keeper notes into a page.
+  // Notebook: surface this week's high-value pages, or turn keeper notes into a page.
   notebook: [
-    { id: 'notebook-audit', text: 'coauthor.prompt.notebookAudit' },
-    { id: 'notebook-from-notes', text: 'coauthor.prompt.notebookFromNotes' },
+    { id: 'notebook-highlights', label: 'coauthor.menu.notebookHighlights', prompt: 'coauthor.prompt.notebookHighlights' },
+    { id: 'notebook-from-notes', label: 'coauthor.menu.notebookFromNotes', prompt: 'coauthor.prompt.notebookFromNotes' },
   ],
   // Schedule is a read-only mirror: read-only questions only.
   schedule: [
-    { id: 'schedule-today', text: 'coauthor.prompt.scheduleToday' },
-    { id: 'schedule-week', text: 'coauthor.prompt.scheduleWeek' },
+    { id: 'schedule-today', label: 'coauthor.menu.scheduleToday', prompt: 'coauthor.prompt.scheduleToday' },
+    { id: 'schedule-week', label: 'coauthor.menu.scheduleWeek', prompt: 'coauthor.prompt.scheduleWeek' },
   ],
   // Session management is administrative: read-only analysis only.
   sessions: [
-    { id: 'sessions-duplicates', text: 'coauthor.prompt.sessionsDuplicates' },
-    { id: 'sessions-review', text: 'coauthor.prompt.sessionsReview' },
+    { id: 'sessions-archive', label: 'coauthor.menu.sessionsArchive', prompt: 'coauthor.prompt.sessionsArchive' },
+    { id: 'sessions-review', label: 'coauthor.menu.sessionsReview', prompt: 'coauthor.prompt.sessionsReview' },
   ],
 }
 
@@ -84,10 +86,10 @@ export function DeskAskMenu({ t, tab, onAskDesk }: {
           key={entry.id}
           onSelect={() => {
             setOpen(false)
-            onAskDesk(t(entry.text))
+            onAskDesk(t(entry.prompt))
           }}
         >
-          {t(entry.text)}
+          {t(entry.label)}
         </MenuItemButton>
       ))}
     </Menu>
