@@ -262,7 +262,6 @@ export function DeskOnePage(props: DeskPanelProps) {
               groupsData={groupsData}
               board={board}
               sessionLink={sessionLink}
-              onAskDesk={() => askDesk(t('coauthor.prompt.taskAdd'))}
             />
           )}
       </div>

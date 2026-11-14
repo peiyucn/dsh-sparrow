@@ -40,6 +40,7 @@
 | 便签墙空态 · 主提示 | `wall.tip` | 双击空白处新建便签 | Double-click empty space |
 | 便签墙空态 · 副提示 | `wall.tipAlt` | 或点击顶栏「+便签」，也可以直接对我说 | or click "+ Note" in the top bar, or just tell me |
 | 便签墙空态 · 按钮 | `wall.askDesk` | 「帮我记一条便签…」 | "Note this down: …" |
-| 任务空泳道 · 文字 | `task.emptyLane` | 暂无任务 | No tasks |
-| 任务空待办列 · 按钮（只在待办列出现） | `task.askDesk` | 「帮我加一个任务…」 | "Add a task: …" |
+| 任务 · 进行中 / 完成 空列 | `task.emptyLane` | 暂无任务 | No tasks |
+| 任务 · 待办空列 主提示 | `task.emptyTip` | 双击空白处新建任务 | Double-click empty space |
+| 任务 · 待办空列 副提示 | `task.emptyTipAlt` | 或点击顶栏「+任务」，也可以直接对我说 | or click "+ Task" in the top bar, or just tell me |
 | 笔记库未链接说明 | `notebook.welcomeBody` | 笔记库 = DSH 工作区，你审阅批注，其余的交给 harness。也可以直接对我说「帮我新建一篇笔记…」。 | The library = a DSH workspace: you review and annotate, harness handles the rest. You can also just tell me "start a new note…". |

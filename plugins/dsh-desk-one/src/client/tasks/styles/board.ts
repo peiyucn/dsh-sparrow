@@ -177,4 +177,18 @@ export const TASK_BOARD_CSS = `
   line-height: 18px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
+/* Empty To-do lane: the notes-wall teaching copy, as plain text — no click action. */
+.dsh-task-empty-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dsh-task-empty-main {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-task-empty-sub {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-caption, #8a919f);
+}
 `

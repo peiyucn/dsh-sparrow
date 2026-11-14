@@ -160,22 +160,6 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 .dsh-desk-brand-ask:hover .dsh-desk-brand-ask-action {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
 }
-/* Inline prompt-style action inside an empty state (empty To-do lane). */
-.dsh-desk-ask-link {
-  appearance: none;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--dsw-alias-state-business-primary, #4176e6);
-  font: inherit;
-  cursor: pointer;
-}
-.dsh-desk-ask-link:hover {
-  text-decoration: underline;
-}
-.dsh-task-empty .dsh-desk-ask-link {
-  margin-left: 8px;
-}
 .dsh-desk-intro-tooltip {
   box-sizing: border-box;
   max-width: 300px;

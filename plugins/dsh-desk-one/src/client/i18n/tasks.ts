@@ -2,7 +2,6 @@
 
 export const zh = {
   'task.add': '任务',
-  'task.askDesk': '「帮我加一个任务…」',
   'task.archive': '存档',
   'task.archiveEmpty': '存档区是空的',
   'task.backToBoard': '返回任务板',
@@ -15,6 +14,8 @@ export const zh = {
   'task.deleteConfirm': '确认删除',
   'task.due': '截止',
   'task.emptyLane': '暂无任务',
+  'task.emptyTip': '双击空白处新建任务',
+  'task.emptyTipAlt': '或点击顶栏「+任务」，也可以直接对我说',
   'task.expand': '展开完成列',
   'task.group.add': '新建分组',
   'task.group.archive': '存档分组',
@@ -65,7 +66,6 @@ export const zh = {
 /** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
 export const en = {
   'task.add': 'Task',
-  'task.askDesk': '"Add a task: …"',
   'task.archive': 'Archived',
   'task.archiveEmpty': 'No archived tasks',
   'task.backToBoard': 'Back to board',
@@ -78,6 +78,8 @@ export const en = {
   'task.deleteConfirm': 'Confirm delete',
   'task.due': 'Due',
   'task.emptyLane': 'No tasks',
+  'task.emptyTip': 'Double-click empty space',
+  'task.emptyTipAlt': 'or click "+ Task" in the top bar, or just tell me',
   'task.expand': 'Expand done',
   'task.group.add': 'New group',
   'task.group.archive': 'Archive group',
