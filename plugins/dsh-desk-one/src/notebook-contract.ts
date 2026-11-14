@@ -294,3 +294,28 @@ export interface ReviewHistoryResponse {
 export interface DeleteReviewRequest {
   readonly id: string
 }
+
+/** One file row on the annotation landing page. */
+export interface NotebookSummaryRow {
+  /** Stable key for React lists. */
+  readonly key: string
+  /** File identity (absent when a marker cannot resolve one). */
+  readonly fileId?: string
+  /** Workspace-relative path (absent when it cannot be resolved). */
+  readonly path?: string
+  /** Display title derived from the file name (records keep their submitted title). */
+  readonly title: string
+  readonly workspaceId?: string
+  readonly workspaceTitle?: string
+  /** Last activity: draft update, record submit, or review-session update. */
+  readonly updatedAt: string
+  /** Pending annotations (drafts) or submitted annotations (records); 0 for reviews. */
+  readonly count: number
+}
+
+/** The three aggregate lists of the annotation landing page (no library root involved). */
+export interface NotebookSummaryResponse {
+  readonly drafts: readonly NotebookSummaryRow[]
+  readonly records: readonly NotebookSummaryRow[]
+  readonly recent: readonly NotebookSummaryRow[]
+}

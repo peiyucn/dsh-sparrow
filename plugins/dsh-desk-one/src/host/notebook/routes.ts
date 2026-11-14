@@ -10,6 +10,7 @@ import type {
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
 import type { DeskRouteContext, DeskRouteEntry } from '../router.js'
 import { workspaceRootOf } from './workspace-root.js'
+import { buildSummary } from './summary.js'
 
 /** Notebook host or an unavailable error. */
 function notebookOf(route: DeskRouteContext) {
@@ -111,6 +112,11 @@ async function openByIdRoute(route: DeskRouteContext, req: IncomingMessage, res:
   const fileId = url.searchParams.get('fileId') ?? ''
   if (fileId === '') throw new DeskError('BAD_BODY', '缺少 fileId')
   sendJson(res, 200, await notebookOf(route).openById(fileId))
+}
+
+/** Landing page data: drafts, submitted records, and recent reviews, newest first. */
+async function summaryRoute(route: DeskRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
+  sendJson(res, 200, buildSummary(route.store, route.ctx.workspaceRegistry))
 }
 
 async function createRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -241,6 +247,7 @@ export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'POST', path: ROUTES.notebookFile, handle: fileRoute },
   { method: 'POST', path: ROUTES.notebookOpen, handle: openRoute },
   { method: 'GET', path: ROUTES.notebookOpenById, handle: openByIdRoute },
+  { method: 'GET', path: ROUTES.notebookSummary, handle: summaryRoute },
   { method: 'POST', path: ROUTES.notebookCreate, handle: createRoute },
   { method: 'GET', path: ROUTES.notebookReviewSessions, handle: reviewSessionsGetRoute },
   { method: 'POST', path: ROUTES.notebookReviewSessions, handle: reviewSessionMarkRoute },
