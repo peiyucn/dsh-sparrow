@@ -38,4 +38,6 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 * **Sessions tab icon**: the Sessions tab and its pinned sidebar entry use the official session-list glyph (a speech bubble with two lines) instead of the official New Session icon, so the two no longer look alike.
 
+* **Desk One mark**: the sidebar entry and the header badge now use a **「✦」 mark** (an upper-left 「 and a lower-right 」 corner frame around a spark) instead of a rounded square, matching the star cue of the **Talk to DSH** entry.
+
 * **Known limits**: the schedule is read-only (no local event creation, no write-back, and no publishing your own calendar as an iCalendar feed; subscribing to external ICS links is supported). Focus sessions, cross-object search, data export / import and richer task fields are planned in the repository spec.

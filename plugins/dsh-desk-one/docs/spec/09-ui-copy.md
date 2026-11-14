@@ -15,11 +15,11 @@
 
 | 场景 | key | 现在中文 | 现在英文 | 反馈 |
 |---|---|---|---|---|
-| 页头入口按钮（所有 tab 常驻） | `coauthor.entry` | 和 DSH 说 | Talk to DSH | |
+| 页头入口按钮（所有 tab 常驻）    | `coauthor.entry`        | 和 DSH 说                                           | Talk to DSH                                                                                                                        | 能否和logo结合一下，logo本身就是一个按钮，[「✦」同桌\|和我说 ]，按钮前半部分不变，后半部分是白线框，不填充背景，就是反色一下。 |
 | 页头副标题（原有） | `page.subtitle` | 与 harness 共用的一张办公桌 | One desk for you and harness | |
 | info 按钮的无障碍名 | `page.introLabel` | 关于同桌 | About Desk One | |
-| info 浮层首段（原有 slogan） | `page.introDetail` | 碳硅同席：两种生命，一张桌子。你出灵感，harness 出算力；便签、任务、会话与日程，一起完成。 | Carbon and silicon, one desk. You bring the spark, harness brings the compute; notes, tasks, sessions and schedule, done together. | |
-| info 浮层「两种用法」 | `coauthor.introUsage` | 两种用法：自己点，或者直接对我说。 | Two ways: click it yourself, or just tell me. | |
+| info 浮层首段（原有 slogan） | `page.introDetail`      | 碳硅同席：两种生命，一张桌子。你出灵感，harness 出算力；便签、任务、会话与日程，一起完成。 | Carbon and silicon, one desk. You bring the spark, harness brings the compute; notes, tasks, sessions and schedule, done together. | 算力是用户出的……哈哈，得优化一下用词。                                                   |
+| info 浮层「两种用法」        | `coauthor.introUsage`   | 两种用法：自己点，或者直接对我说。                                 | Two ways: click it yourself, or just tell me.                                                                                      | 自己操作，或者直接对我说。                                                          |
 | info 示例 ① | `coauthor.example.note` | 「帮我记一条便签：…」 | "Note this down: …" | |
 | info 示例 ② | `coauthor.example.task` | 「帮我加一个任务：…」 | "Add a task: …" | |
 | info 示例 ③ | `coauthor.example.plan` | 「整理一下我今天的安排。」 | "Sort out my plan for today." | |
@@ -45,8 +45,8 @@
 | 场景 | key | 现在中文 | 现在英文 | 反馈 |
 |---|---|---|---|---|
 | 便签墙空态 · 主提示（原有） | `wall.tip` | 双击空白处新建便签 | Double-click empty space | |
-| 便签墙空态 · 副提示（本次改） | `wall.tipAlt` | 或点顶栏的 + 号；也可以直接对我说 | or click + in the top bar; or just tell DSH | |
-| 便签墙空态 · 按钮（本次新增） | `wall.askDesk` | 让 DSH 记一条 | Let DSH note it | |
+| 便签墙空态 · 副提示（本次改）         | `wall.tipAlt`          | 或点顶栏的 + 号；也可以直接对我说                                   | or click + in the top bar; or just tell DSH                                                                                  | 或点击顶栏「+便签」，也可以直接对我说 |
+| 便签墙空态 · 按钮（本次新增）         | `wall.askDesk`         | 让 DSH 记一条                                            | Let DSH note it                                                                                                              |    |
 | 任务空泳道 · 文字（原有） | `task.emptyLane` | 暂无任务 | No tasks | |
 | 任务空板 · 按钮（本次新增，仅整板为空时出现） | `task.askDesk` | 让 DSH 建任务 | Let DSH add a task | |
 | 笔记库未链接说明（尾部为本次新增句） | `notebook.welcomeBody` | 笔记库就是一个 DSH 工作区目录：AI 在里面写，你在这里审。也可以直接对我说「帮我新建一篇笔记…」。 | The library is a DSH workspace folder: the AI writes there, you review here. You can also just tell DSH "start a new note…". | |
@@ -58,7 +58,7 @@
 | 编号 | 事项 | 选项 | 当前倾向 | 反馈 |
 |---|---|---|---|---|
 | P1 | info 小标位置 | A 身份左、工具右｜B info 贴标题、入口靠右｜C 去掉 info 并入菜单 | B（info 回标题旁，「和 DSH 说」靠右、在页面动作左侧） | |
-| P2 | 入口是否保留「✦」符号 | 保留 / 去掉 | 保留（与「AI 入口」的视觉线索一致） | |
+| P2 | 入口是否保留「✦」符号 | 保留 / 去掉 | 保留（logo 徽标已改为「✦」引号框字形，入口星形与品牌线索一致） | |
 | P3 | 窄面板下入口表现 | 文字 + 图标 / 仅图标（tooltip 补文字） | 仅图标（需补一条容器查询，待实现） | |
 
 ## 5. 定稿后的动作（本节最终删除）
