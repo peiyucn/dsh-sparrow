@@ -1,6 +1,12 @@
-# dsh-desk-one
+# Desk One (同桌)
 
 English | [简体中文](README.zh-CN.md)
+
+**One desk for you and harness.**
+
+![Desk One hero](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-desk-one-hero.png)
+
+`dsh plugin --profile web add @dsh-sparrow/dsh-desk-one`
 
 **Desk One (同桌)** — a shared desk for you and harness inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. Notebook review, notes, tasks, schedule and agent sessions live side by side; the schedule aggregates WeCom / iCloud / personal Outlook calendars (read-only). The header's split **「✦」 Desk One｜Talk to Me** button sends a tab-aware prefilled prompt into the conversation; the empty notes wall offers a "note this down…" entry, and the empty To-do lane repeats the same wording as plain text, with no click action. The "…" menu at the end of the tab strip also has **Make a wish**: describe a feature and it becomes a GitHub issue draft.
 

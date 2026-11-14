@@ -1,6 +1,12 @@
-# dsh-desk-one
+# 同桌（Desk One）
 
 [English](README.md) | 简体中文
+
+**和 harness 共用的一张办公桌。**
+
+![Desk One 主视觉](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-desk-one-hero.png)
+
+`dsh plugin --profile web add @dsh-sparrow/dsh-desk-one`
 
 **同桌**（Desk One）—— DSH Web 里与 harness 共用的办公桌：一个左侧栏入口、一块面板、一套统一对象模型，每个标签都建在同一套数据上。笔记审阅、便签、任务板、日程与 agent 会话收在同一处，日程可聚合企业微信 / iCloud / Outlook 个人日历（只读）。页头品牌位是一枚「✦」同桌｜「和我说」分段按钮，把按当前页面预填好的提示送进对话；便签墙空态有「帮我记一条便签…」入口，任务待办空列用同一套句式写成纯文本引导（不加点击动作）。tab 行末尾的「…」菜单里还有「许个愿」：想去 GitHub 提需求，先说一句，我帮你整理成 issue 草稿。
 
