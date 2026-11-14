@@ -96,4 +96,26 @@ describe('notebook files', () => {
       await rm(outside, { recursive: true, force: true })
     }
   })
+
+  it('createNoteFile：folder 指向库外的符号链接 / 目录联接时拒绝写入（与读取同语义）', async (t) => {
+    const outside = await mkdtemp(join(tmpdir(), 'desk-one-outside-create-'))
+    try {
+      try {
+        await symlink(outside, join(root, 'link-create'), 'junction')
+      } catch (error) {
+        t.skip(`当前环境不能创建符号链接/目录联接：${String(error)}`)
+        return
+      }
+      await assert.rejects(createNoteFile(root, { title: '逃逸', folder: 'link-create' }), (/** @type {any} */ error) => {
+        assert.equal(error.code, 'FORBIDDEN')
+        assert.equal(error.status, 403)
+        return true
+      })
+      // Nothing was created outside the library.
+      const leaked = await readFile(join(outside, '逃逸.md'), 'utf8').catch(() => null)
+      assert.equal(leaked, null)
+    } finally {
+      await rm(outside, { recursive: true, force: true })
+    }
+  })
 })

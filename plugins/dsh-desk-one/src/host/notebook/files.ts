@@ -4,7 +4,7 @@
 
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { NOTEBOOK_MAX_BYTES } from '../../constants.js'
 import { DeskError } from '../http.js'
 import type { DeskStore } from '../store.js'
@@ -77,6 +77,36 @@ export async function detectNote2md(rootPath: string): Promise<boolean> {
   }
 }
 
+/**
+ * Resolve the nearest existing ancestor of one write target and require it (and therefore the
+ * target) to stay inside the library root. Creation must not write through a symlinked folder that
+ * points outside the library; missing intermediate folders are created by the caller afterwards.
+ * @param rootPath - absolute library root.
+ * @param absoluteFile - absolute target path (may not exist yet).
+ * @throws DeskError — 403 when the resolved ancestor escapes the root, 503 when the root itself is gone.
+ */
+async function assertContainedAncestor(rootPath: string, absoluteFile: string): Promise<void> {
+  let rootReal: string
+  try {
+    rootReal = await realpath(rootPath)
+  } catch {
+    throw new DeskError('NOTEBOOK_UNAVAILABLE', '笔记库不可用', 503)
+  }
+  let candidate = dirname(absoluteFile)
+  for (;;) {
+    try {
+      const candidateReal = await realpath(candidate)
+      if (!isWithin(rootReal, candidateReal)) throw new DeskError('FORBIDDEN', '文件必须位于笔记库内', 403)
+      return
+    } catch (error) {
+      if (error instanceof DeskError) throw error
+      const parent = dirname(candidate)
+      if (parent === candidate) throw new DeskError('FORBIDDEN', '文件必须位于笔记库内', 403)
+      candidate = parent
+    }
+  }
+}
+
 /** Write a frontmatter template for one new note; returns the relative path. */
 export async function createNoteFile(rootPath: string, input: {
   readonly title: string
@@ -96,6 +126,7 @@ export async function createNoteFile(rootPath: string, input: {
     }
   }
   const absolute = join(rootPath, ...relative.split('/'))
+  await assertContainedAncestor(rootPath, absolute)
   await mkdir(join(absolute, '..'), { recursive: true })
   const today = new Date().toISOString().slice(0, 10)
   const body = [
