@@ -27,10 +27,10 @@ const ASK_ENTRIES: Readonly<Record<Tab, readonly AskEntry[]>> = {
     { id: 'note-merge', label: 'coauthor.menu.noteMerge', prompt: 'coauthor.prompt.noteMerge' },
     { id: 'note-to-task', label: 'coauthor.menu.noteToTask', prompt: 'coauthor.prompt.noteToTask' },
   ],
-  // Tasks: pull work in from the two sources that most often turn into tasks.
+  // Tasks: pull work in from schedule, then clear the finished lane into the archive.
   tasks: [
     { id: 'task-from-schedule', label: 'coauthor.menu.taskFromSchedule', prompt: 'coauthor.prompt.taskFromSchedule' },
-    { id: 'task-from-notes', label: 'coauthor.menu.taskFromNotes', prompt: 'coauthor.prompt.taskFromNotes' },
+    { id: 'task-archive-done', label: 'coauthor.menu.taskArchiveDone', prompt: 'coauthor.prompt.taskArchiveDone' },
   ],
   // Notebook: surface this week's high-value pages, or turn keeper notes into a page.
   notebook: [
