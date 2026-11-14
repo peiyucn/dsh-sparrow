@@ -6,7 +6,23 @@
  *   - note-baseline: this round's baseline body, one per annotation session
  *   - review-record: one submitted review (annotations + file snapshot metadata)
  *   - review-session: the durable marker that one session was opened by the annotation flow
+ *
+ * The notebook library is gone, but the legacy `notebook-config` record must keep validating: a
+ * profile written before the refactor still has one, and an unknown kind at open time would make
+ * the whole storage domain fail (and with it every plugin route).
  */
+
+/** Legacy notebook-root record: no longer read or written, kept only for stored-data compatibility. */
+export interface DeskNotebookConfig {
+  readonly id: string
+  readonly kind: 'notebook-config'
+  readonly schema: number
+  readonly rootPath: string
+  readonly skillName?: string | null
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly revision: number
+}
 
 /** One page in the library index (derived, never written back into the file). */
 export interface NotebookEntry {

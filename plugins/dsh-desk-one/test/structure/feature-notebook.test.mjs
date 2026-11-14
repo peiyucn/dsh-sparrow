@@ -16,6 +16,19 @@ const nodeSchema = /** @type {any} */ (DESK_DOMAIN.tables.nodes.valueSchema)
 const STAMP = '2026-01-01T00:00:00.000Z'
 
 /**
+ * Legacy notebook-root record: no longer read or written, but it must keep validating so a profile
+ * written before the annotation refactor still opens.
+ * @param {Record<string, unknown>} [overrides]
+ * @returns {Record<string, unknown>}
+ */
+function notebookConfigRecord(overrides) {
+  return {
+    id: 'notebook_config', kind: 'notebook-config', schema: 1, rootPath: '/notes', skillName: null,
+    createdAt: STAMP, updatedAt: STAMP, revision: 1, ...overrides,
+  }
+}
+
+/**
  * @param {Record<string, unknown>} [overrides]
  * @returns {Record<string, unknown>}
  */
@@ -118,7 +131,7 @@ describe('批注契约', () => {
     }
   })
 
-  it('批注记录 kind 应该可解析：文件身份 / 草稿 / 基线 / 审阅记录 / 审阅会话标记', () => {
+  it('批注记录 kind 应该可解析：文件身份 / 草稿 / 基线 / 审阅记录 / 审阅会话标记；旧库配置记录仍兼容', () => {
     for (const record of [
       noteFileRecord(),
       reviewRecord(),
@@ -129,11 +142,19 @@ describe('批注契约', () => {
       assert.equal(nodeSchema.safeParse(record).success, true, `批注记录 ${String(record.kind)} 必须可解析`)
     }
     assert.equal(nodeSchema.safeParse(reviewRecord({ annotations: undefined })).success, false, '审阅记录必须带批注列表')
+    // The stored config record predates the refactor; rejecting it here is what took the whole
+    // domain down on the owner's profile (unknown kind at open time => every route 404).
     assert.equal(
-      nodeSchema.safeParse({ id: 'notebook_config', kind: 'notebook-config', schema: 1, rootPath: '/notes', createdAt: STAMP, updatedAt: STAMP, revision: 1 }).success,
-      false,
-      '笔记库配置记录必须已被移除',
+      nodeSchema.safeParse(notebookConfigRecord()).success,
+      true,
+      '旧笔记库配置记录必须仍可解析',
     )
+    assert.equal(
+      nodeSchema.safeParse(notebookConfigRecord({ rootPath: '' })).success,
+      false,
+      '旧记录同样要过基础字段校验',
+    )
+    assert.equal(DESK_DOMAIN.invalidRecords, 'backup-and-skip', '未知记录必须备份后跳过而不是让整域打不开')
 
     const draft = /** @type {any} */ (nodeSchema.parse({ ...noteDraftRecord(), drafts: undefined }))
     assert.deepEqual(draft.drafts, [], '草稿箱没有批注时应默认空列表')

@@ -177,7 +177,7 @@ interface ProjectPayload {
 * **文件身份随内容走**：`note-file` 只存路径 + 内容哈希；文件改名后按哈希重关联（host 有候选数与时间预算上限），因此批注记录 / 基线不会因改名而丢。
 * **草稿箱 = 文件级、非会话级**：同一文件在任意批注会话里的未提交批注都落在同一 `note-draft`（带乐观并发 revision）；提交后清空。
 * **批注历史是提交记录**：批注本身随会话消息走；`review-record` 只是「独立批注对象」的历史留档（文件快照元信息 + 批注，不存被审正文）。
-* **迁移兼容**：早期「工作区文件 + 批注线程」版本的 `annotation` / `review` 两个 kind 只保留 schema 解析，打开存储域时清理，不参与业务；`notebook-config` 随笔记库一起删除，旧记录在域校验时被拒。
+* **迁移兼容**：早期「工作区文件 + 批注线程」版本的 `annotation` / `review` 两个 kind 只保留 schema 解析，打开存储域时清理，不参与业务；`notebook-config` 只保留 schema 解析、不再读写（**不能直接删 kind**：打开存储域时遇到未知 kind 会整域失败，连带所有插件路由 404）。域声明 `invalidRecords: 'backup-and-skip'`，往后遇到本版不认识的记录时备份、告警并跳过。
 
 ## Edge（关系）
 

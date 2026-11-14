@@ -5,7 +5,7 @@
 
 import type { NOTE_COLORS, ScheduleChannel, ScheduleProvider, TASK_STATUSES } from './constants.js'
 import type {
-  NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ReviewSessionMarker,
+  DeskNotebookConfig, NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ReviewSessionMarker,
 } from './notebook-contract.js'
 
 export type NoteColor = (typeof NOTE_COLORS)[number]
@@ -127,7 +127,7 @@ export interface DeskSessionIndex {
 
 export type DeskNode =
   | DeskNote | DeskTask | DeskTaskGroup | DeskScheduleSource | DeskCalendar | DeskEvent | DeskSessionIndex
-  | NoteFileRef | NoteDraft | ReviewRecord | NoteBaseline | ReviewSessionMarker
+  | DeskNotebookConfig | NoteFileRef | NoteDraft | ReviewRecord | NoteBaseline | ReviewSessionMarker
 
 /* ------------------------------------------------------------------ */
 /* Schedule: read-only mirror of external calendars                    */

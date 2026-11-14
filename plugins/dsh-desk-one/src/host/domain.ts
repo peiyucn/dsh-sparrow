@@ -185,6 +185,18 @@ const annotationSchema = z.object({
   createdAt: z.string().min(1),
 })
 
+/** Legacy notebook-root record (kept so profiles written before the annotation refactor validate). */
+const notebookConfigSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('notebook-config'),
+  schema: z.number().int().positive(),
+  rootPath: z.string().min(1),
+  skillName: z.string().min(1).nullable().optional(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  revision: z.number().int().positive(),
+})
+
 /** One lazily assigned file identity (survives renames while content matches). */
 const noteFileSchema = z.object({
   id: z.string().min(1),
@@ -267,7 +279,7 @@ const reviewSessionSchema = z.object({
 
 const nodeSchema = z.discriminatedUnion('kind', [
   noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema, sessionIndexSchema,
-  noteFileSchema, reviewRecordSchema, noteDraftSchema, noteBaselineSchema, reviewSessionSchema,
+  notebookConfigSchema, noteFileSchema, reviewRecordSchema, noteDraftSchema, noteBaselineSchema, reviewSessionSchema,
   legacyAnnotationSchema, legacyReviewSchema,
 ])
 
@@ -285,6 +297,10 @@ export const DESK_DOMAIN = defineDomain({
   name: DOMAIN_NAME,
   version: DOMAIN_VERSION,
   layout: 'per-record',
+  // A record this build cannot parse must never take the whole domain (and every plugin route)
+  // down: back it up and open without it. The legacy notebook-config kind is still parsed above,
+  // so profiles written before the annotation refactor open cleanly.
+  invalidRecords: 'backup-and-skip',
   tables: {
     [NODES_TABLE]: domainTable<string, DeskNode>(nodeSchema as unknown as z.ZodType<DeskNode>),
     [EDGES_TABLE]: domainTable<string, DeskEdge>(edgeSchema),
