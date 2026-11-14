@@ -15,7 +15,7 @@
 | info 浮层「两种用法」 | `coauthor.introUsage` | 自己操作，或者直接对我说。 | Do it yourself, or just tell me. |
 | info 示例 ① | `coauthor.example.note` | 「帮我记一条便签：…」 | "Note this down: …" |
 | info 示例 ② | `coauthor.example.task` | 「帮我加一个任务：…」 | "Add a task: …" |
-| info 示例 ③ | `coauthor.example.plan` | 「整理一下我今天的安排。」 | "Sort out my plan for today." |
+| info 示例 ③ | `coauthor.example.plan` | 「把今天的日程整理成任务。」 | "Turn today's schedule into tasks." |
 
 ## 2. 页头菜单与预填提示
 
@@ -26,7 +26,7 @@
 | 便签 · 第 1 项 | `coauthor.menu.noteAdd` / `coauthor.prompt.noteAdd` | 记一条便签 | Note something down | 帮我记一条便签： | Note this down: |
 | 便签 · 第 2 项 | `coauthor.menu.noteTidy` / `coauthor.prompt.noteTidy` | 整理最近的便签 | Tidy recent notes | 帮我整理一下最近的便签，看看哪些值得保留。 | Tidy up my recent notes and tell me which ones are worth keeping. |
 | 任务 · 第 1 项 | `coauthor.menu.taskAdd` / `coauthor.prompt.taskAdd` | 加一个任务 | Add a task | 帮我加一个任务： | Add a task: |
-| 任务 · 第 2 项 | `coauthor.menu.taskPlan` / `coauthor.prompt.taskPlan` | 把今天的安排整理成任务 | Turn today's plan into tasks | 帮我把今天的安排整理成任务，放进任务板。 | Turn my plan for today into tasks on the board. |
+| 任务 · 第 2 项 | `coauthor.menu.taskPlan` / `coauthor.prompt.taskPlan` | 把日程整理成任务 | Turn schedule into tasks | 帮我看看今天的日程，把需要行动的事项整理成任务放进任务板；先查一下任务板，已有的不要重复创建。 | Check my schedule for today and turn the actionable items into tasks on the board; check the board first so no task is created twice. |
 | 笔记 · 第 1 项 | `coauthor.menu.notebookNew` / `coauthor.prompt.notebookNew` | 新建一篇笔记 | Start a note | 帮我新建一篇笔记： | Start a new note: |
 | 笔记 · 第 2 项 | `coauthor.menu.notebookBrowse` / `coauthor.prompt.notebookBrowse` | 看看笔记库 | Browse the notebook | 帮我看看笔记库里最近的内容。 | Show me what is recent in my notebook library. |
 | 日程 · 第 1 项 | `coauthor.menu.scheduleToday` / `coauthor.prompt.scheduleToday` | 看看今天的安排 | Check today's schedule | 帮我看看今天的日程安排，有哪些需要注意的。 | Check my schedule for today and tell me what needs attention. |
