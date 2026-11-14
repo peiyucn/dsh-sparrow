@@ -15,11 +15,43 @@ import type { NotebookApi } from '../api.js'
 /** Browser-storage key per Session (the official sidebar layout uses the same kind of storage). */
 const KEY_PREFIX = 'dsh-desk-one.review-tab.'
 
+/**
+ * How many Session memos are kept. A memo is only a restore hint (the host markers are the durable
+ * identity), so the oldest entries are evicted instead of letting the storage grow without bound.
+ */
+const MAX_MEMO_ENTRIES = 100
+
+/** `localStorage` when the browser exposes it; the access itself may throw in restricted modes. */
+function browserStorage(): Storage | undefined {
+  try {
+    return typeof localStorage === 'undefined' ? undefined : localStorage
+  } catch {
+    return undefined
+  }
+}
+
+/** Keys of every stored memo, in storage order (oldest insertion first). */
+function memoStorageKeys(): string[] {
+  const storage = browserStorage()
+  if (storage === undefined) return []
+  const keys: string[] = []
+  try {
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index)
+      if (key !== null && key.startsWith(KEY_PREFIX)) keys.push(key)
+    }
+  } catch {
+    return []
+  }
+  return keys
+}
+
 /** Read the remembered parameters of one Session, if any. */
 export function readReviewTabParams(sessionId: string): NoteReviewParams | undefined {
-  if (typeof localStorage === 'undefined') return undefined
+  const storage = browserStorage()
+  if (storage === undefined) return undefined
   try {
-    const raw = localStorage.getItem(`${KEY_PREFIX}${sessionId}`)
+    const raw = storage.getItem(`${KEY_PREFIX}${sessionId}`)
     if (raw === null) return undefined
     const parsed: unknown = JSON.parse(raw)
     if (typeof parsed !== 'object' || parsed === null) return undefined
@@ -33,13 +65,57 @@ export function readReviewTabParams(sessionId: string): NoteReviewParams | undef
   }
 }
 
+/** Forget one Session's memo: its tab is gone, or the Session itself no longer exists. */
+export function removeReviewTabParams(sessionId: string): void {
+  const storage = browserStorage()
+  if (storage === undefined) return
+  try {
+    storage.removeItem(`${KEY_PREFIX}${sessionId}`)
+  } catch {
+    // Storage disabled: nothing was stored, so nothing has to be removed.
+  }
+}
+
+/**
+ * Drop the memos of Sessions the Host no longer lists (a deleted Session can never restore its tab),
+ * keeping the memo set from accumulating across runs.
+ * @param isLiveSession - whether one Session still exists in the live catalog.
+ */
+export function pruneReviewTabParams(isLiveSession: (sessionId: string) => boolean): void {
+  if (browserStorage() === undefined) return
+  for (const key of memoStorageKeys()) {
+    const sessionId = key.slice(KEY_PREFIX.length)
+    if (!isLiveSession(sessionId)) removeReviewTabParams(sessionId)
+  }
+}
+
 /** Remember one Session's review-tab parameters for the next restore. */
 export function writeReviewTabParams(sessionId: string, params: NoteReviewParams): void {
-  if (typeof localStorage === 'undefined') return
+  const storage = browserStorage()
+  if (storage === undefined) return
+  const key = `${KEY_PREFIX}${sessionId}`
   try {
-    localStorage.setItem(`${KEY_PREFIX}${sessionId}`, JSON.stringify(params))
+    // Re-insert so the eviction order follows the latest write (storage keeps insertion order).
+    storage.removeItem(key)
+    storage.setItem(key, JSON.stringify(params))
   } catch {
     // Storage disabled: the tab still works during this run; only the restore memory is lost.
+    return
+  }
+  enforceMemoCap(key)
+}
+
+/** Evict the oldest memos beyond {@link MAX_MEMO_ENTRIES}, never the one just written. */
+function enforceMemoCap(keepKey: string): void {
+  const keys = memoStorageKeys()
+  const overflow = keys.length - MAX_MEMO_ENTRIES
+  if (overflow <= 0) return
+  let removed = 0
+  for (const key of keys) {
+    if (removed >= overflow) return
+    if (key === keepKey) continue
+    removeReviewTabParams(key.slice(KEY_PREFIX.length))
+    removed += 1
   }
 }
 

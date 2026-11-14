@@ -26,8 +26,10 @@ export function rememberReviewSession(sessionId: string): void {
 }
 
 /**
- * Load the host's durable review-session markers once per page. A failure is silent: the memory
- * registry still covers everything opened in this run.
+ * Load the host's durable review-session markers once per page. Single-flight: concurrent callers
+ * share the pending request. The one-shot flag is set only after a successful load, so a failed
+ * attempt (host not ready, transient error) is retried by the next caller instead of disabling
+ * reuse and the sidebar marks for the rest of the page; the memory registry still covers this run.
  */
 export function hydrateReviewSessions(notebook: NotebookApi): void {
   if (hydrated || hydrating !== undefined) return
@@ -39,10 +41,10 @@ export function hydrateReviewSessions(notebook: NotebookApi): void {
         markers.set(info.sessionId, info)
         rememberReviewSession(info.sessionId)
       }
-    } catch {
-      // The hint is optional; the panel keeps working without persisted markers.
-    } finally {
       hydrated = true
+    } catch {
+      // Leave `hydrated` unset: the next caller retries, and the memory registry keeps working.
+    } finally {
       hydrating = undefined
     }
   })()

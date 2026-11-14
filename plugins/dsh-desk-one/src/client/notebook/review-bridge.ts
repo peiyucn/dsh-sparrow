@@ -10,9 +10,10 @@
  */
 
 import {
-  pickReusableReviewSession, rememberReviewSession, reviewSessionCandidates, reviewSessionsReady,
+  isReviewSession, pickReusableReviewSession, rememberReviewSession, reviewSessionCandidates, reviewSessionsReady,
 } from './review/sessions.js'
 import type { ReusableSessionFacts } from './review/sessions.js'
+import { pruneReviewTabParams } from './review/tab-memory.js'
 import type {
   ConversationLike, SessionNavigationLike, SessionScopeLike, SessionsLike, SidebarRightLike, WorkspacesLike,
 } from './faces.js'
@@ -77,10 +78,44 @@ const MOUNT_RETRIES = 40
 const MOUNT_RETRY_MS = 50
 /** How long warming one candidate's turn count may take before the pick falls back to newest. */
 const TURNS_TIMEOUT_MS = 1_500
+/** How many candidates have their turn counts warmed concurrently (bounded fan-out). */
+const TURNS_WARM_CONCURRENCY = 4
 
 /** Sleep one retry slice. */
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/**
+ * Load the turn counts of the given Sessions with a bounded fan-out.
+ *
+ * Every candidate is eventually warmed (so the reuse pick sees the same facts as before), but only
+ * {@link TURNS_WARM_CONCURRENCY} projection reads may be in flight at once; one slow or failing
+ * Session is capped by `timeoutMs` and never blocks the rest.
+ * @param sessionIds - candidate Sessions to warm.
+ * @param refresh - one Session's projection read (the official `sessions.refreshProjections`).
+ * @param options - concurrency and per-Session timeout overrides (tests use tiny values).
+ */
+export async function warmSessionTurns(
+  sessionIds: readonly string[],
+  refresh: (sessionId: string) => Promise<void>,
+  options: { readonly concurrency?: number; readonly timeoutMs?: number } = {},
+): Promise<void> {
+  const concurrency = Math.max(1, Math.min(Math.floor(options.concurrency ?? TURNS_WARM_CONCURRENCY), sessionIds.length))
+  const timeoutMs = options.timeoutMs ?? TURNS_TIMEOUT_MS
+  let next = 0
+  const worker = async (): Promise<void> => {
+    while (next < sessionIds.length) {
+      const sessionId = sessionIds[next] as string
+      next += 1
+      try {
+        await Promise.race([refresh(sessionId), delay(timeoutMs)])
+      } catch {
+        // Turn counts are progressive enhancement: the newest candidate still reopens.
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker))
 }
 
 /** Wait until the right sidebar reports one Session on screen. */
@@ -127,15 +162,22 @@ export function createReviewBridge(): ReviewBridge {
 
   /** Load turn counts for the openable candidates, bounded so a slow host cannot block opening. */
   const warmTurns = async (sessionIds: readonly string[]): Promise<void> => {
-    if (sessions?.refreshProjections === undefined || sessionIds.length === 0) return
-    const refresh = sessions.refreshProjections.bind(sessions)
-    await Promise.all(sessionIds.map(async (sessionId) => {
-      try {
-        await Promise.race([refresh(sessionId), delay(TURNS_TIMEOUT_MS)])
-      } catch {
-        // Turn counts are progressive enhancement: the newest candidate still reopens.
-      }
-    }))
+    const refresh = sessions?.refreshProjections
+    if (refresh === undefined || sessionIds.length === 0) return
+    await warmSessionTurns(sessionIds, sessionId => refresh.call(sessions, sessionId))
+  }
+
+  /**
+   * Drop review-tab memos whose Session the Host no longer lists: that restored tab can never come
+   * back, so the memo would only occupy storage forever. Sessions opened in this page run and the
+   * one just opened are kept even while the live list has not caught up yet.
+   */
+  const pruneStaleTabMemos = (currentSessionId: string | undefined): void => {
+    const ids = sessions?.list?.getSnapshot().ids
+    if (ids === undefined || ids.length === 0) return
+    pruneReviewTabParams(sessionId => sessionId === currentSessionId
+      || isReviewSession(sessionId)
+      || ids.includes(sessionId))
   }
 
   /** The note's own review Session, when one is still openable in this workspace. */
@@ -169,12 +211,14 @@ export function createReviewBridge(): ReviewBridge {
               // best effort rather than starting a duplicate Session after the user was moved.
               if (await openReviewTab(sidebar, params)) {
                 rememberReviewSession(reusable)
+                pruneStaleTabMemos(reusable)
                 return { ok: true }
               }
               return { ok: false, message: '审阅会话已打开，但右侧栏没有就绪，请再点一次「审阅」' }
             }
             if (await waitForMounted(sidebar, reusable) && await openReviewTab(sidebar, params)) {
               rememberReviewSession(reusable)
+              pruneStaleTabMemos(reusable)
               return { ok: true }
             }
             // The reuse navigation already happened. Falling through to a fresh Session here would
@@ -186,11 +230,15 @@ export function createReviewBridge(): ReviewBridge {
         }
       }
       // 2) First review of this note, or the previous review Session is gone.
+      let createdSessionId: string | undefined
       try {
         // Same flow as the New Session button; openWorkspace also tells us the session id so the
         // conversation-area review hint can be scoped to this session only.
         if (nav.openWorkspace !== undefined) {
-          await nav.openWorkspace(input.workspaceId, sessionId => { rememberReviewSession(sessionId) })
+          await nav.openWorkspace(input.workspaceId, (sessionId) => {
+            createdSessionId = sessionId
+            rememberReviewSession(sessionId)
+          })
         } else {
           nav.startSession(input.workspaceId)
         }
@@ -200,6 +248,7 @@ export function createReviewBridge(): ReviewBridge {
       if (!await openReviewTab(sidebar, params)) {
         return { ok: false, message: '审阅会话已创建，但右侧栏没有就绪，请再点一次「审阅」' }
       }
+      pruneStaleTabMemos(createdSessionId)
       return { ok: true }
     },
     async openFilesBrowser(workspaceId) {

@@ -31,6 +31,9 @@ type OutlookFlow =
       completed?: ScheduleStateResponse
     }
 
+/** Finished / abandoned login flows are only useful for one poll; keep the map small and finite. */
+const MAX_OUTLOOK_FLOWS = 32
+
 /** Facade seams the OAuth module cannot import directly without a cycle. */
 export interface OutlookOAuthDeps {
   /** Pull one source directly (login warm-up; deliberately bypasses the shared single-flight slot). */
@@ -47,8 +50,14 @@ export class OutlookOAuth {
 
   /** Browser redirect login (default) or device code (fallback). */
   async startOutlookLogin(redirectUri?: string): Promise<OutlookLoginStartResponse> {
+    this.pruneFlows()
     if (redirectUri !== undefined && redirectUri !== '') {
-      const parsed = new URL(redirectUri)
+      let parsed: URL
+      try {
+        parsed = new URL(redirectUri)
+      } catch {
+        throw new DeskError('INVALID_SCHEDULE', '登录回调地址不是合法 URL', 400)
+      }
       if (parsed.protocol !== 'http:' || !['localhost', '127.0.0.1'].includes(parsed.hostname)
         || !parsed.pathname.endsWith('/api/desk-one/schedule/outlook/callback')) {
         throw new DeskError('INVALID_SCHEDULE', '登录回调地址必须是本机 desk-one 的 callback 路由', 400)
@@ -86,6 +95,26 @@ export class OutlookOAuth {
     }
   }
 
+  /**
+   * Drop expired flows and cap the registry. A login left open in a browser tab must not keep the
+   * map growing for the lifetime of the host process.
+   */
+  private pruneFlows(): void {
+    const now = Date.now()
+    for (const [id, flow] of this.outlookFlows) {
+      if (flow.expiresAt <= now) this.outlookFlows.delete(id)
+    }
+    while (this.outlookFlows.size >= MAX_OUTLOOK_FLOWS) {
+      let oldestId: string | undefined
+      let oldestExpiry = Number.POSITIVE_INFINITY
+      for (const [id, flow] of this.outlookFlows) {
+        if (flow.expiresAt < oldestExpiry) { oldestExpiry = flow.expiresAt; oldestId = id }
+      }
+      if (oldestId === undefined) break
+      this.outlookFlows.delete(oldestId)
+    }
+  }
+
   async pollOutlookLogin(flowId: unknown): Promise<OutlookLoginPollResponse> {
     const id = text(flowId)
     const flow = this.outlookFlows.get(id)
@@ -115,6 +144,7 @@ export class OutlookOAuth {
 
   /** OAuth redirect callback: exchange the code, persist the refresh token, warm one sync. */
   async completeOutlookLogin(code: unknown, state: unknown): Promise<{ ok: boolean; message: string }> {
+    this.pruneFlows()
     const value = text(code)
     const stateId = text(state)
     const entry = [...this.outlookFlows.entries()].find(([, flow]) => flow.kind === 'redirect' && flow.state === stateId)
@@ -141,7 +171,11 @@ export class OutlookOAuth {
       account: 'Outlook 个人账户',
       credentialRef: OUTLOOK_GRAPH_REFRESH_REF,
     })
-    await this.deps.syncSource(source).catch(() => undefined)
+    await this.deps.syncSource(source).catch((error: unknown) => {
+      // The connection is valid; a warm-up failure is retried by the next sync and must be visible
+      // in the log instead of disappearing.
+      this.ctx.logger.warn(`dsh-desk-one: Outlook 登录后预热同步失败：${error instanceof Error ? error.message : String(error)}`)
+    })
     return { status: 'connected', state: this.deps.state() }
   }
 
@@ -159,7 +193,11 @@ export class OutlookOAuth {
     this.graphAccess.set(source.id, { token: tokens.accessToken, expiresAt: Date.now() + tokens.expiresIn * 1000 })
     if (tokens.refreshToken !== undefined) {
       const service = requireCredentials(this.ctx)
-      await service.set(OUTLOOK_GRAPH_REFRESH_REF, tokens.refreshToken).catch(() => undefined)
+      await service.set(OUTLOOK_GRAPH_REFRESH_REF, tokens.refreshToken).catch((error: unknown) => {
+        // A rotated refresh token that fails to persist leaves the user connected until the next
+        // refresh; log it instead of silently swallowing the failure.
+        this.ctx.logger.warn(`dsh-desk-one: Outlook refresh token 持久化失败：${error instanceof Error ? error.message : String(error)}`)
+      })
     }
     return tokens.accessToken
   }

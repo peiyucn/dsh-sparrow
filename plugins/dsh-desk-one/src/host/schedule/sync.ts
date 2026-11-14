@@ -1,7 +1,8 @@
 /**
  * Schedule sync orchestration: mirror window pull order and the "one failure never blocks the other
- * sources" rule. Sources run sequentially so one slow line cannot starve the others, and every
- * source pull is single-flight so repeated clicks join the running sync instead of stacking pulls.
+ * sources" rule. Sources run sequentially so one slow line cannot starve the others, and **every**
+ * source pull goes through one single-flight slot per source: repeated clicks, post-connection
+ * warm-ups and the UI's sync button all join the running pull instead of stacking writes.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -64,16 +65,21 @@ export class ScheduleSync {
     const key = source.id
     const running = this.inflight.get(key)
     if (running !== undefined) return running
-    const task = this.syncSource(source).finally(() => { this.inflight.delete(key) })
+    const task = this.pullSource(source).finally(() => { this.inflight.delete(key) })
     this.inflight.set(key, task)
     return task
   }
 
   /**
-   * Pull one source directly. Connection actions call this after writing a new connection / syncing
-   * the login warm-up, so it deliberately does not join the shared single-flight slot.
+   * Pull one source now. Every caller (UI sync, connection actions, OAuth warm-up) goes through the
+   * per-source single-flight slot, so a warm-up cannot race the UI sync into duplicate writes.
    */
-  async syncSource(source: DeskScheduleSource): Promise<ScheduleSyncSourceReport> {
+  syncSource(source: DeskScheduleSource): Promise<ScheduleSyncSourceReport> {
+    return this.runSync(source)
+  }
+
+  /** One pull of one source (joined through {@link runSync} — never call directly from outside). */
+  private async pullSource(source: DeskScheduleSource): Promise<ScheduleSyncSourceReport> {
     const now = new Date().toISOString()
     await this.store.setScheduleSyncState(source.id, { syncState: 'syncing' })
     const window = mirrorWindow()
@@ -90,9 +96,11 @@ export class ScheduleSync {
         for (const calendar of stored.filter(row => row.enabled)) {
           try {
             const drafts = dedupeDrafts(await fetchGraphCalendarEvents(token, calendar.remoteId, window, adapterDeps()))
-            await this.store.syncCalendarEvents(calendar, drafts.slice(0, SCHEDULE_MAX_EVENTS))
+            // Count what was actually mirrored, not the raw remote batch: the store caps one sync.
+            const inserted = Math.min(drafts.length, SCHEDULE_MAX_EVENTS)
+            await this.store.syncCalendarEvents(calendar, drafts.slice(0, inserted))
             await this.store.setScheduleSyncState(calendar.id, { lastSyncedAt: now })
-            totalEvents += drafts.length
+            totalEvents += inserted
           } catch (error) {
             await this.store.setScheduleSyncState(calendar.id, { lastError: scheduleErrorOf(error) })
           }
@@ -108,9 +116,10 @@ export class ScheduleSync {
           const drafts = dedupeDrafts(parseIcsEvents(fetched.ics, {
             provider: 'ics', calendarRemoteId: calendar.remoteId, window,
           }).map(event => draftFromRemote(event)))
-          await this.store.syncCalendarEvents(calendar, drafts.slice(0, SCHEDULE_MAX_EVENTS))
+          const inserted = Math.min(drafts.length, SCHEDULE_MAX_EVENTS)
+          await this.store.syncCalendarEvents(calendar, drafts.slice(0, inserted))
           await this.store.setScheduleSyncState(calendar.id, { lastSyncedAt: now })
-          totalEvents += drafts.length
+          totalEvents += inserted
           calendarCount = 1
         }
       } else if (source.provider === 'outlook') {
@@ -124,9 +133,10 @@ export class ScheduleSync {
           const drafts = dedupeDrafts(parseIcsEvents(fetched.ics, {
             provider: 'outlook', calendarRemoteId: calendar.remoteId, window,
           }).map(event => draftFromRemote(event)))
-          await this.store.syncCalendarEvents(calendar, drafts.slice(0, SCHEDULE_MAX_EVENTS))
+          const inserted = Math.min(drafts.length, SCHEDULE_MAX_EVENTS)
+          await this.store.syncCalendarEvents(calendar, drafts.slice(0, inserted))
           await this.store.setScheduleSyncState(calendar.id, { lastSyncedAt: now })
-          totalEvents += drafts.length
+          totalEvents += inserted
           calendarCount = 1
         }
       } else {
@@ -150,9 +160,10 @@ export class ScheduleSync {
               provider: source.provider, calendarRemoteId: calendar.remoteId, window,
             }))
             const drafts = dedupeDrafts(parsed.map(event => draftFromRemote(event)))
-            await this.store.syncCalendarEvents(calendar, drafts.slice(0, SCHEDULE_MAX_EVENTS))
+            const inserted = Math.min(drafts.length, SCHEDULE_MAX_EVENTS)
+            await this.store.syncCalendarEvents(calendar, drafts.slice(0, inserted))
             await this.store.setScheduleSyncState(calendar.id, { lastSyncedAt: now })
-            totalEvents += drafts.length
+            totalEvents += inserted
           } catch (error) {
             await this.store.setScheduleSyncState(calendar.id, { lastError: scheduleErrorOf(error) })
           }
