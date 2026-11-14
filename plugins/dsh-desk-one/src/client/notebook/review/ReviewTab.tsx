@@ -6,7 +6,7 @@
  * overlays and bottom bar are pure presentational components.
  */
 
-import type { ReactElement } from 'react'
+import { useEffect, type ReactElement } from 'react'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../../constants.js'
@@ -24,6 +24,7 @@ import { useReviewInteraction } from './hooks/useReviewInteraction.js'
 import { useReviewSession } from './hooks/useReviewSession.js'
 import type { NoteReviewParams } from '../review-bridge.js'
 import type { NoteReviewInjected } from './types.js'
+import { showReviewTab } from './tab-visibility.js'
 
 type ReviewProps = PropsRuntime<'sidebar.right.pane.tab'> & InjectFace<NoteReviewInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
 
@@ -32,6 +33,13 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const { t, notebook, bridge, sessionId, useTabInfo } = props
   const info = useTabInfo()
   const navigationParams = info.tab.navigation.params as NoteReviewParams | undefined
+  // Publish review-mode visibility for the conversation composer hint: the hint must appear only
+  // while this tab is actually on screen (the official file browser shows a file preview with our
+  // Review view entry instead, where the annotate guidance would be premature).
+  useEffect(() => {
+    if (!info.tab.visible) return
+    return showReviewTab(info.tab.id)
+  }, [info.tab.visible, info.tab.id])
   const { target, recovering } = useReviewSession({ notebook, sessionId, navigationParams })
   const data = useReviewDocument({ notebook, sessionId, target, tabVisible: info.tab.visible, t })
   const review = useReviewInteraction({ t, notebook, bridge, sessionId, target, data })

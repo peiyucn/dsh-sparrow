@@ -6,6 +6,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { ReviewComposerHint } from '../../lib/client/notebook/ReviewPromptDock.js'
 import { rememberReviewSession } from '../../lib/client/notebook/review/sessions.js'
+import { showReviewTab } from '../../lib/client/notebook/review/tab-visibility.js'
 
 /** Render the placeholder hint; `useSession` mimics the slot's session-snapshot selector. */
 const renderHint = (/** @type {Record<string, unknown>} */ props) =>
@@ -15,11 +16,21 @@ const renderHint = (/** @type {Record<string, unknown>} */ props) =>
   ))
 
 describe('审阅输入框引导', () => {
-  it('对话已开始的审阅会话（非空白）仍显示引导', () => {
+  it('审阅视图在屏时显示引导', () => {
     rememberReviewSession('review-started-session')
-    const html = renderHint({ sessionId: 'review-started-session', useSession: () => false })
-    assert.match(html, /dsh-desk-review-composer-hint/u)
-    assert.match(html, /REVIEW-GUIDANCE/u)
+    const release = showReviewTab('tab-under-test')
+    try {
+      const html = renderHint({ sessionId: 'review-started-session', useSession: () => false })
+      assert.match(html, /dsh-desk-review-composer-hint/u)
+      assert.match(html, /REVIEW-GUIDANCE/u)
+    } finally {
+      release()
+    }
+  })
+
+  it('审阅视图不在屏（右侧栏换成官方文件浏览）时不显示引导', () => {
+    rememberReviewSession('review-hidden-session')
+    assert.equal(renderHint({ sessionId: 'review-hidden-session' }), '')
   })
 
   it('普通会话不显示引导', () => {
