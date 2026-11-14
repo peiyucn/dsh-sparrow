@@ -1,6 +1,7 @@
-# 08 · 和 DSH 一起：面板 ↔ 对话的联动入口（草案）
+# 08 · 和 DSH 一起：面板 ↔ 对话的联动入口
 
-> 状态：**草案，待 owner 评审后实施**（2026-11-14）。本文件只定交互与边界，不锁实现细节。
+> 状态：**已评审并实施**（2026-11-14）。owner 决定：三层一起做、页头入口放 info 旁、日程 / 会话只留只读示例、预填用半句让用户接着写。
+> 本文档记录交互与边界；实现落点见第 8 节。
 
 ## 0. 一句话方案
 
@@ -10,7 +11,7 @@
 2. **页头统一入口**：品牌行常驻一个「✦ 和 DSH 说」按钮，按当前 tab 给 2–3 条提示，任何页面都能从同一位置进入对话。
 3. **info 浮层升级**：把 slogan 扩成「两种用法 + 示例」，让说明本身承担教学。
 
-先做 1 + 3（成本低、覆盖首次接触），2 同批实现；日程 / 会话只给只读示例、不给写入口。
+三层一起实现；日程 / 会话只给只读示例、不给写入口。
 
 ## 1. 问题
 
@@ -81,9 +82,24 @@
 - 日程 / 会话没有写入口，只有只读示例。
 - 中英文案齐全；`verify` 全绿；spec / README / CHANGELOG 同步。
 
-## 7. 待 owner 拍板
+## 7. owner 决定（2026-11-14）
 
-1. 三层一起做，还是先做便签空态 + info 浮层试点（任务页下一轮）？
-2. 页头入口放 info 旁（推荐）还是 tab 行末尾、pin 按钮旁？
-3. 日程 / 会话真的不需要入口吗（只读示例放页头菜单已够）？
-4. 预填文案用「帮我记一条便签：」这类半句，让用户接着写（推荐），还是给完整示例句（如「帮我记一条便签：明天十点交周报」）？
+1. 三层一起做（空状态 + 页头入口 + info 浮层）。
+2. 页头入口放 info 旁。
+3. 日程 / 会话真的不给写入口，只留页头只读示例。
+4. 预填文案用半句（「帮我记一条便签：」），让用户接着写。
+
+## 8. 实现落点
+
+| 层 | 落点 |
+|---|---|
+| 预填桥 | `src/client/coauthor.ts`（`createCoauthorBridge`）+ `src/client/index.ts` 的 `uiWorkspace` 可选注入；`install.ts` 的 `startWithPrompt` |
+| 页头入口 | `src/client/app/DeskAskMenu.tsx` + `DeskHeader.tsx`（`onAskDesk`） |
+| info 浮层 | `src/client/app/DeskIntroInfo.tsx` |
+| 便签空态 | `src/client/notes/NotesWall.tsx` |
+| 任务空态 | `src/client/tasks/components/TaskBoard.tsx` → `TaskColumn.tsx`（仅整板为空时的待办列） |
+| 笔记未链接文案 | `src/client/i18n/notebook.ts` 的 `notebook.welcomeBody` |
+| 文案 | `src/client/i18n/app.ts`（`coauthor.*`）、`notes.ts`、`tasks.ts` |
+| 单测 | `test/client/coauthor.test.mjs` |
+
+**便签的预填怎么触发**：便签没有自己的「会话」，所以按钮并不写便签本身——它调用官方 `uiWorkspace.startSession(undefined, { prompt: '帮我记一条便签：', whenDraftExists: 'append' })`：打开（或复用）当前 / 最近工作区的空白会话，把半句指令追加进输入框草稿并聚焦，用户接着写内容、自己按发送；DSH 收到后通过 `desk_note_add` 落库。和「让 AI 起草」是同一条路，只是不带工作区参数、用 `append` 保护已有草稿。无工作区时由官方导航给出「需要工作区」提示。

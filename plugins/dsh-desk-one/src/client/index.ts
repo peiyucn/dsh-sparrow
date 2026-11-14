@@ -23,6 +23,7 @@ import { ReviewComposerHint } from './notebook/ReviewPromptDock.js'
 import { ReviewSessionIcon } from './notebook/ReviewSessionIcon.js'
 import { ReviewSessionTrailingIcon } from './notebook/ReviewSessionTrailingIcon.js'
 import { hydrateReviewSessions } from './notebook/review/sessions.js'
+import { createCoauthorBridge } from './coauthor.js'
 import { DESK_TAB_ICONS, DeskBaseIcon } from './tabIcons.js'
 import { installDeskClient, passesClientGate } from './install.js'
 
@@ -55,6 +56,14 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(['uiWorkspace'], (navigationCtx) => {
     const detach = workspaceAccess.attachNavigation(navigationCtx.get('uiWorkspace') as never)
     navigationCtx.effect(() => detach, `${PACKAGE_NAME}: notebook navigation`)
+  })
+
+  // "和 DSH 一起" entry: prefill the Workspace blank's composer from the panel (never sends).
+  // Optional service: without it the entry stays inert and the panel keeps working.
+  const coauthor = createCoauthorBridge()
+  ctx.inject(['uiWorkspace'], (navigationCtx) => {
+    const detach = coauthor.attachNavigation(navigationCtx.get('uiWorkspace') as never)
+    navigationCtx.effect(() => detach, `${PACKAGE_NAME}: coauthor navigation`)
   })
 
   // A review opens its own session in the library workspace and the tab binds to that session.
@@ -99,6 +108,7 @@ export function apply(ctx: ClientContext): void {
       workspaceAccess,
       openReview: review.open,
       draftWithAi: review.draftInNewSession,
+      startWithPrompt: (prompt) => { coauthor.start(prompt) },
       openBrowser: review.openFilesBrowser,
       listNotes: api.listNotes,
       createNote: api.createNote,

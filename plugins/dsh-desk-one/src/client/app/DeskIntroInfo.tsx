@@ -15,7 +15,7 @@ export function DeskIntroInfo({ t }: { readonly t: DeskTranslator }): ReactEleme
   const [open, setOpen] = useState(false)
   const anchorRef = useRef<HTMLButtonElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
-  const style = useAnchoredPanel({ open, anchorRef, panelRef, gap: 6, margin: 8, maxWidth: 240, fitContent: true, align: 'start' })
+  const style = useAnchoredPanel({ open, anchorRef, panelRef, gap: 6, margin: 8, maxWidth: 300, fitContent: true, align: 'start' })
 
   useEffect(() => {
     if (!open) return
@@ -55,7 +55,13 @@ export function DeskIntroInfo({ t }: { readonly t: DeskTranslator }): ReactEleme
       {open
         ? createPortal(
             <div ref={panelRef} id={TOOLTIP_ID} className="dsh-desk-intro-tooltip" role="tooltip" style={style ?? undefined}>
-              {t('page.introDetail')}
+              <p className="dsh-desk-intro-lead">{t('page.introDetail')}</p>
+              <p className="dsh-desk-intro-usage">{t('coauthor.introUsage')}</p>
+              <ul className="dsh-desk-intro-examples">
+                <li>{t('coauthor.example.note')}</li>
+                <li>{t('coauthor.example.task')}</li>
+                <li>{t('coauthor.example.plan')}</li>
+              </ul>
             </div>,
             document.body,
           )

@@ -43,7 +43,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     listNotes, updateNote, deleteNote, createNote, t,
     listTasks, createTask, updateTask, deleteTask,
     listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink, sessionsArchive, schedule,
-    notebook, workspaceAccess, openReview, draftWithAi, initialTab, pin,
+    notebook, workspaceAccess, openReview, draftWithAi, startWithPrompt, initialTab, pin,
   } = props
   // A left-rail entry opens its own tab; the base entry (no initialTab) resumes the last visited tab.
   const [tab, setTab] = useState<Tab>(() => initialTab ?? readInitialTab())
@@ -73,6 +73,11 @@ export function DeskOnePage(props: DeskPanelProps) {
       // Storage unavailable (private mode): keep the choice for this session only.
     }
   }, [])
+
+  /** "和 DSH 一起": put one prompt into the Workspace blank's composer (never sends). */
+  const askDesk = useCallback((prompt: string): void => {
+    startWithPrompt(prompt)
+  }, [startWithPrompt])
 
   // Pinned left-rail entries own exactly one tab. Clicking such a row while this panel is already
   // active produces no store notification (same panel id), so the click arrives through the
@@ -183,7 +188,7 @@ export function DeskOnePage(props: DeskPanelProps) {
 
   return (
     <div className="dsh-desk-page">
-      <DeskHeader t={t} tab={tab} onSelectTab={selectTab} pinned={pinnedHere} onTogglePin={togglePinned} actions={actions} />
+      <DeskHeader t={t} tab={tab} onSelectTab={selectTab} pinned={pinnedHere} onTogglePin={togglePinned} actions={actions} onAskDesk={askDesk} />
       <div className="dsh-desk-body">
         {data.loadError === null ? null : (
           <div>
@@ -225,6 +230,7 @@ export function DeskOnePage(props: DeskPanelProps) {
                       onColor={(note, color) => data.savePatch(note, { color })}
                       onTrash={trash.trashNote}
                       onBodyCommit={wall.commitBody}
+                      onAskDesk={() => askDesk(t('coauthor.prompt.noteAdd'))}
                     />
                   )}
             </div>
@@ -256,6 +262,7 @@ export function DeskOnePage(props: DeskPanelProps) {
               groupsData={groupsData}
               board={board}
               sessionLink={sessionLink}
+              onAskDesk={() => askDesk(t('coauthor.prompt.taskAdd'))}
             />
           )}
       </div>

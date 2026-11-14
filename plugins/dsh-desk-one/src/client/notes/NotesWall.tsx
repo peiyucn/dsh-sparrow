@@ -28,10 +28,12 @@ export function NotesWall(props: {
   readonly onColor: (note: DeskNote, color: NoteColor) => void
   readonly onTrash: (note: DeskNote) => void
   readonly onBodyCommit: (note: DeskNote, element: HTMLTextAreaElement) => void
+  /** "和 DSH 一起": prefill a note prompt in the conversation (never sends). */
+  readonly onAskDesk: () => void
 }): ReactElement {
   const {
     t, setWallRef, canvasRef, placed, loading, empty, animating, trashingIds,
-    onAddAt, onRaise, onDragStart, onResizeStart, onColor, onTrash, onBodyCommit,
+    onAddAt, onRaise, onDragStart, onResizeStart, onColor, onTrash, onBodyCommit, onAskDesk,
   } = props
   return (
     <div
@@ -59,6 +61,9 @@ export function NotesWall(props: {
                 <p className="dsh-desk-wall-tip">
                   <span className="dsh-desk-wall-tip-main">{t('wall.tip')}</span>
                   <span className="dsh-desk-wall-tip-sub">{t('wall.tipAlt')}</span>
+                  <button type="button" className="dsh-desk-wall-ask" onClick={onAskDesk}>
+                    {t('wall.askDesk')}
+                  </button>
                 </p>
               )
             : null}

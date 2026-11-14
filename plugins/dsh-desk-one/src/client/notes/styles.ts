@@ -60,6 +60,21 @@ export const NOTES_CSS = `
   letter-spacing: 0.02em;
   color: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 16%, transparent);
 }
+.dsh-desk-wall-ask {
+  appearance: none;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-state-business-primary, #4176e6);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+.dsh-desk-wall-ask:hover {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #4176e6) 10%, transparent);
+}
 .dsh-desk-wall-hint {
   position: absolute;
   left: 50%;

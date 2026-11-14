@@ -109,9 +109,56 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   width: 16px;
   height: 16px;
 }
+/* "和 DSH 一起" entry: quiet text button beside the intro info; the glyph carries the accent. */
+.dsh-desk-ask-entry {
+  appearance: none;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dsh-desk-ask-entry:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+.dsh-desk-ask-entry-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--dsw-alias-state-business-primary, #4176e6);
+}
+.dsh-desk-ask-entry-icon svg {
+  display: block;
+}
+/* Inline "让 DSH …" action inside an empty state (notes wall / empty task lane). */
+.dsh-desk-ask-link {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dsw-alias-state-business-primary, #4176e6);
+  font: inherit;
+  cursor: pointer;
+}
+.dsh-desk-ask-link:hover {
+  text-decoration: underline;
+}
+.dsh-task-empty .dsh-desk-ask-link {
+  margin-left: 8px;
+}
 .dsh-desk-intro-tooltip {
   box-sizing: border-box;
-  max-width: 240px;
+  max-width: 300px;
   padding: 8px 10px;
   border-radius: var(--dsw-radius-sm, 8px);
   background: var(--dsw-menu-surface-fill, var(--dsw-specific-menu, #ffffff));
@@ -123,6 +170,21 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
   line-height: 18px;
+}
+.dsh-desk-intro-lead {
+  margin: 0;
+}
+.dsh-desk-intro-usage {
+  margin: 6px 0 0;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+.dsh-desk-intro-examples {
+  margin: 4px 0 0;
+  padding-left: 14px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
+.dsh-desk-intro-examples li + li {
+  margin-top: 2px;
 }
 .dsh-desk-title {
   display: inline-flex;

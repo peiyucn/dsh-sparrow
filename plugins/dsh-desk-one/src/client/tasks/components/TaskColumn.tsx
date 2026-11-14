@@ -67,6 +67,8 @@ interface TaskColumnProps {
   readonly onLinkSessions: (task: DeskTask, sessionIds: readonly string[]) => void
   readonly onOpenSession: (sessionId: string) => void
   readonly onInspectSession: (sessionId: string) => Promise<void>
+  /** "和 DSH 一起": only the empty To-do lane of an empty board receives this. */
+  readonly onAskDesk?: (() => void) | undefined
 }
 
 export function TaskColumn({
@@ -76,6 +78,7 @@ export function TaskColumn({
   onPatch, onArchive, onDelete,
   isGroupCollapsed, onToggleGroup, onCreateGroup, onRenameGroup, onRemoveGroup, onArchiveGroup,
   sessionEnabled, sessionOptions, sessionsFor, onLinkSessions, onOpenSession, onInspectSession,
+  onAskDesk,
 }: TaskColumnProps): ReactElement {
   const [addingGroup, setAddingGroup] = useState(false)
   const laneOver = (dropTarget?.status === status && dropTarget.block === true)
@@ -233,7 +236,14 @@ export function TaskColumn({
             )
           : null}
         {lane.blocks.length === 0 && draft === null && !addingGroup
-          ? <p className="dsh-task-empty">{t('task.emptyLane')}</p>
+          ? (
+              <p className="dsh-task-empty">
+                {t('task.emptyLane')}
+                {onAskDesk === undefined ? null : (
+                  <button type="button" className="dsh-desk-ask-link" onClick={onAskDesk}>{t('task.askDesk')}</button>
+                )}
+              </p>
+            )
           : null}
       </div>
     </section>

@@ -14,6 +14,7 @@ import type { DeskTranslator, Tab } from './types.js'
 import { OVERFLOW_TABS, VISIBLE_TABS } from './tabs.js'
 import { DeskTabMenu } from './DeskTabMenu.js'
 import { DeskIntroInfo } from './DeskIntroInfo.js'
+import { DeskAskMenu } from './DeskAskMenu.js'
 import { DeskTabGlyph } from '../tabIcons.js'
 import { DeskGlyph } from '../brand.js'
 
@@ -27,9 +28,11 @@ interface DeskHeaderProps {
   readonly onTogglePin: () => void
   /** Active view actions; rendered on the title-row right edge. */
   readonly actions: ReactNode
+  /** Open the Workspace blank with one prefilled prompt ("和 DSH 一起", never sends). */
+  readonly onAskDesk: (prompt: string) => void
 }
 
-export function DeskHeader({ t, tab, onSelectTab, pinned, onTogglePin, actions }: DeskHeaderProps): ReactElement {
+export function DeskHeader({ t, tab, onSelectTab, pinned, onTogglePin, actions, onAskDesk }: DeskHeaderProps): ReactElement {
   const shortcutLabel = pinned ? t('tab.unpin') : t('tab.pin')
   return (
     <header className="dsh-desk-header" data-window-drag>
@@ -41,6 +44,7 @@ export function DeskHeader({ t, tab, onSelectTab, pinned, onTogglePin, actions }
           </h1>
           <p className="dsh-desk-intro">{t('page.subtitle')}</p>
           <DeskIntroInfo t={t} />
+          <DeskAskMenu t={t} tab={tab} onAskDesk={onAskDesk} />
         </div>
         {actions === null ? null : (
           <div className="dsh-desk-header-actions" data-window-drag-recall>{actions}</div>

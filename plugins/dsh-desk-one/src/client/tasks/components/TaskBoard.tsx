@@ -28,9 +28,11 @@ interface TaskBoardProps {
   readonly board: TaskBoardApi
   /** Optional session services facade; disabled when the host doesn't expose them. */
   readonly sessionLink: SessionLinkApi
+  /** "和 DSH 一起": shown in the empty To-do lane only when the whole board is empty. */
+  readonly onAskDesk?: () => void
 }
 
-export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoardProps): ReactElement {  const [draggingId, setDraggingId] = useState<string | null>(null)
+export function TaskBoard({ t, data, groupsData, board, sessionLink, onAskDesk }: TaskBoardProps): ReactElement {  const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [groupDrag, setGroupDrag] = useState<DeskTaskGroup | null>(null)
   const [groupDrop, setGroupDrop] = useState<GroupDropTarget | null>(null)
@@ -371,6 +373,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
                   onLinkSessions={linkSessions}
                   onOpenSession={sessionLink.open}
                   onInspectSession={sessionLink.inspect}
+                  onAskDesk={data.tasks.length === 0 && status === 'todo' ? onAskDesk : undefined}
                 />
               ))}
             </div>
