@@ -1,7 +1,7 @@
 # 08 · 和 DSH 一起：面板 ↔ 对话的联动入口
 
 > 状态：**已评审并实施**（2026-11-14）。owner 决定：三层一起做、页头入口放 info 旁、日程 / 会话只留只读示例、预填用半句让用户接着写。
-> 本文档记录交互与边界；实现落点见第 8 节。
+> 本文档记录交互与边界；实现落点见第 8 节。**逐条文案评审见 [`09-ui-copy.md`](09-ui-copy.md)（讨论中；定稿后反馈列删除）。**
 
 ## 0. 一句话方案
 
@@ -99,7 +99,7 @@
 | 便签空态 | `src/client/notes/NotesWall.tsx` |
 | 任务空态 | `src/client/tasks/components/TaskBoard.tsx` → `TaskColumn.tsx`（仅整板为空时的待办列） |
 | 笔记未链接文案 | `src/client/i18n/notebook.ts` 的 `notebook.welcomeBody` |
-| 文案 | `src/client/i18n/app.ts`（`coauthor.*`）、`notes.ts`、`tasks.ts` |
+| 文案 | `src/client/i18n/app.ts`（`coauthor.*`）、`notes.ts`、`tasks.ts`；逐条评审稿见 `09-ui-copy.md` |
 | 单测 | `test/client/coauthor.test.mjs` |
 
 **便签的预填怎么触发**：便签没有自己的「会话」，所以按钮并不写便签本身——它调用官方 `uiWorkspace.startSession(undefined, { prompt: '帮我记一条便签：', whenDraftExists: 'append' })`：打开（或复用）当前 / 最近工作区的空白会话，把半句指令追加进输入框草稿并聚焦，用户接着写内容、自己按发送；DSH 收到后通过 `desk_note_add` 落库。和「让 AI 起草」是同一条路，只是不带工作区参数、用 `append` 保护已有草稿。无工作区时由官方导航给出「需要工作区」提示。
