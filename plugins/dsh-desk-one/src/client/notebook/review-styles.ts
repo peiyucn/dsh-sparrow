@@ -58,13 +58,9 @@ body:has(.dsh-desk-review-composer-hint) [data-composer-placeholder] {
 body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   display: none;
 }
-/* Sidebar session-row leading cell: the same blue brand mark as the bubble avatar, miniaturised. */
-.dsh-desk-review-session-mark-trailing {
-  width: 14px;
-  height: 14px;
-}
-/* Sidebar session-row mark: the note's own markdown file icon, so a review Session is easier to
-   pick out than the monochrome brand glyph. */
+/* Review entry marks (sidebar Session rows and the official document-preview header): one glyph in
+   the official business blue, no filled badge. The official Session row owns the 16px leading cell
+   and swaps in a status dot for busy rows, so the mark stays purely decorative. */
 .dsh-desk-review-session-mark {
   display: inline-flex;
   flex: none;
@@ -72,6 +68,19 @@ body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   justify-content: center;
   width: 16px;
   height: 16px;
+  color: var(--dsw-alias-state-business-primary, #4176e6);
+}
+/* Busy rows replace the leading cell with the official status dot, so the same mark rides the
+   trailing cell (one pixel smaller) while a review Session runs or waits for input. */
+.dsh-desk-review-session-mark-trailing {
+  width: 14px;
+  height: 14px;
+}
+/* The document-preview header action wears the same blue, so both review entry points read as one
+   feature. Tint the glyph wrapper, not the button, to leave the official hover fill untouched. */
+.dsh-desk-review-entry-icon {
+  display: inline-flex;
+  color: var(--dsw-alias-state-business-primary, #4176e6);
 }
 
 /* Frontmatter block: quiet metadata card above the page content (raw frontmatter is stripped from body). */

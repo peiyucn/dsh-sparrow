@@ -93,7 +93,7 @@ export function DocReviewAction(props: DocReviewActionProps): ReactNode {
       <Button
         variant="ghost"
         size="sm"
-        icon={<IconListPenOutlineRegular />}
+        icon={<span className="dsh-desk-review-entry-icon"><IconListPenOutlineRegular /></span>}
         aria-label={t('review.openInPreview')}
         title={t('review.openInPreview')}
         disabled={busy}
