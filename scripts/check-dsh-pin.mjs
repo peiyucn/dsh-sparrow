@@ -181,7 +181,7 @@ if (violations.length > 0) {
   console.error('\n修法：')
   console.error('  · 跟版时把真值**一次性**改遍：plugins/*/package.json 的 peer + devDependencies')
   console.error('  · pnpm-workspace.yaml 的 overrides 闭包 + minimumReleaseAgeExclude → 再 pnpm install 重算 lockfile')
-  console.error('  · README 环境要求行（根 README 中英各 1 行 + 每个活跃插件中英各 1 行；当前 4 个插件 = 10 份文件）')
+  console.error('  · README 环境要求行（根 README 中英各 1 行 + 每个活跃插件中英各 1 行；当前 5 个插件 = 12 份文件）')
   console.error('  · 已删除的退役插件不在仓库内；RETIRED_PLUGINS 名单保持为空')
   process.exit(1)
 }
