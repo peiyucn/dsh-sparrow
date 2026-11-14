@@ -1,7 +1,0 @@
-# dsh-archive-manage 组合补丁。
-# trashRoot 是插件自己的回收站目录，不动 dsh 会话根目录。
-- insert:
-    - id: dsh-archive-manage
-      name: '@dsh-sparrow/dsh-archive-manage'
-      config:
-        trashRoot: !!js dshHomePath('.sessions-trash')

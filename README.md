@@ -16,19 +16,7 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 [Desk One docs](plugins/dsh-desk-one/README.md) · [Plugin market](https://dsh.pyai.site/)
 
-Two ways to do anything here: click it yourself, or just tell DSH. The header's **Talk to Me** button drops a tab-aware prompt into the conversation, and the panel's "…" menu has **Make a wish** for feature requests.
-
-Desk One is the desk. The other plugins below come with it and are installed separately.
-
-## Plugins
-
-| Plugin | What it does | Install |
-| :--- | :--- | :--- |
-| [dsh-desk-one](plugins/dsh-desk-one/README.md) | Desk One — notes, tasks, a read-only calendar and AI-written notebook review in one panel. | `dsh plugin --profile web add @dsh-sparrow/dsh-desk-one` |
-| [dsh-chat-fim](plugins/dsh-chat-fim/README.md) | Fill-in-the-middle suggestions in the composer: pause, Tab to adopt, three sensitivity levels. | `dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim` |
-| [dsh-codebuddy-credits](plugins/dsh-codebuddy-credits/README.md) | CodeBuddy credits as an LLM provider: rates in the model picker, a quota panel, per-turn credits. | `dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits` |
-| [dsh-theme-tone](plugins/dsh-theme-tone/README.md) | Tone skins over the built-in light and dark themes, plus conversation-layout tuning. | `dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone` |
-| [dsh-archive-manage](plugins/dsh-archive-manage/README.md) | Archived-session management: unarchive, trash, delete, restore; a parent and its subagents move together. | `dsh plugin --profile web add @dsh-sparrow/dsh-archive-manage` |
+Desk One is the desk; the tools below come with it and are installed separately. Each plugin is published independently and retires once DSH natively supports its feature. The version badge above tracks the collection's aligned release line (mirrored from official dsh).
 
 ## Requirements
 
@@ -38,7 +26,7 @@ Desk One is the desk. The other plugins below come with it and are installed sep
 
 ## Install
 
-> The packages are published on npm, but do **not** install them with `npm install @dsh-sparrow/...` directly — that only downloads them into a `node_modules` without registering them in the DSH web profile. Use the `dsh plugin` command in the table above so each package lands in `$DSH_HOME/profiles/web` and its bundle layer is activated. Restart DSH after installing.
+> The packages are published on npm, but do **not** install them with `npm install @dsh-sparrow/...` directly — that only downloads them into a `node_modules` without registering them in the DSH web profile. Use the `dsh plugin` command below so each package lands in `$DSH_HOME/profiles/web` and its bundle layer is activated. Restart DSH after installing.
 
 ## Install from the DSH plugin market
 
@@ -50,9 +38,24 @@ https://dsh.pyai.site/market/index.json
 
 Paste it into **Discover → Add index source**. The market marks which versions work with the DSH you are running — every plugin here only supports the exact version line its version number states, so the card usually shows the single installable version.
 
+## Plugins
+
+| Plugin | What it does | Install |
+| :--- | :--- | :--- |
+| [dsh-chat-fim](plugins/dsh-chat-fim/README.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-chat-fim&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-chat-fim) | ![Fill-in-the-middle (FIM) suggestion card](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-chat-fim.png "ratio:0.18")<br>Chat input suggestions powered by DeepSeek FIM (Beta): pause to get a suggestion card, Tab adopts; three trigger-sensitivity levels; the completion model follows the main model. | `dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim` |
+| [dsh-codebuddy-credits](plugins/dsh-codebuddy-credits/README.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-codebuddy-credits&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-codebuddy-credits) | ![Credits entry and quota panel on the session page](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-codebuddy-credits.png "ratio:0.25")<br>Company CodeBuddy credits as a DSH LLM provider: each model's credit rate in the model picker, a quota panel in the header, and per-turn credits. | `dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits` |
+| [dsh-theme-tone](plugins/dsh-theme-tone/README.md) [![npm downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.npmjs.org%2Fdownloads%2Fpoint%2F2015-01-01%3A2099-01-01%2F%40dsh-sparrow%2Fdsh-theme-tone&query=%24.downloads&label=downloads&color=ea7233)](https://www.npmjs.com/package/@dsh-sparrow/dsh-theme-tone) | ![Dark theme](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-dark.png "ratio:0.5") ![Light theme](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-theme-tone-light.png "ratio:0.5")<br>Tone skins for DSH's built-in light and dark themes (dark on the left, light on the right), plus conversation-area layout tuning once a tone is picked. | `dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone` |
+| [dsh-desk-one](plugins/dsh-desk-one/README.md) | **Desk One** — the desk: notes, tasks, a read-only calendar and AI-written notebook review in one panel. | `dsh plugin --profile web add @dsh-sparrow/dsh-desk-one` |
+
 ## Retired
 
-No retired plugins remain in this repository: `dsh-nav-pin` and `dsh-vision-bridge` were deleted on 2026-10-27, and `dsh-file-manage` was deleted on 2026-10-31. The `@dsh-sparrow/dsh-file-manage` npm package keeps its published versions (not unpublished) but is no longer maintained; remove an existing install with `dsh plugin --profile web remove @dsh-sparrow/dsh-file-manage`.
+Retired plugins are removed from the source tree; their npm packages keep their published versions (not unpublished):
+
+- `dsh-nav-pin` and `dsh-vision-bridge` — deleted 2026-10-27
+- `dsh-file-manage` — deleted 2026-10-31
+- `dsh-archive-manage` — retired 2026-11-15
+
+Remove an existing install with `dsh plugin --profile web remove @dsh-sparrow/<plugin>`.
 
 ## License
 

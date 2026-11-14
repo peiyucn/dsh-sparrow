@@ -143,7 +143,6 @@ const LABELS = {
  */
 const PLUGIN_LABELS = {
   'dsh-chat-fim': ['network', 'llm', 'session'],
-  'dsh-archive-manage': ['session', 'fs-write'],
   'dsh-codebuddy-credits': ['network', 'llm', 'credentials'],
   'dsh-theme-tone': ['ui'],
   'dsh-desk-one': ['ui', 'fs-write'],
@@ -155,7 +154,6 @@ const PLUGIN_LABELS = {
  */
 const ZH_DESCRIPTIONS = {
   'dsh-chat-fim': '输入框续写联想：停顿后浮现建议卡，Tab 采纳、Esc 关闭；触发灵敏度三档可调',
-  'dsh-archive-manage': '会话归档管理：取消归档、移入回收站、彻底删除、从回收站还原，父会话与子会话整体操作',
   'dsh-codebuddy-credits': 'CodeBuddy 额度 LLM provider：用官方 API Key 直连，在 DSH 里选用 CodeBuddy 的模型额度',
   'dsh-theme-tone': '明暗主题之下的色调层与对话区布局优化：每轴一款「官方默认」加若干色调，含顶栏与输入框玻璃效果',
   'dsh-desk-one': '同桌（Desk One）：和 DSH 共用的一张办公桌——便签、任务、只读日程，以及 AI 写、你审的笔记，都在一个面板里',

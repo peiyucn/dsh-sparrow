@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 
 export const repoRoot = resolve(import.meta.dirname, '..')
 
-/** 退役插件名单：两个退役插件已于 2026-10-27 彻底删除，名单保留为空供守卫结构稳定。 */
+/** 退役插件名单：四个退役插件已于 2026-10-27、2026-10-31 与 2026-11-15 彻底删除，名单保留为空供守卫结构稳定。 */
 export const RETIRED_PLUGINS = new Set([])
 
 /** 活跃插件名（目录名，按名排序）：只算**已脚手架化**的插件（有 `package.json`），纯文档目录（spec 阶段）跳过。 */

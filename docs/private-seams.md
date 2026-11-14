@@ -6,14 +6,14 @@
 
 ## A. 私有 seam（官方无公开能力）
 
-1. **`dsh-desk-one`（`dsh-archive-manage` 退役前同构）— WorkspaceRegistry 私有写通道**
+1. **`dsh-desk-one` — WorkspaceRegistry 私有写通道**
    `src/host/sessions/archive-set.ts` 的 `mutateArchivedSet`（`enqueueOperation` + `requireState` +
    `setState`）；守卫 `gates.ts` 的 `assertRegistryMutationApi`。
    只用于官方 API 无法表达的静默维护：回收站 / 永久删除（移出归档集但不触发 `session-unarchiving`）、
    回收站还原（加回但不触发 `session-archived`）、父子归档对齐、幽灵 id 清扫。用户归档 / 取消归档走官方
    `archiveSession` / `unarchiveSession`。缺失该私有面 → 插件自停用（只停本插件）。
 
-2. **`dsh-desk-one`（`dsh-archive-manage` 退役前同构）— 官方投影缓存行直读 / 删行 / 清扫**
+2. **`dsh-desk-one` — 官方投影缓存行直读 / 删行 / 清扫**
    `src/host/sessions/projection.ts`：读 `session_projcache` 行（展示事实 / 空白判定）、移入回收站 /
    永久删除后失效对应行、启动清扫陈旧行；回收站会话的行必须保留。官方服务只公开读写快照，**没有删行 /
    清扫 API**。域与表名取公开的 `projectionCacheDomainSpec`（解析不到才回退字面量）。
