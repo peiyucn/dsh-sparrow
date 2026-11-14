@@ -38,7 +38,7 @@ export {
   GLASS_BLUR,
   HEADER_HEIGHT_PX,
 } from './glass.js'
-export { CONTENT_MAX_SIDE_CLEARANCE_PX, CONTENT_MIN_FLOOR_PX, HOVER_HIDE_BREAKPOINT_PX, NAV_ARIA_LABELS, buildNavPinCss } from './nav-pin.js'
+export { CONTENT_MAX_SIDE_CLEARANCE_PX, CONTENT_MIN_FLOOR_PX, HOVER_HIDE_BREAKPOINT_PX, NAV_SELECTOR, buildNavPinCss } from './nav-pin.js'
 export { buildSurfaceCss } from './surfaces.js'
 export {
   DARK_TONE_IDS,

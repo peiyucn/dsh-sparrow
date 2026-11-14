@@ -475,3 +475,24 @@ describe('双语标签', () => {
     assert.equal(zh['tone.official'], '默认', 'official 的 zh 标签就是「默认」')
   })
 })
+
+describe('官方 HoverCard 材料修正（公开 token 通道，不再锚定 hashed 类名）', () => {
+  it('四个 hovercard token 应该 都由主题 token 覆盖层提供（面用抬升面、字用官方 label 阶梯）', () => {
+    const overrides = tokenOverrides(DEFAULT_SETTINGS)
+    const both = value => ({ light: value, dark: value })
+    assert.deepEqual(overrides['--dsw-alias-hovercard-bg'], both('var(--dsw-alias-bg-layer-3)'))
+    assert.deepEqual(overrides['--dsw-alias-hovercard-label-primary'], both('var(--dsw-alias-label-primary)'))
+    assert.deepEqual(overrides['--dsw-alias-hovercard-label-secondary'], both('var(--dsw-alias-label-secondary)'))
+    assert.deepEqual(overrides['--dsw-alias-hovercard-label-tertiary'], both('var(--dsw-alias-label-tertiary)'))
+  })
+
+  it('材质修正不应该 依赖 surfaces.ts 的 DOM 锚点（hashed 类名依赖退场）', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const src = await readFile(new URL('../src/surfaces.ts', import.meta.url), 'utf8')
+    // 只看代码（注释里可以说明历史），确认 hashed 类名 / hovercard token 覆盖已不在这个文件里。
+    const code = src.replace(/\/\*[\s\S]*?\*\//gu, '')
+    for (const forbidden of ['_portal', 'hoverTitle', '--dsw-alias-hovercard']) {
+      assert.ok(!code.includes(forbidden), `surfaces.ts 代码里不得再出现 ${forbidden}`)
+    }
+  })
+})

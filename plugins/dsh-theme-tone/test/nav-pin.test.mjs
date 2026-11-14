@@ -5,23 +5,23 @@ import {
   CONTENT_MAX_SIDE_CLEARANCE_PX,
   CONTENT_MIN_FLOOR_PX,
   HOVER_HIDE_BREAKPOINT_PX,
-  NAV_ARIA_LABELS,
+  NAV_SELECTOR,
   buildNavPinCss,
 } from '../lib/nav-pin.js'
 
 const css = buildNavPinCss()
 
 describe('nav-pin: 轮次导航恒显 + 宽度钳制（纯 CSS）', () => {
-  it('两套 aria-label 文案的 nav 都被命中，且恒显直接压 display: none', () => {
-    for (const label of NAV_ARIA_LABELS) assert.ok(css.includes(`nav[aria-label="${label}"]`), `缺少 ${label}`)
-    const always = /nav\[aria-label="Turn navigation"\],\s*nav\[aria-label="轮次导航"\] \{\s*display: block;/u
-    assert.match(css, always)
+  it('官方轮次导航 nav 用公开滚动区属性定位，且恒显直接压 display: none', () => {
+    assert.equal(NAV_SELECTOR, '[data-conversation-scroll] nav', '锚点必须是公开 data 属性 + nav 结构，不依赖本地化文案')
+    assert.ok(css.includes(`${NAV_SELECTOR} {\n  display: block;`), '恒显规则必须直接命中该 nav')
+    assert.ok(!css.includes('aria-label'), '不再依赖本地化 aria-label 文案')
   })
 
   it('窄断点下默认隐身、hover / focus 淡入，且不改框与底色', () => {
     assert.ok(css.includes(`@container (max-width: ${HOVER_HIDE_BREAKPOINT_PX}px)`), '断点用 700px')
-    assert.match(css, /nav\[aria-label="Turn navigation"\]:hover/u)
-    assert.match(css, /nav\[aria-label="Turn navigation"\]:focus-within/u)
+    assert.ok(css.includes(`${NAV_SELECTOR}:hover`), 'hover 淡入')
+    assert.ok(css.includes(`${NAV_SELECTOR}:focus-within`), '键盘 focus 淡入')
     assert.ok(!/(background|border|box-shadow):/u.test(css.replace(/\/\*[\s\S]*?\*\//gu, '')), '只做透明度，不加框 / 底色 / 阴影')
   })
 

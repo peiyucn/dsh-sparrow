@@ -50,24 +50,25 @@
 6. **右栏内容区同款打光**：pane 用视口对齐（`100vw 100vh` + `right/top`）的「底色 + 三道光」重画。
 7. **设置弹窗打光**：官方弹窗根 `[data-shortcut-modal='settings']` 叠同源光，**按弹窗自身盒子缩放**
    （`background-size: 100% 100%`；弹窗居中、位置不固定，不能按视口相位画）。
-8. **官方浮层材料修正**（`surfaces.ts`，**不带「官方默认」门**——这些是官方材料在深色玻璃 / 多卡叠放 /
+8. **官方 HoverCard 材料修正**（`tones.ts` 的 token 覆盖层，**不带「官方默认」门**）：官方把悬停卡的面 /
+   字写死成「深底白字」的 `--dsw-alias-hovercard-*` token（浅色轴也刻意用深卡）。本插件走官方公开 token
+   通道（`ctx.theme.overrideTokens`）把四个 token 全局换成主题抬升面 + 官方 `--dsw-alias-label-*` 阶梯
+   ⇒ 不再按 portal 包装节点的 hashed 类名锚定卡根。属「刻意改官方默认外观」的例外
+   （`docs/private-seams.md` §B）。
+9. **其他官方浮层材料修正**（`surfaces.ts`，**不带「官方默认」门**——这些是官方材料在深色玻璃 / 多卡叠放 /
    滚动场景下读起来不对，与色调偏好无关，任何音色下都修）：
-   ① 左边栏 Workspace 行 hover 卡：官方写死深底 + 白系字 ⇒ 面换 `--dsw-alias-bg-layer-3`、字换官方
-   `--dsw-alias-label-*`（层次保持）。dsh 0.2.2 起 HoverCard 先挂 `display: contents` 的 portal 包装节点，
-   锚点改为 `body > [class*='_portal'] [role='button'][aria-label]`，字色按官方类名后缀命中
-   ——私有 seam，登记在 `docs/private-seams.md`。
-   ② 停靠卡（todo / goal / queue）材质：官方是半透明菜单玻璃，几张叠放时只有最上面一张看得出磨砂 ⇒
+   ① 停靠卡（todo / goal / queue）材质：官方是半透明菜单玻璃，几张叠放时只有最上面一张看得出磨砂 ⇒
    统一换不透明抬升面（`bg-layer-1`，不做 blur），官方 elevation 阴影 / 边框 / 圆角保持不动。
-   ③ 菜单分组标题（模型选择列表等）：官方 sticky 却没有背景，滚动时条目从标题下穿过 ⇒ 用
+   ② 菜单分组标题（模型选择列表等）：官方 sticky 却没有背景，滚动时条目从标题下穿过 ⇒ 用
    「主题底色 + 菜单色」合成不透明底。
-   ④ 输入框触发菜单（@ / 斜杠 候选列表）：官方用 `::after` 画一条 16px 的色块渐隐条当「下面还有内容」
+   ③ 输入框触发菜单（@ / 斜杠 候选列表）：官方用 `::after` 画一条 16px 的色块渐隐条当「下面还有内容」
    提示，在深色玻璃上会读成一条多余的长方形 ⇒ 隐藏该色块，改为**淡出列表内容本身**（`mask-image`，
    底部 / 顶部各 26px），由官方 `data-overflow-below` / `data-overflow-above` 属性驱动；滚到底时官方移除
    属性、渐隐自动消失，提示语义保留且更直观。
    注：MenuSurface 菜单材质 / 相位动画**交回官方**（不改填充、模糊、动画），保持官方半透明磨砂观感。
-9. **轮次导航功能（自 dsh-nav-pin 并入）**：纯 CSS、无锚点扫描。官方把 `display: none` 写在
-   `<nav aria-label="Turn navigation">` 上 ⇒ 用公开 aria-label 压过官方类名；≤700px 默认隐身、hover /
-   键盘 focus 淡入（只做 opacity）。会话内容宽度：官方 `.body` 的语义是
+10. **轮次导航功能（自 dsh-nav-pin 并入）**：纯 CSS、无锚点扫描。官方把 `display: none` 写在轮次导航
+   `<nav>` 上 ⇒ 用官方公开的滚动区属性定位（`[data-conversation-scroll] nav`，面包屑 nav 在标题行、不在
+   滚动区内）压过官方类名；≤700px 默认隐身、hover / 键盘 focus 淡入（只做 opacity）。会话内容宽度：官方 `.body` 的语义是
    `--dsh-chat-content-width: var(--dsh-chat-user-width, clamp(680px, column×0.64, 920px))`，官方拖拽条只写
    `--dsh-chat-user-width`（拖动中实时写、松手后写 localStorage 偏好）⇒ 本插件**只把钳制放进 var() 的兜底**
    （无偏好时 `min(官方公式, max(640px, column−240px))`，即每侧至少留 120px / 地板 640px），滚动体与拖拽条

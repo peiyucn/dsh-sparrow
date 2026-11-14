@@ -550,5 +550,24 @@ export function tokenOverrides(settings: ThemeToneSettings): TokenOverrides {
       dark: rungFill(dark.tint, darkRung, SURFACE_TINT.dark),
     }
   }
+  // 官方 HoverCard 组件把面 / 字写死成「深底白字」token（浅色轴也刻意用深卡）。本插件的材料修正
+  // 让它跟随主题：走官方公开 token 通道做全局覆盖，而不是按 portal 包装节点的 hashed 类名锚定卡根
+  // （那会构成静默失效风险）。值引用官方语义 token，切轴时自动跟随主题层。
+  overrides['--dsw-alias-hovercard-bg'] = {
+    light: 'var(--dsw-alias-bg-layer-3)',
+    dark: 'var(--dsw-alias-bg-layer-3)',
+  }
+  overrides['--dsw-alias-hovercard-label-primary'] = {
+    light: 'var(--dsw-alias-label-primary)',
+    dark: 'var(--dsw-alias-label-primary)',
+  }
+  overrides['--dsw-alias-hovercard-label-secondary'] = {
+    light: 'var(--dsw-alias-label-secondary)',
+    dark: 'var(--dsw-alias-label-secondary)',
+  }
+  overrides['--dsw-alias-hovercard-label-tertiary'] = {
+    light: 'var(--dsw-alias-label-tertiary)',
+    dark: 'var(--dsw-alias-label-tertiary)',
+  }
   return overrides
 }

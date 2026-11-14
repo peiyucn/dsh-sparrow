@@ -1,11 +1,16 @@
 /**
  * 轮次导航（Turn Navigation）在窄列不消失 + 会话内容宽度钳制 —— 自 `dsh-nav-pin` 并入的**功能**。
- * 纯 CSS，无运行期探测：官方把 `display: none` 直接写在 `<nav aria-label=…>` 上，aria-label 是公开
- * 锚点（两套文案），按属性选择器即可压过官方 CSS-module 类名的特异性。断点与宽度公式照官方常量取。
+ * 纯 CSS，无运行期探测：官方把 `display: none` 直接写在导航 `<nav>` 上，这里用官方公开的滚动区
+ * `[data-conversation-scroll]` 定位它（会话面包屑 nav 在标题行、不在滚动区内，不会误伤）。
+ * 断点与宽度公式照官方常量取。
  */
 
-/** 官方 nav 的 aria-label 文案（中 / 英）。 */
-export const NAV_ARIA_LABELS: readonly string[] = ['Turn navigation', '轮次导航']
+/**
+ * 官方轮次导航 `nav` 的锚点：滚动区内的 `nav`。
+ * 官方没有给这个 nav 专门的 data 属性，但滚动区属性是公开的，且当前滚动区内只有这一个 nav；
+ * 若官方日后在滚动区新增 nav，这条选择器需要重新收窄（见 docs/private-seams.md §C）。
+ */
+export const NAV_SELECTOR = '[data-conversation-scroll] nav'
 
 /** 官方在 900px 隐藏；并到 700px 才停显。 */
 export const HOVER_HIDE_BREAKPOINT_PX = 700
@@ -20,10 +25,6 @@ export const CONTENT_MIN_FLOOR_PX = 640
 /** 输入卡片比内容宽 32px（官方 `--dsh-composer-card-max-width` 公式）。 */
 const CARD_EXTRA_WIDTH_PX = 32
 
-function navSelector(): string {
-  return NAV_ARIA_LABELS.map(label => `nav[aria-label=${JSON.stringify(label)}]`).join(',\n')
-}
-
 /**
  * 内容宽度轴：官方 `.body` 的语义是 `--dsh-chat-content-width: var(--dsh-chat-user-width, clamp(680px, column×0.64, 920px))`，
  * 官方拖拽条只写 `--dsh-chat-user-width`（拖动中实时写、松手后写 localStorage 偏好）。所以这里必须
@@ -37,7 +38,7 @@ function clampedContentWidth(): string {
 }
 
 export function buildNavPinCss(): string {
-  const nav = navSelector()
+  const nav = NAV_SELECTOR
   return `/* 1) 恒显：压过官方 @container (max-width: 900px) 的 display: none */
 ${nav} {
   display: block;
@@ -51,16 +52,14 @@ ${nav} {
     transition: opacity ${OPACITY_TRANSITION_MS}ms ease-out, ${NATIVE_HEIGHT_TRANSITION};
   }
 
-  ${NAV_ARIA_LABELS.map(label => `nav[aria-label=${JSON.stringify(label)}]::before`).join(',\n')} {
+  ${nav}::before {
     content: '';
     position: absolute;
     inset: -8px 0 -8px -16px;
   }
 
-  ${NAV_ARIA_LABELS.flatMap((label) => {
-    const sel = `nav[aria-label=${JSON.stringify(label)}]`
-    return [`${sel}:hover`, `${sel}:focus-within`]
-  }).join(',\n')} {
+  ${nav}:hover,
+  ${nav}:focus-within {
     opacity: 1;
   }
 }

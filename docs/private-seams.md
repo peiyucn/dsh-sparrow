@@ -45,27 +45,23 @@
 
 > 均**不带**官方默认门（`data-dsh-theme-tone-plain` 只对 `backdrop.ts` / `glass.ts` 生效，本节两类在两个档位都生效）。
 
-1. **浮层材料修正** — `plugins/dsh-theme-tone/src/surfaces.ts` 的 `buildSurfaceCss` 无条件注入：官方把少数浮层的
-   面 / 字写成组件内字面量或半透明玻璃，深色玻璃上不可读 ⇒ 统一换成官方 token：
-   * 左边栏 Workspace 行 hover 卡：在卡根覆盖官方 `--dsw-alias-hovercard-*`；
+1. **官方 HoverCard 材料修正** — `plugins/dsh-theme-tone/src/tones.ts` 的 token 覆盖层（公开的
+   `ctx.theme.overrideTokens` 通道）：官方把悬停卡的面 / 字写死为「深底白字」的
+   `--dsw-alias-hovercard-*` token（浅色轴也刻意用深卡）⇒ 本插件全局覆盖这四个 token 为主题抬升面 +
+   官方 `--dsw-alias-label-*` 阶梯，使悬停卡跟随主题（workspace 行 / 会话预览卡等官方 HoverCard 一致）。
+2. **其他浮层材料修正** — `plugins/dsh-theme-tone/src/surfaces.ts` 的 `buildSurfaceCss` 无条件注入：
+   官方材料在深色玻璃上不可读 ⇒ 换成官方 token：
    * 停靠卡（todo / goal / queue）：半透明菜单玻璃 → 不透明抬升面；
    * 菜单分组标题（`[data-menu-group-heading]`）：sticky 却没有不透明底 → 用主题底 + 菜单色合成；
    * 输入框触发菜单「下面还有内容」的官方色块提示（`[data-trigger-menu]::after`）→ 改成列表内容渐隐
      （只在官方 `data-overflow-below/above` 存在时生效）。
-2. **轮次导航恒显 + 内容宽度钳制** — `plugins/dsh-theme-tone/src/nav-pin.ts`：官方在 900px 隐藏轮次导航，
+3. **轮次导航恒显 + 内容宽度钳制** — `plugins/dsh-theme-tone/src/nav-pin.ts`：官方在 900px 隐藏轮次导航，
    owner 定案改到 700px 才停显（hover / focus 淡入）；内容宽度在**没有**官方用户宽度偏好时钳到「每侧 ≥120px、
    地板 640px」，有偏好时原样交还官方（守卫 `test/nav-pin.test.mjs`）。
 
 ## C. 静默失效风险
 
-1. **`dsh-theme-tone` 悬停卡卡根锚点** — `src/surfaces.ts` 的
-   `CARD = body > [class*='_portal'] [role='button'][aria-label]`：官方 HoverCard 的 portal 包装节点只有 hashed
-   类名可辨。官方改名即 token 覆盖不命中、悬停卡退回官方深卡（不抛错、不崩）⇒ 良性降级；
-   守卫 `test/surfaces.test.mjs`。
-2. **`dsh-theme-tone` 轮次导航本地化 `aria-label`** — `src/nav-pin.ts` 的 `NAV_ARIA_LABELS`
-   （`Turn navigation` / `轮次导航`）：官方 nav 没有 data 属性、只有本地化文案可认；官方改字即「恒显 / 窄屏浮现」
-   静默失效（降级 = 窄列上轮次导航照官方消失）。建议向上游提「给该 `<nav>` 加稳定 data 属性」。
-3. **`dsh-codebuddy-credits` 设置行 DOM seam** — `src/client/settings-row.ts` + `CodeBuddyProviderCard.tsx`：
+1. **`dsh-codebuddy-credits` 设置行 DOM seam** — `src/client/settings-row.ts` + `CodeBuddyProviderCard.tsx`：
    在捕获阶段拦截官方行头的「编辑」按钮（阻断官方编辑器并展开本插件编辑器），并把保存提示插到 section 顶部。
    官方改行头结构即一起静默降级：拦截不到 → 本卡不再展开（官方编辑器按原行为打开）；提示插不进 → 只是不显示
    「已保存」，Key 的保存 / 清空不受影响。

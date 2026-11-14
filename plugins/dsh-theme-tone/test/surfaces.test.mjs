@@ -5,26 +5,6 @@ import { buildSurfaceCss } from '../lib/surfaces.js'
 
 const css = buildSurfaceCss()
 
-describe('surfaces: 官方写死牌面的浮层（左边栏 Workspace hover 卡）', () => {
-  it('锚点 = body 下 portal 包装节点内、role=button 的卡片（dsh 0.2.2 起多一层 display:contents 包装）', () => {
-    assert.ok(css.includes("body > [class*='_portal'] [role='button'][aria-label]"))
-    assert.ok(!css.includes("body > [role='button'][aria-label]"), '0.2.2 的卡不再是 body 直接子节点')
-  })
-
-  it('面：官方固定深底换成官方 hovercard 面 token（跟随色调）', () => {
-    assert.match(css, /--dsw-alias-hovercard-bg: var\(--dsw-alias-bg-layer-3\)/u)
-    assert.ok(!css.includes('#2C2C2E'), '不得再写死官方深底色')
-  })
-
-  it('字色：覆盖官方 hovercard 四个 label token，层次保持，不再依赖 hashed 类名后缀', () => {
-    assert.match(css, /--dsw-alias-hovercard-label-primary: var\(--dsw-alias-label-primary\)/u)
-    assert.match(css, /--dsw-alias-hovercard-label-secondary: var\(--dsw-alias-label-secondary\)/u)
-    assert.match(css, /--dsw-alias-hovercard-label-tertiary: var\(--dsw-alias-label-tertiary\)/u)
-    assert.ok(!/hoverTitle|hoverPath|hoverTime|hoverStatus|_copied/u.test(css), '不再按 CSS-module 类名后缀命中字色')
-    assert.ok(!/#FFFFFF|#CFD3D6|#ADB2B8/u.test(css), '不得残留官方写死的字色')
-  })
-})
-
 describe('surfaces: 停靠卡材质（todo / goal / queued messages）', () => {
   it('材质从半透明菜单玻璃换成不透明抬升面（多张叠放时每张观感一致）', () => {
     const todo = /\[data-composer-seat\] \[data-testid='todo-panel'\] \{([^}]*)\}/u.exec(css)?.[1] ?? ''
