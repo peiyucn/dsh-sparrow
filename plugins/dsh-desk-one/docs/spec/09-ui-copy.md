@@ -8,7 +8,7 @@
 
 | 场景 | key | 中文 | 英文 |
 |---|---|---|---|
-| 品牌分段按钮右半（所有 tab 常驻，左半是「✦」同桌徽标） | `coauthor.entry` | 和我说 | Talk to me |
+| 品牌分段按钮右半（所有 tab 常驻，左半是「✦」同桌徽标） | `coauthor.entry`        | 和我说                                              | Talk to Me                                                                                                                    |
 | 页头副标题 | `page.subtitle` | 与 harness 共用的一张办公桌 | One desk for you and harness |
 | info 按钮的无障碍名 | `page.introLabel` | 关于同桌 | About Desk One |
 | info 浮层首段 | `page.introDetail` | 碳硅同席：两种生命，一张桌子。你出灵感，harness 出力；便签、任务、会话与日程，一起完成。 | Carbon and silicon, one desk. You bring the spark, harness does the work; notes, tasks, sessions and schedule, done together. |

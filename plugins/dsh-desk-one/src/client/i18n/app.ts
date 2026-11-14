@@ -51,7 +51,7 @@ export const zh = {
 /** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
 export const en = {
   'button.label': 'Desk One',
-  'coauthor.entry': 'Talk to me',
+  'coauthor.entry': 'Talk to Me',
   'coauthor.example.note': '"Note this down: …"',
   'coauthor.example.plan': '"Sort out my plan for today."',
   'coauthor.example.task': '"Add a task: …"',
