@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-**Desk One (同桌)** — a shared desk for you and harness inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. Notebook review, notes, tasks, schedule and agent sessions live side by side; the schedule aggregates WeCom / iCloud / personal Outlook calendars (read-only). The header's split **「✦」 Desk One｜Talk to Me** button sends a tab-aware prefilled prompt into the conversation; the empty notes wall offers a "note this down…" entry, and the empty To-do lane repeats the same wording as plain text, with no click action.
+**Desk One (同桌)** — a shared desk for you and harness inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. Notebook review, notes, tasks, schedule and agent sessions live side by side; the schedule aggregates WeCom / iCloud / personal Outlook calendars (read-only). The header's split **「✦」 Desk One｜Talk to Me** button sends a tab-aware prefilled prompt into the conversation; the empty notes wall offers a "note this down…" entry, and the empty To-do lane repeats the same wording as plain text, with no click action. The "…" menu at the end of the tab strip also has **Make a wish**: describe a feature and it becomes a GitHub issue draft.
 
 ## What it is
 

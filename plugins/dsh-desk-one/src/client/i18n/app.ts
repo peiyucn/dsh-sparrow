@@ -27,6 +27,7 @@ export const zh = {
   'coauthor.prompt.sessionsArchive': '帮我读一下最近两周的会话，找出已经结束或讲同一件事的会话，按主题分组列出；每组给出哪些可以归档的建议和理由，只给建议，先不要动。',
   'coauthor.prompt.sessionsReview': '帮我读一下最近一周的会话，按主题归纳我做了哪些事、各自进程到哪一步、还有哪些悬而未决；只输出小结，不要动会话。',
   'coauthor.prompt.taskArchiveDone': '帮我把任务板「完成」列里已经做完的任务归档：先列出准备归档的清单让我确认，确认后再执行。',
+  'coauthor.prompt.wish': '我想给同桌增加一个功能：\n\n帮我把它整理成一条 GitHub feature issue（仓库 https://github.com/peiyucn/dsh-sparrow）：先给我看标题和正文草稿，不要自动发布，也不要包含我的私人内容。',
   'coauthor.prompt.taskFromSchedule': '帮我看看今天的日程和任务板，把今天要做的事理出来，缺的补成任务；已经在任务板里的不要重复。',
   'color.blue': '蓝',
   'color.default': '默认',
@@ -48,7 +49,8 @@ export const zh = {
   'tab.tasks': '任务',
   'tab.unpin': '取消固定',
   'tabs.more': '更多',
-  'tabs.moreEmpty': '更多功能开发中…',
+  'tabs.wish': '许个愿',
+  'tabs.wishHint': '去 GitHub 提 feature issue，我帮你整理',
 } as const
 
 /** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
@@ -79,6 +81,7 @@ export const en = {
   'coauthor.prompt.sessionsArchive': 'Read my sessions from the last two weeks and find the ones that are finished or cover the same topic; group them by theme and recommend, with reasons, which can be archived — recommendations only, do not change anything yet.',
   'coauthor.prompt.sessionsReview': 'Read my sessions from the last week and summarize what I worked on, how far each thread got, and what is still unresolved; output the summary only, do not change any session.',
   'coauthor.prompt.taskArchiveDone': 'Archive the finished tasks in the Done lane: list what you plan to archive first, and only archive after I confirm.',
+  'coauthor.prompt.wish': 'I want to add a feature to Desk One:\n\nTurn it into a GitHub feature issue for https://github.com/peiyucn/dsh-sparrow: show me the title and body first, do not publish automatically, and do not include my private content.',
   'coauthor.prompt.taskFromSchedule': 'Check today\'s schedule and the task board, lay out what I need to do today and add whatever is missing as tasks; do not duplicate what is already on the board.',
   'color.blue': 'Blue',
   'color.default': 'Default',
@@ -100,5 +103,6 @@ export const en = {
   'tab.tasks': 'Tasks',
   'tab.unpin': 'Unpin from sidebar',
   'tabs.more': 'More',
-  'tabs.moreEmpty': 'More features coming soon…',
+  'tabs.wish': 'Make a wish',
+  'tabs.wishHint': 'File a feature issue on GitHub; I will draft it',
 } satisfies Record<keyof typeof zh, string>

@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactElement } from 'react'
+import { DeskGlyph } from '../brand.js'
 import type { DeskTranslator, Tab } from './types.js'
 import type { DeskTabEntry } from './tabs.js'
 import { useAnchoredPanel } from '../tasks/hooks/useAnchoredPanel.js'
@@ -16,9 +17,11 @@ interface DeskTabMenuProps {
   readonly tab: Tab
   readonly onSelectTab: (tab: Tab) => void
   readonly entries: readonly DeskTabEntry[]
+  /** "许个愿": prefill the feature-issue request in the conversation (never sends). */
+  readonly onWish: () => void
 }
 
-export function DeskTabMenu({ t, tab, onSelectTab, entries }: DeskTabMenuProps): ReactElement {
+export function DeskTabMenu({ t, tab, onSelectTab, entries, onWish }: DeskTabMenuProps): ReactElement {
   const [open, setOpen] = useState(false)
   const anchorRef = useRef<HTMLButtonElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
@@ -55,10 +58,12 @@ export function DeskTabMenu({ t, tab, onSelectTab, entries }: DeskTabMenuProps):
     itemRefs.current[Math.max(0, index)]?.focus()
   }, [entries, open, tab])
 
+  /** Every menu has at least the "许个愿" row, so one more than the overflow entries. */
+  const rowCount = entries.length + 1
+
   const focusItem = (index: number): void => {
-    const count = entries.length
-    if (count === 0) return
-    itemRefs.current[(index + count) % count]?.focus()
+    if (rowCount === 0) return
+    itemRefs.current[(index + rowCount) % rowCount]?.focus()
   }
 
   const choose = (next: Tab): void => {
@@ -104,13 +109,10 @@ export function DeskTabMenu({ t, tab, onSelectTab, entries }: DeskTabMenuProps):
                   focusItem(0)
                 } else if (event.key === 'End') {
                   event.preventDefault()
-                  focusItem(entries.length - 1)
+                  focusItem(rowCount - 1)
                 }
               }}
             >
-              {entries.length === 0 ? (
-                <p className="dsh-desk-tabmenu-empty">{t('tabs.moreEmpty')}</p>
-              ) : null}
               {entries.map((entry, index) => {
                 const selected = entry.tab === tab
                 return (
@@ -137,6 +139,26 @@ export function DeskTabMenu({ t, tab, onSelectTab, entries }: DeskTabMenuProps):
                   </button>
                 )
               })}
+              {/* "许个愿": the overflow menu's permanent last row — prefill a feature-issue
+                  request for this project's GitHub repository. */}
+              <button
+                ref={(node) => { itemRefs.current[entries.length] = node }}
+                type="button"
+                className="dsh-desk-tabmenu-option"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false)
+                  onWish()
+                  anchorRef.current?.focus()
+                }}
+              >
+                {/* Same 16px check column as the tab rows; the Desk One mark takes the accent colour. */}
+                <span className="dsh-desk-tabmenu-check" aria-hidden="true">
+                  <DeskGlyph size={14} />
+                </span>
+                {t('tabs.wish')}
+              </button>
+              <p className="dsh-desk-tabmenu-hint">{t('tabs.wishHint')}</p>
             </div>,
             document.body,
           )

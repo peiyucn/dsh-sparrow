@@ -188,7 +188,7 @@ export function DeskOnePage(props: DeskPanelProps) {
 
   return (
     <div className="dsh-desk-page">
-      <DeskHeader t={t} tab={tab} onSelectTab={selectTab} pinned={pinnedHere} onTogglePin={togglePinned} actions={actions} onAskDesk={askDesk} />
+      <DeskHeader t={t} tab={tab} onSelectTab={selectTab} pinned={pinnedHere} onTogglePin={togglePinned} actions={actions} onAskDesk={askDesk} onWish={() => askDesk(t('coauthor.prompt.wish'))} />
       <div className="dsh-desk-body">
         {data.loadError === null ? null : (
           <div>

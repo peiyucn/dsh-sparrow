@@ -47,3 +47,13 @@
 | 任务 · 待办空列 主提示 | `task.emptyTip` | 双击空白处新建任务 | Double-click empty space |
 | 任务 · 待办空列 副提示 | `task.emptyTipAlt` | 或点击顶栏「+任务」，也可以直接对我说「帮我加一个任务…」 | or click "+ Task" in the top bar, or just tell me "add a task: …" |
 | 笔记库未链接说明 | `notebook.welcomeBody` | 笔记库 = DSH 工作区，你审阅批注，其余的交给 harness。也可以直接对我说「帮我新建一篇笔记…」。 | The library = a DSH workspace: you review and annotate, harness handles the rest. You can also just tell me "start a new note…". |
+
+## 4. 「…」菜单（许愿）
+
+> 菜单最后一行永远是「许个愿」（以后有溢出 tab 时排在它们后面），行首用 **Desk One 自己的徽标字形**（「✦」，品牌蓝）区分；下方小字说明去 GitHub 提 issue。点选 = 预填下面的请求，不发送；由我先起草 issue 标题 / 正文，人确认后再发。
+
+| 场景 | key | 中文 | 英文 |
+|---|---|---|---|
+| 许愿行 | `tabs.wish` | 许个愿 | Make a wish |
+| 行下小字 | `tabs.wishHint` | 去 GitHub 提 feature issue，我帮你整理 | File a feature issue on GitHub; I will draft it |
+| 隐藏预填 | `coauthor.prompt.wish` | 我想给同桌增加一个功能：（用户在这里写）<br><br>帮我把它整理成一条 GitHub feature issue（仓库 https://github.com/peiyucn/dsh-sparrow）：先给我看标题和正文草稿，不要自动发布，也不要包含我的私人内容。 | I want to add a feature to Desk One:（user writes here）<br><br>Turn it into a GitHub feature issue for https://github.com/peiyucn/dsh-sparrow: show me the title and body first, do not publish automatically, and do not include my private content. |

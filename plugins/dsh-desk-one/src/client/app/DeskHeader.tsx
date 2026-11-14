@@ -29,9 +29,11 @@ interface DeskHeaderProps {
   readonly actions: ReactNode
   /** Open the Workspace blank with one prefilled prompt ("和 DSH 一起", never sends). */
   readonly onAskDesk: (prompt: string) => void
+  /** "许个愿": prefill the feature-issue request from the "…" menu (never sends). */
+  readonly onWish: () => void
 }
 
-export function DeskHeader({ t, tab, onSelectTab, pinned, onTogglePin, actions, onAskDesk }: DeskHeaderProps): ReactElement {
+export function DeskHeader({ t, tab, onSelectTab, pinned, onTogglePin, actions, onAskDesk, onWish }: DeskHeaderProps): ReactElement {
   const shortcutLabel = pinned ? t('tab.unpin') : t('tab.pin')
   return (
     <header className="dsh-desk-header" data-window-drag>
@@ -62,7 +64,7 @@ export function DeskHeader({ t, tab, onSelectTab, pinned, onTogglePin, actions, 
             </button>
           ))}
         </div>
-        <DeskTabMenu t={t} tab={tab} onSelectTab={onSelectTab} entries={OVERFLOW_TABS} />
+        <DeskTabMenu t={t} tab={tab} onSelectTab={onSelectTab} entries={OVERFLOW_TABS} onWish={onWish} />
         <button
           type="button"
           className="dsh-desk-shortcut"

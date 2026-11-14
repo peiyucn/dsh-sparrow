@@ -59,6 +59,13 @@
 
 从单段 slogan 改为结构：slogan + 「两种用法：自己点 / 和 DSH 说」+ 3 条示例句（中英双语，随界面语言）。示例只展示，不设点击（避免把说明变成第二个操作区）。
 
+### 3.4 「…」菜单：许愿
+
+- tab 行末尾的「…」菜单**最后一行永远是「许个愿」**（行首 Desk One 徽标字形「✦」，品牌蓝；当前没有溢出 tab，所以它就是唯一一行；以后有溢出 tab 时排在它们后面），行下有小字「去 GitHub 提 feature issue，我帮你整理」。
+- 点选 = 把 `coauthor.prompt.wish` 预填进输入框（不发送）：句首「我想给同桌增加一个功能：」留给人写愿望，其后要求 agent 把它整理成 **GitHub feature issue 草稿**（仓库固定 `https://github.com/peiyucn/dsh-sparrow`）：**先给标题和正文草稿、不自动发布、不包含私人内容**。
+- 不是「让用户自己定义插件」：这里只是需求收集入口；真正的插件生成 / 安装属于另一项能力，不在本条里承诺。
+- 为什么不让 agent 直接发 issue：创建公开 issue 是**对外且不可逆**的动作，必须由人确认；agent 只负责起草和给出 `issues/new` 链接，或经人明确同意后再用 `gh` 提交。
+
 ## 4. 边界
 
 - **草稿已有内容**：`whenDraftExists: 'append'`，提示词追加在现有草稿后并换行，不覆盖、不清空。
@@ -100,8 +107,9 @@
 | info 浮层 | `src/client/app/DeskIntroInfo.tsx` |
 | 便签空态 | `src/client/notes/NotesWall.tsx` |
 | 任务空态 | `src/client/tasks/components/TaskColumn.tsx`（仅待办空列，两行纯文本，无点击动作） |
+| 「…」许愿 | `src/client/app/DeskTabMenu.tsx`（末行「许个愿」）+ `DeskHeader.tsx` / `DeskOnePage.tsx` 的 `onWish` |
 | 笔记未链接文案 | `src/client/i18n/notebook.ts` 的 `notebook.welcomeBody` |
-| 文案 | `src/client/i18n/app.ts`（`coauthor.*`）、`notes.ts`、`tasks.ts`；定稿文案见 `09-ui-copy.md` |
+| 文案 | `src/client/i18n/app.ts`（`coauthor.*`、`tabs.wish*`）、`notes.ts`、`tasks.ts`；定稿文案见 `09-ui-copy.md` |
 | 单测 | `test/client/coauthor.test.mjs` |
 
 **便签的预填怎么触发**：便签没有自己的「会话」，所以按钮并不写便签本身——它调用官方 `uiWorkspace.startSession(undefined, { prompt: '帮我记一条便签：', whenDraftExists: 'append' })`：打开（或复用）当前 / 最近工作区的空白会话，把半句指令追加进输入框草稿并聚焦，用户接着写内容、自己按发送；DSH 收到后通过 `desk_note_add` 落库。和「让 AI 起草」是同一条路，只是不带工作区参数、用 `append` 保护已有草稿。无工作区时由官方导航给出「需要工作区」提示。

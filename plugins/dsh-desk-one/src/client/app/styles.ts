@@ -716,13 +716,12 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   outline: 0.5px solid var(--dsw-alias-border-l1, #e2e5ea);
   outline-offset: -0.5px;
 }
-.dsh-desk-tabmenu-empty {
+.dsh-desk-tabmenu-hint {
   margin: 0;
-  padding: 10px 12px;
+  padding: 4px 8px 6px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
-  font-size: 12px;
-  line-height: 18px;
-  white-space: nowrap;
+  font-size: 11px;
+  line-height: 16px;
 }
 .dsh-desk-tabmenu-option {
   appearance: none;
