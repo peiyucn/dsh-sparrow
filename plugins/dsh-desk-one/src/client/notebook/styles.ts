@@ -162,6 +162,14 @@ export const NOTEBOOK_CSS = `
   flex: 0 1 420px;
   min-width: 0;
 }
+/* Official SegmentedTabs pills center their label and allow wrapping; English filter labels are
+   longer than zh, so a two-line pill used to break the toolbar row. Keep every tab label on one
+   line and ellipsize on a very narrow panel instead. */
+.dsh-desk-notebook-tabs [role='tab'] {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* --- list: one card, internally scrolling rows, page footer -------------- */
 .dsh-desk-notebook-listwrap {
