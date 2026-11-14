@@ -25,8 +25,8 @@ const ASK_ENTRIES: Readonly<Record<Tab, readonly AskEntry[]>> = {
     { id: 'note-tidy', label: 'coauthor.menu.noteTidy', prompt: 'coauthor.prompt.noteTidy' },
   ],
   tasks: [
-    { id: 'task-add', label: 'coauthor.menu.taskAdd', prompt: 'coauthor.prompt.taskAdd' },
-    { id: 'task-plan', label: 'coauthor.menu.taskPlan', prompt: 'coauthor.prompt.taskPlan' },
+    { id: 'task-from-schedule', label: 'coauthor.menu.taskFromSchedule', prompt: 'coauthor.prompt.taskFromSchedule' },
+    { id: 'task-from-notes', label: 'coauthor.menu.taskFromNotes', prompt: 'coauthor.prompt.taskFromNotes' },
   ],
   notebook: [
     { id: 'notebook-new', label: 'coauthor.menu.notebookNew', prompt: 'coauthor.prompt.notebookNew' },
