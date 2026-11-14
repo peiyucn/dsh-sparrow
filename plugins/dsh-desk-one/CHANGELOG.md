@@ -28,6 +28,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 
 * **Data and privacy**: notes, tasks, schedule mirror and notebook review records live in the profile-level `desk_one` DSH storage domain; schedule credentials (sync password / OAuth refresh token / subscription link) live only in the official credential store, and nothing is written to logs, HTML or exports.
 
+* **Archive follow-up**: archiving a session from Desk One now also runs the official archive follow-up (rc.2+ worktree reclamation removes that session's own checkout), matching what the official archive action does.
+
 * **Notebook filter tabs**: the four view tabs stay on one line in the English UI (shorter labels), so they no longer wrap into two lines on a normal-width panel.
 
 * **Pinned sidebar shortcuts**: clicking a pinned shortcut (for example Sessions) now always returns to that tab, even after switching tabs inside its panel.

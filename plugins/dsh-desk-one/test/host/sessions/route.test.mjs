@@ -165,6 +165,7 @@ async function buildHarness({
   let route = null
   const warnings = []
   const emitted = []
+  const parallelEvents = []
   const disposers = []
   const archived = [...archivedIds]
 
@@ -258,6 +259,8 @@ async function buildHarness({
     },
     on: () => () => {},
     emit: (event, payload) => { emitted.push({ event, payload }) },
+    // Parallel events are the official follow-up admissions (archive / unarchive); record instead of run.
+    parallel: async (event, payload) => { parallelEvents.push({ event, payload }); return [] },
     get: (name) => (name === 'sessionQuery' ? sessionQuery : name === 'sessionProjectionCache' ? projectionCache : undefined),
   }
 
@@ -266,6 +269,8 @@ async function buildHarness({
   const harness = {
     warnings,
     emitted,
+    parallelEvents,
+    get archivedIds() { return [...archived] },
     get route() { return route },
     dispose() { for (const dispose of disposers.splice(0)) { try { dispose() } catch { /* best-effort */ } } },
   }
@@ -724,3 +729,56 @@ describe('archive-manage host 路由：真实 handler 行为', () => {
   })
 })
 
+
+describe('归档 / 取消归档：官方后续动作重放', () => {
+  it('Desk One 归档 应该 重放 workspace/session-archived（官方 worktree 清理等监听方据此处理）', async () => {
+    const layout = await makeLayout()
+    const h = await buildHarness({
+      headers: [header('root-a')], dirs: new Map(), archivedIds: [], titles: new Map(), trashRoot: layout.trash,
+    })
+    const result = await post(h.route.handler, `${PREFIX}/archive`, { sessionId: 'root-a' })
+    assert.equal(result.statusCode, 200)
+    assert.deepEqual(h.parallelEvents, [
+      { event: 'workspace/session-archived', payload: { sessionId: 'root-a' } },
+    ], '归档写入成功后必须重放官方后续动作事件')
+  })
+
+  it('归档整棵子树 应该 只为新归档会话各重放一次（已归档的不重复）', async () => {
+    const layout = await makeLayout()
+    const h = await buildHarness({
+      headers: [header('p-root'), childHeader('c-a', 'p-root')],
+      dirs: new Map(),
+      archivedIds: ['c-a'],
+      titles: new Map(),
+      trashRoot: layout.trash,
+    })
+    const result = await post(h.route.handler, `${PREFIX}/archive`, { sessionId: 'p-root' })
+    assert.equal(result.statusCode, 200)
+    assert.deepEqual(h.parallelEvents, [
+      { event: 'workspace/session-archived', payload: { sessionId: 'p-root' } },
+    ], '子会话原本已归档 ⇒ 不重复重放；与官方「重复归档不派发」一致')
+  })
+
+  it('取消归档 应该 在移除之前重放 workspace/session-unarchiving（供官方监听方取消后续动作）', async () => {
+    const layout = await makeLayout()
+    const h = await buildHarness({
+      headers: [header('root-b')], dirs: new Map(), archivedIds: ['root-b'], titles: new Map(), trashRoot: layout.trash,
+    })
+    const result = await post(h.route.handler, `${PREFIX}/unarchive`, { sessionId: 'root-b' })
+    assert.equal(result.statusCode, 200)
+    assert.deepEqual(h.parallelEvents, [
+      { event: 'workspace/session-unarchiving', payload: { sessionId: 'root-b' } },
+    ])
+    assert.deepEqual(h.archivedIds, [], 'unarchive 必须把 id 移出归档集')
+  })
+
+  it('取消归档一个本来未归档的会话 应该 不重放事件（与官方 no-op 语义一致）', async () => {
+    const layout = await makeLayout()
+    const h = await buildHarness({
+      headers: [header('root-c')], dirs: new Map(), archivedIds: [], titles: new Map(), trashRoot: layout.trash,
+    })
+    const result = await post(h.route.handler, `${PREFIX}/unarchive`, { sessionId: 'root-c' })
+    assert.equal(result.statusCode, 200)
+    assert.deepEqual(h.parallelEvents, [])
+  })
+})

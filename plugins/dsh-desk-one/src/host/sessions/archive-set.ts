@@ -67,6 +67,36 @@ export async function readArchivedIds(ctx: Context): Promise<SessionId[]> {
 }
 
 /**
+ * Re-dispatch the official "durably archived" follow-up admission after our archived-set write.
+ *
+ * The official WorkspaceRegistry dispatches `workspace/session-archived` from `archiveSession`, and rc.2+
+ * official listeners act on it (worktree reclamation removes the archived Session's owned checkout). Our
+ * private write channel deliberately bypasses `archiveSession` (see docs/private-seams.md §A), so without
+ * this re-dispatch a Session archived from Desk One would keep its checkout on disk. A listener failure is
+ * logged and never undoes the archive — the same contract the official dispatch keeps.
+ * @param ctx - host context (public event bus).
+ * @param sessionId - Session that just became durably archived.
+ */
+async function announceArchived(ctx: Context, sessionId: SessionId): Promise<void> {
+  try {
+    await ctx.parallel('workspace/session-archived', { sessionId })
+  } catch (error) {
+    ctx.logger.warn(`${PACKAGE_NAME}: 归档后续动作失败（${String(sessionId)}）：${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+/**
+ * Re-dispatch the official "about to leave the archive set" admission before our own write, mirroring
+ * `unarchiveSession`: official listeners may settle or cancel their archive follow-up (worktree reclamation
+ * cancels a pending checkout removal), and a rejection retains the archived state.
+ * @param ctx - host context (public event bus).
+ * @param sessionId - Session about to be unarchived.
+ */
+async function announceUnarchiving(ctx: Context, sessionId: SessionId): Promise<void> {
+  await ctx.parallel('workspace/session-unarchiving', { sessionId })
+}
+
+/**
  * Read-modify-write of the archived set: run on the official enqueueOperation serialization chain; inside the
  * chain, requireState → compute the new set → setState (official persistence write: domain + in-memory state
  * sync in one step). If update returns the same reference, or the contents are item-by-item identical, treat it
@@ -238,6 +268,10 @@ export async function unarchiveSession(
   headerFacts: HeaderFactsStore<HeaderFacts>,
   sessionId: SessionId,
 ): Promise<UnarchiveResponse> {
+  // Official order: admit the unarchive first (listeners may reject, which retains the archived state),
+  // then drop the id durably. An id that is not archived stays a no-op, exactly like the official API.
+  const archived = await readArchivedIds(ctx)
+  if (archived.some(id => String(id) === String(sessionId))) await announceUnarchiving(ctx, sessionId)
   await removeArchivedId(surface, sessionId)
   try {
     const { headers } = await headerFacts.get()
@@ -257,8 +291,11 @@ export async function unarchiveSession(
 }
 
 /** Archiving is parent-scoped: the parent plus all its child sessions enter the archived set together (atomic
- *  single write chain). This path only handles stray / orphan child sessions. */
+ *  single write chain). This path only handles stray / orphan child sessions.
+ *  Newly archived ids re-dispatch the official "archived" admission afterwards so official follow-up work
+ *  (rc.2+ worktree reclamation) runs exactly as it would after `workspaceRegistry.archiveSession`. */
 export async function archiveSessionSubtree(
+  ctx: Context,
   surface: RegistryMutationSurface,
   headerFacts: HeaderFactsStore<HeaderFacts>,
   rootId: string,
@@ -268,10 +305,14 @@ export async function archiveSessionSubtree(
     throw new SessionsError('UNKNOWN_SESSION', '会话持久化中没有这个会话', 404)
   }
   const subtree = collectSubtreeIds(headers.map(treeHeaderOf), rootId)
+  const before = new Set((await readArchivedIds(ctx)).map(String))
   await mutateArchivedSet(surface, ids => {
     const next = new Set(ids.map(String))
     for (const id of subtree) next.add(id)
     return [...next].map(id => SessionId(id))
   })
+  for (const id of subtree) {
+    if (!before.has(String(id))) await announceArchived(ctx, SessionId(id))
+  }
   return { ok: true, archivedIds: subtree }
 }

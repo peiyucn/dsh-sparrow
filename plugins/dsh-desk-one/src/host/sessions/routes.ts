@@ -112,7 +112,7 @@ async function archiveRoute(route: ArchiveRouteContext, req: IncomingMessage, re
   // Only serves stray/orphan child sessions (the official menu cannot reach them); children of officially archived parents are aligned by domain/changed.
   const parsed = bodyObject<ArchiveRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
   const rootId = requireNonEmptyString(parsed.sessionId, 'sessionId 必须是非空字符串').trim()
-  const body = await archiveSessionSubtree(route.surface, route.headerFacts, rootId)
+  const body = await archiveSessionSubtree(route.ctx, route.surface, route.headerFacts, rootId)
   sendJson(res, 200, body satisfies ArchiveResponse)
 }
 

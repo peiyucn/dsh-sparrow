@@ -44,10 +44,13 @@
   * **官方公开替代（rc.3 实测）**：`archiveSession(id, { stopActivity })` / `unarchiveSession(id)` 是公开方法
     （`packages/workspace/workspace/src/index.ts:381,420`）——**旧文本「归档集没有公开写入口」已过期，删**。
   * 未切换的原因（行为差异，不是能力缺失）：公开路径 ① 无 `stopActivity` 时先跑 `workspace/session-activity`
-    瀑布、有活动即拒绝；② 归档的同一写入里丢 pin；③ **派发 `workspace/session-archived`**——rc.2 起官方
-    worktree 清理挂在该事件上（`packages/experimental/worktree/src/archive.ts:86`），`session-unarchiving`
-    还可拒绝还原；④ 子树归档从「单次 `setState` 原子」变成 N 次排队写入。
-  * 故当前是「刻意保留私有写通道」：切换即接受上述行为；不切换则须在 README「已知限制」写清（现状）。
+    瀑布、有活动即拒绝；② 归档的同一写入里丢 pin；③ **子树归档从「单次 `setState` 原子」变成 N 次排队写入**。
+    ④ ~~派发 `workspace/session-archived`（rc.2 起官方 worktree 清理挂在该事件上）~~ —— **已由本插件在
+    Desk One 归档/取消归档成功后重放该公开事件补偿**（`archive-set.ts` 的 `announceArchived` /
+    `announceUnarchiving`，仅对新归档的 id 重放一次；监听失败只记日志、不回滚归档；取消归档按官方顺序
+    先派发再移除，拒绝时保留归档态）。故 worktree 清理与官方 `archiveSession` 行为一致，不再是差异项。
+  * 剩余决策只剩 ①②③（活动门 / pin / 子树原子性）——切换公开 API 即接受这些行为变化。
+    故当前是「刻意保留私有写通道」：不切换则须在 README「已知限制」写清（现状）。
     **需 owner 定**；决定后本条删除或保留。
 
 * **`session_projcache` 存储域直读 / 直删 / 启动清扫 —— 已收缩一半，剩余仍需要**
