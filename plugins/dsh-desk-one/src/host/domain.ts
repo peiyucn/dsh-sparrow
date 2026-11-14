@@ -185,19 +185,6 @@ const annotationSchema = z.object({
   createdAt: z.string().min(1),
 })
 
-/** The single notes-root record (fixed id). */
-const notebookConfigSchema = z.object({
-  id: z.string().min(1),
-  kind: z.literal('notebook-config'),
-  schema: z.number().int().positive(),
-  rootPath: z.string().min(1),
-  // Optional (absent in older records): the skill used to draft a new note; null means none.
-  skillName: z.string().min(1).nullable().optional(),
-  createdAt: z.string().min(1),
-  updatedAt: z.string().min(1),
-  revision: z.number().int().positive(),
-})
-
 /** One lazily assigned file identity (survives renames while content matches). */
 const noteFileSchema = z.object({
   id: z.string().min(1),
@@ -280,7 +267,7 @@ const reviewSessionSchema = z.object({
 
 const nodeSchema = z.discriminatedUnion('kind', [
   noteSchema, taskSchema, groupSchema, scheduleSourceSchema, calendarSchema, eventSchema, sessionIndexSchema,
-  notebookConfigSchema, noteFileSchema, reviewRecordSchema, noteDraftSchema, noteBaselineSchema, reviewSessionSchema,
+  noteFileSchema, reviewRecordSchema, noteDraftSchema, noteBaselineSchema, reviewSessionSchema,
   legacyAnnotationSchema, legacyReviewSchema,
 ])
 

@@ -1,12 +1,10 @@
 /**
- * Library helpers: path safety, single-page reads, search over indexed entries.
+ * Annotation helpers: path safety and single-page reads.
  */
 
 import { realpath, readFile, stat } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
-import type {
-  NotebookEntry, NotebookField, NotebookPageResponse, NotebookSearchResponse, NotebookStats,
-} from '../../notebook-contract.js'
+import type { NotebookField, NotebookPageResponse } from '../../notebook-contract.js'
 import { NOTEBOOK_MAX_BYTES } from '../../constants.js'
 import { DeskError } from '../http.js'
 import { displayTitle, parsePage } from './frontmatter.js'
@@ -74,45 +72,5 @@ export async function readPage(root: string, relativePath: string): Promise<Note
   }
 }
 
-/** Header counts over the whole library. */
-export function summarize(entries: readonly NotebookEntry[]): NotebookStats {
-  let missingFrontmatter = 0
-  let emptyBody = 0
-  for (const entry of entries) {
-    if (!entry.hasFrontmatter) missingFrontmatter += 1
-    if (entry.emptyBody) emptyBody += 1
-  }
-  return { total: entries.length, missingFrontmatter, emptyBody }
-}
 
-/**
- * Filter indexed entries.
- * @param entries - scanned index.
- * @param query - case-insensitive text over title and path.
- * @param filters - exact frontmatter `type` / `tag`, or a derived count filter.
- * @param limit - response cap.
- * @returns matches plus the truncation flag.
- */
-export function searchEntries(
-  entries: readonly NotebookEntry[],
-  query: string,
-  filters: {
-    readonly type?: string
-    readonly tag?: string
-    readonly missingFrontmatter?: boolean
-    readonly emptyBody?: boolean
-  },
-  limit: number,
-): NotebookSearchResponse {
-  const needle = query.trim().toLowerCase()
-  const matched = entries.filter((entry) => {
-    if (filters.type !== undefined && entry.type !== filters.type) return false
-    if (filters.tag !== undefined && !entry.tags.includes(filters.tag)) return false
-    if (filters.missingFrontmatter === true && entry.hasFrontmatter) return false
-    if (filters.emptyBody === true && !entry.emptyBody) return false
-    if (needle === '') return true
-    return entry.title.toLowerCase().includes(needle) || entry.path.toLowerCase().includes(needle)
-  })
-  return { entries: matched.slice(0, limit), truncated: matched.length > limit }
-}
 

@@ -22,13 +22,13 @@ Desk One 是用户的「一张办公桌」，同一份对象存在面板里，�
 - **任务 task**：任务板上的卡片，有泳道状态（todo / doing / done）、可选截止日期、可归入分组；"完成"用 desk_task_complete 或 status=done。
 - **分组 group**：任务板某一泳道内的一层分组；整组移动会把组内卡片一起换泳道；只有 done 泳道的分组能归档。
 - **日程 schedule**：外部日历的只读镜像，不能写回外部日历；sync 只是重新拉取。
-- **笔记页 page / 批注**：文件系统里的笔记与审阅对象，不是 Desk 工具；AI 用文件读写改稿，批注由用户在界面里做。
+- **工作区文件 / 批注**：工作区里的 Markdown / 文本文件，不是 Desk 对象；AI 用文件工具读写，批注由用户在「批注」视图里做，不走 Desk 工具。
 
 ## 选哪个对象
 
 - 有时限、要跟进、有完成状态 → 任务（不要用便签代替待办）。
 - 随手记、想法、不需要跟进 → 便签。
-- 成篇内容、要长期维护 → 笔记页（用 desk_page_list 检索，用文件工具读/改，不用 Desk 写工具）。
+- 成篇内容、要长期维护 → 工作区里的 Markdown / 文本文件（用文件工具读 / 改；批注由用户在界面里做）。
 - 只是想看看外部日历 → 日程只读工具。
 
 ## 工具
@@ -37,7 +37,6 @@ Desk One 是用户的「一张办公桌」，同一份对象存在面板里，�
 - 任务：desk_task_list → desk_task_add（新建）/ desk_task_update（改标题正文泳道截止排序分组）/ desk_task_complete（完成）/ desk_task_archive（存档或恢复）。
 - 分组：desk_group_list → desk_group_add（新建）/ desk_group_update（改名排序）/ desk_group_move（整组换泳道）/ desk_group_archive（存档或恢复）/ desk_group_delete（删除已归档分组会连卡片一起删）。
 - 日程：desk_schedule_list / desk_schedule_sync / desk_schedule_connections（全部只读）。
-- 笔记页：desk_page_list（只读检索标题/路径/标签/缺元数据/空笔记，返回相对 root 的路径）；读正文、改稿仍用文件工具，不要用 Desk 工具写笔记。
 
 ## 规则
 
@@ -46,7 +45,7 @@ Desk One 是用户的「一张办公桌」，同一份对象存在面板里，�
 3. 任务归组时，分组泳道必须与 task.status 一致。
 4. 删除 / 存档影响多个对象（分组存档连带卡片、删除已归档分组连卡片删除）：先向用户确认再执行。
 5. 日程只读：不要声称能修改或写回外部日历。
-6. 笔记的批注草稿 / 批注记录由人操作，不要用工具代劳；需要改笔记内容时用文件工具。`
+6. 批注草稿 / 批注记录由人操作，不要用工具代劳；需要改工作区文件内容时用文件工具。`
 
 /** Runtime skill registration accepted by the optional skill service. */
 export const DESK_ONE_SKILL = {

@@ -19,7 +19,7 @@ import type {
   DeskCalendar, DeskEvent, DeskNote, DeskScheduleSource, DeskSessionIndex, DeskTask, DeskTaskGroup, ScheduleSyncError,
 } from '../contract.js'
 import type {
-  DeskNotebookConfig, NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ReviewSessionMarker,
+  NoteBaseline, NoteDraft, NoteFileRef, ReviewRecord, ReviewSessionMarker,
 } from '../notebook-contract.js'
 import { StoreCore, type DeskDomain } from './store/core.js'
 import { NoteRepository, type CreateNoteInput } from './store/notes.js'
@@ -159,14 +159,6 @@ export class DeskStore {
   findSessionIndex(sessionId: string): DeskSessionIndex | undefined { return this.sessions.findSessionIndex(sessionId) }
 
   /* ------------------------------ notebook ------------------------------ */
-
-  getNotebookConfig(): DeskNotebookConfig | undefined { return this.notebook.getNotebookConfig() }
-
-  async saveNotebookRoot(rootPath: string): Promise<DeskNotebookConfig> { return this.notebook.saveNotebookRoot(rootPath) }
-
-  async clearNotebookRoot(): Promise<void> { return this.notebook.clearNotebookRoot() }
-
-  async saveNotebookSkill(skillName: string | null): Promise<DeskNotebookConfig> { return this.notebook.saveNotebookSkill(skillName) }
 
   getNoteFile(id: string): NoteFileRef | undefined { return this.notebook.getNoteFile(id) }
 

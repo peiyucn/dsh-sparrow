@@ -23,42 +23,6 @@ export interface NotebookEntry {
   readonly mtime: string
 }
 
-/** Header counts for the library. */
-export interface NotebookStats {
-  readonly total: number
-  readonly missingFrontmatter: number
-  readonly emptyBody: number
-}
-
-/**
- * One skill offered for drafting a new note. The plugin never injects a skill body: it only names
- * the chosen skill in the prefilled prompt, and the agent loads it from its own catalog on demand.
- */
-export interface NotebookSkill {
-  readonly name: string
-  /** Routing description from the skill catalog (shown in the picker). */
-  readonly description: string
-  readonly source: string
-  /** True when the skill reads as note-oriented; recommended for drafting. */
-  readonly note: boolean
-}
-
-/** The single configured notes root record (fixed id `notebook_config`). */
-export interface DeskNotebookConfig {
-  readonly id: string
-  readonly kind: 'notebook-config'
-  readonly schema: number
-  readonly rootPath: string
-  /**
-   * Skill used when drafting a new note. `undefined` = not chosen yet, `null` = explicitly no
-   * skill; the effective default is "no skill" (`resolveSkillName` in host/notebook/skills.ts).
-   */
-  readonly skillName?: string | null
-  readonly createdAt: string
-  readonly updatedAt: string
-  readonly revision: number
-}
-
 /** One frontmatter field as the review tab shows it. */
 export interface NotebookField {
   readonly name: string
@@ -186,38 +150,6 @@ export interface ReviewHistoryEntry {
   readonly resolvedPath?: string
 }
 
-export interface NotebookStateResponse {
-  readonly config: DeskNotebookConfig | null
-  readonly stats: NotebookStats
-  readonly recent: readonly NotebookEntry[]
-  /** Files with unsaved annotations. */
-  readonly drafts: readonly NoteDraft[]
-  readonly draftCount: number
-  readonly historyCount: number
-  readonly historyBytes: number
-  /** True when the library root looks like a note2md-managed workspace. */
-  readonly note2md: boolean
-  /** Skills the agent can load when drafting a new note (note-oriented ones first). */
-  readonly skills: readonly NotebookSkill[]
-  /** Effective skill selection; `null` means no skill is used for drafting. */
-  readonly skillName: string | null
-}
-
-export interface NotebookRootRequest {
-  readonly rootPath: string
-}
-
-export interface NotebookSearchResponse {
-  readonly entries: readonly NotebookEntry[]
-  readonly truncated: boolean
-}
-
-/** One page of the whole library, newest first, with the total for paging. */
-export interface NotebookListResponse {
-  readonly entries: readonly NotebookEntry[]
-  readonly total: number
-}
-
 export interface NotebookFileResponse {
   readonly file: NoteFileRef
 }
@@ -234,16 +166,6 @@ export interface NoteDraftRequest {
 
 export interface NoteDraftResponse {
   readonly draft: NoteDraft | null
-}
-
-export interface CreateNotebookNoteRequest {
-  readonly title: string
-  /** Optional subfolder, `/`-separated. */
-  readonly folder?: string
-}
-
-export interface CreateNoteResponse {
-  readonly path: string
 }
 
 export interface RecordReviewRequest {

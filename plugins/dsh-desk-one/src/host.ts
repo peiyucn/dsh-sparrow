@@ -9,11 +9,9 @@ import { assertHostGates } from './host/gates.js'
 import { createDeskRequestHandler } from './host/router.js'
 import { DeskStore } from './host/store.js'
 import { NotebookHost } from './host/notebook/host.js'
-import { watchSkillCatalog } from './host/skill-catalog.js'
 import { installDeskSkill } from './host/skill.js'
 import { ScheduleHost } from './host/schedule/host.js'
 import { registerScheduleTools } from './host/schedule/tools.js'
-import { registerNotebookTools } from './host/notebook/tools.js'
 import { installSessionsHost, hasSessionServices, type SessionsConfig } from './host/sessions/install.js'
 import { registerDeskTools } from './host/notes/tools.js'
 import { registerGroupTools } from './host/tasks/group-tools.js'
@@ -44,7 +42,7 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
   const sessions = hasSessionServices(ctx) ? await installSessionsHost(ctx, store, config) : undefined
 
   const schedule = new ScheduleHost(ctx, store)
-  const notebook = new NotebookHost(store, watchSkillCatalog(ctx))
+  const notebook = new NotebookHost(store)
   const handler = createDeskRequestHandler({ ctx, store, schedule, sessions, notebook })
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
@@ -56,7 +54,6 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
   registerTaskTools(ctx, store)
   registerGroupTools(ctx, store)
   registerScheduleTools(ctx, schedule)
-  registerNotebookTools(ctx, notebook)
   // One short operating guide skill (object choice + revision workflow + side effects). Optional
   // service: without it the tools still work, so this never disables the plugin.
   installDeskSkill(ctx)

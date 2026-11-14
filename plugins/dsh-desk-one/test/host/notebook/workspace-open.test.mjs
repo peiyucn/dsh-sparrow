@@ -35,7 +35,7 @@ describe('批注：按工作区打开文件', () => {
   after(async () => { await rm(root, { recursive: true, force: true }) })
 
   it('openAt 用工作区根解析文件身份与正文', async () => {
-    const host = new NotebookHost(makeStore(), undefined)
+    const host = new NotebookHost(makeStore())
     const { file, page } = await host.openAt(root, 'note.md')
     assert.equal(file.path, 'note.md')
     assert.equal(file.rootPath, root)
@@ -43,14 +43,14 @@ describe('批注：按工作区打开文件', () => {
   })
 
   it('openById 用记录里的根读回正文', async () => {
-    const host = new NotebookHost(makeStore(), undefined)
+    const host = new NotebookHost(makeStore())
     await host.openAt(root, 'note.md')
     const { page } = await host.openById('note_file_test')
     assert.match(page.body, /hello/u)
   })
 
   it('openById 未知身份 404', async () => {
-    const host = new NotebookHost(makeStore(), undefined)
+    const host = new NotebookHost(makeStore())
     await assert.rejects(
       () => host.openById('missing'),
       (error) => error instanceof DeskError && error.status === 404,
@@ -58,7 +58,7 @@ describe('批注：按工作区打开文件', () => {
   })
 
   it('openAt 拒绝跳出工作区的路径', async () => {
-    const host = new NotebookHost(makeStore(), undefined)
+    const host = new NotebookHost(makeStore())
     await assert.rejects(
       () => host.openAt(root, '../outside.md'),
       (error) => error instanceof DeskError && error.code === 'BAD_BODY',

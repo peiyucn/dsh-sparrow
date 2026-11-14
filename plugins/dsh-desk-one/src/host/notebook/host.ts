@@ -1,30 +1,27 @@
 /**
- * Notebook host: derived index, single-page reads, file identity, the draft box, and review
- * history.
+ * Annotation host: file identity, single-page reads, the draft box, and review history.
  *
- * The scan is cached with a short TTL and single-flight semantics. File identities are assigned
- * lazily (first review) and re-resolved by content hash, so a renamed file keeps its history.
+ * There is no global "library root" and no user-facing index any more: callers name a registered
+ * workspace, and each file identity remembers the workspace root it came from. The only remaining
+ * directory scan is the bounded, on-demand one used to follow a renamed file by content hash.
  */
 
 import { readFile, stat } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import type {
-  CreateNotebookNoteRequest, NoteDraft, NotebookEntry, NotebookFileResponse, NotebookPageResponse, NotebookStateResponse, NotebookSkill,
+  NoteDraft, NotebookEntry, NotebookFileResponse, NotebookPageResponse,
   RecordReviewRequest, ReviewHistoryEntry, ReviewRecord,
 } from '../../notebook-contract.js'
-import { NOTEBOOK_HISTORY_WARN_BYTES, NOTEBOOK_MAX_BYTES, NOTEBOOK_SCAN_TIMEOUT_MS } from '../../constants.js'
+import { NOTEBOOK_MAX_BYTES, NOTEBOOK_SCAN_TIMEOUT_MS } from '../../constants.js'
 import { DeskError } from '../http.js'
 import type { DeskStore } from '../store.js'
-import { detectNote2md, ensureNoteFile, createNoteFile } from './files.js'
-import { readPage, searchEntries, summarize } from './library.js'
-import { resolveSkillName, toNotebookSkills, type SkillSummaryLike } from './skills.js'
+import { ensureNoteFile } from './files.js'
+import { readPage } from './library.js'
 import { scanLibrary } from './scan.js'
 
 /** How long one scan is reused before the next request rescans. */
 const SCAN_TTL_MS = 30_000
-/** How many recent pages the shelf shows. */
-const RECENT_LIMIT = 30
 /** How many candidate files a history resolution hashes before giving up. */
 const RELOCATE_CANDIDATES = 400
 /** Resolve budget for one history request (ms). */
@@ -47,19 +44,12 @@ async function hashFile(rootPath: string, relativePath: string): Promise<string 
   }
 }
 
-/** Host skill catalog narrowed to what the notebook page needs. */
-export interface SkillCatalog {
-  list(options: { readonly cwd?: string; readonly signal?: AbortSignal }): Promise<readonly SkillSummaryLike[]>
-}
-
-/** Notebook data facade shared by routes and tools. */
+/** Annotation data facade shared by routes. */
 export class NotebookHost {
   /** Last successful scan and its root. */
   private cache: { readonly root: string; readonly at: number; readonly entries: readonly NotebookEntry[] } | undefined
   /** In-flight scan (single flight). */
   private pending: Promise<readonly NotebookEntry[]> | undefined
-  /** note2md detection per root. */
-  private note2mdCache: { readonly root: string; readonly value: boolean } | undefined
   /** Recent rename-detection outcomes, so a detached history entry is not re-hashed every request. */
   private readonly relocateCache = new Map<string, {
     readonly hash: string
@@ -67,21 +57,10 @@ export class NotebookHost {
     readonly path?: string
   }>()
 
-  /**
-   * @param store - unified storage store.
-   * @param skillCatalog - live optional host skill catalog; absent hosts simply offer no skills.
-   */
-  constructor(
-    private readonly store: DeskStore,
-    private readonly skillCatalog?: () => SkillCatalog | undefined,
-  ) {}
+  /** @param store - unified storage store. */
+  constructor(private readonly store: DeskStore) {}
 
-  /** Configured root, if any. */
-  root(): string | undefined {
-    return this.store.getNotebookConfig()?.rootPath
-  }
-
-  /** Index the root, reusing the last scan while it is fresh. */
+  /** Scan one root on demand, reusing the last scan while it is fresh (rename detection only). */
   private async entries(root: string): Promise<readonly NotebookEntry[]> {
     const now = Date.now()
     if (this.cache !== undefined && this.cache.root === root && now - this.cache.at < SCAN_TTL_MS) {
@@ -94,115 +73,6 @@ export class NotebookHost {
     }).finally(() => { this.pending = undefined })
     this.pending = scan
     return await scan
-  }
-
-  /** Library root or a readable error. */
-  private requireRoot(): string {
-    const root = this.root()
-    if (root === undefined) throw new DeskError('NOTEBOOK_UNAVAILABLE', '还没有设置笔记库', 409)
-    return root
-  }
-
-  /** Skills offered for drafting, recomputed per request so catalog changes show up live. */
-  private async draftSkills(root: string): Promise<readonly NotebookSkill[]> {
-    const catalog = this.skillCatalog?.()
-    if (catalog === undefined) return []
-    try {
-      const summaries = await catalog.list({ cwd: root })
-      return toNotebookSkills(summaries.filter(summary => summary.invocation?.modelInvocable !== false).slice(0, 200))
-    } catch {
-      // The catalog is an optional enhancement: a broken provider must not break the page.
-      return []
-    }
-  }
-
-  /** Header state: config, counts, newest pages, drafts and history usage. */
-  async state(): Promise<NotebookStateResponse> {
-    const root = this.root()
-    const history = this.store.listReviewRecords()
-    const historyBytes = history.reduce((sum, record) => sum + record.bytes, 0)
-    const config = this.store.getNotebookConfig() ?? null
-    if (root === undefined) {
-      return {
-        config: null,
-        stats: { total: 0, missingFrontmatter: 0, emptyBody: 0 },
-        recent: [],
-        drafts: [],
-        draftCount: 0,
-        historyCount: 0,
-        historyBytes: 0,
-        note2md: false,
-        skills: [],
-        skillName: null,
-      }
-    }
-    const entries = await this.entries(root)
-    const drafts = this.store.listNoteDrafts().filter(draft => draft.rootPath === root && draft.drafts.length > 0)
-    let note2md = false
-    if (this.note2mdCache?.root === root) note2md = this.note2mdCache.value
-    else {
-      note2md = await detectNote2md(root)
-      this.note2mdCache = { root, value: note2md }
-    }
-    const skills = await this.draftSkills(root)
-    return {
-      config,
-      stats: summarize(entries),
-      recent: entries.slice(0, RECENT_LIMIT),
-      drafts,
-      draftCount: drafts.length,
-      historyCount: history.length,
-      historyBytes,
-      note2md,
-      skills,
-      skillName: resolveSkillName(skills, config?.skillName),
-    }
-  }
-
-  /**
-   * Page through the whole library, newest first (the list is the library, not a fixed recent
-   * shelf, so its count and its pages always describe the same set).
-   * @param input - zero-based offset, page size, and whether to keep only files without frontmatter.
-   * @returns the page plus the total number of matching files.
-   */
-  async list(input: {
-    readonly offset?: number
-    readonly limit?: number
-    readonly missingFrontmatter?: boolean
-  }): Promise<{ entries: readonly NotebookEntry[]; total: number }> {
-    const root = this.root()
-    if (root === undefined) return { entries: [], total: 0 }
-    const all = await this.entries(root)
-    const filtered = input.missingFrontmatter === true ? all.filter(entry => !entry.hasFrontmatter) : all
-    const offset = Math.max(0, Math.trunc(input.offset ?? 0))
-    const limit = Math.min(Math.max(1, Math.trunc(input.limit ?? 10)), 200)
-    return { entries: filtered.slice(offset, offset + limit), total: filtered.length }
-  }
-
-  /** Search indexed entries. */
-  async search(input: {
-    readonly query?: string
-    readonly type?: string
-    readonly tag?: string
-    readonly missingFrontmatter?: boolean
-    readonly emptyBody?: boolean
-    readonly limit?: number
-  }) {
-    const root = this.root()
-    if (root === undefined) return { entries: [], truncated: false }
-    const entries = await this.entries(root)
-    return searchEntries(entries, input.query ?? '', input, input.limit ?? 100)
-  }
-
-  /** Read one page for the review tab. */
-  async page(relativePath: string) {
-    return readPage(this.requireRoot(), relativePath)
-  }
-
-  /** Resolve (or lazily assign) the identity of one file. */
-  async ensureFile(relativePath: string): Promise<NotebookFileResponse> {
-    const file = await ensureNoteFile(this.store, this.requireRoot(), relativePath)
-    return { file }
   }
 
   /**
@@ -228,13 +98,6 @@ export class NotebookHost {
     const file = this.store.getNoteFile(fileId)
     if (file === undefined) throw new DeskError('UNKNOWN_NOTE', '文件身份不存在', 404)
     return { file, page: await readPage(file.rootPath, file.path) }
-  }
-
-  /** Create one new note file from the template; returns its relative path. */
-  async createNote(input: CreateNotebookNoteRequest): Promise<{ path: string }> {
-    const path = await createNoteFile(this.requireRoot(), input)
-    this.invalidate()
-    return { path }
   }
 
   /** Record one submitted review (annotations + file snapshot metadata). */
@@ -340,17 +203,4 @@ export class NotebookHost {
   draft(fileId: string): NoteDraft | null {
     return this.store.getNoteDraft(fileId) ?? null
   }
-
-  /** Whether history usage crossed the warning threshold (entry page renders a red meter). */
-  historyWarn(bytes: number): boolean {
-    return bytes >= NOTEBOOK_HISTORY_WARN_BYTES
-  }
-
-  /** Drop the cached scan (root changed). */
-  invalidate(): void {
-    this.cache = undefined
-    this.note2mdCache = undefined
-    this.relocateCache.clear()
-  }
-
 }

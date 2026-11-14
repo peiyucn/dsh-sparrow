@@ -1,11 +1,11 @@
-/** Notebook repository: library config, file identities, draft boxes and review-round baselines. */
+/** Notebook repository: file identities, draft boxes and review-round baselines. */
 
 import { randomUUID } from 'node:crypto'
 import {
-  DESK_NODE_SCHEMA, NOTEBOOK_BASELINE_MAX_CHARS, NOTEBOOK_CONFIG_ID, NOTEBOOK_MAX_DRAFTS, NOTEBOOK_MAX_REVIEW_BASELINES,
+  DESK_NODE_SCHEMA, NOTEBOOK_BASELINE_MAX_CHARS, NOTEBOOK_MAX_DRAFTS, NOTEBOOK_MAX_REVIEW_BASELINES,
 } from '../../constants.js'
 import { DeskModelError } from '../../model.js'
-import type { DeskNotebookConfig, DraftAnnotation, NoteBaseline, NoteDraft, NoteFileRef } from '../../notebook-contract.js'
+import type { DraftAnnotation, NoteBaseline, NoteDraft, NoteFileRef } from '../../notebook-contract.js'
 import type { StoreCore } from './core.js'
 
 /** Deterministic draft-box id: one draft box per file identity. */
@@ -45,53 +45,6 @@ export interface SaveNoteBaselineInput {
 
 export class NotebookRepository {
   constructor(private readonly core: StoreCore) {}
-
-  /** The configured notes root, if any. */
-  getNotebookConfig(): DeskNotebookConfig | undefined {
-    const node = this.core.nodes.get(NOTEBOOK_CONFIG_ID)
-    return node?.kind === 'notebook-config' ? node : undefined
-  }
-
-  /** Point the library at one absolute folder (idempotent on the single record). */
-  async saveNotebookRoot(rootPath: string): Promise<DeskNotebookConfig> {
-    const now = new Date().toISOString()
-    const existing = this.getNotebookConfig()
-    if (existing === undefined) {
-      const record: DeskNotebookConfig = {
-        id: NOTEBOOK_CONFIG_ID,
-        kind: 'notebook-config',
-        schema: DESK_NODE_SCHEMA,
-        rootPath,
-        createdAt: now,
-        updatedAt: now,
-        revision: 1,
-      }
-      await this.core.nodes.put(record.id, record)
-      return record
-    }
-    if (existing.rootPath === rootPath) return existing
-    return await this.core.nodes.update(NOTEBOOK_CONFIG_ID, current => current.kind === 'notebook-config'
-      ? { ...current, rootPath, updatedAt: now, revision: current.revision + 1 }
-      : current) as DeskNotebookConfig
-  }
-
-  /** Forget the configured root (drafts stay; they are found by path again). */
-  async clearNotebookRoot(): Promise<void> {
-    await this.core.nodes.delete(NOTEBOOK_CONFIG_ID)
-  }
-
-  /**
-   * Choose the drafting skill for this library (`null` = no skill). The record must exist: the
-   * route rejects the request before reaching here when no library is configured.
-   * @param skillName - kebab-case skill name, or null for "no skill".
-   * @returns the updated notebook config.
-   */
-  async saveNotebookSkill(skillName: string | null): Promise<DeskNotebookConfig> {
-    const now = new Date().toISOString()
-    return await this.core.nodes.update(NOTEBOOK_CONFIG_ID, current => current.kind === 'notebook-config'
-      ? { ...current, skillName, updatedAt: now, revision: current.revision + 1 }
-      : current) as DeskNotebookConfig
-  }
 
   /** One file identity by id. */
   getNoteFile(id: string): NoteFileRef | undefined {

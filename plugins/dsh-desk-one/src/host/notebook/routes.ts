@@ -1,10 +1,9 @@
-/** Notebook REST routes: library state, root setting, search, page reads, files, drafts, history. */
+/** Annotation REST routes: workspace-scoped opens, the landing summary, drafts, baselines, markers, history. */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { isAbsolute } from 'node:path'
 import { ROUTES, NOTEBOOK_WRITE_BODY_BYTES } from '../../constants.js'
 import type {
-  CreateNotebookNoteRequest, DeleteReviewRequest, MarkReviewSessionRequest, NoteBaselineRequest, NoteDraftRequest, NotebookRootRequest,
+  DeleteReviewRequest, MarkReviewSessionRequest, NoteBaselineRequest, NoteDraftRequest,
   RecordReviewRequest,
 } from '../../notebook-contract.js'
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
@@ -17,83 +16,6 @@ function notebookOf(route: DeskRouteContext) {
   const notebook = route.notebook
   if (notebook === undefined) throw new DeskError('NOTEBOOK_UNAVAILABLE', '笔记库不可用', 503)
   return notebook
-}
-
-async function stateRoute(route: DeskRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
-  sendJson(res, 200, await notebookOf(route).state())
-}
-
-async function setRootRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const notebook = notebookOf(route)
-  const body = bodyObject<NotebookRootRequest>(await readJsonBody(req), '请求体必须是对象')
-  const rootPath = typeof body.rootPath === 'string' ? body.rootPath.trim() : ''
-  if (rootPath === '' || !isAbsolute(rootPath)) throw new DeskError('BAD_BODY', '笔记库必须是绝对路径')
-  await route.store.saveNotebookRoot(rootPath)
-  notebook.invalidate()
-  sendJson(res, 200, await notebook.state())
-}
-
-async function clearRootRoute(route: DeskRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const notebook = notebookOf(route)
-  await route.store.clearNotebookRoot()
-  notebook.invalidate()
-  sendJson(res, 200, await notebook.state())
-}
-
-/** Skill name grammar shared with the host registry (kebab-case). */
-const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
-
-async function setSkillRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const notebook = notebookOf(route)
-  const body = bodyObject<{ name?: string | null }>(await readJsonBody(req), '请求体必须是对象')
-  const name = body.name
-  if (name !== null && (typeof name !== 'string' || !SKILL_NAME.test(name))) {
-    throw new DeskError('BAD_BODY', '技能名不合法')
-  }
-  if (route.store.getNotebookConfig() === undefined) {
-    throw new DeskError('NOTEBOOK_UNAVAILABLE', '还没有设置笔记库', 409)
-  }
-  await route.store.saveNotebookSkill(name)
-  sendJson(res, 200, await notebook.state())
-}
-
-async function searchRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const notebook = notebookOf(route)
-  const url = new URL(req.url ?? '/', 'http://localhost')
-  const limitRaw = Number(url.searchParams.get('limit') ?? '')
-  sendJson(res, 200, await notebook.search({
-    ...url.searchParams.get('q') === null ? {} : { query: url.searchParams.get('q') ?? '' },
-    ...url.searchParams.get('type') === null ? {} : { type: url.searchParams.get('type') ?? '' },
-    ...url.searchParams.get('tag') === null ? {} : { tag: url.searchParams.get('tag') ?? '' },
-    missingFrontmatter: url.searchParams.get('missing') === '1',
-    emptyBody: url.searchParams.get('empty') === '1',
-    ...Number.isFinite(limitRaw) && limitRaw > 0 ? { limit: Math.min(Math.floor(limitRaw), 200) } : {},
-  }))
-}
-
-async function listRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const url = new URL(req.url ?? '/', 'http://localhost')
-  const offsetRaw = Number(url.searchParams.get('offset') ?? '')
-  const limitRaw = Number(url.searchParams.get('limit') ?? '')
-  sendJson(res, 200, await notebookOf(route).list({
-    ...Number.isFinite(offsetRaw) && offsetRaw > 0 ? { offset: Math.floor(offsetRaw) } : {},
-    ...Number.isFinite(limitRaw) && limitRaw > 0 ? { limit: Math.floor(limitRaw) } : {},
-    missingFrontmatter: url.searchParams.get('missing') === '1',
-  }))
-}
-
-async function pageRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const url = new URL(req.url ?? '/', 'http://localhost')
-  const path = url.searchParams.get('path') ?? ''
-  if (path === '') throw new DeskError('BAD_BODY', '缺少 path')
-  sendJson(res, 200, await notebookOf(route).page(path))
-}
-
-async function fileRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = bodyObject<{ path?: string }>(await readJsonBody(req), '请求体必须是对象')
-  const path = typeof body.path === 'string' ? body.path : ''
-  if (path === '') throw new DeskError('BAD_BODY', '缺少 path')
-  sendJson(res, 200, await notebookOf(route).ensureFile(path))
 }
 
 /** Workspace-scoped open: the client names the workspace it is browsing, not a global library. */
@@ -117,15 +39,6 @@ async function openByIdRoute(route: DeskRouteContext, req: IncomingMessage, res:
 /** Landing page data: drafts, submitted records, and recent reviews, newest first. */
 async function summaryRoute(route: DeskRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
   sendJson(res, 200, buildSummary(route.store, route.ctx.workspaceRegistry))
-}
-
-async function createRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = bodyObject<CreateNotebookNoteRequest>(await readJsonBody(req), '请求体必须是对象')
-  if (typeof body.title !== 'string') throw new DeskError('BAD_BODY', '缺少标题')
-  sendJson(res, 201, await notebookOf(route).createNote({
-    title: body.title,
-    ...body.folder === undefined ? {} : { folder: body.folder },
-  }))
 }
 
 async function reviewSessionsGetRoute(route: DeskRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -237,18 +150,9 @@ async function historyDeleteRoute(route: DeskRouteContext, req: IncomingMessage,
 }
 
 export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
-  { method: 'GET', path: ROUTES.notebookState, handle: stateRoute },
-  { method: 'POST', path: ROUTES.notebookRoot, handle: setRootRoute },
-  { method: 'DELETE', path: ROUTES.notebookRoot, handle: clearRootRoute },
-  { method: 'POST', path: ROUTES.notebookSkill, handle: setSkillRoute },
-  { method: 'GET', path: ROUTES.notebookSearch, handle: searchRoute },
-  { method: 'GET', path: ROUTES.notebookList, handle: listRoute },
-  { method: 'GET', path: ROUTES.notebookPage, handle: pageRoute },
-  { method: 'POST', path: ROUTES.notebookFile, handle: fileRoute },
   { method: 'POST', path: ROUTES.notebookOpen, handle: openRoute },
   { method: 'GET', path: ROUTES.notebookOpenById, handle: openByIdRoute },
   { method: 'GET', path: ROUTES.notebookSummary, handle: summaryRoute },
-  { method: 'POST', path: ROUTES.notebookCreate, handle: createRoute },
   { method: 'GET', path: ROUTES.notebookReviewSessions, handle: reviewSessionsGetRoute },
   { method: 'POST', path: ROUTES.notebookReviewSessions, handle: reviewSessionMarkRoute },
   { method: 'GET', path: ROUTES.notebookBaseline, handle: baselineGetRoute },
