@@ -152,6 +152,7 @@ async function waitFor(predicate, timeoutMs = 2_000) {
  *   headers: any[],
  *   dirs: Map<string, string>,
  *   archivedIds: string[],
+ *   pinnedIds?: string[],
  *   titles: Map<string, string>,
  *   trashRoot: string,
  *   listError?: boolean,
@@ -160,7 +161,7 @@ async function waitFor(predicate, timeoutMs = 2_000) {
  * }} options
  */
 async function buildHarness({
-  headers, dirs, archivedIds, titles, trashRoot, listError = false, projectionCache, storageDomain,
+  headers, dirs, archivedIds, pinnedIds = [], titles, trashRoot, listError = false, projectionCache, storageDomain,
 }) {
   let route = null
   const warnings = []
@@ -168,6 +169,7 @@ async function buildHarness({
   const parallelEvents = []
   const disposers = []
   const archived = [...archivedIds]
+  const pinned = [...pinnedIds]
 
   const sessionQuery = {
     // titlesFor 的第二档：官方批量标题读取；这里返回「全部 fulfilled」的桩。
@@ -205,11 +207,15 @@ async function buildHarness({
     agents: { get: () => undefined },
     workspaceRegistry: {
       archivedSessionIds: archived,
+      pinnedSessionIds: pinned,
       list: () => [],
       get: () => undefined,
       enqueueOperation: async (operation) => operation(),
-      requireState: () => ({ archivedSessionIds: archived }),
-      setState: async (state) => { archived.length = 0; archived.push(...state.archivedSessionIds) },
+      requireState: () => ({ archivedSessionIds: archived, pinnedSessionIds: pinned }),
+      setState: async (state) => {
+        archived.length = 0; archived.push(...state.archivedSessionIds)
+        pinned.length = 0; pinned.push(...(state.pinnedSessionIds ?? []))
+      },
     },
     sessionPersistence: {
       // Public snapshot shape: the host's `location` is the only source of session directories now.
@@ -271,6 +277,7 @@ async function buildHarness({
     emitted,
     parallelEvents,
     get archivedIds() { return [...archived] },
+    get pinnedIds() { return [...pinned] },
     get route() { return route },
     dispose() { for (const dispose of disposers.splice(0)) { try { dispose() } catch { /* best-effort */ } } },
   }
@@ -780,5 +787,21 @@ describe('归档 / 取消归档：官方后续动作重放', () => {
     const result = await post(h.route.handler, `${PREFIX}/unarchive`, { sessionId: 'root-c' })
     assert.equal(result.statusCode, 200)
     assert.deepEqual(h.parallelEvents, [])
+  })
+
+  it('归档 应该 在同一持久化写入里摘掉 pin（官方不变量：归档与置顶互斥）', async () => {
+    const layout = await makeLayout()
+    const h = await buildHarness({
+      headers: [header('root-p')],
+      dirs: new Map(),
+      archivedIds: [],
+      pinnedIds: ['root-p'],
+      titles: new Map(),
+      trashRoot: layout.trash,
+    })
+    const result = await post(h.route.handler, `${PREFIX}/archive`, { sessionId: 'root-p' })
+    assert.equal(result.statusCode, 200)
+    assert.deepEqual(h.archivedIds, ['root-p'])
+    assert.deepEqual(h.pinnedIds, [], '归档必须同时摘掉 pin（与官方 archiveSession 一致）')
   })
 })

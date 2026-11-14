@@ -121,6 +121,32 @@ async function removeArchivedId(surface: RegistryMutationSurface, sessionId: Ses
 }
 
 /**
+ * Archive ids **and drop their pins in the same durable write**, mirroring the official invariant
+ * ("pinning and archival are mutually exclusive"; `workspaceRegistry.archiveSession` does the same).
+ * Our private write channel bypasses that method, so without this a session archived from Desk One could
+ * stay pinned. Ids already archived are left alone (like the official idempotent no-op).
+ */
+async function archiveIdsDroppingPins(
+  surface: RegistryMutationSurface,
+  ids: readonly string[],
+): Promise<void> {
+  const added = new Set(ids.map(String))
+  await surface.enqueueOperation(async () => {
+    const state = surface.requireState()
+    const archived = [...state.archivedSessionIds]
+    const known = new Set(archived.map(String))
+    for (const id of added) {
+      if (known.has(id)) continue
+      archived.push(SessionId(id))
+      known.add(id)
+    }
+    const pinned = state.pinnedSessionIds.filter(id => !added.has(String(id)))
+    if (archived.length === state.archivedSessionIds.length && pinned.length === state.pinnedSessionIds.length) return
+    await surface.setState({ ...state, archivedSessionIds: archived, pinnedSessionIds: pinned })
+  })
+}
+
+/**
  * Archived-set cleanup after moving to the trash / permanent deletion: remove the root plus **all descendants**
  * that were actually moved/deleted, in one write chain. Official persistence has a flat sibling layout
  * (sessionDir = projectDir/encodeSegment(id), and children inherit the parent's cwd), while trash/delete moves
@@ -306,11 +332,7 @@ export async function archiveSessionSubtree(
   }
   const subtree = collectSubtreeIds(headers.map(treeHeaderOf), rootId)
   const before = new Set((await readArchivedIds(ctx)).map(String))
-  await mutateArchivedSet(surface, ids => {
-    const next = new Set(ids.map(String))
-    for (const id of subtree) next.add(id)
-    return [...next].map(id => SessionId(id))
-  })
+  await archiveIdsDroppingPins(surface, subtree)
   for (const id of subtree) {
     if (!before.has(String(id))) await announceArchived(ctx, SessionId(id))
   }
