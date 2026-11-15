@@ -519,6 +519,11 @@ button.dsh-desk-notebook-rowbody {
   margin: 0;
 }
 
+/* The header clips its glass layer; let the workspace dropdown paint past the header bottom. */
+.dsh-desk-header[data-workspace-menu='open'] {
+  overflow: visible;
+}
+
 /* Header workspace selector + menu. */
 .dsh-desk-notebook-workspaceselect {
   position: relative;

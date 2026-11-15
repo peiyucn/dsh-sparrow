@@ -28,6 +28,16 @@ export function NotebookHeaderActions(props: {
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [open])
 
+  // The header clips its glass layer with `overflow: hidden`; while the menu is open it must paint
+  // past the header, otherwise the dropdown is cut off at the header's bottom edge.
+  useEffect(() => {
+    const header = rootRef.current?.closest('.dsh-desk-header')
+    if (!(header instanceof HTMLElement)) return undefined
+    if (open) header.dataset.workspaceMenu = 'open'
+    else delete header.dataset.workspaceMenu
+    return () => { delete header.dataset.workspaceMenu }
+  }, [open])
+
   const currentName = page.workspace?.title ?? page.rootPath?.split(/[\\/]/u).pop() ?? ''
   return (
     <div className="dsh-desk-notebook-workspaceselect" ref={rootRef}>
