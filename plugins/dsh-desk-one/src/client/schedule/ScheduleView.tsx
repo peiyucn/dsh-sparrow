@@ -17,7 +17,7 @@ import type { DeskCalendar, DeskEvent, ScheduleEventListResponse, ScheduleStateR
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
 import { addDays, coversDayKey, dayKey, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName } from './utils.js'
-import { createLoadTickets } from '../app/utils.js'
+import { createKeyGuard, createLoadTickets } from '../app/utils.js'
 import { ListBoard, MonthBoard, WeekBoard } from './boards.js'
 import { EventCard } from './event-card.js'
 import { StartPanel, TodayPanel, UpcomingPanel, type TodayContext, type UpcomingRange } from './panels.js'
@@ -83,6 +83,9 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
   const autoSyncTried = useRef(false)
   const loadedOnce = useRef(false)
   const loadTickets = useRef(createLoadTickets())
+  /** One calendar write per calendar at a time: the switches stay clickable, but a double click
+   *  must not send a second patch with the same stale revision (the host answers 409). */
+  const calendarWrites = useRef(createKeyGuard())
 
   const range = useMemo(() => {
     if (view === 'month') return monthRange(cursor)
@@ -210,25 +213,29 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
 
   /** Source-level master switch: show/hide every calendar of that source at once. */
   const cycleColor = useCallback(async (calendar: DeskCalendar): Promise<void> => {
-    const index = (SCHEDULE_COLORS as readonly string[]).indexOf(calendar.color)
-    const next = SCHEDULE_COLORS[(index + 1) % SCHEDULE_COLORS.length] ?? SCHEDULE_COLORS[0]
-    try {
-      setState(await api.updateCalendar({ id: calendar.id, expectedRevision: calendar.revision, patch: { color: next } }))
-      setError(null)
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
-    }
+    await calendarWrites.current.run(calendar.id, async () => {
+      const index = (SCHEDULE_COLORS as readonly string[]).indexOf(calendar.color)
+      const next = SCHEDULE_COLORS[(index + 1) % SCHEDULE_COLORS.length] ?? SCHEDULE_COLORS[0]
+      try {
+        setState(await api.updateCalendar({ id: calendar.id, expectedRevision: calendar.revision, patch: { color: next } }))
+        setError(null)
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : String(reason))
+      }
+    })
   }, [api])
 
   const setCalendarEnabled = useCallback(async (calendar: DeskCalendar, enabled: boolean): Promise<void> => {
-    try {
-      setState(await api.updateCalendar({ id: calendar.id, expectedRevision: calendar.revision, patch: { enabled } }))
-      setError(null)
-      if (enabled) await api.sync()
-      await load()
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
-    }
+    await calendarWrites.current.run(calendar.id, async () => {
+      try {
+        setState(await api.updateCalendar({ id: calendar.id, expectedRevision: calendar.revision, patch: { enabled } }))
+        setError(null)
+        if (enabled) await api.sync()
+        await load()
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : String(reason))
+      }
+    })
   }, [api, load])
 
   const openEvent = (event: DeskEvent, point?: ClickPoint): void => {

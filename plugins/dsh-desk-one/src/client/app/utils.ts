@@ -140,6 +140,34 @@ export function createLoadTickets(): LoadTickets {
 }
 
 /**
+ * Per-key in-flight guard for UI entries that write the same record.
+ *
+ * Controls like the calendar colour / sync switches stay clickable while their write is in
+ * flight; a second click would send a stale `expectedRevision` and surface a spurious 409. One
+ * write per key at a time keeps the store contract (compare-and-set) intact without disabling the
+ * whole card, and different records still write in parallel.
+ */
+export interface KeyGuard {
+  /** Run `task` unless another task with the same key is still running. */
+  run(key: string, task: () => Promise<void>): Promise<void>
+}
+
+export function createKeyGuard(): KeyGuard {
+  const running = new Set<string>()
+  return {
+    async run(key, task): Promise<void> {
+      if (running.has(key)) return
+      running.add(key)
+      try {
+        await task()
+      } finally {
+        running.delete(key)
+      }
+    },
+  }
+}
+
+/**
  * Restore the tab the user left on. Derived from DESK_TABS so a new tab is remembered without
  * touching this function (a hard-coded list previously forgot `schedule` / `sessions`).
  */
