@@ -74,11 +74,10 @@
 | 方法 | 路径 | 作用 |
 | :--- | :--- | :--- |
 | GET | `events?from=&to=&calendarIds=&provider=` | 区间事件（只读） |
-| GET | `calendars` | 源 → 日历两级清单 + 颜色/显隐/同步状态 |
+| GET | `calendars` | 源 → 日历两级清单 + 颜色/显隐/同步状态（连接卡状态同源，凭据永不下发） |
 | POST | `calendars/update` | 改日历 `color` / `enabled` / `order`（只改本地元数据） |
-| GET | `status` | 各源同步状态与上次同步时间 |
+| GET | `status` | 各源同步状态与上次同步时间（与 `calendars` 同一份快照） |
 | POST | `sync` | 手动同步（同源串行、重复点击合并） |
-| GET | `connections` | 连接卡状态（不含凭据） |
 | POST | `connections/save` | 保存连接（密码/链接进 `ctx.credentials`） |
 | POST | `connections/test` | 测试连接（保存前必须先过） |
 | POST | `connections/remove` | 断开连接 |
@@ -98,7 +97,7 @@
 | 企业微信（工作） | CalDAV `caldav.wecom.work` | 发现入口 `/.well-known/caldav`；日历家目录疑似裸 `/calendar/`（**未验证**）；按日历 ctag/ETag 增量 | 手机端同步密码；重新获取使旧密码失效 | 非 IANA TZID（靠内嵌 VTIMEZONE）；读限额未查到 |
 | iCloud（个人） | CalDAV `caldav.icloud.com` | 发现可能跳 `pNN-caldav.icloud.com` 分片；REPORT 只请求裸 `<calendar-data/>`；窗口 ≤ 366 天 / 400 条 | Apple ID + App 专用密码（需双重认证；改主密码全部失效） | 60 读/分钟、单日历 5 万事件上限；共享/家庭日历可见性**未验证** |
 | Outlook（个人） | Microsoft Graph OAuth（浏览器回调 + PKCE，设备码兜底） | refresh token → access token；`/me/calendars` + `calendarView`；多日历、UTC、分页 | 公共客户端 Client ID 内置；回调 `http://localhost/api/desk-one/schedule/outlook/callback` 需在应用注册（Microsoft 对 localhost 忽略端口，DSH 端口可变）；权限 `Calendars.ReadWrite`；refresh token 存官方凭据库 | 不发布公开 ICS；登录一次后自动续期 |
-| 订阅（ICS，provider 无关） | 任意公开 ICS 链接（多条） | 条件 GET；每条链接 = 一本日历 | 链接本身就是凭据；URL 存官方凭据库 | 公开可读，仅适合外部订阅；刷新由发布方决定 |
+| 订阅（ICS，provider 无关） | 任意**公网 https** ICS 链接（多条，拒绝回环 / 内网 / 链路本地地址与 `.local` 等本地名） | 条件 GET；每条链接 = 一本日历；重定向逐跳校验 | 链接本身就是凭据；URL 存官方凭据库 | 公开可读，仅适合外部订阅；刷新由发布方决定 |
 
 统一适配器接口：`probe` / `listCalendars` / `pull(cursor, window)`；失败分类 `AUTH_EXPIRED`（不自动重试）与 `TRANSIENT`（退避重试）。
 
@@ -128,15 +127,16 @@
 4. **通用 ICS 订阅**（provider 无关、可多条；链接存凭据库）。
 5. **Outlook ICS**（历史兼容：网页端发布链接，条件 GET + UID upsert；UI 不再暴露）。
 
-未验证项（以 owner 真机联调为准）：企微 `/calendar/` 家目录与标准发现链、非 IANA TZID 样本；iCloud 分片/REPORT/`sync-collection` 支持；共享日历是否出现在 CalDAV 集合；Outlook Graph 企业租户策略 / 回调注册 / 增量拉取细节；各订阅链接的刷新延迟与内容类型。
+未验证项（以 owner 真机联调为准）：企微 `/calendar/` 家目录与标准发现链、非 IANA TZID 样本；iCloud 分片/REPORT/`sync-collection` 支持；共享日历是否出现在 CalDAV 集合；Outlook Graph 企业租户策略 / 回调注册 / 增量拉取细节；各订阅链接的内容类型、被重定向的实际形态与刷新延迟。
 
 ## 9. 实现备注（2026-11-14 现状）
 
 - **记录形态**：`schedule-source`（连接级来源）+ `calendar` + `event` 三种 kind 与便签/任务一样用**平铺字段**存进 `nodes`（`payload` 分层是设计目标，尚未迁移）；域版本不变，旧记录照常解码。
 - **日历身份**：`DeskCalendar.remoteId` 存的是**日历集合 pathname**（不是绝对 URL），避免 iCloud 在 `pNN-caldav` 分片间切换时同一本日历生成新行；查询时用当前家目录 origin 拼回绝对 URL。
 - **连接卡入口**：只在「日历设置」管理页（页内子页面，从顶栏进入；与便签回收站同一导航语言），不常驻主页、不用弹窗；保存前强制「测试连接」通过。Outlook Graph 卡提供「Microsoft 登录」浏览器回调（设备码兜底）。
+- **ICS 通道的链接策略（2026-11-15）**：Outlook 发布链接（`outlook` 通道）只允许 Microsoft 白名单主机；通用订阅（`ics` 通道）允许任意**公网 https** 链接，拒绝回环 / 内网 / 链路本地地址与 `.local` 等本地名，且重定向逐跳校验（不能借重定向跳进内网）——见 `src/host/schedule/providers/outlook-ics.ts`。订阅先写凭据再建来源记录，来源建失败会回滚刚写入的凭据。
 - **企微 quirk（已真机验证）**：REPORT 会把日历集合自身也作为一个条目返回（无 ETag / 无 calendar-data），对其 GET 会 403；适配器按「href 等于日历集合、无 ETag 且无内联数据」跳过，仅对真实 `.ics` 逐条 GET（6 路并发）。首次全量同步 100+ 事件在办公网内约十几秒；客户端保存/同步超时放宽到 180s。
 - **同步触发**：打开日程页时若上次同步超过 5 分钟自动同步；面板打开期间每 15 分钟同步；手动同步按钮；宿主关闭即停止。同步报告只统计**实际入库**的事件数。
 - **Outlook 增量**：Graph 走 `calendarView` 分页（`@odata.nextLink`，UTC 时区），每次按镜像窗口拉取；`syncToken` / ETag 级增量尚未落地。历史 ICS 通道每次拉整份 ICS。两者待真机验证后再加条件 GET / 增量。
 - **重复事件覆盖件拆文件风险**：若服务端把 RECURRENCE-ID 覆盖件拆成独立 `.ics` 资源，主文件展开与覆盖件会产出同一 `externalId`（不同时间），host 侧按「最后写入者胜」去重；需真机探针确认后再做合并策略。
-- **未验证（禁止当已验证）**：企微 `/.well-known/caldav` 与 `/calendar/` 家目录的具体响应形态（发现链最终走的是 fallback，功能可用但链路的每一步未逐项钉死）、非 IANA TZID 样本；iCloud 分片跳转/REPORT 限制/共享日历可见性；Outlook Graph 的租户策略、回调注册与增量细节；订阅链接的内容类型与被重定向到非白名单 CDN 的可能。
+- **未验证（禁止当已验证）**：企微 `/.well-known/caldav` 与 `/calendar/` 家目录的具体响应形态（发现链最终走的是 fallback，功能可用但链路的每一步未逐项钉死）、非 IANA TZID 样本；iCloud 分片跳转/REPORT 限制/共享日历可见性；Outlook Graph 的租户策略、回调注册与增量细节；订阅链接的内容类型与被重定向的实际形态。

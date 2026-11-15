@@ -30,7 +30,7 @@ DeskOne 的定位是"人与 agent 共享的工作台"，会话是工作台里的
 
 | 模块 | 职责 |
 | :--- | :--- |
-| `archive.ts` | 纯逻辑：配置归一、sidecar v1/v2 解析、归档树 / 父子对齐 / 子树 id、header 事实缓存、LRU / 预算 / 有界并发、掩码与强确认 |
+| `archive.ts` | 纯逻辑的聚合出口：配置归一、sidecar v1/v2 解析、归档树 / 父子对齐 / 子树 id、header 事实缓存、LRU / 预算 / 有界并发、掩码与强确认（实现分别落在 `archive-config` / `session-tree` / `facts-store`，`archive.ts` 只做再导出） |
 | `compat.ts` | 会话格式门：`SESSION_FORMAT_VERSION` 支持集合 + 宿主 header.version 真值门 |
 | `gates.ts` | 唯一私有 seam 的启动自检：`WorkspaceRegistry` 写通道（仅静默维护：移入回收站 / 删除 / 还原 / 父子对齐） |
 | `headers.ts` | `sessionPersistence.list()` 公开快照（headers / sizes / location）+ TTL 单飞缓存 |
@@ -41,7 +41,7 @@ DeskOne 的定位是"人与 agent 共享的工作台"，会话是工作台里的
 | `trash.ts` | 回收站清单 / 位置 / 还原 / 删除（sidecar 磁盘格式 **`dsh-archive-manage.json` 不变**） |
 | `session-files.ts` | 会话目录定位、占用守卫、任意深度子会话整树移动 / 删除 / 回滚 |
 | `views.ts` | `/list` 归档树、`/strays` 游离会话 DTO |
-| `routes.ts` | 12 条路由表（`SESSION_ROUTES`），复用 desk-one 现有 trust / http / router |
+| `routes.ts` | 12 条方法路由表（`createSessionRoutes` 装配为 `DeskRouteEntry[]`，表本身是文件内 `ROUTE_TABLE`），复用 desk-one 现有 trust / http / router |
 | `startup.ts` | 三项启动清扫：30s 延迟兜底 + 首次列表补跑（**不在 apply 抢官方扫盘**） |
 | `install.ts` | 组合 sessions 装配（门 → 缓存 → 清扫 → 路由依赖），可单测 |
 

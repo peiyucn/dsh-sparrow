@@ -1,7 +1,8 @@
 # 06 · 会话索引（Session Index）— 统一对象的外键层
 
-> 状态（2026-11-09）：索引节点、刷新逻辑已实现；**不暴露重复的 agent 搜索工具**（官方会话工具已覆盖）；
-> 任务卡 `sessionIds` → `link` 边的迁移尚未执行（见第 4 节，属于下一步）。
+> 状态（2026-11-09，读取面 2026-11-15 核对）：索引节点、刷新逻辑与读取 API（`listSessionIndexes` /
+> `findSessionIndex`）已实现；**读取面尚无调用方**——任务卡的会话引用仍由客户端从官方会话快照解析，
+> 等第 4 节的 `link` 边迁移落地后才读这份索引。**不暴露重复的 agent 搜索工具**（官方会话工具已覆盖）。
 
 ## 1. 定位
 
@@ -36,7 +37,8 @@ interface DeskSessionIndex {
 
 ## 3. 刷新与生命周期
 
-- 触发：插件启动、`desk_session_search` / `desk_session_get` 调用（5 分钟 TTL）、后续路由可显式 force；
+- 触发：插件启动时一次预热（`host.ts` 装配末尾；5 分钟 TTL 内不重扫）；索引目前**没有读取方**
+  （任务卡引用走第 4 节的客户端快照，`link` 边迁移后才读索引），所以这份预热数据属于等待迁移的前置层；
 - 数据源：`sessionPersistence.list()` 的 header 事实 + 归档集 + live agent 状态；标题沿用归档树的三档
   （live 投影 → 冷投影缓存 → 有界折叠）；
 - 消失：先写 `availability: 'missing'` + `missingSince`，保留 30 天给边/引用解析；超期且无引用才删；
