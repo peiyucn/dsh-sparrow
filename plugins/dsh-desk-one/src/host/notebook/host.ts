@@ -16,6 +16,7 @@ import type {
 import { NOTEBOOK_MAX_BYTES, NOTEBOOK_SCAN_TIMEOUT_MS } from '../../constants.js'
 import { DeskError } from '../http.js'
 import type { DeskStore } from '../store.js'
+import { createLibraryCache } from './cache.js'
 import { ensureNoteFile } from './files.js'
 import { readPage, searchEntries, summarize } from './library.js'
 import { scanLibrary } from './scan.js'
@@ -48,10 +49,11 @@ async function hashFile(rootPath: string, relativePath: string): Promise<string 
 
 /** Notebook data facade shared by routes and tools. */
 export class NotebookHost {
-  /** Last successful scan and its root. */
-  private cache: { readonly root: string; readonly at: number; readonly entries: readonly NotebookEntry[] } | undefined
-  /** In-flight scan (single flight). */
-  private pending: Promise<readonly NotebookEntry[]> | undefined
+  /** Scan cache: root-keyed TTL + single flight (see cache.ts for why the root must key the slot). */
+  private readonly scans = createLibraryCache<NotebookEntry>(
+    root => scanLibrary(root, Date.now() + NOTEBOOK_SCAN_TIMEOUT_MS),
+    SCAN_TTL_MS,
+  )
   /** Recent rename-detection outcomes, so a detached history entry is not re-hashed every request. */
   private readonly relocateCache = new Map<string, {
     readonly hash: string
@@ -67,19 +69,9 @@ export class NotebookHost {
     return this.store.getNotebookConfig()?.rootPath
   }
 
-  /** Index the root, reusing the last scan while it is fresh. */
-  private async entries(root: string): Promise<readonly NotebookEntry[]> {
-    const now = Date.now()
-    if (this.cache !== undefined && this.cache.root === root && now - this.cache.at < SCAN_TTL_MS) {
-      return this.cache.entries
-    }
-    if (this.pending !== undefined) return await this.pending
-    const scan = scanLibrary(root, now + NOTEBOOK_SCAN_TIMEOUT_MS).then((entries) => {
-      this.cache = { root, at: Date.now(), entries }
-      return entries
-    }).finally(() => { this.pending = undefined })
-    this.pending = scan
-    return await scan
+  /** Index the root, reusing the last scan while it is fresh (root-keyed single flight). */
+  private entries(root: string): Promise<readonly NotebookEntry[]> {
+    return this.scans.get(root)
   }
 
   /** Library root or a readable error. */
@@ -291,7 +283,7 @@ export class NotebookHost {
 
   /** Drop the cached scan (root changed). */
   invalidate(): void {
-    this.cache = undefined
+    this.scans.invalidate()
     this.relocateCache.clear()
   }
 
