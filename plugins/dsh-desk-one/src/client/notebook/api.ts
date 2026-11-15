@@ -22,16 +22,6 @@ export function setNotebookRoot(rootPath: string): Promise<NotebookStateResponse
   return postJson<NotebookStateResponse>(ROUTES.notebookRoot, { rootPath } satisfies NotebookRootRequest)
 }
 
-/** Forget the configured root (the index is derived). */
-export function clearNotebookRoot(): Promise<NotebookStateResponse> {
-  return deleteJson<NotebookStateResponse>(ROUTES.notebookRoot)
-}
-
-/** Choose the drafting skill (`null` = no skill). */
-export function setNotebookSkill(name: string | null): Promise<NotebookStateResponse> {
-  return postJson<NotebookStateResponse>(ROUTES.notebookSkill, { name })
-}
-
 /** Search titles / paths, optionally narrowed by a count filter. */
 export function searchNotebook(input: {
   readonly query?: string
@@ -147,7 +137,6 @@ export interface NotebookApi {
   readonly state: typeof notebookState
   readonly setRoot: typeof setNotebookRoot
   readonly list: typeof listNotebook
-  readonly clearRoot: typeof clearNotebookRoot
   readonly search: typeof searchNotebook
   readonly ensureFile: typeof ensureNotebookFile
   readonly open: typeof openNotebookFile
@@ -168,7 +157,6 @@ export const notebookApi: NotebookApi = {
   state: notebookState,
   setRoot: setNotebookRoot,
   list: listNotebook,
-  clearRoot: clearNotebookRoot,
   search: searchNotebook,
   ensureFile: ensureNotebookFile,
   open: openNotebookFile,

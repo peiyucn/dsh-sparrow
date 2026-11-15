@@ -1,4 +1,4 @@
-/** Notebook REST routes: library state, root setting, search, page reads, files, drafts, history. */
+/** Notebook REST routes: library state, workspace link, search/list, file opens, drafts, baselines, history and review markers. */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isAbsolute } from 'node:path'
@@ -28,13 +28,6 @@ async function setRootRoute(route: DeskRouteContext, req: IncomingMessage, res: 
   const rootPath = typeof body.rootPath === 'string' ? body.rootPath.trim() : ''
   if (rootPath === '' || !isAbsolute(rootPath)) throw new DeskError('BAD_BODY', '笔记库必须是绝对路径')
   await route.store.saveNotebookRoot(rootPath)
-  notebook.invalidate()
-  sendJson(res, 200, await notebook.state())
-}
-
-async function clearRootRoute(route: DeskRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const notebook = notebookOf(route)
-  await route.store.clearNotebookRoot()
   notebook.invalidate()
   sendJson(res, 200, await notebook.state())
 }
@@ -200,7 +193,6 @@ async function historyDeleteRoute(route: DeskRouteContext, req: IncomingMessage,
 export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.notebookState, handle: stateRoute },
   { method: 'POST', path: ROUTES.notebookRoot, handle: setRootRoute },
-  { method: 'DELETE', path: ROUTES.notebookRoot, handle: clearRootRoute },
   { method: 'GET', path: ROUTES.notebookSearch, handle: searchRoute },
   { method: 'GET', path: ROUTES.notebookList, handle: listRoute },
   { method: 'POST', path: ROUTES.notebookFile, handle: fileRoute },

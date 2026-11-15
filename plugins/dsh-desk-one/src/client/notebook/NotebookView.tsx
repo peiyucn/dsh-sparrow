@@ -1,6 +1,6 @@
 /**
- * Notebook page body: one vertical page with the search + four views joined into one strip, the
- * official "workspace files" button on its right, and the paginated list below.
+ * Notebook page body: one vertical page with the search field and the official "workspace files"
+ * button on top, the four views in the list header, and the paginated list below.
  */
 
 import { useState } from 'react'
@@ -72,7 +72,7 @@ function RecordDialog(props: {
       <div className="dsh-desk-notebook-record">
         <div className="dsh-desk-notebook-recordmeta">
           <span className="dsh-desk-notebook-recordtitle">{record.record.fileTitle}</span>
-          <span className="dsh-desk-notebook-recordpath">{record.resolvedPath ?? record.record.pathSnapshot}</span>
+          <span className="dsh-desk-notebook-recordpath" title={record.resolvedPath}>{record.record.pathSnapshot}</span>
           <span className="dsh-desk-notebook-recorddate">{formatDateTime(record.record.createdAt)}</span>
           {linked ? null : <Tag tone="warning">{t('notebook.recordDetached')}</Tag>}
         </div>
@@ -149,7 +149,7 @@ function Row({ page, row, onOpen }: {
   )
 }
 
-/** The official "workspace files" entry: one fixed-width white line with an inline folder glyph. */
+/** The official "workspace files" entry: one fixed-width white line with the inline Desk One mark. */
 function WorkspaceFilesButton({ page }: { readonly page: NotebookPageController }): ReactElement {
   const { t } = page
   return (
@@ -184,10 +184,10 @@ function HomeBody({ page }: { readonly page: NotebookPageController }): ReactEle
                       type="button"
                       className="dsh-desk-notebook-homerow"
                       disabled={page.busy}
+                      title={item.path}
                       onClick={() => { void page.chooseRoot(item.path) }}
                     >
                       <span className="dsh-desk-notebook-homerow-title">{item.title}</span>
-                      <span className="dsh-desk-notebook-homerow-path">{item.path}</span>
                     </button>
                   </li>
                 ))}

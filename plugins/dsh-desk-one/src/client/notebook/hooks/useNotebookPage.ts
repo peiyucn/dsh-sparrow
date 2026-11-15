@@ -1,8 +1,9 @@
 /**
  * Notebook page controller: composes the library data (`useNotebookLibrary`), the list view
  * (`useNotebookRows`) and the page's actions (`useNotebookActions`) into the single controller the
- * page body and the panel header share. Keeping the controller here (owned by `DeskOnePage`) is what
- * lets the header own the page's primary actions without the page reaching into the header.
+ * page body and the panel header share. Keeping the controller here (owned by `DeskOnePage`) lets
+ * the header and the page read the same workspace / busy state without either reaching into the
+ * other's component tree.
  */
 
 import { useCallback, useState } from 'react'

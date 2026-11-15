@@ -9,7 +9,7 @@ import { PACKAGE_NAME, TASK_STATUSES } from '../../constants.js'
 import { textOutput, toolError } from '../tools/shared.js'
 import type { DeskStore } from '../store.js'
 
-/** Register the five group tools. */
+/** Register the six group tools. */
 export function registerGroupTools(ctx: Context, store: DeskStore): void {
   ctx.tools.register(defineTool({
     name: 'desk_group_add',

@@ -33,7 +33,7 @@ export const inject = [
  */
 export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<void> {
   // Host compatibility gate (root AGENTS "plugin/host compatibility"), before any registration:
-// a missing capability throws so the plugin disables itself instead of breaking dsh.
+  // a missing capability throws so the plugin disables itself instead of breaking dsh.
   assertHostGates(ctx)
   const store = await DeskStore.open(ctx)
   ctx.effect(() => () => store.close(), 'dsh-desk-one: storage domain')

@@ -117,7 +117,6 @@ describe('笔记 / 审阅契约', () => {
     for (const action of [
       'state',
       'setRoot',
-      'clearRoot',
       'search',
       'list',
       'ensureFile',

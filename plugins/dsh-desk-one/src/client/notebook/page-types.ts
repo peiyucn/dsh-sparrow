@@ -52,7 +52,7 @@ export interface NotebookPageController {
   readonly reload: () => Promise<void>
   /** True once the first state fetch settled; the page must not flash the unlinked offer before it. */
   readonly ready: boolean
-  /** Open the official workspace files page (the right-column card). */
+  /** Open the official workspace files page (the top-row button). */
   readonly openFolder: () => Promise<void>
   readonly chooseRoot: (path: string) => Promise<void>
   readonly pickNewWorkspace: () => Promise<void>

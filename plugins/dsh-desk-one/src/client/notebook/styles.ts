@@ -38,19 +38,6 @@ export const NOTEBOOK_CSS = `
   background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.03));
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
-.dsh-desk-notebook-column {
-  box-sizing: border-box;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-  max-width: min(1100px, 100%);
-  min-height: 0;
-  margin: 0 auto;
-}
-
-
 .dsh-desk-notebook-search {
   flex: 1 1 260px;
   min-width: 0;
@@ -185,6 +172,12 @@ button.dsh-desk-notebook-rowbody {
   font-size: 13px;
   line-height: 20px;
 }
+.dsh-desk-notebook-hint {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 13px;
+  line-height: 20px;
+}
 .dsh-desk-notebook-pager {
   display: flex;
   flex: none;
@@ -200,7 +193,7 @@ button.dsh-desk-notebook-rowbody {
   font-variant-numeric: tabular-nums;
 }
 
-/* --- unlinked state: centred offer -------------------------------------- */
+/* --- loading state: centred spinner / hint ------------------------------ */
 .dsh-desk-notebook-center {
   display: flex;
   flex: 1;
@@ -209,71 +202,6 @@ button.dsh-desk-notebook-rowbody {
   min-height: 0;
   padding: 24px 0 48px;
 }
-.dsh-desk-notebook-centerinner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  max-width: 640px;
-  text-align: center;
-}
-
-.dsh-desk-notebook-centeractions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-}
-.dsh-desk-notebook-centerdivider {
-  align-self: stretch;
-  height: 0;
-  margin-top: 2px;
-  border-top: 0.5px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.06));
-}
-.dsh-desk-notebook-centerhint {
-  margin: 0;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  font-size: 12px;
-  line-height: 18px;
-}
-.dsh-desk-notebook-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  margin-top: 4px;
-  text-align: left;
-}
-.dsh-desk-notebook-pickeritem {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  padding: 8px 10px;
-  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-  border-radius: var(--dsw-radius-md, 12px);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.dsh-desk-notebook-pickeritem:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-}
-.dsh-desk-notebook-pickeritem:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.dsh-desk-notebook-pickertitle {
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 20px;
-}
-
-
 /* --- review record detail ------------------------------------------------ */
 .dsh-desk-notebook-recorddialog {
   width: min(560px, 100%);
@@ -363,8 +291,8 @@ button.dsh-desk-notebook-rowbody {
   color: var(--dsw-alias-state-error-primary, #c62828);
 }
 
-/* Vertical page: one content column with an equal-width top band; the joinable search/filter
-   control sits left and the white workspace-files card sits right at the same width and height. */
+/* Vertical page: one content column with an equal-width top band; the search field sits left and
+   the white workspace-files button sits right at the same width and height. */
 .dsh-desk-notebook-content {
   display: flex;
   flex: 1;
@@ -495,14 +423,6 @@ button.dsh-desk-notebook-rowbody {
   font-size: 13px;
   font-weight: 500;
   line-height: 18px;
-}
-.dsh-desk-notebook-homerow-path {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
 }
 .dsh-desk-notebook-homeactions {
   display: flex;

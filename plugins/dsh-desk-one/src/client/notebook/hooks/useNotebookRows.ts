@@ -1,7 +1,7 @@
 /**
  * Notebook list view: the row model, the four view modes' client-side filtering, search and the
  * dual paging strategy (server-paged for the whole library, client-paged for search / drafts /
- * history), plus the count line under the list.
+ * history), plus the count line carried by the list header.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'

@@ -1,28 +1,16 @@
 /**
- * Annotation contracts: file identity, the persisted draft box, baselines, and the review history.
- * Review state itself stays in the conversation; stored objects are:
+ * Notebook contracts: the linked root, file identity, the persisted draft box, baselines, and the
+ * review history. Review state itself stays in the conversation; stored objects are:
+ *   - notebook-config: the one workspace linked as the notebook library
  *   - note-file: one lazily assigned file identity (workspace root + relative path + content hash)
  *   - note-draft: the unsaved annotations of one file
  *   - note-baseline: this round's baseline body, one per annotation session
  *   - review-record: one submitted review (annotations + file snapshot metadata)
  *   - review-session: the durable marker that one session was opened by the annotation flow
  *
- * The notebook library is gone, but the legacy `notebook-config` record must keep validating: a
- * profile written before the refactor still has one, and an unknown kind at open time would make
- * the whole storage domain fail (and with it every plugin route).
+ * `notebook-config` stays a live record. Old profiles may still carry `skillName` from the removed
+ * AI-draft flow, so that optional field stays parseable and is never written again.
  */
-
-/** Legacy notebook-root record: no longer read or written, kept only for stored-data compatibility. */
-export interface DeskNotebookConfig {
-  readonly id: string
-  readonly kind: 'notebook-config'
-  readonly schema: number
-  readonly rootPath: string
-  readonly skillName?: string | null
-  readonly createdAt: string
-  readonly updatedAt: string
-  readonly revision: number
-}
 
 /** One page in the library index (derived, never written back into the file). */
 export interface NotebookEntry {
@@ -53,9 +41,7 @@ export interface DeskNotebookConfig {
   readonly kind: 'notebook-config'
   readonly schema: number
   readonly rootPath: string
-  /**
-   * Legacy field from the removed AI-draft flow: old records may carry it, new ones never write it.
-   */
+  /** Legacy field from the removed AI-draft flow; old records may carry it, new ones never write it. */
   readonly skillName?: string | null
   readonly createdAt: string
   readonly updatedAt: string

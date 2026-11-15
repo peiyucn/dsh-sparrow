@@ -75,11 +75,6 @@ export class NotebookRepository {
       : current) as DeskNotebookConfig
   }
 
-  /** Forget the configured root (drafts stay; they are found by path again). */
-  async clearNotebookRoot(): Promise<void> {
-    await this.core.nodes.delete(NOTEBOOK_CONFIG_ID)
-  }
-
   /** One file identity by id. */
   getNoteFile(id: string): NoteFileRef | undefined {
     const node = this.core.nodes.get(id)

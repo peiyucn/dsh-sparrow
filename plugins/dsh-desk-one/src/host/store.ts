@@ -164,8 +164,6 @@ export class DeskStore {
 
   async saveNotebookRoot(rootPath: string): Promise<DeskNotebookConfig> { return this.notebook.saveNotebookRoot(rootPath) }
 
-  async clearNotebookRoot(): Promise<void> { return this.notebook.clearNotebookRoot() }
-
   getNoteFile(id: string): NoteFileRef | undefined { return this.notebook.getNoteFile(id) }
 
   listNoteFiles(): NoteFileRef[] { return this.notebook.listNoteFiles() }

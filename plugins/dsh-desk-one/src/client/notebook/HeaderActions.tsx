@@ -1,7 +1,7 @@
 /**
  * Notebook tab header actions: the linked-workspace selector.
  *
- * The "workspace files" entry lives in the page (right column) with the official label and icon;
+ * The "workspace files" entry lives in the page's top row with the official label and icon;
  * this header keeps only the workspace switch so the current library is always visible.
  */
 

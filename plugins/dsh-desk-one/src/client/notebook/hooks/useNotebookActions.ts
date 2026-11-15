@@ -4,7 +4,7 @@
  * state lives here; the library data is mutated through the setters the data hook exposes.
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef } from 'react'
 import type { DeskTranslator } from '../../app/types.js'
 import { messageOf } from '../../app/utils.js'
 import type { NotebookApi } from '../api.js'
@@ -14,11 +14,8 @@ import type { NotebookLibrary } from './useNotebookLibrary.js'
 
 /** Everything the page body and header actions can trigger. */
 export interface NotebookActions {
-  readonly choosing: boolean
-  /** Open the official workspace files page (the right-column card). */
+  /** Open the official workspace files page (the top-row button). */
   readonly openFolder: () => Promise<void>
-  /** Inline picker in the unlinked state. */
-  readonly toggleChoosing: () => void
   readonly chooseRoot: (path: string) => Promise<void>
   /** Switch to another registered workspace without unlinking first. */
   readonly switchTo: (workspace: WorkspacePathView) => Promise<void>
@@ -35,16 +32,15 @@ export function useNotebookActions(input: {
   readonly library: NotebookLibrary
   readonly onOpenReview: (input: ReviewOpenInput) => Promise<ReviewOpenResult>
   readonly onOpenBrowser: (workspaceId: string) => Promise<ReviewOpenResult>
-  /** Reset the list view to the initial recent page (after linking / unlinking a root). */
+  /** Reset the list view to the initial recent page (after switching workspaces). */
   readonly resetView: () => void
 }): NotebookActions {
   const { t, notebook, workspaceAccess, library, onOpenReview, onOpenBrowser, resetView } = input
   const { workspace, reload, setState, setHistory, setError, setNotice, setBusy } = library
-  const [choosing, setChoosing] = useState(false)
 
   /**
    * Open the official files page of the current workspace; when nothing is linked yet, fall back to
-   * the most recent registered workspace (or create one) so the core action always does something.
+   * the first registered workspace (or create one) so the core action always does something.
    */
   const openFolder = useCallback(async (): Promise<void> => {
     setBusy(true)
@@ -72,7 +68,6 @@ export function useNotebookActions(input: {
     setError(null)
     try {
       setState(await notebook.setRoot(path))
-      setChoosing(false)
       resetView()
     } catch (cause) {
       setError(messageOf(cause))
@@ -134,9 +129,7 @@ export function useNotebookActions(input: {
   }, [notebook, reload, setBusy, setHistory, setNotice])
 
   return {
-    choosing,
     openFolder,
-    toggleChoosing: () => setChoosing(current => !current),
     chooseRoot,
     switchTo,
     pickNewWorkspace,
