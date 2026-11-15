@@ -94,15 +94,16 @@ describe('共享客户端传输', () => {
     assert.equal(error instanceof HttpError, false)
   })
 
-  it('非 2xx 透传服务端 message（保留 status 供 409 分支判断）', async () => {
+  it('非 2xx 透传服务端 message 与错误码（保留 status / code 供分支判断）', async () => {
     const stub = stubFetch(() => Promise.resolve(new Response(
-      JSON.stringify({ error: { code: 'CONFLICT', message: '版本冲突，请刷新后重试' } }),
+      JSON.stringify({ error: { code: 'REVISION_CONFLICT', message: '版本冲突，请刷新后重试' } }),
       { status: 409, headers: { 'content-type': 'application/json' } },
     )))
     restores.push(stub.restore)
     const error = await rejectionOf(() => requestJson('/api/desk-one/tasks'))
     assert.ok(error instanceof HttpError)
     assert.equal(error.status, 409)
+    assert.equal(error.code, 'REVISION_CONFLICT')
     assert.equal(error.message, '版本冲突，请刷新后重试')
   })
 

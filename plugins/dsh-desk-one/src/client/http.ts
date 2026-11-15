@@ -3,9 +3,14 @@
 import { REQUEST_TIMEOUT_MS } from '../constants.js'
 import type { ApiErrorPayload } from '../contract.js'
 
-/** Transport failure carrying the HTTP status, so callers can special-case opt-in outcomes (409) and timeouts (0). */
+/**
+ * Transport failure carrying the HTTP status, so callers can special-case opt-in outcomes (409)
+ * and timeouts (0). `code` is the host's semantic error code when the response carried one, so a
+ * caller can tell two failures with the same status apart (e.g. an expired login flow vs a
+ * revision conflict, both 409).
+ */
 export class HttpError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(readonly status: number, message: string, readonly code?: string) {
     super(message)
     this.name = 'HttpError'
   }
@@ -53,7 +58,13 @@ export async function fetchJson<T>(path: string, init?: RequestInit, options?: J
   } catch {
     throw new HttpError(response.status, `请求失败（HTTP ${response.status}）：${text.slice(0, 160) || '响应不是 JSON'}`)
   }
-  if (!response.ok) throw new HttpError(response.status, payload.error?.message ?? `请求失败（HTTP ${response.status}）`)
+  if (!response.ok) {
+    throw new HttpError(
+      response.status,
+      payload.error?.message ?? `请求失败（HTTP ${response.status}）`,
+      payload.error?.code,
+    )
+  }
   return payload
 }
 

@@ -3,12 +3,15 @@
 import { CalendarRows } from './provider-card.js'
 import { MicrosoftLogo, ProviderLogo } from './logos.js'
 import { SourceIssues } from './issues.js'
-import { sourceHealth } from './status.js'
+import { isExpiredLoginFlow, sourceHealth } from './status.js'
 import { useEffect, useRef, useState } from 'react'
 import type { DeskCalendar, DeskScheduleSource } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
 import type { ReactElement } from 'react'
 import type { ScheduleApi } from '../api.js'
+
+/** Poll interval while one OAuth flow is pending (ms). */
+const LOGIN_POLL_INTERVAL_MS = 5_000
 
 export function OutlookGraphCard(props: {
   readonly t: DeskTranslator
@@ -27,27 +30,47 @@ export function OutlookGraphCard(props: {
   const popupRef = useRef<Window | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** Latest refresh callback, so re-renders of the parent cannot restart the poll timer. */
+  const onChangedRef = useRef(props.onChanged)
+  onChangedRef.current = props.onChanged
 
   useEffect(() => {
     if (flow === null) return
     let stopped = false
     const tick = async (): Promise<void> => {
+      let result: Awaited<ReturnType<ScheduleApi['pollOutlookLogin']>>
       try {
-        const result = await api.pollOutlookLogin(flow.flowId)
+        result = await api.pollOutlookLogin(flow.flowId)
+      } catch (reason) {
         if (stopped) return
-        if (result.status === 'connected') {
-          popupRef.current?.close()
-          popupRef.current = null
-          setFlow(null)
-          await props.onChanged()
+        if (!isExpiredLoginFlow(reason)) {
+          setError(reason instanceof Error ? reason.message : String(reason))
+          return
         }
+        // The host forgot this flow: polling can never recover, so return to the login buttons
+        // instead of ticking against a dead flow id forever.
+        popupRef.current?.close()
+        popupRef.current = null
+        setFlow(null)
+        setError(reason instanceof Error ? reason.message : String(reason))
+        return
+      }
+      if (stopped) return
+      // A transient failure earlier is over once the host answers again.
+      setError(null)
+      if (result.status !== 'connected') return
+      popupRef.current?.close()
+      popupRef.current = null
+      setFlow(null)
+      try {
+        await onChangedRef.current()
       } catch (reason) {
         if (!stopped) setError(reason instanceof Error ? reason.message : String(reason))
       }
     }
-    const timer = window.setInterval(() => { void tick() }, 5000)
+    const timer = window.setInterval(() => { void tick() }, LOGIN_POLL_INTERVAL_MS)
     return () => { stopped = true; window.clearInterval(timer) }
-  }, [api, flow, props])
+  }, [api, flow])
 
   const login = async (device = false): Promise<void> => {
     setBusy(true); setError(null)
