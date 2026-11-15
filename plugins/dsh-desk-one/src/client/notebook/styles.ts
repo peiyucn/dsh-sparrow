@@ -397,36 +397,39 @@ button.dsh-desk-notebook-rowbody {
 .dsh-desk-notebook-toolbar-main {
   display: flex;
   flex: 1 1 320px;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   min-width: 0;
-  height: 32px;
   border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
   border-radius: var(--dsw-radius-md, 12px);
   background: var(--dsw-alias-bg-layer-1, #ffffff);
   overflow: hidden;
 }
 .dsh-desk-notebook-toolbar-main .dsh-desk-notebook-search {
-  flex: 1 1 auto;
+  flex: none;
+  width: 100%;
   min-width: 120px;
-  height: 30px;
+  height: 32px;
   border: 0;
   border-radius: 0;
   background: transparent;
 }
 .dsh-desk-notebook-toolbar-divider {
   flex: none;
-  width: 1px;
-  height: 16px;
+  width: 100%;
+  height: 1px;
   background: var(--dsw-alias-border-l1, #e2e5ea);
 }
 .dsh-desk-notebook-toolbar-main .dsh-desk-notebook-tabs {
   flex: none;
-  height: 30px;
+  width: 100%;
+  height: 32px;
   border-radius: 0;
   background: transparent;
 }
 .dsh-desk-notebook-filesbtn {
   flex: none;
+  align-self: stretch;
   height: auto;
   min-height: 40px;
   padding: 6px 14px;
