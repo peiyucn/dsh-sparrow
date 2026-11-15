@@ -114,3 +114,74 @@ describe('fetchOutlookIcs', () => {
     await assert.rejects(fetchOutlookIcs(ICS_URL, { fetchImpl }), isScheduleError('TRANSIENT'))
   })
 })
+
+describe('fetchOutlookIcs hostPolicy=public（通用 ICS 订阅）', () => {
+  it('接受任意公网 https 主机（不再限定 Outlook 白名单）', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => new Response(ICS, {
+      status: 200,
+      headers: { 'content-type': 'text/calendar' },
+    }))
+    const url = 'https://calendar.google.com/calendar/ical/example/basic.ics'
+    const result = await fetchOutlookIcs(url, { fetchImpl, hostPolicy: 'public' })
+    assert.equal('ics' in result ? result.ics : undefined, ICS)
+    assert.equal(calls[0]?.url, url)
+  })
+
+  it('拒绝 http、内嵌凭据与内网 / 回环目标，且不发出请求', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => {
+      throw new Error('must not be called')
+    })
+    for (const url of [
+      'http://calendar.google.com/calendar.ics',
+      'https://user:pass@calendar.google.com/calendar.ics',
+      'https://localhost/calendar.ics',
+      'https://printer.local/calendar.ics',
+      'https://127.0.0.1/calendar.ics',
+      'https://10.1.2.3/calendar.ics',
+      'https://172.16.0.1/calendar.ics',
+      'https://192.168.1.10/calendar.ics',
+      'https://169.254.1.1/calendar.ics',
+      'https://[::1]/calendar.ics',
+      'https://[fd00::1]/calendar.ics',
+    ]) {
+      await assert.rejects(fetchOutlookIcs(url, { fetchImpl, hostPolicy: 'public' }), isScheduleError('UNSUPPORTED'), url)
+    }
+    assert.equal(calls.length, 0)
+  })
+
+  it('重定向到内网地址时在第二跳发出前拒绝', async () => {
+    const { calls, fetchImpl } = fakeFetch((url) => {
+      if (url === 'https://feeds.example.org/a.ics') {
+        return new Response(null, { status: 302, headers: { location: 'http://127.0.0.1:3080/secret' } })
+      }
+      return new Response(ICS, { status: 200, headers: { 'content-type': 'text/calendar' } })
+    })
+    await assert.rejects(
+      fetchOutlookIcs('https://feeds.example.org/a.ics', { fetchImpl, hostPolicy: 'public' }),
+      isScheduleError('UNSUPPORTED'),
+    )
+    assert.equal(calls.length, 1, '内网重定向目标不得被请求')
+  })
+
+  it('跟随公网重定向并返回最终内容', async () => {
+    const { calls, fetchImpl } = fakeFetch((url) => url === 'https://feeds.example.org/a.ics'
+      ? new Response(null, { status: 301, headers: { location: 'https://cdn.example.org/b.ics' } })
+      : new Response(ICS, { status: 200, headers: { 'content-type': 'text/calendar', etag: '"v2"' } }))
+    const result = await fetchOutlookIcs('https://feeds.example.org/a.ics', { fetchImpl, hostPolicy: 'public' })
+    assert.equal('ics' in result ? result.ics : undefined, ICS)
+    assert.equal(result.etag, '"v2"')
+    assert.deepEqual(calls.map(call => call.url), ['https://feeds.example.org/a.ics', 'https://cdn.example.org/b.ics'])
+  })
+
+  it('重定向超过上限时失败', async () => {
+    let hop = 0
+    const { fetchImpl } = fakeFetch(() => {
+      hop += 1
+      return new Response(null, { status: 302, headers: { location: `https://feeds.example.org/${hop}.ics` } })
+    })
+    await assert.rejects(
+      fetchOutlookIcs('https://feeds.example.org/start.ics', { fetchImpl, hostPolicy: 'public' }),
+      isScheduleError('UNSUPPORTED'),
+    )
+  })
+})

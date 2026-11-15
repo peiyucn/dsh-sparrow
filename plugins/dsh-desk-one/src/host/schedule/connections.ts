@@ -119,7 +119,10 @@ export class ScheduleConnections {
     if (input.provider === 'outlook' || input.provider === 'ics') {
       const url = text(input.url)
       if (url === '') throw new DeskError('INVALID_SCHEDULE', '请填写 ICS 订阅链接', 400)
-      const result = await fetchOutlookIcs(url, { timeoutMs: SCHEDULE_REQUEST_TIMEOUT_MS })
+      // The Outlook published-link channel keeps the Microsoft-only host whitelist; the generic
+      // subscription channel accepts any public https host (checked per redirect hop in the adapter).
+      const hostPolicy = input.provider === 'outlook' ? 'outlook' : 'public'
+      const result = await fetchOutlookIcs(url, { timeoutMs: SCHEDULE_REQUEST_TIMEOUT_MS, hostPolicy })
       if (result.ics === undefined) throw new DeskError('SCHEDULE_UNAVAILABLE', '这个链接没有返回日历内容', 400)
       const window = mirrorWindow()
       const events = parseIcsEvents(result.ics, { provider: input.provider, calendarRemoteId: 'published', window })
@@ -192,8 +195,9 @@ export class ScheduleConnections {
   async addSubscription(input: ScheduleSubscriptionInput): Promise<ScheduleStateResponse> {
     const url = text(input.url)
     if (url === '') throw new DeskError('INVALID_SCHEDULE', '请填写 ICS 订阅链接', 400)
-    // Validate before persisting the URL in the credential store.
-    const fetched = await fetchOutlookIcs(url, { timeoutMs: SCHEDULE_REQUEST_TIMEOUT_MS })
+    // Validate before persisting the URL in the credential store. A subscription is provider-agnostic
+    // (any public https feed), not an Outlook published link.
+    const fetched = await fetchOutlookIcs(url, { timeoutMs: SCHEDULE_REQUEST_TIMEOUT_MS, hostPolicy: 'public' })
     if (fetched.ics === undefined) throw new DeskError('SCHEDULE_UNAVAILABLE', '这个链接没有返回日历内容', 400)
     const name = text(input.name)
     const credentialRef = `DESK_ONE_ICS_URL_${randomUUID()}`

@@ -107,7 +107,9 @@ export class ScheduleSync {
         }
       } else if (source.provider === 'ics') {
         const url = await resolveSecret(this.ctx, source.credentialRef ?? CREDENTIAL_REF.ics)
-        const fetched = await fetchOutlookIcs(url, { timeoutMs: SCHEDULE_REQUEST_TIMEOUT_MS })
+        // Provider-agnostic subscription: public hosts only (the Outlook published-link whitelist
+        // belongs to the outlook channel below).
+        const fetched = await fetchOutlookIcs(url, { timeoutMs: SCHEDULE_REQUEST_TIMEOUT_MS, hostPolicy: 'public' })
         if (fetched.ics === undefined) throw new DeskError('SCHEDULE_UNAVAILABLE', '订阅链接没有返回内容', 502)
         const [calendar] = await this.store.upsertCalendars(source, [
           { remoteId: 'ics-published', displayName: source.account ?? 'ICS 订阅' },
