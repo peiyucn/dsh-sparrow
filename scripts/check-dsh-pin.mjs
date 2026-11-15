@@ -2,8 +2,8 @@
 /**
  * 守卫：**活跃插件钉的官方 dsh 版本线必须只有一个真值，而且必须是精确版本**（兼容口径是精确匹配，不是范围）。
  * 跟版要同时改：插件 `package.json` 的 peer + devDependencies、`pnpm-workspace.yaml` 的 `overrides` 与
- * `minimumReleaseAgeExclude`、根与各活跃插件的 README 环境要求行 —— **漏任何一处测试都不会红**，
- * 直到用户从插件管理器装包时被安装门拒掉。判据 1 单一真值 / 2 精确 / 3 周边一致 / 4 文档一致。
+ * （若临时存在的）`minimumReleaseAgeExclude`、根与各活跃插件的 README 环境要求行 —— **漏任何一处测试都不会红**，
+ * 直到用户从插件管理器装包时被安装门拒掉。判据 1 单一真值 / 2 精确 / 3 周边一致 / 4 文档一致 / 5 只声明 peer。
  * ⚠️ 已退役插件不在判据内（不跟版本线，名单取自 `plugin-set.mjs`）。退出码：0 = 一致；1 = 有不一致。
  */
 import { readFileSync } from 'node:fs'
@@ -25,7 +25,7 @@ const addDeclared = (version, where) => {
   declared.get(version).push(where)
 }
 
-// ── 判据 1 + 2：活跃插件的 peer / devDependencies ──
+// ── 判据 1 + 2 + 5：活跃插件的 peer / devDependencies / engines ──
 for (const name of plugins) {
   const file = join(repoRoot, 'plugins', name, 'package.json')
   const json = JSON.parse(readFileSync(file, 'utf8'))
@@ -37,6 +37,18 @@ for (const name of plugins) {
         fail(`判据 2（精确版本）失败：${pkg} 写的是范围 "${version}"`, `plugins/${name}/package.json  ${section}`)
       }
     }
+  }
+
+  // ── 判据 5：包 manifest 不得声明 `engines.dsh`（AGENTS《版本门》）──
+  // 官方 0.2.1-alpha.4 起，manifest 一旦声明 engines.dsh，安装 / 启动兼容性**只**按它判定、peer 被忽略；
+  // 而派生处（市场索引 market/index.json）的值是从 peer 机械派生的 ⇒ 手写 engines.dsh 就是同一事实的
+  // 第二处声明，漂了不会有任何测试红，还会让两边对同一版本的兼容判断相反。故 fail-closed 挡住。
+  const engines = json.engines
+  if (engines !== null && typeof engines === 'object' && Object.hasOwn(engines, 'dsh')) {
+    fail(
+      `判据 5（只声明 peer）失败：plugins/${name}/package.json 声明了 engines.dsh`,
+      '官方兼容门会只看它、忽略 peerDependencies；删掉引擎声明，兼容范围只由 peer 表达（市场索引按 peer 自动派生）',
+    )
   }
 }
 
@@ -180,8 +192,9 @@ if (violations.length > 0) {
   for (const v of violations) console.error(`  · ${v}`)
   console.error('\n修法：')
   console.error('  · 跟版时把真值**一次性**改遍：plugins/*/package.json 的 peer + devDependencies')
-  console.error('  · pnpm-workspace.yaml 的 overrides 闭包 + minimumReleaseAgeExclude → 再 pnpm install 重算 lockfile')
+  console.error('  · pnpm-workspace.yaml 的 overrides 闭包（+ 如临时存在的 minimumReleaseAgeExclude）→ 再 pnpm install 重算 lockfile')
   console.error(`  · README 环境要求行（根 README 中英各 1 行 + 每个活跃插件中英各 1 行；当前 ${plugins.length} 个插件 = ${readmes.length} 份文件）`)
+  console.error('  · 插件 manifest 只声明 peerDependencies；engines.dsh 只能出现在派生处（market/index.json）')
   console.error('  · 已删除的退役插件不在仓库内；RETIRED_PLUGINS 名单保持为空')
   process.exit(1)
 }
@@ -189,5 +202,5 @@ if (violations.length > 0) {
 const declarations = [...declared.values()].reduce((n, places) => n + places.length, 0)
 console.error(
   `check-dsh-pin: ✅ ${plugins.length} 个活跃插件的官方 dsh pin 一致为 "${truth}"`
-  + `（声明 ${declarations} 处 / overrides ${overrides.length} 条 / 发布年龄放行 ${releaseAgeExclude.length} 条 / README ${readmes.length} 份）`,
+  + `（声明 ${declarations} 处 / overrides ${overrides.length} 条 / 发布年龄放行 ${releaseAgeExclude.length} 条 / README ${readmes.length} 份 / engines.dsh 未声明）`,
 )
