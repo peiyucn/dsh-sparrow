@@ -22,7 +22,7 @@
 | --- | --- | --- | --- | --- | --- |
 | B1 | 标志（透明） | `resources/brand/desk-one-mark.svg` | 24 viewBox；品牌蓝 `#4176E6`、墨色两版 | README、市场、社交图 | 待制作 |
 | B2 | 应用图标 | `plugins/dsh-desk-one/icon.svg` | 512×512，圆角 22%，方底反白 | 插件管理器、市场卡 | **已定 B（方底反白）**，已入包 |
-| B3 | 社交预览 | `resources/dsh-desk-one-social.png` | 1280×640 | GitHub Social preview | **已制作（2026-11-15）**：桌面头部 + 功能标签截图，上下版式，中英同图 |
+| B3 | 社交预览 | `resources/dsh-desk-one-social.png` | 1280×640 | GitHub Social preview | **已制作（2026-11-15）**：纯品牌卡，无截图，中英同图 |
 | B4 | README 首图 | `resources/dsh-desk-one-hero.png` | 1600×900 | 根 README、插件 README 第一屏 | **已用真图合成（2026-11-15）**，深色 |
 | B5 | 截图 ×5 | —（不进仓库） | 1440×900 原始素材 | 只作 hero 合成素材，放 TEMP | **已拍（隔离 demo）**，在 `TEMP/brand/shots/` |
 
@@ -162,7 +162,7 @@
 ## 9 进度（2026-11-15）
 
 - 已落地：图标（B）+ `locale` 中英显示元数据 + 包内 `exports` / `files`；市场索引的 title / icon / homepage 与守卫；`landing.html` 首位卡；根 README 首屏；GitHub description / topics / website；issue 表单。
-- 真图（2026-11-15）：`resources/dsh-desk-one-hero.png` 用隔离 demo 的五张 1440×900 截图合成并同名替换；`resources/dsh-desk-one-social.png` 改用桌面头部 + 功能标签截图（1280×640，上下版式），中英同图。
+- 真图（2026-11-15）：`resources/dsh-desk-one-hero.png` 用隔离 demo 的五张 1440×900 截图合成并同名替换；`resources/dsh-desk-one-social.png` 改为纯品牌卡（1280×640，无截图），中英同图。
 - 构图（2026-11-15 定，真图版）：hero 一张图内含大面板 + 四张浮层，README 只放这一张。
 - 构图细节（2026-11-15 定）：主面板 = 笔记批注页；浮层 = 批注视图 / 任务板 / 日程 / 便签墙；会话管理保留在标签栏与左侧功能名；只出深色。
 - 截图素材：`TEMP/brand/shots/`（隔离 demo，1440×900，合成用，不入库）；合成脚本 `TEMP/brand/hero-real.html`、`TEMP/brand/social-card-v4.html`。
