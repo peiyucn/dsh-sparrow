@@ -157,6 +157,12 @@ jobs:
         if: env.NPM_TOKEN == ''
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
         run: npm publish --access public --provenance --tag ${{ steps.resolve.outputs.npm-tag }}
+        env:
+          # setup-node 的 registry-url 会写入 `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`，
+          # 并导出一个占位 token（actions/setup-node 的已知行为）；本步运行的前提是没有 NPM_TOKEN，
+          # 占位值会让 npm 拿它去做认证而不是走可信发布。这里显式清空，让 npm 11 的 OIDC 交换生效
+          #（npm 在 publish 前先调 oidc()，交换成功后才用真 token 覆盖配置；失败则按无凭据报错）。
+          NODE_AUTH_TOKEN: ''
 
       # 不建 GitHub Release：多包单仓库下 Release/Latest 语义混乱；发布记录 =
       # npm dist-tag（latest/next）+ annotated tag（tag 页自带说明）；
