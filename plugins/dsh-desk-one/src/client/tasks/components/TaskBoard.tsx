@@ -15,7 +15,7 @@ import type { GroupsData } from '../hooks/useGroupsData.js'
 import { useSessionLinks } from '../hooks/useSessionLinks.js'
 import type { TaskBoardApi } from '../hooks/useTaskBoard.js'
 import type { TasksData } from '../hooks/useTasksData.js'
-import { TASK_LANE_ORDER } from '../types.js'
+import { TASK_LANE_ORDER, withLinkedSessions } from '../types.js'
 import { LANE_LABEL_KEY } from '../taskLabels.js'
 import { TaskArchiveView } from './TaskArchiveView.js'
 import { TaskColumn, type DropTarget, type GroupDropTarget } from './TaskColumn.js'
@@ -298,8 +298,11 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
       subagent: false,
     }), [sessionById, t])
   const linkSessions = useCallback((task: DeskTask, sessionIds: readonly string[]): void => {
+    // Optimistic: the picker can be clicked again before the host round-trip lands, and the patch
+    // replaces the whole list — without this the second click would overwrite the first one.
+    data.setTasks(current => withLinkedSessions(current, task.id, sessionIds))
     data.savePatch(task, { sessionIds })
-  }, [data.savePatch])
+  }, [data.savePatch, data.setTasks])
 
   /** Archived groups own archived cards: deleting the group also deletes those cards host-side. */
   const deleteArchivedGroup = (group: DeskTaskGroup): void => {

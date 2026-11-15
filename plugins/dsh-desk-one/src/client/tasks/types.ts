@@ -147,3 +147,18 @@ export function groupLanes(
     done: buildLane(tasks, groups, 'done', mode),
   }
 }
+
+/**
+ * Replace one task's linked-session list, leaving every other task untouched.
+ *
+ * The host patch replaces the whole `sessionIds` array, so the client must apply the click
+ * optimistically: two quick toggles would otherwise both start from the same stale list and the
+ * later save would silently drop the earlier pick.
+ */
+export function withLinkedSessions(
+  tasks: readonly DeskTask[],
+  taskId: string,
+  sessionIds: readonly string[],
+): DeskTask[] {
+  return tasks.map(task => task.id === taskId ? { ...task, sessionIds } : task)
+}
