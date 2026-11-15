@@ -13,10 +13,11 @@ import {
   SCHEDULE_COLORS, SCHEDULE_HIDDEN_STORAGE_KEY, SCHEDULE_LIST_DAYS, SCHEDULE_SYNC_INTERVAL_MS,
   SCHEDULE_UPCOMING_DEFAULT_DAYS, SCHEDULE_UPCOMING_MAX_DAYS, SCHEDULE_VIEW_STORAGE_KEY,
 } from '../../constants.js'
-import type { DeskCalendar, DeskEvent, ScheduleStateResponse } from '../../contract.js'
+import type { DeskCalendar, DeskEvent, ScheduleEventListResponse, ScheduleStateResponse } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ScheduleApi } from './api.js'
 import { addDays, coversDayKey, dayKey, listRange, monthRange, startOfLocalDay, weekRange, type ScheduleViewName } from './utils.js'
+import { createLoadTickets } from '../app/utils.js'
 import { ListBoard, MonthBoard, WeekBoard } from './boards.js'
 import { EventCard } from './event-card.js'
 import { StartPanel, TodayPanel, UpcomingPanel, type TodayContext, type UpcomingRange } from './panels.js'
@@ -81,6 +82,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
   const syncingRef = useRef(false)
   const autoSyncTried = useRef(false)
   const loadedOnce = useRef(false)
+  const loadTickets = useRef(createLoadTickets())
 
   const range = useMemo(() => {
     if (view === 'month') return monthRange(cursor)
@@ -93,15 +95,31 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
     [today],
   )
 
-  const load = useCallback(async (): Promise<void> => {
-    const [nextState, payload, upcomingPayload] = await Promise.all([
-      api.loadState(),
-      api.loadEvents(range.from.toISOString(), range.to.toISOString()),
-      api.loadEvents(upcoming.from.toISOString(), upcoming.to.toISOString()),
-    ])
+  /**
+   * Load one snapshot for the current range.
+   * @returns `true` when this snapshot was applied, `false` when a newer load superseded it (the
+   *   newer load owns both the data and the error state, so a stale rejection must not surface).
+   */
+  const load = useCallback(async (): Promise<boolean> => {
+    const ticket = loadTickets.current.take()
+    let nextState: ScheduleStateResponse
+    let payload: ScheduleEventListResponse
+    let upcomingPayload: ScheduleEventListResponse
+    try {
+      [nextState, payload, upcomingPayload] = await Promise.all([
+        api.loadState(),
+        api.loadEvents(range.from.toISOString(), range.to.toISOString()),
+        api.loadEvents(upcoming.from.toISOString(), upcoming.to.toISOString()),
+      ])
+    } catch (reason) {
+      if (!loadTickets.current.isLatest(ticket)) return false
+      throw reason
+    }
+    if (!loadTickets.current.isLatest(ticket)) return false
     setState(nextState)
     setEvents(payload.events)
     setUpcomingEvents(upcomingPayload.events)
+    return true
   }, [api, range.from, range.to, upcoming.from, upcoming.to])
 
   useEffect(() => {
@@ -109,7 +127,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
     // Only the very first load blanks the page; background refreshes keep the current surface.
     if (!loadedOnce.current) setLoading(true)
     load()
-      .then(() => { if (!cancelled) setError(null) })
+      .then((applied) => { if (!cancelled && applied) setError(null) })
       .catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason)) })
       .finally(() => {
         if (cancelled) return

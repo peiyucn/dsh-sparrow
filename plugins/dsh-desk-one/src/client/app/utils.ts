@@ -113,6 +113,33 @@ export const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), Math.max(min, max))
 
 /**
+ * Latest-request-wins tickets for overlapping loads (notes reload, schedule range switch).
+ *
+ * Every load takes a ticket and only the newest ticket may write state. Without this, a slow
+ * earlier response lands after a newer one and renders the previous view's data.
+ */
+export interface LoadTickets {
+  /** Take the newest ticket; invalidates every ticket handed out before it. */
+  take(): number
+  /** Whether the ticket is still the newest one. */
+  isLatest(ticket: number): boolean
+}
+
+export function createLoadTickets(): LoadTickets {
+  let current = 0
+  return {
+    take(): number {
+      current += 1
+      return current
+    },
+    isLatest(ticket: number): boolean {
+      // `0` is never a ticket, so a caller that forgot `take()` cannot claim to be current.
+      return ticket > 0 && ticket === current
+    },
+  }
+}
+
+/**
  * Restore the tab the user left on. Derived from DESK_TABS so a new tab is remembered without
  * touching this function (a hard-coded list previously forgot `schedule` / `sessions`).
  */

@@ -11,7 +11,7 @@ import type { Dispatch, SetStateAction } from 'react'
 import type { DeskNote } from '../../../contract.js'
 import type { DeskPanelInjected } from '../../install.js'
 import type { DeskTranslator } from '../../app/types.js'
-import { messageOf } from '../../app/utils.js'
+import { messageOf, createLoadTickets } from '../../app/utils.js'
 
 type Patch = Parameters<DeskPanelInjected['updateNote']>[0]['patch']
 type Actions = Pick<DeskPanelInjected, 'listNotes' | 'updateNote' | 'deleteNote'>
@@ -43,21 +43,21 @@ export function useNotesData(t: DeskTranslator, actions: Actions): NotesData {
   notesRef.current = notes
   /** One write chain per note id. */
   const writeChains = useRef(new Map<string, Promise<void>>())
-  const loadSeq = useRef(0)
+  const loadTickets = useRef(createLoadTickets())
 
   const reload = useCallback(async (): Promise<void> => {
-    const seq = ++loadSeq.current
+    const ticket = loadTickets.current.take()
     setLoading(true)
     try {
       const next = await listNotes()
-      if (seq !== loadSeq.current) return
+      if (!loadTickets.current.isLatest(ticket)) return
       setNotes(next)
       setLoadError(null)
     } catch (reason) {
-      if (seq !== loadSeq.current) return
+      if (!loadTickets.current.isLatest(ticket)) return
       setLoadError(messageOf(reason))
     } finally {
-      if (seq === loadSeq.current) setLoading(false)
+      if (loadTickets.current.isLatest(ticket)) setLoading(false)
     }
   }, [listNotes])
 
