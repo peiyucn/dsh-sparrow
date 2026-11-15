@@ -48,7 +48,21 @@ jobs:
     env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
+      # fetch-depth: 0 —— 下面「tag 提交必须在 main 上」的祖先校验需要完整历史。
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # E19 / E16：tag 必须先合到 main 再打。工作流在发布前兜底校验，
+      # 防止在未合并分支的提交上打 tag 直接发布（workflow_dispatch 兜底发布同样要求）。
+      - name: Verify commit is on main
+        shell: bash
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "::error::tag 提交不在 main 上：先把 dev 合并到 main 再打 tag（E16）"
+            exit 1
+          fi
 
       # 发布硬门禁（根规范 E18）：任一未处理告警（Dependabot / CodeQL / secret scanning）即中止；
       # 查询本身失败也中止（fail-closed，不因权限/网络问题静默放行）。计数写进日志供 Deployments 追查。
@@ -261,6 +275,13 @@ jobs:
           if [[ -z "${TAG}"     ]]; then MISSING="${MISSING} tag";     fi
           if [[ -n "${MISSING}" ]]; then
             echo "::error::promote 需要 plugin / version / tag 三个输入，缺少：${MISSING}。本次运行**未移动任何 dist-tag**，请补齐后重新派发。" >&2
+            exit 1
+          fi
+
+          # promote 只搬 latest / next 两个通道（E24 发布通道；npm dist-tag 其它值会凭空
+          # 创建一个新通道，Deployments 页也会多一条无意义记录），其它值一律拒绝。
+          if [[ "${TAG}" != "latest" && "${TAG}" != "next" ]]; then
+            echo "::error::promote 只允许把版本移到 latest 或 next，收到：${TAG}。本次运行**未移动任何 dist-tag**。" >&2
             exit 1
           fi
 
