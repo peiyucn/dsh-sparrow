@@ -80,10 +80,10 @@ English | [简体中文](README.zh-CN.md)
 
 * The schedule is a **read-only** aggregation: no local event creation, no write-back, and no publishing / exporting your own calendar as an iCalendar feed. Subscribing to public ICS links is supported.
 * Schedule sources are owned by their services: re-issuing the WeCom sync password invalidates the old one, iCloud app-specific passwords stop working when the Apple password changes, and Outlook needs re-authorisation when its token expires.
-* Task drag is pointer-only; there is no keyboard reorder yet.
+* Task drag is pointer-only; there is no keyboard reorder.
 * Session links are display and navigation only: the board never advances a card when a session starts or ends.
 * Notes created by agent tools get an automatic wall position until you drag them yourself; saved positions are re-clamped while the window is small and return when there is room.
-* Focus sessions, cross-object search and richer task fields (priority, estimates, labels) are planned in the repository spec. The annotations tab has no editor and no new-note form by design.
+* Annotations have no editor and no new-note form; the page is for browsing and line-level annotation only.
 
 ## Development
 
