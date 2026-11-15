@@ -71,13 +71,13 @@ export function NotebookHeaderActions(props: {
                       role="menuitem"
                       className="dsh-desk-notebook-workspaceitem"
                       data-current={item.workspaceId === page.workspace?.workspaceId}
+                      title={item.path}
                       onClick={() => {
                         setOpen(false)
                         void page.switchTo(item)
                       }}
                     >
                       <span className="dsh-desk-notebook-workspaceitem-title">{item.title}</span>
-                      <span className="dsh-desk-notebook-workspaceitem-path">{item.path}</span>
                     </button>
                   ))}
               <div className="dsh-desk-notebook-workspacesep" aria-hidden="true" />

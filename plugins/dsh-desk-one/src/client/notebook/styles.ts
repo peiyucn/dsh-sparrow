@@ -580,14 +580,6 @@ button.dsh-desk-notebook-rowbody {
   font-size: 13px;
   line-height: 18px;
 }
-.dsh-desk-notebook-workspaceitem-path {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-}
 .dsh-desk-notebook-workspaceempty {
   margin: 4px 8px;
   font-size: 12px;
