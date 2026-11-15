@@ -21,10 +21,12 @@ on:
         required: false
         type: string
 
-# id-token: write 用于 npm Trusted Publishing（OIDC）；contents: write 用于自动建 GitHub Release；
+# id-token: write 用于 npm Trusted Publishing（OIDC）；
+# contents: read 只够 checkout 读仓库 —— 本仓库**不建 GitHub Release**（见文件末尾说明，发布记录 =
+#   npm dist-tag + annotated tag），故原「建 Release 用」的 contents: write 已无消费者，按最小权限收回；
 # security-events: read 供发布前的告警门禁查询 Dependabot / CodeQL / secret scanning（根规范 E18）。
 permissions:
-  contents: write
+  contents: read
   id-token: write
   security-events: read
 
