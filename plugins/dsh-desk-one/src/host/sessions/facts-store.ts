@@ -8,6 +8,17 @@ export interface HeaderFactsStore<F> {
   invalidate(): void
 }
 
+/**
+ * Header-facts cache store (pure logic, unit-testable): returns the cache directly within the TTL; once
+ * expired it fills single-flight (concurrent calls share one promise); invalidate clears the cache so the
+ * next get rescans. Safety basis: jsonl headers are immutable once materialized, so caching by id only needs
+ * to handle members appearing/disappearing (write-through invalidation).
+ *
+ * Invalidation generation: invalidate voids an in-flight load — a scan started before the invalidation may
+ * not write its result back to the cache, otherwise write-through invalidation would be cancelled out by
+ * "the old member table refilling the cache" (stale for the whole TTL); a voided promise still settles
+ * normally for whoever was waiting on it (snapshot semantics), it just isn't cached.
+ */
 export function createHeaderFactsStore<F>(
   load: () => Promise<F>,
   ttlMs: number,

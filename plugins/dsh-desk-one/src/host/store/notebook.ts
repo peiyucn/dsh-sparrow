@@ -179,7 +179,6 @@ export class NotebookRepository {
     }) as NoteDraft
   }
 
-  /** One review round's persisted baseline for a file. */
   /** One review session's round baseline. */
   getNoteBaseline(sessionId: string): NoteBaseline | undefined {
     const node = this.core.nodes.get(baselineId(sessionId))
