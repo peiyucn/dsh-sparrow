@@ -202,13 +202,21 @@ export class ScheduleConnections {
     const name = text(input.name)
     const credentialRef = `DESK_ONE_ICS_URL_${randomUUID()}`
     const service = requireCredentials(this.ctx)
-    const source = await this.store.createScheduleSource({
-      provider: 'ics',
-      channel: 'ics',
-      account: name === '' ? new URL(url).hostname : name,
-      credentialRef,
-    })
+    // Persist the secret before the source row: a source without its credential would show up in
+    // the panel and fail every sync, while a leftover secret is invisible and is cleaned up below.
     await service.set(credentialRef, url)
+    let source: DeskScheduleSource
+    try {
+      source = await this.store.createScheduleSource({
+        provider: 'ics',
+        channel: 'ics',
+        account: name === '' ? new URL(url).hostname : name,
+        credentialRef,
+      })
+    } catch (error) {
+      await service.unset(credentialRef).catch(() => undefined)
+      throw error
+    }
     await this.deps.syncSource(source).catch(() => undefined)
     return this.deps.state()
   }

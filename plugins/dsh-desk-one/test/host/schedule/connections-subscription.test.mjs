@@ -18,7 +18,7 @@ const STAMP = '2026-01-01T00:00:00.000Z'
 const emptyState = () => ({ sources: [], calendars: [], counts: {} })
 
 /** Credentials seam stub recording every write. */
-function fakeCredentials() {
+function fakeCredentials(options = {}) {
   /** @type {Array<{ ref: string, value: string }>} */
   const sets = []
   /** @type {string[]} */
@@ -30,7 +30,10 @@ function fakeCredentials() {
       /** @param {string} ref */
       resolve: async (ref) => undefined,
       /** @param {string} ref @param {string} value */
-      set: async (ref, value) => { sets.push({ ref, value }) },
+      set: async (ref, value) => {
+        if (options.failSet === true) throw new Error('credential store failed')
+        sets.push({ ref, value })
+      },
       /** @param {string} ref */
       unset: async (ref) => { unsets.push(ref) },
     },
@@ -38,12 +41,13 @@ function fakeCredentials() {
 }
 
 /** Connection layer + stubbed store / context / facade seams. */
-function harness(credentials) {
+function harness(credentials, options = {}) {
   /** @type {any[]} */
   const created = []
   const store = {
     /** @param {any} input */
     createScheduleSource: async (input) => {
+      if (options.failCreate === true) throw new Error('storage write failed')
       const record = {
         id: `source_${created.length + 1}`,
         kind: 'schedule-source',
@@ -128,5 +132,37 @@ describe('通用 ICS 订阅（provider 无关）', () => {
     assert.equal(fetched, 0, '内网链接不得发起请求')
     assert.equal(created.length, 0)
     assert.equal(credentials.sets.length, 0)
+  })
+
+  it('凭据写入失败时不应留下没有凭据的订阅记录', async () => {
+    const credentials = fakeCredentials({ failSet: true })
+    const { created, connections } = harness(credentials)
+    await withFetch(
+      async () => new Response(ICS, { status: 200, headers: { 'content-type': 'text/calendar' } }),
+      async () => {
+        await assert.rejects(
+          () => connections.addSubscription({ url: 'https://calendar.google.com/calendar/ical/example/basic.ics' }),
+          /credential store failed/u,
+        )
+      },
+    )
+    assert.equal(created.length, 0, '凭据没存成就不能先建 source 记录')
+  })
+
+  it('source 写入失败时应回滚刚写入的凭据', async () => {
+    const credentials = fakeCredentials()
+    const { created, connections } = harness(credentials, { failCreate: true })
+    await withFetch(
+      async () => new Response(ICS, { status: 200, headers: { 'content-type': 'text/calendar' } }),
+      async () => {
+        await assert.rejects(
+          () => connections.addSubscription({ url: 'https://calendar.google.com/calendar/ical/example/basic.ics' }),
+          /storage write failed/u,
+        )
+      },
+    )
+    assert.equal(created.length, 0)
+    assert.equal(credentials.sets.length, 1, '凭据先写入')
+    assert.deepEqual(credentials.unsets, [credentials.sets[0]?.ref], 'source 建失败时应把刚写入的凭据删掉')
   })
 })
