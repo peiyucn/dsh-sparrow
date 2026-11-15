@@ -71,7 +71,11 @@ jobs:
             exit 1
           fi
           count_open() {
-            gh api --paginate "repos/${repo}/$1?state=open&per_page=100" --jq '.[].number' | wc -l | tr -d '[:space:]'
+            # Do not add `?state=open&per_page=100` to this URL: on this repository / gh
+            # combination the parameterized list answers 404 while the plain list answers 200.
+            # Fetch the paginated plain list and filter the open state locally; a query failure
+            # still aborts because of `set -e`.
+            gh api --paginate "repos/${repo}/$1" --jq '.[] | select(.state == "open") | .number' | wc -l | tr -d '[:space:]'
           }
           dependabot="$(count_open dependabot/alerts)"
           codeql="$(count_open code-scanning/alerts)"
@@ -208,7 +212,11 @@ jobs:
             exit 1
           fi
           count_open() {
-            gh api --paginate "repos/${repo}/$1?state=open&per_page=100" --jq '.[].number' | wc -l | tr -d '[:space:]'
+            # Do not add `?state=open&per_page=100` to this URL: on this repository / gh
+            # combination the parameterized list answers 404 while the plain list answers 200.
+            # Fetch the paginated plain list and filter the open state locally; a query failure
+            # still aborts because of `set -e`.
+            gh api --paginate "repos/${repo}/$1" --jq '.[] | select(.state == "open") | .number' | wc -l | tr -d '[:space:]'
           }
           dependabot="$(count_open dependabot/alerts)"
           codeql="$(count_open code-scanning/alerts)"
