@@ -164,6 +164,9 @@ function WorkspaceFilesButton({ page }: { readonly page: NotebookPageController 
         <span className="dsh-desk-notebook-filesbtn-title">{t('notebook.workspaceFiles')}</span>
         <span className="dsh-desk-notebook-filesbtn-subtitle">{t('notebook.workspaceFilesHint')}</span>
       </span>
+      <span className="dsh-desk-notebook-filesbtn-arrow" aria-hidden="true">
+        <IconChevronRightOutlineRegular />
+      </span>
     </button>
   )
 }
@@ -197,7 +200,7 @@ function HomeBody({ page }: { readonly page: NotebookPageController }): ReactEle
       <div className="dsh-desk-notebook-homeactions">
         <button
           type="button"
-          className="dsh-desk-action dsh-desk-action-primary"
+          className="dsh-desk-action"
           disabled={page.busy}
           onClick={() => { void page.pickNewWorkspace() }}
         >
@@ -206,7 +209,6 @@ function HomeBody({ page }: { readonly page: NotebookPageController }): ReactEle
       </div>
       <div className="dsh-desk-notebook-homehints">
         <p className="dsh-desk-page-hint">{t('notebook.welcomeBody')}</p>
-        <p className="dsh-desk-page-hint">{t('notebook.workspaceHint')}</p>
       </div>
     </div>
   )
@@ -316,10 +318,13 @@ export function NotebookView({ page }: { readonly page: NotebookPageController }
                       </div>
                     )
                   : (
-                      <header className="dsh-desk-session-section-head">
-                        <h2 className="dsh-desk-session-section-title">{t('notebook.chooseWorkspace')}</h2>
-                        <span className="dsh-desk-session-section-count">{page.workspaces.length}</span>
-                      </header>
+                      <div className="dsh-desk-notebook-homehead">
+                        <div className="dsh-desk-notebook-homehead-top">
+                          <span className="dsh-desk-notebook-homehead-title">{t('notebook.chooseWorkspace')}</span>
+                          <span className="dsh-desk-notebook-homehead-count">{page.workspaces.length}</span>
+                        </div>
+                        <p className="dsh-desk-notebook-homehead-hint">{t('notebook.workspaceHint')}</p>
+                      </div>
                     )}
                 <WorkspaceFilesButton page={page} />
               </div>

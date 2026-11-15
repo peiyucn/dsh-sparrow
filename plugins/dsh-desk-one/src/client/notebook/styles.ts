@@ -79,7 +79,7 @@ export const NOTEBOOK_CSS = `
   max-height: 100%;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: var(--dsw-radius-sm, 8px);
+  border-radius: var(--dsw-radius-md, 12px);
   background: var(--dsw-alias-bg-layer-1, #ffffff);
 }
 .dsh-desk-notebook-cardhead {
@@ -362,36 +362,26 @@ button.dsh-desk-notebook-rowbody {
 .dsh-desk-notebook-recorddelete {
   color: var(--dsw-alias-state-error-primary, #c62828);
 }
-/* Narrow main panels: search and view tabs each take a full row instead of squeezing. */
-@container (max-width: 760px) {
-  .dsh-desk-notebook-toolbar { gap: 8px; }
-  .dsh-desk-notebook-search { flex: 1 1 100%; }
-  .dsh-desk-notebook-tabs { flex: 1 1 100%; }
-}
 
-
-/* Vertical page: one content column; the official "workspace files" button sits right of the
-   search + filter strip (and right of the workspace heading on the unlinked home). */
+/* Vertical page: one content column with an equal-width top band; the joinable search/filter
+   control sits left and the white workspace-files card sits right at the same width and height. */
 .dsh-desk-notebook-content {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 12px;
   width: 100%;
-  max-width: min(1100px, 100%);
+  max-width: min(960px, 100%);
   min-height: 0;
   margin: 0 auto;
 }
-.dsh-desk-notebook-toprow > .dsh-desk-session-section-head {
-  flex: 1 1 auto;
-  min-width: 0;
-}
+/* Two equal top cells: the joined search/views control and the white workspace-files card.
+   The grid keeps both widths identical in zh and en (text length cannot change the split). */
 .dsh-desk-notebook-toprow {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
+  align-items: stretch;
   min-width: 0;
 }
 .dsh-desk-notebook-toolbar-main {
@@ -432,9 +422,53 @@ button.dsh-desk-notebook-rowbody {
   align-self: stretch;
   height: auto;
   min-height: 40px;
-  padding: 6px 14px;
+  padding: 12px 16px;
   gap: 10px;
+  justify-content: flex-start;
   border-radius: var(--dsw-radius-md, 12px);
+}
+.dsh-desk-notebook-filesbtn-arrow {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+  opacity: 0.6;
+}
+.dsh-desk-notebook-filesbtn-arrow svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.dsh-desk-notebook-homehead {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  border-radius: var(--dsw-radius-md, 12px);
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+}
+.dsh-desk-notebook-homehead-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.dsh-desk-notebook-homehead-title {
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.dsh-desk-notebook-homehead-count {
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 12px;
+  line-height: 18px;
+}
+.dsh-desk-notebook-homehead-hint {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+  font-size: 11px;
+  line-height: 16px;
 }
 .dsh-desk-notebook-filesbtn:disabled {
   opacity: 0.5;
@@ -634,14 +668,10 @@ button.dsh-desk-notebook-rowbody {
 /* Narrow panel: the files button drops below the joined strip / heading. */
 @container (max-width: 760px) {
   .dsh-desk-notebook-toprow {
-    align-items: stretch;
-  }
-  .dsh-desk-notebook-toolbar-main {
-    flex: 1 1 100%;
+    grid-template-columns: minmax(0, 1fr);
   }
   .dsh-desk-notebook-filesbtn {
     width: 100%;
-    justify-content: flex-start;
   }
 }
 `
