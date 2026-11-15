@@ -10,9 +10,10 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 * `plugins/dsh-chat-fim` — 输入框续写联想（FIM Beta 转发 + 官方同款候选菜单）
 * `plugins/dsh-codebuddy-credits` — CodeBuddy 额度 LLM provider（官方 API Key 直连）
 * `plugins/dsh-theme-tone` — 明暗主题之下的色调层 + **对话区布局优化**（每轴各一款「官方默认」+ 若干色调；色调同时驱动抬升面的色相与质感，另含顶栏 / 输入框的玻璃效果）
-* `plugins/dsh-desk-one` — 办公桌（Desk One）：一个侧栏面板 + 标签页（便签墙 / 任务板 / 日程 / 会话），统一对象模型；日程只读聚合企业微信、iCloud 与 Outlook 个人 ICS，会话页含归档与回收站管理；总览仍为占位
+* `plugins/dsh-desk-one` — 办公桌（Desk One）：一个侧栏面板 + 标签页（便签墙 / 任务板 / 笔记批注 / 日程聚合 / 会话管理），统一对象模型；日程只读聚合企业微信 / iCloud CalDAV、Outlook 个人（Microsoft Graph）与公开 ICS 订阅，会话页含归档与回收站管理；无总览页（S3 未做）
 * **口径：四个活跃插件 + 0 个已退役**（四个退役插件已于 2026-10-27、2026-10-31 与 2026-11-15 彻底删除）
 * 活跃插件名单的单一真值是 `scripts/plugin-set.mjs`（`RETIRED_PLUGINS` 为空名单，保留结构供守卫复用）
+* 退役包 npm 状态（2026-11-15）：`dsh-nav-pin` / `dsh-vision-bridge` 已从 npm 移除；`dsh-file-manage` 已 deprecate；`dsh-archive-manage` 仍在 npm，待 owner deprecate（E23）
 
 ## 文档规范
 
@@ -41,7 +42,10 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 * `CHANGELOG`：**中英双份**——同 README 规；**面向用户**：每条 = 一条用户可感知的变化（一句话、行为级）——**纯依赖版本除外**，那种版本按《运维》如实写「无用户可感知的变化」；不写实现细节 / 内部机制 / 修复过程（归 commit 信息与 docs/spec）
 * 私有 seam 明细进 `docs/private-seams.md`（不进 AGENTS）；实现以代码注释与各插件 `docs/spec` 为准
 
-本项目实际文档：根 `README.md` + `README.zh-CN.md`、`SECURITY.md`、`docs/private-seams.md` + `docs/upstream/`；每个活跃插件 `README.md` / `README.zh-CN.md` / `CHANGELOG.md` / `CHANGELOG.zh-CN.md`（双份、顶部互链）+ `docs/spec/`。无 CONTRIBUTING，无根 CHANGELOG。
+本项目实际文档：根 `README.md` + `README.zh-CN.md`、`SECURITY.md`、`docs/brand.md`、`docs/private-seams.md` + `docs/upstream/`；每个活跃插件 `README.md` / `README.zh-CN.md` / `CHANGELOG.md` / `CHANGELOG.zh-CN.md`（双份、顶部互链）+ `docs/spec/`。无 CONTRIBUTING，无根 CHANGELOG。
+
+* `docs/upstream/` 是按官方版本日期的历史快照，只追加新版本评估，不回填当前插件数 / 文件数 / 退役状态。
+* 根 README 是 Desk One 产品页：正文 = Desk One 使用说明 + 末尾三件小工具表 + 退役小节；`check:plugin-docs` 判据 1 只要求另外三个活跃插件在表格里、Desk One 以文档链接出现。
 
 ## 工程管线
 
@@ -93,6 +97,8 @@ push 后立即查询一次未处理的 Dependabot 告警，确认清零才继续
 
 依赖类告警按 E22 处理；代码类告警修复后，须等下一轮扫描确认状态变为已修复再发版。
 
+tag 前须确认 CodeQL default setup 已扫过本轮 main 提交（查 `code-scanning/analyses` 的 `commit_sha`），未扫过则等扫描完成再发；不得用上一次 main 的扫描代替本轮。
+
 ### E14｜发布前审计〔final〕
 
 按 G 段逐条过一遍。
@@ -119,6 +125,8 @@ push 后立即查询一次未处理的 Dependabot 告警，确认清零才继续
 
 该门禁须由发布工作流 fail-closed 执行（查询告警数，非 0 即中止发布），不得只靠人工核对。告警修复后须等下一轮扫描确认关闭，才算清零。依赖类告警按 E22 处理。
 
+门禁凭据一律用环境级只读 secret（至少能读 Dependabot / Code scanning / Secret scanning 告警）；`GITHUB_TOKEN` 读不到 secret scanning 告警，不得用它当门禁凭据。查询本身失败同样中止发布。
+
 ### E19｜打 tag 并推送〔interface〕
 
 一律用 annotated tag 并附说明。push 默认分支即部署、不使用版本号的站点不适用本条。
@@ -143,7 +151,9 @@ push 后立即查询一次未处理的 Dependabot 告警，确认清零才继续
 
 ### E23｜坏版本处理〔final〕
 
-用 deprecate，不得 unpublish，由 owner 在本机手动执行。无 deprecate 能力的市场只在 README 与 Release 说明里标注已知问题，指向修复版本。
+坏版本一律用 deprecate，不得 unpublish，由 owner 在本机手动执行。无 deprecate 能力的市场只在 README 与 Release 说明里标注已知问题，指向修复版本。
+
+退役包另有处置：发布后 24 小时内的 unpublish 窗口内可从 npm 移除；超出窗口的用 deprecate，并在 README 如实描述（不得笼统声称「npm 包已删除」）。以上 npm 处置均由 owner 执行。
 
 ## 代码审计
 
@@ -248,7 +258,8 @@ owner 保留 fast-forward 直推能力。公开仓库的外部 PR 与 Issue 一�
 ### 工作流
 
 * `ci.yml`（push dev/main 与 PR）：`typecheck` → `build` → `test`（JUnit artifact；测试依赖 lib/ 故 build 在前）→ `package`（`npm pack --dry-run` 校验 files 清单）
-* `publish.yml`（push `<插件名>-vX.Y.Z` tag 或 workflow_dispatch 指定插件）：解析插件 / 校验版本 / **跑根 `pnpm run check`（守卫 fail-closed，守卫红则不发）** / verify 后 `npm publish`；同文件含 promote 手动任务（`npm dist-tag add`；三个输入缺任一即**非零退出**，不静默成功）；publish job 挂 `environment: npm-publish`，**无 release-control**
+* `publish.yml`（push `<插件名>-vX.Y.Z` tag 或 workflow_dispatch 指定插件）：解析插件 / 校验版本 / **跑根 `pnpm run check`（守卫 fail-closed，守卫红则不发）** / verify 后 `npm publish`；同文件含 promote 手动任务（`npm dist-tag add`；三个输入缺任一即**非零退出**，不静默成功）；publish job 挂 `environment: npm-publish`，**无 release-control**；publish 权限 `contents: read` + `id-token: write`（不建 Release），OIDC 步骤显式清空 setup-node 占位 `NODE_AUTH_TOKEN`
+* `publish.yml` 的 E18 门禁：用 `npm-publish` 环境级只读 `SECURITY_ALERTS_TOKEN`（fine-grained PAT：Dependabot / Code scanning / Secret scanning 三项 read，限本仓库）；`GITHUB_TOKEN` 读不到 secret scanning 告警，不能当门禁凭据；查询失败同样中止发布
 * `market.yml`（`Publish` 成功后 / `main` 上 `market/**` 变动 / 每日 03:47 UTC / 手动）：见《插件市场索引》
 * 鉴权双模式：有 `NPM_TOKEN` 走 Automation token（首发必需），无则走 npm Trusted Publishing（OIDC）
 
@@ -379,7 +390,7 @@ git 与 agent 宿主进程均不读取系统代理。需要走代理时须显式
 
 * **版本门：包 manifest 只声明 peer，派生处才写 `engines.dsh`**：官方 0.2.1-alpha.4 起，插件 `package.json` 一旦声明 `engines.dsh`，安装 / 启动的兼容性**只**按该 range 判定、`peerDependencies` 被忽略（`@deepseek-ai/dsh-app-boot` 的 `plugin-compatibility.ts`；`workspace:` 形式在该 range 里视为不兼容）。故：
 
-  * **包 manifest 不写 `engines.dsh`**：`check:dsh-pin` 锚定的是 peer 声明，且它不扫 `engines.dsh` ⇒ 手写一份就是同一事实的第二处声明，漂了没有任何测试会红。**保持只声明 `peerDependencies`**（`engines.node` 与本契约无关，可继续写）
+  * **包 manifest 不写 `engines.dsh`**：`check:dsh-pin` 锚定的是 peer 声明；该守卫的判据 5 会直接拒绝插件 manifest 声明 `engines.dsh`（2026-11-15 起）。**保持只声明 `peerDependencies`**（`engines.node` 与本契约无关，可继续写）
   * **派生处必须写**（当前 = 插件市场索引 `market/index.json`）：市场索引格式没有 peers 字段，只有每版本的 `engines.dsh`，而 `dsh-plugin-market` 判兼容时造的是**只含 `engines.dsh`、不含 peers 的合成 manifest** ⇒ 索引里省略该字段等于宣称「任何宿主都兼容」，会把不兼容的版本标成可装。**该值一律由 peer 机械派生、不得手写**：取该版本 `@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-*` 的 peer range，跳过 `workspace:` 值，多个 range 用**空格**连接（semver 的 AND，`&&` 会判为非法比较符），全为 `*` 时省略
   * **守卫**：`check:market-index` 校验索引里每个版本的 `engines.dsh` 等于该版本 manifest 的 peer 派生结果
   * 将来确要在包 manifest 引入 `engines.dsh` 时，该 range 必须自己覆盖所有支持的 DSH 版本，并同步改 `check:dsh-pin` 口径与本文档
@@ -409,9 +420,10 @@ git 与 agent 宿主进程均不读取系统代理。需要走代理时须显式
   * `MARKET_INDEX_EXPECT_WAIT_MS`（等待上限，默认 0 = 不等）——判定「可见」= 版本在 `versions` 且有 `time` 记录（与收录条件一致），每 5s 轮询
   * 生成后**再自检**期待版本是否真进了索引（防「可见但缺 `dsh.bundle.patch`」被跳过）；任一不满足即非零退出且**不写文件** ⇒ fail-closed，宁可这次不部署
   * **只在 `workflow_run` 时等待**：其它触发源必须不等——`main` 在「已合并、tag 未推」的窗口里版本号领先 npm，等待会误红。不用触发 tag 是因为 `workflow_run` 的 `head_branch` 对 tag 触发的 upstream 返回 `main`（实测）
-* **守卫 `check:market-index`** 四条：① 包名集合 = `activePluginNames()`（退役插件不得进索引、活跃插件不得缺席；**首次发布例外**：从未发布过的活跃插件——缺席索引且 `peer-snapshot.json` 里无记录——只告警不失败，因为索引只能由 npm 已发布版本生成，否则新插件首发会被发布前的根 `check` 死锁；首发成功后 `market.yml` 自动收录、判据恢复严格）；② 每个插件有中英双语描述与至少一个能力标签；③ 每版 `engines.dsh` = 该版 peer 派生值；④ 版本合法 SemVer、按降序、且**已在 npm 发布过的**当前版本在列
+* **守卫 `check:market-index`** 四条：① 包名集合 = `activePluginNames()`（退役插件不得进索引、活跃插件不得缺席；**首次发布例外**：从未发布过的活跃插件——缺席索引且 `peer-snapshot.json` 里无记录——只告警不失败，因为索引只能由 npm 已发布版本生成，否则新插件首发会被发布前的根 `check` 死锁；首发成功后 `market.yml` 自动收录、判据恢复严格）；② 每个插件有中英双语描述、至少一个能力标签，以及中英 title 与 icon（`BRANDED_PLUGINS`，判据 2b）；③ 每版 `engines.dsh` = 该版 peer 派生值；④ 版本合法 SemVer、按降序、且**已在 npm 发布过的**当前版本在列
   * 判据 ④ 的「已发布」以 `peer-snapshot.json` 有该版本记录为准——**不是**「仓库内 `package.json` 的当前版本必须已在索引里」：版本号 bump 到发布之间那段窗口里，npm 上还没有该版本，索引不可能包含它，反过来要求会让 dev 分支每次 bump 都误红
   * 新增活跃插件要同时补 `scripts/market-index.mjs` 的 `ZH_DESCRIPTIONS` 与 `PLUGIN_LABELS`，否则判据 ② 会红
+* **其他守卫**：`check:plugin-docs` 判据 7 要求每个活跃插件的 `dsh.bundle.patch` 文件存在且进了 `files` 清单。
 * **允许 CI 写仓库的理由**：索引是**纯派生数据**（内容完全由 npm registry 决定，不含人的判断）、bot 提交范围**只在 `market/`**、守卫 fail-closed 挡住坏数据，且触发顺序是「先发布、后生成」
 * **bot 提交用 `GITHUB_TOKEN` 推送，不触发其它 workflow**（GitHub 已知行为）：部署用的是本次 run 内已重生成的 artifact，不依赖 bot 提交再次触发；`ci.yml` 也不会因 bot 提交重跑。这是有意接受的行为，不为它引入 PAT
 * **新鲜度**：bot 提交后部署约 1 分钟；叠加 Pages 的 `max-age=600` 与 DSH 的 `cacheTtlMs`，终端用户最坏约 20 分钟看到新版本
