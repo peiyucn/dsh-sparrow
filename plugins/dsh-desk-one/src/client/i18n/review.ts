@@ -59,7 +59,7 @@ export const en = {
   'review.baselineMemoryOnly': 'This file exceeds 1 MB, so the baseline stays in memory only; the round changes reset after a refresh',
   'review.baselineSaveFailed': 'Could not save this round baseline: {message}; the round changes may reset after a refresh',
   'review.cancel': 'Cancel',
-  'review.changes': 'Changes in this tab',
+  'review.changes': 'This round\'s changes',
   'review.collapse': 'Collapse',
   'review.composerHint': 'Select text in the right pane, click “Annotate”; submitting fills this box — send it to start the revision.',
   'review.copied': 'Copied',
