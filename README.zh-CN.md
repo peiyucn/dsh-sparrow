@@ -106,7 +106,7 @@
 
 ## 已退役
 
-退役插件会从源码树删除；npm 包保留已发布版本（不作 unpublish）：
+退役插件会从源码树删除，对应的 npm 包也已删除：
 
 * `dsh-nav-pin` 与 `dsh-vision-bridge`——2026-10-27 删除
 * `dsh-file-manage`——2026-10-31 删除
