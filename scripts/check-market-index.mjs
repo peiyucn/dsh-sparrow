@@ -12,7 +12,8 @@
  *      因为索引只能来自 npm 已发布版本，否则新插件首发时发布 workflow 的根 check 会死锁）；
  *   2. 每个插件都有中英双语 title/description 与至少一个能力标签；
  *   2b. 带品牌位的插件（`BRANDED_PLUGINS`）必须有中英标题、图标与主页；
- *   3. 每个版本的 `engines.dsh` = 该版本 manifest 的 peer 派生结果（同 `market-index.mjs` 的 `dshRangeOf`）；
+ *   3. 每个版本的 `engines.dsh` = 该版本 manifest 的 peer 派生结果（与生成器共用
+ *      `market-index.mjs` 的 `deriveDshRange` 一份实现，避免两处口径漂）；
  *   4. 版本集合覆盖「索引生成时 registry 上所有声明了 `dsh.bundle.patch` 的版本」——
  *      离线可比对的只有仓库内 package.json 的当前版本，故判据 4 校验「当前版本在索引里」，
  *      并要求索引每个版本的 version 都是合法 SemVer、按降序排列。
@@ -24,7 +25,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import semver from 'semver'
 import { activePluginNames, repoRoot } from './plugin-set.mjs'
-import { BRANDED_PLUGINS } from './market-index.mjs'
+import { BRANDED_PLUGINS, deriveDshRange } from './market-index.mjs'
 
 const INDEX_PATH = join(repoRoot, 'market', 'index.json')
 const SNAPSHOT_PATH = join(repoRoot, 'market', 'peer-snapshot.json')
@@ -129,7 +130,7 @@ for (const plugin of index.plugins) {
       fail(`判据 3 失败：peer-snapshot.json 里没有 ${plugin.name}@${version.version} 的记录`)
       continue
     }
-    const derived = derivedRangeOf(peerRanges)
+    const derived = deriveDshRange(peerRanges)
     const declared = version.engines?.dsh
     if (derived === undefined) {
       if (declared !== undefined) {
@@ -144,22 +145,6 @@ for (const plugin of index.plugins) {
       )
     }
   }
-}
-
-/**
- * 与 `scripts/market-index.mjs` 的 `dshRangeOf` 同口径（此处只吃快照里的 peer 映射）。
- * @param {Record<string, string>} peerRanges - `@deepseek-ai/dsh*` → range。
- * @returns {string | undefined} 派生 range。
- */
-function derivedRangeOf(peerRanges) {
-  const ranges = []
-  for (const [name, range] of Object.entries(peerRanges)) {
-    if (name !== '@deepseek-ai/dsh' && !name.startsWith('@deepseek-ai/dsh-')) continue
-    if (['workspace:*', 'workspace:^', 'workspace:~'].includes(range)) continue
-    if (!ranges.includes(range)) ranges.push(range)
-  }
-  if (ranges.length === 0 || ranges.every((range) => range === '*')) return undefined
-  return ranges.join(' ')
 }
 
 if (violations.length > 0) {

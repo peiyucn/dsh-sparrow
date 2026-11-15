@@ -199,23 +199,22 @@ function iconDataUrl(relativePath) {
 }
 
 /**
- * 从包 manifest 派生 `engines.dsh`。
+ * 从一组 `@deepseek-ai/dsh*` peer range 派生出索引里的 `engines.dsh` 值。
+ *
+ * 生成器（本文件）与守卫 `check-market-index` **共用这一份实现**：两边各写一份必然漂，
+ * 而两处口径一旦不同，守卫就会把生成器刚写出的正确索引判红（或反过来静默放行）。
  *
  * 规则（与官方 generator 同口径，简化到本仓库实际用到的情形）：
- * 1. manifest 自身声明了 `engines.dsh` 就原样用（本仓库不声明，留给将来）；
- * 2. 否则取 `@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-*` 的 peer range，跳过 `workspace:` 值；
- * 3. 去重后多个 range 用**空格**连接（semver 的 AND —— `&&` 不是 semver 语法，会被判非法比较符）；
- * 4. 全为 `*` 或没有 dsh peer 时返回 undefined（格式允许省略 = 任何版本都兼容）。
+ * 1. 跳过 `workspace:*` / `workspace:^` / `workspace:~`（表示当前宿主版本，不构成范围约束）；
+ * 2. 去重后多个 range 用**空格**连接（semver 的 AND —— `&&` 不是 semver 语法，会被判非法比较符）；
+ * 3. 全为 `*` 或没有 dsh peer 时返回 undefined（格式允许省略 = 任何版本都兼容）。
  *
- * @param {object} manifest - 一个版本的 package.json。
+ * @param {Record<string, unknown> | undefined} peerRanges - 包 manifest 的 peerDependencies，或快照里的同名映射。
  * @returns {string | undefined} 派生出的 SemVer range。
  */
-export function dshRangeOf(manifest) {
-  const declared = manifest.engines?.dsh
-  if (typeof declared === 'string' && declared.trim() !== '') return declared.trim()
-
+export function deriveDshRange(peerRanges) {
   const ranges = []
-  for (const [name, range] of Object.entries(manifest.peerDependencies ?? {})) {
+  for (const [name, range] of Object.entries(peerRanges ?? {})) {
     if (!isDshPackage(name) || typeof range !== 'string') continue
     if (WORKSPACE_VALUES.has(range)) continue
     if (range.startsWith('workspace:')) {
@@ -231,6 +230,21 @@ export function dshRangeOf(manifest) {
     throw new Error(`peer 派生出的 range 不是合法 SemVer：${JSON.stringify(derived)}`)
   }
   return derived
+}
+
+/**
+ * 从包 manifest 派生 `engines.dsh`。
+ *
+ * manifest 自身声明了 `engines.dsh` 就原样用（本仓库插件**不声明**，`check:dsh-pin` 判据 5 会拦住；
+ * 留这条分支是给「将来确要引入」时与官方 generator 同口径），否则交给 `deriveDshRange` 从 peer 派生。
+ *
+ * @param {object} manifest - 一个版本的 package.json。
+ * @returns {string | undefined} 派生出的 SemVer range。
+ */
+export function dshRangeOf(manifest) {
+  const declared = manifest.engines?.dsh
+  if (typeof declared === 'string' && declared.trim() !== '') return declared.trim()
+  return deriveDshRange(manifest.peerDependencies)
 }
 
 /** 读 npm registry 的 packument（一个包的全部版本与元数据）。 */
