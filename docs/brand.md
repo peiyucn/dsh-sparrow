@@ -22,9 +22,9 @@
 | --- | --- | --- | --- | --- | --- |
 | B1 | 标志（透明） | `resources/brand/desk-one-mark.svg` | 24 viewBox；品牌蓝 `#4176E6`、墨色两版 | README、市场、社交图 | 待制作 |
 | B2 | 应用图标 | `plugins/dsh-desk-one/icon.svg` | 512×512，圆角 22%，方底反白 | 插件管理器、市场卡 | **已定 B（方底反白）**，已入包 |
-| B3 | 社交预览 | `resources/brand/social-preview.png` | 1280×640 | GitHub Social preview | 待制作（依赖真实截图） |
-| B4 | README 首图 | `resources/dsh-desk-one-hero.png` | 1600×900 | 根 README、插件 README 第一屏 | 占位已生成，待同名替换 |
-| B5 | 截图 ×5 | —（不进仓库） | 1440×900 原始素材 | 只作 hero 合成素材，放 TEMP | owner 截图 |
+| B3 | 社交预览 | `resources/dsh-desk-one-social.png` | 1280×640 | GitHub Social preview | **已制作（2026-11-15）**：批注视图真图，中英同图 |
+| B4 | README 首图 | `resources/dsh-desk-one-hero.png` | 1600×900 | 根 README、插件 README 第一屏 | **已用真图合成（2026-11-15）**，深色 |
+| B5 | 截图 ×5 | —（不进仓库） | 1440×900 原始素材 | 只作 hero 合成素材，放 TEMP | **已拍（隔离 demo）**，在 `TEMP/brand/shots/` |
 
 > README 与市场详情只放一张 hero；五个功能的原始截图只作合成素材，不进仓库。
 | B6 | 演示 GIF | `resources/dsh-desk-one-demo.gif` | ≤5 MB，可选 | README | 可选 |
@@ -38,17 +38,17 @@
 
 | ID | 图 | 尺寸 | 用途 |
 | --- | --- | --- | --- |
-| M1 | hero 主视觉 | 1600×900，浅 / 深两版 | README 第一屏、市场落地页 |
+| M1 | hero 主视觉 | 1600×900（深色） | README 第一屏、市场落地页 |
 | M2 | hero 素材 ×5 | 1440×900（原始） | 合成 M1 用，不进仓库 |
 | M3 | 社交预览 | 1280×640 | GitHub Social preview（文字烘焙在图里） |
 
 - M2 清单（hero 素材）：便签墙 / 任务板 / 日程 / 笔记批注（笔记页 + 批注视图）/ 对话里的「和我说」预填。
-- 构图优先级（2026-11-15 定）：笔记批注（主面板）→ 任务板 → 日程聚合 → 便签墙 → 会话管理（浮层）；左侧五个功能标签保留。
+- 构图优先级（2026-11-15 定，已按真图调整）：笔记批注（主面板）→ 批注视图 → 任务板 → 日程聚合 → 便签墙（浮层）；会话管理保留在标签栏与左侧功能名，不单独占浮层。
 - 图片语言（2026-11-15 定）：中英同图（不是两套）；功能名用「中文 English」并列：笔记批注 Annotations / 任务板 Task board / 日程聚合 Schedule / 便签墙 Notes wall / 会话管理 Sessions。
-- 演示数据：便签、任务、日程、会话标题一律用示例内容；**不得出现真实工作区名、路径、日历事件、会话标题**。
+- 演示数据：便签、任务、日程、会话标题一律用示例内容；截图取自隔离 demo（`TEMP/desk-demo`），**不得出现真实工作区名、路径、日历事件、会话标题**。
 - 拍摄：浏览器窗口 1440×900、缩放 100%；需要 2x 时用 200% 缩放截取后缩回 1440 宽。
 - 主题：只出深色（2026-11-15 定），README 不用 `<picture>` 切换。
-- 合成：由脚本完成（HTML → 无头 Edge 截图），圆角、留白、字号可复现；除 M3 外不在图里烘焙中文。
+- 合成：由脚本完成（HTML → 无头 Edge 截图），圆角、留白、字号可复现；hero 与社交图都使用真实界面截图，中文来自界面本身与左侧功能名。
 - 最终落 `resources/`，README 用绝对 raw URL 引用。
 
 ## 2 DSH 官方品牌位
@@ -150,7 +150,7 @@
 
 ## 8 发布前检查清单
 
-- [ ] B1–B4 落地，README 全部引用可达
+- [ ] B1–B4 落地，README 全部引用可达（B1 待制作；B3/B4 已完成）
 - [ ] `package.json` 的 `icon` / `files` / `exports` / `locale` 齐全，`npm pack --dry-run` 含这些文件
 - [ ] 插件管理器显示 Desk One 图标与中英标题（GUI 复验）
 - [ ] 市场索引含 Desk One 的 title / icon / homepage，守卫绿
@@ -161,10 +161,11 @@
 
 ## 9 进度（2026-11-15）
 
-- 已落地：图标（B）+ `locale` 中英显示元数据 + 包内 `exports` / `files`；市场索引的 title / icon / homepage 与守卫；`landing.html` 首位卡；根 README 首屏；GitHub description / topics / website；issue 表单；hero 占位图。
-- 构图（2026-11-15 定）：hero 一张图内含五个功能的惊鸿一瞥（大面板 + 四张浮层），README 不再放五张独立截图。
-- 构图细节（2026-11-15 定）：主面板 = 笔记+审阅；浮层顺序 = 任务板 / 日程 / 便签墙 / 会话；五个功能标签保留；只出深色。
-- 待替换：`resources/dsh-desk-one-hero.png`——GUI 验收后按同一构图用真图合成，**同名替换**即可，README 不用改。
-- 待做：插件 README 首屏（只放 hero）；社交预览（M3，依赖素材）；首发后补 npm 徽章并复核市场卡。
+- 已落地：图标（B）+ `locale` 中英显示元数据 + 包内 `exports` / `files`；市场索引的 title / icon / homepage 与守卫；`landing.html` 首位卡；根 README 首屏；GitHub description / topics / website；issue 表单。
+- 真图（2026-11-15）：`resources/dsh-desk-one-hero.png` 用隔离 demo 的五张 1440×900 截图合成并同名替换；`resources/dsh-desk-one-social.png` 改用批注视图真图（1280×640），中英同图。
+- 构图（2026-11-15 定，真图版）：hero 一张图内含大面板 + 四张浮层，README 只放这一张。
+- 构图细节（2026-11-15 定）：主面板 = 笔记批注页；浮层 = 批注视图 / 任务板 / 日程 / 便签墙；会话管理保留在标签栏与左侧功能名；只出深色。
+- 截图素材：`TEMP/brand/shots/`（隔离 demo，1440×900，合成用，不入库）；合成脚本 `TEMP/brand/hero-real.html`、`TEMP/brand/social-card-v4.html`。
+- 待做：B1 透明标志仍未落到 `resources/brand/`；首发后补 npm 徽章并复核市场卡。
 - 只能 owner 做：GitHub Social preview 上传、个人主页 pin。
 
