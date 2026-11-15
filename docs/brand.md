@@ -25,10 +25,10 @@
 | B3 | 社交预览 | `resources/dsh-desk-one-social.png` | 1280×640 | GitHub Social preview | **已制作（2026-11-15）**：纯品牌卡，无截图，中英同图 |
 | B4 | README 首图 | `resources/dsh-desk-one-hero.png` | 1600×900 | 根 README、插件 README 第一屏 | **已用真图合成（2026-11-15）**，深色 |
 | B5 | 截图 ×5 | —（不进仓库） | 1440×900 原始素材 | 只作 hero 合成素材，放 TEMP | **已拍（隔离 demo）**，在 `TEMP/brand/shots/` |
-
-> README 与市场详情只放一张 hero；五个功能的原始截图只作合成素材，不进仓库。
 | B6 | 演示 GIF | `resources/dsh-desk-one-demo.gif` | ≤5 MB，可选 | README | 可选 |
 | B7 | 徽章 | README 内联 | DSH 版本（静态）、License、CI；npm 版本与下载首发后加 | 根与插件 README | 待制作 |
+
+> README 与市场详情只放一张 hero；五个功能的原始截图只作合成素材，不进仓库。
 
 注意：`check:plugin-docs` 要求根 README 保留 `| Plugin |`（中文 `| 插件 |`）表格与 `## Retired`（`## 已退役`）段，重构时不能删。
 
@@ -66,7 +66,7 @@
 - 结构：`{ "meta": { "title": "...", "description": "..." } }`，值必须是非空字符串。
 - 回落：title 缺省用包名，description 缺省用 `package.json` 的 description。
 - 暴露：`exports` 加 `"./locale/*.json": "./locale/*.json"`；`files` 加 `locale/*.json`。
-- 目标值：`title` = `Desk One` / `同桌`；`description` = §5.1 的一句话。
+- 已定值：`title` = `Desk One` / `同桌`；`description` = `A shared desk for you and your DSH harness: notes, tasks, a read-only calendar and AI-written notebook review in one panel.` / `和 DSH 共用的一张办公桌：便签、任务、只读日程，以及 AI 写、你审的笔记。`（§5.1 的一句话用于 README 首屏、市场卡与 GitHub description，不进插件管理器卡片）。
 
 ### 2.3 市场卡片（`market/index.json`）
 
@@ -85,7 +85,7 @@
 
 | 位置 | 内容 | 执行者 |
 | --- | --- | --- |
-| 仓库 description | `Desk One（同桌）— 和 DSH 共用的一张办公桌；随桌附送三件小工具` | agent（`gh api`） |
+| 仓库 description | `Desk One (同桌) — one desk for you and harness. Notes, tasks, read-only calendar and AI-written notebook review in one DSH panel; plus three small tools.` | agent（`gh api`，已上线） |
 | Website | `https://dsh.pyai.site` | agent |
 | Topics | `desk-one` `dsh` `deepseek-harness` `notes` `tasks` `calendar` `plugin` | agent |
 | Social preview | M3，1280×640 | **owner（网页上传）** |
@@ -142,7 +142,7 @@
 ## 7 风险与待定
 
 - ~~B2 在 36 px 下的可读性~~：2026-11-15 对比图后选定 B。
-- `locale/*.json` 与 `exports` 改动对现有构建的影响：未实测，以 `verify` 结果为准。
+- `locale/*.json` 与 `exports` 改动对现有构建的影响：已实测（2026-11-15 四插件 `verify` 全绿，打包含 `locale/*.json` 与 `exports`）。
 - 市场卡与详情页要等首发后才能看真实效果。
 - Social preview 只能网页上传。
 - npm 徽章首发前不可用。
