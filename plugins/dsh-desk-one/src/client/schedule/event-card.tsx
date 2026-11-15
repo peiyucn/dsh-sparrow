@@ -34,6 +34,9 @@ export function EventCard(props: {
 }): ReactElement {
   const { t, event, calendars, sources, point } = props
   const cardRef = useRef<HTMLElement>(null)
+  /** Latest close callback: the outside-click subscription must not be rebuilt on every render. */
+  const onCloseRef = useRef(props.onClose)
+  onCloseRef.current = props.onClose
   const copyFeedback = useCopyFeedback({ feedbackMs: COPY_FEEDBACK_MS })
   // Guest lists are long and unreadable at a glance: show the count and open on demand.
   const [peopleOpen, setPeopleOpen] = useState(false)
@@ -82,16 +85,16 @@ export function EventCard(props: {
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent): void => {
-      if (cardRef.current !== null && !cardRef.current.contains(event.target as Node)) props.onClose()
+      if (cardRef.current !== null && !cardRef.current.contains(event.target as Node)) onCloseRef.current()
     }
-    const onKeyDown = (event: KeyboardEvent): void => { if (event.key === 'Escape') props.onClose() }
+    const onKeyDown = (event: KeyboardEvent): void => { if (event.key === 'Escape') onCloseRef.current() }
     document.addEventListener('pointerdown', onPointerDown, true)
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('pointerdown', onPointerDown, true)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [props])
+  }, [])
 
   const copy = (): void => {
     const people = [
