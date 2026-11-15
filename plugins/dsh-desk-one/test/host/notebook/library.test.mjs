@@ -21,6 +21,8 @@ describe('notebook library', () => {
     assert.equal(normalizeRelativePath('Diary\\a.md'), 'Diary/a.md')
     assert.throws(() => normalizeRelativePath('../outside.md'))
     assert.throws(() => normalizeRelativePath('C:/x.md'))
+    assert.throws(() => normalizeRelativePath('C:\\x.md'))
+    assert.throws(() => normalizeRelativePath('\\\\server\\share\\x.md'))
     assert.throws(() => normalizeRelativePath(''))
   })
 

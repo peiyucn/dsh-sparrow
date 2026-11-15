@@ -3,7 +3,7 @@
  */
 
 import { realpath, readFile, stat } from 'node:fs/promises'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute, join, win32 } from 'node:path'
 import type {
   NotebookEntry, NotebookField, NotebookPageResponse, NotebookSearchResponse, NotebookStats,
 } from '../../notebook-contract.js'
@@ -14,9 +14,17 @@ import { displayTitle, parsePage } from './frontmatter.js'
 /** How many head bytes are checked for binary content. */
 const BINARY_PROBE_BYTES = 8_192
 
-/** Reject absolute or escaping paths; returns the normalized `/`-separated relative path. */
+/**
+ * Reject absolute or escaping paths; returns the normalized `/`-separated relative path.
+ *
+ * A Windows drive / UNC path is not absolute under POSIX (`isAbsolute('C:/x.md')` is false), but
+ * accepting it would create a `C:` directory inside the library on a Linux host. Reject both path
+ * dialects on every platform.
+ */
 export function normalizeRelativePath(relativePath: string): string {
-  if (isAbsolute(relativePath)) throw new DeskError('BAD_BODY', '路径必须是相对路径')
+  if (isAbsolute(relativePath) || win32.isAbsolute(relativePath)) {
+    throw new DeskError('BAD_BODY', '路径必须是相对路径')
+  }
   const parts = relativePath.replace(/\\/gu, '/').split('/')
   const clean: string[] = []
   for (const part of parts) {
