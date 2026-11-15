@@ -36,8 +36,8 @@ export const zh = {
   'notebook.viewMissing': '缺元数据 {count}',
   'notebook.viewRecent': '全部',
   'notebook.welcomeBody': '笔记库 = DSH 工作区：AI 在里面写，你在专用批注会话里逐行批注，其余的交给 harness。',
-  'notebook.workspaceFiles': '工作区文件',
-  'notebook.workspaceFilesHint': '浏览整个工作区，选择文件开始批注',
+  'notebook.workspaceFilesLead': '浏览工作区文件，点击',
+  'notebook.workspaceFilesTrail': '开始批注',
   'notebook.workspaceHint': '只索引目录内的 markdown / 文本文件。',
   'notebook.workspaceLabel': '工作区',
 } as const
@@ -79,8 +79,8 @@ export const en = {
   'notebook.viewMissing': 'No metadata {count}',
   'notebook.viewRecent': 'All',
   'notebook.welcomeBody': 'The library = a DSH workspace: the AI writes there, you annotate exact lines in a dedicated session, and harness handles the rest.',
-  'notebook.workspaceFiles': 'Workspace files',
-  'notebook.workspaceFilesHint': 'Browse the whole workspace, pick a file and start annotating',
+  'notebook.workspaceFilesLead': 'Browse workspace files, click',
+  'notebook.workspaceFilesTrail': 'to annotate',
   'notebook.workspaceHint': 'Only markdown and text files inside it are indexed.',
   'notebook.workspaceLabel': 'Workspace',
 } satisfies Record<keyof typeof zh, string>

@@ -375,83 +375,62 @@ button.dsh-desk-notebook-rowbody {
   min-height: 0;
   margin: 0 auto;
 }
-/* Two equal top cells: the joined search/views control and the white workspace-files card.
-   The grid keeps both widths identical in zh and en (text length cannot change the split). */
+/* Top band: search on the left, the fixed-width workspace-files button on the right. Both widths
+   are fixed in zh and en (the button is 340px, the search fills the rest of the list width), so
+   changing the interface language never shifts this row. */
 .dsh-desk-notebook-toprow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
-  align-items: stretch;
-  min-width: 0;
-}
-.dsh-desk-notebook-toolbar-main {
   display: flex;
-  flex: 1 1 320px;
-  flex-direction: column;
-  align-items: stretch;
+  flex: none;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
-  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: var(--dsw-radius-md, 12px);
-  background: var(--dsw-alias-bg-layer-1, #ffffff);
-  overflow: hidden;
 }
-.dsh-desk-notebook-toolbar-main .dsh-desk-notebook-search {
-  flex: none;
-  width: 100%;
-  min-width: 120px;
-  height: 32px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-.dsh-desk-notebook-toolbar-divider {
-  flex: none;
-  width: 100%;
-  height: 1px;
-  background: var(--dsw-alias-border-l1, #e2e5ea);
-}
-.dsh-desk-notebook-toolbar-main .dsh-desk-notebook-tabs {
-  flex: none;
-  width: 100%;
-  height: 32px;
-  border-radius: 0;
-  background: transparent;
+.dsh-desk-notebook-toprow .dsh-desk-notebook-search {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .dsh-desk-notebook-filesbtn {
   flex: none;
-  align-self: stretch;
-  height: auto;
-  min-height: 40px;
-  padding: 12px 16px;
-  gap: 10px;
-  justify-content: flex-start;
+  width: 340px;
+  max-width: 50%;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 12px;
+  gap: 0;
+  font-size: 12px;
+  white-space: nowrap;
   border-radius: var(--dsw-radius-md, 12px);
 }
-.dsh-desk-notebook-filesbtn-arrow {
+.dsh-desk-notebook-filesbtn-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dsh-desk-notebook-filesbtn-icon {
   display: inline-flex;
   flex: none;
-  margin-left: auto;
-  opacity: 0.6;
+  margin: 0 1px;
+  color: #d7a64b;
 }
-.dsh-desk-notebook-filesbtn-arrow svg {
+.dsh-desk-notebook-filesbtn-icon svg {
   display: block;
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
+}
+.dsh-desk-notebook-filesbtn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 .dsh-desk-notebook-homehead {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-  padding: 14px 16px;
-  border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: var(--dsw-radius-md, 12px);
-  background: var(--dsw-alias-bg-layer-1, #ffffff);
-}
-.dsh-desk-notebook-homehead-top {
-  display: flex;
+  flex: 1 1 auto;
   align-items: baseline;
   gap: 8px;
+  min-width: 0;
 }
 .dsh-desk-notebook-homehead-title {
   color: var(--dsw-alias-label-primary, #1f2329);
@@ -464,42 +443,11 @@ button.dsh-desk-notebook-rowbody {
   font-size: 12px;
   line-height: 18px;
 }
-.dsh-desk-notebook-homehead-hint {
-  margin: 0;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-  font-size: 11px;
-  line-height: 16px;
-}
-.dsh-desk-notebook-filesbtn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.dsh-desk-notebook-filesbtn-icon {
-  display: inline-flex;
+/* The four views now live in the list header, sized to their content rather than the page width. */
+.dsh-desk-notebook-cardhead .dsh-desk-notebook-tabs {
   flex: none;
-  color: #d7a64b;
-}
-.dsh-desk-notebook-filesbtn-icon svg {
-  display: block;
-  width: 20px;
-  height: 20px;
-}
-.dsh-desk-notebook-filesbtn-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-  text-align: left;
-}
-.dsh-desk-notebook-filesbtn-title {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 18px;
-}
-.dsh-desk-notebook-filesbtn-subtitle {
-  font-size: 11px;
-  line-height: 15px;
-  opacity: 0.72;
+  width: max-content;
+  max-width: 100%;
 }
 .dsh-desk-notebook-cardhead-spacer {
   flex: 1 1 auto;
@@ -665,13 +613,17 @@ button.dsh-desk-notebook-rowbody {
 }
 
 
-/* Narrow panel: the files button drops below the joined strip / heading. */
+/* Narrow panel: the search takes a full row and the files button drops below it. */
 @container (max-width: 760px) {
   .dsh-desk-notebook-toprow {
-    grid-template-columns: minmax(0, 1fr);
+    flex-wrap: wrap;
+  }
+  .dsh-desk-notebook-toprow .dsh-desk-notebook-search {
+    flex: 1 1 100%;
   }
   .dsh-desk-notebook-filesbtn {
     width: 100%;
+    max-width: 100%;
   }
 }
 `

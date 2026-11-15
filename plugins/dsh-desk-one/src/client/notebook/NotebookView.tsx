@@ -149,7 +149,7 @@ function Row({ page, row, onOpen }: {
   )
 }
 
-/** The official "workspace files" entry, styled as Desk One's white primary button. */
+/** The official "workspace files" entry: one fixed-width white line with an inline folder glyph. */
 function WorkspaceFilesButton({ page }: { readonly page: NotebookPageController }): ReactElement {
   const { t } = page
   return (
@@ -159,13 +159,10 @@ function WorkspaceFilesButton({ page }: { readonly page: NotebookPageController 
       disabled={page.busy}
       onClick={() => { void page.openFolder() }}
     >
-      <span className="dsh-desk-notebook-filesbtn-icon" aria-hidden="true">{folderIcon}</span>
       <span className="dsh-desk-notebook-filesbtn-text">
-        <span className="dsh-desk-notebook-filesbtn-title">{t('notebook.workspaceFiles')}</span>
-        <span className="dsh-desk-notebook-filesbtn-subtitle">{t('notebook.workspaceFilesHint')}</span>
-      </span>
-      <span className="dsh-desk-notebook-filesbtn-arrow" aria-hidden="true">
-        <IconChevronRightOutlineRegular />
+        {t('notebook.workspaceFilesLead')}
+        <span className="dsh-desk-notebook-filesbtn-icon" aria-hidden="true">{folderIcon}</span>
+        {t('notebook.workspaceFilesTrail')}
       </span>
     </button>
   )
@@ -209,6 +206,7 @@ function HomeBody({ page }: { readonly page: NotebookPageController }): ReactEle
       </div>
       <div className="dsh-desk-notebook-homehints">
         <p className="dsh-desk-page-hint">{t('notebook.welcomeBody')}</p>
+        <p className="dsh-desk-page-hint">{t('notebook.workspaceHint')}</p>
       </div>
     </div>
   )
@@ -223,9 +221,22 @@ function ListCard({ page, onRecord }: {
   return (
     <div className="dsh-desk-notebook-card">
       <div className="dsh-desk-notebook-cardhead">
+        <SegmentedTabs
+          className="dsh-desk-notebook-tabs"
+          size="sm"
+          label={t('notebook.panelLabel')}
+          value={page.mode}
+          onChange={page.setMode}
+          items={[
+            { value: 'recent', label: t('notebook.viewRecent'), id: 'desk-notebook-tab-recent', panelId: 'desk-notebook-panel' },
+            { value: 'drafts', label: t('notebook.viewDrafts', { count: page.state?.draftCount ?? 0 }), id: 'desk-notebook-tab-drafts', panelId: 'desk-notebook-panel' },
+            { value: 'history', label: t('notebook.viewHistory', { count: page.state?.historyCount ?? 0 }), id: 'desk-notebook-tab-history', panelId: 'desk-notebook-panel' },
+            { value: 'missing', label: t('notebook.viewMissing', { count: page.state?.stats.missingFrontmatter ?? 0 }), id: 'desk-notebook-tab-missing', panelId: 'desk-notebook-panel' },
+          ] as const}
+        />
+        <span className="dsh-desk-notebook-cardhead-spacer" />
         <span className="dsh-desk-notebook-cardhead-title">{page.summary}</span>
         {page.summaryHint === null ? null : <span className="dsh-desk-notebook-cardhead-hint">{page.summaryHint}</span>}
-        <span className="dsh-desk-notebook-cardhead-spacer" />
         {page.mode === 'history'
           ? (
               <Tag tone={page.historyWarn ? 'danger' : 'neutral'} className="dsh-desk-notebook-cardhead-usage">
@@ -293,37 +304,18 @@ export function NotebookView({ page }: { readonly page: NotebookPageController }
               <div className="dsh-desk-notebook-toprow">
                 {linked
                   ? (
-                      <div className="dsh-desk-notebook-toolbar-main">
-                        <Input
-                          className="dsh-desk-notebook-search"
-                          icon={<IconSearchOutlineRegular />}
-                          value={page.query}
-                          placeholder={t('notebook.searchPlaceholder')}
-                          onChange={event => page.setQuery(event.target.value)}
-                        />
-                        <span className="dsh-desk-notebook-toolbar-divider" aria-hidden="true" />
-                        <SegmentedTabs
-                          className="dsh-desk-notebook-tabs"
-                          size="sm"
-                          label={t('notebook.panelLabel')}
-                          value={page.mode}
-                          onChange={page.setMode}
-                          items={[
-                            { value: 'recent', label: t('notebook.viewRecent'), id: 'desk-notebook-tab-recent', panelId: 'desk-notebook-panel' },
-                            { value: 'drafts', label: t('notebook.viewDrafts', { count: page.state?.draftCount ?? 0 }), id: 'desk-notebook-tab-drafts', panelId: 'desk-notebook-panel' },
-                            { value: 'history', label: t('notebook.viewHistory', { count: page.state?.historyCount ?? 0 }), id: 'desk-notebook-tab-history', panelId: 'desk-notebook-panel' },
-                            { value: 'missing', label: t('notebook.viewMissing', { count: page.state?.stats.missingFrontmatter ?? 0 }), id: 'desk-notebook-tab-missing', panelId: 'desk-notebook-panel' },
-                          ] as const}
-                        />
-                      </div>
+                      <Input
+                        className="dsh-desk-notebook-search"
+                        icon={<IconSearchOutlineRegular />}
+                        value={page.query}
+                        placeholder={t('notebook.searchPlaceholder')}
+                        onChange={event => page.setQuery(event.target.value)}
+                      />
                     )
                   : (
                       <div className="dsh-desk-notebook-homehead">
-                        <div className="dsh-desk-notebook-homehead-top">
-                          <span className="dsh-desk-notebook-homehead-title">{t('notebook.chooseWorkspace')}</span>
-                          <span className="dsh-desk-notebook-homehead-count">{page.workspaces.length}</span>
-                        </div>
-                        <p className="dsh-desk-notebook-homehead-hint">{t('notebook.workspaceHint')}</p>
+                        <span className="dsh-desk-notebook-homehead-title">{t('notebook.chooseWorkspace')}</span>
+                        <span className="dsh-desk-notebook-homehead-count">{page.workspaces.length}</span>
                       </div>
                     )}
                 <WorkspaceFilesButton page={page} />
