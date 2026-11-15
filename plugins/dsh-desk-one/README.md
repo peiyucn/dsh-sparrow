@@ -56,7 +56,7 @@ English | [简体中文](README.zh-CN.md)
 
 * The top row is **Start** (three tall white actions: Annotation / Note / Task), **Today** and **Upcoming**; below it are month (default, Monday-first), week (ISO week number, 0–24 hour ruler) and list views.
 * Click an event for a card near the cursor; external events stay read-only, with copy and jump-back actions. **Calendar settings** in the shared top bar manages sources, calendars and manual sync.
-* The panel syncs on open and then every 15 minutes. On failure, the **Calendar settings** action gets a red badge and the failing source card shows the exact error; the calendar page stays clean.
+* When the schedule page opens it syncs if the mirror is more than five minutes old, and it then syncs every 15 minutes. On failure, the **Calendar settings** action gets a red badge and the failing source card shows the exact error; the calendar page stays clean.
 
 ### Sessions
 
