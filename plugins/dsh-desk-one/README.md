@@ -6,8 +6,6 @@ English | [简体中文](README.zh-CN.md)
 
 ![Desk One hero](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-desk-one-hero.png)
 
-`dsh plugin --profile web add @dsh-sparrow/dsh-desk-one`
-
 **Desk One (同桌)** is a shared desk for you and harness inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. Annotations, notes, tasks, schedule and agent sessions live side by side; the schedule is a read-only mirror of the calendars you connect. The header's split **「✦」 Desk One｜Talk to Me** button drops a tab-aware prefilled prompt into the conversation, and the **…** menu holds **Make a wish** for turning an idea into a GitHub issue draft.
 
 ## What it is
@@ -27,9 +25,9 @@ English | [简体中文](README.zh-CN.md)
 
 ## Install
 
-* `dsh plugin --profile web add @dsh-sparrow/dsh-desk-one`
-* Restart dsh web after installing; a browser refresh alone is not enough for the client bundle.
-* Open the whale sidebar and pick **Desk One**; use **Pin to sidebar** in a tab header if you want a direct shortcut.
+* Open **Plugins → Add plugin**, enter `@dsh-sparrow/dsh-desk-one`, and follow the install / enable flow.
+* Or enable **Custom plugin index** under **Plugins → Experimental plugins**, open **Plugins → Discover**, add `https://dsh.pyai.site/market/index.json` as an index source, then search for **Desk One** and install it from the card.
+* Restart DSH after installing; a browser refresh alone is not enough for the client bundle.
 
 ## Use
 

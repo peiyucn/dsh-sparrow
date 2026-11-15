@@ -6,13 +6,11 @@ Tone skins for DSH's built-in light and dark themes — a DeepSeek Harness (DSH)
 
 ## Install
 
-```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-theme-tone
-```
+Open **Plugins → Add plugin**, enter `@dsh-sparrow/dsh-theme-tone`, and enable it. Or use the shared market-index flow described in the [root README](../../README.md).
 
-Requires dsh 0.2.2-rc.3 — the exact official version line this release is built and verified against. Also requires a working `pnpm` (`dsh plugin` forwards installation to pnpm).
+Requires DSH 0.2.2-rc.3 — the exact official version line this release is built and verified against.
 
-> Do **not** run `npm install @dsh-sparrow/dsh-theme-tone` directly: that only downloads the package into some `node_modules` and does not register it with the DSH web profile. Use the `dsh plugin` command above, then restart DSH.
+> Install through the DSH plugin manager. A raw npm install does not register the package with the DSH web profile; restart DSH after installing.
 
 ## Usage
 

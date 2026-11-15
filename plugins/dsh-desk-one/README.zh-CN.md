@@ -6,8 +6,6 @@
 
 ![Desk One 主视觉](https://raw.githubusercontent.com/peiyucn/dsh-sparrow/main/resources/dsh-desk-one-hero.png)
 
-`dsh plugin --profile web add @dsh-sparrow/dsh-desk-one`
-
 **同桌（Desk One）** 是 DSH Web 里与 harness 共用的办公桌：一个左侧栏入口、一块面板、一套统一对象模型。笔记批注、便签、任务、日程与 agent 会话收在同一处，日程只是你所连接日历的只读镜像。页头是一枚 **「✦」同桌｜和我说** 分段按钮，把当前 tab 的预填提示送进对话；tab 行末尾的 **…** 菜单里还有 **许个愿**，把想法整理成 GitHub issue 草稿。
 
 ## 它是什么
@@ -27,9 +25,9 @@
 
 ## 安装
 
-* `dsh plugin --profile web add @dsh-sparrow/dsh-desk-one`
-* 安装后重启 dsh web；只刷新浏览器不够，客户端 bundle 由宿主启动时读入。
-* 打开鲸鱼侧栏点 **同桌**；想直达某个 tab，在它头部点 **固定到左栏**。
+* 打开 **插件 → 添加插件**，输入 `@dsh-sparrow/dsh-desk-one`，按安装 / 启用流程操作。
+* 或先在 **插件 → 实验性插件** 开启 **自定义插件索引**，再打开 **插件 → 发现**，添加索引源 `https://dsh.pyai.site/market/index.json`，搜索 **同桌** 并从卡片安装。
+* 安装后重启 DSH；只刷新浏览器不够，客户端 bundle 由宿主启动时读入。
 
 ## 使用
 

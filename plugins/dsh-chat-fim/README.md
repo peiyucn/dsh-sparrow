@@ -8,13 +8,11 @@ After a short typing pause, a suggestion card appears above the input — **Tab*
 
 ## Install
 
-```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim
-```
+Open **Plugins → Add plugin**, enter `@dsh-sparrow/dsh-chat-fim`, and enable it. Or use the shared market-index flow described in the [root README](../../README.md).
 
-Requires dsh 0.2.2-rc.3 — the exact official version line this release is built and verified against (newer lines, pre-releases in particular, are not covered) — and a working `pnpm` (`dsh plugin` forwards installation to pnpm).
+Requires DSH 0.2.2-rc.3 — the exact official version line this release is built and verified against (newer lines, pre-releases in particular, are not covered).
 
-> Do **not** run `npm install @dsh-sparrow/dsh-chat-fim` directly — that only downloads the package into a `node_modules` and does not register it in the DSH web profile. Install with the `dsh plugin` command above, then restart DSH.
+> Install through the DSH plugin manager. A raw npm install does not register the package in the DSH web profile; restart DSH after installing.
 
 ## Usage
 

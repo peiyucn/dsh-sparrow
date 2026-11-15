@@ -23,11 +23,9 @@ browser logins or installing the CodeBuddy CLI.
 
 ## Install
 
-```powershell
-dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits@latest
-```
+Open **Plugins → Add plugin**, enter `@dsh-sparrow/dsh-codebuddy-credits`, and enable it. Or use the shared market-index flow described in the [root README](../../README.md). Restart DSH afterwards.
 
-Restart DSH afterwards. For headless use, repeat with `--profile headless`.
+Install through the DSH plugin manager rather than a raw npm install: the package must be registered in the DSH web profile, not just downloaded into a `node_modules`.
 
 ## Get an API key
 

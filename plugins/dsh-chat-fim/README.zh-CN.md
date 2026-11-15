@@ -8,13 +8,11 @@
 
 ## 安装
 
-```bash
-dsh plugin --profile web add @dsh-sparrow/dsh-chat-fim
-```
+打开 **插件 → 添加插件**，输入 `@dsh-sparrow/dsh-chat-fim` 并启用。也可以走 [根 README](../../README.zh-CN.md) 里的共享市场索引流程。
 
-适配 dsh 0.2.2-rc.3（本版构建与验证所对齐的确切官方版本线；更新的版本线、尤其是预发布版本不在承诺范围内），并需要可用的 `pnpm`（`dsh plugin` 会把安装操作转发给 pnpm）。
+适配 DSH 0.2.2-rc.3（本版构建与验证所对齐的确切官方版本线；更新的版本线、尤其是预发布版本不在承诺范围内）。
 
-> **不要**直接执行 `npm install @dsh-sparrow/dsh-chat-fim`：那只会把包下载到某个 `node_modules`，不会注册进 DSH 的 web profile。请使用上面的 `dsh plugin` 命令安装，并在安装后重启 DSH。
+> 请通过 DSH 插件管理器安装。直接用 npm 安装不会注册进 DSH 的 web profile；安装后重启 DSH。
 
 ## 使用
 

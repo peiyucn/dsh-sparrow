@@ -21,11 +21,9 @@ CodeBuddy 提供积分对应的模型推理，工具、权限与上下文都由 
 
 ## 安装
 
-```powershell
-dsh plugin --profile web add @dsh-sparrow/dsh-codebuddy-credits@latest
-```
+打开 **插件 → 添加插件**，输入 `@dsh-sparrow/dsh-codebuddy-credits` 并启用。也可以走 [根 README](../../README.zh-CN.md) 里的共享市场索引流程；安装后重启 DSH。
 
-装完重启 DSH。headless 场景用 `--profile headless` 再装一次。
+请通过 DSH 插件管理器安装，不要直接 npm 安装：包必须注册进 DSH 的 web profile，而不只是下载到某个 `node_modules`。
 
 ## 获取 API Key
 
