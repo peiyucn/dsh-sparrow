@@ -69,20 +69,12 @@ export function useWallLayout(enabled: boolean, activeNotes: readonly DeskNote[]
     return () => { observer.disconnect() }
   }, [enabled])
 
-  const placed = useMemo<PlacedNote[]>(() => activeNotes.map((note, index) => {
-    // Legacy notes can carry a size smaller than the current minimum (the old 120px limit clipped
-    // the toolbar); clamp on render so the trash button stays inside every note.
-    const width = clamp(note.width ?? NOTE_DEFAULT_WIDTH, NOTE_MIN_WIDTH, NOTE_MAX_SIZE)
-    const height = clamp(note.height ?? NOTE_DEFAULT_HEIGHT, NOTE_MIN_HEIGHT, NOTE_MAX_SIZE)
-    const fallback = fallbackPosition(index)
-    const rawX = note.x ?? fallback.x
-    const rawY = note.y ?? fallback.y
-    // The wall is a vertically infinite canvas with a fixed width: X clamps to the visible
-    // width, Y only has a floor so notes can live below the viewport (the wall scrolls).
-    const x = wallSize.width === 0 ? rawX : clamp(rawX, 0, Math.max(0, wallSize.width - width))
-    const y = clamp(rawY, 0, NOTE_MAX_POSITION)
-    return { note, x, y, width, height, zIndex: note.z ?? index + 1 }
-  }), [activeNotes, wallSize.height, wallSize.width])
+  // One resolver for layout and tests: the hook must not keep a second copy of the clamping rules
+  // (the old inline copy had to be edited twice whenever the geometry changed).
+  const placed = useMemo<PlacedNote[]>(
+    () => activeNotes.map((note, index) => placeNote(note, index, wallSize)),
+    [activeNotes, wallSize.height, wallSize.width],
+  )
 
   return { wallRef, setWallRef, wallSize, placed }
 }
