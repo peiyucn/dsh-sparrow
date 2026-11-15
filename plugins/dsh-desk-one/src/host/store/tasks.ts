@@ -73,7 +73,13 @@ export class TaskRepository {
     try {
       const updated = await this.core.nodes.update(id, (current) => {
         if (current.kind !== 'task') throw new DeskModelError('UNKNOWN_TASK', `任务不存在：${id}`)
-        return this.reconcileTaskGroup(patchTaskRecord(current, patch, { expectedRevision, now }), patch)
+        const next = patchTaskRecord(current, patch, { expectedRevision, now })
+        // The board only archives Done cards; keep that invariant on the host surface too, because
+        // the agent tool and REST routes can bypass the Done-lane-only UI action.
+        if (next.archived && next.status !== 'done') {
+          throw new DeskModelError('INVALID_TASK', '只有完成列的任务才能存档')
+        }
+        return this.reconcileTaskGroup(next, patch)
       })
       if (updated.kind !== 'task') throw new DeskModelError('UNKNOWN_TASK', `任务不存在：${id}`)
       return updated

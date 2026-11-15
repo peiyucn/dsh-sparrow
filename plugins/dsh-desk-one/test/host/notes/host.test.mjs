@@ -200,10 +200,27 @@ describe('host 装配（apply 接线）', () => {
     assert.deepEqual(moved.json.task.sessionIds, ['session-c'])
     assert.equal(moved.json.task.revision, 2)
 
-    const archived = await callRoute(handler, {
+    const todoArchive = await callRoute(handler, {
       method: 'POST',
       url: ROUTES.taskUpdate,
       body: JSON.stringify({ id, expectedRevision: 2, patch: { archived: true } }),
+      headers: host,
+    })
+    assert.equal(todoArchive.status, 400, '只有完成列的任务才能存档')
+
+    const completed = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.taskUpdate,
+      body: JSON.stringify({ id, expectedRevision: 2, patch: { status: 'done' } }),
+      headers: host,
+    })
+    assert.equal(completed.status, 200)
+    assert.equal(completed.json.task.status, 'done')
+
+    const archived = await callRoute(handler, {
+      method: 'POST',
+      url: ROUTES.taskUpdate,
+      body: JSON.stringify({ id, expectedRevision: 3, patch: { archived: true } }),
       headers: host,
     })
     assert.equal(archived.status, 200)
@@ -392,6 +409,21 @@ describe('host 装配（apply 接线）', () => {
     })
     assert.equal(listed.json.tasks.length, 1)
     assert.equal(listed.json.tasks[0].title, '来自工具的任务')
+  })
+
+  it('desk_task_archive 工具 应该 拒绝未完成任务', async () => {
+    const { ctx, collected } = fakeHost()
+    await apply(ctx)
+    const addTool = collected.tools.find(tool => tool.name === 'desk_task_add')
+    const archiveTool = collected.tools.find(tool => tool.name === 'desk_task_archive')
+    assert.ok(addTool)
+    assert.ok(archiveTool)
+    const exec = { signal: AbortSignal.timeout(1_000) }
+    const created = JSON.parse(await addTool.execute({ title: '还没做完的任务' }, exec))
+    await assert.rejects(
+      () => archiveTool.execute({ id: created.task.id, expected_revision: created.task.revision }, exec),
+      /完成列/u,
+    )
   })
 })
 
