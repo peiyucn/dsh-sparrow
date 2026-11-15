@@ -2,7 +2,7 @@
 /**
  * 守卫：**活跃插件钉的官方 dsh 版本线必须只有一个真值，而且必须是精确版本**（兼容口径是精确匹配，不是范围）。
  * 跟版要同时改：插件 `package.json` 的 peer + devDependencies、`pnpm-workspace.yaml` 的 `overrides` 与
- * `minimumReleaseAgeExclude`、根与各活跃插件的 12 份 README 环境要求行 —— **漏任何一处测试都不会红**，
+ * `minimumReleaseAgeExclude`、根与各活跃插件的 README 环境要求行 —— **漏任何一处测试都不会红**，
  * 直到用户从插件管理器装包时被安装门拒掉。判据 1 单一真值 / 2 精确 / 3 周边一致 / 4 文档一致。
  * ⚠️ 已退役插件不在判据内（不跟版本线，名单取自 `plugin-set.mjs`）。退出码：0 = 一致；1 = 有不一致。
  */
@@ -181,7 +181,7 @@ if (violations.length > 0) {
   console.error('\n修法：')
   console.error('  · 跟版时把真值**一次性**改遍：plugins/*/package.json 的 peer + devDependencies')
   console.error('  · pnpm-workspace.yaml 的 overrides 闭包 + minimumReleaseAgeExclude → 再 pnpm install 重算 lockfile')
-  console.error('  · README 环境要求行（根 README 中英各 1 行 + 每个活跃插件中英各 1 行；当前 5 个插件 = 12 份文件）')
+  console.error(`  · README 环境要求行（根 README 中英各 1 行 + 每个活跃插件中英各 1 行；当前 ${plugins.length} 个插件 = ${readmes.length} 份文件）`)
   console.error('  · 已删除的退役插件不在仓库内；RETIRED_PLUGINS 名单保持为空')
   process.exit(1)
 }
