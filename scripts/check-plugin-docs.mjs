@@ -216,7 +216,9 @@ for (const { file, header, retired: retiredHeading } of ROOT_READMES) {
 for (const name of active) {
   const dir = `plugins/${name}`
 
-  // ── 判据 7：files 清单里点名的 .md 必须存在 ──
+  // ── 判据 7：files 清单与组合补丁必须能装出可挂载的包 ──
+  // npm pack 不会因为「patch 文件没进 files」报错：装到用户机器上的包缺 cordis.patch.yml 时，
+  // `dsh plugin add` 才在挂载阶段失败（此时包已发布，只能发补丁版）。故把这条做成 fail-closed。
   const pkgText = read(`${dir}/package.json`)
   let pkg = null
   if (pkgText === null) fail(`判据 7：读不到 ${dir}/package.json`)
@@ -227,6 +229,19 @@ for (const name of active) {
     for (const entry of pkg.files ?? []) {
       if (!/\.md$/u.test(entry)) continue
       if (!existsSync(join(repoRoot, dir, entry))) fail(`判据 7：${dir}/package.json 的 files 指向不存在的文档 ${entry}`)
+    }
+
+    const patch = pkg.dsh?.bundle?.patch
+    if (typeof patch !== 'string' || patch.trim() === '') {
+      fail(`判据 7：${dir}/package.json 缺少 dsh.bundle.patch（Loader 靠它自动挂载）`)
+    } else {
+      // 文件清单里可能写 `./cordis.patch.yml`，也可能省略 `./`；两种都算已收录。
+      const patchPath = patch.replace(/^\.\//u, '')
+      if (!existsSync(join(repoRoot, dir, patchPath))) {
+        fail(`判据 7：${dir}/package.json 的 dsh.bundle.patch 指向不存在的文件 ${patch}`)
+      } else if (!(pkg.files ?? []).some(entry => entry.replace(/^\.\//u, '') === patchPath)) {
+        fail(`判据 7：${dir}/package.json 的 files 清单没有收录组合补丁 ${patch}（装了也挂不上）`)
+      }
     }
   }
 
