@@ -6,10 +6,11 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 import {
-  Button, IconChevronLeftOutlineMedium, IconChevronRightOutlineRegular, IconListPenOutlineRegular,
+  Button, IconChevronLeftOutlineMedium, IconChevronRightOutlineRegular,
   IconSearchOutlineRegular, Input, Modal, SegmentedTabs, Tag,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { formatDateTime, formatKilobytes } from '../app/utils.js'
+import { DeskGlyph } from '../brand.js'
 import type { ReviewHistoryEntry } from '../../notebook-contract.js'
 import type { NotebookPageController, NotebookRow } from './hooks/useNotebookPage.js'
 
@@ -160,7 +161,7 @@ function WorkspaceFilesButton({ page }: { readonly page: NotebookPageController 
     >
       <span className="dsh-desk-notebook-filesbtn-text">
         {t('notebook.workspaceFilesLead')}
-        <span className="dsh-desk-notebook-filesbtn-icon" aria-hidden="true"><IconListPenOutlineRegular size={15} /></span>
+        <span className="dsh-desk-notebook-filesbtn-icon" aria-hidden="true"><DeskGlyph size={16} strokeWidth={2} /></span>
         {t('notebook.workspaceFilesTrail')}
       </span>
     </button>

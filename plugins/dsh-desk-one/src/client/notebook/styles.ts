@@ -414,8 +414,7 @@ button.dsh-desk-notebook-rowbody {
   display: inline-flex;
   flex: none;
   margin: 0 1px;
-  color: inherit;
-  opacity: 0.9;
+  color: var(--dsw-alias-state-business-primary, #4176e6);
 }
 .dsh-desk-notebook-filesbtn-icon svg {
   display: block;
