@@ -22,7 +22,7 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Repo guards (no local paths / dsh pin / plugin docs)
+      - name: Repo guards (root pnpm run check)
         run: pnpm run check
       - name: Typecheck all plugins
         run: pnpm run typecheck:all
@@ -42,7 +42,7 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Repo guards (no local paths / dsh pin / plugin docs)
+      - name: Repo guards (root pnpm run check)
         run: pnpm run check
       - name: Build all plugins (tsc → lib/ + client bundle)
         run: pnpm run build:all
@@ -62,7 +62,7 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Repo guards (no local paths / dsh pin / plugin docs)
+      - name: Repo guards (root pnpm run check)
         run: pnpm run check
       - name: Build all plugins (produce lib/ for tests)
         run: pnpm run build:all
@@ -91,7 +91,7 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Repo guards (no local paths / dsh pin / plugin docs)
+      - name: Repo guards (root pnpm run check)
         run: pnpm run check
       - name: Build all plugins (produce lib/ for pack)
         run: pnpm run build:all
