@@ -1,7 +1,7 @@
 /** Trash: directory resolution, listing, restore, and permanent deletion. Every path check guarantees the result
  *  stays under trashRoot. */
 
-import { mkdir, readdir, readFile, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, rm, rmdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -185,7 +185,18 @@ export async function restoreTrashDir(ctx: Context, surface: RegistryMutationSur
     // A missing directory can be ignored; other read errors surface from the subsequent rename.
   }
   if (targetDirExists) {
-    await rm(sidecar.originalPath, { recursive: true, force: false })
+    // `rmdir`, not a recursive `rm`: the emptiness check above must also hold at delete time, so a
+    // session directory that reappears in between fails the restore instead of losing data.
+    try {
+      await rmdir(sidecar.originalPath)
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException)?.code
+      if (code === 'ENOENT') {
+        // Already gone: the rename below recreates it.
+      } else {
+        throw new SessionsError('TARGET_EXISTS', '原始会话位置在还原过程中出现了新内容，拒绝覆盖还原')
+      }
+    }
   }
   await rename(trashDir, sidecar.originalPath)
   // The accounting sidecar lives in the trash directory, so the rename above carries it back into the session

@@ -636,6 +636,48 @@ describe('archive-manage host 路由：真实 handler 行为', () => {
       assert.equal(added[1].origin, 'subagent')
     })
 
+    it('还原：原始位置已有一个空目录 应该 先清掉再还原', async () => {
+      const layout = await makeLayout()
+      const rootTarget = join(layout.sessions, 'r-empty')
+      await mkdir(rootTarget, { recursive: true })
+      const h = await buildHarness({
+        headers: [header('r-empty')],
+        dirs: new Map(),
+        archivedIds: [],
+        titles: new Map(),
+        trashRoot: layout.trash,
+      })
+      await makeTrashEntry(layout, { trashId: 'entry-empty', sessionId: 'r-empty', originalPath: rootTarget })
+
+      const result = await post(h.route.handler, `${PREFIX}/restore`, { trashId: 'entry-empty' })
+
+      assert.equal(result.statusCode, 200, `还原应成功，实际 ${result.statusCode}：${JSON.stringify(result.body)}`)
+      assert.equal(existsSync(join(rootTarget, 'session.jsonl')), true, '会话日志应移回原处')
+    })
+
+    it('⛔ 还原：原始位置已有内容 应该 拒绝覆盖且两个目录都保持原样', async () => {
+      const layout = await makeLayout()
+      const rootTarget = join(layout.sessions, 'r-occupied')
+      await mkdir(rootTarget, { recursive: true })
+      await writeFile(join(rootTarget, 'keep.txt'), 'existing user data', 'utf8')
+      const h = await buildHarness({
+        headers: [header('r-occupied')],
+        dirs: new Map(),
+        archivedIds: [],
+        titles: new Map(),
+        trashRoot: layout.trash,
+      })
+      const trashDir = await makeTrashEntry(layout, { trashId: 'entry-occupied', sessionId: 'r-occupied', originalPath: rootTarget })
+
+      const result = await post(h.route.handler, `${PREFIX}/restore`, { trashId: 'entry-occupied' })
+
+      assert.equal(result.statusCode, 400, `应拒绝覆盖，实际 ${result.statusCode}：${JSON.stringify(result.body)}`)
+      assert.equal(result.body?.error?.code, 'TARGET_EXISTS')
+      assert.equal(existsSync(join(rootTarget, 'keep.txt')), true, '目标位置已有内容不得被删除')
+      assert.equal(existsSync(join(trashDir, 'session.jsonl')), true, '回收站条目应保持原样')
+    })
+
+
     it('彻底删除回收站条目 应该 同时失效父 + 子会话的投影行', async () => {
       const layout = await makeLayout()
       const deleted = []
