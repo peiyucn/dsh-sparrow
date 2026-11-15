@@ -7,15 +7,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DraftAnnotation, NotebookPageResponse, ReviewHistoryEntry } from '../../../../notebook-contract.js'
 import type { DiffBlockLabels, MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DeskTranslator } from '../../../app/types.js'
-import { messageOf } from '../../../app/utils.js'
+import { createLoadTickets, messageOf } from '../../../app/utils.js'
 import { HttpError } from '../../../http.js'
 import type { NotebookApi } from '../../api.js'
 import { lineChanges } from '../changes.js'
 import { pageText, sameReviewPage } from '../page.js'
+import { REVIEW_REFRESH_INTERVAL_MS, shouldRefreshOnShow } from '../refresh.js'
 import type { ReviewTarget } from '../types.js'
 
-/** Quiet-refresh interval while the tab is on screen. */
-const REFRESH_INTERVAL_MS = 60_000
 /** How long a transient notice stays on screen. */
 const NOTICE_MS = 4_000
 
@@ -65,9 +64,20 @@ export function useReviewDocument(input: {
   const revisionRef = useRef<number | undefined>(undefined)
   /** Draft-box writes run in edit order; concurrent PUTs must not reorder a delete and an add. */
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
+  /** Latest-request-wins tickets: a quiet poll or a manual refresh must not overwrite a newer read. */
+  const loadTickets = useRef(createLoadTickets())
+  const recordsTickets = useRef(createLoadTickets())
+  /** Loads in flight; a quiet tick skips instead of queueing behind a slow read. */
+  const inFlight = useRef(0)
+  /** Previous tab visibility, so returning on screen refreshes without waiting for the next tick. */
+  const visibleRef = useRef(tabVisible)
 
   const load = useCallback(async (silent = false): Promise<void> => {
     if (path === undefined || fileId === undefined) return
+    // A quiet tick must not pile up behind a slow read; the next tick runs after this one settles.
+    if (silent && inFlight.current > 0) return
+    const ticket = loadTickets.current.take()
+    inFlight.current += 1
     if (!silent) {
       setLoading(true)
       setError(null)
@@ -79,6 +89,9 @@ export function useReviewDocument(input: {
       const nextText = pageText(nextPage)
       const draft = await notebook.draft(fileId)
       const stored = await notebook.loadBaseline(sessionId)
+      // A previous read may still be in flight when a manual refresh starts; only the newest ticket
+      // may write state, otherwise the older response lands last and the diff jumps back.
+      if (!loadTickets.current.isLatest(ticket)) return
       setPage(current => current !== null && sameReviewPage(current, nextPage) ? current : nextPage)
       if (!silent) {
         revisionRef.current = draft?.revision ?? 0
@@ -96,16 +109,22 @@ export function useReviewDocument(input: {
         setBaselineAt(at)
         void notebook.saveBaseline({ sessionId, fileId, body: nextText, at })
           .then((saved) => {
+            if (!loadTickets.current.isLatest(ticket)) return
             if (saved.baseline === undefined) setNotice(t('review.baselineMemoryOnly'))
           })
           .catch((cause: unknown) => {
+            if (!loadTickets.current.isLatest(ticket)) return
             setNotice(t('review.baselineSaveFailed', { message: messageOf(cause) }))
           })
       }
     } catch (cause) {
+      if (!loadTickets.current.isLatest(ticket)) return
       if (!silent) setError(messageOf(cause))
     } finally {
-      if (!silent) setLoading(false)
+      inFlight.current = Math.max(0, inFlight.current - 1)
+      // Only the newest manual load owns the spinner. A silent load never turns it on, and a
+      // superseded manual load must not hide the spinner of the load that replaced it.
+      if (!silent && loadTickets.current.isLatest(ticket)) setLoading(false)
     }
   }, [fileId, notebook, path, sessionId, t])
 
@@ -113,16 +132,18 @@ export function useReviewDocument(input: {
 
   /** Records are per file: filter the submitted history by the tab's fileId (or its resolved path). */
   const loadRecords = useCallback(async (): Promise<void> => {
+    const ticket = recordsTickets.current.take()
     if (fileId === undefined) {
       setRecords([])
       return
     }
     try {
       const payload = await notebook.history()
+      if (!recordsTickets.current.isLatest(ticket)) return
       setRecords(payload.entries.filter(entry => entry.record.fileId === fileId
         || (path !== undefined && entry.resolvedPath === path)))
     } catch {
-      setRecords([])
+      if (recordsTickets.current.isLatest(ticket)) setRecords([])
     }
   }, [fileId, notebook, path])
 
@@ -132,16 +153,29 @@ export function useReviewDocument(input: {
   // hidden tabs / other panes, and the browser tab visibility alone does not cover that; the
   // official tab info's `visible` is the authoritative "foreground Session shows this tab" signal.
   useEffect(() => {
+    const wasVisible = visibleRef.current
+    visibleRef.current = tabVisible
     if (!tabVisible) return
-    const refresh = (): void => {
+    const refresh = (withRecords: boolean): void => {
       if (document.visibilityState !== 'visible') return
       void load(true)
-      void loadRecords()
+      // Submitted records only change on submit (which reloads them) or through another window;
+      // the 5 s tick exists for the document diff, so it must not re-read the whole history.
+      if (withRecords) void loadRecords()
     }
-    document.addEventListener('visibilitychange', refresh)
-    const timer = setInterval(refresh, REFRESH_INTERVAL_MS)
+    const onVisible = (): void => refresh(true)
+    const onTick = (): void => refresh(false)
+    // A kept-mounted tab is not remounted when it returns; without this immediate read the user
+    // waits for the next poll to see edits made while the tab was hidden.
+    if (shouldRefreshOnShow(wasVisible, tabVisible)) onVisible()
+    document.addEventListener('visibilitychange', onVisible)
+    // Returning from another application does not fire `visibilitychange`; a focused window is the
+    // same "the document may have changed while I was away" moment.
+    window.addEventListener('focus', onVisible)
+    const timer = setInterval(onTick, REVIEW_REFRESH_INTERVAL_MS)
     return () => {
-      document.removeEventListener('visibilitychange', refresh)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
       clearInterval(timer)
     }
   }, [load, loadRecords, tabVisible])
