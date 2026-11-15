@@ -12,6 +12,7 @@ import type {
 import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
 import type { DeskRouteEntry } from '../router.js'
 import type { DeskRouteContext } from '../router.js'
+import { renderOutlookCallbackPage } from './callback-page.js'
 
 function scheduleOf(route: DeskRouteContext) {
   if (route.schedule === undefined) {
@@ -98,9 +99,15 @@ async function outlookCallback(route: DeskRouteContext, req: IncomingMessage, re
   const result = params.get('error') === null
     ? await scheduleOf(route).completeOutlookLogin(params.get('code') ?? '', params.get('state') ?? '')
     : { ok: false, message: params.get('error_description') ?? params.get('error') ?? 'Microsoft 拒绝了登录' }
-  const title = result.ok ? 'Outlook 已连接' : 'Outlook 连接失败'
-  res.writeHead(result.ok ? 200 : 400, { 'content-type': 'text/html; charset=utf-8' })
-  res.end(`<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font-family:system-ui;padding:32px"><h2>${title}</h2><p>${result.message}</p><script>const ok=${result.ok};if(ok){if(window.opener){window.opener.postMessage({type:'desk-one-outlook',ok:true},'*')}setTimeout(function(){if(window.opener){window.close()}else{window.location.href='/'}},600)}</script></body>`)
+  // Escape + nonce CSP live in callback-page.ts: the message may be attacker-supplied.
+  const page = renderOutlookCallbackPage(result)
+  res.writeHead(result.ok ? 200 : 400, {
+    'content-type': 'text/html; charset=utf-8',
+    'content-security-policy': page.contentSecurityPolicy,
+    'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff',
+  })
+  res.end(page.body)
 }
 
 async function pollOutlookLogin(route: DeskRouteContext, req: IncomingMessage): Promise<OutlookLoginPollResponse> {

@@ -82,6 +82,14 @@
 | POST | `connections/save` | 保存连接（密码/链接进 `ctx.credentials`） |
 | POST | `connections/test` | 测试连接（保存前必须先过） |
 | POST | `connections/remove` | 断开连接 |
+| POST | `subscriptions/add` | 新增通用 ICS 订阅 |
+| POST | `subscriptions/remove` | 删除订阅 |
+| POST | `outlook/login/start` | 发起 Microsoft 登录（浏览器回调 + PKCE，设备码兜底） |
+| GET | `outlook/callback` | Microsoft OAuth 回调（见下方「唯一例外」） |
+| POST | `outlook/login/poll` | 轮询登录/设备码结果 |
+| POST | `outlook/disconnect` | 断开 Outlook Graph |
+
+**唯一例外（`outlook/callback`）**：这是 Microsoft 发起的顶层浏览器导航，不带插件的同源头（`Origin` / `Sec-Fetch-Site`），`host/router.ts` 的 `isLoopbackOauthCallback` 仅对该路径放行，靠一次性 `state` 校验防 CSRF。因此这一页自己不信任任何输入：标题与消息文本 HTML 转义、每个响应生成一个 CSP nonce 且只允许该 nonce 的脚本；它不向 `window.opener` 发 `postMessage`（面板靠轮询拿结果，消息没有监听方）。
 
 ## 5. 适配器与订阅
 
