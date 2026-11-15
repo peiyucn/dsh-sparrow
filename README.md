@@ -30,7 +30,7 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 ## Install
 
 * Open **Plugins → Add plugin**, enter `@dsh-sparrow/dsh-desk-one`, and follow the install / enable flow.
-* Or enable **Custom plugin index** under **Plugins → Experimental plugins**, open **Plugins → Discover**, add `https://dsh.pyai.site/market/index.json` as an index source, then search for **Desk One** and install it from the card.
+* Or enable **Custom plugin indexes** under **Plugins → Experimental plugins**, open **Plugins → Discover**, add `https://dsh.pyai.site/market/index.json` as an index source, then search for **Desk One** and install it from the card.
 * Restart DSH after installing; a browser refresh alone is not enough for the client bundle.
 
 ## Use
