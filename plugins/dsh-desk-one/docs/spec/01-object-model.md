@@ -314,22 +314,23 @@ interface DeskApi {
 | 工具 | 作用 | 风险 |
 | :--- | :--- | :--- |
 | `desk_note_add` / `desk_note_list` / `desk_note_update` / `desk_note_delete` | 便签：新建 / 查询 / 更新 / 永久删除 | 低 |
-| `desk_task_add` / `desk_task_list` / `desk_task_update` / `desk_task_complete` / `desk_task_archive` | 任务：新建 / 查询 / 更新（含状态与排序）/ 完成 / 存档或恢复 | 低 |
+| `desk_task_add` / `desk_task_list` / `desk_task_update` / `desk_task_complete` / `desk_task_archive` | 任务：新建 / 查询 / 更新（含状态与排序）/ 完成 / 存档或恢复（仅完成列可存档） | 低 |
 | `desk_group_add` / `desk_group_list` / `desk_group_update` / `desk_group_move` / `desk_group_archive` / `desk_group_delete` | 分组：新建 / 查询 / 改名排序 / 整组移动 / 存档或恢复 / 删除 | 中（移动、存档、删除会影响组内卡片） |
 | `desk_schedule_list` / `desk_schedule_sync` / `desk_schedule_connections` | 日程镜像查询 / 手动同步 / 连接状态（只读，不写回） | 低 |
-| `desk_page_list` | 笔记库只读检索：标题 / 路径 / 标签 / 缺元数据 / 空笔记；返回相对 root 的路径与元信息 | 低 |
+| `desk_page_list` | 笔记批注页只读检索（当前链接工作区）：标题 / 路径 / 标签 / 缺元数据 / 空笔记；返回相对 root 的路径与元信息 | 低 |
 
 * **一个工具一个动作**：工具名即意图（add / update / complete / move / archive / delete），不把语义不同的动作合并成通用 `save`；更新类工具要求显式 `expected_revision`。
 * **常驻可见（2026-11-14 决策）**：19 个工具保持每个请求全量可见，**不做** skill 激活式惰性加载。实测 wire schema 约 11.1k 字符（≈2.8–3.7k tokens/请求）；对比官方 `tool-office` 的「skill 加载后激活」模式，我们更重视发现性——用户随口说「记一下」时工具必须已经在上下文里；同时激活态会在 resume / fork / 热重载 / 子 agent 上引入额外状态机与「工具明明装了却不可见」的支持成本。工具面显著膨胀（>30 个）时再评估，届时候选是「只惰性化低频工具」而非全量。
-* **笔记页是文件系统对象**：`desk_page_list` 只做只读检索；正文读取与改稿仍用文件工具，Desk 工具不写笔记文件。
+* **笔记批注页是文件系统对象**：`desk_page_list` 只做只读检索；正文读取与改稿仍用文件工具，Desk 工具不写笔记文件。
 * 写工具返回结构化结果 + 一句人类可读摘要；跨外部源的写操作必须带确认。
 * 工具与界面共用同一 Store API，禁止绕过 Store 直接写文件。
 
 ### 随包操作指南 skill
 
 插件随包注册一个 `desk-one` skill（来源 `bundled`，模型与 `/` 用户命令都可见，默认开启、无配置开关），
-内容只讲工具描述装不下的部分：对象选择（便签 / 任务 / 工作区文件）、`list → id + revision → update` 顺序、
-归档/删除的连带影响、日程只读、批注由人操作。
+内容只讲工具描述装不下的部分：对象选择（便签 / 任务 / 笔记批注页）、`list → id + revision → update` 顺序、
+归档/删除的连带影响、日程只读、批注由人操作，以及「工作区由用户在面板顶栏链接 / 切换，`desk_page_list`
+只读检索当前链接工作区」这一边界。
 
 技能服务是可选依赖（`ctx.inject(['skills'], …)`）：宿主没有该服务时不注册、工具照常可用；禁止直接读
 `ctx.skills`（cordis 会抛错并让整只插件停用、全部路由 404）。

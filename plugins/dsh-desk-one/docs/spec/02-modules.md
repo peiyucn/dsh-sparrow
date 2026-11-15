@@ -107,7 +107,7 @@
 * agent 工具与界面读写同一批任务（工具建的任务出现在板上）。
 * 会话关联支持多对多；chip 的实时颜色随宿主会话状态变化；已归档 / 不可用会话以中性灰实线和提示降级，不丢失关联；宿主缺会话服务时卡片照常可用；旋转动画在 `prefers-reduced-motion: reduce` 下静止。
 
-**Agent 工具**：`desk_task_add`、`desk_task_list`、`desk_task_update`、`desk_task_complete`、`desk_task_archive`；分组：`desk_group_add`、`desk_group_list`、`desk_group_update`、`desk_group_move`、`desk_group_archive`、`desk_group_delete`。
+**Agent 工具**：`desk_task_add`、`desk_task_list`、`desk_task_update`、`desk_task_complete`、`desk_task_archive`（仅完成列可存档）；分组：`desk_group_add`、`desk_group_list`、`desk_group_update`、`desk_group_move`、`desk_group_archive`、`desk_group_delete`。
 
 ## 4. 日程 Schedule（S2 只读）
 

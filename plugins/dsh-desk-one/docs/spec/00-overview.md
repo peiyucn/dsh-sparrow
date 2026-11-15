@@ -54,7 +54,7 @@ src/
   model.ts model/{errors,fields,groups}.ts                         # 对象模型分层（model.ts 再导出）
   host/
     domain.ts gates.ts http.ts router.ts store.ts                  # 存储域 / 能力门 / HTTP 基础 / 前缀路由 / 存储门面
-    skill.ts skill-catalog.ts                                     # 随包 desk-one 指南 skill / 可选技能目录
+    skill.ts                                                     # 随包 desk-one 指南 skill
     store/{core,notes,tasks,groups,schedule,sessions,notebook,review}.ts   # 按领域拆的仓库；store.ts 只做转发
     tools/shared.ts                                               # 工具公共 helper（文本输出 / 错误包装）
     notes/{routes,tools}.ts                                       # 便签 host 半
