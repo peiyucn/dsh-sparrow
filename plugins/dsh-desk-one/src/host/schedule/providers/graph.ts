@@ -275,13 +275,15 @@ export function graphEventDraft(event: GraphEvent): EventDraft | undefined {
   const end = isoOf(event.end)
   if (start === undefined || end === undefined) return undefined
   const externalId = event.iCalUId ?? event.id
+  const organizer = organizerOf(event)
+  const attendees = attendeesOf(event)
   return {
     externalId,
     uid: externalId,
     title: event.subject?.trim() ?? '',
     ...(event.bodyPreview === undefined ? {} : { description: event.bodyPreview }),
-    ...(organizerOf(event) === undefined ? {} : { organizer: organizerOf(event) }),
-    ...(attendeesOf(event).length === 0 ? {} : { attendees: attendeesOf(event) }),
+    ...(organizer === undefined ? {} : { organizer }),
+    ...(attendees.length === 0 ? {} : { attendees }),
     ...(event.location?.displayName === undefined ? {} : { location: event.location.displayName }),
     start,
     end,
