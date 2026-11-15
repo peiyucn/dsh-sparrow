@@ -106,7 +106,7 @@ Desk One is the page above. These three tools are separate installs; use the sam
 
 ## Retired
 
-Retired plugins are removed from the source tree, and their npm packages are deleted as well:
+Retired plugins are removed from the source tree and no longer maintained:
 
 * `dsh-nav-pin` and `dsh-vision-bridge` — deleted 2026-10-27
 * `dsh-file-manage` — deleted 2026-10-31
