@@ -2,7 +2,7 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## [0.2.2-rc.3] - 2026-11-14
+## [0.2.2-rc.3] - 2026-11-15
 
 - Adapted to official dsh 0.2.2-rc.3 (web and desktop): official hover cards (workspace rows and session previews) now follow the theme's surface and label tokens through the official theme channel, so the selected tone keeps its colors on both themes; turn navigation keeps its wider 700px persistence. No other visual changes intended.
 

@@ -3,7 +3,7 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
-## [0.2.2-rc.3] - 2026-11-14
+## [0.2.2-rc.3] - 2026-11-15
 
 - The 🐦 dsh-sparrow brand line at the bottom of the credits panel is removed.
 - Sending an image to a model without image input now reports "model does not support image input" directly instead of only the upstream's generic parameter error; error messages carried inside the stream are surfaced as well.
