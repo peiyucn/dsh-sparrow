@@ -14,7 +14,7 @@ Requires DSH 0.2.2-rc.3 — the exact official version line this release is buil
 
 ## Usage
 
-Open **Settings → General** — a **Tone** row sits directly under the **Appearance** row. Light and dark each get four skins plus a **Default**:
+Open **Settings → General** — a **Tone** row sits directly under the **Appearance** row. Light and dark each get three skins plus a **Default**:
 
 | Appearance | Skins |
 | :--- | :--- |
