@@ -1,6 +1,6 @@
 # 同桌（Desk One）
 
-**插件包：** `@dsh-sparrow/dsh-desk-one`
+**dsh-sparrow** 是一个 DeepSeek Harness（DSH）插件合集，其中 **Desk One（同桌）** 是核心插件。
 
 [English](README.md) | 简体中文
 

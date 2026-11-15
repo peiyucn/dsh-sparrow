@@ -1,6 +1,6 @@
 # ✨ Desk One
 
-**Package:** `@dsh-sparrow/dsh-desk-one`
+**dsh-sparrow** is a collection of DeepSeek Harness (DSH) plugins; **Desk One** is the core plugin.
 
 [![Version](https://img.shields.io/github/package-json/v/peiyucn/dsh-sparrow?color=007ec6)](https://www.npmjs.com/org/dsh-sparrow) [![CI](https://img.shields.io/github/actions/workflow/status/peiyucn/dsh-sparrow/ci.yml?branch=main&label=ci)](https://github.com/peiyucn/dsh-sparrow/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/peiyucn/dsh-sparrow)](https://github.com/peiyucn/dsh-sparrow/blob/main/LICENSE)
 

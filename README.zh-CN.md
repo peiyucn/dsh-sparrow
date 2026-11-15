@@ -1,6 +1,6 @@
 # ✨ Desk One
 
-**插件包：** `@dsh-sparrow/dsh-desk-one`
+**dsh-sparrow** 是一个 DeepSeek Harness（DSH）插件合集，其中 **Desk One（同桌）** 是核心插件。
 
 [![Version](https://img.shields.io/github/package-json/v/peiyucn/dsh-sparrow?color=007ec6)](https://www.npmjs.com/org/dsh-sparrow) [![CI](https://img.shields.io/github/actions/workflow/status/peiyucn/dsh-sparrow/ci.yml?branch=main&label=ci)](https://github.com/peiyucn/dsh-sparrow/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/peiyucn/dsh-sparrow)](https://github.com/peiyucn/dsh-sparrow/blob/main/LICENSE)
 

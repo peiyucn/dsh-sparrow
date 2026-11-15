@@ -1,6 +1,6 @@
 # Desk One (同桌)
 
-**Package:** `@dsh-sparrow/dsh-desk-one`
+**dsh-sparrow** is a collection of DeepSeek Harness (DSH) plugins; **Desk One** is the core plugin.
 
 English | [简体中文](README.zh-CN.md)
 
