@@ -41,7 +41,7 @@ export const zh = {
   'state.loadFailed': '加载失败：{message}',
   'state.loading': '加载中…',
   'state.saveFailed': '保存失败：{message}',
-  'tab.notebook': '批注',
+  'tab.notebook': '笔记批注',
   'tab.notes': '便签墙',
   'tab.pin': '固定到左栏',
   'tab.schedule': '日程聚合',

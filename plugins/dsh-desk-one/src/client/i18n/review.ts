@@ -43,7 +43,7 @@ export const zh = {
   'review.submitDisabled': '暂无批注草稿',
   'review.submitFailed': '无法插入输入框（会话不可用）',
   'review.submitted': '已插入输入框，补充要求后发送',
-  'review.tabTitle': '批注',
+  'review.tabTitle': '笔记批注',
   'review.text': '文本',
   'review.unwrap': '不换行',
   'review.viewRender': 'Markdown',

@@ -15,6 +15,7 @@ export const NOTEBOOK_CSS = `
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  container-type: inline-size;
   padding: calc(var(--dsh-desk-header-h) + 16px) clamp(20px, 3vw, 40px) 16px;
 }
 .dsh-desk-notebook-error,
@@ -50,14 +51,6 @@ export const NOTEBOOK_CSS = `
 }
 
 
-/* --- toolbar ------------------------------------------------------------- */
-.dsh-desk-notebook-toolbar {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
 .dsh-desk-notebook-search {
   flex: 1 1 260px;
   min-width: 0;
@@ -76,13 +69,6 @@ export const NOTEBOOK_CSS = `
 }
 
 /* --- list: one card, internally scrolling rows, page footer -------------- */
-.dsh-desk-notebook-listwrap {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 6px;
-  min-height: 0;
-}
 
 .dsh-desk-notebook-card {
   box-sizing: border-box;
@@ -100,7 +86,7 @@ export const NOTEBOOK_CSS = `
   display: flex;
   flex: none;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   padding: 7px 10px;
   border-bottom: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
@@ -117,7 +103,7 @@ export const NOTEBOOK_CSS = `
   line-height: 16px;
 }
 .dsh-desk-notebook-cardhead-usage {
-  margin-left: auto;
+  margin-left: 0;
 }
 .dsh-desk-notebook-rows {
   display: flex;
@@ -383,57 +369,204 @@ button.dsh-desk-notebook-rowbody {
   .dsh-desk-notebook-tabs { flex: 1 1 100%; }
 }
 
-/* Linked-workspace bar + switcher: changing the workspace is one click, with no unlink step. */
-.dsh-desk-notebook-workspace {
-  position: relative;
+
+/* Vertical page: one content column; the official "workspace files" button sits right of the
+   search + filter strip (and right of the workspace heading on the unlinked home). */
+.dsh-desk-notebook-content {
   display: flex;
-  align-items: center;
-  flex: none;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: min(1100px, 100%);
+  min-height: 0;
+  margin: 0 auto;
 }
-.dsh-desk-notebook-workspacebtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.dsh-desk-notebook-toprow > .dsh-desk-session-section-head {
+  flex: 1 1 auto;
   min-width: 0;
-  padding: 4px 8px;
+}
+.dsh-desk-notebook-toprow {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.dsh-desk-notebook-toolbar-main {
+  display: flex;
+  flex: 1 1 320px;
+  align-items: center;
+  min-width: 0;
+  height: 32px;
   border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-radius: var(--dsw-radius-sm, 8px);
+  border-radius: var(--dsw-radius-md, 12px);
   background: var(--dsw-alias-bg-layer-1, #ffffff);
-  color: var(--dsw-alias-label-primary, #1f2329);
-  font: inherit;
+  overflow: hidden;
+}
+.dsh-desk-notebook-toolbar-main .dsh-desk-notebook-search {
+  flex: 1 1 auto;
+  min-width: 120px;
+  height: 30px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.dsh-desk-notebook-toolbar-divider {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  background: var(--dsw-alias-border-l1, #e2e5ea);
+}
+.dsh-desk-notebook-toolbar-main .dsh-desk-notebook-tabs {
+  flex: none;
+  height: 30px;
+  border-radius: 0;
+  background: transparent;
+}
+.dsh-desk-notebook-filesbtn {
+  flex: none;
+  height: auto;
+  min-height: 40px;
+  padding: 6px 14px;
+  gap: 10px;
+  border-radius: var(--dsw-radius-md, 12px);
+}
+.dsh-desk-notebook-filesbtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.dsh-desk-notebook-filesbtn-icon {
+  display: inline-flex;
+  flex: none;
+  color: #d7a64b;
+}
+.dsh-desk-notebook-filesbtn-icon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.dsh-desk-notebook-filesbtn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+}
+.dsh-desk-notebook-filesbtn-title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+}
+.dsh-desk-notebook-filesbtn-subtitle {
+  font-size: 11px;
+  line-height: 15px;
+  opacity: 0.72;
+}
+.dsh-desk-notebook-cardhead-spacer {
+  flex: 1 1 auto;
+}
+
+/* Unlinked home: the workspace picker is visible by default, not behind a first click. */
+.dsh-desk-notebook-home {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dsh-desk-notebook-homeempty {
+  margin: 0;
+  padding: 14px;
   font-size: 12px;
   line-height: 18px;
-  cursor: pointer;
-}
-.dsh-desk-notebook-workspacebtn:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
-}
-.dsh-desk-notebook-workspacetitle {
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
-.dsh-desk-notebook-workspacename {
+.dsh-desk-notebook-homelist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dsh-desk-notebook-homerow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  cursor: pointer;
+}
+.dsh-desk-notebook-homelist li:last-child .dsh-desk-notebook-homerow {
+  border-bottom: 0;
+}
+.dsh-desk-notebook-homerow:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+}
+.dsh-desk-notebook-homerow-title {
+  font-size: 13px;
   font-weight: 500;
+  line-height: 18px;
+}
+.dsh-desk-notebook-homerow-path {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
+.dsh-desk-notebook-homeactions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dsh-desk-notebook-homehints {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dsh-desk-notebook-homehints .dsh-desk-page-hint {
+  margin: 0;
+}
+
+/* Header workspace selector + menu. */
+.dsh-desk-notebook-workspaceselect {
+  position: relative;
+}
+.dsh-desk-notebook-workspacebtn {
+  max-width: 260px;
+}
+.dsh-desk-notebook-workspacelabel {
+  color: var(--dsw-alias-label-tertiary, #8a919f);
+}
+.dsh-desk-notebook-workspacename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
 }
 .dsh-desk-notebook-workspacecaret {
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
-.dsh-desk-notebook-switchmenu {
+.dsh-desk-notebook-workspacemenu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
-  z-index: 6;
-  min-width: 280px;
-  max-width: min(420px, 100%);
+  right: 0;
+  z-index: 30;
+  width: min(300px, calc(100vw - 64px));
+  max-height: 340px;
+  overflow-y: auto;
   padding: 6px;
   border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
   border-radius: var(--dsw-radius-md, 12px);
   background: var(--dsw-alias-bg-layer-1, #ffffff);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
 }
-.dsh-desk-notebook-switchitem {
+.dsh-desk-notebook-workspaceitem {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -447,17 +580,17 @@ button.dsh-desk-notebook-rowbody {
   color: var(--dsw-alias-label-primary, #1f2329);
   cursor: pointer;
 }
-.dsh-desk-notebook-switchitem:hover {
+.dsh-desk-notebook-workspaceitem:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
 }
-.dsh-desk-notebook-switchitem[data-current="true"] {
+.dsh-desk-notebook-workspaceitem[data-current='true'] {
   background: var(--dsw-alias-interactive-bg-active, rgba(0, 0, 0, 0.08));
 }
-.dsh-desk-notebook-switchtitle {
+.dsh-desk-notebook-workspaceitem-title {
   font-size: 13px;
   line-height: 18px;
 }
-.dsh-desk-notebook-switchpath {
+.dsh-desk-notebook-workspaceitem-path {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -465,18 +598,18 @@ button.dsh-desk-notebook-rowbody {
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
-.dsh-desk-notebook-switchnote {
+.dsh-desk-notebook-workspaceempty {
   margin: 4px 8px;
   font-size: 12px;
   line-height: 18px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
 }
-.dsh-desk-notebook-switchsep {
+.dsh-desk-notebook-workspacesep {
   height: 1px;
   margin: 6px 4px;
   background: var(--dsw-alias-border-l1, #e2e5ea);
 }
-.dsh-desk-notebook-switchaction {
+.dsh-desk-notebook-workspaceaction {
   display: block;
   width: 100%;
   padding: 6px 8px;
@@ -490,7 +623,22 @@ button.dsh-desk-notebook-rowbody {
   color: var(--dsw-alias-label-secondary, #6b7280);
   cursor: pointer;
 }
-.dsh-desk-notebook-switchaction:hover {
+.dsh-desk-notebook-workspaceaction:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+}
+
+
+/* Narrow panel: the files button drops below the joined strip / heading. */
+@container (max-width: 760px) {
+  .dsh-desk-notebook-toprow {
+    align-items: stretch;
+  }
+  .dsh-desk-notebook-toolbar-main {
+    flex: 1 1 100%;
+  }
+  .dsh-desk-notebook-filesbtn {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 `

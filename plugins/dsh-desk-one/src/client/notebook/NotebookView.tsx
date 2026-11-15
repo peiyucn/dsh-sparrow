@@ -1,8 +1,6 @@
 /**
- * Notebook page body: the linked-workspace bar (with the loose switcher), the list toolbar
- * (search + the four record views), the paginated list, and the unlinked offer. All state and
- * actions live in `useNotebookPage` (owned by the panel), because the header renders this page's
- * primary actions.
+ * Notebook page body: one vertical page with the search + four views joined into one strip, the
+ * official "workspace files" button on its right, and the paginated list below.
  */
 
 import { useState } from 'react'
@@ -11,8 +9,8 @@ import {
   Button, IconChevronLeftOutlineMedium, IconChevronRightOutlineRegular, IconSearchOutlineRegular,
   Input, Modal, SegmentedTabs, Tag,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { DeskTranslator } from '../app/types.js'
 import { formatDateTime, formatKilobytes } from '../app/utils.js'
+import { folderIcon } from '../app/icons.js'
 import type { ReviewHistoryEntry } from '../../notebook-contract.js'
 import type { NotebookPageController, NotebookRow } from './hooks/useNotebookPage.js'
 
@@ -106,7 +104,7 @@ function RecordDialog(props: {
   )
 }
 
-/** One compact row: title, path, facts, optional inline delete. */
+/** One compact list row: title, path, facts, optional inline delete. */
 function Row({ page, row, onOpen }: {
   readonly page: NotebookPageController
   readonly row: NotebookRow
@@ -151,99 +149,128 @@ function Row({ page, row, onOpen }: {
   )
 }
 
-/** Current workspace + the loose switcher popover: no unlink round-trip to change it. */
-function WorkspaceBar({ page }: { readonly page: NotebookPageController }): ReactElement {
+/** The official "workspace files" entry, styled as Desk One's white primary button. */
+function WorkspaceFilesButton({ page }: { readonly page: NotebookPageController }): ReactElement {
   const { t } = page
-  const currentName = page.workspace?.title ?? page.rootPath?.split(/[\\/]/u).pop() ?? ''
   return (
-    <div className="dsh-desk-notebook-workspace">
-      <button
-        type="button"
-        className="dsh-desk-notebook-workspacebtn"
-        aria-expanded={page.switching}
-        disabled={page.busy}
-        onClick={page.toggleSwitching}
-      >
-        <span className="dsh-desk-notebook-workspacelabel">{t('notebook.currentWorkspace')}</span>
-        <span className="dsh-desk-notebook-workspacename">{currentName}</span>
-        <span className="dsh-desk-notebook-workspacecaret" aria-hidden="true">▾</span>
-      </button>
-      {page.switching
-        ? (
-            <div className="dsh-desk-notebook-switchmenu">
-              {page.workspaces.length === 0
-                ? <p className="dsh-desk-notebook-switchnote">{t('notebook.noWorkspace')}</p>
-                : page.workspaces.map(item => (
+    <button
+      type="button"
+      className="dsh-desk-action dsh-desk-action-primary dsh-desk-notebook-filesbtn"
+      disabled={page.busy}
+      onClick={() => { void page.openFolder() }}
+    >
+      <span className="dsh-desk-notebook-filesbtn-icon" aria-hidden="true">{folderIcon}</span>
+      <span className="dsh-desk-notebook-filesbtn-text">
+        <span className="dsh-desk-notebook-filesbtn-title">{t('notebook.workspaceFiles')}</span>
+        <span className="dsh-desk-notebook-filesbtn-subtitle">{t('notebook.workspaceFilesHint')}</span>
+      </span>
+    </button>
+  )
+}
+
+/** Unlinked home: the workspace picker is shown by default, not behind a first click. */
+function HomeBody({ page }: { readonly page: NotebookPageController }): ReactElement {
+  const { t } = page
+  return (
+    <div className="dsh-desk-notebook-home">
+      <div className="dsh-desk-notebook-card">
+        {page.workspaces.length === 0
+          ? <p className="dsh-desk-notebook-homeempty">{t('notebook.noWorkspace')}</p>
+          : (
+              <ul className="dsh-desk-notebook-homelist">
+                {page.workspaces.map(item => (
+                  <li key={item.workspaceId}>
                     <button
-                      key={item.workspaceId}
                       type="button"
-                      className="dsh-desk-notebook-switchitem"
-                      data-current={item.workspaceId === page.workspace?.workspaceId}
-                      onClick={() => { void page.switchTo(item) }}
+                      className="dsh-desk-notebook-homerow"
+                      disabled={page.busy}
+                      onClick={() => { void page.chooseRoot(item.path) }}
                     >
-                      <span className="dsh-desk-notebook-switchtitle">{item.title}</span>
-                      <span className="dsh-desk-notebook-switchpath">{item.path}</span>
+                      <span className="dsh-desk-notebook-homerow-title">{item.title}</span>
+                      <span className="dsh-desk-notebook-homerow-path">{item.path}</span>
                     </button>
-                  ))}
-              <div className="dsh-desk-notebook-switchsep" aria-hidden="true" />
-              <button type="button" className="dsh-desk-notebook-switchaction" onClick={() => { void page.chooseFolder() }}>
-                {t('notebook.chooseFolder')}
-              </button>
-              <button type="button" className="dsh-desk-notebook-switchaction" onClick={() => { void page.pickNewWorkspace() }}>
-                {t('notebook.createWorkspace')}
-              </button>
-              <button type="button" className="dsh-desk-notebook-switchaction" onClick={() => { void page.forgetWorkspace() }}>
-                {t('notebook.forgetWorkspace')}
-              </button>
-            </div>
-          )
-        : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+      </div>
+      <div className="dsh-desk-notebook-homeactions">
+        <button
+          type="button"
+          className="dsh-desk-action dsh-desk-action-primary"
+          disabled={page.busy}
+          onClick={() => { void page.pickNewWorkspace() }}
+        >
+          {t('notebook.createWorkspace')}
+        </button>
+      </div>
+      <div className="dsh-desk-notebook-homehints">
+        <p className="dsh-desk-page-hint">{t('notebook.welcomeBody')}</p>
+        <p className="dsh-desk-page-hint">{t('notebook.workspaceHint')}</p>
+      </div>
     </div>
   )
 }
 
-/** Unlinked state: pick a registered workspace or create one; copy sits below the divider. */
-function Unlinked({ page }: { readonly page: NotebookPageController }): ReactElement {
+/** Linked list card: the head carries the count and the pager, the body the rows. */
+function ListCard({ page, onRecord }: {
+  readonly page: NotebookPageController
+  readonly onRecord: (record: ReviewHistoryEntry) => void
+}): ReactElement {
   const { t } = page
-  const hasWorkspaces = page.workspaces.length > 0
   return (
-    <div className="dsh-desk-notebook-center">
-      <div className="dsh-desk-notebook-centerinner">
-        <div className="dsh-desk-notebook-centeractions">
-          <Button
-            variant="primary"
-            size="md"
-            disabled={page.busy}
-            onClick={hasWorkspaces ? page.toggleChoosing : () => { void page.pickNewWorkspace() }}
-          >
-            {hasWorkspaces ? t('notebook.chooseWorkspace') : t('notebook.createWorkspace')}
-          </Button>
-          {hasWorkspaces
-            ? (
-                <Button variant="outline" size="md" disabled={page.busy} onClick={() => { void page.pickNewWorkspace() }}>
-                  {t('notebook.createWorkspace')}
-                </Button>
-              )
-            : null}
-        </div>
-        {page.choosing
+    <div className="dsh-desk-notebook-card">
+      <div className="dsh-desk-notebook-cardhead">
+        <span className="dsh-desk-notebook-cardhead-title">{page.summary}</span>
+        {page.summaryHint === null ? null : <span className="dsh-desk-notebook-cardhead-hint">{page.summaryHint}</span>}
+        <span className="dsh-desk-notebook-cardhead-spacer" />
+        {page.mode === 'history'
           ? (
-              <div className="dsh-desk-notebook-picker">
-                {page.workspaces.length === 0
-                  ? <p className="dsh-desk-notebook-centerhint">{t('notebook.noWorkspace')}</p>
-                  : page.workspaces.map(item => (
-                      <button key={item.workspaceId} type="button" className="dsh-desk-notebook-pickeritem" disabled={page.busy} onClick={() => { void page.chooseRoot(item.path) }}>
-                        <span className="dsh-desk-notebook-pickertitle">{item.title}</span>
-                        <span className="dsh-desk-notebook-rowpath">{item.path}</span>
-                      </button>
-                    ))}
-              </div>
+              <Tag tone={page.historyWarn ? 'danger' : 'neutral'} className="dsh-desk-notebook-cardhead-usage">
+                {t('notebook.historyUsage', { size: formatKilobytes(page.historyBytes) })}
+              </Tag>
             )
           : null}
-        <div className="dsh-desk-notebook-centerdivider" aria-hidden="true" />
-        <p className="dsh-desk-notebook-centerhint">{t('notebook.welcomeBody')}</p>
-        <p className="dsh-desk-notebook-centerhint">{t('notebook.workspaceHint')}</p>
+        {page.pages <= 1
+          ? null
+          : (
+              <span className="dsh-desk-notebook-pager">
+                <span className="dsh-desk-notebook-pagerstatus">
+                  {t('notebook.pagerStatus', { page: page.page, pages: page.pages })}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<IconChevronLeftOutlineMedium />}
+                  aria-label={t('notebook.pagerPrev')}
+                  disabled={page.page <= 1}
+                  onClick={() => page.setPage(page.page - 1)}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<IconChevronRightOutlineRegular />}
+                  aria-label={t('notebook.pagerNext')}
+                  disabled={page.page >= page.pages}
+                  onClick={() => page.setPage(page.page + 1)}
+                />
+              </span>
+            )}
       </div>
+      {page.rows.length === 0
+        ? <p className="dsh-desk-notebook-empty">{emptyText(page)}</p>
+        : (
+            <div className="dsh-desk-notebook-rows">
+              {page.rows.map(row => (
+                <Row
+                  key={row.key}
+                  page={page}
+                  row={row}
+                  {...row.record === undefined ? {} : { onOpen: () => { if (row.record !== undefined) onRecord(row.record) } }}
+                />
+              ))}
+            </div>
+          )}
     </div>
   )
 }
@@ -252,100 +279,56 @@ function Unlinked({ page }: { readonly page: NotebookPageController }): ReactEle
 export function NotebookView({ page }: { readonly page: NotebookPageController }): ReactElement {
   const { t } = page
   const [record, setRecord] = useState<ReviewHistoryEntry | null>(null)
+  const linked = page.rootPath !== undefined
   return (
     <div className="dsh-desk-notebookview">
       {page.error === null ? null : <p className="dsh-desk-notebook-error">{t('state.loadFailed', { message: page.error })}</p>}
       {page.notice === null ? null : <p className="dsh-desk-notebook-notice">{page.notice}</p>}
       {!page.ready
         ? <div className="dsh-desk-notebook-center"><p className="dsh-desk-notebook-hint">{t('state.loading')}</p></div>
-        : page.rootPath === undefined
-          ? <Unlinked page={page} />
-          : (
-              <div className="dsh-desk-notebook-column">
-                <WorkspaceBar page={page} />
-                <div className="dsh-desk-notebook-toolbar">
-                  <Input
-                    className="dsh-desk-notebook-search"
-                    icon={<IconSearchOutlineRegular />}
-                    value={page.query}
-                    placeholder={t('notebook.searchPlaceholder')}
-                    onChange={event => page.setQuery(event.target.value)}
-                  />
-                  <SegmentedTabs
-                    className="dsh-desk-notebook-tabs"
-                    size="sm"
-                    label={t('notebook.panelLabel')}
-                    value={page.mode}
-                    onChange={page.setMode}
-                    items={[
-                      { value: 'recent', label: t('notebook.viewRecent'), id: 'desk-notebook-tab-recent', panelId: 'desk-notebook-panel' },
-                      { value: 'drafts', label: t('notebook.viewDrafts', { count: page.state?.draftCount ?? 0 }), id: 'desk-notebook-tab-drafts', panelId: 'desk-notebook-panel' },
-                      { value: 'history', label: t('notebook.viewHistory', { count: page.state?.historyCount ?? 0 }), id: 'desk-notebook-tab-history', panelId: 'desk-notebook-panel' },
-                      { value: 'missing', label: t('notebook.viewMissing', { count: page.state?.stats.missingFrontmatter ?? 0 }), id: 'desk-notebook-tab-missing', panelId: 'desk-notebook-panel' },
-                    ] as const}
-                  />
-                </div>
-
-                <div className="dsh-desk-notebook-listwrap">
-                  <div className="dsh-desk-notebook-card">
-                    <div className="dsh-desk-notebook-cardhead">
-                      <span className="dsh-desk-notebook-cardhead-title">{page.summary}</span>
-                      {page.summaryHint === null ? null : <span className="dsh-desk-notebook-cardhead-hint">{page.summaryHint}</span>}
-                      {page.mode === 'history'
-                        ? (
-                            <Tag tone={page.historyWarn ? 'danger' : 'neutral'} className="dsh-desk-notebook-cardhead-usage">
-                              {t('notebook.historyUsage', { size: formatKilobytes(page.historyBytes) })}
-                            </Tag>
-                          )
-                        : null}
-                    </div>
-                    {page.rows.length === 0
-                      ? <p className="dsh-desk-notebook-empty">{emptyText(page)}</p>
-                      : (
-                          <div className="dsh-desk-notebook-rows">
-                            {page.rows.map(row => (
-                              <Row
-                                key={row.key}
-                                page={page}
-                                row={row}
-                                {...row.record === undefined ? {} : { onOpen: () => setRecord(row.record ?? null) }}
-                              />
-                            ))}
-                          </div>
-                        )}
-                  </div>
-                  {page.pages <= 1
-                    ? null
-                    : (
-                        <div className="dsh-desk-notebook-pager">
-                          <span className="dsh-desk-notebook-pagerstatus">
-                            {t('notebook.pagerStatus', { page: page.page, pages: page.pages })}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            icon={<IconChevronLeftOutlineMedium />}
-                            aria-label={t('notebook.pagerPrev')}
-                            disabled={page.page <= 1}
-                            onClick={() => page.setPage(page.page - 1)}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            icon={<IconChevronRightOutlineRegular />}
-                            aria-label={t('notebook.pagerNext')}
-                            disabled={page.page >= page.pages}
-                            onClick={() => page.setPage(page.page + 1)}
-                          />
-                        </div>
-                      )}
-                </div>
+        : (
+            <div className="dsh-desk-notebook-content">
+              <div className="dsh-desk-notebook-toprow">
+                {linked
+                  ? (
+                      <div className="dsh-desk-notebook-toolbar-main">
+                        <Input
+                          className="dsh-desk-notebook-search"
+                          icon={<IconSearchOutlineRegular />}
+                          value={page.query}
+                          placeholder={t('notebook.searchPlaceholder')}
+                          onChange={event => page.setQuery(event.target.value)}
+                        />
+                        <span className="dsh-desk-notebook-toolbar-divider" aria-hidden="true" />
+                        <SegmentedTabs
+                          className="dsh-desk-notebook-tabs"
+                          size="sm"
+                          label={t('notebook.panelLabel')}
+                          value={page.mode}
+                          onChange={page.setMode}
+                          items={[
+                            { value: 'recent', label: t('notebook.viewRecent'), id: 'desk-notebook-tab-recent', panelId: 'desk-notebook-panel' },
+                            { value: 'drafts', label: t('notebook.viewDrafts', { count: page.state?.draftCount ?? 0 }), id: 'desk-notebook-tab-drafts', panelId: 'desk-notebook-panel' },
+                            { value: 'history', label: t('notebook.viewHistory', { count: page.state?.historyCount ?? 0 }), id: 'desk-notebook-tab-history', panelId: 'desk-notebook-panel' },
+                            { value: 'missing', label: t('notebook.viewMissing', { count: page.state?.stats.missingFrontmatter ?? 0 }), id: 'desk-notebook-tab-missing', panelId: 'desk-notebook-panel' },
+                          ] as const}
+                        />
+                      </div>
+                    )
+                  : (
+                      <header className="dsh-desk-session-section-head">
+                        <h2 className="dsh-desk-session-section-title">{t('notebook.chooseWorkspace')}</h2>
+                        <span className="dsh-desk-session-section-count">{page.workspaces.length}</span>
+                      </header>
+                    )}
+                <WorkspaceFilesButton page={page} />
               </div>
-            )}
+              {linked
+                ? <ListCard page={page} onRecord={setRecord} />
+                : <HomeBody page={page} />}
+            </div>
+          )}
       <RecordDialog page={page} record={record} onClose={() => setRecord(null)} />
     </div>
   )
 }
-
-/** Keep the translator type referenced for documentation. */
-export type { DeskTranslator }

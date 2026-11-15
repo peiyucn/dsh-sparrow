@@ -34,8 +34,6 @@ export interface NotebookPageController {
   readonly error: string | null
   readonly notice: string | null
   readonly busy: boolean
-  readonly choosing: boolean
-  readonly browserOpen: 'pending' | 'opened' | 'failed' | null
   readonly mode: NotebookMode
   readonly query: string
   readonly searching: boolean
@@ -54,20 +52,12 @@ export interface NotebookPageController {
   readonly reload: () => Promise<void>
   /** True once the first state fetch settled; the page must not flash the unlinked offer before it. */
   readonly ready: boolean
-  readonly openBrowser: () => Promise<void>
-  /** Inline workspace picker (unlinked state). */
-  readonly toggleChoosing: () => void
+  /** Open the official workspace files page (the right-column card). */
+  readonly openFolder: () => Promise<void>
   readonly chooseRoot: (path: string) => Promise<void>
   readonly pickNewWorkspace: () => Promise<void>
-  /** Link an arbitrary folder inside a registered workspace (the old library was often a subfolder). */
-  readonly chooseFolder: () => Promise<void>
-  /** Switch the linked workspace without unlinking first (the "loose" link). */
+  /** Switch the linked workspace without unlinking first (header selector). */
   readonly switchTo: (workspace: WorkspacePathView) => Promise<void>
-  /** Clear the linked workspace (still reachable from the switcher menu). */
-  readonly forgetWorkspace: () => Promise<void>
-  /** Switcher popover state in the page's workspace bar. */
-  readonly switching: boolean
-  readonly toggleSwitching: () => void
   readonly setMode: (mode: NotebookMode) => void
   readonly setQuery: (query: string) => void
   readonly setPage: (page: number) => void
