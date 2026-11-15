@@ -13,7 +13,7 @@ DeepSeek Harness（DSH）Web 插件小合集。每个插件独立 npm 包、独�
 * `plugins/dsh-desk-one` — 办公桌（Desk One）：一个侧栏面板 + 标签页（便签墙 / 任务板 / 笔记批注 / 日程聚合 / 会话管理），统一对象模型；日程只读聚合企业微信 / iCloud CalDAV、Outlook 个人（Microsoft Graph）与公开 ICS 订阅，会话页含归档与回收站管理；无总览页（S3 未做）
 * **口径：四个活跃插件 + 0 个已退役**（四个退役插件已于 2026-10-27、2026-10-31 与 2026-11-15 彻底删除）
 * 活跃插件名单的单一真值是 `scripts/plugin-set.mjs`（`RETIRED_PLUGINS` 为空名单，保留结构供守卫复用）
-* 退役包 npm 状态（2026-11-15）：`dsh-nav-pin` / `dsh-vision-bridge` 已从 npm 移除；`dsh-file-manage` 已 deprecate；`dsh-archive-manage` 仍在 npm，待 owner deprecate（E23）
+* 退役包 npm 状态（2026-11-15，owner 执行）：`dsh-nav-pin` / `dsh-vision-bridge` / `dsh-archive-manage` 已从 npm 移除；`dsh-file-manage` 已 deprecate（E23）
 
 ## 文档规范
 
