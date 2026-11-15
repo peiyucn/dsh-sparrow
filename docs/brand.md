@@ -87,13 +87,13 @@
 | --- | --- | --- |
 | 仓库 description | `Desk One (同桌) — one desk for you and harness. Notes, tasks, read-only calendar and AI-written notebook review in one DSH panel; plus three small tools.` | agent（`gh api`，已上线） |
 | Website | `https://dsh.pyai.site` | agent |
-| Topics | `desk-one` `dsh` `dsh-plugin` `deepseek-harness` `notes` `tasks` `calendar` `plugin` | agent |
+| Topics | `desk-one` `dsh` `dsh-plugin` `deepseek-harness` `notes` `tasks` `calendar` `plugin` `annotations` | agent |
 | Social preview | M3，1280×640 | **owner（网页上传）** |
 | 根 README | Desk One 产品区 + 三件小工具表格 + 徽章 | agent |
 | Issue 模板 | feature request（接「许个愿」）/ bug report | agent |
 | 个人主页 pin | 置顶 dsh-sparrow | **owner** |
 
-> `dsh-plugin` 是 DSH 官方推荐 topic，必须保留。2026-11-15 审计曾按本表旧列表覆盖 GitHub topics 时误删，已恢复；后续改 topics 必须把它带上。
+> `annotations`（笔记批注）与 `dsh-plugin`（DSH 官方推荐）均为必须保留的 topic。2026-11-15 审计曾按本表旧列表覆盖 GitHub topics 时误删 `dsh-plugin`，已恢复；后续改 topics 必须把这两项一起带上。
 
 ## 4 市场站与 npm
 
