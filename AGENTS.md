@@ -263,7 +263,7 @@ owner 保留 fast-forward 直推能力。公开仓库的外部 PR 与 Issue 一�
 * `publish.yml`（push `<插件名>-vX.Y.Z` tag 或 workflow_dispatch 指定插件）：解析插件 / 校验版本 / **跑根 `pnpm run check`（守卫 fail-closed，守卫红则不发）** / verify 后 `npm publish`；同文件含 promote 手动任务（`npm dist-tag add`；三个输入缺任一即**非零退出**，不静默成功）；publish job 挂 `environment: npm-publish`，**无 release-control**；publish 权限 `contents: read` + `id-token: write`（不建 Release），OIDC 步骤显式清空 setup-node 占位 `NODE_AUTH_TOKEN`；**tag 发布前校验 tag 提交在 `main` 上**（不在即中止，E19）；**promote 的 `dist-tag` 只允许 `latest` / `next`**（其它值非零退出）
 * `publish.yml` 的 E18 门禁：用 `npm-publish` 环境级只读 `SECURITY_ALERTS_TOKEN`（fine-grained PAT：Dependabot / Code scanning / Secret scanning 三项 read，限本仓库）；`GITHUB_TOKEN` 读不到 secret scanning 告警，不能当门禁凭据；查询失败同样中止发布
 * `market.yml`（`Publish` 成功后 / `main` 上 `market/**` 变动 / 每日 03:47 UTC / 手动）：见《插件市场索引》
-* 鉴权双模式：有 `NPM_TOKEN` 走 Automation token（首发必需），无则走 npm Trusted Publishing（OIDC）
+* 鉴权双模式：有 `NPM_TOKEN` 走 Automation token（首发必需），无则走 npm Trusted Publishing（OIDC）；promote 同口径——OIDC 搬 dist-tag 需各包 trusted publisher 勾选 `Allow npm dist-tag`（npm CLI ≥ 11.21，workflow 内显式升级）
 
 ### CI 环节名称（根规范 E24）
 
@@ -446,4 +446,4 @@ git 与 agent 宿主进程均不读取系统代理。需要走代理时须显式
 * **流程**：改动 push dev + 插件 verify → 版本号 + CHANGELOG 双份 → 再 verify + `git diff --check` → dev→main（ff）并 push → `git tag -a <插件名>-vX.Y.Z -F <说明文件>`（说明用 `node scripts/tag-notes.mjs <插件名> <版本号>` 生成；Windows 先输出到文件再 `-F`）→ **逐个** push tag → `gh run watch` 盯 success + `npm view` 复核版本与 dist-tag → 切回 dev。**版本号编辑只动该插件自己的 `package.json`**
 * **tag 兜底**：GitHub 的 push 事件**一次推超过三个 tag 时不生成事件**——tag **逐个推**（或每批 ≤3 个），推完 30 秒内查 Publish run，没有就 `gh workflow run publish.yml -f plugin=<插件名>` 手动派发（本仓库不建 GitHub Release）
 * **红线**：已发布版本 / tag 不可覆盖、不可挪动，同版本重发 E403；错误只能发新版本 + deprecate 坏版本；tag 版本必须等于 `package.json` version；tag 提交必须在 `main` 上；promote 目标只能是 `latest` / `next`；`secrets` 不能出现在 step 的 `if`（经 job 级 env 中转）；`--provenance` 要求声明 `repository`
-* **发布后收尾（每个包各配一次）**：npm 包 Settings → Access → Trusted Publishing → Add Trusted Publisher → GitHub Actions，填 Organization `peiyucn`、Repository `dsh-sparrow`、Workflow `publish.yml`（只填文件名）、Environment `npm-publish`（须与 publish job 的 environment 一致）；Allowed actions 勾 `Allow npm publish`；配完删 `NPM_TOKEN` secret 并 revoke 旧 token。**新包首发例外**：包不存在时 OIDC 无法预配——首发走 Automation token（临时放 `npm-publish` 环境 secret，发完即配 OIDC 并删 token），或由 owner 本机首发后立即补配；守卫的「首次发布例外」（见《插件市场索引》判据 ①）保证首发前根 `check` 不会被索引缺席挡住
+* **发布后收尾（每个包各配一次）**：npm 包 Settings → Access → Trusted Publishing → Add Trusted Publisher → GitHub Actions，填 Organization `peiyucn`、Repository `dsh-sparrow`、Workflow `publish.yml`（只填文件名）、Environment `npm-publish`（须与 publish job 的 environment 一致）；Allowed actions 勾 `Allow npm publish`（要用 workflow 搬 dist-tag 则再勾 `Allow npm dist-tag`）；配完删 `NPM_TOKEN` secret 并 revoke 旧 token。**新包首发例外**：包不存在时 OIDC 无法预配——首发走 Automation token（临时放 `npm-publish` 环境 secret，发完即配 OIDC 并删 token），或由 owner 本机首发后立即补配；守卫的「首次发布例外」（见《插件市场索引》判据 ①）保证首发前根 `check` 不会被索引缺席挡住
