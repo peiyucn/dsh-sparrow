@@ -73,6 +73,16 @@
       },
       "versions": [
         {
+          "version": "0.2.2-rc.3",
+          "publishTimestamp": 1794757970,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.2-rc.3"
+          }
+        },
+        {
           "version": "0.2.2-rc.1",
           "publishTimestamp": 1793861961,
           "source": {
@@ -235,6 +245,16 @@
       },
       "versions": [
         {
+          "version": "0.2.2-rc.3",
+          "publishTimestamp": 1794757979,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.2-rc.3"
+          }
+        },
+        {
           "version": "0.2.2-rc.1",
           "publishTimestamp": 1793862057,
           "source": {
@@ -377,6 +397,53 @@
       ]
     },
     {
+      "name": "@dsh-sparrow/dsh-desk-one",
+      "title": {
+        "en": "Desk One",
+        "zh": "同桌"
+      },
+      "description": {
+        "en": "Desk One — a shared desk for you and your DSH harness: notes, tasks, a read-only calendar and annotations on workspace files in one panel.",
+        "zh": "同桌（Desk One）：和 DSH 共用的一张办公桌——便签、任务、只读日程，以及 AI 写、你审的笔记，都在一个面板里"
+      },
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiI+CiAgPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSIxMTIiIGZpbGw9IiMxNzE4MUMiLz4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg1My40NCA1My40NCkgc2NhbGUoMTYuODgpIj4KICAgIDxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGRkZGRiIgc3Ryb2tlLXdpZHRoPSIxLjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+CiAgICAgIDxwYXRoIGQ9Ik0yLjYgMTZWMi42SDkiLz4KICAgICAgPHBhdGggZD0iTTIxLjQgOFYyMS40SDE1Ii8+CiAgICA8L2c+CiAgICA8cGF0aCBmaWxsPSIjRkZGRkZGIiBkPSJNMTIgNC40QzEyLjU1IDkuMiAxNC44IDExLjQ1IDE5LjYgMTJDMTQuOCAxMi41NSAxMi41NSAxNC44IDEyIDE5LjZDMTEuNDUgMTQuOCA5LjIgMTIuNTUgNC40IDEyQzkuMiAxMS40NSAxMS40NSA5LjIgMTIgNC40WiIvPgogIDwvZz4KPC9zdmc+Cg==",
+      "author": "peiyucn",
+      "homepage": "https://dsh.pyai.site",
+      "repository": {
+        "url": "https://github.com/peiyucn/dsh-sparrow",
+        "directory": "plugins/dsh-desk-one"
+      },
+      "metadata": {
+        "keywords": [
+          "deepseek-harness",
+          "dsh",
+          "desk",
+          "notes",
+          "calendar",
+          "todo",
+          "cordis",
+          "plugin"
+        ],
+        "labels": [
+          "ui",
+          "fs-write"
+        ],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.2.2-rc.3",
+          "publishTimestamp": 1794757786,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.2-rc.3"
+          }
+        }
+      ]
+    },
+    {
       "name": "@dsh-sparrow/dsh-theme-tone",
       "description": {
         "en": "Tone skins for the official light and dark themes: token colors, ground light, and liquid glass on the conversation header, composer and right sidebar",
@@ -403,6 +470,16 @@
         "sortKeys": {}
       },
       "versions": [
+        {
+          "version": "0.2.2-rc.3",
+          "publishTimestamp": 1794757886,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.2-rc.3"
+          }
+        },
         {
           "version": "0.2.2-rc.1",
           "publishTimestamp": 1793862014,
