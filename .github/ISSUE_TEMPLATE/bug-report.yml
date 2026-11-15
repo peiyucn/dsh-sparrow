@@ -15,7 +15,6 @@ body:
         - dsh-chat-fim
         - dsh-codebuddy-credits
         - dsh-theme-tone
-        - dsh-archive-manage
         - Not sure
     validations:
       required: true
