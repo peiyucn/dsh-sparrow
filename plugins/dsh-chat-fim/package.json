@@ -8,6 +8,16 @@
     "url": "git+https://github.com/peiyucn/dsh-sparrow.git",
     "directory": "plugins/dsh-chat-fim"
   },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "fim",
+    "autocomplete",
+    "suggestion",
+    "chat-input",
+    "cordis",
+    "plugin"
+  ],
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -70,5 +80,11 @@
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.1",
     "react": "^18.2.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=24.9.0"
   }
 }
