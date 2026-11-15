@@ -150,13 +150,17 @@ for (const { file, header, retired: retiredHeading } of ROOT_READMES) {
   if (body === null) { fail(`判据 1：${file} 里找不到插件表（表头不匹配）`); continue }
   const listed = tablePlugins(body)
 
+  // The root README is the Desk One product page: Desk One is the page itself, and the table at the
+  // end only introduces the companion plugins. Keep requiring every other active plugin there.
+  const requiredInTable = active.filter(name => name !== 'dsh-desk-one')
   for (const name of retired) {
     if (listed.has(name)) {
       fail(`判据 1：${file} 的插件表里列着**已退役**的 ${name}（退役插件只能出现在《Retired / 已退役》小节）`)
     }
   }
-  for (const name of active) if (!listed.has(name)) fail(`判据 1：${file} 的插件表缺少活跃插件 ${name}`)
+  for (const name of requiredInTable) if (!listed.has(name)) fail(`判据 1：${file} 的插件表缺少活跃插件 ${name}`)
   for (const name of listed) if (!active.includes(name)) fail(`判据 1：${file} 的插件表里有未知名字 ${name}`)
+  if (!text.includes('plugins/dsh-desk-one/README')) fail(`判据 1：${file} 没有指向 Desk One 文档页`)
 
   const retiredBody = section(text, retiredHeading)
   if (retiredBody === null) { fail(`判据 2：${file} 里找不到《Retired / 已退役》小节`); continue }
