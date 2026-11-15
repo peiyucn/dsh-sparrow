@@ -44,7 +44,6 @@ const NAMED_ENTITIES: Record<string, string> = {
 }
 
 const CDATA_RE = /<!\[CDATA\[([\s\S]*?)\]\]>/g
-const COMMENT_RE = /<!--[\s\S]*?-->/g
 
 /** Extract every top-level `<response>` of a multistatus document. */
 export function parseMultistatus(xml: string): ParsedResponse[] {
@@ -130,8 +129,54 @@ function findElement(source: string, localName: string): ElementSpan | null {
   return findElements(source, localName)[0] ?? null
 }
 
+/**
+ * Remove XML comments without a single multi-character regex replace.
+ *
+ * A nested / malformed `<!--` can survive one replace, and CodeQL's
+ * `js/incomplete-multi-character-sanitization` correctly flags that shape as an HTML-injection
+ * risk. The scanner appends only slices outside comment bodies, so the result never contains a
+ * `<!--` opener; an unclosed comment is dropped to the end instead of leaking its contents.
+ */
 function stripComments(xml: string): string {
-  return xml.replace(COMMENT_RE, '')
+  let out = ''
+  let index = 0
+  while (index < xml.length) {
+    const start = xml.indexOf('<!--', index)
+    if (start === -1) {
+      out += xml.slice(index)
+      break
+    }
+    out += xml.slice(index, start)
+    const end = xml.indexOf('-->', start + 4)
+    if (end === -1) break
+    index = end + 3
+  }
+  return out
+}
+
+/**
+ * Strip XML tags by scanning for `<` and its closing `>`.
+ *
+ * A regex that only matches `<[^>]*>` leaves an unclosed `<script` fragment in the text, which
+ * CodeQL flags as incomplete sanitization. This scanner appends only text before `<` and drops an
+ * unclosed fragment to the end, so raw markup can never survive. Entity-decoded `<` is data and is
+ * decoded after this step, matching the previous `textOf` semantics.
+ */
+function stripTags(text: string): string {
+  let out = ''
+  let index = 0
+  while (index < text.length) {
+    const start = text.indexOf('<', index)
+    if (start === -1) {
+      out += text.slice(index)
+      break
+    }
+    out += text.slice(index, start)
+    const end = text.indexOf('>', start + 1)
+    if (end === -1) break
+    index = end + 1
+  }
+  return out
 }
 
 /** Strip markup, decode entities and trim. CDATA content is kept byte-for-byte (no entity decoding). */
@@ -142,7 +187,7 @@ function textOf(raw: string): string {
     cdata.push(content)
     return `\u0000${cdata.length - 1}\u0000`
   })
-  text = text.replace(/<[^>]*>/g, '')
+  text = stripTags(text)
   text = decodeEntities(text)
   text = text.replace(/\u0000(\d+)\u0000/g, (_match, index: string) => cdata[Number(index)] ?? '')
   return text.trim()

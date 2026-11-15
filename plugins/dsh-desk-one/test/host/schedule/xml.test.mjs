@@ -170,4 +170,18 @@ describe('parseMultistatus', () => {
     const [response] = parseMultistatus(xml)
     assert.equal(response?.props.displayname, '日历')
   })
+
+  it('drops an unclosed tag fragment instead of leaking it into a text value', () => {
+    const xml = `<d:multistatus xmlns:d="DAV:">
+      <d:response>
+        <d:href>/c/</d:href>
+        <d:propstat>
+          <d:prop><d:displayname>safe <script</d:displayname></d:prop>
+          <d:status>HTTP/1.1 200 OK</d:status>
+        </d:propstat>
+      </d:response>
+    </d:multistatus>`
+    const [response] = parseMultistatus(xml)
+    assert.equal(response?.props.displayname, 'safe')
+  })
 })
