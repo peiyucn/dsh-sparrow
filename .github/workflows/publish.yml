@@ -245,6 +245,13 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+
+      # npm 11.21+ 才支持用 Trusted Publishing 的 OIDC 凭据管理 dist-tag（2026-09 起的
+      # opt-in 权限：各包的 trusted publisher 须勾选 Allow npm dist-tag）。runner 自带的
+      # npm 低于该版本，显式升级；没有该权限时 npm 会回退到 token（若 NPM_TOKEN 已配置）。
+      - name: Upgrade npm for OIDC dist-tags
+        run: npm install -g "npm@^11.21.0"
+
       - name: Move dist-tag
         # workflow_dispatch 有三种输入形态，必须分开对待（否则要么静默成功、要么误报红）：
         #   ① 只给 plugin       → tag 兜底发布（真正干活的是 publish job），promote 不适用 → 跳过
@@ -287,4 +294,6 @@ jobs:
 
           npm dist-tag add "@dsh-sparrow/${PLUGIN}@${VERSION}" "${TAG}"
         env:
+          # 配了 NPM_TOKEN 就走 token；没配时这里为空，显式覆盖 setup-node 的占位 token，
+          # 让 npm 用 Trusted Publishing 的 OIDC 凭据（需 Allow npm dist-tag 权限）。
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
