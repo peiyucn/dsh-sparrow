@@ -414,7 +414,8 @@ button.dsh-desk-notebook-rowbody {
   display: inline-flex;
   flex: none;
   margin: 0 1px;
-  color: #d7a64b;
+  color: inherit;
+  opacity: 0.9;
 }
 .dsh-desk-notebook-filesbtn-icon svg {
   display: block;
