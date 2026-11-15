@@ -134,15 +134,23 @@ export class NotebookRepository {
    * Replace one file draft box (bounded; drafts are the user intent, not review state).
    * An empty batch deletes the box: a submitted review must not leave a "has drafts" shell that
    * the entry page would count and list while the review tab shows nothing.
+   *
+   * The revision guard is re-checked **inside** the storage write callback: two windows saving the
+   * same file both read the same `existing` snapshot, so a guard made only before the write would
+   * let the later write silently overwrite the earlier one instead of reporting the conflict.
    */
   async saveNoteDraft(input: SaveNoteDraftInput): Promise<NoteDraft | null> {
     const now = new Date().toISOString()
     const id = draftId(input.fileId)
     const drafts = input.drafts.slice(0, NOTEBOOK_MAX_DRAFTS)
     const existing = this.getNoteDraft(input.fileId)
-    if (input.expectedRevision !== undefined && input.expectedRevision !== (existing?.revision ?? 0)) {
-      throw new DeskModelError('REVISION_CONFLICT', '批注草稿已被其他窗口更新，请刷新后重试')
+    const assertRevision = (current: number): void => {
+      if (input.expectedRevision !== undefined && input.expectedRevision !== current) {
+        throw new DeskModelError('REVISION_CONFLICT', '批注草稿已被其他窗口更新，请刷新后重试')
+      }
     }
+    // Fast guard for the create / delete branches; the update branch re-checks it atomically below.
+    assertRevision(existing?.revision ?? 0)
     if (drafts.length === 0) {
       if (existing !== undefined) await this.core.nodes.delete(id)
       return null
@@ -163,9 +171,12 @@ export class NotebookRepository {
       await this.core.nodes.put(record.id, record)
       return record
     }
-    return await this.core.nodes.update(id, current => current.kind === 'note-draft'
-      ? { ...current, rootPath: input.rootPath, path: input.path, drafts, updatedAt: now, revision: current.revision + 1 }
-      : current) as NoteDraft
+    return await this.core.nodes.update(id, current => {
+      if (current.kind !== 'note-draft') return current
+      // Atomic guard: the snapshot above may be stale once the serialized write chain reaches us.
+      assertRevision(current.revision)
+      return { ...current, rootPath: input.rootPath, path: input.path, drafts, updatedAt: now, revision: current.revision + 1 }
+    }) as NoteDraft
   }
 
   /** One review round's persisted baseline for a file. */
