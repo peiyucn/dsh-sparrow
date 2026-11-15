@@ -63,7 +63,16 @@
         "directory": "plugins/dsh-chat-fim"
       },
       "metadata": {
-        "keywords": [],
+        "keywords": [
+          "deepseek-harness",
+          "dsh",
+          "fim",
+          "autocomplete",
+          "suggestion",
+          "chat-input",
+          "cordis",
+          "plugin"
+        ],
         "labels": [
           "network",
           "llm",
