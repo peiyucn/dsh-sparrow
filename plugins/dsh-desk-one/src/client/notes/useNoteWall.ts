@@ -81,7 +81,7 @@ export function useNoteWall(input: {
     try {
       const note = await createNote({
         body: '',
-        color: STICKY_COLORS[trash.activeNotes.length % STICKY_COLORS.length] ?? 'yellow',
+        color: STICKY_COLORS[trash.activeNotes.length % STICKY_COLORS.length],
         x: Math.max(0, Math.round(anchorX)),
         y: Math.max(0, Math.round(anchorY)),
         z: layer,

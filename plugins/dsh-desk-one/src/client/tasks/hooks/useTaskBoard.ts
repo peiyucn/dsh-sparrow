@@ -278,7 +278,7 @@ export function useTaskBoard({
         ...moving.groupId === undefined ? {} : { groupId: null },
       },
     })
-  }, [applyBlockOrders, blocksFor, savePatch, setActionError, setTasks, tasks])
+  }, [applyBlockOrders, blocksFor, tasks])
 
   /** Move a group block within the unified lane sequence (same lane) or across lanes. */
   const moveGroupBlock = useCallback((group: DeskTaskGroup, status: TaskStatus, toIndex: number): void => {

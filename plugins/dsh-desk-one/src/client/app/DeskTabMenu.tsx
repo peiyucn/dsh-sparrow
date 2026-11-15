@@ -62,7 +62,6 @@ export function DeskTabMenu({ t, tab, onSelectTab, entries, onWish }: DeskTabMen
   const rowCount = entries.length + 1
 
   const focusItem = (index: number): void => {
-    if (rowCount === 0) return
     itemRefs.current[(index + rowCount) % rowCount]?.focus()
   }
 

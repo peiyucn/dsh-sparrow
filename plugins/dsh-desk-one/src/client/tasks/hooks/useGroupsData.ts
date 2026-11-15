@@ -39,8 +39,7 @@ export interface GroupsData {
   readonly reload: () => Promise<void>
   readonly createGroup: (input: CreateTaskGroupRequest) => Promise<DeskTaskGroup | null>
   readonly renameGroup: (group: DeskTaskGroup, name: string) => void
-  /** Persist dense order for one lane; receives the groups already in their new order. */
-  /** Persist arbitrary group orders (shared lane block sequence: order is the block index). */
+  /** Persist group orders: order is the block index in the lane's unified sequence. */
   readonly setGroupOrders: (entries: readonly { group: DeskTaskGroup; order: number }[]) => void
   readonly removeGroup: (group: DeskTaskGroup) => void
   /** Cross-lane move; resolves the moved group, its cards, and the authoritative group list. */
@@ -178,7 +177,7 @@ export function useGroupsData(t: DeskTranslator, actions: Actions): GroupsData {
       void reload()
       return null
     }
-  }, [listGroups, moveGroup, reload, replace, setActionError,t])
+  }, [listGroups, moveGroup, reload, t])
 
   const archiveGroupAction = useCallback(async (group: DeskTaskGroup, archived: boolean) => {
     try {

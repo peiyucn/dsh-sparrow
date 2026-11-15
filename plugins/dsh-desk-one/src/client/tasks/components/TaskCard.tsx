@@ -271,20 +271,20 @@ export function TaskCard({
                 ? (
                     <div className="dsh-task-session-addrow">
                       <button
-                      ref={sessionAnchorRef}
-                      type="button"
-                      className="dsh-task-session-add"
-                      data-session-anchor="true"
-                      aria-label={t('task.session.add')}
-                      aria-expanded={sessionPickerOpen}
-                      title={t('task.session.add')}
-                      onClick={() => {
-                        setSessionPickerOpen(open => !open)
-                        setSessionQuery('')
-                      }}
-                    >
-                      @
-                    </button>
+                        ref={sessionAnchorRef}
+                        type="button"
+                        className="dsh-task-session-add"
+                        data-session-anchor="true"
+                        aria-label={t('task.session.add')}
+                        aria-expanded={sessionPickerOpen}
+                        title={t('task.session.add')}
+                        onClick={() => {
+                          setSessionPickerOpen(open => !open)
+                          setSessionQuery('')
+                        }}
+                      >
+                        @
+                      </button>
                     </div>
                   )
                 : null}

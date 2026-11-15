@@ -30,7 +30,8 @@ interface TaskBoardProps {
   readonly sessionLink: SessionLinkApi
 }
 
-export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoardProps): ReactElement {  const [draggingId, setDraggingId] = useState<string | null>(null)
+export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoardProps): ReactElement {
+  const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [groupDrag, setGroupDrag] = useState<DeskTaskGroup | null>(null)
   const [groupDrop, setGroupDrop] = useState<GroupDropTarget | null>(null)
