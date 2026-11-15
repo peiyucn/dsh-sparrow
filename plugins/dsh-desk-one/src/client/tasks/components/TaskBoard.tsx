@@ -125,6 +125,9 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
       setDraggingId(task.id)
     }
     const onMove = (moveEvent: PointerEvent): void => {
+      // Releasing the mouse outside the window delivers no `pointerup`: the next move with no
+      // pressed button is that missed release, so cancel instead of leaving the drag armed.
+      if (moveEvent.buttons === 0) { onCancel(); return }
       if (!moved) {
         if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < 5) return
         moved = true
@@ -216,6 +219,8 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
       setGroupDrag(group)
     }
     const onMove = (moveEvent: PointerEvent): void => {
+      // Same missed-release handling as the card drag: cancel once no button is pressed anymore.
+      if (moveEvent.buttons === 0) { onCancel(); return }
       if (!moved) {
         if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < 5) return
         moved = true

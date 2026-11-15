@@ -80,6 +80,9 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
     }
     const onMove = (moveEvent: PointerEvent): void => {
       if (moveEvent.pointerId !== event.pointerId) return
+      // Releasing outside the window delivers no `pointerup`; the first move afterwards carries
+      // `buttons === 0` and means the gesture is already over, so restore the note.
+      if (moveEvent.buttons === 0) { cancel(); return }
       const dx = moveEvent.clientX - startX
       const dy = moveEvent.clientY - startY
       if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return
@@ -98,6 +101,15 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
         ? { ...note, x: currentX, y: currentY }
         : note))
       savePatch(item.note, { x: currentX, y: currentY })
+    }
+    /** Missed-release path: undo the optimistic element position, keep the stored layout. */
+    const cancel = (): void => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', finish)
+      window.removeEventListener('pointercancel', finish)
+      delete element.dataset.dragging
+      element.style.left = `${item.x}px`
+      element.style.top = `${item.y}px`
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', finish)
@@ -119,6 +131,8 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
     let moved = false
     const onMove = (moveEvent: PointerEvent): void => {
       if (moveEvent.pointerId !== event.pointerId) return
+      // Same missed-release handling as the drag gesture: no pressed button means it is over.
+      if (moveEvent.buttons === 0) { cancel(); return }
       moved = true
       currentWidth = clamp(Math.round(item.width + moveEvent.clientX - startX), NOTE_MIN_WIDTH, Math.min(maxWidth, NOTE_MAX_SIZE))
       currentHeight = clamp(Math.round(item.height + moveEvent.clientY - startY), NOTE_MIN_HEIGHT, maxHeight)
@@ -136,6 +150,16 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
         ? { ...note, width: currentWidth, height: currentHeight }
         : note))
       savePatch(item.note, { width: currentWidth, height: currentHeight })
+    }
+    /** Missed-release path: undo the optimistic element size, keep the stored layout. */
+    const cancel = (): void => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', finish)
+      window.removeEventListener('pointercancel', finish)
+      if (element !== null) {
+        element.style.width = `${item.width}px`
+        element.style.height = `${item.height}px`
+      }
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', finish)
