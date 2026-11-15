@@ -23,12 +23,14 @@ on:
 
 # id-token: write 用于 npm Trusted Publishing（OIDC）；
 # contents: read 只够 checkout 读仓库 —— 本仓库**不建 GitHub Release**（见文件末尾说明，发布记录 =
-#   npm dist-tag + annotated tag），故原「建 Release 用」的 contents: write 已无消费者，按最小权限收回；
-# security-events: read 供发布前的告警门禁查询 Dependabot / CodeQL / secret scanning（根规范 E18）。
+#   npm dist-tag + annotated tag），故原「建 Release 用」的 contents: write 已无消费者，按最小权限收回。
+# 告警门禁（E18）不申请 GITHUB_TOKEN 权限：官方权限模型下 GITHUB_TOKEN 的 security-events 只覆盖
+# code scanning，Dependabot 告警要 vulnerability-alerts 权限，而 **secret scanning 告警无法用
+# GITHUB_TOKEN 读取**（官方 workflow permissions 文档：必须用 GitHub App 或 personal access token）。
+# 故门禁统一用环境 secret `SECURITY_ALERTS_TOKEN`（只读 PAT，配置见门禁步骤注释）。
 permissions:
   contents: read
   id-token: write
-  security-events: read
 
 jobs:
   publish:
@@ -50,12 +52,24 @@ jobs:
 
       # 发布硬门禁（根规范 E18）：任一未处理告警（Dependabot / CodeQL / secret scanning）即中止；
       # 查询本身失败也中止（fail-closed，不因权限/网络问题静默放行）。计数写进日志供 Deployments 追查。
+      #
+      # 为什么用 SECURITY_ALERTS_TOKEN 而不是 github.token：GITHUB_TOKEN 的 security-events 只覆盖
+      # code scanning；Dependabot 告警要 vulnerability-alerts 权限；secret scanning 告警在官方权限
+      # 模型下**读不到**（必须 GitHub App / PAT）。故统一用一个只读 fine-grained PAT，三项都查。
+      # 配置（owner 一次性）：npmjs/GitHub 侧建 fine-grained PAT，限本仓库、仅
+      #   Dependabot alerts / Code scanning alerts / Secret scanning alerts 三项 read，
+      # 存为 `npm-publish` 环境的 secret SECURITY_ALERTS_TOKEN（E20：不进仓库级）。
+      # 缺失 / 过期 / 权限不足时 gh 非零退出 → 本步失败 → 不发布（fail-closed）。
       - name: Security alert gate (fail-closed)
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.SECURITY_ALERTS_TOKEN }}
         run: |
           set -euo pipefail
           repo="${{ github.repository }}"
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::error::缺少 npm-publish 环境的 secret SECURITY_ALERTS_TOKEN（只读 fine-grained PAT：Dependabot / Code scanning / Secret scanning alerts 三项 read，限本仓库）"
+            exit 1
+          fi
           count_open() {
             gh api --paginate "repos/${repo}/$1?state=open&per_page=100" --jq '.[].number' | wc -l | tr -d '[:space:]'
           }
@@ -181,13 +195,18 @@ jobs:
       - uses: actions/checkout@v7
 
       # promote 只移动 dist-tag（让版本成为 latest / next 默认安装版本），同样对外可见：
-      # 与 publish job 同口径先跑 E18 告警门禁，查询失败也中止（fail-closed）。
+      # 与 publish job 同口径先跑 E18 告警门禁（同一个只读 SECURITY_ALERTS_TOKEN，原因见 publish job 注释），
+      # secret 缺失 / 过期 / 权限不足时 gh 非零退出 → 本步失败 → 不动 dist-tag（fail-closed）。
       - name: Security alert gate (fail-closed)
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.SECURITY_ALERTS_TOKEN }}
         run: |
           set -euo pipefail
           repo="${{ github.repository }}"
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::error::缺少 npm-publish 环境的 secret SECURITY_ALERTS_TOKEN（只读 fine-grained PAT：Dependabot / Code scanning / Secret scanning alerts 三项 read，限本仓库）"
+            exit 1
+          fi
           count_open() {
             gh api --paginate "repos/${repo}/$1?state=open&per_page=100" --jq '.[].number' | wc -l | tr -d '[:space:]'
           }
