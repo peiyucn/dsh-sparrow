@@ -9,7 +9,7 @@ import type { DeskTranslator } from '../../app/types.js'
 import { formatDate, messageOf } from '../../app/utils.js'
 import type { NotebookEntry, NotebookStateResponse, ReviewHistoryEntry } from '../../../notebook-contract.js'
 import type { NotebookApi } from '../api.js'
-import { NOTEBOOK_PAGE_SIZE, paginate } from '../paging.js'
+import { NOTEBOOK_PAGE_SIZE, pageForRoot, paginate, type RootedPage } from '../paging.js'
 import type { NotebookMode, NotebookRow } from '../page-types.js'
 
 /** Row model + paging for the notebook list. */
@@ -41,7 +41,7 @@ export function useNotebookRows(input: {
 }): NotebookRows {
   const { t, notebook, active, state, history, rootPath, mode, query, page, setError, setPage, openPage, deleteHistory } = input
   const [results, setResults] = useState<readonly NotebookEntry[] | null>(null)
-  const [paged, setPaged] = useState<{ readonly entries: readonly NotebookEntry[]; readonly total: number } | null>(null)
+  const [paged, setPaged] = useState<RootedPage<NotebookEntry> | null>(null)
 
   // Search is a flat library query; clearing returns to the recent shelf.
   useEffect(() => {
@@ -95,12 +95,14 @@ export function useNotebookRows(input: {
       limit: NOTEBOOK_PAGE_SIZE,
       ...(mode === 'missing' ? { missingFrontmatter: true } : {}),
     }).then((payload) => {
-      if (!cancelled) setPaged(payload)
+      if (!cancelled) setPaged({ rootPath, entries: payload.entries, total: payload.total })
     }, (cause) => {
       if (!cancelled) setError(messageOf(cause))
     })
     return () => { cancelled = true }
   }, [active, mode, notebook, page, rootPath, searching, setError, state?.stats.missingFrontmatter, state?.stats.total])
+  // A page read from another root is not this list: ignore it until the new root's page lands.
+  const currentPage = pageForRoot(paged, rootPath)
 
   const entryRow = useCallback((entry: NotebookEntry): NotebookRow => ({
     key: entry.path,
@@ -144,10 +146,10 @@ export function useNotebookRows(input: {
       const entries = (results ?? []).filter(entry => mode !== 'missing' || !entry.hasFrontmatter)
       return entries.map(entryRow)
     }
-    return (paged?.entries ?? []).map(entryRow)
-  }, [deleteHistory, entryRow, matchesQuery, mode, openPage, paged, recordCounts, results, searching, state?.drafts])
+    return (currentPage?.entries ?? []).map(entryRow)
+  }, [currentPage, deleteHistory, entryRow, matchesQuery, mode, openPage, recordCounts, results, searching, state?.drafts])
 
-  const totalCount = serverPaged ? paged?.total ?? 0 : allRows.length
+  const totalCount = serverPaged ? currentPage?.total ?? 0 : allRows.length
   const pages = Math.max(1, Math.ceil(totalCount / NOTEBOOK_PAGE_SIZE))
   const slice = serverPaged
     ? { rows: allRows, page: Math.min(page, pages), pages }

@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { NOTEBOOK_PAGE_SIZE, paginate } from '../../lib/client/notebook/paging.js'
+import { NOTEBOOK_PAGE_SIZE, pageForRoot, paginate } from '../../lib/client/notebook/paging.js'
 
 describe('notebook 分页', () => {
   const rows = Array.from({ length: 23 }, (_, index) => index + 1)
@@ -35,5 +35,27 @@ describe('notebook 分页', () => {
     assert.equal(page.rows.length, 5)
     assert.equal(page.pages, 5)
     assert.deepEqual(page.rows, [6, 7, 8, 9, 10])
+  })
+})
+
+describe('notebook 服务端分页快照按根目录生效', () => {
+  const snapshot = (/** @type {string | undefined} */ rootPath) => ({
+    rootPath,
+    entries: [{ path: 'a.md' }],
+    total: 1,
+  })
+
+  it('根目录一致时返回快照', () => {
+    assert.deepEqual(pageForRoot(snapshot('/notes/a'), '/notes/a'), snapshot('/notes/a'))
+  })
+
+  it('切换根目录后旧快照立即失效，不渲染上一个库的行', () => {
+    assert.equal(pageForRoot(snapshot('/notes/a'), '/notes/b'), null)
+  })
+
+  it('没有链接根目录时（含从已链接切到未链接）不返回任何快照', () => {
+    assert.deepEqual(pageForRoot(snapshot(undefined), undefined), snapshot(undefined))
+    assert.equal(pageForRoot(snapshot('/notes/a'), undefined), null)
+    assert.equal(pageForRoot(null, '/notes/a'), null)
   })
 })

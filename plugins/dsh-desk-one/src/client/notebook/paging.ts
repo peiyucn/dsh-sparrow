@@ -26,3 +26,31 @@ export function paginate<Row>(rows: readonly Row[], page: number, pageSize = NOT
   const start = (current - 1) * pageSize
   return { rows: rows.slice(start, start + pageSize), page: current, pages }
 }
+
+/**
+ * One server-paged library page, tied to the root it was read from.
+ *
+ * The host pages over the linked root, so a root switch makes the in-flight page describe a
+ * different library. Keeping the root on the snapshot lets the view ignore it until the new
+ * fetch resolves instead of flashing the previous workspace's rows (and showing them forever when
+ * no root is linked at all).
+ */
+export interface RootedPage<Entry> {
+  /** Library root the entries were read from; `undefined` when no library is linked. */
+  readonly rootPath: string | undefined
+  readonly entries: readonly Entry[]
+  readonly total: number
+}
+
+/**
+ * Return the snapshot only while it still describes `rootPath`.
+ * @param page - last loaded page, if any.
+ * @param rootPath - root the list is rendering for.
+ * @returns the page when it matches, otherwise `null`.
+ */
+export function pageForRoot<Entry>(
+  page: RootedPage<Entry> | null,
+  rootPath: string | undefined,
+): RootedPage<Entry> | null {
+  return page !== null && page.rootPath === rootPath ? page : null
+}
