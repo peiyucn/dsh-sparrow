@@ -30,7 +30,7 @@ export interface NotebookSearchFace {
 export function registerNotebookTools(ctx: Context, notebook: NotebookSearchFace): void {
   ctx.tools.register(defineTool({
     name: 'desk_page_list',
-    description: 'Search / list pages in the user\'s linked notebook library (read-only). Filter by keyword over title and path, by tag, by type, or by missing frontmatter / empty body. Returns each page\'s path relative to the library root plus its metadata; use the normal file tools to read or edit the page content. Content changes still go through file tools — this tool never writes.',
+    description: 'Search / list pages in the notebook workspace currently linked in Desk One (read-only). Filter by keyword over title and path, by tag, by type, or by missing frontmatter / empty body. Returns each page\'s path relative to the library root plus its metadata; use the normal file tools to read or edit the page content. Content changes still go through file tools — this tool never writes.',
     parameters: {
       query: { type: 'string', description: 'Case-insensitive keyword over title and path.' },
       tag: { type: 'string', description: 'Only pages carrying this frontmatter tag.' },
@@ -44,7 +44,7 @@ export function registerNotebookTools(ctx: Context, notebook: NotebookSearchFace
       try {
         const root = notebook.root()
         if (root === undefined) {
-          return JSON.stringify({ ok: true, total: 0, entries: [], summary: '还没有链接笔记库（先让用户在笔记页选择一个工作区）' })
+          return JSON.stringify({ ok: true, total: 0, entries: [], summary: '还没有链接笔记工作区（先让用户在笔记批注页选择一个工作区）' })
         }
         const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(Math.floor(args.limit), 200) : 50
         const result = await notebook.search({

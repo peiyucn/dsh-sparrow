@@ -63,7 +63,7 @@ describe('desk_page_list', () => {
     const output = JSON.parse(await tools[0].execute({}, { signal: AbortSignal.timeout(1000) }))
     assert.equal(output.ok, true)
     assert.equal(output.total, 0)
-    assert.match(output.summary, /笔记库/u)
+    assert.match(output.summary, /笔记批注页|工作区/u)
   })
 
   it('返回 root + 相对路径与元信息，默认 limit 50', async () => {

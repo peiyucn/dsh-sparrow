@@ -47,7 +47,7 @@ export function registerDeskTools(ctx: Context, store: DeskStore): void {
         ok: true,
         total: notes.length,
         notes,
-        summary: notes.length === 0 ? '没有匹配的便签' : `返回 ${notes.length} 条便签（默认不含垃圾桶）`,
+        summary: notes.length === 0 ? '没有匹配的便签' : `返回 ${notes.length} 条便签${args.include_trashed === true ? '（含垃圾桶）' : '（默认不含垃圾桶）'}`,
       }))
     },
   }))

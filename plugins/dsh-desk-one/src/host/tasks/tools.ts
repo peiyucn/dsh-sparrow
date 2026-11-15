@@ -61,14 +61,14 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
         ok: true,
         total: tasks.length,
         tasks,
-        summary: tasks.length === 0 ? '没有匹配的任务' : `返回 ${tasks.length} 条任务（默认不含存档）`,
+        summary: tasks.length === 0 ? '没有匹配的任务' : `返回 ${tasks.length} 条任务${args.include_archived === true ? '（含存档）' : '（默认不含存档）'}`,
       }))
     },
   }))
 
   ctx.tools.register(defineTool({
     name: 'desk_task_update',
-    description: 'Update one desk task (title, description, lane, color, due date, order). Use desk_task_list to get the current revision first.',
+    description: 'Update one desk task (title, description, lane, color, due date, order, group). Use desk_task_list to get the current revision first.',
     parameters: {
       id: { type: 'string', required: true, description: 'Task id from desk_task_list.' },
       expected_revision: { type: 'number', required: true, description: 'Revision returned by desk_task_list.' },
@@ -126,7 +126,7 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
 
   ctx.tools.register(defineTool({
     name: 'desk_task_archive',
-    description: 'Move one desk task to the board archive (or restore it). Archived tasks leave the board but stay recoverable.',
+    description: 'Archive one done-lane desk task (or restore an archived one). Archived tasks leave the board but stay recoverable; only Done cards can be archived.',
     parameters: {
       id: { type: 'string', required: true, description: 'Task id from desk_task_list (pass include_archived to see them).' },
       expected_revision: { type: 'number', required: true, description: 'Revision returned by desk_task_list.' },
