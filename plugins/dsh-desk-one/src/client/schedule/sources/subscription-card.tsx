@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { SourceIssues } from './issues.js'
 import { sourceHealth } from './status.js'
 import type { DeskCalendar, DeskScheduleSource } from '../../../contract.js'
+import { ActionTooltip } from '../../app/ActionTooltip.js'
 import type { DeskTranslator } from '../../app/types.js'
 import type { ReactElement } from 'react'
 import type { ScheduleApi } from '../api.js'
@@ -84,14 +85,15 @@ export function SubscriptionCard(props: {
             <SourceIssues t={t} health={health} />
             {own.map(calendar => (
               <div key={calendar.id} className="dsh-desk-schedule-mgmt-row" data-off={!calendar.enabled}>
-                <button
-                  type="button"
-                  className="dsh-desk-schedule-colorbutton"
-                  style={{ background: calendar.color }}
-                  title={t('schedule.changeColor')}
-                  aria-label={t('schedule.changeColor')}
-                  onClick={() => { void onColor(calendar) }}
-                />
+                <ActionTooltip label={t('schedule.changeColor')}>
+                  <button
+                    type="button"
+                    className="dsh-desk-schedule-colorbutton"
+                    style={{ background: calendar.color }}
+                    aria-label={t('schedule.changeColor')}
+                    onClick={() => { void onColor(calendar) }}
+                  />
+                </ActionTooltip>
                 <span className="dsh-desk-schedule-mgmt-name">{calendar.displayName}</span>
                 <span className="dsh-desk-schedule-mgmt-count">{counts[calendar.id] ?? 0}</span>
                 <span className="dsh-desk-schedule-mgmt-label">{t('schedule.syncLabel')}</span>

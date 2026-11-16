@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactElement } from 'react'
+import { ActionTooltip } from './ActionTooltip.js'
 import { DeskGlyph } from '../brand.js'
 import type { DeskTranslator, Tab } from './types.js'
 import type { DeskTabEntry } from './tabs.js'
@@ -73,20 +74,21 @@ export function DeskTabMenu({ t, tab, onSelectTab, entries, onWish }: DeskTabMen
 
   return (
     <>
-      <button
-        ref={anchorRef}
-        type="button"
-        className="dsh-desk-tab-more"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={t('tabs.more')}
-        title={t('tabs.more')}
-        onClick={() => setOpen(value => !value)}
-      >
-        <svg className="dsh-desk-tab-more-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-          <path d="M4.5 10h.01M10 10h.01M15.5 10h.01" />
-        </svg>
-      </button>
+      <ActionTooltip label={t('tabs.more')}>
+        <button
+          ref={anchorRef}
+          type="button"
+          className="dsh-desk-tab-more"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label={t('tabs.more')}
+          onClick={() => setOpen(value => !value)}
+        >
+          <svg className="dsh-desk-tab-more-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+            <path d="M4.5 10h.01M10 10h.01M15.5 10h.01" />
+          </svg>
+        </button>
+      </ActionTooltip>
       {open
         ? createPortal(
             <div

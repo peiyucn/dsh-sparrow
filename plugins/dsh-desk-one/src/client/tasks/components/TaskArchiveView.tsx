@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DeskTask, DeskTaskGroup } from '../../../contract.js'
+import { ActionTooltip } from '../../app/ActionTooltip.js'
 import type { DeskTranslator } from '../../app/types.js'
 import { SubPageHeader } from '../../app/SubPageHeader.js'
 import { LANE_LABEL_KEY } from '../taskLabels.js'
@@ -39,31 +40,33 @@ function GroupArchiveRow({
       <span className="dsh-task-archive-title">{group.name}</span>
       <span className="dsh-task-archive-count">{countLabel}</span>
       <span className="dsh-task-archive-lane">{t(LANE_LABEL_KEY[group.status])}</span>
-      <button
-        type="button"
-        className="dsh-desk-iconbtn"
-        aria-label={t('task.group.restore')}
-        title={t('task.group.restore')}
-        onClick={() => onRestore(group)}
-      >
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-          <path d="M4.5 6.5v4h4" />
-          <path d="M5 10.3A5.2 5.2 0 1 1 6.6 13.2" />
-        </svg>
-      </button>
-      <button
-        type="button"
-        className="dsh-desk-iconbtn dsh-desk-iconbtn-danger"
-        data-confirm={confirm}
-        aria-label={confirm ? t('task.deleteConfirm') : t('task.delete')}
-        title={confirm ? t('task.deleteConfirm') : t('task.delete')}
-        onClick={() => { if (confirm) onDelete(group); else setConfirm(true) }}
-        onBlur={() => setConfirm(false)}
-      >
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-          <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
-        </svg>
-      </button>
+      <ActionTooltip label={t('task.group.restore')}>
+        <button
+          type="button"
+          className="dsh-desk-iconbtn"
+          aria-label={t('task.group.restore')}
+          onClick={() => onRestore(group)}
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="M4.5 6.5v4h4" />
+            <path d="M5 10.3A5.2 5.2 0 1 1 6.6 13.2" />
+          </svg>
+        </button>
+      </ActionTooltip>
+      <ActionTooltip label={confirm ? t('task.deleteConfirm') : t('task.delete')}>
+        <button
+          type="button"
+          className="dsh-desk-iconbtn dsh-desk-iconbtn-danger"
+          data-confirm={confirm}
+          aria-label={confirm ? t('task.deleteConfirm') : t('task.delete')}
+          onClick={() => { if (confirm) onDelete(group); else setConfirm(true) }}
+          onBlur={() => setConfirm(false)}
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+          </svg>
+        </button>
+      </ActionTooltip>
     </li>
   )
 }
@@ -83,31 +86,33 @@ function ArchiveRow({
       <span className="dsh-task-archive-dot" data-color={task.color} />
       <span className="dsh-task-archive-title">{task.title}</span>
       <span className="dsh-task-archive-lane">{t(LANE_LABEL_KEY[task.status])}</span>
-      <button
-        type="button"
-        className="dsh-desk-iconbtn"
-        aria-label={t('task.restore')}
-        title={t('task.restore')}
-        onClick={() => onRestore(task)}
-      >
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-          <path d="M4.5 6.5v4h4" />
-          <path d="M5 10.3A5.2 5.2 0 1 1 6.6 13.2" />
-        </svg>
-      </button>
-      <button
-        type="button"
-        className="dsh-desk-iconbtn dsh-desk-iconbtn-danger"
-        data-confirm={confirm}
-        aria-label={confirm ? t('task.deleteConfirm') : t('task.delete')}
-        title={confirm ? t('task.deleteConfirm') : t('task.delete')}
-        onClick={() => { if (confirm) onDelete(task.id); else setConfirm(true) }}
-        onBlur={() => setConfirm(false)}
-      >
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-          <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
-        </svg>
-      </button>
+      <ActionTooltip label={t('task.restore')}>
+        <button
+          type="button"
+          className="dsh-desk-iconbtn"
+          aria-label={t('task.restore')}
+          onClick={() => onRestore(task)}
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="M4.5 6.5v4h4" />
+            <path d="M5 10.3A5.2 5.2 0 1 1 6.6 13.2" />
+          </svg>
+        </button>
+      </ActionTooltip>
+      <ActionTooltip label={confirm ? t('task.deleteConfirm') : t('task.delete')}>
+        <button
+          type="button"
+          className="dsh-desk-iconbtn dsh-desk-iconbtn-danger"
+          data-confirm={confirm}
+          aria-label={confirm ? t('task.deleteConfirm') : t('task.delete')}
+          onClick={() => { if (confirm) onDelete(task.id); else setConfirm(true) }}
+          onBlur={() => setConfirm(false)}
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+          </svg>
+        </button>
+      </ActionTooltip>
     </li>
   )
 }

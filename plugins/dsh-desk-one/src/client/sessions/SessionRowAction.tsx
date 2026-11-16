@@ -1,6 +1,6 @@
 /** Icon actions for session rows: element-level operations are icons, section-level ones stay text. */
 import type { ReactElement } from 'react'
-import { SessionActionTooltip } from './SessionActionTooltip.js'
+import { ActionTooltip } from '../app/ActionTooltip.js'
 
 type SessionActionKind = 'archive' | 'unarchive' | 'trash' | 'restore' | 'delete'
 
@@ -21,7 +21,7 @@ export function SessionRowAction(props: {
   readonly onClick: () => void
 }): ReactElement {
   return (
-    <SessionActionTooltip label={props.label}>
+    <ActionTooltip label={props.label}>
       <button
         type="button"
         className="dsh-desk-row-action"
@@ -35,6 +35,6 @@ export function SessionRowAction(props: {
           ? <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           : <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{PATHS[props.kind]}</svg>}
       </button>
-    </SessionActionTooltip>
+    </ActionTooltip>
   )
 }

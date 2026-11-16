@@ -9,6 +9,7 @@ import { SourceIssues } from './issues.js'
 import { sourceHealth } from './status.js'
 import { useState } from 'react'
 import type { DeskCalendar, DeskScheduleSource, ScheduleConnectionInput } from '../../../contract.js'
+import { ActionTooltip } from '../../app/ActionTooltip.js'
 import type { DeskTranslator } from '../../app/types.js'
 import type { ReactElement } from 'react'
 import type { ScheduleApi } from '../api.js'
@@ -29,27 +30,29 @@ export function CalendarRows(props: {
       {calendars.length === 0 ? <p className="dsh-desk-schedule-hint">{t('schedule.noCalendars')}</p> : null}
       {calendars.map(calendar => (
         <div key={calendar.id} className="dsh-desk-schedule-mgmt-row" data-off={!calendar.enabled}>
-          <button
-            type="button"
-            className="dsh-desk-schedule-colorbutton"
-            style={{ background: calendar.color }}
-            title={t('schedule.changeColor')}
-            aria-label={t('schedule.changeColor')}
-            onClick={() => { void onColor(calendar) }}
-          />
+          <ActionTooltip label={t('schedule.changeColor')}>
+            <button
+              type="button"
+              className="dsh-desk-schedule-colorbutton"
+              style={{ background: calendar.color }}
+              aria-label={t('schedule.changeColor')}
+              onClick={() => { void onColor(calendar) }}
+            />
+          </ActionTooltip>
           <span className="dsh-desk-schedule-mgmt-name">{calendar.displayName}</span>
           <span className="dsh-desk-schedule-mgmt-count">{counts[calendar.id] ?? 0}</span>
           <span className="dsh-desk-schedule-mgmt-label">{t('schedule.syncLabel')}</span>
-          <button
-            type="button"
-            className="dsh-desk-switch"
-            role="switch"
-            aria-checked={calendar.enabled}
-            data-on={calendar.enabled}
-            title={t('schedule.syncCalendar')}
-            aria-label={t('schedule.syncCalendar')}
-            onClick={() => { void onSetEnabled(calendar, !calendar.enabled) }}
-          />
+          <ActionTooltip label={t('schedule.syncCalendar')}>
+            <button
+              type="button"
+              className="dsh-desk-switch"
+              role="switch"
+              aria-checked={calendar.enabled}
+              data-on={calendar.enabled}
+              aria-label={t('schedule.syncCalendar')}
+              onClick={() => { void onSetEnabled(calendar, !calendar.enabled) }}
+            />
+          </ActionTooltip>
           <span className="dsh-desk-schedule-mgmt-label">{t('schedule.displayLabel')}</span>
           <button
             type="button"

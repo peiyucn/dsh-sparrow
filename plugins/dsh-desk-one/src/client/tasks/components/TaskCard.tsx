@@ -12,6 +12,7 @@ import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import { MAX_TASK_SESSIONS, NOTE_COLORS } from '../../../constants.js'
 import type { DeskTask, TaskPatchRequest } from '../../../contract.js'
+import { ActionTooltip } from '../../app/ActionTooltip.js'
 import type { DeskTranslator } from '../../app/types.js'
 import type { SessionChipInfo } from '../../sessions/contract.js'
 import { useAnchoredPanel } from '../hooks/useAnchoredPanel.js'
@@ -270,21 +271,22 @@ export function TaskCard({
               {sessionEnabled
                 ? (
                     <div className="dsh-task-session-addrow">
-                      <button
-                        ref={sessionAnchorRef}
-                        type="button"
-                        className="dsh-task-session-add"
-                        data-session-anchor="true"
-                        aria-label={t('task.session.add')}
-                        aria-expanded={sessionPickerOpen}
-                        title={t('task.session.add')}
-                        onClick={() => {
-                          setSessionPickerOpen(open => !open)
-                          setSessionQuery('')
-                        }}
-                      >
-                        @
-                      </button>
+                      <ActionTooltip label={t('task.session.add')}>
+                        <button
+                          ref={sessionAnchorRef}
+                          type="button"
+                          className="dsh-task-session-add"
+                          data-session-anchor="true"
+                          aria-label={t('task.session.add')}
+                          aria-expanded={sessionPickerOpen}
+                          onClick={() => {
+                            setSessionPickerOpen(open => !open)
+                            setSessionQuery('')
+                          }}
+                        >
+                          @
+                        </button>
+                      </ActionTooltip>
                     </div>
                   )
                 : null}
@@ -339,46 +341,47 @@ export function TaskCard({
           )
         : null}
       <div className="dsh-task-foot">
-        <button
-          type="button"
-          className="dsh-task-color"
-          data-color-anchor="true"
-          aria-label={t('task.color')}
-          aria-haspopup="true"
-          aria-expanded={paletteOpen}
-          title={t('task.color')}
-          onClick={() => setPaletteOpen(open => !open)}
-        >
-          {behindColors.map((color, position) => (
-            <span
-              key={color}
-              className="dsh-task-color-layer"
-              data-color={color}
-              data-depth={position === 0 ? 2 : 1}
-              aria-hidden="true"
-            />
-          ))}
-          <span className="dsh-task-color-layer" data-color={task.color} data-depth={0} aria-hidden="true" />
-        </button>
+        <ActionTooltip label={t('task.color')}>
+          <button
+            type="button"
+            className="dsh-task-color"
+            data-color-anchor="true"
+            aria-label={t('task.color')}
+            aria-haspopup="true"
+            aria-expanded={paletteOpen}
+            onClick={() => setPaletteOpen(open => !open)}
+          >
+            {behindColors.map((color, position) => (
+              <span
+                key={color}
+                className="dsh-task-color-layer"
+                data-color={color}
+                data-depth={position === 0 ? 2 : 1}
+                aria-hidden="true"
+              />
+            ))}
+            <span className="dsh-task-color-layer" data-color={task.color} data-depth={0} aria-hidden="true" />
+          </button>
+        </ActionTooltip>
         {paletteOpen
           ? (
               <div className="dsh-task-color-pop" role="listbox" aria-label={t('task.color')}>
                 {NOTE_COLORS.map(color => (
-                  <button
-                    key={color}
-                    type="button"
-                    role="option"
-                    aria-selected={task.color === color}
-                    className="dsh-task-color-swatch"
-                    data-color={color}
-                    data-active={task.color === color}
-                    aria-label={t(`color.${color}`)}
-                    title={t(`color.${color}`)}
-                    onClick={() => {
-                      setPaletteOpen(false)
-                      if (color !== task.color) onPatch(task, { color })
-                    }}
-                  />
+                  <ActionTooltip key={color} label={t(`color.${color}`)}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={task.color === color}
+                      className="dsh-task-color-swatch"
+                      data-color={color}
+                      data-active={task.color === color}
+                      aria-label={t(`color.${color}`)}
+                      onClick={() => {
+                        setPaletteOpen(false)
+                        if (color !== task.color) onPatch(task, { color })
+                      }}
+                    />
+                  </ActionTooltip>
                 ))}
               </div>
             )
@@ -417,35 +420,37 @@ export function TaskCard({
         <div className="dsh-task-actions">
           {canArchive
             ? (
-                <button
-                  type="button"
-                  className="dsh-desk-iconbtn dsh-desk-iconbtn-sm"
-                  aria-label={t('task.archive')}
-                  title={t('task.archive')}
-                  onClick={() => onArchive(task)}
-                >
-                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                    <path d="M4 5.5h12v11H4zM3 3.5h14v2H3zM8 9h4" />
-                  </svg>
-                </button>
+                <ActionTooltip label={t('task.archive')}>
+                  <button
+                    type="button"
+                    className="dsh-desk-iconbtn dsh-desk-iconbtn-sm"
+                    aria-label={t('task.archive')}
+                    onClick={() => onArchive(task)}
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                      <path d="M4 5.5h12v11H4zM3 3.5h14v2H3zM8 9h4" />
+                    </svg>
+                  </button>
+                </ActionTooltip>
               )
             : null}
-          <button
-            type="button"
-            className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-iconbtn-danger"
-            data-confirm={confirmDelete}
-            aria-label={confirmDelete ? t('task.deleteConfirm') : t('task.delete')}
-            title={confirmDelete ? t('task.deleteConfirm') : t('task.delete')}
-            onClick={() => {
-              if (confirmDelete) onDelete(task.id)
-              else setConfirmDelete(true)
-            }}
-            onBlur={() => setConfirmDelete(false)}
-          >
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-              <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
-            </svg>
-          </button>
+          <ActionTooltip label={confirmDelete ? t('task.deleteConfirm') : t('task.delete')}>
+            <button
+              type="button"
+              className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-iconbtn-danger"
+              data-confirm={confirmDelete}
+              aria-label={confirmDelete ? t('task.deleteConfirm') : t('task.delete')}
+              onClick={() => {
+                if (confirmDelete) onDelete(task.id)
+                else setConfirmDelete(true)
+              }}
+              onBlur={() => setConfirmDelete(false)}
+            >
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+              </svg>
+            </button>
+          </ActionTooltip>
         </div>
       </div>
     </article>

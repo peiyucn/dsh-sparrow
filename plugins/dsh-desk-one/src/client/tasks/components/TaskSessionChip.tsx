@@ -7,6 +7,7 @@
  */
 
 import type { ReactElement } from 'react'
+import { ActionTooltip } from '../../app/ActionTooltip.js'
 import { formatDuration, formatTokenCount, relativeTimeOf } from '../../app/utils.js'
 import type { DeskTranslator } from '../../app/types.js'
 import type { SessionChipInfo } from '../../sessions/contract.js'
@@ -64,27 +65,29 @@ export function TaskSessionChip({
       onClick={onToggle}
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <button
-        type="button"
-        className="dsh-task-session-title"
-        title={`${chip.title} · ${sessionStatusText(t, chip)}`}
-      >
-        {chip.title}
-      </button>
-      <button
-        type="button"
-        className="dsh-task-session-remove"
-        aria-label={t('task.session.remove')}
-        title={t('task.session.remove')}
-        onClick={(event) => {
-          event.stopPropagation()
-          onUnlink()
-        }}
-      >
-        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
-          <path d="M3 3l6 6M9 3L3 9" />
-        </svg>
-      </button>
+      <ActionTooltip label={`${chip.title} · ${sessionStatusText(t, chip)}`}>
+        <button
+          type="button"
+          className="dsh-task-session-title"
+        >
+          {chip.title}
+        </button>
+      </ActionTooltip>
+      <ActionTooltip label={t('task.session.remove')}>
+        <button
+          type="button"
+          className="dsh-task-session-remove"
+          aria-label={t('task.session.remove')}
+          onClick={(event) => {
+            event.stopPropagation()
+            onUnlink()
+          }}
+        >
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+            <path d="M3 3l6 6M9 3L3 9" />
+          </svg>
+        </button>
+      </ActionTooltip>
       {expanded
         ? (
             <span className="dsh-task-session-preview">
@@ -98,21 +101,22 @@ export function TaskSessionChip({
                   <span className="dsh-task-session-preview-label">{t('task.session.preview.tokens')}</span>
                   <b>{tokenText}</b>
                 </span>
-                <button
-                  type="button"
-                  className="dsh-task-session-preview-enter"
-                  disabled={chip.availability !== 'available'}
-                  aria-label={t('task.session.preview.open')}
-                  title={t('task.session.preview.open')}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onOpen()
-                  }}
-                >
-                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M4.5 10h11M11 5.5l4.5 4.5-4.5 4.5" />
-                  </svg>
-                </button>
+                <ActionTooltip label={t('task.session.preview.open')}>
+                  <button
+                    type="button"
+                    className="dsh-task-session-preview-enter"
+                    disabled={chip.availability !== 'available'}
+                    aria-label={t('task.session.preview.open')}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onOpen()
+                    }}
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M4.5 10h11M11 5.5l4.5 4.5-4.5 4.5" />
+                    </svg>
+                  </button>
+                </ActionTooltip>
               </span>
               <span className="dsh-task-session-preview-grid">
                 <span className="dsh-task-session-preview-stat">

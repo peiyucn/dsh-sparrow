@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { NOTE_COLORS } from '../../../constants.js'
 import type { DeskNote, NoteColor } from '../../../contract.js'
+import { ActionTooltip } from '../../app/ActionTooltip.js'
 import { formatLocalDateTime } from '../../app/utils.js'
 import type { DeskTranslator, PlacedNote } from '../../app/types.js'
 
@@ -64,29 +65,30 @@ export function NoteCard({
         </span>
         <div className="dsh-desk-note-colors">
           {NOTE_COLORS.map(color => (
-            <button
-              key={color}
-              type="button"
-              className="dsh-desk-dot"
-              data-color={color}
-              data-active={note.color === color}
-              aria-label={t(`color.${color}`)}
-              title={t(`color.${color}`)}
-              onClick={() => onColor(note, color)}
-            />
+            <ActionTooltip key={color} label={t(`color.${color}`)}>
+              <button
+                type="button"
+                className="dsh-desk-dot"
+                data-color={color}
+                data-active={note.color === color}
+                aria-label={t(`color.${color}`)}
+                onClick={() => onColor(note, color)}
+              />
+            </ActionTooltip>
           ))}
         </div>
-        <button
-          type="button"
-          className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-note-action"
-          aria-label={t('action.trash')}
-          title={t('action.trash')}
-          onClick={() => onTrash(note)}
-        >
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-            <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
-          </svg>
-        </button>
+        <ActionTooltip label={t('action.trash')}>
+          <button
+            type="button"
+            className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-note-action"
+            aria-label={t('action.trash')}
+            onClick={() => onTrash(note)}
+          >
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+              <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+            </svg>
+          </button>
+        </ActionTooltip>
       </div>
       <textarea
         ref={textareaRef}

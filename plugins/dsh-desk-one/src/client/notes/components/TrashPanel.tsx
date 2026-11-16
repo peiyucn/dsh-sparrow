@@ -5,6 +5,7 @@
 
 import type { ReactElement } from 'react'
 import type { DeskNote } from '../../../contract.js'
+import { ActionTooltip } from '../../app/ActionTooltip.js'
 import type { DeskTranslator } from '../../app/types.js'
 import { LoadMore, SubPageHeader } from '../../app/SubPageHeader.js'
 import { formatDate } from '../../app/utils.js'
@@ -37,29 +38,31 @@ export function TrashPanel({
                   <span className="dsh-desk-trash-dot" data-color={note.color} />
                   <span className="dsh-desk-trash-text">{note.title === '' ? t('note.placeholder') : note.title}</span>
                   <span className="dsh-desk-trash-meta">{formatDate(note.updatedAt)}</span>
-                  <button
-                    type="button"
-                    className="dsh-desk-iconbtn"
-                    aria-label={t('action.restore')}
-                    title={t('action.restore')}
-                    onClick={() => onRestore(note)}
-                  >
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                      <path d="M4.5 6.5v4h4" />
-                      <path d="M5 10.3A5.2 5.2 0 1 1 6.6 13.2" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    className="dsh-desk-iconbtn dsh-desk-iconbtn-danger"
-                    aria-label={t('action.delete')}
-                    title={t('action.delete')}
-                    onClick={() => onDelete(note.id)}
-                  >
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                      <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
-                    </svg>
-                  </button>
+                  <ActionTooltip label={t('action.restore')}>
+                    <button
+                      type="button"
+                      className="dsh-desk-iconbtn"
+                      aria-label={t('action.restore')}
+                      onClick={() => onRestore(note)}
+                    >
+                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                        <path d="M4.5 6.5v4h4" />
+                        <path d="M5 10.3A5.2 5.2 0 1 1 6.6 13.2" />
+                      </svg>
+                    </button>
+                  </ActionTooltip>
+                  <ActionTooltip label={t('action.delete')}>
+                    <button
+                      type="button"
+                      className="dsh-desk-iconbtn dsh-desk-iconbtn-danger"
+                      aria-label={t('action.delete')}
+                      onClick={() => onDelete(note.id)}
+                    >
+                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                        <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+                      </svg>
+                    </button>
+                  </ActionTooltip>
                 </li>
               ))}
             </ul>

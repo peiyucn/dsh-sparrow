@@ -3,6 +3,7 @@
 import { calendarColorOf, calendarNameOf, formatClock24h, startOfLocalDay } from './utils.js'
 import { dayLabel, eventTitle, providerKey } from './shared.js'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { ActionTooltip } from '../app/ActionTooltip.js'
 import { useCopyFeedback } from '../app/useCopyFeedback.js'
 import type { ClickPoint } from './shared.js'
 import type { DeskCalendar, DeskEvent, DeskScheduleSource } from '../../contract.js'
@@ -109,7 +110,9 @@ export function EventCard(props: {
       <header>
         <span className="dsh-desk-schedule-colorbar" style={{ background: calendarColorOf(event, calendars) }} />
         <h3 title={eventTitle(t, event)}>{eventTitle(t, event)}</h3>
-        <button type="button" className="dsh-desk-schedule-icon" aria-label={t('schedule.detail.close')} onClick={props.onClose}>×</button>
+        <ActionTooltip label={t('schedule.detail.close')}>
+          <button type="button" className="dsh-desk-schedule-icon" aria-label={t('schedule.detail.close')} onClick={props.onClose}>×</button>
+        </ActionTooltip>
       </header>
       <p className="dsh-desk-schedule-detail-source">
         {source === undefined ? calendarNameOf(event, calendars) : `${t(providerKey(source.provider) as never)} · ${source.account ?? ''} · ${calendarNameOf(event, calendars)}`}

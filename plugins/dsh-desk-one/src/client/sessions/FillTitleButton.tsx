@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
-import { SessionActionTooltip } from './SessionActionTooltip.js'
+import { ActionTooltip } from '../app/ActionTooltip.js'
 
 /** How long the button shows its check mark: feedback for the fill action, not for the copy. */
 const FILL_FEEDBACK_MS = 1_600
@@ -21,7 +21,7 @@ export function FillTitleButton(props: {
     window.setTimeout(() => setDone(false), FILL_FEEDBACK_MS)
   }
   return (
-    <SessionActionTooltip label={props.label}>
+    <ActionTooltip label={props.label}>
       <button type="button" className="dsh-desk-row-action" aria-label={props.label} onClick={fill}>
         <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           {done
@@ -29,6 +29,6 @@ export function FillTitleButton(props: {
             : <><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>}
         </svg>
       </button>
-    </SessionActionTooltip>
+    </ActionTooltip>
   )
 }
