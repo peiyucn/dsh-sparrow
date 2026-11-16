@@ -188,6 +188,18 @@ export const SESSIONS_CSS = `
 .dsh-desk-row-action:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); color: inherit; }
 .dsh-desk-row-action:disabled { opacity: .4; cursor: default; }
 .dsh-desk-row-action[data-armed='true'] { border-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); }
+.dsh-desk-row-action[data-armed='true'] {
+  /* Reveal the confirmation label on the first click, so a two-step delete does not read as
+     "nothing happened". Width grows only while armed. */
+  width: auto;
+  padding: 0 8px;
+  gap: 4px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.dsh-desk-row-action-label { white-space: nowrap; }
 .dsh-desk-row-action[data-danger='true'] { color: #c2410c; border-color: color-mix(in srgb, #c2410c 45%, transparent); }
 /* Copy feedback stays on the button itself: green check on success, red tint on a rejected write. */
 .dsh-desk-row-copy[data-copy-state='copied'] {

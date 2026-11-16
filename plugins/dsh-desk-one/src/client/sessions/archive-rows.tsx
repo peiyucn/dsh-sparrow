@@ -69,6 +69,7 @@ export function ArchiveTreeNodeRow(props: {
           <SessionRowAction
             kind="trash"
             label={t('sessions.archive.toTrash')}
+            confirmLabel={t('sessions.archive.toTrashConfirm')}
             armed={armedTrash.has(node.sessionId)}
             disabled={busy || !node.backendSupported}
             onClick={() => {

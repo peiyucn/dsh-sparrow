@@ -15,24 +15,32 @@ const PATHS: Record<SessionActionKind, ReactElement> = {
 export function SessionRowAction(props: {
   readonly kind: SessionActionKind
   readonly label: string
+  /** Text shown in place of the icon after the first click of a two-step action. */
+  readonly confirmLabel?: string
   readonly armed?: boolean
   readonly danger?: boolean
   readonly disabled?: boolean
   readonly onClick: () => void
 }): ReactElement {
+  const text = props.armed === true && props.confirmLabel !== undefined ? props.confirmLabel : props.label
   return (
-    <ActionTooltip label={props.label}>
+    <ActionTooltip label={text}>
       <button
         type="button"
         className="dsh-desk-row-action"
         data-danger={props.danger === true ? 'true' : undefined}
         data-armed={props.armed === true ? 'true' : undefined}
         disabled={props.disabled === true}
-        aria-label={props.label}
+        aria-label={text}
         onClick={props.onClick}
       >
         {props.armed === true
-          ? <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          ? (
+              <>
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                <span className="dsh-desk-row-action-label">{text}</span>
+              </>
+            )
           : <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{PATHS[props.kind]}</svg>}
       </button>
     </ActionTooltip>

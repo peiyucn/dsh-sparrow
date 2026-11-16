@@ -154,6 +154,12 @@ export const TASK_GROUP_CSS = `
 .dsh-task-group-head:hover .dsh-task-group-actions {
   opacity: 1;
 }
+/* Keep an armed confirmation visible even after the pointer leaves the header (the button keeps
+   focus after the first click); otherwise the "click again" label would fade out mid-confirm. */
+.dsh-task-group-head:focus-within .dsh-task-group-actions,
+.dsh-task-group-actions[data-confirm='true'] {
+  opacity: 1;
+}
 .dsh-task-group-body {
   display: flex;
   flex-direction: column;

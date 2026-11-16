@@ -65,6 +65,7 @@ function GroupArchiveRow({
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
             <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
           </svg>
+          {confirm ? <span className="dsh-desk-confirm-label">{t('task.deleteConfirm')}</span> : null}
         </button>
       </ActionTooltip>
     </li>
@@ -111,6 +112,7 @@ function ArchiveRow({
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
             <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
           </svg>
+          {confirm ? <span className="dsh-desk-confirm-label">{t('task.deleteConfirm')}</span> : null}
         </button>
       </ActionTooltip>
     </li>

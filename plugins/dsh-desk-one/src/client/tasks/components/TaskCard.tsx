@@ -417,7 +417,7 @@ export function TaskCard({
                 {task.due === undefined ? null : <span className="dsh-task-due-date">{task.due.date}</span>}
               </button>
             )}
-        <div className="dsh-task-actions">
+        <div className="dsh-task-actions" data-confirm={confirmDelete ? 'true' : undefined}>
           {canArchive
             ? (
                 <ActionTooltip label={t('task.archive')}>
@@ -449,6 +449,7 @@ export function TaskCard({
               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
                 <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
               </svg>
+              {confirmDelete ? <span className="dsh-desk-confirm-label">{t('task.deleteConfirm')}</span> : null}
             </button>
           </ActionTooltip>
         </div>

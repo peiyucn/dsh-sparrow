@@ -513,6 +513,18 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   width: 16px;
   height: 16px;
 }
+/* Armed two-step action: the first click must not look like a no-op, so the button reveals
+   its confirmation label until the second click (or blur). */
+.dsh-desk-iconbtn[data-confirm='true'] {
+  width: auto;
+  padding: 0 8px;
+  gap: 4px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.dsh-desk-confirm-label { white-space: nowrap; }
 
 .dsh-desk-error {
   flex: none;

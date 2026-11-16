@@ -223,6 +223,7 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
                         <SessionRowAction
                           kind="trash"
                           label={t('sessions.archive.toTrash')}
+                          confirmLabel={t('sessions.archive.toTrashConfirm')}
                           armed={armedTrash.has(item.sessionId)}
                           disabled={busy || !item.backendSupported}
                           onClick={() => {
@@ -233,6 +234,7 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
                         <SessionRowAction
                           kind="delete"
                           label={t('sessions.archive.delete')}
+                          confirmLabel={t('sessions.archive.deleteConfirm')}
                           armed={deleteDraft?.id === item.sessionId}
                           danger
                           disabled={busy || !item.backendSupported}
@@ -350,6 +352,7 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
                         <SessionRowAction
                           kind="delete"
                           label={t('sessions.archive.delete')}
+                          confirmLabel={t('sessions.archive.deleteConfirm')}
                           armed={armedTrashDelete.has(entry.trashId)}
                           danger
                           disabled={busy}

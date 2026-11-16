@@ -477,7 +477,8 @@ export const TASK_CARD_CSS = `
   transition: opacity 0.12s ease;
 }
 .dsh-task-card:hover .dsh-task-actions,
-.dsh-task-card:focus-within .dsh-task-actions {
+.dsh-task-card:focus-within .dsh-task-actions,
+.dsh-task-actions[data-confirm='true'] {
   opacity: 1;
 }
 .dsh-desk-iconbtn-danger[data-confirm='true'] {
