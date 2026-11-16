@@ -12,16 +12,13 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 [Desk One docs](plugins/dsh-desk-one/README.md) · [Plugin market](https://dsh.pyai.site/)
 
-**Desk One (同桌)** is a shared desk for you and harness inside the DSH web UI: one sidebar entry, one panel, and one shared object model behind every tab. Annotations, notes, tasks, schedule and agent sessions live side by side; the schedule is a read-only mirror of the calendars you connect. The header's split **「✦」 Desk One｜Talk to Me** button drops a tab-aware prefilled prompt into the conversation, and the **…** menu holds **Make a wish** for turning an idea into a GitHub issue draft.
-
 ## What it is
 
-* **One desk, not five pages.** Everything sits behind a single **Desk One** sidebar entry and switches tabs inside one panel; each tab can also be pinned as its own sidebar shortcut.
-* **Annotations — AI writes, you annotate.** Link a registered DSH workspace as the notebook library, browse its Markdown / text files, and open a page in a dedicated annotation Session with exact source lines and a per-Session round baseline. No editor, no git dependency and no new-note form.
-* **Notes — a wall, not a form.** A free-form sticky canvas with in-place editing, drag, resize, colour, layer order and a trash; **Smash!** clears the wall into the trash after a confirmation.
-* **Tasks — a three-lane board.** To do / Doing / Done with colour tags, day-granular due dates, pointer dragging, one-level groups and a Done archive. Cards can link DSH sessions with **@**.
-* **Schedule — a read-only mirror.** WeCom, iCloud and personal Outlook (Microsoft Graph) calendars plus public ICS subscriptions, shown as Start / Today / Upcoming plus month / week / list views.
-* **Sessions — the shared catalog.** Active sessions grouped by workspace, plus archived / stray / trash sections with restore and permanent delete.
+* Annotations: Link a registered DSH workspace as the notebook library, browse its Markdown / text files, and open a page in a dedicated annotation Session — exact source lines, a per-Session round baseline. No editor, no git dependency and no new-note form.
+* Notes: A free-form sticky canvas with in-place editing, drag, resize, colour, layer order and a trash; **Smash!** clears the wall into the trash after a confirmation.
+* Tasks: To do / Doing / Done lanes with colour tags, day-granular due dates, pointer dragging, one-level groups and a Done archive. Cards can link DSH sessions with **@**.
+* Schedule: WeCom, iCloud and personal Outlook (Microsoft Graph) calendars plus public ICS subscriptions, shown as Start / Today / Upcoming plus month / week / list views.
+* Sessions: Active sessions grouped by workspace, plus archived / stray / trash sections with restore and permanent delete.
 
 ## Requirements
 
@@ -37,7 +34,7 @@ English | [简体中文](README.zh-CN.md) | [GitHub](https://github.com/peiyucn/
 
 ## With harness
 
-Desk One is built for both sides of the desk. The same objects the panel writes are exposed to harness through a bundled skill and **19 agent tools**, so you can ask in the conversation and work on the same desk.
+Desk One is built for you and harness together. The same objects the panel writes are exposed to harness through a bundled skill and **19 agent tools**: ask in the conversation and harness edits the same objects the panel shows.
 
 * **The `desk-one` skill** (on by default, also listed in `/`) teaches the agent when to use a note, a task, a group, a schedule query or a notebook page, and the `list → revision → update` flow. It also keeps the notebook boundary: `desk_page_list` only searches the workspace currently linked in the panel; it never writes files.
 * **The 19 tools share the panel's storage and revision checks.** Note, task and group edits carry a revision check, so the agent and the panel cannot silently overwrite each other; a stale write fails with a conflict instead.
@@ -50,7 +47,7 @@ Desk One is built for both sides of the desk. The same objects the panel writes 
 | Schedule (3) | `desk_schedule_list` · `desk_schedule_sync` · `desk_schedule_connections` | Read the mirror, trigger a sync and inspect connection status; the calendar itself stays read-only. |
 | Notebook (1) | `desk_page_list` | Read-only search of the linked notebook's pages. |
 
-That is the **with harness** part: you can talk about the same desk you are looking at — ask it to add a card, tidy the wall, summarize the week or find the note you were annotating — and you are both working on the same objects.
+That is the **with harness** part: **you say it, harness does it.** Adding a card, tidying the wall, summarizing the week or finding the note you were annotating all start in the conversation.
 
 ## Data and privacy
 
