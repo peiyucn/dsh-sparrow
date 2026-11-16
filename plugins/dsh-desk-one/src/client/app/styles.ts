@@ -7,6 +7,11 @@ export const APP_CSS = `
    declares 14px explicitly. */
 .dsh-desk-page {
   --dsh-desk-header-h: calc(76px + var(--dsh-frame-top-clearance, 0px));
+  /* The official light theme scrollbar token is #e5e5e5: nearly invisible on a white page.
+     Rebinding the two thumb variables here covers every scroll region in the panel (WebKit uses
+     the pseudo-element rules; the Firefox fallback re-resolves the same variables per element). */
+  --dsh-scrollbar-thumb: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 26%, transparent);
+  --dsh-scrollbar-thumb-hover: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 40%, transparent);
   position: relative;
   box-sizing: border-box;
   display: flex;
