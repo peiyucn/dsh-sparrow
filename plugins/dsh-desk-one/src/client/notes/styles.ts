@@ -98,7 +98,7 @@ export const NOTES_CSS = `
   padding: 8px 12px 12px;
   border: 1px solid rgba(55, 53, 47, 0.08);
   border-radius: 2px;
-  background-color: #eeeae2;
+  background-color: #f5f3ee;
   color: #37352f;
   box-shadow: 0 1px 1px rgba(24, 28, 40, 0.05), 0 6px 16px -10px rgba(24, 28, 40, 0.28);
   cursor: grab;
@@ -119,19 +119,14 @@ export const NOTES_CSS = `
   cursor: grabbing;
   z-index: 100000;
 }
-/* Light paper: clean pastels — enough chroma that the hue reads, light enough that the paper stays
-   paper instead of turning muddy grey. The dot on top keeps the deeper hue for the color tag. */
-.dsh-desk-note[data-color='default'] { background-color: #eeeae2; }
-.dsh-desk-note[data-color='yellow'] { background-color: #f9e2a5; }
-.dsh-desk-note[data-color='green'] { background-color: #cfe8c8; }
-.dsh-desk-note[data-color='blue'] { background-color: #cfe2f3; }
-.dsh-desk-note[data-color='pink'] { background-color: #f4d7e2; }
-/* Dark theme keeps the deeper paper: the clean pastels above would glow on the dark surface. */
-body[data-ds-dark-theme] .dsh-desk-note[data-color='default'] { background-color: #e4e0d9; }
-body[data-ds-dark-theme] .dsh-desk-note[data-color='yellow'] { background-color: #e9d3a3; }
-body[data-ds-dark-theme] .dsh-desk-note[data-color='green'] { background-color: #bccebb; }
-body[data-ds-dark-theme] .dsh-desk-note[data-color='blue'] { background-color: #b8cad8; }
-body[data-ds-dark-theme] .dsh-desk-note[data-color='pink'] { background-color: #e0c0ce; }
+/* Paper: one clean, high-lightness pastel palette for both themes. Low chroma plus mid lightness
+   was what read as muddy; these tints keep the hue clearly visible while the paper stays airy.
+   The dot on top keeps the deeper hue for the color tag. */
+.dsh-desk-note[data-color='default'] { background-color: #f5f3ee; }
+.dsh-desk-note[data-color='yellow'] { background-color: #ffeb9c; }
+.dsh-desk-note[data-color='green'] { background-color: #cdf0c2; }
+.dsh-desk-note[data-color='blue'] { background-color: #cbe4ff; }
+.dsh-desk-note[data-color='pink'] { background-color: #ffd6e8; }
 .dsh-desk-note-bar {
   display: flex;
   align-items: center;
