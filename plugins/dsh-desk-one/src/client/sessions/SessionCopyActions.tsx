@@ -10,6 +10,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useCopyFeedback, type CopyFeedbackState } from '../app/useCopyFeedback.js'
 import type { DeskTranslator } from '../app/types.js'
+import { SessionActionTooltip } from './SessionActionTooltip.js'
 
 function CopyButton(props: {
   readonly state: CopyFeedbackState
@@ -25,16 +26,17 @@ function CopyButton(props: {
       ? t('sessions.copyFailed')
       : props.label
   return (
-    <button
-      type="button"
-      className="dsh-desk-row-action dsh-desk-row-copy"
-      data-copy-state={state === 'idle' ? undefined : state}
-      title={text}
-      aria-label={text}
-      onClick={props.onCopy}
-    >
-      {state === 'copied' ? <IconCheckOutlineRegular size={14} /> : props.icon}
-    </button>
+    <SessionActionTooltip label={text}>
+      <button
+        type="button"
+        className="dsh-desk-row-action dsh-desk-row-copy"
+        data-copy-state={state === 'idle' ? undefined : state}
+        aria-label={text}
+        onClick={props.onCopy}
+      >
+        {state === 'copied' ? <IconCheckOutlineRegular size={14} /> : props.icon}
+      </button>
+    </SessionActionTooltip>
   )
 }
 
