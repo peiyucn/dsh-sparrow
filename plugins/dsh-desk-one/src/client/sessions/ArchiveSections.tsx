@@ -1,9 +1,10 @@
 /**
  * Session archive management sections (A2): archived tree, stray sessions and trash.
  *
- * Every destructive action is armed in place first (two-step confirm); permanent delete also
- * requires typing the exact title, matching the archived plugin's safety contract. The trust fence
- * and file validation live on the host; this file only renders state and confirms intent.
+ * Every destructive action is armed in place first (two-step confirm). Permanent delete no longer
+ * asks the user to retype the title: the row's own title is submitted automatically on the second
+ * click, and the host-side exact-title check still guards the route. The trust fence and file
+ * validation live on the host; this file only renders state and confirms intent.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -19,7 +20,6 @@ import type { SessionsArchiveApi } from './archiveApi.js'
 import { formatShortDate, formatTokens } from '../app/utils.js'
 import { ArchiveTreeNodeRow, countTree, TrashSubagentRows } from './archive-rows.js'
 import { ConfirmButton } from './ConfirmButton.js'
-import { FillTitleButton } from './FillTitleButton.js'
 import { knownSessionIds, type KnownSessions } from './known.js'
 import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
@@ -53,7 +53,7 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
   const [busy, setBusy] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [armedTrash, setArmedTrash] = useState<Set<string>>(new Set())
-  const [deleteDraft, setDeleteDraft] = useState<{ id: string; text: string } | null>(null)
+  const [armedDelete, setArmedDelete] = useState<string | null>(null)
   const [armedTrashDelete, setArmedTrashDelete] = useState<Set<string>>(new Set())
   const [bulk, setBulk] = useState<null | 'restoreAll' | 'deleteAll'>(null)
   /** Feedback for the trash-directory copy: the path button flips to "copied" for 2s. */
@@ -108,7 +108,7 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
     } finally {
       setBusy(false)
       setArmedTrash(new Set())
-      setDeleteDraft(null)
+      setArmedDelete(null)
       setArmedTrashDelete(new Set())
       setBulk(null)
     }
@@ -130,7 +130,7 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
 
   const onConfirmDelete = (node: ArchiveTreeNode): void => {
     void run(
-      () => api.deleteSession({ sessionId: node.sessionId, confirmTitle: deleteDraft?.text }),
+      () => api.deleteSession({ sessionId: node.sessionId, confirmTitle: node.title }),
       dropFromTree(node.sessionId),
     )
   }
@@ -158,7 +158,7 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
                   t={t}
                   expanded={expanded}
                   armedTrash={armedTrash}
-                  deleteDraft={deleteDraft}
+                  deleteArmed={armedDelete === node.sessionId}
                   busy={busy}
                   onToggleExpand={(id) => setExpanded(previous => {
                     const next = new Set(previous)
@@ -170,8 +170,7 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
                   onUnarchive={(id) => { void run(() => api.unarchive(id), dropFromTree(id)) }}
                   onArmTrash={(id) => setArmedTrash(new Set([id]))}
                   onConfirmTrash={(id) => { void run(() => api.moveToTrash(id), dropFromTree(id)) }}
-                  onArmDelete={(id) => setDeleteDraft({ id, text: '' })}
-                  onDeleteDraft={(id, text) => setDeleteDraft({ id, text })}
+                  onArmDelete={(id) => setArmedDelete(id)}
                   onConfirmDelete={onConfirmDelete}
                 />
               ))}
@@ -235,17 +234,16 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
                           kind="delete"
                           label={t('sessions.archive.delete')}
                           confirmLabel={t('sessions.archive.deleteConfirm')}
-                          armed={deleteDraft?.id === item.sessionId}
+                          armed={armedDelete === item.sessionId}
                           danger
                           disabled={busy || !item.backendSupported}
                           onClick={() => {
-                            if (deleteDraft?.id !== item.sessionId) { setDeleteDraft({ id: item.sessionId, text: '' }); return }
-                            const confirmTitle = deleteDraft.text
+                            if (armedDelete !== item.sessionId) { setArmedDelete(item.sessionId); return }
                             void run(
                               () => api.deleteSession(
                                 item.blank
                                   ? { sessionId: item.sessionId, confirm: true }
-                                  : { sessionId: item.sessionId, confirmTitle },
+                                  : { sessionId: item.sessionId, confirmTitle: item.title },
                               ),
                               current => ({ ...current, strays: current.strays.filter(row => row.sessionId !== item.sessionId) }),
                             )
@@ -254,25 +252,6 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
                       </>
                     )}
                   />
-                  {deleteDraft?.id === item.sessionId ? (
-                    <div className="dsh-desk-archive-deletebox">
-                      {item.blank ? <span className="dsh-desk-archive-note">{t('sessions.archive.blankDeleteNote')}</span> : (
-                         <>
-                           <FillTitleButton
-                             title={item.title}
-                             label={t('today.copyTitle')}
-                             onFill={() => setDeleteDraft({ id: item.sessionId, text: item.title })}
-                           />
-                           <input
-                             className="dsh-desk-archive-input"
-                             value={deleteDraft.text}
-                             placeholder={t('sessions.archive.deletePlaceholder')}
-                             onChange={event => setDeleteDraft({ id: item.sessionId, text: event.target.value })}
-                           />
-                         </>
-                       )}
-                    </div>
-                  ) : null}
                 </li>
               ))}
             </ul>

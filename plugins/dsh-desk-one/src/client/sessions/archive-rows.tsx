@@ -1,6 +1,6 @@
 /**
- * Archive tree rows: one archived session subtree (with its two-step actions and inline delete
- * confirmation) plus the read-only subagent rows shown inside a trash entry.
+ * Archive tree rows: one archived session subtree (with its two-step actions) plus the read-only
+ * subagent rows shown inside a trash entry.
  */
 
 import type { ReactElement } from 'react'
@@ -8,7 +8,6 @@ import { fileSizeText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ArchiveTreeNode } from '../../session-admin.js'
 import type { DeskTranslator } from '../app/types.js'
 import { formatShortDate, formatTokens } from '../app/utils.js'
-import { FillTitleButton } from './FillTitleButton.js'
 import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
@@ -26,7 +25,7 @@ export function ArchiveTreeNodeRow(props: {
   readonly t: DeskTranslator
   readonly expanded: Set<string>
   readonly armedTrash: Set<string>
-  readonly deleteDraft: { readonly id: string; readonly text: string } | null
+  readonly deleteArmed: boolean
   readonly busy: boolean
   readonly onToggleExpand: (id: string) => void
   readonly onOpen: (id: string) => void
@@ -34,17 +33,11 @@ export function ArchiveTreeNodeRow(props: {
   readonly onArmTrash: (id: string) => void
   readonly onConfirmTrash: (id: string) => void
   readonly onArmDelete: (id: string) => void
-  readonly onDeleteDraft: (id: string, text: string) => void
   readonly onConfirmDelete: (node: ArchiveTreeNode) => void
 }): ReactElement {
-  const { node, depth, t, readOnly, expanded, armedTrash, deleteDraft, busy } = props
+  const { node, depth, t, readOnly, expanded, armedTrash, deleteArmed, busy } = props
   const hasChildren = node.children.length > 0
   const open = expanded.has(node.sessionId)
-  const deleteArmed = deleteDraft?.id === node.sessionId
-  // Archived rows always require the exact title: the host only waives confirmation for blank
-  // stray sessions, never for anything reached through the archived tree.
-  const canDelete = deleteArmed && deleteDraft !== null
-    && deleteDraft.text.trim() === node.title.trim() && node.title.trim() !== ''
   const badges = (
     <>
       {hasChildren ? <span className="dsh-desk-archive-badge">{t('sessions.childCount', { count: node.children.length })}</span> : null}
@@ -79,7 +72,8 @@ export function ArchiveTreeNodeRow(props: {
           />
           <SessionRowAction
             kind="delete"
-            label={deleteArmed ? t('sessions.archive.deleteConfirm') : t('sessions.archive.delete')}
+            label={t('sessions.archive.delete')}
+            confirmLabel={t('sessions.archive.deleteConfirm')}
             armed={deleteArmed}
             danger
             disabled={busy || !node.backendSupported}
@@ -111,28 +105,6 @@ export function ArchiveTreeNodeRow(props: {
         meta={meta}
         actions={actions}
       />
-      {deleteArmed ? (
-        <div className="dsh-desk-archive-deletebox" style={{ marginLeft: `calc(12px + ${depth} * 16px)` }}>
-          <FillTitleButton
-            title={node.title}
-            label={props.t('today.copyTitle')}
-            onFill={() => props.onDeleteDraft(node.sessionId, node.title)}
-          />
-          <input
-            className="dsh-desk-archive-input"
-            value={deleteDraft?.text ?? ''}
-            placeholder={props.t('sessions.archive.deletePlaceholder')}
-            onChange={event => props.onDeleteDraft(node.sessionId, event.target.value)}
-          />
-          <button
-            type="button"
-            className="dsh-desk-archive-action"
-            data-danger="true"
-            disabled={!canDelete || busy}
-            onClick={() => props.onConfirmDelete(node)}
-          >{props.t('sessions.archive.deleteConfirm')}</button>
-        </div>
-      ) : null}
       {hasChildren && open ? (
         <ul className="dsh-desk-archive-list dsh-desk-tree-children">
           {node.children.map(child => (
@@ -144,7 +116,7 @@ export function ArchiveTreeNodeRow(props: {
               t={t}
               expanded={expanded}
               armedTrash={armedTrash}
-              deleteDraft={deleteDraft}
+              deleteArmed={false}
               busy={busy}
               onToggleExpand={props.onToggleExpand}
               onOpen={props.onOpen}
@@ -152,7 +124,6 @@ export function ArchiveTreeNodeRow(props: {
               onArmTrash={props.onArmTrash}
               onConfirmTrash={props.onConfirmTrash}
               onArmDelete={props.onArmDelete}
-              onDeleteDraft={props.onDeleteDraft}
               onConfirmDelete={props.onConfirmDelete}
             />
           ))}

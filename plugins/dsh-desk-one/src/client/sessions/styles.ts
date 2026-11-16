@@ -40,27 +40,6 @@ export const SESSIONS_CSS = `
   border-color: color-mix(in srgb, #c2410c 55%, transparent);
   color: #c2410c;
 }
-.dsh-desk-archive-deletebox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 12px 8px;
-}
-.dsh-desk-archive-input {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  border: 0.5px solid var(--dsw-alias-border-l2, #d8dde5);
-  background: transparent;
-  color: inherit;
-}
-.dsh-desk-archive-note {
-  font-size: 11px;
-  color: var(--dsw-alias-label-tertiary, #8a919f);
-}
 .dsh-desk-archive-error {
   margin: 0;
   font-size: 12px;

@@ -14,7 +14,7 @@
 | 页头 tab | ConversationRoot 的 `.tabs` / `.viewTabs` / `.tab` | 两层 flex：外层 gap 20px（viewTabs ↔ More），内层 gap 32px（文字间）；tab 本体 35px 高、上抬 10px、padding 10/9、10px 命中内边距；当前项 2px 下划线压在页头 rule 上；More 22×22，menu 以三点为锚点左对齐浮出 |
 | 功能动作按钮 | 插件页 `ui-plugin-manager` 的 PluginManagerPage（`.addPrimary` / `.addMore` 覆盖值） | **32px 高 / 13px 文案 / 20px 行高 / 0 12px padding / 12px 圆角**；primary fill 或 0.5px 描边；保留图标 + 文字；图标走官方 Button 的 16px 图标位；不采用通用 Button sm 的 28px/8px |
 | Tooltip | 官方 `ui-primitives` 的 `Tooltip` | 所有**纯图标动作**统一用官方气泡（400ms 延迟、portal 到 body）；不再用原生 `title`（macOS 下依赖悬停后鼠标移动，常不出）。有可见文字标签的按钮不重复挂 tooltip |
-| 两步确认 | 危险动作统一 | 第一次点击后按钮**原位展开成带字按钮**（「确认删除」/「再点一次移入回收站」等），第二次点击才执行；任务类失焦即取消。不得只把图标换成对勾而不给文案 |
+| 两步确认 | 危险动作统一 | 第一次点击后按钮**原位展开成带字按钮**（「确认删除」/「再点一次移入回收站」等），第二次点击才执行；彻底删除不再要求逐字输入标题，行标题由 UI 自动提交（宿主仍校验 exact title），任务类失焦即取消 |
 | 材质 | theme-tone 的官方对话区顶栏 | 默认 `bg-base` 实色、无模糊；theme-tone 激活且非 plain 时，header 自身透明，由 `::before` 套其 barGlass（54% 底色 + `blur(24px) saturate(170%) brightness(1.04)` + 同相位打光）；DeskOne 不另定玻璃配方 |
 | 滚动条 | `ui-theme` 的 scrollbar skin + 对话区滚动契约 | 不声明 `scrollbar-width`（会关闭 Chromium 的 ::-webkit-scrollbar 规则）；track margin 只错开顶部（header + 2px），底部保留 2px，thumb 和内容都能滚到底；面板内把 `--dsh-scrollbar-thumb{,-hover}` 重绑为 label-primary 26% / 40%，因为官方浅色 l1 `#e5e5e5` 在白底上几乎看不见 |
 | 内容区 | 各功能自身语义 | 与页头间距统一 14px；便签墙固定宽度、纵向无限、横向不滚动、全宽动态；任务板三泳道；Sessions 为会话目录 + 归档管理（四区统一行布局）；页头靠 theme-tone 决定是否玻璃 |
