@@ -55,3 +55,28 @@ export function excludeKnownSessions<T extends { readonly id: string }>(
   if (known.archived.size === 0 && known.trashed.size === 0) return sessions
   return sessions.filter(session => !known.archived.has(session.id) && !known.trashed.has(session.id))
 }
+
+/**
+ * Drop the optimistic hide for ids an archive pane now shows.
+ *
+ * Hiding the row right after archiving keeps it from lingering while the archive pane scans disk.
+ * Once the pane lists the id, the pane itself is the authority: the active catalog filters it via
+ * {@link excludeKnownSessions}, and the hide can go. Clearing it here (rather than only suppressing
+ * it at render time) is what makes a later unarchive / restore show the row immediately instead of
+ * leaving it invisible until a full page refresh.
+ * @param hidden - ids hidden after an active-row archive.
+ * @param known - ids currently shown by the archive sections.
+ * @returns the hidden set without ids the archive pane owns, or the same set when nothing changed.
+ */
+export function pruneKnownHidden(
+  hidden: Set<string>,
+  known: KnownSessions,
+): Set<string> {
+  let next: Set<string> | null = null
+  for (const id of hidden) {
+    if (!known.archived.has(id) && !known.trashed.has(id)) continue
+    next ??= new Set(hidden)
+    next.delete(id)
+  }
+  return next ?? hidden
+}

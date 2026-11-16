@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { excludeKnownSessions, knownSessionIds } from '../../lib/client/sessions/known.js'
+import { excludeKnownSessions, knownSessionIds, pruneKnownHidden } from '../../lib/client/sessions/known.js'
 
 /**
  * One archived-tree node.
@@ -52,5 +52,24 @@ describe('会话归档管理：已知 id 集合', () => {
   it('还没有归档数据时原样返回，避免首帧闪空', () => {
     const sessions = [{ id: 'a' }]
     assert.equal(excludeKnownSessions(sessions, { archived: new Set(), trashed: new Set() }), sessions)
+  })
+})
+
+describe('会话归档管理：乐观隐藏的回收', () => {
+  it('归档分区接手展示后清掉隐藏，取消归档时才能立刻回到活跃列表', () => {
+    const hidden = new Set(['a'])
+    const known = knownSessionIds([node('a')], [])
+    assert.deepEqual([...pruneKnownHidden(hidden, known)], [], '归档分区已展示的 id 不得继续隐藏')
+  })
+
+  it('回收站分区同样算接手；未展示的 id 继续隐藏', () => {
+    const hidden = new Set(['a', 'b', 'c'])
+    const known = knownSessionIds([], [trash('b')])
+    assert.deepEqual([...pruneKnownHidden(hidden, known)].sort(), ['a', 'c'])
+  })
+
+  it('没有分区接手的 id 时返回同一集合，不制造无意义重渲染', () => {
+    const hidden = new Set(['a'])
+    assert.equal(pruneKnownHidden(hidden, knownSessionIds([], [])), hidden)
   })
 })

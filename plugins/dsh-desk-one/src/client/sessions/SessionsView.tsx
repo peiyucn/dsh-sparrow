@@ -4,13 +4,13 @@
  * trash operations live in ArchiveSections and all mutations go through the host's routes.
  */
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DeskTranslator } from '../app/types.js'
 import type { SessionChipInfo, SessionLinkSnapshot } from './contract.js'
 import type { SessionsArchiveApi } from './archiveApi.js'
 import { activeSessionGroups } from './catalog.js'
-import { excludeKnownSessions, type KnownSessions } from './known.js'
+import { excludeKnownSessions, pruneKnownHidden, type KnownSessions } from './known.js'
 import { ArchiveSections } from './ArchiveSections.js'
 import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
@@ -85,10 +85,16 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hidden, setHidden] = useState<Set<string>>(new Set())
+  /** Bumped after an active row is archived so the archive pane reloads its own snapshot. */
+  const [archiveRefresh, setArchiveRefresh] = useState(0)
   /** Ids the archive sections already show; keep them out of the active catalog even while the
    *  official session list still carries their rows (a trash move leaves that list stale). */
   const [known, setKnown] = useState<KnownSessions>({ archived: new Set(), trashed: new Set() })
   const activeSessions = excludeKnownSessions(snapshot.sessions, known)
+  const onKnownChange = useCallback((next: KnownSessions): void => {
+    setKnown(next)
+    setHidden(previous => pruneKnownHidden(previous, next))
+  }, [])
   const groups = activeSessionGroups(activeSessions, snapshot.workspaces)
   const activeCount = groups.reduce((sum, group) => sum + group.sessions.length, 0)
   const act = async (sessionId: string, task: () => Promise<unknown>): Promise<void> => {
@@ -97,6 +103,7 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
     try {
       await task()
       setHidden(previous => new Set(previous).add(sessionId))
+      setArchiveRefresh(previous => previous + 1)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
@@ -191,7 +198,7 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
               ))}
         </section>
       ) : <p className="dsh-desk-page-hint">{t('sessions.disabled')}</p>}
-      <ArchiveSections t={t} api={archive} onOpen={onOpen} onKnownChange={setKnown} />
+      <ArchiveSections t={t} api={archive} onOpen={onOpen} onKnownChange={onKnownChange} refreshToken={archiveRefresh} />
     </div>
   )
 }

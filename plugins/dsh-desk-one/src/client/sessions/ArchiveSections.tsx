@@ -41,10 +41,12 @@ interface ArchiveSectionsProps {
   readonly onOpen: (sessionId: string) => void
   /** Report every id these sections display, so the active catalog can drop stale rows. */
   readonly onKnownChange?: (known: KnownSessions) => void
+  /** Parent bump: an active session was archived and the archived pane must reload to show it. */
+  readonly refreshToken: number
 }
 
 
-export function ArchiveSections({ t, api, onOpen, onKnownChange }: ArchiveSectionsProps): ReactElement {
+export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }: ArchiveSectionsProps): ReactElement {
   const [snapshot, setSnapshot] = useState<ArchiveSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -58,22 +60,27 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange }: ArchiveSectio
   const trashDirCopy = useCopyFeedback({ feedbackMs: TRASH_DIR_COPY_FEEDBACK_MS })
   const [visible, setVisible] = useState({ archived: SESSION_STREAM_PAGE_SIZE, strays: SESSION_STREAM_PAGE_SIZE, trash: SESSION_STREAM_PAGE_SIZE })
   const [expandedTrash, setExpandedTrash] = useState<Set<string>>(new Set())
+  /** Monotonic request id: an older reload must never overwrite a newer snapshot. */
+  const reloadSeq = useRef(0)
 
   const reload = useCallback(async (quiet = false): Promise<void> => {
+    const seq = ++reloadSeq.current
     try {
       const [tree, strays, trash, trashDir] = await Promise.all([
         api.list(), api.strays(), api.trash(), api.trashDir(),
       ])
+      if (seq !== reloadSeq.current) return
       setSnapshot({ tree, strays, trash, trashDir })
       setError(null)
     } catch (reason) {
+      if (seq !== reloadSeq.current) return
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
-      if (!quiet) setLoading(false)
+      if (seq === reloadSeq.current && !quiet) setLoading(false)
     }
   }, [api])
 
-  useEffect(() => { void reload() }, [reload])
+  useEffect(() => { void reload() }, [reload, refreshToken])
 
   /** Keep the report stable for the parent even when its setState identity changes per render. */
   const onKnownChangeRef = useRef(onKnownChange)
