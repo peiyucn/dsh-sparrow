@@ -109,7 +109,7 @@ interface TaskPayload {
 | `/api/desk-one/groups/archive` | POST | 整组存档 / 恢复（级联组内卡片） |
 | `/api/desk-one/groups/delete` | POST | 删除分组（成员回未分组） |
 
-工具：`desk_task_add`、`desk_task_list`、`desk_task_update`（含状态与排序）、`desk_task_complete`、`desk_task_archive`；分组：`desk_group_add`、`desk_group_list`、`desk_group_update`、`desk_group_move`、`desk_group_archive`、`desk_group_delete`。
+工具：`desk_task_add`（可传 `link_current_session` 把当前会话写进任务）、`desk_task_list`、`desk_task_update`（含状态与排序）、`desk_task_complete`、`desk_task_archive`；分组：`desk_group_add`、`desk_group_list`、`desk_group_update`、`desk_group_move`、`desk_group_archive`、`desk_group_delete`。新会话任务捕获见 `10-task-capture.md`。
 
 ## 验收标准
 

@@ -15,7 +15,7 @@ import type { DeskStore } from '../store.js'
 export function registerTaskTools(ctx: Context, store: DeskStore): void {
   ctx.tools.register(defineTool({
     name: 'desk_task_add',
-    description: 'Add a task to the user\'s desk board (todo lane by default). Title is required; due date is day-granular (YYYY-MM-DD).',
+    description: 'Add a task to the user\'s desk board (todo lane by default). Title is required; due date is day-granular (YYYY-MM-DD). Set link_current_session true to attach this conversation to the task.',
     parameters: {
       title: { type: 'string', required: true, description: 'Task title (at most 200 characters).' },
       body: { type: 'string', description: 'Optional description / notes (at most 20000 characters).' },
@@ -25,13 +25,27 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
       due_timezone: { type: 'string', description: 'IANA timezone for the due date (optional).' },
       order: { type: 'number', description: 'Manual order inside the lane (larger = later).' },
       group_id: { type: 'string', description: 'Optional group id (see desk_group_list); must belong to the same lane.' },
+      link_current_session: { type: 'boolean', description: 'Link the conversation that called this tool to the new task (the session id is resolved from the tool context).' },
     },
     output: textOutput,
-    async execute(args) {
+    async execute(args, exec) {
       try {
-        const { group_id, ...rest } = args
-        const task = await store.createTask({ ...rest, groupId: group_id })
-        return JSON.stringify({ ok: true, task, summary: `已添加任务「${task.title}」` })
+        const { group_id, link_current_session, due_date, due_timezone, ...rest } = args
+        if (link_current_session === true && exec.agent === undefined) {
+          throw new Error('当前工具调用没有会话上下文，无法关联本会话')
+        }
+        const sessionIds = link_current_session === true ? [String(exec.agent?.id)] : undefined
+        const task = await store.createTask({
+          ...rest,
+          ...(due_date === undefined ? {} : { dueDate: due_date, dueTimezone: due_timezone }),
+          groupId: group_id,
+          ...(sessionIds === undefined ? {} : { sessionIds }),
+        })
+        return JSON.stringify({
+          ok: true,
+          task,
+          summary: `已添加任务「${task.title}」${link_current_session === true ? '（已关联本会话）' : ''}`,
+        })
       } catch (error) {
         toolError(error)
       }

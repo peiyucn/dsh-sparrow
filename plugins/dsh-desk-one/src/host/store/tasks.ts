@@ -18,6 +18,7 @@ export interface CreateTaskInput {
   readonly dueTimezone?: unknown
   readonly order?: unknown
   readonly groupId?: unknown
+  readonly sessionIds?: unknown
 }
 
 export class TaskRepository {
