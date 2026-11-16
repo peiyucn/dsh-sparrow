@@ -181,6 +181,10 @@ export const SESSIONS_CSS = `
   color: var(--dsw-alias-label-secondary, #6b7280);
   cursor: pointer;
 }
+.dsh-desk-row-action svg {
+  width: 16px;
+  height: 16px;
+}
 .dsh-desk-row-action:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05)); color: inherit; }
 .dsh-desk-row-action:disabled { opacity: .4; cursor: default; }
 .dsh-desk-row-action[data-armed='true'] { border-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); }

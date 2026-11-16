@@ -12,7 +12,8 @@
 | 品牌 lockup | 官方 `BrandWordmark` 的反色徽章 | 中文 **同桌**、英文 **Desk One**（与官方 HARNESS wordmark 一样，英文徽章视觉全大写 DESK ONE；中文标题不受影响）；页头品牌位是**一枚分段按钮**：左半为反色徽章（墨色底 + inverted 字 + 14px **「✦」字形**，不拆成两个方块），右半为墨色 0.5px 线框、无填充的「和我说」（主题反色；整枚按钮打开按 tab 的预填菜单，见 08）；副标题后接官方插件页同款 20px infoButton + Tooltip（无点击行为、宽度上限 300px，内含「两种用法 + 示例」；info 小标保持在副标题之后（2026-11-14 决定，跟官方插件页惯例））；tab 与（固定后的）左栏入口共用同一套图标（日程用自绘小日历，避免与官方自动化任务的时钟图标重复；会话用官方会话列表的「queue」图标，避免与官方「新会话」图标重复），页头锁标仍用同一 Desk 字形 |
 | 整体面板 | 对话区 `ui-conversation`（ConversationRoot / ConversationSession） | 76px 页头浮层；第一行品牌标题 + 小字说明 + 当前功能动作，第二行官方纯文字 tab；内容首屏用 `--dsh-desk-header-h` 下移，滚动时内容从页头下经过 |
 | 页头 tab | ConversationRoot 的 `.tabs` / `.viewTabs` / `.tab` | 两层 flex：外层 gap 20px（viewTabs ↔ More），内层 gap 32px（文字间）；tab 本体 35px 高、上抬 10px、padding 10/9、10px 命中内边距；当前项 2px 下划线压在页头 rule 上；More 22×22，menu 以三点为锚点左对齐浮出 |
-| 功能动作按钮 | 插件页 `ui-plugin-manager` 的 PluginManagerPage（`.addPrimary` / `.addMore` 覆盖值） | **32px 高 / 13px 文案 / 20px 行高 / 0 12px padding / 12px 圆角**；primary fill 或 0.5px 描边；保留图标 + 文字；不采用通用 Button sm 的 28px/8px |
+| 功能动作按钮 | 插件页 `ui-plugin-manager` 的 PluginManagerPage（`.addPrimary` / `.addMore` 覆盖值） | **32px 高 / 13px 文案 / 20px 行高 / 0 12px padding / 12px 圆角**；primary fill 或 0.5px 描边；保留图标 + 文字；图标走官方 Button 的 16px 图标位；不采用通用 Button sm 的 28px/8px |
+| Tooltip | 官方 `ui-primitives` 的 `Tooltip` | 所有**纯图标动作**统一用官方气泡（400ms 延迟、portal 到 body）；不再用原生 `title`（macOS 下依赖悬停后鼠标移动，常不出）。有可见文字标签的按钮不重复挂 tooltip |
 | 材质 | theme-tone 的官方对话区顶栏 | 默认 `bg-base` 实色、无模糊；theme-tone 激活且非 plain 时，header 自身透明，由 `::before` 套其 barGlass（54% 底色 + `blur(24px) saturate(170%) brightness(1.04)` + 同相位打光）；DeskOne 不另定玻璃配方 |
 | 滚动条 | `ui-theme` 的 scrollbar skin + 对话区滚动契约 | 不声明 `scrollbar-width`（会关闭 Chromium 的 ::-webkit-scrollbar 规则）；track margin 只错开顶部（header + 2px），底部保留 2px，thumb 和内容都能滚到底 |
 | 内容区 | 各功能自身语义 | 与页头间距统一 14px；便签墙固定宽度、纵向无限、横向不滚动、全宽动态；任务板三泳道；Sessions 为会话目录 + 归档管理（四区统一行布局）；页头靠 theme-tone 决定是否玻璃 |
@@ -263,7 +264,7 @@
 * 空墙提示：不加背板（显脏且缩小操作面积），沿用页面干净底；加载时中央显示加载提示，空墙中央有很淡的两层提示（主提示「双击空白处新建便签」+ 次提示「或点击顶栏「+便签」，也可以直接对我说」）。
 * 新建：页头 **便签** 或双击墙面空白处新建；双击热区覆盖整个滚动墙面（包括动态扩展出来的空白），不局限首屏 canvas；新贴纸落在双击点附近、默认置顶（`z` = 当前最大 + 1，随记录持久化）并立刻聚焦正文。
 * 页头、动作按钮、材质与滚动契约统一见 **第 0 节 UI 设计基准**，本节只列便签功能自身动作。便签视图动作为「便签（主）/ Smash / 垃圾桶」，垃圾桶视图为「返回便签墙 / 清空垃圾桶」。
-* 对象级图标按钮（贴纸垃圾桶、任务卡/分组/垃圾桶行）统一为同一套 24/20px 尺寸与 hover 规则。
+* 对象级图标按钮（贴纸垃圾桶、任务卡/分组/垃圾桶行）统一为 **24×24 命中区 / 16px 图标**；纯图标动作一律挂官方 Tooltip，hover 规则仍按对象级统一。
 * 容量：墙上最多 **100** 张（`MAX_ACTIVE_NOTES`），达到后新建入口提示「便签太多了，请先清理一下吧。」、不再创建；垃圾桶最多 **200** 张（`MAX_TRASH_NOTES`），满了先提示清空。host 侧同样校验，agent 工具也绕不过。
 * 垃圾桶分页：一次渲染 **10** 行（`TRASH_PAGE_SIZE`），顶部显示「共 N 个便签」，点「加载更多」继续；垃圾桶按钮**不挂角标**（角标只留给未读）。
 * **Smash!**：页头标题行里的危险色动作按钮，常驻显示（空墙点击无反应）；二次确认后把墙上全部便签丢进垃圾桶（先播 260ms 飞散动画，再乐观清墙并落库）；单张贴纸丢垃圾桶也播同一段动画。

@@ -365,8 +365,9 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 .dsh-desk-action svg {
   display: block;
   flex: none;
-  width: 13px;
-  height: 13px;
+  /* Match the official toolbar Button icon box (16px), not a hand-smaller glyph. */
+  width: 16px;
+  height: 16px;
 }
 /* Red exclamation on a toolbar action that has attention-worthy state (calendar sync issues). */
 .dsh-desk-action-badge {
@@ -498,12 +499,14 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c62828) 10%, transparent);
 }
 .dsh-desk-iconbtn-sm {
-  width: 20px;
-  height: 20px;
+  /* Same 24px hit target and 16px glyph as the standard icon button: the old 20/14 pair was
+     hard to hit on note cards and task cards. */
+  width: 24px;
+  height: 24px;
 }
 .dsh-desk-iconbtn-sm svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 .dsh-desk-error {

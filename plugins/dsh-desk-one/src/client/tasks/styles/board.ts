@@ -66,8 +66,8 @@ export const TASK_BOARD_CSS = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border-radius: var(--dsw-radius-xs, 4px);
   color: var(--dsw-alias-label-tertiary, #8a919f);
@@ -82,8 +82,8 @@ export const TASK_BOARD_CSS = `
 }
 .dsh-task-add svg {
   display: block;
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 .dsh-task-list {
   flex: 1;

@@ -32,7 +32,7 @@ export const TASK_GROUP_CSS = `
 }
 .dsh-task-group-head {
   display: grid;
-  grid-template-columns: 16px 18px minmax(0, 1fr) auto;
+  grid-template-columns: 16px 20px minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   column-gap: 4px;
   row-gap: 1px;

@@ -139,7 +139,7 @@ export const TASK_CARD_CSS = `
 .dsh-task-session-addrow {
   display: flex;
   align-items: center;
-  min-height: 16px;
+  min-height: 20px;
 }
 /* Neutral chip text: status lives in the border/ring, not the title color. */
 .dsh-task-session {
@@ -239,8 +239,8 @@ export const TASK_CARD_CSS = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   padding: 0;
   border: none;
   background: transparent;
@@ -254,23 +254,23 @@ export const TASK_CARD_CSS = `
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
 }
 .dsh-task-session-remove svg {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
 }
 .dsh-task-session-add {
   appearance: none;
   flex: none;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: none;
   background: transparent;
   border-radius: 4px;
   color: var(--dsw-alias-label-tertiary, #8a919f);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 16px;
+  line-height: 20px;
   cursor: pointer;
 }
 .dsh-task-session-add:hover {
