@@ -98,7 +98,7 @@ export const NOTES_CSS = `
   padding: 8px 12px 12px;
   border: 1px solid rgba(55, 53, 47, 0.08);
   border-radius: 2px;
-  background-color: #f5f3ee;
+  background-color: var(--dsh-desk-color-default-paper);
   color: #37352f;
   box-shadow: 0 1px 1px rgba(24, 28, 40, 0.05), 0 6px 16px -10px rgba(24, 28, 40, 0.28);
   cursor: grab;
@@ -119,14 +119,12 @@ export const NOTES_CSS = `
   cursor: grabbing;
   z-index: 100000;
 }
-/* Paper: one clean, high-lightness pastel palette for both themes. Low chroma plus mid lightness
-   was what read as muddy; these tints keep the hue clearly visible while the paper stays airy.
-   The dot on top keeps the deeper hue for the color tag. */
-.dsh-desk-note[data-color='default'] { background-color: #f5f3ee; }
-.dsh-desk-note[data-color='yellow'] { background-color: #ffeb9c; }
-.dsh-desk-note[data-color='green'] { background-color: #cdf0c2; }
-.dsh-desk-note[data-color='blue'] { background-color: #cbe4ff; }
-.dsh-desk-note[data-color='pink'] { background-color: #ffd6e8; }
+/* Paper uses the shared palette tokens on the panel root (same names as the task board accents). */
+.dsh-desk-note[data-color='default'] { background-color: var(--dsh-desk-color-default-paper); }
+.dsh-desk-note[data-color='yellow'] { background-color: var(--dsh-desk-color-yellow-paper); }
+.dsh-desk-note[data-color='green'] { background-color: var(--dsh-desk-color-green-paper); }
+.dsh-desk-note[data-color='blue'] { background-color: var(--dsh-desk-color-blue-paper); }
+.dsh-desk-note[data-color='pink'] { background-color: var(--dsh-desk-color-pink-paper); }
 .dsh-desk-note-bar {
   display: flex;
   align-items: center;
@@ -170,8 +168,8 @@ export const NOTES_CSS = `
 .dsh-desk-note:focus-within .dsh-desk-note-colors {
   opacity: 1;
 }
-/* Swatches: Notion's dark text colors (#C29343 / #548164 / #487CA5 / #B35488 / #787774), whose hue stays
-   clear at small sizes; same hue as the paper, one step darker, forming the "paper + tag" layering. */
+/* Swatches use the shared accent tokens: same hue as the paper, one step darker, so the five
+   color names mean the same thing on notes and on the task board. */
 .dsh-desk-dot {
   appearance: none;
   width: 12px;
@@ -185,11 +183,11 @@ export const NOTES_CSS = `
 .dsh-desk-dot:hover {
   transform: scale(1.12);
 }
-.dsh-desk-dot[data-color='default'] { background: #787774; }
-.dsh-desk-dot[data-color='yellow'] { background: #c29343; }
-.dsh-desk-dot[data-color='green'] { background: #548164; }
-.dsh-desk-dot[data-color='blue'] { background: #487ca5; }
-.dsh-desk-dot[data-color='pink'] { background: #b35488; }
+.dsh-desk-dot[data-color='default'] { background: var(--dsh-desk-color-default-accent); }
+.dsh-desk-dot[data-color='yellow'] { background: var(--dsh-desk-color-yellow-accent); }
+.dsh-desk-dot[data-color='green'] { background: var(--dsh-desk-color-green-accent); }
+.dsh-desk-dot[data-color='blue'] { background: var(--dsh-desk-color-blue-accent); }
+.dsh-desk-dot[data-color='pink'] { background: var(--dsh-desk-color-pink-accent); }
 .dsh-desk-dot[data-active='true'] {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 3px rgba(55, 53, 47, 0.55);
 }
@@ -304,13 +302,13 @@ export const NOTES_CSS = `
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #787774;
+  background: var(--dsh-desk-color-default-accent);
 }
-.dsh-desk-trash-dot[data-color='default'] { background: #787774; }
-.dsh-desk-trash-dot[data-color='yellow'] { background: #c29343; }
-.dsh-desk-trash-dot[data-color='green'] { background: #548164; }
-.dsh-desk-trash-dot[data-color='blue'] { background: #487ca5; }
-.dsh-desk-trash-dot[data-color='pink'] { background: #b35488; }
+.dsh-desk-trash-dot[data-color='default'] { background: var(--dsh-desk-color-default-accent); }
+.dsh-desk-trash-dot[data-color='yellow'] { background: var(--dsh-desk-color-yellow-accent); }
+.dsh-desk-trash-dot[data-color='green'] { background: var(--dsh-desk-color-green-accent); }
+.dsh-desk-trash-dot[data-color='blue'] { background: var(--dsh-desk-color-blue-accent); }
+.dsh-desk-trash-dot[data-color='pink'] { background: var(--dsh-desk-color-pink-accent); }
 .dsh-desk-trash-text {
   flex: 1;
   min-width: 0;

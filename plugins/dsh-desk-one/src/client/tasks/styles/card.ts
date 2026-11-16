@@ -11,7 +11,7 @@ export const TASK_CARD_CSS = `
   gap: 2px;
   padding: 8px 10px 4px;
   border: 1px solid var(--dsw-alias-border-l1, #e2e5ea);
-  border-left: 3px solid #787774;
+  border-left: 3px solid var(--dsh-desk-color-default-accent);
   border-radius: var(--dsw-radius-md, 12px);
   background: var(--dsw-alias-bg-layer-1, #ffffff);
   box-shadow: 0 1px 2px rgba(20, 25, 40, 0.05);
@@ -29,11 +29,11 @@ export const TASK_CARD_CSS = `
 .dsh-task-card[data-overdue='true'] {
   border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c62828) 55%, transparent);
 }
-.dsh-task-card[data-color='default'] { border-left-color: #787774; }
-.dsh-task-card[data-color='yellow'] { border-left-color: #c29343; }
-.dsh-task-card[data-color='green'] { border-left-color: #548164; }
-.dsh-task-card[data-color='blue'] { border-left-color: #487ca5; }
-.dsh-task-card[data-color='pink'] { border-left-color: #b35488; }
+.dsh-task-card[data-color='default'] { border-left-color: var(--dsh-desk-color-default-accent); }
+.dsh-task-card[data-color='yellow'] { border-left-color: var(--dsh-desk-color-yellow-accent); }
+.dsh-task-card[data-color='green'] { border-left-color: var(--dsh-desk-color-green-accent); }
+.dsh-task-card[data-color='blue'] { border-left-color: var(--dsh-desk-color-blue-accent); }
+.dsh-task-card[data-color='pink'] { border-left-color: var(--dsh-desk-color-pink-accent); }
 /* View mode: card text is plain, non-selectable text so the whole card stays a grab surface.
    Textareas/inputs only exist while editing and re-enable selection. */
 .dsh-task-card textarea,
@@ -112,11 +112,11 @@ export const TASK_CARD_CSS = `
   border-radius: 50%;
   cursor: pointer;
 }
-.dsh-task-color-swatch[data-color='default'] { background: #787774; }
-.dsh-task-color-swatch[data-color='yellow'] { background: #c29343; }
-.dsh-task-color-swatch[data-color='green'] { background: #548164; }
-.dsh-task-color-swatch[data-color='blue'] { background: #487ca5; }
-.dsh-task-color-swatch[data-color='pink'] { background: #b35488; }
+.dsh-task-color-swatch[data-color='default'] { background: var(--dsh-desk-color-default-accent); }
+.dsh-task-color-swatch[data-color='yellow'] { background: var(--dsh-desk-color-yellow-accent); }
+.dsh-task-color-swatch[data-color='green'] { background: var(--dsh-desk-color-green-accent); }
+.dsh-task-color-swatch[data-color='blue'] { background: var(--dsh-desk-color-blue-accent); }
+.dsh-task-color-swatch[data-color='pink'] { background: var(--dsh-desk-color-pink-accent); }
 .dsh-task-color-swatch[data-active='true'] {
   box-shadow: 0 0 0 2px var(--dsw-alias-bg-layer-1, #ffffff), 0 0 0 3.5px rgba(55, 53, 47, 0.55);
 }
@@ -414,11 +414,11 @@ export const TASK_CARD_CSS = `
 .dsh-task-color-layer[data-depth='0'] {
   z-index: 1;
 }
-.dsh-task-color-layer[data-color='default'] { background: #787774; }
-.dsh-task-color-layer[data-color='yellow'] { background: #c29343; }
-.dsh-task-color-layer[data-color='green'] { background: #548164; }
-.dsh-task-color-layer[data-color='blue'] { background: #487ca5; }
-.dsh-task-color-layer[data-color='pink'] { background: #b35488; }
+.dsh-task-color-layer[data-color='default'] { background: var(--dsh-desk-color-default-accent); }
+.dsh-task-color-layer[data-color='yellow'] { background: var(--dsh-desk-color-yellow-accent); }
+.dsh-task-color-layer[data-color='green'] { background: var(--dsh-desk-color-green-accent); }
+.dsh-task-color-layer[data-color='blue'] { background: var(--dsh-desk-color-blue-accent); }
+.dsh-task-color-layer[data-color='pink'] { background: var(--dsh-desk-color-pink-accent); }
 /* Due date: a calendar icon does the labelling; the bare date never stands alone. */
 .dsh-task-due {
   appearance: none;

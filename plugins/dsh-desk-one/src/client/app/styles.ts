@@ -7,6 +7,18 @@ export const APP_CSS = `
    declares 14px explicitly. */
 .dsh-desk-page {
   --dsh-desk-header-h: calc(76px + var(--dsh-frame-top-clearance, 0px));
+  /* One five-color palette shared by every surface in the panel: the paper token is the note
+     surface, the accent token is the same hue used for dots, swatches and task-card rails. */
+  --dsh-desk-color-default-paper: #f5f3ee;
+  --dsh-desk-color-default-accent: #7d7a74;
+  --dsh-desk-color-yellow-paper: #ffeb9c;
+  --dsh-desk-color-yellow-accent: #c9971f;
+  --dsh-desk-color-green-paper: #cdf0c2;
+  --dsh-desk-color-green-accent: #4e9b3e;
+  --dsh-desk-color-blue-paper: #cbe4ff;
+  --dsh-desk-color-blue-accent: #3f7fc4;
+  --dsh-desk-color-pink-paper: #ffd6e8;
+  --dsh-desk-color-pink-accent: #c9508a;
   /* The official light theme scrollbar token is #e5e5e5: nearly invisible on a white page.
      Rebinding the two thumb variables here covers every scroll region in the panel (WebKit uses
      the pseudo-element rules; the Firefox fallback re-resolves the same variables per element). */

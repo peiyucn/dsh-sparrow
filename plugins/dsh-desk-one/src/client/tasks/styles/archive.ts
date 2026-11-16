@@ -19,13 +19,13 @@ export const TASK_ARCHIVE_CSS = `
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #787774;
+  background: var(--dsh-desk-color-default-accent);
 }
-.dsh-task-archive-dot[data-color='default'] { background: #787774; }
-.dsh-task-archive-dot[data-color='yellow'] { background: #c29343; }
-.dsh-task-archive-dot[data-color='green'] { background: #548164; }
-.dsh-task-archive-dot[data-color='blue'] { background: #487ca5; }
-.dsh-task-archive-dot[data-color='pink'] { background: #b35488; }
+.dsh-task-archive-dot[data-color='default'] { background: var(--dsh-desk-color-default-accent); }
+.dsh-task-archive-dot[data-color='yellow'] { background: var(--dsh-desk-color-yellow-accent); }
+.dsh-task-archive-dot[data-color='green'] { background: var(--dsh-desk-color-green-accent); }
+.dsh-task-archive-dot[data-color='blue'] { background: var(--dsh-desk-color-blue-accent); }
+.dsh-task-archive-dot[data-color='pink'] { background: var(--dsh-desk-color-pink-accent); }
 .dsh-task-archive-title {
   flex: 1;
   min-width: 0;
