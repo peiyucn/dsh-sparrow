@@ -98,7 +98,7 @@ export const NOTES_CSS = `
   padding: 8px 12px 12px;
   border: 1px solid rgba(55, 53, 47, 0.08);
   border-radius: 2px;
-  background-color: #f4f1ea;
+  background-color: #eeeae2;
   color: #37352f;
   box-shadow: 0 1px 1px rgba(24, 28, 40, 0.05), 0 6px 16px -10px rgba(24, 28, 40, 0.28);
   cursor: grab;
@@ -119,13 +119,19 @@ export const NOTES_CSS = `
   cursor: grabbing;
   z-index: 100000;
 }
-/* Paper color is the same hue as the Notion dark color tag at medium depth (one step lighter than the tag,
-   one step darker than the old paper): the paper says "this is a note", the tag says "which color this is". */
-.dsh-desk-note[data-color='default'] { background-color: #e4e0d9; }
-.dsh-desk-note[data-color='yellow'] { background-color: #e9d3a3; }
-.dsh-desk-note[data-color='green'] { background-color: #bccebb; }
-.dsh-desk-note[data-color='blue'] { background-color: #b8cad8; }
-.dsh-desk-note[data-color='pink'] { background-color: #e0c0ce; }
+/* Light paper: clean pastels — enough chroma that the hue reads, light enough that the paper stays
+   paper instead of turning muddy grey. The dot on top keeps the deeper hue for the color tag. */
+.dsh-desk-note[data-color='default'] { background-color: #eeeae2; }
+.dsh-desk-note[data-color='yellow'] { background-color: #f9e2a5; }
+.dsh-desk-note[data-color='green'] { background-color: #cfe8c8; }
+.dsh-desk-note[data-color='blue'] { background-color: #cfe2f3; }
+.dsh-desk-note[data-color='pink'] { background-color: #f4d7e2; }
+/* Dark theme keeps the deeper paper: the clean pastels above would glow on the dark surface. */
+body[data-ds-dark-theme] .dsh-desk-note[data-color='default'] { background-color: #e4e0d9; }
+body[data-ds-dark-theme] .dsh-desk-note[data-color='yellow'] { background-color: #e9d3a3; }
+body[data-ds-dark-theme] .dsh-desk-note[data-color='green'] { background-color: #bccebb; }
+body[data-ds-dark-theme] .dsh-desk-note[data-color='blue'] { background-color: #b8cad8; }
+body[data-ds-dark-theme] .dsh-desk-note[data-color='pink'] { background-color: #e0c0ce; }
 .dsh-desk-note-bar {
   display: flex;
   align-items: center;
