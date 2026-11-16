@@ -1,14 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>dsh-sparrow · Desk One and small DSH plugins</title>
+<title>dsh-sparrow · Desk One and three DeepSeek Harness plugins</title>
+<meta name="description" content="Desk One and three small DeepSeek Harness plugins, published under @dsh-sparrow.">
 <!--
   双语落地页：默认英文，点右上角切换。两种语言都在同一份 HTML 里（显示/隐藏切换），
-  不写 cookie、不重定向、不依赖 JS 才能读内容（JS 只负责切换）。
-  ⚠️ 这里引用的索引地址必须与 README / AGENTS 保持一致，改域名时一起改。
-  首位卡片是 Desk One（旗舰），其余插件是随桌附送的小工具。
+  不写 cookie、不重定向、不依赖 JS 才能读内容（JS 只负责切换；<html data-lang="en"> 的初值
+  让禁用 JS 时也能读到英文）。
+  ⚠️ 索引地址、安装步骤必须与 README（根 README 与插件 README 共用正文）保持一致：安装只说
+  「插件 → 添加插件」输入包名，或「插件 → 发现 → 添加索引源」，不写 CLI 命令。
+  首位卡片是 Desk One（旗舰），其余三件小工具在下。
 -->
 <style>
   :root {
@@ -59,15 +62,17 @@
   .feature-cn { margin-left: .15rem; font-size: .95rem; font-weight: 400; color: var(--dim) }
   .feature-sub { margin: .12rem 0 0; font-size: .85rem; color: var(--dim) }
   .feature-body { margin: .85rem 0 0; font-size: .9rem }
-  .feature-cmd {
-    display: inline-block; margin-top: .7rem; padding: .45rem .6rem; border-radius: .4rem;
+  .feature-pkg { margin: .8rem 0 0; font-size: .85rem; color: var(--dim) }
+  .feature-pkg strong { color: var(--fg); font-weight: 600 }
+  .feature-links { margin: .55rem 0 0; font-size: .85rem }
+  .pkg {
+    display: inline-block; padding: .15rem .45rem; border-radius: .35rem;
     background: #0f0f14; border: 1px solid var(--line);
     font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .8rem; color: var(--accent);
   }
-  .feature-links { margin: .7rem 0 0; font-size: .85rem }
 
   h2 { margin: 2rem 0 .5rem; font-size: .8rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim) }
-  code { word-break: break-all }
+  code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; word-break: break-all }
   .url {
     display: block; padding: .85rem 1rem; border-radius: .5rem;
     background: var(--panel); border: 1px solid var(--line);
@@ -80,7 +85,15 @@
   a:hover { text-decoration: underline }
   footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--line); font-size: .8rem; color: var(--faint) }
 
-  /* 无 JS 时也保证能看到内容：默认英文已由 html[data-lang="en"] 决定 */
+  /* 三件小工具：名称 + 包名 + 一句话 */
+  .tools { margin: .3rem 0 0; padding: 0; list-style: none }
+  .tools li { margin: 0; padding: .65rem 0; border-top: 1px solid var(--line) }
+  .tools li:first-child { border-top: 0; padding-top: .1rem }
+  .tool-head { margin: 0; font-size: .9rem }
+  .tool-head code { margin-left: .35rem; color: var(--faint); font-size: .8rem }
+  .tool-desc { margin: .1rem 0 0; font-size: .85rem; color: var(--dim) }
+
+  /* 无 JS 时也保证能看到内容：默认英文已由 <html data-lang="en"> 决定 */
   @media (prefers-reduced-motion: no-preference) {
     body { animation: fade .25s ease-out }
     @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
@@ -92,8 +105,8 @@
   <div class="top">
     <div>
       <h1>dsh-sparrow</h1>
-      <p class="sub" data-lang-block="en">Plugin market index for Desk One and a few small DeepSeek Harness plugins</p>
-      <p class="sub" data-lang-block="zh">Desk One 与几件小工具的 DSH 插件市场索引</p>
+      <p class="sub" data-lang-block="en">DeepSeek Harness plugins: Desk One, plus three small tools.</p>
+      <p class="sub" data-lang-block="zh">DeepSeek Harness 插件合集：同桌（Desk One），以及三件小工具。</p>
     </div>
     <div class="switcher" role="group" aria-label="Language / 语言">
       <button type="button" data-lang-set="en" aria-pressed="true">EN</button>
@@ -120,24 +133,39 @@
           <p class="feature-sub">One desk for you and harness.</p>
         </div>
       </div>
-      <p class="feature-body">Sticky notes, a task board, a read-only calendar and annotations on workspace files in one sidebar panel — plus a header button that turns a plain sentence into a prefilled prompt for DSH.</p>
-      <code class="feature-cmd">dsh plugin --profile web add @dsh-sparrow/dsh-desk-one</code>
+      <p class="feature-body">Annotations, a sticky wall, a three-lane task board, a read-only calendar mirror and session management all live in one sidebar panel.</p>
+      <p class="feature-body">The same objects the panel writes are exposed to harness through a bundled skill and 19 agent tools, so you can ask in the conversation and work alongside harness.</p>
+      <p class="feature-pkg">Package <code class="pkg">@dsh-sparrow/dsh-desk-one</code></p>
       <p class="feature-links"><a href="https://github.com/peiyucn/dsh-sparrow/tree/main/plugins/dsh-desk-one">Docs</a> · <a href="https://www.npmjs.com/package/@dsh-sparrow/dsh-desk-one">npm</a></p>
     </section>
 
     <h2>Index URL</h2>
+    <p class="sub">Paste this into <strong>Plugins → Discover → Add index source</strong>.</p>
     <code class="url">https://dsh.pyai.site/market/index.json</code>
 
-    <h2>Use it in DSH</h2>
+    <h2>Install</h2>
     <ol>
-      <li>Enable the experimental feature: <strong>Plugins → Experimental plugins → More → Custom plugin markets</strong></li>
-      <li>Open <strong>Plugins → Discover → Add index source</strong></li>
-      <li>Paste the index URL above</li>
+      <li>Open <strong>Plugins → Add plugin</strong>, enter <code>@dsh-sparrow/dsh-desk-one</code>, then follow the install and enable flow.</li>
+      <li>Or use this market: turn on <strong>Custom plugin indexes</strong> under <strong>Plugins → Experimental plugins</strong>, open <strong>Plugins → Discover → Add index source</strong>, and paste the URL above. Desk One is the first card.</li>
     </ol>
-    <p class="sub">The market marks which versions work with the DSH you are running. Every plugin here supports only the exact DSH version line stated in its version number.</p>
+    <p class="sub">The market marks which versions fit the DSH you are running. Every plugin here supports only the exact DSH version line named in its version number.</p>
 
     <h2>More plugins</h2>
-    <p class="sub">Three small tools come with the desk and are installed separately: chat suggestions (dsh-chat-fim), CodeBuddy credits (dsh-codebuddy-credits) and tone skins (dsh-theme-tone).</p>
+    <p class="sub">Three small tools install separately, the same way.</p>
+    <ul class="tools">
+      <li>
+        <p class="tool-head"><a href="https://github.com/peiyucn/dsh-sparrow/tree/main/plugins/dsh-chat-fim">dsh-chat-fim</a><code>@dsh-sparrow/dsh-chat-fim</code></p>
+        <p class="tool-desc">Composer suggestions from DeepSeek FIM (Beta): pause for a card, Tab to adopt, Esc to dismiss.</p>
+      </li>
+      <li>
+        <p class="tool-head"><a href="https://github.com/peiyucn/dsh-sparrow/tree/main/plugins/dsh-codebuddy-credits">dsh-codebuddy-credits</a><code>@dsh-sparrow/dsh-codebuddy-credits</code></p>
+        <p class="tool-desc">Company CodeBuddy credits as a DSH LLM provider, with quota and per-turn credits on screen.</p>
+      </li>
+      <li>
+        <p class="tool-head"><a href="https://github.com/peiyucn/dsh-sparrow/tree/main/plugins/dsh-theme-tone">dsh-theme-tone</a><code>@dsh-sparrow/dsh-theme-tone</code></p>
+        <p class="tool-desc">Tone skins layered over DSH's light and dark themes, plus conversation-area layout tuning.</p>
+      </li>
+    </ul>
 
     <h2>Links</h2>
     <ul>
@@ -170,24 +198,39 @@
           <p class="feature-sub">和 harness 共用的一张办公桌。</p>
         </div>
       </div>
-      <p class="feature-body">便签、任务板、只读日程和 AI 写你批注的工作区文件，都在一个侧栏面板里——顶栏还有一个按钮，把一句人话变成给 DSH 的预填提示。</p>
-      <code class="feature-cmd">dsh plugin --profile web add @dsh-sparrow/dsh-desk-one</code>
+      <p class="feature-body">笔记批注、便签墙、三泳道任务板、只读日程镜像和会话管理，都收在一个侧栏面板里。</p>
+      <p class="feature-body">面板写入的同一套对象，也通过随包 skill 和 19 个 agent 工具交给 harness：你可以在对话里直接说，和 harness 一起办公。</p>
+      <p class="feature-pkg">包名 <code class="pkg">@dsh-sparrow/dsh-desk-one</code></p>
       <p class="feature-links"><a href="https://github.com/peiyucn/dsh-sparrow/tree/main/plugins/dsh-desk-one">文档</a> · <a href="https://www.npmjs.com/package/@dsh-sparrow/dsh-desk-one">npm</a></p>
     </section>
 
     <h2>索引地址</h2>
+    <p class="sub">在 <strong>插件 → 发现 → 添加索引源</strong> 里填这个地址。</p>
     <code class="url">https://dsh.pyai.site/market/index.json</code>
 
-    <h2>在 DSH 里使用</h2>
+    <h2>安装</h2>
     <ol>
-      <li>先打开实验性功能：<strong>插件 → 实验性插件 → 更多 → 自定义插件市场</strong></li>
-      <li>进入 <strong>插件 → 发现 → 添加索引源</strong></li>
-      <li>粘贴上面的索引地址</li>
+      <li>打开 <strong>插件 → 添加插件</strong>，输入 <code>@dsh-sparrow/dsh-desk-one</code>，按安装 / 启用流程操作。</li>
+      <li>或者用这个市场：在 <strong>插件 → 实验性插件</strong> 打开 <strong>自定义插件索引</strong>，再进 <strong>插件 → 发现 → 添加索引源</strong>，粘贴上面的地址。同桌是第一张卡片。</li>
     </ol>
-    <p class="sub">市场会按你当前运行的 DSH 版本标出可用版本。每个插件只支持其版本号所标示的那一条 DSH 版本线。</p>
+    <p class="sub">市场会按你正在运行的 DSH 版本标出可安装的版本；每个插件只支持其版本号所指的那一条 DSH 版本线。</p>
 
     <h2>更多插件</h2>
-    <p class="sub">随桌附送的三件小工具，单独安装：输入框续写（dsh-chat-fim）、CodeBuddy 额度（dsh-codebuddy-credits）、色调皮肤（dsh-theme-tone）。</p>
+    <p class="sub">另外三件小工具，各自独立安装，方式同上。</p>
+    <ul class="tools">
+      <li>
+        <p class="tool-head"><a href="https://github.com/peiyucn/dsh-sparrow/tree/main/plugins/dsh-chat-fim">dsh-chat-fim</a><code>@dsh-sparrow/dsh-chat-fim</code></p>
+        <p class="tool-desc">输入框续写联想：停顿后出建议卡，Tab 采纳、Esc 关闭。</p>
+      </li>
+      <li>
+        <p class="tool-head"><a href="https://github.com/peiyucn/dsh-sparrow/tree/main/plugins/dsh-codebuddy-credits">dsh-codebuddy-credits</a><code>@dsh-sparrow/dsh-codebuddy-credits</code></p>
+        <p class="tool-desc">把公司 CodeBuddy 额度接成 DSH 的 LLM provider，显示额度与每轮积分。</p>
+      </li>
+      <li>
+        <p class="tool-head"><a href="https://github.com/peiyucn/dsh-sparrow/tree/main/plugins/dsh-theme-tone">dsh-theme-tone</a><code>@dsh-sparrow/dsh-theme-tone</code></p>
+        <p class="tool-desc">在 DSH 明暗主题之上叠一层色调皮肤，顺带调整对话区布局。</p>
+      </li>
+    </ul>
 
     <h2>相关链接</h2>
     <ul>
@@ -196,8 +239,8 @@
     </ul>
 
     <footer>
-      索引内容由 <a href="https://github.com/peiyucn/dsh-sparrow" target="_blank" rel="noopener noreferrer">peiyucn/dsh-sparrow</a> 生成并发布。
-      市场内容是第三方声明，安装前请核对版本来源。
+      索引由 <a href="https://github.com/peiyucn/dsh-sparrow" target="_blank" rel="noopener noreferrer">peiyucn/dsh-sparrow</a> 生成并发布。
+      市场内容是第三方声明，安装前请核对来源。
     </footer>
   </div>
 </main>
