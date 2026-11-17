@@ -33,6 +33,15 @@ The docked cards, model-picker group headings and the @ / slash suggestion list 
 
 **Default** leaves the official theme and the glass effects completely untouched.
 
+## Settings
+
+| Key | Values | Default |
+| :--- | :--- | :--- |
+| lightTone | official, blue, sakura, green | official |
+| darkTone | official, violet, crimson, forest | violet |
+
+The same selection is also saved in `$DSH_HOME/settings.yaml` under `dsh-theme-tone`.
+
 ## Compatibility
 
 * Targets dsh 0.2.2-rc.3 — the exact official version line this release is built and verified against (other lines are not covered)

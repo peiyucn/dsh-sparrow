@@ -33,6 +33,15 @@
 
 选**默认**时完全不碰官方主题与玻璃效果。
 
+## 设置
+
+| 键 | 取值 | 默认 |
+| :--- | :--- | :--- |
+| lightTone | official、blue、sakura、green | official |
+| darkTone | official、violet、crimson、forest | violet |
+
+同一份选择也会写到 `$DSH_HOME/settings.yaml` 的 `dsh-theme-tone` 段。
+
 ## 版本兼容性
 
 * 适配 dsh 0.2.2-rc.3（本版构建与验证所对齐的确切官方版本线，其它版本线不在承诺范围内）

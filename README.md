@@ -68,7 +68,7 @@ That is the **with harness** part: **you say it, harness does it.** Adding a car
 ## Development
 
 * Plugin-level check: `npm run verify` inside this directory (typecheck, build, tests, pack check).
-* Repository-level check: `pnpm run verify` at the repository root.
+* Repository-level check: `npm run verify` at the repository root.
 
 ## More from dsh-sparrow
 

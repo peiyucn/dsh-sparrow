@@ -1,18 +1,26 @@
 {
   "name": "dsh-sparrow",
   "private": true,
+  "type": "module",
   "version": "0.2.2-rc.3",
   "description": "A collection of small DeepSeek Harness (DSH) web plugins",
   "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": ">=24.9.0"
+  },
   "scripts": {
-    "verify": "pnpm run check && pnpm run verify:all",
-    "check": "pnpm run check:paths && pnpm run check:dsh-pin && pnpm run check:plugin-docs && pnpm run check:market-index && pnpm run check:test-ts-check",
+    "verify": "npm run lint && npm run typecheck:policy && npm run test:policy && npm run verify:all",
+    "lint": "npm run lint:code && npm run lint:policy",
+    "lint:code": "eslint --config meta/lint/project-eslint.mjs \"plugins/*/{src,test,scripts}/**/*.{ts,tsx,mjs,js}\" \"scripts/**/*.mjs\" \"test/**/*.ts\"",
+    "lint:policy": "node scripts/check-policy.mjs && npm run check",
+    "check": "npm run check:paths && npm run check:dsh-pin && npm run check:plugin-docs && npm run check:market-index",
     "check:paths": "node scripts/check-no-local-paths.mjs",
     "check:dsh-pin": "node scripts/check-dsh-pin.mjs",
     "check:plugin-docs": "node scripts/check-plugin-docs.mjs",
     "check:market-index": "node scripts/check-market-index.mjs",
-    "check:test-ts-check": "node scripts/check-test-ts-check.mjs",
     "market:index": "node scripts/market-index.mjs",
+    "typecheck:policy": "tsc -p tsconfig.test.json",
+    "test:policy": "node --test --test-isolation=none \"test/*.test.ts\"",
     "verify:all": "node scripts/verify-all.mjs",
     "typecheck:all": "node scripts/verify-all.mjs --typecheck",
     "build:all": "node scripts/verify-all.mjs --build",
@@ -20,8 +28,12 @@
     "test:all": "node scripts/verify-all.mjs --test"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.2",
     "esbuild": "^0.25.12",
+    "eslint": "^10.15.0",
     "semver": "^7.8.5",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.73.0"
   }
 }
