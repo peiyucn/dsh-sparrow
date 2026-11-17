@@ -193,7 +193,7 @@ export const SESSION_INDEX_TTL_MS = 5 * 60_000
 export const SESSION_INDEX_MISSING_DAYS = 30
 
 /** Per-section row cap for each render; "load more" advances by this amount. */
-export const SESSION_STREAM_PAGE_SIZE = 30
+export const SESSION_STREAM_PAGE_SIZE = 10
 /** Last tab visited (pure UI preference, no user content); switching away and back returns to the same tab. */
 export const TAB_STORAGE_KEY = 'dsh-desk-one:tab'
 /** Task board sort view preference (manual / created / due), pure UI state. */

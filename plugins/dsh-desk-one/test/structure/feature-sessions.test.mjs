@@ -104,7 +104,7 @@ describe('会话归档契约', () => {
   })
 
   it('分区加载更多使用共享分页常量', () => {
-    assert.ok(Number.isInteger(SESSION_STREAM_PAGE_SIZE) && SESSION_STREAM_PAGE_SIZE > 0)
+    assert.equal(SESSION_STREAM_PAGE_SIZE, 10, '归档 / 游离 / 回收站默认每区加载 10 行')
   })
 
   it('会话索引节点按 kind 解析，可用性枚举受限', () => {
