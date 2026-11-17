@@ -14,6 +14,7 @@ import {
 } from './archive.js'
 import type { ArchiveTreeNode, ListResponse, StraySessionItem, StraysResponse } from '../../session-admin.js'
 import { readArchivedIds, workspaceIndexFor } from './archive-set.js'
+import { sortByRecentActivity, sortTreeByRecentActivity } from './activity-order.js'
 import { treeHeaderOf, treeIds, type HeaderFacts } from './headers.js'
 import { readStrayBlankness, sessionFacts } from './projection.js'
 import { sessionDirectoryFromFacts } from './session-files.js'
@@ -48,15 +49,17 @@ export async function archiveTreePayload(
     const liveSession = ctx.sessions.get(sessionId)
     const agent = ctx.agents.get(sessionId)
     const facts = header === undefined ? undefined : sessionFacts(ctx, node.header.id)
+    const createdAt = header?.createdAt ?? node.header.createdAt
+    const lastActiveAt = facts?.lastPromptAt
     return {
       sessionId: node.header.id,
       title: childLabels.get(node.header.id) ?? titles.get(node.header.id) ?? sessionId,
-      updatedAt: header?.createdAt ?? node.header.createdAt,
-      createdAt: header?.createdAt ?? node.header.createdAt,
+      updatedAt: lastActiveAt ?? createdAt,
+      createdAt,
       project: header?.cwd === undefined ? undefined : basename(header.cwd),
       turns: facts?.turns,
       tokens: facts?.decodeTokens,
-      lastActiveAt: facts?.lastPromptAt,
+      lastActiveAt,
       sizeBytes: sizes.get(node.header.id),
       live: liveSession !== undefined,
       running: agent?.status === 'running',
@@ -67,7 +70,7 @@ export async function archiveTreePayload(
       children: node.children.map(nodeOf),
     }
   }
-  return { tree: tree.map(nodeOf) }
+  return { tree: sortTreeByRecentActivity(tree.map(nodeOf)) }
 }
 
 /** GET /strays: sessions that are neither archived nor attached to any workspace (a child session follows its parent and does not appear separately). */
@@ -116,5 +119,5 @@ export async function strayItemsPayload(
       backendSupported,
     })
   }
-  return { items }
+  return { items: sortByRecentActivity(items) }
 }

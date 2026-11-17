@@ -208,7 +208,7 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
                       </>
                     )}
                     meta={[
-                      formatShortDate(item.createdAt),
+                      formatShortDate(item.lastActiveAt ?? item.createdAt),
                       item.turns === undefined ? '' : `${item.turns} ${t('sessions.archive.turns')}`,
                       item.tokens === undefined ? '' : formatTokens(item.tokens),
                       item.backendSupported ? '' : t('sessions.archive.unsupported'),
