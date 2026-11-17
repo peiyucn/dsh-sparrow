@@ -212,13 +212,13 @@ function activeDateLocale(): string {
  * Format one date in an explicit locale (the UI-locale wrappers below call it with the active one).
  * @param locale - BCP 47 locale id, e.g. `zh-CN` / `en`.
  * @param value - timestamp, ISO string or Date.
- * @param style - `date`: y/m/d; `short`: month + day; `datetime`: y/m/d + h:m; `time`: h:m.
+ * @param style - `date`: y/m/d; `short`: month + day; `datetime`: y/m/d + h:m; `short-datetime`: month + day + h:m; `time`: h:m.
  * @returns the localized text, or a stable fallback for invalid input.
  */
 export function formatDateIn(
   locale: string,
   value: number | string | Date,
-  style: 'date' | 'short' | 'datetime' | 'time' = 'date',
+  style: 'date' | 'short' | 'datetime' | 'short-datetime' | 'time' = 'date',
 ): string {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return typeof value === 'string' ? value.slice(0, 10) : ''
@@ -228,7 +228,9 @@ export function formatDateIn(
       ? { hour: '2-digit', minute: '2-digit' }
       : style === 'datetime'
         ? { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }
-        : { year: 'numeric', month: '2-digit', day: '2-digit' }
+        : style === 'short-datetime'
+          ? { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+          : { year: 'numeric', month: '2-digit', day: '2-digit' }
   return new Intl.DateTimeFormat(locale, options).format(date)
 }
 
@@ -240,6 +242,11 @@ export function formatDate(value: number | string | Date): string {
 /** Month + day only (session archive / stray / trash rows, UI locale). */
 export function formatShortDate(value: number | string | Date): string {
   return formatDateIn(activeDateLocale(), value, 'short')
+}
+
+/** Month + day + clock minute (compact session rows, UI locale). */
+export function formatShortDateTime(value: number | string | Date): string {
+  return formatDateIn(activeDateLocale(), value, 'short-datetime')
 }
 
 /** Date + time (annotation records, review baselines, UI locale). */

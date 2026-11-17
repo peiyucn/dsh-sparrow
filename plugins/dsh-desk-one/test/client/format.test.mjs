@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   formatCompactNumber, formatDate, formatDateIn, formatDateTime, formatDuration, formatKilobytes,
-  formatLocalDateTime, formatShortDate, formatTokenCount, formatTokens, relativeTimeOf,
+  formatLocalDateTime, formatShortDate, formatShortDateTime, formatTokenCount, formatTokens, relativeTimeOf,
 } from '../../lib/client/app/utils.js'
 
 describe('token 简写', () => {
@@ -88,6 +88,11 @@ describe('日期本地化', () => {
     assert.match(en, /11:54/u)
   })
 
+  it('会话行紧凑时间显示到分钟', () => {
+    assert.equal(formatDateIn('zh-CN', date, 'short-datetime'), '11月13日 23:54')
+    assert.equal(formatDateIn('en', date, 'short-datetime'), 'Nov 13, 11:54 PM')
+  })
+
   it('日期跟随界面语言（官方 <html lang>），而不是浏览器语言', () => {
     const scope = /** @type {any} */ (globalThis)
     const original = scope.document
@@ -96,6 +101,7 @@ describe('日期本地化', () => {
       assert.equal(formatDate(date), '2026/11/13')
       assert.equal(formatShortDate(date), '11月13日')
       assert.equal(formatDateTime(date).includes('23:54'), true)
+      assert.equal(formatShortDateTime(date), '11月13日 23:54')
     } finally {
       scope.document = original
     }

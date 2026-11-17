@@ -15,7 +15,7 @@ import { ArchiveSections } from './ArchiveSections.js'
 import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
-import { formatDate, formatTokens } from '../app/utils.js'
+import { formatDateTime, formatTokens } from '../app/utils.js'
 
 interface SessionsViewProps {
   readonly snapshot: SessionLinkSnapshot
@@ -36,7 +36,7 @@ function sessionMeta(t: DeskTranslator, session: SessionChipInfo): string {
   if (session.turns !== undefined) parts.push(`${session.turns} ${t('sessions.archive.turns')}`)
   const tokens = (session.inputTokens ?? 0) + (session.outputTokens ?? 0) + (session.cacheReadTokens ?? 0) + (session.cacheWriteTokens ?? 0)
   if (tokens > 0) parts.push(formatTokens(tokens))
-  parts.push(formatDate(session.updatedAt))
+  parts.push(formatDateTime(session.updatedAt))
   return parts.join(' · ')
 }
 

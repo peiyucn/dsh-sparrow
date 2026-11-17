@@ -7,7 +7,7 @@ import type { ReactElement } from 'react'
 import { fileSizeText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ArchiveTreeNode } from '../../session-admin.js'
 import type { DeskTranslator } from '../app/types.js'
-import { formatShortDate, formatTokens } from '../app/utils.js'
+import { formatShortDateTime, formatTokens } from '../app/utils.js'
 import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
@@ -50,7 +50,7 @@ export function ArchiveTreeNodeRow(props: {
       {node.turns === undefined ? '' : `${node.turns} ${t('sessions.archive.turns')}`}
       {node.tokens === undefined ? '' : ` · ${formatTokens(node.tokens)}`}
       {node.sizeBytes === undefined ? '' : ` · ${fileSizeText(node.sizeBytes)}`}
-      {` · ${formatShortDate(node.updatedAt)}`}
+      {` · ${formatShortDateTime(node.updatedAt)}`}
     </>
   )
   const actions = (
