@@ -1,0 +1,396 @@
+
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import type { LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
+import { effortName, factsFromEntries, parseModelConfig, toDiscovered } from '../lib/catalog.js'
+import { CodeBuddyAdapter, mapFinish, mapUsage, parseSseLine, toWireMessages } from '../lib/adapter.js'
+
+describe('factsFromEntries', () => {
+  it('空目录返回空模型集（无预置目录）', () => {
+    assert.deepEqual(factsFromEntries([]), [])
+  })
+  it('远端条目解析为模型事实（容量/输入模态/展示名）', () => {
+    const [model] = factsFromEntries([{ id: 'hy3', name: 'Hy3', contextWindow: 192000, maxTokens: 64000 }])
+    assert.equal(model.id, 'hy3')
+    assert.equal(model.name, 'Hy3')
+    assert.equal(model.contextWindow, 192000)
+    assert.equal(model.maxTokens, 64000)
+    assert.deepEqual(model.input, ['text'])
+    assert.equal(model.reasoning, false)
+  })
+  it('展示名保持原始名：系数与容量只作为事实字段随行，不进名字', () => {
+    const [model] = factsFromEntries([{ id: 'hy3', name: 'Hy3', credits: 'x0.00', contextWindow: 1_000_000 }])
+    assert.equal(model.name, 'Hy3')
+    assert.equal(model.credits, 'x0.00')
+    assert.equal(model.contextWindow, 1_000_000)
+  })
+  it('服务端描述透传（缺省时不携带该字段）', () => {
+    const [withDesc] = factsFromEntries([{ id: 'hy3', name: 'Hy3', description: '旗舰模型' }])
+    assert.equal(withDesc.description, '旗舰模型')
+    const [without] = factsFromEntries([{ id: 'hy3', name: 'Hy3' }])
+    assert.equal(without.description, undefined)
+  })
+  it('容量缺失的条目以兜底常量补齐', () => {
+    const [model] = factsFromEntries([{ id: 'brand-new-model', name: 'Brand New Model' }])
+    assert.equal(model.contextWindow, 262_144)
+    assert.equal(model.maxTokens, 32_768)
+  })
+  it('显式 reasoningEfforts 展开 thinkingLevelMap 且 off 恒支持', () => {
+    const [model] = factsFromEntries([{ id: 'x', name: 'X', reasoningEfforts: { off: null, high: 'high' } }])
+    assert.equal(model.reasoning, true)
+    assert.deepEqual(model.thinkingLevelMap, { off: null, high: 'high' })
+  })
+  it('档位表透传 declaredEfforts 结论，不强行塞 off（hy4 不可关思考/固定档位只有一档）', () => {
+    const [model] = factsFromEntries([{ id: 'hy4', name: 'Hy4', reasoningEfforts: { high: 'high' }, defaultEffort: 'high' }])
+    assert.deepEqual(model.thinkingLevelMap, { high: 'high' })
+    assert.equal(model.defaultEffort, 'high')
+  })
+  it('服务端默认档位透传（仅推理模型携带）', () => {
+    const [model] = factsFromEntries([{ id: 'x', name: 'X', reasoningEfforts: { high: 'high' }, defaultEffort: 'high' }])
+    assert.equal(model.defaultEffort, 'high')
+    const [plain] = factsFromEntries([{ id: 'y', name: 'Y' }])
+    assert.equal(plain.defaultEffort, undefined)
+  })
+  it('reasoningEfforts: false 禁用推理', () => {
+    const [model] = factsFromEntries([{ id: 'x', name: 'X', reasoningEfforts: false }])
+    assert.equal(model.reasoning, false)
+    assert.equal(model.thinkingLevelMap, undefined)
+  })
+  it('未声明 reasoningEfforts 时不声明推理能力（不发思考参数）', () => {
+    const [model] = factsFromEntries([{ id: 'x', name: 'X' }])
+    assert.equal(model.reasoning, false)
+    assert.equal(model.thinkingLevelMap, undefined)
+  })
+})
+
+describe('toDiscovered', () => {
+  it('发现结果的名字是服务端原始名（不带系数/free 后缀）', () => {
+    assert.deepEqual(
+      toDiscovered([{ id: 'glm-5.3', name: 'GLM-5.3', credits: 'x0.79', contextWindow: 1_000_000, maxTokens: 32_000 }]),
+      [{ id: 'glm-5.3', name: 'GLM-5.3', contextWindow: 1_000_000, maxTokens: 32_000 }],
+    )
+  })
+  it('名字与 id 相同时不携带 name 字段（官方四字段契约）', () => {
+    assert.deepEqual(toDiscovered([{ id: 'hy3', name: 'hy3', contextWindow: 192_000 }]), [{ id: 'hy3', contextWindow: 192_000 }])
+  })
+})
+
+describe('effortName', () => {
+  it('官方档位 id 映射为可读展示名', () => {
+    assert.equal(effortName('off'), 'Off')
+    assert.equal(effortName('minimal'), 'Minimal')
+    assert.equal(effortName('low'), 'Low')
+    assert.equal(effortName('medium'), 'Medium')
+    assert.equal(effortName('high'), 'High')
+    assert.equal(effortName('xhigh'), 'Extra high')
+    assert.equal(effortName('max'), 'Max')
+  })
+  it('未知档位 id 原样返回', () => {
+    assert.equal(effortName('turbo'), 'turbo')
+  })
+})
+
+
+function effortKeys(reasoning) {
+  const body = {
+    data: {
+      agents: [{ name: 'cli', models: ['m'] }],
+      models: [{ id: 'm', name: 'M', maxInputTokens: 1_000, maxOutputTokens: 100, supportsReasoning: true, reasoning }],
+    },
+  }
+  const [model] = parseModelConfig(body)
+  assert.ok(model.reasoningEfforts, '测试夹具应当解析出 reasoningEfforts')
+  return Object.keys(model.reasoningEfforts)
+}
+
+describe('declaredEfforts：档位按官方 rank 升序（B）', () => {
+
+
+  it('服务端乱序 supportedEfforts 归一化为 off < minimal < low < medium < high < xhigh < max', () => {
+    assert.deepEqual(
+      effortKeys({ canDisableThinking: true, supportedEfforts: ['max', 'low', 'xhigh', 'high', 'medium', 'minimal'] }),
+      ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+    )
+  })
+
+  it('canDisableThinking:false 时不出 off，其余仍按 rank 升序', () => {
+    assert.deepEqual(
+      effortKeys({ canDisableThinking: false, supportedEfforts: ['high', 'medium', 'low'] }),
+      ['low', 'medium', 'high'],
+    )
+  })
+
+  it('未知档位 id 排在全部已知档位之后，并保持服务端相对次序', () => {
+    assert.deepEqual(
+      effortKeys({ canDisableThinking: true, supportedEfforts: ['turbo', 'high', 'alpha', 'minimal'] }),
+      ['off', 'minimal', 'high', 'turbo', 'alpha'],
+    )
+  })
+
+  it('同一档位只出现一次（重复声明不放大）', () => {
+    assert.deepEqual(
+      effortKeys({ canDisableThinking: true, supportedEfforts: ['high', 'high', 'low'] }),
+      ['off', 'low', 'high'],
+    )
+  })
+
+  it('固定档位形态只有一档（不改 effortName 语义，也不补 off）', () => {
+    assert.deepEqual(effortKeys({ effort: 'high' }), ['high'])
+  })
+
+  it('适配器 resolveModel 的 efforts 按升序产出（标题等消费方依赖 efforts[0] 为最低档）', async () => {
+    const body = {
+      data: {
+        agents: [{ name: 'cli', models: ['m'] }],
+        models: [{
+          id: 'm',
+          name: 'M',
+          maxInputTokens: 1_000,
+          maxOutputTokens: 100,
+          supportsReasoning: true,
+          reasoning: { canDisableThinking: false, supportedEfforts: ['max', 'high', 'minimal'] },
+        }],
+      },
+    }
+    const facts = factsFromEntries(parseModelConfig(body))
+    const adapter = new CodeBuddyAdapter({
+      models: () => facts,
+      resolveApiKey: async () => 'test-key',
+      account: () => undefined,
+      streamIdleTimeoutMs: 1_000,
+    })
+    const info = await adapter.resolveModel('codebuddy-credits', 'm') as LlmResolvedModelInfo
+    assert.ok(info.reasoning, '有推理能力的模型必须带 reasoning 档位（否则选择器无档可选）')
+    assert.deepEqual(
+      info.reasoning.efforts.map(effort => effort.id),
+      ['minimal', 'high', 'max'],
+      'efforts 必须从低到高；efforts[0] 是最低档',
+    )
+  })
+})
+
+describe('parseModelConfig', () => {
+  it('解析实测形状：可选档位 + 固定档位两种 reasoning 形态 + 视觉判定', () => {
+    const body = {
+      code: 0,
+      data: {
+        agents: [{ name: 'cli', models: ['deepseek-v4-pro', 'glm-5.3-flash', 'hy4-preview'] }],
+        models: [
+          {
+            id: 'deepseek-v4-pro',
+            name: 'Deepseek-V4-Pro',
+            descriptionZh: 'DeepSeek 旗舰模型，支持 1M 上下文窗口',
+            maxInputTokens: 1000000,
+            maxOutputTokens: 50000,
+            credits: 'x0.51 credits',
+            supportsImages: true,
+            supportsReasoning: true,
+            reasoning: { effort: 'high', summary: 'auto' },
+          },
+          {
+            id: 'glm-5.3-flash',
+            name: 'GLM-5.3-Flash',
+            descriptionZh: '原生多模态，擅长处理复杂的长程自主任务。',
+            maxInputTokens: 1000000,
+            maxOutputTokens: 32000,
+            credits: 'x0.06 credits',
+            supportsImages: true,
+            supportsReasoning: true,
+            reasoning: { canDisableThinking: true, defaultEffort: 'high', summary: 'auto', supportedEfforts: ['low', 'high', 'max'] },
+          },
+          {
+            id: 'hy4-preview',
+            name: 'Hy4 preview',
+            disabledMultimodal: false,
+            maxInputTokens: 1000000,
+            maxOutputTokens: 64000,
+            credits: 'x0.00 credits',
+            supportsImages: true,
+            supportsReasoning: true,
+            reasoning: { canDisableThinking: false, defaultEffort: 'high', summary: 'auto', supportedEfforts: ['high'] },
+          },
+        ],
+      },
+    }
+    const models = parseModelConfig(body)
+    assert.equal(models.length, 3)
+
+    assert.deepEqual(models[0], {
+      id: 'deepseek-v4-pro',
+      name: 'Deepseek-V4-Pro',
+      description: 'DeepSeek 旗舰模型，支持 1M 上下文窗口',
+      credits: 'x0.51',
+      contextWindow: 1000000,
+      maxTokens: 50000,
+      input: ['text', 'image'],
+      reasoningEfforts: { high: 'high' },
+      defaultEffort: 'high',
+    })
+    assert.deepEqual(models[1], {
+      id: 'glm-5.3-flash',
+      name: 'GLM-5.3-Flash',
+      description: '原生多模态，擅长处理复杂的长程自主任务。',
+      credits: 'x0.06',
+      contextWindow: 1000000,
+      maxTokens: 32000,
+      input: ['text', 'image'],
+      reasoningEfforts: { off: null, low: 'low', high: 'high', max: 'max' },
+      defaultEffort: 'high',
+    })
+
+    assert.deepEqual(models[2], {
+      id: 'hy4-preview',
+      name: 'Hy4 preview',
+      credits: 'x0.00',
+      contextWindow: 1000000,
+      maxTokens: 64000,
+      input: ['text', 'image'],
+      reasoningEfforts: { high: 'high' },
+      defaultEffort: 'high',
+    })
+  })
+  it('agents 包裹在 data.agent 下时同样解析（descriptionEn 兜底）', () => {
+    const body = {
+      data: {
+        agent: { agents: [{ name: 'cli', models: ['hy3'] }] },
+        models: [{ id: 'hy3', descriptionEn: 'Model description fallback', maxInputTokens: 192000, maxOutputTokens: 64000 }],
+      },
+    }
+    const models = parseModelConfig(body)
+    assert.equal(models.length, 1)
+    assert.equal(models[0].id, 'hy3')
+    assert.equal(models[0].description, 'Model description fallback')
+  })
+  it('容量缺失的模型被丢弃，id 不在目录的模型被丢弃', () => {
+    const body = {
+      data: {
+        agents: [{ name: 'cli', models: ['no-capacity', 'ghost'] }],
+        models: [{ id: 'no-capacity' }],
+      },
+    }
+    assert.deepEqual(parseModelConfig(body), [])
+  })
+  it('非数组输入返回空', () => {
+    assert.deepEqual(parseModelConfig(undefined), [])
+    assert.deepEqual(parseModelConfig({ data: null }), [])
+  })
+})
+
+describe('mapUsage', () => {
+  it('实测 usage 帧 → DSH TokenUsage + credit', () => {
+    const { tokens, credit } = mapUsage({
+      prompt_tokens: 2826,
+      completion_tokens: 31,
+      total_tokens: 2857,
+      prompt_cache_hit_tokens: 0,
+      completion_tokens_details: { reasoning_tokens: 28 },
+      credit: 0.03,
+    })
+    assert.deepEqual(tokens, {
+      inputTokens: 2826,
+      outputTokens: 31,
+      totalTokens: 2857,
+      reasoningTokens: 28,
+    })
+    assert.equal(credit, 0.03)
+  })
+  it('缓存命中从输入中扣除', () => {
+    const { tokens } = mapUsage({
+      prompt_tokens: 1000,
+      completion_tokens: 100,
+      prompt_cache_hit_tokens: 400,
+    })
+    assert.equal(tokens.inputTokens, 600)
+    assert.equal(tokens.cacheReadTokens, 400)
+  })
+})
+
+describe('mapFinish', () => {
+  it('服务端结束原因映射', () => {
+    assert.deepEqual(mapFinish('stop'), { kind: 'stop' })
+    assert.deepEqual(mapFinish('length'), { kind: 'max-tokens' })
+    assert.deepEqual(mapFinish('tool_calls'), { kind: 'tool-calls' })
+    assert.equal(mapFinish('unknown-reason'), undefined)
+  })
+})
+
+describe('parseSseLine', () => {
+  it('有效 data 帧解析为对象', () => {
+    const frame = parseSseLine('data: {"id":"x","choices":[]}')
+    assert.deepEqual(frame, { id: 'x', choices: [] })
+  })
+  it('[DONE] 与空帧返回 undefined', () => {
+    assert.equal(parseSseLine('data: [DONE]'), undefined)
+    assert.equal(parseSseLine('data:'), undefined)
+  })
+  it('非 data 行与无效 JSON 返回 undefined', () => {
+    assert.equal(parseSseLine(''), undefined)
+    assert.equal(parseSseLine('event: message'), undefined)
+    assert.equal(parseSseLine('data: {broken'), undefined)
+    assert.equal(parseSseLine('data: 123'), undefined)
+  })
+  it('前缀空白容忍', () => {
+    const frame = parseSseLine('  data: {"a":1}')
+    assert.deepEqual(frame, { a: 1 })
+  })
+})
+
+describe('toWireMessages', () => {
+  it('system/user/assistant 基础转换', async () => {
+    const messages = await toWireMessages({
+      provider: 'codebuddy-credits',
+      model: 'hy3',
+      system: '你是助手',
+      messages: [
+        { id: 'm1', role: 'user', content: [{ type: 'text', text: '你好' }], source: { kind: 'user' } },
+        { id: 'm2', role: 'assistant', content: [{ type: 'text', text: '你好！' }], source: { kind: 'model', provider: 'codebuddy-credits', model: 'hy3' } },
+      ],
+    })
+    assert.equal(messages.length, 3)
+    assert.deepEqual(messages[0], { role: 'system', content: '你是助手' })
+    assert.deepEqual(messages[1], { role: 'user', content: '你好' })
+    assert.deepEqual(messages[2], { role: 'assistant', content: '你好！', tool_calls: undefined })
+  })
+  it('assistant 的 tool-call 块转 wire tool_calls，reasoning 块不进历史', async () => {
+    const messages = await toWireMessages({
+      provider: 'codebuddy-credits',
+      model: 'hy3',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          content: [
+            { type: 'reasoning', text: '思考过程' },
+            { type: 'tool-call', id: 'call-1', name: 'Bash', arguments: '{"cmd":"ls"}' },
+          ],
+          source: { kind: 'model', provider: 'codebuddy-credits', model: 'hy3' },
+        },
+      ],
+    })
+    assert.equal(messages.length, 2, '首条是无 system 时的最小占位')
+    assert.equal(messages[0]?.role, 'system')
+    assert.deepEqual(messages[1], {
+      role: 'assistant',
+      content: '',
+      tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'Bash', arguments: '{"cmd":"ls"}' } }],
+    })
+  })
+  it('tool 角色消息转 role=tool（0.1.7-rc.1：工具结果是独立消息，toolCallId 在根部）', async () => {
+    const messages = await toWireMessages({
+      provider: 'codebuddy-credits',
+      model: 'hy3',
+      messages: [
+        {
+          id: 'm1',
+          role: 'tool',
+          content: [{ type: 'text', text: 'ok' }],
+          source: { kind: 'tool', callId: 'call-1' },
+          toolCallId: 'call-1',
+        },
+      ],
+    })
+    assert.equal(messages.length, 2, '首条是无 system 时的最小占位')
+    assert.equal(messages[0]?.role, 'system')
+    assert.deepEqual(messages[1], { role: 'tool', tool_call_id: 'call-1', content: 'ok' })
+  })
+})

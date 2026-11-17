@@ -1,16 +1,11 @@
-#!/usr/bin/env node
-/**
- * 单插件本地验证：typecheck（tsc --noEmit）+ build（tsc 产出 lib/ + client bundle）
- * + test（node:test）+ package（npm pack --dry-run 校验 files 清单）。
- * 在各插件目录通过 `npm run verify` 调用，工作目录必须是插件根目录。
- * 参数：`--typecheck` / `--build` / `--test` / `--package` 只跑对应单项，默认全跑。
- */
+
+
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-const mode = process.argv[2] // undefined | '--typecheck' | '--build' | '--test' | '--package'
+const mode = process.argv[2]
 const all = mode === undefined
 const runTypecheck = all || mode === '--typecheck'
 const runBuild = all || mode === '--build'
@@ -19,10 +14,10 @@ const runPackage = all || mode === '--package'
 
 const cwd = process.cwd()
 const workspaceRoot = resolve(cwd, '..', '..')
-// 本机优先用 dsh checkout 的 tsc（与运行时源码一致）；CI / 无 checkout 时回退到
-// workspace 根安装的 typescript（root devDependencies 固定与本机同版本）。
-// ⚠️ 本仓库**公开**，一律不写本机绝对路径 —— checkout 位置按约定从主目录推导，
-// 需要非默认位置时用 DSH_SOURCE 覆盖（由 check-no-local-paths.mjs 守着）。
+
+
+
+
 const checkoutSource = process.env.DSH_SOURCE ?? join(homedir(), '.dsh-launcher-panel', 'source')
 const checkoutTsc = join(checkoutSource, 'node_modules', 'typescript', 'bin', 'tsc')
 const tsc = existsSync(checkoutTsc) ? checkoutTsc : resolve(workspaceRoot, 'node_modules', 'typescript', 'bin', 'tsc')
@@ -48,11 +43,11 @@ if (runTypecheck) {
 }
 
 if (runBuild) {
-  // ⚠️ 构建前必须清空 lib/：tsc 只增不删，源文件改名 / 删除后**旧产物会留在 lib/**
-  // 而被 package.json 的 files 清单（lib/**/*.js、lib/types/**/*.d.ts）收进 npm 包。
-  // 实测事故：变异测试留下的 lib/_mutbak.js（92kB）+ lib/types/_mutbak.d.ts（38kB）
-  // 在源文件早已还原之后仍然存活，`npm pack` 把它们一起打了进去。
-  // 清空是安全的：lib/ 整个是构建产物（.gitignore 已忽略），release 一律现构建。
+
+
+
+
+
   const libDir = join(cwd, 'lib')
   if (existsSync(libDir)) rmSync(libDir, { recursive: true, force: true })
 
@@ -70,7 +65,7 @@ if (runBuild) {
     const bundle = spawnSync(process.execPath, [bundleScript], { cwd, stdio: 'inherit', shell: false })
     if (bundle.status !== 0) process.exit(bundle.status ?? 1)
 
-    // 客户端 bundle 的 __ModuleLoader__ 注册 id 必须等于 npm 包名（scoped name）。
+
     const clientPath = join(cwd, 'lib', 'client.js')
     if (!existsSync(clientPath)) {
       console.error(`verify: 缺少 client bundle 产物 ${clientPath}`)
@@ -88,9 +83,9 @@ if (runBuild) {
 }
 
 if (runTest) {
-  // 测试侧类型检查：必须在 build 之后（测试 import 的是 lib/ 产物）。
-  // 配置在 tsconfig.test.json（checkJs: false + 每个文件 `// @ts-check` 逐文件开启：
-  // 开全局 checkJs 会把 lib/*.js 构建产物一并检查，噪声 100+ 条）。
+
+
+
   const testTsconfig = join(cwd, 'tsconfig.test.json')
   if (existsSync(testTsconfig)) {
     console.log(`verify: typecheck test ${cwd}`)
@@ -103,11 +98,11 @@ if (runTest) {
   }
 
   console.log('verify: node:test')
-  // 注意：--test 的第一个位置参数起，后续 token 都会被当作测试模式，
-  // reporter 参数必须放在 glob 前面（放后面会被静默吞掉，junit.xml 不产出）。
+
+
   const testArgs = process.env.CI
-    ? ['--test', '--test-reporter=junit', '--test-reporter-destination=junit.xml', 'test/**/*.test.mjs']
-    : ['--test', 'test/**/*.test.mjs']
+    ? ['--test', '--test-reporter=junit', '--test-reporter-destination=junit.xml', 'test/**/*.test.ts']
+    : ['--test', 'test/**/*.test.ts']
   const test = spawnSync(process.execPath, testArgs, {
     cwd,
     stdio: 'inherit',
