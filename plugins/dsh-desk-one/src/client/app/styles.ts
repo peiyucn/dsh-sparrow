@@ -6,7 +6,11 @@ export const APP_CSS = `
    offsets its first line below it. The central column supplies no base font size, so the root
    declares 14px explicitly. */
 .dsh-desk-page {
-  --dsh-desk-header-h: calc(76px + var(--dsh-frame-top-clearance, 0px));
+  --dsh-desk-header-h: calc(76px + var(--dsh-desk-frame-top, 0px));
+  /* Desktop window chrome: the Windows frame already reserves its caption row, while macOS
+     overlays the window strip over the page. Official plugin pages add the frame clearance only
+     on darwin; doing it unconditionally leaves a blank caption-height band on Windows desktop. */
+  --dsh-desk-frame-top: 0px;
   /* One five-color palette shared by every surface in the panel: the paper token is the note
      surface, the accent token is the same hue used for dots, swatches and task-card rails. */
   --dsh-desk-color-default-paper: #f5f3ee;
@@ -34,8 +38,13 @@ export const APP_CSS = `
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 14px;
 }
-/* Fixed 76px conversation-style header. Plain by default; theme-tone supplies the glass only
-   when it is active (see the conditional ::before material below). */
+/* macOS desktop draws the window chrome over the page; only there does the header need to make
+   room for the 48px strip. Windows already has the caption row outside the main panel. */
+html[data-platform='darwin'] .dsh-desk-page {
+  --dsh-desk-frame-top: var(--dsh-frame-top-clearance, 0px);
+}
+/* Fixed 76px conversation-style header (plus the macOS window strip). Plain by default;
+   theme-tone supplies the glass only when it is active (see the conditional ::before material below). */
 .dsh-desk-header {
   box-sizing: border-box;
   position: absolute;
@@ -44,7 +53,7 @@ export const APP_CSS = `
   right: 0;
   z-index: 5;
   height: var(--dsh-desk-header-h);
-  padding: calc(8px + var(--dsh-frame-top-clearance, 0px)) 28px 0;
+  padding: calc(8px + var(--dsh-desk-frame-top, 0px)) 28px 0;
   /* Plain official topbar: solid theme surface, no blur. The glass comes only when the
      theme-tone plugin is active (see the conditional rule below). */
   background-color: var(--dsw-alias-bg-base, #ffffff);

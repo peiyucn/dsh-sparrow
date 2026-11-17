@@ -10,7 +10,7 @@
 | 区域 | 官方参考 | 落地约束 |
 |---|---|---|
 | 品牌 lockup | 官方 `BrandWordmark` 的反色徽章 | 中文 **同桌**、英文 **Desk One**（与官方 HARNESS wordmark 一样，英文徽章视觉全大写 DESK ONE；中文标题不受影响）；页头品牌位是**一枚分段按钮**：左半为反色徽章（墨色底 + inverted 字 + 14px **「✦」字形**，不拆成两个方块），右半为墨色 0.5px 线框、无填充的「和我说」（主题反色；整枚按钮打开按 tab 的预填菜单，见 08）；副标题后接官方插件页同款 20px infoButton + Tooltip（无点击行为、宽度上限 300px，内含「两种用法 + 示例」；info 小标保持在副标题之后（2026-11-14 决定，跟官方插件页惯例））；tab 与（固定后的）左栏入口共用同一套图标（日程用自绘小日历，避免与官方自动化任务的时钟图标重复；会话用官方会话列表的「queue」图标，避免与官方「新会话」图标重复），页头锁标仍用同一 Desk 字形 |
-| 整体面板 | 对话区 `ui-conversation`（ConversationRoot / ConversationSession） | 76px 页头浮层；第一行品牌标题 + 小字说明 + 当前功能动作，第二行官方纯文字 tab；内容首屏用 `--dsh-desk-header-h` 下移，滚动时内容从页头下经过 |
+| 整体面板 | 对话区 `ui-conversation`（ConversationRoot / ConversationSession） | 76px 页头浮层（macOS 桌面另加窗口顶带）；第一行品牌标题 + 小字说明 + 当前功能动作，第二行官方纯文字 tab；内容首屏用 `--dsh-desk-header-h` 下移，滚动时内容从页头下经过 |
 | 页头 tab | ConversationRoot 的 `.tabs` / `.viewTabs` / `.tab` | 两层 flex：外层 gap 20px（viewTabs ↔ More），内层 gap 32px（文字间）；tab 本体 35px 高、上抬 10px、padding 10/9、10px 命中内边距；当前项 2px 下划线压在页头 rule 上；More 22×22，menu 以三点为锚点左对齐浮出 |
 | 功能动作按钮 | 插件页 `ui-plugin-manager` 的 PluginManagerPage（`.addPrimary` / `.addMore` 覆盖值） | **32px 高 / 13px 文案 / 20px 行高 / 0 12px padding / 12px 圆角**；primary fill 或 0.5px 描边；保留图标 + 文字；图标走官方 Button 的 16px 图标位；不采用通用 Button sm 的 28px/8px |
 | Tooltip | 官方 `ui-primitives` 的 `Tooltip` | 所有**纯图标动作**统一用官方气泡（400ms 延迟、portal 到 body）；不再用原生 `title`（macOS 下依赖悬停后鼠标移动，常不出）。有可见文字标签的按钮不重复挂 tooltip |
@@ -21,6 +21,8 @@
 | 内容区 | 各功能自身语义 | 与页头间距统一 14px；便签墙固定宽度、纵向无限、横向不滚动、全宽动态；任务板三泳道；Sessions 为会话目录 + 归档管理（四区统一行布局）；页头靠 theme-tone 决定是否玻璃 |
 
 **页头尺寸推导**：76px = 8px 顶 inset + 32px 标题行（容纳插件页 32px 按钮，故比对话区的 10px inset 少 2px） + 10px 间距 + 25px tab 行。
+
+**桌面差异**：Windows 的标题栏行由 frame 在页头之外预留，页头不再重复加 `--dsh-frame-top-clearance`；只有 macOS 的 48px 窗口顶带计入 `--dsh-desk-frame-top`。不要两边都加，否则 Windows desktop 会出现一块 caption 高度的空白。
 
 **不照抄的部分**：只复用控件形状、尺寸、材质与交互，不照抄官方页面的信息层级或位置；DeskOne 的一级导航是页头 tab，不把功能动作塞进 tab 行。
 
