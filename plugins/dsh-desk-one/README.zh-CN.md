@@ -64,4 +64,4 @@
 ## 开发
 
 * 单插件检查：在本目录跑 `npm run verify`（类型检查、构建、测试、打包检查）。
-* 仓库级检查：在仓库根跑 `pnpm run verify`。
+* 仓库级检查：在仓库根跑 `npm run verify`。
