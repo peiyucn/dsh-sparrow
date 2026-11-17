@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - '*-v[0-9]*.[0-9]*.[0-9]*'
-      # 预发布后缀（-alpha.N 等）：稳定版模式全串匹配不到带连字符的 tag
+
       - '*-v[0-9]*.[0-9]*.[0-9]*-*'
   workflow_dispatch:
     inputs:
@@ -21,13 +21,13 @@ on:
         required: false
         type: string
 
-# id-token: write 用于 npm Trusted Publishing（OIDC）；
-# contents: read 只够 checkout 读仓库 —— 本仓库**不建 GitHub Release**（见文件末尾说明，发布记录 =
-#   npm dist-tag + annotated tag），故原「建 Release 用」的 contents: write 已无消费者，按最小权限收回。
-# 告警门禁（E18）不申请 GITHUB_TOKEN 权限：官方权限模型下 GITHUB_TOKEN 的 security-events 只覆盖
-# code scanning，Dependabot 告警要 vulnerability-alerts 权限，而 **secret scanning 告警无法用
-# GITHUB_TOKEN 读取**（官方 workflow permissions 文档：必须用 GitHub App 或 personal access token）。
-# 故门禁统一用环境 secret `SECURITY_ALERTS_TOKEN`（只读 PAT，配置见门禁步骤注释）。
+
+
+
+
+
+
+
 permissions:
   contents: read
   id-token: write
@@ -35,26 +35,26 @@ permissions:
 jobs:
   publish:
     name: publish
-    # workflow_dispatch 有两种用途：tag 兜底发布（只给 plugin）与 promote（给 plugin/version/tag）。
-    # 后者绝不能同时跑 publish，否则会把 package.json 当前版本误发出去——按输入严格区分。
+
+
     if: >-
       github.event_name == 'push'
       || (github.event_name == 'workflow_dispatch' && inputs.plugin != '' && inputs.version == '' && inputs.tag == '')
     runs-on: ubuntu-latest
-    # npm 发布环境：Deployments 页留下发布记录，NPM_TOKEN 作用域收窄到环境级（pi 仓库同款做法）
+
     environment: npm-publish
-    # secrets 上下文不能出现在 step 的 if 里（GitHub 会拒绝解析整个工作流，
-    # 表现为 0s 失败且无 job），必须先经 job 级 env 中转。
+
+
     env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
-      # fetch-depth: 0 —— 下面「tag 提交必须在 main 上」的祖先校验需要完整历史。
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      # E19 / E16：tag 必须先合到 main 再打。工作流在发布前兜底校验，
-      # 防止在未合并分支的提交上打 tag 直接发布（workflow_dispatch 兜底发布同样要求）。
+
+
       - name: Verify commit is on main
         shell: bash
         run: |
@@ -64,16 +64,16 @@ jobs:
             exit 1
           fi
 
-      # 发布硬门禁（根规范 E18）：任一未处理告警（Dependabot / CodeQL / secret scanning）即中止；
-      # 查询本身失败也中止（fail-closed，不因权限/网络问题静默放行）。计数写进日志供 Deployments 追查。
-      #
-      # 为什么用 SECURITY_ALERTS_TOKEN 而不是 github.token：GITHUB_TOKEN 的 security-events 只覆盖
-      # code scanning；Dependabot 告警要 vulnerability-alerts 权限；secret scanning 告警在官方权限
-      # 模型下**读不到**（必须 GitHub App / PAT）。故统一用一个只读 fine-grained PAT，三项都查。
-      # 配置（owner 一次性）：npmjs/GitHub 侧建 fine-grained PAT，限本仓库、仅
-      #   Dependabot alerts / Code scanning alerts / Secret scanning alerts 三项 read，
-      # 存为 `npm-publish` 环境的 secret SECURITY_ALERTS_TOKEN（E20：不进仓库级）。
-      # 缺失 / 过期 / 权限不足时 gh 非零退出 → 本步失败 → 不发布（fail-closed）。
+
+
+
+
+
+
+
+
+
+
       - name: Security alert gate (fail-closed)
         env:
           GH_TOKEN: ${{ secrets.SECURITY_ALERTS_TOKEN }}
@@ -85,10 +85,10 @@ jobs:
             exit 1
           fi
           count_open() {
-            # Do not add `?state=open&per_page=100` to this URL: on this repository / gh
-            # combination the parameterized list answers 404 while the plain list answers 200.
-            # Fetch the paginated plain list and filter the open state locally; a query failure
-            # still aborts because of `set -e`.
+
+
+
+
             gh api --paginate "repos/${repo}/$1" --jq '.[] | select(.state == "open") | .number' | wc -l | tr -d '[:space:]'
           }
           dependabot="$(count_open dependabot/alerts)"
@@ -112,10 +112,10 @@ jobs:
             PLUGIN="${{ inputs.plugin }}"
             VERSION="$(node -p "require('./plugins/${PLUGIN}/package.json').version")"
           fi
-          # 通道跟随官方宿主：本插件钉住的官方 dsh 版本在 npm 的哪个 dist-tag 上，
-          # 就发到哪个通道（官方 latest = 稳定线；rc 也可能只存在于 next）。
-          # 两个 tag 都不是该版本（或查询失败）时回退到版本后缀规则：
-          # alpha/beta → next，rc 与纯数字稳定版 → latest。
+
+
+
+
           PIN="$(node -e "
             const peers = require('./plugins/' + process.argv[1] + '/package.json').peerDependencies ?? {};
             const pin = Object.entries(peers)
@@ -152,14 +152,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # 根守卫链（`pnpm run check` = check:paths + check:dsh-pin + check:plugin-docs
-      #   + check:market-index + check:test-ts-check）：
-      # tag 发布会绕过 CI（ci.yml 只在 push dev/main 与 PR 上跑），所以这里必须自己跑一遍，
-      # 否则"文档没跟版 / 文档漂移 / 本机路径泄漏"会**直接随发布出门**。
-      # fail-closed：守卫红 → 这一步失败 → 后面的 publish 步骤不执行。
-      # ⚠️ 新增守卫只需加进根 `check`，这里自动覆盖；别在此逐个列脚本。
-      - name: Guard chain (root pnpm run check)
-        run: pnpm run check
+
+
+
+
+
+
+      - name: Lint and policy checks
+        run: pnpm run lint
 
       - name: Check tag version matches package.json
         if: github.event_name == 'push'
@@ -176,8 +176,8 @@ jobs:
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
         run: npm run verify
 
-      # 双模式鉴权：有 NPM_TOKEN 用 Automation token（首发必需——npm 的
-      # trusted publisher 配置需要包已存在）；没有则走 OIDC 信任发布。
+
+
       - name: Publish to npm (token)
         if: env.NPM_TOKEN != ''
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
@@ -190,18 +190,18 @@ jobs:
         working-directory: plugins/${{ steps.resolve.outputs.plugin }}
         run: npm publish --access public --provenance --tag ${{ steps.resolve.outputs.npm-tag }}
         env:
-          # setup-node 的 registry-url 会写入 `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`，
-          # 并导出一个占位 token（actions/setup-node 的已知行为）；本步运行的前提是没有 NPM_TOKEN，
-          # 占位值会让 npm 拿它去做认证而不是走可信发布。这里显式清空，让 npm 11 的 OIDC 交换生效
-          #（npm 在 publish 前先调 oidc()，交换成功后才用真 token 覆盖配置；失败则按无凭据报错）。
+
+
+
+
           NODE_AUTH_TOKEN: ''
 
-      # 不建 GitHub Release：多包单仓库下 Release/Latest 语义混乱；发布记录 =
-      # npm dist-tag（latest/next）+ annotated tag（tag 页自带说明）；
-      # CHANGELOG 看仓库文件与各插件 README 的 Changelog 链接。
 
-  # 版本运维：alpha 发 next → owner 验证后把同一版本号抬到 latest（不重发包，
-  # 只移 dist-tag）。deprecate 不提供（owner 本机手动执行）。
+
+
+
+
+
   promote:
     name: promote
     if: github.event_name == 'workflow_dispatch'
@@ -212,9 +212,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # promote 只移动 dist-tag（让版本成为 latest / next 默认安装版本），同样对外可见：
-      # 与 publish job 同口径先跑 E18 告警门禁（同一个只读 SECURITY_ALERTS_TOKEN，原因见 publish job 注释），
-      # secret 缺失 / 过期 / 权限不足时 gh 非零退出 → 本步失败 → 不动 dist-tag（fail-closed）。
+
+
+
       - name: Security alert gate (fail-closed)
         env:
           GH_TOKEN: ${{ secrets.SECURITY_ALERTS_TOKEN }}
@@ -226,10 +226,10 @@ jobs:
             exit 1
           fi
           count_open() {
-            # Do not add `?state=open&per_page=100` to this URL: on this repository / gh
-            # combination the parameterized list answers 404 while the plain list answers 200.
-            # Fetch the paginated plain list and filter the open state locally; a query failure
-            # still aborts because of `set -e`.
+
+
+
+
             gh api --paginate "repos/${repo}/$1" --jq '.[] | select(.state == "open") | .number' | wc -l | tr -d '[:space:]'
           }
           dependabot="$(count_open dependabot/alerts)"
@@ -246,19 +246,19 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      # npm 11.21+ 才支持用 Trusted Publishing 的 OIDC 凭据管理 dist-tag（2026-09 起的
-      # opt-in 权限：各包的 trusted publisher 须勾选 Allow npm dist-tag）。runner 自带的
-      # npm 低于该版本，显式升级；没有该权限时 npm 会回退到 token（若 NPM_TOKEN 已配置）。
+
+
+
       - name: Upgrade npm for OIDC dist-tags
         run: npm install -g "npm@^11.21.0"
 
       - name: Move dist-tag
-        # workflow_dispatch 有三种输入形态，必须分开对待（否则要么静默成功、要么误报红）：
-        #   ① 只给 plugin       → tag 兜底发布（真正干活的是 publish job），promote 不适用 → 跳过
-        #   ② 给 version 或 tag → 这是 promote 请求 → plugin/version/tag **三个必须齐**，缺一即失败
-        #   ③ 什么都不给        → 这次派发毫无意义，绝不能显示绿色
-        # ⚠️ 原实现把 ①②③ 一律 `echo skip` + `exit 0`：run 是绿的、stderr 一行 skip，
-        #    owner 会把绿色误读成「promote 已完成」，而 dist-tag 根本没动（实测：exit 0）。
+
+
+
+
+
+
         run: |
           PLUGIN="${{ inputs.plugin }}"
           VERSION="${{ inputs.version }}"
@@ -273,9 +273,9 @@ jobs:
             exit 0
           fi
 
-          # 用显式 if，不用 `[[ -z "$X" ]] && MISSING="..."`：后者是 AND 列表，
-          # 在 `bash -e`（Actions 的 `run:` 默认）下靠一条"非最后一条命令不触发 errexit"
-          # 的豁免才不出错 —— 能用但脆，直接写 if 没有任何歧义。
+
+
+
           MISSING=""
           if [[ -z "${PLUGIN}"  ]]; then MISSING="${MISSING} plugin";  fi
           if [[ -z "${VERSION}" ]]; then MISSING="${MISSING} version"; fi
@@ -285,8 +285,8 @@ jobs:
             exit 1
           fi
 
-          # promote 只搬 latest / next 两个通道（E24 发布通道；npm dist-tag 其它值会凭空
-          # 创建一个新通道，Deployments 页也会多一条无意义记录），其它值一律拒绝。
+
+
           if [[ "${TAG}" != "latest" && "${TAG}" != "next" ]]; then
             echo "::error::promote 只允许把版本移到 latest 或 next，收到：${TAG}。本次运行**未移动任何 dist-tag**。" >&2
             exit 1
@@ -294,6 +294,6 @@ jobs:
 
           npm dist-tag add "@dsh-sparrow/${PLUGIN}@${VERSION}" "${TAG}"
         env:
-          # 配了 NPM_TOKEN 就走 token；没配时这里为空，显式覆盖 setup-node 的占位 token，
-          # 让 npm 用 Trusted Publishing 的 OIDC 凭据（需 Allow npm dist-tag 权限）。
+
+
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

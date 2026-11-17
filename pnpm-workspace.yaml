@@ -1,19 +1,19 @@
 packages:
   - "plugins/*"
 
-# esbuild 安装脚本需要落平台二进制；pnpm 11 默认拦截构建脚本，这里显式放行。
+
 allowBuilds:
-  # 经 @deepseek-ai/dsh-llm-pi-ai 传入的传递依赖，不跑安装脚本
+
   '@google/genai': false
   esbuild: true
   protobufjs: false
 
-# 注：pnpm 11 默认 minimumReleaseAge = 1440 分钟（1 天）——新发布的依赖版本要过 24h 才能解析。
-# 0.2.2-rc.3 官方包闭包（2026-11-13 发布）已过 24h，故原 minimumReleaseAgeExclude 放行名单按
-# 其注释约定整段删除；下次跟版若遇到 <24h 的新版本被拒装，再在这里逐条临时放行，过 24h 后删掉。
 
-# 官方包以精确版本声明同族依赖（0.2.2-rc.N），override 用于把整棵已安装闭包钉在同一版本，
-# 避免插件与宿主各拉一份 rc 版本。清单 = 声明闭包 ∪ lockfile 实际落地，逐条按 checkout 重算。
+
+
+
+
+
 overrides:
   "@deepseek-ai/cordis": "4.1.0"
   "@deepseek-ai/cordis-plugin-group": "1.1.0"
@@ -105,13 +105,13 @@ overrides:
   "@deepseek-ai/dsh-working-directory": "0.2.2-rc.3"
   "@deepseek-ai/dsh-workspace": "0.2.2-rc.3"
   "@deepseek-ai/schemastery": "3.19.0"
-  # 非官方传递依赖：GHSA-vc2v-76pw-4v95（compression < 1.8.2 提前断连时内存泄漏 ⇒ DoS）。
-  # 它是官方 dsh-host-webserver 的传递依赖，只落进本仓库的 dev 闭包 ——
-  # 本仓库插件只声明 peerDependencies，产物不带它。
+
+
+
   compression: "1.8.2"
-  # 2026-10-27 Dependabot 5 条（4× fast-uri、1× zod）：
-  # - fast-uri < 3.1.9：经 ajv ← 官方 dsh 包传入，只落 dev 闭包（产物不带）。
-  # - zod < 4.6.6（high，超大集合校验耗尽内存）：官方 dsh 包与本仓库
-  #   dsh-codebuddy-credits 的**运行时**依赖（host 侧 crdits 投影校验），故该插件需单独发补丁版。
+
+
+
+
   fast-uri: "3.1.9"
   zod: "4.6.6"

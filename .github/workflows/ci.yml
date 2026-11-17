@@ -22,8 +22,12 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Repo guards (root pnpm run check)
-        run: pnpm run check
+      - name: Lint and policy checks
+        run: pnpm run lint
+      - name: Policy tests
+        run: pnpm run test:policy
+      - name: Typecheck policy tests
+        run: pnpm run typecheck:policy
       - name: Typecheck all plugins
         run: pnpm run typecheck:all
 
